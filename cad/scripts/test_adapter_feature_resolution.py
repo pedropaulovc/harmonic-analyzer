@@ -13,18 +13,21 @@ checked-in wrapper. Every build leaf runs these calls, so this pins them:
 * when a call adds an auxiliary feature next to the one it creates, the
   expected ``GetTypeName2`` picks the created feature, and a missing or
   ambiguous match raises -- unless the call declares it creates several
-  (evenly distributed reference points), when the newest is returned.
+  (evenly distributed reference points), when the newest is returned;
+* a raw body edge is only ever queried through ``raw_dispatch.invoke`` -- a
+  by-name call on it raises inside ``_attempt`` and silently drops the edge --
+  so a linear pattern's direction edge and a measure's edge are found.
 
 The raw-call tests use ``RawDispatch``, which answers ``InvokeTypes`` only and
 asserts the whole header. Every header is read as DATA from the checked-in
 wrapper source (``_generated/sldworks_2026.py``: each generated method's
 ``InvokeTypes`` call and each ``_prop_map_get_`` entry), so the contract runs on
-any host, pywin32 or not. Two checks need pywin32 itself -- that
-``raw_dispatch`` records exactly those headers from the imported wrapper, and
-the end-to-end edge selection, which binds ``IEntity`` through it -- so they
-run on Windows only, where a missing wrapper FAILS instead of skipping. The diff
-tests use plain Python doubles, which ``raw_dispatch.invoke`` answers through
-``getattr``.
+any host, pywin32 or not. The checks that bind ``IEntity`` need pywin32 itself
+-- that ``raw_dispatch`` records exactly those headers from the imported
+wrapper, and the end-to-end edge selections, which bind the winner through it
+-- so they run on Windows only, where a missing wrapper FAILS instead of
+skipping. The diff tests use plain Python doubles, which
+``raw_dispatch.invoke`` answers through ``getattr``.
 
 Run: ``uv run python -m pytest cad/scripts/test_adapter_feature_resolution.py -q``
 """
@@ -41,8 +44,12 @@ from types import SimpleNamespace
 import pytest
 
 from solidworks_mcp.adapters import raw_dispatch, sw_type_info
-from solidworks_mcp.adapters.base import CreateReferencePointParameters
-from solidworks_mcp.adapters.solidworks import features, reference_geometry
+from solidworks_mcp.adapters.base import (
+    CreateReferencePointParameters,
+    MeasureEntityRef,
+    MeasureParameters,
+)
+from solidworks_mcp.adapters.solidworks import features, measure, reference_geometry
 
 # (dispid, lcid, flags, return type, argument types) from the SolidWorks 2026
 # type library. flags 1 = method call, 2 = property get; 9 = IDispatch,
@@ -55,6 +62,9 @@ GET_TYPE_NAME2 = (103, 0, 1, (8, 0), ())
 BODY_GET_EDGES = (125, 0, 1, (12, 0), ())
 EDGE_GET_CLOSEST_POINT_ON = (18, 0, 1, (12, 0), ((5, 1), (5, 1), (5, 1)))
 ENTITY_SELECT2 = (65552, 0, 1, (11, 0), ((11, 1), (3, 1)))
+EDGE_GET_CURVE = (1, 0, 1, (9, 0), ())
+EDGE_GET_CURVE_PARAMS2 = (24, 0, 1, (12, 0), ())
+CURVE_IS_LINE = (5, 0, 1, (11, 0), ())
 
 PINNED = {
     ("IModelDoc2", "FirstFeature"): FIRST_FEATURE,
@@ -64,6 +74,9 @@ PINNED = {
     ("IFeature", "GetTypeName2"): GET_TYPE_NAME2,
     ("IBody2", "GetEdges"): BODY_GET_EDGES,
     ("IEdge", "GetClosestPointOn"): EDGE_GET_CLOSEST_POINT_ON,
+    ("IEdge", "GetCurve"): EDGE_GET_CURVE,
+    ("IEdge", "GetCurveParams2"): EDGE_GET_CURVE_PARAMS2,
+    ("ICurve", "IsLine"): CURVE_IS_LINE,
     ("IEntity", "Select2"): ENTITY_SELECT2,
 }
 
@@ -284,6 +297,117 @@ def test_edge_selection_selects_the_nearest_edge_through_ientity():
     probe = (EDGE_GET_CLOSEST_POINT_ON, (0.01, 0.0, 0.0))
     assert far.calls == [probe] and missed.calls == [probe]
     assert near.calls == [probe, (ENTITY_SELECT2, (True, 0))]
+
+
+def _body_edge(closest, *, line=True, start=(0.0, 0.0, 0.0), end=(0.0, 0.0, 0.0)):
+    """A raw body edge: answers GetCurve (a raw curve answering IsLine),
+    GetCurveParams2 (start, end, then the two parameters), GetClosestPointOn
+    and, once bound to IEntity, Select2."""
+    curve = RawDispatch({CURVE_IS_LINE[0]: (CURVE_IS_LINE, line)})
+    return RawDispatch(
+        {
+            EDGE_GET_CURVE[0]: (EDGE_GET_CURVE, curve),
+            EDGE_GET_CURVE_PARAMS2[0]: (
+                EDGE_GET_CURVE_PARAMS2,
+                (*start, *end, 0.0, 1.0),
+            ),
+            EDGE_GET_CLOSEST_POINT_ON[0]: (
+                EDGE_GET_CLOSEST_POINT_ON,
+                lambda x, y, z: closest,
+            ),
+            ENTITY_SELECT2[0]: (ENTITY_SELECT2, True),
+        }
+    )
+
+
+def _model_of(*edges, doc_type=1, **members):
+    """A part (swDocumentTypes_e 1) unless ``doc_type`` says otherwise."""
+    body = RawDispatch({BODY_GET_EDGES[0]: (BODY_GET_EDGES, edges)})
+    return SimpleNamespace(
+        GetType=lambda: doc_type,
+        GetBodies2=lambda _type, _visible: (body,),
+        ClearSelection2=lambda _a: True,
+        **members,
+    )
+
+
+@windows_only
+@pytest.mark.usefixtures("generated_wrapper")
+def test_linear_pattern_direction_is_the_nearest_straight_raw_edge_along_it():
+    """Farm build of stack #1120: every raw edge was queried by name, raised
+    inside ``_attempt``, and was skipped, so every linear pattern failed "No
+    straight body edge runs along direction_vector"."""
+    at_x = (0.01, 0.0, 0.0)
+    # An arc on the point whose chord runs along X: only IsLine rules it out.
+    arc = _body_edge(at_x, line=False, start=(0.0, 0.0, 0.0), end=(0.02, 0.0, 0.0))
+    across = _body_edge(at_x, start=at_x, end=(0.01, 0.02, 0.0))
+    far = _body_edge(
+        (0.01, 0.0, 0.004), start=(0.0, 0.0, 0.004), end=(0.03, 0.0, 0.004)
+    )
+    near = _body_edge(
+        (0.01, 0.0, 0.001), start=(0.03, 0.0, 0.001), end=(0.0, 0.0, 0.001)
+    )
+    model = _model_of(arc, across, far, near)
+
+    flip = features._select_direction_edge(
+        Adapter(model), [10.0, 0.0, 0.0], [2.0, 0.0, 0.0], 1
+    )
+
+    assert flip is True  # the nearest edge runs -X, against the vector
+    assert near.calls[-1] == (ENTITY_SELECT2, (True, 1))
+    others = (arc, across, far)
+    assert all(call[0] != ENTITY_SELECT2 for edge in others for call in edge.calls)
+
+
+@windows_only
+@pytest.mark.usefixtures("generated_wrapper")
+def test_measure_finds_an_edge_the_point_pick_misses_by_geometry():
+    """Farm build of stack #1120: magnifying_wheel's rim-OD pick missed on one
+    seat and hit on another with the same leaf inputs -- SelectByID2 picks at
+    the point's screen projection, so the seat's view decides."""
+    rim = _body_edge((0.05, 0.0, 0.004))
+    hub = _body_edge((0.01, 0.0, 0.005))
+    model = _model_of(
+        hub, rim, Extension=SimpleNamespace(SelectByID2=lambda *_args: False)
+    )
+
+    def select(point):
+        measure._select_measure_entities(
+            Adapter(model),
+            MeasureParameters(
+                entities=[MeasureEntityRef(entity_type="EDGE", point=point)]
+            ),
+        )
+
+    select([50.0, 0.0, 4.0])
+    assert rim.calls[-1] == (ENTITY_SELECT2, (False, 0))
+    assert all(call[0] != ENTITY_SELECT2 for call in hub.calls)
+
+    with pytest.raises(Exception, match=r"Failed to select EDGE at \[50.0, 0.0, 5.0\]"):
+        select([50.0, 0.0, 5.0])  # 1 mm off every edge: nothing is picked
+
+
+@windows_only
+@pytest.mark.usefixtures("generated_wrapper")
+def test_an_assembly_pick_that_misses_says_so_and_selects_nothing(caplog):
+    """The geometric fallback reads a part's bodies only; an assembly's live in
+    its components, each in its own space. A missed pick in an assembly must
+    fail loudly, not pick some body entity out of place."""
+    rim = _body_edge((0.05, 0.0, 0.004))
+    model = _model_of(
+        rim, doc_type=2, Extension=SimpleNamespace(SelectByID2=lambda *_args: False)
+    )
+
+    with pytest.raises(Exception, match=r"Failed to select EDGE at \[50.0, 0.0, 4.0\]"):
+        measure._select_measure_entities(
+            Adapter(model),
+            MeasureParameters(
+                entities=[MeasureEntityRef(entity_type="EDGE", point=[50.0, 0.0, 4.0])]
+            ),
+        )
+
+    assert rim.calls == []
+    assert "swDocumentTypes_e 2) is not a part" in caplog.text
 
 
 @pytest.mark.usefixtures("raw_headers")
@@ -596,3 +720,31 @@ def test_a_single_point_call_that_adds_two_points_is_ambiguous():
                 percentage=50.0,
             ),
         )
+
+
+@windows_only
+@pytest.mark.usefixtures("generated_wrapper")
+def test_an_arc_centre_point_selects_its_edge_by_geometry_when_the_pick_misses():
+    """Farm build at 4eb6c5e: lever_wire's HookPoint pick on the far end of a
+    352.8 mm wire missed on one seat ("Failed to select edge at point"), where
+    every other seat on record hit it with the same inputs."""
+    hook = _body_edge((0.0004, 0.352813, 0.0))
+    hub = _body_edge((0.0004, 0.0, 0.0))
+    body = RawDispatch({BODY_GET_EDGES[0]: (BODY_GET_EDGES, (hub, hook))})
+    tree = _point_model(created=None)
+    tree.Extension = SimpleNamespace(SelectByID2=lambda *_a, **_k: False)
+    tree.GetType = lambda: 1  # swDocPART
+    tree.GetBodies2 = lambda _type, _visible: (body,)
+
+    def arc_center(point):
+        return reference_geometry._create_reference_point_impl(
+            Adapter(tree),
+            CreateReferencePointParameters(mode="arc_center", edge_point=point),
+        )
+
+    assert arc_center([0.4, 352.813, 0.0]).name == "Point1"
+    assert hook.calls[-1] == (ENTITY_SELECT2, (True, 0))
+    assert all(call[0] != ENTITY_SELECT2 for call in hub.calls)
+
+    with pytest.raises(Exception, match=r"Failed to select edge at point"):
+        arc_center([0.4, 351.0, 0.0])  # on no edge: nothing is picked
