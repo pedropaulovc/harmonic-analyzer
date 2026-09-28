@@ -30,7 +30,6 @@ from pathlib import Path
 import pytest
 
 import _common
-import build_cone_gear
 
 CONE_FAULTS = (("ToothGapCut", 1, False), ("ToothGapPattern", 1, False))
 
@@ -429,14 +428,3 @@ def test_the_simplified_part_save_proves_its_saved_caches_on_reopen() -> None:
     import _drawing_simplified
 
     _assert_reopened_then_tripwire(inspect.getsource(_drawing_simplified.save_simplified_part))
-
-
-def test_the_cone_gear_save_tail_no_longer_force_rebuilds_all() -> None:
-    # cg-fx2a: ForceRebuildAll, then Save3, left every T00x cache faulted; the
-    # tail now asserts nothing is stale instead.
-    source = inspect.getsource(build_cone_gear.build)
-    assert "ForceRebuildAll" not in source
-    marks = source.index("AddRebuildSaveMark(2")
-    stale = source.index("stale_configurations(", marks)
-    save = source.index('label="rebuild and persist all marked configurations"')
-    assert marks < stale < save

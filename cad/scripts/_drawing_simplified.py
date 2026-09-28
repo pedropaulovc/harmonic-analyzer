@@ -22,6 +22,16 @@ swSpecifyConfiguration, [child])`` suppresses in the child only; an activated
 description and configuration-specific custom properties, so a BOM grouping a
 derived configuration cannot fork a row.
 
+The children are derived on the SAVED part reopened from disk, never on the
+document that authored it (:func:`derive_simplified_on_saved_part`). The proof
+above ran on files opened from disk; on cone-gear's authoring document, fresh
+from its drawing-dimension, tolerance and property edits, the same calls raised
+a modal dialog on all three farm attempts (c85a21ec4, exit 88 inside
+``simplified.configs``). The reopened part is then finalized on disk the way
+multi-configuration parts must be for an assembly to load their non-active
+configurations: every configuration activated and force-rebuilt, its
+rebuild-save mark set and read back, one silent ``Save3`` in place.
+
 Each derived configuration's comment names what it suppresses (a part: the
 feature names; an assembly: a fingerprint of every component's referenced
 configuration and that configuration's own comment). A child whose simplified
@@ -45,6 +55,7 @@ from _common import (
     assert_saved_configurations_regenerate,
     check,
     save_part_and_images,
+    stale_configurations,
     whats_wrong,
 )
 
@@ -58,6 +69,7 @@ _CONFIGURATION_NAME = 2  # swBOMPartNumberSource_e.swBOMPartNumber_Configuration
 _PARENT_NAME = 4  # swBOMPartNumberSource_e.swBOMPartNumber_ParentName
 _USER_SPECIFIED = 8  # swBOMPartNumberSource_e.swBOMPartNumber_UserSpecified
 _REPLACE_VALUE = 2  # swCustomPropertyAddOption_e.swCustomPropertyReplaceValue
+_SAVE_SILENT = 1  # swSaveAsOptions_e.swSaveAsOptions_Silent
 
 # (BOMPartNoSource, AlternateName, UseAlternateNameInBOM, Description,
 #  UseDescriptionInBOM) of one configuration.
@@ -242,10 +254,11 @@ def add_simplified_configurations(
     """Derive ``<P> Simplified`` from every configuration ``P`` of the open part,
     suppressing ``features`` in the children only; return the children's names.
 
-    Call after the part's configurations, BOM identity and configuration
-    properties are final and before its save (``save_part_and_images`` then
-    proves no configuration stale). Each child is activated and force-rebuilt
-    and must read What's Wrong clean; the active configuration is restored.
+    Call on the saved part reopened from disk, after its configurations, BOM
+    identity and configuration properties are final
+    (:func:`derive_simplified_on_saved_part`). Each child is activated and
+    force-rebuilt and must read What's Wrong clean; the active configuration is
+    restored. Nothing here saves.
     """
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     manager = _early_bound(model.ConfigurationManager, "IConfigurationManager")
@@ -357,24 +370,105 @@ def assert_simplified_configurations(
     _telemetry.annotate(parents=len(parents), features=len(targets))
 
 
+def _close_part(adapter: Any) -> None:
+    adapter.swApp.CloseDoc(str(_early_bound(adapter.currentModel, "IModelDoc2").GetTitle()))
+    adapter.currentModel = None
+
+
+def _save3_in_place(model: Any, *, label: str) -> None:
+    """Silent in-place ``Save3``; its ``(ok, errors, warnings)`` tuple is consumed."""
+    result = model.Save3(_SAVE_SILENT, 0, 0)
+    if isinstance(result, (list, tuple)):
+        ok, errors, warnings = bool(result[0]), int(result[1] or 0), int(result[2] or 0)
+    else:
+        ok, errors, warnings = bool(result), 0, 0
+    _telemetry.info(f"{label}: Save3 ok={ok}, errors={errors}, warnings={warnings}")
+    if not ok or errors:
+        raise RuntimeError(f"{label}: Save3 failed: ok={ok}, errors={errors}, warnings={warnings}")
+
+
+@_telemetry.traced("simplified.persist", label_param="part_name")
+def persist_configurations_in_place(adapter: Any, part_name: str) -> None:
+    """Finalize a reopened part on disk: activate and ``ForceRebuild3`` every
+    configuration (the active one last, so the part stays on it), each reading
+    What's Wrong clean, set and read back its rebuild-save mark, prove none
+    stale, and save once in place.
+
+    A mark set on a never-saved document, or re-applied without the rebuilds,
+    did not make an assembly load the part's non-active configurations (the
+    cone-gear persistence probes, 2026-09-03); this sequence did. ``Save3``
+    rebuilds none of them itself, so none may be stale when it runs.
+    """
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    active = active_configuration_name(adapter, model)
+    names = [str(name) for name in (model.GetConfigurationNames() or ())]
+    if active not in names:
+        raise RuntimeError(f"{part_name}: active configuration {active!r} not in {names}")
+    failures: list[str] = []
+    for name in [name for name in names if name != active] + [active]:
+        if active_configuration_name(adapter, model) != name and not bool(
+            model.ShowConfiguration2(name)
+        ):
+            failures.append(f"{name}: ShowConfiguration2 refused")
+            continue
+        if not bool(model.ForceRebuild3(False)):
+            failures.append(f"{name}: ForceRebuild3 returned False")
+            continue
+        faults = _hard_faults(adapter, model)
+        if faults:
+            failures.append(f"{name}: rebuilt with faults {faults}")
+            continue
+        configuration = _configuration(model, name)
+        configuration.AddRebuildSaveMark = True
+        if not bool(configuration.AddRebuildSaveMark):
+            failures.append(f"{name}: rebuild-save mark did not set")
+    if failures:
+        raise RuntimeError(
+            f"{part_name}: configurations did not finalize for the save: " + "; ".join(failures)
+        )
+    stale = stale_configurations(model, names)
+    if stale:
+        raise RuntimeError(f"{part_name}: configurations {stale} are stale at the final save")
+    _save3_in_place(model, label=f"{part_name}: persist {len(names)} marked configuration(s)")
+    _telemetry.annotate(config_count=len(names), active=active)
+
+
+async def derive_simplified_on_saved_part(
+    adapter: Any, part_name: str, features: Sequence[str], part_path: str
+) -> None:
+    """Close the just-saved part, reopen it from ``part_path``, derive its
+    simplified configurations, finalize every configuration in place and close.
+
+    The caller then reopens the file and proves the saved caches
+    (``assert_saved_configurations_regenerate``) before anything force-rebuilds
+    it, then reads the children back (:func:`assert_simplified_configurations`).
+    """
+    _close_part(adapter)
+    check(
+        f"reopen saved {part_name} to derive simplified configurations",
+        await adapter.open_model(part_path),
+    )
+    add_simplified_configurations(adapter, part_name, features)
+    persist_configurations_in_place(adapter, part_name)
+    _close_part(adapter)
+
+
 async def save_simplified_part(
     adapter: Any,
     part_name: str,
     features: Sequence[str],
     views: Iterable[str] = DEFAULT_VIEWS,
 ) -> dict[str, str]:
-    """Add the simplified configurations, save, and prove the saved caches.
+    """Save, derive the simplified configurations on the saved file, and prove
+    the saved caches.
 
     An assembly's ``Default Simplified`` activates each child from its SAVED
     cache, never rebuilt by the part's own session (cg-fx1: faulted inactive
     caches), so the part is reopened and every configuration is regenerated
     the way a placing assembly loads it, then the readback runs on the file.
     """
-    add_simplified_configurations(adapter, part_name, features)
     artefacts = await save_part_and_images(adapter, part_name, views)
-    part_title = str(_early_bound(adapter.currentModel, "IModelDoc2").GetTitle())
-    adapter.swApp.CloseDoc(part_title)
-    adapter.currentModel = None
+    await derive_simplified_on_saved_part(adapter, part_name, features, artefacts["part"])
     check(f"reopen saved {part_name}", await adapter.open_model(artefacts["part"]))
     assert_saved_configurations_regenerate(adapter, part_name)
     assert_simplified_configurations(adapter, part_name, features)

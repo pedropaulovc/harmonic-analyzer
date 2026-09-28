@@ -96,7 +96,7 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
 )
-from _drawing_simplified import add_simplified_configurations, assert_simplified_configurations
+from _drawing_simplified import assert_simplified_configurations, derive_simplified_on_saved_part
 from _fit_limits import deviations
 from _grouped_bom_properties import apply_grouped_bom_properties
 from _part_pmi import author_part_pmi
@@ -149,7 +149,6 @@ from _common import (
     run_build,
     save_part_and_images,
     set_sketch_direct_db,
-    stale_configurations,
     volume_check,
 )
 from _visibility import assert_reference_geometry_hidden, blank_reference_geometry
@@ -690,31 +689,6 @@ async def _configuration_topology(
             adapter, configuration, phase=phase
         )
     return volume, observation, tuple(issues)
-
-
-def _save3_with_contract(adapter: Any, options: int, *, label: str) -> None:
-    """Save in place and consume Save3's BOOL/errors/warnings tuple exactly."""
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
-    started = time.perf_counter()
-    result = model.Save3(options, 0, 0)
-    if isinstance(result, (list, tuple)):
-        ok = bool(result[0])
-        errors = int(result[1] or 0)
-        warnings = int(result[2] or 0)
-    else:
-        ok = bool(result)
-        errors = 0
-        warnings = 0
-    elapsed = time.perf_counter() - started
-    _telemetry.info(
-        f"{label}: Save3(options={options}) ok={ok}, errors={errors}, "
-        f"warnings={warnings}, elapsed={elapsed:.3f}s"
-    )
-    if not ok or errors:
-        raise RuntimeError(
-            f"{label}: Save3 failed: ok={ok}, errors={errors}, "
-            f"warnings={warnings}"
-        )
 
 
 async def assert_saved_configuration_topology(
@@ -1522,45 +1496,17 @@ async def build(adapter) -> dict[str, str]:
                 "Material Specification": material_specification(teeth),
             },
         )
+    artefacts.update(await save_part_and_images(adapter, PART_NAME))
+    part_path = artefacts["part"]
     # Each T-configuration's derived "<T> Simplified" (teeth suppressed) is
     # what the drive-train drawing's small line views print; it inherits the
     # grouped BOM identity and the per-configuration properties set above.
-    add_simplified_configurations(adapter, PART_NAME, SIMPLIFIED_FEATURES)
-    artefacts.update(await save_part_and_images(adapter, PART_NAME))
-    part_path = artefacts["part"]
-    # save_part_and_images rebuilt every stale configuration, each inactive
-    # one while active (_common.rebuild_stale_configurations: the no-switch
-    # rebuild-all verbs left the T00x tooth gaps faulted, cg-fx1).  Mark every
-    # configuration's cache and serialize them all in one Save3 call.
-    # AddRebuildSaveMark controls which caches are written; Save3 alone does
-    # not rebuild those configurations, so none may be stale here.
-    model = _early_bound(adapter.currentModel, "IModelDoc2")
-    manager = _early_bound(model.ConfigurationManager, "IConfigurationManager")
-    if not bool(manager.AddRebuildSaveMark(2, "")):
-        raise RuntimeError("failed to set all-configuration rebuild-save marks")
-    for name in [str(name) for name in (model.GetConfigurationNames() or ())]:
-        raw_configuration = model.GetConfigurationByName(name)
-        if raw_configuration is None:
-            raise RuntimeError(f"{name}: configuration missing while setting save marks")
-        configuration = _early_bound(raw_configuration, "IConfiguration")
-        if not bool(configuration.AddRebuildSaveMark):
-            raise RuntimeError(f"{name}: rebuild-save mark was not set")
-    stale = stale_configurations(
-        model, [str(name) for name in (model.GetConfigurationNames() or ())]
-    )
-    if stale:
-        raise RuntimeError(f"cone-gear configurations {stale} are stale at the final save")
-    _save3_with_contract(
-        adapter,
-        1,
-        label="rebuild and persist all marked configurations",
-    )
-
-    part_title = str(
-        _early_bound(adapter.currentModel, "IModelDoc2").GetTitle()
-    )
-    adapter.swApp.CloseDoc(part_title)
-    adapter.currentModel = None
+    # It is derived on the saved part reopened from disk (on this authoring
+    # document the derivation raised a modal dialog, c85a21ec4), which is then
+    # finalized in place: every configuration activated and force-rebuilt
+    # (the no-switch rebuild-all verbs left the T00x tooth gaps faulted,
+    # cg-fx1), marked for rebuild-save, and saved in one Save3.
+    await derive_simplified_on_saved_part(adapter, PART_NAME, SIMPLIFIED_FEATURES, part_path)
     check("reopen saved cone-gear", await adapter.open_model(part_path))
     assert_saved_configurations_regenerate(adapter, PART_NAME)
     await assert_saved_configuration_topology(adapter, phase="reopened")
