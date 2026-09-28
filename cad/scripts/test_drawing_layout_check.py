@@ -2639,6 +2639,29 @@ def test_walk_without_a_hit_or_a_listed_edge_fails_naming_what_it_tried(monkeypa
     assert sheet.balloons == [] and view.selected_entities == []
 
 
+def test_visible_edge_anchor_selects_the_listed_edge_without_any_hit_test(monkeypatch):
+    """A screw head seated on a flange: which edge a hit test returns there
+    depends on the seat's pick aperture in pixels. The anchor that says so
+    never hit-tests or walks the body; it selects the listed edge."""
+    face = _BodyFace([_BodyEdge((0.0, 0.05, 0.0), (0.001, 0.05, 0.0))])
+    first = _AnchorEdge("cone-gear-1", ends=(0.02, 0.001, 0.0, 0.01, 0.03, 0.0))
+    outer = _AnchorEdge("cone-gear-1", ends=(0.01, 0.03, 0.0, 0.0, 0.0, 0.0))
+    view = _exploded_view(
+        _instances("cone-gear-1", bodies={"cone-gear-1": _body([face])}),
+        [],
+        visible={"cone-gear-1": (first, outer)},
+    )
+    sheet = _AnchorSheet({(0.0, 0.05): _AnchorEdge("cone-gear-1")})
+    first.sheet = outer.sheet = sheet
+    anchor = drawing_common.BalloonAnchor(visible_edge=True)
+    balloons, _projected, anchors = _balloon(monkeypatch, sheet, view, {"cone-gear": anchor})
+    assert len(balloons) == 1 and view.selected_entities == [outer]
+    assert sheet.hits == [] and face.fetched == 0
+    assert (anchors[0]["method"], anchors[0]["tried"]) == ("visible-edge", 0)
+    with pytest.raises(ValueError, match="takes no frozen point"):
+        drawing_common.BalloonAnchor((0.0, 0.0, 0.0), visible_edge=True)
+
+
 def test_coincident_attachments_break_on_the_bom_item_not_arrival_order():
     """The last geometric tie-break can itself tie.
 

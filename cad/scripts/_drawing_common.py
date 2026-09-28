@@ -5467,10 +5467,22 @@ class BalloonAnchor:
 
     ``point_mm=None`` walks the part's own body instead
     (:func:`_select_balloon_anchor`), for a family no single point claims.
+
+    ``visible_edge=True`` skips every hit test and takes the edge the view's
+    hidden-line pass lists as drawn (:func:`_visible_edge`). Where another
+    part's edge lies next to the point (a screw head seated on a flange),
+    which edge a hit test returns can differ by seat (the frame lag screw,
+    runs 20260928T084730204Z and 20260928T085715872Z); the listed edge does
+    not.
     """
 
     point_mm: tuple[float, float, float] | None = None
     instance: str | None = None
+    visible_edge: bool = False
+
+    def __post_init__(self) -> None:
+        if self.visible_edge and self.point_mm is not None:
+            raise ValueError("a visible-edge balloon anchor takes no frozen point")
 
 
 @dataclass(frozen=True)
@@ -6030,8 +6042,9 @@ def _select_balloon_anchor(
     order, and take the first the hit test gives back to that exact
     instance. A pin in its bore draws its outline on its neighbour's, so no
     hit test claims it: ``visible-edge`` then takes the instance's edge that
-    the view's hidden-line pass lists as drawn (:func:`_visible_edge`). No
-    such edge fails the sheet, naming the instances and every point tried.
+    the view's hidden-line pass lists as drawn (:func:`_visible_edge`), and
+    ``anchor.visible_edge`` goes straight there without hit-testing. No such
+    edge fails the sheet, naming the instances and every point tried.
     Which method ran, and where, is in the ``drawing.balloon_anchor`` event.
     """
     first = candidates[0]
@@ -6061,7 +6074,7 @@ def _select_balloon_anchor(
         method, point_mm = "", ()
         faces = edges = 0
         complete = True
-        for leaf in candidates:
+        for leaf in () if anchor.visible_edge else candidates:
             room = _WALK_HITS_PER_FAMILY - len(tried)
             if room <= 0:
                 break
@@ -6087,7 +6100,8 @@ def _select_balloon_anchor(
                     break
             if method:
                 break
-        scan_attrs = {"faces": faces, "edges": edges, "complete": complete}
+        if not anchor.visible_edge:
+            scan_attrs = {"faces": faces, "edges": edges, "complete": complete}
         if not method:
             adapter.currentModel.ClearSelection2(True)
             counts: list[str] = []
@@ -6110,11 +6124,16 @@ def _select_balloon_anchor(
                 points_text = "; ".join(
                     f"({x * 1000.0:.2f}, {y * 1000.0:.2f})" for x, y in tried
                 )
+                walked = (
+                    ""
+                    if anchor.visible_edge
+                    else f"no hit test claimed {[leaf.path for leaf in candidates]} "
+                    f"at sheet mm [{points_text}], and "
+                )
                 raise RuntimeError(
-                    f"{label}: {stem} has no verifiably visible edge: no hit test "
-                    f"claimed {[leaf.path for leaf in candidates]} at sheet mm "
-                    f"[{points_text}], and no instance lists 1-"
-                    f"{_VISIBLE_EDGES_PER_INSTANCE} visible edges ({', '.join(counts)})"
+                    f"{label}: {stem} has no verifiably visible edge: {walked}no "
+                    f"instance lists 1-{_VISIBLE_EDGES_PER_INSTANCE} visible edges "
+                    f"({', '.join(counts)})"
                 )
     # The span carries what profiling queries group by; the event is what a
     # run-to-run anchor diff compares (App Insights traces, this name).
