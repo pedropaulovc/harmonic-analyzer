@@ -1,18 +1,18 @@
-"""Frozen balloon anchors for the frame exploded view (sheet 2).
+"""Balloon anchors for the frame exploded view (sheet 2).
 
-The point is on an edge of the family's lowest-named shown instance, in
-that part's own millimetres, so view scale, placement and explode distance
-do not move it. The build projects it onto the sheet, hit-tests the sheet
-there and refuses the balloon unless the edge it finds is that instance's
-(``_drawing_common._select_balloon_anchor``). Each point was found by a farm
-probe that tried the family's outermost visible edges from outside in and
-kept the first whose hit test named the family itself (run
-20260928T061043870Z-e88e1bbb, commit c364ce118).
+A frozen point is on an edge of the family's lowest-named shown instance,
+in that part's own millimetres, so view scale, placement and explode
+distance do not move it. The build projects it onto the sheet, hit-tests
+the sheet there and refuses the balloon unless the edge it finds is that
+instance's (``_drawing_common._select_balloon_anchor``).
 
-``BalloonAnchor()`` marks a family no hit test could claim: every point the
-probe tried on it found a neighbour in front -- a pin inside its bore, a
-gear inside the stack. Those walk the part's own body instead, and report
-the point they land on in the ``drawing.balloon_anchor`` event.
+``BalloonAnchor()`` walks the part's own body in its face/edge order and
+takes the first point the hit test gives back to the family, else its first
+walked edge; the ``drawing.balloon_anchor`` event reports where it landed,
+ready to freeze here. The walk is the default: points frozen from a farm
+probe at the old 1:7 frame sheet (run 20260928T061043870Z) missed on the
+1:8 sheet (rocker-arm-support, arbor-pedestal select no edge at their
+projection), so only points proven on the current sheets are frozen.
 """
 
 from __future__ import annotations
@@ -23,11 +23,11 @@ FRAME_BALLOON_ANCHORS: dict[str, BalloonAnchor] = {
     "harmonic-base": BalloonAnchor(),
     "tube-frame": BalloonAnchor((12.700, 0.0, 0.0)),
     "tube-frame-cap": BalloonAnchor((0.0, 18.891, 12.383)),
-    "rocker-arm-support": BalloonAnchor((-120.650, -82.550, 3.175)),
+    "rocker-arm-support": BalloonAnchor(),
     "lag-screw": BalloonAnchor(),
-    "top-frame": BalloonAnchor((-223.100, 22.750, -112.000)),
-    "nameplate": BalloonAnchor((79.010, -6.540, -0.400)),
-    "fillister-screw": BalloonAnchor((0.946, 0.0, 6.350)),
-    "frame-cross-screw": BalloonAnchor((-0.537, -2.506, -8.854)),
-    "gooseneck-set-screw": BalloonAnchor((-2.245, 4.763, 2.245)),
+    "top-frame": BalloonAnchor(),
+    "nameplate": BalloonAnchor(),
+    "fillister-screw": BalloonAnchor(),
+    "frame-cross-screw": BalloonAnchor(),
+    "gooseneck-set-screw": BalloonAnchor(),
 }
