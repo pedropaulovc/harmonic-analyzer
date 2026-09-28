@@ -57,6 +57,7 @@ from summing_lever_spec import (
     CHANNEL_PITCH,
     COUNTER_HOLE_SPEC,
     HEX_DEPTH,
+    HOLE_COUNT,
     HOLE_END_OFFSET_LAST,
     HOLE_SPEC,
     HOLE_X,
@@ -293,19 +294,14 @@ async def build(adapter: Any) -> dict[str, str]:
     # that end) is the bottom hole of the column.
     # Hang B's tag straight down right of the +Z trunnion stub, between it and
     # the 39.85 extension line: left of the stub it sat in the finish leader's
-    # only path (layout audit), and the seed callout now leaves the hole
-    # steeply down-right, 8 mm clear of this tag.
+    # only path (layout audit); the 20X callout now hangs on the middle hole,
+    # well away from this tag.
     # Both the datum and the start-Z dimension name their end edge exactly: a
     # coordinate hit-test on this point resolved to the rib flange 5.08 mm
     # inboard (datum B on the flange, start Z reading 3.35 for 8.43 -- #1105).
     top_edges = scan_view_edges(top, label="summing lever top plan")
     plate_end_edge = _top_xy(10.0, -PLATE_L / 2.0)
-    # The start-Z pick sits 4 mm further along the end edge: its extension
-    # line starts at the pick, and from x=10 it began under the seed
-    # callout's leader, which crosses it 1.7 mm in (leader-crosses-line,
-    # run 20260928T131507773Z; 0.1 mm past the audit's converging radius).
-    start_z_pick = _top_xy(18.0, -PLATE_L / 2.0)
-    end_edge = _end_face_edge(top_edges, x_mm=18.0)
+    end_edge = _end_face_edge(top_edges, x_mm=10.0)
     add_datum_feature(
         adapter,
         top,
@@ -340,7 +336,7 @@ async def build(adapter: Any) -> dict[str, str]:
     start_z = add_edge_dimension(
         adapter,
         top,
-        p0=start_z_pick,
+        p0=plate_end_edge,
         p1=seed_rim_top,
         text_xy=(0.292, 0.106),
         label="spring-hole start Z",
@@ -365,21 +361,26 @@ async def build(adapter: Any) -> dict[str, str]:
         pitch, expected_mm=CHANNEL_PITCH, label="spring-hole pitch"
     )
     set_basic_dimension(adapter, pitch, label="spring-hole pitch")
-    seed_rim_bottom = _top_xy(HOLE_X, HOLE_Z_FIRST - HOLE_DIA / 2.0)
+    # The 20X callout hangs on the middle hole, text in the open field right
+    # of the column (0.100..0.185 there holds nothing; the 44.45 lines are
+    # at 0.19). Every callout on the end hole had to leave it downward and so
+    # crossed the plate-end extension lines of 152.40 and the start-Z
+    # dimension -- steepening the leader only traded that for text-on-line
+    # and arrow-near-text against the 39.85 arrowhead and the start-Z
+    # overshoot (runs 20260928T130915425Z, ...131249806Z, ...131507773Z).
+    mid_hole_z = HOLE_Z_LAST - (HOLE_COUNT // 2) * CHANNEL_PITCH
+    mid_rim = top_edges.circle_at(
+        (HOLE_X, PLATE_T / 2.0, mid_hole_z),
+        HOLE_DIA / 2.0,
+        axis=(0.0, 1.0, 0.0),
+        label="spring-hole middle rim",
+    )
     add_native_hole_callout(
         adapter,
         top,
-        edge_xy=seed_rim_bottom,
-        # Steep drop between the 39.85 and 44.45 extension lines to a block
-        # under the plate: the old down-right leader crossed 152.40's
-        # extension line (layout audit). The start-Z line, text outside its
-        # span, overshoots the plate end down to 0.0855; at 0.082 the
-        # callout's top row (to 0.0865) sat on it (text-on-line, run
-        # 20260928T130915425Z). The block's 9.1 mm cannot also clear the
-        # 39.85 arrowhead (0.0722, tip at x 0.2616) by 2 mm from 0.286, so
-        # it starts 3 mm right of that tip instead (run 20260928T131249806Z).
-        callout_xy=(0.290, 0.0785),
-        label="spring-hole seed",
+        edge=mid_rim.edge,
+        callout_xy=(0.292, _top_xy(HOLE_X, -mid_hole_z)[1] + 0.0015),
+        label="spring-hole middle",
     )
     # The Top view reverses model Z, so -HOLE_Z_FIRST prints the seed hole at
     # the TOP of the column. Every lower hole is boxed in by the 44.45
