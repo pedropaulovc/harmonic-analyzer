@@ -40,6 +40,22 @@ Per-drawing setup sets the sheet scale
 links each sheet's custom-property view to its first drawing view and enforces
 the standard isometric projection as high-quality Shaded With Edges.
 
+### Line weights
+
+Both drawing templates set Document Properties > Line Thickness to
+**Thin 0.13 mm** and **Normal 0.18 mm**. Thick through Thick(6) keep the
+SolidWorks defaults (0.35 to 2.0 mm). Line Font maps visible edges to Normal
+and hidden edges, tangent edges, cosmetic threads, and hatch to Thin. The border
+uses Thick(2), 0.5 mm.
+
+The SolidWorks defaults of 0.18 mm and 0.25 mm filled dense assembly views at
+1:3 with ink. Examples include the cone gear teeth and screw threads on
+`drive-train-assembly` sheet 1. The lighter pair keeps the 1.4:1 contrast
+between visible and thin lines. ISO 128 lists 0.13 mm as its thinnest line
+width. To check weights in an exported PDF, read the stroke widths from its
+drawing operators with PyMuPDF `page.get_drawings()`, and multiply by
+25.4/72 to get millimetres.
+
 `third-angle-projection.SLDBLK` is the projection-symbol block embedded in both
 templates and remains the editable source for future template work.
 

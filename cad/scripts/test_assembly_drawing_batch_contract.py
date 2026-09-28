@@ -16,8 +16,13 @@ import draw_magnifier_assembly
 import draw_paper_drive_assembly
 import draw_pen_assembly
 import draw_summing_assembly
-from _drawing_common import DrawingOutputs
+from _drawing_common import (
+    ASSEMBLY_VIEW_CONFIGURATION,
+    SIMPLIFIED_VIEW_CONFIGURATION,
+    DrawingOutputs,
+)
 from _drawing_registry import DRAWINGS, DrawingLayout
+from test_drawing_simplified import HLR, FakeDrawing, FakeView
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -174,7 +179,10 @@ def test_shared_builder_places_exactly_front_right_and_isometric(
         pdf=tmp_path / "assembly.pdf",
         png=tmp_path / "assembly.png",
     )
-    adapter = SimpleNamespace(open_model=lambda _path: None, currentModel=object())
+    views: list[FakeView] = []
+    adapter = SimpleNamespace(
+        open_model=lambda _path: None, currentModel=FakeDrawing(views)
+    )
 
     async def open_model(path: str) -> bool:
         calls.append(("open", path))
@@ -197,13 +205,13 @@ def test_shared_builder_places_exactly_front_right_and_isometric(
         "new_project_drawing",
         lambda _adapter, *, layout, scale: calls.append(("new", layout, scale)),
     )
-    monkeypatch.setattr(
-        _assembly_drawing,
-        "place_view",
-        lambda _adapter, path, name, x, y, *, scale: calls.append(
-            ("view", path, name, x, y, scale)
-        ),
-    )
+
+    def place(_adapter, path, name, x, y, *, scale):
+        calls.append(("view", path, name, x, y, scale))
+        views.append(FakeView(scale, name, HLR))
+        return views[-1]
+
+    monkeypatch.setattr(_assembly_drawing, "place_view", place)
 
     async def finalize(_adapter, actual_outputs, *, layout, pdf_title, scale):
         calls.append(("finalize", actual_outputs, layout, pdf_title, scale))
@@ -242,3 +250,10 @@ def test_shared_builder_places_exactly_front_right_and_isometric(
         "Assembly Drawing",
         (1.0, 4.0),
     ) in calls
+    # The small front and right views print the simplified configuration; the
+    # isometric is the drawing's designated full-detail view.
+    assert [view.ReferencedConfiguration for view in views] == [
+        SIMPLIFIED_VIEW_CONFIGURATION,
+        SIMPLIFIED_VIEW_CONFIGURATION,
+        ASSEMBLY_VIEW_CONFIGURATION,
+    ]

@@ -9,6 +9,7 @@ Part-specific views, dimensions, and notes belong in ``draw_<part>.py``.
 from __future__ import annotations
 
 import contextlib
+import enum
 import json
 import math
 import os
@@ -26,12 +27,14 @@ import _seat_forensics
 from _common import (
     _build_id,
     _early_bound,
+    _read_member,
     _visible_document_paths,
     apply_custom_properties,
 )
 from _gtol_spec import GTOL_SYMBOLS as _GTOL_SYMBOLS
 from _gtol_spec import gtol_frame_xml as _gtol_frame_xml
 from _surface_finish import SurfaceFinishControl
+from _drawing_simplified import simplified_name
 from _drawing_layout_check import (
     CollisionScope,
     DrawableRegion,
@@ -1744,13 +1747,105 @@ TITLE_BLOCK_COPYRIGHT_PROPERTY = "COPYRIGHT_YEAR"
 DRAWING_BUILD_ID_PROPERTY = "BUILD_ID"
 
 
+# ``IModelDoc2.IsOpenedViewOnly`` is True for two reasons (API remarks): the
+# file is still loading ("Files are loaded using multi-threading ... Until all
+# data and references are loaded, the file is in view-only mode ... many API
+# queries return NULL or empty data"), or it was DELIBERATELY opened for
+# viewing, which only the opener can ask for: ``swOpenDocOptions_ViewOnly``
+# (0x4) on ``OpenDoc6``, or ``IDocumentSpecification.ViewOnly`` on
+# ``OpenDoc7``. The build asks for neither. Every open passes ``OpenDoc6``
+# options without 0x4 (``adapter.open_model`` passes 1, Silent), and
+# ``test_failure_forensics`` holds every ``OpenDoc6``/``OpenDoc7`` call in
+# cad/scripts and solidworks_mcp to that. So on any document the build opened,
+# part or assembly, view-only means "still loading": an empty read waits for
+# the flag to clear (bounded and logged), and is re-read once only when the
+# document then says it is loaded -- never on a flag it cannot read.
+_VIEW_ONLY_WAIT_S = 30.0
+_VIEW_ONLY_POLL_S = 0.25
+
+
+def _opened_view_only(model: Any) -> bool | None:
+    """``IsOpenedViewOnly``, or ``None`` when the document gives no boolean."""
+    try:
+        value = _read_member(model, "IsOpenedViewOnly")
+    except Exception:  # noqa: BLE001 - unreadable is "unknown", never a verdict
+        return None
+    return value if isinstance(value, bool) else None
+
+
+def _await_document_loaded(model: Any) -> dict[str, Any]:
+    """Wait for a view-only (still loading) document to finish loading.
+
+    Returns the observation for the failure capture: ``view_only`` as first
+    read; when it had to wait, ``view_only_wait_s`` and the final state; and
+    ``loaded``, True only when the document's last answer was a definite
+    ``IsOpenedViewOnly=False``.
+    """
+    view_only = _opened_view_only(model)
+    load: dict[str, Any] = {"view_only": "unknown" if view_only is None else view_only}
+    if view_only is True:
+        _telemetry.info(
+            "source document is still loading (IsOpenedViewOnly=True, and the build "
+            "never opens view-only) with empty custom properties; waiting up to "
+            f"{_VIEW_ONLY_WAIT_S:.0f}s for it to load"
+        )
+        begun = time.monotonic()
+        while view_only is True and time.monotonic() - begun < _VIEW_ONLY_WAIT_S:
+            time.sleep(_VIEW_ONLY_POLL_S)
+            view_only = _opened_view_only(model)
+            # One record per poll keeps the watchdog's idle clock (log records
+            # are its heartbeat) from reading this wait as a wedged COM call.
+            _telemetry.debug(
+                f"source document load poll: IsOpenedViewOnly={view_only} after "
+                f"{time.monotonic() - begun:.1f}s"
+            )
+        load["view_only_wait_s"] = round(time.monotonic() - begun, 2)
+        load["view_only_after_wait"] = "unknown" if view_only is None else view_only
+        _telemetry.info(
+            f"source document view-only wait ended after {load['view_only_wait_s']:.1f}s "
+            f"(IsOpenedViewOnly={load['view_only_after_wait']})"
+        )
+    load["loaded"] = view_only is False
+    return load
+
+
 def read_required_properties(
     model: Any, names: Sequence[str], *, required: Iterable[str]
 ) -> dict[str, str]:
-    properties = {name: str(model.GetCustomInfoValue("", name) or "") for name in names}
+    """The source document's file-level custom properties ``names``; raise when
+    one of ``required`` is empty, or ``Revision`` is not the current release.
+
+    An empty required value is re-read once, and only once the document itself
+    reports it is loaded (``IsOpenedViewOnly=False``, after waiting out a load
+    in progress; see ``_await_document_loaded``). The first read may have landed
+    before a load that finished by the time the flag was asked, so a definite
+    "loaded" earns a re-read; an unreadable flag does not. Still empty, the
+    failure names the document, its configuration, both property APIs' answers
+    and the seat's age and startup state
+    (``_seat_forensics.capture_missing_properties``) before raising the same
+    ``RuntimeError``.
+    """
+    required = tuple(required)
+
+    def read() -> dict[str, str]:
+        return {name: str(model.GetCustomInfoValue("", name) or "") for name in names}
+
+    properties = read()
     missing = [name for name in required if not properties.get(name)]
     if missing:
-        raise RuntimeError(f"source part properties are missing: {missing}")
+        load = _await_document_loaded(model)
+        if load["loaded"]:
+            properties = read()
+            missing = [name for name in required if not properties.get(name)]
+        if missing:
+            _seat_forensics.capture_missing_properties(
+                model,
+                f"source part properties are missing: {missing}",
+                missing=missing,
+                values=properties,
+                load=load,
+            )
+        _telemetry.info("source part properties read after the document finished loading")
     revision = properties.get(TITLE_BLOCK_REVISION_PROPERTY)
     if revision is not None:
         expected = _config.release_revision()
@@ -2320,6 +2415,148 @@ def set_hidden_lines_visible(adapter: Any, view: Any) -> None:
         raise RuntimeError(
             f"failed to set hidden-lines-visible drawing view (mode reads {mode})"
         )
+
+
+# Assembly drawing view configurations (the user's ruling, 2026-09-27, widened
+# 2026-09-28): at a small scale the modeled gear teeth and screw threads print
+# as a black mass wherever edges are inked, so EVERY view at 1:2 or smaller
+# whose display draws edges (wireframe, HLV, HLR, their faceted forms, and
+# shaded-with-edges) references the source assembly's derived "Default
+# Simplified" (_assembly.sync_simplified_configuration), whatever it carries:
+# an exploded view shows that configuration's own explode (the builders author
+# it there too), and a BOM or balloons bind to its components, whose BOM
+# identity is their parent's (_drawing_simplified.child_bom_identity). Only a
+# larger view, a pure SHADED one (tone, no edge ink) and the drawing's
+# designated full-detail view keep the full-detail Default. Part drawings
+# never call this.
+ASSEMBLY_VIEW_CONFIGURATION = "Default"
+SIMPLIFIED_VIEW_CONFIGURATION = simplified_name(ASSEMBLY_VIEW_CONFIGURATION)
+SIMPLIFIED_MAX_SCALE = 0.5
+_SW_DISPLAY_MODE_UNKNOWN = -1  # swDisplayMode_e.swDisplayModeUNKNOWN
+
+
+class ViewRole(enum.Enum):
+    """Whether an assembly view follows the scale policy or keeps full detail."""
+
+    PLAIN = "plain"
+    # The view that exists to show every modeled tooth and thread.
+    FULL_DETAIL = "full-detail"
+
+
+def view_configuration(
+    scale: tuple[float, float], display_mode: int, role: ViewRole = ViewRole.PLAIN
+) -> str:
+    """The assembly configuration a drawing view references under the policy."""
+    numerator, denominator = (float(value) for value in scale)
+    if numerator <= 0.0 or denominator <= 0.0:
+        raise ValueError(f"view scale must be positive, got {scale!r}")
+    if display_mode == _SW_DISPLAY_MODE_UNKNOWN:
+        raise ValueError("view display mode reads unknown; its edge ink cannot be judged")
+    if (
+        role is ViewRole.PLAIN
+        and display_mode != _SW_SHADED
+        and numerator / denominator <= SIMPLIFIED_MAX_SCALE + 1e-12
+    ):
+        return SIMPLIFIED_VIEW_CONFIGURATION
+    return ASSEMBLY_VIEW_CONFIGURATION
+
+
+@_telemetry.traced("drawing.view_configuration", label_param="label")
+def apply_view_configuration(
+    adapter: Any, view: Any, *, role: ViewRole = ViewRole.PLAIN, label: str
+) -> str:
+    """Point an assembly view at its policy configuration and read it back.
+
+    Call once the view's scale and display mode are final and BEFORE anything
+    attaches to its edges or components (dimensions, balloons, leaders, a
+    BOM) or sets its exploded state (``set_view_exploded_state``): switching
+    the configuration regenerates the view's geometry, and the explode shown
+    is the referenced configuration's own. A pictorial view is judged
+    shaded-with-edges, because ``finalize_drawing`` shades every one of them
+    that way. A section or projected child follows its parent's configuration.
+    """
+    bound = _early_bound(view, "IView")
+    scale = tuple(float(value) for value in bound.ScaleRatio)
+    orientation = str(bound.GetOrientationName() or "")
+    mode = (
+        _SW_SHADED_EDGES
+        if is_pictorial_orientation(orientation)
+        else int(bound.GetDisplayMode2())
+    )
+    wanted = view_configuration(scale, mode, role)
+    current = str(bound.ReferencedConfiguration)
+    if current != wanted:
+        bound.ReferencedConfiguration = wanted
+        rebuild_drawing(adapter, label=f"{label} configuration")
+        current = str(bound.ReferencedConfiguration)
+        if current != wanted:
+            raise RuntimeError(
+                f"{label}: view references {current!r} after setting {wanted!r}"
+            )
+    _telemetry.annotate(
+        configuration=wanted, scale=f"{scale[0]:g}:{scale[1]:g}", mode=mode, role=role.value
+    )
+    return wanted
+
+
+@_telemetry.traced("drawing.exploded_state", label_param="label")
+def set_view_exploded_state(
+    adapter: Any, view: Any, show: bool, *, configuration: str, label: str
+) -> None:
+    """Explode or collapse an assembly view in its policy configuration.
+
+    ``IView.ShowExploded`` shows the explode of the configuration the view
+    references, so this runs AFTER ``apply_view_configuration`` and refuses a
+    view that does not reference ``configuration`` (its return). An exploded
+    view that already reads exploded (its configuration was just switched) is
+    collapsed first, so the explode shown is regenerated from the referenced
+    configuration's own steps. Both states are read back.
+    """
+    bound = _early_bound(view, "IView")
+    current = str(bound.ReferencedConfiguration)
+    if current != configuration:
+        raise RuntimeError(
+            f"{label}: set the exploded state after apply_view_configuration; the view "
+            f"references {current!r}, not {configuration!r}"
+        )
+    if show and bool(bound.IsExploded()):
+        bound.ShowExploded(False)
+        if bool(bound.IsExploded()):
+            raise RuntimeError(f"{label}: exploded view did not collapse before re-exploding")
+    returned = bool(bound.ShowExploded(show))
+    actual = bool(bound.IsExploded())
+    if actual != show:
+        raise RuntimeError(f"{label}: exploded-state readback is {actual}, expected {show}")
+    if show and not returned:
+        raise RuntimeError(f"{label}: ShowExploded returned false")
+    if not adapter.currentModel.EditRebuild3():
+        raise RuntimeError(f"{label}: exploded-state rebuild failed")
+    after = str(bound.ReferencedConfiguration)
+    if after != configuration:
+        raise RuntimeError(
+            f"{label}: view references {after!r} after its exploded state was set, "
+            f"not {configuration!r}"
+        )
+    _telemetry.annotate(configuration=configuration, exploded=actual)
+
+
+def assert_full_detail_view(adapter: Any, *, label: str) -> None:
+    """Every assembly drawing keeps at least one full-detail (Default) view."""
+    ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
+    configurations = [
+        str(_early_bound(raw_view, "IView").ReferencedConfiguration)
+        for sheet_name in ddoc.GetSheetNames() or ()
+        for raw_view in (_early_bound(ddoc.Sheet(str(sheet_name)), "ISheet").GetViews() or ())
+    ]
+    if ASSEMBLY_VIEW_CONFIGURATION not in configurations:
+        raise RuntimeError(
+            f"{label}: no view shows the full-detail {ASSEMBLY_VIEW_CONFIGURATION!r} "
+            f"configuration ({configurations!r})"
+        )
+    _telemetry.annotate(
+        views=len(configurations),
+        simplified=configurations.count(SIMPLIFIED_VIEW_CONFIGURATION),
+    )
 
 
 def assert_asme_b_sheet(
@@ -4820,12 +5057,20 @@ def _create_auto_balloons(
     return balloons
 
 
+def balloon_item_resolved(text: str) -> bool:
+    """Whether a BOM balloon's displayed item is a real one: SolidWorks prints
+    ``?`` when the balloon's component no longer resolves to a BOM row (the
+    feature-suppression preview's balloons did), and nothing when unattached."""
+    item = text.strip()
+    return bool(item) and "?" not in item
+
+
 def _balloon_item_number(adapter: Any, note: Any, *, label: str) -> str:
-    """Read one BOM balloon's displayed upper item number."""
+    """Read one BOM balloon's displayed upper item number; refuse an unresolved one."""
     note = _sw_type_info.early_bound_or_flag(note, "INote", "GetBomBalloonText")
     item = str(adapter._attempt(lambda: note.GetBomBalloonText(True)) or "").strip()
-    if not item:
-        raise RuntimeError(f"{label}: BOM balloon has no upper item number")
+    if not balloon_item_resolved(item):
+        raise RuntimeError(f"{label}: BOM balloon shows unresolved item {item!r}")
     return item
 
 

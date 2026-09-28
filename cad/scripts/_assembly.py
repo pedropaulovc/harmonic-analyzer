@@ -9,6 +9,7 @@ import hashlib
 import json
 import math
 import re
+import sys
 from collections.abc import Callable, Iterable, Mapping
 from contextlib import contextmanager
 from typing import Any
@@ -38,6 +39,14 @@ from _common import (
     log,
     set_isometric_view,
     whats_wrong,
+)
+from _drawing_simplified import (
+    SIMPLIFIED_COMMENT,
+    SIMPLIFIED_SUFFIX,
+    components_identity,
+    is_simplified,
+    simplified_comment,
+    simplified_name,
 )
 from _visibility import assert_reference_geometry_hidden, blank_reference_geometry
 
@@ -2260,6 +2269,190 @@ async def _export_assembly_images(
     return artefacts
 
 
+@_telemetry.traced("simplified.assembly_config", label_param="asm_name")
+def sync_simplified_configuration(
+    adapter: Any, asm_name: str, *, verify: bool = True
+) -> int:
+    """Ensure ``Default Simplified`` (derived from ``Default``) points every
+    top-level component at its ``<referenced> Simplified`` configuration.
+
+    Every assembly-drawing view at 1:2 or smaller that inks edges references
+    it, so modeled gear teeth and screw threads do not print black
+    (``_drawing_simplified``). The rule is the
+    uniform ``<parent> Simplified`` name, so a subassembly's own ``Default
+    Simplified`` is picked up the same way as a part's ``T24 Simplified``; a
+    component whose model has no such configuration keeps its parent one.
+    Default itself is untouched (proven: every component and mate unchanged).
+
+    Returns how many things changed (configuration created, components
+    re-pointed, identity comment rewritten), so an in-place refresh knows it
+    must re-save. The comment fingerprints every component's referenced
+    configuration and THAT configuration's comment (a part's suppressed
+    features, a subassembly's own fingerprint), so a child whose simplified
+    geometry changed while Default did not still forces the save -- the
+    geometry digest reads Default only. With ``verify`` the simplified
+    configuration is force-rebuilt and must read What's Wrong clean; a caller
+    that rebuilds every configuration next passes False. The rest
+    configuration is re-activated before returning, not rebuilt: both callers
+    run ``final_rebuild_before_save`` next (ForceRebuild3, NeedsRebuild2 must
+    read 0), and ``reconcile_saved_rebuild_state`` rebuilds and persists every
+    configuration of the saved file.
+    """
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    names = [str(name) for name in (model.GetConfigurationNames() or ())]
+    rest = "Default"
+    if rest not in names:
+        raise RuntimeError(f"{asm_name}: no {rest!r} configuration among {names}")
+    child = simplified_name(rest)
+    changes = 0
+    if child not in names:
+        manager = _early_bound(model.ConfigurationManager, "IConfigurationManager")
+        created = manager.AddConfiguration2(child, SIMPLIFIED_COMMENT, "", 0, rest, "", False)
+        if created is None:
+            raise RuntimeError(f"{asm_name}: AddConfiguration2({child!r}) returned None")
+        changes += 1
+    raw = model.GetConfigurationByName(child)
+    configuration = _early_bound(raw, "IConfiguration") if raw is not None else None
+    parent = configuration.GetParent() if configuration is not None else None
+    if parent is None or str(_early_bound(parent, "IConfiguration").Name) != rest:
+        raise RuntimeError(f"{asm_name}: {child!r} is not derived from {rest!r}")
+    if active_configuration_name(adapter, model) != child and not bool(
+        model.ShowConfiguration2(child)
+    ):
+        raise RuntimeError(f"{asm_name}: ShowConfiguration2({child!r}) refused")
+
+    assembly = _early_bound(adapter.currentModel, "IAssemblyDoc")
+    known: dict[str, set[str]] = {}
+    comments: dict[tuple[str, str], str] = {}
+    rows: list[tuple[str, str, str]] = []
+    swapped = kept = 0
+    refused: list[str] = []
+    for raw_component in assembly.GetComponents(True) or ():
+        component = _early_bound(raw_component, "IComponent2")
+        path = str(component.GetPathName())
+        if path not in known:
+            known[path] = {
+                str(name) for name in (adapter.swApp.GetConfigurationNames(path) or ())
+            }
+        current = str(component.ReferencedConfiguration)
+        base = current.removesuffix(SIMPLIFIED_SUFFIX)
+        want = simplified_name(base) if simplified_name(base) in known[path] else base
+        if want == current:
+            kept += 1
+        else:
+            component.ReferencedConfiguration = want
+            if str(component.ReferencedConfiguration) != want:
+                refused.append(f"{component.Name2}: {current!r} -> {want!r}")
+                continue
+            swapped += 1
+        rows.append(
+            (
+                str(component.Name2),
+                want,
+                _referenced_comment(asm_name, component, path, want, comments),
+            )
+        )
+    changes += swapped
+    if refused:
+        raise RuntimeError(
+            f"{asm_name}: {child} refused component configurations: " + "; ".join(refused)
+        )
+    comment = simplified_comment(components_identity(rows))
+    if str(configuration.Comment or "") != comment:
+        configuration.Comment = comment
+        if str(configuration.Comment or "") != comment:
+            raise RuntimeError(f"{asm_name}: {child} comment did not persist")
+        changes += 1
+    if verify:
+        rebuilt = adapter._attempt(lambda: model.ForceRebuild3(False), default=None)
+        faults = _rebuild_faults(adapter)
+        if rebuilt is False or rebuilt is None or faults:
+            raise RuntimeError(
+                f"{asm_name}: {child} rebuild returned {rebuilt!r} with faults {faults}"
+            )
+    if not bool(model.ShowConfiguration2(rest)):
+        raise RuntimeError(f"{asm_name}: re-activating {rest!r} refused")
+    _telemetry.annotate(swapped=swapped, kept=kept, changes=changes, verified=verify)
+    _telemetry.success(
+        f"{asm_name}: {child} re-points {swapped} component(s), {kept} unchanged "
+        f"({comment})"
+    )
+    return changes
+
+
+@_telemetry.traced("simplified.author_in_drawing_configurations", label_param="asm_name")
+def author_in_drawing_configurations(
+    adapter: Any, asm_name: str, author: Callable[[str], None]
+) -> None:
+    """Run a configuration-owned authoring step in ``Default`` and in ``Default
+    Simplified``, each while it is the active configuration.
+
+    An exploded view belongs to one configuration, and a drawing view shows
+    the explode of the configuration it references (``IView.ShowExploded``),
+    so the small exploded drawing views -- which reference ``Default
+    Simplified`` -- need the same steps authored there. The simplified
+    configuration is created first, before anything configuration-owned
+    exists to be copied into it; ``author`` receives the active
+    configuration's name. ``Default`` is active again on return.
+    """
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    rest = "Default"
+    if active_configuration_name(adapter, model) != rest:
+        raise RuntimeError(f"{asm_name}: drawing configurations are authored from {rest!r}")
+    sync_simplified_configuration(adapter, asm_name, verify=False)
+    author(rest)
+    child = simplified_name(rest)
+    if not bool(model.ShowConfiguration2(child)):
+        raise RuntimeError(f"{asm_name}: ShowConfiguration2({child!r}) refused")
+    try:
+        if active_configuration_name(adapter, model) != child:
+            raise RuntimeError(f"{asm_name}: {child!r} did not become active")
+        author(child)
+    finally:
+        primary_error = sys.exception()
+        try:
+            if not bool(model.ShowConfiguration2(rest)) or (
+                active_configuration_name(adapter, model) != rest
+            ):
+                raise RuntimeError(f"{asm_name}: re-activating {rest!r} refused")
+        except Exception as cleanup_error:
+            if primary_error is None:
+                raise
+            _telemetry.warn(f"{asm_name}: cleanup after {child} authoring: {cleanup_error}")
+
+
+
+def _referenced_comment(
+    asm_name: str,
+    component: Any,
+    path: str,
+    configuration: str,
+    cache: dict[tuple[str, str], str],
+) -> str:
+    """The comment of the simplified configuration ``component`` references.
+
+    Empty for a component kept on its parent configuration; a suppressed one
+    contributes no geometry, so its model (unloaded) is not read."""
+    if not is_simplified(configuration):
+        return ""
+    if bool(component.IsSuppressed()):
+        return "<suppressed>"
+    key = (path, configuration)
+    if key not in cache:
+        raw = component.GetModelDoc2()
+        found = (
+            _early_bound(raw, "IModelDoc2").GetConfigurationByName(configuration)
+            if raw is not None
+            else None
+        )
+        if found is None:
+            raise RuntimeError(
+                f"{asm_name}: {component.Name2} ({path}) has no loaded {configuration!r}"
+            )
+        cache[key] = str(_early_bound(found, "IConfiguration").Comment or "")
+    return cache[key]
+
+
 async def save_assembly_and_images(
     adapter: Any,
     asm_name: str,
@@ -2283,6 +2476,10 @@ async def save_assembly_and_images(
     leaves a manifest beside an assembly it does not describe."""
     if asm_name in ("channel", "summing") and native_contact_check is None:
         raise ValueError(f"{asm_name} assembly requires native_contact_check")
+    # The drawings' views at 1:2 and smaller print this derived configuration
+    # (gear teeth and screw threads suppressed); Default stays the solved,
+    # gated, rendered and saved-active pose.
+    sync_simplified_configuration(adapter, asm_name)
     # Establish a clean solved state for the health and pose gates.
     final_rebuild_before_save(adapter, asm_name)
     if solved_gates is not None:
@@ -2513,8 +2710,9 @@ def final_rebuild_before_save(adapter: Any, label: str, model: Any = None) -> No
 async def reconcile_saved_rebuild_state(
     adapter: Any, asm_name: str, asm_path: Any
 ) -> None:
-    """Reopen a just-saved assembly and, if it loads needing a rebuild, EditRebuild3
-    + in-place Save3 so the persisted artifact reopens clean (issue #267).
+    """Reopen a just-saved assembly and, if it loads needing a rebuild, rebuild
+    each configuration + in-place Save3 so the persisted artifact reopens clean
+    (issue #267), then reopen it again and prove it.
 
     Root cause (proven by ``diagnostics/probe_rebuild_matrix.py`` /
     ``probe_child_dirty.py``): ``final_rebuild_before_save`` and the deep health
@@ -2528,8 +2726,20 @@ async def reconcile_saved_rebuild_state(
     reopening from disk (children clean) + ``EditRebuild3`` reconciles the assembly,
     and the in-place ``Save3`` persists the clean mark WITHOUT rewriting any part
     file. A post-``ForceRebuild3(False)`` rebuild in the SAME document instance
-    cannot un-dirty it -- the reopen is required. ``verify:soundness``'s
-    ``saved-rebuild-clean`` gate is the independent backstop that this held.
+    cannot un-dirty it -- the reopen is required.
+
+    Rebuilding the active configuration alone stopped holding once assemblies
+    carried ``Default Simplified`` (``sync_simplified_configuration``):
+    paper-drive (c85a21ec4) logged "reconciled ... was 1", read NeedsRebuild2=0
+    in memory after its Save3, and still opened with NeedsRebuild2=1 for
+    ``verify:soundness``'s ``saved-rebuild-clean`` gate, while every earlier
+    build's reconcile held. So every other configuration is shown and
+    ``EditRebuild3``-ed first and the rest configuration last, each marked for
+    rebuild-save and read back (the part-side finalization,
+    ``_drawing_simplified.persist_configurations_in_place``), before the one
+    ``Save3``. The saved file is then reopened the way that gate opens it and
+    must read clean, so an artifact that would fail it is never cached; a dirty
+    reopen raises naming each configuration's saved state.
     """
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
     with _telemetry.span("assembly.reconcile_rebuild", asm=asm_name) as sp:
@@ -2542,11 +2752,24 @@ async def reconcile_saved_rebuild_state(
                 f"saved artifact already clean, no reconcile ({asm_name})"
             )
             return
-        rebuilt = adapter._attempt(lambda: model.EditRebuild3(), default=None)
-        if rebuilt is False or rebuilt is None:
-            raise RuntimeError(
-                f"{asm_name}: reconcile EditRebuild3 returned {rebuilt!r}"
-            )
+        rest = active_configuration_name(adapter, model)
+        names = [str(name) for name in (model.GetConfigurationNames() or ())]
+        if rest not in names:
+            raise RuntimeError(f"{asm_name}: active configuration {rest!r} not in {names}")
+        for name in [name for name in names if name != rest] + [rest]:
+            if active_configuration_name(adapter, model) != name and not bool(
+                model.ShowConfiguration2(name)
+            ):
+                raise RuntimeError(f"{asm_name}: reconcile ShowConfiguration2({name!r}) refused")
+            rebuilt = adapter._attempt(lambda: model.EditRebuild3(), default=None)
+            if rebuilt is False or rebuilt is None:
+                raise RuntimeError(
+                    f"{asm_name}: reconcile EditRebuild3 in {name!r} returned {rebuilt!r}"
+                )
+            configuration = _early_bound(model.GetConfigurationByName(name), "IConfiguration")
+            configuration.AddRebuildSaveMark = True
+            if not bool(configuration.AddRebuildSaveMark):
+                raise RuntimeError(f"{asm_name}: {name!r} rebuild-save mark did not set")
         result = adapter._attempt(
             lambda: model.Save3(1, 0, 0), default=None
         )  # Silent, in place
@@ -2556,7 +2779,28 @@ async def reconcile_saved_rebuild_state(
                 f"{asm_name}: reconcile left NeedsRebuild2={in_mem} after EditRebuild3+Save3 "
                 f"(save result={result!r})"
             )
-        _telemetry.success(f"reconciled saved rebuild state ({asm_name}, was {status})")
+        adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
+        await adapter.open_model(str(asm_path))
+        reopened = _early_bound(adapter.currentModel, "IModelDoc2")
+        status_on_reopen = saved_rebuild_status(adapter, reopened)
+        sp.set_attribute("needs_rebuild_on_reopen", status_on_reopen)
+        if status_on_reopen != 0:
+            states = "; ".join(
+                f"{name}: NeedsRebuild={bool(configuration.NeedsRebuild)}, "
+                f"AddRebuildSaveMark={bool(configuration.AddRebuildSaveMark)}"
+                for name in names
+                for configuration in [
+                    _early_bound(reopened.GetConfigurationByName(name), "IConfiguration")
+                ]
+            )
+            raise RuntimeError(
+                f"{asm_name}: reconciled .SLDASM still opens with "
+                f"NeedsRebuild2={status_on_reopen} ({states})"
+            )
+        _telemetry.success(
+            f"reconciled saved rebuild state ({asm_name}, was {status}, "
+            f"{len(names)} configuration(s), reopens clean)"
+        )
 
 
 def rebuild_if_needed_before_save(adapter: Any, label: str, model: Any = None) -> bool:
@@ -2701,8 +2945,20 @@ async def assembly_geometry_digest(adapter: Any, asm_name: str) -> str:
     re-exports its PNGs), but ANCESTOR renders won't auto-regenerate. In practice the
     colours that matter are applied at assembly scope via ``apply_component_color``
     (the FULL path -> recipe change -> save), so this only bites a bare part recolour;
-    force a rebuild (delete the .SLDASM target) if one must propagate up."""
-    configs = check("list configurations", await adapter.list_configurations())
+    force a rebuild (delete the .SLDASM target) if one must propagate up.
+
+    ``Default Simplified`` is not fingerprinted here: resolving it would double
+    the top assembly's ~80-160 s configuration switch on every refresh. Its
+    identity rides its configuration comment instead
+    (``sync_simplified_configuration``): a re-pointed component, or a child
+    whose own simplified configuration changed (a part suppressing different
+    features, a subassembly whose fingerprint moved), forces the re-save
+    through ``refresh_assembly`` even when Default's geometry is unchanged."""
+    configs = [
+        cfg
+        for cfg in check("list configurations", await adapter.list_configurations())
+        if not is_simplified(cfg)
+    ]
     rest = "Default" if "Default" in configs else (configs[0] if configs else None)
     # Only switch configs for a genuinely multi-config assembly. A config switch
     # regenerates the whole model (~80-160 s each on the 122-component top), so for
@@ -3021,7 +3277,11 @@ async def refresh_assembly(
     with _telemetry.span("open", asm=asm_name):
         check(f"open {asm_name}", await adapter.open_model(str(asm_path)))
         opened_rebuild_status = saved_rebuild_status(adapter)
-        configs = check("list configurations", await adapter.list_configurations())
+    # A refreshed part may have gained, lost or changed its "<cfg> Simplified",
+    # so the drawing configuration is re-pointed and re-fingerprinted before
+    # the per-config rebuild below proves it clean; any change forces the save.
+    simplified_changes = sync_simplified_configuration(adapter, asm_name, verify=False)
+    configs = check("list configurations", await adapter.list_configurations())
     log(f"refresh {asm_name}: {len(configs)} configuration(s): {configs}")
     # The deterministic export/rest pose: Default is the saved, rendered pose the
     # top-level assembly references, and the DOF gate runs on it.
@@ -3092,7 +3352,9 @@ async def refresh_assembly(
     except OSError:
         prev = None
     persisted_dirty = opened_rebuild_status != 0
-    geometry_changed = prev != digest or repaired_any or persisted_dirty
+    geometry_changed = (
+        prev != digest or repaired_any or persisted_dirty or simplified_changes > 0
+    )
     if persisted_dirty:
         _telemetry.warn(
             f"refresh {asm_name}: saved artifact opened with "

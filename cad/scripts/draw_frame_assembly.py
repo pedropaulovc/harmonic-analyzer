@@ -1,8 +1,9 @@
 r"""Create the native multi-sheet frame assembly drawing package.
 
 The released ``frame.SLDASM`` stays authoritative and byte-for-byte unchanged.
-This recipe consumes the builder-owned ``FRAME_EXPLODED`` presentation for one
-native drawing view. It never creates, edits, deletes, or saves assembly
+This recipe consumes the builder-owned ``FRAME_EXPLODED Simplified``
+presentation (the teeth/thread-free twin of ``FRAME_EXPLODED``) for one native
+drawing view. It never creates, edits, deletes, or saves assembly
 presentation definitions.
 """
 
@@ -18,11 +19,16 @@ from typing import Any, Callable, Sequence
 import _telemetry
 from _common import _early_bound, check, run_build
 from _drawing_common import (
+    ASSEMBLY_VIEW_CONFIGURATION,
+    SIMPLIFIED_VIEW_CONFIGURATION,
     DrawingOutputs,
+    ViewRole,
     _balloon_item_number,
     _edge_endpoint_key,
     _spread_balloons,
     add_component_bom_balloons,
+    apply_view_configuration,
+    assert_full_detail_view,
     create_section_view,
     finalize_drawing,
     insert_bom_table,
@@ -36,9 +42,11 @@ from _drawing_common import (
     set_reference_dimension,
     set_hidden_lines_visible,
     set_high_quality_shaded_with_edges,
+    set_view_exploded_state,
     sheet_drawable_region,
     visible_component_entities,
 )
+from _drawing_simplified import simplified_name
 from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
 from frame_attachment_spec import (
     BASE_SCREW_Y,
@@ -157,7 +165,14 @@ if CROSS_SCREW_SHANK_LEN >= CASTING_FULL_THREAD_DEPTH:
     raise AssertionError("stock cross screw must seat before reaching the tap bottom")
 
 EXPLODED_VIEW_NAME = "FRAME_EXPLODED"
-SOURCE_CONFIGURATION = "Default"
+# The builder authors the explode in both drawing configurations (Default's is
+# FRAME_EXPLODED, Default Simplified's FRAME_EXPLODED Simplified): a view shows
+# the explode of the configuration it references.
+SOURCE_CONFIGURATION = ASSEMBLY_VIEW_CONFIGURATION
+EXPLODED_VIEW_NAMES = {
+    SOURCE_CONFIGURATION: EXPLODED_VIEW_NAME,
+    SIMPLIFIED_VIEW_CONFIGURATION: simplified_name(EXPLODED_VIEW_NAME),
+}
 
 # These instructions carry only requirements that exist at assembly: matched
 # fits, the one-setup coaxial casting threads, transfer-drilled tube holes,
@@ -264,19 +279,19 @@ def _add_note_block(
     return note
 
 
-def _set_exploded_state(adapter: Any, view: Any, show: bool, *, label: str) -> None:
-    bound = _early_bound(view, "IView")
-    if str(bound.ReferencedConfiguration) != SOURCE_CONFIGURATION:
-        raise RuntimeError(f"{label}: view must reference the Default configuration")
-    returned = bool(bound.ShowExploded(show))
-    actual = bool(bound.IsExploded())
-    if actual != show:
-        raise RuntimeError(
-            f"{label}: exploded-state readback is {actual}, expected {show}"
-        )
-    if show and not returned:
-        raise RuntimeError(f"{label}: ShowExploded returned false")
-    adapter.currentModel.EditRebuild3()
+def _configure_view(
+    adapter: Any,
+    view: Any,
+    *,
+    exploded: bool,
+    role: ViewRole = ViewRole.PLAIN,
+    label: str,
+) -> str:
+    """Point a view at its policy configuration, then explode or collapse it
+    there. Both are read back; returns the configuration."""
+    configuration = apply_view_configuration(adapter, view, role=role, label=label)
+    set_view_exploded_state(adapter, view, exploded, configuration=configuration, label=label)
+    return configuration
 
 
 def _checked_height_dimension(
@@ -560,6 +575,7 @@ def _create_joint_sections(adapter: Any, front: Any) -> tuple[Any, Any]:
             label=label,
         )
         set_hidden_lines_visible(adapter, section)
+        apply_view_configuration(adapter, section, label=f"joint section {cut_y:.3f}")
         sections.append(section)
     return sections[0], sections[1]
 
@@ -579,11 +595,12 @@ def _validate_persisted_explode(source_model: Any) -> None:
     configuration = _early_bound(manager.ActiveConfiguration, "IConfiguration")
     if str(configuration.Name) != SOURCE_CONFIGURATION:
         raise RuntimeError("frame source must open in its Default configuration")
-    names = tuple(assembly.GetExplodedViewNames2(SOURCE_CONFIGURATION) or ())
-    if names != (EXPLODED_VIEW_NAME,):
-        raise RuntimeError(
-            f"frame source exploded views {names!r} != {(EXPLODED_VIEW_NAME,)!r}"
-        )
+    for owner, wanted in EXPLODED_VIEW_NAMES.items():
+        names = tuple(assembly.GetExplodedViewNames2(owner) or ())
+        if names != (wanted,):
+            raise RuntimeError(
+                f"frame source {owner} exploded views {names!r} != {(wanted,)!r}"
+            )
     components = tuple(assembly.GetComponents(True) or ())
     if len(components) != sum(BOM_QUANTITIES.values()):
         raise RuntimeError("frame source must contain exactly 29 components")
@@ -1148,8 +1165,10 @@ def _place_package(adapter: Any) -> None:
         *WORKING_FRONT_CENTER,
         scale=SHEET_SCALE,
     )
-    _set_exploded_state(adapter, front, False, label="working front")
     set_hidden_lines_visible(adapter, front)
+    # Before the dimensions and sections bind to it: the 1:8 view prints the
+    # teeth/thread-free configuration, and the A-A/B-B sections follow it.
+    _configure_view(adapter, front, exploded=False, label="working front")
     _add_frame_height_dimensions(adapter, front)
     _create_joint_sections(adapter, front)
     _add_note_block(
@@ -1180,10 +1199,11 @@ def _place_package(adapter: Any) -> None:
         *EXPLODED_ISO_CENTER,
         scale=EXPLODED_ISO_SCALE,
     )
-    _set_exploded_state(adapter, exploded, True, label="exploded isometric")
     set_high_quality_shaded_with_edges(
         adapter, exploded, label="frame exploded anchor visibility"
     )
+    # Configuration, then its own explode, then the BOM and balloons bind.
+    _configure_view(adapter, exploded, exploded=True, label="exploded isometric")
     table = insert_bom_table(
         adapter,
         exploded,
@@ -1218,9 +1238,15 @@ def _place_package(adapter: Any) -> None:
         *ASSEMBLY_ISO_CENTER,
         scale=ASSEMBLY_ISO_SCALE,
     )
-    _set_exploded_state(
-        adapter, instruction_iso, False, label="assembly instruction isometric"
+    # The drawing's full-detail view: every modeled tooth and thread.
+    _configure_view(
+        adapter,
+        instruction_iso,
+        exploded=False,
+        role=ViewRole.FULL_DETAIL,
+        label="assembly instruction isometric",
     )
+    assert_full_detail_view(adapter, label="frame assembly")
     _add_note_block(adapter, ASSEMBLY_STEPS, (0.018, 0.263), label="assembly sequence")
     # 34 lines at ~4.7 mm pitch run the sequence block down to ~0.104; the
     # checks block starts under it with a line of clearance (0.115 overprinted

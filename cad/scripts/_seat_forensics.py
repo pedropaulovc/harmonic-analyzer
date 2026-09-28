@@ -39,7 +39,7 @@ import os
 import re
 import tempfile
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, NoReturn
@@ -409,8 +409,13 @@ def seat_provenance(adapter: Any) -> dict[str, Any]:
 
 
 def record_seat_provenance(adapter: Any) -> dict[str, Any]:
-    """Resolve the seat's provenance, publish it, and return it for the caller to
-    hang on the build PHASE span.
+    """Resolve the seat's provenance, hold the session until the seat has
+    finished starting (:func:`await_seat_startup`), publish both, and return
+    them for the caller to hang on the build PHASE span.
+
+    The startup wait lives here because this is the one connect-time call that
+    runs before any document is opened -- ``run_build`` calls it right after
+    ``connect`` and before the discard, the template pin and the build.
 
     Published three ways, because each answers a different question: a
     ``seat.provenance`` span event (WHEN in the session the seat was identified),
@@ -420,6 +425,16 @@ def record_seat_provenance(adapter: Any) -> dict[str, Any]:
     rather than just the exit code.
     """
     prov = seat_provenance(adapter)
+    # The watchdog learns the seat BEFORE the wait: an abort during it (a seat
+    # that dies or wedges while starting) must still name the seat it killed.
+    _watchdog.set_seat_provenance(prov)
+    startup = await_seat_startup(adapter, prov.get("seat_started_epoch_s"))
+    if startup.get("seat_startup_wait_s"):
+        # The seat aged while we waited; the published uptime is the one at
+        # which the build actually starts.
+        with contextlib.suppress(Exception):
+            prov.update(_seat_liveness(prov.get("seat_pid"), prov.get("seat_started_epoch_s")))
+    prov.update(startup)
     _watchdog.set_seat_provenance(prov)
     _telemetry.event("seat.provenance", **prov)
     _telemetry.info(
@@ -430,6 +445,254 @@ def record_seat_provenance(adapter: Any) -> dict[str, Any]:
         **prov,
     )
     return prov
+
+
+# ``ISldWorks.StartupProcessCompleted`` (propget, dispid 311 in the R2026x
+# typelib): "Gets whether the SOLIDWORKS startup process, including loading all
+# startup add-ins, has completed ... call this property before calling
+# ISldWorks::OpenDoc6 in an out-of-process add-in application." Every COM build
+# is such a client, and the adapter's own readiness probe only proves the server
+# answers ``RevisionNumber``. Two drawing leaves that were the FIRST job on a
+# seat about 20 s old opened their source part and read every custom property
+# empty: drawing:crank_hub (pid 7204, uptime 20.0 s, 2026-09-28 04:38Z) and
+# drawing:cone_pivot_post (pid 15124, uptime 21.8 s, 07:37Z). The same cached
+# SLDPRTs passed on warm seats and on those same seats minutes later. Their opens
+# took 5.0 s and 5.5 s against 1.1-1.8 s on a warm seat.
+#
+# The wait is bounded by seat AGE, not by a timer from now: startup belongs to
+# the start of a process, so a seat older than the window that still answers
+# False is stuck, not starting. Waiting on it would cost every later leaf the
+# same delay, so it is recorded and the build proceeds.
+_STARTUP_WINDOW_ENV = "HARMONIC_SW_STARTUP_WINDOW"
+_DEFAULT_STARTUP_WINDOW_S = 180.0
+_STARTUP_POLL_S = 0.5
+# The connect-time startup record, kept for a later failure capture in this
+# process (:func:`capture_missing_properties`).
+_seat_startup: dict[str, Any] = {}
+
+
+def _startup_window() -> float:
+    """``HARMONIC_SW_STARTUP_WINDOW`` seconds, finite and non-negative (a
+    rejected value is logged and replaced by the default). Not tied to the
+    watchdog's op timeout: every poll emits a log record, which is the
+    watchdog's heartbeat, so a wait longer than that timeout is not idle."""
+    raw = os.environ.get(_STARTUP_WINDOW_ENV)
+    window = _DEFAULT_STARTUP_WINDOW_S
+    if raw is not None:
+        try:
+            window = float(raw)
+        except ValueError:
+            window = math.nan
+        if not math.isfinite(window) or window < 0:
+            _telemetry.warn(
+                f"{_STARTUP_WINDOW_ENV}={raw!r} is not a finite, non-negative number "
+                f"of seconds; using the default {_DEFAULT_STARTUP_WINDOW_S:.0f}s"
+            )
+            window = _DEFAULT_STARTUP_WINDOW_S
+    return window
+
+
+def _startup_completed(sw: Any) -> bool | None:
+    """The seat's ``StartupProcessCompleted``, or ``None`` when it gives no
+    boolean answer. ``None`` is never read as a verdict either way."""
+    try:
+        value = _common._read_member(sw, "StartupProcessCompleted")
+    except Exception:  # noqa: BLE001 - an unreadable seat is "unknown"
+        return None
+    return value if isinstance(value, bool) else None
+
+
+def await_seat_startup(adapter: Any, started_epoch_s: Any = None) -> dict[str, Any]:
+    """Block until the seat reports ``StartupProcessCompleted``, up to the
+    startup window (``HARMONIC_SW_STARTUP_WINDOW`` seconds of seat age).
+
+    Returns flat ``seat_startup_*`` keys: ``seat_startup_completed`` (the last
+    answer: ``True``/``False``, or ``"unknown"`` when the seat gives none), and
+    when the first answer was ``False``, the ``seat_startup_wait_s`` spent and
+    the ``seat_startup_uptime_s`` at which the wait began. A seat that cannot
+    answer is not waited on, and a wait that runs out proceeds: this never
+    fails a build.
+    """
+    global _seat_startup
+    sw = getattr(adapter, "swApp", None)
+    completed = _startup_completed(sw) if sw is not None else None
+    record: dict[str, Any] = {
+        "seat_startup_completed": "unknown" if completed is None else completed
+    }
+    if completed is not False:
+        _seat_startup = record
+        return record
+    window = _startup_window()
+    now = time.time()
+    started = float(started_epoch_s) if isinstance(started_epoch_s, (int, float)) else None
+    uptime = now - started if started is not None else None
+    deadline = (started if started is not None else now) + window
+    record["seat_startup_uptime_s"] = round(uptime, 1) if uptime is not None else "unknown"
+    age = f"{uptime:.1f}s" if uptime is not None else "an unknown age"
+    if now >= deadline:
+        record["seat_startup_wait_s"] = 0.0
+        _telemetry.warn(
+            f"seat reports StartupProcessCompleted=False at {age}, past the "
+            f"{window:.0f}s startup window; not waiting ({_STARTUP_WINDOW_ENV})",
+            **record,
+        )
+        _seat_startup = record
+        return record
+    _telemetry.info(
+        f"seat still starting (StartupProcessCompleted=False at {age}); holding "
+        f"the session until it completes, up to {window:.0f}s of seat age",
+        **record,
+    )
+    # The seat's age needs the wall clock (its start time is an epoch), but the
+    # wait itself is bounded on the monotonic clock: a worker's clock corrected
+    # mid-wait must neither extend it indefinitely nor cut it short. A clock
+    # stepped back BEFORE this call puts the start in the future, so the budget
+    # is also clamped to the window itself.
+    begun = time.monotonic()
+    stop = begun + min(deadline - now, window)
+    while completed is False and time.monotonic() < stop:
+        time.sleep(_STARTUP_POLL_S)
+        completed = _startup_completed(sw)
+        # One record per poll keeps the watchdog's idle clock (log records are
+        # its heartbeat) from reading this wait as a wedged COM call.
+        _telemetry.debug(
+            f"seat startup poll: StartupProcessCompleted={completed} after "
+            f"{time.monotonic() - begun:.1f}s"
+        )
+    waited = round(time.monotonic() - begun, 2)
+    record["seat_startup_completed"] = "unknown" if completed is None else completed
+    record["seat_startup_wait_s"] = waited
+    if completed is True:
+        _telemetry.info(f"seat startup completed after waiting {waited:.1f}s", **record)
+    else:
+        _telemetry.warn(
+            f"seat startup still not reported complete after {waited:.1f}s "
+            f"(StartupProcessCompleted={record['seat_startup_completed']}); "
+            "proceeding -- a document opened now may read empty",
+            **record,
+        )
+    with contextlib.suppress(Exception):
+        _telemetry.event("seat.startup", **record)
+    _seat_startup = record
+    return record
+
+
+# swCustomInfoGetResult_e
+_CUSTOM_INFO_GET_RESULT = {0: "CachedValue", 1: "NotPresent", 2: "ResolvedValue"}
+
+
+def _property_manager_state(
+    model: Any, configuration: str, names: Sequence[str]
+) -> dict[str, Any]:
+    """One ``ICustomPropertyManager``'s view of ``names``: how many properties
+    the manager holds, their names, and ``Get6``'s result code and value for
+    each asked name.
+
+    ``Get6(name, UseCached=True)``: on the file-level manager and on the ACTIVE
+    configuration that is the up-to-date value, and it never loops through the
+    other configurations (``UseCached=False`` may, and may leave a different
+    configuration active). The ``[out]`` values ride the return tuple (early
+    binding, see ``_early_bound``).
+    """
+    extension = _common._read_member(model, "Extension")
+    manager = _common._early_bound(
+        extension.CustomPropertyManager(configuration), "ICustomPropertyManager"
+    )
+    state: dict[str, Any] = {"count": int(_common._read_member(manager, "Count") or 0)}
+    state["names"] = [str(name) for name in (_common._read_member(manager, "GetNames") or ())]
+    reads: dict[str, Any] = {}
+    for name in names:
+        try:
+            result = manager.Get6(name, True)
+            code, value, resolved = int(result[0]), result[1], result[2]
+            reads[name] = {
+                "result": _CUSTOM_INFO_GET_RESULT.get(code, str(code)),
+                "value": str(value or ""),
+                "resolved": str(resolved or ""),
+            }
+        except Exception as exc:  # noqa: BLE001 - one unreadable name is data
+            reads[name] = {"capture_error": f"{type(exc).__name__}: {exc}"}
+    state["get6"] = reads
+    return state
+
+
+def capture_missing_properties(
+    model: Any,
+    message: str,
+    *,
+    missing: Sequence[str],
+    values: Mapping[str, str],
+    load: Mapping[str, Any],
+) -> NoReturn:
+    """Name the document, configuration, API and seat behind an empty
+    custom-property read, then raise ``RuntimeError(message)``.
+
+    ``values`` are what ``IModelDoc2.GetCustomInfoValue("", name)`` returned
+    for every name the caller read; ``load`` is the caller's document-load
+    observation (``IsOpenedViewOnly`` and any wait on it). The capture adds the
+    same names read through ``ICustomPropertyManager`` -- the file-level
+    manager and the active configuration's -- so a reader can tell a property
+    SET that did not load (``count`` 0 everywhere) from properties that exist
+    but read empty, or that live on a configuration only; plus the seat's age
+    and its connect-time startup record.
+
+    Every probe is guarded, and the reporting is too: the caller's message and
+    exception type always survive (see :func:`capture_com_failure`).
+    """
+    report: dict[str, Any] = {
+        "api": 'IModelDoc2.GetCustomInfoValue(Configuration="")',
+        "missing": list(missing),
+        "values": dict(values),
+        "load": dict(load),
+    }
+    probes: dict[str, Callable[[], Any]] = {
+        "path": lambda: str(_common._read_member(model, "GetPathName") or ""),
+        "title": lambda: str(_common._read_member(model, "GetTitle") or ""),
+        "doc_type": lambda: int(_common._read_member(model, "GetType") or 0),
+        "read_only": lambda: bool(_common._read_member(model, "IsOpenedReadOnly")),
+        "configuration": lambda: _common.active_configuration_name(None, model),
+    }
+    for key, probe in probes.items():
+        try:
+            report[key] = probe()
+        except Exception as exc:  # noqa: BLE001 - forensics never raise
+            report[key] = f"unreadable ({type(exc).__name__}: {exc})"
+    names = list(values) or list(missing)
+    managers = {"file_properties": ""}
+    if isinstance(report.get("configuration"), str) and report["configuration"]:
+        managers["configuration_properties"] = report["configuration"]
+    for key, configuration in managers.items():
+        try:
+            report[key] = _property_manager_state(model, configuration, names)
+        except Exception as exc:  # noqa: BLE001 - forensics never raise
+            report[key] = {"capture_error": f"{type(exc).__name__}: {exc}"}
+    with contextlib.suppress(Exception):
+        report["seat"] = {
+            **_seat_identity,
+            **_seat_liveness(_seat_identity.get("seat_pid"), _seat_identity.get("seat_started_epoch_s")),
+            **_seat_startup,
+        }
+    with contextlib.suppress(Exception):
+        seat = report.get("seat") or {}
+        counts = " ".join(
+            f"{key}.count={report[key].get('count', 'unreadable')}"
+            for key in managers
+            if isinstance(report.get(key), dict)
+        )
+        _telemetry.error(
+            f"[forensics] {message}: document={report.get('path')!r} "
+            f"configuration={report.get('configuration')!r} api={report['api']} "
+            f"{counts} view_only={report['load'].get('view_only')} "
+            f"seat_pid={seat.get('seat_pid')} seat_uptime_s={seat.get('seat_uptime_s')} "
+            f"startup_completed={seat.get('seat_startup_completed')}",
+            capture=json.dumps(report, default=str, sort_keys=True),
+            document=str(report.get("path")),
+            configuration=str(report.get("configuration")),
+            api=report["api"],
+            missing=json.dumps(list(missing)),
+            **_common._attributes_of(seat),
+        )
+    raise RuntimeError(message)
 
 
 # The seat user preferences that govern SKETCH AUTHORING. A profile authored from

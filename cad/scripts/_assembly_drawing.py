@@ -9,6 +9,9 @@ import _telemetry
 from _common import check
 from _drawing_common import (
     DrawingOutputs,
+    ViewRole,
+    apply_view_configuration,
+    assert_full_detail_view,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -63,13 +66,18 @@ async def build_simple_three_view_drawing(
         ("*Right", right_center),
         ("*Isometric", iso_center),
     ):
-        place_view(
+        view = place_view(
             adapter,
             str(source),
             view_name,
             *center,
             scale=sheet_scale,
         )
+        # Front and Right print the teeth/thread-free configuration at 1:2
+        # and smaller; the isometric is the drawing's full-detail view.
+        role = ViewRole.FULL_DETAIL if view_name == "*Isometric" else ViewRole.PLAIN
+        apply_view_configuration(adapter, view, role=role, label=f"{pdf_title} {view_name}")
+    assert_full_detail_view(adapter, label=pdf_title)
 
     return await finalize_drawing(
         adapter,

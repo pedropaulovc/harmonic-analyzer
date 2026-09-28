@@ -47,11 +47,11 @@ from _common import (
     name_last_feature,
     report_mass_properties,
     run_build,
-    save_part_and_images,
     set_global,
     set_sketch_direct_db,
     volume_check,
 )
+from _drawing_simplified import save_simplified_part
 
 PART_NAME = "platen-rack"
 MATERIAL = "Brass"  # ch. 22/23 photos: brass
@@ -191,7 +191,7 @@ async def build(adapter) -> dict[str, str]:
         )
     )
     check("linear pattern gaps", res)
-    name_last_feature(adapter, "ToothPattern")
+    tooth_pattern_name = name_last_feature(adapter, "ToothPattern")
     v_rack = v_bar - GAP_COUNT * v_gap
     await volume_check(adapter, "toothed rack", v_rack, 0.01 * GAP_COUNT * v_gap)
 
@@ -218,7 +218,9 @@ async def build(adapter) -> dict[str, str]:
     )
 
     await report_mass_properties(adapter)
-    return await save_part_and_images(adapter, PART_NAME)
+    # Assembly views at 1:2 or smaller print the rack's "<cfg> Simplified":
+    # the seed gap and its pattern suppressed, a plain bar.
+    return await save_simplified_part(adapter, PART_NAME, (gap_cut_name, tooth_pattern_name))
 
 
 if __name__ == "__main__":

@@ -57,12 +57,17 @@ CALL_SITES: dict[tuple[str, str], frozenset[str]] = {
     # A refused rebuild: reads the What's Wrong table, then raises through
     # capture_com_failure.  Nothing after it runs.
     ("_common.py", "force_rebuild"): frozenset({"capture_rebuild_failure"}),
+    # An empty source-property read: reads the property managers and the seat's
+    # age, then raises the reader's own failure.  Nothing after it runs.
+    ("_drawing_common.py", "read_required_properties"): frozenset(
+        {"capture_missing_properties"}
+    ),
 }
 # Allowed anywhere, but only as a statement whose value is the call: it always raises.
 TERMINAL = frozenset({"capture_com_failure"})
 # Pinned captures that must raise like a terminal, though only their CALL_SITES
 # may name them.
-PINNED_TERMINALS = frozenset({"capture_rebuild_failure"})
+PINNED_TERMINALS = frozenset({"capture_rebuild_failure", "capture_missing_properties"})
 
 # Rule 3: the COM mutators an inert module may call, and the function that calls each.
 MUTATOR = re.compile(

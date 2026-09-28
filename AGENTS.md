@@ -713,7 +713,9 @@ enforces it, and derives its scope from that one constant:
 2. **Pinned call sites only.** Tracked code names it only as `<module>.<name>`,
    inside a pinned `(file, function)`: `_common.run_build` (connect-time
    provenance, post-save `teardown_seat`), `_common.save_part_and_images`
-   (`record_authoring_context`), and `package_native._release_seat`. The one
+   (`record_authoring_context`), `_common.force_rebuild`
+   (`capture_rebuild_failure`), `_drawing_common.read_required_properties`
+   (`capture_missing_properties`) and `package_native._release_seat`. The one
    exception is `capture_com_failure(...)` as a bare statement: it always
    raises. A new call site fails loud with file:line.
 3. **No COM write before a save.** The module calls no mutator verb
@@ -735,6 +737,20 @@ identical inputs must give an identical verdict. The sketch-closure census and
 `record_sketch_closure`/`log_profile_geometry` live in the tracked
 `_sketch_closure.py` for that reason. So does anything that writes into the
 model before it is saved, such as `_build_id`'s `Generator` property.
+
+**Seat startup.** `record_seat_provenance` also holds the session until the seat
+reports `ISldWorks.StartupProcessCompleted` (`await_seat_startup`). The wait is
+bounded by seat age: `HARMONIC_SW_STARTUP_WINDOW`, 180 s by default. A value that
+is not a finite, non-negative number is logged and falls back to the default.
+Every poll emits a DEBUG record, and log records are the COM watchdog's
+heartbeat, so the watchdog does not read the wait as a wedged seat and the op
+timeout does not shorten the window. A seat that is still False past the window,
+or that gives no answer, is logged and the build proceeds. The wait is timing,
+not a verdict: it reads nothing into the model and never raises, so it stays
+inert. The seat line reports
+`startup_completed=`/`startup_wait_s=`. Before this, two drawing leaves that were
+the first job on a seat about 20 s old opened their source part and read every
+custom property empty.
 
 If you need a new inert entry point, add it to the gate's `CALL_SITES` only if
 it runs after the save or provably reads nothing into the model. Otherwise put

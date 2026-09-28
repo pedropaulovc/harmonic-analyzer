@@ -67,8 +67,13 @@ instructions. The registry includes both orientation templates as dependencies.
 Finalization checks each native sheet and each exported PDF page against its
 declared layout.
 
-The frame builder owns the persisted `FRAME_EXPLODED` presentation and saves the
-assembly collapsed. The drawing consumes that presentation without authoring
+The frame builder owns the persisted `FRAME_EXPLODED` presentation, authors the
+same steps in `Default Simplified` as `FRAME_EXPLODED Simplified`, and saves the
+assembly collapsed. A drawing view shows the explode of the configuration it
+references, and the 1:7 exploded view references `Default Simplified` (every
+assembly view at 1:2 or smaller that inks edges does; sheet 3's isometric is
+the full-detail view). The drawing therefore sets a view's configuration first
+and its exploded state second, and consumes the presentation without authoring
 source features. Explode validation checks component movement in world
 coordinates; a view's exploded flag alone does not establish correct separation.
 The drawing lifecycle also checks that the source assembly remains unchanged.

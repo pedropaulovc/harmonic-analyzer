@@ -30,6 +30,7 @@ the reason the 2026-09-17 ``logo ring extrude failed`` leaf could only be called
 
 from __future__ import annotations
 
+import ast
 import contextlib
 import json
 import ctypes
@@ -42,6 +43,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, cast
+from types import SimpleNamespace
 from unittest import mock
 
 import pytest
@@ -252,6 +254,7 @@ def offline_seat(monkeypatch, tmp_path):
     monkeypatch.setattr(_seat_forensics, "_sldworks_pids", lambda: {4242})
     monkeypatch.setattr(_seat_forensics, "_seat_pids_at_start", frozenset({4242}))
     monkeypatch.setattr(_seat_forensics, "_seat_identity", {})
+    monkeypatch.setattr(_seat_forensics, "_seat_startup", {})
     monkeypatch.setattr(_seat_forensics, "_process_started_at", lambda pid: 1_700_000_000.0)
     monkeypatch.setattr(_seat_forensics, "_process_memory", lambda pid: (1 << 30, 1 << 29))
     monkeypatch.setattr(_seat_forensics, "_process_session_id", lambda pid: 1)
@@ -592,6 +595,529 @@ def test_unresolvable_seat_pid_is_not_invented(monkeypatch):
 
     assert prov["seat_pid_source"] == "unresolved"
     assert "seat_pid" not in prov
+
+
+class _StartingSeat(_Seat):
+    """An ``ISldWorks`` whose ``StartupProcessCompleted`` (a propget) answers
+    each read with the next scripted value, repeating the last."""
+
+    def __init__(self, answers: list[Any], **kwargs: Any):
+        super().__init__(**kwargs)
+        self._answers = list(answers)
+        self.startup_reads = 0
+
+    @property
+    def StartupProcessCompleted(self) -> Any:
+        self.startup_reads += 1
+        return self._answers[min(self.startup_reads, len(self._answers)) - 1]
+
+
+@pytest.fixture
+def fast_polls(monkeypatch):
+    """The waits poll a real signal; the test only removes the wall time."""
+    monkeypatch.setattr(_seat_forensics, "_STARTUP_POLL_S", 0.0)
+    monkeypatch.setattr(_seat_forensics.time, "sleep", lambda _s: None)
+
+
+def test_a_starting_seat_is_held_until_startup_completes(
+    monkeypatch, fast_polls, capture_telemetry
+):
+    """The 2026-09-28 fresh-seat failures: a leaf connected to a seat ~20 s old
+    and opened its source before SolidWorks said startup was done. Connect now
+    holds the session on the seat's own ``StartupProcessCompleted`` and says
+    so; the build starts only on a True."""
+    spans, logs = capture_telemetry
+    monkeypatch.setattr(_seat_forensics, "_process_started_at", lambda pid: time.time() - 20)
+    seat = _StartingSeat([False, False, False, True])
+
+    prov = _seat_forensics.record_seat_provenance(_Adapter(sw=seat))
+
+    assert seat.startup_reads == 4  # stopped polling on the first True
+    assert prov["seat_startup_completed"] is True
+    assert prov["seat_startup_wait_s"] >= 0
+    assert 19 <= prov["seat_startup_uptime_s"] <= 25
+    bodies = [str(r.log_record.body) for r in logs.get_finished_logs()]
+    assert any("StartupProcessCompleted=False" in body for body in bodies)
+    assert any("startup_completed=True" in body for body in bodies)  # the seat line
+
+
+def test_the_watchdog_names_the_seat_before_the_startup_wait(monkeypatch, fast_polls):
+    """An abort DURING the wait (a seat that dies or wedges while starting) is
+    the watchdog's to report, so the seat must be pushed to it before the first
+    poll -- and the startup fields after the wait."""
+    monkeypatch.setattr(_seat_forensics, "_process_started_at", lambda pid: time.time() - 20)
+    monkeypatch.setattr(_watchdog, "_seat_fields", {})
+    seen_during_wait: list[dict[str, object]] = []
+
+    class _ObservedSeat(_StartingSeat):
+        @property
+        def StartupProcessCompleted(self) -> Any:
+            seen_during_wait.append(dict(_watchdog._seat_fields))
+            return _StartingSeat.StartupProcessCompleted.fget(self)
+
+    _seat_forensics.record_seat_provenance(_Adapter(sw=_ObservedSeat([False, True], pid=7204)))
+
+    assert seen_during_wait, "the wait never polled the seat"
+    for fields in seen_during_wait:
+        assert fields["seat_pid"] == 7204
+        assert fields["seat_uptime_s"] >= 19
+    assert _watchdog._seat_fields["seat_startup_completed"] is True
+
+
+@pytest.fixture
+def heartbeats(monkeypatch, capture_telemetry):
+    """A live count of watchdog heartbeats (``_telemetry._touch_activity``, the
+    idle clock every log record and span boundary pokes)."""
+    count = [0]
+    touch = _telemetry._touch_activity
+
+    def counted(op: str | None = None) -> None:
+        count[0] += 1
+        touch(op)
+
+    monkeypatch.setattr(_telemetry, "_touch_activity", counted)
+    return count
+
+
+def test_the_startup_wait_keeps_the_watchdog_heartbeat_alive(
+    monkeypatch, fast_polls, heartbeats
+):
+    """The startup wait can outlast the op timeout (its window is seat age, up
+    to 180 s by default); a poll that emits nothing leaves the watchdog's idle
+    clock running, and a lower ``HARMONIC_COM_OP_TIMEOUT`` would kill a healthy
+    wait. Every poll must advance the heartbeat."""
+    monkeypatch.setattr(_seat_forensics, "_process_started_at", lambda pid: time.time() - 20)
+    seen: list[int] = []
+
+    class _ObservedSeat(_StartingSeat):
+        @property
+        def StartupProcessCompleted(self) -> Any:
+            seen.append(heartbeats[0])
+            return _StartingSeat.StartupProcessCompleted.fget(self)
+
+    _seat_forensics.record_seat_provenance(
+        _Adapter(sw=_ObservedSeat([False, False, False, False, True]))
+    )
+
+    assert len(seen) == 5
+    assert all(later > earlier for earlier, later in zip(seen, seen[1:])), seen
+
+
+
+def test_a_seat_older_than_the_startup_window_is_not_waited_on(
+    monkeypatch, fast_polls, capture_telemetry
+):
+    """Startup belongs to the START of a process: a seat past the window that
+    still answers False is stuck, and waiting would tax every later leaf."""
+    spans, logs = capture_telemetry
+    seat = _StartingSeat([False])  # fixture: the seat started in 2023
+
+    prov = _seat_forensics.record_seat_provenance(_Adapter(sw=seat))
+
+    assert seat.startup_reads == 1
+    assert prov["seat_startup_completed"] is False
+    assert prov["seat_startup_wait_s"] == 0.0
+    assert any(
+        "past the" in str(r.log_record.body) and r.log_record.severity_text == "WARN"
+        for r in logs.get_finished_logs()
+    )
+
+
+def test_a_wait_that_runs_out_proceeds_and_says_so(monkeypatch, fast_polls, capture_telemetry):
+    """The window is measured in seat AGE, so a seat that never completes costs
+    at most the rest of it, and the build goes on with the state on record."""
+    spans, logs = capture_telemetry
+    monkeypatch.setenv("HARMONIC_SW_STARTUP_WINDOW", "30")
+    started = time.time() - 29.9
+    monkeypatch.setattr(_seat_forensics, "_process_started_at", lambda pid: started)
+    seat = _StartingSeat([False])
+
+    prov = _seat_forensics.record_seat_provenance(_Adapter(sw=seat))
+
+    assert prov["seat_startup_completed"] is False
+    assert "seat_startup_wait_s" in prov
+    assert any("proceeding" in str(r.log_record.body) for r in logs.get_finished_logs())
+
+
+def test_a_wall_clock_stepped_back_mid_wait_does_not_extend_it(monkeypatch, capture_telemetry):
+    """A worker's clock corrected backwards while the seat starts (time sync on
+    a fresh VM) must not stretch the wait: only the seat AGE reads the wall
+    clock; the wait itself runs out on the monotonic clock."""
+    monkeypatch.setenv("HARMONIC_SW_STARTUP_WINDOW", "30")
+    now = time.time()
+    monkeypatch.setattr(_seat_forensics, "_process_started_at", lambda pid: now - 29.9)
+    wall = [now]
+
+    def stepping_back() -> float:
+        wall[0] -= 1.0
+        return wall[0]
+
+    monkeypatch.setattr(
+        _seat_forensics,
+        "time",
+        SimpleNamespace(time=stepping_back, monotonic=time.monotonic, sleep=lambda _s: None),
+    )
+
+    class _NeverStarts(_StartingSeat):
+        @property
+        def StartupProcessCompleted(self):
+            if self.startup_reads > 100_000:
+                raise AssertionError("the startup wait outlived its 0.1 s budget")
+            return super().StartupProcessCompleted
+
+    prov = _seat_forensics.record_seat_provenance(_Adapter(sw=_NeverStarts([False])))
+
+    assert prov["seat_startup_completed"] is False
+    assert prov["seat_startup_wait_s"] < 5
+
+
+def test_a_seat_that_starts_in_the_future_waits_at_most_the_window(
+    monkeypatch, fast_polls, capture_telemetry
+):
+    """A clock stepped back between launching SolidWorks and this call puts the
+    seat's start in the future; the wait is still at most the window, never the
+    skew on top of it."""
+    monkeypatch.setenv("HARMONIC_SW_STARTUP_WINDOW", "0.2")
+    started = time.time() + 1000
+    monkeypatch.setattr(_seat_forensics, "_process_started_at", lambda pid: started)
+
+    class _NeverStarts(_StartingSeat):
+        @property
+        def StartupProcessCompleted(self):
+            if self.startup_reads > 20_000:
+                raise AssertionError("the startup wait outlived its window")
+            return super().StartupProcessCompleted
+
+    prov = _seat_forensics.record_seat_provenance(_Adapter(sw=_NeverStarts([False])))
+
+    assert prov["seat_startup_completed"] is False
+    assert prov["seat_startup_wait_s"] < 1
+
+
+def test_a_ready_or_mute_seat_costs_no_wait():
+    """The control: a started seat is read once, and a seat with no boolean
+    answer is ``unknown`` -- neither a reason to wait nor a claim it is ready."""
+    ready = _StartingSeat([True])
+    assert _seat_forensics.record_seat_provenance(_Adapter(sw=ready))[
+        "seat_startup_completed"
+    ] is True
+    assert ready.startup_reads == 1
+    mute = _seat_forensics.record_seat_provenance(_Adapter(sw=_Seat()))
+    assert mute["seat_startup_completed"] == "unknown"
+    assert "seat_startup_wait_s" not in mute
+
+
+@pytest.mark.parametrize("window", ["inf", "nan", "-5", "soon"])
+def test_an_unusable_startup_window_falls_back_to_the_default(
+    monkeypatch, capture_telemetry, window
+):
+    """``inf`` would poll forever and a negative window is meaningless: both are
+    rejected, loudly, for the default."""
+    spans, logs = capture_telemetry
+    monkeypatch.setenv("HARMONIC_SW_STARTUP_WINDOW", window)
+
+    assert _seat_forensics._startup_window() == _seat_forensics._DEFAULT_STARTUP_WINDOW_S
+    assert any(window in str(r.log_record.body) for r in logs.get_finished_logs())
+
+
+def test_a_short_op_timeout_does_not_shorten_the_startup_wait(
+    monkeypatch, fast_polls
+):
+    """The window is SEAT AGE, and the watchdog is kept alive by the per-poll
+    heartbeat, so the op timeout has no say in it: under a 10 s op timeout a
+    20 s-old seat that is still starting must still be waited on (the
+    2026-09-28 failures were seats of 20.0 s and 21.8 s)."""
+    monkeypatch.setenv("HARMONIC_SW_STARTUP_WINDOW", "180")
+    monkeypatch.setenv("HARMONIC_COM_OP_TIMEOUT", "10")
+    monkeypatch.setattr(
+        _seat_forensics._watchdog, "_active", SimpleNamespace(op_timeout=10.0)
+    )
+    monkeypatch.setattr(_seat_forensics, "_process_started_at", lambda pid: time.time() - 20)
+
+    assert _seat_forensics._startup_window() == 180.0
+    seat = _StartingSeat([False, False, True])
+    prov = _seat_forensics.record_seat_provenance(_Adapter(sw=seat))
+
+    assert seat.startup_reads == 3
+    assert prov["seat_startup_completed"] is True
+
+
+class _PropertyManager:
+    """``ICustomPropertyManager`` early-bound: ``Get6``'s outs ride the return
+    tuple ``(retval, ValOut, ResolvedValOut, WasResolved, LinkToProperty)``."""
+
+    def __init__(self, values: dict[str, str]):
+        self._values = values
+        self.Count = len(values)
+
+    def GetNames(self) -> tuple[str, ...]:
+        return tuple(self._values)
+
+    def Get6(self, name: str, use_cached: bool) -> tuple[int, str, str, bool, bool]:
+        if name not in self._values:
+            return 1, "", "", False, False  # swCustomInfoGetResult_NotPresent
+        return 0, self._values[name], self._values[name], False, False
+
+
+class _SourcePart:
+    """An opened source ``IModelDoc2`` whose properties appear once it has
+    finished loading, as a multi-threaded open reports through
+    ``IsOpenedViewOnly``."""
+
+    def __init__(
+        self,
+        properties: dict[str, str],
+        *,
+        loading_reads: int,
+        doc_type: int = 1,
+        empty_reads: int = 0,
+    ):
+        self._properties = properties
+        self._loading_reads = loading_reads
+        self._doc_type = doc_type
+        # Property reads answered empty regardless of the view-only flag: a
+        # load that finished between the first read and the flag check.
+        self._empty_reads = empty_reads
+        self.property_reads = 0
+        self.view_only_reads = 0
+        self.Extension = SimpleNamespace(
+            CustomPropertyManager=lambda configuration: _PropertyManager(
+                self._properties if configuration == "" and not self._loading_reads else {}
+            )
+        )
+        self.ConfigurationManager = SimpleNamespace(
+            ActiveConfiguration=SimpleNamespace(Name="Default")
+        )
+
+    def IsOpenedViewOnly(self) -> bool:
+        self.view_only_reads += 1
+        if self._loading_reads:
+            self._loading_reads -= 1
+            return True
+        return False
+
+    def GetCustomInfoValue(self, configuration: str, name: str) -> str:
+        self.property_reads += 1
+        if self._empty_reads:
+            self._empty_reads -= 1
+            return ""
+        return "" if self._loading_reads else self._properties.get(name, "")
+
+    def GetPathName(self) -> str:
+        return r"C:\harmonic\work\cad\out\sldprt\crank_hub.SLDPRT"
+
+    def GetTitle(self) -> str:
+        return "crank_hub.SLDPRT"
+
+    def GetType(self) -> int:
+        return self._doc_type
+
+    def IsOpenedReadOnly(self) -> bool:
+        return False
+
+
+_TITLE_BLOCK = ("Number", "Material Specification", "Finish", "Quantity")
+
+
+@pytest.mark.parametrize(
+    "doc_type", [1, 2], ids=["part", "assembly"]  # swDocumentTypes_e
+)
+def test_a_still_loading_source_is_read_once_it_has_loaded(
+    monkeypatch, capture_telemetry, doc_type
+):
+    """Every property read empty on a source the seat had not finished loading;
+    the document's own view-only flag is the signal to wait on, and the read
+    that follows it succeeds. An assembly waits too: the build never opens
+    view-only (see the invariant below), so its flag is a load in progress."""
+    import _drawing_common
+
+    spans, logs = capture_telemetry
+    monkeypatch.setattr(_drawing_common, "_VIEW_ONLY_POLL_S", 0.0)
+    source = _SourcePart(
+        {name: "x" for name in _TITLE_BLOCK}, loading_reads=2, doc_type=doc_type
+    )
+
+    got = _drawing_common.read_required_properties(
+        source, _TITLE_BLOCK, required=_TITLE_BLOCK
+    )
+
+    assert got == {name: "x" for name in _TITLE_BLOCK}
+    assert source.property_reads == 2 * len(_TITLE_BLOCK)  # one read, one after the load
+    assert any("IsOpenedViewOnly=True" in str(r.log_record.body) for r in logs.get_finished_logs())
+
+
+def test_the_load_wait_keeps_the_watchdog_heartbeat_alive(monkeypatch, heartbeats):
+    """The load wait polls for up to 30 s. With no telemetry between polls, a
+    ``HARMONIC_COM_OP_TIMEOUT`` below that hard-exits the leaf (87) before the
+    re-read or the forensics run. Every poll must advance the heartbeat."""
+    import _drawing_common
+
+    monkeypatch.setattr(_drawing_common, "_VIEW_ONLY_POLL_S", 0.0)
+    seen: list[int] = []
+
+    class _ObservedPart(_SourcePart):
+        def IsOpenedViewOnly(self) -> bool:
+            seen.append(heartbeats[0])
+            return super().IsOpenedViewOnly()
+
+    part = _ObservedPart({name: "x" for name in _TITLE_BLOCK}, loading_reads=5)
+    _drawing_common.read_required_properties(part, _TITLE_BLOCK, required=_TITLE_BLOCK)
+
+    assert len(seen) == 6  # the first check, then five polls until it loaded
+    assert all(later > earlier for earlier, later in zip(seen, seen[1:])), seen
+
+
+
+_SW_OPEN_VIEW_ONLY = 0x4  # swOpenDocOptions_e.swOpenDocOptions_ViewOnly
+
+
+def _open_options(node: ast.expr, constants: dict[str, int]) -> int | None:
+    """The integer an ``OpenDoc6`` options argument folds to, or ``None``."""
+    if isinstance(node, ast.Constant) and isinstance(node.value, int):
+        return node.value
+    if isinstance(node, ast.Name):
+        return constants.get(node.id)
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitOr):
+        left = _open_options(node.left, constants)
+        right = _open_options(node.right, constants)
+        return None if left is None or right is None else left | right
+    return None
+
+
+def test_no_document_the_build_opens_is_opened_view_only():
+    """The reader's wait rests on this: ``IsOpenedViewOnly`` is True for a load
+    in progress OR a deliberate view-only open, and only the opener can ask for
+    the latter (``OpenDoc6`` option 0x4, ``OpenDoc7``'s ``ViewOnly``). So every
+    ``OpenDoc6`` in cad/scripts and solidworks_mcp must pass options that fold
+    to a constant without 0x4, and none may use ``OpenDoc7`` or set ``ViewOnly``."""
+    roots = [REPO_ROOT / "cad" / "scripts", REPO_ROOT / "SolidworksMCP-python" / "src"]
+    violations: list[str] = []
+    checked: set[str] = set()
+    for root in roots:
+        for path in sorted(root.rglob("*.py")):
+            if "_generated" in path.parts or path.name.startswith("test_"):
+                continue
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+            constants = {
+                target.id: node.value.value
+                for node in tree.body
+                if isinstance(node, ast.Assign)
+                and isinstance(node.value, ast.Constant)
+                and isinstance(node.value.value, int)
+                for target in node.targets
+                if isinstance(target, ast.Name)
+            }
+            for node in ast.walk(tree):
+                where = f"{path.relative_to(REPO_ROOT).as_posix()}:{getattr(node, 'lineno', '?')}"
+                if isinstance(node, ast.Attribute) and isinstance(node.ctx, ast.Store):
+                    if node.attr == "ViewOnly":
+                        violations.append(f"{where}: sets ViewOnly")
+                if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)):
+                    continue
+                if node.func.attr == "OpenDoc7":
+                    violations.append(f"{where}: OpenDoc7 (spec may be ViewOnly)")
+                if node.func.attr != "OpenDoc6":
+                    continue
+                arg = next((k.value for k in node.keywords if k.arg == "Options"), None)
+                if arg is None and len(node.args) >= 3:
+                    arg = node.args[2]
+                options = _open_options(arg, constants) if arg is not None else None
+                if options is None:
+                    violations.append(f"{where}: OpenDoc6 options not a foldable constant")
+                elif options & _SW_OPEN_VIEW_ONLY:
+                    violations.append(f"{where}: OpenDoc6 options {options:#x} include ViewOnly")
+                checked.add(path.name)
+    assert not violations, "\n".join(violations)
+    # The scan must see the build's real open paths, or it proves nothing.
+    assert {"io.py", "assembly.py", "package_native.py"} <= checked, sorted(checked)
+
+
+def test_empty_properties_on_a_loaded_source_name_the_document_api_and_seat(
+    monkeypatch, capture_telemetry
+):
+    """A document that says it is loaded is re-read once, and when that read is
+    still empty the failure raises the same message, and the one ERROR line
+    names what the next triage needs -- the document, its configuration, the
+    API that read empty, what the property manager holds, and the seat's age
+    and startup state."""
+    import _drawing_common
+
+    spans, logs = capture_telemetry
+    monkeypatch.setattr(_common, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_seat_forensics, "_process_started_at", lambda pid: time.time() - 21.8)
+    _seat_forensics.record_seat_provenance(_Adapter(sw=_StartingSeat([True], pid=15124)))
+    part = _SourcePart({"Number": "MHA-104"}, loading_reads=0)
+
+    with pytest.raises(
+        RuntimeError,
+        match=r"^source part properties are missing: \['Material Specification', "
+        r"'Finish', 'Quantity'\]$",
+    ):
+        _drawing_common.read_required_properties(part, _TITLE_BLOCK, required=_TITLE_BLOCK)
+
+    assert part.property_reads == 2 * len(_TITLE_BLOCK)  # the read, one after "loaded"
+    (record,) = [
+        r for r in logs.get_finished_logs() if "[forensics] source part" in str(r.log_record.body)
+    ]
+    body = str(record.log_record.body)
+    assert "crank_hub.SLDPRT" in body and "configuration='Default'" in body
+    assert "GetCustomInfoValue" in body and "view_only=False" in body
+    assert "file_properties.count=1" in body and "startup_completed=True" in body
+    assert record.log_record.attributes["seat_pid"] == 15124
+    assert 21 <= record.log_record.attributes["seat_uptime_s"] <= 30
+    capture = json.loads(record.log_record.attributes["capture"])
+    assert capture["file_properties"]["names"] == ["Number"]
+    assert capture["file_properties"]["get6"]["Finish"]["result"] == "NotPresent"
+    assert capture["file_properties"]["get6"]["Number"] == {
+        "result": "CachedValue", "value": "MHA-104", "resolved": "MHA-104",
+    }
+
+
+def test_a_load_that_finishes_before_the_flag_is_asked_is_re_read(monkeypatch):
+    """The race: the first read lands while the source is loading, the load
+    completes before ``IsOpenedViewOnly`` is asked, and the flag already says
+    False. A definite "loaded" earns the one re-read, which finds the values."""
+    import _drawing_common
+
+    monkeypatch.setattr(
+        _drawing_common.time, "sleep", lambda _s: pytest.fail("waited on a loaded source")
+    )
+    part = _SourcePart(
+        {name: "x" for name in _TITLE_BLOCK}, loading_reads=0, empty_reads=len(_TITLE_BLOCK)
+    )
+
+    got = _drawing_common.read_required_properties(part, _TITLE_BLOCK, required=_TITLE_BLOCK)
+
+    assert got == {name: "x" for name in _TITLE_BLOCK}
+    assert part.view_only_reads == 1
+    assert part.property_reads == 2 * len(_TITLE_BLOCK)
+
+
+def test_an_unreadable_load_flag_earns_no_re_read(monkeypatch):
+    """Without a definite answer from the document, a re-read would be blind:
+    the failure raises after the one read, with the flag recorded as unknown."""
+    import _drawing_common
+
+    monkeypatch.setattr(_common, "_early_bound", lambda obj, _iface: obj)
+    part = _SourcePart({name: "x" for name in _TITLE_BLOCK}, loading_reads=0, empty_reads=1)
+    monkeypatch.setattr(part, "IsOpenedViewOnly", lambda: None)  # no boolean answer
+
+    with pytest.raises(RuntimeError, match=r"^source part properties are missing: \['Number'\]$"):
+        _drawing_common.read_required_properties(part, _TITLE_BLOCK, required=_TITLE_BLOCK)
+
+    assert part.property_reads == len(_TITLE_BLOCK)
+
+
+def test_a_capture_that_cannot_read_anything_still_raises_the_readers_failure():
+    """The forensics may never replace the failure they describe."""
+    with pytest.raises(RuntimeError, match=r"^source part properties are missing: \['Finish'\]$"):
+        _seat_forensics.capture_missing_properties(
+            object(),
+            "source part properties are missing: ['Finish']",
+            missing=["Finish"],
+            values={"Finish": ""},
+            load={"view_only": "unknown"},
+        )
 
 
 def test_watchdog_abort_names_the_seat_it_killed(capture_telemetry):

@@ -19,7 +19,7 @@ geometry.
 from __future__ import annotations
 
 import math
-from typing import Any
+from typing import Any, NamedTuple
 
 from _common import (
     IN,
@@ -34,6 +34,7 @@ from _visibility import blank_reference_geometry
 from involute_gear import gear_facts
 
 __all__ = [
+    "ToothedDisc",
     "build_fixed_gear",
     "cut_tooth_gap",
     "gap_area_in_disc_ext",
@@ -45,6 +46,15 @@ __all__ = [
 # radius in the machine (120T OD/2 = 2.033") so gap profiles always close
 # outside the blank.
 R_CLEAR_IN = 60.0 / 25.4
+
+
+class ToothedDisc(NamedTuple):
+    """``build_fixed_gear``'s volume-checked disc and the features that form
+    its teeth (seed gap cut or tooth sweep, then the pattern) -- what a
+    ``_drawing_simplified`` configuration suppresses."""
+
+    volume: float
+    tooth_features: tuple[str, ...]
 
 
 def fmt(value: float) -> str:
@@ -446,11 +456,12 @@ async def build_fixed_gear(
     backlash_mm: float = 0.0,
     root_relief: bool = False,
     depth_dp: float | None = None,
-) -> float:
+) -> ToothedDisc:
     """Build a toothed disc on the active new part.
 
     Gear axis = Z through the origin, disc z = 0..face_width (mm). Returns
-    the volume-checked toothed-disc volume in mm^3.
+    the volume-checked toothed-disc volume in mm^3 and the tooth features'
+    names as created (seed, then pattern).
 
     Straight gears (``helix_deg`` 0): tip-radius blank + one gap cut +
     pattern (the cone gear's live-validated recipe). ``helix_deg`` builds a
@@ -535,5 +546,6 @@ async def build_fixed_gear(
         v_gear = v_blank + teeth * tooth_area * IN**2 * face_width
     await volume_check(adapter, "seeded tooth/gap", v_seeded, 1.0)
 
-    await pattern_about_z(adapter, seeds, teeth, ra_mm, face_width / 2.0)
-    return await volume_check(adapter, "toothed disc", v_gear, 0.01 * v_gear)
+    pattern = await pattern_about_z(adapter, seeds, teeth, ra_mm, face_width / 2.0)
+    volume = await volume_check(adapter, "toothed disc", v_gear, 0.01 * v_gear)
+    return ToothedDisc(volume, (*seeds, str(pattern.name)))

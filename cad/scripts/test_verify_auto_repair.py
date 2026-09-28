@@ -293,6 +293,10 @@ def test_unchanged_channel_refresh_still_checks_native_contact_and_revokes_proof
         return {}
 
     monkeypatch.setattr(_assembly, "assembly_geometry_digest", digest)
+    # The saved assembly already carries an up-to-date "Default Simplified".
+    monkeypatch.setattr(
+        _assembly, "sync_simplified_configuration", lambda _adapter, _name, *, verify: 0
+    )
     monkeypatch.setattr(_assembly, "_export_assembly_images", images)
     monkeypatch.setattr(
         _assembly,

@@ -30,7 +30,6 @@ from pathlib import Path
 import pytest
 
 import _common
-import build_cone_gear
 
 CONE_FAULTS = (("ToothGapCut", 1, False), ("ToothGapPattern", 1, False))
 
@@ -365,8 +364,11 @@ def test_a_single_configuration_part_regenerates_with_no_switch(seat) -> None:
 
 
 SCRIPTS = Path(__file__).resolve().parent
-CONFIGURATION_CREATORS = re.compile(r"\bcreate_configuration\(|\bAddConfiguration\d*\(")
-TRIPWIRE = "assert_saved_configurations_regenerate(adapter, PART_NAME)"
+CONFIGURATION_CREATORS = re.compile(
+    r"\bcreate_configuration\(|\bAddConfiguration\d*\(|\badd_simplified_configurations\("
+)
+TRIPWIRE = re.compile(r"assert_saved_configurations_regenerate\(adapter, (PART_NAME|part_name)\)")
+SAVE = re.compile(r"save_part_and_images\(adapter, (PART_NAME|part_name)\b")
 FORCED_REBUILDS = ("ForceRebuild3", "set_active_configuration(", "assert_saved_configuration_topology(")
 
 
@@ -380,7 +382,9 @@ def _configuration_builders() -> set[str]:
 
 def test_the_builders_that_create_configurations_are_the_known_three() -> None:
     """A new multi-configuration builder must fail here until it reopens its
-    saved part and runs the tripwire (and joins this set)."""
+    saved part and runs the tripwire (and joins this set).  Every other builder
+    that derives drawing configurations goes through save_simplified_part,
+    which reopens and runs the tripwire itself."""
     assert _configuration_builders() == {
         "build_cone_gear",
         "build_pinion_lever_pin",
@@ -388,24 +392,39 @@ def test_the_builders_that_create_configurations_are_the_known_three() -> None:
     }
 
 
+def test_only_the_known_helpers_create_configurations_outside_builders() -> None:
+    """The part-tier simplified-configuration helper and the assembly save
+    chokepoint's Default Simplified are the only other creators."""
+    creators = {
+        path.stem
+        for path in SCRIPTS.glob("_*.py")
+        if re.search(r"\bAddConfiguration\d*\(", path.read_text(encoding="utf-8"))
+    }
+    assert creators == {"_assembly", "_drawing_simplified"}
+
+
+def _assert_reopened_then_tripwire(source: str) -> None:
+    reopened = source.rindex("await adapter.open_model(")
+    tripwire = TRIPWIRE.search(source, reopened)
+    assert tripwire is not None
+    between = source[reopened : tripwire.start()]
+    assert not [call for call in FORCED_REBUILDS if call in between]
+    assert max(match.start() for match in SAVE.finditer(source)) < reopened
+
+
 @pytest.mark.parametrize("stem", sorted(_configuration_builders()))
 def test_every_configuration_builder_proves_its_saved_caches_on_reopen(stem) -> None:
     """Reopen, then the tripwire, with nothing force-rebuilding in between: a
-    forced rebuild would repair the very caches the tripwire has to read."""
+    forced rebuild would repair the very caches the tripwire has to read.  A
+    builder that saves through save_simplified_part inherits its reopen."""
     source = inspect.getsource(importlib.import_module(stem).build)
-    reopened = source.rindex("await adapter.open_model(")
-    tripwire = source.index(TRIPWIRE, reopened)
-    between = source[reopened:tripwire]
-    assert not [call for call in FORCED_REBUILDS if call in between]
-    assert source.rindex("save_part_and_images(adapter, PART_NAME)") < reopened
+    if "await adapter.open_model(" not in source:
+        assert "await save_simplified_part(" in source
+        return
+    _assert_reopened_then_tripwire(source)
 
 
-def test_the_cone_gear_save_tail_no_longer_force_rebuilds_all() -> None:
-    # cg-fx2a: ForceRebuildAll, then Save3, left every T00x cache faulted; the
-    # tail now asserts nothing is stale instead.
-    source = inspect.getsource(build_cone_gear.build)
-    assert "ForceRebuildAll" not in source
-    marks = source.index("AddRebuildSaveMark(2")
-    stale = source.index("stale_configurations(", marks)
-    save = source.index('label="rebuild and persist all marked configurations"')
-    assert marks < stale < save
+def test_the_simplified_part_save_proves_its_saved_caches_on_reopen() -> None:
+    import _drawing_simplified
+
+    _assert_reopened_then_tripwire(inspect.getsource(_drawing_simplified.save_simplified_part))

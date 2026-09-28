@@ -82,8 +82,10 @@ NON_PART_SCRIPTS = frozenset(
 # Keyed by assembly stem; run in listed order.
 #
 # Empty: the engagement-CONFIGURATION mutators (cone_disengaged / operating) were
-# removed -- every assembly now carries only its Default configuration. Re-add a
-# stem -> (script, ...) entry here if a future in-place post-build step is needed.
+# removed -- every assembly now carries its Default configuration plus the derived
+# drawing configuration "Default Simplified" that the shared save path authors
+# (_assembly.sync_simplified_configuration). Re-add a stem -> (script, ...) entry
+# here if a future in-place post-build step is needed.
 POST_ASSEMBLY: dict[str, tuple[str, ...]] = {}
 _POST_SCRIPT_NAMES = frozenset(s for v in POST_ASSEMBLY.values() for s in v)
 

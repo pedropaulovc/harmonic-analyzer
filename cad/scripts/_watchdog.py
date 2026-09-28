@@ -180,9 +180,13 @@ def _seat_modal_dialog() -> tuple[int, str] | None:
     ``splash`` (the .NET wedge the lifecycle library recovers at start). The
     crash-report dialog has the same class + title but belongs to
     ``sldexitapp.exe``, so the pid test excludes it. The message text is read
-    off the box's ``Static`` children -- a plain MessageBox exposes it there
-    (the low-memory box did; a DirectUI body would read as no text, still
-    fatal). Best-effort: ``None`` off-Windows, without the lib, or on any error.
+    off every child control: a plain MessageBox exposes it on ``Static``
+    children (the low-memory box did), and other controls add ``[class] text``
+    (a button's caption names the choice offered). A DirectUI body, the
+    TaskDialog kind, has no window text, so the box then reports its child
+    classes instead -- still fatal, but the box can be told apart
+    (cone-gear, c85a21ec4, logged only "(no readable text)"). Best-effort:
+    ``None`` off-Windows, without the lib, or on any error.
     """
     if not _WINDOWS or _sw_recovery is None:
         return None
@@ -235,17 +239,27 @@ def _seat_modal_dialog() -> tuple[int, str] | None:
             if not owner or user32.IsWindowEnabled(owner) or text(owner) == _SPLASH_TITLE:
                 return True
             parts: list[str] = []
+            classes: dict[str, int] = {}
 
             @enum_fn
             def on_child(c, _):
-                if klass(c) == "Static":
-                    t = text(c).strip()
-                    if t:
-                        parts.append(t)
+                cls = klass(c)
+                classes[cls] = classes.get(cls, 0) + 1
+                t = text(c).strip()
+                if t:
+                    parts.append(t if cls == "Static" else f"[{cls}] {t}")
                 return True
 
             user32.EnumChildWindows(h, on_child, 0)
-            found.append((int(h), " ".join(parts) or "(no readable text)"))
+            inventory = ", ".join(
+                f"{cls} x{count}" if count > 1 else cls for cls, count in sorted(classes.items())
+            )
+            found.append(
+                (
+                    int(h),
+                    " ".join(parts) or f"(no readable text; children: {inventory or 'none'})",
+                )
+            )
             return False
 
         user32.EnumWindows(on_window, 0)

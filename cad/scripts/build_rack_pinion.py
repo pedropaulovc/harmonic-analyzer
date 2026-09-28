@@ -34,7 +34,6 @@ from _common import (
     name_last_feature,
     report_mass_properties,
     run_build,
-    save_part_and_images,
     set_global,
 )
 from _drawing_marks import (
@@ -43,6 +42,7 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
 )
+from _drawing_simplified import save_simplified_part
 from _fit_limits import deviations
 from _gear import build_fixed_gear, volume_check
 from _part_pmi import author_part_pmi
@@ -84,7 +84,8 @@ async def build(adapter) -> dict[str, str]:
 
     drive_jobs: list[tuple[str, str]] = []
 
-    volume = await build_fixed_gear(adapter, TEETH, FACE_WIDTH, dp=DP)
+    disc = await build_fixed_gear(adapter, TEETH, FACE_WIDTH, dp=DP)
+    volume = disc.volume
 
     # Shaft bore (on-axis circle at the origin: only the diameter is a dim, so
     # define_circle records just that -- the centre X/Z slots are ignored).
@@ -155,7 +156,7 @@ async def build(adapter) -> dict[str, str]:
         PART_NAME,
         {"Gear Data": GEAR_DATA, "Manufacturing Notes": DRAWING_NOTES},
     )
-    return await save_part_and_images(adapter, PART_NAME)
+    return await save_simplified_part(adapter, PART_NAME, disc.tooth_features)
 
 
 if __name__ == "__main__":

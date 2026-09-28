@@ -83,7 +83,6 @@ from _common import (
     name_last_feature,
     report_mass_properties,
     run_build,
-    save_part_and_images,
     set_global,
 )
 from _drawing_marks import (
@@ -94,6 +93,7 @@ from _drawing_marks import (
     set_dimension_bilateral_tolerance,
     set_dimension_symmetric_tolerance,
 )
+from _drawing_simplified import save_simplified_part
 from _fit_limits import deviations
 from _gear import build_fixed_gear, volume_check
 from _part_pmi import author_part_pmi
@@ -216,12 +216,13 @@ async def build(adapter) -> dict[str, str]:
 
     # Normal-defined (#906): the transverse DP/PA place the involute, the
     # cutter's DP sets the depth.
-    volume = await build_fixed_gear(
+    disc = await build_fixed_gear(
         adapter, TEETH, FACE_WIDTH, dp=DP, pa_deg=PA_DEG,
         helix_deg=HELIX_DEG,
         backlash_mm=BACKLASH_MM, root_relief=True,
         depth_dp=CUTTER_DIAMETRAL_PITCH,
     )
+    volume = disc.volume
 
     # build_fixed_gear is shared by five recipes, so it leaves the blank under
     # the adapter's default names. Name the boss here: the face width is a size
@@ -319,7 +320,7 @@ async def build(adapter) -> dict[str, str]:
     # no assembly instance renders it (#880).  The drawing shows it per view
     # through _drawing_hidden_sketches to import those dimensions.
     blank_sketch(adapter, "OutsideDiaReference")
-    return await save_part_and_images(adapter, PART_NAME)
+    return await save_simplified_part(adapter, PART_NAME, disc.tooth_features)
 
 
 if __name__ == "__main__":

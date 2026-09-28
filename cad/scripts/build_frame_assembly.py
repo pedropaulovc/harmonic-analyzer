@@ -104,11 +104,13 @@ from _common import (
     run_build,
 )
 from _drawing_marks import DRAWN_BY
+from _drawing_simplified import simplified_name
 from _assembly import (
     activate_assembly_contract,
     assembly_title_properties,
     assert_component_placed,
     assert_components_fully_defined,
+    author_in_drawing_configurations,
     check_no_interference,
     lock_mate,
     named_ref,
@@ -373,19 +375,39 @@ def _explode_transform(component: Any) -> tuple[float, ...]:
     return values
 
 
+def frame_exploded_view_name(configuration: str) -> str:
+    """The named explode ``configuration`` owns: exploded-view names are unique
+    per document, so ``Default Simplified``'s copy carries the suffix too."""
+    if configuration == "Default":
+        return FRAME_EXPLODED
+    if configuration == simplified_name("Default"):
+        return simplified_name(FRAME_EXPLODED)
+    raise ValueError(f"{FRAME_EXPLODED}: no explode is authored in {configuration!r}")
+
+
 @_telemetry.traced("assembly.frame_explode")
-def _create_frame_explode(adapter: Any) -> None:
-    """Author twelve global translations; leave the operational model collapsed."""
+def _create_frame_explode(adapter: Any, configuration_name: str) -> None:
+    """Author twelve global translations in the active ``configuration_name``;
+    leave the operational model collapsed.
+
+    Run in Default and in Default Simplified
+    (``_assembly.author_in_drawing_configurations``): a drawing view shows the
+    explode of the configuration it references, and the drawing's small
+    exploded view references the teeth/thread-free one."""
     from solidworks_mcp.adapters.com_variant import null_callout
 
+    view_name = frame_exploded_view_name(configuration_name)
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     assembly = _early_bound(model, "IAssemblyDoc")
     manager = _early_bound(model.ConfigurationManager, "IConfigurationManager")
     configuration = _early_bound(manager.ActiveConfiguration, "IConfiguration")
-    if str(configuration.Name) != "Default":
-        raise RuntimeError("FRAME_EXPLODED requires the builder's Default configuration")
-    if int(assembly.GetExplodedViewCount2("Default")):
-        raise RuntimeError("new frame assembly unexpectedly contains exploded views")
+    if str(configuration.Name) != configuration_name:
+        raise RuntimeError(
+            f"{view_name} requires the active {configuration_name} configuration, "
+            f"not {configuration.Name!r}"
+        )
+    if int(assembly.GetExplodedViewCount2(configuration_name)):
+        raise RuntimeError(f"{view_name}: {configuration_name} unexpectedly contains exploded views")
 
     quantities = {
         "harmonic-base": 1, "tube-frame": 4, "tube-frame-cap": 4,
@@ -401,16 +423,16 @@ def _create_frame_explode(adapter: Any) -> None:
     for component in components:
         stem = Path(str(component.GetPathName() or "")).stem.casefold()
         if stem not in groups:
-            raise RuntimeError(f"FRAME_EXPLODED: unexpected component {component.Name2}: {stem}")
+            raise RuntimeError(f"{view_name}: unexpected component {component.Name2}: {stem}")
         groups[stem].append(component)
     actual_counts = {stem: len(group) for stem, group in groups.items()}
     if actual_counts != quantities:
-        raise RuntimeError(f"FRAME_EXPLODED component counts: {actual_counts!r} != {quantities!r}")
+        raise RuntimeError(f"{view_name} component counts: {actual_counts!r} != {quantities!r}")
     for group in groups.values():
         group.sort(key=lambda component: str(component.Name2))
     baseline = {str(component.Name2): _explode_transform(component) for component in components}
     if len(baseline) != sum(quantities.values()):
-        raise RuntimeError("FRAME_EXPLODED: duplicate component identities")
+        raise RuntimeError(f"{view_name}: duplicate component identities")
     expected = {name: [0.0, 0.0, 0.0] for name in baseline}
     front, rear, upper, lower = [], [], [], []
     for component in groups["frame-cross-screw"]:
@@ -425,7 +447,7 @@ def _create_frame_explode(adapter: Any) -> None:
             raise RuntimeError(f"{component.Name2}: cross screw on assembly mid-plane")
         (front if z < 0.0 else rear).append(component)
     if tuple(map(len, (front, rear, upper, lower))) != (4, 4, 4, 4):
-        raise RuntimeError("FRAME_EXPLODED: cross-screw station split is not 4/4/4/4")
+        raise RuntimeError(f"{view_name}: cross-screw station split is not 4/4/4/4")
     plans = (
         ("tube caps lift", groups["tube-frame-cap"], "y", 0.250),
         ("top frame clears columns", [*groups["top-frame"], *upper, *groups["gooseneck-set-screw"]], "y", 0.150),
@@ -448,7 +470,7 @@ def _create_frame_explode(adapter: Any) -> None:
         axis_name = ensure_global_pattern_axis(adapter, key)
         feature = _early_bound(assembly.FeatureByName(axis_name), "IFeature")
         if feature is None or str(feature.GetTypeName2()) != "RefAxis":
-            raise RuntimeError(f"FRAME_EXPLODED: missing reference axis {axis_name}")
+            raise RuntimeError(f"{view_name}: missing reference axis {axis_name}")
         axis = _early_bound(feature.GetSpecificFeature2(), "IRefAxis")
         points = tuple(float(value) for value in axis.GetRefAxisParams())
         if len(points) != 6 or not all(math.isfinite(value) for value in points):
@@ -462,36 +484,36 @@ def _create_frame_explode(adapter: Any) -> None:
         axes[key] = (axis_name, vector[index] > 0.0)
 
     if not assembly.CreateExplodedView():
-        raise RuntimeError("FRAME_EXPLODED: CreateExplodedView failed")
-    names = tuple(assembly.GetExplodedViewNames2("Default") or ())
+        raise RuntimeError(f"{view_name}: CreateExplodedView failed")
+    names = tuple(assembly.GetExplodedViewNames2(configuration_name) or ())
     if len(names) != 1:
-        raise RuntimeError(f"FRAME_EXPLODED: unexpected created views {names!r}")
+        raise RuntimeError(f"{view_name}: unexpected created views {names!r}")
     # Exploded views are configuration-tree AsmExploder features, not ordinary
     # assembly features discoverable through FeatureByName.
     model.ClearSelection2(True)
     if not model.Extension.SelectByID2(
         str(names[0]), "EXPLODEDVIEWS", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
     ):
-        raise RuntimeError(f"FRAME_EXPLODED: cannot select created exploded view {names[0]!r}")
+        raise RuntimeError(f"{view_name}: cannot select created exploded view {names[0]!r}")
     selection = _early_bound(model.SelectionManager, "ISelectionMgr")
     if int(selection.GetSelectedObjectType3(1, 0)) != 43:  # swSelEXPLVIEWS
-        raise RuntimeError("FRAME_EXPLODED: selection is not an exploded-view feature")
+        raise RuntimeError(f"{view_name}: selection is not an exploded-view feature")
     feature = _early_bound(selection.GetSelectedObject6(1, 0), "IFeature")
     if feature is None or str(feature.GetTypeName2()) != "AsmExploder":
-        raise RuntimeError("FRAME_EXPLODED: selected object is not an AsmExploder")
-    feature.Name = FRAME_EXPLODED
+        raise RuntimeError(f"{view_name}: selected object is not an AsmExploder")
+    feature.Name = view_name
     model.ClearSelection2(True)
-    if not model.EditRebuild3() or tuple(assembly.GetExplodedViewNames2("Default") or ()) != (FRAME_EXPLODED,):
-        raise RuntimeError("FRAME_EXPLODED: exploded-view feature rename did not persist")
-    if not assembly.ShowExploded2(True, FRAME_EXPLODED):
-        raise RuntimeError("FRAME_EXPLODED: cannot activate authored view")
+    if not model.EditRebuild3() or tuple(assembly.GetExplodedViewNames2(configuration_name) or ()) != (view_name,):
+        raise RuntimeError(f"{view_name}: exploded-view feature rename did not persist")
+    if not assembly.ShowExploded2(True, view_name):
+        raise RuntimeError(f"{view_name}: cannot activate authored view")
     try:
         for index in range(int(configuration.GetNumberOfExplodeSteps()) - 1, -1, -1):
             seed = _early_bound(configuration.GetExplodeStep(index), "IExplodeStep")
             if seed is None or not configuration.DeleteExplodeStep(str(seed.Name)):
-                raise RuntimeError(f"FRAME_EXPLODED: cannot remove auto step {index}")
+                raise RuntimeError(f"{view_name}: cannot remove auto step {index}")
         if int(configuration.GetNumberOfExplodeSteps()) != 0:
-            raise RuntimeError("FRAME_EXPLODED: auto steps remain")
+            raise RuntimeError(f"{view_name}: auto steps remain")
         for step_index, (label, moved, key, distance) in enumerate(plans, 1):
             with _telemetry.span("assembly.frame_explode.step", label=label):
                 model.ClearSelection2(True)
@@ -521,8 +543,12 @@ def _create_frame_explode(adapter: Any) -> None:
                 if int(error) != 0 or raw_step is None:
                     raise RuntimeError(f"{label}: AddExplodeStep2 error {error!r}")
                 step = _early_bound(raw_step, "IExplodeStep")
-                step.Name = f"FRAME {label.upper()}"
-                if str(step.Name) != f"FRAME {label.upper()}" or not model.EditRebuild3():
+                # Distinct per explode: Default Simplified's copy carries the suffix.
+                step_name = f"FRAME {label.upper()}"
+                if configuration_name != "Default":
+                    step_name = simplified_name(step_name)
+                step.Name = step_name
+                if str(step.Name) != step_name or not model.EditRebuild3():
                     raise RuntimeError(f"{label}: step name/rebuild failed")
                 if int(configuration.GetNumberOfExplodeSteps()) != step_index:
                     raise RuntimeError(f"{label}: authored step count is not {step_index}")
@@ -559,8 +585,8 @@ def _create_frame_explode(adapter: Any) -> None:
         primary_error = sys.exception()
         try:
             model.ClearSelection2(True)
-            if not assembly.ShowExploded2(False, FRAME_EXPLODED) or not model.EditRebuild3():
-                raise RuntimeError("FRAME_EXPLODED: failed to restore collapsed operational assembly")
+            if not assembly.ShowExploded2(False, view_name) or not model.EditRebuild3():
+                raise RuntimeError(f"{view_name}: failed to restore collapsed operational assembly")
             for component in components:
                 name = str(component.Name2)
                 current = _explode_transform(component)
@@ -570,18 +596,18 @@ def _create_frame_explode(adapter: Any) -> None:
                     abs(values[i] - baseline[name][i]) > 1e-9
                     for values in (current, operational) for i in range(16)
                 ):
-                    raise RuntimeError(f"FRAME_EXPLODED: collapse changed operational transform of {name}")
+                    raise RuntimeError(f"{view_name}: collapse changed operational transform of {name}")
         except Exception as cleanup_error:
             if primary_error is None:
                 raise
-            _telemetry.warn(f"FRAME_EXPLODED: cleanup after authoring failure: {cleanup_error}")
+            _telemetry.warn(f"{view_name}: cleanup after authoring failure: {cleanup_error}")
     if int(configuration.GetNumberOfExplodeSteps()) != len(plans):
-        raise RuntimeError("FRAME_EXPLODED: collapsed presentation lost authored steps")
-    if tuple(assembly.GetExplodedViewNames2("Default") or ()) != (FRAME_EXPLODED,):
-        raise RuntimeError("FRAME_EXPLODED: collapsed presentation lost named view")
-    if str(assembly.GetExplodedViewConfigurationName(FRAME_EXPLODED)) != "Default":
-        raise RuntimeError("FRAME_EXPLODED: named presentation is not owned by Default")
-    _telemetry.success("FRAME_EXPLODED: 12 native steps verified in world space; all 29 instances restored")
+        raise RuntimeError(f"{view_name}: collapsed presentation lost authored steps")
+    if tuple(assembly.GetExplodedViewNames2(configuration_name) or ()) != (view_name,):
+        raise RuntimeError(f"{view_name}: collapsed presentation lost named view")
+    if str(assembly.GetExplodedViewConfigurationName(view_name)) != configuration_name:
+        raise RuntimeError(f"{view_name}: named presentation is not owned by {configuration_name}")
+    _telemetry.success(f"{view_name}: 12 native steps verified in world space; all 29 instances restored")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -891,7 +917,11 @@ async def build(adapter) -> dict[str, str]:
             "Drawn By": DRAWN_BY,
         },
     )
-    _create_frame_explode(adapter)
+    # Both drawing configurations own the explode: the drawing's small
+    # exploded view references Default Simplified.
+    author_in_drawing_configurations(
+        adapter, ASM_NAME, lambda configuration: _create_frame_explode(adapter, configuration)
+    )
     return await save_assembly_and_images(adapter, ASM_NAME)
 
 
