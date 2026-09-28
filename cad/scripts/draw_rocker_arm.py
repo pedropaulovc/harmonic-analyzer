@@ -20,8 +20,7 @@ from __future__ import annotations
 import argparse
 import math
 import sys
-from contextlib import contextmanager
-from typing import Any, Iterator
+from typing import Any
 
 from _gear_drawing_entities import visible_circle_edge
 from rocker_arm_spec import ARM_DEPTH, GEOMETRIC_TOLERANCES_MM
@@ -32,6 +31,7 @@ from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     _select_view_entity,
+    _zoomed_on,
     add_datum_feature,
     add_edge_dimension,
     add_feature_control_frame,
@@ -179,23 +179,6 @@ def _pivot_datum_request(centre: tuple[float, float]) -> tuple[float, float]:
         centre[0] + reach * math.cos(PIVOT_DATUM_ANGLE),
         centre[1] + reach * math.sin(PIVOT_DATUM_ANGLE),
     )
-
-
-@contextmanager
-def _zoomed_on(adapter: Any, centre: tuple[float, float], half: float) -> Iterator[None]:
-    """Zoom the drawing window onto a sheet square, then back to fit.
-
-    new_project_drawing fits the sheet so every other coordinate pick sees the
-    zoom it was placed under; this restores that zoom on the way out.
-    """
-    draw = adapter.currentModel
-    draw.ViewZoomTo2(
-        centre[0] - half, centre[1] - half, 0.0, centre[0] + half, centre[1] + half, 0.0
-    )
-    try:
-        yield
-    finally:
-        draw.ViewZoomtofit2()
 
 
 def _pick_pivot_bore(

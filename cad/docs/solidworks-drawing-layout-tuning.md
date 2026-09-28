@@ -125,6 +125,27 @@ Every one of these produced a plausible-looking wrong answer instead of an error
   arrive as `OwnerType` = 2 (`swAnnotationOwner_DrawingTemplate`) on the sheet's
   view — on tube-frame, 41 of the sheet view's 42 annotations. Filter to
   `OwnerType` = 1 for sheet-owned ink, or you audit the template against itself.
+- **`GetDisplayData` is the window's rendering, not the sheet's.** A balloon's
+  circle and leader start read at fit to the sheet sit where the seat's window
+  drew them, a pixel being 0.68 mm on an 820-high window and 0.94 mm on a
+  640-high one. The PDF prints from the model. Frame item 2, SetPosition
+  (89.32, 250.85) mm: zoomed onto a 24 mm square the ring read (93.61, 249.03)
+  and printed at (93.52, 249.06), 0.10 mm apart (items 5 and 9: 0.19, 0.23 mm;
+  run 20260928T141421973Z, swmaker000008). Read at fit after the rebuild on
+  swmaker000005 (run 20260928T142458776Z), the same SetPosition gave
+  (92.85, 249.98), 1.14 mm off. Place and check a ring zoomed
+  (`_drawing_common._zoomed_on`; `draw_frame_assembly._short_frame_balloon`
+  re-zooms after its fit rebuild); at fit, check only model values such as
+  `GetPosition`. On 1024x640 seats the leader start COM reports is 0.15 to
+  0.78 mm from where the PDF starts that leader, on the printed ring; the
+  layout audit takes the printed start (`_layout_audit._printed_leader_starts`).
+  After a rebuild at fit the reported start stays where the fit render put it
+  at any zoom, and `UpdateViewDisplayGeometry` zoomed does not move it: frame
+  item 2 re-zoomed read its ring exactly as placed but its leader starting
+  4.19 mm from the centre inside a 4.89 mm ring, bit-identical on
+  swmaker000008 and swmaker000005 (runs 20260928T144159300Z,
+  20260928T145256004Z), while the same SetPosition printed its leader from the
+  ring. Check a leader start only on the read right after `SetPosition`.
 
 ## Refusal catalogue — do / don't
 

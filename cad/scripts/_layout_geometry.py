@@ -427,6 +427,16 @@ def calibrate_advance_ratio(
 
 
 @dataclass(frozen=True)
+class LeaderInkAmbiguity:
+    """A balloon leader whose printed start the PDF does not settle: several
+    printed strokes run from its first segment's far end (``tip``) to a start
+    on or inside the printed ring (``starts``)."""
+
+    tip: tuple[float, float]
+    starts: tuple[tuple[float, float], ...]
+
+
+@dataclass(frozen=True)
 class AnnotationGeometry:
     """One annotation's on-sheet ink, as the audit sees it."""
 
@@ -441,6 +451,9 @@ class AnnotationGeometry:
     # the circle's bounding square, whose corners are blank paper, so line and
     # gap tests read the circle instead (``text_overlap``).
     circle: tuple[float, float, float] | None = None
+    # Balloon leaders whose printed start is ambiguous; each keeps its COM
+    # start and is reported (``find_ambiguous_leader_ink``).
+    leader_ink_ambiguities: tuple[LeaderInkAmbiguity, ...] = ()
 
     def box(self) -> Box | None:
         """The annotation's whole footprint: text plus its own ink."""

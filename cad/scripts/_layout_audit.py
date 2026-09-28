@@ -47,6 +47,7 @@ from heapq import heappop, heappush
 from itertools import combinations, product
 from pathlib import Path
 from statistics import median
+from types import MappingProxyType
 from typing import Any, Iterable, Iterator, Mapping, Sequence
 
 from _drawing_layout_check import (
@@ -63,6 +64,7 @@ from _layout_geometry import (
     AnnotationGeometry,
     Box,
     Finding,
+    LeaderInkAmbiguity,
     Segment,
     SegmentGrid,
     SheetGeometry,
@@ -630,12 +632,44 @@ def ink_annotation_strokes(dump: Mapping[str, Any]) -> list[Segment]:
 
 
 # A balloon's GetDisplayData circle sits up to 0.57 mm off the ring the PDF
-# prints (layoutcal2-c, drive-train-assembly: 28 balloons, the COM leader
-# start lands exactly on the printed ring), so the printed ring wins when
-# the page's strokes trace one within this band of the COM circle.
+# prints (layoutcal2-c, drive-train-assembly: 28 balloons), so the printed
+# ring wins when the page's strokes trace one within this band of the COM
+# circle.
 BALLOON_RING_SEARCH_M = 0.001
 # The printed ring is a polyline; every vertex lies this close to its fit.
 BALLOON_RING_FIT_TOL_M = 0.0001
+# COM reads a balloon leader's start off the window's rendering of the ring,
+# so it moves with the seat's window; the PDF draws the leader from the
+# printed ring. On the frame's 1024x640 seats (runs 20260928T124727673Z and
+# 20260928T141421973Z, 20 balloons) every leader printed as one stroke from
+# the COM arrowtip (within 0.02 mm) to a point 0.00-0.02 mm off the printed
+# ring and 0.15-0.78 mm from the COM start; balloon 5 registered its start
+# 0.47 mm inside that ring. How far the COM start strays is the window's
+# business, so it plays no part in finding the printed start: that is the
+# stroke sharing the COM arrowtip (within BALLOON_LEADER_TIP_M) whose other
+# end lies on or inside the printed ring (within BALLOON_LEADER_RING_M).
+# Printed starts measured 0.00-0.025 mm off the ring on 20 frame balloons
+# (20260928T124727673Z, 1024x640; 20260928T152556482Z, 1536x820) and
+# 0.00-0.05 mm on 48 drive-train-assembly ones (20260928T150721937Z).
+BALLOON_LEADER_RING_M = 0.0001
+# How close the printed stroke's far end must be to the registered one.
+BALLOON_LEADER_TIP_M = 0.0001
+# The arrowhead prints as two more strokes from the tip, which a short
+# leader's ring can hold. They are told apart by shape: two strokes of one
+# length, no longer than an arrowhead, one either side of a third stroke from
+# the tip (the leader) and each within 15 deg of it. A leader as long as its
+# barbs pairs with either of them too, but the other then lies on one side of
+# that pair, not between. Of several such pairs only the one closest to the
+# arrowhead GetArrowHeadAtIndex2 gives, 3.556 x 0.762 mm (barbs 3.576 mm at
+# 6.1 deg), is the arrowhead; any other is a leader stroke. The printed pairs
+# measured 3.54-3.62 mm long, the two within 0.03 mm of each other
+# (frame-assembly and drive-train-assembly, runs 20260928T124727673Z,
+# 20260928T150721937Z, 20260928T152556482Z).
+BALLOON_BARB_MAX_M = 0.005
+BALLOON_BARB_PAIR_M = 0.0001
+BALLOON_BARB_ANGLE_RAD = math.radians(15.0)
+BALLOON_BARB_LENGTH_M = math.hypot(0.003556, 0.000381)
+BALLOON_BARB_HALF_ANGLE_RAD = math.atan2(0.000381, 0.003556)
 
 
 def _fit_circle(points: Sequence[tuple[float, float]]) -> tuple[float, float, float] | None:
@@ -667,8 +701,9 @@ def _fit_circle(points: Sequence[tuple[float, float]]) -> tuple[float, float, fl
 
 def printed_circle(
     circle: tuple[float, float, float], strokes: Sequence[Segment]
-) -> tuple[float, float, float]:
-    """The ring a balloon PRINTED near its COM ``circle``, else ``circle``.
+) -> tuple[float, float, float] | None:
+    """The ring a balloon PRINTED near its COM ``circle``; None when the page
+    traces none.
 
     Fits a circle to the stroke vertices within ``BALLOON_RING_SEARCH_M`` of
     the COM ring, dropping the worst-fitting vertex (a leader start or an
@@ -688,7 +723,7 @@ def printed_circle(
     while len(points) >= 12:
         fit = _fit_circle(points)
         if fit is None:
-            return circle
+            return None
         fx, fy, fr = fit
         residuals = [abs(math.hypot(x - fx, y - fy) - fr) for x, y in points]
         worst = max(range(len(points)), key=residuals.__getitem__)
@@ -696,9 +731,9 @@ def printed_circle(
             del points[worst]
             continue
         if len({(x >= fx, y >= fy) for x, y in points}) < 4:
-            return circle
+            return None
         return fit
-    return circle
+    return None
 
 
 def _move_ring(
@@ -732,6 +767,97 @@ def _move_ring(
             continue
         out.append(Segment(*moved(segment.x0, segment.y0), *moved(segment.x1, segment.y1), segment.role))
     return out
+
+
+def _arrowhead_barbs(tip: tuple[float, float], ends: Sequence[tuple[float, float]]) -> set[tuple[float, float]]:
+    """Of the strokes from ``tip`` (given by their other ``ends``), the two
+    printing its arrowhead: of the pairs of one length
+    (``BALLOON_BARB_PAIR_M``), no longer than ``BALLOON_BARB_MAX_M``, either
+    side of a third stroke from the tip (the leader) and within
+    ``BALLOON_BARB_ANGLE_RAD`` of it, the one nearest GetArrowHeadAtIndex2's
+    barb (``BALLOON_BARB_LENGTH_M`` at ``BALLOON_BARB_HALF_ANGLE_RAD``).
+    Never more than one pair: any other is leader strokes."""
+
+    def turn(end: tuple[float, float], other: tuple[float, float]) -> float:
+        u = (end[0] - tip[0], end[1] - tip[1])
+        v = (other[0] - tip[0], other[1] - tip[1])
+        return math.atan2(u[0] * v[1] - u[1] * v[0], u[0] * v[0] + u[1] * v[1])
+
+    def mismatch(end: tuple[float, float], half: float) -> float:
+        return (
+            abs(math.dist(end, tip) - BALLOON_BARB_LENGTH_M) / BALLOON_BARB_LENGTH_M
+            + abs(half - BALLOON_BARB_HALF_ANGLE_RAD) / BALLOON_BARB_ANGLE_RAD
+        )
+
+    pairs = []
+    for index, a in enumerate(ends):
+        for b in ends[index + 1 :]:
+            la, lb = math.dist(a, tip), math.dist(b, tip)
+            if max(la, lb) > BALLOON_BARB_MAX_M or abs(la - lb) > BALLOON_BARB_PAIR_M:
+                continue
+            for c in ends:
+                if c in (a, b):
+                    continue
+                for left, right in ((a, b), (b, a)):
+                    ta, tb = turn(c, left), turn(right, c)
+                    if 0.0 < ta <= BALLOON_BARB_ANGLE_RAD and 0.0 < tb <= BALLOON_BARB_ANGLE_RAD:
+                        pairs.append((mismatch(left, ta) + mismatch(right, tb), a, b))
+    if not pairs:
+        return set()
+    _, a, b = min(pairs)
+    return {a, b}
+
+
+def _printed_leader_starts(
+    segments: Sequence[Segment],
+    annotation: Mapping[str, Any],
+    strokes: Sequence[Segment],
+    ring: tuple[float, float, float],
+) -> tuple[list[Segment], list[LeaderInkAmbiguity]]:
+    """``segments`` with each balloon leader starting where the PDF printed it.
+
+    ``ring`` is the balloon's printed ring (``printed_circle``), else its COM
+    circle. A registered leader's first segment keeps its far end; its start
+    becomes the other end of the one printed stroke that shares that far end
+    (within :data:`BALLOON_LEADER_TIP_M`), is not an arrowhead stroke
+    (``_arrowhead_barbs``) and ends on or inside ``ring`` (within
+    :data:`BALLOON_LEADER_RING_M`), so a leader printed from inside its ring
+    reads there. No such stroke leaves the COM start. Several distinct ones
+    leave it too, and come back as a :class:`LeaderInkAmbiguity` each.
+    """
+    cx, cy, radius = ring
+    starts = {span[0] for span in _leader_spans(annotation)}
+    out = []
+    ambiguities = []
+    for segment in segments:
+        if segment.role != "leader" or (segment.x0, segment.y0) not in starts:
+            out.append(segment)
+            continue
+        far = (segment.x1, segment.y1)
+        ends = sorted(
+            {
+                near
+                for stroke in strokes
+                for near, other in (
+                    ((stroke.x0, stroke.y0), (stroke.x1, stroke.y1)),
+                    ((stroke.x1, stroke.y1), (stroke.x0, stroke.y0)),
+                )
+                if math.dist(other, far) <= BALLOON_LEADER_TIP_M
+            }
+        )
+        barbs = _arrowhead_barbs(far, ends)
+        printed = [
+            near
+            for near in ends
+            if near not in barbs and math.hypot(near[0] - cx, near[1] - cy) <= radius + BALLOON_LEADER_RING_M
+        ]
+        if len(printed) == 1:
+            [near] = printed
+            segment = Segment(near[0], near[1], segment.x1, segment.y1, segment.role)
+        elif printed:
+            ambiguities.append(LeaderInkAmbiguity(tip=far, starts=tuple(printed)))
+        out.append(segment)
+    return out, ambiguities
 
 
 def ink_edges(dump: Mapping[str, Any]) -> list[Segment]:
@@ -1712,11 +1838,16 @@ def annotation_geometry(
     note = annotation.get("note") or {}
     exact = False
     rows: list[tuple[str, Box]]
+    ambiguities: list[LeaderInkAmbiguity] = []
     circle = balloon_circle(display) if note.get("balloon") else None
     if circle is not None and strokes:
-        printed = printed_circle(circle, strokes)
-        segments = _move_ring(segments, circle, printed)
-        circle = printed
+        # A ring the page does not trace (a split or stacked balloon, a
+        # partial print) leaves the COM circle, up to 0.57 mm off the print,
+        # to judge the printed leader start by: never no judgement.
+        ring = printed_circle(circle, strokes) or circle
+        segments = _move_ring(segments, circle, ring)
+        segments, ambiguities = _printed_leader_starts(segments, annotation, strokes, ring)
+        circle = ring
     if circle is not None:
         # A BOM balloon's GetExtent includes its leader; its rendered
         # full-circle arc is the balloon (``rendered_balloon_circle``).
@@ -1783,6 +1914,7 @@ def annotation_geometry(
         position=(position[0], position[1]) if len(position) >= 2 else None,
         exact=exact,
         circle=circle,
+        leader_ink_ambiguities=tuple(ambiguities),
         text_height=height,
         arrow_tails=tuple(tails),
         leader_spans=tuple(_leader_spans(annotation)),
@@ -3572,6 +3704,30 @@ def find_unmatched_text(model: SheetModel) -> list[Finding]:
     ]
 
 
+def find_ambiguous_leader_ink(sheet: SheetGeometry) -> list[Finding]:
+    """A balloon leader the PDF printed more than one start for: the audit
+    kept its COM start, so its own-text check reads the window, not the
+    page (``_printed_leader_starts``)."""
+    return [
+        Finding(
+            kind="leader-ink-ambiguous",
+            sheet=sheet.name,
+            a=annotation.label,
+            b="",
+            detail=(
+                f"{annotation.label}: {len(ambiguity.starts)} printed strokes from its leader tip "
+                f"({ambiguity.tip[0] * MM:.2f}, {ambiguity.tip[1] * MM:.2f}) mm start on or inside "
+                "its ring: "
+                + ", ".join(f"({x * MM:.2f}, {y * MM:.2f})" for x, y in ambiguity.starts)
+            ),
+            at_mm=(ambiguity.tip[0] * MM, ambiguity.tip[1] * MM),
+            extra={"strokes": float(len(ambiguity.starts))},
+        )
+        for annotation in sheet.annotations
+        for ambiguity in annotation.leader_ink_ambiguities
+    ]
+
+
 # Which finding kinds gate once LAYOUT_AUDIT_MODE is GATE.
 GATING_KINDS = frozenset(
     {
@@ -3579,6 +3735,7 @@ GATING_KINDS = frozenset(
         "text-on-line",
         "leader-through-text",
         "leader-through-own-text",
+        "leader-ink-ambiguous",
         "extension-through-own-text",
         "dim-line-through-own-text",
         "line-through-own-text",
@@ -3618,10 +3775,12 @@ GATING_KINDS = frozenset(
 # #1105 re-placed rebuilt on top. "view-edges-missing" is also zero here, but it
 # fires 157 times with the 0.13/0.18 mm line weights (c45096c90), so it waits
 # for that branch. "leader-through-own-text" is held out too. The datum-origin
-# boxing removed 4 of its 5 findings, but balloons still trip it
-# intermittently: a short leader starts just inside its printed ring. It fired
-# on drive-train-assembly in 4 of 18 runs and on frame-assembly (balloon 5,
-# 0.35 mm) at 081cfd468.
+# boxing removed 4 of its 5 findings. A balloon leader now starts where the PDF
+# prints it (BALLOON_LEADER_RING_M), which cleared frame-assembly's balloon 5
+# (0.47 mm inside its ring at 20260928T124727673Z) on replay, but it still
+# fires on harmonic-base, platen-guide, pinion-pivot-shaft and
+# rocker-arm-support (7 days to 2026-09-28). "leader-ink-ambiguous" is new and
+# has no fleet count yet.
 ENFORCED_KINDS: frozenset[str] = frozenset(
     {
         "com-read-errors",
@@ -3635,6 +3794,19 @@ ENFORCED_KINDS: frozenset[str] = frozenset(
         "shoulder-crosses-line",
     }
 )
+# Kinds one drawing enforces under REPORT before the fleet does, because its
+# recipe rests a check on them. frame-assembly's short-leader balloons prove
+# their leader start only on the read right after SetPosition: after the
+# rebuild COM reports the start the fit render left, not the one the PDF
+# draws (draw_frame_assembly._short_frame_balloon). The printed leader is
+# measured here, so a leader printed from inside its own ring fails the leaf,
+# and so does one whose printed start the page leaves ambiguous.
+# frame-assembly reads zero of both on replay of runs 20260928T124727673Z
+# (swmaker000007), 20260928T141421973Z (swmaker000008) and
+# 20260928T152556482Z (swmaker000004).
+STEM_ENFORCED_KINDS: Mapping[str, frozenset[str]] = MappingProxyType(
+    {"frame-assembly": frozenset({"leader-through-own-text", "leader-ink-ambiguous"})}
+)
 
 
 def severity(finding: Finding) -> FindingSeverity:
@@ -3643,11 +3815,12 @@ def severity(finding: Finding) -> FindingSeverity:
     return FindingSeverity.ADVISORY
 
 
-def enforced(mode: LayoutAuditMode, gating: Sequence[Finding]) -> list[Finding]:
-    """The gating findings that fail the leaf under ``mode``."""
+def enforced(mode: LayoutAuditMode, gating: Sequence[Finding], *, stem: str) -> list[Finding]:
+    """The gating findings that fail drawing ``stem``'s leaf under ``mode``."""
     if mode is LayoutAuditMode.GATE:
         return list(gating)
-    return [finding for finding in gating if finding.kind in ENFORCED_KINDS]
+    kinds = ENFORCED_KINDS | STEM_ENFORCED_KINDS.get(stem, frozenset())
+    return [finding for finding in gating if finding.kind in kinds]
 
 
 def audit_dump(dump: Mapping[str, Any]) -> list[Finding]:
@@ -3678,6 +3851,7 @@ def audit_dump(dump: Mapping[str, Any]) -> list[Finding]:
         *on_line,
         *find_text_on_view(sheet),
         *find_leader_through_text(sheet),
+        *find_ambiguous_leader_ink(sheet),
         *find_lines_through_own_text(sheet),
         # A line through a callout's text crosses the shoulder under it too:
         # one defect, reported as text-on-line. Only the SAME line: another

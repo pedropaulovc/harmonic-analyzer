@@ -112,7 +112,28 @@ counts).
 A balloon is its printed circle. `GetDisplayData` puts the circle up to
 0.57 mm off the ring the PDF draws, so the audit fits the ring from the
 page's annotation strokes and keeps the COM circle only when no closed ring
-prints within 1 mm of it. Lines, leaders and gaps are then measured against
+prints within 1 mm of it. A balloon leader's registered start is also read
+off the window: on 1024x640 seats it lay 0.15-0.78 mm from where the PDF
+starts the leader, on the printed ring (frame-assembly, 20 balloons), and
+once 0.47 mm inside it, a false `leader-through-own-text`. How far the COM
+start strays is the window's, so it does not pick the printed start: the
+start becomes the other end of the one printed stroke that shares the
+leader's arrowtip and ends on or inside the ring (0.1 mm band; printed
+starts measured 0.00-0.05 mm off it on 68 frame and drive-train balloons).
+The ring is the fitted one, or the COM circle where none fits (a split or
+stacked balloon), so no leader goes unjudged. The arrowhead's strokes are
+not leaders: two of one length (0.1 mm), at most 5 mm, one either side of
+a third stroke from the tip and each within 15° of it (the printed
+arrowheads measured 3.54-3.62 mm, pairs within 0.03 mm), since on a short
+leader they end inside the ring. A leader as long as its barbs pairs with
+either by length and angle, but never has the third stroke between them.
+Only one pair per tip is the arrowhead, the one nearest
+GetArrowHeadAtIndex2's barbs (3.576 mm at 6.1°) in length and angle
+together; every other stroke, a second symmetric pair included, even one
+as long as the barbs, is a leader candidate.
+A leader printed from inside its ring therefore reads there. No such
+stroke keeps the COM start; several keep it and report
+`leader-ink-ambiguous`. Lines, leaders and gaps are then measured against
 the circle, not its bounding square, whose corners are blank paper
 (layoutcal2-c: 35 of drive-train-assembly's 36 findings; the 36th was the
 table below). A table is one
@@ -127,6 +148,7 @@ only for a dump with no PDF text, i.e. the offline fixtures.
 | `text-on-line` | gating | a foreign line runs through text; covers annotation lines, printed model edges, datum-origin, section-line and detail-circle ink |
 | `text-on-view` | gating | text printed inside a view its annotation does not belong to: within the extent of that view's printed edges (`GetOutline` pads the part by a few mm, so it is used, inset, only when no edges printed; pictorial views skipped); from swing's MHA-092 gap diff |
 | `leader-through-text` / `leader-through-own-text` | gating | a leader runs through foreign text, or through its own rows (0.2 mm inset, shoulder excluded) |
+| `leader-ink-ambiguous` | gating | more than one printed leader stroke (arrowhead strokes excluded) runs from a balloon leader's arrowtip to a start on or inside its ring: the audit keeps the COM start, so its own-text check is unproven |
 | `leader-crosses-line` / `shoulder-crosses-line` | gating | a leader, or a callout's shoulder under its text, crosses another annotation's dimension or extension line (Main's ruling a) or frame line transversally (MHA-092's heel-height line through the ADJUSTER shoulder). Not a detail circle (a leader to a feature inside it must cross it), and not on the stretch a leader runs past its arrow tip into the hole, where the hole's own centre and extension lines pass |
 | `leader-converges-at-landing` | advisory | a leader crossing within 5 mm of both its own landing and the crossed line's end: two leaders closing on one corner (Main's ruling on cone-gear-shaft's Ra 1.6) |
 | `leader-crosses-section-line` | gating | a leader crossing a section cutting line (Main's ruling: the MHA-025 finish leader was moved off its A-A line for this) |
@@ -214,8 +236,15 @@ datum-origin case replay from the calibration run's dumps.
    another. Datum-origin labels are now boxed one by one, which removed 4 of
    its 5 findings. The X axis prints between its "0" and "X" labels, and one
    row box spanning both read the axis as a leader through its own text. But
-   a balloon's short leader still starts inside its printed ring from time
-   to time (drive-train-assembly, frame-assembly). `view-edges-missing` is
+   a balloon's short leader has started inside its printed ring
+   (drive-train-assembly), and the kind also fires on harmonic-base,
+   platen-guide, pinion-pivot-shaft and rocker-arm-support (7 days to
+   2026-09-28). frame-assembly alone enforces it now, with
+   `leader-ink-ambiguous` (`STEM_ENFORCED_KINDS`): its short-leader balloons
+   check their leader start only right after SetPosition, since after the
+   rebuild COM reports the start the fit render left, so the printed leader
+   is their check.
+   `view-edges-missing` is
    zero here, but not with the lighter line weights (c45096c90).
 2. **GATE**: one commit, landed before the release cut. It flips the mode and
    removes the superseded audits: the 6 explicit `check_drawing_layout`

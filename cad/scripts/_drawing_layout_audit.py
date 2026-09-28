@@ -618,8 +618,8 @@ def run_layout_audit(
     mode: LayoutAuditMode = LAYOUT_AUDIT_MODE,
 ) -> None:
     """Dump and audit every sheet, write ``report``; raise on a finding
-    ``enforced`` under ``mode`` (every gating one under GATE, the
-    ``ENFORCED_KINDS`` under REPORT).
+    ``enforced`` for ``stem`` under ``mode`` (every gating one under GATE,
+    the ``ENFORCED_KINDS`` and the stem's ``STEM_ENFORCED_KINDS`` under REPORT).
 
     A collector or audit fault fails the drawing in every mode: a report that
     silently skipped a sheet would under-count the fleet calibration. The
@@ -669,7 +669,7 @@ def run_layout_audit(
             f"layout audit {stem}: {summary['sheets']} sheet(s), {summary['gating']} gating, "
             f"{summary['findings']} -> {report}"
         )
-        failing = enforced(mode, gating)
+        failing = enforced(mode, gating, stem=stem)
         if failing:
             raise RuntimeError(
                 f"drawing layout audit failed for {stem} ({mode.value} mode): {len(failing)} "
