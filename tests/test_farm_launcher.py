@@ -433,8 +433,6 @@ def test_success_records_start_before_completion_and_preserves_native_arguments(
         "90",
         "--verbosity",
         "info",
-        "-n",
-        "4",
         "--continue",
         "part:pen_rod",
         "drawing:pen",
