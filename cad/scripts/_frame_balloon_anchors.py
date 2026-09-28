@@ -18,14 +18,19 @@ one a millimetre-wide fit-to-sheet aperture reached (and reached further on a
 smaller seat window). Points proven under that aperture no longer prove
 anything: tube-frame's (12.7, 0, 0), frozen from run 20260928T074246010Z,
 selected no edge zoomed (run 20260928T092244731Z). harmonic-base's point hit
-zoomed in that run, so it stays frozen; the others walk until a zoomed run
-proves their points on this sheet.
+zoomed in that run, so it stays frozen; the others walk. Zoomed frozen points
+are not yet seat-portable either: tube-frame-cap's (0, 17.939, 13.335), hit
+on swmaker000006 in runs 20260928T093251625Z and 20260928T094157505Z,
+selected no edge at the same sheet point on swmaker000008 (run
+20260928T114357610Z).
 
 The lag screw walks too. Its frozen head point hit lag-screw-2 on
 swmaker000004 (run 20260928T084730204Z) and the rocker-arm-support flange
 under it on swmaker000008 (run 20260928T085715872Z), both unzoomed; its
 listed visible edges were 0 for lag-screw-1 on swmaker000004 and 45 on
-other seats, so a listed edge cannot choose its instance.
+other seats, so a listed edge cannot choose its instance. Walking, it took
+lag-screw-2 on swmaker000008 after lag-screw-1's twelve extreme points all
+hit other parts (run 20260928T100532195Z).
 """
 
 from __future__ import annotations
