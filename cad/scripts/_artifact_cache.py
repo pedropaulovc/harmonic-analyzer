@@ -97,6 +97,7 @@ and no scheduled cleanup job. See ``scripts/azure/provision_build_cache.ps1``.
 from __future__ import annotations
 
 import concurrent.futures
+import contextlib
 import hashlib
 import io
 import json
@@ -573,6 +574,46 @@ _UNSET = _Unset()
 _BACKEND: _BlobBackend | None | _Unset = _UNSET
 
 
+@contextlib.contextmanager
+def _phase(name: str, **attributes):
+    """A ``build-infra`` span for one phase of a cache transfer. ``cache.probe`` on a
+    farm leaf reads 0.84 s p50 on a miss against 0.16 s on a hit (14 d, n=6968 /
+    27455) with nothing inside it, so the SDK import, the token fetch, the transfer
+    and the unpack each get their own span to say which one that is."""
+    import _telemetry
+
+    with _telemetry.span(name, service=_telemetry.BUILD_INFRA_SERVICE, **attributes) as sp:
+        yield sp
+
+
+class _TimedCredential:
+    """Delegating token credential that spans each token fetch (``cache.credential``).
+
+    The storage pipeline fetches a token lazily INSIDE the first request, so without
+    this a managed-identity or CLI round trip is indistinguishable from the download
+    it precedes. The SDK caches the token afterwards, so this fires about once per
+    process; everything else is delegated untouched."""
+
+    def __init__(self, inner):
+        self._inner = inner
+
+    def __getattr__(self, name):
+        return getattr(self._inner, name)
+
+    def get_token(self, *scopes, **kwargs):
+        with _phase("cache.credential", credential=type(self._inner).__name__):
+            return self._inner.get_token(*scopes, **kwargs)
+
+
+class _TimedTokenInfoCredential(_TimedCredential):
+    """:class:`_TimedCredential` for a credential that also offers ``get_token_info``
+    (azure-core prefers it when present, so the proxy must expose it only then)."""
+
+    def get_token_info(self, *scopes, **kwargs):
+        with _phase("cache.credential", credential=type(self._inner).__name__):
+            return self._inner.get_token_info(*scopes, **kwargs)
+
+
 def _make_backend() -> _BlobBackend | None:
     try:
         from azure.storage.blob import ContainerClient
@@ -587,16 +628,22 @@ def _make_backend() -> _BlobBackend | None:
     if sas:
         return _BlobBackend(ContainerClient(account_url, container, credential=sas))
     from azure.identity import DefaultAzureCredential
-    return _BlobBackend(ContainerClient(account_url, container,
-                                        credential=DefaultAzureCredential()))
+
+    inner = DefaultAzureCredential()
+    timed = (
+        _TimedTokenInfoCredential if hasattr(inner, "get_token_info") else _TimedCredential
+    )
+    return _BlobBackend(ContainerClient(account_url, container, credential=timed(inner)))
 
 
 def _backend() -> _BlobBackend | None:
     """Memoized ContainerClient (one credential handshake per process). Returns
-    None when unconfigured / SDK absent, so the caller treats it as a miss."""
+    None when unconfigured / SDK absent, so the caller treats it as a miss. The
+    first call's SDK import and client construction are ``cache.connect``."""
     global _BACKEND
     if isinstance(_BACKEND, _Unset):
-        _BACKEND = _make_backend()
+        with _phase("cache.connect"):
+            _BACKEND = _make_backend()
     return _BACKEND
 
 
@@ -693,17 +740,22 @@ def restore(key: str, outputs: list[Path], label: str) -> bool:
         backend = _backend()
         if backend is None:
             return False
-        blob = backend.get(key)
+        with _phase("cache.download") as download:
+            blob = backend.get(key)
+            download.set_attribute("found", blob is not None)
+            download.set_attribute("bytes", len(blob) if blob is not None else 0)
         if blob is None:
             # A miss is routine on changed inputs. Keep it at DEBUG so the default
             # warning-level build stays concise; the span event and cache.jsonl retain
             # full diagnostics for backtracing why the local build ran.
             _debug_log(f"miss  {label} ({key[:12]}) -> building locally")
             _event("cache.miss", label, key)
-            _record("restore_miss", label, key)
+            with _phase("cache.record", event="restore_miss"):
+                _record("restore_miss", label, key)
             return False
         try:
-            _unpack(blob)
+            with _phase("cache.unpack", bytes=len(blob)):
+                _unpack(blob)
         except PermissionError as exc:
             locked = RestoreLocked(label, key, exc)
             _warn(str(locked))
@@ -748,7 +800,11 @@ def store(key: str, outputs: list[Path], label: str) -> str:
             _event("cache.store_empty", label, key)
             _record("store_empty", label, key)
             return "empty"
-        backend.put(key, _pack(present))
+        with _phase("cache.pack", outputs=len(present)) as pack:
+            blob = _pack(present)
+            pack.set_attribute("bytes", len(blob))
+        with _phase("cache.upload", bytes=len(blob)):
+            backend.put(key, blob)
         _log(f"store {label} ({key[:12]})")
         _event("cache.store", label, key)
         _save_stored_key(label, key)

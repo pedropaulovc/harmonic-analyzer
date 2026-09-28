@@ -1007,6 +1007,16 @@ scripts that `from _common import log, check` are instrumented unchanged.
       parent/child shape. (Aux providers are built with `shutdown_on_exit=False` and
       skipped by `shutdown()`: they don't own their processors, and double-shutting
       them just re-closes every exporter.)
+      Logs follow their span: the logging bridge (`_ResourceRoutedLoggingHandler`)
+      files a record under the resource of the span it is written under (a
+      `[cache]` line inside `cache.probe` lands on `build-infra`, beside its span),
+      through per-resource `LoggerProvider`s sharing the primary's log processors.
+      A line written after its span closed names its resource explicitly:
+      `_telemetry.info(..., service=_telemetry.BUILD_INFRA_SERVICE)`.
+      The cache's own phases are child spans of `cache.probe`/`cache.store` on the
+      same resource: `cache.connect` (SDK import + client, once per process),
+      `cache.credential` (each token fetch), `cache.download` (`found`, `bytes`),
+      `cache.unpack`, `cache.record` (miss provenance), `cache.pack`, `cache.upload`.
 - **A COM task is a CHAIN of top-level spans, one per phase — never one span that
   swallows the lot.** A cached part/assembly/drawing task emits, all as siblings:
   `cache.probe <label>` (the remote-cache restore attempt — on a HIT this IS the

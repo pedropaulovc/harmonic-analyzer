@@ -1560,7 +1560,14 @@ def test_com_seat_hands_back_its_wait_and_logs_total_elapsed(tmp_path, monkeypat
     assert message == (
         "[com.seat] part:x released after 50.5s total (waited 45.0s, held 5.5s)"
     )
-    assert fields == {"wait_s": 45.0, "held_s": 5.5, "elapsed_s": 50.5}
+    # Written after com.seat.wait closed, so it names its resource itself --
+    # otherwise it lands on the umbrella resource, parentless (4.9k rows / 7 d).
+    assert fields == {
+        "wait_s": 45.0,
+        "held_s": 5.5,
+        "elapsed_s": 50.5,
+        "service": dodo._telemetry.BUILD_INFRA_SERVICE,
+    }
 
 
 def test_cached_part_miss_emits_four_sibling_phase_spans(tmp_path, monkeypatch):

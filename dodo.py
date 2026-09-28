@@ -297,6 +297,7 @@ def _com_seat(label: str):
             wait_s=round(waited, 2),
             held_s=round(released - acquired, 2),
             elapsed_s=round(released - entered, 2),
+            service=_telemetry.BUILD_INFRA_SERVICE,
         )
 
 
