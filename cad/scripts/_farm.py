@@ -19,11 +19,14 @@ import getpass
 import json
 import os
 import socket
+import subprocess
 from dataclasses import dataclass, field
 from datetime import timedelta
 from pathlib import Path
 
 import _telemetry
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 FARM_PROTOCOL_VERSION = 4
 
@@ -88,6 +91,84 @@ def workflow_id(task: str, cache_key: str | None, commit: str, timeout_s: int) -
 
 def enabled() -> bool:
     return os.environ.get("HARMONIC_EXECUTOR", "local") == "farm"
+
+
+# A drift report names at most this many paths; a checkout moved to another
+# branch can differ in thousands, and the first few already say what happened.
+_DRIFT_PATHS_SHOWN = 10
+
+# Why a worker can build the leaf, exit 0 and still not publish the key this
+# submitter waits on, once checkout drift has been ruled out. The worker keys
+# the task from the launch commit; the submitter keyed it from this checkout
+# and this process's environment, so the causes are the ways those differ.
+CACHE_MISSING_CAUSES = (
+    "the worker built the launch commit but did not publish the key this "
+    "submitter computed. Likely causes: an input this checkout keyed differently "
+    "from the commit (an artefact left by a local COM build whose .execution "
+    "token no worker can reproduce -- e.g. a HARMONIC_REMOTE_CACHE_MODE=ro local "
+    "build; `doit forget` the task and its dependents so they re-probe -- or a "
+    "checkout edit that was reverted before this check), HARMONIC_CACHE_SALT / "
+    "HARMONIC_CACHE_ACCOUNT / HARMONIC_CACHE_CONTAINER differing from the "
+    "workers', or a publish that failed on the worker (see its task.log). Compare "
+    "this task's row in cad/out/reports/cache.jsonl with the worker's"
+)
+
+
+def checkout_drift(repo: Path = REPO_ROOT, commit: str | None = None) -> str | None:
+    """Why this checkout no longer matches the launch commit, or ``None``.
+
+    The submitter keys each task from the live files when it reaches the task,
+    while every worker builds ``HARMONIC_FARM_COMMIT``. The farm preflight
+    refused a dirty tree, so at launch the checkout WAS that commit's tree, and
+    the commit's tree -- tracked files plus submodule gitlinks -- is the launch
+    fingerprint. ``git diff <commit>`` compares the working tree (and the
+    checked-out submodules, dirty ones included) against it without writing the
+    index, so concurrent doit workers can run it side by side. A HEAD that moved
+    to an identical tree is no drift: every key is unchanged.
+
+    Any tracked difference is drift, not only one inside this task's
+    ``file_dep``: keys fold transitive recipe digests (a drawing keys its
+    part's whole recipe through the ``.SLDPRT`` dep), so a cheap per-task
+    relevance test would miss real re-keys.
+    """
+    launched = commit or os.environ["HARMONIC_FARM_COMMIT"]
+    changed = _git(
+        repo,
+        "diff",
+        "--name-only",
+        "--no-renames",
+        "--ignore-submodules=none",
+        launched,
+        "--",
+    ).splitlines()
+    if not changed:
+        return None
+    head = _git(repo, "rev-parse", "HEAD").strip()
+    moved = (
+        f"HEAD {launched[:12]} (unchanged)"
+        if head == launched
+        else f"HEAD {launched[:12]} -> {head[:12]}"
+    )
+    shown = ", ".join(changed[:_DRIFT_PATHS_SHOWN])
+    if len(changed) > _DRIFT_PATHS_SHOWN:
+        shown += f" and {len(changed) - _DRIFT_PATHS_SHOWN} more"
+    return (
+        f"submitter checkout changed since launch: {moved}; changed: {shown}; "
+        f"the farm builds {launched[:12]}, so keys would not match. Launch from "
+        "an untouched worktree (scripts/farm-run.ps1 does this)."
+    )
+
+
+def _git(repo: Path, *args: str) -> str:
+    done = subprocess.run(
+        ["git", *args], cwd=repo, capture_output=True, text=True, check=False
+    )
+    if done.returncode != 0:
+        raise RuntimeError(
+            f"checkout drift check: git {' '.join(args)} failed "
+            f"(exit {done.returncode}): {done.stderr.strip()}"
+        )
+    return done.stdout
 
 
 def config_path() -> Path:

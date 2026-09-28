@@ -47,8 +47,9 @@ end. An agent must not dispatch that way — a farm build outlives any tool
 deadline — so agent-driven submissions go through `scripts/farm-run.ps1` under
 a persistent `hub` process
 ([supervised farm launches](../../DEVELOPING.md#supervised-farm-launches)). It
-runs the same `build.py` invocation and records the run so a successor can pick
-it up instead of re-inventing a command.
+runs the same `build.py` invocation from a private snapshot of the pushed HEAD,
+so nothing done in your worktree mid-run can move a key, and records the run so
+a successor can pick it up instead of re-inventing a command.
 
 ```powershell
 .\build.cmd --help                    # wrapper options + farm defaults, then doit's commands
@@ -192,6 +193,14 @@ throw away afterwards. Non-negotiable shape:
   then fails `cache_missing` — which is non-retryable, so it kills the build.
   Same trap with `HARMONIC_REMOTE_CACHE_MODE=off`, except the farm preflight
   catches that one up front.
+- **Never change the submitter's checkout mid-run.** The submitter computes
+  every key from its local files while the workers build the launch commit; a
+  commit or edit in that worktree during a direct `./build` run makes the two
+  disagree, and the leaf that follows would fail `cache_missing` (#1114).
+  `build.py` checks for exactly that before each dispatch and on every absent
+  key, and names the drift (`submitter checkout changed since launch: HEAD A ->
+  B; changed: …`) instead. The supervised launcher builds from its own snapshot,
+  so it is immune.
 - **Reading a moved key** (full detail in `DEVELOPING.md`, "Debugging a miss"):
   `uv run python -m doit cache_status -- <substring>` for `HIT`/`MISS` + the
   `(digest, relpath)` list behind a miss and a `DRIFT(last published …)` flag;
@@ -272,7 +281,7 @@ Failure categories, and what they mean for you:
 | category | retried? | read it as |
 |---|---|---|
 | `task_failed` | no | your recipe failed with a working seat — a real bug |
-| `cache_missing` | no | the leaf succeeded but your key is absent (§3) |
+| `cache_missing` | no | the leaf succeeded but your key is absent — your checkout changed mid-run (named in the message), or §3 |
 | `execute_rejected` | no | the task name/graph/key was refused (route B rules) |
 | `restore_mismatch` | no | prepared HEAD/clean/submodule/exclusion state or metadata commit does not match the request; this includes an exclusion naming no submodule gitlink in the commit |
 | `source_unavailable` | yes | the exact-SHA depth-one fetch from the approved repository failed — push it there or fix repository access |

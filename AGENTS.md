@@ -217,7 +217,7 @@ farm (`--executor farm`, which is how a seatless machine runs them).
 harness deadline.** `scripts/farm-run.ps1` started with `hub` (`persist: true`)
 is the only sanctioned way for an agent to submit `--executor farm` work; the
 full contract, parameters, run records and recovery procedure live in
-[`DEVELOPING.md`](DEVELOPING.md#supervised-farm-launches). Four rules bind every
+[`DEVELOPING.md`](DEVELOPING.md#supervised-farm-launches). Five rules bind every
 such build:
 
 - No finite local timer. A cold leaf has measured 61.5 min and a full closure
@@ -227,6 +227,12 @@ such build:
   refused with doit's invalid-command exit 3, naming the target, before any
   fleet query or workflow submission; a failed farm preflight exits 2. Neither
   runs an action.
+- The build runs from a private snapshot of the pushed HEAD under
+  `-LogDirectory` (which must sit outside every Git worktree), so the caller's
+  worktree may change mid-run; outputs land in `<LogDirectory>\<run-id>.out`,
+  not the worktree's `cad/out`. A direct `build.py --executor farm` has no
+  snapshot: it refuses to dispatch, naming the files, once its checkout drifts
+  from the launch commit, so never commit or edit in that worktree mid-run.
 - Prove one real remote leaf on the launcher, protocol and pool configuration
   you are about to use before fanning parallel agents out over the farm. A green
   `check:math` is local-only and a submitter cache hit dispatches nothing;

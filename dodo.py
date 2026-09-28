@@ -2237,27 +2237,47 @@ def _farm_build(label: str, key: str, outputs: list[Path]) -> None:
     A farm failure is the task's failure (worker, category, exit code, log blob all
     in the message); a success whose key is still absent is an infrastructure
     fault and fails just as loud.
+
+    ``key`` came from this checkout's live files, but the worker builds the
+    launch commit. So a checkout that drifted since launch is refused before the
+    dispatch -- the worker could never publish ``key`` -- and a leaf that exits 0
+    without the key is re-checked for drift before blaming the cache (#1114).
     """
+    drift = _farm.checkout_drift()
+    if drift is not None:
+        raise RuntimeError(f"{label}: not dispatched: {drift}")
     result = _farm.run_leaf(label, key)
     if result.state != "succeeded":
-        raise RuntimeError(
+        failure = (
             f"{label} failed on {result.worker_id} [{result.failure_category}] "
             f"exit {result.exit_code}: {result.failure_message} "
             f"(log: {result.log_blob}) -- "
+        )
+        if result.failure_category == "cache_missing":
+            drift = _farm.checkout_drift()
+            if drift is not None:
+                raise RuntimeError(failure + drift)
+            failure += _farm.CACHE_MISSING_CAUSES + " -- "
+        raise RuntimeError(
+            failure
             # The worker's workspace is disposable, so a leaf's forensic
             # artefacts (failing document, seat BMP, capture.json) only exist as
             # blobs; name the command that fetches them, or the submitter has
             # nothing but this one-line message to diagnose from.
-            f"{_failure_artefact_hint(result.log_blob)}"
+            + _failure_artefact_hint(result.log_blob)
         )
     with _telemetry.span(
         f"cache.restore {label}", label=label, service=_telemetry.BUILD_INFRA_SERVICE
     ) as restore:
         _tag_cache_key(restore, key)
         if not _cache.restore(key, outputs, label):
-            raise RuntimeError(
+            absent = (
                 f"{label}: farm reported success but cache key {key[:12]} is absent"
             )
+            drift = _farm.checkout_drift()
+            if drift is not None:
+                raise RuntimeError(f"{absent}: {drift}")
+            raise RuntimeError(f"{absent} -- {_farm.CACHE_MISSING_CAUSES}")
         restore.set_attribute("cache", "hit")
 
 

@@ -163,6 +163,230 @@ function New-EmptyFileExclusive {
     $stream.Dispose()
 }
 
+function Invoke-GitLines {
+    param(
+        [Parameter(Mandatory)][string]$Repository,
+        [Parameter(Mandatory)][string[]]$Arguments
+    )
+
+    $output = @(& git -C $Repository @Arguments 2>&1)
+    $code = $LASTEXITCODE
+    if ($code -ne 0) {
+        throw "git $($Arguments -join ' ') failed with exit $code`: $($output -join [System.Environment]::NewLine)"
+    }
+    return [string[]]@($output | ForEach-Object { [string]$_ })
+}
+
+function Get-ExcludedSubmodules {
+    param(
+        [Parameter(Mandatory)][string]$Repository,
+        [Parameter(Mandatory)][string]$Commit
+    )
+
+    # The commit's own .farm-sources.json, normalized as build.py and the worker
+    # normalize it; a missing file excludes nothing, a malformed one is refused.
+    & git -C $Repository cat-file -e "$Commit`:.farm-sources.json" 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        return [string[]]@()
+    }
+    $text = (Invoke-GitLines -Repository $Repository -Arguments @(
+        'show', "$Commit`:.farm-sources.json"
+    )) -join "`n"
+    try {
+        $declared = ConvertFrom-Json -InputObject $text -AsHashtable
+    }
+    catch {
+        throw ".farm-sources.json at $Commit is not valid JSON: $($_.Exception.Message)"
+    }
+    if ($declared -isnot [System.Collections.IDictionary]) {
+        throw ".farm-sources.json at $Commit must be a JSON object"
+    }
+    $paths = $declared['exclude_submodules']
+    if ($null -eq $paths) {
+        return [string[]]@()
+    }
+    if ($paths -is [string] -or $paths -isnot [System.Collections.IEnumerable]) {
+        throw ".farm-sources.json at ${Commit}: exclude_submodules must be a list of strings"
+    }
+    $excluded = [System.Collections.Generic.List[string]]::new()
+    foreach ($path in $paths) {
+        if ($path -isnot [string]) {
+            throw ".farm-sources.json at ${Commit}: exclude_submodules must be a list of strings"
+        }
+        $excluded.Add(($path -replace '^(\./)+', '' -replace '/+$', ''))
+    }
+    return [string[]]@($excluded)
+}
+
+function Invoke-TeedNative {
+    param(
+        [Parameter(Mandatory)][string]$LogPath,
+        [Parameter(Mandatory)][string]$FilePath,
+        [Parameter(Mandatory)][string[]]$ArgumentList
+    )
+
+    # Tee-Object cannot append to a -LiteralPath, and a -FilePath would treat
+    # brackets in LogDirectory as wildcards; so append through one shared
+    # handle that readers can open while the child is still streaming.
+    $stream = [System.IO.FileStream]::new(
+        $LogPath,
+        [System.IO.FileMode]::Append,
+        [System.IO.FileAccess]::Write,
+        [System.IO.FileShare]::ReadWrite
+    )
+    $writer = [System.IO.StreamWriter]::new($stream, [System.Text.UTF8Encoding]::new($false))
+    $writer.AutoFlush = $true
+    try {
+        & $FilePath @ArgumentList *>&1 | ForEach-Object {
+            $writer.WriteLine([string]$_)
+            $_
+        }
+    }
+    finally {
+        $writer.Dispose()
+    }
+}
+
+function Invoke-LoggedNative {
+    param(
+        [Parameter(Mandatory)][string]$LogPath,
+        [Parameter(Mandatory)][string]$FilePath,
+        [Parameter(Mandatory)][string[]]$ArgumentList
+    )
+
+    Invoke-TeedNative -LogPath $LogPath -FilePath $FilePath -ArgumentList $ArgumentList
+    $code = $LASTEXITCODE
+    if ($code -ne 0) {
+        throw "$FilePath $($ArgumentList -join ' ') failed with exit $code"
+    }
+}
+
+function Write-LaunchLine {
+    param(
+        [Parameter(Mandatory)][string]$LogPath,
+        [Parameter(Mandatory)][string]$Line
+    )
+
+    Write-Output $Line
+    Add-Content -LiteralPath $LogPath -Value $Line -Encoding utf8
+}
+
+function Initialize-SharedEnvironment {
+    param(
+        [Parameter(Mandatory)][string]$EnvironmentPath,
+        [Parameter(Mandatory)][string]$SnapshotPath,
+        [Parameter(Mandatory)][string]$LogPath,
+        [Parameter(Mandatory)]$Identity
+    )
+
+    # One environment per dependency identity, synced once and never again:
+    # every run that shares it builds from a snapshot whose uv.lock,
+    # pyproject.toml, .python-version and required submodule pins are
+    # identical, and the environment holds no editable pointer into any
+    # snapshot (--no-editable), so a finished run's snapshot can go away while
+    # another run still imports from the environment.
+    $marker = Join-Path $EnvironmentPath '.farm-run-environment.json'
+    if (Test-Path -LiteralPath $marker -PathType Leaf) {
+        return $true
+    }
+    [System.IO.Directory]::CreateDirectory((Split-Path -Path $EnvironmentPath -Parent)) | Out-Null
+    $lockPath = "$EnvironmentPath.lock"
+    $lock = $null
+    while ($null -eq $lock) {
+        try {
+            $lock = [System.IO.File]::Open(
+                $lockPath,
+                [System.IO.FileMode]::OpenOrCreate,
+                [System.IO.FileAccess]::ReadWrite,
+                [System.IO.FileShare]::None
+            )
+        }
+        catch [System.IO.IOException] {
+            # Another launcher is creating this environment; its sync ends on
+            # its own, and the lock dies with its process if it does not.
+            Start-Sleep -Milliseconds 250
+        }
+    }
+    try {
+        if (Test-Path -LiteralPath $marker -PathType Leaf) {
+            return $true
+        }
+        if (Test-Path -LiteralPath $EnvironmentPath) {
+            # No marker: a launcher died mid-sync, and no build ever ran from it.
+            Remove-Item -LiteralPath $EnvironmentPath -Recurse -Force
+        }
+        $previous = $env:VIRTUAL_ENV
+        $env:VIRTUAL_ENV = $EnvironmentPath
+        Push-Location -LiteralPath $SnapshotPath
+        try {
+            Invoke-TeedNative -LogPath $LogPath -FilePath 'uv' -ArgumentList @(
+                'sync', '--frozen', '--no-editable', '--active'
+            ) | Out-Host
+            $code = $LASTEXITCODE
+        }
+        finally {
+            Pop-Location
+            $env:VIRTUAL_ENV = $previous
+        }
+        if ($code -ne 0) {
+            throw "uv sync of the shared environment $EnvironmentPath failed with exit $code"
+        }
+        [System.IO.Directory]::CreateDirectory($EnvironmentPath) | Out-Null
+        Write-JsonAtomic -Path $marker -Value $Identity
+        return $false
+    }
+    finally {
+        $lock.Dispose()
+    }
+}
+
+function Complete-Snapshot {
+    param(
+        [Parameter(Mandatory)][string]$Worktree,
+        [Parameter(Mandatory)][string]$SnapshotPath,
+        [Parameter(Mandatory)][string]$OutputsPath
+    )
+
+    # The snapshot's tracked content is the recorded commit, reproducible at
+    # will; what only this run produced is its cad/out (restored artefacts,
+    # reports, cache.jsonl, logs). Keep that on every outcome, then remove the
+    # snapshot -- unless its outputs could not be moved out, in which case the
+    # snapshot itself is the only copy and stays for forensics.
+    $result = [ordered]@{
+        outputs_preserved = $false
+        snapshot_removed = $false
+        cleanup_errors = [System.Collections.Generic.List[string]]::new()
+    }
+    if (-not (Test-Path -LiteralPath $SnapshotPath)) {
+        $result['snapshot_removed'] = $true
+        return $result
+    }
+    $snapshotOutputs = Join-Path $SnapshotPath 'cad\out'
+    if (Test-Path -LiteralPath $snapshotOutputs -PathType Container) {
+        try {
+            [System.IO.Directory]::Move($snapshotOutputs, $OutputsPath)
+            $result['outputs_preserved'] = $true
+        }
+        catch {
+            $result['cleanup_errors'].Add(
+                "could not move $snapshotOutputs to $OutputsPath; the snapshot is kept: $($_.Exception.Message)"
+            )
+            return $result
+        }
+    }
+    $removal = @(& git -C $Worktree worktree remove --force $SnapshotPath 2>&1)
+    $code = $LASTEXITCODE
+    if ($code -eq 0) {
+        $result['snapshot_removed'] = $true
+    }
+    else {
+        $result['cleanup_errors'].Add(
+            "git worktree remove --force $SnapshotPath failed with exit $code`: $($removal -join ' ')"
+        )
+    }
+    return $result
+}
+
 $logCreated = $false
 $startupRecordWritten = $false
 try {
@@ -199,6 +423,18 @@ try {
     $resolvedLogDirectory = Resolve-FutureDirectory -Path $LogDirectory -ParameterName 'LogDirectory'
     if (Test-PathWithin -Candidate $resolvedLogDirectory -Root $resolvedWorktree) {
         throw "LogDirectory must be outside the target worktree: $resolvedLogDirectory"
+    }
+    # The build snapshots live under LogDirectory. Inside any Git worktree they
+    # would appear there as an untracked nested checkout -- dirtying a tree some
+    # other farm preflight may need clean -- so refuse every worktree, not just
+    # the target, before creating anything.
+    $probe = $resolvedLogDirectory
+    while (-not (Test-Path -LiteralPath $probe)) {
+        $probe = Split-Path -Path $probe -Parent
+    }
+    $insideOutput = @(& git -C $probe rev-parse --is-inside-work-tree 2>$null)
+    if ($LASTEXITCODE -eq 0 -and ([string]($insideOutput | Select-Object -Last 1)).Trim() -eq 'true') {
+        throw "LogDirectory must be outside every Git worktree (build snapshots are created under it): $resolvedLogDirectory"
     }
     if (-not (Test-Path -LiteralPath $resolvedLogDirectory)) {
         [System.IO.Directory]::CreateDirectory($resolvedLogDirectory) | Out-Null
@@ -244,14 +480,63 @@ try {
         throw 'HEAD is not known on origin; fetch and push before launching'
     }
 
+    # The build runs from a snapshot of the pushed HEAD, so an uncommitted edit
+    # here would silently not be built. Refuse it, as build.py's preflight did
+    # when the build ran in this tree. --no-optional-locks: never write the
+    # caller's index.
+    $dirty = Invoke-GitLines -Repository $resolvedWorktree -Arguments @(
+        '--no-optional-locks', 'status', '--porcelain=v1', '--untracked-files=all'
+    )
+    if ($dirty.Count -gt 0) {
+        throw (
+            "Worktree has uncommitted changes; the launcher builds its pushed HEAD only, " +
+            "so commit and push them first:" + [System.Environment]::NewLine +
+            (($dirty | ForEach-Object { "  $_" }) -join [System.Environment]::NewLine)
+        )
+    }
+
+    $excludedSubmodules = Get-ExcludedSubmodules -Repository $resolvedWorktree -Commit $commit
+    $requiredSubmodules = [System.Collections.Generic.List[string]]::new()
+    $environmentInputs = [System.Collections.Generic.List[string]]::new()
+    $environmentInputs.Add('farm-run-environment/1 uv-sync --frozen --no-editable')
+    foreach ($line in (Invoke-GitLines -Repository $resolvedWorktree -Arguments @(
+        'ls-tree', '--full-tree', $commit, '--', 'uv.lock', 'pyproject.toml', '.python-version'
+    ))) {
+        $environmentInputs.Add($line)
+    }
+    foreach ($line in (Invoke-GitLines -Repository $resolvedWorktree -Arguments @(
+        'ls-tree', '-r', '--full-tree', $commit
+    ))) {
+        if (-not $line.StartsWith('160000 commit ', [System.StringComparison]::Ordinal)) {
+            continue
+        }
+        $path = $line.Split("`t", 2)[1]
+        if ($excludedSubmodules -contains $path) {
+            continue
+        }
+        $requiredSubmodules.Add($path)
+        $environmentInputs.Add($line)
+    }
+    $environmentKey = [System.Convert]::ToHexString(
+        [System.Security.Cryptography.SHA256]::HashData(
+            [System.Text.Encoding]::UTF8.GetBytes(($environmentInputs -join "`n"))
+        )
+    ).Substring(0, 16).ToLowerInvariant()
+    $environmentPath = Join-Path (Join-Path $resolvedLogDirectory 'envs') $environmentKey
+
     $cacheEnvironment = [ordered]@{
         HARMONIC_CACHE_ACCOUNT = [System.Environment]::GetEnvironmentVariable('HARMONIC_CACHE_ACCOUNT', 'Process')
         HARMONIC_CACHE_CONTAINER = [System.Environment]::GetEnvironmentVariable('HARMONIC_CACHE_CONTAINER', 'Process')
         HARMONIC_CACHE_SALT = [System.Environment]::GetEnvironmentVariable('HARMONIC_CACHE_SALT', 'Process')
     }
 
+    # The shared environment is already synced (Initialize-SharedEnvironment),
+    # so the build never re-syncs it (--no-sync) and runs in it rather than in
+    # a per-snapshot .venv (--active, which reads VIRTUAL_ENV). VIRTUAL_ENV is
+    # also what build.py strips before it runs the pool's own uv project, so
+    # the shared environment cannot leak into the pool.
     $buildArgs = @(
-        'run', '--frozen', 'python', 'build.py',
+        'run', '--frozen', '--no-sync', '--active', 'python', 'build.py',
         '--executor', 'farm',
         '--leaf-timeout', [string]$LeafTimeout,
         '--verbosity', 'info',
@@ -261,19 +546,26 @@ try {
     [string[]]$nativeArgv = @('uv') + $buildArgs
 
     do {
+        $runGuid = [guid]::NewGuid().ToString('N')
         $runId = '{0}-{1}' -f (
             [System.DateTime]::UtcNow.ToString(
                 'yyyyMMddTHHmmssfffZ',
                 [System.Globalization.CultureInfo]::InvariantCulture
             )
-        ), ([guid]::NewGuid().ToString('N'))
+        ), $runGuid
         $recordPath = Join-Path $resolvedLogDirectory "$runId.run.json"
         $logPath = Join-Path $resolvedLogDirectory "$runId.log"
         $donePath = Join-Path $resolvedLogDirectory "$runId.done"
+        $outputsPath = Join-Path $resolvedLogDirectory "$runId.out"
+        # A short name keeps the snapshot's deepest tracked path under MAX_PATH;
+        # the run record maps it back to the run.
+        $snapshotPath = Join-Path (Join-Path $resolvedLogDirectory 'snapshots') $runGuid.Substring(0, 12)
         $hasConflict = (
             (Test-Path -LiteralPath $recordPath) -or
             (Test-Path -LiteralPath $logPath) -or
-            (Test-Path -LiteralPath $donePath)
+            (Test-Path -LiteralPath $donePath) -or
+            (Test-Path -LiteralPath $outputsPath) -or
+            (Test-Path -LiteralPath $snapshotPath)
         )
     } while ($hasConflict)
 
@@ -296,6 +588,9 @@ try {
         cache_environment = $cacheEnvironment
         tag = $Tag
         argv = @($nativeArgv)
+        snapshot = $snapshotPath
+        outputs = $outputsPath
+        environment = $environmentPath
     }
     Write-JsonAtomic -Path $recordPath -Value $runRecord
     $startupRecordWritten = $true
@@ -319,14 +614,54 @@ catch {
 
 $exitCode = 1
 $terminalState = 'failed'
+$launchOverhead = $null
+$environmentReused = $null
 try {
     Write-Output "farm-launch started $runId $([System.IO.Path]::GetFullPath($recordPath))"
     $env:SOLIDWORKS_POOL_HOME = $resolvedPoolHome
     $env:HARMONIC_REMOTE_CACHE_MODE = 'rw'
     $env:PYTHONUNBUFFERED = '1'
-    Push-Location -LiteralPath $resolvedWorktree
+
+    # The submitter keys every task from the files it sees when it reaches the
+    # task, while every worker builds $commit. Building from a private detached
+    # snapshot of $commit means an edit or a commit in the caller's worktree
+    # mid-run cannot reach the submitter (#1114).
+    $prepareTimer = [System.Diagnostics.Stopwatch]::StartNew()
+    [System.IO.Directory]::CreateDirectory((Split-Path -Path $snapshotPath -Parent)) | Out-Null
+    Invoke-LoggedNative -LogPath $logPath -FilePath 'git' -ArgumentList @(
+        '-C', $resolvedWorktree, 'worktree', 'add', '--quiet', '--detach', $snapshotPath, $commit
+    )
+    if ($requiredSubmodules.Count -gt 0) {
+        Invoke-LoggedNative -LogPath $logPath -FilePath 'git' -ArgumentList (
+            @('-C', $snapshotPath, 'submodule', 'update', '--quiet', '--init', '--recursive', '--') +
+            @($requiredSubmodules)
+        )
+    }
+    $environmentReused = Initialize-SharedEnvironment `
+        -EnvironmentPath $environmentPath `
+        -SnapshotPath $snapshotPath `
+        -LogPath $logPath `
+        -Identity ([ordered]@{
+            inputs = @($environmentInputs)
+            created_by_run = $runId
+            commit = $commit
+            created_at = [System.DateTime]::UtcNow.ToString(
+                'o',
+                [System.Globalization.CultureInfo]::InvariantCulture
+            )
+        })
+    $prepareTimer.Stop()
+    $launchOverhead = [System.Math]::Round($prepareTimer.Elapsed.TotalSeconds, 3)
+    $environmentState = if ($environmentReused) { 'reused' } else { 'created' }
+    Write-LaunchLine -LogPath $logPath -Line (
+        "farm-launch snapshot $snapshotPath at $commit ready in $launchOverhead s; " +
+        "environment $environmentState`: $environmentPath"
+    )
+
+    $env:VIRTUAL_ENV = $environmentPath
+    Push-Location -LiteralPath $snapshotPath
     try {
-        & uv @buildArgs *>&1 | Tee-Object -LiteralPath $logPath
+        Invoke-TeedNative -LogPath $logPath -FilePath 'uv' -ArgumentList $buildArgs
         $code = $LASTEXITCODE
     }
     finally {
@@ -355,6 +690,31 @@ catch {
     [System.Console]::Error.WriteLine($diagnostic)
 }
 
+try {
+    $cleanup = Complete-Snapshot `
+        -Worktree $resolvedWorktree `
+        -SnapshotPath $snapshotPath `
+        -OutputsPath $outputsPath
+}
+catch {
+    # Never let cleanup cost the terminal record.
+    $cleanup = [ordered]@{
+        outputs_preserved = Test-Path -LiteralPath $outputsPath
+        snapshot_removed = -not (Test-Path -LiteralPath $snapshotPath)
+        cleanup_errors = @("snapshot cleanup failed: $($_.Exception.Message)")
+    }
+}
+foreach ($problem in $cleanup['cleanup_errors']) {
+    $line = "farm-launch cleanup: $problem"
+    [System.Console]::Error.WriteLine($line)
+    try {
+        Add-Content -LiteralPath $logPath -Value $line -Encoding utf8
+    }
+    catch {
+        [System.Console]::Error.WriteLine("farm-launch could not log the cleanup problem: $($_.Exception.Message)")
+    }
+}
+
 $timer.Stop()
 $doneRecord = [ordered]@{}
 foreach ($entry in $runRecord.GetEnumerator()) {
@@ -367,6 +727,11 @@ $doneRecord['finished_at'] = [System.DateTime]::UtcNow.ToString(
     'o',
     [System.Globalization.CultureInfo]::InvariantCulture
 )
+$doneRecord['launch_overhead_s'] = $launchOverhead
+$doneRecord['environment_reused'] = $environmentReused
+$doneRecord['outputs_preserved'] = $cleanup['outputs_preserved']
+$doneRecord['snapshot_removed'] = $cleanup['snapshot_removed']
+$doneRecord['cleanup_errors'] = @($cleanup['cleanup_errors'])
 
 try {
     Write-JsonAtomic -Path $donePath -Value $doneRecord
