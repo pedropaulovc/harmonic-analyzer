@@ -3094,6 +3094,8 @@ def task_check():
         SUBMODULE_SRC / "adapters" / "sw_type_info.py",
         SUBMODULE_SRC / "adapters" / "_generated" / "sldworks_2026.py",
         SUBMODULE_SRC / "adapters" / "solidworks" / "features.py",
+        SUBMODULE_SRC / "adapters" / "solidworks" / "reference_geometry.py",
+        SUBMODULE_SRC / "adapters" / "base.py",
     ]
     # test_out_param_binding SCANS sources instead of importing them (it reads
     # every top-level build script and every diagnostics/*.py looking for
