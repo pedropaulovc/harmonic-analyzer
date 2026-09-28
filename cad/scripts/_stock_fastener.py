@@ -10,8 +10,8 @@ from typing import Any
 import _telemetry
 from _fastener_catalog import fastener
 from _common import (
+    _com_invoke,
     _early_bound,
-    _read_member,
     apply_color,
     apply_custom_properties,
     apply_material,
@@ -253,10 +253,12 @@ def _blank_recipe_references(adapter: Any) -> None:
     hidden: list[str] = []
     walk = FeatureWalk(model)
     for feature in walk:
-        kind = str(_read_member(feature, "GetTypeName2"))
-        name = str(_read_member(feature, "Name"))
+        kind = str(_com_invoke(feature, "IFeature", "GetTypeName2"))
         select_type = hide_types.get(kind)
-        if not select_type or name == "Origin" or _read_member(feature, "Visible") != 2:
+        if not select_type:
+            continue
+        name = str(_com_invoke(feature, "IFeature", "Name"))
+        if name == "Origin" or _com_invoke(feature, "IFeature", "Visible") != 2:
             continue
 
         model.ClearSelection2(True)
@@ -280,7 +282,7 @@ def _blank_recipe_references(adapter: Any) -> None:
         else:
             model.BlankRefGeom()
         model.ClearSelection2(True)
-        if _read_member(feature, "Visible") == 2:
+        if _com_invoke(feature, "IFeature", "Visible") == 2:
             raise RuntimeError(f"stock reference {name!r} [{kind}] remained visible")
         hidden.append(f"{name} [{kind}]")
 

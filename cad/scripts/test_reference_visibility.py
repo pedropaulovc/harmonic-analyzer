@@ -26,15 +26,19 @@ SCRIPTS = Path(__file__).resolve().parent
 HIDE, SHOWN = 1, 2
 
 # The SolidWorks 2026 type library's dispids and invoke flags (1 method,
-# 2 property get) for the members the save check reads.  Written out here, not
-# read from ``_visibility``, so the fake checks the invocations the check
-# records off the generated wrapper instead of mirroring them.
+# 2 property get) for the members the save check and the shared walk read.
+# Written out here, not read from ``_visibility``, so the fake checks the
+# invocations recorded off the generated wrapper instead of mirroring them.
 _DISPIDS = {
     (66304, 2): "FeatureManager",
+    (65801, 1): "FirstFeature",
     (114, 1): "GetFeatures",
     (103, 1): "GetTypeName2",
     (91, 2): "Visible",
     (1, 2): "Name",
+    (3, 1): "GetNextFeature",
+    (20, 1): "GetFirstSubFeature",
+    (22, 1): "GetNextSubFeature",
 }
 # Every call on a fake dispatch is one COM round trip; tests clear it first.
 _ROUND_TRIPS: Counter[str] = Counter()
@@ -72,7 +76,16 @@ class _Dispatch:
 class _Feature(_Dispatch):
     """The IFeature surface the check walks; no ``_oleobj_``, so no binding."""
 
-    members = frozenset({"GetTypeName2", "Visible", "Name"})
+    members = frozenset(
+        {
+            "GetTypeName2",
+            "Visible",
+            "Name",
+            "GetNextFeature",
+            "GetFirstSubFeature",
+            "GetNextSubFeature",
+        }
+    )
 
     def __init__(self, name: str, kind: str, visible: int = HIDE, subs=()) -> None:
         self.Name = name
@@ -147,7 +160,7 @@ class _FeatureManager(_Dispatch):
 
 
 class _Model(_Dispatch):
-    members = frozenset({"FeatureManager"})
+    members = frozenset({"FeatureManager", "FirstFeature"})
 
     def __init__(self, *features: _Feature, blank_works: bool = True) -> None:
         self.features = list(features)
@@ -828,6 +841,7 @@ def test_the_shared_walk_counts_every_feature_but_skips_components() -> None:
     walk = _visibility.FeatureWalk(
         _Model(_Feature("Front Plane", "RefPlane"), hole, component)
     )
+    _ROUND_TRIPS.clear()
     assert [feature.Name for feature in walk] == [
         "Front Plane",
         "Hole",
@@ -835,6 +849,10 @@ def test_the_shared_walk_counts_every_feature_but_skips_components() -> None:
         "crank-arm-1",
     ]
     assert walk.visited == 4
+    # Only raw dispid calls: FirstFeature, then per feature its type, its first
+    # child (skipped for the component) and its next sibling.  A wrapper bound
+    # per stepped-over feature would add type-info reads and QueryInterfaces.
+    assert _ROUND_TRIPS == Counter({"InvokeTypes": 1 + 4 + 3 + 4})
 
 
 def test_creation_hides_and_the_save_check_are_distinct_spans() -> None:

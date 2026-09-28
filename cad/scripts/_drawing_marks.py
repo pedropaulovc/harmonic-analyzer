@@ -20,16 +20,20 @@ import _config
 import _telemetry
 from _common import (
     apply_custom_properties,
+    _bind,
+    _com_invoke,
     _dim_owner_feature,
     _early_bound,
     _feature_by_name,
+    _feature_display_dimensions,
     _iter_features,
     _read_member,
 )
 
 
 def _feature_tree(feature: Any) -> Any:
-    """Yield ``feature`` and every subfeature, depth-first.
+    """Yield ``feature`` and every subfeature, depth-first, as RAW dispatches
+    (``_common._com_invoke``: one round trip a step, no wrapper per feature).
 
     Hole Wizard placement dimensions live on ``ProfileFeature`` subfeatures,
     so both the mark AND the clear path must walk the same tree — a clear
@@ -39,20 +43,21 @@ def _feature_tree(feature: Any) -> Any:
     while stack:
         current = stack.pop()
         yield current
-        child = _read_member(current, "GetFirstSubFeature")
+        child = _com_invoke(current, "IFeature", "GetFirstSubFeature")
         children: list[Any] = []
         for _ in range(1000):
-            if not child:
+            if child is None:
                 break
             children.append(child)
-            child = _read_member(child, "GetNextSubFeature")
+            child = _com_invoke(child, "IFeature", "GetNextSubFeature")
         stack.extend(reversed(children))
 
 
-def _named_dimension(
-    adapter: Any, feature_name: str, dimension_name: str
-) -> tuple[Any, Any]:
-    """Resolve exactly one named display/source dimension on ``feature_name``.
+def _named_dimensions(
+    adapter: Any, feature_name: str, dimension_names: set[str]
+) -> dict[str, tuple[Any, Any]]:
+    """Resolve each named display/source dimension on ``feature_name`` in ONE
+    walk of its subfeature tree, bound to ``IDisplayDimension``/``IDimension``.
 
     Walks the same subfeature tree as ``mark_dimensions_for_drawing``: a Hole
     Wizard placement dimension belongs to a ``ProfileFeature`` subfeature, so a
@@ -63,24 +68,35 @@ def _named_dimension(
     that resolves twice inside the tree is still rejected rather than guessed.
     """
     feature = _feature_by_name(adapter, feature_name)
-    matches: list[tuple[Any, Any]] = []
+    found: dict[str, list[tuple[Any, Any]]] = {name: [] for name in dimension_names}
     for current in _feature_tree(feature):
-        current_name = str(_read_member(current, "Name"))
-        display = _read_member(current, "GetFirstDisplayDimension")
-        for _ in range(1000):
-            if not display:
-                break
-            dimension = _early_bound(display.GetDimension2(0), "IDimension")
-            name = str(_read_member(dimension, "Name"))
-            if _dim_owner_feature(dimension) == current_name and name == dimension_name:
-                matches.append((display, dimension))
-            display = current.GetNextDisplayDimension(display)
-    if len(matches) != 1:
-        raise RuntimeError(
-            f"{dimension_name}@{feature_name}: expected exactly one dimension, "
-            f"found {len(matches)}"
+        current_name = str(_com_invoke(current, "IFeature", "Name"))
+        for display in _feature_display_dimensions(current):
+            dimension = _com_invoke(display, "IDisplayDimension", "GetDimension2", 0)
+            name = str(_com_invoke(dimension, "IDimension", "Name"))
+            if name in found and _dim_owner_feature(dimension) == current_name:
+                found[name].append((display, dimension))
+    resolved: dict[str, tuple[Any, Any]] = {}
+    for name, matches in found.items():
+        if len(matches) != 1:
+            raise RuntimeError(
+                f"{name}@{feature_name}: expected exactly one dimension, "
+                f"found {len(matches)}"
+            )
+        display, dimension = matches[0]
+        resolved[name] = (
+            _bind(display, "IDisplayDimension"),
+            _bind(dimension, "IDimension"),
         )
-    return matches[0]
+    return resolved
+
+
+def _named_dimension(
+    adapter: Any, feature_name: str, dimension_name: str
+) -> tuple[Any, Any]:
+    """Resolve exactly one named display/source dimension on ``feature_name``
+    (see :func:`_named_dimensions`)."""
+    return _named_dimensions(adapter, feature_name, {dimension_name})[dimension_name]
 
 
 def _tolerance_precision_mm(*deviations_mm: float) -> int:
@@ -123,7 +139,12 @@ def _set_tolerance_precision(
 
 @_telemetry.traced("dim.display_precision", label_param="dimension_name")
 def set_dimension_display_precision(
-    adapter: Any, feature_name: str, dimension_name: str, decimals: int
+    adapter: Any,
+    feature_name: str,
+    dimension_name: str,
+    decimals: int,
+    *,
+    display: Any = None,
 ) -> None:
     """Author the decimal places of one model dimension ON THE PART.
 
@@ -134,13 +155,20 @@ def set_dimension_display_precision(
     reads the same places back instead of rewriting them at render time.
     Only the primary places move; dual and tolerance places are left alone
     (``_set_tolerance_precision`` owns the tolerance places).
+
+    ``display`` is the dimension already resolved by
+    :func:`apply_drawing_precision`'s one walk per feature; without it the
+    dimension is looked up here and ``lookup_ms`` times that walk.
     """
     if decimals < 0 or decimals > 8:
         raise ValueError(f"display precision must be 0..8 decimals, got {decimals!r}")
-    # ~1.5-2 s per call, flat, thousands of calls a week: time the four COM
-    # steps as attributes of this span rather than as four child spans each.
+    # Thousands of calls a week: time the COM steps as attributes of this span
+    # rather than as child spans each.
     started = time.perf_counter()
-    display, _dimension = _named_dimension(adapter, feature_name, dimension_name)
+    timings: dict[str, float] = {}
+    if display is None:
+        display, _dimension = _named_dimension(adapter, feature_name, dimension_name)
+        timings["lookup_ms"] = round((time.perf_counter() - started) * 1000, 1)
     looked_up = time.perf_counter()
     display = _early_bound(display, "IDisplayDimension")
     bound = time.perf_counter()
@@ -149,7 +177,7 @@ def set_dimension_display_precision(
     set_at = time.perf_counter()
     applied = int(display.GetPrimaryPrecision2())
     _telemetry.annotate(
-        lookup_ms=round((looked_up - started) * 1000, 1),
+        **timings,
         bind_ms=round((bound - looked_up) * 1000, 1),
         set_ms=round((set_at - bound) * 1000, 1),
         readback_ms=round((time.perf_counter() - set_at) * 1000, 1),
@@ -167,11 +195,22 @@ def set_dimension_display_precision(
 def apply_drawing_precision(
     adapter: Any, precision: dict[str, dict[str, int]]
 ) -> None:
-    """Apply a spec's ``DRAWING_PRECISION`` -- ``{feature: {dimension: decimals}}``."""
+    """Apply a spec's ``DRAWING_PRECISION`` -- ``{feature: {dimension: decimals}}``.
+
+    Each feature's dimensions are resolved in one walk of its tree
+    (``dim.precision_lookup``), not one walk per dimension."""
     for feature_name, dimensions in precision.items():
+        with _telemetry.span(
+            "dim.precision_lookup", label=feature_name, dimensions=len(dimensions)
+        ):
+            resolved = _named_dimensions(adapter, feature_name, set(dimensions))
         for dimension_name, decimals in dimensions.items():
             set_dimension_display_precision(
-                adapter, feature_name, dimension_name, decimals
+                adapter,
+                feature_name,
+                dimension_name,
+                decimals,
+                display=resolved[dimension_name][0],
             )
 
 
@@ -434,24 +473,23 @@ def mark_dimensions_for_drawing(
     feature = _feature_by_name(adapter, feature_name)
     matches: dict[str, tuple[Any, str]] = {}
     for current in _feature_tree(feature):
-        current_name = str(_read_member(current, "Name"))
-        display = _read_member(current, "GetFirstDisplayDimension")
-        for _ in range(1000):
-            if not display:
-                break
-            dimension = display.GetDimension2(0)
-            name = str(_read_member(dimension, "Name"))
-            owner = _dim_owner_feature(dimension)
-            if owner == current_name and name in dimension_names:
-                full_name = str(_read_member(dimension, "FullName"))
-                previous = matches.get(name)
-                if previous is not None and previous[1] != full_name:
-                    raise RuntimeError(
-                        f"{feature_name}: drawing dimension {name!r} is ambiguous: "
-                        f"{previous[1]!r}, {full_name!r}"
-                    )
-                matches[name] = (display, full_name)
-            display = current.GetNextDisplayDimension(display)
+        current_name = str(_com_invoke(current, "IFeature", "Name"))
+        for display in _feature_display_dimensions(current):
+            dimension = _com_invoke(display, "IDisplayDimension", "GetDimension2", 0)
+            name = str(_com_invoke(dimension, "IDimension", "Name"))
+            if name not in dimension_names:
+                continue
+            full_name = str(_com_invoke(dimension, "IDimension", "FullName"))
+            owner = full_name.split("@")[1] if "@" in full_name else ""
+            if owner != current_name:
+                continue
+            previous = matches.get(name)
+            if previous is not None and previous[1] != full_name:
+                raise RuntimeError(
+                    f"{feature_name}: drawing dimension {name!r} is ambiguous: "
+                    f"{previous[1]!r}, {full_name!r}"
+                )
+            matches[name] = (display, full_name)
 
     missing = dimension_names - matches.keys()
     if missing:
@@ -459,6 +497,7 @@ def mark_dimensions_for_drawing(
             f"{feature_name}: dimensions not marked for drawing: {sorted(missing)}"
         )
     for name, (display, full_name) in matches.items():
+        display = _bind(display, "IDisplayDimension")
         display.MarkedForDrawing = True
         if not bool(_read_member(display, "MarkedForDrawing")):
             raise RuntimeError(f"{full_name}: mark-for-drawing failed")
@@ -468,17 +507,22 @@ def mark_dimensions_for_drawing(
 
 
 def clear_dimensions_for_drawing(adapter: Any) -> None:
-    cleared = 0
-    for feature in _iter_features(adapter):
-        for current in _feature_tree(feature):
-            display = _read_member(current, "GetFirstDisplayDimension")
-            for _ in range(1000):
-                if not display:
-                    break
-                if bool(_read_member(display, "MarkedForDrawing")):
-                    display.MarkedForDrawing = False
-                    cleared += 1
-                display = current.GetNextDisplayDimension(display)
+    """Unmark every model dimension, top-level features and subfeatures alike."""
+    with _telemetry.span("dim.clear_drawing_marks") as span:
+        features = displays = cleared = 0
+        for feature in _iter_features(adapter):
+            for current in _feature_tree(feature):
+                features += 1
+                for display in _feature_display_dimensions(current):
+                    displays += 1
+                    if bool(
+                        _com_invoke(display, "IDisplayDimension", "MarkedForDrawing")
+                    ):
+                        _bind(display, "IDisplayDimension").MarkedForDrawing = False
+                        cleared += 1
+        span.set_attribute("features_visited", features)
+        span.set_attribute("displays_visited", displays)
+        span.set_attribute("cleared", cleared)
     _telemetry.success(f"cleared {cleared} model-dimension drawing marks")
 
 
