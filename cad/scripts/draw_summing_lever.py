@@ -235,7 +235,10 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         top,
         edge_xy=knife_edge_datum,
-        symbol_xy=(knife_edge_datum[0] + 0.020, knife_edge_datum[1] - 0.012),
+        # 24 mm out: at 20 the tag's box straddled the plate's right edge
+        # (0.2575) and the edge ran through the 'A' (text-on-line on every
+        # #1105 run); now the box starts 1.8 mm past it.
+        symbol_xy=(knife_edge_datum[0] + 0.024, knife_edge_datum[1] - 0.012),
         datum="A",
         label="knife-edge pivot axis",
     )
