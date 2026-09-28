@@ -2,32 +2,30 @@ r"""The 64T against MHA-016's north side, at print-worst.
 
 SolidWorks-free.  The 64T (MHA-021) turns on the inclined cone shaft just
 north of MHA-016, and its south face and tip sweep past everything on the
-post's north side: the crank boss's spot face and the flat it runs out into,
-the Ø44 cast collar, the turned Ø42 body, the cone boss's north end face and
-the MHA-149 bushing's north end.  cg-fx2b's drive-train interference gate
-caught the tip in the crank boss (0.00045 mm³ at nominal, once #906 R1 had
-dropped the boss 0.21); the stack is dt-logs/handoffs/to-main/crankhub-0347.md
-(probe: dt-logs/scratch/crankhub/gear64_boss_probe2.py, probe2d.log).
+post's north side: the crank boss's north face and rim, the Ø42.75 head,
+the turned Ø42 body and the cone boss's north end face.  The post is
+the v36 casting (user ruling 2026-09-28): the crank boss's north face is the
+head's tangent plane, uncut, and the crank bore carries no bushing.  The
+same ruling keeps the 64T's north face where the 8.0 face put it and narrows
+the gear from the SOUTH, the MHA-014 thrust collar growing by the same amount,
+until every feature holds FLOOR_CLEARANCE_MM at print-worst; FACE_WIDTH is
+the widest face its printed place allows that does (asserted below).
 
 Frame: machine axes (north = +z, up = +y), origin where the cone axis crosses
 the post axis.  The cone axis leans ``post.INCLINE_DEG`` in plan, the crank
-bore runs along z ``CRANK_AXIS_Y`` above it, and after the post's Ry(180)
-installation the spot face stands ``face_z`` north of the post axis.  The
-64T's centre sits ``gear_offset`` along the cone axis from the origin; the
-drive-train assembly owns that station and passes it in.
+axis runs along z ``CRANK_AXIS_Y`` above it, and after the post's Ry(180)
+installation the crank boss's north face stands ``CRANK_BOSS_NORTH_FACE``
+north of the post axis.  The 64T's centre sits ``gear_offset`` along the cone
+axis from the origin; the drive-train assembly owns that station and passes
+it in.
 
-Each clearance is the gear's worst point against one solid: the boss and the
-bushing end are cylinders ending at their north face (Euclidean past the
-corner, axial over the face), the cone boss end a disc square to the cone
-axis (along that axis), the collar and body vertical cylinders cut down to
-the spot face over its footprint (the normal distance to the cylinder, and
-over the footprint the larger of that and the air above the face -- a lower
-bound, so never optimistic).  A negative value is overlap.
-
-The collar and body were once z-axial air, which reads 1/cos(incline) wide
-of the normal distance where the gear's tilted south face is the near
-surface: the rim-124f SolidWorks cross-check measured 1.6812 on the Ø42 body
-where the axial model said 1.722 (dt-logs/scratch/crankhub/rim_euclid.log).
+Each clearance is the gear's worst point against one solid, measured as a
+true distance to a finite solid: the crank boss a crank-axis cylinder ending
+at its north face, the head and the body vertical cylinders about the post
+axis over their height bands, the cone boss's end a disc square to the cone
+axis.  Past an edge the distance runs to the edge.  A negative value is
+overlap.  The gear is an untoothed disc to its tip diameter, so the real cut
+gear can only read farther (gear64_post_measure checks that natively).
 """
 
 from __future__ import annotations
@@ -40,10 +38,10 @@ import _config
 import cone_gear_shaft_spec as shaft
 import cone_pivot_post_spec as post
 import crank_drive_gear_spec as gear64
-import crank_eccentric_bushing_spec as bushing
-import crank_pinion_spec as pinion
 
 Point = tuple[float, float, float]
+
+RULING = "user ruling 2026-09-28"
 
 
 def _row(places: int) -> float:
@@ -52,217 +50,178 @@ def _row(places: int) -> float:
 
 SIN_I = math.sin(math.radians(post.INCLINE_DEG))
 COS_I = math.cos(math.radians(post.INCLINE_DEG))
-CRANK_AXIS_Y = post.CRANK_BORE_HEIGHT - post.BORE_HEIGHT
-COLLAR_Y = (post.HEAD_BASE_Y - post.BORE_HEIGHT, post.BLOCK_HEIGHT - post.BORE_HEIGHT)
-BODY_Y = (-post.BORE_HEIGHT, COLLAR_Y[0])
+CRANK_AXIS_Y = post.CRANK_ABOVE_CONE
+HEAD_Y = (post.HEAD_BASE_Y - post.BORE_HEIGHT, post.BLOCK_HEIGHT - post.BORE_HEIGHT)
+BODY_Y = (-post.BORE_HEIGHT, HEAD_Y[0])
 
 # --- The print-worst terms ----------------------------------------------------
 # Each moves a surface toward the other.
-#   spot-face station, CrankBossStartZ at .XX: the face stands north, and the
-#   bushing, set flush with it, with it
-SPOT_FACE_NORTH = _row(post.DRAWING_PRECISION_BY_NAME["CrankBossStartZ"])
-#   its run-out flat's width and length below the crank axis, each at its row
-SPOT_FACE_WIDTH_SHORT = _row(post.DRAWING_PRECISION_BY_NAME["SpotFaceWidth"])
-#   ... and the crank axis, which the flat is laid out from, as high above
-#   the cone axis as its spacing band allows
-SPOT_FACE_RUN_OUT_SHORT = (
-    _row(post.DRAWING_PRECISION_BY_NAME["SpotFaceRunOut"]) + post.CRANK_ABOVE_CONE_BAND[0]
-)
-#   the collar's lower edge, the top face (MainBodyHt) less the collar
+#   the crank boss's north face, CrankBossStartZ at .XX
+CRANK_BOSS_NORTH = _row(post.DRAWING_PRECISION_BY_NAME["CrankBossStartZ"])
+#   the cast crank boss, CrankBossDia at .X: its face disc reaches further down
+#   toward the gear's tip
+CRANK_BOSS_GROWTH = _row(post.DRAWING_PRECISION_BY_NAME["CrankBossDia"]) / 2.0
+#   the crank axis over the crank-above-cone spacing band, both ends taken
+#   (a lower boss reaches deeper into the tip's sweep)
+CRANK_AXIS_Y_BAND = tuple(CRANK_AXIS_Y + d for d in sorted(post.CRANK_ABOVE_CONE_BAND))
+#   the head's lower edge, the top face (MainBodyHt) less the head
 #   (HeadHt), each at .X, with the foot's height about the cone axis
-COLLAR_EDGE_LOW = (
+HEAD_EDGE_LOW = (
     _row(post.DRAWING_PRECISION_BY_NAME["MainBodyHt"])
     + _row(post.DRAWING_PRECISION_BY_NAME["HeadHt"])
     + post.JOURNAL_AXIS_HEIGHT_TOLERANCE_MM
 )
-#   64T FaceWidth at .X: each face half the band nearer
-GEAR_FACE_GROWTH = _row(gear64.DRAWING_PRECISION_BY_NAME["FaceWidth"]) / 2.0
-#   64T tip, OutsideDia +/-OUTSIDE_DIA_TOLERANCE_MM (user, #906)
-GEAR_TIP_GROWTH = gear64.OUTSIDE_DIA_TOLERANCE_MM / 2.0
-#   the as-cast collar, HeadDia at .X; the turned body, MainBodyDia at .X
-COLLAR_GROWTH = _row(post.DRAWING_PRECISION_BY_NAME["HeadDia"]) / 2.0
+#   the head, HeadDia at .X; the turned body, MainBodyDia at .X
+HEAD_GROWTH = _row(post.DRAWING_PRECISION_BY_NAME["HeadDia"]) / 2.0
 BODY_GROWTH = _row(post.DRAWING_PRECISION_BY_NAME["MainBodyDia"]) / 2.0
 #   the cone boss's end faces, ConeBossLen at .X, symmetric about the post
-#   axis: the north one short carries the collar and the 64T with it
+#   axis: the north one long carries the collar and the 64T with it; the
+#   boss itself, ConeBossDia at .X
 CONE_BOSS_END_GROWTH = _row(post.DRAWING_PRECISION_BY_NAME["ConeBossLen"]) / 2.0
+CONE_BOSS_GROWTH = _row(post.DRAWING_PRECISION_BY_NAME["ConeBossDia"]) / 2.0
 #   the 64T's station: the ONE input for how far it may stand toward the
 #   post.  MHA-A03 step 1 sets it against MHA-014's thrust collar (#916),
 #   and the collar bears on the cone boss's north end, so the gear's south
 #   face stands the boss end plus CollarWidth off the post axis.  Both
 #   joints are butts, nominally closed (build_drive_train_assembly asserts
 #   each; collar_contacts below reads their sum) and only ever opening, so
-#   they add nothing toward the post.  The stack is the boss end short by
+#   they add nothing toward the post.  The stack is the boss end long by
 #   its row and the collar thin by its own (Main's ruling (b), 2026-09-27).
 COLLAR_WIDTH_SHORT = _row(shaft.DRAWING_PRECISION_BY_NAME["CollarWidth"])
 GEAR64_STATION_TOWARD_POST = CONE_BOSS_END_GROWTH + COLLAR_WIDTH_SHORT
-#   MHA-149's OD at the top of its g6 band
-BUSHING_RADIUS_MAX = (bushing.OUTER_DIA + bushing.OD_BAND[0]) / 2.0
+#   64T FaceWidth: the south face is the seated one, so the band grows the
+#   gear NORTH only, away from the post (#1049)
+GEAR_FACE_GROWTH_NORTH = _row(gear64.DRAWING_PRECISION_BY_NAME["FaceWidth"])
+#   64T tip, OutsideDia +/-OUTSIDE_DIA_TOLERANCE_MM (user, #906)
+GEAR_TIP_GROWTH = gear64.OUTSIDE_DIA_TOLERANCE_MM / 2.0
 
 # --- The requirement ----------------------------------------------------------
-# The floor every feature holds at print-worst is the running gap this
-# assembly already sets between two parts: the 16T's seat feeler off the spot
-# face (MHA-A03 step 4; Main's ruling, 2026-09-27).  build_drive_train_assembly
-# asserts only this floor.  The steps below record the derivation: under the
-# collar stack, the ruled 2.5 retreat and the 23 x 17 run-out each miss the
-# floor a step smaller, which the unit tests pin.
-FLOOR_CLEARANCE_MM = pinion.SEAT_FEELER_MM
-RETREAT_STEP = 0.5
-WIDTH_STEP = 1.0
-RUN_OUT_STEP = 1.0
+# Every MHA-016 north feature holds this much air to the 64T at print-worst
+# (user ruling 2026-09-28).  build_drive_train_assembly asserts it on the
+# placed layout; this module asserts it, and that FACE_WIDTH is the widest
+# one-place face (FaceWidth's .X) that holds it, on the station the specs derive.
+FLOOR_CLEARANCE_MM = 0.25
+FACE_WIDTH_STEP = 10.0 ** -gear64.DRAWING_PRECISION_BY_NAME["FaceWidth"]
 
 
 @dataclass(frozen=True)
 class Gear:
-    """The 64T as a solid disc: centre offset along the cone axis, half face
-    width, tip radius."""
+    """The 64T as a solid disc about the cone axis: its south and north faces
+    as stations along that axis, and its tip radius."""
 
-    gear_offset: float
-    half_face: float
+    south: float
+    north: float
     tip_radius: float
 
     def south_face(self, t: float, r: float) -> Point:
-        return self._at(-self.half_face, r, t)
+        return self._at(self.south, r, t)
 
-    def tip(self, t: float, s: float) -> Point:
-        return self._at(s, self.tip_radius, t)
+    def tip(self, t: float, a: float) -> Point:
+        return self._at(a, self.tip_radius, t)
 
-    def _at(self, s: float, r: float, t: float) -> Point:
-        # centre + s*u + r*(cos t * e1 + sin t * e2); u = (sin i, 0, cos i),
+    @staticmethod
+    def _at(a: float, r: float, t: float) -> Point:
+        # a*u + r*(cos t * e1 + sin t * e2); u = (sin i, 0, cos i),
         # e1 = (cos i, 0, -sin i), e2 = (0, 1, 0)
-        a = self.gear_offset + s
         ct, st = math.cos(t), math.sin(t)
         return (a * SIN_I + r * ct * COS_I, r * st, a * COS_I - r * ct * SIN_I)
 
 
-@dataclass(frozen=True)
-class SpotFace:
-    """The crank boss's spot face: the boss disc at ``face_z``, run out as a
-    flat ``width`` wide from the crank axis ``run_out`` down (``width`` None:
-    the disc alone)."""
-
-    face_z: float
-    width: float | None = None
-    run_out: float = 0.0
-
-    def covers(self, x: float, y: float) -> bool:
-        if math.hypot(x, y - CRANK_AXIS_Y) <= post.CRANK_BOSS_DIA / 2.0:
-            return True
-        return (
-            self.width is not None
-            and abs(x) <= self.width / 2.0
-            and CRANK_AXIS_Y - self.run_out <= y <= CRANK_AXIS_Y
-        )
-
-    def at_print_worst(self) -> SpotFace:
-        """North by the station's row, and the flat as narrow and short as
-        its rows allow."""
-        return SpotFace(
-            self.face_z + SPOT_FACE_NORTH,
-            None if self.width is None else self.width - SPOT_FACE_WIDTH_SHORT,
-            self.run_out - SPOT_FACE_RUN_OUT_SHORT,
-        )
-
-
-def _cylinder_end(p: Point, radius: float, face_z: float) -> float:
-    """Signed clearance to a crank-axis cylinder ending at ``face_z``."""
-    radial = math.hypot(p[0], p[1] - CRANK_AXIS_Y) - radius
+def _crank_boss(p: Point, radius: float, face_z: float, axis_y: float) -> float:
+    """From a crank-axis cylinder ending at ``face_z``: radial beside it,
+    axial over the face, to the rim edge past both."""
+    radial = math.hypot(p[0], p[1] - axis_y) - radius
     axial = p[2] - face_z
     if axial <= 0.0:
         return radial
     return math.hypot(radial, axial) if radial > 0.0 else axial
 
 
-def _casting(p: Point, band: tuple[float, float], radius: float, spot: SpotFace | None) -> float:
-    """Distance from a vertical cylinder about the post axis over ``band``,
-    cut down to the spot face wherever that covers it: normal to the
-    cylinder, and over the footprint the larger of that and the air above the
-    face (the distance to an intersection is at least either one)."""
+def _post_cylinder(p: Point, band: tuple[float, float], radius: float) -> float:
+    """From a vertical cylinder about the post axis over the height ``band``:
+    normal to it beside the band, to its edge circle above or below."""
     x, y, z = p
-    if not band[0] <= y <= band[1]:
-        return math.inf
     radial = math.hypot(x, z) - radius
-    if spot is not None and spot.covers(x, y):
-        return max(radial, z - spot.face_z)
-    return radial
+    beyond = max(band[0] - y, y - band[1], 0.0)
+    if beyond == 0.0:
+        return radial
+    return math.hypot(max(radial, 0.0), beyond)
 
 
-def _cone_boss_end(p: Point, end: float) -> float:
-    """Along the cone axis, from the cone boss's north end disc."""
+def _cone_boss_end(p: Point, end: float, radius: float) -> float:
+    """From the cone boss's north end disc: along the cone axis over it, to
+    its rim edge beyond it."""
     x, y, z = p
     along = x * SIN_I + z * COS_I
-    if x * x + y * y + z * z - along * along > (post.CONE_BOSS_DIA / 2.0) ** 2:
-        return math.inf
-    return along - end
+    off_axis = math.sqrt(max(0.0, x * x + y * y + z * z - along * along))
+    axial = along - end
+    if off_axis <= radius:
+        return axial
+    return math.hypot(off_axis - radius, max(axial, 0.0))
+
+
+def seated_gear_offset() -> float:
+    """The 64T's centre along the cone axis when seated on the collar stack:
+    the cone boss's north end, the collar, and half the face."""
+    return post.CONE_BOSS_LENGTH / 2.0 + shaft.COLLAR_THICKNESS + gear64.FACE_WIDTH / 2.0
 
 
 def collar_contacts(gear_offset: float) -> float:
     """The two collar butts' nominal air, summed: the 64T's south face less
     the cone boss's north end and the collar between them.  Zero when the
     drive train seats the gear the way step 1 sets it."""
-    south_face = gear_offset - gear64.FACE_WIDTH / 2.0
-    return south_face - (post.CONE_BOSS_LENGTH / 2.0 + shaft.COLLAR_THICKNESS)
+    return gear_offset - seated_gear_offset()
 
 
-def clearances(*, gear_offset: float, spot: SpotFace, worst: bool = True) -> dict[str, float]:
+def clearances(
+    *, gear_offset: float, worst: bool = True, face_width: float | None = None
+) -> dict[str, float]:
     """Least clearance from the 64T to each feature on MHA-016's north side.
 
-    ``gear_offset`` and ``spot`` are nominal; ``worst`` moves every term above
-    toward the gear.  MHA-149's north end is set flush with the spot face.
-    The cone boss end rides with the gear through the collar, so it is
-    measured from the gear's south face by the collar at its low limit, never
-    by the boss end's own growth on top of the station term.
+    ``gear_offset`` is nominal; ``worst`` moves every term above toward the
+    gear.  ``face_width`` (default the printed FACE_WIDTH) narrows the gear
+    from the south about the same north face, the collar taking up the
+    difference: the sizing question the ruling asks.  The cone boss end rides
+    with the gear through the collar, so it is measured from the gear's south
+    face by the collar at its low limit, never by the boss end's own growth
+    on top of the station term.
     """
     air = collar_contacts(gear_offset)
     if abs(air) > 1e-6:
         raise ValueError(f"the 64T stands {air:+.4f} off the collar stack; its butts are open")
+    width = gear64.FACE_WIDTH if face_width is None else face_width
+    north = gear_offset + gear64.FACE_WIDTH / 2.0
+    collar = shaft.COLLAR_THICKNESS + gear64.FACE_WIDTH - width
     grow = 1.0 if worst else 0.0
+    south = north - width - grow * GEAR64_STATION_TOWARD_POST
     gear = Gear(
-        gear_offset - grow * GEAR64_STATION_TOWARD_POST,
-        # Grown on both faces about the centre.  With the south face seated
-        # on the collar, face width can only grow north, so the south-side
-        # ~0.4 understates every margin here.  Kept: the ruled 2.5 / 23 x 17
-        # minimality and its fail-first steps were derived under it, and
-        # coupling it moves that derivation (#1049).
-        gear64.FACE_WIDTH / 2.0 + grow * GEAR_FACE_GROWTH,
+        south,
+        south + width + grow * GEAR_FACE_GROWTH_NORTH,
         gear64.OUTSIDE_DIA / 2.0 + grow * GEAR_TIP_GROWTH,
     )
-    face = spot.at_print_worst() if worst else spot
-    collar_r = post.HEAD_DIA / 2.0 + grow * COLLAR_GROWTH
-    collar_low = COLLAR_Y[0] - grow * COLLAR_EDGE_LOW
+    boss_r = post.CRANK_BOSS_DIA / 2.0 + grow * CRANK_BOSS_GROWTH
+    boss_z = post.CRANK_BOSS_NORTH_FACE + grow * CRANK_BOSS_NORTH
+    axes = CRANK_AXIS_Y_BAND if worst else (CRANK_AXIS_Y,)
+    head_r = post.HEAD_DIA / 2.0 + grow * HEAD_GROWTH
+    head_low = HEAD_Y[0] - grow * HEAD_EDGE_LOW
     body_r = post.BLOCK_DIA / 2.0 + grow * BODY_GROWTH
-    boss_end = gear.gear_offset - gear.half_face - (
-        shaft.COLLAR_THICKNESS - grow * COLLAR_WIDTH_SHORT
-    )
-    bushing_r = BUSHING_RADIUS_MAX if worst else bushing.OUTER_DIA / 2.0
+    boss_end = gear.south - (collar - grow * COLLAR_WIDTH_SHORT)
+    cone_r = post.CONE_BOSS_DIA / 2.0 + grow * CONE_BOSS_GROWTH
     measures: dict[str, Callable[[Point], float]] = {
-        "crank boss": lambda p: _cylinder_end(p, post.CRANK_BOSS_DIA / 2.0, face.face_z),
-        "MHA-149 north end": lambda p: _cylinder_end(p, bushing_r, face.face_z),
-        "collar": lambda p: _casting(p, (collar_low, COLLAR_Y[1]), collar_r, face),
-        "body": lambda p: _casting(p, (BODY_Y[0], collar_low), body_r, face),
-        "cone boss end": lambda p: _cone_boss_end(p, boss_end),
+        "crank boss": lambda p: min(_crank_boss(p, boss_r, boss_z, y) for y in axes),
+        "head": lambda p: _post_cylinder(p, (head_low, HEAD_Y[1]), head_r),
+        "body": lambda p: _post_cylinder(p, (BODY_Y[0], head_low), body_r),
+        "cone boss end": lambda p: _cone_boss_end(p, boss_end, cone_r),
     }
     return {name: _least(gear, measure) for name, measure in measures.items()}
 
 
-def worst_shortfalls(gear_offset: float, spot: SpotFace) -> dict[str, float]:
+def worst_shortfalls(gear_offset: float, *, face_width: float | None = None) -> dict[str, float]:
     """The features that miss FLOOR_CLEARANCE_MM at print-worst, by how much."""
     return {
         name: FLOOR_CLEARANCE_MM - value
-        for name, value in clearances(gear_offset=gear_offset, spot=spot).items()
+        for name, value in clearances(gear_offset=gear_offset, face_width=face_width).items()
         if value < FLOOR_CLEARANCE_MM
-    }
-
-
-def spot_face(retreat: float, width: float, run_out: float) -> SpotFace:
-    return SpotFace(post.CRANK_BOSS_HARVESTED_NORTH_FACE - retreat, width, run_out)
-
-
-def one_step_short(retreat: float, width: float, run_out: float) -> dict[str, SpotFace]:
-    """The spot face a step smaller in each of its three sizes."""
-    return {
-        "retreat": spot_face(retreat - RETREAT_STEP, width, run_out),
-        "width": spot_face(retreat, width - WIDTH_STEP, run_out),
-        "run-out": spot_face(retreat, width, run_out - RUN_OUT_STEP),
     }
 
 
@@ -270,7 +229,7 @@ def _least(gear: Gear, measure: Callable[[Point], float]) -> float:
     """Least of ``measure`` over the gear's south face and tip cylinder: a
     grid over each, then two zooms about its worst cell."""
     face = _zoom(lambda t, r: measure(gear.south_face(t, r)), (0.0, 2.0 * math.pi), (0.0, gear.tip_radius))
-    tip = _zoom(lambda t, s: measure(gear.tip(t, s)), (0.0, 2.0 * math.pi), (-gear.half_face, gear.half_face))
+    tip = _zoom(lambda t, a: measure(gear.tip(t, a)), (0.0, 2.0 * math.pi), (gear.south, gear.north))
     return min(face, tip)
 
 
@@ -284,11 +243,31 @@ def _zoom(f: Callable[[float, float], float], a: tuple[float, float], b: tuple[f
             for k in range(n_b + 1)
         ]
         value, i, k = min(cells)
-        if value == math.inf:
-            return math.inf
         best = min(best, value)
         da, db = 2.0 * (a1 - a0) / n_a, 2.0 * (b1 - b0) / n_b
         ai, bk = a0 + (a1 - a0) * i / n_a, b0 + (b1 - b0) * k / n_b
         a = (ai - da, ai + da)
         b = (max(b[0], bk - db), min(b[1], bk + db))
     return best
+
+
+# --- Import-time proof (user ruling 2026-09-28) --------------------------------
+# On the station the specs derive: every feature holds the floor at
+# print-worst, and one printable step wider the governing feature does not.
+WORST_CLEARANCES = clearances(gear_offset=seated_gear_offset())
+GOVERNING_FEATURE = min(WORST_CLEARANCES, key=WORST_CLEARANCES.__getitem__)
+if WORST_CLEARANCES[GOVERNING_FEATURE] < FLOOR_CLEARANCE_MM:
+    raise AssertionError(
+        f"the {gear64.FACE_WIDTH} 64T comes {WORST_CLEARANCES[GOVERNING_FEATURE]:.3f} "
+        f"from MHA-016's {GOVERNING_FEATURE} at print-worst, under the "
+        f"{FLOOR_CLEARANCE_MM} floor ({RULING})"
+    )
+ONE_STEP_WIDER_CLEARANCE = clearances(
+    gear_offset=seated_gear_offset(), face_width=gear64.FACE_WIDTH + FACE_WIDTH_STEP
+)[GOVERNING_FEATURE]
+if ONE_STEP_WIDER_CLEARANCE >= FLOOR_CLEARANCE_MM:
+    raise AssertionError(
+        f"a {gear64.FACE_WIDTH + FACE_WIDTH_STEP:.2f} 64T still holds "
+        f"{ONE_STEP_WIDER_CLEARANCE:.3f} to MHA-016's {GOVERNING_FEATURE}: "
+        f"FACE_WIDTH is not the widest printable face ({RULING})"
+    )

@@ -37,7 +37,27 @@ TEETH = 64
 # gear_train.yaml, shared with the assembly that meshes them.
 HELIX_ANGLE_DEG = _config.machine("gear_train", "crank_drive_helix_deg")
 BACKLASH_MM = _config.machine("gear_train", "crank_drive_backlash_mm")
-FACE_WIDTH = 8.0
+
+# Face width (user ruling 2026-09-28).  The v36 MHA-016 casting is restored:
+# its crank boss's north face is the collar's tangent plane again, and an 8.0
+# face seated on MHA-014's thrust collar reaches into it (-0.05 nominal,
+# -3.69 at print-worst).  The ruling keeps the 64T's NORTH face where the 8.0
+# face put it, so the T120 side of the gear and every cone station stay, and
+# narrows the gear from the SOUTH, the thrust collar growing by the same
+# amount.  FACE_WIDTH is the widest face, at the face width's printed places
+# (one: DRAWING_PRECISION below), that holds every MHA-016 north feature at
+# crank_boss_rim.FLOOR_CLEARANCE_MM at print-worst; the crank boss governs
+# (0.343 at 6.5, 0.244 at 6.6), and crank_boss_rim asserts both at import.
+# The centre therefore sits CENTRE_SHIFT_NORTH north of the 19.9 station the
+# 8.0 face was laid out on.
+NORTH_FACE_REFERENCE_WIDTH = 8.0
+FACE_WIDTH = 6.5
+CENTRE_SHIFT_NORTH = (NORTH_FACE_REFERENCE_WIDTH - FACE_WIDTH) / 2.0
+if not 0.0 < FACE_WIDTH < NORTH_FACE_REFERENCE_WIDTH or abs(CENTRE_SHIFT_NORTH - 0.75) > 1e-9:
+    raise AssertionError(
+        f"the 64T narrows from the south about its 8.0 north face: face {FACE_WIDTH}, "
+        f"centre shift {CENTRE_SHIFT_NORTH} (user ruling 2026-09-28)"
+    )
 
 # ONE cutter cuts both gears of the pair (#906, Main 2026-09-26). A crossed
 # helical pair meshes in the NORMAL plane, so this gear is cut normal-defined:
@@ -70,27 +90,19 @@ ROOT_DIA = PITCH_DIA - 2.0 * 1.157 * NORMAL_MODULE_MM
 # fact a mirrored part would get wrong and no view can settle, so the data block
 # states it in words.
 HELIX_HAND = "RIGHT HAND"
-TOTAL_TWIST_DEG = math.degrees(
-    FACE_WIDTH * math.tan(math.radians(HELIX_ANGLE_DEG)) / (PITCH_DIA / 2.0)
-)
 TRANSVERSE_CIRCULAR_TOOTH_THICKNESS = math.pi * MODULE_MM / 2.0 - BACKLASH_MM
 # What a gear-tooth caliper set square to the helix reads.
 NORMAL_CIRCULAR_TOOTH_THICKNESS = TRANSVERSE_CIRCULAR_TOOTH_THICKNESS * _COS_HELIX
 
 # The blank's outside diameter is the one tooth-system number the turner sets
 # before a cutter touches the part, so it prints as a NATIVE dimension instead
-# of as text in the data block. #906 R1: the MHA-149 bushing closes the
-# crossed 16T:64T mesh at fit-up until the backlash reads its acceptance, so
-# the frame's ``fits.crank_mesh.c2c_slack_mm`` is not what keeps a tip off the
-# mating root.  The radial room is what is left at the worst accepted fit-up
-# on top of the tooth system's own tip clearance below; ``crank_mesh_stack.
-# TIP_ROOT_AIR_WORST`` takes it with this band on the tip circle and asserts
-# it above zero.  At the title block's .XX +/-0.51 the air read -0.020; the
-# user ruled +/-0.10 on both gears' tips (2026-09-26, #906), held with a
-# micrometer before cutting, as on the cone gears' blanks.  The air alone would
-# stay positive to about +/-0.46; the ruling is what sets +/-0.10.
+# of as text in the data block.  The user ruled +/-0.10 on both gears' tips
+# (2026-09-26, #906), held with a micrometer before cutting, as on the cone
+# gears' blanks.  The mesh runs at a fixed centre with no adjustment (user
+# ruling 2026-09-28): ``crank_mesh_stack`` books this band as the tip-to-root
+# term of its closing corner (TIP_ROOT_BAND_RADIAL), and crank_boss_rim grows
+# the tip by half of it toward MHA-016.
 OUTSIDE_DIA_TOLERANCE_MM = 0.10
-TIP_CLEARANCE_MM = 0.157 * NORMAL_MODULE_MM
 
 # The cone shaft's 3/8" gear land. The bore over it is the part's one critical
 # fit and the only reason anything on the print carries a third decimal -- but
@@ -138,8 +150,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # The bore is the only fit on the part and prints three places with its own
 # band. The outside diameter prints two with its own +/-0.10. The face width is a free
 # length between two turned faces: one place, so the title block's .X +/-0.8 is
-# the band it claims -- and that is the band it needs, the mating 16T's face
-# being 2.8 mm wider than this one at every allowed axial position.
+# the band it claims -- and that is the band it needs: the south face is the
+# one seated on MHA-014's collar, so the band moves only the north face, away
+# from MHA-016 (crank_boss_rim), and the mating 16T's 10.4 face is 3.9 wider.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "OutsideDiaReference": {"OutsideDia": 2},
     "GearBlank": {"FaceWidth": 1},

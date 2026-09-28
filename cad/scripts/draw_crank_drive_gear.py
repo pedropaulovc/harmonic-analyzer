@@ -99,7 +99,7 @@ MANUFACTURING_NOTES_POS = (0.016, 0.042)
 HALF_OD = OUTSIDE_DIA * VIEW_SCALE[0] / (VIEW_SCALE[1] * 2000.0)  # 0.0489
 # Half the printed face width: the side view's half-WIDTH, so the three views
 # can be proven not to overlap offline.
-FACE_WIDTH_HALF = FACE_WIDTH * VIEW_SCALE[0] / (VIEW_SCALE[1] * 2000.0)  # 0.006
+FACE_WIDTH_HALF = FACE_WIDTH * VIEW_SCALE[0] / (VIEW_SCALE[1] * 2000.0)  # 0.0049
 
 # Face view: the tip circle above, the bore below-left, both leadered clear of
 # the silhouette and of the gear-data block's column on the far left.

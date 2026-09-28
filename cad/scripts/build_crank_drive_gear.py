@@ -43,15 +43,15 @@ torque. The bore therefore takes the shared bonded-joint fit
 the capillary window a silver-braze filler needs and the gap-fill limits of
 the high-strength retaining compounds, so the USER also approved Loctite
 638/648 as an acceptable alternative to filler metal, 2026-09-21);
-the print says so in crank_drive_gear_notes.DRAWING_NOTES. The gear is NOT
-butted against T120: build_drive_train_assembly.GEAR64_STATION holds the
-rederived 19.9 mm centre against a frozen 10.0 mm reference face, so the real
-8.0 mm face leaves ~1.1 mm of axial air each side and the axial station is an
-assembly fact, not a part requirement.
+the print says so in crank_drive_gear_notes.DRAWING_NOTES. Axially the gear is
+soldered against the MHA-014 thrust collar's north face, so the axial station
+is an assembly fact, not a part requirement; its north face stays where the
+8.0 face put it and the face narrows from the south (user ruling 2026-09-28,
+crank_drive_gear_spec.FACE_WIDTH).
 
-Layout: gear axis = Z through the origin, disc z = 0..8 mm; the helix
-twist is symmetric about the mid-face plane z = 4 (the assembly's phase
-math references the mid-face azimuth).
+Layout: gear axis = Z through the origin, disc z = 0..FACE_WIDTH; the helix
+twist is symmetric about the mid-face plane (the assembly's phase math
+references the mid-face azimuth).
 
 Run (SolidWorks already open)::
 
@@ -103,6 +103,7 @@ from crank_drive_gear_spec import (
     CUTTER_DIAMETRAL_PITCH,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
+    FACE_WIDTH,
     OUTSIDE_DIA,
     OUTSIDE_DIA_TOLERANCE_MM,
     PRESSURE_ANGLE_DEG,
@@ -150,10 +151,9 @@ MATERIAL = "Plain Carbon Steel"  # p.20: dark gear, distinct from the brass trai
 TEETH = 64  # Appendix C #9 estimate, photo-ratified 2026-07-14 (see docstring)
 DP = _config.machine("gear_train", "crank_drive_diametral_pitch")  # cad/config/machine/gear_train.yaml
 PA_DEG = PRESSURE_ANGLE_DEG  # transverse, from the normal-plane cutter (spec)
-FACE_WIDTH = 8.0  # mm, p.20 photo-proportioned (low).  Symmetric narrowing
-# retains the rederived centre/mesh axes and clears the fixed v2 post boss.
-# M6.7: seated perpendicular on the cone shaft's 3/8" pivot journal
-# like the cone gears (true cone, p.20).
+# M6.7: seated perpendicular on the cone shaft's 3/8" pivot journal like the
+# cone gears (true cone, p.20).  FACE_WIDTH is the spec's (user ruling
+# 2026-09-28).
 BORE_DIAMETER = 0.375 * IN  # snug on the 3/8" journal
 
 # Crossed-mesh accommodation (module docstring): the tooth inclination is the
