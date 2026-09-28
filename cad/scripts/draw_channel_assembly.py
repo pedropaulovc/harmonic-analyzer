@@ -19,6 +19,8 @@ import channel_assembly_steps as steps
 from _common import _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    apply_view_configuration,
+    assert_full_detail_view,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -168,7 +170,9 @@ async def build(adapter: Any) -> dict[str, str]:
         ("*Right", RIGHT_CENTER),
         ("*Isometric", ISO_CENTER),
     ):
-        place_view(adapter, str(SOURCE), view_name, *center, scale=SHEET_SCALE)
+        view = place_view(adapter, str(SOURCE), view_name, *center, scale=SHEET_SCALE)
+        apply_view_configuration(adapter, view, label=f"channel {view_name}")
+    assert_full_detail_view(adapter, label="channel assembly")
     _place_fitup_steps(adapter, sheet)
 
     return await finalize_drawing(

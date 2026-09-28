@@ -9,6 +9,8 @@ import _telemetry
 from _common import check
 from _drawing_common import (
     DrawingOutputs,
+    apply_view_configuration,
+    assert_full_detail_view,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
@@ -63,13 +65,17 @@ async def build_simple_three_view_drawing(
         ("*Right", right_center),
         ("*Isometric", iso_center),
     ):
-        place_view(
+        view = place_view(
             adapter,
             str(source),
             view_name,
             *center,
             scale=sheet_scale,
         )
+        # Small line views print the teeth/thread-free configuration; the
+        # (finalize-shaded) isometric keeps the full-detail Default.
+        apply_view_configuration(adapter, view, label=f"{pdf_title} {view_name}")
+    assert_full_detail_view(adapter, label=pdf_title)
 
     return await finalize_drawing(
         adapter,

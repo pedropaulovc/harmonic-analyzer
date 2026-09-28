@@ -197,12 +197,21 @@ def test_shared_builder_places_exactly_front_right_and_isometric(
         "new_project_drawing",
         lambda _adapter, *, layout, scale: calls.append(("new", layout, scale)),
     )
+
+    def place(_adapter, path, name, x, y, *, scale):
+        calls.append(("view", path, name, x, y, scale))
+        return f"view {name}"
+
+    monkeypatch.setattr(_assembly_drawing, "place_view", place)
     monkeypatch.setattr(
         _assembly_drawing,
-        "place_view",
-        lambda _adapter, path, name, x, y, *, scale: calls.append(
-            ("view", path, name, x, y, scale)
-        ),
+        "apply_view_configuration",
+        lambda _adapter, view, *, label: calls.append(("configuration", view)),
+    )
+    monkeypatch.setattr(
+        _assembly_drawing,
+        "assert_full_detail_view",
+        lambda _adapter, *, label: calls.append(("full detail",)),
     )
 
     async def finalize(_adapter, actual_outputs, *, layout, pdf_title, scale):
@@ -242,3 +251,9 @@ def test_shared_builder_places_exactly_front_right_and_isometric(
         "Assembly Drawing",
         (1.0, 4.0),
     ) in calls
+    # Every placed view takes its policy configuration, and the full-detail
+    # guard runs, before anything finalizes the sheet.
+    configured = [call[1] for call in calls if call[0] == "configuration"]
+    assert configured == ["view *Front", "view *Right", "view *Isometric"]
+    finalize_at = next(i for i, call in enumerate(calls) if call[0] == "finalize")
+    assert calls.index(("full detail",)) < finalize_at

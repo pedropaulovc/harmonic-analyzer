@@ -18,11 +18,15 @@ from typing import Any, Callable, Sequence
 import _telemetry
 from _common import _early_bound, check, run_build
 from _drawing_common import (
+    ASSEMBLY_VIEW_CONFIGURATION,
     DrawingOutputs,
+    ViewRole,
     _balloon_item_number,
     _edge_endpoint_key,
     _spread_balloons,
     add_component_bom_balloons,
+    apply_view_configuration,
+    assert_full_detail_view,
     create_section_view,
     finalize_drawing,
     insert_bom_table,
@@ -157,7 +161,9 @@ if CROSS_SCREW_SHANK_LEN >= CASTING_FULL_THREAD_DEPTH:
     raise AssertionError("stock cross screw must seat before reaching the tap bottom")
 
 EXPLODED_VIEW_NAME = "FRAME_EXPLODED"
-SOURCE_CONFIGURATION = "Default"
+# The explode steps belong to Default, the policy's full-detail configuration:
+# a view is exploded or collapsed only while it still references it.
+SOURCE_CONFIGURATION = ASSEMBLY_VIEW_CONFIGURATION
 
 # These instructions carry only requirements that exist at assembly: matched
 # fits, the one-setup coaxial casting threads, transfer-drilled tube holes,
@@ -267,7 +273,10 @@ def _add_note_block(
 def _set_exploded_state(adapter: Any, view: Any, show: bool, *, label: str) -> None:
     bound = _early_bound(view, "IView")
     if str(bound.ReferencedConfiguration) != SOURCE_CONFIGURATION:
-        raise RuntimeError(f"{label}: view must reference the Default configuration")
+        raise RuntimeError(
+            f"{label}: set the exploded state before apply_view_configuration; "
+            f"the view must reference {SOURCE_CONFIGURATION!r}"
+        )
     returned = bool(bound.ShowExploded(show))
     actual = bool(bound.IsExploded())
     if actual != show:
@@ -560,6 +569,7 @@ def _create_joint_sections(adapter: Any, front: Any) -> tuple[Any, Any]:
             label=label,
         )
         set_hidden_lines_visible(adapter, section)
+        apply_view_configuration(adapter, section, label=f"joint section {cut_y:.3f}")
         sections.append(section)
     return sections[0], sections[1]
 
@@ -1150,6 +1160,9 @@ def _place_package(adapter: Any) -> None:
     )
     _set_exploded_state(adapter, front, False, label="working front")
     set_hidden_lines_visible(adapter, front)
+    # Before the dimensions and sections bind to it: 1:8 line work prints the
+    # teeth/thread-free configuration, and the A-A/B-B sections follow it.
+    apply_view_configuration(adapter, front, label="working front")
     _add_frame_height_dimensions(adapter, front)
     _create_joint_sections(adapter, front)
     _add_note_block(
@@ -1184,6 +1197,7 @@ def _place_package(adapter: Any) -> None:
     set_high_quality_shaded_with_edges(
         adapter, exploded, label="frame exploded anchor visibility"
     )
+    apply_view_configuration(adapter, exploded, role=ViewRole.BOM, label="exploded isometric")
     table = insert_bom_table(
         adapter,
         exploded,
@@ -1221,6 +1235,8 @@ def _place_package(adapter: Any) -> None:
     _set_exploded_state(
         adapter, instruction_iso, False, label="assembly instruction isometric"
     )
+    apply_view_configuration(adapter, instruction_iso, label="assembly instruction isometric")
+    assert_full_detail_view(adapter, label="frame assembly")
     _add_note_block(adapter, ASSEMBLY_STEPS, (0.018, 0.263), label="assembly sequence")
     # 34 lines at ~4.7 mm pitch run the sequence block down to ~0.104; the
     # checks block starts under it with a line of clearance (0.115 overprinted

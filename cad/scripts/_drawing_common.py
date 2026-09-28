@@ -9,6 +9,7 @@ Part-specific views, dimensions, and notes belong in ``draw_<part>.py``.
 from __future__ import annotations
 
 import contextlib
+import enum
 import json
 import math
 import os
@@ -33,6 +34,7 @@ from _common import (
 from _gtol_spec import GTOL_SYMBOLS as _GTOL_SYMBOLS
 from _gtol_spec import gtol_frame_xml as _gtol_frame_xml
 from _surface_finish import SurfaceFinishControl
+from _drawing_simplified import simplified_name
 from _drawing_layout_check import (
     CollisionScope,
     DrawableRegion,
@@ -2413,6 +2415,102 @@ def set_hidden_lines_visible(adapter: Any, view: Any) -> None:
         raise RuntimeError(
             f"failed to set hidden-lines-visible drawing view (mode reads {mode})"
         )
+
+
+# Assembly drawing view configurations (the user's ruling, 2026-09-27): at a
+# small scale the modeled gear teeth and screw threads print black, so a LINE
+# view at 1:2 or smaller references the source assembly's derived
+# "Default Simplified" (_assembly.sync_simplified_configuration). Everything
+# else keeps the full-detail Default: a larger view; a shaded one (its tone is
+# not a line mass); an exploded one (the explode steps belong to Default); one
+# that anchors a BOM or carries balloons (their rows and leaders bind to
+# Default's components); and the drawing's designated full-detail view. Part
+# drawings never call this.
+ASSEMBLY_VIEW_CONFIGURATION = "Default"
+SIMPLIFIED_VIEW_CONFIGURATION = simplified_name(ASSEMBLY_VIEW_CONFIGURATION)
+SIMPLIFIED_MAX_SCALE = 0.5
+
+
+class ViewRole(enum.Enum):
+    """What an assembly view carries, beyond its geometry."""
+
+    PLAIN = "plain"
+    EXPLODED = "exploded"
+    BOM = "bom"
+    BALLOONS = "balloons"
+    # The view that exists to show every modeled tooth and thread.
+    FULL_DETAIL = "full-detail"
+
+
+def view_configuration(
+    scale: tuple[float, float], display_mode: int, role: ViewRole = ViewRole.PLAIN
+) -> str:
+    """The assembly configuration a drawing view references under the policy."""
+    numerator, denominator = (float(value) for value in scale)
+    if numerator <= 0.0 or denominator <= 0.0:
+        raise ValueError(f"view scale must be positive, got {scale!r}")
+    if (
+        role is ViewRole.PLAIN
+        and display_mode in (_SW_HLR, _SW_HLV)
+        and numerator / denominator <= SIMPLIFIED_MAX_SCALE + 1e-12
+    ):
+        return SIMPLIFIED_VIEW_CONFIGURATION
+    return ASSEMBLY_VIEW_CONFIGURATION
+
+
+@_telemetry.traced("drawing.view_configuration", label_param="label")
+def apply_view_configuration(
+    adapter: Any, view: Any, *, role: ViewRole = ViewRole.PLAIN, label: str
+) -> str:
+    """Point an assembly view at its policy configuration and read it back.
+
+    Call once the view's scale and display mode are final and BEFORE anything
+    attaches to its edges (dimensions, balloons, leaders): switching the
+    configuration regenerates the view's geometry. A pictorial view is judged
+    shaded, because ``finalize_drawing`` shades every one of them. A section
+    or projected child follows its parent's configuration.
+    """
+    bound = _early_bound(view, "IView")
+    scale = tuple(float(value) for value in bound.ScaleRatio)
+    orientation = str(bound.GetOrientationName() or "")
+    mode = (
+        _SW_SHADED_EDGES
+        if is_pictorial_orientation(orientation)
+        else int(bound.GetDisplayMode2())
+    )
+    wanted = view_configuration(scale, mode, role)
+    current = str(bound.ReferencedConfiguration)
+    if current != wanted:
+        bound.ReferencedConfiguration = wanted
+        rebuild_drawing(adapter, label=f"{label} configuration")
+        current = str(bound.ReferencedConfiguration)
+        if current != wanted:
+            raise RuntimeError(
+                f"{label}: view references {current!r} after setting {wanted!r}"
+            )
+    _telemetry.annotate(
+        configuration=wanted, scale=f"{scale[0]:g}:{scale[1]:g}", mode=mode, role=role.value
+    )
+    return wanted
+
+
+def assert_full_detail_view(adapter: Any, *, label: str) -> None:
+    """Every assembly drawing keeps at least one full-detail (Default) view."""
+    ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
+    configurations = [
+        str(_early_bound(raw_view, "IView").ReferencedConfiguration)
+        for sheet_name in ddoc.GetSheetNames() or ()
+        for raw_view in (_early_bound(ddoc.Sheet(str(sheet_name)), "ISheet").GetViews() or ())
+    ]
+    if ASSEMBLY_VIEW_CONFIGURATION not in configurations:
+        raise RuntimeError(
+            f"{label}: no view shows the full-detail {ASSEMBLY_VIEW_CONFIGURATION!r} "
+            f"configuration ({configurations!r})"
+        )
+    _telemetry.annotate(
+        views=len(configurations),
+        simplified=configurations.count(SIMPLIFIED_VIEW_CONFIGURATION),
+    )
 
 
 def assert_asme_b_sheet(
