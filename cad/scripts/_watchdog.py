@@ -102,6 +102,12 @@ class SeatNotReady(SystemExit):
 _hard_exit: Callable[[int], None] = os._exit
 
 
+def _disabled() -> bool:
+    """The operator kill switch: ``HARMONIC_COM_WATCHDOG=0`` turns off EVERY
+    watchdog hard exit -- the signal thread and any ``deadline`` alike."""
+    return os.environ.get("HARMONIC_COM_WATCHDOG", "1").lower() in {"0", "off", "false"}
+
+
 @contextlib.contextmanager
 def deadline(
     seconds: float, *, reason: str, message: str, code: int, **fields: object
@@ -114,7 +120,12 @@ def deadline(
     needs its own clock: a daemon timer that records the abort on both channels
     (``_abort``: error log + ``watchdog.abort`` span, then flush) and
     hard-exits, exactly as the fatal signals do. Leaving the block cancels it.
+    With the kill switch set (``HARMONIC_COM_WATCHDOG=0``) it arms nothing: the
+    block runs unbounded, as every other watchdog exit does in that mode.
     """
+    if _disabled():
+        yield
+        return
 
     def _expire() -> None:
         _abort(reason, message, code, deadline_s=seconds, **fields)
@@ -496,7 +507,7 @@ def start() -> Watchdog | None:
     global _active
     if not _WINDOWS:
         return None
-    if os.environ.get("HARMONIC_COM_WATCHDOG", "1").lower() in {"0", "off", "false"}:
+    if _disabled():
         return None
     if _active is not None:
         return _active

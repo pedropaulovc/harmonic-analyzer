@@ -296,6 +296,26 @@ def test_a_read_that_never_returns_is_cut_off_at_the_bound(monkeypatch, spans):
     assert aborts == [("seat-not-ready", 89)]
 
 
+def test_the_kill_switch_leaves_a_hanging_read_unbounded(monkeypatch, spans):
+    """``HARMONIC_COM_WATCHDOG=0`` disables every watchdog hard exit, the
+    startup deadline included: an operator debugging a wedged seat must not be
+    killed at the bound. The read returns when SolidWorks answers."""
+    _seat_age(monkeypatch, 20)
+    monkeypatch.setenv("HARMONIC_COM_WATCHDOG", "0")
+    monkeypatch.setattr(_seat_forensics, "_STARTUP_WAIT_S", 0.05)
+    monkeypatch.setattr(_seat_forensics, "_STARTUP_HANG_GRACE_S", 0.05)
+    released = threading.Event()
+    exits: list[int] = []
+    monkeypatch.setattr(_watchdog, "_hard_exit", exits.append)
+    monkeypatch.setattr(_watchdog, "_abort", lambda *_a, **_f: None)
+    threading.Timer(0.5, released.set).start()
+
+    prov = _seat_forensics.record_seat_provenance(_Adapter(_HangingSeat(released)))
+
+    assert exits == []
+    assert prov["seat_startup"] == "already_ready"
+
+
 def test_a_gate_that_finishes_disarms_its_deadline(monkeypatch, spans):
     _seat_age(monkeypatch, 20)
     monkeypatch.setattr(_seat_forensics, "_STARTUP_WAIT_S", 0.02)
