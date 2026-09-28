@@ -199,13 +199,18 @@ async def build(adapter: Any) -> dict[str, str]:
         label="knife-edge pivot axis",
     )
     knife_edge = _top_xy(0.0, -(PLATE_L / 2.0 + HEX_DEPTH / 2.0))
+    # The ridge lands in a pocket closed by the 76.20 extension line (left),
+    # the 76.20/39.85 dimension line (below) and the plate (above); the default
+    # 43 mm body cannot fit, so the 2.5 mm body sits inside it (layout audit:
+    # the old leader crossed 76.20's extension line and datum B's leader).
     add_surface_finish(
         adapter,
         top,
         edge_xy=knife_edge,
-        symbol_xy=(0.185, 0.100),
+        symbol_xy=(0.208, 0.084),
         control=surface_finish_by_key(SURFACE_FINISHES, "knife_edge_ridge"),
         label="knife-edge ridge finish",
+        char_height=0.0025,
     )
     # Use a separate point on the tap rim so the position-frame leader does
     # not stack on the hole-callout leader at the hole's 12-o'clock point.
@@ -243,15 +248,16 @@ async def build(adapter: Any) -> dict[str, str]:
     # start-Z / pitch coordinates off A|B, a native thread callout, and a 20X
     # position frame -- the inspectable pattern definition (the notes no longer
     # carry these numbers as prose).
-    # Pick B toward the plate's -X side and hang its tag down-LEFT: the seed
-    # hole's callout leader sweeps down-right from the hole and crossed a
-    # right-hung tag (layout audit).
+    # Hang B's tag straight down right of the +Z trunnion stub, between it and
+    # the 39.85 extension line: left of the stub it sat in the finish leader's
+    # only path (layout audit), and the seed callout now leaves the hole
+    # steeply down-right, 8 mm clear of this tag.
     plate_end_edge = _top_xy(10.0, -PLATE_L / 2.0)
     add_datum_feature(
         adapter,
         top,
         edge_xy=plate_end_edge,
-        symbol_xy=(plate_end_edge[0] - 0.013, plate_end_edge[1] - 0.011),
+        symbol_xy=(plate_end_edge[0] + 0.0062, plate_end_edge[1] - 0.0035),
         datum="B",
         label="plate -Z end face",
     )
@@ -293,15 +299,23 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         top,
         edge_xy=seed_rim_bottom,
-        callout_xy=(0.310, 0.087),
+        # Steep drop between the 39.85 and 44.45 extension lines to a block
+        # under the plate: the old down-right leader crossed 152.40's
+        # extension line (layout audit).
+        callout_xy=(0.286, 0.082),
         label="spring-hole seed",
     )
-    seed_rim_left = _top_xy(HOLE_X - HOLE_DIA / 2.0, HOLE_Z_FIRST)
+    # The Top view reverses model Z, so -HOLE_Z_FIRST prints the seed hole at
+    # the TOP of the column. Every lower hole is boxed in by the 44.45
+    # extension/dimension lines; from the upper-left the frame's leader
+    # clears them all (the old leader crossed 44.45, 3.35 and 7.06 -- layout
+    # audit) and passes 2 mm off datum A's tag.
+    seed_rim_left = _top_xy(HOLE_X - HOLE_DIA / 2.0, -HOLE_Z_FIRST)
     add_feature_control_frame(
         adapter,
         top,
         edge_xy=seed_rim_left,
-        frame_xy=(0.310, 0.115),
+        frame_xy=(0.175, 0.199),
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["spring-hole pattern position"],
         datums=("A", "B"),

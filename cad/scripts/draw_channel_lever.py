@@ -147,7 +147,9 @@ FRONT_KEEP = {
     "BarLength": (FRONT_CENTER[0] - 0.010, 0.138),
     "TipCentreX": (FRONT_CENTER[0] + 0.070, 0.125),
     "NoseRadius": (0.070, 0.172),
-    "TipRadius": (0.240, 0.172),
+    # Below-right of the tip (was 0.240, 0.172 above it): the spring-eye position
+    # frame's leader now drops to the 3-o'clock rim through the space it freed.
+    "TipRadius": (0.262, 0.141),
     "FulcrumDia": (0.075, 0.180),
 }
 RIGHT_KEEP: dict[str, tuple[float, float]] = {}
@@ -345,7 +347,10 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=outer_profile,
-        frame_xy=(0.105, 0.210),
+        # Between the front and top views, left of the bar-pin frame (was
+        # 0.105, 0.210 on the top view: its leader crossed that view and the
+        # bar-pin frame, and datum A's leader ran through its text).
+        frame_xy=(0.092, 0.189),
         characteristic="profile_surface",
         tolerance=GEOMETRIC_TOLERANCES_MM["outer perimeter profile"],
         datums=("A", "B", "C"),
@@ -372,7 +377,9 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         right,
         edge_xy=opposite_broad_face,
-        frame_xy=(0.225, 0.205),
+        # Right of its own end view, level with the attachment (was 0.225,
+        # 0.205 on the top view: its leader crossed the spring-eye frame).
+        frame_xy=(0.308, 0.159),
         characteristic="parallelism",
         tolerance=GEOMETRIC_TOLERANCES_MM["opposite broad face parallelism"],
         datums=("A",),
@@ -397,9 +404,11 @@ async def build(adapter: Any) -> dict[str, str]:
         front,
         # The hole callout owns the 9-o'clock rim and routes up-left.  Attach
         # the position frame at 3 o'clock and keep its whole leader to the
-        # right of the callout path.
+        # right of the callout path: the frame sits under the callout text,
+        # left of the end view and datum C (was +0.020, 0.174, where its leader
+        # crossed the R3.00 leader and datum C's leader ran through its text).
         edge_xy=spring_fcf_edge,
-        frame_xy=(spring_fcf_edge[0] + 0.020, 0.174),
+        frame_xy=(spring_fcf_edge[0] + 0.006, 0.180),
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["spring-eye hole position"],
         datums=("A", "B", "C"),

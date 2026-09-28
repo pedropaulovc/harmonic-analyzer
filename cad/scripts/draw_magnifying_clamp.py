@@ -209,12 +209,13 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     add_feature_control_frame(
         adapter,
-        front,
-        # pick + frame right of the rod-bore hidden-line column: at the centred
-        # pick both blind reviews read the top-face parallelism as attached to
-        # the vertical bore
-        edge_xy=(FRONT_CENTER[0] + 0.038, _front_y(BLOCK_HEIGHT)),
-        frame_xy=(FRONT_CENTER[0] + 0.052, _front_y(BLOCK_HEIGHT) + 0.016),
+        # The top face on the END view (hidden lines removed, so no bore column
+        # to misread; datum A is on the same view): in the front view the
+        # 20.00 width dimension's extension lines box in the whole top edge,
+        # and the old leader crossed its right one (layout audit).
+        right,
+        edge_xy=(RIGHT_CENTER[0] + 0.012, _front_y(BLOCK_HEIGHT)),
+        frame_xy=(RIGHT_CENTER[0] + 0.020, _front_y(BLOCK_HEIGHT) + 0.019),
         characteristic="parallelism",
         tolerance=GEOMETRIC_TOLERANCES_MM["block top-face parallelism"],
         datums=("A",),
