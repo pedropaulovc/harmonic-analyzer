@@ -260,7 +260,10 @@ def curate_view_dimensions(
             f"{view_label} view is missing model dimensions: {missing}; "
             f"available={sorted(present)} from features={list(features)}"
         )
-    curated = _dc.curate_dimensions(adapter, curated, reposition=dict(keep))
+    if extra:
+        # See ``_drawing_common.curate_view_dimensions``: only a pass that
+        # deleted can leave a kept dimension off its position.
+        curated = _dc.curate_dimensions(adapter, curated, reposition=dict(keep))
     part_shown = [sketch for block in _PART_SHOWN for sketch in block.sketches]
     if hidden or part_shown:
         _assert_dimensions_visible(adapter, curated, hidden, view_label=view_label)

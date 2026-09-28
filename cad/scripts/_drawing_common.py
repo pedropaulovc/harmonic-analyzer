@@ -2900,6 +2900,15 @@ def curate_view_dimensions(
     falls back to the entire-model import plus deletion sweep: the same ink for
     many times the round trips, so the fallback WARNS and names the view, which
     keeps every recipe still on it visible in the build log.
+
+    The kept dimensions are positioned again only when the first pass
+    deleted some: a delete can shift a survivor the same pass already placed
+    (top_frame ``Width`` 6.97 mm, ``RibWidth`` 0.63 mm), while after a
+    reposition-only pass the second one moved nothing and changed no PDF pixel
+    on any of 9 views (diag branch pedro/drawing-step-snapshots-diag,
+    a0e136c66, leaves cone_pivot_post/pinion_arbor/top_frame) and cost
+    ~0.65 s each (one ``EditRebuild3`` plus a name read and ``SetPosition``
+    per dimension).
     """
     if dimensions_by_feature is None:
         _telemetry.warn(
@@ -2939,6 +2948,8 @@ def curate_view_dimensions(
             f"{view_label} view is missing model dimensions: {missing}; "
             f"available={sorted(present)} from features={list(features)}"
         )
+    if not extra:
+        return curated
     return curate_dimensions(adapter, curated, reposition=dict(keep))
 
 

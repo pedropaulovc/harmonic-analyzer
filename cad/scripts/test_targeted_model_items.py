@@ -286,3 +286,42 @@ def test_the_component_qualifier_is_read_back_per_view() -> None:
         "SKETCH",
         True,
     ) in drawing.calls
+
+
+@pytest.mark.parametrize(
+    ("imported", "passes"),
+    [
+        (("Length",), [((), ("Length",))]),
+        (("Length", "Extra"), [(("Extra",), ("Length",)), ((), ("Length",))]),
+    ],
+    ids=["reposition-only", "with-delete"],
+)
+def test_only_a_pass_that_deleted_is_followed_by_a_second_placement(
+    monkeypatch, imported, passes
+) -> None:
+    """A delete can shift a survivor its own pass already placed (top_frame
+    Width 6.97 mm on the step-snapshot leaves), so a pass that deleted is
+    followed by a reposition-only pass; after a reposition-only pass that
+    second one moved nothing on 9 of 9 views and is skipped."""
+    calls = []
+    monkeypatch.setattr(
+        drawing_common,
+        "insert_feature_dimensions",
+        lambda adapter, view, features: [(name, name) for name in imported],
+    )
+
+    def curate(adapter, annotations, *, delete=(), reposition=None):
+        calls.append((tuple(delete), tuple(sorted(reposition or {}))))
+        return [a for a in annotations if a not in delete]
+
+    monkeypatch.setattr(drawing_common, "curate_dimensions", curate)
+    monkeypatch.setattr(drawing_common, "dimension_name", lambda adapter, a: a)
+    curated = drawing_common.curate_view_dimensions(
+        object(),
+        object(),
+        keep={"Length": (0.1, 0.1)},
+        view_label="length",
+        dimensions_by_feature=tube_frame_spec.DRAWING_DIMENSIONS,
+    )
+    assert curated == ["Length"]
+    assert calls == passes
