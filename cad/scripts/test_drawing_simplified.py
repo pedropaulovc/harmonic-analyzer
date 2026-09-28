@@ -415,8 +415,14 @@ class FakeFeature:
         self.suppressed = set(suppressed_in)
 
     def IsSuppressed2(self, option: int, names) -> tuple[bool, ...]:
+        """Answers in the PART's configuration order, not the requested one:
+        what a multi-name query did on the farm (cone-gear, 2026-09-28, read
+        Default's missing teeth against T006)."""
         assert option == 3  # swSpecifyConfiguration
-        return tuple(name in self.suppressed for name in _names(names))
+        asked = set(_names(names))
+        return tuple(
+            name in self.suppressed for name in self.part.GetConfigurationNames() if name in asked
+        )
 
     def SetSuppression2(self, action: int, option: int, names) -> bool:
         assert (action, option) == (0, 3)  # swSuppressFeature, swSpecifyConfiguration

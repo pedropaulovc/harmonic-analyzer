@@ -250,8 +250,22 @@ def _features(model: Any, part_name: str, names: Sequence[str]) -> list[Any]:
 
 
 def _suppression(feature: Any, configurations: Sequence[str]) -> tuple[bool, ...]:
-    states = feature.IsSuppressed2(_SPECIFY_CONFIGURATION, _bstr_array(configurations))
-    return tuple(bool(state) for state in (states or ()))
+    """Suppression of ``feature`` in each of ``configurations``, in that order.
+
+    One ``IsSuppressed2`` call per configuration: the API documents only "an
+    array of Booleans" for a name array, not that it follows the input order,
+    and on the farm a multi-name query came back aligned to the part's own
+    configuration order (cone-gear read ``Default``'s state against ``T006``).
+    """
+    states: list[bool] = []
+    for name in configurations:
+        answer = tuple(feature.IsSuppressed2(_SPECIFY_CONFIGURATION, _bstr_array([name])) or ())
+        if len(answer) != 1:
+            raise RuntimeError(
+                f"{feature.Name}: IsSuppressed2 for {name!r} returned {answer!r}, expected one state"
+            )
+        states.append(bool(answer[0]))
+    return tuple(states)
 
 
 def _simplified_parents(
