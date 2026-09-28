@@ -30,9 +30,9 @@ CLUSTERS: dict[Cluster, tuple[str, ...]] = {
         "cylinder-gear-shaft",
         "arbor-pedestal",
         "cylinder-end-disc",
-        "dome-cap-screw",
         "cylinder-gear",
         "pedestal-hold-down-screw",
+        "arbor-set-screw",
     ),
     "cone-crank": (
         "cone-gear-shaft",
@@ -97,25 +97,24 @@ class ExplodeStep:
 # and castings carry the balloons in place; only what hides or overlaps moves.
 EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     # cylinder bank: slide the retention stack off each end of the arbor
-    ExplodeStep("south dome cap", ("dome-cap-screw",), "z", -55.0, ("south",)),
-    ExplodeStep("north dome cap", ("dome-cap-screw",), "z", 55.0, ("north",)),
     ExplodeStep(
         "south pedestal",
-        ("arbor-pedestal", "pedestal-hold-down-screw"),
+        ("arbor-pedestal", "pedestal-hold-down-screw", "arbor-set-screw"),
         "z",
         -35.0,
         ("south",),
     ),
     ExplodeStep(
         "north pedestal",
-        ("arbor-pedestal", "pedestal-hold-down-screw"),
+        ("arbor-pedestal", "pedestal-hold-down-screw", "arbor-set-screw"),
         "z",
         35.0,
         ("north",),
     ),
-    ExplodeStep("south end disc", ("cylinder-end-disc",), "z", -15.0, ("south",)),
-    ExplodeStep("north end disc", ("cylinder-end-disc",), "z", 15.0, ("north",)),
+    ExplodeStep("south thrust washer", ("cylinder-end-disc",), "z", -15.0, ("south",)),
+    ExplodeStep("north thrust washer", ("cylinder-end-disc",), "z", 15.0, ("north",)),
     ExplodeStep("pedestal screws lift", ("pedestal-hold-down-screw",), "y", 30.0),
+    ExplodeStep("apex set screws lift", ("arbor-set-screw",), "y", 20.0),
     # cone set: base hardware up, swing plate down
     ExplodeStep("swing plate drops", ("cone-swing-platform",), "y", -30.0),
     ExplodeStep("pivot screw lifts", ("cone-pivot-screw",), "y", 35.0),

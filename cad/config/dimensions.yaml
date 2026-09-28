@@ -452,18 +452,18 @@ sections:
         - 'derived: 134 stack (20 × 7.06 Z-pitch) + journal/clamp each end (eight-views 8/8 pedestals)'
         - derived
         - low
-      - - Cylinder end discs ×2 (2026-09)
-        - Ø55 × 3 brass annulus, Ø9.6 bore, 0.5 outboard of gears 0 and 19 on the arbor
-        - '2.17'
-        - 'p.23 "back side" / p.25 "front side" + ch25 p.67 edge-on: a toothless brass washer closes each end of the sandwich (~0.9 of the gear OD; Ø55 since a Ø60 grazed the cone-tip bushing) (`build_cylinder_end_disc.py`)'
-        - scaled
-        - low
-      - - Pedestal dome cap screws ×2 (2026-09)
-        - Ø10 × 3 spherical crown with a Ø5 × 2 spigot, on the arbor axis on each pedestal's outer strap face
-        - '0.39'
-        - 'p.23/25 + ch25 p.67: a bright domed head closes the blind arbor bore on each pedestal (`build_dome_cap_screw.py`)'
-        - scaled
-        - low
+      - - Cylinder bank thrust washers ×2 (#743, 2026-09-25)
+        - Ø25 × Ø9.6 × 1.50 ±0.05 turned steel washer, one between each end gear and its arbor-pedestal strap (MHA-121)
+        - '0.98'
+        - 'p.23 "back side" / p.25 "front side" + ch25 p.67 edge-on: a plain annulus closes each end of the gear/rod sandwich. #743 closes the stack: each gear is one station pitch thick, the back washer bears on the DRO-located back strap, the front one is feeler-set 0.45 off the front strap (`cylinder_bank_layout.py`, `build_cylinder_end_disc.py`). Supersedes the Ø55 × 3 brass disc'
+        - derived
+        - med
+      - - Arbor ends and set screws (#743, 2026-09-25)
+        - arbor ends domed, 1.5 proud of each strap; one #4-40 × 1/4 cup-point set screw in each pedestal crown apex (MHA-147)
+        - '0.06'
+        - 'p.23/25 + ch25 p.67: the bright dome on each pedestal is the arbor end; ch12 p.18 and the user ruling on #743 (Q3) put a set screw at each strap apex. Supersedes the Ø10 dome cap screw MHA-125 (`build_dome_cap_screw.py`, deleted)'
+        - derived
+        - med
   - prose: |2
 
       Notes: set is a sandwich — shiny brass gears alternating with black rough-finished

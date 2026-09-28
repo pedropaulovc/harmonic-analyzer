@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import cylinder_bank_layout as bank
 import cylinder_gear_spec as spec
 
 BORE_FIT_CALLOUT = (
@@ -13,15 +14,14 @@ BORE_FIT_CALLOUT = (
 )
 # TODO(#744): validate the forked rod and centered channel bank in the native
 # assembly. The drawing requirement below does not certify that integration.
-# TODO(#743): establish physical shaft-end retention and measured bank endplay,
-# then prove full ring support through the stroke and every allowed axial position.
-# Static assembly mates and the 3.5 mm reference cam width are not that proof.
-CAM_AXIAL_FIT_CALLOUT = (
-    "FIT TO CONNECTING ROD MHA-017\n"
-    "SUPPORT FULL RING WIDTH\n"
-    "THROUGHOUT OPERATION\n"
-    "FREE MOVEMENT; NO AXIAL BINDING\n"
-    "OR ADJACENT-PART CONTACT"
+# The bank is a solid, unpreloaded stack (#743): a ring can overhang its cam
+# only by an interface the end play lets open, so the acceptance names that
+# bound (cylinder_bank_layout.RING_OVERHANG_MAX, user ruling Q1).
+STACK_FIT_CALLOUT = (
+    "STACKS CAM FACE TO BACK FACE\n"
+    "ON CYLINDER-GEAR-SHAFT MHA-028;\n"
+    "CONNECTING ROD MHA-017 RING\n"
+    f"OVERHANGS CAM {bank.RING_OVERHANG_MAX:.2f} MAX"
 )
 GEAR_DATA = "\n".join(
     (

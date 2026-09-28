@@ -68,8 +68,10 @@ def test_the_part_owns_every_printed_decimal_place() -> None:
     """Policy rule 2: places are the tolerance, so the .SLDPRT carries them.
 
     Three places only where a three-place band rides the dimension (the
-    matched bore's reference nominal, the cam eccentricity); the overall is
-    the one sheet-derived value, a parenthesised reference.
+    matched bore's reference nominal, the cam eccentricity); four on the
+    stacking thickness that sets the station pitch, 7.0565 +/-0.025, exact
+    only at four (#743, user ruling L20 d'); the cam thickness is the one
+    sheet-derived value, a parenthesised reference.
     """
     by_name = spec.DRAWING_PRECISION_BY_NAME
     assert set(by_name) == set().union(*spec.DRAWING_DIMENSIONS.values())
@@ -77,7 +79,10 @@ def test_the_part_owns_every_printed_decimal_place() -> None:
         "BoreDia",
         "CamCy",
     }
-    assert spec.DRAWING_REFERENCE_PRECISION == {"overall axial thickness": 1}
+    assert {name for name, places in by_name.items() if places == 4} == {
+        "OverallThickness",
+    }
+    assert spec.DRAWING_REFERENCE_PRECISION == {"cam thickness reference": 2}
     part_source = Path(part.__file__).read_text(encoding="utf-8")
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in part_source
     source = Path(drawing.__file__).read_text(encoding="utf-8")
@@ -102,3 +107,16 @@ def test_assembly_recipes_exclude_cylinder_drawing_prose(assembly_script: str) -
     }
     assert "cylinder_gear_spec.py" in dependencies
     assert dependencies.isdisjoint({"build_cylinder_gear.py", "cylinder_gear_notes.py"})
+
+
+def test_stacking_thickness_is_the_held_marked_dimension() -> None:
+    import cylinder_bank_layout as bank
+    import cylinder_gear_notes as notes
+
+    # The overall thickness sets every station of the solid bank (#743), so it
+    # is a marked model dimension printed to four places with its own band;
+    # the cam thickness between it and the face width is only a reference.
+    assert spec.DRAWING_DIMENSIONS["CamBoss"] == {"OverallThickness"}
+    assert spec.DRAWING_PRECISION_BY_NAME["OverallThickness"] == 4
+    assert "OverallThickness" in drawing.RIGHT_KEEP
+    assert f"{bank.RING_OVERHANG_MAX:.2f}" in notes.STACK_FIT_CALLOUT

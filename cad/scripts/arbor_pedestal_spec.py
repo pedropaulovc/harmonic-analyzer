@@ -7,7 +7,7 @@ SLDDRW recipes from one source (see build_arbor_pedestal.py for the geometry).
 from __future__ import annotations
 from math import sqrt
 
-from _hole_spec import HoleSpec, blind_cut_dia_mm
+from _hole_spec import HoleSpec, THREAD_MAJOR_MM, blind_cut_dia_mm
 from _gtol_spec import CylinderFace, PlanarFace
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
 
@@ -33,7 +33,10 @@ STRAP_ROOT_Z = STRAP_INNER_Z - STRAP_T  # strap outer face / ledge root, -2
 FOOT_NEAR_Z = STRAP_INNER_Z - FOOT_DEPTH  # outboard end of the ledge, -20
 FOOT_MID_Z = (STRAP_INNER_Z + FOOT_NEAR_Z) / 2.0  # plan centre of the foot, -6
 LEDGE_DEPTH = FOOT_DEPTH - STRAP_T  # exposed hold-down ledge, 18
-TOP_RADIUS = 10.0  # dome radius = strap half-width at the top
+# Dome radius = strap half-width at the top. R11, not the photographed R10:
+# the crown carries the MHA-147 apex set screw (#743, below), and only R11
+# leaves it 1.5D of full thread at the printed worst case.
+TOP_RADIUS = 11.0
 BORE_DIA = 9.55  # finished running bore for the 3/8 in cylinder-arbor journal
 BORE_DIA_BAND = (0.03, 0.0)  # 9.550–9.580 mm running-bore limits
 BORE_HEIGHT = 39.718  # v2 post journal axis: 6.35 platform + 33.368 boss height
@@ -56,10 +59,80 @@ TAPER_TANGENT_Y = (
 SCREW_HOLE_SPEC = HoleSpec("clearance", "#8", fit="close")
 SCREW_HOLE_DIA = blind_cut_dia_mm(SCREW_HOLE_SPEC)
 # Hold-down hole centre, local z: centred on the 18 ledge, 9 outboard of the
-# strap root (machine -91.652 south / +94.202 north). Shared, because the
-# plan view dimensions the hole from the strap inner face and must not
-# restate the number.
+# strap root. Shared, because the plan view dimensions the hole from the
+# strap inner face and must not restate the number.
 SCREW_Z = STRAP_ROOT_Z - LEDGE_DEPTH / 2.0
+
+# --- apex set screw (#743, user ruling Q3: "set screw located at apex of
+# straps") ---------------------------------------------------------------
+# One #4-40 x 1/4 cup-point set screw (MHA-147) drops radially through the
+# crown apex onto the arbor, at the strap's mid-depth. The back pedestal's
+# screw fixes the arbor; the front one is tightened after the bank's end-play
+# leaf is set. The cup bears in a spot drilled into the arbor at fit-up
+# through this tapped hole with the #43 tap drill, so the arbor print keeps
+# "no flats". The tap runs THROUGH to the bore and stops there
+# (through-next), never into the strap below it.
+SET_SCREW_THREAD = "#4-40"
+SET_SCREW_HOLE_SPEC = HoleSpec("tapped", SET_SCREW_THREAD, end="through_next")
+SET_SCREW_Z = STRAP_INNER_Z - STRAP_T / 2.0  # local z +3: strap mid-depth
+SET_SCREW_PITCH = 25.4 / 40.0
+SET_SCREW_MIN_ENGAGEMENT_D = 1.5  # rule 12: >= 1.5D of full thread
+
+# Full thread in the crown wall at the printed worst case. The crown radius
+# prints at one place (title block .X, +-0.8) and the bore at its own running
+# band; the thread is only full where its major-diameter circle lies wholly
+# in metal, so the crown's sag across the hole and the bore's sag across it
+# are lost, and so is the one-pitch entry chamfer.
+_CROWN_BAND_MM = 0.8  # "crown radius" prints at .X
+_BORE_MAX_RADIUS = (BORE_DIA + BORE_DIA_BAND[0]) / 2.0
+_THREAD_HALF_MAJOR = THREAD_MAJOR_MM[SET_SCREW_THREAD] / 2.0
+
+
+def _sag(radius: float) -> float:
+    return radius - sqrt(radius**2 - _THREAD_HALF_MAJOR**2)
+
+
+def set_screw_wall_terms(top_radius: float) -> dict[str, float]:
+    """Named terms of the apex tap's worst-case full-thread length (mm): the
+    crown at its least radius, less the metal the thread cannot use."""
+    least_crown = top_radius - _CROWN_BAND_MM
+    return {
+        "crown radius at .X minimum": least_crown,
+        "bore radius at its maximum": -_BORE_MAX_RADIUS,
+        "crown sag across the thread": -_sag(least_crown),
+        "bore sag across the thread": -_sag(_BORE_MAX_RADIUS),
+        "one-pitch entry chamfer": -SET_SCREW_PITCH,
+    }
+
+
+def set_screw_engagement_d(top_radius: float) -> float:
+    """Worst-case full thread in the crown, in thread diameters."""
+    full = sum(set_screw_wall_terms(top_radius).values())
+    return full / THREAD_MAJOR_MM[SET_SCREW_THREAD]
+
+
+# R10 (the photographed crown) leaves 3.45 of full thread = 1.21D and fails;
+# R11 leaves 4.46 = 1.57D.
+SET_SCREW_FULL_THREAD_MM = sum(set_screw_wall_terms(TOP_RADIUS).values())
+SET_SCREW_ENGAGEMENT_D = set_screw_engagement_d(TOP_RADIUS)
+if SET_SCREW_ENGAGEMENT_D < SET_SCREW_MIN_ENGAGEMENT_D:
+    raise AssertionError(
+        f"apex set screw keeps {SET_SCREW_ENGAGEMENT_D:.2f}D of full thread "
+        f"at the printed worst case (< {SET_SCREW_MIN_ENGAGEMENT_D}D)"
+    )
+# Web between the tap and each strap face (z). The strap depth prints at .X
+# and the screw location at .XX from the strap inner face (both below), so
+# the outer web loses both bands. Target 2.0 / floor 1.5 (policy rule 12).
+_STRAP_DEPTH_BAND_MM = 0.8
+_SET_SCREW_LOCATION_BAND_MM = 0.51
+SET_SCREW_WEB_MM = min(
+    (STRAP_INNER_Z - SET_SCREW_Z) - _SET_SCREW_LOCATION_BAND_MM - _THREAD_HALF_MAJOR,
+    (STRAP_T - _STRAP_DEPTH_BAND_MM)
+    - (STRAP_INNER_Z - SET_SCREW_Z + _SET_SCREW_LOCATION_BAND_MM)
+    - _THREAD_HALF_MAJOR,
+)
+if SET_SCREW_WEB_MM < 2.0:
+    raise AssertionError(f"apex tap web {SET_SCREW_WEB_MM:.2f} < 2.0 target")
 
 SURFACE_FINISHES = (
     SurfaceFinishControl(
@@ -87,12 +160,13 @@ REFERENCE_SKETCHES = (
     "HoldDownReference",
     "HoleLateralReference",
     "BoreLateralReference",
+    "SetScrewReference",
 )
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "FootProfile": {"Width", "Depth"},
     "Foot": {"FootHt"},
-    # BoreHeight plus a concentric R10 crown and tangent sides defines the
+    # BoreHeight plus a concentric R11 crown and tangent sides defines the
     # complete upright profile without redundant endpoint widths.
     "BoreProfile": {"BoreDia", "BoreHeight"},
     # The crown: the dome boss's own diameter, printed radial on the arc.
@@ -101,6 +175,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "HoldDownReference": {"HoldDownLocation"},
     "HoleLateralReference": {"HoleLateral"},
     "BoreLateralReference": {"BoreLateral"},
+    "SetScrewReference": {"SetScrewLocation"},
 }
 
 # Decimal places ARE the tolerance statement (drawing-simplicity policy rule
@@ -117,14 +192,19 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "FootProfile": {"Width": 1, "Depth": 1},
     "Foot": {"FootHt": 1},
     "BoreProfile": {"BoreDia": 2, "BoreHeight": 2},
-    # One place (R10.0): the crown is a cosmetic envelope that only has to
-    # meet the tangent flanks; nothing mates to it.
+    # One place (R11.0): nothing mates to the crown, and the apex set screw's
+    # full thread is sized at this .X band's least radius
+    # (set_screw_wall_terms), so the general grade is enough.
     "DomeProfile": {"DomeDia": 1},
     "StrapDepthReference": {"StrapDepth": 1},
     # One place (.X, ±0.8): the base seat is transferred from this hole at
     # assembly, so its location only has to keep the webs, and the U27 worst
     # case at ±0.8 still leaves 5.0 to the strap root and to the ledge end.
     "HoldDownReference": {"HoldDownLocation": 1},
+    # Two places (.XX, +-0.51) on the apex set-screw tap's station off the
+    # strap inner face: at one place the strap's outer web under the tap
+    # would fall to 1.98, under the 2.0 target (SET_SCREW_WEB_MM).
+    "SetScrewReference": {"SetScrewLocation": 2},
     # Both lateral locations run off the foot's west side face (policy rule 7:
     # an origin is a feature, not the symmetry axis). One place: the drum x is
     # set with the arbor itself at assembly (DRO edge-find), so neither hole's
@@ -139,8 +219,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
 # spec owns the digit and the sheet passes it through instead of writing a
 # literal.
 DRAWING_REFERENCE_PRECISION: dict[str, int] = {
-    # Two places, like the axis height it is the sum of: a one-place (49.7)
-    # next to 39.72 + R10.0 reads as an arithmetic error on the print.
+    # Two places, like the axis height it is the sum of: a one-place (50.7)
+    # next to 39.72 + R11.0 reads as an arithmetic error on the print.
     "overall height": 2,
 }
 

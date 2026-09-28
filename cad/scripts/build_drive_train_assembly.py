@@ -532,93 +532,99 @@ REMOVABLE_Z0 = -157.5  # mounted T12 (face 5.0): band -157.5..-152.5, mid -155 =
 from build_cylinder_end_disc import DISC_DIA as END_DISC_DIA  # noqa: E402
 from build_cylinder_end_disc import DISC_THICK as END_DISC_THICK  # noqa: E402
 
-# Cylinder END DISCS (2026-09, ch13 page002_img01/img03, ch25 page001_img02):
-# the plain brass washer closing each end of the gear/rod sandwich, seated
-# END_DISC_AIR outboard of the END GEAR on the arbor (p.23 "back side": the
-# disc face sits right against the last gear's teeth, the pedestal further
-# out). Every drum gear is end-for-end: face z_j -+ DRUM_FACE/2, its cam on
-# the south side (z_j - DRUM_FACE/2 - cam), so the south disc clears gear 0's
-# cam and rod ring, the north disc gear 19's face. Beside the north pedestal
-# instead, the O60 disc fouled the cone-tip block (interference gate).
-from cylinder_gear_spec import CAM_THICKNESS as DRUM_CAM_T  # noqa: E402
+# The cylinder bank is a SOLID STACK (#743, cylinder_bank_layout): each
+# MHA-027 is one station pitch thick, cam face to back face, and a turned
+# MHA-121 thrust washer closes each end. The back (north) strap is the bank's
+# axial datum and the bank is modelled pushed back against it; the front
+# strap stands one BANK_END_FEELER leaf off the front washer. Every station
+# below is the layout module's, so the ladder, the washers, the straps, the
+# arbor and the apex set screws cannot drift apart. (Supersedes U34's
+# END_DISC_AIR split and its -72.652 / +75.202 strap stations.)
+import cylinder_bank_layout as _bank  # noqa: E402
 
-# U34 (pedestals inboard): each disc floats between its end unit and its
-# pedestal strap. The fitter sets 0.5-0.8 end play per end with a 0.025 in
-# (0.64) feeler, so the model splits that nominal evenly: END_DISC_AIR from the
-# end unit to the disc and the same air from the disc to the strap.
-END_DISC_AIR = 0.32
-END_DISC_SOUTH_Z0 = (
-    Z_DRUM0 - DRUM_FACE / 2.0 - DRUM_CAM_T - END_DISC_AIR - END_DISC_THICK
-)
-END_DISC_NORTH_Z0 = Z_DRUM0 + 19 * Z_PITCH + DRUM_FACE / 2.0 + END_DISC_AIR
+if abs(Z_DRUM0 - _bank.STATION_Z0) > 1e-9 or abs(Z_PITCH - _bank.BANK_PITCH) > 1e-9:
+    raise AssertionError("drive-train drum ladder left the cylinder-bank stations")
+if abs(END_DISC_THICK - (_bank.BACK_WASHER_Z[1] - _bank.BACK_WASHER_Z[0])) > 1e-9:
+    raise AssertionError("placed thrust washer is not the bank layout's washer")
+END_DISC_SOUTH_Z0 = _bank.FRONT_WASHER_Z[0]
+END_DISC_NORTH_Z0 = _bank.BACK_WASHER_Z[0]
 
 # Arbor pedestals (U34c, dt-bank-pedestal-layout-20260923 rev 3): the SAME
 # casting twice -- south as built, north rotated 180 about Y so its strap looks
-# south at the drum (PR8, ch12 img09). Each is anchored on its strap INNER face,
-# END_DISC_AIR outboard of its disc; the foot grows 28 outboard of that face and
-# carries one MHA-143 hold-down in a base seat transferred from the pedestal.
+# south at the drum (PR8, ch12 img09). Each is anchored on its strap INNER face
+# (#743 stations); the foot grows 28 outboard of that face and carries one
+# MHA-143 hold-down in a base seat transferred from the pedestal.
 from arbor_pedestal_spec import (  # noqa: E402
     FOOT_NEAR_Z as ARBOR_PED_FOOT_NEAR_Z,
     STRAP_INNER_Z as ARBOR_PED_STRAP_INNER_Z,
     STRAP_ROOT_Z as ARBOR_PED_STRAP_ROOT_Z,
 )
 
-ARBOR_STRAP_SOUTH_Z = END_DISC_SOUTH_Z0 - END_DISC_AIR  # -72.652
-ARBOR_STRAP_NORTH_Z = END_DISC_NORTH_Z0 + END_DISC_THICK + END_DISC_AIR  # +75.202
+ARBOR_STRAP_SOUTH_Z = _bank.FRONT_STRAP_INNER_Z  # -71.519
+ARBOR_STRAP_NORTH_Z = _bank.BACK_STRAP_INNER_Z  # +73.062
 # Pedestal ORIGINS: south at -ARBOR_PEDESTAL_Z (as built, local +Z = machine
 # +Z), north at +ARBOR_PEDESTAL_NORTH_Z (Ry180, local +Z = machine -Z).
-ARBOR_PEDESTAL_Z = -(ARBOR_STRAP_SOUTH_Z - ARBOR_PED_STRAP_INNER_Z)  # 80.652
-ARBOR_PEDESTAL_NORTH_Z = ARBOR_STRAP_NORTH_Z + ARBOR_PED_STRAP_INNER_Z  # 83.202
+ARBOR_PEDESTAL_Z = -_bank.FRONT_PEDESTAL_ORIGIN_Z  # 79.519
+ARBOR_PEDESTAL_NORTH_Z = _bank.BACK_PEDESTAL_ORIGIN_Z  # 81.062
 # Plan z band of each whole foot (strap inner face .. ledge end).
 ARBOR_PED_SOUTH_Z_BAND = (
     -ARBOR_PEDESTAL_Z + ARBOR_PED_FOOT_NEAR_Z,
     -ARBOR_PEDESTAL_Z + ARBOR_PED_STRAP_INNER_Z,
-)  # -100.652..-72.652
+)  # -99.519..-71.519
 ARBOR_PED_NORTH_Z_BAND = (
     ARBOR_PEDESTAL_NORTH_Z - ARBOR_PED_STRAP_INNER_Z,
     ARBOR_PEDESTAL_NORTH_Z - ARBOR_PED_FOOT_NEAR_Z,
-)  # +75.202..+103.202
-# The layout study's stations (rev 3 section 2) -- a derivation drift is loud.
-for _got, _want in (
-    (ARBOR_STRAP_SOUTH_Z, -72.652),
-    (ARBOR_STRAP_NORTH_Z, 75.202),
+)  # +73.062..+101.062
+if (
+    abs(-ARBOR_PEDESTAL_Z + ARBOR_PED_STRAP_INNER_Z - ARBOR_STRAP_SOUTH_Z) > 1e-9
+    or abs(ARBOR_PEDESTAL_NORTH_Z - ARBOR_PED_STRAP_INNER_Z - ARBOR_STRAP_NORTH_Z)
+    > 1e-9
 ):
-    if abs(_got - _want) > 0.005:
-        raise AssertionError(
-            f"arbor strap face {_got:.4f} drifted from the U34 station {_want}"
-        )
+    raise AssertionError("a pedestal origin no longer puts its strap on the bank face")
 
-# Dome cap screws (2026-09, ch13 page002_img01/img03, ch25 page002_img03): the
-# bright crown head on each pedestal's OUTER strap face, on the arbor axis --
-# it closes the blind arbor bore. Its 2.0 spigot must stop short of the arbor.
-from build_dome_cap_screw import STUB_LEN as CAP_STUB_LEN  # noqa: E402
+# The cylinder arbor (MHA-028) fills both strap bores and domes
+# ARBOR_DOME_HEIGHT proud of each strap's outer face (#743, superseding
+# U34b's "span less 6.0" and the MHA-125 dome cap screws: the dome IS the
+# arbor end). Its part origin is the cylinder's south end.
+from cylinder_gear_shaft_spec import SHAFT_DIA as ARBOR_DIA  # noqa: E402
 
-CAP_SOUTH_Z = -ARBOR_PEDESTAL_Z + ARBOR_PED_STRAP_ROOT_Z  # -82.652, +Y -> -Z
-CAP_NORTH_Z = ARBOR_PEDESTAL_NORTH_Z - ARBOR_PED_STRAP_ROOT_Z  # +85.202, +Y -> +Z
-
-# The cylinder arbor (MHA-028) is CUT TO FIT at assembly (U34b): the span over
-# both strap outer faces less 6.0, so it sits centred with ~7.0 in each strap.
-# The model carries the part's REF length and centres it the same way.
-from cylinder_gear_shaft_spec import SHAFT_LENGTH as ARBOR_LENGTH  # noqa: E402
-
-ARBOR_SOUTH_Z = CAP_SOUTH_Z + ((CAP_NORTH_Z - CAP_SOUTH_Z) - ARBOR_LENGTH) / 2.0
+ARBOR_LENGTH = _bank.ARBOR_LENGTH  # the cylinder; the domes stand past it
+ARBOR_SOUTH_Z = _bank.ARBOR_SOUTH_Z
 _ARBOR_NORTH = ARBOR_SOUTH_Z + ARBOR_LENGTH
-for _label, _engagement, _spigot_air in (
-    ("south", ARBOR_STRAP_SOUTH_Z - ARBOR_SOUTH_Z, ARBOR_SOUTH_Z - CAP_SOUTH_Z),
-    ("north", _ARBOR_NORTH - ARBOR_STRAP_NORTH_Z, CAP_NORTH_Z - _ARBOR_NORTH),
+for _label, _end, _outer in (
+    ("south", ARBOR_SOUTH_Z, -ARBOR_PEDESTAL_Z + ARBOR_PED_STRAP_ROOT_Z),
+    ("north", _ARBOR_NORTH, ARBOR_PEDESTAL_NORTH_Z - ARBOR_PED_STRAP_ROOT_Z),
 ):
-    # 6.0..8.0 seated per the cut-to-fit rule; the dome cap's spigot must
-    # still stop 0.25 short of the arbor end in the blind bore.
-    if not 6.0 <= _engagement <= 8.0:
-        raise AssertionError(
-            f"arbor {_label} engagement {_engagement:.3f} in its pedestal out of band"
-        )
-    if _spigot_air - CAP_STUB_LEN < 0.25:
-        raise AssertionError(f"{_label} dome cap spigot reaches the arbor end")
+    if abs(_end - _outer) > 1e-9:
+        raise AssertionError(f"arbor {_label} end is not flush with its strap face")
+# The apex set screws (MHA-147), one per crown at the strap's mid-depth, cup
+# point down on the arbor's top.
+from build_arbor_set_screw import LENGTH as SET_SCREW_LEN  # noqa: E402
+
+SET_SCREW_SOUTH_Z = _bank.FRONT_SET_SCREW_Z
+SET_SCREW_NORTH_Z = _bank.BACK_SET_SCREW_Z
+SET_SCREW_TIP_Y = Y_DRIVE + ARBOR_DIA / 2.0
+# The socket sits the layout's named height over the crown apex, exactly;
+# cylinder_bank_layout also proves the cup point spans the bore clearance.
+from arbor_pedestal_spec import BORE_HEIGHT as _PED_BORE_H  # noqa: E402
+from arbor_pedestal_spec import TOP_RADIUS as _PED_CROWN_R  # noqa: E402
+
+_CROWN_APEX_Y = Y_BASE_TOP + _PED_BORE_H + _PED_CROWN_R
+if abs(Y_DRIVE - (Y_BASE_TOP + _PED_BORE_H)) > 1e-6:
+    raise AssertionError("arbor pedestal bore is off the drive axis")
+if (
+    abs(SET_SCREW_TIP_Y + SET_SCREW_LEN - _CROWN_APEX_Y - _bank.SET_SCREW_SOCKET_PROUD)
+    > 1e-6
+):
+    raise AssertionError("arbor set screw's socket is not SET_SCREW_SOCKET_PROUD over the apex")
+if _bank.SET_SCREW_POINT_MARGIN < _bank.SET_SCREW_POINT_MARGIN_MIN:
+    raise AssertionError(
+        "arbor set screw's cup point spans the bore clearance by < SET_SCREW_POINT_MARGIN_MIN"
+    )
 if END_DISC_SOUTH_Z0 - ARBOR_STRAP_SOUTH_Z < 0.25:
-    raise AssertionError("south end disc reaches the south pedestal strap")
-if ARBOR_STRAP_NORTH_Z - (END_DISC_NORTH_Z0 + END_DISC_THICK) < 0.25:
-    raise AssertionError("north end disc reaches the north pedestal strap")
+    raise AssertionError("south thrust washer reaches the south pedestal strap")
+if abs(ARBOR_STRAP_NORTH_Z - (END_DISC_NORTH_Z0 + END_DISC_THICK)) > 1e-9:
+    raise AssertionError("north thrust washer does not bear on the datum strap")
 # Plan overlap, not z alone, against the rocker-arm-support foot (x 41.15..
 # 104.65 about SUPPORT_WORLD_X, z +-88.9): the north foot shares its z band but
 # stands ~89.5 away in x (study rev 3 section 6; the z-only test fired falsely).
@@ -1678,7 +1684,7 @@ if SPRING_BLADE_INSET < 0.0 or SPRING_BLADE_INSET + SPRING_W > STRAP_T:
     raise AssertionError("spring blade overhangs the strap flank axially")
 # The cylinder drum: the leaf rides axially PAST its last (j = 19) gear, so
 # the flexed blade can never meet the 120T tips; only the north end disc
-# (Ø55, END_DISC_AIR outboard of that gear) shares its z band.  Parked, the
+# (the Ø25 thrust washer against that gear) shares its z band.  Parked, the
 # crest and the flick tip also clear the tip circle itself in 2D; the engaged
 # blade is gated against the disc with the swing gates below.  Each books the
 # strip's full thickness on the east side.
@@ -2453,8 +2459,10 @@ async def build(adapter) -> dict[str, str]:
         label=f"arbor-pedestal north z={ARBOR_PEDESTAL_NORTH_Z:g}",
     )
     await _lock_static(adapter, north_pedestal, arbor)
-    # Cylinder end discs: one against each pedestal strap (END_DISC_AIR off),
-    # riding the arbor; retained like the pedestals (they turn with nothing).
+    # Thrust washers (MHA-121, #743): the front one on gear 0's cam face, the
+    # back one on gear 19's back face against the datum strap -- the bank
+    # modelled pushed back. They turn with nothing, so each is held like the
+    # pedestals: one lock to the fixed seed arbor.
     for _disc_z0, _end in ((END_DISC_SOUTH_Z0, "south"), (END_DISC_NORTH_Z0, "north")):
         end_disc = await place_component(
             adapter,
@@ -2463,30 +2471,22 @@ async def build(adapter) -> dict[str, str]:
             [0.0, 0.0, 0.0],
             IDENTITY,
             ground=False,
-            label=f"cylinder end disc {_end} z0={_disc_z0:.3f}",
+            label=f"cylinder thrust washer {_end} z0={_disc_z0:.3f}",
         )
         await _lock_static(adapter, end_disc, arbor)
-    # Dome cap screws: crown base on each strap's outer face, spigot into the
-    # blind bore (+Y turned outward: -Z south, +Z north).
-    for _cap_z, _euler, _rows, _end in (
-        (
-            CAP_SOUTH_Z,
-            [-90.0, 0.0, 0.0],
-            [[1.0, 0.0, 0.0], [0.0, 0.0, -1.0], [0.0, 1.0, 0.0]],
-            "south",
-        ),
-        (CAP_NORTH_Z, [90.0, 0.0, 0.0], ROT_X_POS90, "north"),
-    ):
-        cap = await place_component(
+    # Apex set screws (MHA-147, #743 Q3): point down through each crown onto
+    # the arbor's top at the strap's mid-depth; static like their pedestals.
+    for _screw_z, _end in ((SET_SCREW_SOUTH_Z, "south"), (SET_SCREW_NORTH_Z, "north")):
+        set_screw = await place_component(
             adapter,
-            "dome-cap-screw",
-            [X_DRUM, Y_DRIVE, _cap_z],
-            _euler,
-            _rows,
+            "arbor-set-screw",
+            [X_DRUM, SET_SCREW_TIP_Y, _screw_z],
+            [0.0, 0.0, 0.0],
+            IDENTITY,
             ground=False,
-            label=f"dome cap screw {_end} z={_cap_z:.3f}",
+            label=f"arbor set screw {_end} z={_screw_z:.3f}",
         )
-        await _lock_static(adapter, cap, arbor)
+        await _lock_static(adapter, set_screw, arbor)
     # The cone SWING PLATFORM is the swing bracket (ch.12, p.18 "pivot"):
     # floated so the whole cone set can swing horizontally out of mesh about
     # its tip-end vertical pivot (p1). Pinned at the engaged rest pose by a

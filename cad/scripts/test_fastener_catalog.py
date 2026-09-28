@@ -8,6 +8,7 @@ from _fastener_catalog import FASTENERS
 
 _EXPECTED = {
     # Stable production stem: (supplier SKU(s), MHA number, fleet quantity).
+    "arbor-set-screw": (("91375A106",), "MHA-147", 2),
     "boss-hook": (("9490T1",), "MHA-005", 1),
     "bracket-screw": (("90280A194",), "MHA-108", 2),
     "clamp-screw": (("90280A201",), "MHA-107", 6),
@@ -98,3 +99,47 @@ def test_vendor_readme_carries_no_unfilled_harvest_evidence() -> None:
     # placeholder token (HARVEST plus underscore) marks one never measured.
     readme = Path(__file__).resolve().parents[1] / "references" / "mcmaster" / "README.md"
     assert "HARVEST" + "_" not in readme.read_text(encoding="utf-8")
+
+
+def test_arbor_set_screw_is_the_verified_black_oxide_cup_point() -> None:
+    """#743: MHA-147 is McMaster 91375A106 (alloy, C45, black oxide, plain
+    cup), which bites the spotted steel arbor where an 18-8 cup would not.
+    No "PN TO VERIFY" survives in its identity."""
+    row = _config.parts("arbor-set-screw")
+    assert FASTENERS["arbor-set-screw"].material == "Alloy Steel"
+    assert "91375A106" in row["material_specification"]
+    for value in row.values():
+        assert "TO VERIFY" not in str(value).upper()
+
+
+def test_every_catalog_fastener_has_a_reference_sheet() -> None:
+    """Main on #743: every catalogue fastener ships a purchased reference
+    sheet, MHA-147 included, and a plain set screw's sheet is the shared
+    purchased-fastener builder's."""
+    from pathlib import Path
+
+    from _drawing_registry import DRAWINGS
+
+    sheets = {spec.artifact_stem: spec for spec in DRAWINGS}
+    assert set(FASTENERS) <= set(sheets)
+    spec = sheets["arbor-set-screw"]
+    assert (spec.name, spec.part) == ("arbor_set_screw", "arbor_set_screw")
+    script = Path(__file__).resolve().parent / spec.script_name
+    assert "build_purchased_fastener_drawing" in script.read_text(encoding="utf-8")
+
+
+def test_every_catalog_fastener_stamps_its_supplier_identity() -> None:
+    """build_purchased_fastener_drawing refuses a source part without the
+    Stock Name / Supplier / Supplier SKUs properties; a builder that does not
+    go through build_stock_fastener must stamp them itself."""
+    from pathlib import Path
+
+    scripts = Path(__file__).resolve().parent
+    for stem in FASTENERS:
+        source = (scripts / f"build_{stem.replace('-', '_')}.py").read_text(
+            encoding="utf-8"
+        )
+        if "build_stock_fastener" in source:
+            continue
+        for name in ('"Stock Name"', '"Supplier"', '"Supplier SKUs"'):
+            assert name in source, (stem, name)

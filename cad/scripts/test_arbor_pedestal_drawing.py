@@ -43,6 +43,7 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
         "HoldDownLocation",
         "HoleLateral",
         "BoreLateral",
+        "SetScrewLocation",
     }
     # The strap band is owned by its reference sketch, so the strap profile
     # stays unmarked.
@@ -63,6 +64,7 @@ def test_the_part_owns_every_printed_decimal_place() -> None:
         "HoldDownLocation": 1,
         "HoleLateral": 1,
         "BoreLateral": 1,
+        "SetScrewLocation": 2,
     }
     part_source = Path(part.__file__).read_text(encoding="utf-8")
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in part_source
@@ -100,7 +102,7 @@ def test_sheet_derived_dimensions_take_their_places_from_the_spec() -> None:
 
 
 def test_crown_radius_is_the_dome_diameter_printed_radial() -> None:
-    """#810 Codex l4afp follow-up (Main): the R10.0 crown is a controlling
+    """#810 Codex l4afp follow-up (Main): the R11.0 crown is a controlling
     dimension, so it is the dome boss's own DomeDia, imported and flipped to
     its radial form, never a radius the sheet measures off the arc."""
     spec = arbor_pedestal_spec
@@ -129,11 +131,14 @@ def test_manufacturing_locations_are_model_dimensions() -> None:
         "HoldDownReference": "HoldDownLocation",
         "HoleLateralReference": "HoleLateral",
         "BoreLateralReference": "BoreLateral",
+        "SetScrewReference": "SetScrewLocation",
     }
     assert spec.REFERENCE_SKETCHES == tuple(owned)
     for sketch, name in owned.items():
         assert spec.DRAWING_DIMENSIONS[sketch] == {name}
-        assert spec.DRAWING_PRECISION[sketch] == {name: 1}
+        # The apex tap's station prints at two places (SET_SCREW_WEB_MM).
+        places = 2 if name == "SetScrewLocation" else 1
+        assert spec.DRAWING_PRECISION[sketch] == {name: places}
     source = _drawing_source()
     assert "from _drawing_hidden_sketches import curate_view_dimensions" in source
     assert source.count("dimensions_by_feature=DRAWING_DIMENSIONS") == 2
@@ -154,6 +159,7 @@ def test_reference_lines_restate_the_geometry_their_equations_drive() -> None:
         "StrapInnerZ": spec.STRAP_INNER_Z,
         "StrapThickness": spec.STRAP_T,
         "ScrewZ": -spec.SCREW_Z,
+        "SetScrewZ": spec.SET_SCREW_Z,
     }
 
     def evaluate(expression: str) -> float:
@@ -165,6 +171,7 @@ def test_reference_lines_restate_the_geometry_their_equations_drive() -> None:
         "HoldDownLocation": spec.STRAP_INNER_Z - spec.SCREW_Z,
         "HoleLateral": spec.FOOT_WIDTH / 2.0,
         "BoreLateral": spec.FOOT_WIDTH / 2.0,
+        "SetScrewLocation": spec.STRAP_INNER_Z - spec.SET_SCREW_Z,
     }
     for sketch, plane, name, start, end, orientation, value, drives in part.REFERENCE_LINES:
         assert value == expected[name]
@@ -364,6 +371,7 @@ def test_every_annotation_anchor_prints_inside_the_sheet() -> None:
         "isometric view": drawing.ISO_CENTER,
         "bore lateral lane": drawing.BORE_LATERAL_XY,
         "hole lateral lane": drawing.HOLE_LATERAL_XY,
+        "set-screw callout": drawing.SET_SCREW_CALLOUT_XY,
     }
     for label, (x, y) in anchors.items():
         assert margin < x < template.width_m - margin, label
@@ -417,3 +425,39 @@ def test_crown_callout_says_where_the_tapered_flanks_start() -> None:
     assert "FOOT CORNERS" in drawing.CROWN_CALLOUT
     assert "TANGENT" in drawing.CROWN_CALLOUT
     assert not re.search(r"\d", drawing.CROWN_CALLOUT)
+
+
+def test_apex_set_screw_tap_keeps_1_5d_only_at_r11() -> None:
+    """#743 Q3 (user: "set screw located at apex of straps"): a #4-40 tap
+    through the crown onto the arbor. At the printed worst case (crown radius
+    .X low, bore at its maximum, both sags across the thread and a one-pitch
+    entry lost) the photographed R10 crown leaves 1.21D of full thread and
+    fails rule 12; R11 leaves 1.57D."""
+    spec = arbor_pedestal_spec
+    assert spec.TOP_RADIUS == 11.0
+    assert spec.SET_SCREW_THREAD == "#4-40"
+    assert spec.SET_SCREW_HOLE_SPEC.kind == "tapped"
+    # Through-next: the tap stops in the bore, never drills on into the strap.
+    assert spec.SET_SCREW_HOLE_SPEC.end == "through_next"
+    assert spec.set_screw_engagement_d(10.0) < 1.5 <= spec.SET_SCREW_ENGAGEMENT_D
+    assert round(spec.SET_SCREW_ENGAGEMENT_D, 2) == 1.57
+    assert round(spec.SET_SCREW_FULL_THREAD_MM, 2) == 4.46
+    terms = spec.set_screw_wall_terms(spec.TOP_RADIUS)
+    assert terms["crown radius at .X minimum"] == spec.TOP_RADIUS - 0.8
+    assert all(v < 0 for k, v in terms.items() if k != "crown radius at .X minimum")
+
+
+def test_apex_set_screw_sits_mid_strap_with_its_webs() -> None:
+    """The tap stands at the strap's mid-depth; its station prints at two
+    places so the outer web keeps the 2.0 target (1.98 at one place)."""
+    spec = arbor_pedestal_spec
+    assert spec.SET_SCREW_Z == (spec.STRAP_INNER_Z + spec.STRAP_ROOT_Z) / 2.0
+    assert spec.DRAWING_PRECISION_BY_NAME["SetScrewLocation"] == 2
+    assert spec.SET_SCREW_WEB_MM >= 2.0
+    assert round(spec.SET_SCREW_WEB_MM, 2) == 2.27
+    part_source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "wizard_hole_on_cylinder(" in part_source
+    assert '"SetScrewStationPlane", "Right Plane"' in part_source
+    source = _drawing_source()
+    assert 'label="apex set-screw tap"' in source
+    assert not re.search(r"\d", drawing.SET_SCREW_PROCESS)

@@ -28,6 +28,7 @@ from _drawing_common import (
 from _drawing_hidden_sketches import curate_view_dimensions
 from _surface_finish import surface_finish_by_key
 from _drawing_registry import DRAWINGS_BY_NAME
+from _hole_spec import blind_cut_dia_mm
 from arbor_pedestal_spec import (
     BORE_DIA,
     BORE_HEIGHT,
@@ -40,6 +41,8 @@ from arbor_pedestal_spec import (
     FOOT_WIDTH,
     SCREW_HOLE_DIA,
     SCREW_Z,
+    SET_SCREW_HOLE_SPEC,
+    SET_SCREW_Z,
     STRAP_INNER_Z,
     STRAP_ROOT_Z,
     SURFACE_FINISHES,
@@ -131,8 +134,14 @@ TOP_KEEP = {
         TOP_CENTER[0] - 0.036,
         _top_y((STRAP_INNER_Z + SCREW_Z) / 2.0),
     ),
+    # Right lanes, nested off the same far face: the apex set-screw tap's
+    # station (#743) inside, the strap band outside it.
+    "SetScrewLocation": (
+        TOP_CENTER[0] + 0.032,
+        _top_y((STRAP_INNER_Z + SET_SCREW_Z) / 2.0),
+    ),
     "StrapDepth": (
-        TOP_CENTER[0] + 0.036,
+        TOP_CENTER[0] + 0.050,
         _top_y((STRAP_INNER_Z + STRAP_ROOT_Z) / 2.0),
     ),
     "HoleLateral": HOLE_LATERAL_XY,
@@ -145,6 +154,11 @@ DIMENSION_CALLOUTS = {
     "BoreDia": "REAM THRU",
 }
 CROWN_CALLOUT = "SIDES TANGENT FROM FOOT CORNERS"
+# The apex tap runs down to the arbor bore and stops there; the MHA-147 cup
+# point's spot is drilled into the arbor at fit-up through this hole, so the
+# callout says where the thread ends and nothing more (digit-free, rule 6).
+SET_SCREW_PROCESS = "TAP TO BORE, AT CROWN APEX"
+SET_SCREW_CALLOUT_XY = (0.045, _top_y(STRAP_INNER_Z) - 0.007)
 
 
 def _set_reference_precision(display: Any, label: str) -> None:
@@ -478,6 +492,19 @@ async def build(adapter: Any) -> dict[str, str]:
         callout_xy=(TOP_CENTER[0] + 0.120, _top_y(SCREW_Z) + 0.012),
         label="flange hold-down hole",
         process="DRILL",
+    )
+    # Apex set-screw tap (#743): the plan sees it end-on at the crown apex.
+    # Its callout sits left of the plan, below the depth lanes' far-face
+    # extension lines, so the leader rises to the hole under the left lanes
+    # instead of crossing the right-hand strap and set-screw dimensions.
+    _tap_r = blind_cut_dia_mm(SET_SCREW_HOLE_SPEC) / 2.0 * _S
+    add_native_hole_callout(
+        adapter,
+        top,
+        edge_xy=(TOP_CENTER[0] - _tap_r, _top_y(SET_SCREW_Z)),
+        callout_xy=SET_SCREW_CALLOUT_XY,
+        label="apex set-screw tap",
+        process=SET_SCREW_PROCESS,
     )
     # Re-assert the display mode now the last annotation has landed: an
     # annotation attached after placement can leave a view's edge set

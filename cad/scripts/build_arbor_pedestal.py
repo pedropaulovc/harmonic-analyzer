@@ -84,6 +84,8 @@ from arbor_pedestal_spec import (
     SCREW_HOLE_DIA,
     SCREW_HOLE_SPEC,
     SCREW_Z,
+    SET_SCREW_HOLE_SPEC,
+    SET_SCREW_Z,
     STRAP_INNER_Z,
     STRAP_ROOT_Z,
     STRAP_T,
@@ -92,7 +94,14 @@ from arbor_pedestal_spec import (
     TAPER_TANGENT_Y,
     TOP_RADIUS,
 )
-from _holes import DIAMETER_TOLERANCE_MM, wizard_holes
+from _hole_spec import blind_cut_dia_mm
+from _visibility import blank_reference_geometry
+from _holes import (
+    DIAMETER_TOLERANCE_MM,
+    cross_hole_volume_mm3,
+    wizard_hole_on_cylinder,
+    wizard_holes,
+)
 import _telemetry
 
 PART_NAME = "arbor-pedestal"
@@ -108,10 +117,12 @@ CAD_APPEARANCE = (0.28, 0.28, 0.30)  # neutral charcoal keeps drawing edges legi
 # #8-32 x 3/4 fillister (McMaster 90280A197); the base seat under it is
 # transfer-punched through this hole at assembly.
 # SCREW_Z (spec): hole centre on the ledge, local z -11.
+# SET_SCREW_Z (spec): the #4-40 apex tap for the MHA-147 set screw (#743),
+# radial through the crown at the strap's mid-depth, local z +3.
 
 BORE_RADIUS = BORE_DIA / 2.0
 
-# The four drawing-reference lines (arbor_pedestal_spec.REFERENCE_SKETCHES):
+# The five drawing-reference lines (arbor_pedestal_spec.REFERENCE_SKETCHES):
 # (sketch, plane, dimension, start, end, orientation, value, drives). Points
 # are sketch coordinates -- the Top plane's sketch y is machine -Z, the Front
 # plane's is machine +Y. Every line lies on the part outline, so the view
@@ -161,6 +172,16 @@ REFERENCE_LINES = (
         "horizontal",
         FOOT_WIDTH / 2.0,
         ('"FootWidth" / 2', '"FootWidth" / 2'),
+    ),
+    (
+        "SetScrewReference",
+        "Top",
+        "SetScrewLocation",
+        (FOOT_WIDTH / 2.0, -STRAP_INNER_Z),
+        (FOOT_WIDTH / 2.0, -SET_SCREW_Z),
+        "vertical",
+        STRAP_INNER_Z - SET_SCREW_Z,
+        ('"StrapInnerZ" - "SetScrewZ"', '"FootWidth" / 2', '"StrapInnerZ"'),
     ),
 )
 if tuple(row[0] for row in REFERENCE_LINES) != REFERENCE_SKETCHES:
@@ -235,7 +256,7 @@ def _hide_reference_sketches(adapter) -> None:
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import ExtrusionParameters
+    from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
     check("create_part", await adapter.create_part())
 
@@ -256,6 +277,7 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "TangentX", f"{TAPER_TANGENT_X}mm")
     await set_global(adapter, "TangentY", f"{TAPER_TANGENT_Y}mm")
     await set_global(adapter, "ScrewZ", f"{-SCREW_Z}mm")
+    await set_global(adapter, "SetScrewZ", f"{SET_SCREW_Z}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -452,6 +474,40 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += screw_cut.placement_drive_jobs
     v_hole = math.pi * (SCREW_HOLE_DIA / 2.0) ** 2 * FOOT_HEIGHT
     volume = await volume_check(adapter, "screw hole", volume - v_hole, 0.02 * v_hole)
+
+    # Apex set-screw tap (#743, user ruling Q3): ONE native #4-40 tapped hole
+    # drilled radially down through the crown at the strap's mid-depth and
+    # stopped at the next surface -- the arbor bore -- so it never runs on
+    # into the strap below. The station plane carries the axial position;
+    # Right Plane clocks it to the apex.
+    check(
+        "create_plane SetScrewStationPlane",
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="offset", base_plane="Front Plane", offset=SET_SCREW_Z
+            )
+        ),
+    )
+    name_last_feature(adapter, "SetScrewStationPlane")
+    station_dim = name_dimensions(adapter, "SetScrewStationPlane", ["SetScrewZ"])
+    drive_jobs += [(station_dim[0], '"SetScrewZ"')]
+    wizard_hole_on_cylinder(
+        adapter,
+        SET_SCREW_HOLE_SPEC,
+        [0.0, BORE_HEIGHT + TOP_RADIUS, SET_SCREW_Z],
+        "apex set-screw tap (#4-40)",
+        name="SetScrewTap",
+        point_planes=("SetScrewStationPlane", "Right Plane"),
+    )
+    blank_reference_geometry(adapter, (("SetScrewStationPlane", "PLANE"),))
+    # The tap drill removes the crown wall between the crown and the bore:
+    # half of each perpendicular cross-hole volume, crown minus bore.
+    tap_dia = blind_cut_dia_mm(SET_SCREW_HOLE_SPEC)
+    v_tap = (
+        cross_hole_volume_mm3(tap_dia, 2.0 * TOP_RADIUS)
+        - cross_hole_volume_mm3(tap_dia, BORE_DIA)
+    ) / 2.0
+    volume = await volume_check(adapter, "apex set-screw tap", volume - v_tap, 0.03 * v_tap)
     v_final = volume
 
     for row in REFERENCE_LINES:

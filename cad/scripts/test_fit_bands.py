@@ -76,6 +76,13 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
     ("alignment_pinion_spec", "BASE_TANGENT_SPAN_BAND"): (
         "indexed into the span-measurement note text"
     ),
+    ("connecting_rod_spec", "RING_THICKNESS_BAND"): (
+        "indexed by cylinder_bank_layout for the thickest ring its cam slot holds"
+    ),
+    ("cylinder_gear_spec", "OVERALL_THICKNESS_BAND"): (
+        "centred (cylinder_bank_layout asserts it): indexed as the symmetric "
+        "tolerance and the fit-up mic limits"
+    ),
     ("pinion_arbor_spec", "DRUM_LEN_BAND"): "indexed into the drum-length limits",
     ("pinion_handle_geometry", "ROD_DIA_BAND"): (
         "indexed by pinion_arbor_spec for the cross-rod fit limits"

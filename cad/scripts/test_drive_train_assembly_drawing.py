@@ -51,7 +51,7 @@ def _instances(**overrides) -> list[spec.Instance]:
         "cylinder-gear-shaft": [(drum_x, 90.5, -86.9)],
         "arbor-pedestal": [(drum_x, 50.8, -87.4), (drum_x, 50.8, 100.6)],
         "cylinder-end-disc": [(drum_x, 90.5, -72.5), (drum_x, 90.5, 72.1)],
-        "dome-cap-screw": [(drum_x, 90.5, -89.4), (drum_x, 90.5, 102.6)],
+        "arbor-set-screw": [(drum_x, 95.3, -76.519), (drum_x, 95.3, 78.062)],
         "cylinder-gear": [(drum_x, 90.5, -64.0 + 7.0 * j) for j in range(20)],
         "foot-screw": [(7.49, 52.0, 74.0)],
         "pedestal-hold-down-screw": [(drum_x, 55.8, -91.652), (drum_x, 55.8, 94.202)],
@@ -155,12 +155,17 @@ def test_note_lines_fit_a_half_sheet_field() -> None:
 
 def test_sheet_numbers_are_pinned_where_the_sheets_cite_them() -> None:
     names = drawing.SHEET_NAMES
-    assert len(names) == 8
+    assert len(names) == 9
     assert names[drawing.SEQUENCE_SHEET - 1] == "ASSEMBLY SEQUENCE"
+    assert names[drawing.BANK_SHEET - 1] == "ASSEMBLY SEQUENCE CONT. - CYLINDER BANK"
     assert names[drawing.CHECKS_SHEET - 1] == "CHECKS + SETUP"
     assert names[drawing.FIT_SHEET - 1] == "ASSEMBLY SEQUENCE CONT. + FIT"
     assert sorted(drawing.CLUSTER_SHEETS.values()) == [3, 4, 5]
-    assert "SHEET 7" in drawing.BOM_REFERENCE_CAPTION
+    assert set(drawing.SHEET_SCALES) == set(names)
+    assert "BALLOONS ON SHEETS 3-5" in drawing.BOM_REFERENCE_CAPTION
+    assert f"STATIONS: SHEET {drawing.FIT_SHEET}" in drawing.BOM_REFERENCE_CAPTION
+    assert f"CYLINDER BANK: SHEET {drawing.BANK_SHEET}." in drawing.CONE_CRANK_STEPS
+    assert f"(STATION TABLE, SHEET {drawing.FIT_SHEET})" in drawing.CONE_CRANK_STEPS
     assert all(text.count(",") <= 1 for text in drawing.BOM_DESCRIPTIONS.values())
 
 
@@ -173,11 +178,33 @@ def test_rig_is_located_by_its_parked_tip_gap() -> None:
     steps = drawing.RIG_STEPS
     for phrase in ("TRANSFERRED", "2.5 FEELER", "ACCEPT 2.3-2.7", "#8-32", "#4-40"):
         assert phrase in steps, phrase
-    assert "ACCEPT 2.3-2.7 (SHEET 7, STEP 19)" in drawing.CHECKS
+    assert f"ACCEPT 2.3-2.7 (SHEET {drawing.FIT_SHEET}, STEP 19)" in drawing.CHECKS
     assert "19. FACE A MHA-002 TOOTH TIP" in steps
-    assert "SEE SHEET 8" in drawing.ASSEMBLED_HEADING
-    assert "SHEET 8" in drawing.RIG_STEPS
-    assert "SHEET 7" in drawing.BANK_STEPS
+    assert f"SEE SHEET {drawing.CHECKS_SHEET}" in drawing.ASSEMBLED_HEADING
+    assert f"SEE SHEET {drawing.CHECKS_SHEET}, EXTERNAL" in drawing.RIG_STEPS
+    assert f"PINION RIG: CONT. ON SHEET {drawing.FIT_SHEET}." in drawing.BANK_STEPS
+
+
+_SHEET_CITE = re.compile(r"SHEETS? \d")
+# The cluster sheets' balloon-count caption, not a cross-reference.
+_SHEET_CITE_EXEMPT = {"; ITEMS PER SHEET 2"}
+
+
+def test_no_sheet_number_is_typed_into_the_package_text() -> None:
+    """Every "SHEET n" a sheet prints comes from a *_SHEET constant, so adding
+    or moving a sheet can never leave a stale cross-reference (B1, #743).
+    Literal parts of f-strings are string constants too, so they are checked;
+    comments are not."""
+    tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
+    typed = [
+        node.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Constant)
+        and isinstance(node.value, str)
+        and _SHEET_CITE.search(node.value)
+        and node.value not in _SHEET_CITE_EXEMPT
+    ]
+    assert typed == []
 
 
 def test_drum_is_bonded_after_the_arbor_passes_the_front_strap() -> None:
@@ -199,8 +226,17 @@ def test_explode_plan_resolves_every_step_on_the_built_census() -> None:
     plan = spec.plan_explode(_instances())
     assert [step.label for step, _names in plan] == [s.label for s in spec.EXPLODE_STEPS]
     moved = {step.label: names for step, names in plan}
-    assert moved["south pedestal"] == ("arbor-pedestal-1", "pedestal-hold-down-screw-1")
-    assert moved["north pedestal"] == ("arbor-pedestal-2", "pedestal-hold-down-screw-2")
+    assert moved["south pedestal"] == (
+        "arbor-pedestal-1",
+        "arbor-set-screw-1",
+        "pedestal-hold-down-screw-1",
+    )
+    assert moved["north pedestal"] == (
+        "arbor-pedestal-2",
+        "arbor-set-screw-2",
+        "pedestal-hold-down-screw-2",
+    )
+    assert moved["apex set screws lift"] == ("arbor-set-screw-1", "arbor-set-screw-2")
     assert moved["pedestal screws lift"] == (
         "pedestal-hold-down-screw-1",
         "pedestal-hold-down-screw-2",
@@ -400,7 +436,12 @@ def test_every_text_sheet_places_a_view_for_its_title_block() -> None:
         for node in tree.body
         if isinstance(node, ast.FunctionDef) and node.name.startswith("_place_")
     }
-    for name in ("_place_sequence_sheet", "_place_fit_sheet", "_place_checks_sheet"):
+    for name in (
+        "_place_sequence_sheet",
+        "_place_bank_sheet",
+        "_place_fit_sheet",
+        "_place_checks_sheet",
+    ):
         calls = {
             call.func.id
             for call in ast.walk(placers[name])
@@ -592,3 +633,75 @@ def test_final_uncross_leaves_non_balloon_crossings_to_the_audit() -> None:
         _RebuildAdapter(), "SHEET", annotations, read_segments=crossed_with_a_note
     )
     assert annotations["DetailItem1"].position == (0.0, 1.0)
+
+
+def test_bank_fitup_limits_are_the_layout_bands() -> None:
+    """#743 steps 8-9 print cylinder_bank_layout's bands as limits, each
+    rounded inward so a part inside the print is inside the model band."""
+    import math
+
+    import cylinder_bank_layout as bank
+    import harmonic_base_spec as base
+
+    def limits(low: float, high: float, places: int) -> str:
+        scale = 10**places
+        return (
+            f"{math.ceil(low * scale - 1e-9) / scale:.{places}f}-"
+            f"{math.floor(high * scale + 1e-9) / scale:.{places}f}"
+        )
+
+    steps = drawing.BANK_STEPS
+    thickness = bank.OVERALL_THICKNESS
+    upper, lower = bank.OVERALL_THICKNESS_BAND
+    # 7.0565 +/-0.025 is exact at four places (user ruling L20 d').
+    assert limits(thickness + lower, thickness + upper, 4) in steps
+    assert limits(*bank.STACK_L20_ACCEPT, 2) in steps
+    short = f"SHORT OF {bank.STACK_L20_ACCEPT[0]:.2f}: REMAKE THE THINNEST GEAR"
+    assert short in " ".join(steps.split())
+    back_y = base.BOTTOM_REAR_Z - bank.BACK_STRAP_INNER_Z
+    band = bank.BACK_STRAP_LOCATE_BAND
+    assert f"Y {limits(back_y - band, back_y + band, 2)}" in steps
+    assert f"A {bank.BANK_END_FEELER:.2f} LEAF" in steps
+    assert f"A {bank.BANK_END_PLAY[0]:.2f} LEAF ENTERS" in steps
+    assert steps.index("BANK PUSHED BACK:") < steps.index(
+        f"A {bank.BANK_END_PLAY[0]:.2f} LEAF ENTERS"
+    )
+    assert f"A {bank.BANK_END_PLAY[1]:.2f} LEAF DOES NOT" in steps
+    for gone in ("MHA-125", "0.025", "-6.0", "END PLAY 0.5-0.8"):
+        assert gone not in steps, gone
+    assert "MHA-147" in steps
+    dome = f"{bank.ARBOR_DOME_HEIGHT:.1f}"
+    assert f"PLUS A {dome} DOME EACH END" in steps
+    assert f"EACH DOME STANDS {dome} PROUD" in steps
+
+
+def test_bank_drills_the_front_foot_with_the_loaded_mandrel_off_the_base() -> None:
+    """dtrefactor F1/F2 on #937: the loaded mandrel hangs from the back strap
+    until the front strap goes on, and its front end covers the front foot
+    hole, so it is propped, then lifted off for the drill and tap."""
+    steps = " ".join(drawing.BANK_STEPS.split())
+    prop = steps.index("PROP THE MANDREL FRONT END")
+    front_on = steps.index("9C. SLIDE THE FRONT MHA-004 ON")
+    spot = steps.index("SPOT AS 9A", front_on)
+    mandrel_off = steps.index("DRAW THE LOADED MANDREL OUT OF THE BACK MHA-004")
+    drill = steps.index("DRILL AND TAP AS 9A", mandrel_off)
+    back_in = steps.index("PASS THE MANDREL BACK THROUGH THE BACK MHA-004")
+    refit = steps.index("REFIT THE FRONT MHA-004; RE-SET THE LEAF AND X")
+    assert prop < front_on < spot < mandrel_off < drill < back_in < refit
+    assert "LIFT OFF, DRILL AND TAP" not in steps
+
+
+def test_ring_overhang_check_matches_the_cylinder_gear_print() -> None:
+    """dtrefactor F4 on #937: check 3 and the MHA-027 callout print the same
+    bound, the bank's RING_OVERHANG_MAX."""
+    import connecting_rod_spec as rod
+    import cylinder_bank_layout as bank
+    import cylinder_gear_notes
+
+    bound = f"{bank.RING_OVERHANG_MAX:.2f}"
+    checks = " ".join(drawing.CHECKS.split())
+    assert f"OVERHANG ITS CAM UP TO {bound} (AT LEAST" in checks
+    assert f"OVERHANGS CAM {bound} MAX" in cylinder_gear_notes.STACK_FIT_CALLOUT
+    on_cam = 100.0 * (rod.RING_THICKNESS - bank.RING_OVERHANG_MAX) / rod.RING_THICKNESS
+    assert f"AT LEAST {math.floor(on_cam)}% OF THE RING WIDTH" in checks
+    assert "0.56" not in checks

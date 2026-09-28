@@ -451,14 +451,17 @@ FOOT_SCREW_DRILL_DEPTH = seat_drill_depth(
 # fillister holds each arbor pedestal through its ledge hole. Machine frame,
 # like NAMEPLATE_SCREW_XZ (no _FORMER_ twin; the mechanism shift is already in
 # the drive train's stations): the drum axis x, and z = each strap inner face
-# (the drive train's end-disc stations -72.652 / +75.202) -+ the 19.0 from
-# that face to the ledge hole. The seats are TRANSFERRED from the fitted
-# pedestals at assembly, so the print gives no position. These are literals
-# because the base cannot import the drive train (it imports the base); the
-# drive train asserts them against its own derivation within 0.05 and
+# -+ the 19.0 from that face to the ledge hole. The strap faces are the
+# cylinder bank's own stack (#743, cylinder_bank_layout FRONT/BACK
+# _STRAP_INNER_Z). The seats are TRANSFERRED from the fitted pedestals at
+# assembly, so the print gives no position. These are literals because the
+# base cannot import the drive train (it imports the base), and importing the
+# bank layout would make the frame read machine/channels.yaml (its station
+# ladder; test_config_deps_recipe_digest_skips_unread_yaml); the drive train
+# asserts them against its own derivation within 0.05 and
 # test_drive_train_support_layout pins them within 0.005.
 _DRUM_AXIS_X = -54.7 + MECHANISM_X_SHIFT
-_PEDESTAL_STRAP_FACE_Z = (-72.652, 75.202)
+_PEDESTAL_STRAP_FACE_Z = (-71.519, 73.062)
 _PEDESTAL_LEDGE_OFFSET = PEDESTAL_STRAP_INNER_Z - PEDESTAL_LEDGE_SCREW_Z  # 19.0
 PEDESTAL_SCREW_XZ = (
     (_DRUM_AXIS_X, _PEDESTAL_STRAP_FACE_Z[0] - _PEDESTAL_LEDGE_OFFSET),
