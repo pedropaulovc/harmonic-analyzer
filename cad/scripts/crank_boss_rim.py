@@ -75,8 +75,8 @@ HEAD_EDGE_LOW = (
 HEAD_GROWTH = _row(post.DRAWING_PRECISION_BY_NAME["HeadDia"]) / 2.0
 BODY_GROWTH = _row(post.DRAWING_PRECISION_BY_NAME["MainBodyDia"]) / 2.0
 #   the cone boss's end faces, ConeBossLen at .X, symmetric about the post
-#   axis: the north one long carries the collar and the 64T with it; the
-#   boss itself, ConeBossDia at .X
+#   axis: the north end SHORT brings the seated collar and 64T toward the
+#   post; the boss itself, ConeBossDia at .X
 CONE_BOSS_END_GROWTH = _row(post.DRAWING_PRECISION_BY_NAME["ConeBossLen"]) / 2.0
 CONE_BOSS_GROWTH = _row(post.DRAWING_PRECISION_BY_NAME["ConeBossDia"]) / 2.0
 #   the 64T's station: the ONE input for how far it may stand toward the
@@ -85,7 +85,7 @@ CONE_BOSS_GROWTH = _row(post.DRAWING_PRECISION_BY_NAME["ConeBossDia"]) / 2.0
 #   face stands the boss end plus CollarWidth off the post axis.  Both
 #   joints are butts, nominally closed (build_drive_train_assembly asserts
 #   each; collar_contacts below reads their sum) and only ever opening, so
-#   they add nothing toward the post.  The stack is the boss end long by
+#   they add nothing toward the post. The stack is the boss end SHORT by
 #   its row and the collar thin by its own (Main's ruling (b), 2026-09-27).
 COLLAR_WIDTH_SHORT = _row(shaft.DRAWING_PRECISION_BY_NAME["CollarWidth"])
 GEAR64_STATION_TOWARD_POST = CONE_BOSS_END_GROWTH + COLLAR_WIDTH_SHORT
