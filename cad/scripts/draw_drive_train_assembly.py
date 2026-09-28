@@ -1824,6 +1824,7 @@ def _configure_view(
     return configuration
 
 
+@_telemetry.traced("drawing.isolate_instances", label_param="label")
 def _isolate_instances(adapter: Any, view: Any, names: frozenset[str], *, label: str) -> None:
     """Show exactly the named top-level instances in one drawing view.
 
