@@ -367,8 +367,11 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=seed_rim_bottom,
         # Steep drop between the 39.85 and 44.45 extension lines to a block
         # under the plate: the old down-right leader crossed 152.40's
-        # extension line (layout audit).
-        callout_xy=(0.286, 0.082),
+        # extension line (layout audit). The start-Z line, text outside its
+        # span, overshoots the plate end down to 0.0855; at 0.082 the
+        # callout's top row (to 0.0865) sat on it (text-on-line, run
+        # 20260928T130915425Z).
+        callout_xy=(0.286, 0.0785),
         label="spring-hole seed",
     )
     # The Top view reverses model Z, so -HOLE_Z_FIRST prints the seed hole at
