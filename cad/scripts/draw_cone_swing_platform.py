@@ -245,13 +245,14 @@ DETAIL_ARROWS_INSIDE = ("TipSlotW", "TipCboreW")
 # The cutter that sets each +0.10/0 width band, named by a leadered note
 # (2.5 mm text, anchored upper-left) in the open field right of the circle.
 # Each leader tip lands on the WEST (sheet-right) end arc of its slot, at a
-# sheet angle from that arc's centre.  A leadered note's INote.GetExtent --
-# what the layout audit boxes -- runs from its leader tip to its text, so two
-# notes whose texts sit on the same side of their tips nest (ec70186e: 65.5
-# x 12.1 mm overlap).  The slot note therefore rises from the arc's upper
-# quadrant to text above; the counterbore note drops from its lower quadrant
-# to text below, its leader crossing pivot-to-slot's dimension line (the only
-# path: below that line's foot sits the relief note).
+# sheet angle from that arc's centre.  Pivot-to-slot's extension lines
+# (y 0.033 and 0.055) and dimension line fence the arcs' lower quadrants in:
+# a counterbore leader from there crossed the 11.00's line (af13c8ff8
+# leader-crosses-line).  So both tips sit above the slot-centre extension
+# line and both texts above the 11.00's: the slot note's steeper leader to
+# the upper row, the counterbore's under it to the row between.  (ec70186e
+# failed this stacking only because the audit then boxed a leadered note by
+# its INote.GetExtent, tip included; it now boxes the text rows.)
 _WEST_ARC_CENTER = (DETAIL_CENTER[0] + 2.0 * _DETAIL_S, _SLOT_Y)
 
 
@@ -281,10 +282,11 @@ CUTTER_NOTES = (
     CutterNote(
         "cbore",
         f"<MOD-DIAM>{TIP_CBORE_W:g} END MILL C'BORE SLOT\nFROM UNDERSIDE",
-        (0.121, 0.047),
+        # Leader-crosses-line (af13c8ff8): was (0.121, 0.047) at -35 degrees.
+        (0.121, 0.0725),
         "TipScrewCbore",
         TIP_CBORE_W / 2.0,
-        -35.0,
+        20.0,
         None,  # the dashed arc: underside outline and floor edge project as one
     ),
 )

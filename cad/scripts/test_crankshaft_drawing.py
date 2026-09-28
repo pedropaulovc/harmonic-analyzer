@@ -198,11 +198,14 @@ def test_sheet_placements_stay_inside_the_border() -> None:
         assert inner[0] < x < inner[2] and inner[1] < y < inner[3]
         assert not (x >= title_block[0] and y <= title_block[1])
     # Both dragged diameters land on the section their profile sketch starts,
-    # so their axis-parallel extension lines hide under the silhouette.
+    # so their axis-parallel extension lines hide under the silhouette.  The
+    # Ø9.525's run from the dome root, so it sits LEFT of the cross-hole: its
+    # lines then stop short of the hole the callout's leader leaves (af13c8ff8
+    # leader-crosses-line).
     shaft_x = drawing.DIAMETER_POSITIONS["ShaftDiaDim"][0]
     seat_x = drawing.DIAMETER_POSITIONS["PinionSeatDiaDim"][0]
     hole_radius = drawing._PIN_HOLE_DIA * drawing.SHEET_SCALE[0] / 2000.0
-    assert drawing.PIN_X + hole_radius < shaft_x < drawing.SEAT_STEP_X
+    assert drawing.DOME_ROOT_X < shaft_x < drawing.PIN_X - hole_radius
     pinion_hole_left = drawing.PINION_PIN_HOLE_WINDOW[0]
     assert drawing.SEAT_STEP_X < seat_x < pinion_hole_left
     # The cross-hole callout sits right of the hole so its leader cannot run
@@ -309,8 +312,8 @@ def test_pinion_pin_hole_prints_the_shared_matched_fit_note() -> None:
     )
     assert drawing.BUSHING_END_X < drawing.PINION_PIN_X < drawing.FAR_END_X
     # The note block (top-left anchored; sized for up to 3.5 mm note text)
-    # stays inside its field: right of the Ø9.525 text, above its row,
-    # left of the isometric and inside the border.
+    # stays inside its field: right of the cross-hole callout's text, above
+    # the diameter row, left of the isometric and inside the border.
     lines = drawing.CRANKSHAFT_PIN_HOLE_PROCESS.split("\n")
     height = 0.0035
     char_w, line_h = 0.8 * height, 1.7 * height
@@ -318,7 +321,7 @@ def test_pinion_pin_hole_prints_the_shared_matched_fit_note() -> None:
     right = x0 + char_w * max(map(len, lines))
     bottom = y0 - line_h * len(lines)
     field_x0, field_y0, field_x1, field_y1 = drawing.PINION_PIN_NOTE_FIELD
-    assert field_x0 == pytest.approx(drawing.DIAMETER_POSITIONS["ShaftDiaDim"][0] + 0.026)
+    assert field_x0 == pytest.approx(drawing.HOLE_CALLOUT_XY[0] + 0.032)
     assert field_x1 == pytest.approx(drawing.ISO_CENTER[0] - 0.012)
     assert field_y1 < 0.2667
     assert field_x0 < x0 and right < field_x1

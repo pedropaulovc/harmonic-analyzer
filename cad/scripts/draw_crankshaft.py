@@ -156,11 +156,14 @@ SIDE_KEEP = {
 # it, so each must sit on the section that sketch starts: the Ø9.525 circle
 # lies at the dome root, and placed on the far-end seat its extension lines
 # drew solid through the journal (run 20260923T031747843Z-94724e44).
-# Ø9.525 on the core right of the cross-hole; the Ø9.0 seat's on the seat,
-# left of the pinion pin hole.
+# Ø9.525 on the core LEFT of the cross-hole, between the dome root (where its
+# extension lines start) and the hole: placed right of the hole those lines
+# ran along the silhouette over it, and the hole callout's leader had to cross
+# one (leader-crosses-line, af13c8ff8).  The Ø9.0 seat's on the seat, left of
+# the pinion pin hole.
 _DIAMETER_ROW_Y = (0.212,)
 DIAMETER_POSITIONS = {
-    "ShaftDiaDim": (PIN_X + 0.040, _DIAMETER_ROW_Y[0]),
+    "ShaftDiaDim": (PIN_X - 0.016, _DIAMETER_ROW_Y[0]),
     "PinionSeatDiaDim": (SEAT_STEP_X + 0.010, _DIAMETER_ROW_Y[0]),
 }
 CALLOUTS_ABOVE: dict[str, str] = {}
@@ -168,12 +171,13 @@ CALLOUTS_BELOW = {"OverallLength": "OVERALL"}
 # The finish rides the inboard land (crankshaft_spec.SURFACE_FINISHES).
 FINISH_PICK = (BUSHING_END_X - 0.030, SHAFT_FLANK_Y)
 FINISH_SYMBOL = (BUSHING_END_X - 0.033, 0.200)
-# Text centred up-right of the cross-hole, above the Ø9.525 dimension: the
-# callout's leader leaves the text's left end and runs down-left at ~64 deg
-# through the hole centre, a clean crossing of the 118.0 station's extension
-# line rather than a near parallel one (run 20260923T030252135Z-49e46990),
-# left of the Ø9.525 text and clear of the SR on the left.
-HOLE_CALLOUT_XY = (PIN_X + 0.054, 0.247)
+# Text centred up-right of the cross-hole: the callout's leader leaves the
+# text's left end and runs down-left at ~53 deg through the hole centre, a
+# clean crossing of the 118.0 station's extension line rather than a near
+# parallel one (run 20260923T030252135Z-49e46990), 4 mm clear of the Ø9.525
+# shoulder on its left.  18 mm right of its old spot so that leader clears
+# the moved Ø9.525 text (leader-crosses-line, af13c8ff8).
+HOLE_CALLOUT_XY = (PIN_X + 0.072, 0.247)
 # The 16T retention-pin hole is match-drilled through the seated pinion's
 # boss at assembly, so the sheet prints the pinion sheet's own matched-fit
 # note with the mates swapped (crank_pinion_spec.CRANKSHAFT_PIN_HOLE_PROCESS,
@@ -183,8 +187,9 @@ HOLE_CALLOUT_XY = (PIN_X + 0.054, 0.247)
 # review of 4d4e038e3).  The note is attached to the hole's own visible rim edge: a radial hole in a
 # round shaft has a saddle rim, not a circle, so a native Hole Wizard
 # callout cannot bind to it (run1-61671871a).  Its TEXT sits, anchored
-# upper-left, in the free field above the far-end seat, right of the Ø9.525
-# text and left of the isometric; it is placed from its own measured box.
+# upper-left, in the free field above the far-end seat, right of the cross-hole
+# callout's text (which spans ~30 mm right of its centre) and left of the
+# isometric; it is placed from its own measured box.
 # Its leader must end on the hole, which the side view shows straddling the
 # axis -- below the field's floor -- so the leader is held to the hole's
 # window instead (run1b-e7fd1a2ec: the leader tip, not the text, read 0.3 mm
@@ -192,7 +197,7 @@ HOLE_CALLOUT_XY = (PIN_X + 0.054, 0.247)
 PINION_PIN_X = _sheet_x(PINION_PIN_STATION_Y)
 PINION_PIN_NOTE_XY = (0.258, 0.250)
 PINION_PIN_NOTE_FIELD = (
-    DIAMETER_POSITIONS["ShaftDiaDim"][0] + 0.026,
+    HOLE_CALLOUT_XY[0] + 0.032,
     SIDE_CENTER[1],
     ISO_CENTER[0] - 0.012,
     0.2657,  # 1 mm inside the ASME B inner border
