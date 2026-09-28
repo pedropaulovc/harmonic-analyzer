@@ -237,11 +237,15 @@ _DRAWING_OWN_ROW_READERS = {
     # _config.parts(stock.part_name) after the source identity check
     # (spec.source.stem == stock.part_name).
     "_purchased_fastener_drawing.py",
+    # save_simplified_part(adapter, name, ...) forwards to save_part_and_images:
+    # same callers, same pin.
+    "_drawing_simplified.py",
 }
 # Registry-reading helper -> index of its part-name argument.
 _OWN_ROW_HELPERS = {
     "part_properties": 0,
     "save_part_and_images": 1,
+    "save_simplified_part": 1,
     "apply_drawing_properties": 1,
 }
 

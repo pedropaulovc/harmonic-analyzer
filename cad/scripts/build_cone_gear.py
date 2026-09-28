@@ -96,6 +96,7 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
 )
+from _drawing_simplified import add_simplified_configurations, assert_simplified_configurations
 from _fit_limits import deviations
 from _grouped_bom_properties import apply_grouped_bom_properties
 from _part_pmi import author_part_pmi
@@ -204,6 +205,8 @@ DEFAULT_TEETH = CONFIGURATION_TEETH[-1]
 TOOTH_GAP_PROFILE = "ToothGapProfile"
 TOOTH_GAP_CUT = "ToothGapCut"
 TOOTH_PATTERN_FEATURE = "ToothGapPattern"
+# Suppressed in each configuration's derived drawing configuration.
+SIMPLIFIED_FEATURES = (TOOTH_GAP_CUT, TOOTH_PATTERN_FEATURE)
 _TOL_LIMIT = 3  # swTolType_e.swTolLIMIT
 _SET_IN_SPECIFIC_CONFIGURATIONS = 3  # swSetValueInConfiguration_e
 _VISIBILITY_HIDDEN = 1  # swVisibilityState_e
@@ -1519,6 +1522,10 @@ async def build(adapter) -> dict[str, str]:
                 "Material Specification": material_specification(teeth),
             },
         )
+    # Each T-configuration's derived "<T> Simplified" (teeth suppressed) is
+    # what the drive-train drawing's small line views print; it inherits the
+    # grouped BOM identity and the per-configuration properties set above.
+    add_simplified_configurations(adapter, PART_NAME, SIMPLIFIED_FEATURES)
     artefacts.update(await save_part_and_images(adapter, PART_NAME))
     part_path = artefacts["part"]
     # save_part_and_images rebuilt every stale configuration, each inactive
@@ -1531,7 +1538,7 @@ async def build(adapter) -> dict[str, str]:
     manager = _early_bound(model.ConfigurationManager, "IConfigurationManager")
     if not bool(manager.AddRebuildSaveMark(2, "")):
         raise RuntimeError("failed to set all-configuration rebuild-save marks")
-    for name, _teeth in CONFIGS:
+    for name in [str(name) for name in (model.GetConfigurationNames() or ())]:
         raw_configuration = model.GetConfigurationByName(name)
         if raw_configuration is None:
             raise RuntimeError(f"{name}: configuration missing while setting save marks")
@@ -1557,6 +1564,7 @@ async def build(adapter) -> dict[str, str]:
     check("reopen saved cone-gear", await adapter.open_model(part_path))
     assert_saved_configurations_regenerate(adapter, PART_NAME)
     await assert_saved_configuration_topology(adapter, phase="reopened")
+    assert_simplified_configurations(adapter, PART_NAME, SIMPLIFIED_FEATURES)
 
     if findings:
         summary = "; ".join(findings)

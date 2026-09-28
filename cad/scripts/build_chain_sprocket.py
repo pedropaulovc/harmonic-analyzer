@@ -41,10 +41,10 @@ from _common import (
     name_last_feature,
     report_mass_properties,
     run_build,
-    save_part_and_images,
     set_global,
     set_sketch_direct_db,
 )
+from _drawing_simplified import save_simplified_part
 from _gear import volume_check
 
 PART_NAME = "chain-sprocket"
@@ -204,7 +204,7 @@ async def build(adapter) -> dict[str, str]:
 
     from _gear import pattern_about_z
 
-    await pattern_about_z(
+    tooth_pattern = await pattern_about_z(
         adapter, roller_notch, TEETH, OUTER_RADIUS, FACE_WIDTH / 2.0
     )
     v_teeth = v_blank - TEETH * notch_area_in_disc() * FACE_WIDTH
@@ -242,7 +242,9 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
-    return await save_part_and_images(adapter, PART_NAME)
+    return await save_simplified_part(
+        adapter, PART_NAME, (roller_notch, str(tooth_pattern.name))
+    )
 
 
 if __name__ == "__main__":

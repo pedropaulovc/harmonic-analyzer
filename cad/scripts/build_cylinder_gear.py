@@ -95,7 +95,6 @@ from _common import (
     name_dimensions,
     report_mass_properties,
     run_build,
-    save_part_and_images,
     set_global,
     set_sketch_direct_db,
 )
@@ -109,6 +108,7 @@ from _drawing_marks import (
     set_dimension_symmetric_angular_tolerance,
     set_dimension_symmetric_tolerance,
 )
+from _drawing_simplified import save_simplified_part
 from _fit_limits import deviations
 from _gear import build_fixed_gear, volume_check
 from _part_pmi import author_part_pmi
@@ -291,7 +291,8 @@ async def build(adapter) -> dict[str, str]:
     # print needs the original ±0.05 blank width.  Give the first extrusion and
     # its depth stable semantic names, then drive and tolerance that real model
     # dimension.
-    v_teeth = await build_fixed_gear(adapter, TEETH, FACE_WIDTH, dp=DP)
+    disc = await build_fixed_gear(adapter, TEETH, FACE_WIDTH, dp=DP)
+    v_teeth = disc.volume
     _feature_by_name(adapter, "Boss-Extrude1").Name = "GearBlank"
     _telemetry.success("feature 'Boss-Extrude1' -> 'GearBlank'")
     gear_depth = name_dimensions(adapter, "GearBlank", ["FaceWidth"])
@@ -631,7 +632,7 @@ async def build(adapter) -> dict[str, str]:
         PART_NAME,
         {"Gear Data": GEAR_DATA, "Manufacturing Notes": DRAWING_NOTES},
     )
-    return await save_part_and_images(adapter, PART_NAME)
+    return await save_simplified_part(adapter, PART_NAME, disc.tooth_features)
 
 
 if __name__ == "__main__":

@@ -48,7 +48,6 @@ from _common import (
     name_last_feature,
     report_mass_properties,
     run_build,
-    save_part_and_images,
     set_global,
     set_sketch_direct_db,
 )
@@ -61,6 +60,7 @@ from _drawing_marks import (
     set_dimension_bilateral_tolerance,
     set_dimension_symmetric_tolerance,
 )
+from _drawing_simplified import save_simplified_part
 from _fit_limits import deviations
 from _gear import build_fixed_gear, volume_check
 from _holes import cross_hole_volume_mm3, wizard_hole_on_cylinder
@@ -160,9 +160,10 @@ async def build(adapter) -> dict[str, str]:
     # The pinion stays a plain straight spur otherwise -- the book's
     # removable "gear on the crankshaft can be changed" stock member; the
     # crossing accommodation (helix + backlash) lives on the 64T.
-    volume = await build_fixed_gear(
+    disc = await build_fixed_gear(
         adapter, TEETH, FACE_WIDTH, dp=DP, pa_deg=PA_DEG, root_relief=True,
     )
+    volume = disc.volume
 
     # build_fixed_gear is shared by five recipes, so it leaves the blank under
     # the adapter's default names. Name the blank extrude and its absorbed
@@ -436,7 +437,7 @@ async def build(adapter) -> dict[str, str]:
         {"Gear Data": GEAR_DATA, "Manufacturing Notes": DRAWING_NOTES},
     )
     await assert_boss_present(adapter, "crank pinion before save")
-    return await save_part_and_images(adapter, PART_NAME)
+    return await save_simplified_part(adapter, PART_NAME, disc.tooth_features)
 
 
 if __name__ == "__main__":

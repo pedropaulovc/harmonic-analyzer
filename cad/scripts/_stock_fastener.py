@@ -21,11 +21,17 @@ from _common import (
     report_mass_properties,
     save_part_and_images,
 )
+from _drawing_simplified import save_simplified_part
 from _visibility import FeatureWalk
 
 
 type RecipeAuthor = Callable[..., Awaitable[None]]
 type Vector3 = tuple[float, float, float]
+
+# The helical groove every threaded McMaster replay cuts
+# (diag_mcmaster_lib.thread_sweep_cut*): the only feature the drawing-view
+# configuration suppresses on a fastener.
+THREAD_FEATURE = "ThreadGroove"
 
 
 @dataclass(frozen=True, slots=True)
@@ -560,4 +566,9 @@ async def build_stock_fastener(
         },
     )
     await report_mass_properties(adapter)
-    return await save_part_and_images(adapter, part_name)
+    # The McMaster replays name their helical thread cut THREAD_FEATURE; a
+    # threaded fastener's "<cfg> Simplified" suppresses it for assembly views.
+    part = _early_bound(adapter.currentModel, "IPartDoc")
+    if part.FeatureByName(THREAD_FEATURE) is None:
+        return await save_part_and_images(adapter, part_name)
+    return await save_simplified_part(adapter, part_name, (THREAD_FEATURE,))
