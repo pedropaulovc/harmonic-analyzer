@@ -107,23 +107,50 @@ class _Reader:
     def __init__(self, adapter: Any) -> None:
         self.adapter = adapter
         self.errors: dict[str, int] = {}
+        # accessor -> [calls, seconds] over the whole collection: the one
+        # attribution of layout.collect_com's time (8 s a sheet, 1.4 h a day
+        # on 2026-09-27) to the reads that spend it.
+        self.cost: dict[str, list[float]] = {}
+        self.owners: dict[str, list[float]] = {}
 
     def _count(self, name: str) -> None:
         self.errors[name] = self.errors.get(name, 0) + 1
 
+    def _spent(self, name: str, started: float) -> None:
+        entry = self.cost.get(name)
+        if entry is None:
+            entry = self.cost[name] = [0, 0.0]
+        entry[0] += 1
+        entry[1] += time.perf_counter() - started
+
     def call(self, fn: Callable[[], Any], default: Any = None, *, name: str = "", required: bool = False) -> Any:
+        name = name or _accessor(fn)
+        started = time.perf_counter()
         try:
             value = fn()
         except Exception:
-            self._count(name or _accessor(fn))
+            self._spent(name, started)
+            self._count(name)
             return default
+        self._spent(name, started)
         if value is None and required:
-            self._count(name or _accessor(fn))
+            self._count(name)
         return default if value is None else value
 
     def need(self, fn: Callable[[], Any], default: Any = None, *, name: str = "") -> Any:
         """``call`` for a read whose ``None`` loses ink or text."""
         return self.call(fn, default, name=name, required=True)
+
+    def optional(self, fn: Callable[[], Any]) -> Any:
+        """A read whose refusal loses nothing (the audit falls back), so it is
+        never counted as a ``com-read-errors`` refusal."""
+        started = time.perf_counter()
+        try:
+            return fn()
+        except Exception:
+            return None
+        finally:
+            self._spent(_accessor(fn), started)
 
     def first(self, fns: list[Callable[[], Any]], *, name: str) -> Any:
         """The first of some ARRAY-returning overloads that answers (a scalar 0
@@ -134,11 +161,16 @@ class _Reader:
         the next overload, but is returned, uncounted, when none answers with
         data; only raising or None from every overload is a refusal."""
         empty = None
-        for fn in fns:
+        for position, fn in enumerate(fns):
+            # Cost per overload position: ``name#0`` refusing on every row
+            # is a fallback paid once per primitive.
+            started = time.perf_counter()
             try:
                 value = fn()
             except Exception:
+                self._spent(f"{name}#{position}", started)
                 continue
+            self._spent(f"{name}#{position}", started)
             if value:
                 return value
             if value is not None and empty is None:
@@ -150,11 +182,40 @@ class _Reader:
     def bind(self, obj: Any, interface: str) -> Any:
         if obj is None:
             return None
+        started = time.perf_counter()
         try:
             return _early_bound(obj, interface)
         except Exception:
             self._count(f"bind {interface}")
             return None
+        finally:
+            self._spent(f"bind {interface}", started)
+
+    def dumped(self, owner: str, started: float) -> None:
+        """One whole annotation dump, attributed to its ``swAnnotationOwner_e``
+        (0 view, 1 sheet, 2 template)."""
+        entry = self.owners.get(owner)
+        if entry is None:
+            entry = self.owners[owner] = [0, 0.0]
+        entry[0] += 1
+        entry[1] += time.perf_counter() - started
+
+    def cost_attributes(self, top: int = 12) -> dict[str, float]:
+        """The ``top`` costliest accessors as span attributes, plus totals
+        and the per-owner annotation dump cost."""
+        ranked = sorted(self.cost.items(), key=lambda item: item[1][1], reverse=True)
+        attributes: dict[str, float] = {
+            "com.calls": int(sum(calls for calls, _ in self.cost.values())),
+            "com.s": round(sum(seconds for _, seconds in self.cost.values()), 3),
+        }
+        for owner, (count, seconds) in sorted(self.owners.items()):
+            attributes[f"annotations.{owner}.n"] = int(count)
+            attributes[f"annotations.{owner}.s"] = round(seconds, 3)
+        for name, (calls, seconds) in ranked[:top]:
+            key = name.replace(" ", "_")
+            attributes[f"com.{key}.calls"] = int(calls)
+            attributes[f"com.{key}.s"] = round(seconds, 3)
+        return attributes
 
     def take_errors(self) -> dict[str, int]:
         errors, self.errors = self.errors, {}
@@ -163,15 +224,6 @@ class _Reader:
 
 def _accessor(fn: Callable[[], Any]) -> str:
     return fn.__code__.co_names[-1] if fn.__code__.co_names else "?"
-
-
-def _optional(fn: Callable[[], Any]) -> Any:
-    """A read whose refusal loses nothing (the audit falls back), so it is
-    never counted as a ``com-read-errors`` refusal."""
-    try:
-        return fn()
-    except Exception:
-        return None
 
 
 def _dump_display(reader: _Reader, data: Any) -> dict[str, Any]:
@@ -209,7 +261,7 @@ def _dump_display(reader: _Reader, data: Any) -> dict[str, Any]:
         # The run's own width (MHA-062, gdtdiag2: "BOTH CROWNS" 34.1 mm, as
         # printed). Its GetTextInBoxHeightAtIndex twin read 0.0 there, so the
         # height stays GetTextHeightAtIndex.
-        width = _optional(lambda i=index: data.GetTextInBoxWidthAtIndex(i))
+        width = reader.optional(lambda i=index: data.GetTextInBoxWidthAtIndex(i))
         if width:
             texts[-1]["w"] = round(float(width), 7)
     if texts:
@@ -229,6 +281,7 @@ def annotation_display(adapter: Any, annotation: Any) -> tuple[dict[str, Any], d
 
 
 def _dump_annotation(reader: _Reader, raw: Any) -> dict[str, Any] | None:
+    started = time.perf_counter()
     annotation = reader.bind(raw, "IAnnotation")
     if annotation is None:
         return None
@@ -276,6 +329,7 @@ def _dump_annotation(reader: _Reader, raw: Any) -> dict[str, Any] | None:
                 "x_label": str(reader.call(lambda: origin.XLabel, "")),
                 "y_label": str(reader.call(lambda: origin.YLabel, "")),
             }
+    reader.dumped(f"owner{record['owner_type']}", started)
     return record
 
 
@@ -397,13 +451,21 @@ def collect_sheet_dumps(
         pages = read_pdf_ink(pdf)
         span.set_attribute("pages", len(pages))
     with _telemetry.span("layout.collect_com", stem=stem) as span:
-        dumps = _collect_com(adapter, stem=stem, pdf=pdf, pages=pages, sheet_layouts=sheet_layouts, is_pictorial=is_pictorial)
+        reader = _Reader(adapter)
+        try:
+            dumps = _collect_com(
+                adapter, reader, stem=stem, pdf=pdf, pages=pages, sheet_layouts=sheet_layouts, is_pictorial=is_pictorial
+            )
+        finally:
+            for key, value in reader.cost_attributes().items():
+                span.set_attribute(key, value)
         span.set_attribute("sheets", len(dumps))
     return dumps
 
 
 def _collect_com(
     adapter: Any,
+    reader: _Reader,
     *,
     stem: str,
     pdf: Path,
@@ -411,7 +473,6 @@ def _collect_com(
     sheet_layouts: Mapping[str, DrawingLayout],
     is_pictorial: Callable[[str], bool],
 ) -> list[dict[str, Any]]:
-    reader = _Reader(adapter)
     ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
     # GetViews' sheet order is undetermined; the PDF prints GetSheetNames order.
     # Both are read strictly: a tolerant empty answer would audit no sheet and
