@@ -35,6 +35,7 @@ from channel_assembly_steps import NORTH_BRACKET_SET_KEY
 from _common import _early_bound, check, run_build
 from _drawing_common import (
     SIMPLIFIED_VIEW_CONFIGURATION,
+    BalloonLanding,
     DrawingOutputs,
     ViewRole,
     _SW_SHADED_EDGES,
@@ -42,6 +43,7 @@ from _drawing_common import (
     _spread_balloons,
     add_component_bom_balloons,
     apply_view_configuration,
+    assert_balloon_landings,
     assert_full_detail_view,
     balloon_item_resolved,
     check_drawing_layout,
@@ -2265,9 +2267,10 @@ def _balloon_cluster_sheet(
     *,
     bom_name: str,
     items: dict[str, str],
-) -> dict[str, Any]:
+) -> tuple[dict[str, Any], list[BalloonLanding]]:
     """Link one fitted cluster view (``_fit_cluster_view``) to the BOM and
-    balloon it; return its balloons by note name."""
+    balloon it; return its balloons by note name, and their landings for
+    ``finalize_drawing`` to prove again after the last rebuild."""
     number = CLUSTER_SHEETS[cluster]
     _activate_sheet(adapter, SHEET_NAMES[number - 1])
     label = f"{cluster} exploded isometric"
@@ -2278,7 +2281,7 @@ def _balloon_cluster_sheet(
         key=lambda stem: int(items[stem]),
     )
     balloon_items = tuple((stem, items[stem]) for stem in stems)
-    balloons = add_component_bom_balloons(
+    landings = add_component_bom_balloons(
         adapter,
         view,
         items=balloon_items,
@@ -2286,6 +2289,7 @@ def _balloon_cluster_sheet(
         label=f"drive-train {cluster} BOM coverage",
         margin=CLUSTER_BALLOON_MARGIN,
     )
+    balloons = [landing.note for landing in landings]
     # One ring over every balloon at this sheet's clearance; the shared call
     # above ringed them at the default.
     _spread_balloons(
@@ -2304,7 +2308,7 @@ def _balloon_cluster_sheet(
         f"{CLUSTER_TITLES[cluster]} - EXPLODED ISOMETRIC "
         f"{_scale_text(scale)}; ITEMS PER SHEET 2",
     )
-    return _balloon_annotations(balloons)
+    return _balloon_annotations(balloons), landings
 
 
 def _place_sequence_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
@@ -2451,8 +2455,11 @@ def _place_full_detail_sheet(adapter: Any) -> tuple[float, float]:
     return scale
 
 
-def _place_package(adapter: Any, facts: SourceFacts) -> dict[str, tuple[float, float]]:
-    """Place every sheet; return each sheet's scale as placed.
+def _place_package(
+    adapter: Any, facts: SourceFacts
+) -> tuple[dict[str, tuple[float, float]], list[BalloonLanding]]:
+    """Place every sheet; return each sheet's scale as placed, and every
+    balloon landing.
 
     Every view is placed and pointed at its policy configuration first, then
     the cluster views are exploded, isolated and fitted, and only then is the
@@ -2480,17 +2487,18 @@ def _place_package(adapter: Any, facts: SourceFacts) -> dict[str, tuple[float, f
         for cluster, view in cluster_views.items()
     }
     bom_name, items = _insert_bom(adapter, bom_view, facts)
-    cluster_balloons = {
+    placed = {
         SHEET_NAMES[CLUSTER_SHEETS[cluster] - 1]: _balloon_cluster_sheet(
             adapter, cluster, view, facts, cluster_scales[cluster], bom_name=bom_name, items=items
         )
         for cluster, view in cluster_views.items()
     }
     assert_full_detail_view(adapter, label="drive-train package")
-    for sheet_name, sheet_balloons in cluster_balloons.items():
+    for sheet_name, (sheet_balloons, _landings) in placed.items():
         _final_balloon_uncross(adapter, sheet_name, sheet_balloons)
     _check_package_layout(adapter, findings)
-    return package_sheet_scales(cluster_scales, full_detail)
+    landings = [landing for _balloons, sheet in placed.values() for landing in sheet]
+    return package_sheet_scales(cluster_scales, full_detail), landings
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -2514,7 +2522,7 @@ async def build(adapter: Any) -> dict[str, str]:
     try:
         try:
             facts = _validate_source(source_model)
-            sheet_scales = _place_package(adapter, facts)
+            sheet_scales, landings = _place_package(adapter, facts)
             artifacts = await finalize_drawing(
                 adapter,
                 OUTPUTS,
@@ -2524,6 +2532,7 @@ async def build(adapter: Any) -> dict[str, str]:
                 expected_sheet_names=SHEET_NAMES,
                 sheet_layouts=SHEET_LAYOUTS,
                 sheet_scales=sheet_scales,
+                settled_checks=(lambda: assert_balloon_landings(adapter, landings),),
             )
         except Exception:
             _export_failure_pdf(adapter, "build")

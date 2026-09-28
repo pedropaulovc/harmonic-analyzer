@@ -2305,7 +2305,7 @@ class _AnchorSheet:
             GetAttachedEntityTypes=lambda: kinds,
             GetLeaderCount=lambda: 1,
             IsDangling=lambda: False,
-            GetLeaderPointsAtIndex=lambda _index: (0.3, 0.3, 0.0, end[0], end[1], 0.0),
+            GetLeaderPointsAtIndex=lambda _index: (0.3, 0.3, 0.0, note.end[0], note.end[1], 0.0),
         )
         note = SimpleNamespace(item=item, GetAnnotation=lambda: annotation, end=end)
         self.balloons.append(note)
@@ -2464,9 +2464,11 @@ def _balloon(monkeypatch, sheet, view, anchors, items=(("cone-gear", "1"),)):
     monkeypatch.setattr(
         drawing_common._telemetry, "event", lambda name, **kw: events.append((name, kw))
     )
-    balloons = drawing_common.add_component_bom_balloons(
+    landings = drawing_common.add_component_bom_balloons(
         _FakeAdapter(sheet), view, items=items, anchors=anchors, label="t"
     )
+    sheet.landings = landings
+    balloons = [landing.note for landing in landings]
     return balloons, projected, [kw for name, kw in events if name == "drawing.balloon_anchor"]
 
 
@@ -2825,6 +2827,26 @@ def test_a_balloon_leader_that_ends_off_its_claimed_point_fails_the_sheet(monkey
     view, sheet = _walked_to(hit, landing, honours_point=False)
     with pytest.raises(RuntimeError, match="cone-gear balloon leader attachment moved"):
         _balloon(monkeypatch, sheet, view, {"cone-gear": _WALK})
+
+
+@pytest.mark.parametrize("case", sorted(_MEASURED_LANDINGS))
+def test_a_later_rebuild_that_moves_a_landed_leader_fails_the_final_proof(monkeypatch, case):
+    """A balloon is proven where it is inserted, and every rebuild after that
+    (the next balloons', later sheets', the finalizer's) re-solves it. One a
+    later rebuild moves back to where SolidWorks would put it on the edge
+    fails the drawing, named; one left in place passes."""
+    hit, landing = _MEASURED_LANDINGS[case]
+    view, sheet = _walked_to(hit, landing)
+    _balloon(monkeypatch, sheet, view, {"cone-gear": _WALK})
+    adapter = _FakeAdapter(sheet)
+    drawing_common.assert_balloon_landings(adapter, sheet.landings)
+    sheet.balloons[0].end = landing
+    with pytest.raises(
+        RuntimeError,
+        match=r"1 balloon\(s\) changed after the final rebuild: .*cone-gear balloon leader "
+        r"attachment moved",
+    ):
+        drawing_common.assert_balloon_landings(adapter, sheet.landings)
 
 
 def _ring_point(t, centre=(0.1, 0.1), radius=0.00495):

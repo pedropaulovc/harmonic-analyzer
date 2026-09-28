@@ -38,6 +38,7 @@ def test_frame_package_bom_identifies_all_29_released_components() -> None:
 # 2 = property get; 9 = IDispatch, 12 = VARIANT).
 
 import math  # noqa: E402
+import re  # noqa: E402
 from types import SimpleNamespace  # noqa: E402
 
 import pytest  # noqa: E402
@@ -370,7 +371,7 @@ def _short_balloon_rig(monkeypatch, window: _Window):
     view = SimpleNamespace(UpdateViewDisplayGeometry=lambda: None)
 
     def run():
-        drawing._short_frame_balloon(adapter, view, balloon, "5", _OFFSET)
+        return drawing._short_frame_balloon(adapter, view, balloon, "5", _OFFSET)
 
     return run, placed_at, events
 
@@ -426,6 +427,75 @@ def test_short_balloon_fails_when_placed_inside_or_moved_by_the_rebuild(
         run()
     assert events["drawing.frame_short_balloon"]["failed_checks"] == failed
     assert window.span is None
+
+
+@pytest.mark.parametrize(
+    ("rebuild", "failed"),
+    [
+        (None, None),
+        ("position", ["circle_position", "position_moved"]),
+        ("ring", ["circle_position"]),
+        ("radius", ["ring_radius"]),
+        ("tip", ["arrowtip_moved"]),
+    ],
+)
+def test_a_later_rebuild_that_moves_a_placed_short_balloon_fails_the_final_proof(
+    monkeypatch, rebuild, failed
+) -> None:
+    """Item 5 passes its own placement, then the next balloons' and the
+    finalizer's rebuilds re-solve it (Codex on #1111). Read zoomed again
+    after the last one, a moved anchor, ring or arrowtip, or a grown ring,
+    fails the drawing naming the balloon; untouched, it passes, and the
+    window is back at fit either way."""
+    window = _Window(640, fit_drift_px=0.0)
+    run, _placed_at, _events = _short_balloon_rig(monkeypatch, window)
+    proof = drawing._FrameBalloonProof(rebound=frozenset(), bound=(), short=(run(),))
+    monkeypatch.setattr(drawing, "_activate_sheet", lambda _adapter, _name: None)
+    monkeypatch.setattr(drawing, "assert_balloon_landings", lambda _adapter, landings: None)
+    window.rebuild = rebuild
+    window.EditRebuild3()
+    adapter = SimpleNamespace(currentModel=window)
+    if failed is None:
+        drawing._assert_frame_balloons_settled(adapter, [], proof)
+    else:
+        with pytest.raises(
+            RuntimeError, match=re.escape(f"frame balloon 5 short leader: {failed!r}")
+        ):
+            drawing._assert_frame_balloons_settled(adapter, [], proof)
+    assert window.span is None
+
+
+@pytest.mark.parametrize("rebuild", [None, "tip"])
+def test_a_later_rebuild_that_moves_a_rebound_balloons_tip_fails_the_final_proof(
+    monkeypatch, rebuild
+) -> None:
+    """A rebound balloon without a short leader (items 3 and 4) keeps the
+    arrowtip read after the rebind's last rebuild, to the landing tolerance.
+    Its hit-tested component landing is the one the rebind replaced, so only
+    the families left alone are proven against theirs."""
+    window = _Window(640, fit_drift_px=0.0)
+    _short_balloon_rig(monkeypatch, window)
+    balloon = window.balloon
+    proof = drawing._FrameBalloonProof(
+        rebound=frozenset({"lag-screw"}),
+        bound=(drawing._BoundBalloonProof("5", balloon, balloon.entity, balloon.tip),),
+        short=(),
+    )
+    landings = [SimpleNamespace(stem="lag-screw"), SimpleNamespace(stem="nameplate")]
+    proven = []
+    monkeypatch.setattr(drawing, "_activate_sheet", lambda _adapter, _name: None)
+    monkeypatch.setattr(
+        drawing, "assert_balloon_landings", lambda _adapter, given: proven.extend(given)
+    )
+    window.rebuild = rebuild
+    window.EditRebuild3()
+    adapter = SimpleNamespace(currentModel=window)
+    if rebuild is None:
+        drawing._assert_frame_balloons_settled(adapter, landings, proof)
+    else:
+        with pytest.raises(RuntimeError, match=re.escape("frame balloon 5: ['arrowtip_moved']")):
+            drawing._assert_frame_balloons_settled(adapter, landings, proof)
+    assert proven == landings[1:]
 
 
 @pytest.mark.parametrize("fault", ["zoom", "position"])

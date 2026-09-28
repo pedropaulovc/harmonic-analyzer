@@ -6279,6 +6279,57 @@ def _verify_anchor_attachment(
         )
 
 
+@dataclass(frozen=True)
+class BalloonLanding:
+    """One component balloon as :func:`add_component_bom_balloons` proved it:
+    attached to one edge of ``instance``, its leader ending at ``sheet_xy``
+    (``None`` for a ``listed-edge`` balloon, whose landing SolidWorks chose)."""
+
+    stem: str
+    instance: str
+    note: Any
+    sheet_xy: tuple[float, float] | None
+    label: str
+
+
+def _prove_landing(adapter: Any, landing: BalloonLanding) -> None:
+    """``landing``'s balloon attaches to one edge of its instance and, when
+    its landing was proven, its leader still ends there."""
+    _verify_anchor_attachment(
+        adapter, landing.note, instance=landing.instance, stem=landing.stem, label=landing.label
+    )
+    if landing.sheet_xy is not None:
+        _assert_leader_lands(
+            _early_bound(_early_bound(landing.note, "INote").GetAnnotation(), "IAnnotation"),
+            landing.sheet_xy,
+            what=f"{landing.stem} balloon",
+            label=landing.label,
+            tolerance=_BALLOON_LANDING_TOLERANCE_M,
+        )
+
+
+def assert_balloon_landings(adapter: Any, landings: Sequence[BalloonLanding]) -> None:
+    """Prove every balloon's attachment and landing again, all at once.
+
+    The proof at insertion holds only until the next rebuild: each
+    ``EditRebuild3`` re-solves every annotation on every sheet, and later
+    sheets, notes and the finalizer rebuild after a sheet's balloons are
+    checked. Run after the drawing's last rebuild (``finalize_drawing``'s
+    ``settled_checks``), this is the state the export prints. Every failing
+    balloon is named, not just the first.
+    """
+    failures = []
+    for landing in landings:
+        try:
+            _prove_landing(adapter, landing)
+        except RuntimeError as error:
+            failures.append(str(error))
+    if failures:
+        raise RuntimeError(
+            f"{len(failures)} balloon(s) changed after the final rebuild: " + "; ".join(failures)
+        )
+
+
 def _create_component_bom_balloon(
     adapter: Any,
     view: Any,
@@ -6287,7 +6338,7 @@ def _create_component_bom_balloon(
     choice: _AnchorChoice,
     expected_item: str,
     label: str,
-) -> Any:
+) -> BalloonLanding:
     """Attach one BOM balloon to ``stem``'s anchor edge and prove where it landed.
 
     The edge is selected by entity and the hit-tested sheet point made its
@@ -6336,17 +6387,15 @@ def _create_component_bom_balloon(
         raise RuntimeError(
             f"{label}: {stem} resolved item {item}, expected {expected_item}"
         )
-    _verify_anchor_attachment(adapter, note, instance=choice.instance, stem=stem, label=label)
-    if proven:
-        annotation = _early_bound(_early_bound(note, "INote").GetAnnotation(), "IAnnotation")
-        _assert_leader_lands(
-            annotation,
-            choice.sheet_xy,
-            what=f"{stem} balloon",
-            label=label,
-            tolerance=_BALLOON_LANDING_TOLERANCE_M,
-        )
-    return note
+    landing = BalloonLanding(
+        stem=stem,
+        instance=choice.instance,
+        note=note,
+        sheet_xy=choice.sheet_xy if proven else None,
+        label=label,
+    )
+    _prove_landing(adapter, landing)
+    return landing
 
 
 @_telemetry.traced("drawing.component_bom_balloons", label_param="label")
@@ -6358,14 +6407,16 @@ def add_component_bom_balloons(
     anchors: Mapping[str, BalloonAnchor],
     label: str,
     margin: float = 0.014,
-) -> list[Any]:
+) -> list[BalloonLanding]:
     """Insert and ring one checked balloon per requested component family.
 
     Each family's balloon attaches at its anchor in ``anchors``
     (:func:`_select_balloon_anchor`). Every family's instance is chosen and
     every frozen anchor projected in one batch before the first balloon
     exists, so a family without an anchor or a shown instance fails the
-    sheet naming it, with nothing half-placed.
+    sheet naming it, with nothing half-placed. Returns each balloon's
+    :class:`BalloonLanding`, for :func:`assert_balloon_landings` to prove
+    again after the drawing's last rebuild.
     """
     if not items:
         raise ValueError(f"{label}: component balloon list must not be empty")
@@ -6428,7 +6479,7 @@ def add_component_bom_balloons(
         )
         for stem in stems
     ]
-    balloons = [
+    landings = [
         _create_component_bom_balloon(
             adapter,
             view,
@@ -6439,10 +6490,10 @@ def add_component_bom_balloons(
         )
         for (stem, item), choice in zip(items, picks)
     ]
-    _spread_balloons(adapter, view, balloons, margin=margin)
+    _spread_balloons(adapter, view, [landing.note for landing in landings], margin=margin)
     rebuild_drawing(adapter, label="add_component_bom_balloons")
-    _telemetry.success(f"{label}: inserted {len(balloons)} targeted balloons")
-    return balloons
+    _telemetry.success(f"{label}: inserted {len(landings)} targeted balloons")
+    return landings
 
 
 @_telemetry.traced("drawing.auto_balloons_across_views", label_param="label")
@@ -7418,8 +7469,14 @@ async def finalize_drawing(
     expected_sheet_names: tuple[str, ...] | None = None,
     sheet_layouts: Mapping[str, DrawingLayout] | None = None,
     sheet_scales: Mapping[str, tuple[float, float]] | None = None,
+    settled_checks: Sequence[Callable[[], None]] = (),
 ) -> dict[str, str]:
-    """Enforce the sheet/view contract and export SLDDRW, PDF, and rendered PNG."""
+    """Enforce the sheet/view contract and export SLDDRW, PDF, and rendered PNG.
+
+    ``settled_checks`` run after the last rebuild, before anything is
+    saved: a readback taken when an annotation was placed says nothing
+    about the drawing the later rebuilds leave (:func:`assert_balloon_landings`).
+    """
     drawing_model = adapter.currentModel
     ddoc = _early_bound(
         drawing_model, "IDrawingDoc"
@@ -7617,6 +7674,12 @@ async def finalize_drawing(
     # so every text extent and view outline is brought current here, before
     # the SLDDRW/PDF that the blind review and the layout audit read.
     rebuild_drawing(adapter, label="finalize_drawing")
+    if settled_checks:
+        for settled in settled_checks:
+            settled()
+        # A check may activate the sheet it reads.
+        if not ddoc.ActivateSheet(sheet_names[0]):
+            raise RuntimeError("failed to restore first drawing sheet after the settled checks")
 
     # Persist the native drawing and PDF once from the fully loaded authored
     # document. Reopen/scale/save cycles are deliberately absent from this hot

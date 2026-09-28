@@ -13,6 +13,7 @@ import argparse
 import hashlib
 import math
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Sequence
 
@@ -23,12 +24,15 @@ from _drawing_common import (
     SIMPLIFIED_VIEW_CONFIGURATION,
     DrawingOutputs,
     ViewRole,
+    BalloonLanding,
+    _BALLOON_LANDING_TOLERANCE_M,
     _balloon_item_number,
     _edge_endpoint_key,
     _spread_balloons,
     _zoomed_on,
     add_component_bom_balloons,
     apply_view_configuration,
+    assert_balloon_landings,
     assert_full_detail_view,
     create_section_view,
     finalize_drawing,
@@ -1130,9 +1134,29 @@ def _rebuilt_balloon_failures(
     return failures
 
 
+@dataclass(frozen=True)
+class _ShortBalloonProof:
+    """What a short-leader balloon passed: its binding, target ring and the
+    zoomed read right after placement, for :func:`_settled_short_balloon_failures`."""
+
+    item: str
+    annotation: Any
+    entity: Any
+    target: tuple[float, float]
+    placed: dict[str, Any]
+
+
+def _position_moved(state: dict[str, Any], placed: dict[str, Any]) -> bool:
+    moved = [
+        abs(a - b)
+        for a, b in zip(state["annotation_position"][:2], placed["annotation_position"][:2])
+    ]
+    return len(moved) != 2 or max(moved) > _SHORT_BALLOON_POSITION_TOL_M
+
+
 def _short_frame_balloon(
     adapter: Any, view: Any, note: Any, item: str, offset: tuple[float, float]
-) -> None:
+) -> _ShortBalloonProof:
     """Give frame balloon ``item`` a short leader ``offset`` from its arrowtip.
 
     The ring is placed zoomed onto its target (:data:`_SHORT_BALLOON_ZOOM_HALF`)
@@ -1191,10 +1215,7 @@ def _short_frame_balloon(
         for name in _short_balloon_failures(placed, target) + _leader_start_failures(placed)
     ]
     failures += [f"fit:{name}" for name in fit["failed_checks"]]
-    moved = [
-        abs(a - b) for a, b in zip(fit["annotation_position"][:2], placed["annotation_position"][:2])
-    ]
-    if len(moved) != 2 or max(moved) > _SHORT_BALLOON_POSITION_TOL_M:
+    if _position_moved(fit, placed):
         failures.append("fit:position_moved")
     failures += [f"rebuilt:{name}" for name in _rebuilt_balloon_failures(after, placed, target)]
     state = {"before": before, "placed": placed, "fit": fit, "after": after,
@@ -1202,13 +1223,94 @@ def _short_frame_balloon(
     _telemetry.event("drawing.frame_short_balloon", item=item, **state)
     if failures:
         raise RuntimeError(f"frame balloon {item} short placement failed: {state!r}")
+    return _ShortBalloonProof(
+        item=item, annotation=annotation, entity=entity, target=target, placed=placed
+    )
 
 
+def _settled_short_balloon_failures(adapter: Any, proof: _ShortBalloonProof) -> list[str]:
+    """Read a short-leader balloon zoomed onto its target again, as
+    :func:`_short_frame_balloon` did after its own rebuild: every later
+    rebuild (the next balloons', the finalizer's) re-solves it too. Ring,
+    arrowtip and SetPosition anchor must still be the placed ones."""
+    with _zoomed_on(adapter, proof.target, _SHORT_BALLOON_ZOOM_HALF):
+        adapter.currentModel.GraphicsRedraw2()
+        settled = _frame_balloon_binding_readback(
+            adapter, proof.annotation, proof.entity, proof.item
+        )
+    failures = _rebuilt_balloon_failures(settled, proof.placed, proof.target)
+    if _position_moved(settled, proof.placed):
+        failures.append("position_moved")
+    _telemetry.event(
+        "drawing.frame_short_balloon_settled", item=proof.item, settled=settled,
+        failed_checks=failures,
+    )
+    return failures
+
+
+@dataclass(frozen=True)
+class _BoundBalloonProof:
+    """A rebound frame balloon without a short leader: its binding and the
+    arrowtip read after :func:`_reattach_frame_balloons`' last rebuild."""
+
+    item: str
+    annotation: Any
+    entity: Any
+    tip: tuple[float, float]
+
+
+@dataclass(frozen=True)
+class _FrameBalloonProof:
+    """What :func:`_reattach_frame_balloons` proved, for
+    :func:`_assert_frame_balloons_settled`. ``rebound`` names the families
+    whose component landing the rebind replaced."""
+
+    rebound: frozenset[str]
+    bound: tuple[_BoundBalloonProof, ...]
+    short: tuple[_ShortBalloonProof, ...]
+
+
+def _assert_frame_balloons_settled(
+    adapter: Any, landings: Sequence[BalloonLanding], proof: _FrameBalloonProof
+) -> None:
+    """Prove every frame balloon again after the drawing's last rebuild.
+
+    Each balloon was checked where it was placed, and every rebuild after
+    that (the next balloons', the later sheets', the finalizer's) re-solves
+    all of them. The component balloons keep their attachment and hit-tested
+    landing (:func:`assert_balloon_landings`), the rebound ones their
+    binding and arrowtip, the short-leader ones their ring, arrowtip and
+    anchor (:func:`_settled_short_balloon_failures`). Every failure is named.
+    """
+    _activate_sheet(adapter, SHEET_NAMES[1])
+    failures = []
+    try:
+        assert_balloon_landings(
+            adapter, [landing for landing in landings if landing.stem not in proof.rebound]
+        )
+    except RuntimeError as error:
+        failures.append(str(error))
+    for bound in proof.bound:
+        state = _frame_balloon_binding_readback(adapter, bound.annotation, bound.entity, bound.item)
+        failed = list(state["failed_checks"])
+        tip = state["actual_leader_points"][-3:-1]
+        if len(tip) != 2 or math.dist(tip, bound.tip) > _BALLOON_LANDING_TOLERANCE_M:
+            failed.append("arrowtip_moved")
+        if failed:
+            failures.append(f"frame balloon {bound.item}: {failed}")
+    for short in proof.short:
+        failed = _settled_short_balloon_failures(adapter, short)
+        if failed:
+            failures.append(f"frame balloon {short.item} short leader: {failed}")
+    if failures:
+        raise RuntimeError(
+            "frame balloons changed after the final rebuild: " + "; ".join(failures)
+        )
 
 
 def _reattach_frame_balloons(
     adapter: Any, view: Any, balloons: Sequence[Any], items: Sequence[tuple[str, str]]
-) -> None:
+) -> _FrameBalloonProof:
     families = _frame_visible_components(view)
     anchors = _upper_frame_balloon_edges(adapter, view, families)
     item_by_stem = dict(items)
@@ -1219,11 +1321,13 @@ def _reattach_frame_balloons(
     anchors["top-frame"] = _exposed_top_casting_edge(
         adapter, view, families["top-frame"]
     )
+    bound = {}
     for stem, entity in anchors.items():
         item = item_by_stem[stem]
-        notes[item], _annotation, _point = _bind_frame_balloon(
+        notes[item], annotation, _point = _bind_frame_balloon(
             adapter, view, notes[item], entity, item
         )
+        bound[item] = (annotation, entity)
 
     item = item_by_stem["tube-frame"]
     notes[item], _annotation, _rim = _bind_left_column_balloon(
@@ -1281,12 +1385,30 @@ def _reattach_frame_balloons(
         [note for item, note in notes.items() if item not in short],
         margin=0.012,
     )
-    for item, offset in short.items():
+    proofs = tuple(
         _short_frame_balloon(adapter, view, notes[item], item, offset)
+        for item, offset in short.items()
+    )
     adapter.currentModel.EditRebuild3()
+    held = []
+    for item, (annotation, entity) in bound.items():
+        if item in short:
+            continue
+        state = _frame_balloon_binding_readback(adapter, annotation, entity, item)
+        if state["failed_checks"]:
+            raise RuntimeError(f"frame balloon {item} lost its binding: {state!r}")
+        tip = state["actual_leader_points"][-3:-1]
+        held.append(_BoundBalloonProof(item=item, annotation=annotation, entity=entity, tip=tip))
+    return _FrameBalloonProof(
+        rebound=frozenset((*anchors, "tube-frame", "frame-cross-screw")),
+        bound=tuple(held),
+        short=proofs,
+    )
 
 
-def _place_package(adapter: Any) -> None:
+def _place_package(adapter: Any) -> Callable[[], None]:
+    """Place every sheet; return the check that proves every balloon again
+    after the last rebuild (:func:`_assert_frame_balloons_settled`)."""
     _create_mixed_package_sheets(adapter)
     for sheet_number, sheet_name in enumerate(SHEET_NAMES, start=1):
         _activate_sheet(adapter, sheet_name)
@@ -1361,7 +1483,7 @@ def _place_package(adapter: Any) -> None:
         label="frame",
     )
     balloon_items = _validate_frame_bom(adapter, table)
-    balloons = add_component_bom_balloons(
+    landings = add_component_bom_balloons(
         adapter,
         exploded,
         items=balloon_items,
@@ -1369,7 +1491,9 @@ def _place_package(adapter: Any) -> None:
         label="frame exploded-view BOM coverage",
         margin=0.012,
     )
-    _reattach_frame_balloons(adapter, exploded, balloons, balloon_items)
+    proof = _reattach_frame_balloons(
+        adapter, exploded, [landing.note for landing in landings], balloon_items
+    )
     _add_note_block(
         adapter,
         f"EXPLODED VIEW {EXPLODED_ISO_SCALE[0]:g}:{EXPLODED_ISO_SCALE[1]:g}"
@@ -1406,6 +1530,7 @@ def _place_package(adapter: Any) -> None:
         (0.300, 0.074),
         label="assembly isometric caption",
     )
+    return lambda: _assert_frame_balloons_settled(adapter, landings, proof)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -1443,7 +1568,7 @@ async def build(adapter: Any) -> dict[str, str]:
     artifacts: dict[str, str] | None = None
     try:
         _validate_persisted_explode(source_model)
-        _place_package(adapter)
+        settled = _place_package(adapter)
         artifacts = await finalize_drawing(
             adapter,
             OUTPUTS,
@@ -1453,6 +1578,7 @@ async def build(adapter: Any) -> dict[str, str]:
             expected_sheet_names=SHEET_NAMES,
             sheet_layouts=SHEET_LAYOUTS,
             sheet_scales=SHEET_SCALES,
+            settled_checks=(settled,),
         )
     finally:
         primary_error = sys.exception()
