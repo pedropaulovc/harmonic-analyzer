@@ -307,15 +307,18 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     # The Top view reverses model Z, so -HOLE_Z_FIRST prints the seed hole at
     # the TOP of the column. Every lower hole is boxed in by the 44.45
-    # extension/dimension lines; from the upper-left the frame's leader
-    # clears them all (the old leader crossed 44.45, 3.35 and 7.06 -- layout
-    # audit) and passes 2 mm off datum A's tag.
+    # extension/dimension lines (the old leader crossed 44.45, 3.35 and 7.06 --
+    # layout audit). The frame sits above the +Z trunnion stub with its right
+    # stub ending over the rim, so the leader drops vertically through the
+    # 1.5 mm gap between the flange end and datum A's tag and runs only ~5 mm
+    # over the plate (the diagonal from 0.175 crossed the stub and flange:
+    # leader-over-part, 24 mm).
     seed_rim_left = _top_xy(HOLE_X - HOLE_DIA / 2.0, -HOLE_Z_FIRST)
     add_feature_control_frame(
         adapter,
         top,
         edge_xy=seed_rim_left,
-        frame_xy=(0.175, 0.199),
+        frame_xy=(0.2133, 0.199),
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["spring-hole pattern position"],
         datums=("A", "B"),
