@@ -54,7 +54,11 @@ def _feature_tree(feature: Any) -> Any:
 
 
 def _named_dimensions(
-    adapter: Any, feature_name: str, dimension_names: set[str]
+    adapter: Any,
+    feature_name: str,
+    dimension_names: set[str],
+    *,
+    feature: Any = None,
 ) -> dict[str, tuple[Any, Any]]:
     """Resolve each named display/source dimension on ``feature_name`` in ONE
     walk of its subfeature tree, bound to ``IDisplayDimension``/``IDimension``.
@@ -66,8 +70,10 @@ def _named_dimensions(
     the wizard feature, and the dimension is one level down.  Every candidate is
     matched against the name of the feature that actually owns it, and a name
     that resolves twice inside the tree is still rejected rather than guessed.
+    ``feature`` is ``feature_name``'s dispatch when the caller already has it.
     """
-    feature = _feature_by_name(adapter, feature_name)
+    if feature is None:
+        feature = _feature_by_name(adapter, feature_name)
     found: dict[str, list[tuple[Any, Any]]] = {name: [] for name in dimension_names}
     for current in _feature_tree(feature):
         current_name = str(_com_invoke(current, "IFeature", "Name"))
@@ -197,13 +203,32 @@ def apply_drawing_precision(
 ) -> None:
     """Apply a spec's ``DRAWING_PRECISION`` -- ``{feature: {dimension: decimals}}``.
 
-    Each feature's dimensions are resolved in one walk of its tree
-    (``dim.precision_lookup``), not one walk per dimension."""
+    One forward pass over the top-level features finds every named feature
+    (``dim.precision_features``), then each feature's dimensions are resolved
+    in one walk of its own tree (``dim.precision_lookup``): not one
+    newest-first search per feature, nor one walk per dimension."""
+    wanted = set(precision)
+    features: dict[str, Any] = {}
+    with _telemetry.span("dim.precision_features", features=len(wanted)) as span:
+        visited = 0
+        for feature in _iter_features(adapter):
+            visited += 1
+            name = str(_com_invoke(feature, "IFeature", "Name"))
+            if name in wanted:
+                features[name] = feature
+                if len(features) == len(wanted):
+                    break
+        span.set_attribute("features_visited", visited)
     for feature_name, dimensions in precision.items():
         with _telemetry.span(
             "dim.precision_lookup", label=feature_name, dimensions=len(dimensions)
         ):
-            resolved = _named_dimensions(adapter, feature_name, set(dimensions))
+            resolved = _named_dimensions(
+                adapter,
+                feature_name,
+                set(dimensions),
+                feature=features.get(feature_name),
+            )
         for dimension_name, decimals in dimensions.items():
             set_dimension_display_precision(
                 adapter,
