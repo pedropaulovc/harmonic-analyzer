@@ -1332,10 +1332,17 @@ def _module_closure(script: Path) -> tuple[str, ...]:
 _SOURCE_TEXT: dict[Path, tuple[tuple[int, int], str]] = {}
 
 # A file modified within this window of the read is "racily clean": a second
-# same-size write inside one file-time tick (~15.6 ms on Windows, coarser on
-# some filesystems) leaves (mtime_ns, size) unchanged, so its stamp cannot vouch
-# for the text. Such reads are never memoized -- git's racy-git rule.
+# same-size write inside one file-time tick (~15.6 ms on NTFS, 2 s on FAT)
+# leaves (mtime_ns, size) unchanged, so its stamp cannot vouch for the text.
+# Such reads are never memoized -- git's racy-git rule. The window assumes the
+# file clock and this process's clock agree to well under it (a local disk);
+# a skewed network filesystem is not a supported checkout location.
 _RACY_NS = 2_000_000_000
+
+
+def is_racy_mtime(mtime_s: float) -> bool:
+    """True when an mtime (seconds) is too recent to identify file content."""
+    return time.time_ns() - int(mtime_s * 1e9) < _RACY_NS
 
 
 def read_source(path: Path) -> str:

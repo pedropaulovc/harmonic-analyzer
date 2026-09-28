@@ -1292,6 +1292,37 @@ def test_content_checker_check_modified_ignores_comment(tmp_path):
     )
 
 
+def test_content_checker_sees_a_same_tick_same_size_rewrite(tmp_path):
+    """A dep rewritten at the same size inside the file-time tick its state was
+    recorded in keeps its mtime, so the mtime fast path alone would vouch for the
+    stale content and leave the task up to date. Pinning one mtime across both
+    writes reproduces that tick deterministically."""
+    dodo = _load_dodo()
+    checker = dodo.ContentChecker()
+    src = tmp_path / "s.py"
+    src.write_text("X = 'old'\n")
+    tick = (time.time_ns(),) * 2
+    os.utime(src, ns=tick)
+    state = checker.get_state(str(src), None)
+    src.write_text("X = 'new'\n")
+    os.utime(src, ns=tick)
+    assert checker.check_modified(str(src), os.stat(src), state) is True
+
+
+def test_content_checker_keeps_the_fast_path_for_settled_deps(tmp_path):
+    """A dep whose mtime settled before its state was recorded keeps doit's mtime
+    fast path: an unchanged mtime means unchanged, with no digest recomputed."""
+    dodo = _load_dodo()
+    checker = dodo.ContentChecker()
+    src = tmp_path / "s.py"
+    src.write_text("X = 1\n")
+    settled = (time.time_ns() - 60_000_000_000,) * 2
+    os.utime(src, ns=settled)
+    state = checker.get_state(str(src), None)
+    assert state[0] == os.stat(src).st_mtime
+    assert checker.get_state(str(src), state) is None
+
+
 class _FakeStat:
     """Minimal os.stat stand-in: ContentChecker.check_modified only reads st_mtime."""
 
