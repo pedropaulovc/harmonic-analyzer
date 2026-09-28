@@ -26,6 +26,7 @@ import _telemetry
 import _seat_forensics
 from _common import (
     _build_id,
+    _com_invoke,
     _early_bound,
     _read_member,
     _visible_document_paths,
@@ -1380,7 +1381,37 @@ def create_section_view(
     return section
 
 
-@_telemetry.traced("drawing.model_point_projection", label_param="label")
+def _projection_frame(adapter: Any, view: Any) -> tuple[Any, Any]:
+    """The math utility and the view's CURRENT model-to-sheet transform, raw.
+
+    Raw dispatches (``_common._com_invoke``): the generated wrapper would read
+    type info and ``QueryInterface`` every object these calls return, which
+    is most of what one projection used to cost (p50 71 ms, n=22,839 in 30 d)
+    for five round trips of real work.  SolidWorks still does the product, so
+    a projected point is the same number it always was.
+    """
+    utility = _com_invoke(adapter.swApp, "ISldWorks", "GetMathUtility")
+    transform = _com_invoke(view, "IView", "ModelToViewTransform")
+    return utility, transform
+
+
+def _project_through(
+    utility: Any, transform: Any, xyz: Sequence[float], *, label: str
+) -> tuple[float, float]:
+    model_point = _com_invoke(
+        utility, "IMathUtility", "CreatePoint", double_array([float(v) for v in xyz])
+    )
+    if model_point is None:
+        raise RuntimeError(f"failed to create model point ({label})")
+    view_point = _com_invoke(model_point, "IMathPoint", "MultiplyTransform", transform)
+    if view_point is None:
+        raise RuntimeError(f"failed to project model point into view ({label})")
+    coordinates = list(_com_invoke(view_point, "IMathPoint", "ArrayData") or ())
+    if len(coordinates) < 2:
+        raise RuntimeError(f"projected model point has no sheet coordinates ({label})")
+    return (float(coordinates[0]), float(coordinates[1]))
+
+
 def model_point_in_view(
     adapter: Any,
     view: Any,
@@ -1388,21 +1419,36 @@ def model_point_in_view(
     *,
     label: str,
 ) -> tuple[float, float]:
-    """Project a model-space point into drawing-sheet coordinates."""
-    math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-    model_point = math_utility.CreatePoint(double_array([float(v) for v in xyz]))
-    if model_point is None:
-        raise RuntimeError(f"failed to create model point ({label})")
-    model_point = _early_bound(model_point, "IMathPoint")
-    transform = _early_bound(view.ModelToViewTransform, "IMathTransform")
-    view_point = model_point.MultiplyTransform(transform)
-    if view_point is None:
-        raise RuntimeError(f"failed to project model point into view ({label})")
-    view_point = _early_bound(view_point, "IMathPoint")
-    coordinates = list(view_point.ArrayData or ())
-    if len(coordinates) < 2:
-        raise RuntimeError(f"projected model point has no sheet coordinates ({label})")
-    return (float(coordinates[0]), float(coordinates[1]))
+    """Project a model-space point into drawing-sheet coordinates.
+
+    Five raw round trips and no span of its own: a recipe calls this dozens
+    to hundreds of times per drawing, and a span each flooded the trace
+    (up to 422 per trace).  A loop projects through
+    :func:`model_points_in_view`, which reads the transform once and records
+    one span with the count.
+    """
+    utility, transform = _projection_frame(adapter, view)
+    return _project_through(utility, transform, xyz, label=label)
+
+
+@_telemetry.traced("drawing.model_point_projection", label_param="label")
+def model_points_in_view(
+    adapter: Any,
+    view: Any,
+    points: Sequence[Sequence[float]],
+    *,
+    label: str,
+) -> list[tuple[float, float]]:
+    """:func:`model_point_in_view` for many points of one view at one moment.
+
+    The transform is read once, so nothing may move ``view`` between the
+    points; three round trips per point after that."""
+    utility, transform = _projection_frame(adapter, view)
+    projected = [
+        _project_through(utility, transform, xyz, label=label) for xyz in points
+    ]
+    _telemetry.annotate(points=len(projected))
+    return projected
 
 
 @_telemetry.traced("drawing.linked_note", label_param="property_name")

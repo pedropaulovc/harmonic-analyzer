@@ -33,6 +33,7 @@ from _drawing_common import (
     finalize_drawing,
     insert_bom_table,
     model_point_in_view,
+    model_points_in_view,
     position_bom_balloon,
     rendered_balloon_circle,
     drawing_viewport_pixel_size,
@@ -312,17 +313,27 @@ def _checked_height_dimension(
     return display
 
 
-def _component_point_in_assembly(
-    component: Any, point: Sequence[float]
-) -> tuple[float, float, float]:
-    """Transform one component-local point through its exact native transform."""
+def _component_transform(component: Any) -> tuple[float, ...]:
+    """One component's native ``Transform2`` ArrayData (16 values).
+
+    Two round trips plus a wrapped object; the edge loops below read it once
+    per component instead of twice per visible edge."""
     values = tuple(
         float(value)
         for value in _early_bound(
             _early_bound(component, "IComponent2").Transform2, "IMathTransform"
         ).ArrayData
     )
-    if len(values) != 16 or len(point) != 3:
+    if len(values) != 16:
+        raise RuntimeError("frame drawing component transform is incomplete")
+    return values
+
+
+def _transform_point(
+    values: Sequence[float], point: Sequence[float]
+) -> tuple[float, float, float]:
+    """Apply :func:`_component_transform` values to one component-local point."""
+    if len(point) != 3:
         raise RuntimeError("frame drawing component transform is incomplete")
     x, y, z = (float(value) for value in point)
     scale = values[12]
@@ -331,6 +342,13 @@ def _component_point_in_assembly(
         scale * (x * values[1] + y * values[4] + z * values[7]) + values[10],
         scale * (x * values[2] + y * values[5] + z * values[8]) + values[11],
     )
+
+
+def _component_point_in_assembly(
+    component: Any, point: Sequence[float]
+) -> tuple[float, float, float]:
+    """Transform one component-local point through its exact native transform."""
+    return _transform_point(_component_transform(component), point)
 
 
 def _visible_circle_at_height(
@@ -875,12 +893,13 @@ def _upper_frame_balloon_edges(
     for stem in ("rocker-arm-support", "lag-screw"):
         for component, full in families[stem]:
             name = str(component.Name2)
+            transform = _component_transform(full)
             for edge in visible_component_entities(view, component, 1):
                 key = _edge_endpoint_key(adapter, edge)
                 if key is None:
                     continue
-                p0 = _component_point_in_assembly(full, key[:3])
-                p1 = _component_point_in_assembly(full, key[3:6])
+                p0 = _transform_point(transform, key[:3])
+                p1 = _transform_point(transform, key[3:6])
                 score = (min(p0[1], p1[1]), -abs(p0[1] - p1[1]), name, *key)
                 if stem not in winners or score > winners[stem][0]:
                     winners[stem] = (score, edge)
@@ -925,8 +944,12 @@ def _bind_left_column_balloon(
 def _exposed_top_casting_edge(
     adapter: Any, view: Any, components: Sequence[tuple[Any, Any]]
 ) -> Any:
-    candidates = []
+    # Every linear edge's two ends go through ONE projection call: the view
+    # does not move while its edges are ranked (~210 edges, 420 points).
+    lines = []
+    points = []
     for component, full in components:
+        transform = _component_transform(full)
         for edge in visible_component_entities(view, component, 1):
             curve = _early_bound(_early_bound(edge, "IEdge").GetCurve(), "ICurve")
             if not curve.IsLine():
@@ -934,21 +957,18 @@ def _exposed_top_casting_edge(
             key = _edge_endpoint_key(adapter, edge)
             if key is None:
                 continue
-            p0 = model_point_in_view(
-                adapter,
-                view,
-                _component_point_in_assembly(full, key[:3]),
-                label="top casting edge start",
-            )
-            p1 = model_point_in_view(
-                adapter,
-                view,
-                _component_point_in_assembly(full, key[3:6]),
-                label="top casting edge end",
-            )
-            length = math.hypot(p1[0] - p0[0], p1[1] - p0[1])
-            if length >= 0.003:
-                candidates.append(((min(p0[0], p1[0]), length, *key), edge))
+            lines.append((key, edge))
+            points.append(_transform_point(transform, key[:3]))
+            points.append(_transform_point(transform, key[3:6]))
+    projected = model_points_in_view(
+        adapter, view, points, label="top casting edge ends"
+    )
+    candidates = []
+    for index, (key, edge) in enumerate(lines):
+        p0, p1 = projected[2 * index], projected[2 * index + 1]
+        length = math.hypot(p1[0] - p0[0], p1[1] - p0[1])
+        if length >= 0.003:
+            candidates.append(((min(p0[0], p1[0]), length, *key), edge))
     if not candidates:
         raise RuntimeError("top casting has no exposed right-side linear edge")
     return max(candidates, key=lambda row: row[0])[1]
