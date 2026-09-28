@@ -227,7 +227,10 @@ no `.done`.
   a build child outlives a killed launcher and keeps dispatching), `commit`,
   `targets`, `leaf_timeout_minutes`, `cache_environment`, `counts` (cache
   `hits`, farm leaves `requested`/`succeeded`/`failed`/`in_flight`), every farm
-  leaf with its `workflow_id` and state, `in_flight_workflows`, `task_errors`,
+  leaf with its `workflow_id` and state, `in_flight_workflows`,
+  `unsettled_workflows` (every leaf with a workflow id and no result: the
+  in-flight ones plus those the build saw fail, since a local Temporal or
+  protocol fault fails the task while its workflow may still run), `task_errors`,
   `log_idle_s` and `outputs` (the snapshot's `cad\out` while running,
   `.done`'s `outputs` after). Tools that only need a run's `cad/out` —
   `cache.jsonl`, `telemetry/traces.jsonl` — read `outputs` from here.
@@ -244,7 +247,9 @@ no `.done`.
 - **`-Cancel -Why <reason>`** stops the launcher and every process it started,
   including a build a dead launcher left behind (a process under a dead
   launcher's PID counts only if it carries the recorded build command line),
-  then cancels each in-flight leaf that `farm.py status` reports `RUNNING`,
+  rescanning until a scan finds no process started since the last (at most
+  10 rounds, else an error). It then cancels each of `unsettled_workflows`
+  that `farm.py status` reports `RUNNING`,
   with the reason and run id on the cancellation. Workflows are shared by ID
   (`USE_EXISTING`), and the farm cannot say which submitter created one, so
   two leaves are kept. One is a leaf a sibling run in the same
@@ -253,7 +258,8 @@ no `.done`.
   cannot show it created (`kept-foreign`). It counts as created here only when
   the farm's `start_time` falls between the second of one of this run's own
   `Farm workflow requested` telemetry records (`reports/telemetry/logs.jsonl`
-  in its outputs) and 30 s after it. A clock skew between this machine and
+  in its outputs; a torn line is skipped) and 30 s after it. A clock skew
+  between this machine and
   the farm errs toward keeping. A submitter outside this `-LogDirectory` that
   attached *after* this run created a leaf is invisible, and that leaf is
   cancelled with the rest; only farm-side reference counting could see it.
@@ -266,7 +272,10 @@ no `.done`.
   why, the stopped PIDs and each workflow's outcome (`cancelled`,
   `already-closed`, `not-found`, `kept-shared`, `kept-foreign`). A cleanup
   failure still writes `.done` (with `cleanup_errors`) and exits 1.
-  Cancelling a finished run is a no-op.
+  On a run that already finished, `-Cancel` stops nothing and leaves `.done`
+  as the launcher wrote it; it only cancels that run's leaves still
+  `RUNNING` (a failed run's leaf may be) and prints each outcome, exiting 1
+  if one could not be accounted for.
 
 ### The two records
 
@@ -376,7 +385,7 @@ cache-miss followed by a restored artifact, and the artifact plus its
 In case 3, either abandon the run with `-Cancel -Why …` (it stops the orphans,
 cancels the leaves no live sibling needs, keeps the outputs and removes the
 snapshot), or finish it. To finish it, query every workflow in
-`in_flight_workflows` — every leaf requested or attached without a result, not
+`unsettled_workflows` — every leaf with a workflow id and no result, not
 one representative — from the pool checkout:
 
 ```powershell

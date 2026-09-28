@@ -458,12 +458,23 @@ function Get-RunLeafRequests {
         return $requests
     }
     foreach ($match in Select-String -LiteralPath $logs -SimpleMatch 'Farm workflow requested: ') {
-        $entry = $match.Line | ConvertFrom-Json -AsHashtable
-        $workflowId = $entry['attributes']['workflow_id']
+        # A short write or a killed writer can leave a torn line. It proves
+        # nothing, so skip it: a leaf without a request record is kept.
+        try {
+            $entry = $match.Line | ConvertFrom-Json -AsHashtable -ErrorAction Stop
+            $workflowId = [string]$entry['attributes']['workflow_id']
+            $requestedAt = ConvertTo-UtcTimestamp -Value $entry['timestamp']
+        }
+        catch {
+            continue
+        }
+        if ([string]::IsNullOrEmpty($workflowId)) {
+            continue
+        }
         if (-not $requests.ContainsKey($workflowId)) {
             $requests[$workflowId] = [System.Collections.Generic.List[datetime]]::new()
         }
-        $requests[$workflowId].Add((ConvertTo-UtcTimestamp -Value $entry['timestamp']))
+        $requests[$workflowId].Add($requestedAt)
     }
     return $requests
 }
@@ -713,6 +724,9 @@ function Get-RunStatus {
     $log = Read-RunLog -Path $record['log']
     $leaves = @($log['leaves'].Values)
     $inFlight = @($leaves | Where-Object { $_['state'] -in @('requested', 'attached') })
+    # A leaf the build saw fail may still be running on the farm: a client
+    # connection or protocol fault fails the local task, not the workflow.
+    $unsettled = @($leaves | Where-Object { $null -ne $_['workflow_id'] -and $_['state'] -ne 'succeeded' })
     $now = [System.DateTime]::UtcNow
     $startedAt = ConvertTo-UtcTimestamp -Value $record['started_at']
     $orphans = @()
@@ -755,6 +769,7 @@ function Get-RunStatus {
         }
         leaves = $leaves
         in_flight_workflows = @($inFlight | ForEach-Object { $_['workflow_id'] })
+        unsettled_workflows = @($unsettled | ForEach-Object { $_['workflow_id'] })
         task_errors = @($log['task_errors'])
     }
     if ($null -ne $done -and $done.Contains('cancel')) {
@@ -785,6 +800,17 @@ function Invoke-FarmCli {
 function Get-RunProcesses {
     param([Parameter(Mandatory)]$Record)
 
+    return @(Get-RunProcessTree -Record $Record | ForEach-Object { [int]$_.ProcessId })
+}
+
+function Get-RunProcessTree {
+    param(
+        [Parameter(Mandatory)]$Record,
+        # PID -> @{ created; exited } for processes this command already
+        # stopped: their surviving children are still the run's.
+        [hashtable]$Stopped = @{}
+    )
+
     # The launcher (when it is still the recorded process) and everything it
     # started. A child keeps its ParentProcessId after its parent dies, so the
     # build a dead launcher left behind is still found; `started_at` and the
@@ -805,10 +831,19 @@ function Get-RunProcesses {
     }
     $holder = $all | Where-Object { [int]$_.ProcessId -eq $launcherId } | Select-Object -First 1
     $isLauncher = $null -ne $holder -and $holder.CreationDate.ToUniversalTime() -le $startedAt.AddSeconds(1)
-    $found = [System.Collections.Generic.List[int]]::new()
     $queue = [System.Collections.Generic.Queue[object]]::new()
-    if ($isLauncher) {
-        $found.Add($launcherId)
+    foreach ($entry in $Stopped.GetEnumerator()) {
+        foreach ($child in @($byParent[[int]$entry.Key])) {
+            if ($null -eq $child) {
+                continue
+            }
+            # Created while that process lived: a child of a later process
+            # that reused its PID falls outside.
+            $created = $child.CreationDate.ToUniversalTime()
+            if ($created -ge $entry.Value['created'] -and $created -le $entry.Value['exited']) {
+                $queue.Enqueue($child)
+            }
+        }
     }
     foreach ($child in @($byParent[$launcherId])) {
         if ($null -eq $child -or [int]$child.ProcessId -eq $launcherId) {
@@ -827,9 +862,18 @@ function Get-RunProcesses {
         }
         $queue.Enqueue($child)
     }
+    $seen = [System.Collections.Generic.HashSet[int]]::new()
+    $found = [System.Collections.Generic.List[object]]::new()
+    if ($isLauncher) {
+        [void]$seen.Add($launcherId)
+        $found.Add($holder)
+    }
     while ($queue.Count -gt 0) {
         $current = $queue.Dequeue()
-        $found.Add([int]$current.ProcessId)
+        if (-not $seen.Add([int]$current.ProcessId)) {
+            continue
+        }
+        $found.Add($current)
         foreach ($child in @($byParent[[int]$current.ProcessId])) {
             if ($null -eq $child -or [int]$child.ProcessId -eq [int]$current.ProcessId) {
                 continue
@@ -951,6 +995,63 @@ function Invoke-RunList {
     $script:TrackExitCode = 0
 }
 
+# Bounds the fixed-point stop below: each round only meets processes started
+# since the previous scan, so a run still spawning after this many is an error.
+$script:StopRounds = 10
+
+function Stop-RunProcesses {
+    param(
+        [Parameter(Mandatory)]$Record,
+        [Parameter(Mandatory)][AllowEmptyCollection()][System.Collections.Generic.List[int]]$Killed,
+        [Parameter(Mandatory)][AllowEmptyCollection()][System.Collections.Generic.List[string]]$Errors
+    )
+
+    # The launcher first, so it cannot react to its child dying by writing a
+    # `failed` .done; then everything it started (uv, build.py, doit workers),
+    # including a build a dead launcher left running, which would keep
+    # dispatching leaves. A process can start a child between a scan and its
+    # own stop, so scan again until a scan finds nothing new.
+    $stopped = @{}
+    for ($round = 1; ; $round++) {
+        $fresh = @(Get-RunProcessTree -Record $Record -Stopped $stopped |
+                Where-Object { -not $stopped.ContainsKey([int]$_.ProcessId) })
+        if ($fresh.Count -eq 0) {
+            return
+        }
+        if ($round -gt $script:StopRounds) {
+            $Errors.Add(
+                "processes of this run were still starting after $($script:StopRounds) stop rounds: " +
+                (@($fresh | ForEach-Object { $_.ProcessId }) -join ',')
+            )
+            return
+        }
+        $stopping = [System.Collections.Generic.List[int]]::new()
+        foreach ($process in $fresh) {
+            $processId = [int]$process.ProcessId
+            $stopped[$processId] = @{ created = $process.CreationDate.ToUniversalTime(); exited = $null }
+            try {
+                Stop-Process -Id $processId -Force -ErrorAction Stop
+                $Killed.Add($processId)
+                $stopping.Add($processId)
+            }
+            catch [Microsoft.PowerShell.Commands.ProcessCommandException] {
+                # Already exited between the scan and the stop.
+            }
+            catch {
+                $Errors.Add("could not stop process $processId`: $($_.Exception.Message)")
+            }
+        }
+        if ($stopping.Count -gt 0) {
+            Wait-Process -Id $stopping -Timeout 60 -ErrorAction SilentlyContinue
+        }
+        # No process of this round can start a child after this instant.
+        $exited = [System.DateTime]::UtcNow
+        foreach ($process in $fresh) {
+            $stopped[[int]$process.ProcessId]['exited'] = $exited
+        }
+    }
+}
+
 function Invoke-RunCancel {
     param(
         [Parameter(Mandatory)][string]$Directory,
@@ -962,46 +1063,27 @@ function Invoke-RunCancel {
     $status = $snapshot.status
     $record = $snapshot.record
     $runId = $status['run_id']
-    if ($status['state'] -notin @('running', 'launcher-died')) {
-        Write-RunEvent -RunId $runId -Text "already finished: $($status['state']); nothing to cancel"
-        $script:TrackExitCode = 0
-        return
-    }
-
     $errors = [System.Collections.Generic.List[string]]::new()
     $killed = [System.Collections.Generic.List[int]]::new()
     $launcherWas = $status['state']
     $runStartedAt = ConvertTo-UtcTimestamp -Value $record['started_at']
-    # The launcher first, so it cannot react to its child dying by writing a
-    # `failed` .done; then everything it started (uv, build.py) -- including a
-    # build a dead launcher left running, which would keep dispatching leaves.
-    $tree = @(Get-RunProcesses -Record $record)
-    foreach ($processId in $tree) {
-        try {
-            Stop-Process -Id $processId -Force -ErrorAction Stop
-            $killed.Add($processId)
-        }
-        catch [Microsoft.PowerShell.Commands.ProcessCommandException] {
-            # Already exited between the listing and the stop.
-        }
-        catch {
-            $errors.Add("could not stop process $processId`: $($_.Exception.Message)")
+    if ($launcherWas -in @('running', 'launcher-died')) {
+        Stop-RunProcesses -Record $record -Killed $killed -Errors $errors
+        if ($killed.Count -gt 0) {
+            Write-RunEvent -RunId $runId -Text "stopped launcher pid $($record['pid']) and its processes: $($killed -join ',')"
         }
     }
-    if ($killed.Count -gt 0) {
-        Wait-Process -Id $killed -Timeout 60 -ErrorAction SilentlyContinue
-        Write-RunEvent -RunId $runId -Text "stopped launcher pid $($record['pid']) and its processes: $($killed -join ',')"
-    }
+    # A run that finished (before this command, or on its own while being
+    # stopped) keeps its .done; its leaves are still reconciled below, since
+    # a leaf that failed locally may still be running on the farm.
+    $finished = $null
     if (Test-Path -LiteralPath $record['done'] -PathType Leaf) {
-        # The launcher finished on its own before it was stopped.
         $finished = Read-RunRecord -Path $record['done']
-        Write-RunEvent -RunId $runId -Text "finished on its own first: $($finished['state']); nothing to cancel"
-        $script:TrackExitCode = 0
-        return
+        Write-RunEvent -RunId $runId -Text "already finished: $($finished['state']); reconciling its leaves"
     }
 
     # Re-read: the log is final now that nothing writes it.
-    $inFlight = @((Get-RunStatus -RecordPath $RecordPath).status['in_flight_workflows'])
+    $unsettled = @((Get-RunStatus -RecordPath $RecordPath).status['unsettled_workflows'])
     # Workflows are shared by ID (USE_EXISTING): a live sibling run that is
     # waiting on the same leaf keeps it.
     $shared = @{}
@@ -1025,7 +1107,7 @@ function Invoke-RunCancel {
 
     $outcomes = [System.Collections.Generic.List[object]]::new()
     $reason = "$Why (farm-run.ps1 -Cancel $runId)"
-    foreach ($workflowId in $inFlight) {
+    foreach ($workflowId in $unsettled) {
         $outcome = [ordered]@{ workflow_id = $workflowId; outcome = $null; detail = $null }
         $outcomes.Add($outcome)
         if ($shared.ContainsKey($workflowId)) {
@@ -1092,17 +1174,21 @@ function Invoke-RunCancel {
         Write-RunEvent -RunId $runId -Text "$($outcome['outcome']) $workflowId"
     }
 
-    if ($errors.Count -gt 0) {
-        # Some leaf is unaccounted for: leave the run `launcher-died`, with its
-        # snapshot and no .done, so the same -Cancel can be retried.
+    if ($null -ne $finished -or $errors.Count -gt 0) {
+        # A finished run keeps its own .done. An unfinished one with a leaf
+        # unaccounted for stays `launcher-died`, with its snapshot and no
+        # .done, so the same -Cancel can be retried.
         foreach ($outcome in $outcomes) {
             Write-Output ($outcome | ConvertTo-Json -Depth 4 -Compress)
         }
         foreach ($problem in $errors) {
             [System.Console]::Error.WriteLine("farm-run cancel: $problem")
         }
-        [System.Console]::Error.WriteLine("farm-run cancel: not finished; no .done written; retry -Cancel")
-        $script:TrackExitCode = 1
+        $script:TrackExitCode = 0
+        if ($errors.Count -gt 0) {
+            [System.Console]::Error.WriteLine("farm-run cancel: not finished; retry -Cancel")
+            $script:TrackExitCode = 1
+        }
         return
     }
 

@@ -1184,6 +1184,12 @@ def test_status_and_watch_follow_a_live_run_to_its_outcome(tmp_path: Path) -> No
 
 def test_watch_exits_failed_with_the_cause_of_each_task_error(tmp_path: Path) -> None:
     fixture = _launcher_fixture(tmp_path)
+    # Codex on #1125: a local fault (Temporal connection, protocol) fails the
+    # task while its workflow keeps running on the farm.
+    farm_state = Path(fixture["farm_state"])
+    farm_state.write_text(
+        json.dumps({LEAF_PEN: {"status": "RUNNING"}}), encoding="utf-8"
+    )
     printed = tmp_path / "failing lines.txt"
     printed.write_text(DISPATCH_LINES + FAILURE_LINES, encoding="utf-8")
     environment = dict(fixture["environment"])
@@ -1211,6 +1217,33 @@ def test_watch_exits_failed_with_the_cause_of_each_task_error(tmp_path: Path) ->
     assert final["exit_code"] == 2
     assert final["task_errors"] == ["part:pen_rod"]
     assert final["in_flight_workflows"] == []
+    assert final["unsettled_workflows"] == [LEAF_PEN]
+
+    # Codex on #1125: a torn telemetry line must not wedge every -Cancel.
+    telemetry = Path(final["outputs"]) / "reports/telemetry/logs.jsonl"
+    with open(telemetry, "a", encoding="utf-8") as logs:
+        logs.write('{"body": "Farm workflow requested: ' + LEAF_PEN[:8])
+    done_before = Path(final["done"]).read_bytes()
+
+    cancel = _run_launcher(
+        fixture,
+        _tracking(fixture, "-Cancel", "-Tag", "broken", "-Why", "local fault"),
+        fixture["environment"],
+    )
+
+    assert cancel.returncode == 0, (cancel.stdout, cancel.stderr)
+    assert "already finished: failed" in cancel.stdout
+    outcomes = [
+        json.loads(line) for line in cancel.stdout.splitlines() if line.startswith("{")
+    ]
+    assert [(o["workflow_id"], o["outcome"]) for o in outcomes] == [
+        (LEAF_PEN, "cancelled")
+    ]
+    assert json.loads(farm_state.read_text(encoding="utf-8"))[LEAF_PEN]["status"] == (
+        "CANCELED"
+    )
+    # The launcher's own outcome stands.
+    assert Path(final["done"]).read_bytes() == done_before
 
 
 def _write_run_record(
