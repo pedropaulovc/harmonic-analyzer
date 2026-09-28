@@ -303,6 +303,35 @@ def _select_view_entity(
     return entity
 
 
+def _assert_leader_lands(
+    annotation: Any,
+    leader_attach_xy: tuple[float, float],
+    *,
+    what: str,
+    label: str,
+) -> None:
+    """Fail unless ``annotation`` keeps one live leader ending within 5 mm of
+    ``leader_attach_xy``.  ``SetLeaderAttachmentPointAtIndex`` returns True and
+    still re-solves the leader, so the requested point is read back."""
+    leaders = int(annotation.GetLeaderCount())
+    dangling = bool(annotation.IsDangling())
+    if dangling or leaders != 1:
+        raise RuntimeError(
+            f"{what} leader did not survive ({label}): dangling={dangling}, "
+            f"leaders={leaders}"
+        )
+    points = list(annotation.GetLeaderPointsAtIndex(0) or ())
+    if len(points) < 6:
+        raise RuntimeError(f"{what} leader is unreadable ({label})")
+    actual = (float(points[-3]), float(points[-2]))
+    error = math.dist(actual, leader_attach_xy)
+    if error > 0.005:
+        raise RuntimeError(
+            f"{what} leader attachment moved ({label}): actual={actual}, "
+            f"requested={leader_attach_xy}, error={error:.6g} m"
+        )
+
+
 def _assert_attached_to(
     adapter: Any,
     annotation: Any,
@@ -310,13 +339,11 @@ def _assert_attached_to(
     *,
     what: str,
     label: str,
-    leader_attach_xy: tuple[float, float] | None = None,
 ) -> None:
     """Fail unless ``annotation`` is still attached, by one live leader, to
-    exactly ``entity``, and that leader ends within 5 mm of
-    ``leader_attach_xy`` when one was set.  ``SetLeaderAttachmentPointAtIndex``
-    returns True and still re-solves the attachment: it detached a
-    feature-control frame (entities=0) on the #1105 platen_guide leaf.
+    exactly ``entity``.  A leader move re-solves the attachment:
+    ``SetLeaderAttachmentPointAtIndex`` detached a feature-control frame
+    (entities=0) on the #1105 platen_guide leaf.
     """
     attached = tuple(annotation.GetAttachedEntities3() or ())
     leaders = int(annotation.GetLeaderCount())
@@ -330,18 +357,6 @@ def _assert_attached_to(
         raise RuntimeError(
             f"{what} lost its attachment ({label}): entities={len(attached)}, "
             f"same_entity={same}, dangling={dangling}, leaders={leaders}"
-        )
-    if leader_attach_xy is None:
-        return
-    points = list(annotation.GetLeaderPointsAtIndex(0) or ())
-    if len(points) < 6:
-        raise RuntimeError(f"{what} leader is unreadable ({label})")
-    actual = (float(points[-3]), float(points[-2]))
-    error = math.dist(actual, leader_attach_xy)
-    if error > 0.005:
-        raise RuntimeError(
-            f"{what} leader attachment moved ({label}): actual={actual}, "
-            f"requested={leader_attach_xy}, error={error:.6g} m"
         )
 
 
@@ -1214,13 +1229,13 @@ def add_surface_finish(
     draw.ClearSelection2(True)
     rebuild_drawing(adapter, label="add_surface_finish")
     if leader_attach_xy is not None:
-        _assert_attached_to(
-            adapter,
-            annotation,
-            selected_entity,
-            what="surface-finish symbol",
-            label=label,
-            leader_attach_xy=leader_attach_xy,
+        # Only the landing is checkable here: a surface-finish symbol whose
+        # leader was moved reads back no attached entity (entities=0, not
+        # dangling) on every #1105 leaf that moved one (arbor_pedestal,
+        # cylinder_gear, harmonic_base, cone_pivot_post), so the entity check
+        # the notes and frames use cannot tell a good one from a bad one.
+        _assert_leader_lands(
+            annotation, leader_attach_xy, what="surface-finish symbol", label=label
         )
     return symbol
 
