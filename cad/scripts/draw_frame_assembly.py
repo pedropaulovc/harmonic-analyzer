@@ -1061,8 +1061,18 @@ def _bind_frame_balloon(
 # item 5's anchor sat at (154.4, 283.6) mm on swmaker000004/6 and up to
 # (156.2, 283.8) on swmaker000005/7/8 for the same target, and only builds on
 # the small windows printed a short leader through its own ring (399c05283,
-# 8bd440ca7). Zoomed, a pixel is under 0.04 mm on every seat.
+# 8bd440ca7). Zoomed, a pixel is under 0.06 mm on every seat, and the zoomed
+# read is the ring the PDF prints: on swmaker000008 (run 20260928T141421973Z)
+# items 2, 5 and 9 read (93.61, 249.03), (159.11, 282.43), (91.71, 270.84)
+# zoomed and printed at (93.52, 249.06), (158.93, 282.50), (91.50, 270.74),
+# 0.10, 0.19 and 0.23 mm apart. On swmaker000005 (run 20260928T142458776Z)
+# the same SetPosition for item 2, (89.32, 250.85), read at fit after the
+# rebuild put the ring at (92.85, 249.98), 1.14 mm off that print, so a fit
+# read is no check of where the ring prints.
 _SHORT_BALLOON_ZOOM_HALF = 0.012
+# How far the rebuild may move the balloon's SetPosition anchor: a model
+# value, not a rendered one, so any move is the rebuild's.
+_SHORT_BALLOON_POSITION_TOL_M = 1e-7
 
 
 def _short_balloon_failures(
@@ -1101,10 +1111,11 @@ def _short_frame_balloon(
     """Give frame balloon ``item`` a short leader ``offset`` from its arrowtip.
 
     The ring is placed zoomed onto its target (:data:`_SHORT_BALLOON_ZOOM_HALF`)
-    and read back there, then read again after the window is back at fit and
-    the drawing rebuilt: the state the export starts from. GetDisplayData
-    moves with the viewport, so the zoomed read alone does not prove it. Both
-    reads must hold, each within its own pixel; the leaf fails otherwise.
+    and read back there. The window then goes back to fit and the drawing
+    rebuilds, the state the export starts from: read there, the balloon must
+    keep its attachment, item and SetPosition anchor. Its ring is then read
+    zoomed again, where the read matches the print, and must still sit on
+    target with its leader leaving it. Any failure fails the leaf.
     """
     note = _early_bound(note, "INote")
     annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
@@ -1136,11 +1147,20 @@ def _short_frame_balloon(
     adapter.currentModel.EditRebuild3()
     view.UpdateViewDisplayGeometry()
     adapter.currentModel.GraphicsRedraw2()
-    after = _frame_balloon_binding_readback(adapter, annotation, entity, item)
+    fit = _frame_balloon_binding_readback(adapter, annotation, entity, item)
+    with _zoomed_on(adapter, target, _SHORT_BALLOON_ZOOM_HALF):
+        adapter.currentModel.GraphicsRedraw2()
+        after = _frame_balloon_binding_readback(adapter, annotation, entity, item)
     failures = [f"zoomed:{name}" for name in _short_balloon_failures(placed, target)]
-    failures += [f"fit:{name}" for name in _short_balloon_failures(after, target)]
-    state = {"before": before, "placed": placed, "after": after, "target_circle": target,
-             "failed_checks": failures}
+    failures += [f"fit:{name}" for name in fit["failed_checks"]]
+    moved = [
+        abs(a - b) for a, b in zip(fit["annotation_position"][:2], placed["annotation_position"][:2])
+    ]
+    if len(moved) != 2 or max(moved) > _SHORT_BALLOON_POSITION_TOL_M:
+        failures.append("fit:position_moved")
+    failures += [f"rebuilt:{name}" for name in _short_balloon_failures(after, target)]
+    state = {"before": before, "placed": placed, "fit": fit, "after": after,
+             "target_circle": target, "failed_checks": failures}
     _telemetry.event("drawing.frame_short_balloon", item=item, **state)
     if failures:
         raise RuntimeError(f"frame balloon {item} short placement failed: {state!r}")

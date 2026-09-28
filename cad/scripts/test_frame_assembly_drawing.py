@@ -241,12 +241,26 @@ _RING_R = 0.00475
 
 
 class _Window:
-    """``adapter.currentModel``: the zoom state, and what ran under which."""
+    """``adapter.currentModel``: the zoom state, and what ran under which.
 
-    def __init__(self, window_px: int, *, fit_drift_px: float, fault: str | None = None):
+    ``fit_drift_px``: how far GetDisplayData's ring sits off the model at fit,
+    in fit pixels. ``rebuild``: what EditRebuild3 does to the balloon, moving
+    its SetPosition anchor (``"position"``) or only its ring (``"ring"``) 1 mm.
+    """
+
+    def __init__(
+        self,
+        window_px: int,
+        *,
+        fit_drift_px: float,
+        fault: str | None = None,
+        rebuild: str | None = None,
+    ):
         self.window_px = window_px
         self.fit_drift_px = fit_drift_px
         self.fault = fault
+        self.rebuild = rebuild
+        self.balloon: _ShortBalloon | None = None
         self.span: float | None = None  # None: fit to the sheet
         self.log: list[tuple[str, float | None]] = []
 
@@ -268,6 +282,11 @@ class _Window:
 
     def EditRebuild3(self):  # noqa: N802
         self.log.append(("rebuild", self.span))
+        balloon = self.balloon
+        if self.rebuild == "position":
+            balloon.position = (balloon.position[0] + 0.001, balloon.position[1])
+        if self.rebuild in ("position", "ring"):
+            balloon.centre = (balloon.centre[0] + 0.001, balloon.centre[1])
 
 
 class _ShortBalloon:
@@ -275,7 +294,8 @@ class _ShortBalloon:
 
     def __init__(self):
         self.entity = object()
-        self.centre = (_ARROWTIP[0] - 0.010, _ARROWTIP[1] + 0.005)
+        self.position = (_ARROWTIP[0] - 0.010, _ARROWTIP[1] + 0.005)
+        self.centre = self.position
 
     def GetAnnotation(self):  # noqa: N802
         return self
@@ -289,6 +309,7 @@ class _ShortBalloon:
 
 def _short_balloon_rig(monkeypatch, window: _Window):
     balloon = _ShortBalloon()
+    window.balloon = balloon
     placed_at: list[tuple[tuple[float, float], float | None]] = []
     events: dict[str, dict] = {}
 
@@ -297,7 +318,7 @@ def _short_balloon_rig(monkeypatch, window: _Window):
         placed_at.append((tuple(position_xy), window.span))
         if window.fault == "position":
             raise RuntimeError("SetPosition failed")
-        balloon.centre = tuple(position_xy)
+        balloon.position = balloon.centre = tuple(position_xy)
 
     def readback(_adapter, annotation, entity, item):
         assert annotation is balloon and entity is balloon.entity and item == "5"
@@ -310,6 +331,7 @@ def _short_balloon_rig(monkeypatch, window: _Window):
         return {
             "failed_checks": [],
             "actual_leader_points": (*start, 0.0, *_ARROWTIP, 0.0),
+            "annotation_position": (*balloon.position, 0.0),
             "rendered_circle": (*centre, _RING_R),
             "viewport_pixel_bounds_m": (pixel, pixel),
         }
@@ -329,39 +351,50 @@ def _short_balloon_rig(monkeypatch, window: _Window):
     return run, placed_at, events
 
 
-def test_short_balloon_places_zoomed_on_both_windows_and_checks_the_rebuilt_fit(
-    monkeypatch,
+@pytest.mark.parametrize("window_px", [640, 820])
+def test_short_balloon_places_and_rechecks_zoomed_around_the_fit_rebuild(
+    monkeypatch, window_px
 ) -> None:
     """The ring is placed where a pixel is tens of microns on either seat, so
-    both windows ask SetPosition for the same point; the read that decides is
-    then taken back at fit after the rebuild, the state the export prints."""
-    placements = []
-    for window_px in (640, 820):
-        window = _Window(window_px, fit_drift_px=0.5)
-        run, placed_at, events = _short_balloon_rig(monkeypatch, window)
-        run()
-        [(position_xy, span)] = placed_at
-        assert span == pytest.approx(2 * drawing._SHORT_BALLOON_ZOOM_HALF)
-        assert window.log[-3:] == [("fit", None), ("rebuild", None), ("read", None)]
-        final = events["drawing.frame_short_balloon"]
-        assert final["failed_checks"] == []
-        assert final["after"]["viewport_pixel_bounds_m"][0] == _FIT_PIXEL_M[window_px]
-        placements.append(position_xy)
-    assert placements[0] == placements[1] == pytest.approx(_TARGET)
+    both windows ask SetPosition for the same point. After the rebuild at fit
+    it is read zoomed again: the fit read's ring is off by two fit pixels,
+    as GetDisplayData renders at fit, and does not decide."""
+    window = _Window(window_px, fit_drift_px=2.0)
+    run, placed_at, events = _short_balloon_rig(monkeypatch, window)
+    run()
+    [(position_xy, span)] = placed_at
+    zoomed = 2 * drawing._SHORT_BALLOON_ZOOM_HALF
+    assert span == pytest.approx(zoomed)
+    assert position_xy == pytest.approx(_TARGET)
+    assert window.log[-6:] == [
+        ("fit", None), ("rebuild", None), ("read", None),
+        ("zoom", pytest.approx(zoomed)), ("read", pytest.approx(zoomed)), ("fit", None),
+    ]
+    final = events["drawing.frame_short_balloon"]
+    assert final["failed_checks"] == []
+    assert final["fit"]["viewport_pixel_bounds_m"][0] == _FIT_PIXEL_M[window_px]
+    assert final["after"]["rendered_circle"][:2] == pytest.approx(_TARGET)
 
 
 @pytest.mark.parametrize("window_px", [640, 820])
-def test_short_balloon_fails_when_the_rebuilt_fit_read_leaves_its_target(
-    monkeypatch, window_px
+@pytest.mark.parametrize(
+    ("rebuild", "failed"),
+    [
+        ("position", ["fit:position_moved", "rebuilt:circle_position"]),
+        ("ring", ["rebuilt:circle_position"]),
+    ],
+)
+def test_short_balloon_fails_when_the_rebuild_moves_it(
+    monkeypatch, window_px, rebuild, failed
 ) -> None:
-    """A zoomed read on target proves nothing about fit: GetDisplayData moves
-    with the viewport. Two fit pixels off, the leaf fails, with the view
-    back at fit."""
-    window = _Window(window_px, fit_drift_px=2.0)
+    """A zoomed read on target proves nothing about the rebuilt drawing the
+    export prints. The rebuild moving the SetPosition anchor, or only the
+    ring, 1 mm fails the leaf, with the view back at fit."""
+    window = _Window(window_px, fit_drift_px=0.0, rebuild=rebuild)
     run, _placed_at, events = _short_balloon_rig(monkeypatch, window)
     with pytest.raises(RuntimeError, match="frame balloon 5 short placement failed"):
         run()
-    assert events["drawing.frame_short_balloon"]["failed_checks"] == ["fit:circle_position"]
+    assert events["drawing.frame_short_balloon"]["failed_checks"] == failed
     assert window.span is None
 
 
