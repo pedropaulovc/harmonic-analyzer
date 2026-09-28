@@ -343,9 +343,11 @@ async def build(adapter: Any) -> dict[str, str]:
         right,
         edge_xy=datum_a_edge,
         # Was (0.325, 0.145) -- under the isometric, so its leader ran across
-        # that view. Below the view instead; the leader reaches the face at
-        # y=0.110 while staying under the front view's lower edge (y=0.104).
-        frame_xy=(0.312, 0.092),
+        # that view. Below-left of the view; its leader lands on (0.365, 0.1125).
+        # Was (0.312, 0.092): that leader clipped datum A's box corner
+        # (leader-crosses-line). Shoulder end now (0.349, 0.086), so the steeper
+        # leader threads datum A's box and the 10.00 extension line >= 3.1 mm.
+        frame_xy=(0.322, 0.0895),
         characteristic="flatness",
         tolerance=GEOMETRIC_TOLERANCES_MM["platen-mating face flatness"],
         label="platen-mating face flatness",
@@ -354,17 +356,17 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         right,
         edge_xy=(0.375, 0.110),
-        # Below-right of the view (was (0.382, 0.145), under the isometric).
-        # x=0.390, NOT 0.400: an FCF's anchor is its frame's TOP-LEFT corner and
-        # the frame grows RIGHT from it by its full width -- it is not centred.
-        # This one ("|//| 0.10 |A|") measures 25.2 mm wide, so x=0.400 put its
-        # right edge at 0.4252, over the 0.4191 margin by 6.1 mm. The old comment
-        # here reasoned from an "8 mm half-box" -- the audit's since-corrected
-        # model, which had it stopping at 0.408 and passed it clean. 0.390 lands
-        # the right edge at 0.4152, 3.9 mm inside the margin, and the frame sits
-        # at y 0.079..0.086 so it stays clear of the 5.00 height dimension up at
-        # (0.385, 0.110).
-        frame_xy=(0.390, 0.086),
+        # Above-left of the view, under the isometric's caption (was (0.390,
+        # 0.086) below-right: that leader crossed the 5.00 lower extension line
+        # and the 10.00 dimension line, leader-crosses-line x2). An FCF's anchor
+        # is its frame's TOP-LEFT corner and this one ("|//| 0.10 |A|") is
+        # 25.2 mm wide, so it spans x 0.332..0.3572, y 0.115..0.122, centred in the
+        # gap between the front view (x <= 0.3304) and the right view (x >= 0.3594):
+        # 2.4 mm under the caption's glyphs, 2.5 mm over datum A's line. Its shoulder
+        # runs right to 0.3635 and the leader drops 6 mm to the corner it landed on
+        # before; pinned there, because the frame changed side of it.
+        frame_xy=(0.332, 0.122),
+        leader_attach_xy=(0.3748, 0.1125),
         characteristic="parallelism",
         tolerance=GEOMETRIC_TOLERANCES_MM["guide opposite-face parallelism"],
         datums=("A",),
@@ -374,7 +376,11 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=(FRONT_LEFT_X_M + BLIND_X[0] / 1000.0, FRONT_HOLE_Y_M),
-        frame_xy=(0.105, 0.155),
+        # Was (0.105, 0.155), above the 269.64 dimension line, which its leader
+        # to A1 crossed (leader-crosses-line). Now between the bar and that line,
+        # right of the A1 tag: frame y 0.122..0.129 and "9X" down to 0.1174,
+        # 3.2 mm under the dimension line and 3.6 mm clear of the A1 tag.
+        frame_xy=(0.097, 0.129),
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["guide hole-pattern position"],
         datums=("A", "B", "C"),

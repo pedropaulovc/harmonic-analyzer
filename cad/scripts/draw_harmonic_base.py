@@ -281,7 +281,12 @@ HOLE_TOP_KEEP: dict[str, tuple[float, float]] = {}
 # captions ran off the sheet edge -- 433.6 mm on a 431.8 mm sheet. Both texts
 # now sit beside the corner they dimension, captions inside the border.
 SECTION_KEEP = {
-    "RimHeight": (0.393, 0.215),
+    # Down beside the rear end its witnesses start from (y 0.1017), between
+    # the spotface block and the bore Ra (was (0.393, 0.215)): the witnesses
+    # ran up the whole section and the Ra leader crossed both
+    # (leader-crosses-line x2). Now they stop at y 0.1265, 17 mm under the
+    # Ra's shoulder; the dimension line is 2.4 mm over the spotface text.
+    "RimHeight": (0.4025, 0.1338),
     "TopRimChamfer": (0.400, 0.189),
     "BottomEdgeChamfer": (0.385, 0.1633),
     # Right of the section, not left: a display dimension anchors where

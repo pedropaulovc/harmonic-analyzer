@@ -205,7 +205,12 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         right,
         edge_xy=right_crown_face,
-        frame_xy=(0.245, 0.228),
+        # Right of the crown, not left (was (0.245, 0.228)): the 33 mm "BOTH
+        # CROWNS" row outruns the 20 mm frame, so the leader out of the frame's
+        # right side ran through it (leader-through-own-text). From here the
+        # shoulder leaves the frame's left side and the leader drops near-vertical
+        # to the crown, 6 mm left of the row and 2.4 mm past the 187.0 witness end.
+        frame_xy=(0.295, 0.228),
         characteristic="profile_surface",
         tolerance=GEOMETRIC_TOLERANCES_MM["pinion pivot crown profile"],
         datums=(),
