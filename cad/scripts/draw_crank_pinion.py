@@ -329,7 +329,6 @@ async def build(adapter: Any) -> dict[str, str]:
         attach_xy=PIN_HOLE_EDGE,
         label="retention-pin matched cross-hole",
         view=right,
-        height=0.0025,
     )
     # Put the fit note immediately left of the end view and send its short
     # leader radially through the upper-left tooth gap to the visible bore.
@@ -341,7 +340,6 @@ async def build(adapter: Any) -> dict[str, str]:
         attach_xy=BORE_FIT_ATTACH,
         label="crank pinion bore fit",
         view=front,
-        height=0.0022,
     )
     # The fit note and finish symbol use different bore quadrants, so their
     # leaders cannot be mistaken for one another.

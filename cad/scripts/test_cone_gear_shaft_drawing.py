@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import _config
+import _drawing_common
 import _fit_limits
 import build_cone_gear_shaft as part
 import build_drive_train_assembly as drive
@@ -354,10 +355,11 @@ def test_shoulder_roots_are_modelled_not_noted() -> None:
     # say it.
     notes = cone_gear_shaft_spec.DRAWING_NOTES
     assert 1 <= len(notes.splitlines()) <= 4
-    # The sheet's note text runs ~2.7 mm per character; a line from the
-    # note anchor must end before the title block at x = 0.216 m (the
-    # first render's 67-character line ran under the tolerance table).
-    assert max(len(line) for line in notes.splitlines()) * 0.0027 < (
+    # A default-format note line from the note anchor must end before the
+    # title block at x = 0.216 m (the first render's 67-character line ran
+    # under the tolerance table).
+    widest = max(len(line) for line in notes.splitlines())
+    assert widest * _drawing_common.DEFAULT_NOTE_CHAR_WIDTH_M < (
         0.216 - drawing.NOTES_XY[0]
     )
     mate_number = _config.parts("cone-gear")["number"]
