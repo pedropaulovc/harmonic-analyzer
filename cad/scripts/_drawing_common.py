@@ -20,7 +20,7 @@ from collections import Counter
 from dataclasses import dataclass, replace
 from itertools import combinations
 from pathlib import Path
-from typing import Any, Callable, Iterable, Literal, Mapping, Sequence
+from typing import Any, Callable, Iterable, Iterator, Literal, Mapping, Sequence
 
 import _config
 import _telemetry
@@ -5469,11 +5469,10 @@ class BalloonAnchor:
     (:func:`_select_balloon_anchor`), for a family no single point claims.
 
     ``visible_edge=True`` skips every hit test and takes the edge the view's
-    hidden-line pass lists as drawn (:func:`_visible_edge`). Where another
-    part's edge lies next to the point (a screw head seated on a flange),
-    which edge a hit test returns can differ by seat (the frame lag screw,
-    runs 20260928T084730204Z and 20260928T085715872Z); the listed edge does
-    not.
+    hidden-line pass lists as drawn (:func:`_visible_edge`), for a part drawn
+    against another's outline (a screw head seated on a flange): the frame
+    lag screw's frozen point hit the screw on one seat and the flange on
+    another (runs 20260928T084730204Z and 20260928T085715872Z).
     """
 
     point_mm: tuple[float, float, float] | None = None
@@ -5945,17 +5944,46 @@ def _entity_owner(adapter: Any, entity: Any) -> str:
     return _component_path(adapter, component)
 
 
+# The hit test's zoom window half-span. Fit to sheet, the pick aperture is a
+# few pixels of a ~280 mm portrait sheet: millimetres wide, and wider on a
+# 1024x640 seat window than on an 820-high one, so the same point returned
+# another part's edge on swmaker000008 than on swmaker000004/6. Zoomed ~56x,
+# the aperture is a few hundredths of a millimetre on every seat.
+_HIT_ZOOM_HALF = 0.0025
+
+
+@contextlib.contextmanager
+def _zoomed_on(adapter: Any, centre: Sequence[float], half: float) -> Iterator[None]:
+    """Zoom the drawing window onto a sheet square, then back to fit.
+
+    new_project_drawing fits the sheet so every other coordinate pick sees the
+    zoom it was placed under; this restores that zoom on the way out.
+    """
+    draw = adapter.currentModel
+    draw.ViewZoomTo2(
+        centre[0] - half, centre[1] - half, 0.0, centre[0] + half, centre[1] + half, 0.0
+    )
+    try:
+        yield
+    finally:
+        draw.ViewZoomtofit2()
+
+
 def _hit_test_edge(adapter: Any, sheet_xy: Sequence[float]) -> tuple[Any, str]:
     """Select the edge drawn at ``sheet_xy`` of the active view; return it and its owner.
 
-    In a drawing the view is selected alongside the edge; the edge is last.
-    The selection is left in place for the caller to use or clear.
+    The pick runs zoomed onto the point (:data:`_HIT_ZOOM_HALF`), so which
+    edge it returns does not depend on the seat's window size. In a drawing
+    the view is selected alongside the edge; the edge is last. The selection
+    is left in place for the caller to use or clear.
     """
     draw = adapter.currentModel
     draw.ClearSelection2(True)
-    if not draw.Extension.SelectByID2(
-        "", "EDGE", sheet_xy[0], sheet_xy[1], 0.0, False, 0, null_callout(), 0
-    ):
+    with _zoomed_on(adapter, sheet_xy, _HIT_ZOOM_HALF):
+        selected = draw.Extension.SelectByID2(
+            "", "EDGE", sheet_xy[0], sheet_xy[1], 0.0, False, 0, null_callout(), 0
+        )
+    if not selected:
         return None, ""
     manager = draw.SelectionManager
     edge = manager.GetSelectedObject6(int(manager.GetSelectedObjectCount2(-1)), -1)

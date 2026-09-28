@@ -2211,20 +2211,32 @@ class _AnchorEdge:
         return True
 
 
+# A portrait sheet fit to the window, and a pick aperture of a few pixels.
+_FIT_SPAN_M = 0.28
+_PICK_PX = 8
+
+
 class _AnchorSheet:
     """A drawing whose hit test returns the edge drawn at a sheet point.
 
-    ``attach(edge)`` is what an inserted balloon reports through
-    ``GetAttachedEntities3`` / ``GetAttachedEntityTypes``: by default the
-    selected edge, typed swSelEDGES."""
+    ``near`` maps a sheet point where nothing of interest is drawn to (distance,
+    edge) of the closest drawn edge. Like SolidWorks' pick, the hit test takes
+    it when it lies inside an aperture of :data:`_PICK_PX` pixels, so the
+    aperture in sheet metres depends on the zoom and on ``window_px``, the
+    graphics area's height. ``attach(edge)`` is what an inserted balloon
+    reports through ``GetAttachedEntities3`` / ``GetAttachedEntityTypes``: by
+    default the selected edge, typed swSelEDGES."""
 
-    def __init__(self, edges_at, attach=lambda edge: ((edge,), (1,))):
+    def __init__(self, edges_at, attach=lambda edge: ((edge,), (1,)), near=None, window_px=640):
         self.edges_at = edges_at
         self.attach = attach
+        self.near = near or {}
+        self.window_px = window_px
+        self.span = _FIT_SPAN_M
         self.selected = []
         self.hits = []
         self.balloons = []
-        for edge in edges_at.values():
+        for edge in (*edges_at.values(), *(edge for _d, edge in self.near.values())):
             edge.sheet = self
         manager = SimpleNamespace(
             CreateSelectData=lambda: SimpleNamespace(),
@@ -2238,14 +2250,26 @@ class _AnchorSheet:
             InsertBOMBalloon2=self._insert,
         )
 
+    def ViewZoomTo2(self, x0, y0, _z0, x1, y1, _z1):
+        self.span = max(x1 - x0, y1 - y0)
+
+    def ViewZoomtofit2(self):
+        self.span = _FIT_SPAN_M
+
     def _select(self, _name, kind, x, y, _z, _append, _mark, _callout, _option):
         assert kind == "EDGE"
-        self.hits.append((round(x, 9), round(y, 9)))
-        edge = self.edges_at.get((round(x, 9), round(y, 9)))
+        key = (round(x, 9), round(y, 9))
+        self.hits.append(key)
+        edge = self.edges_at.get(key)
+        if edge is None and key in self.near:
+            distance, closest = self.near[key]
+            if distance <= _PICK_PX * self.span / self.window_px:
+                edge = closest
         self.selected = [] if edge is None else ["the view", edge]
         return edge is not None
 
     def _insert(self, _options):
+        assert self.span == _FIT_SPAN_M, "balloons go in under the fit-to-sheet zoom"
         entities, kinds = self.attach(self.selected[-1])
         item = str(len(self.balloons) + 1)
         annotation = SimpleNamespace(
@@ -2564,6 +2588,37 @@ def test_walk_budget_never_fetches_an_oversized_face_or_reads_past_its_caps(monk
     assert all(face.fetched == 0 for face in small[15:])
     assert (anchors[0]["faces"], anchors[0]["edges"], anchors[0]["complete"]) == (16, 30, False)
     assert anchors[0]["method"] == "walk" and anchors[0]["tried"] == 1
+
+
+def test_walk_anchors_identically_on_a_640_and_an_820_pixel_seat_window(monkeypatch):
+    """Fit to sheet, a few pixels of pick aperture are millimetres of sheet,
+    more on a small window: the first walk point, whose own edge is not drawn
+    there, borrows the gear's edge 3 mm away on a 640 px window but not on an
+    820 px one (swmaker000008 against swmaker000004). Zoomed onto each point,
+    both seats reject it and anchor on the next, drawn point."""
+
+    def run(sheet):
+        view = _exploded_view(
+            _instances("cone-gear-1", bodies={"cone-gear-1": _body(_walk_faces())}), []
+        )
+        return _balloon(monkeypatch, sheet, view, {"cone-gear": _WALK})
+
+    probe = _AnchorSheet({})
+    with pytest.raises(RuntimeError, match="no verifiably visible edge"):
+        run(probe)
+    first, second = probe.hits[:2]
+    anchors = []
+    for window_px in (640, 820):
+        sheet = _AnchorSheet(
+            {second: _AnchorEdge("cone-gear-1")},
+            near={first: (0.003, _AnchorEdge("cone-gear-1"))},
+            window_px=window_px,
+        )
+        _balloons, _projected, placed = run(sheet)
+        assert sheet.span == _FIT_SPAN_M
+        anchors.append(placed[0])
+    assert anchors[0] == anchors[1]
+    assert (anchors[0]["method"], anchors[0]["tried"]) == ("walk", 2)
 
 
 def test_walk_hit_on_the_same_named_part_of_another_subassembly_is_not_claimed(monkeypatch):
