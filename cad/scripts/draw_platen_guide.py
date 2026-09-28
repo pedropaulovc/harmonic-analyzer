@@ -378,8 +378,8 @@ async def build(adapter: Any) -> dict[str, str]:
         # the isometric's caption (0.1235), inside the 0.4191 border. Above-left
         # (0.332, 0.122), its leader dropped onto the face from inside the
         # section and crossed the old 5.00's upper extension line. No
-        # leader_attach_xy: setting the leader point detached the frame from
-        # its edge (entities=0 on the 1c99291b4 farm leaf).
+        # leader_attach_xy: it lands where the edge pick sits, and the pick is
+        # already level with the frame.
         frame_xy=(0.384, 0.1135),
         characteristic="parallelism",
         tolerance=GEOMETRIC_TOLERANCES_MM["guide opposite-face parallelism"],

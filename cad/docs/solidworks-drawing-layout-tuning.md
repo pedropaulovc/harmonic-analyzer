@@ -282,6 +282,36 @@ prints there. Keep the guard at its 20 mm default and tighten it only where the
 leader itself is shorter than 20 mm (a snap-back would pass otherwise:
 channel_lever, platen_guide, rocker_arm, cone_tip_block E).
 
+**i. Moving a leader after the symbol is inserted.**
+Don't: land a surface-finish symbol's or feature-control frame's leader with
+`IAnnotation::SetLeaderAttachmentPointAtIndex`. It returns True, moves the
+tip, and DETACHES the annotation: `GetAttachedEntityCount3` goes 1 -> 0 and
+`GetAttachedEntityTypes` empties, while `ISFSymbol.IsAttached` /
+`IGtol.IsAttached` keep reading True, `GetLeaderCount` stays 1 and
+`IsDangling` stays False (13 surface finishes on the #1105 sfprobe leaves;
+6 frames on farm run 20260928T080412049Z, re-set to the tip they already
+had). Those three reads are not attachment evidence.
+Do: select the entity, call `ISelectionMgr::SetSelectionPoint2(1, -1, x, y,
+0)` with the sheet landing, THEN insert (`InsertSurfaceFinishSymbol3`,
+`InsertGtol`); assert `GetAttachedEntityCount3 == 1` and the types after the
+rebuild (`add_surface_finish`, `add_feature_control_frame`). A pointer note
+(`add_leader_note`) has no attachment to lose (0 -> 0 on the same run) and
+keeps the call. Where the pick and the landing differ, the leader may end on
+the PICK (pinion_bracket pivot finish, 4.6 mm off), so pick the edge at the
+landing point.
+
+**j. A fresh detail view whose readbacks lag its ink.**
+Right after `CreateDetailViewAt4` + rebuild, `IView::GetOutline` is centred
+on the request while `ModelToViewTransform` projects the circle centre 99 mm
+away and `Position` reads 99 mm from where `SetViewPosition` later has to put
+it (cone_swing_platform detail B, leaf 20260928T075849Z-1-882b4704). A loop
+that "corrects" the projection moves a correct view off the sheet target and
+needs a second move to recover; on three #1105 leaves it never did.
+Do: place by the outline centre (`GetOutline` is the ink; `SetViewPosition`
+moves it by the delta from the `Position` it reads), then re-read the
+projection until it agrees with the outline before hanging anything on the
+view.
+
 ## The sheet-split rule
 
 When two views' callouts are squeezed together, the fix is a NEW SHEET, not a

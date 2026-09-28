@@ -878,6 +878,15 @@ def add_feature_control_frame(
 
     ``entity_type`` widens the pick for entities that are not model edges —
     a revolve's flank lines are ``"SILHOUETTE"`` edges.
+
+    ``leader_attach_xy`` is where the leader lands on that entity (sheet
+    metres): it becomes the selection point before ``InsertGtol``, the same
+    way :func:`add_surface_finish` lands.  It is never applied with
+    ``SetLeaderAttachmentPointAtIndex``: on farm run
+    20260928T080412049Z-77daa98fe5514439bd4ce684c6e19ec7 that call, re-setting
+    six frames' leaders to the tip they already had, dropped every frame's
+    attached entity (GetAttachedEntityCount3 1 -> 0, types (EDGE,) -> ())
+    while IGtol.IsAttached kept reading True with one non-dangling leader.
     """
     draw = adapter.currentModel
     edge = _select_annotation_entity(
@@ -889,6 +898,14 @@ def add_feature_control_frame(
         entity_type=entity_type,
         label=label,
     )
+    if leader_attach_xy is not None:
+        selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+        if selection_manager.SetSelectionPoint2(
+            1, -1, leader_attach_xy[0], leader_attach_xy[1], 0.0
+        ) is not True:
+            raise RuntimeError(
+                f"failed to set the feature-control-frame landing {leader_attach_xy} ({label})"
+            )
     gtol = draw.InsertGtol()
     if gtol is None:
         raise RuntimeError(f"failed to insert feature-control frame ({label})")
@@ -972,7 +989,9 @@ def add_feature_control_frame(
         "SetAttachedEntities",
         "SetPosition2",
         "SetLeader3",
-        "SetLeaderAttachmentPointAtIndex",
+        "GetAttachedEntities3",
+        "GetLeaderCount",
+        "IsDangling",
         "GetLeaderPointsAtIndex",
     )
     # A GTol inserted from a selected display dimension reports its association
@@ -1002,38 +1021,30 @@ def add_feature_control_frame(
         )
     if not annotation.SetPosition2(frame_xy[0], frame_xy[1], 0.0):
         raise RuntimeError(f"failed to position feature-control frame ({label})")
-    if leader_attach_xy is not None and not annotation.SetLeaderAttachmentPointAtIndex(
-        0, leader_attach_xy[0], leader_attach_xy[1], 0.0
-    ):
-        raise RuntimeError(f"failed to position feature-control-frame leader ({label})")
     rebuild_drawing(adapter, label="add_feature_control_frame")
-    if (
-        int(annotation.GetAttachedEntityCount3()) not in expected_entities
-        or not bool(gtol.IsAttached())
-        or int(gtol.GetLeaderCount()) != 1
-    ):
-        raise RuntimeError(
-            f"feature-control frame attachment mismatch ({label}): "
-            f"entities={annotation.GetAttachedEntityCount3()}, "
-            f"expected in {sorted(expected_entities)}; "
-            f"attached={bool(gtol.IsAttached())}; "
-            f"leaders={gtol.GetLeaderCount()}, expected=1"
+    # IGtol.IsAttached reads True on a detached frame (run 20260928T080412049Z
+    # above), so the attached entity is what proves the attachment.
+    if entity_type == "DIMENSION":
+        if (
+            int(annotation.GetAttachedEntityCount3()) not in expected_entities
+            or not bool(gtol.IsAttached())
+            or int(gtol.GetLeaderCount()) != 1
+        ):
+            raise RuntimeError(
+                f"feature-control frame attachment mismatch ({label}): "
+                f"entities={annotation.GetAttachedEntityCount3()}, "
+                f"expected in {sorted(expected_entities)}; "
+                f"attached={bool(gtol.IsAttached())}; "
+                f"leaders={gtol.GetLeaderCount()}, expected=1"
+            )
+    else:
+        _assert_attached_to(
+            adapter, annotation, edge, what="feature-control frame", label=label
         )
     if leader_attach_xy is not None:
-        points = list(annotation.GetLeaderPointsAtIndex(0) or ())
-        if len(points) < 6:
-            raise RuntimeError(f"feature-control-frame leader is unreadable ({label})")
-        actual_attach = (float(points[-3]), float(points[-2]))
-        attach_error = math.hypot(
-            actual_attach[0] - leader_attach_xy[0],
-            actual_attach[1] - leader_attach_xy[1],
+        _assert_leader_lands(
+            annotation, leader_attach_xy, what="feature-control frame", label=label
         )
-        if attach_error > 0.005:
-            raise RuntimeError(
-                f"feature-control-frame leader attachment moved ({label}): "
-                f"actual={actual_attach}, requested={leader_attach_xy}, "
-                f"error={attach_error:.6g} m"
-            )
     draw.ClearSelection2(True)
     return gtol
 
@@ -2302,6 +2313,13 @@ def add_leader_note(
     a leader from the one view it is owned by -- a sheet-owned label whose
     leader ends ON a view reads as crossing it (12 findings on the priming
     sheet before this).
+
+    ``SetLeaderAttachmentPointAtIndex`` is the right call HERE, unlike for
+    surface-finish symbols and feature-control frames, which it detaches: a
+    pointer note has no attached entity to lose (farm run
+    20260928T080412049Z-77daa98fe5514439bd4ce684c6e19ec7 read
+    GetAttachedEntityCount3 0 -> 0, one non-dangling leader, on all four
+    cone-swing and crank-pinion notes).
     """
     draw = adapter.currentModel
     if view is not None:
