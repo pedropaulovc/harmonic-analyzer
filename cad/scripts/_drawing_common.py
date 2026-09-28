@@ -1749,16 +1749,17 @@ DRAWING_BUILD_ID_PROPERTY = "BUILD_ID"
 # file is still loading ("Files are loaded using multi-threading ... Until all
 # data and references are loaded, the file is in view-only mode ... many API
 # queries return NULL or empty data"), or it was DELIBERATELY opened for
-# viewing. The only deliberate view-only open is ``swOpenDocOptions_ViewOnly``
-# (0x4), "Large Design Review mode (assemblies only)", and every build-path
-# open passes ``OpenDoc6`` options 1 (Silent) through ``adapter.open_model``.
-# So on a PART, view-only can only mean "still loading", and an empty read
-# waits for the flag to clear -- bounded and logged, and never a blind re-read
-# of a document that says it is loaded. An assembly or drawing may be view-only
-# by choice, so its flag is reported, not waited on.
+# viewing, which only the opener can ask for: ``swOpenDocOptions_ViewOnly``
+# (0x4) on ``OpenDoc6``, or ``IDocumentSpecification.ViewOnly`` on
+# ``OpenDoc7``. The build asks for neither. Every open passes ``OpenDoc6``
+# options without 0x4 (``adapter.open_model`` passes 1, Silent), and
+# ``test_failure_forensics`` holds every ``OpenDoc6``/``OpenDoc7`` call in
+# cad/scripts and solidworks_mcp to that. So on any document the build opened,
+# part or assembly, view-only means "still loading", and an empty read waits
+# for the flag to clear -- bounded and logged, and never a blind re-read of a
+# document that says it is loaded.
 _VIEW_ONLY_WAIT_S = 30.0
 _VIEW_ONLY_POLL_S = 0.25
-_SW_DOC_PART = 1  # swDocumentTypes_e.swDocPART
 
 
 def _opened_view_only(model: Any) -> bool | None:
@@ -1770,34 +1771,19 @@ def _opened_view_only(model: Any) -> bool | None:
     return value if isinstance(value, bool) else None
 
 
-def _document_type(model: Any) -> int | None:
-    try:
-        return int(_read_member(model, "GetType"))
-    except Exception:  # noqa: BLE001 - unreadable type is "unknown"
-        return None
-
-
 def _await_document_loaded(model: Any) -> dict[str, Any]:
-    """Wait for a view-only PART (a load in progress) to finish loading.
+    """Wait for a view-only (still loading) document to finish loading.
 
     Returns the observation for the failure capture: ``view_only`` as first
-    read, and, when it had to wait, ``view_only_wait_s`` and the final state;
-    a view-only document that is not a part carries ``view_only_not_waited``.
+    read, and, when it had to wait, ``view_only_wait_s`` and the final state.
     """
     view_only = _opened_view_only(model)
     load: dict[str, Any] = {"view_only": "unknown" if view_only is None else view_only}
     if view_only is not True:
         return load
-    doc_type = _document_type(model)
-    if doc_type != _SW_DOC_PART:
-        load["view_only_not_waited"] = (
-            f"document type {doc_type if doc_type is not None else 'unknown'} is not "
-            "a part: view-only may be a deliberate Large Design Review open"
-        )
-        return load
     _telemetry.info(
-        "source part is still loading (IsOpenedViewOnly=True; opened Silent, never "
-        "view-only) with empty custom properties; waiting up to "
+        "source document is still loading (IsOpenedViewOnly=True, and the build "
+        "never opens view-only) with empty custom properties; waiting up to "
         f"{_VIEW_ONLY_WAIT_S:.0f}s for it to load"
     )
     begun = time.monotonic()

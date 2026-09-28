@@ -30,6 +30,7 @@ the reason the 2026-09-17 ``logo ring extrude failed`` leaf could only be called
 
 from __future__ import annotations
 
+import ast
 import contextlib
 import json
 import ctypes
@@ -793,52 +794,95 @@ class _SourcePart:
 _TITLE_BLOCK = ("Number", "Material Specification", "Finish", "Quantity")
 
 
+@pytest.mark.parametrize(
+    "doc_type", [1, 2], ids=["part", "assembly"]  # swDocumentTypes_e
+)
 def test_a_still_loading_source_is_read_once_it_has_loaded(
-    monkeypatch, capture_telemetry
+    monkeypatch, capture_telemetry, doc_type
 ):
     """Every property read empty on a source the seat had not finished loading;
     the document's own view-only flag is the signal to wait on, and the read
-    that follows it succeeds."""
+    that follows it succeeds. An assembly waits too: the build never opens
+    view-only (see the invariant below), so its flag is a load in progress."""
     import _drawing_common
 
     spans, logs = capture_telemetry
     monkeypatch.setattr(_drawing_common, "_VIEW_ONLY_POLL_S", 0.0)
-    part = _SourcePart({name: "x" for name in _TITLE_BLOCK}, loading_reads=2)
+    source = _SourcePart(
+        {name: "x" for name in _TITLE_BLOCK}, loading_reads=2, doc_type=doc_type
+    )
 
-    got = _drawing_common.read_required_properties(part, _TITLE_BLOCK, required=_TITLE_BLOCK)
+    got = _drawing_common.read_required_properties(
+        source, _TITLE_BLOCK, required=_TITLE_BLOCK
+    )
 
     assert got == {name: "x" for name in _TITLE_BLOCK}
-    assert part.property_reads == 2 * len(_TITLE_BLOCK)  # one read, one after the load
+    assert source.property_reads == 2 * len(_TITLE_BLOCK)  # one read, one after the load
     assert any("IsOpenedViewOnly=True" in str(r.log_record.body) for r in logs.get_finished_logs())
 
 
-def test_a_view_only_assembly_is_reported_not_waited_on(monkeypatch, capture_telemetry):
-    """``IsOpenedViewOnly`` is also True for a DELIBERATE view-only open, and the
-    only such open (``swOpenDocOptions_ViewOnly``, Large Design Review) exists
-    for assemblies alone. An assembly's flag is therefore no proof of a load in
-    progress: it is recorded and the failure raises at once, with no wait."""
-    import _drawing_common
+_SW_OPEN_VIEW_ONLY = 0x4  # swOpenDocOptions_e.swOpenDocOptions_ViewOnly
 
-    spans, logs = capture_telemetry
-    monkeypatch.setattr(_common, "_early_bound", lambda obj, _iface: obj)
-    monkeypatch.setattr(
-        _drawing_common.time, "sleep", lambda _s: pytest.fail("waited on an assembly")
-    )
-    assembly = _SourcePart({}, loading_reads=10**6, doc_type=2)  # swDocASSEMBLY
 
-    with pytest.raises(RuntimeError, match=r"^source part properties are missing"):
-        _drawing_common.read_required_properties(
-            assembly, _TITLE_BLOCK, required=_TITLE_BLOCK
-        )
+def _open_options(node: ast.expr, constants: dict[str, int]) -> int | None:
+    """The integer an ``OpenDoc6`` options argument folds to, or ``None``."""
+    if isinstance(node, ast.Constant) and isinstance(node.value, int):
+        return node.value
+    if isinstance(node, ast.Name):
+        return constants.get(node.id)
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitOr):
+        left = _open_options(node.left, constants)
+        right = _open_options(node.right, constants)
+        return None if left is None or right is None else left | right
+    return None
 
-    assert assembly.view_only_reads == 1
-    assert assembly.property_reads == len(_TITLE_BLOCK)
-    (record,) = [
-        r for r in logs.get_finished_logs() if "[forensics] source part" in str(r.log_record.body)
-    ]
-    load = json.loads(record.log_record.attributes["capture"])["load"]
-    assert load["view_only"] is True
-    assert "Large Design Review" in load["view_only_not_waited"]
+
+def test_no_document_the_build_opens_is_opened_view_only():
+    """The reader's wait rests on this: ``IsOpenedViewOnly`` is True for a load
+    in progress OR a deliberate view-only open, and only the opener can ask for
+    the latter (``OpenDoc6`` option 0x4, ``OpenDoc7``'s ``ViewOnly``). So every
+    ``OpenDoc6`` in cad/scripts and solidworks_mcp must pass options that fold
+    to a constant without 0x4, and none may use ``OpenDoc7`` or set ``ViewOnly``."""
+    roots = [REPO_ROOT / "cad" / "scripts", REPO_ROOT / "SolidworksMCP-python" / "src"]
+    violations: list[str] = []
+    checked: set[str] = set()
+    for root in roots:
+        for path in sorted(root.rglob("*.py")):
+            if "_generated" in path.parts or path.name.startswith("test_"):
+                continue
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+            constants = {
+                target.id: node.value.value
+                for node in tree.body
+                if isinstance(node, ast.Assign)
+                and isinstance(node.value, ast.Constant)
+                and isinstance(node.value.value, int)
+                for target in node.targets
+                if isinstance(target, ast.Name)
+            }
+            for node in ast.walk(tree):
+                where = f"{path.relative_to(REPO_ROOT).as_posix()}:{getattr(node, 'lineno', '?')}"
+                if isinstance(node, ast.Attribute) and isinstance(node.ctx, ast.Store):
+                    if node.attr == "ViewOnly":
+                        violations.append(f"{where}: sets ViewOnly")
+                if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)):
+                    continue
+                if node.func.attr == "OpenDoc7":
+                    violations.append(f"{where}: OpenDoc7 (spec may be ViewOnly)")
+                if node.func.attr != "OpenDoc6":
+                    continue
+                arg = next((k.value for k in node.keywords if k.arg == "Options"), None)
+                if arg is None and len(node.args) >= 3:
+                    arg = node.args[2]
+                options = _open_options(arg, constants) if arg is not None else None
+                if options is None:
+                    violations.append(f"{where}: OpenDoc6 options not a foldable constant")
+                elif options & _SW_OPEN_VIEW_ONLY:
+                    violations.append(f"{where}: OpenDoc6 options {options:#x} include ViewOnly")
+                checked.add(path.name)
+    assert not violations, "\n".join(violations)
+    # The scan must see the build's real open paths, or it proves nothing.
+    assert {"io.py", "assembly.py", "package_native.py"} <= checked, sorted(checked)
 
 
 def test_empty_properties_on_a_loaded_source_name_the_document_api_and_seat(
