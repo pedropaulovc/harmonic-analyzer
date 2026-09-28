@@ -219,9 +219,15 @@ _SLOT_Y = DETAIL_CENTER[1] + (DETAIL_MODEL_Z - TIP_SCREW_LOCAL_Z) * _DETAIL_S
 # the slot's dimension line inside the slot's span), and pivot-to-slot alone
 # on the right.  The cutters are named by leadered notes, not dimension text.
 DETAIL_KEEP = {
-    # Right, alone: text above the slot-centre extension line (0.055),
-    # hanging right, under the cutter notes' leaders (>= 0.063 here).
-    "TipSlotZ": (DETAIL_CENTER[0] + 0.030, _SLOT_Y + 0.0045),
+    # Right, alone, OUTBOARD of both cutter notes: text above the slot-centre
+    # extension line (0.055), hanging right, short of the title block
+    # (0.216). The counterbore's lower arc sits inside this dimension's
+    # frame (pivot 0.033 to slot 0.055), so its note's leader, entering from
+    # the right, crossed the dimension line when that line stood between
+    # the circle and the notes (was DETAIL_CENTER[0] + 0.030;
+    # leader-crosses-line). Out here the note sits inside the frame and its
+    # leader reaches the arc without meeting either witness.
+    "TipSlotZ": (0.175, _SLOT_Y + 0.0045),
     # Above the circle, each 2.00 outside its own extension lines and under
     # the plan caption row (y >= 0.0805).  The west one sits in toward the
     # circle, left of the through-slot leader's path.
@@ -250,8 +256,8 @@ DETAIL_ARROWS_INSIDE = ("TipSlotW", "TipCboreW")
 # notes whose texts sit on the same side of their tips nest (ec70186e: 65.5
 # x 12.1 mm overlap).  The slot note therefore rises from the arc's upper
 # quadrant to text above; the counterbore note drops from its lower quadrant
-# to text below, its leader crossing pivot-to-slot's dimension line (the only
-# path: below that line's foot sits the relief note).
+# to text below, between pivot-to-slot's extension lines. That dimension's
+# line stands right of the note text, so the leader crosses neither.
 _WEST_ARC_CENTER = (DETAIL_CENTER[0] + 2.0 * _DETAIL_S, _SLOT_Y)
 
 
@@ -316,7 +322,10 @@ def cutter_note_model_tip(note: CutterNote) -> tuple[float, float, float]:
 DETAIL_LABEL_LOWER_LEFT = (0.016, 0.015)
 # The pivot relief-fit note (2.5 mm text, ~0.095 x 0.018): anchored by its
 # upper-left corner, lower right of the free band, left of the title block.
-RELIEF_NOTE_XY = (0.120, 0.034)
+# 2.5 mm under pivot-to-slot's lower extension line (0.033), which now runs
+# right past this note's left end to reach its line at 0.175. At 0.034 the
+# first row's top lay on that line.
+RELIEF_NOTE_XY = (0.120, 0.0315)
 # The MHA-142 named-exception note and its tap-break override (2.5 mm text,
 # two lines, ~141 x 8.8 mm), anchored upper-left in the empty band above the
 # title block (0.066): right of the plan caption row (x <= 0.2185), under the

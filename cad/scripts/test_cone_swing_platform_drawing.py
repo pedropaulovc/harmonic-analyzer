@@ -610,6 +610,29 @@ def test_cutter_note_leaders_reach_their_arcs_without_crossing() -> None:
         for a in _leader_fan(swapped[0])
         for b in _leader_fan(swapped[1])
     )
+    # No leader crosses pivot-to-slot's dimension line or extension lines,
+    # and those lines clear both note texts and the relief note (the audit's
+    # leader-crosses-line; the note sits inside that dimension's frame).
+    z_x = drawing.DETAIL_KEEP["TipSlotZ"][0]
+
+    def pivot_to_slot_lines(x):
+        return [
+            ((x, 0.033), (x, 0.055)),
+            ((drawing.DETAIL_CENTER[0], 0.033), (x, 0.033)),
+            ((drawing.DETAIL_CENTER[0] - 0.004, 0.055), (x, 0.055)),
+        ]
+
+    note_x, note_y = drawing.RELIEF_NOTE_XY
+    relief = (note_x, note_y - 0.0176, note_x + 0.0947, note_y)
+    for line in pivot_to_slot_lines(z_x):
+        for fan in fans.values():
+            for segment in fan:
+                assert not _segments_cross(segment, line), line
+        for box in (*map(_note_box, drawing.CUTTER_NOTES), relief):
+            assert not _segment_hits_box(line, box), (line, box)
+    # Positive control: the old line between the circle and the notes.
+    old_line = pivot_to_slot_lines(drawing.DETAIL_CENTER[0] + 0.030)[0]
+    assert any(_segments_cross(segment, old_line) for segment in fans["cbore"])
 
 
 def test_slot_section_cut_keeps_its_plane_and_crosses_the_plate() -> None:
