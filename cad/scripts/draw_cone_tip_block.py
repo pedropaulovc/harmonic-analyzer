@@ -1835,10 +1835,12 @@ async def build(adapter: Any) -> dict[str, str]:
     leader_points = tuple(
         leader_values[index : index + 3] for index in range(0, len(leader_values), 3)
     )
+    # Sheet x/y only: an attached leader end carries the edge's model depth
+    # in z.  The old z == 0 test matched the free sheet point that the
+    # leader setter left once it had detached the symbol.
     if not any(
         abs(point[0] - foot_right[0]) < 1e-6
         and abs(point[1] - foot_right[1]) < 1e-6
-        and abs(point[2]) < 1e-6
         for point in leader_points
     ):
         raise RuntimeError(
