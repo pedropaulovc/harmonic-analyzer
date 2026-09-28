@@ -185,14 +185,20 @@ OVERALL_XY = (0.112, 0.168)
 # The arbor symbol has a short leader to the bore's unobstructed left edge.
 ARBOR_FINISH_EDGE = (_front_x(-ARBOR_BORE / 2.0), _front_y(C2C))
 ARBOR_FINISH_XY = (0.155, 0.205)
-PIVOT_FINISH_EDGE = (_front_x(-PIVOT_BORE / 2.0), _front_y(0.0))
 # Low and far left, with the leader to the bore's lower-left quadrant: a
 # shallow rise keeps it under the symbol's own Ra text and the B label.
+# The edge is PICKED at that same 45-degree point.  Landing by selection
+# point (45d0a46da) puts the leader on the pick, not the selection point:
+# picked at 9 o'clock the leader ended at (203.7, 122.1), 4.6 mm above this
+# point, and at x 180 that raised it from y 112.9 to 115.9, through the
+# bottom of section line B's left label (115.7-121.8; leader-through-text,
+# leaf 20260928T073154Z-1-39ba7421).
 PIVOT_FINISH_XY = (0.136, 0.106)
 PIVOT_FINISH_LEADER = (
     _front_x(-PIVOT_BORE / 2.0 * math.cos(math.radians(45.0))),
     _front_y(-PIVOT_BORE / 2.0 * math.sin(math.radians(45.0))),
 )
+PIVOT_FINISH_EDGE = PIVOT_FINISH_LEADER
 # A callout says only what a dimension cannot: how the feature is made, where
 # it stops, and -- for the one dimension held finer than the general grade --
 # why it is held there.  Naming both follower-seat annotations ties the native
