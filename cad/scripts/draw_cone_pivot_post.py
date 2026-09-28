@@ -1478,7 +1478,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # native entity's default landing sat below it, on the lower-left.  The
     # rim is the pad end-face circle seen along Z, centred L/2*sin(incline)
     # right of the axis and foreshortened by cos(incline) across; the audit
-    # read the old landing within 0.1 mm of this ellipse.
+    # read the old landing within 0.1 mm of this ellipse.  The pick only sets
+    # the landing: the note must still attach to the identified bore rim.
     view_b_t = math.radians(35.0)
     view_b_incline = math.radians(INCLINE_DEG)
     add_attached_note(
@@ -1494,6 +1495,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         note_xy=(0.1265, 0.1087),
         label="cone-axis auxiliary-view direction",
+        attached_to=_bore_rim_edge(front, diameter_mm=BORE_DIA),
     )
 
     add_native_hole_callout(

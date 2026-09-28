@@ -303,6 +303,48 @@ def _select_view_entity(
     return entity
 
 
+def _assert_attached_to(
+    adapter: Any,
+    annotation: Any,
+    entity: Any,
+    *,
+    what: str,
+    label: str,
+    leader_attach_xy: tuple[float, float] | None = None,
+) -> None:
+    """Fail unless ``annotation`` is still attached, by one live leader, to
+    exactly ``entity``, and that leader ends within 5 mm of
+    ``leader_attach_xy`` when one was set.  ``SetLeaderAttachmentPointAtIndex``
+    returns True and still re-solves the attachment: it detached a
+    feature-control frame (entities=0) on the #1105 platen_guide leaf.
+    """
+    attached = tuple(annotation.GetAttachedEntities3() or ())
+    leaders = int(annotation.GetLeaderCount())
+    dangling = bool(annotation.IsDangling())
+    same = (
+        len(attached) == 1
+        and attached[0] is not None
+        and int(adapter.swApp.IsSame(attached[0], entity)) == 1
+    )
+    if not same or dangling or leaders != 1:
+        raise RuntimeError(
+            f"{what} lost its attachment ({label}): entities={len(attached)}, "
+            f"same_entity={same}, dangling={dangling}, leaders={leaders}"
+        )
+    if leader_attach_xy is None:
+        return
+    points = list(annotation.GetLeaderPointsAtIndex(0) or ())
+    if len(points) < 6:
+        raise RuntimeError(f"{what} leader is unreadable ({label})")
+    actual = (float(points[-3]), float(points[-2]))
+    error = math.dist(actual, leader_attach_xy)
+    if error > 0.005:
+        raise RuntimeError(
+            f"{what} leader attachment moved ({label}): actual={actual}, "
+            f"requested={leader_attach_xy}, error={error:.6g} m"
+        )
+
+
 # swSelectType_e names for the kinds a drawing-view pick can resolve to; an
 # unlisted code is reported as its number, never mapped to a guess.
 _SELECT_TYPE_NAMES = {
@@ -1133,6 +1175,10 @@ def add_surface_finish(
         "SetLeaderAttachmentPointAtIndex",
         "GetTextFormat",
         "SetTextFormat",
+        "GetAttachedEntities3",
+        "GetLeaderCount",
+        "IsDangling",
+        "GetLeaderPointsAtIndex",
     )
     leader_status = int(
         annotation.SetLeader3(
@@ -1167,6 +1213,15 @@ def add_surface_finish(
             raise RuntimeError(f"failed to set surface-finish text height ({label})")
     draw.ClearSelection2(True)
     rebuild_drawing(adapter, label="add_surface_finish")
+    if leader_attach_xy is not None:
+        _assert_attached_to(
+            adapter,
+            annotation,
+            selected_entity,
+            what="surface-finish symbol",
+            label=label,
+            leader_attach_xy=leader_attach_xy,
+        )
     return symbol
 
 
@@ -1566,12 +1621,16 @@ def add_attached_note(
     label: str,
     entity_type: str = "EDGE",
     entity: Any | None = None,
+    attached_to: Any | None = None,
 ) -> Any:
     """Attach one literal arrowed note to a drawing-view entity.
 
     Provide EITHER ``entity_xy`` (a sheet-coordinate pick) OR ``entity`` (a
     precise model entity — for an offset/inclined rim whose projected edge has
     no stable sheet coordinate); ``_select_view_entity`` prefers ``entity``.
+    ``attached_to`` is the identified model entity a sheet-point pick must
+    resolve to: the pick sets where the arrow lands, and the build fails if
+    it attached anything else.
     """
     target = _select_view_entity(
         adapter, view, entity_type, entity_xy, label=label, entity=entity
@@ -1592,6 +1651,8 @@ def add_attached_note(
         "SetLeader3",
         "SetPosition2",
         "GetLeaderCount",
+        "GetAttachedEntities3",
+        "IsDangling",
     )
     if int(annotation.GetAttachedEntityCount3()) != 1:
         if not annotation.SetAttachedEntities(dispatch_array([target])):
@@ -1607,6 +1668,8 @@ def add_attached_note(
         or int(annotation.GetLeaderCount()) != 1
     ):
         raise RuntimeError(f"attached note lacks one arrow ({label})")
+    if attached_to is not None:
+        _assert_attached_to(adapter, annotation, attached_to, what="attached note", label=label)
     draw.ClearSelection2(True)
     return note
 
