@@ -2267,6 +2267,9 @@ class _RecordedInvoke:
     def InvokeTypes(self, *args: Any) -> None:
         self.args = args
 
+    def Invoke(self, *args: Any) -> None:  # a generated property put
+        self.args = args
+
 
 _COM_HEADERS: dict[tuple[str, str], tuple[Any, ...]] = {}
 
@@ -2312,6 +2315,28 @@ def _com_invoke(obj: Any, interface: str, member: str, *args: Any) -> Any:
         value = getattr(obj, member)
         return value(*args) if callable(value) else value
     return invoke(*_com_header(interface, member), *args)
+
+
+def _com_put(obj: Any, interface: str, member: str, value: Any) -> None:
+    """Set property ``interface.member`` on ``obj``'s RAW dispatch: the one
+    ``Invoke`` the generated wrapper's setter sends, without binding the
+    object first (a :func:`_bind` is a ``QueryInterface`` round trip).
+    A test double is set as a plain attribute."""
+    raw = getattr(obj, "_oleobj_", obj)
+    invoke = getattr(raw, "Invoke", None)
+    if invoke is None or not hasattr(raw, "InvokeTypes"):
+        setattr(obj, member, value)
+        return
+    key = (interface, f"{member}=")
+    header = _COM_HEADERS.get(key)
+    if header is None:
+        recorded = _RecordedInvoke()
+        wrapper = _early_bound(SimpleNamespace(_oleobj_=recorded), interface)
+        setattr(wrapper, member, None)
+        if len(recorded.args) < 5:
+            raise RuntimeError(f"{interface}.{member}: the wrapper sent no put")
+        header = _COM_HEADERS[key] = recorded.args
+    invoke(*header[:4], value, *header[5:])
 
 
 def _bind(raw: Any, interface: str) -> Any:

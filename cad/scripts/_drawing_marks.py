@@ -22,6 +22,7 @@ from _common import (
     apply_custom_properties,
     _bind,
     _com_invoke,
+    _com_put,
     _dim_owner_feature,
     _early_bound,
     _feature_by_name,
@@ -522,9 +523,8 @@ def mark_dimensions_for_drawing(
             f"{feature_name}: dimensions not marked for drawing: {sorted(missing)}"
         )
     for name, (display, full_name) in matches.items():
-        display = _bind(display, "IDisplayDimension")
-        display.MarkedForDrawing = True
-        if not bool(_read_member(display, "MarkedForDrawing")):
+        _com_put(display, "IDisplayDimension", "MarkedForDrawing", True)
+        if not bool(_com_invoke(display, "IDisplayDimension", "MarkedForDrawing")):
             raise RuntimeError(f"{full_name}: mark-for-drawing failed")
     _telemetry.success(
         f"marked for drawing {feature_name}: {', '.join(sorted(matches))}"
@@ -532,20 +532,26 @@ def mark_dimensions_for_drawing(
 
 
 def clear_dimensions_for_drawing(adapter: Any) -> None:
-    """Unmark every model dimension, top-level features and subfeatures alike."""
+    """Unmark every model dimension, top-level features and subfeatures alike.
+
+    ``IFeatureManager.GetFeatures(False)`` returns every top-level feature
+    and every child feature in one call (the API reference: "the top-level
+    features and all child features"), the set the recursive tree walk
+    reached with two or three round trips per feature; order is irrelevant
+    to clearing.  Each display dimension is then read and, if marked, put
+    raw."""
     with _telemetry.span("dim.clear_drawing_marks") as span:
-        features = displays = cleared = 0
-        for feature in _iter_features(adapter):
-            for current in _feature_tree(feature):
-                features += 1
-                for display in _feature_display_dimensions(current):
-                    displays += 1
-                    if bool(
-                        _com_invoke(display, "IDisplayDimension", "MarkedForDrawing")
-                    ):
-                        _bind(display, "IDisplayDimension").MarkedForDrawing = False
-                        cleared += 1
-        span.set_attribute("features_visited", features)
+        model = _early_bound(adapter.currentModel, "IModelDoc2")
+        manager = _com_invoke(model, "IModelDoc2", "FeatureManager")
+        features = _com_invoke(manager, "IFeatureManager", "GetFeatures", False)
+        displays = cleared = 0
+        for feature in features or ():
+            for display in _feature_display_dimensions(feature):
+                displays += 1
+                if bool(_com_invoke(display, "IDisplayDimension", "MarkedForDrawing")):
+                    _com_put(display, "IDisplayDimension", "MarkedForDrawing", False)
+                    cleared += 1
+        span.set_attribute("features_visited", len(features or ()))
         span.set_attribute("displays_visited", displays)
         span.set_attribute("cleared", cleared)
     _telemetry.success(f"cleared {cleared} model-dimension drawing marks")
