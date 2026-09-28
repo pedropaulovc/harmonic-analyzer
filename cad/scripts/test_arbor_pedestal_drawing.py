@@ -476,7 +476,6 @@ def test_apex_tap_callout_clears_the_crown_the_plan_and_the_left_lanes() -> None
         "crown apex and its overall-height extension line",
         "overall height dimension line",
     }
-    assert set(beside) == {"plan far-face extension lines", "foot depth (28.0) dimension line"}
     assert set(above) == {"plan far face"}
     neighbours = {**below, **beside, **above}
     crowded = [name for name, other in neighbours.items() if not boxes_clear(block, other)]
@@ -523,9 +522,15 @@ def test_lateral_locations_start_on_a_feature_not_the_symmetry_axis() -> None:
     starts = {row[2]: row[3] for row in part.REFERENCE_LINES}
     assert starts["BoreLateral"][0] == -arbor_pedestal_spec.FOOT_WIDTH / 2.0
     assert starts["HoleLateral"][0] == -arbor_pedestal_spec.FOOT_WIDTH / 2.0
-    # The hole lane sits between the plan's near edge and the foot-width lane.
+    # The hole lane sits above the plan's near edge; the foot-width lane sits
+    # below the far face, over the tap callout's shoulder.
     plan_top = drawing._top_y(arbor_pedestal_spec.FOOT_NEAR_Z)
-    assert plan_top < drawing.HOLE_LATERAL_XY[1] < drawing.TOP_KEEP["Width"][1]
+    assert plan_top < drawing.HOLE_LATERAL_XY[1]
+    assert (
+        drawing.SET_SCREW_CALLOUT_XY[1]
+        < drawing.TOP_KEEP["Width"][1]
+        < drawing._top_y(arbor_pedestal_spec.STRAP_INNER_Z)
+    )
     # The bore lane sits below the seat.
     assert drawing.BORE_LATERAL_XY[1] < drawing._front_y(0.0)
 

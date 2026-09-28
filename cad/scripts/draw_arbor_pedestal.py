@@ -76,15 +76,15 @@ _S = SHEET_SCALE[0] / 1000.0  # sheet meters per model mm
 # elevation on that midpoint. Third-angle projection keeps the plan aligned
 # above the elevation; the isometric balances the aligned group from the
 # right. The elevation sits low so the 28-deep plan (56 on the sheet) clears
-# the crown callout and still leaves a dimension lane above itself under the
+# the crown band and still leaves a callout lane above itself under the
 # sheet border: lateral-location lane 0.055, elevation 0.065..0.165, crown
-# text ~0.173, plan 0.182..0.238, hole lateral lane 0.246, foot-width lane
-# 0.256.
+# text ~0.173, foot-width lane 0.180, plan 0.186..0.242, hole lateral lane
+# 0.250, hold-down hole callout 0.254.
 _PART_MID_Y = (
     BORE_HEIGHT + TOP_RADIUS
 ) / 2.0  # foot 0 .. dome top (bore + dome radius)
 FRONT_CENTER = (0.115, 0.115)
-TOP_CENTER = (FRONT_CENTER[0], 0.210)
+TOP_CENTER = (FRONT_CENTER[0], 0.214)
 ISO_CENTER = (0.325, 0.155)
 
 
@@ -125,10 +125,20 @@ FRONT_KEEP = {
     "DomeRadius": (0.178, _front_y(BORE_HEIGHT + TOP_RADIUS) + 0.008),
 }
 TOP_KEEP = {
-    "Width": (TOP_CENTER[0], _top_y(FOOT_NEAR_Z) + 0.018),
-    # Outer left lane; its text sits above the hold-down lane's text so the
-    # two nested dimensions never read side by side.
-    "Depth": (TOP_CENTER[0] - 0.048, _top_y(FOOT_NEAR_Z) - 0.012),
+    # BELOW the plan, in the band over the crown callout. Above it (0.256)
+    # the witnesses ran the plan's full height, and the hold-down hole's
+    # callout crossed the east one on its way out (leader-crosses-line).
+    # Down here the apex tap callout's leader still crosses this dimension
+    # line: that tap sits 5 mm inside the far face, so its leader can only
+    # leave the plan downward, through this lane. Any other exit runs ~23 mm
+    # over the part (leader-over-part). That one crossing is an ACCEPTED
+    # finding (user ruling on #1105, like amplitude-bar's). Do not "fix" it by
+    # moving this lane back above the plan.
+    "Width": (TOP_CENTER[0], _top_y(STRAP_INNER_Z) - 0.0032),
+    # Outer right lane, outboard of the strap band and set-screw station
+    # nested inside it. On the left (0.067) its far-face witness was the
+    # line the apex tap callout's leader had to cross.
+    "Depth": (TOP_CENTER[0] + 0.065, TOP_CENTER[1]),
     # Both plan depths work off the foot's far face -- the one face the strap
     # is flush with, so a shop can set the whole Z chain from a single edge.
     "HoldDownLocation": (
@@ -165,11 +175,14 @@ SET_SCREW_PROCESS = "TAP TO BORE"
 OVERALL_HEIGHT_XY = (FRONT_CENTER[0] - 0.058, FRONT_CENTER[1])
 # Sheet Y of the elevation's crown apex and of the plan's far face: the tap
 # callout sits in the band between them, left of the hole, so its leader
-# rises right into the plan under the left lanes instead of crossing the
-# right-hand strap and set-screw dimensions.
+# drops left out of the plan under the left lane instead of crossing the
+# right-hand strap and set-screw dimensions. Its shoulder (the bottom row,
+# ~5.6 mm under the centre) stands above the elevation's padded outline
+# (apex + 5.6 mm). Centred mid-band, the shoulder ran inside that outline
+# (leader-crosses-view).
 _CROWN_APEX_Y = _front_y(BORE_HEIGHT + TOP_RADIUS)
 _PLAN_FAR_Y = _top_y(STRAP_INNER_Z)
-SET_SCREW_CALLOUT_XY = (TOP_CENTER[0] - 0.055, (_CROWN_APEX_Y + _PLAN_FAR_Y) / 2.0)
+SET_SCREW_CALLOUT_XY = (TOP_CENTER[0] - 0.055, _CROWN_APEX_Y + 0.0114)
 # Half the ink of a drawn line: the 0.25 mm line weight.
 _LINE_HALF_M = 0.000125
 
@@ -199,19 +212,19 @@ def set_screw_callout_below() -> dict[str, tuple[float, ...]]:
 
 
 def set_screw_callout_beside() -> dict[str, tuple[float, ...]]:
-    """The plan's left lanes over the band: the text clears them from the
-    right, and the leader must not cross them (place_callout_clear's
+    """The plan's left lane over the band: the text clears it from the
+    right, and the leader must not cross it (place_callout_clear's
     ``beside``). The far face is split at the plan's west edge: the leader has
-    to cross the face itself to reach the hole, but not the extension lines
-    the two left lanes draw off it."""
+    to cross the face itself to reach the hole, but not the extension line
+    the hold-down lane draws off it."""
     plan_west = TOP_CENTER[0] - FOOT_WIDTH / 2.0 * _S
-    depth_x = TOP_KEEP["Depth"][0]
+    lane_x = TOP_KEEP["HoldDownLocation"][0]
     return {
-        "plan far-face extension lines": _line_box(
-            depth_x, _PLAN_FAR_Y, plan_west, _PLAN_FAR_Y
+        "plan far-face extension line": _line_box(
+            lane_x, _PLAN_FAR_Y, plan_west, _PLAN_FAR_Y
         ),
-        "foot depth (28.0) dimension line": _line_box(
-            depth_x, _PLAN_FAR_Y, depth_x, _top_y(FOOT_NEAR_Z)
+        "hold-down location (19.0) dimension line": _line_box(
+            lane_x, _PLAN_FAR_Y, lane_x, _top_y(SCREW_Z)
         ),
     }
 
@@ -566,16 +579,17 @@ async def build(adapter: Any) -> dict[str, str]:
     _show_crown_radius(adapter, front_annotations)
     adapter.currentModel.GraphicsRedraw2()
     _screw_r = SCREW_HOLE_DIA / 2.0 * _S
-    # ``callout_xy`` is the text's CENTRE, and this callout's text is ~114 mm
-    # wide at 2:1, so anchoring it near the view buried its left half in the
-    # plan outline and the foot-width dimension. Centred a view-width to the
-    # right it lands in open sheet between the plan and the isometric, and
-    # its leader leaves the hole below the width witness lines.
+    # ``callout_xy`` is the text's CENTRE (the text runs ~50 mm). Over the
+    # plan, right of the hole lateral lane: the leader leaves the hole up and
+    # right through the plan's near edge, west of the depth lane's witness.
+    # Right of the plan (0.235, 0.232) it crossed the east witness of the
+    # foot width and, with depth now on the right, would cross its dimension
+    # line too (leader-crosses-line).
     add_native_hole_callout(
         adapter,
         top,
         edge_xy=(TOP_CENTER[0] + _screw_r, _top_y(SCREW_Z)),
-        callout_xy=(TOP_CENTER[0] + 0.120, _top_y(SCREW_Z) + 0.012),
+        callout_xy=(TOP_CENTER[0] + 0.050, _top_y(FOOT_NEAR_Z) + 0.012),
         label="flange hold-down hole",
         process="DRILL",
     )
