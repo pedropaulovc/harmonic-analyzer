@@ -5709,17 +5709,43 @@ def _view_explode_offsets(
     and keyed by the same ``Name2`` the view's leaves carry: the step's own
     name string is an undocumented format, and cutting it to its last segment
     merged two sub-assemblies' ``cone-gear-1``.
+
+    Two reads that fail once a model owns explodes in more than one
+    configuration (``Default`` and ``Default Simplified``), measured on both
+    frame and drive-train drawings (farm probe, 2026-09-28):
+
+    * the model's ACTIVE configuration reads zero steps until its named
+      explode is shown on the model; showing it and collapsing it again makes
+      all of them readable and leaves the drawing view exploded;
+    * a NON-active configuration reads every step, but ``GetComponent``
+      returns None for every member. ``GetComponentName`` then read exactly
+      the member's ``Name2``, so the member is resolved by that name against
+      the configuration's own component tree. A name that is not one of that
+      tree's instance paths still refuses the view.
     """
     bound = _early_bound(view, "IView")
     if not bool(bound.IsExploded()):
         return {}
     model = _early_bound(bound.ReferencedDocument, "IModelDoc2")
-    configuration = model.GetConfigurationByName(str(bound.ReferencedConfiguration))
+    configuration_name = str(bound.ReferencedConfiguration)
+    configuration = model.GetConfigurationByName(configuration_name)
     if configuration is None:
         raise RuntimeError(f"{label}: exploded view has no referenced configuration")
     configuration = _early_bound(configuration, "IConfiguration")
-    offsets: dict[str, list[float]] = {}
     count = int(configuration.GetNumberOfExplodeSteps())
+    read = "direct"
+    if count == 0:
+        count = _shown_explode_step_count(model, configuration, configuration_name, label=label)
+        read = "shown on model"
+        if not bool(bound.IsExploded()):
+            raise RuntimeError(f"{label}: collapsing the model collapsed the drawing view")
+    if count == 0:
+        raise RuntimeError(
+            f"{label}: exploded view's configuration {configuration_name!r} reads no explode steps"
+        )
+    offsets: dict[str, list[float]] = {}
+    instances: dict[str, str] | None = None
+    by_name = 0
     for index in range(count):
         step = _early_bound(configuration.GetExplodeStep(index), "IExplodeStep")
         xform = tuple(float(value) for value in (step.GetComponentXform() or ()))
@@ -5733,15 +5759,62 @@ def _view_explode_offsets(
         for member in range(int(step.GetNumOfComponents())):
             path = _component_path(adapter, step.GetComponent(member))
             if not path:
-                raise RuntimeError(
-                    f"{label}: explode step {step.Name!r} moves "
-                    f"{step.GetComponentName(member)!r}, which reads as no component"
-                )
+                if instances is None:
+                    instances = _configuration_instance_paths(adapter, configuration)
+                name = str(step.GetComponentName(member) or "").replace("\\", "/")
+                path = instances.get(name.casefold(), "")
+                if not path:
+                    raise RuntimeError(
+                        f"{label}: explode step {step.Name!r} moves {name!r}, which reads "
+                        f"as no component and names no instance of {configuration_name!r}"
+                    )
+                by_name += 1
             row = offsets.setdefault(path.casefold(), [0.0, 0.0, 0.0])
             for axis in range(3):
                 row[axis] += xform[9 + axis]
-    _span_scan_attrs(steps=count, moved=len(offsets))
+    _span_scan_attrs(steps=count, moved=len(offsets), by_name=by_name)
+    _telemetry.annotate(explode_read=read)
     return {name: (row[0], row[1], row[2]) for name, row in offsets.items()}
+
+
+def _shown_explode_step_count(
+    model: Any, configuration: Any, configuration_name: str, *, label: str
+) -> int:
+    """Show the active configuration's one named explode on the model, then
+    collapse it again, and return the step count that makes readable."""
+    manager = _early_bound(model.ConfigurationManager, "IConfigurationManager")
+    active = str(_early_bound(manager.ActiveConfiguration, "IConfiguration").Name)
+    if active != configuration_name:
+        raise RuntimeError(
+            f"{label}: {configuration_name!r} reads no explode steps and is not the "
+            f"model's active configuration ({active!r})"
+        )
+    assembly = _early_bound(model, "IAssemblyDoc")
+    names = tuple(str(name) for name in (assembly.GetExplodedViewNames2(configuration_name) or ()))
+    if len(names) != 1:
+        raise RuntimeError(f"{label}: {configuration_name!r} owns explodes {names!r}, not one")
+    if not bool(assembly.ShowExploded2(True, names[0])):
+        raise RuntimeError(f"{label}: cannot show {names[0]!r} on the model")
+    count = int(configuration.GetNumberOfExplodeSteps())
+    if not bool(assembly.ShowExploded2(False, names[0])):
+        raise RuntimeError(f"{label}: cannot collapse {names[0]!r} on the model")
+    return count
+
+
+def _configuration_instance_paths(adapter: Any, configuration: Any) -> dict[str, str]:
+    """Every component instance path of ``configuration``, casefolded -> as read,
+    walked from its own root (``GetRootComponent3(True)`` resolves a
+    configuration that is not the model's active one)."""
+    root = configuration.GetRootComponent3(True)
+    paths: dict[str, str] = {}
+    pending = list(root.GetChildren() or ()) if root is not None else []
+    while pending:
+        component = _early_bound(pending.pop(), "IComponent2")
+        path = _component_path(adapter, component)
+        if path:
+            paths[path.casefold()] = path
+        pending.extend(component.GetChildren() or ())
+    return paths
 
 
 def _explode_offset(

@@ -2290,32 +2290,104 @@ class _AnchorSheet:
         return True
 
 
-def _exploded_view(children, steps, visible=None):
+class _ExplodedModel:
+    """The referenced assembly as a farm probe read it (2026-09-28) once
+    ``Default`` and ``Default Simplified`` each own an explode: the ACTIVE
+    configuration reads zero steps until its named explode is shown on the
+    model, and a NON-active one reads every step but no step component
+    (``GetComponent`` is None; ``GetComponentName`` is the ``Name2``)."""
+
+    ACTIVE = "Default"
+
+    def __init__(self, steps, instances, *, referenced, shown_only):
+        self.referenced = referenced
+        self.shown_only = shown_only
+        self.shown = []
+        self.exploded = False
+        members = self.referenced != self.ACTIVE
+        self.steps = [
+            SimpleNamespace(
+                Name=f"step {index}",
+                GetComponentXform=lambda t=t: (1, 0, 0, 0, 1, 0, 0, 0, 1, *t, 1, 0, 0, 0),
+                GetNumOfComponents=lambda names=names: len(names),
+                GetComponent=lambda member, names=names: (
+                    None if members else SimpleNamespace(Name2=names[member])
+                ),
+                GetComponentName=lambda member, names=names: names[member],
+            )
+            for index, (t, names) in enumerate(steps)
+        ]
+        root = SimpleNamespace(GetChildren=lambda: _model_tree(instances))
+        self.configuration = SimpleNamespace(
+            Name=referenced,
+            GetNumberOfExplodeSteps=self._count,
+            GetExplodeStep=lambda index: self.steps[index],
+            GetRootComponent3=lambda resolve: root if resolve else None,
+        )
+        self.ConfigurationManager = SimpleNamespace(
+            ActiveConfiguration=SimpleNamespace(Name=self.ACTIVE)
+        )
+
+    def _count(self):
+        if self.shown_only and not self.shown:
+            return 0
+        return len(self.steps)
+
+    def GetConfigurationByName(self, name):
+        return self.configuration if name == self.referenced else None
+
+    def GetExplodedViewNames2(self, name):
+        return (f"EXPLODED {name}",)
+
+    def ShowExploded2(self, show, name):
+        self.shown.append((show, name))
+        self.exploded = show
+        return True
+
+
+def _model_tree(paths):
+    """Model components for instance ``paths``: each sub-assembly segment is
+    a parent whose ``Name2`` is its own path, as ``IComponent2`` reads."""
+    nodes: dict[str, SimpleNamespace] = {}
+    top = []
+    for path in paths:
+        parts = path.split("/")
+        for depth in range(len(parts)):
+            key = "/".join(parts[: depth + 1])
+            if key not in nodes:
+                node = SimpleNamespace(Name2=key, children=[])
+                node.GetChildren = lambda node=node: tuple(node.children)
+                nodes[key] = node
+                if depth:
+                    nodes["/".join(parts[:depth])].children.append(node)
+                else:
+                    top.append(node)
+    return tuple(top)
+
+
+def _exploded_view(
+    children, steps, visible=None, *, referenced="Default", shown_only=False, instances=None
+):
     """A view shown exploded; ``steps`` are (translation, moved component paths).
 
     ``visible`` maps an instance path to the edges ``GetVisibleEntities2``
-    lists for it; ``view.selected_entities`` records ``SelectEntity``."""
+    lists for it; ``view.selected_entities`` records ``SelectEntity``.
+    ``referenced`` is the configuration the view shows (the model's active one
+    is ``Default``); ``instances`` are that configuration's component paths
+    (default: the view's leaves). No steps means a collapsed view."""
     root = _FakeDrawingComponent("drive-train-8", children=children)
-    explode = [
-        SimpleNamespace(
-            Name=f"step {index}",
-            GetComponentXform=lambda t=t: (1, 0, 0, 0, 1, 0, 0, 0, 1, *t, 1, 0, 0, 0),
-            GetNumOfComponents=lambda names=names: len(names),
-            GetComponent=lambda member, names=names: SimpleNamespace(Name2=names[member]),
-            GetComponentName=lambda member, names=names: f"{names[member]}@drive-train-8",
-        )
-        for index, (t, names) in enumerate(steps)
-    ]
-    configuration = SimpleNamespace(
-        GetNumberOfExplodeSteps=lambda: len(explode),
-        GetExplodeStep=lambda index: explode[index],
+    model = _ExplodedModel(
+        steps,
+        instances if instances is not None else [child.Component.Name2 for child in children],
+        referenced=referenced,
+        shown_only=shown_only,
     )
     listed = visible or {}
     view = SimpleNamespace(
         RootDrawingComponent2=lambda _resolve: root,
-        IsExploded=lambda: True,
-        ReferencedConfiguration="Default",
-        ReferencedDocument=SimpleNamespace(GetConfigurationByName=lambda _name: configuration),
+        IsExploded=lambda: bool(steps),
+        ReferencedConfiguration=referenced,
+        ReferencedDocument=model,
         GetName2=lambda: "Drawing View9",
         UpdateViewDisplayGeometry=lambda: True,
         GetVisibleEntityCount2=lambda component, kind: len(listed.get(component.Name2, ())),
@@ -2459,17 +2531,64 @@ def test_frozen_hit_on_the_same_named_part_of_another_subassembly_fails(monkeypa
     assert sheet.balloons == []
 
 
-def test_explode_offsets_are_keyed_by_full_path_and_include_the_subassembly(monkeypatch):
+_SUBASSEMBLY_EXPLODE = [((0.0, 0.25, 0.0), ["sub-1/cone-gear-1"]), ((0.03, 0.0, 0.0), ["sub-2"])]
+
+
+@pytest.mark.parametrize(
+    ("referenced", "shown_only", "shown"),
+    [
+        ("Default", False, []),
+        ("Default", True, [(True, "EXPLODED Default"), (False, "EXPLODED Default")]),
+        ("Default Simplified", False, []),
+    ],
+    ids=["active", "active-reads-steps-once-shown", "non-active-reads-no-components"],
+)
+def test_explode_offsets_are_keyed_by_full_path_and_include_the_subassembly(
+    monkeypatch, referenced, shown_only, shown
+):
     """sub-1's cone-gear-1 moves +250 mm Y; sub-2 moves +30 mm X as a whole.
-    Keyed by the last segment, sub-2's gear would take sub-1's move too."""
+    Keyed by the last segment, sub-2's gear would take sub-1's move too.
+    Whichever way the referenced configuration gives its steps up, the
+    balloon lands on the exploded part, and the model is left collapsed."""
     view = _exploded_view(
-        _pair_of_subassemblies(),
-        [((0.0, 0.25, 0.0), ["sub-1/cone-gear-1"]), ((0.03, 0.0, 0.0), ["sub-2"])],
+        _pair_of_subassemblies(), _SUBASSEMBLY_EXPLODE, referenced=referenced, shown_only=shown_only
     )
     sheet = _AnchorSheet({(0.031, 0.002): _AnchorEdge("sub-2/cone-gear-1")})
     balloons, _projected, anchors = _balloon(monkeypatch, sheet, view, {"cone-gear": _SUB_2})
     assert len(balloons) == 1 and sheet.hits == [(0.031, 0.002)]
     assert anchors[0]["instance"] == "sub-2/cone-gear-1"
+    assert view.ReferencedDocument.shown == shown
+    assert not view.ReferencedDocument.exploded
+
+
+def test_a_non_active_explode_member_naming_no_instance_of_its_configuration_fails():
+    """Resolution by name is exact: ``sub-2`` is not an instance of this
+    configuration, so its explode cannot be placed and the view is refused."""
+    view = _exploded_view(
+        _pair_of_subassemblies(),
+        _SUBASSEMBLY_EXPLODE,
+        referenced="Default Simplified",
+        instances=["sub-1/cone-gear-1"],
+    )
+    with pytest.raises(
+        RuntimeError, match=r"moves 'sub-2', which .* names no instance of 'Default Simplified'"
+    ):
+        drawing_common._view_explode_offsets(_FakeAdapter(None), view, label="t")
+
+
+@pytest.mark.parametrize(
+    ("referenced", "why"),
+    [
+        ("Default", r"'Default' reads no explode steps"),
+        ("Default Simplified", r"reads no explode steps and is not the model's active"),
+    ],
+)
+def test_an_exploded_view_whose_configuration_reads_no_steps_is_refused(referenced, why):
+    """Zero offsets would project every anchor at the collapsed pose."""
+    view = _exploded_view(_pair_of_subassemblies(), _SUBASSEMBLY_EXPLODE, referenced=referenced)
+    view.ReferencedDocument.configuration.GetNumberOfExplodeSteps = lambda: 0
+    with pytest.raises(RuntimeError, match=why):
+        drawing_common._view_explode_offsets(_FakeAdapter(None), view, label="t")
 
 
 @pytest.mark.parametrize(
