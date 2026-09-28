@@ -1724,7 +1724,8 @@ def test_data_deps_of_keeps_missing_referenced_artefact():
 def test_data_deps_of_follows_an_edited_script_literal():
     """A same-size edit with an unchanged timestamp must update the graph:
     a stale old.dxf edge would leave the real input out of the cache key.
-    Force the timestamp collision rather than depending on filesystem timing.
+    Pin the clock and timestamp collision so a delayed CI worker cannot age
+    the file between its first read and the rewrite.
     """
     with tempfile.NamedTemporaryFile(
         "w", suffix=".py", dir=SCRIPTS_DIR, delete=False
@@ -1732,12 +1733,13 @@ def test_data_deps_of_follows_an_edited_script_literal():
         fh.write('PATH = REFERENCES_DIR / "old-xyz.dxf"\n')
         script = Path(fh.name)
     try:
-        assert [Path(d).name for d in data_deps_of(script)] == ["old-xyz.dxf"]
         mtime_ns = script.stat().st_mtime_ns
-        script.write_text('PATH = REFERENCES_DIR / "new-xyz.dxf"\n', encoding="utf-8")
-        os.utime(script, ns=(mtime_ns, mtime_ns))
-        assert script.stat().st_mtime_ns == mtime_ns
-        assert [Path(d).name for d in data_deps_of(script)] == ["new-xyz.dxf"]
+        with patch.object(bg.time, "time_ns", return_value=mtime_ns):
+            assert [Path(d).name for d in data_deps_of(script)] == ["old-xyz.dxf"]
+            script.write_text('PATH = REFERENCES_DIR / "new-xyz.dxf"\n', encoding="utf-8")
+            os.utime(script, ns=(mtime_ns, mtime_ns))
+            assert script.stat().st_mtime_ns == mtime_ns
+            assert [Path(d).name for d in data_deps_of(script)] == ["new-xyz.dxf"]
     finally:
         script.unlink()
 

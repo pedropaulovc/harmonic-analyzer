@@ -38,11 +38,14 @@ instead of rebuilt from scratch (re-insert + re-mate ~122 components — ~500 s)
 A refresh that hits a dangling mate, free DOF, or interference **fails loud**
 (non-zero exit, the `.SLDASM` left untouched).
 
-Graph enumeration memoizes source text for old, unchanged scripts to avoid
+On local worktrees whose filesystem timestamps share the machine's clock,
+graph enumeration memoizes source text for old, unchanged scripts to avoid
 re-reading import closures for every task. Recently modified scripts are
 re-read even when their size and filesystem mtime match the cached values:
-same-size edits within one timestamp tick must still update data/config
-dependencies and their cache keys.
+same-size edits within one timestamp tick must still update uncached data
+dependencies and their cache keys. Per-process import closures and
+`config_files_of` results are separately cached; call `clear_import_caches`
+before rescanning those after a source edit in a long-lived process.
 
 Tasks are grouped by whether they need SolidWorks — the prefix tells you at a
 glance:

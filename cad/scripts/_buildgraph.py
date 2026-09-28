@@ -1327,9 +1327,11 @@ def _module_closure(script: Path) -> tuple[str, ...]:
     return tuple(sorted(str(_resolved(mods[m])) for m in result))
 
 
-# A filesystem can assign the same mtime to multiple same-size writes within
-# one timestamp tick. Treat recently modified files as racy, as git does.
-_SOURCE_MTIME_MARGIN_NS = 2_000_000_000
+# Local worktree files can share an mtime across same-size writes within one
+# filesystem tick. The wall clock used below must match the filesystem clock;
+# unlike git's index-mtime comparison, remote clock-skewed shares are not covered.
+# Three seconds exceeds the two-second tick of coarse FAT timestamps.
+_SOURCE_MTIME_MARGIN_NS = 3_000_000_000
 # path -> ((st_mtime_ns, st_size), text, time_ns read completed)
 _SOURCE_TEXT: dict[Path, tuple[tuple[int, int], str, int]] = {}
 
@@ -1339,10 +1341,10 @@ def read_source(path: Path) -> str:
 
     One doit graph load asks for the same few hundred local sources ~20k times:
     every task's config/data/fastener scan re-reads its whole import closure.
-    A stat is much cheaper than a read, so old files keep the fast path.
-    Recent files must be re-read even with unchanged (mtime_ns, size): an edit
-    within one filesystem timestamp tick can keep both values while changing
-    a DXF literal or config read, leaving a real input out of the cache key.
+    A stat is much cheaper than a read, so old files keep the fast path on
+    locally clocked worktrees. Recent files must be re-read even with unchanged
+    (mtime_ns, size): an edit within one filesystem timestamp tick can keep
+    both values while changing a DXF literal or an uncached config read.
     Re-reading also lets an entry become memoizable once its mtime ages. The
     stat comes first, so an edit landing between it and the read stores the
     new text under the old stamp and is re-read next time if racy. An
