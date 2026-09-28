@@ -6,7 +6,11 @@ deep rebuild of its own before the explode. That is sound only if:
 
 * the ``resolve=False`` gates read AFTER that rebuild (a stale pre-solve
   constrained status would certify the wrong free set), and the whole save
-  pays ONE deep rebuild when no gate dirties the model;
+  pays ONE deep rebuild of the saved ``Default`` when no gate dirties the
+  model. ``Default Simplified``'s own verifying rebuild (the drawings' teeth-
+  and threads-suppressed configuration) lands before it, in its own
+  configuration, so it neither stands in for Default's solve nor follows
+  the certification;
 * a gate that dirties the solve state is re-run on the re-solved model, so no
   rebuild ever lands between certification and save -- and a gate that dirties
   it every time refuses the save;
@@ -24,6 +28,7 @@ from __future__ import annotations
 
 import asyncio
 import sys
+from collections import Counter
 from pathlib import Path
 from types import SimpleNamespace as NS
 
@@ -51,28 +56,74 @@ class Component:
         self._stale = stale
         self._solved = solved
         self.model = None
+        self.ReferencedConfiguration = "Default"
 
     def IsPatternInstance(self):
         return False
 
+    def IsSuppressed(self):
+        return False
+
+    def GetPathName(self):
+        return f"{self.Name2}.SLDPRT"
+
     def GetConstrainedStatus(self):
-        return self._solved if self.model.rebuilds else self._stale
+        # Solved only once the ACTIVE configuration has itself been rebuilt:
+        # another configuration's rebuild does not solve this one.
+        return self._solved if self.model.rebuilds[self.model.active] else self._stale
+
+
+class Configuration:
+    def __init__(self, name, parent=None, comment=""):
+        self.Name = name
+        self.parent = parent
+        self.Comment = comment
+
+    def GetParent(self):
+        return self.parent
 
 
 class Model:
-    """Constrained statuses read stale until the first deep rebuild; a deep
-    rebuild clears ``NeedsRebuild2``."""
+    """An assembly whose constrained statuses read stale in a configuration
+    until that configuration's first deep rebuild; a deep rebuild clears
+    ``NeedsRebuild2``. ``AddConfiguration2`` activates the configuration it
+    derives, as SolidWorks does."""
 
     def __init__(self, components):
         self.components = components
         for comp in components:
             comp.model = self
-        self.rebuilds = 0
+        default = Configuration("Default")
+        self.configurations = {default.Name: default}
+        self.ConfigurationManager = NS(ActiveConfiguration=default, AddConfiguration2=self._add)
+        self.rebuilds = Counter()
+        self.rebuild_order: list[str] = []
         self.exploded = False
-        self.Extension = NS(NeedsRebuild2=0)
+        self.Extension = NS(NeedsRebuild2=0, GetWhatsWrong=lambda: None)
+
+    @property
+    def active(self):
+        return self.ConfigurationManager.ActiveConfiguration.Name
+
+    def _add(self, name, comment, _alternate, _options, parent, _description, _rebuild):
+        created = Configuration(name, self.configurations[parent], comment)
+        self.configurations[name] = created
+        self.ConfigurationManager.ActiveConfiguration = created
+        return created
+
+    def GetConfigurationNames(self):
+        return list(self.configurations)
+
+    def GetConfigurationByName(self, name):
+        return self.configurations.get(name)
+
+    def ShowConfiguration2(self, name):
+        self.ConfigurationManager.ActiveConfiguration = self.configurations[name]
+        return True
 
     def ForceRebuild3(self, _top_only):
-        self.rebuilds += 1
+        self.rebuilds[self.active] += 1
+        self.rebuild_order.append(self.active)
         self.Extension.NeedsRebuild2 = 0
         return True
 
@@ -81,6 +132,12 @@ class Model:
 
     def IsExploded(self):
         return self.exploded
+
+    def default_rebuilds(self):
+        """How often the saved, gated ``Default`` has been deep-rebuilt, read
+        while it is the active configuration (the gates' view)."""
+        assert self.active == "Default"
+        return self.rebuilds["Default"]
 
 
 @pytest.fixture
@@ -138,7 +195,10 @@ def _drive_train_like(solved_rod_status=UNDER):
             Component("rod-1", stale=FULLY, solved=solved_rod_status),
         ]
     )
-    return NS(currentModel=model, _attempt=_attempt), model
+    # Its parts carry no simplified configuration, so Default Simplified keeps
+    # every component on its Default.
+    app = NS(GetConfigurationNames=lambda _path: ["Default"])
+    return NS(currentModel=model, _attempt=_attempt, swApp=app), model
 
 
 def _free_dof_gate(adapter):
@@ -158,12 +218,16 @@ def test_gates_read_the_final_rebuild_and_the_save_pays_one_rebuild(save_steps):
     seen = []
 
     def gates(solved):
-        seen.append(model.rebuilds)
+        seen.append(model.default_rebuilds())
         _free_dof_gate(solved)
 
     _save(adapter, gates)
     assert seen == [1]
-    assert model.rebuilds == 1
+    # The simplified child is verified in its own configuration BEFORE
+    # Default's one deep rebuild, which the gates then certify.
+    assert model.rebuild_order == ["Default Simplified", "Default"]
+    assert model.GetConfigurationByName("Default Simplified").GetParent().Name == "Default"
+    assert model.active == "Default"
     assert _assembly.dof_manifest_path(ASM).exists()
 
 
@@ -172,7 +236,7 @@ def test_a_gate_that_dirties_the_model_is_recertified_on_the_resolved_model(save
     seen = []
 
     def dirtying_gate(solved):
-        seen.append(model.rebuilds)
+        seen.append(model.default_rebuilds())
         _free_dof_gate(solved)
         if len(seen) == 1:  # e.g. interference detection marks the solve dirty
             model.Extension.NeedsRebuild2 = 1
@@ -180,7 +244,7 @@ def test_a_gate_that_dirties_the_model_is_recertified_on_the_resolved_model(save
     _save(adapter, dirtying_gate)
     # Re-run on the re-solved model; nothing re-solves between it and the save.
     assert seen == [1, 2]
-    assert model.rebuilds == 2
+    assert model.rebuilds["Default"] == 2
     assert "save" in save_steps
 
 
@@ -194,7 +258,7 @@ def test_a_later_step_that_dirties_the_model_recertifies_before_the_save(
     saved_at = []
 
     def gates(solved):
-        seen.append(model.rebuilds)
+        seen.append(model.default_rebuilds())
         _free_dof_gate(solved)
 
     def dirtying_health(*_args, **_kwargs):
@@ -203,10 +267,12 @@ def test_a_later_step_that_dirties_the_model_recertifies_before_the_save(
 
     monkeypatch.setattr(_assembly, "assert_model_healthy", dirtying_health)
     monkeypatch.setattr(
-        _assembly, "_save_new_assembly_as_copy", lambda *_a: saved_at.append(model.rebuilds)
+        _assembly,
+        "_save_new_assembly_as_copy",
+        lambda *_a: saved_at.append(model.default_rebuilds()),
     )
     _save(adapter, gates)
-    assert model.rebuilds == 2
+    assert model.rebuilds["Default"] == 2
     # Certified after the final rebuild AND after the chokepoint rebuild, with no
     # rebuild between that last certification and the save.
     assert seen == [1, 2]
