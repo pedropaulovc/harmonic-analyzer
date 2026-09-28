@@ -483,11 +483,36 @@ A fatal signal logs `xx`, flushes telemetry, and hard-exits (`os._exit`) — the
 main thread is blocked inside the dead COM call, so only a process exit frees
 it. The doit parent then fails the task, and since the seat lock is held by the
 PARENT's `_com_seat`, the machine-global seat releases cleanly. Kill switch:
-`HARMONIC_COM_WATCHDOG=0`. Recovery after exit 86/87/88 is automatic
+`HARMONIC_COM_WATCHDOG=0`. Recovery after exit 86/87/88/89 is automatic
 (`_exec_com`: kill, relaunch, retry); by hand: clear the crash dialog,
 relaunch SolidWorks via the 3DEXPERIENCE Platform desktop shortcut (never
 COM-start it), rerun the build. The fatal/log-only contract is pinned by
 `check:watchdog` (`test_watchdog.py`).
+
+**Seat startup gate — exit 89.** A seat launched seconds before a leaf can
+answer `GetCustomInfoValue` with `''` for every property of the first part it
+opens (2026-09-28 `drawing:crank_hub`, seat uptime 20 s; 2026-09-17
+`drawing:pinion_handle`; both drew clean on a warm seat). So `run_build`'s
+connect path (`_seat_forensics.await_seat_startup`, inside `seat.identity`,
+before the first document operation) reads `ISldWorks.StartupProcessCompleted`
+and holds the seat while it says False or rejects the call as busy —
+whatever the seat's age or origin, which only ride the `sw.startup_wait` span
+(`uptime_s`, `seat_origin`, `waited_s`, `reads`, `outcome` ∈
+`already_ready`/`ready_after_wait`/`timeout`/`unsupported`/`unreadable`) —
+bounded at 60 s. `timeout` raises `_watchdog.SeatNotReady` (a `SystemExit`,
+so `run_build`'s `except Exception` cannot turn it into exit 1); a read that
+never returns is cut off by `_watchdog.deadline` at 65 s (log, flush,
+`os._exit(89)`). Either way the process exits 89 — `_telemetry.build_session`
+names the exit and flushes on a `SystemExit` — which `_exec_com` recovers and
+retries like a crash; on a farm leaf (`HARMONIC_SW_AUTOSTART=0`, the keeper
+owns the seat) it instead re-runs once on the untouched seat. A seat with no
+such member (`unsupported`) or an unintelligible answer (`unreadable`) is
+released after one read with a warning. Every poll emits a DEBUG record, the
+watchdog's heartbeat, so a lowered `HARMONIC_COM_OP_TIMEOUT` does not cut the
+wait short. The seat line reports `startup=`/`startup_completed=`/
+`startup_wait_s=`, and a later missing-source-property capture carries them.
+Pinned by `test_seat_startup_gate.py` (`check:recipe`) and the startup tests
+in `test_failure_forensics.py`.
 
 **Memory preflight — restart before the warning, not after.** SolidWorks'
 commit charge grows across a day of builds (66 GB after ~10 h on the 127 GB
@@ -712,12 +737,13 @@ enforces it, and derives its scope from that one constant:
    inert module.
 2. **Pinned call sites only.** Tracked code names it only as `<module>.<name>`,
    inside a pinned `(file, function)`: `_common.run_build` (connect-time
-   provenance, post-save `teardown_seat`), `_common.save_part_and_images`
-   (`record_authoring_context`), `_common.force_rebuild`
-   (`capture_rebuild_failure`), `_drawing_common.read_required_properties`
-   (`capture_missing_properties`) and `package_native._release_seat`. The one
-   exception is `capture_com_failure(...)` as a bare statement: it always
-   raises. A new call site fails loud with file:line.
+   provenance and the startup gate, post-save `teardown_seat`),
+   `_common.save_part_and_images` (`record_authoring_context`),
+   `_common.force_rebuild` (`capture_rebuild_failure`),
+   `_drawing_common.read_required_properties` (`capture_missing_properties`)
+   and `package_native._release_seat`. The one exception is
+   `capture_com_failure(...)` as a bare statement: it always raises. A new call
+   site fails loud with file:line.
 3. **No COM write before a save.** The module calls no mutator verb
    (`Save*`/`Set*`/`Add*`/`Insert*`/`Create*`/`Edit*`/`Select*`/…, which covers
    custom-property and dimension writes) and stores no attribute on a foreign
@@ -736,21 +762,10 @@ enforces it, and derives its scope from that one constant:
 identical inputs must give an identical verdict. The sketch-closure census and
 `record_sketch_closure`/`log_profile_geometry` live in the tracked
 `_sketch_closure.py` for that reason. So does anything that writes into the
-model before it is saved, such as `_build_id`'s `Generator` property.
-
-**Seat startup.** `record_seat_provenance` also holds the session until the seat
-reports `ISldWorks.StartupProcessCompleted` (`await_seat_startup`). The wait is
-bounded by seat age: `HARMONIC_SW_STARTUP_WINDOW`, 180 s by default. A value that
-is not a finite, non-negative number is logged and falls back to the default.
-Every poll emits a DEBUG record, and log records are the COM watchdog's
-heartbeat, so the watchdog does not read the wait as a wedged seat and the op
-timeout does not shorten the window. A seat that is still False past the window,
-or that gives no answer, is logged and the build proceeds. The wait is timing,
-not a verdict: it reads nothing into the model and never raises, so it stays
-inert. The seat line reports
-`startup_completed=`/`startup_wait_s=`. Before this, two drawing leaves that were
-the first job on a seat about 20 s old opened their source part and read every
-custom property empty.
+model before it is saved, such as `_build_id`'s `Generator` property. The
+startup gate's exit 89 is not such a verdict: it judges the seat, not the
+model, fires before any document opens, and leaves no artefact — the same
+reason `_watchdog`'s aborts are inert.
 
 If you need a new inert entry point, add it to the gate's `CALL_SITES` only if
 it runs after the save or provably reads nothing into the model. Otherwise put

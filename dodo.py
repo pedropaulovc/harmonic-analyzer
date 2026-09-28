@@ -725,8 +725,14 @@ _SW_ENSURED = False
 _COM_RETRY_BACKOFF_S: tuple[int, ...] = (60, 120, 240)
 # Watchdog exit codes that unambiguously mean SolidWorks itself broke (see _watchdog):
 # 86 crash, 87 op timeout, 88 a modal dialog blocking the seat (the 2026-09-02
-# low-committed-memory box) -- all three recover by kill + relaunch + retry.
-_WATCHDOG_EXIT_CODES = frozenset({86, 87, 88})
+# low-committed-memory box), 89 a freshly started seat that never reported
+# ISldWorks.StartupProcessCompleted (_seat_forensics' connect-time gate) -- all
+# four recover by kill + relaunch + retry.
+_WATCHDOG_EXIT_CODES = frozenset({86, 87, 88, 89})
+# _watchdog.EXIT_SEAT_NOT_READY: the connect-time startup gate's exit, restated
+# like the codes above (dodo never imports the per-subprocess _watchdog) and
+# pinned equal by test_seat_startup_gate.
+_EXIT_SEAT_NOT_READY = 89
 # Pre-task memory preflight. SolidWorks' commit charge grows across a day of
 # builds (66 GB after ~10 h on 2026-09-02, on a 127 GB seat) until SolidWorks
 # itself pops "Warning! Your system is running critically low on committed
@@ -894,8 +900,8 @@ def _exec_com(
 ) -> None:
     """Run a COM subprocess with reactive SolidWorks recovery.
 
-    If the subprocess exits with a watchdog crash/op-timeout/modal-dialog code
-    (86/87/88) or leaves
+    If the subprocess exits with a watchdog crash/op-timeout/modal-dialog/
+    seat-not-ready code (86/87/88/89) or leaves
     SolidWorks not-connected, retry up to ``len(_COM_RETRY_BACKOFF_S)`` times, waiting
     1/2/4 min then force-recovering SW (kill→relaunch) between attempts. An ordinary
     failure (gate assertion, build error) with SolidWorks still healthy is NOT retried
@@ -906,9 +912,26 @@ def _exec_com(
     BEFORE the task span -- not here, so it can't nest under the task span.
 
     Fail-loud contract of :func:`_exec` is preserved: a terminal failure still raises
-    ``RuntimeError``. Honors ``HARMONIC_SW_AUTOSTART=0`` (skip retry, plain ``_exec``)."""
+    ``RuntimeError``. Under ``HARMONIC_SW_AUTOSTART=0`` (every farm leaf: the
+    keeper owns the seat) nothing here may kill or relaunch SolidWorks, so there
+    is no recovery loop -- except that exit 89 (the seat had not finished
+    starting within the gate's bound) re-runs ONCE, untouched: a seat still
+    loading add-ins is the one unhealthy state that heals by waiting, and the
+    re-run's own gate waits again."""
     if not _sw_autostart_enabled():
-        _exec(cmd, label, log_stem, task=task)
+        started = time.time()
+        rc = _run_subprocess(cmd, label, log_stem, task=task)
+        if rc == _EXIT_SEAT_NOT_READY:
+            _telemetry.warn(
+                f"[sw] {label}: seat still starting (exit {rc}); re-running once "
+                "on the same seat (autostart off: no recovery here)",
+                exit_code=rc,
+                attempt=1,
+            )
+            started = time.time()
+            rc = _run_subprocess(cmd, label, log_stem, task=task)
+        if rc:
+            _fail_task(label, rc, started=started)
         return
 
     backoff = _com_retry_backoff()
@@ -2919,6 +2942,10 @@ def task_check():
         # must survive its own failure. Both are pure-Python contracts of
         # _seat_forensics.capture_com_failure, so they gate offline.
         SCRIPTS_DIR / "test_failure_forensics.py",
+        # The connect-time seat startup gate (a fresh seat is held until
+        # StartupProcessCompleted, bounded, and exits 89 for recover + retry)
+        # and the missing-source-property census (2026-09-28 crank_hub).
+        SCRIPTS_DIR / "test_seat_startup_gate.py",
         # The SolidWorks-free geometry contract for the drawing layout audit
         # (collision / sheet-overflow logic run before every drawing saves).
         SCRIPTS_DIR / "test_drawing_layout_check.py",

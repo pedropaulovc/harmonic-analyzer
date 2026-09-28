@@ -1630,25 +1630,45 @@ def build_session(
     it (:func:`instrument_adapter`): ``run_build`` imports ``PyWin32Adapter``
     before it opens the session, so every COM build, drawing, verify and export
     process gets ``adapter.<method>`` spans without a line changed in a recipe.
+
+    A ``SystemExit`` (or other non-``Exception``) leaving the block -- the
+    startup gate's ``SeatNotReady``, exit 89 -- skips the caller's own
+    post-session :func:`shutdown`, and OTLP export is batched, so the spans and
+    logs that explain the exit would be lost. So on that path this names the
+    exit on the console and in ``logs.jsonl``, then flushes, AFTER the root has
+    closed, before re-raising. An ``Exception`` never reaches here from
+    ``run_build`` (it returns an exit code), so the normal path flushes once.
     """
     configure()
     _instrument_loaded_adapter()
     parent = _parent_context_from_env()
-    if parent is not None:
-        token = otel_context.attach(parent)
-        try:
-            # Inside the attached parent context, so this process's spawn + import
-            # cost is billed to the REMOTE task span that paid for it -- and before
-            # any local span is opened, since a back-dated startup span parented
-            # under a span that started later reads as a malformed waterfall.
+    try:
+        if parent is not None:
+            token = otel_context.attach(parent)
+            try:
+                # Inside the attached parent context, so this process's spawn +
+                # import cost is billed to the REMOTE task span that paid for it
+                # -- and before any local span is opened, since a back-dated
+                # startup span parented under a span that started later reads
+                # as a malformed waterfall.
+                record_process_startup()
+                yield None
+            finally:
+                otel_context.detach(token)
+        else:
             record_process_startup()
-            yield None
-        finally:
-            otel_context.detach(token)
-    else:
-        record_process_startup()
-        with span(f"build.{label}", label=label, **attributes) as root:
-            yield root
+            with span(f"build.{label}", label=label, **attributes) as root:
+                yield root
+    except (Exception, GeneratorExit):
+        raise
+    except BaseException as exc:
+        code = getattr(exc, "code", None)
+        error(
+            f"build {label} exiting ({type(exc).__name__}, exit {code}): {exc}",
+            **({"exit_code": code} if isinstance(code, int) else {}),
+        )
+        shutdown()
+        raise
 
 
 _startup_recorded = False

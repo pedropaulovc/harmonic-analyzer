@@ -316,6 +316,7 @@ and hard-exits, because the main thread is blocked inside a dead COM call:
 | **86** | crash — a NEW `sldexitapp.exe` (SolidWorks' own crash-report handler) appeared | automatic: `_exec_com` waits 60/120/240 s, force-recovers (kill → relaunch) and retries, up to 3 retries |
 | **87** | op timeout — no span boundary or log record for `HARMONIC_COM_OP_TIMEOUT` s (default 900) | same automatic path; if it repeats, the wedged op is named in the abort record's `last_op` |
 | **88** | modal dialog — a `#32770` "SOLIDWORKS Design" box owned by `sldworks.exe` disabling the main frame, surviving two polls | same automatic path (the watchdog never clicks); the box text rides `dialog_text`. The memory box means the seat was already dying |
+| **89** | seat not ready — not the watchdog thread but the connect-time startup gate (`_seat_forensics.await_seat_startup`): the seat still reports `ISldWorks.StartupProcessCompleted=False`, or rejects the call as busy, after 60 s, before any document opened (`sw.startup_wait` span, `outcome=timeout`); or one read has not returned by 65 s (`_watchdog.deadline`, `watchdog.abort reason=seat-not-ready`) | locally, the same automatic path; on a farm leaf (`HARMONIC_SW_AUTOSTART=0`, the keeper owns the seat) `_exec_com` re-runs once on the untouched seat, whose gate waits again, then fails |
 
 A hung window (`IsHungAppWindow`) is **log-only** — SolidWorks legitimately
 stops pumping messages while solving geometry — but the throttled warn makes a

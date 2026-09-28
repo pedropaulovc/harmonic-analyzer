@@ -39,7 +39,9 @@ INERT = {Path(name).stem: SCRIPTS / name for name in bg.RECIPE_INERT_MODULES}
 
 # Rule 2: where tracked code may name the inert module, and what it may use there.
 CALL_SITES: dict[tuple[str, str], frozenset[str]] = {
-    # Connect-time provenance (read-only) and the post-save teardown.
+    # Connect-time provenance and the startup gate (it only reads, then either
+    # returns or ends the process before any document opens), and the post-save
+    # teardown.
     ("_common.py", "run_build"): frozenset(
         {"note_seats_before_connect", "record_seat_provenance", "teardown_seat"}
     ),
