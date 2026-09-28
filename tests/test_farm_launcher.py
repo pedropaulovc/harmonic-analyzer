@@ -97,6 +97,12 @@ import sys
 import time
 from pathlib import Path
 
+if sys.argv[1] == "venv":
+    environment = Path(sys.argv[-1])
+    environment.mkdir(parents=True)
+    (environment / "pyvenv.cfg").write_text("relocatable = true\\n", encoding="utf-8")
+    raise SystemExit(0)
+
 if sys.argv[1] == "sync":
     with open(os.environ["UV_STUB_SYNCS"], "a", encoding="utf-8") as syncs:
         syncs.write(
@@ -109,7 +115,19 @@ if sys.argv[1] == "sync":
             )
             + "\\n"
         )
+    time.sleep(float(os.environ.get("UV_STUB_SYNC_DELAY", "0")))
+    (Path(os.environ["VIRTUAL_ENV"]) / "synced.txt").write_text(
+        str(os.getpid()), encoding="utf-8"
+    )
     raise SystemExit(int(os.environ.get("UV_STUB_SYNC_EXIT", "0")))
+
+blocked = os.environ.get("UV_STUB_BLOCK_OUTPUTS")
+if blocked:
+    # Occupy this run's outputs path so the launcher cannot move cad/out there.
+    for record_path in Path(blocked).glob("*.run.json"):
+        run = json.loads(record_path.read_text(encoding="utf-8-sig"))
+        if Path(run["snapshot"]) == Path.cwd():
+            Path(run["outputs"]).mkdir()
 
 
 def record(**late):
@@ -131,6 +149,9 @@ def record(**late):
                 "submodule_files": {
                     name: (cwd / name / "marker.txt").exists() for name in ("lib", "refs")
                 },
+                "environment_synced": (
+                    Path(os.environ.get("VIRTUAL_ENV", "?")) / "synced.txt"
+                ).exists(),
                 **late,
             }
         ),
@@ -536,7 +557,112 @@ def test_launches_share_one_environment_synced_once(tmp_path: Path) -> None:
     assert len(syncs) == 1, syncs
     assert syncs[0]["argv"] == ["sync", "--frozen", "--no-editable", "--active"]
     assert Path(syncs[0]["cwd"]) == Path(first["snapshot"])
-    assert Path(syncs[0]["VIRTUAL_ENV"]) == Path(first["environment"])
+    # Synced in a staging directory of its own, then published whole.
+    staged = Path(syncs[0]["VIRTUAL_ENV"])
+    assert staged.parent == Path(first["environment"]).parent
+    assert staged.name.startswith(Path(first["environment"]).name + ".staging-")
+    assert not staged.exists()
+    assert sorted(p.name for p in staged.parent.iterdir()) == [
+        Path(first["environment"]).name
+    ]
+    invocation = json.loads(Path(fixture["invocation"]).read_text(encoding="utf-8"))
+    assert invocation["environment_synced"] is True
+
+
+def test_concurrent_launches_publish_one_environment_and_both_build(
+    tmp_path: Path,
+) -> None:
+    """Two launchers creating the same environment each sync privately; one
+    publishes, the other adopts it, and neither touches the other's sync."""
+    fixture = _launcher_fixture(tmp_path)
+    processes = []
+    invocations = []
+    for index in range(2):
+        environment = dict(fixture["environment"])
+        environment["UV_STUB_SYNC_DELAY"] = "3"
+        invocations.append(tmp_path / f"uv invocation {index}.json")
+        environment["UV_STUB_INVOCATION"] = str(invocations[-1])
+        processes.append(
+            subprocess.Popen(
+                _command(fixture, "part:pen_rod", tag=f"racer{index}"),
+                env=environment,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+        )
+    results = [process.communicate(timeout=HANG_GUARD_S) for process in processes]
+
+    for process, (stdout, stderr) in zip(processes, results):
+        assert process.returncode == 0, (stdout, stderr)
+    finished = [json.loads(stdout.splitlines()[-1]) for stdout, _ in results]
+    assert finished[0]["environment"] == finished[1]["environment"]
+    assert sorted(f["environment_reused"] for f in finished) == [False, True]
+    syncs = Path(fixture["syncs"]).read_text(encoding="utf-8").splitlines()
+    assert len({json.loads(line)["VIRTUAL_ENV"] for line in syncs}) == 2, syncs
+    for invocation in invocations:
+        built = json.loads(invocation.read_text(encoding="utf-8"))
+        assert Path(built["environment"]["VIRTUAL_ENV"]) == Path(
+            finished[0]["environment"]
+        )
+        assert built["environment_synced"] is True
+    envs = Path(finished[0]["environment"]).parent
+    assert sorted(p.name for p in envs.iterdir()) == [
+        Path(finished[0]["environment"]).name
+    ]
+
+
+def test_a_stale_staging_directory_is_never_touched(tmp_path: Path) -> None:
+    """A killed launcher can leave its uv syncing into its staging directory;
+    a later launcher syncs and publishes its own instead of reusing or
+    deleting that one."""
+    fixture = _launcher_fixture(tmp_path)
+    environment = dict(fixture["environment"])
+    environment["UV_STUB_SYNC_EXIT"] = "5"
+    failed = _run_launcher(fixture, _command(fixture, "part:pen_rod"), environment)
+    assert failed.returncode == 1, (failed.stdout, failed.stderr)
+    target = Path(
+        _record(_only(Path(fixture["log_directory"]), "*.done"))["environment"]
+    )
+    orphan = target.parent / f"{target.name}.staging-0123456789ab"
+    orphan.mkdir()
+    (orphan / "half-synced.txt").write_text("still syncing\n", encoding="utf-8")
+
+    result = _run_launcher(
+        fixture, _command(fixture, "part:pen_rod"), fixture["environment"]
+    )
+
+    assert result.returncode == 0, (result.stdout, result.stderr)
+    finished = json.loads(result.stdout.splitlines()[-1])
+    assert Path(finished["environment"]) == target
+    assert finished["environment_reused"] is False
+    assert (target / "synced.txt").exists()
+    assert (orphan / "half-synced.txt").read_text(encoding="utf-8") == "still syncing\n"
+
+
+def test_outputs_that_cannot_be_kept_fail_the_run_and_keep_the_snapshot(
+    tmp_path: Path,
+) -> None:
+    fixture = _launcher_fixture(tmp_path)
+    environment = dict(fixture["environment"])
+    environment["UV_STUB_BLOCK_OUTPUTS"] = str(fixture["log_directory"])
+
+    result = _run_launcher(fixture, _command(fixture, "part:pen_rod"), environment)
+
+    # The build itself exited 0, but its outputs are not where a finished
+    # run's record says they are.
+    assert result.returncode == 1, (result.stdout, result.stderr)
+    assert "the snapshot is kept" in result.stderr
+    finished = json.loads(result.stdout.splitlines()[-1])
+    assert finished["state"] == "failed"
+    assert finished["exit_code"] == 1
+    assert finished["outputs_preserved"] is False
+    assert finished["snapshot_removed"] is False
+    stranded = Path(finished["snapshot"]) / "cad" / "out"
+    assert Path(finished["outputs"]) == stranded
+    assert (stranded / "reports" / "stub-output.txt").read_text(
+        encoding="utf-8"
+    ) == "built\n"
 
 
 def test_a_changed_lock_gets_its_own_environment(tmp_path: Path) -> None:
@@ -588,7 +714,10 @@ def test_a_failed_environment_sync_never_builds_and_still_cleans_up(
     assert finished["state"] == "failed"
     assert finished["snapshot_removed"] is True
     assert not Path(finished["snapshot"]).exists()
-    assert not (Path(finished["environment"]) / ".farm-run-environment.json").exists()
+    # Neither a published environment nor the failed staging copy is left.
+    assert not Path(finished["environment"]).parent.exists() or not any(
+        Path(finished["environment"]).parent.iterdir()
+    )
 
 
 def test_a_dirty_worktree_is_refused_before_startup(tmp_path: Path) -> None:

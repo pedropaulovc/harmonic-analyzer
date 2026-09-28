@@ -229,10 +229,12 @@ such build:
   runs an action.
 - The build runs from a private snapshot of the pushed HEAD under
   `-LogDirectory` (which must sit outside every Git worktree), so the caller's
-  worktree may change mid-run; outputs land in `<LogDirectory>\<run-id>.out`,
-  not the worktree's `cad/out`. A direct `build.py --executor farm` has no
-  snapshot: it refuses to dispatch, naming the files, once its checkout drifts
-  from the launch commit, so never commit or edit in that worktree mid-run.
+  worktree may change mid-run; outputs land in the run record's `outputs`
+  (`<LogDirectory>\<run-id>.out`), not the worktree's `cad/out`, and recovery
+  works from the recorded commit, not the worktree. A direct
+  `build.py --executor farm` has no snapshot: it refuses to dispatch a leaf
+  whose key a checkout change since launch can move, naming the files, so
+  never commit or edit in that worktree mid-run.
 - Prove one real remote leaf on the launcher, protocol and pool configuration
   you are about to use before fanning parallel agents out over the farm. A green
   `check:math` is local-only and a submitter cache hit dispatches nothing;

@@ -276,6 +276,7 @@ function Initialize-SharedEnvironment {
         [Parameter(Mandatory)][string]$EnvironmentPath,
         [Parameter(Mandatory)][string]$SnapshotPath,
         [Parameter(Mandatory)][string]$LogPath,
+        [Parameter(Mandatory)][string]$StagingSuffix,
         [Parameter(Mandatory)]$Identity
     )
 
@@ -285,58 +286,60 @@ function Initialize-SharedEnvironment {
     # identical, and the environment holds no editable pointer into any
     # snapshot (--no-editable), so a finished run's snapshot can go away while
     # another run still imports from the environment.
+    #
+    # It is published whole: each launcher syncs into a staging directory of
+    # its own and renames it into place only after uv has exited and the marker
+    # is written. No launcher ever deletes or syncs into a directory another
+    # process may be using -- not even when a killed launcher's uv outlives it
+    # -- and the rename either publishes or finds a published one. The venv is
+    # created --relocatable so its entry points survive that rename.
     $marker = Join-Path $EnvironmentPath '.farm-run-environment.json'
     if (Test-Path -LiteralPath $marker -PathType Leaf) {
         return $true
     }
-    [System.IO.Directory]::CreateDirectory((Split-Path -Path $EnvironmentPath -Parent)) | Out-Null
-    $lockPath = "$EnvironmentPath.lock"
-    $lock = $null
-    while ($null -eq $lock) {
-        try {
-            $lock = [System.IO.File]::Open(
-                $lockPath,
-                [System.IO.FileMode]::OpenOrCreate,
-                [System.IO.FileAccess]::ReadWrite,
-                [System.IO.FileShare]::None
-            )
-        }
-        catch [System.IO.IOException] {
-            # Another launcher is creating this environment; its sync ends on
-            # its own, and the lock dies with its process if it does not.
-            Start-Sleep -Milliseconds 250
-        }
+    if (Test-Path -LiteralPath $EnvironmentPath) {
+        throw (
+            "Shared environment $EnvironmentPath exists without its marker; launchers only " +
+            "ever publish complete environments, so remove it once no launcher uses it"
+        )
     }
+    [System.IO.Directory]::CreateDirectory((Split-Path -Path $EnvironmentPath -Parent)) | Out-Null
+    $staging = "$EnvironmentPath.staging-$StagingSuffix"
+    $previous = $env:VIRTUAL_ENV
+    Push-Location -LiteralPath $SnapshotPath
     try {
-        if (Test-Path -LiteralPath $marker -PathType Leaf) {
-            return $true
-        }
-        if (Test-Path -LiteralPath $EnvironmentPath) {
-            # No marker: a launcher died mid-sync, and no build ever ran from it.
-            Remove-Item -LiteralPath $EnvironmentPath -Recurse -Force
-        }
-        $previous = $env:VIRTUAL_ENV
-        $env:VIRTUAL_ENV = $EnvironmentPath
-        Push-Location -LiteralPath $SnapshotPath
-        try {
-            Invoke-TeedNative -LogPath $LogPath -FilePath 'uv' -ArgumentList @(
-                'sync', '--frozen', '--no-editable', '--active'
-            ) | Out-Host
-            $code = $LASTEXITCODE
-        }
-        finally {
-            Pop-Location
-            $env:VIRTUAL_ENV = $previous
-        }
-        if ($code -ne 0) {
-            throw "uv sync of the shared environment $EnvironmentPath failed with exit $code"
-        }
-        [System.IO.Directory]::CreateDirectory($EnvironmentPath) | Out-Null
-        Write-JsonAtomic -Path $marker -Value $Identity
-        return $false
+        Invoke-LoggedNative -LogPath $LogPath -FilePath 'uv' -ArgumentList @(
+            'venv', '--quiet', '--relocatable', $staging
+        ) | Out-Host
+        $env:VIRTUAL_ENV = $staging
+        Invoke-LoggedNative -LogPath $LogPath -FilePath 'uv' -ArgumentList @(
+            'sync', '--frozen', '--no-editable', '--active'
+        ) | Out-Host
+        Write-JsonAtomic -Path (Join-Path $staging '.farm-run-environment.json') -Value $Identity
+    }
+    catch {
+        Remove-Item -LiteralPath $staging -Recurse -Force -ErrorAction SilentlyContinue
+        throw "uv sync of the shared environment $EnvironmentPath failed: $($_.Exception.Message)"
     }
     finally {
-        $lock.Dispose()
+        Pop-Location
+        $env:VIRTUAL_ENV = $previous
+    }
+    try {
+        [System.IO.Directory]::Move($staging, $EnvironmentPath)
+        return $false
+    }
+    catch {
+        if (-not (Test-Path -LiteralPath $marker -PathType Leaf)) {
+            throw "could not publish the shared environment $staging as $EnvironmentPath`: $($_.Exception.Message)"
+        }
+        # Another launcher published the same dependencies first; its copy is
+        # identical, and ours was never used.
+        Remove-Item -LiteralPath $staging -Recurse -Force -ErrorAction SilentlyContinue
+        Add-Content -LiteralPath $LogPath -Encoding utf8 -Value (
+            "farm-launch environment $EnvironmentPath was published by another launcher first; using it"
+        )
+        return $true
     }
 }
 
@@ -351,9 +354,12 @@ function Complete-Snapshot {
     # will; what only this run produced is its cad/out (restored artefacts,
     # reports, cache.jsonl, logs). Keep that on every outcome, then remove the
     # snapshot -- unless its outputs could not be moved out, in which case the
-    # snapshot itself is the only copy and stays for forensics.
+    # snapshot itself is the only copy and stays for forensics. ``outputs`` is
+    # where they actually are afterwards ($null when the build made none).
     $result = [ordered]@{
+        outputs = $null
         outputs_preserved = $false
+        outputs_stranded = $false
         snapshot_removed = $false
         cleanup_errors = [System.Collections.Generic.List[string]]::new()
     }
@@ -365,9 +371,12 @@ function Complete-Snapshot {
     if (Test-Path -LiteralPath $snapshotOutputs -PathType Container) {
         try {
             [System.IO.Directory]::Move($snapshotOutputs, $OutputsPath)
+            $result['outputs'] = $OutputsPath
             $result['outputs_preserved'] = $true
         }
         catch {
+            $result['outputs'] = $snapshotOutputs
+            $result['outputs_stranded'] = $true
             $result['cleanup_errors'].Add(
                 "could not move $snapshotOutputs to $OutputsPath; the snapshot is kept: $($_.Exception.Message)"
             )
@@ -641,6 +650,7 @@ try {
         -EnvironmentPath $environmentPath `
         -SnapshotPath $snapshotPath `
         -LogPath $logPath `
+        -StagingSuffix $runGuid.Substring(0, 12) `
         -Identity ([ordered]@{
             inputs = @($environmentInputs)
             created_by_run = $runId
@@ -698,10 +708,24 @@ try {
 }
 catch {
     # Never let cleanup cost the terminal record.
+    $strandedOutputs = Join-Path $snapshotPath 'cad\out'
+    $preserved = Test-Path -LiteralPath $outputsPath
+    $stranded = (-not $preserved) -and (Test-Path -LiteralPath $strandedOutputs)
     $cleanup = [ordered]@{
-        outputs_preserved = Test-Path -LiteralPath $outputsPath
+        outputs = if ($preserved) { $outputsPath } elseif ($stranded) { $strandedOutputs } else { $null }
+        outputs_preserved = $preserved
+        outputs_stranded = $stranded
         snapshot_removed = -not (Test-Path -LiteralPath $snapshotPath)
         cleanup_errors = @("snapshot cleanup failed: $($_.Exception.Message)")
+    }
+}
+if ($cleanup['outputs_stranded']) {
+    # The build's outputs are only in the kept snapshot, not where the record
+    # says a finished run's outputs are: whatever the child did, this run is
+    # not complete until someone recovers them.
+    $terminalState = 'failed'
+    if ($exitCode -eq 0) {
+        $exitCode = 1
     }
 }
 foreach ($problem in $cleanup['cleanup_errors']) {
@@ -729,6 +753,7 @@ $doneRecord['finished_at'] = [System.DateTime]::UtcNow.ToString(
 )
 $doneRecord['launch_overhead_s'] = $launchOverhead
 $doneRecord['environment_reused'] = $environmentReused
+$doneRecord['outputs'] = $cleanup['outputs']
 $doneRecord['outputs_preserved'] = $cleanup['outputs_preserved']
 $doneRecord['snapshot_removed'] = $cleanup['snapshot_removed']
 $doneRecord['cleanup_errors'] = @($cleanup['cleanup_errors'])

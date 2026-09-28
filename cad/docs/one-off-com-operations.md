@@ -197,14 +197,16 @@ throw away afterwards. Non-negotiable shape:
   every key from its local files while the workers build the launch commit; a
   commit or edit in that worktree during a direct `./build` run makes the two
   disagree, and the leaf that follows would fail `cache_missing` (#1114).
-  `build.py` checks for exactly that before each dispatch and on every absent
-  key, and names the drift (`submitter checkout changed since launch: HEAD A ->
-  B; changed: …`) instead. The supervised launcher builds from its own snapshot,
-  so it is immune.
+  `build.py` refuses each dispatch whose key such a change can move (anything
+  under `cad/`, the graph and environment files, submodules, the task's own
+  inputs) and names it (`submitter checkout changed since launch: HEAD A ->
+  B; changed: …`); on an absent key it names every tracked change. The
+  supervised launcher builds from its own snapshot, so it is immune.
 - **Reading a moved key** (full detail in `DEVELOPING.md`, "Debugging a miss"):
-  `uv run python -m doit cache_status -- <substring>` for `HIT`/`MISS` + the
-  `(digest, relpath)` list behind a miss and a `DRIFT(last published …)` flag;
-  `cad/out/reports/cache.jsonl` for the append-only event log
+  `uv run python -m doit cache_status -- <substring>` (from a checkout at the
+  run's commit) for `HIT`/`MISS` + the `(digest, relpath)` list behind a miss
+  and a `DRIFT(last published …)` flag; `<out>/reports/cache.jsonl` (§4) for
+  the append-only event log
   (`store`/`store_skip`/`restore_hit`/`restore_miss`/`restore_locked`/
   `restore_hit_drift`/…); `HARMONIC_CACHE_DEBUG=1` on the run you are
   diagnosing to log every key input as it is computed. A key is
@@ -216,11 +218,17 @@ throw away afterwards. Non-negotiable shape:
 
 ## 4. Getting evidence when it fails
 
-**Local half** (the submitter, even in farm mode):
+**Local half** (the submitter, even in farm mode). Its outputs live in `<out>`:
+`cad/out` of the checkout for a direct attended build, but for a supervised
+launch the run record's `outputs` — `<LogDirectory>\<run-id>.out`, where the
+launcher moves the snapshot's `cad/out` when the run ends (the snapshot's own
+`cad\out` while it is still running, or when `.done` says the move failed).
+The caller's `cad/out` holds nothing from a supervised run.
 
-- `cad/out/logs/<log_stem>.log` — the per-task console tee (only for tasks that
-  pass a `log_stem`; otherwise output is inherited straight to the terminal).
-- `cad/out/reports/telemetry/traces.jsonl` and `logs.jsonl` — every span and
+- `<out>/logs/<log_stem>.log` — the per-task console tee (only for tasks that
+  pass a `log_stem`; otherwise output is inherited straight to the terminal,
+  which for a supervised launch is the run's `.log`).
+- `<out>/reports/telemetry/traces.jsonl` and `logs.jsonl` — every span and
   log record as JSON; query them with `rg`/`jq` instead of scraping the console
   (`AGENTS.md`, "Observability"). What matters for an ad-hoc operation: the
   phase spans are SIBLINGS — `cache.probe` → `com.seat.wait` →
@@ -232,7 +240,7 @@ throw away afterwards. Non-negotiable shape:
   COM session means that session ran unprotected.
 
   ```powershell
-  rg watchdog_signal cad/out/reports/telemetry/logs.jsonl | jq -c '.body'
+  rg watchdog_signal <out>/reports/telemetry/logs.jsonl | jq -c '.body'
   ```
 
 **Farm half.** The failure message `_farm_build` raises already names worker,
@@ -259,9 +267,11 @@ programmatically.
 Stopping a local submitter cancels nothing: leaves share their workflow by ID
 (`USE_EXISTING`), so only `farm.py cancel` cancels. Recovering an interrupted
 run therefore means querying *every* requested and attached ID in that run's
-log, not one representative leaf, with the worktree, HEAD, targets and leaf
-budget unchanged — the budget is part of the workflow ID. The full procedure is
-in [supervised farm launches](../../DEVELOPING.md#supervised-farm-launches).
+log, not one representative leaf, and resuming with the commit, targets, leaf
+budget and cache environment unchanged — for a supervised launch, the ones in
+its run record, not whatever the caller's worktree holds now; the budget is
+part of the workflow ID. The full procedure is in
+[supervised farm launches](../../DEVELOPING.md#supervised-farm-launches).
 
 **A failure OUTSIDE the recipe has no leaf log.** `farm.py logs` needs
 `log_blob`, and the worker only publishes one once it has actually run the

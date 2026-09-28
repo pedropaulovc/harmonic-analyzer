@@ -20,6 +20,7 @@ import json
 import os
 import socket
 import subprocess
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import timedelta
 from pathlib import Path
@@ -113,8 +114,48 @@ CACHE_MISSING_CAUSES = (
     "this task's row in cad/out/reports/cache.jsonl with the worker's"
 )
 
+# Tracked paths outside cad/ that can still move a key or the graph itself:
+# the graph and its runner, the environment every recipe runs in, and what
+# decides which submodules a worker checks out.
+_KEY_AFFECTING_FILES = frozenset(
+    {
+        "dodo.py",
+        "build.py",
+        "pyproject.toml",
+        "uv.lock",
+        ".python-version",
+        ".farm-sources.json",
+        ".gitmodules",
+    }
+)
+_GITLINK_MODE = "160000"
 
-def checkout_drift(repo: Path = REPO_ROOT, commit: str | None = None) -> str | None:
+
+def _can_move_a_key(path: str, gitlink: bool, task_inputs: frozenset[str]) -> bool:
+    """Whether a changed tracked ``path`` can change some cache key or the graph.
+
+    Conservative by construction -- refusing a harmless edit costs a relaunch,
+    missing a real re-key costs the build. Every recipe input lives under
+    ``cad/`` (scripts, config, templates, references), a key folds its
+    dependencies' recipes transitively (a drawing keys its part's whole recipe
+    through the ``.SLDPRT`` dep), and a ``.gitattributes`` rewrites checked-out
+    bytes; so all of those count for every task, alongside the task's own
+    recorded key inputs and any submodule.
+    """
+    return (
+        gitlink
+        or path.startswith("cad/")
+        or path in _KEY_AFFECTING_FILES
+        or path.rsplit("/", 1)[-1] == ".gitattributes"
+        or path in task_inputs
+    )
+
+
+def checkout_drift(
+    repo: Path = REPO_ROOT,
+    commit: str | None = None,
+    task_inputs: Iterable[str] | None = None,
+) -> str | None:
     """Why this checkout no longer matches the launch commit, or ``None``.
 
     The submitter keys each task from the live files when it reaches the task,
@@ -126,32 +167,44 @@ def checkout_drift(repo: Path = REPO_ROOT, commit: str | None = None) -> str | N
     index, so concurrent doit workers can run it side by side. A HEAD that moved
     to an identical tree is no drift: every key is unchanged.
 
-    Any tracked difference is drift, not only one inside this task's
-    ``file_dep``: keys fold transitive recipe digests (a drawing keys its
-    part's whole recipe through the ``.SLDPRT`` dep), so a cheap per-task
-    relevance test would miss real re-keys.
+    With ``task_inputs`` (the repo-relative paths a task's key was computed
+    from) only a change that can move a key counts -- see ``_can_move_a_key``
+    -- so a README edit mid-run does not stop a valid dispatch. Without it,
+    any tracked difference counts: that is the explanation after a key has
+    already gone missing, where every difference is a lead.
     """
     launched = commit or os.environ["HARMONIC_FARM_COMMIT"]
-    changed = _git(
+    raw = _git(
         repo,
         "diff",
-        "--name-only",
+        "--raw",
+        "-z",
         "--no-renames",
         "--ignore-submodules=none",
         launched,
         "--",
-    ).splitlines()
+    ).split("\0")
+    # -z --raw: ":<old mode> <new mode> <old sha> <new sha> <status>", then the path.
+    changed = [
+        (path, _GITLINK_MODE in status.split()[:2])
+        for status, path in zip(raw[0::2], raw[1::2])
+        if status.startswith(":")
+    ]
+    if task_inputs is not None:
+        inputs = frozenset(task_inputs)
+        changed = [c for c in changed if _can_move_a_key(*c, inputs)]
     if not changed:
         return None
+    paths = [path for path, _ in changed]
     head = _git(repo, "rev-parse", "HEAD").strip()
     moved = (
         f"HEAD {launched[:12]} (unchanged)"
         if head == launched
         else f"HEAD {launched[:12]} -> {head[:12]}"
     )
-    shown = ", ".join(changed[:_DRIFT_PATHS_SHOWN])
-    if len(changed) > _DRIFT_PATHS_SHOWN:
-        shown += f" and {len(changed) - _DRIFT_PATHS_SHOWN} more"
+    shown = ", ".join(paths[:_DRIFT_PATHS_SHOWN])
+    if len(paths) > _DRIFT_PATHS_SHOWN:
+        shown += f" and {len(paths) - _DRIFT_PATHS_SHOWN} more"
     return (
         f"submitter checkout changed since launch: {moved}; changed: {shown}; "
         f"the farm builds {launched[:12]}, so keys would not match. Launch from "
@@ -161,7 +214,12 @@ def checkout_drift(repo: Path = REPO_ROOT, commit: str | None = None) -> str | N
 
 def _git(repo: Path, *args: str) -> str:
     done = subprocess.run(
-        ["git", *args], cwd=repo, capture_output=True, text=True, check=False
+        ["git", *args],
+        cwd=repo,
+        capture_output=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
     )
     if done.returncode != 0:
         raise RuntimeError(

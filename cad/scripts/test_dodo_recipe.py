@@ -1802,7 +1802,7 @@ def test_farm_restore_span_names_its_cache_key(monkeypatch):
     monkeypatch.setattr(dodo, "_cache_key", lambda file_deps, label: key)
     monkeypatch.setattr(dodo._cache, "restore", lambda *args: next(restores))
     monkeypatch.setattr(dodo._farm, "enabled", lambda: True)
-    monkeypatch.setattr(dodo._farm, "checkout_drift", lambda: None)
+    monkeypatch.setattr(dodo._farm, "checkout_drift", lambda task_inputs=None: None)
     monkeypatch.setattr(dodo._farm, "run_leaf", lambda label, k: succeeded)
 
     dodo._cached_com_action("part:x", ["build"], [], [], "part-x")

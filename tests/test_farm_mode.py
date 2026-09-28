@@ -100,7 +100,7 @@ def _undrifted_checkout(monkeypatch):
     The real check runs git against the live checkout; these tests exercise the
     dispatch around it (tests/test_farm_checkout_drift.py covers git itself).
     """
-    monkeypatch.setattr(_farm, "checkout_drift", lambda: None)
+    monkeypatch.setattr(_farm, "checkout_drift", lambda task_inputs=None: None)
 
 
 def _restore_sequence(dodo, monkeypatch, calls, outcomes, on_hit=None):
@@ -130,6 +130,13 @@ def farm_part(tmp_path, monkeypatch):
     monkeypatch.setattr(dodo, "_part_file_deps", lambda _script, _stem: [str(script)])
     monkeypatch.setattr(dodo, "_part_cache_outputs", lambda _stem: [output])
     monkeypatch.setattr(dodo, "_cache_key", lambda _deps, _label: "k" * 64)
+    monkeypatch.setattr(
+        dodo._cache,
+        "key_input_paths",
+        lambda label, key: (
+            list(KEY_INPUTS) if (label, key) == ("part:pen_rod", "k" * 64) else None
+        ),
+    )
     monkeypatch.setattr(
         dodo, "_stamp_part_execution", lambda stem: calls["stamp"].append(stem)
     )
@@ -201,14 +208,16 @@ DRIFT = (
     "keys would not match. Launch from an untouched worktree "
     "(scripts/farm-run.ps1 does this)."
 )
+KEY_INPUTS = ("cad/config/release.yaml", "cad/scripts/build_pen_rod.py")
 
 
-def _drift_after(monkeypatch, checks: int) -> list[None]:
-    """``checkout_drift`` clean for the first ``checks`` calls, drifted after."""
-    seen: list[None] = []
+def _drift_after(monkeypatch, checks: int) -> list[list[str] | None]:
+    """``checkout_drift`` clean for the first ``checks`` calls, drifted after;
+    returns the ``task_inputs`` each call was scoped to."""
+    seen: list[list[str] | None] = []
 
-    def drift():
-        seen.append(None)
+    def drift(task_inputs=None):
+        seen.append(None if task_inputs is None else list(task_inputs))
         return DRIFT if len(seen) > checks else None
 
     monkeypatch.setattr(_farm, "checkout_drift", drift)
@@ -218,7 +227,7 @@ def _drift_after(monkeypatch, checks: int) -> list[None]:
 def test_a_drifted_checkout_is_refused_before_any_dispatch(farm_part, monkeypatch):
     dodo, script, calls, restore = farm_part
     restore((False,))
-    _drift_after(monkeypatch, 0)
+    checks = _drift_after(monkeypatch, 0)
     monkeypatch.setattr(
         dodo._farm, "run_leaf", lambda label, key: pytest.fail("dispatched on drift")
     )
@@ -228,6 +237,8 @@ def test_a_drifted_checkout_is_refused_before_any_dispatch(farm_part, monkeypatc
 
     assert str(failure.value) == f"part:pen_rod: not dispatched: {DRIFT}"
     assert calls["stamp"] == []
+    # Before dispatch only a change that can move THIS key counts.
+    assert checks == [list(KEY_INPUTS)]
 
 
 def test_cache_missing_on_a_drifted_checkout_names_the_drift(farm_part, monkeypatch):
@@ -253,7 +264,8 @@ def test_cache_missing_on_a_drifted_checkout_names_the_drift(farm_part, monkeypa
     assert message.startswith("part:pen_rod failed on sw-01@3 [cache_missing] exit 0:")
     assert message.endswith(DRIFT)
     assert _farm.CACHE_MISSING_CAUSES not in message
-    assert len(checks) == 2
+    # After the key went missing, every tracked difference is a lead.
+    assert checks == [list(KEY_INPUTS), None]
 
 
 def test_cache_missing_without_drift_names_the_likely_causes(farm_part, monkeypatch):
@@ -278,7 +290,7 @@ def test_cache_missing_without_drift_names_the_likely_causes(farm_part, monkeypa
     assert message.startswith("part:pen_rod failed on sw-01@3 [cache_missing] exit 0:")
     assert _farm.CACHE_MISSING_CAUSES in message
     assert "failures/*" in message
-    assert len(checks) == 2
+    assert checks == [list(KEY_INPUTS), None]
 
 
 def test_absent_key_after_success_on_a_drifted_checkout_names_the_drift(

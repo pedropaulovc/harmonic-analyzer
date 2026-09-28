@@ -106,11 +106,18 @@ surfaced as `[cache_missing] exit 0`. The launcher therefore never runs
    set the workers skip).
 3. A shared environment at `<LogDirectory>\envs\<key>`, where `<key>` hashes
    the commit's `uv.lock`, `pyproject.toml`, `.python-version` and required
-   gitlinks. It is synced once (`uv sync --frozen --no-editable --active`,
-   under `<key>.lock`) and then reused by every launch with the same
-   dependencies; `--no-editable` keeps it free of pointers into any snapshot,
-   so snapshots come and go while it is in use. A directory without its
-   `.farm-run-environment.json` marker is an interrupted sync and is rebuilt.
+   gitlinks, reused by every launch with the same dependencies. The first
+   launch for a key creates it in a staging directory of its own
+   (`<key>.staging-<12 hex>`: `uv venv --relocatable`, then
+   `uv sync --frozen --no-editable --active`), writes the
+   `.farm-run-environment.json` marker, and only after uv has exited renames
+   it to `<key>`. No launcher ever syncs into or deletes a directory another
+   one may be using, even when a killed launcher's uv outlives it; two
+   launchers racing on one key both sync, one rename wins, and the other
+   discards its copy and adopts the winner's. `--no-editable` keeps the
+   environment free of pointers into any snapshot, so snapshots come and go
+   while it is in use, and `--relocatable` keeps its entry points valid
+   across the rename.
 4. The build runs from the snapshot with `VIRTUAL_ENV` set to that environment
    and `--no-sync --active`, so neither `uv` nor `build.py` touches `-Worktree`
    again. Commit, edit or check out anything there mid-run; this run cannot
@@ -126,23 +133,32 @@ Every snapshot starts with an empty `cad/out`, so `.doit.db` is fresh and each
 task first looks for its key in the remote cache; nothing from the caller's
 `cad/out` is read or written. When the child exits, whatever the outcome, the
 launcher moves the snapshot's `cad/out` (restored artefacts, `.doit.db`,
-`reports/cache.jsonl`, logs) to `<LogDirectory>\<run-id>.out` and runs
-`git worktree remove --force` on the snapshot. If the move fails, the snapshot
-is the only copy of those outputs, so it is kept and the reason is recorded in
-`cleanup_errors`. The shared environments stay; delete an `envs\<key>`
-directory only when no launcher is running.
+`reports/cache.jsonl`, `reports/telemetry`, logs) to
+`<LogDirectory>\<run-id>.out` and runs `git worktree remove --force` on the
+snapshot. `.done`'s `outputs` is where they actually are. If the move fails,
+the snapshot holds the only copy, so it is kept, `outputs` points into it,
+the reason is in `cleanup_errors`, and the run ends `failed` with a nonzero
+exit even when the build itself exited 0 — its outputs are not where a
+finished run's are. The shared environments stay; delete an `envs\<key>`
+directory, or a `<key>.staging-*` left by a killed launcher, only when no
+launcher is running.
 
 A direct `build.py --executor farm` in an attended terminal has no snapshot. It
-guards the same hazard instead: before each leaf dispatch, and again whenever a
-leaf reports `cache_missing` or succeeds without its key, it runs
-`git diff --name-only --ignore-submodules=none <launch commit>` (plus a
-`git rev-parse HEAD` only once something differs) and stops the task with
+guards the same hazard instead. Before each leaf dispatch it runs
+`git diff --raw --ignore-submodules=none <launch commit>` (plus a
+`git rev-parse HEAD` only once something differs) and refuses the dispatch if
+a change can move that leaf's key: any path under `cad/` (every recipe input
+lives there, and a key folds its dependencies' recipes), `dodo.py`,
+`build.py`, `pyproject.toml`, `uv.lock`, `.python-version`,
+`.farm-sources.json`, `.gitmodules`, any `.gitattributes`, any submodule, or
+one of the task's own recorded key inputs. The task stops with
 `submitter checkout changed since launch: HEAD A -> B; changed: <files>; the
 farm builds A, so keys would not match. Launch from an untouched worktree
-(scripts/farm-run.ps1 does this).` Any tracked change counts, not only the
-task's own inputs, because a key folds transitive recipe digests; untracked
-files and a new commit with an identical tree do not. Without drift, a
-`cache_missing` failure names its other likely causes instead.
+(scripts/farm-run.ps1 does this).` A README or test edit dispatches normally;
+untracked files and a new commit with an identical tree never count. When a
+leaf then reports `cache_missing`, or succeeds without its key, every tracked
+difference is reported the same way, since each is a lead; without any, the
+failure names its other likely causes instead.
 
 ### Starting one under the supervisor
 
@@ -224,20 +240,25 @@ one compressed JSON line):
 {
   "run_id": "20260920T173011482Z-3f7b1c9a2d5e4081b6c3a9f0d4e27516",
   "state": "succeeded",
-  "...": "the identity fields from the startup record, unchanged",
+  "...": "the identity fields from the startup record, unchanged, except outputs",
   "exit_code": 0,
   "elapsed_s": 1487.216,
   "finished_at": "2026-09-20T17:54:58.6980000Z",
   "launch_overhead_s": 4.412,
   "environment_reused": true,
+  "outputs": "C:\\src\\dt-logs\\farm-runs\\20260920T173011482Z-3f7b1c9a2d5e4081b6c3a9f0d4e27516.out",
   "outputs_preserved": true,
   "snapshot_removed": true,
   "cleanup_errors": []
 }
 ```
 
-Only exit 0 is `succeeded`; a wrapper exception is `failed` with exit 1 and its
-diagnostic in the log. A run ID is
+`.done`'s `outputs` is where the run's `cad/out` actually is: the planned
+`<run-id>.out`, the kept snapshot's `cad\out` when moving it failed (then
+`outputs_preserved` is false and the run is `failed`), or `null` when the
+build produced none. Only exit 0 with its outputs preserved is `succeeded`; a
+wrapper exception is `failed` with exit 1 and its diagnostic in the log. A run
+ID is
 `yyyyMMddTHHmmssfffZ-<32 lowercase hex GUID characters>`, so it is
 collision-resistant, and the launcher never overwrites an existing record, log,
 marker, outputs directory or snapshot: the files for one run are
@@ -285,10 +306,20 @@ uv run --frozen --project C:/src/solidworks-pool C:/src/solidworks-pool/farm.py 
 ```
 
 Follow a RUNNING workflow under a supervised monitor until it is terminal, then
-finish the bookkeeping with the *unchanged* worktree, HEAD, targets and leaf
-budget. The leaf budget is part of the workflow ID, so changing it during
-recovery creates a different workflow instead of rejoining the one already
-running. Never cancel a shared workflow automatically.
+finish the bookkeeping from the *run record*, never from the caller's worktree:
+the snapshot contract lets that worktree move on mid-run, so its HEAD says
+nothing about what was launched. The recorded identity is `commit`, `targets`,
+`leaf_timeout_minutes` and `cache_environment`. Launch `scripts/farm-run.ps1`
+again with exactly those — `-Worktree` pointed at a clean checkout whose HEAD
+is `commit` (the kept snapshot itself, or a fresh
+`git worktree add --detach <path> <commit>`), `-Targets` and `-LeafTimeout`
+from the record, and `HARMONIC_CACHE_ACCOUNT`/`CONTAINER`/`SALT` set (or unset)
+to match `cache_environment`. Same commit, cache environment and budget give
+the same keys and workflow IDs, so every finished leaf restores from the cache
+and a running one is rejoined rather than duplicated. The leaf budget is part
+of the workflow ID, so changing it during recovery creates a different
+workflow instead of rejoining the one already running. Never cancel a shared
+workflow automatically.
 
 A launcher killed before its `.done` never ran its cleanup, so its snapshot is
 still registered and its outputs are still in `<snapshot>\cad\out`. Once the
@@ -297,14 +328,14 @@ snapshot from any checkout of the repository:
 `git worktree remove --force <snapshot>` followed by `git worktree prune`. A
 snapshot is only ever the recorded commit; removing it loses nothing else.
 
-Relaunching the unchanged invocation is allowed in exactly one case: an
+Relaunching the recorded invocation is allowed in exactly one case: an
 authenticated `NOT_FOUND` for an ID that was *requested* but never *attached*.
 That pair of log lines exists precisely for the window between server acceptance
 and the submitter's acknowledgement. Everything else stays unresolved and blocks
 an automatic relaunch: `NOT_FOUND` for an attached ID, a missing or unreadable
-identifier, a changed worktree or cache environment, or a `status` call that
-failed on authentication, network or CLI error. An auth or network failure is
-never a `NOT_FOUND`.
+identifier, a checkout at any commit other than the recorded one or a different
+cache environment, or a `status` call that failed on authentication, network or
+CLI error. An auth or network failure is never a `NOT_FOUND`.
 
 ## Remote build-artifact cache
 

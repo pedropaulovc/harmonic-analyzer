@@ -2239,11 +2239,13 @@ def _farm_build(label: str, key: str, outputs: list[Path]) -> None:
     fault and fails just as loud.
 
     ``key`` came from this checkout's live files, but the worker builds the
-    launch commit. So a checkout that drifted since launch is refused before the
-    dispatch -- the worker could never publish ``key`` -- and a leaf that exits 0
-    without the key is re-checked for drift before blaming the cache (#1114).
+    launch commit. So a checkout whose drift since launch can move ``key`` is
+    refused before the dispatch -- the worker could never publish it -- and a
+    leaf that exits 0 without the key is re-checked against every tracked
+    difference before blaming the cache (#1114).
     """
-    drift = _farm.checkout_drift()
+    # Inputs this process never recorded mean every tracked change counts.
+    drift = _farm.checkout_drift(task_inputs=_cache.key_input_paths(label, key))
     if drift is not None:
         raise RuntimeError(f"{label}: not dispatched: {drift}")
     result = _farm.run_leaf(label, key)
