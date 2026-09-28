@@ -439,6 +439,15 @@ _configured = False
 # console stream / traces.jsonl / OTLP exporter instead of duplicating handles.
 _span_processors: list[Any] = []
 _aux_providers: dict[str, Any] = {}
+# The log side of the same arrangement: a log record belongs to the resource of
+# the span it is written under (see :class:`_ResourceRoutedLoggingHandler`), so
+# each extra resource also gets a ``LoggerProvider`` sharing these processors.
+_log_processors: list[Any] = []
+_aux_logger_providers: dict[str, Any] = {}
+# LogRecord attribute naming an explicit resource for a record written OUTSIDE any
+# span of that resource (``info(..., service=...)``); consumed by the routing
+# handler, never exported as an attribute.
+_SERVICE_RECORD_ATTR = "_harmonic_service"
 
 
 def _stamp() -> str:
@@ -992,11 +1001,15 @@ def configure(*, console: bool = True, force: bool = False) -> None:
     _aux_providers.clear()
 
     # ---- logs ---------------------------------------------------------- #
-    logger_provider = LoggerProvider(resource=resource)
+    # Kept, like the span processors, so the per-resource logger providers of
+    # :func:`_logger_provider_for_service` share this one logs.jsonl handle and
+    # OTLP exporter.
+    global _log_processors
+    _log_processors = []
     if tdir is not None:
         with contextlib.suppress(Exception):
             logs = _jsonl_stream(tdir / "logs.jsonl")
-            logger_provider.add_log_record_processor(
+            _log_processors.append(
                 SimpleLogRecordProcessor(
                     _JsonlLogRecordExporter(
                         out=logs, formatter=lambda r: r.to_json(indent=None) + "\n"
@@ -1006,8 +1019,12 @@ def configure(*, console: bool = True, force: bool = False) -> None:
     if otlp_endpoints["logs"]:
         processor = _otlp_log_processor(pending_warnings=pending_otlp_warnings)
         if processor is not None:
-            logger_provider.add_log_record_processor(processor)
+            _log_processors.append(processor)
+    logger_provider = LoggerProvider(resource=resource)
+    for processor in _log_processors:
+        logger_provider.add_log_record_processor(processor)
     set_logger_provider(logger_provider)
+    _aux_logger_providers.clear()
 
     pylog = logging.getLogger(_LOGGER_NAME)
     pylog.setLevel(logging.DEBUG)
@@ -1016,9 +1033,10 @@ def configure(*, console: bool = True, force: bool = False) -> None:
     pylog.addFilter(_ActivityFilter())
     pylog.propagate = False
     # Bridge into OTel's logs SDK: carries SeverityNumber + the active span's
-    # trace/span id onto every record, so logs and traces correlate.
+    # trace/span id onto every record, so logs and traces correlate -- and files
+    # each record under the resource of that span.
     pylog.addHandler(
-        LoggingHandler(level=logging.DEBUG, logger_provider=logger_provider)
+        _ResourceRoutedLoggingHandler(level=logging.DEBUG, logger_provider=logger_provider)
     )
     if want_console:
         stream = logging.StreamHandler(stream=_LiveStderr())
@@ -1131,6 +1149,50 @@ def _provider_for_service(service: str):
     return provider
 
 
+def _logger_provider_for_service(service: str):
+    """The ``LoggerProvider`` counterpart of :func:`_provider_for_service`: a
+    resource naming ``service``, sharing :data:`_log_processors`, built lazily."""
+    provider = _aux_logger_providers.get(service)
+    if provider is None:
+        provider = LoggerProvider(
+            # Not the owner of the shared processors; see _provider_for_service.
+            shutdown_on_exit=False,
+            resource=Resource.create(_resource_attributes(service)),
+        )
+        for processor in _log_processors:
+            provider.add_log_record_processor(processor)
+        _aux_logger_providers[service] = provider
+    return provider
+
+
+class _ResourceRoutedLoggingHandler(LoggingHandler):
+    """OTel logging bridge that files a record under the resource of its SPAN.
+
+    One ``LoggingHandler`` is bound to one provider, and so to one resource: this
+    process's stage. But the doit parent writes most of its lines under spans of
+    OTHER resources -- ``[cache]`` under ``cache.probe``/``cache.store``, ``[sw]``
+    under ``sw.ensure_ready`` (``build-infra``), launch/failure lines under a
+    ``task <label>`` span (the stage) -- and all of them landed on the umbrella
+    ``harmonic-analyzer`` resource: 76.9k rows in the 30 days to 2026-09-28,
+    49.9k of them ``[cache]``, so App Insights could not put a build-infra log
+    beside its build-infra span. A record now takes the ``service.name`` of the
+    active span's resource, or the explicit ``service=`` of a record written
+    outside any such span; otherwise this process's own.
+    """
+
+    def emit(self, record: logging.LogRecord) -> None:
+        service = record.__dict__.pop(_SERVICE_RECORD_ATTR, None)
+        if service is None:
+            resource = getattr(trace.get_current_span(), "resource", None)
+            if resource is not None:
+                service = resource.attributes.get("service.name")
+        if not service or service == _service_name:
+            super().emit(record)
+            return
+        provider = _logger_provider_for_service(str(service))
+        provider.get_logger(record.name).emit(self._translate(record))
+
+
 def get_tracer(name: str = _SERVICE_NAME, *, service: str | None = None):
     """Tracer for this process's own resource, or for ``service`` (see
     :func:`_provider_for_service`) when spans must be attributed elsewhere."""
@@ -1182,6 +1244,15 @@ def _extra(fields: Mapping[str, Any]) -> dict[str, Any] | None:
     return safe
 
 
+def _log_extra(fields: Mapping[str, Any], service: str | None) -> dict[str, Any] | None:
+    """:func:`_extra` plus the record's explicit resource, when the caller names
+    one (a build-infra line written after its span closed)."""
+    extra = _extra(fields)
+    if service is None:
+        return extra
+    return {**(extra or {}), _SERVICE_RECORD_ATTR: service}
+
+
 # A log record's ``code.*`` attributes (``code.function.name`` / ``code.file.path`` /
 # ``code.line.number`` in App Insights) are how a dark stretch of a build span maps
 # back to code: the gap before a record is the work its caller just finished. The
@@ -1223,29 +1294,40 @@ def _caller_stacklevel() -> int:
     return level
 
 
-def debug(message: str, **fields: Any) -> None:
-    get_logger().debug(message, extra=_extra(fields), stacklevel=_caller_stacklevel())
-
-
-def info(message: str, **fields: Any) -> None:
-    get_logger().info(message, extra=_extra(fields), stacklevel=_caller_stacklevel())
-
-
-def success(message: str, **fields: Any) -> None:
-    get_logger().log(
-        SUCCESS, message, extra=_extra(fields), stacklevel=_caller_stacklevel()
+# ``service`` files a record written OUTSIDE any span of that resource under it
+# anyway (a build-infra line logged after its span closed); inside a span the
+# record already takes the span's resource.
+def debug(message: str, *, service: str | None = None, **fields: Any) -> None:
+    get_logger().debug(
+        message, extra=_log_extra(fields, service), stacklevel=_caller_stacklevel()
     )
 
 
-def warn(message: str, **fields: Any) -> None:
-    get_logger().warning(message, extra=_extra(fields), stacklevel=_caller_stacklevel())
+def info(message: str, *, service: str | None = None, **fields: Any) -> None:
+    get_logger().info(
+        message, extra=_log_extra(fields, service), stacklevel=_caller_stacklevel()
+    )
 
 
-def error(message: str, *, exc_info: bool = False, **fields: Any) -> None:
+def success(message: str, *, service: str | None = None, **fields: Any) -> None:
+    get_logger().log(
+        SUCCESS, message, extra=_log_extra(fields, service), stacklevel=_caller_stacklevel()
+    )
+
+
+def warn(message: str, *, service: str | None = None, **fields: Any) -> None:
+    get_logger().warning(
+        message, extra=_log_extra(fields, service), stacklevel=_caller_stacklevel()
+    )
+
+
+def error(
+    message: str, *, exc_info: bool = False, service: str | None = None, **fields: Any
+) -> None:
     get_logger().error(
         message,
         exc_info=exc_info,
-        extra=_extra(fields),
+        extra=_log_extra(fields, service),
         stacklevel=_caller_stacklevel(),
     )
 
@@ -1366,9 +1448,13 @@ def _exit_span(handle: Any, exc: BaseException | None) -> None:
             }
         )
         span.set_status(Status(StatusCode.ERROR, str(exc)))
-        error(
-            f"{span.name if isinstance(span, ReadableSpan) else 'span'} failed: {exc}"
-        )
+        # Best-effort: a log handler that raises here would replace the very
+        # exception this records (a SeatNotReady would become an exit 1) and
+        # leave the span open.
+        with contextlib.suppress(Exception):
+            error(
+                f"{span.name if isinstance(span, ReadableSpan) else 'span'} failed: {exc}"
+            )
     else:
         # get_current_span() is typed Span (mutable, has set_status); only
         # ReadableSpan exposes .status -- the live SDK span is both.
@@ -1600,6 +1686,19 @@ def instrument_adapter(cls: type) -> int:
     return wrapped
 
 
+_FEATURES_MODULE = "solidworks_mcp.adapters.solidworks.features"
+
+
+def _record_tree_path(lookup: str, path: str) -> None:
+    """Stamp which strategy a feature-tree lookup took on the current span:
+    ``feature_tree.diff`` (``positional`` / ``walk``) on the ``adapter.*`` span
+    whose creation call resolved its feature by tree diff, and
+    ``feature_tree.last_profile`` (``newest_first`` / ``walk``). ``positional``
+    means ``FeatureByPositionReverse`` agreed with the forward walk, so the
+    added features were counted from the end instead of re-walking the tree."""
+    annotate(**{f"feature_tree.{lookup}": path})
+
+
 def _instrument_loaded_adapter() -> None:
     """Instrument the adapter class if this process has imported it.
 
@@ -1610,6 +1709,11 @@ def _instrument_loaded_adapter() -> None:
     if isinstance(cls, type):
         with contextlib.suppress(Exception):
             instrument_adapter(cls)
+    features = sys.modules.get(_FEATURES_MODULE)
+    observe = getattr(features, "set_tree_path_observer", None)
+    if callable(observe):
+        with contextlib.suppress(Exception):
+            observe(_record_tree_path)
 
 
 @contextlib.contextmanager
@@ -1630,25 +1734,48 @@ def build_session(
     it (:func:`instrument_adapter`): ``run_build`` imports ``PyWin32Adapter``
     before it opens the session, so every COM build, drawing, verify and export
     process gets ``adapter.<method>`` spans without a line changed in a recipe.
+
+    A ``SystemExit`` (or other non-``Exception``) leaving the block -- the
+    startup gate's ``SeatNotReady``, exit 89 -- skips the caller's own
+    post-session :func:`shutdown`, and OTLP export is batched, so the spans and
+    logs that explain the exit would be lost. So on that path this names the
+    exit on the console and in ``logs.jsonl``, then flushes, AFTER the root has
+    closed, before re-raising. An ``Exception`` never reaches here from
+    ``run_build`` (it returns an exit code), so the normal path flushes once.
     """
     configure()
     _instrument_loaded_adapter()
     parent = _parent_context_from_env()
-    if parent is not None:
-        token = otel_context.attach(parent)
-        try:
-            # Inside the attached parent context, so this process's spawn + import
-            # cost is billed to the REMOTE task span that paid for it -- and before
-            # any local span is opened, since a back-dated startup span parented
-            # under a span that started later reads as a malformed waterfall.
+    try:
+        if parent is not None:
+            token = otel_context.attach(parent)
+            try:
+                # Inside the attached parent context, so this process's spawn +
+                # import cost is billed to the REMOTE task span that paid for it
+                # -- and before any local span is opened, since a back-dated
+                # startup span parented under a span that started later reads
+                # as a malformed waterfall.
+                record_process_startup()
+                yield None
+            finally:
+                otel_context.detach(token)
+        else:
             record_process_startup()
-            yield None
-        finally:
-            otel_context.detach(token)
-    else:
-        record_process_startup()
-        with span(f"build.{label}", label=label, **attributes) as root:
-            yield root
+            with span(f"build.{label}", label=label, **attributes) as root:
+                yield root
+    except (Exception, GeneratorExit):
+        raise
+    except BaseException as exc:
+        code = getattr(exc, "code", None)
+        # Best-effort, like the flush: a raising handler must not turn exit 89
+        # into an ordinary exception.
+        with contextlib.suppress(Exception):
+            error(
+                f"build {label} exiting ({type(exc).__name__}, exit {code}): {exc}",
+                **({"exit_code": code} if isinstance(code, int) else {}),
+            )
+        shutdown()
+        raise
 
 
 _startup_recorded = False

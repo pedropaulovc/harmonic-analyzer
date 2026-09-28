@@ -26,6 +26,7 @@ import _telemetry
 import _seat_forensics
 from _common import (
     _build_id,
+    _com_invoke,
     _early_bound,
     _read_member,
     _visible_document_paths,
@@ -126,6 +127,9 @@ _ANNOT_DATUM = 2
 _ANNOT_GTOL = 5
 _ANNOT_SFSYM = 7
 _SEL_DIMENSION = 14  # swSelectType_e.swSelDIMENSIONS
+_SEL_EDGE = 1  # swSelectType_e.swSelEDGES
+_SEL_SILHOUETTE = 46  # swSelectType_e.swSelSILHOUETTES
+_SEL_FACE = 2  # swSelectType_e.swSelFACES
 _GDT_TYPES = frozenset({_ANNOT_DATUM, _ANNOT_GTOL, _ANNOT_SFSYM})
 # Fallback only, for an annotation whose geometry cannot be read. Every GD&T
 # symbol that CAN be measured is (see _measured_gdt_box) -- a fixed square is
@@ -300,6 +304,152 @@ def _select_view_entity(
     if entity is None:
         raise RuntimeError(f"selected {label} {entity_type.lower()} has no entity")
     return entity
+
+
+# How far a leader may land from its requested attachment point.  Measured on
+# the #1105 idprobe farm leaves (20260928T084216466Z, 14 surface finishes and
+# feature-control frames landed by selection point): every leader but one read
+# back within 4e-8 m of its request; the pinion-bracket pivot-bore finish,
+# whose request sits on the bore circle at 45 deg, re-solved 0.61 mm along the
+# edge.  1 mm admits that re-solve and rejects a landing on the neighbouring
+# edge, which the earlier 5 mm bound could not.
+_LEADER_LANDING_TOLERANCE_M = 0.001
+
+
+def _assert_leader_lands(
+    annotation: Any,
+    leader_attach_xy: tuple[float, float],
+    *,
+    what: str,
+    label: str,
+) -> None:
+    """Fail unless ``annotation`` keeps one live leader ending within
+    ``_LEADER_LANDING_TOLERANCE_M`` of ``leader_attach_xy``.  A returned True
+    from a leader or selection-point setter proves nothing, so the landing is
+    read back."""
+    leaders = int(annotation.GetLeaderCount())
+    dangling = bool(annotation.IsDangling())
+    if dangling or leaders != 1:
+        raise RuntimeError(
+            f"{what} leader did not survive ({label}): dangling={dangling}, "
+            f"leaders={leaders}"
+        )
+    points = list(annotation.GetLeaderPointsAtIndex(0) or ())
+    if len(points) < 6:
+        raise RuntimeError(f"{what} leader is unreadable ({label})")
+    actual = (float(points[-3]), float(points[-2]))
+    error = math.dist(actual, leader_attach_xy)
+    if error > _LEADER_LANDING_TOLERANCE_M:
+        raise RuntimeError(
+            f"{what} leader attachment moved ({label}): actual={actual}, "
+            f"requested={leader_attach_xy}, error={error:.6g} m, "
+            f"limit={_LEADER_LANDING_TOLERANCE_M:g} m"
+        )
+
+
+_ATTACHMENT_SELECT_TYPES = {
+    "EDGE": _SEL_EDGE,
+    "FACE": _SEL_FACE,
+    "SILHOUETTE": _SEL_SILHOUETTE,
+}
+
+
+def _is_same_attachment(adapter: Any, attached: Any, entity: Any, kind: str) -> bool:
+    """Whether ``attached`` is the ``kind`` entity an annotation was inserted on.
+
+    ``ISldWorks::IsSame`` reads 1 for the model edge or face itself, and 0 for
+    every silhouette, moved or not (probe 3 and run 20260928T081119688Z).  A
+    silhouette is identified by its owning face instead: on the #1105 idprobe2
+    leaves (20260928T085009031Z) ``ISilhouetteEdge::GetFace`` of the selected
+    and of the attached silhouette passed IsSame on all 16 silhouette finishes
+    and frames, and the drawing's ``IsSamePersistentID`` agreed.  A cylinder's
+    two flank silhouettes share that face; the leader-landing check tells them
+    apart.
+    """
+    if kind != "SILHOUETTE":
+        return int(adapter.swApp.IsSame(attached, entity)) == 1
+    selected_face = _early_bound(entity, "ISilhouetteEdge").GetFace()
+    attached_face = _early_bound(attached, "ISilhouetteEdge").GetFace()
+    if selected_face is None or attached_face is None:
+        return False
+    return int(adapter.swApp.IsSame(attached_face, selected_face)) == 1
+
+
+def _assert_attached_to(
+    adapter: Any,
+    annotation: Any,
+    entity: Any,
+    *,
+    entity_type: str,
+    what: str,
+    label: str,
+    expected_leaders: int = 1,
+) -> None:
+    """Fail unless ``annotation`` is still attached, by ``expected_leaders``
+    live leaders, to exactly ``entity``, an ``entity_type`` (EDGE, FACE or
+    SILHOUETTE) entity.
+
+    The count, type and entity readbacks must agree on one entity of that
+    type -- ``IGtol.IsAttached`` and ``ISFSymbol.IsAttached`` keep reading
+    True on a detached symbol -- and that entity must be ``entity`` by
+    :func:`_is_same_attachment`.  A leader move re-solves the attachment:
+    ``SetLeaderAttachmentPointAtIndex`` detached a feature-control frame
+    (entities=0) on the #1105 platen_guide leaf.  A datum tag's triangle is
+    not a leader (``GetLeaderCount`` reads 0 on every datum tag), so it
+    passes ``expected_leaders=0``.
+    """
+    kind = entity_type.upper()
+    if kind not in _ATTACHMENT_SELECT_TYPES:
+        raise ValueError(f"{what} cannot verify a {kind} attachment ({label})")
+    attached = tuple(annotation.GetAttachedEntities3() or ())
+    count = int(annotation.GetAttachedEntityCount3())
+    types = tuple(int(t) for t in (annotation.GetAttachedEntityTypes() or ()))
+    leaders = int(annotation.GetLeaderCount())
+    dangling = bool(annotation.IsDangling())
+    one = (
+        len(attached) == 1
+        and count == 1
+        and types == (_ATTACHMENT_SELECT_TYPES[kind],)
+        and attached[0] is not None
+    )
+    same = one and _is_same_attachment(adapter, attached[0], entity, kind)
+    if not same or dangling or leaders != expected_leaders:
+        raise RuntimeError(
+            f"{what} lost its {kind.lower()} attachment ({label}): "
+            f"entities={len(attached)}, count={count}, types={types}, "
+            f"same_entity={same}, dangling={dangling}, leaders={leaders}"
+        )
+
+
+def _expected_pick(
+    adapter: Any,
+    selected: Any,
+    expected: Any | None,
+    *,
+    entity_type: str,
+    what: str,
+    label: str,
+) -> Any:
+    """The entity an annotation must end up on: ``expected`` when the recipe
+    named one, else what the pick returned.
+
+    A named entity that was selected directly is ``selected`` itself. One
+    named alongside a coordinate hit-test must BE what the hit-test resolved
+    to (``_is_same_attachment``): a pick point where two lines meet returns
+    whichever SolidWorks tests first, and every later readback then agrees
+    on that wrong line, so the only proof is against an independently
+    identified entity.
+    """
+    if expected is None:
+        return selected
+    if expected is not selected and not _is_same_attachment(
+        adapter, selected, expected, entity_type.upper()
+    ):
+        raise RuntimeError(
+            f"{what} pick resolved to a {entity_type.lower()} other than the "
+            f"one named ({label}): the hit-test landed on a neighbour"
+        )
+    return expected
 
 
 # swSelectType_e names for the kinds a drawing-view pick can resolve to; an
@@ -603,15 +753,25 @@ def add_datum_feature(
     label: str,
     entity_type: str = "EDGE",
     entity: Any | None = None,
-    annotation: Any | None = None,
     shoulder: bool = False,
     position_tolerance_m: float = 0.02,
     callout_below: str = "",
+    expected_entity: Any | None = None,
 ) -> Any:
     """Attach a native datum-feature symbol to a drawing-view edge.
 
     ``entity_type`` widens the pick for entities that are not model edges —
     a revolve's flank lines are ``"SILHOUETTE"`` edges.
+
+    The tag is proved, after the rebuild, to sit on ONE entity that IS the
+    feature the recipe named (``_assert_attached_to``, ``IsSame``). A recipe
+    names it by ``edge_entity``/``entity`` (selected directly), or by
+    ``expected_entity`` with an ``edge_xy`` hit-test -- the pick keeps its
+    landing point and must resolve to that entity, else the sheet fails
+    before insertion. With ``edge_xy`` alone the proof is only that the tag
+    sits on what the hit-test returned: a neighbouring line within the pick
+    radius passes, so that form is for datums whose feature has no
+    neighbour there (the recipe says so where it picks).
 
     ``position_tolerance_m`` bounds how far ``IAnnotation::GetPosition`` may
     read from ``symbol_xy`` after the move. That readback is the point where
@@ -629,49 +789,23 @@ def add_datum_feature(
     a rebuild, so it cannot serve as a readback here.
     """
     draw = adapter.currentModel
-    if annotation is None:
-        _select_annotation_entity(
-            adapter,
-            view,
-            edge_xy=edge_xy,
-            edge_entity=edge_entity,
-            entity=entity,
-            entity_type=entity_type,
-            label=label,
-        )
-    else:
-        ddoc = _early_bound(draw, "IDrawingDoc")
-        name = view_name(adapter, view)
-        if not ddoc.ActivateView(name):
-            raise RuntimeError(f"failed to activate {label} drawing view {name!r}")
-        draw.ClearSelection2(True)
-        annotation = _sw_type_info.early_bound_or_flag(
-            annotation, "IAnnotation", "Select3", "GetSpecificAnnotation"
-        )
-        selected = bool(annotation.Select3(False, null_callout()))
-        if not selected:
-            display = adapter._attempt(lambda: annotation.GetSpecificAnnotation())
-            if display is not None:
-                display = _sw_type_info.early_bound_or_flag(
-                    display, "IDisplayDimension", "GetNameForSelection"
-                )
-                selection_name = str(display.GetNameForSelection() or "")
-                selected = bool(
-                    selection_name
-                    and draw.Extension.SelectByID2(
-                        selection_name,
-                        "DIMENSION",
-                        0.0,
-                        0.0,
-                        0.0,
-                        False,
-                        0,
-                        null_callout(),
-                        0,
-                    )
-                )
-        if not selected:
-            raise RuntimeError(f"failed to select {label} annotation")
+    selected = _select_annotation_entity(
+        adapter,
+        view,
+        edge_xy=edge_xy,
+        edge_entity=edge_entity,
+        entity=entity,
+        entity_type=entity_type,
+        label=label,
+    )
+    expected = _expected_pick(
+        adapter,
+        selected,
+        expected_entity if expected_entity is not None else edge_entity or entity,
+        entity_type=entity_type,
+        what=f"datum {datum}",
+        label=label,
+    )
     tag = draw.InsertDatumTag2()
     if tag is None:
         raise RuntimeError(f"failed to insert datum {datum} ({label})")
@@ -690,7 +824,15 @@ def add_datum_feature(
     if shoulder:
         tag.Shoulder = True
     tag_annotation = _sw_type_info.early_bound_or_flag(
-        tag.GetAnnotation(), "IAnnotation", "GetPosition", "SetPosition2"
+        tag.GetAnnotation(),
+        "IAnnotation",
+        "GetPosition",
+        "SetPosition2",
+        "GetAttachedEntities3",
+        "GetAttachedEntityCount3",
+        "GetAttachedEntityTypes",
+        "GetLeaderCount",
+        "IsDangling",
     )
     forced_shoulder = bool(tag.ForcedShoulder)
     if not tag_annotation.SetPosition2(symbol_xy[0], symbol_xy[1], 0.0):
@@ -729,6 +871,22 @@ def add_datum_feature(
         raise RuntimeError(f"failed to set datum callout text ({label})")
     draw.ClearSelection2(True)
     rebuild_drawing(adapter, label="add_datum_feature")
+    # The tag proves it sits on the feature the recipe NAMED, not merely on
+    # whatever the pick returned: a coordinate hit-test resolves whichever
+    # line is nearest, and insertion and readback then agree on the neighbour
+    # (summing-lever datum B on the rib flange instead of the plate end,
+    # #1105). A re-solved attachment fails here rather than printing. No
+    # leader count: the triangle is not a ``SetLeader3`` leader
+    # (``_datum_leader_segments``).
+    _assert_attached_to(
+        adapter,
+        tag_annotation,
+        expected,
+        entity_type=entity_type,
+        what="datum feature",
+        label=label,
+        expected_leaders=0,
+    )
     return tag
 
 
@@ -754,9 +912,25 @@ def add_feature_control_frame(
     """Attach a native feature-control frame to a drawing-view edge.
 
     ``entity_type`` widens the pick for entities that are not model edges —
-    a revolve's flank lines are ``"SILHOUETTE"`` edges.
+    a revolve's flank lines are ``"SILHOUETTE"`` edges.  Only the kinds
+    :func:`_assert_attached_to` can prove (EDGE, FACE, SILHOUETTE) are
+    accepted; the former DIMENSION path, which took ``IGtol.IsAttached`` as
+    proof, had no caller and is gone.
+
+    ``leader_attach_xy`` is where the leader lands on that entity (sheet
+    metres): it becomes the selection point before ``InsertGtol``, the same
+    way :func:`add_surface_finish` lands.  It is never applied with
+    ``SetLeaderAttachmentPointAtIndex``: on farm run
+    20260928T080412049Z-77daa98fe5514439bd4ce684c6e19ec7 that call, re-setting
+    six frames' leaders to the tip they already had, dropped every frame's
+    attached entity (GetAttachedEntityCount3 1 -> 0, types (EDGE,) -> ())
+    while IGtol.IsAttached kept reading True with one non-dangling leader.
     """
     draw = adapter.currentModel
+    if entity_type.upper() not in _ATTACHMENT_SELECT_TYPES:
+        raise ValueError(
+            f"feature-control frame cannot attach to a {entity_type} ({label})"
+        )
     edge = _select_annotation_entity(
         adapter,
         view,
@@ -766,6 +940,14 @@ def add_feature_control_frame(
         entity_type=entity_type,
         label=label,
     )
+    if leader_attach_xy is not None:
+        selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+        if selection_manager.SetSelectionPoint2(
+            1, -1, leader_attach_xy[0], leader_attach_xy[1], 0.0
+        ) is not True:
+            raise RuntimeError(
+                f"failed to set the feature-control-frame landing {leader_attach_xy} ({label})"
+            )
     gtol = draw.InsertGtol()
     if gtol is None:
         raise RuntimeError(f"failed to insert feature-control frame ({label})")
@@ -849,16 +1031,13 @@ def add_feature_control_frame(
         "SetAttachedEntities",
         "SetPosition2",
         "SetLeader3",
-        "SetLeaderAttachmentPointAtIndex",
+        "GetAttachedEntities3",
+        "GetAttachedEntityTypes",
+        "GetLeaderCount",
+        "IsDangling",
         "GetLeaderPointsAtIndex",
     )
-    # A GTol inserted from a selected display dimension reports its association
-    # through IGtol.IsAttached/GetLeaderCount; whether the dimension ALSO lands
-    # in the annotation's model-entity array is flow-dependent (0 on the
-    # pre-merge insertion order, 1 on the current one), so accept either.
-    # Ordinary edge/silhouette attachments must register exactly one entity.
-    expected_entities = {0, 1} if entity_type == "DIMENSION" else {1}
-    if entity_type != "DIMENSION" and int(annotation.GetAttachedEntityCount3()) != 1:
+    if int(annotation.GetAttachedEntityCount3()) != 1:
         if not annotation.SetAttachedEntities(dispatch_array([edge])):
             raise RuntimeError(f"failed to attach feature-control frame ({label})")
     # Bent leaders keep ordinary feature attachments out of neighbouring views.
@@ -879,38 +1058,21 @@ def add_feature_control_frame(
         )
     if not annotation.SetPosition2(frame_xy[0], frame_xy[1], 0.0):
         raise RuntimeError(f"failed to position feature-control frame ({label})")
-    if leader_attach_xy is not None and not annotation.SetLeaderAttachmentPointAtIndex(
-        0, leader_attach_xy[0], leader_attach_xy[1], 0.0
-    ):
-        raise RuntimeError(f"failed to position feature-control-frame leader ({label})")
     rebuild_drawing(adapter, label="add_feature_control_frame")
-    if (
-        int(annotation.GetAttachedEntityCount3()) not in expected_entities
-        or not bool(gtol.IsAttached())
-        or int(gtol.GetLeaderCount()) != 1
-    ):
-        raise RuntimeError(
-            f"feature-control frame attachment mismatch ({label}): "
-            f"entities={annotation.GetAttachedEntityCount3()}, "
-            f"expected in {sorted(expected_entities)}; "
-            f"attached={bool(gtol.IsAttached())}; "
-            f"leaders={gtol.GetLeaderCount()}, expected=1"
-        )
+    # IGtol.IsAttached reads True on a detached frame (run 20260928T080412049Z
+    # above), so the attached entity is what proves the attachment.
+    _assert_attached_to(
+        adapter,
+        annotation,
+        edge,
+        entity_type=entity_type,
+        what="feature-control frame",
+        label=label,
+    )
     if leader_attach_xy is not None:
-        points = list(annotation.GetLeaderPointsAtIndex(0) or ())
-        if len(points) < 6:
-            raise RuntimeError(f"feature-control-frame leader is unreadable ({label})")
-        actual_attach = (float(points[-3]), float(points[-2]))
-        attach_error = math.hypot(
-            actual_attach[0] - leader_attach_xy[0],
-            actual_attach[1] - leader_attach_xy[1],
+        _assert_leader_lands(
+            annotation, leader_attach_xy, what="feature-control frame", label=label
         )
-        if attach_error > 0.005:
-            raise RuntimeError(
-                f"feature-control-frame leader attachment moved ({label}): "
-                f"actual={actual_attach}, requested={leader_attach_xy}, "
-                f"error={attach_error:.6g} m"
-            )
     draw.ClearSelection2(True)
     return gtol
 
@@ -1050,6 +1212,16 @@ def add_surface_finish(
     edges — a revolve's flank lines are ``"SILHOUETTE"`` edges.  Pass a model
     ``edge_entity`` obtained from ``IView.GetVisibleEntities2`` when a small or
     overlapping projection makes coordinate selection ambiguous.
+
+    ``leader_attach_xy`` is where the leader lands on that entity (sheet
+    metres).  It becomes the selection point of the selected entity before
+    insertion (``ISelectionMgr.SetSelectionPoint2``), so SolidWorks attaches
+    the leader there.  Do not move the leader afterwards: on #1105's
+    sfprobe farm leaves, ``SetLeaderAttachmentPointAtIndex`` dropped every
+    symbol's attached entity (count 1 before the call, 0 after) while
+    ``ISFSymbol.IsAttached`` still read True.  After the rebuild the symbol
+    must be attached to exactly the selected entity, and a moved leader must
+    end within 5 mm of ``leader_attach_xy``.
     """
     if control is not None:
         if roughness_ra is not None or production_method:
@@ -1091,6 +1263,16 @@ def add_surface_finish(
             f"SURFACE_AUDIT {label}: entity_type={entity_type}, faces={diagnostic!r}"
         )
     draw = adapter.currentModel
+    if leader_attach_xy is not None:
+        # Coordinates are sheet metres with z 0: the probe landed every
+        # leader within 0.01 mm of the requested point this way.
+        selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+        if selection_manager.SetSelectionPoint2(
+            1, -1, leader_attach_xy[0], leader_attach_xy[1], 0.0
+        ) is not True:
+            raise RuntimeError(
+                f"failed to set the surface-finish landing {leader_attach_xy} ({label})"
+            )
     symbol = draw.Extension.InsertSurfaceFinishSymbol3(
         1,  # installed R2026x swSFSymType_e.swSFMachining_Req
         _LEADER_BENT,  # swLeaderStyle_e.swBENT -- see _LEADER_BENT
@@ -1129,9 +1311,14 @@ def add_surface_finish(
         "IAnnotation",
         "SetPosition2",
         "SetLeader3",
-        "SetLeaderAttachmentPointAtIndex",
         "GetTextFormat",
         "SetTextFormat",
+        "GetAttachedEntityCount3",
+        "GetAttachedEntities3",
+        "GetAttachedEntityTypes",
+        "GetLeaderCount",
+        "IsDangling",
+        "GetLeaderPointsAtIndex",
     )
     leader_status = int(
         annotation.SetLeader3(
@@ -1150,10 +1337,6 @@ def add_surface_finish(
         )
     if not annotation.SetPosition2(symbol_xy[0], symbol_xy[1], 0.0):
         raise RuntimeError(f"failed to position surface-finish symbol ({label})")
-    if leader_attach_xy is not None and not annotation.SetLeaderAttachmentPointAtIndex(
-        0, leader_attach_xy[0], leader_attach_xy[1], 0.0
-    ):
-        raise RuntimeError(f"failed to position surface-finish leader ({label})")
     if char_height is not None:
         # The symbol scales with its text: a smaller Ra reads as the routine
         # callout it is instead of a headline (default document height is
@@ -1166,6 +1349,18 @@ def add_surface_finish(
             raise RuntimeError(f"failed to set surface-finish text height ({label})")
     draw.ClearSelection2(True)
     rebuild_drawing(adapter, label="add_surface_finish")
+    _assert_attached_to(
+        adapter,
+        annotation,
+        selected_entity,
+        entity_type=entity_type,
+        what="surface-finish symbol",
+        label=label,
+    )
+    if leader_attach_xy is not None:
+        _assert_leader_lands(
+            annotation, leader_attach_xy, what="surface-finish symbol", label=label
+        )
     return symbol
 
 
@@ -1380,6 +1575,37 @@ def create_section_view(
     return section
 
 
+def _projection_frame(adapter: Any, view: Any) -> tuple[Any, Any]:
+    """The math utility and the view's CURRENT model-to-sheet transform, raw.
+
+    Raw dispatches (``_common._com_invoke``): the generated wrapper would read
+    type info and ``QueryInterface`` every object these calls return, which
+    is most of what one projection used to cost (p50 71 ms, n=22,839 in 30 d)
+    for five round trips of real work.  SolidWorks still does the product, so
+    a projected point is the same number it always was.
+    """
+    utility = _com_invoke(adapter.swApp, "ISldWorks", "GetMathUtility")
+    transform = _com_invoke(view, "IView", "ModelToViewTransform")
+    return utility, transform
+
+
+def _project_through(
+    utility: Any, transform: Any, xyz: Sequence[float], *, label: str
+) -> tuple[float, float]:
+    model_point = _com_invoke(
+        utility, "IMathUtility", "CreatePoint", double_array([float(v) for v in xyz])
+    )
+    if model_point is None:
+        raise RuntimeError(f"failed to create model point ({label})")
+    view_point = _com_invoke(model_point, "IMathPoint", "MultiplyTransform", transform)
+    if view_point is None:
+        raise RuntimeError(f"failed to project model point into view ({label})")
+    coordinates = list(_com_invoke(view_point, "IMathPoint", "ArrayData") or ())
+    if len(coordinates) < 2:
+        raise RuntimeError(f"projected model point has no sheet coordinates ({label})")
+    return (float(coordinates[0]), float(coordinates[1]))
+
+
 @_telemetry.traced("drawing.model_point_projection", label_param="label")
 def model_point_in_view(
     adapter: Any,
@@ -1388,21 +1614,52 @@ def model_point_in_view(
     *,
     label: str,
 ) -> tuple[float, float]:
-    """Project a model-space point into drawing-sheet coordinates."""
-    math_utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
-    model_point = math_utility.CreatePoint(double_array([float(v) for v in xyz]))
-    if model_point is None:
-        raise RuntimeError(f"failed to create model point ({label})")
-    model_point = _early_bound(model_point, "IMathPoint")
-    transform = _early_bound(view.ModelToViewTransform, "IMathTransform")
-    view_point = model_point.MultiplyTransform(transform)
-    if view_point is None:
-        raise RuntimeError(f"failed to project model point into view ({label})")
-    view_point = _early_bound(view_point, "IMathPoint")
-    coordinates = list(view_point.ArrayData or ())
-    if len(coordinates) < 2:
-        raise RuntimeError(f"projected model point has no sheet coordinates ({label})")
-    return (float(coordinates[0]), float(coordinates[1]))
+    """Project a model-space point into drawing-sheet coordinates.
+
+    Five raw round trips.  A loop over one view's points projects through
+    :func:`model_points_in_view` instead: one transform read and one span for
+    the whole batch rather than one per point (up to 422 per trace).
+    """
+    utility, transform = _projection_frame(adapter, view)
+    return _project_through(utility, transform, xyz, label=label)
+
+
+@_telemetry.traced("drawing.model_point_projection", label_param="label")
+def model_points_in_view(
+    adapter: Any,
+    view: Any,
+    points: Sequence[Sequence[float]],
+    *,
+    label: str,
+    names: Sequence[str] | None = None,
+) -> list[tuple[float, float]]:
+    """:func:`model_point_in_view` for many points of one view at one moment.
+
+    The transform is read once, so nothing may move ``view`` between the
+    points; three round trips per point after that.  ``names`` (one per
+    point) identify a failing point in the error; its index, model point and
+    the count projected before it are raised and set on the span either way.
+    """
+    if names is not None and len(names) != len(points):
+        raise ValueError(f"{label}: {len(names)} names for {len(points)} points")
+    _telemetry.annotate(points=len(points))
+    utility, transform = _projection_frame(adapter, view)
+    projected: list[tuple[float, float]] = []
+    for index, xyz in enumerate(points):
+        try:
+            projected.append(_project_through(utility, transform, xyz, label=label))
+        except Exception as exc:
+            model = tuple(float(v) for v in xyz)
+            point = names[index] if names is not None else f"point {index}"
+            _telemetry.annotate(
+                failed_index=index, failed_point=point, projected=len(projected)
+            )
+            raise RuntimeError(
+                f"{label}: {point} (index {index} of {len(points)}) at model"
+                f" {model} failed after {len(projected)} projected: {exc}"
+            ) from exc
+    _telemetry.annotate(projected=len(projected))
+    return projected
 
 
 @_telemetry.traced("drawing.linked_note", label_param="property_name")
@@ -1503,12 +1760,16 @@ def add_attached_note(
     label: str,
     entity_type: str = "EDGE",
     entity: Any | None = None,
+    attached_to: Any | None = None,
 ) -> Any:
     """Attach one literal arrowed note to a drawing-view entity.
 
     Provide EITHER ``entity_xy`` (a sheet-coordinate pick) OR ``entity`` (a
     precise model entity — for an offset/inclined rim whose projected edge has
     no stable sheet coordinate); ``_select_view_entity`` prefers ``entity``.
+    ``attached_to`` is the identified model entity a sheet-point pick must
+    resolve to: the pick sets where the arrow lands, and the build fails if
+    it attached anything else.
     """
     target = _select_view_entity(
         adapter, view, entity_type, entity_xy, label=label, entity=entity
@@ -1529,6 +1790,9 @@ def add_attached_note(
         "SetLeader3",
         "SetPosition2",
         "GetLeaderCount",
+        "GetAttachedEntities3",
+        "GetAttachedEntityTypes",
+        "IsDangling",
     )
     if int(annotation.GetAttachedEntityCount3()) != 1:
         if not annotation.SetAttachedEntities(dispatch_array([target])):
@@ -1544,6 +1808,15 @@ def add_attached_note(
         or int(annotation.GetLeaderCount()) != 1
     ):
         raise RuntimeError(f"attached note lacks one arrow ({label})")
+    if attached_to is not None:
+        _assert_attached_to(
+            adapter,
+            annotation,
+            attached_to,
+            entity_type=entity_type,
+            what="attached note",
+            label=label,
+        )
     draw.ClearSelection2(True)
     return note
 
@@ -2082,6 +2355,13 @@ def add_leader_note(
     a leader from the one view it is owned by -- a sheet-owned label whose
     leader ends ON a view reads as crossing it (12 findings on the priming
     sheet before this).
+
+    ``SetLeaderAttachmentPointAtIndex`` is the right call HERE, unlike for
+    surface-finish symbols and feature-control frames, which it detaches: a
+    pointer note has no attached entity to lose (farm run
+    20260928T080412049Z-77daa98fe5514439bd4ce684c6e19ec7 read
+    GetAttachedEntityCount3 0 -> 0, one non-dangling leader, on all four
+    cone-swing and crank-pinion notes).
     """
     draw = adapter.currentModel
     if view is not None:
@@ -4077,6 +4357,78 @@ def set_basic_dimension(adapter: Any, dimension: Any, *, label: str) -> Any:
         raise RuntimeError(f"{label} dimension did not retain BASIC tolerance")
     rebuild_drawing(adapter, label="set_basic_dimension")
     return dimension
+
+
+def assert_dimension_measures(
+    adapter: Any,
+    dimension: Any,
+    *,
+    expected_mm: float,
+    label: str,
+    entities: tuple[Any, Any] | None = None,
+    entity_types: tuple[str, str] = ("EDGE", "EDGE"),
+    tolerance_mm: float = 1e-5,
+) -> float:
+    """Fail unless a native ``Add*Dimension2`` result spans ``entities`` and
+    measures ``expected_mm``.
+
+    A drawing dimension reads whatever its two picks resolved to; when a
+    coordinate hit-test lands on the neighbouring line the sheet prints a
+    wrong locating number with no error (summing-lever's spring-hole start
+    read 3.35 off the rib flange instead of 8.43 off the plate end, #1105).
+    The value alone is a weak proof -- a 20-hole row has nineteen pairs at
+    the same pitch and twenty rims at the same row X -- so the dimension's
+    attached entities (``IAnnotation::GetAttachedEntities3``) must be the
+    two the recipe named, each by ``_is_same_attachment``, and only then is
+    ``IDimension.SystemValue`` checked against the spec constant. Returns the
+    measured millimetres.
+
+    ``entities=None`` is value-only: for a dimension the recipe cannot name
+    by entity. The call site says why.
+    """
+    display = _sw_type_info.early_bound_or_flag(
+        dimension, "IDisplayDimension", "GetDimension2", "GetAnnotation"
+    )
+    if entities is not None:
+        annotation = _sw_type_info.early_bound_or_flag(
+            display.GetAnnotation(),
+            "IAnnotation",
+            "GetAttachedEntities3",
+            "GetAttachedEntityTypes",
+            "IsDangling",
+        )
+        attached = list(annotation.GetAttachedEntities3() or ())
+        types = tuple(int(t) for t in (annotation.GetAttachedEntityTypes() or ()))
+        dangling = bool(annotation.IsDangling())
+        unmatched = []
+        for index, (expected, kind) in enumerate(zip(entities, entity_types)):
+            match = next(
+                (
+                    item
+                    for item in attached
+                    if item is not None
+                    and _is_same_attachment(adapter, item, expected, kind.upper())
+                ),
+                None,
+            )
+            if match is None:
+                unmatched.append(index)
+            else:
+                attached.remove(match)
+        if unmatched or attached or dangling:
+            raise RuntimeError(
+                f"{label} is not the dimension between its named entities: "
+                f"unmatched picks={unmatched}, extra attachments={len(attached)}, "
+                f"types={types}, dangling={dangling}"
+            )
+    model_dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    measured_mm = abs(float(model_dimension.SystemValue)) * 1000.0
+    if abs(measured_mm - expected_mm) > tolerance_mm:
+        raise RuntimeError(
+            f"{label} measures {measured_mm:g} mm, expected {expected_mm:g} mm: "
+            "a pick resolved to the wrong entity"
+        )
+    return measured_mm
 
 
 def set_basic_dimensions(

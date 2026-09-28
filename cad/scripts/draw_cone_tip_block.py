@@ -214,8 +214,11 @@ PASSAGE_CENTER_RISE = 0.024
 ARROWS_OUTSIDE = ("SlitW", "HeelReliefDepth", "FlangeSlotW", "FlangeSlotNorthZ")
 # Main eye-pass of 287c: the 15.2's smart arrows stood outside, and its lower
 # tail ran down to 0.4 mm over ADJUSTER ENTRY.  Its 22.8 mm span holds the
-# two-line value and both arrows inside.
-ARROWS_INSIDE = ("SlitDepth", "FlangeSlotSouthZ", "PinchHeight")
+# two-line value and both arrows inside.  The 6.0's 9.0 mm span holds its two
+# 3.4 mm arrows: with no outside tail right of the hole-centre witness, the
+# pinch clearance callout's leader passes there (leader-crosses-line,
+# af13c8ff8).
+ARROWS_INSIDE = ("SlitDepth", "FlangeSlotSouthZ", "PinchHeight", "PinchDepthCenter")
 _DIM_ARROWS_OUTSIDE = 1
 _DIM_ARROWS_INSIDE = 0
 # The plan.  Left of it, stepping out from the part: the slot's two arc
@@ -346,16 +349,14 @@ DIMENSION_CALLOUTS = {
 # The pinch clearance callout stands above and left of the right view.  At
 # (x - 0.033, 0.1735) its text printed over the 6.0 (I31); raised to 0.178
 # (287c) its leader still dropped almost straight down beside the 6.0's
-# hole-centre witness and crossed the 6.0's dimension line.  25 mm further
-# left the leader runs down to the hole at about 35 degrees, passing 3.5 mm
-# outside the 6.0's left arrow tail and under its north-face witness, into
-# the view across its north face.  r3: DRILL TO SLOT prints about 20 mm wider
-# than the blind depth did (PINCH_CLEARANCE_CALLOUT_EXTENT, an estimate), so
-# the callout steps 2.5 mm further left, its left end 1 mm right of the
-# adjuster elevation's right edge at W 17, above that view and under the slit
-# width's value, and drops 4.5 mm so its leader leaves the shoulder low
-# enough to pass outside the 6.0's arrow tail.
-PINCH_CLEARANCE_CALLOUT_XY = (RIGHT_CENTER[0] - 0.0605, 0.1715)
+# hole-centre witness and crossed the 6.0's dimension line.  r3 moved it far
+# left, but the 6.0's north-face witness rises from the hole's height, not the
+# block's top (af13c8ff8 print), so that leader crossed it
+# (leader-crosses-line).  With the 6.0's arrows inside (ARROWS_INSIDE), the
+# text stands above the 6.0 and left of SECTION A-A's label, and its leader
+# leaves the shoulder's right end down to the hole at about 64 degrees,
+# 2.6 mm right of the hole-centre witness and 5 mm past the 6.0's line.
+PINCH_CLEARANCE_CALLOUT_XY = (RIGHT_CENTER[0] - 0.0322, 0.1788)
 PINCH_THREAD_CALLOUT_XY = (LEFT_CENTER[0] + 0.016, 0.190)
 ROTATED_NOTE_XY = (SECTION_CENTER[0] - 0.015, 0.195)
 # The locating foot's finish symbol, on the elevation named here.  On the
@@ -848,10 +849,12 @@ def sheet_dimension_ink(
         "FlangeSlotX": (
             h, (_PLAN_LEFT, tc), (_plan_y(Z_SOUTH), FLANGE_SLOT_X_WITNESS_START_Y - EXTENSION_GAP), drop("FlangeSlotX"), out
         ),
+        # The north-face witness leaves the face at the hole centre's height
+        # (af13c8ff8 print: from 1.0 mm above it), not at the block's top.
         "PinchDepthCenter": (
             h,
             (north, _right_x(0.0)),
-            (top, top - 0.002),
+            (_elevation_y(PINCH_HEIGHT, RIGHT_CENTER), top - 0.002),
             drop("PinchDepthCenter"),
             out,
         ),
@@ -1832,10 +1835,12 @@ async def build(adapter: Any) -> dict[str, str]:
     leader_points = tuple(
         leader_values[index : index + 3] for index in range(0, len(leader_values), 3)
     )
+    # Sheet x/y only: an attached leader end carries the edge's model depth
+    # in z.  The old z == 0 test matched the free sheet point that the
+    # leader setter left once it had detached the symbol.
     if not any(
         abs(point[0] - foot_right[0]) < 1e-6
         and abs(point[1] - foot_right[1]) < 1e-6
-        and abs(point[2]) < 1e-6
         for point in leader_points
     ):
         raise RuntimeError(

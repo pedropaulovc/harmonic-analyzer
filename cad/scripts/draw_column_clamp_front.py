@@ -19,6 +19,7 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -180,12 +181,15 @@ async def build(adapter: Any) -> dict[str, str]:
     )
 
     # Collar height (16): dimension the front view's flat top/bottom faces.
+    # RIGHT of the view (x+0.033, was x-0.033): on the left its extension
+    # lines (y 0.109/0.141, x 0.071..0.086) fenced the mating face, and the
+    # parallelism FCF's leader to that face crossed the lower one.
     add_edge_dimension(
         adapter,
         front,
         p0=(FRONT_CENTER[0], FRONT_CENTER[1] - ARC_HEIGHT / 2.0 * _M),
         p1=(FRONT_CENTER[0], FRONT_CENTER[1] + ARC_HEIGHT / 2.0 * _M),
-        text_xy=(FRONT_CENTER[0] - 0.033, FRONT_CENTER[1]),
+        text_xy=(FRONT_CENTER[0] + 0.033, FRONT_CENTER[1]),
         label="collar-height overall",
     )
 
@@ -216,11 +220,25 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="A",
         label="bar-seat face",
     )
+    # Datum B tags the relief bore from INSIDE its open half-disc: the top
+    # view is fenced on all four sides by the Depth/Width extension lines
+    # (they lie along the silhouette edges), so the old tag right of the view
+    # crossed Depth's right-hand one. Attached 20 deg below the bore's apex,
+    # the leader runs radially inward to the tag (angular -> forced shoulder,
+    # box to its left at ~x 0.091..0.098, y 0.195..0.202): 3.6 mm clear of the
+    # left extension line and 4.3 mm below the Ø25.6 leader.
+    datum_b_angle = math.radians(-20.0)
     add_datum_feature(
         adapter,
         top,
-        edge_xy=(_plan_x(BORE_RADIUS), TOP_CENTER[1]),
-        symbol_xy=(0.150, TOP_CENTER[1]),
+        edge_xy=(
+            _plan_x(BORE_RADIUS * math.cos(datum_b_angle)),
+            TOP_CENTER[1] + BORE_RADIUS * math.sin(datum_b_angle) * _M,
+        ),
+        symbol_xy=(
+            _plan_x(9.0 * math.cos(datum_b_angle)),
+            TOP_CENTER[1] + 9.0 * math.sin(datum_b_angle) * _M,
+        ),
         datum="B",
         label="column-relief bore",
     )
@@ -239,11 +257,14 @@ async def build(adapter: Any) -> dict[str, str]:
         quantity="2X",
         label="ear-hole position",
     )
+    # Frame level with its attachment (was (0.040, 0.096), whose diagonal
+    # leader crossed the 16.00's lower extension line): the leader now runs
+    # horizontally ~10 mm into the mating face, crossing nothing.
     add_feature_control_frame(
         adapter,
         front,
         edge_xy=(_plan_x(0.0), FRONT_CENTER[1]),
-        frame_xy=(0.040, 0.096),
+        frame_xy=(0.052, FRONT_CENTER[1] + 0.0035),
         characteristic="parallelism",
         tolerance=GEOMETRIC_TOLERANCES_MM["mating-face parallelism"],
         datums=("A",),

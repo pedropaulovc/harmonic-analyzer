@@ -96,13 +96,17 @@ and no scheduled cleanup job. See ``scripts/azure/provision_build_cache.ps1``.
 
 from __future__ import annotations
 
+import atexit
 import concurrent.futures
+import contextlib
 import hashlib
 import io
 import json
 import os
 import secrets
+import sys
 import tarfile
+import threading
 import time
 from pathlib import Path
 
@@ -573,6 +577,61 @@ _UNSET = _Unset()
 _BACKEND: _BlobBackend | None | _Unset = _UNSET
 
 
+class _NoSpan:
+    """What :func:`_phase` yields when this process never loaded the telemetry spine."""
+
+    def set_attribute(self, key: str, value) -> None:
+        pass
+
+
+@contextlib.contextmanager
+def _phase(name: str, **attributes):
+    """A ``build-infra`` span for one phase of a cache transfer. A farm leaf's own
+    ``cache.probe`` (the first in its process) reads 0.90 s p50 for a part against
+    0.15 s for a drawing, whose part dependencies were probed first (14 d, n=3194 /
+    3221) -- with nothing inside it, so the SDK import, the token fetch, the
+    transfer and the unpack each get their own span to say which one that is.
+
+    Spans only where the telemetry spine is ALREADY loaded (every doit process).
+    The pool's job runner imports this module bare to confirm a publish
+    (``probe``); importing ``_telemetry`` there would configure a whole OTel
+    pipeline in that helper just to time one HEAD."""
+    telemetry = sys.modules.get("_telemetry")
+    if telemetry is None:
+        yield _NoSpan()
+        return
+    with telemetry.span(name, service=telemetry.BUILD_INFRA_SERVICE, **attributes) as sp:
+        yield sp
+
+
+class _TimedCredential:
+    """Delegating token credential that spans each token fetch (``cache.credential``).
+
+    The storage pipeline fetches a token lazily INSIDE the first request, so without
+    this a managed-identity or CLI round trip is indistinguishable from the download
+    it precedes. The SDK caches the token afterwards, so this fires about once per
+    process; everything else is delegated untouched."""
+
+    def __init__(self, inner):
+        self._inner = inner
+
+    def __getattr__(self, name):
+        return getattr(self._inner, name)
+
+    def get_token(self, *scopes, **kwargs):
+        with _phase("cache.credential", credential=type(self._inner).__name__):
+            return self._inner.get_token(*scopes, **kwargs)
+
+
+class _TimedTokenInfoCredential(_TimedCredential):
+    """:class:`_TimedCredential` for a credential that also offers ``get_token_info``
+    (azure-core prefers it when present, so the proxy must expose it only then)."""
+
+    def get_token_info(self, *scopes, **kwargs):
+        with _phase("cache.credential", credential=type(self._inner).__name__):
+            return self._inner.get_token_info(*scopes, **kwargs)
+
+
 def _make_backend() -> _BlobBackend | None:
     try:
         from azure.storage.blob import ContainerClient
@@ -587,17 +646,127 @@ def _make_backend() -> _BlobBackend | None:
     if sas:
         return _BlobBackend(ContainerClient(account_url, container, credential=sas))
     from azure.identity import DefaultAzureCredential
-    return _BlobBackend(ContainerClient(account_url, container,
-                                        credential=DefaultAzureCredential()))
+
+    inner = DefaultAzureCredential()
+    timed = (
+        _TimedTokenInfoCredential if hasattr(inner, "get_token_info") else _TimedCredential
+    )
+    return _BlobBackend(ContainerClient(account_url, container, credential=timed(inner)))
+
+
+_BACKEND_LOCK = threading.Lock()
+# Created unset by :func:`prewarm`; set once its warming request has finished,
+# failed or never started. ``None`` in a process that never prewarms.
+_PREWARMED: threading.Event | None = None
+# How long the first real cache call waits for an in-flight prewarm before
+# opening its own connection. A healthy prewarm finishes in ~1.1 s, inside the
+# ~2.7 s graph load, so this bound is met only by a stalled one; the cache
+# verdict never depends on it.
+_PREWARM_WAIT_S = 3.0
+_PREWARM_JOIN_S = 2.0
 
 
 def _backend() -> _BlobBackend | None:
     """Memoized ContainerClient (one credential handshake per process). Returns
-    None when unconfigured / SDK absent, so the caller treats it as a miss."""
+    None when unconfigured / SDK absent, so the caller treats it as a miss. The
+    first call's SDK import and client construction are ``cache.connect``.
+
+    A :func:`prewarm` still in flight is waited for -- through its warming
+    request, so this call reuses the connection it opened -- for at most
+    :data:`_PREWARM_WAIT_S`; past that the caller proceeds on its own."""
     global _BACKEND
-    if isinstance(_BACKEND, _Unset):
-        _BACKEND = _make_backend()
+    warming = _PREWARMED
+    if warming is not None:
+        warming.wait(_PREWARM_WAIT_S)
+    with _BACKEND_LOCK:
+        if isinstance(_BACKEND, _Unset):
+            with _phase("cache.connect"):
+                _BACKEND = _make_backend()
     return _BACKEND
+
+
+_PREWARM_THREAD = "cache-prewarm"
+
+
+def _farm_leaf_execution() -> bool:
+    """Is this process a farm worker's leaf execution?
+
+    The pool appends ``farm.execution=<id>`` to ``OTEL_RESOURCE_ATTRIBUTES`` for
+    exactly the build it runs as a leaf (solidworks-pool
+    ``farm_worker.leaf_resource_attributes``); a submitter, a developer seat, a
+    ``doit list`` or a test never carries it. Parsed by exact key, as the SDK's
+    ``OTELResourceDetector`` does."""
+    for entry in os.environ.get("OTEL_RESOURCE_ATTRIBUTES", "").split(","):
+        key, separator, value = entry.partition("=")
+        if separator and key.strip() == "farm.execution" and value.strip():
+            return True
+    return False
+
+
+def _warm() -> None:
+    """The prewarm thread's body: build the client, then HEAD a blob that never
+    exists so the token is fetched and the pooled TLS connection is open.
+
+    Speculative, so it never decides anything: a client that cannot be built
+    (SDK absent, constructor error) leaves ``_BACKEND`` unset for the real call
+    to build -- and report -- itself; only a working client is published."""
+    global _BACKEND
+    warming = _PREWARMED
+    try:
+        with contextlib.suppress(Exception), _phase("cache.prewarm"):
+            with _BACKEND_LOCK:
+                backend = None if isinstance(_BACKEND, _Unset) else _BACKEND
+            if backend is None:
+                import azure.storage.blob  # noqa: F401 -- absent SDK: stay unset
+
+                with _phase("cache.connect"):
+                    built = _make_backend()
+                if built is None:
+                    return
+                with _BACKEND_LOCK:
+                    if isinstance(_BACKEND, _Unset):
+                        _BACKEND = built
+                    backend = _BACKEND
+            if backend is not None:
+                backend.exists("prewarm")
+    finally:
+        if warming is not None:
+            warming.set()
+
+
+def _join_prewarm(thread: threading.Thread) -> None:
+    """At exit, give an in-flight prewarm a bounded moment to end its spans before
+    telemetry's own exit hook (registered earlier, so run later) closes the
+    exporters. A prewarm still running after that is abandoned: it decides nothing."""
+    thread.join(_PREWARM_JOIN_S)
+
+
+def prewarm() -> threading.Thread | None:
+    """Open the cache connection on a daemon thread while the caller does other work.
+
+    A farm leaf's first ``cache.probe`` measured 0.91 / 0.91 / 0.88 s on three
+    part leaves (2026-09-28, 6a67cdf43): ``cache.connect`` (azure SDK import +
+    client) 0.53 s and a cold ``cache.download`` 0.31-0.34 s -- of which the token
+    was 0.03-0.04 s and the rest the first TLS connection; the same GET on the
+    warm connection (``cache.reprobe``) took 0.07 s. None of that depends on the
+    task, and the leaf spends ~2.7 s loading its graph first.
+
+    Only a farm leaf execution in ``rw`` mode -- the one process certain to probe
+    next -- starts it (:func:`_farm_leaf_execution`); every other graph load
+    (``doit list``, ``check:*``, a submitter, a test) stays off Azure. Best-effort
+    end to end: a thread that cannot start is simply no prewarm."""
+    global _PREWARMED
+    if not (writable() and _farm_leaf_execution()):
+        return None
+    _PREWARMED = threading.Event()
+    thread = threading.Thread(target=_warm, name=_PREWARM_THREAD, daemon=True)
+    try:
+        thread.start()
+    except RuntimeError:
+        _PREWARMED.set()
+        return None
+    atexit.register(_join_prewarm, thread)
+    return thread
 
 
 def probe(key: str) -> bool | None:
@@ -693,17 +862,22 @@ def restore(key: str, outputs: list[Path], label: str) -> bool:
         backend = _backend()
         if backend is None:
             return False
-        blob = backend.get(key)
+        with _phase("cache.download") as download:
+            blob = backend.get(key)
+            download.set_attribute("found", blob is not None)
+            download.set_attribute("bytes", len(blob) if blob is not None else 0)
         if blob is None:
             # A miss is routine on changed inputs. Keep it at DEBUG so the default
             # warning-level build stays concise; the span event and cache.jsonl retain
             # full diagnostics for backtracing why the local build ran.
             _debug_log(f"miss  {label} ({key[:12]}) -> building locally")
             _event("cache.miss", label, key)
-            _record("restore_miss", label, key)
+            with _phase("cache.record", event="restore_miss"):
+                _record("restore_miss", label, key)
             return False
         try:
-            _unpack(blob)
+            with _phase("cache.unpack", bytes=len(blob)):
+                _unpack(blob)
         except PermissionError as exc:
             locked = RestoreLocked(label, key, exc)
             _warn(str(locked))
@@ -748,7 +922,11 @@ def store(key: str, outputs: list[Path], label: str) -> str:
             _event("cache.store_empty", label, key)
             _record("store_empty", label, key)
             return "empty"
-        backend.put(key, _pack(present))
+        with _phase("cache.pack", outputs=len(present)) as pack:
+            blob = _pack(present)
+            pack.set_attribute("bytes", len(blob))
+        with _phase("cache.upload", bytes=len(blob)):
+            backend.put(key, blob)
         _log(f"store {label} ({key[:12]})")
         _event("cache.store", label, key)
         _save_stored_key(label, key)

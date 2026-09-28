@@ -79,6 +79,7 @@ from pathlib import Path
 from typing import Any
 import yaml as _yaml
 from doit.dependency import CHECKERS, Dependency, JsonDB, MD5Checker
+from doit.tools import config_changed
 from filelock import FileLock, Timeout  # noqa: E402
 
 # Every build/verify/export task routes its subprocess through ``_run``, which
@@ -139,6 +140,10 @@ from _drawing_registry import (  # noqa: E402
     DRAWING_TEMPLATES,
     DRAWINGS_BY_NAME,
 )
+
+# A farm leaf execution (rw) opens its cache connection while the graph loads,
+# instead of inside its first cache.probe; a no-op anywhere else (_cache.prewarm).
+_cache.prewarm()
 
 REPO_ROOT = Path(__file__).resolve().parent
 CONFIG_DIR = REPO_ROOT / "cad" / "config"
@@ -297,6 +302,7 @@ def _com_seat(label: str):
             wait_s=round(waited, 2),
             held_s=round(released - acquired, 2),
             elapsed_s=round(released - entered, 2),
+            service=_telemetry.BUILD_INFRA_SERVICE,
         )
 
 
@@ -725,8 +731,15 @@ _SW_ENSURED = False
 _COM_RETRY_BACKOFF_S: tuple[int, ...] = (60, 120, 240)
 # Watchdog exit codes that unambiguously mean SolidWorks itself broke (see _watchdog):
 # 86 crash, 87 op timeout, 88 a modal dialog blocking the seat (the 2026-09-02
-# low-committed-memory box) -- all three recover by kill + relaunch + retry.
-_WATCHDOG_EXIT_CODES = frozenset({86, 87, 88})
+# low-committed-memory box), 89 a seat of any age or origin that never reported
+# ISldWorks.StartupProcessCompleted (_seat_forensics' connect-time gate) -- all
+# four recover by kill + relaunch + retry locally; a farm leaf (autostart off)
+# recovers none of them and re-runs only 89, once, on the untouched seat.
+_WATCHDOG_EXIT_CODES = frozenset({86, 87, 88, 89})
+# _watchdog.EXIT_SEAT_NOT_READY: the connect-time startup gate's exit, restated
+# like the codes above (dodo never imports the per-subprocess _watchdog) and
+# pinned equal by test_seat_startup_gate.
+_EXIT_SEAT_NOT_READY = 89
 # Pre-task memory preflight. SolidWorks' commit charge grows across a day of
 # builds (66 GB after ~10 h on 2026-09-02, on a 127 GB seat) until SolidWorks
 # itself pops "Warning! Your system is running critically low on committed
@@ -894,8 +907,8 @@ def _exec_com(
 ) -> None:
     """Run a COM subprocess with reactive SolidWorks recovery.
 
-    If the subprocess exits with a watchdog crash/op-timeout/modal-dialog code
-    (86/87/88) or leaves
+    If the subprocess exits with a watchdog crash/op-timeout/modal-dialog/
+    seat-not-ready code (86/87/88/89) or leaves
     SolidWorks not-connected, retry up to ``len(_COM_RETRY_BACKOFF_S)`` times, waiting
     1/2/4 min then force-recovering SW (kill→relaunch) between attempts. An ordinary
     failure (gate assertion, build error) with SolidWorks still healthy is NOT retried
@@ -906,9 +919,26 @@ def _exec_com(
     BEFORE the task span -- not here, so it can't nest under the task span.
 
     Fail-loud contract of :func:`_exec` is preserved: a terminal failure still raises
-    ``RuntimeError``. Honors ``HARMONIC_SW_AUTOSTART=0`` (skip retry, plain ``_exec``)."""
+    ``RuntimeError``. Under ``HARMONIC_SW_AUTOSTART=0`` (every farm leaf: the
+    keeper owns the seat) nothing here may kill or relaunch SolidWorks, so there
+    is no recovery loop -- except that exit 89 (the seat had not finished
+    starting within the gate's bound) re-runs ONCE, untouched: a seat still
+    loading add-ins is the one unhealthy state that heals by waiting, and the
+    re-run's own gate waits again."""
     if not _sw_autostart_enabled():
-        _exec(cmd, label, log_stem, task=task)
+        started = time.time()
+        rc = _run_subprocess(cmd, label, log_stem, task=task)
+        if rc == _EXIT_SEAT_NOT_READY:
+            _telemetry.warn(
+                f"[sw] {label}: seat still starting (exit {rc}); re-running once "
+                "on the same seat (autostart off: no recovery here)",
+                exit_code=rc,
+                attempt=1,
+            )
+            started = time.time()
+            rc = _run_subprocess(cmd, label, log_stem, task=task)
+        if rc:
+            _fail_task(label, rc, started=started)
         return
 
     backoff = _com_retry_backoff()
@@ -2919,6 +2949,10 @@ def task_check():
         # must survive its own failure. Both are pure-Python contracts of
         # _seat_forensics.capture_com_failure, so they gate offline.
         SCRIPTS_DIR / "test_failure_forensics.py",
+        # The connect-time seat startup gate (a fresh seat is held until
+        # StartupProcessCompleted, bounded, and exits 89 for recover + retry)
+        # and the missing-source-property census (2026-09-28 crank_hub).
+        SCRIPTS_DIR / "test_seat_startup_gate.py",
         # The SolidWorks-free geometry contract for the drawing layout audit
         # (collision / sheet-overflow logic run before every drawing saves).
         SCRIPTS_DIR / "test_drawing_layout_check.py",
@@ -3036,6 +3070,11 @@ def task_check():
         # Assembly mates select by name, never by a view-dependent point pick
         # (#916: the collar pick selected the shaft collar's OD on one seat).
         SCRIPTS_DIR / "test_assembly_named_selection.py",
+        # The adapter's raw feature-tree diff and edge scoring (solidworks_mcp
+        # features.py over raw_dispatch): raw calls match the generated
+        # members, an incomplete before-walk refuses to diff, and the created
+        # feature is picked by type, never an auxiliary one beside it.
+        SCRIPTS_DIR / "test_adapter_feature_resolution.py",
     ]
     # These are runtime-read rather than imported, so module_deps_of cannot
     # discover them. A prompt/schema edit must invalidate check:recipe and rerun
@@ -3048,6 +3087,14 @@ def task_check():
         # removed row must rerun its tagged-emitter check.
         SCRIPTS_DIR.parent / "docs" / "drawing-simplicity-policy.md",
     ]
+    # test_adapter_feature_resolution exercises the vendored adapter, which
+    # module_deps_of never walks (an installed package, see SUBMODULE_SRC). Its
+    # real import closure (package __init__s, transitive helpers) is wider than
+    # any hand-picked list, so depend on EVERY submodule source file the digest
+    # tiers hash: any submodule bump re-runs the gate (codex #1101). The files,
+    # not a digest sidecar -- the sidecars are COM cache-key inputs, which no
+    # check:* task may carry (test_com_deps_include_submodule_and_checks_do_not).
+    adapter_contract_deps = [str(path) for path in _submodule_src_files()]
     # test_out_param_binding SCANS sources instead of importing them (it reads
     # every top-level build script and every diagnostics/*.py looking for
     # VT_BYREF), so module_deps_of cannot see them -- an import graph does not
@@ -3065,6 +3112,7 @@ def task_check():
             *(str(path.resolve()) for path in recipe_tests),
             *(dep for path in recipe_tests for dep in module_deps_of(path)),
             *(str(path.resolve()) for path in machinist_review_contract_deps),
+            *adapter_contract_deps,
             *scanned_by_binding_gate,
             str(
                 (REPO_ROOT / "cad" / "comparisons" / "tools" / "composite.py").resolve()
@@ -3169,6 +3217,19 @@ def task_check():
                 ),
             ],
             "cmd": [*pytest_cmd, *(str(path) for path in recipe_tests)],
+            # file_dep sees additions and edits, but a source file DELETED from
+            # the submodule just drops out of the list -- doit never compares it
+            # -- so the stamp stayed green (codex #1101). The manifest of paths
+            # makes a removal or rename re-run the adapter contract too.
+            "uptodate": [
+                config_changed(
+                    {
+                        "submodule_sources": [
+                            _rel_tag(path) for path in adapter_contract_deps
+                        ]
+                    }
+                )
+            ],
         },
         "cache": {
             # The artefact-cache provenance/observability unit tests (issue #73):
@@ -3376,6 +3437,7 @@ def task_check():
         yield {
             "name": name,
             "file_dep": sorted({*spec["file_dep"], *executed}),
+            "uptodate": spec.get("uptodate", []),
             "targets": [stamp],
             "actions": [
                 (_run_stamped, [spec["cmd"], f"check {name}", stamp, f"check:{name}"])

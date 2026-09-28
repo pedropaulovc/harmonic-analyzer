@@ -148,14 +148,16 @@ def _pattern_raw_flip(adapter, seed: str, n: int):
         raise RuntimeError(f"direction pick failed at {PIVOT_OD_PT}")
     fm = model.FeatureManager
     _sw_asm._flag_feature_methods(fm, "IFeatureManager")
-    names_before = _sw_feat._feature_names(adapter)
+    before = _sw_feat._tree_snapshot(adapter)
     feature = fm.FeatureLinearPattern5(
         int(n), float(PITCH) / 1000.0, 1, 0.0,
         True,   # FlipDir1  <-- the ONLY change vs the adapter
         False, "", "", False, False, False, False, True, True,
         False, False, False, False, 0.0, 0.0, False, False,
     )
-    return _sw_feat._resolve_feature(adapter, feature, names_before)
+    return _sw_feat._resolve_feature(
+        adapter, feature, before, frozenset({"LocalLPattern"})
+    )
 
 
 def _try_reverse_direction(adapter, pattern_name: str) -> str:

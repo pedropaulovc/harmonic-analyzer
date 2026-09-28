@@ -282,6 +282,75 @@ prints there. Keep the guard at its 20 mm default and tighten it only where the
 leader itself is shorter than 20 mm (a snap-back would pass otherwise:
 channel_lever, platen_guide, rocker_arm, cone_tip_block E).
 
+**i. Moving a leader after the symbol is inserted.**
+Don't: land a surface-finish symbol's or feature-control frame's leader with
+`IAnnotation::SetLeaderAttachmentPointAtIndex`. It returns True, moves the
+tip, and DETACHES the annotation: `GetAttachedEntityCount3` goes 1 -> 0 and
+`GetAttachedEntityTypes` empties, while `ISFSymbol.IsAttached` /
+`IGtol.IsAttached` keep reading True, `GetLeaderCount` stays 1 and
+`IsDangling` stays False (13 surface finishes on the #1105 sfprobe leaves;
+6 frames on farm run 20260928T080412049Z, re-set to the tip they already
+had). Those three reads are not attachment evidence.
+Do: select the entity, call `ISelectionMgr::SetSelectionPoint2(1, -1, x, y,
+0)` with the sheet landing, THEN insert (`InsertSurfaceFinishSymbol3`,
+`InsertGtol`); after the rebuild require `GetAttachedEntities3`,
+`GetAttachedEntityCount3` and `GetAttachedEntityTypes` to agree on ONE entity
+of the selected kind, and require that entity to BE the selected one
+(`_drawing_common._assert_attached_to`). `ISldWorks::IsSame` proves an edge or
+face; it reads 0 for every silhouette, so a silhouette is proved through
+`ISilhouetteEdge::GetFace` — the selected and attached silhouettes' faces
+passed IsSame on all 16 silhouette finishes and frames of farm run
+20260928T085009031Z, and `IModelDocExtension::IsSamePersistentID` on the
+drawing agreed. The two flanks of one cylinder share that face; the leader
+landing readback (`GetLeaderPointsAtIndex`) tells them apart, and it must be
+within 1 mm of the request: 13 of 14 landings on run 20260928T084216466Z were
+within 4e-8 m, the pinion-bracket pivot-bore finish re-solved 0.61 mm along
+its edge. A pointer note (`add_leader_note`) has no attachment to lose (0 -> 0
+on the same run) and keeps the call. Where the pick and the landing differ,
+the leader may end on the PICK (pinion_bracket pivot finish, 4.6 mm off), so
+pick the edge at the landing point.
+
+**j. A fresh detail view whose readbacks lag its ink.**
+Right after `CreateDetailViewAt4` + rebuild, `IView::GetOutline` is centred
+on the request while `ModelToViewTransform` projects the circle centre 99 mm
+away and `Position` reads 99 mm from where `SetViewPosition` later has to put
+it (cone_swing_platform detail B, leaf 20260928T075849Z-1-882b4704). A loop
+that "corrects" the projection moves a correct view off the sheet target and
+needs a second move to recover; on three #1105 leaves it never did.
+Do: place by the outline centre (`GetOutline` is the ink; `SetViewPosition`
+moves it by the delta from the `Position` it reads), then re-read the
+projection until it agrees with the outline before hanging anything on the
+view.
+
+**k. A datum or dimension picked by sheet coordinate where two lines meet.**
+Don't: hang a datum tag or a locating dimension on `SelectByID2("", "EDGE",
+x, y)` at a point where a second visible line runs within the hit-test
+radius. The pick resolves to whichever line SolidWorks tests first and the
+sheet prints a correct-looking symbol on the wrong feature: summing-lever
+datum B, aimed at the plate's end face, landed on the end rib's flange 5.08 mm
+inboard, and the BASIC start-Z dimension off the same pick read 3.35 for 8.43
+(#1105, run 20260928T090231982Z) — no error, only a print that would put the
+hole pattern 5 mm from where the casting has it.
+Do: name the edge (`scan_view_edges` + an exact model-space filter, or
+`ViewEdges.circle_at` for a rim) and pass it as `edge_entity` / `entities`;
+`add_datum_feature` then proves the tag sits on THAT edge by `IsSame`
+(`_assert_attached_to`, `expected_leaders=0` — a datum tag's triangle is not
+a `SetLeader3` leader). A datum that must keep its coordinate landing point
+passes the named edge as `expected_entity`: the hit-test's selection must be
+that edge before insertion, so the wrong-neighbour case cannot pass by the
+selection and the readback agreeing with each other. `assert_dimension_measures`
+takes the same two named entities and proves the dimension's attached
+entities ARE them (`IAnnotation::GetAttachedEntities3` + `IsSame`, no extra
+attachment, not dangling) before checking the value against the spec
+constant — the value alone accepts any of a hole row's equal-pitch pairs or
+any rim at the row's X. `entities=None` is value-only and the call site says
+why. Every datum and dimension of summing-lever's pattern definition (A, B,
+76.20, 39.85, 8.43, 7.06) is identity-checked. A coordinate-only datum
+(`edge_xy` alone) is proved only to sit on what its hit-test returned; it is
+acceptable where no second line runs inside the hit radius of the pick, and
+`draw_rocker_arm._require_datum_on_bore` shows the alternative, a recipe-side
+`IsSame` readback against the named bore.
+
 ## The sheet-split rule
 
 When two views' callouts are squeezed together, the fix is a NEW SHEET, not a

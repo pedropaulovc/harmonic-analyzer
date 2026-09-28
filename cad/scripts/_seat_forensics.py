@@ -9,8 +9,9 @@ artefact, which ``check:inert`` (``test_recipe_inert.py``) enforces:
 - Tracked code reaches this module only through pinned call sites: connect-time
   provenance and the post-save teardown in ``_common.run_build``, the pre-save
   authoring snapshot in ``_common.save_part_and_images`` (read-only: it has to
-  run before the camera moves), ``package_native``'s teardown, and
-  ``capture_com_failure`` as a terminal failure call (it always raises).
+  run before the camera moves), ``package_native``'s teardown, the
+  missing-property capture behind ``_drawing_common.read_required_properties``,
+  and ``capture_com_failure`` as a terminal failure call (it always raises).
 - No COM mutator runs here except three pinned ones, each after the artefact
   is settled: ``SaveAs3``/``SaveBMP`` of a failing document (only under the
   always-raising ``capture_com_failure``) and ``SetCurrentWorkingDirectory``
@@ -22,10 +23,17 @@ artefact, which ``check:inert`` (``test_recipe_inert.py``) enforces:
 A change that makes any of this untrue (a verdict a build raises on, a write
 into the model before its save) belongs in a tracked module instead: the
 sketch-closure verdict lives in ``_sketch_closure`` for exactly that reason.
+The one raise here that is not a failure capture is the connect-time startup
+gate (:func:`await_seat_startup`), and it is a seat-health abort, not a
+verdict on the model: it runs before any document is opened and ends the
+process with no artefact, like ``_watchdog``'s aborts.
 
-Everything here is BEST-EFFORT by construction. Forensics that can fail a build,
-or that can replace a clear geometry failure with an unrelated crash, is worse
-than no forensics: it moves the diagnosis further away.
+Everything else here is BEST-EFFORT by construction. Forensics that can fail a
+build, or that can replace a clear geometry failure with an unrelated crash, is
+worse than no forensics: it moves the diagnosis further away. The startup gate
+fails a build only on a seat positively observed not ready for its whole bound
+(False, or calls rejected as busy, or a read that never returns); a seat
+without the member, or with an unintelligible answer, is released at once.
 """
 
 from __future__ import annotations
@@ -413,7 +421,7 @@ def record_seat_provenance(adapter: Any) -> dict[str, Any]:
     finished starting (:func:`await_seat_startup`), publish both, and return
     them for the caller to hang on the build PHASE span.
 
-    The startup wait lives here because this is the one connect-time call that
+    The startup gate lives here because this is the one connect-time call that
     runs before any document is opened -- ``run_build`` calls it right after
     ``connect`` and before the discard, the template pin and the build.
 
@@ -422,159 +430,234 @@ def record_seat_provenance(adapter: Any) -> dict[str, Any]:
     one INFO log record (so the entries with no phase span -- verify, export, the
     ``diagnostics/`` probes -- are still attributable in ``logs.jsonl``), and a
     push into the watchdog so a fatal crash/timeout abort names the seat it killed
-    rather than just the exit code.
+    rather than just the exit code. The gate's ``seat_startup_*`` record rides
+    all three, and the returned provenance.
     """
     prov = seat_provenance(adapter)
-    # The watchdog learns the seat BEFORE the wait: an abort during it (a seat
+    # The watchdog learns the seat BEFORE the gate: an abort during it (a seat
     # that dies or wedges while starting) must still name the seat it killed.
     _watchdog.set_seat_provenance(prov)
-    startup = await_seat_startup(adapter, prov.get("seat_started_epoch_s"))
-    if startup.get("seat_startup_wait_s"):
-        # The seat aged while we waited; the published uptime is the one at
-        # which the build actually starts.
+    try:
+        await_seat_startup(adapter, prov)
+    finally:
+        # Published on exit 89 too, so a seat that never finished starting is
+        # still named with its startup record.
+        if _seat_startup.get("seat_startup") == "ready_after_wait":
+            # The seat aged while we waited; the published uptime is the one at
+            # which the build actually starts.
+            with contextlib.suppress(Exception):
+                prov.update(
+                    _seat_liveness(prov.get("seat_pid"), prov.get("seat_started_epoch_s"))
+                )
+        prov.update(_seat_startup)
+        _watchdog.set_seat_provenance(prov)
+        _telemetry.event("seat.provenance", **prov)
+        # Best-effort: a log handler that raises here would replace a pending
+        # SeatNotReady with an ordinary exception -- exit 1, never retried.
         with contextlib.suppress(Exception):
-            prov.update(_seat_liveness(prov.get("seat_pid"), prov.get("seat_started_epoch_s")))
-    prov.update(startup)
-    _watchdog.set_seat_provenance(prov)
-    _telemetry.event("seat.provenance", **prov)
-    _telemetry.info(
-        "seat "
-        + " ".join(
-            f"{key.removeprefix('seat_')}={value}" for key, value in prov.items()
-        ),
-        **prov,
-    )
+            _telemetry.info(
+                "seat "
+                + " ".join(
+                    f"{key.removeprefix('seat_')}={value}"
+                    for key, value in prov.items()
+                ),
+                **prov,
+            )
     return prov
 
 
+# ---------------------------------------------------------------------------
+# Seat startup gate
+#
 # ``ISldWorks.StartupProcessCompleted`` (propget, dispid 311 in the R2026x
 # typelib): "Gets whether the SOLIDWORKS startup process, including loading all
 # startup add-ins, has completed ... call this property before calling
 # ISldWorks::OpenDoc6 in an out-of-process add-in application." Every COM build
 # is such a client, and the adapter's own readiness probe only proves the server
-# answers ``RevisionNumber``. Two drawing leaves that were the FIRST job on a
-# seat about 20 s old opened their source part and read every custom property
-# empty: drawing:crank_hub (pid 7204, uptime 20.0 s, 2026-09-28 04:38Z) and
-# drawing:cone_pivot_post (pid 15124, uptime 21.8 s, 07:37Z). The same cached
-# SLDPRTs passed on warm seats and on those same seats minutes later. Their opens
-# took 5.0 s and 5.5 s against 1.1-1.8 s on a warm seat.
+# answers ``RevisionNumber``. Drawing leaves that were the FIRST job on a seat
+# about 20 s old opened their source part and read every custom property empty:
+# drawing:crank_hub (swmaker000008, pid 7204, uptime 20.0 s, sw.connect 14.8 s,
+# 2026-09-28 04:38Z), drawing:cone_pivot_post (swmaker000005, pid 15124, uptime
+# 21.8 s, 07:37Z) and drawing:pinion_handle (swmaker000005, sw.connect 41 s,
+# 2026-09-17). The same cached SLDPRTs passed on warm seats and on those same
+# seats minutes later; their opens took 5.0 s and 5.5 s against 1.1-1.8 s warm.
 #
-# The wait is bounded by seat AGE, not by a timer from now: startup belongs to
-# the start of a process, so a seat older than the window that still answers
-# False is stuck, not starting. Waiting on it would cost every later leaf the
-# same delay, so it is recorded and the build proceeds.
-_STARTUP_WINDOW_ENV = "HARMONIC_SW_STARTUP_WINDOW"
-_DEFAULT_STARTUP_WINDOW_S = 180.0
+# A gate, not a mutator: it reads one property, then either returns -- and the
+# build runs exactly as it would have on a ready seat -- or ends the process
+# with exit 89 before any document is opened, so with no artefact. Either way
+# no saved byte can depend on this code, the same argument that keeps
+# ``_watchdog``'s aborts out of every cache key.
+#
+# The OBSERVED flag decides, not the seat's age: a seat that says False is
+# held whatever its uptime or origin (those ride the span for analysis). It
+# ends the process only on a seat positively seen not ready -- False, or a
+# call it rejects as busy -- and never since seen True, for the whole bound.
+# Once a seat has been seen not ready, a later read that fails or answers
+# something unintelligible is no evidence that it finished starting: it is
+# logged and polled again. A seat whose interface lacks the member, or whose
+# FIRST answer is unintelligible, is recorded and released at once: nothing was
+# observed to be wrong, and polling it for the bound would only burn a minute
+# and then build unprotected anyway.
+# ---------------------------------------------------------------------------
+
+# The bound on the wait, on the monotonic clock (a worker's wall clock
+# corrected mid-wait neither extends nor cuts it). A seat still starting after
+# this long is not going to be a good seat for this leaf: recover it (exit 89)
+# rather than wait on. The failing seats were 20 s old at connect; the
+# crank_hub seat drew its next source part cleanly at 52.6 s. Not tied to the
+# watchdog's op timeout: every poll emits a log record, which is the
+# watchdog's heartbeat, so a wait longer than that timeout is not idle.
+_STARTUP_WAIT_S = 60.0
 _STARTUP_POLL_S = 0.5
+# Past the bound by this much and still inside the gate means a read has not
+# returned: ``_watchdog.deadline`` hard-exits 89 rather than leave it to the
+# 900 s op timeout. The loop's own timeout fires first on any read that returns.
+_STARTUP_HANG_GRACE_S = 5.0
+
 # The connect-time startup record, kept for a later failure capture in this
 # process (:func:`capture_missing_properties`).
 _seat_startup: dict[str, Any] = {}
 
-
-def _startup_window() -> float:
-    """``HARMONIC_SW_STARTUP_WINDOW`` seconds, finite and non-negative (a
-    rejected value is logged and replaced by the default). Not tied to the
-    watchdog's op timeout: every poll emits a log record, which is the
-    watchdog's heartbeat, so a wait longer than that timeout is not idle."""
-    raw = os.environ.get(_STARTUP_WINDOW_ENV)
-    window = _DEFAULT_STARTUP_WINDOW_S
-    if raw is not None:
-        try:
-            window = float(raw)
-        except ValueError:
-            window = math.nan
-        if not math.isfinite(window) or window < 0:
-            _telemetry.warn(
-                f"{_STARTUP_WINDOW_ENV}={raw!r} is not a finite, non-negative number "
-                f"of seconds; using the default {_DEFAULT_STARTUP_WINDOW_S:.0f}s"
-            )
-            window = _DEFAULT_STARTUP_WINDOW_S
-    return window
+# HRESULTs (unsigned) that classify a failed read. Busy: the server is alive
+# and refusing calls for now, which during startup is exactly "not ready".
+# Missing: this seat's interface has no such member, and never will.
+_BUSY_HRESULTS = frozenset({0x80010001, 0x8001010A})  # CALL_REJECTED, RETRYLATER
+_MISSING_HRESULTS = frozenset({0x80020003, 0x80020006})  # MEMBERNOTFOUND, UNKNOWNNAME
 
 
-def _startup_completed(sw: Any) -> bool | None:
-    """The seat's ``StartupProcessCompleted``, or ``None`` when it gives no
-    boolean answer. ``None`` is never read as a verdict either way."""
+def _hresult(exc: BaseException) -> int | None:
+    code = getattr(exc, "hresult", None)
+    if not isinstance(code, int) and exc.args and isinstance(exc.args[0], int):
+        code = exc.args[0]
+    return code & 0xFFFFFFFF if isinstance(code, int) else None
+
+
+def _startup_state(adapter: Any) -> str:
+    """One read of ``ISldWorks.StartupProcessCompleted``, classified: ``ready``
+    (True), ``not_ready`` (False), ``busy`` (the call was rejected), ``missing``
+    (the member does not exist), or ``unreadable`` (anything else)."""
     try:
-        value = _common._read_member(sw, "StartupProcessCompleted")
-    except Exception:  # noqa: BLE001 - an unreadable seat is "unknown"
-        return None
-    return value if isinstance(value, bool) else None
+        member = getattr(adapter.swApp, "StartupProcessCompleted")
+        value = member() if callable(member) else member
+    except AttributeError:
+        return "missing"
+    except Exception as exc:  # noqa: BLE001 - classified, never raised
+        code = _hresult(exc)
+        if code in _MISSING_HRESULTS:
+            return "missing"
+        return "busy" if code in _BUSY_HRESULTS else "unreadable"
+    if isinstance(value, bool):
+        return "ready" if value else "not_ready"
+    return "unreadable"
 
 
-def await_seat_startup(adapter: Any, started_epoch_s: Any = None) -> dict[str, Any]:
-    """Block until the seat reports ``StartupProcessCompleted``, up to the
-    startup window (``HARMONIC_SW_STARTUP_WINDOW`` seconds of seat age).
+def await_seat_startup(adapter: Any, prov: dict[str, Any]) -> dict[str, Any]:
+    """Hold the seat until it reports ``StartupProcessCompleted``, bounded.
 
-    Returns flat ``seat_startup_*`` keys: ``seat_startup_completed`` (the last
-    answer: ``True``/``False``, or ``"unknown"`` when the seat gives none), and
-    when the first answer was ``False``, the ``seat_startup_wait_s`` spent and
-    the ``seat_startup_uptime_s`` at which the wait began. A seat that cannot
-    answer is not waited on, and a wait that runs out proceeds: this never
-    fails a build.
+    Always reads the flag, inside a ``sw.startup_wait`` span (``uptime_s``,
+    ``seat_origin``, ``waited_s``, ``outcome``, ``reads``), so a warm seat
+    records ``already_ready`` and a failure has a success to compare against.
+    Outcomes:
+
+    - ``already_ready``: the first read said True.
+    - ``ready_after_wait``: False or busy first, True within the bound.
+    - ``timeout``: False or busy first, and no True for the whole bound (a
+      later unreadable or missing read does not release the seat): raises
+      :class:`_watchdog.SeatNotReady` (exit 89, recover + retry). A read that
+      never returns is cut off by ``_watchdog.deadline``, also exit 89.
+    - ``unsupported``: the seat has no such member; warn, proceed at once.
+    - ``unreadable``: a first answer that is neither a bool nor a rejected
+      call; warn, proceed at once.
+
+    Returns flat ``seat_startup_*`` keys for the provenance and the seat line:
+    ``seat_startup`` (the outcome), ``seat_startup_completed`` (the last
+    answer: ``True``/``False``, or ``"unknown"`` when the seat gave none) and
+    ``seat_startup_wait_s``.
     """
     global _seat_startup
-    sw = getattr(adapter, "swApp", None)
-    completed = _startup_completed(sw) if sw is not None else None
-    record: dict[str, Any] = {
-        "seat_startup_completed": "unknown" if completed is None else completed
-    }
-    if completed is not False:
-        _seat_startup = record
-        return record
-    window = _startup_window()
-    now = time.time()
-    started = float(started_epoch_s) if isinstance(started_epoch_s, (int, float)) else None
-    uptime = now - started if started is not None else None
-    deadline = (started if started is not None else now) + window
-    record["seat_startup_uptime_s"] = round(uptime, 1) if uptime is not None else "unknown"
-    age = f"{uptime:.1f}s" if uptime is not None else "an unknown age"
-    if now >= deadline:
-        record["seat_startup_wait_s"] = 0.0
-        _telemetry.warn(
-            f"seat reports StartupProcessCompleted=False at {age}, past the "
-            f"{window:.0f}s startup window; not waiting ({_STARTUP_WINDOW_ENV})",
-            **record,
-        )
-        _seat_startup = record
-        return record
-    _telemetry.info(
-        f"seat still starting (StartupProcessCompleted=False at {age}); holding "
-        f"the session until it completes, up to {window:.0f}s of seat age",
-        **record,
+    uptime = prov.get("seat_uptime_s")
+    origin = prov.get("seat_origin")
+    seat = (
+        f"seat pid={prov.get('seat_pid')} "
+        f"uptime={'unknown' if uptime is None else f'{uptime}s'} origin={origin}"
     )
-    # The seat's age needs the wall clock (its start time is an epoch), but the
-    # wait itself is bounded on the monotonic clock: a worker's clock corrected
-    # mid-wait must neither extend it indefinitely nor cut it short. A clock
-    # stepped back BEFORE this call puts the start in the future, so the budget
-    # is also clamped to the window itself.
-    begun = time.monotonic()
-    stop = begun + min(deadline - now, window)
-    while completed is False and time.monotonic() < stop:
-        time.sleep(_STARTUP_POLL_S)
-        completed = _startup_completed(sw)
-        # One record per poll keeps the watchdog's idle clock (log records are
-        # its heartbeat) from reading this wait as a wedged COM call.
-        _telemetry.debug(
-            f"seat startup poll: StartupProcessCompleted={completed} after "
-            f"{time.monotonic() - begun:.1f}s"
-        )
-    waited = round(time.monotonic() - begun, 2)
-    record["seat_startup_completed"] = "unknown" if completed is None else completed
-    record["seat_startup_wait_s"] = waited
-    if completed is True:
-        _telemetry.info(f"seat startup completed after waiting {waited:.1f}s", **record)
-    else:
-        _telemetry.warn(
-            f"seat startup still not reported complete after {waited:.1f}s "
-            f"(StartupProcessCompleted={record['seat_startup_completed']}); "
-            "proceeding -- a document opened now may read empty",
-            **record,
-        )
-    with contextlib.suppress(Exception):
-        _telemetry.event("seat.startup", **record)
-    _seat_startup = record
-    return record
+    hang_bound = _STARTUP_WAIT_S + _STARTUP_HANG_GRACE_S
+    with (
+        _telemetry.span(
+            "sw.startup_wait", uptime_s=uptime, seat_origin=origin, bound_s=_STARTUP_WAIT_S
+        ),
+        _watchdog.deadline(
+            hang_bound,
+            reason="seat-not-ready",
+            code=_watchdog.EXIT_SEAT_NOT_READY,
+            message=(
+                f"{seat}: a StartupProcessCompleted read has not returned "
+                f"{hang_bound:.0f}s into the startup gate -- the seat is wedged "
+                f"while starting; aborting COM task (exit "
+                f"{_watchdog.EXIT_SEAT_NOT_READY}) so it is recovered and retried"
+            ),
+        ),
+    ):
+        started = time.monotonic()
+        state = _startup_state(adapter)
+        first, reads = state, 1
+        if state in ("not_ready", "busy"):
+            _telemetry.info(
+                f"{seat} still starting (StartupProcessCompleted {state}); holding "
+                f"the session until it completes, up to {_STARTUP_WAIT_S:.0f}s"
+            )
+        until = started + _STARTUP_WAIT_S
+        # Seen not ready, only True (or the bound) ends the hold: a later read
+        # that fails or answers garbage says nothing about startup finishing.
+        held = state in ("not_ready", "busy")
+        while held and state != "ready" and time.monotonic() < until:
+            time.sleep(_STARTUP_POLL_S)
+            state = _startup_state(adapter)
+            reads += 1
+            # One record per poll keeps the watchdog's idle clock (log records
+            # are its heartbeat) from reading this wait as a wedged COM call.
+            _telemetry.debug(
+                f"seat startup poll: StartupProcessCompleted {state} after "
+                f"{time.monotonic() - started:.1f}s"
+            )
+        if state == "ready":
+            outcome = "already_ready" if first == "ready" else "ready_after_wait"
+        elif held:
+            outcome = "timeout"
+        elif state == "missing":
+            outcome = "unsupported"
+        else:
+            outcome = "unreadable"
+        waited = round(time.monotonic() - started, 2)
+        _seat_startup = {
+            "seat_startup": outcome,
+            "seat_startup_completed": {"ready": True, "not_ready": False}.get(
+                state, "unknown"
+            ),
+            "seat_startup_wait_s": waited,
+        }
+        _telemetry.annotate(waited_s=waited, outcome=outcome, reads=reads, last_read=state)
+        if outcome == "timeout":
+            answer = {
+                "not_ready": "=False",
+                "busy": " calls rejected (busy)",
+            }.get(state, f" {state} after an earlier not-ready read")
+            raise _watchdog.SeatNotReady(
+                f"{seat} still reports StartupProcessCompleted{answer} "
+                f"after {waited}s ({reads} reads): SolidWorks has not finished "
+                "starting (startup add-ins), and a document opened now can read "
+                "back blank custom properties -- exit "
+                f"{_watchdog.EXIT_SEAT_NOT_READY} so the seat is recovered and "
+                "the task retried"
+            )
+        if outcome == "ready_after_wait":
+            _telemetry.info(f"{seat} finished starting after {waited}s ({reads} reads)")
+        elif outcome in ("unsupported", "unreadable"):
+            _telemetry.warn(
+                f"{seat}: StartupProcessCompleted {outcome} ({state} after "
+                f"{reads} read(s)); proceeding without the startup gate"
+            )
+    return dict(_seat_startup)
 
 
 # swCustomInfoGetResult_e

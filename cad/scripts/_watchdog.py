@@ -45,6 +45,16 @@ its ``_com_seat`` context (the seat lock is held by the PARENT, not this
 process) releases the machine-global lock: the seat never leaks. Distinct exit
 codes make the three fatals diagnosable from the doit console alone.
 
+A fourth seat-health exit, :data:`EXIT_SEAT_NOT_READY` (89), belongs to
+``_seat_forensics``' connect-time startup gate: it raises :class:`SeatNotReady`
+when a seat still reports ``ISldWorks.StartupProcessCompleted`` False (or
+rejects the read) at the end of its bound. That unwinds normally (so the
+teardown and the spans still run; ``_telemetry.build_session`` flushes on the
+way out) and exits the process with 89, which ``dodo._exec_com`` treats like
+86/87/88. A read that never RETURNS cannot unwind at all, so the gate also
+arms :func:`deadline`, a one-shot timer that aborts like the fatals above --
+log, flush, ``os._exit(89)`` -- if the gate overruns its bound.
+
 Disable entirely with ``HARMONIC_COM_WATCHDOG=0``; disable just the idle
 timeout with ``HARMONIC_COM_OP_TIMEOUT=0``.
 """
@@ -52,10 +62,11 @@ timeout with ``HARMONIC_COM_OP_TIMEOUT=0``.
 from __future__ import annotations
 
 import contextlib
+import enum
 import os
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 
 import _telemetry
 
@@ -72,6 +83,112 @@ except Exception:  # noqa: BLE001 - lib is always present in the build venv; deg
 EXIT_CRASH = 86
 EXIT_OP_TIMEOUT = 87
 EXIT_MODAL_DIALOG = 88
+EXIT_SEAT_NOT_READY = 89
+
+
+class SeatNotReady(SystemExit):
+    """A seat that never finished starting: exit :data:`EXIT_SEAT_NOT_READY`.
+
+    A ``SystemExit`` so ``run_build``'s ``except Exception`` cannot turn it
+    into an ordinary exit 1, which ``dodo._exec_com`` reads as a recipe failure
+    and does not retry. ``str()`` is the message; ``code`` is the exit status.
+    """
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+        self.code = EXIT_SEAT_NOT_READY
+
+
+# Swapped by the offline gate: the real one ends the process.
+_hard_exit: Callable[[int], None] = os._exit
+
+# How long a block that found its deadline fired waits for the timer's own
+# exit (its abort record flushes first) before exiting from the block's thread
+# instead: a flush that hangs must not park the gate forever.
+_FIRED_EXIT_GRACE_S = 10.0
+
+
+class _Deadline(enum.Enum):
+    """Who decides a :func:`deadline`'s outcome. Exactly one transition leaves
+    ``ARMED``, under the deadline's lock: the timer's (``FIRED``) or the
+    block's exit (``DISARMED``)."""
+
+    ARMED = "armed"
+    FIRED = "fired"
+    DISARMED = "disarmed"
+
+
+def _disabled() -> bool:
+    """The operator kill switch: ``HARMONIC_COM_WATCHDOG=0`` turns off EVERY
+    watchdog hard exit -- the signal thread and any ``deadline`` alike."""
+    return os.environ.get("HARMONIC_COM_WATCHDOG", "1").lower() in {"0", "off", "false"}
+
+
+@contextlib.contextmanager
+def deadline(
+    seconds: float, *, reason: str, message: str, code: int, **fields: object
+) -> Iterator[None]:
+    """Abort the process with ``code`` if the block is still running after
+    ``seconds`` -- the bound for a COM read that may never return.
+
+    A Python-level timeout cannot interrupt a thread blocked inside a COM call,
+    and the op-timeout signal waits 900 s, so a bounded wait around such a call
+    needs its own clock: a daemon timer that records the abort on both channels
+    (``_abort``: error log + ``watchdog.abort`` span, then flush) and
+    hard-exits, exactly as the fatal signals do. The record is best-effort: a
+    telemetry sink that raises still ends in the exit.
+
+    Firing and leaving the block race; ``timer.cancel()`` cannot stop a
+    callback already running. So whichever of the two claims the deadline
+    first (see :class:`_Deadline`) decides: a timer that finds the block gone
+    does nothing, and a block that finds the timer fired never returns -- it
+    waits for the timer's exit, up to ``_FIRED_EXIT_GRACE_S``, then exits with
+    ``code`` itself, so the caller cannot open a document meanwhile.
+    With the kill switch set (``HARMONIC_COM_WATCHDOG=0``) it arms nothing: the
+    block runs unbounded, as every other watchdog exit does in that mode.
+    """
+    if _disabled():
+        yield
+        return
+
+    lock = threading.Lock()
+    state = _Deadline.ARMED
+    exited = threading.Event()
+
+    def _expire() -> None:
+        nonlocal state
+        with lock:
+            if state is not _Deadline.ARMED:
+                return
+            state = _Deadline.FIRED
+        try:
+            _abort(reason, message, code, deadline_s=seconds, **fields)
+        finally:
+            try:
+                _hard_exit(code)
+            finally:
+                exited.set()
+
+    timer = threading.Timer(seconds, _expire)
+    timer.daemon = True
+    timer.name = f"com-deadline-{reason}"
+    timer.start()
+    try:
+        yield
+    finally:
+        timer.cancel()
+        with lock:
+            if state is _Deadline.ARMED:
+                state = _Deadline.DISARMED
+        if state is _Deadline.FIRED:
+            # The timer's exit normally ends the process inside this wait. If
+            # its abort record stalls, exit from here instead. Only a stubbed
+            # exit (the offline gate) gets past both, and even then the caller
+            # must not carry on as if the gate had passed.
+            if not exited.wait(_FIRED_EXIT_GRACE_S):
+                _hard_exit(code)
+            raise SystemExit(code)
+
 
 DEFAULT_OP_TIMEOUT = 900.0
 _POLL_INTERVAL = 15.0
@@ -439,7 +556,7 @@ def start() -> Watchdog | None:
     global _active
     if not _WINDOWS:
         return None
-    if os.environ.get("HARMONIC_COM_WATCHDOG", "1").lower() in {"0", "off", "false"}:
+    if _disabled():
         return None
     if _active is not None:
         return _active

@@ -148,16 +148,26 @@ def _sheet_x(model_z: float) -> float:
 
 # Each land's Ra arrow lands RA_ARROW_FROM_HEAD_END in from the land's
 # head-side end, and its symbol hangs RA_SHOULDER further head side on a short
-# bent-leader shoulder.  The front symbol hangs below the shaft, its left edge
-# clear of that end's station witness.  At c6eb7f6f the back symbol did the
-# same and its shoulder ran through the 199.9 / 19.0 witness below the shaft
-# (Main).  Nothing rises from the back land above the shaft, so its symbol
-# hangs there, over the land's head-side end and under the raised back
-# JOURNAL diameter (BACK_JOURNAL_DIA_Y).
+# bent-leader shoulder.  At c6eb7f6f the back symbol hung below the shaft and
+# its shoulder ran through the 199.9 / 19.0 witness there (Main).  Nothing
+# rises from the back land above the shaft, so its symbol hangs there, over
+# the land's head-side end and under the raised back JOURNAL diameter
+# (BACK_JOURNAL_DIA_Y).
 RA_ARROW_FROM_HEAD_END = 2.0
 RA_SYMBOL_OFFSET = 0.0033
 RA_SHOULDER = RA_SYMBOL_OFFSET + RA_ARROW_FROM_HEAD_END / 1000.0
-FRONT_RA_X = _sheet_x(FRONT_JOURNAL_Z) + RA_SYMBOL_OFFSET
+# The front land is walled below the shaft by the drum-station witness (x
+# ~0.2458) and the 46.3 station witness at its head end (x ~0.2606), 14.8 mm
+# apart -- narrower than the 16.9 mm symbol.  Hung beside the land at y 0.150
+# its shoulder ran back across the 46.3 witness (audit leader-crosses-line).
+# So the symbol drops UNDER that witness's end (the 46.3 row rises to y 0.140
+# to make room): the ▽ sits right of the witness at y 0.124, 6.6 mm over the
+# 61.05 line, and the shoulder runs left beneath the witness end onto a steep
+# leader that stays inside the pocket, 2.7 mm off the witness and 2.9 mm off
+# the 46.3 arrow. Landing 7 mm in from the head end (x ~0.2533) keeps that
+# leader 7.5 mm clear of the drum-station witness.
+FRONT_RA_ARROW_FROM_HEAD_END = 7.0
+FRONT_RA_XY = (_sheet_x(FRONT_JOURNAL_Z) + 0.0048, 0.124)
 BACK_RA_XY = (
     _sheet_x(BACK_JOURNAL_Z + RA_ARROW_FROM_HEAD_END) + RA_SHOULDER,
     0.179,
@@ -274,7 +284,10 @@ PRINCIPAL_KEEP = {
     "FrontJournalDia": (FRONT_JOURNAL_DIA_X, 0.150),
     "BondZoneDia": BOND_ZONE_TEXT_XY,
     "BackJournalDia": (BACK_JOURNAL_TEXT_X, BACK_JOURNAL_DIA_Y),
-    "FrontJournalFromHeadRear": (0.283, 0.130),
+    # y 0.140, not 0.130: lifts the dimension line to y ~0.1372 so its head-end
+    # witness stops at ~0.1362, leaving room for the front Ra's shoulder to
+    # pass beneath it (audit leader-crosses-line). Text stays 7.4 mm off the Ra.
+    "FrontJournalFromHeadRear": (0.283, 0.140),
     # The drum station stacks between the two land stations, its text left of
     # its own drum-end witness.  The back station's text moves left to clear
     # it.
@@ -380,8 +393,8 @@ AXIS_OVERSHOOT_MM = 3.0
 # diameter line, clear of the split-line rings at the land ends.
 JOURNAL_FINISHES = {
     "front_journal": (
-        FRONT_JOURNAL_Z + RA_ARROW_FROM_HEAD_END,
-        (FRONT_RA_X, 0.150),
+        FRONT_JOURNAL_Z + FRONT_RA_ARROW_FROM_HEAD_END,
+        FRONT_RA_XY,
         "lower",
     ),
     "back_journal": (BACK_JOURNAL_Z + RA_ARROW_FROM_HEAD_END, BACK_RA_XY, "upper"),

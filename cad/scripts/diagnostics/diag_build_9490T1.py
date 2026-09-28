@@ -241,17 +241,18 @@ def _select_face_mark1(adapter, point_mm: list[float], tol_mm: float = 0.05) -> 
     nearest rival (the eye torus the cap is cut from) is a full wire radius
     away -- a 0.05 mm window cannot pick the wrong one.
     """
-    from solidworks_mcp.adapters.solidworks.features import (
-        _all_body_faces,
-        _flag_feature_methods,
-    )
+    from solidworks_mcp.adapters import raw_dispatch as _raw
+    from solidworks_mcp.adapters.solidworks.features import _all_body_faces
 
     px, py, pz = (c / 1000.0 for c in point_mm)
     tol_m = tol_mm / 1000.0
     best, best_d = None, tol_m
     for face in _all_body_faces(adapter):
         near = adapter._attempt(
-            lambda f=face: list(f.GetClosestPointOn(px, py, pz)), default=None
+            lambda f=face: list(
+                _raw.invoke(f, "IFace2", "GetClosestPointOn", px, py, pz)
+            ),
+            default=None,
         )
         if not near or len(near) < 3:
             continue
@@ -263,7 +264,7 @@ def _select_face_mark1(adapter, point_mm: list[float], tol_mm: float = 0.05) -> 
             f"no face within {tol_mm} mm of {point_mm} to put the dome on"
         )
     adapter.currentModel.ClearSelection2(True)
-    entity = _flag_feature_methods(best, "IEntity", "Select2")
+    entity = _raw.bind(best, "IEntity")
     if not adapter._attempt(lambda e=entity: e.Select2(False, 1), default=False):
         raise RuntimeError(f"cannot select dome face at {point_mm} (mark 1)")
 

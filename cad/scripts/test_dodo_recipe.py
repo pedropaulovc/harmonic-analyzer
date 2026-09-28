@@ -1560,7 +1560,14 @@ def test_com_seat_hands_back_its_wait_and_logs_total_elapsed(tmp_path, monkeypat
     assert message == (
         "[com.seat] part:x released after 50.5s total (waited 45.0s, held 5.5s)"
     )
-    assert fields == {"wait_s": 45.0, "held_s": 5.5, "elapsed_s": 50.5}
+    # Written after com.seat.wait closed, so it names its resource itself --
+    # otherwise it lands on the umbrella resource, parentless (4.9k rows / 7 d).
+    assert fields == {
+        "wait_s": 45.0,
+        "held_s": 5.5,
+        "elapsed_s": 50.5,
+        "service": dodo._telemetry.BUILD_INFRA_SERVICE,
+    }
 
 
 def test_cached_part_miss_emits_four_sibling_phase_spans(tmp_path, monkeypatch):
@@ -2225,6 +2232,29 @@ def test_com_deps_include_submodule_and_checks_do_not(tmp_path):
         assert not ({full_dep, asm_dep, part_dep} & set(deps)), (
             f"check:{task['name']} must not depend on the submodule"
         )
+
+
+def test_deleting_a_submodule_source_reruns_check_recipe(tmp_path):
+    """check:recipe runs the adapter contract against the vendored package, so a
+    submodule bump must re-run it. file_dep catches an edited or added module,
+    but a DELETED one just leaves the dep list -- doit never compares it -- so
+    the gate also carries the manifest of source paths (codex #1101)."""
+    dodo = _load_dodo()
+    src = _redirect_submodule(dodo, tmp_path)
+    (src / "adapter.py").write_text("A = 1\n")
+    (src / "headers.py").write_text("H = 1\n")
+
+    def recipe_is_current(saved: dict) -> tuple[bool, dict]:
+        task = next(t for t in dodo.task_check() if t["name"] == "recipe")
+        (checker,) = task["uptodate"]
+        current = checker(None, saved)
+        return current, {"_config_changed": checker.config_digest}
+
+    _, saved = recipe_is_current({})
+    assert recipe_is_current(saved)[0], "an unchanged tree must stay up to date"
+
+    (src / "headers.py").unlink()
+    assert not recipe_is_current(saved)[0], "a deleted source must re-run the gate"
 
 
 def test_part_relevant_submodule_change_flips_part_cache_key(tmp_path):

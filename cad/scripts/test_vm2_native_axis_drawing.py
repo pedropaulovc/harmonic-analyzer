@@ -28,6 +28,7 @@ class Annotation:
         self.attached = (edge,)
         self.types = (1,)
         self.dangling = False
+        self.leaders = 0
         self.set_calls = []
         self.set_result = True
         self.requested_readback = None
@@ -43,8 +44,15 @@ class Annotation:
     def GetAttachedEntities3(self):
         return self.attached
 
+    def GetAttachedEntityCount3(self):
+        return len(self.attached)
+
     def GetAttachedEntityTypes(self):
         return self.types
+
+    def GetLeaderCount(self):
+        # Measured: a datum tag's triangle is not a SetLeader3 leader.
+        return self.leaders
 
     def IsDangling(self):
         return self.dangling
@@ -264,6 +272,92 @@ def test_requested_position_rejects_failed_settled_move(harness):
         common.add_datum_feature(
             harness.adapter, harness.view, edge_xy=(0.085, 0.193175),
             symbol_xy=(0.085, 0.227), datum="A", label="bushing bore axis",
+        )
+
+
+@pytest.mark.parametrize(
+    ("defect", "expected"),
+    (
+        # summing-lever datum B (#1105): the tag on the rib flange, the pick
+        # named the plate end.
+        ("neighbour", "same_entity=False"),
+        ("detached", "entities=0"),
+        ("dangling", "dangling=True"),
+        # A SetLeader3 leader on a datum FEATURE symbol is not the contract.
+        ("leader", "leaders=1"),
+    ),
+)
+def test_requested_datum_must_sit_on_the_named_edge(harness, defect, expected):
+    if defect == "neighbour":
+        harness.annotation.attached = (harness.canonical_edge,)
+    elif defect == "detached":
+        harness.annotation.attached, harness.annotation.types = (), ()
+    elif defect == "dangling":
+        harness.annotation.dangling = True
+    else:
+        harness.annotation.leaders = 1
+    with pytest.raises(
+        RuntimeError, match=r"datum feature lost its edge attachment \(plate end\)"
+    ) as info:
+        common.add_datum_feature(
+            harness.adapter, harness.view, edge_entity=harness.edge,
+            symbol_xy=(0.2, 0.25), datum="B", label="plate end",
+        )
+    assert expected in str(info.value)
+    # The proof reads the settled sheet: it runs after the rebuild.
+    assert harness.rebuild_calls == 1
+
+
+def test_requested_datum_proves_the_named_edge_by_identity(harness):
+    harness.equality_calls.clear()
+    tag = common.add_datum_feature(
+        harness.adapter, harness.view, edge_entity=harness.edge,
+        symbol_xy=(0.2, 0.25), datum="B", label="plate end",
+    )
+    assert tag is harness.tag
+    assert (harness.edge, harness.edge) in harness.equality_calls
+
+
+def test_coordinate_datum_must_hit_test_to_the_named_entity(harness):
+    """The hit-test returns a neighbour and the tag lands on that same
+    neighbour: insertion and readback agree, only an independently named
+    entity can tell (summing-lever datum A, #1105 P2)."""
+    harness.selected = harness.edge  # the hit-test's neighbour...
+    harness.annotation.attached = (harness.edge,)  # ...is where the tag sits
+    with pytest.raises(
+        RuntimeError,
+        match=r"datum A pick resolved to a edge other than the one named "
+        r"\(knife-edge pivot axis\)",
+    ):
+        common.add_datum_feature(
+            harness.adapter, harness.view, edge_xy=(0.225, 0.087),
+            expected_entity=harness.canonical_edge, symbol_xy=(0.249, 0.075),
+            datum="A", label="knife-edge pivot axis",
+        )
+    # Refused before anything was inserted.
+    assert harness.insert_calls == 0
+    assert harness.rebuild_calls == 0
+
+
+def test_coordinate_datum_hit_testing_the_named_entity_proves_it_after_rebuild(harness):
+    harness.equality_calls.clear()
+    tag = common.add_datum_feature(
+        harness.adapter, harness.view, edge_xy=(0.225, 0.087),
+        expected_entity=harness.edge, symbol_xy=(0.249, 0.075),
+        datum="A", label="knife-edge pivot axis",
+    )
+    assert tag is harness.tag
+    assert harness.rebuild_calls == 1
+    # The settled attachment is compared with the NAMED entity.
+    assert (harness.edge, harness.edge) in harness.equality_calls
+    # ...and the tag settling on a neighbour still fails, even though the
+    # hit-test agreed with the name.
+    harness.annotation.attached = (harness.canonical_edge,)
+    with pytest.raises(RuntimeError, match=r"datum feature lost its edge attachment"):
+        common.add_datum_feature(
+            harness.adapter, harness.view, edge_xy=(0.225, 0.087),
+            expected_entity=harness.edge, symbol_xy=(0.249, 0.075),
+            datum="A", label="knife-edge pivot axis",
         )
 
 

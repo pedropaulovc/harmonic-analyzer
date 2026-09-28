@@ -102,9 +102,11 @@ DATUM_FACE_X = RIGHT_CENTER[0] + LOCK_THICK * SHEET_SCALE[0] / 2000.0
 # Per-view survivors of the marked-dimension import: parametric name -> sheet
 # position.  Width stacks below the front view (under the hole locators),
 # Height sits to its left, the strip thickness rides above the right view.
+# Height at x=0.056 (was 0.064) opens a 20 mm lane between its dimension line
+# and the plate's left edge for datum C, whose leader crossed it at 0.064.
 FRONT_KEEP = {
     "Width": (FRONT_CENTER[0], 0.088),
-    "Height": (0.064, FRONT_CENTER[1]),
+    "Height": (0.056, FRONT_CENTER[1]),
 }
 RIGHT_KEEP = {"Depth": (RIGHT_CENTER[0], 0.196)}
 
@@ -190,12 +192,14 @@ async def build(adapter: Any) -> dict[str, str]:
         label="hole-2 X location",
     )
     set_basic_dimension(adapter, hole_2_x, label="hole-2 X location")
+    # x=0.046 (was 0.056) keeps the 2.50 outboard of Height's moved dimension
+    # line, clear of Height's bottom extension line (now ending at x=0.055).
     hole_band_y = add_edge_dimension(
         adapter,
         front,
         p0=(FRONT_CENTER[0] - 0.014, BOTTOM_EDGE_Y),
         p1=(HOLE_1_X_SHEET - HOLE_R_SHEET, HOLE_Y_SHEET),
-        text_xy=(0.056, 0.118),
+        text_xy=(0.046, 0.118),
         label="hole band height",
     )
     set_basic_dimension(adapter, hole_band_y, label="hole band height")
@@ -229,11 +233,13 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="B",
         label="lock guide-side edge",
     )
+    # 8 mm standoff (was 16): the tag now sits between Height's dimension line
+    # (x=0.056) and the edge, so its leader no longer crosses that line.
     add_datum_feature(
         adapter,
         front,
         edge_xy=(LEFT_EDGE_X, FRONT_CENTER[1] + 0.018),
-        symbol_xy=(LEFT_EDGE_X - 0.016, FRONT_CENTER[1] + 0.018),
+        symbol_xy=(LEFT_EDGE_X - 0.008, FRONT_CENTER[1] + 0.018),
         datum="C",
         label="lock end edge",
     )
@@ -268,17 +274,23 @@ async def build(adapter: Any) -> dict[str, str]:
         tolerance=GEOMETRIC_TOLERANCES_MM["rail-mating face flatness"],
         label="rail-mating face flatness",
     )
-    # The bent leader elbows at the text's LEFT end, so the text must start just
-    # RIGHT of the hole it points at or the tail rakes back across the view: the
-    # old (0.094, 0.198) centred the ~45 mm wide "2X Ø3.05 THRU ALL" so its
-    # elbow fell at x=0.071, left of hole 1 at x=0.093, and the tail ran as one
-    # long diagonal down across the whole plate face. Centred at 0.117 the text
-    # starts at ~0.094 and the tail drops nearly vertically into the bore.
+    # The bent leader elbows at the text's LEFT end and runs through the hole
+    # centre. Height's extension lines lie along the plate's whole top and
+    # bottom edges (x 0.055..0.163), so a leader from above or below crosses
+    # one (the old hole-1 callout at (0.117, 0.196) crossed the top one).
+    # Enter from the RIGHT instead: hole 2's upper-right quadrant, text right
+    # of the plate above the position FCF (frame top y=0.134), between the
+    # plate (x=0.164) and the right view (x=0.2204). The ~45 mm text spans
+    # x 0.170..0.214; the leader (0.1685,0.157)->(0.1517,0.1349) crosses only
+    # the plate's right edge, 5.4 mm above the FCF leader.
     add_native_hole_callout(
         adapter,
         front,
-        edge_xy=(HOLE_1_X_SHEET, HOLE_Y_SHEET + HOLE_R_SHEET),
-        callout_xy=(0.117, 0.196),
+        edge_xy=(
+            HOLE_2_X_SHEET + 0.6 * HOLE_R_SHEET,
+            HOLE_Y_SHEET + 0.8 * HOLE_R_SHEET,
+        ),
+        callout_xy=(0.192, 0.160),
         label="guide-lock screw holes",
     )
     # x=0.020: the note anchor IS the text's left edge, so the ink starts here.

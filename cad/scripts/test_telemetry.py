@@ -125,13 +125,19 @@ def capture():
     _telemetry._aux_providers.clear()
 
     logs = InMemoryLogRecordExporter()
+    log_processor = SimpleLogRecordProcessor(logs)
     cast(SdkLoggerProvider, get_logger_provider()).add_log_record_processor(
-        SimpleLogRecordProcessor(logs)
+        log_processor
     )
+    # Likewise for the per-resource logger providers a routed record lands on.
+    _telemetry._log_processors.append(log_processor)
+    _telemetry._aux_logger_providers.clear()
     yield spans, logs
 
     _telemetry._span_processors.remove(processor)
     _telemetry._aux_providers.clear()
+    _telemetry._log_processors.remove(log_processor)
+    _telemetry._aux_logger_providers.clear()
 
 
 def test_logs_split_into_severity_levels(capture):
@@ -509,6 +515,35 @@ def test_build_infra_spans_carry_their_own_resource(capture):
     # Provider ≠ context: the infra span still parents under the task span.
     assert seat_trace == task.context.trace_id
     assert wait.parent.span_id == task.context.span_id
+
+
+def test_logs_take_the_resource_of_the_span_they_are_written_under(capture):
+    """A ``[cache]`` line written under ``cache.probe`` must land on the same
+    ``build-infra`` resource as that span, not on the process's own (76.9k doit
+    parent rows were filed under the umbrella resource). A record outside any
+    such span keeps the process resource unless it names one explicitly, and
+    the routing key never leaks into the exported attributes."""
+    _, logs = capture
+    infra = _telemetry.BUILD_INFRA_SERVICE
+    with _telemetry.span("task part:cone_gear"):
+        _telemetry.info("stage line")
+        with _telemetry.span("cache.probe part:cone_gear", service=infra):
+            _telemetry.info("[cache] miss")
+    _telemetry.info("[com.seat] released", service=infra)
+    _telemetry.info("plain line")
+
+    records = {
+        str(r.log_record.body): r for r in logs.get_finished_logs()
+    }
+    service = {
+        body: rec.resource.attributes["service.name"] for body, rec in records.items()
+    }
+    assert service["[cache] miss"] == infra
+    assert service["[com.seat] released"] == infra
+    assert service["stage line"] == _telemetry._service_name
+    assert service["plain line"] == _telemetry._service_name
+    for rec in records.values():
+        assert _telemetry._SERVICE_RECORD_ATTR not in (rec.log_record.attributes or {})
 
 
 def test_every_resource_identifies_the_machine(capture):

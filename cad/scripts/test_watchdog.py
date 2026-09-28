@@ -372,6 +372,9 @@ def _seat(
         CloseAllDocuments=Mock(),
         GetCurrentWorkingDirectory=Mock(side_effect=lambda: seat.cwd),
         SetCurrentWorkingDirectory=Mock(side_effect=_set),
+        # A started seat answers the startup gate with a bool; a seat that
+        # answered nothing would make every session here warn.
+        StartupProcessCompleted=True,
     )
     adapter = SimpleNamespace(
         connect=AsyncMock(),
@@ -663,8 +666,10 @@ def test_log_records_poke_the_heartbeat() -> None:
 def test_connect_is_split_into_dispatch_identity_and_discard(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # sw.connect costs ~2.2 s p50 in every COM subprocess; its three steps each
-    # get a child span so that cost is attributable without log archaeology.
+    # sw.connect costs ~2.2 s p50 in every COM subprocess; its steps each get a
+    # child span so that cost is attributable without log archaeology. The
+    # startup gate runs inside seat.identity and BEFORE seat.discard, the
+    # session's first document operation.
     opened: list[str] = []
     span, aspan = _common._telemetry.span, _common._telemetry.aspan
 
@@ -683,8 +688,9 @@ def test_connect_is_split_into_dispatch_identity_and_discard(
     _session(monkeypatch, adapter)
 
     connect = opened.index("sw.connect")
-    assert opened[connect + 1 : connect + 4] == [
+    assert opened[connect + 1 : connect + 5] == [
         "sw.dispatch",
         "seat.identity",
+        "sw.startup_wait",
         "seat.discard",
     ]

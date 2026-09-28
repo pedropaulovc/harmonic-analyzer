@@ -87,16 +87,15 @@ def _select_end_face_mark1(adapter, y_mm: float) -> None:
     """Select the flat end face carrying the axis point (0, ``y_mm``, 0) with
     selection mark 1, the mark ``InsertDome`` requires. Only the end face
     contains the axis point; the cylinder is a full radius away."""
-    from solidworks_mcp.adapters.solidworks.features import (
-        _all_body_faces,
-        _flag_feature_methods,
-    )
+    from solidworks_mcp.adapters import raw_dispatch as _raw
+    from solidworks_mcp.adapters.solidworks.features import _all_body_faces
 
     target = (0.0, y_mm / 1000.0, 0.0)
     best, best_d = None, 1e-6
     for face in _all_body_faces(adapter):
         near = adapter._attempt(
-            lambda f=face: list(f.GetClosestPointOn(*target)), default=None
+            lambda f=face: list(_raw.invoke(f, "IFace2", "GetClosestPointOn", *target)),
+            default=None,
         )
         if not near or len(near) < 3:
             continue
@@ -106,7 +105,7 @@ def _select_end_face_mark1(adapter, y_mm: float) -> None:
     if best is None:
         raise RuntimeError(f"no arbor end face on the axis at y={y_mm:g} mm")
     adapter.currentModel.ClearSelection2(True)
-    entity = _flag_feature_methods(best, "IEntity", "Select2")
+    entity = _raw.bind(best, "IEntity")
     if not adapter._attempt(lambda e=entity: e.Select2(False, 1), default=False):
         raise RuntimeError(f"cannot select the arbor end face at y={y_mm:g} (mark 1)")
 

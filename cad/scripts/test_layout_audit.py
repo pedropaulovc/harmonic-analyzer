@@ -771,13 +771,14 @@ def test_a_failed_calibration_leaves_no_stale_json(tmp_path):
     assert not out.exists()
 
 
-def test_report_mode_writes_every_finding_and_dump_and_gate_mode_raises(monkeypatch, tmp_path):
+def test_report_mode_writes_every_finding_and_dump_before_an_enforced_kind_raises(monkeypatch, tmp_path):
     import json
 
     sheet = _holes_sheet(HB2_TOP_LABEL, HB2_PEDESTAL, HB2_BLOCK)
     live = _patch_collect(monkeypatch, [sheet])
     report = tmp_path / "reports" / "fixture.json"
-    _run(live, LayoutAuditMode.REPORT, report)
+    with pytest.raises(RuntimeError, match=r"report mode.*\n.*\[leader-through-text\]"):
+        _run(live, LayoutAuditMode.REPORT, report)
     content = json.loads(report.read_text(encoding="utf-8"))
     assert content["mode"] == "report"
     assert content["sheets"] == [sheet]
@@ -830,7 +831,8 @@ def test_the_audit_span_carries_per_class_counts(monkeypatch, tmp_path):
 
     live = _patch_collect(monkeypatch, [_holes_sheet(HB2_TOP_LABEL, HB2_PEDESTAL, HB2_BLOCK)])
     monkeypatch.setattr(live._telemetry, "span", recording_span)
-    _run(live, LayoutAuditMode.REPORT, tmp_path / "fixture.json")
+    with pytest.raises(RuntimeError, match="leader-through-text"):
+        _run(live, LayoutAuditMode.REPORT, tmp_path / "fixture.json")
     recorded = dict(spans)
     assert list(recorded) == ["layout.audit fixture", "layout.findings"]
     assert recorded["layout.audit fixture"].attributes["findings.leader-through-text"] == 1
@@ -3118,6 +3120,66 @@ def _crown_finish_strikes(mm, y):
 
 
 # --------------------------------------------------------------------------
+# Real case: MHA-089 rocker-arm-support, datum origin (af13c8ff8)
+# --------------------------------------------------------------------------
+
+# DetailItem361 as the leaf logged it: "0"/"X" on the X axis (one baseline),
+# "0"/"Y" on the Y axis.
+RAS_DATUM_ORIGIN = {
+    "type": 16,
+    "name": "DetailItem361",
+    "visible": 1,
+    "owner_type": 0,
+    "pos": [0.06055, 0.059125, 0.0],
+    "layer": "",
+    "datum_origin": {
+        "axis": [0.06055, 0.04563, 0.076601, 0.04563, 0.047055, 0.059125, 0.047055, 0.075176],
+        "x_label": "X",
+        "y_label": "Y",
+    },
+    "display": {
+        "lines": [
+            _line(0.06055, 0.058125, 0.06055, 0.04363),
+            _line(0.06055, 0.04563, 0.073045, 0.04563),
+            _line(0.05955, 0.059125, 0.045055, 0.059125),
+            _line(0.047055, 0.059125, 0.047055, 0.07162),
+        ],
+        "arrows": [
+            [0.076601, 0.04563, 0.0, -1.0, -0.0, -0.0, 0.003556, 0.000762, 1.0, 0.0, 0.0, 1.0],
+            [0.047055, 0.075176, 0.0, -0.0, -1.0, -0.0, 0.003556, 0.000762, 1.0, 0.0, 0.0, 1.0],
+        ],
+        "texts": [
+            {"t": "X", "pos": [0.080101, 0.0427801, 0.0], "h": 0.0035, "ref": 1, "ang": 0.0},
+            {"t": "Y", "pos": [0.0456744, 0.0758979, 0.0], "h": 0.0035, "ref": 1, "ang": 0.0},
+            {"t": "0", "pos": [0.0562569, 0.0428519, 0.0], "h": 0.0035, "ref": 1, "ang": 0.0},
+            {"t": "0", "pos": [0.0457619, 0.0533469, 0.0], "h": 0.0035, "ref": 1, "ang": 0.0},
+        ],
+    },
+}
+
+
+def test_a_datum_origins_axis_between_its_own_labels_is_not_through_its_text():
+    """af13c8ff8: 4 of the fleet's 5 leader-through-own-text were datum
+    origins (rocker-arm-support, platen-guide x2, harmonic-base). The X axis
+    prints between its "0" and "X" labels on one baseline; boxed as one row
+    they spanned 56.4..82.8 mm and the axis ran 12.5 mm "through" it. Each
+    label is its own box. The control: a label printed ON the axis is still
+    a strike."""
+    view = _view("Drawing View3", (0.054962, 0.053615, 0.155038, 0.096385), [RAS_DATUM_ORIGIN])
+
+    def own_strikes(annotation):
+        dump = _dump(views=[{**view, "annotations": [annotation]}])
+        return [f for f in audit_dump(dump) if f.kind == "leader-through-own-text"]
+
+    assert own_strikes(RAS_DATUM_ORIGIN) == []
+    display = RAS_DATUM_ORIGIN["display"]
+    on_axis = {**display["texts"][0], "pos": [0.066, 0.0445, 0.0]}
+    struck = {**RAS_DATUM_ORIGIN, "display": {**display, "texts": [on_axis, *display["texts"][1:]]}}
+    [finding] = own_strikes(struck)
+    assert "datum-origin" in finding.a and finding.a == finding.b
+
+
+# --------------------------------------------------------------------------
 # Real cases: MHA-089 rocker-arm-support, rocker fix3 (6a5d8dd5c)
 # --------------------------------------------------------------------------
 #
@@ -3731,12 +3793,54 @@ def test_a_dimension_past_the_border_or_on_the_title_block_gates(x, y, kind):
     assert enforced(LayoutAuditMode.GATE, [clearance]) == [clearance]
 
 
-def test_report_mode_enforces_nothing_until_the_full_fleet_count_is_zero():
-    """#946's replay covered 32 of 111 drawings; the border and title-block
-    kinds wait for the #877 cold build's full-fleet count (#1052)."""
-    from _layout_audit import ENFORCED_KINDS
+# The kinds that read zero fleet-wide (#1109), written out independently of
+# ENFORCED_KINDS so that dropping one from the set fails its own case.
+_ENFORCED_IN_REPORT = [
+    ("com-read-errors", "note DetailItem9", "2 refused COM read(s) on 'note DetailItem9'"),
+    ("duplicate-thread-callout", "hole-callout RD2", "'hole-callout RD2' repeats '10-24 UNC' from 'note DetailItem5'"),
+    ("leader-crosses-leader", "hole-callout RD1", "'hole-callout RD1' and 'gtol DetailItem354' cross their leaders"),
+    ("leader-crosses-section-line", "note DetailItem372", "leader of 'note DetailItem372' crosses 'section-line A'"),
+    ("leader-through-text", "datum DetailItem356", "leader of 'datum DetailItem356' runs 4.30mm through 'gtol DetailItem361'"),
+    ("line-on-dimension-line", "dim Depth", "leader of 'gtol DetailItem4' lies on the dimension line of 'dim Depth'"),
+    ("line-through-own-text", "note DetailItem7", "line of 'note DetailItem7' runs 2.10mm through its own text"),
+    ("merged-blocks", "note DetailItem8", "'note DetailItem8' and 'note DetailItem11' read as one block"),
+    ("shoulder-crosses-line", "hole-callout RD3", "shoulder of 'hole-callout RD3' crosses 'dim Width'"),
+]
 
-    assert ENFORCED_KINDS == frozenset()
+
+def _report_run_with(monkeypatch, tmp_path, finding):
+    """Run the drawing-task audit in REPORT mode on a sheet whose one finding
+    is ``finding``."""
+    import _layout_audit
+
+    monkeypatch.setattr(_layout_audit, "audit_dump", lambda _dump: [finding])
+    _run(_patch_collect(monkeypatch, [_dump()]), LayoutAuditMode.REPORT, tmp_path / "fixture.json")
+
+
+@pytest.mark.parametrize(("kind", "item", "detail"), _ENFORCED_IN_REPORT, ids=[k for k, _i, _d in _ENFORCED_IN_REPORT])
+def test_report_mode_fails_the_leaf_on_each_enforced_kind(monkeypatch, tmp_path, kind, item, detail):
+    """REPORT fails the drawing on every kind the fleet brought to zero,
+    naming the kind and the item, so none can come back unnoticed."""
+    from _layout_geometry import Finding
+
+    finding = Finding(kind=kind, sheet="Sheet1", a=item, b="", detail=detail)
+    with pytest.raises(RuntimeError, match=r"report mode.*\n") as raised:
+        _report_run_with(monkeypatch, tmp_path, finding)
+    assert f"[{kind}]" in str(raised.value)
+    assert item in str(raised.value)
+
+
+def test_report_mode_passes_a_gating_kind_that_is_not_enforced(monkeypatch, tmp_path):
+    """A kind that still fires fleet-wide is reported, not failed, until GATE.
+    Every enforced kind must be a gating kind: a misspelt entry would enforce
+    nothing and read green."""
+    from _layout_audit import ENFORCED_KINDS, GATING_KINDS, enforced
+    from _layout_geometry import Finding
+
+    assert ENFORCED_KINDS <= GATING_KINDS
+    crossing = Finding(kind="leader-crosses-line", sheet="Sheet1", a="surface-finish DetailItem350", b="", detail="x")
+    _report_run_with(monkeypatch, tmp_path, crossing)
+    assert enforced(LayoutAuditMode.GATE, [crossing]) == [crossing]
 
 
 _ZERO_LINE = [0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]

@@ -206,9 +206,11 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         front,
-        edge_xy=(FRONT_CENTER[0] + HUB_DIA * SHEET_SCALE[0] / 2000.0, FRONT_CENTER[1]),
-        # up-right of the hub, clear of the Ø20 leader (round 1: crossed it)
-        symbol_xy=(FRONT_CENTER[0] + _HUB_R + 0.024, FRONT_CENTER[1] + 0.024),
+        # Land at -60 deg, mid-window between the -30/-90 spokes, and hang the
+        # symbol radially below-right of the rim: the old up-right leader ran
+        # through datum A's tag (layout audit).
+        edge_xy=(FRONT_CENTER[0] + _HUB_R * 0.5, FRONT_CENTER[1] - _HUB_R * 0.866),
+        symbol_xy=(FRONT_CENTER[0] + 0.045, FRONT_CENTER[1] - 0.065),
         control=surface_finish_by_key(SURFACE_FINISHES, "hub_drum"),
         label="hub drum finish",
     )

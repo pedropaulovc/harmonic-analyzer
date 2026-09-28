@@ -91,7 +91,10 @@ def ensure_ready() -> str:
     from solidworks_mcp.adapters.sw_recovery import SolidWorksState
 
     if _disabled():
-        _telemetry.info("[sw] autostart disabled (HARMONIC_SW_AUTOSTART=0); skipping ensure_ready")
+        _telemetry.info(
+            "[sw] autostart disabled (HARMONIC_SW_AUTOSTART=0); skipping ensure_ready",
+            service=_INFRA,
+        )
         return sw_recovery.detect_state().value
 
     with _telemetry.span("sw.ensure_ready", service=_INFRA) as span:

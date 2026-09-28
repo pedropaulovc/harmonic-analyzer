@@ -78,7 +78,12 @@ RIGHT_CENTER = (0.205, 0.270)
 ISO_CENTER = (0.165, 0.145)
 GEAR_DATA_POS = (0.015, 0.410)
 MANUFACTURING_NOTES_POS = (0.015, 0.085)
-NOTCH_DETAIL_CENTER = (0.060, 0.155)
+# The 6:1 boundary prints 25.2 mm off this centre; NotchDepth's two-row text
+# hangs left of it at x 13.9..36.1 (fixed by its 0.025 dimension line and the
+# 12.7 border zone), so at 0.060 the circle's flank (34.8) crossed "FROM OD"
+# (text-on-line).  6 mm right the flank sits at 40.8, 4.7 mm clear, with the
+# outline (30..102) still short of the isometric's (122.7).
+NOTCH_DETAIL_CENTER = (0.066, 0.155)
 NOTCH_DETAIL_SCALE = (6, 1)
 NOTCH_DETAIL_RADIUS_MM = 4.0
 NOTCH_DETAIL_DIMENSIONS = {
@@ -516,26 +521,29 @@ async def build(adapter: Any) -> dict[str, str]:
         char_height=0.0025,
     )
 
-    # The follower finish belongs on the cam's cylindrical flank.  The side
-    # view exposes that surface without dragging a leader across the gear face.
+    # The follower finish belongs on the cam's cylindrical flank, which the
+    # cam-side front view prints edge-on as the cam circle; it attaches at the
+    # circle's 45-degree point.  In the side view the flank sits between
+    # OverallThickness's extension lines (x 199.7/210.3 up to y 347), so its
+    # leader crossed one (leader-crosses-line).  This leader runs ~12.6 mm over
+    # the gear teeth, 2.5 mm longer than the flank's shortest way out.
     cam_flank = _project_mm(
         adapter,
-        right,
+        front,
         (
-            0.0,
-            ECCENTRICITY + CAM_DIA / 2.0,
-            FACE_WIDTH + CAM_THICKNESS / 2.0,
+            CAM_DIA / (2.0 * math.sqrt(2.0)),
+            ECCENTRICITY + CAM_DIA / (2.0 * math.sqrt(2.0)),
+            OVERALL_THICKNESS,
         ),
         label="cam follower flank",
     )
     add_surface_finish(
         adapter,
-        right,
+        front,
         edge_xy=cam_flank,
-        symbol_xy=(0.220, 0.310),
+        symbol_xy=(0.140, 0.318),
         control=surface_finish_by_key(SURFACE_FINISHES, "cam_follower"),
         label="cam follower finish",
-        entity_type="SILHOUETTE",
         leader_attach_xy=cam_flank,
         char_height=0.0025,
     )

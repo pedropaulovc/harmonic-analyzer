@@ -633,11 +633,11 @@ def test_a_starting_seat_is_held_until_startup_completes(
     prov = _seat_forensics.record_seat_provenance(_Adapter(sw=seat))
 
     assert seat.startup_reads == 4  # stopped polling on the first True
+    assert prov["seat_startup"] == "ready_after_wait"
     assert prov["seat_startup_completed"] is True
     assert prov["seat_startup_wait_s"] >= 0
-    assert 19 <= prov["seat_startup_uptime_s"] <= 25
     bodies = [str(r.log_record.body) for r in logs.get_finished_logs()]
-    assert any("StartupProcessCompleted=False" in body for body in bodies)
+    assert any("still starting" in body for body in bodies)
     assert any("startup_completed=True" in body for body in bodies)  # the seat line
 
 
@@ -682,10 +682,10 @@ def heartbeats(monkeypatch, capture_telemetry):
 def test_the_startup_wait_keeps_the_watchdog_heartbeat_alive(
     monkeypatch, fast_polls, heartbeats
 ):
-    """The startup wait can outlast the op timeout (its window is seat age, up
-    to 180 s by default); a poll that emits nothing leaves the watchdog's idle
-    clock running, and a lower ``HARMONIC_COM_OP_TIMEOUT`` would kill a healthy
-    wait. Every poll must advance the heartbeat."""
+    """The startup wait can outlast the op timeout (its bound is 60 s); a poll
+    that emits nothing leaves the watchdog's idle clock running, and a lower
+    ``HARMONIC_COM_OP_TIMEOUT`` would kill a healthy wait. Every poll must
+    advance the heartbeat."""
     monkeypatch.setattr(_seat_forensics, "_process_started_at", lambda pid: time.time() - 20)
     seen: list[int] = []
 
@@ -704,48 +704,14 @@ def test_the_startup_wait_keeps_the_watchdog_heartbeat_alive(
 
 
 
-def test_a_seat_older_than_the_startup_window_is_not_waited_on(
-    monkeypatch, fast_polls, capture_telemetry
-):
-    """Startup belongs to the START of a process: a seat past the window that
-    still answers False is stuck, and waiting would tax every later leaf."""
-    spans, logs = capture_telemetry
-    seat = _StartingSeat([False])  # fixture: the seat started in 2023
-
-    prov = _seat_forensics.record_seat_provenance(_Adapter(sw=seat))
-
-    assert seat.startup_reads == 1
-    assert prov["seat_startup_completed"] is False
-    assert prov["seat_startup_wait_s"] == 0.0
-    assert any(
-        "past the" in str(r.log_record.body) and r.log_record.severity_text == "WARN"
-        for r in logs.get_finished_logs()
-    )
-
-
-def test_a_wait_that_runs_out_proceeds_and_says_so(monkeypatch, fast_polls, capture_telemetry):
-    """The window is measured in seat AGE, so a seat that never completes costs
-    at most the rest of it, and the build goes on with the state on record."""
-    spans, logs = capture_telemetry
-    monkeypatch.setenv("HARMONIC_SW_STARTUP_WINDOW", "30")
-    started = time.time() - 29.9
-    monkeypatch.setattr(_seat_forensics, "_process_started_at", lambda pid: started)
-    seat = _StartingSeat([False])
-
-    prov = _seat_forensics.record_seat_provenance(_Adapter(sw=seat))
-
-    assert prov["seat_startup_completed"] is False
-    assert "seat_startup_wait_s" in prov
-    assert any("proceeding" in str(r.log_record.body) for r in logs.get_finished_logs())
-
 
 def test_a_wall_clock_stepped_back_mid_wait_does_not_extend_it(monkeypatch, capture_telemetry):
     """A worker's clock corrected backwards while the seat starts (time sync on
-    a fresh VM) must not stretch the wait: only the seat AGE reads the wall
-    clock; the wait itself runs out on the monotonic clock."""
-    monkeypatch.setenv("HARMONIC_SW_STARTUP_WINDOW", "30")
+    a fresh VM) must not stretch the wait: it runs out on the monotonic clock,
+    and ends the leaf with exit 89 when it does."""
+    monkeypatch.setattr(_seat_forensics, "_STARTUP_WAIT_S", 0.1)
     now = time.time()
-    monkeypatch.setattr(_seat_forensics, "_process_started_at", lambda pid: now - 29.9)
+    monkeypatch.setattr(_seat_forensics, "_process_started_at", lambda pid: now - 20)
     wall = [now]
 
     def stepping_back() -> float:
@@ -765,76 +731,27 @@ def test_a_wall_clock_stepped_back_mid_wait_does_not_extend_it(monkeypatch, capt
                 raise AssertionError("the startup wait outlived its 0.1 s budget")
             return super().StartupProcessCompleted
 
-    prov = _seat_forensics.record_seat_provenance(_Adapter(sw=_NeverStarts([False])))
+    with pytest.raises(_watchdog.SeatNotReady):
+        _seat_forensics.record_seat_provenance(_Adapter(sw=_NeverStarts([False])))
 
-    assert prov["seat_startup_completed"] is False
-    assert prov["seat_startup_wait_s"] < 5
+    assert _seat_forensics._seat_startup["seat_startup_completed"] is False
+    assert _seat_forensics._seat_startup["seat_startup_wait_s"] < 5
 
-
-def test_a_seat_that_starts_in_the_future_waits_at_most_the_window(
-    monkeypatch, fast_polls, capture_telemetry
-):
-    """A clock stepped back between launching SolidWorks and this call puts the
-    seat's start in the future; the wait is still at most the window, never the
-    skew on top of it."""
-    monkeypatch.setenv("HARMONIC_SW_STARTUP_WINDOW", "0.2")
-    started = time.time() + 1000
-    monkeypatch.setattr(_seat_forensics, "_process_started_at", lambda pid: started)
-
-    class _NeverStarts(_StartingSeat):
-        @property
-        def StartupProcessCompleted(self):
-            if self.startup_reads > 20_000:
-                raise AssertionError("the startup wait outlived its window")
-            return super().StartupProcessCompleted
-
-    prov = _seat_forensics.record_seat_provenance(_Adapter(sw=_NeverStarts([False])))
-
-    assert prov["seat_startup_completed"] is False
-    assert prov["seat_startup_wait_s"] < 1
-
-
-def test_a_ready_or_mute_seat_costs_no_wait():
-    """The control: a started seat is read once, and a seat with no boolean
-    answer is ``unknown`` -- neither a reason to wait nor a claim it is ready."""
-    ready = _StartingSeat([True])
-    assert _seat_forensics.record_seat_provenance(_Adapter(sw=ready))[
-        "seat_startup_completed"
-    ] is True
-    assert ready.startup_reads == 1
-    mute = _seat_forensics.record_seat_provenance(_Adapter(sw=_Seat()))
-    assert mute["seat_startup_completed"] == "unknown"
-    assert "seat_startup_wait_s" not in mute
-
-
-@pytest.mark.parametrize("window", ["inf", "nan", "-5", "soon"])
-def test_an_unusable_startup_window_falls_back_to_the_default(
-    monkeypatch, capture_telemetry, window
-):
-    """``inf`` would poll forever and a negative window is meaningless: both are
-    rejected, loudly, for the default."""
-    spans, logs = capture_telemetry
-    monkeypatch.setenv("HARMONIC_SW_STARTUP_WINDOW", window)
-
-    assert _seat_forensics._startup_window() == _seat_forensics._DEFAULT_STARTUP_WINDOW_S
-    assert any(window in str(r.log_record.body) for r in logs.get_finished_logs())
 
 
 def test_a_short_op_timeout_does_not_shorten_the_startup_wait(
     monkeypatch, fast_polls
 ):
-    """The window is SEAT AGE, and the watchdog is kept alive by the per-poll
-    heartbeat, so the op timeout has no say in it: under a 10 s op timeout a
-    20 s-old seat that is still starting must still be waited on (the
-    2026-09-28 failures were seats of 20.0 s and 21.8 s)."""
-    monkeypatch.setenv("HARMONIC_SW_STARTUP_WINDOW", "180")
+    """The watchdog is kept alive by the per-poll heartbeat, so the op timeout
+    has no say in the bound: under a 10 s op timeout a 20 s-old seat that is
+    still starting must still be waited on (the 2026-09-28 failures were seats
+    of 20.0 s and 21.8 s)."""
     monkeypatch.setenv("HARMONIC_COM_OP_TIMEOUT", "10")
     monkeypatch.setattr(
         _seat_forensics._watchdog, "_active", SimpleNamespace(op_timeout=10.0)
     )
     monkeypatch.setattr(_seat_forensics, "_process_started_at", lambda pid: time.time() - 20)
 
-    assert _seat_forensics._startup_window() == 180.0
     seat = _StartingSeat([False, False, True])
     prov = _seat_forensics.record_seat_provenance(_Adapter(sw=seat))
 

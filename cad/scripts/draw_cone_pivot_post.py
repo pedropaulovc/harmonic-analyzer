@@ -194,7 +194,9 @@ FRONT_KEEP = {
     # A REFERENCE since U31: the crank bore is located from the cone bore
     # (View B), so its height above the foot only follows that chain.
     "CrankAxisY": (0.060, _front_y(CRANK_BORE_HEIGHT / 2.0)),
-    "HeadHt": (0.150, _front_y(CRANK_BORE_HEIGHT)),
+    # Out past the angularity frame, text above it: at x=0.150 its extension
+    # lines fenced the frame off the crank bore (leader-crosses-line, af13).
+    "HeadHt": (0.164, 0.1475),
     "CrankBossDia": (0.132, 0.120),
     # Held 10 mm clear of View B's toleranced crank-above-cone text: at
     # x=0.155 the two sat 4.15 mm apart, under one text height (r7 audit).
@@ -1470,13 +1472,30 @@ async def build(adapter: Any) -> dict[str, str]:
         label="crank boss axis",
     )
     _add_cone_section_centerline(adapter, section)
+    # The note's arrow lands on the journal rim's upper-right quarter (35
+    # degrees), above the A-A line, so it reaches the rim from the right
+    # without crossing that line (leader-crosses-section-line, af13): the
+    # native entity's default landing sat below it, on the lower-left.  The
+    # rim is the pad end-face circle seen along Z, centred L/2*sin(incline)
+    # right of the axis and foreshortened by cos(incline) across; the audit
+    # read the old landing within 0.1 mm of this ellipse.  The pick only sets
+    # the landing: the note must still attach to the identified bore rim.
+    view_b_t = math.radians(35.0)
+    view_b_incline = math.radians(INCLINE_DEG)
     add_attached_note(
         adapter,
         front,
         text="VIEW B",
-        entity=_bore_rim_edge(front, diameter_mm=BORE_DIA),
-        note_xy=(0.165, 0.112),
+        entity_xy=(
+            _front_x(
+                CONE_BOSS_LENGTH / 2.0 * math.sin(view_b_incline)
+                + BORE_DIA / 2.0 * math.cos(view_b_t) * math.cos(view_b_incline)
+            ),
+            _front_y(BORE_HEIGHT + BORE_DIA / 2.0 * math.sin(view_b_t)),
+        ),
+        note_xy=(0.1265, 0.1087),
         label="cone-axis auxiliary-view direction",
+        attached_to=_bore_rim_edge(front, diameter_mm=BORE_DIA),
     )
 
     add_native_hole_callout(
@@ -1508,11 +1527,14 @@ async def build(adapter: Any) -> dict[str, str]:
         label="foot seat finish",
         char_height=0.0025,
     )
+    # The crank-bore Ra stands left of the head, between the (72.49)'s witness
+    # and the 86.0's top witness: above the view its leader crossed the 86.0's
+    # top witness (leader-crosses-line, ha-perf-parts audit).
     add_surface_finish(
         adapter,
         front,
         edge_entity=_bore_rim_edge(front, diameter_mm=CRANK_BORE_DIA),
-        symbol_xy=(0.055, 0.165),
+        symbol_xy=(0.050, 0.1447),
         leader_attach_xy=model_point_in_view(
             adapter,
             front,
@@ -1589,10 +1611,23 @@ async def build(adapter: Any) -> dict[str, str]:
                     front, radius_mm=BLOCK_DIA / 2.0, center_y_mm=0.0
                 ),
             ),
+            # The frame sits right of the head between HeadHt's extension
+            # lines, its leader landing on the bore rim at -28 degrees,
+            # between the CRANK BOSS diameter line and the centre-mark arm:
+            # from (0.160, 0.128) to the natural lower-left landing it
+            # crossed HeadHt's and CrankBossDia's lines (leader-crosses-line,
+            # af13).  A sheet-point pick sets the landing; explicit leader
+            # placement detached a GTol from its edge (fulcrum 1149f227f).
             "crank_bore_angularity": PmiDrawingPlacement(
                 view=front,
-                position=(0.160, 0.128),
-                edge_entity=_bore_rim_edge(front, diameter_mm=CRANK_BORE_DIA),
+                position=(0.124, 0.138),
+                attachment_xy=(
+                    _front_x(CRANK_BORE_DIA / 2.0 * math.cos(math.radians(-28.0))),
+                    _front_y(
+                        CRANK_BORE_HEIGHT
+                        + CRANK_BORE_DIA / 2.0 * math.sin(math.radians(-28.0))
+                    ),
+                ),
             ),
         },
         datums=PART_DATUMS,

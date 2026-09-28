@@ -600,13 +600,13 @@ _R287_PLACEMENT = {
         "FLANGE_SLOT_W_Z = FLANGE_SLOT_CENTER_Z - 8.42 * 0.4"
     ),
     "_plan_y(Z_SOUTH) + 0.0105)": "_plan_y(Z_SOUTH) + 0.013)",
-    "(RIGHT_CENTER[0] - 0.0605, 0.1715)": "(RIGHT_CENTER[0] - 0.033, 0.178)",
+    "(RIGHT_CENTER[0] - 0.0322, 0.1788)": "(RIGHT_CENTER[0] - 0.033, 0.178)",
     "_PINCH_CLEARANCE_TEXT_GROWTH = 0.0196": "_PINCH_CLEARANCE_TEXT_GROWTH = 0.0",
     "FOOT_FINISH_CENTER = BACK_CENTER": "FOOT_FINISH_CENTER = FRONT_CENTER",
     "_PLAN_RIGHT + 0.0094 + 0.002,": (
         "_PLAN_RIGHT + ARROW_LENGTH + TEXT_CLEARANCE + VALUE_TEXT_HALF_WIDTH,"
     ),
-    'ARROWS_INSIDE = ("SlitDepth", "FlangeSlotSouthZ", "PinchHeight")': (
+    'ARROWS_INSIDE = ("SlitDepth", "FlangeSlotSouthZ", "PinchHeight", "PinchDepthCenter")': (
         'ARROWS_INSIDE = ("FlangeSlotSouthZ", "PinchHeight")'
     ),
     # r3 widened the block to 17 and moved PassageCenter's datum (and
@@ -631,7 +631,7 @@ _R287_PLACEMENT = {
 # ... and what the I31 sheet commanded at 7ab69742b, before round 1.
 _I31_PLACEMENT = {
     **_R287_PLACEMENT,
-    "(RIGHT_CENTER[0] - 0.0605, 0.1715)": "(RIGHT_CENTER[0] - 0.033, 0.1735)",
+    "(RIGHT_CENTER[0] - 0.0322, 0.1788)": "(RIGHT_CENTER[0] - 0.033, 0.1735)",
     "PLAN_CHAIN_X = _PLAN_LEFT - 3.0 * PLAN_BASELINE_STEP": (
         "PLAN_CHAIN_X = TOP_CENTER[0] - 0.030"
     ),
@@ -820,7 +820,7 @@ def test_sheet_ink_model_reproduces_the_i31_render() -> None:
             ],
         ),
         (
-            ("(RIGHT_CENTER[0] - 0.0605, 0.1715)",),
+            ("(RIGHT_CENTER[0] - 0.0322, 0.1788)",),
             [
                 _I31_FINDINGS[1],
                 "arrow-near-text: PinchDepthCenter's arrow ... 'pinch clearance callout'",
@@ -893,6 +893,28 @@ def _turned_inside(arrow):
     return ((tip_x, tip_y), (tip_x - (tail_x - tip_x) * run, tip_y - (tail_y - tip_y) * run))
 
 
+def _along_dimension_line(segment, name: str) -> bool:
+    """Whether ``segment`` runs along ``name``'s dimension line, the way its
+    arrows point, rather than across it as a witness line does."""
+    (_, tip_y), (_, tail_y) = drawing.sheet_dimension_ink()[name].arrows[0]
+    (x0, y0), (x1, y1) = segment
+    return y0 == y1 if tip_y == tail_y else x0 == x1
+
+
+def _tails_trimmed(segment, name: str):
+    """A measured line-and-tails run turned inside: the tails are gone and the
+    line keeps its centre, as long as the module's own dimension line.  Only
+    a horizontal dimension line prints as one run to measure against."""
+    (x0, y0), (x1, y1) = segment
+    if y0 != y1:
+        raise ValueError(f"{name}: only a horizontal dimension line's tails trim")
+    (a, _), (b, _) = next(
+        line for line in drawing.sheet_dimension_ink()[name].lines if line[0][1] == line[1][1]
+    )
+    centre, half = (x0 + x1) / 2.0, abs(b - a) / 2.0
+    return ((centre - half, y0), (centre + half, y1))
+
+
 def _moved_r287_fixture(names: tuple[str, ...]):
     """The planted 287c ink, each owner moved by what its constant moved."""
     old = _drawing_at(_R287_PLACEMENT)
@@ -949,7 +971,12 @@ def _moved_r287_fixture(names: tuple[str, ...]):
     turned = set(drawing.ARROWS_INSIDE) - set(old.ARROWS_INSIDE)
     dimensions = {
         name: drawing.DimensionInk(
-            tuple(_stretch(s, *moves.get(name, still)) for s in ink.lines),
+            tuple(
+                _tails_trimmed(s, name)
+                if name in turned and _along_dimension_line(s, name)
+                else _stretch(s, *moves.get(name, still))
+                for s in ink.lines
+            ),
             tuple(
                 _turned_inside(s) if name in turned else _stretch(s, *moves.get(name, still))
                 for s in ink.arrows
@@ -1062,17 +1089,14 @@ def test_sheet_ink_model_reproduces_the_287c_render() -> None:
     ("reverted", "expected"),
     [
         (("_PLAN_RIGHT + 0.0094 + 0.002,",), [_R287_FINDINGS[0]]),
-        (("(RIGHT_CENTER[0] - 0.0605, 0.1715)",), [_R287_FINDINGS[2]]),
         (("FOOT_FINISH_CENTER = BACK_CENTER",), [_R287_FINDINGS[1], _R287_FINDINGS[4]]),
-        # r3's lower, wider pinch callout now stands in the 15.2's upper
-        # outside arrow's run too: inside arrows clear both.
+        # 287c's pinch callout leader crossed the 6.0's outside arrow tail;
+        # its arrows now stand inside with the 15.2's, one line, so reverting
+        # it brings back both collisions (the callout's own 287c placement is
+        # clear with the 6.0's arrows inside).
         (
-            ('ARROWS_INSIDE = ("SlitDepth", "FlangeSlotSouthZ", "PinchHeight")',),
-            [
-                "text-on-line: SlitDepth's dimension line crosses 'pinch clearance callout'",
-                _R287_FINDINGS[5],
-                "arrow-near-text: SlitDepth's arrow ... 'pinch clearance callout'",
-            ],
+            ('ARROWS_INSIDE = ("SlitDepth", "FlangeSlotSouthZ", "PinchHeight", "PinchDepthCenter")',),
+            [_R287_FINDINGS[2], _R287_FINDINGS[5]],
         ),
         # r3: the location's value now stands over the letter, so at 287c's
         # height the letter meets the value itself.
@@ -1083,9 +1107,8 @@ def test_sheet_ink_model_reproduces_the_287c_render() -> None:
     ],
     ids=[
         "plan-3.97-value",
-        "b-pinch-callout",
         "ra-finish-to-view-c",
-        "slit-depth-inside",
+        "arrows-inside",
         "view-c-letter",
     ],
 )
@@ -1094,6 +1117,23 @@ def test_each_287c_move_is_what_clears_its_collision(reverted, expected) -> None
     mutant = _drawing_at({**_RD1_PLACEMENT, **{line: _R287_PLACEMENT[line] for line in reverted}})
     findings = _sheet_findings(mutant)
     assert _findings_match(findings, expected), findings
+
+
+# The af13c8ff8 farm audit: r3's callout, far left and low, ran its leader
+# across the 6.0's north-face witness, which rises from the hole's height.
+# The callout above the 6.0 and the 6.0's arrows inside each are needed.
+_AF13_PINCH = {
+    "(RIGHT_CENTER[0] - 0.0322, 0.1788)": "(RIGHT_CENTER[0] - 0.0605, 0.1715)",
+    'ARROWS_INSIDE = ("SlitDepth", "FlangeSlotSouthZ", "PinchHeight", "PinchDepthCenter")': (
+        'ARROWS_INSIDE = ("SlitDepth", "FlangeSlotSouthZ", "PinchHeight")'
+    ),
+}
+
+
+@pytest.mark.parametrize("reverted", [*_AF13_PINCH], ids=["callout", "arrows"])
+def test_each_af13_pinch_move_is_what_clears_the_leader_crossing(reverted) -> None:
+    findings = _sheet_findings(_drawing_at({reverted: _AF13_PINCH[reverted]}))
+    assert _findings_match(findings, [_R287_FINDINGS[2]]), findings
 
 
 def test_sheet_ink_is_clear_and_the_build_places_what_it_audits() -> None:
@@ -1121,7 +1161,12 @@ def test_sheet_ink_is_clear_and_the_build_places_what_it_audits() -> None:
     assert body.count("add_note(adapter,") == 1
     # The foot's Ra 3.2 sits on VIEW C, where nothing is dimensioned under it.
     assert drawing.FOOT_FINISH_CENTER == drawing.BACK_CENTER
-    assert drawing.ARROWS_INSIDE == ("SlitDepth", "FlangeSlotSouthZ", "PinchHeight")
+    assert drawing.ARROWS_INSIDE == (
+        "SlitDepth",
+        "FlangeSlotSouthZ",
+        "PinchHeight",
+        "PinchDepthCenter",
+    )
     assert not set(drawing.ARROWS_INSIDE) & set(drawing.ARROWS_OUTSIDE)
 
 

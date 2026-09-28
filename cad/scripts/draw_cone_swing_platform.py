@@ -219,9 +219,15 @@ _SLOT_Y = DETAIL_CENTER[1] + (DETAIL_MODEL_Z - TIP_SCREW_LOCAL_Z) * _DETAIL_S
 # the slot's dimension line inside the slot's span), and pivot-to-slot alone
 # on the right.  The cutters are named by leadered notes, not dimension text.
 DETAIL_KEEP = {
-    # Right, alone: text above the slot-centre extension line (0.055),
-    # hanging right, under the cutter notes' leaders (>= 0.063 here).
-    "TipSlotZ": (DETAIL_CENTER[0] + 0.030, _SLOT_Y + 0.0045),
+    # Right, alone, OUTBOARD of both cutter notes: text above the slot-centre
+    # extension line (0.055), hanging right, short of the title block
+    # (0.216). The counterbore's lower arc sits inside this dimension's
+    # frame (pivot 0.033 to slot 0.055), so its note's leader, entering from
+    # the right, crossed the dimension line when that line stood between
+    # the circle and the notes (was DETAIL_CENTER[0] + 0.030;
+    # leader-crosses-line). Out here the note sits inside the frame and its
+    # leader reaches the arc without meeting either witness.
+    "TipSlotZ": (0.175, _SLOT_Y + 0.0045),
     # Above the circle, each 2.00 outside its own extension lines and under
     # the plan caption row (y >= 0.0805).  The west one sits in toward the
     # circle, left of the through-slot leader's path.
@@ -250,8 +256,8 @@ DETAIL_ARROWS_INSIDE = ("TipSlotW", "TipCboreW")
 # notes whose texts sit on the same side of their tips nest (ec70186e: 65.5
 # x 12.1 mm overlap).  The slot note therefore rises from the arc's upper
 # quadrant to text above; the counterbore note drops from its lower quadrant
-# to text below, its leader crossing pivot-to-slot's dimension line (the only
-# path: below that line's foot sits the relief note).
+# to text below, between pivot-to-slot's extension lines. That dimension's
+# line stands right of the note text, so the leader crosses neither.
 _WEST_ARC_CENTER = (DETAIL_CENTER[0] + 2.0 * _DETAIL_S, _SLOT_Y)
 
 
@@ -316,7 +322,13 @@ def cutter_note_model_tip(note: CutterNote) -> tuple[float, float, float]:
 DETAIL_LABEL_LOWER_LEFT = (0.016, 0.015)
 # The pivot relief-fit note (2.5 mm text, ~0.095 x 0.018): anchored by its
 # upper-left corner, lower right of the free band, left of the title block.
-RELIEF_NOTE_XY = (0.120, 0.034)
+# Under pivot-to-slot's lower extension line (0.033), which runs right past
+# this note to reach its dimension line at 0.175, where the lower arrowhead
+# sits on the line's foot: at 0.0315 the first row's top (31.2) stood
+# 1.8 mm under that arrow (arrow-near-text, 2 mm clearance); at 0.029 the
+# rows print 26.2..28.7 down to 15.7, still 3 mm above the border zone
+# (12.7).
+RELIEF_NOTE_XY = (0.120, 0.029)
 # The MHA-142 named-exception note and its tap-break override (2.5 mm text,
 # two lines, ~141 x 8.8 mm), anchored upper-left in the empty band above the
 # title block (0.066): right of the plan caption row (x <= 0.2185), under the
@@ -593,14 +605,27 @@ def _create_detail_view(
         detail, "IView", "SetViewPosition", "Position"
     )
     rebuild_drawing(adapter, label=f"create detail view {detail_label}")
-    # A detail view's Position is its model-origin anchor, not the circle
-    # centre (run 2b643c17 placed the circle 99 mm below the request).  Move
-    # the anchor until the circle's model centre lands on ``view_xy``.
-    for attempt in range(2):
-        landed = model_point_in_view(
-            adapter, detail, center_m, label=f"{label} centre, pass {attempt}"
-        )
+    # CreateDetailViewAt4 puts the circle's centre on (x, y), but a fresh
+    # detail view's readbacks lag its ink: on leaf 20260928T075849Z-1-882b4704
+    # the outline was centred on the request while ModelToViewTransform
+    # projected the centre 99 mm below it and Position read 99 mm below where
+    # SetViewPosition later had to put it.  A loop that trusted the
+    # projection moved a correctly placed view 99 mm up and needed a second
+    # move to bring it back; on three #1105 leaves the projection then read
+    # "on target" while the outline sat 99 mm high, and the view stayed there.
+    # GetOutline is the ink (a 2:1 circle of DETAIL_RADIUS_MM, its label is
+    # placed separately), and SetViewPosition moves that ink by the
+    # difference from the Position it reads, so place by the outline and only
+    # verify the projection afterwards, once it has caught up.
+    landed = view_xy
+    for attempt in range(4):
+        outline = tuple(float(v) for v in detail.GetOutline())
+        landed = ((outline[0] + outline[2]) / 2.0, (outline[1] + outline[3]) / 2.0)
         anchor = tuple(float(v) for v in detail.Position)
+        print(
+            f"detail {detail_label} pass {attempt}: anchor={anchor} "
+            f"outline_centre={landed} outline={outline}"
+        )
         if max(abs(landed[0] - view_xy[0]), abs(landed[1] - view_xy[1])) < 0.0002:
             break
         moved = (
@@ -610,16 +635,30 @@ def _create_detail_view(
         if not detail.SetViewPosition(double_array(list(moved)), False):
             raise RuntimeError(f"failed to position the detail view ({label})")
         rebuild_drawing(adapter, label=f"place detail view {detail_label}")
-    landed = model_point_in_view(adapter, detail, center_m, label=f"{label} centre")
+    else:
+        raise RuntimeError(
+            f"detail {detail_label} outline centre stayed at {landed}, "
+            f"requested {view_xy}"
+        )
+    # Every later placement on this view projects through its transform, so
+    # it must agree with the ink before anything is hung on it.
+    for attempt in range(3):
+        projected = model_point_in_view(
+            adapter, detail, center_m, label=f"{label} centre, read {attempt}"
+        )
+        if max(abs(projected[0] - landed[0]), abs(projected[1] - landed[1])) < 0.0005:
+            break
+        rebuild_drawing(adapter, label=f"settle detail view {detail_label}")
+    else:
+        raise RuntimeError(
+            f"detail {detail_label} projects its centre to {projected} while its "
+            f"outline is centred on {landed} (requested {view_xy})"
+        )
     print(
         f"detail {detail_label}: parent_sheet_centre={sheet[0]} "
         f"sketch_centre={points[0]} requested={view_xy} landed={landed} "
-        f"outline={tuple(float(v) for v in detail.GetOutline())}"
+        f"projected={projected} outline={tuple(float(v) for v in detail.GetOutline())}"
     )
-    if max(abs(landed[0] - view_xy[0]), abs(landed[1] - view_xy[1])) > 0.0005:
-        raise RuntimeError(
-            f"detail {detail_label} centre landed at {landed}, requested {view_xy}"
-        )
     return detail
 
 
