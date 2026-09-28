@@ -2922,7 +2922,8 @@ def task_check():
         # The SolidWorks-free geometry contract for the drawing layout audit
         # (collision / sheet-overflow logic run before every drawing saves).
         SCRIPTS_DIR / "test_drawing_layout_check.py",
-        # The assembly-view configuration policy (1:2 boundary, roles, BOM identity).
+        # The assembly-view configuration policy (1:2 boundary, roles, BOM
+        # identity, simplified re-save fingerprint).
         SCRIPTS_DIR / "test_drawing_simplified.py",
         # Stock fasteners declare their thread; a missing groove fails loud.
         SCRIPTS_DIR / "test_stock_fastener.py",

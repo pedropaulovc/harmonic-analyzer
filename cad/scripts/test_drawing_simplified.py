@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
+import _assembly
 import _drawing_simplified
 from _drawing_common import (
     ASSEMBLY_VIEW_CONFIGURATION,
@@ -14,7 +15,12 @@ from _drawing_common import (
     apply_view_configuration,
     view_configuration,
 )
-from _drawing_simplified import child_bom_identity, is_simplified, simplified_name
+from _drawing_simplified import (
+    child_bom_identity,
+    is_simplified,
+    simplified_comment,
+    simplified_name,
+)
 
 HLV, HLR, SHADED, SHADED_EDGES = 1, 2, 3, 7
 DOCUMENT, CONFIGURATION, PARENT, USER = 1, 2, 4, 8
@@ -199,6 +205,23 @@ class FakeModel:
         return self.components
 
 
+class FakeComponent:
+    def __init__(self, name: str, path: str, model: FakeModel, referenced: str) -> None:
+        self.Name2 = name
+        self.path = path
+        self.model = model
+        self.ReferencedConfiguration = referenced
+
+    def GetPathName(self) -> str:
+        return self.path
+
+    def IsSuppressed(self) -> bool:
+        return False
+
+    def GetModelDoc2(self) -> FakeModel:
+        return self.model
+
+
 def test_a_linked_configurations_simplified_child_prints_the_root_name() -> None:
     root = FakeConfiguration("Default", source=CONFIGURATION)
     linked = FakeConfiguration("T24", root, source=PARENT)
@@ -209,6 +232,35 @@ def test_a_linked_configurations_simplified_child_prints_the_root_name() -> None
         "Default",
         True,
     )
+
+
+def _assembly_model(*components: FakeComponent) -> FakeModel:
+    default = FakeConfiguration("Default")
+    return FakeModel(default, components=components)
+
+
+def _sync(model: FakeModel, paths: dict[str, FakeModel]) -> int:
+    app = SimpleNamespace(GetConfigurationNames=lambda path: paths[path].GetConfigurationNames())
+    adapter = SimpleNamespace(currentModel=model, swApp=app)
+    return _assembly.sync_simplified_configuration(adapter, "fixture", verify=False)
+
+
+def test_a_childs_changed_simplified_geometry_forces_the_assembly_save() -> None:
+    t24 = FakeConfiguration("T24")
+    gear_simplified = FakeConfiguration("T24 Simplified", t24, comment=simplified_comment("Teeth"))
+    gear = FakeModel(t24, gear_simplified)
+    sub = _assembly_model(FakeComponent("gear-1", "gear.SLDPRT", gear, "T24"))
+    top = _assembly_model(FakeComponent("sub-1", "sub.SLDASM", sub, "Default"))
+    paths = {"gear.SLDPRT": gear, "sub.SLDASM": sub}
+    assert _sync(sub, paths) > 0  # created, re-pointed
+    assert _sync(top, paths) > 0
+    # A settled refresh leaves both byte-stable.
+    assert (_sync(sub, paths), _sync(top, paths)) == (0, 0)
+    # The part recipe now suppresses more: Default and every component's
+    # referenced configuration are unchanged, yet both levels must re-save.
+    gear_simplified.Comment = simplified_comment("Teeth, Chamfer")
+    assert (_sync(sub, paths), _sync(top, paths)) == (1, 1)
+    assert (_sync(sub, paths), _sync(top, paths)) == (0, 0)
 
 
 def _apply(view: FakeView, role: ViewRole = ViewRole.PLAIN) -> tuple[str, FakeDrawing]:

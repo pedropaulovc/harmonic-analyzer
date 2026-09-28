@@ -42,7 +42,9 @@ from _common import (
 from _drawing_simplified import (
     SIMPLIFIED_COMMENT,
     SIMPLIFIED_SUFFIX,
+    components_identity,
     is_simplified,
+    simplified_comment,
     simplified_name,
 )
 from _visibility import assert_reference_geometry_hidden, blank_reference_geometry
@@ -2280,11 +2282,16 @@ def sync_simplified_configuration(
     component whose model has no such configuration keeps its parent one.
     Default itself is untouched (proven: every component and mate unchanged).
 
-    Returns how many things changed (configuration created + components
-    re-pointed), so an in-place refresh knows it must re-save. With ``verify``
-    the simplified configuration is force-rebuilt and must read What's Wrong
-    clean; a caller that rebuilds every configuration next passes False. The
-    rest configuration is re-activated before returning.
+    Returns how many things changed (configuration created, components
+    re-pointed, identity comment rewritten), so an in-place refresh knows it
+    must re-save. The comment fingerprints every component's referenced
+    configuration and THAT configuration's comment (a part's suppressed
+    features, a subassembly's own fingerprint), so a child whose simplified
+    geometry changed while Default did not still forces the save -- the
+    geometry digest reads Default only. With ``verify`` the simplified
+    configuration is force-rebuilt and must read What's Wrong clean; a caller
+    that rebuilds every configuration next passes False. The rest
+    configuration is re-activated before returning.
     """
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     names = [str(name) for name in (model.GetConfigurationNames() or ())]
@@ -2300,7 +2307,8 @@ def sync_simplified_configuration(
             raise RuntimeError(f"{asm_name}: AddConfiguration2({child!r}) returned None")
         changes += 1
     raw = model.GetConfigurationByName(child)
-    parent = _early_bound(raw, "IConfiguration").GetParent() if raw is not None else None
+    configuration = _early_bound(raw, "IConfiguration") if raw is not None else None
+    parent = configuration.GetParent() if configuration is not None else None
     if parent is None or str(_early_bound(parent, "IConfiguration").Name) != rest:
         raise RuntimeError(f"{asm_name}: {child!r} is not derived from {rest!r}")
     if active_configuration_name(adapter, model) != child and not bool(
@@ -2310,6 +2318,8 @@ def sync_simplified_configuration(
 
     assembly = _early_bound(adapter.currentModel, "IAssemblyDoc")
     known: dict[str, set[str]] = {}
+    comments: dict[tuple[str, str], str] = {}
+    rows: list[tuple[str, str, str]] = []
     swapped = kept = 0
     refused: list[str] = []
     for raw_component in assembly.GetComponents(True) or ():
@@ -2324,17 +2334,30 @@ def sync_simplified_configuration(
         want = simplified_name(base) if simplified_name(base) in known[path] else base
         if want == current:
             kept += 1
-            continue
-        component.ReferencedConfiguration = want
-        if str(component.ReferencedConfiguration) != want:
-            refused.append(f"{component.Name2}: {current!r} -> {want!r}")
-            continue
-        swapped += 1
+        else:
+            component.ReferencedConfiguration = want
+            if str(component.ReferencedConfiguration) != want:
+                refused.append(f"{component.Name2}: {current!r} -> {want!r}")
+                continue
+            swapped += 1
+        rows.append(
+            (
+                str(component.Name2),
+                want,
+                _referenced_comment(asm_name, component, path, want, comments),
+            )
+        )
     changes += swapped
     if refused:
         raise RuntimeError(
             f"{asm_name}: {child} refused component configurations: " + "; ".join(refused)
         )
+    comment = simplified_comment(components_identity(rows))
+    if str(configuration.Comment or "") != comment:
+        configuration.Comment = comment
+        if str(configuration.Comment or "") != comment:
+            raise RuntimeError(f"{asm_name}: {child} comment did not persist")
+        changes += 1
     if verify:
         rebuilt = adapter._attempt(lambda: model.ForceRebuild3(False), default=None)
         faults = _rebuild_faults(adapter)
@@ -2346,9 +2369,41 @@ def sync_simplified_configuration(
         raise RuntimeError(f"{asm_name}: re-activating {rest!r} refused")
     _telemetry.annotate(swapped=swapped, kept=kept, changes=changes, verified=verify)
     _telemetry.success(
-        f"{asm_name}: {child} re-points {swapped} component(s), {kept} unchanged"
+        f"{asm_name}: {child} re-points {swapped} component(s), {kept} unchanged "
+        f"({comment})"
     )
     return changes
+
+
+def _referenced_comment(
+    asm_name: str,
+    component: Any,
+    path: str,
+    configuration: str,
+    cache: dict[tuple[str, str], str],
+) -> str:
+    """The comment of the simplified configuration ``component`` references.
+
+    Empty for a component kept on its parent configuration; a suppressed one
+    contributes no geometry, so its model (unloaded) is not read."""
+    if not is_simplified(configuration):
+        return ""
+    if bool(component.IsSuppressed()):
+        return "<suppressed>"
+    key = (path, configuration)
+    if key not in cache:
+        raw = component.GetModelDoc2()
+        found = (
+            _early_bound(raw, "IModelDoc2").GetConfigurationByName(configuration)
+            if raw is not None
+            else None
+        )
+        if found is None:
+            raise RuntimeError(
+                f"{asm_name}: {component.Name2} ({path}) has no loaded {configuration!r}"
+            )
+        cache[key] = str(_early_bound(found, "IConfiguration").Comment or "")
+    return cache[key]
 
 
 async def save_assembly_and_images(
@@ -2798,11 +2853,13 @@ async def assembly_geometry_digest(adapter: Any, asm_name: str) -> str:
     (the FULL path -> recipe change -> save), so this only bites a bare part recolour;
     force a rebuild (delete the .SLDASM target) if one must propagate up.
 
-    ``Default Simplified`` is not fingerprinted: it is Default's components and
-    mates with each part's own derived configuration, so its geometry is a
-    function of Default's plus the parts' files, and resolving it would double
-    the top assembly's ~80-160 s configuration switch on every refresh. A
-    component re-pointed in it forces the re-save through ``refresh_assembly``."""
+    ``Default Simplified`` is not fingerprinted here: resolving it would double
+    the top assembly's ~80-160 s configuration switch on every refresh. Its
+    identity rides its configuration comment instead
+    (``sync_simplified_configuration``): a re-pointed component, or a child
+    whose own simplified configuration changed (a part suppressing different
+    features, a subassembly whose fingerprint moved), forces the re-save
+    through ``refresh_assembly`` even when Default's geometry is unchanged."""
     configs = [
         cfg
         for cfg in check("list configurations", await adapter.list_configurations())
@@ -3126,9 +3183,9 @@ async def refresh_assembly(
     with _telemetry.span("open", asm=asm_name):
         check(f"open {asm_name}", await adapter.open_model(str(asm_path)))
         opened_rebuild_status = saved_rebuild_status(adapter)
-    # A refreshed part may have gained (or lost) its "<cfg> Simplified", so the
-    # drawing configuration is re-pointed before the per-config rebuild below
-    # proves it clean; any change forces the re-save.
+    # A refreshed part may have gained, lost or changed its "<cfg> Simplified",
+    # so the drawing configuration is re-pointed and re-fingerprinted before
+    # the per-config rebuild below proves it clean; any change forces the save.
     simplified_changes = sync_simplified_configuration(adapter, asm_name, verify=False)
     configs = check("list configurations", await adapter.list_configurations())
     log(f"refresh {asm_name}: {len(configs)} configuration(s): {configs}")

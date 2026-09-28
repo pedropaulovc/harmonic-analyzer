@@ -21,10 +21,18 @@ swSpecifyConfiguration, [child])`` suppresses in the child only; an activated
 ``ForceRebuild3`` regenerates it. The child reports its parent's BOM part number,
 description and configuration-specific custom properties, so a BOM grouping a
 derived configuration cannot fork a row.
+
+Each derived configuration's comment names what it suppresses (a part: the
+feature names; an assembly: a fingerprint of every component's referenced
+configuration and that configuration's own comment). A child whose simplified
+geometry changes therefore changes every ancestor's ``Default Simplified``
+comment, which is how an in-place assembly refresh knows to re-save even when
+Default's geometry is untouched.
 """
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Iterable, Sequence
 from typing import Any
 
@@ -65,6 +73,21 @@ def simplified_name(configuration: str) -> str:
 
 def is_simplified(configuration: str) -> bool:
     return configuration.endswith(SIMPLIFIED_SUFFIX)
+
+
+def simplified_comment(identity: str) -> str:
+    """A derived configuration's comment: the policy plus what it suppresses."""
+    return f"{SIMPLIFIED_COMMENT} [{identity}]"
+
+
+def components_identity(rows: Iterable[tuple[str, str, str]]) -> str:
+    """Order-free fingerprint of an assembly's simplified components.
+
+    One row per top-level component: its name, the configuration it references
+    in ``Default Simplified`` and that configuration's own comment.
+    """
+    digest = hashlib.sha256(repr(sorted(rows)).encode("utf-8")).hexdigest()
+    return f"components {digest[:16]}"
 
 
 def child_bom_identity(
@@ -234,6 +257,7 @@ def add_simplified_configurations(
     if active not in parents:
         raise RuntimeError(f"{part_name}: active configuration {active!r} not in {parents}")
     targets = _features(model, part_name, features)
+    comment = simplified_comment(", ".join(features))
     children: list[str] = []
     failures: list[str] = []
     for parent in parents:
@@ -243,7 +267,7 @@ def add_simplified_configurations(
         ):
             failures.append(f"{parent}: ShowConfiguration2 refused")
             continue
-        created = manager.AddConfiguration2(child, SIMPLIFIED_COMMENT, "", 0, parent, "", False)
+        created = manager.AddConfiguration2(child, comment, "", 0, parent, "", False)
         if created is None:
             failures.append(f"{child}: AddConfiguration2 returned None")
             continue
@@ -296,13 +320,14 @@ def assert_simplified_configurations(
     adapter: Any, part_name: str, features: Sequence[str]
 ) -> None:
     """Prove, without switching, every ``P`` has its derived ``P Simplified``
-    with exactly ``features`` suppressed there (not in ``P``) and ``P``'s BOM
-    part number."""
+    with exactly ``features`` suppressed there (not in ``P``), a comment naming
+    them and ``P``'s BOM part number."""
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     names = [str(name) for name in (model.GetConfigurationNames() or ())]
     parents = [name for name in names if not is_simplified(name)]
     orphans = sorted(set(names) - set(parents) - {simplified_name(p) for p in parents})
     targets = _features(model, part_name, features)
+    comment = simplified_comment(", ".join(features))
     failures: list[str] = [f"orphan simplified configurations {orphans}"] if orphans else []
     for parent in parents:
         child = simplified_name(parent)
@@ -313,6 +338,8 @@ def assert_simplified_configurations(
         derived_from = configuration.GetParent()
         if derived_from is None or str(_early_bound(derived_from, "IConfiguration").Name) != parent:
             failures.append(f"{child}: not derived from {parent}")
+        if str(configuration.Comment or "") != comment:
+            failures.append(f"{child}: comment {configuration.Comment!r} != {comment!r}")
         for feature in targets:
             states = _suppression(feature, [parent, child])
             if states != (False, True):
