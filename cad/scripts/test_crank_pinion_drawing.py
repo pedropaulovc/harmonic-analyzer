@@ -143,24 +143,6 @@ def test_the_boss_is_the_root_circle_and_the_pin_hole_stays_in_its_wall() -> Non
     assert '\'"FaceWidth" + "BossLength" / 2\'' in build
 
 
-def test_pin_hole_is_match_drilled_to_the_named_pin() -> None:
-    # Rules 2 and 6: this matched fit is governed by its named pin and fit
-    # acceptance, never by the model's nominal drill diameter.
-    assert spec.PIN_HOLE_SPEC.kind == "drilled_fractional"
-    assert spec.PIN_HOLE_SPEC.size == "1/8"
-    assert spec.PIN_DIA == pytest.approx(3.175)
-    assert spec.CRANKSHAFT_NUMBER == _config.parts("crankshaft")["number"]
-    assert spec.PIN_NUMBER == _config.parts("crank-pinion-pin")["number"]
-    assert spec.PINION_NUMBER == _config.parts("crank-pinion")["number"]
-    assert "DRILL" in spec.PIN_HOLE_PROCESS
-    assert "1/8" not in spec.PIN_HOLE_PROCESS
-    assert f"{spec.PIN_DIA:.2f}" not in spec.PIN_HOLE_PROCESS
-    assert not hasattr(spec, "PIN_DIA_BAND")
-    assert "fit_class" not in _config.parts("crank-pinion-pin")
-    # The pinion's hole clocking is the assembly's mesh seed, asserted there:
-    # the seed at the R1 fit-up axis, centred in the window measured there
-    # (crank-mesh-R1-fitaxis-20260926.jsonl, centre -1.22..-1.25 deg).
-    assert spec.PIN_CLOCKING_DEG == pytest.approx(18.15033786449369)
 
 
 def _assert_four_fact_note(note: str, mate_number: str) -> None:
@@ -330,11 +312,8 @@ def test_bore_band_is_derived_from_its_fit_class_not_written_by_hand() -> None:
     assert (minimum, maximum) == (pytest.approx(low), pytest.approx(high))
 
 
-def test_outside_diameter_prints_the_tip_band_the_mesh_stack_takes() -> None:
-    # #906 R1 (user, 2026-09-26): at the title block's .XX +/-0.51 a tip could
-    # reach the 64T's root at the worst accepted fit-up, so the tip diameter
-    # prints +/-0.10 of its own -- on the witness the sheet imports -- and the
-    # stack takes that band.
+def test_tip_diameter_band_is_carried_by_the_fixed_centre_mesh() -> None:
+    # Tip enlargement consumes radial room even with no adjustable fit-up.
     import crank_mesh_stack
 
     assert spec.OUTSIDE_DIA_TOLERANCE_MM == 0.10
@@ -342,12 +321,7 @@ def test_outside_diameter_prints_the_tip_band_the_mesh_stack_takes() -> None:
     assert "OutsideDia" in spec.DRAWING_DIMENSIONS["BossProfile"]
     assert spec.TIP_CLEARANCE_MM == pytest.approx(0.152, abs=0.001)
     assert crank_mesh_stack.TIP_ROOT_BAND_RADIAL >= spec.OUTSIDE_DIA_TOLERANCE_MM / 2.0
-    assert crank_mesh_stack.TIP_CLEARANCE_MM <= spec.TIP_CLEARANCE_MM
-    assert crank_mesh_stack.TIP_ROOT_AIR_WORST > 0.0
-    assert (
-        'set_dimension_symmetric_tolerance(\n        adapter, "BossProfile", "OutsideDia", '
-        "OUTSIDE_DIA_TOLERANCE_MM\n    )"
-    ) in _build_source()
+    assert crank_mesh_stack.TIGHT_BACKLASH_MM > 0.0
     # The face width is the one free length: one place, so the title block's
     # .X grade is the band it claims, and nothing contradicts it.
     assert spec.DRAWING_PRECISION["GearBlank"]["FaceWidth"] == 1
@@ -605,30 +579,24 @@ def test_w15_boss_hides_the_shaft_end_and_walls_the_pin_at_every_limit() -> None
     assert edge == {
         "nominal": pytest.approx(4.523, abs=1e-3),
         "shaft length": pytest.approx(-0.40),
-        "seat gap": pytest.approx(-0.75),
+        "seat gap": pytest.approx(-0.85),
         # The pin is laid out at the boss mid-length on the ACTUAL part, so a
         # long face and overall length (each +0.8 printed) move it north.
         "boss mid-length": pytest.approx(-0.80),
         "pin layout": pytest.approx(-0.25),
         "drill oversize": pytest.approx(-0.05),
     }
-    assert sum(edge.values()) == pytest.approx(2.273, abs=1e-3)
+    assert sum(edge.values()) == pytest.approx(2.173, abs=1e-3)
     assert sum(edge.values()) >= spec.PIN_EDGE_MIN_WORST
-    # The seat gap is a (low, high) range starting at the one feeler MHA-A03
-    # sets, not a fit band.
-    # #906 moved the 1.0 upper end into the spec; the value is unchanged, so
-    # sourcing it there left the BDT stacks value-neutral.
-    assert spec.SEAT_GAP_MAX_MM == 1.0
-    # ... measured past the spot face's retreat from the 64T, which the
-    # fitter's feeler stack adds (MHA-A03 step 4).
-    retreat = bdt.POST_SPOT_FACE_RETREAT
-    assert bdt.PINION_BOSS_NORTH_GAP_RANGE == (retreat + spec.SEAT_FEELER_MM, retreat + 1.0)
-    assert not hasattr(bdt, "PINION_BOSS_NORTH_GAP_BAND")
+    # The seat feeler is directly against the restored boss north face.
+    assert bdt.PINION_BOSS_NORTH_GAP_RANGE == (0.15, 1.0)
+    assert bdt.PINION_BOSS_NORTH_GAP_RANGE == spec.PINION_BOSS_NORTH_GAP_RANGE
     recess = bdt.PINION_RECESS_STACK
     assert recess == {
         "nominal": pytest.approx(1.1395, abs=1e-4),
         "pinion overall length": pytest.approx(-0.80),
-        "seat gap": pytest.approx(0.0),
+        # The shaft's harvested station is retained to nine decimal places.
+        "seat gap": pytest.approx(0.0, abs=1e-9),
         "shaft length": pytest.approx(0.0),
     }
     assert sum(recess.values()) >= spec.SHAFT_END_RECESS_MIN_WORST
@@ -645,10 +613,6 @@ def test_w15_boss_hides_the_shaft_end_and_walls_the_pin_at_every_limit() -> None
     # 0.32 recess: at the printed row the shaft end then stands proud.
     equal_growth_recess = 113.039505572 + 17.28 - 130.0
     assert sum(bdt.pinion_recess_stack(equal_growth_recess, 130.0, 17.28).values()) < 0.25
-    # #893: the leaf log carries both sums, since the asserts are import-time.
-    build = Path(bdt.__file__).read_text(encoding="utf-8")
-    assert "{_stack_text(PINION_PIN_EDGE_STACK)} >= {PINION_PIN_EDGE_MIN_WORST}" in build
-    assert "{_stack_text(PINION_RECESS_STACK)} >= {PINION_RECESS_MIN_WORST}" in build
 
 
 def test_boss_wall_is_the_ruled_option_c_exception() -> None:

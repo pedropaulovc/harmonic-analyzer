@@ -60,20 +60,8 @@ TRANSVERSE_CIRCULAR_TOOTH_THICKNESS = math.pi * MODULE_MM / 2.0
 TOOTH_THICKNESS_UPPER_DEVIATION = 0.000
 TOOTH_THICKNESS_LOWER_DEVIATION = -0.020
 
-# The blank's outside diameter is the one tooth-system number the turner sets
-# before a cutter touches the part, so it prints as a NATIVE dimension instead
-# of as text in the data block. #906 R1: the MHA-149 bushing closes the
-# crossed 16T:64T mesh at fit-up until the backlash reads its acceptance, so
-# the frame's ``fits.crank_mesh.c2c_slack_mm`` is not what keeps a tip off the
-# mating root.  The radial room is what is left at the worst accepted fit-up
-# (thinnest teeth, bushing turned in until the reading is at the bottom of its
-# acceptance) on top of the tooth system's own 0.157/DP tip clearance;
-# ``crank_mesh_stack.TIP_ROOT_AIR_WORST`` takes it with this band on the tip
-# circle and asserts it above zero.  At the title block's .XX +/-0.51 the
-# air read -0.020; the user ruled +/-0.10 on both gears' tips (2026-09-26,
-# #906), which the turner holds with a micrometer before cutting, as on the
-# cone gears' blanks (cone_gear_spec.BLANK_DIA_BAND).  The air alone would
-# stay positive to about +/-0.46; the ruling is what sets +/-0.10.
+# The blank tip circles retain the ruled +/-0.10 turning band. The fixed-centre
+# mesh's nonbinding stack, rather than an eccentric fit-up, owns tip/root air.
 OUTSIDE_DIA_TOLERANCE_MM = 0.10
 MESH_C2C_SLACK_MM = _config.fit("crank_mesh")["c2c_slack_mm"]
 TIP_CLEARANCE_MM = 0.157 / DIAMETRAL_PITCH * MM_PER_IN
@@ -213,14 +201,12 @@ PIN_LENGTH = BOSS_DIA  # flush both sides
 PIN_EDGE_TO_SHAFT_END_NOMINAL = 4.5
 PIN_EDGE_MIN_WORST = 2.0
 PIN_STATION_LAYOUT_ALLOWANCE_MM = 0.25
-# The pinion is set on its seat with this feeler between its toothed south
-# face and the v2 post boss's spot face, on top of the spot face's retreat
-# from the 64T (MHA-A03 step 4's feeler stack); the assembly's seat-gap range
-# starts here past the retreat, and it may open to SEAT_GAP_MAX_MM before the
-# pinion is re-set: the W15 pin-wall and recess stacks carry the pinion that
-# far north of its nominal seat on the shaft.
-SEAT_FEELER_MM = 0.25
+# The toothed south face is set directly off the restored MHA-016 north
+# boss face. There is no spot-face retreat or eccentric sleeve in this stack.
+SEAT_FEELER_MM = 0.15
 SEAT_GAP_MAX_MM = 1.0
+PINION_BOSS_NORTH_GAP_RANGE = (SEAT_FEELER_MM, SEAT_GAP_MAX_MM)
+assert PINION_BOSS_NORTH_GAP_RANGE == (0.15, 1.0), "user ruling 2026-09-28"
 # The shaft end stays recessed inside the boss in the worst case too.  The
 # overall length prints at OVERALL_LENGTH_PLACES, so an accepted pinion is as
 # short as the printed row allows (.X +/-0.8).  Nothing else can shallow the
@@ -258,10 +244,17 @@ for _name, _value, _places in (
 # wall alone needed 12.815 (1.23 faces) at the old 0.32 recess; the recess
 # that survives the printed row and an exactly printed shaft adds the rest.
 PIN_STATION = FACE_WIDTH + BOSS_LENGTH / 2.0  # 17.65 from the toothed (south) face
-# = build_drive_train_assembly.PINION_SEED_DEG at the R1 nominal fit-up axis,
-# window-centred at the exact-solid window measured there (MESH_WINDOW_CENTRE_DEG
-# -1.24; dt-logs/crankhub/crank-mesh-R1-fitaxis-20260926.jsonl).
-PIN_CLOCKING_DEG = 18.15033786449369
+assert OVERALL_LENGTH == 24.9, "user ruling 2026-09-28"
+assert BOSS_LENGTH == 14.5, "user ruling 2026-09-28"
+assert PIN_STATION == 17.65, "user ruling 2026-09-28"
+assert abs(SHAFT_END_RECESS_MIN - 1.05) < 1e-9, "user ruling 2026-09-28"
+assert abs(SHAFT_END_RECESS_MAX - 1.15) < 1e-9, "user ruling 2026-09-28"
+# The fixed-axis seed with the 6.5-mm 64T face; the offline nine-phase
+# exact-solid study found a common free offset interval -2.775957..-0.205645
+# degrees. The assembly selects -1.49 degrees and independently checks this
+# physical retention-hole clocking against its mesh seed at import.
+PIN_CLOCKING_DEG = 12.576430992160178
+assert abs(PIN_CLOCKING_DEG - 12.576430992160178) < 1e-12, "user ruling 2026-09-28"
 if PIN_STATION - PIN_DIA / 2.0 < FACE_WIDTH + 0.5:
     raise AssertionError("retention pin hole breaks into the pinion's tooth face")
 if PIN_STATION + PIN_DIA / 2.0 > OVERALL_LENGTH - 0.5:
