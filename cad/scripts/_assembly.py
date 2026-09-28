@@ -2267,19 +2267,26 @@ async def save_assembly_and_images(
     *,
     native_contact_check: Callable[[Any, str], None] | None = None,
     solved_gates: Callable[[Any], None] | None = None,
+    dof_manifest: bool = False,
 ) -> dict[str, str]:
     """Save the assembly to ``cad/out/sldasm`` and PNG views to ``cad/out/png``.
 
     ``solved_gates`` runs right after the final deep rebuild, before any other
     gate reads the model: a builder whose own gates need a fully solved model
     (``resolve=False``) certifies the exact state being saved there, instead of
-    paying a second deep rebuild of its own before the last mutation."""
+    paying a second deep rebuild of its own before the last mutation (see
+    :func:`_run_solved_gates`).
+
+    ``dof_manifest`` publishes the recorded free-DOF manifest only once the
+    assembly it describes is saved and fingerprinted; the previous manifest is
+    retired with the previous mass-property proof, so a failed build never
+    leaves a manifest beside an assembly it does not describe."""
     if asm_name in ("channel", "summing") and native_contact_check is None:
         raise ValueError(f"{asm_name} assembly requires native_contact_check")
     # Establish a clean solved state for the health and pose gates.
     final_rebuild_before_save(adapter, asm_name)
     if solved_gates is not None:
-        solved_gates(adapter)
+        _run_solved_gates(adapter, asm_name, solved_gates)
     # Fail fast: never save a broken assembly. Catches mate errors (e.g. a gear
     # mate whose entity went suppressed = the silent drive-train corruption) that
     # the DOF and interference gates miss -- a fixed/grounded component passes
@@ -2301,6 +2308,8 @@ async def save_assembly_and_images(
     # A full build replaces the assembly bytes. Strictly retire proof for the
     # previous bytes before replacement; an unlink failure aborts the save.
     _invalidate_massprops_proof(sidecar)
+    if dof_manifest:
+        dof_manifest_path(asm_name).unlink(missing_ok=True)
     # Save on isometric so the .SLDASM opens isometric; runs AFTER any
     # remap_front_to_machine_front (which re-bases the standard views) so the
     # re-based Front/Back/etc. used by the gallery stay correct.
@@ -2330,7 +2339,45 @@ async def save_assembly_and_images(
     digest = await assembly_geometry_digest(adapter, asm_name)
     sidecar.parent.mkdir(parents=True, exist_ok=True)
     sidecar.write_text(digest + "\n", encoding="utf-8")
+    if dof_manifest:
+        write_dof_manifest(asm_name)
     return artefacts
+
+
+def _run_solved_gates(
+    adapter: Any, label: str, gates: Callable[[Any], None]
+) -> None:
+    """Run builder gates on the model ``final_rebuild_before_save`` just solved.
+
+    They must certify the state that is SAVED: the collapsed working model (an
+    exploded presentation moves components off their operational poses), and a
+    solve state no later rebuild replaces. A gate that dirties the solve state
+    would otherwise hand ``rebuild_if_needed_before_save`` a deep rebuild AFTER
+    certification, so a dirty model is re-solved and every gate re-run on the
+    result; still dirty after that, the save is refused.
+    """
+    model = adapter.currentModel
+    with _telemetry.span("assembly.solved_gates", asm=label) as sp:
+        exploded = _early_bound(model, "IModelDoc2").IsExploded()
+        if exploded is None or bool(exploded):
+            raise RuntimeError(
+                f"{label}: solved gates need the collapsed working model, "
+                f"IsExploded() returned {exploded!r}"
+            )
+        gates(adapter)
+        status = saved_rebuild_status(adapter, model)
+        sp.set_attribute("post_gate_rebuild", status != 0)
+        if status == 0:
+            return
+        _telemetry.event("assembly.solved_gates_dirtied", asm=label, status=status)
+        final_rebuild_before_save(adapter, label, model)
+        gates(adapter)
+        status = saved_rebuild_status(adapter, model)
+        if status != 0:
+            raise RuntimeError(
+                f"{label}: solved gates leave NeedsRebuild2={status} even on a "
+                "re-solved model; refusing to save a state they did not certify"
+            )
 
 
 @_telemetry.traced("assembly.save_copy")

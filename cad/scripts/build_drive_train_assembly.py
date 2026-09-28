@@ -216,7 +216,6 @@ from _assembly import (
     save_assembly_and_images,
     suspend_automatic_assembly_rebuilds,
     whats_wrong,
-    write_dof_manifest,
 )
 from _assembly_couplings import (
     gear_mate,
@@ -5773,7 +5772,9 @@ async def build(adapter) -> dict[str, str]:
     # and the 64T clearance are read on the identical mate system and poses,
     # which is also exactly the state being saved. Soundness reads the same
     # gate on the saved (exploded-and-collapsed) model after one shared
-    # rebuild, also ``resolve=False``.
+    # rebuild, also ``resolve=False``. The DOF manifest (the recorded free-DOF
+    # specs) is published by the save only after the assembly it describes is
+    # saved and fingerprinted.
     def _certify_as_built(solved_adapter) -> None:
         assert_free_dof_necessity(
             solved_adapter,
@@ -5786,7 +5787,6 @@ async def build(adapter) -> dict[str, str]:
                 "pinion-lift-rod",
             ),
         )
-        write_dof_manifest(ASM_NAME)
         check_no_interference(
             solved_adapter,
             allowed_pairs=allowed_interference_pairs(ASM_NAME),
@@ -5819,7 +5819,7 @@ async def build(adapter) -> dict[str, str]:
     _require_collar_pin_in_collar_hole(adapter, collar_pin, arbor_collar)
     create_drive_train_explode(adapter, {collar_pin: COLLAR_PIN_ROLE})
     return await save_assembly_and_images(
-        adapter, ASM_NAME, solved_gates=_certify_as_built
+        adapter, ASM_NAME, solved_gates=_certify_as_built, dof_manifest=True
     )
 
 
