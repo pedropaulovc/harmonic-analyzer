@@ -1956,6 +1956,7 @@ _LEADER_STRAIGHT = 1  # swLeaderStyle_e.swSTRAIGHT
 
 
 _OWNER_DRAWING_VIEW = 0  # swAnnotationOwner_e.swAnnotationOwner_DrawingView
+_OWNER_DRAWING_SHEET = 1  # swAnnotationOwner_e.swAnnotationOwner_DrawingSheet
 
 
 @_telemetry.traced("drawing.leader_note", label_param="label")
@@ -5538,7 +5539,7 @@ def _gdt_element(
     )
 
 
-def _iter_view_annotations(adapter: Any, view: Any):
+def _iter_view_annotations(adapter: Any, view: Any, *, sheet_notes_only: bool = False):
     """Yield ``(LayoutElement, annotation)`` for each note / GD&T symbol / dimension.
 
     ``IView.GetAnnotations`` returns dimensions, center marks, cosmetic-thread
@@ -5551,6 +5552,12 @@ def _iter_view_annotations(adapter: Any, view: Any):
     (see :func:`_leader_segments_of`) without a second COM walk. A DISPLAY
     DIMENSION yields ``None`` for its element: it gets no box here (see
     ``_ANNOT_DIM``), only its leaders.
+
+    ``sheet_notes_only`` is the SHEET view's walk: only notes the drawing
+    sheet itself owns (``swAnnotationOwner_DrawingSheet``) are boxed. The sheet
+    view also returns the template's notes -- the title block and sheet format,
+    40 on a B sheet -- and a view's; their type and owner are read first, so
+    none of them costs a note box (six COM reads each) only to be dropped.
     """
     annotations = (
         adapter._attempt(lambda: adapter._get_attr_or_call(view, "GetAnnotations"))
@@ -5567,6 +5574,18 @@ def _iter_view_annotations(adapter: Any, view: Any):
             "GetLeaderCount",
         )
         kind = int(adapter._get_attr_or_call(annotation, "GetType") or 0)
+        if sheet_notes_only and (
+            kind != _ANNOT_NOTE
+            or int(
+                adapter._attempt(
+                    lambda a=annotation: adapter._get_attr_or_call(a, "OwnerType"),
+                    default=-1,
+                )
+                or -1
+            )
+            != _OWNER_DRAWING_SHEET
+        ):
+            continue
         name = str(adapter._get_attr_or_call(annotation, "GetName") or "")
         if kind == _ANNOT_NOTE:
             element = _note_element(adapter, annotation, name)
@@ -5956,18 +5975,9 @@ def collect_layout_elements(
     if sheet_view is not None:
         for table in _iter_tables(adapter, sheet_view):
             tables[table.label] = table
-        for element, annotation in _iter_view_annotations(adapter, sheet_view):
-            if element is None or element.kind != "note":
-                continue
-            owner_type = int(
-                adapter._attempt(
-                    lambda a=annotation: adapter._get_attr_or_call(a, "OwnerType"),
-                    default=-1,
-                )
-                or -1
-            )
-            if owner_type != 1:  # swAnnotationOwner_DrawingSheet
-                continue
+        for element, annotation in _iter_view_annotations(
+            adapter, sheet_view, sheet_notes_only=True
+        ):
             element = replace(element, owner="sheet")
             elements.append(element)
             leaders.extend(
