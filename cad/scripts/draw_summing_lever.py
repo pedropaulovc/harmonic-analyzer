@@ -150,7 +150,13 @@ FRONT_KEEP = {
     "CylDia": (0.145, 0.260),
 }
 TOP_KEEP = {
-    "PlateWidth": (0.300, 0.160),
+    # Below the plate end, its witness lines 14 mm long: at 0.160 they ran
+    # from the end up past every hole, boxing the column's right side (the
+    # 20X callout's leader had to cross one). The line prints 2.8 mm under
+    # the keep, at 0.0785: 2.9 mm under datum B's box, 2.3 mm over the 39.85
+    # text (whose line, with 76.20's, dropped to 0.0695 for that), and the
+    # text sits right of the span, clear of B.
+    "PlateWidth": (0.266, 0.0813),
     "PlateLength": (0.395, TOP_CENTER[1]),
     "AnchorOuterDia": (0.145, 0.175),
 }
@@ -279,7 +285,7 @@ async def build(adapter: Any) -> dict[str, str]:
         top,
         p0=ridge_dim_edge,
         p1=anchor_tap_bottom,
-        text_xy=(0.216, 0.075),
+        text_xy=(0.216, 0.0723),
         label="anchor tap X location",
         orientation="horizontal",
     )
@@ -316,7 +322,7 @@ async def build(adapter: Any) -> dict[str, str]:
         top,
         p0=ridge_dim_edge,
         p1=seed_rim_right,
-        text_xy=(0.248, 0.075),
+        text_xy=(0.248, 0.0723),
         label="spring-hole row X",
         orientation="horizontal",
     )
@@ -362,9 +368,9 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_basic_dimension(adapter, pitch, label="spring-hole pitch")
     # The 20X callout hangs on the middle hole, text in the open field right
-    # of the column (0.100..0.185 there holds nothing; the 44.45 lines are
-    # at 0.19). Every callout on the end hole had to leave it downward and so
-    # crossed the plate-end extension lines of 152.40 and the start-Z
+    # of the column: with 44.45 below the plate end, 0.100..0.185 there
+    # holds nothing. Every callout on the end hole had to leave it downward
+    # and so crossed the plate-end extension lines of 152.40 and the start-Z
     # dimension -- steepening the leader only traded that for text-on-line
     # and arrow-near-text against the 39.85 arrowhead and the start-Z
     # overshoot (runs 20260928T130915425Z, ...131249806Z, ...131507773Z).
@@ -383,13 +389,11 @@ async def build(adapter: Any) -> dict[str, str]:
         label="spring-hole middle",
     )
     # The Top view reverses model Z, so -HOLE_Z_FIRST prints the seed hole at
-    # the TOP of the column. Every lower hole is boxed in by the 44.45
-    # extension/dimension lines (the old leader crossed 44.45, 3.35 and 7.06 --
-    # layout audit). The frame sits above the +Z trunnion stub with its right
-    # stub ending over the rim, so the leader drops vertically through the
-    # 1.5 mm gap between the flange end and datum A's tag and runs only ~5 mm
-    # over the plate (the diagonal from 0.175 crossed the stub and flange:
-    # leader-over-part, 24 mm).
+    # the TOP of the column. The frame sits above the +Z trunnion stub with
+    # its right stub ending over the rim, so the leader drops vertically
+    # through the 1.5 mm gap between the flange end and datum A's tag and runs
+    # only ~5 mm over the plate (the diagonal from 0.175 crossed the stub and
+    # flange: leader-over-part, 24 mm).
     seed_rim_left = _top_xy(HOLE_X - HOLE_DIA / 2.0, -HOLE_Z_FIRST)
     add_feature_control_frame(
         adapter,
