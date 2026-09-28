@@ -58,7 +58,7 @@ import time
 from collections.abc import Awaitable, Callable, Iterable, Iterator, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from types import MappingProxyType
+from types import MappingProxyType, SimpleNamespace
 from typing import Any, Literal
 
 import _telemetry  # observability spine: console logging + tracing, preconfigured
@@ -425,16 +425,14 @@ class SketchDims:
         from the document's top-level feature walk. Callers that already hold
         the subfeature use this path; ordinary sketches keep :meth:`apply`.
         """
-        actual = len(list(_display_dimensions(feature, feature_name)))
-        if actual != len(self._rows):
+        dims = list(_display_dimensions(feature, feature_name))
+        if len(dims) != len(self._rows):
             raise RuntimeError(
                 f"{feature_name}: recorded {len(self._rows)} dims but the feature "
-                f"has {actual} -- a define_* helper's dim emission drifted from "
+                f"has {len(dims)} -- a define_* helper's dim emission drifted from "
                 "what it recorded into SketchDims"
             )
-        _name_dimensions_feature(
-            feature, feature_name, [name for name, _ in self._rows]
-        )
+        _rename_dimensions(dims, feature_name, [name for name, _ in self._rows])
         return [
             (f"{name}@{feature_name}", drive)
             for name, drive in self._rows
@@ -860,34 +858,29 @@ def feature_name_by_type(adapter: Any, type_name: str) -> str:
     """Return the name of the last feature whose GetTypeName2 matches.
 
     Recovers features whose creator call returns None on success (e.g. the
-    raw-COM ``InsertHelix`` stopgap used until Phase 3 lands), by walking the
-    feature tree with method flagging.
+    raw-COM ``InsertHelix`` stopgap used until Phase 3 lands). Searches from
+    the newest feature back over raw dispatches (see
+    :func:`_iter_features_newest_first`), so finding the sketch or helix just
+    made costs a step or two rather than a wrapped walk of the whole tree.
     """
-    from solidworks_mcp.adapters import sw_type_info
 
-    model = sw_type_info.early_bound_or_flag(
-        adapter.currentModel, "IModelDoc2", "FirstFeature"
-    )
-    found = ""
-    feat = _read_member(model, "FirstFeature")
-    for _ in range(5000):
-        if not feat:
-            break
-        # Flag only the two methods the walk calls (the c992057 pattern):
-        # full IFeature flagging is a GetIDsOfNames round-trip per method
-        # name per feature, uncached across walks (fresh CDispatch each
-        # GetNextFeature), which taxed every extrude_at_offset with an
-        # O(features) flag storm. GetTypeName2 must stay method-dispatched
-        # or the comparison below silently never matches.
-        feat = sw_type_info.early_bound_or_flag(
-            feat, "IFeature", "GetTypeName2", "GetNextFeature"
-        )
+    def matches(feat: Any) -> bool:
         try:
-            if _read_member(feat, "GetTypeName2") == type_name:
-                found = str(_read_member(feat, "Name"))
+            return _com_invoke(feat, "IFeature", "GetTypeName2") == type_name
         except Exception:
-            pass
-        feat = _read_member(feat, "GetNextFeature")
+            return False
+
+    answered = False
+    for feat in _iter_features_newest_first(adapter):
+        answered = True
+        if matches(feat):
+            return str(_com_invoke(feat, "IFeature", "Name"))
+    if answered:
+        return ""
+    found = ""
+    for feat in _iter_features(adapter):
+        if matches(feat):
+            found = str(_com_invoke(feat, "IFeature", "Name"))
     return found
 
 
@@ -2265,6 +2258,97 @@ def _early_bound(obj: Any, interface: str) -> Any:
     )
 
 
+class _RecordedInvoke:
+    """Stands in for a raw dispatch, so a generated member hands over its call."""
+
+    def __init__(self) -> None:
+        self.args: tuple[Any, ...] = ()
+
+    def InvokeTypes(self, *args: Any) -> None:
+        self.args = args
+
+    def Invoke(self, *args: Any) -> None:  # a generated property put
+        self.args = args
+
+
+_COM_HEADERS: dict[tuple[str, str], tuple[Any, ...]] = {}
+
+
+def _com_header(interface: str, member: str) -> tuple[Any, ...]:
+    """The ``(dispid, lcid, flags, return type, arg types)`` that ``interface``'s
+    generated wrapper sends for ``member``, recorded once per process.
+
+    The numbers come from the type-library wrapper, never from a hand-written
+    dispid, and recording them makes no COM call: the wrapper is built on a
+    stand-in that keeps the call instead of sending it."""
+    key = (interface, member)
+    header = _COM_HEADERS.get(key)
+    if header is None:
+        recorded = _RecordedInvoke()
+        wrapper = _early_bound(SimpleNamespace(_oleobj_=recorded), interface)
+        value = getattr(wrapper, member)  # a property sends its call here
+        if callable(value):
+            value()  # every generated parameter has a placeholder default
+        if len(recorded.args) < 5:
+            raise RuntimeError(f"{interface}.{member}: the wrapper sent no call")
+        header = _COM_HEADERS[key] = recorded.args[:5]
+    return header
+
+
+def _com_invoke(obj: Any, interface: str, member: str, *args: Any) -> Any:
+    """Call ``interface.member`` on ``obj``'s RAW dispatch by dispid.
+
+    One round trip, and an object result stays a raw ``PyIDispatch``. A
+    generated wrapper instead wraps every object it returns from a method
+    typed ``object`` (``FirstFeature``, ``GetNextFeature``,
+    ``GetFirstSubFeature``, ``GetNextDisplayDimension``, …): pywin32 reads the
+    element's type info (``GetTypeInfo``, ``GetTypeAttr``) and the generated
+    class runs a ``QueryInterface`` in its constructor -- three extra round
+    trips of ~7 ms on a farm seat for each object a walk merely steps over.
+    Walk raw, then :func:`_bind` only the object a caller keeps.
+
+    A test double (no ``InvokeTypes``) answers through its plain Python
+    members, as :func:`_read_member` reads it."""
+    raw = getattr(obj, "_oleobj_", obj)
+    invoke = getattr(raw, "InvokeTypes", None)
+    if invoke is None:
+        value = getattr(obj, member)
+        return value(*args) if callable(value) else value
+    return invoke(*_com_header(interface, member), *args)
+
+
+def _com_put(obj: Any, interface: str, member: str, value: Any) -> None:
+    """Set property ``interface.member`` on ``obj``'s RAW dispatch: the one
+    ``Invoke`` the generated wrapper's setter sends, without binding the
+    object first (a :func:`_bind` is a ``QueryInterface`` round trip).
+    A test double is set as a plain attribute."""
+    raw = getattr(obj, "_oleobj_", obj)
+    invoke = getattr(raw, "Invoke", None)
+    if invoke is None or not hasattr(raw, "InvokeTypes"):
+        setattr(obj, member, value)
+        return
+    key = (interface, f"{member}=")
+    header = _COM_HEADERS.get(key)
+    if header is None:
+        recorded = _RecordedInvoke()
+        wrapper = _early_bound(SimpleNamespace(_oleobj_=recorded), interface)
+        setattr(wrapper, member, None)
+        if len(recorded.args) < 5:
+            raise RuntimeError(f"{interface}.{member}: the wrapper sent no put")
+        header = _COM_HEADERS[key] = recorded.args
+    invoke(*header[:4], value, *header[5:])
+
+
+def _bind(raw: Any, interface: str) -> Any:
+    """Early-bind one raw dispatch :func:`_com_invoke` returned (one
+    ``QueryInterface``); ``None``, a wrapper or a test double passes through."""
+    if raw is None or getattr(raw, "_oleobj_", None) is not None:
+        return raw
+    if not hasattr(raw, "InvokeTypes"):
+        return raw
+    return _early_bound(SimpleNamespace(_oleobj_=raw), interface)
+
+
 def _flag_only(obj: Any, *method_names: str) -> None:
     """Flag ONLY the named zero-arg methods on ``obj`` -- not its whole
     interface.
@@ -2311,42 +2395,77 @@ def _flag_only(obj: Any, *method_names: str) -> None:
 
 
 def _iter_features(adapter: Any):
-    """Yield every top-level feature of the active doc in tree order.
+    """Yield every top-level feature of the active doc in tree order, as RAW
+    dispatches (:func:`_com_invoke`): :func:`_bind` the one you keep.
 
-    No in-place method flagging here: this walks the SHARED
+    Raw, because the generated ``FirstFeature``/``GetNextFeature`` wrap every
+    feature they step over (three extra round trips each, ~30 ms a feature on
+    a farm seat). No in-place method flagging either: this walks the SHARED
     ``adapter.currentModel``, and ``_FlagAsMethod`` mutates that instance in
-    place.  A generated early-bound wrapper supplies the DISPIDs without
-    touching the adapter-owned dispatch. Flipping ``FirstFeature`` /
-    ``GetNextFeature`` to method dispatch would break the adapter's OWN bare
-    property reads -- its ``create_cut_extrude`` walks ``FirstFeature`` as a
-    property to find the profile to cut, and a flagged model silently yields no
-    profile (``FeatureCut3 ... Parameter not optional``). ``_read_member`` reads
-    these accessors property-style whether or not they are flagged."""
+    place -- flipping ``FirstFeature`` to method dispatch would break the
+    adapter's OWN bare property reads (its ``create_cut_extrude`` walks
+    ``FirstFeature`` as a property to find the profile to cut)."""
     model = _early_bound(adapter.currentModel, "IModelDoc2")
-    feat = _read_member(model, "FirstFeature")
+    feat = _com_invoke(model, "IModelDoc2", "FirstFeature")
     for _ in range(5000):
-        if not feat:
+        if feat is None:
             return
-        feat = _early_bound(feat, "IFeature")
         yield feat
-        feat = _read_member(feat, "GetNextFeature")
+        feat = _com_invoke(feat, "IFeature", "GetNextFeature")
+
+
+def _iter_features_newest_first(adapter: Any):
+    """Top-level features newest first, as RAW dispatches; stops early (and
+    callers fall back to :func:`_iter_features`) if the seat will not answer.
+
+    ``IModelDoc2.FeatureByPositionReverse(n)`` counts back from the end of the
+    same model-definition order ``FirstFeature``/``GetNextFeature`` walk (the
+    API reference says so for all three), one round trip per step. The
+    features a build looks up are the ones it just made, so a search from the
+    newest end stops after a step or two instead of walking the whole tree:
+    the forward walk cost 0.9 s per rename at p50 and 2 s on harmonic_base."""
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    for position in range(5000):
+        try:
+            feat = _com_invoke(
+                model, "IModelDoc2", "FeatureByPositionReverse", position
+            )
+        except Exception:
+            return
+        if feat is None:
+            return
+        yield feat
 
 
 def _last_feature(adapter: Any) -> Any:
     """The most-recently created top-level feature: a just-exited sketch, or the
-    boss/cut that just consumed it."""
+    boss/cut that just consumed it -- the LAST one the forward walk reaches.
+
+    ``FeatureByPositionReverse(0)`` is that feature when it has no next
+    feature (checked: one more round trip); otherwise the forward walk
+    decides, and the disagreement is logged."""
+    candidate = next(iter(_iter_features_newest_first(adapter)), None)
+    if candidate is not None and (
+        _com_invoke(candidate, "IFeature", "GetNextFeature") is None
+    ):
+        return _bind(candidate, "IFeature")
     last = None
     for feat in _iter_features(adapter):
         last = feat
     if last is None:
         raise RuntimeError("name_last_feature: the active document has no features")
-    return last
+    if candidate is not None:
+        _telemetry.event("feature.reverse_order_mismatch", member="last")
+    return _bind(last, "IFeature")
 
 
 def _feature_by_name(adapter: Any, name: str) -> Any:
-    for feat in _iter_features(adapter):
-        if str(_read_member(feat, "Name")) == name:
-            return feat
+    """The top-level feature called ``name`` (feature names are unique, so the
+    newest-first search and the forward walk can only find the same one)."""
+    for walk in (_iter_features_newest_first, _iter_features):
+        for feat in walk(adapter):
+            if str(_com_invoke(feat, "IFeature", "Name")) == name:
+                return _bind(feat, "IFeature")
     raise RuntimeError(f"feature {name!r} not found in the active document")
 
 
@@ -2362,8 +2481,8 @@ def name_last_feature(adapter: Any, name: str) -> str:
 
 
 def _display_dimensions(feat: Any, owner: str | None = None):
-    """Yield the IDimension of each display dimension of ``feat``, in
-    creation order.
+    """Yield the RAW IDimension (:func:`_com_invoke`) of each display dimension
+    of ``feat``, in creation order; :func:`_bind` one before writing to it.
 
     ``owner`` filters to dims whose ``FullName`` names that feature as the
     owning one (the middle ``@`` segment). A sketch created on a REFERENCE
@@ -2372,37 +2491,37 @@ def _display_dimensions(feat: Any, owner: str | None = None):
     recorded-count guard -- proven live on cone-pivot-screw's HeadTop driver
     slot. Pass the feature's (post-rename) name to see only its own dims.
 
-    No in-place method flagging -- generated early-bound wrappers provide the
-    DISPIDs without mutating the gen_py type-shared dispatch repr. Flagging one
-    ``IFeature`` instance flips ``GetTypeName2``
-    to method dispatch on EVERY ``IFeature`` wrapper, including the fresh ones
-    the adapter's ``create_cut_extrude`` walk reads as bare properties (the
-    "Parameter not optional" cut failure). The adapter itself calls arg-taking
-    IFeature methods unflagged (``pf.Select2(...)`` in that same walk), so the
-    arg-taking ``GetNextDisplayDimension`` / ``GetDimension2`` need no flag, and
-    the zero-arg ``GetFirstDisplayDimension`` resolves to its value via
-    ``_read_member``."""
-    feat = _early_bound(feat, "IFeature")
-    disp = _read_member(feat, "GetFirstDisplayDimension")
-    for _ in range(1000):
-        if not disp:
-            return
-        disp = _early_bound(disp, "IDisplayDimension")
-        idim = _early_bound(disp.GetDimension2(0), "IDimension")
+    No in-place method flagging: flagging one ``IFeature`` instance flips
+    ``GetTypeName2`` to method dispatch on EVERY ``IFeature`` wrapper,
+    including the fresh ones the adapter's ``create_cut_extrude`` walk reads
+    as bare properties (the "Parameter not optional" cut failure). Raw calls
+    by the generated wrapper's dispid touch no shared wrapper at all."""
+    for disp in _feature_display_dimensions(feat):
+        idim = _com_invoke(disp, "IDisplayDimension", "GetDimension2", 0)
         if owner is None or _dim_owner_feature(idim) == owner:
             yield idim
-        disp = feat.GetNextDisplayDimension(disp)
+
+
+def _feature_display_dimensions(feat: Any):
+    """Yield each display dimension of ``feat`` as a RAW dispatch
+    (:func:`_com_invoke`), one round trip per step."""
+    disp = _com_invoke(feat, "IFeature", "GetFirstDisplayDimension")
+    for _ in range(1000):
+        if disp is None:
+            return
+        yield disp
+        disp = _com_invoke(feat, "IFeature", "GetNextDisplayDimension", disp)
 
 
 def _dim_owner_feature(idim: Any) -> str:
     """The owning feature's name from a dim's ``FullName`` (``D1@Sketch1@Part``)."""
-    parts = str(_read_member(idim, "FullName")).split("@")
+    parts = str(_com_invoke(idim, "IDimension", "FullName")).split("@")
     return parts[1] if len(parts) > 1 else ""
 
 
 def _dim_value_mm(idim: Any) -> float:
     try:
-        return float(_read_member(idim, "SystemValue")) * 1000.0
+        return float(_com_invoke(idim, "IDimension", "SystemValue")) * 1000.0
     except Exception:
         return float("nan")
 
@@ -2416,7 +2535,7 @@ def dump_dimensions(adapter: Any, feature_name: str) -> list[dict[str, Any]]:
     feat = _feature_by_name(adapter, feature_name)
     rows: list[dict[str, Any]] = []
     for i, idim in enumerate(_display_dimensions(feat)):
-        full = str(_read_member(idim, "FullName"))
+        full = str(_com_invoke(idim, "IDimension", "FullName"))
         val = _dim_value_mm(idim)
         rows.append({"index": i, "full_name": full, "value_mm": val})
         _telemetry.debug(f"dim[{i}] {full} = {val:.4g} mm")
@@ -2434,14 +2553,14 @@ def name_dimensions(
     sketch's dimensioning ever changes, cross-check against
     :func:`dump_dimensions`. Returns the new ``leaf@feature`` names."""
     feat = _feature_by_name(adapter, feature_name)
-    return _name_dimensions_feature(feat, feature_name, names)
-
-
-def _name_dimensions_feature(
-    feat: Any, feature_name: str, names: list[str | None]
-) -> list[str]:
-    """Rename dimensions on an already-resolved feature dispatch."""
     dims = list(_display_dimensions(feat, feature_name))
+    return _rename_dimensions(dims, feature_name, names)
+
+
+def _rename_dimensions(
+    dims: list[Any], feature_name: str, names: list[str | None]
+) -> list[str]:
+    """Rename ``feature_name``'s already-listed dims (``_display_dimensions``)."""
     if len(names) > len(dims):
         raise RuntimeError(
             f"name_dimensions {feature_name}: {len(names)} names for "
@@ -2449,12 +2568,12 @@ def _name_dimensions_feature(
         )
     out: list[str] = []
     for idim, new in zip(dims, names, strict=False):
-        old = str(_read_member(idim, "FullName"))
+        old = str(_com_invoke(idim, "IDimension", "FullName"))
         val = _dim_value_mm(idim)
         if new is None:
             _telemetry.info(f"dim {old} = {val:.4g} mm (kept)")
             continue
-        idim.Name = new
+        _bind(idim, "IDimension").Name = new
         out.append(f"{new}@{feature_name}")
         _telemetry.success(f"dim {old} = {val:.4g} mm -> {new}@{feature_name}")
     return out

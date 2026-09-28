@@ -96,7 +96,10 @@ for _stream in (sys.stdout, sys.stderr):
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "cad" / "scripts"))
 
+# ``_resolved`` is the graph's per-process ``Path.resolve()`` memo (dropped by
+# ``clear_import_caches``); dodo's per-task path plumbing shares it.
 from _buildgraph import (  # noqa: E402
+    _resolved,
     ASSEMBLY_ORDER,
     CAD_OUT,
     POST_ASSEMBLY,
@@ -119,6 +122,7 @@ from _buildgraph import (  # noqa: E402
     part_scripts,
     part_stems,
     parts_registry_files,
+    read_source,
     reads_title_block_geometry,
     references_of,
     script_for,
@@ -503,11 +507,11 @@ DOIT_CONFIG = {
 
 
 def _sldprt(stem: str) -> str:
-    return str(artefact_for(SCRIPTS_DIR / f"build_{stem}.py").resolve())
+    return str(_resolved(artefact_for(SCRIPTS_DIR / f"build_{stem}.py")))
 
 
 def _sldasm(stem: str) -> str:
-    return str(artefact_for(SCRIPTS_DIR / f"build_{stem}_assembly.py").resolve())
+    return str(_resolved(artefact_for(SCRIPTS_DIR / f"build_{stem}_assembly.py")))
 
 
 def _part_execution_token(stem: str) -> str:
@@ -521,7 +525,7 @@ def _part_execution_token(stem: str) -> str:
     that recipe gets a different token and correctly invalidates its drawings.
     """
     name = stem.replace("_", "-")
-    return str((CAD_OUT / "sldprt" / f".{name}.execution").resolve())
+    return str(_resolved(CAD_OUT / "sldprt" / f".{name}.execution"))
 
 
 def _assembly_execution_token(stem: str) -> str:
@@ -533,7 +537,7 @@ def _assembly_execution_token(stem: str) -> str:
     was saved against another SolidWorks identity (issue #301).
     """
     name = stem.replace("_", "-")
-    return str((CAD_OUT / "sldasm" / f".{name}.execution").resolve())
+    return str(_resolved(CAD_OUT / "sldasm" / f".{name}.execution"))
 
 
 def _stamp_execution(artefact: str, token_path: str) -> None:
@@ -1026,7 +1030,7 @@ def _expand_parts_token(stem: str | None, kind: str | None, script: Path) -> lis
         files: set[str] = set()
         defaults = CONFIG_DIR / "parts" / "_defaults.yaml"
         if defaults.exists():
-            files.add(str(defaults.resolve()))
+            files.add(str(_resolved(defaults)))
         for ref in references_of(stem):
             files.update(part_row_files(ref.replace("_", "-")))
         return sorted(files)
@@ -1047,7 +1051,7 @@ def _expand_title_block_token(kind: str | None, script: Path) -> list[str]:
         and not reads_title_block_geometry(script)
     ):
         return []
-    return [str((CONFIG_DIR / "title_block.yaml").resolve())]
+    return [str(_resolved(CONFIG_DIR / "title_block.yaml"))]
 
 
 def _expand_assembly_contracts_token(stem: str | None, kind: str | None) -> list[str]:
@@ -1084,7 +1088,7 @@ def _config_deps(script, stem: str | None = None, kind: str | None = None) -> li
         elif tok == ASSEMBLY_CONTRACTS_TOKEN:
             out.update(_expand_assembly_contracts_token(stem, kind))
         else:
-            out.add(str((CONFIG_DIR / tok).resolve()))
+            out.add(str(_resolved(CONFIG_DIR / tok)))
     return sorted(out)
 
 
@@ -1374,7 +1378,7 @@ def _rel_tag(f: str) -> str:
     assembly's key per checkout path and silently defeat cross-machine hits.
     Falls back to the basename for a path outside the repo (none today; defensive)."""
     try:
-        return Path(f).resolve().relative_to(REPO_ROOT).as_posix()
+        return _resolved(Path(f)).relative_to(REPO_ROOT).as_posix()
     except ValueError:
         return os.path.basename(f)
 
@@ -1511,7 +1515,7 @@ def _submodule_rel_tag(f: Path) -> str | None:
     file against the exclusion sets, or None if it's outside the package tree. Matching
     on this tag keeps the classification identical across checkout roots / REPO_ROOT."""
     try:
-        return f.resolve().relative_to(SUBMODULE_SRC.resolve()).as_posix()
+        return _resolved(f).relative_to(_resolved(SUBMODULE_SRC)).as_posix()
     except ValueError:
         return None
 
@@ -1745,7 +1749,7 @@ def _narrow_fastener_catalog(
         {Path(dep) for dep in deps if dep.endswith(".py")} - {_FASTENER_CATALOG}
     )
     selected = fastener_rows_selected(
-        tuple(path.read_text(encoding="utf-8") for path in consumers), own_row, rows
+        tuple(read_source(path) for path in consumers), own_row, rows
     )
     if selected is None:
         return deps
@@ -1800,16 +1804,16 @@ def _drawing_file_deps(stem: str) -> list[str]:
     from hitting against a same-recipe part with different IDs.
     """
     spec = DRAWINGS_BY_NAME[stem]
-    script = spec.script.resolve()
+    script = _resolved(spec.script)
     # Traverse first: helpers imported BY the registry must remain dependencies.
     runtime = _helper_deps(script)
-    registry = (SCRIPTS_DIR / "_drawing_registry.py").resolve()
+    registry = _resolved(SCRIPTS_DIR / "_drawing_registry.py")
     if str(registry) in runtime:
         consumers = sorted({script, *(Path(path) for path in runtime)} - {registry})
         if drawing_registry_reads_selected(
-            tuple(path.read_text(encoding="utf-8") for path in consumers), stem
+            tuple(read_source(path) for path in consumers), stem
         ):
-            runtime = [path for path in runtime if Path(path).resolve() != registry]
+            runtime = [path for path in runtime if _resolved(Path(path)) != registry]
             runtime.append(_drawing_registry_dep(stem, registry))
     runtime.append(_submodule_dep())
     if spec.source_kind == "assembly":
@@ -1833,7 +1837,7 @@ def _drawing_file_deps(stem: str) -> list[str]:
             # sheet that prints another part's registry number must re-run, and
             # miss the cache, when that row changes without any geometry change.
             *_config_deps(script, spec.part, "drawing"),
-            *(str(path.resolve()) for path in spec.assets),
+            *(str(_resolved(path)) for path in spec.assets),
         }
     )
     return _narrow_fastener_catalog(f"drawing:{stem}", deps, spec.artifact_stem)
@@ -1844,7 +1848,7 @@ def _drawing_cache_outputs(stem: str) -> list[Path]:
     layout-audit report -- which rides the remote cache with the sheet, so a
     restored leaf still carries its findings and sheet dumps."""
     spec = DRAWINGS_BY_NAME[stem]
-    return [path.resolve() for path in (*spec.outputs.values(), spec.layout_report)]
+    return [_resolved(path) for path in (*spec.outputs.values(), spec.layout_report)]
 
 
 # --- Inputs of the whole-machine COM stages (verify gates, preflight, neutral
@@ -2853,10 +2857,17 @@ def task_check():
         SCRIPTS_DIR / "test_pose_manifest.py",
         SCRIPTS_DIR / "test_render_offline.py",
         SCRIPTS_DIR / "test_verify_auto_repair.py",
+        # Builder gates handed to save's final deep rebuild (drive-train) must
+        # read AFTER it, cost no second rebuild, and still block the save.
+        SCRIPTS_DIR / "test_assembly_save_solved_gates.py",
         # The copied-mate safeguard must keep failing CLOSED: an unreadable
         # GetErrorCode2 or a truncated MateGroup scan has to raise/re-walk, never
         # read as "this copy is clean".
         SCRIPTS_DIR / "test_cwm_mate_guard.py",
+        # The DOF gate and geometry digest skip a re-solve on a solved model;
+        # a failed enumeration or a dirty model must still re-solve first, and
+        # the fast mass-property read must keep the adapter's units.
+        SCRIPTS_DIR / "test_assembly_solved_state_reads.py",
         # A missing assembly-manager pair must not certify an overlapping spring.
         SCRIPTS_DIR / "test_native_spring_contact.py",
         SCRIPTS_DIR / "test_settled_spring_seats.py",
@@ -3010,8 +3021,8 @@ def task_check():
     # silently stops enforcing (codex #418). Same failure shape as the
     # never-enrolled contract test above -- a green gate that checks nothing.
     scanned_by_binding_gate = {
-        *(str(path.resolve()) for path in SCRIPTS_DIR.glob("*.py")),
-        *(str(path.resolve()) for path in (SCRIPTS_DIR / "diagnostics").glob("*.py")),
+        *(str(_resolved(path)) for path in SCRIPTS_DIR.glob("*.py")),
+        *(str(_resolved(path)) for path in (SCRIPTS_DIR / "diagnostics").glob("*.py")),
     }
     recipe_test_deps = sorted(
         {

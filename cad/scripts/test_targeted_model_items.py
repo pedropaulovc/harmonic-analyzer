@@ -103,9 +103,13 @@ class FakeDisplayDimension:
 class FakeAnnotation:
     def __init__(self, name: str) -> None:
         self._display = FakeDisplayDimension(name)
+        self.position: tuple[float, float] | None = None
 
     def GetSpecificAnnotation(self):
         return self._display
+
+    def GetPosition(self):
+        return self.position
 
 
 class FakeComponent:
@@ -286,3 +290,64 @@ def test_the_component_qualifier_is_read_back_per_view() -> None:
         "SKETCH",
         True,
     ) in drawing.calls
+
+
+@pytest.mark.parametrize(
+    ("imported", "first_pass_offset", "reason", "passes"),
+    [
+        (("Length",), 0.0, "none", [((), ("Length",))]),
+        (("Length",), 2e-6, "none", [((), ("Length",))]),
+        (("Length",), 0.00063, "drifted", [((), ("Length",)), ((), ("Length",))]),
+        (
+            ("Length", "Extra"),
+            0.0,
+            "deleted",
+            [(("Extra",), ("Length",)), ((), ("Length",))],
+        ),
+    ],
+    ids=["lands-on-point", "sub-tolerance-jitter", "rebuild-drifted", "deleted"],
+)
+def test_kept_dimensions_are_placed_again_only_after_a_delete_or_a_drift(
+    monkeypatch, imported, first_pass_offset, reason, passes
+) -> None:
+    """A delete can shift a survivor its own pass already placed (top_frame
+    Width 6.97 mm on the step-snapshot leaves), and so could the first pass's
+    rebuild on a view nobody snapshotted: either one is followed by a second
+    placement.  A kept dimension that reads back on its point skips it."""
+    calls = []
+    monkeypatch.setattr(
+        drawing_common,
+        "insert_feature_dimensions",
+        lambda adapter, view, features: [
+            (name, FakeAnnotation(name)) for name in imported
+        ],
+    )
+
+    def curate(adapter, annotations, *, delete=(), reposition=None):
+        offset = first_pass_offset if not calls else 0.0
+        calls.append((tuple(delete), tuple(sorted(reposition or {}))))
+        survivors = []
+        for a in annotations:
+            name = drawing_common.dimension_name(adapter, a)
+            if name in delete:
+                continue
+            x, y = (reposition or {})[name]
+            a.position = (x + offset, y)
+            survivors.append(a)
+        return survivors
+
+    recorded: dict[str, object] = {}
+    monkeypatch.setattr(drawing_common, "curate_dimensions", curate)
+    monkeypatch.setattr(
+        drawing_common._telemetry, "annotate", lambda **attrs: recorded.update(attrs)
+    )
+    curated = drawing_common.curate_view_dimensions(
+        FakeAdapter(None),
+        object(),
+        keep={"Length": (0.1, 0.1)},
+        view_label="length",
+        dimensions_by_feature=tube_frame_spec.DRAWING_DIMENSIONS,
+    )
+    assert [a.position for a in curated] == [pytest.approx((0.1, 0.1), abs=1e-5)]
+    assert calls == passes
+    assert recorded["reposition_rerun_reason"] == reason

@@ -8,8 +8,14 @@ uses, and closes a collision/clear bracket to 1e-6 mm. Each clear trial also
 reads the native minimum distance ``d``: a rigid shift shorter than ``d``
 cannot create overlap, so the next probe goes to ``hi - d`` (a few trials to
 converge) and only falls back to the midpoint when that bound makes no
-progress. Trial placements affect only that one component and are always
-restored. No overlap volume is allowed and no clearance margin is ever added.
+progress. When ``d`` reads zero on a pose that is still clear, one probe
+``2 * NATIVE_CONTACT_DISTANCE_TOLERANCE_MM`` below it tries to close the
+bracket at the distance guard's scale before plain bisection takes over. A
+caller that already knows where the boundary sits (an outer search re-seating
+the same pair, a refit aimed at ``-allowance``) passes ``hint_offset_mm``: the
+first interior trials straddle it. Every endpoint is still a native verdict.
+Trial placements affect only that one component and are always restored. No
+overlap volume is allowed and no clearance margin is ever added.
 
 Driven by ``calibrate_spring_seats.py``; never imported by a build script.
 """
@@ -31,6 +37,14 @@ NATIVE_CONTACT_DISTANCE_TOLERANCE_MM = 1e-5
 _POSITION_CONVERGENCE_MM = 1e-6
 _TRANSFORM_READBACK_TOLERANCE = 1e-12
 _MAX_ITERATIONS = 64
+# Hint probes straddle the hint, doubling their step on the side the bracket
+# still needs: 5 probes reach ~12e-6 mm from it (two boolean_stability_mm
+# allowances; the observed re-seat drift is 2.5e-6 mm), then the steered loop
+# takes over whatever bracket they left, so a bad hint costs at most these. The
+# first step is 3/4 of the convergence width so that a straddle at that scale
+# is strictly converged; an exact 1e-6 mm step can round to just above it.
+_HINT_PROBES = 5
+_HINT_FIRST_STEP_MM = 0.75 * _POSITION_CONVERGENCE_MM
 
 
 @dataclass(frozen=True, slots=True)
@@ -91,6 +105,10 @@ class _ActualContact:
         self.direction = direction
         self.label = label
         self.trials = 0
+        # Seconds per native phase, summed over every trial and restoration and
+        # reported on the spring.native_contact span (aggregate, not per-trial
+        # spans): readback, put, update_mates, manager, native, distance.
+        self.seconds: dict[str, float] = {}
         self.components = list(self.asm.GetComponents(True) or [])
         self.names = [
             str(_read_member(component, "Name2")) for component in self.components
@@ -107,7 +125,13 @@ class _ActualContact:
         self.originals = {name: self._transform(name) for name in self.names}
         self.endpoints = (self._shifted(-maximum), self._shifted(maximum))
 
+    def _timed(self, phase: str, started: float) -> None:
+        self.seconds[phase] = self.seconds.get(phase, 0.0) + (
+            time.perf_counter() - started
+        )
+
     def _transform(self, name: str) -> list[float]:
+        started = time.perf_counter()
         component = self.asm.GetComponentByName(name)
         if component is None:
             raise RuntimeError(f"{self.label}: component disappeared: {name}")
@@ -115,6 +139,7 @@ class _ActualContact:
         if transform is None:
             raise RuntimeError(f"{self.label}: transform unavailable: {name}")
         data = [float(value) for value in _read_member(transform, "ArrayData")]
+        self._timed("readback", started)
         if (
             len(data) != 16
             or not all(math.isfinite(value) for value in data)
@@ -154,10 +179,13 @@ class _ActualContact:
             ),
         )
         for transform in (waypoint, target):
+            started = time.perf_counter()
             put_component_pose(self.adapter, self.moving, transform)
+            self._timed("put", started)
             self._assert_pose(self.moving, transform)
 
     def _distance_mm(self) -> float:
+        started = time.perf_counter()
         moving = _early_bound(self.asm.GetComponentByName(self.moving), "IComponent2")
         fixed = _early_bound(self.asm.GetComponentByName(self.fixed), "IComponent2")
         result = self.model.ClosestDistance(moving, fixed)
@@ -166,6 +194,7 @@ class _ActualContact:
                 f"{self.label}: unexpected ClosestDistance result: {result!r}"
             )
         distance_mm = float(result[0]) * 1000.0
+        self._timed("distance", started)
         if not math.isfinite(distance_mm) or distance_mm < 0.0:
             raise RuntimeError(
                 f"{self.label}: native ClosestDistance has no finite solution"
@@ -175,6 +204,7 @@ class _ActualContact:
     def _interference_state(
         self, expected: dict[str, list[float]]
     ) -> Literal["interfering", "clear"]:
+        started = time.perf_counter()
         self.model.ClearSelection2(True)
         self.adapter._attempt(lambda: self.asm.ToolsCheckInterference(), default=None)
         manager = configured_interference_manager(self.adapter)
@@ -190,6 +220,7 @@ class _ActualContact:
                 ]
                 if len(names) == 2 and set(names) == pair:
                     state = "interfering"
+            self._timed("manager", started)
             # Verify immediately after querying as well as after Done. The native
             # detector must not silently reset a trial to its original position.
             self._assert_poses(expected)
@@ -198,7 +229,9 @@ class _ActualContact:
             raise
         finally:
             try:
+                started = time.perf_counter()
                 manager.Done()
+                self._timed("manager", started)
             except BaseException as cleanup:
                 _cleanup_failure(
                     primary, cleanup, f"{self.label}: interference Done failed"
@@ -206,12 +239,14 @@ class _ActualContact:
         self._assert_poses(expected)
         if state == "interfering":
             return state
+        started = time.perf_counter()
         native_result = native_component_interference(
             self.adapter,
             self.moving,
             self.fixed,
             label=self.label,
         )
+        self._timed("native", started)
         self._assert_poses(expected)
         if native_result.state == "interfering":
             details: dict[str, Any] = {
@@ -242,11 +277,13 @@ class _ActualContact:
     def _update_mates(self) -> None:
         # swRebuildOptions_e.swUpdateMates is documented specifically for
         # Transform2 and refreshes placement without rebuilding supplier solids.
+        started = time.perf_counter()
         extension = _early_bound(
             _read_member(self.model, "Extension"), "IModelDocExtension"
         )
         if not extension.Rebuild(4):
             raise RuntimeError(f"{self.label}: native contact mate update failed")
+        self._timed("update_mates", started)
 
     def evaluate(
         self, offset_mm: float
@@ -306,6 +343,7 @@ def solve_component_contact(
     *,
     label: str,
     locate_only: bool = False,
+    hint_offset_mm: float | None = None,
 ) -> ContactSolution:
     """Certify an existing seat or return a proposed clear native contact pose.
 
@@ -323,6 +361,12 @@ def solve_component_contact(
     (disagreement warns); it never decides a state and cannot overrule the
     native bracket. No distance margin is added. Recheck after applying the
     offset.
+
+    ``hint_offset_mm`` is where the caller expects the boundary (the clear
+    offset a previous search of the SAME pair returned, or the ``-allowance``
+    a refit aimed at). It only chooses where the first interior trials land;
+    the bracket endpoints, their native verdicts and the 1e-6 mm convergence
+    are unchanged, so a wrong hint costs at most ``_HINT_PROBES`` trials.
     """
     if len(direction_xyz) != 3 or not all(
         math.isfinite(value) for value in direction_xyz
@@ -336,6 +380,8 @@ def solve_component_contact(
         or not math.isfinite(2.0 * max_translation_mm)
     ):
         raise ValueError("native contact bracket must have finite positive width")
+    if hint_offset_mm is not None and not math.isfinite(hint_offset_mm):
+        raise ValueError("native contact hint must be finite")
     with _telemetry.span("spring.native_contact", label=label) as span:
         started = time.monotonic()
         iterations = 0
@@ -347,6 +393,8 @@ def solve_component_contact(
         span.set_attribute(
             "native_distance_guard_mm", NATIVE_CONTACT_DISTANCE_TOLERANCE_MM
         )
+        if hint_offset_mm is not None:
+            span.set_attribute("hint_offset_mm", hint_offset_mm)
         try:
             pair = _ActualContact(
                 adapter,
@@ -411,6 +459,16 @@ def solve_component_contact(
             steer = True
             previous_clear: tuple[float, float] | None = None
             use_secant = True
+            # Hint phase: straddle the caller's expected boundary before any
+            # distance steering. The first probe lands ON the hint; each later
+            # one steps back across it from the endpoint the last probe set,
+            # doubling while the probes keep landing on the same side.
+            hint_active = hint_offset_mm is not None
+            hint_probes = 0
+            hint_step = _HINT_FIRST_STEP_MM
+            hint_side: str | None = None
+            guard_pending = False
+            guard_state: str | None = None
             while hi - lo > _POSITION_CONVERGENCE_MM:
                 if iterations >= _MAX_ITERATIONS:
                     raise RuntimeError(
@@ -425,12 +483,36 @@ def solve_component_contact(
                 # d is below the convergence width the clear endpoint IS the
                 # contact and one probe a width below it closes the bracket.
                 # Only the native evaluations decide: a landing outside the
-                # bracket falls back to the midpoint, and a closing probe that
-                # comes back clear hands the rest to plain bisection.
+                # bracket falls back to the midpoint. A closing probe that comes
+                # back clear means d under-reported the gap; ClosestDistance is
+                # trusted to NATIVE_CONTACT_DISTANCE_TOLERANCE_MM (the guard the
+                # gate applies), so one probe twice that below the clear
+                # endpoint tries to close the bracket at the guard's scale
+                # before plain bisection finishes it.
                 candidate = None
                 closing = False
                 by_secant = False
-                if steer and hi_distance < _POSITION_CONVERGENCE_MM:
+                hinting = False
+                guarding = False
+                if hint_active and hint_probes < _HINT_PROBES:
+                    assert hint_offset_mm is not None
+                    if hint_side is None:
+                        candidate = hint_offset_mm
+                    elif hint_side == "clear":
+                        candidate = hi - hint_step
+                    else:
+                        candidate = lo + hint_step
+                    hinting = lo < candidate < hi
+                    if not hinting:
+                        candidate = None
+                        hint_active = False
+                if hinting:
+                    pass  # the hint probe above is this trial
+                elif guard_pending:
+                    guard_pending = False
+                    candidate = hi - 2.0 * NATIVE_CONTACT_DISTANCE_TOLERANCE_MM
+                    guarding = True
+                elif steer and hi_distance < _POSITION_CONVERGENCE_MM:
                     candidate = hi - _POSITION_CONVERGENCE_MM
                     closing = True
                 elif steer:
@@ -449,9 +531,9 @@ def solve_component_contact(
                 if candidate is not None and not lo < candidate < hi:
                     candidate = None
                 if candidate is None:
-                    closing = False
+                    closing = guarding = False
                     candidate = lo + (hi - lo) / 2.0
-                else:
+                elif not hinting:
                     jumps += 1
                 if not math.isfinite(candidate) or not lo < candidate < hi:
                     raise RuntimeError(
@@ -472,8 +554,23 @@ def solve_component_contact(
                     use_secant = True
                     if closing:
                         steer = False  # the distance under-reported the gap
+                        guard_pending = True
+                if guarding:
+                    guard_state = state
+                if hinting:
+                    if hint_side is not None and state != hint_side:
+                        # Straddled within hint_step: bisection closes it.
+                        hint_active = False
+                        steer = False
+                    elif hint_side is not None:
+                        hint_step *= 2.0
+                    hint_side = state
+                    hint_probes += 1
                 iterations += 1
                 span.set_attribute("iterations", iterations)
+            span.set_attribute("hint_probes", hint_probes)
+            if guard_state is not None:
+                span.set_attribute("guard_probe_state", guard_state)
             span.set_attribute("distance_jumps", jumps)
             span.set_attribute("final_distance_mm", hi_distance)
             _warn_distance_disagreement(label, hi_distance)
@@ -496,3 +593,6 @@ def solve_component_contact(
             span.set_attribute("iterations", iterations)
             span.set_attribute("trials", pair.trials if pair is not None else 0)
             span.set_attribute("elapsed_s", time.monotonic() - started)
+            if pair is not None:
+                for phase, seconds in pair.seconds.items():
+                    span.set_attribute(f"{phase}_s", seconds)

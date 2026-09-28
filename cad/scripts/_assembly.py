@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 from collections.abc import Callable, Iterable, Mapping
 from contextlib import contextmanager
@@ -1420,6 +1421,17 @@ async def place_components_batch(
     return out_names
 
 
+def _reads_constrained_status(adapter: Any, component: Any) -> bool:
+    """Whether the DOF gate must read this component's solver-owned
+    ``GetConstrainedStatus``: it is neither fixed nor a pattern instance."""
+    component = _early_bound(component, "IComponent2")
+    if bool(_read_member(component, "IsFixed")):
+        return False
+    return not bool(
+        adapter._attempt(lambda: component.IsPatternInstance(), default=False)
+    )
+
+
 def assert_components_fully_defined(adapter: Any, *, resolve: bool = True) -> None:
     """Raise when any top-level component is neither fixed, fully defined,
     nor a pattern instance.
@@ -1437,23 +1449,45 @@ def assert_components_fully_defined(adapter: Any, *, resolve: bool = True) -> No
     # assembly is rebuilt, GetConstrainedStatus returns a STALE swNoSolution
     # (5) for every mated part even though the mates are consistent and the
     # parts have not moved (probed live -- a ForceRebuild3 restores the true
-    # status). Always re-solve before reading the gate.
+    # status). Re-solve before reading any constrained status.
     problems = []
     with _telemetry.span("gate.dof") as gsp:
-        # Re-solve the mate solver before reading the gate (stale-status reason
-        # above). ``resolve=False`` means soundness already performed its single
-        # shared ``verify.rebuild``; do not emit a misleading rebuild span when
-        # this gate only collects components and reads their status.
-        if resolve:
+        asm_h = _early_bound(
+            asm, "IAssemblyDoc"
+        )  # IAssemblyDoc for GetComponents; keep `asm` for ForceRebuild3
+
+        def _collect() -> list[Any] | None:
+            # None = enumeration FAILED, never "an empty assembly": a failed
+            # read must not certify zero free DOF.
+            with _telemetry.span("dof.collect_components"):
+                found = adapter._attempt(lambda: asm_h.GetComponents(True), default=None)
+            return None if found is None else list(found)
+
+        components = _collect()
+        # Only GetConstrainedStatus goes stale before a solve; IsFixed and
+        # IsPatternInstance are component properties the solver never writes.
+        # When every top-level component is fixed or a pattern instance (the
+        # top assembly: nine fixed components), no status is read, so the deep
+        # re-solve cannot change the verdict and is skipped -- it measured 133 s
+        # median there, and the component collect after it another 24 s. A
+        # failed or empty enumeration proves nothing, so it re-solves and
+        # re-collects exactly as before the skip existed.
+        # ``resolve=False`` means soundness already performed its single shared
+        # ``verify.rebuild``; do not emit a misleading rebuild span then.
+        rebuilt = False
+        if resolve and (
+            not components
+            or any(_reads_constrained_status(adapter, c) for c in components)
+        ):
             with _telemetry.span("dof.rebuild"):
                 adapter._attempt(lambda: asm.ForceRebuild3(False), default=None)
-        with _telemetry.span("dof.collect_components"):
-            asm_h = _early_bound(
-                asm, "IAssemblyDoc"
-            )  # IAssemblyDoc for GetComponents; keep `asm` for ForceRebuild3
-            components = (
-                adapter._attempt(lambda: asm_h.GetComponents(True), default=None) or []
+            rebuilt = True
+            components = _collect()
+        if components is None:
+            raise RuntimeError(
+                "cannot certify free DOF: IAssemblyDoc.GetComponents(True) failed"
             )
+        gsp.set_attribute("rebuild_skipped", resolve and not rebuilt)
         gsp.set_attribute("components", len(components))
         log(f"checking {len(components)} components for free DOF ...")
         # NO span per component. A span per component floods the trace with one
@@ -2232,12 +2266,27 @@ async def save_assembly_and_images(
     views: Iterable[str] = DEFAULT_VIEWS,
     *,
     native_contact_check: Callable[[Any, str], None] | None = None,
+    solved_gates: Callable[[Any], None] | None = None,
+    dof_manifest: bool = False,
 ) -> dict[str, str]:
-    """Save the assembly to ``cad/out/sldasm`` and PNG views to ``cad/out/png``."""
+    """Save the assembly to ``cad/out/sldasm`` and PNG views to ``cad/out/png``.
+
+    ``solved_gates`` runs right after the final deep rebuild, before any other
+    gate reads the model: a builder whose own gates need a fully solved model
+    (``resolve=False``) certifies the exact state being saved there, instead of
+    paying a second deep rebuild of its own before the last mutation (see
+    :func:`_run_solved_gates`).
+
+    ``dof_manifest`` publishes the recorded free-DOF manifest only once the
+    assembly it describes is saved and fingerprinted; the previous manifest is
+    retired with the previous mass-property proof, so a failed build never
+    leaves a manifest beside an assembly it does not describe."""
     if asm_name in ("channel", "summing") and native_contact_check is None:
         raise ValueError(f"{asm_name} assembly requires native_contact_check")
     # Establish a clean solved state for the health and pose gates.
     final_rebuild_before_save(adapter, asm_name)
+    if solved_gates is not None:
+        _run_solved_gates(adapter, asm_name, solved_gates)
     # Fail fast: never save a broken assembly. Catches mate errors (e.g. a gear
     # mate whose entity went suppressed = the silent drive-train corruption) that
     # the DOF and interference gates miss -- a fixed/grounded component passes
@@ -2259,14 +2308,20 @@ async def save_assembly_and_images(
     # A full build replaces the assembly bytes. Strictly retire proof for the
     # previous bytes before replacement; an unlink failure aborts the save.
     _invalidate_massprops_proof(sidecar)
+    if dof_manifest:
+        dof_manifest_path(asm_name).unlink(missing_ok=True)
     # Save on isometric so the .SLDASM opens isometric; runs AFTER any
     # remap_front_to_machine_front (which re-bases the standard views) so the
     # re-based Front/Back/etc. used by the gallery stay correct.
     set_isometric_view(adapter)
     # View setup dirties the document so the camera persists, but does not dirty
     # the solve state. Avoid repeating the 7-32 s deep rebuild unless SolidWorks
-    # explicitly reports that a gate or view operation requested one.
-    rebuild_if_needed_before_save(adapter, asm_name)
+    # explicitly reports that a gate or view operation requested one. Such a
+    # rebuild replaces the state the solved gates certified, so they run again
+    # on the new one: nothing may re-solve between their certification and the
+    # save (_run_solved_gates leaves the model clean or raises).
+    if rebuild_if_needed_before_save(adapter, asm_name) and solved_gates is not None:
+        _run_solved_gates(adapter, asm_name, solved_gates, trigger="save_rebuild")
     _save_new_assembly_as_copy(adapter, asm_path)
     try:
         artefacts = {"assembly": str(asm_path)}
@@ -2288,7 +2343,51 @@ async def save_assembly_and_images(
     digest = await assembly_geometry_digest(adapter, asm_name)
     sidecar.parent.mkdir(parents=True, exist_ok=True)
     sidecar.write_text(digest + "\n", encoding="utf-8")
+    if dof_manifest:
+        write_dof_manifest(asm_name)
     return artefacts
+
+
+def _run_solved_gates(
+    adapter: Any,
+    label: str,
+    gates: Callable[[Any], None],
+    *,
+    trigger: str = "final_rebuild",
+) -> None:
+    """Run builder gates on the model a deep rebuild just solved.
+
+    They must certify the state that is SAVED: the collapsed working model (an
+    exploded presentation moves components off their operational poses), and a
+    solve state no later rebuild replaces. A gate that dirties the solve state
+    would otherwise hand ``rebuild_if_needed_before_save`` a deep rebuild AFTER
+    certification, so a dirty model is re-solved and every gate re-run on the
+    result; still dirty after that, the save is refused. ``trigger`` names the
+    rebuild being certified (save runs the gates again after its chokepoint
+    rebuild, when a later health/view step dirtied the model).
+    """
+    model = adapter.currentModel
+    with _telemetry.span("assembly.solved_gates", asm=label, trigger=trigger) as sp:
+        exploded = _early_bound(model, "IModelDoc2").IsExploded()
+        if exploded is None or bool(exploded):
+            raise RuntimeError(
+                f"{label}: solved gates need the collapsed working model, "
+                f"IsExploded() returned {exploded!r}"
+            )
+        gates(adapter)
+        status = saved_rebuild_status(adapter, model)
+        sp.set_attribute("post_gate_rebuild", status != 0)
+        if status == 0:
+            return
+        _telemetry.event("assembly.solved_gates_dirtied", asm=label, status=status)
+        final_rebuild_before_save(adapter, label, model)
+        gates(adapter)
+        status = saved_rebuild_status(adapter, model)
+        if status != 0:
+            raise RuntimeError(
+                f"{label}: solved gates leave NeedsRebuild2={status} even on a "
+                "re-solved model; refusing to save a state they did not certify"
+            )
 
 
 @_telemetry.traced("assembly.save_copy")
@@ -2460,8 +2559,9 @@ async def reconcile_saved_rebuild_state(
         _telemetry.success(f"reconciled saved rebuild state ({asm_name}, was {status})")
 
 
-def rebuild_if_needed_before_save(adapter: Any, label: str, model: Any = None) -> None:
-    """Rebuild at the save chokepoint only when the solve state became dirty.
+def rebuild_if_needed_before_save(adapter: Any, label: str, model: Any = None) -> bool:
+    """Rebuild at the save chokepoint only when the solve state became dirty;
+    return whether it rebuilt.
 
     ``GetSaveFlag`` is deliberately not consulted: changing the active view sets
     that flag because the camera must be saved, but it does not invalidate model
@@ -2472,9 +2572,105 @@ def rebuild_if_needed_before_save(adapter: Any, label: str, model: Any = None) -
     if status != 0:
         _telemetry.event("assembly.final_rebuild_required", asm=label, status=status)
         final_rebuild_before_save(adapter, label, target)
-        return
+        return True
     _telemetry.event("assembly.final_rebuild_skipped", asm=label)
     _telemetry.success(f"solve state already clean before save ({label})")
+    return False
+
+
+async def _solved_mass_properties(adapter: Any, span: Any) -> Any:
+    """Mass properties of the active model WITHOUT a redundant deep rebuild.
+
+    ``adapter.get_mass_properties()`` opens with ``ForceRebuild3(False)``: a deep
+    rebuild that re-solves every subassembly and regenerates every part (the
+    ``geometry_digest.mass_properties`` span measured median 169 s on the top
+    assembly, 79 s on drive-train, 30 days to 2026-09-27). Every digest caller has
+    already established the solved state it reads -- the full build reopened the
+    reconciled saved artifact, the refresh ran ``final_rebuild_before_save``, a
+    multi-config switch ran ``activate_resolved`` -- so that rebuild re-solved an
+    already-solved model. ``NeedsRebuild2 == 0`` is SolidWorks' own statement
+    that nothing is stale; only then read ``CreateMassProperty`` directly, with
+    the adapter's exact unit conversions so the digest value is unchanged. Any
+    other state (dirty model, no mass-property object) takes the adapter path,
+    rebuild included, exactly as before.
+
+    An incomplete fast read (a raising or non-finite / malformed Volume,
+    SurfaceArea, Mass, CenterOfMass or GetMomentOfInertia) RAISES. It must not
+    be zero-filled: the digest decides whether a refresh skips the DOF,
+    interference and health gates, so two placeholder digests would match and
+    certify an unmeasured model. Falling back is no cure -- the adapter path
+    zero-fills the same two reads (``io.get_mass_properties``).
+    """
+    from solidworks_mcp.adapters.base import (
+        AdapterResult,
+        AdapterResultStatus,
+        MassProperties,
+    )
+
+    model = adapter.currentModel
+    status = saved_rebuild_status(adapter, model)
+    span.set_attribute("needs_rebuild", status)
+    mass_props = (
+        adapter._attempt(lambda: model.Extension.CreateMassProperty(), default=None)
+        if status == 0
+        else None
+    )
+    if mass_props is None:
+        span.set_attribute("rebuild_skipped", False)
+        return await adapter.get_mass_properties()
+    span.set_attribute("rebuild_skipped", True)
+    return AdapterResult(
+        status=AdapterResultStatus.SUCCESS,
+        data=MassProperties(**_fast_mass_properties(adapter, mass_props)),
+    )
+
+
+def _fast_mass_properties(adapter: Any, mass_props: Any) -> dict[str, Any]:
+    """``MassProperties`` fields from an ``IMassProperty`` in the adapter's units.
+    Raises when any read fails or is not the expected finite number(s)."""
+
+    def _numbers(label: str, value: Any, count: int) -> list[float]:
+        if isinstance(value, (list, tuple)) and len(value) >= count:
+            items = value[:count]
+            if all(
+                isinstance(v, (int, float))
+                and not isinstance(v, bool)
+                and math.isfinite(v)
+                for v in items
+            ):
+                return [float(v) for v in items]
+        raise RuntimeError(
+            f"IMassProperty.{label} returned {value!r}; refusing to fingerprint "
+            "an incomplete mass-property read"
+        )
+
+    def _scalar(name: str) -> float:
+        value = adapter._attempt(lambda: getattr(mass_props, name), default=None)
+        return _numbers(name, [value], 1)[0]
+
+    volume, surface_area, mass = (_scalar(n) for n in ("Volume", "SurfaceArea", "Mass"))
+    com = _numbers(
+        "CenterOfMass", adapter._attempt(lambda: mass_props.CenterOfMass, default=None), 3
+    )
+    moi = _numbers(
+        "GetMomentOfInertia(0)",
+        adapter._attempt(lambda: mass_props.GetMomentOfInertia(0), default=None),
+        9,
+    )
+    return {
+        "volume": volume * 1e9,
+        "surface_area": surface_area * 1e6,
+        "mass": mass,
+        "center_of_mass": [com[0] * 1000, com[1] * 1000, com[2] * 1000],
+        "moments_of_inertia": {
+            "Ixx": moi[0],
+            "Iyy": moi[4],
+            "Izz": moi[8],
+            "Ixy": moi[1],
+            "Ixz": moi[2],
+            "Iyz": moi[5],
+        },
+    }
 
 
 @_telemetry.traced("assembly.geometry_digest", label_param="asm_name")
@@ -2543,8 +2739,8 @@ async def assembly_geometry_digest(adapter: Any, asm_name: str) -> str:
             await activate_resolved(cfg)
         async with _telemetry.aspan(
             "geometry_digest.mass_properties", configuration=cfg
-        ):
-            res = await adapter.get_mass_properties()
+        ) as msp:
+            res = await _solved_mass_properties(adapter, msp)
         if not res.is_success:
             raise RuntimeError(
                 f"{asm_name}: get_mass_properties failed for config {cfg!r}: "

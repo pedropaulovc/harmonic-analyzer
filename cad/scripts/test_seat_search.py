@@ -27,6 +27,7 @@ class _FakeContact:
     def __init__(self, adapter, moving, fixed, direction, maximum, label) -> None:
         self.trials = 0
         self.offsets: list[float] = []
+        self.seconds: dict[str, float] = {}
 
     def evaluate(self, offset_mm: float):
         self.trials += 1
@@ -145,6 +146,68 @@ def test_seated_pose_within_guard_is_certified_without_a_move(fake) -> None:
     assert solution.certificate == "already_seated"
     assert solution.witness == "native_distance"
     assert solution.offset_mm == 0.0
+
+
+class _GuardShortDistance(_FakeContact):
+    """ClosestDistance reading up to its 1e-5 mm guard short, so it reads zero
+    on poses that are still clear -- the gooseneck screw against the counter
+    eye (farm 2026-09-23: 23 native trials, 17 of them bisection)."""
+
+    def evaluate(self, offset_mm: float):
+        state, distance = super().evaluate(offset_mm)
+        if state == "interfering":
+            return state, None
+        return state, max(0.0, distance - search.NATIVE_CONTACT_DISTANCE_TOLERANCE_MM)
+
+
+def test_distance_short_by_its_guard_closes_at_the_guard_scale(monkeypatch) -> None:
+    """A clear closing probe means the boundary is within the distance guard of
+    the clear endpoint; the search must close there, not bisect from -max."""
+    monkeypatch.setattr(search, "_ActualContact", _GuardShortDistance)
+    solution = _solve()
+
+    assert solution.iterations <= 10
+    assert solution.interfering_offset_mm < _CONTACT_OFFSET_MM <= solution.clear_offset_mm
+    assert solution.clear_offset_mm - solution.interfering_offset_mm <= 1e-6
+
+
+@pytest.mark.parametrize("gain", [1.0, 0.0])
+@pytest.mark.parametrize("error", [0.0, 3e-10, -9e-7, 2.5e-6, -2.5e-6])
+def test_hint_near_the_boundary_closes_in_a_few_trials(fake, gain, error) -> None:
+    """A re-seat of the same pair (the clamp tilt search re-seats both eyes
+    ~20 times, drifting < 2.5e-6 mm) must not pay a fresh bracket search,
+    whatever the distance reads."""
+    fake.gain = gain
+    try:
+        solution = search.solve_component_contact(
+            object(), "spring", "hook", (0.0, 1.0, 0.0), 0.3175, label="fake",
+            hint_offset_mm=_CONTACT_OFFSET_MM + error,
+        )
+    finally:
+        fake.gain = 1.0
+
+    assert solution.iterations <= 6
+    assert solution.interfering_offset_mm < _CONTACT_OFFSET_MM <= solution.clear_offset_mm
+    assert solution.clear_offset_mm - solution.interfering_offset_mm <= 1e-6
+
+
+@pytest.mark.parametrize("gain", [1.0, 0.0])
+@pytest.mark.parametrize("hint", [0.0731, 0.2, -0.3, 0.3175, -0.3175, 5.0])
+def test_wrong_hint_still_ends_in_a_native_bracket(fake, gain, hint) -> None:
+    """A hint far off, on either side, at an endpoint or outside the bracket
+    only costs trials; the verdict is still the native 1e-6 mm bracket."""
+    fake.gain = gain
+    try:
+        solution = search.solve_component_contact(
+            object(), "spring", "hook", (0.0, 1.0, 0.0), 0.3175, label="fake",
+            hint_offset_mm=hint,
+        )
+    finally:
+        fake.gain = 1.0
+
+    assert solution.iterations <= 30
+    assert solution.interfering_offset_mm < _CONTACT_OFFSET_MM <= solution.clear_offset_mm
+    assert solution.clear_offset_mm - solution.interfering_offset_mm <= 1e-6
 
 
 def test_write_refuses_presets_that_do_not_cover_every_channel_amplitude(

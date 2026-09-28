@@ -96,10 +96,12 @@ and no scheduled cleanup job. See ``scripts/azure/provision_build_cache.ps1``.
 
 from __future__ import annotations
 
+import concurrent.futures
 import hashlib
 import io
 import json
 import os
+import secrets
 import tarfile
 import time
 from pathlib import Path
@@ -266,9 +268,17 @@ def cache_key(file_deps: list[str], digest_one, label: str | None = None) -> str
 # --------------------------------------------------------------------------- #
 # Pack / unpack -- one gzip tar of a task's outputs, paths stored repo-relative
 # --------------------------------------------------------------------------- #
+# gzip level 6 (zlib's default), not tarfile's 9: the export and package entries
+# (329 MB / 660 MB) spend most of their pack in deflate, and on the real 701 MB
+# export payload level 9 took 25.1 s for 329.1 MB against 12.3 s for 348.1 MB at
+# level 6. SLDPRT/PNG members are already compressed, so their size barely moves.
+# Only the stored bytes change: keys hash inputs, and restore reads any level.
+_PACK_LEVEL = 6
+
+
 def _pack(outputs: list[Path]) -> bytes:
     buf = io.BytesIO()
-    with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+    with tarfile.open(fileobj=buf, mode="w:gz", compresslevel=_PACK_LEVEL) as tar:
         for out in outputs:
             if out.exists():
                 tar.add(str(out), arcname=_rel(out))
@@ -313,6 +323,17 @@ def _unpack(blob: bytes) -> None:
 # --------------------------------------------------------------------------- #
 # Backend -- Azure Blob container over HTTPS (443)
 # --------------------------------------------------------------------------- #
+# Parallel block transfers for the entries above the single-shot size: the
+# export and package entries. The SDK default moves their 4 MiB blocks one at a
+# time; downloading the 329 MB export entry took 244.3 s serially and 45.8 s at
+# 8. Smaller entries still go in one request.
+_TRANSFER_CONCURRENCY = 8
+# One Put Blob up to this size (the SDK's own single-shot default); above it,
+# ``_BlobBackend.put`` stages _BLOCK_SIZE blocks under writer-unique IDs.
+_SINGLE_PUT_MAX = 64 * 1024 * 1024
+_BLOCK_SIZE = 4 * 1024 * 1024
+
+
 class _BlobBackend:
     """One Azure Blob container of content-addressed ``<key>.tar.gz`` entries.
 
@@ -331,7 +352,8 @@ class _BlobBackend:
     def get(self, key: str) -> bytes | None:
         from azure.core.exceptions import ResourceNotFoundError
         try:
-            return self._cc.get_blob_client(self._name(key)).download_blob().readall()
+            blob = self._cc.get_blob_client(self._name(key))
+            return blob.download_blob(max_concurrency=_TRANSFER_CONCURRENCY).readall()
         except ResourceNotFoundError:
             return None
 
@@ -341,10 +363,39 @@ class _BlobBackend:
         return self._cc.get_blob_client(self._name(key)).exists()
 
     def put(self, key: str, blob: bytes) -> None:
-        # Content-addressed: any concurrent writer stores identical bytes, so
-        # overwrite is a harmless no-op (last-writer-wins). A blob upload commits
-        # atomically, so a concurrent reader never observes a partial entry.
-        self._cc.get_blob_client(self._name(key)).upload_blob(blob, overwrite=True)
+        # The key hashes INPUTS, not these bytes: two writers of one key (a
+        # local rw seat and a farm leaf, or old and new code during a rollout)
+        # upload different archives -- tar mtimes differ, the gzip level may too.
+        # Last-writer-wins is fine; a MIXED archive is not. A single Put Blob is
+        # atomic, so small entries go in one request. A large one is staged as
+        # blocks, and the SDK derives block IDs from the chunk offset alone --
+        # the same IDs for every writer -- so interleaved writers could each
+        # commit a list that resolves to the other's blocks: a torn archive (CRC
+        # failure on restore). Each publish therefore stages under IDs only it
+        # uses and commits exactly that list. A competing commit
+        # garbage-collects this writer's still-uncommitted blocks, which makes
+        # this commit fail (store_error) rather than tear; the winner's archive
+        # stands whole. 48 raw characters encode to 64 on the wire, the same
+        # length as the SDK's own IDs: Azure rejects a Put Block whose ID length
+        # differs from uncommitted blocks an older writer left on the blob.
+        client = self._cc.get_blob_client(self._name(key))
+        if len(blob) <= _SINGLE_PUT_MAX:
+            client.upload_blob(blob, overwrite=True)
+            return
+        from azure.storage.blob import BlobBlock
+
+        writer = secrets.token_hex(16)
+        count = -(-len(blob) // _BLOCK_SIZE)
+        ids = [f"{writer}{index:016d}" for index in range(count)]
+
+        def stage(index: int) -> None:
+            start = index * _BLOCK_SIZE
+            client.stage_block(ids[index], blob[start:start + _BLOCK_SIZE])
+
+        with concurrent.futures.ThreadPoolExecutor(_TRANSFER_CONCURRENCY) as pool:
+            for _ in pool.map(stage, range(count)):
+                pass
+        client.commit_block_list([BlobBlock(block_id=block_id) for block_id in ids])
 
 
 # --------------------------------------------------------------------------- #

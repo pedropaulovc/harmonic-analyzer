@@ -2310,6 +2310,72 @@ def test_a_required_read_answering_none_is_a_read_error(monkeypatch):
     assert reader.call(lambda: None, "") == "" and reader.take_errors() == {}
 
 
+@pytest.mark.parametrize("owner_type", [0, 1, 2], ids=["view", "sheet", "template"])
+def test_only_template_annotations_skip_their_ink(monkeypatch, owner_type):
+    """The title block's notes (owner 2) were ~66% of the collector's COM
+    reads and no check reads anything of them but their owner, so nothing
+    else is fetched; a view's or the sheet's own annotation still dumps its
+    identity, position, leaders, display data and note."""
+    import _drawing_layout_audit as collector
+
+    monkeypatch.setattr(collector, "_early_bound", lambda obj, _interface: obj)
+    fetched = []
+
+    class Display:
+        def __getattr__(self, name):
+            if name.endswith("Count"):
+                return lambda: 1 if name == "GetTextCount" else 0
+            return lambda _index: {"GetTextAtIndex": "REV", "GetTextPositionAtIndex": (0.1, 0.2, 0.0)}.get(name, 0.003)
+
+    class Note:
+        def GetText(self):
+            return "REV"
+
+        def GetExtent(self):
+            return (0.1, 0.2, 0.0, 0.11, 0.203, 0.0)
+
+        def IsBomBalloon(self):
+            return False
+
+    class Annotation:
+        Visible = 1
+        OwnerType = owner_type
+        Layer = ""
+
+        def GetType(self):
+            fetched.append("type")
+            return 6
+
+        def GetName(self):
+            return "DetailItem1"
+
+        def GetPosition(self):
+            fetched.append("pos")
+            return (0.1, 0.2, 0.0)
+
+        def GetLeaderCount(self):
+            fetched.append("leaders")
+            return 0
+
+        def GetDisplayData(self):
+            fetched.append("display")
+            return Display()
+
+        def GetSpecificAnnotation(self):
+            fetched.append("note")
+            return Note()
+
+    reader = collector._Reader(adapter=None)
+    record = collector._dump_annotation(reader, Annotation())
+    assert reader.take_errors() == {}
+    if owner_type == 2:
+        assert fetched == [] and record == {"owner_type": 2, "display": {}}
+    else:
+        assert fetched == ["type", "pos", "leaders", "display", "note"]
+        assert record["owner_type"] == owner_type and record["pos"] == [0.1, 0.2, 0.0]
+        assert record["display"]["texts"][0]["t"] == "REV" and record["note"]["text"] == "REV"
+
+
 @pytest.mark.parametrize(
     ("kind", "errors"),
     [(1, {}), (15, {}), (6, {"GetPosition": 1}), (5, {"GetPosition": 1})],

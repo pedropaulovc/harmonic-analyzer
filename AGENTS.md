@@ -1015,6 +1015,28 @@ scripts that `from _common import log, check` are instrumented unchanged.
   documented use ("SHOULD only be set when span creation time has already passed") —
   no live span is mutated. A process nobody stamped (standalone run) or a stale
   inherited stamp (>1 h) records nothing.
+- **Adapter calls are spans without touching a recipe.** 42.9 h of `part.build`'s
+  79.4 h (30 days to 2026-09-27) sat in no child span, and log-gap attribution put
+  ~9 h of it on a build script's direct `await adapter.<feature>(...)` calls
+  (fillet/chamfer 2.7 h, extrude/cut/revolve 1.7 h, sketch open/close 2.3 h, ...).
+  `build_session` instruments the already-imported `PyWin32Adapter` class
+  (`_telemetry.instrument_adapter`, the OTel instrumentation-library pattern) so
+  each document/feature/reference-geometry coroutine in
+  `_telemetry.ADAPTER_TRACED_METHODS` runs in an `adapter.<method>` span with its
+  leading name/path as `arg` (never `label`: `label` at depth 0 is the farm's leaf
+  key). Per-entity sketch calls stay out of the list — that would be the per-item
+  flood above. A returned `AdapterResult` failure is an `adapter.status` +
+  `error.message` attribute, not an ERROR span (callers probe with failures). The
+  wrapper lives in recipe-inert `_telemetry`, so extending the list re-keys no
+  leaf; the vendored submodule would re-key them all.
+- **A log record names its caller, and a failed span names its cause.** App
+  Insights maps a dark gap to code through the `code.function.name` /
+  `code.file.path` of the record that ends it; `_telemetry`'s helpers pass a
+  `stacklevel` that skips `_telemetry`, contextlib and `_common`'s pass-through
+  `log`/`check`, where every row used to read `success`/`info` in `_telemetry.py`.
+  `_exit_span` also stamps `error.type` / `error.message` on the failed span:
+  the exported `exception` event reaches the `exceptions` table with an empty
+  message, so `dependencies | where success == false` must explain itself.
 - **Telemetry must not cost seat time.** Two measured traps, both fixed, both worth
   remembering before adding an exporter. First, default endpoints are **literal
   loopback addresses, never `localhost`**: Windows resolves `localhost` to `::1`

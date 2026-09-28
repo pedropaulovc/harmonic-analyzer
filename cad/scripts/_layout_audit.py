@@ -2037,11 +2037,13 @@ def sheet_model(dump: Mapping[str, Any]) -> SheetModel:
     keep_outs = (("title-block", Box(*title[:4])),) if len(title) >= 4 else ()
 
     views = list(dump.get("views", ()))
+    # Template annotations (the title block's) are excluded: the collector
+    # does not read their ink (``_drawing_layout_audit._dump_annotation``).
     every_annotation = [
         annotation
         for view in views
         for annotation in view.get("annotations", ())
-    ] + list(dump.get("sheet_annotations", ()))
+    ] + [annotation for annotation in dump.get("sheet_annotations", ()) if sheet_owned(annotation)]
     advance = calibrate_sheet_advance(every_annotation)
     audited = audited_annotations(dump)
 

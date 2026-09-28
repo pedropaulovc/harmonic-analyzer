@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import time
 from collections.abc import Iterator, Mapping
-from types import SimpleNamespace
 from typing import Any
 
 from opentelemetry import trace
@@ -70,8 +69,9 @@ class FeatureWalk:
     The stock-fastener cleanup's walk.  It does not descend into an assembly's
     components (each part's own save proved its tree), counts what it visits in
     ``visited`` for the span that owns the walk, and refuses a runaway
-    traversal.  The save check does not use it: it costs three COM calls per
-    feature just to move (``visible_reference_geometry``).
+    traversal.  It yields RAW dispatches: read them with
+    ``_common._com_invoke`` (one round trip a member) rather than paying the
+    three a generated wrapper spends binding each feature it steps over.
     """
 
     def __init__(self, model: Any) -> None:
@@ -79,65 +79,26 @@ class FeatureWalk:
         self.visited = 0
 
     def __iter__(self) -> Iterator[Any]:
-        from _common import _early_bound, _read_member
+        from _common import _com_invoke, _early_bound
 
         def siblings(feature: Any, next_member: str) -> Iterator[Any]:
-            while feature:
+            while feature is not None:
                 self.visited += 1
                 if self.visited > _MAX_FEATURES:
                     raise RuntimeError(
                         f"feature traversal exceeded {_MAX_FEATURES} features"
                     )
-                feature = _early_bound(feature, "IFeature")
                 yield feature
-                kind = str(_read_member(feature, "GetTypeName2"))
+                kind = str(_com_invoke(feature, "IFeature", "GetTypeName2"))
                 if kind not in _COMPONENT_FEATURE_TYPES:
-                    child = _read_member(feature, "GetFirstSubFeature")
+                    child = _com_invoke(feature, "IFeature", "GetFirstSubFeature")
                     yield from siblings(child, "GetNextSubFeature")
-                feature = _read_member(feature, next_member)
+                feature = _com_invoke(feature, "IFeature", next_member)
 
-        yield from siblings(_read_member(self.model, "FirstFeature"), "GetNextFeature")
-
-
-class _RecordedCall:
-    """Stands in for a raw dispatch, so a generated member hands over its call."""
-
-    def __init__(self) -> None:
-        self.args: tuple[Any, ...] = ()
-
-    def InvokeTypes(self, *args: Any) -> None:
-        self.args = args
-
-
-_INVOCATIONS: dict[tuple[str, str], tuple[Any, ...]] = {}
-
-
-def _invocation(interface: str, member: str, *args: Any) -> tuple[Any, ...]:
-    """The ``InvokeTypes`` arguments ``interface``'s generated wrapper sends for
-    ``member`` (called with ``args``), recorded once per process.
-
-    The dispid, flags and types come from the type-library wrapper, never from
-    a hand-written number, and recording them makes no COM call: the wrapper
-    is built on a stand-in that keeps the call instead of sending it.  The
-    tuple ends with ``args``, which never changes per key here."""
-    from _common import _early_bound
-
-    key = (interface, member)
-    if key not in _INVOCATIONS:
-        recorded = _RecordedCall()
-        wrapper = _early_bound(SimpleNamespace(_oleobj_=recorded), interface)
-        value = getattr(wrapper, member)  # a property sends its call here
-        if callable(value):
-            value(*args)
-        if not recorded.args:
-            raise RuntimeError(f"{interface}.{member}: the wrapper sent no call")
-        _INVOCATIONS[key] = recorded.args
-    return _INVOCATIONS[key]
-
-
-def _dispatch(obj: Any) -> Any:
-    """The raw IDispatch under a pywin32 wrapper (a test double is its own)."""
-    return getattr(obj, "_oleobj_", obj)
+        model = _early_bound(self.model, "IModelDoc2")
+        yield from siblings(
+            _com_invoke(model, "IModelDoc2", "FirstFeature"), "GetNextFeature"
+        )
 
 
 def visible_reference_geometry(model: Any, label: str = "") -> list[tuple[str, str]]:
@@ -146,7 +107,7 @@ def visible_reference_geometry(model: Any, label: str = "") -> list[tuple[str, s
     One ``IFeatureManager.GetFeatures(False)`` call returns every feature and
     child feature, and none inside an assembly's components (the SolidWorks
     API reference), so nothing is walked.  Every call after the first hop goes
-    straight to a RAW dispatch by dispid (``_invocation``), because pywin32
+    straight to a RAW dispatch by dispid (``_common._com_header``), because pywin32
     wraps what a wrapper returns, and each wrap costs round trips: it reads
     the element's type info (GetTypeInfo, GetTypeAttr), and the generated
     class it builds runs a QueryInterface in its constructor, as
@@ -160,13 +121,16 @@ def visible_reference_geometry(model: Any, label: str = "") -> list[tuple[str, s
     the first feature proving the elements answer ``IFeature``'s dispids (the
     array is untyped, and a foreign table would read every type as unknown,
     so the check would pass blind).  #880's save bar is <= 1 s."""
-    from _common import _early_bound
+    from _common import _com_header, _early_bound
 
     started = time.perf_counter()
-    manager = _dispatch(_early_bound(model, "IModelDoc2")).InvokeTypes(
-        *_invocation("IModelDoc2", "FeatureManager")
+    model = _early_bound(model, "IModelDoc2")
+    manager = getattr(model, "_oleobj_", model).InvokeTypes(
+        *_com_header("IModelDoc2", "FeatureManager")
     )
-    returned = manager.InvokeTypes(*_invocation("IFeatureManager", "GetFeatures", False))
+    returned = manager.InvokeTypes(
+        *_com_header("IFeatureManager", "GetFeatures"), False
+    )
     fetch_s = time.perf_counter() - started
     com_calls = 2
     # Every document has at least its origin and default planes, so None or
@@ -178,7 +142,7 @@ def visible_reference_geometry(model: Any, label: str = "") -> list[tuple[str, s
     features = tuple(returned)
     if len(features) > _MAX_FEATURES:
         raise RuntimeError(f"{label}: {len(features)} features exceed {_MAX_FEATURES}")
-    type_name = _invocation("IFeature", "GetTypeName2")
+    type_name = _com_header("IFeature", "GetTypeName2")
     answered = features[0].GetIDsOfNames(0, "GetTypeName2")
     com_calls += 1
     if answered != type_name[0]:
@@ -186,8 +150,8 @@ def visible_reference_geometry(model: Any, label: str = "") -> list[tuple[str, s
             f"{label}: GetFeatures returned a dispatch whose GetTypeName2 is "
             f"dispid {answered}, not IFeature's {type_name[0]}"
         )
-    visible = _invocation("IFeature", "Visible")
-    feature_name = _invocation("IFeature", "Name")
+    visible = _com_header("IFeature", "Visible")
+    feature_name = _com_header("IFeature", "Name")
     shown: list[tuple[str, str]] = []
     seen: set[str] = set()
     for feature in features:

@@ -31,14 +31,19 @@ DIMENSIONS = {"ArcReference": {"ArcCentreX"}, "Column": {"Length"}}
 
 @pytest.fixture(autouse=True)
 def _no_com_curate(monkeypatch) -> None:
-    """``curate_dimensions`` repositions over COM; here it only deletes."""
+    """``curate_dimensions`` repositions over COM; here it deletes and lands
+    each kept dimension exactly on its requested point."""
 
     def curate(adapter, annotations, *, delete=(), reposition=None):
-        return [
-            a
-            for a in annotations
-            if _drawing_common.dimension_name(adapter, a) not in delete
-        ]
+        survivors = []
+        for a in annotations:
+            name = _drawing_common.dimension_name(adapter, a)
+            if name in delete:
+                continue
+            if reposition and name in reposition:
+                a.position = reposition[name]
+            survivors.append(a)
+        return survivors
 
     monkeypatch.setattr(_drawing_common, "curate_dimensions", curate)
 

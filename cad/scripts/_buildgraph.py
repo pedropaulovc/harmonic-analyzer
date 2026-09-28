@@ -804,12 +804,6 @@ class _AssemblySources:
         return frozenset(names)
 
 
-@functools.lru_cache(maxsize=128)
-def _assembly_source_names(source: str) -> frozenset[str]:
-    """Reuse syntax by content, never file time or a previously resolved DAG."""
-    return _AssemblySources(source).collect()
-
-
 def references_of(asm_stem: str) -> list[str]:
     """Part + sub-assembly stems this assembly's build script references.
 
@@ -1087,7 +1081,13 @@ def _persisted_facts(name: str, encode=lambda value: value, decode=lambda raw: r
         @functools.wraps(function)
         def facts(text: str, *extra):
             digest = hashlib.sha256()
-            for part in (name, text, *(repr(sorted(e)) for e in extra)):
+            # Sets hash in sorted order (their iteration order is per-process);
+            # every other extra is a plain value whose repr is already stable.
+            parts = (
+                repr(sorted(e)) if isinstance(e, (set, frozenset)) else repr(e)
+                for e in extra
+            )
+            for part in (name, text, *parts):
                 digest.update(part.encode("utf-8", "surrogatepass"))
                 digest.update(b"\0")
             key = digest.digest()
@@ -1104,6 +1104,21 @@ def _persisted_facts(name: str, encode=lambda value: value, decode=lambda raw: r
         return facts
 
     return wrap
+
+
+@functools.lru_cache(maxsize=128)
+@_persisted_facts(
+    "assembly_source_names",
+    encode=lambda names: tuple(sorted(names)),
+    decode=frozenset,
+)
+def _assembly_source_names(source: str) -> frozenset[str]:
+    """Reuse syntax by content, never file time or a previously resolved DAG.
+
+    Persisted like the other syntax facts: the bounded enumeration walks each
+    assembly script's whole tree (~0.9 s for the eight scripts per graph load).
+    An unresolved source raises and is never stored."""
+    return _AssemblySources(source).collect()
 
 
 class _ModuleSyntax(NamedTuple):
@@ -1223,7 +1238,7 @@ def _direct_local_imports(path: Path) -> frozenset[str]:
             parent = parent.rpartition(".")[0]
 
     current_module = _module_by_path().get(_resolved(path))
-    syntax = _module_syntax(path.read_text(encoding="utf-8"))
+    syntax = _module_syntax(read_source(path))
     for name, _asname in syntax.imports:
         add(name)
     for level, module, names in syntax.from_imports:
@@ -1311,9 +1326,39 @@ def _module_closure(script: Path) -> tuple[str, ...]:
     return tuple(sorted(str(_resolved(mods[m])) for m in result))
 
 
+# path -> ((st_mtime_ns, st_size), text) for :func:`read_source`.
+_SOURCE_TEXT: dict[Path, tuple[tuple[int, int], str]] = {}
+
+
+def read_source(path: Path) -> str:
+    """``path``'s UTF-8 text, re-read only when its (mtime_ns, size) moved.
+
+    One doit graph load asks for the same few hundred local sources ~20k times:
+    every task's config/data/fastener scan re-reads its whole import closure
+    (a part closure is ~30 modules, and ~250 tasks share them). Those reads
+    measured ~2.2 s of a ~6 s load on Windows. Unlike the per-path import facts
+    this memo validates itself: a caller that edits a source and asks again
+    (a test fixture, a long-lived process) must see the new text, because a
+    stale DXF literal or config read would leave a real input out of a cache
+    key. A stat is a fraction of the read it saves. The stat comes first, so an
+    edit landing between it and the read stores the new text under the old
+    stamp and is simply re-read next time. An ``OSError`` propagates and is
+    not memoized.
+    """
+    st = os.stat(path)
+    stamp = (st.st_mtime_ns, st.st_size)
+    cached = _SOURCE_TEXT.get(path)
+    if cached is not None and cached[0] == stamp:
+        return cached[1]
+    text = path.read_text(encoding="utf-8")
+    _SOURCE_TEXT[path] = (stamp, text)
+    return text
+
+
 def clear_import_caches() -> None:
     """Forget every per-process fact about the local module tree: the module map,
-    each module's direct imports, the import closures and the resolved paths.
+    each module's direct imports, the import closures, the resolved paths and the
+    source texts.
 
     The one entry point for "re-read the tree" -- a test that rebuilds its
     fixture sources, or a long-lived process whose checkout moved. The syntax
@@ -1324,6 +1369,7 @@ def clear_import_caches() -> None:
     _direct_local_imports.cache_clear()
     _module_closure.cache_clear()
     _resolved_absolute.cache_clear()
+    _SOURCE_TEXT.clear()
 
 
 def _drawing_registry_value(node: ast.AST) -> object:
@@ -1585,6 +1631,11 @@ class TableReads(NamedTuple):
 
 
 @functools.lru_cache(maxsize=512)
+@_persisted_facts(
+    "table_reads",
+    encode=lambda reads: None if reads is None else (reads.keys, reads.dynamic),
+    decode=lambda raw: None if raw is None else TableReads(frozenset(raw[0]), bool(raw[1])),
+)
 def table_reads(
     text: str, module: str, table: str, accessor: str, exports: frozenset[str]
 ) -> TableReads | None:
@@ -1720,17 +1771,24 @@ def data_deps_of(script: Path) -> list[str]:
     date. It is CONSERVATIVE (can over- but never under-invalidate): only files
     named by a literal in the script's own import closure are ever listed.
     """
-    sources = [script.resolve(), *(Path(p) for p in module_deps_of(script))]
+    sources = [_resolved(script), *(Path(p) for p in module_deps_of(script))]
     found: set[str] = set()
     for src in sources:
         try:
-            text = src.read_text(encoding="utf-8")
+            text = read_source(src)
         except OSError:
             continue
-        for literal in _DATA_LITERAL_RE.findall(text):
+        for literal in _data_literals(text):
             candidate = REFERENCES_DIR / Path(literal).name
-            found.add(str(candidate.resolve()))
+            found.add(str(_resolved(candidate)))
     return sorted(found)
+
+
+@functools.lru_cache(maxsize=1024)
+def _data_literals(text: str) -> tuple[str, ...]:
+    """The quoted DXF/DWG names in one source CONTENT (every task re-scans its
+    whole closure, so the ~600 shared helpers are scanned once, not ~1600 times)."""
+    return tuple(_DATA_LITERAL_RE.findall(text))
 
 
 # --- Per-script CONFIG read-set: which cad/config FILES a build script actually
@@ -1944,13 +2002,11 @@ def _config_references_in_text(
 def _config_tokens_in_source(path: Path) -> frozenset[str]:
     """Resolve ONE source's config reads; reject every unclassified use.
 
-    Only syntax is reused. Reading source content on each call detects edits even
-    when timestamps are unchanged; accessor/family resolution is not memoized by
-    this function. Callers retain their existing per-invocation graph snapshot.
+    Only syntax is reused across contents; the text comes from :func:`read_source`,
+    which re-reads a source whose (mtime_ns, size) moved, and
+    accessor/family resolution is not memoized by this function.
     """
-    references = _config_references_in_text(
-        path.read_text(encoding="utf-8"), _CONFIG_MODULES
-    )
+    references = _config_references_in_text(read_source(path), _CONFIG_MODULES)
     if references is None:
         raise _UnknownConfigUse
     tokens: set[str] = set()
@@ -1976,7 +2032,7 @@ def config_files_of(script: Path) -> frozenset[str]:
     unclassifiably or fails to parse -- so doit over-rebuilds rather than ever
     skipping a real change.
     """
-    sources = [script.resolve(), *(Path(p) for p in module_deps_of(script))]
+    sources = [_resolved(script), *(Path(p) for p in module_deps_of(script))]
     tokens: set[str] = set()
     for src in sources:
         try:

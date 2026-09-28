@@ -13,6 +13,7 @@ import json
 import math
 import os
 import sys
+import time
 from collections import Counter
 from dataclasses import dataclass, replace
 from itertools import combinations
@@ -1956,6 +1957,7 @@ _LEADER_STRAIGHT = 1  # swLeaderStyle_e.swSTRAIGHT
 
 
 _OWNER_DRAWING_VIEW = 0  # swAnnotationOwner_e.swAnnotationOwner_DrawingView
+_OWNER_DRAWING_SHEET = 1  # swAnnotationOwner_e.swAnnotationOwner_DrawingSheet
 
 
 @_telemetry.traced("drawing.leader_note", label_param="label")
@@ -2877,6 +2879,64 @@ def _curate_entire_model_import(
     return curate_dimensions(adapter, curated, reposition=dict(keep))
 
 
+# How far a kept dimension may read back from its requested sheet point before
+# it is placed again.  SetPosition + EditRebuild3 leaves an unmoved survivor
+# exactly on its point (all 17 curate passes on the step-snapshot leaves read
+# back equal at 1e-6 m); the two real shifts were 6.97 mm and 0.63 mm.
+_REPOSITION_DRIFT_TOLERANCE_M = 1e-5
+
+
+def _reposition_rerun_reason(
+    adapter: Any,
+    curated: Sequence[Any],
+    names: Sequence[str],
+    keep: Mapping[str, tuple[float, float]],
+    *,
+    deleted: bool,
+) -> Literal["deleted", "drifted", "none"]:
+    """Whether ``curate_view_dimensions`` must place its kept dimensions again.
+
+    A pass that deleted can shift a survivor it already placed (top_frame
+    ``Width`` 6.97 mm), so it is always followed by a second placement.  After
+    a reposition-only pass one ``GetPosition`` per kept dimension (~3 ms each,
+    against ~0.65 s for the pass) decides instead: any kept dimension off its
+    requested point by more than ``_REPOSITION_DRIFT_TOLERANCE_M`` is placed
+    again with the rest.  Records ``reposition_rerun_reason`` (and, for the
+    readback, its count/cost/drift) on the current span.
+    """
+    if deleted:
+        _telemetry.annotate(reposition_rerun_reason="deleted")
+        return "deleted"
+    started = time.perf_counter()
+    drifted: list[str] = []
+    read = 0
+    for annotation, name in zip(curated, names):
+        if name not in keep:
+            continue
+        read += 1
+        position = adapter._attempt(
+            lambda a=annotation: adapter._get_attr_or_call(a, "GetPosition")
+        )
+        if not position or math.dist(
+            (float(position[0]), float(position[1])), keep[name]
+        ) > _REPOSITION_DRIFT_TOLERANCE_M:
+            drifted.append(name)
+    reason: Literal["drifted", "none"] = "drifted" if drifted else "none"
+    _telemetry.annotate(
+        reposition_rerun_reason=reason,
+        reposition_readback_n=read,
+        reposition_readback_s=round(time.perf_counter() - started, 4),
+        reposition_drifted_n=len(drifted),
+    )
+    if drifted:
+        _telemetry.info(
+            f"kept dimensions {sorted(drifted)} read back off their requested "
+            "position after the rebuild; placing the view's dimensions again"
+        )
+    return reason
+
+
+
 @_telemetry.traced("drawing.curate_dimensions", label_param="view_label")
 def curate_view_dimensions(
     adapter: Any,
@@ -2899,6 +2959,16 @@ def curate_view_dimensions(
     falls back to the entire-model import plus deletion sweep: the same ink for
     many times the round trips, so the fallback WARNS and names the view, which
     keeps every recipe still on it visible in the build log.
+
+    The kept dimensions are positioned again when the first pass deleted some
+    (a delete can shift a survivor the same pass already placed: top_frame
+    ``Width`` 6.97 mm, ``RibWidth`` 0.63 mm) or when one reads back off its
+    requested point after that pass's rebuild.  Otherwise the second pass is
+    skipped: after a reposition-only pass it moved nothing and changed no PDF
+    pixel on any of 9 views (diag branch pedro/drawing-step-snapshots-diag,
+    a0e136c66, leaves cone_pivot_post/pinion_arbor/top_frame) and cost ~0.65 s
+    each (one ``EditRebuild3`` plus a name read and ``SetPosition`` per
+    dimension); the readback costs one ``GetPosition`` per kept dimension.
     """
     if dimensions_by_feature is None:
         _telemetry.warn(
@@ -2931,13 +3001,18 @@ def curate_view_dimensions(
     curated = curate_dimensions(
         adapter, annotations, delete=extra, reposition=dict(keep)
     )
-    present = {dimension_name(adapter, annotation) for annotation in curated}
-    missing = sorted(set(keep) - present)
+    names = [dimension_name(adapter, annotation) for annotation in curated]
+    missing = sorted(set(keep) - set(names))
     if missing:
         raise RuntimeError(
             f"{view_label} view is missing model dimensions: {missing}; "
-            f"available={sorted(present)} from features={list(features)}"
+            f"available={sorted(set(names))} from features={list(features)}"
         )
+    if (
+        _reposition_rerun_reason(adapter, curated, names, keep, deleted=bool(extra))
+        == "none"
+    ):
+        return curated
     return curate_dimensions(adapter, curated, reposition=dict(keep))
 
 
@@ -5538,7 +5613,7 @@ def _gdt_element(
     )
 
 
-def _iter_view_annotations(adapter: Any, view: Any):
+def _iter_view_annotations(adapter: Any, view: Any, *, sheet_notes_only: bool = False):
     """Yield ``(LayoutElement, annotation)`` for each note / GD&T symbol / dimension.
 
     ``IView.GetAnnotations`` returns dimensions, center marks, cosmetic-thread
@@ -5551,6 +5626,12 @@ def _iter_view_annotations(adapter: Any, view: Any):
     (see :func:`_leader_segments_of`) without a second COM walk. A DISPLAY
     DIMENSION yields ``None`` for its element: it gets no box here (see
     ``_ANNOT_DIM``), only its leaders.
+
+    ``sheet_notes_only`` is the SHEET view's walk: only notes the drawing
+    sheet itself owns (``swAnnotationOwner_DrawingSheet``) are boxed. The sheet
+    view also returns the template's notes -- the title block and sheet format,
+    40 on a B sheet -- and a view's; their type and owner are read first, so
+    none of them costs a note box (six COM reads each) only to be dropped.
     """
     annotations = (
         adapter._attempt(lambda: adapter._get_attr_or_call(view, "GetAnnotations"))
@@ -5567,6 +5648,18 @@ def _iter_view_annotations(adapter: Any, view: Any):
             "GetLeaderCount",
         )
         kind = int(adapter._get_attr_or_call(annotation, "GetType") or 0)
+        if sheet_notes_only and (
+            kind != _ANNOT_NOTE
+            or int(
+                adapter._attempt(
+                    lambda a=annotation: adapter._get_attr_or_call(a, "OwnerType"),
+                    default=-1,
+                )
+                or -1
+            )
+            != _OWNER_DRAWING_SHEET
+        ):
+            continue
         name = str(adapter._get_attr_or_call(annotation, "GetName") or "")
         if kind == _ANNOT_NOTE:
             element = _note_element(adapter, annotation, name)
@@ -5956,18 +6049,9 @@ def collect_layout_elements(
     if sheet_view is not None:
         for table in _iter_tables(adapter, sheet_view):
             tables[table.label] = table
-        for element, annotation in _iter_view_annotations(adapter, sheet_view):
-            if element is None or element.kind != "note":
-                continue
-            owner_type = int(
-                adapter._attempt(
-                    lambda a=annotation: adapter._get_attr_or_call(a, "OwnerType"),
-                    default=-1,
-                )
-                or -1
-            )
-            if owner_type != 1:  # swAnnotationOwner_DrawingSheet
-                continue
+        for element, annotation in _iter_view_annotations(
+            adapter, sheet_view, sheet_notes_only=True
+        ):
             element = replace(element, owner="sheet")
             elements.append(element)
             leaders.extend(
@@ -6246,9 +6330,15 @@ async def finalize_drawing(
     # Persist the native drawing and PDF once from the fully loaded authored
     # document. Reopen/scale/save cycles are deliberately absent from this hot
     # path; the template and precomputed recipe placements own the layout.
+    # One child span per SaveAs3: an assembly drawing's save_and_export_pdf
+    # runs 42-180 s (harmonic_analyzer_assembly p50 177 s) and nothing said
+    # whether the SLDDRW save or the PDF export spends it.
     with _telemetry.span("drawing.save_and_export_pdf"):
         artifacts = save_drawing(
-            adapter, str(outputs.slddrw), pdf_path=str(outputs.pdf)
+            adapter,
+            str(outputs.slddrw),
+            pdf_path=str(outputs.pdf),
+            artifact_context=lambda kind, _path: _telemetry.span(f"drawing.save_{kind}"),
         )
     if set(artifacts) != {"drawing", "pdf"}:
         raise RuntimeError(f"drawing save/export incomplete: {artifacts!r}")
