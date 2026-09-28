@@ -16,10 +16,11 @@ Every frame family is frozen, at the point farm run 20260928T074246010Z
 hit on the current 1:8 sheet: that sheet audited clean, and its frozen
 anchors project to the same sheet points today. Walking instead moved the
 cross-screw balloon's leader through its own number (run
-20260928T083410084Z) and walked the lag screws through 24 hidden points
-first. Points frozen from the old 1:7 sheet (run 20260928T061043870Z) had
-missed on the 1:8 sheet, so a point is frozen only once proven on the sheet
-it serves.
+20260928T083410084Z) and spent 24 lag-screw points no hit claimed
+first. Frozen, run 20260928T084730204Z hit all ten at those same sheet
+points in 5 s of picks, and the sheet audited clean again. Points frozen
+from the old 1:7 sheet (run 20260928T061043870Z) had missed on the 1:8
+sheet, so a point is frozen only once proven on the sheet it serves.
 """
 
 from __future__ import annotations
