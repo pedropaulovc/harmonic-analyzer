@@ -13,6 +13,7 @@ import json
 import math
 import os
 import sys
+import time
 from collections import Counter
 from dataclasses import dataclass, replace
 from itertools import combinations
@@ -2878,6 +2879,64 @@ def _curate_entire_model_import(
     return curate_dimensions(adapter, curated, reposition=dict(keep))
 
 
+# How far a kept dimension may read back from its requested sheet point before
+# it is placed again.  SetPosition + EditRebuild3 leaves an unmoved survivor
+# exactly on its point (all 17 curate passes on the step-snapshot leaves read
+# back equal at 1e-6 m); the two real shifts were 6.97 mm and 0.63 mm.
+_REPOSITION_DRIFT_TOLERANCE_M = 1e-5
+
+
+def _reposition_rerun_reason(
+    adapter: Any,
+    curated: Sequence[Any],
+    names: Sequence[str],
+    keep: Mapping[str, tuple[float, float]],
+    *,
+    deleted: bool,
+) -> Literal["deleted", "drifted", "none"]:
+    """Whether ``curate_view_dimensions`` must place its kept dimensions again.
+
+    A pass that deleted can shift a survivor it already placed (top_frame
+    ``Width`` 6.97 mm), so it is always followed by a second placement.  After
+    a reposition-only pass one ``GetPosition`` per kept dimension (~3 ms each,
+    against ~0.65 s for the pass) decides instead: any kept dimension off its
+    requested point by more than ``_REPOSITION_DRIFT_TOLERANCE_M`` is placed
+    again with the rest.  Records ``reposition_rerun_reason`` (and, for the
+    readback, its count/cost/drift) on the current span.
+    """
+    if deleted:
+        _telemetry.annotate(reposition_rerun_reason="deleted")
+        return "deleted"
+    started = time.perf_counter()
+    drifted: list[str] = []
+    read = 0
+    for annotation, name in zip(curated, names):
+        if name not in keep:
+            continue
+        read += 1
+        position = adapter._attempt(
+            lambda a=annotation: adapter._get_attr_or_call(a, "GetPosition")
+        )
+        if not position or math.dist(
+            (float(position[0]), float(position[1])), keep[name]
+        ) > _REPOSITION_DRIFT_TOLERANCE_M:
+            drifted.append(name)
+    reason: Literal["drifted", "none"] = "drifted" if drifted else "none"
+    _telemetry.annotate(
+        reposition_rerun_reason=reason,
+        reposition_readback_n=read,
+        reposition_readback_s=round(time.perf_counter() - started, 4),
+        reposition_drifted_n=len(drifted),
+    )
+    if drifted:
+        _telemetry.info(
+            f"kept dimensions {sorted(drifted)} read back off their requested "
+            "position after the rebuild; placing the view's dimensions again"
+        )
+    return reason
+
+
+
 @_telemetry.traced("drawing.curate_dimensions", label_param="view_label")
 def curate_view_dimensions(
     adapter: Any,
@@ -2901,14 +2960,15 @@ def curate_view_dimensions(
     many times the round trips, so the fallback WARNS and names the view, which
     keeps every recipe still on it visible in the build log.
 
-    The kept dimensions are positioned again only when the first pass
-    deleted some: a delete can shift a survivor the same pass already placed
-    (top_frame ``Width`` 6.97 mm, ``RibWidth`` 0.63 mm), while after a
-    reposition-only pass the second one moved nothing and changed no PDF pixel
-    on any of 9 views (diag branch pedro/drawing-step-snapshots-diag,
-    a0e136c66, leaves cone_pivot_post/pinion_arbor/top_frame) and cost
-    ~0.65 s each (one ``EditRebuild3`` plus a name read and ``SetPosition``
-    per dimension).
+    The kept dimensions are positioned again when the first pass deleted some
+    (a delete can shift a survivor the same pass already placed: top_frame
+    ``Width`` 6.97 mm, ``RibWidth`` 0.63 mm) or when one reads back off its
+    requested point after that pass's rebuild.  Otherwise the second pass is
+    skipped: after a reposition-only pass it moved nothing and changed no PDF
+    pixel on any of 9 views (diag branch pedro/drawing-step-snapshots-diag,
+    a0e136c66, leaves cone_pivot_post/pinion_arbor/top_frame) and cost ~0.65 s
+    each (one ``EditRebuild3`` plus a name read and ``SetPosition`` per
+    dimension); the readback costs one ``GetPosition`` per kept dimension.
     """
     if dimensions_by_feature is None:
         _telemetry.warn(
@@ -2941,14 +3001,17 @@ def curate_view_dimensions(
     curated = curate_dimensions(
         adapter, annotations, delete=extra, reposition=dict(keep)
     )
-    present = {dimension_name(adapter, annotation) for annotation in curated}
-    missing = sorted(set(keep) - present)
+    names = [dimension_name(adapter, annotation) for annotation in curated]
+    missing = sorted(set(keep) - set(names))
     if missing:
         raise RuntimeError(
             f"{view_label} view is missing model dimensions: {missing}; "
-            f"available={sorted(present)} from features={list(features)}"
+            f"available={sorted(set(names))} from features={list(features)}"
         )
-    if not extra:
+    if (
+        _reposition_rerun_reason(adapter, curated, names, keep, deleted=bool(extra))
+        == "none"
+    ):
         return curated
     return curate_dimensions(adapter, curated, reposition=dict(keep))
 

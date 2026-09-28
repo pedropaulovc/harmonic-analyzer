@@ -248,7 +248,8 @@ def curate_view_dimensions(
     curated = _dc.curate_dimensions(
         adapter, annotations, delete=extra, reposition=dict(keep)
     )
-    present = {_dc.dimension_name(adapter, annotation) for annotation in curated}
+    names = [_dc.dimension_name(adapter, annotation) for annotation in curated]
+    present = set(names)
     missing = sorted(set(keep) - present)
     if missing:
         _warn_undetected_owners(
@@ -260,9 +261,14 @@ def curate_view_dimensions(
             f"{view_label} view is missing model dimensions: {missing}; "
             f"available={sorted(present)} from features={list(features)}"
         )
-    if extra:
-        # See ``_drawing_common.curate_view_dimensions``: only a pass that
-        # deleted can leave a kept dimension off its position.
+    if (
+        _dc._reposition_rerun_reason(
+            adapter, curated, names, keep, deleted=bool(extra)
+        )
+        != "none"
+    ):
+        # See ``_drawing_common.curate_view_dimensions``: a pass that deleted,
+        # or a kept dimension read back off its point, is placed again.
         curated = _dc.curate_dimensions(adapter, curated, reposition=dict(keep))
     part_shown = [sketch for block in _PART_SHOWN for sketch in block.sketches]
     if hidden or part_shown:
