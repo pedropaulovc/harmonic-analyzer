@@ -602,14 +602,27 @@ def _create_detail_view(
         detail, "IView", "SetViewPosition", "Position"
     )
     rebuild_drawing(adapter, label=f"create detail view {detail_label}")
-    # A detail view's Position is its model-origin anchor, not the circle
-    # centre (run 2b643c17 placed the circle 99 mm below the request).  Move
-    # the anchor until the circle's model centre lands on ``view_xy``.
-    for attempt in range(2):
-        landed = model_point_in_view(
-            adapter, detail, center_m, label=f"{label} centre, pass {attempt}"
-        )
+    # CreateDetailViewAt4 puts the circle's centre on (x, y), but a fresh
+    # detail view's readbacks lag its ink: on leaf 20260928T075849Z-1-882b4704
+    # the outline was centred on the request while ModelToViewTransform
+    # projected the centre 99 mm below it and Position read 99 mm below where
+    # SetViewPosition later had to put it.  A loop that trusted the
+    # projection moved a correctly placed view 99 mm up and needed a second
+    # move to bring it back; on three #1105 leaves the projection then read
+    # "on target" while the outline sat 99 mm high, and the view stayed there.
+    # GetOutline is the ink (a 2:1 circle of DETAIL_RADIUS_MM, its label is
+    # placed separately), and SetViewPosition moves that ink by the
+    # difference from the Position it reads, so place by the outline and only
+    # verify the projection afterwards, once it has caught up.
+    landed = view_xy
+    for attempt in range(4):
+        outline = tuple(float(v) for v in detail.GetOutline())
+        landed = ((outline[0] + outline[2]) / 2.0, (outline[1] + outline[3]) / 2.0)
         anchor = tuple(float(v) for v in detail.Position)
+        print(
+            f"detail {detail_label} pass {attempt}: anchor={anchor} "
+            f"outline_centre={landed} outline={outline}"
+        )
         if max(abs(landed[0] - view_xy[0]), abs(landed[1] - view_xy[1])) < 0.0002:
             break
         moved = (
@@ -619,16 +632,30 @@ def _create_detail_view(
         if not detail.SetViewPosition(double_array(list(moved)), False):
             raise RuntimeError(f"failed to position the detail view ({label})")
         rebuild_drawing(adapter, label=f"place detail view {detail_label}")
-    landed = model_point_in_view(adapter, detail, center_m, label=f"{label} centre")
+    else:
+        raise RuntimeError(
+            f"detail {detail_label} outline centre stayed at {landed}, "
+            f"requested {view_xy}"
+        )
+    # Every later placement on this view projects through its transform, so
+    # it must agree with the ink before anything is hung on it.
+    for attempt in range(3):
+        projected = model_point_in_view(
+            adapter, detail, center_m, label=f"{label} centre, read {attempt}"
+        )
+        if max(abs(projected[0] - landed[0]), abs(projected[1] - landed[1])) < 0.0005:
+            break
+        rebuild_drawing(adapter, label=f"settle detail view {detail_label}")
+    else:
+        raise RuntimeError(
+            f"detail {detail_label} projects its centre to {projected} while its "
+            f"outline is centred on {landed} (requested {view_xy})"
+        )
     print(
         f"detail {detail_label}: parent_sheet_centre={sheet[0]} "
         f"sketch_centre={points[0]} requested={view_xy} landed={landed} "
-        f"outline={tuple(float(v) for v in detail.GetOutline())}"
+        f"projected={projected} outline={tuple(float(v) for v in detail.GetOutline())}"
     )
-    if max(abs(landed[0] - view_xy[0]), abs(landed[1] - view_xy[1])) > 0.0005:
-        raise RuntimeError(
-            f"detail {detail_label} centre landed at {landed}, requested {view_xy}"
-        )
     return detail
 
 
