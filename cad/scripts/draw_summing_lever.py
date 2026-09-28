@@ -32,16 +32,20 @@ from _hole_spec import blind_cut_dia_mm
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    ViewEdge,
+    ViewEdges,
     add_datum_feature,
     add_edge_dimension,
     add_feature_control_frame,
     add_native_hole_callout,
     add_property_linked_note,
     add_surface_finish,
+    assert_dimension_measures,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    scan_view_edges,
     set_basic_dimension,
     set_hidden_lines_removed,
     stamp_drawing_summary,
@@ -53,10 +57,13 @@ from summing_lever_spec import (
     CHANNEL_PITCH,
     COUNTER_HOLE_SPEC,
     HEX_DEPTH,
+    HOLE_END_OFFSET_LAST,
     HOLE_SPEC,
     HOLE_X,
     HOLE_Z_FIRST,
+    HOLE_Z_LAST,
     PLATE_L,
+    PLATE_T,
     PLATE_W,
     SURFACE_FINISHES,
     TIP_X,
@@ -109,6 +116,33 @@ def _top_xy(mx: float, mz: float) -> tuple[float, float]:
         TOP_CENTER[0] + (mx - _BBOX_CX) * _S / 1000.0,
         TOP_CENTER[1] + mz * _S / 1000.0,
     )
+
+
+def _end_face_edge(edges: ViewEdges, *, x_mm: float) -> ViewEdge:
+    """The one visible line of the +Z end face crossing model ``x_mm``.
+
+    In the plan the +Z end (bottom of the view) shows a single line at
+    z = PLATE_L/2: the edge rib's outer top edge, which covers the plate's own
+    end edge until the rib tapers below the plate near x = PLATE_W. The end
+    rib's inboard flange edge sits 5.08 mm up the sheet and the rib's underside
+    edge (y < 0) is hidden, so exactly one visible +y line at that z spans the
+    requested x; anything else is a changed model and fails loud.
+    """
+    z_mm = PLATE_L / 2.0
+    matches = [
+        item
+        for item in edges.lines
+        if all(abs(point[2] - z_mm) < 1e-6 and point[1] > -1e-6 for point in item.line)
+        and min(point[0] for point in item.line) - 1e-6 <= x_mm
+        and x_mm <= max(point[0] for point in item.line) + 1e-6
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"summing lever +Z end face: expected one visible line at z={z_mm:g} "
+            f"spanning x={x_mm:g} in the {edges.label!r} scan, found "
+            f"{[item.line for item in matches]}"
+        )
+    return matches[0]
 
 
 FRONT_KEEP = {
@@ -250,22 +284,30 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_basic_dimension(adapter, anchor_location, label="anchor tap X location")
 
-    # Anchor-tap pattern control: datum B on the -Z plate end, BASIC row-X /
-    # start-Z / pitch coordinates off A|B, a native thread callout, and a 20X
-    # position frame -- the inspectable pattern definition (the notes no longer
-    # carry these numbers as prose).
+    # Anchor-tap pattern control: datum B on the plate end the seed hole is
+    # located from, BASIC row-X / start-Z / pitch coordinates off A|B, a
+    # native thread callout, and a 20X position frame -- the inspectable
+    # pattern definition (the notes no longer carry these numbers as prose).
+    # The plan prints model +Z DOWN the sheet, so the end at the bottom of the
+    # view is the +Z end: the seed hole (HOLE_Z_LAST, HOLE_END_OFFSET_LAST off
+    # that end) is the bottom hole of the column.
     # Hang B's tag straight down right of the +Z trunnion stub, between it and
     # the 39.85 extension line: left of the stub it sat in the finish leader's
     # only path (layout audit), and the seed callout now leaves the hole
     # steeply down-right, 8 mm clear of this tag.
+    # Both the datum and the start-Z dimension name their end edge exactly: a
+    # coordinate hit-test on this point resolved to the rib flange 5.08 mm
+    # inboard (datum B on the flange, start Z reading 3.35 for 8.43 -- #1105).
+    top_edges = scan_view_edges(top, label="summing lever top plan")
+    end_edge = _end_face_edge(top_edges, x_mm=10.0)
     plate_end_edge = _top_xy(10.0, -PLATE_L / 2.0)
     add_datum_feature(
         adapter,
         top,
-        edge_xy=plate_end_edge,
+        edge_entity=end_edge.edge,
         symbol_xy=(plate_end_edge[0] + 0.0062, plate_end_edge[1] - 0.0035),
         datum="B",
-        label="plate -Z end face",
+        label="plate +Z end face",
     )
     seed_rim_right = _top_xy(HOLE_X + HOLE_DIA / 2.0, HOLE_Z_FIRST)
     row_x = add_edge_dimension(
@@ -277,16 +319,31 @@ async def build(adapter: Any) -> dict[str, str]:
         label="spring-hole row X",
         orientation="horizontal",
     )
+    assert_dimension_measures(row_x, expected_mm=HOLE_X, label="spring-hole row X")
     set_basic_dimension(adapter, row_x, label="spring-hole row X")
+    seed_rim = top_edges.circle_at(
+        (HOLE_X, PLATE_T / 2.0, HOLE_Z_LAST),
+        HOLE_DIA / 2.0,
+        axis=(0.0, 1.0, 0.0),
+        label="spring-hole seed rim",
+    )
     seed_rim_top = _top_xy(HOLE_X, HOLE_Z_FIRST + HOLE_DIA / 2.0)
+    # 8.43 spans 4.2 mm of sheet (0.0919..0.0961); text between the arrows
+    # would sit on its own line (3.35 there stood on 7.06's extension line
+    # and 152.40's), so it hangs above the span, right of the 7.06 text
+    # (0.275..0.284, up to 0.1035) and left of the 152.40 line (0.396).
     start_z = add_edge_dimension(
         adapter,
         top,
         p0=plate_end_edge,
         p1=seed_rim_top,
-        text_xy=(0.266, 0.094),
+        text_xy=(0.292, 0.106),
         label="spring-hole start Z",
         orientation="vertical",
+        entities=(end_edge.edge, seed_rim.edge),
+    )
+    assert_dimension_measures(
+        start_z, expected_mm=HOLE_END_OFFSET_LAST, label="spring-hole start Z"
     )
     set_basic_dimension(adapter, start_z, label="spring-hole start Z")
     second_rim_bottom = _top_xy(HOLE_X, HOLE_Z_FIRST + CHANNEL_PITCH - HOLE_DIA / 2.0)
@@ -298,6 +355,9 @@ async def build(adapter: Any) -> dict[str, str]:
         text_xy=(0.275, 0.1015),
         label="spring-hole pitch",
         orientation="vertical",
+    )
+    assert_dimension_measures(
+        pitch, expected_mm=CHANNEL_PITCH, label="spring-hole pitch"
     )
     set_basic_dimension(adapter, pitch, label="spring-hole pitch")
     seed_rim_bottom = _top_xy(HOLE_X, HOLE_Z_FIRST - HOLE_DIA / 2.0)

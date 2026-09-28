@@ -322,10 +322,13 @@ def cutter_note_model_tip(note: CutterNote) -> tuple[float, float, float]:
 DETAIL_LABEL_LOWER_LEFT = (0.016, 0.015)
 # The pivot relief-fit note (2.5 mm text, ~0.095 x 0.018): anchored by its
 # upper-left corner, lower right of the free band, left of the title block.
-# 2.5 mm under pivot-to-slot's lower extension line (0.033), which now runs
-# right past this note's left end to reach its line at 0.175. At 0.034 the
-# first row's top lay on that line.
-RELIEF_NOTE_XY = (0.120, 0.0315)
+# Under pivot-to-slot's lower extension line (0.033), which runs right past
+# this note to reach its dimension line at 0.175, where the lower arrowhead
+# sits on the line's foot: at 0.0315 the first row's top (31.2) stood
+# 1.8 mm under that arrow (arrow-near-text, 2 mm clearance); at 0.029 the
+# rows print 26.2..28.7 down to 15.7, still 3 mm above the border zone
+# (12.7).
+RELIEF_NOTE_XY = (0.120, 0.029)
 # The MHA-142 named-exception note and its tap-break override (2.5 mm text,
 # two lines, ~141 x 8.8 mm), anchored upper-left in the empty band above the
 # title block (0.066): right of the plan caption row (x <= 0.2185), under the

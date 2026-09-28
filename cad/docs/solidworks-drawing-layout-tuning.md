@@ -322,6 +322,22 @@ moves it by the delta from the `Position` it reads), then re-read the
 projection until it agrees with the outline before hanging anything on the
 view.
 
+**k. A datum or dimension picked by sheet coordinate where two lines meet.**
+Don't: hang a datum tag or a locating dimension on `SelectByID2("", "EDGE",
+x, y)` at a point where a second visible line runs within the hit-test
+radius. The pick resolves to whichever line SolidWorks tests first and the
+sheet prints a correct-looking symbol on the wrong feature: summing-lever
+datum B, aimed at the plate's end face, landed on the end rib's flange 5.08 mm
+inboard, and the BASIC start-Z dimension off the same pick read 3.35 for 8.43
+(#1105, run 20260928T090231982Z) — no error, only a print that would put the
+hole pattern 5 mm from where the casting has it.
+Do: name the edge (`scan_view_edges` + an exact model-space filter, or
+`ViewEdges.circle_at` for a rim) and pass it as `edge_entity` / `entities`;
+`add_datum_feature` then proves the tag sits on THAT edge by `IsSame`
+(`_assert_attached_to`, `expected_leaders=0` — a datum tag's triangle is not
+a `SetLeader3` leader), and `assert_dimension_measures` proves the number
+against the spec constant before the sheet prints it.
+
 ## The sheet-split rule
 
 When two views' callouts are squeezed together, the fix is a NEW SHEET, not a

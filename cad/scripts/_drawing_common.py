@@ -383,16 +383,20 @@ def _assert_attached_to(
     entity_type: str,
     what: str,
     label: str,
+    expected_leaders: int = 1,
 ) -> None:
-    """Fail unless ``annotation`` is still attached, by one live leader, to
-    exactly ``entity``, an ``entity_type`` (EDGE, FACE or SILHOUETTE) entity.
+    """Fail unless ``annotation`` is still attached, by ``expected_leaders``
+    live leaders, to exactly ``entity``, an ``entity_type`` (EDGE, FACE or
+    SILHOUETTE) entity.
 
     The count, type and entity readbacks must agree on one entity of that
     type -- ``IGtol.IsAttached`` and ``ISFSymbol.IsAttached`` keep reading
     True on a detached symbol -- and that entity must be ``entity`` by
     :func:`_is_same_attachment`.  A leader move re-solves the attachment:
     ``SetLeaderAttachmentPointAtIndex`` detached a feature-control frame
-    (entities=0) on the #1105 platen_guide leaf.
+    (entities=0) on the #1105 platen_guide leaf.  A datum tag's triangle is
+    not a leader (``GetLeaderCount`` reads 0 on every datum tag), so it
+    passes ``expected_leaders=0``.
     """
     kind = entity_type.upper()
     if kind not in _ATTACHMENT_SELECT_TYPES:
@@ -409,7 +413,7 @@ def _assert_attached_to(
         and attached[0] is not None
     )
     same = one and _is_same_attachment(adapter, attached[0], entity, kind)
-    if not same or dangling or leaders != 1:
+    if not same or dangling or leaders != expected_leaders:
         raise RuntimeError(
             f"{what} lost its {kind.lower()} attachment ({label}): "
             f"entities={len(attached)}, count={count}, types={types}, "
@@ -718,7 +722,6 @@ def add_datum_feature(
     label: str,
     entity_type: str = "EDGE",
     entity: Any | None = None,
-    annotation: Any | None = None,
     shoulder: bool = False,
     position_tolerance_m: float = 0.02,
     callout_below: str = "",
@@ -744,49 +747,15 @@ def add_datum_feature(
     a rebuild, so it cannot serve as a readback here.
     """
     draw = adapter.currentModel
-    if annotation is None:
-        _select_annotation_entity(
-            adapter,
-            view,
-            edge_xy=edge_xy,
-            edge_entity=edge_entity,
-            entity=entity,
-            entity_type=entity_type,
-            label=label,
-        )
-    else:
-        ddoc = _early_bound(draw, "IDrawingDoc")
-        name = view_name(adapter, view)
-        if not ddoc.ActivateView(name):
-            raise RuntimeError(f"failed to activate {label} drawing view {name!r}")
-        draw.ClearSelection2(True)
-        annotation = _sw_type_info.early_bound_or_flag(
-            annotation, "IAnnotation", "Select3", "GetSpecificAnnotation"
-        )
-        selected = bool(annotation.Select3(False, null_callout()))
-        if not selected:
-            display = adapter._attempt(lambda: annotation.GetSpecificAnnotation())
-            if display is not None:
-                display = _sw_type_info.early_bound_or_flag(
-                    display, "IDisplayDimension", "GetNameForSelection"
-                )
-                selection_name = str(display.GetNameForSelection() or "")
-                selected = bool(
-                    selection_name
-                    and draw.Extension.SelectByID2(
-                        selection_name,
-                        "DIMENSION",
-                        0.0,
-                        0.0,
-                        0.0,
-                        False,
-                        0,
-                        null_callout(),
-                        0,
-                    )
-                )
-        if not selected:
-            raise RuntimeError(f"failed to select {label} annotation")
+    selected = _select_annotation_entity(
+        adapter,
+        view,
+        edge_xy=edge_xy,
+        edge_entity=edge_entity,
+        entity=entity,
+        entity_type=entity_type,
+        label=label,
+    )
     tag = draw.InsertDatumTag2()
     if tag is None:
         raise RuntimeError(f"failed to insert datum {datum} ({label})")
@@ -805,7 +774,15 @@ def add_datum_feature(
     if shoulder:
         tag.Shoulder = True
     tag_annotation = _sw_type_info.early_bound_or_flag(
-        tag.GetAnnotation(), "IAnnotation", "GetPosition", "SetPosition2"
+        tag.GetAnnotation(),
+        "IAnnotation",
+        "GetPosition",
+        "SetPosition2",
+        "GetAttachedEntities3",
+        "GetAttachedEntityCount3",
+        "GetAttachedEntityTypes",
+        "GetLeaderCount",
+        "IsDangling",
     )
     forced_shoulder = bool(tag.ForcedShoulder)
     if not tag_annotation.SetPosition2(symbol_xy[0], symbol_xy[1], 0.0):
@@ -844,6 +821,22 @@ def add_datum_feature(
         raise RuntimeError(f"failed to set datum callout text ({label})")
     draw.ClearSelection2(True)
     rebuild_drawing(adapter, label="add_datum_feature")
+    # The tag proves it sits on the entity that was selected. A recipe that
+    # names the feature exactly (``entity``/``edge_entity``) can then only get
+    # a datum on that feature -- a coordinate hit-test resolves whichever
+    # line is nearest and read back as a datum on the neighbour (summing-lever
+    # datum B on the rib flange instead of the plate end, #1105) -- and a
+    # re-solved attachment fails here rather than printing. No leader count:
+    # the triangle is not a ``SetLeader3`` leader (``_datum_leader_segments``).
+    _assert_attached_to(
+        adapter,
+        tag_annotation,
+        selected,
+        entity_type=entity_type,
+        what="datum feature",
+        label=label,
+        expected_leaders=0,
+    )
     return tag
 
 
@@ -4314,6 +4307,32 @@ def set_basic_dimension(adapter: Any, dimension: Any, *, label: str) -> Any:
         raise RuntimeError(f"{label} dimension did not retain BASIC tolerance")
     rebuild_drawing(adapter, label="set_basic_dimension")
     return dimension
+
+
+def assert_dimension_measures(
+    dimension: Any, *, expected_mm: float, label: str, tolerance_mm: float = 1e-5
+) -> float:
+    """Fail unless a native ``Add*Dimension2`` result measures ``expected_mm``.
+
+    A drawing dimension reads whatever its two picks resolved to; when a
+    coordinate hit-test lands on the neighbouring line the sheet prints a
+    wrong locating number with no error (summing-lever's spring-hole start
+    read 3.35 off the rib flange instead of 8.43 off the plate end, #1105).
+    The model value (``IDimension.SystemValue``, metres) is the pick-proof
+    the recipe's spec constant can be checked against. Returns the measured
+    millimetres.
+    """
+    display = _sw_type_info.early_bound_or_flag(
+        dimension, "IDisplayDimension", "GetDimension2"
+    )
+    model_dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    measured_mm = abs(float(model_dimension.SystemValue)) * 1000.0
+    if abs(measured_mm - expected_mm) > tolerance_mm:
+        raise RuntimeError(
+            f"{label} measures {measured_mm:g} mm, expected {expected_mm:g} mm: "
+            "a pick resolved to the wrong entity"
+        )
+    return measured_mm
 
 
 def set_basic_dimensions(

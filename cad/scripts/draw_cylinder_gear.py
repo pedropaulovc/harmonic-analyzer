@@ -78,7 +78,12 @@ RIGHT_CENTER = (0.205, 0.270)
 ISO_CENTER = (0.165, 0.145)
 GEAR_DATA_POS = (0.015, 0.410)
 MANUFACTURING_NOTES_POS = (0.015, 0.085)
-NOTCH_DETAIL_CENTER = (0.060, 0.155)
+# The 6:1 boundary prints 25.2 mm off this centre; NotchDepth's two-row text
+# hangs left of it at x 13.9..36.1 (fixed by its 0.025 dimension line and the
+# 12.7 border zone), so at 0.060 the circle's flank (34.8) crossed "FROM OD"
+# (text-on-line).  6 mm right the flank sits at 40.8, 4.7 mm clear, with the
+# outline (30..102) still short of the isometric's (122.7).
+NOTCH_DETAIL_CENTER = (0.066, 0.155)
 NOTCH_DETAIL_SCALE = (6, 1)
 NOTCH_DETAIL_RADIUS_MM = 4.0
 NOTCH_DETAIL_DIMENSIONS = {

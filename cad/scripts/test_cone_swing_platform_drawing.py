@@ -440,12 +440,20 @@ def _leader_fan(note: drawing.CutterNote):
     return [(tip, (box[0], box[1])), (tip, (box[0], box[3]))]
 
 
+def _relief_note_box():
+    """The relief note as the layout audit boxed it (run 20260928T090231982Z):
+    four 2.5 mm rows from 0.3 mm under the upper-left anchor to 13.3 mm
+    under it, 0.0947 m wide."""
+    note_x, note_y = drawing.RELIEF_NOTE_XY
+    return (note_x, note_y - 0.0133, note_x + 0.0947, note_y)
+
+
 def test_detail_band_clears_border_title_block_and_captions() -> None:
     """Detail B, its label, dimension texts, cutter notes and the relief note.
 
     Extents are the ones the layout audit logged on the farm (runs 2b643c17
     and e86bf319) -- the native label 31.5 x 16.2 mm, the relief note
-    0.0947 x 0.0176 m from its upper-left anchor -- and the rendered text
+    per ``_relief_note_box`` -- and the rendered text
     blocks above.  e86bf319 failed on the label alone (8.9 mm through the
     bottom border); its callouts also ran under the title block and the plan
     caption, which the audit's nominal dimension boxes cannot see (#852).
@@ -457,8 +465,7 @@ def test_detail_band_clears_border_title_block_and_captions() -> None:
     )
     label_x, label_y = drawing.DETAIL_LABEL_LOWER_LEFT
     label = (label_x, label_y, label_x + 0.0315, label_y + 0.0162)
-    note_x, note_y = drawing.RELIEF_NOTE_XY
-    relief = (note_x, note_y - 0.0176, note_x + 0.0947, note_y)
+    relief = _relief_note_box()
     cx, cy = drawing.DETAIL_CENTER
     r = drawing.DETAIL_SHEET_RADIUS
     circle = (cx - r, cy - r, cx + r, cy + r)
@@ -622,8 +629,7 @@ def test_cutter_note_leaders_reach_their_arcs_without_crossing() -> None:
             ((drawing.DETAIL_CENTER[0] - 0.004, 0.055), (x, 0.055)),
         ]
 
-    note_x, note_y = drawing.RELIEF_NOTE_XY
-    relief = (note_x, note_y - 0.0176, note_x + 0.0947, note_y)
+    relief = _relief_note_box()
     for line in pivot_to_slot_lines(z_x):
         for fan in fans.values():
             for segment in fan:
