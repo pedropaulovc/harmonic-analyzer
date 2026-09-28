@@ -1755,9 +1755,9 @@ DRAWING_BUILD_ID_PROPERTY = "BUILD_ID"
 # options without 0x4 (``adapter.open_model`` passes 1, Silent), and
 # ``test_failure_forensics`` holds every ``OpenDoc6``/``OpenDoc7`` call in
 # cad/scripts and solidworks_mcp to that. So on any document the build opened,
-# part or assembly, view-only means "still loading", and an empty read waits
-# for the flag to clear -- bounded and logged, and never a blind re-read of a
-# document that says it is loaded.
+# part or assembly, view-only means "still loading": an empty read waits for
+# the flag to clear (bounded and logged), and is re-read once only when the
+# document then says it is loaded -- never on a flag it cannot read.
 _VIEW_ONLY_WAIT_S = 30.0
 _VIEW_ONLY_POLL_S = 0.25
 
@@ -1775,27 +1775,29 @@ def _await_document_loaded(model: Any) -> dict[str, Any]:
     """Wait for a view-only (still loading) document to finish loading.
 
     Returns the observation for the failure capture: ``view_only`` as first
-    read, and, when it had to wait, ``view_only_wait_s`` and the final state.
+    read; when it had to wait, ``view_only_wait_s`` and the final state; and
+    ``loaded``, True only when the document's last answer was a definite
+    ``IsOpenedViewOnly=False``.
     """
     view_only = _opened_view_only(model)
     load: dict[str, Any] = {"view_only": "unknown" if view_only is None else view_only}
-    if view_only is not True:
-        return load
-    _telemetry.info(
-        "source document is still loading (IsOpenedViewOnly=True, and the build "
-        "never opens view-only) with empty custom properties; waiting up to "
-        f"{_VIEW_ONLY_WAIT_S:.0f}s for it to load"
-    )
-    begun = time.monotonic()
-    while view_only is True and time.monotonic() - begun < _VIEW_ONLY_WAIT_S:
-        time.sleep(_VIEW_ONLY_POLL_S)
-        view_only = _opened_view_only(model)
-    load["view_only_wait_s"] = round(time.monotonic() - begun, 2)
-    load["view_only_after_wait"] = "unknown" if view_only is None else view_only
-    _telemetry.info(
-        f"source document view-only wait ended after {load['view_only_wait_s']:.1f}s "
-        f"(IsOpenedViewOnly={load['view_only_after_wait']})"
-    )
+    if view_only is True:
+        _telemetry.info(
+            "source document is still loading (IsOpenedViewOnly=True, and the build "
+            "never opens view-only) with empty custom properties; waiting up to "
+            f"{_VIEW_ONLY_WAIT_S:.0f}s for it to load"
+        )
+        begun = time.monotonic()
+        while view_only is True and time.monotonic() - begun < _VIEW_ONLY_WAIT_S:
+            time.sleep(_VIEW_ONLY_POLL_S)
+            view_only = _opened_view_only(model)
+        load["view_only_wait_s"] = round(time.monotonic() - begun, 2)
+        load["view_only_after_wait"] = "unknown" if view_only is None else view_only
+        _telemetry.info(
+            f"source document view-only wait ended after {load['view_only_wait_s']:.1f}s "
+            f"(IsOpenedViewOnly={load['view_only_after_wait']})"
+        )
+    load["loaded"] = view_only is False
     return load
 
 
@@ -1805,11 +1807,15 @@ def read_required_properties(
     """The source document's file-level custom properties ``names``; raise when
     one of ``required`` is empty, or ``Revision`` is not the current release.
 
-    An empty required value is re-read only after the document itself said it
-    was still loading (see ``_await_document_loaded``). Still empty, the failure
-    names the document, its configuration, both property APIs' answers and the
-    seat's age and startup state (``_seat_forensics.capture_missing_properties``)
-    before raising the same ``RuntimeError``.
+    An empty required value is re-read once, and only once the document itself
+    reports it is loaded (``IsOpenedViewOnly=False``, after waiting out a load
+    in progress; see ``_await_document_loaded``). The first read may have landed
+    before a load that finished by the time the flag was asked, so a definite
+    "loaded" earns a re-read; an unreadable flag does not. Still empty, the
+    failure names the document, its configuration, both property APIs' answers
+    and the seat's age and startup state
+    (``_seat_forensics.capture_missing_properties``) before raising the same
+    ``RuntimeError``.
     """
     required = tuple(required)
 
@@ -1820,7 +1826,7 @@ def read_required_properties(
     missing = [name for name in required if not properties.get(name)]
     if missing:
         load = _await_document_loaded(model)
-        if "view_only_wait_s" in load:
+        if load["loaded"]:
             properties = read()
             missing = [name for name in required if not properties.get(name)]
         if missing:

@@ -751,11 +751,19 @@ class _SourcePart:
     ``IsOpenedViewOnly``."""
 
     def __init__(
-        self, properties: dict[str, str], *, loading_reads: int, doc_type: int = 1
+        self,
+        properties: dict[str, str],
+        *,
+        loading_reads: int,
+        doc_type: int = 1,
+        empty_reads: int = 0,
     ):
         self._properties = properties
         self._loading_reads = loading_reads
         self._doc_type = doc_type
+        # Property reads answered empty regardless of the view-only flag: a
+        # load that finished between the first read and the flag check.
+        self._empty_reads = empty_reads
         self.property_reads = 0
         self.view_only_reads = 0
         self.Extension = SimpleNamespace(
@@ -776,6 +784,9 @@ class _SourcePart:
 
     def GetCustomInfoValue(self, configuration: str, name: str) -> str:
         self.property_reads += 1
+        if self._empty_reads:
+            self._empty_reads -= 1
+            return ""
         return "" if self._loading_reads else self._properties.get(name, "")
 
     def GetPathName(self) -> str:
@@ -888,10 +899,11 @@ def test_no_document_the_build_opens_is_opened_view_only():
 def test_empty_properties_on_a_loaded_source_name_the_document_api_and_seat(
     monkeypatch, capture_telemetry
 ):
-    """A document that says it is loaded is not re-read: the failure raises the
-    same message at once, and the one ERROR line names what the next triage
-    needs -- the document, its configuration, the API that read empty, what
-    the property manager holds, and the seat's age and startup state."""
+    """A document that says it is loaded is re-read once, and when that read is
+    still empty the failure raises the same message, and the one ERROR line
+    names what the next triage needs -- the document, its configuration, the
+    API that read empty, what the property manager holds, and the seat's age
+    and startup state."""
     import _drawing_common
 
     spans, logs = capture_telemetry
@@ -907,7 +919,7 @@ def test_empty_properties_on_a_loaded_source_name_the_document_api_and_seat(
     ):
         _drawing_common.read_required_properties(part, _TITLE_BLOCK, required=_TITLE_BLOCK)
 
-    assert part.property_reads == len(_TITLE_BLOCK)  # no blind re-read
+    assert part.property_reads == 2 * len(_TITLE_BLOCK)  # the read, one after "loaded"
     (record,) = [
         r for r in logs.get_finished_logs() if "[forensics] source part" in str(r.log_record.body)
     ]
@@ -923,6 +935,41 @@ def test_empty_properties_on_a_loaded_source_name_the_document_api_and_seat(
     assert capture["file_properties"]["get6"]["Number"] == {
         "result": "CachedValue", "value": "MHA-104", "resolved": "MHA-104",
     }
+
+
+def test_a_load_that_finishes_before_the_flag_is_asked_is_re_read(monkeypatch):
+    """The race: the first read lands while the source is loading, the load
+    completes before ``IsOpenedViewOnly`` is asked, and the flag already says
+    False. A definite "loaded" earns the one re-read, which finds the values."""
+    import _drawing_common
+
+    monkeypatch.setattr(
+        _drawing_common.time, "sleep", lambda _s: pytest.fail("waited on a loaded source")
+    )
+    part = _SourcePart(
+        {name: "x" for name in _TITLE_BLOCK}, loading_reads=0, empty_reads=len(_TITLE_BLOCK)
+    )
+
+    got = _drawing_common.read_required_properties(part, _TITLE_BLOCK, required=_TITLE_BLOCK)
+
+    assert got == {name: "x" for name in _TITLE_BLOCK}
+    assert part.view_only_reads == 1
+    assert part.property_reads == 2 * len(_TITLE_BLOCK)
+
+
+def test_an_unreadable_load_flag_earns_no_re_read(monkeypatch):
+    """Without a definite answer from the document, a re-read would be blind:
+    the failure raises after the one read, with the flag recorded as unknown."""
+    import _drawing_common
+
+    monkeypatch.setattr(_common, "_early_bound", lambda obj, _iface: obj)
+    part = _SourcePart({name: "x" for name in _TITLE_BLOCK}, loading_reads=0, empty_reads=1)
+    monkeypatch.setattr(part, "IsOpenedViewOnly", lambda: None)  # no boolean answer
+
+    with pytest.raises(RuntimeError, match=r"^source part properties are missing: \['Number'\]$"):
+        _drawing_common.read_required_properties(part, _TITLE_BLOCK, required=_TITLE_BLOCK)
+
+    assert part.property_reads == len(_TITLE_BLOCK)
 
 
 def test_a_capture_that_cannot_read_anything_still_raises_the_readers_failure():
