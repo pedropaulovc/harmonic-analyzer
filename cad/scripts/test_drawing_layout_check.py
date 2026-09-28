@@ -2116,127 +2116,240 @@ def test_ring_order_survives_any_arrival_order():
 
 
 class _FakeDrawingComponent:
-    def __init__(self, name, children=(), path=""):
+    def __init__(self, name, children=(), path="", visible=True, transform=None):
         self.Name = name
         self._children = tuple(children)
-        self.Component = SimpleNamespace(GetPathName=lambda p=path: p)
+        self.Visible = visible
+        self.Component = SimpleNamespace(
+            GetPathName=lambda p=path: p,
+            Name2=name.split("@", 1)[0].rsplit("/", 1)[-1],
+            Transform2=SimpleNamespace(
+                ArrayData=transform or (1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+            ),
+        )
 
     def GetChildren(self):
         return self._children
 
 
-def _anchor_view(edges_by_component):
-    """A drawing view whose visible edges come back in a caller-chosen order."""
-    leaves = [
-        _FakeDrawingComponent(f"{stem}-1@drive-train", path=f"C:/x/{stem}.SLDPRT")
-        for stem in edges_by_component
+def _instances(*names, hidden=()):
+    """Leaf drawing components, one per instance name, in the given walk order."""
+    return [
+        _FakeDrawingComponent(
+            f"drive-train-8/{name}@Drawing View9",
+            path=f"C:/x/{name.rsplit('-', 1)[0]}.SLDPRT",
+            visible=name not in hidden,
+        )
+        for name in names
     ]
-    by_path = {
-        leaf.Component.GetPathName(): edges_by_component[stem]
-        for leaf, stem in zip(leaves, edges_by_component)
-    }
-    root = _FakeDrawingComponent("drive-train", children=leaves)
+
+
+def _leaves(children):
+    root = _FakeDrawingComponent("drive-train-8", children=children)
+    view = SimpleNamespace(RootDrawingComponent2=lambda _resolve: root)
+    return drawing_common._view_component_leaves(_FakeAdapter(None), view, label="t")
+
+
+_ANCHOR = drawing_common.BalloonAnchor(point_mm=(1.0, 2.0, 3.0))
+
+
+def _chosen(children, stem="cone-gear", anchor=_ANCHOR):
+    leaf = drawing_common._shown_instances(_leaves(children), stem, anchor, label="t")[0]
+    return drawing_common._instance_name(leaf.name)
+
+
+def test_anchor_instance_is_the_lowest_natural_name_in_any_walk_order():
+    """The component tree lists children in no stable order (#865: cone-gear 1
+    vs 19 across runs); the name is the only order that cannot move, and 2
+    sorts before 10 before 19 as a machinist reads them."""
+    from itertools import permutations
+
+    for order in permutations(("cone-gear-19", "cone-gear-2", "cone-gear-10")):
+        assert _chosen(_instances(*order)) == "cone-gear-2"
+
+
+def test_anchor_instance_skips_a_hidden_instance_and_a_hidden_parent():
+    """Drive-train isolates one cluster per view: a hidden instance draws no
+    edge to anchor on, nor does a shown part under a hidden sub-assembly."""
+    assert _chosen(_instances("cone-gear-1", "cone-gear-2", hidden={"cone-gear-1"})) == "cone-gear-2"
+    parent = _FakeDrawingComponent("sub-1", children=_instances("cone-gear-1"), visible=False)
+    assert _chosen([parent, *_instances("cone-gear-3")]) == "cone-gear-3"
+
+
+def test_pinned_anchor_instance_must_be_shown():
+    pinned = drawing_common.BalloonAnchor(point_mm=(0.0, 0.0, 0.0), instance="cone-gear-4")
+    assert _chosen(_instances("cone-gear-1", "cone-gear-4"), anchor=pinned) == "cone-gear-4"
+    with pytest.raises(RuntimeError, match="cone-gear has no shown instance cone-gear-4"):
+        _chosen(_instances("cone-gear-1", "cone-gear-4", hidden={"cone-gear-4"}), anchor=pinned)
+
+
+class _AnchorEdge:
+    def __init__(self, owner, ends=(0.001, 0.002, 0.003, 0.004, 0.005, 0.006)):
+        self._owner = SimpleNamespace(Name2=owner)
+        self._ends = ends
+
+    def GetComponent(self):
+        return self._owner
+
+    def GetCurveParams2(self):
+        return (*self._ends, 0.0, 1.0)
+
+
+class _AnchorSheet:
+    """A drawing whose hit test returns the edge drawn at a sheet point."""
+
+    def __init__(self, edges_at):
+        self.edges_at = edges_at
+        self.selected = []
+        self.hits = []
+        self.balloons = []
+        manager = SimpleNamespace(
+            GetSelectedObjectCount2=lambda _mark: len(self.selected),
+            GetSelectedObject6=lambda index, _mark: self.selected[index - 1],
+        )
+        self.SelectionManager = manager
+        self.Extension = SimpleNamespace(
+            SelectByID2=self._select,
+            CreateBalloonOptions=lambda: SimpleNamespace(),
+            InsertBOMBalloon2=self._insert,
+        )
+
+    def _select(self, _name, kind, x, y, _z, _append, _mark, _callout, _option):
+        assert kind == "EDGE"
+        self.hits.append((round(x, 9), round(y, 9)))
+        edge = self.edges_at.get((round(x, 9), round(y, 9)))
+        self.selected = [] if edge is None else ["the view", edge]
+        return edge is not None
+
+    def _insert(self, _options):
+        edge = self.selected[-1]
+        item = str(len(self.balloons) + 1)
+        annotation = SimpleNamespace(GetAttachedEntities3=lambda: (edge,))
+        note = SimpleNamespace(item=item, GetAnnotation=lambda: annotation)
+        self.balloons.append(note)
+        return note
+
+    def ClearSelection2(self, _all):
+        self.selected = []
+
+    def ActivateView(self, _name):
+        return True
+
+
+def _exploded_view(children, steps):
+    """A view shown exploded; ``steps`` are (translation, instance names)."""
+    root = _FakeDrawingComponent("drive-train-8", children=children)
+    explode = [
+        SimpleNamespace(
+            Name=f"step {index}",
+            GetComponentXform=lambda t=t: (1, 0, 0, 0, 1, 0, 0, 0, 1, *t, 1, 0, 0, 0),
+            GetNumOfComponents=lambda names=names: len(names),
+            GetComponentName=lambda member, names=names: names[member],
+        )
+        for index, (t, names) in enumerate(steps)
+    ]
+    configuration = SimpleNamespace(
+        GetNumberOfExplodeSteps=lambda: len(explode),
+        GetExplodeStep=lambda index: explode[index],
+    )
     return SimpleNamespace(
         RootDrawingComponent2=lambda _resolve: root,
-        GetVisibleEntities2=lambda component, _kind: by_path[component.GetPathName()],
+        IsExploded=lambda: True,
+        ReferencedConfiguration="Default",
+        ReferencedDocument=SimpleNamespace(GetConfigurationByName=lambda _name: configuration),
+        GetName2=lambda: "Drawing View9",
+        UpdateViewDisplayGeometry=lambda: True,
     )
 
 
-def _pick(view, stem, label):
-    adapter = _FakeAdapter(None)
-    leaves = drawing_common._view_component_leaves(adapter, view, label=label)
-    return drawing_common._pick_component_anchor_edge(
-        adapter, view, leaves=leaves, stem=stem, label=label
+def _balloon(monkeypatch, sheet, view, anchors, items=(("cone-gear", "1"),)):
+    """Run the real balloon path with the sheet projection = model (x, y)."""
+    projected = []
+
+    def project(_adapter, _view, points, *, label, names=None):
+        projected.append((tuple(points), tuple(names or ())))
+        return [(round(p[0], 9), round(p[1], 9)) for p in points]
+
+    events = []
+    monkeypatch.setattr(drawing_common, "model_points_in_view", project)
+    monkeypatch.setattr(drawing_common, "_spread_balloons", lambda *a, **k: None)
+    monkeypatch.setattr(drawing_common, "rebuild_drawing", lambda *a, **k: None)
+    monkeypatch.setattr(
+        drawing_common, "_balloon_item_number", lambda _adapter, note, label: note.item
     )
+    monkeypatch.setattr(
+        drawing_common._telemetry, "event", lambda name, **kw: events.append((name, kw))
+    )
+    balloons = drawing_common.add_component_bom_balloons(
+        _FakeAdapter(sheet), view, items=items, anchors=anchors, label="t"
+    )
+    return balloons, projected, [kw for name, kw in events if name == "drawing.balloon_anchor"]
 
 
-def _anchor(edges_by_component, stem="cone-gear"):
-    return _pick(_anchor_view(edges_by_component), stem, "drive-train")
+def test_frozen_anchor_selects_at_its_exploded_projection_and_records_it(monkeypatch):
+    """Component transform, THEN the explode: a drawing view shows the model
+    exploded while every component transform still reads the collapsed pose
+    (farm probe: projecting without the explode hit the tube under each cap)."""
+    children = _instances("cone-gear-2", "cone-gear-1")
+    children[1].Component.Transform2.ArrayData = (1, 0, 0, 0, 1, 0, 0, 0, 1, 0.1, 0.2, 0.0, 1, 0, 0, 0)
+    view = _exploded_view(children, [((0.0, 0.25, 0.0), ["cone-gear-1"]), ((0.03, 0.0, 0.0), ["frame-4/cone-gear-1"])])
+    # (1, 2) mm local -> +(100, 200) mm placed -> +(30, 250) mm exploded.
+    sheet = _AnchorSheet({(0.131, 0.452): _AnchorEdge("cone-gear-1")})
+    balloons, projected, anchors = _balloon(monkeypatch, sheet, view, {"cone-gear": _ANCHOR})
+    assert len(balloons) == 1 and sheet.hits == [(0.131, 0.452)]
+    assert projected[0][1] == ("cone-gear",)
+    assert anchors == [
+        {
+            "stem": "cone-gear",
+            "instance": "cone-gear-1",
+            "method": "frozen",
+            "point_mm": "1.000,2.000,3.000",
+            "sheet_mm": "131.000,452.000",
+            "edge_mm": "",
+            "tried": 1,
+        }
+    ]
 
 
-def _edge(x):
-    return _FakeEdge((x, 0.0, 0.0, x + 0.01, 0.0, 0.0))
+def test_frozen_anchor_that_hits_nothing_fails_naming_the_stem(monkeypatch):
+    view = _exploded_view(_instances("cone-gear-1"), [])
+    sheet = _AnchorSheet({})
+    with pytest.raises(RuntimeError, match="cone-gear frozen balloon anchor .* selects no edge"):
+        _balloon(monkeypatch, sheet, view, {"cone-gear": _ANCHOR})
+    assert sheet.balloons == []
 
 
-def test_anchor_reads_geometry_once_not_once_per_visible_edge():
-    """The measurement must stay cheap enough to leave on in every build.
-
-    Ordering the edges by geometry WAS tried, to make the anchor deterministic
-    by construction. It costs a GetCurve + GetCurveParams2 pair per visible
-    edge -- 24.6 ms + 2.6 ms, each MEASURED on this seat rather than inferred
-    from a paired total. A gear end view carries 481-577 visible edges, so that
-    is ~13 s per balloon and ~7 min for the 32-balloon drive-train sheet, which
-    is why it never finished. This pins the cost at O(1) per balloon so the
-    regression cannot come back quietly.
-    """
-    low, mid, high = _edge(0.01), _edge(0.02), _edge(0.03)
-    picked = _anchor({"cone-gear": [low, mid, high]})
-    assert picked is low
-    assert [e.curve_reads for e in (low, mid, high)] == [1, 0, 0]
+def test_frozen_anchor_on_another_components_edge_fails(monkeypatch):
+    """A part moved in front of the anchor must fail the sheet, not balloon the
+    part in front with the wrong item's number."""
+    view = _exploded_view(_instances("cone-gear-1"), [])
+    sheet = _AnchorSheet({(0.001, 0.002): _AnchorEdge("crank-pinion-1")})
+    with pytest.raises(RuntimeError, match="selects an edge of crank-pinion-1, not cone-gear-1"):
+        _balloon(monkeypatch, sheet, view, {"cone-gear": _ANCHOR})
+    assert sheet.balloons == []
 
 
-def test_anchor_records_where_it_landed():
-    """Two passes' drawing.balloon_anchor events are the repro for a moving
-    anchor; an event without coordinates could not settle the question."""
-    recorded = []
-    edge = _edge(0.02)
-    original = drawing_common._telemetry.event
-    drawing_common._telemetry.event = lambda name, **kw: recorded.append((name, kw))
-    try:
-        _anchor({"cone-gear": [edge]})
-    finally:
-        drawing_common._telemetry.event = original
-    name, attrs = recorded[-1]
-    assert name == "drawing.balloon_anchor"
-    assert attrs["stem"] == "cone-gear"
-    assert attrs["edges"] == 1
-    assert attrs["anchor"].startswith("0.020000,0.000000")
+def test_a_family_without_a_frozen_anchor_fails_before_any_balloon(monkeypatch):
+    view = _exploded_view(_instances("cone-gear-1", "crank-pinion-1"), [])
+    sheet = _AnchorSheet({(0.001, 0.002): _AnchorEdge("cone-gear-1")})
+    with pytest.raises(ValueError, match=r"no balloon anchor for \['crank-pinion'\]"):
+        _balloon(
+            monkeypatch,
+            sheet,
+            view,
+            {"cone-gear": _ANCHOR},
+            items=(("cone-gear", "1"), ("crank-pinion", "2")),
+        )
+    assert sheet.hits == [] and sheet.balloons == []
 
 
-def test_anchor_survives_an_edge_whose_geometry_will_not_read():
-    """The read is telemetry, not selection -- it must not fail the drawing."""
-
-    class _Mute(_FakeEdge):
-        def GetCurveParams2(self):
-            raise RuntimeError("no curve data")
-
-    mute = _Mute((0.0,))
-    assert _anchor({"cone-gear": [mute]}) is mute
-
-
-def test_anchor_raises_when_the_component_has_no_visible_edge():
-    with pytest.raises(RuntimeError, match="no visible edge"):
-        _anchor({"cone-gear": []})
-
-
-def test_anchor_span_counts_every_leaf_it_walked_not_just_the_match():
-    """The duration has to be readable against the workload that produced it.
-
-    The walk stops at the first component of the requested family, so a "matched"
-    count is almost always 1 -- a scan that traversed 80 leaves and one that
-    traversed 3 both read the same. `visited` is the workload.
-    """
-    recorded = {}
-    original = drawing_common._span_scan_attrs
-    drawing_common._span_scan_attrs = lambda **kw: recorded.update(kw)
-    try:
-        # The walk pops from the END of the child list, so the match is listed
-        # FIRST to put three non-matching leaves ahead of it in traversal order.
-        view = _anchor_view({})
-        leaves = [
-            _FakeDrawingComponent(f"{stem}-1@dt", path=f"C:/x/{stem}.SLDPRT")
-            for stem in ("cone-gear", "filler-c", "filler-b", "filler-a")
-        ]
-        root = _FakeDrawingComponent("dt", children=leaves)
-        edges = {"C:/x/cone-gear.SLDPRT": [_edge(0.01)]}
-        view.RootDrawingComponent2 = lambda _r: root
-        view.GetVisibleEntities2 = lambda c, _k: edges.get(c.GetPathName(), [])
-        _pick(view, "cone-gear", "dt")
-    finally:
-        drawing_common._span_scan_attrs = original
-    assert recorded["visited"] == 4, recorded
-    assert recorded["matched"] == 1
-    assert recorded["edges"] == 1
+def test_a_rotating_explode_step_is_refused_not_summed(monkeypatch):
+    view = _exploded_view(_instances("cone-gear-1"), [((0.0, 0.1, 0.0), ["cone-gear-1"])])
+    configuration = view.ReferencedDocument.GetConfigurationByName("Default")
+    step = configuration.GetExplodeStep(0)
+    step.GetComponentXform = lambda: (0, -1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+    with pytest.raises(RuntimeError, match="not a pure translation"):
+        _balloon(monkeypatch, _AnchorSheet({}), view, {"cone-gear": _ANCHOR})
 
 
 def test_coincident_attachments_break_on_the_bom_item_not_arrival_order():

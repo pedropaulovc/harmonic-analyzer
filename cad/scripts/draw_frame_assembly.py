@@ -49,6 +49,7 @@ from _drawing_common import (
 )
 from _drawing_simplified import simplified_name
 from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
+from _frame_balloon_anchors import FRAME_BALLOON_ANCHORS
 from frame_attachment_spec import (
     BASE_SCREW_Y,
     CAP_TOP_Y,
@@ -1261,6 +1262,7 @@ def _place_package(adapter: Any) -> None:
         adapter,
         exploded,
         items=balloon_items,
+        anchors=FRAME_BALLOON_ANCHORS,
         label="frame exploded-view BOM coverage",
         margin=0.012,
     )

@@ -63,6 +63,7 @@ from _drawing_common import (
 from _drawing_simplified import simplified_name
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
+from _drive_train_balloon_anchors import DRIVE_TRAIN_BALLOON_ANCHORS
 from cone_gear_notes import ATTACHMENT as CONE_GEAR_JOINT
 from crank_drive_gear_notes import ATTACHMENT_ALTERNATIVE as CRANK_GEAR_ALTERNATIVE
 from crank_drive_gear_notes import ATTACHMENT_PROCESS as CRANK_GEAR_JOINT
@@ -1622,8 +1623,8 @@ def _final_balloon_uncross(
 def _head_edge(adapter: Any, view: Any, instance: str, *, label: str) -> Any | None:
     """The largest visible circular edge of one named instance: its head rim.
 
-    Reads the view exactly as ``_drawing_common._pick_component_anchor_edge``
-    does (the view object as placed, ``GetVisibleEntities2`` of the drawing
+    Reads the view as the old ``_drawing_common`` balloon-anchor pick did
+    (the view object as placed, ``GetVisibleEntities2`` of the drawing
     component's model component), the path that finds these screws' edges on
     every build. r7 (leaf 20260923T180240Z-1-e6c4ca27) found no circular edge
     on the south pedestal screw through an early-bound ``IView``; the log
@@ -2427,6 +2428,7 @@ def _balloon_cluster_sheet(
         adapter,
         view,
         items=tuple(item for item in balloon_items if item[0] not in anchored),
+        anchors=DRIVE_TRAIN_BALLOON_ANCHORS[cluster],
         label=f"drive-train {cluster} BOM coverage",
         margin=CLUSTER_BALLOON_MARGIN,
     )

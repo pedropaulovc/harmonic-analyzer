@@ -13,6 +13,7 @@ import enum
 import json
 import math
 import os
+import re
 import sys
 import time
 from collections import Counter
@@ -59,13 +60,11 @@ from solidworks_mcp.adapters.solidworks import drawing as _sw_drawing
 from solidworks_mcp.adapters.solidworks.drawing import (
     TOL_BASIC,
     add_note,
-    bind_view_entity,
     curate_dimensions,
     dimension_name,
     iter_views,
     new_drawing,
     place_view,
-    raw_visible_entities,
     remove_notes_matching as remove_notes_matching,
     save_drawing,
     set_units_mm,
@@ -5456,15 +5455,44 @@ def _drawing_component_children(drawing_component: Any) -> tuple[Any, ...]:
 
 
 @dataclass(frozen=True)
+class BalloonAnchor:
+    """Where one BOM family's balloon attaches: a point on one of its edges.
+
+    ``point_mm`` is in the part's own millimetres, so view scale, placement
+    and explode distance do not move it. ``instance`` pins the instance it is
+    on; ``None`` means the lowest-named instance the view shows
+    (:func:`_shown_instances`).
+
+    ``point_mm=None`` walks the part's own body instead
+    (:func:`_select_balloon_anchor`), for a family no single point claims.
+    """
+
+    point_mm: tuple[float, float, float] | None = None
+    instance: str | None = None
+
+
+@dataclass(frozen=True)
 class _ComponentLeaf:
-    """One leaf drawing component and the file identities it answers to."""
+    """One leaf drawing component and the file identities it answers to.
+
+    ``visible`` is the leaf's own drawing-view flag AND every ancestor's: a
+    part under a hidden sub-assembly is not drawn, whatever its own flag says.
+    """
 
     name: str
     component: Any
     identities: frozenset[str]
+    visible: bool = True
 
 
-def _component_leaf(adapter: Any, drawing_component: Any) -> _ComponentLeaf:
+def _instance_name(name: str) -> str:
+    """``drive-train-8/cone-gear-2@Drawing View1`` -> ``cone-gear-2``."""
+    return name.split("@", 1)[0].replace("\\", "/").rsplit("/", 1)[-1]
+
+
+def _component_leaf(
+    adapter: Any, drawing_component: Any, *, visible: bool = True
+) -> _ComponentLeaf:
     """Read one leaf drawing component's model component and identities."""
     component = adapter._attempt(
         lambda dc=drawing_component: dc.Component, default=None
@@ -5473,14 +5501,15 @@ def _component_leaf(adapter: Any, drawing_component: Any) -> _ComponentLeaf:
     if component is not None:
         path = adapter._attempt(lambda c=component: c.GetPathName(), default="") or ""
     name = str(drawing_component.Name or "")
-    drawing_name = name.split("@", 1)[0].replace("\\", "/")
     identities = frozenset(
         {
             Path(str(path)).stem.casefold(),
-            drawing_name.rsplit("/", 1)[-1].casefold(),
+            _instance_name(name).casefold(),
         }
     )
-    return _ComponentLeaf(name=name, component=component, identities=identities)
+    return _ComponentLeaf(
+        name=name, component=component, identities=identities, visible=visible
+    )
 
 
 def _stems_matching(identities: frozenset[str], stems: frozenset[str]) -> set[str]:
@@ -5510,7 +5539,8 @@ def _drawing_component_stems(
 def _view_component_leaves(
     adapter: Any, view: Any, *, label: str
 ) -> tuple[_ComponentLeaf, ...]:
-    """Every leaf drawing component of ``view``, in depth-first walk order.
+    """Every leaf drawing component of ``view``, in depth-first walk order,
+    each marked shown or hidden in this view.
 
     Balloon anchoring used to repeat this walk once PER BALLOON -- ~3 s of
     fixed cost on every ``drawing.pick_balloon_anchor`` span across the farm
@@ -5521,14 +5551,17 @@ def _view_component_leaves(
     if root is None:
         raise RuntimeError(f"{label}: drawing view has no root component")
     leaves: list[_ComponentLeaf] = []
-    pending = list(_drawing_component_children(root))
+    pending = [(child, True) for child in _drawing_component_children(root)]
     while pending:
-        drawing_component = pending.pop()
+        drawing_component, shown = pending.pop()
+        shown = shown and bool(
+            adapter._attempt(lambda dc=drawing_component: dc.Visible, default=True)
+        )
         children = _drawing_component_children(drawing_component)
-        pending.extend(children)
+        pending.extend((child, shown) for child in children)
         if children:
             continue
-        leaves.append(_component_leaf(adapter, drawing_component))
+        leaves.append(_component_leaf(adapter, drawing_component, visible=shown))
     _span_scan_attrs(leaves=len(leaves))
     return tuple(leaves)
 
@@ -5572,125 +5605,378 @@ def isolate_drawing_view_components(
     _telemetry.success(f"{label}: isolated {', '.join(sorted(found))}")
 
 
+def _natural_sort_key(name: str) -> tuple[tuple[int, int | str], ...]:
+    """``cone-gear-2`` before ``cone-gear-10``: digit runs compare as numbers."""
+    return tuple(
+        (0, int(part)) if part.isdigit() else (1, part.casefold())
+        for part in re.split(r"(\d+)", name)
+        if part
+    )
+
+
+def _shown_instances(
+    leaves: Sequence[_ComponentLeaf],
+    stem: str,
+    anchor: BalloonAnchor,
+    *,
+    label: str,
+) -> list[_ComponentLeaf]:
+    """The instances ``stem``'s balloon may anchor on, first choice first.
+
+    The drawing-component tree lists children in no stable order: over 26
+    frame_assembly runs the old first-match walk anchored the cap balloon on
+    tube-frame-cap 1, 2, 3 and 4 in turn. The instance name is the one order
+    that cannot move, compared as a machinist reads it (2 before 10). A
+    hidden instance (drive-train isolates one cluster per view) is never a
+    candidate, and a pinned instance is the only one.
+    """
+    wanted = frozenset({stem})
+    matching = sorted(
+        (leaf for leaf in leaves if _stems_matching(leaf.identities, wanted)),
+        key=lambda leaf: _natural_sort_key(_instance_name(leaf.name)),
+    )
+    shown = [leaf for leaf in matching if leaf.visible and leaf.component is not None]
+    if anchor.instance is not None:
+        shown = [
+            leaf
+            for leaf in shown
+            if _instance_name(leaf.name).casefold() == anchor.instance.casefold()
+        ]
+    if not shown:
+        pinned = f" {anchor.instance}" if anchor.instance else ""
+        raise RuntimeError(
+            f"{label}: {stem} has no shown instance{pinned} to anchor its balloon "
+            f"on; matching={[(leaf.name, leaf.visible) for leaf in matching]}"
+        )
+    return shown
+
+
+@_telemetry.traced("drawing.explode_offsets", label_param="label")
+def _view_explode_offsets(
+    adapter: Any, view: Any, *, label: str
+) -> dict[str, tuple[float, float, float]]:
+    """Each exploded instance's explode translation, in model metres.
+
+    A drawing view shows its model exploded without exploding the model, so
+    every component transform (``Transform2``, ``GetSpecificTransform``,
+    ``GetTotalTransform``) still reads the collapsed position -- measured on
+    the farm: points projected through them landed on the neighbour each
+    part had been exploded away from. The explode itself lives in the
+    referenced configuration's steps; both explode builders
+    (``build_frame_assembly``, ``_drive_train_explode``) author pure
+    translations, and a step that rotates is refused rather than summed wrong.
+    """
+    bound = _early_bound(view, "IView")
+    if not bool(bound.IsExploded()):
+        return {}
+    model = _early_bound(bound.ReferencedDocument, "IModelDoc2")
+    configuration = model.GetConfigurationByName(str(bound.ReferencedConfiguration))
+    if configuration is None:
+        raise RuntimeError(f"{label}: exploded view has no referenced configuration")
+    configuration = _early_bound(configuration, "IConfiguration")
+    offsets: dict[str, list[float]] = {}
+    count = int(configuration.GetNumberOfExplodeSteps())
+    for index in range(count):
+        step = _early_bound(configuration.GetExplodeStep(index), "IExplodeStep")
+        xform = tuple(float(value) for value in (step.GetComponentXform() or ()))
+        if len(xform) < 13 or any(
+            abs(xform[k] - (1.0 if k in (0, 4, 8) else 0.0)) > 1e-9 for k in range(9)
+        ):
+            raise RuntimeError(
+                f"{label}: explode step {step.Name!r} is not a pure translation: "
+                f"{xform!r}"
+            )
+        for member in range(int(step.GetNumOfComponents())):
+            row = offsets.setdefault(
+                _instance_name(str(step.GetComponentName(member))), [0.0, 0.0, 0.0]
+            )
+            for axis in range(3):
+                row[axis] += xform[9 + axis]
+    _span_scan_attrs(steps=count, moved=len(offsets))
+    return {name: (row[0], row[1], row[2]) for name, row in offsets.items()}
+
+
+def _anchor_model_points(
+    adapter: Any,
+    leaf: _ComponentLeaf,
+    points_m: Sequence[Sequence[float]],
+    offsets: Mapping[str, tuple[float, float, float]],
+    *,
+    stem: str,
+    label: str,
+) -> list[tuple[float, float, float]]:
+    """Part-space points (metres) in the view's model space: transform, then explode."""
+    transform = adapter._attempt(
+        lambda: _early_bound(leaf.component, "IComponent2").Transform2, default=None
+    )
+    values = (
+        ()
+        if transform is None
+        else tuple(
+            float(v) for v in (_early_bound(transform, "IMathTransform").ArrayData or ())
+        )
+    )
+    if len(values) < 13:
+        raise RuntimeError(f"{label}: {stem} instance {leaf.name} has no transform")
+    scale = values[12]
+    dx, dy, dz = offsets.get(_instance_name(leaf.name), (0.0, 0.0, 0.0))
+    return [
+        (
+            scale * (x * values[0] + y * values[3] + z * values[6]) + values[9] + dx,
+            scale * (x * values[1] + y * values[4] + z * values[7]) + values[10] + dy,
+            scale * (x * values[2] + y * values[5] + z * values[8]) + values[11] + dz,
+        )
+        for x, y, z in points_m
+    ]
+
+
+# A body walk hit-tests at most this many of one instance's edge points, and
+# this many across all of a family's instances, before it settles for the
+# first walked edge: each hit test is a sheet round trip (~0.4 s measured).
+_WALK_POINTS_PER_INSTANCE = 12
+_WALK_HITS_PER_FAMILY = 24
+
+
+def _walk_edges(
+    adapter: Any, leaf: _ComponentLeaf
+) -> list[tuple[tuple[float, float, float], Any]]:
+    """``(point, edge)`` pairs along ``leaf``'s body, in the body's own order.
+
+    Points are in the part's metres: each line or circle offers its parameter
+    midpoint, which lies on the drawn edge, then its start. The body's face
+    and edge order is the part file's, so the walk is the same every build --
+    unlike ``IView.GetVisibleEntities2``, whose order is undocumented and
+    moved between runs, and whose whole-array fetch cost the nameplate
+    ~524 s a pick (#1079). The walk stops once it has enough points.
+    """
+    component = _early_bound(leaf.component, "IComponent2")
+    body = adapter._attempt(lambda: component.GetBody(), default=None)
+    pairs: list[tuple[tuple[float, float, float], Any]] = []
+    seen: set[tuple[float, ...]] = set()
+    face = None if body is None else _early_bound(body, "IBody2").GetFirstFace()
+    while face is not None and len(pairs) < _WALK_POINTS_PER_INSTANCE:
+        face = _early_bound(face, "IFace2")
+        for raw_edge in tuple(face.GetEdges() or ()):
+            edge = _early_bound(raw_edge, "IEdge")
+            curve = adapter._attempt(lambda e=edge: e.GetCurve(), default=None)
+            if curve is None:
+                continue
+            curve = _early_bound(curve, "ICurve")
+            # GetCurveParams2 reads what GetCurve generated, so GetCurve first.
+            params = tuple(float(v) for v in (edge.GetCurveParams2() or ()))
+            if len(params) < 8:
+                continue
+            offered: list[tuple[float, float, float]] = []
+            if bool(curve.IsLine()) or bool(curve.IsCircle()):
+                middle = tuple(curve.Evaluate2((params[6] + params[7]) / 2.0, 0) or ())
+                if len(middle) >= 3:
+                    offered.append((float(middle[0]), float(middle[1]), float(middle[2])))
+            offered.append((params[0], params[1], params[2]))
+            for point in offered:
+                key = tuple(round(value, 7) for value in point)
+                if key not in seen:
+                    seen.add(key)
+                    pairs.append((point, edge))
+        face = face.GetNextFace()
+    return pairs[:_WALK_POINTS_PER_INSTANCE]
+
+
+def _entity_instance(adapter: Any, entity: Any) -> str:
+    """The instance name of the component that owns ``entity``; ``""`` if none."""
+    if entity is None:
+        return ""
+    component = adapter._attempt(
+        lambda: _early_bound(entity, "IEntity").GetComponent(), default=None
+    )
+    if component is None:
+        return ""
+    return _instance_name(str(_early_bound(component, "IComponent2").Name2 or ""))
+
+
+def _hit_test_edge(adapter: Any, sheet_xy: Sequence[float]) -> tuple[Any, str]:
+    """Select the edge drawn at ``sheet_xy`` of the active view; return it and its owner.
+
+    In a drawing the view is selected alongside the edge; the edge is last.
+    The selection is left in place for the caller to use or clear.
+    """
+    draw = adapter.currentModel
+    draw.ClearSelection2(True)
+    if not draw.Extension.SelectByID2(
+        "", "EDGE", sheet_xy[0], sheet_xy[1], 0.0, False, 0, null_callout(), 0
+    ):
+        return None, ""
+    manager = draw.SelectionManager
+    edge = manager.GetSelectedObject6(int(manager.GetSelectedObjectCount2(-1)), -1)
+    return edge, _entity_instance(adapter, edge)
+
+
+def _mm_text(values: Sequence[float], scale: float = 1.0) -> str:
+    return ",".join(f"{value * scale:.3f}" for value in values)
+
+
 @_telemetry.traced("drawing.pick_balloon_anchor", label_param="stem")
-def _pick_component_anchor_edge(
+def _select_balloon_anchor(
     adapter: Any,
     view: Any,
     *,
-    leaves: Sequence[_ComponentLeaf],
     stem: str,
+    anchor: BalloonAnchor,
+    candidates: Sequence[_ComponentLeaf],
+    offsets: Mapping[str, tuple[float, float, float]],
+    sheet_xy: tuple[float, float] | None,
     label: str,
-) -> Any:
-    """Return the one visible edge a ``stem``'s balloon leader attaches to.
+) -> str:
+    """Select the edge ``stem``'s balloon attaches to; return its instance.
 
-    The anchor becomes the balloon's leader ATTACHMENT point, and
-    :func:`_spread_balloons` assigns ring slots in the attachments' angular
-    order, so an anchor that moves between runs can reorder two balloons
-    attached at nearly the same angle and turn their leaders into a crossing.
-    The drive-train sheet built clean on one fleet pass and failed
-    ``check_drawing_layout`` with "1 leader crossing(s)" between items 5 and 27
-    on the next, same commit, same cached assembly -- and ``GetVisibleEntities2``
-    documents no ordering, which makes a moving anchor the obvious suspect.
+    One hit test per balloon replaces fetching every visible edge of the
+    component and keeping ``edges[0]``: that array's order moved between
+    runs (harmonic-base's anchor walk took 17 shapes over 24 frame runs),
+    and the nameplate's 37,148 edges cost ~524 s a pick, most of it releasing
+    their COM proxies (#1079).
 
-    **Suspect, not culprit -- so this MEASURES before it pays.** Ordering the
-    edges by geometry would settle it, and was tried: it costs a ``GetCurve`` +
-    ``GetCurveParams2`` pair per visible edge -- 24.6 ms + 2.6 ms, MEASURED per
-    call, not inferred from a paired total. A gear end view carries 481-577
-    visible edges, so that is ~13 s per balloon and ~7 min for the 32-balloon
-    sheet, which is why it never finished. Far too much to spend defending
-    against an unproven hypothesis.
+    ``frozen``: hit-test at the anchor's projected ``sheet_xy``. An edge of
+    another instance in front of the point, or no edge, raises; the balloon
+    never falls back to some other edge.
 
-    So the pick stays ``edges[0]`` of the first matching leaf -- ONE geometry
-    read, on the chosen edge only, to record WHERE it landed. Diff the
-    ``drawing.balloon_anchor`` events of two passes and the question answers
-    itself: identical anchors mean the enumeration is stable and the crossing
-    came from somewhere else; different anchors prove the instability and earn
-    the cost of fixing it. Nothing in the logs could answer that the first time.
-
-    The traversal order is deterministic given the tree, and the ring sort in
-    :func:`_spread_balloons` no longer breaks ties on arrival order, so those
-    two sources are closed regardless of what the measurement says.
-
-    ``leaves`` is the view's walk from :func:`_view_component_leaves`, taken
-    once per balloon set. Only the chosen edge is bound
-    (``raw_visible_entities``). The frame nameplate returns 22,486 visible
-    edges: wrapping them all cost 674 s; the raw fetch costs 2-4 s, but
-    releasing the tuple's proxies when this returns still costs 117-206 s,
-    which lands inside this span.
+    ``walk`` (``anchor.point_mm is None``): hit-test the family's body-walk
+    points (:func:`_walk_edges`), instance by instance in name order, and
+    take the first the hit test gives back to that instance. A pin in its
+    bore or a gear inside the stack draws every edge on or behind a
+    neighbour's; no hit test claims it, so the walk selects the lowest
+    instance's first walked edge by entity (``walk-edge``), which still
+    attaches the leader to the part itself. All three are deterministic;
+    which one ran, and where, is in the ``drawing.balloon_anchor`` event.
     """
-    selected_edge: Any | None = None
-    chosen_name = ""
-    edge_count = 0
-    enumerated: list[str] = []
-    visited = 0
-    wanted = frozenset({stem})
-    for leaf in leaves:
-        visited += 1
-        if not _stems_matching(leaf.identities, wanted):
-            continue
-        chosen_name = leaf.name
-        enumerated.append(chosen_name)
-        edges = (
-            adapter._attempt(
-                lambda c=leaf.component: raw_visible_entities(view, c, 1), default=()
+    first = candidates[0]
+    instance = _instance_name(first.name)
+    tried = 0
+    edge_ends: tuple[float, ...] = ()
+    if anchor.point_mm is not None:
+        if sheet_xy is None:
+            raise RuntimeError(f"{label}: {stem} frozen anchor was never projected")
+        where = f"sheet ({sheet_xy[0] * 1000.0:.2f}, {sheet_xy[1] * 1000.0:.2f}) mm"
+        edge, owner = _hit_test_edge(adapter, sheet_xy)
+        tried = 1
+        if edge is None:
+            raise RuntimeError(
+                f"{label}: {stem} frozen balloon anchor {anchor.point_mm} selects "
+                f"no edge at {where} on {instance}"
             )
-            or ()
-        )
-        if not edges:
-            continue
-        edge_count = len(edges)
-        selected_edge = bind_view_entity(edges[0], 1)
-        break
-    if selected_edge is None:
-        raise RuntimeError(
-            f"{label}: {stem} has no visible edge; matching={enumerated}"
-        )
-    # One geometry read, on the winner only -- the whole point is that this is
-    # cheap enough to leave on in every build, so two passes are comparable
-    # without re-running anything under a special flag.
-    key = _edge_endpoint_key(adapter, selected_edge) or ()
-    # On the SPAN as well as the event: an event's attributes do not appear in
-    # the span lines the profiling workflow reads, and this span exists so one
-    # component's scan can be timed and attributed on its own rather than
-    # disappearing into the whole-sheet balloon span.
-    #
-    # `visited` is every leaf the walk TOUCHED -- that is the workload, and it is
-    # what the duration has to be read against. `matched` is almost always 1,
-    # because the walk stops at the first component of the requested family, so
-    # reporting only that made the attribute useless for comparing two scans
-    # (Codex P2): a span that traversed 80 leaves and one that traversed 3 both
-    # read "1".
-    _span_scan_attrs(visited=visited, matched=len(enumerated), edges=edge_count)
+        if owner.casefold() != instance.casefold():
+            adapter.currentModel.ClearSelection2(True)
+            raise RuntimeError(
+                f"{label}: {stem} frozen balloon anchor {anchor.point_mm} at {where} "
+                f"selects an edge of {owner or 'no component'}, not {instance}"
+            )
+        method, point_mm = "frozen", tuple(anchor.point_mm)
+    else:
+        method, point_mm, fallback = "", (), None
+        for leaf in candidates:
+            room = _WALK_HITS_PER_FAMILY - tried
+            if room <= 0:
+                break
+            pairs = _walk_edges(adapter, leaf)
+            if fallback is None and pairs:
+                fallback = (leaf, pairs[0])
+            pairs = pairs[:room]
+            if not pairs:
+                continue
+            points = model_points_in_view(
+                adapter,
+                view,
+                _anchor_model_points(
+                    adapter,
+                    leaf,
+                    [point for point, _edge in pairs],
+                    offsets,
+                    stem=stem,
+                    label=label,
+                ),
+                label=f"{label} {stem} walk",
+                names=[f"{stem} walk {index}" for index in range(len(pairs))],
+            )
+            name = _instance_name(leaf.name)
+            for (point, _edge), xy in zip(pairs, points):
+                tried += 1
+                _hit, owner = _hit_test_edge(adapter, xy)
+                if owner.casefold() == name.casefold():
+                    method, instance, sheet_xy = "walk", name, xy
+                    point_mm = tuple(value * 1000.0 for value in point)
+                    break
+            if method:
+                break
+        if not method:
+            if fallback is None:
+                raise RuntimeError(
+                    f"{label}: {stem} has no body edge to anchor its balloon on "
+                    f"({[leaf.name for leaf in candidates]})"
+                )
+            leaf, (point, edge) = fallback
+            instance = _instance_name(leaf.name)
+            draw = adapter.currentModel
+            draw.ClearSelection2(True)
+            if not view.SelectEntity(edge, False):
+                raise RuntimeError(f"{label}: failed to select {stem}'s walked edge")
+            method, point_mm, sheet_xy = "walk-edge", tuple(v * 1000.0 for v in point), None
+            edge_ends = tuple(
+                adapter._attempt(lambda: tuple(edge.GetCurveParams2() or ())[:6], default=())
+            )
+    # The span carries what profiling queries group by; the event is what a
+    # run-to-run anchor diff compares (App Insights traces, this name).
+    _span_scan_attrs(instance=instance, method=method, tried=tried)
     _telemetry.event(
         "drawing.balloon_anchor",
         stem=stem,
-        component=chosen_name,
-        edges=edge_count,
-        anchor=",".join(f"{value:.6f}" for value in key),
+        instance=instance,
+        method=method,
+        point_mm=_mm_text(point_mm),
+        sheet_mm="" if sheet_xy is None else _mm_text(sheet_xy, 1000.0),
+        edge_mm=_mm_text(edge_ends, 1000.0),
+        tried=tried,
     )
-    return selected_edge
+    return instance
+
+
+def _verify_anchor_attachment(
+    adapter: Any, note: Any, *, instance: str, stem: str, label: str
+) -> None:
+    """The inserted balloon's leader must end on the instance that was selected."""
+    annotation = _early_bound(_early_bound(note, "INote").GetAnnotation(), "IAnnotation")
+    owners = {
+        _entity_instance(adapter, entity)
+        for entity in tuple(annotation.GetAttachedEntities3() or ())
+    } - {""}
+    if instance.casefold() not in {owner.casefold() for owner in owners}:
+        raise RuntimeError(
+            f"{label}: {stem} balloon attached to {sorted(owners) or 'nothing'}, "
+            f"not {instance}"
+        )
 
 
 def _create_component_bom_balloon(
     adapter: Any,
     view: Any,
     *,
-    leaves: Sequence[_ComponentLeaf],
     stem: str,
+    anchor: BalloonAnchor,
+    candidates: Sequence[_ComponentLeaf],
+    offsets: Mapping[str, tuple[float, float, float]],
+    sheet_xy: tuple[float, float] | None,
     expected_item: str,
     label: str,
 ) -> Any:
-    """Attach one BOM balloon to a visible edge of a requested component."""
-    selected_edge = _pick_component_anchor_edge(
-        adapter, view, leaves=leaves, stem=stem, label=label
+    """Attach one BOM balloon at ``stem``'s anchor and prove where it landed."""
+    instance = _select_balloon_anchor(
+        adapter,
+        view,
+        stem=stem,
+        anchor=anchor,
+        candidates=candidates,
+        offsets=offsets,
+        sheet_xy=sheet_xy,
+        label=label,
     )
     draw = adapter.currentModel
-    ddoc = _early_bound(draw, "IDrawingDoc")
-    if not ddoc.ActivateView(view_name(adapter, view)):
-        raise RuntimeError(f"{label}: failed to activate {stem} view")
-    draw.ClearSelection2(True)
-    if not view.SelectEntity(selected_edge, False):
-        raise RuntimeError(f"{label}: failed to select {stem} visible edge")
     extension = _early_bound(draw.Extension, "IModelDocExtension")
     options = extension.CreateBalloonOptions()
     if options is None:
@@ -5712,6 +5998,7 @@ def _create_component_bom_balloon(
         raise RuntimeError(
             f"{label}: {stem} resolved item {item}, expected {expected_item}"
         )
+    _verify_anchor_attachment(adapter, note, instance=instance, stem=stem, label=label)
     return note
 
 
@@ -5721,30 +6008,77 @@ def add_component_bom_balloons(
     view: Any,
     *,
     items: Sequence[tuple[str, str]],
+    anchors: Mapping[str, BalloonAnchor],
     label: str,
     margin: float = 0.014,
 ) -> list[Any]:
-    """Insert and ring one checked balloon per requested component family."""
+    """Insert and ring one checked balloon per requested component family.
+
+    Each family's balloon attaches at its anchor in ``anchors``
+    (:func:`_select_balloon_anchor`). Every family's instance is chosen and
+    every frozen anchor projected in one batch before the first balloon
+    exists, so a family without an anchor or a shown instance fails the
+    sheet naming it, with nothing half-placed.
+    """
     if not items:
         raise ValueError(f"{label}: component balloon list must not be empty")
     stems = [stem for stem, _item in items]
     numbers = [item for _stem, item in items]
     if len(stems) != len(set(stems)) or len(numbers) != len(set(numbers)):
         raise ValueError(f"{label}: duplicate component or item number")
+    if margin <= 0.0:
+        raise ValueError(f"{label}: balloon ring margin must be positive")
+    missing = [stem for stem in stems if stem not in anchors]
+    if missing:
+        raise ValueError(f"{label}: no balloon anchor for {missing}")
     leaves = _view_component_leaves(adapter, view, label=label)
+    candidates = {
+        stem: _shown_instances(leaves, stem, anchors[stem], label=label)
+        for stem in stems
+    }
+    offsets = _view_explode_offsets(adapter, view, label=label)
+    frozen = [stem for stem in stems if anchors[stem].point_mm is not None]
+    projected = (
+        model_points_in_view(
+            adapter,
+            view,
+            [
+                _anchor_model_points(
+                    adapter,
+                    candidates[stem][0],
+                    [tuple(value / 1000.0 for value in anchors[stem].point_mm or ())],
+                    offsets,
+                    stem=stem,
+                    label=label,
+                )[0]
+                for stem in frozen
+            ],
+            label=f"{label} balloon anchors",
+            names=frozen,
+        )
+        if frozen
+        else []
+    )
+    sheet_points: dict[str, tuple[float, float]] = dict(zip(frozen, projected))
+    draw = adapter.currentModel
+    if not _early_bound(draw, "IDrawingDoc").ActivateView(view_name(adapter, view)):
+        raise RuntimeError(f"{label}: failed to activate the balloon view")
+    # A coordinate hit test reads the view's display geometry: make it current once.
+    _early_bound(view, "IView").UpdateViewDisplayGeometry()
     balloons = [
         _create_component_bom_balloon(
             adapter,
             view,
-            leaves=leaves,
             stem=stem,
+            anchor=anchors[stem],
+            candidates=candidates[stem],
+            offsets=offsets,
+            sheet_xy=sheet_points.get(stem),
             expected_item=item,
             label=label,
         )
         for stem, item in items
     ]
-    if margin <= 0.0:
-        raise ValueError(f"{label}: balloon ring margin must be positive")
     _spread_balloons(adapter, view, balloons, margin=margin)
     rebuild_drawing(adapter, label="add_component_bom_balloons")
     _telemetry.success(f"{label}: inserted {len(balloons)} targeted balloons")
