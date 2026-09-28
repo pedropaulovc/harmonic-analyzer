@@ -6267,9 +6267,15 @@ async def finalize_drawing(
     # Persist the native drawing and PDF once from the fully loaded authored
     # document. Reopen/scale/save cycles are deliberately absent from this hot
     # path; the template and precomputed recipe placements own the layout.
+    # One child span per SaveAs3: an assembly drawing's save_and_export_pdf
+    # runs 42-180 s (harmonic_analyzer_assembly p50 177 s) and nothing said
+    # whether the SLDDRW save or the PDF export spends it.
     with _telemetry.span("drawing.save_and_export_pdf"):
         artifacts = save_drawing(
-            adapter, str(outputs.slddrw), pdf_path=str(outputs.pdf)
+            adapter,
+            str(outputs.slddrw),
+            pdf_path=str(outputs.pdf),
+            artifact_context=lambda kind, _path: _telemetry.span(f"drawing.save_{kind}"),
         )
     if set(artifacts) != {"drawing", "pdf"}:
         raise RuntimeError(f"drawing save/export incomplete: {artifacts!r}")
