@@ -509,10 +509,12 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
     assert drawing._side_x(spec.OVERALL_LENGTH) < boss_x
     assert boss_x < drawing.ISO_CENTER[0] - half_od - 0.010
     assert boss_y == pytest.approx(drawing.RIGHT_CENTER[1])
+    # The bore diameter stands off the toothed face, clear of the end view, with
+    # its text above the section: right of the boss its extension lines ran
+    # the bore's full length and fenced the pin-hole leader out of the hole.
     bore_x, bore_y = drawing.RIGHT_KEEP["BoreDia"]
-    assert bore_x > drawing._side_x(0.0) + 0.010
-    assert bore_x < drawing.ISO_CENTER[0] - half_od - 0.010
-    assert bore_y == pytest.approx(drawing.RIGHT_CENTER[1])
+    assert drawing.FRONT_CENTER[0] + half_od < bore_x < drawing._side_x(0.0)
+    assert bore_y > outside_y + 0.010
     for name in ("FaceWidth", "OverallLength"):
         assert drawing.RIGHT_KEEP[name][1] < drawing.RIGHT_CENTER[1] - half_od, name
     assert (
