@@ -19,35 +19,6 @@ REPO_ROOT = SCRIPTS.parents[1]
 # Test files that deliberately run in no check:* gate, each with its reason.
 EXEMPT: dict[str, str] = {}
 
-# Pre-existing orphans found when this guard landed (all on main before #844).
-# Main assigns their triage (enroll, or move to EXEMPT with a reason); until
-# then they are listed here so the guard fails only on NEW orphans.
-PENDING_TRIAGE: frozenset[str] = frozenset(
-    {
-        "test_assembly_save.py",
-        "test_base_serial.py",
-        "test_channel_installation_cascade.py",
-        "test_diag_dump_part.py",
-        "test_face_identity_diff.py",
-        "test_frame_fastener_fit.py",
-        "test_gear.py",
-        "test_hole_spec.py",
-        "test_holes_face_selection.py",
-        "test_layout_geometry.py",
-        "test_machinist_review_eval.py",
-        "test_magnifier_drawing_metadata.py",
-        "test_motion_study_default_free_pen.py",
-        "test_named_views.py",
-        "test_or_flag_fallback_names.py",
-        "test_owned_assembly_health_session.py",
-        "test_platen_refit.py",
-        "test_stock_spring_mounts.py",
-        "test_summing_hanger_stack.py",
-        "test_targeted_model_items.py",
-        "test_vm2_rack_source_save.py",
-    }
-)
-
 
 def _load_dodo():
     spec = importlib.util.spec_from_file_location("dodo", REPO_ROOT / "dodo.py")
@@ -75,7 +46,7 @@ def _collected_by_check_gates() -> dict[str, list[str]]:
 def test_every_offline_test_file_runs_in_a_check_gate() -> None:
     collected = _collected_by_check_gates()
     on_disk = {path.name for path in SCRIPTS.glob("test_*.py")}
-    orphans = sorted(on_disk - set(collected) - set(EXEMPT) - PENDING_TRIAGE)
+    orphans = sorted(on_disk - set(collected) - set(EXEMPT))
     assert not orphans, (
         "test files no check:* gate collects (enroll them in dodo.task_check, "
         f"or exempt them with a reason): {orphans}"
@@ -85,7 +56,7 @@ def test_every_offline_test_file_runs_in_a_check_gate() -> None:
 def test_exemptions_name_real_uncollected_files() -> None:
     collected = _collected_by_check_gates()
     on_disk = {path.name for path in SCRIPTS.glob("test_*.py")}
-    listed = set(EXEMPT) | PENDING_TRIAGE
+    listed = set(EXEMPT)
     assert not (listed - on_disk), (
         f"exempted files that no longer exist: {sorted(listed - on_disk)}"
     )
@@ -93,4 +64,3 @@ def test_exemptions_name_real_uncollected_files() -> None:
         f"exempted files a gate now collects -- drop them: {sorted(listed & set(collected))}"
     )
     assert all(reason.strip() for reason in EXEMPT.values())
-    assert not (set(EXEMPT) & PENDING_TRIAGE)
