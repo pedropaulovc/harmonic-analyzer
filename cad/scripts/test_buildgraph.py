@@ -9,9 +9,11 @@ from __future__ import annotations
 
 import sys
 import ast
+import os
 from collections import Counter
 from dataclasses import asdict, field, make_dataclass, replace
 import tempfile
+import time
 from pathlib import Path
 from unittest.mock import patch
 
@@ -1720,10 +1722,10 @@ def test_data_deps_of_keeps_missing_referenced_artefact():
 
 
 def test_data_deps_of_follows_an_edited_script_literal():
-    """Source texts are memoized per process, but an edit must still move the
-    graph: once the script names new.dxf, a stale old.dxf edge would leave the
-    real input out of the cache key. Same-length names, so only the mtime
-    tells the two texts apart."""
+    """A same-size edit with an unchanged timestamp must update the graph:
+    a stale old.dxf edge would leave the real input out of the cache key.
+    Force the timestamp collision rather than depending on filesystem timing.
+    """
     with tempfile.NamedTemporaryFile(
         "w", suffix=".py", dir=SCRIPTS_DIR, delete=False
     ) as fh:
@@ -1731,10 +1733,24 @@ def test_data_deps_of_follows_an_edited_script_literal():
         script = Path(fh.name)
     try:
         assert [Path(d).name for d in data_deps_of(script)] == ["old-xyz.dxf"]
+        mtime_ns = script.stat().st_mtime_ns
         script.write_text('PATH = REFERENCES_DIR / "new-xyz.dxf"\n', encoding="utf-8")
+        os.utime(script, ns=(mtime_ns, mtime_ns))
+        assert script.stat().st_mtime_ns == mtime_ns
         assert [Path(d).name for d in data_deps_of(script)] == ["new-xyz.dxf"]
     finally:
         script.unlink()
+
+
+def test_read_source_reuses_old_unchanged_file(tmp_path):
+    """Stable older inputs keep the stat-only path during a graph load."""
+    script = tmp_path / "source.py"
+    script.write_text("PATH = 'old.dxf'\n", encoding="utf-8")
+    old_ns = time.time_ns() - 10_000_000_000
+    os.utime(script, ns=(old_ns, old_ns))
+    assert bg.read_source(script) == "PATH = 'old.dxf'\n"
+    with patch.object(Path, "read_text", side_effect=AssertionError("unexpected re-read")):
+        assert bg.read_source(script) == "PATH = 'old.dxf'\n"
 
 
 def _tokens(text: str) -> frozenset[str]:

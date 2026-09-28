@@ -26,6 +26,7 @@ import pickle
 import re
 import sys
 import tempfile
+import time
 from dataclasses import asdict, fields
 from enum import Enum
 from pathlib import Path
@@ -1326,32 +1327,38 @@ def _module_closure(script: Path) -> tuple[str, ...]:
     return tuple(sorted(str(_resolved(mods[m])) for m in result))
 
 
-# path -> ((st_mtime_ns, st_size), text) for :func:`read_source`.
-_SOURCE_TEXT: dict[Path, tuple[tuple[int, int], str]] = {}
+# A filesystem can assign the same mtime to multiple same-size writes within
+# one timestamp tick. Treat recently modified files as racy, as git does.
+_SOURCE_MTIME_MARGIN_NS = 2_000_000_000
+# path -> ((st_mtime_ns, st_size), text, time_ns read completed)
+_SOURCE_TEXT: dict[Path, tuple[tuple[int, int], str, int]] = {}
 
 
 def read_source(path: Path) -> str:
-    """``path``'s UTF-8 text, re-read only when its (mtime_ns, size) moved.
+    """``path``'s UTF-8 text, memoized only for safely old source timestamps.
 
     One doit graph load asks for the same few hundred local sources ~20k times:
-    every task's config/data/fastener scan re-reads its whole import closure
-    (a part closure is ~30 modules, and ~250 tasks share them). Those reads
-    measured ~2.2 s of a ~6 s load on Windows. Unlike the per-path import facts
-    this memo validates itself: a caller that edits a source and asks again
-    (a test fixture, a long-lived process) must see the new text, because a
-    stale DXF literal or config read would leave a real input out of a cache
-    key. A stat is a fraction of the read it saves. The stat comes first, so an
-    edit landing between it and the read stores the new text under the old
-    stamp and is simply re-read next time. An ``OSError`` propagates and is
-    not memoized.
+    every task's config/data/fastener scan re-reads its whole import closure.
+    A stat is much cheaper than a read, so old files keep the fast path.
+    Recent files must be re-read even with unchanged (mtime_ns, size): an edit
+    within one filesystem timestamp tick can keep both values while changing
+    a DXF literal or config read, leaving a real input out of the cache key.
+    Re-reading also lets an entry become memoizable once its mtime ages. The
+    stat comes first, so an edit landing between it and the read stores the
+    new text under the old stamp and is re-read next time if racy. An
+    ``OSError`` propagates and is not memoized.
     """
     st = os.stat(path)
     stamp = (st.st_mtime_ns, st.st_size)
     cached = _SOURCE_TEXT.get(path)
-    if cached is not None and cached[0] == stamp:
+    if (
+        cached is not None
+        and cached[0] == stamp
+        and st.st_mtime_ns < cached[2] - _SOURCE_MTIME_MARGIN_NS
+    ):
         return cached[1]
     text = path.read_text(encoding="utf-8")
-    _SOURCE_TEXT[path] = (stamp, text)
+    _SOURCE_TEXT[path] = (stamp, text, time.time_ns())
     return text
 
 
@@ -2003,8 +2010,8 @@ def _config_tokens_in_source(path: Path) -> frozenset[str]:
     """Resolve ONE source's config reads; reject every unclassified use.
 
     Only syntax is reused across contents; the text comes from :func:`read_source`,
-    which re-reads a source whose (mtime_ns, size) moved, and
-    accessor/family resolution is not memoized by this function.
+    which re-reads when (mtime_ns, size) changes or the mtime is too recent
+    to trust. Accessor/family resolution is not memoized by this function.
     """
     references = _config_references_in_text(read_source(path), _CONFIG_MODULES)
     if references is None:
