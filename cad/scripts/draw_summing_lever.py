@@ -212,16 +212,20 @@ async def build(adapter: Any) -> dict[str, str]:
         label="knife-edge ridge finish",
         char_height=0.0025,
     )
-    # Use a separate point on the tap rim so the position-frame leader does
-    # not stack on the hole-callout leader at the hole's 12-o'clock point.
-    anchor_tap_fcf_edge = _top_xy(TIP_X - COUNTER_R, 0.0)
+    # Land the position frame on the tap rim's 3-o'clock point, opposite the
+    # hole callout, which SolidWorks lands up-left of the 12-o'clock pick. From
+    # the 9-o'clock point, with the frame up-left, the two leaders met 0.6 mm
+    # apart and crossed (leader-crosses-leader). The frame now stands up-right
+    # (x ~0.204..0.234, y ~0.176..0.183, 3 mm under the 20X frame's "20X") and
+    # its leader drops almost vertically at x ~0.198, right of RD1's leader.
+    anchor_tap_fcf_edge = _top_xy(TIP_X + COUNTER_R, 0.0)
     add_feature_control_frame(
         adapter,
         top,
         edge_xy=anchor_tap_fcf_edge,
         frame_xy=(
-            anchor_tap_fcf_edge[0] - 0.010,
-            anchor_tap_fcf_edge[1] + 0.055,
+            anchor_tap_fcf_edge[0] + 0.006,
+            anchor_tap_fcf_edge[1] + 0.053,
         ),
         characteristic="position",
         tolerance=GEOMETRIC_TOLERANCES_MM["summation anchor position"],
