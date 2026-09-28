@@ -10,10 +10,9 @@ instance's (``_drawing_common._select_balloon_anchor``).
 edge points by geometry, and takes the first point the hit test gives back
 to that exact instance, else an edge the view's hidden-line pass lists as
 drawn; with neither, the sheet fails. The ``drawing.balloon_anchor`` event
-reports where it landed, ready to freeze here. The walk is the default: points frozen from a farm
-probe at the old 1:7 frame sheet (run 20260928T061043870Z) missed on the
-1:8 sheet (rocker-arm-support, arbor-pedestal select no edge at their
-projection), so only points proven on the current sheets are frozen.
+reports where it landed, ready to freeze here. Every drive-train family
+walks: run 20260928T083410084Z placed 36 by a hit and 11 pins, shims,
+springs and screws on a listed visible edge, in 87 s of picks.
 
 Keyed by cluster, then family; a cluster sheet shows only its own cluster.
 """
