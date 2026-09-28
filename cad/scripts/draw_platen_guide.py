@@ -209,14 +209,25 @@ async def build(adapter: Any) -> dict[str, str]:
         "automatic callout note(s)"
     )
 
-    # Keep only overall length; hole coordinates live in the native hole table.
+    # Keep only the overall length and height; hole coordinates live in the
+    # native hole table.
+    # The bar's 5.00 height sits off the front view's east end (the dimension
+    # measures the x=Length edge's endpoints, sheet x 0.3248), not beside the
+    # right view. There its extension lines ran along both long edges of the
+    # 10 x 5 section and fenced the opposite face, so the parallelism frame's
+    # leader had to cross one of them to reach it (leader-crosses-line). At
+    # x 0.338 the text clears the front view's box (0.3304) and datum A's tag
+    # (0.3485). Both dimensions live in the GuideProfile sketch (Front plane).
     curate_view_dimensions(
-        adapter, front, keep={"Length": (FRONT_VIEW_X_M, 0.135)}, view_label="front"
+        adapter,
+        front,
+        keep={"Length": (FRONT_VIEW_X_M, 0.135), "Height": (0.338, 0.1111)},
+        view_label="front",
     )
     curate_view_dimensions(
         adapter,
         right,
-        keep={"Depth": (0.370, 0.095), "Height": (0.385, 0.110)},
+        keep={"Depth": (0.370, 0.095)},
         view_label="right",
     )
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
@@ -356,17 +367,17 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         right,
         edge_xy=(0.375, 0.110),
-        # Above-left of the view, under the isometric's caption (was (0.390,
-        # 0.086) below-right: that leader crossed the 5.00 lower extension line
-        # and the 10.00 dimension line, leader-crosses-line x2). An FCF's anchor
-        # is its frame's TOP-LEFT corner and this one ("|//| 0.10 |A|") is
-        # 25.2 mm wide, so it spans x 0.332..0.3572, y 0.115..0.122, centred in the
-        # gap between the front view (x <= 0.3304) and the right view (x >= 0.3594):
-        # 2.4 mm under the caption's glyphs, 2.5 mm over datum A's line. Its
-        # shoulder runs right and the leader drops to the edge pick. No
+        # Right of the view, level with the face it controls: the frame's
+        # left end stands 9 mm off the opposite face and its leader runs
+        # straight in, mirroring datum A's tag on the near face. An FCF's
+        # anchor is its frame's TOP-LEFT corner, and this one ("|//| 0.10 |A|")
+        # is 25.2 x 7 mm, so it spans x 0.384..0.4092, y 0.1065..0.1135: under
+        # the isometric's caption (0.1235), inside the 0.4191 border. Above-left
+        # (0.332, 0.122), its leader dropped onto the face from inside the
+        # section and crossed the old 5.00's upper extension line. No
         # leader_attach_xy: setting the leader point detached the frame from
         # its edge (entities=0 on the 1c99291b4 farm leaf).
-        frame_xy=(0.332, 0.122),
+        frame_xy=(0.384, 0.1135),
         characteristic="parallelism",
         tolerance=GEOMETRIC_TOLERANCES_MM["guide opposite-face parallelism"],
         datums=("A",),
