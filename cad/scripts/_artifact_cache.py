@@ -103,7 +103,9 @@ import io
 import json
 import os
 import secrets
+import sys
 import tarfile
+import threading
 import time
 from pathlib import Path
 
@@ -574,15 +576,30 @@ _UNSET = _Unset()
 _BACKEND: _BlobBackend | None | _Unset = _UNSET
 
 
+class _NoSpan:
+    """What :func:`_phase` yields when this process never loaded the telemetry spine."""
+
+    def set_attribute(self, key: str, value) -> None:
+        pass
+
+
 @contextlib.contextmanager
 def _phase(name: str, **attributes):
-    """A ``build-infra`` span for one phase of a cache transfer. ``cache.probe`` on a
-    farm leaf reads 0.84 s p50 on a miss against 0.16 s on a hit (14 d, n=6968 /
-    27455) with nothing inside it, so the SDK import, the token fetch, the transfer
-    and the unpack each get their own span to say which one that is."""
-    import _telemetry
+    """A ``build-infra`` span for one phase of a cache transfer. A farm leaf's own
+    ``cache.probe`` (the first in its process) reads 0.90 s p50 for a part against
+    0.15 s for a drawing, whose part dependencies were probed first (14 d, n=3194 /
+    3221) -- with nothing inside it, so the SDK import, the token fetch, the
+    transfer and the unpack each get their own span to say which one that is.
 
-    with _telemetry.span(name, service=_telemetry.BUILD_INFRA_SERVICE, **attributes) as sp:
+    Spans only where the telemetry spine is ALREADY loaded (every doit process).
+    The pool's job runner imports this module bare to confirm a publish
+    (``probe``); importing ``_telemetry`` there would configure a whole OTel
+    pipeline in that helper just to time one HEAD."""
+    telemetry = sys.modules.get("_telemetry")
+    if telemetry is None:
+        yield _NoSpan()
+        return
+    with telemetry.span(name, service=telemetry.BUILD_INFRA_SERVICE, **attributes) as sp:
         yield sp
 
 
@@ -636,15 +653,47 @@ def _make_backend() -> _BlobBackend | None:
     return _BlobBackend(ContainerClient(account_url, container, credential=timed(inner)))
 
 
+_BACKEND_LOCK = threading.Lock()
+
+
 def _backend() -> _BlobBackend | None:
     """Memoized ContainerClient (one credential handshake per process). Returns
     None when unconfigured / SDK absent, so the caller treats it as a miss. The
-    first call's SDK import and client construction are ``cache.connect``."""
+    first call's SDK import and client construction are ``cache.connect``; a
+    :func:`prewarm` still in flight is waited for, never duplicated."""
     global _BACKEND
-    if isinstance(_BACKEND, _Unset):
-        with _phase("cache.connect"):
-            _BACKEND = _make_backend()
+    with _BACKEND_LOCK:
+        if isinstance(_BACKEND, _Unset):
+            with _phase("cache.connect"):
+                _BACKEND = _make_backend()
     return _BACKEND
+
+
+def prewarm() -> threading.Thread | None:
+    """Open the cache connection on a daemon thread while the caller does other work.
+
+    A farm leaf's first ``cache.probe`` measured 0.91 / 0.91 / 0.88 s on three
+    part leaves (2026-09-28, 6a67cdf43): ``cache.connect`` (azure SDK import +
+    client) 0.53 s and a cold ``cache.download`` 0.31-0.34 s -- of which the token
+    was 0.03-0.04 s and the rest the first TLS connection; the same GET on the
+    warm connection (``cache.reprobe``) took 0.07 s. None of that depends on the
+    task, and the doit process spends ~3.8 s loading its graph first, so a
+    ``rw`` process (the one that probes, then publishes: a farm leaf) starts it at
+    import. A HEAD for a blob that never exists opens the pooled connection and
+    fetches the token; the probe then reuses both. Best-effort: any failure is
+    left for the real probe to meet and report."""
+    if not writable():
+        return None
+
+    def warm() -> None:
+        with contextlib.suppress(Exception), _phase("cache.prewarm"):
+            backend = _backend()
+            if backend is not None:
+                backend.exists("prewarm")
+
+    thread = threading.Thread(target=warm, name="cache-prewarm", daemon=True)
+    thread.start()
+    return thread
 
 
 def probe(key: str) -> bool | None:

@@ -451,5 +451,47 @@ def test_interleaved_chunked_publishes_never_commit_a_torn_archive(monkeypatch):
     assert service.content(backend._name(key)) in (first, second)
 
 
+def test_prewarm_opens_the_connection_once_and_the_probe_reuses_it(monkeypatch):
+    """A farm leaf warms the cache connection while its graph loads. A probe that
+    arrives mid-warm must wait for that one client, never build a second (a
+    second SDK import + TLS handshake is the cost the warm-up exists to hide), and
+    the warm-up must have touched the service so the connection is really open."""
+    import threading
+    import time
+
+    monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "rw")
+    monkeypatch.setattr(cache, "_BACKEND", cache._UNSET)
+    backend = _FakeBackend()
+    touched: list[str] = []
+    backend.exists = lambda key: touched.append(key) or False
+    built: list[int] = []
+    constructing = threading.Event()
+
+    def slow_make_backend():
+        constructing.set()
+        time.sleep(0.2)
+        built.append(1)
+        return backend
+
+    monkeypatch.setattr(cache, "_make_backend", slow_make_backend)
+    warm = cache.prewarm()
+    assert warm is not None
+    assert constructing.wait(5)
+    assert cache._backend() is backend  # arrives mid-construction
+    warm.join(5)
+    assert built == [1]
+    assert touched == ["prewarm"]
+
+
+@pytest.mark.parametrize("mode", ["ro", "off"])
+def test_prewarm_is_a_no_op_for_a_process_that_does_not_publish(monkeypatch, mode):
+    monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", mode)
+    monkeypatch.setattr(cache, "_BACKEND", cache._UNSET)
+    monkeypatch.setattr(
+        cache, "_make_backend", lambda: pytest.fail("a non-publishing process connected")
+    )
+    assert cache.prewarm() is None
+
+
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-q"]))

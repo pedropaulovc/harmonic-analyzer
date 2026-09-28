@@ -140,6 +140,10 @@ from _drawing_registry import (  # noqa: E402
     DRAWINGS_BY_NAME,
 )
 
+# A publishing (rw) process -- a farm leaf -- opens its cache connection while the
+# graph loads, instead of inside its first cache.probe (see _cache.prewarm).
+_cache.prewarm()
+
 REPO_ROOT = Path(__file__).resolve().parent
 CONFIG_DIR = REPO_ROOT / "cad" / "config"
 RELEASE_VERSION_FILE = (CONFIG_DIR / "release.yaml").resolve()
