@@ -688,6 +688,45 @@ def test_a_ready_or_mute_seat_costs_no_wait():
     assert "seat_startup_wait_s" not in mute
 
 
+@pytest.mark.parametrize("window", ["inf", "nan", "-5", "soon"])
+def test_an_unusable_startup_window_falls_back_to_the_default(
+    monkeypatch, capture_telemetry, window
+):
+    """``inf`` would poll forever and a negative window is meaningless: both are
+    rejected, loudly, for the default."""
+    spans, logs = capture_telemetry
+    monkeypatch.setenv("HARMONIC_SW_STARTUP_WINDOW", window)
+    monkeypatch.setattr(_seat_forensics._watchdog, "_active", None)
+    monkeypatch.setenv("HARMONIC_COM_OP_TIMEOUT", "900")
+
+    assert _seat_forensics._startup_window() == _seat_forensics._DEFAULT_STARTUP_WINDOW_S
+    assert any(window in str(r.log_record.body) for r in logs.get_finished_logs())
+
+
+def test_the_startup_window_ends_well_inside_the_watchdog_op_timeout(
+    monkeypatch, capture_telemetry
+):
+    """The wait polls without telemetry, so a window at or past the watchdog's
+    op timeout would be hard-killed as a wedged seat (exit 87) instead of
+    proceeding. It is clamped to half the ARMED limit, and the clamp is logged."""
+    spans, logs = capture_telemetry
+    monkeypatch.setenv("HARMONIC_SW_STARTUP_WINDOW", "1200")
+    monkeypatch.setattr(
+        _seat_forensics._watchdog, "_active", SimpleNamespace(op_timeout=900.0)
+    )
+
+    assert _seat_forensics._startup_window() == 450.0
+    assert any("clamped to 450s" in str(r.log_record.body) for r in logs.get_finished_logs())
+
+    # Not armed yet: the limit start() would arm with.
+    monkeypatch.setattr(_seat_forensics._watchdog, "_active", None)
+    monkeypatch.setenv("HARMONIC_COM_OP_TIMEOUT", "240")
+    assert _seat_forensics._startup_window() == 120.0
+    # No idle limit at all: the declared window stands.
+    monkeypatch.setenv("HARMONIC_COM_OP_TIMEOUT", "0")
+    assert _seat_forensics._startup_window() == 1200.0
+
+
 class _PropertyManager:
     """``ICustomPropertyManager`` early-bound: ``Get6``'s outs ride the return
     tuple ``(retval, ValOut, ResolvedValOut, WasResolved, LinkToProperty)``."""
@@ -710,10 +749,14 @@ class _SourcePart:
     finished loading, as a multi-threaded open reports through
     ``IsOpenedViewOnly``."""
 
-    def __init__(self, properties: dict[str, str], *, loading_reads: int):
+    def __init__(
+        self, properties: dict[str, str], *, loading_reads: int, doc_type: int = 1
+    ):
         self._properties = properties
         self._loading_reads = loading_reads
+        self._doc_type = doc_type
         self.property_reads = 0
+        self.view_only_reads = 0
         self.Extension = SimpleNamespace(
             CustomPropertyManager=lambda configuration: _PropertyManager(
                 self._properties if configuration == "" and not self._loading_reads else {}
@@ -724,6 +767,7 @@ class _SourcePart:
         )
 
     def IsOpenedViewOnly(self) -> bool:
+        self.view_only_reads += 1
         if self._loading_reads:
             self._loading_reads -= 1
             return True
@@ -740,7 +784,7 @@ class _SourcePart:
         return "crank_hub.SLDPRT"
 
     def GetType(self) -> int:
-        return 1
+        return self._doc_type
 
     def IsOpenedReadOnly(self) -> bool:
         return False
@@ -766,6 +810,35 @@ def test_a_still_loading_source_is_read_once_it_has_loaded(
     assert got == {name: "x" for name in _TITLE_BLOCK}
     assert part.property_reads == 2 * len(_TITLE_BLOCK)  # one read, one after the load
     assert any("IsOpenedViewOnly=True" in str(r.log_record.body) for r in logs.get_finished_logs())
+
+
+def test_a_view_only_assembly_is_reported_not_waited_on(monkeypatch, capture_telemetry):
+    """``IsOpenedViewOnly`` is also True for a DELIBERATE view-only open, and the
+    only such open (``swOpenDocOptions_ViewOnly``, Large Design Review) exists
+    for assemblies alone. An assembly's flag is therefore no proof of a load in
+    progress: it is recorded and the failure raises at once, with no wait."""
+    import _drawing_common
+
+    spans, logs = capture_telemetry
+    monkeypatch.setattr(_common, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(
+        _drawing_common.time, "sleep", lambda _s: pytest.fail("waited on an assembly")
+    )
+    assembly = _SourcePart({}, loading_reads=10**6, doc_type=2)  # swDocASSEMBLY
+
+    with pytest.raises(RuntimeError, match=r"^source part properties are missing"):
+        _drawing_common.read_required_properties(
+            assembly, _TITLE_BLOCK, required=_TITLE_BLOCK
+        )
+
+    assert assembly.view_only_reads == 1
+    assert assembly.property_reads == len(_TITLE_BLOCK)
+    (record,) = [
+        r for r in logs.get_finished_logs() if "[forensics] source part" in str(r.log_record.body)
+    ]
+    load = json.loads(record.log_record.attributes["capture"])["load"]
+    assert load["view_only"] is True
+    assert "Large Design Review" in load["view_only_not_waited"]
 
 
 def test_empty_properties_on_a_loaded_source_name_the_document_api_and_seat(

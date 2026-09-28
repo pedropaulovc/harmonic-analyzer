@@ -468,11 +468,50 @@ _STARTUP_POLL_S = 0.5
 _seat_startup: dict[str, Any] = {}
 
 
+def _watchdog_op_timeout() -> float | None:
+    """The idle limit the COM watchdog will hard-exit on, or ``None`` when no
+    idle limit is armed. The wait below emits no telemetry while it polls, so
+    it must end well inside this."""
+    active = _watchdog._active
+    if active is not None:
+        timeout = float(active.op_timeout)
+    else:  # not armed (yet): the limit start() would arm with
+        try:
+            timeout = float(
+                os.environ.get("HARMONIC_COM_OP_TIMEOUT", _watchdog.DEFAULT_OP_TIMEOUT)
+            )
+        except ValueError:
+            timeout = _watchdog.DEFAULT_OP_TIMEOUT
+    return timeout if math.isfinite(timeout) and timeout > 0 else None
+
+
 def _startup_window() -> float:
-    try:
-        return max(0.0, float(os.environ.get(_STARTUP_WINDOW_ENV, _DEFAULT_STARTUP_WINDOW_S)))
-    except ValueError:
-        return _DEFAULT_STARTUP_WINDOW_S
+    """``HARMONIC_SW_STARTUP_WINDOW`` seconds, finite and non-negative, and
+    clamped to half the watchdog's op timeout: a longer silent wait would be
+    killed as a wedged seat (exit 87) instead of proceeding. Every rejection
+    and clamp is logged."""
+    raw = os.environ.get(_STARTUP_WINDOW_ENV)
+    window = _DEFAULT_STARTUP_WINDOW_S
+    if raw is not None:
+        try:
+            window = float(raw)
+        except ValueError:
+            window = math.nan
+        if not math.isfinite(window) or window < 0:
+            _telemetry.warn(
+                f"{_STARTUP_WINDOW_ENV}={raw!r} is not a finite, non-negative number "
+                f"of seconds; using the default {_DEFAULT_STARTUP_WINDOW_S:.0f}s"
+            )
+            window = _DEFAULT_STARTUP_WINDOW_S
+    op_timeout = _watchdog_op_timeout()
+    if op_timeout is not None and window > op_timeout / 2:
+        _telemetry.warn(
+            f"startup window {window:.0f}s clamped to {op_timeout / 2:.0f}s: half the "
+            f"COM watchdog op timeout ({op_timeout:.0f}s), which would otherwise "
+            "abort the silent wait as a wedged seat"
+        )
+        window = op_timeout / 2
+    return window
 
 
 def _startup_completed(sw: Any) -> bool | None:

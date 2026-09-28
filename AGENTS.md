@@ -740,10 +740,13 @@ model before it is saved, such as `_build_id`'s `Generator` property.
 
 **Seat startup.** `record_seat_provenance` also holds the session until the seat
 reports `ISldWorks.StartupProcessCompleted` (`await_seat_startup`). The wait is
-bounded by seat age: `HARMONIC_SW_STARTUP_WINDOW`, 180 s by default. A seat that
-is still False past the window, or that gives no answer, is logged and the build
-proceeds. The wait is timing, not a verdict: it reads nothing into the model and
-never raises, so it stays inert. The seat line reports
+bounded by seat age: `HARMONIC_SW_STARTUP_WINDOW`, 180 s by default. A value that
+is not a finite, non-negative number falls back to the default. The window is
+clamped to half the COM watchdog's op timeout, because the wait polls without
+telemetry and the watchdog would otherwise kill it as a wedged seat. Both are
+logged. A seat that is still False past the window, or that gives no answer, is
+logged and the build proceeds. The wait is timing, not a verdict: it reads
+nothing into the model and never raises, so it stays inert. The seat line reports
 `startup_completed=`/`startup_wait_s=`. Before this, two drawing leaves that were
 the first job on a seat about 20 s old opened their source part and read every
 custom property empty.
