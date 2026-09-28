@@ -8,6 +8,7 @@ import sys
 import threading
 import time
 from collections.abc import Callable
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import TypeVar
 
@@ -92,6 +93,7 @@ def _launcher_fixture(tmp_path: Path, *, submodules: bool = False) -> dict[str, 
     stub.write_text(
         """import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -101,9 +103,10 @@ farm = next((i for i, arg in enumerate(sys.argv) if arg.endswith("farm.py")), No
 if farm is not None:
     # `uv run --project <pool> <pool>/farm.py <command> ...`, as the tracking
     # operations call it: a stateful fake of the farm's status/cancel.
-    # A workflow is {"status": ..., "start_time": ...}; the default start is
-    # the first query, i.e. after the run that dispatched it began. Status
-    # "UNREACHABLE" fails the query as a network outage would.
+    # A workflow is {"status": ..., "start_time": ...}; the build half of this
+    # stub stamps start_time when the run requests the workflow (the farm
+    # creates it then), unless another submitter's start_time is already set.
+    # Status "UNREACHABLE" fails the query as a network outage would.
     state_path = Path(os.environ["UV_STUB_FARM"])
     workflows = json.loads(state_path.read_text(encoding="utf-8"))
     command, *rest = sys.argv[farm + 1 :]
@@ -112,9 +115,6 @@ if farm is not None:
         print(f"Error: workflow not found for ID: {workflow}", file=sys.stderr)
         raise SystemExit(2)
     described = workflows[workflow]
-    described.setdefault(
-        "start_time", time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime())
-    )
     if described["status"] == "UNREACHABLE":
         print("Error: failed to connect to the farm", file=sys.stderr)
         raise SystemExit(1)
@@ -209,7 +209,36 @@ print("uv-stdout", flush=True)
 lines = os.environ.get("UV_STUB_LINES")
 if lines:
     # Build output as build.py prints it: farm dispatch, cache hits, doit errors.
-    print(Path(lines).read_text(encoding="utf-8"), end="", flush=True)
+    printed = Path(lines).read_text(encoding="utf-8")
+    requested = re.findall(r"Farm workflow requested: (\\S+)", printed)
+    telemetry = reports / "telemetry"
+    telemetry.mkdir(exist_ok=True)
+    farm_state = Path(os.environ["UV_STUB_FARM"])
+    workflows = json.loads(farm_state.read_text(encoding="utf-8"))
+    with open(telemetry / "logs.jsonl", "a", encoding="utf-8") as logs:
+        for workflow in requested:
+            # _farm._dispatch's record, then start_workflow(USE_EXISTING).
+            now = time.time()
+            logs.write(
+                json.dumps(
+                    {
+                        "body": f"Farm workflow requested: {workflow}",
+                        "attributes": {"workflow_id": workflow},
+                        "timestamp": time.strftime(
+                            "%Y-%m-%dT%H:%M:%S", time.gmtime(now)
+                        )
+                        + f".{int(now % 1 * 1e6):06d}Z",
+                    }
+                )
+                + "\\n"
+            )
+            if workflow in workflows:
+                workflows[workflow].setdefault(
+                    "start_time",
+                    time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime(now)),
+                )
+    farm_state.write_text(json.dumps(workflows), encoding="utf-8")
+    print(printed, end="", flush=True)
 print("uv-stderr", file=sys.stderr, flush=True)
 release = os.environ.get("UV_STUB_RELEASE")
 if release:
@@ -997,6 +1026,7 @@ LEAF_CONE = "leaf:part:cone_gear:" + "b" * 64 + ":5400s"
 LEAF_NUT = "leaf:part:wheel_axle_nut:" + "c" * 64 + ":5400s"
 LEAF_SHARED = "leaf:part:crank_hub:" + "d" * 64 + ":5400s"
 LEAF_FOREIGN = "leaf:part:paper_roller:" + "f" * 64 + ":5400s"
+LEAF_RACED = "leaf:part:platen:" + "9" * 64 + ":5400s"
 
 # Verbatim shapes of what build.py prints at --verbosity info (_farm._dispatch,
 # the cache restore, doit's TaskError and the traceback's final exception).
@@ -1335,6 +1365,8 @@ def test_a_dead_launcher_is_reported_and_its_orphaned_leaves_cancelled(
         + f"  --  [   61.1s +  0.1s] Farm workflow attached: {LEAF_SHARED}\n"
         + f"  --  [   61.2s +  0.1s] Farm workflow requested: {LEAF_FOREIGN}\n"
         + f"  --  [   61.3s +  0.1s] Farm workflow attached: {LEAF_FOREIGN}\n"
+        + f"  --  [   61.4s +  0.1s] Farm workflow requested: {LEAF_RACED}\n"
+        + f"  --  [   61.5s +  0.1s] Farm workflow attached: {LEAF_RACED}\n"
     )
     farm_state = Path(fixture["farm_state"])
     farm_state.write_text(
@@ -1349,11 +1381,29 @@ def test_a_dead_launcher_is_reported_and_its_orphaned_leaves_cancelled(
                     "status": "RUNNING",
                     "start_time": "2020-01-01T00:00:00+00:00",
                 },
+                LEAF_RACED: {"status": "RUNNING"},
             }
         ),
         encoding="utf-8",
     )
+    # Requests land >= 3 s after the run starts, leaving room for a race.
+    fixture["environment"]["UV_STUB_START_DELAY"] = "3"
     process, release, running = _start_held(tmp_path, fixture, lines, "orphaned")
+    # Codex on #1125: another submitter created LEAF_RACED after this run
+    # started but before this run requested it; this run only attached.
+    telemetry = Path(running["snapshot"]) / "cad/out/reports/telemetry/logs.jsonl"
+    requested_at = next(
+        datetime.fromisoformat(entry["timestamp"].replace("Z", "+00:00"))
+        for entry in map(json.loads, telemetry.read_text(encoding="utf-8").splitlines())
+        if entry["attributes"]["workflow_id"] == LEAF_RACED
+    )
+    raced_start = requested_at.replace(microsecond=0) - timedelta(seconds=2)
+    # .NET's round-trip form has 7 fractional digits; keep microseconds.
+    run_start = datetime.fromisoformat(running["started_at"][:26] + "+00:00")
+    assert raced_start > run_start
+    workflows = json.loads(farm_state.read_text(encoding="utf-8"))
+    workflows[LEAF_RACED]["start_time"] = raced_start.isoformat()
+    farm_state.write_text(json.dumps(workflows), encoding="utf-8")
     build = _stub_pid(fixture)
     try:
         # The harness kills the launcher alone; the build it started lives on.
@@ -1380,6 +1430,7 @@ def test_a_dead_launcher_is_reported_and_its_orphaned_leaves_cancelled(
             LEAF_NUT,
             LEAF_SHARED,
             LEAF_FOREIGN,
+            LEAF_RACED,
         ]
 
         watch = _run_launcher(
@@ -1410,7 +1461,7 @@ def test_a_dead_launcher_is_reported_and_its_orphaned_leaves_cancelled(
         assert json.loads(again_status.stdout)["state"] == "launcher-died"
 
         workflows = json.loads(farm_state.read_text(encoding="utf-8"))
-        workflows[LEAF_PEN] = {"status": "RUNNING"}
+        workflows[LEAF_PEN]["status"] = "RUNNING"
         farm_state.write_text(json.dumps(workflows), encoding="utf-8")
         cancel = _run_launcher(fixture, cancel_command, fixture["environment"])
     finally:
@@ -1429,6 +1480,7 @@ def test_a_dead_launcher_is_reported_and_its_orphaned_leaves_cancelled(
         LEAF_NUT: "not-found",
         LEAF_SHARED: "kept-shared",
         LEAF_FOREIGN: "kept-foreign",
+        LEAF_RACED: "kept-foreign",
     }
     cancels = [
         json.loads(line)

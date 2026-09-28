@@ -443,6 +443,31 @@ function Get-UnfinishedRunOutputs {
     return Join-Path $Record['snapshot'] 'cad\out'
 }
 
+# A workflow this run created starts within one start_workflow round trip of
+# its request; the bound only has to exclude a later re-creation of the ID.
+$script:CreationWindowSeconds = 30
+
+function Get-RunLeafRequests {
+    param([Parameter(Mandatory)]$Record)
+
+    # _farm._dispatch logs "Farm workflow requested" with an absolute timestamp
+    # just before start_workflow; the console log only has relative times.
+    $requests = @{}
+    $logs = Join-Path (Get-UnfinishedRunOutputs -Record $Record) 'reports\telemetry\logs.jsonl'
+    if (-not (Test-Path -LiteralPath $logs -PathType Leaf)) {
+        return $requests
+    }
+    foreach ($match in Select-String -LiteralPath $logs -SimpleMatch 'Farm workflow requested: ') {
+        $entry = $match.Line | ConvertFrom-Json -AsHashtable
+        $workflowId = $entry['attributes']['workflow_id']
+        if (-not $requests.ContainsKey($workflowId)) {
+            $requests[$workflowId] = [System.Collections.Generic.List[datetime]]::new()
+        }
+        $requests[$workflowId].Add((ConvertTo-UtcTimestamp -Value $entry['timestamp']))
+    }
+    return $requests
+}
+
 # --- Tracking a recorded run: -Status, -Watch, -Cancel, -List -----------------
 #
 # Everything below reads the same three records a launch writes under
@@ -995,6 +1020,8 @@ function Invoke-RunCancel {
             $shared[$workflowId] = $other.status['run_id']
         }
     }
+    # When this run asked the farm for each leaf, from its own telemetry.
+    $requests = Get-RunLeafRequests -Record $record
 
     $outcomes = [System.Collections.Generic.List[object]]::new()
     $reason = "$Why (farm-run.ps1 -Cancel $runId)"
@@ -1037,11 +1064,19 @@ function Invoke-RunCancel {
             continue
         }
         $workflowStarted = ConvertTo-UtcTimestamp -Value $described['start_time']
-        if ($workflowStarted -lt $runStartedAt) {
-            # Started before this run existed: another submitter owns it and
-            # this run only attached, so it is not this run's to cancel.
+        $requested = if ($requests.ContainsKey($workflowId)) { $requests[$workflowId] } else { @() }
+        $createdHere = @($requested | Where-Object {
+                # farm.py truncates start_time to the second; creation follows
+                # the request by one start_workflow round trip.
+                $workflowStarted -ge $_.AddTicks(-($_.Ticks % [System.TimeSpan]::TicksPerSecond)) -and
+                $workflowStarted -le $_.AddSeconds($script:CreationWindowSeconds)
+            }).Count -gt 0
+        if (-not $createdHere) {
+            # USE_EXISTING cannot say who created a workflow, so only one the
+            # farm started right after this run's own request is this run's;
+            # anything else was another submitter's, and this run attached.
             $outcome['outcome'] = 'kept-foreign'
-            $outcome['detail'] = "started $($workflowStarted.ToString('o')) before this run"
+            $outcome['detail'] = "started $($workflowStarted.ToString('o')), not within $($script:CreationWindowSeconds) s of a request by this run"
             Write-RunEvent -RunId $runId -Text "kept $workflowId`: $($outcome['detail'])"
             continue
         }

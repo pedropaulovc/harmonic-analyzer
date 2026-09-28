@@ -245,14 +245,19 @@ no `.done`.
   including a build a dead launcher left behind (a process under a dead
   launcher's PID counts only if it carries the recorded build command line),
   then cancels each in-flight leaf that `farm.py status` reports `RUNNING`,
-  with the reason and run id on the cancellation. Workflows are shared by ID,
-  so two leaves are kept: one a sibling run in the same `-LogDirectory` is
-  still waiting on (`kept-shared`; a `launcher-died` sibling counts while its
-  build outlives it), and one the farm started before this run did
-  (`kept-foreign`: another submitter owns it and this run only attached).
-  A submitter outside this `-LogDirectory` that attached *after* this run
-  started a leaf is invisible to both checks, and its leaf is cancelled with
-  the rest. If any leaf cannot be accounted for (`farm.py` failed on
+  with the reason and run id on the cancellation. Workflows are shared by ID
+  (`USE_EXISTING`), and the farm cannot say which submitter created one, so
+  two leaves are kept. One is a leaf a sibling run in the same
+  `-LogDirectory` is still waiting on (`kept-shared`; a `launcher-died`
+  sibling counts while its build outlives it). The other is a leaf this run
+  cannot show it created (`kept-foreign`). It counts as created here only when
+  the farm's `start_time` falls between the second of one of this run's own
+  `Farm workflow requested` telemetry records (`reports/telemetry/logs.jsonl`
+  in its outputs) and 30 s after it. A clock skew between this machine and
+  the farm errs toward keeping. A submitter outside this `-LogDirectory` that
+  attached *after* this run created a leaf is invisible, and that leaf is
+  cancelled with the rest; only farm-side reference counting could see it.
+  If any leaf cannot be accounted for (`farm.py` failed on
   authentication, network or CLI), `-Cancel` exits 1 and changes nothing
   else: no `.done`, the snapshot kept, the run still `launcher-died`. Retry the
   same command. Otherwise it does the cleanup the launcher never ran —
