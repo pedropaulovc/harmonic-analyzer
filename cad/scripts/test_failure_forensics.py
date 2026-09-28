@@ -771,6 +771,29 @@ def test_a_wall_clock_stepped_back_mid_wait_does_not_extend_it(monkeypatch, capt
     assert prov["seat_startup_wait_s"] < 5
 
 
+def test_a_seat_that_starts_in_the_future_waits_at_most_the_window(
+    monkeypatch, fast_polls, capture_telemetry
+):
+    """A clock stepped back between launching SolidWorks and this call puts the
+    seat's start in the future; the wait is still at most the window, never the
+    skew on top of it."""
+    monkeypatch.setenv("HARMONIC_SW_STARTUP_WINDOW", "0.2")
+    started = time.time() + 1000
+    monkeypatch.setattr(_seat_forensics, "_process_started_at", lambda pid: started)
+
+    class _NeverStarts(_StartingSeat):
+        @property
+        def StartupProcessCompleted(self):
+            if self.startup_reads > 20_000:
+                raise AssertionError("the startup wait outlived its window")
+            return super().StartupProcessCompleted
+
+    prov = _seat_forensics.record_seat_provenance(_Adapter(sw=_NeverStarts([False])))
+
+    assert prov["seat_startup_completed"] is False
+    assert prov["seat_startup_wait_s"] < 1
+
+
 def test_a_ready_or_mute_seat_costs_no_wait():
     """The control: a started seat is read once, and a seat with no boolean
     answer is ``unknown`` -- neither a reason to wait nor a claim it is ready."""

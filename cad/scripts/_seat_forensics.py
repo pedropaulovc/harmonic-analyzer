@@ -570,9 +570,11 @@ def await_seat_startup(adapter: Any, started_epoch_s: Any = None) -> dict[str, A
     )
     # The seat's age needs the wall clock (its start time is an epoch), but the
     # wait itself is bounded on the monotonic clock: a worker's clock corrected
-    # mid-wait must neither extend it indefinitely nor cut it short.
+    # mid-wait must neither extend it indefinitely nor cut it short. A clock
+    # stepped back BEFORE this call puts the start in the future, so the budget
+    # is also clamped to the window itself.
     begun = time.monotonic()
-    stop = begun + (deadline - now)
+    stop = begun + min(deadline - now, window)
     while completed is False and time.monotonic() < stop:
         time.sleep(_STARTUP_POLL_S)
         completed = _startup_completed(sw)
