@@ -568,8 +568,12 @@ def await_seat_startup(adapter: Any, started_epoch_s: Any = None) -> dict[str, A
         f"the session until it completes, up to {window:.0f}s of seat age",
         **record,
     )
+    # The seat's age needs the wall clock (its start time is an epoch), but the
+    # wait itself is bounded on the monotonic clock: a worker's clock corrected
+    # mid-wait must neither extend it indefinitely nor cut it short.
     begun = time.monotonic()
-    while completed is False and time.time() < deadline:
+    stop = begun + (deadline - now)
+    while completed is False and time.monotonic() < stop:
         time.sleep(_STARTUP_POLL_S)
         completed = _startup_completed(sw)
         # One record per poll keeps the watchdog's idle clock (log records are

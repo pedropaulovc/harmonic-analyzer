@@ -739,6 +739,38 @@ def test_a_wait_that_runs_out_proceeds_and_says_so(monkeypatch, fast_polls, capt
     assert any("proceeding" in str(r.log_record.body) for r in logs.get_finished_logs())
 
 
+def test_a_wall_clock_stepped_back_mid_wait_does_not_extend_it(monkeypatch, capture_telemetry):
+    """A worker's clock corrected backwards while the seat starts (time sync on
+    a fresh VM) must not stretch the wait: only the seat AGE reads the wall
+    clock; the wait itself runs out on the monotonic clock."""
+    monkeypatch.setenv("HARMONIC_SW_STARTUP_WINDOW", "30")
+    now = time.time()
+    monkeypatch.setattr(_seat_forensics, "_process_started_at", lambda pid: now - 29.9)
+    wall = [now]
+
+    def stepping_back() -> float:
+        wall[0] -= 1.0
+        return wall[0]
+
+    monkeypatch.setattr(
+        _seat_forensics,
+        "time",
+        SimpleNamespace(time=stepping_back, monotonic=time.monotonic, sleep=lambda _s: None),
+    )
+
+    class _NeverStarts(_StartingSeat):
+        @property
+        def StartupProcessCompleted(self):
+            if self.startup_reads > 100_000:
+                raise AssertionError("the startup wait outlived its 0.1 s budget")
+            return super().StartupProcessCompleted
+
+    prov = _seat_forensics.record_seat_provenance(_Adapter(sw=_NeverStarts([False])))
+
+    assert prov["seat_startup_completed"] is False
+    assert prov["seat_startup_wait_s"] < 5
+
+
 def test_a_ready_or_mute_seat_costs_no_wait():
     """The control: a started seat is read once, and a seat with no boolean
     answer is ``unknown`` -- neither a reason to wait nor a claim it is ready."""
