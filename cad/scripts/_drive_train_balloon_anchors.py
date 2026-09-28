@@ -8,14 +8,21 @@ instance's (``_drawing_common._select_balloon_anchor``).
 
 ``BalloonAnchor()`` walks: it hit-tests the body's extreme points along
 fixed directions (``_drawing_common._walk_points``), ranked by geometry,
-and takes the first the hit test gives back to that exact instance, else an
-edge of the first instance that the view's hidden-line pass lists as drawn;
-with neither, the sheet fails. The ``drawing.balloon_anchor`` event reports
-where it landed, ready to freeze here. Every drive-train family walks.
+and takes the first the hit test gives back to that exact instance, else
+the first so claimed of the points along the edges the view's hidden-line
+pass lists as drawn for that instance; with neither, the sheet fails. The
+balloon's leader ends at the claimed point. The ``drawing.balloon_anchor``
+event reports where it landed, ready to freeze here. Every drive-train
+family walks.
 
 Keyed by cluster, then family; a cluster sheet shows only its own cluster.
-A head-anchored family (``draw_drive_train_assembly.HEAD_ANCHORED``) is
-listed too: with no head rim shown, this anchor balloons it.
+
+The pedestal hold-down screw is pinned to the south screw,
+pedestal-hold-down-screw-1: the north one hides behind its strap in the
+exploded view (r6b item 26). The pin replaces a head-rim pick that took the
+screw's largest listed circle by entity, whose leader SolidWorks ended on
+the pedestal's top face (run
+20260928T194845954Z-44f5de00de924735961d14f4aad40337, item 32).
 """
 
 from __future__ import annotations
@@ -29,7 +36,7 @@ DRIVE_TRAIN_BALLOON_ANCHORS: dict[str, dict[str, BalloonAnchor]] = {
         "cylinder-end-disc": BalloonAnchor(),
         "arbor-set-screw": BalloonAnchor(),
         "cylinder-gear": BalloonAnchor(),
-        "pedestal-hold-down-screw": BalloonAnchor(),
+        "pedestal-hold-down-screw": BalloonAnchor(instance="pedestal-hold-down-screw-1"),
     },
     "cone-crank": {
         "cone-swing-platform": BalloonAnchor(),

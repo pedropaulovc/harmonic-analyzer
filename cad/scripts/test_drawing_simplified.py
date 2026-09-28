@@ -530,10 +530,6 @@ def _stub_drive_train_sheets(monkeypatch, fitted_for):
     def set_scale(_adapter, bound, scale, *, label) -> None:
         bound.ScaleRatio = scale
 
-    def anchored(*_args, **_kwargs) -> tuple[list, frozenset]:
-        record("anchored balloons")()
-        return [], frozenset()
-
     def ballooned(*_args, **_kwargs) -> list:
         record("balloons")()
         return []
@@ -550,7 +546,6 @@ def _stub_drive_train_sheets(monkeypatch, fitted_for):
         "_set_view_scale": set_scale,
         "cluster_ring_fit": lambda _outline: ((0.0, 0.0), [], 0.0),
         "_shift_view": idle,
-        "_head_anchored_balloons": anchored,
         "add_component_bom_balloons": ballooned,
         "_spread_balloons": idle,
         "rebuild_drawing": idle,
@@ -595,7 +590,6 @@ def test_cluster_balloons_attach_to_the_explode_of_the_configuration_printed(
     assert [event for event, _configuration, _explode in seen] == [
         "isolate",
         "bom link",
-        "anchored balloons",
         "balloons",
         "balloon read-back",
     ]

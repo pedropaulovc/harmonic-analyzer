@@ -2193,25 +2193,31 @@ def test_pinned_anchor_instance_must_be_shown():
 class _AnchorEdge:
     """A drawing-view edge: ``IEntity.GetComponent`` names its owner by path.
 
-    Its curve runs straight between ``ends`` unless ``middle`` bends it
-    through another parameter midpoint (an arc)."""
+    Its curve runs straight between ``ends`` over parameters 0..1 unless
+    ``at`` maps a parameter to a point (an arc). ``landing`` is the sheet
+    point where SolidWorks ends a leader on the edge when no selection point
+    says where: by default its start."""
 
-    def __init__(self, owner, ends=(0.001, 0.002, 0.003, 0.004, 0.005, 0.006), middle=None):
+    def __init__(self, owner, ends=(0.001, 0.002, 0.003, 0.004, 0.005, 0.006), at=None, landing=None):
         self._owner = SimpleNamespace(Name2=owner)
         self._ends = ends
-        self._middle = middle or tuple((s + e) / 2.0 for s, e in zip(ends[0:3], ends[3:6]))
+        self._at = at or (
+            lambda t: tuple(s + t * (e - s) for s, e in zip(ends[0:3], ends[3:6]))
+        )
+        self.landing = landing or (ends[0], ends[1])
 
     def GetComponent(self):
         return self._owner
 
     def GetCurve(self):
-        return SimpleNamespace(Evaluate2=lambda t, _derivatives: self._middle)
+        return SimpleNamespace(Evaluate2=lambda t, _derivatives: self._at(t))
 
     def GetCurveParams2(self):
         return (*self._ends, 0.0, 1.0, 0.0, 0.0, 0.0)
 
     def Select4(self, _append, _data):
         self.sheet.selected = [self]
+        self.sheet.selection_point = None
         return True
 
 
@@ -2229,23 +2235,38 @@ class _AnchorSheet:
     aperture in sheet metres depends on the zoom and on ``window_px``, the
     graphics area's height. ``attach(edge)`` is what an inserted balloon
     reports through ``GetAttachedEntities3`` / ``GetAttachedEntityTypes``: by
-    default the selected edge, typed swSelEDGES."""
+    default the selected edge, typed swSelEDGES. Its leader ends at the
+    selection point (a hit test's pick, or ``SetSelectionPoint2``'s), else at
+    the edge's own ``landing``; ``honours_point=False`` always takes the
+    latter."""
 
-    def __init__(self, edges_at, attach=lambda edge: ((edge,), (1,)), near=None, window_px=640):
+    def __init__(
+        self, edges_at, attach=lambda edge: ((edge,), (1,)), near=None, window_px=640,
+        honours_point=True,
+    ):
         self.edges_at = edges_at
         self.attach = attach
         self.near = near or {}
         self.window_px = window_px
+        self.honours_point = honours_point
         self.span = _FIT_SPAN_M
         self.selected = []
+        self.selection_point = None
         self.hits = []
         self.balloons = []
         for edge in (*edges_at.values(), *(edge for _d, edge in self.near.values())):
             edge.sheet = self
+
+        def set_point(index, _mark, x, y, _z):
+            assert index == len(self.selected) == 1, "the point belongs to the one selected edge"
+            self.selection_point = (x, y)
+            return True
+
         manager = SimpleNamespace(
             CreateSelectData=lambda: SimpleNamespace(),
             GetSelectedObjectCount2=lambda _mark: len(self.selected),
             GetSelectedObject6=lambda index, _mark: self.selected[index - 1],
+            SetSelectionPoint2=set_point,
         )
         self.SelectionManager = manager
         self.Extension = SimpleNamespace(
@@ -2270,21 +2291,29 @@ class _AnchorSheet:
             if distance <= _PICK_PX * self.span / self.window_px:
                 edge = closest
         self.selected = [] if edge is None else ["the view", edge]
+        self.selection_point = None if edge is None else (x, y)
         return edge is not None
 
     def _insert(self, _options):
         assert self.span == _FIT_SPAN_M, "balloons go in under the fit-to-sheet zoom"
-        entities, kinds = self.attach(self.selected[-1])
+        edge = self.selected[-1]
+        entities, kinds = self.attach(edge)
+        end = self.selection_point if self.honours_point and self.selection_point else edge.landing
         item = str(len(self.balloons) + 1)
         annotation = SimpleNamespace(
-            GetAttachedEntities3=lambda: entities, GetAttachedEntityTypes=lambda: kinds
+            GetAttachedEntities3=lambda: entities,
+            GetAttachedEntityTypes=lambda: kinds,
+            GetLeaderCount=lambda: 1,
+            IsDangling=lambda: False,
+            GetLeaderPointsAtIndex=lambda _index: (0.3, 0.3, 0.0, end[0], end[1], 0.0),
         )
-        note = SimpleNamespace(item=item, GetAnnotation=lambda: annotation)
+        note = SimpleNamespace(item=item, GetAnnotation=lambda: annotation, end=end)
         self.balloons.append(note)
         return note
 
     def ClearSelection2(self, _all):
         self.selected = []
+        self.selection_point = None
 
     def ActivateView(self, _name):
         return True
@@ -2371,8 +2400,7 @@ def _exploded_view(
     """A view shown exploded; ``steps`` are (translation, moved component paths).
 
     ``visible`` maps an instance path to the edges ``GetVisibleEntities2``
-    lists for it; ``view.selected_entities`` records ``SelectEntity``.
-    ``referenced`` is the configuration the view shows (the model's active one
+    lists for it. ``referenced`` is the configuration the view shows (the model's active one
     is ``Default``); ``instances`` are that configuration's component paths
     (default: the view's leaves). No steps means a collapsed view."""
     root = _FakeDrawingComponent("drive-train-8", children=children)
@@ -2383,7 +2411,7 @@ def _exploded_view(
         shown_only=shown_only,
     )
     listed = visible or {}
-    view = SimpleNamespace(
+    return SimpleNamespace(
         RootDrawingComponent2=lambda _resolve: root,
         IsExploded=lambda: bool(steps),
         ReferencedConfiguration=referenced,
@@ -2392,16 +2420,7 @@ def _exploded_view(
         UpdateViewDisplayGeometry=lambda: True,
         GetVisibleEntityCount2=lambda component, kind: len(listed.get(component.Name2, ())),
         GetVisibleEntities2=lambda component, kind: tuple(listed.get(component.Name2, ())),
-        selected_entities=[],
     )
-
-    def select_entity(entity, append):
-        view.selected_entities.append(entity)
-        entity.sheet.selected = [entity]
-        return True
-
-    view.SelectEntity = select_entity
-    return view
 
 
 def _body(points):
@@ -2461,7 +2480,6 @@ def test_frozen_anchor_selects_at_its_exploded_projection_and_records_it(monkeyp
             "method": "frozen",
             "point_mm": "1.000,2.000,3.000",
             "sheet_mm": "131.000,452.000",
-            "edge_mm": "",
             "tried": 1,
         }
     ]
@@ -2754,58 +2772,88 @@ def test_walk_hit_on_the_same_named_part_of_another_subassembly_is_not_claimed(m
     assert sheet.hits == [(0.0, -0.01), (0.0, 0.01)]
 
 
-def test_walk_without_a_hit_selects_a_listed_visible_edge_through_the_view(monkeypatch):
-    """A pin in its bore: no hit test claims it. The view's hidden-line pass
-    still lists its drawn edges; the one holding the outermost endpoint is
-    selected through the view, whatever order the undocumented array uses."""
-    lone = [(0.0, 0.05, 0.0), (0.001, 0.05, 0.0)]
-    first = _AnchorEdge("cone-gear-1", ends=(0.02, 0.001, 0.0, 0.01, 0.03, 0.0))
-    outer = _AnchorEdge("cone-gear-1", ends=(0.01, 0.03, 0.0, 0.0, 0.0, 0.0))
-    for listed in ((first, outer), (outer, first)):
-        view = _exploded_view(
-            _instances("cone-gear-1", bodies={"cone-gear-1": _body(lone)}),
-            [],
-            visible={"cone-gear-1": listed},
-        )
-        sheet = _AnchorSheet({})
-        first.sheet = outer.sheet = sheet
-        balloons, _projected, anchors = _balloon(monkeypatch, sheet, view, {"cone-gear": _WALK})
-        assert len(balloons) == 1 and view.selected_entities == [outer]
-        assert len(sheet.hits) == 2
-        assert {key: anchors[0][key] for key in ("method", "sheet_mm", "edge_mm", "tried", "visible")} == {
-            "method": "visible-edge",
-            "sheet_mm": "",
-            "edge_mm": "10.000,30.000,0.000,0.000,0.000,0.000",
-            "tried": 2,
-            "visible": "cone-gear-1=2",
-        }
+# Measured on run 20260928T194845954Z-44f5de00de924735961d14f4aad40337: where
+# the walk's zoomed hit test claimed the part (drawing.balloon_anchor
+# sheet_mm) and where SolidWorks ended the balloon's leader, the edge
+# selected by entity alone (drawing.balloon_attachment attach_mm). Sheet m.
+_MEASURED_LANDINGS = {
+    # Frame sheet 2, item 8: 0.46 mm off a #4-40 head drawn 0.35 mm across
+    # at 1:8, into the nameplate engraving.
+    "frame-8-fillister-screw": ((0.161847, 0.139315), (0.161438, 0.139110)),
+    # Drive-train sheet 3, item 3: 10.3 mm round the thrust washer's rim,
+    # into the cylinder gear's teeth.
+    "dt-3-cylinder-end-disc": ((0.259833, 0.190494), (0.254346, 0.181734)),
+}
 
 
-def test_visible_edge_parts_two_arcs_on_the_same_ends_by_their_midpoints(monkeypatch):
-    """Two arcs of a pin's outline can join the same two points; keyed by
-    their ends alone, the array's undocumented order chose between them.
-    Their midpoints differ, and the lower one wins in either listing order;
-    two edges alike in ends and midpoint fail rather than let order choose."""
-    ends = (0.0, 0.0, 0.0, 0.01, 0.0, 0.0)
-    upper = _AnchorEdge("cone-gear-1", ends=ends, middle=(0.005, 0.005, 0.0))
-    lower = _AnchorEdge("cone-gear-1", ends=ends, middle=(0.005, -0.005, 0.0))
+def _walked_to(hit, landing, **sheet_kwargs):
+    """cone-gear-1 walks to ``hit``, the one point the hit test gives back
+    to it; selected by entity alone, its edge ends a leader at ``landing``."""
+    view = _exploded_view(
+        _instances("cone-gear-1", bodies={"cone-gear-1": _body([(*hit, 0.0)])}), []
+    )
+    sheet = _AnchorSheet({hit: _AnchorEdge("cone-gear-1", landing=landing)}, **sheet_kwargs)
+    return view, sheet
 
-    def run(listed):
-        view = _exploded_view(
-            _instances("cone-gear-1", bodies={"cone-gear-1": _body([])}),
-            [],
-            visible={"cone-gear-1": listed},
-        )
-        sheet = _AnchorSheet({})
-        for edge in listed:
-            edge.sheet = sheet
+
+@pytest.mark.parametrize("case", sorted(_MEASURED_LANDINGS))
+def test_a_walked_balloon_leader_ends_where_the_hit_test_claimed_its_part(monkeypatch, case):
+    """The hit test proves the part drawn at one point; elsewhere on the same
+    edge a neighbour can be in front. The leader ends at that point, not
+    where SolidWorks would put it on the edge."""
+    hit, landing = _MEASURED_LANDINGS[case]
+    view, sheet = _walked_to(hit, landing)
+    balloons, _projected, anchors = _balloon(monkeypatch, sheet, view, {"cone-gear": _WALK})
+    assert [note.end for note in balloons] == [hit]
+    assert anchors[0]["sheet_mm"] == f"{hit[0] * 1000:.3f},{hit[1] * 1000:.3f}"
+
+
+@pytest.mark.parametrize("case", sorted(_MEASURED_LANDINGS))
+def test_a_balloon_leader_that_ends_off_its_claimed_point_fails_the_sheet(monkeypatch, case):
+    """A seat that ignores the selection point must not ship the measured
+    landing: 0.46 mm is already the neighbouring part at 1:8."""
+    hit, landing = _MEASURED_LANDINGS[case]
+    view, sheet = _walked_to(hit, landing, honours_point=False)
+    with pytest.raises(RuntimeError, match="cone-gear balloon leader attachment moved"):
         _balloon(monkeypatch, sheet, view, {"cone-gear": _WALK})
-        return view.selected_entities
 
-    assert run((upper, lower)) == run((lower, upper)) == [lower]
-    twin = _AnchorEdge("cone-gear-1", ends=ends, middle=(0.005, -0.005, 0.0))
-    with pytest.raises(RuntimeError, match="2 visible edges with the same ends and midpoint"):
-        run((lower, twin))
+
+def _ring_point(t, centre=(0.1, 0.1), radius=0.00495):
+    """A point on the crank-pin ring's 4.95 mm loop, whose one edge starts
+    and ends at the same point (run 20260928T194845954Z, item 43)."""
+    angle = 2.0 * _math.pi * t
+    return (centre[0] + radius * _math.cos(angle), centre[1] + radius * _math.sin(angle), 0.0)
+
+
+def test_a_ring_behind_a_pin_is_ballooned_where_its_listed_edge_is_drawn(monkeypatch):
+    """Drive-train sheet 4, item 43: no extreme point of the crank-pin ring
+    is claimed, so the fallback takes its listed visible edges. Listed is
+    not drawn everywhere: the taper pin's shank crosses the loop where it
+    starts, and there SolidWorks ended the leader. Points along each listed
+    edge are hit-tested like the walk's, the leader ends on the first one
+    the ring claims, and the array's order does not change which."""
+
+    def key(t):
+        return tuple(round(v, 9) for v in _ring_point(t)[:2])
+
+    shank = _AnchorEdge("taper-pin-1")
+    ring = _AnchorEdge("crank-pin-ring-1", at=_ring_point, landing=key(0.0))
+    bore = _AnchorEdge("crank-pin-ring-1", at=lambda t: _ring_point(t, radius=0.002))
+    results = []
+    for listed in ((ring, bore), (bore, ring)):
+        view = _exploded_view(
+            _instances("crank-pin-ring-1", bodies={"crank-pin-ring-1": _body([(0.0, 0.05, 0.0)])}),
+            [],
+            visible={"crank-pin-ring-1": listed},
+        )
+        sheet = _AnchorSheet({key(0.1): shank, key(0.9): shank, key(0.5): ring})
+        balloons, _projected, anchors = _balloon(
+            monkeypatch, sheet, view, {"crank-pin-ring": _WALK}, items=(("crank-pin-ring", "1"),)
+        )
+        assert [note.end for note in balloons] == [key(0.5)]
+        assert (anchors[0]["method"], anchors[0]["visible"]) == ("visible-edge", "crank-pin-ring-1=2")
+        results.append((tuple(sheet.hits), anchors[0]))
+    assert results[0] == results[1]
 
 
 @pytest.mark.parametrize("listed", [0, 65], ids=["none-listed", "over-the-cap"])
@@ -2833,14 +2881,14 @@ def test_walk_without_a_hit_or_a_listed_edge_fails_naming_what_it_tried(monkeypa
 
     view.GetVisibleEntities2 = fetch
     sheet = _AnchorSheet({(0.0, 0.06): spare})
-    spare.sheet = sheet
     with pytest.raises(
         RuntimeError,
         match=r"cone-gear has no verifiably visible edge: no hit test claimed cone-gear-1 "
-        rf"at sheet mm \[\(0\.00, 50\.00\)\], and cone-gear-1 lists {listed} visible edges, not 1-64",
+        rf"at sheet mm \[\(0\.00, 50\.00\)\]: 1 body extreme points, then 0 points along "
+        rf"its {listed} listed visible edges \(sampled when 1-64\)",
     ):
         _balloon(monkeypatch, sheet, view, {"cone-gear": _WALK})
-    assert sheet.balloons == [] and view.selected_entities == []
+    assert sheet.balloons == []
     assert sheet.hits == [(0.0, 0.05)]
 
 

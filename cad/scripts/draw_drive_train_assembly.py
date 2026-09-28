@@ -38,7 +38,6 @@ from _drawing_common import (
     DrawingOutputs,
     ViewRole,
     _SW_SHADED_EDGES,
-    _balloon_item_number,
     _leader_segments_of,
     _spread_balloons,
     add_component_bom_balloons,
@@ -58,7 +57,6 @@ from _drawing_common import (
     set_high_quality_shaded_with_edges,
     set_view_exploded_state,
     view_configuration,
-    visible_component_entities,
 )
 from _drawing_simplified import simplified_name
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
@@ -267,14 +265,6 @@ CLUSTER_BALLOON_CLEARANCE = {
     "cone-crank": 0.0015,
     "pinion-rig": 0.008,
 }
-# Families whose balloon lands on the head of one chosen instance instead of
-# the first visible edge the shared picker meets. Sheet 3's pedestal hold-down
-# screw balloon (r6b item 26) pointed at the north screw, which hides behind
-# its strap; the south one stands clear in the exploded view.
-HEAD_ANCHORED: dict[Cluster, dict[str, Literal["south", "north"]]] = {
-    "cylinder-bank": {"pedestal-hold-down-screw": "south"},
-}
-SW_VIEW_ENTITY_EDGE = 1  # swViewEntityType_e.swViewEntityType_Edge
 
 # --- note fields (x0, top, x1, bottom), metres --------------------------------
 # Tops sit under the one-line sheet heading at HEADING_XY.
@@ -1620,139 +1610,6 @@ def _final_balloon_uncross(
         )
 
 
-def _head_edge(adapter: Any, view: Any, instance: str, *, label: str) -> Any | None:
-    """The largest visible circular edge of one named instance: its head rim.
-
-    Reads the view as the old ``_drawing_common`` balloon-anchor pick did
-    (the view object as placed, ``GetVisibleEntities2`` of the drawing
-    component's model component), the path that finds these screws' edges on
-    every build. r7 (leaf 20260923T180240Z-1-e6c4ca27) found no circular edge
-    on the south pedestal screw through an early-bound ``IView``; the log
-    could not say whether it saw no edges or no circles, so both counts are
-    logged now.
-    """
-    root = adapter._attempt(lambda: view.RootDrawingComponent2(False), default=None)
-    if root is None:
-        raise RuntimeError(f"{label}: drawing view has no root component")
-    component = None
-    for raw in tuple(_early_bound(root, "IDrawingComponent").GetChildren() or ()):
-        drawing_component = _early_bound(raw, "IDrawingComponent")
-        name = str(drawing_component.Name or "").split("@", 1)[0]
-        if name.replace("\\", "/").rsplit("/", 1)[-1] == instance:
-            component = adapter._attempt(lambda dc=drawing_component: dc.Component, default=None)
-            break
-    if component is None:
-        raise RuntimeError(f"{label}: {instance} is not in the view")
-    edges = tuple(
-        adapter._attempt(
-            lambda: visible_component_entities(view, component, SW_VIEW_ENTITY_EDGE), default=()
-        )
-        or ()
-    )
-    best, best_radius, circles = None, 0.0, 0
-    for edge in edges:
-        curve = adapter._attempt(
-            lambda e=edge: _early_bound(_early_bound(e, "IEdge").GetCurve(), "ICurve"),
-            default=None,
-        )
-        if curve is None or not adapter._attempt(lambda c=curve: bool(c.IsCircle()), default=False):
-            continue
-        circles += 1
-        radius = float(tuple(curve.CircleParams)[6])
-        if radius > best_radius:
-            best, best_radius = edge, radius
-    _telemetry.info(
-        f"{label}: head anchor {instance}: {len(edges)} visible edges, {circles} circular, "
-        f"largest r={best_radius * 1000.0:.3f} mm"
-    )
-    _telemetry.event(
-        "drawing.balloon_head_anchor",
-        label=label,
-        instance=instance,
-        edges=len(edges),
-        circles=circles,
-        radius_mm=best_radius * 1000.0,
-    )
-    return best
-
-
-def _insert_balloon_on_edge(
-    adapter: Any, view: Any, edge: Any, *, stem: str, expected_item: str, label: str
-) -> Any:
-    """``_drawing_common``'s component balloon, on a chosen edge."""
-    draw = adapter.currentModel
-    if not _early_bound(draw, "IDrawingDoc").ActivateView(view_name(adapter, view)):
-        raise RuntimeError(f"{label}: failed to activate the {stem} view")
-    draw.ClearSelection2(True)
-    if not view.SelectEntity(edge, False):
-        raise RuntimeError(f"{label}: failed to select the {stem} head edge")
-    options = _early_bound(
-        _early_bound(draw.Extension, "IModelDocExtension").CreateBalloonOptions(),
-        "IBalloonOptions",
-    )
-    options.Style = 1
-    options.Size = 2
-    options.UpperTextContent = 1
-    options.ShowQuantity = False
-    options.ItemNumberStart = 1
-    options.ItemNumberIncrement = 1
-    options.ItemOrder = 1
-    note = _early_bound(draw.Extension, "IModelDocExtension").InsertBOMBalloon2(options)
-    draw.ClearSelection2(True)
-    if note is None:
-        raise RuntimeError(f"{label}: failed to insert the {stem} balloon")
-    item = _balloon_item_number(adapter, note, label=label)
-    if item != expected_item:
-        raise RuntimeError(f"{label}: {stem} resolved item {item}, expected {expected_item}")
-    return note
-
-
-def _head_anchored_balloons(
-    adapter: Any,
-    view: Any,
-    cluster: Cluster,
-    facts: SourceFacts,
-    items: dict[str, str],
-    *,
-    label: str,
-) -> tuple[list[Any], frozenset[str]]:
-    """Balloons placed on a head rim, and the families they cover.
-
-    The preferred side's instance goes first, then the others. A family with
-    no visible head rim on any instance falls back to the shared picker with a
-    warning: the anchor is cosmetic, and must not fail an eight-sheet package.
-    """
-    balloons = []
-    anchored = set()
-    for stem, side in HEAD_ANCHORED.get(cluster, {}).items():
-        candidates = sorted(
-            (
-                instance
-                for instance in facts.instances
-                if instance.stem == stem and instance.name in facts.clusters[cluster]
-            ),
-            key=lambda instance: instance.origin_mm[2],
-            reverse=side == "north",
-        )
-        edge = None
-        for instance in candidates:
-            edge = _head_edge(adapter, view, instance.name, label=label)
-            if edge is not None:
-                break
-        if edge is None:
-            _telemetry.warn(
-                f"{label}: no {stem} instance shows a head rim; the shared picker anchors it"
-            )
-            continue
-        balloons.append(
-            _insert_balloon_on_edge(
-                adapter, view, edge, stem=stem, expected_item=items[stem], label=label
-            )
-        )
-        anchored.add(stem)
-    return balloons, frozenset(anchored)
-
-
 def _component_stem(component: Any) -> str:
     component = _early_bound(component, "IComponent2")
     path = str(component.GetPathName() or "")
@@ -2421,19 +2278,16 @@ def _balloon_cluster_sheet(
         key=lambda stem: int(items[stem]),
     )
     balloon_items = tuple((stem, items[stem]) for stem in stems)
-    balloons, anchored = _head_anchored_balloons(
-        adapter, view, cluster, facts, items, label=label
-    )
-    balloons += add_component_bom_balloons(
+    balloons = add_component_bom_balloons(
         adapter,
         view,
-        items=tuple(item for item in balloon_items if item[0] not in anchored),
+        items=balloon_items,
         anchors=DRIVE_TRAIN_BALLOON_ANCHORS[cluster],
         label=f"drive-train {cluster} BOM coverage",
         margin=CLUSTER_BALLOON_MARGIN,
     )
-    # One ring over every balloon, anchored ones included, at this sheet's
-    # clearance; the shared call above ringed only its own.
+    # One ring over every balloon at this sheet's clearance; the shared call
+    # above ringed them at the default.
     _spread_balloons(
         adapter,
         view,
