@@ -39,6 +39,12 @@ from _common import (
     set_isometric_view,
     whats_wrong,
 )
+from _drawing_simplified import (
+    SIMPLIFIED_COMMENT,
+    SIMPLIFIED_SUFFIX,
+    is_simplified,
+    simplified_name,
+)
 from _visibility import assert_reference_geometry_hidden, blank_reference_geometry
 
 
@@ -2260,6 +2266,91 @@ async def _export_assembly_images(
     return artefacts
 
 
+@_telemetry.traced("simplified.assembly_config", label_param="asm_name")
+def sync_simplified_configuration(
+    adapter: Any, asm_name: str, *, verify: bool = True
+) -> int:
+    """Ensure ``Default Simplified`` (derived from ``Default``) points every
+    top-level component at its ``<referenced> Simplified`` configuration.
+
+    Assembly drawings' small line views reference it, so modeled gear teeth and
+    screw threads do not print black (``_drawing_simplified``). The rule is the
+    uniform ``<parent> Simplified`` name, so a subassembly's own ``Default
+    Simplified`` is picked up the same way as a part's ``T24 Simplified``; a
+    component whose model has no such configuration keeps its parent one.
+    Default itself is untouched (proven: every component and mate unchanged).
+
+    Returns how many things changed (configuration created + components
+    re-pointed), so an in-place refresh knows it must re-save. With ``verify``
+    the simplified configuration is force-rebuilt and must read What's Wrong
+    clean; a caller that rebuilds every configuration next passes False. The
+    rest configuration is re-activated before returning.
+    """
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    names = [str(name) for name in (model.GetConfigurationNames() or ())]
+    rest = "Default"
+    if rest not in names:
+        raise RuntimeError(f"{asm_name}: no {rest!r} configuration among {names}")
+    child = simplified_name(rest)
+    changes = 0
+    if child not in names:
+        manager = _early_bound(model.ConfigurationManager, "IConfigurationManager")
+        created = manager.AddConfiguration2(child, SIMPLIFIED_COMMENT, "", 0, rest, "", False)
+        if created is None:
+            raise RuntimeError(f"{asm_name}: AddConfiguration2({child!r}) returned None")
+        changes += 1
+    raw = model.GetConfigurationByName(child)
+    parent = _early_bound(raw, "IConfiguration").GetParent() if raw is not None else None
+    if parent is None or str(_early_bound(parent, "IConfiguration").Name) != rest:
+        raise RuntimeError(f"{asm_name}: {child!r} is not derived from {rest!r}")
+    if active_configuration_name(adapter, model) != child and not bool(
+        model.ShowConfiguration2(child)
+    ):
+        raise RuntimeError(f"{asm_name}: ShowConfiguration2({child!r}) refused")
+
+    assembly = _early_bound(adapter.currentModel, "IAssemblyDoc")
+    known: dict[str, set[str]] = {}
+    swapped = kept = 0
+    refused: list[str] = []
+    for raw_component in assembly.GetComponents(True) or ():
+        component = _early_bound(raw_component, "IComponent2")
+        path = str(component.GetPathName())
+        if path not in known:
+            known[path] = {
+                str(name) for name in (adapter.swApp.GetConfigurationNames(path) or ())
+            }
+        current = str(component.ReferencedConfiguration)
+        base = current.removesuffix(SIMPLIFIED_SUFFIX)
+        want = simplified_name(base) if simplified_name(base) in known[path] else base
+        if want == current:
+            kept += 1
+            continue
+        component.ReferencedConfiguration = want
+        if str(component.ReferencedConfiguration) != want:
+            refused.append(f"{component.Name2}: {current!r} -> {want!r}")
+            continue
+        swapped += 1
+    changes += swapped
+    if refused:
+        raise RuntimeError(
+            f"{asm_name}: {child} refused component configurations: " + "; ".join(refused)
+        )
+    if verify:
+        rebuilt = adapter._attempt(lambda: model.ForceRebuild3(False), default=None)
+        faults = _rebuild_faults(adapter)
+        if rebuilt is False or rebuilt is None or faults:
+            raise RuntimeError(
+                f"{asm_name}: {child} rebuild returned {rebuilt!r} with faults {faults}"
+            )
+    if not bool(model.ShowConfiguration2(rest)):
+        raise RuntimeError(f"{asm_name}: re-activating {rest!r} refused")
+    _telemetry.annotate(swapped=swapped, kept=kept, changes=changes, verified=verify)
+    _telemetry.success(
+        f"{asm_name}: {child} re-points {swapped} component(s), {kept} unchanged"
+    )
+    return changes
+
+
 async def save_assembly_and_images(
     adapter: Any,
     asm_name: str,
@@ -2283,6 +2374,10 @@ async def save_assembly_and_images(
     leaves a manifest beside an assembly it does not describe."""
     if asm_name in ("channel", "summing") and native_contact_check is None:
         raise ValueError(f"{asm_name} assembly requires native_contact_check")
+    # The drawings' small line views print this derived configuration (gear
+    # teeth and screw threads suppressed); Default stays the solved, gated,
+    # rendered and saved-active pose.
+    sync_simplified_configuration(adapter, asm_name)
     # Establish a clean solved state for the health and pose gates.
     final_rebuild_before_save(adapter, asm_name)
     if solved_gates is not None:
@@ -2701,8 +2796,18 @@ async def assembly_geometry_digest(adapter: Any, asm_name: str) -> str:
     re-exports its PNGs), but ANCESTOR renders won't auto-regenerate. In practice the
     colours that matter are applied at assembly scope via ``apply_component_color``
     (the FULL path -> recipe change -> save), so this only bites a bare part recolour;
-    force a rebuild (delete the .SLDASM target) if one must propagate up."""
-    configs = check("list configurations", await adapter.list_configurations())
+    force a rebuild (delete the .SLDASM target) if one must propagate up.
+
+    ``Default Simplified`` is not fingerprinted: it is Default's components and
+    mates with each part's own derived configuration, so its geometry is a
+    function of Default's plus the parts' files, and resolving it would double
+    the top assembly's ~80-160 s configuration switch on every refresh. A
+    component re-pointed in it forces the re-save through ``refresh_assembly``."""
+    configs = [
+        cfg
+        for cfg in check("list configurations", await adapter.list_configurations())
+        if not is_simplified(cfg)
+    ]
     rest = "Default" if "Default" in configs else (configs[0] if configs else None)
     # Only switch configs for a genuinely multi-config assembly. A config switch
     # regenerates the whole model (~80-160 s each on the 122-component top), so for
@@ -3021,7 +3126,11 @@ async def refresh_assembly(
     with _telemetry.span("open", asm=asm_name):
         check(f"open {asm_name}", await adapter.open_model(str(asm_path)))
         opened_rebuild_status = saved_rebuild_status(adapter)
-        configs = check("list configurations", await adapter.list_configurations())
+    # A refreshed part may have gained (or lost) its "<cfg> Simplified", so the
+    # drawing configuration is re-pointed before the per-config rebuild below
+    # proves it clean; any change forces the re-save.
+    simplified_changes = sync_simplified_configuration(adapter, asm_name, verify=False)
+    configs = check("list configurations", await adapter.list_configurations())
     log(f"refresh {asm_name}: {len(configs)} configuration(s): {configs}")
     # The deterministic export/rest pose: Default is the saved, rendered pose the
     # top-level assembly references, and the DOF gate runs on it.
@@ -3092,7 +3201,9 @@ async def refresh_assembly(
     except OSError:
         prev = None
     persisted_dirty = opened_rebuild_status != 0
-    geometry_changed = prev != digest or repaired_any or persisted_dirty
+    geometry_changed = (
+        prev != digest or repaired_any or persisted_dirty or simplified_changes > 0
+    )
     if persisted_dirty:
         _telemetry.warn(
             f"refresh {asm_name}: saved artifact opened with "
