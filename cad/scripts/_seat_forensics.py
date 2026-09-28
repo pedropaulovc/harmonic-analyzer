@@ -471,28 +471,11 @@ _STARTUP_POLL_S = 0.5
 _seat_startup: dict[str, Any] = {}
 
 
-def _watchdog_op_timeout() -> float | None:
-    """The idle limit the COM watchdog will hard-exit on, or ``None`` when no
-    idle limit is armed. The wait below emits no telemetry while it polls, so
-    it must end well inside this."""
-    active = _watchdog._active
-    if active is not None:
-        timeout = float(active.op_timeout)
-    else:  # not armed (yet): the limit start() would arm with
-        try:
-            timeout = float(
-                os.environ.get("HARMONIC_COM_OP_TIMEOUT", _watchdog.DEFAULT_OP_TIMEOUT)
-            )
-        except ValueError:
-            timeout = _watchdog.DEFAULT_OP_TIMEOUT
-    return timeout if math.isfinite(timeout) and timeout > 0 else None
-
-
 def _startup_window() -> float:
-    """``HARMONIC_SW_STARTUP_WINDOW`` seconds, finite and non-negative, and
-    clamped to half the watchdog's op timeout: a longer silent wait would be
-    killed as a wedged seat (exit 87) instead of proceeding. Every rejection
-    and clamp is logged."""
+    """``HARMONIC_SW_STARTUP_WINDOW`` seconds, finite and non-negative (a
+    rejected value is logged and replaced by the default). Not tied to the
+    watchdog's op timeout: every poll emits a log record, which is the
+    watchdog's heartbeat, so a wait longer than that timeout is not idle."""
     raw = os.environ.get(_STARTUP_WINDOW_ENV)
     window = _DEFAULT_STARTUP_WINDOW_S
     if raw is not None:
@@ -506,14 +489,6 @@ def _startup_window() -> float:
                 f"of seconds; using the default {_DEFAULT_STARTUP_WINDOW_S:.0f}s"
             )
             window = _DEFAULT_STARTUP_WINDOW_S
-    op_timeout = _watchdog_op_timeout()
-    if op_timeout is not None and window > op_timeout / 2:
-        _telemetry.warn(
-            f"startup window {window:.0f}s clamped to {op_timeout / 2:.0f}s: half the "
-            f"COM watchdog op timeout ({op_timeout:.0f}s), which would otherwise "
-            "abort the silent wait as a wedged seat"
-        )
-        window = op_timeout / 2
     return window
 
 

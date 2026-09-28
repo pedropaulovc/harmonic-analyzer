@@ -682,10 +682,10 @@ def heartbeats(monkeypatch, capture_telemetry):
 def test_the_startup_wait_keeps_the_watchdog_heartbeat_alive(
     monkeypatch, fast_polls, heartbeats
 ):
-    """The startup wait polls silently for up to half the op timeout; a poll
-    that emits nothing leaves the watchdog's idle clock running, and a lower
-    ``HARMONIC_COM_OP_TIMEOUT`` would kill a healthy wait. Every poll must
-    advance the heartbeat."""
+    """The startup wait can outlast the op timeout (its window is seat age, up
+    to 180 s by default); a poll that emits nothing leaves the watchdog's idle
+    clock running, and a lower ``HARMONIC_COM_OP_TIMEOUT`` would kill a healthy
+    wait. Every poll must advance the heartbeat."""
     monkeypatch.setattr(_seat_forensics, "_process_started_at", lambda pid: time.time() - 20)
     seen: list[int] = []
 
@@ -815,35 +815,31 @@ def test_an_unusable_startup_window_falls_back_to_the_default(
     rejected, loudly, for the default."""
     spans, logs = capture_telemetry
     monkeypatch.setenv("HARMONIC_SW_STARTUP_WINDOW", window)
-    monkeypatch.setattr(_seat_forensics._watchdog, "_active", None)
-    monkeypatch.setenv("HARMONIC_COM_OP_TIMEOUT", "900")
 
     assert _seat_forensics._startup_window() == _seat_forensics._DEFAULT_STARTUP_WINDOW_S
     assert any(window in str(r.log_record.body) for r in logs.get_finished_logs())
 
 
-def test_the_startup_window_ends_well_inside_the_watchdog_op_timeout(
-    monkeypatch, capture_telemetry
+def test_a_short_op_timeout_does_not_shorten_the_startup_wait(
+    monkeypatch, fast_polls
 ):
-    """The wait polls without telemetry, so a window at or past the watchdog's
-    op timeout would be hard-killed as a wedged seat (exit 87) instead of
-    proceeding. It is clamped to half the ARMED limit, and the clamp is logged."""
-    spans, logs = capture_telemetry
-    monkeypatch.setenv("HARMONIC_SW_STARTUP_WINDOW", "1200")
+    """The window is SEAT AGE, and the watchdog is kept alive by the per-poll
+    heartbeat, so the op timeout has no say in it: under a 10 s op timeout a
+    20 s-old seat that is still starting must still be waited on (the
+    2026-09-28 failures were seats of 20.0 s and 21.8 s)."""
+    monkeypatch.setenv("HARMONIC_SW_STARTUP_WINDOW", "180")
+    monkeypatch.setenv("HARMONIC_COM_OP_TIMEOUT", "10")
     monkeypatch.setattr(
-        _seat_forensics._watchdog, "_active", SimpleNamespace(op_timeout=900.0)
+        _seat_forensics._watchdog, "_active", SimpleNamespace(op_timeout=10.0)
     )
+    monkeypatch.setattr(_seat_forensics, "_process_started_at", lambda pid: time.time() - 20)
 
-    assert _seat_forensics._startup_window() == 450.0
-    assert any("clamped to 450s" in str(r.log_record.body) for r in logs.get_finished_logs())
+    assert _seat_forensics._startup_window() == 180.0
+    seat = _StartingSeat([False, False, True])
+    prov = _seat_forensics.record_seat_provenance(_Adapter(sw=seat))
 
-    # Not armed yet: the limit start() would arm with.
-    monkeypatch.setattr(_seat_forensics._watchdog, "_active", None)
-    monkeypatch.setenv("HARMONIC_COM_OP_TIMEOUT", "240")
-    assert _seat_forensics._startup_window() == 120.0
-    # No idle limit at all: the declared window stands.
-    monkeypatch.setenv("HARMONIC_COM_OP_TIMEOUT", "0")
-    assert _seat_forensics._startup_window() == 1200.0
+    assert seat.startup_reads == 3
+    assert prov["seat_startup_completed"] is True
 
 
 class _PropertyManager:
