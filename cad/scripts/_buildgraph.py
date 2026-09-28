@@ -1326,20 +1326,33 @@ def _module_closure(script: Path) -> tuple[str, ...]:
     return tuple(sorted(str(_resolved(mods[m])) for m in result))
 
 
-@functools.lru_cache(maxsize=None)
+# path -> ((st_mtime_ns, st_size), text) for :func:`read_source`.
+_SOURCE_TEXT: dict[Path, tuple[tuple[int, int], str]] = {}
+
+
 def read_source(path: Path) -> str:
-    """``path``'s UTF-8 text, read once per path per process.
+    """``path``'s UTF-8 text, re-read only when its (mtime_ns, size) moved.
 
     One doit graph load asks for the same few hundred local sources ~20k times:
     every task's config/data/fastener scan re-reads its whole import closure
     (a part closure is ~30 modules, and ~250 tasks share them). Those reads
-    measured ~2.2 s of a ~6 s load on Windows. The text is only ever the
-    snapshot this process's graph is built from -- exactly the contract
-    :func:`_direct_local_imports` already keeps per path -- and it is dropped
-    with the other per-process facts by :func:`clear_import_caches`. An
-    ``OSError`` is not memoized, so an unreadable file is retried.
+    measured ~2.2 s of a ~6 s load on Windows. Unlike the per-path import facts
+    this memo validates itself: a caller that edits a source and asks again
+    (a test fixture, a long-lived process) must see the new text, because a
+    stale DXF literal or config read would leave a real input out of a cache
+    key. A stat is a fraction of the read it saves. The stat comes first, so an
+    edit landing between it and the read stores the new text under the old
+    stamp and is simply re-read next time. An ``OSError`` propagates and is
+    not memoized.
     """
-    return path.read_text(encoding="utf-8")
+    st = os.stat(path)
+    stamp = (st.st_mtime_ns, st.st_size)
+    cached = _SOURCE_TEXT.get(path)
+    if cached is not None and cached[0] == stamp:
+        return cached[1]
+    text = path.read_text(encoding="utf-8")
+    _SOURCE_TEXT[path] = (stamp, text)
+    return text
 
 
 def clear_import_caches() -> None:
@@ -1356,7 +1369,7 @@ def clear_import_caches() -> None:
     _direct_local_imports.cache_clear()
     _module_closure.cache_clear()
     _resolved_absolute.cache_clear()
-    read_source.cache_clear()
+    _SOURCE_TEXT.clear()
 
 
 def _drawing_registry_value(node: ast.AST) -> object:
@@ -1989,8 +2002,8 @@ def _config_references_in_text(
 def _config_tokens_in_source(path: Path) -> frozenset[str]:
     """Resolve ONE source's config reads; reject every unclassified use.
 
-    Only syntax is reused across contents; the text is this process's snapshot
-    (:func:`read_source`, dropped by :func:`clear_import_caches`), and
+    Only syntax is reused across contents; the text comes from :func:`read_source`,
+    which re-reads a source whose (mtime_ns, size) moved, and
     accessor/family resolution is not memoized by this function.
     """
     references = _config_references_in_text(read_source(path), _CONFIG_MODULES)

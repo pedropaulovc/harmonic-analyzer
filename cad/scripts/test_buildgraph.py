@@ -1719,6 +1719,24 @@ def test_data_deps_of_keeps_missing_referenced_artefact():
         script.unlink()
 
 
+def test_data_deps_of_follows_an_edited_script_literal():
+    """Source texts are memoized per process, but an edit must still move the
+    graph: once the script names new.dxf, a stale old.dxf edge would leave the
+    real input out of the cache key. Same-length names, so only the mtime
+    tells the two texts apart."""
+    with tempfile.NamedTemporaryFile(
+        "w", suffix=".py", dir=SCRIPTS_DIR, delete=False
+    ) as fh:
+        fh.write('PATH = REFERENCES_DIR / "old-xyz.dxf"\n')
+        script = Path(fh.name)
+    try:
+        assert [Path(d).name for d in data_deps_of(script)] == ["old-xyz.dxf"]
+        script.write_text('PATH = REFERENCES_DIR / "new-xyz.dxf"\n', encoding="utf-8")
+        assert [Path(d).name for d in data_deps_of(script)] == ["new-xyz.dxf"]
+    finally:
+        script.unlink()
+
+
 def _tokens(text: str) -> frozenset[str]:
     """Run ``_config_tokens_in_source`` on an inline source snippet (single file)."""
     with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as fh:

@@ -376,5 +376,80 @@ def test_probe_presence_and_disabled(tmp_path, fake, monkeypatch):
     assert cache.probe(key) is None                          # disabled -> unknown
 
 
+# --------------------------------------------------------------------------- #
+# Publish atomicity -- the blob backend against Azure block-blob semantics
+# --------------------------------------------------------------------------- #
+class _BlockBlobService:
+    """One container's block blobs, with the service rules a chunked publish
+    relies on: staged blocks are private to the blob until a commit; a commit
+    resolves each listed ID to its uncommitted block, else its committed one
+    (the SDK's ``latest``); and a commit garbage-collects every uncommitted
+    block it did not list."""
+
+    def __init__(self):
+        self.committed: dict[str, list[tuple[str, bytes]]] = {}
+        self.uncommitted: dict[str, dict[str, bytes]] = {}
+        self.on_stage = None
+
+    def get_blob_client(self, name):
+        service = self
+
+        class _Client:
+            def upload_blob(self, data, overwrite):
+                assert overwrite
+                service.committed[name] = [("single", bytes(data))]
+                service.uncommitted.pop(name, None)
+
+            def stage_block(self, block_id, data):
+                service.uncommitted.setdefault(name, {})[block_id] = bytes(data)
+                if service.on_stage is not None:
+                    service.on_stage()
+
+            def commit_block_list(self, blocks):
+                staged = service.uncommitted.get(name, {})
+                old = dict(service.committed.get(name, []))
+                resolved = []
+                for block in blocks:
+                    if block.id in staged:
+                        resolved.append((block.id, staged[block.id]))
+                    elif block.id in old:
+                        resolved.append((block.id, old[block.id]))
+                    else:
+                        raise RuntimeError(f"InvalidBlockList: {block.id}")
+                service.committed[name] = resolved
+                service.uncommitted.pop(name, None)
+
+        return _Client()
+
+    def content(self, name):
+        return b"".join(data for _, data in self.committed[name])
+
+
+def test_interleaved_chunked_publishes_never_commit_a_torn_archive(monkeypatch):
+    """Two writers of one key upload different bytes (tar mtimes, gzip level).
+    If writer B publishes while writer A is between its first and second staged
+    block, the stored entry must be one writer's archive whole -- never B's
+    first block followed by A's tail (a CRC failure on every later restore)."""
+    monkeypatch.setattr(cache, "_SINGLE_PUT_MAX", 8)
+    monkeypatch.setattr(cache, "_BLOCK_SIZE", 4)
+    monkeypatch.setattr(cache, "_TRANSFER_CONCURRENCY", 1)  # deterministic order
+    service = _BlockBlobService()
+    backend = cache._BlobBackend(service)
+    key = "c" * 64
+    first, second = b"A" * 16, b"B" * 16
+
+    def competing_publish():
+        service.on_stage = None
+        backend.put(key, second)
+
+    service.on_stage = competing_publish
+    try:
+        backend.put(key, first)
+    except RuntimeError:
+        pass  # losing the race is a store_error, which store() swallows
+
+    assert service.content(backend._name(key)) in (first, second)
+
+
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-q"]))
