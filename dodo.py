@@ -2861,6 +2861,10 @@ def task_check():
         # GetErrorCode2 or a truncated MateGroup scan has to raise/re-walk, never
         # read as "this copy is clean".
         SCRIPTS_DIR / "test_cwm_mate_guard.py",
+        # The DOF gate and geometry digest skip a re-solve on a solved model;
+        # a failed enumeration or a dirty model must still re-solve first, and
+        # the fast mass-property read must keep the adapter's units.
+        SCRIPTS_DIR / "test_assembly_solved_state_reads.py",
         # A missing assembly-manager pair must not certify an overlapping spring.
         SCRIPTS_DIR / "test_native_spring_contact.py",
         SCRIPTS_DIR / "test_settled_spring_seats.py",

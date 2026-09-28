@@ -41,9 +41,11 @@ def _attempt(fn, default=None):
 class Model:
     """An assembly whose constrained statuses are stale until a re-solve."""
 
-    def __init__(self, components):
+    def __init__(self, components, *, enumerates_after=0):
         self.components = components
         self.rebuilds = 0
+        # GetComponents fails (returns None) until this many re-solves happened.
+        self.enumerates_after = enumerates_after
 
     def ForceRebuild3(self, _top_only):
         self.rebuilds += 1
@@ -52,6 +54,8 @@ class Model:
         return True
 
     def GetComponents(self, _top_level):
+        if self.rebuilds < self.enumerates_after:
+            return None
         return list(self.components)
 
 
@@ -71,8 +75,8 @@ class Component:
         return self._solved if self.solved else self._stale
 
 
-def _dof_adapter(components):
-    model = Model(components)
+def _dof_adapter(components, **model_kw):
+    model = Model(components, **model_kw)
     return NS(currentModel=model, _attempt=_attempt), model
 
 
@@ -99,6 +103,22 @@ def test_all_fixed_or_pattern_skips_the_resolve():
     )
     _assembly.assert_components_fully_defined(adapter)
     assert model.rebuilds == 0
+
+
+def test_failed_enumeration_resolves_and_reads_the_solved_status():
+    # GetComponents yields nothing before the solve: that must not read as an
+    # empty (hence fully defined) assembly.
+    adapter, model = _dof_adapter([Component("rod", solved=UNDER)], enumerates_after=1)
+    with pytest.raises(RuntimeError, match=r"rod \(under\)"):
+        _assembly.assert_components_fully_defined(adapter)
+    assert model.rebuilds == 1
+
+
+@pytest.mark.parametrize("resolve", [True, False])
+def test_unavailable_enumeration_fails_closed(resolve):
+    adapter, _model = _dof_adapter([Component("rod")], enumerates_after=99)
+    with pytest.raises(RuntimeError, match="cannot certify free DOF"):
+        _assembly.assert_components_fully_defined(adapter, resolve=resolve)
 
 
 class Span:

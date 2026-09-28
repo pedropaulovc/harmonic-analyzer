@@ -1455,12 +1455,12 @@ def assert_components_fully_defined(adapter: Any, *, resolve: bool = True) -> No
             asm, "IAssemblyDoc"
         )  # IAssemblyDoc for GetComponents; keep `asm` for ForceRebuild3
 
-        def _collect() -> list[Any]:
+        def _collect() -> list[Any] | None:
+            # None = enumeration FAILED, never "an empty assembly": a failed
+            # read must not certify zero free DOF.
             with _telemetry.span("dof.collect_components"):
-                return (
-                    adapter._attempt(lambda: asm_h.GetComponents(True), default=None)
-                    or []
-                )
+                found = adapter._attempt(lambda: asm_h.GetComponents(True), default=None)
+            return None if found is None else list(found)
 
         components = _collect()
         # Only GetConstrainedStatus goes stale before a solve; IsFixed and
@@ -1468,15 +1468,24 @@ def assert_components_fully_defined(adapter: Any, *, resolve: bool = True) -> No
         # When every top-level component is fixed or a pattern instance (the
         # top assembly: nine fixed components), no status is read, so the deep
         # re-solve cannot change the verdict and is skipped -- it measured 133 s
-        # median there, and the component collect after it another 24 s.
+        # median there, and the component collect after it another 24 s. A
+        # failed or empty enumeration proves nothing, so it re-solves and
+        # re-collects exactly as before the skip existed.
         # ``resolve=False`` means soundness already performed its single shared
         # ``verify.rebuild``; do not emit a misleading rebuild span then.
         rebuilt = False
-        if resolve and any(_reads_constrained_status(adapter, c) for c in components):
+        if resolve and (
+            not components
+            or any(_reads_constrained_status(adapter, c) for c in components)
+        ):
             with _telemetry.span("dof.rebuild"):
                 adapter._attempt(lambda: asm.ForceRebuild3(False), default=None)
             rebuilt = True
             components = _collect()
+        if components is None:
+            raise RuntimeError(
+                "cannot certify free DOF: IAssemblyDoc.GetComponents(True) failed"
+            )
         gsp.set_attribute("rebuild_skipped", resolve and not rebuilt)
         gsp.set_attribute("components", len(components))
         log(f"checking {len(components)} components for free DOF ...")
