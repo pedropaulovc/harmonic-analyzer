@@ -102,6 +102,11 @@ class SeatNotReady(SystemExit):
 # Swapped by the offline gate: the real one ends the process.
 _hard_exit: Callable[[int], None] = os._exit
 
+# How long a block that found its deadline fired waits for the timer's own
+# exit (its abort record flushes first) before exiting from the block's thread
+# instead: a flush that hangs must not park the gate forever.
+_FIRED_EXIT_GRACE_S = 10.0
+
 
 class _Deadline(enum.Enum):
     """Who decides a :func:`deadline`'s outcome. Exactly one transition leaves
@@ -137,7 +142,8 @@ def deadline(
     callback already running. So whichever of the two claims the deadline
     first (see :class:`_Deadline`) decides: a timer that finds the block gone
     does nothing, and a block that finds the timer fired never returns -- it
-    waits for the exit, so the caller cannot open a document meanwhile.
+    waits for the timer's exit, up to ``_FIRED_EXIT_GRACE_S``, then exits with
+    ``code`` itself, so the caller cannot open a document meanwhile.
     With the kill switch set (``HARMONIC_COM_WATCHDOG=0``) it arms nothing: the
     block runs unbounded, as every other watchdog exit does in that mode.
     """
@@ -158,8 +164,10 @@ def deadline(
         try:
             _abort(reason, message, code, deadline_s=seconds, **fields)
         finally:
-            _hard_exit(code)
-            exited.set()
+            try:
+                _hard_exit(code)
+            finally:
+                exited.set()
 
     timer = threading.Timer(seconds, _expire)
     timer.daemon = True
@@ -173,10 +181,12 @@ def deadline(
             if state is _Deadline.ARMED:
                 state = _Deadline.DISARMED
         if state is _Deadline.FIRED:
-            # The process is ending; the real exit never lets this wait return.
-            # Only a stubbed exit (the offline gate) gets past it, and even then
-            # the caller must not carry on as if the gate had passed.
-            exited.wait()
+            # The timer's exit normally ends the process inside this wait. If
+            # its abort record stalls, exit from here instead. Only a stubbed
+            # exit (the offline gate) gets past both, and even then the caller
+            # must not carry on as if the gate had passed.
+            if not exited.wait(_FIRED_EXIT_GRACE_S):
+                _hard_exit(code)
             raise SystemExit(code)
 
 

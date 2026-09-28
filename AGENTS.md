@@ -507,7 +507,8 @@ so `run_build`'s `except Exception` cannot turn it into exit 1); a read that
 never returns is cut off by `_watchdog.deadline` at 65 s (log, flush,
 `os._exit(89)`; the flush is best-effort, the exit is not, and a gate that
 returns as the deadline fires never proceeds: whichever claims it first
-decides). Either way the process exits 89 — `_telemetry.build_session`
+decides, and a gate that lost exits 89 itself if the timer's flush stalls
+past 10 s). Either way the process exits 89 — `_telemetry.build_session`
 names the exit and flushes on a `SystemExit` — which `_exec_com` recovers and
 retries like a crash; on a farm leaf (`HARMONIC_SW_AUTOSTART=0`, the keeper
 owns the seat) it instead re-runs once on the untouched seat. Once a seat has

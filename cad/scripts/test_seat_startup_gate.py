@@ -19,8 +19,9 @@ Pinned here:
   unreadable read is polled again, never taken as permission to open;
 * a read that never returns is cut off at the bound (``_watchdog.deadline``),
   and exit 89 still flushes its spans and logs and names itself; the deadline's
-  timer and the gate's exit claim it atomically, and a failing telemetry sink
-  cannot stop the exit;
+  timer and the gate's exit claim it atomically, a failing telemetry sink or
+  exit cannot strand it, and a gate whose timer fired but stalls exits 89
+  itself after a grace;
 * a seat without the member, or whose first answer is unintelligible, is
   released at once rather than polled for a minute.
 
@@ -404,53 +405,75 @@ def manual_timer(monkeypatch):
     return made
 
 
+@pytest.fixture
+def gate_threads(monkeypatch):
+    """The threads a deadline test starts, released and joined at teardown
+    BEFORE monkeypatch puts the real ``os._exit`` back: a callback or gate
+    still running then would call it and kill the whole run. Every such thread
+    ends within the (patched, short) exit grace once its events are set."""
+    monkeypatch.setattr(_watchdog, "_FIRED_EXIT_GRACE_S", 1.0)
+    threads: list[threading.Thread] = []
+    releases: list[threading.Event] = []
+
+    def start(target) -> threading.Thread:
+        thread = threading.Thread(target=target, daemon=True)
+        threads.append(thread)
+        thread.start()
+        return thread
+
+    yield SimpleNamespace(start=start, release_at_teardown=releases.append)
+    for event in releases:
+        event.set()
+    for thread in threads:
+        thread.join(_watchdog._FIRED_EXIT_GRACE_S + 5)
+    assert not any(thread.is_alive() for thread in threads)
+
+
 def _gate_deadline():
     return _watchdog.deadline(
         65, reason="seat-not-ready", message="read hung", code=_watchdog.EXIT_SEAT_NOT_READY
     )
 
 
-def _leave_on_a_daemon(gate) -> tuple[threading.Thread, list[object]]:
-    """Leave ``gate`` off the test thread: a gate that (rightly or not) waits
-    for an exit that never comes then parks a daemon, instead of hanging the
-    run when the test's frame is torn down."""
+def _leave(gate, gate_threads) -> tuple[threading.Thread, list[object]]:
+    """Leave ``gate`` off the test thread, so a gate that (rightly or not)
+    waits for an exit parks a joined thread instead of the test."""
     left: list[object] = []
 
-    def _leave() -> None:
+    def _exit_gate() -> None:
         try:
             gate.__exit__(None, None, None)
             left.append("returned")
         except SystemExit as exc:
             left.append(exc.code)
 
-    leaving = threading.Thread(target=_leave, daemon=True)
-    leaving.start()
-    return leaving, left
+    return gate_threads.start(_exit_gate), left
 
 
 def test_a_deadline_that_fires_first_holds_the_gate_until_the_exit(
-    monkeypatch, manual_timer
+    monkeypatch, manual_timer, gate_threads
 ):
     """The read returns True just as the timer fires: the timer won, so the
     gate's exit must not return while the abort is still being recorded --
     otherwise the build opens a document and is killed mid-save."""
+    monkeypatch.setattr(_watchdog, "_FIRED_EXIT_GRACE_S", 5.0)
     recording, recorded = threading.Event(), threading.Event()
+    gate_threads.release_at_teardown(recorded)
     exits: list[int] = []
 
     def _slow_abort(*_a, **_f) -> None:
         recording.set()
-        recorded.wait(5)
+        recorded.wait(10)
 
     monkeypatch.setattr(_watchdog, "_abort", _slow_abort)
     monkeypatch.setattr(_watchdog, "_hard_exit", exits.append)
     gate = _gate_deadline()
     gate.__enter__()
     (timer,) = manual_timer
-    firing = threading.Thread(target=timer.fire, daemon=True)
-    firing.start()
+    firing = gate_threads.start(timer.fire)
     assert recording.wait(5)
 
-    leaving, left = _leave_on_a_daemon(gate)
+    leaving, left = _leave(gate, gate_threads)
     leaving.join(0.3)
     assert leaving.is_alive(), left
 
@@ -459,6 +482,62 @@ def test_a_deadline_that_fires_first_holds_the_gate_until_the_exit(
     leaving.join(5)
     assert exits == [89]
     assert left == [89]
+
+
+def test_a_fired_deadline_whose_abort_stalls_is_exited_by_the_gate(
+    monkeypatch, manual_timer, gate_threads
+):
+    """A telemetry flush that hangs inside the timer's abort must not park the
+    gate forever: past the grace the gate's own thread exits 89."""
+    monkeypatch.setattr(_watchdog, "_FIRED_EXIT_GRACE_S", 0.2)
+    recording, stalled = threading.Event(), threading.Event()
+    gate_threads.release_at_teardown(stalled)
+    exits: list[int] = []
+
+    def _stalled_abort(*_a, **_f) -> None:
+        recording.set()
+        stalled.wait(10)
+
+    monkeypatch.setattr(_watchdog, "_abort", _stalled_abort)
+    monkeypatch.setattr(_watchdog, "_hard_exit", exits.append)
+    gate = _gate_deadline()
+    gate.__enter__()
+    (timer,) = manual_timer
+    gate_threads.start(timer.fire)
+    assert recording.wait(5)
+
+    leaving, left = _leave(gate, gate_threads)
+    leaving.join(3)
+
+    assert left == [89]
+    assert exits == [89]  # the gate's own; the timer's is still stalled
+
+
+def test_a_deadline_whose_exit_raises_still_releases_the_gate(
+    monkeypatch, manual_timer, gate_threads
+):
+    """The timer marks its exit done whatever ``_hard_exit`` does, so the gate
+    ends at once rather than sitting out the grace."""
+    monkeypatch.setattr(_watchdog, "_FIRED_EXIT_GRACE_S", 5.0)
+    exits: list[int] = []
+
+    def _exit_that_raises(code: int) -> None:
+        exits.append(code)
+        raise RuntimeError("exit failed")
+
+    monkeypatch.setattr(_watchdog, "_abort", lambda *_a, **_f: None)
+    monkeypatch.setattr(_watchdog, "_hard_exit", _exit_that_raises)
+    gate = _gate_deadline()
+    gate.__enter__()
+    (timer,) = manual_timer
+
+    with pytest.raises(RuntimeError):
+        timer.fire()
+    leaving, left = _leave(gate, gate_threads)
+    leaving.join(1)
+
+    assert left == [89]
+    assert exits == [89]
 
 
 def test_a_gate_that_exits_first_disarms_a_callback_already_running(
@@ -479,7 +558,9 @@ def test_a_gate_that_exits_first_disarms_a_callback_already_running(
     assert (aborts, exits) == ([], [])
 
 
-def test_a_deadline_exits_even_when_its_telemetry_raises(monkeypatch, manual_timer):
+def test_a_deadline_exits_even_when_its_telemetry_raises(
+    monkeypatch, manual_timer, gate_threads
+):
     """The abort record is best-effort; the bound is the exit."""
     exits: list[int] = []
 
@@ -494,8 +575,8 @@ def test_a_deadline_exits_even_when_its_telemetry_raises(monkeypatch, manual_tim
 
     with pytest.raises(OSError):
         timer.fire()
-    leaving, left = _leave_on_a_daemon(gate)
-    leaving.join(5)
+    leaving, left = _leave(gate, gate_threads)
+    leaving.join(0.5)
 
     assert exits == [89]
     assert left == [89]
