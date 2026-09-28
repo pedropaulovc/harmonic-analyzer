@@ -26,6 +26,7 @@ from _drawing_common import (
     _balloon_item_number,
     _edge_endpoint_key,
     _spread_balloons,
+    _zoomed_on,
     add_component_bom_balloons,
     apply_view_configuration,
     assert_full_detail_view,
@@ -1053,6 +1054,17 @@ def _bind_frame_balloon(
     return note, annotation, points[-3:]
 
 
+# Half the sheet square the short-leader placement runs zoomed onto: a
+# balloon ring (9.5 mm) and its leader's start. Fit to the sheet, the ring
+# GetDisplayData reports is the one the seat's window rendered, at 0.68 mm a
+# pixel on an 820-high window and 0.94 on a 640-high one. Placing from it,
+# item 5's anchor sat at (154.4, 283.6) mm on swmaker000004/6 and up to
+# (156.2, 283.8) on swmaker000005/7/8 for the same target, and only builds on
+# the small windows printed a short leader through its own ring (399c05283,
+# 8bd440ca7). Zoomed, a pixel is under 0.04 mm on every seat.
+_SHORT_BALLOON_ZOOM_HALF = 0.012
+
+
 def _short_frame_balloon(
     adapter: Any, view: Any, note: Any, item: str, offset: tuple[float, float]
 ) -> None:
@@ -1072,15 +1084,17 @@ def _short_frame_balloon(
     # face arrowtip. Sheet XY determines placement and length; Z is view depth.
     target = (leader[-3] + offset[0], leader[-2] + offset[1])
     _telemetry.event("drawing.frame_short_balloon_before", item=item, target=target, **before)
-    position_bom_balloon(
-        adapter, [note], item_number=item, position_xy=target,
-        label="frame short-leader balloon",
-    )
-    note = _early_bound(annotation.GetSpecificAnnotation(), "INote")
-    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
-    view.UpdateViewDisplayGeometry()
-    adapter.currentModel.GraphicsRedraw2()
-    after = _frame_balloon_binding_readback(adapter, annotation, entity, item)
+    with _zoomed_on(adapter, target, _SHORT_BALLOON_ZOOM_HALF):
+        adapter.currentModel.GraphicsRedraw2()
+        position_bom_balloon(
+            adapter, [note], item_number=item, position_xy=target,
+            label="frame short-leader balloon",
+        )
+        note = _early_bound(annotation.GetSpecificAnnotation(), "INote")
+        annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+        view.UpdateViewDisplayGeometry()
+        adapter.currentModel.GraphicsRedraw2()
+        after = _frame_balloon_binding_readback(adapter, annotation, entity, item)
     leader = after["actual_leader_points"]
     length = sum(
         math.hypot(
