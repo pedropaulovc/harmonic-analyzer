@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from types import SimpleNamespace
 
 import pytest
@@ -261,6 +262,94 @@ def test_a_childs_changed_simplified_geometry_forces_the_assembly_save() -> None
     gear_simplified.Comment = simplified_comment("Teeth, Chamfer")
     assert (_sync(sub, paths), _sync(top, paths)) == (1, 1)
     assert (_sync(sub, paths), _sync(top, paths)) == (0, 0)
+
+
+class FakeAssemblyFile:
+    """A saved ``.SLDASM``: whether each configuration's saved data is stale.
+
+    paper-drive (c85a21ec4) reconciled "was 1", read NeedsRebuild2=0 in memory
+    after its EditRebuild3 + Save3, and still opened with NeedsRebuild2=1 for
+    verify:soundness, while the same reconcile held on every build before
+    ``Default Simplified`` existed. The double models that: one stale saved
+    configuration makes the document open dirty, in memory NeedsRebuild2
+    reads only the active configuration, and a plain Save3 writes only the
+    active configuration's data plus the rebuild-save-marked ones'.
+    """
+
+    def __init__(self, stale: dict[str, bool], *, stuck: tuple[str, ...] = ()) -> None:
+        self.stale = dict(stale)
+        self.stuck = set(stuck)  # saved stale whatever a rebuild does
+
+
+class FakeOpenAssembly:
+    def __init__(self, file: FakeAssemblyFile) -> None:
+        self.file = file
+        self.configurations = {name: FakeConfiguration(name) for name in file.stale}
+        for name, configuration in self.configurations.items():
+            configuration.NeedsRebuild = file.stale[name]
+            configuration.AddRebuildSaveMark = False
+        self.configurations["Default"].NeedsRebuild = any(file.stale.values())
+        self.ConfigurationManager = SimpleNamespace(ActiveConfiguration=self.configurations["Default"])
+        self.Extension = self
+
+    @property
+    def NeedsRebuild2(self) -> int:  # noqa: N802
+        return int(self.ConfigurationManager.ActiveConfiguration.NeedsRebuild)
+
+    def GetConfigurationNames(self) -> list[str]:
+        return list(self.configurations)
+
+    def GetConfigurationByName(self, name: str) -> FakeConfiguration:
+        return self.configurations[name]
+
+    def ShowConfiguration2(self, name: str) -> bool:
+        if self.ConfigurationManager.ActiveConfiguration.Name == name:
+            return False  # SolidWorks refuses the already-active configuration
+        self.ConfigurationManager.ActiveConfiguration = self.configurations[name]
+        return True
+
+    def EditRebuild3(self) -> bool:
+        self.ConfigurationManager.ActiveConfiguration.NeedsRebuild = False
+        return True
+
+    def Save3(self, _options: int, _errors: int, _warnings: int) -> bool:
+        active = self.ConfigurationManager.ActiveConfiguration
+        for name, configuration in self.configurations.items():
+            if configuration is active or configuration.AddRebuildSaveMark:
+                self.file.stale[name] = configuration.NeedsRebuild or name in self.file.stuck
+        return True
+
+
+def _reconcile(file: FakeAssemblyFile) -> SimpleNamespace:
+    async def open_model(_path: str) -> bool:
+        adapter.currentModel = FakeOpenAssembly(file)
+        return True
+
+    adapter = SimpleNamespace(
+        currentModel=None,
+        swApp=SimpleNamespace(CloseAllDocuments=lambda _include_unsaved: True),
+        open_model=open_model,
+        _attempt=lambda fn, default=None: fn(),
+    )
+    asyncio.run(_assembly.reconcile_saved_rebuild_state(adapter, "paper-drive", "x.SLDASM"))
+    return adapter
+
+
+def test_the_reconciled_assembly_reopens_clean_in_every_configuration() -> None:
+    file = FakeAssemblyFile({"Default": True, SIMPLIFIED_VIEW_CONFIGURATION: True})
+    adapter = _reconcile(file)
+    assert file.stale == {"Default": False, SIMPLIFIED_VIEW_CONFIGURATION: False}
+    assert FakeOpenAssembly(file).NeedsRebuild2 == 0  # verify:soundness's open
+    assert adapter.currentModel.ConfigurationManager.ActiveConfiguration.Name == "Default"
+
+
+def test_a_reconciled_assembly_that_still_opens_dirty_is_refused() -> None:
+    file = FakeAssemblyFile(
+        {"Default": True, SIMPLIFIED_VIEW_CONFIGURATION: True},
+        stuck=(SIMPLIFIED_VIEW_CONFIGURATION,),
+    )
+    with pytest.raises(RuntimeError, match="Default Simplified"):
+        _reconcile(file)
 
 
 def _apply(view: FakeView, role: ViewRole = ViewRole.PLAIN) -> tuple[str, FakeDrawing]:

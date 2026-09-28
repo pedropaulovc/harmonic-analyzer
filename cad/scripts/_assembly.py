@@ -2291,7 +2291,10 @@ def sync_simplified_configuration(
     geometry digest reads Default only. With ``verify`` the simplified
     configuration is force-rebuilt and must read What's Wrong clean; a caller
     that rebuilds every configuration next passes False. The rest
-    configuration is re-activated before returning.
+    configuration is re-activated before returning, not rebuilt: both callers
+    run ``final_rebuild_before_save`` next (ForceRebuild3, NeedsRebuild2 must
+    read 0), and ``reconcile_saved_rebuild_state`` rebuilds and persists every
+    configuration of the saved file.
     """
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     names = [str(name) for name in (model.GetConfigurationNames() or ())]
@@ -2663,8 +2666,9 @@ def final_rebuild_before_save(adapter: Any, label: str, model: Any = None) -> No
 async def reconcile_saved_rebuild_state(
     adapter: Any, asm_name: str, asm_path: Any
 ) -> None:
-    """Reopen a just-saved assembly and, if it loads needing a rebuild, EditRebuild3
-    + in-place Save3 so the persisted artifact reopens clean (issue #267).
+    """Reopen a just-saved assembly and, if it loads needing a rebuild, rebuild
+    each configuration + in-place Save3 so the persisted artifact reopens clean
+    (issue #267), then reopen it again and prove it.
 
     Root cause (proven by ``diagnostics/probe_rebuild_matrix.py`` /
     ``probe_child_dirty.py``): ``final_rebuild_before_save`` and the deep health
@@ -2678,8 +2682,20 @@ async def reconcile_saved_rebuild_state(
     reopening from disk (children clean) + ``EditRebuild3`` reconciles the assembly,
     and the in-place ``Save3`` persists the clean mark WITHOUT rewriting any part
     file. A post-``ForceRebuild3(False)`` rebuild in the SAME document instance
-    cannot un-dirty it -- the reopen is required. ``verify:soundness``'s
-    ``saved-rebuild-clean`` gate is the independent backstop that this held.
+    cannot un-dirty it -- the reopen is required.
+
+    Rebuilding the active configuration alone stopped holding once assemblies
+    carried ``Default Simplified`` (``sync_simplified_configuration``):
+    paper-drive (c85a21ec4) logged "reconciled ... was 1", read NeedsRebuild2=0
+    in memory after its Save3, and still opened with NeedsRebuild2=1 for
+    ``verify:soundness``'s ``saved-rebuild-clean`` gate, while every earlier
+    build's reconcile held. So every other configuration is shown and
+    ``EditRebuild3``-ed first and the rest configuration last, each marked for
+    rebuild-save and read back (the part-side finalization,
+    ``_drawing_simplified.persist_configurations_in_place``), before the one
+    ``Save3``. The saved file is then reopened the way that gate opens it and
+    must read clean, so an artifact that would fail it is never cached; a dirty
+    reopen raises naming each configuration's saved state.
     """
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
     with _telemetry.span("assembly.reconcile_rebuild", asm=asm_name) as sp:
@@ -2692,11 +2708,24 @@ async def reconcile_saved_rebuild_state(
                 f"saved artifact already clean, no reconcile ({asm_name})"
             )
             return
-        rebuilt = adapter._attempt(lambda: model.EditRebuild3(), default=None)
-        if rebuilt is False or rebuilt is None:
-            raise RuntimeError(
-                f"{asm_name}: reconcile EditRebuild3 returned {rebuilt!r}"
-            )
+        rest = active_configuration_name(adapter, model)
+        names = [str(name) for name in (model.GetConfigurationNames() or ())]
+        if rest not in names:
+            raise RuntimeError(f"{asm_name}: active configuration {rest!r} not in {names}")
+        for name in [name for name in names if name != rest] + [rest]:
+            if active_configuration_name(adapter, model) != name and not bool(
+                model.ShowConfiguration2(name)
+            ):
+                raise RuntimeError(f"{asm_name}: reconcile ShowConfiguration2({name!r}) refused")
+            rebuilt = adapter._attempt(lambda: model.EditRebuild3(), default=None)
+            if rebuilt is False or rebuilt is None:
+                raise RuntimeError(
+                    f"{asm_name}: reconcile EditRebuild3 in {name!r} returned {rebuilt!r}"
+                )
+            configuration = _early_bound(model.GetConfigurationByName(name), "IConfiguration")
+            configuration.AddRebuildSaveMark = True
+            if not bool(configuration.AddRebuildSaveMark):
+                raise RuntimeError(f"{asm_name}: {name!r} rebuild-save mark did not set")
         result = adapter._attempt(
             lambda: model.Save3(1, 0, 0), default=None
         )  # Silent, in place
@@ -2706,7 +2735,28 @@ async def reconcile_saved_rebuild_state(
                 f"{asm_name}: reconcile left NeedsRebuild2={in_mem} after EditRebuild3+Save3 "
                 f"(save result={result!r})"
             )
-        _telemetry.success(f"reconciled saved rebuild state ({asm_name}, was {status})")
+        adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
+        await adapter.open_model(str(asm_path))
+        reopened = _early_bound(adapter.currentModel, "IModelDoc2")
+        status_on_reopen = saved_rebuild_status(adapter, reopened)
+        sp.set_attribute("needs_rebuild_on_reopen", status_on_reopen)
+        if status_on_reopen != 0:
+            states = "; ".join(
+                f"{name}: NeedsRebuild={bool(configuration.NeedsRebuild)}, "
+                f"AddRebuildSaveMark={bool(configuration.AddRebuildSaveMark)}"
+                for name in names
+                for configuration in [
+                    _early_bound(reopened.GetConfigurationByName(name), "IConfiguration")
+                ]
+            )
+            raise RuntimeError(
+                f"{asm_name}: reconciled .SLDASM still opens with "
+                f"NeedsRebuild2={status_on_reopen} ({states})"
+            )
+        _telemetry.success(
+            f"reconciled saved rebuild state ({asm_name}, was {status}, "
+            f"{len(names)} configuration(s), reopens clean)"
+        )
 
 
 def rebuild_if_needed_before_save(adapter: Any, label: str, model: Any = None) -> bool:
