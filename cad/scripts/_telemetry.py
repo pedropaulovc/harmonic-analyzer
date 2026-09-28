@@ -1182,24 +1182,72 @@ def _extra(fields: Mapping[str, Any]) -> dict[str, Any] | None:
     return safe
 
 
+# A log record's ``code.*`` attributes (``code.function.name`` / ``code.file.path`` /
+# ``code.line.number`` in App Insights) are how a dark stretch of a build span maps
+# back to code: the gap before a record is the work its caller just finished. The
+# logging call sits in the helpers below, so every record used to name THIS module:
+# all 725k worker log rows in the 30 days to 2026-09-27 read ``success`` / ``info`` /
+# ``debug`` / ... in ``_telemetry.py``. :func:`_caller_stacklevel` points the record
+# at the first frame outside the plumbing instead: this module, contextlib's span
+# context managers, and ``_common``'s pure pass-through aliases (``log`` / a passing
+# ``check``).
+_PLUMBING_FILES = frozenset(
+    os.path.normcase(os.path.abspath(path)) for path in (__file__, contextlib.__file__)
+)
+_PASS_THROUGH_FUNCTIONS = frozenset({("_common.py", "log"), ("_common.py", "check")})
+
+
+@functools.lru_cache(maxsize=512)
+def _is_plumbing_file(filename: str) -> bool:
+    return os.path.normcase(os.path.abspath(filename)) in _PLUMBING_FILES
+
+
+def _is_plumbing(frame: Any) -> bool:
+    code = frame.f_code
+    if _is_plumbing_file(code.co_filename):
+        return True
+    return (os.path.basename(code.co_filename), code.co_name) in _PASS_THROUGH_FUNCTIONS
+
+
+def _caller_stacklevel() -> int:
+    """``stacklevel`` for a logger call made by one of the helpers below.
+
+    ``logging``'s level 1 is the frame that called the logger -- the helper, i.e.
+    this function's caller -- and each level above it is one frame further out."""
+    level = 1
+    frame = sys._getframe(1)
+    with contextlib.suppress(Exception):
+        while frame.f_back is not None and _is_plumbing(frame):
+            frame = frame.f_back
+            level += 1
+    return level
+
+
 def debug(message: str, **fields: Any) -> None:
-    get_logger().debug(message, extra=_extra(fields))
+    get_logger().debug(message, extra=_extra(fields), stacklevel=_caller_stacklevel())
 
 
 def info(message: str, **fields: Any) -> None:
-    get_logger().info(message, extra=_extra(fields))
+    get_logger().info(message, extra=_extra(fields), stacklevel=_caller_stacklevel())
 
 
 def success(message: str, **fields: Any) -> None:
-    get_logger().log(SUCCESS, message, extra=_extra(fields))
+    get_logger().log(
+        SUCCESS, message, extra=_extra(fields), stacklevel=_caller_stacklevel()
+    )
 
 
 def warn(message: str, **fields: Any) -> None:
-    get_logger().warning(message, extra=_extra(fields))
+    get_logger().warning(message, extra=_extra(fields), stacklevel=_caller_stacklevel())
 
 
 def error(message: str, *, exc_info: bool = False, **fields: Any) -> None:
-    get_logger().error(message, exc_info=exc_info, extra=_extra(fields))
+    get_logger().error(
+        message,
+        exc_info=exc_info,
+        extra=_extra(fields),
+        stacklevel=_caller_stacklevel(),
+    )
 
 
 # Historical aliases so ``_common`` (and anything importing from it) stays a
@@ -1258,6 +1306,19 @@ def _enter_span(
     return span, (cm, token), depth
 
 
+# App Insights keeps a customDimensions value up to 8192 characters; a COM error text
+# is a few hundred at most, and a runaway repr must not bloat every failed row.
+_ERROR_MESSAGE_LIMIT = 2048
+
+
+def _error_type(exc: BaseException) -> str:
+    """OTel ``error.type``: the exception's fully qualified class name."""
+    cls = type(exc)
+    if cls.__module__ == "builtins":
+        return cls.__qualname__
+    return f"{cls.__module__}.{cls.__qualname__}"
+
+
 def _exit_span(handle: Any, exc: BaseException | None) -> None:
     cm, token = handle
     _depth.reset(token)
@@ -1265,6 +1326,17 @@ def _exit_span(handle: Any, exc: BaseException | None) -> None:
     _touch_activity(f"span-end {getattr(span, 'name', '?')}")
     if exc is not None:
         span.record_exception(exc)
+        # The ``exception`` event alone does not survive the farm's export path:
+        # App Insights' ``exceptions`` rows arrive with an empty message and no
+        # details (all 2.5k in the 30 days to 2026-09-27), and a failed
+        # ``dependencies`` row carries no status description. Put the cause on the
+        # span itself so ``dependencies | where success == false`` explains itself.
+        span.set_attributes(
+            {
+                "error.type": _error_type(exc),
+                "error.message": str(exc)[:_ERROR_MESSAGE_LIMIT],
+            }
+        )
         span.set_status(Status(StatusCode.ERROR, str(exc)))
         error(
             f"{span.name if isinstance(span, ReadableSpan) else 'span'} failed: {exc}"
@@ -1356,6 +1428,158 @@ def traced(name: str, *, label_param: str | None = None):
     return deco
 
 
+# --------------------------------------------------------------------------- #
+# Adapter instrumentation.                                                    #
+# --------------------------------------------------------------------------- #
+# Build scripts call the SolidworksMCP adapter directly
+# (``await adapter.create_cut_extrude(...)``) far more often than through a traced
+# ``_common`` helper. 42.9 h of ``part.build``'s 79.4 h in the 30 days to 2026-09-27
+# fell in no child span, and log-gap attribution put ~9 h of that on these direct
+# feature/sketch/document calls.
+
+# The adapter class the build processes construct (``_common.run_build``).
+_ADAPTER_MODULE = "solidworks_mcp.adapters.pywin32_adapter"
+_ADAPTER_CLASS = "PyWin32Adapter"
+
+# Coroutines that each create, regenerate, load or write a whole feature or
+# document -- one call per modelling STEP, seconds each. Per-entity sketch calls
+# (``add_line``, ``add_sketch_constraint``, ``add_sketch_dimension``, ...) and
+# per-value reads/writes are deliberately absent: they run hundreds of times per
+# build at a few ms, the per-item flood AGENTS.md forbids, and the traced
+# ``sketch.*`` / ``param.*`` helpers already group them. ``get_mass_properties``
+# is in: 31 modules outside ``diagnostics/`` call it, most directly rather than
+# through ``check.volume``, and log-gap attribution billed 0.9 h of dark
+# ``part.build`` time to it.
+# ``test_telemetry`` pins every name here to a coroutine on the real class, so an
+# adapter rename fails loud instead of silently going dark.
+ADAPTER_TRACED_METHODS = frozenset(
+    {
+        # documents
+        "create_part",
+        "create_assembly",
+        "create_drawing",
+        "open_model",
+        "close_model",
+        "save_file",
+        "export_file",
+        "export_image",
+        "rebuild_model",
+        "create_configuration",
+        "set_active_configuration",
+        "get_mass_properties",
+        # sketch lifecycle (the entities inside stay unspanned)
+        "create_sketch",
+        "exit_sketch",
+        "import_dxf_dwg",
+        "create_equation_driven_curve",
+        # features
+        "create_extrusion",
+        "create_cut_extrude",
+        "create_cut",
+        "create_revolve",
+        "create_sweep",
+        "create_loft",
+        "add_fillet",
+        "add_chamfer",
+        "shell",
+        "draft",
+        "mirror_feature",
+        "circular_pattern_feature",
+        "linear_pattern_feature",
+        "add_thread",
+        "insert_tapped_hole",
+        # reference geometry
+        "create_plane",
+        "create_axis",
+        "create_reference_point",
+        "create_coordinate_system",
+        # motion
+        "calculate_motion",
+        "export_motion_video",
+    }
+)
+_ADAPTER_ARG_LIMIT = 120
+
+
+def _adapter_arg(args: tuple[Any, ...]) -> str | None:
+    """The call's leading string argument (a plane, configuration or file name).
+
+    Stored as ``arg``, never ``label``: a non-build entry runs its body at the top
+    level of the process, and ``label`` at depth 0 is the farm's leaf key (see
+    ``test_attribute_names_the_log_farm_selects_on_are_pinned_here``)."""
+    if not args:
+        return None
+    first = args[0]
+    if isinstance(first, os.PathLike):
+        return Path(first).name[:_ADAPTER_ARG_LIMIT]
+    if isinstance(first, str):
+        text = Path(first).name if ("/" in first or "\\" in first) else first
+        return text[:_ADAPTER_ARG_LIMIT]
+    return None
+
+
+def _traced_adapter_method(name: str, method: Any) -> Any:
+    span_name = f"adapter.{name}"
+
+    @functools.wraps(method)
+    async def traced_call(self: Any, *args: Any, **kwargs: Any) -> Any:
+        async with aspan(span_name, arg=_adapter_arg(args)) as sp:
+            result = await method(self, *args, **kwargs)
+            # The adapter RETURNS its failures (``AdapterResult`` with an error
+            # status) and callers often probe with them -- ``build_cone_gear`` tries
+            # several axis candidates for one pattern. The status is an attribute,
+            # not an ERROR span: the caller's ``check`` raises inside its own span
+            # when a failure matters.
+            status = getattr(result, "status", None)
+            if status is not None and not getattr(result, "is_success", True):
+                with contextlib.suppress(Exception):
+                    sp.set_attributes(
+                        {
+                            "adapter.status": str(getattr(status, "value", status)),
+                            "error.message": str(result.error)[:_ERROR_MESSAGE_LIMIT],
+                        }
+                    )
+            return result
+
+    traced_call._harmonic_traced = True  # type: ignore[attr-defined]
+    return traced_call
+
+
+def instrument_adapter(cls: type) -> int:
+    """Wrap ``cls``'s :data:`ADAPTER_TRACED_METHODS` in ``adapter.<method>`` spans.
+
+    The OpenTelemetry instrumentation-library pattern (``RequestsInstrumentor``):
+    the adapter lives in the vendored ``SolidworksMCP-python`` submodule, whose
+    content is folded into EVERY COM task's cache key, and a span there would
+    re-key all ~227 leaves. Wrapping from here re-keys none -- this module is
+    recipe-inert -- and a wrapper only times the call: same arguments, same
+    result, same exception. Idempotent; returns how many methods it wrapped."""
+    wrapped = 0
+    for name in sorted(ADAPTER_TRACED_METHODS):
+        method = getattr(cls, name, None)
+        if (
+            method is None
+            or not inspect.iscoroutinefunction(method)
+            or getattr(method, "_harmonic_traced", False)
+        ):
+            continue
+        setattr(cls, name, _traced_adapter_method(name, method))
+        wrapped += 1
+    return wrapped
+
+
+def _instrument_loaded_adapter() -> None:
+    """Instrument the adapter class if this process has imported it.
+
+    Looked up, never imported: a SolidWorks-free process that opens a build
+    session must not pay for (or depend on) the COM stack."""
+    module = sys.modules.get(_ADAPTER_MODULE)
+    cls = getattr(module, _ADAPTER_CLASS, None) if module is not None else None
+    if isinstance(cls, type):
+        with contextlib.suppress(Exception):
+            instrument_adapter(cls)
+
+
 @contextlib.contextmanager
 def build_session(
     label: str, /, **attributes: Any
@@ -1369,8 +1593,14 @@ def build_session(
     ``build.<target>`` root (``label`` is the part/assembly target, so a standalone
     trace title says WHICH part) so nothing is unparented, and yields that span so
     the caller can mark it ERROR on failure.
+
+    Also instruments the SolidworksMCP adapter class when the process has loaded
+    it (:func:`instrument_adapter`): ``run_build`` imports ``PyWin32Adapter``
+    before it opens the session, so every COM build, drawing, verify and export
+    process gets ``adapter.<method>`` spans without a line changed in a recipe.
     """
     configure()
+    _instrument_loaded_adapter()
     parent = _parent_context_from_env()
     if parent is not None:
         token = otel_context.attach(parent)

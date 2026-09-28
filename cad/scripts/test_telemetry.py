@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import asyncio
 import builtins
+import importlib.util
+import inspect
 import json
 import logging
 import os
@@ -20,6 +22,7 @@ import socket
 import subprocess
 import sys
 import time
+import types
 from pathlib import Path
 from typing import cast
 
@@ -181,6 +184,67 @@ def test_span_records_exception_and_sets_error_status(capture):
     # exactly one exception event -- not double-recorded
     assert [e.name for e in sp.events] == ["exception"]
     assert sp.attributes["part"] == "cone_gear"
+    # the cause rides the span itself: the exported exception event arrives in
+    # App Insights with an empty message, so a failed row must explain itself
+    assert sp.attributes["error.type"] == "RuntimeError"
+    assert sp.attributes["error.message"] == "sketch OVER-defined"
+
+
+def _log_from_a_named_caller(message: str) -> None:
+    _telemetry.info(message)
+
+
+def _record_named(logs, body: str):
+    return next(
+        r.log_record for r in logs.get_finished_logs() if r.log_record.body == body
+    )
+
+
+def test_log_records_name_the_code_that_logged_them(capture, tmp_path):
+    """App Insights maps a dark stretch of a build span to code through the
+    ``code.*`` attributes of the record that ends it -- so they must name the
+    caller, not the helper that happened to hold the logging call, nor
+    ``_common``'s pass-through ``log`` / ``check`` aliases, nor the span context
+    manager that logs a failure on the caller's behalf."""
+    _, logs = capture
+    _log_from_a_named_caller("direct")
+    rec = _record_named(logs, "direct")
+    assert rec.attributes["code.function.name"] == "_log_from_a_named_caller"
+    assert Path(rec.attributes["code.file.path"]).name == "test_telemetry.py"
+
+    shim = tmp_path / "_common.py"
+    shim.write_text(
+        "import _telemetry\n"
+        "def log(message):\n"
+        "    _telemetry.progress(message)\n"
+        "def check(label, result):\n"
+        "    _telemetry.success(label)\n"
+        "    return result\n",
+        encoding="utf-8",
+    )
+    spec = importlib.util.spec_from_file_location("_telemetry_test_common_shim", shim)
+    assert spec is not None and spec.loader is not None
+    common = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(common)
+
+    def build_step():
+        common.log("through log")
+        common.check("through check", None)
+
+    build_step()
+    for body in ("through log", "through check"):
+        assert (
+            _record_named(logs, body).attributes["code.function.name"] == "build_step"
+        )
+
+    def failing_step():
+        with _telemetry.span("step"):
+            raise ValueError("boom")
+
+    with pytest.raises(ValueError):
+        failing_step()
+    rec = _record_named(logs, "step failed: boom")
+    assert rec.attributes["code.function.name"] == "failing_step"
 
 
 def test_clean_span_is_ok(capture):
@@ -925,6 +989,103 @@ def test_sequential_root_spans_do_not_nest(capture):
     assert wait.end_time <= task.start_time, (
         "no overlap: the wait cannot leak into work"
     )
+
+
+def test_every_traced_adapter_method_is_a_coroutine_on_the_real_adapter():
+    """A renamed or removed adapter method would silently fall out of the trace
+    (``instrument_adapter`` skips names it cannot find), re-opening the dark time
+    the list exists to close."""
+    from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
+
+    missing = sorted(
+        name
+        for name in _telemetry.ADAPTER_TRACED_METHODS
+        if not inspect.iscoroutinefunction(getattr(PyWin32Adapter, name, None))
+    )
+    assert missing == []
+
+
+def _fake_adapter_class():
+    from solidworks_mcp.adapters.base import AdapterResult, AdapterResultStatus
+
+    class FakeAdapter:
+        async def create_plane(self, name, offset_mm=0.0):
+            return AdapterResult(
+                status=AdapterResultStatus.SUCCESS, data=(name, offset_mm)
+            )
+
+        async def create_axis(self, *args, **kwargs):
+            return AdapterResult(status=AdapterResultStatus.ERROR, error="no such edge")
+
+        async def open_model(self, path):
+            raise OSError(f"cannot open {path}")
+
+        async def add_line(self, *args):
+            return AdapterResult(status=AdapterResultStatus.SUCCESS)
+
+    return FakeAdapter
+
+
+def test_instrumented_adapter_calls_are_spans_and_stay_transparent(capture):
+    spans, _ = capture
+    cls = _fake_adapter_class()
+    assert _telemetry.instrument_adapter(cls) == 3
+    assert _telemetry.instrument_adapter(cls) == 0, "a second pass must not double-wrap"
+    adapter = cls()
+
+    async def drive():
+        with _telemetry.span("part.build"):
+            ok = await adapter.create_plane("Tooth Plane", offset_mm=2.5)
+            probe = await adapter.create_axis("candidate")
+            await adapter.add_line(0, 0, 1, 1)
+            with pytest.raises(OSError, match="cannot open"):
+                await adapter.open_model(Path("C:/models/cone_gear.SLDPRT"))
+        return ok, probe
+
+    ok, probe = asyncio.run(drive())
+    assert ok.data == ("Tooth Plane", 2.5)
+    assert probe.error == "no such edge"
+
+    finished = {s.name: s for s in spans.get_finished_spans()}
+    build = finished["part.build"]
+    plane = finished["adapter.create_plane"]
+    axis = finished["adapter.create_axis"]
+    opened = finished["adapter.open_model"]
+    assert "adapter.add_line" not in finished, "per-entity sketch calls stay unspanned"
+    assert {plane.parent.span_id, axis.parent.span_id, opened.parent.span_id} == {
+        build.context.span_id
+    }
+    assert plane.attributes["arg"] == "Tooth Plane"
+    assert plane.status.status_code.name == "OK"
+    # a returned failure is a probe outcome, recorded but not an ERROR span
+    assert axis.status.status_code.name == "OK"
+    assert axis.attributes["adapter.status"] == "error"
+    assert axis.attributes["error.message"] == "no such edge"
+    # a raised one propagates unchanged and fails the span; a path arg is its name
+    assert opened.status.status_code.name == "ERROR"
+    assert opened.attributes["arg"] == "cone_gear.SLDPRT"
+    assert opened.attributes["error.type"] == "OSError"
+    assert "label" not in plane.attributes, "label at depth 0 is the farm's leaf key"
+
+
+def test_build_session_instruments_only_an_already_loaded_adapter(capture, monkeypatch):
+    """``run_build`` imports the adapter before it opens the session; a process
+    that never did must not be made to import the COM stack."""
+    monkeypatch.delenv("TRACEPARENT", raising=False)
+    monkeypatch.delitem(sys.modules, _telemetry._ADAPTER_MODULE, raising=False)
+    with _telemetry.build_session("offline"):
+        pass
+    assert _telemetry._ADAPTER_MODULE not in sys.modules
+
+    cls = _fake_adapter_class()
+    monkeypatch.setitem(
+        sys.modules,
+        _telemetry._ADAPTER_MODULE,
+        types.SimpleNamespace(PyWin32Adapter=cls),
+    )
+    with _telemetry.build_session("cone_gear"):
+        pass
+    assert getattr(cls.create_plane, "_harmonic_traced", False)
 
 
 def test_export_save_as_is_visible_during_long_com_call(capture, tmp_path):
