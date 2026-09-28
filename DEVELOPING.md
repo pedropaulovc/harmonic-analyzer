@@ -241,17 +241,27 @@ no `.done`.
   same kind of persistent supervisor as the launch, with `progress: "wake"`.
 - **`-List`** prints one JSON line per run, newest first, filtered by `-Tag`,
   `-State` and `-MaxAgeHours`.
-- **`-Cancel -Why <reason>`** stops the launcher and every process it started
-  (including a build a dead launcher left behind), then cancels each in-flight
-  leaf that `farm.py status` reports `RUNNING`, with the reason and run id on
-  the cancellation. A leaf that a live sibling run in the same `-LogDirectory`
-  is also waiting on is kept (`kept-shared`): workflows are shared by ID. It
-  then does the cleanup the launcher never ran — outputs moved to
-  `<run-id>.out`, snapshot removed — and writes `.done` with
+- **`-Cancel -Why <reason>`** stops the launcher and every process it started,
+  including a build a dead launcher left behind (a process under a dead
+  launcher's PID counts only if it carries the recorded build command line),
+  then cancels each in-flight leaf that `farm.py status` reports `RUNNING`,
+  with the reason and run id on the cancellation. Workflows are shared by ID,
+  so two leaves are kept: one a sibling run in the same `-LogDirectory` is
+  still waiting on (`kept-shared`; a `launcher-died` sibling counts while its
+  build outlives it), and one the farm started before this run did
+  (`kept-foreign`: another submitter owns it and this run only attached).
+  A submitter outside this `-LogDirectory` that attached *after* this run
+  started a leaf is invisible to both checks, and its leaf is cancelled with
+  the rest. If any leaf cannot be accounted for (`farm.py` failed on
+  authentication, network or CLI), `-Cancel` exits 1 and changes nothing
+  else: no `.done`, the snapshot kept, the run still `launcher-died`. Retry the
+  same command. Otherwise it does the cleanup the launcher never ran —
+  outputs moved to `<run-id>.out`, snapshot removed — and writes `.done` with
   `state: "cancelled"`, `exit_code: null` and a `cancel` block recording who,
   why, the stopped PIDs and each workflow's outcome (`cancelled`,
-  `already-closed`, `not-found`, `kept-shared`, `error`). It exits 1 if any
-  step failed, and cancelling a finished run is a no-op.
+  `already-closed`, `not-found`, `kept-shared`, `kept-foreign`). A cleanup
+  failure still writes `.done` (with `cleanup_errors`) and exits 1.
+  Cancelling a finished run is a no-op.
 
 ### The two records
 

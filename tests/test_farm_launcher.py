@@ -101,6 +101,9 @@ farm = next((i for i, arg in enumerate(sys.argv) if arg.endswith("farm.py")), No
 if farm is not None:
     # `uv run --project <pool> <pool>/farm.py <command> ...`, as the tracking
     # operations call it: a stateful fake of the farm's status/cancel.
+    # A workflow is {"status": ..., "start_time": ...}; the default start is
+    # the first query, i.e. after the run that dispatched it began. Status
+    # "UNREACHABLE" fails the query as a network outage would.
     state_path = Path(os.environ["UV_STUB_FARM"])
     workflows = json.loads(state_path.read_text(encoding="utf-8"))
     command, *rest = sys.argv[farm + 1 :]
@@ -108,11 +111,18 @@ if farm is not None:
     if workflow not in workflows:
         print(f"Error: workflow not found for ID: {workflow}", file=sys.stderr)
         raise SystemExit(2)
+    described = workflows[workflow]
+    described.setdefault(
+        "start_time", time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime())
+    )
+    if described["status"] == "UNREACHABLE":
+        print("Error: failed to connect to the farm", file=sys.stderr)
+        raise SystemExit(1)
     if command == "status":
-        print(json.dumps({"workflow_id": workflow, "status": workflows[workflow]}))
+        print(json.dumps({"workflow_id": workflow, **described}))
         raise SystemExit(0)
     if command == "cancel":
-        workflows[workflow] = "CANCELED"
+        described["status"] = "CANCELED"
         state_path.write_text(json.dumps(workflows), encoding="utf-8")
         with open(os.environ["UV_STUB_FARM_CANCELS"], "a", encoding="utf-8") as cancels:
             cancels.write(
@@ -986,6 +996,7 @@ LEAF_PEN = "leaf:part:pen_rod:" + "a" * 64 + ":5400s"
 LEAF_CONE = "leaf:part:cone_gear:" + "b" * 64 + ":5400s"
 LEAF_NUT = "leaf:part:wheel_axle_nut:" + "c" * 64 + ":5400s"
 LEAF_SHARED = "leaf:part:crank_hub:" + "d" * 64 + ":5400s"
+LEAF_FOREIGN = "leaf:part:paper_roller:" + "f" * 64 + ":5400s"
 
 # Verbatim shapes of what build.py prints at --verbosity info (_farm._dispatch,
 # the cache restore, doit's TaskError and the traceback's final exception).
@@ -1172,13 +1183,24 @@ def test_watch_exits_failed_with_the_cause_of_each_task_error(tmp_path: Path) ->
     assert final["in_flight_workflows"] == []
 
 
-def _sibling_waiting_on(fixture: dict[str, object], workflow: str) -> Path:
-    """A live run in the same LogDirectory that is waiting on ``workflow``.
-
-    Its launcher PID is this test process, which started before the record.
-    """
+def _write_run_record(
+    fixture: dict[str, object],
+    *,
+    pid: int,
+    tag: str,
+    workflow: str,
+    argv: list[str],
+    hexdigit: str,
+    started: float | None = None,
+) -> Path:
+    """A run record as the launcher writes one, waiting on ``workflow``, whose
+    launcher is ``pid``; started at ``started`` (epoch seconds), else now."""
+    started = time.time() if started is None else started
     log_directory = Path(fixture["log_directory"])
-    run_id = time.strftime("%Y%m%dT%H%M%S000Z", time.gmtime()) + "-" + "e" * 32
+    log_directory.mkdir(exist_ok=True)
+    run_id = (
+        time.strftime("%Y%m%dT%H%M%S000Z", time.gmtime(started)) + "-" + hexdigit * 32
+    )
     log = log_directory / f"{run_id}.log"
     log.write_text(
         f"  --  [ 1.0s + 1.0s] Farm workflow attached: {workflow}\n", encoding="utf-8"
@@ -1191,20 +1213,113 @@ def _sibling_waiting_on(fixture: dict[str, object], workflow: str) -> Path:
         "commit": "0" * 40,
         "targets": ["part:crank_hub"],
         "leaf_timeout_minutes": 90,
-        "started_at": time.strftime("%Y-%m-%dT%H:%M:%S.0000000Z", time.gmtime()),
-        "pid": os.getpid(),
+        "started_at": time.strftime("%Y-%m-%dT%H:%M:%S.0000000Z", time.gmtime(started)),
+        "pid": pid,
         "log": str(log),
         "done": str(log_directory / f"{run_id}.done"),
         "cache_environment": {},
-        "tag": "sibling",
-        "argv": [],
-        "snapshot": str(log_directory / "snapshots" / "sibling"),
+        "tag": tag,
+        "argv": argv,
+        "snapshot": str(log_directory / "snapshots" / tag),
         "outputs": str(log_directory / f"{run_id}.out"),
-        "environment": str(log_directory / "envs" / "sibling"),
+        "environment": str(log_directory / "envs" / tag),
     }
     path = log_directory / f"{run_id}.run.json"
     path.write_text(json.dumps(record), encoding="utf-8")
     return path
+
+
+def _sibling_waiting_on(fixture: dict[str, object], workflow: str) -> Path:
+    """A live run in the same LogDirectory that is waiting on ``workflow``.
+
+    Its launcher PID is this test process, which started before the record.
+    """
+    return _write_run_record(
+        fixture,
+        pid=os.getpid(),
+        tag="sibling",
+        workflow=workflow,
+        argv=[],
+        hexdigit="e",
+    )
+
+
+SLEEPER = "__import__('time').sleep(120)"
+
+
+@pytest.mark.parametrize(
+    ("recorded_code", "orphaned"),
+    [
+        # The recorded build command: the dead launcher's own child.
+        (SLEEPER, True),
+        # A different command under the same (dead) parent PID: not the run's.
+        ("__import__('time').sleep(121)", False),
+    ],
+)
+def test_an_orphan_must_carry_the_recorded_build_command(
+    tmp_path: Path, recorded_code: str, orphaned: bool
+) -> None:
+    """A dead launcher's PID is only a ParentProcessId now: any process that
+    reused it could have left children. Only the recorded command is the run's."""
+    fixture = _launcher_fixture(tmp_path)
+    Path(fixture["log_directory"]).mkdir()
+    started = time.time()
+    parent = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import subprocess, sys; "
+            f"print(subprocess.Popen([sys.executable, '-c', {SLEEPER!r}], "
+            "stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, "
+            "stderr=subprocess.DEVNULL).pid)",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=HANG_GUARD_S,
+    )
+    child = int(parent.stdout)
+    try:
+        _write_run_record(
+            fixture,
+            pid=_dead_parent_pid(child),
+            tag="reused",
+            workflow=LEAF_NUT,
+            argv=["uv", "-c", recorded_code],
+            hexdigit="7",
+            started=started,
+        )
+        status = _run_launcher(
+            fixture,
+            _tracking(fixture, "-Status", "-Tag", "reused"),
+            fixture["environment"],
+        )
+    finally:
+        subprocess.run(
+            ["taskkill", "/F", "/T", "/PID", str(child)], capture_output=True
+        )
+
+    assert status.returncode == 0, status.stderr
+    report = json.loads(status.stdout)
+    assert report["state"] == "launcher-died"
+    assert (child in report["launcher"]["orphaned_processes"]) is orphaned
+
+
+def _dead_parent_pid(child: int) -> int:
+    listed = subprocess.run(
+        [
+            "pwsh.exe",
+            "-NoProfile",
+            "-Command",
+            f"(Get-CimInstance Win32_Process -Filter 'ProcessId={child}').ParentProcessId",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    parent = int(listed.stdout)
+    assert not _process_alive(parent)
+    return parent
 
 
 def test_a_dead_launcher_is_reported_and_its_orphaned_leaves_cancelled(
@@ -1218,10 +1333,23 @@ def test_a_dead_launcher_is_reported_and_its_orphaned_leaves_cancelled(
         + f"  --  [   61.0s +  1.0s] Farm workflow requested: {LEAF_NUT}\n"
         + f"  --  [   61.0s +  1.0s] Farm workflow requested: {LEAF_SHARED}\n"
         + f"  --  [   61.1s +  0.1s] Farm workflow attached: {LEAF_SHARED}\n"
+        + f"  --  [   61.2s +  0.1s] Farm workflow requested: {LEAF_FOREIGN}\n"
+        + f"  --  [   61.3s +  0.1s] Farm workflow attached: {LEAF_FOREIGN}\n"
     )
-    Path(fixture["farm_state"]).write_text(
+    farm_state = Path(fixture["farm_state"])
+    farm_state.write_text(
         json.dumps(
-            {LEAF_PEN: "RUNNING", LEAF_CONE: "COMPLETED", LEAF_SHARED: "RUNNING"}
+            {
+                # The farm cannot be reached for this one on the first try.
+                LEAF_PEN: {"status": "UNREACHABLE"},
+                LEAF_CONE: {"status": "COMPLETED"},
+                LEAF_SHARED: {"status": "RUNNING"},
+                # Another submitter started it long before this run attached.
+                LEAF_FOREIGN: {
+                    "status": "RUNNING",
+                    "start_time": "2020-01-01T00:00:00+00:00",
+                },
+            }
         ),
         encoding="utf-8",
     )
@@ -1247,7 +1375,12 @@ def test_a_dead_launcher_is_reported_and_its_orphaned_leaves_cancelled(
         assert report["state"] == "launcher-died"
         assert report["launcher"]["alive"] is False
         assert build in report["launcher"]["orphaned_processes"]
-        assert report["in_flight_workflows"] == [LEAF_PEN, LEAF_NUT, LEAF_SHARED]
+        assert report["in_flight_workflows"] == [
+            LEAF_PEN,
+            LEAF_NUT,
+            LEAF_SHARED,
+            LEAF_FOREIGN,
+        ]
 
         watch = _run_launcher(
             fixture,
@@ -1257,11 +1390,29 @@ def test_a_dead_launcher_is_reported_and_its_orphaned_leaves_cancelled(
         assert watch.returncode == 21, watch.stdout
         assert "LAUNCHER DIED" in watch.stdout
 
-        cancel = _run_launcher(
+        cancel_command = _tracking(
+            fixture, "-Cancel", "-Tag", "orphaned", "-Why", "launcher died"
+        )
+        refused = _run_launcher(fixture, cancel_command, fixture["environment"])
+        # A leaf it could not account for keeps the run retryable: the orphan
+        # is stopped, but no .done, no cleanup, still launcher-died.
+        assert refused.returncode == 1, (refused.stdout, refused.stderr)
+        assert "failed to connect to the farm" in refused.stderr
+        assert not _process_alive(build)
+        assert not Path(running["done"]).exists()
+        assert Path(running["snapshot"]).exists()
+        assert not Path(fixture["farm_cancels"]).exists()
+        again_status = _run_launcher(
             fixture,
-            _tracking(fixture, "-Cancel", "-Tag", "orphaned", "-Why", "launcher died"),
+            _tracking(fixture, "-Status", "-RunId", running["run_id"]),
             fixture["environment"],
         )
+        assert json.loads(again_status.stdout)["state"] == "launcher-died"
+
+        workflows = json.loads(farm_state.read_text(encoding="utf-8"))
+        workflows[LEAF_PEN] = {"status": "RUNNING"}
+        farm_state.write_text(json.dumps(workflows), encoding="utf-8")
+        cancel = _run_launcher(fixture, cancel_command, fixture["environment"])
     finally:
         release.touch()
 
@@ -1271,11 +1422,13 @@ def test_a_dead_launcher_is_reported_and_its_orphaned_leaves_cancelled(
     assert done["state"] == "cancelled"
     assert done["exit_code"] is None
     assert done["cancel"]["launcher"] == "launcher-died"
-    assert build in done["cancel"]["stopped_pids"]
+    # The refused first attempt already stopped the orphan.
+    assert done["cancel"]["stopped_pids"] == []
     assert {w["workflow_id"]: w["outcome"] for w in done["cancel"]["workflows"]} == {
         LEAF_PEN: "cancelled",
         LEAF_NUT: "not-found",
         LEAF_SHARED: "kept-shared",
+        LEAF_FOREIGN: "kept-foreign",
     }
     cancels = [
         json.loads(line)
@@ -1319,7 +1472,10 @@ def test_cancel_stops_a_live_launcher_and_its_build_before_cancelling_leaves(
 ) -> None:
     fixture = _launcher_fixture(tmp_path)
     Path(fixture["farm_state"]).write_text(
-        json.dumps({LEAF_PEN: "RUNNING", LEAF_CONE: "COMPLETED"}), encoding="utf-8"
+        json.dumps(
+            {LEAF_PEN: {"status": "RUNNING"}, LEAF_CONE: {"status": "COMPLETED"}}
+        ),
+        encoding="utf-8",
     )
     process, release, running = _start_held(tmp_path, fixture, DISPATCH_LINES, "live")
     build = _stub_pid(fixture)
@@ -1347,7 +1503,8 @@ def test_cancel_stops_a_live_launcher_and_its_build_before_cancelling_leaves(
     assert {w["workflow_id"]: w["outcome"] for w in done["cancel"]["workflows"]} == {
         LEAF_PEN: "cancelled"
     }
-    assert json.loads(Path(fixture["farm_state"]).read_text(encoding="utf-8")) == {
+    farm = json.loads(Path(fixture["farm_state"]).read_text(encoding="utf-8"))
+    assert {workflow: farm[workflow]["status"] for workflow in farm} == {
         LEAF_PEN: "CANCELED",
         LEAF_CONE: "COMPLETED",
     }

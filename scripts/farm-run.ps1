@@ -754,7 +754,10 @@ function Get-RunProcesses {
     # creation times keep an unrelated process that reused a PID out.
     $launcherId = [int]$Record['pid']
     $startedAt = ConvertTo-UtcTimestamp -Value $Record['started_at']
-    $all = @(Get-CimInstance -ClassName Win32_Process -Property ProcessId, ParentProcessId, CreationDate)
+    $all = @(Get-CimInstance -ClassName Win32_Process -Property ProcessId, ParentProcessId, CreationDate, CommandLine)
+    # With the launcher gone, its PID says nothing about who a process belongs
+    # to: a direct child must also carry the recorded build command line.
+    $buildCommand = @($Record['argv'] | Select-Object -Skip 1) -join ' '
     $byParent = @{}
     foreach ($process in $all) {
         $parent = [int]$process.ParentProcessId
@@ -780,6 +783,9 @@ function Get-RunProcesses {
         }
         if ($null -ne $holder -and -not $isLauncher -and $created -ge $holder.CreationDate.ToUniversalTime()) {
             # A child of the process that reused the launcher's PID.
+            continue
+        }
+        if (-not $isLauncher -and -not ([string]$child.CommandLine).Contains($buildCommand)) {
             continue
         }
         $queue.Enqueue($child)
@@ -928,6 +934,7 @@ function Invoke-RunCancel {
     $errors = [System.Collections.Generic.List[string]]::new()
     $killed = [System.Collections.Generic.List[int]]::new()
     $launcherWas = $status['state']
+    $runStartedAt = ConvertTo-UtcTimestamp -Value $record['started_at']
     # The launcher first, so it cannot react to its child dying by writing a
     # `failed` .done; then everything it started (uv, build.py) -- including a
     # build a dead launcher left running, which would keep dispatching leaves.
@@ -966,7 +973,10 @@ function Invoke-RunCancel {
             continue
         }
         $other = Get-RunStatus -RecordPath $path
-        if ($other.status['state'] -ne 'running') {
+        # A dead sibling whose build outlived it is still waiting on its leaves.
+        $waiting = $other.status['state'] -eq 'running' -or
+            ($other.status['state'] -eq 'launcher-died' -and @($other.status['launcher']['orphaned_processes']).Count -gt 0)
+        if (-not $waiting) {
             continue
         }
         foreach ($workflowId in $other.status['in_flight_workflows']) {
@@ -1008,6 +1018,21 @@ function Invoke-RunCancel {
             Write-RunEvent -RunId $runId -Text "already closed $workflowId`: $($described['status'])"
             continue
         }
+        if ($null -eq $described['start_time']) {
+            $outcome['outcome'] = 'error'
+            $errors.Add("farm.py status $workflowId gave no start_time; cannot tell who started it")
+            Write-RunEvent -RunId $runId -Text "error $workflowId"
+            continue
+        }
+        $workflowStarted = ConvertTo-UtcTimestamp -Value $described['start_time']
+        if ($workflowStarted -lt $runStartedAt) {
+            # Started before this run existed: another submitter owns it and
+            # this run only attached, so it is not this run's to cancel.
+            $outcome['outcome'] = 'kept-foreign'
+            $outcome['detail'] = "started $($workflowStarted.ToString('o')) before this run"
+            Write-RunEvent -RunId $runId -Text "kept $workflowId`: $($outcome['detail'])"
+            continue
+        }
         $cancelled = Invoke-FarmCli -PoolHome $record['pool_home'] -Arguments @('cancel', '--why', $reason, $workflowId)
         $outcome['detail'] = $cancelled.output -join ' '
         if ($cancelled.code -eq 0) {
@@ -1020,6 +1045,20 @@ function Invoke-RunCancel {
         Write-RunEvent -RunId $runId -Text "$($outcome['outcome']) $workflowId"
     }
 
+    if ($errors.Count -gt 0) {
+        # Some leaf is unaccounted for: leave the run `launcher-died`, with its
+        # snapshot and no .done, so the same -Cancel can be retried.
+        foreach ($outcome in $outcomes) {
+            Write-Output ($outcome | ConvertTo-Json -Depth 4 -Compress)
+        }
+        foreach ($problem in $errors) {
+            [System.Console]::Error.WriteLine("farm-run cancel: $problem")
+        }
+        [System.Console]::Error.WriteLine("farm-run cancel: not finished; no .done written; retry -Cancel")
+        $script:TrackExitCode = 1
+        return
+    }
+
     # The launcher never ran its own cleanup: keep the outputs and remove the
     # snapshot exactly as it would have.
     $cleanup = Complete-Snapshot `
@@ -1030,7 +1069,7 @@ function Invoke-RunCancel {
         $errors.Add($problem)
     }
 
-    $startedAt = ConvertTo-UtcTimestamp -Value $record['started_at']
+    $startedAt = $runStartedAt
     $now = [System.DateTime]::UtcNow
     $doneRecord = [ordered]@{}
     foreach ($entry in $record.GetEnumerator()) {
