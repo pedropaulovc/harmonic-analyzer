@@ -1319,6 +1319,34 @@ def _error_type(exc: BaseException) -> str:
     return f"{cls.__module__}.{cls.__qualname__}"
 
 
+def _fill_error_cause(span: Any, description: str | None) -> None:
+    """Give a span marked ERROR by hand the same ``error.*`` cause attributes a
+    raising body gets.
+
+    ``_common.run_build`` run standalone catches the build's exception, records it
+    on its ``build.<target>`` root, sets ERROR and returns normally -- so the root
+    exits clean and the raising branch of :func:`_exit_span` never sees the cause.
+    The cause is taken from the newest recorded ``exception`` event, else the status
+    description (``error.type`` is then OTel's ``_OTHER``). A cause the code already
+    stamped is kept. Best-effort: never raises."""
+    with contextlib.suppress(Exception):
+        attributes = getattr(span, "attributes", None) or {}
+        if "error.type" in attributes:
+            return
+        events = [e for e in getattr(span, "events", ()) if e.name == "exception"]
+        if events:
+            event_attributes = events[-1].attributes or {}
+            error_type = str(event_attributes.get("exception.type") or "_OTHER")
+            message = str(
+                event_attributes.get("exception.message") or description or ""
+            )
+        else:
+            error_type, message = "_OTHER", description or ""
+        span.set_attributes(
+            {"error.type": error_type, "error.message": message[:_ERROR_MESSAGE_LIMIT]}
+        )
+
+
 def _exit_span(handle: Any, exc: BaseException | None) -> None:
     cm, token = handle
     _depth.reset(token)
@@ -1341,10 +1369,14 @@ def _exit_span(handle: Any, exc: BaseException | None) -> None:
         error(
             f"{span.name if isinstance(span, ReadableSpan) else 'span'} failed: {exc}"
         )
-    elif cast(ReadableSpan, span).status.status_code is StatusCode.UNSET:
+    else:
         # get_current_span() is typed Span (mutable, has set_status); only
         # ReadableSpan exposes .status -- the live SDK span is both.
-        span.set_status(Status(StatusCode.OK))
+        status = cast(ReadableSpan, span).status
+        if status.status_code is StatusCode.UNSET:
+            span.set_status(Status(StatusCode.OK))
+        elif status.status_code is StatusCode.ERROR:
+            _fill_error_cause(span, status.description)
     cm.__exit__(type(exc) if exc else None, exc, exc.__traceback__ if exc else None)
 
 

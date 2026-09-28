@@ -265,6 +265,39 @@ def test_explicit_error_status_survives_clean_exit(capture):
         # no exception raised -- the with-block exits normally, as run_build does
     (done,) = [s for s in spans.get_finished_spans() if s.name == "failed_build"]
     assert done.status.status_code.name == "ERROR"
+    # no exception was recorded, so the status description is the only cause
+    assert done.attributes["error.type"] == "_OTHER"
+    assert done.attributes["error.message"] == "build failed"
+
+
+def test_standalone_build_failure_root_carries_its_cause(capture, monkeypatch):
+    """``run_build`` run standalone catches the build's exception, records it on
+    the ``build.<target>`` root, marks it ERROR and exits the session cleanly --
+    the root must still say WHY, as a raising span does."""
+    spans, _ = capture
+    monkeypatch.delenv("TRACEPARENT", raising=False)
+    monkeypatch.delenv("TRACESTATE", raising=False)
+    with _telemetry.build_session("cone_gear") as root:
+        assert root is not None
+        try:
+            raise RuntimeError("tooth pattern failed: no seed feature")
+        except RuntimeError as exc:
+            root.record_exception(exc)
+            root.set_status(_telemetry.Status(_telemetry.StatusCode.ERROR, str(exc)))
+    (done,) = [s for s in spans.get_finished_spans() if s.name == "build.cone_gear"]
+    assert done.status.status_code.name == "ERROR"
+    assert done.attributes["error.type"] == "RuntimeError"
+    assert done.attributes["error.message"] == "tooth pattern failed: no seed feature"
+
+
+def test_a_cause_stamped_by_the_code_is_not_overwritten(capture):
+    spans, _ = capture
+    with _telemetry.span("gate") as sp:
+        sp.set_attributes({"error.type": "GateRefusal", "error.message": "3 stray DOF"})
+        sp.set_status(_telemetry.Status(_telemetry.StatusCode.ERROR, "gate refused"))
+    (done,) = [s for s in spans.get_finished_spans() if s.name == "gate"]
+    assert done.attributes["error.type"] == "GateRefusal"
+    assert done.attributes["error.message"] == "3 stray DOF"
 
 
 def test_logs_correlate_to_active_span(capture):
