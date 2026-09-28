@@ -20,7 +20,8 @@ smaller seat window). Points proven under that aperture no longer prove
 anything: tube-frame's (12.7, 0, 0), frozen from run 20260928T074246010Z,
 selected no edge zoomed (run 20260928T092244731Z). harmonic-base's point hit
 zoomed in that run, so it stays frozen; the others walk until a zoomed run
-proves their points on this sheet.
+proves their points on this sheet. Walking zoomed, run 20260928T093251625Z
+hit all eight in 16 s of picks and the sheet audited clean.
 
 The lag screw takes its listed visible edge: its frozen head point hit
 lag-screw-2 on swmaker000004 (run 20260928T084730204Z) and the
