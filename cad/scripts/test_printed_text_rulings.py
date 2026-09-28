@@ -248,54 +248,11 @@ def _matches(tag: tuple[str, str, str, str], row: tuple[str, str]) -> bool:
     return part == row[0] and all(word in row[1] for word in words.split())
 
 
-# Named exceptions rows whose part has no sheet yet, so nothing can print the
-# shortfall.  Each waits for its sheet: once the part registers a drawing the
-# assertion below fails, the entry must go, and the row needs its emitter.
-WAITING_FOR_SHEET: dict[str, str] = {
-    # User ruling R1 (2026-09-26, #906): the thin-side wall and the throw band
-    # are ruled now; the sheet is #952 (b), after the release.
-    "MHA-149": "#952 (b) writes the crank eccentric bushing drawing",
-}
-
-
-def _drawn_part_numbers() -> set[str]:
-    from _drawing_registry import DRAWINGS
-
-    drawn = {d.part.replace("_", "-") for d in DRAWINGS if d.source_kind == "part"}
-    numbers = set()
-    for path in PARTS.glob("*.yaml"):
-        for name, row in (yaml.safe_load(path.read_text(encoding="utf-8")) or {}).items():
-            if name in drawn and isinstance(row, dict) and row.get("number"):
-                numbers.add(str(row["number"]))
-    return numbers
-
-
-def test_rows_waiting_for_a_sheet_name_real_sheetless_parts() -> None:
-    numbers = {
-        str(row["number"])
-        for path in PARTS.glob("*.yaml")
-        for row in (yaml.safe_load(path.read_text(encoding="utf-8")) or {}).values()
-        if isinstance(row, dict) and row.get("number")
-    }
-    drawn = _drawn_part_numbers()
-    assert drawn, "no drawn part numbers resolved: the check below would be vacuous"
-    rows = {part for part, _text in named_exception_rows()}
-    for part in WAITING_FOR_SHEET:
-        assert part in numbers, f"{part} names no part in the registry"
-        assert part in rows, f"{part} waits for a sheet but has no Named exceptions row"
-        assert part not in drawn, (
-            f"{part} now has a registered drawing: drop it from WAITING_FOR_SHEET "
-            "and tag the emitter that prints its shortfall"
-        )
-
-
 def test_every_named_exception_has_a_tagged_emitter_that_prints_it() -> None:
     rows = named_exception_rows()
     tags = tagged_emitters()
     assert rows and tags
     for row in rows:
-        if row[0] in WAITING_FOR_SHEET:
-            continue
         assert any(_matches(tag, row) for tag in tags), (
             f"no emitter is tagged for the Named exceptions row {row}"
         )

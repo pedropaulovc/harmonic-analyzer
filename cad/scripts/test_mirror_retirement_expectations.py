@@ -5,10 +5,8 @@ The diagnostic executes at import (it reads a machine-local golden pose dump),
 so this reads its ``expect(DT, ...)`` calls from source and evaluates their
 rows against the SolidWorks-free assembly module.  Codex P3 on #814: 485eaf434
 phased MHA-059 (``pinion-lift-rod``) by ``LIFT_ROD_ROWS`` but the validator
-still expected IDENTITY, a false ``drow`` failure.  Codex on #960 (T_mz5):
-R1 moved the crank family onto ``X_CRANK_FIT``/``Y_CRANK_FIT`` but the
-validator still expected ``X_CRANK``/``Y_CRANK``, a false ``dpos`` failure
-for five components -- so translations are cross-checked too.
+still expected IDENTITY, a false ``drow`` failure. Translations are also
+cross-checked against the restored fixed crank axis.
 """
 
 from __future__ import annotations
@@ -147,15 +145,6 @@ def test_the_cross_check_covers_the_crank_family_translations() -> None:
     } <= covered
 
 
-def test_a_pre_fit_up_crank_translation_is_caught() -> None:
-    # Positive control: the pre-R1 expectation, the frame crank axis, sits off
-    # the fit-up axis the assembly places the crankshaft on.
-    stale = ast.parse("[d.X_CRANK, d.Y_CRANK, d.CRANKSHAFT_Z0]", mode="eval").body
-    delta = max(
-        abs(a - b)
-        for a, b in zip(_diagnostic_eval(stale), PLACED_AT["crankshaft"], strict=True)
-    )
-    assert delta > 1e-3
 
 
 @pytest.mark.parametrize(

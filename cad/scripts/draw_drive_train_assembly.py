@@ -67,7 +67,6 @@ from _drive_train_balloon_anchors import DRIVE_TRAIN_BALLOON_ANCHORS
 from cone_gear_notes import ATTACHMENT as CONE_GEAR_JOINT
 from crank_drive_gear_notes import ATTACHMENT_ALTERNATIVE as CRANK_GEAR_ALTERNATIVE
 from crank_drive_gear_notes import ATTACHMENT_PROCESS as CRANK_GEAR_JOINT
-from cone_pivot_post_spec import CRANK_SPOT_FACE_RETREAT
 from crank_pinion_spec import SEAT_FEELER_MM as PINION_SEAT_FEELER
 from drive_train_assembly_spec import (
     CLUSTERS,
@@ -436,7 +435,6 @@ ASSEMBLED_HEADING = (
     f"FULL DETAIL: SHEET {FULL_DETAIL_SHEET}."
 )
 
-PINION_FEELER_STACK = CRANK_SPOT_FACE_RETREAT + PINION_SEAT_FEELER
 CONE_CRANK_STEPS = "\n".join(
     (
         "ASSEMBLY SEQUENCE - CONE SET AND CRANK",
@@ -483,21 +481,16 @@ CONE_CRANK_STEPS = "\n".join(
         "3. THREAD MHA-097 INTO MHA-092 UNTIL MHA-014 JUST STOPS SHUTTLING",
         "   AND STILL TURNS FREELY; BACK OFF 1/8 TURN; TIGHTEN",
         "   MHA-098 ACROSS THE SLIT. END PLAY 0.05-0.40, BY FEEL OR INDICATOR.",
-        # U31 (user, 2026-09-23, option 3a): MHA-016 bores the crank-above-cone
-        # spacing 39.33 +0.37/0 in one setup, so the mesh is checked, not
-        # set; 14.5 deg PA gives 0.517 backlash per mm of centre distance.
-        # Wording from pivot (DT-ConePivotPost-cc-20260923.md, U31).
-        "4. FIT MHA-026 IN THE MHA-016 CRANK BORE. SLIDE MHA-025 ON, NOT YET",
-        "   PINNED, AND MESH IT WITH MHA-021 TOOTH IN GAP. CHECK BACKLASH",
-        "   0.20-0.55 AT THE MHA-025 PITCH LINE, FREE THROUGH ONE FULL MHA-021",
-        "   TURN. OUT OF BAND: STOP - MHA-016 BORE SPACING IS OUT (SEE ITS",
-        # The spot face stands back from the 64T (cone_pivot_post_spec
-        # CRANK_SPOT_FACE_RETREAT), so the feeler is a stack: the retreat
-        # plus the 16T's seat feeler.
-        f"   PRINT). HOLD MHA-025 IN MESH; SET ITS STATION {PINION_FEELER_STACK:.2f} OFF THE SPOT",
-        "   FACE WITH A FEELER STACK. ONLY THEN MATCH-DRILL AND REAM FOR",
-        "   MHA-134 AT BOSS MID-LENGTH WITH MHA-026; SEAT FLUSH BOTH SIDES PER",
-        "   THE MHA-025 PRINT. RE-CHECK BACKLASH 0.20-0.55 AFTER PINNING.",
+        # User ruling 2026-09-28: the crank journal runs directly in the post;
+        # the centres are fixed, and the only mesh requirement is no binding.
+        "4. FIT MHA-026 DIRECTLY IN THE MHA-016 CRANK BORE. SLIDE MHA-025",
+        "   ON, NOT YET PINNED, AND MESH IT WITH MHA-021 TOOTH IN GAP.",
+        "   TURN MHA-021 THROUGH ONE FULL REVOLUTION: THE MESH MUST NEVER",
+        "   BIND. IF IT BINDS, STOP AND CHECK THE PARTS AND BORE SPACING.",
+        f"   SET MHA-025 {PINION_SEAT_FEELER:.2f} OFF THE MHA-016 BOSS NORTH FACE",
+        "   WITH A FEELER. ONLY THEN MATCH-DRILL AND REAM FOR MHA-134 AT",
+        "   BOSS MID-LENGTH WITH MHA-026; SEAT FLUSH BOTH SIDES PER THE",
+        "   MHA-025 PRINT. RE-CHECK THAT THE MESH NEVER BINDS AFTER PINNING.",
         "5. THE PAPER-DRIVE T12 WHEEL GOES ON MHA-026 BEFORE THE ARM.",
         # U33 (user, 2026-09-23): crank hub MHA-137 pressed into the arm and
         # seam-pinned by MHA-138 (a 4 m6 dowel, 4.0 long = half the arm); the
@@ -752,10 +745,10 @@ CHECKS = "\n".join(
         "ASSEMBLY-ONLY FUNCTIONAL CHECKS",
         "1. CRANK TURNS FREELY THROUGH FULL TURNS; ONE CRANK TURN TURNS THE",
         "   CONE SET 1/4 TURN (16T:64T).",
-        # U31: the bored MHA-016 spacing sets the 16T:64T mesh (step 4).
-        "2. MHA-025/MHA-021 BACKLASH 0.20-0.55 AT THE MHA-025 PITCH LINE, CRANK",
-        "   AT REST, NO TIGHT SPOT THROUGH ONE FULL MHA-021 TURN; EACH CONE",
-        "   GEAR MESHES ITS MHA-027 PER THE MHA-013 PRINT.",
+        # User ruling 2026-09-28: the fixed-centre crank mesh must never bind;
+        # no backlash acceptance interval or fit-up target remains.
+        "2. MHA-025/MHA-021 TURNS WITHOUT BINDING THROUGH ONE FULL MHA-021",
+        "   TURN; EACH CONE GEAR MESHES ITS MHA-027 PER THE MHA-013 PRINT.",
         "3. EACH MHA-027 TURNS FREELY ON MHA-028 WITHOUT AXIAL BINDING.",
         # The same bound the MHA-027 print states (cylinder_gear_notes).
         f"   A CONNECTING-ROD RING MAY OVERHANG ITS CAM UP TO {RING_OVERHANG_TEXT} (AT LEAST",

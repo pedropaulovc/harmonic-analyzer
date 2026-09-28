@@ -11,7 +11,6 @@ import build_drive_train_assembly as drive
 import crank_arm_notes as notes
 import crank_arm_spec as spec
 import crank_hub_geometry as geometry
-import crankshaft_spec
 import draw_crank_arm as drawing
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -50,7 +49,7 @@ def test_axial_seam_key_is_six_oclock_and_stops_halfway_through_arm() -> None:
     assert spec.AXIAL_PIN_X == geometry.AXIAL_PIN_RADIUS_FROM_AXIS == 9.7
     assert spec.AXIAL_PIN_Y == 0.0
     assert drive.CRANK_HUB_PIN_ORIGIN == pytest.approx(
-        [drive.X_CRANK_FIT, drive.Y_CRANK_FIT - 9.7, drive.CRANK_FACE_Z]
+        [drive.X_CRANK, drive.Y_CRANK - 9.7, drive.CRANK_FACE_Z]
     )
     assert drive.CRANK_HUB_PIN_ROWS == drive.IDENTITY
 
@@ -133,9 +132,10 @@ def test_assembly_keeps_common_face_and_established_inboard_stations() -> None:
     assert drive.CRANK_PIN_Z == pytest.approx(-169.4)
     assert drive.CRANK_HUB_REAR_Z == -163.0
     assert drive.REMOVABLE_Z0 - drive.CRANK_HUB_REAR_Z == pytest.approx(5.5)
-    # W15: the shaft's length is crankshaft_spec's, never a restated literal.
-    assert drive.CRANKSHAFT_LENGTH == crankshaft_spec.SHAFT_LENGTH
-    assert drive.CRANKSHAFT_Z0 + drive.CRANKSHAFT_LENGTH == pytest.approx(-46.2)
+    # The restored shaft ends inside the pinion boss, rather than exposing a tip.
+    shaft_end = drive.CRANKSHAFT_Z0 + drive.CRANKSHAFT_LENGTH
+    assert shaft_end < drive.PINION_Z0 + drive.PINION_OVERALL_LENGTH
+    assert shaft_end > drive.PINION_PIN_Z + drive.PINION_PIN_DIA / 2.0
 
 
 def test_stock_anchor_still_clamps_eye_without_bottoming() -> None:

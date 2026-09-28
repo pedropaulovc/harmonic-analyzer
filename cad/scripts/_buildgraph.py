@@ -2285,7 +2285,6 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
     {
         "_printed_tolerance",
         "boss_hook_spec",
-        "build_crank_eccentric_bushing",
         "build_drive_train_assembly",
         "build_harmonic_base",
         "build_wheel_bar",
@@ -2294,8 +2293,8 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         "cone_tip_shim_spec",
         "crank_boss_rim",
         "crank_hub_geometry",
-        "crank_mesh_stack",
         "crank_pinion_spec",
+        "crankshaft_spec",
         "harmonic_base_fasteners",
         "post_mount_screw_spec",
         "spring_hook_spec",

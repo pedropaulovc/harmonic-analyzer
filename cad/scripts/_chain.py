@@ -12,8 +12,8 @@ explicitly placed along this centreline loop (build_paper_drive_assembly
 stand-in are both retired.
 
 Geometry (local frame: knob wrap centre at the origin, machine xy
-pre-mirror; crank centre from build_drive_train_assembly X_CRANK_FIT / Y_CRANK_FIT
-minus build_paper_drive_assembly KNOB_SHAFT_XY): two UNEQUAL wrap arcs whose
+pre-mirror; crank centre from cone_line X_CRANK / Y_CRANK minus
+build_paper_drive_assembly KNOB_SHAFT_XY): two UNEQUAL wrap arcs whose
 centreline rides each gear's PITCH circle (where a real chain seats -- the
 rollers rest in the tooth valleys, the plates STRADDLE the 2.4-wide
 sprocket, and the tips pass between them; only the roller<->tooth seating
@@ -29,29 +29,18 @@ solved numerically for the SAG droop).
 from __future__ import annotations
 
 import math
+from cone_line import X_CRANK, Y_CRANK
+
 
 # Chain-wheel centres, machine xy pre-mirror.
 KNOB_CENTRE = (42.575, 252.3672)  # build_paper_drive_assembly KNOB_SHAFT_XY:
 # stud (0, 266.2007) + latch C2C 44.766 at -18 deg (the permanent 12T:120T
 # mesh). The 2026-07-23 platen refit raises the bar-hung reducer 11.134 mm
 # with the resized platen/support geometry.
-# The crank chain-wheel rides the crankshaft, so its centre IS the crank axis:
-# (X_CRANK_FIT, Y_CRANK_FIT), where #906 R1's MHA-149 throw sets it at the
-# nominal fit-up (build_drive_train_assembly).
-# The v2 casting's exact Ry180 installation moves this axis 1.484 mm in machine
-# X while the photo-anchored T12 axial plane remains at z -155.
-# Hardcoded as a literal (like KNOB_CENTRE above) -- NOT imported from
-# build_drive_train_assembly. _chain feeds the leaf chain-link PARTS through
-# _chain_link, and a leaf part must not transitively depend on _assembly
-# (test_buildgraph / check:graph enforces this); importing the drive-train
-# assembly module would drag _assembly into that import chain. Instead,
-# build_paper_drive_assembly._assert_chain_layout pins this value to the live
-# drive-train (X_CRANK_FIT, Y_CRANK_FIT) and fails loud on drift, so a stale literal can
-# never silently mis-anchor the chain over the relocated 64T/cone. The cleaner
-# split (leaf-safe geometry vs assembly-time layout, no literal) is issue #86.
-CRANK_CENTRE = (128.7333824594892, 129.80464592856396)
-# drive-train -X_CRANK_FIT, Y_CRANK_FIT: the cast-in axis of cone-pivot-post-v2,
-# moved by the MHA-149 throw at the nominal fit-up.
+# The crank chain-wheel rides the fixed post's crank axis. Import its
+# SolidWorks-free frame geometry, never the drive-train assembly: _chain also
+# feeds leaf chain-link parts, which must not depend on _assembly.
+CRANK_CENTRE = (-X_CRANK, Y_CRANK)
 # The chain count and droop below are re-solved from this centre automatically.
 
 TIP_R_T24 = 26.0  # mounted removables, module 2: tip r = (T + 2) * 2 / 2

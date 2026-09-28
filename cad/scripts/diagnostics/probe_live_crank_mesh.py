@@ -49,10 +49,9 @@ def _spin_off_u(rows: list[float]) -> float:
     ))
 
 
-# The assembly's placements: the 64T at its shifted journal-seat station, the
-# 16T on the MHA-149 fit-up axis (test_crank_mesh_probe_placements pins both).
-GEAR64_CENTRE_STATION = dta.GEAR64_STATION + dta.GEAR_AXIS_SHIFT
-X16, Y16 = dta.X_CRANK_FIT, dta.Y_CRANK_FIT
+# The assembly's physical gear centre and restored fixed crank axis.
+GEAR64_CENTRE_STATION = dta.GEAR64_CENTRE_STATION
+X16, Y16 = dta.X_CRANK, dta.Y_CRANK
 
 
 async def build(adapter) -> dict[str, str]:

@@ -5,9 +5,8 @@ seat and chord and the base-fixed swing hardware stations.
 ``build_cone_swing_platform`` authors the part from these numbers; the harmonic
 base (pivot, lock and stop seats) and the drive train (placement and clearance
 checks) read them here instead of importing the part builder, so a sketch or
-drawing change in the builder does not re-key them.  The crank axis the plate
-carries lives in ``cone_swing_platform_crank_axis``: it reads the crank mesh
-stack, which the harmonic base must not.
+drawing change in the builder does not re-key them. The fixed crank reference
+axis the plate carries lives in ``cone_swing_platform_crank_axis``.
 """
 
 from __future__ import annotations
