@@ -165,7 +165,10 @@ def test_note_lines_fit_a_half_sheet_field() -> None:
 
 def test_sheet_numbers_are_pinned_where_the_sheets_cite_them() -> None:
     names = drawing.SHEET_NAMES
-    assert len(names) == 9
+    assert len(names) == 10
+    assert names[drawing.FULL_DETAIL_SHEET - 1] == "FULL-DETAIL SIDE VIEW"
+    assert drawing.FULL_DETAIL_SHEET == len(names), "appended: no cited number moves"
+    assert f"FULL DETAIL: SHEET {drawing.FULL_DETAIL_SHEET}." in drawing.ASSEMBLED_HEADING
     assert names[drawing.SEQUENCE_SHEET - 1] == "ASSEMBLY SEQUENCE"
     assert names[drawing.BANK_SHEET - 1] == "ASSEMBLY SEQUENCE CONT. - CYLINDER BANK"
     assert names[drawing.CHECKS_SHEET - 1] == "CHECKS + SETUP"
@@ -688,12 +691,67 @@ def test_a_preferred_scale_off_the_ladder_is_refused() -> None:
         drawing.cluster_ring_scale(CONE_CRANK_OUTLINE_1_3, (3.0, 7.0), label="odd")
 
 
-def test_the_sheet_scales_follow_the_chosen_cluster_scales() -> None:
+def test_the_sheet_scales_follow_the_chosen_cluster_and_full_detail_scales() -> None:
     chosen = {**drawing.CLUSTER_SCALES, "cone-crank": (1.0, 4.0)}
-    scales = drawing.package_sheet_scales(chosen)
+    scales = drawing.package_sheet_scales(chosen, (2.0, 3.0))
     assert set(scales) == set(drawing.SHEET_NAMES)
     assert scales[drawing.SHEET_NAMES[drawing.CLUSTER_SHEETS["cone-crank"] - 1]] == (1.0, 4.0)
+    assert scales[drawing.SHEET_NAMES[drawing.FULL_DETAIL_SHEET - 1]] == (2.0, 3.0)
     assert drawing.package_sheet_scales(drawing.CLUSTER_SCALES) == drawing.SHEET_SCALES
+
+
+def _outline_mm(width: float, height: float) -> tuple[float, float, float, float]:
+    """An outline of the given size (mm) somewhere off the sheet."""
+    return (0.5, 0.5, 0.5 + width / 1000.0, 0.5 + height / 1000.0)
+
+
+def test_the_full_detail_ladder_never_drops_under_the_simplified_threshold() -> None:
+    ratios = [n / d for n, d in drawing.FULL_DETAIL_SCALE_LADDER]
+    assert ratios == sorted(ratios, reverse=True)
+    assert min(ratios) >= 0.5
+    region = drawing.FULL_DETAIL_REGION
+    template = drawing.DRAWING_TEMPLATES[drawing.SPEC.layout]
+    assert region[1] > template.title_block_top_m, "the field clears the title block"
+    assert region[3] <= drawing.NOTE_FIELD_LEFT[1], "the field clears the heading"
+
+
+@pytest.mark.parametrize(
+    ("size_at_1_1", "expected"),
+    [
+        # Measured on the v37 sheet-1 render: the side view is ~365 x 125 mm
+        # at 1:1, which the 397 x ~175 mm field takes whole.
+        ((365.0, 125.0), (1.0, 1.0)),
+        ((500.0, 125.0), (2.0, 3.0)),  # 333 mm wide at 2:3
+        ((365.0, 250.0), (2.0, 3.0)),  # 167 mm tall at 2:3 still fits
+        ((365.0, 300.0), (1.0, 2.0)),  # 200 mm tall at 2:3; 150 at 1:2
+        ((700.0, 300.0), (1.0, 2.0)),  # 467 mm wide at 2:3
+    ],
+)
+def test_the_full_detail_view_takes_the_largest_scale_that_fits(size_at_1_1, expected) -> None:
+    region = drawing.FULL_DETAIL_REGION
+    room = ((region[2] - region[0]) * 1000.0, (region[3] - region[1]) * 1000.0)
+    assert drawing.full_detail_scale(_outline_mm(*size_at_1_1), (1.0, 1.0)) == expected
+    k = expected[0] / expected[1]
+    assert size_at_1_1[0] * k <= room[0] and size_at_1_1[1] * k <= room[1]
+
+
+def test_the_full_detail_fit_reads_the_outline_at_its_placed_scale() -> None:
+    # 150 mm tall measured at 1:2 is 300 mm at 1:1 (200 at 2:3): the same model.
+    assert drawing.full_detail_scale(_outline_mm(182.5, 150.0), (1.0, 2.0)) == (1.0, 2.0)
+    assert drawing.full_detail_scale(_outline_mm(182.5, 62.5), (1.0, 2.0)) == (1.0, 1.0)
+
+
+def test_a_drive_train_too_big_for_one_to_two_is_refused_not_shrunk() -> None:
+    with pytest.raises(ValueError, match=r"1:2: width"):
+        drawing.full_detail_scale(_outline_mm(900.0, 100.0), (1.0, 1.0))
+
+
+def test_the_centre_shift_centres_the_outline_in_the_region() -> None:
+    region = (0.0, 0.0, 0.4, 0.2)
+    outline = (0.5, 0.5, 0.6, 0.55)
+    dx, dy = drawing.centre_shift(outline, region)
+    moved = (outline[0] + dx, outline[1] + dy, outline[2] + dx, outline[3] + dy)
+    assert moved == pytest.approx((0.15, 0.075, 0.25, 0.125))
 
 
 class _Adapter:

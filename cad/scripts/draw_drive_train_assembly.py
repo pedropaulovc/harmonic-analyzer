@@ -1,4 +1,4 @@
-r"""Create the native nine-sheet drive-train assembly drawing package (MHA-A03).
+r"""Create the native ten-sheet drive-train assembly drawing package (MHA-A03).
 
 The released ``drive-train.SLDASM`` stays authoritative and byte-for-byte
 unchanged. This recipe consumes the builder-owned ``DRIVE_TRAIN_EXPLODED``
@@ -35,10 +35,13 @@ from channel_assembly_steps import NORTH_BRACKET_SET_KEY
 from _common import _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    ViewRole,
     _balloon_item_number,
     _leader_segments_of,
     _spread_balloons,
     add_component_bom_balloons,
+    apply_view_configuration,
+    assert_full_detail_view,
     check_drawing_layout,
     collect_layout_elements,
     create_blank_drawing_sheets,
@@ -103,6 +106,7 @@ SHEET_NAMES = (
     "ASSEMBLY SEQUENCE CONT. - CYLINDER BANK",
     "ASSEMBLY SEQUENCE CONT. + FIT",
     "CHECKS + SETUP",
+    "FULL-DETAIL SIDE VIEW",
 )
 SHEET_LAYOUTS = {name: DrawingLayout.LANDSCAPE for name in SHEET_NAMES}
 if SPEC.layout is not DrawingLayout.LANDSCAPE:
@@ -124,6 +128,12 @@ SEQUENCE_SHEET = 6
 BANK_SHEET = 7
 FIT_SHEET = 8
 CHECKS_SHEET = 9
+# The 1:3 line views on sheet 1 print the teeth/thread-free "Default
+# Simplified" configuration (the assembly view policy in _drawing_common); the
+# user asked for the ENTIRE drive train at 1:2 or larger with every modeled
+# tooth and thread, so the package closes on it (appended: no cited sheet
+# number moves).
+FULL_DETAIL_SHEET = 10
 
 ASSEMBLED_SCALE = (1.0, 3.0)
 ASSEMBLED_ISO_SCALE = (1.0, 3.0)
@@ -150,20 +160,34 @@ CLUSTER_SCALE_LADDER: tuple[tuple[float, float], ...] = (
     (1.0, 4.0),
     (1.0, 5.0),
 )
+# The full-detail view's scales, largest first: it lands at the first one whose
+# outline fits FULL_DETAIL_REGION (full_detail_scale); the layout audit is the
+# proof. Below 1:2 the view would fall under the simplified-view threshold.
+FULL_DETAIL_SCALE_LADDER: tuple[tuple[float, float], ...] = (
+    (1.0, 1.0),
+    (2.0, 3.0),
+    (1.0, 2.0),
+)
+# Side-on, the long axis of the train runs across the landscape field and
+# every gear mesh (cylinder bank, cone set, crank, pinion rig) is in profile.
+FULL_DETAIL_ORIENTATION = "*Right"
 
 
 def package_sheet_scales(
     cluster_scales: dict[Cluster, tuple[float, float]],
+    full_detail_scale: tuple[float, float] = FULL_DETAIL_SCALE_LADDER[0],
 ) -> dict[str, tuple[float, float]]:
-    """Every sheet's scale, each cluster sheet at its cluster view's scale.
+    """Every sheet's scale: each cluster sheet at its cluster view's scale and
+    the full-detail sheet at the scale its view fitted.
 
-    Sheets without a cluster or the assembled views carry only the 1:8
-    reference isometric.
+    The other sheets carry only the 1:8 reference isometric, except sheet 1's
+    assembled views.
     """
     return {
         **{name: REFERENCE_ISO_SCALE for name in SHEET_NAMES},
         SHEET_NAMES[0]: ASSEMBLED_SCALE,
         **{SHEET_NAMES[number - 1]: cluster_scales[c] for c, number in CLUSTER_SHEETS.items()},
+        SHEET_NAMES[FULL_DETAIL_SHEET - 1]: full_detail_scale,
     }
 
 
@@ -269,6 +293,23 @@ REFERENCE_ISO_CENTER = (0.380, 0.110)
 # beside the station table (Main, B1 re-ruling 2026-09-26).
 ISO_RIGHT_FIELD = (NOTE_FIELD_RIGHT[0], NOTE_FIELD_RIGHT[1], NOTE_FIELD_RIGHT[2], 0.140)
 REFERENCE_ISO_CAPTION_XY = (0.330, 0.082)
+
+# --- sheet 10: the whole drive train, full detail ----------------------------
+# The view (outline only) must fit between the one-line heading and the title
+# block row: NOTE_FIELD's top under the heading, and the title block's top
+# (0.0655) plus the BOM's paper clearance plus the caption under the view
+# (VIEW_CAPTION_GAP + one 3.5 mm line). The field spans the full sheet width, so
+# the view clears the title block by height, not by sliding left.
+FULL_DETAIL_CAPTION_ALLOWANCE = 0.008
+FULL_DETAIL_REGION = (
+    NOTE_FIELD_LEFT[0],
+    DRAWING_TEMPLATES[SPEC.layout].title_block_top_m
+    + BOM_SHEET_CLEARANCE
+    + FULL_DETAIL_CAPTION_ALLOWANCE,
+    NOTE_FIELD_RIGHT[2],
+    NOTE_FIELD_LEFT[1],
+)
+FULL_DETAIL_CAPTION = "GEAR TEETH AND SCREW THREADS AS MODELED"
 
 # --- BOM identities: released part numbers and descriptions ------------------
 # The model owns the part number (each component's "Number" property, read and
@@ -390,7 +431,10 @@ BOM_NORMALIZED_ALIASES = {
 # every quoted fit/process is the wording already printed on that part's sheet.
 # "[PENDING ...]" marks a joint whose hardware or ruling has not landed; the
 # package is not released while any remains.
-ASSEMBLED_HEADING = f"SAVED WORKING POSE AND FREE MOTIONS: SEE SHEET {CHECKS_SHEET} FOR SETUP."
+ASSEMBLED_HEADING = (
+    f"SAVED WORKING POSE AND FREE MOTIONS: SEE SHEET {CHECKS_SHEET} FOR SETUP.\n"
+    f"LINE VIEWS OMIT GEAR TEETH AND SCREW THREADS; FULL DETAIL: SHEET {FULL_DETAIL_SHEET}."
+)
 
 PINION_FEELER_STACK = CRANK_SPOT_FACE_RETREAT + PINION_SEAT_FEELER
 CONE_CRANK_STEPS = "\n".join(
@@ -926,6 +970,50 @@ def cluster_ring_scale(
     raise ValueError(
         f"{label}: no ladder scale fits the balloon ring in the cluster region "
         f"({' | '.join(findings)})"
+    )
+
+
+def full_detail_scale(
+    outline: tuple[float, float, float, float],
+    placed: tuple[float, float],
+    *,
+    region: tuple[float, float, float, float] = FULL_DETAIL_REGION,
+) -> tuple[float, float]:
+    """The largest FULL_DETAIL_SCALE_LADDER scale whose view fits ``region``.
+
+    ``outline`` is the view's outline at ``placed``; only its size matters
+    (the build then centres the view in the region). Raises naming every
+    scale's overflow when even 1:2 does not fit: shrinking further would put
+    the view under the simplified-view threshold, so that is a layout ruling,
+    not a fallback.
+    """
+    width, height = outline[2] - outline[0], outline[3] - outline[1]
+    room_w, room_h = region[2] - region[0], region[3] - region[1]
+    findings = []
+    for scale in FULL_DETAIL_SCALE_LADDER:
+        k = (scale[0] / scale[1]) / (placed[0] / placed[1])
+        overflows = [
+            f"{axis} {size * k * 1000:.1f} mm > {room * 1000:.1f} mm"
+            for axis, size, room in (("width", width, room_w), ("height", height, room_h))
+            if size * k > room
+        ]
+        if not overflows:
+            return scale
+        findings.append(f"{_scale_text(scale)}: {'; '.join(overflows)}")
+    raise ValueError(
+        "no full-detail scale fits the drive train in its sheet field "
+        f"({' | '.join(findings)})"
+    )
+
+
+def centre_shift(
+    outline: tuple[float, float, float, float],
+    region: tuple[float, float, float, float],
+) -> tuple[float, float]:
+    """The sheet-space shift that centres ``outline`` in ``region``."""
+    return (
+        (region[0] + region[2]) / 2.0 - (outline[0] + outline[2]) / 2.0,
+        (region[1] + region[3]) / 2.0 - (outline[1] + outline[3]) / 2.0,
     )
 
 
@@ -1711,8 +1799,13 @@ def _verify_balloon_attachments(
 
 def _set_exploded_state(adapter: Any, view: Any, show: bool, *, label: str) -> None:
     bound = _early_bound(view, "IView")
+    # The explode steps belong to Default (the view policy's full-detail
+    # configuration): the state is set before apply_view_configuration.
     if str(bound.ReferencedConfiguration) != SOURCE_CONFIGURATION:
-        raise RuntimeError(f"{label}: view must reference {SOURCE_CONFIGURATION!r}")
+        raise RuntimeError(
+            f"{label}: set the exploded state before apply_view_configuration; "
+            f"the view must reference {SOURCE_CONFIGURATION!r}"
+        )
     returned = bool(bound.ShowExploded(show))
     actual = bool(bound.IsExploded())
     if actual != show:
@@ -2113,6 +2206,7 @@ def _reference_iso(
     view = place_view(adapter, str(SOURCE), "*Isometric", *center, scale=REFERENCE_ISO_SCALE)
     _set_exploded_state(adapter, view, False, label=label)
     set_high_quality_shaded_with_edges(adapter, view, label=label)
+    apply_view_configuration(adapter, view, label=label)
     _caption_under(adapter, view, caption, label=f"{label} caption")
     return view
 
@@ -2130,6 +2224,10 @@ def _place_assembled_sheet(adapter: Any) -> list[str]:
     for view in (front, top, right):
         set_hidden_lines_removed(adapter, view)
     set_high_quality_shaded_with_edges(adapter, iso, label="drive-train assembled isometric")
+    # 1:3 line views print the teeth/thread-free configuration (the NEW last
+    # sheet carries the full-detail line view); the isometric stays Default.
+    for label, view in (("front", front), ("top", top), ("right", right), ("isometric", iso)):
+        apply_view_configuration(adapter, view, label=f"assembled {label}")
 
     # ASME alignment on the model origin: top shares front's x, right shares y.
     origin = (0.0, 0.0, 0.0)
@@ -2188,6 +2286,7 @@ def _place_bom_sheet(adapter: Any, facts: SourceFacts) -> tuple[str, dict[str, s
     )
     _set_exploded_state(adapter, view, False, label="BOM reference isometric")
     set_high_quality_shaded_with_edges(adapter, view, label="BOM reference isometric")
+    apply_view_configuration(adapter, view, role=ViewRole.BOM, label="BOM reference isometric")
     table = insert_bom_table(
         adapter,
         view,
@@ -2231,6 +2330,7 @@ def _place_cluster_sheet(
     _isolate_instances(adapter, view, names, label=label)
     set_high_quality_shaded_with_edges(adapter, view, label=label)
     _link_view_to_bom(view, bom_name, label=label)
+    apply_view_configuration(adapter, view, role=ViewRole.EXPLODED, label=label)
     preferred_outline = _view_outline(view)
     scale = cluster_ring_scale(preferred_outline, preferred, label=label)
     outline = preferred_outline
@@ -2399,6 +2499,50 @@ def _place_checks_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
     return findings
 
 
+def _place_full_detail_sheet(adapter: Any) -> tuple[float, float]:
+    """The whole drive train, side-on, every modeled tooth and thread.
+
+    Returns the scale the view fitted at. The view stays in Default (the view
+    policy's FULL_DETAIL role) whatever the ladder picks.
+    """
+    _activate_sheet(adapter, SHEET_NAMES[FULL_DETAIL_SHEET - 1])
+    label = "full-detail side view"
+    placed = FULL_DETAIL_SCALE_LADDER[0]
+    region = FULL_DETAIL_REGION
+    view = place_view(
+        adapter,
+        str(SOURCE),
+        FULL_DETAIL_ORIENTATION,
+        (region[0] + region[2]) / 2.0,
+        (region[1] + region[3]) / 2.0,
+        scale=placed,
+    )
+    _set_exploded_state(adapter, view, False, label=label)
+    set_hidden_lines_removed(adapter, view)
+    configuration = apply_view_configuration(
+        adapter, view, role=ViewRole.FULL_DETAIL, label=label
+    )
+    scale = full_detail_scale(_view_outline(view), placed)
+    if scale != placed:
+        _set_view_scale(adapter, view, scale, label=label)
+    outline = _view_outline(view)
+    _shift_view(adapter, view, centre_shift(outline, region), label=f"{label} centring")
+    _telemetry.event(
+        "drawing.full_detail_view",
+        scale=_scale_text(scale),
+        configuration=configuration,
+        outline_mm=tuple(round(value * 1000.0, 1) for value in _view_outline(view)),
+    )
+    _heading(adapter, FULL_DETAIL_SHEET)
+    _caption_under(
+        adapter,
+        view,
+        f"RIGHT {_scale_text(scale)} - {FULL_DETAIL_CAPTION}",
+        label=f"{label} caption",
+    )
+    return scale
+
+
 def _place_package(adapter: Any, facts: SourceFacts) -> dict[str, tuple[float, float]]:
     """Place every sheet; return each sheet's scale as placed."""
     _create_package_sheets(adapter)
@@ -2414,10 +2558,12 @@ def _place_package(adapter: Any, facts: SourceFacts) -> dict[str, tuple[float, f
     findings += _place_bank_sheet(adapter, facts)
     findings += _place_fit_sheet(adapter, facts)
     findings += _place_checks_sheet(adapter, facts)
+    full_detail = _place_full_detail_sheet(adapter)
+    assert_full_detail_view(adapter, label="drive-train package")
     for sheet_name, sheet_balloons in cluster_balloons.items():
         _final_balloon_uncross(adapter, sheet_name, sheet_balloons)
     _check_package_layout(adapter, findings)
-    return package_sheet_scales(cluster_scales)
+    return package_sheet_scales(cluster_scales, full_detail)
 
 
 async def build(adapter: Any) -> dict[str, str]:
