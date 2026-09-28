@@ -2958,21 +2958,47 @@ def test_a_short_leaders_arrowhead_inside_its_ring_is_not_a_second_start():
     assert _own_strikes(dump) == []
 
 
+# GetArrowHeadAtIndex2's 3.556 x 0.762 mm arrowhead: each barb's length.
+ARROWHEAD_BARB_M = math.hypot(0.003556, 0.000381)
+
+
+@pytest.mark.parametrize(
+    ("com_inside_m", "ink_inside_m", "found"),
+    [(0.00047, 0.0, []), (0.0, 0.0005, ["leader-through-own-text"])],
+    ids=["printed-on-ring-com-inside", "printed-inside-com-on-ring"],
+)
+def test_a_leader_as_long_as_its_arrowhead_is_still_its_printed_start(com_inside_m, ink_inside_m, found):
+    """A straight leader printed exactly as long as its barbs (3.58 mm, tip
+    to start) pairs with either barb by length and angle; only the barb
+    pair straddles a third stroke, so the leader stays the printed start
+    and is judged where it prints."""
+    leader_m = ARROWHEAD_BARB_M - ink_inside_m
+    dump = _radial_balloon_17(com_inside_m, (ink_inside_m, 0.0), leader_m=leader_m)
+    leader, *barbs = [math.dist(s[:2], s[2:4]) for s in dump["ink"]["strokes"][-3:]]
+    assert all(abs(leader - barb) < 1e-9 for barb in barbs), "fixture: leader and barbs of one length"
+    assert _own_strikes(_radial_balloon_17(com_inside_m, leader_m=leader_m)) == (
+        ["leader-through-own-text"] if com_inside_m else []
+    ), "fixture: the COM start alone"
+    assert _own_strikes(dump) == found
+
+
 @pytest.mark.parametrize(
     ("leader_m", "ink"),
     [
         (None, ((0.0, 0.0), (0.0, 0.3))),
         (0.003, ((0.0, 0.0), (0.0, 0.3), (0.0, -0.3))),
         (0.006, ((0.0, 0.0), (0.0, 0.2), (0.0, -0.2))),
+        (0.003, ((0.0, 0.0), (0.00015, 0.12), (0.0003, -0.12))),
     ],
-    ids=["dta-leader", "short-leader-wide-twins", "long-leader-long-twins"],
+    ids=["dta-leader", "short-leader-wide-twins", "long-leader-long-twins", "short-leader-uneven-close-pair"],
 )
 def test_competing_printed_starts_for_one_balloon_leader_are_reported_as_ambiguous(leader_m, ink):
     """Several leader strokes from the tip to the ring, beside the
     arrowhead, leave the printed start unsettled: the audit keeps the COM
-    start and says so. Twins of one length either side of the leader are
-    still leaders, not an arrowhead, when 24 degrees off it (3.52 mm on a
-    3 mm leader) or 6.2 mm long (9 degrees off a 6 mm leader)."""
+    start and says so. Strokes either side of the leader are still leaders,
+    not an arrowhead, when 24 degrees off it (3.52 mm twins on a 3 mm
+    leader), 6.2 mm long (twins 9 degrees off a 6 mm leader), or of unequal
+    length (3.23 and 3.38 mm, 10 and 9 degrees off a 3 mm leader)."""
     [finding] = [
         f
         for f in audit_dump(_radial_balloon_17(0.0, *ink, leader_m=leader_m))

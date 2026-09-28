@@ -656,8 +656,10 @@ BALLOON_LEADER_RING_M = 0.0001
 BALLOON_LEADER_TIP_M = 0.0001
 # The arrowhead prints as two more strokes from the tip, which a short
 # leader's ring can hold. They are told apart by shape: two strokes of one
-# length, no longer than an arrowhead, each within 15 deg of a third stroke
-# from the tip (the leader). GetArrowHeadAtIndex2 gives 3.556 x 0.762 mm
+# length, no longer than an arrowhead, one either side of a third stroke from
+# the tip (the leader) and each within 15 deg of it. A leader as long as its
+# barbs pairs with either of them too, but the other then lies on one side of
+# that pair, not between. GetArrowHeadAtIndex2 gives 3.556 x 0.762 mm
 # (half-angle 6.1 deg); the printed pairs measured 3.54-3.62 mm long, the two
 # within 0.03 mm of each other (frame-assembly and drive-train-assembly,
 # runs 20260928T124727673Z, 20260928T150721937Z, 20260928T152556482Z).
@@ -766,13 +768,13 @@ def _move_ring(
 def _arrowhead_barbs(tip: tuple[float, float], ends: Sequence[tuple[float, float]]) -> set[tuple[float, float]]:
     """Of the strokes from ``tip`` (given by their other ``ends``), those
     printing its arrowhead: pairs of one length (``BALLOON_BARB_PAIR_M``), no
-    longer than ``BALLOON_BARB_MAX_M``, with a third stroke from the tip (the
-    leader) within ``BALLOON_BARB_ANGLE_RAD`` of both."""
+    longer than ``BALLOON_BARB_MAX_M``, either side of a third stroke from the
+    tip (the leader) and within ``BALLOON_BARB_ANGLE_RAD`` of it."""
 
-    def angle(end: tuple[float, float], other: tuple[float, float]) -> float:
+    def turn(end: tuple[float, float], other: tuple[float, float]) -> float:
         u = (end[0] - tip[0], end[1] - tip[1])
         v = (other[0] - tip[0], other[1] - tip[1])
-        return abs(math.atan2(u[0] * v[1] - u[1] * v[0], u[0] * v[0] + u[1] * v[1]))
+        return math.atan2(u[0] * v[1] - u[1] * v[0], u[0] * v[0] + u[1] * v[1])
 
     barbs: set[tuple[float, float]] = set()
     for index, a in enumerate(ends):
@@ -781,7 +783,8 @@ def _arrowhead_barbs(tip: tuple[float, float], ends: Sequence[tuple[float, float
             if max(la, lb) > BALLOON_BARB_MAX_M or abs(la - lb) > BALLOON_BARB_PAIR_M:
                 continue
             if any(
-                angle(a, c) <= BALLOON_BARB_ANGLE_RAD and angle(b, c) <= BALLOON_BARB_ANGLE_RAD
+                (0.0 < turn(c, a) <= BALLOON_BARB_ANGLE_RAD and 0.0 < turn(b, c) <= BALLOON_BARB_ANGLE_RAD)
+                or (0.0 < turn(c, b) <= BALLOON_BARB_ANGLE_RAD and 0.0 < turn(a, c) <= BALLOON_BARB_ANGLE_RAD)
                 for c in ends
                 if c not in (a, b)
             ):

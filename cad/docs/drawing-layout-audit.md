@@ -122,9 +122,11 @@ leader's arrowtip and ends on or inside the ring (0.1 mm band; printed
 starts measured 0.00-0.05 mm off it on 68 frame and drive-train balloons).
 The ring is the fitted one, or the COM circle where none fits (a split or
 stacked balloon), so no leader goes unjudged. The arrowhead's strokes are
-not leaders: two of one length (0.1 mm), at most 5 mm, each within 15° of
-a third stroke from the tip (the printed arrowheads measured 3.54-3.62 mm,
-pairs within 0.03 mm), since on a short leader they end inside the ring.
+not leaders: two of one length (0.1 mm), at most 5 mm, one either side of
+a third stroke from the tip and each within 15° of it (the printed
+arrowheads measured 3.54-3.62 mm, pairs within 0.03 mm), since on a short
+leader they end inside the ring. A leader as long as its barbs pairs with
+either by length and angle, but never has the third stroke between them.
 A leader printed from inside its ring therefore reads there. No such
 stroke keeps the COM start; several keep it and report
 `leader-ink-ambiguous`. Lines, leaders and gaps are then measured against
