@@ -1686,6 +1686,19 @@ def instrument_adapter(cls: type) -> int:
     return wrapped
 
 
+_FEATURES_MODULE = "solidworks_mcp.adapters.solidworks.features"
+
+
+def _record_tree_path(lookup: str, path: str) -> None:
+    """Stamp which strategy a feature-tree lookup took on the current span:
+    ``feature_tree.diff`` (``positional`` / ``walk``) on the ``adapter.*`` span
+    whose creation call resolved its feature by tree diff, and
+    ``feature_tree.last_profile`` (``newest_first`` / ``walk``). ``positional``
+    means ``FeatureByPositionReverse`` agreed with the forward walk, so the
+    added features were counted from the end instead of re-walking the tree."""
+    annotate(**{f"feature_tree.{lookup}": path})
+
+
 def _instrument_loaded_adapter() -> None:
     """Instrument the adapter class if this process has imported it.
 
@@ -1696,6 +1709,11 @@ def _instrument_loaded_adapter() -> None:
     if isinstance(cls, type):
         with contextlib.suppress(Exception):
             instrument_adapter(cls)
+    features = sys.modules.get(_FEATURES_MODULE)
+    observe = getattr(features, "set_tree_path_observer", None)
+    if callable(observe):
+        with contextlib.suppress(Exception):
+            observe(_record_tree_path)
 
 
 @contextlib.contextmanager

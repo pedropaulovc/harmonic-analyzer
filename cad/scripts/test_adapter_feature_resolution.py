@@ -15,18 +15,27 @@ checked-in wrapper. Every build leaf runs these calls, so this pins them:
   ambiguous match raises -- unless the call declares it creates several
   (evenly distributed reference points), when the newest is returned.
 
-Two kinds of double. The raw-call tests use ``RawDispatch``, which answers
-``InvokeTypes`` only and asserts the whole header; recording a header needs
-the generated wrapper, so those tests need pywin32 and FAIL without it (a
-skipped gate would be green while checking nothing). The diff tests use plain
-Python doubles, which ``raw_dispatch.invoke`` answers through ``getattr``, so
-they run on any host.
+The raw-call tests use ``RawDispatch``, which answers ``InvokeTypes`` only and
+asserts the whole header. Every header is read as DATA from the checked-in
+wrapper source (``_generated/sldworks_2026.py``: each generated method's
+``InvokeTypes`` call and each ``_prop_map_get_`` entry), so the contract runs on
+any host, pywin32 or not. Two checks need pywin32 itself -- that
+``raw_dispatch`` records exactly those headers from the imported wrapper, and
+the end-to-end edge selection, which binds ``IEntity`` through it -- so they
+run on Windows only, where a missing wrapper FAILS instead of skipping. The diff
+tests use plain Python doubles, which ``raw_dispatch.invoke`` answers through
+``getattr``.
 
 Run: ``uv run python -m pytest cad/scripts/test_adapter_feature_resolution.py -q``
 """
 
 from __future__ import annotations
 
+import ast
+import functools
+import re
+import sys
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -46,6 +55,105 @@ GET_TYPE_NAME2 = (103, 0, 1, (8, 0), ())
 BODY_GET_EDGES = (125, 0, 1, (12, 0), ())
 EDGE_GET_CLOSEST_POINT_ON = (18, 0, 1, (12, 0), ((5, 1), (5, 1), (5, 1)))
 ENTITY_SELECT2 = (65552, 0, 1, (11, 0), ((11, 1), (3, 1)))
+
+PINNED = {
+    ("IModelDoc2", "FirstFeature"): FIRST_FEATURE,
+    ("IModelDoc2", "FeatureByPositionReverse"): FEATURE_BY_POSITION_REVERSE,
+    ("IFeature", "GetNextFeature"): GET_NEXT_FEATURE,
+    ("IFeature", "Name"): FEATURE_NAME,
+    ("IFeature", "GetTypeName2"): GET_TYPE_NAME2,
+    ("IBody2", "GetEdges"): BODY_GET_EDGES,
+    ("IEdge", "GetClosestPointOn"): EDGE_GET_CLOSEST_POINT_ON,
+    ("IEntity", "Select2"): ENTITY_SELECT2,
+}
+
+WRAPPER_SOURCE = Path(sw_type_info.__file__).parent / "_generated" / "sldworks_2026.py"
+
+
+@functools.cache
+def wrapper_headers() -> dict[tuple[str, str], tuple]:
+    """The header the checked-in wrapper sends for every ``PINNED`` member,
+    parsed from its source without importing it (the import needs pywin32).
+
+    A generated method either sends ``self._oleobj_.InvokeTypes(dispid, LCID,
+    flags, ret, args, ...)`` itself or hands ``(dispid, flags, ret, args)`` to
+    ``DispatchBaseClass._ApplyTypes_`` (VARIANT results); a property is read
+    through ``_prop_map_get_[member] = (dispid, flags, ret, args, ...)``, also
+    via ``_ApplyTypes_``, which sends LCID 0. A method shadows a property of the
+    same name, as on the class."""
+    source = WRAPPER_SOURCE.read_text(encoding="utf-8")
+    lcid = ast.literal_eval(re.search(r"^LCID = (.+)$", source, re.M).group(1))
+    apply_types_lcid = 0  # pywin32's _ApplyTypes_ hard-codes it
+
+    def header(nodes, call_lcid):
+        dispid, flags, ret, args = (ast.literal_eval(node) for node in nodes)
+        return (dispid, call_lcid, flags, ret, args)
+
+    headers: dict[tuple[str, str], tuple] = {}
+    for interface in {interface for interface, _ in PINNED}:
+        start = re.search(rf"^class {interface}\(", source, re.M)
+        assert start, f"{interface} is not in the checked-in wrapper"
+        following = re.compile(r"^class ", re.M).search(source, start.end())
+        end = following.start() if following else None
+        (cls,) = ast.parse(source[start.start() : end]).body
+        methods, properties = {}, {}
+        for item in cls.body:
+            if isinstance(item, ast.FunctionDef):
+                for node in ast.walk(item):
+                    if not (
+                        isinstance(node, ast.Call)
+                        and isinstance(node.func, ast.Attribute)
+                    ):
+                        continue
+                    if node.func.attr == "InvokeTypes":
+                        dispid, _lcid, *rest = node.args[:5]
+                        methods[item.name] = header([dispid, *rest], lcid)
+                        break
+                    if node.func.attr == "_ApplyTypes_":
+                        methods[item.name] = header(node.args[:4], apply_types_lcid)
+                        break
+            elif (
+                isinstance(item, ast.Assign)
+                and getattr(item.targets[0], "id", None) == "_prop_map_get_"
+            ):
+                for key, value in zip(item.value.keys, item.value.values):
+                    properties[ast.literal_eval(key)] = header(
+                        value.elts[:4], apply_types_lcid
+                    )
+        for owner, member in PINNED:
+            if owner == interface:
+                found = methods.get(member, properties.get(member))
+                assert found, f"{interface}.{member} is not in the wrapper"
+                headers[(owner, member)] = found
+    return headers
+
+
+@pytest.mark.parametrize(("interface", "member"), sorted(PINNED))
+def test_pinned_header_is_the_checked_in_wrappers(interface, member):
+    assert wrapper_headers()[(interface, member)] == PINNED[(interface, member)]
+
+
+@pytest.fixture
+def raw_headers(monkeypatch):
+    """``raw_dispatch``'s header cache, filled from the wrapper SOURCE, so the
+    raw path runs without importing the wrapper."""
+    for key, header in wrapper_headers().items():
+        monkeypatch.setitem(raw_dispatch._HEADERS, key, header)
+
+
+windows_only = pytest.mark.skipif(
+    sys.platform != "win32",
+    reason="pywin32 (and the imported wrapper) exist only on Windows",
+)
+
+
+@pytest.fixture
+def generated_wrapper():
+    """The imported wrapper. On Windows missing it FAILS: every build leaf runs
+    the raw path through it."""
+    sw_type_info._ensure_loaded()
+    assert sw_type_info.PYWIN32_AVAILABLE, "pywin32 is required on Windows"
+    assert sw_type_info._wrapper_module is not None, "generated wrapper not loaded"
 
 
 def _raise(message):
@@ -72,18 +180,6 @@ class Adapter:
         return feature.Name
 
 
-# --- raw path: needs the generated wrapper (pywin32) -------------------------
-
-
-@pytest.fixture
-def generated_wrapper():
-    """The checked-in wrapper the raw headers are recorded from. Missing it is
-    a failure, not a skip: the raw path is what every build leaf runs."""
-    sw_type_info._ensure_loaded()
-    assert sw_type_info.PYWIN32_AVAILABLE, "pywin32 is required by this gate"
-    assert sw_type_info._wrapper_module is not None, "generated wrapper not loaded"
-
-
 class RawDispatch:
     """A bare ``PyIDispatch`` stand-in: only ``InvokeTypes``, keyed by dispid.
 
@@ -103,25 +199,35 @@ class RawDispatch:
         return answer(*args) if callable(answer) else answer
 
 
+INVOKED = [
+    ("IModelDoc2", "FirstFeature", ()),
+    ("IModelDoc2", "FeatureByPositionReverse", (2,)),
+    ("IFeature", "GetNextFeature", ()),
+    ("IFeature", "Name", ()),
+    ("IFeature", "GetTypeName2", ()),
+    ("IBody2", "GetEdges", ()),
+    ("IEdge", "GetClosestPointOn", (0.001, 0.002, 0.003)),
+]
+
+
+@pytest.mark.usefixtures("raw_headers")
+@pytest.mark.parametrize(("interface", "member", "args"), INVOKED)
+def test_invoke_sends_the_wrappers_header(interface, member, args):
+    header = PINNED[(interface, member)]
+    raw = RawDispatch({header[0]: (header, "answer")})
+
+    assert raw_dispatch.invoke(raw, interface, member, *args) == "answer"
+    assert raw.calls == [(header, args)]
+
+
+@windows_only
 @pytest.mark.usefixtures("generated_wrapper")
-@pytest.mark.parametrize(
-    ("interface", "member", "args", "header"),
-    [
-        ("IModelDoc2", "FirstFeature", (), FIRST_FEATURE),
-        ("IModelDoc2", "FeatureByPositionReverse", (2,), FEATURE_BY_POSITION_REVERSE),
-        ("IFeature", "GetNextFeature", (), GET_NEXT_FEATURE),
-        ("IFeature", "Name", (), FEATURE_NAME),
-        ("IFeature", "GetTypeName2", (), GET_TYPE_NAME2),
-        ("IBody2", "GetEdges", (), BODY_GET_EDGES),
-        (
-            "IEdge",
-            "GetClosestPointOn",
-            (0.001, 0.002, 0.003),
-            EDGE_GET_CLOSEST_POINT_ON,
-        ),
-    ],
-)
-def test_invoke_sends_the_generated_members_call(interface, member, args, header):
+@pytest.mark.parametrize(("interface", "member", "args"), INVOKED)
+def test_recorded_header_is_the_generated_members_call(
+    monkeypatch, interface, member, args
+):
+    monkeypatch.delitem(raw_dispatch._HEADERS, (interface, member), raising=False)
+    header = PINNED[(interface, member)]
     raw = RawDispatch({header[0]: (header, "answer")})
     raw_dispatch.invoke(raw, interface, member, *args)
     generated = RawDispatch({header[0]: (header, None)})
@@ -132,7 +238,7 @@ def test_invoke_sends_the_generated_members_call(interface, member, args, header
     assert raw.calls == generated.calls == [(header, args)]
 
 
-@pytest.mark.usefixtures("generated_wrapper")
+@pytest.mark.usefixtures("raw_headers")
 def test_invoke_returns_object_results_unwrapped():
     first = RawDispatch({})
     model = RawDispatch({FIRST_FEATURE[0]: (FIRST_FEATURE, first)})
@@ -151,6 +257,7 @@ def test_invoke_returns_object_results_unwrapped():
     )
 
 
+@windows_only
 @pytest.mark.usefixtures("generated_wrapper")
 def test_edge_selection_selects_the_nearest_edge_through_ientity():
     def edge(closest):
@@ -179,7 +286,7 @@ def test_edge_selection_selects_the_nearest_edge_through_ientity():
     assert near.calls == [probe, (ENTITY_SELECT2, (True, 0))]
 
 
-@pytest.mark.usefixtures("generated_wrapper")
+@pytest.mark.usefixtures("raw_headers")
 def test_raw_tree_diff_resolves_the_created_feature():
     tree = []
 
@@ -200,6 +307,7 @@ def test_raw_tree_diff_resolves_the_created_feature():
         return feat
 
     def by_position_reverse(position):
+        # Zero-based, as SOLIDWORKS documents it: 0 is the last feature.
         index = len(tree) - 1 - position
         return tree[index] if 0 <= index < len(tree) else None
 
@@ -218,11 +326,18 @@ def test_raw_tree_diff_resolves_the_created_feature():
     assert before.error is None and before.positional
     tree.append(raw_feature("Plane1", "RefPlane"))
     tree.append(raw_feature("Sketch2", "ProfileFeature"))
+    paths = []
+    features.set_tree_path_observer(lambda lookup, path: paths.append((lookup, path)))
+    try:
+        found = features._resolve_feature(
+            adapter, None, before, frozenset({"RefPlane"})
+        )
+    finally:
+        features.set_tree_path_observer(None)
 
-    found = features._resolve_feature(adapter, None, before, frozenset({"RefPlane"}))
-
-    assert found.Name == "Plane1"
-    assert found._oleobj_ is tree[-2]
+    assert getattr(found, "_oleobj_", found) is tree[-2]
+    assert raw_dispatch.invoke(found, "IFeature", "Name") == "Plane1"
+    assert paths == [("diff", "positional")]
 
 
 # --- diff logic: plain doubles, any host ---------------------------------------
@@ -257,9 +372,10 @@ class Feature:
 class Tree:
     """A part's model: its top-level feature tree plus whatever a test adds."""
 
-    def __init__(self, *features, positional=True):
+    def __init__(self, *features, positional=True, first_position=0):
         self.features = [Feature(self, name, type_name) for name, type_name in features]
         self.positional = positional
+        self.first_position = first_position
 
     def append(self, name, type_name):
         self.features.append(Feature(self, name, type_name))
@@ -274,7 +390,7 @@ class Tree:
     def FeatureByPositionReverse(self, position):  # noqa: N802
         if not self.positional:
             raise RuntimeError("FeatureByPositionReverse unavailable")
-        index = len(self.features) - 1 - position
+        index = len(self.features) - 1 - (position - self.first_position)
         return self.features[index] if 0 <= index < len(self.features) else None
 
 
@@ -409,6 +525,32 @@ def test_nothing_added_resolves_to_none(positional):
     assert (
         features._resolve_feature(adapter, None, before, frozenset({"Fillet"})) is None
     )
+
+
+# FeatureByPositionReverse is used only where it agrees with the forward walk.
+
+
+@pytest.mark.parametrize(("first_position", "path"), [(0, "positional"), (1, "walk")])
+def test_the_diff_counts_from_the_end_only_when_positions_match_the_walk(
+    first_position, path
+):
+    # SOLIDWORKS documents position 0 as the last feature. A seat that counted
+    # from 1 would fail the snapshot's two probes, and the diff walks instead
+    # of trusting positions shifted by one.
+    tree = Tree(*PART, first_position=first_position)
+    adapter = Adapter(tree)
+    before = features._tree_snapshot(adapter)
+    tree.append("Fillet1", "Fillet")
+    paths = []
+    features.set_tree_path_observer(lambda lookup, taken: paths.append((lookup, taken)))
+    try:
+        found = features._resolve_feature(adapter, None, before, frozenset({"Fillet"}))
+    finally:
+        features.set_tree_path_observer(None)
+
+    assert before.positional is (first_position == 0)
+    assert found.Name == "Fillet1"
+    assert paths == [("diff", path)]
 
 
 # create_reference_point: "evenly" makes several points, one otherwise.
