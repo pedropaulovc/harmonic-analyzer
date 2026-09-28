@@ -2866,12 +2866,13 @@ def test_a_ring_behind_a_pin_is_ballooned_where_its_listed_edge_is_drawn(monkeyp
 
 
 def test_a_bushing_sharing_its_bores_outline_is_ballooned_on_its_own_listed_edge(monkeypatch):
-    """Drive-train sheet 4, item 10: the tip bushing's rim is the tip block's
-    bore edge, and the hit test returns the block's at every point (none of
-    24 on run 20260928T202401351Z). Where a point of a listed rim hits the
-    block's edge the ink is shared: the balloon attaches to the bushing's
-    own listed edge, its leader ending at that point. With no ink at any
-    point the rim is not drawn, and the sheet fails."""
+    """Drive-train sheet 4, item 10: the tip bushing sits flush in the tip
+    block's bore, and none of its 24 walk and listed-edge points hit any edge
+    on runs 20260928T202401351Z and 20260928T203306681Z. Where a point of a
+    listed rim hits the block's edge the ink is shared: the balloon attaches
+    to the bushing's own listed edge, its leader ending at that point. With
+    no ink at any point it still attaches to its own listed edge, where
+    SolidWorks puts the leader, and never to the block."""
 
     def key(t):
         return tuple(round(v, 9) for v in _ring_point(t, radius=0.003)[:2])
@@ -2894,8 +2895,11 @@ def test_a_bushing_sharing_its_bores_outline_is_ballooned_on_its_own_listed_edge
     balloons, _projected, anchors = run(sheet)
     assert [note.end for note in balloons] == [key(0.3)]
     assert (anchors[0]["method"], anchors[0]["shared"]) == ("shared-edge", "cone-tip-block-1")
-    with pytest.raises(RuntimeError, match="cone-tip-bushing has no verifiably visible edge"):
-        run(_AnchorSheet({}))
+    sheet = _AnchorSheet({})
+    balloons, _projected, anchors = run(sheet)
+    assert [note.end for note in balloons] == [rim.landing]
+    assert anchors[0]["method"] == "listed-edge"
+    assert balloons[0].GetAnnotation().GetAttachedEntities3() == (rim,)
 
 
 

@@ -5890,7 +5890,7 @@ _WALK_DIRECTIONS: tuple[tuple[float, float, float], ...] = tuple(
     for sx, sy, sz in product((1.0, -1.0), repeat=3)
 )
 
-AnchorMethod = Literal["frozen", "walk", "visible-edge", "shared-edge"]
+AnchorMethod = Literal["frozen", "walk", "visible-edge", "shared-edge", "listed-edge"]
 
 
 @dataclass(frozen=True)
@@ -6165,15 +6165,20 @@ def _select_balloon_anchor(
     edges of the same instance the view's hidden-line pass lists as drawn
     (:func:`_visible_edge_points`) and takes the first it claims. When the
     instance claims none but one of those points hits another part's edge,
-    the outline is shared ink (cone-tip-bushing-1 in the tip block's bore on
-    run 20260928T202401351Z-8a4fb22ef07f4bf8b9c1158570903a2b claimed none of
-    24 points): ``shared-edge`` attaches to the listed edge that point lies
-    on, landing there. No point with ink fails the sheet, naming what was
-    tried. Which method ran, and where, is in the ``drawing.balloon_anchor``
-    event (``shared`` names the other part).
+    the outline is shared ink: ``shared-edge`` attaches to the listed edge
+    that point lies on, landing there. When no point finds ink at all, the
+    part shows only where no hit test reaches it (cone-tip-bushing-1 sits
+    flush in the tip block's bore: none of 24 points hit any edge on runs
+    20260928T202401351Z and 20260928T203306681Z): ``listed-edge`` attaches
+    to the listed edge holding the first ranked point and lets SolidWorks
+    place the leader on it, the one landing no read-back can prove. No
+    listed edge fails the sheet, naming what was tried. Which method ran,
+    and where, is in the ``drawing.balloon_anchor`` event (``shared`` names
+    the other part).
 
-    Every method returns the hit-tested sheet point, where the balloon's
-    leader is then made to land (:func:`_create_component_bom_balloon`).
+    Every other method returns the hit-tested sheet point, where the
+    balloon's leader is then made to land
+    (:func:`_create_component_bom_balloon`).
     """
     first = candidates[0]
     instance = first.path
@@ -6220,6 +6225,9 @@ def _select_balloon_anchor(
             elif shared is not None:
                 method, (point, edge), sheet_xy = "shared-edge", edge_points[shared.index], shared.xy
                 scan_attrs["shared"] = shared.owner or "no component"
+            elif edge_points:
+                method, (point, edge) = "listed-edge", edge_points[0]
+                sheet_xy = tried[len(walk_points)]
             else:
                 adapter.currentModel.ClearSelection2(True)
                 points_text = "; ".join(
@@ -6286,12 +6294,14 @@ def _create_component_bom_balloon(
     selection point (``ISelectionMgr.SetSelectionPoint2``), the landing
     :func:`add_surface_finish` measured to 0.01 mm; without it SolidWorks
     ends the leader at its own point on the edge (:class:`_AnchorChoice`).
-    A ``shared-edge`` edge is the model edge the view listed, not a hit
-    test's pick, so it is selected through the view. The leader must then
-    read back there.
+    A ``shared-edge`` or ``listed-edge`` edge is the model edge the view
+    listed, not a hit test's pick, so it is selected through the view. The
+    leader must then read back there; a ``listed-edge`` leader has no
+    proven point to land on, so SolidWorks places it.
     """
     draw = adapter.currentModel
-    if choice.method == "shared-edge":
+    listed = choice.method in ("shared-edge", "listed-edge")
+    if listed:
         draw.ClearSelection2(True)
         if not _early_bound(view, "IView").SelectEntity(choice.edge, False):
             raise RuntimeError(f"{label}: failed to select {stem}'s listed visible edge")
@@ -6299,8 +6309,11 @@ def _create_component_bom_balloon(
         _select_view_entity(
             adapter, view, "EDGE", None, label=f"{label} {stem} anchor", entity=choice.edge
         )
+    proven = choice.method != "listed-edge"
     manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
-    if manager.SetSelectionPoint2(1, -1, choice.sheet_xy[0], choice.sheet_xy[1], 0.0) is not True:
+    if proven and manager.SetSelectionPoint2(
+        1, -1, choice.sheet_xy[0], choice.sheet_xy[1], 0.0
+    ) is not True:
         raise RuntimeError(f"{label}: failed to set {stem}'s balloon landing {choice.sheet_xy}")
     extension = _early_bound(draw.Extension, "IModelDocExtension")
     options = extension.CreateBalloonOptions()
@@ -6324,14 +6337,15 @@ def _create_component_bom_balloon(
             f"{label}: {stem} resolved item {item}, expected {expected_item}"
         )
     _verify_anchor_attachment(adapter, note, instance=choice.instance, stem=stem, label=label)
-    annotation = _early_bound(_early_bound(note, "INote").GetAnnotation(), "IAnnotation")
-    _assert_leader_lands(
-        annotation,
-        choice.sheet_xy,
-        what=f"{stem} balloon",
-        label=label,
-        tolerance=_BALLOON_LANDING_TOLERANCE_M,
-    )
+    if proven:
+        annotation = _early_bound(_early_bound(note, "INote").GetAnnotation(), "IAnnotation")
+        _assert_leader_lands(
+            annotation,
+            choice.sheet_xy,
+            what=f"{stem} balloon",
+            label=label,
+            tolerance=_BALLOON_LANDING_TOLERANCE_M,
+        )
     return note
 
 
