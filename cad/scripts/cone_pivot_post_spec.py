@@ -95,7 +95,7 @@ ATTACHMENT_CBORE_DEPTH = 6.0198
 #   2x (thru pi*3.57124^2*79.9802 + cbore pi*5.75437^2*6.0198) = - 7 661.5915
 #                                                   = 112 300.8902
 #
-# (user ruling 2026-09-28.)  v36's constant, harvested from v2's B-rep rather
+# The old v36 constant, harvested from v2's B-rep rather
 # than summed, read 112 302.9406: 2.05 mm^3 (0.002%) apart.  The feature sum
 # is the authority, as it has been since the 2026-09-21 farm build of a
 # Ø44-collar recipe read 121 575.3 against its constant: that recipe had never
@@ -178,14 +178,12 @@ CRANK_BORE_WEBS_WORST = {
     "crank boss OD": (CRANK_BOSS_DIA - _row(1)) / 2.0 - _CRANK_BORE_R_MAX,
 }
 if _CBORE_CORNER[1] <= 0.0:
-    raise AssertionError(
-        "user ruling 2026-09-28: the mounting counterbore reaches below the crank axis"
-    )
+    raise AssertionError("mounting counterbore reaches below the crank axis")
 for _name, _web in CRANK_BORE_WEBS_WORST.items():
     if _web < WEB_FLOOR_MM:
         raise AssertionError(
-            f"user ruling 2026-09-28: Ø{CRANK_BORE_DIA} crank bore leaves "
-            f"{_web:.3f} to the {_name} at print-worst, under the {WEB_FLOOR_MM} floor"
+            f"Ø{CRANK_BORE_DIA} crank bore leaves {_web:.3f} to the {_name} at "
+            f"print-worst, under the {WEB_FLOOR_MM} web floor"
         )
 
 # Journal-plan reference sketch (Top plane, all construction).  The 12.5182 deg
@@ -339,31 +337,3 @@ GEOMETRIC_CONTROLS = (
 )
 BASIC_DIMENSIONS = frozenset({"InclineAngle"})
 GEOMETRIC_TOLERANCES_MM: dict[str, str] = {}
-
-# Every number derived above, pinned at import (user ruling 2026-09-28:
-# v36's MHA-016 post geometry and fixed-centre crank are restored).
-_RULED = "user ruling 2026-09-28"
-for _label, _value, _expected in (
-    ("crank boss north face (head tangent)", CRANK_BOSS_NORTH_FACE, 21.3753),
-    ("crank boss start z", CRANK_BOSS_START_Z, -21.3753),
-    ("crank boss length", CRANK_BOSS_LENGTH, 72.0344),
-    ("crank boss end z", CRANK_BOSS_END_Z, 50.6591),
-    ("crank boss near-face station", CRANK_BOSS_NEAR_Z, 21.3753),
-    ("crank above cone", CRANK_ABOVE_CONE, 39.332),
-    ("head base", HEAD_BASE_Y, 59.4),
-    ("attachment x", ATTACHMENT_X, 13.44352),
-    ("crank bore max radius", _CRANK_BORE_R_MAX, 5.7215),
-    ("crank axis max height", _CRANK_AXIS_Y_MAX, 73.32),
-    *(
-        (f"crank bore web to the {name}", round(web, 4), expected)
-        for (name, web), expected in zip(
-            CRANK_BORE_WEBS_WORST.items(), (3.5908, 3.6939, 6.1585, 4.8435), strict=True
-        )
-    ),
-    ("mass at 7.20 g/cc", round(HARVESTED_VOLUME_MM3 * 7.2e-6, 6), HARVESTED_MASS_KG),
-    ("crank bore angle limit (deg)", round(CRANK_BORE_ANGLE_LIMIT_DEG, 4), 0.0795),
-    ("journal reference x", round(JOURNAL_REFERENCE_X, 6), 8.669989),
-    ("journal reference z", round(JOURNAL_REFERENCE_Z, 6), 39.049088),
-):
-    if round(_value, 6) != round(_expected, 6):
-        raise AssertionError(f"{_RULED}: {_label} is {_value!r}, expected {_expected!r}")

@@ -570,8 +570,8 @@ sections:
         - 'M6.7: a perpendicular gear''s contact tooth sits r·sin i along-shaft south of its centre, so each centre rides r_j·sin i NORTH of its drum plane. The +55 ± 5 photo blob NO LONGER agrees in x (the smaller cone pulled the big-end inboard to +13.9) — flagged consequence of the 62.2 anchor'
         - low
       - - 64T drive gear
-        - perpendicular on the 3/8" pivot journal at effective shaft station −13.215, centre (x, z) = (−123.552, −65.533), 8 mm face with 1.1 mm axial air to the T120 south face
-        - p.20 (directly beside the 120T); DP 25.7311 is fixed by the recentered v2 crank-axis c2c and the rederived centre is unchanged. The low-confidence face-width proportion narrows symmetrically 10 → 8 mm; an exact SolidWorks full-pitch phase sweep proves both the 16T mesh and fixed-post clearance.
+        - perpendicular on the 3/8" pivot journal at effective shaft station −12.465, centre (x, z) = (−123.389, −64.801), 6.5 mm face; its north face and axial air to T120 are unchanged
+        - p.20 (directly beside the 120T); DP 25.7311 is fixed by the v36 post crank-axis centre distance. The face narrows 8.0 → 6.5 mm from the south, with the MHA-014 thrust collar growing by 1.5 mm to keep the gear's north face fixed. The v36 post's print-worst crank boss clearance is 0.343 mm, above its 0.25 floor; a 6.6-mm face would leave only 0.244 mm. The fixed-centre mesh is required not to bind, with no backlash window.
         - low
       - - Cone gear j (j = 0 big … 19 small)
         - shaft seat station 28.25 + 6.889j; centre x_j = −84.702 − (30.59 − 1.5295j)·cos i, z_j = −31.685 + 7.0565j + (30.59 − 1.5295j)·sin i, y = 90.518; ALL 20 perpendicular to the shaft (true cone, p.18)
@@ -586,8 +586,8 @@ sections:
         - mesh plane alignment
         - high
       - - Crankshaft
-        - 'Along Z on the restored fixed crank axis (x, y) = (−129.336, 129.850). The frame-reference c2c is 39.735, with 0.423 slack for the single-cutter pair. User ruling 2026-09-28 retains positive worst-case tight backlash without a prescribed window. The 136.7-mm shaft spans z −183..−46.3 with the existing integral dome outboard. T12 remains at z −155. The restored boss runs z −142.245..−70.210; the pinion south face is feeler-set 0.15 north of it, at z −70.060 (local 112.939505572). The integral Ø11.388 journal runs directly in the post; the Ø9.0 pinion seat step starts at local 112.6.'
-        - 'cone-pivot-post-v2 is the physical authority for x/y. The ch30 GT crank_sprocket result (−122.84, 144.78) remains independent image evidence, while the primary crank construction photo governs the separate through hub and flush outboard face. The crossed-helical accommodation and 0.25 mm mesh slack remain.'
+        - 'Along Z on the restored fixed crank axis (x, y) = (−129.336, 129.850). The frame-reference c2c is 39.735, with 0.423 slack for the single-cutter pair. User ruling 2026-09-28 requires positive worst-case tight backlash without a prescribed window. The 136.8-mm shaft spans z −183..−46.2 with its integral dome outboard. T12 remains at z −155. The restored boss runs z −142.245..−70.210; the pinion south face is feeler-set 0.25 north of it, at z −69.960 (local 113.039505572). The integral Ø11.388 journal runs directly in the post; the Ø9.0 pinion seat step starts at local 112.7.'
+        - 'cone-pivot-post-v2 is the physical authority for x/y. The ch30 GT crank_sprocket result (−122.84, 144.78) remains independent image evidence, while the primary crank construction photo governs the separate through hub and flush outboard face. The crossed-helical accommodation and historical 0.25 mm transverse-DP centre reference remain; neither is a backlash target.'
         - high (GT + mesh)
       - - Chain run
         - crank T12 sprocket on the restored fixed axis (−129.336, 129.850, z −155 chain plane) up to the transgear knob-shaft T24; ANSI #25 link count and sag are solved by _chain.py from those centres
@@ -2137,11 +2137,13 @@ sections:
          restores that fixed crank axis and the unrelieved v36 post boss.
          The 64T narrows only from its south face; its north face remains
          fixed and the thrust collar grows by the removed width. The 10.4
-         pinion face sits 0.15 off the restored boss at z −70.210, so its
-         south face is z −70.060. Positive worst-case tight backlash, not a
-         backlash window, is the acceptance (`crank_mesh_stack`). Exact-solid
-         phase and row engagement are evaluated at the actual narrowed-gear
-         centre (`diagnostics/crank_mesh_backlash_study.py`). The 136.7-mm
+         pinion face sits 0.25 off the restored boss at z −70.210, so its
+         south face is z −69.960. It leaves 0.533 mm axial air to the T120
+         rim and covers the narrowed 64T tooth row completely (>=85% required).
+         Positive worst-case tight backlash, not a backlash window, is the
+         acceptance (`crank_mesh_stack`). Exact-solid phase and row engagement
+         are evaluated at the actual narrowed-gear centre
+         (`diagnostics/crank_mesh_backlash_study.py`). The 136.8-mm
          crankshaft retains the outboard face z −183 and T12 at z −155.
       10. **Alignment-pinion mechanism removed (2026-06-18) — RESTORED
          2026-07-02** (ch. 25). The removal-era impossibility used the now-

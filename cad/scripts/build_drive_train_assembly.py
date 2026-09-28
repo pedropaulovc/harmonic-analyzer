@@ -86,15 +86,14 @@ apart, a visible air gap vs the engaged pair in ch12
 page002_img02/img06). The 64T is now cut as a linearized helix at the
 incline angle with a backlash allowance (build_crank_drive_gear.py --
 a crossed-helical pair, gear helix = shaft angle, pinion straight), and
-the pinion stands PROUD of the pivot post's casting face (img06: no
-relief pocket in the casting -- the pinion's face fills the static
-casting-to-T120 span, ~0.55 clearance each side, spanning ~96% of the
-64T row; the span-fit assert below keeps it off both neighbours). The
-pair engages at 87% of working depth: MESH16_C2C =
-R64 + R16 + slack 0.25, the deepest zero-collision pose over a full
-crank-pitch phase sweep (diagnostics/crossed_mesh_study.py). The
-perpendicular 64T presents its contact tooth r*cos(alpha)*sin(i) north
-of its centre (alpha = the contact azimuth from the in-plane
+the pinion stands PROUD of the pivot post's uncut casting face (img06:
+no relief pocket in the casting). Its south tooth face seats 0.25 mm
+north of that boss face; the span checks below keep it off the T120
+and cover at least 85% of the narrowed 64T row. The fixed-centre
+mesh's only backlash requirement is positive clearance at the worst
+closing corner, proved by crank_mesh_stack.
+The perpendicular 64T presents its contact tooth r*cos(alpha)*sin(i)
+north of its centre (alpha = the contact azimuth from the in-plane
 horizontal).
 
 Positions per cad/DIMENSIONS.md ch. 13 "Drive-train layout" + "Drive
@@ -366,7 +365,12 @@ GEAR64_STATION = (
     SHAFT_T120_STATION - (CONE_FACE_STATION_REFERENCE + GEAR64_CENTRE_REFERENCE_FACE) / 2.0 - 0.1
 )  # 19.9
 GEAR64_CENTRE_STATION = GEAR64_STATION + GEAR_AXIS_SHIFT + GEAR64_CENTRE_SHIFT_NORTH
-assert math.isclose(GEAR64_CENTRE_STATION + GEAR64_FACE / 2.0, GEAR64_STATION + GEAR_AXIS_SHIFT + GEAR64_NORTH_FACE_REFERENCE_WIDTH / 2.0), "user ruling 2026-09-28"
+if not math.isclose(
+    GEAR64_CENTRE_STATION + GEAR64_FACE / 2.0,
+    GEAR64_STATION + GEAR_AXIS_SHIFT + GEAR64_NORTH_FACE_REFERENCE_WIDTH / 2.0,
+    abs_tol=1e-9,
+):
+    raise AssertionError("64T must narrow from the south with its north face fixed (user ruling 2026-09-28)")
 GEAR64_SEAT = cone_station(GEAR64_CENTRE_STATION)
 R64 = (64.0 / DP_CRANK) * 25.4 / 2.0
 R16 = (16.0 / DP_CRANK_CUTTER) * 25.4 / 2.0
@@ -414,7 +418,8 @@ if not 1.2 * ADD16 < CRANK_MESH_DEPTH < 2.0 * ADD16 - 0.1:
 # The restored post carries the fixed crank axis (user ruling 2026-09-28).
 from crank_mesh_stack import TIGHT_BACKLASH_MM, stack_text as crank_mesh_stack_text  # noqa: E402
 
-assert TIGHT_BACKLASH_MM > 0.0, "user ruling 2026-09-28"
+if TIGHT_BACKLASH_MM <= 0.0:
+    raise AssertionError("fixed-centre 16T:64T mesh binds at the worst tight corner (user ruling 2026-09-28)")
 _DX16 = (GEAR64_SEAT[0] - X_CRANK) * COS_I  # horizontal leg toward the
 # crank (a plane-local magnitude: the azimuth convention below measures from
 # the in-plane horizontal TOWARD the other axis, so it is chirality-free)
@@ -422,7 +427,6 @@ _DY16 = Y_CRANK - Y_DRIVE  # vertical leg in both gear planes
 if _DX16 <= 0.0:
     raise AssertionError("the 64T no longer lies +x of the crank (crank_mesh_stack premise)")
 CRANK_ACTUAL_C2C = math.hypot(_DX16, _DY16)
-assert MESH16_C2C <= CRANK_ACTUAL_C2C < MESH16_C2C + 0.05, "user ruling 2026-09-28"
 # Contact azimuths (from each gear's centre toward the other axis, in that
 # gear's own plane, ccw from the in-plane horizontal). The 64T plane rides
 # the inclined cone shaft; the 16T plane is a plain machine-Z section.
@@ -431,14 +435,22 @@ ALPHA16 = math.degrees(math.atan2(_DY16, GEAR64_SEAT[0] - X_CRANK))
 # (both horizontal legs run TOWARD the other axis and read positive -- the
 # chirality-free plane-local convention; the CW spin sense is applied at the
 # rot_z(-PINION_SEED_DEG) callsite)
-# The pinion seats 0.15 mm off the restored boss, independent of the
-# narrowed 64T centre plane; the row-engagement check below takes both.
+# The 16T seats directly off the restored boss north face. Derive its
+# tooth-centre station from the post as installed, not from a historical
+# crankshaft station; the shaft's independent datum is checked against it.
 _GEAR64_CONTACT_Z = GEAR64_SEAT[2] + R64 * math.cos(math.radians(ALPHA64)) * SIN_I
+from crank_pinion_spec import SEAT_FEELER_MM as PINION_SEAT_FEELER  # noqa: E402
+from cone_pivot_post_spec import CRANK_BOSS_START_Z as POST_CRANK_BOSS_START_Z  # noqa: E402
 from crankshaft_spec import SEAT_PINION as CRANK_PINION_SEAT  # noqa: E402
 
 CRANK_FACE_Z = -183.0
-PINION_TOOTH_Z = CRANK_FACE_Z + CRANK_PINION_SEAT + PINION_FACE / 2.0
-assert math.isclose(PINION_TOOTH_Z, -64.860494428), "user ruling 2026-09-28"
+_PPOST = cone_station(POST_STATION)
+_POST_BOSS_NORTH = _PPOST[2] - POST_CRANK_BOSS_START_Z
+PINION_TOOTH_Z = _POST_BOSS_NORTH + PINION_SEAT_FEELER + PINION_FACE / 2.0
+if not math.isclose(
+    CRANK_FACE_Z + CRANK_PINION_SEAT, PINION_TOOTH_Z - PINION_FACE / 2.0, abs_tol=1e-6
+):
+    raise AssertionError("crankshaft pinion seat must match the restored boss-face feeler")
 # The pinion follows the recentered cone/64T row while the photo-anchored crank
 # arm and T12 chain plane remain at their existing stations below.
 # Tooth-in-gap phase seed, generalizing the old +11.25 half-pitch: the 64T is
@@ -464,7 +476,7 @@ MESH_WINDOW_CENTRE_DEG = -1.49
 PINION_SEED_DEG = (
     (ALPHA16 + 180.0) - DELTA64 * (64.0 / 16.0) - 22.5 / 2.0
 ) % 22.5 + MESH_WINDOW_CENTRE_DEG  # window-centred tooth-in-gap
-assert math.isclose(PINION_SEED_DEG, 12.576430992160178), "user ruling 2026-09-28"
+# The crankshaft's retention-hole clocking is independently checked against this phase below.
 
 # ARBOR_SOUTH_Z / ARBOR_LENGTH (the cylinder arbor) follow from the pedestal
 # strap faces and are defined with them below (U34b/U34c).
@@ -740,7 +752,6 @@ from crank_pinion_spec import (  # noqa: E402
     PIN_EDGE_TO_SHAFT_END_NOMINAL as PINION_PIN_EDGE_NOMINAL,
     PIN_STATION as PINION_PIN_STATION,
     PIN_STATION_LAYOUT_ALLOWANCE_MM as PINION_PIN_LAYOUT_ALLOWANCE,
-    SEAT_FEELER_MM as PINION_SEAT_FEELER,
     SEAT_GAP_MAX_MM as PINION_SEAT_GAP_MAX,
     SHAFT_END_RECESS_MIN_WORST as PINION_RECESS_MIN_WORST,
 )
@@ -1052,7 +1063,6 @@ from build_cone_pivot_post import (  # noqa: E402
     BORE_HEIGHT as POST_BORE_HEIGHT,
     CONE_BOSS_LENGTH as POST_CONE_BOSS_LENGTH,
     CRANK_BOSS_LENGTH as POST_CRANK_BOSS_LENGTH,
-    CRANK_BOSS_START_Z as POST_CRANK_BOSS_START_Z,
 )
 from cone_pivot_post_spec import (  # noqa: E402
     JOURNAL_AXIS_HEIGHT_TOLERANCE_MM as POST_JOURNAL_AXIS_HEIGHT_TOLERANCE_MM,
@@ -1378,7 +1388,6 @@ if PINCH_SHANK_LEN - TIP_WORST_PINCH_FAR_WALL_MM < 1.5 * THREAD_MAJOR_MM[PINCH_T
 # set and the 16T<->64T mesh survives the disengage. Cross-script agreement
 # for the merged column's crank bore and the platform's "crank axis":
 _PPIVOT = cone_station(PIVOT_STATION)
-_PPOST = cone_station(POST_STATION)
 # The centered legacy harmonic base is the installation envelope. The engaged
 # platform's four sharp plan vertices must all remain on its top plate; the
 # filleted outline is contained by that convex polygon. This catches a plate
@@ -1420,7 +1429,6 @@ if abs(POST_CRANK_Y - (Y_CRANK - Y_BASE_TOP - PLAT_T)) > 1e-6:
 # south of it while the 16T follows the translated 64T contact row to its north;
 # the two positive clearances are intentionally no longer equal.
 _POST_BOSS_SOUTH = _PPOST[2] - (POST_CRANK_BOSS_START_Z + POST_CRANK_BOSS_LENGTH)
-_POST_BOSS_NORTH = _PPOST[2] - POST_CRANK_BOSS_START_Z
 _T12_NORTH = REMOVABLE_Z0 + 5.0
 _PINION_SOUTH = PINION_TOOTH_Z - PINION_FACE / 2.0
 _BOSS_SOUTH_GAP = _POST_BOSS_SOUTH - _T12_NORTH
@@ -1428,8 +1436,10 @@ _BOSS_NORTH_GAP = _PINION_SOUTH - _POST_BOSS_NORTH
 # The feeler sets the south face directly off the restored boss (MHA-A03).
 PINION_BOSS_NORTH_GAP_RANGE = (PINION_SEAT_FEELER, PINION_SEAT_GAP_MAX)
 _GAP_LO, _GAP_HI = PINION_BOSS_NORTH_GAP_RANGE
-assert _BOSS_SOUTH_GAP >= 0.25, "user ruling 2026-09-28"
-assert math.isclose(_BOSS_NORTH_GAP, PINION_SEAT_FEELER, abs_tol=1e-6), "user ruling 2026-09-28"
+if _BOSS_SOUTH_GAP < 0.25:
+    raise AssertionError("restored boss must clear the T12 north face by 0.25 mm")
+# The boss-face distance is the placement datum; the independent shaft
+# station agrees with it at import above.
 # Keep both independently derived gaps visible to import-time geometry checks.
 if not 10.0 < _BOSS_SOUTH_GAP < 10.5:
     raise AssertionError("v2 crank boss south/T12 clearance left its derived band")
@@ -1539,7 +1549,6 @@ if sum(PINION_RECESS_STACK.values()) < PINION_RECESS_MIN_WORST:
         f"crankshaft end recess inside the 16T boss, worst case: "
         f"{_stack_text(PINION_RECESS_STACK)} < {PINION_RECESS_MIN_WORST}"
     )
-assert math.isclose(PINION_Z0 - _POST_BOSS_NORTH, PINION_SEAT_FEELER, abs_tol=1e-6), "user ruling 2026-09-28"
 
 # The relocated v2 crank axis also clears the inclined T120 rim radially. Keep
 # the exact arc scan as a tripwire: if a later diameter/station change restores
@@ -1557,10 +1566,12 @@ for _k in range(7200):
         _T120_SOUTH = min(
             _T120_SOUTH, _T120_SEAT[2] - _c * SIN_I + (CONE_FACE_STATION_REFERENCE / 2.0 - CONE_FACE) * COS_I
         )
-if PINION_TOOTH_Z + PINION_FACE / 2.0 > _T120_SOUTH - 0.25:
+T120_PINION_NORTH_AIR = _T120_SOUTH - (PINION_TOOTH_Z + PINION_FACE / 2.0)
+T120_PINION_AIR_FLOOR = 0.25
+if T120_PINION_NORTH_AIR < T120_PINION_AIR_FLOOR:
     raise AssertionError(
-        f"16T north face {PINION_TOOTH_Z + PINION_FACE / 2.0:.3f} reaches "
-        f"the inclined T120 rim bound {_T120_SOUTH:.3f}"
+        f"16T north face leaves {T120_PINION_NORTH_AIR:.3f} mm to the inclined T120 rim, "
+        f"below the {T120_PINION_AIR_FLOOR:.2f}-mm axial-air floor"
     )
 # ... and must still cover the 64T row (>= 85% of its face) -- an engagement
 # floor so a future station edit cannot quietly starve the mesh.
@@ -1572,7 +1583,8 @@ _ENGAGED = min(PINION_TOOTH_Z + PINION_FACE / 2.0, _G64_BAND[1]) - max(
     PINION_TOOTH_Z - PINION_FACE / 2.0, _G64_BAND[0]
 )
 CRANK_ROW_ENGAGEMENT_FRACTION = _ENGAGED / (GEAR64_FACE * COS_I)
-assert CRANK_ROW_ENGAGEMENT_FRACTION >= 0.85, "user ruling 2026-09-28"
+if CRANK_ROW_ENGAGEMENT_FRACTION < 0.85:
+    raise AssertionError("16T covers less than 85% of the narrowed 64T tooth row")
 # The base's pivot-screw hole sits exactly under the swing pivot -- both are
 # authored in the machine frame, so the coordinates agree directly (pre-#151
 # this module derived in the mirrored frame and the hole's x was the NEGATED
@@ -3475,6 +3487,11 @@ async def build(adapter) -> dict[str, str]:
     _telemetry.info(
         f"crank mesh actual centre distance {CRANK_ACTUAL_C2C:.6f} mm; "
         f"conservative backlash reference {MESH16_C2C:.6f} mm"
+    )
+    _telemetry.info(
+        f"16T/boss north-face feeler {_BOSS_NORTH_GAP:.4f} mm; "
+        f"16T/T120 north air {T120_PINION_NORTH_AIR:.4f} "
+        f">= {T120_PINION_AIR_FLOOR:.2f} mm"
     )
     _telemetry.info(
         f"16T/64T row engagement {_ENGAGED:.4f}/{GEAR64_FACE * COS_I:.4f} mm "

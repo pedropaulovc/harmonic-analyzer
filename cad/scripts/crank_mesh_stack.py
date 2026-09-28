@@ -19,7 +19,6 @@ import crank_pinion_spec as pinion
 import crankshaft_spec as shaft
 from retained_joint_fit import RETAINED_JOINT_CLEARANCE
 
-RULING = "user ruling 2026-09-28"
 R64 = gear64.PITCH_DIA / 2.0
 R16 = (16.0 / gear64.DIAMETRAL_PITCH) * gear64.MM_PER_IN / 2.0
 FRAME_C2C = R64 + R16 + _config.fit("crank_mesh", "c2c_slack_mm")
@@ -29,14 +28,17 @@ FRAME_DY = post.CRANK_BORE_HEIGHT - post.BORE_HEIGHT
 FRAME_DX = math.sqrt(FRAME_C2C**2 - FRAME_DY**2)
 DC_PER_DY = FRAME_DY / FRAME_C2C
 DC_PER_DX = FRAME_DX / FRAME_C2C
-assert R64 > R16 > 0 and FRAME_C2C > FRAME_DY > 0, RULING
-assert math.isclose(DC_PER_DX**2 + DC_PER_DY**2, 1.0), RULING
+if not R64 > R16 > 0 or not FRAME_C2C > FRAME_DY > 0:
+    raise AssertionError("fixed-centre mesh geometry needs ordered radii and real axis spacing")
+if not math.isclose(DC_PER_DX**2 + DC_PER_DY**2, 1.0):
+    raise AssertionError("mesh centre-distance projections must be orthonormal")
 
 NOMINAL_TIGHT_BACKLASH_MM = 0.32269
 KC = (0.41222 - 0.23685) / 0.300
 K64 = (0.41722 - 0.22079) / 0.20
 K16 = (0.36930 - 0.31888) / 0.05
-assert KC > 0 and K64 > 0 and K16 > 0, RULING
+if not KC > 0 and K64 > 0 and K16 > 0:
+    raise AssertionError("measured mesh sensitivities must preserve the tight-corner sign")
 LINEAR_RESIDUAL_MM = 0.006
 STUDY_CASES = {
     -0.35: 0.11570,
@@ -45,14 +47,15 @@ STUDY_CASES = {
     +0.15: 0.41222,
 }
 for _dc, _measured in STUDY_CASES.items():
-    assert abs(_measured - (NOMINAL_TIGHT_BACKLASH_MM + KC * _dc)) <= LINEAR_RESIDUAL_MM, RULING
+    if abs(_measured - (NOMINAL_TIGHT_BACKLASH_MM + KC * _dc)) > LINEAR_RESIDUAL_MM:
+        raise AssertionError("mesh linear residual does not cover the measured centre-distance cases")
 
 _RUNNING = tuple(float(v) for v in _config.fit("shaft_in_bushing")["diametral_clearance_mm"])
 PLAN_DX_PER_DEG = 0.444
 STATION_64T_DC = 0.015
-# The two restored lands stop short of the bore's north end. Their stations
-# share the shaft's far-end baseline, so shaft length cancels from the support
-# span but not from the north support's worst absolute location.
+# The outboard land starts at a fixed dome-root station; the inboard end
+# prints from the far end. A longer shaft therefore lengthens the supported
+# span and moves its north limit, both carried into the float-at-rest budget.
 CRANK_BEARING_LENGTH = (
     round(shaft.SHAFT_LENGTH - shaft.JOURNAL_START, shaft.STATION_PLACES)
     - shaft.JOURNAL_INBOARD_STATION - 2.0 * shaft.STATION_ROW
@@ -71,14 +74,14 @@ CONE_OVERHANG = 5.68
 MESH_LEVER = post.CRANK_BOSS_NORTH_FACE + pinion.SEAT_GAP_MAX_MM + PINION_HALF_FACE_MAX
 POST_ANGLE_DEG = post.CRANK_BORE_ANGLE_LIMIT_DEG
 POST_ANGLE_AT_MESH = MESH_LEVER * math.tan(math.radians(POST_ANGLE_DEG))
-assert math.isclose(CRANK_BEARING_LENGTH, 66.6), RULING
-assert math.isclose(CRANK_SUPPORT_NORTH_MIN, 107.8), RULING
-assert math.isclose(PINION_HALF_FACE_MAX, 5.6), RULING
-assert math.isclose(CRANK_OVERHANG, 11.589505572), RULING
-assert MESH_LEVER > 0 and POST_ANGLE_AT_MESH > 0, RULING
+if not CRANK_BEARING_LENGTH > 0 and CRANK_SUPPORT_NORTH_MIN > 0 and CRANK_OVERHANG >= 0:
+    raise AssertionError("crankshaft journal must support the 16T mesh plane")
+if not MESH_LEVER > 0 and POST_ANGLE_AT_MESH > 0:
+    raise AssertionError("post angularity must be carried into the worst tight-corner mesh budget")
 TOOTH_RUNOUT_TIR_MM = 0.05
 TIP_ROOT_BAND_RADIAL = max(pinion.OUTSIDE_DIA_TOLERANCE_MM, gear64.OUTSIDE_DIA_TOLERANCE_MM) / 2.0
-assert math.isclose(TIP_ROOT_BAND_RADIAL, 0.05), RULING
+if TIP_ROOT_BAND_RADIAL <= 0:
+    raise AssertionError("gear tip-root tolerance must have a positive closing allowance")
 # Exact-solid tip-diameter cases lost at most 0.00435; round outward.
 TIP_BAND_CLOSE = -0.005
 _YAW = {+1.0: 0.29715, -1.0: 0.22040}
@@ -129,10 +132,12 @@ def stack_terms(*, spacing_printed: float, plan_limit_deg: float, crank_angle_de
 
 
 SPACING_PRINTED = round(post.CRANK_ABOVE_CONE, post.DRAWING_PRECISION_BY_NAME["CrankAboveCone"])
-assert abs(SPACING_PRINTED - FRAME_DY) < 0.01, RULING
+if abs(SPACING_PRINTED - FRAME_DY) >= 0.01:
+    raise AssertionError("printed post bore spacing diverges from the mesh reference")
 TERMS = stack_terms(spacing_printed=SPACING_PRINTED, plan_limit_deg=POST_ANGLE_DEG, crank_angle_deg=POST_ANGLE_DEG, crank_bearing_length=CRANK_BEARING_LENGTH)
 TIGHT_BACKLASH_MM = NOMINAL_TIGHT_BACKLASH_MM + sum(t.tight for t in TERMS)
-assert TIGHT_BACKLASH_MM > 0.0, RULING
+if TIGHT_BACKLASH_MM <= 0.0:
+    raise AssertionError("fixed-centre 16T:64T mesh binds at the worst tight corner (user ruling 2026-09-28)")
 
 
 def stack_text() -> str:

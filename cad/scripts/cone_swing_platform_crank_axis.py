@@ -29,7 +29,8 @@ _COS_I = math.cos(math.radians(INCLINE_DEG))
 # Restored frame line: pivot.x - X_CRANK east, Y_CRANK - Y_BASE_TOP up.
 CRANK_AXIS_OFF = 41.6536661190548
 CRANK_AXIS_Y = 79.05
-assert CRANK_AXIS_OFF > 0 and CRANK_AXIS_Y > 0, "user ruling 2026-09-28"
+if CRANK_AXIS_OFF <= 0 or CRANK_AXIS_Y <= 0:
+    raise AssertionError("swing platform crank axis must lie east and above the pivot")
 # Construction: a vertical REFERENCE AXIS through the crank axis's plan
 # point (the foot of the pivot's perpendicular onto the axis line), built
 # as the intersection of two principal-plane offsets -- name-selected and
@@ -47,4 +48,3 @@ assert CRANK_AXIS_OFF > 0 and CRANK_AXIS_Y > 0, "user ruling 2026-09-28"
 # verify failure.
 CRANK_PLANE_ANGLE = INCLINE_DEG  # sign candidate (flip side)
 CRANK_SEAT_ANCHOR = (-CRANK_AXIS_OFF * _COS_I, -CRANK_AXIS_OFF * _SIN_I)
-assert math.isclose(math.hypot(*CRANK_SEAT_ANCHOR), CRANK_AXIS_OFF), "user ruling 2026-09-28"

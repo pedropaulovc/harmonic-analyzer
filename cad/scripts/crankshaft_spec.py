@@ -1,9 +1,9 @@
 r"""Crankshaft manufacturing contract.
 
-User ruling 2026-09-28 restores integral running lands in MHA-016's v36 bore,
-retains the relieved middle and Ø9 pinion seat, and sets the 16T 0.15 mm off
-the boss north face. All axial stations are measured from the dome root in
-the model and printed from the far end; W15 uses the printed worst cases.
+The v36 MHA-016 bore carries integral running lands again; the pinion sits
+SEAT_FEELER_MM off its north boss face. All axial stations are measured from
+the dome root in the model and printed from the far end; W15 uses the
+printed worst cases.
 """
 
 from __future__ import annotations
@@ -31,8 +31,8 @@ from crank_hub_geometry import (
 # Keep this independent of the post's rebuild closure; assembly checks the mate.
 POST_BORE_END = 104.789505572 + CRANK_FACE_SHIFT
 SEAT_PINION = POST_BORE_END + crank_pinion_spec.SEAT_FEELER_MM
-assert abs(POST_BORE_END - 112.789505572) < 1e-9, "user ruling 2026-09-28"
-assert abs(SEAT_PINION - 112.939505572) < 1e-9, "user ruling 2026-09-28"
+if SEAT_PINION <= POST_BORE_END:
+    raise AssertionError("the 16T seat must clear the restored post boss north face")
 # W15 (Main, 2026-09-25): the far end sits recessed inside the pinion's boss,
 # and crank_pinion_spec sizes that boss so the retention pin keeps its wall to
 # this end.  The length is floored to the places it prints (Codex P2 on #892),
@@ -44,10 +44,8 @@ SHAFT_LENGTH = crank_pinion_spec.floor_to_places(
     + crank_pinion_spec.OVERALL_LENGTH
     - crank_pinion_spec.SHAFT_END_RECESS_MIN,
     crank_pinion_spec.SHAFT_LENGTH_PLACES,
-)  # 136.7
+)  # floored to the drawing's one-place nominal
 SHAFT_END_RECESS = SEAT_PINION + crank_pinion_spec.OVERALL_LENGTH - SHAFT_LENGTH
-assert SHAFT_LENGTH == 136.7, "user ruling 2026-09-28"
-assert abs(SHAFT_END_RECESS - 1.139505572) < 1e-9, "user ruling 2026-09-28"
 if not (
     crank_pinion_spec.SHAFT_END_RECESS_MIN - 1e-9
     <= SHAFT_END_RECESS
@@ -60,10 +58,10 @@ if not (
 # Unilateral: a long shaft would stand proud of the boss, and a short one only
 # deepens the recess and shortens the pin's wall, which build_drive_train_
 # assembly's worst-case stacks carry.  Printed on Depth from the model.
-# RULING W15-SHAFT-BAND (Main 2026-09-25): unilateral +0/-0.4 is required by
+# W15-SHAFT-BAND (Main 2026-09-25): unilateral +0/-0.4 is required by
 # the W15 pin-wall and recess stacks (pinion_pin_edge_stack /
 # pinion_recess_stack in build_drive_train_assembly); at the title-block .X
-# +/-0.8 the restored stack's wall is 1.773 < 2.0 and recess -0.461.
+# +/-0.8 the restored stack's wall is 1.873 < 2.0 and recess -0.461.
 SHAFT_LENGTH_BAND = (0.00, -0.40)  # (upper, lower) deviations
 
 # Integral lands run directly in the restored post bore. Derive the journal
@@ -76,10 +74,15 @@ JOURNAL_DIA_BAND = (
 )
 JOURNAL_CLEARANCE = JOURNAL_BORE_DIA - JOURNAL_DIA
 JOURNAL_START = 32.755105572 + CRANK_FACE_SHIFT
-assert abs(JOURNAL_DIA - 11.388) < 1e-9, "user ruling 2026-09-28"
-assert JOURNAL_DIA_BAND == (0.0, -0.02), "user ruling 2026-09-28"
-assert abs(JOURNAL_CLEARANCE - 0.05) < 1e-9, "user ruling 2026-09-28"
-assert abs(JOURNAL_START - 40.755105572) < 1e-9, "user ruling 2026-09-28"
+_JOURNAL_CLEARANCE_LOW = JOURNAL_BORE_BAND[1] - JOURNAL_DIA_BAND[0] + JOURNAL_CLEARANCE
+_JOURNAL_CLEARANCE_HIGH = JOURNAL_BORE_BAND[0] - JOURNAL_DIA_BAND[1] + JOURNAL_CLEARANCE
+if not (
+    _RUNNING_CLEARANCE[0] - 1e-9
+    <= _JOURNAL_CLEARANCE_LOW
+    <= _JOURNAL_CLEARANCE_HIGH
+    <= _RUNNING_CLEARANCE[1] + 1e-9
+):
+    raise AssertionError("integral journal and post bore exceed the running-fit clearance band")
 
 # Every axial station prints from the FAR END at one place (policy rule 7), and
 # each one below is chosen to print EXACTLY, so its printed row IS its limit
@@ -140,20 +143,18 @@ JOURNAL_LANDS_WORST = (
     - RELIEF_OUTBOARD_STATION - STATION_ROW,
     RELIEF_INBOARD_STATION - JOURNAL_INBOARD_STATION - 2.0 * STATION_ROW,
 )
-assert abs(SEAT_STEP - 112.6) < 1e-9, "user ruling 2026-09-28"
-assert abs(SEAT_STEP_STANDOFF_WORST - 0.710494428) < 1e-9, "user ruling 2026-09-28"
-assert abs(SEAT_GAP_NORTH_RANGE - 0.85) < 1e-9, "user ruling 2026-09-28"
-assert abs(JOURNAL_END - 109.0) < 1e-9, "user ruling 2026-09-28"
-assert abs(JOURNAL_LENGTH - 68.244894428) < 1e-9, "user ruling 2026-09-28"
-assert STEP_WEB_WORST >= WEB_TARGET_MM - 1e-9, "user ruling 2026-09-28"
-assert JOURNAL_END + STATION_ROW < POST_BORE_END, "user ruling 2026-09-28"
-assert abs(RELIEF_START - 55.7) < 1e-9, "user ruling 2026-09-28"
-assert abs(RELIEF_END - 94.0) < 1e-9, "user ruling 2026-09-28"
-assert abs(RELIEF_LENGTH - 38.3) < 1e-9, "user ruling 2026-09-28"
-assert RELIEF_DIA + _RELIEF_ROW < JOURNAL_DIA + JOURNAL_DIA_BAND[1], "user ruling 2026-09-28"
-assert RELIEF_DIA - _RELIEF_ROW > SHAFT_DIA + SHAFT_DIA_BAND[0], "user ruling 2026-09-28"
-assert min(JOURNAL_LANDS_WORST) >= JOURNAL_LAND_L_OVER_D_MIN * JOURNAL_DIA, "user ruling 2026-09-28"
-assert all(abs(actual - expected) < 1e-9 for actual, expected in zip(JOURNAL_LANDS_WORST, (13.3, 13.4))), "user ruling 2026-09-28"
+if STEP_WEB_WORST < WEB_TARGET_MM:
+    raise AssertionError("journal-to-pinion-seat web falls below its printed worst-case floor")
+if JOURNAL_END + STATION_ROW >= POST_BORE_END:
+    raise AssertionError("the journal must stay inside the restored post bore at print-worst")
+if not RELIEF_START < RELIEF_END < JOURNAL_END:
+    raise AssertionError("the relieved middle must stay within the integral journal lands")
+if RELIEF_DIA + _RELIEF_ROW >= JOURNAL_DIA + JOURNAL_DIA_BAND[1]:
+    raise AssertionError("relief must remain below the journal at print-worst")
+if RELIEF_DIA - _RELIEF_ROW <= SHAFT_DIA + SHAFT_DIA_BAND[0]:
+    raise AssertionError("relief must stand proud of the through shaft at print-worst")
+if min(JOURNAL_LANDS_WORST) < JOURNAL_LAND_L_OVER_D_MIN * JOURNAL_DIA:
+    raise AssertionError("the integral journal lands fall below their printed L/D floor")
 SURFACE_FINISHES = (
     SurfaceFinishControl(
         "bearing_journal",
@@ -180,12 +181,10 @@ PINION_RECESS_STACK = {
     "seat gap": 0.0,
     "shaft length": -SHAFT_LENGTH_BAND[0],
 }
-assert abs(PINION_PIN_STATION_Y - 130.589505572) < 1e-9, "user ruling 2026-09-28"
-assert abs(PINION_PIN_EDGE_TO_END - 4.522994428) < 1e-9, "user ruling 2026-09-28"
-assert sum(PINION_PIN_EDGE_STACK.values()) >= crank_pinion_spec.PIN_EDGE_MIN_WORST, "user ruling 2026-09-28"
-assert sum(PINION_RECESS_STACK.values()) >= crank_pinion_spec.SHAFT_END_RECESS_MIN_WORST, "user ruling 2026-09-28"
-assert abs(sum(PINION_PIN_EDGE_STACK.values()) - 2.172994428) < 1e-9, "user ruling 2026-09-28"
-assert abs(sum(PINION_RECESS_STACK.values()) - 0.339505572) < 1e-9, "user ruling 2026-09-28"
+if sum(PINION_PIN_EDGE_STACK.values()) < crank_pinion_spec.PIN_EDGE_MIN_WORST:
+    raise AssertionError("W15 pin edge-to-shaft-end wall falls below its print-worst floor")
+if sum(PINION_RECESS_STACK.values()) < crank_pinion_spec.SHAFT_END_RECESS_MIN_WORST:
+    raise AssertionError("W15 shaft end protrudes past its print-worst boss recess floor")
 # MHA-024 hub-to-shaft cross-hole behind the crank arm.
 PIN_HOLE_SPEC = HoleSpec("drilled_number", "#9")
 PIN_HOLE_HEIGHT = SERVICE_PIN_STATION

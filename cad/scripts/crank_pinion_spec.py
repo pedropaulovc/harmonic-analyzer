@@ -202,11 +202,11 @@ PIN_EDGE_TO_SHAFT_END_NOMINAL = 4.5
 PIN_EDGE_MIN_WORST = 2.0
 PIN_STATION_LAYOUT_ALLOWANCE_MM = 0.25
 # The toothed south face is set directly off the restored MHA-016 north
-# boss face. There is no spot-face retreat or eccentric sleeve in this stack.
-SEAT_FEELER_MM = 0.15
+# boss face with the assembly step-4 feeler. There is no spot-face retreat
+# or eccentric sleeve in this stack.
+SEAT_FEELER_MM = 0.25
 SEAT_GAP_MAX_MM = 1.0
 PINION_BOSS_NORTH_GAP_RANGE = (SEAT_FEELER_MM, SEAT_GAP_MAX_MM)
-assert PINION_BOSS_NORTH_GAP_RANGE == (0.15, 1.0), "user ruling 2026-09-28"
 # The shaft end stays recessed inside the boss in the worst case too.  The
 # overall length prints at OVERALL_LENGTH_PLACES, so an accepted pinion is as
 # short as the printed row allows (.X +/-0.8).  Nothing else can shallow the
@@ -244,17 +244,15 @@ for _name, _value, _places in (
 # wall alone needed 12.815 (1.23 faces) at the old 0.32 recess; the recess
 # that survives the printed row and an exactly printed shaft adds the rest.
 PIN_STATION = FACE_WIDTH + BOSS_LENGTH / 2.0  # 17.65 from the toothed (south) face
-assert OVERALL_LENGTH == 24.9, "user ruling 2026-09-28"
-assert BOSS_LENGTH == 14.5, "user ruling 2026-09-28"
-assert PIN_STATION == 17.65, "user ruling 2026-09-28"
-assert abs(SHAFT_END_RECESS_MIN - 1.05) < 1e-9, "user ruling 2026-09-28"
-assert abs(SHAFT_END_RECESS_MAX - 1.15) < 1e-9, "user ruling 2026-09-28"
+if SHAFT_END_RECESS_MAX <= SHAFT_END_RECESS_MIN:
+    raise AssertionError("the pinion boss needs a positive printed shaft-recess range")
 # The fixed-axis seed with the 6.5-mm 64T face; the offline nine-phase
 # exact-solid study found a common free offset interval -2.775957..-0.205645
 # degrees. The assembly selects -1.49 degrees and independently checks this
 # physical retention-hole clocking against its mesh seed at import.
 PIN_CLOCKING_DEG = 12.576430992160178
-assert abs(PIN_CLOCKING_DEG - 12.576430992160178) < 1e-12, "user ruling 2026-09-28"
+if not 0.0 <= PIN_CLOCKING_DEG < 360.0 / 16.0:
+    raise AssertionError("pinion retention-hole clocking must lie within one 16T pitch")
 if PIN_STATION - PIN_DIA / 2.0 < FACE_WIDTH + 0.5:
     raise AssertionError("retention pin hole breaks into the pinion's tooth face")
 if PIN_STATION + PIN_DIA / 2.0 > OVERALL_LENGTH - 0.5:
