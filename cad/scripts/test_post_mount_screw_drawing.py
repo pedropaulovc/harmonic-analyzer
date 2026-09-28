@@ -959,6 +959,8 @@ def test_tip_view_imports_the_break_by_feature(monkeypatch) -> None:
         "curate_dimensions",
         lambda adapter, items, delete=(), reposition=None: list(items),
     )
+    # The stub places nothing, so there is no position to read back.
+    monkeypatch.setattr(dc, "_reposition_rerun_reason", lambda *a, **k: "none")
     curated = drawing._curate_tip_view(object(), object())
     assert curated == [break_annotation]
     assert calls == ["features:['CutEndDeburrProfile']"]
