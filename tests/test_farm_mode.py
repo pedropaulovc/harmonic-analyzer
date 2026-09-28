@@ -93,6 +93,16 @@ def _refuse_local_build(dodo, monkeypatch, calls):
     )
 
 
+@pytest.fixture(autouse=True)
+def _undrifted_checkout(monkeypatch):
+    """Every dispatch below sees an untouched checkout unless a test says not.
+
+    The real check runs git against the live checkout; these tests exercise the
+    dispatch around it (tests/test_farm_checkout_drift.py covers git itself).
+    """
+    monkeypatch.setattr(_farm, "checkout_drift", lambda task_inputs=None: None)
+
+
 def _restore_sequence(dodo, monkeypatch, calls, outcomes, on_hit=None):
     """``_cache.restore`` answering ``outcomes`` in turn; ``on_hit`` runs on True."""
     pending = iter(outcomes)
@@ -120,6 +130,13 @@ def farm_part(tmp_path, monkeypatch):
     monkeypatch.setattr(dodo, "_part_file_deps", lambda _script, _stem: [str(script)])
     monkeypatch.setattr(dodo, "_part_cache_outputs", lambda _stem: [output])
     monkeypatch.setattr(dodo, "_cache_key", lambda _deps, _label: "k" * 64)
+    monkeypatch.setattr(
+        dodo._cache,
+        "key_input_paths",
+        lambda label, key: (
+            list(KEY_INPUTS) if (label, key) == ("part:pen_rod", "k" * 64) else None
+        ),
+    )
     monkeypatch.setattr(
         dodo, "_stamp_part_execution", lambda stem: calls["stamp"].append(stem)
     )
@@ -183,6 +200,115 @@ def test_success_restores_the_leaf_key_and_stamps_without_publishing(
     assert [r[0] for r in calls["restore"]] == ["k" * 64, "k" * 64]
     assert calls["stamp"] == ["pen_rod"]
     assert calls["store"] == [], "the worker publishes; the submitter never does"
+
+
+DRIFT = (
+    "submitter checkout changed since launch: HEAD aaaaaaaaaaaa -> bbbbbbbbbbbb; "
+    "changed: cad/scripts/_drawing_common.py; the farm builds aaaaaaaaaaaa, so "
+    "keys would not match. Launch from an untouched worktree "
+    "(scripts/farm-run.ps1 does this)."
+)
+KEY_INPUTS = ("cad/config/release.yaml", "cad/scripts/build_pen_rod.py")
+
+
+def _drift_after(monkeypatch, checks: int) -> list[list[str] | None]:
+    """``checkout_drift`` clean for the first ``checks`` calls, drifted after;
+    returns the ``task_inputs`` each call was scoped to."""
+    seen: list[list[str] | None] = []
+
+    def drift(task_inputs=None):
+        seen.append(None if task_inputs is None else list(task_inputs))
+        return DRIFT if len(seen) > checks else None
+
+    monkeypatch.setattr(_farm, "checkout_drift", drift)
+    return seen
+
+
+def test_a_drifted_checkout_is_refused_before_any_dispatch(farm_part, monkeypatch):
+    dodo, script, calls, restore = farm_part
+    restore((False,))
+    checks = _drift_after(monkeypatch, 0)
+    monkeypatch.setattr(
+        dodo._farm, "run_leaf", lambda label, key: pytest.fail("dispatched on drift")
+    )
+
+    with pytest.raises(RuntimeError) as failure:
+        dodo._cached_part_action("pen_rod", script)
+
+    assert str(failure.value) == f"part:pen_rod: not dispatched: {DRIFT}"
+    assert calls["stamp"] == []
+    # Before dispatch only a change that can move THIS key counts.
+    assert checks == [list(KEY_INPUTS)]
+
+
+def test_cache_missing_on_a_drifted_checkout_names_the_drift(farm_part, monkeypatch):
+    """Drift that lands while the leaf runs is re-checked when the key is absent."""
+    dodo, script, calls, restore = farm_part
+    restore((False,))
+    checks = _drift_after(monkeypatch, 1)
+    monkeypatch.setattr(
+        dodo._farm,
+        "run_leaf",
+        lambda label, key: _leaf_result(
+            state="failed",
+            cache_present=False,
+            failure_category="cache_missing",
+            failure_message=f"{label} exited 0 but cache key {key[:12]} is absent",
+        ),
+    )
+
+    with pytest.raises(RuntimeError) as failure:
+        dodo._cached_part_action("pen_rod", script)
+
+    message = str(failure.value)
+    assert message.startswith("part:pen_rod failed on sw-01@3 [cache_missing] exit 0:")
+    assert message.endswith(DRIFT)
+    assert _farm.CACHE_MISSING_CAUSES not in message
+    # After the key went missing, every tracked difference is a lead.
+    assert checks == [list(KEY_INPUTS), None]
+
+
+def test_cache_missing_without_drift_names_the_likely_causes(farm_part, monkeypatch):
+    dodo, script, calls, restore = farm_part
+    restore((False,))
+    checks = _drift_after(monkeypatch, 2)
+    monkeypatch.setattr(
+        dodo._farm,
+        "run_leaf",
+        lambda label, key: _leaf_result(
+            state="failed",
+            cache_present=False,
+            failure_category="cache_missing",
+            failure_message=f"{label} exited 0 but cache key {key[:12]} is absent",
+        ),
+    )
+
+    with pytest.raises(RuntimeError) as failure:
+        dodo._cached_part_action("pen_rod", script)
+
+    message = str(failure.value)
+    assert message.startswith("part:pen_rod failed on sw-01@3 [cache_missing] exit 0:")
+    assert _farm.CACHE_MISSING_CAUSES in message
+    assert "failures/*" in message
+    assert checks == [list(KEY_INPUTS), None]
+
+
+def test_absent_key_after_success_on_a_drifted_checkout_names_the_drift(
+    farm_part, monkeypatch
+):
+    dodo, script, calls, restore = farm_part
+    restore((False, False))
+    _drift_after(monkeypatch, 1)
+    monkeypatch.setattr(dodo._farm, "run_leaf", lambda label, key: _leaf_result())
+
+    with pytest.raises(RuntimeError) as failure:
+        dodo._cached_part_action("pen_rod", script)
+
+    assert str(failure.value) == (
+        f"part:pen_rod: farm reported success but cache key {'k' * 12} is absent: "
+        f"{DRIFT}"
+    )
+    assert calls["stamp"] == []
 
 
 ASM_BYTES = b"SLDASM restored from the farm"

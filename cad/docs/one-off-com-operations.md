@@ -47,8 +47,9 @@ end. An agent must not dispatch that way — a farm build outlives any tool
 deadline — so agent-driven submissions go through `scripts/farm-run.ps1` under
 a persistent `hub` process
 ([supervised farm launches](../../DEVELOPING.md#supervised-farm-launches)). It
-runs the same `build.py` invocation and records the run so a successor can pick
-it up instead of re-inventing a command.
+runs the same `build.py` invocation from a private snapshot of the pushed HEAD,
+so nothing done in your worktree mid-run can move a key, and records the run so
+a successor can pick it up instead of re-inventing a command.
 
 ```powershell
 .\build.cmd --help                    # wrapper options + farm defaults, then doit's commands
@@ -192,10 +193,20 @@ throw away afterwards. Non-negotiable shape:
   then fails `cache_missing` — which is non-retryable, so it kills the build.
   Same trap with `HARMONIC_REMOTE_CACHE_MODE=off`, except the farm preflight
   catches that one up front.
+- **Never change the submitter's checkout mid-run.** The submitter computes
+  every key from its local files while the workers build the launch commit; a
+  commit or edit in that worktree during a direct `./build` run makes the two
+  disagree, and the leaf that follows would fail `cache_missing` (#1114).
+  `build.py` refuses each dispatch whose key such a change can move (anything
+  under `cad/`, the graph and environment files, submodules, the task's own
+  inputs) and names it (`submitter checkout changed since launch: HEAD A ->
+  B; changed: …`); on an absent key it names every tracked change. The
+  supervised launcher builds from its own snapshot, so it is immune.
 - **Reading a moved key** (full detail in `DEVELOPING.md`, "Debugging a miss"):
-  `uv run python -m doit cache_status -- <substring>` for `HIT`/`MISS` + the
-  `(digest, relpath)` list behind a miss and a `DRIFT(last published …)` flag;
-  `cad/out/reports/cache.jsonl` for the append-only event log
+  `uv run python -m doit cache_status -- <substring>` (from a checkout at the
+  run's commit) for `HIT`/`MISS` + the `(digest, relpath)` list behind a miss
+  and a `DRIFT(last published …)` flag; `<out>/reports/cache.jsonl` (§4) for
+  the append-only event log
   (`store`/`store_skip`/`restore_hit`/`restore_miss`/`restore_locked`/
   `restore_hit_drift`/…); `HARMONIC_CACHE_DEBUG=1` on the run you are
   diagnosing to log every key input as it is computed. A key is
@@ -207,11 +218,17 @@ throw away afterwards. Non-negotiable shape:
 
 ## 4. Getting evidence when it fails
 
-**Local half** (the submitter, even in farm mode):
+**Local half** (the submitter, even in farm mode). Its outputs live in `<out>`:
+`cad/out` of the checkout for a direct attended build, but for a supervised
+launch the run record's `outputs` — `<LogDirectory>\<run-id>.out`, where the
+launcher moves the snapshot's `cad/out` when the run ends (the snapshot's own
+`cad\out` while it is still running, or when `.done` says the move failed).
+The caller's `cad/out` holds nothing from a supervised run.
 
-- `cad/out/logs/<log_stem>.log` — the per-task console tee (only for tasks that
-  pass a `log_stem`; otherwise output is inherited straight to the terminal).
-- `cad/out/reports/telemetry/traces.jsonl` and `logs.jsonl` — every span and
+- `<out>/logs/<log_stem>.log` — the per-task console tee (only for tasks that
+  pass a `log_stem`; otherwise output is inherited straight to the terminal,
+  which for a supervised launch is the run's `.log`).
+- `<out>/reports/telemetry/traces.jsonl` and `logs.jsonl` — every span and
   log record as JSON; query them with `rg`/`jq` instead of scraping the console
   (`AGENTS.md`, "Observability"). What matters for an ad-hoc operation: the
   phase spans are SIBLINGS — `cache.probe` → `com.seat.wait` →
@@ -223,7 +240,7 @@ throw away afterwards. Non-negotiable shape:
   COM session means that session ran unprotected.
 
   ```powershell
-  rg watchdog_signal cad/out/reports/telemetry/logs.jsonl | jq -c '.body'
+  rg watchdog_signal <out>/reports/telemetry/logs.jsonl | jq -c '.body'
   ```
 
 **Farm half.** The failure message `_farm_build` raises already names worker,
@@ -250,9 +267,11 @@ programmatically.
 Stopping a local submitter cancels nothing: leaves share their workflow by ID
 (`USE_EXISTING`), so only `farm.py cancel` cancels. Recovering an interrupted
 run therefore means querying *every* requested and attached ID in that run's
-log, not one representative leaf, with the worktree, HEAD, targets and leaf
-budget unchanged — the budget is part of the workflow ID. The full procedure is
-in [supervised farm launches](../../DEVELOPING.md#supervised-farm-launches).
+log, not one representative leaf, and resuming with the commit, targets, leaf
+budget and cache environment unchanged — for a supervised launch, the ones in
+its run record, not whatever the caller's worktree holds now; the budget is
+part of the workflow ID. The full procedure is in
+[supervised farm launches](../../DEVELOPING.md#supervised-farm-launches).
 
 **A failure OUTSIDE the recipe has no leaf log.** `farm.py logs` needs
 `log_blob`, and the worker only publishes one once it has actually run the
@@ -272,7 +291,7 @@ Failure categories, and what they mean for you:
 | category | retried? | read it as |
 |---|---|---|
 | `task_failed` | no | your recipe failed with a working seat — a real bug |
-| `cache_missing` | no | the leaf succeeded but your key is absent (§3) |
+| `cache_missing` | no | the leaf succeeded but your key is absent — your checkout changed mid-run (named in the message), or §3 |
 | `execute_rejected` | no | the task name/graph/key was refused (route B rules) |
 | `restore_mismatch` | no | prepared HEAD/clean/submodule/exclusion state or metadata commit does not match the request; this includes an exclusion naming no submodule gitlink in the commit |
 | `source_unavailable` | yes | the exact-SHA depth-one fetch from the approved repository failed — push it there or fix repository access |

@@ -265,6 +265,13 @@ def cache_key(file_deps: list[str], digest_one, label: str | None = None) -> str
     return key
 
 
+def key_input_paths(label: str, key: str) -> list[str] | None:
+    """Repo-relative paths ``key`` was computed from for ``label`` in this
+    process, or ``None`` when this process never computed it."""
+    pairs = _KEY_INPUTS.get((label, key))
+    return None if pairs is None else [path for path, _ in pairs]
+
+
 # --------------------------------------------------------------------------- #
 # Pack / unpack -- one gzip tar of a task's outputs, paths stored repo-relative
 # --------------------------------------------------------------------------- #
