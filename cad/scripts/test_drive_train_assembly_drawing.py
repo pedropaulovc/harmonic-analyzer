@@ -853,6 +853,35 @@ def test_head_anchor_without_any_rim_leaves_the_family_to_the_shared_picker(monk
     assert balloons == [] and anchored == frozenset()
 
 
+def test_a_pedestal_screw_without_a_rim_is_ballooned_by_the_shared_picker(monkeypatch):
+    """No hold-down screw shows a head rim: the cylinder-bank sheet hands the
+    family to the shared picker, which must hold an anchor for it rather
+    than refuse the sheet before looking at the view."""
+    import _drawing_common
+
+    class PickerReached(Exception):
+        pass
+
+    def leaves(_adapter, _view, *, label):
+        raise PickerReached(label)
+
+    monkeypatch.setattr(drawing, "_insert_balloon_on_edge", pytest.fail)
+    monkeypatch.setattr(drawing, "_activate_sheet", lambda *_a, **_k: None)
+    monkeypatch.setattr(drawing, "_link_view_to_bom", lambda *_a, **_k: None)
+    monkeypatch.setattr(_drawing_common, "_view_component_leaves", leaves)
+    view = _View({"pedestal-hold-down-screw-1": [_Edge(None)], "pedestal-hold-down-screw-2": []})
+    with pytest.raises(PickerReached, match="drive-train cylinder-bank BOM coverage"):
+        drawing._balloon_cluster_sheet(
+            _Adapter(),
+            "cylinder-bank",
+            view,
+            _bank_facts(),
+            (1.0, 2.0),
+            bom_name="BOM",
+            items={"pedestal-hold-down-screw": "26"},
+        )
+
+
 def test_every_text_sheet_places_a_view_for_its_title_block() -> None:
     """finalize_drawing refuses a sheet with no view (r8 leaf 20260923T214354Z-1-4126331f)."""
     tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))

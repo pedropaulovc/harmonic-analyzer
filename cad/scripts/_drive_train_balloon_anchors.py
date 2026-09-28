@@ -14,6 +14,8 @@ with neither, the sheet fails. The ``drawing.balloon_anchor`` event reports
 where it landed, ready to freeze here. Every drive-train family walks.
 
 Keyed by cluster, then family; a cluster sheet shows only its own cluster.
+A head-anchored family (``draw_drive_train_assembly.HEAD_ANCHORED``) is
+listed too: with no head rim shown, this anchor balloons it.
 """
 
 from __future__ import annotations
@@ -27,6 +29,7 @@ DRIVE_TRAIN_BALLOON_ANCHORS: dict[str, dict[str, BalloonAnchor]] = {
         "cylinder-end-disc": BalloonAnchor(),
         "arbor-set-screw": BalloonAnchor(),
         "cylinder-gear": BalloonAnchor(),
+        "pedestal-hold-down-screw": BalloonAnchor(),
     },
     "cone-crank": {
         "cone-swing-platform": BalloonAnchor(),
