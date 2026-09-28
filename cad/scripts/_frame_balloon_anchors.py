@@ -14,12 +14,13 @@ goes straight to that listed edge without hit-testing. The
 ``drawing.balloon_anchor`` event reports where it landed, ready to freeze
 here.
 
-Nine families are frozen at the point farm run 20260928T074246010Z hit on
-the current 1:8 sheet: that sheet audited clean, and those anchors project
-to the same sheet points today. Walking instead moved the cross-screw
-balloon's leader through its own number (run 20260928T083410084Z). Points
-frozen from the old 1:7 sheet (run 20260928T061043870Z) had missed on the
-1:8 sheet, so a point is frozen only once proven on the sheet it serves.
+Hit tests run zoomed onto the point, so a hit is an edge drawn there, not
+one a millimetre-wide fit-to-sheet aperture reached (and reached further on a
+smaller seat window). Points proven under that aperture no longer prove
+anything: tube-frame's (12.7, 0, 0), frozen from run 20260928T074246010Z,
+selected no edge zoomed (run 20260928T092244731Z). harmonic-base's point hit
+zoomed in that run, so it stays frozen; the others walk until a zoomed run
+proves their points on this sheet.
 
 The lag screw takes its listed visible edge: its frozen head point hit
 lag-screw-2 on swmaker000004 (run 20260928T084730204Z) and the
@@ -33,14 +34,14 @@ from _drawing_common import BalloonAnchor
 
 FRAME_BALLOON_ANCHORS: dict[str, BalloonAnchor] = {
     "harmonic-base": BalloonAnchor((90.360, 50.800, -62.873)),
-    "tube-frame": BalloonAnchor((12.700, 0.0, 0.0)),
-    "tube-frame-cap": BalloonAnchor((0.0, 18.891, 12.383)),
-    "rocker-arm-support": BalloonAnchor((76.200, -83.655, 31.063)),
+    "tube-frame": BalloonAnchor(),
+    "tube-frame-cap": BalloonAnchor(),
+    "rocker-arm-support": BalloonAnchor(),
     # Its head sits on the rocker-arm-support flange: hit tests disagree by seat.
     "lag-screw": BalloonAnchor(visible_edge=True),
-    "top-frame": BalloonAnchor((-197.000, -2.019, 124.750)),
-    "nameplate": BalloonAnchor((5.121, 5.121, 0.0)),
-    "fillister-screw": BalloonAnchor((-2.204, 0.495, -2.079)),
-    "frame-cross-screw": BalloonAnchor((1.354, -1.290, 1.329)),
-    "gooseneck-set-screw": BalloonAnchor((2.245, 4.763, -2.245)),
+    "top-frame": BalloonAnchor(),
+    "nameplate": BalloonAnchor(),
+    "fillister-screw": BalloonAnchor(),
+    "frame-cross-screw": BalloonAnchor(),
+    "gooseneck-set-screw": BalloonAnchor(),
 }

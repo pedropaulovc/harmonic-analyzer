@@ -11,9 +11,8 @@ edge points by geometry, and takes the first point the hit test gives back
 to that exact instance, else an edge the view's hidden-line pass lists as
 drawn; with neither, the sheet fails. The ``drawing.balloon_anchor`` event
 reports where it landed, ready to freeze here. Every drive-train family
-walks: run 20260928T083410084Z placed 36 by a hit and 11 pins, shims,
-springs and screws on a listed visible edge, in 87 s of picks, and run
-20260928T084730204Z, on another seat, placed all 47 identically.
+walks. With hit tests zoomed onto each point, run 20260928T092244731Z placed
+39 by a hit and 8 pins and shafts on a listed visible edge, in 68 s of picks.
 
 Keyed by cluster, then family; a cluster sheet shows only its own cluster.
 """
