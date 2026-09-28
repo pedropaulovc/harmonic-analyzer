@@ -184,6 +184,35 @@ def test_a_gate_that_dirties_the_model_is_recertified_on_the_resolved_model(save
     assert "save" in save_steps
 
 
+def test_a_later_step_that_dirties_the_model_recertifies_before_the_save(
+    save_steps, monkeypatch
+):
+    # Health (or a view/reference step) runs AFTER the gates; if it dirties the
+    # solve, save's chokepoint re-solves -- and the gates must certify THAT state.
+    adapter, model = _drive_train_like()
+    seen = []
+    saved_at = []
+
+    def gates(solved):
+        seen.append(model.rebuilds)
+        _free_dof_gate(solved)
+
+    def dirtying_health(*_args, **_kwargs):
+        save_steps.append("health")
+        model.Extension.NeedsRebuild2 = 1
+
+    monkeypatch.setattr(_assembly, "assert_model_healthy", dirtying_health)
+    monkeypatch.setattr(
+        _assembly, "_save_new_assembly_as_copy", lambda *_a: saved_at.append(model.rebuilds)
+    )
+    _save(adapter, gates)
+    assert model.rebuilds == 2
+    # Certified after the final rebuild AND after the chokepoint rebuild, with no
+    # rebuild between that last certification and the save.
+    assert seen == [1, 2]
+    assert saved_at == [2]
+
+
 def test_a_gate_that_always_dirties_the_model_refuses_the_save(save_steps):
     adapter, model = _drive_train_like()
 

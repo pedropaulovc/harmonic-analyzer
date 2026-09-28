@@ -2316,8 +2316,12 @@ async def save_assembly_and_images(
     set_isometric_view(adapter)
     # View setup dirties the document so the camera persists, but does not dirty
     # the solve state. Avoid repeating the 7-32 s deep rebuild unless SolidWorks
-    # explicitly reports that a gate or view operation requested one.
-    rebuild_if_needed_before_save(adapter, asm_name)
+    # explicitly reports that a gate or view operation requested one. Such a
+    # rebuild replaces the state the solved gates certified, so they run again
+    # on the new one: nothing may re-solve between their certification and the
+    # save (_run_solved_gates leaves the model clean or raises).
+    if rebuild_if_needed_before_save(adapter, asm_name) and solved_gates is not None:
+        _run_solved_gates(adapter, asm_name, solved_gates, trigger="save_rebuild")
     _save_new_assembly_as_copy(adapter, asm_path)
     try:
         artefacts = {"assembly": str(asm_path)}
@@ -2345,19 +2349,25 @@ async def save_assembly_and_images(
 
 
 def _run_solved_gates(
-    adapter: Any, label: str, gates: Callable[[Any], None]
+    adapter: Any,
+    label: str,
+    gates: Callable[[Any], None],
+    *,
+    trigger: str = "final_rebuild",
 ) -> None:
-    """Run builder gates on the model ``final_rebuild_before_save`` just solved.
+    """Run builder gates on the model a deep rebuild just solved.
 
     They must certify the state that is SAVED: the collapsed working model (an
     exploded presentation moves components off their operational poses), and a
     solve state no later rebuild replaces. A gate that dirties the solve state
     would otherwise hand ``rebuild_if_needed_before_save`` a deep rebuild AFTER
     certification, so a dirty model is re-solved and every gate re-run on the
-    result; still dirty after that, the save is refused.
+    result; still dirty after that, the save is refused. ``trigger`` names the
+    rebuild being certified (save runs the gates again after its chokepoint
+    rebuild, when a later health/view step dirtied the model).
     """
     model = adapter.currentModel
-    with _telemetry.span("assembly.solved_gates", asm=label) as sp:
+    with _telemetry.span("assembly.solved_gates", asm=label, trigger=trigger) as sp:
         exploded = _early_bound(model, "IModelDoc2").IsExploded()
         if exploded is None or bool(exploded):
             raise RuntimeError(
@@ -2549,8 +2559,9 @@ async def reconcile_saved_rebuild_state(
         _telemetry.success(f"reconciled saved rebuild state ({asm_name}, was {status})")
 
 
-def rebuild_if_needed_before_save(adapter: Any, label: str, model: Any = None) -> None:
-    """Rebuild at the save chokepoint only when the solve state became dirty.
+def rebuild_if_needed_before_save(adapter: Any, label: str, model: Any = None) -> bool:
+    """Rebuild at the save chokepoint only when the solve state became dirty;
+    return whether it rebuilt.
 
     ``GetSaveFlag`` is deliberately not consulted: changing the active view sets
     that flag because the camera must be saved, but it does not invalidate model
@@ -2561,9 +2572,10 @@ def rebuild_if_needed_before_save(adapter: Any, label: str, model: Any = None) -
     if status != 0:
         _telemetry.event("assembly.final_rebuild_required", asm=label, status=status)
         final_rebuild_before_save(adapter, label, target)
-        return
+        return True
     _telemetry.event("assembly.final_rebuild_skipped", asm=label)
     _telemetry.success(f"solve state already clean before save ({label})")
+    return False
 
 
 async def _solved_mass_properties(adapter: Any, span: Any) -> Any:
