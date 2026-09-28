@@ -215,6 +215,9 @@ async def _calibrate_channel(
                 label="channel seat fixture",
             )
             titles = _owned_titles(adapter, fixture, [lever, spring, hook])
+            # A refit moved each eye to put its boundary at -allowance, so the
+            # re-measure straddles that instead of re-bracketing the full radius.
+            hint = None if refit == 0 else -allowance
             lower = solve_component_contact(
                 adapter,
                 spring,
@@ -223,6 +226,7 @@ async def _calibrate_channel(
                 radius,
                 label=f"channel {amplitude:g} lower",
                 locate_only=True,
+                hint_offset_mm=hint,
             )
             upper = solve_component_contact(
                 adapter,
@@ -232,6 +236,7 @@ async def _calibrate_channel(
                 radius,
                 label=f"channel {amplitude:g} upper",
                 locate_only=True,
+                hint_offset_mm=hint,
             )
             seated = _seated(
                 f"channel {amplitude:g} lower", lower, allowance
