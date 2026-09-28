@@ -483,8 +483,11 @@ A fatal signal logs `xx`, flushes telemetry, and hard-exits (`os._exit`) — the
 main thread is blocked inside the dead COM call, so only a process exit frees
 it. The doit parent then fails the task, and since the seat lock is held by the
 PARENT's `_com_seat`, the machine-global seat releases cleanly. Kill switch:
-`HARMONIC_COM_WATCHDOG=0`. Recovery after exit 86/87/88/89 is automatic
-(`_exec_com`: kill, relaunch, retry); by hand: clear the crash dialog,
+`HARMONIC_COM_WATCHDOG=0`. On a local build, recovery after exit 86/87/88/89
+is automatic (`_exec_com`: kill, relaunch, retry). A farm leaf
+(`HARMONIC_SW_AUTOSTART=0`: the keeper owns the seat) never kills or
+relaunches SolidWorks: 86/87/88 fail the leaf for the pool to classify, and 89
+re-runs the leaf once on the same, untouched seat. By hand: clear the crash dialog,
 relaunch SolidWorks via the 3DEXPERIENCE Platform desktop shortcut (never
 COM-start it), rerun the build. The fatal/log-only contract is pinned by
 `check:watchdog` (`test_watchdog.py`).
@@ -502,12 +505,16 @@ whatever the seat's age or origin, which only ride the `sw.startup_wait` span
 bounded at 60 s. `timeout` raises `_watchdog.SeatNotReady` (a `SystemExit`,
 so `run_build`'s `except Exception` cannot turn it into exit 1); a read that
 never returns is cut off by `_watchdog.deadline` at 65 s (log, flush,
-`os._exit(89)`). Either way the process exits 89 — `_telemetry.build_session`
+`os._exit(89)`; the flush is best-effort, the exit is not, and a gate that
+returns as the deadline fires never proceeds: whichever claims it first
+decides). Either way the process exits 89 — `_telemetry.build_session`
 names the exit and flushes on a `SystemExit` — which `_exec_com` recovers and
 retries like a crash; on a farm leaf (`HARMONIC_SW_AUTOSTART=0`, the keeper
-owns the seat) it instead re-runs once on the untouched seat. A seat with no
-such member (`unsupported`) or an unintelligible answer (`unreadable`) is
-released after one read with a warning. Every poll emits a DEBUG record, the
+owns the seat) it instead re-runs once on the untouched seat. Once a seat has
+said False or busy, only True or the bound ends the hold: a later unreadable
+read is polled again. A seat with no such member (`unsupported`), or whose
+first answer is unintelligible (`unreadable`), is released after one read
+with a warning. Every poll emits a DEBUG record, the
 watchdog's heartbeat, so a lowered `HARMONIC_COM_OP_TIMEOUT` does not cut the
 wait short. The seat line reports `startup=`/`startup_completed=`/
 `startup_wait_s=`, and a later missing-source-property capture carries them.

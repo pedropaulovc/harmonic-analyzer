@@ -725,9 +725,10 @@ _SW_ENSURED = False
 _COM_RETRY_BACKOFF_S: tuple[int, ...] = (60, 120, 240)
 # Watchdog exit codes that unambiguously mean SolidWorks itself broke (see _watchdog):
 # 86 crash, 87 op timeout, 88 a modal dialog blocking the seat (the 2026-09-02
-# low-committed-memory box), 89 a freshly started seat that never reported
+# low-committed-memory box), 89 a seat of any age or origin that never reported
 # ISldWorks.StartupProcessCompleted (_seat_forensics' connect-time gate) -- all
-# four recover by kill + relaunch + retry.
+# four recover by kill + relaunch + retry locally; a farm leaf (autostart off)
+# recovers none of them and re-runs only 89, once, on the untouched seat.
 _WATCHDOG_EXIT_CODES = frozenset({86, 87, 88, 89})
 # _watchdog.EXIT_SEAT_NOT_READY: the connect-time startup gate's exit, restated
 # like the codes above (dodo never imports the per-subprocess _watchdog) and

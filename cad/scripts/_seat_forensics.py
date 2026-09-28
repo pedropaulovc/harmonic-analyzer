@@ -487,10 +487,13 @@ def record_seat_provenance(adapter: Any) -> dict[str, Any]:
 # The OBSERVED flag decides, not the seat's age: a seat that says False is
 # held whatever its uptime or origin (those ride the span for analysis). It
 # ends the process only on a seat positively seen not ready -- False, or a
-# call it rejects as busy -- for the whole bound. A seat whose interface lacks
-# the member, or that answers something unintelligible, is recorded and
-# released at once: nothing was observed to be wrong, and polling it for the
-# bound would only burn a minute and then build unprotected anyway.
+# call it rejects as busy -- and never since seen True, for the whole bound.
+# Once a seat has been seen not ready, a later read that fails or answers
+# something unintelligible is no evidence that it finished starting: it is
+# logged and polled again. A seat whose interface lacks the member, or whose
+# FIRST answer is unintelligible, is recorded and released at once: nothing was
+# observed to be wrong, and polling it for the bound would only burn a minute
+# and then build unprotected anyway.
 # ---------------------------------------------------------------------------
 
 # The bound on the wait, on the monotonic clock (a worker's wall clock
@@ -554,12 +557,13 @@ def await_seat_startup(adapter: Any, prov: dict[str, Any]) -> dict[str, Any]:
 
     - ``already_ready``: the first read said True.
     - ``ready_after_wait``: False or busy first, True within the bound.
-    - ``timeout``: False or busy for the whole bound: raises
+    - ``timeout``: False or busy first, and no True for the whole bound (a
+      later unreadable or missing read does not release the seat): raises
       :class:`_watchdog.SeatNotReady` (exit 89, recover + retry). A read that
       never returns is cut off by ``_watchdog.deadline``, also exit 89.
     - ``unsupported``: the seat has no such member; warn, proceed at once.
-    - ``unreadable``: an answer that is neither a bool nor a rejected call;
-      warn, proceed at once.
+    - ``unreadable``: a first answer that is neither a bool nor a rejected
+      call; warn, proceed at once.
 
     Returns flat ``seat_startup_*`` keys for the provenance and the seat line:
     ``seat_startup`` (the outcome), ``seat_startup_completed`` (the last
@@ -599,7 +603,10 @@ def await_seat_startup(adapter: Any, prov: dict[str, Any]) -> dict[str, Any]:
                 f"the session until it completes, up to {_STARTUP_WAIT_S:.0f}s"
             )
         until = started + _STARTUP_WAIT_S
-        while state in ("not_ready", "busy") and time.monotonic() < until:
+        # Seen not ready, only True (or the bound) ends the hold: a later read
+        # that fails or answers garbage says nothing about startup finishing.
+        held = state in ("not_ready", "busy")
+        while held and state != "ready" and time.monotonic() < until:
             time.sleep(_STARTUP_POLL_S)
             state = _startup_state(adapter)
             reads += 1
@@ -609,12 +616,14 @@ def await_seat_startup(adapter: Any, prov: dict[str, Any]) -> dict[str, Any]:
                 f"seat startup poll: StartupProcessCompleted {state} after "
                 f"{time.monotonic() - started:.1f}s"
             )
-        outcome = {
-            "ready": "already_ready" if first == "ready" else "ready_after_wait",
-            "not_ready": "timeout",
-            "busy": "timeout",
-            "missing": "unsupported",
-        }.get(state, "unreadable")
+        if state == "ready":
+            outcome = "already_ready" if first == "ready" else "ready_after_wait"
+        elif held:
+            outcome = "timeout"
+        elif state == "missing":
+            outcome = "unsupported"
+        else:
+            outcome = "unreadable"
         waited = round(time.monotonic() - started, 2)
         _seat_startup = {
             "seat_startup": outcome,
@@ -625,7 +634,10 @@ def await_seat_startup(adapter: Any, prov: dict[str, Any]) -> dict[str, Any]:
         }
         _telemetry.annotate(waited_s=waited, outcome=outcome, reads=reads, last_read=state)
         if outcome == "timeout":
-            answer = "=False" if state == "not_ready" else " calls rejected (busy)"
+            answer = {
+                "not_ready": "=False",
+                "busy": " calls rejected (busy)",
+            }.get(state, f" {state} after an earlier not-ready read")
             raise _watchdog.SeatNotReady(
                 f"{seat} still reports StartupProcessCompleted{answer} "
                 f"after {waited}s ({reads} reads): SolidWorks has not finished "

@@ -15,10 +15,14 @@ Pinned here:
   ``dodo._exec_com`` recovers and retries like a crash -- not an exit 1 that
   reads as a drawing defect; on a farm leaf (autostart off, the keeper's seat)
   it re-runs once on the untouched seat instead;
+* once seen not ready, a seat stays held until True or the bound: a later
+  unreadable read is polled again, never taken as permission to open;
 * a read that never returns is cut off at the bound (``_watchdog.deadline``),
-  and exit 89 still flushes its spans and logs and names itself;
-* a seat without the member, or with an unintelligible answer, is released at
-  once rather than polled for a minute.
+  and exit 89 still flushes its spans and logs and names itself; the deadline's
+  timer and the gate's exit claim it atomically, and a failing telemetry sink
+  cannot stop the exit;
+* a seat without the member, or whose first answer is unintelligible, is
+  released at once rather than polled for a minute.
 
 The seat line, the watchdog hand-off and the per-poll heartbeat are pinned in
 ``test_failure_forensics.py``, next to the missing-property capture.
@@ -261,6 +265,47 @@ def test_an_unintelligible_answer_is_recorded_and_released(monkeypatch, spans, a
     assert prov["seat_startup_wait_s"] < 0.5
 
 
+_RPC_UNAVAILABLE = 0x800706BA  # RPC_S_SERVER_UNAVAILABLE: neither busy nor missing
+
+
+@pytest.mark.parametrize(
+    "garbled", [_ComError(_RPC_UNAVAILABLE), None], ids=["rpc-error", "not-a-bool"]
+)
+def test_an_unreadable_read_after_false_keeps_the_seat_held(monkeypatch, spans, garbled):
+    """A seat that said False has told us it is not ready; a read that then
+    fails says nothing about it having finished. Only True opens the gate."""
+    _seat_age(monkeypatch, 20)
+    seat = _Seat(False, garbled, True)
+
+    prov = _seat_forensics.record_seat_provenance(_Adapter(seat))
+
+    assert (seat.reads, prov["seat_startup"]) == (3, "ready_after_wait")
+    assert prov["seat_startup_completed"] is True
+
+
+@pytest.mark.parametrize(
+    "garbled", [_ComError(_RPC_UNAVAILABLE), None], ids=["rpc-error", "not-a-bool"]
+)
+def test_a_seat_unreadable_after_false_until_the_bound_exits_89(
+    monkeypatch, spans, garbled
+):
+    _seat_age(monkeypatch, 20)
+    monkeypatch.setattr(_seat_forensics, "_STARTUP_WAIT_S", 0.05)
+    seat = _Seat(False, garbled)
+
+    with pytest.raises(_watchdog.SeatNotReady) as caught:
+        _seat_forensics.record_seat_provenance(_Adapter(seat))
+
+    assert caught.value.code == 89
+    assert "unreadable after an earlier not-ready read" in str(caught.value)
+    assert seat.reads > 2
+    span = _gate_span(spans)
+    assert (span.attributes["outcome"], span.attributes["last_read"]) == (
+        "timeout",
+        "unreadable",
+    )
+
+
 class _HangingSeat(_Seat):
     """A read that does not return until the process would have been killed."""
 
@@ -290,8 +335,10 @@ def test_a_read_that_never_returns_is_cut_off_at_the_bound(monkeypatch, spans):
         _watchdog, "_hard_exit", lambda code: (exits.append(code), released.set())
     )
 
-    _seat_forensics.record_seat_provenance(_Adapter(_HangingSeat(released)))
+    with pytest.raises(SystemExit) as caught:
+        _seat_forensics.record_seat_provenance(_Adapter(_HangingSeat(released)))
 
+    assert caught.value.code == 89
     assert exits == [89]
     assert aborts == [("seat-not-ready", 89)]
 
@@ -328,6 +375,130 @@ def test_a_gate_that_finishes_disarms_its_deadline(monkeypatch, spans):
     time.sleep(0.2)
 
     assert exits == []
+
+
+class _ManualTimer:
+    """A ``threading.Timer`` that fires only when the test calls it, so each
+    order of "deadline fires" and "gate exits" is run deliberately."""
+
+    def __init__(self, made: list[_ManualTimer], interval: float, function):
+        self.fire = function
+        self.cancelled = False
+        made.append(self)
+
+    def start(self) -> None:
+        pass
+
+    def cancel(self) -> None:
+        self.cancelled = True
+
+
+@pytest.fixture
+def manual_timer(monkeypatch):
+    made: list[_ManualTimer] = []
+    monkeypatch.setattr(
+        _watchdog.threading,
+        "Timer",
+        lambda interval, function: _ManualTimer(made, interval, function),
+    )
+    return made
+
+
+def _gate_deadline():
+    return _watchdog.deadline(
+        65, reason="seat-not-ready", message="read hung", code=_watchdog.EXIT_SEAT_NOT_READY
+    )
+
+
+def _leave_on_a_daemon(gate) -> tuple[threading.Thread, list[object]]:
+    """Leave ``gate`` off the test thread: a gate that (rightly or not) waits
+    for an exit that never comes then parks a daemon, instead of hanging the
+    run when the test's frame is torn down."""
+    left: list[object] = []
+
+    def _leave() -> None:
+        try:
+            gate.__exit__(None, None, None)
+            left.append("returned")
+        except SystemExit as exc:
+            left.append(exc.code)
+
+    leaving = threading.Thread(target=_leave, daemon=True)
+    leaving.start()
+    return leaving, left
+
+
+def test_a_deadline_that_fires_first_holds_the_gate_until_the_exit(
+    monkeypatch, manual_timer
+):
+    """The read returns True just as the timer fires: the timer won, so the
+    gate's exit must not return while the abort is still being recorded --
+    otherwise the build opens a document and is killed mid-save."""
+    recording, recorded = threading.Event(), threading.Event()
+    exits: list[int] = []
+
+    def _slow_abort(*_a, **_f) -> None:
+        recording.set()
+        recorded.wait(5)
+
+    monkeypatch.setattr(_watchdog, "_abort", _slow_abort)
+    monkeypatch.setattr(_watchdog, "_hard_exit", exits.append)
+    gate = _gate_deadline()
+    gate.__enter__()
+    (timer,) = manual_timer
+    firing = threading.Thread(target=timer.fire, daemon=True)
+    firing.start()
+    assert recording.wait(5)
+
+    leaving, left = _leave_on_a_daemon(gate)
+    leaving.join(0.3)
+    assert leaving.is_alive(), left
+
+    recorded.set()
+    firing.join(5)
+    leaving.join(5)
+    assert exits == [89]
+    assert left == [89]
+
+
+def test_a_gate_that_exits_first_disarms_a_callback_already_running(
+    monkeypatch, manual_timer
+):
+    """``timer.cancel()`` cannot stop a callback already past its wait; one that
+    finds the gate gone must do nothing."""
+    aborts: list[str] = []
+    exits: list[int] = []
+    monkeypatch.setattr(_watchdog, "_abort", lambda reason, *_a, **_f: aborts.append(reason))
+    monkeypatch.setattr(_watchdog, "_hard_exit", exits.append)
+
+    with _gate_deadline():
+        pass
+    (timer,) = manual_timer
+    timer.fire()
+
+    assert (aborts, exits) == ([], [])
+
+
+def test_a_deadline_exits_even_when_its_telemetry_raises(monkeypatch, manual_timer):
+    """The abort record is best-effort; the bound is the exit."""
+    exits: list[int] = []
+
+    def _sink_full(*_a, **_f) -> None:
+        raise OSError(28, "No space left on device")
+
+    monkeypatch.setattr(_telemetry, "error", _sink_full)
+    monkeypatch.setattr(_watchdog, "_hard_exit", exits.append)
+    gate = _gate_deadline()
+    gate.__enter__()
+    (timer,) = manual_timer
+
+    with pytest.raises(OSError):
+        timer.fire()
+    leaving, left = _leave_on_a_daemon(gate)
+    leaving.join(5)
+
+    assert exits == [89]
+    assert left == [89]
 
 
 def test_exit_89_flushes_its_telemetry_and_names_itself(monkeypatch):

@@ -62,6 +62,7 @@ timeout with ``HARMONIC_COM_OP_TIMEOUT=0``.
 from __future__ import annotations
 
 import contextlib
+import enum
 import os
 import threading
 import time
@@ -102,6 +103,16 @@ class SeatNotReady(SystemExit):
 _hard_exit: Callable[[int], None] = os._exit
 
 
+class _Deadline(enum.Enum):
+    """Who decides a :func:`deadline`'s outcome. Exactly one transition leaves
+    ``ARMED``, under the deadline's lock: the timer's (``FIRED``) or the
+    block's exit (``DISARMED``)."""
+
+    ARMED = "armed"
+    FIRED = "fired"
+    DISARMED = "disarmed"
+
+
 def _disabled() -> bool:
     """The operator kill switch: ``HARMONIC_COM_WATCHDOG=0`` turns off EVERY
     watchdog hard exit -- the signal thread and any ``deadline`` alike."""
@@ -119,7 +130,14 @@ def deadline(
     and the op-timeout signal waits 900 s, so a bounded wait around such a call
     needs its own clock: a daemon timer that records the abort on both channels
     (``_abort``: error log + ``watchdog.abort`` span, then flush) and
-    hard-exits, exactly as the fatal signals do. Leaving the block cancels it.
+    hard-exits, exactly as the fatal signals do. The record is best-effort: a
+    telemetry sink that raises still ends in the exit.
+
+    Firing and leaving the block race; ``timer.cancel()`` cannot stop a
+    callback already running. So whichever of the two claims the deadline
+    first (see :class:`_Deadline`) decides: a timer that finds the block gone
+    does nothing, and a block that finds the timer fired never returns -- it
+    waits for the exit, so the caller cannot open a document meanwhile.
     With the kill switch set (``HARMONIC_COM_WATCHDOG=0``) it arms nothing: the
     block runs unbounded, as every other watchdog exit does in that mode.
     """
@@ -127,9 +145,21 @@ def deadline(
         yield
         return
 
+    lock = threading.Lock()
+    state = _Deadline.ARMED
+    exited = threading.Event()
+
     def _expire() -> None:
-        _abort(reason, message, code, deadline_s=seconds, **fields)
-        _hard_exit(code)
+        nonlocal state
+        with lock:
+            if state is not _Deadline.ARMED:
+                return
+            state = _Deadline.FIRED
+        try:
+            _abort(reason, message, code, deadline_s=seconds, **fields)
+        finally:
+            _hard_exit(code)
+            exited.set()
 
     timer = threading.Timer(seconds, _expire)
     timer.daemon = True
@@ -139,6 +169,15 @@ def deadline(
         yield
     finally:
         timer.cancel()
+        with lock:
+            if state is _Deadline.ARMED:
+                state = _Deadline.DISARMED
+        if state is _Deadline.FIRED:
+            # The process is ending; the real exit never lets this wait return.
+            # Only a stubbed exit (the offline gate) gets past it, and even then
+            # the caller must not carry on as if the gate had passed.
+            exited.wait()
+            raise SystemExit(code)
 
 
 DEFAULT_OP_TIMEOUT = 900.0
