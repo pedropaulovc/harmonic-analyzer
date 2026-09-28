@@ -1412,6 +1412,7 @@ def _project_through(
     return (float(coordinates[0]), float(coordinates[1]))
 
 
+@_telemetry.traced("drawing.model_point_projection", label_param="label")
 def model_point_in_view(
     adapter: Any,
     view: Any,
@@ -1421,11 +1422,9 @@ def model_point_in_view(
 ) -> tuple[float, float]:
     """Project a model-space point into drawing-sheet coordinates.
 
-    Five raw round trips and no span of its own: a recipe calls this dozens
-    to hundreds of times per drawing, and a span each flooded the trace
-    (up to 422 per trace).  A loop projects through
-    :func:`model_points_in_view`, which reads the transform once and records
-    one span with the count.
+    Five raw round trips.  A loop over one view's points projects through
+    :func:`model_points_in_view` instead: one transform read and one span for
+    the whole batch rather than one per point (up to 422 per trace).
     """
     utility, transform = _projection_frame(adapter, view)
     return _project_through(utility, transform, xyz, label=label)
@@ -1438,16 +1437,34 @@ def model_points_in_view(
     points: Sequence[Sequence[float]],
     *,
     label: str,
+    names: Sequence[str] | None = None,
 ) -> list[tuple[float, float]]:
     """:func:`model_point_in_view` for many points of one view at one moment.
 
     The transform is read once, so nothing may move ``view`` between the
-    points; three round trips per point after that."""
+    points; three round trips per point after that.  ``names`` (one per
+    point) identify a failing point in the error; its index, model point and
+    the count projected before it are raised and set on the span either way.
+    """
+    if names is not None and len(names) != len(points):
+        raise ValueError(f"{label}: {len(names)} names for {len(points)} points")
+    _telemetry.annotate(points=len(points))
     utility, transform = _projection_frame(adapter, view)
-    projected = [
-        _project_through(utility, transform, xyz, label=label) for xyz in points
-    ]
-    _telemetry.annotate(points=len(projected))
+    projected: list[tuple[float, float]] = []
+    for index, xyz in enumerate(points):
+        try:
+            projected.append(_project_through(utility, transform, xyz, label=label))
+        except Exception as exc:
+            model = tuple(float(v) for v in xyz)
+            point = names[index] if names is not None else f"point {index}"
+            _telemetry.annotate(
+                failed_index=index, failed_point=point, projected=len(projected)
+            )
+            raise RuntimeError(
+                f"{label}: {point} (index {index} of {len(points)}) at model"
+                f" {model} failed after {len(projected)} projected: {exc}"
+            ) from exc
+    _telemetry.annotate(projected=len(projected))
     return projected
 
 

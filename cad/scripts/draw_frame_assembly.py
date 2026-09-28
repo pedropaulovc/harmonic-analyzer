@@ -893,11 +893,13 @@ def _upper_frame_balloon_edges(
     for stem in ("rocker-arm-support", "lag-screw"):
         for component, full in families[stem]:
             name = str(component.Name2)
-            transform = _component_transform(full)
+            transform = None  # read at the first usable edge, as before batching
             for edge in visible_component_entities(view, component, 1):
                 key = _edge_endpoint_key(adapter, edge)
                 if key is None:
                     continue
+                if transform is None:
+                    transform = _component_transform(full)
                 p0 = _transform_point(transform, key[:3])
                 p1 = _transform_point(transform, key[3:6])
                 score = (min(p0[1], p1[1]), -abs(p0[1] - p1[1]), name, *key)
@@ -948,20 +950,28 @@ def _exposed_top_casting_edge(
     # does not move while its edges are ranked (~210 edges, 420 points).
     lines = []
     points = []
+    names = []
     for component, full in components:
-        transform = _component_transform(full)
-        for edge in visible_component_entities(view, component, 1):
+        # Read at the first usable edge: a component with none neither pays
+        # for the transform nor can abort the pick with an unreadable one.
+        transform = None
+        for edge_index, edge in enumerate(visible_component_entities(view, component, 1)):
             curve = _early_bound(_early_bound(edge, "IEdge").GetCurve(), "ICurve")
             if not curve.IsLine():
                 continue
             key = _edge_endpoint_key(adapter, edge)
             if key is None:
                 continue
+            if transform is None:
+                transform = _component_transform(full)
+                component_name = str(component.Name2)
             lines.append((key, edge))
             points.append(_transform_point(transform, key[:3]))
             points.append(_transform_point(transform, key[3:6]))
+            edge_name = f"{component_name} edge {edge_index}"
+            names += [f"{edge_name} start", f"{edge_name} end"]
     projected = model_points_in_view(
-        adapter, view, points, label="top casting edge ends"
+        adapter, view, points, label="top casting edge ends", names=names
     )
     candidates = []
     for index, (key, edge) in enumerate(lines):
