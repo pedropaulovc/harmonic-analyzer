@@ -174,11 +174,17 @@ async def build(adapter) -> dict[str, str]:
     v_gap = GAP_AREA * BAR_THICKNESS
     volume = await volume_check(adapter, "seed gap", volume - v_gap, 0.02 * v_gap)
 
-    # Pattern along +X (measuring-stick precedent: direction point on the
-    # bottom edge, seed at the left end; the volume check catches reversal).
+    # Pattern along +X from the seed at the left end. The direction edge is
+    # resolved geometrically (the straight bar edge along +X nearest the
+    # point) and FlipDir1 follows from direction_vector, so the active view no
+    # longer decides the sense: a top view once picked the -X top edge and an
+    # isometric one the back face, sending every gap off the bar. A pattern
+    # whose instances all miss now fails loudly in the adapter; the volume
+    # check below still catches a partial miss.
     res = await adapter.linear_pattern_feature(
         LinearPatternParameters(
             direction_point=[BAR_LENGTH / 2.0, 0.0, 0.0],
+            direction_vector=[1.0, 0.0, 0.0],
             features=[gap_cut_name],
             count=GAP_COUNT,
             spacing=PITCH,
