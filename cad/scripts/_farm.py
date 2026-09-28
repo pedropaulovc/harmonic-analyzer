@@ -19,7 +19,7 @@ import getpass
 import json
 import os
 import socket
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import timedelta
 from pathlib import Path
 
@@ -62,6 +62,11 @@ class LeafResult:
     log_blob: str | None  # "<results-container>/<blob-name>"
     failure_category: str | None
     failure_message: str | None  # <=1000 chars, CR/LF stripped
+    # Milliseconds the leaf spent in each worker phase it reached (queue, admit,
+    # seat_gate, acquire_source, source_restore, source_verify, execute,
+    # publish_log), mirroring the pool contract; a phase never entered is absent.
+    # Defaulted so a worker that predates the field still decodes.
+    phase_ms: dict[str, int] = field(default_factory=dict)
 
 
 def clamp_leaf_timeout_s(requested: int | None) -> int:
@@ -199,6 +204,11 @@ def run_leaf(task: str, cache_key: str | None) -> LeafResult:
         sp.set_attribute("worker", result.worker_id)
         sp.set_attribute("attempt", result.attempt)
         sp.set_attribute("state", result.state)
+        # The worker's own phase split, so a slow leaf's farm.run span says whether
+        # it waited (queue/seat_gate), fetched (acquire_source) or built (execute)
+        # without joining the pool's log by time window.
+        for phase, ms in result.phase_ms.items():
+            sp.set_attribute(f"phase.{phase}_ms", ms)
         return result
 
 

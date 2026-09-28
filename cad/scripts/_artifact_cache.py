@@ -266,9 +266,17 @@ def cache_key(file_deps: list[str], digest_one, label: str | None = None) -> str
 # --------------------------------------------------------------------------- #
 # Pack / unpack -- one gzip tar of a task's outputs, paths stored repo-relative
 # --------------------------------------------------------------------------- #
+# gzip level 6 (zlib's default), not tarfile's 9: the export and package entries
+# (329 MB / 660 MB) spend most of their pack in deflate, and on the real 701 MB
+# export payload level 9 took 25.1 s for 329.1 MB against 12.3 s for 348.1 MB at
+# level 6. SLDPRT/PNG members are already compressed, so their size barely moves.
+# Only the stored bytes change: keys hash inputs, and restore reads any level.
+_PACK_LEVEL = 6
+
+
 def _pack(outputs: list[Path]) -> bytes:
     buf = io.BytesIO()
-    with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+    with tarfile.open(fileobj=buf, mode="w:gz", compresslevel=_PACK_LEVEL) as tar:
         for out in outputs:
             if out.exists():
                 tar.add(str(out), arcname=_rel(out))
@@ -313,6 +321,13 @@ def _unpack(blob: bytes) -> None:
 # --------------------------------------------------------------------------- #
 # Backend -- Azure Blob container over HTTPS (443)
 # --------------------------------------------------------------------------- #
+# Parallel block transfers for the entries above the SDK's single-shot size
+# (64 MiB put / 32 MiB get): the export and package entries. The SDK default
+# moves their 4 MiB blocks one at a time; downloading the 329 MB export entry
+# took 244.3 s serially and 45.8 s at 8. Smaller entries still go in one request.
+_TRANSFER_CONCURRENCY = 8
+
+
 class _BlobBackend:
     """One Azure Blob container of content-addressed ``<key>.tar.gz`` entries.
 
@@ -331,7 +346,8 @@ class _BlobBackend:
     def get(self, key: str) -> bytes | None:
         from azure.core.exceptions import ResourceNotFoundError
         try:
-            return self._cc.get_blob_client(self._name(key)).download_blob().readall()
+            blob = self._cc.get_blob_client(self._name(key))
+            return blob.download_blob(max_concurrency=_TRANSFER_CONCURRENCY).readall()
         except ResourceNotFoundError:
             return None
 
@@ -343,8 +359,12 @@ class _BlobBackend:
     def put(self, key: str, blob: bytes) -> None:
         # Content-addressed: any concurrent writer stores identical bytes, so
         # overwrite is a harmless no-op (last-writer-wins). A blob upload commits
-        # atomically, so a concurrent reader never observes a partial entry.
-        self._cc.get_blob_client(self._name(key)).upload_blob(blob, overwrite=True)
+        # atomically, so a concurrent reader never observes a partial entry --
+        # also when it is chunked: the staged blocks become visible only at the
+        # final block-list commit.
+        self._cc.get_blob_client(self._name(key)).upload_blob(
+            blob, overwrite=True, max_concurrency=_TRANSFER_CONCURRENCY
+        )
 
 
 # --------------------------------------------------------------------------- #
