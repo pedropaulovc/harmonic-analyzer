@@ -260,10 +260,15 @@ GEOMETRY_TOP_KEEP = {
     "PadCornerRadius": (0.070, 0.236),
     "FlangeCornerRadius": (0.040, 0.215),
     "RimInnerCornerRadius": (0.050, 0.232),
-    # Below the 287.2 depth dimension's lower extension line (sheet y 0.149),
-    # not against it: three caption lines ride under this value (2026-09
-    # review clarity item).
-    "RimWidth": (0.243, 0.125),
+    # Above the plan, beside the 444.5/457.2 stack, not below it. The
+    # witnesses rise from the reference line at the view centre (sheet y
+    # 0.184), and the stamped ID sits on the rim between them, 14.5 mm below
+    # that line. With the value below the plan (was (0.243, 0.125)) the
+    # witnesses ran 71 mm down past the serial, and the STAMPED ID leader had
+    # to cross one of them to reach it (leader-crosses-line). Going up, they
+    # leave the outline 10 mm before the dimension line and never pass the
+    # serial. x keeps the 54 mm caption row clear of the 457.2 witness.
+    "RimWidth": (0.238, 0.241),
 }
 SIDE_KEEP = {
     "BottomThickness": (0.073, 0.085),
@@ -281,7 +286,16 @@ HOLE_TOP_KEEP: dict[str, tuple[float, float]] = {}
 # captions ran off the sheet edge -- 433.6 mm on a 431.8 mm sheet. Both texts
 # now sit beside the corner they dimension, captions inside the border.
 SECTION_KEEP = {
-    "RimHeight": (0.393, 0.215),
+    # Below the section, between the view (bottom 93.5 mm) and its SECTION
+    # A-A label (top 80.5 mm). The witnesses start at the rear end (y 0.1017).
+    # Above the view (was (0.393, 0.215)) they ran up the whole section, and
+    # the A1-A4 bore Ra leader had to cross them (leader-crosses-line). Beside
+    # the view (e252ac13d) the 2.5's outside-arrow stub printed across the
+    # hatched deck. Under the view the stub is clear of the part, the
+    # witnesses stop 18 mm down, and the block stays 3.8 mm under the
+    # spotface depth line. x keeps the caption right of the spotface arrow
+    # stub at 384.5 mm.
+    "RimHeight": (0.400, 0.0928),
     "TopRimChamfer": (0.400, 0.189),
     "BottomEdgeChamfer": (0.385, 0.1633),
     # Right of the section, not left: a display dimension anchors where
