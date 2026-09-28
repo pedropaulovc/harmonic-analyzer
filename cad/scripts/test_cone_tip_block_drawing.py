@@ -893,10 +893,21 @@ def _turned_inside(arrow):
     return ((tip_x, tip_y), (tip_x - (tail_x - tip_x) * run, tip_y - (tail_y - tip_y) * run))
 
 
+def _along_dimension_line(segment, name: str) -> bool:
+    """Whether ``segment`` runs along ``name``'s dimension line, the way its
+    arrows point, rather than across it as a witness line does."""
+    (_, tip_y), (_, tail_y) = drawing.sheet_dimension_ink()[name].arrows[0]
+    (x0, y0), (x1, y1) = segment
+    return y0 == y1 if tip_y == tail_y else x0 == x1
+
+
 def _tails_trimmed(segment, name: str):
     """A measured line-and-tails run turned inside: the tails are gone and the
-    line keeps its centre, as long as the module's own dimension line."""
+    line keeps its centre, as long as the module's own dimension line.  Only
+    a horizontal dimension line prints as one run to measure against."""
     (x0, y0), (x1, y1) = segment
+    if y0 != y1:
+        raise ValueError(f"{name}: only a horizontal dimension line's tails trim")
     (a, _), (b, _) = next(
         line for line in drawing.sheet_dimension_ink()[name].lines if line[0][1] == line[1][1]
     )
@@ -961,7 +972,9 @@ def _moved_r287_fixture(names: tuple[str, ...]):
     dimensions = {
         name: drawing.DimensionInk(
             tuple(
-                _tails_trimmed(s, name) if name in turned else _stretch(s, *moves.get(name, still))
+                _tails_trimmed(s, name)
+                if name in turned and _along_dimension_line(s, name)
+                else _stretch(s, *moves.get(name, still))
                 for s in ink.lines
             ),
             tuple(
