@@ -98,7 +98,13 @@ BASE_SECTION_CENTER = (0.170714, 0.1823453)
 TOP_SECTION_CENTER = (0.335290, 0.1815266)
 JOINT_SECTION_SCALE = (1.0, 3.0)
 EXPLODED_ISO_CENTER = (0.140, 0.198)
-EXPLODED_ISO_SCALE = (1.0, 7.0)
+# 1:8, not 1:7: at 1:7 the balloon ring's apex (outline + 12 mm margin) sat at
+# y=328 mm, and a balloon near it (item 10 on af13c8ff8, item 6 on earlier runs)
+# printed 1.2-1.4 mm INTO the BOM table, whose bottom rule is at 331.6 mm. The
+# table already runs to 5 mm under the top border, so it cannot rise with any air
+# left, and the caption and title block sit 7 mm under the lowest balloons, so
+# the view cannot drop. 1:8 pulls the ring apex in by ~15 mm at both ends.
+EXPLODED_ISO_SCALE = (1.0, 8.0)
 ASSEMBLY_ISO_CENTER = (0.345, 0.172)
 ASSEMBLY_ISO_SCALE = (1.0, 7.0)
 SHEET_SCALES = {
@@ -1154,10 +1160,16 @@ def _reattach_frame_balloons(
         adapter, view, notes[item], face, item
     )
 
+    # Offsets are sheet metres from each balloon's native attachment. Items 2
+    # and 9 attach 7 mm apart on the upper-left column/casting corner: at
+    # (-18, -12) and (-16, -8) mm their circles printed 1.50 mm apart, under the
+    # audit's 0.5 x text-height clearance (1.74 mm); 9 now rises above the
+    # screw instead. Item 5 at (+14, +10) mm printed onto the rear-right
+    # MHA-133 cap; (+8, +16) mm clears it above the rear rail.
     short = {
         item_by_stem["tube-frame"]: (-0.018, -0.012),
-        item_by_stem["top-frame"]: (0.014, 0.010),
-        item_by_stem["frame-cross-screw"]: (-0.016, -0.008),
+        item_by_stem["top-frame"]: (0.008, 0.016),
+        item_by_stem["frame-cross-screw"]: (-0.018, 0.004),
     }
     _spread_balloons(
         adapter,
@@ -1255,7 +1267,8 @@ def _place_package(adapter: Any) -> None:
     _reattach_frame_balloons(adapter, exploded, balloons, balloon_items)
     _add_note_block(
         adapter,
-        "EXPLODED VIEW 1:7 - SEE SHEET 3 FOR INSTALLATION ORDER",
+        f"EXPLODED VIEW {EXPLODED_ISO_SCALE[0]:g}:{EXPLODED_ISO_SCALE[1]:g}"
+        " - SEE SHEET 3 FOR INSTALLATION ORDER",
         (0.045, 0.075),
         label="exploded-view caption",
     )
