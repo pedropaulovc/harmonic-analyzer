@@ -26,6 +26,7 @@ import _seat_forensics
 from _common import (
     _build_id,
     _early_bound,
+    _read_member,
     _visible_document_paths,
     apply_custom_properties,
 )
@@ -1744,13 +1745,85 @@ TITLE_BLOCK_COPYRIGHT_PROPERTY = "COPYRIGHT_YEAR"
 DRAWING_BUILD_ID_PROPERTY = "BUILD_ID"
 
 
+# ``IModelDoc2.IsOpenedViewOnly``: "Files are loaded using multi-threading ...
+# Until all data and references are loaded, the file is in view-only mode ...
+# When a file is in view-only mode, many API queries return NULL or empty
+# data." That is the document's own positive "not loaded yet" signal, so an
+# empty read on a view-only document waits for it to clear -- bounded, logged,
+# and never a blind re-read of a document that says it is loaded.
+_VIEW_ONLY_WAIT_S = 30.0
+_VIEW_ONLY_POLL_S = 0.25
+
+
+def _opened_view_only(model: Any) -> bool | None:
+    """``IsOpenedViewOnly``, or ``None`` when the document gives no boolean."""
+    try:
+        value = _read_member(model, "IsOpenedViewOnly")
+    except Exception:  # noqa: BLE001 - unreadable is "unknown", never a verdict
+        return None
+    return value if isinstance(value, bool) else None
+
+
+def _await_document_loaded(model: Any) -> dict[str, Any]:
+    """Wait for a view-only (still loading) document to finish loading.
+
+    Returns the observation for the failure capture: ``view_only`` as first
+    read, and, when it had to wait, ``view_only_wait_s`` and the final state.
+    """
+    view_only = _opened_view_only(model)
+    load: dict[str, Any] = {"view_only": "unknown" if view_only is None else view_only}
+    if view_only is not True:
+        return load
+    _telemetry.info(
+        "source document is still loading (IsOpenedViewOnly=True) with empty "
+        f"custom properties; waiting up to {_VIEW_ONLY_WAIT_S:.0f}s for it to load"
+    )
+    begun = time.monotonic()
+    while view_only is True and time.monotonic() - begun < _VIEW_ONLY_WAIT_S:
+        time.sleep(_VIEW_ONLY_POLL_S)
+        view_only = _opened_view_only(model)
+    load["view_only_wait_s"] = round(time.monotonic() - begun, 2)
+    load["view_only_after_wait"] = "unknown" if view_only is None else view_only
+    _telemetry.info(
+        f"source document view-only wait ended after {load['view_only_wait_s']:.1f}s "
+        f"(IsOpenedViewOnly={load['view_only_after_wait']})"
+    )
+    return load
+
+
 def read_required_properties(
     model: Any, names: Sequence[str], *, required: Iterable[str]
 ) -> dict[str, str]:
-    properties = {name: str(model.GetCustomInfoValue("", name) or "") for name in names}
+    """The source document's file-level custom properties ``names``; raise when
+    one of ``required`` is empty, or ``Revision`` is not the current release.
+
+    An empty required value is re-read only after the document itself said it
+    was still loading (see ``_await_document_loaded``). Still empty, the failure
+    names the document, its configuration, both property APIs' answers and the
+    seat's age and startup state (``_seat_forensics.capture_missing_properties``)
+    before raising the same ``RuntimeError``.
+    """
+    required = tuple(required)
+
+    def read() -> dict[str, str]:
+        return {name: str(model.GetCustomInfoValue("", name) or "") for name in names}
+
+    properties = read()
     missing = [name for name in required if not properties.get(name)]
     if missing:
-        raise RuntimeError(f"source part properties are missing: {missing}")
+        load = _await_document_loaded(model)
+        if "view_only_wait_s" in load:
+            properties = read()
+            missing = [name for name in required if not properties.get(name)]
+        if missing:
+            _seat_forensics.capture_missing_properties(
+                model,
+                f"source part properties are missing: {missing}",
+                missing=missing,
+                values=properties,
+                load=load,
+            )
+        _telemetry.info("source part properties read after the document finished loading")
     revision = properties.get(TITLE_BLOCK_REVISION_PROPERTY)
     if revision is not None:
         expected = _config.release_revision()

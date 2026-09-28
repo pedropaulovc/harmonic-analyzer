@@ -42,6 +42,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, cast
+from types import SimpleNamespace
 from unittest import mock
 
 import pytest
@@ -252,6 +253,7 @@ def offline_seat(monkeypatch, tmp_path):
     monkeypatch.setattr(_seat_forensics, "_sldworks_pids", lambda: {4242})
     monkeypatch.setattr(_seat_forensics, "_seat_pids_at_start", frozenset({4242}))
     monkeypatch.setattr(_seat_forensics, "_seat_identity", {})
+    monkeypatch.setattr(_seat_forensics, "_seat_startup", {})
     monkeypatch.setattr(_seat_forensics, "_process_started_at", lambda pid: 1_700_000_000.0)
     monkeypatch.setattr(_seat_forensics, "_process_memory", lambda pid: (1 << 30, 1 << 29))
     monkeypatch.setattr(_seat_forensics, "_process_session_id", lambda pid: 1)
@@ -592,6 +594,230 @@ def test_unresolvable_seat_pid_is_not_invented(monkeypatch):
 
     assert prov["seat_pid_source"] == "unresolved"
     assert "seat_pid" not in prov
+
+
+class _StartingSeat(_Seat):
+    """An ``ISldWorks`` whose ``StartupProcessCompleted`` (a propget) answers
+    each read with the next scripted value, repeating the last."""
+
+    def __init__(self, answers: list[Any], **kwargs: Any):
+        super().__init__(**kwargs)
+        self._answers = list(answers)
+        self.startup_reads = 0
+
+    @property
+    def StartupProcessCompleted(self) -> Any:
+        self.startup_reads += 1
+        return self._answers[min(self.startup_reads, len(self._answers)) - 1]
+
+
+@pytest.fixture
+def fast_polls(monkeypatch):
+    """The waits poll a real signal; the test only removes the wall time."""
+    monkeypatch.setattr(_seat_forensics, "_STARTUP_POLL_S", 0.0)
+    monkeypatch.setattr(_seat_forensics.time, "sleep", lambda _s: None)
+
+
+def test_a_starting_seat_is_held_until_startup_completes(
+    monkeypatch, fast_polls, capture_telemetry
+):
+    """The 2026-09-28 fresh-seat failures: a leaf connected to a seat ~20 s old
+    and opened its source before SolidWorks said startup was done. Connect now
+    holds the session on the seat's own ``StartupProcessCompleted`` and says
+    so; the build starts only on a True."""
+    spans, logs = capture_telemetry
+    monkeypatch.setattr(_seat_forensics, "_process_started_at", lambda pid: time.time() - 20)
+    seat = _StartingSeat([False, False, False, True])
+
+    prov = _seat_forensics.record_seat_provenance(_Adapter(sw=seat))
+
+    assert seat.startup_reads == 4  # stopped polling on the first True
+    assert prov["seat_startup_completed"] is True
+    assert prov["seat_startup_wait_s"] >= 0
+    assert 19 <= prov["seat_startup_uptime_s"] <= 25
+    bodies = [str(r.log_record.body) for r in logs.get_finished_logs()]
+    assert any("StartupProcessCompleted=False" in body for body in bodies)
+    assert any("startup_completed=True" in body for body in bodies)  # the seat line
+
+
+def test_a_seat_older_than_the_startup_window_is_not_waited_on(
+    monkeypatch, fast_polls, capture_telemetry
+):
+    """Startup belongs to the START of a process: a seat past the window that
+    still answers False is stuck, and waiting would tax every later leaf."""
+    spans, logs = capture_telemetry
+    seat = _StartingSeat([False])  # fixture: the seat started in 2023
+
+    prov = _seat_forensics.record_seat_provenance(_Adapter(sw=seat))
+
+    assert seat.startup_reads == 1
+    assert prov["seat_startup_completed"] is False
+    assert prov["seat_startup_wait_s"] == 0.0
+    assert any(
+        "past the" in str(r.log_record.body) and r.log_record.severity_text == "WARN"
+        for r in logs.get_finished_logs()
+    )
+
+
+def test_a_wait_that_runs_out_proceeds_and_says_so(monkeypatch, fast_polls, capture_telemetry):
+    """The window is measured in seat AGE, so a seat that never completes costs
+    at most the rest of it, and the build goes on with the state on record."""
+    spans, logs = capture_telemetry
+    monkeypatch.setenv("HARMONIC_SW_STARTUP_WINDOW", "30")
+    started = time.time() - 29.9
+    monkeypatch.setattr(_seat_forensics, "_process_started_at", lambda pid: started)
+    seat = _StartingSeat([False])
+
+    prov = _seat_forensics.record_seat_provenance(_Adapter(sw=seat))
+
+    assert prov["seat_startup_completed"] is False
+    assert "seat_startup_wait_s" in prov
+    assert any("proceeding" in str(r.log_record.body) for r in logs.get_finished_logs())
+
+
+def test_a_ready_or_mute_seat_costs_no_wait():
+    """The control: a started seat is read once, and a seat with no boolean
+    answer is ``unknown`` -- neither a reason to wait nor a claim it is ready."""
+    ready = _StartingSeat([True])
+    assert _seat_forensics.record_seat_provenance(_Adapter(sw=ready))[
+        "seat_startup_completed"
+    ] is True
+    assert ready.startup_reads == 1
+    mute = _seat_forensics.record_seat_provenance(_Adapter(sw=_Seat()))
+    assert mute["seat_startup_completed"] == "unknown"
+    assert "seat_startup_wait_s" not in mute
+
+
+class _PropertyManager:
+    """``ICustomPropertyManager`` early-bound: ``Get6``'s outs ride the return
+    tuple ``(retval, ValOut, ResolvedValOut, WasResolved, LinkToProperty)``."""
+
+    def __init__(self, values: dict[str, str]):
+        self._values = values
+        self.Count = len(values)
+
+    def GetNames(self) -> tuple[str, ...]:
+        return tuple(self._values)
+
+    def Get6(self, name: str, use_cached: bool) -> tuple[int, str, str, bool, bool]:
+        if name not in self._values:
+            return 1, "", "", False, False  # swCustomInfoGetResult_NotPresent
+        return 0, self._values[name], self._values[name], False, False
+
+
+class _SourcePart:
+    """An opened source ``IModelDoc2`` whose properties appear once it has
+    finished loading, as a multi-threaded open reports through
+    ``IsOpenedViewOnly``."""
+
+    def __init__(self, properties: dict[str, str], *, loading_reads: int):
+        self._properties = properties
+        self._loading_reads = loading_reads
+        self.property_reads = 0
+        self.Extension = SimpleNamespace(
+            CustomPropertyManager=lambda configuration: _PropertyManager(
+                self._properties if configuration == "" and not self._loading_reads else {}
+            )
+        )
+        self.ConfigurationManager = SimpleNamespace(
+            ActiveConfiguration=SimpleNamespace(Name="Default")
+        )
+
+    def IsOpenedViewOnly(self) -> bool:
+        if self._loading_reads:
+            self._loading_reads -= 1
+            return True
+        return False
+
+    def GetCustomInfoValue(self, configuration: str, name: str) -> str:
+        self.property_reads += 1
+        return "" if self._loading_reads else self._properties.get(name, "")
+
+    def GetPathName(self) -> str:
+        return r"C:\harmonic\work\cad\out\sldprt\crank_hub.SLDPRT"
+
+    def GetTitle(self) -> str:
+        return "crank_hub.SLDPRT"
+
+    def GetType(self) -> int:
+        return 1
+
+    def IsOpenedReadOnly(self) -> bool:
+        return False
+
+
+_TITLE_BLOCK = ("Number", "Material Specification", "Finish", "Quantity")
+
+
+def test_a_still_loading_source_is_read_once_it_has_loaded(
+    monkeypatch, capture_telemetry
+):
+    """Every property read empty on a source the seat had not finished loading;
+    the document's own view-only flag is the signal to wait on, and the read
+    that follows it succeeds."""
+    import _drawing_common
+
+    spans, logs = capture_telemetry
+    monkeypatch.setattr(_drawing_common, "_VIEW_ONLY_POLL_S", 0.0)
+    part = _SourcePart({name: "x" for name in _TITLE_BLOCK}, loading_reads=2)
+
+    got = _drawing_common.read_required_properties(part, _TITLE_BLOCK, required=_TITLE_BLOCK)
+
+    assert got == {name: "x" for name in _TITLE_BLOCK}
+    assert part.property_reads == 2 * len(_TITLE_BLOCK)  # one read, one after the load
+    assert any("IsOpenedViewOnly=True" in str(r.log_record.body) for r in logs.get_finished_logs())
+
+
+def test_empty_properties_on_a_loaded_source_name_the_document_api_and_seat(
+    monkeypatch, capture_telemetry
+):
+    """A document that says it is loaded is not re-read: the failure raises the
+    same message at once, and the one ERROR line names what the next triage
+    needs -- the document, its configuration, the API that read empty, what
+    the property manager holds, and the seat's age and startup state."""
+    import _drawing_common
+
+    spans, logs = capture_telemetry
+    monkeypatch.setattr(_common, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(_seat_forensics, "_process_started_at", lambda pid: time.time() - 21.8)
+    _seat_forensics.record_seat_provenance(_Adapter(sw=_StartingSeat([True], pid=15124)))
+    part = _SourcePart({"Number": "MHA-104"}, loading_reads=0)
+
+    with pytest.raises(
+        RuntimeError,
+        match=r"^source part properties are missing: \['Material Specification', "
+        r"'Finish', 'Quantity'\]$",
+    ):
+        _drawing_common.read_required_properties(part, _TITLE_BLOCK, required=_TITLE_BLOCK)
+
+    assert part.property_reads == len(_TITLE_BLOCK)  # no blind re-read
+    (record,) = [
+        r for r in logs.get_finished_logs() if "[forensics] source part" in str(r.log_record.body)
+    ]
+    body = str(record.log_record.body)
+    assert "crank_hub.SLDPRT" in body and "configuration='Default'" in body
+    assert "GetCustomInfoValue" in body and "view_only=False" in body
+    assert "file_properties.count=1" in body and "startup_completed=True" in body
+    assert record.log_record.attributes["seat_pid"] == 15124
+    assert 21 <= record.log_record.attributes["seat_uptime_s"] <= 30
+    capture = json.loads(record.log_record.attributes["capture"])
+    assert capture["file_properties"]["names"] == ["Number"]
+    assert capture["file_properties"]["get6"]["Finish"]["result"] == "NotPresent"
+    assert capture["file_properties"]["get6"]["Number"] == {
+        "result": "CachedValue", "value": "MHA-104", "resolved": "MHA-104",
+    }
+
+
+def test_a_capture_that_cannot_read_anything_still_raises_the_readers_failure():
+    """The forensics may never replace the failure they describe."""
+    with pytest.raises(RuntimeError, match=r"^source part properties are missing: \['Finish'\]$"):
+        _seat_forensics.capture_missing_properties(
+            object(),
+            "source part properties are missing: ['Finish']",
+            missing=["Finish"],
+            values={"Finish": ""},
+            load={"view_only": "unknown"},
+        )
 
 
 def test_watchdog_abort_names_the_seat_it_killed(capture_telemetry):
