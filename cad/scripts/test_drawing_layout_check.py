@@ -2191,17 +2191,21 @@ def test_pinned_anchor_instance_must_be_shown():
 
 
 class _AnchorEdge:
-    """A drawing-view edge: ``IEntity.GetComponent`` names its owner by path."""
+    """A drawing-view edge: ``IEntity.GetComponent`` names its owner by path.
 
-    def __init__(self, owner, ends=(0.001, 0.002, 0.003, 0.004, 0.005, 0.006)):
+    Its curve runs straight between ``ends`` unless ``middle`` bends it
+    through another parameter midpoint (an arc)."""
+
+    def __init__(self, owner, ends=(0.001, 0.002, 0.003, 0.004, 0.005, 0.006), middle=None):
         self._owner = SimpleNamespace(Name2=owner)
         self._ends = ends
+        self._middle = middle or tuple((s + e) / 2.0 for s, e in zip(ends[0:3], ends[3:6]))
 
     def GetComponent(self):
         return self._owner
 
     def GetCurve(self):
-        return SimpleNamespace()
+        return SimpleNamespace(Evaluate2=lambda t, _derivatives: self._middle)
 
     def GetCurveParams2(self):
         return (*self._ends, 0.0, 1.0, 0.0, 0.0, 0.0)
@@ -2328,51 +2332,18 @@ def _exploded_view(children, steps, visible=None):
     return view
 
 
-class _BodyEdge:
-    """A straight model edge of a part body, in part metres (IEdge + ICurve)."""
+def _body(points):
+    """``IBody2`` whose ``GetExtremePoint`` returns the first of ``points``
+    farthest along the direction: a tie falls to list order, the stand-in for
+    whatever order a real body would break it in."""
+    vertices = [tuple(point) for point in points]
 
-    def __init__(self, start, end):
-        self._params = (*start, *end, 0.0, 1.0, 0.0, 0.0, 0.0)
-        self.curve = SimpleNamespace(
-            IsLine=lambda: True,
-            IsCircle=lambda: False,
-            Evaluate2=lambda t, _derivatives: tuple(
-                s + t * (e - s) for s, e in zip(start, end)
-            ),
-        )
+    def extreme(x, y, z):
+        if not vertices:
+            return (False, 0.0, 0.0, 0.0)
+        return (True, *max(vertices, key=lambda p: p[0] * x + p[1] * y + p[2] * z))
 
-    def GetCurve(self):
-        return self.curve
-
-    def GetCurveParams2(self):
-        return self._params
-
-
-class _BodyFace:
-    """``IFace2``: counts its edges without fetching them; ``GetEdges`` is the fetch."""
-
-    def __init__(self, edges, count=None):
-        self._edges = tuple(edges)
-        self._count = len(self._edges) if count is None else count
-        self.fetched = 0
-        self.next = None
-
-    def GetEdgeCount(self):
-        return self._count
-
-    def GetEdges(self):
-        self.fetched += 1
-        return self._edges
-
-    def GetNextFace(self):
-        return self.next
-
-
-def _body(faces):
-    """``IBody2`` whose ``GetFirstFace``/``GetNextFace`` chain runs in ``faces`` order."""
-    for face, following in zip(faces, [*faces[1:], None]):
-        face.next = following
-    return SimpleNamespace(GetFirstFace=lambda: faces[0] if faces else None)
+    return SimpleNamespace(GetExtremePoint=extreme)
 
 
 def _balloon(monkeypatch, sheet, view, anchors, items=(("cone-gear", "1"),)):
@@ -2527,67 +2498,48 @@ def test_balloon_must_attach_to_exactly_one_edge_of_the_exact_instance(
 
 _WALK = drawing_common.BalloonAnchor()
 
+# An L-shaped outline's corners.
+_L_POINTS = ((0.0, 0.0, 0.0), (0.004, 0.0, 0.0), (0.004, 0.006, 0.0), (0.0, 0.006, 0.0))
 
-def _walk_faces():
-    """Three faces of an L-shaped outline, one straight edge each."""
+
+def _comb():
+    """A 12-tooth comb extruded 3 mm: 96 corners, most sharing a face with
+    another along x, y or z, as a gear or a screw thread does."""
     return [
-        _BodyFace([_BodyEdge((0.0, 0.0, 0.0), (0.004, 0.0, 0.0))]),
-        _BodyFace([_BodyEdge((0.004, 0.0, 0.0), (0.004, 0.006, 0.0))]),
-        _BodyFace([_BodyEdge((0.004, 0.006, 0.0), (0.0, 0.006, 0.0))]),
+        (tooth * 0.002 + dx, dy, z)
+        for tooth in range(12)
+        for dx, dy in ((0.0, 0.0), (0.0, 0.004), (0.001, 0.004), (0.001, 0.0))
+        for z in (0.0, 0.003)
     ]
 
 
-def test_walk_tries_the_same_points_in_any_face_order(monkeypatch):
-    """Neither IFace2::GetEdges nor the body's face chain promises an order:
-    the walk must rank what it read by geometry, so a body enumerated in any
-    order hit-tests the same points in the same order and anchors identically."""
-    from itertools import permutations
+def test_walk_tries_the_same_points_however_the_body_breaks_ties(monkeypatch):
+    """A body has faces square to x, y and z and far more of them than a walk
+    can read: a probe direction normal to one would leave which of its
+    corners comes back to the kernel. No probe direction is, so the comb
+    anchors identically whatever order its corners are held in."""
+    import random
 
+    def run(points, sheet):
+        view = _exploded_view(_instances("cone-gear-1", bodies={"cone-gear-1": _body(points)}), [])
+        return _balloon(monkeypatch, sheet, view, {"cone-gear": _WALK})
+
+    probe = _AnchorSheet({})
+    with pytest.raises(RuntimeError, match="no verifiably visible edge"):
+        run(_comb(), probe)
+    claimed = probe.hits[2]
+    shuffle = random.Random(865)
     runs = []
-    for order in permutations(range(3)):
-        faces = _walk_faces()
-        body = _body([faces[index] for index in order])
-        view = _exploded_view(_instances("cone-gear-1", bodies={"cone-gear-1": body}), [])
-        sheet = _AnchorSheet({(0.004, 0.003): _AnchorEdge("cone-gear-1")})
-        balloons, _projected, anchors = _balloon(monkeypatch, sheet, view, {"cone-gear": _WALK})
-        assert len(balloons) == 1 and view.selected_entities == []
+    for _ in range(12):
+        points = _comb()
+        shuffle.shuffle(points)
+        sheet = _AnchorSheet({claimed: _AnchorEdge("cone-gear-1")})
+        balloons, _projected, anchors = run(points, sheet)
+        assert len(balloons) == 1
         runs.append((tuple(sheet.hits), anchors[0]))
-    assert len(set(hits for hits, _anchor in runs)) == 1
-    assert all(anchor == runs[0][1] for _hits, anchor in runs)
-    assert runs[0][1]["method"] == "walk"
-    assert runs[0][1]["point_mm"] == "4.000,3.000,0.000"
-    assert runs[0][1]["tried"] == len(runs[0][0]) > 1
-
-
-def test_walk_budget_never_fetches_an_oversized_face_or_reads_past_its_caps(monkeypatch):
-    """A toothed or engraved face holds thousands of edges: GetEdges on it
-    materialises every proxy. Its count is read, the face is skipped, and the
-    walk stops at its face and edge caps however many faces remain."""
-    huge = _BodyFace([], count=5000)
-    small = [
-        _BodyFace(
-            [
-                _BodyEdge((index * 0.001, 0.0, 0.0), (index * 0.001, 0.001, 0.0)),
-                _BodyEdge((index * 0.001, 0.001, 0.0), (index * 0.001 + 0.0005, 0.002, 0.0)),
-            ]
-        )
-        for index in range(1, 31)
-    ]
-    body = _body([huge, *small])
-    claimed = {}
-    for face in small:
-        for edge in face._edges:
-            start, end = edge._params[0:3], edge._params[3:6]
-            middle = edge.curve.Evaluate2(0.5, 0)
-            for x, y, _z in (start, end, middle):
-                claimed[(round(x, 9), round(y, 9))] = _AnchorEdge("cone-gear-1")
-    view = _exploded_view(_instances("cone-gear-1", bodies={"cone-gear-1": body}), [])
-    sheet = _AnchorSheet(claimed)
-    _balloons, _projected, anchors = _balloon(monkeypatch, sheet, view, {"cone-gear": _WALK})
-    assert huge.fetched == 0
-    assert all(face.fetched == 0 for face in small[15:])
-    assert (anchors[0]["faces"], anchors[0]["edges"], anchors[0]["complete"]) == (16, 30, False)
-    assert anchors[0]["method"] == "walk" and anchors[0]["tried"] == 1
+    assert all(run_ == runs[0] for run_ in runs)
+    assert runs[0][0] == tuple(probe.hits[:3])
+    assert (runs[0][1]["method"], runs[0][1]["tried"]) == ("walk", 3)
 
 
 def test_walk_anchors_identically_on_a_640_and_an_820_pixel_seat_window(monkeypatch):
@@ -2599,7 +2551,7 @@ def test_walk_anchors_identically_on_a_640_and_an_820_pixel_seat_window(monkeypa
 
     def run(sheet):
         view = _exploded_view(
-            _instances("cone-gear-1", bodies={"cone-gear-1": _body(_walk_faces())}), []
+            _instances("cone-gear-1", bodies={"cone-gear-1": _body(_L_POINTS)}), []
         )
         return _balloon(monkeypatch, sheet, view, {"cone-gear": _WALK})
 
@@ -2625,8 +2577,8 @@ def test_walk_hit_on_the_same_named_part_of_another_subassembly_is_not_claimed(m
     """sub-2's gear sits in front of sub-1's walk point: that hit is sub-2's,
     not sub-1's, however alike their last path segments read."""
     bodies = {
-        "sub-1/cone-gear-1": _body([_BodyFace([_BodyEdge((0.0, 0.01, 0.0), (0.0, 0.01, 0.0))])]),
-        "sub-2/cone-gear-1": _body([_BodyFace([_BodyEdge((0.0, 0.02, 0.0), (0.0, 0.02, 0.0))])]),
+        "sub-1/cone-gear-1": _body([(0.0, 0.01, 0.0)]),
+        "sub-2/cone-gear-1": _body([(0.0, 0.02, 0.0)]),
     }
     view = _exploded_view(_pair_of_subassemblies(bodies=bodies), [])
     sheet = _AnchorSheet(
@@ -2644,12 +2596,12 @@ def test_walk_without_a_hit_selects_a_listed_visible_edge_through_the_view(monke
     """A pin in its bore: no hit test claims it. The view's hidden-line pass
     still lists its drawn edges; the one holding the outermost endpoint is
     selected through the view, whatever order the undocumented array uses."""
-    lone = _BodyEdge((0.0, 0.05, 0.0), (0.001, 0.05, 0.0))
+    lone = [(0.0, 0.05, 0.0), (0.001, 0.05, 0.0)]
     first = _AnchorEdge("cone-gear-1", ends=(0.02, 0.001, 0.0, 0.01, 0.03, 0.0))
     outer = _AnchorEdge("cone-gear-1", ends=(0.01, 0.03, 0.0, 0.0, 0.0, 0.0))
     for listed in ((first, outer), (outer, first)):
         view = _exploded_view(
-            _instances("cone-gear-1", bodies={"cone-gear-1": _body([_BodyFace([lone])])}),
+            _instances("cone-gear-1", bodies={"cone-gear-1": _body(lone)}),
             [],
             visible={"cone-gear-1": listed},
         )
@@ -2657,64 +2609,71 @@ def test_walk_without_a_hit_selects_a_listed_visible_edge_through_the_view(monke
         first.sheet = outer.sheet = sheet
         balloons, _projected, anchors = _balloon(monkeypatch, sheet, view, {"cone-gear": _WALK})
         assert len(balloons) == 1 and view.selected_entities == [outer]
-        assert len(sheet.hits) == 3
+        assert len(sheet.hits) == 2
         assert {key: anchors[0][key] for key in ("method", "sheet_mm", "edge_mm", "tried", "visible")} == {
             "method": "visible-edge",
             "sheet_mm": "",
             "edge_mm": "10.000,30.000,0.000,0.000,0.000,0.000",
-            "tried": 3,
+            "tried": 2,
             "visible": "cone-gear-1=2",
         }
 
 
-def test_walk_without_a_hit_or_a_listed_edge_fails_naming_what_it_tried(monkeypatch):
-    """No hit and nothing listed (or too much to fetch) is not "attach to the
-    first walked edge": that edge may be hidden and print no leader end."""
-    bodies = {
-        name: _body([_BodyFace([_BodyEdge((0.0, 0.05, 0.0), (0.0, 0.05, 0.0))])])
-        for name in ("cone-gear-1", "cone-gear-2")
-    }
+def test_visible_edge_parts_two_arcs_on_the_same_ends_by_their_midpoints(monkeypatch):
+    """Two arcs of a pin's outline can join the same two points; keyed by
+    their ends alone, the array's undocumented order chose between them.
+    Their midpoints differ, and the lower one wins in either listing order;
+    two edges alike in ends and midpoint fail rather than let order choose."""
+    ends = (0.0, 0.0, 0.0, 0.01, 0.0, 0.0)
+    upper = _AnchorEdge("cone-gear-1", ends=ends, middle=(0.005, 0.005, 0.0))
+    lower = _AnchorEdge("cone-gear-1", ends=ends, middle=(0.005, -0.005, 0.0))
+
+    def run(listed):
+        view = _exploded_view(
+            _instances("cone-gear-1", bodies={"cone-gear-1": _body([])}),
+            [],
+            visible={"cone-gear-1": listed},
+        )
+        sheet = _AnchorSheet({})
+        for edge in listed:
+            edge.sheet = sheet
+        _balloon(monkeypatch, sheet, view, {"cone-gear": _WALK})
+        return view.selected_entities
+
+    assert run((upper, lower)) == run((lower, upper)) == [lower]
+    twin = _AnchorEdge("cone-gear-1", ends=ends, middle=(0.005, -0.005, 0.0))
+    with pytest.raises(RuntimeError, match="2 visible edges with the same ends and midpoint"):
+        run((lower, twin))
+
+
+@pytest.mark.parametrize("listed", [0, 65], ids=["none-listed", "over-the-cap"])
+def test_walk_without_a_hit_or_a_listed_edge_fails_naming_what_it_tried(monkeypatch, listed):
+    """No hit and nothing listed (or too much to fetch) for the first
+    instance fails, even though the second lists a drawable edge: letting
+    the second stand in makes the ballooned instance hang on how many edges
+    a seat lists (lag-screw-1 listed 0 on swmaker000004 and 45 elsewhere).
+    Nor is it "attach to the first walked edge": that edge may be hidden."""
+    bodies = {name: _body([(0.0, 0.05, 0.0)]) for name in ("cone-gear-1", "cone-gear-2")}
+    spare = _AnchorEdge("cone-gear-2")
     view = _exploded_view(
         _instances("cone-gear-1", "cone-gear-2", bodies=bodies),
         [],
-        visible={"cone-gear-2": [_AnchorEdge("cone-gear-2")] * 65},
+        visible={"cone-gear-1": [_AnchorEdge("cone-gear-1")] * listed, "cone-gear-2": [spare]},
     )
 
     def fetch(_component, _kind):
-        raise AssertionError("an instance over the cap must not be fetched")
+        raise AssertionError("only the first instance's count is read, and it is not fetched")
 
     view.GetVisibleEntities2 = fetch
     sheet = _AnchorSheet({})
+    spare.sheet = sheet
     with pytest.raises(
         RuntimeError,
         match=r"cone-gear has no verifiably visible edge: .*\(0\.00, 50\.00\); \(0\.00, 50\.00\)"
-        r".*cone-gear-1=0, cone-gear-2=65",
+        rf".*cone-gear-1 lists {listed} visible edges, not 1-64",
     ):
         _balloon(monkeypatch, sheet, view, {"cone-gear": _WALK})
     assert sheet.balloons == [] and view.selected_entities == []
-
-
-def test_visible_edge_anchor_selects_the_listed_edge_without_any_hit_test(monkeypatch):
-    """A screw head seated on a flange: which edge a hit test returns there
-    depends on the seat's pick aperture in pixels. The anchor that says so
-    never hit-tests or walks the body; it selects the listed edge."""
-    face = _BodyFace([_BodyEdge((0.0, 0.05, 0.0), (0.001, 0.05, 0.0))])
-    first = _AnchorEdge("cone-gear-1", ends=(0.02, 0.001, 0.0, 0.01, 0.03, 0.0))
-    outer = _AnchorEdge("cone-gear-1", ends=(0.01, 0.03, 0.0, 0.0, 0.0, 0.0))
-    view = _exploded_view(
-        _instances("cone-gear-1", bodies={"cone-gear-1": _body([face])}),
-        [],
-        visible={"cone-gear-1": (first, outer)},
-    )
-    sheet = _AnchorSheet({(0.0, 0.05): _AnchorEdge("cone-gear-1")})
-    first.sheet = outer.sheet = sheet
-    anchor = drawing_common.BalloonAnchor(visible_edge=True)
-    balloons, _projected, anchors = _balloon(monkeypatch, sheet, view, {"cone-gear": anchor})
-    assert len(balloons) == 1 and view.selected_entities == [outer]
-    assert sheet.hits == [] and face.fetched == 0
-    assert (anchors[0]["method"], anchors[0]["tried"]) == ("visible-edge", 0)
-    with pytest.raises(ValueError, match="takes no frozen point"):
-        drawing_common.BalloonAnchor((0.0, 0.0, 0.0), visible_edge=True)
 
 
 def test_coincident_attachments_break_on_the_bom_item_not_arrival_order():

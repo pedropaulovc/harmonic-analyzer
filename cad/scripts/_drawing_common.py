@@ -18,7 +18,7 @@ import sys
 import time
 from collections import Counter
 from dataclasses import dataclass, replace
-from itertools import combinations
+from itertools import combinations, product
 from pathlib import Path
 from typing import Any, Callable, Iterable, Iterator, Literal, Mapping, Sequence
 
@@ -5467,21 +5467,10 @@ class BalloonAnchor:
 
     ``point_mm=None`` walks the part's own body instead
     (:func:`_select_balloon_anchor`), for a family no single point claims.
-
-    ``visible_edge=True`` skips every hit test and takes the edge the view's
-    hidden-line pass lists as drawn (:func:`_visible_edge`), for a part drawn
-    against another's outline (a screw head seated on a flange): the frame
-    lag screw's frozen point hit the screw on one seat and the flange on
-    another (runs 20260928T084730204Z and 20260928T085715872Z).
     """
 
     point_mm: tuple[float, float, float] | None = None
     instance: str | None = None
-    visible_edge: bool = False
-
-    def __post_init__(self) -> None:
-        if self.visible_edge and self.point_mm is not None:
-            raise ValueError("a visible-edge balloon anchor takes no frozen point")
 
 
 @dataclass(frozen=True)
@@ -5799,13 +5788,8 @@ def _anchor_model_points(
     ]
 
 
-# A body walk reads at most this many faces and edges of one instance, keeps
-# this many of their points, and a family hit-tests at most this many points
-# across its instances: each edge read is ~30 ms of COM, each hit test a
-# sheet round trip (~0.4 s measured). A face the edge budget cannot finish is
-# skipped unread, so a gear's toothed face never materialises its array.
-_WALK_FACES_PER_INSTANCE = 16
-_WALK_EDGES_PER_INSTANCE = 32
+# A family hit-tests at most this many points across its instances, each a
+# zoomed sheet round trip, and at most this many of one instance's.
 _WALK_POINTS_PER_INSTANCE = 12
 _WALK_HITS_PER_FAMILY = 24
 # The visible-edge fallback keys every visible edge of the instance, so it
@@ -5813,21 +5797,31 @@ _WALK_HITS_PER_FAMILY = 24
 _VISIBLE_EDGES_PER_INSTANCE = 64
 _VIEW_ENTITY_EDGE = 1  # swViewEntityType_Edge
 _SEL_EDGES = 1  # swSelEDGES
+# The walk's probe directions in part space: every sign of (1, 0.618, 0.382)
+# in each cyclic order. No component is zero and no two are equal, so none is
+# normal to an axis-aligned face or square to an axis-aligned bore, and a
+# body's extreme point along one is a single point, on a plane-and-cylinder
+# part usually a vertex or a point of an edge.
+_WALK_DIRECTIONS: tuple[tuple[float, float, float], ...] = tuple(
+    (sx * a, sy * b, sz * c)
+    for a, b, c in ((1.0, 0.618, 0.382), (0.382, 1.0, 0.618), (0.618, 0.382, 1.0))
+    for sx, sy, sz in product((1.0, -1.0), repeat=3)
+)
+
+AnchorMethod = Literal["frozen", "walk", "visible-edge"]
 
 
 @dataclass(frozen=True)
-class _WalkScan:
-    """One instance's bounded body walk: its points, best first, and its cost.
+class _AnchorChoice:
+    """The edge one family's balloon attaches to, and how it was found.
 
-    ``complete`` is whether the walk read every face and edge of the body.
-    Only then is the candidate set, and so the ranked order, independent of
-    the topology enumeration order.
+    A ``visible-edge`` edge is a model edge the view lists, so it is selected
+    through the view; a ``frozen`` or ``walk`` edge is the hit test's own pick.
     """
 
-    points: tuple[tuple[float, float, float], ...]
-    faces: int
-    edges: int
-    complete: bool
+    instance: str
+    edge: Any
+    method: AnchorMethod
 
 
 _PointKey = tuple[int, int, int]
@@ -5838,40 +5832,14 @@ def _point_key(point: Sequence[float]) -> _PointKey:
     return (round(point[0] * 1e6), round(point[1] * 1e6), round(point[2] * 1e6))
 
 
-def _edge_points(edge: Any) -> list[tuple[float, float, float]]:
-    """Points on one raw model edge, in part metres: a line's or circle's
-    parameter midpoint, which lies on the drawn edge, then its two ends.
-    Raw dispatch calls, nothing bound."""
-    curve = _com_invoke(edge, "IEdge", "GetCurve")
-    if curve is None:
-        return []
-    # GetCurveParams2 reads what GetCurve generated, so GetCurve first.
-    params = tuple(float(v) for v in (_com_invoke(edge, "IEdge", "GetCurveParams2") or ()))
-    if len(params) < 8:
-        return []
-    points: list[tuple[float, float, float]] = []
-    if bool(_com_invoke(curve, "ICurve", "IsLine")) or bool(
-        _com_invoke(curve, "ICurve", "IsCircle")
-    ):
-        middle = tuple(
-            _com_invoke(curve, "ICurve", "Evaluate2", (params[6] + params[7]) / 2.0, 0)
-            or ()
-        )
-        if len(middle) >= 3:
-            points.append((float(middle[0]), float(middle[1]), float(middle[2])))
-    points.append((params[0], params[1], params[2]))
-    points.append((params[3], params[4], params[5]))
-    return points
-
-
 def _spread_order(keys: Iterable[_PointKey], limit: int) -> list[_PointKey]:
     """Up to ``limit`` keys: the one farthest from the set's box centre, then
     each next the farthest from every one already taken.
 
-    Geometry alone decides, ties falling to the smaller key, so a body read
-    in any face or edge order ranks the same. Outermost first because a
-    part's outer edges are the ones its neighbours hide least; spread
-    because a family whose first point is hidden is seldom hidden all round.
+    Geometry alone decides, ties falling to the smaller key, so points
+    gathered in any order rank the same. Outermost first because a part's
+    outer edges are the ones its neighbours hide least; spread because a
+    family whose first point is hidden is seldom hidden all round.
     """
     pool = sorted(set(keys))
     if not pool or limit <= 0:
@@ -5895,44 +5863,28 @@ def _spread_order(keys: Iterable[_PointKey], limit: int) -> list[_PointKey]:
     return chosen
 
 
-def _walk_scan(adapter: Any, leaf: _ComponentLeaf) -> _WalkScan:
-    """Read a bounded part of ``leaf``'s body and rank its edge points.
+def _walk_points(adapter: Any, leaf: _ComponentLeaf) -> tuple[tuple[float, float, float], ...]:
+    """``leaf``'s body's extreme points along :data:`_WALK_DIRECTIONS`, ranked.
 
-    At most :data:`_WALK_FACES_PER_INSTANCE` faces and
-    :data:`_WALK_EDGES_PER_INSTANCE` edges are read; a face whose edge count
-    would overrun the edge budget is skipped without fetching its edges (one
-    toothed gear face materialised ~400 edge proxies, 23 s). Neither the
-    typelib nor ``IFace2::GetEdges`` promises an enumeration order, so the
-    points are ranked by :func:`_spread_order`, not taken in walk order.
-    Points are in the part's metres.
+    ``IBody2::GetExtremePoint`` answers from geometry alone, one point per
+    direction even on a tie, so which points exist and the order
+    :func:`_spread_order` tries them in owe nothing to a face or edge
+    enumeration order (which nothing promises), and no face or edge proxy is
+    materialised (a gear's toothed face held ~400). Part metres.
     """
     component = _early_bound(leaf.component, "IComponent2")
     body = adapter._attempt(lambda: component.GetBody(), default=None)
-    face = None if body is None else _com_invoke(body, "IBody2", "GetFirstFace")
-    faces = edges = 0
-    complete = True
+    if body is None:
+        return ()
+    bound = _early_bound(body, "IBody2")
     found: dict[_PointKey, tuple[float, float, float]] = {}
-    while face is not None:
-        if faces == _WALK_FACES_PER_INSTANCE:
-            complete = False
-            break
-        faces += 1
-        count = int(_com_invoke(face, "IFace2", "GetEdgeCount") or 0)
-        if edges + count > _WALK_EDGES_PER_INSTANCE:
-            complete = False
-        else:
-            for edge in tuple(_com_invoke(face, "IFace2", "GetEdges") or ())[:count]:
-                edges += 1
-                for point in _edge_points(edge):
-                    found.setdefault(_point_key(point), point)
-        face = _com_invoke(face, "IFace2", "GetNextFace")
-    ranked = _spread_order(found, _WALK_POINTS_PER_INSTANCE)
-    return _WalkScan(
-        points=tuple(found[key] for key in ranked),
-        faces=faces,
-        edges=edges,
-        complete=complete,
-    )
+    for direction in _WALK_DIRECTIONS:
+        # The wrapper returns the [out] coordinates after the found flag.
+        result = tuple(bound.GetExtremePoint(*direction) or ())
+        if len(result) == 4 and result[0]:
+            point = (float(result[1]), float(result[2]), float(result[3]))
+            found.setdefault(_point_key(point), point)
+    return tuple(found[key] for key in _spread_order(found, _WALK_POINTS_PER_INSTANCE))
 
 
 def _entity_owner(adapter: Any, entity: Any) -> str:
@@ -5999,37 +5951,58 @@ class _VisibleEdge:
     ends: tuple[float, ...] = ()
 
 
-def _visible_edge(adapter: Any, view: Any, leaf: _ComponentLeaf) -> _VisibleEdge:
+def _visible_edge(
+    adapter: Any, view: Any, leaf: _ComponentLeaf, *, label: str
+) -> _VisibleEdge:
     """One edge of ``leaf`` the view is proven to draw, chosen by geometry.
 
     ``IView::GetVisibleEntities2`` lists the edges the view's hidden-line
     pass kept, which is the independent proof a hit test cannot give a pin
     whose outline coincides with its bore's. Its order is undocumented, so
-    every returned edge is keyed and the outermost endpoint's edge wins
-    (:func:`_spread_order`). Counted first: an instance drawing more than
-    :data:`_VISIBLE_EDGES_PER_INSTANCE` edges is not fetched at all.
+    each listed edge is keyed by its ends and its parameter midpoint
+    (``ICurve::Evaluate2``: two arcs joining the same two ends part there),
+    and the outermost end's edge wins (:func:`_spread_order`). Edges alike in
+    all three leave only that order to choose, so they fail. Counted first:
+    an instance drawing more than :data:`_VISIBLE_EDGES_PER_INSTANCE` edges
+    is not fetched at all.
     """
     bound = _early_bound(view, "IView")
     count = int(bound.GetVisibleEntityCount2(leaf.component, _VIEW_ENTITY_EDGE) or 0)
     if count <= 0 or count > _VISIBLE_EDGES_PER_INSTANCE:
         return _VisibleEdge(visible=count)
-    ends_of: dict[_PointKey, list[tuple[tuple[_PointKey, _PointKey], Any, tuple[float, ...]]]] = {}
+    shapes_at: dict[
+        _PointKey, list[tuple[tuple[_PointKey, _PointKey, _PointKey], Any, tuple[float, ...]]]
+    ] = {}
     raw = _sw_drawing.raw_visible_entities(view, leaf.component, _VIEW_ENTITY_EDGE)
     for edge in raw[:_VISIBLE_EDGES_PER_INSTANCE]:
-        if _com_invoke(edge, "IEdge", "GetCurve") is None:
+        curve = _com_invoke(edge, "IEdge", "GetCurve")
+        if curve is None:
             continue
         # GetCurveParams2 reads what GetCurve generated, so GetCurve first.
         params = tuple(float(v) for v in (_com_invoke(edge, "IEdge", "GetCurveParams2") or ()))
-        if len(params) < 6:
+        if len(params) < 8:
+            continue
+        middle = tuple(
+            _com_invoke(curve, "ICurve", "Evaluate2", (params[6] + params[7]) / 2.0, 0) or ()
+        )
+        if len(middle) < 3:
             continue
         start, end = _point_key(params[0:3]), _point_key(params[3:6])
-        pair = (min(start, end), max(start, end))
+        shape = (min(start, end), max(start, end), _point_key(middle[:3]))
         for key in {start, end}:
-            ends_of.setdefault(key, []).append((pair, edge, params[:6]))
-    order = _spread_order(ends_of, 1)
+            shapes_at.setdefault(key, []).append((shape, edge, params[:6]))
+    order = _spread_order(shapes_at, 1)
     if not order:
         return _VisibleEdge(visible=count)
-    _pair, edge, ends = min(ends_of[order[0]], key=lambda item: item[0])
+    holders = sorted(shapes_at[order[0]], key=lambda item: item[0])
+    alike = [item for item in holders if item[0] == holders[0][0]]
+    if len(alike) > 1:
+        raise RuntimeError(
+            f"{label}: {leaf.path} lists {len(alike)} visible edges with the same "
+            f"ends and midpoint {holders[0][0]} um; only GetVisibleEntities2's "
+            "undocumented order would choose between them"
+        )
+    _shape, edge, ends = holders[0]
     return _VisibleEdge(visible=count, edge=edge, ends=ends)
 
 
@@ -6048,12 +6021,8 @@ def _select_balloon_anchor(
     offsets: Mapping[str, tuple[float, float, float]],
     sheet_xy: tuple[float, float] | None,
     label: str,
-) -> tuple[str, Any, bool]:
+) -> _AnchorChoice:
     """Find the edge ``stem``'s balloon attaches to.
-
-    Returns the instance path, the edge, and whether the edge must be
-    selected through the view (a model edge) rather than being the hit
-    test's own selection.
 
     One hit test per balloon replaces fetching every visible edge of the
     component and keeping ``edges[0]``: that array's order moved between
@@ -6065,14 +6034,15 @@ def _select_balloon_anchor(
     another instance in front of the point, or no edge, raises; the balloon
     never falls back to some other edge.
 
-    ``walk`` (``anchor.point_mm is None``): hit-test the family's ranked
-    body-walk points (:func:`_walk_scan`), instance by instance in path
+    ``walk`` (``anchor.point_mm is None``): hit-test each instance's body
+    extreme points (:func:`_walk_points`), instance by instance in path
     order, and take the first the hit test gives back to that exact
     instance. A pin in its bore draws its outline on its neighbour's, so no
-    hit test claims it: ``visible-edge`` then takes the instance's edge that
-    the view's hidden-line pass lists as drawn (:func:`_visible_edge`), and
-    ``anchor.visible_edge`` goes straight there without hit-testing. No such
-    edge fails the sheet, naming the instances and every point tried.
+    hit test claims it: ``visible-edge`` then takes an edge the view's
+    hidden-line pass lists as drawn (:func:`_visible_edge`) of the family's
+    first instance, the one :func:`_shown_instances` put first. Never a later
+    instance: which one ballooned would then hang on how many edges a seat
+    lists for the first. No such edge fails the sheet, naming what was tried.
     Which method ran, and where, is in the ``drawing.balloon_anchor`` event.
     """
     first = candidates[0]
@@ -6080,6 +6050,7 @@ def _select_balloon_anchor(
     tried: list[tuple[float, float]] = []
     edge_ends: tuple[float, ...] = ()
     scan_attrs: dict[str, Any] = {}
+    method: AnchorMethod
     if anchor.point_mm is not None:
         if sheet_xy is None:
             raise RuntimeError(f"{label}: {stem} frozen anchor was never projected")
@@ -6099,17 +6070,16 @@ def _select_balloon_anchor(
             )
         method, point_mm = "frozen", tuple(anchor.point_mm)
     else:
-        method, point_mm = "", ()
-        faces = edges = 0
-        complete = True
-        for leaf in () if anchor.visible_edge else candidates:
+        walked: AnchorMethod | None = None
+        point_mm = ()
+        extremes = 0
+        for leaf in candidates:
             room = _WALK_HITS_PER_FAMILY - len(tried)
             if room <= 0:
                 break
-            scan = _walk_scan(adapter, leaf)
-            faces, edges = faces + scan.faces, edges + scan.edges
-            complete = complete and scan.complete
-            points = scan.points[:room]
+            found_points = _walk_points(adapter, leaf)
+            extremes += len(found_points)
+            points = found_points[:room]
             if not points:
                 continue
             projected = model_points_in_view(
@@ -6123,46 +6093,35 @@ def _select_balloon_anchor(
                 tried.append(xy)
                 hit, owner = _hit_test_edge(adapter, xy)
                 if owner.casefold() == leaf.path.casefold():
-                    method, instance, sheet_xy, edge = "walk", leaf.path, xy, hit
+                    walked, instance, sheet_xy, edge = "walk", leaf.path, xy, hit
                     point_mm = tuple(value * 1000.0 for value in point)
                     break
-            if method:
+            if walked:
                 break
-        if not anchor.visible_edge:
-            scan_attrs = {"faces": faces, "edges": edges, "complete": complete}
-        if not method:
+        scan_attrs = {"extremes": extremes}
+        if walked is None:
             adapter.currentModel.ClearSelection2(True)
-            counts: list[str] = []
-            for leaf in candidates:
-                found = _visible_edge(adapter, view, leaf)
-                counts.append(f"{leaf.path}={found.visible}")
-                if found.edge is None:
-                    continue
-                owner = _entity_owner(adapter, found.edge)
-                if owner.casefold() != leaf.path.casefold():
-                    raise RuntimeError(
-                        f"{label}: {stem} visible edge of {leaf.path} belongs to "
-                        f"{owner or 'no component'}"
-                    )
-                method, instance, sheet_xy, edge = "visible-edge", leaf.path, None, found.edge
-                edge_ends = found.ends
-                break
-            scan_attrs["visible"] = ";".join(counts)
-            if not method:
+            found = _visible_edge(adapter, view, first, label=f"{label}: {stem}")
+            scan_attrs["visible"] = f"{first.path}={found.visible}"
+            if found.edge is None:
                 points_text = "; ".join(
                     f"({x * 1000.0:.2f}, {y * 1000.0:.2f})" for x, y in tried
                 )
-                walked = (
-                    ""
-                    if anchor.visible_edge
-                    else f"no hit test claimed {[leaf.path for leaf in candidates]} "
-                    f"at sheet mm [{points_text}], and "
-                )
                 raise RuntimeError(
-                    f"{label}: {stem} has no verifiably visible edge: {walked}no "
-                    f"instance lists 1-{_VISIBLE_EDGES_PER_INSTANCE} visible edges "
-                    f"({', '.join(counts)})"
+                    f"{label}: {stem} has no verifiably visible edge: no hit test "
+                    f"claimed {[leaf.path for leaf in candidates]} at sheet mm "
+                    f"[{points_text}], and {first.path} lists {found.visible} visible "
+                    f"edges, not 1-{_VISIBLE_EDGES_PER_INSTANCE}"
                 )
+            owner = _entity_owner(adapter, found.edge)
+            if owner.casefold() != first.path.casefold():
+                raise RuntimeError(
+                    f"{label}: {stem} visible edge of {first.path} belongs to "
+                    f"{owner or 'no component'}"
+                )
+            walked, instance, sheet_xy, edge = "visible-edge", first.path, None, found.edge
+            edge_ends = found.ends
+        method = walked
     # The span carries what profiling queries group by; the event is what a
     # run-to-run anchor diff compares (App Insights traces, this name).
     _span_scan_attrs(instance=instance, method=method, tried=len(tried), **scan_attrs)
@@ -6178,7 +6137,7 @@ def _select_balloon_anchor(
         **scan_attrs,
     )
     adapter.currentModel.ClearSelection2(True)
-    return instance, edge, method == "visible-edge"
+    return _AnchorChoice(instance=instance, edge=edge, method=method)
 
 
 def _verify_anchor_attachment(
@@ -6207,15 +6166,14 @@ def _create_component_bom_balloon(
     view: Any,
     *,
     stem: str,
-    instance: str,
-    edge: Any,
-    through_view: bool,
+    choice: _AnchorChoice,
     expected_item: str,
     label: str,
 ) -> Any:
     """Attach one BOM balloon to ``stem``'s anchor edge and prove where it landed."""
     draw = adapter.currentModel
-    if through_view:
+    edge = choice.edge
+    if choice.method == "visible-edge":
         draw.ClearSelection2(True)
         if not _early_bound(view, "IView").SelectEntity(edge, False):
             raise RuntimeError(f"{label}: failed to select {stem}'s visible edge")
@@ -6244,7 +6202,7 @@ def _create_component_bom_balloon(
         raise RuntimeError(
             f"{label}: {stem} resolved item {item}, expected {expected_item}"
         )
-    _verify_anchor_attachment(adapter, note, instance=instance, stem=stem, label=label)
+    _verify_anchor_attachment(adapter, note, instance=choice.instance, stem=stem, label=label)
     return note
 
 
@@ -6332,13 +6290,11 @@ def add_component_bom_balloons(
             adapter,
             view,
             stem=stem,
-            instance=instance,
-            edge=edge,
-            through_view=through_view,
+            choice=choice,
             expected_item=item,
             label=label,
         )
-        for (stem, item), (instance, edge, through_view) in zip(items, picks)
+        for (stem, item), choice in zip(items, picks)
     ]
     _spread_balloons(adapter, view, balloons, margin=margin)
     rebuild_drawing(adapter, label="add_component_bom_balloons")
