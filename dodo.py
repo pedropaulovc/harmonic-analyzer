@@ -3069,6 +3069,11 @@ def task_check():
         # Assembly mates select by name, never by a view-dependent point pick
         # (#916: the collar pick selected the shaft collar's OD on one seat).
         SCRIPTS_DIR / "test_assembly_named_selection.py",
+        # The adapter's raw feature-tree diff and edge scoring (solidworks_mcp
+        # features.py over raw_dispatch): raw calls match the generated
+        # members, an incomplete before-walk refuses to diff, and the created
+        # feature is picked by type, never an auxiliary one beside it.
+        SCRIPTS_DIR / "test_adapter_feature_resolution.py",
     ]
     # These are runtime-read rather than imported, so module_deps_of cannot
     # discover them. A prompt/schema edit must invalidate check:recipe and rerun
@@ -3080,6 +3085,15 @@ def task_check():
         # test_printed_text_rulings reads the Named exceptions table: a new or
         # removed row must rerun its tagged-emitter check.
         SCRIPTS_DIR.parent / "docs" / "drawing-simplicity-policy.md",
+    ]
+    # test_adapter_feature_resolution exercises the vendored adapter, which
+    # module_deps_of never walks (an installed package, see SUBMODULE_SRC): a
+    # submodule bump touching these must re-run the gate.
+    adapter_contract_deps = [
+        SUBMODULE_SRC / "adapters" / "raw_dispatch.py",
+        SUBMODULE_SRC / "adapters" / "sw_type_info.py",
+        SUBMODULE_SRC / "adapters" / "_generated" / "sldworks_2026.py",
+        SUBMODULE_SRC / "adapters" / "solidworks" / "features.py",
     ]
     # test_out_param_binding SCANS sources instead of importing them (it reads
     # every top-level build script and every diagnostics/*.py looking for
@@ -3098,6 +3112,7 @@ def task_check():
             *(str(path.resolve()) for path in recipe_tests),
             *(dep for path in recipe_tests for dep in module_deps_of(path)),
             *(str(path.resolve()) for path in machinist_review_contract_deps),
+            *(str(path.resolve()) for path in adapter_contract_deps),
             *scanned_by_binding_gate,
             str(
                 (REPO_ROOT / "cad" / "comparisons" / "tools" / "composite.py").resolve()
