@@ -771,13 +771,14 @@ def test_a_failed_calibration_leaves_no_stale_json(tmp_path):
     assert not out.exists()
 
 
-def test_report_mode_writes_every_finding_and_dump_and_gate_mode_raises(monkeypatch, tmp_path):
+def test_report_mode_writes_every_finding_and_dump_before_an_enforced_kind_raises(monkeypatch, tmp_path):
     import json
 
     sheet = _holes_sheet(HB2_TOP_LABEL, HB2_PEDESTAL, HB2_BLOCK)
     live = _patch_collect(monkeypatch, [sheet])
     report = tmp_path / "reports" / "fixture.json"
-    _run(live, LayoutAuditMode.REPORT, report)
+    with pytest.raises(RuntimeError, match=r"report mode.*\n.*\[leader-through-text\]"):
+        _run(live, LayoutAuditMode.REPORT, report)
     content = json.loads(report.read_text(encoding="utf-8"))
     assert content["mode"] == "report"
     assert content["sheets"] == [sheet]
@@ -830,7 +831,8 @@ def test_the_audit_span_carries_per_class_counts(monkeypatch, tmp_path):
 
     live = _patch_collect(monkeypatch, [_holes_sheet(HB2_TOP_LABEL, HB2_PEDESTAL, HB2_BLOCK)])
     monkeypatch.setattr(live._telemetry, "span", recording_span)
-    _run(live, LayoutAuditMode.REPORT, tmp_path / "fixture.json")
+    with pytest.raises(RuntimeError, match="leader-through-text"):
+        _run(live, LayoutAuditMode.REPORT, tmp_path / "fixture.json")
     recorded = dict(spans)
     assert list(recorded) == ["layout.audit fixture", "layout.findings"]
     assert recorded["layout.audit fixture"].attributes["findings.leader-through-text"] == 1
@@ -3791,12 +3793,16 @@ def test_a_dimension_past_the_border_or_on_the_title_block_gates(x, y, kind):
     assert enforced(LayoutAuditMode.GATE, [clearance]) == [clearance]
 
 
-def test_report_mode_enforces_nothing_until_the_full_fleet_count_is_zero():
-    """#946's replay covered 32 of 111 drawings; the border and title-block
-    kinds wait for the #877 cold build's full-fleet count (#1052)."""
-    from _layout_audit import ENFORCED_KINDS
+def test_report_mode_fails_the_leaf_only_on_enforced_gating_kinds():
+    """REPORT fails the leaf on exactly the enforced kinds; GATE on every
+    gating kind. A misspelt entry would enforce nothing and read green."""
+    from _layout_audit import ENFORCED_KINDS, GATING_KINDS, enforced
+    from _layout_geometry import Finding
 
-    assert ENFORCED_KINDS == frozenset()
+    assert ENFORCED_KINDS <= GATING_KINDS
+    findings = [Finding(kind=kind, sheet="Sheet1", a="a", b="b", detail="") for kind in sorted(GATING_KINDS)]
+    assert [f.kind for f in enforced(LayoutAuditMode.REPORT, findings)] == sorted(ENFORCED_KINDS)
+    assert enforced(LayoutAuditMode.GATE, findings) == findings
 
 
 _ZERO_LINE = [0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]

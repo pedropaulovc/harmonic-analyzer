@@ -198,9 +198,25 @@ datum-origin case replay from the calibration run's dumps.
 
 ## Rollout
 
-1. **REPORT** (`LAYOUT_AUDIT_MODE`): writes the report and never fails a leaf
-   on a finding (a fault still fails it).
+1. **REPORT** (`LAYOUT_AUDIT_MODE`): writes the report and fails a leaf only
+   on a finding of a kind in `ENFORCED_KINDS` (a fault still fails it).
    One fleet farm run produces each drawing's finding list for its owner.
+   A gating kind joins `ENFORCED_KINDS` once it reads zero on every drawing.
+   The count takes each stem's latest `layout.audit` span on the branch's
+   lineage. The set now holds `com-read-errors`, `duplicate-thread-callout`,
+   `leader-crosses-leader`, `leader-crosses-section-line`,
+   `leader-through-text`, `line-on-dimension-line`, `line-through-own-text`,
+   `merged-blocks` and `shoulder-crosses-line`. The leader kinds reached zero
+   when #1105 re-placed the callouts.
+   The kinds that still fire are held out. `leader-crosses-line` is one:
+   amplitude-bar's notch-floor Ra stands under ruling B, and arbor-pedestal's
+   tap callout crosses Width, both accepted. `leader-through-own-text` is
+   another. Datum-origin labels are now boxed one by one, which removed 4 of
+   its 5 findings. The X axis prints between its "0" and "X" labels, and one
+   row box spanning both read the axis as a leader through its own text. But
+   a balloon's short leader still starts inside its printed ring from time
+   to time (drive-train-assembly, frame-assembly). `view-edges-missing` is
+   zero here, but not with the lighter line weights (c45096c90).
 2. **GATE**: one commit, landed before the release cut. It flips the mode and
    removes the superseded audits: the 6 explicit `check_drawing_layout`
    calls, the 3 `audit_sheet` calls, `diagnostics/drawing_layout_audit`'s own

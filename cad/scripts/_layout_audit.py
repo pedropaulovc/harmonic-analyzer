@@ -3611,11 +3611,30 @@ GATING_KINDS = frozenset(
 # a5563c7a0 retired check_drawing_layout's nominal dimension box, whose border
 # and title-block checks failed the build; this audit took them over (Codex
 # P2 on #901, PRRT_kwDOPHDy386mTiwV). "outside-border" and "keep-out" are
-# held out until a full-fleet count reads zero: the pre-merge replay of #946
-# covered 32 of 111 drawings (79 have no layout dump), and there they fired
-# on three drawings until 2930b3f0d fixed the detail-circle read. The #877
-# cold build's reports are the first full-fleet count (#1052).
-ENFORCED_KINDS: frozenset[str] = frozenset()
+# still held out: they fire on 3 and 6 drawings.
+#
+# These kinds read zero on all 111 drawings, counting the latest layout.audit
+# span of each stem on this lineage: 91180520b's fleet run, with the stems that
+# #1105 re-placed rebuilt on top. "view-edges-missing" is also zero here, but it
+# fires 157 times with the 0.13/0.18 mm line weights (c45096c90), so it waits
+# for that branch. "leader-through-own-text" is held out too. The datum-origin
+# boxing removed 4 of its 5 findings, but balloons still trip it
+# intermittently: a short leader starts just inside its printed ring. It fired
+# on drive-train-assembly in 4 of 18 runs and on frame-assembly (balloon 5,
+# 0.35 mm) at 081cfd468.
+ENFORCED_KINDS: frozenset[str] = frozenset(
+    {
+        "com-read-errors",
+        "duplicate-thread-callout",
+        "leader-crosses-leader",
+        "leader-crosses-section-line",
+        "leader-through-text",
+        "line-on-dimension-line",
+        "line-through-own-text",
+        "merged-blocks",
+        "shoulder-crosses-line",
+    }
+)
 
 
 def severity(finding: Finding) -> FindingSeverity:
