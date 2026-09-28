@@ -647,14 +647,23 @@ BALLOON_RING_FIT_TOL_M = 0.0001
 # 0.47 mm inside that ring. How far the COM start strays is the window's
 # business, so it plays no part in finding the printed start: that is the
 # stroke sharing the COM arrowtip (within BALLOON_LEADER_TIP_M) whose other
-# end lies on or inside the printed ring (within BALLOON_LEADER_RING_M). The
-# arrowhead's two 3.6 mm strokes also share the tip; they end outside it.
+# end lies on or inside the printed ring (within BALLOON_LEADER_RING_M).
 # Printed starts measured 0.00-0.025 mm off the ring on 20 frame balloons
 # (20260928T124727673Z, 1024x640; 20260928T152556482Z, 1536x820) and
 # 0.00-0.05 mm on 48 drive-train-assembly ones (20260928T150721937Z).
 BALLOON_LEADER_RING_M = 0.0001
 # How close the printed stroke's far end must be to the registered one.
 BALLOON_LEADER_TIP_M = 0.0001
+# The arrowhead prints as two more strokes from the tip, which a short
+# leader's ring can hold. They are told apart by shape: two strokes of one
+# length, no longer than an arrowhead, each within 15 deg of a third stroke
+# from the tip (the leader). GetArrowHeadAtIndex2 gives 3.556 x 0.762 mm
+# (half-angle 6.1 deg); the printed pairs measured 3.54-3.62 mm long, the two
+# within 0.03 mm of each other (frame-assembly and drive-train-assembly,
+# runs 20260928T124727673Z, 20260928T150721937Z, 20260928T152556482Z).
+BALLOON_BARB_MAX_M = 0.005
+BALLOON_BARB_PAIR_M = 0.0001
+BALLOON_BARB_ANGLE_RAD = math.radians(15.0)
 
 
 def _fit_circle(points: Sequence[tuple[float, float]]) -> tuple[float, float, float] | None:
@@ -686,8 +695,9 @@ def _fit_circle(points: Sequence[tuple[float, float]]) -> tuple[float, float, fl
 
 def printed_circle(
     circle: tuple[float, float, float], strokes: Sequence[Segment]
-) -> tuple[float, float, float]:
-    """The ring a balloon PRINTED near its COM ``circle``, else ``circle``.
+) -> tuple[float, float, float] | None:
+    """The ring a balloon PRINTED near its COM ``circle``; None when the page
+    traces none.
 
     Fits a circle to the stroke vertices within ``BALLOON_RING_SEARCH_M`` of
     the COM ring, dropping the worst-fitting vertex (a leader start or an
@@ -707,7 +717,7 @@ def printed_circle(
     while len(points) >= 12:
         fit = _fit_circle(points)
         if fit is None:
-            return circle
+            return None
         fx, fy, fr = fit
         residuals = [abs(math.hypot(x - fx, y - fy) - fr) for x, y in points]
         worst = max(range(len(points)), key=residuals.__getitem__)
@@ -715,9 +725,9 @@ def printed_circle(
             del points[worst]
             continue
         if len({(x >= fx, y >= fy) for x, y in points}) < 4:
-            return circle
+            return None
         return fit
-    return circle
+    return None
 
 
 def _move_ring(
@@ -753,6 +763,32 @@ def _move_ring(
     return out
 
 
+def _arrowhead_barbs(tip: tuple[float, float], ends: Sequence[tuple[float, float]]) -> set[tuple[float, float]]:
+    """Of the strokes from ``tip`` (given by their other ``ends``), those
+    printing its arrowhead: pairs of one length (``BALLOON_BARB_PAIR_M``), no
+    longer than ``BALLOON_BARB_MAX_M``, with a third stroke from the tip (the
+    leader) within ``BALLOON_BARB_ANGLE_RAD`` of both."""
+
+    def angle(end: tuple[float, float], other: tuple[float, float]) -> float:
+        u = (end[0] - tip[0], end[1] - tip[1])
+        v = (other[0] - tip[0], other[1] - tip[1])
+        return abs(math.atan2(u[0] * v[1] - u[1] * v[0], u[0] * v[0] + u[1] * v[1]))
+
+    barbs: set[tuple[float, float]] = set()
+    for index, a in enumerate(ends):
+        for b in ends[index + 1 :]:
+            la, lb = math.dist(a, tip), math.dist(b, tip)
+            if max(la, lb) > BALLOON_BARB_MAX_M or abs(la - lb) > BALLOON_BARB_PAIR_M:
+                continue
+            if any(
+                angle(a, c) <= BALLOON_BARB_ANGLE_RAD and angle(b, c) <= BALLOON_BARB_ANGLE_RAD
+                for c in ends
+                if c not in (a, b)
+            ):
+                barbs |= {a, b}
+    return barbs
+
+
 def _printed_leader_starts(
     segments: Sequence[Segment],
     annotation: Mapping[str, Any],
@@ -761,10 +797,11 @@ def _printed_leader_starts(
 ) -> tuple[list[Segment], list[LeaderInkAmbiguity]]:
     """``segments`` with each balloon leader starting where the PDF printed it.
 
-    ``ring`` is the balloon's printed ring (``printed_circle``). A registered
-    leader's first segment keeps its far end; its start becomes the other end
-    of the one printed stroke that shares that far end (within
-    :data:`BALLOON_LEADER_TIP_M`) and ends on or inside ``ring`` (within
+    ``ring`` is the balloon's printed ring (``printed_circle``), else its COM
+    circle. A registered leader's first segment keeps its far end; its start
+    becomes the other end of the one printed stroke that shares that far end
+    (within :data:`BALLOON_LEADER_TIP_M`), is not an arrowhead stroke
+    (``_arrowhead_barbs``) and ends on or inside ``ring`` (within
     :data:`BALLOON_LEADER_RING_M`), so a leader printed from inside its ring
     reads there. No such stroke leaves the COM start. Several distinct ones
     leave it too, and come back as a :class:`LeaderInkAmbiguity` each.
@@ -778,7 +815,7 @@ def _printed_leader_starts(
             out.append(segment)
             continue
         far = (segment.x1, segment.y1)
-        printed = sorted(
+        ends = sorted(
             {
                 near
                 for stroke in strokes
@@ -787,9 +824,14 @@ def _printed_leader_starts(
                     ((stroke.x1, stroke.y1), (stroke.x0, stroke.y0)),
                 )
                 if math.dist(other, far) <= BALLOON_LEADER_TIP_M
-                and math.hypot(near[0] - cx, near[1] - cy) <= radius + BALLOON_LEADER_RING_M
             }
         )
+        barbs = _arrowhead_barbs(far, ends)
+        printed = [
+            near
+            for near in ends
+            if near not in barbs and math.hypot(near[0] - cx, near[1] - cy) <= radius + BALLOON_LEADER_RING_M
+        ]
         if len(printed) == 1:
             [near] = printed
             segment = Segment(near[0], near[1], segment.x1, segment.y1, segment.role)
@@ -1780,13 +1822,13 @@ def annotation_geometry(
     ambiguities: list[LeaderInkAmbiguity] = []
     circle = balloon_circle(display) if note.get("balloon") else None
     if circle is not None and strokes:
-        printed = printed_circle(circle, strokes)
-        if printed != circle:
-            # The leader's printed start is judged against the ring the page
-            # traces, never the COM circle (up to 0.57 mm off it).
-            segments = _move_ring(segments, circle, printed)
-            segments, ambiguities = _printed_leader_starts(segments, annotation, strokes, printed)
-        circle = printed
+        # A ring the page does not trace (a split or stacked balloon, a
+        # partial print) leaves the COM circle, up to 0.57 mm off the print,
+        # to judge the printed leader start by: never no judgement.
+        ring = printed_circle(circle, strokes) or circle
+        segments = _move_ring(segments, circle, ring)
+        segments, ambiguities = _printed_leader_starts(segments, annotation, strokes, ring)
+        circle = ring
     if circle is not None:
         # A BOM balloon's GetExtent includes its leader; its rendered
         # full-circle arc is the balloon (``rendered_balloon_circle``).
