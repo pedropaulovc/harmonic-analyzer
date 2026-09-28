@@ -370,8 +370,10 @@ async def build(adapter: Any) -> dict[str, str]:
         # extension line (layout audit). The start-Z line, text outside its
         # span, overshoots the plate end down to 0.0855; at 0.082 the
         # callout's top row (to 0.0865) sat on it (text-on-line, run
-        # 20260928T130915425Z).
-        callout_xy=(0.286, 0.0785),
+        # 20260928T130915425Z). The block's 9.1 mm cannot also clear the
+        # 39.85 arrowhead (0.0722, tip at x 0.2616) by 2 mm from 0.286, so
+        # it starts 3 mm right of that tip instead (run 20260928T131249806Z).
+        callout_xy=(0.290, 0.0785),
         label="spring-hole seed",
     )
     # The Top view reverses model Z, so -HOLE_Z_FIRST prints the seed hole at
