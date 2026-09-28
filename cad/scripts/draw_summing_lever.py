@@ -53,10 +53,12 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from summing_lever_spec import (
+    ANCHOR_H,
     ANCHOR_R,
     CHANNEL_PITCH,
     COUNTER_HOLE_SPEC,
     HEX_DEPTH,
+    HEX_H,
     HOLE_COUNT,
     HOLE_END_OFFSET_LAST,
     HOLE_SPEC,
@@ -230,11 +232,20 @@ async def build(adapter: Any) -> dict[str, str]:
     # reverses model Z on the sheet: the positive sheet offset selects the -Z
     # ridge, while the negative offset selects the part-owned +Z finish face.
     # Keep datum and finish on opposite ridges so their leaders stay distinct.
+    # One sweep of the plan's visible edges serves every named pick below.
+    # The ridge is the hexagon's top vertex line, y = HEX_H/2 (vertex-up
+    # sketch centred on the pivot axis, build_summing_lever._hex_collar).
+    top_edges = scan_view_edges(top, label="summing lever top plan")
     knife_edge_datum = _top_xy(0.0, PLATE_L / 2.0 + HEX_DEPTH / 2.0)
+    datum_ridge = top_edges.exact_line_through(
+        (0.0, HEX_H / 2.0, -(PLATE_L / 2.0 + HEX_DEPTH / 2.0)),
+        label="-Z knife-edge ridge",
+    )
     add_datum_feature(
         adapter,
         top,
         edge_xy=knife_edge_datum,
+        expected_entity=datum_ridge.edge,
         # 24 mm out: at 20 the tag's box straddled the plate's right edge
         # (0.2575) and the edge ran through the 'A' (text-on-line on every
         # #1105 run); now the box starts 1.8 mm past it.
@@ -280,9 +291,22 @@ async def build(adapter: Any) -> dict[str, str]:
         label="summation anchor position",
     )
     # BASIC X coordinate backing the anchor position frame: knife-edge pivot
-    # axis (datum A, the -Z trunnion ridge line) to the anchor tap centre.
+    # axis (the +Z trunnion ridge, the finish's) to the anchor tap. Both
+    # endpoints are named: the ridge line through a mid-stub point, the tap's
+    # rim on the boss top (centre (TIP_X, ANCHOR_H/2, 0), the hole wizard's
+    # placement in build_summing_lever._counter_anchor_tap).
     ridge_dim_edge = _top_xy(0.0, -(PLATE_L / 2.0 + 0.3 * HEX_DEPTH))
     anchor_tap_bottom = _top_xy(TIP_X, -COUNTER_R)
+    dim_ridge = top_edges.exact_line_through(
+        (0.0, HEX_H / 2.0, PLATE_L / 2.0 + 0.3 * HEX_DEPTH),
+        label="+Z knife-edge ridge",
+    )
+    anchor_rim = top_edges.circle_at(
+        (TIP_X, ANCHOR_H / 2.0, 0.0),
+        COUNTER_R,
+        axis=(0.0, 1.0, 0.0),
+        label="counter-anchor tap rim",
+    )
     anchor_location = add_edge_dimension(
         adapter,
         top,
@@ -291,6 +315,14 @@ async def build(adapter: Any) -> dict[str, str]:
         text_xy=(0.216, 0.0723),
         label="anchor tap X location",
         orientation="horizontal",
+        entities=(dim_ridge.edge, anchor_rim.edge),
+    )
+    assert_dimension_measures(
+        adapter,
+        anchor_location,
+        expected_mm=-TIP_X,
+        label="anchor tap X location",
+        entities=(dim_ridge.edge, anchor_rim.edge),
     )
     set_basic_dimension(adapter, anchor_location, label="anchor tap X location")
 
@@ -305,10 +337,13 @@ async def build(adapter: Any) -> dict[str, str]:
     # the 39.85 extension line: left of the stub it sat in the finish leader's
     # only path (layout audit); the 20X callout now hangs on the middle hole,
     # well away from this tag.
-    # Both the datum and the start-Z dimension name their end edge exactly: a
-    # coordinate hit-test on this point resolved to the rib flange 5.08 mm
-    # inboard (datum B on the flange, start Z reading 3.35 for 8.43 -- #1105).
-    top_edges = scan_view_edges(top, label="summing lever top plan")
+    # Every datum and dimension here names its entities: a coordinate
+    # hit-test on the plate corner resolved to the rib flange 5.08 mm inboard
+    # (datum B on the flange, start Z reading 3.35 for 8.43 -- #1105), and a
+    # value check alone cannot tell the seed rim from the nineteen others at
+    # the same X or any equal-pitch pair. The picks below are the rims'
+    # model positions (the hole wizard's seed at HOLE_Z_LAST, the pattern
+    # marching -Z by CHANNEL_PITCH; build_summing_lever).
     plate_end_edge = _top_xy(10.0, -PLATE_L / 2.0)
     end_edge = _end_face_edge(top_edges, x_mm=10.0)
     add_datum_feature(
@@ -319,7 +354,19 @@ async def build(adapter: Any) -> dict[str, str]:
         datum="B",
         label="plate +Z end face",
     )
-    seed_rim_right = _top_xy(HOLE_X + HOLE_DIA / 2.0, HOLE_Z_FIRST)
+    seed_rim = top_edges.circle_at(
+        (HOLE_X, PLATE_T / 2.0, HOLE_Z_LAST),
+        HOLE_DIA / 2.0,
+        axis=(0.0, 1.0, 0.0),
+        label="spring-hole seed rim",
+    )
+    second_rim = top_edges.circle_at(
+        (HOLE_X, PLATE_T / 2.0, HOLE_Z_LAST - CHANNEL_PITCH),
+        HOLE_DIA / 2.0,
+        axis=(0.0, 1.0, 0.0),
+        label="spring-hole second rim",
+    )
+    seed_rim_right = _top_xy(HOLE_X + HOLE_DIA / 2.0, -HOLE_Z_LAST)
     row_x = add_edge_dimension(
         adapter,
         top,
@@ -328,16 +375,17 @@ async def build(adapter: Any) -> dict[str, str]:
         text_xy=(0.248, 0.0723),
         label="spring-hole row X",
         orientation="horizontal",
+        entities=(dim_ridge.edge, seed_rim.edge),
     )
-    assert_dimension_measures(row_x, expected_mm=HOLE_X, label="spring-hole row X")
+    assert_dimension_measures(
+        adapter,
+        row_x,
+        expected_mm=HOLE_X,
+        label="spring-hole row X",
+        entities=(dim_ridge.edge, seed_rim.edge),
+    )
     set_basic_dimension(adapter, row_x, label="spring-hole row X")
-    seed_rim = top_edges.circle_at(
-        (HOLE_X, PLATE_T / 2.0, HOLE_Z_LAST),
-        HOLE_DIA / 2.0,
-        axis=(0.0, 1.0, 0.0),
-        label="spring-hole seed rim",
-    )
-    seed_rim_top = _top_xy(HOLE_X, HOLE_Z_FIRST + HOLE_DIA / 2.0)
+    seed_rim_top = _top_xy(HOLE_X, -HOLE_Z_LAST + HOLE_DIA / 2.0)
     # 8.43 spans 4.2 mm of sheet (0.0919..0.0961); text between the arrows
     # would sit on its own line (3.35 there stood on 7.06's extension line
     # and 152.40's), so it hangs above the span, right of the 7.06 text
@@ -353,10 +401,16 @@ async def build(adapter: Any) -> dict[str, str]:
         entities=(end_edge.edge, seed_rim.edge),
     )
     assert_dimension_measures(
-        start_z, expected_mm=HOLE_END_OFFSET_LAST, label="spring-hole start Z"
+        adapter,
+        start_z,
+        expected_mm=HOLE_END_OFFSET_LAST,
+        label="spring-hole start Z",
+        entities=(end_edge.edge, seed_rim.edge),
     )
     set_basic_dimension(adapter, start_z, label="spring-hole start Z")
-    second_rim_bottom = _top_xy(HOLE_X, HOLE_Z_FIRST + CHANNEL_PITCH - HOLE_DIA / 2.0)
+    second_rim_bottom = _top_xy(
+        HOLE_X, -HOLE_Z_LAST + CHANNEL_PITCH - HOLE_DIA / 2.0
+    )
     pitch = add_edge_dimension(
         adapter,
         top,
@@ -365,9 +419,14 @@ async def build(adapter: Any) -> dict[str, str]:
         text_xy=(0.275, 0.1015),
         label="spring-hole pitch",
         orientation="vertical",
+        entities=(seed_rim.edge, second_rim.edge),
     )
     assert_dimension_measures(
-        pitch, expected_mm=CHANNEL_PITCH, label="spring-hole pitch"
+        adapter,
+        pitch,
+        expected_mm=CHANNEL_PITCH,
+        label="spring-hole pitch",
+        entities=(seed_rim.edge, second_rim.edge),
     )
     set_basic_dimension(adapter, pitch, label="spring-hole pitch")
     # The 20X callout hangs on the middle hole, text in the open field right

@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 
+import _drawing_common as common
 import draw_summing_lever as drawing
 import summing_lever_spec
-from _drawing_common import ViewEdge, ViewEdges
+from _drawing_common import ViewEdge, ViewEdges, assert_dimension_measures
 from _hole_spec import blind_cut_dia_mm
 from stock_anchor_geom import ANCHOR_9489T111, ANCHOR_9490T1
 
@@ -48,3 +51,59 @@ def test_end_face_edge_is_the_rib_top_edge_not_the_flange_or_underside() -> None
         drawing._end_face_edge(edges, x_mm=40.0)
     with pytest.raises(RuntimeError, match="expected one visible line"):
         drawing._end_face_edge(ViewEdges(label="plan", edges=(flange, underside)), x_mm=10.0)
+
+
+def _dimension(mm: float, attached: tuple[object, ...]):
+    annotation = SimpleNamespace(
+        GetAttachedEntities3=lambda: attached,
+        GetAttachedEntityTypes=lambda: tuple(1 for _ in attached),
+        IsDangling=lambda: False,
+    )
+    return SimpleNamespace(
+        GetDimension2=lambda _index: SimpleNamespace(SystemValue=mm / 1000.0),
+        GetAnnotation=lambda: annotation,
+    )
+
+
+@pytest.fixture
+def identity(monkeypatch):
+    monkeypatch.setattr(common, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(
+        common._sw_type_info, "early_bound_or_flag", lambda value, *_args: value
+    )
+    return SimpleNamespace(swApp=SimpleNamespace(IsSame=lambda a, b: int(a is b)))
+
+
+def test_pitch_proof_rejects_an_equal_pitch_between_other_holes(identity) -> None:
+    """Nineteen hole pairs measure CHANNEL_PITCH: the value cannot tell the
+    seed/second pair from the next one down, only the attached rims can."""
+    seed, second, third = object(), object(), object()
+    pitch = summing_lever_spec.CHANNEL_PITCH
+    assert assert_dimension_measures(
+        identity, _dimension(pitch, (second, seed)), expected_mm=pitch,
+        label="spring-hole pitch", entities=(seed, second),
+    ) == pytest.approx(pitch)
+    with pytest.raises(RuntimeError, match=r"unmatched picks=\[0\]") as info:
+        assert_dimension_measures(
+            identity, _dimension(pitch, (second, third)), expected_mm=pitch,
+            label="spring-hole pitch", entities=(seed, second),
+        )
+    assert "not the dimension between its named entities" in str(info.value)
+    # One entity attached twice is not a span between two.
+    with pytest.raises(RuntimeError, match=r"unmatched picks=\[1\]"):
+        assert_dimension_measures(
+            identity, _dimension(pitch, (seed, seed)), expected_mm=pitch,
+            label="spring-hole pitch", entities=(seed, second),
+        )
+    # A third attachment or a dangling leader is not the named span either.
+    with pytest.raises(RuntimeError, match=r"extra attachments=1"):
+        assert_dimension_measures(
+            identity, _dimension(pitch, (seed, second, third)), expected_mm=pitch,
+            label="spring-hole pitch", entities=(seed, second),
+        )
+    # Identity passes, the value still has to match.
+    with pytest.raises(RuntimeError, match=r"measures 7\.0565 mm, expected 8\.43"):
+        assert_dimension_measures(
+            identity, _dimension(pitch, (seed, second)), expected_mm=8.43,
+            label="spring-hole start Z", entities=(seed, second),
+        )

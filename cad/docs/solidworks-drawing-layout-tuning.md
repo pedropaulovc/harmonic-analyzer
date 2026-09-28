@@ -335,8 +335,21 @@ Do: name the edge (`scan_view_edges` + an exact model-space filter, or
 `ViewEdges.circle_at` for a rim) and pass it as `edge_entity` / `entities`;
 `add_datum_feature` then proves the tag sits on THAT edge by `IsSame`
 (`_assert_attached_to`, `expected_leaders=0` — a datum tag's triangle is not
-a `SetLeader3` leader), and `assert_dimension_measures` proves the number
-against the spec constant before the sheet prints it.
+a `SetLeader3` leader). A datum that must keep its coordinate landing point
+passes the named edge as `expected_entity`: the hit-test's selection must be
+that edge before insertion, so the wrong-neighbour case cannot pass by the
+selection and the readback agreeing with each other. `assert_dimension_measures`
+takes the same two named entities and proves the dimension's attached
+entities ARE them (`IAnnotation::GetAttachedEntities3` + `IsSame`, no extra
+attachment, not dangling) before checking the value against the spec
+constant — the value alone accepts any of a hole row's equal-pitch pairs or
+any rim at the row's X. `entities=None` is value-only and the call site says
+why. Every datum and dimension of summing-lever's pattern definition (A, B,
+76.20, 39.85, 8.43, 7.06) is identity-checked. A coordinate-only datum
+(`edge_xy` alone) is proved only to sit on what its hit-test returned; it is
+acceptable where no second line runs inside the hit radius of the pick, and
+`draw_rocker_arm._require_datum_on_bore` shows the alternative, a recipe-side
+`IsSame` readback against the named bore.
 
 ## The sheet-split rule
 

@@ -318,6 +318,49 @@ def test_requested_datum_proves_the_named_edge_by_identity(harness):
     assert (harness.edge, harness.edge) in harness.equality_calls
 
 
+def test_coordinate_datum_must_hit_test_to_the_named_entity(harness):
+    """The hit-test returns a neighbour and the tag lands on that same
+    neighbour: insertion and readback agree, only an independently named
+    entity can tell (summing-lever datum A, #1105 P2)."""
+    harness.selected = harness.edge  # the hit-test's neighbour...
+    harness.annotation.attached = (harness.edge,)  # ...is where the tag sits
+    with pytest.raises(
+        RuntimeError,
+        match=r"datum A pick resolved to a edge other than the one named "
+        r"\(knife-edge pivot axis\)",
+    ):
+        common.add_datum_feature(
+            harness.adapter, harness.view, edge_xy=(0.225, 0.087),
+            expected_entity=harness.canonical_edge, symbol_xy=(0.249, 0.075),
+            datum="A", label="knife-edge pivot axis",
+        )
+    # Refused before anything was inserted.
+    assert harness.insert_calls == 0
+    assert harness.rebuild_calls == 0
+
+
+def test_coordinate_datum_hit_testing_the_named_entity_proves_it_after_rebuild(harness):
+    harness.equality_calls.clear()
+    tag = common.add_datum_feature(
+        harness.adapter, harness.view, edge_xy=(0.225, 0.087),
+        expected_entity=harness.edge, symbol_xy=(0.249, 0.075),
+        datum="A", label="knife-edge pivot axis",
+    )
+    assert tag is harness.tag
+    assert harness.rebuild_calls == 1
+    # The settled attachment is compared with the NAMED entity.
+    assert (harness.edge, harness.edge) in harness.equality_calls
+    # ...and the tag settling on a neighbour still fails, even though the
+    # hit-test agreed with the name.
+    harness.annotation.attached = (harness.canonical_edge,)
+    with pytest.raises(RuntimeError, match=r"datum feature lost its edge attachment"):
+        common.add_datum_feature(
+            harness.adapter, harness.view, edge_xy=(0.225, 0.087),
+            expected_entity=harness.edge, symbol_xy=(0.249, 0.075),
+            datum="A", label="knife-edge pivot axis",
+        )
+
+
 @pytest.mark.parametrize("limit", LIMITS)
 def test_native_keeps_position_and_never_calls_setposition(harness, limit):
     initial = harness.annotation.position

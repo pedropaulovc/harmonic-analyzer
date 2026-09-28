@@ -421,6 +421,37 @@ def _assert_attached_to(
         )
 
 
+def _expected_pick(
+    adapter: Any,
+    selected: Any,
+    expected: Any | None,
+    *,
+    entity_type: str,
+    what: str,
+    label: str,
+) -> Any:
+    """The entity an annotation must end up on: ``expected`` when the recipe
+    named one, else what the pick returned.
+
+    A named entity that was selected directly is ``selected`` itself. One
+    named alongside a coordinate hit-test must BE what the hit-test resolved
+    to (``_is_same_attachment``): a pick point where two lines meet returns
+    whichever SolidWorks tests first, and every later readback then agrees
+    on that wrong line, so the only proof is against an independently
+    identified entity.
+    """
+    if expected is None:
+        return selected
+    if expected is not selected and not _is_same_attachment(
+        adapter, selected, expected, entity_type.upper()
+    ):
+        raise RuntimeError(
+            f"{what} pick resolved to a {entity_type.lower()} other than the "
+            f"one named ({label}): the hit-test landed on a neighbour"
+        )
+    return expected
+
+
 # swSelectType_e names for the kinds a drawing-view pick can resolve to; an
 # unlisted code is reported as its number, never mapped to a guess.
 _SELECT_TYPE_NAMES = {
@@ -725,11 +756,22 @@ def add_datum_feature(
     shoulder: bool = False,
     position_tolerance_m: float = 0.02,
     callout_below: str = "",
+    expected_entity: Any | None = None,
 ) -> Any:
     """Attach a native datum-feature symbol to a drawing-view edge.
 
     ``entity_type`` widens the pick for entities that are not model edges —
     a revolve's flank lines are ``"SILHOUETTE"`` edges.
+
+    The tag is proved, after the rebuild, to sit on ONE entity that IS the
+    feature the recipe named (``_assert_attached_to``, ``IsSame``). A recipe
+    names it by ``edge_entity``/``entity`` (selected directly), or by
+    ``expected_entity`` with an ``edge_xy`` hit-test -- the pick keeps its
+    landing point and must resolve to that entity, else the sheet fails
+    before insertion. With ``edge_xy`` alone the proof is only that the tag
+    sits on what the hit-test returned: a neighbouring line within the pick
+    radius passes, so that form is for datums whose feature has no
+    neighbour there (the recipe says so where it picks).
 
     ``position_tolerance_m`` bounds how far ``IAnnotation::GetPosition`` may
     read from ``symbol_xy`` after the move. That readback is the point where
@@ -754,6 +796,14 @@ def add_datum_feature(
         edge_entity=edge_entity,
         entity=entity,
         entity_type=entity_type,
+        label=label,
+    )
+    expected = _expected_pick(
+        adapter,
+        selected,
+        expected_entity if expected_entity is not None else edge_entity or entity,
+        entity_type=entity_type,
+        what=f"datum {datum}",
         label=label,
     )
     tag = draw.InsertDatumTag2()
@@ -821,17 +871,17 @@ def add_datum_feature(
         raise RuntimeError(f"failed to set datum callout text ({label})")
     draw.ClearSelection2(True)
     rebuild_drawing(adapter, label="add_datum_feature")
-    # The tag proves it sits on the entity that was selected. A recipe that
-    # names the feature exactly (``entity``/``edge_entity``) can then only get
-    # a datum on that feature -- a coordinate hit-test resolves whichever
-    # line is nearest and read back as a datum on the neighbour (summing-lever
-    # datum B on the rib flange instead of the plate end, #1105) -- and a
-    # re-solved attachment fails here rather than printing. No leader count:
-    # the triangle is not a ``SetLeader3`` leader (``_datum_leader_segments``).
+    # The tag proves it sits on the feature the recipe NAMED, not merely on
+    # whatever the pick returned: a coordinate hit-test resolves whichever
+    # line is nearest, and insertion and readback then agree on the neighbour
+    # (summing-lever datum B on the rib flange instead of the plate end,
+    # #1105). A re-solved attachment fails here rather than printing. No
+    # leader count: the triangle is not a ``SetLeader3`` leader
+    # (``_datum_leader_segments``).
     _assert_attached_to(
         adapter,
         tag_annotation,
-        selected,
+        expected,
         entity_type=entity_type,
         what="datum feature",
         label=label,
@@ -4310,21 +4360,67 @@ def set_basic_dimension(adapter: Any, dimension: Any, *, label: str) -> Any:
 
 
 def assert_dimension_measures(
-    dimension: Any, *, expected_mm: float, label: str, tolerance_mm: float = 1e-5
+    adapter: Any,
+    dimension: Any,
+    *,
+    expected_mm: float,
+    label: str,
+    entities: tuple[Any, Any] | None = None,
+    entity_types: tuple[str, str] = ("EDGE", "EDGE"),
+    tolerance_mm: float = 1e-5,
 ) -> float:
-    """Fail unless a native ``Add*Dimension2`` result measures ``expected_mm``.
+    """Fail unless a native ``Add*Dimension2`` result spans ``entities`` and
+    measures ``expected_mm``.
 
     A drawing dimension reads whatever its two picks resolved to; when a
     coordinate hit-test lands on the neighbouring line the sheet prints a
     wrong locating number with no error (summing-lever's spring-hole start
     read 3.35 off the rib flange instead of 8.43 off the plate end, #1105).
-    The model value (``IDimension.SystemValue``, metres) is the pick-proof
-    the recipe's spec constant can be checked against. Returns the measured
-    millimetres.
+    The value alone is a weak proof -- a 20-hole row has nineteen pairs at
+    the same pitch and twenty rims at the same row X -- so the dimension's
+    attached entities (``IAnnotation::GetAttachedEntities3``) must be the
+    two the recipe named, each by ``_is_same_attachment``, and only then is
+    ``IDimension.SystemValue`` checked against the spec constant. Returns the
+    measured millimetres.
+
+    ``entities=None`` is value-only: for a dimension the recipe cannot name
+    by entity. The call site says why.
     """
     display = _sw_type_info.early_bound_or_flag(
-        dimension, "IDisplayDimension", "GetDimension2"
+        dimension, "IDisplayDimension", "GetDimension2", "GetAnnotation"
     )
+    if entities is not None:
+        annotation = _sw_type_info.early_bound_or_flag(
+            display.GetAnnotation(),
+            "IAnnotation",
+            "GetAttachedEntities3",
+            "GetAttachedEntityTypes",
+            "IsDangling",
+        )
+        attached = list(annotation.GetAttachedEntities3() or ())
+        types = tuple(int(t) for t in (annotation.GetAttachedEntityTypes() or ()))
+        dangling = bool(annotation.IsDangling())
+        unmatched = []
+        for index, (expected, kind) in enumerate(zip(entities, entity_types)):
+            match = next(
+                (
+                    item
+                    for item in attached
+                    if item is not None
+                    and _is_same_attachment(adapter, item, expected, kind.upper())
+                ),
+                None,
+            )
+            if match is None:
+                unmatched.append(index)
+            else:
+                attached.remove(match)
+        if unmatched or attached or dangling:
+            raise RuntimeError(
+                f"{label} is not the dimension between its named entities: "
+                f"unmatched picks={unmatched}, extra attachments={len(attached)}, "
+                f"types={types}, dangling={dangling}"
+            )
     model_dimension = _early_bound(display.GetDimension2(0), "IDimension")
     measured_mm = abs(float(model_dimension.SystemValue)) * 1000.0
     if abs(measured_mm - expected_mm) > tolerance_mm:
