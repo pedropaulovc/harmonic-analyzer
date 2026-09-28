@@ -425,6 +425,9 @@ def record_seat_provenance(adapter: Any) -> dict[str, Any]:
     rather than just the exit code.
     """
     prov = seat_provenance(adapter)
+    # The watchdog learns the seat BEFORE the wait: an abort during it (a seat
+    # that dies or wedges while starting) must still name the seat it killed.
+    _watchdog.set_seat_provenance(prov)
     startup = await_seat_startup(adapter, prov.get("seat_started_epoch_s"))
     if startup.get("seat_startup_wait_s"):
         # The seat aged while we waited; the published uptime is the one at

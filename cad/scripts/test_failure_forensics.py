@@ -641,6 +641,29 @@ def test_a_starting_seat_is_held_until_startup_completes(
     assert any("startup_completed=True" in body for body in bodies)  # the seat line
 
 
+def test_the_watchdog_names_the_seat_before_the_startup_wait(monkeypatch, fast_polls):
+    """An abort DURING the wait (a seat that dies or wedges while starting) is
+    the watchdog's to report, so the seat must be pushed to it before the first
+    poll -- and the startup fields after the wait."""
+    monkeypatch.setattr(_seat_forensics, "_process_started_at", lambda pid: time.time() - 20)
+    monkeypatch.setattr(_watchdog, "_seat_fields", {})
+    seen_during_wait: list[dict[str, object]] = []
+
+    class _ObservedSeat(_StartingSeat):
+        @property
+        def StartupProcessCompleted(self) -> Any:
+            seen_during_wait.append(dict(_watchdog._seat_fields))
+            return _StartingSeat.StartupProcessCompleted.fget(self)
+
+    _seat_forensics.record_seat_provenance(_Adapter(sw=_ObservedSeat([False, True], pid=7204)))
+
+    assert seen_during_wait, "the wait never polled the seat"
+    for fields in seen_during_wait:
+        assert fields["seat_pid"] == 7204
+        assert fields["seat_uptime_s"] >= 19
+    assert _watchdog._seat_fields["seat_startup_completed"] is True
+
+
 def test_a_seat_older_than_the_startup_window_is_not_waited_on(
     monkeypatch, fast_polls, capture_telemetry
 ):
