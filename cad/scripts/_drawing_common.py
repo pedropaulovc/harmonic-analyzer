@@ -5890,7 +5890,7 @@ _WALK_DIRECTIONS: tuple[tuple[float, float, float], ...] = tuple(
     for sx, sy, sz in product((1.0, -1.0), repeat=3)
 )
 
-AnchorMethod = Literal["frozen", "walk", "visible-edge"]
+AnchorMethod = Literal["frozen", "walk", "visible-edge", "shared-edge"]
 
 
 @dataclass(frozen=True)
@@ -6039,7 +6039,7 @@ def _hit_test_edge(adapter: Any, sheet_xy: Sequence[float]) -> tuple[Any, str]:
 
 def _visible_edge_points(
     adapter: Any, view: Any, leaf: _ComponentLeaf
-) -> tuple[int, tuple[tuple[float, float, float], ...]]:
+) -> tuple[int, tuple[tuple[tuple[float, float, float], Any], ...]]:
     """How many edges of ``leaf`` the view lists as drawn, and points along them.
 
     ``IView::GetVisibleEntities2`` lists the edges the view's hidden-line pass
@@ -6047,16 +6047,17 @@ def _visible_edge_points(
     outline its neighbour's edge also draws. Listed is not drawn everywhere:
     a washer's rim listed as visible ran behind the gear for most of its
     length. So each listed edge gives points (``ICurve::Evaluate2`` at
-    :data:`_EDGE_SAMPLE_FRACTIONS` of its range) for the same hit test the
-    walk runs, ranked by :func:`_spread_order` since the array's order is
-    undocumented. Counted first: an instance drawing more than
-    :data:`_VISIBLE_EDGES_PER_INSTANCE` edges is not fetched at all. Part metres.
+    :data:`_EDGE_SAMPLE_FRACTIONS` of its range), each with the listed edge
+    it lies on, for the same hit test the walk runs, ranked by
+    :func:`_spread_order` since the array's order is undocumented. Counted
+    first: an instance drawing more than :data:`_VISIBLE_EDGES_PER_INSTANCE`
+    edges is not fetched at all. Part metres.
     """
     bound = _early_bound(view, "IView")
     count = int(bound.GetVisibleEntityCount2(leaf.component, _VIEW_ENTITY_EDGE) or 0)
     if count <= 0 or count > _VISIBLE_EDGES_PER_INSTANCE:
         return count, ()
-    found: dict[_PointKey, tuple[float, float, float]] = {}
+    found: dict[_PointKey, tuple[tuple[float, float, float], Any]] = {}
     raw = _sw_drawing.raw_visible_entities(view, leaf.component, _VIEW_ENTITY_EDGE)
     for edge in raw[:_VISIBLE_EDGES_PER_INSTANCE]:
         curve = _com_invoke(edge, "IEdge", "GetCurve")
@@ -6071,11 +6072,22 @@ def _visible_edge_points(
             value = tuple(_com_invoke(curve, "ICurve", "Evaluate2", at, 0) or ())
             if len(value) >= 3:
                 point = (float(value[0]), float(value[1]), float(value[2]))
-                found.setdefault(_point_key(point), point)
+                found.setdefault(_point_key(point), (point, edge))
     return count, tuple(found[key] for key in _spread_order(found, _WALK_POINTS_PER_INSTANCE))
 
 
-def _first_claimed_point(
+@dataclass(frozen=True)
+class _PointHit:
+    """One hit-tested point: its index in the tried list, sheet point, the
+    edge the hit test returned and that edge's owner."""
+
+    index: int
+    xy: tuple[float, float]
+    edge: Any
+    owner: str
+
+
+def _scan_points(
     adapter: Any,
     view: Any,
     leaf: _ComponentLeaf,
@@ -6086,11 +6098,13 @@ def _first_claimed_point(
     stem: str,
     what: str,
     label: str,
-) -> tuple[tuple[float, float, float], tuple[float, float], Any] | None:
-    """The first of ``points`` (part metres) whose sheet hit test returns an
-    edge of exactly ``leaf``: the point, its sheet point, and that edge."""
+) -> tuple[_PointHit | None, _PointHit | None]:
+    """Hit-test ``points`` (part metres) in order, stopping at the first
+    whose hit returns an edge of exactly ``leaf`` (the claimed point).
+    Also returns the first point that hit another part's edge on the way:
+    ink is drawn there, shared or in front."""
     if not points:
-        return None
+        return None, None
     projected = model_points_in_view(
         adapter,
         view,
@@ -6098,12 +6112,16 @@ def _first_claimed_point(
         label=f"{label} {stem} {what}",
         names=[f"{stem} {what} {index}" for index in range(len(points))],
     )
-    for point, xy in zip(points, projected):
+    shared = None
+    for index, xy in enumerate(projected):
         tried.append(xy)
         hit, owner = _hit_test_edge(adapter, xy)
+        found = _PointHit(index=index, xy=xy, edge=hit, owner=owner)
         if owner.casefold() == leaf.path.casefold():
-            return point, xy, hit
-    return None
+            return found, shared
+        if hit is not None and shared is None:
+            shared = found
+    return None, shared
 
 
 def _mm_text(values: Sequence[float], scale: float = 1.0) -> str:
@@ -6145,9 +6163,14 @@ def _select_balloon_anchor(
     pin in its bore draws its outline on its neighbour's, so no extreme
     point may be claimed: ``visible-edge`` then hit-tests points along the
     edges of the same instance the view's hidden-line pass lists as drawn
-    (:func:`_visible_edge_points`). No claimed point fails the sheet, naming
-    what was tried. Which method ran, and where, is in the
-    ``drawing.balloon_anchor`` event.
+    (:func:`_visible_edge_points`) and takes the first it claims. When the
+    instance claims none but one of those points hits another part's edge,
+    the outline is shared ink (cone-tip-bushing-1 in the tip block's bore on
+    run 20260928T202401351Z-8a4fb22ef07f4bf8b9c1158570903a2b claimed none of
+    24 points): ``shared-edge`` attaches to the listed edge that point lies
+    on, landing there. No point with ink fails the sheet, naming what was
+    tried. Which method ran, and where, is in the ``drawing.balloon_anchor``
+    event (``shared`` names the other part).
 
     Every method returns the hit-tested sheet point, where the balloon's
     leader is then made to land (:func:`_create_component_bom_balloon`).
@@ -6178,32 +6201,37 @@ def _select_balloon_anchor(
     else:
         walk_points = _walk_points(adapter, first)
         scan_attrs = {"extremes": len(walk_points)}
-        claimed = _first_claimed_point(
+        claimed, _ = _scan_points(
             adapter, view, first, walk_points, offsets, tried, stem=stem, what="walk", label=label
         )
-        method = "walk"
-        if claimed is None:
+        if claimed is not None:
+            method, point, sheet_xy, edge = "walk", walk_points[claimed.index], claimed.xy, claimed.edge
+        else:
             adapter.currentModel.ClearSelection2(True)
             listed, edge_points = _visible_edge_points(adapter, view, first)
             scan_attrs["visible"] = f"{first.path}={listed}"
-            claimed = _first_claimed_point(
-                adapter, view, first, edge_points, offsets, tried,
+            claimed, shared = _scan_points(
+                adapter, view, first, [point for point, _edge in edge_points], offsets, tried,
                 stem=stem, what="edge", label=label,
             )
-            method = "visible-edge"
-            if claimed is None:
+            if claimed is not None:
+                method, edge = "visible-edge", claimed.edge
+                point, sheet_xy = edge_points[claimed.index][0], claimed.xy
+            elif shared is not None:
+                method, (point, edge), sheet_xy = "shared-edge", edge_points[shared.index], shared.xy
+                scan_attrs["shared"] = shared.owner or "no component"
+            else:
                 adapter.currentModel.ClearSelection2(True)
                 points_text = "; ".join(
                     f"({x * 1000.0:.2f}, {y * 1000.0:.2f})" for x, y in tried
                 )
                 raise RuntimeError(
                     f"{label}: {stem} has no verifiably visible edge: no hit test "
-                    f"claimed {first.path} at sheet mm [{points_text}]: "
+                    f"found ink of {first.path} at sheet mm [{points_text}]: "
                     f"{len(walk_points)} body extreme points, then "
                     f"{len(edge_points)} points along its {listed} listed visible "
                     f"edges (sampled when 1-{_VISIBLE_EDGES_PER_INSTANCE})"
                 )
-        point, sheet_xy, edge = claimed
         point_mm = tuple(value * 1000.0 for value in point)
     # The span carries what profiling queries group by; the event is what a
     # run-to-run anchor diff compares (App Insights traces, this name).
@@ -6258,12 +6286,19 @@ def _create_component_bom_balloon(
     selection point (``ISelectionMgr.SetSelectionPoint2``), the landing
     :func:`add_surface_finish` measured to 0.01 mm; without it SolidWorks
     ends the leader at its own point on the edge (:class:`_AnchorChoice`).
-    The leader must then read back there.
+    A ``shared-edge`` edge is the model edge the view listed, not a hit
+    test's pick, so it is selected through the view. The leader must then
+    read back there.
     """
     draw = adapter.currentModel
-    _select_view_entity(
-        adapter, view, "EDGE", None, label=f"{label} {stem} anchor", entity=choice.edge
-    )
+    if choice.method == "shared-edge":
+        draw.ClearSelection2(True)
+        if not _early_bound(view, "IView").SelectEntity(choice.edge, False):
+            raise RuntimeError(f"{label}: failed to select {stem}'s listed visible edge")
+    else:
+        _select_view_entity(
+            adapter, view, "EDGE", None, label=f"{label} {stem} anchor", entity=choice.edge
+        )
     manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
     if manager.SetSelectionPoint2(1, -1, choice.sheet_xy[0], choice.sheet_xy[1], 0.0) is not True:
         raise RuntimeError(f"{label}: failed to set {stem}'s balloon landing {choice.sheet_xy}")

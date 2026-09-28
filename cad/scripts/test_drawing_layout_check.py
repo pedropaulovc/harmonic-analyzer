@@ -2400,7 +2400,8 @@ def _exploded_view(
     """A view shown exploded; ``steps`` are (translation, moved component paths).
 
     ``visible`` maps an instance path to the edges ``GetVisibleEntities2``
-    lists for it. ``referenced`` is the configuration the view shows (the model's active one
+    lists for it; ``SelectEntity`` selects one on its sheet with no selection
+    point. ``referenced`` is the configuration the view shows (the model's active one
     is ``Default``); ``instances`` are that configuration's component paths
     (default: the view's leaves). No steps means a collapsed view."""
     root = _FakeDrawingComponent("drive-train-8", children=children)
@@ -2411,7 +2412,7 @@ def _exploded_view(
         shown_only=shown_only,
     )
     listed = visible or {}
-    return SimpleNamespace(
+    view = SimpleNamespace(
         RootDrawingComponent2=lambda _resolve: root,
         IsExploded=lambda: bool(steps),
         ReferencedConfiguration=referenced,
@@ -2421,6 +2422,14 @@ def _exploded_view(
         GetVisibleEntityCount2=lambda component, kind: len(listed.get(component.Name2, ())),
         GetVisibleEntities2=lambda component, kind: tuple(listed.get(component.Name2, ())),
     )
+
+    def select_entity(entity, _append):
+        entity.sheet.selected = [entity]
+        entity.sheet.selection_point = None
+        return True
+
+    view.SelectEntity = select_entity
+    return view
 
 
 def _body(points):
@@ -2856,6 +2865,40 @@ def test_a_ring_behind_a_pin_is_ballooned_where_its_listed_edge_is_drawn(monkeyp
     assert results[0] == results[1]
 
 
+def test_a_bushing_sharing_its_bores_outline_is_ballooned_on_its_own_listed_edge(monkeypatch):
+    """Drive-train sheet 4, item 10: the tip bushing's rim is the tip block's
+    bore edge, and the hit test returns the block's at every point (none of
+    24 on run 20260928T202401351Z). Where a point of a listed rim hits the
+    block's edge the ink is shared: the balloon attaches to the bushing's
+    own listed edge, its leader ending at that point. With no ink at any
+    point the rim is not drawn, and the sheet fails."""
+
+    def key(t):
+        return tuple(round(v, 9) for v in _ring_point(t, radius=0.003)[:2])
+
+    rim = _AnchorEdge("cone-tip-bushing-1", at=lambda t: _ring_point(t, radius=0.003))
+    bore = _AnchorEdge("cone-tip-block-1")
+
+    def run(sheet):
+        rim.sheet = sheet
+        view = _exploded_view(
+            _instances("cone-tip-bushing-1", bodies={"cone-tip-bushing-1": _body([(0.0, 0.05, 0.0)])}),
+            [],
+            visible={"cone-tip-bushing-1": [rim]},
+        )
+        return _balloon(
+            monkeypatch, sheet, view, {"cone-tip-bushing": _WALK}, items=(("cone-tip-bushing", "1"),)
+        )
+
+    sheet = _AnchorSheet({key(0.3): bore})
+    balloons, _projected, anchors = run(sheet)
+    assert [note.end for note in balloons] == [key(0.3)]
+    assert (anchors[0]["method"], anchors[0]["shared"]) == ("shared-edge", "cone-tip-block-1")
+    with pytest.raises(RuntimeError, match="cone-tip-bushing has no verifiably visible edge"):
+        run(_AnchorSheet({}))
+
+
+
 @pytest.mark.parametrize("listed", [0, 65], ids=["none-listed", "over-the-cap"])
 def test_walk_without_a_hit_or_a_listed_edge_fails_naming_what_it_tried(monkeypatch, listed):
     """No hit and nothing listed (or too much to fetch) for the first
@@ -2883,7 +2926,7 @@ def test_walk_without_a_hit_or_a_listed_edge_fails_naming_what_it_tried(monkeypa
     sheet = _AnchorSheet({(0.0, 0.06): spare})
     with pytest.raises(
         RuntimeError,
-        match=r"cone-gear has no verifiably visible edge: no hit test claimed cone-gear-1 "
+        match=r"cone-gear has no verifiably visible edge: no hit test found ink of cone-gear-1 "
         rf"at sheet mm \[\(0\.00, 50\.00\)\]: 1 body extreme points, then 0 points along "
         rf"its {listed} listed visible edges \(sampled when 1-64\)",
     ):
