@@ -2573,23 +2573,66 @@ def test_walk_anchors_identically_on_a_640_and_an_820_pixel_seat_window(monkeypa
     assert (anchors[0]["method"], anchors[0]["tried"]) == ("walk", 2)
 
 
+class _ZoomWindow:
+    """A drawing window whose zoom calls can fail after moving the view."""
+
+    def __init__(self, fault: str | None):
+        self.fault = fault
+        self.span: float | None = None  # None: fit to the sheet
+
+    def ViewZoomTo2(self, x1, _y1, _z1, x2, _y2, _z2):  # noqa: N802
+        self.span = x2 - x1
+        if self.fault == "zoom":
+            raise RuntimeError("ViewZoomTo2 moved the view, then failed")
+
+    def ViewZoomtofit2(self):  # noqa: N802
+        if self.fault == "body-then-restore":
+            raise RuntimeError("ViewZoomtofit2 failed")
+        self.span = None
+
+
+@pytest.mark.parametrize(
+    ("fault", "raised"),
+    [
+        ("zoom", "ViewZoomTo2 moved the view"),
+        ("body", "the pick failed"),
+        ("body-then-restore", "the pick failed"),
+    ],
+)
+def test_zoomed_on_restores_fit_and_raises_the_first_failure(fault, raised):
+    """ViewZoomTo2 can change the view and then raise; the body can raise
+    zoomed. The window goes back to fit either way, and when that restore
+    fails too, the failure raised is still the first one, noting the second."""
+    window = _ZoomWindow(fault)
+    with pytest.raises(RuntimeError, match=raised) as failure:
+        with drawing_common._zoomed_on(SimpleNamespace(currentModel=window), (0.1, 0.2), 0.012):
+            raise RuntimeError("the pick failed")
+    notes = getattr(failure.value, "__notes__", [])
+    if fault == "body-then-restore":
+        assert window.span == pytest.approx(0.024)
+        assert notes == ["restoring the fit zoom also failed: RuntimeError('ViewZoomtofit2 failed')"]
+    else:
+        assert window.span is None and notes == []
+
+
 def test_walk_hit_on_the_same_named_part_of_another_subassembly_is_not_claimed(monkeypatch):
-    """sub-2's gear sits in front of sub-1's walk point: that hit is sub-2's,
-    not sub-1's, however alike their last path segments read."""
+    """sub-2's gear sits in front of sub-1's first walk point: that hit is
+    sub-2's, not sub-1's, however alike their last path segments read, so
+    sub-1 anchors on its next point."""
     bodies = {
-        "sub-1/cone-gear-1": _body([(0.0, 0.01, 0.0)]),
+        "sub-1/cone-gear-1": _body([(0.0, 0.01, 0.0), (0.0, -0.01, 0.0)]),
         "sub-2/cone-gear-1": _body([(0.0, 0.02, 0.0)]),
     }
     view = _exploded_view(_pair_of_subassemblies(bodies=bodies), [])
     sheet = _AnchorSheet(
         {
-            (0.0, 0.01): _AnchorEdge("sub-2/cone-gear-1"),
-            (0.0, 0.02): _AnchorEdge("sub-2/cone-gear-1"),
+            (0.0, -0.01): _AnchorEdge("sub-2/cone-gear-1"),
+            (0.0, 0.01): _AnchorEdge("sub-1/cone-gear-1"),
         }
     )
     _balloons, _projected, anchors = _balloon(monkeypatch, sheet, view, {"cone-gear": _WALK})
-    assert anchors[0]["instance"] == "sub-2/cone-gear-1"
-    assert sheet.hits == [(0.0, 0.01), (0.0, 0.02)]
+    assert (anchors[0]["instance"], anchors[0]["sheet_mm"]) == ("sub-1/cone-gear-1", "0.000,10.000")
+    assert sheet.hits == [(0.0, -0.01), (0.0, 0.01)]
 
 
 def test_walk_without_a_hit_selects_a_listed_visible_edge_through_the_view(monkeypatch):
@@ -2649,11 +2692,16 @@ def test_visible_edge_parts_two_arcs_on_the_same_ends_by_their_midpoints(monkeyp
 @pytest.mark.parametrize("listed", [0, 65], ids=["none-listed", "over-the-cap"])
 def test_walk_without_a_hit_or_a_listed_edge_fails_naming_what_it_tried(monkeypatch, listed):
     """No hit and nothing listed (or too much to fetch) for the first
-    instance fails, even though the second lists a drawable edge: letting
-    the second stand in makes the ballooned instance hang on how many edges
-    a seat lists (lag-screw-1 listed 0 on swmaker000004 and 45 elsewhere).
+    instance fails, even though the second's own walk point is drawn and
+    lists a drawable edge: letting the second stand in makes a hit result, or
+    how many edges a seat lists (lag-screw-1 listed 0 on swmaker000004 and 45
+    elsewhere), choose the ballooned instance. The lag screw walked to
+    lag-screw-2 that way on every 640 px seat; the instance is now a pin.
     Nor is it "attach to the first walked edge": that edge may be hidden."""
-    bodies = {name: _body([(0.0, 0.05, 0.0)]) for name in ("cone-gear-1", "cone-gear-2")}
+    bodies = {
+        "cone-gear-1": _body([(0.0, 0.05, 0.0)]),
+        "cone-gear-2": _body([(0.0, 0.06, 0.0)]),
+    }
     spare = _AnchorEdge("cone-gear-2")
     view = _exploded_view(
         _instances("cone-gear-1", "cone-gear-2", bodies=bodies),
@@ -2665,15 +2713,16 @@ def test_walk_without_a_hit_or_a_listed_edge_fails_naming_what_it_tried(monkeypa
         raise AssertionError("only the first instance's count is read, and it is not fetched")
 
     view.GetVisibleEntities2 = fetch
-    sheet = _AnchorSheet({})
+    sheet = _AnchorSheet({(0.0, 0.06): spare})
     spare.sheet = sheet
     with pytest.raises(
         RuntimeError,
-        match=r"cone-gear has no verifiably visible edge: .*\(0\.00, 50\.00\); \(0\.00, 50\.00\)"
-        rf".*cone-gear-1 lists {listed} visible edges, not 1-64",
+        match=r"cone-gear has no verifiably visible edge: no hit test claimed cone-gear-1 "
+        rf"at sheet mm \[\(0\.00, 50\.00\)\], and cone-gear-1 lists {listed} visible edges, not 1-64",
     ):
         _balloon(monkeypatch, sheet, view, {"cone-gear": _WALK})
     assert sheet.balloons == [] and view.selected_entities == []
+    assert sheet.hits == [(0.0, 0.05)]
 
 
 def test_coincident_attachments_break_on_the_bom_item_not_arrival_order():

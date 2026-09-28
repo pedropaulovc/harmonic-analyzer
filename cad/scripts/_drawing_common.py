@@ -5466,7 +5466,8 @@ class BalloonAnchor:
     lowest-named instance the view shows (:func:`_shown_instances`).
 
     ``point_mm=None`` walks the part's own body instead
-    (:func:`_select_balloon_anchor`), for a family no single point claims.
+    (:func:`_select_balloon_anchor`), for a family no single point claims,
+    on the pinned instance or else the lowest-named shown one, never another.
     """
 
     point_mm: tuple[float, float, float] | None = None
@@ -5788,10 +5789,9 @@ def _anchor_model_points(
     ]
 
 
-# A family hit-tests at most this many points across its instances, each a
-# zoomed sheet round trip, and at most this many of one instance's.
+# A walk hit-tests at most this many of its instance's extreme points, each a
+# zoomed sheet round trip.
 _WALK_POINTS_PER_INSTANCE = 12
-_WALK_HITS_PER_FAMILY = 24
 # The visible-edge fallback keys every visible edge of the instance, so it
 # refuses one with more: pins and screws draw 2-50, a gear over 1,000.
 _VISIBLE_EDGES_PER_INSTANCE = 64
@@ -5909,16 +5909,24 @@ def _zoomed_on(adapter: Any, centre: Sequence[float], half: float) -> Iterator[N
     """Zoom the drawing window onto a sheet square, then back to fit.
 
     new_project_drawing fits the sheet so every other coordinate pick sees the
-    zoom it was placed under; this restores that zoom on the way out.
+    zoom it was placed under; this restores that zoom on the way out, also
+    when the zoom call itself moved the view and then raised. A restore that
+    fails after the body failed is noted on the body's error, which is the
+    one raised.
     """
     draw = adapter.currentModel
-    draw.ViewZoomTo2(
-        centre[0] - half, centre[1] - half, 0.0, centre[0] + half, centre[1] + half, 0.0
-    )
     try:
+        draw.ViewZoomTo2(
+            centre[0] - half, centre[1] - half, 0.0, centre[0] + half, centre[1] + half, 0.0
+        )
         yield
-    finally:
-        draw.ViewZoomtofit2()
+    except BaseException as primary:
+        try:
+            draw.ViewZoomtofit2()
+        except Exception as restore:
+            primary.add_note(f"restoring the fit zoom also failed: {restore!r}")
+        raise
+    draw.ViewZoomtofit2()
 
 
 def _hit_test_edge(adapter: Any, sheet_xy: Sequence[float]) -> tuple[Any, str]:
@@ -6034,16 +6042,19 @@ def _select_balloon_anchor(
     another instance in front of the point, or no edge, raises; the balloon
     never falls back to some other edge.
 
-    ``walk`` (``anchor.point_mm is None``): hit-test each instance's body
-    extreme points (:func:`_walk_points`), instance by instance in path
-    order, and take the first the hit test gives back to that exact
-    instance. A pin in its bore draws its outline on its neighbour's, so no
-    hit test claims it: ``visible-edge`` then takes an edge the view's
-    hidden-line pass lists as drawn (:func:`_visible_edge`) of the family's
-    first instance, the one :func:`_shown_instances` put first. Never a later
-    instance: which one ballooned would then hang on how many edges a seat
-    lists for the first. No such edge fails the sheet, naming what was tried.
-    Which method ran, and where, is in the ``drawing.balloon_anchor`` event.
+    ``walk`` (``anchor.point_mm is None``): hit-test the family's first
+    instance's body extreme points (:func:`_walk_points`), the instance
+    :func:`_shown_instances` put first (the pinned one when the anchor pins
+    it), and take the first point the hit test gives back to that exact
+    instance. Never a later instance: whether the first instance's points
+    are drawn or covered is a hit result, and a hit result must not choose
+    which part carries the item (the lag screw walked to lag-screw-2 after
+    lag-screw-1's points all hit other parts; that choice is now a pin). A
+    pin in its bore draws its outline on its neighbour's, so no hit test
+    claims it: ``visible-edge`` then takes an edge of the same instance the
+    view's hidden-line pass lists as drawn (:func:`_visible_edge`). No such
+    edge fails the sheet, naming what was tried. Which method ran, and
+    where, is in the ``drawing.balloon_anchor`` event.
     """
     first = candidates[0]
     instance = first.path
@@ -6072,32 +6083,23 @@ def _select_balloon_anchor(
     else:
         walked: AnchorMethod | None = None
         point_mm = ()
-        extremes = 0
-        for leaf in candidates:
-            room = _WALK_HITS_PER_FAMILY - len(tried)
-            if room <= 0:
-                break
-            found_points = _walk_points(adapter, leaf)
-            extremes += len(found_points)
-            points = found_points[:room]
-            if not points:
-                continue
+        found_points = _walk_points(adapter, first)
+        extremes = len(found_points)
+        if found_points:
             projected = model_points_in_view(
                 adapter,
                 view,
-                _anchor_model_points(adapter, leaf, points, offsets, stem=stem, label=label),
+                _anchor_model_points(adapter, first, found_points, offsets, stem=stem, label=label),
                 label=f"{label} {stem} walk",
-                names=[f"{stem} walk {index}" for index in range(len(points))],
+                names=[f"{stem} walk {index}" for index in range(len(found_points))],
             )
-            for point, xy in zip(points, projected):
+            for point, xy in zip(found_points, projected):
                 tried.append(xy)
                 hit, owner = _hit_test_edge(adapter, xy)
-                if owner.casefold() == leaf.path.casefold():
-                    walked, instance, sheet_xy, edge = "walk", leaf.path, xy, hit
+                if owner.casefold() == first.path.casefold():
+                    walked, sheet_xy, edge = "walk", xy, hit
                     point_mm = tuple(value * 1000.0 for value in point)
                     break
-            if walked:
-                break
         scan_attrs = {"extremes": extremes}
         if walked is None:
             adapter.currentModel.ClearSelection2(True)
@@ -6109,7 +6111,7 @@ def _select_balloon_anchor(
                 )
                 raise RuntimeError(
                     f"{label}: {stem} has no verifiably visible edge: no hit test "
-                    f"claimed {[leaf.path for leaf in candidates]} at sheet mm "
+                    f"claimed {first.path} at sheet mm "
                     f"[{points_text}], and {first.path} lists {found.visible} visible "
                     f"edges, not 1-{_VISIBLE_EDGES_PER_INSTANCE}"
                 )
@@ -6119,7 +6121,7 @@ def _select_balloon_anchor(
                     f"{label}: {stem} visible edge of {first.path} belongs to "
                     f"{owner or 'no component'}"
                 )
-            walked, instance, sheet_xy, edge = "visible-edge", first.path, None, found.edge
+            walked, sheet_xy, edge = "visible-edge", None, found.edge
             edge_ends = found.ends
         method = walked
     # The span carries what profiling queries group by; the event is what a
