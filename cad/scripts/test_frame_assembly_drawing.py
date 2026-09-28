@@ -238,6 +238,10 @@ _ARROWTIP = (0.1511, 0.2664)
 _OFFSET = (0.008, 0.016)
 _TARGET = (_ARROWTIP[0] + _OFFSET[0], _ARROWTIP[1] + _OFFSET[1])
 _RING_R = 0.00475
+# The ring GetDisplayData draws at fit is smaller (item 2 on swmaker000008,
+# run 20260928T144159300Z: 4.19 mm at fit, 4.89 zoomed), and a leader keeps
+# the start the last UpdateViewDisplayGeometry gave it.
+_RING_R_FIT = 0.00405
 
 
 class _Window:
@@ -266,6 +270,9 @@ class _Window:
 
     def pixel(self) -> float:
         return _FIT_PIXEL_M[self.window_px] if self.span is None else self.span / self.window_px
+
+    def ring_r(self) -> float:
+        return _RING_R_FIT if self.span is None else _RING_R
 
     def ViewZoomTo2(self, x1, y1, _z1, x2, _y2, _z2):  # noqa: N802
         self.span = x2 - x1
@@ -296,6 +303,7 @@ class _ShortBalloon:
         self.entity = object()
         self.position = (_ARROWTIP[0] - 0.010, _ARROWTIP[1] + 0.005)
         self.centre = self.position
+        self.leader_r = _RING_R_FIT
 
     def GetAnnotation(self):  # noqa: N802
         return self
@@ -326,15 +334,21 @@ def _short_balloon_rig(monkeypatch, window: _Window):
         drift = window.fit_drift_px * pixel if window.span is None else 0.0
         centre = (balloon.centre[0] + drift, balloon.centre[1] + drift)
         angle = math.atan2(_ARROWTIP[1] - centre[1], _ARROWTIP[0] - centre[0])
-        start = (centre[0] + _RING_R * math.cos(angle), centre[1] + _RING_R * math.sin(angle))
+        start = (
+            centre[0] + balloon.leader_r * math.cos(angle),
+            centre[1] + balloon.leader_r * math.sin(angle),
+        )
         window.log.append(("read", window.span))
         return {
             "failed_checks": [],
             "actual_leader_points": (*start, 0.0, *_ARROWTIP, 0.0),
             "annotation_position": (*balloon.position, 0.0),
-            "rendered_circle": (*centre, _RING_R),
+            "rendered_circle": (*centre, window.ring_r()),
             "viewport_pixel_bounds_m": (pixel, pixel),
         }
+
+    def update_display_geometry():
+        balloon.leader_r = window.ring_r()
 
     monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
     monkeypatch.setattr(drawing, "position_bom_balloon", position)
@@ -343,7 +357,7 @@ def _short_balloon_rig(monkeypatch, window: _Window):
         drawing._telemetry, "event", lambda name, **attrs: events.__setitem__(name, attrs)
     )
     adapter = SimpleNamespace(currentModel=window)
-    view = SimpleNamespace(UpdateViewDisplayGeometry=lambda: None)
+    view = SimpleNamespace(UpdateViewDisplayGeometry=update_display_geometry)
 
     def run():
         drawing._short_frame_balloon(adapter, view, balloon, "5", _OFFSET)
@@ -358,7 +372,8 @@ def test_short_balloon_places_and_rechecks_zoomed_around_the_fit_rebuild(
     """The ring is placed where a pixel is tens of microns on either seat, so
     both windows ask SetPosition for the same point. After the rebuild at fit
     it is read zoomed again: the fit read's ring is off by two fit pixels,
-    as GetDisplayData renders at fit, and does not decide."""
+    as GetDisplayData renders at fit, and does not decide; the leader the fit
+    render left inside the zoomed ring is re-rendered zoomed before the read."""
     window = _Window(window_px, fit_drift_px=2.0)
     run, placed_at, events = _short_balloon_rig(monkeypatch, window)
     run()

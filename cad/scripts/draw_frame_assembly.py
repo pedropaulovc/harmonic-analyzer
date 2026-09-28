@@ -1148,7 +1148,12 @@ def _short_frame_balloon(
     view.UpdateViewDisplayGeometry()
     adapter.currentModel.GraphicsRedraw2()
     fit = _frame_balloon_binding_readback(adapter, annotation, entity, item)
+    # The rebuilt leader's start is the one the fit render left: on
+    # swmaker000008 (run 20260928T144159300Z) item 2's re-zoomed ring read on
+    # target with its leader starting 4.19 mm from the centre, the fit ring's
+    # radius, inside the zoomed 4.89 mm ring. Refresh it zoomed, as placed.
     with _zoomed_on(adapter, target, _SHORT_BALLOON_ZOOM_HALF):
+        view.UpdateViewDisplayGeometry()
         adapter.currentModel.GraphicsRedraw2()
         after = _frame_balloon_binding_readback(adapter, annotation, entity, item)
     failures = [f"zoomed:{name}" for name in _short_balloon_failures(placed, target)]
