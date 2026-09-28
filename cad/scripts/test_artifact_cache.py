@@ -451,46 +451,162 @@ def test_interleaved_chunked_publishes_never_commit_a_torn_archive(monkeypatch):
     assert service.content(backend._name(key)) in (first, second)
 
 
-def test_prewarm_opens_the_connection_once_and_the_probe_reuses_it(monkeypatch):
-    """A farm leaf warms the cache connection while its graph loads. A probe that
-    arrives mid-warm must wait for that one client, never build a second (a
-    second SDK import + TLS handshake is the cost the warm-up exists to hide), and
-    the warm-up must have touched the service so the connection is really open."""
-    import threading
-    import time
+_LEAF_RESOURCE = "microsoft.applicationId=app,farm.worker=w@1,farm.execution=wf/run/1"
 
+
+@pytest.fixture
+def leaf(monkeypatch):
+    """A farm leaf execution in rw mode, with prewarm state isolated per test and
+    its exit hook captured instead of registered with the interpreter."""
     monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "rw")
+    monkeypatch.setenv("OTEL_RESOURCE_ATTRIBUTES", _LEAF_RESOURCE)
     monkeypatch.setattr(cache, "_BACKEND", cache._UNSET)
+    monkeypatch.setattr(cache, "_PREWARMED", None)
+    exits: list[tuple] = []
+    monkeypatch.setattr(cache.atexit, "register", lambda *args: exits.append(args))
+    return exits
+
+
+def _gated_backend():
+    """A fake whose prewarm HEAD blocks until released, recording the order."""
+    import threading
+
     backend = _FakeBackend()
-    touched: list[str] = []
-    backend.exists = lambda key: touched.append(key) or False
+    order: list[str] = []
+    release = threading.Event()
+
+    def head(key):
+        order.append(f"head {key}")
+        release.wait(5)
+        order.append("head done")
+        return False
+
+    backend.exists = head
+    return backend, order, release
+
+
+def test_prewarm_opens_the_connection_once_and_the_probe_reuses_it(leaf, monkeypatch):
+    """A probe that arrives while the prewarm's HEAD is still in flight waits for
+    that request, so it reuses the connection it opens -- rather than racing it
+    with a second cold TLS handshake -- and the client is built exactly once."""
+    import threading
+
+    backend, order, release = _gated_backend()
     built: list[int] = []
-    constructing = threading.Event()
-
-    def slow_make_backend():
-        constructing.set()
-        time.sleep(0.2)
-        built.append(1)
-        return backend
-
-    monkeypatch.setattr(cache, "_make_backend", slow_make_backend)
+    monkeypatch.setattr(cache, "_make_backend", lambda: built.append(1) or backend)
     warm = cache.prewarm()
     assert warm is not None
-    assert constructing.wait(5)
-    assert cache._backend() is backend  # arrives mid-construction
+    while "head prewarm" not in order:  # client built, HEAD in flight
+        threading.Event().wait(0.01)
+
+    threading.Timer(0.2, release.set).start()
+    assert cache._backend() is backend
+    order.append("probe")
     warm.join(5)
+    assert order == ["head prewarm", "head done", "probe"]
     assert built == [1]
-    assert touched == ["prewarm"]
+    assert [args[0] for args in leaf] == [cache._join_prewarm]
 
 
-@pytest.mark.parametrize("mode", ["ro", "off"])
-def test_prewarm_is_a_no_op_for_a_process_that_does_not_publish(monkeypatch, mode):
+def test_a_stalled_prewarm_delays_the_probe_only_by_its_bound(leaf, monkeypatch):
+    """The cache verdict never depends on the prewarm: a HEAD that hangs costs the
+    first real call at most ``_PREWARM_WAIT_S``, after which it proceeds."""
+    import time
+
+    backend, order, release = _gated_backend()
+    monkeypatch.setattr(cache, "_make_backend", lambda: backend)
+    monkeypatch.setattr(cache, "_PREWARM_WAIT_S", 0.2)
+    warm = cache.prewarm()
+    try:
+        while "head prewarm" not in order:
+            time.sleep(0.01)
+        started = time.monotonic()
+        assert cache._backend() is backend
+        assert time.monotonic() - started < 2
+        assert "head done" not in order
+    finally:
+        release.set()
+        warm.join(5)
+
+
+def test_a_stalled_prewarm_holds_interpreter_exit_only_by_its_bound(leaf, monkeypatch):
+    """The exit hook joins so the prewarm's spans end before telemetry closes its
+    exporters -- but a hung prewarm must not hold the leaf's exit hostage."""
+    import time
+
+    backend, order, release = _gated_backend()
+    monkeypatch.setattr(cache, "_make_backend", lambda: backend)
+    monkeypatch.setattr(cache, "_PREWARM_JOIN_S", 0.2)
+    warm = cache.prewarm()
+    try:
+        (hook, thread), = leaf
+        started = time.monotonic()
+        hook(thread)
+        assert time.monotonic() - started < 2
+        assert warm.is_alive()
+    finally:
+        release.set()
+        warm.join(5)
+
+
+@pytest.mark.parametrize("failure", ["none", "raises"])
+def test_a_failed_prewarm_never_turns_the_cache_off(leaf, monkeypatch, failure):
+    """Only the real call may memoize 'no backend': a prewarm whose client cannot
+    be built leaves the backend unset, so the probe builds (and reports) its own."""
+    attempts: list[str] = []
+
+    def speculative_failure():
+        attempts.append("prewarm")
+        if failure == "raises":
+            raise RuntimeError("constructor failed")
+        return None
+
+    monkeypatch.setattr(cache, "_make_backend", speculative_failure)
+    cache.prewarm().join(5)
+    assert isinstance(cache._BACKEND, cache._Unset)
+
+    backend = _FakeBackend()
+    monkeypatch.setattr(cache, "_make_backend", lambda: attempts.append("probe") or backend)
+    assert cache._backend() is backend
+    assert attempts == ["prewarm", "probe"]
+
+
+@pytest.mark.parametrize(
+    ("mode", "resource"),
+    [
+        ("rw", "microsoft.applicationId=app"),  # a developer seat / check gate
+        ("rw", "farm.executionx=1,farm.execution.id=2"),  # exact key only
+        ("rw", "farm.execution="),  # declared but empty
+        ("ro", _LEAF_RESOURCE),  # an export-role helper: never publishes
+        ("off", _LEAF_RESOURCE),
+    ],
+)
+def test_prewarm_runs_only_in_a_publishing_farm_leaf(leaf, monkeypatch, mode, resource):
+    """Every other graph load -- ``doit list``, ``check:*``, the submitter, tests
+    that load dodo -- must stay off Azure."""
     monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", mode)
-    monkeypatch.setattr(cache, "_BACKEND", cache._UNSET)
+    monkeypatch.setenv("OTEL_RESOURCE_ATTRIBUTES", resource)
     monkeypatch.setattr(
-        cache, "_make_backend", lambda: pytest.fail("a non-publishing process connected")
+        cache, "_make_backend", lambda: pytest.fail("a non-leaf process connected")
     )
     assert cache.prewarm() is None
+    assert cache._PREWARMED is None
+    assert leaf == []
+
+
+def test_a_thread_that_cannot_start_is_no_prewarm(leaf, monkeypatch):
+    """``Thread.start`` runs at dodo import: its RuntimeError must not abort doit,
+    and must not leave the first probe waiting on a warm-up that never began."""
+    import threading
+
+    def refuse(self):
+        raise RuntimeError("can't start new thread")
+
+    monkeypatch.setattr(threading.Thread, "start", refuse)
+    monkeypatch.setattr(cache, "_PREWARM_WAIT_S", 30)
+    assert cache.prewarm() is None
+    assert cache._PREWARMED.is_set()
+    assert leaf == []
 
 
 if __name__ == "__main__":

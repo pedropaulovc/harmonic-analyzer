@@ -140,8 +140,8 @@ from _drawing_registry import (  # noqa: E402
     DRAWINGS_BY_NAME,
 )
 
-# A publishing (rw) process -- a farm leaf -- opens its cache connection while the
-# graph loads, instead of inside its first cache.probe (see _cache.prewarm).
+# A farm leaf execution (rw) opens its cache connection while the graph loads,
+# instead of inside its first cache.probe; a no-op anywhere else (_cache.prewarm).
 _cache.prewarm()
 
 REPO_ROOT = Path(__file__).resolve().parent

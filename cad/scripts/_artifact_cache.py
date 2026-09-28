@@ -96,6 +96,7 @@ and no scheduled cleanup job. See ``scripts/azure/provision_build_cache.ps1``.
 
 from __future__ import annotations
 
+import atexit
 import concurrent.futures
 import contextlib
 import hashlib
@@ -654,19 +655,90 @@ def _make_backend() -> _BlobBackend | None:
 
 
 _BACKEND_LOCK = threading.Lock()
+# Created unset by :func:`prewarm`; set once its warming request has finished,
+# failed or never started. ``None`` in a process that never prewarms.
+_PREWARMED: threading.Event | None = None
+# How long the first real cache call waits for an in-flight prewarm before
+# opening its own connection. A healthy prewarm finishes in ~1.1 s, inside the
+# ~2.7 s graph load, so this bound is met only by a stalled one; the cache
+# verdict never depends on it.
+_PREWARM_WAIT_S = 3.0
+_PREWARM_JOIN_S = 2.0
 
 
 def _backend() -> _BlobBackend | None:
     """Memoized ContainerClient (one credential handshake per process). Returns
     None when unconfigured / SDK absent, so the caller treats it as a miss. The
-    first call's SDK import and client construction are ``cache.connect``; a
-    :func:`prewarm` still in flight is waited for, never duplicated."""
+    first call's SDK import and client construction are ``cache.connect``.
+
+    A :func:`prewarm` still in flight is waited for -- through its warming
+    request, so this call reuses the connection it opened -- for at most
+    :data:`_PREWARM_WAIT_S`; past that the caller proceeds on its own."""
     global _BACKEND
+    warming = _PREWARMED
+    if warming is not None:
+        warming.wait(_PREWARM_WAIT_S)
     with _BACKEND_LOCK:
         if isinstance(_BACKEND, _Unset):
             with _phase("cache.connect"):
                 _BACKEND = _make_backend()
     return _BACKEND
+
+
+_PREWARM_THREAD = "cache-prewarm"
+
+
+def _farm_leaf_execution() -> bool:
+    """Is this process a farm worker's leaf execution?
+
+    The pool appends ``farm.execution=<id>`` to ``OTEL_RESOURCE_ATTRIBUTES`` for
+    exactly the build it runs as a leaf (solidworks-pool
+    ``farm_worker.leaf_resource_attributes``); a submitter, a developer seat, a
+    ``doit list`` or a test never carries it. Parsed by exact key, as the SDK's
+    ``OTELResourceDetector`` does."""
+    for entry in os.environ.get("OTEL_RESOURCE_ATTRIBUTES", "").split(","):
+        key, separator, value = entry.partition("=")
+        if separator and key.strip() == "farm.execution" and value.strip():
+            return True
+    return False
+
+
+def _warm() -> None:
+    """The prewarm thread's body: build the client, then HEAD a blob that never
+    exists so the token is fetched and the pooled TLS connection is open.
+
+    Speculative, so it never decides anything: a client that cannot be built
+    (SDK absent, constructor error) leaves ``_BACKEND`` unset for the real call
+    to build -- and report -- itself; only a working client is published."""
+    global _BACKEND
+    warming = _PREWARMED
+    try:
+        with contextlib.suppress(Exception), _phase("cache.prewarm"):
+            with _BACKEND_LOCK:
+                backend = None if isinstance(_BACKEND, _Unset) else _BACKEND
+            if backend is None:
+                import azure.storage.blob  # noqa: F401 -- absent SDK: stay unset
+
+                with _phase("cache.connect"):
+                    built = _make_backend()
+                if built is None:
+                    return
+                with _BACKEND_LOCK:
+                    if isinstance(_BACKEND, _Unset):
+                        _BACKEND = built
+                    backend = _BACKEND
+            if backend is not None:
+                backend.exists("prewarm")
+    finally:
+        if warming is not None:
+            warming.set()
+
+
+def _join_prewarm(thread: threading.Thread) -> None:
+    """At exit, give an in-flight prewarm a bounded moment to end its spans before
+    telemetry's own exit hook (registered earlier, so run later) closes the
+    exporters. A prewarm still running after that is abandoned: it decides nothing."""
+    thread.join(_PREWARM_JOIN_S)
 
 
 def prewarm() -> threading.Thread | None:
@@ -677,22 +749,23 @@ def prewarm() -> threading.Thread | None:
     client) 0.53 s and a cold ``cache.download`` 0.31-0.34 s -- of which the token
     was 0.03-0.04 s and the rest the first TLS connection; the same GET on the
     warm connection (``cache.reprobe``) took 0.07 s. None of that depends on the
-    task, and the doit process spends ~3.8 s loading its graph first, so a
-    ``rw`` process (the one that probes, then publishes: a farm leaf) starts it at
-    import. A HEAD for a blob that never exists opens the pooled connection and
-    fetches the token; the probe then reuses both. Best-effort: any failure is
-    left for the real probe to meet and report."""
-    if not writable():
+    task, and the leaf spends ~2.7 s loading its graph first.
+
+    Only a farm leaf execution in ``rw`` mode -- the one process certain to probe
+    next -- starts it (:func:`_farm_leaf_execution`); every other graph load
+    (``doit list``, ``check:*``, a submitter, a test) stays off Azure. Best-effort
+    end to end: a thread that cannot start is simply no prewarm."""
+    global _PREWARMED
+    if not (writable() and _farm_leaf_execution()):
         return None
-
-    def warm() -> None:
-        with contextlib.suppress(Exception), _phase("cache.prewarm"):
-            backend = _backend()
-            if backend is not None:
-                backend.exists("prewarm")
-
-    thread = threading.Thread(target=warm, name="cache-prewarm", daemon=True)
-    thread.start()
+    _PREWARMED = threading.Event()
+    thread = threading.Thread(target=_warm, name=_PREWARM_THREAD, daemon=True)
+    try:
+        thread.start()
+    except RuntimeError:
+        _PREWARMED.set()
+        return None
+    atexit.register(_join_prewarm, thread)
     return thread
 
 
