@@ -6312,3 +6312,9 @@ def draw_note_table(
         for x, text in zip(column_x, row, strict=True):
             if add_note(adapter, text, x, y) is None:
                 raise RuntimeError(f"failed to add schedule cell {text!r}")
+
+
+# DIAGNOSTIC ONLY (diag branch): snapshot the drawing between placement steps.
+import _drawing_step_snapshots  # noqa: E402
+
+_drawing_step_snapshots.install(sys.modules[__name__])
