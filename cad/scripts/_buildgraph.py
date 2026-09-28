@@ -26,6 +26,7 @@ import pickle
 import re
 import sys
 import tempfile
+import time
 from dataclasses import asdict, fields
 from enum import Enum
 from pathlib import Path
@@ -1326,8 +1327,22 @@ def _module_closure(script: Path) -> tuple[str, ...]:
     return tuple(sorted(str(_resolved(mods[m])) for m in result))
 
 
-# path -> ((st_mtime_ns, st_size), text) for :func:`read_source`.
+# path -> ((st_mtime_ns, st_size), text) for :func:`read_source`. Only entries
+# whose mtime was already settled when read are stored (see ``_RACY_NS``).
 _SOURCE_TEXT: dict[Path, tuple[tuple[int, int], str]] = {}
+
+# A file modified within this window of the read is "racily clean": a second
+# same-size write inside one file-time tick (~15.6 ms on NTFS, 2 s on FAT)
+# leaves (mtime_ns, size) unchanged, so its stamp cannot vouch for the text.
+# Such reads are never memoized -- git's racy-git rule. The window assumes the
+# file clock and this process's clock agree to well under it (a local disk);
+# a skewed network filesystem is not a supported checkout location.
+_RACY_NS = 2_000_000_000
+
+
+def is_racy_mtime(mtime_s: float) -> bool:
+    """True when an mtime (seconds) is too recent to identify file content."""
+    return time.time_ns() - int(mtime_s * 1e9) < _RACY_NS
 
 
 def read_source(path: Path) -> str:
@@ -1342,8 +1357,10 @@ def read_source(path: Path) -> str:
     stale DXF literal or config read would leave a real input out of a cache
     key. A stat is a fraction of the read it saves. The stat comes first, so an
     edit landing between it and the read stores the new text under the old
-    stamp and is simply re-read next time. An ``OSError`` propagates and is
-    not memoized.
+    stamp and is simply re-read next time. A file modified within ``_RACY_NS``
+    of the read is returned but not memoized: a same-size rewrite in the same
+    file-time tick would otherwise keep its stale text. An ``OSError``
+    propagates and is not memoized.
     """
     st = os.stat(path)
     stamp = (st.st_mtime_ns, st.st_size)
@@ -1351,6 +1368,9 @@ def read_source(path: Path) -> str:
     if cached is not None and cached[0] == stamp:
         return cached[1]
     text = path.read_text(encoding="utf-8")
+    if time.time_ns() - st.st_mtime_ns < _RACY_NS:
+        _SOURCE_TEXT.pop(path, None)
+        return text
     _SOURCE_TEXT[path] = (stamp, text)
     return text
 

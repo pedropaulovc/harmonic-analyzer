@@ -116,6 +116,7 @@ from _buildgraph import (  # noqa: E402
     drawing_registry_reads_selected,
     drawing_registry_recipe,
     fastener_rows_selected,
+    is_racy_mtime,
     machine_family_files,
     module_deps_of,
     part_row_files,
@@ -436,7 +437,8 @@ class ContentChecker(MD5Checker):
 
     def check_modified(self, file_path, file_stat, state):
         timestamp, size, digest = state
-        # mtime unchanged -> content unchanged (stock fast path).
+        # mtime unchanged -> content unchanged (stock fast path). A racily
+        # recorded state stores 0.0 (see get_state), so it never takes this path.
         if file_stat.st_mtime == timestamp:
             return False
         # mtime changed: compare the CONTENT digest. (Stock MD5Checker short-
@@ -449,7 +451,14 @@ class ContentChecker(MD5Checker):
         if current_state and current_state[0] == timestamp:
             return  # mtime optimization: state unchanged
         size = os.path.getsize(dep)
-        return timestamp, size, self._digest(dep)
+        digest = self._digest(dep)
+        # A dep written in the same file-time tick as this record could be
+        # rewritten at the same size without moving its mtime, and the fast path
+        # above would then vouch for stale content. Record 0.0 instead, so the
+        # next check compares digests until the mtime has settled.
+        if is_racy_mtime(timestamp):
+            timestamp = 0.0
+        return timestamp, size, digest
 
 
 CHECKERS["content"] = ContentChecker

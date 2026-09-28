@@ -12,6 +12,8 @@ import ast
 from collections import Counter
 from dataclasses import asdict, field, make_dataclass, replace
 import tempfile
+import os
+import time
 from pathlib import Path
 from unittest.mock import patch
 
@@ -1719,19 +1721,24 @@ def test_data_deps_of_keeps_missing_referenced_artefact():
         script.unlink()
 
 
-def test_data_deps_of_follows_an_edited_script_literal():
+def test_data_deps_of_follows_a_same_tick_rewrite():
     """Source texts are memoized per process, but an edit must still move the
     graph: once the script names new.dxf, a stale old.dxf edge would leave the
-    real input out of the cache key. Same-length names, so only the mtime
-    tells the two texts apart."""
+    real input out of the cache key. Same-length names AND a pinned identical
+    mtime reproduce two writes landing in one file-time tick (~15.6 ms on
+    Windows), where (mtime_ns, size) cannot tell the texts apart; this raced
+    on the farm (run 20260928T124706229Z)."""
     with tempfile.NamedTemporaryFile(
         "w", suffix=".py", dir=SCRIPTS_DIR, delete=False
     ) as fh:
         fh.write('PATH = REFERENCES_DIR / "old-xyz.dxf"\n')
         script = Path(fh.name)
+    tick = (time.time_ns(),) * 2
     try:
+        os.utime(script, ns=tick)
         assert [Path(d).name for d in data_deps_of(script)] == ["old-xyz.dxf"]
         script.write_text('PATH = REFERENCES_DIR / "new-xyz.dxf"\n', encoding="utf-8")
+        os.utime(script, ns=tick)
         assert [Path(d).name for d in data_deps_of(script)] == ["new-xyz.dxf"]
     finally:
         script.unlink()
