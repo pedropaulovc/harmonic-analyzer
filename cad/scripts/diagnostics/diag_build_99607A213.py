@@ -308,9 +308,10 @@ async def build_99607A213(adapter, truth=None):
                           "ISelectionMgr")
 
     def _select_head_od(mark: int) -> bool:
+        from solidworks_mcp.adapters import raw_dispatch as _raw
         from solidworks_mcp.adapters.solidworks.features import _all_body_faces
         for f in _all_body_faces(adapter):
-            f2 = _early_bound(f, "IFace2")
+            f2 = _raw.bind(f, "IFace2")
             surf = _early_bound(f2.GetSurface(), "ISurface")
             try:
                 cp = list(_read_member(surf, "CylinderParams") or [])
