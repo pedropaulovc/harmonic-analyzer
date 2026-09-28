@@ -1017,6 +1017,9 @@ scripts that `from _common import log, check` are instrumented unchanged.
       same resource: `cache.connect` (SDK import + client, once per process),
       `cache.credential` (each token fetch), `cache.download` (`found`, `bytes`),
       `cache.unpack`, `cache.record` (miss provenance), `cache.pack`, `cache.upload`.
+      A rw process (a farm leaf) opens the connection at dodo import on a daemon
+      thread (`_cache.prewarm`, root span `cache.prewarm`), so its first
+      `cache.probe` reuses the imported SDK, token and TLS connection.
 - **A COM task is a CHAIN of top-level spans, one per phase — never one span that
   swallows the lot.** A cached part/assembly/drawing task emits, all as siblings:
   `cache.probe <label>` (the remote-cache restore attempt — on a HIT this IS the
