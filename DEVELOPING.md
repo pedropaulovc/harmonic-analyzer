@@ -26,10 +26,12 @@ The launcher is a foreground runner, not a second scheduler: it validates its
 inputs, writes a startup record, builds a private snapshot of the pushed HEAD,
 runs exactly one `uv run … build.py` child from that snapshot, tees its output
 to a log outside the worktree, keeps the snapshot's outputs, removes the
-snapshot, and writes a terminal record carrying the child's own exit code. It
-never retries, never cancels a remote workflow, never detaches and never
-imposes a local deadline. Cancelling a farm workflow is always a separate,
-explicit `farm.py cancel`.
+snapshot, and writes a terminal record carrying the child's own exit code. A
+launch never retries, never cancels a remote workflow, never detaches and never
+imposes a local deadline. The same script tracks what it launched, from the same
+records under the same `-LogDirectory`: `-Status`, `-Watch`, `-List` and the one
+explicit way to stop a run, `-Cancel` (see
+[tracking a run](#tracking-a-run-status-watch-list-cancel)).
 
 ### Prerequisites
 
@@ -192,9 +194,64 @@ would lose live monitoring, so it is not used.
 ```
 
 The full closure is the same call with `"-Targets", "build"` and
-`"-Tag", "full-build"`. To hand off, pass the hub name and the record paths on;
-do not `hub stop` a live launcher to quiet the console — retune it with
-`op: "monitor"`, `progress: "ambient"` or `"off"`.
+`"-Tag", "full-build"`. Do not `hub stop` a live launcher to quiet the console —
+retune it with `op: "monitor"`, `progress: "ambient"` or `"off"`. The watcher is
+[`-Watch`](#tracking-a-run-status-watch-list-cancel), not the hub's console and
+not a loop waiting for `.done`. To hand off, pass on the run id from the
+readiness line and the `-LogDirectory`; a successor tracks the run with the same
+command, whether or not the hub is still around.
+
+### Tracking a run: status, watch, list, cancel
+
+Every operation takes `-LogDirectory` and selects one run by `-RunId <run-id>`
+or `-Tag <tag>` (the newest run with that tag). A selection that matches nothing,
+or both selectors at once, exits 2.
+
+```powershell
+$launcher = 'C:/src/harmonic-analyzer/scripts/farm-run.ps1'
+$runs = 'C:/src/dt-logs/farm-runs'
+pwsh -NoProfile -File $launcher -Status -LogDirectory $runs -RunId <run-id>
+pwsh -NoProfile -File $launcher -Watch  -LogDirectory $runs -Tag full-build
+pwsh -NoProfile -File $launcher -List   -LogDirectory $runs -State running -MaxAgeHours 24
+pwsh -NoProfile -File $launcher -Cancel -LogDirectory $runs -RunId <run-id> -Why 'superseded by <sha>'
+```
+
+The run's state is derived, never trusted from one file: `.done`'s `state` when
+it exists (`succeeded`, `failed` or `cancelled`), otherwise `running` while the
+recorded `pid` is alive (a PID reused by a process that started after the run is
+not the launcher), otherwise **`launcher-died`** — the launcher is gone and wrote
+no `.done`.
+
+- **`-Status`** prints one JSON object: `state`, `exit_code`, `launcher`
+  (`pid`, `alive`, and for a dead launcher the `orphaned_processes` it left —
+  a build child outlives a killed launcher and keeps dispatching), `commit`,
+  `targets`, `leaf_timeout_minutes`, `cache_environment`, `counts` (cache
+  `hits`, farm leaves `requested`/`succeeded`/`failed`/`in_flight`), every farm
+  leaf with its `workflow_id` and state, `in_flight_workflows`, `task_errors`,
+  `log_idle_s` and `outputs` (the snapshot's `cad\out` while running,
+  `.done`'s `outputs` after). Tools that only need a run's `cad/out` —
+  `cache.jsonl`, `telemetry/traces.jsonl` — read `outputs` from here.
+- **`-Watch`** is the required watcher for an agent-launched build. It prints a
+  line per leaf state change (`requested`, `attached`, `succeeded`, `failed`,
+  each with its workflow id — follow one leaf with `farm.py watch <id>`) and per
+  new `TaskError` with the exception that ended it, polling every
+  `-PollSeconds` (15). It exits when the run is terminal, ending with the
+  final `-Status` object: **0** succeeded, **20** failed, **21** launcher-died
+  (`LAUNCHER DIED` on the summary line), **22** cancelled. Run it under the
+  same kind of persistent supervisor as the launch, with `progress: "wake"`.
+- **`-List`** prints one JSON line per run, newest first, filtered by `-Tag`,
+  `-State` and `-MaxAgeHours`.
+- **`-Cancel -Why <reason>`** stops the launcher and every process it started
+  (including a build a dead launcher left behind), then cancels each in-flight
+  leaf that `farm.py status` reports `RUNNING`, with the reason and run id on
+  the cancellation. A leaf that a live sibling run in the same `-LogDirectory`
+  is also waiting on is kept (`kept-shared`): workflows are shared by ID. It
+  then does the cleanup the launcher never ran — outputs moved to
+  `<run-id>.out`, snapshot removed — and writes `.done` with
+  `state: "cancelled"`, `exit_code: null` and a `cancel` block recording who,
+  why, the stopped PIDs and each workflow's outcome (`cancelled`,
+  `already-closed`, `not-found`, `kept-shared`, `error`). It exits 1 if any
+  step failed, and cancelling a finished run is a no-op.
 
 ### The two records
 
@@ -287,25 +344,29 @@ cache-miss followed by a restored artifact, and the artifact plus its
 
 ### Recovering a run across a handoff
 
-Read the records first, in this order:
+`-Status` the recorded run id (or `-Watch` it, which ends in the same object):
 
-1. **The supervisor is alive** (`hub ps` shows the name). Attach and monitor it.
-   Do not start a second submitter for the same work.
-2. **`.done` exists.** That is the outcome. `succeeded` with exit 0 is a finished
-   run; anything else is a finished failure to diagnose from the log.
-3. **The supervisor is gone and there is no `.done`.** The local outcome is
-   *unknown*. It is not a cancellation, and it is not permission to relaunch.
-   The remote work is very likely still running: `_farm.run_leaf` shares
-   workflows by ID (`USE_EXISTING`), so killing the submitter never cancelled
-   anything.
+1. **`running`.** The launcher is alive. Keep watching with `-Watch`. Do not
+   start a second submitter for the same work.
+2. **`succeeded`, `failed` or `cancelled`.** That is the outcome. `succeeded`
+   with exit 0 is a finished run; `failed` is a finished failure to diagnose
+   from `task_errors` and the log.
+3. **`launcher-died`** (watch exit 21). The launcher is gone and wrote no
+   `.done`, so the local outcome is *unknown*. It is not a cancellation, and it
+   is not permission to relaunch. The remote work is very likely still running:
+   `_farm.run_leaf` shares workflows by ID (`USE_EXISTING`), so killing the
+   submitter never cancelled anything — and `launcher.orphaned_processes`
+   lists a build child that may still be dispatching.
 
-In case 3, harvest every workflow ID the log recorded — both
-`Farm workflow requested: <id>` and `Farm workflow attached: <id>` lines, for
-*all* leaves, not one representative — and query each from the pool checkout:
+In case 3, either abandon the run with `-Cancel -Why …` (it stops the orphans,
+cancels the leaves no live sibling needs, keeps the outputs and removes the
+snapshot), or finish it. To finish it, query every workflow in
+`in_flight_workflows` — every leaf requested or attached without a result, not
+one representative — from the pool checkout:
 
 ```powershell
 uv run --frozen --project C:/src/solidworks-pool C:/src/solidworks-pool/farm.py status "<workflow-id>" --json
-uv run --frozen --project C:/src/solidworks-pool C:/src/solidworks-pool/farm.py logs   "<workflow-id>" --follow
+uv run --frozen --project C:/src/solidworks-pool C:/src/solidworks-pool/farm.py watch  "<workflow-id>"
 ```
 
 Follow a RUNNING workflow under a supervised monitor until it is terminal, then
@@ -324,9 +385,10 @@ of the workflow ID, so changing it during recovery creates a different
 workflow instead of rejoining the one already running. Never cancel a shared
 workflow automatically.
 
-A launcher killed before its `.done` never ran its cleanup, so its snapshot is
-still registered and its outputs are still in `<snapshot>\cad\out`. Once the
-case above is settled, copy what you need out of that `cad\out`, then remove the
+A launcher that died before its `.done` never ran its cleanup, so its snapshot
+is still registered and its outputs are still in `<snapshot>\cad\out` (the
+status `outputs`). `-Cancel` does that cleanup. If you finished the run by
+relaunching instead, copy what you need out of that `cad\out`, then remove the
 snapshot from any checkout of the repository:
 `git worktree remove --force <snapshot>` followed by `git worktree prune`. A
 snapshot is only ever the recorded commit; removing it loses nothing else.

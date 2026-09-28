@@ -1,25 +1,61 @@
 #requires -Version 7.3
 
-[CmdletBinding()]
+[CmdletBinding(DefaultParameterSetName = 'Launch')]
 param(
-    [Parameter(Mandatory)]
+    [Parameter(Mandatory, ParameterSetName = 'Launch')]
     [string]$Worktree,
 
-    [Parameter(Mandatory)]
+    [Parameter(Mandatory, ParameterSetName = 'Launch')]
     [string]$PoolHome,
 
     [Parameter(Mandatory)]
     [string]$LogDirectory,
 
-    [Parameter(Mandatory)]
+    [Parameter(Mandatory, ParameterSetName = 'Launch')]
     [string[]]$Targets,
 
-    [Parameter(Mandatory)]
+    [Parameter(Mandatory, ParameterSetName = 'Launch')]
     [ValidateRange(1, 180)]
     [int]$LeafTimeout,
 
+    # Launch: the label recorded with the run. Status/Watch/Cancel: select the
+    # newest run carrying it. List: filter by it.
     [ValidatePattern('\A[A-Za-z0-9_-]+\z')]
-    [string]$Tag = 'run'
+    [string]$Tag = 'run',
+
+    [Parameter(Mandatory, ParameterSetName = 'Status')]
+    [switch]$Status,
+
+    [Parameter(Mandatory, ParameterSetName = 'Watch')]
+    [switch]$Watch,
+
+    [Parameter(Mandatory, ParameterSetName = 'Cancel')]
+    [switch]$Cancel,
+
+    [Parameter(Mandatory, ParameterSetName = 'List')]
+    [switch]$List,
+
+    [Parameter(ParameterSetName = 'Status')]
+    [Parameter(ParameterSetName = 'Watch')]
+    [Parameter(ParameterSetName = 'Cancel')]
+    [ValidatePattern('\A\d{8}T\d{9}Z-[0-9a-f]{32}\z')]
+    [string]$RunId,
+
+    [Parameter(ParameterSetName = 'Watch')]
+    [ValidateRange(1, 3600)]
+    [int]$PollSeconds = 15,
+
+    [Parameter(Mandatory, ParameterSetName = 'Cancel')]
+    [ValidateNotNullOrEmpty()]
+    [string]$Why,
+
+    [Parameter(ParameterSetName = 'List')]
+    [ValidateSet('running', 'succeeded', 'failed', 'cancelled', 'launcher-died')]
+    [string]$State,
+
+    [Parameter(ParameterSetName = 'List')]
+    [ValidateRange(1, 8760)]
+    [int]$MaxAgeHours
 )
 
 $ErrorActionPreference = 'Stop'
@@ -394,6 +430,674 @@ function Complete-Snapshot {
         )
     }
     return $result
+}
+
+# --- Tracking a recorded run: -Status, -Watch, -Cancel, -List -----------------
+#
+# Everything below reads the same three records a launch writes under
+# -LogDirectory (<run-id>.run.json, .log, .done). A run's state is derived, never
+# stored twice: .done's state when it exists, else `running` while the recorded
+# launcher process is alive, else `launcher-died` -- the launcher is gone and
+# wrote no .done, so the local outcome is unknown and remote leaves may still
+# be running.
+
+$script:WatchExitCodes = @{
+    'succeeded' = 0
+    'failed' = 20
+    'launcher-died' = 21
+    'cancelled' = 22
+}
+$script:RunIdPattern = '\A\d{8}T\d{9}Z-[0-9a-f]{32}\z'
+
+function ConvertTo-UtcTimestamp {
+    param([Parameter(Mandatory)]$Value)
+
+    # ConvertFrom-Json turns ISO-8601 strings into DateTime; 7.3 has no -DateKind.
+    if ($Value -is [System.DateTime]) {
+        return $Value.ToUniversalTime()
+    }
+    return [System.DateTime]::Parse(
+        [string]$Value,
+        [System.Globalization.CultureInfo]::InvariantCulture,
+        [System.Globalization.DateTimeStyles]::AdjustToUniversal -bor
+        [System.Globalization.DateTimeStyles]::AssumeUniversal
+    )
+}
+
+function Read-RunRecord {
+    param([Parameter(Mandatory)][string]$Path)
+
+    # Records are renamed into place, and a reader can briefly hit a sharing
+    # violation right after the rename; it clears on its own.
+    $timer = [System.Diagnostics.Stopwatch]::StartNew()
+    while ($true) {
+        try {
+            $record = [System.IO.File]::ReadAllText($Path) | ConvertFrom-Json -AsHashtable
+            break
+        }
+        catch [System.IO.IOException], [System.UnauthorizedAccessException] {
+            if ($timer.Elapsed.TotalSeconds -ge 30) {
+                throw
+            }
+            Start-Sleep -Milliseconds 50
+        }
+    }
+    foreach ($key in @($record.Keys)) {
+        if ($record[$key] -is [System.DateTime]) {
+            $record[$key] = $record[$key].ToUniversalTime().ToString(
+                'o',
+                [System.Globalization.CultureInfo]::InvariantCulture
+            )
+        }
+    }
+    return $record
+}
+
+function Get-RunRecordPaths {
+    param([Parameter(Mandatory)][string]$Directory)
+
+    return @(
+        Get-ChildItem -LiteralPath $Directory -Filter '*.run.json' -File |
+            Where-Object { $_.Name.Substring(0, $_.Name.Length - '.run.json'.Length) -match $script:RunIdPattern } |
+            Sort-Object -Property Name |
+            ForEach-Object { $_.FullName }
+    )
+}
+
+function Select-RunRecordPath {
+    param(
+        [Parameter(Mandatory)][string]$Directory,
+        [string]$RunId,
+        [string]$Tag
+    )
+
+    if ($RunId) {
+        $path = Join-Path $Directory "$RunId.run.json"
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+            throw "no run record $path"
+        }
+        return $path
+    }
+    # Run IDs start with a UTC timestamp, so name order is start order.
+    $matching = @(
+        Get-RunRecordPaths -Directory $Directory | Where-Object {
+            (Read-RunRecord -Path $_)['tag'] -ceq $Tag
+        }
+    )
+    if ($matching.Count -eq 0) {
+        throw "no run tagged '$Tag' under $Directory"
+    }
+    return $matching[-1]
+}
+
+function Test-LauncherAlive {
+    param([Parameter(Mandatory)]$Record)
+
+    $process = Get-Process -Id ([int]$Record['pid']) -ErrorAction SilentlyContinue
+    if ($null -eq $process) {
+        return $false
+    }
+    # The launcher started before it wrote started_at; a process with this PID
+    # that started later is an unrelated process that reused it.
+    $startedAt = ConvertTo-UtcTimestamp -Value $Record['started_at']
+    try {
+        return $process.StartTime.ToUniversalTime() -le $startedAt.AddSeconds(1)
+    }
+    catch {
+        return $true
+    }
+}
+
+function Read-SharedText {
+    param([Parameter(Mandatory)][string]$Path)
+
+    # The launcher appends to its log through a shared handle while we read.
+    $stream = [System.IO.FileStream]::new(
+        $Path,
+        [System.IO.FileMode]::Open,
+        [System.IO.FileAccess]::Read,
+        [System.IO.FileShare]::ReadWrite -bor [System.IO.FileShare]::Delete
+    )
+    try {
+        $reader = [System.IO.StreamReader]::new($stream, [System.Text.UTF8Encoding]::new($false))
+        return $reader.ReadToEnd()
+    }
+    finally {
+        $stream.Dispose()
+    }
+}
+
+function Get-WorkflowTask {
+    param([Parameter(Mandatory)][string]$WorkflowId)
+
+    # _farm.workflow_id: leaf:<task>:<cache key or commit prefix>:<budget>s
+    $match = [System.Text.RegularExpressions.Regex]::Match($WorkflowId, '\Aleaf:(.+):[^:]+:\d+s\z')
+    if ($match.Success) {
+        return $match.Groups[1].Value
+    }
+    return $WorkflowId
+}
+
+function Read-RunLog {
+    param([Parameter(Mandatory)][string]$Path)
+
+    # The log lines that mark a leaf's life, as build.py/_farm/_artifact_cache
+    # print them at --verbosity info:
+    #   Farm workflow requested: <workflow-id>      (_farm._dispatch)
+    #   Farm workflow attached: <workflow-id>       (_farm._dispatch)
+    #   [cache] HIT   <task> (<key12>) -> ...       (restore: a submitter hit, or
+    #                                                a farm leaf's result arriving)
+    #   TaskError - taskid:<task>                   (doit, then a traceback whose
+    #                                                last exception line says why)
+    $parsed = [ordered]@{
+        leaves = [ordered]@{}
+        hits = 0
+        task_errors = [System.Collections.Generic.List[string]]::new()
+        events = [System.Collections.Generic.List[string]]::new()
+        last_write_utc = $null
+    }
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        return $parsed
+    }
+    $parsed['last_write_utc'] = (Get-Item -LiteralPath $Path).LastWriteTimeUtc
+    $text = Read-SharedText -Path $Path
+    # A line still being written is read on the next pass, whole.
+    $complete = $text.LastIndexOf("`n")
+    if ($complete -lt 0) {
+        return $parsed
+    }
+    $awaitingCause = $null
+    foreach ($raw in $text.Substring(0, $complete).Split("`n")) {
+        $line = $raw.TrimEnd("`r")
+        $workflow = [System.Text.RegularExpressions.Regex]::Match(
+            $line, 'Farm workflow (requested|attached): (\S+)'
+        )
+        if ($workflow.Success) {
+            $verb = $workflow.Groups[1].Value
+            $workflowId = $workflow.Groups[2].Value
+            $task = Get-WorkflowTask -WorkflowId $workflowId
+            $parsed['leaves'][$task] = [ordered]@{
+                task = $task
+                state = $verb
+                workflow_id = $workflowId
+                error = $null
+            }
+            $parsed['events'].Add("leaf $task $verb $workflowId")
+            continue
+        }
+        $hit = [System.Text.RegularExpressions.Regex]::Match($line, '\[cache\] HIT\s+(\S+) \(')
+        if ($hit.Success) {
+            $task = $hit.Groups[1].Value
+            $leaf = $parsed['leaves'][$task]
+            if ($null -ne $leaf -and $leaf['state'] -in @('requested', 'attached')) {
+                $leaf['state'] = 'succeeded'
+                $parsed['events'].Add("leaf $task succeeded $($leaf['workflow_id'])")
+            }
+            elseif ($null -eq $leaf) {
+                $parsed['hits'] += 1
+            }
+            continue
+        }
+        $taskError = [System.Text.RegularExpressions.Regex]::Match($line, '\ATaskError - taskid:(\S+)')
+        if ($taskError.Success) {
+            $task = $taskError.Groups[1].Value
+            $leaf = $parsed['leaves'][$task]
+            if ($null -eq $leaf) {
+                $leaf = [ordered]@{ task = $task; state = 'failed'; workflow_id = $null; error = $null }
+                $parsed['leaves'][$task] = $leaf
+            }
+            $leaf['state'] = 'failed'
+            $parsed['task_errors'].Add($task)
+            $parsed['events'].Add("leaf $task failed $($leaf['workflow_id'])".TrimEnd())
+            $awaitingCause = $leaf
+            continue
+        }
+        if ($null -ne $awaitingCause -and $line -match '\A[A-Za-z_][\w.]*(Error|Exception|Exit)\b') {
+            $cause = if ($line.Length -gt 500) { $line.Substring(0, 500) + '...' } else { $line }
+            $awaitingCause['error'] = $cause
+            $parsed['events'].Add("error $($awaitingCause['task']): $cause")
+            $awaitingCause = $null
+        }
+    }
+    return $parsed
+}
+
+function Get-RunStatus {
+    param([Parameter(Mandatory)][string]$RecordPath)
+
+    $record = Read-RunRecord -Path $RecordPath
+    # Liveness first, then .done: the launcher writes .done before it exits, so
+    # a launcher already gone with still no .done never wrote one.
+    $alive = Test-LauncherAlive -Record $record
+    $done = $null
+    if (Test-Path -LiteralPath $record['done'] -PathType Leaf) {
+        $done = Read-RunRecord -Path $record['done']
+    }
+    $state = if ($null -ne $done) { $done['state'] } elseif ($alive) { 'running' } else { 'launcher-died' }
+    $log = Read-RunLog -Path $record['log']
+    $leaves = @($log['leaves'].Values)
+    $inFlight = @($leaves | Where-Object { $_['state'] -in @('requested', 'attached') })
+    $now = [System.DateTime]::UtcNow
+    $startedAt = ConvertTo-UtcTimestamp -Value $record['started_at']
+    $orphans = @()
+    if ($state -eq 'launcher-died') {
+        $orphans = @(Get-RunProcesses -Record $record)
+    }
+    $status = [ordered]@{
+        run_id = $record['run_id']
+        tag = $record['tag']
+        state = $state
+        exit_code = if ($null -ne $done) { $done['exit_code'] } else { $null }
+        launcher = [ordered]@{
+            pid = $record['pid']
+            alive = $alive
+            # A dead launcher's build child may outlive it and keep dispatching.
+            orphaned_processes = $orphans
+        }
+        commit = $record['commit']
+        targets = @($record['targets'])
+        leaf_timeout_minutes = $record['leaf_timeout_minutes']
+        cache_environment = $record['cache_environment']
+        started_at = $record['started_at']
+        finished_at = if ($null -ne $done) { $done['finished_at'] } else { $null }
+        elapsed_s = if ($null -ne $done) { $done['elapsed_s'] } else { [System.Math]::Round(($now - $startedAt).TotalSeconds, 1) }
+        log_idle_s = if ($null -ne $log['last_write_utc']) { [System.Math]::Round(($now - $log['last_write_utc']).TotalSeconds, 1) } else { $null }
+        worktree = $record['worktree']
+        pool_home = $record['pool_home']
+        record = [System.IO.Path]::GetFullPath($RecordPath)
+        log = $record['log']
+        done = $record['done']
+        # .done's outputs is where they are; before it, the snapshot still has them.
+        outputs = if ($null -ne $done) { $done['outputs'] } else { Join-Path $record['snapshot'] 'cad\out' }
+        counts = [ordered]@{
+            hits = $log['hits']
+            requested = @($leaves | Where-Object { $null -ne $_['workflow_id'] }).Count
+            succeeded = @($leaves | Where-Object { $_['state'] -eq 'succeeded' }).Count
+            failed = @($leaves | Where-Object { $_['state'] -eq 'failed' }).Count
+            in_flight = $inFlight.Count
+        }
+        leaves = $leaves
+        in_flight_workflows = @($inFlight | ForEach-Object { $_['workflow_id'] })
+        task_errors = @($log['task_errors'])
+    }
+    if ($null -ne $done -and $done.Contains('cancel')) {
+        $status['cancel'] = $done['cancel']
+    }
+    return [pscustomobject]@{ status = $status; events = $log['events']; record = $record }
+}
+
+function Invoke-FarmCli {
+    param(
+        [Parameter(Mandatory)][string]$PoolHome,
+        [Parameter(Mandatory)][string[]]$Arguments
+    )
+
+    # The pool is its own uv project; a caller's VIRTUAL_ENV must not leak in.
+    $previous = $env:VIRTUAL_ENV
+    $env:VIRTUAL_ENV = $null
+    try {
+        $output = @(& uv run --frozen --project $PoolHome (Join-Path $PoolHome 'farm.py') @Arguments 2>&1 |
+                ForEach-Object { [string]$_ })
+        return [pscustomobject]@{ code = $LASTEXITCODE; output = $output }
+    }
+    finally {
+        $env:VIRTUAL_ENV = $previous
+    }
+}
+
+function Get-RunProcesses {
+    param([Parameter(Mandatory)]$Record)
+
+    # The launcher (when it is still the recorded process) and everything it
+    # started. A child keeps its ParentProcessId after its parent dies, so the
+    # build a dead launcher left behind is still found; `started_at` and the
+    # creation times keep an unrelated process that reused a PID out.
+    $launcherId = [int]$Record['pid']
+    $startedAt = ConvertTo-UtcTimestamp -Value $Record['started_at']
+    $all = @(Get-CimInstance -ClassName Win32_Process -Property ProcessId, ParentProcessId, CreationDate)
+    $byParent = @{}
+    foreach ($process in $all) {
+        $parent = [int]$process.ParentProcessId
+        if (-not $byParent.ContainsKey($parent)) {
+            $byParent[$parent] = [System.Collections.Generic.List[object]]::new()
+        }
+        $byParent[$parent].Add($process)
+    }
+    $holder = $all | Where-Object { [int]$_.ProcessId -eq $launcherId } | Select-Object -First 1
+    $isLauncher = $null -ne $holder -and $holder.CreationDate.ToUniversalTime() -le $startedAt.AddSeconds(1)
+    $found = [System.Collections.Generic.List[int]]::new()
+    $queue = [System.Collections.Generic.Queue[object]]::new()
+    if ($isLauncher) {
+        $found.Add($launcherId)
+    }
+    foreach ($child in @($byParent[$launcherId])) {
+        if ($null -eq $child -or [int]$child.ProcessId -eq $launcherId) {
+            continue
+        }
+        $created = $child.CreationDate.ToUniversalTime()
+        if ($created -lt $startedAt.AddSeconds(-1)) {
+            continue
+        }
+        if ($null -ne $holder -and -not $isLauncher -and $created -ge $holder.CreationDate.ToUniversalTime()) {
+            # A child of the process that reused the launcher's PID.
+            continue
+        }
+        $queue.Enqueue($child)
+    }
+    while ($queue.Count -gt 0) {
+        $current = $queue.Dequeue()
+        $found.Add([int]$current.ProcessId)
+        foreach ($child in @($byParent[[int]$current.ProcessId])) {
+            if ($null -eq $child -or [int]$child.ProcessId -eq [int]$current.ProcessId) {
+                continue
+            }
+            if ($child.CreationDate -lt $current.CreationDate) {
+                continue
+            }
+            $queue.Enqueue($child)
+        }
+    }
+    return @($found)
+}
+
+function Write-RunEvent {
+    param(
+        [Parameter(Mandatory)][string]$RunId,
+        [Parameter(Mandatory)][string]$Text
+    )
+
+    $stamp = [System.DateTime]::UtcNow.ToString('HH:mm:ss', [System.Globalization.CultureInfo]::InvariantCulture)
+    Write-Output "farm-run $stamp $RunId $Text"
+}
+
+function Invoke-RunStatus {
+    param([Parameter(Mandatory)][string]$RecordPath)
+
+    Write-Output ((Get-RunStatus -RecordPath $RecordPath).status | ConvertTo-Json -Depth 8 -Compress)
+    $script:TrackExitCode = 0
+}
+
+function Invoke-RunWatch {
+    param(
+        [Parameter(Mandatory)][string]$RecordPath,
+        [Parameter(Mandatory)][int]$PollSeconds
+    )
+
+    $emitted = 0
+    $announced = $false
+    while ($true) {
+        $snapshot = Get-RunStatus -RecordPath $RecordPath
+        $status = $snapshot.status
+        if (-not $announced) {
+            Write-RunEvent -RunId $status['run_id'] -Text (
+                "watching tag=$($status['tag']) pid=$($status['launcher']['pid']) " +
+                "state=$($status['state']) commit=$($status['commit']) targets=$($status['targets'] -join ',')"
+            )
+            $announced = $true
+        }
+        for ($index = $emitted; $index -lt $snapshot.events.Count; $index++) {
+            Write-RunEvent -RunId $status['run_id'] -Text $snapshot.events[$index]
+        }
+        $emitted = $snapshot.events.Count
+        if ($script:WatchExitCodes.ContainsKey($status['state'])) {
+            $counts = $status['counts']
+            $summary = (
+                "end $($status['state']) exit_code=$($status['exit_code']) " +
+                "hits=$($counts['hits']) farm=$($counts['requested']) succeeded=$($counts['succeeded']) " +
+                "failed=$($counts['failed']) in_flight=$($counts['in_flight'])"
+            )
+            if ($status['state'] -eq 'launcher-died') {
+                $summary += (
+                    "; LAUNCHER DIED: pid $($status['launcher']['pid']) is gone and wrote no .done, " +
+                    "log idle $($status['log_idle_s']) s; the remote leaves may still be running: " +
+                    "farm-run.ps1 -Status for their workflow IDs, -Cancel to stop them"
+                )
+            }
+            Write-RunEvent -RunId $status['run_id'] -Text $summary
+            $status.Remove('leaves')
+            Write-Output ($status | ConvertTo-Json -Depth 8 -Compress)
+            $script:TrackExitCode = $script:WatchExitCodes[$status['state']]
+            return
+        }
+        Start-Sleep -Seconds $PollSeconds
+    }
+}
+
+function Invoke-RunList {
+    param(
+        [Parameter(Mandatory)][string]$Directory,
+        [string]$Tag,
+        [string]$State,
+        [int]$MaxAgeHours
+    )
+
+    $now = [System.DateTime]::UtcNow
+    $paths = @(Get-RunRecordPaths -Directory $Directory)
+    [array]::Reverse($paths)
+    foreach ($path in $paths) {
+        $record = Read-RunRecord -Path $path
+        if ($Tag -and $record['tag'] -cne $Tag) {
+            continue
+        }
+        $startedAt = ConvertTo-UtcTimestamp -Value $record['started_at']
+        if ($MaxAgeHours -and ($now - $startedAt).TotalHours -gt $MaxAgeHours) {
+            continue
+        }
+        $alive = Test-LauncherAlive -Record $record
+        $done = $null
+        if (Test-Path -LiteralPath $record['done'] -PathType Leaf) {
+            $done = Read-RunRecord -Path $record['done']
+        }
+        $runState = if ($null -ne $done) { $done['state'] } elseif ($alive) { 'running' } else { 'launcher-died' }
+        if ($State -and $runState -ne $State) {
+            continue
+        }
+        Write-Output ([ordered]@{
+                run_id = $record['run_id']
+                tag = $record['tag']
+                state = $runState
+                exit_code = if ($null -ne $done) { $done['exit_code'] } else { $null }
+                started_at = $record['started_at']
+                finished_at = if ($null -ne $done) { $done['finished_at'] } else { $null }
+                commit = $record['commit']
+                targets = @($record['targets'])
+                pid = $record['pid']
+                record = $path
+            } | ConvertTo-Json -Depth 4 -Compress)
+    }
+    $script:TrackExitCode = 0
+}
+
+function Invoke-RunCancel {
+    param(
+        [Parameter(Mandatory)][string]$Directory,
+        [Parameter(Mandatory)][string]$RecordPath,
+        [Parameter(Mandatory)][string]$Why
+    )
+
+    $snapshot = Get-RunStatus -RecordPath $RecordPath
+    $status = $snapshot.status
+    $record = $snapshot.record
+    $runId = $status['run_id']
+    if ($status['state'] -notin @('running', 'launcher-died')) {
+        Write-RunEvent -RunId $runId -Text "already finished: $($status['state']); nothing to cancel"
+        $script:TrackExitCode = 0
+        return
+    }
+
+    $errors = [System.Collections.Generic.List[string]]::new()
+    $killed = [System.Collections.Generic.List[int]]::new()
+    $launcherWas = $status['state']
+    # The launcher first, so it cannot react to its child dying by writing a
+    # `failed` .done; then everything it started (uv, build.py) -- including a
+    # build a dead launcher left running, which would keep dispatching leaves.
+    $tree = @(Get-RunProcesses -Record $record)
+    foreach ($processId in $tree) {
+        try {
+            Stop-Process -Id $processId -Force -ErrorAction Stop
+            $killed.Add($processId)
+        }
+        catch [Microsoft.PowerShell.Commands.ProcessCommandException] {
+            # Already exited between the listing and the stop.
+        }
+        catch {
+            $errors.Add("could not stop process $processId`: $($_.Exception.Message)")
+        }
+    }
+    if ($killed.Count -gt 0) {
+        Wait-Process -Id $killed -Timeout 60 -ErrorAction SilentlyContinue
+        Write-RunEvent -RunId $runId -Text "stopped launcher pid $($record['pid']) and its processes: $($killed -join ',')"
+    }
+    if (Test-Path -LiteralPath $record['done'] -PathType Leaf) {
+        # The launcher finished on its own before it was stopped.
+        $finished = Read-RunRecord -Path $record['done']
+        Write-RunEvent -RunId $runId -Text "finished on its own first: $($finished['state']); nothing to cancel"
+        $script:TrackExitCode = 0
+        return
+    }
+
+    # Re-read: the log is final now that nothing writes it.
+    $inFlight = @((Get-RunStatus -RecordPath $RecordPath).status['in_flight_workflows'])
+    # Workflows are shared by ID (USE_EXISTING): a live sibling run that is
+    # waiting on the same leaf keeps it.
+    $shared = @{}
+    foreach ($path in @(Get-RunRecordPaths -Directory $Directory)) {
+        if ([System.IO.Path]::GetFullPath($path) -eq [System.IO.Path]::GetFullPath($RecordPath)) {
+            continue
+        }
+        $other = Get-RunStatus -RecordPath $path
+        if ($other.status['state'] -ne 'running') {
+            continue
+        }
+        foreach ($workflowId in $other.status['in_flight_workflows']) {
+            $shared[$workflowId] = $other.status['run_id']
+        }
+    }
+
+    $outcomes = [System.Collections.Generic.List[object]]::new()
+    $reason = "$Why (farm-run.ps1 -Cancel $runId)"
+    foreach ($workflowId in $inFlight) {
+        $outcome = [ordered]@{ workflow_id = $workflowId; outcome = $null; detail = $null }
+        $outcomes.Add($outcome)
+        if ($shared.ContainsKey($workflowId)) {
+            $outcome['outcome'] = 'kept-shared'
+            $outcome['detail'] = "run $($shared[$workflowId]) is still waiting on it"
+            Write-RunEvent -RunId $runId -Text "kept $workflowId`: $($outcome['detail'])"
+            continue
+        }
+        $query = Invoke-FarmCli -PoolHome $record['pool_home'] -Arguments @('status', '--json', $workflowId)
+        if ($query.code -ne 0) {
+            $text = $query.output -join ' '
+            if ($text -match 'workflow not found') {
+                # Requested, but the submitter died before the farm recorded it.
+                $outcome['outcome'] = 'not-found'
+            }
+            else {
+                $outcome['outcome'] = 'error'
+                $errors.Add("farm.py status $workflowId exited $($query.code): $text")
+            }
+            $outcome['detail'] = $text
+            Write-RunEvent -RunId $runId -Text "$($outcome['outcome']) $workflowId"
+            continue
+        }
+        $described = ($query.output | Where-Object { $_.TrimStart().StartsWith('{') } | Select-Object -Last 1) |
+            ConvertFrom-Json -AsHashtable
+        if ($described['status'] -ne 'RUNNING') {
+            $outcome['outcome'] = 'already-closed'
+            $outcome['detail'] = $described['status']
+            Write-RunEvent -RunId $runId -Text "already closed $workflowId`: $($described['status'])"
+            continue
+        }
+        $cancelled = Invoke-FarmCli -PoolHome $record['pool_home'] -Arguments @('cancel', '--why', $reason, $workflowId)
+        $outcome['detail'] = $cancelled.output -join ' '
+        if ($cancelled.code -eq 0) {
+            $outcome['outcome'] = 'cancelled'
+        }
+        else {
+            $outcome['outcome'] = 'error'
+            $errors.Add("farm.py cancel $workflowId exited $($cancelled.code): $($outcome['detail'])")
+        }
+        Write-RunEvent -RunId $runId -Text "$($outcome['outcome']) $workflowId"
+    }
+
+    # The launcher never ran its own cleanup: keep the outputs and remove the
+    # snapshot exactly as it would have.
+    $cleanup = Complete-Snapshot `
+        -Worktree $record['worktree'] `
+        -SnapshotPath $record['snapshot'] `
+        -OutputsPath $record['outputs']
+    foreach ($problem in $cleanup['cleanup_errors']) {
+        $errors.Add($problem)
+    }
+
+    $startedAt = ConvertTo-UtcTimestamp -Value $record['started_at']
+    $now = [System.DateTime]::UtcNow
+    $doneRecord = [ordered]@{}
+    foreach ($entry in $record.GetEnumerator()) {
+        $doneRecord[$entry.Key] = $entry.Value
+    }
+    $doneRecord['state'] = 'cancelled'
+    $doneRecord['exit_code'] = $null
+    $doneRecord['elapsed_s'] = [System.Math]::Round(($now - $startedAt).TotalSeconds, 3)
+    $doneRecord['finished_at'] = $now.ToString('o', [System.Globalization.CultureInfo]::InvariantCulture)
+    $doneRecord['launch_overhead_s'] = $null
+    $doneRecord['environment_reused'] = $null
+    $doneRecord['outputs'] = $cleanup['outputs']
+    $doneRecord['outputs_preserved'] = $cleanup['outputs_preserved']
+    $doneRecord['snapshot_removed'] = $cleanup['snapshot_removed']
+    $doneRecord['cleanup_errors'] = @($cleanup['cleanup_errors'])
+    $doneRecord['cancel'] = [ordered]@{
+        why = $Why
+        by = "$([System.Environment]::UserName)@$([System.Environment]::MachineName)"
+        launcher = $launcherWas
+        stopped_pids = @($killed)
+        workflows = @($outcomes)
+        errors = @($errors)
+    }
+    Write-JsonAtomic -Path $record['done'] -Value $doneRecord
+    Write-Output ($doneRecord | ConvertTo-Json -Depth 8 -Compress)
+    if ($errors.Count -gt 0) {
+        foreach ($problem in $errors) {
+            [System.Console]::Error.WriteLine("farm-run cancel: $problem")
+        }
+        $script:TrackExitCode = 1
+        return
+    }
+    $script:TrackExitCode = 0
+}
+
+if ($PSCmdlet.ParameterSetName -ne 'Launch') {
+    try {
+        $trackedDirectory = Resolve-ExistingDirectory -Path $LogDirectory -ParameterName 'LogDirectory'
+        $selectsRun = $PSCmdlet.ParameterSetName -in @('Status', 'Watch', 'Cancel')
+        if ($selectsRun -and -not $RunId -and -not $PSBoundParameters.ContainsKey('Tag')) {
+            throw "-$($PSCmdlet.ParameterSetName) needs -RunId or -Tag"
+        }
+        if ($selectsRun -and $RunId -and $PSBoundParameters.ContainsKey('Tag')) {
+            throw "-$($PSCmdlet.ParameterSetName) takes -RunId or -Tag, not both"
+        }
+        $listTag = if ($PSBoundParameters.ContainsKey('Tag')) { $Tag } else { $null }
+        # Each operation streams its lines to stdout and sets TrackExitCode.
+        $script:TrackExitCode = 2
+        switch ($PSCmdlet.ParameterSetName) {
+            'List' {
+                Invoke-RunList -Directory $trackedDirectory -Tag $listTag -State $State -MaxAgeHours $MaxAgeHours
+            }
+            default {
+                $selected = Select-RunRecordPath -Directory $trackedDirectory -RunId $RunId -Tag $listTag
+                switch ($PSCmdlet.ParameterSetName) {
+                    'Status' { Invoke-RunStatus -RecordPath $selected }
+                    'Watch' { Invoke-RunWatch -RecordPath $selected -PollSeconds $PollSeconds }
+                    'Cancel' { Invoke-RunCancel -Directory $trackedDirectory -RecordPath $selected -Why $Why }
+                }
+            }
+        }
+    }
+    catch {
+        [System.Console]::Error.WriteLine("farm-run $($PSCmdlet.ParameterSetName.ToLowerInvariant()): $($_.Exception.Message)")
+        exit 2
+    }
+    exit $script:TrackExitCode
 }
 
 $logCreated = $false

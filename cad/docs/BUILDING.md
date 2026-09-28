@@ -9,7 +9,9 @@ drives COM needs a SolidWorks seat, and there are two ways to have one:
 - **A seatless submitter.** No SolidWorks here at all: `build.py --executor
   farm` dispatches each cache-missing COM task as a farm leaf and restores what
   the worker published. An agent-driven farm build has its own launch contract —
-  see [supervised farm launches](../../DEVELOPING.md#supervised-farm-launches).
+  started and tracked (`-Status`, `-Watch`, `-List`, `-Cancel`) through
+  `scripts/farm-run.ps1`; see
+  [supervised farm launches](../../DEVELOPING.md#supervised-farm-launches).
 
 The SolidWorks-free `check:*` gates, `gallery` and the comparison tooling need
 no seat under either arrangement.
