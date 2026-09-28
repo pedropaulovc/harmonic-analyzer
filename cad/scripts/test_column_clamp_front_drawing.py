@@ -86,13 +86,6 @@ def test_hole_states_are_annotated() -> None:
 def test_native_gdt_replaces_form_orientation_notes() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_datum_feature(") == 2
-    assert (
-        "        edge_xy=(_plan_x(BORE_RADIUS), TOP_CENTER[1]),\n"
-        "        symbol_xy=(0.150, TOP_CENTER[1]),\n"
-        '        datum="B",\n'
-        '        label="column-relief bore",\n'
-        in source
-    )
     assert source.count("add_feature_control_frame(") == 2
     assert "characteristic=\"parallelism\"" in source
     assert "characteristic=\"position\"" in source

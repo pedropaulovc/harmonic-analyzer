@@ -282,7 +282,13 @@ HUB_SECTION_SCALE = (1, 1)
 HUB_SECTION_CAPTION_XY = (0.330, 0.178)
 POCKET_DEPTH_TEXT_XY = (0.330, 0.238)
 POCKET_DEPTH_OFFSET_XY = (0.378, 0.242)
-HUB_BORE_FINISH_SYMBOL_XY = (0.030, 0.160)
+# In the left window, right of the bore (clears leader-crosses-line Ra 3.2 x
+# RibWidth 27.0 at x 60): was (0.030, 0.160), its 35 mm tail cut the 27.0
+# line.  The leader now lands on the bore's lower-right rim (-45 deg on the
+# sheet) from an 8 mm tail at y 195, passing 2.2 mm over the 27.0 extension
+# line's end (84.0, 194.5) and 2.0 mm under the D-D cutting line.
+HUB_BORE_FINISH_SYMBOL_XY = (0.108, 0.195)
+HUB_BORE_FINISH_TAIL = 0.008
 # One ramp, three numbers: the 60.0 feather span, the 8.0 drop below the
 # rail underside and the 20 DEG ramp all park in the band under the hub
 # side view, so nobody has to hold one of them on another sheet.
@@ -993,15 +999,17 @@ def _hub_underside_detail(adapter: Any, parent_view: Any) -> Any:
 
 
 
-def _finish_leader_tail(symbol: Any, *, label: str) -> None:
+def _finish_leader_tail(symbol: Any, *, label: str, length: float = FINISH_LEADER_TAIL) -> None:
     """Give one surface-finish symbol the horizontal tail its text needs.
 
     The roughness value hangs to the right of the symbol, so a short bent
-    leader draws its own tail straight through "Ra 3.2".
+    leader to a feature on the right draws its own tail straight through
+    "Ra 3.2".  A feature on the left takes the tail away from the text, so
+    its ``length`` only sets where the leader bends.
     """
     annotation = _early_bound(symbol.GetAnnotation(), "IAnnotation")
-    annotation.BentLeaderLength = FINISH_LEADER_TAIL
-    if abs(float(annotation.BentLeaderLength)-FINISH_LEADER_TAIL) > 1e-7:
+    annotation.BentLeaderLength = length
+    if abs(float(annotation.BentLeaderLength)-length) > 1e-7:
         raise RuntimeError(f"{label} finish leader did not clear its roughness text")
 
 
@@ -1691,8 +1699,10 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _checked_dimension(
         adapter, detail_top,
-        p0=(COLUMN_X + BORE_DIA/2, HALF_H + BOSS_ABOVE, FRONT_COLUMN_Z),
-        p1=(COLUMN_X + BORE_DIA/2, HALF_H + BOSS_ABOVE, REAR_COLUMN_Z),
+        # Left sockets, not right (clears leader-crosses-line HANGER DRILL x
+        # 224.00): extension lines x 312.5->82 at y 216/104 become 115.5->82.
+        p0=(-COLUMN_X - BORE_DIA/2, HALF_H + BOSS_ABOVE, FRONT_COLUMN_Z),
+        p1=(-COLUMN_X - BORE_DIA/2, HALF_H + BOSS_ABOVE, REAR_COLUMN_Z),
         text_xy=(0.083, 0.168), label="socket vertical pitch",
         expected_mm=REAR_COLUMN_Z-FRONT_COLUMN_Z, orientation="vertical",
         center=True,
@@ -2194,15 +2204,24 @@ async def build(adapter: Any) -> dict[str, str]:
         label="gooseneck hub bore finish",
         entity_type="FACE",
         entity=machined_faces["hub_bore"],
+        # Lower-right rim, (81.3, 197.0) mm (was the +Z rim, (79.3, 196.2)):
+        # model +Z runs down this plan, so +X/+Z at 45 deg faces the window
+        # the symbol stands in (clears leader-crosses-line Ra 3.2 x 27.0).
         leader_attach_xy=model_point_in_view(
             adapter,
             hub_top,
-            (GOOSENECK_X/1000.0, 0.0, (GOOSENECK_Z+GOOSENECK_BORE_DIA/2)/1000.0),
+            (
+                (GOOSENECK_X + GOOSENECK_BORE_DIA/2*math.sqrt(0.5))/1000.0,
+                0.0,
+                (GOOSENECK_Z + GOOSENECK_BORE_DIA/2*math.sqrt(0.5))/1000.0,
+            ),
             label="hub bore finish leader",
         ),
         char_height=0.0025,
     )
-    _finish_leader_tail(hub_bore_finish, label="gooseneck hub bore")
+    _finish_leader_tail(
+        hub_bore_finish, label="gooseneck hub bore", length=HUB_BORE_FINISH_TAIL,
+    )
     set_hidden_lines_removed(adapter, detail_left)
     detail_left_edges = scan_view_edges(detail_left, label="hub side")
     tap_x = -(OUTER_X - SET_POCKET_DEPTH)
@@ -2230,9 +2249,15 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         detail_left,
         edge=set_tap_edge,
+        # Up-right of the tap, not up-left (clears leader-crosses-line 5.11
+        # THRU x PocketRise 16.0): was (0.070, 0.125), whose leader cut the
+        # pocket's y 99.9 extension line.  (0.2294, 0.1306) elbows at (199.4,
+        # 125.0) mm and drops at 0.55 through the tap centre (146.5, 95.9),
+        # passing 2.0 mm right of that line's end (149.5, 99.9) and 5.2 mm
+        # over the 18.2 text; the text sits 12.8 mm above the view.
         callout_xy=(
-            HUB_LEFT_CENTER[0] - 0.075,
-            HUB_LEFT_CENTER[1] + 0.030,
+            HUB_LEFT_CENTER[0] + 0.0844,
+            HUB_LEFT_CENTER[1] + 0.0356,
         ),
         label="gooseneck set-screw through-to-bore tap",
         process="TAP",
