@@ -362,11 +362,11 @@ async def build(adapter: Any) -> dict[str, str]:
         # is its frame's TOP-LEFT corner and this one ("|//| 0.10 |A|") is
         # 25.2 mm wide, so it spans x 0.332..0.3572, y 0.115..0.122, centred in the
         # gap between the front view (x <= 0.3304) and the right view (x >= 0.3594):
-        # 2.4 mm under the caption's glyphs, 2.5 mm over datum A's line. Its shoulder
-        # runs right to 0.3635 and the leader drops 6 mm to the corner it landed on
-        # before; pinned there, because the frame changed side of it.
+        # 2.4 mm under the caption's glyphs, 2.5 mm over datum A's line. Its
+        # shoulder runs right and the leader drops to the edge pick. No
+        # leader_attach_xy: setting the leader point detached the frame from
+        # its edge (entities=0 on the 1c99291b4 farm leaf).
         frame_xy=(0.332, 0.122),
-        leader_attach_xy=(0.3748, 0.1125),
         characteristic="parallelism",
         tolerance=GEOMETRIC_TOLERANCES_MM["guide opposite-face parallelism"],
         datums=("A",),
