@@ -5825,8 +5825,11 @@ def _select_balloon_anchor(
     offsets: Mapping[str, tuple[float, float, float]],
     sheet_xy: tuple[float, float] | None,
     label: str,
-) -> str:
-    """Select the edge ``stem``'s balloon attaches to; return its instance.
+) -> tuple[str, Any, bool]:
+    """Find the edge ``stem``'s balloon attaches to.
+
+    Returns the instance, the edge, and whether the edge came from the body
+    walk (a model edge, selected through the view) rather than a hit test.
 
     One hit test per balloon replaces fetching every visible edge of the
     component and keeping ``edges[0]``: that array's order moved between
@@ -5898,9 +5901,9 @@ def _select_balloon_anchor(
             name = _instance_name(leaf.name)
             for (point, _edge), xy in zip(pairs, points):
                 tried += 1
-                _hit, owner = _hit_test_edge(adapter, xy)
+                hit, owner = _hit_test_edge(adapter, xy)
                 if owner.casefold() == name.casefold():
-                    method, instance, sheet_xy = "walk", name, xy
+                    method, instance, sheet_xy, edge = "walk", name, xy, hit
                     point_mm = tuple(value * 1000.0 for value in point)
                     break
             if method:
@@ -5913,10 +5916,6 @@ def _select_balloon_anchor(
                 )
             leaf, (point, edge) = fallback
             instance = _instance_name(leaf.name)
-            draw = adapter.currentModel
-            draw.ClearSelection2(True)
-            if not view.SelectEntity(edge, False):
-                raise RuntimeError(f"{label}: failed to select {stem}'s walked edge")
             method, point_mm, sheet_xy = "walk-edge", tuple(v * 1000.0 for v in point), None
             edge_ends = tuple(
                 adapter._attempt(lambda: tuple(edge.GetCurveParams2() or ())[:6], default=())
@@ -5934,7 +5933,8 @@ def _select_balloon_anchor(
         edge_mm=_mm_text(edge_ends, 1000.0),
         tried=tried,
     )
-    return instance
+    adapter.currentModel.ClearSelection2(True)
+    return instance, edge, method == "walk-edge"
 
 
 def _verify_anchor_attachment(
@@ -5958,25 +5958,22 @@ def _create_component_bom_balloon(
     view: Any,
     *,
     stem: str,
-    anchor: BalloonAnchor,
-    candidates: Sequence[_ComponentLeaf],
-    offsets: Mapping[str, tuple[float, float, float]],
-    sheet_xy: tuple[float, float] | None,
+    instance: str,
+    edge: Any,
+    walked: bool,
     expected_item: str,
     label: str,
 ) -> Any:
-    """Attach one BOM balloon at ``stem``'s anchor and prove where it landed."""
-    instance = _select_balloon_anchor(
-        adapter,
-        view,
-        stem=stem,
-        anchor=anchor,
-        candidates=candidates,
-        offsets=offsets,
-        sheet_xy=sheet_xy,
-        label=label,
-    )
+    """Attach one BOM balloon to ``stem``'s anchor edge and prove where it landed."""
     draw = adapter.currentModel
+    if walked:
+        draw.ClearSelection2(True)
+        if not view.SelectEntity(edge, False):
+            raise RuntimeError(f"{label}: failed to select {stem}'s walked edge")
+    else:
+        _select_view_entity(
+            adapter, view, "EDGE", None, label=f"{label} {stem} anchor", entity=edge
+        )
     extension = _early_bound(draw.Extension, "IModelDocExtension")
     options = extension.CreateBalloonOptions()
     if options is None:
@@ -6065,8 +6062,11 @@ def add_component_bom_balloons(
         raise RuntimeError(f"{label}: failed to activate the balloon view")
     # A coordinate hit test reads the view's display geometry: make it current once.
     _early_bound(view, "IView").UpdateViewDisplayGeometry()
-    balloons = [
-        _create_component_bom_balloon(
+    # Every anchor is hit-tested before the first balloon exists: a balloon
+    # dropped near its own anchor would otherwise sit on the next family's
+    # point and swallow its hit test.
+    picks = [
+        _select_balloon_anchor(
             adapter,
             view,
             stem=stem,
@@ -6074,10 +6074,22 @@ def add_component_bom_balloons(
             candidates=candidates[stem],
             offsets=offsets,
             sheet_xy=sheet_points.get(stem),
+            label=label,
+        )
+        for stem in stems
+    ]
+    balloons = [
+        _create_component_bom_balloon(
+            adapter,
+            view,
+            stem=stem,
+            instance=instance,
+            edge=edge,
+            walked=walked,
             expected_item=item,
             label=label,
         )
-        for stem, item in items
+        for (stem, item), (instance, edge, walked) in zip(items, picks)
     ]
     _spread_balloons(adapter, view, balloons, margin=margin)
     rebuild_drawing(adapter, label="add_component_bom_balloons")

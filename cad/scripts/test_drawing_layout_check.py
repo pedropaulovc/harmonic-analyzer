@@ -2194,6 +2194,10 @@ class _AnchorEdge:
     def GetCurveParams2(self):
         return (*self._ends, 0.0, 1.0)
 
+    def Select4(self, _append, _data):
+        self.sheet.selected = [self]
+        return True
+
 
 class _AnchorSheet:
     """A drawing whose hit test returns the edge drawn at a sheet point."""
@@ -2203,7 +2207,10 @@ class _AnchorSheet:
         self.selected = []
         self.hits = []
         self.balloons = []
+        for edge in edges_at.values():
+            edge.sheet = self
         manager = SimpleNamespace(
+            CreateSelectData=lambda: SimpleNamespace(),
             GetSelectedObjectCount2=lambda _mark: len(self.selected),
             GetSelectedObject6=lambda index, _mark: self.selected[index - 1],
         )
