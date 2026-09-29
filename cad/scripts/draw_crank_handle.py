@@ -231,7 +231,9 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=SHOULDER_PICK,
-        symbol_xy=(0.050, 0.150),
+        # Below the perpendicularity frame's "DATUM B FACE" caption (farm run
+        # 20260929T221540276Z drew the symbol on top of it at (0.050, 0.150)).
+        symbol_xy=(0.075, 0.135),
         datum="B",
         label="tenon shoulder face",
     )
