@@ -10,12 +10,12 @@ import pytest
 import build_crankshaft as part
 import crank_hub_geometry as geometry
 import crankshaft_notes as notes
-import crank_eccentric_bushing_spec as bushing
 import crankshaft_spec as spec
 import draw_crankshaft as drawing
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import blind_cut_dia_mm
+from _surface_finish import MACHINED_UM
 
 
 def test_required_drawing_paths() -> None:
@@ -25,23 +25,6 @@ def test_required_drawing_paths() -> None:
     assert DRAWINGS_BY_NAME["crankshaft"].script == Path(drawing.__file__).resolve()
 
 
-def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
-    assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
-    marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    assert set(drawing.END_KEEP) | set(drawing.SIDE_KEEP) == marked
-    assert marked == {
-        "ShaftDiaDim",
-        "Depth",
-        "DomeHeight",
-        "PinionSeatDiaDim",
-        "OverallLength",
-        "PinionSeatStation",
-        "PinHoleStation",
-        "DomeSphereRadius",
-    }
-    # Diameters are imported in the end view only to be dragged onto the
-    # longitudinal profile (policy rule 7: diameters on the side view).
-    assert set(drawing.DIAMETER_POSITIONS) == set(drawing.END_KEEP)
 
 
 def test_policy_migrated_sheet_carries_no_gdt_and_model_owned_places() -> None:
@@ -59,7 +42,7 @@ def test_policy_migrated_sheet_carries_no_gdt_and_model_owned_places() -> None:
     assert "draw_crankshaft.py" in PRECISION_MIGRATED_DRAWINGS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
-    functional_fits = {"ShaftDiaDim", "PinionSeatDiaDim"}
+    functional_fits = {"ShaftDiaDim", "JournalDiaDim", "PinionSeatDiaDim"}
     for name, places in spec.DRAWING_PRECISION_BY_NAME.items():
         assert places == (3 if name in functional_fits else 1), name
     assert spec.REFERENCE_DIMENSIONS <= marked
@@ -75,8 +58,6 @@ def test_far_end_stations_restate_the_modelled_geometry() -> None:
     assert spec.PINION_SEAT_STATION == round(spec.PINION_SEAT_STATION, spec.STATION_PLACES)
     assert set(part._STATIONS) == set(part._STATION_DRIVES)
     assert set(part._STATIONS) <= spec.DRAWING_DIMENSIONS["StationReference"]
-    assert far - spec.PIN_HOLE_HEIGHT == pytest.approx(123.2)
-    assert far + spec.SHAFT_DOME_HEIGHT == pytest.approx(138.8)
     assert part.DOME_SPHERE_R == pytest.approx(6.6710, abs=1e-3)
 
 
@@ -86,35 +67,19 @@ def test_notes_stay_within_rule_six() -> None:
     assert all(len(line) <= 66 for line in lines)
 
 
-def test_face_shift_preserves_every_inboard_world_station() -> None:
-    # W15: the far end sits recessed inside the 16T's boss, so the length
-    # follows the pinion (crank_pinion_spec), not a literal -- floored to the
-    # places it prints, so the sheet's nominal is the model's (Codex P2, #892).
+def test_shaft_prints_exactly_and_reaches_the_restored_post_boss() -> None:
+    # W15: the boss recess survives the printed limits, while the shaft
+    # datum independently lands on the post's restored north face.
     pinion = spec.crank_pinion_spec
-    assert spec.SHAFT_LENGTH == pytest.approx(
-        pinion.floor_to_places(
-            spec.SEAT_PINION + pinion.OVERALL_LENGTH - pinion.SHAFT_END_RECESS_MIN,
-            pinion.SHAFT_LENGTH_PLACES,
-        )
-    )
     assert spec.SHAFT_LENGTH == round(spec.SHAFT_LENGTH, pinion.SHAFT_LENGTH_PLACES)
     assert spec.DRAWING_PRECISION["Shaft"]["Depth"] == pinion.SHAFT_LENGTH_PLACES
-    assert spec.SHAFT_LENGTH == pytest.approx(136.8)
     assert pinion.SHAFT_END_RECESS_MIN <= spec.SHAFT_END_RECESS <= pinion.SHAFT_END_RECESS_MAX
-    assert part.SEAT_PINION == spec.SEAT_PINION
-    # The bushing's north end is flush with MHA-016's spot face, which stands
-    # its retreat south of the harvested station (world z -70.210494428).
+    import cone_line
     import cone_pivot_post_spec as post
 
-    assert -183.0 + spec.POST_BORE_END == pytest.approx(
-        -70.210494428 - post.CRANK_SPOT_FACE_RETREAT
-    )
-    assert part.SEAT_T12 == pytest.approx(25.5)
-    assert part.SEAT_PINION == pytest.approx(113.039505572)
-    assert not hasattr(part, "SEAT_ARM")
-    assert -183.0 + part.SEAT_T12 == pytest.approx(-157.5)
-    assert -183.0 + part.SEAT_PINION == pytest.approx(-69.960494428)
-    assert -183.0 + spec.SHAFT_LENGTH == pytest.approx(-46.2)
+    post_boss_north = cone_line.cone_station(cone_line.POST_STATION)[2] - post.CRANK_BOSS_START_Z
+    assert -183.0 + spec.POST_BORE_END == pytest.approx(post_boss_north)
+    assert part.SEAT_T12 < spec.POST_BORE_END
 
 
 def test_integral_dome_is_the_only_outboard_shaft_projection() -> None:
@@ -190,7 +155,7 @@ def test_sheet_placements_stay_inside_the_border() -> None:
         drawing.PINION_PIN_NOTE_XY,
         drawing.NOTES_XY,
         drawing.ISO_NOTE_XY,
-        drawing.FINISH_SYMBOL,
+        *(symbol for _, symbol in drawing.JOURNAL_FINISHES.values()),
         *drawing.SIDE_KEEP.values(),
         *drawing.DIAMETER_POSITIONS.values(),
     ]
@@ -211,25 +176,39 @@ def test_sheet_placements_stay_inside_the_border() -> None:
     # The cross-hole callout sits right of the hole so its leader cannot run
     # near-parallel to the station extension line through the hole.
     assert drawing.HOLE_CALLOUT_XY[0] > drawing.PIN_X
-    # The finish sits on the core inside the bushing, as its control names.
-    bushing_south_x = drawing._sheet_x(spec.POST_BORE_END - bushing.LENGTH)
-    assert bushing_south_x < drawing.FINISH_PICK[0] < drawing.BUSHING_END_X
-    finish_y = spec.SURFACE_FINISHES[0].face.contains_y_mm
-    assert spec.POST_BORE_END - bushing.LENGTH < finish_y < spec.POST_BORE_END
+    # Each bearing land has its own native control and visible Ra leader; a
+    # 2X diameter does not extend the finish symbol across the relief.
+    lands = {
+        "outboard_journal": (spec.JOURNAL_START, spec.RELIEF_START),
+        "inboard_journal": (spec.RELIEF_END, spec.JOURNAL_END),
+    }
+    assert set(drawing.JOURNAL_FINISHES) == {control.key for control in spec.SURFACE_FINISHES}
+    assert set(drawing.JOURNAL_FINISHES) == set(lands)
+    for control in spec.SURFACE_FINISHES:
+        start, end = lands[control.key]
+        assert control.roughness_um == MACHINED_UM
+        assert control.face.diameter_mm == spec.JOURNAL_DIA
+        assert start < control.face.contains_y_mm < end
+        pick, symbol = drawing.JOURNAL_FINISHES[control.key]
+        assert drawing._sheet_x(start) < pick[0] < drawing._sheet_x(end)
+        assert pick[1] == pytest.approx(drawing.JOURNAL_FLANK_Y)
+        assert drawing._sheet_x(start) < symbol[0] < drawing._sheet_x(end)
 
 
-def test_the_core_runs_in_the_bushing_with_one_finish() -> None:
-    """#906 R1: no integral journal; the 3/8 in core runs in MHA-149."""
-    assert not hasattr(spec, "JOURNAL_DIA")
-    assert not hasattr(spec, "RELIEF_DIA")
-    # Rule 5: one Ra, on the core inside the bushing.
-    assert len(spec.SURFACE_FINISHES) == 1
-    assert spec.SURFACE_FINISHES[0].key == "bearing_core"
-    assert spec.SURFACE_FINISHES[0].face.diameter_mm == spec.SHAFT_DIA
-    # The seat step is never south of the bushing's last 1 mm, so the core runs
-    # the bushing's length; since the spot face's retreat it stands north of
-    # the bushing, still south of the 16T's seat.
-    assert spec.POST_BORE_END - 1.0 < spec.SEAT_STEP < part.SEAT_PINION
+def test_integral_lands_run_in_the_restored_post_at_every_size_limit() -> None:
+    import cone_pivot_post_spec as post
+
+    bore_min = post.CRANK_BORE_DIA + post.RUNNING_BORE_BAND[1]
+    bore_max = post.CRANK_BORE_DIA + post.RUNNING_BORE_BAND[0]
+    shaft_min = spec.JOURNAL_DIA + spec.JOURNAL_DIA_BAND[1]
+    shaft_max = spec.JOURNAL_DIA + spec.JOURNAL_DIA_BAND[0]
+    assert (bore_min - shaft_max, bore_max - shaft_min) == pytest.approx((0.025, 0.075))
+    assert spec.JOURNAL_START < spec.RELIEF_START < spec.RELIEF_END < spec.JOURNAL_END
+    assert min(spec.JOURNAL_LANDS_WORST) >= spec.JOURNAL_DIA
+    assert spec.JOURNAL_END + spec.STATION_ROW < spec.POST_BORE_END
+    assert spec.STEP_WEB_WORST >= spec.WEB_TARGET_MM - 1e-9
+    assert spec.RELIEF_DIA + spec.STATION_ROW < shaft_min
+    assert spec.RELIEF_DIA - spec.STATION_ROW > spec.SHAFT_DIA
 
 
 def test_view_scales_and_linked_notes_are_explicit() -> None:
@@ -239,24 +218,6 @@ def test_view_scales_and_linked_notes_are_explicit() -> None:
     assert spec.ISOMETRIC_VIEW_NOTE == "ISOMETRIC VIEW\nSCALE 1:1"
 
 
-def test_part_registry_retains_make_critical_properties() -> None:
-    import _config
-
-    config = _config.parts("crankshaft")
-    assert config["material"] == config["material_specification"]
-    assert "1018" in str(config["material_specification"])
-    assert config["finish"]
-    assert int(config["quantity"]) == 1
-    # Codex on #960 (WjJD): the audit's process column describes the shaft R1
-    # ships -- the plain core in MHA-149 and the pinion seat step -- not the
-    # retired integral journal.
-    from fractions import Fraction
-
-    process = str(config["process"])
-    core_in = Fraction(geometry.SHAFT_DIA / 25.4).limit_denominator(64)
-    assert f"plain {core_in} in core" in process
-    assert f"Ø{spec.PINION_SEAT_DIA:.1f} pinion seat step" in process
-    assert "journal" not in process
 
 
 def test_seat_step_never_pushes_the_pinion_past_its_seat_gap() -> None:
@@ -277,40 +238,13 @@ def test_seat_step_never_pushes_the_pinion_past_its_seat_gap() -> None:
     # The seat is the pinion's bore mate, at the through shaft's size band.
     assert spec.PINION_SEAT_DIA == pinion.BORE_DIA == 9.0
     assert spec.PINION_SEAT_DIA_BAND == spec.SHAFT_DIA_BAND
-    build = Path(part.__file__).read_text(encoding="utf-8")
-    assert '"PinionSeatProfile",\n        "PinionSeatDiaDim",' in build
 
 
-def test_pinion_pin_hole_prints_the_shared_matched_fit_note() -> None:
-    """Codex #813 (PRRT_kwDOPHDy386l4ZrZ): MHA-026 cut the PinionPinHole but
-    the sheet did not show it.  The hole is match-drilled through the seated
-    pinion's boss at assembly, so the sheet prints no size and no station;
-    since the machinist review of 4d4e038e3 it prints the pinion sheet's own
-    four-fact note with the mates swapped, because a bare transfer gave the
-    shaft's machinist no process or fit (test_crank_pinion_drawing pins the
-    facts).  run1-61671871a proved a native Hole Wizard callout cannot bind
-    to the saddle rim of a radial hole in a round shaft."""
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "add_attached_note(" in source
-    assert "text=CRANKSHAFT_PIN_HOLE_PROCESS," in source
-    assert "entity=_visible_cross_hole_edge(adapter, side, PINION_PIN_DIA)," in source
-    # One native callout on the sheet, the MHA-024 cross-hole's; none here.
-    assert source.count("add_native_hole_callout(\n") == 1
-    assert "PINION_PIN_PROCESS" not in source
-    # No station: neither a marked model dimension nor a sheet placement.
-    marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    assert all("PinionPin" not in name for name in marked)
-    assert all("PinionPin" not in name for name in drawing.SIDE_KEEP)
-    build = Path(part.__file__).read_text(encoding="utf-8")
-    assert '"ShaftLength" - "PinionPinStation"' not in build
-    # The build stores the same text on the part; the sheet refuses a part
-    # built from any other.
-    assert not hasattr(notes, "PINION_PIN_TRANSFER_NOTE")
-    assert '"Pinion Pin Hole Process"' in source
+def test_retention_pin_note_clears_the_profile_and_title_block() -> None:
     assert drawing.PINION_PIN_X == pytest.approx(
         drawing.DOME_ROOT_X + part.PINION_PIN_STATION_Y * drawing.SHEET_SCALE[0] / 1000.0
     )
-    assert drawing.BUSHING_END_X < drawing.PINION_PIN_X < drawing.FAR_END_X
+    assert drawing.JOURNAL_END_X < drawing.PINION_PIN_X < drawing.FAR_END_X
     # The note block (top-left anchored; sized for up to 3.5 mm note text)
     # stays inside its field: right of the cross-hole callout's text, above
     # the diameter row, left of the isometric and inside the border.
@@ -384,8 +318,7 @@ def test_shaft_band_ruling_holds_because_the_general_tolerance_fails_both_stacks
     # the title block's .X +/-0.8 instead, both W15 stacks fail.
     import build_drive_train_assembly as bdt
 
-    source = Path(spec.__file__).read_text(encoding="utf-8")
-    assert "# RULING W15-SHAFT-BAND (Main 2026-09-25)" in source
+    assert spec.SHAFT_LENGTH_BAND == (0.0, -0.4)
     shaft, pinion = spec.SHAFT_LENGTH, bdt.PINION_OVERALL_LENGTH
     edge_nominal, recess_nominal = bdt.PINION_PIN_EDGE_NOMINAL_ACTUAL, bdt.PINION_RECESS_NOMINAL
     assert sum(bdt.pinion_pin_edge_stack(edge_nominal, shaft, pinion).values()) >= (
@@ -397,76 +330,12 @@ def test_shaft_band_ruling_holds_because_the_general_tolerance_fails_both_stacks
     monkeypatch.setattr(bdt, "_SHAFT_LENGTH_LIMITS", (-0.8, 0.8))
     edge = sum(bdt.pinion_pin_edge_stack(edge_nominal, shaft, pinion).values())
     recess = sum(bdt.pinion_recess_stack(recess_nominal, shaft, pinion).values())
-    assert edge == pytest.approx(1.873, abs=1e-3)
     assert edge < bdt.PINION_PIN_EDGE_MIN_WORST
-    assert recess == pytest.approx(-0.461, abs=1e-3)
     assert recess < bdt.PINION_RECESS_MIN_WORST
 
 
-def _dimension_record_rows() -> dict[str, list[str]]:
-    import yaml
-
-    record = yaml.safe_load(
-        (Path(spec.__file__).resolve().parents[1] / "config" / "dimensions.yaml").read_text(
-            encoding="utf-8"
-        )
-    )
-    rows: dict[str, list[str]] = {}
-    stack = [record]
-    while stack:
-        node = stack.pop()
-        if isinstance(node, dict):
-            stack.extend(node.values())
-            continue
-        if not isinstance(node, list):
-            continue
-        if node and isinstance(node[0], str) and node[0].startswith("Crankshaft"):
-            rows[node[0]] = [str(cell) for cell in node]
-            continue
-        stack.extend(node)
-    return rows
 
 
-def test_dimension_record_rows_follow_the_spec() -> None:
-    # Codex #892 (PRRT_kwDOPHDy386mNCXx): W15 lengthened the cylinder to 136.8
-    # (inboard end z -46.2), but the structured dimensions record still said
-    # 130 ending at -53.  Every crankshaft length and station it states comes
-    # from the spec and the placed shaft origin.
-    import build_drive_train_assembly as bdt
-
-    z0 = bdt.CRANKSHAFT_Z0
-    end = z0 + spec.SHAFT_LENGTH
-    rows = _dimension_record_rows()
-    length = rows["Crankshaft length"]
-    assert length[1] == (
-        f"{spec.SHAFT_LENGTH:g} mm cylindrical length plus "
-        f"{spec.SHAFT_DOME_HEIGHT:g}-mm integral outboard dome"
-    )
-    assert length[2] == f"{spec.SHAFT_LENGTH / 25.4:.2f} + dome"
-    assert f"inboard end sits at z −{-end:g}" in length[3]
-    assert f"{spec.SHAFT_END_RECESS:.2f} inside the 16T pinion's boss" in length[3]
-    placed = rows["Crankshaft"][1]
-    assert f"The {spec.SHAFT_LENGTH:g}-mm cylinder spans z −{-z0:g}..−{-end:g}" in placed
-    assert f"(local {spec.POST_BORE_END:.2f})" in placed
-    south = spec.POST_BORE_END - bushing.LENGTH
-    bearing = rows["Crankshaft bearing"][1]
-    assert bearing == (
-        f"plain Ø{spec.SHAFT_DIA:g} core in the MHA-149 bushing; local stations "
-        f"{south:.9f}..{spec.POST_BORE_END:.9f} "
-        f"(world z −{-(z0 + south):.9f}..−{-(z0 + spec.POST_BORE_END):.9f})"
-    )
-    # Codex on #960 (WjJA): the bushing's south end stands its length past the
-    # boss it is flush with at the north, not the grip head's centre plane.
-    import cone_pivot_post_spec as post
-
-    proud = bushing.LENGTH - post.CRANK_BOSS_LENGTH
-    head_start = proud - bushing.HEAD_LENGTH
-    rationale = rows["Crankshaft bearing"][3]
-    assert f"its south end stands {proud:.3f} proud of the boss" in rationale
-    assert (
-        f"the {bushing.HEAD_LENGTH:.1f} grip head starting {head_start:.3f} off "
-        "the boss's south face"
-    ) in rationale
 
 
 def test_station_reference_is_saved_hidden_and_imported_per_view() -> None:

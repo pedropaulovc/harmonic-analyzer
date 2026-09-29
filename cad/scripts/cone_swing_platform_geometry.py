@@ -5,9 +5,8 @@ seat and chord and the base-fixed swing hardware stations.
 ``build_cone_swing_platform`` authors the part from these numbers; the harmonic
 base (pivot, lock and stop seats) and the drive train (placement and clearance
 checks) read them here instead of importing the part builder, so a sketch or
-drawing change in the builder does not re-key them.  The crank axis the plate
-carries lives in ``cone_swing_platform_crank_axis``: it reads the crank mesh
-stack, which the harmonic base must not.
+drawing change in the builder does not re-key them. The fixed crank reference
+axis the plate carries lives in ``cone_swing_platform_crank_axis``.
 """
 
 from __future__ import annotations
@@ -46,10 +45,10 @@ _SIN_I = math.sin(math.radians(INCLINE_DEG))
 _COS_I = math.cos(math.radians(INCLINE_DEG))
 
 # --- cone-pivot-post-v2 attachment footprint -------------------------------
-# The rederived casting is centred at cone station -39.90136099793 while the
-# plate origin/pivot remains station 196.  Its two vertical attachment holes
-# are a world-X pair at +/-13.44352 mm.  Undoing the engaged Ry(+INCLINE)
-# placement gives this skewed pair in the platform's local (x, z) frame.
+# The casting is centred at cone station -39.90136099793 while the plate
+# origin/pivot remains station 196.  Its inward-shifted vertical attachment
+# holes are a world-X pair at +/-POST_MOUNT_HALF_PITCH.  Undoing the engaged
+# Ry(+INCLINE) placement gives the skewed pair in the platform's local (x, z).
 POST_STATION = -39.90136099793
 PIVOT_STATION = 152.27232594770453
 POST_MAIN_DIA = POST_BLOCK_DIA

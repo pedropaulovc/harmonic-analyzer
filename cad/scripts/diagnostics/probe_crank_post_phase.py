@@ -89,7 +89,7 @@ async def build(adapter) -> dict[str, str]:
         ground=True,
         label="fixed v2 post",
     )
-    gear_centre = dta.cone_station(dta.GEAR64_STATION + dta.GEAR_AXIS_SHIFT)
+    gear_centre = dta.cone_station(dta.GEAR64_CENTRE_STATION)
     gear_position = [
         gear_centre[0] - dta.GEAR64_FACE / 2.0 * dta.SIN_I,
         dta.Y_DRIVE,
@@ -104,10 +104,10 @@ async def build(adapter) -> dict[str, str]:
         ground=True,
         label="64T at recentered design station",
     )
-    # The 16T rides the MHA-149 fit-up axis, as the assembly places it.
+    # The 16T rides the restored fixed crank axis.
     pinion_position = [
-        dta.X_CRANK_FIT,
-        dta.Y_CRANK_FIT,
+        dta.X_CRANK,
+        dta.Y_CRANK,
         dta.PINION_TOOTH_Z - dta.PINION_FACE / 2.0,
     ]
     pinion = await place_component(

@@ -33,7 +33,7 @@ def test_required_drawing_paths() -> None:
 def test_v2_harvest_is_the_exact_dimensional_contract() -> None:
     assert (spec.BLOCK_DIA, spec.BLOCK_HEIGHT) == (42.011, 86.0)
     assert (spec.HEAD_DIA, spec.HEAD_HEIGHT, spec.HEAD_BASE_Y) == (
-        44.0,
+        42.7506,
         26.6,
         59.4,
     )
@@ -42,19 +42,14 @@ def test_v2_harvest_is_the_exact_dimensional_contract() -> None:
         spec.CRANK_BORE_DIA,
         round(spec.CRANK_BORE_HEIGHT, 6),
         spec.CRANK_BORE_OFFSET,
-    ) == (21.93, 14.6, 72.49, 0.0)
-    assert (spec.CRANK_AXIS_HEIGHT, spec.CRANK_BORE_DROP) == (72.7, 0.21)
+    ) == (21.93, 11.438, 72.7, 0.0)
     assert spec.CRANK_BOSS_LENGTH_IN == 2.8360
-    # The spot face is stationed from the post axis, NOT from the cast collar.
-    assert spec.CRANK_BOSS_HARVESTED_NORTH_FACE == 21.3753
-    assert spec.CRANK_BOSS_START_Z != -spec.HEAD_DIA / 2.0
-    # The harvested boss ends where it always did; the spot face stands the
-    # retreat south of its harvested station, and the boss is that much shorter.
+    # v36 (user ruling 2026-09-28): the boss starts on the head's tangent
+    # plane and runs the harvested 2.8360 in from there.
+    assert spec.CRANK_BOSS_NORTH_FACE == spec.HEAD_DIA / 2.0 == 21.3753
+    assert spec.CRANK_BOSS_START_Z == -21.3753
     assert round(spec.CRANK_BOSS_END_Z, 4) == 50.6591
-    retreat = spec.CRANK_SPOT_FACE_RETREAT
-    assert spec.CRANK_BOSS_NORTH_FACE == pytest.approx(21.3753 - retreat)
-    assert spec.CRANK_BOSS_START_Z == pytest.approx(-(21.3753 - retreat))
-    assert spec.CRANK_BOSS_LENGTH == pytest.approx(2.8360 * 25.4 - retreat)
+    assert spec.CRANK_BOSS_LENGTH == pytest.approx(2.8360 * 25.4)
     assert (spec.CONE_BOSS_DIA, spec.BORE_DIA, spec.BORE_HEIGHT) == (
         17.2,
         12.2808,
@@ -62,11 +57,11 @@ def test_v2_harvest_is_the_exact_dimensional_contract() -> None:
     )
     assert spec.INCLINE_DEG == 12.5182
     assert (
-        spec.ATTACHMENT_SPACING,
         spec.ATTACHMENT_THRU_DIA,
         spec.ATTACHMENT_CBORE_DIA,
         spec.ATTACHMENT_CBORE_DEPTH,
-    ) == (26.88704, 7.14248, 11.50874, 6.0198)
+    ) == (7.14248, 11.50874, 6.0198)
+    assert spec.ATTACHMENT_SPACING == 2.0 * spec.ATTACHMENT_X
     # The final volume is the per-feature sum the build checks natively; a
     # constant that drifts from the features (the 2026-09-21 unbored-boss
     # build) fails at import, so only mass coherence is left to pin here.
@@ -78,35 +73,21 @@ def test_v2_harvest_is_the_exact_dimensional_contract() -> None:
     assert round(part.ATTACHMENT_HOLES_MM3, 1) == 7661.6
 
 
-def test_the_spot_face_volumes_are_their_columns() -> None:
-    """Brute-force the spot face and its run-out flat on a grid, independently
-    of the Simpson integrals the build checks each cut against."""
-    station = spec.CRANK_BOSS_NORTH_FACE
-    head_r, body_r, boss_r = spec.HEAD_DIA / 2.0, spec.BLOCK_DIA / 2.0, spec.CRANK_BOSS_DIA / 2.0
-    axis = spec.CRANK_BORE_HEIGHT
-    half = spec.CRANK_SPOT_FACE_WIDTH / 2.0
-    bottom = axis - spec.CRANK_SPOT_FACE_RUN_OUT
-    n = 600
-    dx, dy = 2.0 * half / n, (axis - bottom) / n
-    disc = run_out = 0.0
-    for i in range(n):
-        x = -half + (i + 0.5) * dx
-        for k in range(n):
-            y = bottom + (k + 0.5) * dy
-            radius = head_r if y >= spec.HEAD_BASE_Y else body_r
-            proud = max(math.sqrt(max(radius**2 - x * x, 0.0)) - station, 0.0)
-            if math.hypot(x, y - axis) > boss_r:
-                run_out += proud * dx * dy
-    # The disc's upper half lies above the run-out's band: grid the whole disc.
-    for i in range(n):
-        x = -boss_r + (i + 0.5) * 2.0 * boss_r / n
-        for k in range(n):
-            y = axis - boss_r + (k + 0.5) * 2.0 * boss_r / n
-            if math.hypot(x, y - axis) <= boss_r:
-                proud = max(math.sqrt(head_r**2 - x * x) - station, 0.0)
-                disc += proud * (2.0 * boss_r / n) ** 2
-    assert part.CRANK_SPOT_FACE_RUN_OUT_MM3 == pytest.approx(run_out, rel=2e-3)
-    assert part.CRANK_SPOT_FACE_MM3 == pytest.approx(disc, rel=2e-3)
+def test_mounting_counterbores_take_the_last_printable_head_wall_station() -> None:
+    """The Ø42.8 head retains 1.5 mm at the counterbores' printed corners."""
+    assert spec.DRAWING_PRECISION_BY_NAME["HeadDia"] == 1
+    assert spec.DRAWING_PRECISION_BY_NAME["MountWestX"] == 2
+    assert spec.DRAWING_PRECISION_BY_NAME["MountEastX"] == 2
+    head_radius_min = (round(spec.HEAD_DIA, 1) - spec._row(1)) / 2.0
+    cbore_radius_max = (
+        round(spec.ATTACHMENT_CBORE_DIA, 2) + spec._row(2)
+    ) / 2.0
+    wall = head_radius_min - (spec.ATTACHMENT_X + spec._row(2)) - cbore_radius_max
+    assert spec.ATTACHMENT_X == pytest.approx(12.98)
+    assert spec.ATTACHMENT_SPACING == pytest.approx(25.96)
+    assert wall == pytest.approx(spec.MOUNT_HEAD_WEB_WORST)
+    assert wall >= spec.WEB_FLOOR_MM - 1e-9
+    assert wall - 0.01 < spec.WEB_FLOOR_MM
 
 
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
@@ -117,8 +98,6 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
         | set(drawing.TOP_KEEP)
         | set(drawing.SECTION_KEEP)
         | set(drawing.JOURNAL_KEEP)
-        | set(drawing.REAR_KEEP)
-        | {drawing.SPOT_PLAN_DIMENSION}
     )
     assert kept == marked
     assert marked == {
@@ -139,8 +118,6 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
         "JournalBoreDia",
         "CrankBossStartZ",
         "InclineAngle",
-        "SpotFaceWidth",
-        "SpotFaceRunOut",
     }
     # No dimension may be placed twice: two views that both carry a value are
     # two chances for the sheet to contradict itself.
@@ -149,84 +126,8 @@ def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
         + len(drawing.TOP_KEEP)
         + len(drawing.SECTION_KEEP)
         + len(drawing.JOURNAL_KEEP)
-        + len(drawing.REAR_KEEP)
-        + 1
         == len(kept)
     )
-
-
-def test_the_spot_face_run_out_is_dimensioned_face_on() -> None:
-    """The run-out flat is on the north face, behind the elevation (which looks
-    at the crank boss's far end), so only the rear view shows it face-on."""
-    assert set(drawing.REAR_KEEP) == spec.DRAWING_DIMENSIONS["CrankSpotFaceRunOutProfile"]
-    assert "*Back" in Path(drawing.__file__).read_text(encoding="utf-8")
-
-
-def test_the_spot_face_has_its_own_sheet_at_two_to_one() -> None:
-    """Sheet 1 had no room to show the D at a size a novice reads (the
-    rim-8339 eye pass), so it is sheet 2, at 2:1, which the title block states;
-    sheet 1 keeps 1:1 and points there by the derived sheet number."""
-    assert drawing.SHEET_NAMES == ("MAIN", "SPOT-FACE")
-    assert drawing.SHEET_SCALES == {"MAIN": (1.0, 1.0), "SPOT-FACE": (2.0, 1.0)}
-    assert drawing.SPOT_FACE_SCALE == drawing.SHEET_SCALES[drawing.SPOT_FACE_SHEET]
-    # Chosen by fit: the largest preferred scale whose views and text lanes
-    # fit the sheet; the next preferred one does not.
-    fitting = [s for s in drawing.PREFERRED_SCALES if drawing.spot_face_fits(s)]
-    assert drawing.SPOT_FACE_SCALE == max(fitting, key=lambda s: s[0] / s[1])
-    larger = [
-        s
-        for s in drawing.PREFERRED_SCALES
-        if s[0] / s[1] > drawing.SPOT_FACE_SCALE[0] / drawing.SPOT_FACE_SCALE[1]
-    ]
-    assert larger and not any(drawing.spot_face_fits(s) for s in larger)
-    assert drawing.SEE_SPOT_FACE_SHEET == "SPOT FACE:\nSEE SHEET 2"
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "sheet_scales=SHEET_SCALES" in source
-    assert "expected_sheet_names=SHEET_NAMES" in source
-    # Every sheet-2 view is placed at the sheet's own scale.
-    assert source.count("scale=SPOT_FACE_SCALE") == 2
-
-
-def test_the_spot_face_dimensions_are_labelled_for_what_they_locate() -> None:
-    assert drawing.SPOT_FACE_WIDTH_CALLOUT == {"SpotFaceWidth": "SPOT FACE WIDTH"}
-    assert drawing.SPOT_FACE_CALLOUTS == {
-        "SpotFaceRunOut": "RUN-OUT TO STEP",
-        "CrankBossStartZ": "SPOT FACE STATION",
-    }
-    assert not set(drawing.DIMENSION_CALLOUTS) & (
-        set(drawing.SPOT_FACE_WIDTH_CALLOUT) | set(drawing.SPOT_FACE_CALLOUTS)
-    )
-    # The collar the flat clears is the part's, not a typed 44.
-    assert drawing.SPOT_FACE_NOTE == (
-        f"SPOT FACE CLEARS <MOD-DIAM>{spec.HEAD_DIA:.0f} COLLAR"
-    )
-    assert spec.HEAD_DIA == 44.0
-
-
-def _spot_face_outlines() -> dict[str, tuple[float, float, float, float]]:
-    """Sheet-2 view outlines predicted from the part: ``place_view`` centres
-    each on its projected bounding box.  The plan's box runs from the cone
-    boss's corner (beyond the collar, whose flat trims it at the spot face) to
-    the crank boss's far end."""
-    f = drawing.SPOT_FACE_SCALE[0] / drawing.SPOT_FACE_SCALE[1] / 1000.0
-    plan_depth = drawing.spot_plan_depth_mm()
-    half = spec.HEAD_DIA / 2.0 * f
-    rear_x, rear_y = drawing.REAR_CENTER
-    plan_x, plan_y = drawing.SPOT_PLAN_CENTER
-    return {
-        "rear view": (
-            rear_x - half,
-            rear_y - spec.BLOCK_HEIGHT / 2.0 * f,
-            rear_x + half,
-            rear_y + spec.BLOCK_HEIGHT / 2.0 * f,
-        ),
-        "spot-face plan": (
-            plan_x - half,
-            plan_y - plan_depth / 2.0 * f,
-            plan_x + half,
-            plan_y + plan_depth / 2.0 * f,
-        ),
-    }
 
 
 def _landscape_sheet() -> tuple[object, tuple]:
@@ -240,88 +141,45 @@ def _landscape_sheet() -> tuple[object, tuple]:
     return region, _keep_outs(template.width_m, template.height_m)
 
 
-def test_the_plan_depth_is_the_cone_boss_corner_to_the_crank_boss_end() -> None:
-    incline = math.radians(spec.INCLINE_DEG)
-    corner = (spec.CONE_BOSS_LENGTH / 2.0) * math.cos(incline) + (
-        spec.CONE_BOSS_DIA / 2.0
-    ) * math.sin(incline)
-    assert corner > spec.BLOCK_DIA / 2.0
-    assert drawing.spot_plan_depth_mm() == pytest.approx(spec.CRANK_BOSS_END_Z + corner)
-
-
-def test_the_drawable_region_is_the_templates_zone_margin() -> None:
-    from _drawing_registry import DRAWING_TEMPLATES, DrawingLayout
-    from test_drawing_layout_check import ZONE_MARGINS
-
-    template = DRAWING_TEMPLATES[DrawingLayout.LANDSCAPE]
-    assert drawing.DRAWABLE == (
-        ZONE_MARGINS["left"],
-        ZONE_MARGINS["bottom"],
-        template.width_m - ZONE_MARGINS["right"],
-        template.height_m - ZONE_MARGINS["top"],
-    )
-
-
-def test_the_spot_face_views_fit_the_sheet_clear_of_the_title_block() -> None:
-    region, keep_outs = _landscape_sheet()
-    outlines = _spot_face_outlines()
-    assert drawing.view_placement_problems(outlines, region, keep_outs) == []
-    rear, plan = outlines["rear view"], outlines["spot-face plan"]
-    # The run-out text stands between the two views, the station text left of
-    # the plan and right of the run-out text.
-    run_out_x = drawing.REAR_KEEP["SpotFaceRunOut"][0]
-    station_x = plan[0] - drawing.SPOT_PLAN_TEXT_LEFT_OF_VIEW
-    assert rear[2] < run_out_x < station_x < plan[0]
-
-
-def _spot_face_gate(monkeypatch: pytest.MonkeyPatch, labels: list[str]) -> None:
+def _plan_gate(monkeypatch: pytest.MonkeyPatch, labels: list[str]) -> None:
     import diagnostics.drawing_layout_audit as audit
 
     region, keep_outs = _landscape_sheet()
-    outlines = _spot_face_outlines()
     sheets = [
-        SimpleNamespace(name="MAIN", region=region, keep_outs=keep_outs, annotations=()),
         SimpleNamespace(
-            name="SPOT-FACE",
+            name="Sheet1",
             region=region,
             keep_outs=keep_outs,
             annotations=tuple(SimpleNamespace(label=label) for label in labels),
         ),
     ]
     monkeypatch.setattr(audit, "collect_document", lambda _adapter: sheets)
-    views = {label: label for label in outlines}
-    journal_outline = (0.213, 0.117, 0.257, 0.2034)
-    monkeypatch.setattr(
-        drawing, "_view_outline", lambda view: outlines.get(view, journal_outline)
-    )
+    monkeypatch.setattr(drawing, "_view_outline", lambda _view: (0.213, 0.117, 0.257, 0.2034))
     drawing._assert_native_layout(
         SimpleNamespace(currentModel=object()),
         "journal",
-        spot_face_views=views,
         expected_finish="x",
     )
 
 
 def test_the_station_must_survive_its_hidden_sketch(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Sheet 2 must not print JournalPlanReference's rays, which read as edges
-    without the plan angle.  Hiding a sketch in a view hides what was imported
-    from it (rim-aba9 lost the station so), so the station comes from its own
-    part-hidden sketch through the hidden-owner import, and the gate fails a
-    sheet that lost it.  The part now saves every reference sketch hidden, so
-    no view hides one: a view shows exactly the sketches it dimensions."""
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "_hide_witness_sketch" not in source
-    assert "BlankSketch" not in source
-    assert "plan_annotations = curate_hidden_owner_dimensions(" in source
+    """Hiding a sketch in a view hides what was imported from it (rim-aba9
+    lost the station so), so the station and the plan angle come through the
+    hidden-owner import, and the gate fails a sheet that lost either."""
     with pytest.raises(RuntimeError, match=r"\['CrankBossStartZ'\] once"):
-        _spot_face_gate(monkeypatch, ["SpotFaceWidth", "SpotFaceRunOut"])
-    # With all three present the gate moves on to sheet 1's title block.
-    def sheet_one(_obj, _iface):
-        raise LookupError("sheet 1 title block")
+        _plan_gate(monkeypatch, ["InclineAngle"])
+    # Printed twice is as wrong as lost.
+    with pytest.raises(RuntimeError, match=r"\['CrankBossStartZ'\] once"):
+        _plan_gate(monkeypatch, ["CrankBossStartZ", "CrankBossStartZ", "InclineAngle"])
+    with pytest.raises(RuntimeError, match=r"\['InclineAngle'\] once"):
+        _plan_gate(monkeypatch, ["CrankBossStartZ"])
+    # With both present the gate moves on to the title block.
+    def title_block(_obj, _iface):
+        raise LookupError("title block")
 
-    monkeypatch.setattr(drawing, "_early_bound", sheet_one)
-    with pytest.raises(LookupError, match="sheet 1 title block"):
-        _spot_face_gate(monkeypatch, ["SpotFaceWidth", "SpotFaceRunOut", "CrankBossStartZ"])
+    monkeypatch.setattr(drawing, "_early_bound", title_block)
+    with pytest.raises(LookupError, match="title block"):
+        _plan_gate(monkeypatch, ["CrankBossStartZ", "InclineAngle"])
 
 
 def test_view_placement_flags_the_border_and_the_title_block() -> None:
@@ -337,105 +195,32 @@ def test_view_placement_flags_the_border_and_the_title_block() -> None:
     assert "off the left leaves the inner border" in problems[1]
 
 
-def test_the_station_text_stands_left_of_the_plan_half_way_to_the_face(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Both ends of the station are projected from the model onto the placed
-    plan, so the text follows the view, not a measured coordinate."""
-    projected = {
-        "plan post axis": (0.290, 0.1933),
-        "plan spot face": (0.290, 0.2311),
-    }
-    monkeypatch.setattr(
-        drawing,
-        "model_point_in_view",
-        lambda _adapter, _view, _xyz, *, label: projected[label],
-    )
-    monkeypatch.setattr(drawing, "_view_outline", lambda _view: (0.246, 0.092, 0.334, 0.238))
-    keep = drawing._spot_plan_keep(object(), object())
-    assert keep == {
-        "CrankBossStartZ": (
-            pytest.approx(0.246 - drawing.SPOT_PLAN_TEXT_LEFT_OF_VIEW),
-            pytest.approx((0.1933 + 0.2311) / 2.0),
-        )
-    }
-
-
-def test_a_view_label_centres_under_its_view(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The text box does not sit on its insertion point, so the label is
-    steered by its rendered extent until its top stands the gap under the view
-    outline, centred on it."""
-
-    class Annotation:
-        def __init__(self) -> None:
-            self.position = (0.041, 0.054, 0.0)
-
-        def GetPosition(self):
-            return self.position
-
-        def SetPosition(self, x, y, z):
-            self.position = (x, y, z)
-            return True
-
-    class Note:
-        def __init__(self) -> None:
-            self.annotation = Annotation()
-
-        def GetAnnotation(self):
-            return self.annotation
-
-        def GetExtent(self):
-            # 22 x 4.5 mm, offset from the anchor the way SolidWorks offsets it
-            x, y, _z = self.annotation.position
-            return (x + 0.0003, y - 0.0050, 0.0, x + 0.0223, y - 0.0005, 0.0)
-
-    class Model:
-        def GraphicsRedraw2(self) -> None:
-            pass
-
-    monkeypatch.setattr(drawing, "_early_bound", lambda obj, iface: obj)
-    note = Note()
-    outline = (0.041, 0.054, 0.129, 0.226)
-    adapter = type("Adapter", (), {"currentModel": Model()})()
-    gap = drawing.VIEW_LABEL_GAP
-    drawing._place_note_under(adapter, note, outline, gap=gap, label="rear view label")
-    x0, _y0, _z0, x1, y1, _z1 = note.GetExtent()
-    assert (x0 + x1) / 2.0 == pytest.approx((outline[0] + outline[2]) / 2.0, abs=1e-4)
-    assert y1 == pytest.approx(outline[1] - gap, abs=1e-4)
-    assert gap is layout.DEFAULT_MOVE_CLEARANCE_M
-
-
-def _crank_evidence(boss_lists_spot_face: bool) -> dict:
+def _crank_evidence() -> dict:
     """The crank boss's BREP evidence as draw_cone_pivot_post reads it (model
-    metres), shaped as the rim-124f leaf logged it (the run-out merges the
-    spot face out of CrankSprocketBoss's list) or as before the run-out."""
+    metres): its north face on the head's tangent plane and its far face."""
     y = spec.CRANK_BORE_HEIGHT / 1000.0
-    spot = ("plane", (0.0, 0.0, 1.0, 0.0, y, spec.CRANK_BOSS_START_Z / 1000.0))
+    north = ("plane", (0.0, 0.0, 1.0, 0.0, y, spec.CRANK_BOSS_START_Z / 1000.0))
     far = ("plane", (0.0, 0.0, 1.0, 0.0, y, spec.CRANK_BOSS_END_Z / 1000.0))
     wall = ("cylinder", (0.0, y, 0.0, 0.0, 0.0, 1.0, spec.CRANK_BOSS_DIA / 2000.0))
-    return {
-        "CrankSprocketBoss": [far, wall, spot] if boss_lists_spot_face else [far, wall],
-        "CrankSpotFace": [wall, spot],
-    }
+    return {"CrankSprocketBoss": [far, wall, north]}
 
 
-@pytest.mark.parametrize("boss_lists_spot_face", [False, True])
-def test_the_crank_boss_faces_resolve_to_spot_then_far(boss_lists_spot_face: bool) -> None:
-    spot, far = drawing._crank_face_centres(_crank_evidence(boss_lists_spot_face))
-    assert spot[2] * 1000.0 == pytest.approx(spec.CRANK_BOSS_START_Z)
+def test_the_crank_boss_faces_resolve_to_north_then_far() -> None:
+    north, far = drawing._crank_face_centres(_crank_evidence())
+    assert north[2] * 1000.0 == pytest.approx(spec.CRANK_BOSS_START_Z)
     assert far[2] * 1000.0 == pytest.approx(spec.CRANK_BOSS_END_Z)
 
 
 def test_the_crank_boss_face_set_is_asserted_not_guessed() -> None:
-    """A boss missing its far face, or a spot face off its station, fails."""
-    evidence = _crank_evidence(False)
+    """A boss missing a face, or a north face off its station, fails."""
+    evidence = _crank_evidence()
     evidence["CrankSprocketBoss"] = evidence["CrankSprocketBoss"][1:]
-    with pytest.raises(RuntimeError, match="expected 1"):
+    with pytest.raises(RuntimeError, match="expected 2"):
         drawing._crank_face_centres(evidence)
-    evidence = _crank_evidence(False)
-    kind, values = evidence["CrankSpotFace"][1]
-    evidence["CrankSpotFace"][1] = (kind, values[:5] + (values[5] - 0.0025,))
-    with pytest.raises(RuntimeError, match="spot face"):
+    evidence = _crank_evidence()
+    kind, values = evidence["CrankSprocketBoss"][2]
+    evidence["CrankSprocketBoss"][2] = (kind, values[:5] + (values[5] - 0.0025,))
+    with pytest.raises(RuntimeError, match="north face"):
         drawing._crank_face_centres(evidence)
 
 
@@ -469,35 +254,22 @@ def test_the_failure_pdf_never_masks_the_layout_error(
     adapter = type("Adapter", (), {"currentModel": object()})()
     with pytest.raises(RuntimeError, match="native annotation layout failed: probe"):
         drawing._assert_native_layout_with_evidence(
-            adapter, object(), spot_face_views={}, expected_finish="x"
+            adapter, object(), expected_finish="x"
         )
 
 
-def test_the_failure_evidence_has_a_pdf_per_sheet(
+def test_the_failure_evidence_is_the_sheet_as_a_pdf(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """A PDF save prints the active sheet, so each sheet is activated and
-    saved in turn; Main's eye pass needs sheet 2 as much as sheet 1."""
-    saved = []
-
-    class Drawing:
-        active = ""
-
-        def ActivateSheet(self, name):
-            Drawing.active = name
-            return True
-
+    class Model:
         def SaveAs3(self, path, _version, _options):
-            saved.append(Drawing.active)
             Path(path).write_bytes(b"%PDF")
 
     monkeypatch.setattr(drawing, "_early_bound", lambda obj, iface: obj)
     monkeypatch.setattr(drawing._seat_forensics, "OUT_FAILURES", tmp_path)
-    adapter = SimpleNamespace(currentModel=Drawing())
-    drawing._export_failure_pdf(adapter, "native-layout")
-    assert saved == list(drawing.SHEET_NAMES)
+    drawing._export_failure_pdf(SimpleNamespace(currentModel=Model()), "native-layout")
     pdfs = sorted(path.name for path in tmp_path.rglob("*.pdf"))
-    assert pdfs == ["cone-pivot-post-main.pdf", "cone-pivot-post-spot-face.pdf"]
+    assert pdfs == ["cone-pivot-post.pdf"]
 
 
 def test_inclined_journal_sizes_live_in_the_true_shape_view() -> None:
@@ -531,10 +303,8 @@ def test_part_owns_every_printed_decimal_place() -> None:
         *spec.DRAWING_DIMENSIONS.values()
     )
     assert "draw_cone_pivot_post.py" in PRECISION_MIGRATED_DRAWINGS
-    # Only the two bores earn a third place: the cone journal's limits deliver
-    # the shaft_in_bushing clearance band, the crank bore prints its H7; the
-    # basic plan angle prints the model's exact value (#906, it feeds the
-    # frame).
+    # Only the two bores earn a third place, for their limits; the basic plan
+    # angle prints the model's exact value (#906, it feeds the frame).
     assert {
         name
         for name, places in spec.DRAWING_PRECISION_BY_NAME.items()
@@ -542,51 +312,37 @@ def test_part_owns_every_printed_decimal_place() -> None:
     } == {"CrankBoreDia", "JournalBoreDia", "InclineAngle"}
 
 
-def test_running_bore_closes_the_configured_fit_class() -> None:
+def test_running_bores_close_the_configured_fit_class() -> None:
+    """User ruling 2026-09-28: MHA-026 runs directly in the restored Ø11.438
+    crank bore, so both bores carry the one running band."""
     import _config
     import cone_gear_shaft_spec
+    import crankshaft_spec
 
     upper, lower = spec.RUNNING_BORE_BAND
     expected = tuple(_config.fit("shaft_in_bushing", "diametral_clearance_mm"))
-    shaft_nominal = cone_gear_shaft_spec.JOURNAL_DIA
-    shaft_upper, shaft_lower = cone_gear_shaft_spec.SECTION_DIA_BANDS[0]
-    clearances = (
-        spec.BORE_DIA + lower - (shaft_nominal + shaft_upper),
-        spec.BORE_DIA + upper - (shaft_nominal + shaft_lower),
-    )
-    assert tuple(round(value, 3) for value in clearances) == expected
-
-
-def test_crank_bore_is_an_h7_bushing_seat_with_webs_over_the_floor() -> None:
-    """#906 R1: Ø14.6 H7, on the post's symmetry plane, for MHA-149.
-
-    The web numbers are the print-worst table; each is an import-time assert
-    in the spec against the 1.5 floor, so this pins the table itself.  R1
-    holds the 2.0 target on every web.  The cone axis's own ±0.25 band
-    (JOURNAL_AXIS_HEIGHT_TOLERANCE_MM, the shim pack's range) sets how high
-    the crank axis can print, so the webs above it read against that band,
-    not the ±0.51 .XX grade it replaced.
-    """
-    assert spec.CRANK_BORE_DIA == 14.6
-    assert spec.CRANK_BORE_OFFSET == 0.0
-    assert spec.CRANK_BORE_BAND == (0.018, 0.0)
-    assert spec.WEB_FLOOR_MM == 1.5
-    assert {
-        name: round(web, 2) for name, web in spec.CRANK_BORE_WEBS_WORST.items()
-    } == {
-        "mounting thru hole": 2.0,
-        "mounting counterbore": 2.24,
-        "top face": 4.78,
-        "crank boss OD": 3.26,
-    }
-    assert min(spec.CRANK_BORE_WEBS_WORST.values()) >= 2.0
-    assert "MHA-149" in spec.DRAWING_NOTES.splitlines()[0]
+    for bore, shaft_nominal, shaft_band in (
+        (
+            spec.CRANK_BORE_DIA,
+            crankshaft_spec.JOURNAL_DIA,
+            crankshaft_spec.JOURNAL_DIA_BAND,
+        ),
+        (
+            spec.BORE_DIA,
+            cone_gear_shaft_spec.JOURNAL_DIA,
+            cone_gear_shaft_spec.SECTION_DIA_BANDS[0],
+        ),
+    ):
+        shaft_max = shaft_nominal + shaft_band[0]
+        shaft_min = shaft_nominal + shaft_band[1]
+        clearances = (bore + lower - shaft_max, bore + upper - shaft_min)
+        assert tuple(round(value, 3) for value in clearances) == expected
 
 
 def test_nothing_else_on_the_casting_carries_a_band() -> None:
     """Each band named once, applied to the features whose fit needs it.
 
-    The cast body, collar and boss diameters and the mounting-hole stations
+    The cast body, head and boss diameters and the mounting-hole stations
     are not accuracy features (cad/docs/tolerance-policy.md, "Result"), so the
     part must not author a tolerance on them at all: the title block's general
     grade is the whole specification.
@@ -594,8 +350,7 @@ def test_nothing_else_on_the_casting_carries_a_band() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert source.count("set_dimension_bilateral_tolerance(") == 3
     assert source.count("set_dimension_symmetric_tolerance(") == 1
-    assert source.count("deviations(RUNNING_BORE_BAND)") == 1
-    assert source.count("deviations(CRANK_BORE_BAND)") == 1
+    assert source.count("deviations(RUNNING_BORE_BAND)") == 2
     assert source.count("deviations(CRANK_ABOVE_CONE_BAND)") == 1
     assert not hasattr(spec, "TURNED_DIAMETER_TOLERANCE_MM")
     assert not hasattr(spec, "CRANK_BORE_TOLERANCE_MM")
@@ -634,8 +389,8 @@ def test_the_plan_angle_is_model_geometry_not_sheet_text() -> None:
     """
     assert spec.DRAWING_DIMENSIONS["JournalPlanReference"] == {"InclineAngle"}
     # The station has its own sketch: a view dimensioning only it must not
-    # print the plan-angle rays (MHA-016 sheet 2).
-    assert spec.DRAWING_DIMENSIONS["SpotFaceStationReference"] == {"CrankBossStartZ"}
+    # print the plan-angle rays.
+    assert spec.DRAWING_DIMENSIONS["CrankBossStationReference"] == {"CrankBossStartZ"}
     assert spec.CRANK_BOSS_NEAR_Z == spec.CRANK_BOSS_NORTH_FACE
     assert round(spec.JOURNAL_REFERENCE_X, 6) == 8.669989
     assert round(spec.JOURNAL_REFERENCE_Z, 6) == 39.049088
@@ -657,15 +412,11 @@ def test_machined_faces_are_called_out_on_the_casting() -> None:
         surface_finish_by_key(spec.SURFACE_FINISHES, "foot_seat").roughness_um
         == SEAT_UM
     )
-    # #906 A2: the crank bore seats the bushing; only the cone journal runs.
-    assert (
-        surface_finish_by_key(spec.SURFACE_FINISHES, "crank_bore").roughness_um
-        == SEAT_UM
-    )
-    assert (
-        surface_finish_by_key(spec.SURFACE_FINISHES, "journal_bore").roughness_um
-        == MACHINED_UM
-    )
+    for key in ("crank_bore", "journal_bore"):
+        assert (
+            surface_finish_by_key(spec.SURFACE_FINISHES, key).roughness_um
+            == MACHINED_UM
+        )
     seat = surface_finish_by_key(spec.SURFACE_FINISHES, "foot_seat").face
     assert seat.normal == (0, -1, 0) and seat.offset_mm == 0.0
     crank = surface_finish_by_key(spec.SURFACE_FINISHES, "crank_bore").face
@@ -705,9 +456,8 @@ def test_the_one_allowlisted_frame_is_the_crank_bore_angularity() -> None:
     assert frame.face == CylinderFace(
         spec.CRANK_BORE_DIA, contains_y_mm=spec.CRANK_BORE_HEIGHT
     )
-    # The zone spans the boss, so the spot face's retreat (a shorter boss)
-    # loosens the angle it holds: 0.0795 deg over 72.03, 0.0824 over 69.53.
-    assert round(spec.CRANK_BORE_ANGLE_LIMIT_DEG, 4) == 0.0824
+    # The zone spans the boss: 0.0795 deg over its 72.03.
+    assert round(spec.CRANK_BORE_ANGLE_LIMIT_DEG, 4) == 0.0795
     assert part.PART_DATUMS is spec.PART_DATUMS
     assert part.GEOMETRIC_CONTROLS is spec.GEOMETRIC_CONTROLS
     policy = (
@@ -818,7 +568,7 @@ def test_face_finder_keeps_only_the_square_face_through_the_station() -> None:
     faces = [
         _FakeFace((0.0, 0.0, 0.0), centre),  # the collar OD #916 picked
         _FakeFace(tuple(-c for c in normal), centre),  # the south end
-        _FakeFace((0.0, 0.0, -1.0), centre),  # the milled step
+        _FakeFace((0.0, 0.0, -1.0), centre),  # the crank boss's north face
         _FakeFace(normal, tuple(c + 0.01 * n for c, n in zip(centre, normal))),
         target,
     ]
@@ -901,12 +651,12 @@ def test_journal_rims_print_the_thrust_ring_break() -> None:
     assert shaft.POST_JOURNAL_BORE_BAND == spec.RUNNING_BORE_BAND
 
 
-def test_collar_diameter_lives_on_its_plan_circle() -> None:
-    """The front-view crank-bore leaders must not cross a collar dimension line."""
+def test_head_diameter_lives_on_its_plan_circle() -> None:
+    """The front-view crank-bore leaders must not cross a head dimension line."""
     assert "HeadDia" in drawing.TOP_KEEP
     assert "HeadDia" not in drawing.FRONT_KEEP
     # Names the feature, not a process: the part may be turned from bar stock.
-    assert drawing.DIMENSION_CALLOUTS["HeadDia"] == "COLLAR"
+    assert drawing.DIMENSION_CALLOUTS["HeadDia"] == "HEAD"
 
 
 def test_cone_boss_end_faces_are_located_by_symmetry() -> None:
@@ -968,22 +718,14 @@ def test_section_reads_by_its_bore_axis_not_by_a_note() -> None:
     assert "_add_cone_section_centerline(adapter, section)" in source
 
 
-def test_spotface_station_prints_its_value_on_its_own_dimension_line() -> None:
-    """Labelled, stacked, no shelf.  On sheet 1 the station's text was once
-    offset to a distant shelf, where a blind reader took it for a note, so it
-    never leaves its own dimension line.  The "no label" half is Main's
-    rim-8339 station-label ruling's to change: a bare 18.88 was not found as
-    the station, so on sheet 2 the label stacks with the value in the
-    dimension's own text, like the width and run-out beside it.  It stands
-    once, on sheet 2's plan, not on sheet 1's."""
-    assert "CrankBossStartZ" not in drawing.DIMENSION_CALLOUTS
-    assert drawing.SPOT_FACE_CALLOUTS["CrankBossStartZ"] == "SPOT FACE STATION"
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "set_dimension_callouts(adapter, annotations, SPOT_FACE_CALLOUTS)\n" in source
-    assert "CrankBossStartZ" not in drawing.TOP_KEEP
-    assert drawing.SPOT_PLAN_DIMENSION == "CrankBossStartZ"
-    assert '{"CrankBossStartZ":' not in source
-    assert "offset_dimension_text(adapter, plan_annotations" not in source
+def test_crank_boss_station_prints_on_its_own_dimension_line() -> None:
+    """Labelled, stacked, no shelf.  The station's text was once offset to a
+    distant shelf, where a blind reader took it for a note, so it never leaves
+    its own dimension line; and a bare station was not found as one (Main's
+    rim-8339 ruling), so its label stacks with the value.  It stands once, in
+    the plan."""
+    assert "CrankBossStartZ" in drawing.TOP_KEEP
+    assert "CrankBossStartZ" not in drawing.JOURNAL_TEXT_OFFSETS
 
 
 def test_section_centerline_is_forced_to_print_black_in_center_font() -> None:
@@ -995,9 +737,8 @@ def test_section_centerline_is_forced_to_print_black_in_center_font() -> None:
 
 
 def test_crank_boss_od_is_labelled_as_the_boss() -> None:
-    """The elevation sees the boss's far end: its Ø is the boss, not a spotface."""
+    """The elevation sees the boss's far end: its Ø is the boss."""
     assert drawing.DIMENSION_CALLOUTS["CrankBossDia"] == "CRANK BOSS"
-    assert "SPOTFACE" not in drawing.DIMENSION_CALLOUTS.values()
 
 
 def test_section_caption_states_no_scale_at_sheet_scale() -> None:
@@ -1006,7 +747,7 @@ def test_section_caption_states_no_scale_at_sheet_scale() -> None:
     assert 'expected = "<VLNAME> <VLLABEL>"\n' in source
 
 
-def test_spotface_station_has_one_driving_global() -> None:
+def test_crank_boss_station_has_one_driving_global() -> None:
     """The printed station and the plane the boss grows from cannot drift apart."""
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert '"CrankBossNearZ": CRANK_BOSS_NEAR_Z,' in source
@@ -1036,7 +777,7 @@ def test_the_post_saves_every_reference_sketch_hidden() -> None:
     references = {name for name in spec.DRAWING_DIMENSIONS if name.endswith("Reference")}
     assert references == {
         "JournalPlanReference",
-        "SpotFaceStationReference",
+        "CrankBossStationReference",
         "BoreSpacingReference",
     }
     assert _blanked_reference_sketches() == references
@@ -1048,7 +789,7 @@ def test_the_post_saves_every_reference_sketch_hidden() -> None:
 def test_every_view_dimensioning_a_hidden_sketch_shows_it_itself() -> None:
     """A part-hidden sketch's dimensions import only through the hidden-owner
     import, which shows the sketch in that one view.  The plan owns the plan
-    angle, View B the bore spacing, sheet 2's plan the station; no other view
+    angle and the crank boss station, View B the bore spacing; no other view
     keeps anything from those sketches, so none of them prints a ray."""
     hidden = {
         item
@@ -1056,33 +797,31 @@ def test_every_view_dimensioning_a_hidden_sketch_shows_it_itself() -> None:
         for item in spec.DRAWING_DIMENSIONS[name]
     }
     assert hidden == {"InclineAngle", "CrankAboveCone", "CrankBossStartZ"}
-    assert set(drawing.TOP_KEEP) & hidden == {"InclineAngle"}
+    assert set(drawing.TOP_KEEP) & hidden == {"InclineAngle", "CrankBossStartZ"}
     assert set(drawing.JOURNAL_KEEP) & hidden == {"CrankAboveCone"}
-    assert drawing.SPOT_PLAN_DIMENSION == "CrankBossStartZ"
-    for keep in (drawing.FRONT_KEEP, drawing.SECTION_KEEP, drawing.REAR_KEEP):
+    for keep in (drawing.FRONT_KEEP, drawing.SECTION_KEEP):
         assert not set(keep) & hidden
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    for curated in ("top", "journal", "plan"):
+    for curated in ("top", "journal"):
         assert f"{curated}_annotations = curate_hidden_owner_dimensions(" in source
-    for curated in ("front", "section", "rear"):
+    for curated in ("front", "section"):
         assert f"{curated}_annotations = curate_view_dimensions(" in source
 
 
-def test_crank_bore_is_located_from_the_cone_bore_inside_the_mesh_window() -> None:
+def test_crank_bore_is_located_from_the_cone_bore_and_never_binds() -> None:
     """U31: the 16T:64T mesh closes on the bore spacing, so the print states it.
 
-    #906 R1: the MHA-149 bushing takes up the mesh at fit-up, and
-    crank_mesh_stack carries the printed spacing band as one of its terms,
-    placed CRANK_BORE_DROP below the frame; its import-time assert is the
-    window check.
+    User ruling 2026-09-28: fixed centres, no drop and no fit-up bushing; the
+    printed spacing band is one of crank_mesh_stack's terms, and its
+    import-time assert is the never-bind check.
     """
     import crank_mesh_stack
 
-    assert round(spec.CRANK_ABOVE_CONE, 3) == 39.122
+    assert round(spec.CRANK_ABOVE_CONE, 3) == 39.332
     assert spec.CRANK_ABOVE_CONE_BAND == (0.37, 0.0)
     assert crank_mesh_stack.SPACING_PRINTED == round(spec.CRANK_ABOVE_CONE, 2)
-    assert abs(crank_mesh_stack.FRAME_DY - spec.CRANK_ABOVE_CONE - spec.CRANK_BORE_DROP) < 1e-9
-    assert min(crank_mesh_stack.OPEN_MARGIN, crank_mesh_stack.CLOSE_MARGIN) > 0.0
+    assert abs(crank_mesh_stack.FRAME_DY - spec.CRANK_ABOVE_CONE) < 1e-9
+    assert crank_mesh_stack.TIGHT_BACKLASH_MM > 0.0
     # The foot-to-crank height stays on the front view only as a reference.
     assert "CrankAxisY" in drawing.FRONT_KEEP
     drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
@@ -1126,38 +865,6 @@ def test_point_relations_use_the_point_relation_types() -> None:
                 f"line-only relation {relation!r} on points {entity1} / {entity2}"
             )
     assert '"origin", "horizontal_points"' in source
-
-
-def _catalog_rows(node):
-    if isinstance(node, dict):
-        for value in node.values():
-            yield from _catalog_rows(value)
-    if isinstance(node, list):
-        if node and all(isinstance(cell, str) for cell in node):
-            yield node
-        for item in node:
-            yield from _catalog_rows(item)
-
-
-def test_dimension_catalog_row_matches_the_spec() -> None:
-    # dimensions.yaml is the narrative geometry catalog; its cone-pivot-post
-    # row must state the collar the part is built with, not the retired
-    # v2-harvest O42.7506 (Codex PRRT_kwDOPHDy386l4aOa).
-    import yaml
-
-    catalog = Path(spec.__file__).resolve().parents[1] / "config" / "dimensions.yaml"
-    rows = [
-        row
-        for row in _catalog_rows(yaml.safe_load(catalog.read_text(encoding="utf-8")))
-        if row[0].startswith("`cone-pivot-post`")
-    ]
-    assert len(rows) == 1
-    dims = rows[0][1]
-    assert f"Ø{spec.HEAD_DIA:.1f} ± 0.4 × {spec.HEAD_HEIGHT:g} upper collar" in dims
-    assert f"y {spec.HEAD_BASE_Y:g}..{spec.BLOCK_HEIGHT:g}" in dims
-    assert f"Ø{spec.BLOCK_DIA:g} × {spec.BLOCK_HEIGHT:.1f} tall" in dims
-    assert f"bore on the body centreline at y {spec.CRANK_BORE_HEIGHT:g}" in dims
-    assert "42.7506" not in " ".join(rows[0])
 
 
 def _datum_b_frame_clears_the_notes(tag_y: float) -> bool:

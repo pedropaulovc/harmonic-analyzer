@@ -418,10 +418,8 @@ def _corner_fillet_area(label: str, r: float) -> float:
     return r * r * (1.0 / math.tan(theta / 2.0) - (math.pi - theta) / 2.0)
 
 
-# The crank axis (cone_swing_platform_crank_axis: the crank's nominal fit-up
-# line, user ruling R1) is construction for mates only.  No printed dimension is
-# taken off it: the sheet keeps exactly DRAWING_DIMENSIONS, so moving it can
-# change nothing the drawing prints.
+# The fixed crank axis (cone_swing_platform_crank_axis) is construction for
+# mates only. The drawing keeps exactly DRAWING_DIMENSIONS.
 _CRANK_AXIS_FEATURES = frozenset(
     {"crank anchor (vertical)", "CrankAxisVert", "CrankAxisHigh", "CrankAxisSeat", "crank axis"}
 )

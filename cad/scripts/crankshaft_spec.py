@@ -1,10 +1,19 @@
-r"""Pure-data dimensional contract shared by the crankshaft and its drawing."""
+r"""Crankshaft manufacturing contract.
+
+The v36 MHA-016 bore carries integral running lands again; the pinion sits
+SEAT_FEELER_MM off its north boss face. All axial stations are measured from
+the dome root in the model and printed from the far end; W15 uses the
+printed worst cases.
+"""
 
 from __future__ import annotations
 
+import _config
 from _hole_spec import HoleSpec, drill_process
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from cone_pivot_post_spec import CRANK_BORE_DIA as JOURNAL_BORE_DIA
+from cone_pivot_post_spec import RUNNING_BORE_BAND as JOURNAL_BORE_BAND
 import crank_pinion_spec
 from crank_hub_geometry import (
     CRANK_FACE_SHIFT,
@@ -18,23 +27,23 @@ from crank_hub_geometry import (
 )
 
 
-# The common arm/hub/shaft cylinder face moved 8 mm outboard.  Adding the same
-# shift to all inboard stations preserves every established bearing, T12 and
-# pinion world interface.  The 16T pinion's toothed south face seats here.
-SEAT_PINION = 105.039505572 + CRANK_FACE_SHIFT  # 113.039505572
-# W15 (Main, 2026-09-25): the far end sits recessed inside the pinion's boss,
-# and crank_pinion_spec sizes that boss so the retention pin keeps its wall to
-# this end.  The length is floored to the places it prints (Codex P2 on #892),
-# so the sheet's nominal IS the model's and an accepted shaft is never longer
-# than the model; the recess that leaves lies between the pinion's
-# SHAFT_END_RECESS_MIN and _MAX, the range its boss was sized for.
+# The restored v36 post's north boss face, measured from the shifted dome root.
+# Keep this independent of the post's rebuild closure; assembly checks the mate.
+POST_BORE_END = 104.789505572 + CRANK_FACE_SHIFT
+SEAT_PINION = POST_BORE_END + crank_pinion_spec.SEAT_FEELER_MM
+if SEAT_PINION <= POST_BORE_END:
+    raise AssertionError("the 16T seat must clear the restored post boss north face")
+# W15: the far end remains recessed inside the pinion's shorter boss. Its
+# one-place length is floored so the printed nominal is the model's and an
+# accepted shaft cannot be longer than the model. The pinion spec reserves
+# enough boss for the retained pin at its worst printed limit.
 SHAFT_LENGTH = crank_pinion_spec.floor_to_places(
     SEAT_PINION
     + crank_pinion_spec.OVERALL_LENGTH
     - crank_pinion_spec.SHAFT_END_RECESS_MIN,
     crank_pinion_spec.SHAFT_LENGTH_PLACES,
-)  # 136.8
-SHAFT_END_RECESS = SEAT_PINION + crank_pinion_spec.OVERALL_LENGTH - SHAFT_LENGTH  # 1.1395
+)  # floored to the drawing's one-place nominal
+SHAFT_END_RECESS = SEAT_PINION + crank_pinion_spec.OVERALL_LENGTH - SHAFT_LENGTH
 if not (
     crank_pinion_spec.SHAFT_END_RECESS_MIN - 1e-9
     <= SHAFT_END_RECESS
@@ -47,21 +56,30 @@ if not (
 # Unilateral: a long shaft would stand proud of the boss, and a short one only
 # deepens the recess and shortens the pin's wall, which build_drive_train_
 # assembly's worst-case stacks carry.  Printed on Depth from the model.
-# RULING W15-SHAFT-BAND (Main 2026-09-25): unilateral +0/-0.4 is required by
-# the W15 pin-wall and recess stacks (pinion_pin_edge_stack /
-# pinion_recess_stack in build_drive_train_assembly); at the title-block .X
-# +/-0.8 the wall is 1.873 < 2.0 and the recess -0.461.
-SHAFT_LENGTH_BAND = (0.00, -0.40)  # (upper, lower) deviations
+# W15-SHAFT-BAND (Main 2026-09-25): preserve unilateral +0/-0.4;
+# the normal title-block .X +/-0.8 would leave the shortened boss's
+# pin wall below 2.0 and make the shaft end stand proud at print-worst.
+SHAFT_LENGTH_BAND = (0.00, -crank_pinion_spec.SHAFT_LENGTH_SHORT_MM)
 
-# #906 R1: the shaft runs in the MHA-149 eccentric bushing on its plain 3/8 in
-# core; the integral journal and its relief are gone.  The bushing's north
-# end sits flush with the post boss's spot face here: the old journal bore's
-# inboard end, less the 2.5 the spot face retreated from the 64T
-# (cone_pivot_post_spec CRANK_SPOT_FACE_RETREAT; hard-coded so the post's spec
-# is not a rebuild input of this shaft, and the offline test pins it).  The
-# Ø9.0 seat step stays where it was, north of it, so the core runs the
-# bushing's full length.
-POST_BORE_END = 104.789505572 + CRANK_FACE_SHIFT - 2.5  # 110.29
+# Integral lands run directly in the restored post bore. Derive the journal
+# from the named running fit and the bore's published +0.005/-0.025 band.
+_RUNNING_CLEARANCE = tuple(_config.fit("shaft_in_bushing")["diametral_clearance_mm"])
+JOURNAL_DIA = JOURNAL_BORE_DIA + JOURNAL_BORE_BAND[1] - _RUNNING_CLEARANCE[0]
+JOURNAL_DIA_BAND = (
+    0.0,
+    round(JOURNAL_BORE_DIA + JOURNAL_BORE_BAND[0] - _RUNNING_CLEARANCE[1] - JOURNAL_DIA, 3),
+)
+JOURNAL_CLEARANCE = JOURNAL_BORE_DIA - JOURNAL_DIA
+JOURNAL_START = 32.755105572 + CRANK_FACE_SHIFT
+_JOURNAL_CLEARANCE_LOW = JOURNAL_BORE_BAND[1] - JOURNAL_DIA_BAND[0] + JOURNAL_CLEARANCE
+_JOURNAL_CLEARANCE_HIGH = JOURNAL_BORE_BAND[0] - JOURNAL_DIA_BAND[1] + JOURNAL_CLEARANCE
+if not (
+    _RUNNING_CLEARANCE[0] - 1e-9
+    <= _JOURNAL_CLEARANCE_LOW
+    <= _JOURNAL_CLEARANCE_HIGH
+    <= _RUNNING_CLEARANCE[1] + 1e-9
+):
+    raise AssertionError("integral journal and post bore exceed the running-fit clearance band")
 
 # Every axial station prints from the FAR END at one place (policy rule 7), and
 # each one below is chosen to print EXACTLY, so its printed row IS its limit
@@ -88,7 +106,7 @@ def local_station(far_end_station: float) -> float:
 PINION_SEAT_DIA = crank_pinion_spec.SEAT_DIA
 PINION_SEAT_DIA_BAND = SHAFT_DIA_BAND  # the through shaft's turned-fit band
 PINION_SEAT_STATION = 24.1  # far end to the step
-SEAT_STEP = local_station(PINION_SEAT_STATION)  # 112.7
+SEAT_STEP = local_station(PINION_SEAT_STATION)
 STEP_CORNER_RADIUS_MAX = 0.25  # the title block's R0.25 edge break
 SEAT_STEP_STANDOFF_WORST = SEAT_STEP + STATION_ROW + STEP_CORNER_RADIUS_MAX - SEAT_PINION
 SEAT_GAP_NORTH_RANGE = crank_pinion_spec.SEAT_GAP_MAX_MM - crank_pinion_spec.SEAT_FEELER_MM
@@ -98,15 +116,98 @@ if SEAT_STEP_STANDOFF_WORST > SEAT_GAP_NORTH_RANGE + 1e-9:
         f"at print-worst, past the seat gap's {SEAT_GAP_NORTH_RANGE:.2f} north range"
     )
 
-# The core runs in the bushing (rule 5); the finish rides its middle.
-BEARING_MID_STATION = POST_BORE_END - 38.5
-SURFACE_FINISHES = (
-    SurfaceFinishControl(
-        "bearing_core",
-        MACHINED_UM,
-        CylinderFace(SHAFT_DIA, contains_y_mm=BEARING_MID_STATION),
-    ),
+# Restore the two bearing lands and the relieved middle. Printed stations
+# remain baseline dimensions from the faced far end, at the routine .X band.
+WEB_TARGET_MM = 2.0
+JOURNAL_INBOARD_STATION = 27.7
+JOURNAL_END = local_station(JOURNAL_INBOARD_STATION)
+JOURNAL_LENGTH = JOURNAL_END - JOURNAL_START
+STEP_WEB_WORST = SEAT_STEP - JOURNAL_END - 2.0 * STATION_ROW
+RELIEF_DIA = 10.4
+RELIEF_DIA_PLACES = 1
+RELIEF_OUTBOARD_STATION = 81.0
+RELIEF_INBOARD_STATION = 42.7
+RELIEF_START = local_station(RELIEF_OUTBOARD_STATION)
+RELIEF_END = local_station(RELIEF_INBOARD_STATION)
+RELIEF_LENGTH = RELIEF_END - RELIEF_START
+_RELIEF_ROW = crank_pinion_spec.printed_band_mm(RELIEF_DIA_PLACES)
+_OUTBOARD_START_LOWER, _ = crank_pinion_spec.printed_deviations(
+    SHAFT_LENGTH - JOURNAL_START, STATION_PLACES
 )
+JOURNAL_LAND_L_OVER_D_MIN = 1.0
+JOURNAL_LANDS_WORST = (
+    SHAFT_LENGTH - JOURNAL_START + _OUTBOARD_START_LOWER
+    - RELIEF_OUTBOARD_STATION - STATION_ROW,
+    RELIEF_INBOARD_STATION - JOURNAL_INBOARD_STATION - 2.0 * STATION_ROW,
+)
+if STEP_WEB_WORST < WEB_TARGET_MM:
+    raise AssertionError("journal-to-pinion-seat web falls below its printed worst-case floor")
+if JOURNAL_END + STATION_ROW >= POST_BORE_END:
+    raise AssertionError("the journal must stay inside the restored post bore at print-worst")
+if not RELIEF_START < RELIEF_END < JOURNAL_END:
+    raise AssertionError("the relieved middle must stay within the integral journal lands")
+if RELIEF_DIA + _RELIEF_ROW >= JOURNAL_DIA + JOURNAL_DIA_BAND[1]:
+    raise AssertionError("relief must remain below the journal at print-worst")
+if RELIEF_DIA - _RELIEF_ROW <= SHAFT_DIA + SHAFT_DIA_BAND[0]:
+    raise AssertionError("relief must stand proud of the through shaft at print-worst")
+if min(JOURNAL_LANDS_WORST) < JOURNAL_LAND_L_OVER_D_MIN * JOURNAL_DIA:
+    raise AssertionError("the integral journal lands fall below their printed L/D floor")
+# Both Ø11.388 lands run in MHA-016 and therefore need their own Ra 1.6
+# control on the native cylindrical face and their own drawing leader.
+SURFACE_FINISHES = tuple(
+    SurfaceFinishControl(
+        key,
+        MACHINED_UM,
+        CylinderFace(JOURNAL_DIA, contains_y_mm=(start + end) / 2.0),
+    )
+    for key, start, end in (
+        ("outboard_journal", JOURNAL_START, RELIEF_START),
+        ("inboard_journal", RELIEF_END, JOURNAL_END),
+    )
+)
+
+# W15's printed worst cases are pure data, so they can be checked without
+# importing an assembly builder. The retention hole is laid out at boss middle.
+PINION_PIN_STATION_Y = SEAT_PINION + crank_pinion_spec.PIN_STATION
+PINION_PIN_EDGE_TO_END = SHAFT_LENGTH - PINION_PIN_STATION_Y - crank_pinion_spec.PIN_DIA / 2.0
+PINION_PIN_EDGE_STACK = {
+    "nominal": PINION_PIN_EDGE_TO_END,
+    "shaft length": SHAFT_LENGTH_BAND[1],
+    "seat gap": -SEAT_GAP_NORTH_RANGE,
+    "boss mid-length": -(crank_pinion_spec.FACE_WIDTH_GRADE_MM + crank_pinion_spec.OVERALL_LENGTH_GRADE_MM) / 2.0,
+    "pin layout": -crank_pinion_spec.PIN_STATION_LAYOUT_ALLOWANCE_MM,
+    "drill oversize": -float(_config.title_block("drilled_hole")["plus_mm"]) / 2.0,
+}
+PINION_RECESS_STACK = {
+    "nominal": SHAFT_END_RECESS,
+    "pinion overall length": -crank_pinion_spec.OVERALL_LENGTH_GRADE_MM,
+    "seat gap": 0.0,
+    "shaft length": -SHAFT_LENGTH_BAND[0],
+}
+if sum(PINION_PIN_EDGE_STACK.values()) < crank_pinion_spec.PIN_EDGE_MIN_WORST:
+    raise AssertionError("W15 pin edge-to-shaft-end wall falls below its print-worst floor")
+if sum(PINION_RECESS_STACK.values()) < crank_pinion_spec.SHAFT_END_RECESS_MIN_WORST:
+    raise AssertionError("W15 shaft end protrudes past its print-worst boss recess floor")
+_BOSS_PRINT_STEP = 10.0 ** -crank_pinion_spec.BOSS_LENGTH_PLACES
+_SHORTER_SHAFT_LENGTH = crank_pinion_spec.floor_to_places(
+    SEAT_PINION
+    + crank_pinion_spec.OVERALL_LENGTH
+    - _BOSS_PRINT_STEP
+    - crank_pinion_spec.SHAFT_END_RECESS_MIN,
+    crank_pinion_spec.SHAFT_LENGTH_PLACES,
+)
+_SHORTER_PIN_EDGE_WORST = (
+    sum(PINION_PIN_EDGE_STACK.values())
+    + _SHORTER_SHAFT_LENGTH
+    - SHAFT_LENGTH
+    + _BOSS_PRINT_STEP / 2.0
+)
+if _SHORTER_PIN_EDGE_WORST >= crank_pinion_spec.PIN_EDGE_MIN_WORST:
+    raise AssertionError(
+        f"a boss one print step shorter still holds the W15 pin-edge floor "
+        f"({_SHORTER_PIN_EDGE_WORST:.3f} >= {crank_pinion_spec.PIN_EDGE_MIN_WORST:.2f}); "
+        "the pinion boss is not the shortest feasible"
+    )
 # MHA-024 hub-to-shaft cross-hole behind the crank arm.
 PIN_HOLE_SPEC = HoleSpec("drilled_number", "#9")
 PIN_HOLE_HEIGHT = SERVICE_PIN_STATION
@@ -121,25 +222,36 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ShaftProfile": {"ShaftDiaDim"},
     "Shaft": {"Depth"},
     "ShaftDomeProfile": {"DomeHeight"},
+    "JournalProfile": {"JournalDiaDim"},
+    "ReliefProfile": {"ReliefDiaDim"},
     "PinionSeatProfile": {"PinionSeatDiaDim"},
     "StationReference": {
         "OverallLength",
         "PinionSeatStation",
+        "JournalInboardStation",
+        "ReliefInboardStation",
+        "ReliefOutboardStation",
+        "JournalOutboardStation",
         "PinHoleStation",
         "DomeSphereRadius",
     },
 }
-# Decimal places ARE the tolerance (policy rule 2).  The two running/seat
-# diameters are functional fits and keep their three-place size bands; every
-# length on this hand-cranked shaft is routine (.X).
+# Running/seat diameters carry their fit bands at three places. Relief and
+# axial stations carry the routine one-place title-block band.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ShaftProfile": {"ShaftDiaDim": 3},
     "Shaft": {"Depth": crank_pinion_spec.SHAFT_LENGTH_PLACES},
     "ShaftDomeProfile": {"DomeHeight": 1},
+    "JournalProfile": {"JournalDiaDim": 3},
+    "ReliefProfile": {"ReliefDiaDim": RELIEF_DIA_PLACES},
     "PinionSeatProfile": {"PinionSeatDiaDim": 3},
     "StationReference": {
         "OverallLength": 1,
         "PinionSeatStation": STATION_PLACES,
+        "JournalInboardStation": STATION_PLACES,
+        "ReliefInboardStation": STATION_PLACES,
+        "ReliefOutboardStation": STATION_PLACES,
+        "JournalOutboardStation": STATION_PLACES,
         "PinHoleStation": STATION_PLACES,
         "DomeSphereRadius": 1,
     },

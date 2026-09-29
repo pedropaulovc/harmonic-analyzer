@@ -651,7 +651,7 @@ def test_the_routing_guard_sees_the_known_hidden_sketch_drawings() -> None:
     assert found["cone_pivot_post"] == {
         "BoreSpacingReference",
         "JournalPlanReference",
-        "SpotFaceStationReference",
+        "CrankBossStationReference",
     }
     assert found["cone_gear_shaft"] == {"SolderStations"}
 

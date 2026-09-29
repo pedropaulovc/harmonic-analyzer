@@ -15,7 +15,9 @@ from cone_shaft_land_bands import (  # noqa: F401  re-exported for the shaft bui
     RUNNING_DIA_BAND,
     SECTION_DIA_BANDS,
 )
+from crank_drive_gear_spec import CENTRE_SHIFT_NORTH as GEAR64_CENTRE_SHIFT_NORTH
 from crank_drive_gear_spec import FACE_WIDTH as GEAR64_FACE_WIDTH
+from crank_drive_gear_spec import NORTH_FACE_REFERENCE_WIDTH as GEAR64_NORTH_FACE_REFERENCE_WIDTH
 
 
 MM_PER_IN = 25.4
@@ -37,17 +39,36 @@ FRONT_STUB = 61.9068609979
 
 # Axial capture (#914, user ruling 2026-09-25).  The tip adjuster pushes the
 # shaft south, toward the post; nothing reacted it until the 64T met the post
-# boss 1.681 further on.  An integral collar now fills that gap: its south
-# face bears on the post's north boss face (flush with the journal end) and
-# the 64T is soldered against its north face, so no station moves.  The web is
-# the gap, 1.681 -- above the 1.5 floor, accepted by the user rather than
-# moving the 64T.  The collar bears on the boss annulus outside the
-# Ø12.2808 bore and inside the Ø17.2 boss.  The 64T centre is the
-# drive-train's GEAR64_STATION (the shaft tests pin the two equal).
-GEAR64_CENTER_STATION = 19.9 + GEAR_AXIS_SHIFT
+# boss 1.681 further on.  An integral collar fills that gap: its south face
+# bears on the post's north boss face (flush with the journal end) and the 64T
+# is soldered against its north face.  The collar bears on the boss annulus
+# outside the Ø12.2808 bore and inside the Ø17.2 boss.
+#
+# The 64T's north face stays where the 8.0 face laid out on the 19.9 centre
+# put it, and the gear narrows from the south (user ruling 2026-09-28,
+# crank_drive_gear_spec.FACE_WIDTH), so the collar grows by exactly the
+# narrowing: the 1.681 web becomes 3.181, above rule 12's 2.0 target at its
+# low limit.  The 64T centre is the drive-train's physical 64T station (the
+# shaft tests pin the two equal).
+GEAR64_NORTH_FACE_STATION = 19.9 + GEAR_AXIS_SHIFT + GEAR64_NORTH_FACE_REFERENCE_WIDTH / 2.0
+GEAR64_CENTER_STATION = 19.9 + GEAR_AXIS_SHIFT + GEAR64_CENTRE_SHIFT_NORTH
 COLLAR_START_STATION = JOURNAL_END
 COLLAR_END_STATION = FRONT_STUB + GEAR64_CENTER_STATION - GEAR64_FACE_WIDTH / 2.0
 COLLAR_THICKNESS = COLLAR_END_STATION - COLLAR_START_STATION
+_COLLAR_THICKNESS_UNDER_8_FACE = 1.681218417601599
+if (
+    abs(GEAR64_CENTER_STATION + GEAR64_FACE_WIDTH / 2.0 - GEAR64_NORTH_FACE_STATION) > 1e-9
+    or abs(
+        COLLAR_THICKNESS
+        - (_COLLAR_THICKNESS_UNDER_8_FACE + GEAR64_NORTH_FACE_REFERENCE_WIDTH - GEAR64_FACE_WIDTH)
+    )
+    > 1e-9
+    or abs(COLLAR_THICKNESS - 3.181) > 5e-4
+):
+    raise AssertionError(
+        f"the collar {COLLAR_THICKNESS:.4f} must grow by the 64T's narrowing about its "
+        f"unchanged north face {GEAR64_NORTH_FACE_STATION:.4f} (user ruling 2026-09-28)"
+    )
 
 # The collar's diameter is the 5/8 in cold-finished bar's own, as supplied:
 # never turned (user ruling 2026-09-26 on Codex P1 #916).  The turned Ø15.0 it
@@ -351,9 +372,10 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 #
 # Collar (#914): the diameter is the bar's as supplied (STOCK_DIA), so it
 # prints as a two-place reference, 15.88, the bar's own size; the web
-# prints three places, because at .XX the 1.681 web could fall to 1.17, under
-# the 1.5 floor the user accepted it against.  Solder stations: three places,
-# the +-0.13 the user ruled.
+# prints three places because it is the 64T's station toward MHA-016
+# (crank_boss_rim.GEAR64_STATION_TOWARD_POST): at .XX the station term grows
+# from 0.53 to 0.91 and the widest face holding the post floor falls from 6.5
+# to 6.2.  Solder stations: three places, the +-0.13 the user ruled.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Sec0Profile": {"Sec0Dia": 3},
     "Sec1Profile": {"Sec1Dia": 3},

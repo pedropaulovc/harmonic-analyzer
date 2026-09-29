@@ -21,13 +21,12 @@ Findings it reproduces (run it after changing any crank-mesh input):
   manifests as lateral flank misregistration, +-1.08 mm across the face);
 * helix hand: +INCLINE on the 64T zeroes the collision; the mirrored hand and
   straight teeth both collide hard at the engaged depth;
-* the shipped pose (backlash 0.15, smooth helix, c2c slack 0.25 -> tips engaged
-  into the gaps, 87% of working depth) is ZERO-collision over a full
-  crank-pitch phase sweep, with a >=0.05 backlash margin and a
-  [-4.00, -3.20] deg zero seed window (+-0.40 around the shipped centre --
-  4x the 0.10-deg authoring-time correction bound).  The window was
-  re-arbitrated for the fixed-post recenter at DP25.7311 and a 12.0-degree
-  helix; the current -1.50 phase centre is checked with +/-0.4-degree margin.
+* the restored fixed-axis pose (user ruling 2026-09-28), with 0.15 tooth
+  thinning and the 6.5-wide 64T, has a nine-phase common seed-offset interval
+  approximately [-2.776, -0.206] deg in ``crank_mesh_backlash_study``.
+  The shipped -1.49 offset retains over 0.4-degree margin each way; minimum
+  measured nominal backlash is 0.3476 mm. The print-worst closing stack is
+  separate (``crank_mesh_stack``) and requires only positive backlash.
 
 Run (no SolidWorks)::
 
@@ -58,18 +57,15 @@ ADDENDUM64_EXTRA_IN = 1.0 / DP_CRANK_CUTTER - 1.0 / DP_CRANK
 GEAR64_SEAT = dta.GEAR64_SEAT
 GEAR64_FACE = dta.GEAR64_FACE
 PINION_FACE = dta.PINION_FACE
-# The FRAME crank axis: where the casting lays the crank out and where the
-# 2026-07-14 rederivation lifted it (y_for_extra).  crank_mesh_backlash_study
-# offsets MHA-149's throw from it.
+# The restored post carries the fixed crank axis; both studies and the
+# assembly use this same placement.
 X_CRANK = dta.X_CRANK
-# #906 R1: the crank train ships on the MHA-149 nominal fit-up axis, so that
-# is the pose the assembly's seed is derived at and the one this study checks.
-SHIPPED_AXIS = (dta.X_CRANK_FIT, dta.Y_CRANK_FIT)
+SHIPPED_AXIS = (dta.X_CRANK, dta.Y_CRANK)
 Y_DRIVE = dta.Y_DRIVE
 SIN_I, COS_I = dta.SIN_I, dta.COS_I
 INCLINE_DEG = dta.INCLINE_DEG
 R64, R16, ADD16 = dta.R64, dta.R16, dta.ADD16
-SLACK = dta.MESH16_C2C_SLACK
+SLACK = math.hypot((GEAR64_SEAT[0] - dta.X_CRANK) * COS_I, dta.Y_CRANK - Y_DRIVE) - R64 - R16
 PINION_TOOTH_Z = dta.PINION_TOOTH_Z
 
 

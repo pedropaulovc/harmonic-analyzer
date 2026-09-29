@@ -2,7 +2,7 @@ r"""Create the cone-gear-shaft manufacturing drawing under the simplicity policy
 
 The turned shaft is shown horizontally at 1:1 with baseline lengths from the
 collar's thrust face below it and every diameter above it on that same side
-view, each dimension line inside the land it measures (the 1.7 mm collar
+view, each dimension line inside the land it measures (the 3.2 mm collar
 instead takes one near-side arrow on its rim).  The two short lands
 ahead of the tip are 6.9 mm long, so the three tip-end diameter texts climb
 in steps: the tip's line rises highest and each text hangs to the RIGHT of
@@ -134,7 +134,7 @@ DONOR_CENTER = (0.360, 0.090)
 # the same origin on the first tier, and the front-to-tip overall, a
 # reference, hangs lowest, above the title block.  A station's text is
 # centred in its span when it fits there with STATION_TEXT_CLEARANCE to spare;
-# the web's 1.68 and the T120's 10.78 spans are narrower than their texts, so
+# the web's 3.18 and the T120's 10.78 spans are narrower than their texts, so
 # both texts stand stacked LEFT of the T120 extension line (the 916a render
 # had the datum line strike "10.781" and the web text touch the collar's
 # witness line).  The one radius rides above the 3/8-to-1/4 in step it
@@ -173,7 +173,7 @@ SIDE_DIAMETERS = {
     "Sec2Dia": (0.0853, 0.1760),
     "Sec3Dia": (0.0785, 0.1880),
     "Sec4Dia": (0.0520, 0.2000),
-    # #914: the collar ring is 1.681 wide, too narrow for a dimension line
+    # #914: the collar ring is 3.181 wide, too narrow for a dimension line
     # and two arrows inside it, so the collar alone takes the near-side
     # diametric style: one arrow on the top rim from outside, leader up to
     # the text, nothing drawn inside the ring.

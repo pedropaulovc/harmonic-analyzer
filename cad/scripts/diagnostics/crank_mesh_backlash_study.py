@@ -182,8 +182,8 @@ class Pose:
         # by ~w^2 / 2r at the face ends -- the flank-line sag.
         self.skew64 = skew64
         self.tan64 = math.tan(math.radians(gear64.beta_deg))
-        # ``crank_xy`` places the crank axis anywhere in its transverse plane
-        # (an eccentric bushing's throw); otherwise ``extra`` lifts it along y.
+        # ``crank_xy`` evaluates a specified axis directly; otherwise
+        # ``extra`` perturbs the fixed-centre layout along y.
         if crank_xy is None:
             self.x_crank, self.y_crank = cms.X_CRANK, y_for_extra(extra, gear16, gear64)
         else:

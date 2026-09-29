@@ -37,8 +37,8 @@ def test_assembly_places_pin_axially_at_six_oclock() -> None:
 
     assert assembly.CRANK_HUB_PIN_ORIGIN == pytest.approx(
         (
-            assembly.X_CRANK_FIT,
-            assembly.Y_CRANK_FIT - geometry.AXIAL_PIN_RADIUS_FROM_AXIS,
+            assembly.X_CRANK,
+            assembly.Y_CRANK - geometry.AXIAL_PIN_RADIUS_FROM_AXIS,
             assembly.CRANK_FACE_Z,
         )
     )

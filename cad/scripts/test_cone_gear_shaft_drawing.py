@@ -102,17 +102,18 @@ def test_display_precision_is_owned_by_the_part() -> None:
         "Sec3End": 3,
         "Sec4End": 1,
         "ShoulderR": 2,
-        # #914: the collar web holds the 1.5 floor at .XXX (not at .XX), and
-        # the solder stations carry the user-ruled +-0.13.  The collar
-        # diameter is the bar's as supplied, a two-place reference (15.88).
+        # #914: the collar web is the 64T's station toward MHA-016, so it
+        # prints .XXX (crank_boss_rim), and the solder stations carry the
+        # user-ruled +-0.13.  The collar diameter is the bar's as supplied, a
+        # two-place reference (15.88).
         "CollarDia": 2,
         "CollarWidth": 3,
         "T120Station": 3,
         "T006Station": 3,
     }
+    # Rule 12: the web holds the 2.0 target at the low limit it prints.
     web = cone_gear_shaft_spec.COLLAR_THICKNESS
-    assert web - _config.title_block("linear_3pl")["value_in"] * 25.4 >= 1.5
-    assert web - _config.title_block("linear_2pl")["value_in"] * 25.4 < 1.5
+    assert web - _config.title_block("linear_3pl")["value_in"] * 25.4 >= 2.0
 
 
 def _gear_faces() -> list[tuple[float, float]]:
@@ -263,8 +264,9 @@ def test_every_diameter_stands_on_its_own_land() -> None:
 
 
 def test_collar_diameter_stands_on_the_collar() -> None:
-    """#914: the collar is 1.681 wide, so its diameter line stands inside
-    that ring, above the shaft, clear of the pivot-journal finish symbol."""
+    """#914: the collar ring is too narrow for a dimension line with two
+    arrows, so its diameter line stands inside that ring, above the shaft,
+    clear of the pivot-journal finish symbol."""
     spec = cone_gear_shaft_spec
     big_end = drawing.SIDE_CENTER[0] + spec.SHAFT_LENGTH / 2000.0
     ring = (
@@ -1066,17 +1068,27 @@ def test_collar_fills_the_gap_between_the_post_boss_and_the_64t() -> None:
         - drive.SHAFT_FRONT_STATION
     )
     gear64_south_face = (
-        drive.GEAR64_STATION
-        + drive.GEAR_AXIS_SHIFT
+        drive.GEAR64_CENTRE_STATION
         - drive.GEAR64_FACE / 2.0
         - drive.SHAFT_FRONT_STATION
     )
     assert spec.COLLAR_START_STATION == pytest.approx(post_north_face, abs=1e-9)
     assert spec.COLLAR_START_STATION == spec.JOURNAL_END
     assert spec.COLLAR_END_STATION == pytest.approx(gear64_south_face, abs=1e-9)
-    # user ruling: accept the 1.681 web (novice floor 1.5, no station moves)
-    assert spec.COLLAR_THICKNESS == pytest.approx(1.681, abs=5e-4)
-    assert spec.COLLAR_THICKNESS >= 1.5
+    assert spec.GEAR64_CENTER_STATION == pytest.approx(drive.GEAR64_CENTRE_STATION, abs=1e-9)
+
+
+def test_the_narrowed_64t_keeps_its_north_face_and_the_collar_takes_the_rest() -> None:
+    """User ruling 2026-09-28: the 64T narrows from the south about the north
+    face the 8.0 face had, and the collar grows by exactly the narrowing, so
+    everything north of the 64T stays where it was."""
+    spec = cone_gear_shaft_spec
+    north_before = drive.GEAR64_STATION + drive.GEAR_AXIS_SHIFT + 8.0 / 2.0
+    north_now = drive.GEAR64_CENTRE_STATION + drive.GEAR64_FACE / 2.0
+    assert north_now == pytest.approx(north_before, abs=1e-9)
+    web_under_8 = spec.COLLAR_THICKNESS - (8.0 - drive.GEAR64_FACE)
+    assert web_under_8 == pytest.approx(1.681, abs=5e-4)
+    assert spec.COLLAR_THICKNESS == pytest.approx(3.181, abs=5e-4)
 
 
 def test_the_collar_is_the_bar_as_supplied_and_its_thrust_ring_holds_the_floor() -> None:
@@ -1507,7 +1519,7 @@ def test_the_64t_front_plane_is_its_south_face(monkeypatch) -> None:
         drive._place_on_shaft(
             object(),
             "crank-drive-gear",
-            drive.GEAR64_STATION + drive.GEAR_AXIS_SHIFT,
+            drive.GEAR64_CENTRE_STATION,
             drive.GEAR64_FACE,
         )
     )

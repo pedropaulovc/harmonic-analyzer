@@ -3031,10 +3031,9 @@ def task_check():
         SCRIPTS_DIR / "test_mcmaster_replica_driver.py",
         # ... and #906: the crank native-acceptance record pins.
         SCRIPTS_DIR / "test_crank_native_acceptance.py",
-        # ... and #906 R1: the crank mesh stack (the fit-up axis the drive
-        # train places the crank train on) and MHA-149's wall and throw.
+        # ... and the fixed-centre 16T:64T crank mesh clearance.
         SCRIPTS_DIR / "test_crank_mesh_stack.py",
-        SCRIPTS_DIR / "test_crank_eccentric_bushing.py",
+        SCRIPTS_DIR / "test_crank_boss_rim.py",
         # ... and #937: the cylinder-bank layout bands and MHA-147's set screw.
         SCRIPTS_DIR / "test_arbor_set_screw.py",
         SCRIPTS_DIR / "test_cylinder_bank_layout.py",

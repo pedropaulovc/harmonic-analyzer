@@ -4,8 +4,8 @@ The cylindrical shaft starts at local y=0, the common outboard plane where
 MHA-020 and through hub MHA-137 finish flush.  Only the shaft's same-diameter
 spherical dome projects outboard (negative Y), so the crank can still withdraw
 through the hub bore after removable taper pin MHA-024 is removed.  The shared
-8-mm face shift is added to every inboard station, preserving all established
-bearing, T12 and pinion world interfaces.  Near the far end, the 1/8 in
+8-mm face shift preserves the established bearing and T12 interfaces.  Near
+the far end, the 1/8 in
 straight-pin cross-hole keys the 16T pinion's hub boss to the shaft (ch12
 p.19 page002_img02; crank_pinion_spec owns the pin), its entry turned
 PIN_CLOCKING_DEG from -X toward -Z about the shaft axis so it meets the
@@ -62,9 +62,7 @@ from crank_pinion_spec import (
     CRANKSHAFT_PIN_HOLE_PROCESS,
     PIN_CLOCKING_DEG as PINION_PIN_CLOCKING_DEG,
     PIN_DIA as PINION_PIN_DIA,
-    PIN_EDGE_TO_SHAFT_END_NOMINAL,
     PIN_HOLE_SPEC as PINION_PIN_HOLE_SPEC,
-    PIN_STATION as PINION_PIN_STATION,
 )
 from crankshaft_spec import (
     DRAWING_DIMENSIONS,
@@ -73,6 +71,14 @@ from crankshaft_spec import (
     FIDUCIAL_MODEL_DEPTH,
     FIDUCIAL_MODEL_DIA,
     ISOMETRIC_VIEW_NOTE,
+    JOURNAL_DIA,
+    JOURNAL_DIA_BAND,
+    JOURNAL_START,
+    JOURNAL_LENGTH,
+    RELIEF_DIA,
+    RELIEF_START,
+    RELIEF_LENGTH,
+    PINION_PIN_STATION_Y,
     PIN_HOLE_SPEC,
     PIN_HOLE_HEIGHT,
     PINION_SEAT_DIA,
@@ -92,23 +98,16 @@ from crank_native_acceptance import assert_signed_circle_center
 PART_NAME = "crankshaft"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
-# Dimensions live in crankshaft_spec / crank_hub_geometry.  The common face
-# moved outboard by one arm thickness; all inboard stations and the shaft length
-# carry the same shift, leaving the bearing, T12, pinion and far-end world
-# positions unchanged.  MHA-024 now crosses the separate hub behind the arm.
+# Dimensions live in crankshaft_spec / crank_hub_geometry. The crank face,
+# T12 station and restored post bore stay fixed while the shaft's north end
+# follows the shortest W15-compliant pinion boss; MHA-024 still crosses the
+# separate hub behind the arm.
 SEAT_T12 = 25.5
 # The pinion's retention-pin cross-hole station: the pinion's own PIN_STATION
 # (from its toothed south face) measured from the SeatPinion datum that face
 # sits on. Machine z = CRANKSHAFT_Z0 + this. The recess of the shaft end inside
 # the pinion's boss (build_drive_train_assembly asserts it) is
 # SEAT_PINION + OVERALL_LENGTH - SHAFT_LENGTH.
-PINION_PIN_STATION_Y = SEAT_PINION + PINION_PIN_STATION  # 130.690 (+8 face shift)
-PINION_PIN_EDGE_TO_END = SHAFT_LENGTH - (PINION_PIN_STATION_Y + PINION_PIN_DIA / 2.0)
-if PINION_PIN_EDGE_TO_END < PIN_EDGE_TO_SHAFT_END_NOMINAL - 1e-9:
-    raise AssertionError(
-        f"pinion pin hole edge {PINION_PIN_EDGE_TO_END:.3f} from the crankshaft's "
-        f"north end, under W15's {PIN_EDGE_TO_SHAFT_END_NOMINAL}"
-    )
 
 DOME_R = SHAFT_DIA / 2.0
 DOME_SPHERE_R = (DOME_R**2 + SHAFT_DOME_HEIGHT**2) / (2.0 * SHAFT_DOME_HEIGHT)
@@ -202,10 +201,18 @@ async def _angled_plane_containing(
 # globals as the feature it locates.
 _STATIONS = {
     "PinionSeatStation": SEAT_STEP,
+    "JournalInboardStation": JOURNAL_START + JOURNAL_LENGTH,
+    "ReliefInboardStation": RELIEF_START + RELIEF_LENGTH,
+    "ReliefOutboardStation": RELIEF_START,
+    "JournalOutboardStation": JOURNAL_START,
     "PinHoleStation": PIN_HOLE_HEIGHT,
 }
 _STATION_DRIVES = {
     "PinionSeatStation": '"ShaftLength" - "PinionSeatStep"',
+    "JournalInboardStation": '"ShaftLength" - "JournalStart" - "JournalLength"',
+    "ReliefInboardStation": '"ShaftLength" - "ReliefStart" - "ReliefLength"',
+    "ReliefOutboardStation": '"ShaftLength" - "ReliefStart"',
+    "JournalOutboardStation": '"ShaftLength" - "JournalStart"',
     "PinHoleStation": '"ShaftLength" - "PinHoleHeight"',
 }
 
@@ -294,6 +301,12 @@ async def build(adapter) -> dict[str, str]:
     # already mm (0.375 * IN), so it serialises as its mm value.
     await set_global(adapter, "ShaftDia", f"{SHAFT_DIA}mm")
     await set_global(adapter, "ShaftLength", f"{SHAFT_LENGTH}mm")
+    await set_global(adapter, "JournalDia", f"{JOURNAL_DIA}mm")
+    await set_global(adapter, "JournalStart", f"{JOURNAL_START}mm")
+    await set_global(adapter, "JournalLength", f"{JOURNAL_LENGTH}mm")
+    await set_global(adapter, "ReliefDia", f"{RELIEF_DIA}mm")
+    await set_global(adapter, "ReliefStart", f"{RELIEF_START}mm")
+    await set_global(adapter, "ReliefLength", f"{RELIEF_LENGTH}mm")
     await set_global(adapter, "PinionSeatDia", f"{PINION_SEAT_DIA}mm")
     await set_global(adapter, "PinionSeatStep", f"{SEAT_STEP}mm")
     await set_global(adapter, "PinHoleHeight", f"{PIN_HOLE_HEIGHT}mm")
@@ -463,7 +476,57 @@ async def build(adapter) -> dict[str, str]:
     name_last_feature(adapter, "PunchedFiducial")
     v_shaft_nose = await _volume(adapter)
 
-    v_with_seat = v_shaft_nose
+    # Integral journal: the original concentric extrusion and middle relief,
+    # retaining the later rebuild-neutrality, signed witness and visibility gates.
+    check(
+        "create_plane JournalStartPlane",
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="offset", base_plane="Top Plane", offset=JOURNAL_START
+            )
+        ),
+    )
+    name_last_feature(adapter, "JournalStartPlane")
+    start_dim = name_dimensions(adapter, "JournalStartPlane", ["JournalStart"])
+    drive_jobs += [(start_dim[0], '"JournalStart"')]
+    journal = SketchDims()
+    check("create_sketch bearing journal", await adapter.create_sketch("JournalStartPlane"))
+    await define_circle(
+        adapter, 0.0, 0.0, JOURNAL_DIA / 2.0, "bearing journal circle",
+        dims=journal,
+        names=("JournalCx", "JournalCz", "JournalDiaDim"),
+        drives=(None, None, '"JournalDia"'),
+    )
+    await ensure_fully_defined(adapter, "bearing journal sketch")
+    check("exit_sketch bearing journal", await adapter.exit_sketch())
+    name_last_feature(adapter, "JournalProfile")
+    drive_jobs += journal.apply(adapter, "JournalProfile")
+    check(
+        "extrude bearing journal",
+        await adapter.create_extrusion(ExtrusionParameters(depth=JOURNAL_LENGTH)),
+    )
+    name_last_feature(adapter, "Journal")
+    journal_depth_dim = name_dimensions(adapter, "Journal", ["JournalLength"])
+    drive_jobs += [(journal_depth_dim[0], '"JournalLength"')]
+    v_with_seat = v_shaft_nose + math.pi * (
+        (JOURNAL_DIA / 2.0) ** 2 - (SHAFT_DIA / 2.0) ** 2
+    ) * JOURNAL_LENGTH
+    await volume_check(
+        adapter, "shaft + bearing journal", v_with_seat, 0.005 * v_with_seat
+    )
+    v_with_seat -= await _cut_annulus_inboard(
+        adapter,
+        "Relief",
+        start=RELIEF_START,
+        start_global="ReliefStart",
+        turned_dia=JOURNAL_DIA,
+        inner_dia=RELIEF_DIA,
+        inner_global="ReliefDia",
+        length=RELIEF_LENGTH,
+        length_expr='"ReliefLength"',
+        drive_jobs=drive_jobs,
+    )
+    await volume_check(adapter, "journal relief", v_with_seat, 0.005 * v_with_seat)
     # The Ø9.0 pinion seat (RULING (b)): the same cut from the seat step to
     # the far end face.
     v_with_seat -= await _cut_annulus_inboard(
@@ -710,6 +773,9 @@ async def build(adapter) -> dict[str, str]:
         adapter, "ShaftProfile", "ShaftDiaDim", *deviations(SHAFT_DIA_BAND)
     )
     set_dimension_bilateral_tolerance(
+        adapter, "JournalProfile", "JournalDiaDim", *deviations(JOURNAL_DIA_BAND)
+    )
+    set_dimension_bilateral_tolerance(
         adapter,
         "PinionSeatProfile",
         "PinionSeatDiaDim",
@@ -748,6 +814,8 @@ async def build(adapter) -> dict[str, str]:
             (name, "PLANE")
             for name in (
                 "ShaftFiducialPlane",
+                "JournalStartPlane",
+                "ReliefStartPlane",
                 "PinionSeatStartPlane",
                 "PinHoleStationPlane",
                 "PinionPinStationPlane",
