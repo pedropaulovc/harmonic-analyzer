@@ -49,6 +49,9 @@ allowed_free_stems:
   - crank-arm
   - crank-drive-gear
   - crank-handle
+  # MHA-150/MHA-153: bonded to the handle, they ride its crank spin.
+  - crank-handle-butt-cup
+  - crank-handle-ferrule
   - crank-handle-pivot-screw
   - crank-hub
   - crank-hub-pin

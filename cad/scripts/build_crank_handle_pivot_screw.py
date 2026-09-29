@@ -72,6 +72,7 @@ from crank_handle_pivot_screw_spec import (
     DRAWING_NOTES,
     DRAWING_PRECISION,
     HEAD_DIA,
+    HEAD_DIA_TOL,
     HEAD_LENGTH,
     INSTALLED_CONFIG,
     INSTALLED_THREAD_LENGTH,
@@ -399,6 +400,7 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_symmetric_tolerance(
         adapter, "ScrewProfile", "ShoulderLength", SHOULDER_LENGTH_TOL
     )
+    set_dimension_symmetric_tolerance(adapter, "ScrewProfile", "HeadDia", HEAD_DIA_TOL)
     set_dimension_bilateral_tolerance(
         adapter, "ScrewProfile", "ThreadLength", *deviations(THREAD_LENGTH_BAND)
     )

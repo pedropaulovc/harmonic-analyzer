@@ -179,7 +179,8 @@ END_KEEP = {
 # The note stands up and right so its leader slants down-left onto that edge
 # instead of running along the chamfer's own extension line.
 THREAD_PICK = (THREAD_START_X, SIDE_CENTER[1] + 0.004)
-THREAD_NOTE_XY = (0.068, SIDE_CENTER[1] + 0.042)
+# Up and right of the thread start, so the leader leans back onto the thread.
+THREAD_NOTE_XY = (THREAD_START_X + 0.013, SIDE_CENTER[1] + 0.042)
 # The running shoulder's upper flank, right of the Ø dimension line.
 FINISH_PICK = (UNDERHEAD_X - 0.060, SHOULDER_TOP_Y)
 FINISH_SYMBOL = (UNDERHEAD_X - 0.050, SIDE_CENTER[1] + 0.030)

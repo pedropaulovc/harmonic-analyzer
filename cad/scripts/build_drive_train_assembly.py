@@ -519,6 +519,7 @@ from crankshaft_spec import (  # noqa: E402
     SHAFT_LENGTH as CRANKSHAFT_LENGTH,
     SHAFT_LENGTH_BAND as CRANKSHAFT_LENGTH_BAND,
 )
+from crank_handle_spec import HANDLE_LENGTH as HANDLE_BASIC_LENGTH  # noqa: E402
 from crank_handle_pivot_screw_spec import (  # noqa: E402
     INSTALLED_CONFIG as HANDLE_SCREW_INSTALLED_CONFIG,
     INSTALLED_THREAD_LENGTH as HANDLE_SCREW_INSTALLED_THREAD,
@@ -4457,6 +4458,29 @@ async def build(adapter) -> dict[str, str]:
         ROT_Y_POS90,
         ground=False,
     )
+    # User ruling 2026-09-29 (ch11 p.14/p.15): the brass ferrule MHA-150 and the
+    # flanged steel butt cup MHA-153 are bonded to the oak, each authored in the
+    # handle's own frame -- the ferrule from the arm face at x=0, the cup from
+    # its flange face at the basic overall length -- so both take the handle's
+    # transform and lock to it.
+    handle_ferrule = await place_component(
+        adapter,
+        "crank-handle-ferrule",
+        [X_CRANK, Y_CRANK - ARM_C2C, CRANK_ARM_Z0],
+        [0.0, 90.0, 0.0],
+        ROT_Y_POS90,
+        ground=False,
+        label="crank-handle-ferrule (MHA-150, on the handle tenon)",
+    )
+    handle_cup = await place_component(
+        adapter,
+        "crank-handle-butt-cup",
+        [X_CRANK, Y_CRANK - ARM_C2C, CRANK_ARM_Z0 - HANDLE_BASIC_LENGTH],
+        [0.0, 90.0, 0.0],
+        ROT_Y_POS90,
+        ground=False,
+        label="crank-handle-butt-cup (MHA-153, in the handle butt)",
+    )
     # MHA-139 carries the handle: head outboard, local +Z (head -> tip) along
     # machine +z, so the shoulder's ArmSeat lands on the arm's outboard face.
     # Its INSTALLED configuration is the tip filed flush with the arm's
@@ -4651,6 +4675,17 @@ async def build(adapter) -> dict[str, str]:
         label="handle anti-spin (grip rest)",
         verify=(handle, hd_o),
     )
+    # The bonded ferrule and butt cup ride the handle rigidly (epoxy).
+    for bonded, what in (
+        (handle_ferrule, "MHA-150 ferrule"),
+        (handle_cup, "MHA-153 butt cup"),
+    ):
+        await lock_mate(
+            adapter,
+            named_ref(f"Front Plane@{bonded}", "PLANE"),
+            named_ref(f"Front Plane@{handle}", "PLANE"),
+            label=f"{what} bonded to the handle",
+        )
     # MHA-139 mirrors the handle's pin joint on the same arm datums: coaxial
     # on the arm pivot, shoulder seated on HandleSeat (ArmSeat's normal is
     # machine +z, HandleSeat's reads -z), and a parallel holding the slot's

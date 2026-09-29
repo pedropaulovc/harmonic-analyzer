@@ -61,8 +61,9 @@ def test_model_owns_places_and_bands() -> None:
     assert "draw_crank_handle_pivot_screw.py" in PRECISION_MIGRATED_DRAWINGS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
-    # The running fit, and the relief width that holds the U33b floor.
-    running_fit = {"ShoulderDia", "ShoulderLength", "ReliefWidth"}
+    # The running fit, the head's MHA-153 pocket clearance, and the relief
+    # width that holds the U33b floor.
+    running_fit = {"ShoulderDia", "ShoulderLength", "ReliefWidth", "HeadDia"}
     for name, places in spec.DRAWING_PRECISION_BY_NAME.items():
         assert places == (2 if name in running_fit else 1), name
     assert spec.REFERENCE_DIMENSIONS == {"OverallLength"}
@@ -70,12 +71,14 @@ def test_model_owns_places_and_bands() -> None:
     assert model_toleranced_dimensions(part) == {
         ("ScrewProfile", "ShoulderDia"): "*deviations(SHOULDER_DIA_BAND)",
         ("ScrewProfile", "ShoulderLength"): "SHOULDER_LENGTH_TOL",
+        ("ScrewProfile", "HeadDia"): "HEAD_DIA_TOL",
         ("ScrewProfile", "ThreadLength"): "*deviations(THREAD_LENGTH_BAND)",
     }
     assert spec.SHOULDER_DIA == 6.00
     assert spec.SHOULDER_DIA_BAND == (-0.03, -0.08)
-    assert spec.SHOULDER_LENGTH == 58.50
-    assert spec.SHOULDER_LENGTH_TOL == 0.25
+    # User ruling 2026-09-29: the head bears on the MHA-153 cup floor.
+    assert spec.SHOULDER_LENGTH == 54.90
+    assert spec.SHOULDER_LENGTH_TOL == 0.10
     assert spec.THREAD_LENGTH == 9.0
     assert spec.THREAD_LENGTH_BAND == (0.0, -0.5)
 
@@ -94,7 +97,8 @@ def test_policy_sheet_carries_no_gdt_or_render_time_precision() -> None:
 
 
 def test_geometry_matches_the_u33_ruling() -> None:
-    assert spec.HEAD_DIA == 8.0
+    assert spec.HEAD_DIA == 7.80
+    assert spec.HEAD_DIA_TOL == 0.05
     assert spec.HEAD_LENGTH == 3.0
     assert spec.SLOT_WIDTH == 1.0
     assert spec.SLOT_DEPTH == 1.0
@@ -102,8 +106,8 @@ def test_geometry_matches_the_u33_ruling() -> None:
     assert spec.THREAD_SIZE == "#8-32"
     assert spec.THREAD_MODEL_DIA == THREAD_MAJOR_MM["#8-32"] == 4.166
     assert spec.THREAD_PITCH == pytest.approx(25.4 / 32.0)
-    assert spec.SEAT_STATION == pytest.approx(61.5)
-    assert spec.OVERALL_LENGTH == pytest.approx(70.5)
+    assert spec.SEAT_STATION == pytest.approx(57.9)
+    assert spec.OVERALL_LENGTH == pytest.approx(66.9)
     assert spec.TIP_CHAMFER == 0.4
     # The tip chamfer stays within the 0.49 thread depth (17/24 H).
     assert spec.TIP_CHAMFER <= 0.61343 * 25.4 / 32.0
@@ -114,12 +118,15 @@ def test_u33_running_fit_end_play_and_engagement() -> None:
     # Handle numbers come from its own spec, the arm thickness from the shared
     # crank interface geometry.
     assert handle.HANDLE_LENGTH == 58.0
-    assert handle.HANDLE_LENGTH_BAND == (0.0, -0.25)
+    assert handle.WOOD_LENGTH_BAND == (0.0, -0.25)
     assert handle.PIVOT_BORE_DIA + handle.PIVOT_BORE_BAND[1] == pytest.approx(6.10)
     assert handle.PIVOT_BORE_DIA + handle.PIVOT_BORE_BAND[0] == pytest.approx(6.15)
     assert geometry.ARM_THICKNESS == 8.0
 
-    # Shoulder 58.25..58.75 against wood 57.75..58.00.
+    # Shoulder 54.80..55.00 against the ferrule (7.00 +/-0.05) + oak
+    # (49.95..50.20) + cup flange (0.80 +/-0.05) - cup pocket (3.60 +/-0.05)
+    # stack of 54.00..54.55.
+    assert (spec.HANDLE_STACK_MIN, spec.HANDLE_STACK_MAX) == pytest.approx((54.0, 54.55))
     assert spec.END_PLAY_MIN == pytest.approx(0.25)
     assert spec.END_PLAY_MAX == pytest.approx(1.00)
     # Bore 6.10..6.15 over shoulder 5.92..5.97, on diameter.
@@ -249,8 +256,8 @@ def test_notes_stay_within_rule_six() -> None:
 
 
 def test_modelled_volume_is_the_turned_body_less_the_slot() -> None:
-    head = math.pi * 4.0**2 * 3.0
-    shoulder = math.pi * 3.0**2 * 58.5
+    head = math.pi * 3.9**2 * 3.0
+    shoulder = math.pi * 3.0**2 * 54.9
     relief = math.pi * (3.0 / 2.0) ** 2 * 1.5
     thread = math.pi * (4.166 / 2.0) ** 2 * 7.5
     # Pappus: the lead's 0.5 x 0.5 corner triangle, centroid 1.5 + 0.5/3 out,
