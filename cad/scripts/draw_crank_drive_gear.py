@@ -139,15 +139,22 @@ SECTION_KEEP = {
 }
 
 # Native bands on both bore dimensions set the fitted clearance. The callout
-# adds process, extent and mating part; it does not repeat those dimensions.
+# adds extent and the mating part by name and number; it does not repeat
+# those dimensions. No process word: a reamer would cut away the flat, and
+# the dimensions define the D-profile (user ruling 2026-09-29, machinist
+# review of the #1128 full build). The mate's name lives here, not beside
+# its number in crank_drive_gear_notes, which is in the part's rebuild
+# closure; test_crank_drive_gear_drawing checks it against the registry.
+SHAFT_MATE_NAME = "CONE GEAR SHAFT"
 BORE_CALLOUT = (
-    "REAM THRU\n"
+    "THRU\n"
     f"({BORE_DIAMETRAL_CLEARANCE[0]:.3f}-{BORE_DIAMETRAL_CLEARANCE[1]:.3f} DIAMETRAL\n"
-    f"CLEARANCE ON {SHAFT_MATE_NUMBER})"
+    f"CLEARANCE ON\n{SHAFT_MATE_NAME} {SHAFT_MATE_NUMBER})"
 )
 AF_CALLOUT = (
-    f"ACROSS FLAT ON {SHAFT_MATE_NUMBER}\n"
-    f"({FLAT_AF_CLEARANCE[0]:.3f}-{FLAT_AF_CLEARANCE[1]:.3f} AF CLEARANCE)"
+    "BORE ACROSS FLAT\n"
+    f"({FLAT_AF_CLEARANCE[0]:.3f}-{FLAT_AF_CLEARANCE[1]:.3f} AF CLEARANCE\n"
+    f"ON {SHAFT_MATE_NAME} {SHAFT_MATE_NUMBER})"
 )
 DIMENSION_CALLOUTS = {
     "BoreDia": BORE_CALLOUT,
@@ -431,9 +438,10 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _add_bore_arc_center_mark(adapter, front)
     # The bore is the part's one fit surface, and a fit is a function of the
-    # peaks as well as the size: REAM names the operation, not the finish it
-    # leaves. The roughness is the project's general machined grade, authored
-    # on the PART and read back here (policy rule 5's running-surface case).
+    # peaks as well as the size, so the bore carries its own roughness; the
+    # THRU callout names no process to imply one. The roughness is the
+    # project's general machined grade, authored on the PART and read back
+    # here (policy rule 5's running-surface case).
     finish = add_surface_finish(
         adapter,
         front,

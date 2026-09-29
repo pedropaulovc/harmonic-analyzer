@@ -13,8 +13,6 @@ import cone_gear_spec as spec
 
 
 CYLINDER_MATE_NUMBER = "MHA-027"
-# The D-bore's across-flat callout names the shaft land it slides on.
-SHAFT_MATE_NUMBER = "MHA-014"
 
 
 # The U42 gears' worst-case transverse contact ratio with MHA-027, rounded

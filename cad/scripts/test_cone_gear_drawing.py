@@ -304,8 +304,6 @@ def test_notes_state_no_bore_joint_method_or_review_record() -> None:
         for retired in ("RUNOUT", "DATUM", "+/-", "PITCH DIA="):
             assert retired not in text
     assert notes.CYLINDER_MATE_NUMBER == _config.parts("cylinder-gear")["number"]
-    assert notes.SHAFT_MATE_NUMBER == _config.parts("cone-gear-shaft")["number"]
-    assert notes.SHAFT_MATE_NUMBER in drawing.DIMENSION_CALLOUTS["BoreAF"]
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert '"Manufacturing Notes": drawing_notes(teeth)' in source
 
@@ -457,10 +455,10 @@ def test_every_sheet_layout_keeps_views_dimensions_and_title_block_separate() ->
             assert shelf_y - tail_y == pytest.approx(_drawing_leaders.ARROW_TEXT_CLEARANCE)
 
 
-# Text half-widths in the bore view, sheet metres: the stacked diameter with
-# "REAM THRU" (~33 mm, the old front-view lane's measure), the clock value
-# over "TO TOOTH CENTERLINE" and the across-flat value over its mate callout
-# (~42 mm each, estimated at the fleet's 2.5 mm text), and the two-line title.
+# Text half-widths in the bore view, sheet metres: the stacked diameter
+# (~33 mm, measured when its callout still read "REAM THRU"; "THRU" is
+# narrower) and the clock value over "TO TOOTH CENTERLINE" (~42 mm,
+# estimated at the fleet's 2.5 mm text), and the two-line title.
 _BORE_DIA_TEXT_HALF_WIDTH = 0.0165
 _BORE_CALLOUT_TEXT_HALF_WIDTH = 0.021
 _BORE_TEXT_HALF_HEIGHT = 0.005
@@ -515,17 +513,18 @@ def test_bore_view_enlarges_every_d_bore_clear_of_its_neighbours() -> None:
         dia_x, dia_y = keep["BoreCutDia"]
         assert dia_x - _BORE_DIA_TEXT_HALF_WIDTH > 0.012
         assert dia_y - _BORE_TEXT_HALF_HEIGHT > cy + crop - 0.003
-        # The across-flat text hangs under the circle between its witnesses,
-        # above the title, which stays inside the border.
+        # The across-flat text stands wholly right of the flat's witness,
+        # left of the title block, above the title, which stays inside the
+        # border, and under the clock's text.
         af_x, af_y = keep["BoreAF"]
-        radius = bore * ratio / 2000.0
         flat = spec.bore_flat_offset_mm(teeth) * ratio / 1000.0
-        assert cx - radius < af_x < cx + flat
+        assert af_x - drawing.BORE_VIEW_AF_HALF_WIDTH > cx + flat + 0.002
+        assert af_x + drawing.BORE_VIEW_AF_HALF_WIDTH < 0.216
         assert af_y < cy - crop
         title_top = drawing.bore_view_label_top(teeth)
         assert af_y - 2.0 * _BORE_TEXT_HALF_HEIGHT > title_top
         assert title_top - _BORE_TITLE_HEIGHT > _ZONE_MARGIN + 0.001
-        assert af_x - _BORE_CALLOUT_TEXT_HALF_WIDTH > 0.012
+        assert af_y + 2.0 * _BORE_TEXT_HALF_HEIGHT < keep["BoreFlatClock"][1] - 0.010
         # The clock text stands wholly right of the circle and clear of the
         # thickness callout under the front view.
         clock_x, clock_y = keep["BoreFlatClock"]

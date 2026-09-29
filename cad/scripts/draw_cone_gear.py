@@ -64,7 +64,6 @@ from build_cone_gear import (
     assert_saved_configuration_topology,
     gap_floor_deviations_mm,
 )
-from cone_gear_notes import SHAFT_MATE_NUMBER
 from cone_gear_spec import (
     BORE_SURFACE_FINISHES,
     CONFIGURATION_TEETH,
@@ -151,10 +150,19 @@ BORE_VIEW_SCALE_LADDER = ((4.0, 1.0), (5.0, 1.0), (10.0, 1.0), (20.0, 1.0))
 # Gear body kept round the bore inside the crop circle, sheet metres.
 BORE_VIEW_CROP_MARGIN = 0.003
 # The view's title stands this far under the crop circle, below the
-# across-flat value and its callout line, which hang BORE_VIEW_AF_DROP under
+# across-flat value and its dimension line, which hang BORE_VIEW_AF_DROP under
 # it.
 BORE_VIEW_AF_DROP = 0.005
 BORE_VIEW_LABEL_DROP = 0.016
+# The across-flat text stands OUTSIDE its witnesses, right of the flat's, as
+# MHA-021's does. Centred between them, its lines (~2.65 mm a character in
+# the #1128 full-5 render) ran wider than the 29-35 mm witness span on every
+# sheet, so both witness lines crossed the callout, and its tolerance stack
+# sat on the diameter leader's lower end (machinist review of full-5).
+# BORE_VIEW_AF_HALF_WIDTH is half the widest line, BORE ACROSS FLAT, rounded
+# up; the text's left edge clears the flat's witness by BORE_VIEW_AF_GAP.
+BORE_VIEW_AF_GAP = 0.004
+BORE_VIEW_AF_HALF_WIDTH = 0.022
 # The bore axis must land within 0.1 mm of BORE_VIEW_CENTER after the move
 # (draw_amplitude_bar's detail tolerance), and the title within 1 mm.
 BORE_VIEW_POSITION_TOL_M = 1e-4
@@ -186,8 +194,13 @@ MANUFACTURING_NOTES_POS = (0.015, 0.263)
 SHEET_COUNT_POS = (0.350, 0.263)
 
 DIMENSION_CALLOUTS = {
-    "BoreCutDia": "REAM THRU",
-    "BoreAF": f"ACROSS FLAT ON {SHAFT_MATE_NUMBER}",
+    # No process word: a reamer would cut away the flat, and the dimensions
+    # define the D-profile (user ruling 2026-09-29, machinist review of the
+    # #1128 full build).
+    "BoreCutDia": "THRU",
+    # The value is the gear bore's own; naming the bore, not the shaft it
+    # slides on, keeps it from reading as MHA-014's across-flat.
+    "BoreAF": "BORE ACROSS FLAT",
     # The flat's normal runs through the bore axis and the +X tooth's centre;
     # the bore view crops the teeth off, so the callout names the reference
     # its centre-mark line stands for.
@@ -323,21 +336,25 @@ def bore_flat_vertex(teeth: int) -> tuple[float, float]:
 def bore_view_keep(teeth: int) -> dict[str, tuple[float, float]]:
     """Text positions of the three bore dimensions round the bore view.
 
-    The diameter's leader runs in from upper left; the across-flat hangs
-    under the crop circle between its witnesses (the arc's -X point and the
-    flat); the clock's arc sweeps the quadrant between the flat's upper half
-    and the +X centre-mark line (``_sweep_clock_right_of_flat``), its text
-    right of the circle and just above the axis, where the front view's
-    thickness callout (above right, x 134-164 y 78-108 mm) never reaches.
+    The diameter's leader runs in from upper left; the across-flat's
+    dimension line hangs under the crop circle between its witnesses (the
+    arc's -X point and the flat) and runs on right to its text, which stands
+    outside the flat's witness; the clock's arc sweeps the quadrant between
+    the flat's upper half and the +X centre-mark line
+    (``_sweep_clock_right_of_flat``), its text right of the circle and just
+    above the axis, where the front view's thickness callout (above right,
+    x 134-164 y 78-108 mm) never reaches.
     """
     ratio = _bore_view_ratio(teeth)
-    radius = bore_dia_mm(teeth) * ratio / 2000.0
     flat = bore_flat_offset_mm(teeth) * ratio / 1000.0
     crop = bore_view_crop_radius(teeth)
     x, y = BORE_VIEW_CENTER
     return {
         "BoreCutDia": (x - 0.020, y + crop + 0.006),
-        "BoreAF": (x + (flat - radius) / 2.0, y - crop - BORE_VIEW_AF_DROP),
+        "BoreAF": (
+            x + flat + BORE_VIEW_AF_GAP + BORE_VIEW_AF_HALF_WIDTH,
+            y - crop - BORE_VIEW_AF_DROP,
+        ),
         "BoreFlatClock": (x + crop + 0.024, y + 0.006),
     }
 

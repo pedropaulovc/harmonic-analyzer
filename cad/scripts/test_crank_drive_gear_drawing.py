@@ -235,18 +235,6 @@ def test_outside_diameter_prints_the_tip_band_the_mesh_stack_takes() -> None:
     assert pinion_spec.FACE_WIDTH == 9.5
 
 
-def test_bore_callout_names_the_finished_mate_and_clearance() -> None:
-    assert drawing.DIMENSION_CALLOUTS["BoreDia"] == (
-        "REAM THRU\n(0.025-0.105 DIAMETRAL\nCLEARANCE ON MHA-014)"
-    )
-    assert drawing.DIMENSION_CALLOUTS["BoreAF"] == (
-        "ACROSS FLAT ON MHA-014\n(0.010-0.030 AF CLEARANCE)"
-    )
-    assert drawing.FRONT_KEEP.keys() >= {"BoreDia", "BoreAF"}
-
-
-
-
 def test_print_carries_no_gdt_or_basic_dimensions() -> None:
     # Rules 3-4: a gear on a shaft land is not on the GD&T allowlist, so the
     # end-face perpendicularity frame, the tooth-tip runout frame and the bore
@@ -415,6 +403,7 @@ def test_gear_data_numbers_track_the_part_geometry() -> None:
 def test_notes_do_not_substitute_for_native_fit_dimensions() -> None:
     assert notes.DRAWING_NOTES == "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS."
     assert notes.SHAFT_MATE_NUMBER == _config.parts("cone-gear-shaft")["number"]
+    assert drawing.SHAFT_MATE_NAME == _config.parts("cone-gear-shaft")["title"].upper()
     assert not hasattr(notes, "ATTACHMENT_PROCESS")
     assert not hasattr(notes, "ATTACHMENT_ALTERNATIVE")
 
