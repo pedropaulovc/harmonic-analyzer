@@ -397,7 +397,7 @@ BOM_DESCRIPTIONS = {
     "crank-pin-ring": "TAPER PIN KEEPER RING",
     "crank-pin-eye": "KEEPER CHAIN ANCHOR EYE",
     "keeper-chain": "#3 BRASS BEAD CHAIN, MCMASTER 3606T118",
-    "keeper-chain-splice": "#3 BEAD CHAIN SPLICING LINK, MCMASTER 3606T813",
+    "keeper-chain-splice": "SPLICING LINK, MCMASTER 3606T813",
     "fillister-screw": "#4-40 BRASS FILLISTER, MCMASTER 90114A511",
     "crank-handle": "CRANK HANDLE",
     "crank-handle-pivot-screw": "CRANK HANDLE PIVOT SCREW",

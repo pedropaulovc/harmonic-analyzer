@@ -2969,6 +2969,9 @@ def task_check():
         SCRIPTS_DIR / "test_drawing_marks.py",
         SCRIPTS_DIR / "test_cone_drawing_batch_contract.py",
         SCRIPTS_DIR / "test_fastener_catalog.py",
+        # The keeper chain's rest-pose solve: whole pitches, clearances, and a
+        # length that lets the taper pin come fully out.
+        SCRIPTS_DIR / "test_keeper_chain.py",
         # No part or assembly saves construction geometry shown, and the
         # per-part sketch allowances only shrink (#880).
         SCRIPTS_DIR / "test_reference_visibility.py",
