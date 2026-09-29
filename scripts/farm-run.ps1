@@ -1213,17 +1213,21 @@ function Stop-RunProcesses {
             $stopped[$processId] = @{ created = $created; exited = $null }
             $holder = Get-Process -Id $processId -ErrorAction SilentlyContinue
             if ($null -eq $holder) {
-                # Already exited between the scan and the stop.
+                # Exited between the scan and the stop, and no handle pins the
+                # PID: it may be reused before this round's exit stamp, so it
+                # must not seed the next scan. Children it started are still
+                # found as members of the run's job.
+                $stopped.Remove($processId)
+                [void]$rejected.Add($processId)
                 continue
             }
+            $verified = $false
             try {
                 # An open handle pins the PID: from here on it cannot name
                 # another process, so the start time checked below is the one
-                # killed and waited on.
+                # killed and waited on. Every holder of this run stays in
+                # $stopping, handle open, until the round's exit stamp.
                 $null = $holder.SafeHandle
-                if ($holder.HasExited) {
-                    continue
-                }
                 # CIM dates a process to the microsecond, StartTime to 100 ns:
                 # equal at CIM's resolution is the same process (checked on
                 # every readable process on amet), anything else is not.
@@ -1234,6 +1238,11 @@ function Stop-RunProcesses {
                     # the next scan as a stopped process's would.
                     $stopped.Remove($processId)
                     [void]$rejected.Add($processId)
+                    continue
+                }
+                $verified = $true
+                if ($holder.HasExited) {
+                    $stopping.Add($holder)
                     continue
                 }
                 $holder.Kill()
@@ -1251,7 +1260,15 @@ function Stop-RunProcesses {
                 }
                 if (-not $gone) {
                     $Errors.Add("could not stop process $processId`: $problem")
+                    continue
                 }
+                if ($verified) {
+                    $stopping.Add($holder)
+                    continue
+                }
+                # Gone before its start time was read: identity unproven.
+                $stopped.Remove($processId)
+                [void]$rejected.Add($processId)
             }
         }
         $deadline = [System.Diagnostics.Stopwatch]::StartNew()
