@@ -52,7 +52,8 @@ PIVOT_LY = 12.0
 MIN_INSIDE_BEND_R = 0.13 * 25.4  # 3.302
 R_BEND = MIN_INSIDE_BEND_R
 R_KINK = MIN_INSIDE_BEND_R  # the crest
-KINK_DEG = 28.0  # all formed corners retain at least 3 deg on the crest arc
+KINK_DEG = 28.0  # flick angle past the crest
+MIN_CREST_ARC_MARGIN_DEG = 3.0  # assembly gate reserves each crest-arc end
 FLAT_LEN = 2.0
 FOOT_Y = THICK  # the foot's top face (the path); its underside is the base top
 
@@ -60,9 +61,11 @@ FOOT_Y = THICK  # the foot's top face (the path); its underside is the base top
 # The photo's ~5 mm below the arbor was an approximate scale reading, not a
 # fixed seat: at the revised cam-contact rest, moving the bearing station
 # 1.8 mm upward gives formed-corner preload and stress reserve while leaving
-# >0.25 mm spare to the arbor end cap at the farthest formed contact.
+# at least 0.25 mm extra spare beyond the 1.0 mm arbor end-cap keep-out at the
+# farthest formed contact.
 # The parked pose retains 0.15 air; the preset presses the free crest into it.
 CONTACT_T = 24.8
+MIN_ARBOR_END_CAP_SPARE_MM = 0.25
 PARKED_AIR = 0.15
 
 # Screw-down pad: #4 clearance, webs >= 2.0 at the printed .XX worst case

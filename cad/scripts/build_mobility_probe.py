@@ -22,7 +22,7 @@ probe against. The argument, per subassembly:
 
 With the replayed drivers active the assembly is 0-DOF. Suppressing the
 pinion-cam driver frees the lift rod AND the linked strap swing: their
-persistent cam-follower mate couples them into one operational freedom, not
+persistent tangent mate couples them into one operational freedom, not
 two independent setup drivers. The probe NEVER saves.
 
 Drive mates land at the top level of each standalone assembly (drive-train
@@ -183,6 +183,13 @@ async def _probe_sub(adapter: Any, sub: str, probes: list[tuple]) -> list[str]:
         if not any(_family(c) == family for c in freed):
             raise RuntimeError(
                 f"{label}: freed {freed} but none are {family} components")
+        if sub == "drive-train" and family == "pinion-lift-rod" and not any(
+            _family(c) == "pinion-bracket" for c in freed
+        ):
+            raise RuntimeError(
+                f"{label}: cam input freed {freed} but the contact-coupled "
+                "pinion bracket stayed constrained"
+            )
         if restored:
             raise RuntimeError(
                 f"{label}: rest NOT restored after unsuppress -- still free: "

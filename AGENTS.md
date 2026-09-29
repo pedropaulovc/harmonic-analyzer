@@ -835,14 +835,16 @@ folded into soundness entirely; see `memory/release-perf-incremental.md` and
 
 ## Default-free DOF (operational kinematics)
 
-The default build saves a **working kinematic model**, NOT a frozen one: the
-predetermined operational DOF are left FREE. That is drive-train's **crank spin**
-(drag the crank in the saved `.SLDASM` and the whole geared train turns),
-**cone-platform swing** (the p1 disengage: the plate — carrying the cone set AND
-the crank rig on the merged column — swings on its pivot screw), **pinion engage
-swing** (PR8: the strap+pinion rigid group swings on the torque shaft — the p2
-setup motion, formerly park-driven at the engaged pose) **and lift-rod/cam spin**
-(PR8: the eccentric-cam engage path; 4 DOF total for drive-train), plus channel's
+The default build saves a **working kinematic model**, NOT a frozen one:
+predetermined operational DOF are left FREE. Drive-train has **three**
+independent DOF: **crank spin** (drag the crank in the saved `.SLDASM` and the
+whole geared train turns), **cone-platform swing** (the p1 disengage: the plate
+— carrying the cone set AND the crank rig on the merged column — swings on its
+pivot screw), and **lift-rod/cam spin** (PR8: the eccentric-cam engage path).
+The **pinion engage swing** is contact-linked, not another DOF: the persistent
+front collar-OD/pin-shank tangent mate couples the strap+pinion group's angle
+to lift-rod/cam rotation; the rear copy follows the same rigid shaft/strap
+groups. Other mechanisms include channel's
 **3 DOF per active channel** (rocker swing +
 connecting-rod follow + amplitude-bar slide; 2026-07-07 the **channel lever is
 COUPLED**, not separately freed: the J5 foot-on-arc mate — the amplitude bar's

@@ -2,7 +2,7 @@ r"""Setup-motion demonstrations for cone swing, cam-driven pinion and p0.
 
 The crank is the operating input. The cone swing (p1) and each channel's
 amplitude adjustment (p0) remain independent setup freedoms. Pinion engage
-(p2) is NOT an additional DOF: the cam-follower mate couples the strap swing
+(p2) is NOT an additional DOF: the tangent mate couples the strap swing
 to the free lift-rod/cam spin. A clockwise motor on the lift rod drives the
 strap into mesh; a second strap motor would fight the active contact mate.
 
@@ -205,7 +205,7 @@ async def _drive_p1(adapter: Any) -> dict[str, str]:
 
 
 async def _drive_p2(adapter: Any) -> dict[str, str]:
-    """p2: rotate the lift cam and verify the contact-coupled pinion follows."""
+    """p2: rotate the lift cam and prove its contact-coupled bracket follows."""
     path = str(OUT_SLDASM / "drive-train.SLDASM")
     check("open drive-train", await adapter.open_model(path))
     _assert_dof_already_free(_family_driver_names(
@@ -216,9 +216,9 @@ async def _drive_p2(adapter: Any) -> dict[str, str]:
         raise RuntimeError("p2: pinion-lift-rod not found")
     motor_axis = _entity_ref(rod_name, "Axis1", "AXIS")
     return await _run_swing_study(
-        adapter, motor_axis, "alignment-pinion",
-        "p2 cam-driven pinion engage", "drive-train-p2-pinion-swing",
-        rpm=5.0, reverse=True, min_span_deg=1.0)
+        adapter, motor_axis, "pinion-bracket-1",
+        "p2 cam-driven bracket engage", "drive-train-p2-pinion-swing",
+        rpm=5.0, reverse=True, min_span_deg=0.1)
 
 
 async def _drive_p0(adapter: Any) -> dict[str, str]:

@@ -117,6 +117,7 @@ def test_blade_leans_in_to_its_flank_contact() -> None:
     # cam rest needs the crest 3.2 below the arbor for both strength reserves;
     # img01's blade still leans in from the foot by 9-13 deg.
     assert geometry.CONTACT_T == 24.8
+    assert geometry.KINK_DEG == 28.0
     assert 9.0 <= geometry.BLADE_TO_FLANK_DEG <= 13.0
     assert geometry.BLADE_LEAN_DEG > 0.0  # west of vertical, toward the strap
     assert geometry.KINK_START[0] < geometry.BEND_EXIT[0]

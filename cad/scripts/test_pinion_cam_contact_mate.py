@@ -1,25 +1,35 @@
-r"""SolidWorks-free contract for ``_assembly_couplings.cam_follower_mate``.
+r"""SolidWorks-free contract for ``_assembly_couplings.tangent_contact_mate``.
 
-The cam-follower mate is the one live contact between the pinion rig's cam and
-its follower pin, so it must bind exactly the cam OD and the pin shank, under
-the ICamFollowerMateFeatureData role marks, and through ``CreateMate``.  A
-stateful fake assembly (components -> part bodies -> faces, a selection
-manager, ``CreateMateData``/``CreateMate`` and the persisted ``IMate2``) pins:
+The tangent mate is the one live contact between the pinion rig's cam OD and
+its follower pin shank: two cylinders on crossed axes (cam along machine z,
+pin in the XY plane).  It must bind exactly those two faces as ONE standard
+``swMateTANGENT`` mate through ``CreateMate``.  A stateful fake assembly
+(components -> part bodies -> faces, a selection manager,
+``CreateMateData``/``CreateMate`` and the persisted ``IMate2``) pins:
 
 * each face is the component's only cylinder of its radius, mapped into the
-  assembly and selected cam-first under marks 1 and 8, then built by
-  ``CreateMateData(9)`` -> ``EntitiesToMate`` -> ``CreateMate`` + rebuild, never
-  the obsolete ``AddMate5``;
+  assembly and selected cam-first, both under Mark 1, then built by
+  ``CreateMateData(4)`` -> the ``EntitiesToMate`` array property ->
+  ``CreateMate`` + rebuild;
+* the mate data is interface-strict, like the generated wrappers:
+  ITangentMateFeatureData declares ``EntitiesToMate`` as a VARIANT property
+  (no indexed ``SetEntitiesToMate``) and no ``ErrorStatus``, so a refused
+  ``CreateMate`` must read it through IMateFeatureData on the same raw handle;
+* the retired cam-follower path fails here as it did natively (farm run
+  85d: ``CreateMateData(9)`` + indexed ``SetEntitiesToMate`` reached
+  ``CreateMate``, which returned None on the crossed cylinders);
 * a missing or ambiguous face, a refused selection, a failed ``CreateMate`` or
   a hard feature error raises before or instead of a silent mate;
-* a persisted mate that does not read back as the intended face pair raises.
+* a persisted mate that does not read back as a tangent mate on the intended
+  face pair, cam entity 0 and follower entity 1, raises.
 
-Run: ``uv run python -m pytest cad/scripts/test_cam_follower_mate.py -q``
+Run: ``uv run python -m pytest cad/scripts/test_pinion_cam_contact_mate.py -q``
 """
 
 from __future__ import annotations
 
 import asyncio
+import math
 import sys
 from pathlib import Path
 
@@ -27,12 +37,24 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _assembly_couplings import CylinderFace, cam_follower_mate  # noqa: E402
+import _assembly_couplings  # noqa: E402
+from _assembly_couplings import CylinderFace, tangent_contact_mate  # noqa: E402
+
+try:
+    import pythoncom
+
+    # What ``com_variant.dispatch_array`` marshals an ``object[]`` as.
+    _DISPATCH_ARRAY = pythoncom.VT_ARRAY | pythoncom.VT_DISPATCH
+except ImportError:  # no pywin32: dispatch_array hands back the plain list
+    _DISPATCH_ARRAY = None
 
 CAM = CylinderFace("pinion-cam-1", (4.08, 62.96, -75.34), (0.0, 0.0, 1.0), 7.3)
 PIN = CylinderFace(
     "pinion-cam-pin-1", (-15.35, 69.74, -75.34), (0.9911, 0.1329, 0.0), 2.0
 )
+
+_TANGENT = 4  # swMateTANGENT
+_CAMFOLLOWER = 9  # swMateCAMFOLLOWER
 
 
 class Surface:
@@ -110,6 +132,9 @@ class AssemblyFace:
         assembly.SelectionManager.items.append((self, data.Mark))
         return True
 
+    def is_cylinder(self):
+        return bool(self.part_face.surface.IsCylinder())
+
     def entity_params(self):
         """``IMateEntity2.EntityParams`` of this face: metres, assembly frame."""
         face = self.component.face
@@ -141,8 +166,8 @@ class MateEntity:
 
 
 class Mate:
-    def __init__(self, entities):
-        self.Type = 9  # swMateCAMFOLLOWER
+    def __init__(self, mate_type, entities):
+        self.Type = mate_type
         self.entities = entities
 
     def GetMateEntityCount(self):  # noqa: N802
@@ -165,25 +190,118 @@ class MateFeature:
         return self.error
 
 
-class CamFollowerData:
-    """ICamFollowerMateFeatureData with the generated indexed setter contract."""
+class MateDataDispatch:
+    """``CreateMateData(kind)``'s raw dispatch.  It declares nothing itself:
+    like a generated wrapper, each ``_early_bound`` view exposes only its
+    interface."""
 
-    __slots__ = ("ErrorStatus", "MateAlignment", "_entities", "_calls")
+    def __init__(self, kind, calls):
+        self.kind = kind
+        self.error_status = 4  # swAddMateError_IncorrectSelections
+        self.alignment = -1
+        self.entities = [None, None]
+        self.calls = calls
 
-    def __init__(self, calls):
-        self.ErrorStatus = 4  # swAddMateError_IncorrectSelections, read on failure
-        self.MateAlignment = -1
-        self._entities = [None, None]
-        self._calls = calls
+
+class TangentView:
+    """ITangentMateFeatureData: the ``EntitiesToMate`` VARIANT property and
+    ``MateAlignment``; NOT indexed ``SetEntitiesToMate`` (a cam-follower
+    member) and NOT ``ErrorStatus`` (declared on IMateFeatureData)."""
+
+    __slots__ = ("raw",)
+
+    def __init__(self, raw):
+        self.raw = raw
 
     @property
-    def entities(self):
-        return self._entities
+    def EntitiesToMate(self):  # noqa: N802
+        return tuple(self.raw.entities)
+
+    @EntitiesToMate.setter
+    def EntitiesToMate(self, value):  # noqa: N802
+        if _DISPATCH_ARRAY is not None:
+            # A bare list marshals as VT_ARRAY|VT_VARIANT: COM type mismatch.
+            if getattr(value, "varianttype", None) != _DISPATCH_ARRAY:
+                raise TypeError(f"EntitiesToMate needs an IDispatch array: {value!r}")
+            value = value.value
+        entities = list(value)
+        self.raw.calls.append(("EntitiesToMate", tuple(entities)))
+        self.raw.entities = entities
+
+    @property
+    def MateAlignment(self):  # noqa: N802
+        return self.raw.alignment
+
+    @MateAlignment.setter
+    def MateAlignment(self, value):  # noqa: N802
+        self.raw.alignment = value
+
+
+class CamFollowerView:
+    """ICamFollowerMateFeatureData: indexed ``SetEntitiesToMate`` and
+    ``MateAlignment`` -- the retired creator's surface."""
+
+    __slots__ = ("raw",)
+
+    def __init__(self, raw):
+        self.raw = raw
+
+    @property
+    def MateAlignment(self):  # noqa: N802
+        return self.raw.alignment
+
+    @MateAlignment.setter
+    def MateAlignment(self, value):  # noqa: N802
+        self.raw.alignment = value
 
     def SetEntitiesToMate(self, index, entity):  # noqa: N802
-        assert index in (0, 1)
-        self._calls.append(("SetEntitiesToMate", index, entity))
-        self._entities[index] = entity
+        self.raw.calls.append(("SetEntitiesToMate", index, entity))
+        self.raw.entities[index] = entity
+
+
+class MateFeatureView:
+    """IMateFeatureData: the read-only ``ErrorStatus`` of adding the mate."""
+
+    __slots__ = ("raw",)
+
+    def __init__(self, raw):
+        self.raw = raw
+
+    @property
+    def ErrorStatus(self):  # noqa: N802
+        return self.raw.error_status
+
+
+_MATE_DATA_VIEWS = {
+    ("ITangentMateFeatureData", _TANGENT): TangentView,
+    ("ICamFollowerMateFeatureData", _CAMFOLLOWER): CamFollowerView,
+}
+
+
+def _bind(obj, interface):
+    """``_early_bound``: mate data binds only an interface it implements."""
+    if not isinstance(obj, MateDataDispatch):
+        return obj
+    if interface == "IMateFeatureData":
+        return MateFeatureView(obj)
+    view = _MATE_DATA_VIEWS.get((interface, obj.kind))
+    if view is None:
+        raise ValueError(f"mate data {obj.kind} does not implement {interface}")
+    return view(obj)
+
+
+@pytest.fixture(autouse=True)
+def _strict_mate_data(monkeypatch):
+    monkeypatch.setattr(_assembly_couplings, "_early_bound", _bind)
+
+
+def _crossed(first, second):
+    """True when the two faces' modelled axes are not parallel."""
+    a, b = first.component.face.axis, second.component.face.axis
+    cross = math.hypot(
+        a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]
+    )
+    return cross > 1e-6 * math.hypot(*a) * math.hypot(*b)
 
 
 class Assembly:
@@ -193,7 +311,7 @@ class Assembly:
         self.SelectionManager = SelectionManager()
         self.calls = []
         self.selectable = True
-        self.create_fails = False
+        self.refusal = None  # an swAddMateError_e CreateMate refuses with
         self.error = (0, False)
         self.persist = lambda mate: mate
         self.mates = {}
@@ -219,23 +337,45 @@ class Assembly:
 
     def CreateMateData(self, mate_type):  # noqa: N802
         self.calls.append(("CreateMateData", mate_type))
-        return CamFollowerData(self.calls) if mate_type == 9 else None
+        if mate_type in (_TANGENT, _CAMFOLLOWER):
+            return MateDataDispatch(mate_type, self.calls)
+        return None
+
+    def _refuses(self, raw):
+        """The native refusals this stand-in reproduces, as swAddMateError_e."""
+        if self.refusal is not None:
+            return self.refusal
+        faces = raw.entities
+        if len(faces) != 2 or not all(
+            isinstance(face, AssemblyFace) and face.is_cylinder() for face in faces
+        ):
+            return 4  # tangent: cylinder face / cylinder face in the SDK table
+        if raw.kind == _CAMFOLLOWER and _crossed(*faces):
+            # Farm run 85d: CreateMate returned None on the crossed cylinders.
+            return 0
+        return None
 
     def CreateMate(self, data):  # noqa: N802
-        entities = list(data.entities)
+        # CreateMate remarks: pass in the mate-specific object.
+        assert isinstance(data, (TangentView, CamFollowerView))
+        raw = data.raw
         self.created = {
             "selection": [
                 (face.component.Name2, face.part_face, mark)
                 for face, mark in self.SelectionManager.items
             ],
-            "entities": entities,
-            "alignment": data.MateAlignment,
+            "entities": list(raw.entities),
+            "alignment": raw.alignment,
         }
         self.calls.append("CreateMate")
-        if self.create_fails:
+        refusal = self._refuses(raw)
+        if refusal is not None:
+            raw.error_status = refusal
             return None
-        name = f"CamMateTangent{len(self.mates) + 1}"
-        mate = self.persist(Mate([MateEntity(face) for face in entities]))
+        raw.error_status = 1  # swAddMateError_NoError
+        prefix = "Tangent" if raw.kind == _TANGENT else "CamFollower"
+        name = f"{prefix}{len(self.mates) + 1}"
+        mate = self.persist(Mate(raw.kind, [MateEntity(face) for face in raw.entities]))
         self.mates[name] = MateFeature(name, mate, self.error)
         return self.mates[name]
 
@@ -272,34 +412,39 @@ def _scene(cam_faces=None, pin_faces=None):
 
 
 def _mate(adapter):
-    return asyncio.run(cam_follower_mate(adapter, CAM, PIN, label="cam on pin"))
+    return asyncio.run(tangent_contact_mate(adapter, CAM, PIN, label="cam on pin"))
 
 
-def test_binds_the_unique_cylinders_under_role_marks_through_createmate():
+def test_binds_the_crossed_cylinders_as_one_native_tangent_mate():
     adapter, assembly, cam_od, pin_shank = _scene()
 
     result = _mate(adapter)
 
-    assert result["name"] == "CamMateTangent1"
+    assert result == {
+        "name": "Tangent1",
+        "mate_type": "tangent",
+        "alignment": "closest",
+    }
     assert assembly.created["selection"] == [
         ("pinion-cam-1", cam_od, 1),
-        ("pinion-cam-pin-1", pin_shank, 8),
+        ("pinion-cam-pin-1", pin_shank, 1),
     ]
     entities = assembly.created["entities"]
     assert [(e.component.Name2, e.part_face) for e in entities] == [
         ("pinion-cam-1", cam_od),
         ("pinion-cam-pin-1", pin_shank),
     ]
-    assert assembly.created["alignment"] == 2  # swMateAlignCLOSEST, as the SDK example
+    assert assembly.created["alignment"] == 2  # swMateAlignCLOSEST
     assert assembly.calls == [
         "ClearSelection2",
-        ("CreateMateData", 9),
-        ("SetEntitiesToMate", 0, entities[0]),
-        ("SetEntitiesToMate", 1, entities[1]),
+        ("CreateMateData", _TANGENT),
+        ("EntitiesToMate", tuple(entities)),
         "CreateMate",
         "ClearSelection2",
         "EditRebuild3",
     ]
+    assert list(assembly.mates) == ["Tangent1"]
+    assert assembly.mates["Tangent1"].mate.Type == _TANGENT
     assert assembly.SelectionManager.items == []
 
 
@@ -323,7 +468,7 @@ def test_same_component_for_both_roles_is_refused():
     adapter, assembly, _, _ = _scene()
 
     with pytest.raises(ValueError, match="both on 'pinion-cam-1'"):
-        asyncio.run(cam_follower_mate(adapter, CAM, CAM, label="cam on pin"))
+        asyncio.run(tangent_contact_mate(adapter, CAM, CAM, label="cam on pin"))
 
     assert assembly.calls == []
 
@@ -338,11 +483,20 @@ def test_refused_selection_raises_before_createmate():
     assert "CreateMate" not in assembly.calls
 
 
-def test_failed_createmate_raises_without_a_fallback_mate():
+@pytest.mark.parametrize(
+    ("status", "reason"),
+    [
+        pytest.param(4, "incorrect selections for mate", id="incorrect-selections"),
+        pytest.param(5, "mate over-defines the assembly", id="over-defines"),
+    ],
+)
+def test_failed_createmate_reports_its_status_without_a_fallback_mate(status, reason):
     adapter, assembly, _, _ = _scene()
-    assembly.create_fails = True
+    assembly.refusal = status
 
-    with pytest.raises(Exception, match="CreateMate failed .*incorrect selections"):
+    with pytest.raises(
+        Exception, match=f"CreateMate failed for tangent mate: {reason}"
+    ):
         _mate(adapter)
 
     assert "AddMate5" not in assembly.calls
@@ -359,7 +513,7 @@ def test_hard_feature_error_on_the_created_mate_raises():
 
 
 def _retype(mate):
-    mate.Type = 0  # swMateCOINCIDENT
+    mate.Type = _CAMFOLLOWER
     return mate
 
 
@@ -370,6 +524,11 @@ def _single(mate):
 
 def _both_on_cam(mate):
     mate.entities = [mate.entities[0], mate.entities[0]]
+    return mate
+
+
+def _swapped(mate):
+    mate.entities = mate.entities[::-1]
     return mate
 
 
@@ -408,10 +567,17 @@ def _eccentric(mate):
 @pytest.mark.parametrize(
     ("persist", "message"),
     [
-        pytest.param(_retype, "not cam-follower", id="mate-type"),
+        pytest.param(_retype, "swMateType 9, not tangent", id="mate-type"),
         pytest.param(_single, "1 entities", id="entity-count"),
-        pytest.param(_both_on_cam, "expected one each", id="same-component"),
-        pytest.param(_on_strap, "expected one each", id="wrong-component"),
+        pytest.param(
+            _both_on_cam, "follower entity 1 is on 'pinion-cam-1'", id="same-component"
+        ),
+        pytest.param(
+            _swapped, "cam entity 0 is on 'pinion-cam-pin-1'", id="swapped-roles"
+        ),
+        pytest.param(
+            _on_strap, "entity 1 is on 'pinion-bracket-1'", id="wrong-component"
+        ),
         pytest.param(_edge, "not FACE", id="entity-type"),
         pytest.param(_bore, "radius", id="radius"),
         pytest.param(_tilted, "axis", id="axis-direction"),

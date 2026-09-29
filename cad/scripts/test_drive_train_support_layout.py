@@ -163,6 +163,8 @@ def test_return_spring_preload_and_stress_hold_at_the_stock_corners() -> None:
     # independently walked worst corners, not just clear the 1.5 floors.
     assert min(drive.SPRING_PRELOAD_RATIO) - drive._PRELOAD_MARGIN > 0.06
     assert drive.SPRING_STRESS_SF - drive._STRESS_SF > 0.06
+    assert leaf.MIN_CREST_ARC_MARGIN_DEG == 3.0
+    assert leaf.MIN_ARBOR_END_CAP_SPARE_MM == 0.25
     # The crest must still bear on the straight flank even at the farthest
     # formed station, with 0.25 mm spare beyond the 1-mm cap keep-out.
     farthest = max(
@@ -170,7 +172,10 @@ def test_return_spring_preload_and_stress_hold_at_the_stock_corners() -> None:
         for dev in leaf.FORMED_CORNERS
         for thick in (drive._SPR_T_LO, drive._SPR_T_HI)
     )
-    assert drive.STRAP_C2C - 1.0 - farthest > 0.25
+    assert (
+        drive.STRAP_C2C - 1.0 - farthest
+        >= leaf.MIN_ARBOR_END_CAP_SPARE_MM
+    )
     # The nominal crest arc alone is insufficient: at a hand-formed corner
     # the blade's tangent rotates independently of its bearing station.
     sweeps = [
@@ -178,8 +183,8 @@ def test_return_spring_preload_and_stress_hold_at_the_stock_corners() -> None:
         for dev in leaf.FORMED_CORNERS
         for phi in (0.0, drive._PHI_ENG)
     ]
-    assert min(sweeps) > -leaf.KINK_DEG + 3.0
-    assert max(sweeps) < 0.0
+    assert min(sweeps) >= -leaf.KINK_DEG + leaf.MIN_CREST_ARC_MARGIN_DEG
+    assert max(sweeps) <= -leaf.MIN_CREST_ARC_MARGIN_DEG
     # Positive control: the one-band gate this replaced read higher on both.
     for deflection, station, moment, walked in zip(
         drive.SPRING_DEFLECTION,
@@ -1222,7 +1227,8 @@ def test_mha145_pins_carry_no_interference_exemption() -> None:
 def test_torque_shaft_is_phased_to_the_straps_and_swings_with_them() -> None:
     # Option E-a: the shaft's pin-hole axis (local X) lies along the straps'
     # cross holes at the park lean, and verify:soundness admits the shaft into
-    # the drive train's free swing family.
+    # the drive-train's under-constrained pinion swing group, whose angle is
+    # contact-linked to lift-rod/cam spin.
     from _assembly import allowed_free_stems
     from pinion_pivot_shaft_spec import SHAFT_DIA
 

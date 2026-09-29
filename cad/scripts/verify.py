@@ -1441,8 +1441,14 @@ async def _verify_pinion_cam_contact(adapter: Any, report: Report) -> None:
                 rows, _ = _transform(pin)
                 direction = rows[2]
                 along = sum((axis[k] - root[k]) * direction[k] for k in range(3))
-                if not 1.0 < along < rig.FPIN_LEN - 1.0:
-                    raise RuntimeError(f"{pin}: contact is outside its straight shank")
+                if not (
+                    rig.FPIN_SEAT_LEN + 1.0
+                    < along
+                    < rig.FPIN_LEN - rig.FPIN_CAP_SAG - 1.0
+                ):
+                    raise RuntimeError(
+                        f"{pin}: contact is outside its exposed straight shank"
+                    )
                 perpendicular = [
                     axis[k] - root[k] - along * direction[k] for k in range(3)
                 ]

@@ -932,7 +932,8 @@ def test_source_graph_cache_keys_preserve_real_transitive_identity_edges(
 
 
 def test_verify_gates_depend_on_exact_assembly_identities():
-    """An identity-only refresh must invalidate persisted verify stamps."""
+    """Native and execution-token edges order the cam gate after part/assembly
+    builds and make an identity-only assembly refresh invalidate its stamp."""
     dodo = _load_dodo()
     soundness = {task["name"]: task for task in dodo.task_verify_soundness()}
     for stem in dodo.ASSEMBLY_ORDER:
@@ -941,8 +942,13 @@ def test_verify_gates_depend_on_exact_assembly_identities():
     kinematics = next(
         task for task in dodo.task_verify() if task["name"] == "kinematics"
     )
-    for stem in ("pen", "magnifier", "paper_drive"):
+    for stem in ("pen", "magnifier", "paper_drive", "drive_train"):
         assert dodo._assembly_execution_token(stem) in kinematics["file_dep"]
+    drive = next(task for task in dodo.task_assembly() if task["name"] == "drive_train")
+    cam = next(task for task in dodo.task_part() if task["name"] == "pinion_cam")
+    assert set(cam["targets"]) & set(drive["file_dep"])
+    assert set(drive["targets"]) <= set(kinematics["file_dep"])
+    assert dodo._dof_json("drive_train") in kinematics["file_dep"]
 
 
 def test_assembly_cache_key_changes_with_child_identity(tmp_path, monkeypatch):

@@ -4,7 +4,7 @@ The leaf spring that holds the alignment-pinion drum disengaged by default
 (p. 68-69 close-ups img01/img03/img04; video frames v4_pinion_013/018/019):
 a 17-7 PH stainless strip screwed to the base EAST of the BACK swing strap,
 outboard, rising in a blade that leans IN toward the strap and bears on its
-east flank 23.0 up from the pivot, 5.0 below the arbor.  Gravity swings the
+east flank 24.8 up from the pivot, 3.2 below the arbor. Gravity swings the
 cluster east into mesh; the blade pushes the strap top back west onto the
 parked cam, and the lever engages against it.
 
@@ -16,7 +16,7 @@ Layout (sketch on the Front plane; the assembly seats the part at its machine
 anchor, base top 50.8, with a composed Ry(180), so part-local +x reads machine
 EAST -- direction words below are MACHINE directions; the part is an exact
 mid-plane z-extrude, so the Ry(180)'s z-flip is immaterial): the strip's
-INSIDE-surface path, drawn from the free tip down = a 2.0 flat, an R_KINK x 25
+INSIDE-surface path, drawn from the free tip down = a 2.0 flat, an R_KINK x 28
 deg crest turning back west, the straight blade leaning BLADE_LEAN_DEG west of
 vertical, an R_BEND bend, and the FOOT_LEN foot heading EAST to its free end.
 Traced that way the one-sided thin wall lands right of travel -- west of the

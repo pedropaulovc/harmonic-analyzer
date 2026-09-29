@@ -11,14 +11,13 @@ import _telemetry
 from _assembly import _mate, _mate_hard_error, suspend_automatic_assembly_rebuilds
 from _common import _MATE_TOL_MM, _early_bound
 
-# swMateType_e.swMateCAMFOLLOWER, swSelectType_e.swSelFACES, swBodyType_e.swSolidBody.
-_SW_MATE_CAMFOLLOWER = 9
+# swMateType_e.swMateTANGENT, swSelectType_e.swSelFACES, swBodyType_e.swSolidBody.
+_SW_MATE_TANGENT = 4
 _SW_SEL_FACES = 2
 _SW_SOLID_BODY = 0
-# ICamFollowerMateFeatureData remarks: pre-select the cam face with Mark 1 and
-# the follower face or vertex with Mark 8.
-_CAM_MARK = 1
-_FOLLOWER_MARK = 8
+# ITangentMateFeatureData.EntitiesToMate remarks: tangent mate entities are
+# pre-selected with Mark 1 -- both of them; the roles differ only by order.
+_TANGENT_MARK = 1
 # A modelled radius reads back exactly; a different face differs by far more.
 _RADIUS_TOL_MM = 1e-3
 # Sine of the angle a read-back axis may make with its modelled axis.
@@ -155,72 +154,73 @@ def gear_mates_batch(
     return results
 
 
-async def cam_follower_mate(
+async def tangent_contact_mate(
     adapter: Any,
     cam: CylinderFace,
     follower: CylinderFace,
     *,
-    label: str = "cam_follower",
+    label: str = "tangent contact",
 ) -> dict[str, Any]:
-    """Persist a cam-follower mate between two cylindrical faces, then prove it.
+    """Persist a standard tangent mate between two cylindrical faces, then prove it.
 
     Each face is the component part's only solid-body cylinder of its radius,
     mapped into the assembly with ``IComponent2.GetCorrespondingEntity`` --
-    never a view-dependent point pick.  They are selected in order under the
-    ICamFollowerMateFeatureData marks (cam 1, follower 8) and supplied to
-    ``SetEntitiesToMate`` by index, then created and rebuilt like ``_mate``.
-    The persisted mate is read back: a cam-follower mate whose two FACE
-    entities sit one on each component, on its modelled cylinder.
+    never a view-dependent point pick.  Both are selected under Mark 1, the
+    ITangentMateFeatureData.EntitiesToMate remarks' pre-selection mark, and
+    written cam-first as that property's ``object[]`` array (the generated
+    wrapper declares it a writable VARIANT property, as in the SDK's
+    *Create Standard Mates* example), then created and rebuilt like ``_mate``.
+    The SDK lists cylinder face / cylinder face as a tangent combination.
+    A refused ``CreateMate`` reports ``IMateFeatureData.ErrorStatus``: the
+    CreateMate remarks make IMateFeatureData the base the mate-specific data is
+    cast from, and ITangentMateFeatureData itself does not declare it.
+    The persisted mate is read back: a tangent mate whose entity 0 is the cam's
+    modelled cylinder and entity 1 the follower's.
     """
+    from solidworks_mcp.adapters.com_variant import dispatch_array
     from solidworks_mcp.adapters.solidworks import assembly as _sw_asm
 
     if cam.component == follower.component:
         raise ValueError(f"{label}: cam and follower are both on {cam.component!r}")
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     assembly = _early_bound(model, "IAssemblyDoc")
-    async with _telemetry.aspan(label, kind="cam_follower", label=label):
+    async with _telemetry.aspan(label, kind="tangent", label=label):
         faces = [_component_cylinder(adapter, face, label) for face in (cam, follower)]
         selection = _early_bound(model.SelectionManager, "ISelectionMgr")
         model.ClearSelection2(True)
-        for face, entity, mark in zip(
-            (cam, follower), faces, (_CAM_MARK, _FOLLOWER_MARK), strict=True
-        ):
+        for face, entity in zip((cam, follower), faces, strict=True):
             data = _early_bound(selection.CreateSelectData(), "ISelectData")
-            data.Mark = mark
+            data.Mark = _TANGENT_MARK
             if not bool(_early_bound(entity, "IEntity").Select4(True, data)):
                 raise RuntimeError(f"{label}: cannot select the {face.component} face")
         selected = int(selection.GetSelectedObjectCount2(-1))
         if selected != 2:
             raise RuntimeError(f"{label}: {selected} entities selected, not 2")
 
-        mate_data = adapter._attempt(
-            lambda: assembly.CreateMateData(_SW_MATE_CAMFOLLOWER), default=None
+        raw_data = adapter._attempt(
+            lambda: assembly.CreateMateData(_SW_MATE_TANGENT), default=None
         )
-        if mate_data is None:
+        if raw_data is None:
             raise Exception(
-                f"CreateMateData({_SW_MATE_CAMFOLLOWER}) returned None "
-                "for cam_follower mate"
+                f"CreateMateData({_SW_MATE_TANGENT}) returned None for tangent mate"
             )
-        mate_data = _early_bound(mate_data, "ICamFollowerMateFeatureData")
-        cam_entity = adapter._attempt(
-            lambda: selection.GetSelectedObject6(1, -1), default=None
-        )
-        if cam_entity is None:
-            raise Exception("Mate entity 1 did not resolve from the selection")
-        follower_entity = adapter._attempt(
-            lambda: selection.GetSelectedObject6(2, -1), default=None
-        )
-        if follower_entity is None:
-            raise Exception("Mate entity 2 did not resolve from the selection")
-        mate_data.SetEntitiesToMate(0, cam_entity)
-        mate_data.SetEntitiesToMate(1, follower_entity)
+        mate_data = _early_bound(raw_data, "ITangentMateFeatureData")
+        entities = []
+        for index in (1, 2):
+            entity = adapter._attempt(
+                lambda i=index: selection.GetSelectedObject6(i, -1), default=None
+            )
+            if entity is None:
+                raise Exception(f"{label}: mate entity {index} did not resolve")
+            entities.append(entity)
+        mate_data.EntitiesToMate = dispatch_array(entities)
         mate_data.MateAlignment = _SW_MATE_ALIGN_CLOSEST
 
         mate = adapter._attempt(lambda: assembly.CreateMate(mate_data), default=None)
         if mate is None:
-            status = adapter._attempt(lambda: int(mate_data.ErrorStatus), default=None)
-            reason = _sw_asm._MATE_ERRORS.get(status or 0, f"error status {status}")
-            raise Exception(f"CreateMate failed for cam_follower mate: {reason}")
+            status = int(_early_bound(raw_data, "IMateFeatureData").ErrorStatus)
+            reason = _sw_asm._MATE_ERRORS.get(status, f"error status {status}")
+            raise Exception(f"CreateMate failed for tangent mate: {reason}")
         model.ClearSelection2(True)
         name = _sw_asm._mate_feature_name(adapter, mate)
         if not bool(model.EditRebuild3()):
@@ -228,8 +228,8 @@ async def cam_follower_mate(
         error = _mate_hard_error(adapter, name)
         if error:
             raise RuntimeError(f"{label}: {name!r} has hard feature error {error}")
-        _assert_cam_follower_faces(adapter, label, name, cam, follower)
-    return {"name": name, "mate_type": "cam_follower", "alignment": "closest"}
+        _assert_tangent_faces(adapter, label, name, cam, follower)
+    return {"name": name, "mate_type": "tangent", "alignment": "closest"}
 
 
 def _component_cylinder(adapter: Any, face: CylinderFace, label: str) -> Any:
@@ -270,14 +270,16 @@ def _component_cylinder(adapter: Any, face: CylinderFace, label: str) -> Any:
     return mapped
 
 
-def _assert_cam_follower_faces(
+def _assert_tangent_faces(
     adapter: Any, label: str, name: str, cam: CylinderFace, follower: CylinderFace
 ) -> None:
-    """Raise unless mate ``name`` binds exactly ``cam`` and ``follower``.
+    """Raise unless mate ``name`` binds exactly ``cam`` and ``follower``, in order.
 
+    ``EntitiesToMate`` is written cam-first, and ``IMate2.MateEntity`` reads the
+    same 0-based order back, so entity 0 must sit on the cam and entity 1 on
+    the follower; a swapped pair is refused, not re-matched.
     ``IMateEntity2.EntityParams`` gives a cylinder entity's axis point, axis
-    vector and radius in the assembly frame (metres); each entity is matched
-    to its role by the component it sits on.
+    vector and radius in the assembly frame (metres).
     """
     if not name:
         raise RuntimeError(f"{label}: CreateMate returned no mate name")
@@ -289,26 +291,22 @@ def _assert_cam_follower_faces(
     if mate is None:
         raise RuntimeError(f"{label}: {name!r} has no IMate2 definition")
     mate_type = int(mate.Type)
-    if mate_type != _SW_MATE_CAMFOLLOWER:
-        raise RuntimeError(
-            f"{label}: {name!r} is swMateType {mate_type}, not cam-follower"
-        )
+    if mate_type != _SW_MATE_TANGENT:
+        raise RuntimeError(f"{label}: {name!r} is swMateType {mate_type}, not tangent")
     count = int(mate.GetMateEntityCount())
     if count != 2:
         raise RuntimeError(f"{label}: {name!r} has {count} entities, not 2")
-    roles = {cam.component: ("cam", cam), follower.component: ("follower", follower)}
-    for index in range(count):
+    for index, (role, face) in enumerate((("cam", cam), ("follower", follower))):
         entity = _early_bound(mate.MateEntity(index), "IMateEntity2")
         if entity is None:
             raise RuntimeError(f"{label}: {name!r} entity {index} did not resolve")
         owner = _early_bound(entity.ReferenceComponent, "IComponent2")
         component = str(owner.Name2) if owner is not None else ""
-        if component not in roles:
+        if component != face.component:
             raise RuntimeError(
-                f"{label}: {name!r} entity {index} is on {component!r}, "
-                f"expected one each of {sorted(roles)}"
+                f"{label}: {name!r} {role} entity {index} is on {component!r}, "
+                f"not {face.component!r}"
             )
-        role, face = roles.pop(component)
         kind = int(entity.ReferenceType2)
         if kind != _SW_SEL_FACES:
             raise RuntimeError(

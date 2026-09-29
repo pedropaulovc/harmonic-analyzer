@@ -1953,16 +1953,18 @@ def _kinematics_file_deps() -> list[str]:
     .SLDPRT -> .SLDASM digest.
 
     The magnifier live-chain sweep (verify._verify_live_chain_one) opens
-    magnifier.SLDASM and authors its recorded lever drive spec transiently; the
-    paper-feed proof (verify._verify_paper_feed_one) opens paper-drive.SLDASM and
-    drives the crank -- without those deps a rebuild of either would leave the
-    stamp valid and SKIP the gates (codex #177/#189). The pen sweep + magnifier
-    chain sweep read the .dof.json manifests directly (codex #221), and the
-    transient pen equation reads _config VALUES through pen_driver/truth_model
-    (machine/output.yaml + channels.yaml), which post-#221 are no longer on pen's
-    build recipe -- so an amplitude edit would otherwise skip the sweep (codex
-    #224). Those config deps are derived by the same static analyzer as the build
-    recipes, so a new config read is picked up automatically.
+    magnifier.SLDASM and authors its recorded lever drive spec transiently;
+    paper-feed opens paper-drive.SLDASM and drives the crank; pinion contact
+    opens drive-train.SLDASM and replays its recorded cam driver. Each saved
+    assembly, native execution token and replayed DOF manifest must invalidate
+    the gate when it changes.
+
+    The pen sweep + magnifier chain sweep read the .dof.json manifests directly
+    (codex #221), and the transient pen equation reads _config VALUES through
+    pen_driver/truth_model (machine/output.yaml + channels.yaml), which post-#221
+    are no longer on pen's build recipe -- so an amplitude edit would otherwise
+    skip the sweep (codex #224). Those config deps are derived by the same static
+    analyzer as the build recipes, so a new config read is picked up automatically.
     """
     return [
         str(VERIFY_PY),
@@ -1973,6 +1975,9 @@ def _kinematics_file_deps() -> list[str]:
         _assembly_execution_token("magnifier"),
         _sldasm("paper_drive"),
         _assembly_execution_token("paper_drive"),
+        _sldasm("drive_train"),
+        _assembly_execution_token("drive_train"),
+        _dof_json("drive_train"),
         _dof_json("pen"),
         _dof_json("magnifier"),
         str((SCRIPTS_DIR / "build_kinematic_probe.py").resolve()),
@@ -3070,9 +3075,11 @@ def task_check():
         # Assembly mates select by name, never by a view-dependent point pick
         # (#916: the collar pick selected the shaft collar's OD on one seat).
         SCRIPTS_DIR / "test_assembly_named_selection.py",
-        # Bind the pinion cam and follower to their own cylindrical faces via
-        # the native mate's role marks; refuse an ambiguous or wrong component.
-        SCRIPTS_DIR / "test_cam_follower_mate.py",
+        # Bind the pinion cam OD and follower pin shank as one native tangent
+        # mate on their own cylindrical faces; refuse an ambiguous or wrong face.
+        SCRIPTS_DIR / "test_pinion_cam_contact_mate.py",
+        # A cam drive must expose only the installed shank and move the strap.
+        SCRIPTS_DIR / "test_pinion_cam_gate.py",
         # The adapter's raw feature-tree diff and edge scoring (solidworks_mcp
         # features.py over raw_dispatch): raw calls match the generated
         # members, an incomplete before-walk refuses to diff, and the created

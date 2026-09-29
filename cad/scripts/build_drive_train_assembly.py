@@ -123,7 +123,7 @@ is left with exactly ONE operational DOF -- the crank angle.
 The saved model is a WORKING kinematic model: crank spin, cone-platform
 swing and lift-rod/cam spin are three independent free DOFs; the pinion swing
 follows the cam contact. The front cam OD and pin shank have one persistent
-cam-follower mate; the back pair rides the same rigid groups. No permanent
+tangent mate; the back pair rides the same rigid groups. No permanent
 driver mates exist; the three transient driver specs (including lift-rod/cam
 spin, NOT a separate strap driver) are recorded in ``.drive-train.dof.json``
 for kinematic replay. Every part is inserted on its solved transform, so the
@@ -220,9 +220,9 @@ from _assembly import (
 )
 from _assembly_couplings import (
     CylinderFace,
-    cam_follower_mate,
     gear_mate,
     gear_mates_batch,
+    tangent_contact_mate,
 )
 from _assembly_patterns import (
     assert_pattern_targets,
@@ -1022,6 +1022,8 @@ from pinion_spring_geometry import (  # noqa: E402
     HOLE_X as SPR_HOLE_X_L,
     KINK_C as SPR_KINK_C_L,
     KINK_DEG as SPR_KINK_DEG,
+    MIN_ARBOR_END_CAP_SPARE_MM as SPR_ENDCAP_SPARE_MM,
+    MIN_CREST_ARC_MARGIN_DEG as SPR_CREST_ARC_MARGIN_DEG,
     KINK_START as SPR_KINK_START_L,
     PARKED_AIR as SPR_PARKED_AIR,
     PIVOT_LX as SPR_PIVOT_LX,
@@ -2595,19 +2597,33 @@ if SPRING_STRESS_SF < _STRESS_SF:
 # The free profile tolerances shift the contact normal as well as penetration.
 # Prove all 32 combinations keep the crest (rather than the terminal flat)
 # against the *straight* flank over the whole swing at both stock thickness
-# extremes.  End poses bound the monotone swing in this short arc.
+# extremes.  End poses bound this monotone short swing and retain the documented
+# 3 degree reserve at both ends of the 28 degree crest arc.
 for _dev in SPR_FORMED_CORNERS:
     for _phi in (0.0, _PHI_ENG):
         _sweep = spr_formed_contact_arc_sweep(_dev, math.degrees(_phi))
-        if not -SPR_KINK_DEG <= _sweep <= 0.0:
+        if not (
+            -SPR_KINK_DEG + SPR_CREST_ARC_MARGIN_DEG
+            <= _sweep
+            <= -SPR_CREST_ARC_MARGIN_DEG
+        ):
             raise AssertionError(
-                f"formed spring contact leaves the crest arc: {_sweep:.3f} deg"
+                f"formed spring contact has less than "
+                f"{SPR_CREST_ARC_MARGIN_DEG:.1f} deg of crest-arc reserve: "
+                f"{_sweep:.3f} deg"
             )
     for _thick in (_SPR_T_LO, _SPR_T_HI):
         _, _, _stations = _spring_corner(_dev, _thick)
-        if not all(1.0 <= _t <= STRAP_C2C - 1.0 for _t in _stations):
+        if min(_stations) < 1.0:
             raise AssertionError(
                 f"formed spring contact leaves the straight flank: {_stations}"
+            )
+        if (
+            STRAP_C2C - 1.0 - max(_stations) < SPR_ENDCAP_SPARE_MM
+        ):
+            raise AssertionError(
+                f"formed spring contact lacks {SPR_ENDCAP_SPARE_MM:.2f} mm "
+                f"spare beyond the arbor end-cap keep-out: {_stations}"
             )
 # The engaged blade flexes east toward the cylinder drum: the crest and the
 # flick tip, carried east by the extra deflection, keep 0.25 to the north end
@@ -5245,7 +5261,7 @@ async def build(adapter) -> dict[str, str]:
             )
         reledger_to_solved(adapter, cyl)
 
-    # =============== alignment-pinion swing group (p2 engage DOF) ==============
+    # =============== alignment-pinion swing group (p2 contact motion) ==============
     # The two straps + the pinion drum swing as ONE group to mesh the cylinder
     # train (ch.25, p.66); parked DISENGAGED (p.68 "gap").  Option E-a pins
     # both straps to the torque shaft, so the shaft swings with them in the
@@ -5328,10 +5344,8 @@ async def build(adapter) -> dict[str, str]:
         "arbor pedestal hold-down pattern",
     )
     # Front strap: revolute on the torque shaft (coincident pivot bore + axial
-    # seat) -- the swing DOF. The parked-lean ANGLE driver is a FREED
-    # operational DOF (PR8 item 3, ``free_dof_key``): its spec is recorded
-    # into the DOF manifest instead of authored, so the saved model swings
-    # the drum in/out of mesh by hand.
+    # seat). Its angle follows the live front cam/pin contact below; it is not
+    # an independent parked-lean DOF.
     fb, bb = pinion_brackets["front"], pinion_brackets["back"]
     fb_o = _org(adapter, fb)
     await coincident_mate(
@@ -5349,8 +5363,8 @@ async def build(adapter) -> dict[str, str]:
         label=f"pinion swing axial d={abs(fb_o[2]):.2f}",
         verify=(fb, fb_o),
     )
-    # The front swing stays free: the live cam-follower mate below couples it
-    # to the lift rod.  A second park angle driver would over-constrain contact.
+    # The front swing stays undriven: the live cam/pin tangent mate below
+    # couples it to the lift rod. A second park-angle driver would over-constrain contact.
     # Back strap: the same revolute on the shaft + a parallel anti-spin to the
     # front strap (both inserted at the same lean, so their Right planes are
     # parallel) -- the rigid-group tie, semantic (no lock).
@@ -5385,10 +5399,9 @@ async def build(adapter) -> dict[str, str]:
     # axis: the shaft's holes sit at the fit-up stack's strap stations, which
     # this pose is (pinion_pivot_shaft_spec).  The pin tie is the back strap's
     # own rigid-group idiom -- the shaft's Right plane parallel to the front
-    # strap's.  The front strap's swing is the freed DOF, so the shaft now
-    # turns with the group in the block bores.  Its origin is on the swing
-    # axis (#154 blindness), so a point on the pin-hole axis at the shaft's
-    # surface witnesses the phase.
+    # strap's. The shaft rotates with the rigid group in the block bores; its
+    # origin is on the swing axis (#154 blindness), so a point on the pin-hole
+    # axis at its surface witnesses the phase.
     shaft_x = component_transform(adapter, pivot_shaft)[0:3]
     strap_x = component_transform(adapter, fb)[0:3]
     if abs(abs(sum(a * b for a, b in zip(shaft_x, strap_x))) - 1.0) > 1e-6:
@@ -5407,8 +5420,8 @@ async def build(adapter) -> dict[str, str]:
     # (Axis3), so they RIDE the swing group -- coaxial + the seat-bottom axial
     # split off the strap's Right plane (which contains the seat bottom's
     # station along the pin axis) + a spin pin at the inserted dihedral (the
-    # pin is axisymmetric, so the angle is cosmetic, but the DOF must close
-    # for the release 0-DOF closure proof).
+    # pin is axisymmetric, so this clocking is cosmetic; it pins the follower
+    # rigidly to its bracket.
     for tag in ("front", "back"):
         cpin = cam_pins[tag]
         br = pinion_brackets[tag]
@@ -5528,13 +5541,14 @@ async def build(adapter) -> dict[str, str]:
             verify=(cam, cam_o),
             witness_local=[0.0, 5.0, 0.0],
         )
-    # One persistent mechanical mate connects the two otherwise free rigid
-    # groups.  The back cam/pin copy is rigidly phased at the same profile and
-    # station: mating it again would add a redundant contact equation.
+    # One persistent tangent mate (cam OD on pin shank) connects the two
+    # otherwise free rigid groups.  The back cam/pin copy is rigidly phased at
+    # the same profile and station: mating it again would add a redundant
+    # contact equation.
     cam_face, pin_face = _cam_pin_contact_faces(
         pinion_cams["front"], cam_pins["front"], _STRAP_MID_Z[0]
     )
-    await cam_follower_mate(
+    await tangent_contact_mate(
         adapter,
         cam_face,
         pin_face,
