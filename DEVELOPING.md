@@ -263,9 +263,14 @@ no `.done`.
   --json` reports it. A leaf counts as this run's only when `farm_run` equals
   its run id. A leaf created without one (a direct `build.py --executor farm`)
   is kept, and so is every leaf when `farm.py` predates `farm_run`
-  (pedropaulovc/solidworks-pool#165). A submitter outside this `-LogDirectory`
-  that attached *after* this run created a leaf is invisible, and that leaf
-  is cancelled with the rest; only farm-side reference counting could see it.
+  (pedropaulovc/solidworks-pool#165). Siblings are scanned once up front and
+  again right before each `farm.py cancel`, so a sibling that attaches while
+  `-Cancel` queries the farm keeps its leaf. A sibling that attaches during
+  the cancel call itself (one `farm.py` round trip) still loses it: its leaf
+  fails as cancelled and a rerun rebuilds it. A submitter outside this
+  `-LogDirectory` that attached *after* this run created a leaf is invisible,
+  and that leaf is cancelled with the rest. Only farm-side reference counting
+  would close both gaps.
   If any leaf cannot be accounted for (`farm.py` failed on
   authentication, network or CLI), `-Cancel` exits 1 and changes nothing
   else: no `.done`, the snapshot kept, the run still `launcher-died`. Retry the

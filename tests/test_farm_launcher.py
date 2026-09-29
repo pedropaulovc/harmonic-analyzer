@@ -122,6 +122,12 @@ if farm is not None:
         shown = {key: value for key, value in described.items() if key != "_old"}
         if described.get("_old"):
             shown.pop("farm_run", None)
+        # "_attach": a run record to publish while the farm answers: a sibling
+        # that attaches to this leaf mid-cancel.
+        attach = described.pop("_attach", None)
+        if attach is not None:
+            state_path.write_text(json.dumps(workflows), encoding="utf-8")
+            Path(attach["path"]).write_text(attach["record"], encoding="utf-8")
         print(json.dumps({"workflow_id": workflow, **shown}))
         raise SystemExit(0)
     if command == "cancel":
@@ -1232,6 +1238,52 @@ def test_watch_exits_failed_with_the_cause_of_each_task_error(tmp_path: Path) ->
     )
     # The launcher's own outcome stands.
     assert Path(final["done"]).read_bytes() == done_before
+
+
+def test_cancel_keeps_a_leaf_a_sibling_attached_to_mid_cancel(tmp_path: Path) -> None:
+    """Codex on #1125 (81928f376): siblings were enumerated once, before the
+    farm queries; one that attached after that scan lost the leaf."""
+    fixture = _launcher_fixture(tmp_path)
+    farm_state = Path(fixture["farm_state"])
+    farm_state.write_text(
+        json.dumps({LEAF_PEN: {"status": "RUNNING"}}), encoding="utf-8"
+    )
+    printed = tmp_path / "failing lines.txt"
+    printed.write_text(DISPATCH_LINES + FAILURE_LINES, encoding="utf-8")
+    environment = dict(fixture["environment"])
+    environment["UV_STUB_LINES"] = str(printed)
+    environment["UV_STUB_EXIT"] = "2"
+    launched = _run_launcher(
+        fixture, _command(fixture, "part:pen_rod", tag="broken"), environment
+    )
+    assert launched.returncode == 2
+    # This run created LEAF_PEN. Build the sibling's record now, then take it
+    # out of the directory: it appears only once -Cancel queries the farm.
+    sibling = _sibling_waiting_on(fixture, LEAF_PEN)
+    staged = sibling.read_text(encoding="utf-8")
+    sibling.unlink()
+    workflows = json.loads(farm_state.read_text(encoding="utf-8"))
+    workflows[LEAF_PEN]["_attach"] = {"path": str(sibling), "record": staged}
+    farm_state.write_text(json.dumps(workflows), encoding="utf-8")
+
+    cancel = _run_launcher(
+        fixture,
+        _tracking(fixture, "-Cancel", "-Tag", "broken", "-Why", "local fault"),
+        fixture["environment"],
+    )
+
+    assert cancel.returncode == 0, (cancel.stdout, cancel.stderr)
+    assert sibling.exists()
+    outcomes = [
+        json.loads(line) for line in cancel.stdout.splitlines() if line.startswith("{")
+    ]
+    assert [(o["workflow_id"], o["outcome"]) for o in outcomes] == [
+        (LEAF_PEN, "kept-shared")
+    ]
+    assert json.loads(farm_state.read_text(encoding="utf-8"))[LEAF_PEN]["status"] == (
+        "RUNNING"
+    )
+    assert not Path(fixture["farm_cancels"]).exists()
 
 
 def _write_run_record(

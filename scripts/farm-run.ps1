@@ -1030,6 +1030,32 @@ function Stop-RunProcesses {
     }
 }
 
+function Get-SiblingWaits {
+    param(
+        [Parameter(Mandatory)][string]$Directory,
+        [Parameter(Mandatory)][string]$RecordPath
+    )
+
+    # Workflow id -> run id of a sibling in -LogDirectory still waiting on it.
+    $waits = @{}
+    foreach ($path in @(Get-RunRecordPaths -Directory $Directory)) {
+        if ([System.IO.Path]::GetFullPath($path) -eq [System.IO.Path]::GetFullPath($RecordPath)) {
+            continue
+        }
+        $other = Get-RunStatus -RecordPath $path
+        # A dead sibling whose build outlived it is still waiting on its leaves.
+        $waiting = $other.status['state'] -eq 'running' -or
+            ($other.status['state'] -eq 'launcher-died' -and @($other.status['launcher']['orphaned_processes']).Count -gt 0)
+        if (-not $waiting) {
+            continue
+        }
+        foreach ($workflowId in $other.status['in_flight_workflows']) {
+            $waits[$workflowId] = $other.status['run_id']
+        }
+    }
+    return $waits
+}
+
 function Invoke-RunCancel {
     param(
         [Parameter(Mandatory)][string]$Directory,
@@ -1064,22 +1090,7 @@ function Invoke-RunCancel {
     $unsettled = @((Get-RunStatus -RecordPath $RecordPath).status['unsettled_workflows'])
     # Workflows are shared by ID (USE_EXISTING): a live sibling run that is
     # waiting on the same leaf keeps it.
-    $shared = @{}
-    foreach ($path in @(Get-RunRecordPaths -Directory $Directory)) {
-        if ([System.IO.Path]::GetFullPath($path) -eq [System.IO.Path]::GetFullPath($RecordPath)) {
-            continue
-        }
-        $other = Get-RunStatus -RecordPath $path
-        # A dead sibling whose build outlived it is still waiting on its leaves.
-        $waiting = $other.status['state'] -eq 'running' -or
-            ($other.status['state'] -eq 'launcher-died' -and @($other.status['launcher']['orphaned_processes']).Count -gt 0)
-        if (-not $waiting) {
-            continue
-        }
-        foreach ($workflowId in $other.status['in_flight_workflows']) {
-            $shared[$workflowId] = $other.status['run_id']
-        }
-    }
+    $shared = Get-SiblingWaits -Directory $Directory -RecordPath $RecordPath
 
     $outcomes = [System.Collections.Generic.List[object]]::new()
     $reason = "$Why (farm-run.ps1 -Cancel $runId)"
@@ -1129,6 +1140,16 @@ function Invoke-RunCancel {
             $creator = if ($null -eq $described['farm_run']) { 'a submitter outside farm-run.ps1' } else { "run $($described['farm_run'])" }
             $outcome['outcome'] = 'kept-foreign'
             $outcome['detail'] = "created by $creator; this run attached"
+            Write-RunEvent -RunId $runId -Text "kept $workflowId`: $($outcome['detail'])"
+            continue
+        }
+        # A sibling may have attached since the scan above, while this loop
+        # queried the farm. Look again right before cancelling; what remains
+        # is the one farm.py round trip this cancel takes.
+        $waiter = (Get-SiblingWaits -Directory $Directory -RecordPath $RecordPath)[$workflowId]
+        if ($null -ne $waiter) {
+            $outcome['outcome'] = 'kept-shared'
+            $outcome['detail'] = "run $waiter is still waiting on it"
             Write-RunEvent -RunId $runId -Text "kept $workflowId`: $($outcome['detail'])"
             continue
         }
