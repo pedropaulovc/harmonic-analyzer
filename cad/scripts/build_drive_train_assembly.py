@@ -117,8 +117,9 @@ gears are keyed to the cone shaft. A 16T:64T gear mate drives the cone cluster
 from the crank, and each cylinder gear meshes its cone gear k at ratio
 [120-6k : 120]. The
 gear mate is each cylinder gear's sole rotational constraint, so it
-holds the cosine-setup phase without nudging the gear. The whole train
-is left with exactly ONE operational DOF -- the crank angle.
+holds the cosine-setup phase without nudging the gear. The geared crank-to-cone
+train has one rotational input, the crank angle; the platform and cam have
+separate setup freedoms described below.
 
 The saved model is a WORKING kinematic model: crank spin, cone-platform
 swing and lift-rod/cam spin are three independent free DOFs; the pinion swing
@@ -2245,7 +2246,7 @@ if math.hypot(_FPIN_S0, FPIN_DROP) - FPIN_DIA / 2.0 - STRAP_PIVOT_BORE / 2.0 < 0
 # Pin axis, machine frame: _FPIN_C (pinion_rig_park_geometry), through the
 # strap axis FPIN_DROP below the pivot, running WEST along -N (the axis RISES
 # going west, N[1] < 0).
-_FPIN_TIP_S = _FPIN_S0 + FPIN_LEN  # 20: dome end station, from the centreline
+_FPIN_TIP_S = _FPIN_S0 + FPIN_LEN  # 20: shank end / dome start from centreline
 _S_CAM = (_FPIN_C[0] - LIFT_X) / _SPR_N[0]  # 14.9: where the pin crosses the
 # rod/cam plane x = LIFT_X
 if _FPIN_TIP_S - _S_CAM < 2.0:

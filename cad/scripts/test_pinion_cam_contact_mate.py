@@ -532,6 +532,23 @@ def _swapped(mate):
     return mate
 
 
+def test_native_reordered_tangent_entities_still_bind_the_same_face_pair():
+    adapter, assembly, _, _ = _scene()
+    assembly.persist = _swapped
+
+    assert _mate(adapter)["mate_type"] == "tangent"
+    assert [
+        e.ReferenceComponent.Name2 for e in assembly.mates["Tangent1"].mate.entities
+    ] == [
+        "pinion-cam-pin-1",
+        "pinion-cam-1",
+    ]
+    assert [
+        round(e.EntityParams[6] * 1000, 1)
+        for e in assembly.mates["Tangent1"].mate.entities
+    ] == [2.0, 7.3]
+
+
 def _on_strap(mate):
     pin = mate.entities[1].ReferenceComponent
     mate.entities[1].ReferenceComponent = pin.assembly.component("pinion-bracket-1")
@@ -569,15 +586,8 @@ def _eccentric(mate):
     [
         pytest.param(_retype, "swMateType 9, not tangent", id="mate-type"),
         pytest.param(_single, "1 entities", id="entity-count"),
-        pytest.param(
-            _both_on_cam, "follower entity 1 is on 'pinion-cam-1'", id="same-component"
-        ),
-        pytest.param(
-            _swapped, "cam entity 0 is on 'pinion-cam-pin-1'", id="swapped-roles"
-        ),
-        pytest.param(
-            _on_strap, "entity 1 is on 'pinion-bracket-1'", id="wrong-component"
-        ),
+        pytest.param(_both_on_cam, "expected one each of", id="same-component"),
+        pytest.param(_on_strap, "expected one each of", id="wrong-component"),
         pytest.param(_edge, "not FACE", id="entity-type"),
         pytest.param(_bore, "radius", id="radius"),
         pytest.param(_tilted, "axis", id="axis-direction"),

@@ -174,8 +174,8 @@ async def tangent_contact_mate(
     A refused ``CreateMate`` reports ``IMateFeatureData.ErrorStatus``: the
     CreateMate remarks make IMateFeatureData the base the mate-specific data is
     cast from, and ITangentMateFeatureData itself does not declare it.
-    The persisted mate is read back: a tangent mate whose entity 0 is the cam's
-    modelled cylinder and entity 1 the follower's.
+    The persisted mate is read back as an unordered pair of the cam's and
+    follower's modelled cylinders; SolidWorks may reorder symmetric mates.
     """
     from solidworks_mcp.adapters.com_variant import dispatch_array
     from solidworks_mcp.adapters.solidworks import assembly as _sw_asm
@@ -273,13 +273,11 @@ def _component_cylinder(adapter: Any, face: CylinderFace, label: str) -> Any:
 def _assert_tangent_faces(
     adapter: Any, label: str, name: str, cam: CylinderFace, follower: CylinderFace
 ) -> None:
-    """Raise unless mate ``name`` binds exactly ``cam`` and ``follower``, in order.
+    """Require the unordered native tangent pair to bind the intended cylinders.
 
-    ``EntitiesToMate`` is written cam-first, and ``IMate2.MateEntity`` reads the
-    same 0-based order back, so entity 0 must sit on the cam and entity 1 on
-    the follower; a swapped pair is refused, not re-matched.
-    ``IMateEntity2.EntityParams`` gives a cylinder entity's axis point, axis
-    vector and radius in the assembly frame (metres).
+    SOLIDWORKS may reorder a symmetric tangent mate's entities when saving it.
+    Identify each role by its owning component, then verify its cylinder in
+    assembly coordinates (metres); a duplicate or foreign owner fails closed.
     """
     if not name:
         raise RuntimeError(f"{label}: CreateMate returned no mate name")
@@ -296,17 +294,19 @@ def _assert_tangent_faces(
     count = int(mate.GetMateEntityCount())
     if count != 2:
         raise RuntimeError(f"{label}: {name!r} has {count} entities, not 2")
-    for index, (role, face) in enumerate((("cam", cam), ("follower", follower))):
+    roles = {cam.component: ("cam", cam), follower.component: ("follower", follower)}
+    for index in range(count):
         entity = _early_bound(mate.MateEntity(index), "IMateEntity2")
         if entity is None:
             raise RuntimeError(f"{label}: {name!r} entity {index} did not resolve")
         owner = _early_bound(entity.ReferenceComponent, "IComponent2")
         component = str(owner.Name2) if owner is not None else ""
-        if component != face.component:
+        if component not in roles:
             raise RuntimeError(
-                f"{label}: {name!r} {role} entity {index} is on {component!r}, "
-                f"not {face.component!r}"
+                f"{label}: {name!r} entity {index} is on {component!r}, "
+                f"expected one each of {sorted(roles)}"
             )
+        role, face = roles.pop(component)
         kind = int(entity.ReferenceType2)
         if kind != _SW_SEL_FACES:
             raise RuntimeError(
