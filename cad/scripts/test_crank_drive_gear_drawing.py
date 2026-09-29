@@ -50,7 +50,7 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     # mirrored in the other fails here, offline.
     assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
+    kept = set(drawing.FRONT_KEEP) | set(drawing.SECTION_KEEP)
     assert kept == marked == {
         "OutsideDia", "FaceWidth", "BoreDia", "BoreAF", "BoreSouthChamferSize"
     }
@@ -430,19 +430,48 @@ def test_sheet_runs_at_3_to_2_with_every_view_at_sheet_scale() -> None:
 
 
 def test_hidden_lines_are_off_and_helical_tangent_edges_are_dropped() -> None:
-    # The face view shows the arc and flat in solid lines. In the side view
-    # hidden bore edges add no requirement; the helical flanks project dense
-    # tangent curves, removed from orthographic views only.
+    # The face view shows the arc and flat in solid lines, and the centre
+    # section cuts the bore open, so hidden edges add no requirement; the
+    # helical flanks project dense tangent curves, removed from orthographic
+    # views only.
     source = _source()
     assert (
-        "for view in (front, right, iso):\n        set_hidden_lines_removed" in source
+        "for view in (front, section, iso):\n        set_hidden_lines_removed" in source
     )
     assert "set_hidden_lines_visible" not in source
     assert '_hide_tangent_edges(front, "front")' in source
-    assert '_hide_tangent_edges(right, "side")' in source
+    assert '_hide_tangent_edges(section, "section")' in source
     assert "_hide_tangent_edges(iso" not in source
     assert "SetDisplayTangentEdges2(0)" in source
     assert "GetDisplayTangentEdges2()" in source
+
+
+# Dimension text centres on its keep point. Metrics off the round-bore 3:2 64T
+# sheet of farm run 20260929T061401240Z (e0f6636): "(0.025-0.105 DIAMETRAL"
+# is 52 mm for 22 characters, the five-line bore block stands 25 mm tall, and
+# the title block's top edge is at 64.7 mm. A stacked tolerance puts the
+# value on two lines.
+_CHAR_WIDTH = 0.00236
+_LINE_HEIGHT = 0.005
+_TITLE_BLOCK_TOP = 0.0647
+# Outline pad the layout audit adds round an uncropped view (cone-gear T084).
+_VIEW_OUTLINE_PAD = 0.0056
+# The native section caption, "SECTION A-A" over its scale, stands 16.5 mm
+# tall on the crank-pinion sheet and is placed by its top centre.
+_CAPTION_HEIGHT = 0.0165
+
+
+def _text_box(xy: tuple[float, float], callout: str, value: str) -> tuple[float, ...]:
+    lines = callout.lstrip().split("\n")
+    width = _CHAR_WIDTH * max(len(value), *(len(line) for line in lines))
+    height = _LINE_HEIGHT * (2 + len(lines))
+    return (xy[0] - width / 2, xy[1] - height / 2, xy[0] + width / 2, xy[1] + height / 2)
+
+
+def _box_distance(box: tuple[float, ...], point: tuple[float, float]) -> float:
+    dx = max(box[0] - point[0], 0.0, point[0] - box[2])
+    dy = max(box[1] - point[1], 0.0, point[1] - box[3])
+    return math.hypot(dx, dy)
 
 
 def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
@@ -454,11 +483,12 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
     for name, (x, y) in drawing.FRONT_KEEP.items():
         reach = math.hypot(x - drawing.FRONT_CENTER[0], y - drawing.FRONT_CENTER[1])
         assert reach > half_od + 0.010, name
-    for name, (x, y) in drawing.RIGHT_KEEP.items():
-        assert y > drawing.RIGHT_CENTER[1] + half_od, name
+    sx, sy = drawing.SECTION_CENTER
+    face_half = drawing.FACE_WIDTH_HALF
+    assert drawing.SECTION_KEEP["FaceWidth"][1] > sy + half_od
     positions = (
         *drawing.FRONT_KEEP.values(),
-        *drawing.RIGHT_KEEP.values(),
+        *drawing.SECTION_KEEP.values(),
         drawing.GEAR_DATA_POS,
         drawing.MANUFACTURING_NOTES_POS,
     )
@@ -466,13 +496,32 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
         assert 0.012 < x < 0.420
         assert 0.012 < y < 0.267
         assert not (x > 0.216 and y < 0.070), (x, y)  # title-block keep-out
-    # The three views march left to right without overlapping: face view, side
-    # view, isometric.
-    face_half = drawing.FACE_WIDTH_HALF
-    assert drawing.FRONT_CENTER[0] + half_od < drawing.RIGHT_CENTER[0] - face_half
-    assert drawing.RIGHT_CENTER[0] + face_half < drawing.ISO_CENTER[0] - half_od
+    # The three views march left to right without overlapping: face view,
+    # centre section, isometric.
+    assert drawing.FRONT_CENTER[0] + half_od < sx - face_half
+    assert sx + face_half < drawing.ISO_CENTER[0] - half_od
     # The gear-data column stays left of every dimension the face view places.
     assert drawing.GEAR_DATA_POS[0] < min(x for x, _ in drawing.FRONT_KEEP.values())
+    # The AF callout and the chamfer stand in the lane between the tooth tips
+    # and the section's south face, the chamfer under the AF block.
+    af = _text_box(drawing.FRONT_KEEP["BoreAF"], drawing.AF_CALLOUT, "8.763 +0.020")
+    chamfer = _text_box(
+        drawing.SECTION_KEEP["BoreSouthChamferSize"],
+        drawing.DIMENSION_CALLOUTS["BoreSouthChamferSize"],
+        "1.00 +0.10",
+    )
+    section_left = sx - face_half - _VIEW_OUTLINE_PAD
+    for box in (af, chamfer):
+        assert _box_distance(box, drawing.FRONT_CENTER) > half_od + _VIEW_OUTLINE_PAD + 0.003
+        assert box[2] < section_left - 0.003
+    assert chamfer[3] < af[1] - 0.003
+    # The chamfer's leg dimension runs off the south face at bore height.
+    assert sy - half_od < drawing.SECTION_KEEP["BoreSouthChamferSize"][1] < sy
+    # The caption hangs under the section and over the title block.
+    cap_x, cap_top = drawing.SECTION_CAPTION_XY
+    assert cap_x == pytest.approx(sx)
+    assert cap_top < sy - half_od - 0.005
+    assert cap_top - _CAPTION_HEIGHT > _TITLE_BLOCK_TOP + 0.003
 
 
 def test_part_stamps_make_critical_properties() -> None:
@@ -510,14 +559,15 @@ def test_outside_dia_reference_is_saved_hidden_and_imported_per_view() -> None:
 
 def test_bore_finish_reads_at_note_height_and_leaders_have_separate_landings() -> None:
     # The round diameter, AF and finish all need room around the D-bore;
-    # the tip-diameter arrow belongs on the far tooth silhouette.
+    # the tip-diameter arrow belongs on the near tooth silhouette, and only
+    # the AF dimension (it spans the axis) may meet the A-A cutting line.
     import _drawing_leaders as leaders
 
     assert drawing.FINISH_CHAR_HEIGHT == 0.0025  # the Gear Data / notes height
     source = _source()
     assert "char_height=FINISH_CHAR_HEIGHT" in source
     assert '"Gear Data", *GEAR_DATA_POS, char_height=0.0025' in source
-    assert "_bore_leaders_clear(adapter, front_annotations, finish)" in source
+    assert "_bore_leaders_clear(adapter, front, front_annotations, finish)" in source
     assert 'set_near_side_diameter(tip, "tip diameter")' in source
 
     cx, cy = drawing.FRONT_CENTER
@@ -537,9 +587,16 @@ def test_bore_finish_reads_at_note_height_and_leaders_have_separate_landings() -
         1000 * drawing.VIEW_SCALE[1]
     )
     af = [(af_text, (cx + flat_x, cy))]
-    old_tip = [(tip_text, (cx, cy - drawing.HALF_OD))]
-    new_tip = [(tip_text, (cx, cy + drawing.HALF_OD))]
+    # The broken leader leaves the text's near end aimed at the centre
+    # ("65.11 +/-0.1" is 28 mm wide on the round-bore sheet).
+    near_end = (tip_text[0] + 0.014, tip_text[1])
+    aim = math.atan2(near_end[1] - cy, near_end[0] - cx)
+    rim = (math.cos(aim) * drawing.HALF_OD, math.sin(aim) * drawing.HALF_OD)
+    old_tip = [(near_end, (cx - rim[0], cy - rim[1]))]
+    new_tip = [(near_end, (cx + rim[0], cy + rim[1]))]
     finish = [(drawing.FINISH_SYMBOL, drawing.FINISH_ATTACH)]
+    reach = drawing.HALF_OD + drawing.SECTION_LINE_OVERRUN
+    cutting_line = [((cx, cy - reach), (cx, cy + reach))]
     assert leaders.distance_to_point(old_tip[0], (cx, cy)) < drawing.TIP_DIA_KEEP_OUT
     leaders.assert_leaders_clear(
         {"OutsideDia": new_tip, "BoreDia": bore, "BoreAF": af, "BoreFinish": finish},
@@ -553,3 +610,23 @@ def test_bore_finish_reads_at_note_height_and_leaders_have_separate_landings() -
         },
         label="gear bore layout",
     )
+    leaders.assert_leaders_clear(
+        {
+            "OutsideDia": new_tip,
+            "BoreDia": bore,
+            "BoreFinish": finish,
+            "SectionLine": cutting_line,
+        },
+        centre=(cx, cy),
+        keep_out={},
+        lands_within={
+            "OutsideDia": drawing.TIP_DIA_LANDING,
+            "BoreDia": drawing.BORE_LANDING,
+            "BoreFinish": drawing.BORE_LANDING,
+            "SectionLine": drawing.SECTION_LINE_LANDING,
+        },
+        label="gear leaders vs A-A",
+    )
+    # The A-A arrows and letters stand right of the line's ends; the tip
+    # leader stays left of the line.
+    assert max(new_tip[0][0][0], new_tip[0][1][0]) < cx - 0.005

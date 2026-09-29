@@ -135,13 +135,20 @@ ISO_CENTER = (0.355, 0.150)
 # flat is 0.76-2.3 mm deep, 1.02 mm on T006's 8:1; enlarged, 2.5-3.1 mm.
 # The view sits lower left, under the front view and left of the thickness
 # callout, and carries every bore dimension: diameter, across-flat, clock.
-BORE_VIEW_CENTER = (0.052, 0.066)
+# The layout audit compares view OUTLINES, not circles: GetOutline pads the
+# front view ~5.5 mm and a cropped view 10.1-10.75 mm past its crop circle
+# (farm run 20260929T061328212Z at 70d2e52: T084's front box [54.8, 99.8, 155.2,
+# 200.2] met this view's [15.2, 29.2, 88.8, 102.8] when it stood at y 0.066
+# with a 7 mm margin). At y 0.060 with 3 mm the box clears T120's, the
+# largest tip circle on the set, by ~4 mm and the title stays above the
+# 12.7 mm zone band.
+BORE_VIEW_CENTER = (0.052, 0.060)
 # Each sheet takes the smallest ladder ratio above its own that renders the
 # bore at least this wide: 20:1 on T006/T012, 10:1 T018, 5:1 T024, 4:1 T030+.
 BORE_VIEW_BORE_MIN = 0.028
 BORE_VIEW_SCALE_LADDER = ((4.0, 1.0), (5.0, 1.0), (10.0, 1.0), (20.0, 1.0))
 # Gear body kept round the bore inside the crop circle, sheet metres.
-BORE_VIEW_CROP_MARGIN = 0.007
+BORE_VIEW_CROP_MARGIN = 0.003
 # The view's title stands this far under the crop circle, below the
 # across-flat value and its callout line, which hang BORE_VIEW_AF_DROP under
 # it.

@@ -466,6 +466,15 @@ _BORE_CALLOUT_TEXT_HALF_WIDTH = 0.021
 _BORE_TEXT_HALF_HEIGHT = 0.005
 _BORE_TITLE_HEIGHT = 0.008
 _THICKNESS_TEXT_HALF_WIDTH = 0.0325
+# The layout audit compares IView.GetOutline boxes, which pad the geometry:
+# ~5.5 mm round an uncropped view (T084 front [54.8, 99.8, 155.2, 200.2]
+# about a 44.66 mm half tip circle) and 10.1-10.75 mm past a bore view's crop
+# circle (T006-T024 and T030+ sheets; 11.3 is taken as the pad), inside the
+# sheet format's 12.7 mm zone band (_drawing_common.sheet_drawable_region;
+# farm run 20260929T061328212Z at 70d2e52).
+_FRONT_OUTLINE_PAD = 0.0056
+_CROPPED_OUTLINE_PAD = 0.0113
+_ZONE_MARGIN = 0.0127
 
 
 def test_bore_view_enlarges_every_d_bore_clear_of_its_neighbours() -> None:
@@ -491,10 +500,15 @@ def test_bore_view_enlarges_every_d_bore_clear_of_its_neighbours() -> None:
         crop = drawing.bore_view_crop_radius(teeth)
         assert crop > bore * ratio / 2000.0
         # The crop circle stands inside the border and clear of the front
-        # view's tip circle.
-        assert cx - crop > 0.012 and cy - crop > 0.012
+        # view's tip circle, and the boxes the audit compares stay apart: the
+        # views overlap in x, so the bore view's box must sit under the front
+        # view's on every sheet (T084 met it at y 0.066 with a 7 mm margin).
+        assert cx - crop - _CROPPED_OUTLINE_PAD > _ZONE_MARGIN
+        assert cy - crop - _CROPPED_OUTLINE_PAD > _ZONE_MARGIN
         half_od = drawing.rendered_half_od(teeth)
         assert math.dist((cx, cy), drawing.FRONT_CENTER) > crop + half_od + 0.010
+        front_bottom = drawing.FRONT_CENTER[1] - half_od - _FRONT_OUTLINE_PAD
+        assert cy + crop + _CROPPED_OUTLINE_PAD + 0.002 < front_bottom, teeth
         keep = drawing.bore_view_keep(teeth)
         for x, y in keep.values():
             assert math.dist((x, y), drawing.FRONT_CENTER) > half_od + 0.015
@@ -510,7 +524,7 @@ def test_bore_view_enlarges_every_d_bore_clear_of_its_neighbours() -> None:
         assert af_y < cy - crop
         title_top = drawing.bore_view_label_top(teeth)
         assert af_y - 2.0 * _BORE_TEXT_HALF_HEIGHT > title_top
-        assert title_top - _BORE_TITLE_HEIGHT > 0.012
+        assert title_top - _BORE_TITLE_HEIGHT > _ZONE_MARGIN + 0.001
         assert af_x - _BORE_CALLOUT_TEXT_HALF_WIDTH > 0.012
         # The clock text stands wholly right of the circle and clear of the
         # thickness callout under the front view.
