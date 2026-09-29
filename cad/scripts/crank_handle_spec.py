@@ -27,6 +27,7 @@ from __future__ import annotations
 import math
 
 from _fit_limits import band_text
+from crank_hub_geometry import GENERAL_1PL_TOL_MM
 from crank_handle_butt_cup_spec import (
     BODY_DIA as CUP_BODY_DIA,
     BODY_DIA_TOL as CUP_BODY_DIA_TOL,
@@ -106,7 +107,7 @@ _CUP_BODY_MAX = CUP_BODY_DIA + CUP_BODY_DIA_TOL
 _CUP_BODY_MIN = CUP_BODY_DIA - CUP_BODY_DIA_TOL
 _CUP_BODY_LENGTH_MAX = CUP_BODY_LENGTH + CUP_OVERALL_LENGTH_TOL + CUP_FLANGE_THICKNESS_TOL
 # The title block's .X band on the two routine (.X) sizes below.
-_GENERAL_1PL = 0.8
+_GENERAL_1PL = GENERAL_1PL_TOL_MM
 TENON_GLUE_LINE = (_FERRULE_BORE_MIN - _TENON_MAX, _FERRULE_BORE_MAX - _TENON_MIN)
 CUP_GLUE_LINE = (_CBORE_MIN - _CUP_BODY_MAX, _CBORE_MAX - _CUP_BODY_MIN)
 # Oak left around the counterbore at its mouth, under the cup flange.
