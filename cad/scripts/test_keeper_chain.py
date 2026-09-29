@@ -59,3 +59,22 @@ def test_purchased_parts_name_their_skus() -> None:
     assert _config.parts("keeper-chain")["supplier_skus"] == [chain.CHAIN_SKU]
     assert _config.parts("keeper-chain-splice")["supplier_skus"] == [chain.SPLICE_SKU]
     assert int(_config.parts("keeper-chain-splice")["quantity"]) == len(chain.SPLICE_ORIGINS)
+
+
+def test_frozen_balloon_anchor_sits_on_a_rod_bead_edge() -> None:
+    from _drive_train_balloon_anchors import DRIVE_TRAIN_BALLOON_ANCHORS
+
+    point = DRIVE_TRAIN_BALLOON_ANCHORS["cone-crank"]["keeper-chain"].point_mm
+    assert point is not None
+    bead, toward = chain.BEAD_CENTRES[24], chain.BEAD_CENTRES[25]
+    u = [(t - b) / chain.PITCH for b, t in zip(bead, toward)]
+    h0 = math.sqrt(chain.BEAD_R**2 - chain.ROD_R**2)
+    rel = [p - b for p, b in zip(point, bead)]
+    along = sum(r * a for r, a in zip(rel, u))
+    radial = math.sqrt(sum(r * r for r in rel) - along * along)
+    # On the circle where the rod leaves the bead (4-decimal literal).
+    assert along == pytest.approx(h0, abs=2e-4)
+    assert radial == pytest.approx(chain.ROD_R, abs=2e-4)
+    # On the side facing the *Isometric viewer.
+    view = [1.0 / math.sqrt(3.0)] * 3
+    assert sum(r * v for r, v in zip(rel, view)) > 0.0

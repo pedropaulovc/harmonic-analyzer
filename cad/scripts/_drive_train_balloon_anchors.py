@@ -62,7 +62,12 @@ DRIVE_TRAIN_BALLOON_ANCHORS: dict[str, dict[str, BalloonAnchor]] = {
         "crank-pin-ring": BalloonAnchor(),
         "crank-pinion-pin": BalloonAnchor(),
         "crank-pin-eye": BalloonAnchor(),
-        "keeper-chain": BalloonAnchor(),
+        # The walk cannot claim the chain: its beads draw only silhouettes, and
+        # its 66 rod/bead edges exceed the 64-edge sampling cap. The frozen
+        # point is on the edge where bead 24's rod leaves toward bead 25 on the
+        # rising strand, on the side facing the *Isometric viewer (+1, +1, +1)
+        # (test_keeper_chain pins it to that circle).
+        "keeper-chain": BalloonAnchor(point_mm=(-17.5224, -23.6835, 14.6174)),
         "keeper-chain-splice": BalloonAnchor(),
         "fillister-screw": BalloonAnchor(),
         "crank-handle": BalloonAnchor(),
