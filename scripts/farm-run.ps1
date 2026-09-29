@@ -708,6 +708,41 @@ function Read-RunLog {
     return $parsed
 }
 
+function Add-RunRequests {
+    param(
+        [Parameter(Mandatory)]$Parsed,
+        [string]$Directory
+    )
+
+    # The workflows _farm._dispatch named before creating them. The log is
+    # this launcher's copy of the build's output, so a launcher stopped
+    # mid-dispatch can leave a `requested` line out of it; these files never
+    # depend on the launcher. A build of a commit whose _farm predates them
+    # writes none, and a record from before them names no directory.
+    if (-not $Directory -or -not (Test-Path -LiteralPath $Directory -PathType Container)) {
+        return
+    }
+    foreach ($file in @(Get-ChildItem -LiteralPath $Directory -Filter '*.json' -File | Sort-Object -Property Name)) {
+        $request = Read-RunRecord -Path $file.FullName
+        $task = $request['task']
+        $leaf = $Parsed['leaves'][$task]
+        if ($null -eq $leaf) {
+            $Parsed['leaves'][$task] = [ordered]@{
+                task = $task
+                state = 'requested'
+                workflow_id = $request['workflow_id']
+                error = $null
+            }
+            $Parsed['events'].Add("leaf $task requested $($request['workflow_id']) (request record; not in the log)")
+            continue
+        }
+        if ($null -eq $leaf['workflow_id']) {
+            # The log saw the task fail but lost the line naming its workflow.
+            $leaf['workflow_id'] = $request['workflow_id']
+        }
+    }
+}
+
 function Get-RunStatus {
     param([Parameter(Mandatory)][string]$RecordPath)
 
@@ -721,6 +756,7 @@ function Get-RunStatus {
     }
     $state = if ($null -ne $done) { $done['state'] } elseif ($alive) { 'running' } else { 'launcher-died' }
     $log = Read-RunLog -Path $record['log']
+    Add-RunRequests -Parsed $log -Directory $record['requests']
     $leaves = @($log['leaves'].Values)
     $inFlight = @($leaves | Where-Object { $_['state'] -in @('requested', 'attached') })
     # A leaf the build saw fail may still be running on the farm: a client
@@ -1471,6 +1507,8 @@ try {
         $logPath = Join-Path $resolvedLogDirectory "$runId.log"
         $donePath = Join-Path $resolvedLogDirectory "$runId.done"
         $outputsPath = Join-Path $resolvedLogDirectory "$runId.out"
+        # _farm._dispatch names each workflow here before creating it.
+        $requestsPath = Join-Path $resolvedLogDirectory "$runId.requests"
         # A short name keeps the snapshot's deepest tracked path under MAX_PATH;
         # the run record maps it back to the run.
         $snapshotPath = Join-Path (Join-Path $resolvedLogDirectory 'snapshots') $runGuid.Substring(0, 12)
@@ -1479,6 +1517,7 @@ try {
             (Test-Path -LiteralPath $logPath) -or
             (Test-Path -LiteralPath $donePath) -or
             (Test-Path -LiteralPath $outputsPath) -or
+            (Test-Path -LiteralPath $requestsPath) -or
             (Test-Path -LiteralPath $snapshotPath)
         )
     } while ($hasConflict)
@@ -1505,6 +1544,7 @@ try {
         snapshot = $snapshotPath
         outputs = $outputsPath
         environment = $environmentPath
+        requests = [System.IO.Path]::GetFullPath($requestsPath)
     }
     Write-JsonAtomic -Path $recordPath -Value $runRecord
     $startupRecordWritten = $true
@@ -1538,6 +1578,11 @@ try {
     # _farm._dispatch stamps this on every leaf it creates, so -Cancel can tell
     # a leaf this run created from one it attached to.
     $env:HARMONIC_FARM_RUN = $runId
+    # _farm._dispatch names each workflow here before it can exist: -Cancel
+    # stops this process, whose copy of the build's output can then miss the
+    # last `Farm workflow requested` lines.
+    [System.IO.Directory]::CreateDirectory($runRecord['requests']) | Out-Null
+    $env:HARMONIC_FARM_REQUESTS = $runRecord['requests']
 
     # The submitter keys every task from the files it sees when it reaches the
     # task, while every worker builds $commit. Building from a private detached

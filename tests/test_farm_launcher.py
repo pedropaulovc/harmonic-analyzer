@@ -90,7 +90,8 @@ def _launcher_fixture(tmp_path: Path, *, submodules: bool = False) -> dict[str, 
     syncs = tmp_path / "uv syncs.jsonl"
     stub = tools / "uv_stub.py"
     stub.write_text(
-        """import json
+        """import hashlib
+import json
 import os
 import re
 import subprocess
@@ -220,10 +221,21 @@ if lines:
     # Build output as build.py prints it: farm dispatch, cache hits, doit errors.
     printed = Path(lines).read_text(encoding="utf-8")
     requested = re.findall(r"Farm workflow requested: (\\S+)", printed)
+    # UV_STUB_UNLOGGED: workflows dispatched whose lines never reach the log,
+    # as when -Cancel stops the launcher before it copies them.
+    unlogged = [w for w in os.environ.get("UV_STUB_UNLOGGED", "").split(",") if w]
     farm_state = Path(os.environ["UV_STUB_FARM"])
     workflows = json.loads(farm_state.read_text(encoding="utf-8"))
-    for workflow in requested:
-        # start_workflow(USE_EXISTING, memo=...): only a creation writes it.
+    for workflow in requested + unlogged:
+        # _farm._dispatch names the workflow in the run's request directory...
+        requests = os.environ.get("HARMONIC_FARM_REQUESTS")
+        if requests:
+            task = ":".join(workflow.split(":")[1:3])
+            name = hashlib.sha256(workflow.encode("utf-8")).hexdigest()[:32]
+            (Path(requests) / f"{name}.json").write_text(
+                json.dumps({"task": task, "workflow_id": workflow}), encoding="utf-8"
+            )
+        # ...then start_workflow(USE_EXISTING, memo=...): only a creation writes it.
         if workflow in workflows and not workflows[workflow].get("_old"):
             workflows[workflow].setdefault("farm_run", os.environ.get("HARMONIC_FARM_RUN"))
     farm_state.write_text(json.dumps(workflows), encoding="utf-8")
@@ -1077,7 +1089,11 @@ def _process_alive(pid: int) -> bool:
 
 
 def _start_held(
-    tmp_path: Path, fixture: dict[str, object], lines: str, tag: str
+    tmp_path: Path,
+    fixture: dict[str, object],
+    lines: str,
+    tag: str,
+    extra: dict[str, str] | None = None,
 ) -> tuple[subprocess.Popen[str], Path, dict[str, object]]:
     """Launch with the build child printing ``lines`` and then held open."""
     release = tmp_path / f"release {tag}"
@@ -1087,6 +1103,7 @@ def _start_held(
     environment["UV_STUB_RELEASE"] = str(release)
     environment["UV_STUB_RELEASE_GUARD"] = str(HANG_GUARD_S)
     environment["UV_STUB_LINES"] = str(printed)
+    environment.update(extra or {})
     process = subprocess.Popen(
         _command(fixture, "part:pen_rod", tag=tag),
         env=environment,
@@ -1790,6 +1807,50 @@ def test_cancel_stops_a_live_launcher_and_its_build_before_cancelling_leaves(
         LEAF_CONE: "COMPLETED",
     }
     assert not Path(running["snapshot"]).exists()
+
+
+def test_cancel_finds_a_leaf_whose_request_never_reached_the_log(
+    tmp_path: Path,
+) -> None:
+    """Codex on #1125 (f90a4c357): -Cancel stops the launcher, the only copy
+    of the build's output into the log, so a `Farm workflow requested` line
+    still in that pipe was lost while its workflow kept running."""
+    fixture = _launcher_fixture(tmp_path)
+    Path(fixture["farm_state"]).write_text(
+        json.dumps({LEAF_PEN: {"status": "RUNNING"}, LEAF_NUT: {"status": "RUNNING"}}),
+        encoding="utf-8",
+    )
+    process, release, running = _start_held(
+        tmp_path, fixture, DISPATCH_LINES, "unlogged", {"UV_STUB_UNLOGGED": LEAF_NUT}
+    )
+    try:
+        assert LEAF_NUT not in Path(running["log"]).read_text(encoding="utf-8")
+        status = _run_launcher(
+            fixture,
+            _tracking(fixture, "-Status", "-RunId", running["run_id"]),
+            fixture["environment"],
+        )
+        cancel = _run_launcher(
+            fixture,
+            _tracking(
+                fixture, "-Cancel", "-RunId", running["run_id"], "-Why", "lost line"
+            ),
+            fixture["environment"],
+        )
+        process.communicate(timeout=HANG_GUARD_S)
+    finally:
+        release.touch()
+
+    assert status.returncode == 0, status.stderr
+    assert LEAF_NUT in json.loads(status.stdout)["in_flight_workflows"]
+    assert cancel.returncode == 0, (cancel.stdout, cancel.stderr)
+    done = _record(Path(running["done"]))
+    assert {w["workflow_id"]: w["outcome"] for w in done["cancel"]["workflows"]} == {
+        LEAF_PEN: "cancelled",
+        LEAF_NUT: "cancelled",
+    }
+    farm = json.loads(Path(fixture["farm_state"]).read_text(encoding="utf-8"))
+    assert farm[LEAF_NUT]["status"] == "CANCELED"
 
 
 def test_cancel_keeps_outputs_the_launcher_moved_before_it_died(

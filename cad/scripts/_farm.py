@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import getpass
+import hashlib
 import json
 import os
 import socket
@@ -351,6 +352,29 @@ def run_leaf(task: str, cache_key: str | None) -> LeafResult:
         return result
 
 
+def _record_request(task: str, wf_id: str) -> None:
+    """Name this workflow in the launcher run's request directory, if any.
+
+    scripts/farm-run.ps1 exports ``HARMONIC_FARM_REQUESTS``. Its own copy of
+    this process's output can lose the last lines when -Cancel stops it, so
+    -Cancel also reads these files, written straight from here before the
+    workflow can exist. One file per workflow, renamed into place, so parallel
+    doit workers never share a handle and a reader never sees half a file. A
+    write that fails fails the leaf before dispatch: an unnamed leaf could
+    outlive a cancel.
+    """
+    directory = os.environ.get("HARMONIC_FARM_REQUESTS")
+    if not directory:
+        return
+    name = hashlib.sha256(wf_id.encode("utf-8")).hexdigest()[:32]
+    path = Path(directory) / f"{name}.json"
+    staging = path.with_name(f"{name}.{os.getpid()}.tmp")
+    staging.write_text(
+        json.dumps({"task": task, "workflow_id": wf_id}), encoding="utf-8"
+    )
+    os.replace(staging, path)
+
+
 async def _dispatch(request: LeafRequest, wf_id: str) -> LeafResult:
     # temporalio loads a Rust bridge; import it only when a leaf is dispatched so
     # local builds and the offline check:* workers never pay for it.
@@ -379,10 +403,11 @@ async def _dispatch(request: LeafRequest, wf_id: str) -> LeafResult:
         task=request.task,
         commit=request.commit,
     )
+    _record_request(request.task, wf_id)
     # A memo is written only by the start that creates the execution; an
-    # attach (USE_EXISTING) leaves the creator's. So the memo, not the request
-    # record above, is what tells scripts/farm-run.ps1 -Cancel that its own
-    # run created this leaf (farm.py status --json reports it as farm_run).
+    # attach (USE_EXISTING) leaves the creator's. The request records above say
+    # this run asked for the leaf; only the memo says its own run created it
+    # (farm.py status --json reports it as farm_run).
     farm_run = os.environ.get("HARMONIC_FARM_RUN")
     handle = await client.start_workflow(
         WORKFLOW_BUILD_LEAF,

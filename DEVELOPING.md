@@ -234,6 +234,12 @@ no `.done`.
   `log_idle_s` and `outputs` (the snapshot's `cad\out` while running,
   `.done`'s `outputs` after). Tools that only need a run's `cad/out` —
   `cache.jsonl`, `telemetry/traces.jsonl` — read `outputs` from here.
+  Leaves come from the log plus `<run-id>.requests\`: the launcher sets
+  `HARMONIC_FARM_REQUESTS` to that directory, and `_farm._dispatch` writes one
+  `{task, workflow_id}` file there before it creates the workflow (a failed
+  write fails the leaf before dispatch). The log is the launcher's copy of the
+  build's output, so stopping the launcher mid-dispatch can drop a `Farm
+  workflow requested` line; the file cannot be dropped that way.
 - **`-Watch`** is the required watcher for an agent-launched build. It prints a
   line per leaf state change (`requested`, `attached`, `succeeded`, `failed`,
   each with its workflow id — follow one leaf with `farm.py watch <id>`) and per
@@ -318,7 +324,8 @@ farm-launch started 20260920T173011482Z-3f7b1c9a2d5e4081b6c3a9f0d4e27516 C:\src\
            "--continue", "part:pen_rod"],
   "snapshot": "C:\\src\\dt-logs\\farm-runs\\snapshots\\3f7b1c9a2d5e",
   "outputs": "C:\\src\\dt-logs\\farm-runs\\20260920T173011482Z-3f7b1c9a2d5e4081b6c3a9f0d4e27516.out",
-  "environment": "C:\\src\\dt-logs\\farm-runs\\envs\\9c41d07a2be35f18"
+  "environment": "C:\\src\\dt-logs\\farm-runs\\envs\\9c41d07a2be35f18",
+  "requests": "C:\\src\\dt-logs\\farm-runs\\20260920T173011482Z-3f7b1c9a2d5e4081b6c3a9f0d4e27516.requests"
 }
 ```
 
@@ -353,9 +360,10 @@ wrapper exception is `failed` with exit 1 and its diagnostic in the log. A run
 ID is
 `yyyyMMddTHHmmssfffZ-<32 lowercase hex GUID characters>`, so it is
 collision-resistant, and the launcher never overwrites an existing record, log,
-marker, outputs directory or snapshot: the files for one run are
+marker, outputs or requests directory, or snapshot: the files for one run are
 `<run-id>.run.json`, `<run-id>.log`, `<run-id>.done` and the `<run-id>.out`
-directory, with `-Tag` recorded inside them rather than in their names.
+and `<run-id>.requests` directories, with `-Tag` recorded inside them rather
+than in their names.
 
 `cache_environment` is in the record because `HARMONIC_CACHE_ACCOUNT`,
 `HARMONIC_CACHE_CONTAINER` and `HARMONIC_CACHE_SALT` move cache keys and
