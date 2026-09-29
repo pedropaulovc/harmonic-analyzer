@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import itertools
-import math
 import re
 from pathlib import Path
 
@@ -18,23 +17,29 @@ import drive_train_steps as steps
 from _drawing_contract import drawing_specification_violations
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import THREAD_MAJOR_MM
+from _printed_tolerance import printed_band_mm
 
 
-def test_pack_is_cut_to_the_block_foot_face_at_the_nominal_stack() -> None:
-    """U30 / handoff item 3 / I31: the block's width, from the foot flange's
-    south end to the heel relief's inner face (15.0 x 31.27), at
-    SHIM_NOMINAL."""
+def test_pack_covers_the_unrelieved_block_and_foot_at_nominal_stack() -> None:
     assert spec.SHIM_X == block.BLOCK_X
     assert spec.SHIM_SOUTH_Z == pytest.approx(-block.BLOCK_Z / 2.0 - block.FLANGE_LEN)
-    assert spec.SHIM_NORTH_Z == pytest.approx(
-        block.BLOCK_Z / 2.0 - block.HEEL_RELIEF_DEPTH
-    )
-    assert spec.SHIM_Z == pytest.approx(31.27)
+    assert spec.SHIM_NORTH_Z == pytest.approx(block.BLOCK_Z / 2.0)
+    assert spec.SHIM_Z == pytest.approx(32.8)
     assert spec.SHIM_T == block.SHIM_NOMINAL == 1.10
     assert spec.STACK_RANGE_MM == block.FOOT_SHIM_RANGE_MM
     low, high = spec.STACK_RANGE_MM
     assert low <= spec.SHIM_T <= high
 
+
+def test_printed_shim_depth_preserves_pivot_head_air_at_accepted_limits() -> None:
+    """A .X depth would intrude into the 0.20 mm minimum air."""
+    assert spec.DRAWING_PRECISION_BY_NAME["Depth"] == spec.SHIM_DEPTH_PLACES == 2
+    assert spec.PIVOT_HEAD_NOMINAL_AIR_MM == pytest.approx(1.7875)
+    before_shim_band = spec.PIVOT_HEAD_SHIM_AIR_WORST_MM + printed_band_mm(2)
+    assert before_shim_band == pytest.approx(0.8195)
+    assert spec.PIVOT_HEAD_SHIM_AIR_WORST_MM == pytest.approx(0.3095)
+    assert spec.PIVOT_HEAD_SHIM_AIR_WORST_MM >= 0.20
+    assert before_shim_band - printed_band_mm(1) < 0.20
 
 def test_leaf_stock_builds_the_nominal_and_both_stack_limits() -> None:
     """Some combination of leaves (each size used at most 4 times) hits each."""
@@ -60,59 +65,29 @@ def test_horseshoe_slot_spans_the_flange_slot_with_webs() -> None:
 
 
 def test_closed_end_stays_north_of_every_screw_position() -> None:
-    """The pack is squared on the heel-relief face; the screw's farthest
-    reach north of that edge runs through the block's printed bands and its
-    float in the flange slot.  The radius end, at its narrowest and at its
-    location's long limit, still passes it.
-
-    #838 r3 (datum A): the block baselines the flange slot's north arc
-    centre from the body's south face at .X (FlangeSlotNorthZ 6.5), so the
-    chain is heel relief .XX + Depth .X + FlangeSlotNorthZ .X + float; the
-    old midpoint (FlangeSlotZ .X) and half-spacing (.XX / 2) terms are gone."""
+    """Printed block depth and flange-slot end leave the screw inside the slot."""
     assert block.FLANGE_SLOT_NORTH_Z == 6.5
-    assert block.FLANGE_SLOT_END_PLACES == 1
-    nominal = (12.0 - 1.53) + 6.5
+    nominal = block.BLOCK_Z + block.FLANGE_SLOT_NORTH_Z
     assert spec.FLANGE_SLOT_NORTH_CENTRE_FROM_NORTH == pytest.approx(nominal)
-    bands = 0.51 + 0.8 + 0.8
+    bands = printed_band_mm(block.BLOCK_DEPTH_PLACES) + printed_band_mm(
+        block.FLANGE_SLOT_END_PLACES
+    )
     assert spec.SCREW_NORTH_REACH_BANDS_MM == pytest.approx(bands)
     reach = nominal - (bands + block.FLANGE_SLOT_FLOAT)
     assert spec.SCREW_NORTH_REACH_FROM_NORTH == pytest.approx(reach)
-    slack = (spec.SLOT_W - 0.51) / 2.0 - 3.505 / 2.0
-    assert spec.SLOT_CENTRE_FROM_NORTH == 14.0
-    assert spec.SLOT_CENTRE_FROM_NORTH + 0.8 - slack <= reach
-    # One step further south (14.1) no longer passes: the value is derived.
-    assert 14.1 + 0.8 - slack > reach
-    assert spec.SLOT_CENTRE_Z == pytest.approx(spec.SHIM_NORTH_Z - 14.0)
+    slack = (spec.SLOT_W - printed_band_mm(2)) / 2.0 - 3.505 / 2.0
+    assert spec.SLOT_CENTRE_FROM_NORTH == 16.7
+    assert spec.SLOT_CENTRE_FROM_NORTH + printed_band_mm(1) - slack <= reach
+    assert 16.8 + printed_band_mm(1) - slack > reach
+    assert spec.SLOT_CENTRE_Z == pytest.approx(spec.SHIM_NORTH_Z - 16.7)
 
 
-def test_old_midpoint_chain_no_longer_describes_the_block() -> None:
-    """The pre-r3 chain ran through FlangeSlotZ (.X, the slot midpoint) and
-    half the .XX spacing; the baselined chain runs through FlangeSlotNorthZ
-    (.X) alone.  Same nominal, but the old chain spends half a .XX band more,
-    so on today's block it reaches a shorter distance (and floored the slot
-    centre to 13.8, not 14.0) -- and the shim spec no longer reads the
-    retired names."""
-    old_nominal = (12.0 - 1.53) + block.FLANGE_SLOT_Z - block.FLANGE_SLOT_CTOC / 2.0
-    old_reach = old_nominal - (0.51 + 0.8 + 0.8 + 0.51 / 2.0 + block.FLANGE_SLOT_FLOAT)
-    assert old_nominal == pytest.approx(spec.FLANGE_SLOT_NORTH_CENTRE_FROM_NORTH)
-    assert spec.SCREW_NORTH_REACH_FROM_NORTH - old_reach == pytest.approx(0.51 / 2.0)
-    slack = (spec.SLOT_W - 0.51) / 2.0 - 3.505 / 2.0
-    old_centre = math.floor((old_reach + slack - 0.8) * 10.0 + 1e-6) / 10.0
-    assert old_centre == 13.8 != spec.SLOT_CENTRE_FROM_NORTH
-    source = Path(spec.__file__).read_text(encoding="utf-8")
-    for retired in ("FLANGE_SLOT_Z_PLACES", "FlangeSlotCtoC", "_CTOC_PLACES"):
-        assert retired not in source
 
-
-def test_slot_opens_south_along_the_flange_slot() -> None:
-    """I31: the screw rides the block's axial flange slot, so the horseshoe
-    opens to the south edge on the block's centre plane."""
+def test_pack_open_slot_and_full_depth_clear_the_foot_screw() -> None:
     assert spec.SLOT_OPEN_EDGE == "south"
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert "run_end = -SHIM_SOUTH_Z + SLOT_OVERRUN" in source
-    assert "slot_pts = [(-h, y_centre), (h, y_centre), (h, run_end), (-h, run_end)]" in source
-    # The mid-plane cut clears the whole pack from its bottom face.
+    assert spec.SLOT_CENTRE_FROM_NORTH < spec.SHIM_Z
     assert part.CUT_DEPTH / 2.0 > spec.SHIM_T
+    assert spec.SLOT_W - printed_band_mm(2) >= block.FLANGE_SLOT_W_MAX
 
 
 def test_stack_range_rides_the_thickness_dimension_not_a_note() -> None:

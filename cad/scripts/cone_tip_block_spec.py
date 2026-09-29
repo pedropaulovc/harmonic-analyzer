@@ -10,6 +10,7 @@ from _fit_limits import deviations
 from _gtol_spec import PlanarFace
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
 from _surface_finish import SEAT_UM, SurfaceFinishControl
+from cone_stack_end_play import TIP_BLOCK_FEELER_BAND
 
 
 # Small black-steel clamp block on the swing platform that carries the axial
@@ -61,12 +62,10 @@ SLIT_DEPTH = BLOCK_HEIGHT - SLIT_FLOOR
 # 94025A164) in a thread tapped THROUGH the block, a 90-degree countersink at
 # both mouths, and no block growth.  A through tap has no floor to break out
 # and no tap lead to deduct; the shaft tip enters through the same thread.
-# The cup rim sits ADJUSTER_EMBED in from the north face (the 3/8 screw stands
-# 0.03 proud).  Worst case at the printed bands: the tip station can come
-# 0.8 north (the shaft's .X overall length), and the north countersink eats
-# its depth, so engagement is min(L, embed - 0.8) - countersink >= 1.5D.  The
-# block's own axial location is set at fit-up (integration item "tip-block
-# axial fit-up slot"), not stacked.
+# The cup rim sits nominally ADJUSTER_EMBED in from the north face. The
+# bushing and gear stack locate the block via a feeler, so the installed
+# embed must absorb the accepted stack, printed axial sizes and feeler-setting
+# error; it is no longer set by following the shaft tip.
 ADJUSTER_THREAD = "#10-32"
 ADJUSTER_SCREW_LENGTH = 9.525
 ADJUSTER_EMBED = 9.5
@@ -110,10 +109,11 @@ PINCH_CLEARANCE_DIA = blind_cut_dia_mm(PINCH_CLEARANCE_SPEC)
 # stations chain from the adjuster axis: axis, rise and height all print .XX.
 _GENERAL_1PL_MM = float(str(_config.title_block("linear_1pl")["display"]).lstrip("±"))
 _GENERAL_2PL_MM = float(str(_config.title_block("linear_2pl")["display"]).lstrip("±"))
+_GENERAL_3PL_MM = float(str(_config.title_block("linear_3pl")["display"]).lstrip("±"))
 _DRILLED_HOLE_PLUS_MM = float(
     str(_config.title_block("drilled_hole")["display_plus"]).lstrip("+")
 )
-_BAND_BY_PLACES = {1: _GENERAL_1PL_MM, 2: _GENERAL_2PL_MM}
+_BAND_BY_PLACES = {1: _GENERAL_1PL_MM, 2: _GENERAL_2PL_MM, 3: _GENERAL_3PL_MM}
 # The title block's general bands as (upper, lower) fit bands, so every stack
 # below reads its limits through _fit_limits.deviations like any other band.
 GENERAL_BAND_BY_PLACES = {
@@ -330,43 +330,53 @@ if WORST_PINCH_TIP_RECESS_MM < PINCH_SCREW_RECESS_MM - 1e-9:
         f"pinch screw tip can stand {WORST_PINCH_TIP_RECESS_MM:.3f} inside the -X "
         f"face at the printed width minimum (< {PINCH_SCREW_RECESS_MM})"
     )
-# E11/W1: the through thread is the whole block, so the screw is the limit.
+# The shaft's Sec4End is baselined from the collar's south face. From that
+# face to the block's north face: collar width (.XXX), 64T + accepted L20
+# (0.025 + 0.20), bushing depth (.XXX), feeler set (±0.10), and block depth
+# (.XXX). Add the shaft tip's Sec4End (.XXX) in the opposite direction.
+# Keep the stack's 0.225 here rather than importing cone_gear_stack: cone_line
+# imports this module and must remain free of gear-spec imports. The drawing
+# contract test pins the copy to face_band(19, "north").
+GEAR_STACK_NORTH_FACE_BAND_MM = 0.225
+SHAFT_OVERALL_LENGTH_PLACES = 3
+BLOCK_DEPTH_PLACES = 3
+BUSHING_DEPTH_PLACES = 3
+COLLAR_WIDTH_PLACES = 3
+TIP_FEELER_SET_BAND_MM = TIP_BLOCK_FEELER_BAND
+ADJUSTER_EMBED_TRAVEL_MM = (
+    _BAND_BY_PLACES[SHAFT_OVERALL_LENGTH_PLACES]
+    + _BAND_BY_PLACES[COLLAR_WIDTH_PLACES]
+    + GEAR_STACK_NORTH_FACE_BAND_MM
+    + _BAND_BY_PLACES[BUSHING_DEPTH_PLACES]
+    + TIP_FEELER_SET_BAND_MM
+    + _BAND_BY_PLACES[BLOCK_DEPTH_PLACES]
+)
 WORST_ADJUSTER_ENGAGEMENT_MM = (
-    min(ADJUSTER_SCREW_LENGTH, ADJUSTER_EMBED - _GENERAL_1PL_MM) - ADJUSTER_CSK
+    min(ADJUSTER_SCREW_LENGTH, ADJUSTER_EMBED - ADJUSTER_EMBED_TRAVEL_MM)
+    - ADJUSTER_CSK
 )
 if WORST_ADJUSTER_ENGAGEMENT_MM < 1.5 * THREAD_MAJOR_MM[ADJUSTER_THREAD]:
     raise AssertionError(
-        f"adjuster engagement {WORST_ADJUSTER_ENGAGEMENT_MM:.2f} < 1.5D at the "
-        "printed worst case"
+        "the installed adjuster has under 1.5D full thread at the stack limits: "
+        f"{WORST_ADJUSTER_ENGAGEMENT_MM:.3f}"
     )
-# The adjuster's working window, cup rim measured in from the north face:
-# shallow end = 1.5D of full thread under the north countersink; deep end = the
-# cup rim still on full thread above the south countersink with the block at
-# its .X-short depth.  Fit-up sets the block so the cup seats at
-# ADJUSTER_EMBED; end-play turns (1/8 turn = 0.099) move it inside the window.
+# Cup-rim window from the block's north face: the north countersink + 1.5D
+# full thread at the shallow end, and the south countersink beyond the
+# deepest rim at the block's minimum printed depth.
 ADJUSTER_EMBED_WINDOW = (
     1.5 * THREAD_MAJOR_MM[ADJUSTER_THREAD] + ADJUSTER_CSK,
-    round(BLOCK_Z, 1) - _GENERAL_1PL_MM - ADJUSTER_CSK,
+    round(BLOCK_Z, BLOCK_DEPTH_PLACES)
+    - _BAND_BY_PLACES[BLOCK_DEPTH_PLACES]
+    - ADJUSTER_CSK,
 )
 if not (
     ADJUSTER_EMBED_WINDOW[0]
-    <= ADJUSTER_EMBED - _GENERAL_1PL_MM
-    <= ADJUSTER_EMBED + _GENERAL_1PL_MM
+    <= ADJUSTER_EMBED - ADJUSTER_EMBED_TRAVEL_MM
+    <= ADJUSTER_EMBED + ADJUSTER_EMBED_TRAVEL_MM
     <= ADJUSTER_EMBED_WINDOW[1]
 ):
     raise AssertionError("adjuster embed band leaves its working window")
 
-# I31 heel relief (Main, 2026-09-25): the cone pivot screw's head (McMaster
-# 91829A560, Ø9.525 x 4.7625) stands on the platform top 11.0 north of the
-# block centre, only 0.2375 off the block's north face at nominal, and the
-# block's north face moves north with the shaft tip (Sec4End, .X) at fit-up.
-# A rectangular step along the whole north-bottom edge clears the head: the
-# drive-train builder derives the required depth (tip travel + head float in
-# the pivot hole + 0.20 air - nominal gap) and height (head top above the
-# lowest foot) from the live parts and asserts these printed .XX values cover
-# them (build_drive_train_assembly, "heel relief").
-HEEL_RELIEF_DEPTH = 1.53
-HEEL_RELIEF_HEIGHT = 5.56
 # --- I31 foot flange and its axial slot --------------------------------------
 # The purchased hardware the flange is sized for, from the McMaster product
 # pages (read 2026-09-25): 93075A150 is a 6-32 x 5/8 low-strength zinc-plated
@@ -400,16 +410,12 @@ FLANGE_SLOT_FLOAT_MIN = (FLANGE_SLOT_W_MIN - _HOLDDOWN_MAJOR_MM) / 2.0
 # no longer needed and the slot prints .XX like the rest.
 if FLANGE_SLOT_W - _GENERAL_2PL_MM >= _HOLDDOWN_MAJOR_MM:
     raise AssertionError("the flange slot's +0.10/0 fit is no longer needed; print it .XX")
-# Fit-up chain: how far the screw can sit from where the block needs it,
-# along the axis.  The block's north face follows the shaft tip (the cup seats
-# at ADJUSTER_EMBED), so the chain runs tip -> north face -> south face ->
-# screw -> plate slot centre: the shaft's overall length Sec4End (.X; asserted
-# against the shaft spec in build_drive_train_assembly), the block Depth (.X),
-# the plate's TipSlotZ station (.XX; asserted against the platform spec there
-# too) and the screw's float across the plate's 4.0 +0.10 slot.  The flange
-# slot's two ends carry their own bands below.
-SHAFT_OVERALL_LENGTH_PLACES = 1
-BLOCK_DEPTH_PLACES = 1
+# Fit-up chain: independent axial print and setting deviations which move the
+# screw away from the flange slot's midpoint. The plate TipSlotZ location is
+# .XX; the shaft, collar, bushing and block axial dimensions are .XXX, with
+# the stack face bounded by the accepted L20 and 64T bands. The feeler is
+# set within ±0.10 and the screw floats across the plate's 4.0 +0.10 slot.
+# The flange's two arc ends retain their own .X print bands below.
 PLATE_TIP_SLOT_Z_PLACES = 2
 PLATE_TIP_SLOT_W = 4.0
 PLATE_TIP_SLOT_W_PLUS = _DRILLED_HOLE_PLUS_MM
@@ -417,8 +423,7 @@ PLATE_TIP_SLOT_FLOAT = (
     PLATE_TIP_SLOT_W + PLATE_TIP_SLOT_W_PLUS - _HOLDDOWN_MAJOR_MM
 ) / 2.0
 FIT_UP_CHAIN_MM = (
-    _BAND_BY_PLACES[SHAFT_OVERALL_LENGTH_PLACES]
-    + _BAND_BY_PLACES[BLOCK_DEPTH_PLACES]
+    ADJUSTER_EMBED_TRAVEL_MM
     + _BAND_BY_PLACES[PLATE_TIP_SLOT_Z_PLACES]
     + PLATE_TIP_SLOT_FLOAT
 )
@@ -558,13 +563,6 @@ if HOLDDOWN_PROTRUSION_MM[0] < HOLDDOWN_PITCH_MM:
         f"hold-down screw stands {HOLDDOWN_PROTRUSION_MM[0]:.3f} past the nut at "
         "the thickest stack (< one pitch past the nylon insert)"
     )
-# The relief stays in the foot, well under the adjuster thread and its
-# countersink.
-if (
-    HEEL_RELIEF_HEIGHT + _GENERAL_2PL_MM
-    > _axis_limits[0] - ADJUSTER_CSK_DIA / 2.0 - MIN_WEB_MM
-):
-    raise AssertionError("heel relief rises into the adjuster countersink")
 
 SURFACE_FINISHES = (
     # This face locates the adjuster block on the swing platform. Everything
@@ -584,8 +582,6 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PinchHeightReference": {"PinchHeight"},
     "SlitProfile": {"SlitW"},
     "TopSlit": {"SlitDepth"},
-    # I31 heel relief: depth from the north face, height from the foot.
-    "HeelReliefProfile": {"HeelReliefDepth", "HeelReliefHt"},
     # I31 foot flange: its length past the south face and its thickness; the
     # axial slot's width, located from the +X face, and (r3, option A) each
     # arc centre baselined from the south face (hidden reference sketches).
@@ -597,17 +593,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "FlangeSlotSouthReference": {"FlangeSlotSouthZ"},
 }
 
-# Decimal places carry the general tolerance and therefore live on the model.
-# U24b: the webs close at the title-block bands, so no dimension carries its
-# own band.  r3 dropped the four .XX the codex review named (46.83, 32.27,
-# 8.42, 8.85) to .X or off the print.  Still .XX: the pinch-hole height (the
-# top ligament closes at 1.92 at .X), the slit width (the drill-to-slot point
-# reaches past the far jaw's tap drill at .X), the heel relief (asserted
-# against the pivot-screw head in build_drive_train_assembly), the flange
-# thickness (the hold-down protrusion stack) and the flange slot's cutter
-# fit, and PassageCenter (at .X the west half could reach 9.3 against the
-# platform's 9.558 there; build_drive_train_assembly's print-worst
-# containment).  FlangeSlotX dropped to .X in r3: no stack needed I31's .XX.
+# Decimal places carry the general tolerance and live on the model. The
+# block's axial Depth now prints .XXX in the accepted gear-stack/feeler chain;
+# the slit, web and hold-down grades retain their earlier functional bands.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BlockProfile": {"Width": BLOCK_WIDTH_PLACES, "Depth": BLOCK_DEPTH_PLACES},
     "Block": {"BlockHt": BLOCK_HEIGHT_PLACES},
@@ -617,7 +605,6 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PinchHeightReference": {"PinchHeight": PINCH_HEIGHT_PLACES},
     "SlitProfile": {"SlitW": SLIT_W_PLACES},
     "TopSlit": {"SlitDepth": SLIT_DEPTH_PLACES},
-    "HeelReliefProfile": {"HeelReliefDepth": 2, "HeelReliefHt": 2},
     "FlangeProfile": {"FlangeLen": 1},
     "Flange": {"FlangeT": 2},
     # The width is the 5/32 cutter's (+0.10/0, set on the model).

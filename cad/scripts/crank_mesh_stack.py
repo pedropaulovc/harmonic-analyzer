@@ -2,8 +2,9 @@
 
 No backlash window or adjustable axis: the printed post-bore angularity and
 spacing must leave positive backlash at the worst closing corner. Slopes and
-pose readings are from the exact-solid B-star and crank-mesh-angle studies
-(2026-09-26); their residual is retained conservatively.
+pose readings come from the #1126 exact-solid B-star and crank-mesh-angle
+studies at the old 6.5 face; the grown 7.2113 face is rechecked by the
+assembly's exact-solid interference gate, not by assuming a new fitted slope.
 """
 
 from __future__ import annotations
@@ -17,7 +18,7 @@ import crank_drive_gear_notes
 import crank_drive_gear_spec as gear64
 import crank_pinion_spec as pinion
 import crankshaft_spec as shaft
-from retained_joint_fit import RETAINED_JOINT_CLEARANCE
+from gear_seat_fit import GEAR_SEAT_CLEARANCE
 
 R64 = gear64.PITCH_DIA / 2.0
 R16 = (16.0 / gear64.DIAMETRAL_PITCH) * gear64.MM_PER_IN / 2.0
@@ -119,7 +120,7 @@ def stack_terms(*, spacing_printed: float, plan_limit_deg: float, crank_angle_de
         Term("64T axial station", -KC * STATION_64T_DC),
         Term("crank float at rest", -KC * _float_at_rest(_RUNNING[1], crank_bearing_length, CRANK_OVERHANG) * DC_PER_DY),
         Term("cone float at rest", KC * _float_at_rest(_RUNNING[0], post.CONE_BOSS_LENGTH, CONE_OVERHANG) * DC_PER_DY),
-        Term("gear bore runout", -KC * (pinion.BORE_DIAMETRAL_CLEARANCE[1] + RETAINED_JOINT_CLEARANCE[1]) / 2.0),
+        Term("gear bore runout", -KC * (pinion.BORE_DIAMETRAL_CLEARANCE[1] + GEAR_SEAT_CLEARANCE[1]) / 2.0),
         Term("tooth-to-bore cutting runout", -KC * TOOTH_RUNOUT_TIR_MM),
         Term("tip diameter band", TIP_BAND_CLOSE),
         Term("64T tooth thickness", -K64 * crank_drive_gear_notes.TOOTH_THICKNESS_DEVIATIONS[0]),

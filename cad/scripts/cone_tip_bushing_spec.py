@@ -17,12 +17,12 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 
 OUTER_DIA = 6.0
-BORE_DIA = 0.0625 * 25.4  # 1.5875: the cone shaft's 1/16 in tip journal
-LENGTH = 4.0
+BORE_DIA = 0.0625 * 25.4  # 1.5875: round bore around the flatted shaft tip
+LENGTH = 4.0  # thrust spacer between T006 and the feeler-set tip block
 
-# Rule 5's running-surface case: the bore runs on the shaft's tip journal, so
-# the finish belongs on it and nowhere else -- the OD and the end faces are
-# spacer faces at the general grade.
+# The bore can run against the shaft tip's remaining cylindrical arc; the
+# D-flat now continues through the tip. Keep the bore finish on that bearing
+# arc, not on the free OD or thrust faces.
 SURFACE_FINISHES = (
     SurfaceFinishControl(
         "bushing_bore",
@@ -42,14 +42,13 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # Policy rule 2: the places a dimension prints are part of the tolerance it
 # carries, so the part build applies them (``apply_drawing_precision``) and the
 # drawing only reads them back (``assert_imported_precision``). Three places
-# on the bore: it carries the running-fit band. One on the OD and the length:
-# the loosest title-block band (.X +/-0.8) -- the OD is a free outer surface
-# and the length is a spacer thickness the tip adjuster's end-play takeup
-# absorbs, so neither earns the tighter .XX grade (codex review, 2026-09-23).
+# on the bore: it carries the running-fit band. One on the free OD; three on
+# the length, which locates the thrust face of the solid gear stack under the
+# tip block's feeler (the .X band would consume the set gap).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BodyProfile": {"ODDim": 1},
     "BoreProfile": {"BoreDiaDim": 3},
-    "Body": {"Depth": 1},
+    "Body": {"Depth": 3},
 }
 
 # The drawing reads this flat view back off the sheet: a dimension name is
@@ -77,9 +76,8 @@ for _feature, _dimensions in DRAWING_PRECISION.items():
 # checks it against the registry.
 SHAFT_MATE_NUMBER = "MHA-014"
 
-# Rule 6, one line: identify the mating journal and the required fit without
-# duplicating a size or prescribing an assembly method.  The native bore limits
-# and the shaft print quantify this slip fit.
+# Rule 6: name the mating shaft tip and its slip clearance without implying
+# a continuous round journal. The bore stays round around the shaft's D-flat.
 DRAWING_NOTES = (
-    f"BORE SLIP-FITS THE {SHAFT_MATE_NUMBER} CONE GEAR SHAFT TIP JOURNAL."
+    f"BORE SLIP-FITS THE {SHAFT_MATE_NUMBER} CONE GEAR SHAFT TIP."
 )

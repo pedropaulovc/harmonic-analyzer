@@ -4,12 +4,12 @@ The dark steel 64T gear at the cone set's large end; it carries the crossed-axis
 helical accommodation for its straight 16T crank pinion mate (4:1 crank-to-cone
 reduction).
 
-Recreated under ``cad/docs/drawing-simplicity-policy.md``. The three sizes a
-machinist turns and bores -- outside diameter, face width, bore -- are NATIVE
-model dimensions carrying their own decimal places and bands (rules 1, 2, 4);
-the tooth system a cut-gear print cannot express as dimensions stays in the
-gear-data block rule 6 allows, with every generating number marked REF; and
-nothing here restates the title block.
+Recreated under ``cad/docs/drawing-simplicity-policy.md``. The five blank,
+bore and entry sizes -- outside diameter, face width, round bore, D-bore
+across-flat and south bore chamfer -- are NATIVE model dimensions carrying
+their own decimal places and bands; the tooth system a cut-gear print cannot
+express as dimensions stays in the gear-data block rule 6 allows, with every
+generating number marked REF.
 
 PURE DATA, no SolidWorks/COM imports: ``build_crank_drive_gear`` marks and
 tolerances exactly ``DRAWING_DIMENSIONS`` / ``DRAWING_PRECISION`` on the model,
@@ -22,6 +22,8 @@ from __future__ import annotations
 import math
 
 import _config
+import cone_shaft_land_bands
+import gear_seat_fit
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
@@ -38,25 +40,25 @@ TEETH = 64
 HELIX_ANGLE_DEG = _config.machine("gear_train", "crank_drive_helix_deg")
 BACKLASH_MM = _config.machine("gear_train", "crank_drive_backlash_mm")
 
-# Face width (user ruling 2026-09-28).  The v36 MHA-016 casting is restored:
-# its crank boss's north face is the collar's tangent plane again, and an 8.0
-# face seated on MHA-014's thrust collar reaches into it (-0.05 nominal,
-# -3.69 at print-worst).  The ruling keeps the 64T's NORTH face where the 8.0
-# face put it, so the T120 side of the gear and every cone station stay, and
-# narrows the gear from the SOUTH, the thrust collar growing by the same
-# amount.  FACE_WIDTH is the widest face, at the face width's printed places
-# (one: DRAWING_PRECISION below), that holds every MHA-016 north feature at
-# crank_boss_rim.FLOOR_CLEARANCE_MM at print-worst; the crank boss governs
-# (0.343 at 6.5, 0.244 at 6.6), and crank_boss_rim asserts both at import.
-# The centre therefore sits CENTRE_SHIFT_NORTH north of the 19.9 station the
-# 8.0 face was laid out on.
-NORTH_FACE_REFERENCE_WIDTH = 8.0
-FACE_WIDTH = 6.5
-CENTRE_SHIFT_NORTH = (NORTH_FACE_REFERENCE_WIDTH - FACE_WIDTH) / 2.0
-if not 0.0 < FACE_WIDTH < NORTH_FACE_REFERENCE_WIDTH or abs(CENTRE_SHIFT_NORTH - 0.75) > 1e-9:
+# Face width.  The v36 MHA-016 casting is restored: its crank boss's north
+# face is the collar's tangent plane again, so the 64T's SOUTH face -- seated
+# on MHA-014's thrust collar -- stays where the #1126 ruling put it, 1.5 north
+# of the 8.0 face the 19.9 station was laid out on (crank_boss_rim holds every
+# MHA-016 north feature off it).  The cone set is a solid stack (user ruling
+# 2026-09-28, cone_gear_stack): the 64T grows NORTH until it bears on T120's
+# grown south face, so its face is the gap between the collar and T120,
+# floored to the four places it prints.  cone_gear_stack pins the two faces
+# together.  The band is the cone gears' +/-0.025.
+LAYOUT_FACE_WIDTH = 8.0
+SOUTH_FACE_SHIFT_NORTH = 1.5
+FACE_WIDTH = 7.2113
+FACE_WIDTH_BAND = (0.025, -0.025)
+# The centre sits CENTRE_SHIFT_NORTH north of the 19.9 layout station.
+CENTRE_SHIFT_NORTH = SOUTH_FACE_SHIFT_NORTH + (FACE_WIDTH - LAYOUT_FACE_WIDTH) / 2.0
+if not LAYOUT_FACE_WIDTH - SOUTH_FACE_SHIFT_NORTH < FACE_WIDTH < LAYOUT_FACE_WIDTH:
     raise AssertionError(
-        f"the 64T narrows from the south about its 8.0 north face: face {FACE_WIDTH}, "
-        f"centre shift {CENTRE_SHIFT_NORTH} (user ruling 2026-09-28)"
+        f"64T face {FACE_WIDTH} must grow past the #1126 6.5 face "
+        f"and stay inside the {LAYOUT_FACE_WIDTH} layout face"
     )
 
 # ONE cutter cuts both gears of the pair (#906, Main 2026-09-26). A crossed
@@ -104,16 +106,67 @@ NORMAL_CIRCULAR_TOOTH_THICKNESS = TRANSVERSE_CIRCULAR_TOOTH_THICKNESS * _COS_HEL
 # the tip by half of it toward MHA-016.
 OUTSIDE_DIA_TOLERANCE_MM = 0.10
 
-# The cone shaft's 3/8" gear land. The bore over it is the part's one critical
-# fit and the only reason anything on the print carries a third decimal -- but
-# its BAND is derived in ``build_crank_drive_gear`` from the named fit class and
-# the shaft land's own published limits, because a fit-class read
-# (``_config.fit`` -> tolerances.yaml) inside THIS module would land in the
-# import closure of every assembly that imports OUTSIDE_DIA and make fit classes
-# a rebuild dependency of the frame (test_dodo_recipe's fine-grained-config
-# contract). The drawing needs the size and the places; only the part needs the
-# limits.
+# The Ø9.525 round portion of MHA-014's Sec1 gear seat. The round-bore
+# clearance is paired with the published shaft diameter band in the part
+# builder. This shared spec owns the nominal and D-flat AF band without
+# pulling a fit-class config read into assembly rebuild dependencies.
 BORE_DIA = 0.375 * MM_PER_IN  # 9.525
+
+# One D-flat on local +X, paired with MHA-014 Sec1. Across-flat is measured
+# from this plane to the opposite circular wall, not from the gear centre.
+BORE_AF = cone_shaft_land_bands.SECTION_FLAT_AF[1]
+BORE_AF_BAND = gear_seat_fit.flat_bore_af_band(cone_shaft_land_bands.FLAT_AF_BAND)
+if BORE_AF is None:
+    raise AssertionError("the 64T needs the flatted Sec1 gear seat")
+
+# The MHA-014 Sec1 flat stops square against its collar. A flat milled with
+# an end mill of at least Ø8 leaves an axial crescent at the chord corners.
+# At offset y from the flat midpoint its horn height above the flat is
+# sqrt(Rshaft²-y²)-flat_offset, and the cutter's axial runout is
+# Rcutter-sqrt(Rcutter²-y²). Their SUM must fit inside the 45° bore-entry
+# chamfer, not merely the cutter runout alone. With Rcutter < Rshaft that
+# sum increases monotonically from the flat midpoint to a chord corner;
+# using the upper shaft diameter and lower shaft AF is print-worst.
+MIN_FLAT_CUTTER_RADIUS = 4.0  # ≥Ø8 end mill
+BORE_SOUTH_CHAMFER = 1.00
+# The south entry is functional: .X's general band could accept a chamfer
+# smaller than the cutter crescent. A native +0.10/-0.00 leg band preserves
+# the full 1.00-mm minimum without constraining the harmless upper end.
+BORE_SOUTH_CHAMFER_BAND = (0.10, 0.00)
+# The shaft's nominal Sec1 Ø is BORE_DIA; the drawing contract tests it
+# against cone_gear_shaft_spec.SECTION_DIAS[1] without a circular import.
+_SHAFT_MAX_R = (BORE_DIA + cone_shaft_land_bands.SECTION_DIA_BANDS[1][0]) / 2.0
+_SHAFT_MIN_AF = BORE_AF + cone_shaft_land_bands.FLAT_AF_BAND[1]
+_FLAT_OFFSET = _SHAFT_MIN_AF - _SHAFT_MAX_R
+_HALF_CHORD = math.sqrt(_SHAFT_MAX_R**2 - _FLAT_OFFSET**2)
+_MAX_HORN = _SHAFT_MAX_R - _FLAT_OFFSET
+_MAX_CUTTER_RUNOUT = MIN_FLAT_CUTTER_RADIUS - math.sqrt(
+    MIN_FLAT_CUTTER_RADIUS**2 - _HALF_CHORD**2
+)
+MAX_FLAT_CRESCENT = max(_MAX_HORN, _MAX_CUTTER_RUNOUT)
+if MAX_FLAT_CRESCENT >= BORE_SOUTH_CHAMFER + BORE_SOUTH_CHAMFER_BAND[1]:
+    raise AssertionError(
+        f"Sec1 end-mill horn + runout {MAX_FLAT_CRESCENT:.4f} reaches "
+        f"the south bore chamfer {BORE_SOUTH_CHAMFER + BORE_SOUTH_CHAMFER_BAND[1]:.4f}"
+    )
+
+# Even at the collar's supplied 5/8-in stock lower bound and the bore/chamfer
+# upper bounds, the mouth ends before the collar's outer bearing annulus.
+# Mirror the stock class here: cone_gear_shaft_spec imports this gear's face
+# width, so importing its COLLAR_DIA here would form an import cycle. The
+# offline drawing test cross-checks these numbers against the shaft spec.
+_COLLAR_MIN_R = (0.625 * MM_PER_IN - 0.002 * MM_PER_IN) / 2.0
+_BORE_MAX_R = (
+    BORE_DIA + gear_seat_fit.seat_bore_band(cone_shaft_land_bands.GEAR_SEAT_BAND)[0]
+) / 2.0
+COLLAR_BEARING_ANNULUS = _COLLAR_MIN_R - (
+    _BORE_MAX_R + BORE_SOUTH_CHAMFER + BORE_SOUTH_CHAMFER_BAND[0]
+)
+if COLLAR_BEARING_ANNULUS <= 0:
+    raise AssertionError("the chamfer reaches the collar's bearing outer rim")
+FLAT_ENGAGEMENT_MIN = FACE_WIDTH + FACE_WIDTH_BAND[1] - (
+    BORE_SOUTH_CHAMFER + BORE_SOUTH_CHAMFER_BAND[0]
+)
 
 # One roughness, on the one surface whose function depends on it: the bore is a
 # size-toleranced fit onto the cone shaft's land, and a fit lives on the peaks
@@ -136,7 +189,8 @@ SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = (
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "OutsideDiaReference": {"OutsideDia"},
     "GearBlank": {"FaceWidth"},
-    "BoreProfile": {"BoreDia"},
+    "BoreProfile": {"BoreDia", "BoreAF"},
+    "BoreSouthChamfer": {"BoreSouthChamferSize"},
 }
 
 # --- Decimal places, authored ON THE PART ------------------------------------
@@ -147,16 +201,16 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # marks, so ``draw_crank_drive_gear`` imports each dimension verbatim and only
 # reads ``GetPrimaryPrecision2()`` back off the sheet.
 #
-# The bore is the only fit on the part and prints three places with its own
-# band. The outside diameter prints two with its own +/-0.10. The face width is a free
-# length between two turned faces: one place, so the title block's .X +/-0.8 is
-# the band it claims -- and that is the band it needs: the south face is the
-# one seated on MHA-014's collar, so the band moves only the north face, away
-# from MHA-016 (crank_boss_rim), and the mating 16T's 10.4 face is 3.9 wider.
+# The round and D-flat bore sizes carry their own fit bands at three places.
+# The outside diameter prints two with +/-0.10. The face width is the four-place
+# ±0.025 member of the solid gear stack; its south face seats on the collar
+# and the tolerance only shifts the north face. The south chamfer leg prints
+# two places with its explicitly unilateral functional band.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "OutsideDiaReference": {"OutsideDia": 2},
-    "GearBlank": {"FaceWidth": 1},
-    "BoreProfile": {"BoreDia": 3},
+    "GearBlank": {"FaceWidth": 4},
+    "BoreProfile": {"BoreDia": 3, "BoreAF": 3},
+    "BoreSouthChamfer": {"BoreSouthChamferSize": 2},
 }
 
 # The drawing reads this flat view back off the sheet: a dimension name is

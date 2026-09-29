@@ -121,7 +121,7 @@ reserved:
 monte_carlo:
   draws: 4000
   seed: 20260912
-  distribution: uniform          # every feature uniform within +/- tolerance (no process centring credit)
+  distribution: uniform          # deviations uniform within +/- tolerance; cone_flat_play is drawn about the fit's 0.02 mm mean
 
 # Channel-specific features. `tolerance` is the +/- half-width of the drawing
 # (or matching/setup) limit; `unit` is mm unless stated. `class`:
@@ -187,6 +187,20 @@ critical_features:
     quantity: phase
     class: channel
     holds: "derived: half the cone<->cylinder gear_mesh backlash band (tolerances.yaml 0.05..0.20 mm) at the 120T pitch radius, one-directional cranking"
+  cone_flat_clock:
+    tolerance: 0.25
+    unit: deg
+    nominal: null
+    quantity: phase
+    class: channel
+    holds: "mill all shaft flats at one clock; index each cone gear's teeth off its D-bore flat on one setup (BoreFlatClock +/-0.25 deg)"
+  cone_flat_play:
+    tolerance: 0.010
+    unit: mm
+    nominal: null
+    quantity: phase
+    class: channel
+    holds: "D-bore across-flat fit: 0.01-0.03 mm clearance on every gear (gear_seat_fit.FLAT_AF_CLEARANCE); subtract the common Ø9.525-land mean lag as a crank-index time shift, retain per-land residual and per-gear scatter"
   station_setting:
     tolerance: 0.25
     nominal: null

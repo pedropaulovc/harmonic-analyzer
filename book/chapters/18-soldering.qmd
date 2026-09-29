@@ -1,48 +1,48 @@
 ---
-title: "Soft and silver soldering"
+title: "Fitting D-bores and the cone gear stack"
 status: stub
 ---
 
-# Soft and silver soldering {#sec-soldering}
+# Fitting D-bores and the cone gear stack {#sec-soldering}
 
-There is not a single keyway in this machine. The cone gears are soldered to their shaft.
+MHA-014 has one co-clocked D-flat on each gear land. The 64T and all twenty cone gears
+slide onto matching D-bores; the gears touch from the thrust-collar-supported 64T
+to T006. This is a 2026-09-28 user ruling for alignment without adhesive, not
+the photographed original: the p.21 macro shows solder blobs on the small gears.
 
 ::: {.callout-note appearance="simple"}
-**TODO** — stub. Nothing here has been written yet.
+**TODO(cut it first)** — the D-bore finishing and gauging operation has not been logged;
+this is a fit specification, not a proved machining sequence.
 :::
 
-## Soft solder versus silver solder: strength, temperature, when each
+## Check the flats and bores
 
-TODO
+The shaft AF values are 8.763, 5.842, 2.921 and 1.460 mm, each +0/−0.010 mm.
+Each matching D-bore AF is +0.010/+0.020 mm over its shaft nominal (0.01–0.03 mm
+flat clearance); the round portions have 0.025–0.105 mm diametral slip clearance.
+These values come from `cad/scripts/cone_shaft_land_bands.py` and
+`cad/scripts/gear_seat_fit.py`. **TODO(cut it first):** the D-bore production method
+has not yet been recorded in `logbook/entries/`; no cutter, feed or setup is prescribed here.
 
-## Cleanliness and flux
+## Fit the solid stack
 
-TODO
-
-## Heating brass and steel together without overheating the brass
-
-TODO
-
-## Fixturing a joint that must stay square and concentric
-
-TODO
-
-## Soldering twenty gears onto one shaft, in position
-
-TODO
-
-## Undoing a joint you got wrong
-
-TODO
+The 64T is 7.2113 ±0.025 mm thick. The twenty cone gears are each
+6.8887 ±0.025 mm thick; check the twenty-gear stack at **137.774 ±0.20 mm**
+(`cad/scripts/cone_gear_stack.py`). The tip bushing bears on T006. Set the tip
+block against a 0.45 mm feeler off the bushing; the end-play window is
+0.35–0.55 mm (`cad/scripts/cone_stack_end_play.py`). The 16T pinion face is
+9.5 mm (`cad/scripts/crank_pinion_spec.py`). The tip bushing retains its
+round bore but acts as a thrust spacer on the continuous D-flat.
 
 ::: {.callout-tip}
 ## Now make
-A test joint at temperature, pulled to destruction, before touching the real cone gear set.
+Gauge a shaft-land D-flat and its mating gear bore before assembling the stack.
 :::
 
 ---
 
 **Sources for this chapter**
 
-- `cad/docs/machining-dfm.md` (gears soldered, no keys)
+- `cad/config/dimensions.yaml` (Chapter 12 cone shaft and gear stack)
+- `cad/docs/machining-dfm.md` (machining hazards and unselected D-bore route)
 

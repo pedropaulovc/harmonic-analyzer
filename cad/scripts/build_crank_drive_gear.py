@@ -30,24 +30,14 @@ that also absorbs the cos(incline) normal-pitch shrink, and a deepened root floo
 Dimensions: cad/config/dimensions.yaml ch12 crank-drive gear row +
 Appendix C #9.
 
-ATTACHMENT (rule-11 flag closed 2026-09-21, C:/src/dt-logs/geometry-decisions.md):
-the bore is the ONLY attachment feature -- no key, keyway, pin, set screw or
-hub boss -- and that is deliberate, not an omission. Evidence (ch12 p.20
-page003_img03.jpeg; p.21 page003_img02.jpeg's solder blobs on the same shaft's
-small gears; engineerguy v4_t00399/v2_t00069 showing the south face within
-~1 mm of the pivot post, i.e. no room for a boss) says the 64T is fixed like
-the 20 cone gears: soldered or silver-brazed to its 3/8" seat on
-build_cone_gear_shaft's journal, so the brazed joint carries the whole crank
-torque. The bore therefore takes the shared bonded-joint fit
-(retained_joint_fit: 0.025..0.105 diametral clearance on its land, inside both
-the capillary window a silver-braze filler needs and the gap-fill limits of
-the high-strength retaining compounds, so the USER also approved Loctite
-638/648 as an acceptable alternative to filler metal, 2026-09-21);
-the print says so in crank_drive_gear_notes.DRAWING_NOTES. Axially the gear is
-soldered against the MHA-014 thrust collar's north face, so the axial station
-is an assembly fact, not a part requirement; its north face stays where the
-8.0 face put it and the face narrows from the south (user ruling 2026-09-28,
-crank_drive_gear_spec.FACE_WIDTH).
+ATTACHMENT (user ruling 2026-09-28): the 64T slides onto MHA-014's
+Sec1 D-flat land with one matching flat, normal to local +X. The round
+and across-flat bore bands are derived from that land's two printed
+bands. Its south bore entry has a 1.00 x 45° chamfer across the entire
+D-profile to swallow the flat mill's runout crescent against the square
+shaft collar; the bearing annulus remains intact. Its south face butts
+against the MHA-014 thrust collar; the north face touches T120 in the
+solid cone-gear stack. The 64T has no tooth-to-flat clock requirement.
 
 Layout: gear axis = Z through the origin, disc z = 0..FACE_WIDTH; the helix
 twist is symmetric about the mid-face plane (the assembly's phase math
@@ -69,12 +59,12 @@ import cone_shaft_land_bands
 from _common import (
     IN,
     SketchDims,
-    _early_bound,
     _feature_by_name,
+    anchor_point_to_origin,
     apply_material,
     blank_sketch,
-    name_bore_axis,
     check,
+    name_bore_axis,
     define_circle,
     drive_dimension,
     ensure_fully_defined,
@@ -84,6 +74,7 @@ from _common import (
     report_mass_properties,
     run_build,
     set_global,
+    set_sketch_direct_db,
 )
 from _drawing_marks import (
     apply_drawing_precision,
@@ -98,12 +89,17 @@ from _fit_limits import deviations
 from _gear import build_fixed_gear, volume_check
 from _part_pmi import author_part_pmi
 from crank_drive_gear_notes import DRAWING_NOTES, GEAR_DATA
-from retained_joint_fit import RETAINED_JOINT_CLEARANCE, bonded_bore_band
+from gear_seat_fit import GEAR_SEAT_CLEARANCE, seat_bore_band
 from crank_drive_gear_spec import (
+    BORE_AF,
+    BORE_AF_BAND,
+    BORE_SOUTH_CHAMFER,
+    BORE_SOUTH_CHAMFER_BAND,
     CUTTER_DIAMETRAL_PITCH,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     FACE_WIDTH,
+    FACE_WIDTH_BAND,
     OUTSIDE_DIA,
     OUTSIDE_DIA_TOLERANCE_MM,
     PRESSURE_ANGLE_DEG,
@@ -111,15 +107,37 @@ from crank_drive_gear_spec import (
 )
 
 
-def _as_construction(adapter, entity_id: str) -> None:
-    """Flag a registered sketch circle as construction geometry.
+def _d_bore_area(radius: float, flat_x: float) -> float:
+    """Area of a round bore trimmed by its across-flat chord, in mm²."""
+    half_chord = math.sqrt(radius * radius - flat_x * flat_x)
+    segment = radius * radius * math.acos(flat_x / radius) - flat_x * half_chord
+    return math.pi * radius * radius - segment
 
-    ``ConstructionGeometry`` is declared on the base ISketchSegment, not the
-    derived ISketchArc the entity registry binds -- rebind before the set.
-    Construction, not BLANKED: a blanked sketch's dimensions never reach
-    ``InsertModelAnnotations3``, while construction geometry imports its
-    dimensions normally and is never drawn in a view (build_harmonic_base's
-    two reference sketches proved both halves live).
+
+def _bore_south_chamfer_volume(radius: float, flat_x: float, leg: float) -> float:
+    """45° D-rim chamfer removal: offset arc AND flat, integrated axially.
+
+    At depth z the bore grows by leg-z along both walls; Simpson quadrature
+    of that exact D cross-section avoids pretending the flat is a full circle.
+    """
+    base = _d_bore_area(radius, flat_x)
+    steps = 16
+    dz = leg / steps
+    total = 0.0
+    for index in range(steps + 1):
+        offset = index * dz
+        area_added = _d_bore_area(radius + offset, flat_x + offset) - base
+        total += (1 if index in (0, steps) else 4 if index % 2 else 2) * area_added
+    return dz * total / 3.0
+
+
+def _as_construction(adapter, entity_id: str) -> None:
+    """Flag a registered sketch segment as construction geometry.
+
+    ``ConstructionGeometry`` lives on ISketchSegment, not the derived
+    ISketchArc/ISketchLine bound by the entity registry. A construction
+    witness imports its native dimension while staying out of the cut
+    profile and the visible drawing geometry.
     """
     segment = _early_bound(adapter._sketch_entities[entity_id], "ISketchSegment")
     segment.ConstructionGeometry = True
@@ -151,10 +169,8 @@ MATERIAL = "Plain Carbon Steel"  # p.20: dark gear, distinct from the brass trai
 TEETH = 64  # Appendix C #9 estimate, photo-ratified 2026-07-14 (see docstring)
 DP = _config.machine("gear_train", "crank_drive_diametral_pitch")  # cad/config/machine/gear_train.yaml
 PA_DEG = PRESSURE_ANGLE_DEG  # transverse, from the normal-plane cutter (spec)
-# M6.7: seated perpendicular on the cone shaft's 3/8" pivot journal like the
-# cone gears (true cone, p.20).  FACE_WIDTH is the spec's (user ruling
-# 2026-09-28).
-BORE_DIAMETER = 0.375 * IN  # snug on the 3/8" journal
+# The 64T seats on MHA-014's flatted Sec1 gear land.
+BORE_DIAMETER = 0.375 * IN
 
 # Crossed-mesh accommodation (module docstring): the tooth inclination is the
 # exact-solid result for the recentered 64T station and is shared through the
@@ -165,34 +181,19 @@ BORE_DIAMETER = 0.375 * IN  # snug on the 3/8" journal
 HELIX_DEG = _config.machine("gear_train", "crank_drive_helix_deg")
 BACKLASH_MM = _config.machine("gear_train", "crank_drive_backlash_mm")
 
-# The bore over the cone gear shaft is this part's ONE critical fit: a bonded
-# joint (solder, silver-braze or Loctite 638/648) on MHA-014's Sec1 gear-seat
-# land, the same land the T030-T120 cone gears bond to.  It takes the shared
-# retained-joint fit class (retained_joint_fit, Main ruling 2026-09-25) from
-# that land's own published limits: bore_min = land_max + clearance_min,
-# bore_max = land_min + clearance_max, so moving either input moves the bore.
-# The former shaft_in_bushing running fit, applied to the 0.05-wide land,
-# left a ZERO-width bore band (+0.025/+0.025), which no reamer holds.  It
-# lives in the BUILD script, not the shared spec, so the assemblies that
-# import OUTSIDE_DIA from crank_drive_gear_spec never re-key on a fit edit.
+# A printable slide fit on the Sec1 gear-seat land. The round and flat
+# clearances are independent: BoreDia sets radial runout; BoreAF limits
+# angular play on the local +X flat. No joining compound is involved.
 _LAND_UPPER, _LAND_LOWER = cone_shaft_land_bands.SECTION_DIA_BANDS[1]
 if (_LAND_UPPER, _LAND_LOWER) != cone_shaft_land_bands.GEAR_SEAT_BAND:
     raise AssertionError("the 64T no longer rides a gear-seat land")
-BORE_DIA_BAND = bonded_bore_band(cone_shaft_land_bands.GEAR_SEAT_BAND)  # (upper, lower)
-# The diametral gap the printed limits actually give, and its three checks:
-# a band a reamer can hold, never over Loctite 648's 0.15 gap-fill limit (with
-# 0.02 margin), and never under the floor that lets the gear start on its land.
-BORE_DIAMETRAL_GAP = (
+BORE_DIA_BAND = seat_bore_band(cone_shaft_land_bands.GEAR_SEAT_BAND)
+BORE_DIAMETRAL_CLEARANCE = (
     round(BORE_DIA_BAND[1] - _LAND_UPPER, 6),
     round(BORE_DIA_BAND[0] - _LAND_LOWER, 6),
 )
-LOCTITE_648_GAP_FILL_MAX = 0.15
-if BORE_DIA_BAND[0] - BORE_DIA_BAND[1] < 0.02:
-    raise AssertionError(f"64T bore band {BORE_DIA_BAND} is narrower than 0.02")
-if BORE_DIAMETRAL_GAP[1] > LOCTITE_648_GAP_FILL_MAX - 0.02:
-    raise AssertionError(f"64T bond gap {BORE_DIAMETRAL_GAP} nears the 648 fill limit")
-if BORE_DIAMETRAL_GAP[0] < RETAINED_JOINT_CLEARANCE[0]:
-    raise AssertionError(f"64T bond gap {BORE_DIAMETRAL_GAP} is under the start floor")
+if BORE_DIAMETRAL_CLEARANCE != GEAR_SEAT_CLEARANCE:
+    raise AssertionError("64T bore lost its round slide-fit clearance")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -200,17 +201,13 @@ async def build(adapter) -> dict[str, str]:
 
     check("create_part", await adapter.create_part())
 
-    # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
-    # is an INCH document and the equation manager reads BARE numbers in document
-    # units (an unsuffixed 9.525 would be read as 9.525 inches). FaceWidth is the
-    # blank/bore extrude DEPTH and BoreDia the shaft-bore diameter; both are
-    # printed dimensions, so both are knobs AND both are driven below. The
-    # toothed-disc geometry (teeth/DP/helix) is authored by the shared _gear
-    # helper with literal-numeric curve expressions, so it has no sketch dim to
-    # drive here -- which is why the tip circle needs the reference sketch
-    # further down.
+    # This INCH document needs explicit mm suffixes in its editable globals.
+    # The face width, round bore, across-flat witness and entry chamfer
+    # dimensions are equation-driven after the full feature tree exists.
     await set_global(adapter, "FaceWidth", f"{FACE_WIDTH}mm")
     await set_global(adapter, "BoreDia", f"{BORE_DIAMETER}mm")
+    await set_global(adapter, "BoreAF", f"{BORE_AF}mm")
+    await set_global(adapter, "BoreSouthChamferSize", f"{BORE_SOUTH_CHAMFER}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -238,27 +235,89 @@ async def build(adapter) -> dict[str, str]:
         (name_dimensions(adapter, "GearBlank", ["FaceWidth"])[0], '"FaceWidth"')
     ]
 
-    # Shaft bore (on-axis circle at the origin: only the diameter is a dim, so
-    # define_circle records just that -- the centre X/Z slots are ignored).
+    # Cut one D-profile through the finished helix. Its circle arc is the
+    # major arc through local -X; the closing chord is perpendicular to +X.
+    # A construction witness from the opposite arc wall to the flat owns
+    # the native across-flat measurement (BoreAF), independent of BoreDia.
     bore = SketchDims()
     check("create_sketch bore", await adapter.create_sketch("Front"))
-    await define_circle(
-        adapter, 0.0, 0.0, BORE_DIAMETER / 2.0, "bore", dims=bore,
-        names=("BoreCx", "BoreCz", "BoreDia"),
-        drives=(None, None, '"BoreDia"'),
+    radius = BORE_DIAMETER / 2.0
+    flat_x = BORE_AF - radius
+    half_chord = math.sqrt(radius * radius - flat_x * flat_x)
+    set_sketch_direct_db(adapter, True)
+    arc = check(
+        "D-bore major arc",
+        await adapter.add_arc(0.0, 0.0, flat_x, half_chord, flat_x, -half_chord),
     )
-    await ensure_fully_defined(adapter, "bore sketch")
+    flat = check(
+        "D-bore flat", await adapter.add_line(flat_x, -half_chord, flat_x, half_chord)
+    )
+    af_witness = check(
+        "D-bore across-flat witness", await adapter.add_line(-radius, 0.0, flat_x, 0.0)
+    )
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, af_witness)
+    for label, first, second, relation in (
+        ("bore arc centre", f"{arc}.center", "origin", "coincident"),
+        ("bore lower junction", f"{flat}.start", f"{arc}.end", "coincident"),
+        ("bore upper junction", f"{flat}.end", f"{arc}.start", "coincident"),
+        ("vertical bore flat", flat, None, "vertical"),
+        ("horizontal AF witness", af_witness, None, "horizontal"),
+        ("witness on bore arc", f"{af_witness}.start", arc, "coincident"),
+        ("witness on bore centre", f"{af_witness}.start", "origin", "horizontal_points"),
+        ("witness on bore flat", f"{af_witness}.end", flat, "coincident"),
+    ):
+        check(label, await adapter.add_sketch_constraint(first, second, relation))
+    check(
+        "bore diameter", await adapter.add_sketch_dimension(
+            arc, None, "diameter", BORE_DIAMETER
+        ),
+    )
+    bore.record("BoreDia", '"BoreDia"')
+    check(
+        "across-flat size", await adapter.add_sketch_dimension(
+            f"{af_witness}.start", f"{af_witness}.end",
+            "horizontal_distance", BORE_AF,
+        ),
+    )
+    bore.record("BoreAF", '"BoreAF"')
+    await ensure_fully_defined(adapter, "D-bore sketch")
     check("exit_sketch bore", await adapter.exit_sketch())
     name_last_feature(adapter, "BoreProfile")
     drive_jobs += bore.apply(adapter, "BoreProfile")
+    _verify_named_dimension(adapter, "BoreDia@BoreProfile", BORE_DIAMETER)
+    _verify_named_dimension(adapter, "BoreAF@BoreProfile", BORE_AF)
     check(
-        "cut bore",
+        "cut D-bore",
         await adapter.create_cut_extrude(ExtrusionParameters(depth=FACE_WIDTH + 2.0)),
     )
     name_last_feature(adapter, "Bore")
-    v_bore = math.pi * (BORE_DIAMETER / 2.0) ** 2 * FACE_WIDTH
+    v_bore = _d_bore_area(radius, flat_x) * FACE_WIDTH
     expected = volume - v_bore
-    await volume_check(adapter, "bore", expected, 0.01 * v_bore)
+    await volume_check(adapter, "D-bore", expected, 0.01 * v_bore)
+
+    # Both south (z=0) bore edges must be selected: the round major arc at
+    # -X and the D-flat chord on +X. The north rim stays square against T120.
+    # A ≥Ø8 end mill leaves at most MAX_FLAT_CRESCENT (≈0.960 mm at print
+    # worst) of horn + axial runout where the shaft flat meets its collar;
+    # the minimum 1.00-mm, 45° chamfer swallows it. A single native feature
+    # removes both sides of that crescent, not just the easy round arc.
+    check(
+        "chamfer south D-bore entry",
+        await adapter.add_chamfer(
+            BORE_SOUTH_CHAMFER,
+            [[-radius, 0.0, 0.0], [flat_x, 0.0, 0.0]],
+        ),
+    )
+    name_last_feature(adapter, "BoreSouthChamfer")
+    chamfer_dim = name_dimensions(
+        adapter, "BoreSouthChamfer", ["BoreSouthChamferSize"]
+    )[0]
+    _verify_named_dimension(adapter, chamfer_dim, BORE_SOUTH_CHAMFER)
+    drive_jobs.append((chamfer_dim, '"BoreSouthChamferSize"'))
+    v_chamfer = _bore_south_chamfer_volume(radius, flat_x, BORE_SOUTH_CHAMFER)
+    expected -= v_chamfer
+    await volume_check(adapter, "south D-bore chamfer", expected, 0.03 * v_chamfer + 0.15)
 
     # Named bore/central axis for view-independent assembly mate
     # selection (M6 mated-DOF drive train).
@@ -271,10 +330,26 @@ async def build(adapter) -> dict[str, str]:
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
+    face_lower, face_upper = deviations(FACE_WIDTH_BAND)
+    if face_lower != -face_upper:
+        raise AssertionError("the 64T face-width band must be symmetric")
+    set_dimension_symmetric_tolerance(
+        adapter, "GearBlank", "FaceWidth", face_upper
+    )
     set_dimension_bilateral_tolerance(
         adapter, "BoreProfile", "BoreDia", *deviations(BORE_DIA_BAND)
     )
-    await volume_check(adapter, "driven crank-drive gear (equations neutral)", expected, 0.01 * v_bore)
+    set_dimension_bilateral_tolerance(
+        adapter, "BoreProfile", "BoreAF", *deviations(BORE_AF_BAND)
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "BoreSouthChamfer", "BoreSouthChamferSize",
+        *deviations(BORE_SOUTH_CHAMFER_BAND),
+    )
+    await volume_check(
+        adapter, "driven crank-drive gear (equations neutral)",
+        expected, 0.03 * v_chamfer + 0.15,
+    )
 
     # The tip circle, as a REFERENCE sketch. The helix recipe grows the teeth
     # off a ROOT cylinder blank (_gear.build_fixed_gear), so no solid feature
@@ -302,10 +377,8 @@ async def build(adapter) -> dict[str, str]:
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
 
-    # Mark this part's three manufacturing dimensions, author the decimal places
-    # they print with (policy rule 2: the model owns both the band and its
-    # spelling -- the drawing only reads them back), and stamp the title-block +
-    # gear-data properties the curated drawing reads.
+    # Mark the five manufacturing dimensions, author their model precision
+    # and stamp the drawing's title-block and gear-data properties.
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

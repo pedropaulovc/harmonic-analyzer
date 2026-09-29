@@ -38,13 +38,17 @@ involute starting at angle ``+Delta``) and above by tooth 1's lower flank
 
 Prototype scope notes:
 
-* **Configured bore, no keyway** (Appendix C #7 resolution): the shaft steps
-  down toward the tip and each bore matches its seat (U40 S1): 3/8" for
-  T030..T120, 1/4" for T024, 1/8" for T018, and 1/16" for T012 and T006 on
-  the 24.7 mm terminal land (L/D 15.5).
-  The bore circle is origin-centred with a DRIVING diameter dimension linked
-  to the configured ``BoreDia`` global.  The p.21 macro shows solder at the
-  smallest gears; no evidence supports a key, pin, set screw, or hub.
+* **Configured D-bore** (user ruling 2026-09-28): the shaft steps down toward
+  the tip and each bore matches its land (U40 S1): 3/8" for T030..T120, 1/4"
+  for T024, 1/8" for T018, and 1/16" for T012 and T006 on the terminal land.
+  Every land carries a flat, and every bore a matching flat, so each gear
+  slides onto its land at the clock it is placed at and bears on its
+  neighbour (the solid stack, ``cone_gear_stack``).  The BoreProfile sketch
+  is one D: an origin-centred arc with a DRIVING diameter linked to the
+  configured ``BoreDia`` global, closed by a flat whose across-flat is
+  linked to the configured ``BoreAF`` global.  A driven angular dimension,
+  ``BoreFlatClock``, holds the flat square to the phase-0 tooth centreline
+  (local +X) and carries ``FLAT_CLOCK_TOLERANCE_DEG``.
 * Circular tooth thickness is a native DRIVING dimension in a construction
   authoring sketch.  Its witness is the pitch chord of the +X tooth -- the
   tooth every configuration seeds on local +X, so the witness brackets a
@@ -68,12 +72,13 @@ Prototype scope notes:
   configuration-scoped ``FloorDia`` global) carries the printed MIN/MAX as a
   per-configuration LIMIT tolerance.  Both authoring sketches save hidden.
 
-Dimensions: cad/DIMENSIONS.md "Chapter 12" -- DP 49.82 / PA 14.5 deg, face
-width 6.5 mm (M6.7 mesh packing; annotated 7 is inconsistent with the drum
-grid), tooth counts 6k.
+Dimensions: cad/DIMENSIONS.md "Chapter 12" -- DP 49.82 / PA 14.5 deg, tooth
+counts 6k.  Face width is one seat pitch floored to four places
+(``cone_gear_spec.FACE_WIDTH``, 6.8887), so the twenty gears stack solid.
 
 Layout: gear axis = Z through the origin, blank extruded +Z from the Front
-plane (z = 0..7 mm).
+plane (z = 0..FACE_WIDTH); the phase-0 tooth and the bore flat's outward
+normal lie on local +X.
 
 Run (SolidWorks already open)::
 
@@ -90,11 +95,13 @@ from typing import Any
 import _config
 from _drawing_marks import (
     _named_dimension,
+    add_angular_reference_dimension,
     apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_angular_tolerance,
 )
 from _drawing_simplified import assert_simplified_configurations, derive_simplified_on_saved_part
 from _fit_limits import deviations
@@ -103,12 +110,14 @@ from _part_pmi import author_part_pmi
 from cone_gear_notes import drawing_notes, gear_data
 from cone_gear_spec import (
     BLANK_DIA_BAND,
+    BORE_AF_BAND,
     FACE_WIDTH_BAND,
     BORE_DIA_BAND,
     CONFIGURATION_TEETH,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     FACE_WIDTH,
+    FLAT_CLOCK_TOLERANCE_DEG,
     GAP_FLOOR_SKETCH,
     MM_PER_IN,
     REFERENCE_SKETCHES,
@@ -118,6 +127,9 @@ from cone_gear_spec import (
     TOOTH_THICKNESS,
     TOOTH_THICKNESS_BAND,
     bore_dia_mm,
+    bore_flat_af_mm,
+    bore_flat_offset_mm,
+    bore_flat_segment_area_mm2,
     configuration_number,
     floor_dip_mm,
     floor_limits_mm,
@@ -186,12 +198,12 @@ MATERIAL = "Brass"  # ch. 13 text: polished brass gear stock; cone set matches
 # (export_models comp_rgb -> IComponent2.GetMaterialPropertyValues2). The part
 # itself stays uniformly brass. See cad/config/materials.yaml.
 
-# M6.7: the exact-tracking mesh (assembly docstring) fixes the seat
-# pitch along the shaft at Z_PITCH*cos(12.52 deg) = 6.889 mm (the finer
-# DP 49.82 module gives a shallower incline); face 6.0 (cone_gear_spec,
-# U27: .X band, max 6.8 still clears the pitch) leaves 0.89 air, and the
-# photo's 7 mm callout still cannot hold -- the annotated cone figures stay
-# inconsistent with the drum grid, see DIMENSIONS.md ch. 12.
+# M6.7: the exact-tracking mesh (assembly docstring) fixes the seat pitch
+# along the shaft at Z_PITCH*cos(12.52 deg) = 6.889 mm (the finer DP 49.82
+# module gives a shallower incline).  The face is that pitch floored to its
+# printed four places (cone_gear_spec.FACE_WIDTH), so neighbouring gears bear
+# on each other; the annotated 7 mm cone figures stay inconsistent with the
+# drum grid, see DIMENSIONS.md ch. 12.
 
 # Cut clearance radius (inches -- document units, see module docstring)
 # beyond the largest tip radius (120T OD/2 = 2.033") so the gap profile
@@ -213,6 +225,18 @@ _VISIBILITY_HIDDEN = 1  # swVisibilityState_e
 def bore_dia_in(teeth: int) -> float:
     """Configured bore diameter in inches, matching the stepped-shaft seat."""
     return bore_dia_mm(teeth) / MM_PER_IN
+
+
+def bore_af_in(teeth: int) -> float:
+    """Configured bore across-flat in inches, matching its land's flat."""
+    return bore_flat_af_mm(teeth) / MM_PER_IN
+
+
+def bore_area_mm2(teeth: int) -> float:
+    """Area of the D-bore: the round bore less the segment the flat keeps."""
+    return math.pi * (bore_dia_mm(teeth) / 2.0) ** 2 - bore_flat_segment_area_mm2(
+        teeth
+    )
 
 
 def floor_dia_in(teeth: int) -> float:
@@ -462,7 +486,7 @@ def _expected_configuration_volume(teeth: int) -> float:
     facts = cone_facts(teeth)
     radius_mm = facts["Ra"] * 25.4
     blank_mm3 = math.pi * radius_mm**2 * FACE_WIDTH
-    bore_mm3 = math.pi * (bore_dia_in(teeth) * 12.7) ** 2 * FACE_WIDTH
+    bore_mm3 = bore_area_mm2(teeth) * FACE_WIDTH
     return (
         blank_mm3
         - teeth * cone_gap_area_in_disc(teeth) * 25.4**2 * FACE_WIDTH
@@ -539,7 +563,7 @@ def _configuration_definition_state(
     model = _early_bound(adapter.currentModel, "IModelDoc2")
     part = _early_bound(model, "IPartDoc")
     equation_manager = _early_bound(model.GetEquationMgr(), "IEquationMgr")
-    wanted = {"ToothCount", "BoreDia", "Rb", "Ra", "Rf", "XMax"}
+    wanted = {"ToothCount", "BoreDia", "BoreAF", "Rb", "Ra", "Rf", "XMax"}
     equations: dict[str, tuple[str, float]] = {}
     count = int(_read_member(equation_manager, "GetCount") or 0)
     for index in range(count):
@@ -1003,9 +1027,24 @@ async def build(adapter) -> dict[str, str]:
     _telemetry.debug(f"{od_dim} reads {before:g} (unit factor {dim_unit:g})")
 
     # ------------------------------------------------------------------
-    # Configured bore (Appendix C #7): origin-snapped circle + DRIVING
-    # diameter dimension -- no fix, or the dimension goes driven and the
-    # configuration link dies. Diameter equation-linked to "BoreDia".
+    # Configured D-bore (user ruling 2026-09-28): one sketch, one cut.  The
+    # round part is an origin-centred arc with a DRIVING diameter linked to
+    # "BoreDia"; the flat is a vertical line joining the arc's ends on local
+    # +X (the phase-0 tooth's side), so its outward normal is +X.  A
+    # construction centreline runs from the arc's far (-X) point along the
+    # X axis to the flat: its horizontal length is the across-flat, the
+    # DRIVING "BoreAF" dimension linked to the configured "BoreAF" global.
+    # The flat's squareness to that centreline (the phase-0 tooth's) comes
+    # from the vertical relation; the DRIVEN angular BoreFlatClock between
+    # the flat and the centreline carries FLAT_CLOCK_TOLERANCE_DEG (the
+    # cylinder gear's NotchPhase precedent).  No fix anywhere: a fix drives
+    # the dimensions and kills their configuration links.
+    #
+    # DOF: arc 5 + flat 4 + centreline 4 = 13 = centre on origin 2 +
+    # diameter 1 + flat vertical 1 + two end joins 4 + centreline horizontal
+    # 1 + its start on the arc 1 + its start level with the origin 1 + its
+    # end on the flat 1 + BoreAF 1.
+    #
     # The bore MUST precede the circular pattern: cut AFTER the pattern,
     # the same recipe solves to nothing in every configuration whose
     # BoreDia differs from the creation-time value (live SW 2026 finding,
@@ -1015,28 +1054,75 @@ async def build(adapter) -> dict[str, str]:
     # ------------------------------------------------------------------
     bore_default_in = bore_dia_in(DEFAULT_TEETH)
     await set_global(adapter, "BoreDia", f"{bore_default_in:g}", bore_default_in)
+    bore_af_default_in = bore_af_in(DEFAULT_TEETH)
+    await set_global(
+        adapter, "BoreAF", f"{bore_af_default_in:.12g}", bore_af_default_in
+    )
+    bore_radius = bore_dia_mm(DEFAULT_TEETH) / 2.0
+    flat_x = bore_flat_offset_mm(DEFAULT_TEETH)
+    flat_half = math.sqrt(bore_radius * bore_radius - flat_x * flat_x)
     bore = SketchDims()
     check("create_sketch bore", await adapter.create_sketch("Front"))
-    bore_circle = check(
-        "add_circle bore", await adapter.add_circle(0.0, 0.0, bore_default_in * 12.7)
+    set_sketch_direct_db(adapter, True)
+    # CCW from the flat's upper end round through -X to its lower end.
+    bore_arc = check(
+        "bore arc",
+        await adapter.add_arc(0.0, 0.0, flat_x, flat_half, flat_x, -flat_half),
     )
+    bore_flat = check(
+        "bore flat", await adapter.add_line(flat_x, -flat_half, flat_x, flat_half)
+    )
+    clock_line = check(
+        "bore clock centreline",
+        await adapter.add_centerline(-bore_radius, 0.0, flat_x, 0.0),
+    )
+    set_sketch_direct_db(adapter, False)
+    for label, first, second, relation in (
+        ("bore arc centre on origin", f"{bore_arc}.center", "origin", "coincident"),
+        ("flat lower end joins arc", f"{bore_flat}.start", f"{bore_arc}.end", "coincident"),
+        ("flat upper end joins arc", f"{bore_flat}.end", f"{bore_arc}.start", "coincident"),
+        ("flat vertical", bore_flat, None, "vertical"),
+        ("clock centreline horizontal", clock_line, None, "horizontal"),
+        ("clock centreline starts on the arc", f"{clock_line}.start", bore_arc, "coincident"),
+        (
+            "clock centreline on the bore axis",
+            f"{clock_line}.start",
+            "origin",
+            "horizontal_points",
+        ),
+        ("clock centreline ends on the flat", f"{clock_line}.end", bore_flat, "coincident"),
+    ):
+        check(label, await adapter.add_sketch_constraint(first, second, relation))
     check(
         "bore diameter dim (driving)",
         await adapter.add_sketch_dimension(
-            bore_circle, None, "diameter", bore_default_in * 25.4
+            bore_arc, None, "diameter", bore_default_in * 25.4
         ),
     )
     # Record the manual driving dim: one display dim, driven by the "BoreDia"
     # global (the same link the inline equation used, now named + deferred).
     bore.record("BoreCutDia", '"BoreDia"')
-    status = await adapter.check_sketch_fully_defined()
-    state = status.data.get("definition_state") if status.is_success else None
-    if state != "fully_defined":
-        raise RuntimeError(
-            f"bore sketch is {state!r} -- origin snap missing; a fix would "
-            "break the BoreDia configuration link, aborting"
-        )
-    _telemetry.success("bore sketch fully defined (driving dim, no fix)")
+    await dimension_between(
+        adapter,
+        f"{clock_line}.start",
+        f"{clock_line}.end",
+        "horizontal_distance",
+        bore_flat_af_mm(DEFAULT_TEETH),
+        "bore across-flat",
+    )
+    bore.record("BoreAF", '"BoreAF"')
+    # Text inside the right angle the flat makes above the centreline; the
+    # sheet repositions it.  Either reading is 90 deg.
+    await add_angular_reference_dimension(
+        adapter,
+        bore_flat,
+        clock_line,
+        (flat_x - 0.3 * bore_radius, 0.4 * flat_half),
+        "bore flat clock",
+        expected_degrees=90.0,
+    )
+    bore.record("BoreFlatClock")
+    await ensure_fully_defined(adapter, "bore D sketch")
     check("exit_sketch bore", await adapter.exit_sketch())
     bore_sketch = name_last_feature(adapter, "BoreProfile")
     drive_jobs += bore.apply(adapter, bore_sketch)
@@ -1052,9 +1138,18 @@ async def build(adapter) -> dict[str, str]:
         or abs(bore_before - bore_default_in * 25.4) < 1e-4
     ):
         raise RuntimeError(f"{bore_dim} reads {bore_before!r}, not the bore diameter")
+    bore_af_dim = f"BoreAF@{bore_sketch}"
+    bore_af_before = read_dimension(adapter, bore_af_dim)
+    if not (
+        abs(bore_af_before - bore_af_default_in) < 1e-6
+        or abs(bore_af_before - bore_af_default_in * 25.4) < 1e-4
+    ):
+        raise RuntimeError(
+            f"{bore_af_dim} reads {bore_af_before!r}, not the bore across-flat"
+        )
     mass = await adapter.get_mass_properties()
     bored_volume = float(mass.data.volume)
-    expected_bored = expected_blank - math.pi * (bore_default_in * 12.7) ** 2 * FACE_WIDTH
+    expected_bored = expected_blank - bore_area_mm2(DEFAULT_TEETH) * FACE_WIDTH
     if abs(bored_volume - expected_bored) > 0.02 * expected_bored:
         raise RuntimeError(
             f"bored blank volume {bored_volume:.1f} mm^3, expected {expected_bored:.1f}"
@@ -1204,11 +1299,10 @@ async def build(adapter) -> dict[str, str]:
     # expectation the per-config loop uses (blank - teeth*gap - bore). This is
     # the "last check" the neutrality re-check below reuses.
     # ------------------------------------------------------------------
-    bore_default_mm3 = math.pi * (bore_default_in * 12.7) ** 2 * FACE_WIDTH
     v_gear = (
         expected_blank
         - DEFAULT_TEETH * cone_gap_area_in_disc(DEFAULT_TEETH) * 25.4**2 * FACE_WIDTH
-        - bore_default_mm3
+        - bore_area_mm2(DEFAULT_TEETH) * FACE_WIDTH
     )
     await volume_check(adapter, "cone gear (default config)", v_gear, 0.01 * v_gear)
 
@@ -1285,6 +1379,15 @@ async def build(adapter) -> dict[str, str]:
                     name="BoreDia",
                     expression=f"{bore_dia_in(teeth):g}",
                     configuration=name,
+                )
+            ),
+        )
+        bore_af_value = f"{bore_af_in(teeth):.12g}"
+        check(
+            f"BoreAF = {bore_af_value} in {name}",
+            await adapter.set_global_variable(
+                SetGlobalVariableParameters(
+                    name="BoreAF", expression=bore_af_value, configuration=name
                 )
             ),
         )
@@ -1401,6 +1504,15 @@ async def build(adapter) -> dict[str, str]:
                 f"{expected_floor:g} -- FloorDia did not regenerate"
             )
         _assert_gap_floor_limits(adapter, name, teeth)
+        # The D-bore's across-flat follows its land's flat (BoreAF global).
+        bore_af = read_dimension(adapter, bore_af_dim)
+        expected_af = bore_af_in(teeth) * dim_unit
+        if abs(bore_af - expected_af) > 1e-6 * expected_af:
+            raise RuntimeError(
+                f"{name}: {bore_af_dim} reads {bore_af:g}, expected "
+                f"{expected_af:g} -- BoreAF did not regenerate"
+            )
+        _telemetry.success(f"{name}: bore across-flat dim = {bore_af:g}")
 
         img = (png_dir / f"{PART_NAME}_{name}_isometric.png").resolve()
         check(
@@ -1450,7 +1562,7 @@ async def build(adapter) -> dict[str, str]:
     apply_custom_properties(adapter, {"Description": description})
     await report_mass_properties(adapter)
 
-    # Mark the five manufacturing model dimensions.  Each carries a band
+    # Mark the manufacturing model dimensions.  Each carries a band
     # derived above (FloorDia's per-configuration LIMIT was set before the
     # sweep); their decimal places live on the model and each configuration
     # sheet only imports and arranges them.
@@ -1465,6 +1577,16 @@ async def build(adapter) -> dict[str, str]:
     )
     set_dimension_bilateral_tolerance(
         adapter, "BoreProfile", "BoreCutDia", *deviations(BORE_DIA_BAND)
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "BoreProfile", "BoreAF", *deviations(BORE_AF_BAND)
+    )
+    set_dimension_symmetric_angular_tolerance(
+        adapter,
+        "BoreProfile",
+        "BoreFlatClock",
+        FLAT_CLOCK_TOLERANCE_DEG,
+        require_driven=True,
     )
     set_dimension_bilateral_tolerance(
         adapter,

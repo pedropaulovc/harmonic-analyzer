@@ -3,8 +3,8 @@ r"""Pure-data contract shared by the MHA-141 cone tip shim pack part and drawing
 User ruling U30 (2026-09-23): the cone tip block (MHA-092) stands on a
 blackened carbon-steel shim pack between the swing platform's top face and
 its foot, set at fit-up to bring the adjuster axis onto the cone axis. The
-pack is cut to the block's foot face -- the footprint, with the I31 foot
-flange, less the heel relief -- so every size here is the tip block's.
+pack is cut to the block's complete foot face: the south flange through to
+the north face. The heel relief is gone, so the pack has no notch.
 
 Main's ruling on the passage (2026-09-24): a HORSESHOE, not a hole.  Stacking
 to 0.05 is iterative; with an open slot the leaves slide in or out with the
@@ -21,11 +21,14 @@ from __future__ import annotations
 import math
 
 import _config
+from _printed_tolerance import printed_band_mm
 from _hole_spec import THREAD_MAJOR_MM
 from cone_tip_block_spec import (
     BLOCK_DEPTH_PLACES,
     BLOCK_X,
     BLOCK_Z,
+    BUSHING_DEPTH_PLACES,
+    COLLAR_WIDTH_PLACES,
     DRAWING_PRECISION as BLOCK_DRAWING_PRECISION,
     FLANGE_LEN,
     FLANGE_SLOT_END_PLACES,
@@ -34,17 +37,18 @@ from cone_tip_block_spec import (
     FLANGE_SLOT_W_MAX,
     FOOT_SHIM_RANGE_MM,
     FOOT_THREAD,
-    HEEL_RELIEF_DEPTH,
+    GEAR_STACK_NORTH_FACE_BAND_MM,
     SHIM_NOMINAL,
+    TIP_FEELER_SET_BAND_MM,
 )
+from cone_line import PIVOT_STATION, TIP_BLOCK_STATION
+from cone_pivot_screw_spec import HEAD_DIA, SHOULDER_DIA
+from cone_swing_platform_spec import PIVOT_HOLE_DIA
 
 SHIM_X = BLOCK_X
-# I31 (Main, 2026-09-25): the block's north-bottom heel is relieved for the
-# cone pivot screw's head, so the pack stops at the relief's inner face; left
-# full length it would reach under the head the relief clears.  I31 option
-# 1: it runs south under the foot flange to the flange's end.  Edges are in
-# the block frame (+Z north), origin on the block centre.
-SHIM_NORTH_Z = BLOCK_Z / 2.0 - HEEL_RELIEF_DEPTH
+# The pack reaches the north face of the unrelieved body and the south end
+# of the foot flange. Edges are in the block frame (+Z north).
+SHIM_NORTH_Z = BLOCK_Z / 2.0
 SHIM_SOUTH_Z = -BLOCK_Z / 2.0 - FLANGE_LEN
 SHIM_Z = SHIM_NORTH_Z - SHIM_SOUTH_Z
 SHIM_T = SHIM_NOMINAL  # modelled at the nominal stack
@@ -55,7 +59,7 @@ LEAF_STOCK_MM = (0.05, 0.10, 0.25, 0.50)
 
 _GENERAL_1PL_MM = float(str(_config.title_block("linear_1pl")["display"]).lstrip("±"))
 _GENERAL_2PL_MM = float(str(_config.title_block("linear_2pl")["display"]).lstrip("±"))
-_BAND_BY_PLACES = {1: _GENERAL_1PL_MM, 2: _GENERAL_2PL_MM}
+_BAND_BY_PLACES = {1: _GENERAL_1PL_MM, 2: _GENERAL_2PL_MM, 3: printed_band_mm(3)}
 # The slot opens to the south edge, along the block's flange slot.
 SLOT_OPEN_EDGE = "south"
 # Width (.XX): its narrowest print still spans the flange slot's widest cut,
@@ -64,17 +68,10 @@ SLOT_W = math.ceil((FLANGE_SLOT_W_MAX + _GENERAL_2PL_MM) * 100.0 - 1e-6) / 100.0
 SLOT_R = SLOT_W / 2.0  # full radius at the closed end
 _SLOT_R_MIN = (SLOT_W - _GENERAL_2PL_MM) / 2.0
 _SCREW_R = THREAD_MAJOR_MM[FOOT_THREAD] / 2.0
-# The closed end's radius centre, located (.X) from the pack's north edge.
-# The fitter squares the north edge on the block's heel-relief face, so the
-# screw's farthest reach north of that edge runs through the block's prints
-# (heel relief .XX, Depth .X, and the flange slot's north arc centre
-# FlangeSlotNorthZ, baselined from the body's south face at .X since #838
-# r3) plus the screw's float in the flange slot.  The old chain went through
-# the slot midpoint FlangeSlotZ (.X) and half the .XX spacing; the block no
-# longer prints either.  The radius end must pass it
-# with the narrowest slot (the screw can sit that slot's slack past the
-# radius centre) and the location at its long limit.
-_HEEL_DEPTH_PLACES = BLOCK_DRAWING_PRECISION["HeelReliefProfile"]["HeelReliefDepth"]
+# The fitter squares the pack's north edge on the block's north face. The
+# screw's farthest north reach follows the body's printed depth and the
+# north arc-centre location, plus the screw's float in the flange slot. The
+# shim slot's radius end must pass it at its narrowest and longest print.
 _NORTH_END_PLACES = BLOCK_DRAWING_PRECISION["FlangeSlotNorthReference"][
     "FlangeSlotNorthZ"
 ]
@@ -84,9 +81,7 @@ FLANGE_SLOT_NORTH_CENTRE_FROM_NORTH = (
     SHIM_NORTH_Z + BLOCK_Z / 2.0 + FLANGE_SLOT_NORTH_Z
 )
 SCREW_NORTH_REACH_BANDS_MM = (
-    _BAND_BY_PLACES[_HEEL_DEPTH_PLACES]
-    + _BAND_BY_PLACES[BLOCK_DEPTH_PLACES]
-    + _BAND_BY_PLACES[_NORTH_END_PLACES]
+    _BAND_BY_PLACES[BLOCK_DEPTH_PLACES] + _BAND_BY_PLACES[_NORTH_END_PLACES]
 )
 SCREW_NORTH_REACH_FROM_NORTH = FLANGE_SLOT_NORTH_CENTRE_FROM_NORTH - (
     SCREW_NORTH_REACH_BANDS_MM + FLANGE_SLOT_FLOAT
@@ -131,8 +126,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "SlotCentreXReference": {"SlotCentreX"},
     "SlotCentreZReference": {"SlotCentreZ"},
 }
+SHIM_DEPTH_PLACES = 2
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "ShimProfile": {"Width": 1, "Depth": 1},
+    "ShimProfile": {"Width": 1, "Depth": SHIM_DEPTH_PLACES},
     "Shim": {"Thickness": 2},
     "SlotProfile": {"SlotWidth": 2},
     "SlotCentreXReference": {"SlotCentreX": 1},
@@ -144,6 +140,35 @@ DRAWING_PRECISION_BY_NAME = {
     for dimensions in DRAWING_PRECISION.values()
     for name, places in dimensions.items()
 }
+
+# The full-north-face shim reaches toward the pivot head. Its printed Depth
+# can exceed the nominal model: reserve that entire deviation after the
+# collar, gear, bushing, feeler, block and pivot-hole print excursions.
+# The .XX depth keeps at least 0.20 mm air without a heel relief or field trim.
+_BLOCK_NORTH_TRAVEL_MM = (
+    printed_band_mm(COLLAR_WIDTH_PLACES)
+    + GEAR_STACK_NORTH_FACE_BAND_MM
+    + printed_band_mm(BUSHING_DEPTH_PLACES)
+    + TIP_FEELER_SET_BAND_MM
+    + printed_band_mm(BLOCK_DEPTH_PLACES)
+)
+_PIVOT_HOLE_PLUS_MM = float(
+    str(_config.title_block("drilled_hole")["display_plus"]).lstrip("+")
+)
+_PIVOT_HEAD_FLOAT_MM = (
+    PIVOT_HOLE_DIA + _PIVOT_HOLE_PLUS_MM - SHOULDER_DIA
+) / 2.0
+PIVOT_HEAD_NOMINAL_AIR_MM = (
+    PIVOT_STATION - TIP_BLOCK_STATION - BLOCK_Z / 2.0 - HEAD_DIA / 2.0
+)
+PIVOT_HEAD_SHIM_AIR_WORST_MM = (
+    PIVOT_HEAD_NOMINAL_AIR_MM
+    - _BLOCK_NORTH_TRAVEL_MM
+    - _PIVOT_HEAD_FLOAT_MM
+    - printed_band_mm(SHIM_DEPTH_PLACES)
+)
+if PIVOT_HEAD_SHIM_AIR_WORST_MM < 0.20:
+    raise ValueError("shim north edge can hit the cone pivot head")
 
 # Rule 6: a note never carries a dimension.  The stack range IS the
 # thickness requirement, so it rides the thickness dimension's own text,

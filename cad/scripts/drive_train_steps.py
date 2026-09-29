@@ -12,7 +12,7 @@ DRAWING_NUMBER = "MHA-A03"
 
 SEQUENCE: tuple[str, ...] = (
     # Cone set and crank (CONE_CRANK_STEPS).
-    "cone-gears-bonded",
+    "cone-gears-stacked",
     "post-and-tip-block",
     "tip-adjuster-set",
     "crank-mesh-checked",

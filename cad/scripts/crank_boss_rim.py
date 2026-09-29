@@ -5,11 +5,10 @@ north of MHA-016, and its south face and tip sweep past everything on the
 post's north side: the crank boss's north face and rim, the Ø42.75 head,
 the turned Ø42 body and the cone boss's north end face.  The post is
 the v36 casting (user ruling 2026-09-28): the crank boss's north face is the
-head's tangent plane, uncut, and the crank bore carries no bushing.  The
-same ruling keeps the 64T's north face where the 8.0 face put it and narrows
-the gear from the SOUTH, the MHA-014 thrust collar growing by the same amount,
-until every feature holds FLOOR_CLEARANCE_MM at print-worst; FACE_WIDTH is
-the widest face its printed place allows that does (asserted below).
+head's tangent plane, uncut, and the crank bore carries no bushing. The 64T
+stands on the unchanged MHA-014 collar; its south face is fixed there, while
+the solid gear stack grows its north face to touch T120. The collar and boss
+bands, not the gear face-width band, govern clearance to MHA-016.
 
 Frame: machine axes (north = +z, up = +y), origin where the cone axis crosses
 the post axis.  The cone axis leans ``post.INCLINE_DEG`` in plan, the crank
@@ -89,19 +88,13 @@ CONE_BOSS_GROWTH = _row(post.DRAWING_PRECISION_BY_NAME["ConeBossDia"]) / 2.0
 #   its row and the collar thin by its own (Main's ruling (b), 2026-09-27).
 COLLAR_WIDTH_SHORT = _row(shaft.DRAWING_PRECISION_BY_NAME["CollarWidth"])
 GEAR64_STATION_TOWARD_POST = CONE_BOSS_END_GROWTH + COLLAR_WIDTH_SHORT
-#   64T FaceWidth: the south face is the seated one, so the band grows the
-#   gear NORTH only, away from the post (#1049)
-GEAR_FACE_GROWTH_NORTH = _row(gear64.DRAWING_PRECISION_BY_NAME["FaceWidth"])
+#   FaceWidth's ±0.025 extends NORTH of the seated south face and does not
+#   consume any margin to the post; only the collar and MHA-016 bands do.
 #   64T tip, OutsideDia +/-OUTSIDE_DIA_TOLERANCE_MM (user, #906)
 GEAR_TIP_GROWTH = gear64.OUTSIDE_DIA_TOLERANCE_MM / 2.0
 
-# --- The requirement ----------------------------------------------------------
-# Every MHA-016 north feature holds this much air to the 64T at print-worst
-# (user ruling 2026-09-28).  build_drive_train_assembly asserts it on the
-# placed layout; this module asserts it, and that FACE_WIDTH is the widest
-# one-place face (FaceWidth's .X) that holds it, on the station the specs derive.
+# Every MHA-016 north feature holds this much air to the 64T at print-worst.
 FLOOR_CLEARANCE_MM = 0.25
-FACE_WIDTH_STEP = 10.0 ** -gear64.DRAWING_PRECISION_BY_NAME["FaceWidth"]
 
 
 @dataclass(frozen=True)
@@ -160,43 +153,37 @@ def _cone_boss_end(p: Point, end: float, radius: float) -> float:
     return math.hypot(off_axis - radius, max(axial, 0.0))
 
 
-def seated_gear_offset() -> float:
-    """The 64T's centre along the cone axis when seated on the collar stack:
-    the cone boss's north end, the collar, and half the face."""
-    return post.CONE_BOSS_LENGTH / 2.0 + shaft.COLLAR_THICKNESS + gear64.FACE_WIDTH / 2.0
+def seated_gear_offset(*, collar_thickness: float = shaft.COLLAR_THICKNESS) -> float:
+    """The 64T's centre along the cone axis, with its south face seated on
+    the cone boss's north end plus the collar."""
+    return post.CONE_BOSS_LENGTH / 2.0 + collar_thickness + gear64.FACE_WIDTH / 2.0
 
 
-def collar_contacts(gear_offset: float) -> float:
-    """The two collar butts' nominal air, summed: the 64T's south face less
-    the cone boss's north end and the collar between them.  Zero when the
-    drive train seats the gear the way step 1 sets it."""
-    return gear_offset - seated_gear_offset()
+def collar_contacts(
+    gear_offset: float, *, collar_thickness: float = shaft.COLLAR_THICKNESS
+) -> float:
+    """The two collar butts' nominal air, summed; zero for a seated gear."""
+    return gear_offset - seated_gear_offset(collar_thickness=collar_thickness)
 
 
 def clearances(
-    *, gear_offset: float, worst: bool = True, face_width: float | None = None
+    *, gear_offset: float, worst: bool = True,
+    collar_thickness: float = shaft.COLLAR_THICKNESS,
 ) -> dict[str, float]:
     """Least clearance from the 64T to each feature on MHA-016's north side.
 
-    ``gear_offset`` is nominal; ``worst`` moves every term above toward the
-    gear.  ``face_width`` (default the printed FACE_WIDTH) narrows the gear
-    from the south about the same north face, the collar taking up the
-    difference: the sizing question the ruling asks.  The cone boss end rides
-    with the gear through the collar, so it is measured from the gear's south
-    face by the collar at its low limit, never by the boss end's own growth
-    on top of the station term.
+    ``gear_offset`` must seat the south face on ``collar_thickness``. ``worst``
+    moves each published boss/collar/gear-tip band toward its opposing surface;
+    FaceWidth's ±0.025 shifts only the north face and cannot move this seat.
     """
-    air = collar_contacts(gear_offset)
+    air = collar_contacts(gear_offset, collar_thickness=collar_thickness)
     if abs(air) > 1e-6:
         raise ValueError(f"the 64T stands {air:+.4f} off the collar stack; its butts are open")
-    width = gear64.FACE_WIDTH if face_width is None else face_width
-    north = gear_offset + gear64.FACE_WIDTH / 2.0
-    collar = shaft.COLLAR_THICKNESS + gear64.FACE_WIDTH - width
     grow = 1.0 if worst else 0.0
-    south = north - width - grow * GEAR64_STATION_TOWARD_POST
+    south = gear_offset - gear64.FACE_WIDTH / 2.0 - grow * GEAR64_STATION_TOWARD_POST
     gear = Gear(
         south,
-        south + width + grow * GEAR_FACE_GROWTH_NORTH,
+        south + gear64.FACE_WIDTH + grow * gear64.FACE_WIDTH_BAND[0],
         gear64.OUTSIDE_DIA / 2.0 + grow * GEAR_TIP_GROWTH,
     )
     boss_r = post.CRANK_BOSS_DIA / 2.0 + grow * CRANK_BOSS_GROWTH
@@ -205,7 +192,7 @@ def clearances(
     head_r = post.HEAD_DIA / 2.0 + grow * HEAD_GROWTH
     head_low = HEAD_Y[0] - grow * HEAD_EDGE_LOW
     body_r = post.BLOCK_DIA / 2.0 + grow * BODY_GROWTH
-    boss_end = gear.south - (collar - grow * COLLAR_WIDTH_SHORT)
+    boss_end = gear.south - (collar_thickness - grow * COLLAR_WIDTH_SHORT)
     cone_r = post.CONE_BOSS_DIA / 2.0 + grow * CONE_BOSS_GROWTH
     measures: dict[str, Callable[[Point], float]] = {
         "crank boss": lambda p: min(_crank_boss(p, boss_r, boss_z, y) for y in axes),
@@ -216,11 +203,15 @@ def clearances(
     return {name: _least(gear, measure) for name, measure in measures.items()}
 
 
-def worst_shortfalls(gear_offset: float, *, face_width: float | None = None) -> dict[str, float]:
+def worst_shortfalls(
+    gear_offset: float, *, collar_thickness: float = shaft.COLLAR_THICKNESS
+) -> dict[str, float]:
     """The features that miss FLOOR_CLEARANCE_MM at print-worst, by how much."""
     return {
         name: FLOOR_CLEARANCE_MM - value
-        for name, value in clearances(gear_offset=gear_offset, face_width=face_width).items()
+        for name, value in clearances(
+            gear_offset=gear_offset, collar_thickness=collar_thickness
+        ).items()
         if value < FLOOR_CLEARANCE_MM
     }
 
@@ -251,23 +242,22 @@ def _zoom(f: Callable[[float, float], float], a: tuple[float, float], b: tuple[f
     return best
 
 
-# --- Import-time proof (user ruling 2026-09-28) --------------------------------
-# On the station the specs derive: every feature holds the floor at
-# print-worst, and one printable step wider the governing feature does not.
+# Every feature clears the print-worst floor on the seated collar. The prior
+# "one face-width step wider fails" was tied to an obsolete south-growing gear.
+# A collar made enough thinner instead eventually fails on the crank boss.
 WORST_CLEARANCES = clearances(gear_offset=seated_gear_offset())
 GOVERNING_FEATURE = min(WORST_CLEARANCES, key=WORST_CLEARANCES.__getitem__)
 if WORST_CLEARANCES[GOVERNING_FEATURE] < FLOOR_CLEARANCE_MM:
     raise AssertionError(
-        f"the {gear64.FACE_WIDTH} 64T comes {WORST_CLEARANCES[GOVERNING_FEATURE]:.3f} "
+        f"the seated 64T comes {WORST_CLEARANCES[GOVERNING_FEATURE]:.3f} "
         f"from MHA-016's {GOVERNING_FEATURE} at print-worst, under the "
         f"{FLOOR_CLEARANCE_MM} floor ({RULING})"
     )
-ONE_STEP_WIDER_CLEARANCE = clearances(
-    gear_offset=seated_gear_offset(), face_width=gear64.FACE_WIDTH + FACE_WIDTH_STEP
+COLLAR_MARGIN_MM = WORST_CLEARANCES[GOVERNING_FEATURE] - FLOOR_CLEARANCE_MM
+THINNER_COLLAR = shaft.COLLAR_THICKNESS - COLLAR_MARGIN_MM - 0.01
+THINNER_COLLAR_CLEARANCE = clearances(
+    gear_offset=seated_gear_offset(collar_thickness=THINNER_COLLAR),
+    collar_thickness=THINNER_COLLAR,
 )[GOVERNING_FEATURE]
-if ONE_STEP_WIDER_CLEARANCE >= FLOOR_CLEARANCE_MM:
-    raise AssertionError(
-        f"a {gear64.FACE_WIDTH + FACE_WIDTH_STEP:.2f} 64T still holds "
-        f"{ONE_STEP_WIDER_CLEARANCE:.3f} to MHA-016's {GOVERNING_FEATURE}: "
-        f"FACE_WIDTH is not the widest printable face ({RULING})"
-    )
+if THINNER_COLLAR_CLEARANCE >= FLOOR_CLEARANCE_MM:
+    raise AssertionError("thinning the collar past its remaining margin must breach the post floor")

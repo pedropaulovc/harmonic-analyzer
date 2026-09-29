@@ -9,48 +9,47 @@ unit (ch. 25; p. 18 "pivot"). At the finer module DP 49.82 (ch13 OD 62.2) the
 tip gears are tiny -- T006 OD is 4.28 mm -- so the shaft steps down far
 more at the thin end to match the configured gear bores AND stay inside
 each gear's root circle (`build_cone_gear.py` ``BoreDia``, DIMENSIONS.md
-Appendix C #7). Gears attach by means the book never shows (p.21 macro
-shows solder blobs at the small gears) -- no keyseat, the shaft steps are
-plain; the four yellow tip gears (T006..T024) are a harder high-zinc
-yellow metal soldered on.
+Appendix C #7). The book never shows how the gears attach; here every gear
+land carries one D-flat on the shaft's +X and the gears' D-bores slide on
+from the tip as a solid touching stack (user ruling 2026-09-28).
 
 Sections, FRONT STUB end at z = 0.  The v2 post puts that end at cone
 station -61.9068609979, 1.0 mm proud of the post front face.  An integral
 Ø12.2308 journal runs to z = 43.011 in the post's Ø12.2808 bore, where an
 integral thrust collar (#914), the 5/8 bar's own Ø15.875 as supplied (#916),
-fills the 3.181 to the 64T (user ruling 2026-09-28) and bears on
-the post's north boss face, then steps to the existing 3/8 in gear-seat shaft. M6.7
-(true-cone mesh, see the assembly docstring): gear seats at the
-exact-tracking stack pitch 6.8889 mm (= drum z-pitch 7.0565 x
-cos 12.52 deg), reference seat centres at FRONT_STUB + 28.25 + 6.8889 j;
-U27 narrowed each 6.5 gear face to 6.0 from its south side, so each step
-is centred in the 0.889 mm air gap between adjacent gear faces
-(cone_gear_shaft_spec.seat_gap_midpoint; stations below quoted from the
-legacy pivot end):
+fills the 3.181 to the 64T's south face and bears on the post's north boss
+face, then steps to the 3/8 in gear-seat shaft.  M6.7 (true-cone mesh, see
+the assembly docstring): gear seats at the exact-tracking stack pitch
+6.8888 mm, each gear 6.8887 thick, grown south from the 6.5 reference north
+face, so the stack touches; each land step sits SEAT_STEP_SETBACK (1.0)
+south of the north face of the last gear on the larger land
+(cone_gear_shaft_spec.seat_step_station; stations below are cone stations):
 
 * 12.2308 mm x 43.011 -- v2 pivot-post bearing journal, 0.05 diametral
   running clearance
-* 3/8 in x 135.28 -- 64T at stations 17.4..23.9 + seats T120..T030
-* 1/4 in x 142.17 -- T024 seat
-* 1/8 in x 149.05 -- T018 seat
-* 1/16 in x 138.9788 -- T012 and T006 seats and tip journal; contacts the
-  exact McMaster 94025A164 conical cup apex at 9.5 mm thread engagement
-  (rule-12 E11).  Its 23.040 mm terminal land also carries the 4 mm tip bushing.  U40
-  (2026-09-23) moved every small land one station toward the big end at
-  unchanged overall length, so this land now also carries T012 and runs at
-  L/D 14.5; it is turned with tailstock support (a drawing note).  The
-  1/16 in step leaves T006 the 0.621 mm worst-case web accepted as its named
-  exception (U40) -- see cone_gear_shaft_spec.SECTIONS.
+* 3/8 in to 100.717 -- 64T + seats T120..T030
+* 1/4 in to 107.606 -- T024 seat
+* 1/8 in to 114.495 -- T018 seat
+* 1/16 in to 137.429 -- T012 and T006 seats and the MHA-096 spacer; its end
+  contacts the exact McMaster 94025A164 conical cup apex at 9.5 mm thread
+  engagement (rule-12 E11), the tip block one 0.45 feeler off the spacer.
+  The land runs at L/D 14.5 and is turned with tailstock support (a drawing
+  note).  The 1/16 in step leaves T006 the 0.621 mm worst-case web accepted
+  as its named exception (U40) -- see cone_gear_shaft_spec.SECTIONS.
+
+Every gear land's flat (SECTION_FLAT_AF, across flat) runs the whole land;
+the terminal land's runs out through the tip, so its end face is a D.
 
 Dimensions: cad/DIMENSIONS.md "Chapter 12" -- the journal comes from the
 manually rederived v2 post bore and its 42.011 axial body; the gear-seat
 stations and diameters remain the legacy/derived stack (Appendix C #7).
 
-Build: five coaxial Front-plane circles extruded +Z to each section's end
-station with ``merge_result`` -- each smaller cylinder is contained in
-its larger neighbour over the shared length, so the union is exactly the
-stepped shaft (volume check is exact per section, no offset planes
-needed).
+Build: coaxial circles extruded along +Z to each section's end station with
+``merge_result`` -- each smaller cylinder is contained in its larger
+neighbour over the shared length, so the union is exactly the stepped shaft
+(volume check is exact per section).  Each flat is then cut back from its
+land's end plane over the land's length, and the three step roots are
+filleted round and flat alike.
 
 Layout: shaft axis along +Z, large (pivot) end at the origin -- along
 the assembly depth like the gears (`build_cone_gear.py` axis = Z), so
@@ -73,8 +72,9 @@ from _common import (
     IN,
     SketchDims,
     _early_bound,
+    add_line_chain,
+    anchor_point_to_origin,
     apply_material,
-    blank_sketch,
     name_bore_axis,
     check,
     define_circle,
@@ -88,7 +88,6 @@ from _common import (
     run_build,
     save_part_and_images,
     set_global,
-    set_sketch_direct_db,
 )
 from _drawing_marks import (
     apply_drawing_precision,
@@ -106,19 +105,20 @@ from cone_gear_shaft_spec import (
     COLLAR_END_STATION,
     COLLAR_START_STATION,
     COLLAR_THICKNESS,
-    DATUM_STATION,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
     FILLET_RADIUS,
-    REFERENCE_SKETCHES,
+    FLAT_AF_BAND,
+    FLAT_LANDS,
+    FLAT_OFFSETS,
     SECTION_DIA_BANDS,
+    SECTION_DIAS,
+    SECTION_ENDS,
+    SECTION_FLAT_AF,
     SECTION_KNOBS,
     SECTION_ORIGINS,
     SECTIONS,
-    SOLDER_STATION_SKETCH,
-    SOLDER_T006_STATION,
-    SOLDER_T120_STATION,
     SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.com_variant import double_array
@@ -134,33 +134,26 @@ MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 # 49.6068609979 stub delta.
 
 # SECTIONS (diameter in inches, section end station in mm from the FRONT STUB
-# end) now lives in cone_gear_shaft_spec.py -- the pure-data contract the
-# drawing shares -- and is imported above; the derivation stays here. M6.7
-# exact-tracking seat pitch 6.8889 (= 7.0565 drum z-pitch x cos 12.5188 deg,
-# the shallower incline at DP 49.82): seat j's 6.0 face spans 28.25 + 6.8889 j
-# - 2.75 .. + 3.25 from the pivot end (U27 narrowed it from the south); each
-# step station is centred in the ~0.89 air gap between faces (T030 north
-# 134.83 | 135.28 | T024 south 135.72, and so on; U40).
-# Diameters agree with build_cone_gear.bore_dia_in (snug perpendicular seats),
-# stepping much finer than the old DP 30 shaft because the tip gears shrank:
-# T006 OD is now 4.28 mm.  The terminal land stops at 1/16": below that the
-# T006 rim gains little and the journal becomes unturnable (L/D 31 at 1/32").
+# end) lives in cone_gear_shaft_spec.py -- the pure-data contract the drawing
+# shares -- with its derivation: each gear 6.8887 thick at the 6.8888 seat
+# pitch, touching the next, and each step one SEAT_STEP_SETBACK south of the
+# north face of the last gear on the larger land.  Diameters agree with
+# build_cone_gear.bore_dia_in, stepping much finer than the old DP 30 shaft
+# because the tip gears shrank: T006 OD is now 4.28 mm.  The terminal land
+# stops at 1/16": below that the T006 rim gains little and the land becomes
+# unturnable (L/D 31 at 1/32").
 
 # Every length knob and the dimensions it is the ONE owner of (the seat-side
 # gate proves it): SecEnd{i} owns land i's end plane and its depth, SecEnd0
 # the journal and the CollarFace plane, CollarWidth the collar's plane and
-# web, and the two solder knobs their reference-sketch stations (#914
-# option A: all of them but the journal and the overall length measured from
-# the collar face).
+# web (#914 option A: all of them but the journal and the overall length
+# measured from the collar face).  A flat's length is its land's, so it is
+# driven by the two knobs that bound the land, not owned by either.
 STATION_OWNERS: tuple[tuple[str, float, tuple[str, ...]], ...] = (
     (
         "SecEnd0",
         SECTION_KNOBS[0],
-        (
-            "Sec0End@Sec0",
-            "CollarFaceStation@CollarFace",
-            "DatumStation@SolderStations",
-        ),
+        ("Sec0End@Sec0", "CollarFaceStation@CollarFace"),
     ),
     *(
         (
@@ -175,11 +168,7 @@ STATION_OWNERS: tuple[tuple[str, float, tuple[str, ...]], ...] = (
         COLLAR_THICKNESS,
         ("CollarStation@CollarEndPlane", "CollarWidth@Collar"),
     ),
-    ("SolderT120", SOLDER_T120_STATION, ("T120Station@SolderStations",)),
-    ("SolderT006", SOLDER_T006_STATION, ("T006Station@SolderStations",)),
 )
-# Height of the solder-station witness lines, up from the axis.
-STATION_WITNESS_HEIGHT = 4.0
 
 
 async def build(adapter) -> dict[str, str]:
@@ -205,8 +194,8 @@ async def build(adapter) -> dict[str, str]:
         await set_global(adapter, f"SecEnd{i}", f"{SECTION_KNOBS[i]}mm")
     await set_global(adapter, "CollarDia", f"{COLLAR_DIA}mm")
     await set_global(adapter, "CollarWidth", f"{COLLAR_THICKNESS}mm")
-    await set_global(adapter, "SolderT120", f"{SOLDER_T120_STATION}mm")
-    await set_global(adapter, "SolderT006", f"{SOLDER_T006_STATION}mm")
+    for i in FLAT_LANDS:
+        await set_global(adapter, f"SecAF{i}", f"{SECTION_FLAT_AF[i]}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -349,33 +338,47 @@ async def build(adapter) -> dict[str, str]:
     # in every assembly that places the shaft (#950's save gate).
     blank_reference_geometry(adapter, (("CollarFace", "PLANE"), ("CollarEndPlane", "PLANE")))
 
-    # Solder stations (#914): model-owned, measured from the collar face.
-    stations = await _author_solder_stations(adapter)
-    name_last_feature(adapter, SOLDER_STATION_SKETCH)
-    drive_jobs += stations.apply(adapter, SOLDER_STATION_SKETCH)
+    # D-flats (user ruling 2026-09-28): one per gear land, each cut back from
+    # its land's end plane over exactly the land, so it runs from the collar's
+    # (or the larger land's) face to the land's end -- the terminal land's out
+    # through the tip.  Before the step roots, so the fillet follows the D.
+    for i in FLAT_LANDS:
+        removed = await _cut_flat(adapter, i, drive_jobs)
+        volume -= removed
+        # The flat's own volume, not the shaft's, sets the gate: a cut run the
+        # wrong way off the end plane meets only air (the next land lies
+        # inside this flat's plane, the spec proves), so it removes nothing
+        # and fails here even for the Ø1.5875 land's 2 mm^3.
+        await volume_check(adapter, f"Sec{i} flat", volume, 0.1 * removed)
 
-    # Shoulder roots.  ONE constant-radius fillet over the three gear-seat
-    # step edges, each picked by a point on the SMALLER land's circle at that
-    # station; the nearest other edge is 0.79 mm away radially and 6.9 mm
-    # axially.  Tangent propagation is off: every seed is already a complete
-    # closed circle.  The collar's two roots stay sharp: the post boss and the
-    # 64T bear flat against its faces, and a root radius would stand on the
-    # post bore's and the 64T bore's edges -- the title block's edge break on
-    # those parts is what clears the tool's nose radius.  (The old journal
-    # step edge is buried under the collar.)
+    # Step roots.  ONE constant-radius fillet over the three land steps,
+    # round and flat alike: each step is a D-shaped edge loop on the SMALLER
+    # land, picked once mid-round (at -X, opposite the flat) and once
+    # mid-flat (at +X); the nearest other edge to either pick is a corner of
+    # its own D, >= 0.43 mm away, and the next step 6.9 mm axially.  Tangent
+    # propagation is off: the arc and the line meet at a corner.  The
+    # collar's two roots stay sharp: the post boss and the 64T bear flat
+    # against its faces, and a root radius would stand on the post bore's and
+    # the 64T bore's edges -- the title block's edge break on those parts is
+    # what clears the tool's nose radius.  (The old journal step edge is
+    # buried under the collar.)
     fillet_edges = [
-        [SECTIONS[i + 1][0] * IN / 2.0, 0.0, end_z]
-        for i, (_dia_in, end_z) in enumerate(SECTIONS[1:-1], start=1)
+        pick
+        for step in range(1, len(SECTIONS) - 1)
+        for pick in (
+            [-SECTION_DIAS[step + 1] / 2.0, 0.0, SECTION_ENDS[step]],
+            [FLAT_OFFSETS[step + 1], 0.0, SECTION_ENDS[step]],
+        )
     ]
     check(
-        "fillet shoulder roots",
+        "fillet step roots",
         await adapter.add_fillet(FILLET_RADIUS, fillet_edges, propagate=False),
     )
     name_last_feature(adapter, "ShoulderFillets")
     name_dimensions(adapter, "ShoulderFillets", ["ShoulderR"])
-    # Three R0.10 rounds add ~0.1 mm^3 to a ~13000 mm^3 shaft: this checks
+    # Three R0.10 roots add ~0.1 mm^3 to a ~13000 mm^3 shaft: this checks
     # that the fillet did not eat a land, not that it moved the number.
-    await volume_check(adapter, "shoulder fillets", volume, 0.005 * volume)
+    await volume_check(adapter, "step fillets", volume, 0.005 * volume)
 
     # Deferred drive equations, then re-check neutrality (each evaluates to the
     # as-built value, so the geometry must not move).
@@ -394,15 +397,22 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
-    # The five turned diameters carry their fit on the MODEL dimension, so
-    # SolidWorks renders the limits and re-renders them on a unit change. The
-    # sheet used to append "+0.00/-0.02" as frozen callout text instead.
+    # The five turned diameters and the four across-flats carry their fit on
+    # the MODEL dimension, so SolidWorks renders the limits and re-renders
+    # them on a unit change.
     for section, band in enumerate(SECTION_DIA_BANDS):
         set_dimension_bilateral_tolerance(
             adapter,
             f"Sec{section}Profile",
             f"Sec{section}Dia",
             *deviations(band),
+        )
+    for land in FLAT_LANDS:
+        set_dimension_bilateral_tolerance(
+            adapter,
+            f"Sec{land}FlatProfile",
+            f"Sec{land}AF",
+            *deviations(FLAT_AF_BAND),
         )
     # Display precision is model-owned too (drawing-simplicity policy rule 2).
     apply_drawing_precision(adapter, DRAWING_PRECISION)
@@ -413,21 +423,131 @@ async def build(adapter) -> dict[str, str]:
     # feature-control frames (drawing-simplicity policy rule 3).
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})
-    _blank_solder_stations(adapter)
     return await save_part_and_images(adapter, PART_NAME)
 
 
-def _blank_solder_stations(adapter: Any) -> None:
-    """Save the solder-station witness sketch hidden, so no part image or
-    assembly instance renders it; the drawing's side view shows it back
-    through _drawing_hidden_sketches to import the station dimensions."""
-    part_doc = _early_bound(adapter.currentModel, "IPartDoc")
-    for sketch in REFERENCE_SKETCHES:
-        blank_sketch(adapter, sketch)
-        feature = _early_bound(part_doc.FeatureByName(sketch), "IFeature")
-        state = int(feature.Visible)
-        if state != 1:  # swVisibilityStateHide
-            raise RuntimeError(f"{sketch} still visible after BlankSketch ({state})")
+def _flat_start_station(land: int) -> float:
+    """Front-stub station where land ``land``'s flat starts: the collar's
+    north face for the first gear land, the larger land's step otherwise."""
+    return COLLAR_END_STATION if land == 1 else SECTION_ENDS[land - 1]
+
+
+def flat_length_expression(land: int) -> str:
+    """The flat length's equation: the land's own length, from the two knobs
+    that bound it (the gear-seat knobs are measured from the collar face)."""
+    start = '"CollarWidth"' if land == 1 else f'"SecEnd{land - 1}"'
+    return f'"SecEnd{land}" - {start}'
+
+
+def flat_segment_area(land: int) -> float:
+    """Cross-section (mm^2) a land loses to its flat: the circular segment
+    beyond the flat plane."""
+    radius = SECTION_DIAS[land] / 2.0
+    offset = FLAT_OFFSETS[land]
+    return radius**2 * math.acos(offset / radius) - offset * math.sqrt(
+        radius**2 - offset**2
+    )
+
+
+async def _cut_flat(adapter: Any, land: int, drive_jobs: list[tuple[str, str]]) -> float:
+    """Cut land ``land``'s D-flat and return the volume removed.
+
+    Sketched on the land's end plane, where its across-flat dimension lies in
+    the plane a section view shows: a rectangle whose inner edge is the flat
+    and whose other three edges stand 1 mm clear of the land, and a
+    construction line along the sketch's x axis from the land's far side
+    (anchored by ``SecDia{i}``/2 from the axis) to the flat's midpoint, whose
+    length IS the across-flat ``Sec{i}AF``.  The cut runs back toward the
+    collar face (a blind cut's default, off a plane with material behind it)
+    by the land's length, so it stops at the step or the collar and never
+    touches the larger land or the collar.  Over that length there is no
+    material outside the land for the rectangle's 1 mm margin to reach.
+    """
+    from solidworks_mcp.adapters.base import ExtrusionParameters
+
+    label = f"Sec{land} flat"
+    radius = SECTION_DIAS[land] / 2.0
+    offset = FLAT_OFFSETS[land]
+    reach = radius + 1.0
+    length = SECTION_ENDS[land] - _flat_start_station(land)
+    profile = f"Sec{land}FlatProfile"
+    dims = SketchDims()
+    check(f"create_sketch {label}", await adapter.create_sketch(f"Sec{land}EndPlane"))
+    sign = _sketch_x_per_model_x(adapter)
+    bottom, outer, top, flat = await add_line_chain(
+        adapter,
+        [
+            (sign * offset, -reach),
+            (sign * reach, -reach),
+            (sign * reach, reach),
+            (sign * offset, reach),
+        ],
+    )
+    for edge, direction in (
+        (bottom, "horizontal"),
+        (outer, "vertical"),
+        (top, "horizontal"),
+        (flat, "vertical"),
+    ):
+        check(
+            f"{label} {direction} {edge}",
+            await adapter.add_sketch_constraint(edge, None, direction),
+        )
+    await dimension_between(
+        adapter,
+        f"{bottom}.start",
+        f"{bottom}.end",
+        "horizontal_distance",
+        reach - offset,
+        f"{label} reach",
+    )
+    dims.record(f"Sec{land}FlatReach")
+    await dimension_between(
+        adapter,
+        f"{flat}.start",
+        f"{flat}.end",
+        "vertical_distance",
+        2.0 * reach,
+        f"{label} span",
+    )
+    dims.record(f"Sec{land}FlatSpan")
+    (across,) = await add_line_chain(
+        adapter, [(-sign * radius, 0.0), (sign * offset, 0.0)], close=False
+    )
+    _as_construction(adapter, across)
+    check(
+        f"{label} across-flat horizontal",
+        await adapter.add_sketch_constraint(across, None, "horizontal"),
+    )
+    await anchor_point_to_origin(
+        adapter, f"{across}.start", -sign * radius, 0.0, f"{label} far side"
+    )
+    dims.record(f"Sec{land}FarSide", f'"SecDia{land}" / 2')
+    check(
+        f"{label} across-flat meets the flat",
+        await adapter.add_sketch_constraint(f"{across}.end", flat, "midpoint"),
+    )
+    await dimension_between(
+        adapter,
+        f"{across}.start",
+        f"{across}.end",
+        "horizontal_distance",
+        SECTION_FLAT_AF[land],
+        f"{label} across flat",
+    )
+    dims.record(f"Sec{land}AF", f'"SecAF{land}"')
+    await ensure_fully_defined(adapter, f"{label} sketch")
+    check(f"exit_sketch {label}", await adapter.exit_sketch())
+    name_last_feature(adapter, profile)
+    drive_jobs += dims.apply(adapter, profile)
+    check(
+        f"cut {label}",
+        await adapter.create_cut_extrude(ExtrusionParameters(depth=length)),
+    )
+    name_last_feature(adapter, f"Sec{land}Flat")
+    length_dim = name_dimensions(adapter, f"Sec{land}Flat", [f"Sec{land}FlatLength"])
+    drive_jobs += [(length_dim[0], flat_length_expression(land))]
+    return flat_segment_area(land) * length
 
 
 def _as_construction(adapter: Any, entity_id: str) -> None:
@@ -438,98 +558,31 @@ def _as_construction(adapter: Any, entity_id: str) -> None:
         raise RuntimeError(f"{entity_id} did not take the construction flag")
 
 
-def _sketch_x_per_model_z(adapter: Any) -> float:
-    """+1 or -1: the active sketch's x per model +Z.
+def _sketch_x_per_model_x(adapter: Any) -> float:
+    """+1 or -1: the active sketch's x per model +X.
 
-    The Right plane's sketch x runs along the shaft axis; which way is the
-    sketch's to state (ModelToSketchTransform), not ours to assume.
+    The flats' outward normal is the part's +X (the Right plane's normal, the
+    direction the gears' D-bores are keyed to); which way a land end plane's
+    sketch x runs is the sketch's to state (ModelToSketchTransform), not ours
+    to assume.
     """
     sketch = _early_bound(adapter.currentModel.SketchManager.ActiveSketch, "ISketch")
     transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
     utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
     mapped = []
-    for z in (0.0, 0.001):
+    for x in (0.0, 0.001):
         point = _early_bound(
-            utility.CreatePoint(double_array([0.0, 0.0, z])), "IMathPoint"
+            utility.CreatePoint(double_array([x, 0.0, 0.0])), "IMathPoint"
         )
-        if abs(float(point.ArrayData[2]) - z) > 1e-12:
-            raise RuntimeError(f"CreatePoint did not echo z={z}: {point.ArrayData}")
+        if abs(float(point.ArrayData[0]) - x) > 1e-12:
+            raise RuntimeError(f"CreatePoint did not echo x={x}: {point.ArrayData}")
         moved = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
         mapped.append(tuple(float(value) for value in moved.ArrayData))
     dx = mapped[1][0] - mapped[0][0]
-    if abs(abs(dx) - 0.001) > 1e-9:
-        raise RuntimeError(f"sketch x is not along model Z: {mapped}")
+    dy = mapped[1][1] - mapped[0][1]
+    if abs(abs(dx) - 0.001) > 1e-9 or abs(dy) > 1e-9:
+        raise RuntimeError(f"sketch x is not along model X: {mapped}")
     return math.copysign(1.0, dx)
-
-
-async def _author_solder_stations(adapter: Any) -> SketchDims:
-    """Model-owned solder-station dimensions (#914 option A).
-
-    Policy rule 2's authoring reference sketch, as the cone gear's tooth
-    thickness: construction witness lines stand on the axis at the collar face
-    and at T120's and T006's south faces, and the two stations are dimensioned
-    from the collar-face line, which the sketch origin places by SecEnd0.  The
-    witnesses are volume-neutral; the drawing hides the sketch in its
-    pictorial.
-    """
-    stations = SketchDims()
-    check("create_sketch solder stations", await adapter.create_sketch("Right"))
-    sign = _sketch_x_per_model_z(adapter)
-    witnesses = {}
-    for key, z in (
-        ("Datum", DATUM_STATION),
-        ("T120", DATUM_STATION + SOLDER_T120_STATION),
-        ("T006", DATUM_STATION + SOLDER_T006_STATION),
-    ):
-        set_sketch_direct_db(adapter, True)
-        line = check(
-            f"{key} witness",
-            await adapter.add_line(sign * z, 0.0, sign * z, STATION_WITNESS_HEIGHT),
-        )
-        set_sketch_direct_db(adapter, False)
-        _as_construction(adapter, line)
-        check(
-            f"{key} witness vertical",
-            await adapter.add_sketch_constraint(line, None, "vertical"),
-        )
-        check(
-            f"{key} witness on the axis",
-            await adapter.add_sketch_constraint(
-                f"{line}.start", "origin", "horizontal_points"
-            ),
-        )
-        await dimension_between(
-            adapter,
-            f"{line}.start",
-            f"{line}.end",
-            "vertical_distance",
-            STATION_WITNESS_HEIGHT,
-            f"{key} witness height",
-        )
-        stations.record(f"{key}WitnessHeight")
-        witnesses[key] = line
-    await dimension_between(
-        adapter,
-        f"{witnesses['Datum']}.start",
-        "origin",
-        "horizontal_distance",
-        DATUM_STATION,
-        "collar face",
-    )
-    stations.record("DatumStation", '"SecEnd0"')
-    for key, station in (("T120", SOLDER_T120_STATION), ("T006", SOLDER_T006_STATION)):
-        await dimension_between(
-            adapter,
-            f"{witnesses[key]}.start",
-            f"{witnesses['Datum']}.start",
-            "horizontal_distance",
-            station,
-            f"{key} solder station",
-        )
-        stations.record(f"{key}Station", f'"Solder{key}"')
-    await ensure_fully_defined(adapter, "solder-station reference sketch")
-    check("exit_sketch solder stations", await adapter.exit_sketch())
-    return stations
 
 
 def _equations_for(adapter: Any, lhs: str) -> list[str]:
@@ -557,8 +610,8 @@ def _assert_stations_single_owned(adapter: Any) -> None:
     """After the deferred equations and the final rebuild.
 
     Each STATION_OWNERS knob must be the ONE owner of every dimension that
-    carries it (Codex #839; #914 adds the collar face, the collar and the
-    solder stations).  An equation-owned dimension reads DrivenState 1
+    carries it (Codex #839; #914 adds the collar face and the collar).  An
+    equation-owned dimension reads DrivenState 1
     (driven), never 2, so the gate is single ownership: the knob is defined
     once; each dimension has exactly one equation, whose right-hand side is
     the knob; the knob's dimensions share one DrivenState; none is a

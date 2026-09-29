@@ -1,10 +1,10 @@
 r"""Create the curated manufacturing drawing for the crank-drive gear (64T).
 
-Recreated under ``cad/docs/drawing-simplicity-policy.md``. The sheet is three
-views of a plain helical toothed disc and three native model dimensions --
-outside diameter, face width, reamed bore -- plus the gear-data block rule 6
-keeps for the tooth system a cut-gear print cannot dimension (including the
-helix angle, its hand, and the tooth thinning that opens the crossed mesh).
+Recreated under ``cad/docs/drawing-simplicity-policy.md``. The sheet is
+three views of a helical toothed disc with a local +X D-bore and five native
+model dimensions -- outside diameter, four-place face width, round bore
+diameter, across-flat and south-entry chamfer -- plus the gear-data block
+rule 6 keeps for the crossed-axis tooth system.
 
 No datums, no feature control frames: a gear slipped onto a shaft land is not
 on the GD&T allowlist (rules 3-4), and the retired end-face perpendicularity
@@ -51,8 +51,9 @@ from _drawing_leaders import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
 from _surface_finish import surface_finish_by_key
-from build_crank_drive_gear import BORE_DIAMETRAL_GAP
+from build_crank_drive_gear import BORE_DIAMETRAL_CLEARANCE
 from crank_drive_gear_notes import SHAFT_MATE_NUMBER
+from gear_seat_fit import FLAT_AF_CLEARANCE
 from crank_drive_gear_spec import (
     BORE_DIA,
     DRAWING_DIMENSIONS,
@@ -61,10 +62,12 @@ from crank_drive_gear_spec import (
     OUTSIDE_DIA,
     SURFACE_FINISHES,
 )
+from solidworks_mcp.adapters import sw_type_info as _sw_type_info
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
     dimension_name,
     place_view,
+    view_name,
 )
 
 
@@ -86,11 +89,8 @@ FRONT_CENTER = (0.135, 0.145)
 RIGHT_CENTER = (0.255, 0.145)
 ISO_CENTER = (0.350, 0.150)
 GEAR_DATA_POS = (0.016, 0.262)
-# The notes block grew from one line to three when the attachment note landed
-# (crank_drive_gear_notes.DRAWING_NOTES), so its anchor sits a line-and-a-half
-# higher: the block now ends where the single line used to, clear of the
-# sheet's bottom border, and nothing else lives in this column below the
-# bore callout at y = 0.083.
+# One short tooth-edge note below the gear data; the D-bore fit is carried by
+# the two native model dimensions and their feature callout.
 MANUFACTURING_NOTES_POS = (0.016, 0.042)
 
 # Half the printed tooth-tip circle, in sheet metres: the face view's silhouette
@@ -101,33 +101,42 @@ HALF_OD = OUTSIDE_DIA * VIEW_SCALE[0] / (VIEW_SCALE[1] * 2000.0)  # 0.0489
 # can be proven not to overlap offline.
 FACE_WIDTH_HALF = FACE_WIDTH * VIEW_SCALE[0] / (VIEW_SCALE[1] * 2000.0)  # 0.0049
 
-# Face view: the tip circle above, the bore below-left, both leadered clear of
-# the silhouette and of the gear-data block's column on the far left.
+# End view: round diameter on the lower left, AF on the upper right and tip
+# above. The flat itself appears on local +X in the face view.
 FRONT_KEEP = {
     "OutsideDia": (FRONT_CENTER[0], FRONT_CENTER[1] + HALF_OD + 0.016),
     "BoreDia": (FRONT_CENTER[0] - 0.078, FRONT_CENTER[1] - 0.062),
+    "BoreAF": (FRONT_CENTER[0] + 0.075, FRONT_CENTER[1] + 0.028),
 }
-# Side view: the face width, above the view -- below it would land in the
-# title block's corner of the B sheet.
+# Side view: the face width and south-entry chamfer sit above the side
+# silhouette, clear of both the title block and the isometric's tooth tips.
 RIGHT_KEEP = {
     "FaceWidth": (RIGHT_CENTER[0], RIGHT_CENTER[1] + HALF_OD + 0.014),
+    "BoreSouthChamferSize": (0.300, 0.226),
 }
 
-# The bore's own limits are the fit; the callout says how far it goes and how
-# it is finished (policy rule 7), then restates, as a reference, the bond gap
-# those limits leave on the MHA-014 land (the crank hub's bore precedent).
+# Native bands on both bore dimensions set the fitted clearance. The callout
+# adds process, extent and mating part; it does not repeat those dimensions.
 BORE_CALLOUT = (
     "REAM THRU\n"
-    f"({BORE_DIAMETRAL_GAP[0]:.3f}-{BORE_DIAMETRAL_GAP[1]:.3f} DIAMETRAL\n"
-    f"GAP ON {SHAFT_MATE_NUMBER})"
+    f"({BORE_DIAMETRAL_CLEARANCE[0]:.3f}-{BORE_DIAMETRAL_CLEARANCE[1]:.3f} DIAMETRAL\n"
+    f"CLEARANCE ON {SHAFT_MATE_NUMBER})"
 )
-DIMENSION_CALLOUTS = {"BoreDia": BORE_CALLOUT}
+AF_CALLOUT = (
+    f"ACROSS FLAT ON {SHAFT_MATE_NUMBER}\n"
+    f"({FLAT_AF_CLEARANCE[0]:.3f}-{FLAT_AF_CLEARANCE[1]:.3f} AF CLEARANCE)"
+)
+DIMENSION_CALLOUTS = {
+    "BoreDia": BORE_CALLOUT,
+    "BoreAF": AF_CALLOUT,
+    # The leg and its +0.10/-0.00 band are native; the chamfer feature is
+    # 45° on the model, and this suffix identifies the south entry only.
+    "BoreSouthChamferSize": " X 45 DEG\nSOUTH BORE ENTRY",
+}
 
-# Nothing but the bore's own finish and callout may reach the bore
-# (eye pass of w15-301f4bf4e: the tip diameter ran through the centre, and
-# the finish leader rose to the bottom of the bore between the other two).
-# The tip diameter lands one arrow on its near (top) rim; the bore callout
-# keeps its lower-left landing; the finish comes in from the lower right.
+# The tip diameter lands on its near (top) rim, the round clearance on
+# the lower left, the AF callout on the upper right and the finish on the
+# lower right of the surviving circular bore wall.
 BORE_SHEET_RADIUS = BORE_DIA * VIEW_SCALE[0] / (VIEW_SCALE[1] * 2000.0)
 FINISH_ATTACH = (
     FRONT_CENTER[0] + BORE_SHEET_RADIUS * math.cos(math.pi / 4.0),
@@ -169,6 +178,26 @@ def _named(adapter: Any, annotations: list[Any], name: str) -> Any:
     return matches[0]
 
 
+def _add_bore_arc_center_mark(adapter: Any, view: Any) -> None:
+    """Mark the D-bore axis on its far (-X) circular arc, not the flat."""
+    draw = adapter.currentModel
+    drawing_doc = _sw_type_info.early_bound_or_flag(
+        draw, "IDrawingDoc", "ActivateView", "InsertCenterMark3"
+    )
+    if not drawing_doc.ActivateView(view_name(adapter, view)):
+        raise RuntimeError("failed to activate 64T front view for bore centre")
+    draw.ClearSelection2(True)
+    if not draw.Extension.SelectByID2(
+        "", "EDGE", FRONT_CENTER[0] - BORE_SHEET_RADIUS, FRONT_CENTER[1], 0.0,
+        False, 0, null_callout(), 0,
+    ):
+        raise RuntimeError("failed to select the round side of the D-bore")
+    center_mark = drawing_doc.InsertCenterMark3(2, False, False)
+    draw.ClearSelection2(True)
+    if center_mark is None:
+        raise RuntimeError("failed to mark the D-bore axis")
+
+
 def _bore_leaders_clear(adapter: Any, annotations: list[Any], finish: Any) -> None:
     """Fail unless the finish reads at note height and no two bore leaders cross."""
     finish_annotation = finish.GetAnnotation()
@@ -182,6 +211,7 @@ def _bore_leaders_clear(adapter: Any, annotations: list[Any], finish: Any) -> No
         {
             "OutsideDia": dimension_segments(tip),
             "BoreDia": dimension_segments(_named(adapter, annotations, "BoreDia")),
+            "BoreAF": dimension_segments(_named(adapter, annotations, "BoreAF")),
             "BoreFinish": leader_segments(finish_annotation),
         },
         centre=FRONT_CENTER,
@@ -189,6 +219,7 @@ def _bore_leaders_clear(adapter: Any, annotations: list[Any], finish: Any) -> No
         lands_within={
             "OutsideDia": TIP_DIA_LANDING,
             "BoreDia": BORE_LANDING,
+            "BoreAF": BORE_LANDING,
             "BoreFinish": BORE_LANDING,
         },
         label="crank drive gear bore",
@@ -239,9 +270,8 @@ async def build(adapter: Any) -> dict[str, str]:
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=VIEW_SCALE)
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=VIEW_SCALE)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
-    # Hidden lines OFF in every view: the only internal feature is a straight
-    # reamed bore whose callout already says THRU, so hidden edges in the side
-    # view would add ink without adding a fact.
+    # The bore profile is a circular arc closed by a flat; the D-shape is
+    # explicit in this view and needs no side-view hidden edges.
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
     _hide_tangent_edges(front, "front")
@@ -261,12 +291,18 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="right",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
+    set_dimension_callouts(
+        adapter, front_annotations,
+        {name: DIMENSION_CALLOUTS[name] for name in FRONT_KEEP if name in DIMENSION_CALLOUTS},
+    )
+    set_dimension_callouts(
+        adapter, right_annotations,
+        {"BoreSouthChamferSize": DIMENSION_CALLOUTS["BoreSouthChamferSize"]},
+    )
     assert_imported_precision(
         adapter, front_annotations + right_annotations, DRAWING_PRECISION_BY_NAME
     )
-    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center mark to gear bore")
+    _add_bore_arc_center_mark(adapter, front)
     # The bore is the part's one fit surface, and a fit is a function of the
     # peaks as well as the size: REAM names the operation, not the finish it
     # leaves. The roughness is the project's general machined grade, authored

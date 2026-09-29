@@ -86,8 +86,6 @@ from cone_tip_block_spec import (
     FLANGE_SLOT_X,
     FLANGE_SLOT_Z,
     FLANGE_T,
-    HEEL_RELIEF_DEPTH,
-    HEEL_RELIEF_HEIGHT,
     MIN_WEB_MM,
     PASSAGE_CENTER_DATUM,
     PINCH_CLEARANCE_DIA,
@@ -413,8 +411,6 @@ async def build(adapter) -> dict[str, str]:
     # r3 option A: both arc centres baselined from the body's south face.
     await set_global(adapter, "FlangeSlotNorthZ", f"{FLANGE_SLOT_NORTH_Z}mm")
     await set_global(adapter, "FlangeSlotSouthZ", f"{FLANGE_SLOT_SOUTH_Z}mm")
-    await set_global(adapter, "HeelReliefDepth", f"{HEEL_RELIEF_DEPTH}mm")
-    await set_global(adapter, "HeelReliefHt", f"{HEEL_RELIEF_HEIGHT}mm")
     await set_global(
         adapter, "PinchBoreY", '"AdjusterAxisHeight" + "PinchRise"'
     )
@@ -544,43 +540,6 @@ async def build(adapter) -> dict[str, str]:
     volume = await volume_check(
         adapter, "pinch clearance", volume - v_clearance, 0.08 * v_clearance
     )
-
-    # I31 heel relief: a step along the whole north-bottom edge, so the cone
-    # pivot screw's head (on the platform top, just north of the block) never
-    # meets the north face at the fit-up extreme.  The Right plane reads the
-    # model's +Z (north) as sketch -x; the profile's outer edges lie on the
-    # north face and the foot, and a mid-plane cut runs it across the block.
-    heel = SketchDims()
-    heel_pts = [
-        (-BLOCK_Z / 2.0, 0.0),
-        (-BLOCK_Z / 2.0, HEEL_RELIEF_HEIGHT),
-        (-BLOCK_Z / 2.0 + HEEL_RELIEF_DEPTH, HEEL_RELIEF_HEIGHT),
-        (-BLOCK_Z / 2.0 + HEEL_RELIEF_DEPTH, 0.0),
-    ]
-    check("create_sketch heel relief", await adapter.create_sketch("Right"))
-    heel_lines = await add_line_chain(adapter, heel_pts)
-    await define_rectilinear_chain(
-        adapter,
-        heel_lines,
-        heel_pts,
-        label="heel relief",
-        dims=heel,
-        names=["HeelReliefHt", "HeelReliefDepth", "HeelReliefFace"],
-        drives=['"HeelReliefHt"', '"HeelReliefDepth"', '"BlockZ" / 2'],
-    )
-    await ensure_fully_defined(adapter, "heel relief sketch")
-    check("exit_sketch heel relief", await adapter.exit_sketch())
-    name_last_feature(adapter, "HeelReliefProfile")
-    drive_jobs += heel.apply(adapter, "HeelReliefProfile")
-    check(
-        "cut heel relief",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=BLOCK_X + 2.0, both_directions=True)
-        ),
-    )
-    name_last_feature(adapter, "HeelRelief")
-    v_heel = BLOCK_X * HEEL_RELIEF_DEPTH * HEEL_RELIEF_HEIGHT
-    volume = await volume_check(adapter, "heel relief", volume - v_heel, 0.01 * v_heel)
 
     # I31 foot flange: the block's full width, FLANGE_LEN past the south face
     # (Top-plane sketch y = -Z, so south is +y), FLANGE_T up from the foot,

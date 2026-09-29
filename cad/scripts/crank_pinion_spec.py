@@ -94,13 +94,9 @@ BORE_DIA_BAND = (  # (upper, lower) deviations
     round(_SHAFT_UPPER + _CLEARANCE_MIN, 3),
 )
 
-FACE_WIDTH = 10.4  # spans the 64T row north of the v2 crank boss
-# (build_crank_pinion drives the blank from this; build_drive_train_assembly's
-# PINION_FACE asserts equality.)  It was 10.8 until the deepened cone mesh
-# (#834, U38) grew the T120 tip: its inclined rim then reached the toothed
-# north end (-0.26 against the 0.25 axial clearance).  Main ruled option A
-# (2026-09-23): shorten the teeth from the north.  The south face stays where
-# it was; the boss length is now set by W15 below.
+FACE_WIDTH = 9.5  # teeth shortened at the north end; south face stays seated
+# The south face and boss length stay where they were. The 64T row is now
+# 7.2113 wide; the assembly's exact rim scan proves T120 air and gear overlap.
 
 # --- Hub boss + retention pin (ch. 12 p. 19, page002_img02 / img06) ---------
 #
@@ -266,11 +262,10 @@ if PIN_AXIAL_LIGAMENT_WORST < PIN_AXIAL_LIGAMENT_FLOOR_MM:
     raise AssertionError("match-drilled pin breaks through the boss end at print-worst")
 if SHAFT_END_RECESS_MAX <= SHAFT_END_RECESS_MIN:
     raise AssertionError("the pinion boss needs a positive printed shaft-recess range")
-# The fixed-axis seed with the 6.5-mm 64T face; the offline nine-phase
-# exact-solid study found a common free offset interval -2.775957..-0.205645
-# degrees. The assembly selects -1.49 degrees and independently checks this
-# physical retention-hole clocking against its mesh seed at import.
-PIN_CLOCKING_DEG = 12.576430992160178
+# The fixed-axis tooth-in-gap seed follows the installed 64T centre; the
+# assembly asserts this cross-hole clock against its independently derived
+# seed so the shaft's radial pin hole tracks a centre-station change.
+PIN_CLOCKING_DEG = 12.037647012980765
 if not 0.0 <= PIN_CLOCKING_DEG < 360.0 / 16.0:
     raise AssertionError("pinion retention-hole clocking must lie within one 16T pitch")
 # The matched-hole callout on both part records identifies both seated parts,
@@ -345,18 +340,14 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # marks, so ``draw_crank_pinion`` imports each dimension verbatim and only reads
 # ``GetPrimaryPrecision2()`` back off the sheet.
 #
-# The bore is the only fit on the part and prints three places with its own
-# derived band. The outside diameter prints two with its own +/-0.10. The face
-# width is a free length between two turned faces: one place, so the title
-# block's .X +/-0.8 is the band it claims -- and that is the band it needs, the
-# 64T row it runs in being far wider than this face. The boss diameter is a
-# routine turned size at the general .XX grade: it is not a running surface
-# (no band, no symbol). The match-drilled pin station is deliberately absent:
-# its callout locates the shared operation at boss mid-length and the actual
-# crankshaft/pinion stack sets it. The overall length is one place like the
-# face width: it only has to leave the shaft end recessed inside the boss, a
-# look, not a fit, and W15 sizes the boss so its general grade does. The end
-# break is a deburr: one place.
+# The bore is the only size fit on the part and prints three places with its
+# derived band. The outside diameter prints two with its own +/-0.10. Face
+# width prints one place at the title-block .X row; the assembly checks the
+# nominal north-face air to T120 and actual overlap with the grown 64T.
+# The boss diameter is routine .XX, not a running surface. The match-drilled
+# pin station is absent: its callout locates it at boss mid-length and the
+# crankshaft/pinion stack sets it. The overall length prints one place like
+# the face, with the W15 boss sized for the recessed shaft-end condition.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "GearBlank": {"FaceWidth": FACE_WIDTH_PLACES},
     "BossProfile": {

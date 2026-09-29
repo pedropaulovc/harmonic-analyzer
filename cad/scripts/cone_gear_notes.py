@@ -2,9 +2,7 @@
 
 This module deliberately performs no ``_config`` reads because the cone-gear
 constants are imported by assemblies.  Every configuration sheet receives its
-own native dimensions and a tooth-system block for that configuration.  The
-shaft joint's text lives here too, for the drive-train assembly step that makes
-the joint; no part sheet prints it.
+own native dimensions and a tooth-system block for that configuration.
 """
 
 from __future__ import annotations
@@ -15,6 +13,8 @@ import cone_gear_spec as spec
 
 
 CYLINDER_MATE_NUMBER = "MHA-027"
+# The D-bore's across-flat callout names the shaft land it slides on.
+SHAFT_MATE_NUMBER = "MHA-014"
 
 
 # The U42 gears' worst-case transverse contact ratio with MHA-027, rounded
@@ -104,14 +104,6 @@ def gear_data(teeth: int) -> str:
     return "\n".join(["GEAR DATA", *(f"{label}:  {value}" for label, value in rows)])
 
 
-# The user approved either a metallurgical joint or a retaining-compound joint
-# for every cone gear.  Joining is a method, so rule 6 keeps it off the part
-# sheets: the drive-train assembly step that fixes each gear to its shaft
-# imports this constant rather than retyping it.  There is no key, pin, set
-# screw, or hub in the evidence or model.
-ATTACHMENT = "SOLDER, SILVER-BRAZE OR LOCTITE 638/648"
-SHAFT_MATE_NUMBER = "MHA-014"
-
 # The named shortfalls (user rulings U42 and U40, 2026-09-23) print once each,
 # as GEAR DATA rows (web_row, contact_ratio_row), never again in these notes.
 # Which gears carry them stays in cone_gear_spec (CONTACT_RATIO_EXCEPTION_TEETH,
@@ -121,7 +113,6 @@ DRAWING_NOTES = "\n".join(
     (
         "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS.",
         "MAKE ONE GEAR FROM EACH SHEET IN THIS PACKAGE.",
-        "PLAIN BORE, NO KEYWAY.",
     )
 )
 

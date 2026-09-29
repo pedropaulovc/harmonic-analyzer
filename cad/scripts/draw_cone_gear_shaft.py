@@ -6,11 +6,12 @@ view, each dimension line inside the land it measures (the 3.2 mm collar
 instead takes one near-side arrow on its rim).  The two short lands
 ahead of the tip are 6.9 mm long, so the three tip-end diameter texts climb
 in steps: the tip's line rises highest and each text hangs to the RIGHT of
-its line above every line it spans.  A standard isometric supplies pictorial
-clarity, and the note names the gear seats the lands are fitted to and the
-tailstock support the tip land needs (U40).  Source geometry and
-native model fits stay authoritative: the sheet types no tolerance and no
-precision.
+its line above every line it spans.  Each gear land's D-flat is shown in its
+own enlarged cut-only section, A-A to D-D, carrying its across-flat.  A
+standard isometric supplies pictorial clarity, and the note names the bores
+the seats and flats mate and the tailstock support the tip land needs
+(U40).  Source geometry and native model fits stay authoritative: the sheet
+types no tolerance and no precision.
 
 Run with SolidWorks open::
 
@@ -20,12 +21,12 @@ Run with SolidWorks open::
 from __future__ import annotations
 
 import argparse
+import math
 import sys
-from typing import Any
+from typing import Any, NamedTuple
 
 from collections.abc import Mapping, Sequence
 
-import _drawing_hidden_sketches as hidden_sketches
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_annotation_extent import (
@@ -45,6 +46,7 @@ from _drawing_common import (
     add_edge_dimension,
     add_property_linked_note,
     add_surface_finish,
+    create_section_view,
     curate_view_dimensions,
     dimension_name,
     finalize_drawing,
@@ -75,11 +77,13 @@ from cone_gear_shaft_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_REFERENCE_PRECISION,
     FILLET_CALLOUT,
+    FLAT_LANDS,
     JOURNAL_DIA,
     SECTION_DIAS,
     SHAFT_LENGTH,
     SURFACE_FINISHES,
 )
+from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     delete_view,
@@ -106,13 +110,14 @@ ISO_SCALE = (1, 2)
 
 
 # Landscape sheet, 0.4318 x 0.2794 m, title block bottom right (x > ~0.216,
-# y < ~0.066).  The 200.89 mm shaft at 1:1 spans 0.0503..0.2512, leaving the
-# right third for the pictorial; the group sits just below mid-height so
-# the baseline stack below and the diameters above share the field with the
-# note block in the lower left (review 2026-09-23: at 0.170 rows A-B stood
-# empty but for the note).  The view is placed by its large end: every
-# dimension below is laid out from that datum face, so a change at the tip
-# (E1 shortened it 2.9 mm) moves only the tip.
+# y < ~0.066).  The 199.34 mm shaft at 1:1 spans 0.0533..0.2526, leaving the
+# right third for the pictorial and the four D sections; the group sits just
+# below mid-height so the baseline stack below and the diameters above share
+# the field with the note block in the lower left (review 2026-09-23: at
+# 0.170 rows A-B stood empty but for the note).  The view is placed by its
+# large end: every dimension below is laid out from that datum face, so a
+# change at the tip (the 2026-09-28 tip stack shortened it 1.55 mm) moves
+# only the tip.
 BIG_END_X = 0.2526
 SIDE_CENTER = (BIG_END_X - SHAFT_LENGTH / 2000.0, 0.150)
 ISO_CENTER = (0.345, 0.165)
@@ -125,29 +130,23 @@ DONOR_CENTER = (0.360, 0.090)
 
 # Lengths (option A, #914): ONE origin, the collar's thrust face at sheet x
 # 0.2096.  Everything measured from it is baseline below the shaft, one tier
-# per dimension, the shortest nearest the part: the collar web, the T120
-# solder station, the three gear-seat shoulders, the T006 station with its
-# 20X EQ SP on the value's own line, then the tip (#917 R5 (a)).  Every tier
-# is therefore one line of text: as a callout below, "20X EQ SP" hung
-# between 142.168 and 157.9 and read as either's (final877 eye pass).  The
-# journal runs the other way from
-# the same origin on the first tier, and the front-to-tip overall, a
-# reference, hangs lowest, above the title block.  A station's text is
-# centred in its span when it fits there with STATION_TEXT_CLEARANCE to spare;
-# the web's 3.18 and the T120's 10.78 spans are narrower than their texts, so
-# both texts stand stacked LEFT of the T120 extension line (the 916a render
-# had the datum line strike "10.781" and the web text touch the collar's
-# witness line).  The one radius rides above the 3/8-to-1/4 in step it
-# attaches to (the fillet's first edge), right of the Ø6.350 line.
+# per dimension, the shortest nearest the part: the collar web, the three
+# land steps, then the tip (#917 R5 (a)).  Every tier is one line of text.
+# The journal runs the other way from the same origin on the first tier, and
+# the front-to-tip overall, a reference, hangs lowest, above the title block.
+# A station's text is centred in its span when it fits there with
+# STATION_TEXT_CLEARANCE to spare; the web's 3.18 span is narrower than its
+# text, so the text stands LEFT of the collar's north witness line (the 916a
+# render had the web text touch that line).  The one radius rides above the
+# 3/8-to-1/4 in step it attaches to (the fillet's first edge), right of the
+# Ø6.350 line.
 SIDE_KEEP = {
-    "CollarWidth": (0.1895, 0.1355),
+    "CollarWidth": (0.1985, 0.1355),
     "Sec0End": (0.2311, 0.1355),
-    "T120Station": (0.1895, 0.1275),
-    "Sec1End": (0.1492, 0.1195),
-    "Sec2End": (0.1457, 0.1115),
-    "Sec3End": (0.1423, 0.1035),
-    "T006Station": (0.1388, 0.0955),
-    "Sec4End": (0.1307, 0.0875),
+    "Sec1End": (0.1498, 0.1275),
+    "Sec2End": (0.1464, 0.1195),
+    "Sec3End": (0.1429, 0.1115),
+    "Sec4End": (0.1314, 0.1035),
     "ShoulderR": (0.1000, 0.1640),
 }
 OVERALL_REFERENCE_TEXT_XY = (0.1515, 0.0795)
@@ -159,9 +158,9 @@ STATION_TEXT_CLEARANCE = 0.002
 # Diameters, imported on the donor and dragged onto the side view.  A vertical
 # linear dimension's line sits at its text x and the text hangs to the RIGHT
 # of that line (~32 mm wide with its stacked band), so each x lies INSIDE the
-# land it measures (the big end is at sheet x 0.2526; since U40 land 1 spans
-# 0.0888..0.2096, land 2 0.0819..0.0888, land 3 0.0750..0.0819, land 4
-# 0.0503..0.0750); Ø12.231 stands just off the faced end.  Lands 2 and 3 are
+# land it measures (the big end is at sheet x 0.2526; land 1 spans
+# 0.0900..0.2096, land 2 0.0831..0.0900, land 3 0.0762..0.0831, land 4
+# 0.0533..0.0762); Ø12.231 stands just off the faced end.  Lands 2 and 3 are
 # only 6.9 mm long, so a tip-end text spans its right-hand neighbours'
 # lines: the tip's text sits highest and each neighbour to the right steps
 # down, so no line rises through a text (codex, 18395f30).  Lands 2 and 3
@@ -172,7 +171,7 @@ SIDE_DIAMETERS = {
     "Sec1Dia": (0.1400, 0.1730),
     "Sec2Dia": (0.0853, 0.1760),
     "Sec3Dia": (0.0785, 0.1880),
-    "Sec4Dia": (0.0520, 0.2000),
+    "Sec4Dia": (0.0550, 0.2000),
     # #914: the collar ring is 3.181 wide, too narrow for a dimension line
     # and two arrows inside it, so the collar alone takes the near-side
     # diametric style: one arrow on the top rim from outside, leader up to
@@ -202,16 +201,51 @@ DONOR_KEEP = {
     name: (DONOR_CENTER[0], DONOR_CENTER[1] - 0.012 * index)
     for index, name in enumerate(SIDE_DIAMETERS)
 }
-# Three identical gear-seat shoulder roots, one modelled fillet, one radius
-# dimension (the collar's roots stay sharp, #914).
+# Three identical step roots, one modelled fillet, one radius dimension (the
+# collar's roots stay sharp, #914).
 DIMENSION_CALLOUTS = {
     "ShoulderR": FILLET_CALLOUT,
     "CollarDia": COLLAR_STOCK_CALLOUT,
 }
-# The T006 station's pattern note, on the value's own line.
-T006_STATION_SUFFIX = " 20X EQ SP"
 # The pivot-journal finish symbol, above whose ink the collar's text must stand.
 PIVOT_FINISH_XY = (0.2400, 0.1800)
+
+
+class DSection(NamedTuple):
+    """One gear land's D-flat section: where the cutting line crosses the
+    side view, where the removed section stands, and its own scale."""
+
+    land: int
+    label: str
+    cut_x: float
+    centre: tuple[float, float]
+    scale: tuple[int, int]
+
+
+# The D sections (user ruling 2026-09-28: every gear land carries one flat on
+# the shaft's +X).  The side view looks straight at the flats, so their size
+# is only readable end-on: each land is cut across mid-land, clear of its
+# diameter line, and shown cut-only (nothing beyond the plane prints), each
+# enlarged to about 16..19 mm across so the smallest AF, 1.460 on the
+# Ø1.588, reads with its band.  The four stand in a row right of the side
+# view's baseline stack, under the pictorial and above the title block.  The
+# across-flat is the part's own dimension (Sec{i}AF, sketched on the land's
+# end plane, parallel to the cut), so it prints its model band and places.
+D_SECTIONS = (
+    DSection(1, "A", 0.1150, (0.285, 0.100), (2, 1)),
+    DSection(2, "B", 0.0876, (0.323, 0.100), (3, 1)),
+    DSection(3, "C", 0.0810, (0.361, 0.100), (5, 1)),
+    DSection(4, "D", 0.0660, (0.399, 0.100), (10, 1)),
+)
+# How far a cutting-plane line runs past the land it cuts.
+D_SECTION_LINE_OVERRUN = 0.004
+# Each across-flat's text, centred over its section.
+D_SECTION_KEEP = {
+    f"Sec{section.land}AF": (section.centre[0], section.centre[1] + 0.017)
+    for section in D_SECTIONS
+}
+if tuple(section.land for section in D_SECTIONS) != FLAT_LANDS:
+    raise AssertionError("every flatted land takes exactly one D section")
 
 
 @_telemetry.traced("drawing.cylindrical_face_scan")
@@ -242,12 +276,14 @@ def _cylindrical_face(adapter: Any, view: Any, diameter_mm: float) -> Any:
 
 @_telemetry.traced("drawing.end_face_circle", label_param="label")
 def _end_circle(view: Any, *, station_mm: float, diameter_mm: float, label: str) -> Any:
-    """The one visible end-face circle at ``station_mm`` of ``diameter_mm``.
+    """The one visible end-face circle (or arc) at ``station_mm`` of ``diameter_mm``.
 
     The journal's circle also stands at the collar face and the tip land's at
-    its own start, so the pick is by station AND diameter.  The station is
-    matched on |z|: the shaft runs along model Z from the front face, and the
-    sign of that axis is the part's, not an assumption made here.
+    its own start, so the pick is by station AND diameter.  The tip's end face
+    is a D (its flat runs out through the tip), so its edge is the D's arc,
+    still a circle curve of the land's radius.  The station is matched on
+    |z|: the shaft runs along model Z from the front face, and the sign of
+    that axis is the part's, not an assumption made here.
     """
     matches: list[Any] = []
     for raw in visible_view_entities(view, 1, label=f"{label} edges"):
@@ -507,19 +543,56 @@ def _clear_collar_callout(
     )
 
 
-def _set_t006_station_suffix(adapter: Any, annotations: Sequence[Any]) -> None:
-    """Print the T006 station's pattern note on the value's own line."""
-    for annotation in annotations:
-        if dimension_name(adapter, annotation) != "T006Station":
-            continue
-        annotation = _early_bound(annotation, "IAnnotation")
-        display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
-        display.SetText(2, T006_STATION_SUFFIX)  # swDimensionTextSuffix
-        readback = str(display.GetText(2) or "")
-        if readback != T006_STATION_SUFFIX:
-            raise RuntimeError(f"T006 station suffix did not persist: {readback!r}")
-        return
-    raise RuntimeError("side view has no T006Station dimension to label")
+def _prepare_d_section(adapter: Any, view: Any, section: DSection) -> None:
+    """Keep only the D's cut face, at the section's own independent scale."""
+    bound = _early_bound(view, "IView")
+    bound.UseParentScale = False
+    bound.UseSheetScale = 0
+    bound.ScaleRatio = double_array([float(section.scale[0]), float(section.scale[1])])
+    cut = _early_bound(bound.GetSection(), "IDrSection")
+    # R2026x declares SetDisplayOnlySurfaceCut as a void setter; only its
+    # dedicated bool getter may be truth-tested.
+    cut.SetDisplayOnlySurfaceCut(True)
+    rebuild_drawing(adapter, label=f"section {section.label} cut face and scale")
+    ratio = tuple(float(value) for value in bound.ScaleRatio)
+    if (
+        bool(bound.UseParentScale)
+        or int(bound.UseSheetScale) != 0
+        or not math.isclose(ratio[0] / ratio[1], section.scale[0] / section.scale[1])
+    ):
+        raise RuntimeError(f"section {section.label} scale did not persist: {ratio}")
+    if not bool(cut.GetDisplayOnlySurfaceCut()):
+        raise RuntimeError(f"section {section.label} kept geometry beyond the cut")
+    if bool(cut.GetPartialSection()):
+        raise RuntimeError(f"section {section.label} cutting line did not close")
+
+
+def _add_d_sections(adapter: Any, side: Any) -> None:
+    """Cut each flatted land across and print its across-flat in the section.
+
+    ``curate_view_dimensions`` fails the build if a section's across-flat
+    does not arrive, so every D on the sheet carries its size."""
+    for section in D_SECTIONS:
+        reach = SECTION_DIAS[section.land] / 2000.0 + D_SECTION_LINE_OVERRUN
+        view = create_section_view(
+            adapter,
+            side,
+            line_start=(section.cut_x, SIDE_CENTER[1] - reach),
+            line_end=(section.cut_x, SIDE_CENTER[1] + reach),
+            view_xy=section.centre,
+            section_label=section.label,
+            scale=section.scale,
+            label=f"land {section.land} D section",
+        )
+        _prepare_d_section(adapter, view, section)
+        name = f"Sec{section.land}AF"
+        curate_view_dimensions(
+            adapter,
+            view,
+            keep={name: D_SECTION_KEEP[name]},
+            view_label=f"section {section.label}",
+            dimensions_by_feature=DRAWING_DIMENSIONS,
+        )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -574,12 +647,13 @@ async def build(adapter: Any) -> dict[str, str]:
     # The donor is curated FIRST so the diameters cannot be claimed (and then
     # deleted) by a view that cannot show them.
     donor_annotations = curate_view_dimensions(
-        adapter, donor, keep=DONOR_KEEP, view_label="diameter donor"
+        adapter,
+        donor,
+        keep=DONOR_KEEP,
+        view_label="diameter donor",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    # The part saves its SolderStations witness sketch hidden, so the side
-    # view, which owns the two station dimensions, takes the opt-in import
-    # that shows it in this view only; the pictorial shows the part as saved.
-    side_annotations = hidden_sketches.curate_view_dimensions(
+    side_annotations = curate_view_dimensions(
         adapter,
         side,
         keep=SIDE_KEEP,
@@ -611,7 +685,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if collar is None:
         raise RuntimeError("the donor view gave no CollarDia dimension")
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
-    _set_t006_station_suffix(adapter, annotations)
+    _add_d_sections(adapter, side)
     overall = _add_overall_reference(adapter, side)
     # Every other dimension on the side view, which the collar callout's
     # proof measures it against.
@@ -655,8 +729,8 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         side,
         symbol_xy=(0.0240, 0.1960),
-        control=surface_finish_by_key(SURFACE_FINISHES, "tip_journal"),
-        label="tip journal finish",
+        control=surface_finish_by_key(SURFACE_FINISHES, "tip_land"),
+        label="tip land finish",
         char_height=0.0025,
         entity_type="FACE",
         entity=tip_face,

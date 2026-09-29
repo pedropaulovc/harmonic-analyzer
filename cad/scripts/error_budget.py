@@ -50,6 +50,9 @@ import channel_spring_installed_spec
 import connecting_rod_spec
 import counter_spring_spec
 import cylinder_gear_spec
+import cone_gear_spec
+import cone_shaft_land_bands
+import gear_seat_fit
 import lever_wire_geom
 import magnifying_clamp_geom
 import magnifying_lever_geom
@@ -841,6 +844,48 @@ def finite_difference_check(
 # --------------------------------------------------------------------------
 
 
+def phase_profiles() -> dict[str, tuple[np.ndarray, np.ndarray]]:
+    """Phase radians = drawn deviation * per-channel scale + fixed residual.
+
+    Cone gear T_i has T_i/120 of its phase at the 120T cylinder cam.
+    The D-flat's AF clearance turns each gear by c / flat half-chord. A
+    uniform Ø9.525-land mean lag is proportional to i and therefore only
+    shifts the crank index; its per-land departures and per-gear scatter
+    cannot be removed by that index.
+    """
+    teeth = 6 * np.arange(1, N_ELEMENTS + 1)
+    ratio = teeth / 120.0
+    half_chords = np.empty(N_ELEMENTS)
+    for _band, af, carried in zip(
+        cone_shaft_land_bands.SECTION_DIA_BANDS,
+        cone_shaft_land_bands.SECTION_FLAT_AF,
+        cone_shaft_land_bands.SECTION_CONE_GEAR_TEETH,
+        strict=True,
+    ):
+        if af is None:
+            continue  # pivot journal, with no gear and no flat
+        # The configured gear's bore is the nominal diameter of its shaft
+        # section; the adjacent section band sets that land's size limits.
+        for count in carried:
+            diameter = cone_gear_spec.bore_dia_mm(count)
+            half_chords[count // 6 - 1] = math.sqrt(
+                (diameter / 2.0) ** 2 - (af - diameter / 2.0) ** 2
+            )
+    clearance_lo, clearance_hi = gear_seat_fit.FLAT_AF_CLEARANCE
+    clearance_mean = (clearance_lo + clearance_hi) / 2.0
+    reference_chord = half_chords[-1]  # T120, on the Ø9.525 land
+    deg = math.pi / 180.0
+    return {
+        "cam_phase": (np.full(N_ELEMENTS, deg), np.zeros(N_ELEMENTS)),
+        "mesh_lag_spread": (np.full(N_ELEMENTS, deg), np.zeros(N_ELEMENTS)),
+        "cone_flat_clock": (ratio * deg, np.zeros(N_ELEMENTS)),
+        "cone_flat_play": (
+            ratio / half_chords,
+            clearance_mean * ratio * (1.0 / half_chords - 1.0 / reference_chord),
+        ),
+    }
+
+
 def load_budget(path: Path = BUDGET_YAML) -> dict[str, Any]:
     """The allocation config (cad/config/error_budget.yaml)."""
     return yaml.safe_load(path.read_text(encoding="utf-8"))
@@ -878,6 +923,7 @@ def _channel_model(
     axes = feature_axes(nom)
     d = np.broadcast_to(scale * x * nom.d_max, (draws, N_ELEMENTS)).copy()
     bias = np.zeros(N_ELEMENTS)
+    phases = phase_profiles()
     for key, v in dev.items():
         if key in axes:
             # the linearised deviated cycle: its gain AND its shape, per axis
@@ -887,8 +933,9 @@ def _channel_model(
                 shape[field] = shape.get(field, 0.0) + per_mm * comp
         elif key in sens:
             log_g += np.log1p(sens[key] / 100.0 * v)
-        elif key in ("cam_phase", "mesh_lag_spread"):
-            phi += np.radians(v)
+        elif key in phases:
+            per_unit, residual = phases[key]
+            phi += v * per_unit + residual
         elif key == "station_setting":
             # A bar can be set neither below the pivot (build_channel_assembly
             # rejects amplitude_mm < 0) nor past amplitude.max_travel_mm (the
@@ -1048,11 +1095,15 @@ def monte_carlo(
         }
 
     per_feature = {key: stats({key: all_dev[key]}) for key in feats}
-    # Errors scale linearly with a feature's tolerance (uniform draws, small
-    # deviations), so the tolerance at which a feature ALONE would consume its
-    # allocation share follows by proportion -- the number a drawing may relax to.
+    # A linear allowable applies only to zero-centred deviations. A fixed
+    # per-land phase residual survives even at zero clearance scatter; changing
+    # the half-width alone cannot scale that effect proportionally.
     share = budget["allocation_share"]
+    phases = phase_profiles()
     for key, s in per_feature.items():
+        if key in phases and np.any(phases[key][1]):
+            s["allowable_tolerance"] = None
+            continue
         pair = s["per_input"]["pair_1_20"]["p99_max"]
         factor = min(share["mae_fs_pct"] / s["mae"], share["pair_p99_pct"] / pair)
         s["allowable_tolerance"] = feats[key]["tolerance"] * factor
@@ -1723,9 +1774,11 @@ def _print_report(r: dict[str, Any], budget: dict[str, Any]) -> None:
     mc = r["monte_carlo"]
     for key, s in mc["per_feature"].items():
         unit = feats[key].get("unit", "mm")
+        allowable = s["allowable_tolerance"]
+        allowable_text = f"{allowable:.3f}" if allowable is not None else "n/a"
         p(
             f"{key:<24} {feats[key]['tolerance']:>6.3f} {unit:<3}{s['mae']:>7.3f} {s['rms']:>7.3f} {s['p99_max']:>8.3f} "
-            f"{s['per_input']['pair_1_20']['p99_max']:>9.3f} {s['allowable_tolerance']:>10.3f}"
+            f"{s['per_input']['pair_1_20']['p99_max']:>9.3f} {allowable_text:>10}"
         )
     c = mc["combined"]
     p(

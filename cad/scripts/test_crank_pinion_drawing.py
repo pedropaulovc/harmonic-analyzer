@@ -124,6 +124,16 @@ def test_precision_is_authored_on_the_part_and_only_read_by_the_sheet() -> None:
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in _build_source()
 
 
+def test_north_shortened_face_keeps_the_south_seat_and_boss_length() -> None:
+    # The old 10.4 face retreats 0.9 at the north; W15 sizes the boss from
+    # its own limits, so the boss and shaft recess follow without moving the
+    # fixed south seat on MHA-016.
+    assert spec.FACE_WIDTH == pytest.approx(9.5)
+    assert spec.BOSS_LENGTH == pytest.approx(spec.OVERALL_LENGTH - spec.FACE_WIDTH)
+    assert spec.PIN_STATION == pytest.approx(spec.FACE_WIDTH + spec.BOSS_LENGTH / 2.0)
+    assert spec.OVERALL_LENGTH == pytest.approx(10.4 + spec.BOSS_LENGTH - 0.9)
+
+
 def test_the_boss_is_the_root_circle_and_the_pin_hole_stays_in_its_wall() -> None:
     # ch12 p.19: the hub boss is the tooth-root cylinder carried on past the
     # face, so the boss needs no second turned diameter and the tooth root

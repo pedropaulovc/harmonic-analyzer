@@ -26,9 +26,10 @@ geometry is casting-shaped, not milling-shaped.
      **21.717 mm unsupported** past each end of a casting-shaped organic lever. Delicate (nicks/rounds)
      *and* fixturing-hostile from bar. Per §6 the edge should be a **separate hardened tool-steel
      insert**, not this parent — which also removes it from this part's machining hazard.
-  3. **`cone-gear-shaft` tip** — a **Ø1.588 mm × 23.0 mm journal in steel** (L/D 14.5, carrying T012 and T006 since U40). Was Ø0.79
-     (L/D 29, whip city); enlarging the T006 bore to 1/16 in bought 16× the bending stiffness and
-     still needs a follower/steady and a light finishing cut.
+  3. **`cone-gear-shaft` tip** — a **Ø1.5875 mm terminal land, about 21.5 mm long in steel** after the
+     1.55 mm tip shortening, carrying the T012/T006 seats and the tip thrust spacer.
+     Support the slender work with a follower/steady and take a light finishing cut;
+     the terminal D-flat continues from the T018 step through the shaft tip.
 
 - **The CNC repeat families (make N identical on the PM-30MV — this is where CNC earns its keep):**
   | family | qty | why CNC |
@@ -62,12 +63,10 @@ geometry is casting-shaped, not milling-shaped.
   13.20 mm full thread (0.25 mm tip reserve at the low limit) and 20.60 mm
   cylindrical tap-drill depth (five 1.27 mm pitches past the thread).
   Other receivers are threaded too; the `knife-mount` hanger-stud seat is one
-  example. No keyways anywhere — gears are **soldered** to their shafts (the 20
-  `cone-gear`s, and the 64T `crank-drive-gear`: plain bore, no keyway,
-  soldered or silver-brazed to the cone shaft's 3/8″ seat, with Loctite
-  638/648 retaining compound an approved alternative — the joint is that
-  gear's whole torque path, so it is stated on its print) or ride **free on
-  an arbor** (cylinder).
+  example. The 20 `cone-gear`s and the 64T `crank-drive-gear` transmit torque
+  through matching D-bores on the shaft's D-flat lands; the cylinder gears
+  ride free on their stationary arbor. The gears seat against each other,
+  without an adhesive joint or spacers, from the collar-supported 64T to T006.
 
 ### Blind-thread DFM rule
 
@@ -113,8 +112,8 @@ Applied from the [thread-depth DFM walkthrough](https://www.youtube.com/watch?v=
 
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
-| **`cone-gear`** ×20 (T006→T120) | round brass bar, extruded disc, face 6.0, long-addendum OD printed per gear at DP 49.82 → **4.28 (T006) → 62.93 (T120)** (same DP as the 120T cylinder gear it meshes; `cone_gear_spec.DEEPENED_MESH_MM`); tip gears T006–T024 harder yellow metal | 1 central through-bore, **bonded (solder, silver-braze or Loctite 638/648), no key**; bore Ø by config (T006/T012 **1.588**/1/16″, T018 3.175, T024 6.350, T030+ 9.525); 6–120 involute teeth PA14.5°, 2.5D through-cut; gap floor printed as MIN/MAX limit diameters, any shape between them | **T006 wall 0.646 mm nominal / 0.621 mm at maximum bore** (headline); T006 whole gear tiny → brutal workholding; the floor may take any shape between its limit diameters, so the flank↔floor corner needs no radius control | ~2 (lathe OD/face/bore; teeth) | **single-point fly cutter ground to the gap form, indexed** (in-house; plunge to the floor, widen by indexing — no catalogue cutter fits DP 49.82); T006 = hardest part — on enlarging tip gears see gap #5 (DP caveat) |
-| **`cone-gear-shaft`** ×1 | stepped steel bar ~252; integral Ø12.2308 post journal then 3/8→1/4→1/8→1/16″ | 5 turned diameter steps; **no keyseat** (gears soldered); finish the Ø12.2308 journal for 0.05 diametral clearance in the v2 post bore | **Ø1.588×23.0 tip journal in steel, L/D 14.5** (tailstock-supported, U40) → was 29:1 at Ø0.79; long slender overall | 1 (single-axis turn from one end) | manual lathe **+ steady/follower**; light finish on both bearing journals |
+| **`cone-gear`** ×20 (T006→T120) | round brass bar, extruded disc, face **6.8887 ±0.025** each, long-addendum OD printed per gear at DP 49.82 → **4.28 (T006) → 62.93 (T120)**; tip gears T006–T024 harder yellow metal | D-bore matching the land's single +X flat, clocked to the phase-0 tooth: round seat Ø by config (T006/T012 1.5875, T018 3.175, T024 6.350, T030+ 9.525); bore AF +0.010/+0.020 over shaft nominal AF (0.01–0.03 clearance), diametral slip clearance 0.025–0.105; 6–120 involute teeth PA14.5°, 2.5D through-cut | **T006 wall 0.646 mm nominal / 0.621 mm at maximum round bore** (the flat cuts inward from that circle); whole gear tiny → difficult workholding, especially forming and gauging the D without damaging the teeth | ≥2 (turn/bore, indexed teeth, plus D-bore finishing) | **single-point fly cutter ground to the gap form, indexed** for teeth; form the bore flat to the AF gauge (filing or broaching is a hobby-shop possibility, not a selected route; EDM or a D-shaped punch needs process/fixture approval). Measure all 20 touching faces as a stack: **137.774 ±0.20** |
+| **`cone-gear-shaft`** ×1 | stepped steel bar; integral Ø12.2308 post journal, thrust collar then Ø9.525→6.35→3.175→1.5875 gear lands | turned steps plus **one milled +X D-flat on each gear land**, nominal AF **8.763/5.842/2.921/1.460** respectively, each +0/−0.010; the Ø1.5875 flat continues through the tip end and the unchanged round-bore MHA-096 thrust spacer rides the D. Finish the post journal for 0.05 diametral clearance | slender terminal land needs tailstock support; flat machining adds an indexed milling setup and inspection against the mating D-bores | lathe + at least 1 indexed milling setup | manual lathe **+ steady/follower**, then mill/gauge the co-clocked flats; do not leave a round section under the tip thrust spacer |
 
 ### Pivots, bushings, shafts (T1 — the 19-channel stacks)
 
@@ -192,7 +191,7 @@ steps instead of one big engagement.
   rule-of-thumb checker.
   - **But its blind spot is exactly where the worst risk lives.** Fusion treats geometry as **rigid**
   and stock as **held**, so it will *not* warn that the **T006 0.621 mm minimum web** breaks in
-  workholding, the **Ø1.588 × 23.0 mm shaft tip** whips, the **1.90 mm cam wall** is fragile, or that
+  workholding, the **Ø1.5875 mm slender shaft tip** whips, the **1.90 mm cam wall** is fragile, or that
   a ~4 mm gear can't be gripped. Thin-wall / fragile-feature / fixturing failures are not modelled
   by CAM sim. **A clean Fusion sim is not a substitute for a first cut on the fragile parts.**
 

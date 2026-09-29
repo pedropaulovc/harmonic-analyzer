@@ -1,19 +1,19 @@
 r"""Reproduction script: MHA-141 cone tip shim pack (U30 fit-up stack).
 
 The blackened carbon-steel shim pack under the cone tip block (MHA-092): a
-15 x 31.27 pack of leaves (the block's foot and I31 foot flange, less its
-heel relief) cut from shim stock, stacked at fit-up so the block's adjuster axis lands on the
-cone axis, then clamped between the swing platform's top face and the
-block's foot by the MHA-140 hold-down screw. The model is ONE solid at the
+15 x 32.8 pack of leaves matching the block's entire foot and south flange.
+Cut from shim stock, its thickness is stacked at fit-up to align the block's
+adjuster axis with the cone, then clamped by the MHA-140 hold-down screw
+between the swing platform's top face and the block's foot. The model is ONE solid at the
 nominal stack (cone_tip_shim_spec.SHIM_T); the drawing states the stack
 range on the thickness dimension and the leaf stock in the material
 specification.
 
 Layout: origin on the bottom face under the block's centre (the plan runs
-from the flange's south end to the heel relief), footprint on the Top plane
-(X across the cone shaft, Z along it -- the tip block's own frame), thickness
-up +Y. The horseshoe slot runs along the block's flange slot from the south
-edge to a full radius north of every place the hold-down screw can reach.
+from the flange's south end to the block's unrelieved north face), footprint
+on the Top plane (X across the cone shaft, Z along it -- the tip block's
+own frame), thickness up +Y. The horseshoe slot runs along the block's
+flange slot from the south edge to a full radius north of the hold-down screw.
 
 Run (SolidWorks already open)::
 
@@ -159,9 +159,9 @@ async def build(adapter) -> dict[str, str]:
 
     drive_jobs: list[tuple[str, str]] = []
 
-    # The plan: full block width, from the flange's south end to the heel
-    # relief's inner face (I31), with the origin under the block centre.  A
-    # Top-plane sketch reads model +Z (north) as -y.
+    # The plan: full block width, from the flange's south end to the body's
+    # north face, with the origin under the block centre. A Top-plane sketch
+    # reads model +Z (north) as -y.
     profile = SketchDims()
     shim_pts = [
         (-SHIM_X / 2.0, -SHIM_NORTH_Z),

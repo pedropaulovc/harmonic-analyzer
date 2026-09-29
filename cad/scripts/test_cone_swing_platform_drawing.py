@@ -79,6 +79,20 @@ def test_engaged_post_and_plate_hole_axes_coincide_in_machine_coordinates() -> N
         assert -local_x * math.sin(angle) + dz * math.cos(angle) == pytest.approx(0.0)
 
 
+def test_tip_slot_tracks_the_block_south_without_moving_the_pivot() -> None:
+    import cone_line
+
+    assert cone_line.PIVOT_STATION == pytest.approx(152.27232594770453)
+    assert geometry.PIVOT_STATION == pytest.approx(cone_line.PIVOT_STATION)
+    assert spec.TIP_SCREW_LOCAL_Z == pytest.approx(-12.55)
+    assert cone_line.TIP_BLOCK_STATION - cone_line.PIVOT_STATION == pytest.approx(
+        spec.TIP_SCREW_LOCAL_Z
+    )
+    assert drawing_spec.DRAWING_PRECISION_BY_NAME["TipSlotZ"] == 2
+    assert drawing._SLOT_Y - drawing._PIVOT_Y == pytest.approx(
+        -spec.TIP_SCREW_LOCAL_Z * 2 / 1000.0
+    )
+
 def test_only_sliding_and_locating_surfaces_carry_roughness() -> None:
     by_key = {control.key: control for control in spec.SURFACE_FINISHES}
     assert set(by_key) == {"post_seat", "base_slide"}
@@ -383,15 +397,14 @@ def test_post_screw_engagement_note_states_the_computed_exception() -> None:
 
 # Detail B text extents (sheet metres), from the renders: outside its span a
 # vertical dimension's text hangs outward from its line, centred on the keep
-# y -- "4.0 +0.1/0.0" 17 x 8 mm, "7.94 +0.1/0.0" 21 x 8 mm and "11.00"
-# 12 x 5 mm (81788ce9); the 2.00s ~12 x 5 centred on theirs.  Notes are
+# y -- two cutter-width bands and the pivot-to-slot location. Notes are
 # 2.5 mm text anchored upper-left, ~1.894 mm a character and 3.52 mm a line
 # (the relief note, 0.0947 x 0.0176 for 50 characters on five lines).
 _NOTE_CHAR_W, _NOTE_LINE_H = 0.001894, 0.00352
 _DETAIL_SPANS = {  # each vertical dimension's extension-line span, sheet y
-    "TipSlotZ": (0.033, 0.055),
-    "TipSlotW": (0.051, 0.059),
-    "TipCboreW": (0.04706, 0.06294),
+    "TipSlotZ": (drawing._PIVOT_Y, drawing._SLOT_Y),
+    "TipSlotW": (drawing._SLOT_Y - spec.TIP_SLOT_W / 1000, drawing._SLOT_Y + spec.TIP_SLOT_W / 1000),
+    "TipCboreW": (drawing._SLOT_Y - spec.TIP_CBORE_W / 1000, drawing._SLOT_Y + spec.TIP_CBORE_W / 1000),
 }
 
 
@@ -562,8 +575,8 @@ def test_detail_dimension_text_sits_outside_its_own_lines() -> None:
     slot_x, cbore_x = keep["TipSlotW"][0], keep["TipCboreW"][0]
     assert cbore_x < slot_x < east_arc_x  # counterbore outboard of the slot
     assert set(drawing.DETAIL_ARROWS_INSIDE) == {"TipSlotW", "TipCboreW"}
-    # Positive control: 81788ce9's keeps put the 11.00 and both widths
-    # inside their spans, where the text is centred on its own line.
+    # Positive control: the older keeps placed the pivot-to-slot and widths
+    # inside their spans, centring the text on its own dimension line.
     old = {
         "TipSlotZ": (0.1135, 0.0435),
         "TipSlotW": (0.0515, 0.055),
@@ -654,17 +667,17 @@ def test_cutter_note_leaders_reach_their_arcs_without_crossing() -> None:
 
 
 def test_slot_section_cut_keeps_its_plane_and_crosses_the_plate() -> None:
-    """Section C-C cuts at the slot station, edge to edge (8783776d eye-pass).
+    """Section C-C cuts at the moved slot station, edge to edge.
 
-    The plane is the one detail B carried; the line now runs past both plate
-    edges, so the strip is the full 26.98 mm width and needs no symmetry.
+    Both endpoints extend beyond the full-width plate strip, not just its
+    counterbored slot. The station's profile width is not a fixed constant.
     """
     z = spec.TIP_SCREW_LOCAL_Z
     ends = drawing.slot_section_line_model_points()
     assert all(end[1:] == (spec.PLATE_THICKNESS / 1000.0, z / 1000.0) for end in ends)
     east, west = drawing.plate_edge_mm(z, -1), drawing.plate_edge_mm(z, +1)
     assert ends[0][0] * 1000.0 < east and ends[1][0] * 1000.0 > west
-    assert west - east == pytest.approx(26.98, abs=0.01)
+    assert west - east > 26.0
     # The slot and its counterbore lie inside the cut.
     assert east < -(spec.TIP_SCREW_HALF_TRAVEL + spec.TIP_CBORE_W / 2.0)
     assert west > spec.TIP_SCREW_HALF_TRAVEL + spec.TIP_CBORE_W / 2.0

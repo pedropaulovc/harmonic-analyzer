@@ -1,7 +1,7 @@
 r"""Create the machinist drawing for the MHA-141 cone tip shim pack.
 
-One plan view carries the whole blank at 3:1: the 15.0 x 31.3 outline
-(I31: the pack runs under the tip block's foot flange), the horseshoe slot's
+One plan view carries the whole blank at 3:1: the 15.0 x 32.80 outline
+(the pack spans the unrelieved block and its south foot flange), the horseshoe slot's
 width with its full-radius callout, and the radius centre located from the
 +X edge and the lower (north) edge (policy rule 7: a location
 starts on a face the shop can pick up, never the model origin).  An edge
@@ -71,17 +71,17 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# I31: 31.3 long, the plan no longer fits over the edge view at 4:1.
+# The full block and flange fit on the plan at 3:1, not 4:1.
 SHEET_SCALE = (3.0, 1.0)
 _S = SHEET_SCALE[0] / 1000.0
 # Third-angle: the plan (Top) above the edge view (Front).
 TOP_CENTER = (0.120, 0.170)
 FRONT_CENTER = (TOP_CENTER[0], 0.100)
 ISO_CENTER = (0.320, 0.180)
-HALF_X = SHIM_X * _S / 2.0  # 0.0225 on the sheet
-HALF_Z = SHIM_Z * _S / 2.0  # 0.0469 on the sheet
+HALF_X = SHIM_X * _S / 2.0
+HALF_Z = SHIM_Z * _S / 2.0
 # The view centres on the plan's box; the *Top view shows model +Z (north,
-# the heel-trimmed edge) at the bottom and the south (open) edge at the top.
+# at the block's north face) at the bottom and the south (open) edge at the top.
 _MID_Z = (SHIM_NORTH_Z + SHIM_SOUTH_Z) / 2.0
 
 
@@ -97,9 +97,8 @@ PLAN_BOTTOM = plan_y(SHIM_NORTH_Z)
 if SLOT_OPEN_EDGE != "south":
     raise ValueError("the plan layout assumes the slot opens to the south edge")
 
-# Larger dimensions stand outside smaller ones: the 31.3 depth outboard of
-# the 13.2 radius-centre location on the right; the 15.0 width above the
-# slot's width at the open (top) edge.
+# Larger dimensions stand outside smaller ones: overall shim depth outboard
+# of the radius-centre location on the right, and width above the slot width.
 TOP_KEEP = {
     "Width": (TOP_CENTER[0], PLAN_TOP + 0.020),
     "Depth": (TOP_CENTER[0] + HALF_X + 0.024, TOP_CENTER[1]),

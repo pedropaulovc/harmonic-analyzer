@@ -51,8 +51,6 @@ from cone_tip_block_spec import (
     FLANGE_SLOT_W,
     FLANGE_SLOT_Z,
     FLANGE_T,
-    HEEL_RELIEF_DEPTH,
-    HEEL_RELIEF_HEIGHT,
     PINCH_BORE_DIA,
     PINCH_CLEARANCE_DIA,
     PINCH_HEIGHT,
@@ -211,7 +209,7 @@ FRONT_KEEP = {
 PASSAGE_CENTER_RISE = 0.024
 # swDimensionArrowsSide_e, set rather than left to the document's smart
 # arrows: swDimArrowsOutside = 1, swDimArrowsInside = 0.
-ARROWS_OUTSIDE = ("SlitW", "HeelReliefDepth", "FlangeSlotW", "FlangeSlotNorthZ")
+ARROWS_OUTSIDE = ("SlitW", "FlangeSlotW", "FlangeSlotNorthZ")
 # Main eye-pass of 287c: the 15.2's smart arrows stood outside, and its lower
 # tail ran down to 0.4 mm over ADJUSTER ENTRY.  Its 22.8 mm span holds the
 # two-line value and both arrows inside.  The 6.0's 9.0 mm span holds its two
@@ -276,31 +274,15 @@ SECTION_KEEP: dict[str, tuple[float, float]] = {}
 # 5637ac42), the witness and centreline ended in the decimal point; at +0.003
 # its dimension line printed on the block's top edge.
 #
-# I31 heel relief: the right view has north on the left, so the step is its
-# lower-left notch.  The depth's dimension line runs through the notch's air
-# half way up (at 3:2 the notch is only 8.3 mm tall), arrows outside, its value left of the north face;
-# the height stands further left, so the depth's value sits between the
-# height's two extension lines.  The flange thickness stands past the
-# flange's south end, on the right, and (r3) the pinch-hole height from the
-# foot one value-width further out: its witness leaves the foot at the
-# flange's south-end corner, shared with the thickness's.
-_RIGHT_NORTH_X = _right_x(Z_NORTH)
-HEEL_DEPTH_TEXT_X = _RIGHT_NORTH_X - ARROW_LENGTH - TEXT_CLEARANCE - VALUE_TEXT_HALF_WIDTH
-HEEL_HEIGHT_LINE_X = HEEL_DEPTH_TEXT_X - VALUE_TEXT_HALF_WIDTH - 0.008
+# The flange thickness stands past the flange's south end, on the right;
+# the pinch-hole height is one value-width further out. Its witness leaves
+# the foot at the flange's south-end corner, shared with the thickness's.
 FLANGE_T_LINE_X = _right_x(Z_SOUTH) + 0.010
 PINCH_HEIGHT_LINE_X = FLANGE_T_LINE_X + PLAN_BASELINE_STEP
 RIGHT_KEEP = {
     "PinchDepthCenter": (
         _right_x(BLOCK_Z / 4.0),
         _elevation_y(BLOCK_HEIGHT, RIGHT_CENTER) + 0.007,
-    ),
-    "HeelReliefDepth": (
-        HEEL_DEPTH_TEXT_X,
-        _elevation_y(HEEL_RELIEF_HEIGHT / 2.0, RIGHT_CENTER),
-    ),
-    "HeelReliefHt": (
-        HEEL_HEIGHT_LINE_X,
-        _elevation_y(HEEL_RELIEF_HEIGHT / 2.0, RIGHT_CENTER),
     ),
     "FlangeT": (
         FLANGE_T_LINE_X,
@@ -802,7 +784,6 @@ def sheet_dimension_ink(
     slot_w = FLANGE_SLOT_W * _S / 2.0
     south_face = _plan_y(-BLOCK_Z / 2.0)
     north = _right_x(Z_NORTH)
-    heel_top = _elevation_y(HEEL_RELIEF_HEIGHT, RIGHT_CENTER)
     specs = {
         "Width": (h, (front_x - half_x, front_x + half_x), (foot, foot), drop("Width"), out),
         "BlockHt": (v, (foot, top), (front_x - half_x,) * 2, keeps["BlockHt"][0], inside),
@@ -858,14 +839,6 @@ def sheet_dimension_ink(
             drop("PinchDepthCenter"),
             out,
         ),
-        "HeelReliefDepth": (
-            h,
-            (north, north + HEEL_RELIEF_DEPTH * _S),
-            (heel_top, None),
-            drop("HeelReliefDepth"),
-            out,
-        ),
-        "HeelReliefHt": (v, (foot, heel_top), (north, north), keeps["HeelReliefHt"][0], out),
         "FlangeT": (
             v,
             (foot, _elevation_y(FLANGE_T, RIGHT_CENTER)),
