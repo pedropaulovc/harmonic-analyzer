@@ -1192,9 +1192,11 @@ def test_reference_inputs_stay_on_the_lifting_side():
         assert np.all(x >= 0.0), name
 
 
-def test_cone_flat_phase_follows_gear_ratio_and_land_half_chord(budget):
-    """The index removes only the Ø9.525-land mean lag, not differences
-    between flats or the clearance variation between individual gears."""
+def test_cone_flat_phase_follows_gear_ratio_and_broken_land_lever(budget):
+    """The index removes only the Ø9.525-land lag, not differences between
+    flats or the clearance variation between individual gears. The lever is
+    the flat half-chord less the title block's edge break: an accepted break
+    on the torque corner shortens it (Codex, #1128)."""
     import cone_gear_spec
     import cone_shaft_land_bands
     import gear_seat_fit
@@ -1207,6 +1209,8 @@ def test_cone_flat_phase_follows_gear_ratio_and_land_half_chord(budget):
     assert clock == cone_gear_spec.FLAT_CLOCK_TOLERANCE_DEG
     assert play == pytest.approx((clearance_hi - clearance_lo) / 2.0)
     assert gear_seat_fit.FLAT_AF_CLEARANCE == (0.010, 0.030)
+    edge_break = _config.title_block("edge_break")
+    lever_loss = max(edge_break["radius_mm"], edge_break["chamfer_max_mm"])
 
     reference_r = cone_gear_spec.bore_dia_mm(120) / 2.0
     reference_af = cone_shaft_land_bands.SECTION_FLAT_AF[1]
@@ -1225,7 +1229,7 @@ def test_cone_flat_phase_follows_gear_ratio_and_land_half_chord(budget):
         assert af is not None
         diameter = cone_gear_spec.bore_dia_mm(carried[0])
         radius = diameter / 2.0
-        chord = math.sqrt(radius**2 - (af - radius) ** 2)
+        lever = math.sqrt(radius**2 - (af - radius) ** 2) - lever_loss
         for teeth in carried:
             index = teeth // 6 - 1
             ratio = teeth / 120.0
@@ -1236,10 +1240,11 @@ def test_cone_flat_phase_follows_gear_ratio_and_land_half_chord(budget):
             per_unit, residual = profiles["cone_flat_play"]
             for clearance in (clearance_lo, mean, clearance_hi):
                 phase = (clearance - mean) * per_unit[index] + residual[index]
-                assert phase == pytest.approx(
-                    (clearance / chord - mean / reference_chord) * ratio,
-                    abs=1e-12,
-                )
+                if section == 1:
+                    expected = (clearance - mean) / lever * ratio
+                else:
+                    expected = (clearance / lever - mean / reference_chord) * ratio
+                assert phase == pytest.approx(expected, abs=1e-12)
             if section == 1:
                 assert residual[index] == pytest.approx(0.0, abs=1e-12)
             else:

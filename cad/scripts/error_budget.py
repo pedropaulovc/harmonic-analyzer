@@ -844,20 +844,35 @@ def finite_difference_check(
 # --------------------------------------------------------------------------
 
 
+def flat_edge_break_mm() -> float:
+    """The flat half-chord the title block's edge break may take off a
+    D-flat's torque corner. A C0.25 chamfer's leg along the flat is at most
+    0.25; an R0.25 break sets back R*cot(a/2) < R, since every flat meets
+    its land at an obtuse corner (a ~ 147 deg on the Ø1.5875 tip land)."""
+    row = _config.title_block("edge_break")
+    return max(float(row["radius_mm"]), float(row["chamfer_max_mm"]))
+
+
 def phase_profiles() -> dict[str, tuple[np.ndarray, np.ndarray]]:
     """Phase radians = drawn deviation * per-channel scale + fixed residual.
 
     Cone gear T_i has T_i/120 of its phase at the 120T cylinder cam.
-    The D-flat's AF clearance turns each gear by c / flat half-chord. A
-    uniform Ø9.525-land mean lag is proportional to i and therefore only
-    shifts the crank index; its per-land departures and per-gear scatter
-    cannot be removed by that index. A shaft land's flat clocked off the
-    Ø9.525 land's turns every gear on it by the same angle
-    (``cone_land_clock``, drawn per land by ``draw_groups``).
+    The D-flat's AF clearance turns each gear by c / lever, the lever being
+    the flat half-chord less the edge break the title block permits on the
+    shaft flat's torque corner (``flat_edge_break_mm``). Both terms are
+    bounded, not averaged: the clearance acts on the fully broken lever,
+    and each land's residual is its fully broken lag against an unbroken
+    Ø9.525 land. The crank index removes the Ø9.525 land's lag whatever its
+    break, since that lag is proportional to i and only shifts the index.
+    Per-land departures and per-gear scatter cannot be removed by that
+    index. A shaft land's flat clocked off the Ø9.525 land's turns every
+    gear on it by the same angle (``cone_land_clock``, drawn per land by
+    ``draw_groups``).
     """
     teeth = 6 * np.arange(1, N_ELEMENTS + 1)
     ratio = teeth / 120.0
     half_chords = np.empty(N_ELEMENTS)
+    reference_land = np.zeros(N_ELEMENTS, dtype=bool)
     for _band, af, carried in zip(
         cone_shaft_land_bands.SECTION_DIA_BANDS,
         cone_shaft_land_bands.SECTION_FLAT_AF,
@@ -873,19 +888,26 @@ def phase_profiles() -> dict[str, tuple[np.ndarray, np.ndarray]]:
             half_chords[count // 6 - 1] = math.sqrt(
                 (diameter / 2.0) ** 2 - (af - diameter / 2.0) ** 2
             )
+            reference_land[count // 6 - 1] = 120 in carried
+    levers = half_chords - flat_edge_break_mm()
+    if np.any(levers <= 0.0):
+        raise ValueError(
+            f"the {flat_edge_break_mm()} edge break leaves no D-flat lever: "
+            f"half-chords {np.round(half_chords, 4).tolist()}"
+        )
     clearance_lo, clearance_hi = gear_seat_fit.FLAT_AF_CLEARANCE
     clearance_mean = (clearance_lo + clearance_hi) / 2.0
     reference_chord = half_chords[-1]  # T120, on the Ø9.525 land
+    residual = np.where(
+        reference_land, 0.0, clearance_mean * ratio * (1.0 / levers - 1.0 / reference_chord)
+    )
     deg = math.pi / 180.0
     return {
         "cam_phase": (np.full(N_ELEMENTS, deg), np.zeros(N_ELEMENTS)),
         "mesh_lag_spread": (np.full(N_ELEMENTS, deg), np.zeros(N_ELEMENTS)),
         "cone_flat_clock": (ratio * deg, np.zeros(N_ELEMENTS)),
         "cone_land_clock": (ratio * deg, np.zeros(N_ELEMENTS)),
-        "cone_flat_play": (
-            ratio / half_chords,
-            clearance_mean * ratio * (1.0 / half_chords - 1.0 / reference_chord),
-        ),
+        "cone_flat_play": (ratio / levers, residual),
     }
 
 

@@ -200,7 +200,7 @@ critical_features:
     nominal: null
     quantity: phase
     class: channel
-    holds: "D-bore across-flat fit: 0.01-0.03 mm clearance on every gear (gear_seat_fit.FLAT_AF_CLEARANCE); subtract the common Ø9.525-land mean lag as a crank-index time shift, retain per-land residual and per-gear scatter"
+    holds: "D-bore across-flat fit: 0.01-0.03 mm clearance on every gear (gear_seat_fit.FLAT_AF_CLEARANCE), acting on each land's flat half-chord less the title block's 0.25 edge break on its torque corner (error_budget.flat_edge_break_mm); subtract the common Ø9.525-land mean lag as a crank-index time shift, retain per-land residual and per-gear scatter"
   cone_land_clock:
     tolerance: 1.0
     unit: deg
