@@ -598,7 +598,10 @@ def _add_holddown_callout(adapter: Any, section: Any) -> Any:
     counterbore wall on the callout's (sheet-right, model +x) side.
     """
     walls = _section_hole_walls(
-        section, HOLDDOWN_CBORE_DIA / 2.0, label="hold-down counterbore"
+        section,
+        HOLDDOWN_CBORE_DIA / 2.0,
+        center_x_mm=HOLDDOWN_LOCAL_X,
+        label="hold-down counterbore",
     )
     return add_native_hole_callout(
         adapter,
@@ -665,11 +668,14 @@ def _horizontal_section_edge(
     return max(candidates, key=lambda item: item[key_index])[2]
 
 
-def _section_hole_walls(section: Any, radius_mm: float, *, label: str) -> dict[int, Any]:
+def _section_hole_walls(
+    section: Any, radius_mm: float, *, center_x_mm: float, label: str
+) -> dict[int, Any]:
     """Return the two vertical wall edges of a hole cut at its axis in a section.
 
-    The section edges carry model coordinates; a hole on the model x = 0 axis
-    shows its walls at x = -/+radius, keyed -1 / +1.
+    The section edges carry model coordinates; a hole whose axis stands at
+    model x = center_x_mm shows its walls at center_x_mm -/+ radius, keyed
+    -1 / +1.
     """
     walls: dict[int, Any] = {}
     for raw_edge in visible_view_entities(section, 1, label=f"{label} wall edges"):
@@ -682,7 +688,7 @@ def _section_hole_walls(section: Any, radius_mm: float, *, label: str) -> dict[i
         if abs(p0[1] - p1[1]) < 1.0:
             continue
         for side in (-1, 1):
-            if all(abs(p[0] - side * radius_mm) <= 0.01 for p in (p0, p1)):
+            if all(abs(p[0] - (center_x_mm + side * radius_mm)) <= 0.01 for p in (p0, p1)):
                 walls[side] = edge
                 print(f"{label} wall {side:+d}: {p0} -> {p1}")
     if set(walls) != {-1, 1}:
@@ -691,14 +697,14 @@ def _section_hole_walls(section: Any, radius_mm: float, *, label: str) -> dict[i
 
 
 def _add_section_hole_axis(
-    adapter: Any, section: Any, radius_mm: float, *, label: str
+    adapter: Any, section: Any, radius_mm: float, *, center_x_mm: float, label: str
 ) -> None:
     """Draw a hole's axis between the two cut slices of a cut-face-only section.
 
     The cut-face-only section shows the hole as a bare gap; without its axis a
     reader takes one slice for an unrelated fragment.
     """
-    walls = _section_hole_walls(section, radius_mm, label=label)
+    walls = _section_hole_walls(section, radius_mm, center_x_mm=center_x_mm, label=label)
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
     if not ddoc.ActivateView(view_name(adapter, section)):
@@ -946,7 +952,11 @@ async def build(adapter: Any) -> dict[str, str]:
     _position_section_label(adapter, section)
     set_hidden_lines_removed(adapter, section)
     _add_section_hole_axis(
-        adapter, section, PIVOT_HOLE_DIA / 2.0, label="section A-A pivot hole"
+        adapter,
+        section,
+        PIVOT_HOLE_DIA / 2.0,
+        center_x_mm=0.0,
+        label="section A-A pivot hole",
     )
 
     detail = _create_detail_view(
@@ -996,6 +1006,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         holddown_section,
         HOLDDOWN_CLEARANCE_DIA / 2.0,
+        center_x_mm=HOLDDOWN_LOCAL_X,
         label="section C-C hold-down hole",
     )
 
