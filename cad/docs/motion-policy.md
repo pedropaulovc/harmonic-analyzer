@@ -78,9 +78,12 @@ level-centre setup pose; the cam-contact rest is the model's saved pose.
 The drive-train has three independent coordinates: crank spin, cone-platform
 swing, and lift-rod/cam spin. The bracket/strap swing is contact-linked to cam
 rotation, not a fourth independent DOF. The MHA-114 spring bears at 24.8 mm up
-the strap and has a 28° flick; its import-time corner gate preserves at least
-3° of crest arc and 0.25 mm spare beyond the arbor end-cap keep-out at every
-formed corner.
+the strap and has a 28° crest; its import-time analytical gate evaluates all
+32 formed corners, both poses and both stock thickness limits. It adds the
+cantilever's elastic tip rotation to the *free* crest tangent before requiring
+at least 3° of loaded arc at either end, alongside 0.25 mm spare beyond the
+arbor end-cap keep-out. This is a small-deflection force/displacement model,
+not a SolidWorks contact-force simulation or a physical spring qualification.
 
 Other local cam/follower and spring/lever contact uses isolated subassemblies
 and their `verify:soundness` interference/health gates. The full 21-spring

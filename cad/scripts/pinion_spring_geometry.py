@@ -69,10 +69,11 @@ MIN_ARBOR_END_CAP_SPARE_MM = 0.25
 PARKED_AIR = 0.15
 
 # Screw-down pad: #4 clearance, webs >= 2.0 at the printed .XX worst case
-# (test_pinion_spring_drawing), which takes the 9.5 square.  The screw is
-# 20.7 east of the pivot axis, 13.2 east of the flank.  The bend starts at
-# the pad's edge (FOOT_FLAT=0), leaving the blade 9.77 deg to the parked
-# flank, within the 9-13 deg photo band.
+# (test_pinion_spring_drawing), which takes the 9.5 square.  The foot screw
+# stands 21.3 east of the pivot axis, 13.8 east of the flank.  The bend starts
+# at the pad's edge (FOOT_FLAT=0), leaving the blade in the photographed
+# 9-13 deg lean to the parked flank.  The 0.6 mm outboard shift gives the
+# loaded crest room at the blade-side entry.
 HOLE_SPEC = HoleSpec("clearance", "#4")
 HOLE_DIA = blind_cut_dia_mm(HOLE_SPEC)
 PAD_LEN = 9.5
@@ -105,7 +106,7 @@ FORMED_BAND_MM = 0.5
 # scaling from tensile applies (ruling 1's rule was for tensile-only minima).
 # The optional CH 900 age (482 C, 1 h) raises it and is NOT counted.
 YIELD_MPA = 1205.0
-PRESET_DEG = 5.4  # balances the 32-corner preload and engaged-yield reserves
+PRESET_DEG = 5.0  # with the outboard foot, balances loaded preload and root stress
 
 _LAM = math.radians(STRAP_LEAN_DEG)
 STRAP_U = (math.sin(_LAM), math.cos(_LAM))  # up the strap axis
@@ -189,9 +190,24 @@ PRESET = (
     - PARKED_AIR
 )
 
-# Cantilever from the blade root (the bend exit) to the contact.
+# Cantilever from the blade root (the bend exit) to the contact.  This is the
+# transverse rate in the FREE beam frame; the contact-normal rate depends on
+# pose and free tangent through the two-direction projection below.
 BLADE_ARM = (CREST[0] - BEND_EXIT[0]) * _B[0] + (CREST[1] - BEND_EXIT[1]) * _B[1]
 RATE_N_PER_MM = MODULUS_MPA * WIDTH * THICK**3 / (4.0 * BLADE_ARM**3)
+
+
+def _normal_projection(free_sweep_deg: float) -> float:
+    """Projection of the contact normal onto the FREE blade's bending normal.
+
+    This is the fixed undeformed reference direction of the linear cantilever
+    approximation, not the rotated loaded tangent.  Use it consistently for
+    displacement, force, root moment and tip rotation.
+    """
+    projection = math.cos(math.radians(free_sweep_deg))
+    if projection <= 0.0:
+        raise AssertionError("spring contact normal no longer bends the blade outward")
+    return projection
 
 
 def contact_force(
@@ -199,18 +215,34 @@ def contact_force(
     thick: float = THICK,
     width: float = WIDTH,
     arm: float = BLADE_ARM,
+    *,
+    free_sweep_deg: float,
 ) -> float:
-    """Normal force (N) at the crest for a crest deflection (mm), for a strip
-    of ``thick`` x ``width`` on a cantilever ``arm`` long (the nominal part by
-    default)."""
-    return MODULUS_MPA * width * thick**3 / (4.0 * arm**3) * deflection_mm
+    """Contact-normal force (N) for normal deflection from the FREE crest.
+
+    In the small-deflection end-loaded beam model, normal displacement is the
+    transverse displacement times cos(alpha); the transverse load is the
+    normal force times cos(alpha).  Thus F_normal = k * delta_normal / cos²(alpha).
+    """
+    projection = _normal_projection(free_sweep_deg)
+    return MODULUS_MPA * width * thick**3 / (4.0 * arm**3) * deflection_mm / projection**2
 
 
 def root_stress(
-    deflection_mm: float, thick: float = THICK, arm: float = BLADE_ARM
+    deflection_mm: float,
+    thick: float = THICK,
+    arm: float = BLADE_ARM,
+    *,
+    free_sweep_deg: float,
 ) -> float:
-    """Bending stress (MPa) at the blade root for a crest deflection (mm)."""
-    return 1.5 * MODULUS_MPA * thick * deflection_mm / arm**2
+    """Free-reference bending stress (MPa) from the transverse force."""
+    return (
+        1.5
+        * MODULUS_MPA
+        * thick
+        * deflection_mm
+        / (arm**2 * _normal_projection(free_sweep_deg))
+    )
 
 
 # The formed profile as the print holds it (Codex #859, PRRT_kwDOPHDy386mTao2):
@@ -270,15 +302,45 @@ def formed_contact(
 def formed_contact_arc_sweep(
     deviations: dict[str, float], swing_deg: float
 ) -> float:
-    """Contact-normal rotation from the formed blade's crest entry, degrees.
+    """FREE formed blade's crest-entry sweep from the contact normal, degrees.
 
     Zero is the blade-side tangent; negative values advance over the crest.
     Installed machine swing is reversed by the spring's Ry(180) placement.
+    This is the load-direction angle, not the loaded crest clearance.
     """
     _, _, _, lean = _formed_root_and_tangent(deviations)
     west_angle = math.atan2(-math.sin(lean), -math.cos(lean))
     contact_angle = _CONTACT_ANGLE - math.radians(swing_deg)
     return math.degrees((contact_angle - west_angle + math.pi) % (2.0 * math.pi) - math.pi)
+
+
+def loaded_contact_arc_sweep(
+    free_sweep_deg: float, deflection_mm: float, arm: float
+) -> float:
+    """Crest-entry sweep after outward/east elastic rotation of the blade.
+
+    A point-load cantilever has tip slope 3*delta_transverse/(2*arm);
+    delta_transverse = delta_normal / cos(free_sweep).  The installed crest
+    already carries the preset; rotate the FREE tangent by this slope exactly
+    once, using the total parked/engaged displacement from the free form.
+    """
+    return free_sweep_deg + math.degrees(
+        1.5 * deflection_mm / (arm * _normal_projection(free_sweep_deg))
+    )
+
+
+def require_loaded_crest_reserve(
+    free_sweep_deg: float, deflection_mm: float, arm: float
+) -> float:
+    """Reject a loaded contact within 3 degrees of either crest-arc end."""
+    sweep = loaded_contact_arc_sweep(free_sweep_deg, deflection_mm, arm)
+    if not (-KINK_DEG + MIN_CREST_ARC_MARGIN_DEG <= sweep <= -MIN_CREST_ARC_MARGIN_DEG):
+        raise AssertionError(
+            f"loaded spring contact has less than "
+            f"{MIN_CREST_ARC_MARGIN_DEG:.1f} deg of crest-arc reserve: "
+            f"{sweep:.3f} deg"
+        )
+    return sweep
 
 
 FORMED_CORNERS = tuple(

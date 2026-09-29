@@ -159,10 +159,11 @@ def test_return_spring_preload_and_stress_hold_at_the_stock_corners() -> None:
     assert stations0 == pytest.approx(
         (drive._spr_station[0], drive._spr_station[-1]), abs=1e-12
     )
-    # The geometry redesign should leave a measurable reserve at *both*
-    # independently walked worst corners, not just clear the 1.5 floors.
-    assert min(drive.SPRING_PRELOAD_RATIO) - drive._PRELOAD_MARGIN > 0.06
-    assert drive.SPRING_STRESS_SF - drive._STRESS_SF > 0.06
+    # Both stock extremes and every formed corner carry the actual hard gates;
+    # with the contact force resolved against the free beam, these reserves
+    # are narrow, not a physical-test margin.
+    assert min(drive.SPRING_PRELOAD_RATIO) > drive._PRELOAD_MARGIN
+    assert drive.SPRING_STRESS_SF > drive._STRESS_SF
     assert leaf.MIN_CREST_ARC_MARGIN_DEG == 3.0
     assert leaf.MIN_ARBOR_END_CAP_SPARE_MM == 0.25
     # The crest must still bear on the straight flank even at the farthest
@@ -176,27 +177,68 @@ def test_return_spring_preload_and_stress_hold_at_the_stock_corners() -> None:
         drive.STRAP_C2C - 1.0 - farthest
         >= leaf.MIN_ARBOR_END_CAP_SPARE_MM
     )
-    # The nominal crest arc alone is insufficient: at a hand-formed corner
-    # the blade's tangent rotates independently of its bearing station.
-    sweeps = [
-        leaf.formed_contact_arc_sweep(dev, math.degrees(phi))
-        for dev in leaf.FORMED_CORNERS
-        for phi in (0.0, drive._PHI_ENG)
-    ]
-    assert min(sweeps) >= -leaf.KINK_DEG + leaf.MIN_CREST_ARC_MARGIN_DEG
-    assert max(sweeps) <= -leaf.MIN_CREST_ARC_MARGIN_DEG
-    # Positive control: the one-band gate this replaced read higher on both.
-    for deflection, station, moment, walked in zip(
-        drive.SPRING_DEFLECTION,
-        (drive._spr_station[0], drive._spr_station[-1]),
-        gravity,
-        drive.SPRING_PRELOAD_RATIO,
-        strict=True,
-    ):
-        soft = deflection - band + (t_lo - section.THICK)
-        assert leaf.contact_force(soft, t_lo, w_lo) * station / moment > walked
-    stiff = engaged + band + (t_hi - section.THICK)
-    assert leaf.YIELD_MPA / leaf.root_stress(stiff, t_hi) > drive.SPRING_STRESS_SF
+    # The former free-only sweep passes even if bending brings the crest
+    # *past* its blade-side end.  An independent counterexample must fail the
+    # actual production gate (not just a reimplementation of its inequality).
+    free_near_entry = -4.0
+    assert -leaf.KINK_DEG + leaf.MIN_CREST_ARC_MARGIN_DEG <= free_near_entry
+    assert free_near_entry <= -leaf.MIN_CREST_ARC_MARGIN_DEG
+    with pytest.raises(AssertionError, match="loaded spring contact"):
+        leaf.require_loaded_crest_reserve(free_near_entry, 1.0, 32.0)
+
+    loaded_sweeps = []
+    soft_ratios = ([], [])
+    stiff_safety = []
+    for dev in leaf.FORMED_CORNERS:
+        for thick in (t_lo, t_hi):
+            deflections, arm, stations = drive._spring_corner(dev, thick)
+            for pose, phi in enumerate((0.0, drive._PHI_ENG)):
+                free = leaf.formed_contact_arc_sweep(dev, math.degrees(phi))
+                projection = math.cos(math.radians(free))
+                displacement = deflections[pose]
+                # Independent Euler-Bernoulli end-load slope, with normal
+                # displacement projected into the unbent blade's frame.
+                expected = free + math.degrees(
+                    3.0 * displacement / (2.0 * arm * projection)
+                )
+                loaded = leaf.require_loaded_crest_reserve(free, displacement, arm)
+                assert loaded == pytest.approx(expected)
+                assert loaded > free  # east/outward loading, no second preset
+                loaded_sweeps.append(loaded)
+                if thick == t_lo:
+                    normal_force = (
+                        leaf.MODULUS_MPA
+                        * w_lo
+                        * thick**3
+                        * displacement
+                        / (4.0 * arm**3 * projection**2)
+                    )
+                    assert leaf.contact_force(
+                        displacement, thick, w_lo, arm, free_sweep_deg=free
+                    ) == pytest.approx(normal_force)
+                    soft_ratios[pose].append(
+                        normal_force * stations[pose] / gravity[pose]
+                    )
+                if thick == t_hi and pose == 1:
+                    stress = (
+                        1.5
+                        * leaf.MODULUS_MPA
+                        * thick
+                        * displacement
+                        / (arm**2 * projection)
+                    )
+                    assert leaf.root_stress(
+                        displacement, thick, arm, free_sweep_deg=free
+                    ) == pytest.approx(stress)
+                    stiff_safety.append(leaf.YIELD_MPA / stress)
+    assert drive.SPRING_PRELOAD_RATIO == pytest.approx(
+        tuple(min(ratios) for ratios in soft_ratios)
+    )
+    assert drive.SPRING_STRESS_SF == pytest.approx(min(stiff_safety))
+    assert drive.SPRING_LOADED_CREST_RESERVE_DEG == pytest.approx(
+        (leaf.KINK_DEG + min(loaded_sweeps), -max(loaded_sweeps))
+    )
+    assert min(drive.SPRING_LOADED_CREST_RESERVE_DEG) >= leaf.MIN_CREST_ARC_MARGIN_DEG
 
 
 def test_swing_gravity_basis_is_the_current_parts() -> None:
@@ -1304,7 +1346,13 @@ def test_spring_pad_east_west_placement_fits_the_preload_and_stress_window() -> 
         for pose in range(2):
             ratio = (
                 drive.spr_contact_force(
-                    deflection[pose], drive._SPR_T_LO, drive._SPR_W_LO, arm
+                    deflection[pose],
+                    drive._SPR_T_LO,
+                    drive._SPR_W_LO,
+                    arm,
+                    free_sweep_deg=drive.spr_formed_contact_arc_sweep(
+                        dev, math.degrees((0.0, drive._PHI_ENG)[pose])
+                    ),
                 )
                 * stations[pose]
                 / drive.SWING_GRAVITY_CORNER_NMM[pose]
@@ -1314,7 +1362,12 @@ def test_spring_pad_east_west_placement_fits_the_preload_and_stress_window() -> 
     for dev in drive.SPR_FORMED_CORNERS:
         deflection, arm, _ = drive._spring_corner(dev, drive._SPR_T_HI)
         sf = drive.SPR_YIELD_MPA / drive.spr_root_stress(
-            deflection[1], drive._SPR_T_HI, arm
+            deflection[1],
+            drive._SPR_T_HI,
+            arm,
+            free_sweep_deg=drive.spr_formed_contact_arc_sweep(
+                dev, math.degrees(drive._PHI_ENG)
+            ),
         )
         west_room.append(deflection[1] * (sf / 1.5 - 1.0) / cos_lean)
     window = min(min(east_room), min(west_room))

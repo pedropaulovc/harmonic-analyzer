@@ -31,8 +31,8 @@ WIDTH_PLACES = 2  # StripWidth prints .XX (pinion_spring_spec)
 PAD_WIDTH = 9.5
 PAD_WIDTH_PLACES = 2  # PadWidth prints .XX (pinion_spring_spec)
 
-# The foot screw stands this far east of the swing pivot axis.  Moving it
-# 0.7 mm outboard accommodates the higher crest while keeping the blade
-# within the photographed 9-13 deg lean into the parked flank.  The harmonic
-# base seats the screw from it, so it lives with the section.
-SCREW_EAST_OF_PIVOT = 20.7
+# The foot screw stands east of the swing pivot axis.  The 0.6 mm outboard
+# shift from the prior 20.7 mm seat rotates the formed blade tangent inward
+# without thinning the printed pad webs or widening the blade off the strap.
+# The harmonic base seats the screw from this same datum.
+SCREW_EAST_OF_PIVOT = 21.3

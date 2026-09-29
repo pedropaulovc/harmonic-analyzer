@@ -1024,7 +1024,6 @@ from pinion_spring_geometry import (  # noqa: E402
     KINK_C as SPR_KINK_C_L,
     KINK_DEG as SPR_KINK_DEG,
     MIN_ARBOR_END_CAP_SPARE_MM as SPR_ENDCAP_SPARE_MM,
-    MIN_CREST_ARC_MARGIN_DEG as SPR_CREST_ARC_MARGIN_DEG,
     KINK_START as SPR_KINK_START_L,
     PARKED_AIR as SPR_PARKED_AIR,
     PIVOT_LX as SPR_PIVOT_LX,
@@ -1037,6 +1036,7 @@ from pinion_spring_geometry import (  # noqa: E402
     contact_force as spr_contact_force,
     formed_contact as spr_formed_contact,
     formed_contact_arc_sweep as spr_formed_contact_arc_sweep,
+    require_loaded_crest_reserve as spr_require_loaded_crest_reserve,
     root_stress as spr_root_stress,
 )
 from pinion_spring_section import (  # noqa: E402
@@ -2541,15 +2541,13 @@ for _i in range(_SPR_STEPS):
     _spr_deflection.append(SPR_PRESET + SPR_PARKED_AIR - (_n - STRAP_R_END))
     _spr_station.append(_t)
 SPRING_DEFLECTION = (_spr_deflection[0], _spr_deflection[-1])  # parked, engaged
-# Every accepted formed profile (Codex #859, PRRT_kwDOPHDy386mTao2): the print
-# holds FootLen, BendR, FreeKinkH, FreeKinkV and KinkR to the formed band each,
-# independently, so each gate walks all 32 sign corners.  A corner moves the
-# free crest's penetration, the arm and the contact station by what it moves
-# them in the free profile (spr_formed_contact); those changes ride the
-# installed nominal the swing above computes.  The swing's own penetration
-# grows with the station, so a corner scales it by its station.  The stock
-# corners stay: the soft gate forms a thin, narrow strip, the stiff gate a
-# thick one (the thickness moves the crest's contact face with it).
+# Every accepted formed profile: the print holds FootLen, BendR, FreeKinkH,
+# FreeKinkV and KinkR to independent ±0.5 mm bands, so walk all 32 corners.
+# The free crest's penetration, arm and contact station ride the installed
+# nominal; the swing penetration scales with the corner's contact station.
+# The normal deflection is measured from the FREE form (including the preset
+# exactly once).  Resolve the contact force, root moment and elastic tip angle
+# against the same FREE blade normal at both stock thickness limits.
 _SPR_FREE_NOM = spr_formed_contact()
 _SPR_SWING_DEFLECTION = SPRING_DEFLECTION[1] - SPRING_DEFLECTION[0]
 _SPR_SWING_STATION = _spr_station[-1] - _spr_station[0]
@@ -2567,65 +2565,61 @@ def _spring_corner(deviations: dict[str, float], thick: float):
         (station_p, station_p + _SPR_SWING_STATION),
     )
 
-
-_spr_ratios = []
+_spr_ratios = ([], [])  # parked and engaged contact moment / gravity, thin strip
+_spr_safety = []  # engaged yield SF, thick strip
+_spr_loaded_sweeps = []
 for _dev in SPR_FORMED_CORNERS:
-    _defl, _arm, _stations = _spring_corner(_dev, _SPR_T_LO)
-    _spr_ratios.append(
-        tuple(
-            spr_contact_force(_d, _SPR_T_LO, _SPR_W_LO, _arm) * _t / _m
-            for _d, _t, _m in zip(_defl, _stations, SWING_GRAVITY_CORNER_NMM, strict=True)
-        )
+    _free_sweeps = tuple(
+        spr_formed_contact_arc_sweep(_dev, math.degrees(_phi))
+        for _phi in (0.0, _PHI_ENG)
     )
-SPRING_PRELOAD_RATIO = tuple(
-    min(_r[_k] for _r in _spr_ratios) for _k in range(2)
-)  # parked, engaged: the softest corner's moment over gravity
+    for _thick in (_SPR_T_LO, _SPR_T_HI):
+        _defl, _arm, _stations = _spring_corner(_dev, _thick)
+        for _pose, (_d, _station, _free_sweep) in enumerate(
+            zip(_defl, _stations, _free_sweeps, strict=True)
+        ):
+            _spr_loaded_sweeps.append(
+                spr_require_loaded_crest_reserve(_free_sweep, _d, _arm)
+            )
+            if _thick == _SPR_T_LO:
+                _spr_ratios[_pose].append(
+                    spr_contact_force(
+                        _d, _thick, _SPR_W_LO, _arm, free_sweep_deg=_free_sweep
+                    )
+                    * _station
+                    / SWING_GRAVITY_CORNER_NMM[_pose]
+                )
+            if _thick == _SPR_T_HI and _pose == 1:
+                _spr_safety.append(
+                    SPR_YIELD_MPA
+                    / spr_root_stress(
+                        _d, _thick, _arm, free_sweep_deg=_free_sweep
+                    )
+                )
+        if min(_stations) < 1.0:
+            raise AssertionError(
+                f"formed spring contact leaves the straight flank: {_stations}"
+            )
+        if STRAP_C2C - 1.0 - max(_stations) < SPR_ENDCAP_SPARE_MM:
+            raise AssertionError(
+                f"formed spring contact lacks {SPR_ENDCAP_SPARE_MM:.2f} mm "
+                f"spare beyond the arbor end-cap keep-out: {_stations}"
+            )
+SPRING_PRELOAD_RATIO = tuple(min(_ratios) for _ratios in _spr_ratios)
+SPRING_STRESS_SF = min(_spr_safety)
+SPRING_LOADED_CREST_RESERVE_DEG = (
+    SPR_KINK_DEG + min(_spr_loaded_sweeps),
+    -max(_spr_loaded_sweeps),
+)  # flick-side and blade-side reserves of the LOADED crest, degrees
 for _label, _ratio in zip(("parked", "engaged"), SPRING_PRELOAD_RATIO, strict=True):
     if _ratio < _PRELOAD_MARGIN:
         raise AssertionError(
             f"spring preload {_ratio:.2f}x loses to gravity {_label} at the soft corner"
         )
-SPRING_STRESS_SF = min(
-    SPR_YIELD_MPA / spr_root_stress(_defl[1], _SPR_T_HI, _arm)
-    for _defl, _arm, _ in (
-        _spring_corner(_dev, _SPR_T_HI) for _dev in SPR_FORMED_CORNERS
-    )
-)
 if SPRING_STRESS_SF < _STRESS_SF:
     raise AssertionError(
         f"spring root stress SF {SPRING_STRESS_SF:.2f} engaged at the stiff corner"
     )
-# The free profile tolerances shift the contact normal as well as penetration.
-# Prove all 32 combinations keep the crest (rather than the terminal flat)
-# against the *straight* flank over the whole swing at both stock thickness
-# extremes.  End poses bound this monotone short swing and retain the documented
-# 3 degree reserve at both ends of the 28 degree crest arc.
-for _dev in SPR_FORMED_CORNERS:
-    for _phi in (0.0, _PHI_ENG):
-        _sweep = spr_formed_contact_arc_sweep(_dev, math.degrees(_phi))
-        if not (
-            -SPR_KINK_DEG + SPR_CREST_ARC_MARGIN_DEG
-            <= _sweep
-            <= -SPR_CREST_ARC_MARGIN_DEG
-        ):
-            raise AssertionError(
-                f"formed spring contact has less than "
-                f"{SPR_CREST_ARC_MARGIN_DEG:.1f} deg of crest-arc reserve: "
-                f"{_sweep:.3f} deg"
-            )
-    for _thick in (_SPR_T_LO, _SPR_T_HI):
-        _, _, _stations = _spring_corner(_dev, _thick)
-        if min(_stations) < 1.0:
-            raise AssertionError(
-                f"formed spring contact leaves the straight flank: {_stations}"
-            )
-        if (
-            STRAP_C2C - 1.0 - max(_stations) < SPR_ENDCAP_SPARE_MM
-        ):
-            raise AssertionError(
-                f"formed spring contact lacks {SPR_ENDCAP_SPARE_MM:.2f} mm "
-                f"spare beyond the arbor end-cap keep-out: {_stations}"
-            )
 # The engaged blade flexes east toward the cylinder drum: the crest and the
 # flick tip, carried east by the extra deflection, keep 0.25 to the north end
 # disc beside them (the gears themselves end axially short of the leaf).
