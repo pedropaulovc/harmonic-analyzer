@@ -51,6 +51,8 @@ from doit.cmdparse import CmdParseError
 from doit.control import TaskControl
 from doit.doit_cmd import DoitMain
 
+from cad.scripts._undefined_names import scan_undefined_names
+
 REPO_ROOT = Path(__file__).resolve().parent
 _LEVELS = ("debug", "info", "success", "warning", "error", "critical")
 _EXECUTORS = ("local", "farm")
@@ -352,6 +354,13 @@ def _farm_preflight() -> None:
             "working tree is dirty:\n" + "\n".join(f"  {p}" for p in dirty)
         )
     sha = _git("rev-parse", "HEAD").strip()
+    lint = scan_undefined_names(REPO_ROOT)
+    if lint.returncode != 0:
+        raise FarmPreflightError(
+            "undefined names in build sources (check:undefined_names):\n"
+            + lint.stdout
+            + lint.stderr
+        )
 
     sys.path.insert(0, str(REPO_ROOT / "cad" / "scripts"))
     import _artifact_cache
