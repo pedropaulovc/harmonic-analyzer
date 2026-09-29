@@ -547,19 +547,17 @@ function Select-RunRecordPath {
 function Test-LauncherAlive {
     param([Parameter(Mandatory)]$Record)
 
-    $process = Get-Process -Id ([int]$Record['pid']) -ErrorAction SilentlyContinue
-    if ($null -eq $process) {
+    # CIM reports CreationDate even for a protected process, where
+    # Process.StartTime throws; Get-RunProcessTree reads the same field.
+    $holder = Get-CimInstance -ClassName Win32_Process -Filter "ProcessId=$([int]$Record['pid'])" -ErrorAction SilentlyContinue
+    if ($null -eq $holder -or $null -eq $holder.CreationDate) {
+        # Gone, or its identity cannot be read: not confirmed as the launcher.
         return $false
     }
     # The launcher started before it wrote started_at; a process with this PID
     # created at or after it is an unrelated process that reused it.
     $startedAt = ConvertTo-UtcTimestamp -Value $Record['started_at']
-    try {
-        return $process.StartTime.ToUniversalTime() -lt $startedAt
-    }
-    catch {
-        return $true
-    }
+    return $holder.CreationDate.ToUniversalTime() -lt $startedAt
 }
 
 function Read-SharedText {
@@ -937,10 +935,14 @@ function Invoke-RunList {
     )
 
     $now = [System.DateTime]::UtcNow
-    $paths = @(Get-RunRecordPaths -Directory $Directory)
-    [array]::Reverse($paths)
-    foreach ($path in $paths) {
-        $record = Read-RunRecord -Path $path
+    # Newest first by started_at: run IDs carry the start only to the
+    # millisecond, so file names do not order launches within one.
+    $entries = Get-RunRecordPaths -Directory $Directory |
+        ForEach-Object { [pscustomobject]@{ Path = $_; Record = Read-RunRecord -Path $_ } } |
+        Sort-Object -Property { ConvertTo-UtcTimestamp -Value $_.Record['started_at'] } -Descending
+    foreach ($entry in $entries) {
+        $path = $entry.Path
+        $record = $entry.Record
         if ($Tag -and $record['tag'] -cne $Tag) {
             continue
         }

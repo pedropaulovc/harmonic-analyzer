@@ -1349,13 +1349,14 @@ def _sibling_waiting_on(fixture: dict[str, object], workflow: str) -> Path:
     )
 
 
-def test_a_tag_resolves_to_its_latest_started_run(tmp_path: Path) -> None:
-    """Codex on #1125 (4243d95d2): run IDs carry the start to the millisecond,
-    so two launches in one millisecond were ordered by their random suffix."""
+def test_a_tag_and_the_list_order_runs_by_their_precise_start(tmp_path: Path) -> None:
+    """Codex on #1125 (4243d95d2, 81928f376): run IDs carry the start to the
+    millisecond, so two launches in one millisecond were ordered by their
+    random suffix, both for -Tag and for -List's newest-first order."""
     fixture = _launcher_fixture(tmp_path)
     second = float(int(time.time()) - 10)
     # Same run-id timestamp; the older one's suffix sorts last by name.
-    _write_run_record(
+    older = _write_run_record(
         fixture,
         pid=os.getpid(),
         tag="twin",
@@ -1380,6 +1381,16 @@ def test_a_tag_resolves_to_its_latest_started_run(tmp_path: Path) -> None:
 
     assert status.returncode == 0, status.stderr
     assert json.loads(status.stdout)["run_id"] == _record(newer)["run_id"]
+
+    listed = _run_launcher(
+        fixture, _tracking(fixture, "-List", "-Tag", "twin"), fixture["environment"]
+    )
+
+    assert listed.returncode == 0, listed.stderr
+    assert [json.loads(line)["run_id"] for line in listed.stdout.splitlines()] == [
+        _record(newer)["run_id"],
+        _record(older)["run_id"],
+    ]
 
 
 def test_a_pid_reused_after_the_record_is_not_the_launcher(tmp_path: Path) -> None:
