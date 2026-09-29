@@ -1192,14 +1192,20 @@ def test_reference_inputs_stay_on_the_lifting_side():
         assert np.all(x >= 0.0), name
 
 
-def test_cone_flat_phase_follows_gear_ratio_and_broken_land_lever(budget):
+def test_cone_flat_phase_follows_gear_ratio_and_print_worst_lever(budget):
     """The index removes only the Ø9.525-land lag, not differences between
     flats or the clearance variation between individual gears. The lever is
-    the flat half-chord less the title block's edge break: an accepted break
-    on the torque corner shortens it (Codex, #1128)."""
+    the shortest flat the print accepts: the land at its least diameter and
+    greatest AF, less the title block's edge break on the torque corner
+    (Codex, #1128), unless the least bore flat is shorter still. The residual
+    is booked against the longest unbroken Ø9.525 flat."""
     import cone_gear_spec
     import cone_shaft_land_bands
     import gear_seat_fit
+
+    def chord(diameter, af):
+        radius = diameter / 2.0
+        return math.sqrt(radius**2 - (af - radius) ** 2)
 
     profiles = eb.phase_profiles()
     clearance_lo, clearance_hi = gear_seat_fit.FLAT_AF_CLEARANCE
@@ -1211,11 +1217,17 @@ def test_cone_flat_phase_follows_gear_ratio_and_broken_land_lever(budget):
     assert gear_seat_fit.FLAT_AF_CLEARANCE == (0.010, 0.030)
     edge_break = _config.title_block("edge_break")
     lever_loss = max(edge_break["radius_mm"], edge_break["chamfer_max_mm"])
+    af_upper, af_lower = cone_shaft_land_bands.FLAT_AF_BAND
+    bore_af_upper, _ = gear_seat_fit.flat_bore_af_band(
+        cone_shaft_land_bands.FLAT_AF_BAND
+    )
 
-    reference_r = cone_gear_spec.bore_dia_mm(120) / 2.0
-    reference_af = cone_shaft_land_bands.SECTION_FLAT_AF[1]
-    reference_chord = math.sqrt(reference_r**2 - (reference_af - reference_r) ** 2)
-    for section, (_band, af, carried) in enumerate(
+    reference_upper, _ = cone_shaft_land_bands.SECTION_DIA_BANDS[1]
+    reference_chord = chord(
+        cone_gear_spec.bore_dia_mm(120) + reference_upper,
+        cone_shaft_land_bands.SECTION_FLAT_AF[1] + af_lower,
+    )
+    for section, (band, af, carried) in enumerate(
         zip(
             cone_shaft_land_bands.SECTION_DIA_BANDS,
             cone_shaft_land_bands.SECTION_FLAT_AF,
@@ -1228,8 +1240,12 @@ def test_cone_flat_phase_follows_gear_ratio_and_broken_land_lever(budget):
             continue
         assert af is not None
         diameter = cone_gear_spec.bore_dia_mm(carried[0])
-        radius = diameter / 2.0
-        lever = math.sqrt(radius**2 - (af - radius) ** 2) - lever_loss
+        _, lower = band
+        _, bore_lower = gear_seat_fit.seat_bore_band(band)
+        lever = min(
+            chord(diameter + lower, af + af_upper) - lever_loss,
+            chord(diameter + bore_lower, af + bore_af_upper),
+        )
         for teeth in carried:
             index = teeth // 6 - 1
             ratio = teeth / 120.0

@@ -853,27 +853,57 @@ def flat_edge_break_mm() -> float:
     return max(float(row["radius_mm"]), float(row["chamfer_max_mm"]))
 
 
+def _flat_half_chord(diameter: float, af: float) -> float:
+    """Half the width of a D-flat with across-flat ``af`` on a ``diameter`` land."""
+    return math.sqrt((diameter - af) * af)
+
+
+def _flat_chord_range(
+    diameter: float,
+    af: float,
+    dia_band: tuple[float, float],
+    af_band: tuple[float, float],
+) -> tuple[float, float]:
+    """(shortest, longest) flat half-chord a print accepts. For a fixed AF
+    the chord grows with the diameter; for a fixed diameter it shrinks as the
+    AF grows, because every flat is shallow (AF > D/2). Both extremes are
+    therefore corners of the limit box."""
+    chords = [
+        _flat_half_chord(diameter + d_dev, af + af_dev)
+        for d_dev in dia_band
+        for af_dev in af_band
+    ]
+    return min(chords), max(chords)
+
+
 def phase_profiles() -> dict[str, tuple[np.ndarray, np.ndarray]]:
     """Phase radians = drawn deviation * per-channel scale + fixed residual.
 
     Cone gear T_i has T_i/120 of its phase at the 120T cylinder cam.
-    The D-flat's AF clearance turns each gear by c / lever, the lever being
-    the flat half-chord less the edge break the title block permits on the
-    shaft flat's torque corner (``flat_edge_break_mm``). Both terms are
-    bounded, not averaged: the clearance acts on the fully broken lever,
-    and each land's residual is its fully broken lag against an unbroken
-    Ø9.525 land. The crank index removes the Ø9.525 land's lag whatever its
-    break, since that lag is proportional to i and only shifts the index.
-    Per-land departures and per-gear scatter cannot be removed by that
-    index. A shaft land's flat clocked off the Ø9.525 land's turns every
+    The D-flat's AF clearance turns each gear by c / lever, where the lever is
+    how far along the flat the gear's bore can bear before contact runs out.
+    Every term is bounded at the print's worst, not averaged: the lever is
+    the shortest shaft flat MHA-014 accepts (land at its smallest diameter
+    and largest AF) less the title block's edge break on its torque corner
+    (``flat_edge_break_mm``), or the shortest bore flat if that is shorter.
+    The bore flat's corner is an inside corner, which the title block does
+    not break. Each land's residual is that lag against the longest unbroken
+    Ø9.525 flat. The crank index removes the Ø9.525 land's own lag whatever
+    its size or break, since that lag is proportional to i and only shifts
+    the index. Per-land departures and per-gear scatter cannot be removed by
+    that index. A shaft land's flat clocked off the Ø9.525 land's turns every
     gear on it by the same angle (``cone_land_clock``, drawn per land by
     ``draw_groups``).
     """
     teeth = 6 * np.arange(1, N_ELEMENTS + 1)
     ratio = teeth / 120.0
-    half_chords = np.empty(N_ELEMENTS)
+    edge_break = flat_edge_break_mm()
+    land_af_band = cone_shaft_land_bands.FLAT_AF_BAND
+    bore_af_band = gear_seat_fit.flat_bore_af_band(land_af_band)
+    levers = np.empty(N_ELEMENTS)
     reference_land = np.zeros(N_ELEMENTS, dtype=bool)
-    for _band, af, carried in zip(
+    reference_chord = math.nan
+    for dia_band, af, carried in zip(
         cone_shaft_land_bands.SECTION_DIA_BANDS,
         cone_shaft_land_bands.SECTION_FLAT_AF,
         cone_shaft_land_bands.SECTION_CONE_GEAR_TEETH,
@@ -881,25 +911,31 @@ def phase_profiles() -> dict[str, tuple[np.ndarray, np.ndarray]]:
     ):
         if af is None:
             continue  # pivot journal, with no gear and no flat
+        bore_band = gear_seat_fit.seat_bore_band(dia_band)
         # The configured gear's bore is the nominal diameter of its shaft
-        # section; the adjacent section band sets that land's size limits.
+        # section; the section's bands set the land's and bores' limits.
         for count in carried:
             diameter = cone_gear_spec.bore_dia_mm(count)
-            half_chords[count // 6 - 1] = math.sqrt(
-                (diameter / 2.0) ** 2 - (af - diameter / 2.0) ** 2
+            shaft_short, shaft_long = _flat_chord_range(
+                diameter, af, dia_band, land_af_band
             )
-            reference_land[count // 6 - 1] = 120 in carried
-    levers = half_chords - flat_edge_break_mm()
-    if np.any(levers <= 0.0):
-        raise ValueError(
-            f"the {flat_edge_break_mm()} edge break leaves no D-flat lever: "
-            f"half-chords {np.round(half_chords, 4).tolist()}"
-        )
+            bore_short, _ = _flat_chord_range(diameter, af, bore_band, bore_af_band)
+            if shaft_short <= edge_break:
+                raise ValueError(
+                    f"the {edge_break} edge break leaves no D-flat lever on the "
+                    f"Ø{diameter:.4f} land: shortest half-chord {shaft_short:.4f}"
+                )
+            levers[count // 6 - 1] = min(shaft_short - edge_break, bore_short)
+            if 120 not in carried:
+                continue
+            reference_land[count // 6 - 1] = True
+            reference_chord = shaft_long
     clearance_lo, clearance_hi = gear_seat_fit.FLAT_AF_CLEARANCE
     clearance_mean = (clearance_lo + clearance_hi) / 2.0
-    reference_chord = half_chords[-1]  # T120, on the Ø9.525 land
     residual = np.where(
-        reference_land, 0.0, clearance_mean * ratio * (1.0 / levers - 1.0 / reference_chord)
+        reference_land,
+        0.0,
+        clearance_mean * ratio * (1.0 / levers - 1.0 / reference_chord),
     )
     deg = math.pi / 180.0
     return {
