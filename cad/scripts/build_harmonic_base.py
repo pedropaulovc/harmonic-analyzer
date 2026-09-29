@@ -141,17 +141,22 @@ from rocker_arm_support_spec import SUPPORT_HOLD_DOWN_XZ
 from harmonic_base_fasteners import (
     BASE_CROSS_TAP_DRILL_DIA,
     BASE_CROSS_TAP_SPEC,
+    HOLD_DOWN_BEARING_OFFSET,  # noqa: F401 - consumed by drawing contracts
     HOLD_DOWN_DRILL_DEPTH,
     HOLD_DOWN_ENGAGEMENT,
+    HOLD_DOWN_PITCH,  # noqa: F401 - consumed by drawing contracts
     HOLD_DOWN_SEAT_SPEC,
     HOLD_DOWN_TAP_DRILL_DIA,
     HOLD_DOWN_THREAD,
+    HOLD_DOWN_THREAD_DEPTH,  # noqa: F401 - consumed by drawing contracts
     NAMEPLATE_SCREW_DRILL_DEPTH,
     NAMEPLATE_SCREW_HOLE_DEPTH,
     NAMEPLATE_SCREW_XZ,
     PEDESTAL_SCREW_ENGAGEMENT,
     SEAT_DEPTH_BAND,
+    SEAT_DEPTH_STEP,  # noqa: F401 - consumed by drawing contracts
     SEAT_TIP_RESERVE,
+    SUPPORT_FOOT_THICKNESS,  # noqa: F401 - consumed by drawing contracts
     seat_drill_depth,
     seat_thread_depth,
     title_block_band_mm,
