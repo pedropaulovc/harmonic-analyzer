@@ -67,8 +67,14 @@ sizing are done **analytically** (external spring calculations), not read off a 
 
 ## Where contact *is* tested
 
-Local cam/follower and spring/lever contact is exercised only in **small isolated
-subassemblies** — the interference/health gates of `verify:soundness` open every
-(sub)assembly standalone (the former `verify:subsystems` suite is retired; its one
-unique gate, channel-independence, is folded into soundness). The full 21-spring
+The alignment-pinion lift cams have one persistent cam-follower mate from the
+front collar OD to its pin's cylindrical shank. The rear copy follows the same
+rigid shaft/strap groups, without a redundant mate. `verify:kinematics` drives
+the saved drive-train's free lift-rod spin transiently and measures **both**
+OD-to-pin gaps and bracket swing through the stroke (including saved-rest
+tangency); `verify:soundness` checks mate health. The former 0.161 mm air was only the unsaved
+level-centre setup pose; the cam-contact rest is the model's saved pose.
+
+Other local cam/follower and spring/lever contact uses isolated subassemblies
+and their `verify:soundness` interference/health gates. The full 21-spring
 equilibrium is never solved in the top-level assembly.

@@ -2,7 +2,7 @@ pinion-spring:
   title: Pinion Return Leaf Spring
   number: MHA-114
   material: 17-7 PH Cond C, 0.381 mm
-  material_specification: 17-7 PH stainless (UNS S17700) strip, Condition C, ASTM A693; 0.015 in (0.381 mm) +/-0.00075 in, sheared 1/4 in wide from McMaster-Carr 2325K19
+  material_specification: 17-7 PH stainless (UNS S17700) strip, Condition C, ASTM A693; 0.015 in (0.381 mm) +/-0.00075 in, sheared 6.50 mm wide from the 6 in x 50 in McMaster-Carr 2325K19 roll
   finish: degreased after forming; bare stainless, no coating
   quantity: 1
   tolerance_class: machined_block

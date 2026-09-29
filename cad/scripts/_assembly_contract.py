@@ -42,8 +42,9 @@ class AssemblyContract:
     ``allowed_free_stems``: the exact component families allowed to read
     under-constrained (freed operational DOF plus everything coupled to them),
     shared by the incremental refresh and the ``verify:soundness`` gate.
-    ``required_free_stems``: one family per freed DOF that must ITSELF read
-    under-constrained (the necessity direction of the soundness gate).
+    ``required_free_stems``: at least one family for each freed DOF that must
+    read under-constrained; a coupled group may name additional families whose
+    mobility is also essential (the necessity direction of soundness).
     ``free_dof`` (+ ``free_dof_per_active_channel`` x the active channel count):
     the operational DOF the saved model ships free.
     """

@@ -1845,9 +1845,9 @@ sections:
         - stated
         - high
       - - Return spring (leaf)
-        - 0.381 × 6.35 17-7 PH stainless strip, Condition C (0.015 in, McMaster-Carr 2325K19 sheared 1/4 in wide; PR 859 ruling 4, 2026-09-25, supersedes the 0.5 × 6.0 C51000 of O1-b — stainless departs from the p.68 brass look for stress margin and corrosion resistance); foot screwed down 20.0 EAST of the pivot bore, outboard of the back strap, on a 9.5 square pad flush with the strip's aft edge (widening forward only, PR 859 option (iv)); R3.3 bend straight off the pad; straight blade leaning ~1.0° west of vertical (~9.2° in to the parked flank); crest R3.3 bearing on the east flank 23.0 up the strap, 5 below the arbor; 25° flick back east, 2.0 flat. Modelled installed (0.15 parked air); formed free with the crest preset ~2.6 into the flank (5.4° more bend) (`pinion_spring_geometry.py`, `pinion_spring_section.py`)
+        - 0.381 × 6.5 17-7 PH stainless strip, Condition C (0.015 in, McMaster-Carr 2325K19 sheared 6.50 mm wide from the same 6 in × 50 in roll; PR 859 ruling 4, 2026-09-25, supersedes the 0.5 × 6.0 C51000 of O1-b — stainless departs from the p.68 brass look for stress margin and corrosion resistance); foot screwed down 20.7 EAST of the pivot bore, outboard of the back strap, on a 9.5 square pad flush with the strip's aft edge (widening forward only, PR 859 option (iv)); R3.3 bend straight off the pad; straight blade leaning ~2.14° west of vertical (~9.77° in to the rested flank); crest R3.3 bearing on the east flank 24.8 up the strap, 3.2 below the arbor; 28° flick back east, 2.0 flat. Modelled installed (0.15 air at the spring crest; the separate cam/pin contact has zero air); formed free with the crest preset ~2.72 into the flank (5.4° more bend). At all 32 independent formed-profile corners, the original 0.015-in stock's thickness band and the printed .XX strip-width band, the revised cam-contact rest yields parked/engaged soft preload 1.571/2.188 times worst gravity and stiff engaged Condition-C minimum-yield SF 1.571, above their 1.5 floors; the 28° crest gives at least 3.3° arc reserve and the extreme engaged contact stands 0.296 mm inside the straight-flank 1-mm cap keep-out. The bend coupon, Condition-C modulus stand-in and physical force/cycle checks remain release limitations.
         - —
-        - 'p.68–69 + v4_pinion_013/018/019: a brass-coloured leaf bears on the BACK strap''s east flank in both poses, more flexed engaged — it holds the drum disengaged by default; front strap clean (t00393). img01''s far-left black screw is on the DRUM side (east): the foot is outboard, not under the strap (the pre-2026-09-24 model read it as west). img04 puts the crest 5 below the arbor. The pad''s aft edge, flush with the strip''s, is set a 0.65 gage leaf off the back block (`SPRING_PAD_LEAF`), which stations the blade in from the strap''s inner face (`SPRING_BLADE_INSET`) (build_pinion_spring / build_drive_train SPRING_*)'
+        - 'p.68–69 + v4_pinion_013/018/019: a brass-coloured leaf bears on the BACK strap''s east flank in both poses, more flexed engaged — it holds the drum disengaged by default; front strap clean (t00393). img01''s far-left black screw is on the DRUM side (east): the foot is outboard, not under the strap (the pre-2026-09-24 model read it as west). img04 scaled the crest about 5 below the arbor; its bearing station is now 3.2 below because the revised cam-contact rest requires formed-corner stress and preload reserve, not because the photograph specifies a precise dimension. The pad''s aft edge, flush with the strip''s, is set a 0.65 gage leaf off the back block (`SPRING_PAD_LEAF`), which stations the blade in from the strap''s inner face (`SPRING_BLADE_INSET`) (build_pinion_spring / build_drive_train SPRING_*)'
         - scaled
         - med
       - - Swing straps ×2 (2026-09 re-derive)
@@ -1863,7 +1863,7 @@ sections:
         - scaled
         - med
       - - Engage lever rest and throw (2026-09 photo correction)
-        - Ø6 × 86 lever; parked +10° from vertical toward machine −X; the −82.023° eccentric-cam contact rotation carries it through vertical to −72.023° toward machine +X at engagement (U28 2026-09-23: Ø14.6 × 9 collar, ecc 2.0, 2.100 thin-side wall, sub-flush M2.5 set screw; drum parked 2.2425 out so the 120T tips seat at C2C 38.990)
+        - Ø6 × 86 lever; parked +10° from vertical toward machine −X; the −82.023° eccentric-cam contact rotation carries it through vertical to −72.023° toward machine +X at engagement (U28 2026-09-23: Ø14.6 × 9 collar, ecc 2.0, 2.100 thin-side wall, sub-flush M2.5 set screw; 2.2425 level-centre gap locates the blocks; the spring-rested, cam-mated drum actually has a 2.4853 tooth-tip gap before the 120T tips seat at C2C 38.990)
         - —
         - 'ch25 p.68 front-side pair: page002_img08 is disengaged and puts the lever about 10° from vertical toward image-right = machine −X; page002_img07 is engaged and folds it about 76° toward image-left = machine +X. The linkage independently solves −82.023° cam rotation and a −72.023° engaged lever, within the photo perspective band. Supersedes the −40° parked seed, which put the rest pose on the photographed engaged side.'
         - scaled + derived
@@ -1894,29 +1894,34 @@ sections:
       64T — but the GT shows the drum never lived there: pinion_front/pinion_back
       triangulate its axis near machine x −10 to −11, y ~104–107. The x evidence
       establishes the level-inboard topology; the exact v2 journal, the
-      user-authoritative 32T count and the U28 2.2425 mm parked tip gap now own
-      the derived rig location. Modeled layout (`APINION_*` constants): axis at
-      machine (−18.384, 90.518) = X_DRUM + (drum tip 31.100 + pinion tip 8.667 +
-      2.2425 disengaged gap); drum z −70.388..+72.812 (face 143.2, spanning all 20
-      stations), integral steel arbor/head root z −130.688..+95.562,
-      head/crossrod axis z −137.188, and separate MHA-058 crossrod at +65°.
+      user-authoritative 32T count and the U28 2.2425 mm LEVEL-CENTRE setup gap
+      locate the fixed pivot and lift blocks. The saved rig, however, rests
+      on the eccentric-down cam: its linked swing rotates −0.501586° clockwise
+      from that construction station, placing the pinion axis at machine
+      (−18.141, 90.552) and the actual tooth-tip gap at 2.4853 mm (2.50 feeler).
+      The reference level-centre station was (−18.384, 90.518) = X_DRUM +
+      drum tip 31.100 + pinion tip 8.667 + 2.2425 construction gap.
+      Drum z −70.388..+72.812 (face 143.2, spanning all 20 stations),
+      integral steel arbor/head root z −130.688..+95.562, head/crossrod
+      axis z −137.188, and separate MHA-058 crossrod at +65°.
       Straps: 15 wide × 9 thick with R7.5 ends, plain (no cam relief), pivot
-      (−14.420, 62.8), bore-to-bore c2c 28.0, parked at an 8.139° lean; the swing
-      rides the setup DOF (a freed operational DOF, its angle drive spec recorded
-      in the DOF manifest; articulated by the mobility probe / motion drives).
-      The bronze return spring (table row above) stands beside the back strap,
+      (−14.420, 62.8), bore-to-bore c2c 28.0, saved at a 7.637° lean. The
+      swing is now mechanically coupled to cam spin, NOT a second independent
+      setup DOF; only the cam angle has a replayable drive spec.
+      The 17-7 PH return spring (table row above) stands beside the back strap,
       foot on the base east of it, and presses the swing to the disengaged rest —
-      parked-pose clearances asserted in `build_drive_train_assembly`
-      (`SPRING_*`). The engage path is the p.69 cam: the lift rod rides the
-      blocks' other bores at (4.080, 64.960), and each strap tail carries a Ø4
-      follower pin (table row above), bonded into its blind seat, that the
-      rod's eccentric collar lifts. The collar is Ø14.6 with a 2.0 eccentricity
-      and keeps a 2.100 thin-side wall. Parked surface gap is 0.161; the solved
-      −82.023° cam rotation gives 1.711 mm engaged authority and leaves 2.591 mm
-      of follower pin beyond the contact station. All are asserted analytically
-      (`CAM_*` + the segment-distance scan). At DP 49.82 the drum is 32T Ø17.334 (the
-      same DP as the cylinder train it must mesh); the table above records the
-      book-vintage DP 30 readings.
+      spring clearances are asserted in `build_drive_train_assembly`.
+      The engage path is the p.69 cam: the lift rod rides the blocks' other
+      bores at (4.080, 64.960), and each strap carries a Ø4 follower pin,
+      bonded into its blind seat, that the rod's eccentric collar lifts. The
+      collar is Ø14.6 with a 2.0 eccentricity and keeps a 2.100 thin-side wall.
+      At saved rest its OD is tangent to the follower shank (0.000 gap);
+      the old 0.161 mm air belongs solely to the unsaved level-centre pose.
+      One front cam-follower mate drives the rigid-linked front/back group.
+      The solved −82.023° cam rotation gives 1.711 mm engaged authority
+      and leaves 2.591 mm of follower pin beyond the contact station.
+      At DP 49.82 the drum is 32T Ø17.334 (the same DP as the cylinder
+      train it must mesh); the table above records the book-vintage DP 30 readings.
 
 
       ---

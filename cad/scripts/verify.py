@@ -1379,6 +1379,128 @@ async def _verify_paper_feed_one(adapter: Any, report: Report) -> None:
         discard_open_documents(adapter)
 
 
+async def _verify_pinion_cam_contact(adapter: Any, report: Report) -> None:
+    """Drive the cam in the real saved assembly; the bracket must follow it.
+
+    A rest-only clearance or a point selection that failed to create a mate
+    cannot pass this gate: neither drives the follower as the cam turns.
+    """
+    import build_drive_train_assembly as rig
+    import pinion_rig_park_geometry as park
+
+    name = "drive-train"
+    sldasm = OUT_SLDASM / f"{name}.SLDASM"
+    if not sldasm.exists():
+        report.failed.append(("pinion:contact:open", f"not built: {sldasm}"))
+        return
+    if not _assert_fresh(name, report):
+        return
+    specs = [s for s in load_dof_manifest(name) if s.get("key") == "pinion_cam"]
+    if len(specs) != 1:
+        report.failed.append(
+            (
+                "pinion:contact:dof-manifest",
+                f"expected one cam driver, got {len(specs)}",
+            )
+        )
+        return
+    adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
+    check(f"open {name}", await adapter.open_model(str(sldasm)))
+    try:
+
+        async def _drive_and_measure() -> None:
+            model = adapter.currentModel
+            (mate,) = await author_dof_drives(adapter, specs)
+            param = adapter._attempt(
+                lambda: model.Parameter(f"D1@{mate}"), default=None
+            )
+            if param is None:
+                raise RuntimeError(f"cannot read D1@{mate} for the cam")
+            rest_rad = float(_read_member(param, "SystemValue"))
+
+            def _transform(part: str) -> tuple[list[list[float]], list[float]]:
+                a = component_transform(adapter, part)
+                return [list(a[0:3]), list(a[3:6]), list(a[6:9])], [
+                    v * 1000.0 for v in a[9:12]
+                ]
+
+            def _world(part: str, local: tuple[float, float, float]) -> list[float]:
+                rows, pos = _transform(part)
+                return [
+                    pos[j] + sum(local[i] * rows[i][j] for i in range(3))
+                    for j in range(3)
+                ]
+
+            def _surface_gap(tag: int) -> float:
+                cam, pin = f"pinion-cam-{tag}", f"pinion-cam-pin-{tag}"
+                # The OD axis is 2 mm OFF Axis1@cam (the bore); the pin
+                # shank's axis runs along its local Z. Both run at the
+                # corresponding strap z station, not at the domed pin end.
+                axis = _world(cam, (0.0, -rig.CAM_ECC, rig.CAM_PIN_STATION[tag - 1]))
+                root = _world(pin, (0.0, 0.0, 0.0))
+                rows, _ = _transform(pin)
+                direction = rows[2]
+                along = sum((axis[k] - root[k]) * direction[k] for k in range(3))
+                if not 1.0 < along < rig.FPIN_LEN - 1.0:
+                    raise RuntimeError(f"{pin}: contact is outside its straight shank")
+                perpendicular = [
+                    axis[k] - root[k] - along * direction[k] for k in range(3)
+                ]
+                return (
+                    math.sqrt(sum(x * x for x in perpendicular))
+                    - (rig.CAM_OD + rig.FPIN_DIA) / 2.0
+                )
+
+            def _swing() -> float:
+                rows, _ = _transform("pinion-bracket-1")
+                u, u0 = rows[1], park.SPR_U
+                return math.atan2(
+                    u0[0] * u[1] - u0[1] * u[0], u0[0] * u[0] + u0[1] * u[1]
+                )
+
+            _rebuild(adapter)
+            rest = _swing()
+            if abs(rest) > math.radians(0.05):
+                raise AssertionError(
+                    f"rest strap rotated {math.degrees(rest):.3f} degrees"
+                )
+            for tag in (1, 2):
+                if abs(_surface_gap(tag)) > 0.03:
+                    raise AssertionError(f"rest station {tag} not tangent")
+            for fraction in (0.25, 0.5, 0.75, 0.9):
+                theta = math.radians(rig.CAM_ENGAGE_ROTATION_DEG * fraction)
+                param.SystemValue = rest_rad + theta
+                _rebuild(adapter)
+                swing = _swing()
+                if swing <= math.radians(0.1):
+                    raise AssertionError(
+                        f"cam turned {math.degrees(theta):.1f} degrees but bracket "
+                        f"moved only {math.degrees(swing):.3f} degrees"
+                    )
+                if abs(park.cam_pin_gap(theta, swing)) > 0.04:
+                    raise AssertionError(
+                        f"cam {math.degrees(theta):.1f}: bracket angle "
+                        f"{math.degrees(swing):.3f} missed the contact solution"
+                    )
+                for tag in (1, 2):
+                    gap = _surface_gap(tag)
+                    if abs(gap) > 0.04:
+                        raise AssertionError(
+                            f"cam {math.degrees(theta):.1f}: station {tag} "
+                            f"OD-to-shank gap {gap:.3f} mm, not live contact"
+                        )
+            param.SystemValue = rest_rad
+            _rebuild(adapter)
+            if abs(_swing()) > math.radians(0.05):
+                raise AssertionError("bracket failed to return to cam-contact rest")
+
+        await report.agate(
+            "pinion:cam-drives-swing-and-both-contacts", _drive_and_measure
+        )
+    finally:
+        discard_open_documents(adapter)
+
+
 async def _verify_live_chain_one(adapter: Any, report: Report) -> None:
     """Magnifier live-chain physics sweep (WIRE 1 articulation).
 
@@ -2180,6 +2302,7 @@ async def build(adapter: Any) -> dict[str, str]:
         await _verify_motion_one(adapter, report)
         await _verify_live_chain_one(adapter, report)
         await _verify_paper_feed_one(adapter, report)
+        await _verify_pinion_cam_contact(adapter, report)
     if suite == "math":
         verify_truth(report)
         verify_spring_base(report)

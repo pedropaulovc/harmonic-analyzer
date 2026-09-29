@@ -416,9 +416,9 @@ def test_no_per_component_dof_check_spans(monkeypatch, tmp_path):
     # still no per-component flood.
     nec = _by_name(spans, "gate.dof_free_necessity")
     assert len(nec) == 1
-    # crank spin + cone-platform swing + pinion swing + lift-rod/cam spin (PR8)
-    assert nec[0].attributes["expected_free_dof"] == 4
-    assert nec[0].attributes["free_under_constrained"] >= 4
+    # crank spin + cone-platform swing + lift-rod/cam spin; pinion follows cam
+    assert nec[0].attributes["expected_free_dof"] == 3
+    assert nec[0].attributes["free_under_constrained"] >= 3
     assert nec[0].status.status_code.name == "OK"
 
 
@@ -604,9 +604,9 @@ def test_free_dof_gate_is_single_necessity_span_not_park_phases(monkeypatch, tmp
     assert report.failed == [], report.failed
     (gate,) = _by_name(spans, "gate.dof_free_necessity")
     assert gate.status.status_code.name == "OK"
-    # crank spin + cone-platform swing + pinion swing + lift-rod/cam spin (PR8)
-    assert gate.attributes["expected_free_dof"] == 4
-    assert gate.attributes["free_under_constrained"] >= 4
+    # crank spin + cone-platform swing + lift-rod/cam spin; pinion follows cam
+    assert gate.attributes["expected_free_dof"] == 3
+    assert gate.attributes["free_under_constrained"] >= 3
     # the park machinery is gone -- none of its spans may reappear.
     assert _by_name(spans, "gate.dof_expected_free") == []
     assert _by_name(spans, "gate.park_closure") == []

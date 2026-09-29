@@ -11,9 +11,10 @@ in a tail cross-bore is retired: the photo reads a fatter (~Ø4-5) stud
 at the pivot's height band, and a blind edge seat is the only geometry
 that clears the Ø6.35 pivot bore there.
 
-Layout: axis Z, root (seated) end at the ORIGIN, z 0..15: 4.0 presses
-into the strap's blind edge bore, 13 proud after the v2 linkage closure; domed outer end (sagitta
-0.8, the rod-end crown idiom). Axisymmetric about its local x = 0.  Shank and
+Layout: axis Z, root (seated) end at the ORIGIN, straight shank z 0..20:
+4.0 seats in the blind edge bore, 16 proud and bearing on the cam OD near
+shank z 10; the domed end projects another 0.8 (rod-end crown idiom).
+Axisymmetric about its local x = 0. Shank and
 crown are both Right-plane half-profiles (sketch u = -z), so the diameter,
 length and crown radius all import into the *Right side view, where the pin
 lies as it is turned (rule 7; machinist review of 7f7fc1717).

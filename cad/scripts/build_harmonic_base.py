@@ -141,22 +141,17 @@ from rocker_arm_support_spec import SUPPORT_HOLD_DOWN_XZ
 from harmonic_base_fasteners import (
     BASE_CROSS_TAP_DRILL_DIA,
     BASE_CROSS_TAP_SPEC,
-    HOLD_DOWN_BEARING_OFFSET,
     HOLD_DOWN_DRILL_DEPTH,
     HOLD_DOWN_ENGAGEMENT,
-    HOLD_DOWN_PITCH,
     HOLD_DOWN_SEAT_SPEC,
     HOLD_DOWN_TAP_DRILL_DIA,
     HOLD_DOWN_THREAD,
-    HOLD_DOWN_THREAD_DEPTH,
     NAMEPLATE_SCREW_DRILL_DEPTH,
     NAMEPLATE_SCREW_HOLE_DEPTH,
     NAMEPLATE_SCREW_XZ,
     PEDESTAL_SCREW_ENGAGEMENT,
     SEAT_DEPTH_BAND,
-    SEAT_DEPTH_STEP,
     SEAT_TIP_RESERVE,
-    SUPPORT_FOOT_THICKNESS,
     seat_drill_depth,
     seat_thread_depth,
     title_block_band_mm,
@@ -337,11 +332,12 @@ STOP_SCREW_DRILL_DEPTH = seat_drill_depth(STOP_SCREW_HOLE_DEPTH, STOP_THREAD, "t
 # machine-handed convention: four #8-32 seats under the two pivot blocks
 # and one #4-40 seat under the spring foot (the arbor pedestals moved to their
 # own #8-32 group, PEDESTAL_SCREW_XZ, with U34c).
-# The block and spring seats follow the user-authoritative 32T rig's parked
-# tip gap (U28, 2026-09-23: 2.2425, the park-out that seats the 120T tips at
-# the drum's base-circle root) and the U28 block re-layout -- screws +-8.5
-# about the pivot bore, block mid-depth 5.125 in from each outer face; the
-# drum-axis pedestal seats remain unchanged.  Ruling (c) (user, 2026-09-24):
+# The block and spring seats follow the 32T rig's U28 level-centre
+# CONSTRUCTION gap (2.2425 mm), which fixes the pivot and lift-axis bores.
+# The saved strapped group rotates clockwise onto the cam: its actual tooth
+# gap is 2.4853 mm. The U28 block screws stay +-8.5 about the pivot bore,
+# block mid-depth 5.125 in from each outer face; drum-axis pedestal seats
+# remain unchanged. Ruling (c) (user, 2026-09-24):
 # the block and spring-foot z stations are pinion_rig_layout's -- the front
 # block stands one feeler off the front strap, the spring foot's pad one
 # leaf off the back block, and the whole rig where the rig-set leaf D off gear
@@ -374,7 +370,7 @@ FOOT_SCREW_XZ = tuple(
     (x + MECHANISM_X_SHIFT, z + MECHANISM_Z_SHIFT) for x, z in _FORMER_FOOT_SCREW_XZ
 )
 # The stock 9.525-mm foot screw penetrates deepest below the THINNEST spring
-# strip the stock band allows (#859 ruling 4: 17-7 PH 0.015 in, 2325K19); the
+# strip the stock band allows (17-7 PH Condition C 0.015 in, 2325K19); the
 # seat is sized at its printed worst case for a #4-40 bottoming tap.
 SPRING_THICKNESS_MIN = SPRING_THICKNESS + deviations(SPRING_THICKNESS_BAND)[0]
 FOOT_SCREW_HOLE_DEPTH = seat_thread_depth(FOOT_SCREW_LEN - SPRING_THICKNESS_MIN)

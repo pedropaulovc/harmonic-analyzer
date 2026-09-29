@@ -63,11 +63,12 @@ def _expected_fragments() -> list[str]:
     follower_reserve = dt._FPIN_TIP_S - dt._S_CAM_ENG
     return [
         # Layout summary.
-        f"U28 {dt.APINION_GAP} mm parked tip gap",
-        f"machine ({_mm(dt.APINION_X)}, {dt.APINION_Y:g})",
+        f"U28 {dt.APINION_GAP} mm LEVEL-CENTRE setup gap",
+        f"({_mm(dt.APINION_X)}, {_mm(dt.APINION_Y)}) and the actual tooth-tip gap at "
+        f"{dt.REST_TIP_GAP:.4f} mm",
         f"drum tip {dt.TIP_DRUM120:.3f} + pinion tip {dt.TIP_APINION:.3f} "
-        f"+ {dt.APINION_GAP} disengaged gap",
-        f"drum z {_mm(dt.APINION_Z_FRONT)}..+{dt.APINION_Z_BACK:.3f}",
+        f"+ {dt.APINION_GAP} construction gap",
+        f"Drum z {_mm(dt.APINION_Z_FRONT)}..+{dt.APINION_Z_BACK:.3f}",
         f"face {dt.APINION_Z_BACK - dt.APINION_Z_FRONT:.1f}",
         f"root z {_mm(dt.ARBOR_Z0)}..+{dt.ARBOR_Z0 + ARBOR_LEN:.3f}",
         f"head/crossrod axis z {_mm(dt.HANDLE_Z)}",
@@ -80,10 +81,11 @@ def _expected_fragments() -> list[str]:
         f"bores at ({_mm(dt.LIFT_X)}, {_mm(dt.LIFT_Y)})",
         f"The collar is Ø{dt.CAM_OD:g} with a {dt.CAM_ECC:.1f} eccentricity "
         f"and keeps a {dt.CAM_THIN_SIDE_WALL:.3f} thin-side wall",
-        f"Parked surface gap is {dt._PARK_GAP:.3f}",
-        f"{_mm(dt.CAM_ENGAGE_ROTATION_DEG)}° cam rotation gives "
-        f"{authority:.3f} mm engaged authority and leaves "
-        f"{follower_reserve:.3f} mm of follower pin",
+        f"At saved rest its OD is tangent to the follower shank "
+        f"({dt._REST_CONTACT_GAP:.3f} gap)",
+        f"The solved {_mm(dt.CAM_ENGAGE_ROTATION_DEG)}° cam rotation gives "
+        f"{authority:.3f} mm engaged authority "
+        f"and leaves {follower_reserve:.3f} mm of follower pin",
         # Engage-lever row.
         f"the {_mm(dt.CAM_ENGAGE_ROTATION_DEG)}° eccentric-cam contact rotation "
         f"carries it through vertical to {_mm(dt.LEVER_ENGAGED_TILT_DEG)}°",

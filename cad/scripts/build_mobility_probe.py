@@ -20,14 +20,13 @@ probe against. The argument, per subassembly:
   3. unsuppress -> back to all-defined. ``rest`` is restored (the doc is never
      saved, so the on-disk free model is untouched regardless).
 
-So with every replayed drive mate active the device is 0-DOF (deterministic);
-drop the crank driver and the whole gear train is free to be turned (the 1
-operating DOF); drop a setup driver (p0 amplitude / p1 cone swing / p2 pinion
-swing) and just that quasi-static freedom opens. The probe NEVER saves.
+With the replayed drivers active the assembly is 0-DOF. Suppressing the
+pinion-cam driver frees the lift rod AND the linked strap swing: their
+persistent cam-follower mate couples them into one operational freedom, not
+two independent setup drivers. The probe NEVER saves.
 
-Drive mates land as TOP-LEVEL mates of each standalone subassembly (drive-train
-carries crank + p1 + p2; channel carries the 20 p0 amplitude slides), so they are
-suppressible by name without the flexible-sub indirection the motion study needs.
+Drive mates land at the top level of each standalone assembly (drive-train
+carries crank + cone swing + pinion cam; channel carries p0 slides).
 
 Run (SolidWorks already open)::
 
@@ -69,9 +68,8 @@ PROBES = [
     # p1: the swing driver pins the PLATFORM (the post/tip block/shaft ride it by
     # seat mates, so no rider family carries a swing driver of its own).
     ("drive-train", "cone-swing-platform", "p1 cone swing-to-disengage"),
-    # p2: the swing driver pins the FRONT STRAP (the pinion itself is tied to the
-    # strap by two-real mates, so its family carries no swing driver of its own).
-    ("drive-train", "pinion-bracket", "p2 pinion swing-to-engage"),
+    # The one cam spin driver pins the lift rod AND the contact-coupled strap.
+    ("drive-train", "pinion-lift-rod", "pinion cam drives the engage swing"),
     ("channel", "amplitude-bar", "p0 amplitude slides (all 20)"),
 ]
 

@@ -2,11 +2,62 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+import math
+from collections.abc import Iterable, Sequence
+from dataclasses import dataclass
 from typing import Any
 
 import _telemetry
 from _assembly import _mate, _mate_hard_error, suspend_automatic_assembly_rebuilds
+from _common import _MATE_TOL_MM, _early_bound
+
+# swMateType_e.swMateCAMFOLLOWER, swSelectType_e.swSelFACES, swBodyType_e.swSolidBody.
+_SW_MATE_CAMFOLLOWER = 9
+_SW_SEL_FACES = 2
+_SW_SOLID_BODY = 0
+# ICamFollowerMateFeatureData remarks: pre-select the cam face with Mark 1 and
+# the follower face or vertex with Mark 8.
+_CAM_MARK = 1
+_FOLLOWER_MARK = 8
+# A modelled radius reads back exactly; a different face differs by far more.
+_RADIUS_TOL_MM = 1e-3
+# Sine of the angle a read-back axis may make with its modelled axis.
+_AXIS_SIN_TOL = 1e-2
+
+
+@dataclass(frozen=True)
+class CylinderFace:
+    """The one cylindrical face of radius ``radius_mm`` on ``component``.
+
+    ``component`` is the component's ``Name2``.  ``axis_point_mm``/``axis``
+    are the modelled axis in the assembly frame (millimetres), which the
+    persisted mate entity must read back as.
+    """
+
+    component: str
+    axis_point_mm: tuple[float, float, float]
+    axis: tuple[float, float, float]
+    radius_mm: float
+
+
+def _cross(a: Sequence[float], b: Sequence[float]) -> tuple[float, float, float]:
+    return (
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0],
+    )
+
+
+def _axis_distance(point: Sequence[float], face: CylinderFace) -> float:
+    """Distance from ``point`` to the modelled axis line of ``face``."""
+    rel = [p - o for p, o in zip(point, face.axis_point_mm, strict=True)]
+    return math.hypot(*_cross(rel, face.axis)) / math.hypot(*face.axis)
+
+
+def _axis_sine(axis: Sequence[float], face: CylinderFace) -> float:
+    """Sine of the angle between ``axis`` and the modelled axis of ``face``."""
+    norm = math.hypot(*axis) * math.hypot(*face.axis)
+    return math.hypot(*_cross(axis, face.axis)) / norm if norm else 1.0
 
 
 async def gear_mate(
@@ -103,10 +154,170 @@ def gear_mates_batch(
 
 
 async def cam_follower_mate(
-    adapter: Any, cam_ref: Any, follower_ref: Any, *, label: str = "cam_follower"
-) -> Any:
-    """Cam-follower mate; the adapter applies the cam selection mark (8)."""
-    return await _mate(adapter, label, "cam_follower", [cam_ref, follower_ref])
+    adapter: Any,
+    cam: CylinderFace,
+    follower: CylinderFace,
+    *,
+    label: str = "cam_follower",
+) -> dict[str, Any]:
+    """Persist a cam-follower mate between two cylindrical faces, then prove it.
+
+    Each face is the component part's only solid-body cylinder of its radius,
+    mapped into the assembly with ``IComponent2.GetCorrespondingEntity`` --
+    never a view-dependent point pick.  They are selected in order under the
+    ICamFollowerMateFeatureData marks (cam 1, follower 8) and built by the
+    adapter's ``CreateMateData(swMateCAMFOLLOWER)`` -> ``EntitiesToMate`` ->
+    ``CreateMate`` path, then rebuilt and rejected on a hard feature error, as
+    ``_mate`` does.  The persisted mate is read back: a cam-follower mate whose
+    two FACE entities sit one on each component, on its modelled cylinder.
+    """
+    from solidworks_mcp.adapters.base import AddMateParameters, MateEntityRef
+    from solidworks_mcp.adapters.solidworks import assembly as _sw_asm
+
+    if cam.component == follower.component:
+        raise ValueError(f"{label}: cam and follower are both on {cam.component!r}")
+    params = AddMateParameters(
+        mate_type="cam_follower",
+        entities=[
+            MateEntityRef(entity_type="FACE", component=face.component, mark=mark)
+            for face, mark in ((cam, _CAM_MARK), (follower, _FOLLOWER_MARK))
+        ],
+        alignment="closest",
+    )
+    model = _early_bound(adapter.currentModel, "IModelDoc2")
+    async with _telemetry.aspan(label, kind="cam_follower", label=label):
+        faces = [_component_cylinder(adapter, face, label) for face in (cam, follower)]
+        selection = _early_bound(model.SelectionManager, "ISelectionMgr")
+        model.ClearSelection2(True)
+        pairs = zip((cam, follower), faces, params.entities, strict=True)
+        for face, entity, ref in pairs:
+            data = _early_bound(selection.CreateSelectData(), "ISelectData")
+            data.Mark = ref.mark
+            if not bool(_early_bound(entity, "IEntity").Select4(True, data)):
+                raise RuntimeError(f"{label}: cannot select the {face.component} face")
+        selected = int(selection.GetSelectedObjectCount2(-1))
+        if selected != 2:
+            raise RuntimeError(f"{label}: {selected} entities selected, not 2")
+        mate = _sw_asm._create_standard_mate(
+            adapter,
+            _early_bound(model, "IAssemblyDoc"),
+            params,
+            _sw_asm._MATE_TYPES["cam_follower"],
+        )
+        model.ClearSelection2(True)
+        name = _sw_asm._mate_feature_name(adapter, mate)
+        if not bool(model.EditRebuild3()):
+            raise RuntimeError(f"{label}: EditRebuild3 failed after {name!r}")
+        error = _mate_hard_error(adapter, name)
+        if error:
+            raise RuntimeError(f"{label}: {name!r} has hard feature error {error}")
+        _assert_cam_follower_faces(adapter, label, name, cam, follower)
+    return {"name": name, "mate_type": "cam_follower", "alignment": "closest"}
+
+
+def _component_cylinder(adapter: Any, face: CylinderFace, label: str) -> Any:
+    """Assembly-context entity of the only cylinder of ``face.radius_mm``.
+
+    Radius is frame-free, so the part-space walk needs no transform; zero or
+    several matches raise instead of guessing.
+    """
+    from solidworks_mcp.adapters.solidworks import assembly as _sw_asm
+
+    component = _early_bound(
+        _sw_asm._get_component(adapter, face.component), "IComponent2"
+    )
+    if component is None:
+        raise RuntimeError(f"{label}: no component {face.component!r}")
+    part = _early_bound(component.GetModelDoc2(), "IPartDoc")
+    if part is None:
+        raise RuntimeError(f"{label}: {face.component} has no loaded part document")
+    matches = []
+    for body in part.GetBodies2(_SW_SOLID_BODY, False) or ():
+        for candidate in _early_bound(body, "IBody2").GetFaces() or ():
+            surface = _early_bound(
+                _early_bound(candidate, "IFace2").GetSurface(), "ISurface"
+            )
+            if surface is None or not bool(surface.IsCylinder()):
+                continue
+            radius = float(surface.CylinderParams[6]) * 1000.0
+            if abs(radius - face.radius_mm) <= _RADIUS_TOL_MM:
+                matches.append(candidate)
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"{label}: {face.component} has {len(matches)} cylinders of radius "
+            f"{face.radius_mm:g} mm; the mate needs exactly one"
+        )
+    mapped = component.GetCorrespondingEntity(matches[0])
+    if mapped is None:
+        raise RuntimeError(f"{label}: {face.component} face has no assembly entity")
+    return mapped
+
+
+def _assert_cam_follower_faces(
+    adapter: Any, label: str, name: str, cam: CylinderFace, follower: CylinderFace
+) -> None:
+    """Raise unless mate ``name`` binds exactly ``cam`` and ``follower``.
+
+    ``IMateEntity2.EntityParams`` gives a cylinder entity's axis point, axis
+    vector and radius in the assembly frame (metres); each entity is matched
+    to its role by the component it sits on.
+    """
+    if not name:
+        raise RuntimeError(f"{label}: CreateMate returned no mate name")
+    assembly = _early_bound(adapter.currentModel, "IAssemblyDoc")
+    feature = _early_bound(assembly.FeatureByName(name), "IFeature")
+    if feature is None:
+        raise RuntimeError(f"{label}: mate {name!r} is not in the assembly")
+    mate = _early_bound(feature.GetSpecificFeature2(), "IMate2")
+    if mate is None:
+        raise RuntimeError(f"{label}: {name!r} has no IMate2 definition")
+    mate_type = int(mate.Type)
+    if mate_type != _SW_MATE_CAMFOLLOWER:
+        raise RuntimeError(
+            f"{label}: {name!r} is swMateType {mate_type}, not cam-follower"
+        )
+    count = int(mate.GetMateEntityCount())
+    if count != 2:
+        raise RuntimeError(f"{label}: {name!r} has {count} entities, not 2")
+    roles = {cam.component: ("cam", cam), follower.component: ("follower", follower)}
+    for index in range(count):
+        entity = _early_bound(mate.MateEntity(index), "IMateEntity2")
+        if entity is None:
+            raise RuntimeError(f"{label}: {name!r} entity {index} did not resolve")
+        owner = _early_bound(entity.ReferenceComponent, "IComponent2")
+        component = str(owner.Name2) if owner is not None else ""
+        if component not in roles:
+            raise RuntimeError(
+                f"{label}: {name!r} entity {index} is on {component!r}, "
+                f"expected one each of {sorted(roles)}"
+            )
+        role, face = roles.pop(component)
+        kind = int(entity.ReferenceType2)
+        if kind != _SW_SEL_FACES:
+            raise RuntimeError(
+                f"{label}: {role} entity is swSelectType {kind}, not FACE"
+            )
+        params = [float(value) for value in entity.EntityParams]
+        if len(params) < 7:
+            raise RuntimeError(f"{label}: {role} face has no cylinder params {params}")
+        point = [value * 1000.0 for value in params[0:3]]
+        radius = params[6] * 1000.0
+        if abs(radius - face.radius_mm) > _RADIUS_TOL_MM:
+            raise RuntimeError(
+                f"{label}: {role} face radius {radius:.4f} != {face.radius_mm:.4f} mm"
+            )
+        if _axis_sine(params[3:6], face) > _AXIS_SIN_TOL:
+            raise RuntimeError(
+                f"{label}: {role} face axis {params[3:6]} is off {face.axis}"
+            )
+        offset = _axis_distance(point, face)
+        if offset > _MATE_TOL_MM:
+            raise RuntimeError(
+                f"{label}: {role} face axis sits {offset:.3f} mm off its model"
+            )
+    _telemetry.success(
+        f"{label}: {name} binds {cam.component} cam OD to {follower.component} follower"
+    )
 
 
 async def rack_pinion_mate(

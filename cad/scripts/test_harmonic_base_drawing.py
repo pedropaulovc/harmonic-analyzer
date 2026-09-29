@@ -350,13 +350,16 @@ def test_v2_structural_holes_follow_the_same_installation_delta() -> None:
     # Ruling (c) (user, 2026-09-24): the block and spring-foot z stations come
     # from pinion_rig_layout -- the back block keeps its released seat, the
     # front block stands one feeler off the front strap, the spring rides with
-    # the back strap.  The spring foot's seat is 20.0 east of the pivot bore
-    # (the 2026-09-24 re-derive: outboard of the back strap, not west of it).
+    # the back strap.  The spring foot's seat follows the authoritative
+    # east-of-pivot spring screw dimension, not the former 20.0-mm value.
     import pinion_rig_layout as rig
+    from pinion_spring_section import SCREW_EAST_OF_PIVOT
 
     former_block_x = (-17.226441649810653, -0.22644164981065273)
     former_pivot_x = former_block_x[0] + 8.5
-    former_feet = ((former_pivot_x - 20.0, rig.SPRING_PAD_Z - MECHANISM_Z_SHIFT),)
+    former_feet = (
+        (former_pivot_x - SCREW_EAST_OF_PIVOT, rig.SPRING_PAD_Z - MECHANISM_Z_SHIFT),
+    )
     assert part.BLOCK_SCREW_XZ == tuple(
         (x + MECHANISM_X_SHIFT, z) for z in rig.BLOCK_SEAT_Z for x in former_block_x
     )

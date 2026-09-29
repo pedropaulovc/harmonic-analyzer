@@ -6,8 +6,8 @@ not become assembly recipe changes.
 Re-derived 2026-09-24 (swing, handoff dt-pinion-spring-rederive-20260924): the
 previous foot ran 35 mm WEST under the strap and the lift rod, from a mis-read
 of ch25 img01 (its image-left is the DRUM side, east).  The screw sits EAST of
-the back strap, outboard, and the blade rises from it leaning IN toward the
-strap, bearing on the east flank about 5 below the arbor (img04).
+the back strap, outboard.  The blade rises from it toward the east flank, with
+its crest now 3.2 below the arbor; img04's ~5-below estimate was not a datum.
 
 Part-local frame: +x is machine EAST (the assembly places the part with a
 Ry(180)), +y is up, y 0 is the base top.  The sketch path is the INSIDE
@@ -22,6 +22,7 @@ import itertools
 import math
 
 from _hole_spec import HoleSpec, blind_cut_dia_mm
+from pinion_rig_park_geometry import STRAP_LEAN_DEG
 from pinion_spring_section import (
     PAD_WIDTH,
     PAD_WIDTH_PLACES as PAD_WIDTH_PLACES,
@@ -31,8 +32,8 @@ from pinion_spring_section import (
     WIDTH_PLACES as WIDTH_PLACES,
 )
 
-# The strap the blade bears on (the drive train asserts both in lockstep).
-STRAP_LEAN_DEG = 8.138574451932667  # parked lean, top east
+# The manufactured leaf references the actual cam-contact rest strap, not the
+# obsolete level-centre construction (which left air beneath the follower).
 STRAP_HALF_WIDTH = 7.5
 
 # The part owns a convenient local frame; the assembly translates this local
@@ -51,23 +52,24 @@ PIVOT_LY = 12.0
 MIN_INSIDE_BEND_R = 0.13 * 25.4  # 3.302
 R_BEND = MIN_INSIDE_BEND_R
 R_KINK = MIN_INSIDE_BEND_R  # the crest
-KINK_DEG = 25.0  # the flick turns back EAST above the crest
+KINK_DEG = 28.0  # all formed corners retain at least 3 deg on the crest arc
 FLAT_LEN = 2.0
 FOOT_Y = THICK  # the foot's top face (the path); its underside is the base top
 
-# Contact (img04): the crest bears on the straight east flank 23.0 up the strap
-# from the pivot, 5.0 below the arbor.  The model's parked pose keeps 0.15 of
-# air there (no exact tangency: the cam's PR5 lesson); physically the crest is
-# on the flank, pressed by the preset below.
-CONTACT_T = 23.0
+# Contact (img04): the crest bears on the straight east flank near the arbor.
+# The photo's ~5 mm below the arbor was an approximate scale reading, not a
+# fixed seat: at the revised cam-contact rest, moving the bearing station
+# 1.8 mm upward gives formed-corner preload and stress reserve while leaving
+# >0.25 mm spare to the arbor end cap at the farthest formed contact.
+# The parked pose retains 0.15 air; the preset presses the free crest into it.
+CONTACT_T = 24.8
 PARKED_AIR = 0.15
 
 # Screw-down pad: #4 clearance, webs >= 2.0 at the printed .XX worst case
-# (test_pinion_spring_drawing), which takes the 9.5 square.  O5 (Main,
-# 2026-09-24, option c): the screw stands 20.0 east of the pivot axis -- 12.5
-# east of the flank.  FOOT_FLAT is the straight between the pad and the bend:
-# ruling 4 sets it to zero (the bend starts at the pad's edge) so the R3.3
-# bend keeps the blade at 9.2 deg to the flank, inside O5's 9-13 deg band.
+# (test_pinion_spring_drawing), which takes the 9.5 square.  The screw is
+# 20.7 east of the pivot axis, 13.2 east of the flank.  The bend starts at
+# the pad's edge (FOOT_FLAT=0), leaving the blade 9.77 deg to the parked
+# flank, within the 9-13 deg photo band.
 HOLE_SPEC = HoleSpec("clearance", "#4")
 HOLE_DIA = blind_cut_dia_mm(HOLE_SPEC)
 PAD_LEN = 9.5
@@ -100,7 +102,7 @@ FORMED_BAND_MM = 0.5
 # scaling from tensile applies (ruling 1's rule was for tensile-only minima).
 # The optional CH 900 age (482 C, 1 h) raises it and is NOT counted.
 YIELD_MPA = 1205.0
-PRESET_DEG = 5.4
+PRESET_DEG = 5.4  # balances the 32-corner preload and engaged-yield reserves
 
 _LAM = math.radians(STRAP_LEAN_DEG)
 STRAP_U = (math.sin(_LAM), math.cos(_LAM))  # up the strap axis
@@ -218,6 +220,22 @@ FREE_KINK_V = FREE_KINK_START[1] - FOOT_END[1]
 FORMED_CONTACT_BANDS = ("FootLen", "BendR", "FreeKinkH", "FreeKinkV", "KinkR")
 
 
+def _formed_root_and_tangent(
+    deviations: dict[str, float] | None,
+) -> tuple[tuple[float, float], tuple[float, float], float, float]:
+    """Root centre, free kink tangent, root radius and free blade angle."""
+    dev = deviations or {}
+    r_bend = R_BEND + dev.get("BendR", 0.0)
+    bend_c = (FOOT_END[0] - FOOT_LEN - dev.get("FootLen", 0.0), FOOT_Y + r_bend)
+    kink_start = (
+        FOOT_END[0] - FREE_KINK_H - dev.get("FreeKinkH", 0.0),
+        FOOT_END[1] + FREE_KINK_V + dev.get("FreeKinkV", 0.0),
+    )
+    dx, dy = bend_c[0] - kink_start[0], bend_c[1] - kink_start[1]
+    lean = math.atan2(dy, dx) + math.acos(r_bend / math.hypot(dx, dy))
+    return bend_c, kink_start, r_bend, lean
+
+
 def formed_contact(
     deviations: dict[str, float] | None = None, thick: float = THICK
 ) -> tuple[float, float, float]:
@@ -231,17 +249,8 @@ def formed_contact(
     arm runs from the bend exit to the contact along the blade, and station
     is the contact's distance up the strap from the pivot.
     """
-    dev = {name: 0.0 for name in FORMED_CONTACT_BANDS}
-    dev.update(deviations or {})
-    r_bend = R_BEND + dev["BendR"]
-    r_kink = R_KINK + dev["KinkR"]
-    bend_c = (FOOT_END[0] - (FOOT_LEN + dev["FootLen"]), FOOT_Y + r_bend)
-    kink_start = (
-        FOOT_END[0] - (FREE_KINK_H + dev["FreeKinkH"]),
-        FOOT_END[1] + FREE_KINK_V + dev["FreeKinkV"],
-    )
-    dx, dy = bend_c[0] - kink_start[0], bend_c[1] - kink_start[1]
-    lean = math.atan2(dy, dx) + math.acos(r_bend / math.hypot(dx, dy))
+    bend_c, kink_start, r_bend, lean = _formed_root_and_tangent(deviations)
+    r_kink = R_KINK + (deviations or {}).get("KinkR", 0.0)
     up = (-math.sin(lean), math.cos(lean))
     west = (-math.cos(lean), -math.sin(lean))
     bend_exit = _add(bend_c, west, r_bend)
@@ -253,6 +262,20 @@ def formed_contact(
     arm = (contact[0] - bend_exit[0]) * up[0] + (contact[1] - bend_exit[1]) * up[1]
     station = (contact[0] - _PIVOT[0]) * STRAP_U[0] + (contact[1] - _PIVOT[1]) * STRAP_U[1]
     return penetration, arm, station
+
+
+def formed_contact_arc_sweep(
+    deviations: dict[str, float], swing_deg: float
+) -> float:
+    """Contact-normal rotation from the formed blade's crest entry, degrees.
+
+    Zero is the blade-side tangent; negative values advance over the crest.
+    Installed machine swing is reversed by the spring's Ry(180) placement.
+    """
+    _, _, _, lean = _formed_root_and_tangent(deviations)
+    west_angle = math.atan2(-math.sin(lean), -math.cos(lean))
+    contact_angle = _CONTACT_ANGLE - math.radians(swing_deg)
+    return math.degrees((contact_angle - west_angle + math.pi) % (2.0 * math.pi) - math.pi)
 
 
 FORMED_CORNERS = tuple(

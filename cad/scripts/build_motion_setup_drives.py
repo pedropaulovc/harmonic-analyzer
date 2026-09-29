@@ -1,33 +1,15 @@
-r"""Setup-DOF articulation drives (plan step 5, the p0/p1/p2 motion studies).
+r"""Setup-motion demonstrations for cone swing, cam-driven pinion and p0.
 
-The crank is the device's ONE operating DOF and the full-device study
-(``build_motion_study.py``) drives it. The other three freedoms the refactor
-opened are quasi-static SETUP DOFs -- the operator poses them by hand before a
-run, then they hold:
+The crank is the operating input. The cone swing (p1) and each channel's
+amplitude adjustment (p0) remain independent setup freedoms. Pinion engage
+(p2) is NOT an additional DOF: the cam-follower mate couples the strap swing
+to the free lift-rod/cam spin. A clockwise motor on the lift rod drives the
+strap into mesh; a second strap motor would fight the active contact mate.
 
-    p1  cone disengage  -- the cone set swings horizontally out of mesh about
-                           the cone-swing-platform's tip-end vertical pivot
-                           (ch.12, p.18; post/shaft/gears/tip block ride the plate).
-    p2  pinion engage   -- the strap+alignment-pinion group swings on the torque
-                           shaft to mesh the cylinder train (ch.25, p.66).
-    p0  amplitude adjust -- each amplitude bar swings about its top pin; the swing
-                           is the channel's amplitude coefficient (ch.17).
-
-Each is proven the same way the crank is: a short Basic Motion sweep on the
-STANDALONE subassembly that carries the DOF (drive-train for p1/p2, channel for
-p0 -- far lighter than the flexible full device). The joint's drive spec is
-recorded into the DOF manifest, never authored, so the joint is already free --
-no suppression needed -- and a rotary motor drives the swing axis directly. The
-sampled pose of the driven member must advance with the motor
-(``assert_motion_progressed``); a frozen member would mean the "DOF" is actually
-still pinned. The sub is NEVER saved (the on-disk rest pose stays bit-exact);
-each drive exports a short mp4.
-
-Why the standalone sub and not the full device: each freed DOF is a TOP-LEVEL
-joint of the standalone sub, so its swing axis is a depth-1 component ref with
-no flexible-sub indirection. The full-device study already covers the crank;
-layering three more heavy flexible solves onto it buys nothing the sub-level
-sweep does not prove.
+Each standalone subassembly is exercised in a transient Basic Motion study.
+The saved model keeps the appropriate driver free, so there is no permanent
+driver mate to suppress. The driven member must visibly move; the document is
+discarded unsaved after the study.
 
 Run (SolidWorks already open)::
 
@@ -56,13 +38,11 @@ from build_motion_study import (
 
 import _telemetry
 
-# A setup DOF is posed by hand and then held, so the demonstration sweep is
-# short and gentle: 3 RPM for 2 s -> ~36 deg of swing, enough to read the arc
-# without spinning the member through a full turn (these joints have no hard
-# stop in the kinematic model, so a fast/long motor would just keep rotating).
+# p1/p0: a gentle 3 RPM for 2 s; p2's cam input turns clockwise 60°
+# (5 RPM) so its follower has a visible but physically bounded swing.
 SWING_RPM = 3.0
 SWING_DURATION = 2.0
-SWING_MIN_DEG = 5.0  # the driven member must advance at least this far to pass
+SWING_MIN_DEG = 5.0
 
 
 def _gear_mate_names(mates: list[dict[str, Any]]) -> list[str]:
@@ -126,8 +106,7 @@ def _assert_dof_already_free(names: list[str], label: str) -> None:
     Every freed DOF's drive spec is recorded into the DOF manifest, never
     authored (AGENTS.md "Default-free DOF") -- the family is already free.
     A non-empty ``names`` means a driver got authored unexpectedly; fail loud
-    rather than silently suppressing it away (the p0 bug, repeated for p2's
-    pinion swing when PR8 deferred it -- Codex catch, 2026-07-05).
+    rather than silently suppressing it away (Codex catch, 2026-07-05).
     """
     if names:
         raise RuntimeError(
@@ -137,10 +116,12 @@ def _assert_dof_already_free(names: list[str], label: str) -> None:
         "(recorded in the DOF manifest, not authored)")
 
 
-async def _run_swing_study(adapter: Any, motor_axis, driven_needle: str,
-                           label: str, video_tag: str) -> dict[str, str]:
-    """Add a rotary motor on ``motor_axis``, solve a short sweep, prove the
-    driven member articulates, export an mp4. Never saves the doc."""
+async def _run_swing_study(
+    adapter: Any, motor_axis, driven_needle: str, label: str, video_tag: str,
+    *, rpm: float = SWING_RPM, reverse: bool = False,
+    min_span_deg: float = SWING_MIN_DEG,
+) -> dict[str, str]:
+    """Motor one free input; prove the coupled member moves, never save."""
     from solidworks_mcp.adapters.base import (
         MotionExportParameters,
         MotionMotorParameters,
@@ -154,9 +135,10 @@ async def _run_swing_study(adapter: Any, motor_axis, driven_needle: str,
         MotionStudyParameters(name="", study_type="physical_simulation",
                               duration=SWING_DURATION, activate=True)))
     log(f"  {label}: study {made['name']!r}, motor on "
-        f"{motor_axis.name}@{motor_axis.component} ({SWING_RPM} RPM)")
+        f"{motor_axis.name}@{motor_axis.component} ({rpm} RPM, reverse={reverse})")
     check("add_motor", await adapter.add_motor(MotionMotorParameters(
-        motor_type="rotary", entity=motor_axis, speed=SWING_RPM, study_name="")))
+        motor_type="rotary", entity=motor_axis, speed=rpm,
+        reverse=reverse, study_name="")))
 
     await _reset_to_assembled(adapter)
     log(f"  {label}: Calculate() -- short sub-level swing solve ...")
@@ -183,11 +165,10 @@ async def _run_swing_study(adapter: Any, motor_axis, driven_needle: str,
     # and it covered a real arc (the DOF is genuinely free, not still pinned).
     assert_motion_progressed(samples, SWING_DURATION, label,
                              min_frac=0.75, stall_frac=0.25)
-    if span < SWING_MIN_DEG:
+    if span < min_span_deg:
         raise RuntimeError(
-            f"{label}: driven member swung only {span:.2f} deg (< {SWING_MIN_DEG}) "
-            f"-- the setup DOF is still pinned (drive spec not recorded free?) or the "
-            f"motor did not couple to it")
+            f"{label}: driven member swung only {span:.2f} deg "
+            f"(< {min_span_deg}) -- the motor did not couple to it")
 
     vid = (OUT_PNG.parent / f"{video_tag}.mp4").resolve()
     res = await adapter.export_motion_video(MotionExportParameters(
@@ -224,24 +205,20 @@ async def _drive_p1(adapter: Any) -> dict[str, str]:
 
 
 async def _drive_p2(adapter: Any) -> dict[str, str]:
-    """p2: the strap+pinion rigid group swings on the torque shaft to engage.
-    The swing is already free (the front strap's lone ANGLE drive spec is
-    recorded, never authored -- the group's axial DISTANCE seats stay engaged,
-    exactly the p1 locator pattern), then motor a strap about its pivot bore
-    (Axis1, collinear with the torque shaft); the journaled pinion must ride
-    the arc."""
+    """p2: rotate the lift cam and verify the contact-coupled pinion follows."""
     path = str(OUT_SLDASM / "drive-train.SLDASM")
     check("open drive-train", await adapter.open_model(path))
     _assert_dof_already_free(_family_driver_names(
-        adapter, "drive-train", "pinion-bracket", only_type=ANGLE),
-        "p2 pinion swing")
-    bracket, bracket_name = _find_one(adapter, "pinion-bracket")
-    if bracket is None:
-        raise RuntimeError("p2: pinion-bracket not found")
-    motor_axis = _entity_ref(bracket_name, "Axis1", "AXIS")
+        adapter, "drive-train", "pinion-lift-rod", only_type=ANGLE),
+        "p2 cam input")
+    rod, rod_name = _find_one(adapter, "pinion-lift-rod")
+    if rod is None:
+        raise RuntimeError("p2: pinion-lift-rod not found")
+    motor_axis = _entity_ref(rod_name, "Axis1", "AXIS")
     return await _run_swing_study(
         adapter, motor_axis, "alignment-pinion",
-        "p2 pinion engage", "drive-train-p2-pinion-swing")
+        "p2 cam-driven pinion engage", "drive-train-p2-pinion-swing",
+        rpm=5.0, reverse=True, min_span_deg=1.0)
 
 
 async def _drive_p0(adapter: Any) -> dict[str, str]:

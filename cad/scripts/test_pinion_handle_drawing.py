@@ -105,9 +105,9 @@ def test_integral_cutover_preserves_head_axis_and_crossrod_world_transform() -> 
         0.42261826174069944,
         0.0,
     )
-    # x follows the drum's parked station: U28 (2026-09-23) parks it with a
-    # 2.2425 tip gap to the review-first 32T drum's 8.667 tip radius.
-    expected_axis = (-18.383940352466745, 90.518, -137.18811169145133)
+    # The cam-contact rest swings the drum −0.501586° from U28's level-centre
+    # construction. The saved grip axis follows that drum (2.4853 tip gap).
+    expected_axis = (-18.141139038250056, 90.55163869240812, -137.18811169145133)
     # Rule 12 (audit W6) grew the head 9.0 -> 10.5 and the machinist review of
     # 7f7fc1717 (Main's option 2) to 11.5, each about the released centre, so
     # both faces and the crown move 1.25 out.  The neck shoulder (the released
@@ -147,11 +147,11 @@ def test_integral_cutover_preserves_head_axis_and_crossrod_world_transform() -> 
     for local, expected in (
         (
             (0.0, -32.0, 0.0),
-            (10.617908832706053, 76.99421562429762, -137.18811169145133),
+            (10.860710146922742, 77.02785431670574, -137.18811169145133),
         ),
         (
             (0.0, 33.0, 0.0),
-            (-48.29209732467619, 104.46440263744309, -137.18811169145133),
+            (-48.0492960104595, 104.4980413298512, -137.18811169145133),
         ),
     ):
         released_endpoint = _world_point(released_origin, assembly.HANDLE_ROWS, local)

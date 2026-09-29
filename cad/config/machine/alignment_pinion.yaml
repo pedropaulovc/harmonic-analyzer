@@ -1,7 +1,7 @@
 
 alignment_pinion:                  # ch25 — engages the cylinder-gear set for zeroing
   teeth: 32
-  disengaged_tip_gap_mm: 2.2425    # PINION_GAP; U28 park-out (was 2.0)
+  disengaged_tip_gap_mm: 2.2425    # U28 level-centre block-locate datum, not the saved cam-contact tooth gap
   engaged_center_distance_mm: 38.990010  # 120T tip r31.099960 + drum gap-floor chord r7.890050 (tips seat)
   source: "user correction 2026-09-22 (32 teeth); U28 2026-09-23 (park-out); DIMENSIONS.md ch25 (mechanism)"
   confidence: "high tooth count; low placement"
@@ -11,6 +11,9 @@ alignment_pinion:                  # ch25 — engages the cylinder-gear set for 
     circle, r7.890), so the engage stroke ends where the 120T tips seat on
     that floor: engaged centre distance 38.990010 mm, 0.2425 mm outside the
     38.747491 pitch-circle sum at DP 49.82 (reviewfirst Rule 11). U28 (user,
-    2026-09-23) keeps the roots and parks the drum 0.2425 further out instead
-    (2.2425 mm disengaged tip gap), so the seated stop is reached at the same
-    6.314-degree strap swing and photographed -71.8-degree lever as before.
+    2026-09-23) keeps the roots and locates the fixed block/pivot seats from
+    the level-centre 2.2425 mm construction gap. At saved rest the spring swings
+    the linked straps 0.501586 degrees clockwise onto the eccentric-down cams:
+    the pin-to-cam air is zero, the actual tooth-tip gap is 2.4853 mm (2.50 mm
+    feeler), and the full engage swing is 6.81565 degrees. Cam rotation to the
+    seated stop stays -82.023 degrees; the +10-degree lever ends near -72.023.

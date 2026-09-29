@@ -101,9 +101,11 @@ def test_hole_callout_picks_the_hole_rim_where_the_pad_puts_it() -> None:
 
 def test_screw_stands_outboard_east_of_the_back_strap() -> None:
     # 2026-09-24 re-derive: img01's far-left screw is on the DRUM side (east).
-    # The base's seat is transferred from this hole: it stands 20.0 east of
-    # the pivot bore, the pad and the bend wholly east of the strap flank.
-    assert geometry.HOLE_X - geometry.PIVOT_LX == pytest.approx(20.0)
+    # The base's transferred seat follows the section's screw offset; the
+    # pad and bend remain entirely outboard of the parked strap flank.
+    assert geometry.HOLE_X - geometry.PIVOT_LX == pytest.approx(
+        section.SCREW_EAST_OF_PIVOT
+    )
     flank = geometry.PIVOT_LX + geometry.STRAP_HALF_WIDTH
     assert geometry.FOOT_END[0] > geometry.HOLE_X > geometry.FOOT_TAN[0] > flank
     assert geometry.FOOT_END[0] - geometry.HOLE_X == geometry.HOLE_FROM_END
@@ -111,9 +113,10 @@ def test_screw_stands_outboard_east_of_the_back_strap() -> None:
 
 
 def test_blade_leans_in_to_its_flank_contact() -> None:
-    # img04: the crest bears on the east flank about 5 below the arbor; img01
-    # reads the blade about 11-13 deg to the flank, leaning in from the foot.
-    assert geometry.CONTACT_T == 23.0
+    # img04's roughly 5-below-arbor read was a scaled estimate.  The revised
+    # cam rest needs the crest 3.2 below the arbor for both strength reserves;
+    # img01's blade still leans in from the foot by 9-13 deg.
+    assert geometry.CONTACT_T == 24.8
     assert 9.0 <= geometry.BLADE_TO_FLANK_DEG <= 13.0
     assert geometry.BLADE_LEAN_DEG > 0.0  # west of vertical, toward the strap
     assert geometry.KINK_START[0] < geometry.BEND_EXIT[0]
@@ -441,15 +444,15 @@ def test_part_stamps_make_critical_drawing_properties() -> None:
 
 
 def test_registry_names_the_stock_the_section_models() -> None:
-    # #859 ruling 4: 17-7 PH Condition C, 0.015 in, McMaster-Carr 2325K19
-    # (+/-0.00075 in on the vendor page), sheared 1/4 in wide.  The width is a
-    # sheared, .XX-printed dimension, so its band is the title block's.
+    # The existing 6-in-wide 2325K19 Condition-C roll supplies the 6.50-mm
+    # sheared blade; its +/-0.00075-in thickness band is unchanged.
     spec = _config.parts("pinion-spring")["material_specification"]
     assert "McMaster-Carr 2325K19" in spec and "ASTM A693" in spec
     assert "Condition C" in spec and "+/-0.00075 in" in spec
+    assert "6 in x 50 in" in spec and "sheared 6.50 mm wide" in spec
     assert section.THICK == pytest.approx(0.015 * 25.4)
     assert section.THICK_BAND == pytest.approx((0.00075 * 25.4, -0.00075 * 25.4))
-    assert section.WIDTH == pytest.approx(0.25 * 25.4)
+    assert section.WIDTH == pytest.approx(6.50)
     assert printed_deviations(section.WIDTH, section.WIDTH_PLACES) == pytest.approx(
         (-_XX_BAND, _XX_BAND), abs=0.005
     )

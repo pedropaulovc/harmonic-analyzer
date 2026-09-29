@@ -16,13 +16,26 @@ from pinion_pivot_block_geometry import BLOCK_EAST
 from rocker_arm_support_spec import SUPPORT_WORLD_X
 
 
-def test_alignment_pinion_mesh_gap_stays_at_the_proven_axis() -> None:
-    assert drive.APINION_Y == drive.Y_DRIVE
+def test_alignment_pinion_setup_gap_and_saved_contact_rest_are_distinct() -> None:
+    import pinion_rig_park_geometry as park
+
+    # U28's level-centre construction locates the fixed block seats; the
+    # SOLIDWORKS assembly saves the clockwise-rested cam contact instead.
     assert math.isclose(
-        drive.APINION_X - drive.X_DRUM,
+        park._LEVEL_APINION[0] - drive.X_DRUM,
         drive.TIP_DRUM120 + drive.TIP_APINION + drive.APINION_GAP,
         abs_tol=1e-9,
     )
+    assert math.isclose(park._LEVEL_APINION[1], drive.Y_DRIVE, abs_tol=1e-9)
+    assert park.REST_SWING_RAD < 0
+    assert drive.APINION_Y > drive.Y_DRIVE
+    assert math.isclose(
+        math.hypot(drive.APINION_X - drive.X_DRUM, drive.APINION_Y - drive.Y_DRIVE)
+        - drive.TIP_DRUM120 - drive.TIP_APINION,
+        park.REST_TIP_GAP,
+        abs_tol=1e-9,
+    )
+    assert 2.4 < park.REST_TIP_GAP < 2.6
     # U28 (user, 2026-09-23; 997f3534): the drum parks 2.0 outside the tip
     # circles PLUS the base-chord seat offset, so the engage swing ends where
     # the 120T tips seat on the gap floor (engaged C2C), not at the pitch sum.
@@ -57,12 +70,19 @@ def test_lever_sweeps_from_photographed_park_to_cam_solved_engagement() -> None:
     assert drive.LEVER_ENGAGED_TILT_DEG < 0.0 < drive.LEVER_TILT_DEG
 
 
-def test_rederived_cam_and_return_leaf_clearances_are_positive() -> None:
-    # The design band the assembly itself asserts (0.10..0.25 of air).  The
-    # derived value moved 0.150 -> 0.153 with the U28 re-lay (997f3534) and
-    # -> 0.161 with U27's line-to-line follower pin, 4.016 -> 4.000 (c9685fa0).
-    assert 0.10 <= drive._PARK_GAP <= 0.25
-    assert math.isclose(drive._PARK_GAP, 0.1606, abs_tol=5e-4)
+def test_saved_cam_contact_and_return_leaf_clearances() -> None:
+    import pinion_rig_park_geometry as park
+
+    # The old level-centre construction has air, but the SAVED geometry has
+    # an actual working cylinder-to-cylinder tangent at both rigid stations.
+    assert 0.10 < park._construction_air(0.0) < 0.25
+    assert abs(drive._REST_CONTACT_GAP) < 1e-9
+    assert park.cam_pin_gap(0.0, 0.0) == pytest.approx(0.0, abs=1e-9)
+    # Rotation from that rest drives an engaging swing rather than letting
+    # the collar overlap a stationary follower.
+    middle = math.radians(drive.CAM_ENGAGE_ROTATION_DEG / 2.0)
+    assert park.cam_pin_gap(middle, 0.0) < -0.25
+    assert park.cam_pin_gap(middle, drive._PHI_ENG) > 0.25
     cam_authority = (drive.FPIN_DIA + drive.CAM_OD) / 2.0 - drive._D_ENG
     assert cam_authority >= 0.25
     assert drive.LIFT_Y - drive._CAM_SWEEP_R - drive.Y_BASE_TOP >= 0.25
@@ -139,10 +159,27 @@ def test_return_spring_preload_and_stress_hold_at_the_stock_corners() -> None:
     assert stations0 == pytest.approx(
         (drive._spr_station[0], drive._spr_station[-1]), abs=1e-12
     )
-    assert drive.SPRING_PRELOAD_RATIO == pytest.approx((1.575, 2.118), abs=5e-4)
-    assert drive.SPRING_STRESS_SF == pytest.approx(1.525, abs=5e-4)
-    assert min(drive.SPRING_PRELOAD_RATIO) >= 1.5
-    assert drive.SPRING_STRESS_SF >= 1.5
+    # The geometry redesign should leave a measurable reserve at *both*
+    # independently walked worst corners, not just clear the 1.5 floors.
+    assert min(drive.SPRING_PRELOAD_RATIO) - drive._PRELOAD_MARGIN > 0.06
+    assert drive.SPRING_STRESS_SF - drive._STRESS_SF > 0.06
+    # The crest must still bear on the straight flank even at the farthest
+    # formed station, with 0.25 mm spare beyond the 1-mm cap keep-out.
+    farthest = max(
+        drive._spring_corner(dev, thick)[2][1]
+        for dev in leaf.FORMED_CORNERS
+        for thick in (drive._SPR_T_LO, drive._SPR_T_HI)
+    )
+    assert drive.STRAP_C2C - 1.0 - farthest > 0.25
+    # The nominal crest arc alone is insufficient: at a hand-formed corner
+    # the blade's tangent rotates independently of its bearing station.
+    sweeps = [
+        leaf.formed_contact_arc_sweep(dev, math.degrees(phi))
+        for dev in leaf.FORMED_CORNERS
+        for phi in (0.0, drive._PHI_ENG)
+    ]
+    assert min(sweeps) > -leaf.KINK_DEG + 3.0
+    assert max(sweeps) < 0.0
     # Positive control: the one-band gate this replaced read higher on both.
     for deflection, station, moment, walked in zip(
         drive.SPRING_DEFLECTION,
@@ -336,18 +373,16 @@ def test_mha135_is_shown_trimmed_flush_in_its_installed_configuration() -> None:
     assert "apply_grouped_bom_properties(" in source
 
 
-def test_rod_phase_leaves_the_cams_parked_ecc_down() -> None:
-    # The rod carries LEVER_TILT_DEG of phase; the cams must not: their world
-    # rows stay the identity the park-gap and engage solves assume, tied back
-    # to the rod by the same angle, and the freed spin's rest dihedral moves
-    # by exactly that phase.
+def test_rod_phase_leaves_the_cams_ecc_down_at_tangent_rest() -> None:
+    # The rod carries LEVER_TILT_DEG of phase; the cams stay at identity to
+    # keep the calculated rest tangency and the photographed lever angle.
     identity = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
     assert drive.PINION_CAM_ROWS == identity
     assert math.isclose(drive.CAM_ROD_PHASE_DEG, drive.LEVER_TILT_DEG, abs_tol=1e-9)
     assert math.isclose(
         drive.LIFT_ROD_PARK_DEG, 90.0 + drive.LEVER_TILT_DEG, abs_tol=1e-9
     )
-    assert math.isclose(drive._PARK_GAP, 0.1606, abs_tol=5e-4)
+    assert abs(drive._REST_CONTACT_GAP) < 1e-9
 
 
 # Ruling (c) worst-case stack (user, 2026-09-24), under option E-a (Main,
@@ -1277,9 +1312,11 @@ def test_spring_pad_east_west_placement_fits_the_preload_and_stress_window() -> 
         )
         west_room.append(deflection[1] * (sf / 1.5 - 1.0) / cos_lean)
     window = min(min(east_room), min(west_room))
-    assert window == pytest.approx(0.092, abs=0.002)  # #1037's number
-    # The best named-datum stop #1037 found: a gage leaf on edge against the
-    # back block's east end, the pad screwed through its clearance hole.
+    # Keep this strict xfail until an actual pad x locator's full placement
+    # stack fits the redesigned leaf's window; greater nominal reserve alone
+    # does not prove a manufacturable east-west locating operation.
+    # Best explored datum: a gage leaf on edge against the back block's east
+    # end, with the pad screwed through its clearance hole.
     placement = {
         "gage leaf set error": RIG.FEELER_SET_ERROR,
         "MHA-061 east end from its pivot bore, .X": printed_deviations(

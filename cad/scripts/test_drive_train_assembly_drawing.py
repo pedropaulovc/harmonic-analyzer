@@ -342,11 +342,14 @@ def test_the_tip_gap_feeler_is_the_rest_gap_in_gage_leaves() -> None:
     the STARRETT 66MA leaves the fit-up uses; nothing on it is typed."""
     import pinion_rig_fitup as fitup
     import pinion_rig_layout as rig
+    import pinion_rig_park_geometry as park
     import pinion_rig_tip_gap as tip_gap
 
-    # The model parks the pins a design air above the cams; the spring takes
-    # it up on the bench, so the rest gap is wider than the model's.
-    assert tip_gap.REST_TIP_GAP > tip_gap.MODEL_TIP_GAP
+    # The model itself now saves the physical pins-on-cams rest; the former
+    # level-centre 2.2425 mm gap is a block-locate construction, not model air.
+    assert tip_gap.REST_TIP_GAP == pytest.approx(park.REST_TIP_GAP, abs=1e-9)
+    assert tip_gap.SETUP_TIP_GAP == pytest.approx(park.APINION_GAP, abs=1e-9)
+    assert tip_gap.REST_TIP_GAP > tip_gap.SETUP_TIP_GAP
     assert abs(tip_gap.TIP_GAP_FEELER - tip_gap.REST_TIP_GAP) <= rig.FEELER_LEAF_STEP / 2.0
     assert set(tip_gap.TIP_GAP_LEAVES) <= set(fitup.FEELER_GAGE_LEAVES_MM)
     assert math.isclose(sum(tip_gap.TIP_GAP_LEAVES), tip_gap.TIP_GAP_FEELER, abs_tol=1e-9)
