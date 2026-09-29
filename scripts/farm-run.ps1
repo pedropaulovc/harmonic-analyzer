@@ -942,6 +942,19 @@ function Get-RunProcessTree {
             $queue.Enqueue($child)
         }
     }
+    # Every live member of the run's job, however much of the parent chain
+    # between it and the launcher is gone (a build whose uv died). A member is
+    # the run's by construction, so no command-line or creation-time check. A
+    # record from before run jobs has none; the scan above still covers it.
+    if ($Record['job']) {
+        $members = [System.Collections.Generic.HashSet[int]]::new([int[]][FarmRunJob]::Members($Record['job']))
+        foreach ($process in $all) {
+            $processId = [int]$process.ProcessId
+            if ($members.Contains($processId) -and $seen.Add($processId)) {
+                $found.Add($process)
+            }
+        }
+    }
     return @($found)
 }
 
@@ -1063,6 +1076,104 @@ function Invoke-RunList {
 # Bounds the fixed-point stop below: each round only meets processes started
 # since the previous scan, so a run still spawning after this many is an error.
 $script:StopRounds = 10
+# How long a stopped process gets to exit before -Cancel counts it as wedged.
+$script:StopWaitSeconds = 60
+
+# The launcher's run job (`job` in the run record): a named Windows job object
+# the launcher joins before it starts anything. Membership is inherited by
+# every descendant and survives the death of any ancestor, so it names the
+# run's processes where the parent chain cannot: the launcher gone, then the
+# uv between it and the build. No kill-on-close: the job outlives the launcher
+# while a member runs, which is what lets -Cancel find the rest.
+# Its NAME, though, lives only while a handle is open: the launcher's handle
+# is inheritable, so uv, the venv python and the build each hold one. A
+# Python subprocess of the build does not (subprocess passes only its std
+# handles); it stays a member, and is found while the build still runs.
+Add-Type -TypeDefinition @'
+using System;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+
+public static class FarmRunJob {
+    const uint JobQuery = 0x0004;
+    const int ErrorFileNotFound = 2;
+    const int ErrorMoreData = 234;
+    const int BasicProcessIdList = 3;
+
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    static extern IntPtr CreateJobObjectW(IntPtr attributes, string name);
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    static extern IntPtr OpenJobObjectW(uint access, bool inherit, string name);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    static extern bool AssignProcessToJobObject(IntPtr job, IntPtr process);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    static extern bool QueryInformationJobObject(IntPtr job, int infoClass, IntPtr info, int length, IntPtr returned);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    static extern bool CloseHandle(IntPtr handle);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    static extern bool SetHandleInformation(IntPtr handle, uint mask, uint flags);
+    [DllImport("kernel32.dll")]
+    static extern IntPtr GetCurrentProcess();
+
+    // Creates the job and puts this process in it. The handle is never
+    // closed, and every child started with inheritance holds a copy.
+    public static IntPtr Join(string name) {
+        const uint HandleFlagInherit = 0x1;
+        IntPtr job = CreateJobObjectW(IntPtr.Zero, name);
+        if (job == IntPtr.Zero) {
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "CreateJobObject " + name);
+        }
+        if (!SetHandleInformation(job, HandleFlagInherit, HandleFlagInherit)) {
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "SetHandleInformation " + name);
+        }
+        if (!AssignProcessToJobObject(job, GetCurrentProcess())) {
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "AssignProcessToJobObject " + name);
+        }
+        return job;
+    }
+
+    // The job's live members; empty once its name is gone, which it is when
+    // no process holds a handle to it (see above).
+    public static int[] Members(string name) {
+        IntPtr job = OpenJobObjectW(JobQuery, false, name);
+        if (job == IntPtr.Zero) {
+            int error = Marshal.GetLastWin32Error();
+            if (error == ErrorFileNotFound) {
+                return new int[0];
+            }
+            throw new Win32Exception(error, "OpenJobObject " + name);
+        }
+        try {
+            for (int capacity = 256; ; capacity *= 4) {
+                // JOBOBJECT_BASIC_PROCESS_ID_LIST: two DWORD counts, then ULONG_PTR ids.
+                int size = 8 + capacity * IntPtr.Size;
+                IntPtr buffer = Marshal.AllocHGlobal(size);
+                try {
+                    if (!QueryInformationJobObject(job, BasicProcessIdList, buffer, size, IntPtr.Zero)) {
+                        int error = Marshal.GetLastWin32Error();
+                        if (error == ErrorMoreData) {
+                            continue;
+                        }
+                        throw new Win32Exception(error, "QueryInformationJobObject " + name);
+                    }
+                    int listed = Marshal.ReadInt32(buffer, 4);
+                    int[] ids = new int[listed];
+                    for (int i = 0; i < listed; i++) {
+                        ids[i] = (int)Marshal.ReadIntPtr(buffer, 8 + i * IntPtr.Size).ToInt64();
+                    }
+                    return ids;
+                }
+                finally {
+                    Marshal.FreeHGlobal(buffer);
+                }
+            }
+        }
+        finally {
+            CloseHandle(job);
+        }
+    }
+}
+'@
 
 function Stop-RunProcesses {
     param(
@@ -1107,7 +1218,22 @@ function Stop-RunProcesses {
             }
         }
         if ($stopping.Count -gt 0) {
-            Wait-Process -Id $stopping -Timeout 60 -ErrorAction SilentlyContinue
+            # A timeout here is reported, not thrown; the check below is what
+            # tells a wedged process from a stopped one.
+            Wait-Process -Id $stopping -Timeout $script:StopWaitSeconds -ErrorAction SilentlyContinue
+        }
+        foreach ($processId in $stopping) {
+            $survivor = Get-Process -Id $processId -ErrorAction SilentlyContinue
+            if ($null -eq $survivor) {
+                continue
+            }
+            # Same PID, same process: a PID reused since the stop is gone.
+            $drift = ($survivor.StartTime.ToUniversalTime() - $stopped[$processId]['created']).Duration()
+            if ($drift.TotalSeconds -ge 1) {
+                continue
+            }
+            # It may still dispatch: no .done, snapshot kept, retry -Cancel.
+            $Errors.Add("process $processId was still running $($script:StopWaitSeconds) s after it was stopped")
         }
         # No process of this round can start a child after this instant.
         $exited = [System.DateTime]::UtcNow
@@ -1587,6 +1713,7 @@ try {
         outputs = $outputsPath
         environment = $environmentPath
         requests = [System.IO.Path]::GetFullPath($requestsPath)
+        job = "Local\harmonic-farm-run-$runId"
     }
     Write-JsonAtomic -Path $recordPath -Value $runRecord
     $startupRecordWritten = $true
@@ -1614,6 +1741,11 @@ $launchOverhead = $null
 $environmentReused = $null
 try {
     Write-Output "farm-launch started $runId $([System.IO.Path]::GetFullPath($recordPath))"
+    # Before any child: every process this run starts, and every process those
+    # start, belongs to the job whatever dies in between, so -Cancel finds a
+    # build whose uv died with the launcher. The handle lives as long as this
+    # process; the job outlives it while any member runs.
+    [void][FarmRunJob]::Join($runRecord['job'])
     $env:SOLIDWORKS_POOL_HOME = $resolvedPoolHome
     $env:HARMONIC_REMOTE_CACHE_MODE = 'rw'
     $env:PYTHONUNBUFFERED = '1'

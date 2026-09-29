@@ -196,6 +196,9 @@ def record(**late):
         json.dumps(
             {
                 "pid": os.getpid(),
+                # The venv python.exe that started this interpreter; its
+                # parent is the uv.cmd shim's cmd.exe.
+                "ppid": os.getppid(),
                 "argv": sys.argv[1:],
                 "cwd": str(cwd),
                 "head": subprocess.run(
@@ -1633,6 +1636,75 @@ def _dead_parent_pid(child: int) -> int:
     parent = int(listed.stdout)
     assert not _process_alive(parent)
     return parent
+
+
+def test_cancel_finds_a_build_whose_launcher_and_uv_both_died(
+    tmp_path: Path,
+) -> None:
+    """Codex on #1125 (b8a08b2b9): `uv run` does not take its python with it
+    (checked: killing uv leaves both python.exe processes running), so once the
+    launcher and then uv are gone, no scan from the launcher reaches the build,
+    which keeps dispatching. The run's job still holds it."""
+    fixture = _launcher_fixture(tmp_path)
+    Path(fixture["farm_state"]).write_text(
+        json.dumps(
+            {LEAF_PEN: {"status": "RUNNING"}, LEAF_CONE: {"status": "COMPLETED"}}
+        ),
+        encoding="utf-8",
+    )
+    process, release, running = _start_held(tmp_path, fixture, DISPATCH_LINES, "chain")
+    build = int(_record(Path(fixture["invocation"]))["pid"])
+    # launcher -> uv.cmd's cmd.exe -> venv python.exe -> build. The venv
+    # launcher takes its child down with it; cmd.exe, like uv.exe, does not.
+    shim = int(
+        subprocess.run(
+            [
+                "pwsh",
+                "-NoProfile",
+                "-Command",
+                "(Get-CimInstance Win32_Process -Filter "
+                f"'ProcessId={_record(Path(fixture['invocation']))['ppid']}').ParentProcessId",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+    )
+    try:
+        process.kill()
+        process.wait(timeout=HANG_GUARD_S)
+        process.stdout.close()
+        process.stderr.close()
+        # The uv between them dies too (os.kill is TerminateProcess here).
+        os.kill(shim, 9)
+        deadline = time.monotonic() + 10
+        while _process_alive(shim) and time.monotonic() < deadline:
+            time.sleep(0.05)
+        assert not _process_alive(shim)
+        assert _process_alive(build)
+
+        status = _run_launcher(
+            fixture,
+            _tracking(fixture, "-Status", "-RunId", running["run_id"]),
+            fixture["environment"],
+        )
+        cancel = _run_launcher(
+            fixture,
+            _tracking(fixture, "-Cancel", "-RunId", running["run_id"], "-Why", "chain"),
+            fixture["environment"],
+        )
+        survived = _process_alive(build)
+    finally:
+        release.touch()
+
+    assert status.returncode == 0, status.stderr
+    assert build in json.loads(status.stdout)["launcher"]["orphaned_processes"]
+    assert cancel.returncode == 0, (cancel.stdout, cancel.stderr)
+    assert not survived, "the build outlived -Cancel"
+    done = _record(Path(running["done"]))
+    assert {w["workflow_id"]: w["outcome"] for w in done["cancel"]["workflows"]} == {
+        LEAF_PEN: "cancelled"
+    }
 
 
 def test_a_dead_launcher_is_reported_and_its_orphaned_leaves_cancelled(

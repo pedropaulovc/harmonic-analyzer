@@ -251,13 +251,21 @@ no `.done`.
 - **`-List`** prints one JSON line per run, newest first, filtered by `-Tag`,
   `-State` and `-MaxAgeHours`.
 - **`-Cancel -Why <reason>`** stops the launcher and every process it started,
-  including a build a dead launcher left behind (a process under a dead
+  including a build a dead launcher left behind. The launcher joins a named
+  Windows job object (`job` in the run record) before it starts anything, so
+  every descendant is a member whichever of its ancestors died: `uv run` does
+  not take its python with it, and a build whose launcher and uv are both gone
+  has no parent chain back to the run. The job's name lives while a process
+  holds a handle to it; the launcher's handle is inheritable, so uv, the venv
+  python and the build each hold one. A record from a launcher that predates
+  run jobs falls back to the parent chain (a process under a dead
   launcher's PID counts only if its command line names the run: the recorded
   build command, the run's snapshot — git worktree add/remove, submodule
-  update, uv sync — or its private uv staging environment),
-  rescanning until a scan finds no process started since the last (at most
-  10 rounds, else an error). It then cancels each of `unsettled_workflows`
-  that `farm.py status` reports `RUNNING`,
+  update, uv sync — or its private uv staging environment).
+  It rescans until a scan finds no process started since the last (at most
+  10 rounds, else an error), and a stopped process still running 60 s later is
+  an error too, since it may still be dispatching. It then cancels each of
+  `unsettled_workflows` that `farm.py status` reports `RUNNING`,
   with the reason and run id on the cancellation. Workflows are shared by ID
   (`USE_EXISTING`), so two leaves are kept. One is a leaf a sibling run in the
   same `-LogDirectory` is still waiting on (`kept-shared`; a `launcher-died`
@@ -331,7 +339,8 @@ farm-launch started 20260920T173011482Z-3f7b1c9a2d5e4081b6c3a9f0d4e27516 C:\src\
   "snapshot": "C:\\src\\dt-logs\\farm-runs\\snapshots\\3f7b1c9a2d5e",
   "outputs": "C:\\src\\dt-logs\\farm-runs\\20260920T173011482Z-3f7b1c9a2d5e4081b6c3a9f0d4e27516.out",
   "environment": "C:\\src\\dt-logs\\farm-runs\\envs\\9c41d07a2be35f18",
-  "requests": "C:\\src\\dt-logs\\farm-runs\\20260920T173011482Z-3f7b1c9a2d5e4081b6c3a9f0d4e27516.requests"
+  "requests": "C:\\src\\dt-logs\\farm-runs\\20260920T173011482Z-3f7b1c9a2d5e4081b6c3a9f0d4e27516.requests",
+  "job": "Local\\harmonic-farm-run-20260920T173011482Z-3f7b1c9a2d5e4081b6c3a9f0d4e27516"
 }
 ```
 
