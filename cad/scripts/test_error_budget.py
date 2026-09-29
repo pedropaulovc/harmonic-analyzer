@@ -19,6 +19,7 @@ import math
 import numpy as np
 import pytest
 
+import _config
 import error_budget as eb
 
 NOMINAL_FIELD = {
@@ -81,7 +82,7 @@ def test_every_toleranced_nominal_is_the_cad_constant(budget, nom):
         if feat["nominal"] is None:
             assert key in (
                 "cam_phase", "mesh_lag_spread", "cone_flat_clock",
-                "cone_flat_play", "station_setting",
+                "cone_land_clock", "cone_flat_play", "station_setting",
             ), key
             continue
         assert key in NOMINAL_FIELD, f"{key}: no Nominal field mapped"
@@ -1243,6 +1244,36 @@ def test_cone_flat_phase_follows_gear_ratio_and_land_half_chord(budget):
                 assert residual[index] == pytest.approx(0.0, abs=1e-12)
             else:
                 assert residual[index] > 0.0
+
+
+def test_shaft_flat_clock_is_printed_and_booked_per_land(budget):
+    """MHA-014's four flats share one clock by note, at the title block's
+    angle, and the budget draws that angle once per land: gears on one land
+    turn together, and the Ø9.525 land (the 64T and T030..T120) is the
+    reference its own clock cannot move."""
+    import cone_gear_shaft_spec
+    import cone_shaft_land_bands
+
+    angle = float(_config.title_block("angular")["value_deg"])
+    assert budget["critical_features"]["cone_land_clock"]["tolerance"] == angle
+    assert "ALL FLATS PARALLEL." in cone_gear_shaft_spec.DRAWING_NOTES.splitlines()
+
+    land = eb.draw_groups()["cone_land_clock"]
+    for carried in cone_shaft_land_bands.SECTION_CONE_GEAR_TEETH:
+        columns = {int(land[teeth // 6 - 1]) for teeth in carried}
+        if 120 in carried:
+            assert columns == {-1}
+            continue
+        assert len(columns) <= 1
+    assert sorted(set(land.tolist()) - {-1}) == [0, 1, 2]
+
+    dev = eb.draw_feature(np.random.default_rng(3), "cone_land_clock", angle, 500, 1)
+    assert dev.shape == (500, eb.N_ELEMENTS)
+    assert np.all(dev[:, 4:] == 0.0)  # T030..T120
+    assert np.array_equal(dev[:, 0], dev[:, 1])  # T006, T012: the tip flat
+    assert not np.array_equal(dev[:, 1], dev[:, 2])
+    assert not np.array_equal(dev[:, 2], dev[:, 3])
+    assert np.max(np.abs(dev)) <= angle
 
 
 def test_flat_phase_propagates_through_physical_readout(nom):

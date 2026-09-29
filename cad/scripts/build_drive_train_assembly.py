@@ -485,9 +485,10 @@ if not math.isclose(
 # study if the slack, band or backlash ever changes.
 _TP64 = 360.0 / 64.0
 DELTA64 = round(ALPHA64 / _TP64) * _TP64 - ALPHA64  # 1.57: 64T tooth lead
-# Exact-solid nine-phase sweep of the restored fixed axis and 6.5 face
-# (2026-09-28): common free seed-offset interval [-2.775957, -0.205645].
-# Its midpoint rounded to 0.01 deg retains over 1.28 deg on either side.
+# Exact-solid nine-phase sweep of the restored fixed axis at the grown 7.2113
+# 64T face and the 9.5 pinion face (2026-09-28,
+# dt-logs/crank-mesh-backlash-72113-95-20260928.jsonl): common free
+# seed-offset interval [-2.789, -0.215]; -1.49 keeps over 1.27 deg each side.
 MESH_WINDOW_CENTRE_DEG = -1.49
 PINION_SEED_DEG = (
     (ALPHA16 + 180.0) - DELTA64 * (64.0 / 16.0) - 22.5 / 2.0

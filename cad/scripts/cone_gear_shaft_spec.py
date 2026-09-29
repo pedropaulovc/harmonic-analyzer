@@ -349,10 +349,16 @@ SURFACE_FINISHES = (
 # The tailstock line is that one process word, by user ruling (U40,
 # 2026-09-23): the Ø1.588 terminal land (L/D 14.5) cannot be turned
 # unsupported, so the support IS the requirement (rule 6's exception), not a
-# method preference.
+# method preference.  The parallel line is the flats' relative clock (codex,
+# fca59e2b): each land's flat turns every gear on it, so the four must share
+# one clock.  No dimension can say it -- the flats stand in four separate
+# sections -- and rule 3 keeps a parallelism frame off a shaft, so the
+# requirement is the note and its tolerance is the title block's angle,
+# which error_budget.yaml books per land as cone_land_clock.
 DRAWING_NOTES = "\n".join(
     (
         "GEAR SEATS AND FLATS MATE MHA-013 AND MHA-021 BORES.",
+        "ALL FLATS PARALLEL.",
         "TURN THE TIP LAND WITH TAILSTOCK SUPPORT.",
     )
 )

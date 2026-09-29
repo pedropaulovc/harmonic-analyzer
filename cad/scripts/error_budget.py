@@ -851,7 +851,9 @@ def phase_profiles() -> dict[str, tuple[np.ndarray, np.ndarray]]:
     The D-flat's AF clearance turns each gear by c / flat half-chord. A
     uniform Ø9.525-land mean lag is proportional to i and therefore only
     shifts the crank index; its per-land departures and per-gear scatter
-    cannot be removed by that index.
+    cannot be removed by that index. A shaft land's flat clocked off the
+    Ø9.525 land's turns every gear on it by the same angle
+    (``cone_land_clock``, drawn per land by ``draw_groups``).
     """
     teeth = 6 * np.arange(1, N_ELEMENTS + 1)
     ratio = teeth / 120.0
@@ -879,11 +881,48 @@ def phase_profiles() -> dict[str, tuple[np.ndarray, np.ndarray]]:
         "cam_phase": (np.full(N_ELEMENTS, deg), np.zeros(N_ELEMENTS)),
         "mesh_lag_spread": (np.full(N_ELEMENTS, deg), np.zeros(N_ELEMENTS)),
         "cone_flat_clock": (ratio * deg, np.zeros(N_ELEMENTS)),
+        "cone_land_clock": (ratio * deg, np.zeros(N_ELEMENTS)),
         "cone_flat_play": (
             ratio / half_chords,
             clearance_mean * ratio * (1.0 / half_chords - 1.0 / reference_chord),
         ),
     }
+
+
+def draw_groups() -> dict[str, np.ndarray]:
+    """Features whose one draw moves several channels together.
+
+    ``group[i]`` is channel i's draw column, -1 a channel the feature never
+    moves. ``cone_land_clock`` is each flatted shaft land's clock off the
+    Ø9.525 land's flat: that land carries T030..T120 and the 64T, so it is
+    the reference, and turning it turns the whole train (a crank-index
+    shift). Every other land turns its own gears together -- T006 and T012
+    share the tip land's single flat.
+    """
+    land = np.full(N_ELEMENTS, -1)
+    column = 0
+    for carried in cone_shaft_land_bands.SECTION_CONE_GEAR_TEETH:
+        if not carried or 120 in carried:
+            continue  # the pivot journal, and the reference land
+        for count in carried:
+            land[count // 6 - 1] = column
+        column += 1
+    return {"cone_land_clock": land}
+
+
+def draw_feature(
+    rng: np.random.Generator, key: str, tolerance: float, draws: int, n_axes: int
+) -> np.ndarray:
+    """One feature's deviations, uniform within +/-``tolerance``: draws x 20,
+    or draws x 20 x axes for a position zone (``feature_axes``). A grouped
+    feature (``draw_groups``) takes one column per group, shared by its
+    channels."""
+    groups = draw_groups().get(key)
+    if groups is not None:
+        columns = rng.uniform(-tolerance, tolerance, size=(draws, int(groups.max()) + 1))
+        return np.where(groups >= 0, columns[:, np.maximum(groups, 0)], 0.0)
+    size = (draws, N_ELEMENTS) if n_axes == 1 else (draws, N_ELEMENTS, n_axes)
+    return rng.uniform(-tolerance, tolerance, size=size)
 
 
 def load_budget(path: Path = BUDGET_YAML) -> dict[str, Any]:
@@ -1054,11 +1093,8 @@ def monte_carlo(
     axes = feature_axes(nom)
 
     def draw(key: str, f: dict[str, Any]) -> np.ndarray:
-        # one column per axis the feature moves: a position zone's radial AND
-        # tangential offsets, each uniform within +/-tol (feature_axes)
         n_axes = len(axes.get(key, ((key, 1.0),)))
-        size = (draws, N_ELEMENTS) if n_axes == 1 else (draws, N_ELEMENTS, n_axes)
-        return rng.uniform(-f["tolerance"], f["tolerance"], size=size)
+        return draw_feature(rng, key, f["tolerance"], draws, n_axes)
 
     all_dev = {
         key: draw(key, f)
@@ -1545,8 +1581,7 @@ def pair_joint_worst(
     dev = {}
     for key, f in feats.items():
         n_axes = len(axes.get(key, ((key, 1.0),)))
-        size = (draws, N_ELEMENTS) if n_axes == 1 else (draws, N_ELEMENTS, n_axes)
-        dev[key] = rng.uniform(-f["tolerance"], f["tolerance"], size=size)
+        dev[key] = draw_feature(rng, key, f["tolerance"], draws, n_axes)
     scatter = _channel_model(
         x,
         nom,

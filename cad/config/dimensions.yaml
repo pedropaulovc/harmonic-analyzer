@@ -568,8 +568,8 @@ sections:
         - 'M6.7: a perpendicular gear''s contact tooth sits r·sin i along-shaft south of its centre, so each centre rides r_j·sin i NORTH of its drum plane. The +55 ± 5 photo blob NO LONGER agrees in x (the smaller cone pulled the big-end inboard to +13.9) — flagged consequence of the 62.2 anchor'
         - low
       - - 64T drive gear
-        - perpendicular on the 3/8" pivot journal at effective shaft station −12.465, centre (x, z) = (−123.389, −64.801), 6.5 mm face; its north face and axial air to T120 are unchanged
-        - p.20 (directly beside the 120T); DP 25.7311 is fixed by the v36 post crank-axis centre distance. The face narrows 8.0 → 6.5 mm from the south, with the MHA-014 thrust collar growing by 1.5 mm to keep the gear's north face fixed. The v36 post's print-worst crank boss clearance is 0.343 mm, above its 0.25 floor; a 6.6-mm face would leave only 0.244 mm. The fixed-centre mesh is required not to bind, with no backlash window.
+        - perpendicular on the 3/8" land at effective shaft station −12.109, centre (x, z) = (−123.312, −64.454), 7.2113 mm face; its south face bears on the MHA-014 thrust collar (unchanged) and its north face touches T120's south face (no axial air)
+        - p.20 (directly beside the 120T); DP 25.7311 is fixed by the v36 post crank-axis centre distance. User ruling 2026-09-28 grows the face 6.5 → 7.2113 mm northward from the unchanged collar face until it meets T120, the first joint of the solid gear stack; its D-bore locates it rotationally. The south face does not move, so the v36 post's print-worst crank boss clearance stays 0.343 mm, above its 0.25 floor. The fixed-centre mesh is required not to bind; the re-measured backlash study keeps ≥ 0.163 mm at the tightest corner.
         - low
       - - Cone gear j (j = 0 big … 19 small)
         - shaft seat station 28.25 + 6.889j; centre x_j = −84.702 − (30.59 − 1.5295j)·cos i, z_j = −31.685 + 7.0565j + (30.59 − 1.5295j)·sin i, y = 90.518; ALL 20 perpendicular to the shaft (true cone, p.18)
