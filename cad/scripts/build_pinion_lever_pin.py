@@ -24,7 +24,6 @@ import math
 import sys
 
 import _config
-import _telemetry
 from _common import (
     POLISHED_STEEL,
     _early_bound,
@@ -57,6 +56,7 @@ from _drawing_marks import (
     set_dimension_bilateral_tolerance,
 )
 from _fit_limits import deviations
+from _configuration_material import require_material_in_every_configuration
 from _grouped_bom_properties import apply_grouped_bom_properties
 from _saved_part_guard import require_saved_drawing_properties
 from pinion_lever_pin_geometry import INSTALLED_CONFIG, INSTALLED_LEN
@@ -231,7 +231,9 @@ async def build(adapter) -> dict[str, str]:
         description=str(grouped_spec["description"]),
     )
     await report_mass_properties(adapter)
-    require_material_in_every_configuration(adapter, (default_config, INSTALLED_CONFIG))
+    require_material_in_every_configuration(
+        adapter, PART_NAME, MATERIAL, (default_config, INSTALLED_CONFIG)
+    )
     apply_drawing_properties(
         adapter,
         PART_NAME,
@@ -250,32 +252,6 @@ async def build(adapter) -> dict[str, str]:
     check("reopen saved pinion-lever-pin", await adapter.open_model(artefacts["part"]))
     assert_saved_configurations_regenerate(adapter, PART_NAME)
     return artefacts
-
-
-def require_material_in_every_configuration(
-    adapter, configurations: tuple[str, ...]
-) -> None:
-    """Read each configuration's material back; raise unless all are MATERIAL.
-
-    ``apply_material`` sets the ACTIVE configuration's material only
-    (``IPartDoc::SetMaterialPropertyName2``), so a configuration split before
-    it could carry no material, and drive-train would take MHA-135's mass
-    from the wrong density.  Every configuration is logged before any
-    raise, so a failing leaf still shows what each one reads.
-    """
-    part = _early_bound(adapter.currentModel, "IPartDoc")
-    readings: dict[str, str] = {}
-    for name in configurations:
-        # Early-bound: the retval, then the [out] database.
-        material, database = part.GetMaterialPropertyName2(name)
-        readings[name] = str(material or "")
-        _telemetry.info(f"material in {name}: {material!r} (database {database!r})")
-    wrong = {name: got for name, got in readings.items() if got != MATERIAL}
-    if wrong:
-        raise RuntimeError(
-            f"{PART_NAME}: configurations {wrong} do not carry {MATERIAL!r}"
-        )
-    _telemetry.success(f"{MATERIAL} in every configuration {list(readings)}")
 
 
 if __name__ == "__main__":

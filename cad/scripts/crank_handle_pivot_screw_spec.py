@@ -3,7 +3,8 @@ r"""Pure-data contract for MHA-139, the crank handle pivot screw (user ruling U3
 A made slotted shoulder screw turned from 3/8-in cold-finished rod.  The oak
 handle MHA-022 spins on the shoulder; the thread screws into the crank arm
 MHA-020's #8-32 tapped through hole and the shoulder seats tight on the arm
-face, so the shoulder length alone sets the handle's end play.
+face, so the shoulder length alone sets the handle's end play.  The tip is
+filed flush with the arm's inboard face at assembly (``INSTALLED_CONFIG``).
 
 Local frame: the axis is local +Z.  The slotted head face is at z=0, the head
 runs to the under-head face at z=HEAD_LENGTH, the shoulder to the arm seat face
@@ -66,8 +67,8 @@ THREAD_MODEL_DIA = THREAD_MAJOR_MM[THREAD_SIZE]
 # 9.0 +0/-0.5 (Main, on U33b): the shortest thread section, 8.5, less the
 # 0.4 tip chamfer still carries full thread across the arm's 7.94 (5/16-in)
 # stock thickness, so the ARM governs the worst-case engagement, not the
-# screw.  Fixed by geometry, not a tighter relief band (U27).  The price is a
-# tip standing up to PROUD_INBOARD_MAX past the arm's inboard face.
+# screw.  Fixed by geometry, not a tighter relief band (U27).  The tip is cut
+# proud of the arm's inboard face and filed flush at assembly (below).
 THREAD_LENGTH = 9.0
 THREAD_LENGTH_BAND = (0.0, -0.5)
 # 45-degree thread-start chamfer on the tip, inside the 0.49 thread depth.
@@ -201,8 +202,21 @@ FULL_THREAD_WORST_DIAMETERS = FULL_THREAD_WORST / THREAD_MODEL_DIA
 FULL_THREAD_WORST_PRINTED_ARM_DIAMETERS = (
     FULL_THREAD_WORST_PRINTED_ARM / THREAD_MODEL_DIA
 )
-# The tip may stand proud of the arm's inboard face by up to this much.
-PROUD_INBOARD_MAX = round(THREAD_LENGTH_MAX - ARM_STOCK_THICKNESS, 6)
+# User ruling 2026-09-29 (ch11 p.14 re-check): the photographs show no screw
+# end on the arm's inboard face, so the screw is cut long, seated with its
+# threadlocker, then filed flush with that face and its edge broken.  The
+# drive train places that fitted state as the INSTALLED configuration (the
+# MHA-135 precedent); the default stays the as-turned screw the sheet prints.
+# Filing removes at most FILE_ALLOWANCE_MAX, and even the shortest screw in
+# the thickest stock arm carries full thread past the face before filing, so
+# nothing of the tip chamfer survives and the arm still governs engagement.
+INSTALLED_CONFIG = "INSTALLED"
+# Flush with the modelled arm, which carries the printed 8.0.
+INSTALLED_THREAD_LENGTH = ARM_THICKNESS
+INSTALLED_TIP_CHAMFER = EDGE_BREAK_MAX_MM
+ARM_STOCK_THICKNESS_MAX = 2.0 * ARM_STOCK_THICKNESS - ARM_STOCK_THICKNESS_MIN
+FILE_ALLOWANCE_MAX = round(THREAD_LENGTH_MAX - ARM_STOCK_THICKNESS_MIN, 6)
+FILE_ALLOWANCE_MIN = round(FULL_THREAD_REACH_MIN - ARM_STOCK_THICKNESS_MAX, 6)
 # The one manufacturing note: the named exception, stated with the worst-case
 # engagement its policy row records (the stock arm, after the exit break) and
 # worded like the other sheets' rule-12 statements.  The ruling ID (U33b)
@@ -264,8 +278,13 @@ for _ok, _what in (
         "printed-arm worst-case engagement is under the U33b floor",
     ),
     (
-        THREAD_LENGTH_MIN >= ARM_STOCK_THICKNESS,
-        "shortest thread section does not span the stock arm",
+        FILE_ALLOWANCE_MIN > 0.0,
+        "shortest screw's full thread does not reach the thickest stock arm's "
+        "inboard face, so it cannot be filed flush on full thread",
+    ),
+    (
+        INSTALLED_TIP_CHAMFER < TIP_CHAMFER,
+        "the fitted edge break is not smaller than the as-turned tip chamfer",
     ),
     (
         TIP_CHAMFER <= 0.61343 * THREAD_PITCH,

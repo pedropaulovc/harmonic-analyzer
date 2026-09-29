@@ -152,16 +152,19 @@ def test_every_configuration_must_carry_the_pin_material() -> None:
     from types import SimpleNamespace
 
     import build_pinion_lever_pin as part
+    from _configuration_material import require_material_in_every_configuration
 
     configs = ("Default", part.INSTALLED_CONFIG)
     good = SimpleNamespace(
         currentModel=_MaterialPart(dict.fromkeys(configs, part.MATERIAL))
     )
-    part.require_material_in_every_configuration(good, configs)
+    require_material_in_every_configuration(good, part.PART_NAME, part.MATERIAL, configs)
     bare = SimpleNamespace(
         currentModel=_MaterialPart(
             {"Default": part.MATERIAL, part.INSTALLED_CONFIG: ""}
         )
     )
     with pytest.raises(RuntimeError, match=part.INSTALLED_CONFIG):
-        part.require_material_in_every_configuration(bare, configs)
+        require_material_in_every_configuration(bare, part.PART_NAME, part.MATERIAL, configs)
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    assert "require_material_in_every_configuration(\n        adapter, PART_NAME, MATERIAL," in source.replace("\r\n", "\n")

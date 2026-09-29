@@ -520,10 +520,9 @@ from crankshaft_spec import (  # noqa: E402
     SHAFT_LENGTH_BAND as CRANKSHAFT_LENGTH_BAND,
 )
 from crank_handle_pivot_screw_spec import (  # noqa: E402
-    OVERALL_LENGTH as HANDLE_SCREW_LENGTH,
-    PROUD_INBOARD_MAX as HANDLE_SCREW_PROUD_MAX,
+    INSTALLED_CONFIG as HANDLE_SCREW_INSTALLED_CONFIG,
+    INSTALLED_THREAD_LENGTH as HANDLE_SCREW_INSTALLED_THREAD,
     SEAT_STATION as HANDLE_SCREW_SEAT_STATION,
-    THREAD_LENGTH_MAX as HANDLE_SCREW_THREAD_MAX,
     THREAD_MODEL_DIA as HANDLE_SCREW_THREAD_MAJOR,
 )
 
@@ -2876,31 +2875,16 @@ if _GRIP_HEAD_Z[0] < CRANK_HUB_REAR_Z + 0.25:
     raise AssertionError("integral grip-head band reaches the crank hub")
 
 # MHA-139 handle pivot screw (U33): the shoulder seats on the arm's outboard
-# face and its thread runs inboard through the arm's tapped hole, so
-# its tip stands proud of the arm's inboard face and sweeps the r = ARM_C2C
-# circle with the crank.  At its longest thread in the thinnest (stock 5/16)
-# arm the tip reaches CRANK_ARM_Z0 + THREAD_LENGTH_MAX; that is the axial
-# band every neighbour on the sweep must clear.
+# face and its thread runs inboard through the arm's tapped hole.  User ruling
+# 2026-09-29 (ch11 p.14): the tip is filed flush with the arm's inboard face
+# at assembly, so the drive train places the INSTALLED configuration and
+# nothing of the screw sweeps past the arm.
 HANDLE_SCREW_Z0 = CRANK_ARM_Z0 - HANDLE_SCREW_SEAT_STATION  # slotted head face
-HANDLE_SCREW_TIP_Z = HANDLE_SCREW_Z0 + HANDLE_SCREW_LENGTH
-HANDLE_SCREW_TIP_Z_MAX = CRANK_ARM_Z0 + HANDLE_SCREW_THREAD_MAX
-if not 0.0 < HANDLE_SCREW_TIP_Z - CRANK_ARM_ORIGIN_Z <= HANDLE_SCREW_PROUD_MAX:
-    raise AssertionError("MHA-139 tip left its proud band past the arm's inboard face")
-for _lo, _what in (
-    (REMOVABLE_Z0, "T12 chain wheel"),
-    (_GRIP_HEAD_Z[0], "integral grip head"),
-    (_GRIP_ROD_Z[0], "grip crossrod"),
-):
-    if HANDLE_SCREW_TIP_Z_MAX > _lo - 0.25:
-        raise AssertionError(f"MHA-139 tip sweep reaches the {_what}")
-# The base, and the swing platform and posts standing on it, end at the base's
-# south face (-137.25), far north of the tip band: the arm and its sweep
-# hang in front of the base.  The hub barrel is inside the band but radially
-# inside the screw circle.
-if HANDLE_SCREW_TIP_Z_MAX > -_BASE_Z_LIMIT - 0.25:
-    raise AssertionError("MHA-139 tip sweep reaches the harmonic-base south face")
+HANDLE_SCREW_TIP_Z = CRANK_ARM_Z0 + HANDLE_SCREW_INSTALLED_THREAD
+if abs(HANDLE_SCREW_TIP_Z - CRANK_ARM_ORIGIN_Z) > 1e-9:
+    raise AssertionError("MHA-139's filed tip is not flush with the arm's inboard face")
 if ARM_C2C - HANDLE_SCREW_THREAD_MAJOR / 2.0 < HUB_BARREL_DIA / 2.0 + 0.25:
-    raise AssertionError("MHA-139 tip sweep reaches the crank hub barrel")
+    raise AssertionError("MHA-139 thread reaches the crank hub barrel")
 
 # Lever full throw: sample the solved cam-contact path from the photographed
 # +10-degree parked pose to about -72 degrees engaged.  Clearance improves
@@ -4475,6 +4459,8 @@ async def build(adapter) -> dict[str, str]:
     )
     # MHA-139 carries the handle: head outboard, local +Z (head -> tip) along
     # machine +z, so the shoulder's ArmSeat lands on the arm's outboard face.
+    # Its INSTALLED configuration is the tip filed flush with the arm's
+    # inboard face, not the long as-turned thread the part's drawing prints.
     handle_screw = await place_component(
         adapter,
         "crank-handle-pivot-screw",
@@ -4482,6 +4468,8 @@ async def build(adapter) -> dict[str, str]:
         [0.0, 0.0, 0.0],
         IDENTITY,
         ground=False,
+        configuration=HANDLE_SCREW_INSTALLED_CONFIG,
+        label="crank-handle-pivot-screw (MHA-139, tip filed flush)",
     )
 
     # =================== joints ================================================
