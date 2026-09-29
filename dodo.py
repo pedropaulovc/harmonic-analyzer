@@ -3070,6 +3070,9 @@ def task_check():
         # Assembly mates select by name, never by a view-dependent point pick
         # (#916: the collar pick selected the shaft collar's OD on one seat).
         SCRIPTS_DIR / "test_assembly_named_selection.py",
+        # Bind the pinion cam and follower to their own cylindrical faces via
+        # the native mate's role marks; refuse an ambiguous or wrong component.
+        SCRIPTS_DIR / "test_cam_follower_mate.py",
         # The adapter's raw feature-tree diff and edge scoring (solidworks_mcp
         # features.py over raw_dispatch): raw calls match the generated
         # members, an incomplete before-walk refuses to diff, and the created
