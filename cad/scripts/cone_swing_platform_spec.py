@@ -111,6 +111,12 @@ POST_MOUNT_ENGAGEMENT_NOTE = (
     f"{POST_MOUNT_TAP_BREAK_NOTE}"
 )
 
+# Named exception: MHA-142 engagement (drawing-simplicity-policy.md, "Named exceptions").
+POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT = (
+    f"ENGAGEMENT {POST_MOUNT_ENGAGEMENT_WORST:.2f} MIN "
+    f"({POST_MOUNT_ENGAGEMENT_PRINTED:.2f}D)."
+)
+
 
 # U30 (2026-09-23): the cone tip block is held by one hidden #6-32 x 1/2
 # BUTTON-head socket cap screw (McMaster 91255A148, black-oxide alloy steel;

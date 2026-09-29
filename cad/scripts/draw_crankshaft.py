@@ -181,8 +181,11 @@ DIAMETER_POSITIONS = {
     "ReliefDiaDim": (RELIEF_START_X + 0.030, _DIAMETER_ROW_Y[0]),
     "PinionSeatDiaDim": (SEAT_STEP_X + 0.010, _DIAMETER_ROW_Y[0]),
 }
-# One diameter governs the two exposed 3/8-in core seats.
-CALLOUTS_ABOVE = {"ShaftDiaDim": "2X"}
+# The 2X Ø9.525 names the dome-side core and the short exposed core between
+# the inboard journal land and Ø9 pinion-seat step. The 2X Ø11.388 names both
+# bearing lands on either side of the relief; the displayed arrow picks the
+# outboard land, and the equal-size callout also governs the inboard land.
+CALLOUTS_ABOVE = {"ShaftDiaDim": "2X", "JournalDiaDim": "2X"}
 CALLOUTS_BELOW = {"OverallLength": "OVERALL"}
 # The finish rides the inboard land (crankshaft_spec.SURFACE_FINISHES).
 FINISH_PICK = (RELIEF_END_X + 0.015, JOURNAL_FLANK_Y)

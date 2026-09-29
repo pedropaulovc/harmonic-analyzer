@@ -15,9 +15,8 @@ mating crankshaft and required diametral clearance. The decimal places are the
 PART's (``crank_pinion_spec.DRAWING_PRECISION``, applied natively by
 ``build_crank_pinion``); this script only reads them back off the sheet.
 
-Drawn 3:1 -- W15's boss makes the part 24.9 long: at 4:1 the section's
-boss-end dimensions ran into the isometric, and at 5:1 the isometric had
-already run off the B sheet's right border.
+Drawn 3:1: the longitudinal section and its diameter/length dimensions
+clear the end view and isometric at this common sheet scale.
 """
 
 from __future__ import annotations

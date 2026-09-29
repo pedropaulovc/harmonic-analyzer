@@ -749,7 +749,6 @@ from crank_pinion_spec import (  # noqa: E402
     SHAFT_LENGTH_PLACES as PINION_SHAFT_LENGTH_PLACES,
     printed_band_mm,
     PIN_EDGE_MIN_WORST as PINION_PIN_EDGE_MIN_WORST,
-    PIN_EDGE_TO_SHAFT_END_NOMINAL as PINION_PIN_EDGE_NOMINAL,
     PIN_STATION as PINION_PIN_STATION,
     PIN_STATION_LAYOUT_ALLOWANCE_MM as PINION_PIN_LAYOUT_ALLOWANCE,
     SEAT_GAP_MAX_MM as PINION_SEAT_GAP_MAX,
@@ -1528,11 +1527,6 @@ def _stack_text(stack: dict[str, float]) -> str:
     return f"{terms} = {sum(stack.values()):.3f}"
 
 
-if PINION_PIN_EDGE_NOMINAL_ACTUAL < PINION_PIN_EDGE_NOMINAL - 1e-6:
-    raise AssertionError(
-        f"16T pin wall to the shaft end {PINION_PIN_EDGE_NOMINAL_ACTUAL:.3f} is under "
-        f"its {PINION_PIN_EDGE_NOMINAL} nominal"
-    )
 PINION_PIN_EDGE_STACK = pinion_pin_edge_stack(
     PINION_PIN_EDGE_NOMINAL_ACTUAL, CS_SHAFT_LENGTH, PINION_OVERALL_LENGTH
 )

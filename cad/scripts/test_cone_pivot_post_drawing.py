@@ -57,11 +57,11 @@ def test_v2_harvest_is_the_exact_dimensional_contract() -> None:
     )
     assert spec.INCLINE_DEG == 12.5182
     assert (
-        spec.ATTACHMENT_SPACING,
         spec.ATTACHMENT_THRU_DIA,
         spec.ATTACHMENT_CBORE_DIA,
         spec.ATTACHMENT_CBORE_DEPTH,
-    ) == (26.88704, 7.14248, 11.50874, 6.0198)
+    ) == (7.14248, 11.50874, 6.0198)
+    assert spec.ATTACHMENT_SPACING == 2.0 * spec.ATTACHMENT_X
     # The final volume is the per-feature sum the build checks natively; a
     # constant that drifts from the features (the 2026-09-21 unbored-boss
     # build) fails at import, so only mass coherence is left to pin here.
@@ -71,6 +71,23 @@ def test_v2_harvest_is_the_exact_dimensional_contract() -> None:
         math.pi * (spec.CRANK_BORE_DIA / 2.0) ** 2 * spec.CRANK_BOSS_LENGTH
     )
     assert round(part.ATTACHMENT_HOLES_MM3, 1) == 7661.6
+
+
+def test_mounting_counterbores_take_the_last_printable_head_wall_station() -> None:
+    """The Ø42.8 head retains 1.5 mm at the counterbores' printed corners."""
+    assert spec.DRAWING_PRECISION_BY_NAME["HeadDia"] == 1
+    assert spec.DRAWING_PRECISION_BY_NAME["MountWestX"] == 2
+    assert spec.DRAWING_PRECISION_BY_NAME["MountEastX"] == 2
+    head_radius_min = (round(spec.HEAD_DIA, 1) - spec._row(1)) / 2.0
+    cbore_radius_max = (
+        round(spec.ATTACHMENT_CBORE_DIA, 2) + spec._row(2)
+    ) / 2.0
+    wall = head_radius_min - (spec.ATTACHMENT_X + spec._row(2)) - cbore_radius_max
+    assert spec.ATTACHMENT_X == pytest.approx(12.98)
+    assert spec.ATTACHMENT_SPACING == pytest.approx(25.96)
+    assert wall == pytest.approx(spec.MOUNT_HEAD_WEB_WORST)
+    assert wall >= spec.WEB_FLOOR_MM - 1e-9
+    assert wall - 0.01 < spec.WEB_FLOOR_MM
 
 
 def test_spec_is_the_single_source_of_drawing_dimensions() -> None:
@@ -320,26 +337,6 @@ def test_running_bores_close_the_configured_fit_class() -> None:
         shaft_min = shaft_nominal + shaft_band[1]
         clearances = (bore + lower - shaft_max, bore + upper - shaft_min)
         assert tuple(round(value, 3) for value in clearances) == expected
-
-
-def test_crank_bore_webs_stay_over_the_floor() -> None:
-    """The web numbers are the print-worst table; each is an import-time
-    assert in the spec against the 1.5 floor, so this pins the table itself.
-    The cone axis's own ±0.25 band (JOURNAL_AXIS_HEIGHT_TOLERANCE_MM, the shim
-    pack's range) sets how high the crank axis can print, so the webs above
-    it read against that band, not the ±0.51 .XX grade it replaced.
-    """
-    assert spec.CRANK_BORE_OFFSET == 0.0
-    assert spec.WEB_FLOOR_MM == 1.5
-    assert {
-        name: round(web, 2) for name, web in spec.CRANK_BORE_WEBS_WORST.items()
-    } == {
-        "mounting thru hole": 3.59,
-        "mounting counterbore": 3.69,
-        "top face": 6.16,
-        "crank boss OD": 4.84,
-    }
-    assert "MHA-026" in spec.DRAWING_NOTES.splitlines()[0]
 
 
 def test_nothing_else_on_the_casting_carries_a_band() -> None:

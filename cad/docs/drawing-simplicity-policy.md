@@ -289,7 +289,7 @@ Accepted shortfalls against rule 12. Each is specific to the parts named; it
 is not precedent for anything else. Every sheet a row affects should state
 the shortfall itself; the table is the backstop. A sheet states it as a plain
 manufacturing fact, the shortfall and its value (for example "ENGAGEMENT
-5.92-6.35 (0.93-1.0D)"), and never cites a rule number, a ruling id, or the
+5.72 MIN (0.90D)"), and never cites a rule number, a ruling id, or the
 words EXCEPTION, ACCEPTED, RULING, POLICY or BOOK FIDELITY
 (test_printed_text_rulings enforces this); this table is where the governance
 lives. The blind reviewer sees only the sheets, so it may still report a row's

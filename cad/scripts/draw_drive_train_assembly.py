@@ -65,6 +65,7 @@ from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 from _drive_train_balloon_anchors import DRIVE_TRAIN_BALLOON_ANCHORS
 from cone_gear_notes import ATTACHMENT as CONE_GEAR_JOINT
+from cone_swing_platform_spec import POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT
 from crank_drive_gear_notes import ATTACHMENT_ALTERNATIVE as CRANK_GEAR_ALTERNATIVE
 from crank_drive_gear_notes import ATTACHMENT_PROCESS as CRANK_GEAR_JOINT
 from crank_pinion_spec import SEAT_FEELER_MM as PINION_SEAT_FEELER
@@ -435,6 +436,7 @@ ASSEMBLED_HEADING = (
     f"FULL DETAIL: SHEET {FULL_DETAIL_SHEET}."
 )
 
+
 CONE_CRANK_STEPS = "\n".join(
     (
         "ASSEMBLY SEQUENCE - CONE SET AND CRANK",
@@ -451,20 +453,16 @@ CONE_CRANK_STEPS = "\n".join(
         f"   {CRANK_GEAR_JOINT} ITS SEAT;",
         f"   {CRANK_GEAR_ALTERNATIVE}.",
         # U37c (user, 2026-09-23): MHA-142 is MSC 40923898, 1/4-20 x 3-1/2
-        # slotted fillister, through the unchanged 6.02 counterbore. Its floor
-        # sits 78.67-81.29 above the post foot at the printed bands, so a fixed
-        # length could end 0.98 proud; each screw is cut to its own hole
-        # (pivot). Engagement is capped by the plate, printed as 1/4 1018 CF
-        # flat bar as supplied (U41, 6.22 min less the 0.3 cut: 5.92 = 0.93D
-        # worst case, swing): a named, user-accepted exception to rule 12, in
-        # the Named exceptions table of cad/docs/drawing-simplicity-policy.md.
-        # The sheet states the range, never the governance label (fleet
-        # ruling 2026-09-26, test_printed_text_rulings).
-        "2. SCREW MHA-016 TO MHA-091 WITH 2X MHA-142 FROM THE TOP. CUT EACH TO",
-        "   FIT AND CHAMFER THE END: FLUSH TO 0.3 SHORT OF THE MHA-091",
-        # Named exception: MHA-142 engagement (drawing-simplicity-policy.md, "Named exceptions").
-        "   UNDERSIDE, NEVER PROUD (NOMINAL LENGTH 86.0). ENGAGEMENT 5.92-6.35",
-        "   (0.93-1.0D).",
+        # slotted fillister, through the 6.02 counterbore.  Cut each screw
+        # against its own MHA-016/MHA-091 matched holes, never proud of the
+        # plate underside.  The MHA-091 plate's worst-case 5.72 mm = 0.90D
+        # includes stock, cut allowance and both tap-mouth edge breaks; this
+        # is the named short-engagement exception in the drawing policy.
+        # The sheet states the actual minimum, never the governance label.
+        "2. ALIGN MHA-016 COUNTERBORES TO MHA-091 TAPS; SCREW WITH 2X",
+        "   MHA-142 FROM TOP, EACH CUT TO FIT: FLUSH TO 0.3 SHORT OF",
+        "   MHA-091 UNDERSIDE, NEVER PROUD (NOMINAL LENGTH 86.0).",
+        "   CHAMFER ENDS; " + POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT,
         # U30 (user, 2026-09-23, option (a)): one #6-32 button-head screw (W22)
         # up through the MHA-091 slot, height and side set by the shim pack at
         # fit-up. Wording from swing (dt-tip-block-attachment-options-20260923.md
@@ -808,8 +806,8 @@ FIT_PLACEHOLDER = "\n".join(
         # The rest of the old placeholder is owned elsewhere now: each cone
         # gear's mesh by the MHA-013 print (check 2), the pinion engagement
         # by the rig-located step and check 7, the taper pin by step 6.
-        "16T:64T CENTRE DISTANCE FIXED BY MHA-016 BORE SPACING; VERIFY BY",
-        "BACKLASH (CHECK 2).",
+        "16T:64T CENTRE DISTANCE FIXED BY MHA-016 BORE SPACING; VERIFY NO",
+        "BINDING THROUGH ONE CRANK TURN (CHECK 2).",
     )
 )
 

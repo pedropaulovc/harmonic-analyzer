@@ -67,6 +67,18 @@ def test_post_mount_pattern_is_derived_from_its_mating_post() -> None:
     assert spec.POST_MOUNT_TAP_DIA == blind_cut_dia_mm(spec.POST_MOUNT_SPEC)
 
 
+def test_engaged_post_and_plate_hole_axes_coincide_in_machine_coordinates() -> None:
+    """Rotating the plate into the engaged pose places its taps under the post."""
+    angle = math.radians(geometry.INCLINE_DEG)
+    for (local_x, local_z), post_x in (
+        (part.POST_MOUNT_WEST_XZ, cone_pivot_post_spec.ATTACHMENT_X),
+        (part.POST_MOUNT_EAST_XZ, -cone_pivot_post_spec.ATTACHMENT_X),
+    ):
+        dz = local_z - geometry.POST_LOCAL_Z
+        assert local_x * math.cos(angle) + dz * math.sin(angle) == pytest.approx(post_x)
+        assert -local_x * math.sin(angle) + dz * math.cos(angle) == pytest.approx(0.0)
+
+
 def test_only_sliding_and_locating_surfaces_carry_roughness() -> None:
     by_key = {control.key: control for control in spec.SURFACE_FINISHES}
     assert set(by_key) == {"post_seat", "base_slide"}

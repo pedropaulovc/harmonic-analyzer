@@ -76,11 +76,34 @@ CONE_BOSS_LENGTH = BLOCK_DIA
 # counterbore.  Deepening the counterbore for a shorter screw is not an
 # option: at 16.15 its wall to the crank bore would fall under the 1.5 web
 # floor at print-worst.
-ATTACHMENT_SPACING = 26.88704
-ATTACHMENT_X = ATTACHMENT_SPACING / 2.0
 ATTACHMENT_THRU_DIA = 7.14248
 ATTACHMENT_CBORE_DIA = 11.50874
 ATTACHMENT_CBORE_DEPTH = 6.0198
+WEB_FLOOR_MM = 1.5
+
+
+def _row(places: int) -> float:
+    return float(str(_config.title_block(f"linear_{places}pl")["display"]).lstrip("±"))
+
+
+# R2: a nominal v36 hole centre at 13.44 leaves only 1.04 mm to the restored
+# head OD at the printed limits.  The head prints Ø42.8 (.X); the machined
+# counterbore's native hole callout prints Ø11.51 (.XX), unlike its twist-drilled
+# through hole (+0.10 / 0).  Each centre prints .XX.  Move the complete matched
+# post/platform pattern inward by the least printable amount that retains the
+# policy's 1.5 mm hard floor at all three closing corners.
+_HEAD_R_PRINT_MIN = (round(HEAD_DIA, 1) - _row(1)) / 2.0
+_CBORE_R_PRINT_MAX = (round(ATTACHMENT_CBORE_DIA, 2) + _row(2)) / 2.0
+_ATTACHMENT_X_MAX = (
+    _HEAD_R_PRINT_MIN - _CBORE_R_PRINT_MAX - _row(2) - WEB_FLOOR_MM
+)
+ATTACHMENT_X = math.floor((_ATTACHMENT_X_MAX + 1e-10) * 100.0) / 100.0
+ATTACHMENT_SPACING = 2.0 * ATTACHMENT_X
+MOUNT_HEAD_WEB_WORST = _HEAD_R_PRINT_MIN - (ATTACHMENT_X + _row(2)) - _CBORE_R_PRINT_MAX
+if MOUNT_HEAD_WEB_WORST + 1e-9 < WEB_FLOOR_MM:
+    raise AssertionError("mounting counterbore breaches the head's print-worst wall")
+if MOUNT_HEAD_WEB_WORST - 0.01 >= WEB_FLOOR_MM:
+    raise AssertionError("mounting holes are farther inward than the printable floor requires")
 
 # Final solid volume, the sum of the per-feature analytic terms the build
 # checks natively one feature at a time (build_cone_pivot_post.py asserts
@@ -148,16 +171,9 @@ JOURNAL_AXIS_HEIGHT_TOLERANCE_MM = 0.25
 # target, 1.5 floor).  The bore is centred on the post's symmetry plane, which
 # is what keeps the two mounting holes beside it workable; its worst case is
 # the running band's maximum with the crank axis at its highest (the cone axis
-# at the top of its own band above plus the whole +0.37 spacing band).  Holes
-# are drilled (+0.10/0), their stations and the counterbore depth print .XX,
-# the top face and the boss diameter .X.
-WEB_FLOOR_MM = 1.5
-
-
-def _row(places: int) -> float:
-    return float(str(_config.title_block(f"linear_{places}pl")["display"]).lstrip("±"))
-
-
+# at the top of its own band above plus the whole +0.37 spacing band).  The
+# through holes are drilled (+0.10/0), their stations and the counterbore's
+# diameter/depth print .XX, and the top face and boss diameter print .X.
 _DRILL_OVERSIZE = float(_config.title_block("drilled_hole")["plus_mm"])
 _CRANK_BORE_R_MAX = (CRANK_BORE_DIA + RUNNING_BORE_BAND[0]) / 2.0
 _CRANK_AXIS_Y_MAX = (
@@ -165,8 +181,12 @@ _CRANK_AXIS_Y_MAX = (
 )
 _HOLE_X_MIN = ATTACHMENT_X - _row(2)
 _CBORE_CORNER = (
-    _HOLE_X_MIN - (ATTACHMENT_CBORE_DIA + _DRILL_OVERSIZE) / 2.0,
-    BLOCK_HEIGHT - ATTACHMENT_CBORE_DEPTH - _row(2) - _CRANK_AXIS_Y_MAX,
+    _HOLE_X_MIN - _CBORE_R_PRINT_MAX,
+    BLOCK_HEIGHT
+    - _row(1)
+    - round(ATTACHMENT_CBORE_DEPTH, 2)
+    - _row(2)
+    - _CRANK_AXIS_Y_MAX,
 )
 CRANK_BORE_WEBS_WORST = {
     "mounting thru hole": _HOLE_X_MIN
@@ -184,6 +204,35 @@ for _name, _web in CRANK_BORE_WEBS_WORST.items():
         raise AssertionError(
             f"Ø{CRANK_BORE_DIA} crank bore leaves {_web:.3f} to the {_name} at "
             f"print-worst, under the {WEB_FLOOR_MM} web floor"
+        )
+
+# The inward pattern also clears the smaller lower body and the inclined
+# cone journal bore; the counterbore floor keeps a full screw-head seat
+# outside the through drill.  Use the through-drill's unilateral oversize and
+# the loosest title-block angular row on the cone axis; its BASIC angle and
+# angularity frame are tighter, so this overbounds the printed corner.
+MOUNT_OTHER_WEBS_WORST = {
+    "body foot OD": (round(BLOCK_DIA, 1) - _row(1)) / 2.0
+    - (ATTACHMENT_X + _row(2))
+    - (ATTACHMENT_THRU_DIA + _DRILL_OVERSIZE) / 2.0,
+    "inclined cone bore": _HOLE_X_MIN
+    * math.cos(
+        math.radians(INCLINE_DEG + float(_config.title_block("angular")["value_deg"]))
+    )
+    - (ATTACHMENT_THRU_DIA + _DRILL_OVERSIZE) / 2.0
+    - (round(BORE_DIA, 3) + RUNNING_BORE_BAND[0]) / 2.0,
+    "counterbore floor annulus": (
+        round(ATTACHMENT_CBORE_DIA, 2)
+        - _row(2)
+        - ATTACHMENT_THRU_DIA
+        - _DRILL_OVERSIZE
+    ) / 2.0,
+}
+for _name, _web in MOUNT_OTHER_WEBS_WORST.items():
+    if _web < WEB_FLOOR_MM:
+        raise AssertionError(
+            f"mounting holes leave {_web:.3f} to the {_name} at print-worst, "
+            f"under the {WEB_FLOOR_MM} web floor"
         )
 
 # Journal-plan reference sketch (Top plane, all construction).  The 12.5182 deg

@@ -266,9 +266,9 @@ sections:
         - scaled
         - med
       - - Crankshaft length
-        - 136.8 mm cylindrical length plus 2-mm integral outboard dome
-        - '5.39 + dome'
-        - 'the outboard cylinder/arm/hub plane moves from world z −175 to −183. Every bearing/T12/pinion local station shifts +8, preserving established world interfaces; only the integral dome projects outboard and remains within the through-hub envelope. W15: the inboard end sits at z −46.2, 1.14 inside the 16T pinion''s boss, so the pinion''s retention pin crosses the shaft (length floored to its one printed place, +0/−0.4).'
+        - 136.3 mm cylindrical length plus 2-mm integral outboard dome
+        - '5.39 in initial reference; shortened for the shortest W15-compliant 16T boss'
+        - 'The outboard cylinder/arm/hub face remains at world z −183, with T12 at z −155. The inboard shaft end is now z −46.7, recessed 1.14 inside the 16T pinion boss. With the original pin and printed bands unchanged, its W15 pin-edge wall is 2.023 mm at print-worst (2.0 floor); a boss one .X step shorter would give 1.973. Length prints at one place, +0/−0.4.'
         - derived
         - high
   - prose: |2
@@ -586,7 +586,7 @@ sections:
         - mesh plane alignment
         - high
       - - Crankshaft
-        - 'Along Z on the restored fixed crank axis (x, y) = (−129.336, 129.850). The frame-reference c2c is 39.735, with 0.423 slack for the single-cutter pair. User ruling 2026-09-28 requires positive worst-case tight backlash without a prescribed window. The 136.8-mm shaft spans z −183..−46.2 with its integral dome outboard. T12 remains at z −155. The restored boss runs z −142.245..−70.210; the pinion south face is feeler-set 0.25 north of it, at z −69.960 (local 113.039505572). The integral Ø11.388 journal runs directly in the post; the Ø9.0 pinion seat step starts at local 112.7.'
+        - 'Along Z on the restored fixed crank axis (x, y) = (−129.336, 129.850). The frame-reference c2c is 39.735, with 0.423 slack for the single-cutter pair. User ruling 2026-09-28 requires positive worst-case tight backlash without a prescribed window. The 136.3-mm shaft spans z −183..−46.7 with its integral dome outboard. T12 remains at z −155. The restored boss runs z −142.245..−70.210; the pinion south face is feeler-set 0.25 north of it, at z −69.960 (local 113.039505572). The pinion has the shortest boss meeting all printed W15 floors: 14.0 mm past its 10.4 face, 24.4 overall; its Ø3.175 pin stays at boss mid-length. The integral Ø11.388 journal runs directly in the post; the Ø9.0 pinion seat step starts at local 112.2.'
         - 'cone-pivot-post-v2 is the physical authority for x/y. The ch30 GT crank_sprocket result (−122.84, 144.78) remains independent image evidence, while the primary crank construction photo governs the separate through hub and flush outboard face. The crossed-helical accommodation and historical 0.25 mm transverse-DP centre reference remain; neither is a backlash target.'
         - high (GT + mesh)
       - - Chain run
@@ -614,12 +614,12 @@ sections:
         - ch30 GT (cyl_front); shape from still t00393 / v4_pinion_008 (base:top taper ~1.2, scaled off the 120T OD 62.2)
         - med (GT height; shape photo-scaled)
       - - '`cone-swing-platform` (p1 swing bracket; the p.18 wedge plate)'
-        - 'black steel wedge plate 6.35 thick, ASYMMETRIC trapezoid — half-width 16 east / 8 west (north, pivot) → east 24 / west 37 (south, big end) over 223.354 along the cone axis; south edge leaves 3.175 mm (1/8 in) beyond the Ø42.011 cone-pivot-post south rim; two native 1/4-20 UNC-2B through taps derive from the post''s 26.88704 attachment pitch; the north-west trim leaves 0.370 mm exact plan clearance to the recentered north arbor pedestal; plan corners are NE R10 / NW R8 / SW R5 / SE R12; native 1/4-in close-clearance pivot hole Ø6.756 clears the pivot screw''s stock Ø6.35 shoulder without imposing an unsupported precision bearing fit; Ø10.50 × 0.25-deep top relief leaves 6.10 local pivot-bearing thickness; 8-wide OPEN lock notch follows the R208.436 swing chord from its closed centre 33.00 west / 205.808 south of the pivot; carries the fixed part-local crank-axis reference 41.654 east of the pivot and 79.05 above the plate bottom; plate top remains y 57.15'
+        - 'black steel wedge plate 6.35 thick, ASYMMETRIC trapezoid — half-width 16 east / 8 west (north, pivot) → east 24 / west 37 (south, big end) over 223.354 along the cone axis; south edge leaves 3.175 mm (1/8 in) beyond the Ø42.011 cone-pivot-post south rim; two native 1/4-20 UNC-2B through taps derive from the post''s 25.96 attachment pitch; the north-west trim leaves 0.370 mm exact plan clearance to the recentered north arbor pedestal; plan corners are NE R10 / NW R8 / SW R5 / SE R12; native 1/4-in close-clearance pivot hole Ø6.756 clears the pivot screw''s stock Ø6.35 shoulder without imposing an unsupported precision bearing fit; Ø10.50 × 0.25-deep top relief leaves 6.10 local pivot-bearing thickness; 8-wide OPEN lock notch follows the R208.436 swing chord from its closed centre 33.00 west / 205.808 south of the pivot; carries the fixed part-local crank-axis reference 41.654 east of the pivot and 79.05 above the plate bottom; plate top remains y 57.15'
         - 'FLOATED, pivot at cone station 152.272 = (−87.683, +96.019) with the plate rotated to the cone incline, swinging ON the cone-pivot-screw; the merged crank column, cone shaft, tip block and crank rig all ride it. The p1 disengage DOF remains FREE by default and sweeps 4.250°. The post and carrier retain their rederived world placement; only the working cone/cylinder/channel family is recentered along the unchanged cone-bore line. The base preserves its front edge and extends only at the rear.'
         - p.18 top-down (the "pivot" label at the TIP; dark wedge under the whole cone set) + v4 stills; v2 envelope/mount cascade from cone-pivot-post-v2.SLDPRT, whose height was manually rederived from ch30 Eight Views image 2 (page003_img01.png) and whose proportions follow ch11 page002_img05.jpeg / page002_img06.jpeg
         - med (role high, dims low)
       - - '`cone-pivot-post` (ONE green column: big-end journal + crank pedestal, on the plate)'
-        - 'Restored v36 green cast body: Ø42.011 × 86.0 tall, with Ø42.7506 × 26.6 upper head (y 59.4..86); straight crank boss Ø21.93 with Ø11.438 running bore on the body centreline at y 72.7, harvested length 2.8360 in (72.0344 mm), with no north spot face. Inclined cone-shaft boss Ø17.2 with Ø12.2808 journal at y 33.368, yawed 12.5182° about the vertical body axis. The crank bore retains its diametral angularity frame; later nongeometric drawing improvements remain. Two vertical ANSI-inch 1/4 fillister counterbores on 26.88704 centres (Ø7.14248 thru, Ø11.50874 × 6.0198 deep).'
+        - 'Restored v36 green cast body: Ø42.011 × 86.0 tall, with Ø42.7506 × 26.6 upper head (y 59.4..86); straight crank boss Ø21.93 with Ø11.438 running bore on the body centreline at y 72.7, harvested length 2.8360 in (72.0344 mm), with no north spot face. Inclined cone-shaft boss Ø17.2 with Ø12.2808 journal at y 33.368, yawed 12.5182° about the vertical body axis. The crank bore retains its diametral angularity frame; later nongeometric drawing improvements remain. Two vertical ANSI-inch 1/4 fillister counterbores moved inward onto 25.96 centres for the Ø42.8 head wall (Ø7.14248 thru, Ø11.50874 × 6.0198 deep).'
         - 'stands on the cone swing platform at exact Ry180, cross-pairing the two mounting-hole axes and putting the crank boss outside the machine. The post and carrier retain the ch30-fitted +1.484 X / +35.415 Z world placement. The working cone/cylinder/channel family is independently recentered 33.115 mm toward the post along its unchanged inclined bore; the post fit is not a machine-wide translation.'
         - 'User ruling 2026-09-28 restores the v36 post geometry, including its Ø42.7506 head. Manual height rederivation from ch30 Eight Views station 2 (references/albert-michelsons-harmonic-analyzer/ch30_images/page003_img01.png), with proportions from ch11 page002_img05.jpeg and page002_img06.jpeg; other feature dimensions harvested from cone-pivot-post-v2.SLDPRT.'
         - 'med (86 mm height and proportions photo-derived; other restored v36 feature dimensions exact)'
@@ -2143,8 +2143,10 @@ sections:
          Positive worst-case tight backlash, not a backlash window, is the
          acceptance (`crank_mesh_stack`). Exact-solid phase and row engagement
          are evaluated at the actual narrowed-gear centre
-         (`diagnostics/crank_mesh_backlash_study.py`). The 136.8-mm
-         crankshaft retains the outboard face z −183 and T12 at z −155.
+         (`diagnostics/crank_mesh_backlash_study.py`). The 136.3-mm
+         crankshaft retains the outboard face z −183 and T12 at z −155;
+         the 16T boss is the shortest printable length holding the existing
+         W15 pin-edge and shaft-end-recess floors.
       10. **Alignment-pinion mechanism removed (2026-06-18) — RESTORED
          2026-07-02** (ch. 25). The removal-era impossibility used the now-
          superseded pre-correction drum against the 12.56 mm frustum/64T

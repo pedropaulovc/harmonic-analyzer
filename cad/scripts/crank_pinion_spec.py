@@ -189,16 +189,12 @@ PIN_HOLE_SPEC = HoleSpec("drilled_fractional", "1/8")
 PIN_DIA = FRACTIONAL_DRILL_MM["1/8"]  # 3.175
 PIN_LENGTH = BOSS_DIA  # flush both sides
 
-# --- W15: the boss is as long as the shaft end it hides and the pin's wall to
-# that end need (Main rulings, 2026-09-25, option 1) ---------------------------
+# --- W15: shortest boss that still protects the match-drilled shaft end ----
 #
-# The pin crosses the crankshaft PIN_EDGE_TO_SHAFT_END_NOMINAL from its north
-# end, so the drill never breaks out through a thin end wall; after every
-# band in build_drive_train_assembly's stack at least PIN_EDGE_MIN_WORST
-# remains.  The pin station is laid out on the seated pair at boss mid-length
-# (the callout), never dimensioned: PIN_STATION_LAYOUT_ALLOWANCE_MM is that
-# layout's allowance.
-PIN_EDGE_TO_SHAFT_END_NOMINAL = 4.5
+# The ch12 photograph suggests a compact hub, but its length is controlled
+# by the pin's print-worst 2.0-mm ligament to the recessed crankshaft end,
+# not by a nominal 4.5-mm wall. The Ø3.175 pin stays at the actual boss
+# mid-length, with the existing layout allowance.
 PIN_EDGE_MIN_WORST = 2.0
 PIN_STATION_LAYOUT_ALLOWANCE_MM = 0.25
 # The toothed south face is set directly off the restored MHA-016 north
@@ -218,32 +214,56 @@ PINION_BOSS_NORTH_GAP_RANGE = (SEAT_FEELER_MM, SEAT_GAP_MAX_MM)
 # shaft length to SHAFT_LENGTH_PLACES, which leaves the nominal recess between
 # its minimum and one printed unit more, and the boss is sized for the most.
 OVERALL_LENGTH_PLACES = 1
-SHAFT_LENGTH_PLACES = 1  # crankshaft_spec prints its Depth here and asserts it
+SHAFT_LENGTH_PLACES = 1  # crankshaft_spec prints its Depth here
 FACE_WIDTH_PLACES = 1
-OVERALL_LENGTH_GRADE_MM = printed_band_mm(OVERALL_LENGTH_PLACES)  # 0.8
+OVERALL_LENGTH_GRADE_MM = printed_band_mm(OVERALL_LENGTH_PLACES)
+FACE_WIDTH_GRADE_MM = printed_band_mm(FACE_WIDTH_PLACES)
+SHAFT_LENGTH_SHORT_MM = 0.40  # preserved W15 unilateral +0/-0.40 shaft band
 SHAFT_END_RECESS_MIN_WORST = 0.25
-SHAFT_END_RECESS_MIN = SHAFT_END_RECESS_MIN_WORST + OVERALL_LENGTH_GRADE_MM  # 1.05
-SHAFT_END_RECESS_MAX = SHAFT_END_RECESS_MIN + 10.0**-SHAFT_LENGTH_PLACES  # 1.15
-# With the pin at boss mid-length, its wall to the shaft end is half the boss
-# less the recess less the pin radius, so the boss follows from the three at
-# the deepest recess, and the overall length rounds UP to what it prints.
-OVERALL_LENGTH = ceil_to_places(
-    FACE_WIDTH
-    + 2.0 * (PIN_EDGE_TO_SHAFT_END_NOMINAL + SHAFT_END_RECESS_MAX + PIN_DIA / 2.0),
-    OVERALL_LENGTH_PLACES,
-)  # 24.9
-BOSS_LENGTH = round(OVERALL_LENGTH - FACE_WIDTH, OVERALL_LENGTH_PLACES)  # 14.5
+SHAFT_END_RECESS_MIN = SHAFT_END_RECESS_MIN_WORST + OVERALL_LENGTH_GRADE_MM
+SHAFT_END_RECESS_MAX = SHAFT_END_RECESS_MIN + 10.0**-SHAFT_LENGTH_PLACES
+# The pin's drilled-hole grade grows its radius by half the printed oversize.
+# At boss mid-length, each accepted face/overall row can shift the pin north
+# by half its allowance; the seat gap can also open to its stated maximum.
+_PIN_HOLE_RADIUS_GROWTH = float(_config.title_block("drilled_hole")["plus_mm"]) / 2.0
+_PIN_EDGE_CLOSING_TERMS = (
+    SHAFT_LENGTH_SHORT_MM
+    + SEAT_GAP_MAX_MM - SEAT_FEELER_MM
+    + (FACE_WIDTH_GRADE_MM + OVERALL_LENGTH_GRADE_MM) / 2.0
+    + PIN_STATION_LAYOUT_ALLOWANCE_MM
+    + _PIN_HOLE_RADIUS_GROWTH
+)
+# The exact shaft recess depends on its one-place floor and installed post
+# station; SHAFT_END_RECESS_MAX is the safe ceiling of that range. The shaft
+# spec independently checks the actual floor and proves that the next shorter
+# printable boss fails it. No tolerance or pin size is tightened for the photo.
+BOSS_LENGTH_PLACES = OVERALL_LENGTH_PLACES
+BOSS_LENGTH = ceil_to_places(
+    2.0 * (
+        PIN_EDGE_MIN_WORST
+        + SHAFT_END_RECESS_MAX
+        + PIN_DIA / 2.0
+        + _PIN_EDGE_CLOSING_TERMS
+    ),
+    BOSS_LENGTH_PLACES,
+)
+OVERALL_LENGTH = round(FACE_WIDTH + BOSS_LENGTH, OVERALL_LENGTH_PLACES)
 for _name, _value, _places in (
     ("FACE_WIDTH", FACE_WIDTH, FACE_WIDTH_PLACES),
     ("OVERALL_LENGTH", OVERALL_LENGTH, OVERALL_LENGTH_PLACES),
 ):
     if abs(_value - round(_value, _places)) > 1e-9:
         raise AssertionError(f"{_name} {_value!r} does not print exactly at {_places} places")
-# Fidelity departure (#877): ch. 12 p. 19 shows the boss "a little over half"
-# a face long; this one is BOSS_LENGTH / FACE_WIDTH = 1.39 faces.  The 4.5 pin
-# wall alone needed 12.815 (1.23 faces) at the old 0.32 recess; the recess
-# that survives the printed row and an exactly printed shaft adds the rest.
-PIN_STATION = FACE_WIDTH + BOSS_LENGTH / 2.0  # 17.65 from the toothed (south) face
+PIN_STATION = FACE_WIDTH + BOSS_LENGTH / 2.0
+PIN_AXIAL_LIGAMENT_FLOOR_MM = 0.5
+PIN_AXIAL_LIGAMENT_WORST = (
+    (BOSS_LENGTH - FACE_WIDTH_GRADE_MM - OVERALL_LENGTH_GRADE_MM) / 2.0
+    - PIN_DIA / 2.0
+    - _PIN_HOLE_RADIUS_GROWTH
+    - PIN_STATION_LAYOUT_ALLOWANCE_MM
+)
+if PIN_AXIAL_LIGAMENT_WORST < PIN_AXIAL_LIGAMENT_FLOOR_MM:
+    raise AssertionError("match-drilled pin breaks through the boss end at print-worst")
 if SHAFT_END_RECESS_MAX <= SHAFT_END_RECESS_MIN:
     raise AssertionError("the pinion boss needs a positive printed shaft-recess range")
 # The fixed-axis seed with the 6.5-mm 64T face; the offline nine-phase
@@ -253,10 +273,6 @@ if SHAFT_END_RECESS_MAX <= SHAFT_END_RECESS_MIN:
 PIN_CLOCKING_DEG = 12.576430992160178
 if not 0.0 <= PIN_CLOCKING_DEG < 360.0 / 16.0:
     raise AssertionError("pinion retention-hole clocking must lie within one 16T pitch")
-if PIN_STATION - PIN_DIA / 2.0 < FACE_WIDTH + 0.5:
-    raise AssertionError("retention pin hole breaks into the pinion's tooth face")
-if PIN_STATION + PIN_DIA / 2.0 > OVERALL_LENGTH - 0.5:
-    raise AssertionError("retention pin hole reaches the boss end")
 # The matched-hole callout on both part records identifies both seated parts,
 # the shared boss-mid-length operation and the actual fitted pin. It deliberately
 # omits the modeled hole nominal: reaming to a functional acceptance governs,

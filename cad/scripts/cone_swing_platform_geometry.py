@@ -45,10 +45,10 @@ _SIN_I = math.sin(math.radians(INCLINE_DEG))
 _COS_I = math.cos(math.radians(INCLINE_DEG))
 
 # --- cone-pivot-post-v2 attachment footprint -------------------------------
-# The rederived casting is centred at cone station -39.90136099793 while the
-# plate origin/pivot remains station 196.  Its two vertical attachment holes
-# are a world-X pair at +/-13.44352 mm.  Undoing the engaged Ry(+INCLINE)
-# placement gives this skewed pair in the platform's local (x, z) frame.
+# The casting is centred at cone station -39.90136099793 while the plate
+# origin/pivot remains station 196.  Its inward-shifted vertical attachment
+# holes are a world-X pair at +/-POST_MOUNT_HALF_PITCH.  Undoing the engaged
+# Ry(+INCLINE) placement gives the skewed pair in the platform's local (x, z).
 POST_STATION = -39.90136099793
 PIVOT_STATION = 152.27232594770453
 POST_MAIN_DIA = POST_BLOCK_DIA

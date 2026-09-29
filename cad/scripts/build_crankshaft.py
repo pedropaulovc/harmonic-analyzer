@@ -63,7 +63,6 @@ from crank_pinion_spec import (
     CRANKSHAFT_PIN_HOLE_PROCESS,
     PIN_CLOCKING_DEG as PINION_PIN_CLOCKING_DEG,
     PIN_DIA as PINION_PIN_DIA,
-    PIN_EDGE_TO_SHAFT_END_NOMINAL,
     PIN_HOLE_SPEC as PINION_PIN_HOLE_SPEC,
 )
 from crankshaft_spec import (
@@ -81,7 +80,6 @@ from crankshaft_spec import (
     RELIEF_START,
     RELIEF_LENGTH,
     PINION_PIN_STATION_Y,
-    PINION_PIN_EDGE_TO_END,
     PIN_HOLE_SPEC,
     PIN_HOLE_HEIGHT,
     PINION_SEAT_DIA,
@@ -101,21 +99,16 @@ from crank_native_acceptance import assert_signed_circle_center
 PART_NAME = "crankshaft"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
-# Dimensions live in crankshaft_spec / crank_hub_geometry.  The common face
-# moved outboard by one arm thickness; all inboard stations and the shaft length
-# carry the same shift, leaving the bearing, T12, pinion and far-end world
-# positions unchanged.  MHA-024 now crosses the separate hub behind the arm.
+# Dimensions live in crankshaft_spec / crank_hub_geometry. The crank face,
+# T12 station and restored post bore stay fixed while the shaft's north end
+# follows the shortest W15-compliant pinion boss; MHA-024 still crosses the
+# separate hub behind the arm.
 SEAT_T12 = 25.5
 # The pinion's retention-pin cross-hole station: the pinion's own PIN_STATION
 # (from its toothed south face) measured from the SeatPinion datum that face
 # sits on. Machine z = CRANKSHAFT_Z0 + this. The recess of the shaft end inside
 # the pinion's boss (build_drive_train_assembly asserts it) is
 # SEAT_PINION + OVERALL_LENGTH - SHAFT_LENGTH.
-if PINION_PIN_EDGE_TO_END < PIN_EDGE_TO_SHAFT_END_NOMINAL - 1e-9:
-    raise AssertionError(
-        f"pinion pin hole edge {PINION_PIN_EDGE_TO_END:.3f} from the crankshaft's "
-        f"north end, under W15's {PIN_EDGE_TO_SHAFT_END_NOMINAL}"
-    )
 
 DOME_R = SHAFT_DIA / 2.0
 DOME_SPHERE_R = (DOME_R**2 + SHAFT_DOME_HEIGHT**2) / (2.0 * SHAFT_DOME_HEIGHT)

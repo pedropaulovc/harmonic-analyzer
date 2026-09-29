@@ -586,11 +586,11 @@ async def build(adapter: Any) -> dict[str, str]:
     # 5. Two vertical ANSI-inch 1/4 Fillister Head Screw counterbores in the
     # top face, ONE native Hole Wizard feature with two driven placement
     # points.  Drilled LAST, as the real casting is: the crank boss is cast
-    # integral and its Ø21.93 cylinder passes 1.09 mm into both Ø7.14 thru
-    # holes, so a boss extruded after the holes would re-fill a crescent of
-    # each and no 1/4 screw would pass.  The top face is still one +Y planar
-    # face after the transverse booleans (they stop 2.3 mm below it), which is
-    # all the normal-based placement-face walk needs.
+    # integral and its Ø21.93 cylinder overlaps both Ø7.14 thru holes; a boss
+    # extruded after the holes would re-fill a crescent of each and no 1/4
+    # screw would pass.  The top face is still one +Y planar face after the
+    # transverse booleans (they stop 2.3 mm below it), which is all the
+    # normal-based placement-face walk needs.
     attachment_cut = wizard_holes(
         adapter,
         ATTACHMENT_HOLE_SPEC,

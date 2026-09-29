@@ -453,10 +453,9 @@ def test_notes_carry_the_tooth_edge_override_and_the_boss_wall_fact() -> None:
 
 
 def test_sheet_runs_at_3_to_1_with_every_view_at_sheet_scale() -> None:
-    # A 17.8 x 24.9 mm part on a B sheet (W15): at 4:1 the section's boss-end
-    # dimensions ran into the isometric, so 3:1 is the largest scale that lays
-    # out. One scale for every view means the title block's SCALE field is the
-    # whole truth and no view needs a scale note.
+    # One scale for every view means the title block's SCALE field is the
+    # whole truth and no view needs a scale note. The 24.4-mm boss-ended
+    # blank must still clear its section dimensions and neighbouring views.
     assert drawing.SHEET_SCALE == (3.0, 1.0)
     assert drawing.VIEW_SCALE == (3, 1)
     assert drawing.SHEET_SCALE[0] == drawing.VIEW_SCALE[0]
@@ -557,9 +556,8 @@ def test_part_stamps_make_critical_properties() -> None:
 
 
 def test_w15_boss_hides_the_shaft_end_and_walls_the_pin_at_every_limit() -> None:
-    # Main rulings 2026-09-25 (W15, option 1): the boss is sized so the pin keeps
-    # 4.5 of shaft beyond it nominally and 2.0 in the worst case, and the shaft
-    # end stays 0.25 inside the boss with every length at its PRINTED limit.
+    # The photo asks for the shortest printable boss, but neither the
+    # match-drilled pin nor the existing W15 print-worst floors may change.
     import build_drive_train_assembly as bdt
 
     printed = float(str(_config.title_block("linear_1pl")["display"]).lstrip("±"))
@@ -569,8 +567,9 @@ def test_w15_boss_hides_the_shaft_end_and_walls_the_pin_at_every_limit() -> None
     # Both lengths print exactly, so no rounded nominal eats the margin.
     assert spec.OVERALL_LENGTH == round(spec.OVERALL_LENGTH, spec.OVERALL_LENGTH_PLACES)
     assert spec.SHAFT_END_RECESS_MIN <= bdt.PINION_RECESS_NOMINAL <= spec.SHAFT_END_RECESS_MAX
-    assert bdt.PINION_PIN_EDGE_NOMINAL_ACTUAL >= spec.PIN_EDGE_TO_SHAFT_END_NOMINAL
     assert sum(bdt.PINION_PIN_EDGE_STACK.values()) >= spec.PIN_EDGE_MIN_WORST
+    assert crankshaft_spec._SHORTER_PIN_EDGE_WORST < spec.PIN_EDGE_MIN_WORST
+    assert spec.PIN_AXIAL_LIGAMENT_WORST >= spec.PIN_AXIAL_LIGAMENT_FLOOR_MM
     # The seat feeler is directly against the restored boss north face.
     assert spec.SEAT_FEELER_MM == pytest.approx(0.25)
     assert bdt.T120_PINION_NORTH_AIR >= bdt.T120_PINION_AIR_FLOOR

@@ -15,8 +15,8 @@ Dimensions: cad/config/dimensions.yaml ch12 crank-drive gear row +
 Appendix C #9. Face slightly wider than the drive gear's (meshing-pair
 practice, axial alignment slack).
 
-Layout: gear axis = Z through the origin, teeth z = 0..10.4 mm, boss
-z = 10.4..24.9 mm, pin cross-hole along X at z = 17.65 (W15).
+Layout: gear axis = Z through the origin, teeth z = 0..FACE_WIDTH, boss
+z = FACE_WIDTH..OVERALL_LENGTH, pin at FACE_WIDTH + BOSS_LENGTH / 2 (W15).
 
 Run (SolidWorks already open)::
 

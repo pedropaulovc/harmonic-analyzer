@@ -33,12 +33,10 @@ POST_BORE_END = 104.789505572 + CRANK_FACE_SHIFT
 SEAT_PINION = POST_BORE_END + crank_pinion_spec.SEAT_FEELER_MM
 if SEAT_PINION <= POST_BORE_END:
     raise AssertionError("the 16T seat must clear the restored post boss north face")
-# W15 (Main, 2026-09-25): the far end sits recessed inside the pinion's boss,
-# and crank_pinion_spec sizes that boss so the retention pin keeps its wall to
-# this end.  The length is floored to the places it prints (Codex P2 on #892),
-# so the sheet's nominal IS the model's and an accepted shaft is never longer
-# than the model; the recess that leaves lies between the pinion's
-# SHAFT_END_RECESS_MIN and _MAX, the range its boss was sized for.
+# W15: the far end remains recessed inside the pinion's shorter boss. Its
+# one-place length is floored so the printed nominal is the model's and an
+# accepted shaft cannot be longer than the model. The pinion spec reserves
+# enough boss for the retained pin at its worst printed limit.
 SHAFT_LENGTH = crank_pinion_spec.floor_to_places(
     SEAT_PINION
     + crank_pinion_spec.OVERALL_LENGTH
@@ -58,11 +56,10 @@ if not (
 # Unilateral: a long shaft would stand proud of the boss, and a short one only
 # deepens the recess and shortens the pin's wall, which build_drive_train_
 # assembly's worst-case stacks carry.  Printed on Depth from the model.
-# W15-SHAFT-BAND (Main 2026-09-25): unilateral +0/-0.4 is required by
-# the W15 pin-wall and recess stacks (pinion_pin_edge_stack /
-# pinion_recess_stack in build_drive_train_assembly); at the title-block .X
-# +/-0.8 the restored stack's wall is 1.873 < 2.0 and recess -0.461.
-SHAFT_LENGTH_BAND = (0.00, -0.40)  # (upper, lower) deviations
+# W15-SHAFT-BAND (Main 2026-09-25): preserve unilateral +0/-0.4;
+# the normal title-block .X +/-0.8 would leave the shortened boss's
+# pin wall below 2.0 and make the shaft end stand proud at print-worst.
+SHAFT_LENGTH_BAND = (0.00, -crank_pinion_spec.SHAFT_LENGTH_SHORT_MM)
 
 # Integral lands run directly in the restored post bore. Derive the journal
 # from the named running fit and the bore's published +0.005/-0.025 band.
@@ -171,7 +168,7 @@ PINION_PIN_EDGE_STACK = {
     "nominal": PINION_PIN_EDGE_TO_END,
     "shaft length": SHAFT_LENGTH_BAND[1],
     "seat gap": -SEAT_GAP_NORTH_RANGE,
-    "boss mid-length": -crank_pinion_spec.OVERALL_LENGTH_GRADE_MM,
+    "boss mid-length": -(crank_pinion_spec.FACE_WIDTH_GRADE_MM + crank_pinion_spec.OVERALL_LENGTH_GRADE_MM) / 2.0,
     "pin layout": -crank_pinion_spec.PIN_STATION_LAYOUT_ALLOWANCE_MM,
     "drill oversize": -float(_config.title_block("drilled_hole")["plus_mm"]) / 2.0,
 }
@@ -185,6 +182,26 @@ if sum(PINION_PIN_EDGE_STACK.values()) < crank_pinion_spec.PIN_EDGE_MIN_WORST:
     raise AssertionError("W15 pin edge-to-shaft-end wall falls below its print-worst floor")
 if sum(PINION_RECESS_STACK.values()) < crank_pinion_spec.SHAFT_END_RECESS_MIN_WORST:
     raise AssertionError("W15 shaft end protrudes past its print-worst boss recess floor")
+_BOSS_PRINT_STEP = 10.0 ** -crank_pinion_spec.BOSS_LENGTH_PLACES
+_SHORTER_SHAFT_LENGTH = crank_pinion_spec.floor_to_places(
+    SEAT_PINION
+    + crank_pinion_spec.OVERALL_LENGTH
+    - _BOSS_PRINT_STEP
+    - crank_pinion_spec.SHAFT_END_RECESS_MIN,
+    crank_pinion_spec.SHAFT_LENGTH_PLACES,
+)
+_SHORTER_PIN_EDGE_WORST = (
+    sum(PINION_PIN_EDGE_STACK.values())
+    + _SHORTER_SHAFT_LENGTH
+    - SHAFT_LENGTH
+    + _BOSS_PRINT_STEP / 2.0
+)
+if _SHORTER_PIN_EDGE_WORST >= crank_pinion_spec.PIN_EDGE_MIN_WORST:
+    raise AssertionError(
+        f"a boss one print step shorter still holds the W15 pin-edge floor "
+        f"({_SHORTER_PIN_EDGE_WORST:.3f} >= {crank_pinion_spec.PIN_EDGE_MIN_WORST:.2f}); "
+        "the pinion boss is not the shortest feasible"
+    )
 # MHA-024 hub-to-shaft cross-hole behind the crank arm.
 PIN_HOLE_SPEC = HoleSpec("drilled_number", "#9")
 PIN_HOLE_HEIGHT = SERVICE_PIN_STATION
