@@ -348,8 +348,10 @@ function Initialize-SharedEnvironment {
             'venv', '--quiet', '--relocatable', $staging
         ) | Out-Host
         $env:VIRTUAL_ENV = $staging
+        # --project repeats the working directory, so the command line names
+        # this run's snapshot: -Cancel finds a sync a dead launcher left.
         Invoke-LoggedNative -LogPath $LogPath -FilePath 'uv' -ArgumentList @(
-            'sync', '--frozen', '--no-editable', '--active'
+            'sync', '--frozen', '--no-editable', '--active', '--project', $SnapshotPath
         ) | Out-Host
         Write-JsonAtomic -Path (Join-Path $staging '.farm-run-environment.json') -Value $Identity
     }
@@ -819,8 +821,15 @@ function Get-RunProcessTree {
     $startedAt = ConvertTo-UtcTimestamp -Value $Record['started_at']
     $all = @(Get-CimInstance -ClassName Win32_Process -Property ProcessId, ParentProcessId, CreationDate, CommandLine)
     # With the launcher gone, its PID says nothing about who a process belongs
-    # to: a direct child must also carry the recorded build command line.
-    $buildCommand = @($Record['argv'] | Select-Object -Skip 1) -join ' '
+    # to: a direct child must also name this run on its command line -- the
+    # recorded build command, or, for the preparation and cleanup commands
+    # (git worktree add/remove, submodule update, uv sync), this run's
+    # snapshot, or (uv venv) its private staging environment.
+    $markers = @(
+        (@($Record['argv'] | Select-Object -Skip 1) -join ' '),
+        [string]$Record['snapshot'],
+        "$($Record['environment']).staging-$(Split-Path -Path $Record['snapshot'] -Leaf)"
+    ) | Where-Object { -not [string]::IsNullOrEmpty($_) }
     $byParent = @{}
     foreach ($process in $all) {
         $parent = [int]$process.ParentProcessId
@@ -857,7 +866,11 @@ function Get-RunProcessTree {
             # A child of the process that reused the launcher's PID.
             continue
         }
-        if (-not $isLauncher -and -not ([string]$child.CommandLine).Contains($buildCommand)) {
+        $commandLine = [string]$child.CommandLine
+        $namesRun = @($markers | Where-Object {
+                $commandLine.Contains($_, [System.StringComparison]::OrdinalIgnoreCase)
+            }).Count -gt 0
+        if (-not $isLauncher -and -not $namesRun) {
             continue
         }
         $queue.Enqueue($child)
@@ -1131,8 +1144,8 @@ function Invoke-RunCancel {
             Write-RunEvent -RunId $runId -Text "$($outcome['outcome']) $workflowId"
             continue
         }
-        $described = ($query.output | Where-Object { $_.TrimStart().StartsWith('{') } | Select-Object -Last 1) |
-            ConvertFrom-Json -AsHashtable
+        $line = $query.output | Where-Object { $_.TrimStart().StartsWith('{') } | Select-Object -Last 1
+        $described = $line | ConvertFrom-Json -AsHashtable
         if ($described['status'] -ne 'RUNNING') {
             $outcome['outcome'] = 'already-closed'
             $outcome['detail'] = $described['status']
@@ -1145,20 +1158,28 @@ function Invoke-RunCancel {
             Write-RunEvent -RunId $runId -Text "error $workflowId"
             continue
         }
+        # ConvertFrom-Json has already parsed the value, so its precision is
+        # read from the raw line.
+        if ($line -notmatch '"start_time"\s*:\s*"[^"]*T\d\d:\d\d:\d\d\.\d') {
+            # A whole second cannot order the start against this run's request:
+            # another submitter may have created it earlier in that second.
+            $outcome['outcome'] = 'kept-foreign'
+            $outcome['detail'] = "farm.py reported start_time $($described['start_time']) without sub-second precision; cannot order it against this run's request"
+            Write-RunEvent -RunId $runId -Text "kept $workflowId`: $($outcome['detail'])"
+            continue
+        }
         $workflowStarted = ConvertTo-UtcTimestamp -Value $described['start_time']
         $requested = if ($requests.ContainsKey($workflowId)) { $requests[$workflowId] } else { @() }
+        # Creation follows the request by one start_workflow round trip.
         $createdHere = @($requested | Where-Object {
-                # farm.py truncates start_time to the second; creation follows
-                # the request by one start_workflow round trip.
-                $workflowStarted -ge $_.AddTicks(-($_.Ticks % [System.TimeSpan]::TicksPerSecond)) -and
-                $workflowStarted -le $_.AddSeconds($script:CreationWindowSeconds)
+                $workflowStarted -ge $_ -and $workflowStarted -le $_.AddSeconds($script:CreationWindowSeconds)
             }).Count -gt 0
         if (-not $createdHere) {
             # USE_EXISTING cannot say who created a workflow, so only one the
-            # farm started right after this run's own request is this run's;
+            # farm started after this run's own request is this run's;
             # anything else was another submitter's, and this run attached.
             $outcome['outcome'] = 'kept-foreign'
-            $outcome['detail'] = "started $($workflowStarted.ToString('o')), not within $($script:CreationWindowSeconds) s of a request by this run"
+            $outcome['detail'] = "started $($workflowStarted.ToString('o')), not within $($script:CreationWindowSeconds) s after a request by this run"
             Write-RunEvent -RunId $runId -Text "kept $workflowId`: $($outcome['detail'])"
             continue
         }

@@ -233,9 +233,11 @@ if lines:
                 + "\\n"
             )
             if workflow in workflows:
+                # farm.py status reports it to the microsecond.
                 workflows[workflow].setdefault(
                     "start_time",
-                    time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime(now)),
+                    time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(now))
+                    + f".{int(now % 1 * 1e6):06d}+00:00",
                 )
     farm_state.write_text(json.dumps(workflows), encoding="utf-8")
     print(printed, end="", flush=True)
@@ -634,7 +636,16 @@ def test_launches_share_one_environment_synced_once(tmp_path: Path) -> None:
         for line in Path(fixture["syncs"]).read_text(encoding="utf-8").splitlines()
     ]
     assert len(syncs) == 1, syncs
-    assert syncs[0]["argv"] == ["sync", "--frozen", "--no-editable", "--active"]
+    # --project names the snapshot so -Cancel can tell a sync a dead launcher
+    # left from anyone else's.
+    assert syncs[0]["argv"] == [
+        "sync",
+        "--frozen",
+        "--no-editable",
+        "--active",
+        "--project",
+        first["snapshot"],
+    ]
     assert Path(syncs[0]["cwd"]) == Path(first["snapshot"])
     # Synced in a staging directory of its own, then published whole.
     staged = Path(syncs[0]["VIRTUAL_ENV"])
@@ -1311,28 +1322,36 @@ SLEEPER = "__import__('time').sleep(120)"
 
 
 @pytest.mark.parametrize(
-    ("recorded_code", "orphaned"),
+    ("recorded_code", "names", "orphaned"),
     [
         # The recorded build command: the dead launcher's own child.
-        (SLEEPER, True),
+        (SLEEPER, None, True),
+        # Codex on #1125 (d05cb04d9): a preparation or cleanup command (git
+        # worktree add/remove, submodule update, uv sync) names the snapshot...
+        ("__import__('time').sleep(121)", "snapshots/reused", True),
+        # ...and uv venv names the run's private staging environment.
+        ("__import__('time').sleep(121)", "envs/reused.staging-reused", True),
         # A different command under the same (dead) parent PID: not the run's.
-        ("__import__('time').sleep(121)", False),
+        ("__import__('time').sleep(121)", None, False),
     ],
+    ids=["build", "snapshot", "staging", "other"],
 )
-def test_an_orphan_must_carry_the_recorded_build_command(
-    tmp_path: Path, recorded_code: str, orphaned: bool
+def test_an_orphan_must_name_the_run_on_its_command_line(
+    tmp_path: Path, recorded_code: str, names: str | None, orphaned: bool
 ) -> None:
     """A dead launcher's PID is only a ParentProcessId now: any process that
-    reused it could have left children. Only the recorded command is the run's."""
+    reused it could have left children. Only a command naming the run is its."""
     fixture = _launcher_fixture(tmp_path)
-    Path(fixture["log_directory"]).mkdir()
+    log_directory = Path(fixture["log_directory"])
+    log_directory.mkdir()
+    extra = [] if names is None else [str(log_directory / names)]
     started = time.time()
     parent = subprocess.run(
         [
             sys.executable,
             "-c",
             "import subprocess, sys; "
-            f"print(subprocess.Popen([sys.executable, '-c', {SLEEPER!r}], "
+            f"print(subprocess.Popen([sys.executable, '-c', {SLEEPER!r}, *{extra!r}], "
             "stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, "
             "stderr=subprocess.DEVNULL).pid)",
         ],
@@ -1409,7 +1428,8 @@ def test_a_dead_launcher_is_reported_and_its_orphaned_leaves_cancelled(
                 LEAF_PEN: {"status": "UNREACHABLE"},
                 LEAF_CONE: {"status": "COMPLETED"},
                 LEAF_SHARED: {"status": "RUNNING"},
-                # Another submitter started it long before this run attached.
+                # Another submitter started it long before this run attached;
+                # an older farm.py reports it to the whole second only.
                 LEAF_FOREIGN: {
                     "status": "RUNNING",
                     "start_time": "2020-01-01T00:00:00+00:00",
@@ -1430,12 +1450,17 @@ def test_a_dead_launcher_is_reported_and_its_orphaned_leaves_cancelled(
         for entry in map(json.loads, telemetry.read_text(encoding="utf-8").splitlines())
         if entry["attributes"]["workflow_id"] == LEAF_RACED
     )
-    raced_start = requested_at.replace(microsecond=0) - timedelta(seconds=2)
+    # Codex on #1125 (d05cb04d9): created earlier in the same second as this
+    # run's request, which a whole-second start_time could not tell apart.
+    raced_start = requested_at - timedelta(
+        microseconds=requested_at.microsecond // 2 + 1
+    )
+    assert raced_start.replace(microsecond=0) == requested_at.replace(microsecond=0)
     # .NET's round-trip form has 7 fractional digits; keep microseconds.
     run_start = datetime.fromisoformat(running["started_at"][:26] + "+00:00")
     assert raced_start > run_start
     workflows = json.loads(farm_state.read_text(encoding="utf-8"))
-    workflows[LEAF_RACED]["start_time"] = raced_start.isoformat()
+    workflows[LEAF_RACED]["start_time"] = raced_start.isoformat(timespec="microseconds")
     farm_state.write_text(json.dumps(workflows), encoding="utf-8")
     build = _stub_pid(fixture)
     try:

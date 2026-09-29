@@ -246,7 +246,9 @@ no `.done`.
   `-State` and `-MaxAgeHours`.
 - **`-Cancel -Why <reason>`** stops the launcher and every process it started,
   including a build a dead launcher left behind (a process under a dead
-  launcher's PID counts only if it carries the recorded build command line),
+  launcher's PID counts only if its command line names the run: the recorded
+  build command, the run's snapshot — git worktree add/remove, submodule
+  update, uv sync — or its private uv staging environment),
   rescanning until a scan finds no process started since the last (at most
   10 rounds, else an error). It then cancels each of `unsettled_workflows`
   that `farm.py status` reports `RUNNING`,
@@ -256,13 +258,18 @@ no `.done`.
   `-LogDirectory` is still waiting on (`kept-shared`; a `launcher-died`
   sibling counts while its build outlives it). The other is a leaf this run
   cannot show it created (`kept-foreign`). It counts as created here only when
-  the farm's `start_time` falls between the second of one of this run's own
-  `Farm workflow requested` telemetry records (`reports/telemetry/logs.jsonl`
-  in its outputs; a torn line is skipped) and 30 s after it. A clock skew
-  between this machine and
-  the farm errs toward keeping. A submitter outside this `-LogDirectory` that
-  attached *after* this run created a leaf is invisible, and that leaf is
-  cancelled with the rest; only farm-side reference counting could see it.
+  the farm's `start_time`, to the microsecond, falls at or after one of this
+  run's own `Farm workflow requested` telemetry records
+  (`reports/telemetry/logs.jsonl` in its outputs; a torn line is skipped) and
+  within 30 s of it. A `start_time` reported to the whole second (a
+  solidworks-pool `farm.py` older than pedropaulovc/solidworks-pool#165)
+  cannot be ordered against the request, so that leaf is kept. The two
+  timestamps come from different clocks: a farm clock behind this machine's
+  errs toward keeping; one ahead can make a leaf another submitter created
+  that much before this run's request look like this run's. A submitter
+  outside this `-LogDirectory` that attached *after* this run created a leaf
+  is invisible, and that leaf is cancelled with the rest; only farm-side
+  reference counting could see it.
   If any leaf cannot be accounted for (`farm.py` failed on
   authentication, network or CLI), `-Cancel` exits 1 and changes nothing
   else: no `.done`, the snapshot kept, the run still `launcher-died`. Retry the
