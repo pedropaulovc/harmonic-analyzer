@@ -1201,39 +1201,54 @@ function Stop-RunProcesses {
             )
             return
         }
-        $stopping = [System.Collections.Generic.List[int]]::new()
+        $stopping = [System.Collections.Generic.List[System.Diagnostics.Process]]::new()
         foreach ($process in $fresh) {
             $processId = [int]$process.ProcessId
-            $stopped[$processId] = @{ created = $process.CreationDate.ToUniversalTime(); exited = $null }
-            try {
-                Stop-Process -Id $processId -Force -ErrorAction Stop
-                $Killed.Add($processId)
-                $stopping.Add($processId)
-            }
-            catch [Microsoft.PowerShell.Commands.ProcessCommandException] {
+            $created = $process.CreationDate.ToUniversalTime()
+            $stopped[$processId] = @{ created = $created; exited = $null }
+            $holder = Get-Process -Id $processId -ErrorAction SilentlyContinue
+            if ($null -eq $holder) {
                 # Already exited between the scan and the stop.
-            }
-            catch {
-                $Errors.Add("could not stop process $processId`: $($_.Exception.Message)")
-            }
-        }
-        if ($stopping.Count -gt 0) {
-            # A timeout here is reported, not thrown; the check below is what
-            # tells a wedged process from a stopped one.
-            Wait-Process -Id $stopping -Timeout $script:StopWaitSeconds -ErrorAction SilentlyContinue
-        }
-        foreach ($processId in $stopping) {
-            $survivor = Get-Process -Id $processId -ErrorAction SilentlyContinue
-            if ($null -eq $survivor) {
                 continue
             }
-            # Same PID, same process: a PID reused since the stop is gone.
-            $drift = ($survivor.StartTime.ToUniversalTime() - $stopped[$processId]['created']).Duration()
-            if ($drift.TotalSeconds -ge 1) {
+            try {
+                # An open handle pins the PID: from here on it cannot name
+                # another process, so the start time checked below is the one
+                # killed and waited on.
+                $null = $holder.SafeHandle
+                if ($holder.HasExited) {
+                    continue
+                }
+                if (($holder.StartTime.ToUniversalTime() - $created).Duration().TotalSeconds -ge 1) {
+                    # The scanned process exited and its PID was reused.
+                    continue
+                }
+                $holder.Kill()
+                $Killed.Add($processId)
+                $stopping.Add($holder)
+            }
+            catch {
+                $problem = $_.Exception.Message
+                $gone = $false
+                try {
+                    $gone = $holder.HasExited
+                }
+                catch {
+                    # No access to ask: report the original failure.
+                }
+                if (-not $gone) {
+                    $Errors.Add("could not stop process $processId`: $problem")
+                }
+            }
+        }
+        $deadline = [System.Diagnostics.Stopwatch]::StartNew()
+        foreach ($holder in $stopping) {
+            $left = [math]::Max(0, $script:StopWaitSeconds * 1000 - $deadline.ElapsedMilliseconds)
+            if ($holder.WaitForExit([int]$left)) {
                 continue
             }
             # It may still dispatch: no .done, snapshot kept, retry -Cancel.
-            $Errors.Add("process $processId was still running $($script:StopWaitSeconds) s after it was stopped")
+            $Errors.Add("process $($holder.Id) was still running $($script:StopWaitSeconds) s after it was stopped")
         }
         # No process of this round can start a child after this instant.
         $exited = [System.DateTime]::UtcNow

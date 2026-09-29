@@ -263,8 +263,10 @@ no `.done`.
   build command, the run's snapshot — git worktree add/remove, submodule
   update, uv sync — or its private uv staging environment).
   It rescans until a scan finds no process started since the last (at most
-  10 rounds, else an error), and a stopped process still running 60 s later is
-  an error too, since it may still be dispatching. It then cancels each of
+  10 rounds, else an error). Each process is stopped through a handle whose
+  start time matches the scan's, so a PID reused after the scan is never
+  killed, and a stopped process still running 60 s later is an error, since it
+  may still be dispatching. It then cancels each of
   `unsettled_workflows` that `farm.py status` reports `RUNNING`,
   with the reason and run id on the cancellation. Workflows are shared by ID
   (`USE_EXISTING`), so two leaves are kept. One is a leaf a sibling run in the
