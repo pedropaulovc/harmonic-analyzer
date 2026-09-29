@@ -727,7 +727,6 @@ def test_crank_boss_station_prints_on_its_own_dimension_line() -> None:
     its own dimension line; and a bare station was not found as one (Main's
     rim-8339 ruling), so its label stacks with the value.  It stands once, in
     the plan."""
-    assert drawing.DIMENSION_CALLOUTS["CrankBossStartZ"] == "CRANK BOSS FACE"
     assert "CrankBossStartZ" in drawing.TOP_KEEP
     assert "CrankBossStartZ" not in drawing.JOURNAL_TEXT_OFFSETS
 

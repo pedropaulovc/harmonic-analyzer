@@ -201,13 +201,16 @@ FRONT_KEEP = {
 # north-face station, the face the crank boss length is taken from.
 TOP_KEEP = {
     "HeadDia": (0.071, 0.188),
-    "CrankBossLen": (0.056, TOP_CENTER[1]),
+    # The length stands outboard of the station so the station's stacked
+    # label clears its dimension line: with the v36 boss face 2.5 further
+    # north, a one-line label spanning both lines was crossed by the length.
+    "CrankBossLen": (0.040, TOP_CENTER[1]),
     # The station stands between the crank-boss length and the circle, its
     # value on its own dimension line.  On the right its upper witness line
     # ran level with the counterbore callout's shelf and that callout's
     # leader crossed its dimension line, so its text had to be offset to a
     # distant shelf, where a blind reader took it for a note.
-    "CrankBossStartZ": (0.0655, 0.2338),
+    "CrankBossStartZ": (0.062, 0.2338),
     "MountEastX": (0.075, 0.2525),
     "MountWestX": (0.110, 0.2525),
     "InclineAngle": (0.142, _top_y(28.0)),
@@ -255,8 +258,8 @@ JOURNAL_TEXT_OFFSETS = {
 DIMENSION_CALLOUTS = {
     "HeadDia": "HEAD",
     "CrankBossDia": "CRANK BOSS",
-    "CrankBossLen": "CRANK BOSS LENGTH",
-    "CrankBossStartZ": "CRANK BOSS FACE",
+    "CrankBossLen": "CRANK BOSS\nLENGTH",
+    "CrankBossStartZ": "CRANK BOSS\nFACE",
     "CrankBoreDia": "CRANK BORE THRU",
     "JournalBoreDia": f"CONE BORE THRU\n{POST_JOURNAL_RIM_BREAK}",
     "ConeBossDia": "CONE JOURNAL BOSS OD",
