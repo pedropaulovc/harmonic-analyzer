@@ -1191,9 +1191,11 @@ function Stop-RunProcesses {
     # dispatching leaves. A process can start a child between a scan and its
     # own stop, so scan again until a scan finds nothing new.
     $stopped = @{}
+    # PIDs a scan named but whose current holder is another process.
+    $rejected = [System.Collections.Generic.HashSet[int]]::new()
     for ($round = 1; ; $round++) {
         $fresh = @(Get-RunProcessTree -Record $Record -Stopped $stopped |
-                Where-Object { -not $stopped.ContainsKey([int]$_.ProcessId) })
+                Where-Object { -not $stopped.ContainsKey([int]$_.ProcessId) -and -not $rejected.Contains([int]$_.ProcessId) })
         if ($fresh.Count -eq 0) {
             return
         }
@@ -1227,7 +1229,11 @@ function Stop-RunProcesses {
                 # every readable process on amet), anything else is not.
                 $startTicks = $holder.StartTime.ToUniversalTime().Ticks
                 if ($startTicks - ($startTicks % 10) -ne $created.Ticks) {
-                    # The scanned process exited and its PID was reused.
+                    # The scanned process exited and its PID was reused. The
+                    # holder is not the run's, so its children must not seed
+                    # the next scan as a stopped process's would.
+                    $stopped.Remove($processId)
+                    [void]$rejected.Add($processId)
                     continue
                 }
                 $holder.Kill()
@@ -1260,7 +1266,10 @@ function Stop-RunProcesses {
         # No process of this round can start a child after this instant.
         $exited = [System.DateTime]::UtcNow
         foreach ($process in $fresh) {
-            $stopped[[int]$process.ProcessId]['exited'] = $exited
+            $entry = $stopped[[int]$process.ProcessId]
+            if ($null -ne $entry) {
+                $entry['exited'] = $exited
+            }
         }
     }
 }
