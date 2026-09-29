@@ -76,6 +76,18 @@ def test_the_cone_stack_step_prints_measured_limits_and_feeler() -> None:
     assert "IT NIPS; SNUG MHA-140" in fitup
 
 
+def test_the_printed_shaft_end_play_keeps_the_bushing_off_the_tip_block() -> None:
+    """Codex P1 on #1128: the collar carries the stack north by MHA-014's end
+    play, so the printed top spends the stack's float.  At the tightest feeler
+    setting the bushing must still run MIN_END_PLAY off the block."""
+    match = re.search(r"END PLAY (\d+\.\d+)-(\d+\.\d+)", _step_body("tip-adjuster-set"))
+    assert match is not None
+    low, high = (float(value) for value in match.groups())
+    assert 0.0 < low < high
+    running = cone_stack_end_play.STACK_FLOAT[0] - high
+    assert running >= cone_stack_end_play.MIN_END_PLAY - 1e-9, running
+
+
 def test_a_cite_to_the_wrong_step_is_caught() -> None:
     """Positive control: RIG SET sets the rig along the bank, not its tip gap."""
     assert TIP_GAP_FEELER not in _step_body("rig-set")

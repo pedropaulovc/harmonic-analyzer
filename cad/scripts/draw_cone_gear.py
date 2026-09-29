@@ -617,6 +617,9 @@ def _sweep_clock_right_of_flat(
     annotation = clocks[0]
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
     dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    selection_name = str(display.GetNameForSelection() or "")
+    if not selection_name:
+        raise RuntimeError(f"{label}: the flat clock has no selection name")
     model = adapter.currentModel
     drawing = _early_bound(model, "IDrawingDoc")
     vertex = bore_flat_vertex(teeth)
@@ -629,8 +632,10 @@ def _sweep_clock_right_of_flat(
             if not drawing.ActivateView(view.GetName2()):
                 raise RuntimeError(f"{label}: failed to activate the bore view")
             model.ClearSelection2(True)
-            if not annotation.Select3(False, null_callout()):
-                raise RuntimeError(f"{label}: failed to select the flat clock")
+            if not model.Extension.SelectByID2(
+                selection_name, "DIMENSION", 0.0, 0.0, 0.0, False, 0, null_callout(), 0
+            ):
+                raise RuntimeError(f"{label}: failed to select the flat clock {selection_name!r}")
             flipped = getattr(display, flip)()
             model.ClearSelection2(True)
             if not flipped:

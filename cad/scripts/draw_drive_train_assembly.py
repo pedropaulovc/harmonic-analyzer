@@ -66,7 +66,7 @@ from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 from _drive_train_balloon_anchors import DRIVE_TRAIN_BALLOON_ANCHORS
 from cone_swing_platform_spec import POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT
 from cone_gear_stack import COUNT as CONE_GEAR_COUNT, STACK_L20_ACCEPT
-from cone_stack_end_play import TIP_BLOCK_FEELER
+from cone_stack_end_play import MIN_END_PLAY, STACK_FLOAT, TIP_BLOCK_FEELER
 from crank_pinion_spec import SEAT_FEELER_MM as PINION_SEAT_FEELER
 from drive_train_assembly_spec import (
     CLUSTERS,
@@ -80,7 +80,7 @@ from drive_train_assembly_spec import (
 )
 from pinion_spring_section import SCREW_EAST_OF_PIVOT as SPRING_SCREW_EAST_OF_PIVOT
 from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view, view_name
+from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 
 SPEC = DRAWINGS_BY_NAME["drive_train_assembly"]
 ARTIFACT_STEM = SPEC.artifact_stem
@@ -435,6 +435,16 @@ ASSEMBLED_HEADING = (
     f"FULL DETAIL: SHEET {FULL_DETAIL_SHEET}."
 )
 
+# MHA-014's end play at step 3.  Backing the cup screw off lets the collar
+# carry the stack north toward the tip block, so the top of the band spends the
+# stack's float: it stops where the tightest feeler setting still leaves the
+# bushing MIN_END_PLAY off the block, with no MARGIN_SPARE at that corner (user
+# ruling 2026-09-29, Codex P1 on #1128, over a thicker feeler that would move
+# the block and lengthen the shaft).  Derived here, not in cone_stack_end_play:
+# that module sits in the recipe closure of every cone_line reader, and this
+# sheet is the band's only consumer.  0.05: the shaft never runs clamped.
+SHAFT_END_PLAY = (0.05, STACK_FLOAT[0] - MIN_END_PLAY)  # (0.05, 0.25)
+
 
 CONE_CRANK_STEPS = "\n".join(
     (
@@ -475,7 +485,8 @@ CONE_CRANK_STEPS = "\n".join(
         # (MHA-097 5/16-18 -> #10-32: 1/8 turn is ~0.18 -> ~0.10).
         "3. THREAD MHA-097 INTO MHA-092 UNTIL MHA-014 JUST STOPS SHUTTLING",
         "   AND STILL TURNS FREELY; BACK OFF 1/8 TURN; TIGHTEN",
-        "   MHA-098 ACROSS THE SLIT. END PLAY 0.05-0.40, BY FEEL OR INDICATOR.",
+        "   MHA-098 ACROSS THE SLIT. END PLAY "
+        f"{SHAFT_END_PLAY[0]:.2f}-{SHAFT_END_PLAY[1]:.2f}, BY FEEL OR INDICATOR.",
         # User ruling 2026-09-28: the crank journal runs directly in the post;
         # the centres are fixed, and the only mesh requirement is no binding.
         "4. FIT MHA-026 DIRECTLY IN THE MHA-016 CRANK BORE. SLIDE MHA-025",
