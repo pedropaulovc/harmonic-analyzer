@@ -231,7 +231,10 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         edge_xy=SHOULDER_PICK,
-        frame_xy=(0.020, 0.120),
+        # Above the datum B leader (a horizontal at y=0.150 into the shoulder
+        # line): from below at 0.120 the frame's leader crossed it (farm leaf
+        # 20260929T194845Z layout audit).
+        frame_xy=(0.020, 0.158),
         characteristic="perpendicularity",
         tolerance=GEOMETRIC_TOLERANCES_MM["shoulder perpendicularity"],
         datums=("A",),
