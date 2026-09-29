@@ -49,6 +49,13 @@ param(
     [ValidateNotNullOrEmpty()]
     [string]$Why,
 
+    # Cancel: how long after stopping the run a workflow the farm reports
+    # absent is asked about again, so a start RPC in flight when the build was
+    # killed has landed first.
+    [Parameter(ParameterSetName = 'Cancel')]
+    [ValidateRange(0, 600)]
+    [int]$SettleSeconds = 30,
+
     [Parameter(ParameterSetName = 'List')]
     [ValidateSet('running', 'succeeded', 'failed', 'cancelled', 'launcher-died')]
     [string]$State,
@@ -961,7 +968,9 @@ function Invoke-RunWatch {
         [Parameter(Mandatory)][int]$PollSeconds
     )
 
-    $emitted = 0
+    # Events are matched by text, not position: request-record events are
+    # rebuilt each poll and can sort ahead of ones already printed.
+    $emitted = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
     $announced = $false
     while ($true) {
         $snapshot = Get-RunStatus -RecordPath $RecordPath
@@ -973,10 +982,11 @@ function Invoke-RunWatch {
             )
             $announced = $true
         }
-        for ($index = $emitted; $index -lt $snapshot.events.Count; $index++) {
-            Write-RunEvent -RunId $status['run_id'] -Text $snapshot.events[$index]
+        foreach ($runEvent in $snapshot.events) {
+            if ($emitted.Add($runEvent)) {
+                Write-RunEvent -RunId $status['run_id'] -Text $runEvent
+            }
         }
-        $emitted = $snapshot.events.Count
         if ($script:WatchExitCodes.ContainsKey($status['state'])) {
             $counts = $status['counts']
             $summary = (
@@ -1137,7 +1147,8 @@ function Invoke-RunCancel {
     param(
         [Parameter(Mandatory)][string]$Directory,
         [Parameter(Mandatory)][string]$RecordPath,
-        [Parameter(Mandatory)][string]$Why
+        [Parameter(Mandatory)][string]$Why,
+        [Parameter(Mandatory)][int]$SettleSeconds
     )
 
     $snapshot = Get-RunStatus -RecordPath $RecordPath
@@ -1154,6 +1165,9 @@ function Invoke-RunCancel {
             Write-RunEvent -RunId $runId -Text "stopped launcher pid $($record['pid']) and its processes: $($killed -join ',')"
         }
     }
+    # From here no process of this run can send a start; one already sent may
+    # still be committing on the farm (see the not-found pass below).
+    $stoppedAt = [System.Diagnostics.Stopwatch]::StartNew()
     # A run that finished (before this command, or on its own while being
     # stopped) keeps its .done; its leaves are still reconciled below, since
     # a leaf that failed locally may still be running on the farm.
@@ -1169,39 +1183,41 @@ function Invoke-RunCancel {
     # waiting on the same leaf keeps it.
     $shared = Get-SiblingWaits -Directory $Directory -RecordPath $RecordPath
 
-    $outcomes = [System.Collections.Generic.List[object]]::new()
     $reason = "$Why (farm-run.ps1 -Cancel $runId)"
-    foreach ($workflowId in $unsettled) {
-        $outcome = [ordered]@{ workflow_id = $workflowId; outcome = $null; detail = $null }
-        $outcomes.Add($outcome)
-        if ($shared.ContainsKey($workflowId)) {
+    # Returns one outcome whose `event` the caller prints: anything this block
+    # wrote to the pipeline would be returned with the outcome.
+    $resolve = {
+        param([string]$WorkflowId)
+
+        $outcome = [ordered]@{ workflow_id = $WorkflowId; outcome = $null; detail = $null; event = $null }
+        if ($shared.ContainsKey($WorkflowId)) {
             $outcome['outcome'] = 'kept-shared'
-            $outcome['detail'] = "run $($shared[$workflowId]) is still waiting on it"
-            Write-RunEvent -RunId $runId -Text "kept $workflowId`: $($outcome['detail'])"
-            continue
+            $outcome['detail'] = "run $($shared[$WorkflowId]) is still waiting on it"
+            $outcome['event'] = "kept $WorkflowId`: $($outcome['detail'])"
+            return $outcome
         }
-        $query = Invoke-FarmCli -PoolHome $record['pool_home'] -Arguments @('status', '--json', $workflowId)
+        $query = Invoke-FarmCli -PoolHome $record['pool_home'] -Arguments @('status', '--json', $WorkflowId)
         if ($query.code -ne 0) {
             $text = $query.output -join ' '
-            if ($text -match 'workflow not found') {
-                # Requested, but the submitter died before the farm recorded it.
-                $outcome['outcome'] = 'not-found'
-            }
-            else {
-                $outcome['outcome'] = 'error'
-                $errors.Add("farm.py status $workflowId exited $($query.code): $text")
-            }
             $outcome['detail'] = $text
-            Write-RunEvent -RunId $runId -Text "$($outcome['outcome']) $workflowId"
-            continue
+            if ($text -notmatch 'workflow not found') {
+                $outcome['outcome'] = 'error'
+                $errors.Add("farm.py status $WorkflowId exited $($query.code): $text")
+                $outcome['event'] = "error $WorkflowId"
+                return $outcome
+            }
+            # Requested, but the farm has no record of it (yet: see below).
+            $outcome['outcome'] = 'not-found'
+            $outcome['event'] = "not-found $WorkflowId"
+            return $outcome
         }
         $line = $query.output | Where-Object { $_.TrimStart().StartsWith('{') } | Select-Object -Last 1
         $described = $line | ConvertFrom-Json -AsHashtable
         if ($described['status'] -ne 'RUNNING') {
             $outcome['outcome'] = 'already-closed'
             $outcome['detail'] = $described['status']
-            Write-RunEvent -RunId $runId -Text "already closed $workflowId`: $($described['status'])"
-            continue
+            $outcome['event'] = "already closed $WorkflowId`: $($described['status'])"
+            return $outcome
         }
         # The farm has no creator identity (every submitter on a host shares
         # user@host), and an attach looks like a creation. Only the start that
@@ -1210,36 +1226,62 @@ function Invoke-RunCancel {
         if (-not $described.ContainsKey('farm_run')) {
             $outcome['outcome'] = 'kept-foreign'
             $outcome['detail'] = 'farm.py status reports no farm_run (solidworks-pool before pedropaulovc/solidworks-pool#165); cannot tell who created it'
-            Write-RunEvent -RunId $runId -Text "kept $workflowId`: $($outcome['detail'])"
-            continue
+            $outcome['event'] = "kept $WorkflowId`: $($outcome['detail'])"
+            return $outcome
         }
         if ($described['farm_run'] -ne $runId) {
             $creator = if ($null -eq $described['farm_run']) { 'a submitter outside farm-run.ps1' } else { "run $($described['farm_run'])" }
             $outcome['outcome'] = 'kept-foreign'
             $outcome['detail'] = "created by $creator; this run attached"
-            Write-RunEvent -RunId $runId -Text "kept $workflowId`: $($outcome['detail'])"
-            continue
+            $outcome['event'] = "kept $WorkflowId`: $($outcome['detail'])"
+            return $outcome
         }
         # A sibling may have attached since the scan above, while this loop
         # queried the farm. Look again right before cancelling; what remains
         # is the one farm.py round trip this cancel takes.
-        $waiter = (Get-SiblingWaits -Directory $Directory -RecordPath $RecordPath)[$workflowId]
+        $waiter = (Get-SiblingWaits -Directory $Directory -RecordPath $RecordPath)[$WorkflowId]
         if ($null -ne $waiter) {
             $outcome['outcome'] = 'kept-shared'
             $outcome['detail'] = "run $waiter is still waiting on it"
-            Write-RunEvent -RunId $runId -Text "kept $workflowId`: $($outcome['detail'])"
-            continue
+            $outcome['event'] = "kept $WorkflowId`: $($outcome['detail'])"
+            return $outcome
         }
-        $cancelled = Invoke-FarmCli -PoolHome $record['pool_home'] -Arguments @('cancel', '--why', $reason, $workflowId)
+        $cancelled = Invoke-FarmCli -PoolHome $record['pool_home'] -Arguments @('cancel', '--why', $reason, $WorkflowId)
         $outcome['detail'] = $cancelled.output -join ' '
-        if ($cancelled.code -eq 0) {
-            $outcome['outcome'] = 'cancelled'
-        }
-        else {
+        $outcome['outcome'] = 'cancelled'
+        if ($cancelled.code -ne 0) {
             $outcome['outcome'] = 'error'
-            $errors.Add("farm.py cancel $workflowId exited $($cancelled.code): $($outcome['detail'])")
+            $errors.Add("farm.py cancel $WorkflowId exited $($cancelled.code): $($outcome['detail'])")
         }
-        Write-RunEvent -RunId $runId -Text "$($outcome['outcome']) $workflowId"
+        $outcome['event'] = "$($outcome['outcome']) $WorkflowId"
+        return $outcome
+    }
+
+    $outcomes = [System.Collections.Generic.List[object]]::new()
+    foreach ($workflowId in $unsettled) {
+        $outcome = & $resolve $workflowId
+        Write-RunEvent -RunId $runId -Text $outcome['event']
+        $outcome.Remove('event')
+        $outcomes.Add($outcome)
+    }
+
+    # _farm._dispatch names a workflow before its start RPC, so a build killed
+    # mid-RPC leaves a name the farm may not have committed yet. Not-found is
+    # final only once that RPC can no longer land: ask again after
+    # -SettleSeconds since the run's processes were stopped.
+    $absent = @($outcomes | Where-Object { $_['outcome'] -eq 'not-found' })
+    if ($absent.Count -gt 0) {
+        $remaining = $SettleSeconds - $stoppedAt.Elapsed.TotalSeconds
+        if ($remaining -gt 0) {
+            Write-RunEvent -RunId $runId -Text "$($absent.Count) not found; asking again in $([int][Math]::Ceiling($remaining)) s"
+            Start-Sleep -Milliseconds ([int][Math]::Ceiling($remaining * 1000))
+        }
+        foreach ($stale in $absent) {
+            $outcome = & $resolve $stale['workflow_id']
+            Write-RunEvent -RunId $runId -Text $outcome['event']
+            $outcome.Remove('event')
+            $outcomes[$outcomes.IndexOf($stale)] = $outcome
+        }
     }
 
     if ($null -ne $finished -or $errors.Count -gt 0) {
@@ -1323,7 +1365,7 @@ if ($PSCmdlet.ParameterSetName -ne 'Launch') {
                 switch ($PSCmdlet.ParameterSetName) {
                     'Status' { Invoke-RunStatus -RecordPath $selected }
                     'Watch' { Invoke-RunWatch -RecordPath $selected -PollSeconds $PollSeconds }
-                    'Cancel' { Invoke-RunCancel -Directory $trackedDirectory -RecordPath $selected -Why $Why }
+                    'Cancel' { Invoke-RunCancel -Directory $trackedDirectory -RecordPath $selected -Why $Why -SettleSeconds $SettleSeconds }
                 }
             }
         }

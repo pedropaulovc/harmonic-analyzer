@@ -108,11 +108,17 @@ if farm is not None:
     # writes it on creation) unless its creator already set one. "_old": true
     # plays a farm.py that predates farm_run: status leaves the key out.
     # Status "UNREACHABLE" fails the query as a network outage would.
+    # "_absent_for": N reports the workflow missing to its first N status
+    # queries: a start RPC the farm had not committed yet.
     state_path = Path(os.environ["UV_STUB_FARM"])
     workflows = json.loads(state_path.read_text(encoding="utf-8"))
     command, *rest = sys.argv[farm + 1 :]
     workflow = rest[-1]
-    if workflow not in workflows:
+    absent = workflow in workflows and workflows[workflow].get("_absent_for", 0) > 0
+    if absent and command == "status":
+        workflows[workflow]["_absent_for"] -= 1
+        state_path.write_text(json.dumps(workflows), encoding="utf-8")
+    if workflow not in workflows or absent:
         print(f"Error: workflow not found for ID: {workflow}", file=sys.stderr)
         raise SystemExit(2)
     described = workflows[workflow]
@@ -120,7 +126,11 @@ if farm is not None:
         print("Error: failed to connect to the farm", file=sys.stderr)
         raise SystemExit(1)
     if command == "status":
-        shown = {key: value for key, value in described.items() if key != "_old"}
+        shown = {
+            key: value
+            for key, value in described.items()
+            if key not in ("_old", "_absent_for")
+        }
         if described.get("_old"):
             shown.pop("farm_run", None)
         # "_attach": a run record to publish while the farm answers: a sibling
@@ -1037,6 +1047,7 @@ LEAF_NUT = "leaf:part:wheel_axle_nut:" + "c" * 64 + ":5400s"
 LEAF_SHARED = "leaf:part:crank_hub:" + "d" * 64 + ":5400s"
 LEAF_FOREIGN = "leaf:part:paper_roller:" + "f" * 64 + ":5400s"
 LEAF_RACED = "leaf:part:platen:" + "9" * 64 + ":5400s"
+LEAF_EARLY = "leaf:part:cam_follower:" + "e" * 64 + ":5400s"
 
 # Verbatim shapes of what build.py prints at --verbosity info (_farm._dispatch,
 # the cache restore, doit's TaskError and the traceback's final exception).
@@ -1515,7 +1526,16 @@ def test_a_dead_run_from_an_older_launcher_breaks_neither_status_nor_cancel(
 
     cancel_old = _run_launcher(
         fixture,
-        _tracking(fixture, "-Cancel", "-Tag", "old-launcher", "-Why", "old run"),
+        _tracking(
+            fixture,
+            "-Cancel",
+            "-Tag",
+            "old-launcher",
+            "-Why",
+            "old run",
+            "-SettleSeconds",
+            "0",
+        ),
         fixture["environment"],
     )
 
@@ -1688,7 +1708,14 @@ def test_a_dead_launcher_is_reported_and_its_orphaned_leaves_cancelled(
         assert "LAUNCHER DIED" in watch.stdout
 
         cancel_command = _tracking(
-            fixture, "-Cancel", "-Tag", "orphaned", "-Why", "launcher died"
+            fixture,
+            "-Cancel",
+            "-Tag",
+            "orphaned",
+            "-Why",
+            "launcher died",
+            "-SettleSeconds",
+            "0",
         )
         refused = _run_launcher(fixture, cancel_command, fixture["environment"])
         # A leaf it could not account for keeps the run retryable: the orphan
@@ -1807,6 +1834,100 @@ def test_cancel_stops_a_live_launcher_and_its_build_before_cancelling_leaves(
         LEAF_CONE: "COMPLETED",
     }
     assert not Path(running["snapshot"]).exists()
+
+
+def test_cancel_asks_again_about_a_leaf_the_farm_had_not_committed_yet(
+    tmp_path: Path,
+) -> None:
+    """Codex on #1125 (1bf36d088): the request record is written before the
+    start RPC, so a build killed mid-RPC names a workflow the farm reports
+    absent for a moment and then runs. Not-found must not settle it early."""
+    fixture = _launcher_fixture(tmp_path)
+    Path(fixture["farm_state"]).write_text(
+        json.dumps(
+            {
+                LEAF_PEN: {"status": "COMPLETED"},
+                LEAF_NUT: {"status": "RUNNING", "_absent_for": 1},
+            }
+        ),
+        encoding="utf-8",
+    )
+    process, release, running = _start_held(
+        tmp_path, fixture, DISPATCH_LINES, "landing", {"UV_STUB_UNLOGGED": LEAF_NUT}
+    )
+    try:
+        cancel = _run_launcher(
+            fixture,
+            _tracking(
+                fixture,
+                "-Cancel",
+                "-RunId",
+                running["run_id"],
+                "-Why",
+                "mid-rpc",
+                "-SettleSeconds",
+                "2",
+            ),
+            fixture["environment"],
+        )
+        process.communicate(timeout=HANG_GUARD_S)
+    finally:
+        release.touch()
+
+    assert cancel.returncode == 0, (cancel.stdout, cancel.stderr)
+    assert f"not-found {LEAF_NUT}" in cancel.stdout
+    done = _record(Path(running["done"]))
+    assert {w["workflow_id"]: w["outcome"] for w in done["cancel"]["workflows"]} == {
+        LEAF_PEN: "already-closed",
+        LEAF_NUT: "cancelled",
+    }
+    farm = json.loads(Path(fixture["farm_state"]).read_text(encoding="utf-8"))
+    assert farm[LEAF_NUT]["status"] == "CANCELED"
+
+
+def test_watch_prints_a_request_record_that_sorts_ahead_of_printed_ones(
+    tmp_path: Path,
+) -> None:
+    """Codex on #1125 (1bf36d088): request-record events are rebuilt in file
+    name order each poll, so a positional cursor skipped a new one that
+    sorted first and printed an old one again."""
+    fixture = _launcher_fixture(tmp_path)
+    process, release, running = _start_held(
+        tmp_path, fixture, DISPATCH_LINES, "reorder", {"UV_STUB_UNLOGGED": LEAF_NUT}
+    )
+    try:
+        watch = subprocess.Popen(
+            _tracking(
+                fixture, "-Watch", "-RunId", running["run_id"], "-PollSeconds", "1"
+            ),
+            env=fixture["environment"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        printed = []
+        while not any(LEAF_NUT in line for line in printed):
+            line = watch.stdout.readline()
+            assert line, "watch ended before printing the recorded request"
+            printed.append(line)
+        # A dispatch the log has not caught up with, named to sort first.
+        (Path(running["requests"]) / "0000.json").write_text(
+            json.dumps({"task": "part:cam_follower", "workflow_id": LEAF_EARLY}),
+            encoding="utf-8",
+        )
+        time.sleep(2.5)  # two -Watch polls
+        release.touch()
+        rest, errors = watch.communicate(timeout=HANG_GUARD_S)
+    finally:
+        release.touch()
+        process.communicate(timeout=HANG_GUARD_S)
+
+    lines = printed + rest.splitlines()
+    assert watch.returncode == 0, (lines, errors)
+    assert (
+        sum(f"leaf part:cam_follower requested {LEAF_EARLY}" in x for x in lines) == 1
+    )
+    assert sum(f"requested {LEAF_NUT}" in x for x in lines) == 1, lines
 
 
 def test_cancel_finds_a_leaf_whose_request_never_reached_the_log(

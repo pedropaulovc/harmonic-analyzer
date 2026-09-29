@@ -277,6 +277,12 @@ no `.done`.
   `-LogDirectory` that attached *after* this run created a leaf is invisible,
   and that leaf is cancelled with the rest. Only farm-side reference counting
   would close both gaps.
+  A leaf the farm reports absent is not settled on that answer: its request
+  record is written before the start RPC, and a build killed mid-RPC can
+  leave a start the farm commits a moment later. `-Cancel` asks again once
+  `-SettleSeconds` (30) have passed since it stopped the run's processes, and
+  handles a leaf that has appeared like any other; one still absent is
+  `not-found`.
   If any leaf cannot be accounted for (`farm.py` failed on
   authentication, network or CLI), `-Cancel` exits 1 and changes nothing
   else: no `.done`, the snapshot kept, the run still `launcher-died`. Retry the
