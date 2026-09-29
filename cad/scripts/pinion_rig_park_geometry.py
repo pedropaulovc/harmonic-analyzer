@@ -72,6 +72,18 @@ def pin_line_dist(
     return abs(dx * (-n[1]) - dy * (-n[0]))
 
 
+def pin_contact_station(cam_angle: float, swing: float) -> float:
+    """Cam-axis projection along the follower pin from the strap centreline, mm.
+
+    This is the closest station of the two perpendicular cylinder axes, not
+    the pin's crossing of the fixed lift-rod x plane.
+    """
+    c, n = _pin_frame(REST_SWING_RAD + swing)
+    dx = LIFT_X + CAM_ECC * math.sin(cam_angle) - c[0]
+    dy = LIFT_Y - CAM_ECC * math.cos(cam_angle) - c[1]
+    return -(dx * n[0] + dy * n[1])
+
+
 def cam_pin_gap(cam_angle: float, swing: float) -> float:
     """Signed OD-to-shank air; cam and swing angles are radians from rest."""
     c, n = _pin_frame(REST_SWING_RAD + swing)

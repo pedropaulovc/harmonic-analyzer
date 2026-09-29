@@ -144,9 +144,12 @@ Run (SolidWorks already open)::
 
 from __future__ import annotations
 
+import itertools
 import math
 import os
 import sys
+
+import numpy as np
 
 import _config
 import _telemetry
@@ -659,7 +662,7 @@ if PINION_TOOTH_Z + PINION_FACE / 2.0 > CRANKSHAFT_Z0 + CRANKSHAFT_LENGTH:
 # The crankshaft's named seat datums (the flip-free coincident seats for the
 # keyed chain -- see _seat_on_crank) must sit exactly at this module's
 # authored stations.  Hub and arm seat to one another at the shaft origin.
-from _hole_spec import THREAD_MAJOR_MM, blind_cut_dia_mm  # noqa: E402
+from _hole_spec import THREAD_MAJOR_MM  # noqa: E402
 from build_crankshaft import (  # noqa: E402
     SEAT_PINION as CS_SEAT_PINION,
     SEAT_T12 as CS_SEAT_T12,
@@ -1009,37 +1012,40 @@ from pinion_handle_geometry import (  # noqa: E402
     ROD_DIA as HANDLE_ROD_DIA,
     ROD_DIA_BAND as HANDLE_ROD_DIA_BAND,
 )
+import pinion_spring_load as spr_load  # noqa: E402
 from pinion_spring_geometry import (  # noqa: E402
     BEND_EXIT as SPR_BEND_EXIT_L,
-    BLADE_ARM as SPR_BLADE_ARM,
     CONTACT_T as SPR_CONTACT_T,
     CREST as SPR_CREST_L,
     FLAT_TIP as SPR_FLAT_TIP_L,
     FOOT_END as SPR_FOOT_END_L,
     FOOT_TAN as SPR_FOOT_TAN_L,
     FORMED_BAND_MM as SPR_FORMED_BAND,
-    FORMED_CORNERS as SPR_FORMED_CORNERS,
     HOLE_SPEC as SPR_HOLE_SPEC,
     HOLE_X as SPR_HOLE_X_L,
+    PAD_LEN as SPR_PAD_LEN,
+    PAD_LEN_PLACES as SPR_PAD_LEN_PLACES,
     KINK_C as SPR_KINK_C_L,
-    KINK_DEG as SPR_KINK_DEG,
+    HOLE_FROM_END as SPR_HOLE_FROM_END,
+    LEAF_DESIGN as SPR_LEAF_DESIGN,
     MIN_ARBOR_END_CAP_SPARE_MM as SPR_ENDCAP_SPARE_MM,
+    MIN_CREST_ARC_MARGIN_DEG as SPR_CREST_MARGIN_DEG,
     KINK_START as SPR_KINK_START_L,
+    NOMINAL_CONTACT_T as SPR_NOMINAL_CONTACT_T,
     PARKED_AIR as SPR_PARKED_AIR,
     PIVOT_LX as SPR_PIVOT_LX,
     PIVOT_LY as SPR_PIVOT_LY,
-    PRESET as SPR_PRESET,
     R_KINK as SPR_R_KINK,
+    SET_ERROR_MM as SPR_SET_ERROR,
+    SET_SCREW_FLOAT_MM as SPR_SET_SCREW_FLOAT,
     STRAP_HALF_WIDTH as SPR_STRAP_HALF_WIDTH,
     STRAP_LEAN_DEG as SPR_STRAP_LEAN_DEG,
     YIELD_MPA as SPR_YIELD_MPA,
-    contact_force as spr_contact_force,
-    formed_contact as spr_formed_contact,
-    formed_contact_arc_sweep as spr_formed_contact_arc_sweep,
-    require_loaded_crest_reserve as spr_require_loaded_crest_reserve,
-    root_stress as spr_root_stress,
+    loaded as spr_loaded,
 )
 from pinion_spring_section import (  # noqa: E402
+    PAD_WIDTH as SPR_PAD_WIDTH,
+    PAD_WIDTH_PLACES as SPR_PAD_WIDTH_PLACES,
     THICK as SPRING_T,
     THICK_BAND as SPRING_T_BAND,
     WIDTH as SPRING_W,
@@ -1921,6 +1927,7 @@ from pinion_rig_park_geometry import (  # noqa: E402
 )
 from pinion_rig_park_geometry import pin_line_dist as _pin_line_dist  # noqa: E402
 from pinion_rig_park_geometry import cam_pin_gap as _cam_pin_gap  # noqa: E402
+from pinion_rig_park_geometry import pin_contact_station as _pin_contact_station  # noqa: E402
 
 _APINION_PA = math.radians(14.5)  # alignment_pinion_spec PRESSURE_ANGLE_DEG
 _APINION_BASE_R = APINION_TEETH / DP_TRAIN * 25.4 * math.cos(_APINION_PA) / 2.0
@@ -2174,14 +2181,19 @@ if abs(SPR_STRAP_LEAN_DEG - STRAP_LEAN_DEG) > 0.01:
     raise AssertionError("spring geometry assumes another parked strap lean")
 if abs(SPR_STRAP_HALF_WIDTH - STRAP_R_END) > 1e-9:
     raise AssertionError("spring geometry assumes another strap width")
-# Crest station and air, parked: on the straight flank at CONTACT_T, clear of
-# the arbor end cap (the flank is straight from the pivot to STRAP_C2C).
+# The installed SOLID hovers its crest PARKED_AIR off the parked flank at the
+# model's CONTACT_T (a rigid-rotation stand-in for the loaded leaf, so the
+# interference gate sees a clean part); the LOADED crest of the elastica bears
+# on the flank near it, on the straight flank (pivot to STRAP_C2C), clear of
+# the arbor end cap.  The load gates below use the elastica alone.
 _CREST_T, _CREST_N = _strap_frame(SPRING_CREST)
 if abs(_CREST_T - SPR_CONTACT_T) > 0.01:
-    raise AssertionError("spring crest is off its contact station")
+    raise AssertionError("spring crest is off its model contact station")
 if abs(_CREST_N - STRAP_R_END - SPR_PARKED_AIR) > 0.01 or SPR_PARKED_AIR < 0.1:
     raise AssertionError("spring crest does not hover its parked air off the flank")
-if _CREST_T > STRAP_C2C - 1.0:
+if abs(_CREST_T - SPR_NOMINAL_CONTACT_T) > 1.5:
+    raise AssertionError("spring solid's crest strays from the loaded nominal contact")
+if not 1.0 <= min(_CREST_T, SPR_NOMINAL_CONTACT_T) <= max(_CREST_T, SPR_NOMINAL_CONTACT_T) <= STRAP_C2C - 1.0:
     raise AssertionError("spring crest bears on the arbor end cap, not the flank")
 if SPRING_BLADE_INSET < 0.0 or SPRING_BLADE_INSET + SPRING_W > STRAP_T:
     raise AssertionError("spring blade overhangs the strap flank axially")
@@ -2246,14 +2258,13 @@ if math.hypot(_FPIN_S0, FPIN_DROP) - FPIN_DIA / 2.0 - STRAP_PIVOT_BORE / 2.0 < 0
 # Pin axis, machine frame: _FPIN_C (pinion_rig_park_geometry), through the
 # strap axis FPIN_DROP below the pivot, running WEST along -N (the axis RISES
 # going west, N[1] < 0).
-_FPIN_TIP_S = _FPIN_S0 + FPIN_LEN  # 20: shank end / dome start from centreline
-_S_CAM = (_FPIN_C[0] - LIFT_X) / _SPR_N[0]  # 14.9: where the pin crosses the
-# rod/cam plane x = LIFT_X
-if _FPIN_TIP_S - _S_CAM < 2.0:
-    raise AssertionError("follower pin ends short of the cam axis")
-if _S_CAM - _FPIN_S0 < 2.0:
-    raise AssertionError("cam contact lands inside the strap edge, not the pin")
-_FPIN_Y_AT_CAM = _FPIN_C[1] - _S_CAM * _SPR_N[1]  # 64.04
+_FPIN_TIP_S = _FPIN_S0 + FPIN_LEN  # 23.5: shank end / dome start from centreline
+_S_CAM = (_FPIN_C[0] - LIFT_X) / _SPR_N[0]  # where the pin crosses
+# the rod/cam plane x = LIFT_X (for the lift-height comparison below)
+_REST_PIN_CONTACT_STATION = _pin_contact_station(0.0, 0.0)
+if not STRAP_R_END + 1.0 < _REST_PIN_CONTACT_STATION < _FPIN_TIP_S - FPIN_CAP_SAG - 1.0:
+    raise AssertionError("rest cam contact lies outside the bare follower shank")
+_FPIN_Y_AT_CAM = _FPIN_C[1] - _S_CAM * _SPR_N[1]
 
 # Cam z stations: CAM_PIN_STATION of the 9-long collar, from its front face.
 # U28 (2026-09-23) deleted the set-pin boss for a sub-flush M2.5 set screw at
@@ -2301,9 +2312,6 @@ def _cam_pin_contact_faces(
     """
     ax, ay = LIFT_X, LIFT_Y - CAM_ECC
     dx, dy = -_SPR_N[0], -_SPR_N[1]  # pin root -> domed tip
-    station = (ax - _FPIN_C[0]) * dx + (ay - _FPIN_C[1]) * dy
-    if not STRAP_R_END + 1.0 < station < _FPIN_TIP_S - FPIN_CAP_SAG - 1.0:
-        raise AssertionError("cam's closest station is outside the bare pin shank")
     cam_face = CylinderFace(
         component=cam,
         axis_point_mm=(ax, ay, z_mid),
@@ -2357,8 +2365,6 @@ if _NEED_LIFT <= 0.2:
 _D_ENG = _pin_line_dist(LIFT_Y + CAM_ECC, c=_FPIN_C_ENG, n=_N_ENG)
 if (FPIN_DIA + CAM_OD) / 2.0 - _D_ENG < 0.25:
     raise AssertionError("cam lift cannot reach the engaged follower")
-if _FPIN_TIP_S - _S_CAM_ENG < 1.0:
-    raise AssertionError("engaged pin slides off the cam axis")
 
 
 # Solve the lever's photographed engaged angle from the real eccentric-cam
@@ -2395,6 +2401,13 @@ if not -85.0 < CAM_ENGAGE_ROTATION_DEG < -75.0:
     raise AssertionError("pinion cam engage rotation left the photo-backed range")
 if not -80.0 < LEVER_ENGAGED_TILT_DEG < -65.0:
     raise AssertionError("engaged pinion lever left the photographed +X-side range")
+# The x-plane crossing above is for lift authority, not the closest
+# station of the two skew cylinders; check the latter after solving cam.
+_ENGAGED_PIN_CONTACT_STATION = _pin_contact_station(
+    math.radians(CAM_ENGAGE_ROTATION_DEG), _PHI_ENG
+)
+if not STRAP_R_END + 1.0 < _ENGAGED_PIN_CONTACT_STATION < _FPIN_TIP_S - FPIN_CAP_SAG - 1.0:
+    raise AssertionError("engaged cam contact lies outside the bare follower shank")
 
 
 # Follower-seat integrity in the uncut strap. The complete Ø4 mouth must land
@@ -2422,39 +2435,16 @@ if LIFT_Y - _CAM_SWEEP_R - Y_BASE_TOP < 0.25:
     raise AssertionError("cam collar sweep reaches the base top")
 if math.hypot(PIVOT_X - LIFT_X, PIVOT_Y - LIFT_Y) - _CAM_SWEEP_R - 3.175 < 0.25:
     raise AssertionError("cam sweep reaches the pivot shaft")
-# The return spring stands east of the strap and the lift rod west of it,
-# the collar's sweep spanning the blade's height.  The whole leaf -- foot,
-# bend, blade and crest -- keeps 0.25 off the rod's envelope (the collar
-# sweeps about the rod's own axis, so it contains the rod) where the leaf
-# sits furthest west.  The base seat is spotted through the pad hole, so
-# the screw's float in that hole and the formed profile's band move it.
-SPRING_WEST_SHIFT_STACK = {
-    "MHA-114 formed profile band": SPR_FORMED_BAND,
-    "#4 screw float in the pad's clearance hole": (
-        blind_cut_dia_mm(SPR_HOLE_SPEC) - THREAD_MAJOR_MM[FSCREW_THREAD]
-    )
-    / 2.0,
-}
-_SPR_WEST_X = max(
-    SPRING_FOOT_TAN_X,  # the foot, up to the bend
-    SPRING_BEND_EXIT[0] + SPRING_T,  # the bend and the blade's root
-    SPRING_KINK_START[0] + SPRING_T,  # the blade's top
-    SPRING_KINK_C[0] + SPR_R_KINK + SPRING_T,  # the crest's outer arc
-    SPRING_FLAT_TIP[0] + SPRING_T,  # the flick
-)
-SPRING_TO_LIFT_ROD = (
-    LIFT_X
-    - max(3.175, _CAM_SWEEP_R)
-    - _SPR_WEST_X
-    - sum(SPRING_WEST_SHIFT_STACK.values())
-)
-if SPRING_TO_LIFT_ROD < 0.25:
-    raise AssertionError("spring leaf reaches the lift rod's collar sweep")
-
-# --- return spring across the engage swing (analytic; issue #158) ------------
-# The strap swings 0 -> _PHI_ENG CCW into the blade.  The leaf deflects by the
-# crest's penetration into the swung flank on top of its PRESET (the free form
-# stands PRESET into the parked flank; the model hovers PARKED_AIR off it).
+# --- return spring across the engage swing (elastica; issue #158, PR #1127) --
+# The strap swings 0 -> _PHI_ENG CCW into the blade.  The leaf is the free
+# profile MHA-114 prints, its pad SET off the parked flank (pinion_spring
+# _geometry SET_*), and every load number is the root-compliant elastica of
+# pinion_spring_load solved over the printed envelope: the five formed
+# contact dimensions each end of their band, the stock thickness band, the
+# strip and pad widths and the pad length at .XX, the strap's cap radii and
+# c2c at their printed places, the parked lean's band, the SPRING SET error
+# each way, the pad hole's .XX location, both poses; FlatLen and FreeTipH are
+# walked on every solved shape (TIP_CASES).
 # Gravity moments of the swing cluster about the pivot, parked then engaged,
 # N.mm; both turn it INTO mesh.  CAD-derived (#859, 2026-09-25; re-derived
 # 2026-09-26): each part's centroid from the STLs of the warm integration
@@ -2490,140 +2480,165 @@ if (
     > 0.01
 ):
     raise AssertionError("SWING_GRAVITY_BASIS no longer sums to its mass")
-_PRELOAD_MARGIN = 1.5  # over gravity, at the soft corner
-_STRESS_SF = 1.5  # on yield, at the stiff corner
-# Stock corners (#859 ruling 1): the leaf is formed to the nominal inside
-# profile, so a thicker strip moves the contact face into the flank by the
-# thickness excess.  Soft: thinnest, narrowest strip.  Stiff: thickest strip.
-# Each is then walked over every formed corner (below).
+_PRELOAD_MARGIN = 1.5  # over gravity, parked and engaged, every corner
+_STRESS_SF = 1.5  # on yield, every corner
 _SPR_T_LO, _SPR_T_HI = (SPRING_T + _d for _d in deviations(SPRING_T_BAND))
-_SPR_W_LO = SPRING_W + printed_deviations(SPRING_W, SPRING_W_PLACES)[0]
-_SPR_STEPS = 1 + math.ceil(math.degrees(_PHI_ENG) / 0.25)
-_SPR_BLADE_SAMPLES = 16
-_SPR_CREST_OUTER_R = SPR_R_KINK + SPRING_T  # the crest's contact-face radius
-_spr_blade = (
-    SPRING_KINK_START[0] - SPRING_BEND_EXIT[0],
-    SPRING_KINK_START[1] - SPRING_BEND_EXIT[1],
-)
-_spr_len = math.hypot(*_spr_blade)
-_SPR_WEST = (_spr_blade[1] / _spr_len, -_spr_blade[0] / _spr_len)  # blade normal
-_spr_deflection: list[float] = []
-_spr_station: list[float] = []
-for _i in range(_SPR_STEPS):
-    _phi = _PHI_ENG * _i / (_SPR_STEPS - 1)
-    # The flank touches the crest where the crest's outward normal faces it:
-    # that direction must stay on the crest arc (blade side -> flick side).
-    _t, _n = _strap_frame(SPRING_KINK_C, _phi)
-    _n -= _SPR_CREST_OUTER_R
-    _toward = math.atan2(
-        -(_SPR_N[0] * math.sin(_phi) + _SPR_N[1] * math.cos(_phi)),
-        -(_SPR_N[0] * math.cos(_phi) - _SPR_N[1] * math.sin(_phi)),
-    )
-    _from = math.atan2(_SPR_WEST[1], _SPR_WEST[0])
-    _sweep = (_toward - _from + math.pi) % (2.0 * math.pi) - math.pi
-    if not -1e-9 <= _sweep <= math.radians(SPR_KINK_DEG) + 1e-9:
-        raise AssertionError(f"spring contact runs off the crest arc at {_phi:.4f}")
-    # The contact stays on the STRAIGHT flank, clear of the arbor end cap.
-    if not 1.0 <= _t <= STRAP_C2C - 1.0:
-        raise AssertionError(f"spring contact leaves the straight flank at {_phi:.4f}")
-    # The crest is the first contact: no point of the blade's west face below
-    # it nor the flick tip comes nearer the swung flank.
-    for _k in range(_SPR_BLADE_SAMPLES + 1):
-        _f = _k / _SPR_BLADE_SAMPLES
-        _p = (
-            SPRING_BEND_EXIT[0] + _f * _spr_blade[0] + SPRING_T * _SPR_WEST[0],
-            SPRING_BEND_EXIT[1] + _f * _spr_blade[1] + SPRING_T * _SPR_WEST[1],
-        )
-        if _strap_frame(_p, _phi)[1] < _n - 1e-6:
-            raise AssertionError("spring blade crosses the flank below the crest")
-    if _strap_frame(SPRING_FLAT_TIP, _phi)[1] - SPRING_T < _n - 1e-6:
-        raise AssertionError("spring flick tip crosses the flank above the crest")
-    _spr_deflection.append(SPR_PRESET + SPR_PARKED_AIR - (_n - STRAP_R_END))
-    _spr_station.append(_t)
-SPRING_DEFLECTION = (_spr_deflection[0], _spr_deflection[-1])  # parked, engaged
-# Every accepted formed profile: the print holds FootLen, BendR, FreeKinkH,
-# FreeKinkV and KinkR to independent ±0.5 mm bands, so walk all 32 corners.
-# The free crest's penetration, arm and contact station ride the installed
-# nominal; the swing penetration scales with the corner's contact station.
-# The normal deflection is measured from the FREE form (including the preset
-# exactly once).  Resolve the contact force, root moment and elastic tip angle
-# against the same FREE blade normal at both stock thickness limits.
-_SPR_FREE_NOM = spr_formed_contact()
-_SPR_SWING_DEFLECTION = SPRING_DEFLECTION[1] - SPRING_DEFLECTION[0]
-_SPR_SWING_STATION = _spr_station[-1] - _spr_station[0]
+_SPR_W_LO, _SPR_W_HI = (SPRING_W + _d for _d in printed_deviations(SPRING_W, SPRING_W_PLACES))
+_SPR_PAD_W = tuple(SPR_PAD_WIDTH + _d for _d in printed_deviations(SPR_PAD_WIDTH, SPR_PAD_WIDTH_PLACES))
+_SPR_PAD_L = tuple(SPR_PAD_LEN + _d for _d in printed_deviations(SPR_PAD_LEN, SPR_PAD_LEN_PLACES))
+_SPR_CAP_DEV = printed_deviations(STRAP_R_END, 1)[1]  # the strap's R7.5 ends print .X
+_SPR_C2C_DEV = printed_deviations(STRAP_C2C, 2)[1]  # its bore c2c prints .XX
+# The parked lean's band: the pins rest on their cams, so the cam eccentric,
+# the pin seats and the pivot fits stack into the strap's parked angle.
+SPRING_PARKED_LEAN_BAND_DEG = 1.0
+_SPR_HOLE_DEV = printed_deviations(SPR_HOLE_FROM_END, 2)[1]  # the pad hole locates .XX
 
 
-def _spring_corner(deviations: dict[str, float], thick: float):
-    """(parked, engaged) deflection, arm, and (parked, engaged) station."""
-    penetration, arm, station = spr_formed_contact(deviations, thick)
-    parked = SPRING_DEFLECTION[0] + penetration - _SPR_FREE_NOM[0]
-    station_p = _spr_station[0] + station - _SPR_FREE_NOM[2]
-    engaged = parked + _SPR_SWING_DEFLECTION * station_p / _spr_station[0]
-    return (
-        (parked, engaged),
-        SPR_BLADE_ARM + arm - _SPR_FREE_NOM[1],
-        (station_p, station_p + _SPR_SWING_STATION),
+def spring_envelope(full: bool) -> dict[str, np.ndarray]:
+    """The printed envelope the load gates walk.  ``full`` takes every band
+    independently (65536 cases, the test suite's proof); the import-time gate
+    walks the 4096-case subset with the strap's two caps moved together, its
+    c2c and the pad's blank at nominal."""
+    park = math.radians(SPRING_PARKED_LEAN_BAND_DEG)
+    if full:
+        caps = tuple(itertools.product((-_SPR_CAP_DEV, _SPR_CAP_DEV), repeat=2))
+        c2c, pad_w, pad_l = (-_SPR_C2C_DEV, _SPR_C2C_DEV), _SPR_PAD_W, _SPR_PAD_L
+    else:
+        caps = ((-_SPR_CAP_DEV, -_SPR_CAP_DEV), (_SPR_CAP_DEV, _SPR_CAP_DEV))
+        c2c, pad_w, pad_l = (0.0,), (SPR_PAD_WIDTH,), (SPR_PAD_LEN,)
+    return spr_load.corner_cases(
+        SPR_LEAF_DESIGN,
+        thick=(_SPR_T_LO, _SPR_T_HI),
+        width=(_SPR_W_LO, _SPR_W_HI),
+        pad_width=pad_w,
+        pad_len=pad_l,
+        taper_len=(SPR_LEAF_DESIGN.taper_len,),
+        caps=caps,
+        c2c=c2c,
+        park=(-park, park),
+        engage=(_PHI_ENG,),
+        set_error=(-SPR_SET_ERROR, SPR_SET_ERROR),
+        hole=(-_SPR_HOLE_DEV, _SPR_HOLE_DEV),
+        formed_band=SPR_FORMED_BAND,
     )
 
-_spr_ratios = ([], [])  # parked and engaged contact moment / gravity, thin strip
-_spr_safety = []  # engaged yield SF, thick strip
-_spr_loaded_sweeps = []
-for _dev in SPR_FORMED_CORNERS:
-    _free_sweeps = tuple(
-        spr_formed_contact_arc_sweep(_dev, math.degrees(_phi))
-        for _phi in (0.0, _PHI_ENG)
-    )
-    for _thick in (_SPR_T_LO, _SPR_T_HI):
-        _defl, _arm, _stations = _spring_corner(_dev, _thick)
-        for _pose, (_d, _station, _free_sweep) in enumerate(
-            zip(_defl, _stations, _free_sweeps, strict=True)
-        ):
-            _spr_loaded_sweeps.append(
-                spr_require_loaded_crest_reserve(_free_sweep, _d, _arm)
-            )
-            if _thick == _SPR_T_LO:
-                _spr_ratios[_pose].append(
-                    spr_contact_force(
-                        _d, _thick, _SPR_W_LO, _arm, free_sweep_deg=_free_sweep
-                    )
-                    * _station
-                    / SWING_GRAVITY_CORNER_NMM[_pose]
-                )
-            if _thick == _SPR_T_HI and _pose == 1:
-                _spr_safety.append(
-                    SPR_YIELD_MPA
-                    / spr_root_stress(
-                        _d, _thick, _arm, free_sweep_deg=_free_sweep
-                    )
-                )
-        if min(_stations) < 1.0:
+
+def spring_gates(cases: dict[str, np.ndarray], chunk: int = 8192) -> dict[str, float]:
+    """Worst value of every spring gate over ``cases`` (solved in chunks)."""
+    n = len(cases["t"])
+    worst: dict[str, float] = {}
+    for start in range(0, n, chunk):
+        sub = {k: v[start : start + chunk] for k, v in cases.items()}
+        r = spr_loaded(sub)
+        engaged = sub["swing"] > sub["park"] + 1e-9
+        gravity = np.where(engaged, SWING_GRAVITY_CORNER_NMM[1], SWING_GRAVITY_CORNER_NMM[0])
+        ratio = r.force * r.arm / gravity
+        part = {
+            "preload_parked": float(ratio[~engaged].min()),
+            "preload_engaged": float(ratio[engaged].min()),
+            "stress_sf": float(SPR_YIELD_MPA / r.stress.max()),
+            "crest_before_deg": float(r.crest_before.min()),
+            "crest_after_deg": float(r.crest_after.min()),
+            "station_min": float(r.station.min()),
+            "endcap_spare": float((r.flank_len - 1.0 - r.station).min()),
+            "second_clear": float(r.second_clear.min()),
+            "tip_clear": float(r.tip_clear.min()),
+            "touch_tip_clear": float(r.touch_tip_clear.min()),
+            "foot_dip": float(r.foot_dip.min()),
+            "shift_west": float(r.shift.min()),
+            "shift_east": float(r.shift.max()),
+            "force_max": float(r.force.max()),
+        }
+        for k, v in part.items():
+            worst[k] = (max if k in ("shift_east", "force_max") else min)(worst.get(k, v), v)
+    return worst
+
+
+def require_spring_gates(g: dict[str, float]) -> None:
+    """Every hard gate of the loaded leaf; raises naming the first miss."""
+    for label, key in (("parked", "preload_parked"), ("engaged", "preload_engaged")):
+        if g[key] < _PRELOAD_MARGIN:
             raise AssertionError(
-                f"formed spring contact leaves the straight flank: {_stations}"
+                f"spring preload {g[key]:.5f}x below {_PRELOAD_MARGIN:.2f}x gravity "
+                f"{label} over the printed envelope"
             )
-        if STRAP_C2C - 1.0 - max(_stations) < SPR_ENDCAP_SPARE_MM:
-            raise AssertionError(
-                f"formed spring contact lacks {SPR_ENDCAP_SPARE_MM:.2f} mm "
-                f"spare beyond the arbor end-cap keep-out: {_stations}"
-            )
-SPRING_PRELOAD_RATIO = tuple(min(_ratios) for _ratios in _spr_ratios)
-SPRING_STRESS_SF = min(_spr_safety)
-SPRING_LOADED_CREST_RESERVE_DEG = (
-    SPR_KINK_DEG + min(_spr_loaded_sweeps),
-    -max(_spr_loaded_sweeps),
-)  # flick-side and blade-side reserves of the LOADED crest, degrees
-for _label, _ratio in zip(("parked", "engaged"), SPRING_PRELOAD_RATIO, strict=True):
-    if _ratio < _PRELOAD_MARGIN:
+    if g["stress_sf"] < _STRESS_SF:
         raise AssertionError(
-            f"spring preload {_ratio:.2f}x loses to gravity {_label} at the soft corner"
+            f"spring peak stress SF {g['stress_sf']:.5f} below {_STRESS_SF:.2f} "
+            "over the printed envelope"
         )
-if SPRING_STRESS_SF < _STRESS_SF:
-    raise AssertionError(
-        f"spring root stress SF {SPRING_STRESS_SF:.2f} engaged at the stiff corner"
-    )
+    for label, key in (("blade", "crest_before_deg"), ("flick", "crest_after_deg")):
+        if g[key] < SPR_CREST_MARGIN_DEG:
+            raise AssertionError(
+                f"loaded spring contact has {g[key]:.3f} deg of crest arc on the "
+                f"{label} side, under {SPR_CREST_MARGIN_DEG:.1f}"
+            )
+    if g["station_min"] < 1.0:
+        raise AssertionError("loaded spring contact leaves the straight flank at the pivot cap")
+    if g["endcap_spare"] < SPR_ENDCAP_SPARE_MM:
+        raise AssertionError(
+            f"loaded spring contact lacks {SPR_ENDCAP_SPARE_MM:.2f} mm spare beyond "
+            f"the arbor end-cap keep-out: {g['endcap_spare']:.3f}"
+        )
+    if g["second_clear"] <= 0.0:
+        raise AssertionError("the loaded leaf touches the flank somewhere besides its crest")
+    if g["tip_clear"] < 0.25:
+        raise AssertionError(f"the loaded flick tip comes {g['tip_clear']:.3f} off the flank")
+    if g["touch_tip_clear"] <= 0.0:
+        raise AssertionError("at SPRING SET's touch the flick tip, not the crest, meets the flank")
+    if g["foot_dip"] < -1e-6:
+        raise AssertionError("the loaded foot lifts off the base ahead of the screw")
+
+
+SPRING_GATES = spring_gates(spring_envelope(full=False))
+require_spring_gates(SPRING_GATES)
+SPRING_PRELOAD_RATIO = (SPRING_GATES["preload_parked"], SPRING_GATES["preload_engaged"])
+SPRING_STRESS_SF = SPRING_GATES["stress_sf"]
+SPRING_LOADED_CREST_RESERVE_DEG = (
+    SPRING_GATES["crest_after_deg"],
+    SPRING_GATES["crest_before_deg"],
+)  # flick-side and blade-side reserves of the LOADED crest, degrees
+# SPRING SET puts the pad where the strap is, not where the seat is: its
+# station about the model seat over the envelope (west, east), mm.
+SPRING_SET_SHIFT = (SPRING_GATES["shift_west"], SPRING_GATES["shift_east"])
+if SPR_SET_SCREW_FLOAT > SPR_SET_ERROR:
+    raise AssertionError("SPRING SET's error budget no longer covers the screw's float")
+
+# The return spring stands east of the strap and the lift rod west of it,
+# the collar's sweep spanning the blade's height.  The whole leaf -- foot,
+# bend, blade and crest -- keeps 0.25 off the rod's envelope (the collar
+# sweeps about the rod's own axis, so it contains the rod) where the leaf
+# sits furthest west: the SPRING SET's west extreme (it already books the
+# screw's float) plus the formed profile's band.
+SPRING_WEST_SHIFT_STACK = {
+    "SPRING SET pad west of the model seat, printed-envelope extreme": -SPRING_SET_SHIFT[0],
+    "MHA-114 formed profile band": SPR_FORMED_BAND,
+}
+_SPR_WEST_X = max(
+    SPRING_FOOT_TAN_X,  # the foot, up to the bend
+    SPRING_BEND_EXIT[0] + SPRING_T,  # the bend and the blade's root
+    SPRING_KINK_START[0] + SPRING_T,  # the blade's top
+    SPRING_KINK_C[0] + SPR_R_KINK + SPRING_T,  # the crest's outer arc
+    SPRING_FLAT_TIP[0] + SPRING_T,  # the flick
+)
+SPRING_TO_LIFT_ROD = (
+    LIFT_X
+    - max(3.175, _CAM_SWEEP_R)
+    - _SPR_WEST_X
+    - sum(SPRING_WEST_SHIFT_STACK.values())
+)
+if SPRING_TO_LIFT_ROD < 0.25:
+    raise AssertionError("spring leaf reaches the lift rod's collar sweep")
 # The engaged blade flexes east toward the cylinder drum: the crest and the
-# flick tip, carried east by the extra deflection, keep 0.25 to the north end
+# flick tip, carried east by the swing's penetration at the contact, the
+# SPRING SET's east extreme and the formed band, keep 0.25 to the north end
 # disc beside them (the gears themselves end axially short of the leaf).
-_spr_push = SPRING_DEFLECTION[1] - SPRING_DEFLECTION[0]
+_spr_push = (
+    (STRAP_C2C - 1.0) * _PHI_ENG
+    + SPRING_SET_SHIFT[1]
+    + SPR_PARKED_AIR
+    + SPR_FORMED_BAND
+)
 for _label, _p in (("crest", SPRING_CREST), ("flick tip", SPRING_FLAT_TIP)):
     _q = (_p[0] + _spr_push * _SPR_N[0], _p[1] + _spr_push * _SPR_N[1])
     if (

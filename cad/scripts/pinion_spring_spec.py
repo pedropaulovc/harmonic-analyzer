@@ -5,7 +5,8 @@ PURE DATA, no SolidWorks/COM imports.  The pinion return spring is NOT a coil
 spring: it is a bent 17-7 PH STAINLESS LEAF -- a 0.015 in (0.381) strip
 sheared 6.50 mm wide and formed as a flat screw-down foot with a square pad,
 an R3.3 bend up to a blade leaning BLADE_LEAN_DEG west of vertical (in toward
-the strap), then an R3.3 crest turning 28 deg back east to a short free flat.
+the strap), then an R3.3 crest turning KINK_DEG (55 deg) back east to a short
+free flat.  The print holds the FREE form; the solid is the installed stand-in.
 The nominals drive the part's named equation globals AND the
 drawing's coordinate math; the marked-dimension map keeps the part marks and
 drawing keeps in lockstep (``test_pinion_spring_drawing.py``).

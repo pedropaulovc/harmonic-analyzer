@@ -1603,7 +1603,10 @@ def test_rig_callouts_name_the_rig_set_note() -> None:
     assert note.index(feeler) == 1
     assert "1.00 + 0.25 LEAVES OFF" in fitup.RIG_SET_STEP
     assert "BANK PUSHED NORTH" in fitup.RIG_SET_STEP
-    assert "MHA-114 PAD 0.65 LEAF OFF MHA-061." in fitup.RIG_SET_STEP
+    assert "MHA-114 PAD 0.65 LEAF OFF MHA-061;" in fitup.RIG_SET_STEP
+    # PR #1127: east-west the pad is SPRING SET off the parked strap itself.
+    assert f"{fitup.SPRING_SET_NAME}: MHA-114 CREST TOUCHING PARKED BACK MHA-056," in note
+    assert f"TO G + {fitup.SPRING_SET_PUSH:.1f} FEELERS, TIGHTEN MHA-103 ON THE GAGE." in note
 
 
 # The note's printed character advance and line pitch at the sheet's 3.5 text

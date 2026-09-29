@@ -3,7 +3,7 @@ r"""Create the curated machinist drawing for the pinion return leaf spring.
 NOT a coil spring: a bent 17-7 PH stainless leaf.  A 0.381-mm strip
 sheared 6.50 mm wide with a square screw pad at its free end -- formed as
 a flat screw-down foot, an R3.3 bend up to a blade leaning back over the
-foot's bend, then an R3.3 crest turning 28 deg out to a short free flat.
+foot's bend, then an R3.3 crest turning 55 deg out to a short free flat.
 The solid is the installed shape; the front view also shows the hidden
 FreeForm reference sketch as the phantom free form.  The free crest and tip
 are baselined from the foot's free end on it.  The projected top view carries

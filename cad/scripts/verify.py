@@ -1473,7 +1473,7 @@ async def _verify_pinion_cam_contact(adapter: Any, report: Report) -> None:
             for tag in (1, 2):
                 if abs(_surface_gap(tag)) > 0.03:
                     raise AssertionError(f"rest station {tag} not tangent")
-            for fraction in (0.25, 0.5, 0.75, 0.9):
+            for fraction in (0.25, 0.5, 0.75, 0.9, 1.0):
                 theta = math.radians(rig.CAM_ENGAGE_ROTATION_DEG * fraction)
                 param.SystemValue = rest_rad + theta
                 _rebuild(adapter)

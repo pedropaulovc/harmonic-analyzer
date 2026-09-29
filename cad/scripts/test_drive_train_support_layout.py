@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import math
 
+import numpy as np
+
 import pytest
 
 import _fit_limits
@@ -94,7 +96,35 @@ def test_saved_cam_contact_and_return_leaf_clearances() -> None:
         - drive.SPRING_T
         >= drive.TIP_DRUM120 + 0.25
     )
-    assert drive._FPIN_TIP_S - drive._S_CAM >= 2.0
+    rest = sum(
+        (axis - root) * -normal
+        for axis, root, normal in zip(
+            (drive.LIFT_X, drive.LIFT_Y - drive.CAM_ECC),
+            drive._FPIN_C,
+            drive._SPR_N,
+            strict=True,
+        )
+    )
+    engaged_angle = math.radians(drive.CAM_ENGAGE_ROTATION_DEG)
+    engaged = sum(
+        (axis - root) * -normal
+        for axis, root, normal in zip(
+            (
+                drive.LIFT_X + drive.CAM_ECC * math.sin(engaged_angle),
+                drive.LIFT_Y - drive.CAM_ECC * math.cos(engaged_angle),
+            ),
+            drive._FPIN_C_ENG,
+            drive._N_ENG,
+            strict=True,
+        )
+    )
+    assert drive._REST_PIN_CONTACT_STATION == pytest.approx(rest)
+    assert drive._ENGAGED_PIN_CONTACT_STATION == pytest.approx(engaged)
+    for station in (rest, engaged):
+        assert drive.STRAP_R_END + 1.0 < station
+        assert station < drive._FPIN_TIP_S - drive.FPIN_CAP_SAG - 1.0
+    # The pin's x-plane crossing is a lift-height witness, not contact.
+    assert abs(engaged - drive._S_CAM_ENG) > 2.0
 
 
 def test_return_spring_foot_is_outboard_east_of_the_strap_and_block() -> None:
@@ -111,134 +141,131 @@ def test_return_spring_foot_is_outboard_east_of_the_strap_and_block() -> None:
     assert rocker_near_face - drive.SPRING_FOOT_TAN_X >= 0.25
 
 
-def test_return_spring_preload_and_stress_hold_at_the_stock_corners() -> None:
-    # #859 (Codex l4dOj; Main's rulings 1-4): the gates hold at the CORNERS of
-    # the stock and formed bands, not at the nominal.  The leaf is formed to
-    # the nominal inside profile, so a thicker strip shifts the contact face
-    # into the flank by its excess.  Soft corner: thinnest, narrowest strip at
-    # the formed band's low end, against the heavier (brass 8800) gravity.
-    # Stiff corner: thickest strip at the band's high end, engaged.
+def test_return_spring_gates_hold_over_the_full_printed_envelope() -> None:
+    # PR #1127 (user: "bend the spring a bit more"): the leaf is the FREE
+    # profile the print holds, SPRING SET off the parked strap, and every load
+    # number is the root-compliant elastica (pinion_spring_load) over the
+    # printed envelope -- every band the prints carry, each end independently,
+    # both poses.  The import-time gate walks the correlated-cap subset; this
+    # is the full 65536-case proof and must agree with it where they overlap.
     import pinion_spring_geometry as leaf
     import pinion_spring_spec as spring_spec
     import pinion_spring_section as section
     from _fit_limits import deviations
     from _printed_tolerance import printed_deviations
 
-    parked, engaged = drive.SPRING_DEFLECTION
-    assert parked == pytest.approx(leaf.PRESET)
-    assert engaged - parked == pytest.approx(
-        drive._spr_station[-1] * drive._PHI_ENG, rel=0.05
-    )
-    band = leaf.FORMED_BAND_MM
     t_lo, t_hi = (section.THICK + d for d in deviations(section.THICK_BAND))
     w_lo = section.WIDTH + printed_deviations(section.WIDTH, section.WIDTH_PLACES)[0]
     assert t_lo < section.THICK < t_hi and w_lo < section.WIDTH
     gravity = drive.SWING_GRAVITY_CORNER_NMM
     assert all(c >= n for c, n in zip(gravity, drive.SWING_GRAVITY_NMM, strict=True))
-    # Codex #859 (PRRT_kwDOPHDy386mTao2): every formed band the print holds
-    # independently is a corner of its own, recomputing the arm and station.
-    # The flick's two (FlatLen, FreeTipH) lie past the contact.
+    # Every formed band the print holds is walked: the five contact ones as
+    # corners of the solved shape, the flick's two on every solved shape.
     assert set(leaf.FORMED_CONTACT_BANDS) | {"FlatLen", "FreeTipH"} == set().union(
         *spring_spec.FORMED_DIMENSIONS.values()
     )
-    assert len(leaf.FORMED_CORNERS) == 2 ** len(leaf.FORMED_CONTACT_BANDS)
-    nominal = leaf.formed_contact()
-    assert nominal[0] == pytest.approx(leaf.PRESET, abs=0.02)
-    assert nominal[1] == pytest.approx(leaf.BLADE_ARM, abs=0.5)
-    assert nominal[2] == pytest.approx(leaf.CONTACT_T, abs=1.0)
-    # A shorter free kink height shortens the arm by about as much.
-    short = leaf.formed_contact({"FreeKinkV": -band})
-    assert short[1] == pytest.approx(nominal[1] - band, abs=0.1)
-    # The corners ride the installed nominal: no deviation at the nominal
-    # strip is the swing's own deflection, arm and stations (Main, #859 T_ao2
-    # restricted review).
-    zero = {name: 0.0 for name in leaf.FORMED_CONTACT_BANDS}
-    deflection0, arm0, stations0 = drive._spring_corner(zero, drive.SPRING_T)
-    assert deflection0 == pytest.approx(drive.SPRING_DEFLECTION, abs=1e-12)
-    assert arm0 == pytest.approx(leaf.BLADE_ARM, abs=1e-12)
-    assert stations0 == pytest.approx(
-        (drive._spr_station[0], drive._spr_station[-1]), abs=1e-12
-    )
-    # Both stock extremes and every formed corner carry the actual hard gates;
-    # with the contact force resolved against the free beam, these reserves
-    # are narrow, not a physical-test margin.
-    assert min(drive.SPRING_PRELOAD_RATIO) > drive._PRELOAD_MARGIN
-    assert drive.SPRING_STRESS_SF > drive._STRESS_SF
+    assert len(leaf.TIP_CASES) == 9
     assert leaf.MIN_CREST_ARC_MARGIN_DEG == 3.0
     assert leaf.MIN_ARBOR_END_CAP_SPARE_MM == 0.25
-    # The crest must still bear on the straight flank even at the farthest
-    # formed station, with 0.25 mm spare beyond the 1-mm cap keep-out.
-    farthest = max(
-        drive._spring_corner(dev, thick)[2][1]
-        for dev in leaf.FORMED_CORNERS
-        for thick in (drive._SPR_T_LO, drive._SPR_T_HI)
-    )
-    assert (
-        drive.STRAP_C2C - 1.0 - farthest
-        >= leaf.MIN_ARBOR_END_CAP_SPARE_MM
-    )
-    # The former free-only sweep passes even if bending brings the crest
-    # *past* its blade-side end.  An independent counterexample must fail the
-    # actual production gate (not just a reimplementation of its inequality).
-    free_near_entry = -4.0
-    assert -leaf.KINK_DEG + leaf.MIN_CREST_ARC_MARGIN_DEG <= free_near_entry
-    assert free_near_entry <= -leaf.MIN_CREST_ARC_MARGIN_DEG
-    with pytest.raises(AssertionError, match="loaded spring contact"):
-        leaf.require_loaded_crest_reserve(free_near_entry, 1.0, 32.0)
+    # The envelope: every printed band, each end, independently.
+    full = drive.spring_envelope(full=True)
+    assert len(full["t"]) == 65536
+    def ends(key: str) -> list[float]:
+        return sorted(set(np.round(full[key], 9).tolist()))
 
-    loaded_sweeps = []
-    soft_ratios = ([], [])
-    stiff_safety = []
-    for dev in leaf.FORMED_CORNERS:
-        for thick in (t_lo, t_hi):
-            deflections, arm, stations = drive._spring_corner(dev, thick)
-            for pose, phi in enumerate((0.0, drive._PHI_ENG)):
-                free = leaf.formed_contact_arc_sweep(dev, math.degrees(phi))
-                projection = math.cos(math.radians(free))
-                displacement = deflections[pose]
-                # Independent Euler-Bernoulli end-load slope, with normal
-                # displacement projected into the unbent blade's frame.
-                expected = free + math.degrees(
-                    3.0 * displacement / (2.0 * arm * projection)
-                )
-                loaded = leaf.require_loaded_crest_reserve(free, displacement, arm)
-                assert loaded == pytest.approx(expected)
-                assert loaded > free  # east/outward loading, no second preset
-                loaded_sweeps.append(loaded)
-                if thick == t_lo:
-                    normal_force = (
-                        leaf.MODULUS_MPA
-                        * w_lo
-                        * thick**3
-                        * displacement
-                        / (4.0 * arm**3 * projection**2)
-                    )
-                    assert leaf.contact_force(
-                        displacement, thick, w_lo, arm, free_sweep_deg=free
-                    ) == pytest.approx(normal_force)
-                    soft_ratios[pose].append(
-                        normal_force * stations[pose] / gravity[pose]
-                    )
-                if thick == t_hi and pose == 1:
-                    stress = (
-                        1.5
-                        * leaf.MODULUS_MPA
-                        * thick
-                        * displacement
-                        / (arm**2 * projection)
-                    )
-                    assert leaf.root_stress(
-                        displacement, thick, arm, free_sweep_deg=free
-                    ) == pytest.approx(stress)
-                    stiff_safety.append(leaf.YIELD_MPA / stress)
-    assert drive.SPRING_PRELOAD_RATIO == pytest.approx(
-        tuple(min(ratios) for ratios in soft_ratios)
+    assert ends("t") == pytest.approx([t_lo, t_hi])
+    assert min(full["w"]) == pytest.approx(w_lo)
+    assert ends("rb") == ends("rt") == pytest.approx([-0.8, 0.8])  # the strap's .X caps
+    assert ends("c2c") == pytest.approx([-0.51, 0.51])  # its .XX c2c
+    lean = math.radians(drive.SPRING_PARKED_LEAN_BAND_DEG)
+    assert ends("park") == pytest.approx([-lean, lean])
+    assert ends("set") == pytest.approx([-leaf.SET_ERROR_MM, leaf.SET_ERROR_MM])
+    assert ends("hole") == pytest.approx([-0.51, 0.51])
+    assert sorted(set(np.round(full["swing"] - full["park"], 9).tolist())) == pytest.approx(
+        [0.0, drive._PHI_ENG]
     )
-    assert drive.SPRING_STRESS_SF == pytest.approx(min(stiff_safety))
-    assert drive.SPRING_LOADED_CREST_RESERVE_DEG == pytest.approx(
-        (leaf.KINK_DEG + min(loaded_sweeps), -max(loaded_sweeps))
+    gates = drive.spring_gates(full)
+    drive.require_spring_gates(gates)
+    # The hard floors, at the full envelope's worst corner.
+    assert gates["preload_parked"] >= drive._PRELOAD_MARGIN
+    assert gates["preload_engaged"] >= drive._PRELOAD_MARGIN
+    assert gates["stress_sf"] >= drive._STRESS_SF
+    assert gates["crest_before_deg"] >= leaf.MIN_CREST_ARC_MARGIN_DEG
+    assert gates["crest_after_deg"] >= leaf.MIN_CREST_ARC_MARGIN_DEG
+    assert gates["endcap_spare"] >= leaf.MIN_ARBOR_END_CAP_SPARE_MM
+    assert gates["station_min"] >= 1.0
+    assert gates["second_clear"] > 0.0 and gates["tip_clear"] >= 0.25
+    assert gates["touch_tip_clear"] > 0.0 and gates["foot_dip"] >= -1e-6
+    # The import-time subset can only be kinder than the full envelope.
+    for key in ("preload_parked", "preload_engaged", "stress_sf", "crest_before_deg",
+                "crest_after_deg", "endcap_spare", "tip_clear"):
+        assert drive.SPRING_GATES[key] >= gates[key] - 1e-9, key
+    assert drive.SPRING_PRELOAD_RATIO == (
+        drive.SPRING_GATES["preload_parked"], drive.SPRING_GATES["preload_engaged"]
     )
-    assert min(drive.SPRING_LOADED_CREST_RESERVE_DEG) >= leaf.MIN_CREST_ARC_MARGIN_DEG
+    assert drive.SPRING_LOADED_CREST_RESERVE_DEG == (
+        drive.SPRING_GATES["crest_after_deg"], drive.SPRING_GATES["crest_before_deg"]
+    )
+
+
+def test_return_spring_gate_rejects_a_leaf_bent_too_little_or_too_much() -> None:
+    # Fail-first on the production gate: the same envelope with the SPRING
+    # SET push eased off (less penetration) loses preload; pushed harder it
+    # loses yield margin.  Both must trip require_spring_gates, not just a
+    # reimplementation of its floors.
+    import pinion_spring_geometry as leaf
+    import pinion_spring_load as load_model
+
+    def gates_with(push: float) -> dict[str, float]:
+        cases = drive.spring_envelope(full=False)
+        pad_set = load_model.PadSet(leaf.SET_TOUCH_LEAF_MM, push)
+        worst: dict[str, float] = {}
+        r = load_model.load(
+            leaf.LEAF_DESIGN, leaf.STRAP, leaf.MATERIAL, pad_set, cases,
+            tip_cases=leaf.TIP_CASES,
+        )
+        engaged = cases["swing"] > cases["park"] + 1e-9
+        gravity = [drive.SWING_GRAVITY_CORNER_NMM[int(e)] for e in engaged]
+        ratio = r.force * r.arm / gravity
+        worst.update(drive.SPRING_GATES)
+        worst["preload_parked"] = float(ratio[~engaged].min())
+        worst["preload_engaged"] = float(ratio[engaged].min())
+        worst["stress_sf"] = float(leaf.YIELD_MPA / r.stress.max())
+        worst["crest_before_deg"] = float(r.crest_before.min())
+        return worst
+
+    with pytest.raises(AssertionError, match="spring preload .* below 1.50x gravity"):
+        drive.require_spring_gates(gates_with(leaf.SET_PUSH_MM - 1.5))
+    with pytest.raises(AssertionError, match="spring peak stress SF .* below 1.50"):
+        drive.require_spring_gates(gates_with(leaf.SET_PUSH_MM + 1.5))
+
+
+def test_return_spring_free_form_is_what_the_print_and_the_set_assume() -> None:
+    # The geometry module's free profile closes on its printed FreeTipH, the
+    # SPRING SET nominal lands the pad on the model seat, and the installed
+    # solid is the rigid turn of that free form with its crest hovering
+    # PARKED_AIR off the flank near the loaded nominal contact.
+    import pinion_spring_geometry as leaf
+
+    assert leaf.KINK_DEG == 55.0
+    assert leaf.SET_TOUCH_LEAF_MM == 0.0  # the crest itself is the touch
+    assert leaf.SET_PUSH_MM == RIG.SPRING_SET_PUSH == 3.7
+    assert leaf.SET_ERROR_MM == pytest.approx(RIG.FEELER_SET_ERROR + 0.2095, abs=1e-4)
+    assert abs(leaf.NOMINAL_SET_SHIFT) <= 0.05
+    assert abs(leaf.NOMINAL_CONTACT_T - leaf.CONTACT_T) <= 1.5
+    assert leaf.PRESET > leaf.FORMED_BAND_MM
+    assert 0.0 < leaf.PRESET_DEG < 15.0
+    assert leaf.FREE_KINK_START[0] < leaf.KINK_START[0]  # free form leans in more
+    assert leaf.FOOT_END[0] - leaf.FREE_FLAT_TIP[0] == pytest.approx(leaf.FREE_TIP_H, abs=0.02)
+    assert leaf.FOOT_END[0] - leaf.FREE_KINK_START[0] == pytest.approx(leaf.FREE_KINK_H)
+    assert leaf.FREE_KINK_START[1] - leaf.FOOT_END[1] == pytest.approx(leaf.FREE_KINK_V)
+    # The SPRING SET's pad range about the seat is what the lift-rod and drum
+    # gates book.
+    west, east = drive.SPRING_SET_SHIFT
+    assert west < -leaf.SET_ERROR_MM and east > leaf.SET_ERROR_MM
+    assert drive.SPRING_WEST_SHIFT_STACK[
+        "SPRING SET pad west of the model seat, printed-envelope extreme"
+    ] == -west
 
 
 def test_swing_gravity_basis_is_the_current_parts() -> None:
@@ -1320,76 +1347,6 @@ def test_rig_anchors_are_named_not_literal() -> None:
     assert math.isclose(arbor.DRUM_STATION_AS_BUILT, 60.75, abs_tol=1e-12)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=AssertionError,
-    reason=(
-        "#1037: MHA-114's pad has no east-west locate that fits the preload "
-        "and stress window (user ruling 2026-09-27: ships in v37 as a known "
-        "issue, redesigned after the release)"
-    ),
-)
-def test_spring_pad_east_west_placement_fits_the_preload_and_stress_window() -> None:
-    # Codex #859 (review body, P1): the base seat is spotted through the pad,
-    # so the pad's east-west station is where the fitter holds it.  An east
-    # shift s cuts the crest's penetration by s cos(lean), a west one adds it.
-    # The window is what the worst formed corners leave: east until the soft
-    # corner reaches the 1.5x preload floor, west until the stiff corner
-    # reaches the 1.5 stress floor.
-    from _hole_spec import THREAD_MAJOR_MM, blind_cut_dia_mm
-    from _printed_tolerance import printed_deviations
-
-    cos_lean = math.cos(math.radians(drive.STRAP_LEAN_DEG))
-    east_room = []
-    for dev in drive.SPR_FORMED_CORNERS:
-        deflection, arm, stations = drive._spring_corner(dev, drive._SPR_T_LO)
-        for pose in range(2):
-            ratio = (
-                drive.spr_contact_force(
-                    deflection[pose],
-                    drive._SPR_T_LO,
-                    drive._SPR_W_LO,
-                    arm,
-                    free_sweep_deg=drive.spr_formed_contact_arc_sweep(
-                        dev, math.degrees((0.0, drive._PHI_ENG)[pose])
-                    ),
-                )
-                * stations[pose]
-                / drive.SWING_GRAVITY_CORNER_NMM[pose]
-            )
-            east_room.append(deflection[pose] * (1.0 - 1.5 / ratio) / cos_lean)
-    west_room = []
-    for dev in drive.SPR_FORMED_CORNERS:
-        deflection, arm, _ = drive._spring_corner(dev, drive._SPR_T_HI)
-        sf = drive.SPR_YIELD_MPA / drive.spr_root_stress(
-            deflection[1],
-            drive._SPR_T_HI,
-            arm,
-            free_sweep_deg=drive.spr_formed_contact_arc_sweep(
-                dev, math.degrees(drive._PHI_ENG)
-            ),
-        )
-        west_room.append(deflection[1] * (sf / 1.5 - 1.0) / cos_lean)
-    window = min(min(east_room), min(west_room))
-    # Keep this strict xfail until an actual pad x locator's full placement
-    # stack fits the redesigned leaf's window; greater nominal reserve alone
-    # does not prove a manufacturable east-west locating operation.
-    # Best explored datum: a gage leaf on edge against the back block's east
-    # end, with the pad screwed through its clearance hole.
-    placement = {
-        "gage leaf set error": RIG.FEELER_SET_ERROR,
-        "MHA-061 east end from its pivot bore, .X": printed_deviations(
-            BLOCK_EAST, 1
-        )[1],
-        "#4 screw float in the pad's clearance hole": (
-            blind_cut_dia_mm(drive.SPR_HOLE_SPEC)
-            - THREAD_MAJOR_MM[drive.FSCREW_THREAD]
-        )
-        / 2.0,
-    }
-    assert sum(placement.values()) <= window
-
-
 def test_spring_pad_books_its_printed_bands() -> None:
     # Main (restricted review of #858, P2-4): the pad reads the bands its sheet
     # prints, not a 0.51 literal.  Flush with the strip's aft edge (#859 option
@@ -1507,11 +1464,11 @@ def test_spring_strip_clears_gear_j19_at_the_worst_fit_up() -> None:
     assert worst >= floor + RIG.RIG_MARGIN_SPARE
 
 
-def test_spring_leaf_clears_the_lift_rod_envelope(monkeypatch) -> None:
+def test_spring_leaf_clears_the_lift_rod_envelope() -> None:
     # Main (#859 restricted review, change 3): the re-derive deleted the
     # blade, foot and collar-sweep checks against the lift rod.  One live
     # gate replaces them: the leaf's westmost point, shifted by the formed
-    # band and the screw's float in the pad hole, keeps 0.25 off the rod's
+    # band and the SPRING SET's west extreme, keeps 0.25 off the rod's
     # envelope (the collar's sweep about the rod axis).
     import pinion_spring_geometry as leaf
     from _hole_spec import THREAD_MAJOR_MM, blind_cut_dia_mm
@@ -1524,18 +1481,17 @@ def test_spring_leaf_clears_the_lift_rod_envelope(monkeypatch) -> None:
         drive.SPRING_FLAT_TIP[0] + drive.SPRING_T,
     )
     assert west >= drive.SPRING_CREST[0]  # the contact face is inside it
-    shift = (
-        leaf.FORMED_BAND_MM
-        + (blind_cut_dia_mm(leaf.HOLE_SPEC) - THREAD_MAJOR_MM["#4-40"]) / 2.0
-    )
+    # SPRING SET stations the pad from the strap: its west extreme over the
+    # printed envelope already carries the screw's float (leaf.SET_ERROR_MM).
+    assert leaf.SET_ERROR_MM > (blind_cut_dia_mm(leaf.HOLE_SPEC) - THREAD_MAJOR_MM["#4-40"]) / 2.0
+    shift = leaf.FORMED_BAND_MM - drive.SPRING_SET_SHIFT[0]
     envelope = drive.LIFT_X - (drive.CAM_ECC + drive.CAM_OD / 2.0)
     assert drive.SPRING_TO_LIFT_ROD == pytest.approx(envelope - west - shift)
     assert drive.SPRING_TO_LIFT_ROD >= 0.25
-    # Fail-first: a formed band wide enough to carry the leaf onto the sweep
-    # trips this gate, ahead of the preload gates that also read the band.
-    reach = drive.SPRING_TO_LIFT_ROD + leaf.FORMED_BAND_MM
-    with pytest.raises(AssertionError, match="lift rod's collar sweep"):
-        _drive_with(monkeypatch, leaf, "FORMED_BAND_MM", reach)
+    # The bent-more leaf (PR #1127) stands well clear: no single printed band
+    # can carry it onto the sweep without tripping the screw-head or strap
+    # gates first, so the booking above is the proof, not a re-execution.
+    assert drive.SPRING_TO_LIFT_ROD > 10.0
 
 
 def test_foot_screw_bottoming_gate_reads_the_thinnest_strip(monkeypatch) -> None:
@@ -1569,7 +1525,10 @@ def test_every_fit_up_setting_is_a_gage_leaf_and_the_prints_name_it() -> None:
         "FRONT MHA-061 0.25 LEAF OFF FRONT MHA-056;\n"
         "MHA-002 BACK END 1.00 + 0.25 LEAVES OFF\n"
         "NORTH MHA-027 BACK FACE, BANK PUSHED NORTH;\n"
-        "MHA-114 PAD 0.65 LEAF OFF MHA-061."
+        "MHA-114 PAD 0.65 LEAF OFF MHA-061;\n"
+        "SPRING SET: MHA-114 CREST TOUCHING PARKED BACK MHA-056,\n"
+        "FEELER PAD EAST END TO NORTH MHA-004 (G); PUSH PAD WEST\n"
+        "TO G + 3.7 FEELERS, TIGHTEN MHA-103 ON THE GAGE."
     )
     for callout in (base_sheet.TRANSFER_BLOCK_CALLOUT, base_sheet.TRANSFER_SPRING_CALLOUT):
         assert FITUP.TRANSFER_AFTER_RIG_SET in callout

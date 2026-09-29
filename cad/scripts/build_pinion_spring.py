@@ -16,9 +16,10 @@ Layout (sketch on the Front plane; the assembly seats the part at its machine
 anchor, base top 50.8, with a composed Ry(180), so part-local +x reads machine
 EAST -- direction words below are MACHINE directions; the part is an exact
 mid-plane z-extrude, so the Ry(180)'s z-flip is immaterial): the strip's
-INSIDE-surface path, drawn from the free tip down = a 2.0 flat, an R_KINK x 28
-deg crest turning back west, the straight blade leaning BLADE_LEAN_DEG west of
-vertical, an R_BEND bend, and the FOOT_LEN foot heading EAST to its free end.
+INSIDE-surface path, drawn from the free tip down = a 2.0 flat, an R_KINK x
+KINK_DEG (55 deg) crest turning back west, the straight blade leaning
+BLADE_LEAN_DEG west of vertical, an R_BEND bend, and the FOOT_LEN foot heading
+EAST to its free end.
 Traced that way the one-sided thin wall lands right of travel -- west of the
 blade, under the foot -- so the blade's west face is the contact face.  The
 pad-merge volume gate proves the foot side and a west-extreme probe the
@@ -26,8 +27,10 @@ blade side.  Thin mid-plane extrude, WIDTH symmetric about z 0, plus a square
 screw pad (PAD_WIDTH x PAD_LEN) at the foot's free end, cut with the flat
 blank.
 
-The model is the INSTALLED, parked shape (O2); the maker forms the free shape,
-PRESET_DEG more bend (pinion_spring_geometry).
+The model is the INSTALLED, parked shape (O2), a stand-in for the loaded leaf;
+the maker forms the FREE shape the print holds, from which the solid is the
+blade turned PRESET_DEG away from the strap (pinion_spring_geometry).  The
+load itself is the elastica of pinion_spring_load, gated in the drive train.
 
 Dimensions: cad/config/dimensions.yaml "Chapter 25".
 
@@ -415,8 +418,9 @@ async def build(adapter) -> dict[str, str]:
 
     # O2 (Main, 2026-09-24): the part is the INSTALLED shape; the maker forms
     # the FREE shape.  A hidden construction-only reference sketch carries the
-    # whole free profile -- the blade turned PRESET_DEG further toward the
-    # strap about the bend centre -- and owns the printed free locations; the
+    # whole free profile -- the print's FreeKinkH/FreeKinkV/FreeTipH, of which
+    # the installed solid is the rigid PRESET_DEG turn about the bend centre
+    # (pinion_spring_geometry) -- and owns the printed free locations; the
     # drawing shows it as the phantom (_drawing_hidden_sketches).
     check("create_sketch free form", await adapter.create_sketch("Front"))
     free = await _formed_path(adapter, FREE_PATH, prefix="Free", construction=True)

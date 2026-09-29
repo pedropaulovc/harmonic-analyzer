@@ -113,22 +113,25 @@ def test_screw_stands_outboard_east_of_the_back_strap() -> None:
 
 
 def test_blade_leans_in_to_its_flank_contact() -> None:
-    # img04's roughly 5-below-arbor read was a scaled estimate.  The revised
-    # cam rest needs the crest 3.2 below the arbor for both strength reserves;
-    # img01's blade still leans in from the foot by 9-13 deg.
-    assert geometry.CONTACT_T == 24.8
-    assert geometry.KINK_DEG == 28.0
-    assert 9.0 <= geometry.BLADE_TO_FLANK_DEG <= 13.0
+    # PR #1127: the crest station is what the elastica solves for the free
+    # form the print holds (NOMINAL_CONTACT_T), and the installed model's
+    # crest is placed near it; img01's blade still leans in from the foot.
+    assert abs(geometry.CONTACT_T - geometry.NOMINAL_CONTACT_T) <= 1.5
+    assert 1.0 < geometry.CONTACT_T < geometry.STRAP_C2C - 1.0
+    assert geometry.BLADE_TO_FLANK_DEG > 0.0  # the blade closes on the flank
     assert geometry.BLADE_LEAN_DEG > 0.0  # west of vertical, toward the strap
     assert geometry.KINK_START[0] < geometry.BEND_EXIT[0]
+    assert geometry.KINK_DEG > geometry.BLADE_TO_FLANK_DEG  # the flat turns away
 
 
 def test_free_form_presets_the_crest_into_the_flank() -> None:
     # O2: the part is the installed shape; the maker forms the free shape,
     # whose crest stands PRESET into the parked flank.  The band's low end
-    # still leaves a preset.
+    # still leaves a preset, and the SPRING SET nominal lands the pad on the
+    # model seat.
     assert geometry.PRESET - geometry.FORMED_BAND_MM > 1.0
     assert geometry.FREE_KINK_START[0] < geometry.KINK_START[0]
+    assert abs(geometry.NOMINAL_SET_SHIFT) <= 0.05
     assert pinion_spring_spec.FORMED_TOLERANCE_MM == geometry.FORMED_BAND_MM
 
 

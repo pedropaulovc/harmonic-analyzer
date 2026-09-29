@@ -419,39 +419,60 @@ operator forms from step 1; the table is the only data the procedure needs beyon
 | station table check | one bar alone at each station, k = 0 amplitude vs a full-scale bar | slide-arc height, contact offset, gain curvature | matches the `READOUT.md` table; idle bar reads ≈ 0.029; subtract the read-vs-set vector (20ℓ at k = 0, −ℓ at odd k) from every trial |
 | broad-input benchmark | Michelson's Gaussian ($e^{-(0.1i)^2}$) and half-range rectangle, corrected readout | everything | MAE ≈ 0.7 %, max ≈ 2 % of the greatest term — historical parity |
 | sparse-input stress | channels 1 and 20 alone | consistency without averaging | expected worst coefficient ≤ 2 % (p99 2.318 reported) |
-| pinion-spring bend coupon (before forming MHA-114) | cut a 6.50-mm-wide coupon from the 6-in-wide 2325K19 roll along its 50 in length (bend line across the rolling direction, as the part is cut); bend it 90° and 28° over a 7/32 in (Ø5.56) drill-rod mandrel, R2.78, at or under the R2.8 the ±0.5 formed band accepts on both R3.3 bends; then form one leaf and measure its free preset | whether 17-7 PH Condition C takes the tightest radius the drawing accepts at 0.015 in — the R3.3 nominal is proxied from NASA SP-5089 Table XXXI (hardened STA sheet, 0.012–0.016 in, R 0.13 in), and Condition C has less elongation, so the coupon qualifies the band's low limit, not the nominal | no crack or orange peel on the outside of either bend under a 10× loupe; measure the free crest's nominal ~2.50-mm penetration and every separately printed formed dimension against its own ±0.5-mm band (the contact response is recomputed across all corners, not assigned one ±0.5-mm penetration band); a crack moves both nominal radii up until the coupon passes at their low limit, and re-runs the corner gates |
+| pinion-spring bend coupon (before forming MHA-114) | cut a 6.50-mm-wide coupon from the 6-in-wide 2325K19 roll along its 50 in length (bend line across the rolling direction, as the part is cut); bend it 90° and 55° over a 7/32 in (Ø5.56) drill-rod mandrel, R2.78, at or under the R2.8 the ±0.5 formed band accepts on both R3.3 bends; then form one leaf and measure its free preset | whether 17-7 PH Condition C takes the tightest radius the drawing accepts at 0.015 in — the R3.3 nominal is proxied from NASA SP-5089 Table XXXI (hardened STA sheet, 0.012–0.016 in, R 0.13 in), and Condition C has less elongation, so the coupon qualifies the band's low limit, not the nominal | no crack or orange peel on the outside of either bend under a 10× loupe; measure the free crest's nominal ~2.50-mm penetration and every separately printed formed dimension against its own ±0.5-mm band (the contact response is recomputed across all corners, not assigned one ±0.5-mm penetration band); a crack moves both nominal radii up until the coupon passes at their low limit, and re-runs the corner gates |
 
-For MHA-114, the analytical load gate walks the five separately printed
-contact dimensions (`FootLen`, `BendR`, `FreeKinkH`, `FreeKinkV`, `KinkR`) at
-all 32 corners, both poses and both stock thickness extremes. The normal
-contact deflection is measured from the *free* form: the parked deflection
-already includes the preset, and the engage increment adds once. For an
-end-loaded Euler–Bernoulli cantilever with free beam/contact-normal offset
-$\alpha$, it resolves $\delta_\perp=\delta_n/\cos\alpha$,
-$F_n=(Ewt^3/4L^3)\delta_n/\cos^2\alpha$,
-$\sigma_{\rm root}=1.5Et\delta_n/(L^2\cos\alpha)$ and
-$\theta_{\rm tip}=3\delta_n/(2L\cos\alpha)$, turning the free crest tangent
-outward by $\theta_{\rm tip}$. The 3° reserve gates the **loaded** crest at
-both ends, not the undeformed profile. It uses the same load-direction
-projection as the force and yield-safety gates.
+For MHA-114 the load gate is the root-compliant elastica of
+`pinion_spring_load.py` (PR #1127): the FREE profile the print holds is
+discretised from the foot's clamp edge (the pad's last bearing point, so the
+foot's own flat and the R3.3 bend both flex), each station's curvature change
+is integrated under the contact force, and the crest's contact with the
+parked or engaged flank is solved as a rigid-strap constraint. The
+crest's station, the flank-normal force, its moment arm about the pivot,
+the peak bending stress along the whole path, the crest arc left before and
+after the contact point (loaded, not free), the flat tip's and any second
+point's clearance to the flank, and whether the foot lifts off its pad all
+come out of the same solution. The model is a hypothesis about a hand-formed
+part, not a measurement: the first leaf's force, contact station and
+permanent set are still checked physically (bend coupon row above).
 
-The 21.3-mm outboard screw station and 5.0° free preset leave the 9.5-mm pad,
-6.5-mm-wide stock, 24.8-mm contact station and printed ±0.5-mm forming bands
-unchanged. In this approximation the limiting loaded crest reserves are
-about 16.58° at the flick end and 4.00° at the blade end; the limiting parked
-preload is ~1.519× worst gravity and engaged yield safety factor ~1.520
-(both hard floors 1.5). These are narrow **analytical** margins, not measured
-strength or certified contact. Engaged tip rotations approach ~18° at some
-formed corners, outside a comfortably small-rotation regime: finite-rotation
-beam/contact behavior, compliance of the curved root and crest, setup
-variation and Condition-C modulus are not validated here. The independently
-printed `FlatLen` and `FreeTipH` shape the tail *after* the modeled contact
-point; the simple model does not prove their independent ±0.5-mm variations
-preserve arc engagement. Inspect the first formed spring against the
-free-profile print, confirm actual crest contact through the cam throw and
-measure force and permanent set before transferring its base seat. The pad's
-east-west locator still has a strict-xfail fit-up contract; analytical rate
-reserve is not proof that the pad can be positioned to it.
+The gate walks the full printed envelope, every band at each end
+independently: the five contact dimensions (`FootLen`, `BendR`,
+`FreeKinkH`, `FreeKinkV`, `KinkR`, ±0.5 each), stock thickness
+(0.381 ±0.019), strip width (.XX), pad width and length (.XX), the strap's
+two cap radii (.X, ±0.8 each end), its c2c (.XX, ±0.51), the strap's parked
+lean (±1°), the SPRING SET error (feeler class + #4 screw float, ±0.3095),
+the pad hole (.XX), parked and engaged — 65 536 cases in the test, and the
+same gate on a 4 096-case correlated-cap subset at import. The flick's own
+two bands (`FlatLen`, `FreeTipH`) are swept at nine combinations on every
+solved shape for the tip clearances. Doubling, quadrupling and octupling the
+elastica's integration steps moves the worst preload ratio by 0.1 % and the
+worst yield SF by 0.05 %, so the discretisation is converged for the gate's
+margins.
+
+**MHA-114 is no longer blocked.** The seat, foot and pad are unchanged
+(screw 21.3 east of the pivot, 9.5 foot, 9.5 square pad): the leaf is only
+bent more. The free form is `FreeKinkH` 19.1, `FreeKinkV` 28.0, `FreeTipH`
+17.1, both radii R3.3, a 55° crest (was 28°) and a 2.0 flat. East-west the
+pad is stationed by SPRING SET (`pinion_rig_fitup.RIG_SET_STEP`): with the
+straps parked, the leaf slides west until its crest touches the parked back
+flank, then a feeler stack gaged off the north MHA-004 pedestal's west flank
+pushes the pad 3.7 further west before MHA-103 is tightened and the seat
+spotted. The strap itself is the reference, so the strap's cap and c2c bands
+and its parked lean no longer enter the crest's penetration; the pedestal is
+only the relative reference between the two readings. The nominal set lands
+the pad 0.005 from the model seat and the crest 19.0 up the strap at 1.96 N.
+
+Worst corners over the full envelope: parked preload 1.604× gravity,
+engaged 1.645×, yield SF 1.556, loaded crest reserve 3.47° blade-side /
+17.0° flick-side, contact station ≥ 17.15 up the strap (end-cap spare
+3.63), the flat tip ≥ 0.92 off the flank with no second contact, the foot
+never lifting, peak force 5.04 N. The pad's SPRING SET station ranges
+−2.10/+2.17 about the model seat over the envelope; that west extreme plus
+the formed band is what the lift-rod and drum end-disc gates book.
+
+Still to prove physically: Condition C's modulus (200 GPa stand-in), the
+55° crest and 90° bend coupons at the band's R2.8 low limit, and the first
+leaf's force through the throw and permanent set.
 
 ## Fit classes (interfaces that must carry a rule)
 

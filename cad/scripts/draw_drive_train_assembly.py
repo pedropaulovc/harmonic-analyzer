@@ -81,7 +81,7 @@ from drive_train_assembly_spec import (
 )
 from pinion_spring_section import SCREW_EAST_OF_PIVOT as SPRING_SCREW_EAST_OF_PIVOT
 from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view, view_name
+from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 
 SPEC = DRAWINGS_BY_NAME["drive_train_assembly"]
 ARTIFACT_STEM = SPEC.artifact_stem
@@ -621,14 +621,15 @@ _STEP_LINE_WIDTH = 70
     _LEVER_PIN_STEP,
 ) = FITUP.ASSEMBLY_SEQUENCE
 
-# MHA-114's east-west station, in the strap's swing plane (Main's TbPB
-# ruling Q2(2) A): the foot hole where the preload gates put it
-# (pinion_spring_section), the crest then bearing on the parked flank.  RIG
-# SET's pad leaf sets the other axis, along the bank.  The window a fitter
-# must hold it in is known issue #1037, which ships this as the interim.
+# MHA-114's east-west station, in the strap's swing plane: the foot hole
+# lands about SPRING_SCREW_EAST_OF_PIVOT east of the pivot (the model seat),
+# but the fitter stations it from the parked strap itself -- RIG SET's SPRING
+# SET slides the crest onto the parked flank and pushes the pad west by a
+# gaged amount (pinion_rig_fitup), which retires the fixed-window issue
+# #1037.  RIG SET's pad leaf sets the other axis, along the bank.
 SPRING_EAST_WEST = (
-    f"MHA-114 FOOT HOLE CENTRE {SPRING_SCREW_EAST_OF_PIVOT:.1f} EAST OF THE "
-    "MHA-062 AXIS, CREST BEARING ON THE PARKED BACK MHA-056 FLANK"
+    f"MHA-114 FOOT HOLE CENTRE ABOUT {SPRING_SCREW_EAST_OF_PIVOT:.1f} EAST OF THE "
+    f"MHA-062 AXIS, STATIONED BY {FITUP.SPRING_SET_NAME} UNDER {FITUP.RIG_SET_NAME}"
 )
 
 

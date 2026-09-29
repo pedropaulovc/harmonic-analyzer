@@ -26,7 +26,10 @@ import it.
   SPRING_PAD_LEAF off the back block before its seat is transferred (the
   same RIG SET note).  The foot lies east of the block's east end, so the
   leaf stands on edge against the block's inner face and overhangs that
-  end to meet the pad.
+  end to meet the pad.  East-west the pad is SPRING SET off the parked
+  back strap itself (crest touching, then pushed SPRING_SET_PUSH west on
+  feelers gaged off the north pedestal), so the crest's penetration never
+  carries the strap or block bands (PR #1127).
 - ASSEMBLY_SEQUENCE orders the rig's assembly steps.  The MHA-144 collar's
   install, the bonds and the MHA-135 drive-through are each part spec's
   ASSEMBLY_STEP (policy rule 6 moved them off the part sheets, #814),
@@ -53,6 +56,7 @@ from pinion_rig_layout import (
     RIG_SET_LEAF_D,
     RIG_SET_LEAVES,
     SPRING_PAD_LEAF,
+    SPRING_SET_PUSH,
 )
 from pinion_strap_pin_spec import PIN_SUB_FLUSH_MAX
 
@@ -114,13 +118,25 @@ def _leaves_text(leaves: tuple[float, ...]) -> str:
 # VIEW caption, section arrow A and the MHA-132 callout), and the sheet takes
 # no numbered notes (Main), so the name is the reference.
 RIG_SET_NAME = "RIG SET"
+# MHA-114's east-west station is SPRING SET (PR #1127): the strap itself, not
+# the block or the pedestal, references the crest's penetration.  With the
+# straps parked on their cams, slide the leaf west until its crest just
+# touches the parked back MHA-056 flank; gage the pad's east end off the
+# north MHA-004 pedestal's west flank (feeler stack G); push the pad west
+# to G + SPRING_SET_PUSH on the same feelers, tighten MHA-103 on the gage,
+# then spot the seat.  The pedestal is only the reference between the two
+# readings, so its own position never enters the set.
+SPRING_SET_NAME = "SPRING SET"
 RIG_SET_STEP = "\n".join(
     (
         f"{RIG_SET_NAME}, BEFORE SPOTTING THE TRANSFER SEATS:",
         f"FRONT MHA-061 {FRONT_BLOCK_FEELER:.2f} LEAF OFF FRONT MHA-056;",
         f"MHA-002 BACK END {_leaves_text(RIG_SET_LEAVES)} LEAVES OFF",
         f"NORTH MHA-027 BACK FACE, {RIG_SET_BANK_PRECONDITION};",
-        f"MHA-114 PAD {SPRING_PAD_LEAF:.2f} LEAF OFF MHA-061.",
+        f"MHA-114 PAD {SPRING_PAD_LEAF:.2f} LEAF OFF MHA-061;",
+        f"{SPRING_SET_NAME}: MHA-114 CREST TOUCHING PARKED BACK MHA-056,",
+        "FEELER PAD EAST END TO NORTH MHA-004 (G); PUSH PAD WEST",
+        f"TO G + {SPRING_SET_PUSH:.1f} FEELERS, TIGHTEN MHA-103 ON THE GAGE.",
     )
 )
 TRANSFER_AFTER_RIG_SET = f"AFTER {RIG_SET_NAME};"
@@ -198,6 +214,8 @@ __all__ = [
     "SHAFT_DRILL_STEP",
     "SINGLE_LEAF_SETTINGS",
     "SPRING_PAD_LEAF",
+    "SPRING_SET_NAME",
+    "SPRING_SET_PUSH",
     "STRAP_PIN_NUMBER",
     "TRANSFER_AFTER_RIG_SET",
 ]

@@ -378,19 +378,21 @@ def test_a_leaf_stack_sums_to_its_setting_from_gage_leaves(setting: float) -> No
 
 
 def test_the_spring_is_stationed_east_west_where_its_preload_is_gated() -> None:
-    """Main's TbPB ruling Q2(2) A: MHA-114's foot hole is set where the
-    preload gates put it, the crest on the flank (the flick's flat stays off
-    it), before RIG SET's pad leaf sets it along the bank.  #1037 is the
-    window a fitter must hold."""
+    """Main's TbPB ruling Q2(2) A: MHA-114's foot hole lands where the
+    preload gates put it, and PR #1127 stations it there by SPRING SET off
+    the parked strap under RIG SET (which retired #1037's fixed window),
+    before RIG SET's pad leaf sets it along the bank."""
     import drive_train_steps as steps
+    import pinion_rig_fitup as fitup
     from pinion_spring_section import SCREW_EAST_OF_PIVOT
 
     located = _rig_step_body("rig-located")
     assert drawing.SPRING_EAST_WEST in located
-    printed = re.search(r"FOOT HOLE CENTRE ([\d.]+) EAST OF THE MHA-062 AXIS", located)
+    printed = re.search(r"FOOT HOLE CENTRE ABOUT ([\d.]+) EAST OF THE MHA-062 AXIS", located)
     assert printed is not None
     assert float(printed.group(1)) == pytest.approx(SCREW_EAST_OF_PIVOT, abs=0.05)
-    assert "CREST BEARING ON THE PARKED BACK MHA-056 FLANK" in located
+    assert f"STATIONED BY {fitup.SPRING_SET_NAME} UNDER {fitup.RIG_SET_NAME}" in located
+    assert fitup.SPRING_SET_NAME in fitup.RIG_SET_STEP
     assert "TERMINAL FLAT" not in _flat(RIG_STEPS)
     assert "TERMINAL FLAT" not in Path(drawing.__file__).read_text(encoding="utf-8")
     assert steps.step_number("rig-located") < steps.step_number("rig-set")

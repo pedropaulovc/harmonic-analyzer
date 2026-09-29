@@ -481,6 +481,16 @@ if SPRING_PAD_LEAF < smallest_leaf_setting(
     raise AssertionError("the spring pad leaf no longer covers its floor and spare")
 SPRING_PAD_AFT_Z = BACK_BLOCK_Z0 - SPRING_PAD_LEAF  # the pad's and the strip's
 SPRING_Z = SPRING_PAD_AFT_Z - SPRING_W / 2.0  # the strip's mid-plane
+# SPRING SET (PR #1127, pinion_rig_fitup.RIG_SET_STEP): east-west, the pad
+# is stationed from the parked back strap itself.  The leaf is slid west
+# until the crest touches the parked flank, then pushed SPRING_SET_PUSH
+# further west on feelers gaged off the north pedestal, so the crest's
+# penetration carries neither the strap's cap or c2c bands, its parked lean,
+# nor the block's .X end.  The set's error, each way, is the feeler class
+# plus the #4 screw's float in the pad's clearance hole (pinion_spring
+# _geometry.SET_ERROR_MM books it in the drive train's load gate).
+SPRING_SET_PUSH = 3.7
+SPRING_SET_FEEL_ERROR = FEELER_SET_ERROR
 SPRING_PAD_Z = SPRING_PAD_AFT_Z - SPRING_PAD_WIDTH / 2.0  # the pad's, its screw's
 SPRING_BLADE_INSET = SPRING_Z - SPRING_W / 2.0 - STRAP_Z_INNER[1]
 SPRING_BLADE_MIN_ON_FLANK = 0.1

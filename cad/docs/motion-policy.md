@@ -71,19 +71,28 @@ The alignment-pinion lift cams use one persistent tangent mate between the
 front collar OD and its pin's cylindrical shank. The rear copy follows the same
 rigid shaft/strap groups, without a redundant mate. `verify:kinematics` drives
 the saved drive-train's free lift-rod spin transiently and measures **both**
-OD-to-pin gaps and bracket swing through the stroke (including saved-rest
-tangency); `verify:soundness` checks mate health. The former 0.161 mm air was only the unsaved
+OD-to-pin gaps and bracket swing through the full analytically solved engaged
+pose, including saved-rest tangency; `verify:soundness` checks mate health.
+The former 0.161 mm air was only the unsaved
 level-centre setup pose; the cam-contact rest is the model's saved pose.
+
+The p2 setup study is a transient, partial 60° cam-input sweep (5 RPM for 2 s),
+compared with the sign and strap excursion derived from the cam-contact geometry.
+The analytically solved engaged cam rotation is about -82°; this short study is
+not an engagement endpoint and the kinematic model has no physical hard stop.
+Its motor duration is not a stop, travel limit, or claim about a built stop.
 
 The drive-train has three independent coordinates: crank spin, cone-platform
 swing, and lift-rod/cam spin. The bracket/strap swing is contact-linked to cam
-rotation, not a fourth independent DOF. The MHA-114 spring bears at 24.8 mm up
-the strap and has a 28° crest; its import-time analytical gate evaluates all
-32 formed corners, both poses and both stock thickness limits. It adds the
-cantilever's elastic tip rotation to the *free* crest tangent before requiring
-at least 3° of loaded arc at either end, alongside 0.25 mm spare beyond the
-arbor end-cap keep-out. This is a small-deflection force/displacement model,
-not a SolidWorks contact-force simulation or a physical spring qualification.
+rotation, not a fourth independent DOF. The MHA-114 spring bears about 19 mm up
+the strap and has a 55° crest; its load gate is the root-compliant elastica of
+`pinion_spring_load.py`, which solves the free profile's contact with the
+parked and engaged flank over the full printed envelope (formed bands, stock,
+strap caps, c2c, parked lean, SPRING SET error), and requires at least 3° of
+*loaded* crest arc at either end, 0.25 mm spare beyond the arbor end-cap
+keep-out, a clear flat tip, and 1.5× on both preload and yield
+(`cad/docs/tolerance-policy.md`). This is a finite-rotation beam model, not a
+SolidWorks contact-force simulation or a physical spring qualification.
 
 Other local cam/follower and spring/lever contact uses isolated subassemblies
 and their `verify:soundness` interference/health gates. The full 21-spring
