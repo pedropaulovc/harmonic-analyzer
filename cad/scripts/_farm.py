@@ -379,6 +379,11 @@ async def _dispatch(request: LeafRequest, wf_id: str) -> LeafResult:
         task=request.task,
         commit=request.commit,
     )
+    # A memo is written only by the start that creates the execution; an
+    # attach (USE_EXISTING) leaves the creator's. So the memo, not the request
+    # record above, is what tells scripts/farm-run.ps1 -Cancel that its own
+    # run created this leaf (farm.py status --json reports it as farm_run).
+    farm_run = os.environ.get("HARMONIC_FARM_RUN")
     handle = await client.start_workflow(
         WORKFLOW_BUILD_LEAF,
         request,
@@ -387,6 +392,7 @@ async def _dispatch(request: LeafRequest, wf_id: str) -> LeafResult:
         result_type=LeafResult,
         id_conflict_policy=WorkflowIDConflictPolicy.USE_EXISTING,
         execution_timeout=EXECUTION_TIMEOUT,
+        memo={"farm_run": farm_run} if farm_run else None,
     )
     _telemetry.info(
         f"Farm workflow attached: {wf_id}",

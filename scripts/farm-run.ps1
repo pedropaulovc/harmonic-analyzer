@@ -445,42 +445,6 @@ function Get-UnfinishedRunOutputs {
     return Join-Path $Record['snapshot'] 'cad\out'
 }
 
-# A workflow this run created starts within one start_workflow round trip of
-# its request; the bound only has to exclude a later re-creation of the ID.
-$script:CreationWindowSeconds = 30
-
-function Get-RunLeafRequests {
-    param([Parameter(Mandatory)]$Record)
-
-    # _farm._dispatch logs "Farm workflow requested" with an absolute timestamp
-    # just before start_workflow; the console log only has relative times.
-    $requests = @{}
-    $logs = Join-Path (Get-UnfinishedRunOutputs -Record $Record) 'reports\telemetry\logs.jsonl'
-    if (-not (Test-Path -LiteralPath $logs -PathType Leaf)) {
-        return $requests
-    }
-    foreach ($match in Select-String -LiteralPath $logs -SimpleMatch 'Farm workflow requested: ') {
-        # A short write or a killed writer can leave a torn line. It proves
-        # nothing, so skip it: a leaf without a request record is kept.
-        try {
-            $entry = $match.Line | ConvertFrom-Json -AsHashtable -ErrorAction Stop
-            $workflowId = [string]$entry['attributes']['workflow_id']
-            $requestedAt = ConvertTo-UtcTimestamp -Value $entry['timestamp']
-        }
-        catch {
-            continue
-        }
-        if ([string]::IsNullOrEmpty($workflowId)) {
-            continue
-        }
-        if (-not $requests.ContainsKey($workflowId)) {
-            $requests[$workflowId] = [System.Collections.Generic.List[datetime]]::new()
-        }
-        $requests[$workflowId].Add($requestedAt)
-    }
-    return $requests
-}
-
 # --- Tracking a recorded run: -Status, -Watch, -Cancel, -List -----------------
 #
 # Everything below reads the same three records a launch writes under
@@ -1115,8 +1079,6 @@ function Invoke-RunCancel {
             $shared[$workflowId] = $other.status['run_id']
         }
     }
-    # When this run asked the farm for each leaf, from its own telemetry.
-    $requests = Get-RunLeafRequests -Record $record
 
     $outcomes = [System.Collections.Generic.List[object]]::new()
     $reason = "$Why (farm-run.ps1 -Cancel $runId)"
@@ -1152,34 +1114,20 @@ function Invoke-RunCancel {
             Write-RunEvent -RunId $runId -Text "already closed $workflowId`: $($described['status'])"
             continue
         }
-        if ($null -eq $described['start_time']) {
-            $outcome['outcome'] = 'error'
-            $errors.Add("farm.py status $workflowId gave no start_time; cannot tell who started it")
-            Write-RunEvent -RunId $runId -Text "error $workflowId"
-            continue
-        }
-        # ConvertFrom-Json has already parsed the value, so its precision is
-        # read from the raw line.
-        if ($line -notmatch '"start_time"\s*:\s*"[^"]*T\d\d:\d\d:\d\d\.\d') {
-            # A whole second cannot order the start against this run's request:
-            # another submitter may have created it earlier in that second.
+        # The farm has no creator identity (every submitter on a host shares
+        # user@host), and an attach looks like a creation. Only the start that
+        # creates a workflow writes its memo, and _farm._dispatch stamps this
+        # run's ID there, so the memo alone says this run created the leaf.
+        if (-not $described.ContainsKey('farm_run')) {
             $outcome['outcome'] = 'kept-foreign'
-            $outcome['detail'] = "farm.py reported start_time $($described['start_time']) without sub-second precision; cannot order it against this run's request"
+            $outcome['detail'] = 'farm.py status reports no farm_run (solidworks-pool before pedropaulovc/solidworks-pool#165); cannot tell who created it'
             Write-RunEvent -RunId $runId -Text "kept $workflowId`: $($outcome['detail'])"
             continue
         }
-        $workflowStarted = ConvertTo-UtcTimestamp -Value $described['start_time']
-        $requested = if ($requests.ContainsKey($workflowId)) { $requests[$workflowId] } else { @() }
-        # Creation follows the request by one start_workflow round trip.
-        $createdHere = @($requested | Where-Object {
-                $workflowStarted -ge $_ -and $workflowStarted -le $_.AddSeconds($script:CreationWindowSeconds)
-            }).Count -gt 0
-        if (-not $createdHere) {
-            # USE_EXISTING cannot say who created a workflow, so only one the
-            # farm started after this run's own request is this run's;
-            # anything else was another submitter's, and this run attached.
+        if ($described['farm_run'] -ne $runId) {
+            $creator = if ($null -eq $described['farm_run']) { 'a submitter outside farm-run.ps1' } else { "run $($described['farm_run'])" }
             $outcome['outcome'] = 'kept-foreign'
-            $outcome['detail'] = "started $($workflowStarted.ToString('o')), not within $($script:CreationWindowSeconds) s after a request by this run"
+            $outcome['detail'] = "created by $creator; this run attached"
             Write-RunEvent -RunId $runId -Text "kept $workflowId`: $($outcome['detail'])"
             continue
         }
@@ -1535,6 +1483,9 @@ try {
     $env:SOLIDWORKS_POOL_HOME = $resolvedPoolHome
     $env:HARMONIC_REMOTE_CACHE_MODE = 'rw'
     $env:PYTHONUNBUFFERED = '1'
+    # _farm._dispatch stamps this on every leaf it creates, so -Cancel can tell
+    # a leaf this run created from one it attached to.
+    $env:HARMONIC_FARM_RUN = $runId
 
     # The submitter keys every task from the files it sees when it reaches the
     # task, while every worker builds $commit. Building from a private detached

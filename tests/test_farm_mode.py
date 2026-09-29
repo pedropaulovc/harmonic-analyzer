@@ -1496,6 +1496,7 @@ def temporal_boundary(tmp_path, monkeypatch):
 
     monkeypatch.setenv("SOLIDWORKS_POOL_CONFIG", str(_write_config(tmp_path)))
     monkeypatch.setenv("HARMONIC_FARM_COMMIT", SHA)
+    monkeypatch.delenv("HARMONIC_FARM_RUN", raising=False)
     calls: dict = {"connect": [], "start": []}
     outcome: dict = {}
 
@@ -1638,6 +1639,20 @@ def test_run_leaf_starts_the_shared_workflow_with_the_contract(temporal_boundary
     assert options["id_conflict_policy"] is WorkflowIDConflictPolicy.USE_EXISTING
     assert options["execution_timeout"] == timedelta(hours=8)
     assert options["result_type"] is _farm.LeafResult
+    assert options["memo"] is None, "no launcher run to name"
+
+
+def test_a_launcher_run_is_stamped_as_the_creator_memo(temporal_boundary, monkeypatch):
+    # Only the start that creates the execution writes its memo, so this is
+    # what farm-run.ps1 -Cancel compares with its run ID.
+    calls, resolve = temporal_boundary
+    resolve(_leaf_result())
+    monkeypatch.setenv("HARMONIC_FARM_RUN", "20260929T000000000Z-abc")
+
+    _farm.run_leaf("part:pen_rod", "k" * 64)
+
+    [(_, _, options)] = calls["start"]
+    assert options["memo"] == {"farm_run": "20260929T000000000Z-abc"}
 
 
 def test_a_keyless_leaf_uses_the_commit_in_its_workflow_identity(temporal_boundary):

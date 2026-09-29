@@ -8,7 +8,6 @@ import sys
 import threading
 import time
 from collections.abc import Callable
-from datetime import datetime, timedelta
 from pathlib import Path
 from typing import TypeVar
 
@@ -103,9 +102,10 @@ farm = next((i for i, arg in enumerate(sys.argv) if arg.endswith("farm.py")), No
 if farm is not None:
     # `uv run --project <pool> <pool>/farm.py <command> ...`, as the tracking
     # operations call it: a stateful fake of the farm's status/cancel.
-    # A workflow is {"status": ..., "start_time": ...}; the build half of this
-    # stub stamps start_time when the run requests the workflow (the farm
-    # creates it then), unless another submitter's start_time is already set.
+    # A workflow is {"status": ..., "farm_run": ...}; the build half of this
+    # stub creates a requested workflow's memo from HARMONIC_FARM_RUN (the farm
+    # writes it on creation) unless its creator already set one. "_old": true
+    # plays a farm.py that predates farm_run: status leaves the key out.
     # Status "UNREACHABLE" fails the query as a network outage would.
     state_path = Path(os.environ["UV_STUB_FARM"])
     workflows = json.loads(state_path.read_text(encoding="utf-8"))
@@ -119,7 +119,10 @@ if farm is not None:
         print("Error: failed to connect to the farm", file=sys.stderr)
         raise SystemExit(1)
     if command == "status":
-        print(json.dumps({"workflow_id": workflow, **described}))
+        shown = {key: value for key, value in described.items() if key != "_old"}
+        if described.get("_old"):
+            shown.pop("farm_run", None)
+        print(json.dumps({"workflow_id": workflow, **shown}))
         raise SystemExit(0)
     if command == "cancel":
         described["status"] = "CANCELED"
@@ -211,34 +214,12 @@ if lines:
     # Build output as build.py prints it: farm dispatch, cache hits, doit errors.
     printed = Path(lines).read_text(encoding="utf-8")
     requested = re.findall(r"Farm workflow requested: (\\S+)", printed)
-    telemetry = reports / "telemetry"
-    telemetry.mkdir(exist_ok=True)
     farm_state = Path(os.environ["UV_STUB_FARM"])
     workflows = json.loads(farm_state.read_text(encoding="utf-8"))
-    with open(telemetry / "logs.jsonl", "a", encoding="utf-8") as logs:
-        for workflow in requested:
-            # _farm._dispatch's record, then start_workflow(USE_EXISTING).
-            now = time.time()
-            logs.write(
-                json.dumps(
-                    {
-                        "body": f"Farm workflow requested: {workflow}",
-                        "attributes": {"workflow_id": workflow},
-                        "timestamp": time.strftime(
-                            "%Y-%m-%dT%H:%M:%S", time.gmtime(now)
-                        )
-                        + f".{int(now % 1 * 1e6):06d}Z",
-                    }
-                )
-                + "\\n"
-            )
-            if workflow in workflows:
-                # farm.py status reports it to the microsecond.
-                workflows[workflow].setdefault(
-                    "start_time",
-                    time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(now))
-                    + f".{int(now % 1 * 1e6):06d}+00:00",
-                )
+    for workflow in requested:
+        # start_workflow(USE_EXISTING, memo=...): only a creation writes it.
+        if workflow in workflows and not workflows[workflow].get("_old"):
+            workflows[workflow].setdefault("farm_run", os.environ.get("HARMONIC_FARM_RUN"))
     farm_state.write_text(json.dumps(workflows), encoding="utf-8")
     print(printed, end="", flush=True)
 print("uv-stderr", file=sys.stderr, flush=True)
@@ -1230,10 +1211,6 @@ def test_watch_exits_failed_with_the_cause_of_each_task_error(tmp_path: Path) ->
     assert final["in_flight_workflows"] == []
     assert final["unsettled_workflows"] == [LEAF_PEN]
 
-    # Codex on #1125: a torn telemetry line must not wedge every -Cancel.
-    telemetry = Path(final["outputs"]) / "reports/telemetry/logs.jsonl"
-    with open(telemetry, "a", encoding="utf-8") as logs:
-        logs.write('{"body": "Farm workflow requested: ' + LEAF_PEN[:8])
     done_before = Path(final["done"]).read_bytes()
 
     cancel = _run_launcher(
@@ -1428,40 +1405,17 @@ def test_a_dead_launcher_is_reported_and_its_orphaned_leaves_cancelled(
                 LEAF_PEN: {"status": "UNREACHABLE"},
                 LEAF_CONE: {"status": "COMPLETED"},
                 LEAF_SHARED: {"status": "RUNNING"},
-                # Another submitter started it long before this run attached;
-                # an older farm.py reports it to the whole second only.
-                LEAF_FOREIGN: {
-                    "status": "RUNNING",
-                    "start_time": "2020-01-01T00:00:00+00:00",
-                },
-                LEAF_RACED: {"status": "RUNNING"},
+                # Created by a submitter outside farm-run.ps1, and reported by
+                # a farm.py too old to say so; this run attached to both.
+                LEAF_FOREIGN: {"status": "RUNNING", "_old": True},
+                # Codex on #1125 (79d706547): this run logged its request, its
+                # start failed, and a sibling run created the workflow.
+                LEAF_RACED: {"status": "RUNNING", "farm_run": "sibling-run"},
             }
         ),
         encoding="utf-8",
     )
-    # Requests land >= 3 s after the run starts, leaving room for a race.
-    fixture["environment"]["UV_STUB_START_DELAY"] = "3"
     process, release, running = _start_held(tmp_path, fixture, lines, "orphaned")
-    # Codex on #1125: another submitter created LEAF_RACED after this run
-    # started but before this run requested it; this run only attached.
-    telemetry = Path(running["snapshot"]) / "cad/out/reports/telemetry/logs.jsonl"
-    requested_at = next(
-        datetime.fromisoformat(entry["timestamp"].replace("Z", "+00:00"))
-        for entry in map(json.loads, telemetry.read_text(encoding="utf-8").splitlines())
-        if entry["attributes"]["workflow_id"] == LEAF_RACED
-    )
-    # Codex on #1125 (d05cb04d9): created earlier in the same second as this
-    # run's request, which a whole-second start_time could not tell apart.
-    raced_start = requested_at - timedelta(
-        microseconds=requested_at.microsecond // 2 + 1
-    )
-    assert raced_start.replace(microsecond=0) == requested_at.replace(microsecond=0)
-    # .NET's round-trip form has 7 fractional digits; keep microseconds.
-    run_start = datetime.fromisoformat(running["started_at"][:26] + "+00:00")
-    assert raced_start > run_start
-    workflows = json.loads(farm_state.read_text(encoding="utf-8"))
-    workflows[LEAF_RACED]["start_time"] = raced_start.isoformat(timespec="microseconds")
-    farm_state.write_text(json.dumps(workflows), encoding="utf-8")
     build = _stub_pid(fixture)
     try:
         # The harness kills the launcher alone; the build it started lives on.
