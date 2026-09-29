@@ -173,11 +173,13 @@ SIDE_KEEP = {
 # extension lines start) and the hole: placed right of the hole those lines
 # ran along the silhouette over it, and the hole callout's leader had to cross
 # one (leader-crosses-line, af13c8ff8).  The Ø9.0 seat's on the seat, left of
-# the pinion pin hole.
-_DIAMETER_ROW_Y = (0.212, 0.228)
+# the pinion pin hole. The Ø11.388's 2X/limit stack rises above its dimension:
+# place its arrow near the outboard land's relief shoulder and lower its row
+# 5 mm, so the 2X clears both LIGHT DRIVE FIT and the taper note's landing line.
+_DIAMETER_ROW_Y = (0.212, 0.223)
 DIAMETER_POSITIONS = {
     "ShaftDiaDim": (PIN_X - 0.016, _DIAMETER_ROW_Y[0]),
-    "JournalDiaDim": (JOURNAL_START_X + 0.012, _DIAMETER_ROW_Y[1]),
+    "JournalDiaDim": (RELIEF_START_X - 0.002, _DIAMETER_ROW_Y[1]),
     "ReliefDiaDim": (RELIEF_START_X + 0.030, _DIAMETER_ROW_Y[0]),
     "PinionSeatDiaDim": (SEAT_STEP_X + 0.010, _DIAMETER_ROW_Y[0]),
 }
@@ -187,14 +189,14 @@ DIAMETER_POSITIONS = {
 # outboard land, and the equal-size callout also governs the inboard land.
 CALLOUTS_ABOVE = {"ShaftDiaDim": "2X", "JournalDiaDim": "2X"}
 CALLOUTS_BELOW = {"OverallLength": "OVERALL"}
-# Both running lands carry a separate part-owned finish and drawing symbol;
-# the outboard symbol sits between the Ø11.388 and Ø10.4 diameter leaders,
-# while the inboard symbol retains its clear position above the relief.
+# Both running lands carry separate part-owned finish symbols. Move the
+# outboard symbol left of the Ø11.388 leader, but keep its arrow at land
+# mid-length; the inboard symbol retains its clear spot above the relief.
 _OUTBOARD_FINISH_X = _sheet_x((JOURNAL_START + RELIEF_START) / 2.0)
 JOURNAL_FINISHES = {
     "outboard_journal": (
         (_OUTBOARD_FINISH_X, JOURNAL_FLANK_Y),
-        (_OUTBOARD_FINISH_X - 0.003, 0.205),
+        (_OUTBOARD_FINISH_X - 0.010, 0.205),
     ),
     "inboard_journal": (
         (RELIEF_END_X + 0.015, JOURNAL_FLANK_Y),
