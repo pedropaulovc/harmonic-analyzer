@@ -4,9 +4,9 @@ The leaf spring that holds the alignment-pinion drum disengaged by default
 (p. 68-69 close-ups img01/img03/img04; video frames v4_pinion_013/018/019):
 a 17-7 PH stainless strip screwed to the base EAST of the BACK swing strap,
 outboard, rising in a blade that leans IN toward the strap and bears on its
-east flank 24.8 up from the pivot, 3.2 below the arbor. Gravity swings the
-cluster east into mesh; the blade pushes the strap top back west onto the
-parked cam, and the lever engages against it.
+east flank at the contact station derived in pinion_spring_geometry.
+Gravity swings the cluster east into mesh; the blade pushes the strap top
+back west onto the parked cam, and the lever engages against it.
 
 Re-derived 2026-09-24 (handoff dt-pinion-spring-rederive-20260924): the old
 foot ran 35 WEST under the strap and the lift rod, read off img01's far-left

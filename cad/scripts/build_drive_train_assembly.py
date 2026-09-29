@@ -2121,9 +2121,8 @@ if _LEV_STUB_D < (_ARBOR_DIA_AT_LEVER + LEVER_ROD_DIA) / 2.0 + 0.25:
 # img01's far-left black head; that side of img01 is the drum side (cylinder
 # gear top-left, lift rod and follower bottom-right), not west as the old
 # block read it.  The blade rises leaning IN toward the strap; its crest
-# bears on the straight east flank CONTACT_T up from the pivot, now 3.2 below
-# the arbor (the img04 ~5 below was a scaled estimate).  A short flick turns
-# back east above the crest.
+# bears on the straight east flank at CONTACT_T measured from the pivot.
+# A short flick turns back east above the crest.
 # Gravity swings the cluster east into mesh; the leaf pushes the strap top
 # back WEST onto the parked cam collar, and the lever engages against it.
 # In rigid CAD the engaged pose overlaps the unflexed blade, a documented
