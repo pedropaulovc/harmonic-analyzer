@@ -4,9 +4,8 @@ The cylindrical shaft starts at local y=0, the common outboard plane where
 MHA-020 and through hub MHA-137 finish flush.  Only the shaft's same-diameter
 spherical dome projects outboard (negative Y), so the crank can still withdraw
 through the hub bore after removable taper pin MHA-024 is removed.  The shared
-8-mm face shift preserves the established bearing and T12 interfaces.
-The restored post's 0.15 feeler relocates the pinion seat 0.1 mm south.
-Near the far end, the 1/8 in
+8-mm face shift preserves the established bearing and T12 interfaces.  Near
+the far end, the 1/8 in
 straight-pin cross-hole keys the 16T pinion's hub boss to the shaft (ch12
 p.19 page002_img02; crank_pinion_spec owns the pin), its entry turned
 PIN_CLOCKING_DEG from -X toward -Z about the shaft axis so it meets the
