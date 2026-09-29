@@ -69,12 +69,21 @@ def test_reference_dimensions_remain_model_owned() -> None:
         "PivotStation",
         "AnchorStation",
         "AnchorOffset",
-        "AxisOffset",
         "Width",
     }
     assert spec.DRAWING_DIMENSIONS["HubSeatProfile"] == {"HubSeatDia"}
     assert spec.HALF_WIDTH - spec.ANCHOR_SCREW_Y == pytest.approx(8.2)
-    assert spec.ARM_END_X + spec.HALF_WIDTH == pytest.approx(97.7)
+    assert spec.ARM_END_X + spec.HALF_WIDTH == pytest.approx(100.4)
+
+
+def test_handle_end_is_a_semicircle_about_the_pivot() -> None:
+    # User ruling 2026-09-29 (ch11 p.14 re-check): both ends are R12.7 caps
+    # concentric with their holes; the crank radius stays 75.
+    assert spec.ARM_C2C == pytest.approx(75.0)
+    assert spec.END_RADIUS == pytest.approx(spec.HALF_WIDTH)
+    assert spec.ARM_END_X == pytest.approx(87.7)
+    assert spec.DRAWING_DIMENSIONS["ArmOutline"] == {"BossRadius", "EndRadius"}
+    assert not hasattr(spec, "SQUARE_END_OVERHANG")
     assert spec.DRAWING_REFERENCE_PRECISION == {"overall length reference": 1}
 
 
@@ -273,7 +282,7 @@ def test_handle_pivot_is_tapped_for_the_mha139_screw_with_a_2mm_web() -> None:
 
     assert spec.HANDLE_PIVOT_HOLE_SPEC.size == screw.THREAD_SIZE == "#8-32"
     assert spec.HANDLE_PIVOT_HOLE_SPEC.end == "through_all"
-    assert spec.PIVOT_END_WEB_NOMINAL == pytest.approx(7.917)
+    assert spec.PIVOT_END_WEB_NOMINAL == pytest.approx(10.617)
     assert spec.PIVOT_END_WEB_WORST >= 2.0
 
 
