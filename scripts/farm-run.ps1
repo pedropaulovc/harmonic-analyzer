@@ -437,12 +437,46 @@ function Complete-Snapshot {
 function Get-UnfinishedRunOutputs {
     param([Parameter(Mandatory)]$Record)
 
+    if (-not $Record['snapshot'] -or -not $Record['outputs']) {
+        # A launcher that predates snapshots built in -Worktree itself and
+        # recorded no outputs of its own.
+        return $null
+    }
     # A launcher stopped between moving cad/out and writing .done has already
     # put its outputs where a finished run's are.
     if (Test-Path -LiteralPath $Record['outputs'] -PathType Container) {
         return $Record['outputs']
     }
     return Join-Path $Record['snapshot'] 'cad\out'
+}
+
+function Complete-AbandonedRun {
+    param([Parameter(Mandatory)]$Record)
+
+    # The cleanup a launcher that died never ran: keep the outputs and remove
+    # the snapshot exactly as it would have.
+    if (-not $Record['snapshot'] -or -not $Record['outputs']) {
+        # A launcher that predates snapshots built in -Worktree itself: no
+        # snapshot to remove, and that cad/out was never this run's to move.
+        return [ordered]@{
+            outputs = $null
+            outputs_preserved = $false
+            outputs_stranded = $false
+            snapshot_removed = $null
+            cleanup_errors = [System.Collections.Generic.List[string]]::new()
+        }
+    }
+    $cleanup = Complete-Snapshot `
+        -Worktree $Record['worktree'] `
+        -SnapshotPath $Record['snapshot'] `
+        -OutputsPath $Record['outputs']
+    if ($null -eq $cleanup['outputs'] -and (Test-Path -LiteralPath $Record['outputs'] -PathType Container)) {
+        # The launcher was stopped between moving cad/out and writing .done:
+        # its outputs are already where a finished run's are.
+        $cleanup['outputs'] = $Record['outputs']
+        $cleanup['outputs_preserved'] = $true
+    }
+    return $cleanup
 }
 
 # --- Tracking a recorded run: -Status, -Watch, -Cancel, -List -----------------
@@ -788,10 +822,15 @@ function Get-RunProcessTree {
     # recorded build command, or, for the preparation and cleanup commands
     # (git worktree add/remove, submodule update, uv sync), this run's
     # snapshot, or (uv venv) its private staging environment.
+    # A record from a launcher that predates snapshots has neither field.
+    $staging = $null
+    if ($Record['environment'] -and $Record['snapshot']) {
+        $staging = "$($Record['environment']).staging-$(Split-Path -Path $Record['snapshot'] -Leaf)"
+    }
     $markers = @(
         (@($Record['argv'] | Select-Object -Skip 1) -join ' '),
         [string]$Record['snapshot'],
-        "$($Record['environment']).staging-$(Split-Path -Path $Record['snapshot'] -Leaf)"
+        $staging
     ) | Where-Object { -not [string]::IsNullOrEmpty($_) }
     $byParent = @{}
     foreach ($process in $all) {
@@ -1185,20 +1224,9 @@ function Invoke-RunCancel {
         return
     }
 
-    # The launcher never ran its own cleanup: keep the outputs and remove the
-    # snapshot exactly as it would have.
-    $cleanup = Complete-Snapshot `
-        -Worktree $record['worktree'] `
-        -SnapshotPath $record['snapshot'] `
-        -OutputsPath $record['outputs']
+    $cleanup = Complete-AbandonedRun -Record $record
     foreach ($problem in $cleanup['cleanup_errors']) {
         $errors.Add($problem)
-    }
-    if ($null -eq $cleanup['outputs'] -and (Test-Path -LiteralPath $record['outputs'] -PathType Container)) {
-        # The launcher was stopped between moving cad/out and writing .done:
-        # its outputs are already where a finished run's are.
-        $cleanup['outputs'] = $record['outputs']
-        $cleanup['outputs_preserved'] = $true
     }
 
     $startedAt = $runStartedAt
