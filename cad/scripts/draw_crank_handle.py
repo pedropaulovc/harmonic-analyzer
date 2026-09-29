@@ -248,6 +248,9 @@ async def build(adapter: Any) -> dict[str, str]:
         datums=("A",),
         quantity="TENON OD",
         label="tenon total runout",
+        # A cylinder's side-view outline is a silhouette, not a model edge
+        # (farm leaf 20260929T192327Z: an EDGE pick found nothing there).
+        entity_type="SILHOUETTE",
     )
     add_feature_control_frame(
         adapter,

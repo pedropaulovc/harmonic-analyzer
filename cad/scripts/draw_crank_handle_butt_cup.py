@@ -69,7 +69,9 @@ SIDE_CENTER = (0.140, 0.160)
 END_CENTER = (0.290, 0.160)
 ISO_CENTER = (0.370, 0.225)
 MANUFACTURING_NOTES_POS = (0.022, 0.075)
-ISO_NOTE_POS = (0.335, 0.185)
+# Right of the end view's box (farm leaf 20260929T192841Z: at 0.335 the note
+# ran 4 mm into it).
+ISO_NOTE_POS = (0.345, 0.185)
 
 _S = VIEW_SCALE[0] / 1000.0
 FLANGE_R = FLANGE_DIA * _S / 2.0  # 0.0432
