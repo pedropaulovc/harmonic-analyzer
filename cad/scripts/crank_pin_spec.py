@@ -19,8 +19,9 @@ SMALL_END_DIA = 5.0
 BIG_END_DIA = SMALL_END_DIA + PIN_LENGTH / 48.0  # 5.9375
 # Keeper-ring cross-hole through the big end (ch11 p.14 page002_img01: the
 # brass ring hangs from a hole in the pin's head), perpendicular to the axis.
-RING_HOLE_DIA = 1.5
-RING_HOLE_X = 3.0  # from the big end
+# Sized for the round Ø10 ring's wire arc (crank_pin_ring_spec asserts the air).
+RING_HOLE_DIA = 2.1
+RING_HOLE_X = 3.2  # from the big end: a 1.5 ligament at the worst-case band
 TAPER_HALF_ANGLE_DEGREES = math.degrees(
     math.atan((BIG_END_DIA - SMALL_END_DIA) / (2.0 * PIN_LENGTH))
 )

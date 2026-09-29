@@ -85,15 +85,18 @@ def test_part_stamps_make_critical_properties() -> None:
 
 
 def test_crank_keeper_ring_threads_the_pin_hole_clear_of_the_arm() -> None:
-    import build_crank_pin_ring as ring
     import build_drive_train_assembly as drive
+    import crank_pin_ring_spec as ring
     import pytest
 
-    radial_clearance = (crank_pin_spec.RING_HOLE_DIA - ring.WIRE_DIA) / 2.0
+    # The round ring's wire arc, centred in the straight cross-hole, keeps air
+    # to the hole wall across the whole pin section.
+    assert ring.HOLE_AIR >= ring.RING_HOLE_AIR
+    wall = (ring.PIN_DIA_AT_HOLE - crank_pin_spec.RING_HOLE_DIA) / 2.0
+    assert wall >= 1.5  # machined-web floor, drawing-simplicity rule 12
+    # It hangs clear of the pin: the ring's inside edge below the pin surface.
     pin_radius = ring.PIN_DIA_AT_HOLE / 2.0
-    assert radial_clearance >= 0.1
-    assert ring.STRAIGHT_HALF - pin_radius - ring.WIRE_DIA / 2.0 >= 0.25
-    assert ring.LOOP_WIDTH - pin_radius - ring.WIRE_DIA / 2.0 >= 0.25
+    assert ring.RING_BOTTOM_X - ring.WIRE_DIA / 2.0 - pin_radius >= 3.0
     assert drive.PIN_PROUD == pytest.approx(
         crank_pin_spec.RING_HOLE_X
         + ring.WIRE_DIA / 2.0

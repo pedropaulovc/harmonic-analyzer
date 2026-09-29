@@ -1,0 +1,13 @@
+keeper-chain:
+  title: Brass Bead Chain, Trade Size 3
+  number: MHA-149
+  stock_name: Bead Chain, Unfinished Brass, Trade Size 3
+  supplier: McMaster-Carr
+  supplier_skus: [3606T118]
+  material: Brass
+  material_specification: Brass, McMaster-Carr 3606T118
+  finish: unfinished
+  quantity: 1
+  tolerance_class: visual_noncritical
+  process: purchased
+  # Cut to keeper_chain_spec.BEAD_COUNT beads; 3/32 in beads, 20 lbf.

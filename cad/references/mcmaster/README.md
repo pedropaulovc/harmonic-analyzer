@@ -15,6 +15,8 @@ recipes:
 
 | part number | production part stem(s) | stock item |
 |---|---|---|
+| 3606T118 | `keeper-chain` (catalogue-only; no vendor model) | Bead Chain, Unfinished Brass, Trade Size 3 |
+| 3606T813 | `keeper-chain-splice` (catalogue-only; no vendor model) | Splicing Link for Brass Trade Size 3 Bead Chain |
 | 90114A511 | `fillister-screw` | Brass Fillister Head Slotted Screw |
 | 90126A211 | `knife-hanger-washer` | Zinc-Plated Steel SAE Washer |
 | 90280A108 | `foot-screw` | Steel Narrow Fillister Head Slotted Screw |
@@ -179,6 +181,17 @@ Catalog specifications checked on September 10, 2026:
   installed, a 1/16 in tube with the catalog wall. The page gives no slot
   or chamfer size, so the recipe models neither. No vendor SLDPRT has been
   harvested for it yet.
+
+- [3606T118](https://www.mcmaster.com/3606T118/) (`keeper-chain`, MHA-149)
+  and [3606T813](https://www.mcmaster.com/3606T813/) (`keeper-chain-splice`,
+  MHA-150) tie the crank's taper pin to the arm. Both product pages were read
+  on September 29, 2026. 3606T118 is unfinished brass bead chain, trade size 3,
+  3/32 in beads, 20 lbf, not for lifting. 3606T813 is the brass splicing link
+  for trade-size-3 chain. McMaster publishes neither dimensions beyond the bead
+  diameter nor CAD for either item. The 3.2426 mm pitch is the trade-size-3
+  average of 94 beads per foot (Ball Chain Mfg. and Frank Winne size charts).
+  The rod and splicing-link envelope are assumptions named in
+  `keeper_chain_spec.py`, so neither part has a replica gate.
 
 Ground rules (mirrored in the diagnostics themselves): the vendor files are
 opened read-only and NEVER saved or modified; everything derived from them
