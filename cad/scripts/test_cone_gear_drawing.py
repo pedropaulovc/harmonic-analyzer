@@ -536,6 +536,17 @@ def test_bore_view_enlarges_every_d_bore_clear_of_its_neighbours() -> None:
             > clock_x + _BORE_CALLOUT_TEXT_HALF_WIDTH + 0.005
             or ctt_y - clock_y > 4.0 * _BORE_TEXT_HALF_HEIGHT
         ), teeth
+        # The clock's arc centres where the flat crosses the axis and swings
+        # through its text, in the quadrant right of the flat and above the
+        # axis: clear of the diameter's upper-left lane and under the front
+        # view. Left in the sketch's upper-left quadrant, it crossed the
+        # diameter's shoulder on every 4:1 sheet.
+        vx, vy = drawing.bore_flat_vertex(teeth)
+        assert (vx, vy) == pytest.approx((cx + flat, cy))
+        assert clock_x > vx and clock_y > vy
+        reach = math.dist((vx, vy), (clock_x, clock_y))
+        assert dia_x + _BORE_DIA_TEXT_HALF_WIDTH < vx - 0.005
+        assert vy + reach + 0.003 < front_bottom, teeth
         assert drawing.bore_view_label(teeth).splitlines() == [
             "BORE PROFILE",
             f"SCALE {view_numerator:g} : {view_denominator:g}",

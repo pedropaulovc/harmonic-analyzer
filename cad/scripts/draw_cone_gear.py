@@ -58,6 +58,7 @@ from _drawing_common import (
     visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _layout_audit import arc_segments
 from _surface_finish import surface_finish_by_key
 from build_cone_gear import (
     assert_saved_configuration_topology,
@@ -160,6 +161,17 @@ BORE_VIEW_POSITION_TOL_M = 1e-4
 NOTE_CENTRING_TOL_M = 0.001
 CROP_NO_ERROR = 1  # swCropViewErrors_e.swCropViewErrors_NoError
 CENTER_MARK_SINGLE = 2  # swCenterMarkStyle_e.swCenterMark_Single
+# Imported, the flat clock keeps its sketch's quadrant (between the flat's
+# upper half and the -X centreline) wherever its text goes. Its arc then
+# swept the diameter's upper-left leader lane, and on the 4:1 sheets it
+# crossed that leader's shoulder (T030-T120, run 20260929T064504232Z).
+# ``_sweep_clock_right_of_flat`` flips it into the quadrant right of the
+# flat and above the axis. Its arc may overrun the flat or the axis by
+# CLOCK_ARC_OVERRUN and must centre on the flat/axis crossing within
+# CLOCK_ARC_CENTRE_TOL (sheet metres).
+CLOCK_ARC_OVERRUN = 0.0003
+CLOCK_ARC_CENTRE_TOL = 0.0005
+CLOCK_FLIPS = ("SupplementaryAngle", "VerticallyOppositeAngle", "SupplementaryAngle")
 # Top-aligned with the manufacturing notes: the 14-line block (header + 13
 # rows) measured 49.1 mm tall natively (e91d2581 layout audit), 3.51 mm a
 # line; the 15-line block ends ~52.6 mm down, still above the largest side
@@ -301,15 +313,22 @@ def bore_view_crop_radius(teeth: int) -> float:
     return bore_dia_mm(teeth) * _bore_view_ratio(teeth) / 2000.0 + BORE_VIEW_CROP_MARGIN
 
 
+def bore_flat_vertex(teeth: int) -> tuple[float, float]:
+    """Sheet point where the flat crosses the bore's horizontal centreline:
+    the clock dimension's vertex."""
+    flat = bore_flat_offset_mm(teeth) * _bore_view_ratio(teeth) / 1000.0
+    return BORE_VIEW_CENTER[0] + flat, BORE_VIEW_CENTER[1]
+
+
 def bore_view_keep(teeth: int) -> dict[str, tuple[float, float]]:
     """Text positions of the three bore dimensions round the bore view.
 
     The diameter's leader runs in from upper left; the across-flat hangs
     under the crop circle between its witnesses (the arc's -X point and the
-    flat); the clock's arc opens in the quadrant between the flat's lower
-    half and the +X centre-mark line, its text right of the circle and below
-    the axis, where the front view's thickness callout (above right, x 134-164
-    y 78-108 mm) never reaches.
+    flat); the clock's arc sweeps the quadrant between the flat's upper half
+    and the +X centre-mark line (``_sweep_clock_right_of_flat``), its text
+    right of the circle and just above the axis, where the front view's
+    thickness callout (above right, x 134-164 y 78-108 mm) never reaches.
     """
     ratio = _bore_view_ratio(teeth)
     radius = bore_dia_mm(teeth) * ratio / 2000.0
@@ -319,7 +338,7 @@ def bore_view_keep(teeth: int) -> dict[str, tuple[float, float]]:
     return {
         "BoreCutDia": (x - 0.020, y + crop + 0.006),
         "BoreAF": (x + (flat - radius) / 2.0, y - crop - BORE_VIEW_AF_DROP),
-        "BoreFlatClock": (x + crop + 0.024, y - 0.006),
+        "BoreFlatClock": (x + crop + 0.024, y + 0.006),
     }
 
 
@@ -562,6 +581,84 @@ def _crop_bore_view(
         raise RuntimeError(f"{label} lost {lost} to its crop; it holds {sorted(after)}")
 
 
+def _clock_arcs(display: Any) -> list[tuple[tuple[float, float], list[tuple[float, float]]]]:
+    """The clock dimension's drawn arcs as (centre, tessellated points), in
+    sheet metres, read the way the layout audit reads them."""
+    data = _early_bound(display.GetDisplayData(), "IDisplayData")
+    arcs = []
+    for index in range(int(data.GetArcCount())):
+        raw = tuple(float(value) for value in (data.GetArcAtIndex2(index) or ()))
+        segments = arc_segments(raw)
+        if not segments:
+            continue
+        points = [(segments[0].x0, segments[0].y0), *((s.x1, s.y1) for s in segments)]
+        arcs.append(((raw[10], raw[11]), points))
+    return arcs
+
+
+def _sweep_clock_right_of_flat(
+    adapter: Any, annotations: list[Any], teeth: int, *, label: str
+) -> None:
+    """Flip the imported flat clock until its arc sweeps only the quadrant
+    right of the flat and above the axis, then re-seat its text there.
+
+    Every flip is read back from the drawn arcs; a clock that ends anywhere
+    else raises with the stray points.
+    """
+    clocks = [
+        _early_bound(annotation, "IAnnotation")
+        for annotation in annotations
+        if dimension_name(adapter, _early_bound(annotation, "IAnnotation")) == "BoreFlatClock"
+    ]
+    if len(clocks) != 1:
+        raise RuntimeError(f"{label}: expected one BoreFlatClock, found {len(clocks)}")
+    annotation = clocks[0]
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    vertex = bore_flat_vertex(teeth)
+    text_xy = bore_view_keep(teeth)["BoreFlatClock"]
+    flips: list[str] = []
+    stray: list[tuple[float, float]] = []
+    for flip in ("", *CLOCK_FLIPS):
+        if flip:
+            if not getattr(display, flip)():
+                raise RuntimeError(f"{label}: {flip} refused on the flat clock")
+            flips.append(flip)
+            if not annotation.SetPosition2(*text_xy, 0.0):
+                raise RuntimeError(f"{label}: failed to re-seat the flat clock text")
+            rebuild_drawing(adapter, label=f"{label} clock {flip}")
+        arcs = _clock_arcs(display)
+        if not arcs:
+            raise RuntimeError(f"{label}: the flat clock draws no arc")
+        for centre, points in arcs:
+            if math.dist(centre, vertex) > CLOCK_ARC_CENTRE_TOL:
+                raise RuntimeError(
+                    f"{label}: flat clock arc centred at "
+                    f"{tuple(round(v * 1000, 2) for v in centre)} mm, not the "
+                    f"flat/axis crossing {tuple(round(v * 1000, 2) for v in vertex)} mm"
+                )
+        stray = [
+            point
+            for _centre, points in arcs
+            for point in points
+            if point[0] < vertex[0] - CLOCK_ARC_OVERRUN or point[1] < vertex[1] - CLOCK_ARC_OVERRUN
+        ]
+        radii = sorted({round(math.dist(centre, points[0]) * 1000, 2) for centre, points in arcs})
+        _telemetry.info(
+            f"{label}: flat clock after {flips or ['import']}: {len(arcs)} arc(s), "
+            f"radius {radii} mm, {len(stray)} point(s) outside the quadrant right "
+            "of the flat and above the axis",
+            clock_flips=len(flips),
+            clock_stray_points=len(stray),
+        )
+        if not stray:
+            return
+    raise RuntimeError(
+        f"{label}: flat clock arc still leaves the quadrant right of the flat and "
+        f"above the axis after {flips}; first stray points "
+        f"{[tuple(round(v * 1000, 1) for v in p) for p in stray[:3]]} mm"
+    )
+
+
 def _center_mark_bore(adapter: Any, view: Any, teeth: int, *, label: str) -> None:
     """Centre-mark the D-bore on its arc.  ``IView.AutoInsertCenterMarks2``
     looks for round holes; the D is an arc and a flat, so the arc's -X point
@@ -782,6 +879,9 @@ async def build(adapter: Any) -> dict[str, str]:
             keep=bore_keep,
             view_label=f"{configuration} bore",
             dimensions_by_feature=DRAWING_DIMENSIONS,
+        )
+        _sweep_clock_right_of_flat(
+            adapter, bore_annotations, teeth, label=f"{configuration} bore view"
         )
         _crop_bore_view(adapter, bore_view, configuration, teeth, set(bore_keep))
         # The part saves both authoring sketches hidden; the front view shows

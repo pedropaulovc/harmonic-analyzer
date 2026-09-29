@@ -596,7 +596,7 @@ def test_bore_finish_reads_at_note_height_and_leaders_have_separate_landings() -
     new_tip = [(near_end, (cx + rim[0], cy + rim[1]))]
     finish = [(drawing.FINISH_SYMBOL, drawing.FINISH_ATTACH)]
     reach = drawing.HALF_OD + drawing.SECTION_LINE_OVERRUN
-    cutting_line = [((cx, cy - reach), (cx, cy + reach))]
+    cutting_line = [((cx - reach, cy), (cx + reach, cy))]
     assert leaders.distance_to_point(old_tip[0], (cx, cy)) < drawing.TIP_DIA_KEEP_OUT
     leaders.assert_leaders_clear(
         {"OutsideDia": new_tip, "BoreDia": bore, "BoreAF": af, "BoreFinish": finish},
@@ -627,6 +627,8 @@ def test_bore_finish_reads_at_note_height_and_leaders_have_separate_landings() -
         },
         label="gear leaders vs A-A",
     )
-    # The A-A arrows and letters stand right of the line's ends; the tip
-    # leader stays left of the line.
-    assert max(new_tip[0][0][0], new_tip[0][1][0]) < cx - 0.005
+    # The cut runs along the bore axis through the flat: the tip leader stays
+    # above it, the bore and finish leaders below it.
+    assert min(new_tip[0][0][1], new_tip[0][1][1]) > cy + 0.005
+    for name, segments in (("BoreDia", bore), ("BoreFinish", finish)):
+        assert max(segments[0][0][1], segments[0][1][1]) < cy, name

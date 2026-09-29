@@ -1,11 +1,11 @@
 r"""Create the curated manufacturing drawing for the crank-drive gear (64T).
 
 Recreated under ``cad/docs/drawing-simplicity-policy.md``. The sheet is a
-face view, a longitudinal centre section and an isometric of a helical
-toothed disc with a local +X D-bore, and five native model dimensions --
-outside diameter, four-place face width, round bore diameter, across-flat and
-south-entry chamfer -- plus the gear-data block rule 6 keeps for the
-crossed-axis tooth system.
+face view, a longitudinal centre section through the D-flat and an isometric
+of a helical toothed disc with a local +X D-bore, and five native model
+dimensions -- outside diameter, four-place face width, round bore diameter,
+across-flat and south-entry chamfer -- plus the gear-data block rule 6 keeps
+for the crossed-axis tooth system.
 
 No datums, no feature control frames: a gear slipped onto a shaft land is not
 on the GD&T allowlist (rules 3-4), and the retired end-face perpendicularity
@@ -36,6 +36,7 @@ from _drawing_common import (
     assert_imported_precision,
     create_section_view,
     finalize_drawing,
+    model_point_in_view,
     new_project_drawing,
     read_required_properties,
     rebuild_drawing,
@@ -106,23 +107,27 @@ FACE_WIDTH_HALF = FACE_WIDTH * VIEW_SCALE[0] / (VIEW_SCALE[1] * 2000.0)  # 0.005
 
 # End view: round diameter on the lower left, AF in the lane right of the
 # tooth tips and tip diameter above. Dimension text centres on its keep
-# point; the A-A arrows and letters stand right of the cutting line's ends
-# (crank-pinion sheet), so the tip text sits left of it and its leader,
-# aimed at the centre from the text's near end, lands clear of the line.
-# The flat itself appears on local +X in the face view.
+# point. The A-A cutting line crosses the face on the bore axis, below the
+# tip leader and above the bore and finish leaders; only AF's witness lines,
+# which start on the axis, meet it. The flat itself appears on local +X in
+# the face view.
 FRONT_KEEP = {
     "OutsideDia": (FRONT_CENTER[0] - 0.035, FRONT_CENTER[1] + HALF_OD + 0.016),
     "BoreDia": (FRONT_CENTER[0] - 0.078, FRONT_CENTER[1] - 0.062),
     "BoreAF": (FRONT_CENTER[0] + 0.090, FRONT_CENTER[1] + 0.028),
 }
-# Longitudinal centre section A-A instead of a plain side view: the south bore
-# chamfer is internal, and a targeted import delivers a chamfer's size only
-# where its edges are drawn. The hidden-line side view returned FaceWidth
-# alone (farm run 20260929T061328212Z at 70d2e52); draw_rocker_arm_support's
-# RimChamfer is the same case. Cut bottom to top, as draw_crank_pinion does,
-# the arrows point +X: the section keeps the +X (flat) half seen from -X, so
-# the part's +Z (north) face is on its right and the chamfered south face on
-# its left, toward the face view.
+# Longitudinal centre section A-A instead of a plain side view: the south
+# bore chamfer is internal, and a targeted import delivers the chamfer's
+# size only into a section whose plane holds the flat. Probe run
+# 20260929T113615557Z-0f9264a5 (223e44d) imported BoreSouthChamfer into each
+# candidate view before any other view held it: the cut along +X gave
+# BoreSouthChamferSize, while the cut along +Y, *Right and *Back gave
+# nothing. Farm run 20260929T064504232Z (525b753) printed FaceWidth alone
+# from the +Y cut, and the hidden-line side view did the same at 70d2e52.
+# The line runs left to right through the bore axis, and the view is turned
+# (``_turn_section_axis_across``) so the gear axis reads left to right like
+# the side view it replaces: the chamfered south face on the left, toward
+# the face view, and the +Z (north) face on the right.
 SECTION_LINE_OVERRUN = 0.005
 # The native caption's top centre, under the section and above the title block.
 SECTION_CAPTION_XY = (SECTION_CENTER[0], 0.090)
@@ -211,6 +216,45 @@ def _position_section_caption(adapter: Any, view: Any) -> None:
         raise RuntimeError("64T section caption position did not persist")
     if str(note.PropertyLinkedText or "") != linked_text:
         raise RuntimeError("64T section caption lost its native fields")
+
+
+def _section_axes(adapter: Any, view: Any) -> tuple[tuple[float, float], tuple[float, float]]:
+    """Sheet directions of the gear axis (+Z) and the flat's normal (+X)."""
+    origin = model_point_in_view(adapter, view, (0.0, 0.0, 0.0), label="64T section origin")
+    axes = []
+    for xyz, name in (((0.0, 0.0, 0.001), "gear axis"), ((0.001, 0.0, 0.0), "flat normal")):
+        point = model_point_in_view(adapter, view, xyz, label=f"64T section {name}")
+        axes.append((point[0] - origin[0], point[1] - origin[1]))
+    return axes[0], axes[1]
+
+
+def _turn_section_axis_across(adapter: Any, view: Any) -> None:
+    """Turn A-A so the gear axis reads left to right, flat side up.
+
+    Cut along +X, the section lands with the axis vertical. A left-to-right
+    axis puts the south face, the chamfered one, toward the face view. With
+    the flat up the sight runs along -Y, so the A-A arrows point down, away
+    from the AF dimension line above the cutting line.
+    """
+    native = _early_bound(view, "IView")
+    section = _early_bound(native.GetSection(), "IDrSection")
+    axis, flat = _section_axes(adapter, native)
+    if axis[0] * flat[1] - axis[1] * flat[0] < 0.0:
+        reversed_cut = not bool(section.GetReversedCutDirection())
+        section.SetReversedCutDirection(reversed_cut)
+        rebuild_drawing(adapter, label="reverse 64T section")
+        if bool(section.GetReversedCutDirection()) != reversed_cut:
+            raise RuntimeError("64T section cutting direction did not persist")
+        axis, flat = _section_axes(adapter, native)
+    native.Angle = float(native.Angle) - math.atan2(axis[1], axis[0])
+    rebuild_drawing(adapter, label="turn 64T section")
+    axis, flat = _section_axes(adapter, native)
+    if axis[0] <= 0.0 or abs(axis[1]) > 1e-8 or flat[1] <= 0.0 or abs(flat[0]) > 1e-8:
+        raise RuntimeError(f"64T section did not turn axis-across: {axis=}, {flat=}")
+    _telemetry.info(
+        f"64T section turned: angle={float(native.Angle):.6f} rad, "
+        f"reversed={bool(section.GetReversedCutDirection())}"
+    )
 
 
 def _named(adapter: Any, annotations: list[Any], name: str) -> Any:
@@ -338,13 +382,14 @@ async def build(adapter: Any) -> dict[str, str]:
     section = create_section_view(
         adapter,
         front,
-        line_start=(FRONT_CENTER[0], FRONT_CENTER[1] - HALF_OD - SECTION_LINE_OVERRUN),
-        line_end=(FRONT_CENTER[0], FRONT_CENTER[1] + HALF_OD + SECTION_LINE_OVERRUN),
+        line_start=(FRONT_CENTER[0] - HALF_OD - SECTION_LINE_OVERRUN, FRONT_CENTER[1]),
+        line_end=(FRONT_CENTER[0] + HALF_OD + SECTION_LINE_OVERRUN, FRONT_CENTER[1]),
         view_xy=SECTION_CENTER,
         section_label="A",
         scale=VIEW_SCALE,
         label="64T longitudinal centre section",
     )
+    _turn_section_axis_across(adapter, section)
     _position_section_caption(adapter, section)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
     # The bore profile is a circular arc closed by a flat; the D-shape is
