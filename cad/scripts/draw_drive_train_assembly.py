@@ -384,7 +384,7 @@ BOM_DESCRIPTIONS = {
     "cone-tip-pinch-screw": "#4-40 FILLISTER SCREW, MCMASTER 91794A112",
     "cone-tip-shim": "CONE TIP SHIM PACK, 1.10 NOMINAL",
     "post-mount-screw": "1/4-20 FILLISTER SCREW, MSC 40923898",
-    "cone-lock-knob": "KNURLED THUMB SCREW, MCMASTER 91882A425",
+    "cone-lock-knob": "KNURLED THUMB SCREW, MCMASTER 93585A190",
     "cone-pivot-screw": "SHOULDER SCREW, MCMASTER 91829A560",
     "swing-stop-screw": "#4-40 FILLISTER SCREW, MCMASTER 90280A108",
     "crankshaft": "CRANKSHAFT",

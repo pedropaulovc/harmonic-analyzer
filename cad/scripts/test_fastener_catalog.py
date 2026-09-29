@@ -12,7 +12,7 @@ _EXPECTED = {
     "boss-hook": (("9490T1",), "MHA-005", 1),
     "bracket-screw": (("90280A194",), "MHA-108", 2),
     "clamp-screw": (("90280A201",), "MHA-107", 6),
-    "cone-lock-knob": (("91882A425",), "MHA-093", 1),
+    "cone-lock-knob": (("93585A190",), "MHA-093", 1),
     "cone-pivot-screw": (("91829A560",), "MHA-094", 1),
     "cone-tip-adjuster": (("94025A164",), "MHA-097", 1),
     "cone-tip-block-nut": (("90631A007",), "MHA-146", 1),

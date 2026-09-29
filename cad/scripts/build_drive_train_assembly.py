@@ -854,7 +854,6 @@ from post_mount_screw_spec import (  # noqa: E402
 )
 from cone_lock_knob_spec import (  # noqa: E402
     HEAD_DIA as KNOB_HEAD_DIA,
-    WASHER_DIA as KNOB_WASHER_DIA,  # noqa: F401 - verify footprint contract
     STUD_DIA as KNOB_STUD_DIA,
     STUD_LEN as KNOB_STUD_LEN,
     THREAD as KNOB_THREAD,
@@ -1672,9 +1671,9 @@ if abs(BASE_LOCK_ENGAGEMENT - (KNOB_STUD_LEN - PLAT_T)) > 1e-9:
     raise AssertionError("base lock engagement does not use the stock stud excess")
 require_lock_seat_fit(BASE_LOCK_SEAT_SPEC, PLAT_T, KNOB_STUD_LEN)
 
-# The stock knurled head is much wider than the former simplified knob.  Keep
-# its base seat outside a conservative plan-envelope of every adjacent gear;
-# the real solids must therefore have clearance at every tooth phase.
+# Keep the stock knurled head's base seat outside a conservative plan-envelope
+# of every adjacent gear; the real solids must therefore have clearance at
+# every tooth phase.
 _KNOB_GEAR_CLEARANCE = 0.25
 _KNOB_R = KNOB_HEAD_DIA / 2.0
 _GEAR64_TIP_R = R64 + ADD16
@@ -1702,9 +1701,9 @@ if abs(_SEAT_ANCHOR_M[0] - X_CRANK) > 1e-6:
         f" != X_CRANK {X_CRANK:.6f} -- anchor sign convention broke"
     )
 
-# The collar controls notch-exit travel; the larger knurled head controls
-# external clearance. The stock stop (the foot screw's #4-40 SKU) seats its
-# head on the base top; swing_stop_screw_spec owns the embed/proud split.
+# The collarless knurled head controls both notch-exit travel and external
+# clearance. The stock stop (the foot screw's #4-40 SKU) seats its head on the
+# base top; swing_stop_screw_spec owns the embed/proud split.
 DISENGAGE_DEG = BASE_SWING_HARDWARE.disengage_deg
 STOP_X, STOP_Z = BASE_SWING_HARDWARE.stop_xz
 _STOP_CONTACT = BASE_SWING_HARDWARE.stop_contact_xz
@@ -3693,7 +3692,7 @@ async def build(adapter) -> dict[str, str]:
         ground=False,
         label="cone-tip-pinch-screw (slit clamp, head east)",
     )
-    # The lock knob is a base-bolted static: its collar underside lands on the
+    # The lock knob is a base-bolted static: its head underside lands on the
     # plate top and its longer stud passes through the slot into the new 1/4-20
     # base seat. The plate remains the mover, sweeping around the stationary
     # stud without changing the assembly's operational swing DOF.

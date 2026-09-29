@@ -1753,8 +1753,8 @@ def verify_base_footprint(report: Report) -> None:
                 "cone-lock-knob",
                 train.KNOB_X,
                 train.KNOB_Z,
-                train.KNOB_WASHER_DIA / 2.0,
-                train.KNOB_WASHER_DIA / 2.0,
+                train.KNOB_HEAD_DIA / 2.0,
+                train.KNOB_HEAD_DIA / 2.0,
             ),
             (
                 "cone-pivot-screw",
@@ -1789,7 +1789,7 @@ def verify_base_footprint(report: Report) -> None:
         # Corner fillets only pull the true extents INSIDE this sharp-corner
         # sweep, so it stays conservative. The lock notch is open-ended, so
         # the disengaged pose is the plate swung until its edge clears the
-        # knob washer (train.DISENGAGE_DEG, derived from the notch geometry)
+        # knob head (train.DISENGAGE_DEG, derived from the notch geometry)
         # -- sweep every corner at BOTH poses. The v2 Ry180 installation keeps
         # this carrier at the ch30-fitted +35.415-mm post station. The base keeps its
         # photographed front edge and extends only at the rear, so every load

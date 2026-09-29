@@ -111,7 +111,7 @@ from cone_pivot_screw_spec import (
     THREAD_TAIL_LEN as PIVOT_THREAD_ENGAGEMENT,
 )
 from cone_lock_knob_spec import (
-    COLLAR_DIA as LOCK_COLLAR_DIA,
+    HEAD_DIA as LOCK_HEAD_DIA,
     PLUG_TAP_LEAD as LOCK_PLUG_TAP_LEAD,
     STUD_BOTTOM_CLEARANCE as LOCK_STUD_BOTTOM_CLEARANCE,
     STUD_LEN as LOCK_STUD_LEN,
@@ -300,7 +300,7 @@ SERIAL_AREA_MM2 = 3.1029  # pinned from gen_base_serial_dxf's summary (net glyph
 # on the cone journal line) and exact purchased-hardware diameters.
 SWING_HARDWARE_GEOMETRY = swing_hardware_geometry(
     PIVOT_SCREW_XZ,
-    lock_collar_dia=LOCK_COLLAR_DIA,
+    lock_head_dia=LOCK_HEAD_DIA,
     stop_contact_dia=STOP_CONTACT_DIA,
 )
 LOCK_KNOB_XZ = SWING_HARDWARE_GEOMETRY.lock_xz
@@ -315,7 +315,7 @@ PIVOT_SCREW_DRILL_DEPTH = seat_drill_depth(
 )
 
 # The 19.05-mm stock stud enters 12.70 through the platform, or its full
-# length when the collar fences the disengaged notch on the bare base.
+# length when the head fences the disengaged notch on the bare base.
 # Full threads clear that deepest pose by 0.25 at their printed low limit;
 # a five-pitch plug-tap lead fits below them, before the drill point.
 LOCK_STUD_ENGAGEMENT = LOCK_STUD_LEN - PLATE_T

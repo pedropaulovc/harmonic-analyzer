@@ -17,7 +17,7 @@ from cone_pivot_post_installation import (
     MECHANISM_X_SHIFT,
     MECHANISM_Z_SHIFT,
 )
-from cone_lock_knob_spec import COLLAR_DIA as KNOB_COLLAR_DIA
+from cone_lock_knob_spec import HEAD_DIA as KNOB_HEAD_DIA
 from swing_stop_screw_spec import CONTACT_DIA as STOP_CONTACT_DIA
 
 
@@ -183,7 +183,7 @@ def test_cone_lock_rejects_a_receiver_that_only_clears_the_plate_pose() -> None:
         part.LOCK_SEAT_SPEC,
         overrides_mm={"ThreadDepth": knob.STUD_LEN - platform.PLATE_T + 0.25},
     )
-    with pytest.raises(AssertionError, match="collar seats"):
+    with pytest.raises(AssertionError, match="head seats"):
         knob.require_seat_fit(seat, platform.PLATE_T, knob.STUD_LEN)
 
 
@@ -296,7 +296,7 @@ def test_v2_platform_swing_stop_coordinate_is_rederived() -> None:
     edge_norm = math.hypot(edge_x, edge_z)
     edge_x, edge_z = edge_x / edge_norm, edge_z / edge_norm
     disengage_rad = (
-        platform.NOTCH_EXIT_TRAVEL + KNOB_COLLAR_DIA / 2.0 + platform.DISENGAGE_COLLAR_MARGIN
+        platform.NOTCH_EXIT_TRAVEL + KNOB_HEAD_DIA / 2.0 + platform.DISENGAGE_HEAD_MARGIN
     ) / platform.SLOT_R
     angle = math.radians(platform.INCLINE_DEG) + disengage_rad
     cos_a, sin_a = math.cos(angle), math.sin(angle)
