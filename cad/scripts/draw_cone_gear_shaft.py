@@ -651,6 +651,7 @@ class PlacedSection(NamedTuple):
 
     section: DSection
     view: Any
+    face: Box
     across_flat: Any
     caption: Box
     centre_marks: dict[str, Box]
@@ -992,18 +993,40 @@ def _add_d_sections(
             dimensions_by_feature=DRAWING_DIMENSIONS,
         )
         centre_marks = _trim_centre_mark(adapter, view, section)
-        outline = tuple(
-            float(value) for value in _early_bound(view, "IView").GetOutline()
-        )
+        face = _section_face(adapter, view, section, sign)
         caption = _place_view_caption(
             adapter,
             view,
-            (section.centre[0], outline[1] - SECTION_CAPTION_GAP),
+            (section.centre[0], face[1] - SECTION_CAPTION_GAP),
             CaptionAnchor.TOP_CENTRE,
             label=f"section {section.label} caption",
         )
-        placed.append(PlacedSection(section, view, across_flat, caption, centre_marks))
+        placed.append(
+            PlacedSection(section, view, face, across_flat, caption, centre_marks)
+        )
     return placed
+
+
+def _section_face(adapter: Any, view: Any, section: DSection, sign: int) -> Box:
+    """The D's cut face on its section, boxed round the land's full circle.
+
+    A section's outline is no measure of its ink: SolidWorks boxes the whole
+    part's depth (the Ø15.9 collar) and the cutting line's length, plus 5.6
+    mm (leaf 20260929T212933Z-1-e35ef0ba: B-B's outline ran 29 mm either side
+    of its 9.5 mm face, past the right border).  The face is centred on the
+    axis, which must stand where the layout put the section."""
+    (centre,) = model_points_in_view(
+        adapter,
+        view,
+        (_station_point(section.station_mm, 0.0, sign),),
+        label=f"section {section.label} axis",
+    )
+    if math.dist(centre, section.centre) > 0.001:
+        raise RuntimeError(
+            f"section {section.label} centres its face at {centre}, not {section.centre}"
+        )
+    half = SECTION_DIAS[section.land] / 2000.0 * section.scale[0] / section.scale[1]
+    return (centre[0] - half, centre[1] - half, centre[0] + half, centre[1] + half)
 
 
 def _section_line_ink(view: Any) -> dict[str, dict[str, Box]]:
@@ -1151,7 +1174,7 @@ def _prove_section_layout(
     for placed in sections:
         label = f"section {placed.section.label}"
         cell = {
-            f"{label} view": _view_outline(placed.view),
+            f"{label} face": placed.face,
             f"{label} across-flat": _dimension_text_box(
                 placed.across_flat, f"{label} across-flat"
             ),
