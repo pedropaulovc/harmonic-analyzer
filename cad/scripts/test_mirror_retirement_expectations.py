@@ -171,3 +171,74 @@ def test_expected_rows_are_the_placement_rows(component: str, rows: ast.expr) ->
         f"{component}: check_mirror_retirement expects {ast.unparse(rows)}, "
         f"the assembly places it with {PLACED[component.rsplit('-', 1)[0]].id}"
     )
+
+
+def _shaft_helper_placements() -> dict[str, tuple[ast.expr, ast.expr]]:
+    """Station and face passed when the assembly seeds an on-shaft gear."""
+    placed = {}
+    for call in _calls(ASSEMBLY, "_place_on_shaft"):
+        part = call.args[1]
+        if isinstance(part, ast.Constant) and isinstance(part.value, str):
+            assert part.value not in placed, f"duplicate on-shaft seed: {part.value}"
+            placed[part.value] = (call.args[2], call.args[3])
+    return placed
+
+
+def _shaft_diagnostic_expectations() -> dict[str, tuple[ast.expr, ast.expr]]:
+    """The diagnostic's on_shaft arguments for the helper-seeded instances."""
+    expected = {}
+    for call in _calls(DIAGNOSTIC, "expect"):
+        if not (isinstance(call.args[0], ast.Name) and call.args[0].id == "DT"):
+            continue
+        position = call.args[2]
+        if not (
+            isinstance(position, ast.Call)
+            and isinstance(position.func, ast.Name)
+            and position.func.id == "on_shaft"
+        ):
+            continue
+        component_node = call.args[1]
+        if not isinstance(component_node, (ast.Constant, ast.JoinedStr)):
+            continue
+        # The cone-gear expectation is in a j loop. Its helper-seeded T120
+        # instance is j=0; the rest are copies, not _place_on_shaft calls.
+        component = eval(
+            compile(ast.Expression(component_node), str(DIAGNOSTIC), "eval"),
+            {"j": 0},
+        )
+        stem = component.rsplit("-", 1)[0]
+        assert stem not in expected, f"duplicate on-shaft expectation: {stem}"
+        expected[stem] = (position.args[0], position.args[1])
+    return expected
+
+
+SHAFT_HELPER_PLACEMENTS = _shaft_helper_placements()
+SHAFT_DIAGNOSTIC_EXPECTATIONS = _shaft_diagnostic_expectations()
+
+
+def test_on_shaft_cross_check_covers_helper_seeded_gears() -> None:
+    assert {"crank-drive-gear", "cone-gear"} <= SHAFT_HELPER_PLACEMENTS.keys()
+    assert SHAFT_HELPER_PLACEMENTS.keys() == SHAFT_DIAGNOSTIC_EXPECTATIONS.keys()
+
+
+@pytest.mark.parametrize("stem", sorted(SHAFT_HELPER_PLACEMENTS))
+def test_on_shaft_expectation_matches_assembly_station_and_face(stem: str) -> None:
+    expected_station, expected_face = SHAFT_DIAGNOSTIC_EXPECTATIONS[stem]
+    placed_station, placed_face = SHAFT_HELPER_PLACEMENTS[stem]
+    for label, expected, placed in (
+        ("station", expected_station, placed_station),
+        ("face", expected_face, placed_face),
+    ):
+        diagnostic_value = eval(
+            compile(ast.Expression(expected), str(DIAGNOSTIC), "eval"),
+            {"d": drive, "j": 0},
+        )
+        assembly_value = eval(
+            compile(ast.Expression(placed), str(ASSEMBLY), "eval"),
+            dict(vars(drive)),
+        )
+        assert abs(diagnostic_value - assembly_value) < 1e-9, (
+            f"{stem}: diagnostic on_shaft {label} {ast.unparse(expected)} "
+            f"differs by {diagnostic_value - assembly_value:.6f} mm "
+            f"from assembly _place_on_shaft {ast.unparse(placed)}"
+        )

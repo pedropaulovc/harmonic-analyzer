@@ -541,7 +541,7 @@ def on_shaft(station, face):
 expect(
     DT,
     "crank-drive-gear-1",
-    on_shaft(d.GEAR64_STATION + d.GEAR_AXIS_SHIFT, d.GEAR64_FACE),
+    on_shaft(d.GEAR64_CENTRE_STATION, d.GEAR64_FACE),
     d.ROT_Y_INCLINE,
     "crank-drive-gear 64T",
 )
