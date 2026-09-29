@@ -90,12 +90,72 @@ def _launcher_fixture(tmp_path: Path, *, submodules: bool = False) -> dict[str, 
     syncs = tmp_path / "uv syncs.jsonl"
     stub = tools / "uv_stub.py"
     stub.write_text(
-        """import json
+        """import hashlib
+import json
 import os
+import re
 import subprocess
 import sys
 import time
 from pathlib import Path
+
+farm = next((i for i, arg in enumerate(sys.argv) if arg.endswith("farm.py")), None)
+if farm is not None:
+    # `uv run --project <pool> <pool>/farm.py <command> ...`, as the tracking
+    # operations call it: a stateful fake of the farm's status/cancel.
+    # A workflow is {"status": ..., "farm_run": ...}; the build half of this
+    # stub creates a requested workflow's memo from HARMONIC_FARM_RUN (the farm
+    # writes it on creation) unless its creator already set one. "_old": true
+    # plays a farm.py that predates farm_run: status leaves the key out.
+    # Status "UNREACHABLE" fails the query as a network outage would.
+    # "_absent_for": N reports the workflow missing to its first N status
+    # queries: a start RPC the farm had not committed yet.
+    state_path = Path(os.environ["UV_STUB_FARM"])
+    workflows = json.loads(state_path.read_text(encoding="utf-8"))
+    command, *rest = sys.argv[farm + 1 :]
+    workflow = rest[-1]
+    absent = workflow in workflows and workflows[workflow].get("_absent_for", 0) > 0
+    if absent and command == "status":
+        workflows[workflow]["_absent_for"] -= 1
+        state_path.write_text(json.dumps(workflows), encoding="utf-8")
+    if workflow not in workflows or absent:
+        print(f"Error: workflow not found for ID: {workflow}", file=sys.stderr)
+        raise SystemExit(2)
+    described = workflows[workflow]
+    if described["status"] == "UNREACHABLE":
+        print("Error: failed to connect to the farm", file=sys.stderr)
+        raise SystemExit(1)
+    if command == "status":
+        shown = {
+            key: value
+            for key, value in described.items()
+            if key not in ("_old", "_absent_for")
+        }
+        if described.get("_old"):
+            shown.pop("farm_run", None)
+        # "_attach": a run record to publish while the farm answers: a sibling
+        # that attaches to this leaf mid-cancel.
+        attach = described.pop("_attach", None)
+        if attach is not None:
+            state_path.write_text(json.dumps(workflows), encoding="utf-8")
+            Path(attach["path"]).write_text(attach["record"], encoding="utf-8")
+        print(json.dumps({"workflow_id": workflow, **shown}))
+        raise SystemExit(0)
+    if command == "cancel":
+        described["status"] = "CANCELED"
+        state_path.write_text(json.dumps(workflows), encoding="utf-8")
+        with open(os.environ["UV_STUB_FARM_CANCELS"], "a", encoding="utf-8") as cancels:
+            cancels.write(
+                json.dumps(
+                    {
+                        "argv": sys.argv[farm + 1 :],
+                        "VIRTUAL_ENV": os.environ.get("VIRTUAL_ENV"),
+                    }
+                )
+                + "\\n"
+            )
+        raise SystemExit(0)
+    raise SystemExit(64)
 
 if sys.argv[1] == "venv":
     environment = Path(sys.argv[-1])
@@ -135,6 +195,10 @@ def record(**late):
     Path(os.environ["UV_STUB_INVOCATION"]).write_text(
         json.dumps(
             {
+                "pid": os.getpid(),
+                # The venv python.exe that started this interpreter; its
+                # parent is the uv.cmd shim's cmd.exe.
+                "ppid": os.getppid(),
                 "argv": sys.argv[1:],
                 "cwd": str(cwd),
                 "head": subprocess.run(
@@ -165,6 +229,30 @@ reports.mkdir(parents=True, exist_ok=True)
 (reports / "stub-output.txt").write_text("built\\n", encoding="utf-8")
 time.sleep(float(os.environ.get("UV_STUB_START_DELAY", "0")))
 print("uv-stdout", flush=True)
+lines = os.environ.get("UV_STUB_LINES")
+if lines:
+    # Build output as build.py prints it: farm dispatch, cache hits, doit errors.
+    printed = Path(lines).read_text(encoding="utf-8")
+    requested = re.findall(r"Farm workflow requested: (\\S+)", printed)
+    # UV_STUB_UNLOGGED: workflows dispatched whose lines never reach the log,
+    # as when -Cancel stops the launcher before it copies them.
+    unlogged = [w for w in os.environ.get("UV_STUB_UNLOGGED", "").split(",") if w]
+    farm_state = Path(os.environ["UV_STUB_FARM"])
+    workflows = json.loads(farm_state.read_text(encoding="utf-8"))
+    for workflow in requested + unlogged:
+        # _farm._dispatch names the workflow in the run's request directory...
+        requests = os.environ.get("HARMONIC_FARM_REQUESTS")
+        if requests:
+            task = ":".join(workflow.split(":")[1:3])
+            name = hashlib.sha256(workflow.encode("utf-8")).hexdigest()[:32]
+            (Path(requests) / f"{name}.json").write_text(
+                json.dumps({"task": task, "workflow_id": workflow}), encoding="utf-8"
+            )
+        # ...then start_workflow(USE_EXISTING, memo=...): only a creation writes it.
+        if workflow in workflows and not workflows[workflow].get("_old"):
+            workflows[workflow].setdefault("farm_run", os.environ.get("HARMONIC_FARM_RUN"))
+    farm_state.write_text(json.dumps(workflows), encoding="utf-8")
+    print(printed, end="", flush=True)
 print("uv-stderr", file=sys.stderr, flush=True)
 release = os.environ.get("UV_STUB_RELEASE")
 if release:
@@ -198,6 +286,11 @@ raise SystemExit(int(os.environ.get("UV_STUB_EXIT", "0")))
     environment["GIT_CONFIG_COUNT"] = "1"
     environment["GIT_CONFIG_KEY_0"] = "protocol.file.allow"
     environment["GIT_CONFIG_VALUE_0"] = "always"
+    farm_state = tmp_path / "farm workflows.json"
+    farm_state.write_text("{}", encoding="utf-8")
+    farm_cancels = tmp_path / "farm cancels.jsonl"
+    environment["UV_STUB_FARM"] = str(farm_state)
+    environment["UV_STUB_FARM_CANCELS"] = str(farm_cancels)
 
     return {
         "pwsh": pwsh,
@@ -208,6 +301,8 @@ raise SystemExit(int(os.environ.get("UV_STUB_EXIT", "0")))
         "syncs": syncs,
         "tools": tools,
         "environment": environment,
+        "farm_state": farm_state,
+        "farm_cancels": farm_cancels,
     }
 
 
@@ -553,7 +648,16 @@ def test_launches_share_one_environment_synced_once(tmp_path: Path) -> None:
         for line in Path(fixture["syncs"]).read_text(encoding="utf-8").splitlines()
     ]
     assert len(syncs) == 1, syncs
-    assert syncs[0]["argv"] == ["sync", "--frozen", "--no-editable", "--active"]
+    # --project names the snapshot so -Cancel can tell a sync a dead launcher
+    # left from anyone else's.
+    assert syncs[0]["argv"] == [
+        "sync",
+        "--frozen",
+        "--no-editable",
+        "--active",
+        "--project",
+        first["snapshot"],
+    ]
     assert Path(syncs[0]["cwd"]) == Path(first["snapshot"])
     # Synced in a staging directory of its own, then published whole.
     staged = Path(syncs[0]["VIRTUAL_ENV"])
@@ -936,3 +1040,1154 @@ def test_log_directory_must_be_outside_the_worktree(tmp_path: Path) -> None:
     assert "LogDirectory must be outside the target worktree" in result.stderr
     assert not Path(fixture["invocation"]).exists()
     assert not Path(fixture["log_directory"]).exists()
+
+
+# --- Tracking a recorded run: -Status, -Watch, -Cancel, -List ------------------
+
+LEAF_PEN = "leaf:part:pen_rod:" + "a" * 64 + ":5400s"
+LEAF_CONE = "leaf:part:cone_gear:" + "b" * 64 + ":5400s"
+LEAF_NUT = "leaf:part:wheel_axle_nut:" + "c" * 64 + ":5400s"
+LEAF_SHARED = "leaf:part:crank_hub:" + "d" * 64 + ":5400s"
+LEAF_FOREIGN = "leaf:part:paper_roller:" + "f" * 64 + ":5400s"
+LEAF_RACED = "leaf:part:platen:" + "9" * 64 + ":5400s"
+LEAF_EARLY = "leaf:part:cam_follower:" + "e" * 64 + ":5400s"
+
+# Verbatim shapes of what build.py prints at --verbosity info (_farm._dispatch,
+# the cache restore, doit's TaskError and the traceback's final exception).
+DISPATCH_LINES = (
+    "  --  [    2.0s +  1.9s] [cache] HIT   part:foot_screw (45719abb0031) -> skipped COM build\n"
+    f"  --  [    2.0s +  1.9s] Farm workflow requested: {LEAF_CONE}\n"
+    f"  --  [    2.1s +  0.1s] Farm workflow attached: {LEAF_CONE}\n"
+    f"  --  [    2.2s +  0.1s] Farm workflow requested: {LEAF_PEN}\n"
+    f"  --  [    2.3s +  0.1s] Farm workflow attached: {LEAF_PEN}\n"
+    "  --  [   60.0s + 57.7s] [cache] HIT   part:cone_gear (bbbbbbbbbbbb) -> skipped COM build\n"
+)
+FAILURE_LINES = (
+    "TaskError - taskid:part:pen_rod\n"
+    "PythonAction Error\n"
+    "Traceback (most recent call last):\n"
+    '  File "dodo.py", line 2302, in _farm_build\n'
+    "RuntimeError: part:pen_rod failed on swmaker000005@5 [task_failed] exit 2: boom\n"
+)
+
+
+def _tracking(fixture: dict[str, object], *args: str) -> list[str]:
+    return [
+        str(fixture["pwsh"]),
+        "-NoProfile",
+        "-NonInteractive",
+        "-File",
+        str(LAUNCHER),
+        *args,
+        "-LogDirectory",
+        str(fixture["log_directory"]),
+    ]
+
+
+def _process_alive(pid: int) -> bool:
+    import ctypes
+    from ctypes import wintypes
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    kernel32.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+    handle = kernel32.OpenProcess(0x1000, False, pid)  # QUERY_LIMITED_INFORMATION
+    if not handle:
+        return False
+    try:
+        code = wintypes.DWORD()
+        kernel32.GetExitCodeProcess(handle, ctypes.byref(code))
+        return code.value == 259  # STILL_ACTIVE
+    finally:
+        kernel32.CloseHandle(handle)
+
+
+def _start_held(
+    tmp_path: Path,
+    fixture: dict[str, object],
+    lines: str,
+    tag: str,
+    extra: dict[str, str] | None = None,
+) -> tuple[subprocess.Popen[str], Path, dict[str, object]]:
+    """Launch with the build child printing ``lines`` and then held open."""
+    release = tmp_path / f"release {tag}"
+    printed = tmp_path / f"lines {tag}.txt"
+    printed.write_text(lines, encoding="utf-8")
+    environment = dict(fixture["environment"])
+    environment["UV_STUB_RELEASE"] = str(release)
+    environment["UV_STUB_RELEASE_GUARD"] = str(HANG_GUARD_S)
+    environment["UV_STUB_LINES"] = str(printed)
+    environment.update(extra or {})
+    process = subprocess.Popen(
+        _command(fixture, "part:pen_rod", tag=tag),
+        env=environment,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    log_directory = Path(fixture["log_directory"])
+    last_line = lines.splitlines()[-1]
+
+    def running() -> dict[str, object] | None:
+        for path in log_directory.glob("*.run.json") if log_directory.exists() else ():
+            record = _record(path)
+            if record["tag"] != tag:
+                continue
+            log = Path(record["log"]).read_text(encoding="utf-8")
+            if last_line in log and "uv-stderr" in log:
+                return record
+        return None
+
+    record = _wait_for(process, running, f"{tag} build output", log_directory)
+    assert record is not None and process.poll() is None, (
+        process.poll(),
+        _observed(log_directory),
+    )
+    return process, release, record
+
+
+def _stub_pid(fixture: dict[str, object]) -> int:
+    return int(_record(Path(fixture["invocation"]))["pid"])
+
+
+def test_status_and_watch_follow_a_live_run_to_its_outcome(tmp_path: Path) -> None:
+    fixture = _launcher_fixture(tmp_path)
+    process, release, running = _start_held(tmp_path, fixture, DISPATCH_LINES, "live")
+    try:
+        status = _run_launcher(
+            fixture,
+            _tracking(fixture, "-Status", "-Tag", "live"),
+            fixture["environment"],
+        )
+        assert status.returncode == 0, status.stderr
+        report = json.loads(status.stdout)
+        assert report["run_id"] == running["run_id"]
+        assert report["state"] == "running"
+        assert report["launcher"] == {
+            "pid": running["pid"],
+            "alive": True,
+            "orphaned_processes": [],
+        }
+        assert report["counts"] == {
+            "hits": 1,
+            "requested": 2,
+            "succeeded": 1,
+            "failed": 0,
+            "in_flight": 1,
+        }
+        assert report["in_flight_workflows"] == [LEAF_PEN]
+        assert {leaf["task"]: leaf["state"] for leaf in report["leaves"]} == {
+            "part:cone_gear": "succeeded",
+            "part:pen_rod": "attached",
+        }
+        # Before .done the outputs are still in the snapshot.
+        assert Path(report["outputs"]) == Path(running["snapshot"]) / "cad" / "out"
+
+        watch = subprocess.Popen(
+            _tracking(
+                fixture, "-Watch", "-RunId", running["run_id"], "-PollSeconds", "1"
+            ),
+            env=fixture["environment"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        first = watch.stdout.readline()
+        assert "watching tag=live" in first and "state=running" in first, first
+        release.touch()
+        rest, errors = watch.communicate(timeout=HANG_GUARD_S)
+    finally:
+        release.touch()
+        process.communicate(timeout=HANG_GUARD_S)
+
+    assert process.returncode == 0
+    assert watch.returncode == 0, (rest, errors)
+    lines = rest.splitlines()
+    assert any(f"leaf part:pen_rod attached {LEAF_PEN}" in line for line in lines)
+    assert any(f"leaf part:cone_gear succeeded {LEAF_CONE}" in line for line in lines)
+    assert any(" end succeeded exit_code=0 " in line for line in lines), lines
+    final = json.loads(lines[-1])
+    assert final["state"] == "succeeded"
+    assert final["outputs"] == _record(Path(running["done"]))["outputs"]
+
+
+def test_watch_exits_failed_with_the_cause_of_each_task_error(tmp_path: Path) -> None:
+    fixture = _launcher_fixture(tmp_path)
+    # Codex on #1125: a local fault (Temporal connection, protocol) fails the
+    # task while its workflow keeps running on the farm.
+    farm_state = Path(fixture["farm_state"])
+    farm_state.write_text(
+        json.dumps({LEAF_PEN: {"status": "RUNNING"}}), encoding="utf-8"
+    )
+    printed = tmp_path / "failing lines.txt"
+    printed.write_text(DISPATCH_LINES + FAILURE_LINES, encoding="utf-8")
+    environment = dict(fixture["environment"])
+    environment["UV_STUB_LINES"] = str(printed)
+    environment["UV_STUB_EXIT"] = "2"
+    launched = _run_launcher(
+        fixture, _command(fixture, "part:pen_rod", tag="broken"), environment
+    )
+    assert launched.returncode == 2
+
+    watch = _run_launcher(
+        fixture,
+        _tracking(fixture, "-Watch", "-Tag", "broken", "-PollSeconds", "1"),
+        fixture["environment"],
+    )
+
+    assert watch.returncode == 20, watch.stdout
+    assert f"leaf part:pen_rod failed {LEAF_PEN}" in watch.stdout
+    assert (
+        "error part:pen_rod: RuntimeError: part:pen_rod failed on swmaker000005@5 "
+        "[task_failed] exit 2: boom"
+    ) in watch.stdout
+    final = json.loads(watch.stdout.splitlines()[-1])
+    assert final["state"] == "failed"
+    assert final["exit_code"] == 2
+    assert final["task_errors"] == ["part:pen_rod"]
+    assert final["in_flight_workflows"] == []
+    assert final["unsettled_workflows"] == [LEAF_PEN]
+
+    done_before = Path(final["done"]).read_bytes()
+
+    cancel = _run_launcher(
+        fixture,
+        _tracking(fixture, "-Cancel", "-Tag", "broken", "-Why", "local fault"),
+        fixture["environment"],
+    )
+
+    assert cancel.returncode == 0, (cancel.stdout, cancel.stderr)
+    assert "already finished: failed" in cancel.stdout
+    outcomes = [
+        json.loads(line) for line in cancel.stdout.splitlines() if line.startswith("{")
+    ]
+    assert [(o["workflow_id"], o["outcome"]) for o in outcomes] == [
+        (LEAF_PEN, "cancelled")
+    ]
+    assert json.loads(farm_state.read_text(encoding="utf-8"))[LEAF_PEN]["status"] == (
+        "CANCELED"
+    )
+    # The launcher's own outcome stands.
+    assert Path(final["done"]).read_bytes() == done_before
+
+
+def test_cancel_keeps_a_leaf_a_sibling_attached_to_mid_cancel(tmp_path: Path) -> None:
+    """Codex on #1125 (81928f376): siblings were enumerated once, before the
+    farm queries; one that attached after that scan lost the leaf."""
+    fixture = _launcher_fixture(tmp_path)
+    farm_state = Path(fixture["farm_state"])
+    farm_state.write_text(
+        json.dumps({LEAF_PEN: {"status": "RUNNING"}}), encoding="utf-8"
+    )
+    printed = tmp_path / "failing lines.txt"
+    printed.write_text(DISPATCH_LINES + FAILURE_LINES, encoding="utf-8")
+    environment = dict(fixture["environment"])
+    environment["UV_STUB_LINES"] = str(printed)
+    environment["UV_STUB_EXIT"] = "2"
+    launched = _run_launcher(
+        fixture, _command(fixture, "part:pen_rod", tag="broken"), environment
+    )
+    assert launched.returncode == 2
+    # This run created LEAF_PEN. Build the sibling's record now, then take it
+    # out of the directory: it appears only once -Cancel queries the farm.
+    sibling = _sibling_waiting_on(fixture, LEAF_PEN)
+    staged = sibling.read_text(encoding="utf-8")
+    sibling.unlink()
+    workflows = json.loads(farm_state.read_text(encoding="utf-8"))
+    workflows[LEAF_PEN]["_attach"] = {"path": str(sibling), "record": staged}
+    farm_state.write_text(json.dumps(workflows), encoding="utf-8")
+
+    cancel = _run_launcher(
+        fixture,
+        _tracking(fixture, "-Cancel", "-Tag", "broken", "-Why", "local fault"),
+        fixture["environment"],
+    )
+
+    assert cancel.returncode == 0, (cancel.stdout, cancel.stderr)
+    assert sibling.exists()
+    outcomes = [
+        json.loads(line) for line in cancel.stdout.splitlines() if line.startswith("{")
+    ]
+    assert [(o["workflow_id"], o["outcome"]) for o in outcomes] == [
+        (LEAF_PEN, "kept-shared")
+    ]
+    assert json.loads(farm_state.read_text(encoding="utf-8"))[LEAF_PEN]["status"] == (
+        "RUNNING"
+    )
+    assert not Path(fixture["farm_cancels"]).exists()
+
+
+def test_cancel_takes_a_leaf_whose_sibling_finished_mid_cancel(tmp_path: Path) -> None:
+    """Codex on #1125 (6c35279e1): siblings scanned before the farm queries
+    kept their leaves on that cached answer, so a sibling that finished (its
+    own local failure) while -Cancel asked the farm left the leaf RUNNING
+    with no run waiting on it."""
+    fixture = _launcher_fixture(tmp_path)
+    farm_state = Path(fixture["farm_state"])
+    farm_state.write_text(
+        json.dumps({LEAF_PEN: {"status": "RUNNING"}}), encoding="utf-8"
+    )
+    printed = tmp_path / "failing lines.txt"
+    printed.write_text(DISPATCH_LINES + FAILURE_LINES, encoding="utf-8")
+    environment = dict(fixture["environment"])
+    environment["UV_STUB_LINES"] = str(printed)
+    environment["UV_STUB_EXIT"] = "2"
+    launched = _run_launcher(
+        fixture, _command(fixture, "part:pen_rod", tag="broken"), environment
+    )
+    assert launched.returncode == 2
+    # The sibling waits on LEAF_PEN when -Cancel starts, and fails while
+    # -Cancel queries the farm.
+    sibling = _record(_sibling_waiting_on(fixture, LEAF_PEN))
+    finished = {**sibling, "state": "failed", "exit_code": 2}
+    workflows = json.loads(farm_state.read_text(encoding="utf-8"))
+    workflows[LEAF_PEN]["_attach"] = {
+        "path": sibling["done"],
+        "record": json.dumps(finished),
+    }
+    farm_state.write_text(json.dumps(workflows), encoding="utf-8")
+
+    cancel = _run_launcher(
+        fixture,
+        _tracking(fixture, "-Cancel", "-Tag", "broken", "-Why", "local fault"),
+        fixture["environment"],
+    )
+
+    assert cancel.returncode == 0, (cancel.stdout, cancel.stderr)
+    outcomes = [
+        json.loads(line) for line in cancel.stdout.splitlines() if line.startswith("{")
+    ]
+    assert [(o["workflow_id"], o["outcome"]) for o in outcomes] == [
+        (LEAF_PEN, "cancelled")
+    ]
+    # The sibling finished before the leaf was decided, not after.
+    assert Path(sibling["done"]).exists()
+    assert json.loads(farm_state.read_text(encoding="utf-8"))[LEAF_PEN]["status"] == (
+        "CANCELED"
+    )
+
+
+def _write_run_record(
+    fixture: dict[str, object],
+    *,
+    pid: int,
+    tag: str,
+    workflow: str,
+    argv: list[str],
+    hexdigit: str,
+    started: float | None = None,
+) -> Path:
+    """A run record as the launcher writes one, waiting on ``workflow``, whose
+    launcher is ``pid``; started at ``started`` (epoch seconds), else now."""
+    started = time.time() if started is None else started
+    log_directory = Path(fixture["log_directory"])
+    log_directory.mkdir(exist_ok=True)
+    run_id = (
+        time.strftime("%Y%m%dT%H%M%S000Z", time.gmtime(started)) + "-" + hexdigit * 32
+    )
+    log = log_directory / f"{run_id}.log"
+    log.write_text(
+        f"  --  [ 1.0s + 1.0s] Farm workflow attached: {workflow}\n", encoding="utf-8"
+    )
+    record = {
+        "run_id": run_id,
+        "state": "running",
+        "worktree": str(fixture["worktree"]),
+        "pool_home": str(fixture["pool"]),
+        "commit": "0" * 40,
+        "targets": ["part:crank_hub"],
+        "leaf_timeout_minutes": 90,
+        # The launcher's round-trip form: 100 ns ticks.
+        "started_at": time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(started))
+        + f".{int(started % 1 * 1e7):07d}Z",
+        "pid": pid,
+        "log": str(log),
+        "done": str(log_directory / f"{run_id}.done"),
+        "cache_environment": {},
+        "tag": tag,
+        "argv": argv,
+        "snapshot": str(log_directory / "snapshots" / tag),
+        "outputs": str(log_directory / f"{run_id}.out"),
+        "environment": str(log_directory / "envs" / tag),
+    }
+    path = log_directory / f"{run_id}.run.json"
+    path.write_text(json.dumps(record), encoding="utf-8")
+    return path
+
+
+def _sibling_waiting_on(fixture: dict[str, object], workflow: str) -> Path:
+    """A live run in the same LogDirectory that is waiting on ``workflow``.
+
+    Its launcher PID is this test process, which started before the record.
+    """
+    return _write_run_record(
+        fixture,
+        pid=os.getpid(),
+        tag="sibling",
+        workflow=workflow,
+        argv=[],
+        hexdigit="e",
+    )
+
+
+def test_a_tag_and_the_list_order_runs_by_their_precise_start(tmp_path: Path) -> None:
+    """Codex on #1125 (4243d95d2, 81928f376): run IDs carry the start to the
+    millisecond, so two launches in one millisecond were ordered by their
+    random suffix, both for -Tag and for -List's newest-first order."""
+    fixture = _launcher_fixture(tmp_path)
+    second = float(int(time.time()) - 10)
+    # Same run-id timestamp; the older one's suffix sorts last by name.
+    older = _write_run_record(
+        fixture,
+        pid=os.getpid(),
+        tag="twin",
+        workflow=LEAF_NUT,
+        argv=[],
+        hexdigit="f",
+        started=second + 0.0002,
+    )
+    newer = _write_run_record(
+        fixture,
+        pid=os.getpid(),
+        tag="twin",
+        workflow=LEAF_NUT,
+        argv=[],
+        hexdigit="1",
+        started=second + 0.0007,
+    )
+
+    status = _run_launcher(
+        fixture, _tracking(fixture, "-Status", "-Tag", "twin"), fixture["environment"]
+    )
+
+    assert status.returncode == 0, status.stderr
+    assert json.loads(status.stdout)["run_id"] == _record(newer)["run_id"]
+
+    listed = _run_launcher(
+        fixture, _tracking(fixture, "-List", "-Tag", "twin"), fixture["environment"]
+    )
+
+    assert listed.returncode == 0, listed.stderr
+    assert [json.loads(line)["run_id"] for line in listed.stdout.splitlines()] == [
+        _record(newer)["run_id"],
+        _record(older)["run_id"],
+    ]
+
+
+def test_a_pid_reused_after_the_record_is_not_the_launcher(tmp_path: Path) -> None:
+    """Codex on #1125 (4243d95d2): a process that took a dead launcher's PID
+    within a second of its record counted as the launcher, and -Cancel would
+    have killed it."""
+    fixture = _launcher_fixture(tmp_path)
+    started = time.time()
+    reused = subprocess.Popen(
+        [sys.executable, "-c", SLEEPER],
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    try:
+        _write_run_record(
+            fixture,
+            pid=reused.pid,
+            tag="reused",
+            workflow=LEAF_NUT,
+            argv=["uv", "-c", "pass"],
+            hexdigit="7",
+            started=started,
+        )
+        status = _run_launcher(
+            fixture,
+            _tracking(fixture, "-Status", "-Tag", "reused"),
+            fixture["environment"],
+        )
+        _run_launcher(
+            fixture,
+            _tracking(fixture, "-Cancel", "-Tag", "reused", "-Why", "reused pid"),
+            fixture["environment"],
+        )
+        survived = reused.poll() is None
+    finally:
+        reused.kill()
+        reused.wait(timeout=HANG_GUARD_S)
+
+    assert status.returncode == 0, status.stderr
+    report = json.loads(status.stdout)
+    assert report["state"] == "launcher-died"
+    assert report["launcher"]["alive"] is False
+    assert survived
+
+
+def test_a_dead_run_from_an_older_launcher_breaks_neither_status_nor_cancel(
+    tmp_path: Path,
+) -> None:
+    """Live farm probe on #1125 (f90a4c357): a record from a launcher that
+    predates snapshots has no `snapshot`, `outputs` or `environment`. -Status
+    on it crashed, and so did -Cancel on it and every -Cancel in the same
+    directory, which scans it as a sibling."""
+    fixture = _launcher_fixture(tmp_path)
+    exited = subprocess.Popen([sys.executable, "-c", "pass"])
+    exited.wait(timeout=HANG_GUARD_S)
+    old = _write_run_record(
+        fixture,
+        pid=exited.pid,
+        tag="old-launcher",
+        workflow=LEAF_NUT,
+        argv=["uv", "run", "python", "build.py"],
+        hexdigit="3",
+    )
+    record = _record(old)
+    del record["snapshot"], record["outputs"], record["environment"]
+    old.write_text(json.dumps(record), encoding="utf-8")
+    farm_state = Path(fixture["farm_state"])
+    farm_state.write_text(
+        json.dumps({LEAF_PEN: {"status": "RUNNING"}}), encoding="utf-8"
+    )
+    printed = tmp_path / "failing lines.txt"
+    printed.write_text(DISPATCH_LINES + FAILURE_LINES, encoding="utf-8")
+    failing = dict(fixture["environment"])
+    failing["UV_STUB_LINES"] = str(printed)
+    failing["UV_STUB_EXIT"] = "2"
+    launched = _run_launcher(
+        fixture, _command(fixture, "part:pen_rod", tag="broken"), failing
+    )
+    assert launched.returncode == 2
+
+    status = _run_launcher(
+        fixture,
+        _tracking(fixture, "-Status", "-Tag", "old-launcher"),
+        fixture["environment"],
+    )
+    cancel = _run_launcher(
+        fixture,
+        _tracking(fixture, "-Cancel", "-Tag", "broken", "-Why", "old sibling"),
+        fixture["environment"],
+    )
+
+    assert status.returncode == 0, status.stderr
+    report = json.loads(status.stdout)
+    assert report["state"] == "launcher-died"
+    assert report["launcher"]["orphaned_processes"] == []
+    assert report["outputs"] is None
+    assert cancel.returncode == 0, (cancel.stdout, cancel.stderr)
+    outcomes = [
+        json.loads(line) for line in cancel.stdout.splitlines() if line.startswith("{")
+    ]
+    assert [(o["workflow_id"], o["outcome"]) for o in outcomes] == [
+        (LEAF_PEN, "cancelled")
+    ]
+
+    cancel_old = _run_launcher(
+        fixture,
+        _tracking(
+            fixture,
+            "-Cancel",
+            "-Tag",
+            "old-launcher",
+            "-Why",
+            "old run",
+            "-SettleSeconds",
+            "0",
+        ),
+        fixture["environment"],
+    )
+
+    assert cancel_old.returncode == 0, (cancel_old.stdout, cancel_old.stderr)
+    done = _record(Path(record["done"]))
+    assert done["state"] == "cancelled"
+    assert done["outputs"] is None
+    assert done["snapshot_removed"] is None
+    assert [(o["workflow_id"], o["outcome"]) for o in done["cancel"]["workflows"]] == [
+        (LEAF_NUT, "not-found")
+    ]
+
+
+SLEEPER = "__import__('time').sleep(120)"
+
+
+@pytest.mark.parametrize(
+    ("recorded_code", "names", "orphaned"),
+    [
+        # The recorded build command: the dead launcher's own child.
+        (SLEEPER, None, True),
+        # Codex on #1125 (d05cb04d9): a preparation or cleanup command (git
+        # worktree add/remove, submodule update, uv sync) names the snapshot...
+        ("__import__('time').sleep(121)", "snapshots/reused", True),
+        # ...and uv venv names the run's private staging environment.
+        ("__import__('time').sleep(121)", "envs/reused.staging-reused", True),
+        # A different command under the same (dead) parent PID: not the run's.
+        ("__import__('time').sleep(121)", None, False),
+    ],
+    ids=["build", "snapshot", "staging", "other"],
+)
+def test_an_orphan_must_name_the_run_on_its_command_line(
+    tmp_path: Path, recorded_code: str, names: str | None, orphaned: bool
+) -> None:
+    """A dead launcher's PID is only a ParentProcessId now: any process that
+    reused it could have left children. Only a command naming the run is its."""
+    fixture = _launcher_fixture(tmp_path)
+    log_directory = Path(fixture["log_directory"])
+    log_directory.mkdir()
+    extra = [] if names is None else [str(log_directory / names)]
+    started = time.time()
+    parent = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import subprocess, sys; "
+            f"print(subprocess.Popen([sys.executable, '-c', {SLEEPER!r}, *{extra!r}], "
+            "stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, "
+            "stderr=subprocess.DEVNULL).pid)",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=HANG_GUARD_S,
+    )
+    child = int(parent.stdout)
+    try:
+        _write_run_record(
+            fixture,
+            pid=_dead_parent_pid(child),
+            tag="reused",
+            workflow=LEAF_NUT,
+            argv=["uv", "-c", recorded_code],
+            hexdigit="7",
+            started=started,
+        )
+        status = _run_launcher(
+            fixture,
+            _tracking(fixture, "-Status", "-Tag", "reused"),
+            fixture["environment"],
+        )
+    finally:
+        subprocess.run(
+            ["taskkill", "/F", "/T", "/PID", str(child)], capture_output=True
+        )
+
+    assert status.returncode == 0, status.stderr
+    report = json.loads(status.stdout)
+    assert report["state"] == "launcher-died"
+    assert (child in report["launcher"]["orphaned_processes"]) is orphaned
+
+
+def _dead_parent_pid(child: int) -> int:
+    listed = subprocess.run(
+        [
+            "pwsh.exe",
+            "-NoProfile",
+            "-Command",
+            f"(Get-CimInstance Win32_Process -Filter 'ProcessId={child}').ParentProcessId",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    parent = int(listed.stdout)
+    assert not _process_alive(parent)
+    return parent
+
+
+def test_cancel_finds_a_build_whose_launcher_and_uv_both_died(
+    tmp_path: Path,
+) -> None:
+    """Codex on #1125 (b8a08b2b9): `uv run` does not take its python with it
+    (checked: killing uv leaves both python.exe processes running), so once the
+    launcher and then uv are gone, no scan from the launcher reaches the build,
+    which keeps dispatching. The run's job still holds it."""
+    fixture = _launcher_fixture(tmp_path)
+    Path(fixture["farm_state"]).write_text(
+        json.dumps(
+            {LEAF_PEN: {"status": "RUNNING"}, LEAF_CONE: {"status": "COMPLETED"}}
+        ),
+        encoding="utf-8",
+    )
+    process, release, running = _start_held(tmp_path, fixture, DISPATCH_LINES, "chain")
+    build = int(_record(Path(fixture["invocation"]))["pid"])
+    # launcher -> uv.cmd's cmd.exe -> venv python.exe -> build. The venv
+    # launcher takes its child down with it; cmd.exe, like uv.exe, does not.
+    shim = int(
+        subprocess.run(
+            [
+                "pwsh",
+                "-NoProfile",
+                "-Command",
+                "(Get-CimInstance Win32_Process -Filter "
+                f"'ProcessId={_record(Path(fixture['invocation']))['ppid']}').ParentProcessId",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+    )
+    try:
+        process.kill()
+        process.wait(timeout=HANG_GUARD_S)
+        process.stdout.close()
+        process.stderr.close()
+        # The uv between them dies too (os.kill is TerminateProcess here).
+        os.kill(shim, 9)
+        deadline = time.monotonic() + 10
+        while _process_alive(shim) and time.monotonic() < deadline:
+            time.sleep(0.05)
+        assert not _process_alive(shim)
+        assert _process_alive(build)
+
+        status = _run_launcher(
+            fixture,
+            _tracking(fixture, "-Status", "-RunId", running["run_id"]),
+            fixture["environment"],
+        )
+        cancel = _run_launcher(
+            fixture,
+            _tracking(fixture, "-Cancel", "-RunId", running["run_id"], "-Why", "chain"),
+            fixture["environment"],
+        )
+        survived = _process_alive(build)
+    finally:
+        release.touch()
+
+    assert status.returncode == 0, status.stderr
+    assert build in json.loads(status.stdout)["launcher"]["orphaned_processes"]
+    assert cancel.returncode == 0, (cancel.stdout, cancel.stderr)
+    assert not survived, "the build outlived -Cancel"
+    done = _record(Path(running["done"]))
+    assert {w["workflow_id"]: w["outcome"] for w in done["cancel"]["workflows"]} == {
+        LEAF_PEN: "cancelled"
+    }
+
+
+def test_a_dead_launcher_is_reported_and_its_orphaned_leaves_cancelled(
+    tmp_path: Path,
+) -> None:
+    """2026-09-28: a launcher killed mid-run wrote no .done, its record still said
+    `running`, and a watcher waiting for .done sat silent for 35 min."""
+    fixture = _launcher_fixture(tmp_path)
+    lines = (
+        DISPATCH_LINES
+        + f"  --  [   61.0s +  1.0s] Farm workflow requested: {LEAF_NUT}\n"
+        + f"  --  [   61.0s +  1.0s] Farm workflow requested: {LEAF_SHARED}\n"
+        + f"  --  [   61.1s +  0.1s] Farm workflow attached: {LEAF_SHARED}\n"
+        + f"  --  [   61.2s +  0.1s] Farm workflow requested: {LEAF_FOREIGN}\n"
+        + f"  --  [   61.3s +  0.1s] Farm workflow attached: {LEAF_FOREIGN}\n"
+        + f"  --  [   61.4s +  0.1s] Farm workflow requested: {LEAF_RACED}\n"
+        + f"  --  [   61.5s +  0.1s] Farm workflow attached: {LEAF_RACED}\n"
+    )
+    farm_state = Path(fixture["farm_state"])
+    farm_state.write_text(
+        json.dumps(
+            {
+                # The farm cannot be reached for this one on the first try.
+                LEAF_PEN: {"status": "UNREACHABLE"},
+                LEAF_CONE: {"status": "COMPLETED"},
+                LEAF_SHARED: {"status": "RUNNING"},
+                # Created by a submitter outside farm-run.ps1, and reported by
+                # a farm.py too old to say so; this run attached to both.
+                LEAF_FOREIGN: {"status": "RUNNING", "_old": True},
+                # Codex on #1125 (79d706547): this run logged its request, its
+                # start failed, and a sibling run created the workflow.
+                LEAF_RACED: {"status": "RUNNING", "farm_run": "sibling-run"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    process, release, running = _start_held(tmp_path, fixture, lines, "orphaned")
+    build = _stub_pid(fixture)
+    try:
+        # The harness kills the launcher alone; the build it started lives on.
+        process.kill()
+        # The orphan inherited the launcher's pipes, so they never reach EOF.
+        process.wait(timeout=HANG_GUARD_S)
+        process.stdout.close()
+        process.stderr.close()
+        assert _process_alive(build)
+        _sibling_waiting_on(fixture, LEAF_SHARED)
+
+        status = _run_launcher(
+            fixture,
+            _tracking(fixture, "-Status", "-RunId", running["run_id"]),
+            fixture["environment"],
+        )
+        assert status.returncode == 0, status.stderr
+        report = json.loads(status.stdout)
+        assert report["state"] == "launcher-died"
+        assert report["launcher"]["alive"] is False
+        assert build in report["launcher"]["orphaned_processes"]
+        assert report["in_flight_workflows"] == [
+            LEAF_PEN,
+            LEAF_NUT,
+            LEAF_SHARED,
+            LEAF_FOREIGN,
+            LEAF_RACED,
+        ]
+
+        watch = _run_launcher(
+            fixture,
+            _tracking(fixture, "-Watch", "-Tag", "orphaned", "-PollSeconds", "1"),
+            fixture["environment"],
+        )
+        assert watch.returncode == 21, watch.stdout
+        assert "LAUNCHER DIED" in watch.stdout
+
+        cancel_command = _tracking(
+            fixture,
+            "-Cancel",
+            "-Tag",
+            "orphaned",
+            "-Why",
+            "launcher died",
+            "-SettleSeconds",
+            "0",
+        )
+        refused = _run_launcher(fixture, cancel_command, fixture["environment"])
+        # A leaf it could not account for keeps the run retryable: the orphan
+        # is stopped, but no .done, no cleanup, still launcher-died.
+        assert refused.returncode == 1, (refused.stdout, refused.stderr)
+        assert "failed to connect to the farm" in refused.stderr
+        assert not _process_alive(build)
+        assert not Path(running["done"]).exists()
+        assert Path(running["snapshot"]).exists()
+        assert not Path(fixture["farm_cancels"]).exists()
+        again_status = _run_launcher(
+            fixture,
+            _tracking(fixture, "-Status", "-RunId", running["run_id"]),
+            fixture["environment"],
+        )
+        assert json.loads(again_status.stdout)["state"] == "launcher-died"
+
+        workflows = json.loads(farm_state.read_text(encoding="utf-8"))
+        workflows[LEAF_PEN]["status"] = "RUNNING"
+        farm_state.write_text(json.dumps(workflows), encoding="utf-8")
+        cancel = _run_launcher(fixture, cancel_command, fixture["environment"])
+    finally:
+        release.touch()
+
+    assert cancel.returncode == 0, (cancel.stdout, cancel.stderr)
+    assert not _process_alive(build)
+    done = _record(Path(running["done"]))
+    assert done["state"] == "cancelled"
+    assert done["exit_code"] is None
+    assert done["cancel"]["launcher"] == "launcher-died"
+    # The refused first attempt already stopped the orphan.
+    assert done["cancel"]["stopped_pids"] == []
+    assert {w["workflow_id"]: w["outcome"] for w in done["cancel"]["workflows"]} == {
+        LEAF_PEN: "cancelled",
+        LEAF_NUT: "not-found",
+        LEAF_SHARED: "kept-shared",
+        LEAF_FOREIGN: "kept-foreign",
+        LEAF_RACED: "kept-foreign",
+    }
+    cancels = [
+        json.loads(line)
+        for line in Path(fixture["farm_cancels"])
+        .read_text(encoding="utf-8")
+        .splitlines()
+    ]
+    assert [entry["argv"] for entry in cancels] == [
+        [
+            "cancel",
+            "--why",
+            f"launcher died (farm-run.ps1 -Cancel {running['run_id']})",
+            LEAF_PEN,
+        ]
+    ]
+    assert cancels[0]["VIRTUAL_ENV"] is None
+    # The cleanup the dead launcher never ran: outputs kept, snapshot gone.
+    assert done["outputs_preserved"] is True
+    assert (Path(done["outputs"]) / "reports" / "stub-output.txt").read_text(
+        encoding="utf-8"
+    ) == "built\n"
+    assert not Path(running["snapshot"]).exists()
+
+    again = _run_launcher(
+        fixture,
+        _tracking(fixture, "-Cancel", "-RunId", running["run_id"], "-Why", "twice"),
+        fixture["environment"],
+    )
+    assert again.returncode == 0
+    assert "already finished: cancelled" in again.stdout
+    watch = _run_launcher(
+        fixture,
+        _tracking(fixture, "-Watch", "-RunId", running["run_id"], "-PollSeconds", "1"),
+        fixture["environment"],
+    )
+    assert watch.returncode == 22
+
+
+def test_cancel_stops_a_live_launcher_and_its_build_before_cancelling_leaves(
+    tmp_path: Path,
+) -> None:
+    fixture = _launcher_fixture(tmp_path)
+    Path(fixture["farm_state"]).write_text(
+        json.dumps(
+            {LEAF_PEN: {"status": "RUNNING"}, LEAF_CONE: {"status": "COMPLETED"}}
+        ),
+        encoding="utf-8",
+    )
+    process, release, running = _start_held(tmp_path, fixture, DISPATCH_LINES, "live")
+    build = _stub_pid(fixture)
+    try:
+        cancel = _run_launcher(
+            fixture,
+            _tracking(
+                fixture, "-Cancel", "-RunId", running["run_id"], "-Why", "superseded"
+            ),
+            fixture["environment"],
+        )
+        process.communicate(timeout=HANG_GUARD_S)
+    finally:
+        release.touch()
+
+    assert cancel.returncode == 0, (cancel.stdout, cancel.stderr)
+    # Killed, not finished: the launcher never reached its own terminal record.
+    assert process.returncode != 0
+    assert not _process_alive(build)
+    done = _record(Path(running["done"]))
+    assert done["state"] == "cancelled"
+    assert done["cancel"]["launcher"] == "running"
+    assert done["cancel"]["stopped_pids"][0] == running["pid"]
+    assert build in done["cancel"]["stopped_pids"]
+    assert {w["workflow_id"]: w["outcome"] for w in done["cancel"]["workflows"]} == {
+        LEAF_PEN: "cancelled"
+    }
+    farm = json.loads(Path(fixture["farm_state"]).read_text(encoding="utf-8"))
+    assert {workflow: farm[workflow]["status"] for workflow in farm} == {
+        LEAF_PEN: "CANCELED",
+        LEAF_CONE: "COMPLETED",
+    }
+    assert not Path(running["snapshot"]).exists()
+
+
+def test_cancel_asks_again_about_a_leaf_the_farm_had_not_committed_yet(
+    tmp_path: Path,
+) -> None:
+    """Codex on #1125 (1bf36d088): the request record is written before the
+    start RPC, so a build killed mid-RPC names a workflow the farm reports
+    absent for a moment and then runs. Not-found must not settle it early."""
+    fixture = _launcher_fixture(tmp_path)
+    Path(fixture["farm_state"]).write_text(
+        json.dumps(
+            {
+                LEAF_PEN: {"status": "COMPLETED"},
+                LEAF_NUT: {"status": "RUNNING", "_absent_for": 1},
+            }
+        ),
+        encoding="utf-8",
+    )
+    process, release, running = _start_held(
+        tmp_path, fixture, DISPATCH_LINES, "landing", {"UV_STUB_UNLOGGED": LEAF_NUT}
+    )
+    try:
+        cancel = _run_launcher(
+            fixture,
+            _tracking(
+                fixture,
+                "-Cancel",
+                "-RunId",
+                running["run_id"],
+                "-Why",
+                "mid-rpc",
+                "-SettleSeconds",
+                "2",
+            ),
+            fixture["environment"],
+        )
+        process.communicate(timeout=HANG_GUARD_S)
+    finally:
+        release.touch()
+
+    assert cancel.returncode == 0, (cancel.stdout, cancel.stderr)
+    assert f"not-found {LEAF_NUT}" in cancel.stdout
+    done = _record(Path(running["done"]))
+    assert {w["workflow_id"]: w["outcome"] for w in done["cancel"]["workflows"]} == {
+        LEAF_PEN: "already-closed",
+        LEAF_NUT: "cancelled",
+    }
+    farm = json.loads(Path(fixture["farm_state"]).read_text(encoding="utf-8"))
+    assert farm[LEAF_NUT]["status"] == "CANCELED"
+
+
+def test_watch_prints_a_request_record_that_sorts_ahead_of_printed_ones(
+    tmp_path: Path,
+) -> None:
+    """Codex on #1125 (1bf36d088): request-record events are rebuilt in file
+    name order each poll, so a positional cursor skipped a new one that
+    sorted first and printed an old one again."""
+    fixture = _launcher_fixture(tmp_path)
+    process, release, running = _start_held(
+        tmp_path, fixture, DISPATCH_LINES, "reorder", {"UV_STUB_UNLOGGED": LEAF_NUT}
+    )
+    try:
+        watch = subprocess.Popen(
+            _tracking(
+                fixture, "-Watch", "-RunId", running["run_id"], "-PollSeconds", "1"
+            ),
+            env=fixture["environment"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        printed = []
+        while not any(LEAF_NUT in line for line in printed):
+            line = watch.stdout.readline()
+            assert line, "watch ended before printing the recorded request"
+            printed.append(line)
+        # A dispatch the log has not caught up with, named to sort first.
+        (Path(running["requests"]) / "0000.json").write_text(
+            json.dumps({"task": "part:cam_follower", "workflow_id": LEAF_EARLY}),
+            encoding="utf-8",
+        )
+        time.sleep(2.5)  # two -Watch polls
+        release.touch()
+        rest, errors = watch.communicate(timeout=HANG_GUARD_S)
+    finally:
+        release.touch()
+        process.communicate(timeout=HANG_GUARD_S)
+
+    lines = printed + rest.splitlines()
+    assert watch.returncode == 0, (lines, errors)
+    assert (
+        sum(f"leaf part:cam_follower requested {LEAF_EARLY}" in x for x in lines) == 1
+    )
+    assert sum(f"requested {LEAF_NUT}" in x for x in lines) == 1, lines
+
+
+def test_cancel_finds_a_leaf_whose_request_never_reached_the_log(
+    tmp_path: Path,
+) -> None:
+    """Codex on #1125 (f90a4c357): -Cancel stops the launcher, the only copy
+    of the build's output into the log, so a `Farm workflow requested` line
+    still in that pipe was lost while its workflow kept running."""
+    fixture = _launcher_fixture(tmp_path)
+    Path(fixture["farm_state"]).write_text(
+        json.dumps({LEAF_PEN: {"status": "RUNNING"}, LEAF_NUT: {"status": "RUNNING"}}),
+        encoding="utf-8",
+    )
+    process, release, running = _start_held(
+        tmp_path, fixture, DISPATCH_LINES, "unlogged", {"UV_STUB_UNLOGGED": LEAF_NUT}
+    )
+    try:
+        assert LEAF_NUT not in Path(running["log"]).read_text(encoding="utf-8")
+        status = _run_launcher(
+            fixture,
+            _tracking(fixture, "-Status", "-RunId", running["run_id"]),
+            fixture["environment"],
+        )
+        cancel = _run_launcher(
+            fixture,
+            _tracking(
+                fixture, "-Cancel", "-RunId", running["run_id"], "-Why", "lost line"
+            ),
+            fixture["environment"],
+        )
+        process.communicate(timeout=HANG_GUARD_S)
+    finally:
+        release.touch()
+
+    assert status.returncode == 0, status.stderr
+    assert LEAF_NUT in json.loads(status.stdout)["in_flight_workflows"]
+    assert cancel.returncode == 0, (cancel.stdout, cancel.stderr)
+    done = _record(Path(running["done"]))
+    assert {w["workflow_id"]: w["outcome"] for w in done["cancel"]["workflows"]} == {
+        LEAF_PEN: "cancelled",
+        LEAF_NUT: "cancelled",
+    }
+    farm = json.loads(Path(fixture["farm_state"]).read_text(encoding="utf-8"))
+    assert farm[LEAF_NUT]["status"] == "CANCELED"
+
+
+def test_cancel_keeps_outputs_the_launcher_moved_before_it_died(
+    tmp_path: Path,
+) -> None:
+    """Codex on #1125: a launcher stopped after moving cad/out to <run-id>.out
+    but before writing .done must not leave the cancelled run's outputs null."""
+    fixture = _launcher_fixture(tmp_path)
+    process, release, running = _start_held(tmp_path, fixture, DISPATCH_LINES, "race")
+    try:
+        process.kill()
+        process.wait(timeout=HANG_GUARD_S)
+        process.stdout.close()
+        process.stderr.close()
+        # The launcher's own first cleanup step, done before it was stopped.
+        (Path(running["snapshot"]) / "cad" / "out").rename(running["outputs"])
+        status = _run_launcher(
+            fixture,
+            _tracking(fixture, "-Status", "-Tag", "race"),
+            fixture["environment"],
+        )
+        cancel = _run_launcher(
+            fixture,
+            _tracking(fixture, "-Cancel", "-Tag", "race", "-Why", "raced cleanup"),
+            fixture["environment"],
+        )
+    finally:
+        release.touch()
+
+    assert status.returncode == 0, status.stderr
+    reported = json.loads(status.stdout)
+    assert reported["state"] == "launcher-died"
+    assert reported["outputs"] == running["outputs"]
+
+    assert cancel.returncode == 0, (cancel.stdout, cancel.stderr)
+    done = _record(Path(running["done"]))
+    assert done["state"] == "cancelled"
+    assert done["outputs"] == running["outputs"]
+    assert done["outputs_preserved"] is True
+    assert (Path(done["outputs"]) / "reports" / "stub-output.txt").read_text(
+        encoding="utf-8"
+    ) == "built\n"
+    assert not Path(running["snapshot"]).exists()
+
+
+def test_list_filters_runs_by_tag_and_state_newest_first(tmp_path: Path) -> None:
+    fixture = _launcher_fixture(tmp_path)
+    assert (
+        _run_launcher(
+            fixture,
+            _command(fixture, "part:pen_rod", tag="alpha"),
+            fixture["environment"],
+        ).returncode
+        == 0
+    )
+    failing = dict(fixture["environment"])
+    failing["UV_STUB_EXIT"] = "2"
+    assert (
+        _run_launcher(
+            fixture, _command(fixture, "part:pen_rod", tag="beta"), failing
+        ).returncode
+        == 2
+    )
+
+    def listed(*args: str) -> list[dict[str, object]]:
+        result = _run_launcher(
+            fixture, _tracking(fixture, "-List", *args), fixture["environment"]
+        )
+        assert result.returncode == 0, result.stderr
+        return [json.loads(line) for line in result.stdout.splitlines()]
+
+    assert [(run["tag"], run["state"]) for run in listed()] == [
+        ("beta", "failed"),
+        ("alpha", "succeeded"),
+    ]
+    assert [run["tag"] for run in listed("-Tag", "alpha")] == ["alpha"]
+    assert [run["tag"] for run in listed("-State", "failed")] == ["beta"]
+    assert listed("-State", "running") == []
+
+
+@pytest.mark.parametrize(
+    ("args", "diagnostic"),
+    [
+        (("-Status",), "-Status needs -RunId or -Tag"),
+        (("-Watch", "-Tag", "nothing"), "no run tagged 'nothing'"),
+    ],
+)
+def test_tracking_refuses_an_unselected_or_unknown_run(
+    tmp_path: Path, args: tuple[str, ...], diagnostic: str
+) -> None:
+    fixture = _launcher_fixture(tmp_path)
+    Path(fixture["log_directory"]).mkdir()
+
+    result = _run_launcher(fixture, _tracking(fixture, *args), fixture["environment"])
+
+    assert result.returncode == 2
+    assert diagnostic in result.stderr

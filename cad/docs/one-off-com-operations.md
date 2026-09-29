@@ -49,7 +49,9 @@ a persistent `hub` process
 ([supervised farm launches](../../DEVELOPING.md#supervised-farm-launches)). It
 runs the same `build.py` invocation from a private snapshot of the pushed HEAD,
 so nothing done in your worktree mid-run can move a key, and records the run so
-a successor can pick it up instead of re-inventing a command.
+a successor can pick it up instead of re-inventing a command. The same script
+follows the recorded run: `-Watch -RunId <id>` streams leaf changes and task
+errors and exits 0/20/21/22 for succeeded/failed/launcher-died/cancelled.
 
 ```powershell
 .\build.cmd --help                    # wrapper options + farm defaults, then doit's commands
@@ -220,10 +222,10 @@ throw away afterwards. Non-negotiable shape:
 
 **Local half** (the submitter, even in farm mode). Its outputs live in `<out>`:
 `cad/out` of the checkout for a direct attended build, but for a supervised
-launch the run record's `outputs` — `<LogDirectory>\<run-id>.out`, where the
-launcher moves the snapshot's `cad/out` when the run ends (the snapshot's own
-`cad\out` while it is still running, or when `.done` says the move failed).
-The caller's `cad/out` holds nothing from a supervised run.
+launch the `outputs` field of `farm-run.ps1 -Status -RunId <id>` —
+`<LogDirectory>\<run-id>.out` once the run ends, the snapshot's own `cad\out`
+while it is still running or when the move failed. The caller's `cad/out`
+holds nothing from a supervised run.
 
 - `<out>/logs/<log_stem>.log` — the per-task console tee (only for tasks that
   pass a `log_stem`; otherwise output is inherited straight to the terminal,

@@ -1496,6 +1496,8 @@ def temporal_boundary(tmp_path, monkeypatch):
 
     monkeypatch.setenv("SOLIDWORKS_POOL_CONFIG", str(_write_config(tmp_path)))
     monkeypatch.setenv("HARMONIC_FARM_COMMIT", SHA)
+    monkeypatch.delenv("HARMONIC_FARM_RUN", raising=False)
+    monkeypatch.delenv("HARMONIC_FARM_REQUESTS", raising=False)
     calls: dict = {"connect": [], "start": []}
     outcome: dict = {}
 
@@ -1638,6 +1640,72 @@ def test_run_leaf_starts_the_shared_workflow_with_the_contract(temporal_boundary
     assert options["id_conflict_policy"] is WorkflowIDConflictPolicy.USE_EXISTING
     assert options["execution_timeout"] == timedelta(hours=8)
     assert options["result_type"] is _farm.LeafResult
+    assert options["memo"] is None, "no launcher run to name"
+
+
+def test_a_launcher_run_is_stamped_as_the_creator_memo(temporal_boundary, monkeypatch):
+    # Only the start that creates the execution writes its memo, so this is
+    # what farm-run.ps1 -Cancel compares with its run ID.
+    calls, resolve = temporal_boundary
+    resolve(_leaf_result())
+    monkeypatch.setenv("HARMONIC_FARM_RUN", "20260929T000000000Z-abc")
+
+    _farm.run_leaf("part:pen_rod", "k" * 64)
+
+    [(_, _, options)] = calls["start"]
+    assert options["memo"] == {"farm_run": "20260929T000000000Z-abc"}
+
+
+def test_a_launcher_run_names_each_workflow_before_creating_it(
+    temporal_boundary, tmp_path, monkeypatch
+):
+    # farm-run.ps1 -Cancel reads these when the launcher it stopped never
+    # copied a `Farm workflow requested` line into the run log.
+    from temporalio.client import Client
+
+    calls, resolve = temporal_boundary
+    resolve(_leaf_result())
+    requests = tmp_path / "run.requests"
+    requests.mkdir()
+    monkeypatch.setenv("HARMONIC_FARM_REQUESTS", str(requests))
+    fake_connect = Client.connect
+    named_at_start = []
+
+    async def observing_connect(*args, **kwargs):
+        client = await fake_connect(*args, **kwargs)
+        start = client.start_workflow
+
+        async def start_workflow(*start_args, **start_options):
+            named_at_start.extend(
+                json.loads(path.read_text(encoding="utf-8"))
+                for path in sorted(requests.iterdir())
+            )
+            return await start(*start_args, **start_options)
+
+        client.start_workflow = start_workflow
+        return client
+
+    monkeypatch.setattr(Client, "connect", observing_connect)
+
+    _farm.run_leaf("part:pen_rod", "k" * 64)
+
+    wf_id = "leaf:part:pen_rod:" + "k" * 64 + ":900s"
+    assert named_at_start == [{"task": "part:pen_rod", "workflow_id": wf_id}]
+    assert len(calls["start"]) == 1
+
+
+def test_a_request_that_cannot_be_named_is_never_dispatched(
+    temporal_boundary, tmp_path, monkeypatch
+):
+    # An unnamed workflow could outlive farm-run.ps1 -Cancel.
+    calls, resolve = temporal_boundary
+    resolve(_leaf_result())
+    monkeypatch.setenv("HARMONIC_FARM_REQUESTS", str(tmp_path / "absent"))
+
+    with pytest.raises(FileNotFoundError):
+        _farm.run_leaf("part:pen_rod", "k" * 64)
+
+    assert calls["start"] == []
 
 
 def test_a_keyless_leaf_uses_the_commit_in_its_workflow_identity(temporal_boundary):

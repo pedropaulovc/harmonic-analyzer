@@ -239,10 +239,14 @@ such build:
   you are about to use before fanning parallel agents out over the farm. A green
   `check:math` is local-only and a submitter cache hit dispatches nothing;
   neither is evidence of dispatch.
-- Hand off the recorded run — launcher path, hub name, run/log/`.done` paths,
-  worktree, pushed HEAD, pool, exact targets and leaf budget — rather than
-  letting a successor recreate the command. A missing `.done` means the local
-  outcome is unknown, never that the remote work was cancelled.
+- Hand off the run id and `-LogDirectory` — plus the hub name, worktree,
+  pushed HEAD, pool, exact targets and leaf budget — rather than letting a
+  successor recreate the command. The successor tracks the run with the same
+  script that launched it: `farm-run.ps1 -Watch -RunId <id> -LogDirectory <dir>`
+  is the required watcher (exit 0 succeeded, 20 failed, 21 launcher-died,
+  22 cancelled), `-Status` reports it once, `-Cancel -Why …` is the only way to
+  stop it. Never wait for `.done` or parse the records by hand. `launcher-died`
+  means the local outcome is unknown, never that the remote work was cancelled.
 
 ## Task groups — the prefix tells you if SolidWorks is needed
 
