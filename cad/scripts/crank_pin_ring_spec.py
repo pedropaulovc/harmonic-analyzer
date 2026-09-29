@@ -37,6 +37,14 @@ ARC_SAGITTA = MEAN_R - math.sqrt(MEAN_R**2 - (PIN_DIA_AT_HOLE / 2.0) ** 2)
 RING_CENTRE_X = MEAN_R - ARC_SAGITTA / 2.0
 RING_BOTTOM_X = RING_CENTRE_X + MEAN_R  # the wire centreline's lowest point
 V_RING = 2.0 * math.pi**2 * MEAN_R * (WIRE_DIA / 2.0) ** 2
+# The silver-soldered butt joint, on the ring's side away from the arm: a
+# JOINT_DIA bead centred on the wire centreline. It also gives the drawings a
+# real edge to balloon, which a plain torus lacks.
+JOINT_DIA = 1.3
+_JOINT_H = math.sqrt((JOINT_DIA / 2.0) ** 2 - (WIRE_DIA / 2.0) ** 2)
+# The bead less the wire it swallows (a straight-wire approximation; the ring's
+# 5 mm bend changes it by well under 0.1 %).
+V_JOINT = 4.0 / 3.0 * math.pi * _JOINT_H**3
 
 HOLE_AIR = RING_HOLE_DIA / 2.0 - WIRE_DIA / 2.0 - ARC_SAGITTA / 2.0
 if HOLE_AIR < RING_HOLE_AIR - 1e-9:
