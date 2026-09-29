@@ -292,9 +292,18 @@ def _select_view_entity(
                 "", entity_type, xy[0], xy[1], 0.0, False, 0, null_callout(), 0
             )
         )
+    if not selected and xy is not None:
+        # A coordinate pick is the seat's interactive hit test: name the
+        # window it ran in before raising.
+        _seat_forensics.capture_pick_miss(
+            adapter,
+            f"failed to select {label} {entity_type.lower()} at sheet ({xy[0]:g}, {xy[1]:g})",
+            view=name,
+            entity_type=entity_type,
+            sheet_xy=xy,
+        )
     if not selected:
-        where = "by entity" if xy is None else f"at sheet ({xy[0]:g}, {xy[1]:g})"
-        raise RuntimeError(f"failed to select {label} {entity_type.lower()} {where}")
+        raise RuntimeError(f"failed to select {label} {entity_type.lower()} by entity")
     count = int(draw.SelectionManager.GetSelectedObjectCount2(-1))
     if entity is not None and count != 1:
         raise RuntimeError(
@@ -2324,6 +2333,8 @@ def new_project_drawing(
     draw.ViewZoomtofit2()
     draw.ForceRebuild3(False)
     rebuild_drawing(adapter, label="new_project_drawing")
+    # The window every coordinate pick in this drawing hit-tests in, as fitted.
+    _seat_forensics.record_drawing_display(adapter, f"new {layout.value} drawing")
     return draw, sheet
 
 
@@ -4072,6 +4083,110 @@ def visible_view_entities(view: Any, entity_kind: int, *, label: str) -> list[An
     span.set_attribute("entities", len(entities))
     span.set_attribute("entity_kind", entity_kind)
     return entities
+
+
+_VIEW_ENTITY_SILHOUETTE = 4  # swViewEntityType_SilhouetteEdge
+# How far a silhouette's projected line may pass from the sheet point it is
+# asked for.  Projection is exact to ~1e-9 m, and the lines this separates are
+# a cylinder's two flanks, a diameter apart on the sheet.
+_SILHOUETTE_POINT_TOLERANCE_M = 1e-5
+
+
+def _segment_distance(
+    point: Sequence[float], start: Sequence[float], end: Sequence[float]
+) -> float:
+    """Distance on the sheet from ``point`` to the segment ``start``-``end``."""
+    dx, dy = end[0] - start[0], end[1] - start[1]
+    length_sq = dx * dx + dy * dy
+    if length_sq == 0.0:
+        return math.dist(point[:2], start[:2])
+    t = ((point[0] - start[0]) * dx + (point[1] - start[1]) * dy) / length_sq
+    t = min(1.0, max(0.0, t))
+    return math.dist(point[:2], (start[0] + t * dx, start[1] + t * dy))
+
+
+@_telemetry.traced("drawing.pick_face_silhouettes", label_param="label")
+def face_silhouettes_through(
+    adapter: Any,
+    view: Any,
+    picks: Mapping[str, tuple[Any, tuple[float, float]]],
+    *,
+    label: str,
+) -> dict[str, Any]:
+    """Resolve each pick to the one silhouette of its face drawn through its point.
+
+    ``picks`` maps a key to ``(face spec, sheet point)``: the model face a
+    silhouette must belong to (a ``_gtol_spec`` face spec, the one a
+    ``SurfaceFinishControl`` carries) and a sheet point on the line it draws.
+    A cylinder shows two flank silhouettes of one face; the point picks the
+    flank.  Returns the silhouette entity per key, for the ``entity=`` path of
+    the annotation helpers.
+
+    This replaces ``SelectByID2`` at the sheet point.  That call hit-tests the
+    seat's graphics window, so the same point on the same geometry can miss on
+    one worker and hit on another: ``drawing:pinion_arbor`` (key 870279bc)
+    missed its front-journal flank at sheet (0.25355, 0.166) on
+    swmaker00000a@10 and hit on swmaker000004@4, and missed on @10 again at
+    the next commit.  The silhouettes and their faces come from the model, so
+    the pick reads the same on every seat.
+
+    One ``GetVisibleEntities2(..., 4)`` sweep serves every pick (see
+    :func:`visible_view_entities` for what a silhouette sweep costs); faces are
+    matched before any endpoint is read, and the matched ends are projected in
+    one batch.  Fails loud unless each key resolves to exactly one silhouette.
+    """
+    from _part_pmi import _face_geometry, _face_matches
+
+    silhouettes = visible_view_entities(view, _VIEW_ENTITY_SILHOUETTE, label=label)
+    matched: list[tuple[Any, tuple[str, ...], tuple[float, ...], tuple[float, ...]]] = []
+    for silhouette in silhouettes:
+        face = _com_invoke(silhouette, "ISilhouetteEdge", "GetFace")
+        geometry = _face_geometry(face) if face is not None else None
+        if geometry is None:
+            continue
+        keys = tuple(key for key, (spec, _xy) in picks.items() if _face_matches(geometry, spec))
+        if not keys:
+            continue
+        ends = []
+        for member in ("GetStartPoint", "GetEndPoint"):
+            point = _com_invoke(silhouette, "ISilhouetteEdge", member)
+            values = _com_invoke(point, "IMathPoint", "ArrayData") if point is not None else None
+            ends.append(tuple(float(v) for v in (values or ())[:3]))
+        if all(len(end) == 3 for end in ends):
+            matched.append((silhouette, keys, ends[0], ends[1]))
+    projected = model_points_in_view(
+        adapter,
+        view,
+        [end for _silhouette, _keys, start, stop in matched for end in (start, stop)],
+        label=f"{label} silhouette ends",
+    )
+    lines = [
+        (silhouette, keys, projected[2 * index], projected[2 * index + 1])
+        for index, (silhouette, keys, _start, _stop) in enumerate(matched)
+    ]
+    _telemetry.annotate(silhouettes=len(silhouettes), face_matched=len(matched))
+    resolved: dict[str, Any] = {}
+    for key, (spec, xy) in picks.items():
+        own = [line for line in lines if key in line[1]]
+        hits = [
+            line
+            for line in own
+            if _segment_distance(xy, line[2], line[3]) <= _SILHOUETTE_POINT_TOLERANCE_M
+        ]
+        if len(hits) != 1:
+            drawn = "; ".join(
+                f"({a[0] * 1000:.3f}, {a[1] * 1000:.3f})-({b[0] * 1000:.3f}, "
+                f"{b[1] * 1000:.3f}) mm"
+                for _silhouette, _keys, a, b in own
+            )
+            raise RuntimeError(
+                f"{label}: {len(hits)} silhouettes of {key}'s face {spec!r} pass "
+                f"through sheet ({xy[0] * 1000:.3f}, {xy[1] * 1000:.3f}) mm; want "
+                f"exactly 1 of the {len(own)} that face draws: {drawn or 'none'} "
+                f"({len(silhouettes)} silhouettes in the view)"
+            )
+        resolved[key] = hits[0][0]
+    return resolved
 
 
 @_telemetry.traced("drawing.rebuild", label_param="label")

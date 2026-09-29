@@ -9,9 +9,12 @@ artefact, which ``check:inert`` (``test_recipe_inert.py``) enforces:
 - Tracked code reaches this module only through pinned call sites: connect-time
   provenance and the post-save teardown in ``_common.run_build``, the pre-save
   authoring snapshot in ``_common.save_part_and_images`` (read-only: it has to
-  run before the camera moves), ``package_native``'s teardown, the
-  missing-property capture behind ``_drawing_common.read_required_properties``,
-  and ``capture_com_failure`` as a terminal failure call (it always raises).
+  run before the camera moves), the pre-save display record in
+  ``_drawing_common.new_project_drawing`` (read-only), ``package_native``'s
+  teardown, the missing-property capture behind
+  ``_drawing_common.read_required_properties``, the pick-miss capture behind
+  ``_drawing_common._select_view_entity`` (it always raises), and
+  ``capture_com_failure`` as a terminal failure call (it always raises).
 - No COM mutator runs here except three pinned ones, each after the artefact
   is settled: ``SaveAs3``/``SaveBMP`` of a failing document (only under the
   always-raising ``capture_com_failure``) and ``SetCurrentWorkingDirectory``
@@ -413,6 +416,15 @@ def seat_provenance(adapter: Any) -> dict[str, Any]:
         prov.update(_seat_working_directory(adapter))
     except Exception as exc:  # noqa: BLE001 - provenance is never fatal
         prov["seat_liveness_error"] = f"{type(exc).__name__}: {exc}"
+    # Re-read per call: a session is disconnected long after its seat started.
+    session = prov.get("seat_session_id")
+    if isinstance(session, int):
+        try:
+            state = _session_connect_state(session)
+        except Exception as exc:  # noqa: BLE001 - provenance is never fatal
+            state = f"unreadable ({type(exc).__name__}: {exc})"
+        if state:
+            prov["seat_session_state"] = state
     return prov
 
 
@@ -1156,21 +1168,93 @@ def display_geometry(adapter: Any) -> dict[str, Any]:
     scale = adapter._attempt(lambda: float(_common._read_member(view, "Scale2")), default=None)
     if scale is not None:
         geometry["view_scale2"] = scale
+    geometry.update(_model_view_window(adapter, view))
+    geometry.update(_projected_px_per_mm(adapter, view))
+    return geometry
+
+
+def _model_view_window(adapter: Any, view: Any) -> dict[str, Any]:
+    """The document window a hit test runs in, in pixels.
+
+    ``_frame_geometry`` measures the MAIN window; a coordinate pick runs in the
+    document's own graphics window inside it, which a docked task pane or tree
+    narrows. ``IModelView.GetVisibleBox`` is documented as four longs, the
+    visible graphics area in screen pixels less anything the FeatureManager
+    tree covers. It was read here as six model-space metres until 2026-09-29,
+    so no seat ever recorded it: every authoring record in the fleet carried no
+    ``visible_box_*`` key. ``FrameWidth``/``FrameHeight``/``FrameState`` are
+    the document window's frame, in client-area pixels.
+    """
+    window: dict[str, Any] = {}
     box = adapter._attempt(
         lambda: list(_common._early_bound(view, "IModelView").GetVisibleBox() or []), default=None
     )
-    if box and len(box) >= 6:
-        numbers = [float(value) for value in box[:6]]
-        geometry["visible_box_mm"] = [round(value * 1000.0, 3) for value in numbers]
-        geometry["visible_width_mm"] = round(abs(numbers[3] - numbers[0]) * 1000.0, 3)
-        geometry["visible_height_mm"] = round(abs(numbers[4] - numbers[1]) * 1000.0, 3)
-        client_width = geometry.get("frame_client_width_px")
-        if client_width and geometry["visible_width_mm"]:
-            geometry["px_per_mm_from_box"] = round(
-                client_width / geometry["visible_width_mm"], 3
-            )
-    geometry.update(_projected_px_per_mm(adapter, view))
-    return geometry
+    if box and len(box) == 4:
+        left, top, right, bottom = (int(value) for value in box)
+        window["view_visible_box_px"] = [left, top, right, bottom]
+        window["view_visible_width_px"] = abs(right - left)
+        window["view_visible_height_px"] = abs(bottom - top)
+    for member, key in (
+        ("FrameWidth", "view_frame_width_px"),
+        ("FrameHeight", "view_frame_height_px"),
+        ("FrameState", "view_frame_state"),
+    ):
+        value = adapter._attempt(lambda m=member: _common._read_member(view, m), default=None)
+        if isinstance(value, (int, float)):
+            window[key] = int(value)
+    return window
+
+
+# ``WTS_INFO_CLASS.WTSConnectState``, and the ``WTS_CONNECTSTATE_CLASS`` names in
+# enum order. The pool's screen capture freezes when a worker's interactive
+# session is left DISCONNECTED by an RDP connect; ``GetSystemMetrics`` still
+# reports the old desktop then (swmaker00000a@10 read 1920x1080 on one monitor
+# while its frame had been frozen for hours, 2026-09-29), so the session's own
+# state is the only record of it.
+_WTS_CONNECT_STATE = 8
+_WTS_CONNECT_STATES = (
+    "active",
+    "connected",
+    "connect_query",
+    "shadow",
+    "disconnected",
+    "idle",
+    "listen",
+    "reset",
+    "down",
+    "init",
+)
+
+
+def _session_connect_state(session_id: int) -> str | None:
+    """``WTSQuerySessionInformationW(WTSConnectState)`` for ``session_id``."""
+    wtsapi32 = ctypes.windll.wtsapi32
+    query = wtsapi32.WTSQuerySessionInformationW
+    query.argtypes = (
+        wintypes.HANDLE,
+        wintypes.DWORD,
+        ctypes.c_int,
+        ctypes.POINTER(ctypes.c_void_p),
+        ctypes.POINTER(wintypes.DWORD),
+    )
+    query.restype = wintypes.BOOL
+    release = wtsapi32.WTSFreeMemory
+    release.argtypes = (ctypes.c_void_p,)
+    release.restype = None
+    buffer = ctypes.c_void_p()
+    returned = wintypes.DWORD()
+    # WTS_CURRENT_SERVER_HANDLE is NULL: this machine.
+    if not query(None, int(session_id), _WTS_CONNECT_STATE, ctypes.byref(buffer), ctypes.byref(returned)):
+        return None
+    try:
+        if not buffer.value or returned.value < ctypes.sizeof(ctypes.c_int):
+            return None
+        state = int(ctypes.cast(buffer, ctypes.POINTER(ctypes.c_int))[0])
+    finally:
+        release(buffer)
+    if 0 <= state < len(_WTS_CONNECT_STATES):
+        return _WTS_CONNECT_STATES[state]
+    return f"unknown({state})"
 
 
 def record_authoring_context(adapter: Any, label: str) -> dict[str, Any]:
@@ -1220,6 +1304,104 @@ def record_authoring_context(adapter: Any, label: str) -> dict[str, Any]:
         )
         _telemetry.info(summary, label=label, authoring=json.dumps(context, default=str))
     return context
+
+
+def _display_summary(display: Mapping[str, Any], seat: Mapping[str, Any]) -> str:
+    """One console line for the hit-test surface: session, windows, zoom."""
+    return (
+        f"session={seat.get('seat_session_state', 'unknown')} "
+        f"screen={display.get('screen_px', '?')} "
+        f"frame={display.get('frame_width_px', '?')}x{display.get('frame_height_px', '?')}"
+        f"({display.get('frame_state', 'unknown')}) "
+        f"view_window={display.get('view_visible_width_px', '?')}x"
+        f"{display.get('view_visible_height_px', '?')} "
+        f"px/mm={display.get('px_per_mm', 'unknown')}"
+    )
+
+
+def _display_bags(adapter: Any) -> tuple[dict[str, Any], dict[str, Any]]:
+    """``(display_geometry, seat_provenance)``, each unreadable as its own error."""
+    bags: list[dict[str, Any]] = []
+    for probe in (display_geometry, seat_provenance):
+        try:
+            bags.append(dict(probe(adapter)))
+        except Exception as exc:  # noqa: BLE001 - forensics never raise
+            bags.append({"capture_error": f"{type(exc).__name__}: {exc}"})
+    return bags[0], bags[1]
+
+
+def record_drawing_display(adapter: Any, label: str) -> None:
+    """Record, on the success path, the window a drawing's coordinate picks
+    hit-test in.
+
+    ``SelectByID2`` at a sheet point runs SolidWorks' interactive pick in the
+    document's graphics window, at a pixel tolerance mapped through the zoom.
+    ``new_project_drawing`` fits the sheet to that window, so its pixel size is
+    the one input a coordinate pick has that the model does not decide. Part
+    builds record it (:func:`record_authoring_context`); drawings did not, so
+    when ``drawing:pinion_arbor``'s journal pick missed on swmaker00000a@10 and
+    hit on swmaker000004@4 with the same key, neither leaf said what window it
+    picked in. Reads only; never raises.
+    """
+    display, seat = _display_bags(adapter)
+    with contextlib.suppress(Exception):
+        _telemetry.event(
+            "seat.drawing_display",
+            label=label,
+            **_common._attributes_of(display),
+            **_common._attributes_of(seat),
+        )
+        _telemetry.info(
+            f"drawing display {label}: {_display_summary(display, seat)}",
+            label=label,
+            display=json.dumps(display, default=str, sort_keys=True),
+        )
+
+
+def capture_pick_miss(
+    adapter: Any,
+    message: str,
+    *,
+    view: str,
+    entity_type: str,
+    sheet_xy: Sequence[float],
+) -> NoReturn:
+    """Name the window a sheet-coordinate pick missed in, then raise
+    ``RuntimeError(message)``.
+
+    A ``SelectByID2`` that returns False at a point says nothing about why: the
+    point may be off the drawn entity, or the seat's hit test may not see an
+    entity that is there. The second is seat state (the graphics window's pixel
+    size and zoom, the session's display), which the model cannot show and the
+    leaf log did not record. Paired with :func:`record_drawing_display` on the
+    leaves that passed, this is the comparison a worker-dependent miss needs.
+    Every probe is guarded; the caller's message always survives.
+    """
+    display, seat = _display_bags(adapter)
+    report = {
+        "view": view,
+        "entity_type": entity_type,
+        "sheet_xy": [float(value) for value in sheet_xy[:2]],
+        "display": display,
+        "seat": seat,
+    }
+    with contextlib.suppress(Exception):
+        _telemetry.event(
+            "drawing.pick_miss",
+            view=view,
+            entity_type=entity_type,
+            sheet_x=float(sheet_xy[0]),
+            sheet_y=float(sheet_xy[1]),
+            **_common._attributes_of(display),
+        )
+        _telemetry.error(
+            f"[forensics] {message}: view={view!r} {_display_summary(display, seat)}",
+            capture=json.dumps(report, default=str, sort_keys=True),
+            view=view,
+            entity_type=entity_type,
+            **_common._attributes_of(seat),
+        )
+    raise RuntimeError(message)
 
 
 _SAVE_AS_CURRENT_VERSION = 0  # swSaveAsVersion_e.swSaveAsCurrentVersion

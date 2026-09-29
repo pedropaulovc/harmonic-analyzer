@@ -755,8 +755,11 @@ enforces it, and derives its scope from that one constant:
    provenance and the startup gate, post-save `teardown_seat`),
    `_common.save_part_and_images` (`record_authoring_context`),
    `_common.force_rebuild` (`capture_rebuild_failure`),
-   `_drawing_common.read_required_properties` (`capture_missing_properties`)
-   and `package_native._release_seat`. The one exception is
+   `_drawing_common.read_required_properties` (`capture_missing_properties`),
+   `_drawing_common._select_view_entity` (`capture_pick_miss`, a sheet-point
+   pick that selected nothing), `_drawing_common.new_project_drawing`
+   (`record_drawing_display`, read-only) and `package_native._release_seat`.
+   The one exception is
    `capture_com_failure(...)` as a bare statement: it always raises. A new call
    site fails loud with file:line.
 3. **No COM write before a save.** The module calls no mutator verb

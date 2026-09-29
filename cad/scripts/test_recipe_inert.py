@@ -64,12 +64,20 @@ CALL_SITES: dict[tuple[str, str], frozenset[str]] = {
     ("_drawing_common.py", "read_required_properties"): frozenset(
         {"capture_missing_properties"}
     ),
+    # A sheet-coordinate pick that selected nothing: reads the seat's windows
+    # and session, then raises the pick's own failure.  Nothing after it runs.
+    ("_drawing_common.py", "_select_view_entity"): frozenset({"capture_pick_miss"}),
+    # PRE-save, after the sheet is fitted: records the window the drawing's
+    # coordinate picks hit-test in.  Rule 3 proves it reads only.
+    ("_drawing_common.py", "new_project_drawing"): frozenset({"record_drawing_display"}),
 }
 # Allowed anywhere, but only as a statement whose value is the call: it always raises.
 TERMINAL = frozenset({"capture_com_failure"})
 # Pinned captures that must raise like a terminal, though only their CALL_SITES
 # may name them.
-PINNED_TERMINALS = frozenset({"capture_rebuild_failure", "capture_missing_properties"})
+PINNED_TERMINALS = frozenset(
+    {"capture_rebuild_failure", "capture_missing_properties", "capture_pick_miss"}
+)
 
 # Rule 3: the COM mutators an inert module may call, and the function that calls each.
 MUTATOR = re.compile(
@@ -93,7 +101,12 @@ MUTATOR_ROOTS = {
     "release_seat_working_directory": {"teardown_seat"},
 }
 # Entry points that run BEFORE an artefact is saved: nothing they reach may mutate.
-PRE_SAVE = {"record_authoring_context", "record_seat_provenance", "note_seats_before_connect"}
+PRE_SAVE = {
+    "record_authoring_context",
+    "record_seat_provenance",
+    "note_seats_before_connect",
+    "record_drawing_display",
+}
 # ctypes structures and prototypes the module builds itself.
 LOCAL_ATTRIBUTE_STORES = {"cb", "argtypes", "restype"}
 
