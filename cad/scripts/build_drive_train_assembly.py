@@ -1703,8 +1703,8 @@ if abs(_SEAT_ANCHOR_M[0] - X_CRANK) > 1e-6:
     )
 
 # The collar controls notch-exit travel; the larger knurled head controls
-# external clearance. The stock stop (the foot screw's #4-40 SKU) keeps its
-# base-top placement frame; swing_stop_screw_spec owns the embed/proud split.
+# external clearance. The stock stop (the foot screw's #4-40 SKU) seats its
+# head on the base top; swing_stop_screw_spec owns the embed/proud split.
 DISENGAGE_DEG = BASE_SWING_HARDWARE.disengage_deg
 STOP_X, STOP_Z = BASE_SWING_HARDWARE.stop_xz
 _STOP_CONTACT = BASE_SWING_HARDWARE.stop_contact_xz
@@ -3722,7 +3722,7 @@ async def build(adapter) -> dict[str, str]:
     )
     await _lock_static(adapter, pivot_screw, arbor)
     # The base-threaded swing stop remains a static at the base-top production
-    # frame. Its proud shank meets the disengaged platform's east edge
+    # frame. Screwed fully home, its head meets the disengaged platform's east edge
     # at the one shared contact station exported with the base hole.
     stop_screw = await place_component(
         adapter,

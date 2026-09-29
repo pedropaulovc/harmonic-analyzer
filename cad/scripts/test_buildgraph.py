@@ -2672,12 +2672,11 @@ def test_interference_contracts_do_not_depend_on_the_crankshaft_spec() -> None:
         # Listed themselves: the root script is not in its own import closure
         # (Codex #1035, PRRT_kwDOPHDy386mV11b).
         ("build_wheel_bar.py", True),
+        ("build_swing_stop_screw.py", True),
         # Reads through an imported listed module.
         ("build_boss_hook.py", True),
         ("build_spring_hook.py", True),
         ("build_platen_guide.py", False),
-        # The #4-40 stop checks the nominal plate only (2026-09-29).
-        ("build_swing_stop_screw.py", False),
     ],
 )
 def test_reads_title_block_geometry_covers_root_and_closure(script, expected):

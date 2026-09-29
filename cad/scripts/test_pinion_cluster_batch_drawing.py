@@ -537,9 +537,9 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 "drive-train-1/swing-stop-screw",
                 range(1, 2),
                 "frame-1/harmonic-base",
-                2.8448,  # the foot screw's #4-40 SKU, 2.85 embedded
+                2.8448,  # the foot screw's #4-40 SKU, seated full length
                 2.261,
-                2.85,
+                9.525,
             ),
             **_expected_numbered_pairs(
                 "drive-train-1/slotted-screw",
