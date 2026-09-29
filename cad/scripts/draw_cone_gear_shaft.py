@@ -653,7 +653,7 @@ class PlacedSection(NamedTuple):
     view: Any
     across_flat: Any
     caption: Box
-    centre_mark: Box
+    centre_marks: dict[str, Box]
 
 
 def _axis_sign(adapter: Any, side: Any) -> int:
@@ -904,17 +904,23 @@ def _annotation_ink(annotation: Any, label: str) -> Box:
     return (min(xs), min(ys), max(xs), max(ys))
 
 
-def _trim_centre_mark(adapter: Any, view: Any, section: DSection) -> Box:
-    """Keep the section's centre mark as a small cross, and return its ink.
+def _trim_centre_mark(adapter: Any, view: Any, section: DSection) -> dict[str, Box]:
+    """Keep the section's centre mark, if SolidWorks gave it one, as a small
+    cross, and return its ink by name.
 
-    The mark's size is model length (its 2.5 mm arms read 5 mm at 2:1 and
-    25 mm at 10:1), so the arm is divided by the section's scale."""
+    A full section gets a mark; a partial one (cut from the tip detail) gets
+    none (leaf 20260929T212711Z-1-75518df7).  The mark's size is model
+    length (its 2.5 mm arms read 5 mm at 2:1 and 25 mm at 10:1), so the arm
+    is divided by the section's scale."""
     label = f"section {section.label} centre mark"
     marks = tuple(
         _early_bound(view, "IView").GetAnnotationsByType(_CENTER_MARK_ANNOTATION) or ()
     )
+    if not marks:
+        _telemetry.info(f"{label}: none drawn")
+        return {}
     if len(marks) != 1:
-        raise RuntimeError(f"expected one {label}, found {len(marks)}")
+        raise RuntimeError(f"expected at most one {label}, found {len(marks)}")
     annotation = _early_bound(marks[0], "IAnnotation")
     mark = _early_bound(annotation.GetSpecificAnnotation(), "ICenterMark")
     mark.UseDocDisplaySettings = False
@@ -930,7 +936,7 @@ def _trim_centre_mark(adapter: Any, view: Any, section: DSection) -> Box:
             f"{label} arms read {arm:.4f} m (size {float(mark.Size):.5f}), not "
             f"{CENTRE_MARK_ARM:.4f}: ink {ink}"
         )
-    return ink
+    return {label: ink}
 
 
 def _cut_endpoints(
@@ -985,7 +991,7 @@ def _add_d_sections(
             view_label=f"section {section.label}",
             dimensions_by_feature=DRAWING_DIMENSIONS,
         )
-        centre_mark = _trim_centre_mark(adapter, view, section)
+        centre_marks = _trim_centre_mark(adapter, view, section)
         outline = tuple(
             float(value) for value in _early_bound(view, "IView").GetOutline()
         )
@@ -996,7 +1002,7 @@ def _add_d_sections(
             CaptionAnchor.TOP_CENTRE,
             label=f"section {section.label} caption",
         )
-        placed.append(PlacedSection(section, view, across_flat, caption, centre_mark))
+        placed.append(PlacedSection(section, view, across_flat, caption, centre_marks))
     return placed
 
 
@@ -1150,20 +1156,19 @@ def _prove_section_layout(
                 placed.across_flat, f"{label} across-flat"
             ),
             f"{label} caption": placed.caption,
+            **placed.centre_marks,
         }
         require_clear(
             f"{label} caption",
             placed.caption,
             {name: box for name, box in cell.items() if name != f"{label} caption"},
         )
-        require_clear(
-            f"{label} centre mark",
-            placed.centre_mark,
-            {
-                f"{label} across-flat": cell[f"{label} across-flat"],
-                f"{label} caption": placed.caption,
-            },
-        )
+        for name, box in placed.centre_marks.items():
+            require_clear(
+                name,
+                box,
+                {f"{label} across-flat": cell[f"{label} across-flat"]},
+            )
         groups[label] = {label: _union(cell.values())}
     lands = {
         **_land_boxes(adapter, side, sign, label="side view"),
