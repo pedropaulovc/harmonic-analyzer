@@ -19,6 +19,7 @@ Run (SolidWorks already open)::
 
 from __future__ import annotations
 
+import math
 import sys
 
 from _common import (
@@ -43,7 +44,31 @@ from crank_pin_eye_spec import LOOP_R, TAIL_LEN, V_LOOP, V_TAIL, WIRE_DIA
 PART_NAME = "crank-pin-eye"
 MATERIAL = "Brass"
 
-V_EYE = V_LOOP + V_TAIL  # the tail root overlaps the loop by well under 6 %
+def _tail_loop_overlap(steps: int = 64) -> float:
+    """Volume the tail shares with the loop, by midpoint integration.
+
+    The tail runs tangent into the loop, so the two tubes overlap until their
+    centrelines part by a wire diameter (about 1.7 mm along the tail).
+    """
+    r = WIRE_DIA / 2.0
+    cell = 2.0 * r / steps
+    dy = TAIL_LEN / steps
+    shared = 0.0
+    for iy in range(steps):
+        y = (iy + 0.5) * dy
+        for ix in range(steps):
+            x = -r + (ix + 0.5) * cell
+            for iz in range(steps):
+                z = -r + (iz + 0.5) * cell
+                if x * x + z * z > r * r:
+                    continue
+                ring = math.hypot(y, z + LOOP_R) - LOOP_R
+                if ring * ring + x * x <= r * r:
+                    shared += cell * cell * dy
+    return shared
+
+
+V_EYE = V_LOOP + V_TAIL - _tail_loop_overlap()
 
 
 async def _wire_circle(adapter, dims: SketchDims, names: tuple[str, str, str]) -> None:
@@ -96,7 +121,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += tail.apply(adapter, "TailProfile")
     check("extrude tail", await adapter.create_extrusion(ExtrusionParameters(depth=TAIL_LEN)))
     name_last_feature(adapter, "Tail")
-    got = await volume_check(adapter, "eye", V_EYE, 0.06 * V_EYE)
+    got = await volume_check(adapter, "eye", V_EYE, 0.01 * V_EYE)
     # The loop is symmetric in Y about the origin, so only the tail moves the
     # centre of mass along Y: a tail extruded into -Y lands it below zero.
     mass = await adapter.get_mass_properties()

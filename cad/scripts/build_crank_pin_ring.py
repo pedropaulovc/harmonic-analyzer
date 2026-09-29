@@ -64,6 +64,7 @@ async def build(adapter) -> dict[str, str]:
     await anchor_point_to_origin(
         adapter, f"{centerline}.start", RING_CENTRE_X, 0.0, "ring centre"
     )
+    prof.record("CentreX")
     check("axis length", await adapter.add_sketch_dimension(centerline, None, "linear", MEAN_R))
     prof.record("AxisLen", '"MeanR"')
     crown = -ARC_SAGITTA / 2.0
