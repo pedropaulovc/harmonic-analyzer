@@ -1372,6 +1372,7 @@ _CHECK_NAMES = (
     "math",
     "config",
     "graph",
+    "undefined_names",
     "nameplate",
     "numerals",
     "recipe",
@@ -3129,7 +3130,35 @@ def task_check():
             ),
         }
     )
+    tracked_python = [
+        str((REPO_ROOT / path).resolve())
+        for path in subprocess.check_output(
+            [
+                "git",
+                "ls-files",
+                "--cached",
+                "-z",
+                "--",
+                "cad/scripts",
+                "dodo.py",
+                "build.py",
+            ],
+            cwd=REPO_ROOT,
+        ).decode("utf-8").split("\0")
+        if path.endswith(".py")
+    ]
     specs = {
+        "undefined_names": {
+            # Ruff scans the entire scripts tree, not only import-reachable modules.
+            # Depend on every tracked Python input so a fresh typo invalidates the stamp.
+            "file_dep": sorted(
+                {
+                    *tracked_python,
+                    str((SCRIPTS_DIR / "test_undefined_names.py").resolve()),
+                }
+            ),
+            "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_undefined_names.py")],
+        },
         "math": {
             # The import closure of verify.py (truth_model, the base-footprint
             # build modules and the *_spec.py single-source modules they import,
