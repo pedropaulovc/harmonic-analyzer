@@ -32,7 +32,7 @@ _EXPECTED = {
     "pinion-strap-pin": (("98296A027",), "MHA-145", 3),
     "post-mount-screw": (("40923898",), "MHA-142", 2),
     "slotted-screw": (("90280A201",), "MHA-101", 4),
-    "swing-stop-screw": (("90280A199",), "MHA-095", 1),
+    "swing-stop-screw": (("90280A108",), "MHA-095", 1),
     "thumb-screw": (("91882A221",), "MHA-075", 2),
     "knife-hanger-washer": (("90126A211",), "MHA-131", 2),
     "spring-hook": (("9489T111",), "MHA-090", 20),
@@ -85,8 +85,10 @@ def test_fillister_stock_is_shared_across_the_fleet() -> None:
         )
 
     # Rule 12 (E10): the four pinion-block screws moved from the #8-32 x 1 to
-    # the clamp screws' #8-32 x 1-1/4, leaving the swing stop on the x 1.
-    assert fleet_quantity("90280A199") == 1
+    # the clamp screws' #8-32 x 1-1/4; the swing stop then left the x 1 for
+    # the foot screw's #4-40 x 3/8 (2026-09-29), retiring 90280A199.
+    assert fleet_quantity("90280A199") == 0
+    assert fleet_quantity("90280A108") == 2
     assert fleet_quantity("90280A201") == 10
 
 

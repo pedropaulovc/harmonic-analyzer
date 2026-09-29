@@ -639,9 +639,9 @@ sections:
         - McMaster-Carr 91829A560 model + v4 top stills (slotted head at the plate tip)
         - med (role high, dims low)
       - - '`swing-stop-screw` (p1 travel limit)'
-        - 'McMaster-Carr 90280A199 steel narrow fillister-head slotted screw: head Ø6.858 × 3.9624, #8-32 shank Ø4.1656 × 25.4; 15.525 embedded in the base leaves 9.875 proud above it. The base receiver has 16.0 full thread depth and 20.0 drill depth before the drill point.'
-        - 'base-threaded STATIC at (−139.107, +1.929), derived so the 223.354-long plate''s EAST taper edge just touches the shank flank at the 4.250° disengaged swing. The disengage swing walks the knob stud out of the notch mouth and advances the east edge onto the stop; the engaged edge retains 7.779 mm signed clearance (derived and asserted against the base hole).'
-        - 'McMaster-Carr 90280A199 recipe (`cad/scripts/diagnostics/diag_mcmaster_fillister.py`); embed and receiver depths from `cad/scripts/build_swing_stop_screw.py` and `cad/scripts/build_harmonic_base.py`; user review (v4: small screw the platform bumps against); position derived from the notch/knob geometry'
+        - 'McMaster-Carr 90280A108 steel narrow fillister-head slotted screw, the foot screw''s SKU (user decision 2026-09-29): head Ø4.6482 × 2.7178, #4-40 shank Ø2.8448 × 9.525; 2.85 embedded in the base leaves 6.675 proud above it, 0.26 over the nominal 6.35 platform plus underhead fillet. Relaxed contract: 1.0D seat engagement (0.85D useful past the tip chamfer) and no clearance for a platform at its +0.51 high limit. The base receiver has 3.65 full thread depth and 7.85 drill depth before the drill point.'
+        - 'base-threaded STATIC at (−138.482, +1.716), derived so the 223.354-long plate''s EAST taper edge just touches the shank flank at the 4.250° disengaged swing. The disengage swing walks the knob stud out of the notch mouth and advances the east edge onto the stop; the engaged edge retains 7.780 mm signed clearance (derived and asserted against the base hole).'
+        - 'McMaster-Carr 90280A108 recipe (`cad/scripts/diagnostics/diag_mcmaster_fillister.py`); embed and receiver depths from `cad/scripts/build_swing_stop_screw.py` and `cad/scripts/build_harmonic_base.py`; user review (v4: small screw the platform bumps against); position derived from the notch/knob geometry'
         - high (stock dimensions exact; function and placement derived)
       - - '`cone-tip-bushing` (T006 spacer on the tip stub)'
         - brass sleeve Ø6 × 4, Ø1.588 (1/16") bore

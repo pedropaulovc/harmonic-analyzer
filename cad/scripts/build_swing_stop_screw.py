@@ -1,4 +1,4 @@
-"""Build the swing-stop screw from shared McMaster 90280A199 stock."""
+"""Build the swing-stop screw from shared McMaster 90280A108 stock."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import sys
 from _common import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
-from diagnostics.diag_build_90280A199 import build_90280A199
+from diagnostics.diag_build_90280A108 import build_90280A108
 from swing_stop_screw_spec import PROUD_LEN
 
 PART_NAME = "swing-stop-screw"
@@ -21,8 +21,8 @@ async def build(adapter) -> dict[str, str]:
         part_name=PART_NAME,
         components=(
             StockComponent(
-                "90280A199",
-                build_90280A199,
+                "90280A108",
+                build_90280A108,
                 RigidTransform(translation_mm=(0.0, PROUD_LEN, 0.0)),
             ),
         ),

@@ -119,6 +119,7 @@ from cone_lock_knob_spec import (
 )
 from cone_swing_platform_geometry import PLATE_T, swing_hardware_geometry
 from swing_stop_screw_spec import (
+    MIN_SEAT_ENGAGEMENT_D as STOP_MIN_ENGAGEMENT_D,
     SHANK_DIA as STOP_SHANK_DIA,
     THREAD as STOP_THREAD,
 )
@@ -326,9 +327,10 @@ if LOCK_SCREW_HOLE_DEPTH - SEAT_DEPTH_BAND - LOCK_STUD_LEN < LOCK_STUD_BOTTOM_CL
 if LOCK_SCREW_DRILL_DEPTH - LOCK_SCREW_HOLE_DEPTH < LOCK_PLUG_TAP_LEAD:
     raise AssertionError("cone lock seat drill loses the knob's plug-tap lead")
 
-# The shared 25.4-mm stock stop keeps its original 9.875-mm exposed height.
-# Its full thread clears the 15.525-mm embed at the printed low limit; the
-# drill keeps the #8-32 plug tap's five-pitch lead below the high limit.
+# The stop shares the foot screw's 9.525-mm #4-40 stock and stands just proud
+# of the nominal platform. Its full thread clears the short embed at the
+# printed low limit; the drill keeps the plug tap's five-pitch lead below the
+# high limit (swing_stop_screw_spec).
 STOP_SCREW_HOLE_DEPTH = seat_thread_depth(STOP_ENGAGEMENT)
 STOP_SCREW_DRILL_DEPTH = seat_drill_depth(STOP_SCREW_HOLE_DEPTH, STOP_THREAD, "tapped")
 
@@ -649,6 +651,12 @@ for _axis, _stack in COLUMN_SOCKET_LAND_STACKS.items():
         )
 
 
+# Every seat engages 1.5D except the swing stop, which shares the foot
+# screw's short #4-40 and is held to 1.0D (user decision, 2026-09-29).
+SEAT_MIN_ENGAGEMENT_D_DEFAULT = 1.5
+SEAT_MIN_ENGAGEMENT_D = {"swing stop": STOP_MIN_ENGAGEMENT_D}
+
+
 def require_blind_seat_fit(
     label: str,
     seat: HoleSpec,
@@ -656,9 +664,11 @@ def require_blind_seat_fit(
     *,
     tip_reserve: float = SEAT_TIP_RESERVE,
     band: float = SEAT_DEPTH_BAND,
+    min_engagement_d: float = SEAT_MIN_ENGAGEMENT_D_DEFAULT,
 ) -> None:
     """Keep a stock screw in full threads above a manufacturable tap lead,
-    with both printed depths at the worst case of their ``band``."""
+    with both printed depths at the worst case of their ``band``. A seat
+    engages ``min_engagement_d`` diameters (``SEAT_MIN_ENGAGEMENT_D``)."""
     if seat.kind not in ("tapped", "tapped_bottoming") or seat.end != "blind":
         raise AssertionError(f"{label}: base seat must be a native blind tap")
     thread_depth = seat.overrides_mm.get("ThreadDepth", seat.depth_mm)
@@ -676,14 +686,15 @@ def require_blind_seat_fit(
         raise AssertionError(
             f"{label}: less than one diameter of full-thread engagement"
         )
-    if engagement < 1.5 * diameter - 1e-9:
+    if engagement < min_engagement_d * diameter - 1e-9:
         raise AssertionError(
-            f"{label}: screw engages {engagement / diameter:.3f}D, under 1.5D"
+            f"{label}: screw engages {engagement / diameter:.3f}D, "
+            f"under {min_engagement_d:g}D"
         )
-    if thread_depth - band < 1.5 * diameter - 1e-9:
+    if thread_depth - band < min_engagement_d * diameter - 1e-9:
         raise AssertionError(
             f"{label}: full thread {thread_depth - band:.3f} at its printed low "
-            f"limit is under 1.5D ({1.5 * diameter:.3f})"
+            f"limit is under {min_engagement_d:g}D ({min_engagement_d * diameter:.3f})"
         )
     if thread_depth - band - engagement < tip_reserve - 1e-9:
         raise AssertionError(
@@ -718,7 +729,14 @@ for _label, _seat, _engagement in (
         NAMEPLATE_SCREW_LEN - nameplate_spec.PLATE_THICKNESS,
     ),
 ):
-    require_blind_seat_fit(_label, _seat, _engagement)
+    require_blind_seat_fit(
+        _label,
+        _seat,
+        _engagement,
+        min_engagement_d=SEAT_MIN_ENGAGEMENT_D.get(
+            _label, SEAT_MIN_ENGAGEMENT_D_DEFAULT
+        ),
+    )
 
 # Include each blind drill's deeper cylindrical cut and separate 118-degree
 # point in the upper-pad wall checks. Full-height cavity envelopes
@@ -1159,7 +1177,7 @@ async def build(adapter) -> dict[str, str]:
             "StopSeat",
             STOP_SEAT_SPEC,
             (STOP_SCREW_XZ,),
-            "swing-stop tapped seat (#8-32)",
+            f"swing-stop tapped seat ({STOP_THREAD})",
         ),
         (
             "BlockScrewHoles",

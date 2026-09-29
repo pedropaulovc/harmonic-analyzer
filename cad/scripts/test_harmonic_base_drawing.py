@@ -21,6 +21,10 @@ from cone_lock_knob_spec import COLLAR_DIA as KNOB_COLLAR_DIA
 from swing_stop_screw_spec import SHANK_DIA as STOP_SHANK_DIA
 
 
+def _min_engagement_d(label: str) -> float:
+    return part.SEAT_MIN_ENGAGEMENT_D.get(label, part.SEAT_MIN_ENGAGEMENT_D_DEFAULT)
+
+
 @pytest.mark.parametrize(
     ("label", "seat", "engagement", "kind", "lead_pitches"),
     (
@@ -68,7 +72,9 @@ def test_blind_seats_keep_stock_in_full_threads_above_the_tap_lead(
     label: str, seat, engagement: float, kind: str, lead_pitches: int
 ) -> None:
     assert seat.kind == kind
-    part.require_blind_seat_fit(label, seat, engagement)
+    part.require_blind_seat_fit(
+        label, seat, engagement, min_engagement_d=_min_engagement_d(label)
+    )
     band = part.SEAT_DEPTH_BAND
     thread_depth = seat.overrides_mm["ThreadDepth"]
     pitch = 25.4 / float(seat.size.rsplit("-", 1)[1])
@@ -81,7 +87,9 @@ def test_blind_seats_keep_stock_in_full_threads_above_the_tap_lead(
         seat, depth_mm=thread_depth + 2.0 * band + lead_pitches * pitch - 0.01
     )
     with pytest.raises(AssertionError, match="tap lead"):
-        part.require_blind_seat_fit(label, short_lead, engagement)
+        part.require_blind_seat_fit(
+            label, short_lead, engagement, min_engagement_d=_min_engagement_d(label)
+        )
 
 
 def test_foot_seat_names_its_bottoming_tap_runout() -> None:
@@ -199,13 +207,16 @@ def test_cone_lock_requires_plug_tap_lead_beyond_full_thread_depth() -> None:
         knob.require_seat_fit(seat, platform.PLATE_T, knob.STUD_LEN)
 
 
-def test_shared_stop_preserves_exposed_geometry_with_a_deeper_clear_seat() -> None:
+def test_foot_screw_sku_stop_clears_the_nominal_plate() -> None:
+    import foot_screw_spec as foot
     import swing_stop_screw_spec as stop
 
     stop.require_seat_fit(part.STOP_SEAT_SPEC, platform.PLATE_T)
-    assert stop.PROUD_LEN == pytest.approx(9.875)
-    assert stop.EMBED_LEN - stop.TIP_CHAMFER >= stop.SHANK_DIA
-    assert stop.PROUD_LEN - platform.PLATE_T - stop.UNDERHEAD_FILLET - 0.51 >= 1.0
+    # One SKU with the foot screw (user decision, 2026-09-29).
+    assert (stop.THREAD, stop.SHANK_LEN) == (foot.THREAD, foot.SHANK_LEN)
+    assert stop.PROUD_LEN == pytest.approx(6.675)
+    assert stop.EMBED_LEN - stop.TIP_CHAMFER >= 0.8 * stop.SHANK_DIA
+    assert stop.PROUD_LEN - platform.PLATE_T - stop.UNDERHEAD_FILLET >= 0.25
     assert part.STOP_SEAT_SPEC.overrides_mm["ThreadDepth"] - stop.EMBED_LEN >= 0.25
     assert part.STOP_DRILL_BOTTOM_WALL >= 1.5 * part.STOP_SCREW_HOLE_DIA
     assert part.STOP_NEAREST_CAVITY_WALL >= part.STOP_SCREW_HOLE_DIA
@@ -215,7 +226,7 @@ def test_shared_stop_rejects_the_former_shallow_receiver() -> None:
     from dataclasses import replace
     import swing_stop_screw_spec as stop
 
-    seat = replace(part.STOP_SEAT_SPEC, depth_mm=9.0, overrides_mm={"ThreadDepth": 6.0})
+    seat = replace(part.STOP_SEAT_SPEC, depth_mm=6.0, overrides_mm={"ThreadDepth": 2.9})
     with pytest.raises(AssertionError, match="bottoms"):
         stop.require_seat_fit(seat, platform.PLATE_T)
 
@@ -1377,7 +1388,15 @@ _PRE_BAND_SEATS = (
     ),
     ("cone pivot", part.PIVOT_SEAT_SPEC, part.PIVOT_THREAD_ENGAGEMENT, 9.775, 12.0),
     ("cone lock", part.LOCK_SEAT_SPEC, part.LOCK_STUD_LEN, 19.3, 25.65),
-    ("swing stop", part.STOP_SEAT_SPEC, part.STOP_ENGAGEMENT, 16.0, 20.0),
+    # The #4-40 stop at the pre-band sizing rule: thread = embed + 0.25,
+    # drill = thread + five pitches.
+    (
+        "swing stop",
+        part.STOP_SEAT_SPEC,
+        part.STOP_ENGAGEMENT,
+        part.STOP_ENGAGEMENT + 0.25,
+        part.STOP_ENGAGEMENT + 0.25 + 5.0 * 25.4 / 40.0,
+    ),
     ("spring foot", part.FOOT_SEAT_SPEC, part.FOOT_SCREW_LEN - part.SPRING_THICKNESS, 9.275, 11.3),
     ("pinion block", part.BLOCK_SEAT_SPEC, part.BLOCK_SCREW_LEN - part.BLOCK_HEIGHT, 12.75, 15.0),
 )
@@ -1396,8 +1415,10 @@ def test_pre_band_seat_depths_fail_at_the_printed_low_limit(
     # incomplete threads, as did four other seats; the pinion-block drill lost
     # its bottoming-tap lead at the worst case. Each old seat now fails.
     old = replace(seat, depth_mm=drill, overrides_mm={"ThreadDepth": thread})
-    with pytest.raises(AssertionError, match="bottoms|tap lead|under 1.5D"):
-        part.require_blind_seat_fit(label, old, engagement)
+    with pytest.raises(AssertionError, match=r"bottoms|tap lead|under [0-9.]+D"):
+        part.require_blind_seat_fit(
+            label, old, engagement, min_engagement_d=_min_engagement_d(label)
+        )
 
 
 def test_seat_depths_derive_from_engagement_band_and_tap_lead() -> None:
