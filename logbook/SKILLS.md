@@ -22,7 +22,8 @@ failure mode that would make the book worthless.
 | Dividing head, indexing, co-phasing | M09 | `cylinder-gear` notches ×20, every gear blank | ch. 15 Indexing |
 | Form-cutter generation (Eureka) | M10 | the cutters themselves — **nothing in the gear train without them** | ch. 16 Making your own gear cutters |
 | Gear cutting and inspection | M10 | `cone-gear` ×20, `cylinder-gear` ×20, `crank-pinion`, `alignment-pinion`, `rack-pinion`, `transgear-*`, `chain-sprocket`, `platen-rack` | ch. 17 Cutting the gears |
-| Soft and silver soldering | M11 | cone gear set → shaft; wire terminations | ch. 18 Soldering |
+| D-bore fitting, gear-stack assembly | M11 | 64T + cone gear set → D-flat shaft | ch. 18 Fitting D-bores and the cone gear stack |
+| Silver soldering | M11 | `crank-pin-ring` ends | — |
 | Draw filing, polishing, blacking | M11 | every visible part | ch. 19 Finishing |
 | Assembly, alignment, calibration | — (learned on the machine) | the whole analyzer | ch. 33–35 |
 

@@ -43,7 +43,7 @@ A four-hole pattern within 0.1 mm true position, and a 1/2-13 UNC-2B thread cut 
 
 ## Notes
 
-The support feet are one tapped joint among several; the knife-mount hanger-stud seat is another (`cad/docs/machining-dfm.md`). There are no keyways: gears are soldered or run free on an arbor.
+The support feet are one tapped joint among several; the knife-mount hanger-stud seat is another (`cad/docs/machining-dfm.md`). There are no keyways: gears seat on D-flats, are pinned, or run free on an arbor.
 
 ## Sessions
 
