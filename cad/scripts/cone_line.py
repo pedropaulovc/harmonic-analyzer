@@ -20,8 +20,6 @@ import math
 import _config
 from cone_pivot_post_installation import DRUM_X, GEAR_AXIS_SHIFT
 from cone_tip_block_spec import BLOCK_Z as TIP_BLOCK_Z
-from cone_tip_bushing_spec import LENGTH as BUSH_LEN
-from cone_stack_end_play import TIP_BLOCK_FEELER
 
 Y_BASE_TOP = 50.8  # harmonic-base top face
 Y_DRIVE = Y_BASE_TOP + 6.35 + 33.368  # 90.518: v2 casting's journal axis
@@ -116,13 +114,25 @@ POST_STATION = -39.90136099792956
 X_CRANK = cone_station(POST_STATION)[0]  # -129.336: Ry180 v2 installation
 Y_CRANK = Y_BASE_TOP + 6.35 + 72.7  # 129.850: v2 cast-in crank-axis height
 
-# T006's north face is the fixed layout reference. MHA-096 bears on the
-# gear stack; slide the block south until a 0.45 feeler nips between them.
-# The base's pivot seat is independent of that fit-up, so it stays put.
+# T006 is the reference gear for the tip-end stack: its north face is the
+# fixed layout reference the MHA-096 stack collar is feeler-set off.
 T006_CENTER_STATION = SHAFT_T120_STATION + GEAR_AXIS_SHIFT + 19 * SEAT_PITCH
 T006_NORTH_FACE = T006_CENTER_STATION + CONE_FACE_STATION_REFERENCE / 2.0
-TIP_BLOCK_STATION = T006_NORTH_FACE + BUSH_LEN + TIP_BLOCK_FEELER + TIP_BLOCK_Z / 2.0
-# Base pivot-seat layout: T006 north face + 23 mm, independent of the block.
+# The swing platform pivots about a vertical axis here, just north of the
+# shaft's rear end; the base's pivot-screw seat sits directly under it.  The
+# station is the established layout, 23.0 north of T006's face; the base
+# casting's seat fixes it, so the tip block no longer sets it.
 PIVOT_STATION = T006_NORTH_FACE + 23.0
+# User ruling 2026-09-29 (eight-views-4.png): the tip block is a straight
+# prism held by one screw in a fixed platform hole under its centre.  Its
+# north face stands TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET south of the pivot,
+# 0.8125 off the pivot screw's head at nominal -- the gap
+# build_drive_train_assembly proves at print-worst -- and the block grows
+# SOUTH from there (its depth closes the adjuster's embed window), so the
+# centre, and the platform hole under it, follow the depth.
+TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET = 5.575
+TIP_BLOCK_NORTH_FACE = PIVOT_STATION - TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET
+TIP_BLOCK_STATION = TIP_BLOCK_NORTH_FACE - TIP_BLOCK_Z / 2.0
+TIP_BLOCK_PIVOT_OFFSET = PIVOT_STATION - TIP_BLOCK_STATION
 _PIVOT = cone_station(PIVOT_STATION)
 PIVOT_XZ = (_PIVOT[0], _PIVOT[2])

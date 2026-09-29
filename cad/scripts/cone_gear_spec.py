@@ -135,10 +135,10 @@ BORE_DIA = 0.375 * MM_PER_IN  # 9.525 (3/8") at T120; smaller on the tip gears
 # on MHA-021 sets every station (cone_gear_stack); no gear is bonded.  The
 # face is SEAT_PITCH floored to the four places it prints, so the modelled
 # stack closes without interference.  Every gear grew SOUTH: its north face
-# stays on the station layout (cone_line), so T006's north face -- the tip
-# bushing's seat -- does not move.  The band is the cylinder bank's L20 d'
-# rule (+/-0.025 per gear, the 20-gear stack accepted at +/-0.20), so it is
-# faced to a micrometer on both sides.
+# stays on the station layout (cone_line), so T006's north face -- the
+# datum the MHA-096 stack collar is feelered off -- does not move.  The band
+# is the cylinder bank's L20 d' rule (+/-0.025 per gear, the 20-gear stack
+# accepted at +/-0.20), so it is faced to a micrometer on both sides.
 SEAT_PITCH = 6.888787817263312  # cone_line.SEAT_PITCH, pinned by test
 FACE_WIDTH = math.floor(SEAT_PITCH * 1e4) / 1e4  # 6.8887
 FACE_WIDTH_BAND = (0.025, -0.025)

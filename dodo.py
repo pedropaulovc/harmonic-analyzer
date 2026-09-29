@@ -2999,8 +2999,9 @@ def task_check():
         # Same failure shape: never enrolled, so the U28 re-lay (997f3534) left
         # its three drive-train support pins red with every gate green.
         SCRIPTS_DIR / "test_drive_train_support_layout.py",
-        # The cone tip block's shim, post-fillister and heel-relief contracts
-        # (I20/I22/I24/I31) that build_drive_train_assembly asserts at import.
+        # The cone tip block's hold-down, embed-window and collar-air contracts
+        # (I20/I22/I24/I31; prism ruling 2026-09-29) that
+        # build_drive_train_assembly asserts at import.
         SCRIPTS_DIR / "test_drive_train_cone_tip_holddown.py",
         # dimensions.yaml is read by no part, so only this test keeps its
         # alignment-pinion record pinned to the CAD constants (#814).

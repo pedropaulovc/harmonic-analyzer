@@ -356,27 +356,6 @@ def test_nothing_else_on_the_casting_carries_a_band() -> None:
     assert not hasattr(spec, "CRANK_BORE_TOLERANCE_MM")
 
 
-def test_the_cone_axis_height_carries_the_shim_packs_band() -> None:
-    """The post sets the cone shaft's height and MHA-141's shim pack takes up
-    what it leaves; the pack's range holds 0.25 for the post.  The .XX grade
-    (+/-0.51) overruns that, so the height carries its own band -- the
-    loosest the pack allows -- on the model dimension, where the sheet
-    imports it, and nowhere as a literal or a frame."""
-    assert spec.JOURNAL_AXIS_HEIGHT_TOLERANCE_MM == 0.25
-    # The title block's general grades by places: .X, .XX, .XXX.
-    general = {1: 0.8, 2: 0.51, 3: 0.13}
-    assert spec.JOURNAL_AXIS_HEIGHT_TOLERANCE_MM < general[
-        spec.DRAWING_PRECISION_BY_NAME["JournalAxisY"]
-    ]
-    assert spec.GEOMETRIC_TOLERANCES_MM == {}
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert re.search(
-        r'set_dimension_symmetric_tolerance\(\s*adapter,\s*"ConeBossProfile",'
-        r'\s*"JournalAxisY",\s*JOURNAL_AXIS_HEIGHT_TOLERANCE_MM,?\s*\)',
-        source,
-    )
-
-
 def test_the_plan_angle_is_model_geometry_not_sheet_text() -> None:
     """The 12.5182 deg plan incline is a DRIVING model dimension.
 

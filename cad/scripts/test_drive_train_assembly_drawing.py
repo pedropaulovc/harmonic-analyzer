@@ -24,14 +24,6 @@ RIG_STEPS = drawing.rig_steps(pivot_blocks=2, cams=2, slotted=4)
 # Installation interfaces the package may cite without owning a BOM row.
 # Step 10 sets the channel's north MHA-123 on the frame's MHA-089 (#936 P1 b).
 EXTERNAL_NUMBERS = frozenset({"MHA-035", "MHA-089", "MHA-123"})
-# Ruled hardware the sequence already names while its BOM row, cluster stem and
-# explode step wait for the drive-train integrator's single re-key (Main,
-# 2026-09-23: drawing-only rulings commit). The integration commit that adds
-# a row drops its number here; the test below fails once a row lands anyway.
-# MHA-139 (crank hub) landed with #906, MHA-141/142 with the cone-tip
-# integration; MHA-140 (the I31 hold-down, placed once #925's I31 plate is
-# under it) waits.
-PRE_REGISTERED_NUMBERS = frozenset({"MHA-140"})
 
 
 def _builder_stems() -> set[str]:
@@ -134,8 +126,7 @@ def test_package_text_cites_only_bom_or_external_part_numbers() -> None:
     )
     cited = set(re.findall(r"MHA-\d{3}", "\n".join(texts)))
     bom = set(drawing.BOM_PART_NUMBERS.values())
-    assert cited <= bom | EXTERNAL_NUMBERS | PRE_REGISTERED_NUMBERS
-    assert not PRE_REGISTERED_NUMBERS & bom, "integrated: drop PRE_REGISTERED_NUMBERS"
+    assert cited <= bom | EXTERNAL_NUMBERS
 
 
 def test_note_lines_fit_a_half_sheet_field() -> None:

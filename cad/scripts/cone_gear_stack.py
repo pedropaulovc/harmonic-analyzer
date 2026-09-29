@@ -12,8 +12,8 @@ before it, so the stack itself sets every station.
 * Each cone gear (MHA-013) is one seat pitch thick, grown SOUTH from the
   north face every station was laid out on, so T120 bears on the 64T and
   each gear on the one before it, T006 last.
-* The cone tip bushing (MHA-096) bears on T006's north face, and the tip
-  block (MHA-092) is feeler-set off the bushing (cone_stack_end_play).
+* The MHA-096 stack collar is set one feeler off T006's north face and
+  locked on the shaft, retaining the stack's float (cone_stack_end_play).
 * Every gear face prints +/-0.025 (the cylinder bank's L20 d' rule, user
   ruling 2026-09-28).  A fit-up acceptance on the measured 20-gear stack
   (STACK_L20_ACCEPT, +/-0.20) caps the cumulative deviation; a part of the

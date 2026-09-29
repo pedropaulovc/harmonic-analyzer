@@ -66,7 +66,8 @@ from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 from _drive_train_balloon_anchors import DRIVE_TRAIN_BALLOON_ANCHORS
 from cone_swing_platform_spec import POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT
 from cone_gear_stack import COUNT as CONE_GEAR_COUNT, STACK_L20_ACCEPT
-from cone_stack_end_play import MIN_END_PLAY, STACK_FLOAT, TIP_BLOCK_FEELER
+from cone_stack_end_play import COLLAR_FEELER, SHAFT_END_PLAY
+from cone_tip_block_spec import ADJUSTER_ENGAGEMENT_ASSEMBLY_FACT
 from crank_pinion_spec import SEAT_FEELER_MM as PINION_SEAT_FEELER
 from drive_train_assembly_spec import (
     CLUSTERS,
@@ -328,10 +329,10 @@ BOM_PART_NUMBERS = {
     "cone-swing-platform": "MHA-091",
     "cone-pivot-post": "MHA-016",
     "cone-tip-block": "MHA-092",
-    "cone-tip-bushing": "MHA-096",
+    "cone-tip-collar": "MHA-096",
     "cone-tip-adjuster": "MHA-097",
     "cone-tip-pinch-screw": "MHA-098",
-    "cone-tip-shim": "MHA-141",
+    "cone-tip-block-screw": "MHA-140",
     "post-mount-screw": "MHA-142",
     "cone-lock-knob": "MHA-093",
     "cone-pivot-screw": "MHA-094",
@@ -378,10 +379,10 @@ BOM_DESCRIPTIONS = {
     "cone-swing-platform": "CONE SWING PLATFORM",
     "cone-pivot-post": "CONE PIVOT POST AND CRANK COLUMN",
     "cone-tip-block": "CONE TIP BLOCK",
-    "cone-tip-bushing": "CONE TIP BUSHING",
+    "cone-tip-collar": "1/16 SHAFT COLLAR, MCMASTER 9414T1",
     "cone-tip-adjuster": "CUP-TIP SET SCREW, MCMASTER 94025A164",
     "cone-tip-pinch-screw": "#4-40 FILLISTER SCREW, MCMASTER 91794A112",
-    "cone-tip-shim": "CONE TIP SHIM PACK, 1.10 NOMINAL",
+    "cone-tip-block-screw": "#4-40 X 3/8 SHCS, MCMASTER 91251A108",
     "post-mount-screw": "1/4-20 FILLISTER SCREW, MSC 40923898",
     "cone-lock-knob": "KNURLED THUMB SCREW, MCMASTER 93585A190",
     "cone-pivot-screw": "SHOULDER SCREW, MCMASTER 91829A560",
@@ -435,16 +436,6 @@ ASSEMBLED_HEADING = (
     f"FULL DETAIL: SHEET {FULL_DETAIL_SHEET}."
 )
 
-# MHA-014's end play at step 3.  Backing the cup screw off lets the collar
-# carry the stack north toward the tip block, so the top of the band spends the
-# stack's float: it stops where the tightest feeler setting still leaves the
-# bushing MIN_END_PLAY off the block, with no MARGIN_SPARE at that corner (user
-# ruling 2026-09-29, Codex P1 on #1128, over a thicker feeler that would move
-# the block and lengthen the shaft).  Derived here, not in cone_stack_end_play:
-# that module sits in the recipe closure of every cone_line reader, and this
-# sheet is the band's only consumer.  0.05: the shaft never runs clamped.
-SHAFT_END_PLAY = (0.05, STACK_FLOAT[0] - MIN_END_PLAY)  # (0.05, 0.25)
-
 
 CONE_CRANK_STEPS = "\n".join(
     (
@@ -468,25 +459,27 @@ CONE_CRANK_STEPS = "\n".join(
         "   MHA-142 FROM TOP, EACH CUT TO FIT: FLUSH TO 0.3 SHORT OF",
         "   MHA-091 UNDERSIDE, NEVER PROUD (NOMINAL LENGTH 86.0).",
         "   CHAMFER ENDS; " + POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT,
-        # U30 (user, 2026-09-23, option (a)): one #6-32 button-head screw (W22)
-        # up through the MHA-091 slot, height and side set by the shim pack at
-        # fit-up. Wording from swing (dt-tip-block-attachment-options-20260923.md
-        # section 2(a)).
-        "   JOURNAL MHA-014 IN MHA-016. SLIP MHA-096 ON AGAINST T006;",
-        "   PUSH THE STACK ONTO THE MHA-014 COLLAR. SET MHA-092 ON",
-        "   ITS MHA-141 SHIM PACK IN THE MHA-091 SLOT. LAY A",
-        f"   {TIP_BLOCK_FEELER:.2f} FEELER ON MHA-096; SLIDE MHA-092 ONTO IT UNTIL",
-        "   IT NIPS; SNUG MHA-140. RUN MHA-097 IN UNTIL ITS CUP SEATS",
-        "   THE TIP. CHANGE SHIMS UNTIL MHA-014 SPINS FREE, WITH NO",
-        "   TIGHT SPOT AT THE MHA-016 JOURNAL; SNUG MHA-140 AND",
-        "   RECHECK. RECORD THE SHIM STACK.",
-        # U32 (user, 2026-09-23): option 1A turn-set, dt-pending-rulings
-        # packet section 1. Worded without the pitch so it survives E11
-        # (MHA-097 5/16-18 -> #10-32: 1/8 turn is ~0.18 -> ~0.10).
-        "3. THREAD MHA-097 INTO MHA-092 UNTIL MHA-014 JUST STOPS SHUTTLING",
+        # User ruling 2026-09-29 (eight-views-4 photo): MHA-092 is a prism
+        # standing directly on MHA-091, held by one #4-40 socket head cap
+        # screw up from under the plate through its counterbored hole.  The
+        # MHA-096 collar goes on loose here; step 3 sets it.  Whether the post
+        # pattern itself can be assembled is issue #1134 (pre-existing).
+        "   JOURNAL MHA-014 IN MHA-016. SLIP MHA-096 ON THE TIP STUB.",
+        "   STAND MHA-092 ON MHA-091 AT ITS HOLE; MHA-140 UP FROM",
+        "   UNDER THE PLATE THROUGH THE COUNTERBORE INTO THE MHA-092 FOOT,",
+        "   SNUG.",
+        # User ruling 2026-09-29: the stack's north float is held on the
+        # shaft by MHA-096, set off T006 by one feeler and locked on the
+        # D-flat; the cup screw alone then sets MHA-014's end play
+        # (cone_stack_end_play).  U32 (user, 2026-09-23): option 1A turn-set,
+        # worded without the pitch (#10-32: 1/8 turn is ~0.10).
+        "3. PUSH THE STACK ONTO THE MHA-014 COLLAR. PUSH MHA-096 ONTO A",
+        f"   {COLLAR_FEELER:.2f} FEELER ON T006; LOCK ITS SET SCREW ON THE FLAT.",
+        "   THREAD MHA-097 INTO MHA-092 UNTIL MHA-014 JUST STOPS SHUTTLING",
         "   AND STILL TURNS FREELY; BACK OFF 1/8 TURN; TIGHTEN",
         "   MHA-098 ACROSS THE SLIT. END PLAY "
         f"{SHAFT_END_PLAY[0]:.2f}-{SHAFT_END_PLAY[1]:.2f}, BY FEEL OR INDICATOR.",
+        "   MHA-097 " + ADJUSTER_ENGAGEMENT_ASSEMBLY_FACT,
         # User ruling 2026-09-28: the crank journal runs directly in the post;
         # the centres are fixed, and the only mesh requirement is no binding.
         "4. FIT MHA-026 DIRECTLY IN THE MHA-016 CRANK BORE. SLIDE MHA-025",

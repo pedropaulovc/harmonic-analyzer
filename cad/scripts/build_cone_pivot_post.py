@@ -813,10 +813,10 @@ async def build(adapter: Any) -> dict[str, str]:
     # Four accuracy features on this casting: both running bores carry the
     # band that closes the `shaft_in_bushing` fit class against their turned
     # shafts (cad/docs/tolerance-policy.md), the spacing between them the
-    # 16T:64T mesh band, and the cone axis above the foot the tip block's
-    # shim-pack band.  Everything else -- cast body and head diameters, boss
-    # diameters, boss extents, mounting-hole stations -- runs at the title
-    # block's general grade.
+    # 16T:64T mesh band, and the cone axis above the foot the band that keeps
+    # the tip's stub inside the adjuster's cup.  Everything else -- cast body
+    # and head diameters, boss diameters, boss extents, mounting-hole
+    # stations -- runs at the title block's general grade.
     set_dimension_bilateral_tolerance(
         adapter, "CrankBoreProfile", "CrankBoreDia", *deviations(RUNNING_BORE_BAND)
     )
@@ -834,7 +834,7 @@ async def build(adapter: Any) -> dict[str, str]:
         "CrankAboveCone",
         *deviations(CRANK_ABOVE_CONE_BAND),
     )
-    # The shim-pack band on the cone-axis height (derivation in
+    # The cup-capture band on the cone-axis height (derivation in
     # cone_pivot_post_spec.JOURNAL_AXIS_HEIGHT_TOLERANCE_MM).
     set_dimension_symmetric_tolerance(
         adapter,

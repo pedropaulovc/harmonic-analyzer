@@ -10,49 +10,68 @@ from _fit_limits import deviations
 from _gtol_spec import PlanarFace
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
 from _surface_finish import SEAT_UM, SurfaceFinishControl
-from cone_stack_end_play import TIP_BLOCK_FEELER_BAND
 
 
 # Small black-steel clamp block on the swing platform that carries the axial
 # end-play adjuster. See build_cone_tip_block.py for the derivation; this module
 # is the drawing's single source of the marked dimensions.
-# U24b (2026-09-23): 15 wide so the adjuster thread's side walls keep 2.05 at
-# the printed width (.X) and passage-centre (.XX) bands.
+#
+# User ruling (2026-09-29, eight-views-4.png lower right: a plain black
+# rectangular block standing directly on the swing platform, a round-head
+# pinch screw on its side face, the shaft tip entering it): the block is a
+# STRAIGHT PRISM standing on the platform top, held by one #4-40 socket head
+# cap screw rising from under the platform into a blind tapped hole in the
+# foot.  Its station is fixed by that hole, so every fit closes by print
+# tolerance (build_drive_train_assembly proves the cross-part stacks against
+# the bands exported here).
+# U24b (2026-09-23): the adjuster thread's side walls keep 2.0 at the printed
+# width (.X) and passage-centre bands.
 # r3 (user ruling, Main option (a), 2026-09-25): 17 wide, the narrowest .X
 # width whose lower limit keeps the 5/8 pinch screw (McMaster 91794A112)
 # PINCH_SCREW_RECESS_MM short of the -X face (asserted with the screw below).
 BLOCK_X = 17.0  # plan width across the shaft
-BLOCK_Z = 12.0  # plan depth along the shaft
-# User ruling U30 (2026-09-23): the block stands on a blackened shim pack
-# (1.10 nominal, set at fit-up) and is held by one hidden #6-32 screw from
-# under the swing platform. The whole block therefore drops 1.10 below the
-# cone axis: every feature keeps its place relative to the adjuster axis, and
-# the shim restores the drive height in the assembly. The 2026-09-21 DFM
+# Plan depth along the shaft, printed .XXX.  The north face stands the pivot
+# screw's head gap off the pivot (cone_line.TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET)
+# and the block grows SOUTH (user ruling 2026-09-29): the depth must hold the
+# adjuster's embed window (below) open over the tip's axial stack, and stay
+# short enough that the MHA-096 stack collar never reaches the south face
+# (build_drive_train_assembly's collar-to-block air).  9.75 sits between the
+# two at print-worst.
+BLOCK_Z = 9.75
+# The adjuster axis is the cone journal axis: 33.368 above the platform top,
+# on which the block's foot now stands directly.  The 2026-09-21 DFM
 # correction still stands relative to that axis: free material above the
 # slit floor, and the pinch screw located from the adjuster axis.
-SHIM_NOMINAL = 1.10
-ADJUSTER_AXIS_HEIGHT = 33.368 - SHIM_NOMINAL  # 32.268 above the foot
+ADJUSTER_AXIS_HEIGHT = 33.368
 # User ruling U24b (2026-09-23, W-target): the pinch screw sits 8.85 above the
 # adjuster axis and the top 14.56 above it, so the slit-mouth web between the
 # pinch clearance hole and the adjuster thread root, and the ligament over the
 # pinch hole, both keep 2.0 after edge breaks at the printed limits.
 # r3 (codex FIX review of 72ab, 2026-09-25): the print locates the pinch hole
 # straight from the foot (PinchHeight, .XX) rather than chaining it off the
-# adjuster axis, and the axis height and the overall height drop to the .X
-# envelope grade: the fit-up shim takes up the axis band, and every web below
-# closes on those grades.  PINCH_RISE stays the design offset; it no longer
-# prints.
+# adjuster axis.  PINCH_RISE stays the design offset; it no longer prints.
 TOP_ABOVE_AXIS = 14.56
-BLOCK_HEIGHT = ADJUSTER_AXIS_HEIGHT + TOP_ABOVE_AXIS  # 46.828
+BLOCK_HEIGHT = ADJUSTER_AXIS_HEIGHT + TOP_ABOVE_AXIS  # 47.928
 PINCH_RISE = 8.85
-PINCH_HEIGHT = ADJUSTER_AXIS_HEIGHT + PINCH_RISE  # 41.118 above the foot
-# The printed grade of every dimension a stack below reads; DRAWING_PRECISION
-# must carry the same (checked at the end of this module).
-BLOCK_WIDTH_PLACES = 1
+PINCH_HEIGHT = ADJUSTER_AXIS_HEIGHT + PINCH_RISE  # 42.218 above the foot
+# The printed grade of every dimension a stack reads; DRAWING_PRECISION must
+# carry the same (checked at the end of this module).  Two dimensions carry
+# an explicit band instead of the title block's: the axis height (the tip's
+# vertical capture in the adjuster cup, build_drive_train_assembly) and the
+# hold-down tap's two stations (the pivot-head, embed and lateral stacks).
+# The width prints .XXX: PassageCenter and FootTapX locate from the -X face,
+# so the width's band lands on the +X face, which stands over the plate's
+# narrow west edge; at .X that face could overhang it at the printed limits
+# (build_drive_train_assembly's print-worst containment), at .XX it keeps
+# only 0.27 of the 0.50 it needs.
+BLOCK_WIDTH_PLACES = 3
+BLOCK_DEPTH_PLACES = 3
 BLOCK_HEIGHT_PLACES = 1
-AXIS_HEIGHT_PLACES = 1
+AXIS_HEIGHT_PLACES = 3
+AXIS_HEIGHT_TOL_MM = 0.10
 PINCH_HEIGHT_PLACES = 2
-PASSAGE_CENTER_PLACES = 2
+PASSAGE_CENTER_PLACES = 3
+PINCH_DEPTH_PLACES = 1
 SLIT_W_PLACES = 2
 SLIT_DEPTH_PLACES = 1
 SLIT_FLOOR = ADJUSTER_AXIS_HEIGHT - 0.65
@@ -62,13 +81,16 @@ SLIT_DEPTH = BLOCK_HEIGHT - SLIT_FLOOR
 # 94025A164) in a thread tapped THROUGH the block, a 90-degree countersink at
 # both mouths, and no block growth.  A through tap has no floor to break out
 # and no tap lead to deduct; the shaft tip enters through the same thread.
-# The cup rim sits nominally ADJUSTER_EMBED in from the north face. The
-# bushing and gear stack locate the block via a feeler, so the installed
-# embed must absorb the accepted stack, printed axial sizes and feeler-setting
-# error; it is no longer set by following the shaft tip.
+# ADJUSTER_EMBED is the depth from the north face at which the cup's apex
+# would meet the tip; the tip's flat end seats on the cup wall one seat depth
+# (stub radius / tan 45 deg) short of the apex, so the rim, and the thread
+# engagement, sit that much shallower.  User ruling 2026-09-29: the block is
+# fixed by its hold-down, so the tip's axial scatter lands on that
+# engagement; build_drive_train_assembly sums the stack and asserts it stays
+# inside ADJUSTER_EMBED_WINDOW.  The value centres the engagement there.
 ADJUSTER_THREAD = "#10-32"
 ADJUSTER_SCREW_LENGTH = 9.525
-ADJUSTER_EMBED = 9.5
+ADJUSTER_EMBED = 8.17
 # 90-degree countersink on each mouth to Ø5.0, just over the 4.826 major, so
 # the first thread starts full rather than on a feather edge (Main,
 # 2026-09-24).  Its depth is the 45-degree break on the tap drill.
@@ -77,16 +99,6 @@ ADJUSTER_CSK_DIA = 5.0
 # envelope the shaft tip passes through.
 ADJUSTER_MINOR_MIN_DIA = 0.1560 * 25.4
 SHAFT_PASSAGE_DIA = ADJUSTER_MINOR_MIN_DIA
-# I31 option 1 (Main, 2026-09-25): the block is held down through a south
-# foot flange.  One #6-32 x 5/8 hex-head screw (McMaster 93075A150) rises from
-# the swing platform's counterbored lateral slot, through the fit-up shim pack
-# and an axial slot in the flange, into a #6-32 nylon-insert locknut
-# (McMaster 90631A007) on the flange top.  The plate slot lets the block move
-# across the cone axis, the flange slot along it, so the block sits wherever
-# the shaft tip puts it and the screw clamps it there; the counterbore slot's
-# walls hold the hex head, so the nut is turned from above alone.
-FOOT_THREAD = "#6-32"
-FOOT_SHIM_RANGE_MM = (0.05, 2.20)
 PINCH_THREAD = "#4-40"  # cross-bore tapped hole that squeezes the top slit
 ADJUSTER_BORE_SPEC = HoleSpec("tapped", ADJUSTER_THREAD)
 ADJUSTER_BORE_DIA = blind_cut_dia_mm(ADJUSTER_BORE_SPEC)
@@ -105,8 +117,7 @@ PINCH_CLEARANCE_SPEC = HoleSpec(
 PINCH_CLEARANCE_DIA = blind_cut_dia_mm(PINCH_CLEARANCE_SPEC)
 
 # Prove every web against what the PRINT permits, not just nominal CAD (U27:
-# 2.0 target, 1.5 floor, at the worst case of the printed bands).  Relative
-# stations chain from the adjuster axis: axis, rise and height all print .XX.
+# 2.0 target, 1.5 floor, at the worst case of the printed bands).
 _GENERAL_1PL_MM = float(str(_config.title_block("linear_1pl")["display"]).lstrip("±"))
 _GENERAL_2PL_MM = float(str(_config.title_block("linear_2pl")["display"]).lstrip("±"))
 _GENERAL_3PL_MM = float(str(_config.title_block("linear_3pl")["display"]).lstrip("±"))
@@ -128,10 +139,15 @@ def _printed_limits(nominal: float, places: int) -> tuple[float, float]:
     return printed + lower, printed + upper
 
 
-# r3 (Main, 2026-09-25): PassageCenter -- and FlangeSlotX with it -- prints
-# from the -X (west) face.  The +X (east) face carries only the pinch screw's
-# head, so the width's .X band lands on that side, and the west half, which
-# the swing platform's trimmed north-west corner bounds, keeps the .XX band
+def printed_band_mm(places: int) -> float:
+    """Half-width of the title block's general band at ``places`` decimals."""
+    return _BAND_BY_PLACES[places]
+
+
+# r3 (Main, 2026-09-25): PassageCenter prints from the -X face, which the
+# plate frame puts on the east.  The +X (west) face carries only the pinch
+# screw's head, so the width's band lands on that side; it prints .XXX
+# because the swing platform's trimmed west edge bounds it there
 # (build_drive_train_assembly asserts the print-worst containment).
 XDatumFace = Literal["-X", "+X"]
 PASSAGE_CENTER_DATUM: XDatumFace = "-X"
@@ -139,9 +155,9 @@ PASSAGE_CENTER_DATUM: XDatumFace = "-X"
 
 def worst_half_widths_mm(datum: XDatumFace) -> dict[XDatumFace, float]:
     """Farthest each side face can stand from the adjuster axis at the
-    printed limits, with PassageCenter (.XX) measured from ``datum``: that
-    side is PassageCenter's upper limit, the other the width's upper limit
-    less PassageCenter's lower."""
+    printed limits, with PassageCenter measured from ``datum``: that side is
+    PassageCenter's upper limit, the other the width's upper limit less
+    PassageCenter's lower."""
     if datum not in ("-X", "+X"):
         raise ValueError(f"unknown PassageCenter datum face {datum!r}")
     passage = _printed_limits(BLOCK_X / 2.0, PASSAGE_CENTER_PLACES)
@@ -153,7 +169,6 @@ def worst_half_widths_mm(datum: XDatumFace) -> dict[XDatumFace, float]:
 
 
 WORST_HALF_WIDTH_MM = worst_half_widths_mm(PASSAGE_CENTER_DATUM)
-
 
 # Title block: REMOVE BURRS AND BREAK SHARP EDGES R0.25 OR CHAMFER 0.25 MAX.
 # Where a web ends in two exposed edges (the slit mouth, the pinch-hole mouth
@@ -175,7 +190,10 @@ _worst_clearance_radius = (
 _min_slit_half = _printed_limits(SLIT_W, SLIT_W_PLACES)[0] / 2.0
 _adjuster_major_radius = THREAD_MAJOR_MM[ADJUSTER_THREAD] / 2.0
 _pinch_major_radius = THREAD_MAJOR_MM[PINCH_THREAD] / 2.0
-_axis_limits = _printed_limits(ADJUSTER_AXIS_HEIGHT, AXIS_HEIGHT_PLACES)
+_axis_limits = (
+    ADJUSTER_AXIS_HEIGHT - AXIS_HEIGHT_TOL_MM,
+    ADJUSTER_AXIS_HEIGHT + AXIS_HEIGHT_TOL_MM,
+)
 _pinch_limits = _printed_limits(PINCH_HEIGHT, PINCH_HEIGHT_PLACES)
 _height_limits = _printed_limits(BLOCK_HEIGHT, BLOCK_HEIGHT_PLACES)
 # Both stations are located from the foot, so the pinch centre can sit as low
@@ -199,16 +217,16 @@ WORST_TOP_LIGAMENT_MM = (
     - _worst_clearance_radius
     - 2.0 * EDGE_BREAK_MAX_MM
 )
+_width_limits = _printed_limits(BLOCK_X, BLOCK_WIDTH_PLACES)
+_depth_limits = _printed_limits(BLOCK_Z, BLOCK_DEPTH_PLACES)
 WORST_ADJUSTER_SIDE_LIGAMENT_MM = (
-    round(BLOCK_X, 1)
-    - _GENERAL_1PL_MM
-    - (round(BLOCK_X / 2.0, 2) + _GENERAL_2PL_MM)
+    _width_limits[0]
+    - _printed_limits(BLOCK_X / 2.0, PASSAGE_CENTER_PLACES)[1]
     - _root_r
 )
 WORST_PINCH_DEPTH_LIGAMENT_MM = (
-    round(BLOCK_Z, 1)
-    - _GENERAL_1PL_MM
-    - (round(BLOCK_Z / 2.0, 1) + _GENERAL_1PL_MM)
+    _depth_limits[0]
+    - _printed_limits(BLOCK_Z / 2.0, PINCH_DEPTH_PLACES)[1]
     - _worst_clearance_radius
 )
 for _name, _web in (
@@ -221,23 +239,6 @@ for _name, _web in (
         raise AssertionError(f"{_name} is {_web:.3f} at the printed limits (< 2.0, U27)")
 if WORST_SCREW_ENVELOPE_GAP_MM <= 0.0:
     raise AssertionError("pinch screw can collide with the installed adjuster")
-# Fit-up: the shim pack sets the adjuster axis on the shaft axis, so its range
-# takes up the printed AxisHeight band either way, plus FIT_UP_SHIM_MARGIN_MM
-# for the platform-side terms (build_drive_train_assembly asserts the pivot
-# post's journal position tolerance fits inside it).
-FIT_UP_SHIM_MARGIN_MM = 0.25
-FIT_UP_SHIM_NEEDED_MM = (
-    SHIM_NOMINAL - (ADJUSTER_AXIS_HEIGHT - _axis_limits[0]) - FIT_UP_SHIM_MARGIN_MM,
-    SHIM_NOMINAL + (_axis_limits[1] - ADJUSTER_AXIS_HEIGHT) + FIT_UP_SHIM_MARGIN_MM,
-)
-if (
-    FIT_UP_SHIM_NEEDED_MM[0] < FOOT_SHIM_RANGE_MM[0] - 1e-9
-    or FIT_UP_SHIM_NEEDED_MM[1] > FOOT_SHIM_RANGE_MM[1] + 1e-9
-):
-    raise AssertionError(
-        f"shim range {FOOT_SHIM_RANGE_MM} cannot take up the printed axis "
-        f"height band: needs {FIT_UP_SHIM_NEEDED_MM[0]:.3f}..{FIT_UP_SHIM_NEEDED_MM[1]:.3f}"
-    )
 # The slit must open into the adjuster thread or its jaws never grip it: the
 # slit floor (SlitDepth down from the top) stays under the tap-drill crown
 # (AxisHeight up from the foot) at the printed extremes.  Below the thread the
@@ -266,7 +267,6 @@ if WORST_SLIT_BREAKTHROUGH_MM < SLIT_BREAKTHROUGH_MARGIN_MM - 1e-9:
 # inside the tap drill already through it.
 PINCH_BREAKTHROUGH_MARGIN_MM = 0.25
 DRILL_POINT_ANGLE_DEG = 118.0
-_width_limits = _printed_limits(BLOCK_X, BLOCK_WIDTH_PLACES)
 WORST_PINCH_NEAR_WALL_MM = (
     max(worst_half_widths_mm(datum)["+X"] for datum in ("-X", "+X"))
     - _min_slit_half
@@ -330,245 +330,142 @@ if WORST_PINCH_TIP_RECESS_MM < PINCH_SCREW_RECESS_MM - 1e-9:
         f"pinch screw tip can stand {WORST_PINCH_TIP_RECESS_MM:.3f} inside the -X "
         f"face at the printed width minimum (< {PINCH_SCREW_RECESS_MM})"
     )
-# The shaft's Sec4End is baselined from the collar's south face. From that
-# face to the block's north face: collar width (.XXX), 64T + accepted L20
-# (0.025 + 0.20), bushing depth (.XXX), feeler set (±0.10), and block depth
-# (.XXX). Add the shaft tip's Sec4End (.XXX) in the opposite direction.
-# Keep the stack's 0.225 here rather than importing cone_gear_stack: cone_line
-# imports this module and must remain free of gear-spec imports. The drawing
-# contract test pins the copy to face_band(19, "north").
-GEAR_STACK_NORTH_FACE_BAND_MM = 0.225
-SHAFT_OVERALL_LENGTH_PLACES = 3
-BLOCK_DEPTH_PLACES = 3
-BUSHING_DEPTH_PLACES = 3
-COLLAR_WIDTH_PLACES = 3
-TIP_FEELER_SET_BAND_MM = TIP_BLOCK_FEELER_BAND
-ADJUSTER_EMBED_TRAVEL_MM = (
-    _BAND_BY_PLACES[SHAFT_OVERALL_LENGTH_PLACES]
-    + _BAND_BY_PLACES[COLLAR_WIDTH_PLACES]
-    + GEAR_STACK_NORTH_FACE_BAND_MM
-    + _BAND_BY_PLACES[BUSHING_DEPTH_PLACES]
-    + TIP_FEELER_SET_BAND_MM
-    + _BAND_BY_PLACES[BLOCK_DEPTH_PLACES]
-)
-WORST_ADJUSTER_ENGAGEMENT_MM = (
-    min(ADJUSTER_SCREW_LENGTH, ADJUSTER_EMBED - ADJUSTER_EMBED_TRAVEL_MM)
-    - ADJUSTER_CSK
-)
-if WORST_ADJUSTER_ENGAGEMENT_MM < 1.5 * THREAD_MAJOR_MM[ADJUSTER_THREAD]:
-    raise AssertionError(
-        "the installed adjuster has under 1.5D full thread at the stack limits: "
-        f"{WORST_ADJUSTER_ENGAGEMENT_MM:.3f}"
-    )
-# Cup-rim window from the block's north face: the north countersink + 1.5D
-# full thread at the shallow end, and the south countersink beyond the
-# deepest rim at the block's minimum printed depth.
-ADJUSTER_EMBED_WINDOW = (
-    1.5 * THREAD_MAJOR_MM[ADJUSTER_THREAD] + ADJUSTER_CSK,
-    round(BLOCK_Z, BLOCK_DEPTH_PLACES)
-    - _BAND_BY_PLACES[BLOCK_DEPTH_PLACES]
-    - ADJUSTER_CSK,
-)
-if not (
-    ADJUSTER_EMBED_WINDOW[0]
-    <= ADJUSTER_EMBED - ADJUSTER_EMBED_TRAVEL_MM
-    <= ADJUSTER_EMBED + ADJUSTER_EMBED_TRAVEL_MM
-    <= ADJUSTER_EMBED_WINDOW[1]
-):
-    raise AssertionError("adjuster embed band leaves its working window")
-
-# --- I31 foot flange and its axial slot --------------------------------------
-# The purchased hardware the flange is sized for, from the McMaster product
-# pages (read 2026-09-25): 93075A150 is a 6-32 x 5/8 low-strength zinc-plated
-# steel hex head screw, head 1/4 wide x 3/32 high (ASME B18.6.3); 90631A007 is
-# a 6-32 zinc-plated steel nylon-insert locknut, 5/16 wide x 11/64 high.  The
-# catalogue gives no insert height, so the whole 11/64 counts as nut and the
-# screw must stand a full pitch past its top face.
-HOLDDOWN_SCREW_LENGTH = 0.625 * 25.4
-HOLDDOWN_NUT_AF = 5.0 / 16.0 * 25.4
-HOLDDOWN_NUT_H = 11.0 / 64.0 * 25.4
-# Sharp corners: the largest the nut can sweep.
-HOLDDOWN_NUT_AC = HOLDDOWN_NUT_AF / (3.0**0.5 / 2.0)
-HOLDDOWN_PITCH_MM = 25.4 / 32.0
-_HOLDDOWN_MAJOR_MM = THREAD_MAJOR_MM[FOOT_THREAD]
-# The flange slot is one pass of a 5/32 end mill, so its width carries the
-# cutter's one-sided +0.10/0 band (the title block's drilled-hole row),
-# written (upper, lower) like every _fit_limits band and only ever read
-# through _fit_limits.deviations, here and on the model -- never by index.
-FLANGE_SLOT_W = 5.0 / 32.0 * 25.4
-FLANGE_SLOT_W_BAND = (_DRILLED_HOLE_PLUS_MM, 0.0)
-_FLANGE_SLOT_W_LOWER, _FLANGE_SLOT_W_UPPER = deviations(FLANGE_SLOT_W_BAND)
-FLANGE_SLOT_W_MIN = FLANGE_SLOT_W + _FLANGE_SLOT_W_LOWER
-FLANGE_SLOT_W_MAX = FLANGE_SLOT_W + _FLANGE_SLOT_W_UPPER
-FLANGE_SLOT_FLOAT = (FLANGE_SLOT_W_MAX - _HOLDDOWN_MAJOR_MM) / 2.0
-FLANGE_SLOT_FLOAT_MIN = (FLANGE_SLOT_W_MIN - _HOLDDOWN_MAJOR_MM) / 2.0
-# Why the width keeps that band (Main's ruled fit, r3): under the title
-# block's general .XX band the slot could come out 3.46, under the #6-32
-# major, and the hold-down screw would not pass; rule 12 lets the one-pass
-# cutter's band stand as the loose grade.  The reason lives here, not in a
-# sheet note (rule 6).  Should the .XX band ever clear the major, the fit is
-# no longer needed and the slot prints .XX like the rest.
-if FLANGE_SLOT_W - _GENERAL_2PL_MM >= _HOLDDOWN_MAJOR_MM:
-    raise AssertionError("the flange slot's +0.10/0 fit is no longer needed; print it .XX")
-# Fit-up chain: independent axial print and setting deviations which move the
-# screw away from the flange slot's midpoint. The plate TipSlotZ location is
-# .XX; the shaft, collar, bushing and block axial dimensions are .XXX, with
-# the stack face bounded by the accepted L20 and 64T bands. The feeler is
-# set within ±0.10 and the screw floats across the plate's 4.0 +0.10 slot.
-# The flange's two arc ends retain their own .X print bands below.
-PLATE_TIP_SLOT_Z_PLACES = 2
-PLATE_TIP_SLOT_W = 4.0
-PLATE_TIP_SLOT_W_PLUS = _DRILLED_HOLE_PLUS_MM
-PLATE_TIP_SLOT_FLOAT = (
-    PLATE_TIP_SLOT_W + PLATE_TIP_SLOT_W_PLUS - _HOLDDOWN_MAJOR_MM
-) / 2.0
-FIT_UP_CHAIN_MM = (
-    ADJUSTER_EMBED_TRAVEL_MM
-    + _BAND_BY_PLACES[PLATE_TIP_SLOT_Z_PLACES]
-    + PLATE_TIP_SLOT_FLOAT
-)
-FIT_UP_MARGIN_MM = 1.0
-# The screw's nominal station south of the body's south face: the slot's
-# midpoint, where the plate's TipSlotZ puts it.
-FLANGE_SLOT_Z = 10.7
-# r3 (codex FIX review of 72ab, option A): each arc centre is baselined from
-# the body's south face -- a face the shop can reach -- at .X, so the print
-# carries neither the .XX spacing (the old 8.42) nor a location from the
-# slot's own midpoint (the old 10.7).  With its own band and the screw's float
-# in the slot, each end still passes the screw FIT_UP_MARGIN_MM beyond the
-# fit-up chain.
-FLANGE_SLOT_END_PLACES = 1
-FLANGE_SLOT_NORTH_Z = 6.5
-FLANGE_SLOT_SOUTH_Z = 14.9
-FLANGE_SLOT_CTOC = FLANGE_SLOT_SOUTH_Z - FLANGE_SLOT_NORTH_Z
-_north_end_limits = _printed_limits(FLANGE_SLOT_NORTH_Z, FLANGE_SLOT_END_PLACES)
-_south_end_limits = _printed_limits(FLANGE_SLOT_SOUTH_Z, FLANGE_SLOT_END_PLACES)
-if abs((FLANGE_SLOT_NORTH_Z + FLANGE_SLOT_SOUTH_Z) / 2.0 - FLANGE_SLOT_Z) > 1e-9:
-    raise AssertionError("the flange slot's ends are not centred on the screw station")
-FIT_UP_NORTH_MARGIN_MM = (FLANGE_SLOT_Z - FIT_UP_CHAIN_MM) - (
-    _north_end_limits[1] - FLANGE_SLOT_FLOAT
-)
-FIT_UP_SOUTH_MARGIN_MM = (_south_end_limits[0] + FLANGE_SLOT_FLOAT) - (
-    FLANGE_SLOT_Z + FIT_UP_CHAIN_MM
-)
-if min(FIT_UP_NORTH_MARGIN_MM, FIT_UP_SOUTH_MARGIN_MM) < FIT_UP_MARGIN_MM - 1e-9:
-    raise AssertionError(
-        "flange slot no longer covers the fit-up chain with its margin: "
-        f"north {FIT_UP_NORTH_MARGIN_MM:.3f}, south {FIT_UP_SOUTH_MARGIN_MM:.3f}"
-    )
-FLANGE_SLOT_LEN = FLANGE_SLOT_CTOC + FLANGE_SLOT_W
-# The nut sits on the flange top next to the body's south wall.  At the
-# slot's north end (that end short, the screw floating north) its corners
-# keep NUT_WALL_AIR off the wall.
-NUT_WALL_AIR = 0.5
-# From the south face; the flange's own length is .X like the body's plan.
-# The rule -- the slot's south edge at its printed limits, plus MIN_WEB_MM,
-# plus the length's own .X band, rounded up to .X -- gives 20.6.  The flange
-# end locates nothing, so it takes FLANGE_END_ALLOWANCE_MM more: the end web
-# is then 2.27 at the printed limits, not 2.07, room a first-time machinist
-# can spend on a rough saw cut.  The drive train's clearances read FLANGE_LEN.
-_SLOT_SOUTH_EDGE_MAX = _south_end_limits[1] + FLANGE_SLOT_W_MAX / 2.0
-_FLANGE_LEN_BY_RULE = (
-    math.ceil((_SLOT_SOUTH_EDGE_MAX + MIN_WEB_MM + _GENERAL_1PL_MM) * 10.0 - 1e-6) / 10.0
-)
-FLANGE_END_ALLOWANCE_MM = 0.2
-FLANGE_LEN = round(_FLANGE_LEN_BY_RULE + FLANGE_END_ALLOWANCE_MM, 1)
-# The slot is on the block's centre plane, located from the -X face (the
-# PassageCenter datum); the flange is the block's full width (.X).  r3 (Main,
-# 2026-09-25): no stack needs the slot's location at .XX, so it prints .X --
-# the side webs below and the lateral take-up after them both close there.
-FLANGE_SLOT_X = BLOCK_X / 2.0
-FLANGE_SLOT_X_PLACES = 1
-_slot_x_limits = _printed_limits(FLANGE_SLOT_X, FLANGE_SLOT_X_PLACES)
-WORST_FLANGE_SIDE_WEB_MM = min(
-    _slot_x_limits[0],
-    _width_limits[0] - _slot_x_limits[1],
-) - (FLANGE_SLOT_W_MAX) / 2.0
-# Lateral fit-up: the shaft sets the adjuster axis (PassageCenter) and the
-# hold-down screw stands at the flange slot's centre (FlangeSlotX), both from
-# the -X face, so the two disagree by at most their two bands.  The screw's
-# float in the narrowest flange slot and the swing platform's cross slot take
-# that up with HOLDDOWN_LATERAL_MARGIN_MM to spare.
+# The adjuster's working window, cup rim measured in from the north face:
+# shallow end = ADJUSTER_MIN_ENGAGEMENT_D of full thread under the north
+# countersink; deep end = the cup rim still on full thread above the south
+# countersink with the block at its .XXX-short depth.  The screw is longer
+# than the window's deep end, so its head always stands proud and the rim's
+# depth is the engagement.  The tip's axial stack (shaft, post, platform,
+# hold-down and this block's tap station) moves the cup's seat about
+# ADJUSTER_EMBED; build_drive_train_assembly asserts that band stays inside
+# this window.
 #
-# The platform's worst lateral travel either side of the cone axis is owned by
-# cone_swing_platform_spec.TIP_LATERAL_TRAVEL_WORST (PR #830, branch
-# drawings/dt-cone-swing-platform): 2.2475 - 0.51 = 1.7375, which the platform
-# asserts rounds to 1.74.  That symbol is not on this branch's base yet, so its
-# exact value is held here as a named copy and
-# test_platform_lateral_travel_lockstep compares the two once the import
-# resolves.  MERGE RIDER (#838): when #830 is on the base, replace this
-# constant with the import and delete the lockstep test's skip.
-PLATE_TIP_LATERAL_TRAVEL_WORST_MM = 1.7375
-HOLDDOWN_LATERAL_MARGIN_MM = 0.25
-_passage_x_limits = _printed_limits(BLOCK_X / 2.0, PASSAGE_CENTER_PLACES)
-WORST_HOLDDOWN_LATERAL_OFFSET_MM = max(
-    _slot_x_limits[1] - _passage_x_limits[0],
-    _passage_x_limits[1] - _slot_x_limits[0],
+# Named exception to the drawing policy's 1.5D thread-engagement rule (user
+# ruling 2026-09-29, option (a); the policy's Named exceptions row for
+# MHA-097): the cup adjuster engages 1.0D at the worst case.  It carries only
+# the shaft's end-play thrust -- the cone set's running push, no clamp load;
+# the pinch screw across the slit locks it -- and 1.5D would need a block deep
+# enough to push the MHA-096 stack collar into the block's south face at
+# print-worst (the collar-to-block air in build_drive_train_assembly).
+ADJUSTER_MIN_ENGAGEMENT_D = 1.0
+ADJUSTER_EMBED_WINDOW = (
+    ADJUSTER_MIN_ENGAGEMENT_D * THREAD_MAJOR_MM[ADJUSTER_THREAD] + ADJUSTER_CSK,
+    _depth_limits[0] - ADJUSTER_CSK,
 )
-HOLDDOWN_LATERAL_TAKE_UP_MM = PLATE_TIP_LATERAL_TRAVEL_WORST_MM + FLANGE_SLOT_FLOAT_MIN
-if (
-    WORST_HOLDDOWN_LATERAL_OFFSET_MM + HOLDDOWN_LATERAL_MARGIN_MM
-    > HOLDDOWN_LATERAL_TAKE_UP_MM + 1e-9
-):
+if ADJUSTER_MIN_ENGAGEMENT_D != 1.0:
     raise AssertionError(
-        f"the hold-down screw can sit {WORST_HOLDDOWN_LATERAL_OFFSET_MM:.3f} off the "
-        f"adjuster axis; the slots take up {HOLDDOWN_LATERAL_TAKE_UP_MM:.3f}"
+        "the MHA-097 1.0D engagement is a named exception (user ruling "
+        "2026-09-29); any other value is a new ruling"
     )
-WORST_FLANGE_END_WEB_MM = FLANGE_LEN - _GENERAL_1PL_MM - _SLOT_SOUTH_EDGE_MAX
-WORST_FLANGE_ROOT_WEB_MM = _north_end_limits[0] - FLANGE_SLOT_W_MAX / 2.0
-WORST_NUT_WALL_AIR_MM = (
-    _north_end_limits[0] - FLANGE_SLOT_FLOAT - HOLDDOWN_NUT_AC / 2.0
-)
-# The nut bears on the flange beside the slot without a washer.
-NUT_BEARING_MM = (HOLDDOWN_NUT_AF - (FLANGE_SLOT_W_MAX)) / 2.0
-for _name, _web in (
-    ("flange side web", WORST_FLANGE_SIDE_WEB_MM),
-    ("flange end web", WORST_FLANGE_END_WEB_MM),
-    ("flange root web", WORST_FLANGE_ROOT_WEB_MM),
+if not (
+    ADJUSTER_EMBED_WINDOW[0] < ADJUSTER_EMBED < ADJUSTER_EMBED_WINDOW[1]
+    and ADJUSTER_SCREW_LENGTH >= ADJUSTER_EMBED_WINDOW[1]
 ):
+    raise AssertionError("adjuster embed leaves its working window")
+# The worst-case full-thread engagement the window guarantees, floored to the
+# printed places so the sheet never states more than the stack delivers.
+ADJUSTER_ENGAGEMENT_MIN_MM = (
+    math.floor(ADJUSTER_MIN_ENGAGEMENT_D * THREAD_MAJOR_MM[ADJUSTER_THREAD] * 100.0)
+    / 100.0
+)
+# The assembly sheet states the shortfall as a plain fact at the step that
+# sets the adjuster, worded like MHA-142's.
+# Named exception: MHA-097 engagement (drawing-simplicity-policy.md, "Named exceptions").
+ADJUSTER_ENGAGEMENT_ASSEMBLY_FACT = (
+    f"ENGAGEMENT {ADJUSTER_ENGAGEMENT_MIN_MM:.2f} MIN ({ADJUSTER_MIN_ENGAGEMENT_D:.1f}D)."
+)
+
+# --- hold-down (user ruling 2026-09-29) --------------------------------------
+# One McMaster 91251A108 #4-40 x 3/8 black-oxide alloy socket head cap screw
+# (MHA-140) rises from the swing platform's underside counterbore through a
+# #4 close-clearance hole into a blind #4-40 tap in the foot, on the block's
+# centre (under the adjuster axis, at mid-depth).  A #4 rather than a #6: the
+# #6 head's counterbore would leave a 1.59 ledge in the 1/4 plate.
+HOLDDOWN_THREAD = "#4-40"
+HOLDDOWN_SCREW_LENGTH = 0.375 * 25.4
+# ASME B18.3 socket head cap screw length tolerance, nominal lengths to 1 in:
+# +0 / -0.03 in.
+HOLDDOWN_SCREW_LENGTH_MIN = HOLDDOWN_SCREW_LENGTH - 0.03 * 25.4
+_HOLDDOWN_MAJOR_MM = THREAD_MAJOR_MM[HOLDDOWN_THREAD]
+_HOLDDOWN_PITCH_MM = 25.4 / 40.0
+# The ledge the head bears on, counterbore floor to platform top, at the
+# plate's stock band and its .XX counterbore depth
+# (cone_swing_platform_spec.HOLDDOWN_LEDGE_RANGE, asserted equal in
+# build_drive_train_assembly; a copy so this part does not re-key on the
+# platform's print).
+HOLDDOWN_LEDGE_RANGE_MM = (2.21, 3.49)
+# The block's foot sits on the platform top, so the screw reaches past the
+# ledge straight into the tap.
+WORST_HOLDDOWN_ENGAGEMENT_MM = HOLDDOWN_SCREW_LENGTH_MIN - HOLDDOWN_LEDGE_RANGE_MM[1]
+WORST_HOLDDOWN_REACH_MM = HOLDDOWN_SCREW_LENGTH - HOLDDOWN_LEDGE_RANGE_MM[0]
+if WORST_HOLDDOWN_ENGAGEMENT_MM < 1.5 * _HOLDDOWN_MAJOR_MM:
+    raise AssertionError(
+        f"hold-down engagement {WORST_HOLDDOWN_ENGAGEMENT_MM:.3f} < 1.5D at the "
+        "thickest ledge and shortest screw"
+    )
+# Full-thread depth (.X) keeps the longest reach FOOT_TAP_MARGIN_MM clear of
+# the tap's incomplete lead; the tap drill (.X) runs 1.5P past the deepest
+# full thread so a plug tap's lead never eats it.
+FOOT_TAP_MARGIN_MM = 0.25
+FOOT_THREAD_DEPTH = 8.5
+FOOT_DEPTH = 11.1
+FOOT_DEPTH_PLACES = 1
+if WORST_HOLDDOWN_REACH_MM > FOOT_THREAD_DEPTH - _GENERAL_1PL_MM - FOOT_TAP_MARGIN_MM:
+    raise AssertionError("hold-down screw can reach the foot tap's incomplete threads")
+if (FOOT_DEPTH - _GENERAL_1PL_MM) - (FOOT_THREAD_DEPTH + _GENERAL_1PL_MM) < (
+    1.5 * _HOLDDOWN_PITCH_MM
+):
+    raise AssertionError("foot tap drill leaves no lead room past the full thread")
+FOOT_BORE_SPEC = HoleSpec(
+    "tapped",
+    HOLDDOWN_THREAD,
+    end="blind",
+    depth_mm=FOOT_DEPTH,
+    overrides_mm={"ThreadDepth": FOOT_THREAD_DEPTH},
+)
+FOOT_BORE_DIA = blind_cut_dia_mm(FOOT_BORE_SPEC)
+# The tap's two stations, each with an explicit +/-FOOT_TAP_STATION_TOL_MM:
+# across the block from the -X face (the PassageCenter datum), and along the
+# axis from the NORTH face, the face the pivot screw's head gap is measured
+# to (build_drive_train_assembly's pivot-head, embed and lateral stacks read
+# this band).  The tap sits FOOT_TAP_OFFSET_X off the adjuster axis, the
+# same offset as the platform's hold-down hole off the cone line
+# (cone_swing_platform_spec.HOLDDOWN_LOCAL_X, which says why), so the block
+# body stands centred on the cone line.  Toward -X because the width's band
+# falls on the +X side: there the tap's web is the thinner one.
+FOOT_TAP_OFFSET_X = -1.0
+FOOT_TAP_X = BLOCK_X / 2.0 + FOOT_TAP_OFFSET_X
+FOOT_TAP_Z = BLOCK_Z / 2.0
+FOOT_TAP_STATION_TOL_MM = 0.10
+FOOT_TAP_X_PLACES = 2
+FOOT_TAP_Z_PLACES = 3
+_tap_r = _HOLDDOWN_MAJOR_MM / 2.0
+_tap_drill_top_max = (
+    FOOT_DEPTH
+    + _GENERAL_1PL_MM
+    + (FOOT_BORE_DIA / 2.0) / math.tan(math.radians(DRILL_POINT_ANGLE_DEG / 2.0))
+)
+WORST_FOOT_TAP_WEBS_MM = {
+    "-X side": FOOT_TAP_X - FOOT_TAP_STATION_TOL_MM - _tap_r,
+    "+X side": _width_limits[0] - (FOOT_TAP_X + FOOT_TAP_STATION_TOL_MM) - _tap_r,
+    "north face": FOOT_TAP_Z - FOOT_TAP_STATION_TOL_MM - _tap_r,
+    "south face": _depth_limits[0] - (FOOT_TAP_Z + FOOT_TAP_STATION_TOL_MM) - _tap_r,
+    "adjuster thread": (
+        _axis_limits[0] - ADJUSTER_ROOT_REF_DIA / 2.0 - _tap_drill_top_max
+    ),
+}
+for _name, _web in WORST_FOOT_TAP_WEBS_MM.items():
     if round(_web, 6) < MIN_WEB_MM:
-        raise AssertionError(f"{_name} is {_web:.3f} at the printed limits (< 2.0, U27)")
-if WORST_NUT_WALL_AIR_MM < NUT_WALL_AIR - 1e-9:
-    raise AssertionError("the hold-down nut can reach the block's south wall")
-if NUT_BEARING_MM < 1.0:
-    raise AssertionError("the hold-down nut bears on under 1.0 beside the flange slot")
-if FLANGE_SLOT_W_MIN - _HOLDDOWN_MAJOR_MM < 0.25:
-    raise AssertionError("flange slot does not clear the #6-32 major")
-# Flange thickness (.XX): with the thickest ledge under the head (the
-# platform's stock-plate and counterbore bands, cone_swing_platform_spec
-# TIP_LEDGE_RANGE, asserted equal in build_drive_train_assembly) and the
-# thickest shim stack, the 5/8 screw still stands a pitch past the nut.
-FLANGE_T = 3.50
-HOLDDOWN_LEDGE_RANGE_MM = (2.71, 3.99)
-HOLDDOWN_PROTRUSION_MM = (
-    HOLDDOWN_SCREW_LENGTH
-    - (
-        HOLDDOWN_LEDGE_RANGE_MM[1]
-        + FOOT_SHIM_RANGE_MM[1]
-        + FLANGE_T
-        + _GENERAL_2PL_MM
-        + HOLDDOWN_NUT_H
-    ),
-    HOLDDOWN_SCREW_LENGTH
-    - (
-        HOLDDOWN_LEDGE_RANGE_MM[0]
-        + FOOT_SHIM_RANGE_MM[0]
-        + FLANGE_T
-        - _GENERAL_2PL_MM
-        + HOLDDOWN_NUT_H
-    ),
-)
-if HOLDDOWN_PROTRUSION_MM[0] < HOLDDOWN_PITCH_MM:
-    raise AssertionError(
-        f"hold-down screw stands {HOLDDOWN_PROTRUSION_MM[0]:.3f} past the nut at "
-        "the thickest stack (< one pitch past the nylon insert)"
-    )
+        raise AssertionError(
+            f"foot tap {_name} web is {_web:.3f} at the printed limits (< 2.0, U27)"
+        )
 
 SURFACE_FINISHES = (
     # This face locates the adjuster block on the swing platform. Everything
     # else remains governed by the title-block CAST/MACHINED process row.
     SurfaceFinishControl("foot_seat", SEAT_UM, PlanarFace((0, -1, 0), 0.0)),
 )
+
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BlockProfile": {"Width", "Depth"},
@@ -582,36 +479,32 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PinchHeightReference": {"PinchHeight"},
     "SlitProfile": {"SlitW"},
     "TopSlit": {"SlitDepth"},
-    # I31 foot flange: its length past the south face and its thickness; the
-    # axial slot's width, located from the +X face, and (r3, option A) each
-    # arc centre baselined from the south face (hidden reference sketches).
-    "FlangeProfile": {"FlangeLen"},
-    "Flange": {"FlangeT"},
-    "FlangeSlotProfile": {"FlangeSlotW"},
-    "FlangeSlotXReference": {"FlangeSlotX"},
-    "FlangeSlotNorthReference": {"FlangeSlotNorthZ"},
-    "FlangeSlotSouthReference": {"FlangeSlotSouthZ"},
+    # 2026-09-29: the hold-down tap's stations on the foot (hidden reference
+    # sketches; the tap's size and depths print on its Hole Wizard callout).
+    "FootTapXReference": {"FootTapX"},
+    "FootTapZReference": {"FootTapZ"},
 }
 
-# Decimal places carry the general tolerance and live on the model. The
-# block's axial Depth now prints .XXX in the accepted gear-stack/feeler chain;
-# the slit, web and hold-down grades retain their earlier functional bands.
+# Decimal places carry the general tolerance and therefore live on the model.
+# U24b: the webs close at the title-block bands.  Still .XX: the pinch-hole
+# height (the top ligament closes at 1.92 at .X) and the slit width (the
+# drill-to-slot point reaches past the far jaw's tap drill at .X).  2026-09-29:
+# with the block fixed by its hold-down, the depth and the passage centre
+# print .XXX (the embed window, the collar-to-block air and the lateral
+# stack; build_drive_train_assembly proves each looser grade fails), and the
+# axis height and the tap's stations carry an explicit +/-0.10 (set on the
+# model, AXIS_HEIGHT_TOL_MM / FOOT_TAP_STATION_TOL_MM).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BlockProfile": {"Width": BLOCK_WIDTH_PLACES, "Depth": BLOCK_DEPTH_PLACES},
     "Block": {"BlockHt": BLOCK_HEIGHT_PLACES},
     "AxisHeightReference": {"AxisHeight": AXIS_HEIGHT_PLACES},
     "PassageCenterReference": {"PassageCenter": PASSAGE_CENTER_PLACES},
-    "PinchDepthReference": {"PinchDepthCenter": 1},
+    "PinchDepthReference": {"PinchDepthCenter": PINCH_DEPTH_PLACES},
     "PinchHeightReference": {"PinchHeight": PINCH_HEIGHT_PLACES},
     "SlitProfile": {"SlitW": SLIT_W_PLACES},
     "TopSlit": {"SlitDepth": SLIT_DEPTH_PLACES},
-    "FlangeProfile": {"FlangeLen": 1},
-    "Flange": {"FlangeT": 2},
-    # The width is the 5/32 cutter's (+0.10/0, set on the model).
-    "FlangeSlotProfile": {"FlangeSlotW": 2},
-    "FlangeSlotXReference": {"FlangeSlotX": FLANGE_SLOT_X_PLACES},
-    "FlangeSlotNorthReference": {"FlangeSlotNorthZ": FLANGE_SLOT_END_PLACES},
-    "FlangeSlotSouthReference": {"FlangeSlotSouthZ": FLANGE_SLOT_END_PLACES},
+    "FootTapXReference": {"FootTapX": FOOT_TAP_X_PLACES},
+    "FootTapZReference": {"FootTapZ": FOOT_TAP_Z_PLACES},
 }
 # The stacks above read these grades; the print must carry exactly them.
 _STACK_GRADES = {
@@ -620,12 +513,19 @@ _STACK_GRADES = {
     ("Block", "BlockHt"): BLOCK_HEIGHT_PLACES,
     ("AxisHeightReference", "AxisHeight"): AXIS_HEIGHT_PLACES,
     ("PassageCenterReference", "PassageCenter"): PASSAGE_CENTER_PLACES,
-    ("FlangeSlotXReference", "FlangeSlotX"): FLANGE_SLOT_X_PLACES,
+    ("PinchDepthReference", "PinchDepthCenter"): PINCH_DEPTH_PLACES,
     ("PinchHeightReference", "PinchHeight"): PINCH_HEIGHT_PLACES,
     ("SlitProfile", "SlitW"): SLIT_W_PLACES,
     ("TopSlit", "SlitDepth"): SLIT_DEPTH_PLACES,
-    ("FlangeSlotNorthReference", "FlangeSlotNorthZ"): FLANGE_SLOT_END_PLACES,
-    ("FlangeSlotSouthReference", "FlangeSlotSouthZ"): FLANGE_SLOT_END_PLACES,
+    ("FootTapXReference", "FootTapX"): FOOT_TAP_X_PLACES,
+    ("FootTapZReference", "FootTapZ"): FOOT_TAP_Z_PLACES,
+}
+# Explicit symmetric bands the model sets on these dimensions; every other
+# marked dimension prints the title block's general band for its places.
+EXPLICIT_SYMMETRIC_TOLERANCES_MM: dict[tuple[str, str], float] = {
+    ("AxisHeightReference", "AxisHeight"): AXIS_HEIGHT_TOL_MM,
+    ("FootTapXReference", "FootTapX"): FOOT_TAP_STATION_TOL_MM,
+    ("FootTapZReference", "FootTapZ"): FOOT_TAP_STATION_TOL_MM,
 }
 for (_feature, _dimension), _places in _STACK_GRADES.items():
     if DRAWING_PRECISION[_feature][_dimension] != _places:
@@ -648,4 +548,14 @@ for _feature, _dimensions in DRAWING_PRECISION.items():
         raise AssertionError(
             f"DRAWING_PRECISION names unmarked {_feature} dimensions: {_unmarked}"
         )
+_EXPLICIT_BAND_BY_NAME = {
+    dimension: band for (_feature, dimension), band in EXPLICIT_SYMMETRIC_TOLERANCES_MM.items()
+}
 
+
+def printed_value_text(name: str, nominal: float) -> str:
+    """The text a marked dimension prints: the value at its model places,
+    then the explicit symmetric band where the model sets one."""
+    text = f"{nominal:.{DRAWING_PRECISION_BY_NAME[name]}f}"
+    band = _EXPLICIT_BAND_BY_NAME.get(name)
+    return text if band is None else f"{text}\u00b1{band:.2f}"

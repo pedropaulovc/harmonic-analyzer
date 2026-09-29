@@ -158,10 +158,10 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
-        name="cone_tip_bushing",
-        part="cone_tip_bushing",
-        artifact_stem="cone-tip-bushing",
-        script_name="draw_cone_tip_bushing.py",
+        name="cone_tip_collar",
+        part="cone_tip_collar",
+        artifact_stem="cone-tip-collar",
+        script_name="draw_cone_tip_collar.py",
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
@@ -593,13 +593,6 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
-        name="cone_tip_shim",
-        part="cone_tip_shim",
-        artifact_stem="cone-tip-shim",
-        script_name="draw_cone_tip_shim.py",
-        layout=DrawingLayout.LANDSCAPE,
-    ),
-    DrawingSpec(
         name="cylinder_end_disc",
         part="cylinder_end_disc",
         artifact_stem="cylinder-end-disc",
@@ -695,13 +688,6 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         part="cone_tip_pinch_screw",
         artifact_stem="cone-tip-pinch-screw",
         script_name="draw_cone_tip_pinch_screw.py",
-        layout=DrawingLayout.LANDSCAPE,
-    ),
-    DrawingSpec(
-        name="cone_tip_block_nut",
-        part="cone_tip_block_nut",
-        artifact_stem="cone-tip-block-nut",
-        script_name="draw_cone_tip_block_nut.py",
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(

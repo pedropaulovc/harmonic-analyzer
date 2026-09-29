@@ -12,8 +12,7 @@ import build_cone_tip_block as part
 import cone_tip_block_spec
 import draw_cone_tip_block as drawing
 from _drawing_registry import DRAWINGS_BY_NAME
-from _fit_limits import deviations
-from _hole_spec import THREAD_MAJOR_MM, blind_cut_dia_mm
+from _hole_spec import blind_cut_dia_mm
 from _surface_finish import SEAT_UM
 
 
@@ -37,23 +36,19 @@ def test_adjuster_thread_is_tapped_through_with_no_floor() -> None:
     assert spec.SHAFT_PASSAGE_DIA < spec.ADJUSTER_BORE_DIA
 
 
-def test_adjuster_engagement_closes_at_the_accepted_stack_limits() -> None:
-    """The shaft and feeler-set block may move independently; the cup keeps 1.5D."""
+def test_adjuster_embed_band_stays_inside_its_engagement_window() -> None:
+    """The window opens at 1.0D + countersink (the adjuster's user-ruled
+    engagement exception, 2026-09-29) and closes a countersink short of the
+    south face at the depth's .XXX-short limit: the cup sits on full thread.
+    A 1.5D floor would leave no room for the tip's print-worst stack."""
     spec = cone_tip_block_spec
-    assert spec.ADJUSTER_EMBED_TRAVEL_MM == pytest.approx(0.845)
-    assert spec.WORST_ADJUSTER_ENGAGEMENT_MM == pytest.approx(
-        min(spec.ADJUSTER_SCREW_LENGTH, spec.ADJUSTER_EMBED - 0.845)
-        - spec.ADJUSTER_CSK
-    )
-    assert spec.WORST_ADJUSTER_ENGAGEMENT_MM >= 1.5 * THREAD_MAJOR_MM[spec.ADJUSTER_THREAD]
-    assert spec.ADJUSTER_EMBED_WINDOW == pytest.approx(
-        (
-            1.5 * THREAD_MAJOR_MM[spec.ADJUSTER_THREAD] + spec.ADJUSTER_CSK,
-            spec.BLOCK_Z - 0.13 - spec.ADJUSTER_CSK,
-        )
-    )
+    assert spec.ADJUSTER_CSK_DIA > 4.826
+    assert spec.ADJUSTER_MIN_ENGAGEMENT_D == 1.0
+    assert spec.ADJUSTER_EMBED_WINDOW == pytest.approx((5.3067, 9.1393))
     low, high = spec.ADJUSTER_EMBED_WINDOW
-    assert low <= spec.ADJUSTER_EMBED - 0.845 <= spec.ADJUSTER_EMBED + 0.845 <= high
+    assert low == pytest.approx(1.0 * 4.826 + spec.ADJUSTER_CSK, abs=1e-3)
+    assert high == pytest.approx(spec.BLOCK_Z - 0.13 - spec.ADJUSTER_CSK)
+    assert low < spec.ADJUSTER_EMBED < high
     assert drawing.ADJUSTER_CSK_QUALIFIER == "90° CSK Ø5.0 BOTH ENDS"
 
 
@@ -126,11 +121,13 @@ def test_pinch_spacing_closes_every_print_tolerance_stack() -> None:
     assert spec.WORST_SCREW_ENVELOPE_GAP_MM > 0.0
     # U24b / U27: every web keeps 2.0 at the printed limits after edge breaks.
     # E11/W1's #10-32 root (ref Ø5.04 vs Ø8.28) adds ~1.6 to the adjuster webs.
-    # r3: PinchHeight .XX from the foot, AxisHeight and BlockHt .X; the
-    # 17 block (5/8 pinch screw) adds 1.0 to the adjuster's side wall.
-    assert spec.WORST_SLIT_MOUTH_WEB_MM == pytest.approx(2.834, abs=1e-3)
+    # r3: PinchHeight .XX from the foot, BlockHt .X, AxisHeight .XXX +/-0.10
+    # (2026-09-29: the prism stands on the platform, so the axis height is
+    # the block's own fit); the 17 block adds 1.0 to the adjuster's side wall,
+    # and Width at .XXX (the hold-down containment) adds 0.67 more.
+    assert spec.WORST_SLIT_MOUTH_WEB_MM == pytest.approx(3.566, abs=1e-3)
     assert spec.WORST_TOP_LIGAMENT_MM == pytest.approx(2.19, abs=1e-6)
-    assert spec.WORST_ADJUSTER_SIDE_LIGAMENT_MM == pytest.approx(4.670, abs=1e-3)
+    assert spec.WORST_ADJUSTER_SIDE_LIGAMENT_MM == pytest.approx(5.720, abs=1e-3)
     for web in (
         spec.WORST_SLIT_MOUTH_WEB_MM,
         spec.WORST_TOP_LIGAMENT_MM,
@@ -160,13 +157,13 @@ def test_part_config_preserves_manufacturing_metadata() -> None:
     assert int(config["quantity"]) == 1
 
 
-def test_block_drops_by_the_shim_and_keeps_every_axis_relation() -> None:
-    """U30: the shim restores the old axis height; nothing moves off the axis."""
+def test_block_stands_on_the_platform_and_keeps_every_axis_relation() -> None:
+    """2026-09-29: the foot sits straight on the platform, so the adjuster
+    axis is the cone axis's height above the platform top."""
     spec = cone_tip_block_spec
-    assert spec.ADJUSTER_AXIS_HEIGHT + spec.SHIM_NOMINAL == 33.368
+    assert spec.ADJUSTER_AXIS_HEIGHT == 33.368
     assert abs(spec.SLIT_FLOOR - (spec.ADJUSTER_AXIS_HEIGHT - 0.65)) < 1e-12
     assert abs(spec.PINCH_HEIGHT - spec.ADJUSTER_AXIS_HEIGHT - spec.PINCH_RISE) < 1e-12
-    assert spec.ADJUSTER_EMBED == 9.5
     assert spec.DRAWING_DIMENSIONS["AxisHeightReference"] == {"AxisHeight"}
 
 
@@ -223,10 +220,11 @@ def test_section_a_carries_no_dimension_so_shows_no_hidden_sketch() -> None:
 def test_only_views_dimensioning_hidden_sketches_opt_in() -> None:
     """The opt-in import goes where a kept dimension lives on a hidden sketch.
 
-    Right (PinchDepthCenter, and r3's PinchHeight) and the plan (FlangeSlotX,
-    I31, and r3's two arc-centre baselines) always do; the adjuster elevation
-    (AxisHeight/PassageCenter) opts in at build time; left and the base front
-    keep only solid-feature dimensions and stay on _drawing_common's import.
+    Right (PinchDepthCenter, and r3's PinchHeight) and the bottom view (the
+    hold-down tap's two stations) always do; the adjuster elevation
+    (AxisHeight/PassageCenter) opts in at build time; the plan, left and the
+    base front keep only solid-feature dimensions and stay on
+    _drawing_common's import.
     """
 
     def hidden_owners(keep) -> set[str]:
@@ -240,29 +238,29 @@ def test_only_views_dimensioning_hidden_sketches_opt_in() -> None:
         "PinchDepthReference",
         "PinchHeightReference",
     }
-    assert hidden_owners(drawing.TOP_KEEP) == {
-        "FlangeSlotXReference",
-        "FlangeSlotNorthReference",
-        "FlangeSlotSouthReference",
+    assert hidden_owners(drawing.BOTTOM_KEEP) == {
+        "FootTapXReference",
+        "FootTapZReference",
     }
     assert hidden_owners({"AxisHeight": 0, "PassageCenter": 0}) == {
         "AxisHeightReference",
         "PassageCenterReference",
     }
-    for keep in (drawing.LEFT_KEEP, drawing.FRONT_KEEP):
+    for keep in (drawing.TOP_KEEP, drawing.LEFT_KEEP, drawing.FRONT_KEEP):
         assert hidden_owners(keep) == set()
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     body = source[source.index("async def build(") :]
-    top_call = body[: body.index("keep=TOP_KEEP")]
-    assert top_call.rstrip().endswith(
-        "top_annotations = hidden_sketches.curate_view_dimensions(\n"
-        "        adapter,\n        top,"
-    )
+    for keep, call in (
+        ("keep=TOP_KEEP", "top_annotations = curate_view_dimensions("),
+        ("keep=BOTTOM_KEEP", "bottom_annotations = hidden_sketches.curate_view_dimensions("),
+    ):
+        before = body[: body.index(keep)].rstrip()
+        assert before[: before.rindex("adapter,")].rstrip().endswith(call)
 
 
 def test_every_marked_dimension_is_kept_in_exactly_one_view() -> None:
-    """I31 retired the bottom view with the foot tap; nothing it carried may be
-    orphaned, and the flange's dimensions each land on one view."""
+    """Every marked dimension lands on one view; the bottom view carries the
+    hold-down tap's two stations (2026-09-29)."""
     adjuster_axis = {"AxisHeight", "PassageCenter", "SlitDepth"}
     kept = [
         *drawing.FRONT_KEEP,
@@ -270,6 +268,7 @@ def test_every_marked_dimension_is_kept_in_exactly_one_view() -> None:
         *drawing.RIGHT_KEEP,
         *drawing.LEFT_KEEP,
         *drawing.SECTION_KEEP,
+        *drawing.BOTTOM_KEEP,
         *adjuster_axis,
     ]
     marked = {
@@ -279,15 +278,8 @@ def test_every_marked_dimension_is_kept_in_exactly_one_view() -> None:
     }
     assert sorted(kept) == sorted(set(kept))
     assert set(kept) == marked
-    assert not hasattr(drawing, "BOTTOM_KEEP")
-    assert set(drawing.TOP_KEEP) == {
-        "Depth",
-        "FlangeLen",
-        "FlangeSlotNorthZ",
-        "FlangeSlotSouthZ",
-        "FlangeSlotW",
-        "FlangeSlotX",
-    }
+    assert set(drawing.TOP_KEEP) == {"Depth"}
+    assert set(drawing.BOTTOM_KEEP) == {"FootTapX", "FootTapZ"}
 
 
 def test_slot_width_text_stands_right_of_its_outside_arrows() -> None:
@@ -301,29 +293,26 @@ def test_slot_width_text_stands_right_of_its_outside_arrows() -> None:
     assert text_x - drawing.VALUE_TEXT_HALF_WIDTH >= arrow_tail + 0.001
     passage_x = drawing._adjuster_axis_keep(drawing.FRONT_CENTER)["PassageCenter"][0]
     assert passage_x < slot_x < text_x
-    assert drawing.ARROWS_OUTSIDE == (
-        "SlitW",
-        "FlangeSlotW",
-        "FlangeSlotNorthZ",
-    )
+    assert drawing.ARROWS_OUTSIDE == ("SlitW",)
 
 
-def test_sheet_drops_to_three_to_two_for_the_flange() -> None:
-    """The flange makes the block 32.8 long; every view centres on that box."""
-    assert drawing.SHEET_SCALE == (3.0, 2.0)
-    assert drawing._S == pytest.approx(0.0015)
-    assert drawing.Z_NORTH - drawing.Z_SOUTH == pytest.approx(
-        part.BLOCK_Z + cone_tip_block_spec.FLANGE_LEN
-    )
-    # *Top shows north down the sheet; the right view shows it on the left.
+def test_every_view_centres_on_the_prism_with_north_where_it_shows() -> None:
+    """The prism's centre is the model origin; *Top shows north down the
+    sheet, the right view on the left, the bottom view up (toward the front
+    view, third angle)."""
+    assert drawing.Z_NORTH - drawing.Z_SOUTH == pytest.approx(part.BLOCK_Z)
     assert drawing._plan_y(drawing.Z_NORTH) < drawing._plan_y(drawing.Z_SOUTH)
     assert drawing._right_x(drawing.Z_NORTH) < drawing._right_x(drawing.Z_SOUTH)
+    assert drawing._bottom_y(drawing.Z_NORTH) > drawing._bottom_y(drawing.Z_SOUTH)
     assert (
         drawing._plan_y(drawing.Z_NORTH) + drawing._plan_y(drawing.Z_SOUTH)
     ) / 2.0 == pytest.approx(drawing.TOP_CENTER[1])
     assert (
         drawing._right_x(drawing.Z_NORTH) + drawing._right_x(drawing.Z_SOUTH)
     ) / 2.0 == pytest.approx(drawing.RIGHT_CENTER[0])
+    assert (
+        drawing._bottom_y(drawing.Z_NORTH) + drawing._bottom_y(drawing.Z_SOUTH)
+    ) / 2.0 == pytest.approx(drawing.BOTTOM_CENTER[1])
 
 
 def test_half_block_station_value_clears_both_witnesses() -> None:
@@ -331,8 +320,8 @@ def test_half_block_station_value_clears_both_witnesses() -> None:
 
     PinchDepthCenter runs from the north face to the pinch-hole centre (the
     model origin), so the value sits between the two witness lines with room
-    on both sides, not on either.  At 3:2 the span is 9.0 mm on the sheet, so
-    each side keeps 1 mm rather than 5637ac42's 2.
+    on both sides, not on either.  At 2:1 the span is 11.75 mm on the sheet,
+    so each side keeps 1 mm rather than 5637ac42's 2.
     """
     text_x = drawing.RIGHT_KEEP["PinchDepthCenter"][0]
     half_width = 0.0065 / 2.0  # a three-character value, measured on 5637ac42
@@ -350,112 +339,6 @@ def test_pinch_depth_dimension_line_stands_between_the_block_and_section_a() -> 
     assert line_y - top >= 0.005
     assert line_y + drawing.VALUE_TEXT_HALF_HEIGHT <= section_foot - 0.005
 
-
-
-def test_flange_thickness_stands_past_the_south_end_short_of_view_b() -> None:
-    south_x = drawing._right_x(drawing.Z_SOUTH)
-    text_x, text_y = drawing.RIGHT_KEEP["FlangeT"]
-    half_width = drawing.VALUE_TEXT_HALF_WIDTH
-    left_view_edge = drawing.LEFT_CENTER[0] - (
-        drawing.Z_NORTH - drawing.Z_SOUTH
-    ) * drawing._S / 2.0
-    assert south_x + 0.004 <= text_x - half_width
-    assert text_x + half_width <= left_view_edge - 0.003
-    assert text_y == pytest.approx(
-        drawing._elevation_y(cone_tip_block_spec.FLANGE_T / 2.0, drawing.RIGHT_CENTER)
-    )
-
-
-def test_plan_values_stand_off_the_part_and_each_other() -> None:
-    """Left of the plan, stepping out: the north and south arc centres, each
-    baselined from the body's south face (r3, option A), then Depth and
-    FlangeLen chained on one line, each value mid-span.  Right: the slot
-    width, its line across the slot's middle.  Above the south end, higher
-    than the A-A arrow: the slot's location from -X (r3's datum)."""
-    keep = drawing.TOP_KEEP
-    half_width = drawing.VALUE_TEXT_HALF_WIDTH
-    plan_left = drawing.TOP_CENTER[0] - part.BLOCK_X * drawing._S / 2.0
-    plan_right = drawing.TOP_CENTER[0] + part.BLOCK_X * drawing._S / 2.0
-    south_face = -part.BLOCK_Z / 2.0
-    assert keep["Depth"][0] == keep["FlangeLen"][0] == drawing.PLAN_CHAIN_X
-    assert keep["Depth"][1] == pytest.approx(drawing._plan_y(0.0))
-    assert keep["FlangeLen"][1] == pytest.approx(
-        drawing._plan_y((south_face + drawing.Z_SOUTH) / 2.0)
-    )
-    north_x, north_y = keep["FlangeSlotNorthZ"]
-    south_x, south_y = keep["FlangeSlotSouthZ"]
-    # Each value mid-span on its own line, the lines stepping out from the
-    # part: a value keeps TEXT_CLEARANCE off the next line out and the part.
-    assert north_y == pytest.approx(
-        drawing._plan_y((south_face + drawing.FLANGE_SLOT_NORTH_CENTER_Z) / 2.0)
-    )
-    assert south_y == pytest.approx(
-        drawing._plan_y((south_face + drawing.FLANGE_SLOT_SOUTH_CENTER_Z) / 2.0)
-    )
-    assert north_x + half_width + drawing.TEXT_CLEARANCE <= plan_left
-    for inner, outer in ((north_x, south_x), (south_x, drawing.PLAN_CHAIN_X)):
-        assert outer + half_width + drawing.TEXT_CLEARANCE <= inner
-    # Both arc centres are located from the south face, not from each other.
-    assert drawing.FLANGE_SLOT_NORTH_CENTER_Z == pytest.approx(
-        south_face - cone_tip_block_spec.FLANGE_SLOT_NORTH_Z
-    )
-    assert drawing.FLANGE_SLOT_SOUTH_CENTER_Z == pytest.approx(
-        south_face - cone_tip_block_spec.FLANGE_SLOT_SOUTH_Z
-    )
-    width_x, width_y = keep["FlangeSlotW"]
-    assert plan_right + drawing.ARROW_LENGTH <= width_x - half_width
-    # Its line, 4.5 mm under the value, runs across the slot's middle, well
-    # inside the straight walls and clear of both arc centres' witnesses.
-    centre_y = drawing._plan_y(drawing.FLANGE_SLOT_CENTER_Z)
-    width_line_y = width_y - drawing.FLANGE_SLOT_W_LINE_DROP
-    assert width_line_y == pytest.approx(centre_y)
-    for arc_z in (drawing.FLANGE_SLOT_NORTH_CENTER_Z, drawing.FLANGE_SLOT_SOUTH_CENTER_Z):
-        assert abs(drawing._plan_y(arc_z) - width_line_y) >= 0.005
-    # "3.97" starts 2 mm right of the plan (287c: 0.2 mm).
-    value_left = width_x - drawing._VALUE_EXTENTS["FlangeSlotW"][0]
-    assert value_left == pytest.approx(plan_right + 0.002)
-    loc_x, loc_y = keep["FlangeSlotX"]
-    assert plan_left < loc_x < drawing.TOP_CENTER[0]
-    assert loc_y - drawing._plan_y(drawing.Z_SOUTH) >= 0.015
-    location_line_y = loc_y - drawing.HORIZONTAL_LINE_DROP
-    # Higher than the A-A arrow: the location's line (and the value on it)
-    # clears the south cutting-plane arrow's head and its letter by
-    # TEXT_CLEARANCE.
-    south_arrow = drawing.sheet_dimension_ink()["section A south"]
-    arrow_top = max(y for segment in south_arrow.arrows for _x, y in segment)
-    south_letter = drawing.sheet_text_boxes()["section A south"]
-    for top in (arrow_top, south_letter[3]):
-        assert top + drawing.TEXT_CLEARANCE <= location_line_y
-    # VIEW C's letter, left of the stem, now stands under the location's
-    # value (r3): clear of the value and of its line by TEXT_CLEARANCE.
-    letter = drawing.sheet_text_boxes()["view C letter"]
-    assert letter[3] + drawing.TEXT_CLEARANCE <= location_line_y
-    assert letter[2] <= drawing.TOP_CENTER[0]
-
-
-def test_slot_location_witness_clears_the_section_line_overshoot() -> None:
-    """Main (a1b154f69 review): FlangeSlotX's witness leaves the slot centre,
-    on section A-A's chain line (the cutting plane is X = 0), so drawn over
-    the chain line's south overshoot the two read as one stroke.  The witness
-    starts WITNESS_CLEAR_OF_SECTION past the overshoot's end -- the sheet's
-    TEXT_CLEARANCE, so the break reads at print scale (Main, 5e8c13351 eye
-    pass: 0.5 mm was too tight) -- and the gap the build sets from the slot
-    centre lands it exactly there."""
-    assert drawing.WITNESS_CLEAR_OF_SECTION == drawing.TEXT_CLEARANCE
-    x = drawing.TOP_CENTER[0]
-    tail = drawing.sheet_section_arrows()["section A south"][0]
-    assert tail[0] == pytest.approx(x)
-    witnesses = [
-        segment
-        for segment in drawing.sheet_dimension_ink()["FlangeSlotX"].lines
-        if all(abs(px - x) < 1e-9 for px, _py in segment)
-    ]
-    assert len(witnesses) == 1
-    start = min(py for _px, py in witnesses[0])
-    assert start >= tail[1] + drawing.WITNESS_CLEAR_OF_SECTION - 1e-12
-    assert drawing._plan_y(
-        drawing.FLANGE_SLOT_CENTER_Z
-    ) + drawing.FLANGE_SLOT_X_CENTRE_WITNESS_GAP == pytest.approx(start)
 
 
 def _matches(finding: str, expected: str) -> bool:
@@ -482,6 +365,7 @@ def _sheet_findings(module) -> list[str]:
         module.sheet_leaders(),
     )
 
+
 def test_sheet_ink_is_clear_and_the_build_places_what_it_audits() -> None:
     assert _sheet_findings(drawing) == []
     drawing.assert_sheet_ink_clear()
@@ -493,6 +377,7 @@ def test_sheet_ink_is_clear_and_the_build_places_what_it_audits() -> None:
         "callout_xy=_adjuster_callout_xy(adjuster_center)",
         "callout_xy=PINCH_CLEARANCE_CALLOUT_XY",
         "callout_xy=PINCH_THREAD_CALLOUT_XY",
+        "callout_xy=FOOT_TAP_CALLOUT_XY",
         "for text, x, y in _sheet_notes(adjuster_center):",
         "adjuster_axis_keep = _adjuster_axis_keep(adjuster_center)",
         "[FOOT_FINISH_CENTER]",
@@ -509,9 +394,11 @@ def test_sheet_ink_is_clear_and_the_build_places_what_it_audits() -> None:
     assert drawing.FOOT_FINISH_CENTER == drawing.BACK_CENTER
     assert drawing.ARROWS_INSIDE == (
         "SlitDepth",
-        "FlangeSlotSouthZ",
         "PinchHeight",
         "PinchDepthCenter",
+        "Depth",
+        "FootTapX",
+        "FootTapZ",
     )
     assert not set(drawing.ARROWS_INSIDE) & set(drawing.ARROWS_OUTSIDE)
 
@@ -610,7 +497,7 @@ def test_the_slid_view_row_fits_the_sheet() -> None:
     """#946 slid the right view and the removed views B and C right to make
     room for the adjuster callout's short leader.  Every view outline, text
     block and dimension line stays inside the frame and off the title block,
-    and no two views' outlines meet."""
+    and no two views' outlines meet (the 2:1 bottom view and isometric too)."""
     views = {**drawing.sheet_view_silhouettes(), "isometric": _isometric_box(drawing)}
     ink = {
         **{f"view {name}": box for name, box in views.items()},
@@ -635,22 +522,18 @@ def test_the_slid_view_row_fits_the_sheet() -> None:
         and box[3] > TITLE_BLOCK[1]
     ]
     assert on_title == []
-    # A view's body and its flange share an edge; different views may not.
-    owner = {name: name.split(" ")[0] if name.startswith(("right", "view B")) else name for name in views}
-    owner["view B body"] = owner["view B flange"] = "view B"
     names = sorted(views)
     touching = [
         (first, second)
         for index, first in enumerate(names)
         for second in names[index + 1 :]
-        if owner[first] != owner[second]
-        and drawing._box_gap(views[first], views[second]) < drawing.TEXT_CLEARANCE
+        if drawing._box_gap(views[first], views[second]) < drawing.TEXT_CLEARANCE
     ]
     assert touching == []
     # The slide is what the callout needs: the right view's north face stands
     # one text clearance past the callout's right end.
     callout = drawing.sheet_text_boxes()["adjuster callout"]
-    assert views["right body"][0] - callout[2] == pytest.approx(
+    assert views["right"][0] - callout[2] == pytest.approx(
         drawing.TEXT_CLEARANCE + drawing.ROUND_OUT, abs=1e-9
     )
 
@@ -662,190 +545,22 @@ def test_no_leader_on_the_sheet_detours_over_the_part() -> None:
     assert long_way == {}
 
 
-def test_flange_slot_travel_covers_the_printed_stack_and_fitting_range() -> None:
-    """Both ends of the existing slot keep a 1 mm margin on the accepted stack."""
-    import cone_gear_stack
-    import cone_line
-    import cone_stack_end_play
-    import cone_tip_bushing_spec
-    import cone_swing_platform_spec
-
-    spec = cone_tip_block_spec
-    general = {1: 0.8, 2: 0.51, 3: 0.13}
-    gear_band = cone_gear_stack.face_band(19, "north")
-    assert gear_band == pytest.approx((0.225, -0.225))
-    assert spec.GEAR_STACK_NORTH_FACE_BAND_MM == pytest.approx(gear_band[0])
-    assert spec.TIP_FEELER_SET_BAND_MM == cone_stack_end_play.TIP_BLOCK_FEELER_BAND
-    assert cone_tip_bushing_spec.DRAWING_PRECISION_BY_NAME["Depth"] == spec.BUSHING_DEPTH_PLACES
-    assert spec.SHAFT_OVERALL_LENGTH_PLACES == spec.COLLAR_WIDTH_PLACES == 3
-    travel = (
-        general[spec.SHAFT_OVERALL_LENGTH_PLACES]
-        + general[spec.COLLAR_WIDTH_PLACES]
-        + gear_band[0]
-        + general[spec.BUSHING_DEPTH_PLACES]
-        + cone_stack_end_play.TIP_BLOCK_FEELER_BAND
-        + general[spec.BLOCK_DEPTH_PLACES]
-    )
-    assert spec.ADJUSTER_EMBED_TRAVEL_MM == pytest.approx(travel) == pytest.approx(0.845)
-    chain = travel + general[spec.PLATE_TIP_SLOT_Z_PLACES] + spec.PLATE_TIP_SLOT_FLOAT
-    assert spec.FIT_UP_CHAIN_MM == pytest.approx(chain) == pytest.approx(1.6525)
-    assert spec.PLATE_TIP_SLOT_FLOAT == pytest.approx((4.0 + 0.10 - 3.505) / 2.0)
-    assert spec.FIT_UP_MARGIN_MM == 1.0
-    assert (spec.FLANGE_SLOT_NORTH_Z, spec.FLANGE_SLOT_SOUTH_Z) == (6.5, 14.9)
-    end_band = general[spec.FLANGE_SLOT_END_PLACES]
-    north = spec.FLANGE_SLOT_Z - chain - (6.5 + end_band - spec.FLANGE_SLOT_FLOAT)
-    south = (14.9 - end_band + spec.FLANGE_SLOT_FLOAT) - (spec.FLANGE_SLOT_Z + chain)
-    assert spec.FIT_UP_NORTH_MARGIN_MM == pytest.approx(north) == pytest.approx(2.029375)
-    assert spec.FIT_UP_SOUTH_MARGIN_MM == pytest.approx(south) == pytest.approx(2.029375)
-    assert min(north, south) >= spec.FIT_UP_MARGIN_MM
-    assert (6.5 + 14.9) / 2.0 == pytest.approx(spec.FLANGE_SLOT_Z)
-    assert spec.FLANGE_SLOT_CTOC == pytest.approx(8.4)
-    assert spec.DRAWING_PRECISION["BlockProfile"]["Depth"] == 3
-    for end in ("North", "South"):
-        assert (
-            spec.DRAWING_PRECISION[f"FlangeSlot{end}Reference"][f"FlangeSlot{end}Z"]
-            == spec.FLANGE_SLOT_END_PLACES
-        )
-    # The pivot/base remains on its original station, while the screw and
-    # block shift south together along the cone station axis.
-    assert cone_line.PIVOT_STATION == pytest.approx(152.27232594770453)
-    assert cone_line.TIP_BLOCK_STATION == pytest.approx(
-        cone_line.T006_NORTH_FACE + cone_tip_bushing_spec.LENGTH
-        + cone_stack_end_play.TIP_BLOCK_FEELER + spec.BLOCK_Z / 2.0
-    )
-    assert cone_line.TIP_BLOCK_STATION - cone_line.PIVOT_STATION == pytest.approx(
-        cone_swing_platform_spec.TIP_SCREW_LOCAL_Z
-    )
-
-
-def test_flange_slot_is_one_pass_of_a_five_thirty_second_end_mill() -> None:
-    spec = cone_tip_block_spec
-    assert spec.FLANGE_SLOT_W == pytest.approx(5.0 / 32.0 * 25.4)
-    # (upper, lower), set through deviations() like every other band.
-    assert spec.FLANGE_SLOT_W_BAND == (0.10, 0.0)
-    assert deviations(spec.FLANGE_SLOT_W_BAND) == (0.0, 0.10)
-    assert spec.FLANGE_SLOT_W - 3.505 >= 0.25
-    assert spec.FLANGE_SLOT_X == spec.BLOCK_X / 2.0
-    assert spec.DRAWING_DIMENSIONS["FlangeSlotProfile"] == {"FlangeSlotW"}
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    assert (
-        'set_dimension_bilateral_tolerance(\n        adapter, "FlangeSlotProfile", '
-        '"FlangeSlotW", *deviations(FLANGE_SLOT_W_BAND)\n    )'
-    ) in source
-
-
-def test_flange_webs_and_nut_clear_the_2_0_target_at_the_printed_limits() -> None:
-    """U27 webs and the nut beside the body's south wall, worst case."""
-    spec = cone_tip_block_spec
-    assert (spec.FLANGE_SLOT_Z, spec.FLANGE_LEN, spec.FLANGE_T) == (10.7, 20.8, 3.50)
-    slot_max = spec.FLANGE_SLOT_W + 0.10
-    width = spec.BLOCK_X
-    # r3: the slot is located .X from -X; the flange's width is .X.
-    assert spec.WORST_FLANGE_SIDE_WEB_MM == pytest.approx(
-        min(width / 2.0 - 0.8, width - 0.8 - (width / 2.0 + 0.8)) - slot_max / 2.0
-    )
-    # r3: each arc centre from the south face, .X.
-    assert spec.WORST_FLANGE_END_WEB_MM == pytest.approx(
-        20.8 - 0.8 - (14.9 + 0.8 + slot_max / 2.0)
-    )
-    assert spec.WORST_FLANGE_ROOT_WEB_MM == pytest.approx(6.5 - 0.8 - slot_max / 2.0)
-    assert spec.WORST_NUT_WALL_AIR_MM == pytest.approx(
-        6.5 - 0.8 - spec.FLANGE_SLOT_FLOAT - spec.HOLDDOWN_NUT_AC / 2.0
-    )
-    for web in (
-        spec.WORST_FLANGE_SIDE_WEB_MM,
-        spec.WORST_FLANGE_END_WEB_MM,
-        spec.WORST_FLANGE_ROOT_WEB_MM,
-    ):
-        assert round(web, 6) >= spec.MIN_WEB_MM == 2.0
-    assert spec.WORST_NUT_WALL_AIR_MM >= spec.NUT_WALL_AIR == 0.5
-    assert spec.NUT_BEARING_MM >= 1.0
-
-
-def test_flange_length_is_its_rule_plus_a_named_end_allowance() -> None:
-    """The flange length is derived, not typed: the slot's south edge at its
-    printed limits, plus the 2.0 web, plus the length's own .X band, rounded
-    up to .X -- then a named allowance, so the end web sits well clear of
-    the floor for a first-time machinist."""
-    spec = cone_tip_block_spec
-    slot_south_edge_max = 14.9 + 0.8 + (spec.FLANGE_SLOT_W + 0.10) / 2.0
-    by_rule = math.ceil((slot_south_edge_max + 2.0 + 0.8) * 10.0 - 1e-6) / 10.0
-    assert by_rule == pytest.approx(20.6)
-    assert spec.FLANGE_END_ALLOWANCE_MM == 0.2
-    assert spec.FLANGE_LEN == round(by_rule + 0.2, 1) == 20.8
-    assert spec.WORST_FLANGE_END_WEB_MM - spec.MIN_WEB_MM == pytest.approx(
-        0.2 + by_rule - (slot_south_edge_max + 2.0 + 0.8)
-    )
-
-
-def test_holddown_screw_stands_a_pitch_past_the_nut_at_the_thickest_stack() -> None:
-    """93075A150 (6-32 x 5/8) into 90631A007: head ledge, shim, flange, nut."""
-    spec = cone_tip_block_spec
-    assert spec.HOLDDOWN_SCREW_LENGTH == pytest.approx(15.875)
-    assert spec.HOLDDOWN_NUT_H == pytest.approx(11.0 / 64.0 * 25.4)
-    assert spec.HOLDDOWN_NUT_AF == pytest.approx(5.0 / 16.0 * 25.4)
-    assert spec.HOLDDOWN_LEDGE_RANGE_MM == (2.71, 3.99)
-    shortest = 15.875 - (3.99 + 2.20 + 3.50 + 0.51 + spec.HOLDDOWN_NUT_H)
-    assert spec.HOLDDOWN_PROTRUSION_MM[0] == pytest.approx(shortest)
-    assert shortest >= 25.4 / 32.0
-
-
-# The flange slot at the printed worst case, as numbers: 5/32 +0.10/0 against
-# the #6-32 major and the 5/16 nut.
-_FLANGE_SLOT_WORST = {
-    "FLANGE_SLOT_W_MIN": 5.0 / 32.0 * 25.4,
-    "FLANGE_SLOT_W_MAX": 5.0 / 32.0 * 25.4 + 0.10,
-    "FLANGE_SLOT_FLOAT": (5.0 / 32.0 * 25.4 + 0.10 - 3.505) / 2.0,
-    "NUT_BEARING_MM": (5.0 / 16.0 * 25.4 - (5.0 / 32.0 * 25.4 + 0.10)) / 2.0,
-}
-
-
-def _flange_slot(namespace) -> dict[str, float]:
-    return {name: getattr(namespace, name) for name in _FLANGE_SLOT_WORST}
-
-
-def test_flange_slot_band_is_read_through_deviations() -> None:
-    """dtscout / Main (I31): pinned at the worst case, and a raw index read of
-    the (upper, lower) band -- or a dropped upper deviation -- moves it."""
-    import re
-    import types
-
-    assert _flange_slot(cone_tip_block_spec) == pytest.approx(_FLANGE_SLOT_WORST, abs=1e-9)
-    source = Path(cone_tip_block_spec.__file__).read_text(encoding="utf-8")
-    assert not re.search(r"_BAND\[", source)
-    for old, new in (
-        (
-            "_FLANGE_SLOT_W_LOWER, _FLANGE_SLOT_W_UPPER = deviations(FLANGE_SLOT_W_BAND)",
-            # Built by concatenation so no raw index appears in this source.
-            "_FLANGE_SLOT_W_LOWER, _FLANGE_SLOT_W_UPPER = "
-            + ", ".join("FLANGE_SLOT_W_BAND" + f"[{i}]" for i in (0, 1)),
-        ),
-        (
-            "FLANGE_SLOT_W_MAX = FLANGE_SLOT_W + _FLANGE_SLOT_W_UPPER",
-            "FLANGE_SLOT_W_MAX = FLANGE_SLOT_W",
-        ),
-    ):
-        assert source.count(old) == 1, old
-        mutant = types.ModuleType("cone_tip_block_spec_mutant")
-        mutant.__file__ = cone_tip_block_spec.__file__
-        try:
-            exec(compile(source.replace(old, new), cone_tip_block_spec.__file__, "exec"), mutant.__dict__)
-        except AssertionError:
-            continue  # an import-time floor caught it
-        assert _flange_slot(mutant) != pytest.approx(_FLANGE_SLOT_WORST, abs=1e-9)
-
 
 # --- r3: codex FIX review of 72ab (C:/src/dt-logs/mreview-i31/block-72ab) ----
 # Every number below is recomputed from the print's own grades
 # (DRAWING_PRECISION) and the title block's general bands, never read back
 # from the spec's stack constants, so each test states the property itself.
+# The three explicit bands are the user's rulings: AxisHeight +/-0.10, and
+# the hold-down tap's two stations +/-0.10 (2026-09-29).
 _GENERAL = {1: 0.8, 2: 0.51, 3: 0.13}
+_EXPLICIT = {"AxisHeight": 0.10, "FootTapX": 0.10, "FootTapZ": 0.10}
 _DRILLED_PLUS = 0.10
 
 
 def _printed(name: str, nominal: float) -> tuple[float, float]:
     places = cone_tip_block_spec.DRAWING_PRECISION_BY_NAME[name]
-    return round(nominal, places) - _GENERAL[places], round(nominal, places) + _GENERAL[places]
+    band = _EXPLICIT.get(name, _GENERAL[places])
+    return round(nominal, places) - band, round(nominal, places) + band
 
 
 def _worst_near_jaw_wall() -> float:
@@ -911,17 +626,22 @@ def test_far_jaw_is_tapped_full_thread_through_to_the_slit() -> None:
     assert spec.PINCH_CLEARANCE_DIA > 0.112 * 25.4  # #4-40 basic major
 
 
-def test_the_tip_depth_prints_three_places_without_overspecifying_other_webs() -> None:
+def test_r3_prints_no_two_place_dimension_it_does_not_need() -> None:
+    """Over-specification: 46.83, 32.27, 8.42 and 8.85 printed .XX with no fit
+    or asserted margin needing it.  The overall height drops to .X, the rise
+    leaves the print (the pinch hole locates from the foot).  2026-09-29: the
+    block's foot sits straight on the platform, so AxisHeight is the block's
+    own fit, .XXX with an explicit +/-0.10."""
     grades = cone_tip_block_spec.DRAWING_PRECISION_BY_NAME
     assert grades["Depth"] == 3
     assert grades["BlockHt"] == 1
-    assert grades["AxisHeight"] == 1
+    assert grades["AxisHeight"] == 3
+    assert "PinchRise" not in grades
+    # Kept .XX, each for a named stack (see the report's list).
     assert {name for name, places in grades.items() if places == 2} == {
-        "PassageCenter",
         "PinchHeight",
         "SlitW",
-        "FlangeT",
-        "FlangeSlotW",
+        "FootTapX",
     }
 
 
@@ -956,37 +676,19 @@ def test_pinch_hole_height_is_located_from_the_foot() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")
     body = source[source.index("async def build(") :]
     call = _reference_call(body, "PinchHeightReference")
-    # Its witness leaves the foot (sketch y 0) at the flange's south end.
-    assert "start=(BLOCK_Z / 2.0 + FLANGE_LEN, 0.0)" in call
+    # Its witness leaves the foot (sketch y 0) at the prism's south corner.
+    assert "start=(BLOCK_Z / 2.0, 0.0)" in call
     assert "end_y=PINCH_BORE_Y" in call
     assert "drive_expression='\"PinchBoreY\"'" in call
-    # Its value stands one value-width outside the flange thickness's, over
-    # VIEW B's flange and short of VIEW B's body.
+    # Its value stands past the south face, short of VIEW B, at half height.
     text_x, text_y = drawing.RIGHT_KEEP["PinchHeight"]
-    flange_t_x = drawing.RIGHT_KEEP["FlangeT"][0]
     half = drawing.VALUE_TEXT_HALF_WIDTH
     silhouettes = drawing.sheet_view_silhouettes()
-    assert flange_t_x + half + drawing.TEXT_CLEARANCE <= text_x - half
-    assert text_x + half <= silhouettes["view B body"][0] - 0.005
-    assert text_y - drawing.VALUE_TEXT_HALF_HEIGHT >= silhouettes["view B flange"][3] + 0.005
+    assert silhouettes["right"][2] + drawing.ARROW_LENGTH <= text_x - half
+    assert text_x + half <= silhouettes["view B"][0] - 0.005
     assert text_y == pytest.approx(
         drawing._elevation_y(spec.PINCH_HEIGHT / 2.0, drawing.RIGHT_CENTER)
     )
-
-
-def test_flange_slot_arc_centres_baseline_from_the_south_face() -> None:
-    """Clarity: each arc centre is located from the body's south face, a face
-    the shop can reach, not from the slot's own midpoint."""
-    spec = cone_tip_block_spec
-    assert spec.DRAWING_DIMENSIONS["FlangeSlotNorthReference"] == {"FlangeSlotNorthZ"}
-    assert spec.DRAWING_DIMENSIONS["FlangeSlotSouthReference"] == {"FlangeSlotSouthZ"}
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    body = source[source.index("async def build(") :]
-    for end in ("North", "South"):
-        call = _reference_call(body, f"FlangeSlot{end}Reference")
-        # Sketch y = -Z on the Top plane: BLOCK_Z / 2 is the south face.
-        assert "start=(-BLOCK_X / 2.0, BLOCK_Z / 2.0)" in call
-        assert f"end_y=BLOCK_Z / 2.0 + FLANGE_SLOT_{end.upper()}_Z" in call
 
 
 def test_slit_breaks_into_the_adjuster_thread_at_the_printed_limits() -> None:
@@ -1003,43 +705,11 @@ def test_slit_breaks_into_the_adjuster_thread_at_the_printed_limits() -> None:
     assert crown_min - floor_max >= 0.25
 
 
-def test_shim_takes_up_the_printed_axis_height_band() -> None:
-    """The fit-up shim sets the adjuster axis on the shaft axis, so its range
-    covers the printed AxisHeight band either way plus the pivot post's
-    cone-axis height band (the post sets the shaft's height).  Read by value:
-    the post's printed band, stacked with the block's, must fit the pack."""
-    import cone_pivot_post_spec
-
-    post_band = cone_pivot_post_spec.JOURNAL_AXIS_HEIGHT_TOLERANCE_MM
-    spec = cone_tip_block_spec
-    assert spec.FIT_UP_SHIM_MARGIN_MM == 0.25
-    assert post_band <= spec.FIT_UP_SHIM_MARGIN_MM
-    low, high = _printed("AxisHeight", spec.ADJUSTER_AXIS_HEIGHT)
-    needed = (
-        spec.SHIM_NOMINAL - (spec.ADJUSTER_AXIS_HEIGHT - low) - post_band,
-        spec.SHIM_NOMINAL + (high - spec.ADJUSTER_AXIS_HEIGHT) + post_band,
-    )
-    assert spec.FOOT_SHIM_RANGE_MM[0] <= needed[0] + 1e-9
-    assert needed[1] <= spec.FOOT_SHIM_RANGE_MM[1] + 1e-9
-
-
-def test_flange_slot_fit_keeps_its_cutter_band_for_a_reason() -> None:
-    """3.97 +0.1/0 is Main's ruled fit: a general .XX band would let the slot
-    come out under the #6-32 major.  The reason is a spec comment and an
-    import-time check, not a sheet note (policy rule 6)."""
-    spec = cone_tip_block_spec
-    assert spec.FLANGE_SLOT_W - _GENERAL[2] < 0.138 * 25.4  # #6-32 basic major
-    lower, upper = deviations(spec.FLANGE_SLOT_W_BAND)
-    assert spec.FLANGE_SLOT_W + lower - 0.138 * 25.4 >= 0.25
-    source = Path(spec.__file__).read_text(encoding="utf-8")
-    assert "the fit is\n# no longer needed" in source
-
-
 # --- r3, round two: the 17 block, the 5/8 pinch screw, the -X datum ---------
 # Main's ruling (option (a), 2026-09-25): a #4-40 x 5/8 18-8 stainless
-# fillister (McMaster 91794A112) in a 17-wide block, PassageCenter and
-# FlangeSlotX printed from the -X face, and a print-worst containment
-# contract.  As above, each number is recomputed from the print's grades.
+# fillister (McMaster 91794A112) in a 17-wide block, PassageCenter printed
+# from the -X face, and a print-worst containment contract.  As above, each
+# number is recomputed from the print's grades.
 _PINCH_MAJOR_MM = 0.112 * 25.4  # #4-40 basic major
 
 
@@ -1072,69 +742,57 @@ def _worst_far_wall_from_head() -> float:
 def test_far_jaw_keeps_1_5d_of_thread_past_the_slits_far_wall() -> None:
     """72ab asserted 1.5D to the NEAR wall, crediting the slit as thread: the
     1/2 screw kept 3.835 (1.35D) past the far wall.  The 5/8 screw keeps
-    5.21 (1.83D) at the printed worst case, the width's band on the head's
-    side under the -X datum."""
+    6.26 (2.20D) at the printed worst case, the width's band on the head's
+    side under the -X datum, Width and PassageCenter at .XXX."""
     spec = cone_tip_block_spec
     engagement = spec.PINCH_SCREW_LENGTH - _worst_far_wall_from_head()
     assert engagement >= 1.5 * _PINCH_MAJOR_MM, engagement
     assert spec.WORST_PINCH_ENGAGEMENT_MM == pytest.approx(engagement)
-    assert engagement == pytest.approx(5.21)
+    assert engagement == pytest.approx(6.26)
 
 
 def test_pinch_screw_tip_stays_inside_the_minus_x_face() -> None:
     """Regression pin (the 1/2 screw passed it too): at the width's lower
-    limit the 5/8 screw's tip stays 0.25 inside the far face."""
+    limit the 5/8 screw's tip stays 0.25 inside the far face; Width at .XXX
+    leaves 0.995."""
     spec = cone_tip_block_spec
     recess = _printed("Width", spec.BLOCK_X)[0] - spec.PINCH_SCREW_LENGTH
     assert recess >= 0.25
     assert spec.WORST_PINCH_TIP_RECESS_MM == pytest.approx(recess)
-    assert recess == pytest.approx(0.325)
+    assert recess == pytest.approx(0.995)
 
 
-def test_axis_and_flange_slot_locate_from_the_minus_x_face() -> None:
-    """Main's datum: PassageCenter, and FlangeSlotX with it, measure from the
-    -X face; the model, the spec and both prints agree."""
+def test_axis_and_hold_down_tap_locate_from_the_minus_x_face() -> None:
+    """Main's datum: PassageCenter, and the hold-down tap's FootTapX with it,
+    measure from the -X face, FootTapZ from the north face; the model, the
+    spec and both prints agree."""
     spec = cone_tip_block_spec
-    for feature in ("PassageCenterReference", "FlangeSlotXReference"):
+    for feature in ("PassageCenterReference", "FootTapXReference"):
         assert _datum_face_x(feature) == pytest.approx(-spec.BLOCK_X / 2.0), feature
     assert spec.PASSAGE_CENTER_DATUM == "-X"
-    # Each print's extension lines rise from the -X face and the centre.
+    # Each print's extension lines rise from its datum face and the centre.
     ink = drawing.sheet_dimension_ink()
     half_x = spec.BLOCK_X * drawing._S / 2.0
 
-    def witnesses(name: str) -> list[float]:
-        return sorted({round(a[0], 9) for a, b in ink[name].lines if a[0] == b[0]})
+    def witnesses(name: str, across: int) -> list[float]:
+        return sorted({round(a[across], 9) for a, b in ink[name].lines if a[across] == b[across]})
 
-    assert witnesses("PassageCenter") == pytest.approx(
+    assert witnesses("PassageCenter", 0) == pytest.approx(
         [drawing.FRONT_CENTER[0] - half_x, drawing.FRONT_CENTER[0]]
     )
-    assert witnesses("FlangeSlotX") == pytest.approx(
-        [drawing._PLAN_LEFT, drawing.TOP_CENTER[0]]
+    tap_x, tap_y = drawing.FOOT_TAP_CENTER
+    assert witnesses("FootTapX", 0) == pytest.approx([drawing._BOTTOM_LEFT, tap_x])
+    assert witnesses("FootTapZ", 1) == pytest.approx(
+        [tap_y, drawing._bottom_y(drawing.Z_NORTH)]
     )
 
-
-def test_print_worst_containment_fails_loud_on_the_east_datum() -> None:
-    """The +X datum fails print-worst plate containment; -X still clears
-    the plate corner by the declared floor and print-worst margin."""
-    import build_drive_train_assembly as drive_train
-
-    spec = cone_tip_block_spec
-    with pytest.raises(AssertionError, match="overhang the swing platform"):
-        drive_train.tip_block_print_worst_containment_mm(spec.worst_half_widths_mm("+X"))
-    margin = drive_train.tip_block_print_worst_containment_mm(
-        spec.worst_half_widths_mm(spec.PASSAGE_CENTER_DATUM)
-    )
-    assert margin >= (
-        drive_train.PLATFORM_CONTAINMENT_FLOOR_MM + drive_train.TIP_PRINT_WORST_MARGIN_MM
-    )
-    assert drive_train.TIP_PRINT_WORST_CONTAINMENT_MM == pytest.approx(margin)
 
 
 def test_print_worst_containment_fails_off_the_plate(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """CodeRabbit (#838): the print-worst check read the plate's side edges by
-    extrapolating them, so a flange run off the plate's south end still found
+    extrapolating them, so a block run off the plate's south end still found
     'plate' there, and the extrapolated edges widen southwards.  A station off
     the plate must fail loud, as the nominal loop's _plat_half_width does."""
     import build_drive_train_assembly as drive_train
@@ -1142,13 +800,8 @@ def test_print_worst_containment_fails_off_the_plate(
     south_end = (
         drive_train.PIVOT_STATION + drive_train.PLAT_OVERHANG - drive_train.PLAT_LEN
     )
-    flange_south = (
-        drive_train.TIP_BLOCK_STATION
-        - drive_train.TIP_BLOCK_Z / 2.0
-        - drive_train.TIP_FLANGE_LEN
-    )
-    past_the_end = drive_train.TIP_FLANGE_LEN + (flange_south - south_end) + 1.0
-    monkeypatch.setattr(drive_train, "TIP_FLANGE_LEN", past_the_end)
+    off_the_end = south_end + drive_train.TIP_BLOCK_Z / 2.0 - 1.0
+    monkeypatch.setattr(drive_train, "TIP_BLOCK_STATION", off_the_end)
     with pytest.raises(AssertionError, match="overhang the swing platform"):
         drive_train.tip_block_print_worst_containment_mm({"+X": 1.0, "-X": 1.0})
     assert drive_train._plat_side_half_widths(south_end - 1.0) == {"+X": -1.0, "-X": -1.0}
@@ -1226,9 +879,10 @@ def test_sheet_audit_sees_section_arrows_run1_hid() -> None:
 def test_section_arrows_stand_clear_of_every_value() -> None:
     """Today both cutting-plane arrows keep ARROW_TEXT_CLEARANCE (2 mm) from
     every text: PassageCenter's value moved to the slit's left with its
-    datum, 2.1 mm from the north arrow (3.5 until #955 dropped that end to
-    clear its letter off the plan); VIEW C's letter is 2.65 mm from the
-    south one.  The build cuts the section where the model draws it."""
+    datum, 3.57 mm from the north arrow on the 9.75 prism (2.5 on the 11.75
+    one, 3.5 until #955 dropped that end to clear its letter off the plan);
+    VIEW C's letter is 2.65 mm from the south one.  The build cuts the
+    section where the model draws it."""
     from _drawing_leaders import distance_to_box
 
     texts = drawing.sheet_text_boxes()
@@ -1241,7 +895,7 @@ def test_section_arrows_stand_clear_of_every_value() -> None:
             nearest = min(distance_to_box(s, box) for s in ink[arrow].arrows)
             gaps[(arrow, name)] = nearest - drawing.ARROW_HALF_WIDTH
     assert min(gaps.values()) >= drawing.ARROW_TEXT_CLEARANCE
-    assert gaps[("section A north", "PassageCenter")] == pytest.approx(0.00209, abs=5e-5)
+    assert gaps[("section A north", "PassageCenter")] == pytest.approx(0.00357, abs=5e-5)
     assert gaps[("section A south", "view C letter")] == pytest.approx(0.00265, abs=5e-5)
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     body = source[source.index("async def build(") :]
@@ -1274,56 +928,91 @@ def test_section_a_north_letter_clears_the_plan() -> None:
     assert _north_letter_ink_gap(drawing.SECTION_NORTH_OVERSHOOT) >= drawing.TEXT_CLEARANCE
 
 
-def test_the_4mm_north_end_left_its_letter_beside_the_plan() -> None:
-    """Fail-first: at the 4 mm overshoot both ends had until #955, the
-    letter stood 1.45 mm off the plan's edge, beside it."""
-    assert _north_letter_ink_gap(0.004) == pytest.approx(0.00145, abs=1e-5)
+def test_the_4mm_north_end_left_its_letter_on_the_plan() -> None:
+    """Fail-first: at the 4 mm overshoot both ends had until #955, the letter
+    stood 1.45 mm off the 3:2 plan's edge; at 2:1 it meets the plan."""
     assert _north_letter_ink_gap(0.004) < drawing.TEXT_CLEARANCE
 
 
-def test_flange_slot_location_prints_one_place() -> None:
-    """Main (r3): FlangeSlotX kept I31's .XX with no stack behind it.  At .X
-    the flange's side webs keep 4.87 (target 2.0), and the hold-down screw
-    can sit 0.8 + 0.51 = 1.31 off the adjuster axis, which the platform's
-    worst cross-slot travel (1.7375, printed 1.74) plus the screw's float in
-    the narrowest flange slot (0.23) takes up with 0.66 to spare (0.25
-    required)."""
+# --- the hold-down tap (user ruling 2026-09-29) -------------------------------
+# MHA-140 rises from under the platform into a blind #4-40 tap in the foot.
+# Each mutation below moves one spec input past a limit the spec guards at
+# import; the unmutated module imports, so the guard is what fails.
+_FOOT_TAP_MUTATIONS = {
+    "screw engages under 1.5D": (
+        "HOLDDOWN_LEDGE_RANGE_MM = (2.21, 3.49)",
+        "HOLDDOWN_LEDGE_RANGE_MM = (2.21, 6.0)",
+    ),
+    "screw reaches the incomplete threads": (
+        "FOOT_THREAD_DEPTH = 8.5",
+        "FOOT_THREAD_DEPTH = 7.5",
+    ),
+    "drill leaves the tap no lead": (
+        "FOOT_DEPTH = 11.1",
+        "FOOT_DEPTH = 8.6",
+    ),
+    "tap station band eats a web": (
+        "FOOT_TAP_STATION_TOL_MM = 0.10",
+        "FOOT_TAP_STATION_TOL_MM = 4.0",
+    ),
+}
+
+
+def _import_mutant(old: str, new: str) -> None:
+    import types
+
+    source = Path(cone_tip_block_spec.__file__).read_text(encoding="utf-8")
+    assert source.count(old) == 1, old
+    mutant = types.ModuleType("cone_tip_block_spec_mutant")
+    mutant.__file__ = cone_tip_block_spec.__file__
+    exec(compile(source.replace(old, new), cone_tip_block_spec.__file__, "exec"), mutant.__dict__)
+
+
+@pytest.mark.parametrize("mutation", sorted(_FOOT_TAP_MUTATIONS))
+def test_spec_refuses_a_hold_down_tap_that_cannot_hold(mutation: str) -> None:
+    with pytest.raises(AssertionError):
+        _import_mutant(*_FOOT_TAP_MUTATIONS[mutation])
+
+
+def test_hold_down_tap_keeps_every_limit_at_the_printed_extremes() -> None:
+    """Recomputed from the print: the screw's longest reach from the
+    platform's thinnest ledge stays 0.25 short of the full thread's shortest
+    print, it engages 1.5D from the thickest ledge, and the thread stands
+    2 mm inside every face at its explicit station bands."""
     spec = cone_tip_block_spec
-    assert spec.DRAWING_PRECISION_BY_NAME["FlangeSlotX"] == 1
-    slot = _printed("FlangeSlotX", spec.FLANGE_SLOT_X)
-    width = _printed("Width", spec.BLOCK_X)
-    lower, upper = deviations(spec.FLANGE_SLOT_W_BAND)
-    side_web = min(slot[0], width[0] - slot[1]) - (spec.FLANGE_SLOT_W + upper) / 2.0
-    assert side_web >= 2.0
-    assert spec.WORST_FLANGE_SIDE_WEB_MM == pytest.approx(side_web)
-    passage = _printed("PassageCenter", spec.BLOCK_X / 2.0)
-    offset = max(slot[1] - passage[0], passage[1] - slot[0])
-    float_min = (spec.FLANGE_SLOT_W + lower - 0.138 * 25.4) / 2.0
-    take_up = 1.7375 + float_min
-    assert offset + 0.25 <= take_up
-    assert spec.WORST_HOLDDOWN_LATERAL_OFFSET_MM == pytest.approx(offset)
-    # The thread table rounds the #6-32 major to 3.505; 0.138 in is 3.5052.
-    assert spec.HOLDDOWN_LATERAL_TAKE_UP_MM == pytest.approx(take_up, abs=1e-3)
-    assert take_up - offset == pytest.approx(0.6595, abs=1e-3)
+    ledge_min, ledge_max = spec.HOLDDOWN_LEDGE_RANGE_MM
+    places = spec.FOOT_DEPTH_PLACES
+    thread_min = round(spec.FOOT_THREAD_DEPTH, places) - _GENERAL[places]
+    assert spec.HOLDDOWN_SCREW_LENGTH - ledge_min <= thread_min - 0.25
+    assert spec.HOLDDOWN_SCREW_LENGTH_MIN - ledge_max >= 1.5 * _PINCH_MAJOR_MM
+    thread_r = _PINCH_MAJOR_MM / 2.0  # the hold-down is #4-40 too
+    x_low, x_high = _printed("FootTapX", spec.FOOT_TAP_X)
+    z_low, z_high = _printed("FootTapZ", spec.FOOT_TAP_Z)
+    width_min = _printed("Width", spec.BLOCK_X)[0]
+    depth_min = _printed("Depth", spec.BLOCK_Z)[0]
+    webs = {
+        "west": x_low - thread_r,
+        "east": width_min - x_high - thread_r,
+        "north": z_low - thread_r,
+        "south": depth_min - z_high - thread_r,
+    }
+    assert min(webs.values()) >= 2.0, webs
 
 
-_PLATFORM_TRAVEL_RIDER = (
-    "merge rider (#838): cone_swing_platform_spec.TIP_LATERAL_TRAVEL_WORST "
-    "lands with #830; when #830 is on the base, import it in "
-    "cone_tip_block_spec and delete this skip"
-)
-
-
-def test_platform_lateral_travel_lockstep() -> None:
-    """The hold-down take-up reads the swing platform's worst lateral travel
-    through a named copy until #830 merges.  Once the platform's own symbol is
-    importable the copy must equal it, so the platform cannot move its travel
-    without this check seeing it."""
-    import cone_swing_platform_spec as platform
-
-    source = getattr(platform, "TIP_LATERAL_TRAVEL_WORST", None)
-    if source is None:
-        pytest.skip(_PLATFORM_TRAVEL_RIDER)
-    assert cone_tip_block_spec.PLATE_TIP_LATERAL_TRAVEL_WORST_MM == pytest.approx(
-        source, abs=1e-9
+def test_foot_tap_callout_reads_as_a_blind_tap_with_both_depths() -> None:
+    """Policy rule 7 on the resolved callout: the thread and its full-thread
+    depth on one line, the tap drill's depth on another, no THRU."""
+    spec = cone_tip_block_spec
+    places = spec.FOOT_DEPTH_PLACES
+    thread = f"{spec.HOLDDOWN_THREAD.lstrip('#')} UNC-2B"
+    full = f"{spec.FOOT_THREAD_DEPTH:.{places}f}"
+    drill = f"{spec.FOOT_DEPTH:.{places}f}"
+    good = {1: f"{thread} x {full}", 2: f"DRILL {spec.FOOT_BORE_DIA:.2f} x {drill}"}
+    assert drawing._foot_tap_callout_resolved(good)
+    assert not drawing._foot_tap_callout_resolved({**good, 2: f"DRILL {spec.FOOT_BORE_DIA:.2f} THRU"})
+    assert not drawing._foot_tap_callout_resolved({**good, 1: thread})
+    assert not drawing._foot_tap_callout_resolved({1: good[1], 2: ""})
+    # The native two places would print 8.50 and 11.10; neither reads as .X.
+    assert not drawing._foot_tap_callout_resolved(
+        {1: f"{thread} x {spec.FOOT_THREAD_DEPTH:.2f}", 2: f"x {spec.FOOT_DEPTH:.2f}"}
     )

@@ -1,31 +1,44 @@
-"""End play of the cone gear stack on MHA-014, set by the tip block's feeler.
+"""End play of the cone gear stack on MHA-014, and of MHA-014 in its bearings.
 
-The stack (MHA-021, twenty MHA-013 and the MHA-096 tip bushing) is pushed onto
-MHA-014's thrust collar at fit-up, and the MHA-092 tip block is slid onto one
-TIP_BLOCK_FEELER leaf laid on the bushing's north face (user ruling
-2026-09-28).  That gap is how far the stack can float north in service.  The
-feeler follows the cylinder bank's rule (cylinder_bank_layout.BANK_END_FEELER):
-the smallest 0.05 blade whose tightest setting keeps MIN_END_PLAY with
-MARGIN_SPARE to spare.
+Two independent floats (user ruling 2026-09-29):
 
-Import-free on purpose: cone_line reads the feeler for the tip block's
-station, and everything that imports cone_line must not pick up the gear
-specs through it.
+* The stack (MHA-021 and the twenty MHA-013) floats on the shaft between
+  MHA-014's integral thrust collar and the MHA-096 set-screw shaft collar.  At
+  fit-up the stack is pushed onto the thrust collar, the MHA-096 collar is
+  pushed against T006 over one COLLAR_FEELER leaf and its set screw locked on
+  the Sec4 D-flat.  That gap is how far the stack can float north in service,
+  whatever the shaft does.  The feeler follows the cylinder bank's rule
+  (cylinder_bank_layout.BANK_END_FEELER): the smallest 0.05 blade whose
+  tightest setting keeps MIN_END_PLAY with MARGIN_SPARE to spare.
+* The shaft floats between the MHA-016 boss (its thrust collar's south face)
+  and the MHA-097 cup (its tip), SHAFT_END_PLAY, set by the cup screw alone.
+  The tip block and the MHA-096 collar never touch
+  (build_drive_train_assembly's collar-to-block air).
+
+Import-free on purpose: the shaft spec, the gear-mesh proof and the assembly
+sheet all read these numbers, and none of them may pick up another spec
+through this module.
 """
 
 from __future__ import annotations
 
 import math
 
-MIN_END_PLAY = 0.10  # running floor: the bushing's oiled brass face on the block
+MIN_END_PLAY = 0.10  # running floor: the stack never clamped on the shaft
 MARGIN_SPARE = 0.25  # novice spare over every floor (cylinder bank rule)
 FEELER_STEP = 0.05  # blades of the metric gauge set
-TIP_BLOCK_FEELER_BAND = 0.10  # set error: the block's hold-down re-set
-TIP_BLOCK_FEELER = FEELER_STEP * math.ceil(
-    round((MIN_END_PLAY + MARGIN_SPARE + TIP_BLOCK_FEELER_BAND) / FEELER_STEP, 9)
+COLLAR_FEELER_BAND = 0.10  # set error: the collar creeps as its set screw bites
+COLLAR_FEELER = FEELER_STEP * math.ceil(
+    round((MIN_END_PLAY + MARGIN_SPARE + COLLAR_FEELER_BAND) / FEELER_STEP, 9)
 )  # 0.45
-# (min, max) float of the stack north off the collar in service.
+# (min, max) float of the stack north off the thrust collar in service.
 STACK_FLOAT = (
-    TIP_BLOCK_FEELER - TIP_BLOCK_FEELER_BAND,
-    TIP_BLOCK_FEELER + TIP_BLOCK_FEELER_BAND,
+    COLLAR_FEELER - COLLAR_FEELER_BAND,
+    COLLAR_FEELER + COLLAR_FEELER_BAND,
 )
+# (min, max) shaft end play at MHA-A03 step 3: the cup screw is run in until
+# the shaft just stops shuttling, then backed off 1/8 turn (0.099 on the
+# #10-32).  0.05: the shaft never runs clamped.  0.25: the most the
+# collar-to-block air, the adjuster's embed window and the drum's engaged-zone
+# margin book for it.
+SHAFT_END_PLAY = (0.05, 0.25)

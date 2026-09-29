@@ -104,8 +104,7 @@ _INSERTED_SOURCES = {
     "lag_screw nameplate rocker_arm_support top_frame tube_frame tube_frame_cap",
     "drive_train": "alignment_pinion arbor_pedestal arbor_set_screw cone_gear cone_gear_shaft "
     "cone_lock_knob cone_pivot_post cone_pivot_screw cone_swing_platform "
-    "cone_tip_adjuster cone_tip_block cone_tip_bushing cone_tip_pinch_screw "
-    "cone_tip_shim "
+    "cone_tip_adjuster cone_tip_block cone_tip_block_screw cone_tip_collar cone_tip_pinch_screw "
     "crank_arm crank_drive_gear crank_handle crank_handle_pivot_screw crank_hub crank_hub_pin crank_pin "
     "crank_pin_eye crank_pin_ring "
     "crank_pinion crank_pinion_pin crankshaft cylinder_end_disc cylinder_gear "
@@ -1444,9 +1443,6 @@ _GRANDFATHERED_BUILDER_EDGES = {
     ("build_drive_train_assembly.py", "build_cone_tip_adjuster"): (
         "dtrefactor: reads BODY_LEN, CUP_DEPTH, CUP_DIA, THREAD"
     ),
-    ("build_drive_train_assembly.py", "build_cone_tip_bushing"): (
-        "dtrefactor: reads BORE_DIA, LENGTH"
-    ),
     ("build_drive_train_assembly.py", "build_cone_tip_pinch_screw"): (
         "dtrefactor: reads SHANK_LEN, THREAD"
     ),
@@ -1664,7 +1660,7 @@ def test_module_deps_are_transitive():
     import (so parts.yaml-driven custom properties stay correctly tracked)."""
     links = _helper_names("build_chain_inner_link.py")
     assert {"_chain_link", "_chain", "_common"} <= links, links
-    assert "_config" in _helper_names("build_cone_tip_bushing.py"), (
+    assert "_config" in _helper_names("build_cone_tip_collar.py"), (
         "lazy _config edge lost"
     )
 

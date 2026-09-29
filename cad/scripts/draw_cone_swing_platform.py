@@ -8,13 +8,14 @@ model.
 
 The platform is an asymmetric steel wedge with a 1/4-in close-clearance pivot
 hole over the stock screw shoulder, paired 1/4-20 post-mount taps, an open
-west-edge lock notch, four rounded plan corners and the counterbored slot
-for the tip block's hidden hold-down screw (U30).  The three plan views run
-1:2 and pivot section A-A 2:1.  Slot detail B enlarges a 12 mm radius
-around the pivot-to-slot region at 2:1, hidden lines dashed, at sheet
-(88, 44) mm, its cutters named by leadered notes; section C-C (1:1),
-cut on the plate-profile plan, runs along the slot for the counterbore
-depth.  The isometric runs 1:3.
+west-edge lock notch, four rounded plan corners and the counterbored #4
+clearance hole for the tip block's single hold-down screw, rising from the
+underside (user ruling 2026-09-29).  The three plan views run 1:2 and pivot
+section A-A 2:1.  Detail B enlarges a 12 mm radius around the pivot-to-hole
+region at 2:1 for the hole's station; section C-C (1:1), cut on the
+plate-profile plan through the hole's axis, shows the underside counterbore
+in solid lines and carries its native Hole Wizard callout.  The isometric
+runs 1:3.
 
 Run with SolidWorks open::
 
@@ -26,15 +27,12 @@ from __future__ import annotations
 import argparse
 import math
 import sys
-from dataclasses import dataclass
-from collections.abc import Sequence
 from typing import Any
 
 import _telemetry
 from _common import CAD_ROOT, _early_bound, _read_member, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_leader_note,
     add_native_hole_callout,
     add_property_linked_note,
     add_surface_finish,
@@ -48,7 +46,6 @@ from _drawing_common import (
     model_point_in_view,
     read_required_properties,
     set_hidden_lines_removed,
-    set_hidden_lines_visible,
     set_dimension_callouts,
     set_reference_dimension,
     stamp_drawing_summary,
@@ -72,14 +69,15 @@ from cone_swing_platform_drawing_spec import (
     DRAWING_PRECISION_BY_NAME,
 )
 from cone_swing_platform_spec import (
+    HOLDDOWN_CBORE_DIA,
+    HOLDDOWN_CLEARANCE_DIA,
+    HOLDDOWN_LOCAL_X,
+    HOLDDOWN_LOCAL_Z,
     PIVOT_HOLE_DIA,
     PLATE_STOCK_CALLOUT,
     PLATE_THICKNESS,
     POST_MOUNT_SPEC,
     SURFACE_FINISHES,
-    TIP_CBORE_W,
-    TIP_SCREW_LOCAL_Z,
-    TIP_SLOT_W,
 )
 from diagnostics.drawing_layout_audit import collect_document, describe_sheet
 
@@ -108,9 +106,7 @@ NOTCH_CENTER = (0.260, 0.190)
 ISO_CENTER = (0.355, 0.205)
 # The section group sits up and right in the open field below the isometric,
 # clear of the lock-notch caption; every section annotation shares this shift.
-# x 0.030, not 0.020: at 0.020 section C-C's 2.80 arrow line ran up through
-# the "(6.35)" stock text left of A-A (aa9766da).  The group's right-hand ink
-# then ends ~410 mm, inside the 419 mm border.
+# The group's right-hand ink ends ~410 mm, inside the 419 mm border.
 SECTION_SHIFT = (0.030, 0.015)
 
 
@@ -168,31 +164,29 @@ SECTION_KEEP = {
     # Outside its witnesses, the text hangs LEFT of the dimension line (away
     # from the plate), right edge on the line and centred on this y.  The
     # three lines (~26 x 15.3 mm) sit in x 0.3035..0.3295, y 0.1213..0.1366:
-    # under the 205.81 witness (0.1379), right of C-C's 2.80 arrow line
-    # (x 0.2993).  The flush widest line sits above the top witness, the
-    # set-back last line beside the arrowhead (aa9766da: "AS SUPPLIED" there
-    # ran its D into it).
+    # under the 205.81 witness (0.1379).  The flush widest line sits above
+    # the top witness, the set-back last line beside the arrowhead (aa9766da:
+    # "AS SUPPLIED" there ran its D into it).
     "PlateThk": _shifted(0.300, 0.114),
     "PivotBearingReliefDepth": _shifted(0.365, 0.115),
 }
 
-# U30 tip-block hold-down slot: too small to dimension at 1:2, so DETAIL B
-# enlarges the pivot-to-slot region of the hole-location plan to 2:1, with
-# hidden lines shown so the underside counterbored slot reads dashed.  At
-# 1:1 (run 7959e994) five dimensions and two cutter callouts crowded a 24 mm
-# circle, texts over the outline and each other; 2:1 gives them the room.
-# The counterbore depth is section C-C's imported dimension.
+# Tip-block hold-down hole (user ruling 2026-09-29): its 10.45 station from
+# the pivot bore is too small to dimension at 1:2 beside the relief, so
+# DETAIL B enlarges the pivot-to-hole region of the hole-location plan to 2:1
+# and carries HoldDownZ and HoldDownX.  The detail inherits the plan's
+# hidden-lines-removed style: the counterbore is on the underside, and its
+# size is stated by the native Hole Wizard callout on section C-C, where it
+# shows in solid lines.
 #
 # The free band is x 0.0127..0.216 under the plan captions (y <= 0.0805)
 # and above the bottom border (y >= 0.0127).  Run e86bf319 put the detail in
 # its right half, where the title block (x >= 0.216, y <= 0.066) boxed its
 # callouts in and its native label fell 8.9 mm through the bottom border.
-# So the relief-fit note moves to the band's lower right and the detail to
-# its left half: the wide callouts get the open field right of the circle.
-# A vertical dimension's text hangs outward from its dimension line (the
-# e86bf319 extents: left of a left-side line, right of a right-side one).
+# So the detail takes the band's left half, section C-C its right half and
+# the relief-fit note its lower right.
 # Sheet +x is model +x (west) and sheet +y is model -z (south) in these plans.
-DETAIL_MODEL_Z = -6.0  # detail circle centre, between the pivot and the slot
+DETAIL_MODEL_Z = -6.0  # detail circle centre, between the pivot and the hole
 DETAIL_RADIUS_MM = 12.0
 DETAIL_SCALE = (2, 1)
 _DETAIL_S = DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
@@ -205,164 +199,74 @@ _DETAIL_S = DETAIL_SCALE[0] / DETAIL_SCALE[1] / 1000.0
 DETAIL_CENTER = (0.0835, 0.045)
 DETAIL_OUTLINE_PAD = 0.0104
 DETAIL_SHEET_RADIUS = DETAIL_RADIUS_MM * _DETAIL_S
-_PIVOT_Y = DETAIL_CENTER[1] + DETAIL_MODEL_Z * _DETAIL_S
-_SLOT_Y = DETAIL_CENTER[1] + (DETAIL_MODEL_Z - TIP_SCREW_LOCAL_Z) * _DETAIL_S
-# Between its extension lines a vertical dimension's text is centred on its
-# dimension line and can collide with it; outside them it hangs outward.
-# Park the pivot-to-slot, slot-width and counterbore-width texts outside
-# their overlapping spans. The slot sits nearest the part, the counterbore
-# outboard, and the pivot-to-slot location alone on the right. The cutters
-# are named by leadered notes, not dimension text.
+DETAIL_PIVOT_Y = DETAIL_CENTER[1] + DETAIL_MODEL_Z * _DETAIL_S
+DETAIL_HOLDDOWN_Y = DETAIL_CENTER[1] + (DETAIL_MODEL_Z - HOLDDOWN_LOCAL_Z) * _DETAIL_S
+DETAIL_HOLDDOWN_X = DETAIL_CENTER[0] + HOLDDOWN_LOCAL_X * _DETAIL_S
+# Between its extension lines a vertical dimension's text is CENTRED on its
+# dimension line, which then runs through it (81788ce9: "11.|00"); outside
+# them the text hangs outward, one edge on the line, centred on the keep y.
+# So HoldDownZ stands LEFT of the detail outline (x 0.0491), its text above
+# the hole's extension line, hanging left toward the border (0.0127) and
+# above the detail label, leaving the band's right half to section C-C.
+# HoldDownX (1.00, pivot bore to hole, 2 mm apart at 2:1) is far too short
+# to hold its text, so its dimension line runs south of the hole's rim
+# (sheet-up) and the text hangs off it to sheet-right, inside the detail,
+# clear of the rim and of the 10.45's extension lines on the left.
 DETAIL_KEEP = {
-    # Right, alone, outboard of both cutter notes: text above the slot-centre
-    # extension line, hanging right and short of the title block. Placing
-    # the dimension line nearer the slot crossed the counterbore note's
-    # leader (the measured drawing layout from the earlier station).
-    "TipSlotZ": (0.175, _SLOT_Y + 0.0045),
-    # Above the circle, each 2.00 outside its own extension lines and under
-    # the plan caption row (y >= 0.0805).  The west one sits in toward the
-    # circle, left of the through-slot leader's path.
-    "TipSlotEastCx": (
-        DETAIL_CENTER[0] - 0.020,
-        DETAIL_CENTER[1] + DETAIL_SHEET_RADIUS + 0.005,
-    ),
-    "TipSlotWestCx": (
-        DETAIL_CENTER[0] + 0.0135,
-        DETAIL_CENTER[1] + DETAIL_SHEET_RADIUS + 0.005,
-    ),
-    # Left, nearest the circle: the through slot, text below its span
-    # (under the counterbore's lower extension line at 0.047).
-    "TipSlotW": (DETAIL_CENTER[0] - 0.0275, _SLOT_Y - 0.014),
-    # Left, outboard: the counterbored slot, text above its span (0.063).
-    "TipCboreW": (DETAIL_CENTER[0] - 0.0465, _SLOT_Y + 0.0135),
+    "HoldDownZ": (0.044, DETAIL_HOLDDOWN_Y + 0.0045),
+    "HoldDownX": (DETAIL_HOLDDOWN_X + 0.012, DETAIL_HOLDDOWN_Y + 0.0095),
 }
-# Arrowheads inside the extension lines: outside, the slot's 8 mm span put
-# an arrow tail across the counterbore's upper extension line (81788ce9).
-DETAIL_ARROWS_INSIDE = ("TipSlotW", "TipCboreW")
-# The cutter that sets each +0.10/0 width band, named by a leadered note
-# (2.5 mm text, anchored upper-left) in the open field right of the circle.
-# Each leader tip lands on the WEST (sheet-right) end arc of its slot, at a
-# sheet angle from that arc's centre.  A leadered note's INote.GetExtent --
-# what the layout audit boxes -- runs from its leader tip to its text, so two
-# notes whose texts sit on the same side of their tips nest (ec70186e: 65.5
-# x 12.1 mm overlap).  The slot note therefore rises from the arc's upper
-# quadrant to text above; the counterbore note drops from its lower quadrant
-# to text below, between pivot-to-slot's extension lines. That dimension's
-# line stands right of the note text, so the leader crosses neither.
-_WEST_ARC_CENTER = (DETAIL_CENTER[0] + 2.0 * _DETAIL_S, _SLOT_Y)
-
-
-@dataclass(frozen=True)
-class CutterNote:
-    """One leadered cutter note: ``text`` at ``text_xy`` pointing at an arc."""
-
-    key: str
-    text: str
-    text_xy: tuple[float, float]
-    feature: str  # the native cut whose end arc the leader names
-    radius_mm: float
-    tip_deg: float  # sheet angle of the tip on the west end arc
-    model_y_mm: float | None  # the arc's face; None = either coincident arc
-
-
-CUTTER_NOTES = (
-    CutterNote(
-        "slot",
-        f"<MOD-DIAM>{TIP_SLOT_W:g} END MILL SLOT THRU",
-        (0.121, 0.0785),
-        "TipScrewSlot",
-        TIP_SLOT_W / 2.0,
-        60.0,
-        PLATE_THICKNESS,  # the visible top-face arc, not the hidden floor one
-    ),
-    CutterNote(
-        "cbore",
-        f"<MOD-DIAM>{TIP_CBORE_W:g} END MILL C'BORE SLOT\nFROM UNDERSIDE",
-        (0.121, 0.047),
-        "TipScrewCbore",
-        TIP_CBORE_W / 2.0,
-        -35.0,
-        None,  # the dashed arc: underside outline and floor edge project as one
-    ),
-)
-CUTTER_NOTE_CHAR_HEIGHT = 0.0025
-# Physical-edge bound on a leader tip, model metres (the R8 proof's bound).
-LEADER_TIP_BOUND_M = 0.00001
-
-
-def cutter_note_tip(note: CutterNote) -> tuple[float, float]:
-    """The sheet point on ``note``'s west end arc its leader must touch."""
-    angle = math.radians(note.tip_deg)
-    r = note.radius_mm * _DETAIL_S
-    return (
-        _WEST_ARC_CENTER[0] + r * math.cos(angle),
-        _WEST_ARC_CENTER[1] + r * math.sin(angle),
-    )
-
-
-def cutter_note_model_tip(note: CutterNote) -> tuple[float, float, float]:
-    """``cutter_note_tip`` in part metres (sheet +x = +x, sheet +y = -z)."""
-    angle = math.radians(note.tip_deg)
-    return (
-        (2.0 + note.radius_mm * math.cos(angle)) / 1000.0,
-        (note.model_y_mm if note.model_y_mm is not None else PLATE_THICKNESS) / 1000.0,
-        (TIP_SCREW_LOCAL_Z - note.radius_mm * math.sin(angle)) / 1000.0,
-    )
 # The native "DETAIL B / SCALE 2:1" label, moved by its measured extent:
-# lower left of its box, in the band's lower-left corner under the slot text.
+# lower left of its box, in the band's lower-left corner.
 DETAIL_LABEL_LOWER_LEFT = (0.016, 0.015)
 # The pivot relief-fit note (2.5 mm text, ~0.095 x 0.018): anchored by its
 # upper-left corner, lower right of the free band, left of the title block.
-# Under pivot-to-slot's lower extension line (0.033), which runs right past
-# this note to reach its dimension line at 0.175, where the lower arrowhead
-# sits on the line's foot: at 0.0315 the first row's top (31.2) stood
-# 1.8 mm under that arrow (arrow-near-text, 2 mm clearance); at 0.029 the
-# rows print 26.2..28.7 down to 15.7, still 3 mm above the border zone
-# (12.7).
-RELIEF_NOTE_XY = (0.120, 0.029)
+# The audit boxed its rows 0.3..13.3 mm under the anchor (run
+# 20260928T090231982Z); at 0.0275 they end at 14.2, 1.5 mm above the border
+# zone (12.7), under section C-C's label (28.5).
+RELIEF_NOTE_XY = (0.120, 0.0275)
 # The MHA-142 named-exception note and its tap-break override (2.5 mm text,
 # two lines, ~141 x 8.8 mm), anchored upper-left in the empty band above the
-# title block (0.066): right of the plan caption row (x <= 0.2185), under the
-# C-C label (y >= 0.0815) and the A-A label (y >= 0.0853).  A sheet must state
-# a named exception (codex review of 68565ace, blocker B1).
+# title block (0.066): right of the plan caption row (x <= 0.2185) and under
+# the A-A label (y >= 0.0853).  A sheet must state a named exception (codex
+# review of 68565ace, blocker B1).
 ENGAGEMENT_NOTE_XY = (0.222, 0.0795)
-# SECTION C-C cuts across the plate along the slot, so the counterbore's
-# depth is an imported model dimension (drawing-simplicity rule 2: a typed
-# "4.20 DEEP" was not).  Its cutting line lives on the 1:2 plate-profile
-# plan, not in detail B: in the detail it lay ON the slot centreline, so
-# pivot-to-slot's extension line ran along it and its arrows sat in every
-# width extension's path.  On the plan the default arrows (looking north,
+# SECTION C-C cuts across the plate through the hold-down hole's axis, so
+# the counterbore opening from the underside shows in solid lines and the
+# native Hole Wizard callout lands on its wall.  Its cutting line lives on
+# the 1:2 plate-profile plan, not in detail B (there it lay ON the hole's
+# extension line).  On the plan the default arrows (looking north,
 # sheet-down) ran beside the 8.0 extension line and through the R8 leader,
 # so the cut looks SOUTH (arrows sheet-up).
 #
-# The line runs PAST both plate edges (a full section, 26.98 mm across at
-# the slot station): as a +-9 mm partial cut its sheet-up arrows sat inside
-# the plate, and the west letter, 42..55 mm south of the cut where the plate
-# flares, landed on the sloped west edge (Main's eye-pass of 8783776d).
+# The line runs PAST both plate edges (a full section, 27.06 mm across at
+# the hold-down station): as a +-9 mm partial cut its sheet-up arrows sat
+# inside the plate, and the west letter, 42..55 mm south of the cut where the
+# plate flares, landed on the sloped west edge (Main's eye-pass of 8783776d).
 # Each end clears its edge at the letter's far station by the letter's half
 # width (5.5 model mm at 1:2) plus 1.5.
-SLOT_SECTION_LINE_X_MM = (-26.0, 24.0)
-# 1:1, full width: the strip is the plate edge-on, 26.98 x 6.35, in the
-# pocket right of the drill callout RD1 (x <= 0.246), under the notch plan
-# (y >= 0.1286) and its lifted caption (y >= 0.1207), with its native label
-# centred directly under it, right of the plan caption row (x <= 0.2185)
-# and above the title block (y 0.066): 8783776d printed the label 50 mm left
-# of its strip.  5 mm lower than aa9766da, to make room for the caption.
-SLOT_SECTION_CENTER = (0.279, 0.1059)
-# Where the depth text hangs: beyond the strip's left end, or mirrored past
-# its right end when SolidWorks attaches the depth at the right-hand
-# counterbore edge (looking south mirrors the strip).
-SLOT_SECTION_KEEP = {
-    "TipCboreDepth": (SLOT_SECTION_CENTER[0] - 0.0205, SLOT_SECTION_CENTER[1]),
-}
-SLOT_SECTION_DEPTH_RIGHT = (SLOT_SECTION_CENTER[0] + 0.0205, SLOT_SECTION_CENTER[1])
-# The native label box measured 46.5 x 16.2 mm; centred under the strip.
-SLOT_SECTION_LABEL_LOWER_LEFT = (SLOT_SECTION_CENTER[0] - 0.02325, 0.0815)
+HOLDDOWN_SECTION_LINE_X_MM = (-26.0, 24.0)
+# 1:1, full width: the strip is the plate edge-on, 27.06 x 6.35 (sheet
+# x 0.1295..0.1565, y 0.0493..0.0557; ~4 mm outline padding), in the free
+# band's right half: right of detail B's outline (x 0.1179), its native label
+# centred under it and above the relief note (y 0.0275).
+HOLDDOWN_SECTION_CENTER = (0.143, 0.0525)
+# The native label box measured 46.5 x 16.2 mm; centred under the strip,
+# its top (0.0447) under the strip's padded outline (0.0453).
+HOLDDOWN_SECTION_LABEL_LOWER_LEFT = (HOLDDOWN_SECTION_CENTER[0] - 0.02325, 0.0285)
+# The hold-down callout (the drilled Ø3.05 THRU ALL, then the Ø5.56
+# counterbore and its 3.50 depth), above and right of the strip.  RD1's
+# render put the text's centre on the requested x and its baseline 2.7 mm
+# under the requested y, so the two lines sit in ~x 0.133..0.183,
+# y 0.062..0.076: over the strip's padded outline (0.0597), under the plan
+# captions (0.0805), left of the title block (0.216).  Its leader drops to
+# the counterbore's sheet-right wall (x ~0.148: the wall is 15.66 west of
+# the strip's east end).
+HOLDDOWN_CALLOUT_XY = (0.158, 0.072)
 # The lock-notch caption sits directly under its own view, not on the plan
-# caption row: there it printed right under "SECTION C-C / SCALE 1:1" and
-# read as that section's caption (aa9766da).  Its 59.7 x 4.8 mm box,
-# anchored upper-left and centred under the notch plan, clears the 7.0
-# arrow tip (y 0.1276) above and the C-C strip (ink top ~0.1152) below.
+# caption row (aa9766da printed it there, where it read as a section's
+# caption).  Its 59.7 x 4.8 mm box, anchored upper-left and centred under
+# the notch plan, clears the 7.0 arrow tip (y 0.1276) above.
 NOTCH_CAPTION_UPPER_LEFT = (NOTCH_CENTER[0] - 0.02985, 0.1255)
 # The pivot on the profile plan, from the NE/NW corner-radius stations below
 # (their fillet centres sit at model (-6.35, -3) and (0.97, -1) mm).
@@ -377,14 +281,12 @@ def plate_edge_mm(z_mm: float, side: int) -> float:
     return _part.WEST_HALF_N + (_part.WEST_HALF_S - _part.WEST_HALF_N) * run
 
 
-def slot_section_line_model_points() -> tuple[tuple[float, float, float], ...]:
-    """The C-C cutting line's ends, part metres, past both edges at the slot."""
+def holddown_section_line_model_points() -> tuple[tuple[float, float, float], ...]:
+    """The C-C cutting line's ends, part metres, past both edges at the hole."""
     return tuple(
-        (x / 1000.0, PLATE_THICKNESS / 1000.0, TIP_SCREW_LOCAL_Z / 1000.0)
-        for x in SLOT_SECTION_LINE_X_MM
+        (x / 1000.0, PLATE_THICKNESS / 1000.0, HOLDDOWN_LOCAL_Z / 1000.0)
+        for x in HOLDDOWN_SECTION_LINE_X_MM
     )
-
-
 
 
 _COSMETIC_THREAD_LAYER = "COSMETIC-THREADS-HIDDEN"
@@ -462,46 +364,29 @@ def _position_section_label(adapter: Any, section: Any) -> None:
         )
 
 
-def _note_annotation_name(note: Any) -> str:
-    annotation = _early_bound(_early_bound(note, "INote").GetAnnotation(), "IAnnotation")
-    return str(annotation.GetName() or "")
-
-
 def _position_view_label(
     adapter: Any,
     view: Any,
     lower_left: tuple[float, float],
     *,
     label: str,
-    added_notes: Sequence[Any] = (),
 ) -> None:
     """Move a view's native label so its box's lower-left lands at ``lower_left``.
 
     The label's anchor is not its box corner, so the move is measured: read
     ``INote.GetExtent``, shift the anchor by the corner's error, read back.
     The sheet scale is pinned first; finalization re-applying it must not
-    move a dynamic label after this readback.
-
-    ``IView::GetNotes`` returns every note in the view, so notes this script
-    added there (detail B's cutter notes: 498160d1 found 3) are excluded by
-    their own annotation names, not by text; exactly one native label must
-    remain.
+    move a dynamic label after this readback.  The script adds no notes to
+    these views, so the native label is the view's one note.
     """
     ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
     sheet = _early_bound(ddoc.GetCurrentSheet(), "ISheet")
     if not sheet.SetScale(*SHEET_SCALE, False, False):
         raise RuntimeError(f"cannot pin sheet scale before {label} placement")
-    added = {_note_annotation_name(item) for item in added_notes}
-    if "" in added or len(added) != len(added_notes):
-        raise RuntimeError(f"{label}: added notes lack distinct annotation names")
     notes = tuple(_read_member(view, "GetNotes") or ())
-    native = [item for item in notes if _note_annotation_name(item) not in added]
-    if len(native) != 1 or len(notes) - len(native) != len(added):
-        raise RuntimeError(
-            f"expected one native {label} beside {len(added)} added notes, "
-            f"found {len(notes)} notes ({len(native)} not added here)"
-        )
-    note = _early_bound(native[0], "INote")
+    if len(notes) != 1:
+        raise RuntimeError(f"expected one native {label}, found {len(notes)} notes")
+    note = _early_bound(notes[0], "INote")
     annotation = _early_bound(_read_member(note, "GetAnnotation"), "IAnnotation")
     for _attempt in range(2):
         extent = tuple(float(v) for v in note.GetExtent())
@@ -653,7 +538,7 @@ def _create_detail_view(
     return detail
 
 
-def _look_slot_section_south(
+def _look_holddown_section_south(
     adapter: Any, parent: Any, section: Any, cut: Any
 ) -> None:
     """Point section C-C's arrows sheet-up (looking south) and prove the strip.
@@ -662,10 +547,9 @@ def _look_slot_section_south(
     arrow-array layouts: with screen-right r and screen-up u, the sight line
     is u x r, so it runs along -z (south) exactly when model +x's sheet-x sign
     times model +y's sheet-y sign is positive.  The strip must be the full
-    width of the 6.35 plate at the slot station, at 1:1 -- the geometry section C-C
-    had in detail B.
+    width of the 6.35 plate at the hold-down station, at 1:1.
     """
-    z = TIP_SCREW_LOCAL_Z / 1000.0
+    z = HOLDDOWN_LOCAL_Z / 1000.0
 
     def x_direction() -> float:
         base = model_point_in_view(adapter, section, (0.0, 0.003, z), label="C-C origin")
@@ -682,8 +566,8 @@ def _look_slot_section_south(
     direction = x_direction()
     if not direction > 0.0:
         raise RuntimeError(f"section C-C still looks north (x/y sign product {direction})")
-    east = plate_edge_mm(TIP_SCREW_LOCAL_Z, -1) / 1000.0
-    west = plate_edge_mm(TIP_SCREW_LOCAL_Z, +1) / 1000.0
+    east = plate_edge_mm(HOLDDOWN_LOCAL_Z, -1) / 1000.0
+    west = plate_edge_mm(HOLDDOWN_LOCAL_Z, +1) / 1000.0
     low = model_point_in_view(
         adapter, section, (east, 0.0, z), label="C-C strip east underside"
     )
@@ -706,202 +590,24 @@ def _look_slot_section_south(
         )
 
 
-def _ink_segments(annotation: Any) -> list[tuple[float, float, float, float]]:
-    """An annotation's straight ink runs, sheet metres (x0, y0, x1, y1).
+def _add_holddown_callout(adapter: Any, section: Any) -> Any:
+    """The hold-down's native Hole Wizard callout, on its counterbore wall.
 
-    ``IDisplayData::GetLineAtIndex3`` ends with startPt[3], endPt[3]; the
-    start index is read from the array length, as the layout audit does.
+    Section C-C cuts through the hole's axis, so the counterbore opening from
+    the underside shows in solid lines; the callout's leader lands on the
+    counterbore wall on the callout's (sheet-right, model +x) side.
     """
-    data = _early_bound(annotation.GetDisplayData(), "IDisplayData")
-    runs = []
-    for index in range(int(data.GetLineCount())):
-        values = [float(v) for v in (data.GetLineAtIndex3(index) or ())]
-        if len(values) < 10:
-            continue
-        start = len(values) - 6
-        runs.append(
-            (values[start], values[start + 1], values[start + 3], values[start + 4])
-        )
-    return runs
-
-
-def _set_arrows_inside(
-    adapter: Any, annotations: list[Any], names: tuple[str, ...]
-) -> None:
-    """Pin the named dimensions' arrowheads between their extension lines."""
-    found = set()
-    for item in annotations:
-        name = dimension_name(adapter, item)
-        if name not in names:
-            continue
-        display = _early_bound(item.GetSpecificAnnotation(), "IDisplayDimension")
-        display.ArrowSide = 0  # swDimensionArrowsSide_e.swDimArrowsInside
-        if int(display.ArrowSide) != 0:
-            raise RuntimeError(f"{name} did not keep its arrows inside")
-        found.add(name)
-    if found != set(names):
-        raise RuntimeError(f"arrows-inside dimensions missing: {set(names) - found}")
-    rebuild_drawing(adapter, label="detail B arrows inside")
-
-
-def _keep_depth_on_its_attached_end(adapter: Any, annotations: list[Any]) -> None:
-    """Park the C-C depth text beside the strip end its extension lines leave.
-
-    Looking south mirrors the strip; SolidWorks attaches the imported depth to
-    whichever end it picks.  Text on the far side would stretch both extension
-    lines across the strip, so if the ink reaches past the strip centre the
-    text moves to the mirrored keep.
-    """
-    matches = [
-        item for item in annotations if dimension_name(adapter, item) == "TipCboreDepth"
-    ]
-    if len(matches) != 1:
-        raise RuntimeError("expected one native counterbore depth in section C-C")
-    annotation = _early_bound(matches[0], "IAnnotation")
-    runs = _ink_segments(annotation)
-    reach = max((max(run[0], run[2]) for run in runs), default=float("-inf"))
-    print(f"TipCboreDepth ink: runs={runs} max_x={reach}")
-    if reach <= SLOT_SECTION_CENTER[0]:
-        return
-    target = (*SLOT_SECTION_DEPTH_RIGHT, 0.0)
-    if not annotation.SetPosition2(*target):
-        raise RuntimeError("failed to move the C-C depth text to the strip's right end")
-    rebuild_drawing(adapter, label="section C-C depth on its attached end")
-    runs = _ink_segments(annotation)
-    low = min((min(run[0], run[2]) for run in runs), default=float("inf"))
-    print(f"TipCboreDepth ink after move: runs={runs} min_x={low}")
-    if low < SLOT_SECTION_CENTER[0]:
-        raise RuntimeError("C-C depth ink still crosses the strip after the move")
-
-
-def _plan_basis_to_model(
-    adapter: Any,
-    view: Any,
-    sheet_xy: tuple[float, float],
-    origin: tuple[float, float, float],
-    *,
-    label: str,
-) -> tuple[float, float, float]:
-    """Invert a plan view's measured X/Z basis at ``origin``'s model Y.
-
-    The R8 proof's inversion, shared by the cutter-note leader proof.
-    """
-    center = model_point_in_view(adapter, view, origin, label=f"{label} origin")
-    px = model_point_in_view(
-        adapter, view, (origin[0] + 0.001, origin[1], origin[2]), label=f"{label} X basis"
+    walls = _section_hole_walls(
+        section, HOLDDOWN_CBORE_DIA / 2.0, label="hold-down counterbore"
     )
-    pz = model_point_in_view(
-        adapter, view, (origin[0], origin[1], origin[2] + 0.001), label=f"{label} Z basis"
-    )
-    xx, xy = px[0] - center[0], px[1] - center[1]
-    zx, zy = pz[0] - center[0], pz[1] - center[1]
-    det = xx * zy - zx * xy
-    if abs(det) < 1e-12:
-        raise RuntimeError(f"{label} plan projection is singular")
-    dx, dy = sheet_xy[0] - center[0], sheet_xy[1] - center[1]
-    return (
-        origin[0] + 0.001 * (dx * zy - zx * dy) / det,
-        origin[1],
-        origin[2] + 0.001 * (xx * dy - dx * xy) / det,
-    )
-
-
-def _add_cutter_note(adapter: Any, view: Any, note: CutterNote) -> Any:
-    """Place one leadered cutter note, then prove its tip is on its arc.
-
-    Same proof as the R8 radius: the leader tip read back off the sheet is
-    inverted through the view's measured plan basis at each candidate edge's
-    model Y, and the trimmed physical edge (``IEdge::GetClosestPointOn``) must
-    lie within ``LEADER_TIP_BOUND_M`` of it.  Candidates are the named cut's
-    own edges on the west end circle (radius and centre to 1e-6 m), limited
-    to ``note.model_y_mm`` when the note names one face.
-    """
-    tip_xy = model_point_in_view(
-        adapter, view, cutter_note_model_tip(note), label=f"{note.key} note tip"
-    )
-    drift = math.dist(tip_xy[:2], cutter_note_tip(note))
-    # The detail's centre lands within 0.5 mm of DETAIL_CENTER (asserted by
-    # _create_detail_view); the layout was checked against that point.
-    if drift > 0.0006:
-        raise RuntimeError(
-            f"{note.key} note tip projects to {tip_xy[:2]}, layout expects "
-            f"{cutter_note_tip(note)} ({drift * 1000:.3f} mm off)"
-        )
-    created = add_leader_note(
+    return add_native_hole_callout(
         adapter,
-        note.text,
-        text_xy=note.text_xy,
-        attach_xy=(tip_xy[0], tip_xy[1]),
-        label=f"{note.key} cutter note",
-        view=view,
+        section,
+        callout_xy=HOLDDOWN_CALLOUT_XY,
+        label="tip-block hold-down counterbored hole",
+        edge=walls[1],
+        process="DRILL",
     )
-    annotation = _early_bound(_early_bound(created, "INote").GetAnnotation(), "IAnnotation")
-    text_format = annotation.GetTextFormat(0)
-    if text_format is None:
-        raise RuntimeError(f"{note.key} cutter note has no text format")
-    text_format.CharHeight = CUTTER_NOTE_CHAR_HEIGHT
-    if not annotation.SetTextFormat(0, False, text_format):
-        raise RuntimeError(f"failed to size the {note.key} cutter note")
-    rebuild_drawing(adapter, label=f"{note.key} cutter note text height")
-
-    points = [float(v) for v in (annotation.GetLeaderPointsAtIndex(0) or ())]
-    if len(points) < 6:
-        raise RuntimeError(f"{note.key} cutter note leader is unreadable")
-    tip = (points[-3], points[-2])
-    document = _early_bound(_early_bound(view, "IView").ReferencedDocument, "IModelDoc2")
-    feature = _early_bound(
-        _early_bound(document, "IPartDoc").FeatureByName(note.feature), "IFeature"
-    )
-    radius_m = note.radius_mm / 1000.0
-    center_x = 0.002  # the west end arc's centre, +TIP_SCREW_HALF_TRAVEL
-    center_z = TIP_SCREW_LOCAL_Z / 1000.0
-    candidates: list[tuple[Any, tuple[float, ...]]] = []
-    for raw_face in feature.GetFaces() or ():
-        for raw_edge in _early_bound(raw_face, "IFace2").GetEdges() or ():
-            edge = _early_bound(raw_edge, "IEdge")
-            if any(int(adapter.swApp.IsSame(edge, item[0])) == 1 for item in candidates):
-                continue
-            curve = _early_bound(edge.GetCurve(), "ICurve")
-            if not curve.IsCircle():
-                continue
-            circle = tuple(float(value) for value in curve.CircleParams)
-            if (
-                abs(circle[6] - radius_m) > 1e-6
-                or abs(circle[0] - center_x) > 1e-6
-                or abs(circle[2] - center_z) > 1e-6
-            ):
-                continue
-            if (
-                note.model_y_mm is not None
-                and abs(circle[1] - note.model_y_mm / 1000.0) > 1e-6
-            ):
-                continue
-            candidates.append((edge, circle))
-    if not candidates:
-        raise RuntimeError(f"{note.feature} has no west end arc for the {note.key} note")
-    distances = []
-    for edge, circle in candidates:
-        model_tip = _plan_basis_to_model(
-            adapter, view, tip, circle[:3], label=f"{note.key} note arc"
-        )
-        closest = tuple(float(value) for value in edge.GetClosestPointOn(*model_tip))
-        distance = math.dist(model_tip, closest[:3])
-        distances.append(distance)
-        print(
-            f"{note.key} cutter note: tip_sheet_m={tip} arc_center_m={circle[:3]} "
-            f"radius_m={circle[6]} tip_model_m={model_tip} "
-            f"closest_model_m={closest[:3]} distance_m={distance}"
-        )
-    if not min(distances) <= LEADER_TIP_BOUND_M:
-        raise RuntimeError(
-            f"{note.key} cutter note leader misses its {note.feature} end arc "
-            f"by {min(distances) * 1000:.4f} mm"
-        )
-    _telemetry.info(
-        f"{note.key} cutter note leader lands on {note.feature}'s west end arc "
-        f"({len(candidates)} candidate edge(s), {min(distances) * 1e6:.2f} um)"
-    )
-    return created
 
 
 def _visible_plan_controls(adapter: Any, view: Any) -> tuple[Any, Any]:
@@ -959,15 +665,14 @@ def _horizontal_section_edge(
     return max(candidates, key=lambda item: item[key_index])[2]
 
 
-def _add_section_hole_axis(adapter: Any, section: Any) -> None:
-    """Draw the pivot-hole axis between the two cut slices of section A-A.
+def _section_hole_walls(section: Any, radius_mm: float, *, label: str) -> dict[int, Any]:
+    """Return the two vertical wall edges of a hole cut at its axis in a section.
 
-    The cut-face-only section shows the hole as a bare gap; without its axis a
-    reader takes the right slice for an unrelated fragment.
+    The section edges carry model coordinates; a hole on the model x = 0 axis
+    shows its walls at x = -/+radius, keyed -1 / +1.
     """
-    radius_mm = PIVOT_HOLE_DIA / 2.0
     walls: dict[int, Any] = {}
-    for raw_edge in visible_view_entities(section, 1, label="pivot hole wall edges"):
+    for raw_edge in visible_view_entities(section, 1, label=f"{label} wall edges"):
         edge = _early_bound(raw_edge, "IEdge")
         start, end = edge.GetStartVertex(), edge.GetEndVertex()
         if start is None or end is None:
@@ -979,31 +684,44 @@ def _add_section_hole_axis(adapter: Any, section: Any) -> None:
         for side in (-1, 1):
             if all(abs(p[0] - side * radius_mm) <= 0.01 for p in (p0, p1)):
                 walls[side] = edge
-                print(f"pivot hole wall {side:+d}: {p0} -> {p1}")
+                print(f"{label} wall {side:+d}: {p0} -> {p1}")
     if set(walls) != {-1, 1}:
-        raise RuntimeError(f"section A-A shows {len(walls)} pivot hole walls, expected 2")
+        raise RuntimeError(f"{label}: section shows {len(walls)} walls, expected 2")
+    return walls
+
+
+def _add_section_hole_axis(
+    adapter: Any, section: Any, radius_mm: float, *, label: str
+) -> None:
+    """Draw a hole's axis between the two cut slices of a cut-face-only section.
+
+    The cut-face-only section shows the hole as a bare gap; without its axis a
+    reader takes one slice for an unrelated fragment.
+    """
+    walls = _section_hole_walls(section, radius_mm, label=label)
     draw = adapter.currentModel
     ddoc = _early_bound(draw, "IDrawingDoc")
     if not ddoc.ActivateView(view_name(adapter, section)):
-        raise RuntimeError("failed to activate section A-A for the hole axis")
+        raise RuntimeError(f"failed to activate the section for the {label} axis")
     draw.ClearSelection2(True)
     selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
     for index, side in enumerate((-1, 1)):
         data = selection_manager.CreateSelectData()
         data.View = section
         if not _early_bound(walls[side], "IEntity").Select4(index > 0, data):
-            raise RuntimeError(f"failed to select pivot hole wall {side:+d}")
+            raise RuntimeError(f"failed to select {label} wall {side:+d}")
     if int(selection_manager.GetSelectedObjectCount2(-1)) != 2:
-        raise RuntimeError("pivot hole axis needs exactly the two wall edges selected")
+        raise RuntimeError(f"{label} axis needs exactly the two wall edges selected")
+    before = len(tuple(_read_member(section, "GetCenterLines") or ()))
     centerline = ddoc.InsertCenterLine2()
     draw.ClearSelection2(True)
     if centerline is None:
-        raise RuntimeError("failed to insert the pivot hole axis in section A-A")
-    rebuild_drawing(adapter, label="section A-A pivot hole axis")
+        raise RuntimeError(f"failed to insert the {label} axis")
+    rebuild_drawing(adapter, label=f"{label} axis")
     lines = tuple(_read_member(section, "GetCenterLines") or ())
-    if not lines:
-        raise RuntimeError("section A-A lost its pivot hole axis")
-    print(f"section A-A centerlines: {len(lines)}")
+    if len(lines) != before + 1:
+        raise RuntimeError(f"{label} axis did not persist ({before} -> {len(lines)})")
+    print(f"{label} centerlines: {len(lines)}")
 
 
 def _section_edge_midpoint(
@@ -1227,7 +945,9 @@ async def build(adapter: Any) -> dict[str, str]:
         raise RuntimeError("pivot section retained geometry beyond the cutting plane")
     _position_section_label(adapter, section)
     set_hidden_lines_removed(adapter, section)
-    _add_section_hole_axis(adapter, section)
+    _add_section_hole_axis(
+        adapter, section, PIVOT_HOLE_DIA / 2.0, label="section A-A pivot hole"
+    )
 
     detail = _create_detail_view(
         adapter,
@@ -1237,10 +957,12 @@ async def build(adapter: Any) -> dict[str, str]:
         view_xy=DETAIL_CENTER,
         detail_label="B",
         scale=DETAIL_SCALE,
-        label="tip screw slot detail",
+        label="hold-down station detail",
     )
-    # Hidden edges dashed, so the underside counterbored slot reads.
-    set_hidden_lines_visible(adapter, detail)
+    # Hidden lines removed: HoldDownZ and HoldDownX run between the pivot bore
+    # and the hold-down hole's visible top-face rims, never to the underside
+    # counterbore.
+    set_hidden_lines_removed(adapter, detail)
     profile_pivot = model_point_in_view(
         adapter, profile, (0.0, PLATE_THICKNESS / 1000.0, 0.0), label="profile pivot"
     )
@@ -1250,26 +972,32 @@ async def build(adapter: Any) -> dict[str, str]:
         _telemetry.warn(
             f"profile pivot landed at {profile_pivot[:2]}, layout assumes {PROFILE_PIVOT_XY}"
         )
-    slot_ends = [
-        model_point_in_view(adapter, profile, point, label=f"slot section end {index}")
-        for index, point in enumerate(slot_section_line_model_points())
+    holddown_ends = [
+        model_point_in_view(adapter, profile, point, label=f"hold-down section end {index}")
+        for index, point in enumerate(holddown_section_line_model_points())
     ]
-    slot_section = create_section_view(
+    holddown_section = create_section_view(
         adapter,
         profile,
-        line_start=slot_ends[0],
-        line_end=slot_ends[1],
-        view_xy=SLOT_SECTION_CENTER,
+        line_start=holddown_ends[0],
+        line_end=holddown_ends[1],
+        view_xy=HOLDDOWN_SECTION_CENTER,
         section_label="C",
         scale=(1, 1),
         partial=False,
-        label="tip screw slot section",
+        label="hold-down hole section",
     )
-    slot_cut = _early_bound(slot_section.GetSection(), "IDrSection")
-    slot_cut.SetDisplayOnlySurfaceCut(True)
-    rebuild_drawing(adapter, label="slot section cut faces only")
-    _look_slot_section_south(adapter, profile, slot_section, slot_cut)
-    set_hidden_lines_removed(adapter, slot_section)
+    holddown_cut = _early_bound(holddown_section.GetSection(), "IDrSection")
+    holddown_cut.SetDisplayOnlySurfaceCut(True)
+    rebuild_drawing(adapter, label="hold-down section cut faces only")
+    _look_holddown_section_south(adapter, profile, holddown_section, holddown_cut)
+    set_hidden_lines_removed(adapter, holddown_section)
+    _add_section_hole_axis(
+        adapter,
+        holddown_section,
+        HOLDDOWN_CLEARANCE_DIA / 2.0,
+        label="section C-C hold-down hole",
+    )
 
     profile_annotations = curate_view_dimensions(
         adapter,
@@ -1329,10 +1057,9 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         detail,
         keep=DETAIL_KEEP,
-        view_label="tip screw slot detail",
+        view_label="hold-down station detail",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    _set_arrows_inside(adapter, detail_annotations, DETAIL_ARROWS_INSIDE)
     # U41: the thickness is the stock's, a reference with no band.
     thickness_annotations = [
         item for item in section_annotations
@@ -1346,14 +1073,6 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(
         adapter, thickness_annotations, {"PlateThk": PLATE_STOCK_CALLOUT}
     )
-    slot_section_annotations = curate_view_dimensions(
-        adapter,
-        slot_section,
-        keep=SLOT_SECTION_KEEP,
-        view_label="tip screw slot section",
-        dimensions_by_feature=DRAWING_DIMENSIONS,
-    )
-    _keep_depth_on_its_attached_end(adapter, slot_section_annotations)
     relief_annotations = [
         item for item in section_annotations
         if dimension_name(adapter, item) == "PivotBearingReliefDepth"
@@ -1369,7 +1088,6 @@ async def build(adapter: Any) -> dict[str, str]:
         *notch_annotations,
         *section_annotations,
         *detail_annotations,
-        *slot_section_annotations,
     ]
     if not auto_center_marks(adapter, feature, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to feature plan")
@@ -1429,28 +1147,24 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(
         adapter, "Pivot Relief Fit", *RELIEF_NOTE_XY, char_height=0.0025
     )
-    cutter_notes = [
-        _add_cutter_note(adapter, detail, cutter_note) for cutter_note in CUTTER_NOTES
-    ]
+    # The hold-down's size, from the underside, where section C-C shows its
+    # counterbore in solid lines (user ruling 2026-09-29).
+    _add_holddown_callout(adapter, holddown_section)
 
     # Annotation insertion can invalidate the exported display geometry.
-    for view in (profile, feature, notch, section, slot_section, iso):
+    for view in (profile, feature, notch, section, detail, holddown_section, iso):
         set_hidden_lines_removed(adapter, view)
-    # Re-assert after the dimensions attach: the shared helper passes through
-    # HLR, so the dashed edge set is regenerated, not a same-mode no-op.
-    set_hidden_lines_visible(adapter, detail)
     # Last, after every annotation and display-mode regen could re-lay it.
     _position_view_label(
         adapter,
         detail,
         DETAIL_LABEL_LOWER_LEFT,
         label="detail B label",
-        added_notes=cutter_notes,
     )
     _position_view_label(
         adapter,
-        slot_section,
-        SLOT_SECTION_LABEL_LOWER_LEFT,
+        holddown_section,
+        HOLDDOWN_SECTION_LABEL_LOWER_LEFT,
         label="section C-C label",
     )
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)

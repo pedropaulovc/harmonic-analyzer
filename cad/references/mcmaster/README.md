@@ -23,9 +23,9 @@ recipes:
 | 90280A199 | `swing-stop-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A201 | `clamp-screw`, `slotted-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A837 | `frame-cross-screw` | Steel Narrow Fillister Head Slotted Screw |
-| 90631A007 | `cone-tip-block-nut` (catalogue-only; no vendor model) | Zinc-Plated Steel Nylon-Insert Locknut |
 | 91247A720 | `knife-hanger-stud` | Medium-Strength Grade 5 Steel Hex Head Screw |
-| 91255A148 | — (diagnostic recipe; `cone-tip-block-screw` until I31) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
+| 91251A108 | `cone-tip-block-screw` (catalogue-only; no vendor model) | Black-Oxide Alloy Steel Socket Head Screw |
+| 91255A148 | — (diagnostic recipe; a former `cone-tip-block-screw`) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91375A106 | `arbor-set-screw` | Alloy Steel Cup-Tip Set Screw |
 | 91410A538 | `gooseneck-set-screw` | Steel Square-Head Cup-Point Set Screw |
 | 91794A112 | `cone-tip-pinch-screw` | 18-8 Stainless Steel Fillister Head Slotted Screw |
@@ -34,8 +34,8 @@ recipes:
 | 91882A221 | `thumb-screw` | Steel Raised Knurled-Head Thumb Screw |
 | 91882A425 | — (diagnostic recipe; `cone-lock-knob` until 2026-09-29) | Steel Raised Knurled-Head Thumb Screw |
 | 9275K141 | `tube-frame-cap` | Metal Round Cap |
+| 9414T1 | `cone-tip-collar` (catalogue-only; no vendor model) | Set Screw Shaft Collar for 1/16" Diameter |
 | 92865A585 | `hex-bolt` | Medium-Strength Grade 5 Steel Hex Head Screw |
-| 93075A150 | `cone-tip-block-screw` (catalogue-only; no vendor model) | Low-Strength Zinc-Plated Steel Hex Head Screw |
 | 93075A194 | `hanger-screw` | Low-Strength Zinc-Plated Steel Hex Head Screw |
 | 93585A190 | `cone-lock-knob` | Stainless Steel High-Profile Knurled-Head Thumb Screw |
 | 94025A150 | — (diagnostic recipe; `cone-tip-adjuster` until rule-12 E11) | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
@@ -129,6 +129,18 @@ Catalog specifications checked on September 10, 2026:
   `5bcc08b043bb1e7a8060c75d32db9f30f1528139478ee2a3f35676ab754c05c8`;
   native SLDPRT
   `0e52851776ee9ac5cd03c4d6ad2b1c07715417e4b97b85f032206cd8c2e3fad2`.
+- [9414T1](https://www.mcmaster.com/9414T1/) (`cone-tip-collar`, MHA-096,
+  replacing the turned brass tip bushing by user ruling 2026-09-29): the
+  product page, read in a headless browser on September 29, 2026, gives a
+  one-piece set screw shaft collar for 1/16 in shaft, 1/4 in OD, 3/16 in
+  wide, black-oxide 1215 carbon steel, with one black-oxide steel hex-socket
+  set screw. The vendor STEP was read locally (not committed) for what the
+  page omits: 45 deg breaks 0.009375 in on all four edges and the #2-56
+  radial cup-point set screw at mid-width, 0.050 in hex socket, its outer
+  end 5/32 in from the axis. The numbers live in `cone_tip_collar_spec.py`;
+  `diag_build_9414T1.py` builds them (flat-ended set screw at the cup rim,
+  threads not modelled). No vendor model is kept here, so it has no replica
+  gate; its standalone diagnostic is a catalog-only run.
 - [90280A197](https://www.mcmaster.com/90280A197/) was read live on
   September 23, 2026: #8-32 UNC class 2A, 3/4 in (19.05 mm) long under the
   head, fully threaded zinc-plated steel, flat tip, ASME B18.6.3; head
@@ -138,8 +150,8 @@ Catalog specifications checked on September 10, 2026:
   this length yet.
 - [91255A148](https://www.mcmaster.com/91255A148/) is the #6-32 x 1/2 in
   black-oxide alloy steel button head hex drive screw that held the cone tip
-  block until I31 (U30, rule-12 W22). `cone-tip-block-screw` is now
-  93075A150 (below); this entry stays as the replica recipe's provenance and
+  block under U30 (rule-12 W22). `cone-tip-block-screw` is now
+  91251A108 (below); this entry stays as the replica recipe's provenance and
   is no longer a machine part. Source: the McMaster product page, supplied by
   the user on September 24, 2026 (an agent fetch that day was refused, HTTP
   403): #6-32 UNC-3A, right hand, flat tip, head Ø0.262 in x 0.073 in, 5/64
@@ -158,19 +170,19 @@ Catalog specifications checked on September 10, 2026:
   Evidence SHA-256: native SLDPRT
   `4b8dac17c6b7e77499209a399342aa51780743b657aec0df7175f227b54e59a0`.
 
-- [93075A150](https://www.mcmaster.com/93075A150/) (`cone-tip-block-screw`,
-  MHA-140, from I31) and [90631A007](https://www.mcmaster.com/90631A007/)
-  (`cone-tip-block-nut`, MHA-146) hold the cone tip block down. Both product
-  pages were read through Browserbase on September 25, 2026. 93075A150 is a
-  #6-32 x 5/8 in low-strength zinc-plated steel hex head screw, ASME
-  B18.6.3, head 1/4 in across flats (0.244 min) and 3/32 in high (0.080 to
-  0.093). 90631A007 is a #6-32 zinc-plated steel nylon-insert locknut, 5/16
-  in across flats and 11/64 in high. They are catalogue-only: no vendor
-  model is downloaded or kept here, so neither has a replica gate. The screw
-  is the 93075A* family (`diag_mcmaster_hex_head.py`, whose laws are the
-  replica-gated 93075A194's) at the catalogue sizes. The nut is its
-  catalogue envelope, a sharp hex prism bored at the tap drill. Their
-  standalone diagnostics are catalog-only runs.
+- [91251A108](https://www.mcmaster.com/91251A108/) (`cone-tip-block-screw`,
+  MHA-140) holds the cone tip block down per the user ruling of September 29,
+  2026 (photo `eight-views-4.png`, lower right): the block stands directly on
+  the cone swing platform, and this one screw rises from under the platform's
+  counterbored clearance hole into a blind #4-40 tap in the block's bottom
+  face. The product page was read in a headless browser on September 29,
+  2026: black-oxide alloy steel socket head screw, #4-40 UNC class 3A, right
+  hand, 3/8 in under the head, fully threaded, flat tip, head Ø0.183 in x
+  0.112 in, 3/32 in hex drive, 170 ksi, Rockwell C37, ASTM A574. The page
+  gives no socket depth; `diag_build_91251A108.py` takes ASME B18.3's #4
+  minimum key engagement, 0.055 in, and a plain cylindrical head. It is
+  catalogue-only: no vendor model is downloaded or kept here, so it has no
+  replica gate, and its standalone diagnostic is a catalog-only run.
 - [98296A027](https://www.mcmaster.com/98296A027/) was read live on
   September 25, 2026: 1050-1095 spring steel slotted spring pin, 1/16 in
   diameter, 1/2 in long, 0.012 in wall, for a 0.062-0.065 in hole,

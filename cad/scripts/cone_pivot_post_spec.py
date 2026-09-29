@@ -158,13 +158,12 @@ CRANK_ABOVE_CONE = CRANK_BORE_HEIGHT - BORE_HEIGHT
 CRANK_ABOVE_CONE_BAND = (0.37, 0.0)
 
 # Cone-axis height above the foot.  The post's journal sets the cone shaft's
-# height; at the shaft's tip MHA-092 is set on MHA-141's shim pack, whose
-# range holds 0.25 beyond the block's own AxisHeight band for this side's
-# terms (cone_tip_block_spec.FIT_UP_SHIM_MARGIN_MM; the plate top is common
-# to both and cancels).  The .XX grade (+/-0.51) overruns that, so the height
-# carries its own symmetric band: the loosest the pack allows, so the
-# machinist gets every hundredth the fit-up can absorb.  The drive train's
-# shim check reads this name.
+# height; at the shaft's tip MHA-092 stands directly on the same platform top
+# (user ruling 2026-09-29, no shim), so the tip's stub must enter the
+# adjuster's cup on this band plus the block's explicit AxisHeight band (the
+# plate top is common to both and cancels).  The .XX grade (+/-0.51)
+# overruns the cup's capture, so the height carries its own symmetric band;
+# build_drive_train_assembly asserts the capture closes.
 JOURNAL_AXIS_HEIGHT_TOLERANCE_MM = 0.25
 
 # Webs around the Ø11.438 crank bore, at print-worst (policy rule 12: 2.0
@@ -305,10 +304,14 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # them.  The cone-axis height and the crank-above-cone spacing (each carries
 # its own explicit band), the crank-axis height the print repeats only as a
 # reference, the two mounting-hole stations and the crank boss's machined
-# north-face station take two.  The plan angle takes
-# one: the title block holds angles to +/-1 deg, so a second place would only
-# suggest a precision nobody sets up for.  Only the two running bores take
-# three, and only because their size limits are what deliver the
+# north-face station take two.  So does the cone boss length (user ruling
+# 2026-09-29, option (a)): the shaft collar bears on its north face, half its
+# band off the post centre, and that half lands on the cone-tip adjuster's
+# engagement (build_drive_train_assembly.TIP_EMBED_WORST_MM), which the .X
+# band's 0.40 pushes out of the block's 1.0D working window.  The plan angle
+# takes one: the title block holds angles to +/-1 deg, so a second place
+# would only suggest a precision nobody sets up for.  Only the two running
+# bores take three, and only because their size limits are what deliver the
 # `shaft_in_bushing` clearance band.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "MainBodyProfile": {"MainBodyDia": 1},
@@ -320,7 +323,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "CrankSprocketBoss": {"CrankBossLen": 1},
     "CrankBoreProfile": {"CrankBoreDia": 3},
     "ConeBossProfile": {"JournalAxisY": 2, "ConeBossDia": 1},
-    "ConeShaftBoss": {"ConeBossLen": 1},
+    "ConeShaftBoss": {"ConeBossLen": 2},
     "JournalBoreProfile": {"JournalBoreDia": 3},
     # BASIC since #906: it feeds the crank bore's angularity frame, so it
     # prints the model's exact angle.

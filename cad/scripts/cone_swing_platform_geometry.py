@@ -14,13 +14,23 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
+import _config
 from cone_swing_platform_spec import (
+    HOLDDOWN_CBORE_DIA,
+    HOLDDOWN_CLEARANCE_DIA,
+    HOLDDOWN_LOCAL_X,
+    HOLDDOWN_LOCAL_Z,
+    HOLDDOWN_STATION_TOL_MM,
     PIVOT_BEARING_RELIEF_DEPTH,
+    PIVOT_BEARING_RELIEF_DIAMETER,
     PIVOT_BEARING_THICKNESS,
+    PIVOT_HOLE_DIA,
     PLATE_THICKNESS,
     POST_ATTACHMENT_SPACING,
     POST_BLOCK_DIA,
+    POST_MOUNT_STATION_TOL_MM,
     POST_MOUNT_TAP_DIA,
+    POST_MOUNT_THREAD_DIA,
 )
 
 PLATE_T = PLATE_THICKNESS  # 1/4" plate
@@ -83,6 +93,68 @@ if POST_FOOT_CONTAINMENT < 0.25:
     )
 if POST_MOUNT_HALF_PITCH + POST_MOUNT_TAP_DIA / 2.0 > _POST_R:
     raise AssertionError("v2 post mount taps fall outside the casting foot")
+
+# Rule-12 webs round the tip-block hold-down hole (user ruling 2026-09-29), at
+# print worst: the outline at .X, relief and counterbore at .XX, drilled holes
+# +0.10, the hole's two stations (HoldDownX, HoldDownZ) at their +/-0.10
+# bands; the post taps at their +/-0.10 bands, judged at the thread major.
+# The relief is on the TOP face only (there the hole is the drilled
+# clearance), the counterbore on the UNDERSIDE only (there the pivot is the
+# bare drilled bore); each web is judged on the face both share.  The plan
+# corner rounds sweep toward their own corners, away from this hole, so the
+# straight edges bound the outline web.
+_GENERAL_1PL_MM = float(str(_config.title_block("linear_1pl")["display"]).lstrip("±"))
+_GENERAL_2PL_MM = float(str(_config.title_block("linear_2pl")["display"]).lstrip("±"))
+_DRILL_OVERSIZE_MM = float(_config.title_block("drilled_hole")["plus_mm"])
+_HOLDDOWN_SHIFT = math.hypot(HOLDDOWN_STATION_TOL_MM, HOLDDOWN_STATION_TOL_MM)
+_HOLDDOWN_THRU_R = (HOLDDOWN_CLEARANCE_DIA + _DRILL_OVERSIZE_MM) / 2.0
+_HOLDDOWN_CBORE_R = (HOLDDOWN_CBORE_DIA + _GENERAL_2PL_MM) / 2.0
+_HOLDDOWN_PIVOT_DIST = math.hypot(HOLDDOWN_LOCAL_X, HOLDDOWN_LOCAL_Z)
+
+
+def _edge_normal_distance(
+    point: tuple[float, float], a: tuple[float, float], b: tuple[float, float]
+) -> float:
+    """Distance from ``point`` to the infinite line through plan points a, b."""
+    (px, pz), (ax, az), (bx, bz) = point, a, b
+    return abs((bx - ax) * (az - pz) - (ax - px) * (bz - az)) / math.hypot(
+        bx - ax, bz - az
+    )
+
+
+_HOLDDOWN_XZ = (HOLDDOWN_LOCAL_X, HOLDDOWN_LOCAL_Z)
+_SOUTH_Z = NORTH_OVERHANG - PLATE_LEN
+HOLDDOWN_WEBS = {
+    "pivot relief (top)": _HOLDDOWN_PIVOT_DIST
+    - _HOLDDOWN_SHIFT
+    - _HOLDDOWN_THRU_R
+    - (PIVOT_BEARING_RELIEF_DIAMETER + _GENERAL_2PL_MM) / 2.0,
+    "pivot bore (underside)": _HOLDDOWN_PIVOT_DIST
+    - _HOLDDOWN_SHIFT
+    - _HOLDDOWN_CBORE_R
+    - (PIVOT_HOLE_DIA + _DRILL_OVERSIZE_MM) / 2.0,
+    **{
+        f"post tap {side}": math.dist(_HOLDDOWN_XZ, tap)
+        - _HOLDDOWN_SHIFT
+        - math.hypot(POST_MOUNT_STATION_TOL_MM, POST_MOUNT_STATION_TOL_MM)
+        - _HOLDDOWN_CBORE_R
+        - POST_MOUNT_THREAD_DIA / 2.0
+        for side, tap in (("west", POST_MOUNT_WEST_XZ), ("east", POST_MOUNT_EAST_XZ))
+    },
+    "north edge": NORTH_OVERHANG - HOLDDOWN_LOCAL_Z,
+    "east edge": _edge_normal_distance(
+        _HOLDDOWN_XZ, (-HALF_WIDTH_N, NORTH_OVERHANG), (-EAST_HALF_S, _SOUTH_Z)
+    ),
+    "west edge": _edge_normal_distance(
+        _HOLDDOWN_XZ, (WEST_HALF_N, NORTH_OVERHANG), (WEST_HALF_S, _SOUTH_Z)
+    ),
+}
+for _edge in ("north edge", "east edge", "west edge"):
+    HOLDDOWN_WEBS[_edge] -= _HOLDDOWN_SHIFT + _HOLDDOWN_CBORE_R + _GENERAL_1PL_MM
+if min(HOLDDOWN_WEBS.values()) < 2.0:
+    raise AssertionError(
+        f"tip-block hold-down leaves a web under the U27 2.0 target: {HOLDDOWN_WEBS}"
+    )
 
 # The open-ended lock notch cuts from the engaged stud seat straight out
 # through the plate's WEST edge. The cone-lock-knob stud is fixed to the base;

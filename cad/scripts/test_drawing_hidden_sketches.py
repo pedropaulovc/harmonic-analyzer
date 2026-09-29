@@ -639,7 +639,6 @@ def test_the_routing_guard_sees_the_known_hidden_sketch_drawings() -> None:
         "cone_gear",
         "cone_pivot_post",
         "cone_tip_block",
-        "cone_tip_shim",
         "cylinder_gear_shaft",
         "harmonic_base",
         "pinion_bracket",

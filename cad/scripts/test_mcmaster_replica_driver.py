@@ -1,6 +1,6 @@
 """Offline contracts for the McMaster replica driver (diag_build_mcmaster.py).
 
-91255A148, the #6-32 button head MHA-140 used until I31, stays in the replica
+91255A148, a #6-32 button head MHA-140 once used, stays in the replica
 fleet only; these driver tests keep using it as the example local-only part.
 """
 
@@ -16,7 +16,7 @@ from _stock_fastener import STOCK_RECIPES
 
 
 def test_91255A148_is_a_diagnostic_recipe_only() -> None:
-    """I31 moved MHA-140 to 93075A150; no production builder imports the old
+    """MHA-140 is now 91251A108; no production builder imports the old
     button head, which stays registered for the replica fleet."""
     from diagnostics import diag_build_mcmaster as driver
 

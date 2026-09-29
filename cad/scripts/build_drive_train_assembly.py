@@ -184,6 +184,8 @@ from cone_line import (
     SHAFT_T120_STATION,
     SIN_I,
     T006_NORTH_FACE,
+    TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET,
+    TIP_BLOCK_PIVOT_OFFSET,
     TIP_BLOCK_STATION,
     X_CRANK,
     X_DRUM,
@@ -308,11 +310,11 @@ def _cone_tip_radius_max(teeth: int) -> float:
 # Cone gear face (cone_gear_spec.FACE_WIDTH = 6.8887: the seat pitch floored
 # to the four places it prints).  The cone set is a SOLID STACK (user ruling
 # 2026-09-28, cone_gear_stack): collar -> 64T -> T120 ... T006, each gear
-# bearing on the one before it.  Every station and the T006 -> bushing ->
-# tip-block stack stay on the historical 6.5 reference face: each gear grew
+# bearing on the one before it.  Every station and the T006 -> stack collar
+# -> tip-block stack stay on the historical 6.5 reference face: each gear grew
 # from its SOUTH face only (seed placed (reference - face)/2 = 0.19435 SOUTH
-# of its station), so all north faces -- and the tip end-play stack against
-# T006 -- are unchanged.  The drum's engaged zone keeps its place about the
+# of its station), so all north faces -- and the tip end against T006 -- are
+# unchanged.  The drum's engaged zone keeps its place about the
 # reference centre (test_cone_gear_mesh_design re-expresses it about the grown
 # centre and holds it inside the face under the stack's axial stations).
 CONE_FACE = CONE_GEAR_FACE_WIDTH
@@ -816,12 +818,14 @@ PINION_PIN_EDGE_NOMINAL_ACTUAL = _SHAFT_NORTH_END - (
 # north of the shaft's rear end, so on disengage the BIG end -- where the
 # gears need the most working-depth separation -- swings the farthest
 # (throw ~ distance from pivot).
-# T006 is the reference gear for the tip-end stack. The bushing bears on its
-# north face; the block is feeler-set one TIP_BLOCK_FEELER off the bushing
-# (cone_stack_end_play, user ruling 2026-09-28), and the pivot stays where it
-# was, now 12.55 north of the block (the platform's TIP_SCREW_LOCAL_Z)
-# (T006_CENTER_STATION, T006_NORTH_FACE, TIP_BLOCK_STATION and PIVOT_STATION
-# come from cone_line; the check below holds them to the parts).
+# T006 is the reference gear for the tip-end stack.  The MHA-096 stack collar
+# is set one COLLAR_FEELER off its north face (cone_stack_end_play); the pivot
+# stays 23.0 north of that face and the tip block's north face
+# TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET south of the pivot, the block growing
+# south from it (user ruling 2026-09-29: its station is fixed by its
+# hold-down hole, not slid at fit-up).  T006_CENTER_STATION, T006_NORTH_FACE,
+# TIP_BLOCK_STATION and PIVOT_STATION come from cone_line; the checks below
+# hold them to the parts.
 
 # --- platform <-> riders fit (SolidWorks-free, import-time) ------------------
 # The platform/post/block parts hardcode their envelopes in THEIR part frames;
@@ -851,21 +855,25 @@ from cone_swing_platform_geometry import (  # noqa: E402
     WEST_HALF_S as PLAT_WEST_S,
 )
 from cone_swing_platform_spec import (  # noqa: E402
+    HOLDDOWN_CBORE_DEPTH as PLAT_HOLDDOWN_CBORE_DEPTH,
+    HOLDDOWN_CLEARANCE_DIA as PLAT_HOLDDOWN_CLEARANCE_DIA,
+    HOLDDOWN_HOLE_SPEC as PLAT_HOLDDOWN_HOLE_SPEC,
+    HOLDDOWN_LEDGE_RANGE as PLAT_HOLDDOWN_LEDGE_RANGE,
+    HOLDDOWN_LOCAL_X as PLAT_HOLDDOWN_LOCAL_X,
+    HOLDDOWN_LOCAL_Z as PLAT_HOLDDOWN_LOCAL_Z,
+    HOLDDOWN_SCREW_HEAD_DIA as PLAT_HOLDDOWN_SCREW_HEAD_DIA,
+    HOLDDOWN_SCREW_HEAD_H as PLAT_HOLDDOWN_SCREW_HEAD_H,
+    HOLDDOWN_STATION_TOL_MM as PLAT_HOLDDOWN_STATION_TOL_MM,
     PIVOT_BEARING_RELIEF_DIAMETER as PLAT_PIVOT_RELIEF_DIA,
     PIVOT_BEARING_THICKNESS as PLAT_PIVOT_BEARING_T,
     PIVOT_HEAD_RADIAL_CLEARANCE as PLAT_PIVOT_HEAD_RADIAL_CLEARANCE,
     PIVOT_HOLE_DIA as PLAT_PIVOT_HOLE_DIA,
     POST_MOUNT_ENGAGEMENT_WORST_DIAMETERS,
     POST_MOUNT_SPEC,
+    POST_MOUNT_STATION_TOL_MM as PLAT_POST_MOUNT_STATION_TOL_MM,
     POST_MOUNT_TAP_EDGE_BREAK,
     POST_MOUNT_THREAD_DIA,
-    TIP_SCREW_LOCAL_Z as PLAT_TIP_SCREW_LOCAL_Z,
-)
-from cone_tip_shim_spec import (  # noqa: E402
-    SHIM_NORTH_Z as TIP_SHIM_NORTH_Z,
-    SHIM_SOUTH_Z as TIP_SHIM_SOUTH_Z,
-    SHIM_T as TIP_SHIM_T,
-    SHIM_X as TIP_SHIM_X,
+
 )
 from post_mount_screw_spec import (  # noqa: E402
     CUT_LENGTH_MM as POST_SCREW_LEN,
@@ -1081,6 +1089,8 @@ from build_cone_pivot_post import (  # noqa: E402
     CRANK_BOSS_LENGTH as POST_CRANK_BOSS_LENGTH,
 )
 from cone_pivot_post_spec import (  # noqa: E402
+    ATTACHMENT_THRU_DIA as POST_ATTACHMENT_THRU_DIA,
+    DRAWING_PRECISION_BY_NAME as POST_DRAWING_PRECISION,
     JOURNAL_AXIS_HEIGHT_TOLERANCE_MM as POST_JOURNAL_AXIS_HEIGHT_TOLERANCE_MM,
 )
 import crank_boss_rim  # noqa: E402
@@ -1091,24 +1101,39 @@ from cone_tip_block_spec import (  # noqa: E402
     ADJUSTER_AXIS_HEIGHT as TIP_ADJUSTER_AXIS_HEIGHT,
     ADJUSTER_EMBED as TIP_ADJ_EMBED,
     ADJUSTER_EMBED_WINDOW as TIP_ADJ_EMBED_WINDOW,
+    AXIS_HEIGHT_TOL_MM as TIP_AXIS_HEIGHT_TOL_MM,
     BLOCK_X as TIP_BLOCK_X,
     BLOCK_Z as TIP_BLOCK_Z,
-    FIT_UP_SHIM_MARGIN_MM as TIP_FIT_UP_SHIM_MARGIN_MM,
-    FLANGE_LEN as TIP_FLANGE_LEN,
-    PASSAGE_CENTER_DATUM as TIP_PASSAGE_CENTER_DATUM,
+    DRAWING_PRECISION_BY_NAME as TIP_DRAWING_PRECISION,
+    FOOT_BORE_SPEC as TIP_FOOT_BORE_SPEC,
+    FOOT_TAP_STATION_TOL_MM as TIP_FOOT_TAP_STATION_TOL_MM,
+    HOLDDOWN_LEDGE_RANGE_MM as TIP_HOLDDOWN_LEDGE_RANGE,
+    HOLDDOWN_SCREW_LENGTH as TIP_HOLDDOWN_SCREW_LENGTH,
+    HOLDDOWN_THREAD as TIP_HOLDDOWN_THREAD,
+    FOOT_TAP_OFFSET_X as TIP_FOOT_TAP_OFFSET_X,
+    FOOT_TAP_X as TIP_FOOT_TAP_X,
+    FOOT_TAP_Z as TIP_FOOT_TAP_Z,
+    PASSAGE_CENTER_PLACES as TIP_PASSAGE_CENTER_PLACES,
     PINCH_BORE_SPEC as TIP_PINCH_BORE_SPEC,
     PINCH_CLEARANCE_SPEC as TIP_PINCH_CLEARANCE_SPEC,
     PINCH_HEIGHT as TIP_PINCH_Y,
     PINCH_SCREW_LENGTH as TIP_PINCH_SCREW_LENGTH,
     PINCH_SCREW_SKU as TIP_PINCH_SCREW_SKU,
     SHAFT_PASSAGE_DIA as TIP_SHAFT_PASSAGE_DIA,
-    SHIM_NOMINAL as TIP_SHIM_NOMINAL,
     WORST_PINCH_FAR_WALL_MM as TIP_WORST_PINCH_FAR_WALL_MM,
-    worst_half_widths_mm as tip_worst_half_widths_mm,
+    printed_band_mm as tip_printed_band_mm,
 )
-from build_cone_tip_bushing import (  # noqa: E402
-    BORE_DIA as BUSH_BORE_DIA,
-    LENGTH as BUSH_LEN,
+from cone_tip_block_screw_spec import (  # noqa: E402
+    HEAD_DIA as HOLDDOWN_HEAD_DIA,
+    HEAD_H as HOLDDOWN_HEAD_H,
+    SHANK_DIA as HOLDDOWN_SHANK_DIA,
+    SHANK_LEN as HOLDDOWN_SHANK_LEN,
+    THREAD as HOLDDOWN_THREAD,
+)
+from cone_tip_collar_spec import (  # noqa: E402
+    BORE_DIA as COLLAR_BORE_DIA,
+    WIDTH as COLLAR_WIDTH,
+    WIDTH_BAND_MM as COLLAR_WIDTH_BAND_MM,
 )
 from build_cone_tip_adjuster import (  # noqa: E402
     BODY_LEN as ADJ_LEN,
@@ -1122,13 +1147,25 @@ from build_cone_tip_pinch_screw import (  # noqa: E402
     THREAD as PINCH_THREAD,
 )
 from cone_gear_shaft_spec import (  # noqa: E402
+    DRAWING_PRECISION_BY_NAME as SHAFT_DRAWING_PRECISION,
     ADJUSTER_EMBED as ADJ_EMBED,
     COLLAR_END_STATION as SHAFT_COLLAR_END,
     COLLAR_START_STATION as SHAFT_COLLAR_START,
     FRONT_STUB as SHAFT_FRONT_STUB,
+    PIVOT_FROM_T006_NORTH_FACE as SHAFT_PIVOT_FROM_T006,
     SECTIONS as SHAFT_SECTIONS,
+    TIP_BLOCK_LENGTH as SHAFT_TIP_BLOCK_LENGTH,
+    TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET as SHAFT_TIP_BLOCK_NORTH_OFFSET,
+    TIP_COLLAR_END_STATION as SHAFT_TIP_COLLAR_END,
+    TIP_COLLAR_START_STATION as SHAFT_TIP_COLLAR_START,
+    printed_band as shaft_printed_band,
 )
-from cone_stack_end_play import TIP_BLOCK_FEELER  # noqa: E402
+import cone_gear_stack  # noqa: E402
+from cone_stack_end_play import (  # noqa: E402
+    COLLAR_FEELER,
+    COLLAR_FEELER_BAND,
+    SHAFT_END_PLAY,
+)
 
 
 def _require_tapped_thread(
@@ -1154,42 +1191,56 @@ def _require_clearance_size(label: str, screw_thread: str, hole_spec) -> None:
         )
 
 
-# The block is feeler-set off the bushing, and the platform's tip-screw slot
-# is laid out from the pivot to the block's station.
-_TIP_BLOCK_STACK = T006_NORTH_FACE + BUSH_LEN + TIP_BLOCK_FEELER + TIP_BLOCK_Z / 2.0
+# User ruling 2026-09-29 (eight-views-4.png, lower right): the tip block is a
+# straight prism standing directly on the platform, its station fixed by ONE
+# hold-down hole under its centre; its north face stands
+# TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET south of the pivot and the block grows
+# south from it.  The platform's hole, cone_line and the shaft spec's own copy
+# of the stack must agree, and the hole sits as far off the cone line as the
+# block's foot tap sits off its adjuster axis, so the block stands centred on
+# the line.  The MHA-096 collar sits one COLLAR_FEELER off T006.
 if (
-    abs(TIP_BLOCK_STATION - _TIP_BLOCK_STACK) > 1e-9
-    or abs(TIP_BLOCK_STATION - PIVOT_STATION - PLAT_TIP_SCREW_LOCAL_Z) > 1e-9
+    abs(TIP_BLOCK_STATION + TIP_BLOCK_Z / 2.0 - (PIVOT_STATION - TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET)) > 1e-9
+    or abs(TIP_BLOCK_STATION - (PIVOT_STATION - TIP_BLOCK_PIVOT_OFFSET)) > 1e-9
+    or abs(PLAT_HOLDDOWN_LOCAL_Z + TIP_BLOCK_PIVOT_OFFSET) > 1e-9
+    or abs(PLAT_HOLDDOWN_LOCAL_X - TIP_FOOT_TAP_OFFSET_X) > 1e-9
+    or abs(TIP_FOOT_TAP_Z - TIP_BLOCK_Z / 2.0) > 1e-9
+    or abs(SHAFT_TIP_BLOCK_NORTH_OFFSET - TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET) > 1e-9
+    or abs(SHAFT_PIVOT_FROM_T006 - (PIVOT_STATION - T006_NORTH_FACE)) > 1e-9
+    or abs(SHAFT_TIP_BLOCK_LENGTH - TIP_BLOCK_Z) > 1e-9
+    or abs(SHAFT_TIP_COLLAR_START - (T006_NORTH_FACE + COLLAR_FEELER)) > 1e-9
+    or abs(SHAFT_TIP_COLLAR_END - SHAFT_TIP_COLLAR_START - COLLAR_WIDTH) > 1e-9
 ):
-    raise AssertionError("cone_line tip-end stack drifted from the bushing/block/platform parts")
+    raise AssertionError("cone_line tip-end stack drifted from the platform/collar/block parts")
 # One journal drive height across the platform and both riders: plate
-# thickness under each foot + bore height = 54 above the base top.
+# thickness under each foot + bore height = 54 above the base top.  The block
+# stands straight on PlateTop (no shim).
 if (
     abs((Y_DRIVE - Y_BASE_TOP) - (PLAT_T + POST_BORE_HEIGHT)) > 1e-9
-    or abs(
-        (Y_DRIVE - Y_BASE_TOP) - (PLAT_T + TIP_SHIM_NOMINAL + TIP_ADJUSTER_AXIS_HEIGHT)
-    )
-    > 1e-9
+    or abs((Y_DRIVE - Y_BASE_TOP) - (PLAT_T + TIP_ADJUSTER_AXIS_HEIGHT)) > 1e-9
 ):
     raise AssertionError("cone axis height drifted between platform/post/block")
-# r3: the tip block's fit-up shim takes up its printed AxisHeight band plus a
-# margin for this side's terms: the pivot post sets the shaft's height, its
-# cone-axis height held to its named symmetric band.  The plate top is
-# common to both riders and cancels.
-if POST_JOURNAL_AXIS_HEIGHT_TOLERANCE_MM > TIP_FIT_UP_SHIM_MARGIN_MM:
-    raise AssertionError("the tip-block shim margin no longer covers the post's axis-height band")
-# U30 stack (I24): PlateTop | MHA-141 shim pack | block foot. The shim is
-# modelled at the nominal pack and covers the block's foot face exactly -- the
-# full width, from the I31 foot flange's south end to the block's north face
-# -- so the foot rests on it across the whole face.
-if abs(TIP_SHIM_T - TIP_SHIM_NOMINAL) > 1e-9:
-    raise AssertionError("MHA-141 shim thickness differs from the block's nominal pack")
+# The hold-down (MHA-140): the placed part is the screw the block and the
+# platform were sized for, and the platform's printed ledge range is the one
+# the block's engagement/reach stack reads.
+_require_tapped_thread("cone-tip hold-down", HOLDDOWN_THREAD, TIP_FOOT_BORE_SPEC)
 if (
-    abs(TIP_SHIM_X - TIP_BLOCK_X) > 1e-9
-    or abs(TIP_SHIM_SOUTH_Z - (-TIP_BLOCK_Z / 2.0 - TIP_FLANGE_LEN)) > 1e-9
-    or abs(TIP_SHIM_NORTH_Z - TIP_BLOCK_Z / 2.0) > 1e-9
+    HOLDDOWN_THREAD != TIP_HOLDDOWN_THREAD
+    or abs(HOLDDOWN_SHANK_LEN - TIP_HOLDDOWN_SCREW_LENGTH) > 1e-9
+    or abs(HOLDDOWN_HEAD_DIA - PLAT_HOLDDOWN_SCREW_HEAD_DIA) > 1e-9
+    or abs(HOLDDOWN_HEAD_H - PLAT_HOLDDOWN_SCREW_HEAD_H) > 1e-9
 ):
-    raise AssertionError("MHA-141 shim footprint differs from the tip block foot face")
+    raise AssertionError("MHA-140 is not the screw the tip block and platform were sized for")
+if PLAT_HOLDDOWN_HOLE_SPEC.size != HOLDDOWN_THREAD.split("-", 1)[0]:
+    raise AssertionError("platform hold-down counterbore is not sized for MHA-140")
+if any(
+    abs(_have - _want) > 1e-9
+    for _have, _want in zip(PLAT_HOLDDOWN_LEDGE_RANGE, TIP_HOLDDOWN_LEDGE_RANGE, strict=True)
+):
+    raise AssertionError(
+        f"platform hold-down ledge {PLAT_HOLDDOWN_LEDGE_RANGE} differs from the "
+        f"range the tip block's engagement stack reads {TIP_HOLDDOWN_LEDGE_RANGE}"
+    )
 # U30 post mount (I22): each MHA-142 seats on the MHA-016 counterbore floor and
 # is cut to fit into the MHA-091 tap: never proud of the plate underside, and
 # at least 0.90D of thread (U37c/U41's named exception to rule 12) both at the
@@ -1212,16 +1263,18 @@ if abs(SHAFT_FRONT_STATION + SHAFT_FRONT_STUB) > 1e-9:
 
 
 def _plat_side_half_widths(s: float) -> dict[str, float]:
-    """The plate's own east (+X) and west (-X) half-widths at cone station
-    ``s``; both negative if s is off the plate, so a rider run past either
-    end fails its containment check instead of reading extrapolated edges."""
+    """The plate's own half-widths at cone station ``s`` on its local +x
+    (west) and -x (east) sides, keyed by the sign a rider placed with the
+    plate's ROT_Y_INCLINE shares; both negative if s is off the plate, so a
+    rider run past either end fails its containment check instead of reading
+    extrapolated edges."""
     z_local = s - PIVOT_STATION  # platform local z (+ along increasing station)
     if not (PLAT_OVERHANG - PLAT_LEN - 1e-9 <= z_local <= PLAT_OVERHANG + 1e-9):
         return {"+X": -1.0, "-X": -1.0}
     frac = (PLAT_OVERHANG - z_local) / PLAT_LEN
     return {
-        "+X": PLAT_EAST_N + (PLAT_EAST_S - PLAT_EAST_N) * frac,
-        "-X": PLAT_WEST_N + (PLAT_WEST_S - PLAT_WEST_N) * frac,
+        "+X": PLAT_WEST_N + (PLAT_WEST_S - PLAT_WEST_N) * frac,
+        "-X": PLAT_EAST_N + (PLAT_EAST_S - PLAT_EAST_N) * frac,
     }
 
 
@@ -1246,9 +1299,9 @@ PLATFORM_RIDER_SPANS: dict[str, tuple[float, float, float]] = {
         POST_STATION + POST_BLOCK_DIA / 2.0,
         POST_BLOCK_DIA / 2.0,
     ),
-    # I31: the block's foot runs FLANGE_LEN further south as its flange.
+    # The straight prism's foot is its full plan section.
     "tip block": (
-        TIP_BLOCK_STATION - TIP_BLOCK_Z / 2.0 - TIP_FLANGE_LEN,
+        TIP_BLOCK_STATION - TIP_BLOCK_Z / 2.0,
         TIP_BLOCK_STATION + TIP_BLOCK_Z / 2.0,
         TIP_BLOCK_X / 2.0,
     ),
@@ -1263,25 +1316,24 @@ for _lbl, (_south, _north, _hx) in PLATFORM_RIDER_SPANS.items():
 
 # r3 (Main, 2026-09-25): the tip block also stands on the plate at its PRINT's
 # worst case.  Its two side faces sit asymmetrically there -- PassageCenter
-# (.XX) locates the adjuster axis, which the shaft puts on the plan line, from
-# one face and the width's .X band lands on the other -- so each face is held
+# and FootTapX locate the adjuster axis and the hold-down tap from the -X
+# face and the width's band lands on the other -- so each face is held
 # against its own plate edge, the block's +X (pinch-head) face against the
-# east edge and its -X face against the trimmed west one, with the nominal
+# trimmed west edge and its -X face against the east one, with the nominal
 # contract's PLATFORM_CONTAINMENT_FLOOR_MM plus TIP_PRINT_WORST_MARGIN_MM,
-# from the body's north face
-# to the foot flange's south end (the flange is the block's full width, and
-# the plate's edges run straight between those stations).
+# from the north face to the south face (the plate's edges run straight
+# between those stations).
 TIP_PRINT_WORST_MARGIN_MM = 0.25
 
 
 def tip_block_print_worst_containment_mm(half_widths: dict[str, float]) -> float:
     """Least plate edge left outside the block's side faces, over its whole
-    footprint, given each face's worst distance from the adjuster axis; raise
-    if it is under the floor plus the print-worst margin."""
+    footprint, given each face's worst distance from the plate centreline;
+    raise if it is under the floor plus the print-worst margin."""
     margins = [
         _plat_side_half_widths(end)[face] - half_widths[face]
         for end in (
-            TIP_BLOCK_STATION - TIP_BLOCK_Z / 2.0 - TIP_FLANGE_LEN,
+            TIP_BLOCK_STATION - TIP_BLOCK_Z / 2.0,
             TIP_BLOCK_STATION + TIP_BLOCK_Z / 2.0,
         )
         for face in ("+X", "-X")
@@ -1296,14 +1348,41 @@ def tip_block_print_worst_containment_mm(half_widths: dict[str, float]) -> float
     return margin
 
 
+# --- where the hold-down puts the tip block (user ruling 2026-09-29) --------
+# The block is located by its foot tap on MHA-140 in the platform's hold-down
+# hole, not slid to the shaft at fit-up, so every station it used to take up
+# closes by print tolerance.  The screw floats in its drilled close-clearance
+# hole; the hole's two stations from the pivot bore (HoldDownX, HoldDownZ)
+# and the tap's two stations carry explicit +/-0.10 bands.
+_DRILLED_HOLE_PLUS_MM = float(
+    str(_config.title_block("drilled_hole")["display_plus"]).lstrip("+")
+)
+HOLDDOWN_SCREW_FLOAT_MM = (
+    PLAT_HOLDDOWN_CLEARANCE_DIA + _DRILLED_HOLE_PLUS_MM - HOLDDOWN_SHANK_DIA
+) / 2.0
+# Block north face along the cone axis, about its nominal station off the
+# pivot bore.
+TIP_NORTH_FACE_BAND_MM = (
+    PLAT_HOLDDOWN_STATION_TOL_MM + HOLDDOWN_SCREW_FLOAT_MM + TIP_FOOT_TAP_STATION_TOL_MM
+)
+# The tap's lateral station about its nominal PLAT_HOLDDOWN_LOCAL_X.
+TIP_TAP_LATERAL_BAND_MM = (
+    PLAT_HOLDDOWN_STATION_TOL_MM + HOLDDOWN_SCREW_FLOAT_MM + TIP_FOOT_TAP_STATION_TOL_MM
+)
+# Each side face's worst distance from the plate centreline: the tap stands
+# at PLAT_HOLDDOWN_LOCAL_X, the -X face FootTapX to its -X side, and the +X
+# face the width on from there.
+_TIP_WIDTH_MAX = TIP_BLOCK_X + tip_printed_band_mm(TIP_DRAWING_PRECISION["Width"])
+TIP_WORST_HALF_WIDTHS_MM = {
+    "-X": TIP_FOOT_TAP_X - PLAT_HOLDDOWN_LOCAL_X + TIP_TAP_LATERAL_BAND_MM,
+    "+X": _TIP_WIDTH_MAX - TIP_FOOT_TAP_X + PLAT_HOLDDOWN_LOCAL_X + TIP_TAP_LATERAL_BAND_MM,
+}
 TIP_PRINT_WORST_CONTAINMENT_MM = tip_block_print_worst_containment_mm(
-    tip_worst_half_widths_mm(TIP_PASSAGE_CENTER_DATUM)
+    TIP_WORST_HALF_WIDTHS_MM
 )
 # Where the tip ends is owned by the end-play stack below: it sits on the
 # adjuster's cup apex, and the cup rim stays inside the adjuster's working
-# window.  (The former ">= 5 inside the block" floor was the tip-JOURNAL
-# engagement of ada675b1, when the block was the tip bearing; f4462091 moved
-# radial support to the brass bushing and left the number behind.)
+# window.
 _TIP_END_STATION = SHAFT_FRONT_STATION + SHAFT_SECTIONS[-1][1]
 # The stub end stands 1.0 mm proud of the post's inclined journal face.
 _STUB_END_Z = cone_station(SHAFT_FRONT_STATION)[2]
@@ -1329,17 +1408,18 @@ if abs(SHAFT_FRONT_STATION + SHAFT_COLLAR_END - _GEAR64_SOUTH_STATION) > 1e-9:
 # through the graphics ray), and one 0.33 mm outside the collar selected the
 # collar's OD on some seats (#916).
 # --- tip end-play stack (item 5, v4_t00471 / 7:49) ---------------------------
-# Along the axis, south to north: T006 gear | brass bushing | block | shaft tip
-# | the 94025A164 adjuster's conical cup, its #10-32 thread tapped through the
-# block (rule-12 E11/W1). The shaft's flat 1/16-in end cannot reach the cup
-# apex: it seats on the ring where its end edge meets the cone wall,
-# ADJ_SEAT_DEPTH short of the apex (end radius / tan of the vendor cup's
-# half-angle). The adjuster therefore backs out from the nominal ADJ_EMBED by
-# that depth (Main ruling 2026-09-23; burying the apex left 1.05 mm^3 of
-# overlap once the journal grew from 1/32 in). The top slit and 91794A112 pinch
-# screw lock that setting.
+# Along the axis, south to north: T006 gear | feeler gap | MHA-096 stack
+# collar, locked on the Sec4 D-flat | air | block | shaft tip | the 94025A164
+# adjuster's conical cup, its #10-32 thread tapped through the block
+# (rule-12 E11/W1). The shaft's flat 1/16-in end cannot reach the cup apex: it
+# seats on the ring where its end edge meets the cone wall, ADJ_SEAT_DEPTH
+# short of the apex (end radius / tan of the vendor cup's half-angle). The
+# adjuster therefore backs out from the nominal ADJ_EMBED by that depth (Main
+# ruling 2026-09-23; burying the apex left 1.05 mm^3 of overlap once the
+# journal grew from 1/32 in). The top slit and 91794A112 pinch screw lock that
+# setting.
 TIP_SOUTH_STATION = TIP_BLOCK_STATION - TIP_BLOCK_Z / 2.0
-BUSH_STATION = T006_NORTH_FACE
+COLLAR_STATION = T006_NORTH_FACE + COLLAR_FEELER
 _STUB_DIA = SHAFT_SECTIONS[-1][0] * 25.4
 ADJ_CUP_HALF_ANGLE = math.atan((ADJ_CUP_DIA / 2.0) / ADJ_CUP_DEPTH)
 ADJ_SEAT_DEPTH = (_STUB_DIA / 2.0) / math.tan(ADJ_CUP_HALF_ANGLE)
@@ -1350,19 +1430,21 @@ ADJ_HEAD_STATION = (
 _ADJ_CUP_RIM = ADJ_HEAD_STATION - ADJ_LEN
 _ADJ_CUP_APEX = _ADJ_CUP_RIM + ADJ_CUP_DEPTH
 _STUB_START = SHAFT_FRONT_STATION + SHAFT_SECTIONS[-2][1]
-# tip_stub_radially_supported: the brass bushing is the tip's only radial
-# bearing, so its whole length rides the stub section on a matching bore.
+# The collar's set screw bites the Sec4 D-flat, so its whole width rides the
+# terminal land, on a bore made for that land.
 if not (
-    _STUB_START + 1.0 <= BUSH_STATION
-    and BUSH_STATION + BUSH_LEN <= _TIP_END_STATION
+    _STUB_START + 1.0 <= COLLAR_STATION
+    and COLLAR_STATION + COLLAR_WIDTH <= TIP_SOUTH_STATION
 ):
-    raise AssertionError("tip stub is not radially supported: bushing rides off the stub")
-if abs(BUSH_BORE_DIA - _STUB_DIA) > 0.05:
-    raise AssertionError("tip-bushing bore does not match the tip stub dia")
+    raise AssertionError("MHA-096 stack collar rides off the Sec4 land or into the block")
+if abs(COLLAR_BORE_DIA - _STUB_DIA) > 0.05:
+    raise AssertionError("MHA-096 collar bore does not match the tip land dia")
 _require_tapped_thread("cone-tip adjuster", ADJ_THREAD, TIP_ADJ_BORE_SPEC)
-# adjuster_cup_in_working_window: the fit-up embed is the block spec's.
+# adjuster_cup_in_working_window: the embed is the block spec's; the nominal
+# engagement sits in the working window here, and the print-worst stack
+# below (TIP_EMBED_WORST_MM) holds both of its extremes there too.
 if ADJ_EMBED != TIP_ADJ_EMBED or not (
-    TIP_ADJ_EMBED_WINDOW[0] <= ADJ_EMBED <= TIP_ADJ_EMBED_WINDOW[1]
+    TIP_ADJ_EMBED_WINDOW[0] <= ADJ_THREAD_ENGAGEMENT <= TIP_ADJ_EMBED_WINDOW[1]
 ):
     raise AssertionError("adjuster cup rim is outside its working window")
 if not 0.0 < ADJ_CUP_DEPTH < ADJ_LEN:
@@ -1628,6 +1710,165 @@ _require_tapped_thread(
     "cone pivot", PSCREW_THREAD, BASE_PIVOT_SEAT_SPEC, kind="tapped_bottoming"
 )
 require_base_seat_fit("cone pivot", BASE_PIVOT_SEAT_SPEC, PSCREW_THREAD_TAIL_LEN)
+# --- tip-block print-worst stacks (user ruling 2026-09-29) -------------------
+# With no shim, no flange slot and no platform slot, the block's station comes
+# from the hold-down (TIP_NORTH_FACE_BAND_MM / TIP_TAP_LATERAL_BAND_MM above)
+# and the shaft tip's from the pivot post, both off the same plate.  The cup
+# adjuster sets the shaft's end play at assembly; every other stack closes at
+# the printed limits.
+#
+# The post rides its two MHA-142 screws in drilled clearance holes, on the
+# plate's post-mount taps (explicit +/-0.10 stations).  Its journal runs at the
+# incline to its mount-hole line, so the mount holes' .XX stations move it
+# along the cone axis by sin(I); the shaft collar bears on the boss's north
+# face, half the ConeBossLen band off the post centre.
+_SIN_INCLINE = math.sin(math.radians(INCLINE_DEG))
+_COS_INCLINE = math.cos(math.radians(INCLINE_DEG))
+POST_SCREW_FLOAT_MM = (
+    POST_ATTACHMENT_THRU_DIA + _DRILLED_HOLE_PLUS_MM - POST_MOUNT_THREAD_DIA
+) / 2.0
+_POST_MOUNT_X_BAND = tip_printed_band_mm(POST_DRAWING_PRECISION["MountWestX"])
+POST_BOSS_FACE_AXIAL_BAND_MM = (
+    PLAT_POST_MOUNT_STATION_TOL_MM
+    + POST_SCREW_FLOAT_MM
+    + _POST_MOUNT_X_BAND * _SIN_INCLINE
+    + tip_printed_band_mm(POST_DRAWING_PRECISION["ConeBossLen"]) / 2.0
+)
+# Pivot-screw head vs the block's plain north face: the head stands on its
+# shoulder at PIVOT_STATION and floats in the plate's drilled pivot hole; the
+# north face moves by the hold-down band.  Nothing of the shaft enters, since
+# the block does not follow the tip.
+PIVOT_HEAD_AIR = 0.20
+PIVOT_HEAD_NOMINAL_GAP = (
+    PIVOT_STATION - (TIP_BLOCK_STATION + TIP_BLOCK_Z / 2.0)
+) - PSCREW_HEAD_DIA / 2.0
+PIVOT_HEAD_FLOAT = (
+    PLAT_PIVOT_HOLE_DIA + _DRILLED_HOLE_PLUS_MM - PSCREW_SHOULDER_DIA
+) / 2.0
+
+
+def tip_pivot_head_worst_gap_mm(north_face_band_mm: float) -> float:
+    """Least air between the pivot-screw head and the block's north face when
+    the face stands north_face_band_mm off its nominal station; raise under
+    PIVOT_HEAD_AIR."""
+    gap = PIVOT_HEAD_NOMINAL_GAP - PIVOT_HEAD_FLOAT - north_face_band_mm
+    if gap < PIVOT_HEAD_AIR - 1e-9:
+        raise AssertionError(
+            f"pivot-screw head can come within {gap:.3f} of the tip block's north "
+            f"face at the printed limits (< {PIVOT_HEAD_AIR})"
+        )
+    return gap
+
+
+PIVOT_HEAD_WORST_GAP = tip_pivot_head_worst_gap_mm(TIP_NORTH_FACE_BAND_MM)
+# Adjuster engagement: the cup seats on the tip, so the engagement moves by the
+# tip's station (post band + Sec4End, collar face to tip) against the north
+# face's, and the set end play (cone_stack_end_play.SHAFT_END_PLAY) backs the
+# cup off the tip by up to its upper limit.  The block's working window (the
+# 1.0D engagement exception at the shallow end, full thread under the rim at
+# the deep end) must hold both extremes.
+TIP_EMBED_BAND_MM = (
+    shaft_printed_band("Sec4End")
+    + POST_BOSS_FACE_AXIAL_BAND_MM
+    + TIP_NORTH_FACE_BAND_MM
+)
+
+
+def tip_embed_worst_mm(band_mm: float) -> tuple[float, float]:
+    """The adjuster's thread engagement at both extremes of band_mm and the
+    set end play; raise if either leaves the block's working window."""
+    worst = (
+        ADJ_THREAD_ENGAGEMENT - band_mm - SHAFT_END_PLAY[1],
+        ADJ_THREAD_ENGAGEMENT + band_mm - SHAFT_END_PLAY[0],
+    )
+    if not (TIP_ADJ_EMBED_WINDOW[0] <= worst[0] and worst[1] <= TIP_ADJ_EMBED_WINDOW[1]):
+        raise AssertionError(
+            f"adjuster embed {worst[0]:.3f}..{worst[1]:.3f} leaves its working "
+            f"window {TIP_ADJ_EMBED_WINDOW[0]:.3f}..{TIP_ADJ_EMBED_WINDOW[1]:.3f} "
+            f"at the printed limits"
+        )
+    return worst
+
+
+TIP_EMBED_WORST_MM = tip_embed_worst_mm(TIP_EMBED_BAND_MM)
+# Collar air: the MHA-096 stack collar is set one COLLAR_FEELER off T006's
+# north face at assembly, so its north face is T006's station (post band, the
+# shaft collar web, the gear stack's face band, the set end play) plus the
+# feeler's reading band and the stock collar's width band.  The block's south
+# face is the hold-down's north face less the printed depth.  The collar is a
+# locked spacer, not a thrust face: it must never touch the block.
+TIP_COLLAR_NOMINAL_AIR = (TIP_BLOCK_STATION - TIP_BLOCK_Z / 2.0) - (
+    COLLAR_STATION + COLLAR_WIDTH
+)
+TIP_COLLAR_AIR_BAND_MM = (
+    POST_BOSS_FACE_AXIAL_BAND_MM
+    + shaft_printed_band("CollarWidth")
+    + cone_gear_stack.face_band(cone_gear_stack.COUNT - 1, "north")[0]
+    + SHAFT_END_PLAY[1]
+    + COLLAR_FEELER_BAND
+    + COLLAR_WIDTH_BAND_MM
+    + TIP_NORTH_FACE_BAND_MM
+    + tip_printed_band_mm(TIP_DRAWING_PRECISION["Depth"])
+)
+
+
+def tip_collar_worst_air_mm(band_mm: float) -> float:
+    """Least axial air left between the stack collar and the block's south
+    face at band_mm; raise if the collar can touch the block."""
+    air = TIP_COLLAR_NOMINAL_AIR - band_mm
+    if air < 0.0:
+        raise AssertionError(
+            f"MHA-096 stack collar can reach the tip block at the printed limits "
+            f"(air {air:.3f})"
+        )
+    return air
+
+
+TIP_COLLAR_WORST_AIR = tip_collar_worst_air_mm(TIP_COLLAR_AIR_BAND_MM)
+# Lateral: the adjuster axis (hold-down + PassageCenter, off the plate
+# centreline) against the line the journal points the shaft along.  The
+# journal's plan angle to the post's mount holes is BASIC with no frame
+# locating it, so it takes the title block's angular band over the post-to-
+# tip run; the post's mount holes add their stations (the platform's +/-0.10
+# pair turns the post, the post's own .XX pair shifts it).  At assembly the
+# post turns on its screws' clearance until the tip sits in the cup: that
+# capacity must cover the whole error.
+_POST_TO_TIP = TIP_BLOCK_STATION - POST_STATION
+_ANGULAR_DEG = float(_config.title_block("angular")["value_deg"])
+TIP_LATERAL_ERROR_MM = (
+    PLAT_POST_MOUNT_STATION_TOL_MM
+    + _POST_TO_TIP
+    * (PLAT_POST_MOUNT_STATION_TOL_MM * (_SIN_INCLINE + _COS_INCLINE))
+    / POST_ATTACHMENT_X
+    + _POST_MOUNT_X_BAND * _COS_INCLINE
+    + _POST_TO_TIP * math.tan(math.radians(_ANGULAR_DEG))
+    + TIP_TAP_LATERAL_BAND_MM
+    + tip_printed_band_mm(TIP_PASSAGE_CENTER_PLACES)
+)
+TIP_LATERAL_CAPACITY_MM = _POST_TO_TIP * POST_SCREW_FLOAT_MM / POST_ATTACHMENT_X
+
+
+def require_tip_lateral_take_up(error_mm: float, capacity_mm: float) -> None:
+    """Turning the post on its screws must take up the whole lateral error."""
+    if error_mm > capacity_mm:
+        raise AssertionError(
+            f"tip lateral error {error_mm:.3f} exceeds what turning the post on "
+            f"its screws takes up ({capacity_mm:.3f})"
+        )
+
+
+require_tip_lateral_take_up(TIP_LATERAL_ERROR_MM, TIP_LATERAL_CAPACITY_MM)
+# Vertical: both riders stand on the same plate top (it cancels); the post's
+# journal height band and the block's AxisHeight band must keep the stub
+# inside the cup's mouth.
+TIP_VERTICAL_ERROR_MM = POST_JOURNAL_AXIS_HEIGHT_TOLERANCE_MM + TIP_AXIS_HEIGHT_TOL_MM
+TIP_CUP_CAPTURE_MM = (ADJ_CUP_DIA - SHAFT_SECTIONS[-1][0] * 25.4) / 2.0
+if TIP_VERTICAL_ERROR_MM > TIP_CUP_CAPTURE_MM:
+    raise AssertionError(
+        f"tip axis-height error {TIP_VERTICAL_ERROR_MM:.3f} exceeds the adjuster "
+        f"cup's capture {TIP_CUP_CAPTURE_MM:.3f}"
+    )
+
 
 
 # --- cone lock knob and swing stop -------------------------------------------
@@ -3189,7 +3430,7 @@ ROT_Y_INCLINE = [
 ]  # Ry(+INCLINE), row-vector convention (matches the frame script's Ry rows)
 # The tip-stack riders are authored along +Y (Top-plane extrusions); these lay
 # that +Y axis along the inclined plate frame (same row-vector convention).
-ROT_SHAFT_NORTH = [  # +Y -> the increasing-station shaft direction (bushing)
+ROT_SHAFT_NORTH = [  # +Y -> the increasing-station shaft direction (tip collar)
     [COS_I, 0.0, -SIN_I],
     [SIN_I, 0.0, COS_I],
     [0.0, -1.0, 0.0],
@@ -3199,12 +3440,21 @@ ROT_SHAFT_SOUTH = [  # +Y -> the decreasing-station direction (adjuster: head no
     [-SIN_I, 0.0, -COS_I],
     [0.0, 1.0, 0.0],
 ]
-ROT_PINCH_WEST = [  # +Y -> plate-frame -X: the head seats east, the shank runs west
-    [0.0, -1.0, 0.0],
-    [-COS_I, 0.0, SIN_I],
+# The fillister screw is authored head up (+Y), its under-head face at y = 0.
+# The block's clearance hole is drilled from its +X face, which the plate
+# frame puts on machine WEST (cone_swing_platform_geometry's local-frame
+# convention), so the head seats there and the shank runs east into the far
+# jaw's thread.
+ROT_PINCH_WEST = [  # +Y (head) -> plate-frame +X (west)
+    [0.0, 1.0, 0.0],
+    [COS_I, 0.0, -SIN_I],
     [-SIN_I, 0.0, -COS_I],
 ]
-PINCH_WEST_EULER = euler_from_rows(ROT_PINCH_WEST)  # [180-INCLINE, 0, -90]
+PINCH_WEST_EULER = euler_from_rows(ROT_PINCH_WEST)
+# MHA-140 is authored head up along +Y; Rx(180) turns it head down under the
+# platform (it is a revolved screw, so its spin is immaterial).
+ROT_X_180 = [[1.0, 0.0, 0.0], [0.0, -1.0, 0.0], [0.0, 0.0, -1.0]]
+HOLDDOWN_HEAD_DOWN_EULER = euler_from_rows(ROT_X_180)
 
 
 def rot_z_rows(deg: float) -> list[list[float]]:
@@ -3613,10 +3863,10 @@ async def build(adapter) -> dict[str, str]:
             )
         )
     ptip = cone_station(TIP_BLOCK_STATION)
-    # U30: the block stands on the nominal MHA-141 fit-up shim pack, so its
-    # foot sits TIP_SHIM_NOMINAL above PlateTop (the axis-height assert above
-    # already counts it); the shim is placed under it below.
-    tip_foot_y = Y_BASE_TOP + PLAT_T + TIP_SHIM_NOMINAL
+    # User ruling 2026-09-29: the block is a straight prism standing directly
+    # on PlateTop (no shim), so its foot is the plate top and its height is
+    # the axis-height assert above.
+    tip_foot_y = Y_BASE_TOP + PLAT_T
     tip_block = await place_component(
         adapter,
         "cone-tip-block",
@@ -3626,34 +3876,39 @@ async def build(adapter) -> dict[str, str]:
         ground=False,
         label="cone-tip-block (end-play adjuster support, on the plate)",
     )
-    # I20: the MHA-141 shim pack on PlateTop under the block's foot, in the
-    # block's own frame (it runs under the I31 foot flange, its horseshoe slot
-    # open south along the flange slot).  The I31 hold-down (MHA-140 through
-    # the flange slot into the MHA-146 locknut) is not placed on this base:
-    # its plate slot still sits under the block centre (U30) until #925's I31
-    # plate lands (test_i31_hold_down_is_placed, strict xfail).
-    tip_shim = await place_component(
-        adapter,
-        "cone-tip-shim",
-        [ptip[0], Y_BASE_TOP + PLAT_T, ptip[2]],
-        [0.0, INCLINE_DEG, 0.0],
-        ROT_Y_INCLINE,
-        ground=False,
-        label="cone-tip-shim (MHA-141 fit-up pack under the tip block)",
+    # MHA-140 (#4-40 x 3/8 SHCS) rises from under the plate: head down on the
+    # hold-down counterbore's floor, HOLDDOWN_CBORE_DEPTH above the plate's
+    # underside, shank up into the block foot's blind tap.  The hole sits
+    # TIP_BLOCK_PIVOT_OFFSET south of the pivot (the block's station) and
+    # PLAT_HOLDDOWN_LOCAL_X along the plate's local x (ROT_Y_INCLINE's row 0).
+    tip_tap_xz = (
+        ptip[0] + PLAT_HOLDDOWN_LOCAL_X * ROT_Y_INCLINE[0][0],
+        ptip[2] + PLAT_HOLDDOWN_LOCAL_X * ROT_Y_INCLINE[0][2],
     )
-    # Tip end-play stack (item 5, v4_t00471): the brass spacer bushing on the
-    # tip stub, the axial adjuster screw in the block's counterbore, and the
-    # pinch screw across the block's top slit. Stations derived at import
-    # (BUSH_STATION / ADJ_HEAD_STATION); all three ride the swing family.
-    pbush = cone_station(BUSH_STATION)
-    tip_bushing = await place_component(
+    tip_holddown = await place_component(
         adapter,
-        "cone-tip-bushing",
-        [pbush[0], Y_DRIVE, pbush[2]],
+        "cone-tip-block-screw",
+        [tip_tap_xz[0], Y_BASE_TOP + PLAT_HOLDDOWN_CBORE_DEPTH, tip_tap_xz[1]],
+        HOLDDOWN_HEAD_DOWN_EULER,
+        ROT_X_180,
+        ground=False,
+        label="cone-tip-block-screw (MHA-140 up through the plate into the block foot)",
+    )
+    # Tip end-play stack (item 5, v4_t00471): the MHA-096 stack collar on the
+    # tip land, the axial adjuster screw in the block's tapped bore, and the
+    # pinch screw across the block's top slit. Stations derived at import
+    # (COLLAR_STATION / ADJ_HEAD_STATION); all three ride the swing family.
+    # ROT_SHAFT_NORTH lays the collar's +X (its set screw) on the shaft's +X,
+    # the D-flat's outward normal.
+    pcollar = cone_station(COLLAR_STATION)
+    tip_collar = await place_component(
+        adapter,
+        "cone-tip-collar",
+        [pcollar[0], Y_DRIVE, pcollar[2]],
         [90.0, INCLINE_DEG, 0.0],
         ROT_SHAFT_NORTH,
         ground=False,
-        label="cone-tip-bushing (T006 spacer, on the tip stub)",
+        label="cone-tip-collar (stack collar, locked on the tip D-flat)",
     )
     padj = cone_station(ADJ_HEAD_STATION)
     tip_adjuster = await place_component(
@@ -3669,14 +3924,14 @@ async def build(adapter) -> dict[str, str]:
         adapter,
         "cone-tip-pinch-screw",
         [
-            ptip[0] - (TIP_BLOCK_X / 2.0) * COS_I,
+            ptip[0] + (TIP_BLOCK_X / 2.0) * COS_I,
             tip_foot_y + TIP_PINCH_Y,
-            ptip[2] + (TIP_BLOCK_X / 2.0) * SIN_I,
+            ptip[2] - (TIP_BLOCK_X / 2.0) * SIN_I,
         ],
         PINCH_WEST_EULER,
         ROT_PINCH_WEST,
         ground=False,
-        label="cone-tip-pinch-screw (slit clamp, head east)",
+        label="cone-tip-pinch-screw (slit clamp, head on the +X clearance face)",
     )
     # The lock knob is a base-bolted static: its head underside lands on the
     # plate top and its longer stud passes through the slot into the new 1/4-20
@@ -4492,12 +4747,12 @@ async def build(adapter) -> dict[str, str]:
         verify=(cone_shaft, cone_o),
     )
     # Tip block: aligned to the shaft/adjuster axis (which the post + platform
-    # already carry) + an axial seat + a
-    # parallel anti-spin against the PLATFORM (not the spinning shaft). Its
-    # height falls out of the coaxial (plate + shim + axis height = drive
-    # height, asserted at import), so its foot sits the nominal shim pack
-    # above PlateTop with no seat mate; the shim (MHA-141) is the
-    # integrator's. It follows the p1 swing through the shaft.
+    # already carry) + an axial seat + a parallel anti-spin against the
+    # PLATFORM (not the spinning shaft).  It stands directly on PlateTop (user
+    # ruling 2026-09-29): its height falls out of the coaxial (plate + axis
+    # height = drive height, asserted at import), so the foot's contact with
+    # the plate is proven by that assert and the interference gate, not a
+    # mate.  It follows the p1 swing through the shaft.
     tb_o = _org(adapter, tip_block)
     tb_axial = sum((tb_o[k] - cone_o[k]) * cone_axis_dir[k] for k in range(3))
     await coincident_mate(
@@ -4522,62 +4777,59 @@ async def build(adapter) -> dict[str, str]:
         label="tip-block anti-spin (rides the plate)",
         verify=(tip_block, tb_o),
     )
-    # I24: the shim pack is seated face-to-face on PlateTop and squared under
-    # the block's foot (its Front/Right planes are the foot's). The block's
-    # height already comes from the coaxial, so its foot resting on the shim
-    # is contact, proven below and by the interference gate, not a mate.
-    shim_o = _org(adapter, tip_shim)
-    await coincident_mate(
+    # MHA-140 clamps the block to the plate: locked to the platform, whose
+    # hold-down hole is the block's station.  Its origin (the head's bearing
+    # face) must sit on the counterbore floor, under the block's foot tap.
+    await lock_mate(
         adapter,
-        named_ref(f"Top Plane@{tip_shim}", "PLANE"),
-        named_ref(f"PlateTop@{platform}", "PLANE"),
-        label="tip shim seats on the plate (bottom <-> PlateTop)",
-        verify=(tip_shim, shim_o),
+        named_ref(f"Front Plane@{tip_holddown}", "PLANE"),
+        named_ref(f"Front Plane@{platform}", "PLANE"),
+        label=f"{tip_holddown} clamped in the platform hold-down counterbore",
     )
-    for plane in ("Front Plane", "Right Plane"):
-        await coincident_mate(
-            adapter,
-            named_ref(f"{plane}@{tip_shim}", "PLANE"),
-            named_ref(f"{plane}@{tip_block}", "PLANE"),
-            label=f"tip shim squared under the block foot ({plane})",
-            verify=(tip_shim, shim_o),
-        )
-    _shim_y = _org(adapter, tip_shim)[1]
-    _stack = _org(adapter, tip_block)[1] - _shim_y
-    if abs(_stack - TIP_SHIM_T) > 1e-4 or abs(_shim_y - (Y_BASE_TOP + PLAT_T)) > 1e-4:
+    _hd_o = _org(adapter, tip_holddown)
+    _tb_o = _org(adapter, tip_block)
+    _tap = (
+        _tb_o[0] + TIP_FOOT_TAP_OFFSET_X * ROT_Y_INCLINE[0][0],
+        _tb_o[2] + TIP_FOOT_TAP_OFFSET_X * ROT_Y_INCLINE[0][2],
+    )
+    if (
+        abs(_hd_o[0] - _tap[0]) > 1e-4
+        or abs(_hd_o[2] - _tap[1]) > 1e-4
+        or abs(_hd_o[1] - (Y_BASE_TOP + PLAT_HOLDDOWN_CBORE_DEPTH)) > 1e-4
+    ):
         raise AssertionError(
-            f"tip block foot is {_stack:.4f} above the shim's underside, not on its "
-            f"{TIP_SHIM_T:.2f} top"
+            f"hold-down screw at {_hd_o} is not on the counterbore floor under the "
+            f"tip block's foot tap (x, z) {_tap}"
         )
-    # --- tip end-play stack (item 5): bushing | adjuster | pinch screw --------
-    # The bushing spaces the T006 gear off the block's south face: coaxial on
-    # the tip stub + an axial seat off the shaft. Free-spinning in reality; its
-    # spin is pinned to the PLATFORM (immaterial, the lag-screw idiom) so the
-    # 0-DOF closure proof stays exact. Its Top plane is the axial reference
-    # (the part is authored along +Y).
-    bush_o = _org(adapter, tip_bushing)
-    bush_axial = sum((bush_o[k] - cone_o[k]) * cone_axis_dir[k] for k in range(3))
+    # --- tip end-play stack (item 5): collar | adjuster | pinch screw ---------
+    # MHA-096 is locked on the shaft one COLLAR_FEELER off T006: coaxial on
+    # the tip land + an axial seat off the shaft.  Its set screw bites the
+    # Sec4 D-flat, so its Right plane is parallel to the shaft's, the gears'
+    # D-flat idiom (both +X normals point at the flat).  Its Top plane is its
+    # south face (the part is authored along +Y).
+    collar_o = _org(adapter, tip_collar)
+    collar_axial = sum((collar_o[k] - cone_o[k]) * cone_axis_dir[k] for k in range(3))
     await coincident_mate(
         adapter,
-        named_ref(f"Axis1@{tip_bushing}", "AXIS"),
+        named_ref(f"ScrewAxis@{tip_collar}", "AXIS"),
         named_ref(f"Axis1@{cone_shaft}", "AXIS"),
-        label="tip-bushing on the tip stub",
-        verify=(tip_bushing, bush_o),
+        label="tip collar on the tip land",
+        verify=(tip_collar, collar_o),
     )
     await distance_driver(
         adapter,
-        named_ref(f"Top Plane@{tip_bushing}", "PLANE"),
+        named_ref(f"Top Plane@{tip_collar}", "PLANE"),
         named_ref(f"Front Plane@{cone_shaft}", "PLANE"),
-        bush_axial,
-        label=f"tip-bushing axial seat d={bush_axial:.2f}",
-        verify=(tip_bushing, bush_o),
+        collar_axial,
+        label=f"tip collar axial seat d={collar_axial:.2f}",
+        verify=(tip_collar, collar_o),
     )
     await parallel_mate(
         adapter,
-        named_ref(f"Right Plane@{tip_bushing}", "PLANE"),
-        named_ref(f"Right Plane@{platform}", "PLANE"),
-        label="tip-bushing anti-spin (spin immaterial)",
-        verify=(tip_bushing, bush_o),
+        named_ref(f"Right Plane@{tip_collar}", "PLANE"),
+        named_ref(f"Right Plane@{cone_shaft}", "PLANE"),
+        label="tip collar set screw on the D-flat",
+        verify=(tip_collar, collar_o),
     )
     # The adjuster screws into the BLOCK's tapped bore: coaxial on the block's
     # adjuster axis + an axial seat off the block's Front plane + an anti-spin
@@ -4632,6 +4884,17 @@ async def build(adapter) -> dict[str, str]:
         label="pinch-screw anti-spin (slot upright)",
         verify=(pinch_screw, pin_o),
     )
+    # The head must bear on the +X face, where the near jaw is drilled clear;
+    # on the -X face it would thread into its own jaw and never pinch.
+    _pin_o = _org(adapter, pinch_screw)
+    _pin_x = sum(
+        (_pin_o[k] - _tb_o[k]) * ROT_Y_INCLINE[0][k] for k in range(3)
+    )
+    if abs(_pin_x - TIP_BLOCK_X / 2.0) > 1e-4:
+        raise AssertionError(
+            f"pinch screw head face sits at block x {_pin_x:.4f}, not on the +X "
+            f"clearance face (x {TIP_BLOCK_X / 2.0:.4f})"
+        )
     # The 64T crank-drive gear and the 20 cone gears are one rigid stepped
     # cluster KEYED to the cone shaft -- each via coaxial + axial seat + parallel
     # anti-spin (see _key_to_shaft), replacing its lock with no fix/lock/tuned

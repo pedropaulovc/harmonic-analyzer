@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
-import dataclasses
 import math
+import sys
+import types
+from pathlib import Path
 
 import _config
 import cone_pivot_screw_spec
@@ -15,7 +17,7 @@ import cone_swing_platform_spec as spec
 import draw_cone_swing_platform as drawing
 import pytest
 from _gtol_spec import PlanarFace
-from _hole_spec import blind_cut_dia_mm
+from _hole_spec import CLEARANCE_MM, blind_cut_dia_mm
 from _surface_finish import MACHINED_UM, SEAT_UM
 
 
@@ -30,7 +32,6 @@ def test_every_marked_model_dimension_has_one_view_and_native_precision() -> Non
         set(drawing.NOTCH_KEEP),
         set(drawing.SECTION_KEEP),
         set(drawing.DETAIL_KEEP),
-        set(drawing.SLOT_SECTION_KEEP),
     )
     kept = set().union(*view_sets)
     assert kept == marked
@@ -78,20 +79,6 @@ def test_engaged_post_and_plate_hole_axes_coincide_in_machine_coordinates() -> N
         assert local_x * math.cos(angle) + dz * math.sin(angle) == pytest.approx(post_x)
         assert -local_x * math.sin(angle) + dz * math.cos(angle) == pytest.approx(0.0)
 
-
-def test_tip_slot_tracks_the_block_south_without_moving_the_pivot() -> None:
-    import cone_line
-
-    assert cone_line.PIVOT_STATION == pytest.approx(152.27232594770453)
-    assert geometry.PIVOT_STATION == pytest.approx(cone_line.PIVOT_STATION)
-    assert spec.TIP_SCREW_LOCAL_Z == pytest.approx(-12.55)
-    assert cone_line.TIP_BLOCK_STATION - cone_line.PIVOT_STATION == pytest.approx(
-        spec.TIP_SCREW_LOCAL_Z
-    )
-    assert drawing_spec.DRAWING_PRECISION_BY_NAME["TipSlotZ"] == 2
-    assert drawing._SLOT_Y - drawing._PIVOT_Y == pytest.approx(
-        -spec.TIP_SCREW_LOCAL_Z * 2 / 1000.0
-    )
 
 def test_only_sliding_and_locating_surfaces_carry_roughness() -> None:
     by_key = {control.key: control for control in spec.SURFACE_FINISHES}
@@ -234,16 +221,14 @@ def test_plate_thickness_text_sits_beside_section_a_a() -> None:
     """The (6.35) stock callout stays in the pocket left of section A-A.
 
     Above it: the notch plan's 205.81 witness (y 0.1379) and the 7.0 arrow at
-    x 0.2697, both measured on the 81788ce9 render; below it the relocated
-    section C-C label.  Its keep y must stay above the top witness (plate top
-    0.1265) so SolidWorks keeps the text outside, not centred on the line.
+    x 0.2697, both measured on the 81788ce9 render.  Its keep y must stay
+    above the top witness (plate top 0.1265) so SolidWorks keeps the text
+    outside, not centred on the line.
     """
     box = _plate_thickness_text_box()
     witness_205 = (0.2690, 0.1374, 0.3060, 0.1384)
     arrow_7 = (0.2692, 0.1280, 0.2702, 0.1379)
-    lx, ly = drawing.SLOT_SECTION_LABEL_LOWER_LEFT
-    cc_label = (lx, ly, lx + 0.0465, ly + 0.0162)
-    for other in (witness_205, arrow_7, cc_label):
+    for other in (witness_205, arrow_7):
         assert not _boxes_overlap(box, other), other
     assert drawing.SECTION_KEEP["PlateThk"][1] > 0.1265 + 0.001
     assert box[2] < drawing.SECTION_CENTER[0] - 0.02  # left of the cut edge
@@ -254,42 +239,6 @@ def test_plate_thickness_text_sits_beside_section_a_a() -> None:
     assert _boxes_overlap(old, witness_205)
 
 
-# Section C-C's 2.80 depth dimension parks its text right of the strip; its
-# upper arrow line runs up from the plate top to ~9.5 mm above the strip's
-# view centre (aa9766da render: x 0.2993, top 0.1304 at centre 0.1109).
-_CC_DEPTH_LINE_DX, _CC_DEPTH_LINE_TOP_DY = 0.0203, 0.0195
-
-
-def _cc_depth_line(center: tuple[float, float] | None = None) -> tuple[float, ...]:
-    cx, cy = center or drawing.SLOT_SECTION_CENTER
-    x = cx + _CC_DEPTH_LINE_DX
-    return (x - 0.0003, cy, x + 0.0003, cy + _CC_DEPTH_LINE_TOP_DY)
-
-
-def test_plate_thickness_text_clears_the_cc_depth_line_and_its_own_arrow() -> None:
-    """aa9766da: the 2.80 arrow line ran up between "AS" and "SUPPLIED".
-
-    The stock text keeps 2 mm from that line, and the line beside the 6.35
-    dimension's top arrowhead is the short one, set back from the arrow by
-    at least 1.5 mm (there "AS SUPPLIED" ran its D into the arrowhead).
-    """
-    box = _plate_thickness_text_box()
-    line = _cc_depth_line()
-    assert box[0] - line[2] >= 0.002
-    assert line[3] > box[1]  # the line does reach the text's height
-    callout = spec.PLATE_STOCK_CALLOUT.split("\n")
-    widest = max(len(text) for text in ("(6.35)", *callout))
-    setback = (widest - len(callout[-1])) * _CHAR_W / 2.0
-    assert setback >= 0.0015
-    # Positive controls: aa9766da's shift crossed the line, and its callout
-    # put the widest line beside the arrow.
-    old_keep = (drawing.SECTION_KEEP["PlateThk"][0] - (drawing.SECTION_SHIFT[0] - 0.020),
-                drawing.SECTION_KEEP["PlateThk"][1])
-    old_box = _plate_thickness_text_box(old_keep, "1/4 PLATE\nAS SUPPLIED")
-    old_line = _cc_depth_line((0.279, 0.1109))
-    assert _boxes_overlap(old_box, old_line)
-    assert len("AS SUPPLIED") == max(len(t) for t in ("(6.35)", "1/4 PLATE", "AS SUPPLIED"))
-
 
 def _notch_caption_box() -> tuple[float, float, float, float]:
     """The lock-notch caption, 59.7 x 4.8 mm from its upper-left anchor."""
@@ -298,28 +247,12 @@ def _notch_caption_box() -> tuple[float, float, float, float]:
 
 
 def test_lock_notch_caption_sits_under_its_own_view() -> None:
-    """aa9766da printed it right under "SECTION C-C / SCALE 1:1" (one block).
-
-    Lifted off the plan caption row, it is centred under the notch plan,
-    under the 7.0 arrow tip (aa9766da: y 0.1276), and 5 mm or more above the
-    C-C strip's ink (aa9766da: top 0.1202 at view centre 0.1109) and well
-    clear of the C-C label and depth line.
-    """
+    """Centred under the notch plan, under the 7.0 arrow tip (aa9766da:
+    y 0.1276), clear of the (6.35) stock text beside section A-A."""
     box = _notch_caption_box()
     assert (box[0] + box[2]) / 2.0 == pytest.approx(drawing.NOTCH_CENTER[0], abs=1e-4)
     assert box[3] <= 0.1276 - 0.0015
-    strip_top = drawing.SLOT_SECTION_CENTER[1] + (0.1202 - 0.1109)
-    assert box[1] - strip_top >= 0.005
-    lx, ly = drawing.SLOT_SECTION_LABEL_LOWER_LEFT
-    label = (lx, ly, lx + 0.0465, ly + 0.0162)
-    assert box[1] - label[3] >= 0.015
-    assert not _boxes_overlap(box, _cc_depth_line())
     assert not _boxes_overlap(box, _plate_thickness_text_box())
-    # Positive control: aa9766da's caption on the plan row sat 1.2 mm under
-    # its C-C label, and would now overlap the lowered label outright.
-    old = (0.2448, 0.0805, 0.3045, 0.0853)
-    assert 0.0865 - old[3] < 0.002
-    assert _boxes_overlap(old, label)
 
 
 def test_section_a_a_group_stays_inside_the_border() -> None:
@@ -387,58 +320,38 @@ def test_post_screw_engagement_note_states_the_computed_exception() -> None:
     x, y = drawing.ENGAGEMENT_NOTE_XY
     lines = spec.POST_MOUNT_ENGAGEMENT_NOTE.split("\n")
     note = (x, y - 0.0044 * len(lines), x + max(map(len, lines)) * 0.00193, y)
-    lx, ly = drawing.SLOT_SECTION_LABEL_LOWER_LEFT
     assert note[0] > 0.2185 + 0.002  # plan caption row
-    assert note[3] <= ly - 0.0015  # C-C label
     assert note[3] <= 0.0853 - 0.004  # A-A label bottom (aa9766da render)
     assert note[1] >= 0.066 + 0.004  # title block top
     assert note[2] <= 0.4189 - 0.010  # border
 
 
-# Detail B text extents (sheet metres), from the renders: outside its span a
-# vertical dimension's text hangs outward from its line, centred on the keep
-# y -- two cutter-width bands and the pivot-to-slot location. Notes are
-# 2.5 mm text anchored upper-left, ~1.894 mm a character and 3.52 mm a line
-# (the relief note, 0.0947 x 0.0176 for 50 characters on five lines).
-_NOTE_CHAR_W, _NOTE_LINE_H = 0.001894, 0.00352
-_DETAIL_SPANS = {  # each vertical dimension's extension-line span, sheet y
-    "TipSlotZ": (drawing._PIVOT_Y, drawing._SLOT_Y),
-    "TipSlotW": (drawing._SLOT_Y - spec.TIP_SLOT_W / 1000, drawing._SLOT_Y + spec.TIP_SLOT_W / 1000),
-    "TipCboreW": (drawing._SLOT_Y - spec.TIP_CBORE_W / 1000, drawing._SLOT_Y + spec.TIP_CBORE_W / 1000),
-}
+# Detail B's "10.45" (12 x 5 mm, 81788ce9's "11.00") hangs outward from its
+# dimension line, centred on the keep y.  The hold-down callout's box follows
+# RD1's render (text centred on the requested x, baseline 2.7 mm under the
+# requested y, 3.5 mm text): 50 mm wide for "DRILL <MOD-DIAM>3.05 THRU ALL"
+# over its counterbore line, 10 mm under to 4 mm over the requested point.
+def _holddown_z_text_box() -> tuple[float, float, float, float]:
+    x, y = drawing.DETAIL_KEEP["HoldDownZ"]
+    return (x - 0.013, y - 0.0025, x, y + 0.0025)
 
 
-def _detail_text_boxes(keep: dict[str, tuple[float, float]]) -> dict[str, tuple]:
-    z_x, z_y = keep["TipSlotZ"]
-    slot_x, slot_y = keep["TipSlotW"]
-    cbore_x, cbore_y = keep["TipCboreW"]
-    east_x, east_y = keep["TipSlotEastCx"]
-    west_x, west_y = keep["TipSlotWestCx"]
-    return {
-        "TipSlotZ": (z_x, z_y - 0.0025, z_x + 0.013, z_y + 0.0025),
-        "TipSlotW": (slot_x - 0.018, slot_y - 0.0045, slot_x, slot_y + 0.0045),
-        "TipCboreW": (cbore_x - 0.022, cbore_y - 0.0045, cbore_x, cbore_y + 0.0045),
-        "TipSlotEastCx": (east_x - 0.006, east_y - 0.0025, east_x + 0.006, east_y + 0.0025),
-        "TipSlotWestCx": (west_x - 0.006, west_y - 0.0025, west_x + 0.006, west_y + 0.0025),
-    }
+def _holddown_callout_box() -> tuple[float, float, float, float]:
+    x, y = drawing.HOLDDOWN_CALLOUT_XY
+    return (x - 0.025, y - 0.010, x + 0.025, y + 0.004)
 
 
-def _note_box(note: drawing.CutterNote) -> tuple[float, float, float, float]:
-    lines = note.text.replace("<MOD-DIAM>", "D").split("\n")
-    x, y = note.text_xy
-    width = max(len(line) for line in lines) * _NOTE_CHAR_W
-    return (x, y - len(lines) * _NOTE_LINE_H, x + width, y)
+def _holddown_strip() -> tuple[float, float, float, float]:
+    """Section C-C's strip at 1:1 plus SolidWorks' ~4 mm outline padding."""
+    z = spec.HOLDDOWN_LOCAL_Z
+    half = (drawing.plate_edge_mm(z, 1) - drawing.plate_edge_mm(z, -1)) / 2000.0 + 0.004
+    cx, cy = drawing.HOLDDOWN_SECTION_CENTER
+    return (cx - half, cy - 0.0072, cx + half, cy + 0.0072)
 
 
-def _note_extent(note: drawing.CutterNote) -> tuple[float, float, float, float]:
-    """What INote.GetExtent -- the audit's box -- spans: text plus leader tip.
-
-    ec70186e logged the one-line slot note as [89.2, 59.1]..[158.9, 79.1] mm:
-    its leader tip on the arc up to 0.6 mm above its text anchor.
-    """
-    x0, y0, x1, y1 = _note_box(note)
-    tip = drawing.cutter_note_tip(note)
-    return (min(x0, tip[0]), min(y0, tip[1]), max(x1, tip[0]), max(y1 + 0.0006, tip[1]))
+def _holddown_label() -> tuple[float, float, float, float]:
+    lx, ly = drawing.HOLDDOWN_SECTION_LABEL_LOWER_LEFT
+    return (lx, ly, lx + 0.0465, ly + 0.0162)
 
 
 def _segments_cross(a, b) -> bool:
@@ -458,13 +371,6 @@ def _segment_hits_box(segment, box) -> bool:
     return any(_segments_cross(segment, edge) for edge in edges)
 
 
-def _leader_fan(note: drawing.CutterNote):
-    """The leader from its arc tip to each end of the note's left edge."""
-    tip = drawing.cutter_note_tip(note)
-    box = _note_box(note)
-    return [(tip, (box[0], box[1])), (tip, (box[0], box[3]))]
-
-
 def _relief_note_box():
     """The relief note as the layout audit boxed it (run 20260928T090231982Z):
     four 2.5 mm rows from 0.3 mm under the upper-left anchor to 13.3 mm
@@ -473,217 +379,98 @@ def _relief_note_box():
     return (note_x, note_y - 0.0133, note_x + 0.0947, note_y)
 
 
-def test_detail_band_clears_border_title_block_and_captions() -> None:
-    """Detail B, its label, dimension texts, cutter notes and the relief note.
+def test_holddown_band_clears_border_title_block_and_captions() -> None:
+    """Detail B, section C-C, the hold-down callout and the relief note share
+    the band under the plan captions without touching each other.
 
-    Extents are the ones the layout audit logged on the farm (runs 2b643c17
-    and e86bf319) -- the native label 31.5 x 16.2 mm, the relief note
-    per ``_relief_note_box`` -- and the rendered text
-    blocks above.  e86bf319 failed on the label alone (8.9 mm through the
-    bottom border); its callouts also ran under the title block and the plan
-    caption, which the audit's nominal dimension boxes cannot see (#852).
+    Extents are the ones the layout audit logged on the farm (runs 2b643c17,
+    e86bf319, eaafbc73): the detail label 31.5 x 16.2 mm, the section label
+    46.5 x 16.2 mm, a detail's outline its circle plus 10.4 mm a side.
+    e86bf319 failed on a label 8.9 mm through the bottom border; its callouts
+    also ran under the title block and the plan caption.
     """
-    border_bottom, title_block = 0.0127, (0.216, 0.0, 0.4318, 0.066)
+    border_bottom, border_left = 0.0127, 0.0127
+    title_block = (0.216, 0.0, 0.4318, 0.066)
     captions = (
         (0.0449, 0.0805, 0.1059, 0.0853),
         (0.1497, 0.0805, 0.2185, 0.0853),
     )
+    x, y = drawing.ENGAGEMENT_NOTE_XY
+    lines = spec.POST_MOUNT_ENGAGEMENT_NOTE.split("\n")
+    engagement = (x, y - 0.0044 * len(lines), x + max(map(len, lines)) * 0.00193, y)
     label_x, label_y = drawing.DETAIL_LABEL_LOWER_LEFT
-    label = (label_x, label_y, label_x + 0.0315, label_y + 0.0162)
-    relief = _relief_note_box()
     cx, cy = drawing.DETAIL_CENTER
     r = drawing.DETAIL_SHEET_RADIUS
-    circle = (cx - r, cy - r, cx + r, cy + r)
-    # eaafbc73: the audit boxes the view by its native outline, the circle
-    # padded 10.4 mm a side, against the 9.7 mm zone border.
     pad = drawing.DETAIL_OUTLINE_PAD
     outline = (cx - r - pad, cy - r - pad, cx + r + pad, cy + r + pad)
-    assert outline[1] > 0.0097
-    notes = {f"{note.key} note": _note_box(note) for note in drawing.CUTTER_NOTES}
-    # The audit boxes each leadered note from leader tip to text (ec70186e):
-    # those extents stay apart by 3 mm, and clear of the label and relief.
-    extents = [_note_extent(note) for note in drawing.CUTTER_NOTES]
-    low, high = sorted(extents, key=lambda box: box[1])
-    assert high[1] - low[3] >= 0.003
-    for extent in extents:
-        assert not _boxes_overlap(extent, label) and not _boxes_overlap(extent, relief)
-    # Positive control: ec70186e's cbore note (text above its upper-quadrant
-    # tip) nested inside the slot note's extent.
-    by_key = {note.key: note for note in drawing.CUTTER_NOTES}
-    old_cbore = dataclasses.replace(by_key["cbore"], text_xy=(0.121, 0.0715), tip_deg=35.0)
-    assert _boxes_overlap(_note_extent(old_cbore), _note_extent(by_key["slot"]))
-    for other in (label, relief, *notes.values()):
-        assert not _boxes_overlap(outline, other)
-    for caption in captions:
-        assert not _boxes_overlap(outline, caption)
-    eaafbc73_outline = (0.0536, 0.0096, 0.1224, 0.0784)
-    assert _boxes_overlap(eaafbc73_outline, (0.1189, 0.0166, 0.2135, 0.0342))
-    boxes = {
-        "label": label,
-        "relief": relief,
-        "circle": circle,
-        **_detail_text_boxes(drawing.DETAIL_KEEP),
-        **notes,
+    assert outline[1] > 0.0097  # the zone border (eaafbc73 crossed it by 0.1)
+    ours = {
+        "detail label": (label_x, label_y, label_x + 0.0315, label_y + 0.0162),
+        "detail outline": outline,
+        "10.45": _holddown_z_text_box(),
+        "C-C strip": _holddown_strip(),
+        "C-C label": _holddown_label(),
+        "hold-down callout": _holddown_callout_box(),
+        "relief note": _relief_note_box(),
     }
-    for name, box in boxes.items():
-        assert box[1] > border_bottom + 0.001, name
-        assert box[0] > 0.0127 + 0.001, name
+    for name, box in ours.items():
+        if name != "detail outline":
+            assert box[1] > border_bottom + 0.001, name
+            assert box[0] > border_left + 0.001, name
         assert not _boxes_overlap(box, title_block), name
+        assert not _boxes_overlap(box, engagement), name
         for caption in captions:
             assert not _boxes_overlap(box, caption), (name, caption)
-    names = list(boxes)
+    names = list(ours)
     for i, first in enumerate(names):
         for second in names[i + 1 :]:
-            assert not _boxes_overlap(boxes[first], boxes[second]), (first, second)
-    # Positive control: e86bf319's layout fails this very check.
-    old_label = (0.1443, 0.0038, 0.1758, 0.0200)
-    old_cbore = (0.196, 0.072 - 0.016, 0.196 + 0.042, 0.072 + 0.015)
-    assert old_label[1] < border_bottom
-    assert _boxes_overlap(old_cbore, title_block)
-    assert _boxes_overlap(old_cbore, captions[1])
+            assert not _boxes_overlap(ours[first], ours[second]), (first, second)
+    # The 10.45 text sits outside its own extension-line span (pivot to hole),
+    # so SolidWorks hangs it off the line instead of centring the line through
+    # it (81788ce9: "11.|00").
+    assert ours["10.45"][1] >= drawing.DETAIL_HOLDDOWN_Y > drawing.DETAIL_PIVOT_Y
+    # The label centres under its own strip (8783776d printed it 50 mm off).
+    lx = drawing.HOLDDOWN_SECTION_LABEL_LOWER_LEFT[0]
+    assert lx + 0.0465 / 2.0 == pytest.approx(drawing.HOLDDOWN_SECTION_CENTER[0])
+    # Positive control: the relief note at its old anchor (0.029) meets the
+    # C-C label.
+    old_relief = (0.120, 0.029 - 0.0133, 0.120 + 0.0947, 0.029)
+    assert _boxes_overlap(old_relief, ours["C-C label"])
 
 
-def test_detail_dimension_text_sits_outside_its_own_lines() -> None:
-    """No vertical dimension's line runs through its text (81788ce9).
-
-    Each text sits outside its extension-line span, on one side of its own
-    dimension line, and clear of every other vertical dimension's extension
-    lines.  The slot sits nearest the part so the counterbore's extension
-    lines, further out, never cross the slot's line inside the slot's span.
-    """
-    keep = drawing.DETAIL_KEEP
-    boxes = _detail_text_boxes(keep)
-    east_arc_x = drawing.DETAIL_CENTER[0] - 0.004  # where the width lines start
-    extension_runs = {
-        # The widths run left from the slot's straight edges to their lines.
-        "TipSlotW": [((keep["TipSlotW"][0], y), (east_arc_x, y)) for y in _DETAIL_SPANS["TipSlotW"]],
-        "TipCboreW": [((keep["TipCboreW"][0], y), (east_arc_x, y)) for y in _DETAIL_SPANS["TipCboreW"]],
-        # Pivot-to-slot runs right from the pivot and the east arc centre.
-        "TipSlotZ": [
-            ((drawing.DETAIL_CENTER[0], 0.033), (keep["TipSlotZ"][0], 0.033)),
-            ((east_arc_x, 0.055), (keep["TipSlotZ"][0], 0.055)),
-        ],
-    }
-    for name, (low, high) in _DETAIL_SPANS.items():
-        x, _y = keep[name]
-        box = boxes[name]
-        assert box[3] <= low or box[1] >= high, name  # text outside its span
-        assert box[0] >= x or box[2] <= x, name  # not straddling its line
-        for other, runs in extension_runs.items():
-            for run in runs:
-                assert not _segment_hits_box(run, box), (name, other, run)
-    slot_x, cbore_x = keep["TipSlotW"][0], keep["TipCboreW"][0]
-    assert cbore_x < slot_x < east_arc_x  # counterbore outboard of the slot
-    assert set(drawing.DETAIL_ARROWS_INSIDE) == {"TipSlotW", "TipCboreW"}
-    # Positive control: the older keeps placed the pivot-to-slot and widths
-    # inside their spans, centring the text on its own dimension line.
-    old = {
-        "TipSlotZ": (0.1135, 0.0435),
-        "TipSlotW": (0.0515, 0.055),
-        "TipCboreW": (0.1315, 0.055),
-    }
-    for name, (_x, y) in old.items():
-        low, high = _DETAIL_SPANS[name]
-        assert low < y < high
+def test_holddown_callout_leader_reaches_its_counterbore_wall() -> None:
+    """The callout's leader drops to the counterbore's sheet-right wall in
+    section C-C, where the underside counterbore is solid, clear of the
+    section's label and the relief note under the strip."""
+    z = spec.HOLDDOWN_LOCAL_Z
+    east = drawing.plate_edge_mm(z, -1)
+    width = drawing.plate_edge_mm(z, 1) - east
+    cx, cy = drawing.HOLDDOWN_SECTION_CENTER
+    # Looking south, sheet +x is model +x: the strip's left end is the east edge.
+    wall_x = cx - width / 2000.0 + (
+        spec.HOLDDOWN_LOCAL_X + spec.HOLDDOWN_CBORE_DIA / 2.0 - east
+    ) / 1000.0
+    wall_y = cy - spec.PLATE_THICKNESS / 2000.0 + spec.HOLDDOWN_CBORE_DEPTH / 2000.0
+    callout = _holddown_callout_box()
+    assert callout[0] < wall_x < callout[2]  # a short, near-vertical leader
+    leader = ((wall_x, wall_y), (wall_x, callout[1]))
+    assert not _segment_hits_box(leader, _holddown_label())
+    assert not _segment_hits_box(leader, _relief_note_box())
 
 
-def test_cutter_note_leaders_reach_their_arcs_without_crossing() -> None:
-    """Each cutter note's leader tip is on its slot's west end arc.
-
-    The build proves the tip against the physical edge (``_add_cutter_note``,
-    0.01 mm); here the tip's sheet image, the arc radius and the leader paths
-    are pinned: both leaders rise to the right and cross neither each other,
-    the other note, pivot-to-slot's text or the 2.00s.
-    """
-    by_key = {note.key: note for note in drawing.CUTTER_NOTES}
-    assert set(by_key) == {"slot", "cbore"}
-    assert by_key["slot"].feature == "TipScrewSlot"
-    assert by_key["cbore"].feature == "TipScrewCbore"
-    assert by_key["slot"].radius_mm == spec.TIP_SLOT_W / 2.0
-    assert by_key["cbore"].radius_mm == spec.TIP_CBORE_W / 2.0
-    assert by_key["slot"].model_y_mm == spec.PLATE_THICKNESS  # the visible arc
-    assert "SLOT THRU" in by_key["slot"].text
-    assert "FROM UNDERSIDE" in by_key["cbore"].text
-    assert drawing.LEADER_TIP_BOUND_M == 0.00001
-    centre = (drawing.DETAIL_CENTER[0] + 0.004, drawing._SLOT_Y)
-    for note in drawing.CUTTER_NOTES:
-        tip = drawing.cutter_note_tip(note)
-        assert math.dist(tip, centre) == pytest.approx(note.radius_mm * 0.002)
-        assert -90.0 < note.tip_deg < 90.0  # the west (sheet-right) end arc
-        model = drawing.cutter_note_model_tip(note)
-        assert math.hypot(
-            model[0] - spec.TIP_SCREW_HALF_TRAVEL / 1000.0,
-            model[2] - spec.TIP_SCREW_LOCAL_Z / 1000.0,
-        ) == pytest.approx(note.radius_mm / 1000.0)
-    # The slot note rises from the upper quadrant, the counterbore note drops
-    # from the lower one (their audit extents must not nest, ec70186e).
-    assert by_key["slot"].tip_deg > 0.0 > by_key["cbore"].tip_deg
-    assert drawing.cutter_note_tip(by_key["slot"])[1] > 0.055
-    boxes = _detail_text_boxes(drawing.DETAIL_KEEP)
-    obstacles = {
-        name: boxes[name] for name in ("TipSlotZ", "TipSlotEastCx", "TipSlotWestCx")
-    }
-    fans = {note.key: _leader_fan(note) for note in drawing.CUTTER_NOTES}
-    for key, fan in fans.items():
-        other = "cbore" if key == "slot" else "slot"
-        for segment in fan:
-            for name, box in obstacles.items():
-                assert not _segment_hits_box(segment, box), (key, name)
-            assert not _segment_hits_box(segment, _note_box(by_key[other])), key
-            for other_segment in fans[other]:
-                assert not _segments_cross(segment, other_segment)
-    # Positive control: with the texts swapped, the two leaders cross.
-    swapped = [
-        dataclasses.replace(by_key["slot"], text_xy=by_key["cbore"].text_xy),
-        dataclasses.replace(by_key["cbore"], text_xy=by_key["slot"].text_xy),
-    ]
-    assert any(
-        _segments_cross(a, b)
-        for a in _leader_fan(swapped[0])
-        for b in _leader_fan(swapped[1])
-    )
-    # No leader crosses pivot-to-slot's dimension line or extension lines,
-    # and those lines clear both note texts and the relief note (the audit's
-    # leader-crosses-line; the note sits inside that dimension's frame).
-    z_x = drawing.DETAIL_KEEP["TipSlotZ"][0]
-
-    def pivot_to_slot_lines(x):
-        return [
-            ((x, 0.033), (x, 0.055)),
-            ((drawing.DETAIL_CENTER[0], 0.033), (x, 0.033)),
-            ((drawing.DETAIL_CENTER[0] - 0.004, 0.055), (x, 0.055)),
-        ]
-
-    relief = _relief_note_box()
-    for line in pivot_to_slot_lines(z_x):
-        for fan in fans.values():
-            for segment in fan:
-                assert not _segments_cross(segment, line), line
-        for box in (*map(_note_box, drawing.CUTTER_NOTES), relief):
-            assert not _segment_hits_box(line, box), (line, box)
-    # Positive control: the old line between the circle and the notes.
-    old_line = pivot_to_slot_lines(drawing.DETAIL_CENTER[0] + 0.030)[0]
-    assert any(_segments_cross(segment, old_line) for segment in fans["cbore"])
-
-
-def test_slot_section_cut_keeps_its_plane_and_crosses_the_plate() -> None:
-    """Section C-C cuts at the moved slot station, edge to edge.
-
-    Both endpoints extend beyond the full-width plate strip, not just its
-    counterbored slot. The station's profile width is not a fixed constant.
-    """
-    z = spec.TIP_SCREW_LOCAL_Z
-    ends = drawing.slot_section_line_model_points()
+def test_holddown_section_cuts_through_the_hole_axis_across_the_plate() -> None:
+    """Section C-C cuts on the hold-down station, edge to edge, so the whole
+    counterbore and clearance hole lie in the cut (8783776d eye-pass)."""
+    z = spec.HOLDDOWN_LOCAL_Z
+    ends = drawing.holddown_section_line_model_points()
     assert all(end[1:] == (spec.PLATE_THICKNESS / 1000.0, z / 1000.0) for end in ends)
     east, west = drawing.plate_edge_mm(z, -1), drawing.plate_edge_mm(z, +1)
     assert ends[0][0] * 1000.0 < east and ends[1][0] * 1000.0 > west
-    assert west - east > 26.0
-    # The slot and its counterbore lie inside the cut.
-    assert east < -(spec.TIP_SCREW_HALF_TRAVEL + spec.TIP_CBORE_W / 2.0)
-    assert west > spec.TIP_SCREW_HALF_TRAVEL + spec.TIP_CBORE_W / 2.0
-
-
-_profile_edge_mm = drawing.plate_edge_mm
+    # The plate's chord at the hold-down station, 10.45 south of the pivot on
+    # #1128's stack (the prism block's centre station).
+    assert west - east == pytest.approx(26.89, abs=0.01)
+    assert east < spec.HOLDDOWN_LOCAL_X - spec.HOLDDOWN_CBORE_DIA / 2.0
+    assert west > spec.HOLDDOWN_LOCAL_X + spec.HOLDDOWN_CBORE_DIA / 2.0
 
 
 def _cc_arrows_and_letters(line_x_mm):
@@ -693,7 +480,7 @@ def _cc_arrows_and_letters(line_x_mm):
     the line and 5.5 mm wide (the 8783776d render, full-res crop).
     """
     px, py = drawing.PROFILE_PIVOT_XY
-    line_y = py - spec.TIP_SCREW_LOCAL_Z * 0.0005
+    line_y = py - spec.HOLDDOWN_LOCAL_Z * 0.0005
     length, head, half_letter = 0.0126, 0.0015, 0.00275
     arrows, letters = [], []
     for x_mm in line_x_mm:
@@ -711,7 +498,7 @@ def _clears_plate(box, side: int) -> bool:
     return box[2] < edge if side < 0 else box[0] > edge
 
 
-def test_slot_section_arrows_clear_the_profile_plan() -> None:
+def test_holddown_section_arrows_clear_the_profile_plan() -> None:
     """C-C's arrows and letters, looking south, stand outside the plate.
 
     As a +-9 mm partial cut the west letter landed on the plate's sloped west
@@ -720,7 +507,7 @@ def test_slot_section_arrows_clear_the_profile_plan() -> None:
     stay clear of the corner radii's leaders and the north-edge witness.
     """
     px, py = drawing.PROFILE_PIVOT_XY
-    arrows, letters = _cc_arrows_and_letters(drawing.SLOT_SECTION_LINE_X_MM)
+    arrows, letters = _cc_arrows_and_letters(drawing.HOLDDOWN_SECTION_LINE_X_MM)
     for side, arrow, letter in zip((-1, 1), arrows, letters):
         assert _clears_plate(arrow, side) and _clears_plate(letter, side)
     r10_leader = ((0.051, 0.139), (0.0686 - 0.00354, 0.1392 - 0.00354))
@@ -737,7 +524,7 @@ def test_slot_section_arrows_clear_the_profile_plan() -> None:
     assert not _clears_plate(old_letters[1], 1)
     half = 9.0 * 0.0005
     length, head = 0.0126, 0.0015
-    line_y = py - spec.TIP_SCREW_LOCAL_Z * 0.0005
+    line_y = py - spec.HOLDDOWN_LOCAL_Z * 0.0005
     # Positive control: the default north-looking arrows hit the R8 leader
     # and the 8.0 extension line.
     down = (px + half - head, line_y - length, px + half + head, line_y)
@@ -745,65 +532,124 @@ def test_slot_section_arrows_clear_the_profile_plan() -> None:
     assert _segment_hits_box(r8_leader, down)
 
 
-def test_slot_section_pocket_clears_its_neighbours() -> None:
-    """Section C-C, its label and its depth text fit the pocket they are given.
+def test_holddown_hole_is_the_ruled_counterbore_for_the_tip_block_screw() -> None:
+    """One #4 socket-head counterbore, close clearance, drilled from under,
+    10.45 south of the pivot and 1.00 to -x of the cone axis, the block's
+    foot tap offset the same way, so the block itself stays centred."""
+    import cone_tip_block_spec as block
 
-    Neighbour boxes are the extents the layout audit logged on the farm
-    (runs 2b643c17 and e86bf319): the notch plan, its caption, the relief
-    dimension RD1, and section A-A's outline, finish symbol and thickness
-    text.  The strip is the plate edge-on at 1:1 plus SolidWorks' ~4 mm
-    outline padding; the native label measured 46.5 x 16.2 mm.  The thickness
-    text is its rendered extent (see the test below), not the audit's
-    nominal box (#852).
-    """
-    # Section A-A's boxes were logged at SECTION_SHIFT x 0.020; they move
-    # with the shift.
-    dx_aa = drawing.SECTION_SHIFT[0] - 0.020
-    neighbours = {
-        "notch view": (0.2394, 0.1286, 0.2806, 0.2514),
-        "notch caption": _notch_caption_box(),
-        "hole caption": (0.1497, 0.0805, 0.2185, 0.0853),
-        "RD1": (0.1900, 0.1042, 0.2460, 0.1077),
-        "section A-A": (0.3246 + dx_aa, 0.1081, 0.3854 + dx_aa, 0.1319),
-        "A-A finish": (0.3160 + dx_aa, 0.1056, 0.3276 + dx_aa, 0.1081),
-        "A-A thickness": _plate_thickness_text_box(),
-        "title block": (0.216, 0.0, 0.4318, 0.066),
+    hole = spec.HOLDDOWN_HOLE_SPEC
+    assert (hole.kind, hole.size) == ("counterbore_socket", "#4")
+    assert dict(hole.overrides_mm) == {
+        "HoleDiameter": CLEARANCE_MM[("#4", "close")],
+        "CounterBoreDiameter": spec.HOLDDOWN_CBORE_DIA,
+        "CounterBoreDepth": spec.HOLDDOWN_CBORE_DEPTH,
     }
-    z = spec.TIP_SCREW_LOCAL_Z
-    width = drawing.plate_edge_mm(z, 1) - drawing.plate_edge_mm(z, -1)
-    half = width / 2000.0 + 0.004
-    cx, cy = drawing.SLOT_SECTION_CENTER
-    strip = (cx - half, cy - 0.0072, cx + half, cy + 0.0072)
-    lx, ly = drawing.SLOT_SECTION_LABEL_LOWER_LEFT
-    label = (lx, ly, lx + 0.0465, ly + 0.0162)
-    # The label sits directly under its own strip, centred (8783776d printed
-    # it 50 mm to the left, closer to nothing of its own).
-    assert lx + 0.0465 / 2.0 == pytest.approx(cx)
-    assert label[3] < strip[1]
-    # The depth text hangs beyond the strip's ends, not over it.
-    assert drawing.SLOT_SECTION_KEEP["TipCboreDepth"][0] < cx - width / 2000.0
-    assert drawing.SLOT_SECTION_DEPTH_RIGHT[0] > cx + width / 2000.0
-    dx, dy = drawing.SLOT_SECTION_KEEP["TipCboreDepth"]
-    depth = (dx - 0.012, dy - 0.004, dx, dy + 0.004)
-    # Looking south mirrors the strip, so the build may park the depth on the
-    # right-hand end instead (text hanging right): both must fit.
-    rx, ry = drawing.SLOT_SECTION_DEPTH_RIGHT
-    depth_right = (rx, ry - 0.004, rx + 0.012, ry + 0.004)
-    assert rx - cx == pytest.approx(cx - dx)
-    ours = {
-        "C-C strip": strip,
-        "C-C label": label,
-        "depth text": depth,
-        "depth text right": depth_right,
+    assert spec.HOLDDOWN_CLEARANCE_DIA == pytest.approx(3.048)
+    assert (spec.HOLDDOWN_LOCAL_X, spec.HOLDDOWN_LOCAL_Z) == (-1.0, -10.45)
+    assert block.FOOT_TAP_OFFSET_X == spec.HOLDDOWN_LOCAL_X
+
+
+def test_holddown_x_is_a_banded_dimension_hanging_inside_detail_b() -> None:
+    """User ruling 2026-09-29: the hole's lateral station prints as HoldDownX
+    at .XX with +/-0.10, in detail B.  Its 2 mm span cannot hold the text, so
+    the text hangs sheet-right of the hole's rim, clear of it and of the
+    pivot relief, inside the detail's outline."""
+    assert drawing_spec.DRAWING_PRECISION["HoldDownHole"] == {
+        "HoldDownX": 2,
+        "HoldDownZ": 2,
     }
-    for name, box in ours.items():
-        for other, neighbour in neighbours.items():
-            assert not _boxes_overlap(box, neighbour), (name, other)
-    assert not _boxes_overlap(strip, label)
-    # Positive control: the pocket is real -- moving the strip up onto the
-    # lifted notch caption is caught.
-    moved = (strip[0], 0.118, strip[2], 0.132)
-    assert _boxes_overlap(moved, neighbours["notch caption"])
+    assert spec.HOLDDOWN_STATION_TOL_MM == 0.10
+    x, y = drawing.DETAIL_KEEP["HoldDownX"]
+    text = (x - 0.008, y - 0.0025, x + 0.008, y + 0.0025)  # "1.00±0.10", 3.5 mm
+    s = drawing._DETAIL_S
+    rim = spec.HOLDDOWN_CLEARANCE_DIA / 2.0 * s
+    hole = (
+        drawing.DETAIL_HOLDDOWN_X - rim,
+        drawing.DETAIL_HOLDDOWN_Y - rim,
+        drawing.DETAIL_HOLDDOWN_X + rim,
+        drawing.DETAIL_HOLDDOWN_Y + rim,
+    )
+    relief_r = spec.PIVOT_BEARING_RELIEF_DIAMETER / 2.0 * s
+    relief = (
+        drawing.DETAIL_CENTER[0] - relief_r,
+        drawing.DETAIL_PIVOT_Y - relief_r,
+        drawing.DETAIL_CENTER[0] + relief_r,
+        drawing.DETAIL_PIVOT_Y + relief_r,
+    )
+    assert not _boxes_overlap(text, hole)
+    assert not _boxes_overlap(text, relief)
+    # Outside its own extension-line span, so SolidWorks hangs it.
+    assert text[0] > max(drawing.DETAIL_HOLDDOWN_X, drawing.DETAIL_CENTER[0])
+    pad = drawing.DETAIL_SHEET_RADIUS
+    cx, cy = drawing.DETAIL_CENTER
+    assert cx - pad <= text[0] and text[2] <= cx + pad
+    assert cy - pad <= text[1] and text[3] <= cy + pad
+
+
+def test_holddown_print_worst_stack_keeps_its_margins() -> None:
+    """At .XX (+/-0.51) and the drilled +0.10: head recess under the slide
+    face, head clearance, bearing beside the hole, the counterbore-floor
+    ledge and every web to a neighbour (U27 2.0)."""
+    xx = 0.51
+    head_d, head_h = 0.183 * 25.4, 0.112 * 25.4
+    assert spec.HOLDDOWN_CBORE_DEPTH - xx - head_h >= 0.1
+    assert spec.HOLDDOWN_CBORE_DIA - xx - head_d >= 0.25
+    assert (head_d - (spec.HOLDDOWN_CLEARANCE_DIA + 0.10)) / 2.0 >= 0.5
+    ledge_min = (
+        spec.PLATE_THICKNESS - spec.PLATE_STOCK_BAND - (spec.HOLDDOWN_CBORE_DEPTH + xx)
+    )
+    assert spec.HOLDDOWN_LEDGE_RANGE[0] == pytest.approx(ledge_min)
+    assert ledge_min >= 2.0
+    assert min(geometry.HOLDDOWN_WEBS.values()) >= 2.0
+
+
+def _exec_mutated(module, replacements: dict[str, str]):
+    """Run ``module``'s source with literal ``replacements`` in a fresh namespace."""
+    path = Path(module.__file__)
+    source = path.read_text(encoding="utf-8")
+    for old, new in replacements.items():
+        assert source.count(old) == 1, old
+        source = source.replace(old, new)
+    mutated = types.ModuleType(module.__name__)
+    mutated.__file__ = str(path)
+    exec(compile(source, str(path), "exec"), mutated.__dict__)
+    return mutated
+
+
+@pytest.mark.parametrize(
+    ("replacements", "message"),
+    [
+        ({"HOLDDOWN_CBORE_DEPTH = 3.50": "HOLDDOWN_CBORE_DEPTH = 3.20"}, "stand proud"),
+        ({"HOLDDOWN_CBORE_DIA = 5.56": "HOLDDOWN_CBORE_DIA = 5.20"}, "does not clear"),
+        ({"HOLDDOWN_SCREW_HEAD_DIA = 0.183": "HOLDDOWN_SCREW_HEAD_DIA = 0.160"}, "bears on"),
+        ({"HOLDDOWN_CBORE_DEPTH = 3.50": "HOLDDOWN_CBORE_DEPTH = 4.20"}, "ledge"),
+    ],
+)
+def test_holddown_guards_refuse_a_spec_that_fails_at_print_worst(
+    replacements: dict[str, str], message: str
+) -> None:
+    _exec_mutated(spec, {})  # positive control: the shipped spec passes
+    with pytest.raises(AssertionError, match=message):
+        _exec_mutated(spec, replacements)
+
+
+@pytest.mark.parametrize(
+    "replacement",
+    [
+        ("HOLDDOWN_LOCAL_Z = -10.45", "HOLDDOWN_LOCAL_Z = -6.00"),  # onto the pivot
+        ("HOLDDOWN_LOCAL_X = -1.0", "HOLDDOWN_LOCAL_X = 6.0"),  # to the west edge
+    ],
+)
+def test_holddown_web_guard_refuses_a_station_that_crowds_a_neighbour(
+    monkeypatch: pytest.MonkeyPatch, replacement: tuple[str, str]
+) -> None:
+    """Moved toward the pivot bore or the plate's west edge, the web check fires."""
+    _exec_mutated(geometry, {})  # positive control: the shipped station passes
+    mutated = _exec_mutated(spec, dict([replacement]))
+    monkeypatch.setitem(sys.modules, spec.__name__, mutated)
+    with pytest.raises(AssertionError, match="hold-down leaves a web"):
+        _exec_mutated(geometry, {})
 
 
 def test_relief_width_text_sits_between_its_neighbours() -> None:

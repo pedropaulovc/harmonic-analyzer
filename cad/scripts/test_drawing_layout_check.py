@@ -1029,7 +1029,7 @@ def test_plain_dimension_contributes_no_leader():
 
 
 def test_datum_leader_across_a_foreign_view_now_flags():
-    """The defect the eye pass found on cone-tip-bushing and crank-arm.
+    """The defect the eye pass found on the former tip bushing and crank-arm.
 
     A datum leader driven through a neighbouring view used to pass EVERY gate:
     the box is CollisionScope.NONE so it is never overlap-checked, and the tag
@@ -2888,7 +2888,7 @@ def test_a_ring_behind_a_pin_is_ballooned_where_its_listed_edge_is_drawn(monkeyp
 
 
 def test_a_bushing_sharing_its_bores_outline_is_ballooned_on_its_own_listed_edge(monkeypatch):
-    """Drive-train sheet 4, item 10: the tip bushing sits flush in the tip
+    """Drive-train sheet 4, item 10: the former tip bushing sat flush in the tip
     block's bore, and none of its 24 walk and listed-edge points hit any edge
     on runs 20260928T202401351Z and 20260928T203306681Z. Where a point of a
     listed rim hits the block's edge the ink is shared: the balloon attaches
@@ -2899,18 +2899,18 @@ def test_a_bushing_sharing_its_bores_outline_is_ballooned_on_its_own_listed_edge
     def key(t):
         return tuple(round(v, 9) for v in _ring_point(t, radius=0.003)[:2])
 
-    rim = _AnchorEdge("cone-tip-bushing-1", at=lambda t: _ring_point(t, radius=0.003))
+    rim = _AnchorEdge("flush-part-1", at=lambda t: _ring_point(t, radius=0.003))
     bore = _AnchorEdge("cone-tip-block-1")
 
     def run(sheet):
         rim.sheet = sheet
         view = _exploded_view(
-            _instances("cone-tip-bushing-1", bodies={"cone-tip-bushing-1": _body([(0.0, 0.05, 0.0)])}),
+            _instances("flush-part-1", bodies={"flush-part-1": _body([(0.0, 0.05, 0.0)])}),
             [],
-            visible={"cone-tip-bushing-1": [rim]},
+            visible={"flush-part-1": [rim]},
         )
         return _balloon(
-            monkeypatch, sheet, view, {"cone-tip-bushing": _WALK}, items=(("cone-tip-bushing", "1"),)
+            monkeypatch, sheet, view, {"flush-part": _WALK}, items=(("flush-part", "1"),)
         )
 
     sheet = _AnchorSheet({key(0.3): bore})

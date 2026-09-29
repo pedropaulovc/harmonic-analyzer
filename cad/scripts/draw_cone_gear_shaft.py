@@ -116,7 +116,7 @@ ISO_SCALE = (1, 2)
 
 
 # Landscape sheet, 0.4318 x 0.2794 m, title block bottom right (x > ~0.216,
-# y < ~0.066).  The 199.34 mm shaft at 1:1 spans 0.0533..0.2526, leaving the
+# y < ~0.066).  The 201.64 mm shaft at 1:1 spans 0.0510..0.2526, leaving the
 # right third for the pictorial (top) over the four D sections; the tip
 # detail fills the field above the side view (codex review, #1128: with the
 # sections in one row the drawing sat in the lower half, the upper field
@@ -125,10 +125,11 @@ ISO_SCALE = (1, 2)
 # share the field with the note block in the lower left (review 2026-09-23:
 # at 0.170 rows A-B stood empty but for the note).  The view is placed by its
 # large end: every dimension below is laid out from that datum face, so a
-# change at the tip (the 2026-09-28 tip stack shortened it 1.55 mm) moves
-# only the tip.
+# change at the tip (the 2026-09-29 prism tip block lengthened it 2.31 mm)
+# moves only the tip.
 BIG_END_X = 0.2526
 SIDE_CENTER = (BIG_END_X - SHAFT_LENGTH / 2000.0, 0.150)
+TIP_END_X = BIG_END_X - SHAFT_LENGTH / 1000.0
 ISO_CENTER = (0.363, 0.232)
 NOTES_XY = (0.058, 0.060)
 # Off-sheet-left donor: the five diameters are model dimensions of circular
@@ -169,18 +170,19 @@ STATION_TEXT_CLEARANCE = 0.002
 # of that line (~32 mm wide with its stacked band), so each x lies INSIDE the
 # land it measures (the big end is at sheet x 0.2526; land 1 spans
 # 0.0900..0.2096, land 2 0.0831..0.0900, land 3 0.0762..0.0831, land 4
-# 0.0533..0.0762); Ø12.231 stands just off the faced end.  Lands 2 and 3 are
+# 0.0510..0.0762); Ø12.231 stands just off the faced end.  Lands 2 and 3 are
 # only 6.9 mm long, so a tip-end text spans its right-hand neighbours'
 # lines: the tip's text sits highest and each neighbour to the right steps
 # down, so no line rises through a text (codex, 18395f30).  Lands 2 and 3
 # carry their lines mid-land; the tip's line stays 1.7 mm in from the tip
-# face, right of the tip finish glyph.
+# face, right of the tip finish glyph, and follows the tip face when its
+# station moves.
 SIDE_DIAMETERS = {
     "Sec0Dia": (0.2700, 0.1620),
     "Sec1Dia": (0.1400, 0.1730),
     "Sec2Dia": (0.0853, 0.1760),
     "Sec3Dia": (0.0785, 0.1880),
-    "Sec4Dia": (0.0550, 0.2000),
+    "Sec4Dia": (TIP_END_X + 0.0017, 0.2000),
     # #914: the collar ring is 3.181 wide, too narrow for a dimension line
     # and two arrows inside it, so the collar alone takes the near-side
     # diametric style: one arrow on the top rim from outside, leader up to

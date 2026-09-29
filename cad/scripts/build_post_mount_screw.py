@@ -156,9 +156,9 @@ async def _author_reference_dimension(
     value_mm: float,
 ) -> None:
     """One construction line on the Front plane carrying ONE driving,
-    model-owned drawing dimension; build_cone_tip_shim's reference-sketch
-    pattern.  The line is dimensioned first, so name_dimensions' creation
-    order finds it before the origin-anchor dimensions."""
+    model-owned drawing dimension.  The line is dimensioned first, so
+    name_dimensions' creation order finds it before the origin-anchor
+    dimensions."""
     check(f"create_sketch {sketch}", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     line = check(f"{sketch} line", await adapter.add_line(*start, *end))
