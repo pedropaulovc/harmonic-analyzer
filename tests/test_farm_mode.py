@@ -701,6 +701,13 @@ def _preflight_fakes(monkeypatch, *, agents=None, git=None):
         return subprocess.CompletedProcess(argv, 0, out, "")
 
     monkeypatch.setattr(build.subprocess, "run", fake_run)
+    # Farm-mode protocol tests stub external commands; the real lint scan is
+    # covered by test_undefined_names without inheriting this fake subprocess.
+    monkeypatch.setattr(
+        build,
+        "scan_undefined_names",
+        lambda root: subprocess.CompletedProcess([], 0, "", ""),
+    )
     # The fake project has no parts, so it carries no visibility debt; the
     # real repo's release gate is test_reference_visibility's.
     monkeypatch.setattr(build, "_visibility_debt", lambda: None)

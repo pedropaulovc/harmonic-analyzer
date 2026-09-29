@@ -227,6 +227,9 @@ such build:
   refused with doit's invalid-command exit 3, naming the target, before any
   fleet query or workflow submission; a failed farm preflight exits 2. Neither
   runs an action.
+  Farm preflight also runs the same `check:undefined_names` Ruff scan before
+  querying the fleet, so an undefined CAD/build-script name cannot dispatch a
+  COM leaf even when the stamped checks would run later in the doit graph.
 - The build runs from a private snapshot of the pushed HEAD under
   `-LogDirectory` (which must sit outside every Git worktree), so the caller's
   worktree may change mid-run; outputs land in the run record's `outputs`
@@ -256,7 +259,7 @@ such build:
 | `verify_soundness:<stem>`, `verify:kinematics` | yes | yes | yes |
 | `preflight`, `export`, `package:release` | yes | yes | yes |
 | `verify:soundness` | no (aggregator) | no | — (its leaves are) |
-| `check:math`, `check:config`, `check:graph`, `check:nameplate`, `check:numerals`, `check:recipe`, `check:cache`, `check:partiso`, `check:inert`, `check:budget` | **no** | no (parallel) | no (runs locally) |
+| `check:math`, `check:config`, `check:graph`, `check:undefined_names`, `check:nameplate`, `check:numerals`, `check:recipe`, `check:cache`, `check:partiso`, `check:inert`, `check:budget` | **no** | no (parallel) | no (runs locally) |
 | `check:verify_telemetry` | **no** | no (opt-in — NOT in build/release) | no |
 | `gallery` | **no** (Blender + GPU) | no | no (no worker has Blender) |
 | `cache_status` | **no** | no (diagnostic) | no |
