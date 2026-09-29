@@ -1947,8 +1947,9 @@ class _ProfileView:
         return (0.30 - xyz[2], 0.17 + xyz[1])
 
 
-def _journal_profile(monkeypatch, *, drop=()) -> tuple[_ProfileView, dict]:
-    """Both flanks of every Ø8 zone, collinear on the sheet, plus the Ø15 head."""
+def _journal_profile(monkeypatch, *, drop=(), twins=()) -> tuple[_ProfileView, dict]:
+    """Both flanks of every Ø8 zone, collinear on the sheet, plus the Ø15 head;
+    ``twins`` flanks come back twice, as the seat returns the front land's."""
     import _drawing_common
 
     front, back = spec.FRONT_JOURNAL_Z, spec.BACK_JOURNAL_Z
@@ -1964,7 +1965,8 @@ def _journal_profile(monkeypatch, *, drop=()) -> tuple[_ProfileView, dict]:
         for side, sign in (("lower", -1.0), ("upper", 1.0))
         if (name, side) not in drop
     }
-    view = _ProfileView(list(silhouettes.values()))
+    extra = [_Silhouette(faces[name], -1.0 if side == "lower" else 1.0) for name, side in twins]
+    view = _ProfileView([*silhouettes.values(), *extra])
     monkeypatch.setattr(
         drawing,
         "model_point_in_view",
@@ -1994,10 +1996,9 @@ def test_each_journal_ra_lands_on_its_own_faces_silhouette_found_on_the_model(
 
     assert view.sweeps == [4]
     assert set(picks) == set(drawing.JOURNAL_FINISHES)
-    for key, (silhouette, landing, symbol_xy, control) in picks.items():
+    for key, (silhouette, landing, symbol_xy) in picks.items():
         station_z, want_symbol, flank = drawing.JOURNAL_FINISHES[key]
         assert silhouette is silhouettes[(key, flank)]
-        assert control is drawing.surface_finish_by_key(spec.SURFACE_FINISHES, key)
         assert symbol_xy == want_symbol
         # The leader lands at the station on that flank, as the pick did.
         assert landing == pytest.approx(
@@ -2016,3 +2017,38 @@ def test_a_journal_flank_the_view_does_not_draw_fails_loud(monkeypatch) -> None:
 
     with pytest.raises(RuntimeError, match=r"0 silhouettes of front_journal's face"):
         drawing._journal_finish_picks(SimpleNamespace(), view)
+
+
+def test_a_flank_the_seat_returns_twice_is_one_line(monkeypatch) -> None:
+    """Farm run 20260929T224917539Z on swmaker000004@4: the front land's face
+    returned its lower flank as TWO silhouettes, both (240.55, 166)-(260.55,
+    166) mm -- the tie under the point the hit test had to break.  Coincident
+    twins are the one line they draw; the first is taken."""
+    view, silhouettes = _journal_profile(monkeypatch, twins={("front_journal", "lower")})
+
+    picks = drawing._journal_finish_picks(SimpleNamespace(), view)
+
+    assert picks["front_journal"][0] is silhouettes[("front_journal", "lower")]
+    assert picks["back_journal"][0] is silhouettes[("back_journal", "upper")]
+
+
+def test_two_different_lines_of_one_face_through_the_point_are_refused(monkeypatch) -> None:
+    import _drawing_common
+
+    face = _ShaftFace(spec.SHAFT_DIA, 0.0, 20.0)
+    lower = _Silhouette(face, -1.0)
+    # A shorter segment on the same line: not a twin, so not the same line.
+    stub = _Silhouette(face, -1.0)
+    stub.ends = (stub.ends[0], (0.0, stub.ends[1][1], 0.015))
+    view = _ProfileView([lower, stub])
+    monkeypatch.setattr(
+        _drawing_common,
+        "model_points_in_view",
+        lambda adapter, v, points, *, label, names=None: [v.sheet(p) for p in points],
+    )
+    spec_face = spec.SURFACE_FINISHES[0].face.__class__(spec.SHAFT_DIA, contains_z_mm=10.0)
+    with pytest.raises(RuntimeError, match=r"2 silhouettes of land's face"):
+        _drawing_common.face_silhouettes_through(
+            SimpleNamespace(), view, {"land": (spec_face, view.sheet((0.0, -0.004, 0.010)))},
+            label="land",
+        )

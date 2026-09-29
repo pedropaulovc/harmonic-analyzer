@@ -404,14 +404,15 @@ JOURNAL_FINISHES = {
 
 def _journal_finish_picks(
     adapter: Any, view: Any
-) -> dict[str, tuple[Any, tuple[float, float], tuple[float, float], Any]]:
-    """Each land's Ra target: ``(silhouette, landing, symbol_xy, control)``.
+) -> dict[str, tuple[Any, tuple[float, float], tuple[float, float]]]:
+    """Each land's Ra target: ``(silhouette, landing, symbol_xy)``.
 
     The landing is the land's station on its flank; the silhouette is the one
-    its part-owned face draws through that point, found on the model
-    (:func:`face_silhouettes_through`), not hit-tested there.  The hit test
-    missed the front land at sheet (0.25355, 0.166), dead on the flank, on
-    swmaker00000a@10 twice while swmaker000004@4 hit it with the same key.
+    its part-owned face (``SURFACE_FINISHES``) draws through that point, found
+    on the model (:func:`face_silhouettes_through`), not hit-tested there.
+    The hit test missed the front land at sheet (0.25355, 0.166), dead on the
+    flank, on swmaker00000a@10 twice while swmaker000004@4 hit it with the
+    same key; the land's face draws that flank as two coincident silhouettes.
     """
     picks = {}
     for key, (station_z, symbol_xy, flank) in JOURNAL_FINISHES.items():
@@ -422,16 +423,16 @@ def _journal_finish_picks(
             label=f"arbor {key} finish station",
         )
         landing = (land_x, axis_y + FLANK_SIGN[flank] * SHAFT_DIA / 2000.0)
-        picks[key] = (surface_finish_by_key(SURFACE_FINISHES, key), landing, symbol_xy)
+        picks[key] = (surface_finish_by_key(SURFACE_FINISHES, key).face, landing, symbol_xy)
     silhouettes = face_silhouettes_through(
         adapter,
         view,
-        {key: (control.face, landing) for key, (control, landing, _xy) in picks.items()},
+        {key: (face, landing) for key, (face, landing, _xy) in picks.items()},
         label="arbor journal finish flanks",
     )
     return {
-        key: (silhouettes[key], landing, symbol_xy, control)
-        for key, (control, landing, symbol_xy) in picks.items()
+        key: (silhouettes[key], landing, symbol_xy)
+        for key, (_face, landing, symbol_xy) in picks.items()
     }
 
 
@@ -1173,14 +1174,14 @@ async def build(adapter: Any) -> dict[str, str]:
     _add_turning_axis(adapter, principal)
     witness_spans = _blacken_reference_witnesses(adapter, principal)
     finishes = _journal_finish_picks(adapter, principal)
-    for key, (silhouette, landing, symbol_xy, control) in finishes.items():
+    for key, (silhouette, landing, symbol_xy) in finishes.items():
         add_surface_finish(
             adapter,
             principal,
             entity=silhouette,
             leader_attach_xy=landing,
             symbol_xy=symbol_xy,
-            control=control,
+            control=surface_finish_by_key(SURFACE_FINISHES, key),
             label=f"arbor {key} finish",
             entity_type="SILHOUETTE",
             char_height=0.0025,

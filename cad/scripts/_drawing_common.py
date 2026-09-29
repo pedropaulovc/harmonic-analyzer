@@ -4105,6 +4105,14 @@ def _segment_distance(
     return math.dist(point[:2], (start[0] + t * dx, start[1] + t * dy))
 
 
+def _same_segment(first: Sequence[Any], second: Sequence[Any]) -> bool:
+    """Whether two ``(entity, keys, start, end)`` lines draw the same segment."""
+    a0, a1, b0, b1 = first[2], first[3], second[2], second[3]
+    tol = _SILHOUETTE_POINT_TOLERANCE_M
+    forward = math.dist(a0, b0) <= tol and math.dist(a1, b1) <= tol
+    return forward or (math.dist(a0, b1) <= tol and math.dist(a1, b0) <= tol)
+
+
 @_telemetry.traced("drawing.pick_face_silhouettes", label_param="label")
 def face_silhouettes_through(
     adapter: Any,
@@ -4127,8 +4135,11 @@ def face_silhouettes_through(
     one worker and hit on another: ``drawing:pinion_arbor`` (key 870279bc)
     missed its front-journal flank at sheet (0.25355, 0.166) on
     swmaker00000a@10 and hit on swmaker000004@4, and missed on @10 again at
-    the next commit.  The silhouettes and their faces come from the model, so
-    the pick reads the same on every seat.
+    the next commit.  The sweep then showed what sits under that point: the
+    land's face returns its lower flank TWICE, as two coincident silhouettes,
+    so the hit test had a tie to break.  The silhouettes and their faces come
+    from the model, and coincident twins are taken as the one line they draw,
+    so the pick reads the same on every seat.
 
     One ``GetVisibleEntities2(..., 4)`` sweep serves every pick (see
     :func:`visible_view_entities` for what a silhouette sweep costs); faces are
@@ -4173,6 +4184,19 @@ def face_silhouettes_through(
             for line in own
             if _segment_distance(xy, line[2], line[3]) <= _SILHOUETTE_POINT_TOLERANCE_M
         ]
+        # One drawn line can come back as several silhouettes of the same face:
+        # the arbor's front-land lower flank read twice, (240.55, 166)-(260.55,
+        # 166) mm both times, on swmaker000004@4 (run 20260929T224917539Z).
+        # Coincident twins are one line; different lines through the point are
+        # ambiguous.
+        distinct = [
+            line
+            for index, line in enumerate(hits)
+            if not any(_same_segment(line, other) for other in hits[:index])
+        ]
+        _telemetry.annotate(**{f"{key}_hits": len(hits), f"{key}_lines": len(distinct)})
+        if len(distinct) == 1:
+            hits = distinct
         if len(hits) != 1:
             drawn = "; ".join(
                 f"({a[0] * 1000:.3f}, {a[1] * 1000:.3f})-({b[0] * 1000:.3f}, "
