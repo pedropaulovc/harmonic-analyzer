@@ -15,6 +15,7 @@ import draw_crankshaft as drawing
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import blind_cut_dia_mm
+from _surface_finish import MACHINED_UM
 
 
 def test_required_drawing_paths() -> None:
@@ -154,7 +155,7 @@ def test_sheet_placements_stay_inside_the_border() -> None:
         drawing.PINION_PIN_NOTE_XY,
         drawing.NOTES_XY,
         drawing.ISO_NOTE_XY,
-        drawing.FINISH_SYMBOL,
+        *(symbol for _, symbol in drawing.JOURNAL_FINISHES.values()),
         *drawing.SIDE_KEEP.values(),
         *drawing.DIAMETER_POSITIONS.values(),
     ]
@@ -175,11 +176,23 @@ def test_sheet_placements_stay_inside_the_border() -> None:
     # The cross-hole callout sits right of the hole so its leader cannot run
     # near-parallel to the station extension line through the hole.
     assert drawing.HOLE_CALLOUT_XY[0] > drawing.PIN_X
-    # The finish lands on the inboard running land, never on the relief.
-    assert drawing._sheet_x(spec.RELIEF_END) < drawing.FINISH_PICK[0]
-    assert drawing.FINISH_PICK[0] < drawing._sheet_x(spec.JOURNAL_END)
-    finish_y = spec.SURFACE_FINISHES[0].face.contains_y_mm
-    assert spec.RELIEF_END < finish_y < spec.JOURNAL_END
+    # Each bearing land has its own native control and visible Ra leader; a
+    # 2X diameter does not extend the finish symbol across the relief.
+    lands = {
+        "outboard_journal": (spec.JOURNAL_START, spec.RELIEF_START),
+        "inboard_journal": (spec.RELIEF_END, spec.JOURNAL_END),
+    }
+    assert set(drawing.JOURNAL_FINISHES) == {control.key for control in spec.SURFACE_FINISHES}
+    assert set(drawing.JOURNAL_FINISHES) == set(lands)
+    for control in spec.SURFACE_FINISHES:
+        start, end = lands[control.key]
+        assert control.roughness_um == MACHINED_UM
+        assert control.face.diameter_mm == spec.JOURNAL_DIA
+        assert start < control.face.contains_y_mm < end
+        pick, symbol = drawing.JOURNAL_FINISHES[control.key]
+        assert drawing._sheet_x(start) < pick[0] < drawing._sheet_x(end)
+        assert pick[1] == pytest.approx(drawing.JOURNAL_FLANK_Y)
+        assert drawing._sheet_x(start) < symbol[0] < drawing._sheet_x(end)
 
 
 def test_integral_lands_run_in_the_restored_post_at_every_size_limit() -> None:
@@ -190,7 +203,6 @@ def test_integral_lands_run_in_the_restored_post_at_every_size_limit() -> None:
     shaft_min = spec.JOURNAL_DIA + spec.JOURNAL_DIA_BAND[1]
     shaft_max = spec.JOURNAL_DIA + spec.JOURNAL_DIA_BAND[0]
     assert (bore_min - shaft_max, bore_max - shaft_min) == pytest.approx((0.025, 0.075))
-    assert spec.SURFACE_FINISHES[0].face.diameter_mm == spec.JOURNAL_DIA
     assert spec.JOURNAL_START < spec.RELIEF_START < spec.RELIEF_END < spec.JOURNAL_END
     assert min(spec.JOURNAL_LANDS_WORST) >= spec.JOURNAL_DIA
     assert spec.JOURNAL_END + spec.STATION_ROW < spec.POST_BORE_END

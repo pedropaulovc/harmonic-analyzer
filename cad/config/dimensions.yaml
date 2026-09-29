@@ -224,13 +224,13 @@ sections:
         - scaled + stated topology
         - med
       - - Crankshaft diameter
-        - 9.525 mm (3/8") on the T12 and crank-hub seats; restored integral Ø11.388 journal runs directly in MHA-016; the 16T pinion sits on a Ø9.0 seat step (local 112.7)
+        - 9.525 mm (3/8") on the T12 and crank-hub seats; restored integral Ø11.388 journal runs directly in MHA-016; the 16T pinion sits on a Ø9.0 seat step (local 112.2)
         - '0.375'
         - 'User ruling 2026-09-28 restores the integral running journal while retaining the single-cutter 16T seat and existing T12 and hub geometry. The smaller pinion root needs the Ø9.0 seat to keep its boss wall over 1.5 at print-worst.'
         - legacy
         - med
       - - Crankshaft bearing
-        - 'Integral Ø11.388 journal in the restored MHA-016 Ø11.438 crank bore; relieved middle Ø10.4, journal local stations 40.755105572..109.0 and relief 55.7..94.0.'
+        - 'Integral Ø11.388 journal in the restored MHA-016 Ø11.438 crank bore; relieved middle Ø10.4, journal local stations 40.755105572..108.6 and relief 55.3..93.6.'
         - —
         - 'User ruling 2026-09-28: restore the journal and its relief. The shaft runs directly in the post, with the shaft_in_bushing clearance class; there is no separate crank bearing sleeve.'
         - derived

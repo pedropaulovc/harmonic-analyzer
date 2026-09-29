@@ -175,11 +175,23 @@ CASES = (
         draw_crankshaft,
         (
             SurfaceFinishControl(
-                "bearing_journal",
+                "outboard_journal",
                 MACHINED_UM,
                 CylinderFace(
                     crankshaft_spec.JOURNAL_DIA,
-                    contains_y_mm=(crankshaft_spec.RELIEF_END + crankshaft_spec.JOURNAL_END) / 2.0,
+                    contains_y_mm=(
+                        crankshaft_spec.JOURNAL_START + crankshaft_spec.RELIEF_START
+                    )
+                    / 2.0,
+                ),
+            ),
+            SurfaceFinishControl(
+                "inboard_journal",
+                MACHINED_UM,
+                CylinderFace(
+                    crankshaft_spec.JOURNAL_DIA,
+                    contains_y_mm=(crankshaft_spec.RELIEF_END + crankshaft_spec.JOURNAL_END)
+                    / 2.0,
                 ),
             ),
         ),

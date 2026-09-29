@@ -187,9 +187,20 @@ DIAMETER_POSITIONS = {
 # outboard land, and the equal-size callout also governs the inboard land.
 CALLOUTS_ABOVE = {"ShaftDiaDim": "2X", "JournalDiaDim": "2X"}
 CALLOUTS_BELOW = {"OverallLength": "OVERALL"}
-# The finish rides the inboard land (crankshaft_spec.SURFACE_FINISHES).
-FINISH_PICK = (RELIEF_END_X + 0.015, JOURNAL_FLANK_Y)
-FINISH_SYMBOL = (RELIEF_END_X + 0.012, 0.200)
+# Both running lands carry a separate part-owned finish and drawing symbol;
+# the outboard symbol sits between the Ø11.388 and Ø10.4 diameter leaders,
+# while the inboard symbol retains its clear position above the relief.
+_OUTBOARD_FINISH_X = _sheet_x((JOURNAL_START + RELIEF_START) / 2.0)
+JOURNAL_FINISHES = {
+    "outboard_journal": (
+        (_OUTBOARD_FINISH_X, JOURNAL_FLANK_Y),
+        (_OUTBOARD_FINISH_X - 0.003, 0.205),
+    ),
+    "inboard_journal": (
+        (RELIEF_END_X + 0.015, JOURNAL_FLANK_Y),
+        (RELIEF_END_X + 0.012, 0.200),
+    ),
+}
 # Text centred up-right of the cross-hole: the callout's leader leaves the
 # text's left end and runs down-left at ~53 deg through the hole centre, a
 # clean crossing of the 118.0 station's extension line rather than a near
@@ -610,10 +621,20 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         side,
-        edge_xy=FINISH_PICK,
-        symbol_xy=FINISH_SYMBOL,
-        control=surface_finish_by_key(SURFACE_FINISHES, "bearing_journal"),
-        label="crankshaft bearing-journal finish",
+        edge_xy=JOURNAL_FINISHES["outboard_journal"][0],
+        symbol_xy=JOURNAL_FINISHES["outboard_journal"][1],
+        control=surface_finish_by_key(SURFACE_FINISHES, "outboard_journal"),
+        label="crankshaft outboard journal finish",
+        entity_type="SILHOUETTE",
+        char_height=0.0025,
+    )
+    add_surface_finish(
+        adapter,
+        side,
+        edge_xy=JOURNAL_FINISHES["inboard_journal"][0],
+        symbol_xy=JOURNAL_FINISHES["inboard_journal"][1],
+        control=surface_finish_by_key(SURFACE_FINISHES, "inboard_journal"),
+        label="crankshaft inboard journal finish",
         entity_type="SILHOUETTE",
         char_height=0.0025,
     )

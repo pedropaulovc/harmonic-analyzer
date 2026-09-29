@@ -106,7 +106,7 @@ def local_station(far_end_station: float) -> float:
 PINION_SEAT_DIA = crank_pinion_spec.SEAT_DIA
 PINION_SEAT_DIA_BAND = SHAFT_DIA_BAND  # the through shaft's turned-fit band
 PINION_SEAT_STATION = 24.1  # far end to the step
-SEAT_STEP = local_station(PINION_SEAT_STATION)  # 112.7
+SEAT_STEP = local_station(PINION_SEAT_STATION)
 STEP_CORNER_RADIUS_MAX = 0.25  # the title block's R0.25 edge break
 SEAT_STEP_STANDOFF_WORST = SEAT_STEP + STATION_ROW + STEP_CORNER_RADIUS_MAX - SEAT_PINION
 SEAT_GAP_NORTH_RANGE = crank_pinion_spec.SEAT_GAP_MAX_MM - crank_pinion_spec.SEAT_FEELER_MM
@@ -152,12 +152,18 @@ if RELIEF_DIA - _RELIEF_ROW <= SHAFT_DIA + SHAFT_DIA_BAND[0]:
     raise AssertionError("relief must stand proud of the through shaft at print-worst")
 if min(JOURNAL_LANDS_WORST) < JOURNAL_LAND_L_OVER_D_MIN * JOURNAL_DIA:
     raise AssertionError("the integral journal lands fall below their printed L/D floor")
-SURFACE_FINISHES = (
+# Both Ø11.388 lands run in MHA-016 and therefore need their own Ra 1.6
+# control on the native cylindrical face and their own drawing leader.
+SURFACE_FINISHES = tuple(
     SurfaceFinishControl(
-        "bearing_journal",
+        key,
         MACHINED_UM,
-        CylinderFace(JOURNAL_DIA, contains_y_mm=(RELIEF_END + JOURNAL_END) / 2.0),
-    ),
+        CylinderFace(JOURNAL_DIA, contains_y_mm=(start + end) / 2.0),
+    )
+    for key, start, end in (
+        ("outboard_journal", JOURNAL_START, RELIEF_START),
+        ("inboard_journal", RELIEF_END, JOURNAL_END),
+    )
 )
 
 # W15's printed worst cases are pure data, so they can be checked without
