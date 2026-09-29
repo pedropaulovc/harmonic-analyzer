@@ -34,10 +34,10 @@ from drive_train_assembly_spec import (
     plan_explode,
 )
 
-# The post's harvested journal carries its incline to four places (12.5182),
-# the layout's is exact (12.518222): the two sit ~4e-7 rad apart.  A wrong axis is
-# degrees off.  The readback moves along the MEASURED axis, the one the rotor
-# is mated to, so this bound only has to tell the journal from anything else.
+# On the seat the post's journal reads on the layout's exact axis: deviation
+# 5.3e-16 in farm run 20260929T174651337Z.  A wrong axis is degrees off.  The
+# readback moves along the MEASURED axis, the one the rotor is mated to, so
+# this bound only has to tell the journal from anything else.
 _CONE_AXIS_TOLERANCE = 1e-5
 
 

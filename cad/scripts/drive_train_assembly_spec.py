@@ -137,7 +137,7 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     ExplodeStep("apex set screws lift", ("arbor-set-screw",), "y", 20.0),
     # cone set: base hardware up, swing plate down.  The rotor (shaft, gears,
     # tip bushing) withdraws north out of the post along its own axis, so the
-    # MHA-014 journal stands clear of the post (Main, 2026-09-29: run 7's
+    # MHA-014 journal stands clear of the post (user ruling 2026-09-29: run 7's
     # touching gears, collar and tip hardware left no shaft face in view).
     # The journal is 43.011 long, so 50 leaves ~7 of air south of it; the tip
     # hardware goes 12 further, which clears the 3.7 the tip runs into the
@@ -146,7 +146,11 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     ExplodeStep("post mount screws lift", ("post-mount-screw",), "y", 100.0),
     ExplodeStep("pivot screw lifts", ("cone-pivot-screw",), "y", 35.0),
     ExplodeStep("lock knob lifts", ("cone-lock-knob",), "y", 30.0),
-    ExplodeStep("swing stop lifts", ("swing-stop-screw",), "y", 25.0),
+    # The withdrawn cone's upper silhouette covers a 25 lift: run
+    # 20260929T174651337Z found no swing-stop-screw ink at any of 24 points
+    # and anchored its balloon on cone-gear-5.  50 puts its head ~2.9 mm of
+    # sheet (1:4) above that silhouette.
+    ExplodeStep("swing stop lifts", ("swing-stop-screw",), "y", 50.0),
     ExplodeStep(
         "cone rotor withdraws",
         ("cone-gear-shaft", "cone-gear", "crank-drive-gear", "cone-tip-bushing"),
@@ -227,6 +231,7 @@ STATIONARY_STEMS = frozenset(
 )
 if CONE_AXIS_SOURCE[0] not in STATIONARY_STEMS:
     raise AssertionError(f"the cone axis's owner {CONE_AXIS_SOURCE[0]!r} must stay put")
+
 
 @dataclass(frozen=True)
 class Instance:
