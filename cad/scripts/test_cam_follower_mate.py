@@ -166,9 +166,24 @@ class MateFeature:
 
 
 class CamFollowerData:
-    ErrorStatus = 4  # swAddMateError_IncorrectSelections, read on failure
-    MateAlignment = -1
-    EntitiesToMate = None
+    """ICamFollowerMateFeatureData with the generated indexed setter contract."""
+
+    __slots__ = ("ErrorStatus", "MateAlignment", "_entities", "_calls")
+
+    def __init__(self, calls):
+        self.ErrorStatus = 4  # swAddMateError_IncorrectSelections, read on failure
+        self.MateAlignment = -1
+        self._entities = [None, None]
+        self._calls = calls
+
+    @property
+    def entities(self):
+        return self._entities
+
+    def SetEntitiesToMate(self, index, entity):  # noqa: N802
+        assert index in (0, 1)
+        self._calls.append(("SetEntitiesToMate", index, entity))
+        self._entities[index] = entity
 
 
 class Assembly:
@@ -204,10 +219,10 @@ class Assembly:
 
     def CreateMateData(self, mate_type):  # noqa: N802
         self.calls.append(("CreateMateData", mate_type))
-        return CamFollowerData() if mate_type == 9 else None
+        return CamFollowerData(self.calls) if mate_type == 9 else None
 
     def CreateMate(self, data):  # noqa: N802
-        entities = list(getattr(data.EntitiesToMate, "value", data.EntitiesToMate))
+        entities = list(data.entities)
         self.created = {
             "selection": [
                 (face.component.Name2, face.part_face, mark)
@@ -279,6 +294,8 @@ def test_binds_the_unique_cylinders_under_role_marks_through_createmate():
     assert assembly.calls == [
         "ClearSelection2",
         ("CreateMateData", 9),
+        ("SetEntitiesToMate", 0, entities[0]),
+        ("SetEntitiesToMate", 1, entities[1]),
         "CreateMate",
         "ClearSelection2",
         "EditRebuild3",

@@ -23,6 +23,8 @@ _FOLLOWER_MARK = 8
 _RADIUS_TOL_MM = 1e-3
 # Sine of the angle a read-back axis may make with its modelled axis.
 _AXIS_SIN_TOL = 1e-2
+# swMateAlign_e.swMateAlignCLOSEST.
+_SW_MATE_ALIGN_CLOSEST = 2
 
 
 @dataclass(frozen=True)
@@ -165,45 +167,60 @@ async def cam_follower_mate(
     Each face is the component part's only solid-body cylinder of its radius,
     mapped into the assembly with ``IComponent2.GetCorrespondingEntity`` --
     never a view-dependent point pick.  They are selected in order under the
-    ICamFollowerMateFeatureData marks (cam 1, follower 8) and built by the
-    adapter's ``CreateMateData(swMateCAMFOLLOWER)`` -> ``EntitiesToMate`` ->
-    ``CreateMate`` path, then rebuilt and rejected on a hard feature error, as
-    ``_mate`` does.  The persisted mate is read back: a cam-follower mate whose
-    two FACE entities sit one on each component, on its modelled cylinder.
+    ICamFollowerMateFeatureData marks (cam 1, follower 8) and supplied to
+    ``SetEntitiesToMate`` by index, then created and rebuilt like ``_mate``.
+    The persisted mate is read back: a cam-follower mate whose two FACE
+    entities sit one on each component, on its modelled cylinder.
     """
-    from solidworks_mcp.adapters.base import AddMateParameters, MateEntityRef
     from solidworks_mcp.adapters.solidworks import assembly as _sw_asm
 
     if cam.component == follower.component:
         raise ValueError(f"{label}: cam and follower are both on {cam.component!r}")
-    params = AddMateParameters(
-        mate_type="cam_follower",
-        entities=[
-            MateEntityRef(entity_type="FACE", component=face.component, mark=mark)
-            for face, mark in ((cam, _CAM_MARK), (follower, _FOLLOWER_MARK))
-        ],
-        alignment="closest",
-    )
     model = _early_bound(adapter.currentModel, "IModelDoc2")
+    assembly = _early_bound(model, "IAssemblyDoc")
     async with _telemetry.aspan(label, kind="cam_follower", label=label):
         faces = [_component_cylinder(adapter, face, label) for face in (cam, follower)]
         selection = _early_bound(model.SelectionManager, "ISelectionMgr")
         model.ClearSelection2(True)
-        pairs = zip((cam, follower), faces, params.entities, strict=True)
-        for face, entity, ref in pairs:
+        for face, entity, mark in zip(
+            (cam, follower), faces, (_CAM_MARK, _FOLLOWER_MARK), strict=True
+        ):
             data = _early_bound(selection.CreateSelectData(), "ISelectData")
-            data.Mark = ref.mark
+            data.Mark = mark
             if not bool(_early_bound(entity, "IEntity").Select4(True, data)):
                 raise RuntimeError(f"{label}: cannot select the {face.component} face")
         selected = int(selection.GetSelectedObjectCount2(-1))
         if selected != 2:
             raise RuntimeError(f"{label}: {selected} entities selected, not 2")
-        mate = _sw_asm._create_standard_mate(
-            adapter,
-            _early_bound(model, "IAssemblyDoc"),
-            params,
-            _sw_asm._MATE_TYPES["cam_follower"],
+
+        mate_data = adapter._attempt(
+            lambda: assembly.CreateMateData(_SW_MATE_CAMFOLLOWER), default=None
         )
+        if mate_data is None:
+            raise Exception(
+                f"CreateMateData({_SW_MATE_CAMFOLLOWER}) returned None "
+                "for cam_follower mate"
+            )
+        mate_data = _early_bound(mate_data, "ICamFollowerMateFeatureData")
+        cam_entity = adapter._attempt(
+            lambda: selection.GetSelectedObject6(1, -1), default=None
+        )
+        if cam_entity is None:
+            raise Exception("Mate entity 1 did not resolve from the selection")
+        follower_entity = adapter._attempt(
+            lambda: selection.GetSelectedObject6(2, -1), default=None
+        )
+        if follower_entity is None:
+            raise Exception("Mate entity 2 did not resolve from the selection")
+        mate_data.SetEntitiesToMate(0, cam_entity)
+        mate_data.SetEntitiesToMate(1, follower_entity)
+        mate_data.MateAlignment = _SW_MATE_ALIGN_CLOSEST
+
+        mate = adapter._attempt(lambda: assembly.CreateMate(mate_data), default=None)
+        if mate is None:
+            status = adapter._attempt(lambda: int(mate_data.ErrorStatus), default=None)
+            reason = _sw_asm._MATE_ERRORS.get(status or 0, f"error status {status}")
+            raise Exception(f"CreateMate failed for cam_follower mate: {reason}")
         model.ClearSelection2(True)
         name = _sw_asm._mate_feature_name(adapter, mate)
         if not bool(model.EditRebuild3()):
