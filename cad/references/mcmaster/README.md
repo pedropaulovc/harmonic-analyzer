@@ -23,7 +23,7 @@ recipes:
 | 90280A199 | `swing-stop-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A201 | `clamp-screw`, `slotted-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A837 | `frame-cross-screw` | Steel Narrow Fillister Head Slotted Screw |
-| 90631A007 | `cone-tip-block-nut` (catalogue-only; no vendor model) | Zinc-Plated Steel Nylon-Insert Locknut |
+| 90631A007 | `cone-tip-block-nut` (vendor model harvested; no replica gate yet) | Zinc-Plated Steel Nylon-Insert Locknut |
 | 91247A720 | `knife-hanger-stud` | Medium-Strength Grade 5 Steel Hex Head Screw |
 | 91255A148 | — (diagnostic recipe; `cone-tip-block-screw` until I31) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91375A106 | `arbor-set-screw` | Alloy Steel Cup-Tip Set Screw |
@@ -35,7 +35,7 @@ recipes:
 | 91882A425 | `cone-lock-knob` | Steel Raised Knurled-Head Thumb Screw |
 | 9275K141 | `tube-frame-cap` | Metal Round Cap |
 | 92865A585 | `hex-bolt` | Medium-Strength Grade 5 Steel Hex Head Screw |
-| 93075A150 | `cone-tip-block-screw` (catalogue-only; no vendor model) | Low-Strength Zinc-Plated Steel Hex Head Screw |
+| 93075A150 | `cone-tip-block-screw` | Low-Strength Zinc-Plated Steel Hex Head Screw |
 | 93075A194 | `hanger-screw` | Low-Strength Zinc-Plated Steel Hex Head Screw |
 | 94025A150 | — (diagnostic recipe; `cone-tip-adjuster` until rule-12 E11) | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
 | 94025A164 | `cone-tip-adjuster` | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
@@ -146,12 +146,32 @@ Catalog specifications checked on September 10, 2026:
   #6-32 x 5/8 in low-strength zinc-plated steel hex head screw, ASME
   B18.6.3, head 1/4 in across flats (0.244 min) and 3/32 in high (0.080 to
   0.093). 90631A007 is a #6-32 zinc-plated steel nylon-insert locknut, 5/16
-  in across flats and 11/64 in high. They are catalogue-only: no vendor
-  model is downloaded or kept here, so neither has a replica gate. The screw
-  is the 93075A* family (`diag_mcmaster_hex_head.py`, whose laws are the
-  replica-gated 93075A194's) at the catalogue sizes. The nut is its
-  catalogue envelope, a sharp hex prism bored at the tap drill. Their
-  standalone diagnostics are catalog-only runs.
+  in across flats and 11/64 in high.
+  - The screw's supplied SolidWorks model, downloaded by the user on
+    September 29, 2026 as `93075A150_Low-Strength Zinc-Plated Steel Hex
+    Head Screws.SLDPRT`, is stored locally as `93075A150.SLDPRT` and was
+    harvested read-only (`cad/out/reports/mcmaster-93075A150-dump.json`).
+    It carries the 93075A194 equations and feature tree, with the head at
+    its 0.093 in (2.3622 mm) maximum height rather than the nominal 3/32.
+    The 93075A* family (`diag_mcmaster_hex_head.py`) at the catalogue sizes
+    and that head height (`diag_build_93075A150.py`) passed the replica gate
+    against it on September 29, 2026: volume 190.4071 vs 190.4064 mm^3,
+    area 370.3731 vs 370.376 mm^2, 23 faces each with the same face-area
+    multiset (largest per-face delta 0.0018 mm^2), and centre of mass
+    within 0.0002 mm (`cad/out/reference/93075A150-replica-report.json`).
+    Evidence SHA-256: native SLDPRT
+    `f090d20739340efcb48ed5ff66920eabcb544a3ba354b963d15d88ea88bde46b`.
+  - The nut's supplied SolidWorks model, downloaded by the user on
+    September 29, 2026 as `90631A007_Low-Strength Steel Nylon-Insert
+    Locknut.SLDPRT`, is stored locally as `90631A007.SLDPRT` and was
+    harvested read-only (`cad/out/reports/mcmaster-90631A007-dump.json`):
+    volume 190.887 mm^3, area 406.2902 mm^2, two bodies (a 31-face steel
+    body with a chamfered hex, 45 deg countersinks and a swept internal
+    thread, and a 4-face nylon insert ring). The production nut is still
+    its catalogue envelope, a sharp hex prism bored at the tap drill, and
+    has no replica gate yet.
+    Evidence SHA-256: native SLDPRT
+    `58378d8753c923e7dc879c7aaafa74f0d0ee7e1e2aa3a304ee3cfaf52f8bc26f`.
 - [98296A027](https://www.mcmaster.com/98296A027/) was read live on
   September 25, 2026: 1050-1095 spring steel slotted spring pin, 1/16 in
   diameter, 1/2 in long, 0.012 in wall, for a 0.062-0.065 in hole,

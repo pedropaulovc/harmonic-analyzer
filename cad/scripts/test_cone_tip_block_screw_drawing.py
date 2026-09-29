@@ -28,7 +28,7 @@ IN = 25.4
 
 
 def test_recipe_is_the_catalogue_screw_the_hold_down_is_sized_for() -> None:
-    """93075A150: #6-32 x 5/8, hex head 1/4 x 3/32 (the tip block spec's
+    """93075A150: #6-32 x 5/8, hex head 1/4 x 0.093 (the tip block spec's
     HOLDDOWN_* stack is computed for exactly this screw)."""
     assert part.THREAD == block.FOOT_THREAD == "#6-32"
     assert recipe.PART_NO == "93075A150"
@@ -37,7 +37,8 @@ def test_recipe_is_the_catalogue_screw_the_hold_down_is_sized_for() -> None:
     assert part.THREAD_PITCH == block.HOLDDOWN_PITCH_MM == IN / 32.0
     assert part.SHANK_LEN == block.HOLDDOWN_SCREW_LENGTH == 0.625 * IN
     assert part.HEAD_AF == 0.25 * IN
-    assert part.HEAD_H == 3.0 / 32.0 * IN
+    # The vendor model draws the head at the catalogue maximum, 0.093 in.
+    assert part.HEAD_H == 0.093 * IN
 
 
 def test_screw_stands_a_pitch_past_the_nut_at_the_thickest_stack() -> None:
@@ -223,9 +224,9 @@ def test_93075A150_is_the_family_at_its_catalogue_dimensions(monkeypatch) -> Non
     calls = _record(monkeypatch, recipe.build_93075A150)
     offsets = {args[1]: args[2] for name, args, _kw in calls if name == "offset_plane"}
     dims = recipe.DIMS
-    assert offsets["UndersidePlane"] == pytest.approx((15.875 - 2.38125) / 2.0)
+    assert offsets["UndersidePlane"] == pytest.approx((15.875 - 2.3622) / 2.0)
     assert offsets["TipPlane"] == pytest.approx(dims.underside_y - 15.875)
-    assert offsets["HeadTopPlane"] == pytest.approx(dims.underside_y + 2.38125)
+    assert offsets["HeadTopPlane"] == pytest.approx(dims.underside_y + 2.3622)
     helix = next(args for name, args, _kw in calls if name == "insert_helix")
     assert helix[1:3] == (IN / 32.0, 15.875 / (IN / 32.0) + 1.0)
 
@@ -271,27 +272,44 @@ def test_docstring_names_the_real_geometry_source() -> None:
     assert "diagnostics/diag_build_93075A194.py" in doc
     assert "replica gate" in doc
     assert "test_cone_tip_block_screw_drawing.py" in doc
-    assert "No McMaster .SLDPRT is committed or used." in doc
+    assert "No McMaster .SLDPRT is committed or used:" in doc
+    assert "diag_build_mcmaster.py 93075A150" in doc
     assert "diag_build_91255A148" in doc and "no production part builds from it" in doc
     recipe_doc = " ".join((recipe.__doc__ or "").split())
     assert "https://www.mcmaster.com/93075A150/" in recipe_doc
-    assert "no replica gate of its own" in recipe_doc
-    assert "catalog-only" in recipe_doc
+    assert "diag_build_mcmaster.py 93075A150" in recipe_doc
+    assert "catalog-only" not in recipe_doc
 
 
-def test_standalone_recipe_run_is_catalog_only() -> None:
-    """No vendor model: the standalone command must not enter the McMaster
-    replica path, which demands a vendor SLDPRT and its harvest."""
+def test_standalone_recipe_run_is_the_replica_gate() -> None:
+    """#1132: McMaster publishes a 93075A150 model, so the standalone command
+    runs the replica gate against it, and the fleet driver registers it."""
+    from diagnostics import diag_build_mcmaster as driver
+
     source = Path(recipe.__file__).read_text(encoding="utf-8")
-    assert "replica_main(" not in source and "import replica_main" not in source
-    assert "run_build(build_catalog)" in source
+    assert "replica_main(PART_NO, build_93075A150)" in source
+    assert "build_catalog" not in source
     assert "diag_build_93075A150.py" in (recipe.__doc__ or "")
+    assert driver.REGISTRY["93075A150"] is recipe.build_93075A150
 
 
 def test_no_vendor_model_of_the_new_hardware_is_tracked() -> None:
+    """The vendor files are local-only (gitignored): present on a seat that
+    replica-gates them, never in git."""
+    import subprocess
+
     root = Path(__file__).resolve().parents[2]
     for sku in ("93075A150", "90631A007"):
-        assert not list(root.glob(f"cad/references/**/{sku}*.SLDPRT"))
+        tracked = subprocess.run(
+            ["git", "ls-files", "--", f"cad/references/**/{sku}*.SLDPRT"],
+            cwd=root, capture_output=True, text=True, check=True,
+        ).stdout
+        assert tracked == ""
+        ignored = subprocess.run(
+            ["git", "check-ignore", "-q", f"cad/references/mcmaster/{sku}.SLDPRT"],
+            cwd=root,
+        )
+        assert ignored.returncode == 0
 
 
 _DIMENSION = re.compile(r"\d")

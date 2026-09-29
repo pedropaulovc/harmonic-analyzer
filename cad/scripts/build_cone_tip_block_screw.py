@@ -7,17 +7,20 @@ locknut on the flange top.  The counterbore slot is one hex width across, so
 its walls hold the head: the nut is turned from the side and no wrench goes
 under the plate.
 
-Geometry source: the catalogue, not a vendor model.  The dimensions are the
-McMaster product page for 93075A150 (read through Browserbase on 2026-09-25):
-#6-32 UNC, 5/8 in under the head, hex head 1/4 in across flats x 3/32 in
-high, ASME B18.6.3.  ``diagnostics/diag_build_93075A150.py`` builds them with
-the 93075A* family laws (``diagnostics/diag_mcmaster_hex_head.py``), which
-reproduce the laws ``diagnostics/diag_build_93075A194.py`` reads off the
-vendor 93075A194 model and proves in its replica gate
-(``diag_build_mcmaster.py 93075A194``).  This size has no replica gate of its
-own; ``test_cone_tip_block_screw_drawing.py`` pins the catalogue dimensions
-against the tip block's hold-down stack and proves the family builder issues
-93075A194's recipe call for call.  No McMaster .SLDPRT is committed or used.
+Geometry source: the catalogue dimensions, replica-gated against the vendor
+model.  The dimensions are the McMaster product page for 93075A150 (read
+through Browserbase on 2026-09-25): #6-32 UNC, 5/8 in under the head, hex
+head 1/4 in across flats x 3/32 in high, ASME B18.6.3 (modelled at the 0.093 in
+maximum, as the vendor model draws it).
+``diagnostics/diag_build_93075A150.py`` builds them with the 93075A* family
+laws (``diagnostics/diag_mcmaster_hex_head.py``), which reproduce the laws
+``diagnostics/diag_build_93075A194.py`` reads off the vendor 93075A194 model.
+This size passes its own replica gate against the vendor 93075A150 model
+(``diag_build_mcmaster.py 93075A150``); ``test_cone_tip_block_screw_drawing.py``
+pins the catalogue dimensions against the tip block's hold-down stack and
+proves the family builder issues 93075A194's recipe call for call.  No
+McMaster .SLDPRT is committed or used: the vendor file is local-only and the
+build never reads it.
 
 The 91255A148 button-head recipe this part used until I31
 (``diagnostics/diag_build_91255A148.py``) stays in the McMaster replica fleet
