@@ -295,9 +295,14 @@ def _bore_leaders_clear(
         raise RuntimeError(f"bore finish text height {height} is not {FINISH_CHAR_HEIGHT}")
     tip = _named(adapter, annotations, "OutsideDia")
     set_near_side_diameter(tip, "tip diameter")
-    rebuild_drawing(adapter, label="tip diameter near-side leader")
+    # Native, the bore diameter's line runs rim to rim through the centre,
+    # across the centre cut (run 20260929T120308584Z); one arrow on the
+    # lower-left rim keeps it below the line, as draw_crank_arm's hub seat.
+    bore = _named(adapter, annotations, "BoreDia")
+    set_near_side_diameter(bore, "bore diameter")
+    rebuild_drawing(adapter, label="tip and bore diameter near-side leaders")
     tip_segments = dimension_segments(tip)
-    bore_segments = dimension_segments(_named(adapter, annotations, "BoreDia"))
+    bore_segments = dimension_segments(bore)
     finish_segments = leader_segments(finish_annotation)
     assert_leaders_clear(
         {

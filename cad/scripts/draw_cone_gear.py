@@ -32,7 +32,7 @@ from typing import Any
 
 import _drawing_hidden_sketches as hidden_sketches
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, _early_bound, _read_member, check, run_build
 from _drawing_leaders import ARROW_TEXT_CLEARANCE
 from _drawing_common import (
     _INSERT_DIMS_MARKED,
@@ -597,13 +597,15 @@ def _clock_arcs(display: Any) -> list[tuple[tuple[float, float], list[tuple[floa
 
 
 def _sweep_clock_right_of_flat(
-    adapter: Any, annotations: list[Any], teeth: int, *, label: str
+    adapter: Any, view: Any, annotations: list[Any], teeth: int, *, label: str
 ) -> None:
     """Flip the imported flat clock until its arc sweeps only the quadrant
     right of the flat and above the axis, then re-seat its text there.
 
-    Every flip is read back from the drawn arcs; a clock that ends anywhere
-    else raises with the stray points.
+    The flips act on the selected dimension (the API's own example selects
+    it first), so each one runs with the clock alone selected in its active
+    view. Every flip is read back from the drawn arcs and the measured value;
+    a clock that ends anywhere else raises with the stray points.
     """
     clocks = [
         _early_bound(annotation, "IAnnotation")
@@ -614,13 +616,24 @@ def _sweep_clock_right_of_flat(
         raise RuntimeError(f"{label}: expected one BoreFlatClock, found {len(clocks)}")
     annotation = clocks[0]
     display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    model = adapter.currentModel
+    drawing = _early_bound(model, "IDrawingDoc")
     vertex = bore_flat_vertex(teeth)
     text_xy = bore_view_keep(teeth)["BoreFlatClock"]
+    imported = float(_read_member(dimension, "SystemValue"))
     flips: list[str] = []
     stray: list[tuple[float, float]] = []
     for flip in ("", *CLOCK_FLIPS):
         if flip:
-            if not getattr(display, flip)():
+            if not drawing.ActivateView(view.GetName2()):
+                raise RuntimeError(f"{label}: failed to activate the bore view")
+            model.ClearSelection2(True)
+            if not annotation.Select3(False, null_callout()):
+                raise RuntimeError(f"{label}: failed to select the flat clock")
+            flipped = getattr(display, flip)()
+            model.ClearSelection2(True)
+            if not flipped:
                 raise RuntimeError(f"{label}: {flip} refused on the flat clock")
             flips.append(flip)
             if not annotation.SetPosition2(*text_xy, 0.0):
@@ -643,13 +656,28 @@ def _sweep_clock_right_of_flat(
             if point[0] < vertex[0] - CLOCK_ARC_OVERRUN or point[1] < vertex[1] - CLOCK_ARC_OVERRUN
         ]
         radii = sorted({round(math.dist(centre, points[0]) * 1000, 2) for centre, points in arcs})
+        spans = [
+            tuple(
+                round(math.degrees(math.atan2(y - vertex[1], x - vertex[0])), 1)
+                for x, y in (points[0], points[-1])
+            )
+            for _centre, points in arcs
+        ]
+        measured = float(_read_member(dimension, "SystemValue"))
         _telemetry.info(
-            f"{label}: flat clock after {flips or ['import']}: {len(arcs)} arc(s), "
-            f"radius {radii} mm, {len(stray)} point(s) outside the quadrant right "
-            "of the flat and above the axis",
+            f"{label}: flat clock after {flips or ['import']}: reads "
+            f"{math.degrees(measured):.4f} deg, {len(arcs)} arc(s) spanning {spans} "
+            f"deg about the flat/axis crossing, radius {radii} mm, {len(stray)} "
+            "point(s) outside the quadrant right of the flat and above the axis",
             clock_flips=len(flips),
             clock_stray_points=len(stray),
+            clock_measured_deg=math.degrees(measured),
         )
+        if abs(measured - imported) > 1e-9:
+            raise RuntimeError(
+                f"{label}: {flips[-1]} changed the clock from "
+                f"{math.degrees(imported):.4f} to {math.degrees(measured):.4f} deg"
+            )
         if not stray:
             return
     raise RuntimeError(
@@ -881,7 +909,7 @@ async def build(adapter: Any) -> dict[str, str]:
             dimensions_by_feature=DRAWING_DIMENSIONS,
         )
         _sweep_clock_right_of_flat(
-            adapter, bore_annotations, teeth, label=f"{configuration} bore view"
+            adapter, bore_view, bore_annotations, teeth, label=f"{configuration} bore view"
         )
         _crop_bore_view(adapter, bore_view, configuration, teeth, set(bore_keep))
         # The part saves both authoring sketches hidden; the front view shows

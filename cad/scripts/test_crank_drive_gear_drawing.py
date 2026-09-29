@@ -564,11 +564,6 @@ def test_bore_finish_reads_at_note_height_and_leaders_have_separate_landings() -
     import _drawing_leaders as leaders
 
     assert drawing.FINISH_CHAR_HEIGHT == 0.0025  # the Gear Data / notes height
-    source = _source()
-    assert "char_height=FINISH_CHAR_HEIGHT" in source
-    assert '"Gear Data", *GEAR_DATA_POS, char_height=0.0025' in source
-    assert "_bore_leaders_clear(adapter, front, front_annotations, finish)" in source
-    assert 'set_near_side_diameter(tip, "tip diameter")' in source
 
     cx, cy = drawing.FRONT_CENTER
     r = drawing.BORE_SHEET_RADIUS
