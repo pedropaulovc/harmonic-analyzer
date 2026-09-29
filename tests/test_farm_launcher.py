@@ -1264,7 +1264,9 @@ def _write_run_record(
         "commit": "0" * 40,
         "targets": ["part:crank_hub"],
         "leaf_timeout_minutes": 90,
-        "started_at": time.strftime("%Y-%m-%dT%H:%M:%S.0000000Z", time.gmtime(started)),
+        # The launcher's round-trip form: 100 ns ticks.
+        "started_at": time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(started))
+        + f".{int(started % 1 * 1e7):07d}Z",
         "pid": pid,
         "log": str(log),
         "done": str(log_directory / f"{run_id}.done"),
@@ -1293,6 +1295,83 @@ def _sibling_waiting_on(fixture: dict[str, object], workflow: str) -> Path:
         argv=[],
         hexdigit="e",
     )
+
+
+def test_a_tag_resolves_to_its_latest_started_run(tmp_path: Path) -> None:
+    """Codex on #1125 (4243d95d2): run IDs carry the start to the millisecond,
+    so two launches in one millisecond were ordered by their random suffix."""
+    fixture = _launcher_fixture(tmp_path)
+    second = float(int(time.time()) - 10)
+    # Same run-id timestamp; the older one's suffix sorts last by name.
+    _write_run_record(
+        fixture,
+        pid=os.getpid(),
+        tag="twin",
+        workflow=LEAF_NUT,
+        argv=[],
+        hexdigit="f",
+        started=second + 0.0002,
+    )
+    newer = _write_run_record(
+        fixture,
+        pid=os.getpid(),
+        tag="twin",
+        workflow=LEAF_NUT,
+        argv=[],
+        hexdigit="1",
+        started=second + 0.0007,
+    )
+
+    status = _run_launcher(
+        fixture, _tracking(fixture, "-Status", "-Tag", "twin"), fixture["environment"]
+    )
+
+    assert status.returncode == 0, status.stderr
+    assert json.loads(status.stdout)["run_id"] == _record(newer)["run_id"]
+
+
+def test_a_pid_reused_after_the_record_is_not_the_launcher(tmp_path: Path) -> None:
+    """Codex on #1125 (4243d95d2): a process that took a dead launcher's PID
+    within a second of its record counted as the launcher, and -Cancel would
+    have killed it."""
+    fixture = _launcher_fixture(tmp_path)
+    started = time.time()
+    reused = subprocess.Popen(
+        [sys.executable, "-c", SLEEPER],
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    try:
+        _write_run_record(
+            fixture,
+            pid=reused.pid,
+            tag="reused",
+            workflow=LEAF_NUT,
+            argv=["uv", "-c", "pass"],
+            hexdigit="7",
+            started=started,
+        )
+        status = _run_launcher(
+            fixture,
+            _tracking(fixture, "-Status", "-Tag", "reused"),
+            fixture["environment"],
+        )
+        _run_launcher(
+            fixture,
+            _tracking(fixture, "-Cancel", "-Tag", "reused", "-Why", "reused pid"),
+            fixture["environment"],
+        )
+        survived = reused.poll() is None
+    finally:
+        reused.kill()
+        reused.wait(timeout=HANG_GUARD_S)
+
+    assert status.returncode == 0, status.stderr
+    report = json.loads(status.stdout)
+    assert report["state"] == "launcher-died"
+    assert report["launcher"]["alive"] is False
+    assert survived
 
 
 SLEEPER = "__import__('time').sleep(120)"

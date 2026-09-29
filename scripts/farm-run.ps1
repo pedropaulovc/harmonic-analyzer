@@ -531,16 +531,17 @@ function Select-RunRecordPath {
         }
         return $path
     }
-    # Run IDs start with a UTC timestamp, so name order is start order.
-    $matching = @(
-        Get-RunRecordPaths -Directory $Directory | Where-Object {
-            (Read-RunRecord -Path $_)['tag'] -ceq $Tag
-        }
-    )
-    if ($matching.Count -eq 0) {
+    # Run IDs carry the start only to the millisecond, and launches in the same
+    # millisecond would fall back to their random suffix; started_at has 100 ns.
+    $newest = Get-RunRecordPaths -Directory $Directory |
+        ForEach-Object { [pscustomobject]@{ Path = $_; Record = Read-RunRecord -Path $_ } } |
+        Where-Object { $_.Record['tag'] -ceq $Tag } |
+        Sort-Object -Property { ConvertTo-UtcTimestamp -Value $_.Record['started_at'] } |
+        Select-Object -Last 1
+    if ($null -eq $newest) {
         throw "no run tagged '$Tag' under $Directory"
     }
-    return $matching[-1]
+    return $newest.Path
 }
 
 function Test-LauncherAlive {
@@ -551,10 +552,10 @@ function Test-LauncherAlive {
         return $false
     }
     # The launcher started before it wrote started_at; a process with this PID
-    # that started later is an unrelated process that reused it.
+    # created at or after it is an unrelated process that reused it.
     $startedAt = ConvertTo-UtcTimestamp -Value $Record['started_at']
     try {
-        return $process.StartTime.ToUniversalTime() -le $startedAt.AddSeconds(1)
+        return $process.StartTime.ToUniversalTime() -lt $startedAt
     }
     catch {
         return $true
@@ -803,7 +804,7 @@ function Get-RunProcessTree {
         $byParent[$parent].Add($process)
     }
     $holder = $all | Where-Object { [int]$_.ProcessId -eq $launcherId } | Select-Object -First 1
-    $isLauncher = $null -ne $holder -and $holder.CreationDate.ToUniversalTime() -le $startedAt.AddSeconds(1)
+    $isLauncher = $null -ne $holder -and $holder.CreationDate.ToUniversalTime() -lt $startedAt
     $queue = [System.Collections.Generic.Queue[object]]::new()
     foreach ($entry in $Stopped.GetEnumerator()) {
         foreach ($child in @($byParent[[int]$entry.Key])) {
