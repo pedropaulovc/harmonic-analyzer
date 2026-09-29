@@ -989,6 +989,27 @@ def test_handle_pivot_screw_is_built_released_and_backs_out_of_the_handle() -> N
     assert -back_out.distance_mm > screw_spec.THREAD_LENGTH + handle_spec.HANDLE_LENGTH
 
 
+def test_the_cone_rotor_withdraws_clear_of_the_post_and_the_tip_block() -> None:
+    """With the cone gears touching, the collar on the post and the tip in
+    its block, no MHA-014 face showed in place and its balloon leader landed
+    on the tip block (run 7).  The rotor leaves along the cone axis until the
+    whole journal clears the post, and the tip hardware leads it by more than
+    the tip runs into the block."""
+    import cone_gear_shaft_spec as shaft
+
+    steps = {step.label: step for step in spec.EXPLODE_STEPS}
+    rotor, tip = steps["cone rotor withdraws"], steps["tip block slides off"]
+    assert rotor.axis == tip.axis == "cone"
+    assert "cone-gear-shaft" in rotor.stems and "cone-tip-block" in tip.stems
+    # The collar bears on the post's north face, where the journal ends.
+    assert rotor.distance_mm > shaft.JOURNAL_END
+    tip_in_block = shaft.T006_TIP_STATION - shaft.TIP_BLOCK_SOUTH_FACE_STATION
+    assert tip_in_block > 0.0
+    assert tip.distance_mm - rotor.distance_mm > tip_in_block
+    # The adjuster and pinch screw are threaded into the block: they go with it.
+    assert {"cone-tip-adjuster", "cone-tip-pinch-screw"} <= set(tip.stems)
+
+
 def test_bank_fitup_limits_are_the_layout_bands() -> None:
     """#743 steps 8-9 print cylinder_bank_layout's bands as limits, each
     rounded inward so a part inside the print is inside the model band."""
