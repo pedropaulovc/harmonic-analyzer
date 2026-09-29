@@ -87,7 +87,6 @@ from crank_handle_pivot_screw_spec import (
     SHOULDER_DIA,
     SHOULDER_DIA_BAND,
     SHOULDER_LENGTH,
-    SHOULDER_LENGTH_TOL,
     SLOT_DEPTH,
     SLOT_WIDTH,
     SURFACE_FINISHES,
@@ -396,9 +395,6 @@ async def build(adapter) -> dict[str, str]:
     # length, and the thread length that must stay inside the 8.0 arm.
     set_dimension_bilateral_tolerance(
         adapter, "ScrewProfile", "ShoulderDia", *deviations(SHOULDER_DIA_BAND)
-    )
-    set_dimension_symmetric_tolerance(
-        adapter, "ScrewProfile", "ShoulderLength", SHOULDER_LENGTH_TOL
     )
     set_dimension_symmetric_tolerance(adapter, "ScrewProfile", "HeadDia", HEAD_DIA_TOL)
     set_dimension_bilateral_tolerance(

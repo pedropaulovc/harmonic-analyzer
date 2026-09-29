@@ -64,7 +64,7 @@ def seam_callout(mate: str) -> str:
             f"(<MOD-DIAM>{AXIAL_PIN_DIA:.1f}) <HOLE-DEPTH> {AXIAL_PIN_LENGTH:.1f}",
             f"MATCH-DRILL/REAM WITH {mate}",
             "AT ASSEMBLY, CENTRED ON THE SEAM",
-            "FOR MHA-138: LIGHT DRIVE FIT",
+            "FOR MHA-138 AXIAL PIN: LIGHT DRIVE FIT",
         )
     )
 

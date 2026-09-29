@@ -42,19 +42,14 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
-    set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_tolerance,
 )
-from _fit_limits import deviations
 from crank_handle_ferrule_spec import (
     BORE_DIA,
-    BORE_DIA_BAND,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
     ISOMETRIC_VIEW_NOTE,
     LENGTH,
-    LENGTH_TOL,
     OUTER_DIA,
 )
 
@@ -151,12 +146,8 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven brass ferrule (equations neutral)", V_FERRULE, 0.005 * V_FERRULE
     )
 
-    # Model-owned bands (policy rule 2): the epoxy-fit bore and the length the
-    # handle's end-play stack reads.
-    set_dimension_bilateral_tolerance(
-        adapter, "FerruleProfile", "BoreDia", *deviations(BORE_DIA_BAND)
-    )
-    set_dimension_symmetric_tolerance(adapter, "FerruleProfile", "Length", LENGTH_TOL)
+    # Every size is routine (.X): the oak tenon is turned to suit this bore and
+    # the handle's end play is fitted on the MHA-139 shoulder.
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     clear_dimensions_for_drawing(adapter)

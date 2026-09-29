@@ -51,12 +51,29 @@ def test_oak_ends_in_a_ferrule_tenon_and_a_cup_counterbore() -> None:
     assert crank_handle_spec.TRIM_X == pytest.approx(
         crank_handle_spec.HANDLE_LENGTH - cup.FLANGE_THICKNESS
     )
-    assert crank_handle_spec.WOOD_LENGTH == pytest.approx(50.2)
+    assert crank_handle_spec.WOOD_LENGTH == pytest.approx(48.7)
     assert crank_handle_spec.TENON_X0 > 0.0  # no oak reaches the arm face
-    assert crank_handle_spec.TENON_GLUE_LINE == pytest.approx((0.03, 0.12))
-    assert crank_handle_spec.CUP_GLUE_LINE == pytest.approx((0.03, 0.12))
     assert abs(cup.FLANGE_DIA - 2.0 * crank_handle_spec.TRIM_R) <= 0.1
     assert crank_handle_spec.COUNTERBORE_MOUTH_WALL >= 0.6
+    # User ruling 2026-09-29 (MHA-153 review): the butt grew from Ø10 so the
+    # cup keeps 1.5 mm sections.
+    assert crank_handle_spec.CAP_R == pytest.approx(5.75)
+
+
+def test_tenon_and_counterbore_are_fitted_to_the_parts_they_take() -> None:
+    # User ruling 2026-09-29 (after the machinist reviews): turned and bored to
+    # suit, so the sizes print as references and the note carries the fit.
+    spec = crank_handle_spec
+    assert spec.REFERENCE_DIMENSIONS == {"TenonDia", "CounterboreDia"}
+    assert spec.TENON_DIA == pytest.approx(ferrule.BORE_DIA - 0.1)
+    assert spec.COUNTERBORE_DIA == pytest.approx(cup.BODY_DIA + 0.1)
+    assert "TURN THE TENON TO SUIT THE MHA-150 FERRULE BORE" in spec.DRAWING_NOTES
+    assert "COUNTERBORE TO SUIT THE MHA-153 CUP BODY" in spec.DRAWING_NOTES
+    source = Path(handle.__file__).read_text(encoding="utf-8")
+    assert source.count("set_dimension_bilateral_tolerance(") == 1  # the reamed bore
+    assert "set_dimension_symmetric_tolerance" not in source
+    drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "for name in sorted(REFERENCE_DIMENSIONS):" in drawing_source
 
 
 def test_diameters_are_a_basic_profile_note_not_marked_dims() -> None:
@@ -104,7 +121,7 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     assert "NO BLEND, RADIUS, OR CHAMFER" in notes
     assert "FINAL BORE LIMITS APPLY FULL LENGTH" in notes
     assert "STRAIGHT GRAIN PARALLEL TO TURNING AXIS" in notes
-    assert "50.20+0.00/-0.25 IS WOOD" in notes
+    assert "ALL AXIAL STATIONS ARE FROM B." in notes
     assert "PROFILE 0.50 | A | B APPLIES" in notes
     assert all(len(line) <= 90 for line in notes.splitlines())
     assert drawing.DIMENSION_CALLOUTS["PivotBoreDia"] == "THRU - REAM"

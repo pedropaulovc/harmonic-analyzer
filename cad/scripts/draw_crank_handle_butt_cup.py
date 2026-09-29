@@ -1,11 +1,12 @@
 r"""Create the curated machinist drawing for MHA-153, the crank handle butt cup.
 
-A flanged steel cup (user ruling 2026-09-29, ch11 p.14/p.15): flange, body,
-pocket and floor hole, all on the side view (policy rule 7, turned parts:
-diameters on the side view), with hidden lines shown so the pocket and the
-floor hole read.  The end view carries only centre marks.  The stack, fit and
-clearance sizes print their bands from the model
-(``crank_handle_butt_cup_spec``); one note names the mating counterbore.
+A flanged steel cup (user ruling 2026-09-29, ch11 p.14/p.15).  The end view
+carries only its centre mark and the cutting plane; the longitudinal section
+A-A is the cup's length view (policy rule 7) and takes every dimension, so
+the pocket and the floor hole read on cut edges rather than hidden lines (the
+MHA-153 machinist review).  The body diameter is the one band; the pocket is
+bored to suit the MHA-139 head (a reference size, the note says how), and
+the floor hole carries its drill callout.
 
 Run with SolidWorks open::
 
@@ -23,25 +24,30 @@ from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_property_linked_note,
-    add_view_centerline,
     assert_imported_precision,
     check_drawing_layout,
+    create_section_view,
     curate_view_dimensions,
+    dimension_name,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
     rebuild_drawing,
+    set_dimension_callouts,
     set_hidden_lines_removed,
-    set_hidden_lines_visible,
+    set_reference_dimension,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _section_axis import create_section_axis_centerline, position_section_caption
 from crank_handle_butt_cup_spec import (
-    BODY_DIA,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FLANGE_DIA,
+    FLANGE_THICKNESS,
+    FLOOR_HOLE_CALLOUT,
     OVERALL_LENGTH,
+    REFERENCE_DIMENSIONS,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -61,36 +67,40 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# Ø10.8 x 4.6 at 8:1 reads 86 x 37 on the sheet: room for seven dimensions.
-SHEET_SCALE = (8.0, 1.0)
-VIEW_SCALE = (8, 1)
+# Ø13.5 x 7.3 at 5:1 reads 68 x 37 on the sheet.
+SHEET_SCALE = (5.0, 1.0)
+VIEW_SCALE = (5, 1)
 ISO_SCALE = (4, 1)
-SIDE_CENTER = (0.140, 0.160)
-END_CENTER = (0.290, 0.160)
-ISO_CENTER = (0.370, 0.225)
-MANUFACTURING_NOTES_POS = (0.022, 0.075)
-# Right of the end view's box (farm leaf 20260929T192841Z: at 0.335 the note
-# ran 4 mm into it).
-ISO_NOTE_POS = (0.345, 0.185)
+END_CENTER = (0.080, 0.165)
+SECTION_CENTER = (0.215, 0.165)
+ISO_CENTER = (0.368, 0.215)
+CAPTION_XY = (0.195, 0.100)
+MANUFACTURING_NOTES_POS = (0.022, 0.085)
+ISO_NOTE_POS = (0.335, 0.170)
 
 _S = VIEW_SCALE[0] / 1000.0
-FLANGE_R = FLANGE_DIA * _S / 2.0  # 0.0432
-BODY_R = BODY_DIA * _S / 2.0
-HALF_LENGTH = OVERALL_LENGTH * _S / 2.0  # 0.0184
+FLANGE_R = FLANGE_DIA * _S / 2.0  # 0.03375
+HALF_LENGTH = OVERALL_LENGTH * _S / 2.0  # 0.01825
+# The section lays the part's +X to the right (the draw_crank_pinion
+# convention), so the flange face is the right edge and the floor the left.
+FLANGE_RIGHT_X = SECTION_CENTER[0] + HALF_LENGTH
+FLANGE_SEAT_X = FLANGE_RIGHT_X - FLANGE_THICKNESS * _S
 
-# *Front: local +X to the right, so the flange face (x=0) is the view's right
-# end and the body runs left.  Diameters that open at the flange face stand
-# right of the view, the body and floor-hole diameters left of it; the axial
-# sizes stack above (from the flange face) and below (the pocket).
-SIDE_KEEP = {
-    "FlangeDia": (SIDE_CENTER[0] + HALF_LENGTH + 0.016, SIDE_CENTER[1]),
-    "PocketDia": (SIDE_CENTER[0] + HALF_LENGTH + 0.032, SIDE_CENTER[1]),
-    "BodyDia": (SIDE_CENTER[0] - HALF_LENGTH - 0.016, SIDE_CENTER[1]),
-    "FloorHoleDia": (SIDE_CENTER[0] - HALF_LENGTH - 0.032, SIDE_CENTER[1]),
-    "FlangeThickness": (SIDE_CENTER[0] + HALF_LENGTH, SIDE_CENTER[1] + FLANGE_R + 0.010),
-    "OverallLength": (SIDE_CENTER[0], SIDE_CENTER[1] + FLANGE_R + 0.022),
-    "PocketDepth": (SIDE_CENTER[0] + 0.004, SIDE_CENTER[1] - FLANGE_R - 0.012),
+# Diameters that open at the flange face stand right of the section, the body
+# and the floor hole left of it; the axial sizes stack above (from the flange
+# face) and below (the floor).
+SECTION_KEEP = {
+    "FlangeDia": (FLANGE_RIGHT_X + 0.020, SECTION_CENTER[1]),
+    "PocketDia": (FLANGE_RIGHT_X + 0.040, SECTION_CENTER[1]),
+    "BodyDia": (SECTION_CENTER[0] - HALF_LENGTH - 0.020, SECTION_CENTER[1]),
+    "FloorHoleDia": (SECTION_CENTER[0] - HALF_LENGTH - 0.042, SECTION_CENTER[1]),
+    "FlangeThickness": ((FLANGE_RIGHT_X + FLANGE_SEAT_X) / 2.0, SECTION_CENTER[1] + FLANGE_R + 0.009),
+    "OverallLength": (SECTION_CENTER[0], SECTION_CENTER[1] + FLANGE_R + 0.021),
+    "FloorThickness": (SECTION_CENTER[0] - HALF_LENGTH, SECTION_CENTER[1] - FLANGE_R - 0.010),
 }
+DIMENSION_CALLOUTS = {"FloorHoleDia": FLOOR_HOLE_CALLOUT}
+CUT_START = (END_CENTER[0], END_CENTER[1] - FLANGE_R - 0.006)
+CUT_END = (END_CENTER[0], END_CENTER[1] + FLANGE_R + 0.006)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -133,28 +143,40 @@ async def build(adapter: Any) -> dict[str, str]:
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
-    side = place_view(adapter, str(SOURCE), "*Front", *SIDE_CENTER, scale=VIEW_SCALE)
     end = place_view(adapter, str(SOURCE), "*Right", *END_CENTER, scale=VIEW_SCALE)
+    section = create_section_view(
+        adapter,
+        end,
+        line_start=CUT_START,
+        line_end=CUT_END,
+        view_xy=SECTION_CENTER,
+        section_label="A",
+        scale=VIEW_SCALE,
+        label="butt cup longitudinal section",
+    )
+    position_section_caption(adapter, section, CAPTION_XY, label="butt cup")
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
-    set_hidden_lines_visible(adapter, side)
-    for view in (end, iso):
+    for view in (end, section, iso):
         set_hidden_lines_removed(adapter, view)
 
     annotations = curate_view_dimensions(
         adapter,
-        side,
-        keep=SIDE_KEEP,
-        view_label="side",
+        section,
+        keep=SECTION_KEEP,
+        view_label="longitudinal section",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    by_name = {dimension_name(adapter, a): a for a in annotations}
+    for name in sorted(REFERENCE_DIMENSIONS):
+        set_reference_dimension(
+            adapter, by_name[name], label=f"MHA-153 {name}", diameter=True
+        )
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the cup end view")
-    add_view_centerline(
-        adapter,
-        side,
-        face_xy=(SIDE_CENTER[0] - HALF_LENGTH / 2.0, SIDE_CENTER[1] + 0.9 * BODY_R),
-        label="cup side-view axis centerline",
+    create_section_axis_centerline(
+        adapter, section, length_mm=OVERALL_LENGTH, label="butt cup axis"
     )
 
     add_property_linked_note(adapter, "Manufacturing Notes", *MANUFACTURING_NOTES_POS)

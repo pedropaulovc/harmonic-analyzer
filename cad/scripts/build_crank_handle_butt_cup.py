@@ -47,10 +47,8 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
-    set_dimension_bilateral_tolerance,
     set_dimension_symmetric_tolerance,
 )
-from _fit_limits import deviations
 from crank_handle_butt_cup_spec import (
     BODY_DIA,
     BODY_DIA_TOL,
@@ -59,15 +57,12 @@ from crank_handle_butt_cup_spec import (
     DRAWING_PRECISION,
     FLANGE_DIA,
     FLANGE_THICKNESS,
-    FLANGE_THICKNESS_TOL,
     FLOOR_HOLE_DIA,
+    FLOOR_THICKNESS,
     ISOMETRIC_VIEW_NOTE,
     OVERALL_LENGTH,
-    OVERALL_LENGTH_TOL,
     POCKET_DEPTH,
-    POCKET_DEPTH_TOL,
     POCKET_DIA,
-    POCKET_DIA_BAND,
 )
 
 PART_NAME = "crank-handle-butt-cup"
@@ -97,7 +92,7 @@ async def build(adapter) -> dict[str, str]:
         ("BodyDia", BODY_DIA),
         ("OverallLength", OVERALL_LENGTH),
         ("PocketDia", POCKET_DIA),
-        ("PocketDepth", POCKET_DEPTH),
+        ("FloorThickness", FLOOR_THICKNESS),
         ("FloorHoleDia", FLOOR_HOLE_DIA),
     ):
         await set_global(adapter, name, f"{value}mm")
@@ -175,11 +170,17 @@ async def build(adapter) -> dict[str, str]:
         "cup overall length",
     )
     profile.record("OverallLength", '"OverallLength"')
-    check(
-        "pocket depth",
-        await adapter.add_sketch_dimension(pocket_wall, None, "linear", POCKET_DEPTH),
+    # The floor, bottom face to pocket floor: the section the 1.5 floor rule
+    # reads, so it is the printed size and the pocket depth derives.
+    await dimension_between(
+        adapter,
+        f"{bottom}.start",
+        f"{floor_top}.start",
+        "horizontal_distance",
+        FLOOR_THICKNESS,
+        "cup floor thickness",
     )
-    profile.record("PocketDepth", '"PocketDepth"')
+    profile.record("FloorThickness", '"FloorThickness"')
     for name, line, u_mid, radius in (
         ("FlangeDia", flange_od, -FLANGE_THICKNESS / 2.0, FLANGE_R),
         ("BodyDia", body_od, -(FLANGE_THICKNESS + OVERALL_LENGTH) / 2.0, BODY_R),
@@ -208,20 +209,10 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven butt cup (equations neutral)", V_CUP, 0.005 * V_CUP
     )
 
-    # Model-owned bands (policy rule 2): the two end-play stack terms, the
-    # epoxy-fit body, the length that keeps the body off the counterbore floor,
-    # and the pocket's head clearance.
-    set_dimension_symmetric_tolerance(
-        adapter, "CupProfile", "FlangeThickness", FLANGE_THICKNESS_TOL
-    )
-    set_dimension_symmetric_tolerance(adapter, "CupProfile", "PocketDepth", POCKET_DEPTH_TOL)
+    # The one model-owned band (policy rule 2): the body diameter that holds
+    # the pocket wall.  Every other size is routine (.X); the pocket is bored
+    # to suit the MHA-139 head.
     set_dimension_symmetric_tolerance(adapter, "CupProfile", "BodyDia", BODY_DIA_TOL)
-    set_dimension_symmetric_tolerance(
-        adapter, "CupProfile", "OverallLength", OVERALL_LENGTH_TOL
-    )
-    set_dimension_bilateral_tolerance(
-        adapter, "CupProfile", "PocketDia", *deviations(POCKET_DIA_BAND)
-    )
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)
     await report_mass_properties(adapter)

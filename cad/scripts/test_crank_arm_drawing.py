@@ -305,7 +305,7 @@ def test_arm_states_the_mha139_engagement_exception_it_is_tapped_for() -> None:
     # named exception with the same worst case the MHA-139 sheet prints.
     import crank_handle_pivot_screw_spec as screw
 
-    assert spec.DRAWING_NOTES.splitlines()[-1] == screw.DRAWING_NOTES.replace(
+    assert spec.DRAWING_NOTES.splitlines()[-1] == screw.ENGAGEMENT_NOTE.replace(
         "THREAD ENGAGEMENT", f"{screw.THREAD_SIZE} THREAD ENGAGEMENT"
     )
     assert spec.DRAWING_NOTES.splitlines()[-1] == "#8-32 THREAD ENGAGEMENT 1.33D MIN."

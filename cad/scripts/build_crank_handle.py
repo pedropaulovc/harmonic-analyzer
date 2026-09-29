@@ -61,7 +61,6 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_tolerance,
 )
 from _fit_limits import deviations
 from _saved_part_guard import require_saved_drawing_properties
@@ -74,7 +73,6 @@ MATERIAL = "Oak"  # see _common.apply_material docstring
 from crank_handle_spec import (  # noqa: E402
     COUNTERBORE_DEPTH,
     COUNTERBORE_DIA,
-    COUNTERBORE_DIA_BAND,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
@@ -90,13 +88,11 @@ from crank_handle_spec import (  # noqa: E402
     REAR_PROFILE_R,
     SHOULDER_X,
     TENON_DIA,
-    TENON_DIA_TOL,
     TENON_LENGTH,
     TENON_X0,
     TRIM_R,
     TRIM_X,
     WOOD_LENGTH,
-    WOOD_LENGTH_BAND,
 )
 
 PEAK_R = HANDLE_MAX_DIA / 2.0
@@ -374,16 +370,9 @@ async def build(adapter) -> dict[str, str]:
     # selection (M6 mated-DOF drive train).
     await name_bore_axis(adapter, "Front Plane", 0.0, "Top Plane", 0.0, "handle axis")
 
-    # Manufacturing drawing support: the model owns every printed band (policy
-    # rule 2) -- the wood length, the two epoxy-fit diameters and the reamed
-    # bore -- and the places they print with.
-    set_dimension_bilateral_tolerance(
-        adapter, "HandleProfile", "WoodLength", *deviations(WOOD_LENGTH_BAND)
-    )
-    set_dimension_symmetric_tolerance(adapter, "HandleProfile", "TenonDia", TENON_DIA_TOL)
-    set_dimension_bilateral_tolerance(
-        adapter, "HandleProfile", "CounterboreDia", *deviations(COUNTERBORE_DIA_BAND)
-    )
+    # Manufacturing drawing support: the model owns the one printed band
+    # (policy rule 2), the reamed bore, and the places every mark prints with.
+    # The tenon and the counterbore are fitted to the parts they take.
     set_dimension_bilateral_tolerance(
         adapter,
         "PivotBoreProfile",

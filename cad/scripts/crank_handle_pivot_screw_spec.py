@@ -26,24 +26,21 @@ from _gtol_spec import CylinderFace
 from _hole_spec import THREAD_MAJOR_MM
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from crank_handle_butt_cup_spec import (
+    BODY_DIA as CUP_BODY_DIA,
+    BODY_DIA_TOL as CUP_BODY_DIA_TOL,
     FLANGE_THICKNESS as CUP_FLANGE_THICKNESS,
-    FLANGE_THICKNESS_TOL as CUP_FLANGE_THICKNESS_TOL,
     FLOOR_HOLE_DIA as CUP_FLOOR_HOLE_DIA,
+    POCKET_CLEARANCE as CUP_POCKET_CLEARANCE,
     POCKET_DEPTH as CUP_POCKET_DEPTH,
-    POCKET_DEPTH_TOL as CUP_POCKET_DEPTH_TOL,
     POCKET_DIA as CUP_POCKET_DIA,
-    POCKET_DIA_BAND as CUP_POCKET_DIA_BAND,
+    WALL_FLOOR_MM,
 )
-from crank_handle_ferrule_spec import (
-    LENGTH as FERRULE_LENGTH,
-    LENGTH_TOL as FERRULE_LENGTH_TOL,
-)
+from crank_handle_ferrule_spec import LENGTH as FERRULE_LENGTH
 from crank_handle_spec import (
     HANDLE_LENGTH,
     PIVOT_BORE_BAND,
     PIVOT_BORE_DIA,
     WOOD_LENGTH,
-    WOOD_LENGTH_BAND,
 )
 from crank_hub_geometry import (
     ARM_STOCK_THICKNESS,
@@ -59,23 +56,33 @@ from crank_hub_geometry import (
 STOCK_DIA = 0.375 * MM_PER_IN
 
 # User ruling 2026-09-29 (ch11 p.14): the head sits recessed in the MHA-153
-# butt cup's pocket with a visible ring of clearance, so it is a banded Ø7.80
-# (the pocket is Ø8.2 +0.10/0) rather than the former routine Ø8.0.
-HEAD_DIA = 7.80
-HEAD_DIA_TOL = 0.05
-HEAD_LENGTH = 3.0
+# butt cup's pocket, which is bored to suit it, and bears on the cup floor.
+# Its +/-0.10 band keeps a bearing annulus outside the drilled floor hole at
+# the worst case, after an edge break on each.
+HEAD_DIA = 8.0
+HEAD_DIA_TOL = 0.10
+# 4.0 x 0.8 (user ruling 2026-09-29, MHA-139 machinist review): at the .X
+# worst case the slot leaves 1.6 of head under it, not 0.4.
+HEAD_LENGTH = 4.0
 SLOT_WIDTH = 1.0
-SLOT_DEPTH = 1.0
+SLOT_DEPTH = 0.8
 
 # The running surface under the oak bore.  (upper, lower) deviations from the
 # Ø6.00 nominal; the model carries the band natively (policy rule 2).
 SHOULDER_DIA = 6.00
 SHOULDER_DIA_BAND = (-0.03, -0.08)
-# Arm face to the head's underside, which bears on the MHA-153 cup floor.  The
-# end-play stack below (ferrule, oak, cup flange, cup pocket) leaves 0.75 of
-# band for the whole stack, so the shoulder takes +/-0.10.
-SHOULDER_LENGTH = 54.90
-SHOULDER_LENGTH_TOL = 0.10
+# Arm face to the head's underside, which bears on the MHA-153 cup floor.
+# User ruling 2026-09-29 (after the machinist reviews): the shoulder is
+# turned to suit the bonded handle -- its measured length from the ferrule's
+# arm face to the cup floor, plus the end play -- so no part in the handle
+# stack carries a band for it.  The model carries the nominal stack plus the
+# nominal end play, printed as a reference under the to-suit callout.
+END_PLAY_BAND = (0.25, 1.00)
+END_PLAY_NOMINAL = 0.5
+HANDLE_STACK_NOMINAL = round(
+    FERRULE_LENGTH + WOOD_LENGTH + CUP_FLANGE_THICKNESS - CUP_POCKET_DEPTH, 6
+)
+SHOULDER_LENGTH = round(HANDLE_STACK_NOMINAL + END_PLAY_NOMINAL, 6)
 
 # #8-32, not U33's #10-24 (Main, U29/1.25D follow-up, 2026-09-25): the arm
 # governs the worst-case engagement, so the only lever on its D count at the
@@ -85,12 +92,13 @@ THREAD_SIZE = "#8-32"
 # The threaded section is modelled as a plain cylinder at the basic #8 major
 # diameter, the fleet convention for a stock screw in a tap-drill-modelled hole.
 THREAD_MODEL_DIA = THREAD_MAJOR_MM[THREAD_SIZE]
-# 9.0 +0/-0.5 (Main, on U33b): the shortest thread section, 8.5, less the
-# 0.4 tip chamfer still carries full thread across the arm's 7.94 (5/16-in)
-# stock thickness, so the ARM governs the worst-case engagement, not the
-# screw.  Fixed by geometry, not a tighter relief band (U27).  The tip is cut
-# proud of the arm's inboard face and filed flush at assembly (below).
-THREAD_LENGTH = 9.0
+# 10.0 +0/-0.5: the shortest thread section, 9.5, less the relief and 1.5
+# pitches of die run-in still carries full thread across the arm's 7.94
+# (5/16-in) stock thickness, so the ARM governs the worst-case engagement,
+# not the screw (the 9.0 of U33b left the MHA-139 machinist review short).
+# The tip is cut proud of the arm's inboard face and filed flush at assembly
+# (below).
+THREAD_LENGTH = 10.0
 THREAD_LENGTH_BAND = (0.0, -0.5)
 # 45-degree thread-start chamfer on the tip, inside the 0.49 thread depth.
 # Like the relief lead, the model holds the 45 degrees by equation and the
@@ -155,43 +163,18 @@ def _limits(nominal: float, band: tuple[float, float]) -> tuple[float, float]:
 
 
 SHOULDER_DIA_MIN, SHOULDER_DIA_MAX = _limits(SHOULDER_DIA, SHOULDER_DIA_BAND)
-SHOULDER_LENGTH_MIN, SHOULDER_LENGTH_MAX = _limits(
-    SHOULDER_LENGTH, (SHOULDER_LENGTH_TOL, -SHOULDER_LENGTH_TOL)
-)
 THREAD_LENGTH_MIN, THREAD_LENGTH_MAX = _limits(THREAD_LENGTH, THREAD_LENGTH_BAND)
 HANDLE_BORE_MIN, HANDLE_BORE_MAX = _limits(PIVOT_BORE_DIA, PIVOT_BORE_BAND)
 
-# The shoulder seats on the arm face, so the handle runs between the arm and
-# the under-head face.  From the arm, the handle's bearing faces are the
-# MHA-150 ferrule's arm face and the MHA-153 cup's floor: ferrule length, oak
-# from its shoulder to the butt face, cup flange, less the cup pocket depth.
-_WOOD_MIN, _WOOD_MAX = _limits(WOOD_LENGTH, WOOD_LENGTH_BAND)
-HANDLE_STACK_NOMINAL = round(
-    FERRULE_LENGTH + WOOD_LENGTH + CUP_FLANGE_THICKNESS - CUP_POCKET_DEPTH, 6
-)
-HANDLE_STACK_MIN = round(
-    (FERRULE_LENGTH - FERRULE_LENGTH_TOL)
-    + _WOOD_MIN
-    + (CUP_FLANGE_THICKNESS - CUP_FLANGE_THICKNESS_TOL)
-    - (CUP_POCKET_DEPTH + CUP_POCKET_DEPTH_TOL),
-    6,
-)
-HANDLE_STACK_MAX = round(
-    (FERRULE_LENGTH + FERRULE_LENGTH_TOL)
-    + _WOOD_MAX
-    + (CUP_FLANGE_THICKNESS + CUP_FLANGE_THICKNESS_TOL)
-    - (CUP_POCKET_DEPTH - CUP_POCKET_DEPTH_TOL),
-    6,
-)
-END_PLAY_NOMINAL = round(SHOULDER_LENGTH - HANDLE_STACK_NOMINAL, 6)
-END_PLAY_MIN = round(SHOULDER_LENGTH_MIN - HANDLE_STACK_MAX, 6)
-END_PLAY_MAX = round(SHOULDER_LENGTH_MAX - HANDLE_STACK_MIN, 6)
 # Head top below the cup's flange face at nominal: the head reads recessed in
 # the cup (the photographs).
 HEAD_RECESS_NOMINAL = round(HANDLE_LENGTH - (SHOULDER_LENGTH + HEAD_LENGTH), 6)
-# Head in the cup pocket, radial clearance at the tightest pair.
-_POCKET_MIN, _POCKET_MAX = _limits(CUP_POCKET_DIA, CUP_POCKET_DIA_BAND)
-HEAD_POCKET_RADIAL_MIN = round((_POCKET_MIN - (HEAD_DIA + HEAD_DIA_TOL)) / 2.0, 6)
+# The pocket is bored to suit the actual head, so its wall is judged at the
+# largest head plus the widest clearance, inside the smallest cup body.
+POCKET_MAX = HEAD_DIA + HEAD_DIA_TOL + CUP_POCKET_CLEARANCE[1]
+CUP_POCKET_WALL_MIN = round(((CUP_BODY_DIA - CUP_BODY_DIA_TOL) - POCKET_MAX) / 2.0, 6)
+# The slot's worst-case web: both routine (.X) sizes at their limits.
+SLOT_WEB_MIN = round(HEAD_LENGTH - SLOT_DEPTH - 2.0 * GENERAL_1PL_TOL_MM, 6)
 # Under-head bearing annulus on the cup floor at the worst case: the smallest
 # head over the largest drilled floor hole, less a title-block edge break on
 # each.
@@ -278,8 +261,19 @@ FILE_ALLOWANCE_MIN = round(FULL_THREAD_REACH_MIN - ARM_STOCK_THICKNESS_MAX, 6)
 # A MIN never rounds up: 1.155 prints 1.15, floored to two places.
 FULL_THREAD_WORST_DIAMETERS_PRINTED = math.floor(FULL_THREAD_WORST_DIAMETERS * 100.0) / 100.0
 # Named exception: MHA-139 engagement (drawing-simplicity-policy.md, "Named exceptions").
-DRAWING_NOTES = (
+ENGAGEMENT_NOTE = (
     f"THREAD ENGAGEMENT {FULL_THREAD_WORST_DIAMETERS_PRINTED:.2f}D MIN."
+)
+# The fitted shoulder and the head band's reason, stated once (user ruling
+# 2026-09-29, after the MHA-139 machinist review).
+DRAWING_NOTES = "\n".join(
+    (
+        ENGAGEMENT_NOTE,
+        "TURN THE SHOULDER LENGTH TO SUIT THE BONDED MHA-022 CRANK HANDLE:",
+        "  ITS FERRULE FACE TO CUP FLOOR, PLUS "
+        f"{END_PLAY_BAND[0]:.2f}-{END_PLAY_BAND[1]:.2f} END PLAY.",
+        "THE HEAD BEARS ON THE MHA-153 BUTT CUP FLOOR.",
+    )
 )
 
 # Flat seat annulus that bears on the arm face, outside the 45-degree lead:
@@ -309,8 +303,10 @@ for _ok, _what in (
         "worst-case engagement is under 1D: the steel-in-steel full-strength "
         "reason for the named exception no longer holds",
     ),
-    (END_PLAY_MIN > 0.0, "handle is clamped: no end play at worst case"),
-    (END_PLAY_MAX <= 1.0, "handle end play exceeds 1.0 at worst case"),
+    (
+        END_PLAY_BAND[0] <= END_PLAY_NOMINAL <= END_PLAY_BAND[1],
+        "the modelled end play is outside the fitted band",
+    ),
     (DIAMETRAL_CLEARANCE_MIN > 0.0, "shoulder can bind in the oak bore"),
     (
         RELIEF_DIA <= min(THREAD_MINOR_BASIC_ROOT, THREAD_MINOR_UNR_2A_MAX),
@@ -348,10 +344,16 @@ for _ok, _what in (
         TIP_CHAMFER + RELIEF_WIDTH < THREAD_LENGTH_MIN,
         "tip chamfer and relief leave no full thread",
     ),
-    (len(DRAWING_NOTES) <= 72, "U33b note line is over 72 characters"),
+    (
+        all(len(line) <= 72 for line in DRAWING_NOTES.splitlines()),
+        "an MHA-139 note line is over 72 characters",
+    ),
     (HEAD_DIA > HANDLE_BORE_MAX, "head passes through the handle bore"),
     (HEAD_DIA < STOCK_DIA, "head is not turnable from 3/8-in rod"),
-    (HEAD_POCKET_RADIAL_MIN > 0.0, "head can bind in the MHA-153 cup pocket"),
+    (
+        CUP_POCKET_WALL_MIN >= WALL_FLOOR_MM,
+        "the MHA-153 pocket bored to suit the largest head leaves under 1.5 of wall",
+    ),
     (HEAD_BEARING_RADIAL_MIN > 0.0, "no under-head bearing is left on the cup floor"),
     (
         CUP_FLOOR_HOLE_DIA > SHOULDER_DIA_MAX,
@@ -360,6 +362,7 @@ for _ok, _what in (
     (HEAD_RECESS_NOMINAL >= 0.0, "the head stands proud of the cup at nominal"),
     (SHOULDER_DIA_MIN > THREAD_MODEL_DIA, "shoulder has no seat annulus"),
     (HEAD_LENGTH - SLOT_DEPTH >= 2.0, "under 2.0 of head remains under the slot"),
+    (SLOT_WEB_MIN >= WALL_FLOOR_MM, "under 1.5 of head remains under the slot at .X"),
 ):
     if not _ok:
         raise AssertionError(f"MHA-139: {_what}")
@@ -367,8 +370,8 @@ for _ok, _what in (
 # Lengths are one baseline from the UNDER-HEAD face (policy rule 7): the head
 # and the shoulder both start there, it is the face the handle runs against,
 # and it is the face the shop indicates after reversing the part to face and
-# slot the head.  The shoulder length therefore prints directly with its own
-# band and sets the end play without a stack.  The thread length is the SIZE
+# slot the head.  The shoulder length is turned to suit the bonded handle, so
+# it prints as a reference under its to-suit callout.  The thread length is the SIZE
 # of the threaded feature from the arm seat face, not a location; printing it
 # as a 66.50 station from the under-head face would stack the shoulder's
 # +/-0.25 onto the thread's -0.5 that the engagement check needs separate.
@@ -389,17 +392,18 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "DriverSlot": {"SlotDepth"},
     "StationReference": {"OverallLength"},
 }
-# Decimal places ARE the tolerance (policy rule 2): the two shoulder sizes are
-# the running fit and print their bands at two places, the head diameter its
-# MHA-153 pocket clearance band, and the relief width prints at two places for
-# the U33b engagement floor; every other size is routine (.X).  The thread
-# length carries its own +0/-0.5 band at one place.
+# Decimal places ARE the tolerance (policy rule 2): the shoulder diameter is
+# the running fit and prints its band at two places, the head diameter its
+# cup-floor bearing band, and the relief width prints at two places for the
+# U33b engagement floor; every other size is routine (.X), the fitted
+# shoulder length a reference.  The thread length carries its own +0/-0.5
+# band at one place.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ScrewProfile": {
         "HeadDia": 2,
         "HeadLength": 1,
         "ShoulderDia": 2,
-        "ShoulderLength": 2,
+        "ShoulderLength": 1,
         "ThreadLength": 1,
         "ReliefDia": 1,
         "ReliefWidth": 2,
@@ -416,6 +420,6 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 }
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked MHA-139 dimension needs authored places")
-REFERENCE_DIMENSIONS = frozenset({"OverallLength"})
+REFERENCE_DIMENSIONS = frozenset({"OverallLength", "ShoulderLength"})
 
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW\nSCALE 1:1"

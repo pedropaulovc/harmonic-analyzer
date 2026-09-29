@@ -7,10 +7,17 @@ cup is a flanged ferrule: the flange covers the oak's end grain at the butt,
 the body is epoxied into a counterbore in the oak, and the screw head bears on
 the cup's floor, steel on steel, instead of on end-grain wood.
 
+After the MHA-153 machinist review (user rulings 2026-09-29): every section
+holds 1.5 mm at its worst case, which grew the handle's butt; the pocket is
+bored to suit the MHA-139 head; and the handle's end play is fitted on the
+screw shoulder at assembly, so no length here is a stack term and all but the
+body diameter are routine (.X) sizes.  The body diameter keeps a +/-0.10 band
+because it sets the pocket wall.
+
 Local frame: the axis is local +X and the origin plane is the flange's outer
 face; the flange, body and floor run toward -X (into the handle).  In the
 handle's frame the flange face sits at the handle's basic overall length, so
-the drive train places the cup with the handle's own transform.
+the drive train places the cup with the handle's own orientation.
 
 PURE DATA, no SolidWorks/COM imports.
 """
@@ -19,37 +26,39 @@ from __future__ import annotations
 
 # The flange matches the oak's diameter at the butt trim face (the handle
 # spec asserts it); it is a free outer surface.
-FLANGE_DIA = 10.8
-# The flange and the pocket depth are the two cup terms of the handle's
-# end-play stack (crank_handle_pivot_screw_spec): +/- on each.
-FLANGE_THICKNESS = 0.80
-FLANGE_THICKNESS_TOL = 0.05
-# The body slips into the oak counterbore for an epoxy line.
-BODY_DIA = 9.40
-BODY_DIA_TOL = 0.02
-# Overall length from the flange face to the floor's underside.  Banded so the
-# body never bottoms in the oak counterbore before the flange seats.
-OVERALL_LENGTH = 4.60
-OVERALL_LENGTH_TOL = 0.10
-# The pocket takes MHA-139's slotted head with a visible ring of clearance
-# (the photographs).  (upper, lower) deviations.
-POCKET_DIA = 8.2
-POCKET_DIA_BAND = (0.10, 0.0)
-POCKET_DEPTH = 3.60
-POCKET_DEPTH_TOL = 0.05
-# The floor hole passes MHA-139's shoulder.  It is a drilled hole under the
-# title block's DRILLED HOLES band (+0.10/0).
+FLANGE_DIA = 13.5
+FLANGE_THICKNESS = 2.3
+# Holds the pocket wall at 1.5 (the screw spec asserts it against the bored
+# pocket's largest size).
+BODY_DIA = 11.6
+BODY_DIA_TOL = 0.10
+OVERALL_LENGTH = 7.3
+FLOOR_THICKNESS = 2.3
+# Bored to suit the MHA-139 head (reference size); POCKET_CLEARANCE is the
+# diametral clearance the callout asks for.
+POCKET_DIA = 8.3
+POCKET_CLEARANCE = (0.2, 0.4)
+# The floor hole passes the MHA-139 shoulder: a drilled hole under the title
+# block's DRILLED HOLES band (+0.10/0).
 FLOOR_HOLE_DIA = 6.2
 
-FLOOR_THICKNESS = OVERALL_LENGTH - POCKET_DEPTH
+POCKET_DEPTH = OVERALL_LENGTH - FLOOR_THICKNESS
 BODY_LENGTH = OVERALL_LENGTH - FLANGE_THICKNESS
-POCKET_WALL = (BODY_DIA - POCKET_DIA) / 2.0
+
+GENERAL_1PL_MM = 0.8
+WALL_FLOOR_MM = 1.5
+BODY_LENGTH_MAX = (OVERALL_LENGTH + GENERAL_1PL_MM) - (FLANGE_THICKNESS - GENERAL_1PL_MM)
 
 for _ok, _what in (
-    (FLANGE_DIA > BODY_DIA, "flange does not overhang the body"),
-    (POCKET_DIA < BODY_DIA, "pocket breaks through the body"),
-    (POCKET_WALL >= 0.5, "pocket wall is under 0.5"),
-    (FLOOR_THICKNESS >= 0.8, "cup floor is under 0.8"),
+    (FLANGE_DIA > BODY_DIA + BODY_DIA_TOL, "flange does not overhang the body"),
+    (
+        round(FLANGE_THICKNESS - GENERAL_1PL_MM, 6) >= WALL_FLOOR_MM,
+        "flange is under 1.5 at .X",
+    ),
+    (
+        round(FLOOR_THICKNESS - GENERAL_1PL_MM, 6) >= WALL_FLOOR_MM,
+        "cup floor is under 1.5 at .X",
+    ),
     (FLOOR_HOLE_DIA < POCKET_DIA, "floor hole leaves no floor"),
     (POCKET_DEPTH > FLANGE_THICKNESS, "pocket does not reach past the flange"),
 ):
@@ -62,22 +71,21 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "FlangeThickness",
         "BodyDia",
         "OverallLength",
+        "FloorThickness",
         "PocketDia",
-        "PocketDepth",
         "FloorHoleDia",
     },
 }
-# Decimal places are the tolerance (policy rule 2): the stack and fit sizes
-# print their bands at two places; the flange OD, the pocket and the drilled
-# floor hole are one-place sizes (the pocket carries its own +0.10/0 band).
+# Decimal places are the tolerance (policy rule 2): the body diameter prints
+# its band at two places; every other size is routine (.X).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "CupProfile": {
         "FlangeDia": 1,
-        "FlangeThickness": 2,
+        "FlangeThickness": 1,
         "BodyDia": 2,
-        "OverallLength": 2,
+        "OverallLength": 1,
+        "FloorThickness": 1,
         "PocketDia": 1,
-        "PocketDepth": 2,
         "FloorHoleDia": 1,
     },
 }
@@ -88,9 +96,22 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 }
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked MHA-153 dimension needs authored places")
+REFERENCE_DIMENSIONS = frozenset({"PocketDia"})
 
-# The mating part, quoted only to identify it (rule 6); the offline test checks
-# it against the registry.
+# The mating parts, quoted only to identify them (rule 6); the offline test
+# checks them against the registry.
 HANDLE_NUMBER = "MHA-022"
-DRAWING_NOTES = f"EPOXY IN THE {HANDLE_NUMBER} BUTT COUNTERBORE, FLANGE SEATED."
+HANDLE_NAME = "CRANK HANDLE"
+SCREW_NUMBER = "MHA-139"
+SCREW_NAME = "CRANK HANDLE PIVOT SCREW"
+FLOOR_HOLE_CALLOUT = "DRILL THRU"
+DRAWING_NOTES = "\n".join(
+    (
+        f"BORE THE POCKET TO SUIT THE {SCREW_NUMBER} {SCREW_NAME} HEAD FOR",
+        f"  {POCKET_CLEARANCE[0]:.1f}-{POCKET_CLEARANCE[1]:.1f} DIAMETRAL CLEARANCE;"
+        " THE HEAD BEARS ON THE FLOOR.",
+        f"THE <MOD-DIAM>{BODY_DIA:.2f} BAND HOLDS THE 1.5 POCKET WALL.",
+        f"EPOXY IN THE {HANDLE_NUMBER} {HANDLE_NAME} BUTT COUNTERBORE, FLANGE SEATED.",
+    )
+)
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 4:1"

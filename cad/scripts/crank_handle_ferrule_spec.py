@@ -6,6 +6,11 @@ band on the oak.  It is epoxied on a turned tenon of MHA-022, seated against
 the tenon's shoulder, and its outer end face is the face that runs against
 the crank arm MHA-020.
 
+Every size is routine (.X): the oak tenon is turned to suit this bore, and the
+handle's end play is set by facing the MHA-139 shoulder at assembly (user
+ruling 2026-09-29, after the MHA-150 machinist review), so no length here is a
+stack term.
+
 Local frame: the axis is local +X, the part's origin plane is the arm-bearing
 end face (x=0), and the seat face against the oak shoulder is at x=LENGTH --
 the handle's own frame, so the drive train places both with one transform.
@@ -16,27 +21,20 @@ PURE DATA, no SolidWorks/COM imports.
 from __future__ import annotations
 
 OUTER_DIA = 15.0
-# The ring's bore slips over the oak tenon for an epoxy line: (upper, lower)
-# deviations from the nominal.  The tenon band lives in crank_handle_spec.
-BORE_DIA = 10.00
-BORE_DIA_BAND = (0.05, 0.0)
-# The ring's length is the first term of the handle's end-play stack
-# (crank_handle_pivot_screw_spec): both faces are faced in one setting.
-LENGTH = 7.00
-LENGTH_TOL = 0.05
+BORE_DIA = 10.0
+LENGTH = 7.0
 
-# Brass wall, on radius.
-WALL = (OUTER_DIA - BORE_DIA) / 2.0
-if WALL < 2.0:
-    raise AssertionError("MHA-150 ferrule wall is under 2.0")
+# Brass wall, on radius, at the title block's .X worst case.
+GENERAL_1PL_MM = 0.8
+WALL_WORST = ((OUTER_DIA - GENERAL_1PL_MM) - (BORE_DIA + GENERAL_1PL_MM)) / 2.0
+if WALL_WORST < 1.5:
+    raise AssertionError("MHA-150 ferrule wall is under 1.5 at the .X worst case")
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "FerruleProfile": {"OuterDia", "BoreDia", "Length"},
 }
-# Decimal places are the tolerance (policy rule 2): the bore and the length
-# carry their bands at two places; the OD is a free outer surface (.X).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "FerruleProfile": {"OuterDia": 1, "BoreDia": 2, "Length": 2},
+    "FerruleProfile": {"OuterDia": 1, "BoreDia": 1, "Length": 1},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
@@ -46,9 +44,12 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked MHA-150 dimension needs authored places")
 
-# The mating part, quoted only to identify it (rule 6).  Hard-coded rather than
-# read from _config.parts so crank-handle.yaml is not a rebuild input here; the
+# The mating part, quoted only to identify it (rule 6).  Written here rather
+# than read from _config.parts so crank-handle.yaml is not a rebuild input; the
 # offline test checks it against the registry.
 HANDLE_NUMBER = "MHA-022"
-DRAWING_NOTES = f"EPOXY ON THE {HANDLE_NUMBER} TENON, SEATED ON ITS SHOULDER."
+HANDLE_NAME = "CRANK HANDLE"
+DRAWING_NOTES = (
+    f"EPOXY ON THE {HANDLE_NUMBER} {HANDLE_NAME} TENON, SEATED ON ITS SHOULDER."
+)
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"

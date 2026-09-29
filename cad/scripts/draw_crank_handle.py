@@ -41,6 +41,7 @@ from _drawing_common import (
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
+    set_reference_dimension,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -53,6 +54,7 @@ from crank_handle_spec import (
     NECK_R,
     PEAK_X,
     PIVOT_BORE_DIA,
+    REFERENCE_DIMENSIONS,
     SHOULDER_X,
     TENON_DIA,
     TENON_X0,
@@ -188,6 +190,12 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, imported, DIMENSION_CALLOUTS)
     assert_imported_precision(adapter, imported, DRAWING_PRECISION_BY_NAME)
     front_by_name = {dimension_name(adapter, a): a for a in front_annotations}
+    # The tenon and the counterbore are fitted to the ferrule and cup (the
+    # to-suit note), so their sizes print as references.
+    for name in sorted(REFERENCE_DIMENSIONS):
+        set_reference_dimension(
+            adapter, front_by_name[name], label=f"MHA-022 {name}", diameter=True
+        )
     for station in sorted(BASIC_DIMENSIONS):
         annotation = front_by_name[station]
         display = adapter._attempt(lambda a=annotation: a.GetSpecificAnnotation())
@@ -268,7 +276,8 @@ async def build(adapter: Any) -> dict[str, str]:
         entity_type="SILHOUETTE",
     )
 
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.080)
+    # 14 lines: the block starts a little higher than the former 13-line one.
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.086)
     add_property_linked_note(adapter, "Isometric View Note", 0.325, 0.116)
 
     return await finalize_drawing(

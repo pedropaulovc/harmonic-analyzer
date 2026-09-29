@@ -28,36 +28,49 @@ def test_required_drawing_paths_and_registry_entry() -> None:
 
 def test_part_and_drawing_share_the_marked_dimension_contract() -> None:
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    assert set(drawing.SIDE_KEEP) == marked
+    assert set(drawing.SECTION_KEEP) == marked
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
+    assert spec.REFERENCE_DIMENSIONS == {"PocketDia"}
+    assert drawing.DIMENSION_CALLOUTS == {"FloorHoleDia": "DRILL THRU"}
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in source
-    for banded in ("FlangeThickness", "PocketDepth", "BodyDia", "OverallLength", "PocketDia"):
-        assert f'"CupProfile", "{banded}"' in source
+    # The one band: the body diameter that holds the pocket wall.
+    assert source.count("set_dimension_symmetric_tolerance(adapter") == 1
+    assert '"CupProfile", "BodyDia", BODY_DIA_TOL' in source
+    assert "set_dimension_bilateral_tolerance" not in source
 
 
-def test_cup_takes_the_recessed_screw_head() -> None:
-    # User ruling 2026-09-29 (ch11 p.14/p.15): the slotted head sits recessed
-    # in a bright steel cup with a visible ring of clearance.
-    assert screw.HEAD_POCKET_RADIAL_MIN > 0.0
+def test_every_section_holds_1_5_at_its_worst_case() -> None:
+    # User ruling 2026-09-29 (MHA-153 review): the butt grew instead of
+    # accepting 0.54 / 0.85 / 0.75 sections.
+    assert spec.FLANGE_THICKNESS - 0.8 == pytest.approx(1.5)
+    assert spec.FLOOR_THICKNESS - 0.8 == pytest.approx(1.5)
+    assert screw.CUP_POCKET_WALL_MIN == pytest.approx(1.5)
     assert screw.HEAD_BEARING_RADIAL_MIN > 0.0
-    assert screw.HEAD_RECESS_NOMINAL == pytest.approx(0.1)
     assert spec.FLOOR_HOLE_DIA > screw.SHOULDER_DIA_MAX
-    assert spec.POCKET_WALL >= 0.5
-    assert spec.FLOOR_THICKNESS == pytest.approx(1.0)
-    assert part.V_CUP > 0.0
 
 
-def test_end_play_stack_through_ferrule_oak_and_cup() -> None:
+def test_head_sits_recessed_and_end_play_is_fitted() -> None:
+    assert screw.HEAD_RECESS_NOMINAL == pytest.approx(0.5)
     assert screw.END_PLAY_NOMINAL == pytest.approx(0.5)
-    assert screw.END_PLAY_MIN == pytest.approx(0.25)
-    assert screw.END_PLAY_MAX == pytest.approx(1.0)
+    assert screw.SHOULDER_LENGTH == pytest.approx(screw.HANDLE_STACK_NOMINAL + 0.5)
 
 
-def test_note_names_the_mating_counterbore() -> None:
+def test_pocket_and_floor_hole_read_on_a_section() -> None:
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
+    assert "create_section_view(" in source
+    assert "set_hidden_lines_visible" not in source
+    assert "create_section_axis_centerline(" in source
+
+
+def test_notes_name_the_mates_and_the_band_reason() -> None:
     assert spec.HANDLE_NUMBER == _config.parts("crank-handle")["number"]
-    assert spec.HANDLE_NUMBER in spec.DRAWING_NOTES
-    assert len(spec.DRAWING_NOTES.splitlines()) == 1
+    assert spec.SCREW_NUMBER == _config.parts("crank-handle-pivot-screw")["number"]
+    notes = spec.DRAWING_NOTES
+    assert f"{spec.HANDLE_NUMBER} {spec.HANDLE_NAME}" in notes
+    assert f"{spec.SCREW_NUMBER} {spec.SCREW_NAME}" in notes
+    assert "TO SUIT" in notes and "1.5 POCKET WALL" in notes
+    assert all(len(line) <= 90 for line in notes.splitlines())
 
 
 def test_registry_row_is_the_title_block_source() -> None:
@@ -70,11 +83,13 @@ def test_registry_row_is_the_title_block_source() -> None:
 
 def test_sheet_layout_keeps_annotations_inside_the_field() -> None:
     for x, y in (
-        *drawing.SIDE_KEEP.values(),
+        *drawing.SECTION_KEEP.values(),
         drawing.MANUFACTURING_NOTES_POS,
         drawing.ISO_NOTE_POS,
+        drawing.CAPTION_XY,
     ):
         assert 0.012 < x < 0.420
         assert 0.012 < y < 0.267
         assert not (x > 0.216 and y < 0.070)
-    assert drawing.SIDE_KEEP["PocketDia"][0] + 0.010 < drawing.END_CENTER[0] - drawing.FLANGE_R
+    assert drawing.END_CENTER[0] + drawing.FLANGE_R < drawing.SECTION_KEEP["FloorHoleDia"][0] - 0.005
+    assert drawing.SECTION_KEEP["PocketDia"][0] + 0.020 < drawing.ISO_NOTE_POS[0]
