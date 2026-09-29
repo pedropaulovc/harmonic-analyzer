@@ -7,11 +7,12 @@ instead takes one near-side arrow on its rim).  The two short lands
 ahead of the tip are 6.9 mm long, so the three tip-end diameter texts climb
 in steps: the tip's line rises highest and each text hangs to the RIGHT of
 its line above every line it spans.  Each gear land's D-flat is shown in its
-own enlarged cut-only section, A-A to D-D, carrying its across-flat.  A
-standard isometric supplies pictorial clarity, and the note names the bores
-the seats and flats mate and the tailstock support the tip land needs
-(U40).  Source geometry and native model fits stay authoritative: the sheet
-types no tolerance and no precision.
+own enlarged cut-only section, A-A to D-D, carrying its across-flat; B-B to
+D-D are cut on DETAIL E, the stepped tip at 4:1, where their arrows and
+letters have room.  A standard isometric supplies pictorial clarity, and the
+note names the bores the seats and flats mate and the tailstock support the
+tip land needs (U40).  Source geometry and native model fits stay
+authoritative: the sheet types no tolerance and no precision.
 
 Run with SolidWorks open::
 
@@ -23,12 +24,13 @@ from __future__ import annotations
 import argparse
 import math
 import sys
+from enum import Enum
 from typing import Any, NamedTuple
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, _early_bound, _read_member, check, run_build
 from _drawing_annotation_extent import (
     CLEAR_GAP_M,
     PLACE_SETTLE_M,
@@ -50,6 +52,7 @@ from _drawing_common import (
     curate_view_dimensions,
     dimension_name,
     finalize_drawing,
+    model_points_in_view,
     new_project_drawing,
     read_required_properties,
     rebuild_drawing,
@@ -68,11 +71,12 @@ from _drawing_leaders import (
     leader_segments,
     set_near_side_diameter,
 )
-from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _layout_geometry import estimate_text_box
 from _surface_finish import surface_finish_by_key
 from cone_gear_shaft_spec import (
     COLLAR_DIA,
+    COLLAR_END_STATION,
     COLLAR_STOCK_CALLOUT,
     DRAWING_DIMENSIONS,
     DRAWING_REFERENCE_PRECISION,
@@ -80,9 +84,11 @@ from cone_gear_shaft_spec import (
     FLAT_LANDS,
     JOURNAL_DIA,
     SECTION_DIAS,
+    SECTION_ENDS,
     SHAFT_LENGTH,
     SURFACE_FINISHES,
 )
+from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -111,16 +117,19 @@ ISO_SCALE = (1, 2)
 
 # Landscape sheet, 0.4318 x 0.2794 m, title block bottom right (x > ~0.216,
 # y < ~0.066).  The 199.34 mm shaft at 1:1 spans 0.0533..0.2526, leaving the
-# right third for the pictorial and the four D sections; the group sits just
-# below mid-height so the baseline stack below and the diameters above share
-# the field with the note block in the lower left (review 2026-09-23: at
-# 0.170 rows A-B stood empty but for the note).  The view is placed by its
+# right third for the pictorial (top) over the four D sections; the tip
+# detail fills the field above the side view (codex review, #1128: with the
+# sections in one row the drawing sat in the lower half, the upper field
+# empty, and the row's captions ran onto the title block).  The group sits
+# just below mid-height so the baseline stack below and the diameters above
+# share the field with the note block in the lower left (review 2026-09-23:
+# at 0.170 rows A-B stood empty but for the note).  The view is placed by its
 # large end: every dimension below is laid out from that datum face, so a
 # change at the tip (the 2026-09-28 tip stack shortened it 1.55 mm) moves
 # only the tip.
 BIG_END_X = 0.2526
 SIDE_CENTER = (BIG_END_X - SHAFT_LENGTH / 2000.0, 0.150)
-ISO_CENTER = (0.345, 0.165)
+ISO_CENTER = (0.363, 0.232)
 NOTES_XY = (0.058, 0.060)
 # Off-sheet-left donor: the five diameters are model dimensions of circular
 # profile sketches, so they can only be IMPORTED into a view that faces those
@@ -211,39 +220,92 @@ DIMENSION_CALLOUTS = {
 PIVOT_FINISH_XY = (0.2400, 0.1800)
 
 
+class CutParent(Enum):
+    """The view a D section's cutting-plane line is drawn on."""
+
+    SIDE = "side view"
+    TIP_DETAIL = "tip detail"
+
+
 class DSection(NamedTuple):
-    """One gear land's D-flat section: where the cutting line crosses the
-    side view, where the removed section stands, and its own scale."""
+    """One gear land's D-flat section: the station its cutting line crosses,
+    the view carrying that line, how far the line reaches either side of the
+    axis on that view's sheet, where the removed section stands, and its own
+    scale."""
 
     land: int
     label: str
-    cut_x: float
+    station_mm: float
+    parent: CutParent
+    reach: float
     centre: tuple[float, float]
     scale: tuple[int, int]
 
 
+# The stepped tip (lands 2..4, 6.9, 6.9 and 22.9 mm long) is too short at 1:1
+# for three cutting lines: an arrow is 12 mm long and its letter stands 14..21
+# mm past the line, so B, C and D piled onto each other, onto the tip's
+# diameter lines and onto R0.10 3X (codex review, #1128).  They are cut on
+# DETAIL E instead, the tip at 4:1 in the empty field above the side view,
+# where the three lands are 28 mm apart.  The detail carries no dimension:
+# DragModelDimension refuses to re-home a model dimension into a detail view,
+# so every diameter and station stays on the side view.  The circle on the
+# side view (stations 165.6..183.6) spans lands 2..4 only, 3 mm short of the
+# R0.10 leader at the Ø6.350 to Ø9.525 step; the detail draws no boundary
+# round its clipped geometry.
+TIP_DETAIL_LABEL = "E"
+TIP_DETAIL_SCALE = (4, 1)
+TIP_DETAIL_STATION_MM = 174.6
+TIP_DETAIL_RADIUS = 0.009
+TIP_DETAIL_CENTER = (0.100, 0.236)
+# The circle's letter on the side view: up-left of the circle (x 0.069..0.087,
+# y 0.141..0.159), between the Ø1.588 and Ø3.175 dimension lines (x 0.055 and
+# 0.0785) and under their texts, 2 mm off the circle whichever corner of the
+# letter SolidWorks anchors.
+TIP_DETAIL_LETTER_XY = (0.064, 0.164)
+CUT_PARENT_SCALE = {CutParent.SIDE: SIDE_SCALE, CutParent.TIP_DETAIL: TIP_DETAIL_SCALE}
+
 # The D sections (user ruling 2026-09-28: every gear land carries one flat on
 # the shaft's +X).  The side view looks straight at the flats, so their size
-# is only readable end-on: each land is cut across mid-land, clear of its
-# diameter line, and shown cut-only (nothing beyond the plane prints), each
-# enlarged to about 16..19 mm across so the smallest AF, 1.460 on the
-# Ø1.588, reads with its band.  The four stand in a row right of the side
-# view's baseline stack, under the pictorial and above the title block.  The
-# across-flat is the part's own dimension (Sec{i}AF, sketched on the land's
-# end plane, parallel to the cut), so it prints its model band and places.
+# is only readable end-on: each land is cut across and shown cut-only
+# (nothing beyond the plane prints), each enlarged to about 16..19 mm across
+# so the smallest AF, 1.460 on the Ø1.588, reads with its band.  A-A cuts land
+# 1 on the side view, left of the Ø9.525 line; its reach puts the lower letter
+# 2.6 mm under the land.  B, C and D cut the detail, each line's arrows and
+# letters clear of the others' by the layout audit's 2 mm (and the letters 3.2
+# mm apart): C's arrows run between D's letters and B's line at the same
+# height as B's, and D's stand lower, under C's.  The four stand in a 2 x 2
+# grid right of the side view, under the pictorial, each over its caption,
+# the bottom row's captions above the title block (x > 0.216, y < 0.066).
+# The across-flat is the part's own dimension (Sec{i}AF, sketched on the
+# land's end plane, parallel to the cut), so it prints its model band.
 D_SECTIONS = (
-    DSection(1, "A", 0.1150, (0.285, 0.100), (2, 1)),
-    DSection(2, "B", 0.0876, (0.323, 0.100), (3, 1)),
-    DSection(3, "C", 0.0810, (0.361, 0.100), (5, 1)),
-    DSection(4, "D", 0.0660, (0.399, 0.100), (10, 1)),
+    DSection(1, "A", 137.6, CutParent.SIDE, 0.0125, (0.337, 0.165), (2, 1)),
+    DSection(2, "B", 168.5, CutParent.TIP_DETAIL, 0.0210, (0.393, 0.165), (3, 1)),
+    DSection(3, "C", 174.6, CutParent.TIP_DETAIL, 0.0210, (0.337, 0.100), (5, 1)),
+    DSection(4, "D", 180.6, CutParent.TIP_DETAIL, 0.0155, (0.393, 0.100), (10, 1)),
 )
-# How far a cutting-plane line runs past the land it cuts.
-D_SECTION_LINE_OVERRUN = 0.004
 # Each across-flat's text, centred over its section.
 D_SECTION_KEEP = {
     f"Sec{section.land}AF": (section.centre[0], section.centre[1] + 0.017)
     for section in D_SECTIONS
 }
+# A native "SECTION A-A / SCALE 2 : 1" caption measured 45.4 x 17.0 mm (leaf
+# for c8b0aad); each is hung SECTION_CAPTION_GAP under its section's ink.
+SECTION_CAPTION_SIZE = (0.046, 0.017)
+SECTION_CAPTION_GAP = 0.003
+# The detail's caption stands this far right of its rightmost ink, B's letters.
+DETAIL_CAPTION_GAP = 0.004
+# A caption lands within this of its target (its anchor is not its box).
+CAPTION_SETTLE_M = 0.0003
+# The section's centre mark keeps only its cross, arms this long on the sheet:
+# the template's mark scales with the view, so at 10:1 its arms and extended
+# lines ran 104 mm, over the AF text, the right border and the title block.
+CENTRE_MARK_ARM = 0.003
+# swAnnotationType_e.swCenterMarkSym
+_CENTER_MARK_ANNOTATION = 13
+# An arrowhead's half-width across its shaft (the audit's 12.1 x 3.4 mm head).
+SECTION_ARROW_HALF_WIDTH = 0.0017
 if tuple(section.land for section in D_SECTIONS) != FLAT_LANDS:
     raise AssertionError("every flatted land takes exactly one D section")
 
@@ -567,18 +629,337 @@ def _prepare_d_section(adapter: Any, view: Any, section: DSection) -> None:
         raise RuntimeError(f"section {section.label} cutting line did not close")
 
 
-def _add_d_sections(adapter: Any, side: Any) -> None:
-    """Cut each flatted land across and print its across-flat in the section.
+class CaptionAnchor(Enum):
+    """The point of a caption's box laid on its target."""
+
+    TOP_CENTRE = "top centre"
+    LEFT_MIDDLE = "left middle"
+
+
+class PlacedSection(NamedTuple):
+    """A built D section and the ink its layout proof measures."""
+
+    section: DSection
+    view: Any
+    across_flat: Any
+    caption: Box
+    centre_mark: Box
+
+
+def _axis_sign(adapter: Any, side: Any) -> int:
+    """+1 when stations run along model +Z, -1 along -Z, read off the side view.
+
+    A station is measured from the front face (the big end, sheet x
+    BIG_END_X) toward the tip, leftward on the sheet.  The part owns the sign
+    of its axis (``_end_circle`` matches |z|), so it is measured here, and a
+    front face projecting anywhere but the big end fails before a cut is drawn
+    on a wrong station."""
+    front, along = model_points_in_view(
+        adapter,
+        side,
+        ((0.0, 0.0, 0.0), (0.0, 0.0, 0.001)),
+        label="shaft axis direction",
+        names=("front face", "1 mm along +Z"),
+    )
+    step = along[0] - front[0]
+    if (
+        abs(front[0] - BIG_END_X) > 5e-4
+        or abs(front[1] - SIDE_CENTER[1]) > 5e-4
+        or abs(abs(step) - 0.001 * SIDE_SCALE[0] / SIDE_SCALE[1]) > 1e-6
+        or abs(along[1] - front[1]) > 1e-6
+    ):
+        raise RuntimeError(
+            f"the side view does not run the axis along sheet x from the big end: "
+            f"front face {front}, 1 mm along +Z {along}"
+        )
+    return 1 if step < 0 else -1
+
+
+def _station_point(
+    station_mm: float, offset: float, sign: int
+) -> tuple[float, float, float]:
+    """The model point ``offset`` metres off the axis, in the side view's
+    plane (model Y), at ``station_mm`` from the front face."""
+    return (0.0, offset, sign * station_mm / 1000.0)
+
+
+def _sheet_segment_in_parent_sketch(
+    adapter: Any, parent: Any, sheet_points: Sequence[tuple[float, float]]
+) -> list[tuple[float, ...]]:
+    """Sheet points through the parent sketch's transform, as
+    ``create_section_view`` maps its cutting line."""
+    sketch = _early_bound(_early_bound(parent, "IView").GetSketch(), "ISketch")
+    transform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+    utility = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    points = []
+    for x, y in sheet_points:
+        point = _early_bound(
+            utility.CreatePoint(double_array([float(x), float(y), 0.0])), "IMathPoint"
+        )
+        projected = _early_bound(point.MultiplyTransform(transform), "IMathPoint")
+        points.append(tuple(float(value) for value in projected.ArrayData))
+    return points
+
+
+# With no outline printed, the detail's outline is the clipped shaft, not the
+# circle's box: the Ø6.35 end is clipped 2.3 mm short of the circle at 4:1, so
+# the axis point stands up to this far off the outline's centre along the axis.
+TIP_DETAIL_CLIP_SLACK = 0.003
+
+
+@_telemetry.traced("drawing.tip_detail")
+def _create_tip_detail(adapter: Any, side: Any, sign: int) -> Any:
+    """DETAIL E, the stepped tip at TIP_DETAIL_SCALE: the parent of B, C and D.
+
+    The circle is sketched on the side view; its rim point lies off the axis
+    in model Y, since the side view looks along model X.  A fresh detail's
+    Position and ModelToViewTransform lag its ink (draw_cone_swing_platform,
+    leaf 20260928T075849Z-1-882b4704), so the view is placed by its outline,
+    and its projection must catch up before any cut is projected through it.
+    """
+    draw = adapter.currentModel
+    ddoc = _early_bound(draw, "IDrawingDoc")
+    if not ddoc.ActivateView(view_name(adapter, side)):
+        raise RuntimeError("failed to activate the tip detail's parent view")
+    draw.ClearSelection2(True)
+    centre = _station_point(TIP_DETAIL_STATION_MM, 0.0, sign)
+    rim = _station_point(TIP_DETAIL_STATION_MM, TIP_DETAIL_RADIUS, sign)
+    sheet = model_points_in_view(
+        adapter, side, (centre, rim), label="tip detail circle", names=("centre", "rim")
+    )
+    points = _sheet_segment_in_parent_sketch(adapter, side, sheet)
+    manager = _early_bound(draw.SketchManager, "ISketchManager")
+    previous_add_to_db = bool(manager.AddToDB)
+    manager.AddToDB = True
+    try:
+        circle = manager.CreateCircle(*points[0], *points[1])
+    finally:
+        manager.AddToDB = previous_add_to_db
+    if circle is None:
+        raise RuntimeError("failed to sketch the tip detail circle")
+    selection_manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    selection_data = selection_manager.CreateSelectData()
+    selection_data.View = side
+    selectable = _sw_type_info.early_bound_or_flag(circle, "ISketchSegment", "Select4")
+    if not selectable.Select4(False, selection_data):
+        raise RuntimeError("failed to select the tip detail circle")
+    detail = ddoc.CreateDetailViewAt4(
+        *TIP_DETAIL_CENTER,
+        0.0,
+        0,  # swDetViewSTANDARD
+        float(TIP_DETAIL_SCALE[0]),
+        float(TIP_DETAIL_SCALE[1]),
+        TIP_DETAIL_LABEL,
+        1,  # swDetCircleCIRCLE
+        False,  # FullOutline
+        False,  # JaggedOutline
+        True,  # NoOutline
+        5,
+    )
+    draw.ClearSelection2(True)
+    if detail is None:
+        raise RuntimeError("CreateDetailViewAt4 returned no tip detail")
+    detail = _sw_type_info.early_bound_or_flag(
+        detail, "IView", "SetViewPosition", "Position"
+    )
+    rebuild_drawing(adapter, label="create tip detail")
+    ratio = tuple(float(value) for value in detail.ScaleRatio)
+    if not math.isclose(ratio[0] / ratio[1], TIP_DETAIL_SCALE[0] / TIP_DETAIL_SCALE[1]):
+        raise RuntimeError(f"tip detail scale is {ratio}, not {TIP_DETAIL_SCALE}")
+    for attempt in range(4):
+        outline = tuple(float(value) for value in detail.GetOutline())
+        landed = ((outline[0] + outline[2]) / 2.0, (outline[1] + outline[3]) / 2.0)
+        anchor = tuple(float(value) for value in detail.Position)
+        _telemetry.info(f"tip detail pass {attempt}: anchor={anchor} outline={outline}")
+        if math.dist(landed, TIP_DETAIL_CENTER) < PLACE_SETTLE_M:
+            break
+        moved = [
+            anchor[axis] + TIP_DETAIL_CENTER[axis] - landed[axis] for axis in range(2)
+        ]
+        if not detail.SetViewPosition(double_array(moved), False):
+            raise RuntimeError("failed to position the tip detail")
+        rebuild_drawing(adapter, label="place tip detail")
+    else:
+        raise RuntimeError(
+            f"tip detail outline centre stayed at {landed}, requested {TIP_DETAIL_CENTER}"
+        )
+    for attempt in range(3):
+        (projected,) = model_points_in_view(
+            adapter, detail, (centre,), label=f"tip detail centre, read {attempt}"
+        )
+        if (
+            abs(projected[0] - landed[0]) <= TIP_DETAIL_CLIP_SLACK
+            and abs(projected[1] - landed[1]) <= 0.0005
+        ):
+            break
+        rebuild_drawing(adapter, label="settle tip detail")
+    else:
+        raise RuntimeError(
+            f"tip detail projects its centre to {projected} while its outline is "
+            f"centred on {landed}"
+        )
+    _telemetry.info(
+        f"tip detail: parent circle centre {sheet[0]}, detail centre {projected}, "
+        f"outline {tuple(float(value) for value in detail.GetOutline())}"
+    )
+    return detail
+
+
+def _place_detail_letter(adapter: Any, side: Any) -> None:
+    """Stand the side view's circle letter where TIP_DETAIL_LETTER_XY says."""
+    circles = tuple(_read_member(_early_bound(side, "IView"), "GetDetailCircles") or ())
+    if len(circles) != 1:
+        raise RuntimeError(
+            f"expected one detail circle on the side view, found {len(circles)}"
+        )
+    circle = _early_bound(circles[0], "IDetailCircle")
+    circle.SetLabelPosition(*TIP_DETAIL_LETTER_XY)
+    rebuild_drawing(adapter, label="place tip detail letter")
+    actual = tuple(float(value) for value in circle.GetLabelPosition())
+    if len(actual) != 2 or math.dist(actual, TIP_DETAIL_LETTER_XY) > 1e-8:
+        raise RuntimeError(f"tip detail letter position did not persist: {actual}")
+
+
+def _note_box(note: Any) -> Box:
+    extent = tuple(float(value) for value in note.GetExtent())
+    return (extent[0], extent[1], extent[3], extent[4])
+
+
+def _caption_anchor(box: Box, anchor: CaptionAnchor) -> tuple[float, float]:
+    if anchor is CaptionAnchor.TOP_CENTRE:
+        return ((box[0] + box[2]) / 2.0, box[3])
+    return (box[0], (box[1] + box[3]) / 2.0)
+
+
+def _place_view_caption(
+    adapter: Any,
+    view: Any,
+    target: tuple[float, float],
+    anchor: CaptionAnchor,
+    *,
+    label: str,
+) -> Box:
+    """Move a view's native caption so its box's ``anchor`` lands on
+    ``target``, its linked fields intact, and return the measured box.
+
+    The caption's position is not its box, so the move is measured
+    (``INote.GetExtent``), as draw_cone_swing_platform places its labels.
+    The sheet scale is pinned first; finalization re-applying it must not
+    move a dynamic caption after this readback."""
+    ddoc = _early_bound(adapter.currentModel, "IDrawingDoc")
+    sheet = _early_bound(ddoc.GetCurrentSheet(), "ISheet")
+    if not sheet.SetScale(*SHEET_SCALE, False, False):
+        raise RuntimeError(f"cannot pin sheet scale before {label} placement")
+    notes = tuple(_read_member(_early_bound(view, "IView"), "GetNotes") or ())
+    if len(notes) != 1:
+        raise RuntimeError(f"expected one native {label}, found {len(notes)} notes")
+    note = _early_bound(notes[0], "INote")
+    linked = str(note.PropertyLinkedText or "")
+    if not linked:
+        raise RuntimeError(f"{label} carries no linked view fields")
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    for _attempt in range(4):
+        box = _note_box(note)
+        point = _caption_anchor(box, anchor)
+        error = (target[0] - point[0], target[1] - point[1])
+        if max(abs(error[0]), abs(error[1])) < CAPTION_SETTLE_M:
+            break
+        x, y, z = (float(value) for value in annotation.GetPosition())
+        if not annotation.SetPosition2(x + error[0], y + error[1], z):
+            raise RuntimeError(f"failed to move the {label}")
+        rebuild_drawing(adapter, label=f"place {label}")
+    else:
+        raise RuntimeError(
+            f"{label} stayed at {box}, its {anchor.value} requested at {target}"
+        )
+    if str(note.PropertyLinkedText or "") != linked:
+        raise RuntimeError(f"{label} lost its linked view fields")
+    _telemetry.info(f"{label}: {anchor.value} at {target}, box {box}")
+    return box
+
+
+def _annotation_ink(annotation: Any, label: str) -> Box:
+    """The box of every line an annotation draws, in sheet metres."""
+    data = _early_bound(
+        _early_bound(annotation, "IAnnotation").GetDisplayData(), "IDisplayData"
+    )
+    lines = [
+        tuple(float(value) for value in data.GetLineAtIndex2(index))
+        for index in range(int(data.GetLineCount()))
+    ]
+    if not lines:
+        raise RuntimeError(f"{label} draws no line")
+    xs = [value for line in lines for value in (line[4], line[7])]
+    ys = [value for line in lines for value in (line[5], line[8])]
+    return (min(xs), min(ys), max(xs), max(ys))
+
+
+def _trim_centre_mark(adapter: Any, view: Any, section: DSection) -> Box:
+    """Keep the section's centre mark as a small cross, and return its ink.
+
+    The mark's size is model length (its 2.5 mm arms read 5 mm at 2:1 and
+    25 mm at 10:1), so the arm is divided by the section's scale."""
+    label = f"section {section.label} centre mark"
+    marks = tuple(
+        _early_bound(view, "IView").GetAnnotationsByType(_CENTER_MARK_ANNOTATION) or ()
+    )
+    if len(marks) != 1:
+        raise RuntimeError(f"expected one {label}, found {len(marks)}")
+    annotation = _early_bound(marks[0], "IAnnotation")
+    mark = _early_bound(annotation.GetSpecificAnnotation(), "ICenterMark")
+    mark.UseDocDisplaySettings = False
+    mark.ShowLines = False
+    mark.Size = CENTRE_MARK_ARM * section.scale[1] / section.scale[0]
+    rebuild_drawing(adapter, label=f"trim {label}")
+    if bool(mark.UseDocDisplaySettings) or bool(mark.ShowLines):
+        raise RuntimeError(f"{label} kept its document display or its extended lines")
+    ink = _annotation_ink(annotation, label)
+    arm = max(ink[2] - ink[0], ink[3] - ink[1]) / 2.0
+    if not 0.5 * CENTRE_MARK_ARM <= arm <= 1.5 * CENTRE_MARK_ARM:
+        raise RuntimeError(
+            f"{label} arms read {arm:.4f} m (size {float(mark.Size):.5f}), not "
+            f"{CENTRE_MARK_ARM:.4f}: ink {ink}"
+        )
+    return ink
+
+
+def _cut_endpoints(
+    adapter: Any, parent: Any, section: DSection, sign: int
+) -> tuple[tuple[float, float], tuple[float, float]]:
+    """The cutting line's sheet endpoints on its parent, bottom first: drawn
+    upward, the arrows look toward the big end, as every D section does."""
+    scale = CUT_PARENT_SCALE[section.parent]
+    offset = section.reach * scale[1] / scale[0]
+    first, second = model_points_in_view(
+        adapter,
+        parent,
+        (
+            _station_point(section.station_mm, -offset, sign),
+            _station_point(section.station_mm, offset, sign),
+        ),
+        label=f"section {section.label} cutting line",
+        names=("one end", "other end"),
+    )
+    return (first, second) if first[1] < second[1] else (second, first)
+
+
+@_telemetry.traced("drawing.d_sections")
+def _add_d_sections(
+    adapter: Any, parents: Mapping[CutParent, Any], sign: int
+) -> list[PlacedSection]:
+    """Cut each flatted land across and print its across-flat in the section,
+    its centre mark a cross and its caption hung under it.
 
     ``curate_view_dimensions`` fails the build if a section's across-flat
     does not arrive, so every D on the sheet carries its size."""
+    placed = []
     for section in D_SECTIONS:
-        reach = SECTION_DIAS[section.land] / 2000.0 + D_SECTION_LINE_OVERRUN
+        start, end = _cut_endpoints(adapter, parents[section.parent], section, sign)
         view = create_section_view(
             adapter,
-            side,
-            line_start=(section.cut_x, SIDE_CENTER[1] - reach),
-            line_end=(section.cut_x, SIDE_CENTER[1] + reach),
+            parents[section.parent],
+            line_start=start,
+            line_end=end,
             view_xy=section.centre,
             section_label=section.label,
             scale=section.scale,
@@ -586,13 +967,230 @@ def _add_d_sections(adapter: Any, side: Any) -> None:
         )
         _prepare_d_section(adapter, view, section)
         name = f"Sec{section.land}AF"
-        curate_view_dimensions(
+        (across_flat,) = curate_view_dimensions(
             adapter,
             view,
             keep={name: D_SECTION_KEEP[name]},
             view_label=f"section {section.label}",
             dimensions_by_feature=DRAWING_DIMENSIONS,
         )
+        centre_mark = _trim_centre_mark(adapter, view, section)
+        outline = tuple(
+            float(value) for value in _early_bound(view, "IView").GetOutline()
+        )
+        caption = _place_view_caption(
+            adapter,
+            view,
+            (section.centre[0], outline[1] - SECTION_CAPTION_GAP),
+            CaptionAnchor.TOP_CENTRE,
+            label=f"section {section.label} caption",
+        )
+        placed.append(PlacedSection(section, view, across_flat, caption, centre_mark))
+    return placed
+
+
+def _section_line_ink(view: Any) -> dict[str, dict[str, Box]]:
+    """Each cutting line a view carries: its two arrows and two letters as
+    boxes, by section letter.  ``GetArrowInfo`` gives each arrow's start and
+    end, ``GetTextInfo`` each letter's upper-left corner, both on the sheet;
+    a letter is boxed one character height square (the audit's 6.35 mm "A"
+    measured 5.9 wide)."""
+    ink: dict[str, dict[str, Box]] = {}
+    for raw in _read_member(_early_bound(view, "IView"), "GetSectionLines") or ():
+        cut = _early_bound(raw, "IDrSection")
+        name = str(cut.GetLabel())
+        height = float(_early_bound(cut.GetTextFormat(), "ITextFormat").CharHeight)
+        arrows = [float(value) for value in cut.GetArrowInfo() or ()]
+        texts = [float(value) for value in cut.GetTextInfo() or ()]
+        if len(arrows) != 12 or len(texts) != 6:
+            raise RuntimeError(f"section line {name}: arrows {arrows}, letters {texts}")
+        pad = SECTION_ARROW_HALF_WIDTH
+        boxes: dict[str, Box] = {}
+        for index, base in enumerate((0, 6), start=1):
+            x0, y0, x1, y1 = (
+                arrows[base],
+                arrows[base + 1],
+                arrows[base + 3],
+                arrows[base + 4],
+            )
+            boxes[f"section {name} arrow {index}"] = (
+                min(x0, x1) - pad,
+                min(y0, y1) - pad,
+                max(x0, x1) + pad,
+                max(y0, y1) + pad,
+            )
+        for index, base in enumerate((0, 3), start=1):
+            x, y = texts[base], texts[base + 1]
+            boxes[f"section {name} letter {index}"] = (x, y - height, x + height, y)
+        _telemetry.info(f"section line {name} ink: {boxes}")
+        ink[name] = boxes
+    return ink
+
+
+def _union(boxes: Iterable[Box]) -> Box:
+    boxes = list(boxes)
+    return (
+        min(box[0] for box in boxes),
+        min(box[1] for box in boxes),
+        max(box[2] for box in boxes),
+        max(box[3] for box in boxes),
+    )
+
+
+def _view_outline(view: Any) -> Box:
+    return tuple(float(value) for value in _early_bound(view, "IView").GetOutline())
+
+
+def _land_boxes(adapter: Any, view: Any, sign: int, *, label: str) -> dict[str, Box]:
+    """Each flatted land's silhouette on ``view``, clipped to its outline."""
+    outline = _view_outline(view)
+    starts = (COLLAR_END_STATION, *SECTION_ENDS[1:-1])
+    boxes = {}
+    for land, start in zip(FLAT_LANDS, starts):
+        radius = SECTION_DIAS[land] / 2000.0
+        corners = model_points_in_view(
+            adapter,
+            view,
+            (
+                _station_point(start, -radius, sign),
+                _station_point(SECTION_ENDS[land], radius, sign),
+            ),
+            label=f"{label} land {land}",
+        )
+        box = (
+            max(min(x for x, _ in corners), outline[0]),
+            max(min(y for _, y in corners), outline[1]),
+            min(max(x for x, _ in corners), outline[2]),
+            min(max(y for _, y in corners), outline[3]),
+        )
+        if box[0] < box[2] and box[1] < box[3]:
+            boxes[f"{label} land {land}"] = box
+    return boxes
+
+
+def _require_apart(groups: Mapping[str, Mapping[str, Box]]) -> None:
+    """Every box of each group clear of every box of every other group."""
+    names = list(groups)
+    for index, name in enumerate(names):
+        others = {
+            box_name: box
+            for other in names[index + 1 :]
+            for box_name, box in groups[other].items()
+        }
+        for box_name, box in groups[name].items():
+            require_clear(box_name, box, others)
+
+
+@_telemetry.traced("drawing.section_layout_proof")
+def _prove_section_layout(
+    adapter: Any,
+    *,
+    side: Any,
+    detail: Any,
+    iso: Any,
+    sections: Sequence[PlacedSection],
+    detail_caption: Box,
+    dimensions: Mapping[str, Any],
+    sign: int,
+) -> None:
+    """Prove from measured ink what the codex review of #1128 found broken:
+    every section, caption, cutting line, the detail and the pictorial inside
+    the frame and off the title block; the cutting lines' arrows and letters
+    clear of each other, of every dimension text and of the lands; and each
+    section's caption, centre mark and across-flat clear of its neighbours."""
+    region = sheet_region(adapter)
+    template = DRAWING_TEMPLATES[SPEC.layout]
+    keep_out = {
+        "title block": (
+            template.title_block_left_m,
+            0.0,
+            template.width_m,
+            template.title_block_top_m,
+        )
+    }
+    texts = {
+        name: _dimension_text_box(annotation, name)
+        for name, annotation in dimensions.items()
+    }
+    side_lines = _section_line_ink(side)
+    detail_lines = _section_line_ink(detail)
+    expected = {
+        CutParent.SIDE: sorted(
+            s.label for s in D_SECTIONS if s.parent is CutParent.SIDE
+        ),
+        CutParent.TIP_DETAIL: sorted(
+            s.label for s in D_SECTIONS if s.parent is CutParent.TIP_DETAIL
+        ),
+    }
+    if (
+        sorted(side_lines) != expected[CutParent.SIDE]
+        or sorted(detail_lines) != expected[CutParent.TIP_DETAIL]
+    ):
+        raise RuntimeError(
+            f"cutting lines: side view {sorted(side_lines)}, tip detail "
+            f"{sorted(detail_lines)}; expected {expected}"
+        )
+    groups: dict[str, dict[str, Box]] = {}
+    for placed in sections:
+        label = f"section {placed.section.label}"
+        cell = {
+            f"{label} view": _view_outline(placed.view),
+            f"{label} across-flat": _dimension_text_box(
+                placed.across_flat, f"{label} across-flat"
+            ),
+            f"{label} caption": placed.caption,
+        }
+        require_clear(
+            f"{label} caption",
+            placed.caption,
+            {name: box for name, box in cell.items() if name != f"{label} caption"},
+        )
+        require_clear(
+            f"{label} centre mark",
+            placed.centre_mark,
+            {
+                f"{label} across-flat": cell[f"{label} across-flat"],
+                f"{label} caption": placed.caption,
+            },
+        )
+        groups[label] = {label: _union(cell.values())}
+    lands = {
+        **_land_boxes(adapter, side, sign, label="side view"),
+        **_land_boxes(adapter, detail, sign, label="tip detail"),
+    }
+    for name, boxes in (*side_lines.items(), *detail_lines.items()):
+        for box_name, box in boxes.items():
+            if "letter" in box_name:
+                require_clear(box_name, box, lands)
+        groups[f"cutting line {name}"] = boxes
+    groups["tip detail"] = {
+        "tip detail": _view_outline(detail),
+        "tip detail caption": detail_caption,
+    }
+    groups["isometric"] = {"isometric": _view_outline(iso)}
+    groups["side view dimension texts"] = texts
+    for group in groups.values():
+        for name, box in group.items():
+            require_inside(name, box, region)
+            require_clear(name, box, keep_out)
+    # A cutting line crosses its own parent's outline by design; everything
+    # else keeps apart.
+    apart = {name: group for name, group in groups.items() if name != "tip detail"}
+    _require_apart(apart)
+    for name, group in groups.items():
+        if name.startswith("cutting line") or name == "tip detail":
+            continue
+        for box_name, box in group.items():
+            require_clear(box_name, box, groups["tip detail"])
+    require_clear(
+        "tip detail caption",
+        detail_caption,
+        {name: box for boxes in detail_lines.values() for name, box in boxes.items()},
+    )
+    _telemetry.success(
+        f"section layout proved: {len(sections)} sections, "
+        f"{len(side_lines) + len(detail_lines)} cutting lines, {len(texts)} dimension texts"
+    )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -636,7 +1234,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     side = place_view(adapter, str(SOURCE), "*Right", *SIDE_CENTER, scale=SIDE_SCALE)
     donor = place_view(adapter, str(SOURCE), "*Front", *DONOR_CENTER, scale=SIDE_SCALE)
-    place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
     for view in (side, donor):
         set_hidden_lines_removed(adapter, view)
 
@@ -685,7 +1283,22 @@ async def build(adapter: Any) -> dict[str, str]:
     if collar is None:
         raise RuntimeError("the donor view gave no CollarDia dimension")
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
-    _add_d_sections(adapter, side)
+    sign = _axis_sign(adapter, side)
+    detail = _create_tip_detail(adapter, side, sign)
+    _place_detail_letter(adapter, side)
+    sections = _add_d_sections(
+        adapter, {CutParent.SIDE: side, CutParent.TIP_DETAIL: detail}, sign
+    )
+    detail_ink_right = max(
+        box[2] for boxes in _section_line_ink(detail).values() for box in boxes.values()
+    )
+    detail_caption = _place_view_caption(
+        adapter,
+        detail,
+        (detail_ink_right + DETAIL_CAPTION_GAP, TIP_DETAIL_CENTER[1]),
+        CaptionAnchor.LEFT_MIDDLE,
+        label="tip detail caption",
+    )
     overall = _add_overall_reference(adapter, side)
     # Every other dimension on the side view, which the collar callout's
     # proof measures it against.
@@ -737,6 +1350,16 @@ async def build(adapter: Any) -> dict[str, str]:
         leader_attach_xy=tip_top,
     )
     _clear_collar_callout(adapter, collar, pivot_finish, collar_neighbours)
+    _prove_section_layout(
+        adapter,
+        side=side,
+        detail=detail,
+        iso=iso,
+        sections=sections,
+        detail_caption=detail_caption,
+        dimensions={**collar_neighbours, "CollarDia": collar},
+        sign=sign,
+    )
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
 
     return await finalize_drawing(

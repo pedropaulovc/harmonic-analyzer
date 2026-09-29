@@ -22,7 +22,7 @@ import cone_tip_bushing_spec
 import draw_cone_gear_shaft as drawing
 import pytest
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
-from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 
 
 # Which NAMED band each land rides (U27, 2026-09-23): the two running lands
@@ -598,35 +598,80 @@ def test_the_collar_diameter_draws_nothing_inside_the_ring() -> None:
 def test_each_d_section_cuts_its_own_land_clear_of_its_neighbours() -> None:
     """User ruling 2026-09-28: every flatted land shows its D end-on, with its
     across-flat.  Each cutting line crosses the land it names at least 2 mm
-    from the land's ends (the step root, the collar) and from that land's
-    diameter line; each D is enlarged to 15 mm or more so the 1.460 reads;
-    and the four stand apart, right of the side view and above the title
-    block with room for their captions."""
+    (on its parent's sheet) from the land's ends, and past the land's
+    surface; on the side view it keeps 2 mm off that land's diameter line,
+    on the tip detail it stays inside the circle over the whole land.  Each D
+    is enlarged to 15 mm or more so the 1.460 reads, and the four, each with
+    its across-flat over it and its caption under it, stand apart right of
+    the side view, inside the frame and off the title block (codex review,
+    #1128: in one row the captions ran onto the title block and below the
+    border)."""
     spec = cone_gear_shaft_spec
+    template = DRAWING_TEMPLATES[drawing.SPEC.layout]
+    margin = 0.0127
     big_end = drawing.SIDE_CENTER[0] + spec.SHAFT_LENGTH / 2000.0
     starts = (spec.COLLAR_END_STATION, *spec.SECTION_ENDS[1:-1])
     sections = drawing.D_SECTIONS
     assert tuple(section.land for section in sections) == spec.FLAT_LANDS
-    boxes = []
+    caption_w, caption_h = drawing.SECTION_CAPTION_SIZE
+    cells = []
     for section, start in zip(sections, starts):
-        tip_side = big_end - spec.SECTION_ENDS[section.land] / 1000.0
-        big_side = big_end - start / 1000.0
-        assert tip_side + 0.002 <= section.cut_x <= big_side - 0.002, section
-        dia_x = drawing.SIDE_DIAMETERS[f"Sec{section.land}Dia"][0]
-        assert abs(section.cut_x - dia_x) >= 0.002, section
+        scale = drawing.CUT_PARENT_SCALE[section.parent]
+        enlarge = scale[0] / scale[1]
+        end = spec.SECTION_ENDS[section.land]
+        radius = spec.SECTION_DIAS[section.land] / 2.0
+        assert (section.station_mm - start) * enlarge >= 2.0, section
+        assert (end - section.station_mm) * enlarge >= 2.0, section
+        assert section.reach * 1000.0 / enlarge > radius, section
+        if section.parent is drawing.CutParent.SIDE:
+            cut_x = big_end - section.station_mm / 1000.0
+            dia_x = drawing.SIDE_DIAMETERS[f"Sec{section.land}Dia"][0]
+            assert abs(cut_x - dia_x) >= 0.002, section
+        else:
+            offset = abs(section.station_mm - drawing.TIP_DETAIL_STATION_MM)
+            chord = math.sqrt((drawing.TIP_DETAIL_RADIUS * 1000.0) ** 2 - offset**2)
+            assert chord >= radius, section
         across = spec.SECTION_DIAS[section.land] * section.scale[0] / section.scale[1]
         assert across >= 15.0, section
         half = across / 2000.0
         x, y = section.centre
-        assert x - half > big_end + 0.02, section
-        assert y - half - 0.012 > 0.066, section  # caption above the title block
         text_x, text_y = drawing.D_SECTION_KEEP[f"Sec{section.land}AF"]
         assert text_x == x and text_y > y + half, section
-        boxes.append((x - half, x + half))
-    for (_left, right), (left, _right) in zip(boxes, boxes[1:]):
-        assert left > right
-    texts = [drawing.D_SECTION_KEEP[f"Sec{section.land}AF"][0] for section in sections]
-    assert all(b - a > drawing.DIAMETER_TEXT_WIDTH for a, b in zip(texts, texts[1:]))
+        cell = (
+            x - caption_w / 2.0,
+            y - half - drawing.SECTION_CAPTION_GAP - caption_h,
+            x + caption_w / 2.0,
+            text_y + 0.005,
+        )
+        assert cell[0] > big_end + 0.02, section
+        assert margin <= cell[0] and cell[2] <= template.width_m - margin, section
+        assert margin <= cell[1] and cell[3] <= template.height_m - margin, section
+        assert cell[1] > template.title_block_top_m, section
+        cells.append(cell)
+    for index, a in enumerate(cells):
+        for b in cells[index + 1 :]:
+            assert a[2] < b[0] or b[2] < a[0] or a[3] < b[1] or b[3] < a[1], (a, b)
+
+
+def test_the_tip_detail_stands_in_the_frame_above_the_side_view() -> None:
+    """The tip detail's cutting lines, letters included, run inside the
+    frame's top and clear above the side view's highest diameter text; its
+    circle stays off the R0.10 step at the Ø6.350 to Ø9.525 shoulder."""
+    template = DRAWING_TEMPLATES[drawing.SPEC.layout]
+    letter = 0.00635
+    reach = max(
+        section.reach
+        for section in drawing.D_SECTIONS
+        if section.parent is drawing.CutParent.TIP_DETAIL
+    )
+    top = drawing.TIP_DETAIL_CENTER[1] + reach + letter
+    bottom = drawing.TIP_DETAIL_CENTER[1] - reach - letter
+    highest_text = max(y for _x, y in drawing.SIDE_DIAMETERS.values()) + letter
+    assert top <= template.height_m - 0.0127
+    assert bottom > highest_text + 0.002
+    circle = drawing.TIP_DETAIL_RADIUS * 1000.0
+    shoulder = cone_gear_shaft_spec.SECTION_ENDS[1]
+    assert drawing.TIP_DETAIL_STATION_MM - circle >= shoulder + 2.0
 
 
 def test_stacked_tip_diameters_never_run_a_line_through_a_text() -> None:
@@ -857,12 +902,8 @@ def test_view_scales_are_explicit() -> None:
     assert drawing.ISO_SCALE == (1, 2)  # reduced pictorial
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     # The end view is gone: its only content was a pile of leadered diameters.
-    # The tip detail is gone too: DragModelDimension refuses to re-home a
-    # model dimension into a detail view, so the five diameters share the
-    # side view.
     assert '"*Front"' in source  # the donor, and only as a donor
     assert "delete_view(adapter, donor)" in source
-    assert "CreateDetailViewAt4" not in source
 
 
 def test_part_stamps_make_critical_properties() -> None:
