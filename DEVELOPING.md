@@ -279,9 +279,10 @@ no `.done`.
   --json` reports it. A leaf counts as this run's only when `farm_run` equals
   its run id. A leaf created without one (a direct `build.py --executor farm`)
   is kept, and so is every leaf when `farm.py` predates `farm_run`
-  (pedropaulovc/solidworks-pool#165). Siblings are scanned once up front and
-  again right before each `farm.py cancel`, so a sibling that attaches while
-  `-Cancel` queries the farm keeps its leaf. A sibling that attaches during
+  (pedropaulovc/solidworks-pool#165). Siblings are scanned right before each
+  `farm.py cancel`, not up front, so a sibling that attaches while `-Cancel`
+  queries the farm keeps its leaf, and one that finishes meanwhile no longer
+  does. A sibling that attaches during
   the cancel call itself (one `farm.py` round trip) still loses it: its leaf
   fails as cancelled and a rerun rebuilds it. A submitter outside this
   `-LogDirectory` that attached *after* this run created a leaf is invisible,

@@ -1317,6 +1317,56 @@ def test_cancel_keeps_a_leaf_a_sibling_attached_to_mid_cancel(tmp_path: Path) ->
     assert not Path(fixture["farm_cancels"]).exists()
 
 
+def test_cancel_takes_a_leaf_whose_sibling_finished_mid_cancel(tmp_path: Path) -> None:
+    """Codex on #1125 (6c35279e1): siblings scanned before the farm queries
+    kept their leaves on that cached answer, so a sibling that finished (its
+    own local failure) while -Cancel asked the farm left the leaf RUNNING
+    with no run waiting on it."""
+    fixture = _launcher_fixture(tmp_path)
+    farm_state = Path(fixture["farm_state"])
+    farm_state.write_text(
+        json.dumps({LEAF_PEN: {"status": "RUNNING"}}), encoding="utf-8"
+    )
+    printed = tmp_path / "failing lines.txt"
+    printed.write_text(DISPATCH_LINES + FAILURE_LINES, encoding="utf-8")
+    environment = dict(fixture["environment"])
+    environment["UV_STUB_LINES"] = str(printed)
+    environment["UV_STUB_EXIT"] = "2"
+    launched = _run_launcher(
+        fixture, _command(fixture, "part:pen_rod", tag="broken"), environment
+    )
+    assert launched.returncode == 2
+    # The sibling waits on LEAF_PEN when -Cancel starts, and fails while
+    # -Cancel queries the farm.
+    sibling = _record(_sibling_waiting_on(fixture, LEAF_PEN))
+    finished = {**sibling, "state": "failed", "exit_code": 2}
+    workflows = json.loads(farm_state.read_text(encoding="utf-8"))
+    workflows[LEAF_PEN]["_attach"] = {
+        "path": sibling["done"],
+        "record": json.dumps(finished),
+    }
+    farm_state.write_text(json.dumps(workflows), encoding="utf-8")
+
+    cancel = _run_launcher(
+        fixture,
+        _tracking(fixture, "-Cancel", "-Tag", "broken", "-Why", "local fault"),
+        fixture["environment"],
+    )
+
+    assert cancel.returncode == 0, (cancel.stdout, cancel.stderr)
+    outcomes = [
+        json.loads(line) for line in cancel.stdout.splitlines() if line.startswith("{")
+    ]
+    assert [(o["workflow_id"], o["outcome"]) for o in outcomes] == [
+        (LEAF_PEN, "cancelled")
+    ]
+    # The sibling finished before the leaf was decided, not after.
+    assert Path(sibling["done"]).exists()
+    assert json.loads(farm_state.read_text(encoding="utf-8"))[LEAF_PEN]["status"] == (
+        "CANCELED"
+    )
+
+
 def _write_run_record(
     fixture: dict[str, object],
     *,

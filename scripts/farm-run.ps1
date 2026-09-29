@@ -1336,9 +1336,6 @@ function Invoke-RunCancel {
 
     # Re-read: the log is final now that nothing writes it.
     $unsettled = @((Get-RunStatus -RecordPath $RecordPath).status['unsettled_workflows'])
-    # Workflows are shared by ID (USE_EXISTING): a live sibling run that is
-    # waiting on the same leaf keeps it.
-    $shared = Get-SiblingWaits -Directory $Directory -RecordPath $RecordPath
 
     $reason = "$Why (farm-run.ps1 -Cancel $runId)"
     # Returns one outcome whose `event` the caller prints: anything this block
@@ -1347,12 +1344,6 @@ function Invoke-RunCancel {
         param([string]$WorkflowId)
 
         $outcome = [ordered]@{ workflow_id = $WorkflowId; outcome = $null; detail = $null; event = $null }
-        if ($shared.ContainsKey($WorkflowId)) {
-            $outcome['outcome'] = 'kept-shared'
-            $outcome['detail'] = "run $($shared[$WorkflowId]) is still waiting on it"
-            $outcome['event'] = "kept $WorkflowId`: $($outcome['detail'])"
-            return $outcome
-        }
         $query = Invoke-FarmCli -PoolHome $record['pool_home'] -Arguments @('status', '--json', $WorkflowId)
         if ($query.code -ne 0) {
             $text = $query.output -join ' '
@@ -1393,9 +1384,11 @@ function Invoke-RunCancel {
             $outcome['event'] = "kept $WorkflowId`: $($outcome['detail'])"
             return $outcome
         }
-        # A sibling may have attached since the scan above, while this loop
-        # queried the farm. Look again right before cancelling; what remains
-        # is the one farm.py round trip this cancel takes.
+        # Workflows are shared by ID (USE_EXISTING): a live sibling run that
+        # is waiting on the same leaf keeps it. Asked only now, right before
+        # cancelling, so a sibling that finished or attached while this loop
+        # queried the farm is seen; what remains is the one farm.py round trip
+        # this cancel takes.
         $waiter = (Get-SiblingWaits -Directory $Directory -RecordPath $RecordPath)[$WorkflowId]
         if ($null -ne $waiter) {
             $outcome['outcome'] = 'kept-shared'
