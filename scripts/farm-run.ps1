@@ -859,7 +859,10 @@ function Get-RunProcessTree {
     # creation times keep an unrelated process that reused a PID out.
     $launcherId = [int]$Record['pid']
     $startedAt = ConvertTo-UtcTimestamp -Value $Record['started_at']
-    $all = @(Get-CimInstance -ClassName Win32_Process -Property ProcessId, ParentProcessId, CreationDate, CommandLine)
+    # A process CIM cannot date (a protected one) can be proven neither the
+    # launcher nor the run's, and every check below compares creation times.
+    $all = @(Get-CimInstance -ClassName Win32_Process -Property ProcessId, ParentProcessId, CreationDate, CommandLine |
+            Where-Object { $null -ne $_.CreationDate })
     # With the launcher gone, its PID says nothing about who a process belongs
     # to: a direct child must also name this run on its command line -- the
     # recorded build command, or, for the preparation and cleanup commands
@@ -1219,7 +1222,11 @@ function Stop-RunProcesses {
                 if ($holder.HasExited) {
                     continue
                 }
-                if (($holder.StartTime.ToUniversalTime() - $created).Duration().TotalSeconds -ge 1) {
+                # CIM dates a process to the microsecond, StartTime to 100 ns:
+                # equal at CIM's resolution is the same process (checked on
+                # every readable process on amet), anything else is not.
+                $startTicks = $holder.StartTime.ToUniversalTime().Ticks
+                if ($startTicks - ($startTicks % 10) -ne $created.Ticks) {
                     # The scanned process exited and its PID was reused.
                     continue
                 }
