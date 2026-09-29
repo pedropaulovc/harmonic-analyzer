@@ -77,7 +77,7 @@ SHOULDER_DIA_BAND = (-0.03, -0.08)
 # arm face to the cup floor, plus the end play -- so no part in the handle
 # stack carries a band for it.  The model carries the nominal stack plus the
 # nominal end play, printed as a reference under the to-suit callout.
-END_PLAY_BAND = (0.25, 1.00)
+END_PLAY_RANGE = (0.25, 1.00)
 END_PLAY_NOMINAL = 0.5
 HANDLE_STACK_NOMINAL = round(
     FERRULE_LENGTH + WOOD_LENGTH + CUP_FLANGE_THICKNESS - CUP_POCKET_DEPTH, 6
@@ -271,7 +271,7 @@ DRAWING_NOTES = "\n".join(
         ENGAGEMENT_NOTE,
         "TURN THE SHOULDER LENGTH TO SUIT THE BONDED MHA-022 CRANK HANDLE:",
         "  ITS FERRULE FACE TO CUP FLOOR, PLUS "
-        f"{END_PLAY_BAND[0]:.2f}-{END_PLAY_BAND[1]:.2f} END PLAY.",
+        f"{END_PLAY_RANGE[0]:.2f}-{END_PLAY_RANGE[1]:.2f} END PLAY.",
         "THE HEAD BEARS ON THE MHA-153 BUTT CUP FLOOR.",
     )
 )
@@ -304,7 +304,7 @@ for _ok, _what in (
         "reason for the named exception no longer holds",
     ),
     (
-        END_PLAY_BAND[0] <= END_PLAY_NOMINAL <= END_PLAY_BAND[1],
+        END_PLAY_RANGE[0] <= END_PLAY_NOMINAL <= END_PLAY_RANGE[1],
         "the modelled end play is outside the fitted band",
     ),
     (DIAMETRAL_CLEARANCE_MIN > 0.0, "shoulder can bind in the oak bore"),

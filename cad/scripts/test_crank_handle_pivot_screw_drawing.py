@@ -127,7 +127,7 @@ def test_u33_running_fit_end_play_and_engagement() -> None:
     # The fitted shoulder: ferrule 7.0 + oak 48.7 + flange 2.3 - pocket 5.0
     # = 53.0 of bonded handle, plus the modelled 0.5 of end play.
     assert spec.HANDLE_STACK_NOMINAL == pytest.approx(53.0)
-    assert spec.END_PLAY_BAND == (0.25, 1.00)
+    assert spec.END_PLAY_RANGE == (0.25, 1.00)
     assert spec.END_PLAY_NOMINAL == pytest.approx(0.5)
     # Bore 6.10..6.15 over shoulder 5.92..5.97, on diameter.
     assert (spec.SHOULDER_DIA_MIN, spec.SHOULDER_DIA_MAX) == pytest.approx((5.92, 5.97))

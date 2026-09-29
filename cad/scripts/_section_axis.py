@@ -53,17 +53,25 @@ def create_section_axis_centerline(
 def position_section_caption(
     adapter: Any, view: Any, target: tuple[float, float], *, label: str
 ) -> None:
-    """Move the native linked section caption to ``target`` and verify it."""
+    """Move the native linked section caption to ``target`` and verify it.
+
+    The caption carries its scale field only when the section's scale differs
+    from the sheet's (MHA-153's 5:1 section on a 5:1 sheet has none: farm leaf
+    20260929T222303Z found no ``<VLSCALEV>`` caption), so it is found by its
+    label field alone.
+    """
     bound_view = _early_bound(view, "IView")
     candidates = []
-    for raw_note in bound_view.GetNotes() or ():
-        note = _early_bound(raw_note, "INote")
+    notes = [_early_bound(raw, "INote") for raw in (bound_view.GetNotes() or ())]
+    for note in notes:
         linked_text = str(note.PropertyLinkedText or "")
-        if all(token in linked_text for token in ("<VLNAME>", "<VLLABEL>", "<VLSCALEV>")):
+        if "<VLLABEL>" in linked_text:
             candidates.append((note, linked_text))
     if len(candidates) != 1:
+        texts = [str(note.PropertyLinkedText or note.GetText() or "") for note in notes]
         raise RuntimeError(
-            f"{label}: expected one native linked section caption, found {len(candidates)}"
+            f"{label}: expected one native linked section caption, found "
+            f"{len(candidates)} among the view's notes {texts!r}"
         )
     note, linked_text = candidates[0]
     annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
