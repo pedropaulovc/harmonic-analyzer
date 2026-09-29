@@ -264,6 +264,12 @@ TIP_DETAIL_CENTER = (0.100, 0.236)
 # letter SolidWorks anchors.
 TIP_DETAIL_LETTER_XY = (0.064, 0.164)
 CUT_PARENT_SCALE = {CutParent.SIDE: SIDE_SCALE, CutParent.TIP_DETAIL: TIP_DETAIL_SCALE}
+# A cutting line on the detail spans its land, not the detail's whole view, so
+# SolidWorks leaves the full section open (leaf 20260929T212413Z-1-c1463903:
+# B-B "did not close"); it is made a partial section, as
+# draw_cone_swing_platform cut C-C from its detail.  The line still runs past
+# its land on both sides, so the partial cut is the whole D.
+PARTIAL_CUT_PARENTS = frozenset({CutParent.TIP_DETAIL})
 
 # The D sections (user ruling 2026-09-28: every gear land carries one flat on
 # the shaft's +X).  The side view looks straight at the flats, so their size
@@ -625,8 +631,12 @@ def _prepare_d_section(adapter: Any, view: Any, section: DSection) -> None:
         raise RuntimeError(f"section {section.label} scale did not persist: {ratio}")
     if not bool(cut.GetDisplayOnlySurfaceCut()):
         raise RuntimeError(f"section {section.label} kept geometry beyond the cut")
-    if bool(cut.GetPartialSection()):
-        raise RuntimeError(f"section {section.label} cutting line did not close")
+    partial = section.parent in PARTIAL_CUT_PARENTS
+    if bool(cut.GetPartialSection()) != partial:
+        raise RuntimeError(
+            f"section {section.label} is {'not ' if partial else ''}a partial "
+            f"section, cut from the {section.parent.value}"
+        )
 
 
 class CaptionAnchor(Enum):
@@ -963,6 +973,7 @@ def _add_d_sections(
             view_xy=section.centre,
             section_label=section.label,
             scale=section.scale,
+            partial=section.parent in PARTIAL_CUT_PARENTS,
             label=f"land {section.land} D section",
         )
         _prepare_d_section(adapter, view, section)
@@ -1289,8 +1300,15 @@ async def build(adapter: Any) -> dict[str, str]:
     sections = _add_d_sections(
         adapter, {CutParent.SIDE: side, CutParent.TIP_DETAIL: detail}, sign
     )
+    # The caption stands right of the detail's ink: B's letters and the
+    # detail's own outline, whichever reaches further.
     detail_ink_right = max(
-        box[2] for boxes in _section_line_ink(detail).values() for box in boxes.values()
+        _view_outline(detail)[2],
+        *(
+            box[2]
+            for boxes in _section_line_ink(detail).values()
+            for box in boxes.values()
+        ),
     )
     detail_caption = _place_view_caption(
         adapter,
