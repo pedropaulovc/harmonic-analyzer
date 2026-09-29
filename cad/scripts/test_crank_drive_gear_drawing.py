@@ -24,7 +24,6 @@ import crank_drive_gear_spec as spec
 import crank_pinion_spec as pinion_spec
 import draw_crank_drive_gear as drawing
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
-from _fit_limits import deviations
 from _drawing_registry import DRAWINGS_BY_NAME
 
 

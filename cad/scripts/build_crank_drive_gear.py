@@ -59,8 +59,8 @@ import cone_shaft_land_bands
 from _common import (
     IN,
     SketchDims,
+    _early_bound,
     _feature_by_name,
-    anchor_point_to_origin,
     apply_material,
     blank_sketch,
     check,
