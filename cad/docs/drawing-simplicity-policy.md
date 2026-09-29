@@ -50,17 +50,24 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
    (`<part>_spec.DRAWING_PRECISION`, applied natively on the `.SLDPRT`) and
    the drawing imports the dimension verbatim, reading the precision back to
    prove it. A drawing script that rewrites precision at render time
-   (`SetPrecision3`, `set_dimension_precision`) or types a spec constant
-   into note text (`f"{DEPTH:.1f} DEEP"`) is hiding a part without its
-   tolerance: the nominal the shop reads must be the model's value, at the
-   model's precision, with the model's band. A value the sheet prints but no
-   feature dimension carries is not an exemption -- model it, even if that
-   takes a hidden reference sketch whose one driving dimension IS the value.
-   The single exception is a pure REFERENCE dimension: a read-only restatement
+   (`SetPrecision3`, `set_dimension_precision`, `set_hole_callout_precision`)
+   or types a spec constant into note text (`f"{DEPTH:.1f} DEEP"`) is hiding
+   a part without its tolerance: the nominal the shop reads must be the
+   model's value, at the model's precision, with the model's band. A value
+   the sheet prints but no feature dimension carries is not an exemption --
+   model it, even if that takes a hidden reference sketch whose one driving
+   dimension IS the value. There are two exceptions. The first is a pure
+   REFERENCE dimension: a read-only restatement
    of values the model already owns, carrying no band and having no model
    dimension to import. Its places are still specification, so a migrated
    sheet reads them from a `*_spec` constant (`DRAWING_REFERENCE_PRECISION`),
-   never from a literal. Migrated packages are gated by
+   never from a literal. The second is a Hole Wizard callout's per-variable
+   places (a blind tap-drill depth printed `16.0`, not `16.00`).
+   `SetPrecision3` cannot set a callout's per-variable places, so there is no
+   model-side home and `set_hole_callout_precision` must write them from the
+   sheet. The part's spec is the next-closest source of truth: the places live
+   in `<part>_spec.HOLE_CALLOUT_PRECISION`, and the sheet passes that constant
+   (or an item of it), never a literal map. Migrated packages are gated by
    `test_drawing_specification_purity.py`; the remaining fleet is #766.
    A matched-fit callout identifies the mating part by name and its drawing
    or part number when assigned, and states the required clearance,
