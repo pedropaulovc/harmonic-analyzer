@@ -224,7 +224,7 @@ sections:
         - scaled + stated topology
         - med
       - - Crankshaft diameter
-        - 9.525 mm (3/8") on the T12 and crank-hub seats; restored integral Ø11.388 journal runs directly in MHA-016; the 16T pinion sits on a Ø9.0 seat step (local 112.6)
+        - 9.525 mm (3/8") on the T12 and crank-hub seats; restored integral Ø11.388 journal runs directly in MHA-016; the 16T pinion sits on a Ø9.0 seat step (local 112.7)
         - '0.375'
         - 'User ruling 2026-09-28 restores the integral running journal while retaining the single-cutter 16T seat and existing T12 and hub geometry. The smaller pinion root needs the Ø9.0 seat to keep its boss wall over 1.5 at print-worst.'
         - legacy

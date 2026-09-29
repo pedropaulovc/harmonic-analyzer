@@ -109,7 +109,7 @@ def local_station(far_end_station: float) -> float:
 PINION_SEAT_DIA = crank_pinion_spec.SEAT_DIA
 PINION_SEAT_DIA_BAND = SHAFT_DIA_BAND  # the through shaft's turned-fit band
 PINION_SEAT_STATION = 24.1  # far end to the step
-SEAT_STEP = local_station(PINION_SEAT_STATION)  # 112.6
+SEAT_STEP = local_station(PINION_SEAT_STATION)  # 112.7
 STEP_CORNER_RADIUS_MAX = 0.25  # the title block's R0.25 edge break
 SEAT_STEP_STANDOFF_WORST = SEAT_STEP + STATION_ROW + STEP_CORNER_RADIUS_MAX - SEAT_PINION
 SEAT_GAP_NORTH_RANGE = crank_pinion_spec.SEAT_GAP_MAX_MM - crank_pinion_spec.SEAT_FEELER_MM

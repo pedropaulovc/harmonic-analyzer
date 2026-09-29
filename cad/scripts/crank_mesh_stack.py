@@ -37,7 +37,7 @@ NOMINAL_TIGHT_BACKLASH_MM = 0.32269
 KC = (0.41222 - 0.23685) / 0.300
 K64 = (0.41722 - 0.22079) / 0.20
 K16 = (0.36930 - 0.31888) / 0.05
-if not KC > 0 and K64 > 0 and K16 > 0:
+if not (KC > 0 and K64 > 0 and K16 > 0):
     raise AssertionError("measured mesh sensitivities must preserve the tight-corner sign")
 LINEAR_RESIDUAL_MM = 0.006
 STUDY_CASES = {
@@ -74,9 +74,9 @@ CONE_OVERHANG = 5.68
 MESH_LEVER = post.CRANK_BOSS_NORTH_FACE + pinion.SEAT_GAP_MAX_MM + PINION_HALF_FACE_MAX
 POST_ANGLE_DEG = post.CRANK_BORE_ANGLE_LIMIT_DEG
 POST_ANGLE_AT_MESH = MESH_LEVER * math.tan(math.radians(POST_ANGLE_DEG))
-if not CRANK_BEARING_LENGTH > 0 and CRANK_SUPPORT_NORTH_MIN > 0 and CRANK_OVERHANG >= 0:
+if not (CRANK_BEARING_LENGTH > 0 and CRANK_SUPPORT_NORTH_MIN > 0 and CRANK_OVERHANG >= 0):
     raise AssertionError("crankshaft journal must support the 16T mesh plane")
-if not MESH_LEVER > 0 and POST_ANGLE_AT_MESH > 0:
+if not (MESH_LEVER > 0 and POST_ANGLE_AT_MESH > 0):
     raise AssertionError("post angularity must be carried into the worst tight-corner mesh budget")
 TOOTH_RUNOUT_TIR_MM = 0.05
 TIP_ROOT_BAND_RADIAL = max(pinion.OUTSIDE_DIA_TOLERANCE_MM, gear64.OUTSIDE_DIA_TOLERANCE_MM) / 2.0

@@ -784,7 +784,7 @@ if abs((CRANKSHAFT_Z0 + CS_PINION_PIN_STATION) - PINION_PIN_Z) > 1e-6:
     raise AssertionError("crankshaft pin hole station off the pinion's pin station")
 if abs(PINION_PIN_LENGTH - PINION_BOSS_DIA) > 1e-9:
     raise AssertionError("pinion pin is not flush with the boss")
-_SHAFT_NORTH_END = CRANKSHAFT_Z0 + CS_SHAFT_LENGTH  # -46.3
+_SHAFT_NORTH_END = CRANKSHAFT_Z0 + CS_SHAFT_LENGTH  # -46.2
 # Nominal recess of the shaft end inside the boss and the pin's wall to that
 # end; their worst cases are asserted once the seat gap is known (below).
 PINION_RECESS_NOMINAL = (PINION_Z0 + PINION_OVERALL_LENGTH) - _SHAFT_NORTH_END
