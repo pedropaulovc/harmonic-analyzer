@@ -169,10 +169,13 @@ def swing_hardware_geometry(
     pivot_xz: tuple[float, float],
     *,
     lock_collar_dia: float,
-    stop_shank_dia: float,
+    stop_contact_dia: float,
 ) -> SwingHardwareGeometry:
-    """Derive the lock seat and stop contact once from the platform outline."""
-    if lock_collar_dia <= 0.0 or stop_shank_dia <= 0.0:
+    """Derive the lock seat and stop contact once from the platform outline.
+
+    ``stop_contact_dia`` is the stop diameter the plate edge bears on (the
+    seated screw's head)."""
+    if lock_collar_dia <= 0.0 or stop_contact_dia <= 0.0:
         raise ValueError("swing hardware diameters must be positive")
 
     def placed(x_local: float, z_local: float, angle_rad: float) -> tuple[float, float]:
@@ -205,8 +208,8 @@ def swing_hardware_geometry(
         -edge_out_local[0] * s_dis + edge_out_local[1] * c_dis,
     )
     stop_xz = (
-        contact_xz[0] + edge_out_disengaged[0] * stop_shank_dia / 2.0,
-        contact_xz[1] + edge_out_disengaged[1] * stop_shank_dia / 2.0,
+        contact_xz[0] + edge_out_disengaged[0] * stop_contact_dia / 2.0,
+        contact_xz[1] + edge_out_disengaged[1] * stop_contact_dia / 2.0,
     )
 
     engaged_edge_xz = placed(stop_local_x, STOP_LOCAL_Z, incline_rad)
@@ -221,7 +224,7 @@ def swing_hardware_geometry(
     engaged_gap = (
         stop_delta[0] * edge_out_engaged[0]
         + stop_delta[1] * edge_out_engaged[1]
-        - stop_shank_dia / 2.0
+        - stop_contact_dia / 2.0
     )
     return SwingHardwareGeometry(
         lock_xz=lock_xz,

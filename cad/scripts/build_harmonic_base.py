@@ -119,7 +119,7 @@ from cone_lock_knob_spec import (
 )
 from cone_swing_platform_geometry import PLATE_T, swing_hardware_geometry
 from swing_stop_screw_spec import (
-    SHANK_DIA as STOP_SHANK_DIA,
+    CONTACT_DIA as STOP_CONTACT_DIA,
     THREAD as STOP_THREAD,
 )
 from slotted_screw_spec import SHANK_LEN as BLOCK_SCREW_LEN
@@ -301,7 +301,7 @@ SERIAL_AREA_MM2 = 3.1029  # pinned from gen_base_serial_dxf's summary (net glyph
 SWING_HARDWARE_GEOMETRY = swing_hardware_geometry(
     PIVOT_SCREW_XZ,
     lock_collar_dia=LOCK_COLLAR_DIA,
-    stop_shank_dia=STOP_SHANK_DIA,
+    stop_contact_dia=STOP_CONTACT_DIA,
 )
 LOCK_KNOB_XZ = SWING_HARDWARE_GEOMETRY.lock_xz
 STOP_SCREW_XZ = SWING_HARDWARE_GEOMETRY.stop_xz
@@ -326,9 +326,10 @@ if LOCK_SCREW_HOLE_DEPTH - SEAT_DEPTH_BAND - LOCK_STUD_LEN < LOCK_STUD_BOTTOM_CL
 if LOCK_SCREW_DRILL_DEPTH - LOCK_SCREW_HOLE_DEPTH < LOCK_PLUG_TAP_LEAD:
     raise AssertionError("cone lock seat drill loses the knob's plug-tap lead")
 
-# The shared 25.4-mm stock stop keeps its original 9.875-mm exposed height.
-# Its full thread clears the 15.525-mm embed at the printed low limit; the
-# drill keeps the #8-32 plug tap's five-pitch lead below the high limit.
+# The stop (the foot screw's #4-40 x 3/8 stock) is screwed fully home: its
+# head seats on the base top and its whole height bears on the platform edge.
+# Full thread clears the full-shank embed at the printed low limit; the drill
+# keeps the plug tap's five-pitch lead below the high limit.
 STOP_SCREW_HOLE_DEPTH = seat_thread_depth(STOP_ENGAGEMENT)
 STOP_SCREW_DRILL_DEPTH = seat_drill_depth(STOP_SCREW_HOLE_DEPTH, STOP_THREAD, "tapped")
 
@@ -1159,7 +1160,7 @@ async def build(adapter) -> dict[str, str]:
             "StopSeat",
             STOP_SEAT_SPEC,
             (STOP_SCREW_XZ,),
-            "swing-stop tapped seat (#8-32)",
+            f"swing-stop tapped seat ({STOP_THREAD})",
         ),
         (
             "BlockScrewHoles",

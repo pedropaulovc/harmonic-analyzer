@@ -43,6 +43,9 @@ from post_mount_screw_spec import CUT_LENGTH_MM as _POST_SCREW_CUT_LENGTH
 from post_mount_screw_spec import GRIP_MM as _POST_SCREW_GRIP
 from arbor_set_screw_spec import LENGTH as _ARBOR_SET_SCREW_LENGTH
 from arbor_set_screw_spec import THREAD as _ARBOR_SET_SCREW_THREAD
+from swing_stop_screw_spec import EMBED_LEN as _STOP_EMBED_LEN
+from swing_stop_screw_spec import SHANK_DIA as _STOP_SHANK_DIA
+from swing_stop_screw_spec import THREAD as _STOP_THREAD
 
 
 def _smooth_annulus_limit_mm3(
@@ -368,7 +371,9 @@ _HARMONIC_ANALYZER_ALLOWED_PAIRS = {
         "drive-train-1/swing-stop-screw",
         range(1, 2),
         "frame-1/harmonic-base",
-        _smooth_annulus_limit_mm3(4.1656, 3.454, 15.525),
+        _smooth_annulus_limit_mm3(
+            _STOP_SHANK_DIA, TAP_DRILL_MM[_STOP_THREAD], _STOP_EMBED_LEN
+        ),
     ),
     # Rule 12 (audit E10): the 31.75 #8-32 x 1-1/4 block screws pass the
     # 20.5 pinion block and engage 11.25 of the base seat.
