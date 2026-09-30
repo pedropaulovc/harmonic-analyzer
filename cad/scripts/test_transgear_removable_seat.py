@@ -57,12 +57,13 @@ def test_knob_pin_holes_obey_the_wall_floor_or_run_through() -> None:
     assert knob.PIN_HOLE_DEPTH == knob.COLLAR_LEN
     assert knob.pin_hole_meets_wall_floor(knob.COLLAR_LEN, knob.PIN_HOLE_DEPTH)
     # Negative control: the old blind hole, reamed to the pin's press depth
-    # (4.7625 - 2.4 = 2.3625) in the 3.6 collar, left a 1.2375 floor.  The old
-    # guard only refused a breakthrough (floor > 0) and passed it.
+    # (4.7625 - 2.4 = 2.3625) in the first 3.6 collar, left a 1.2375 floor.
+    # The old guard only refused a breakthrough (floor > 0) and passed it.
     old_depth = knob_pin.LENGTH - spec.DRIVE_PIN_PROUD
     assert old_depth == pytest.approx(2.3625)
-    assert 0.0 < knob.COLLAR_LEN - old_depth < knob.WALL_FLOOR
-    assert not knob.pin_hole_meets_wall_floor(knob.COLLAR_LEN, old_depth)
+    first_collar = 3.6
+    assert 0.0 < first_collar - old_depth < knob.WALL_FLOOR
+    assert not knob.pin_hole_meets_wall_floor(first_collar, old_depth)
     # A blind hole is fine exactly at the floor, and not a hair under it.
     assert knob.pin_hole_meets_wall_floor(3.6, 3.6 - 1.5)
     assert not knob.pin_hole_meets_wall_floor(3.6, 3.6 - 1.49)
@@ -93,13 +94,13 @@ def test_knob_pin_tip_stays_inside_the_thinnest_wheel_under_the_thumbnut() -> No
 
 def test_knob_pin_pressed_end_stays_inside_the_collar() -> None:
     # Longest 3/16 dowel set lowest, collar at the loosest .X row:
-    # 3.6 - 0.8 - (4.7625 + 0.254 - 2.30).
-    assert knob.PIN_REAR_INSET_WORST == pytest.approx(0.0835)
-    # Negative control: the crank's 1/4 dowel set to the same stop would
-    # stand out of the collar's rear face toward the 120T disc.
+    # 5.4 - 0.8 - (4.7625 + 0.254 - 2.30).
+    assert knob.PIN_REAR_INSET_WORST == pytest.approx(1.8835)
+    # Negative control: the crank's 1/4 dowel set to the same stop in the
+    # first 3.6 collar would stand out of its rear face toward the 120T disc.
     assert (
         knob.pin_rear_inset(
-            knob.COLLAR_LEN - crank.STATION_ROW,
+            3.6 - crank.STATION_ROW,
             crank_pin.LENGTH + crank.DRIVE_PIN_LENGTH_GRADE,
             min(knob_pin.PROUD_RANGE),
         )
@@ -124,14 +125,14 @@ _CRANK_SEAT = dict(
 
 
 def test_crank_pin_tips_are_checked_against_the_hub_rear_face() -> None:
-    # Hand check, dome-root stations: seat forward 30.5 - 0.5, tip 2.754 in
-    # front of it, hub rear long 27.0 + 0.05; floated onto the short hub the
-    # thinnest wheel moves 30.6 - 2.7 - 26.95 off the seat.
+    # Hand check, dome-root stations: seat forward 28.7 - 0.5, tip 2.754 in
+    # front of it, hub rear long 25.2 + 0.05; floated onto the short hub the
+    # thinnest wheel moves 28.8 - 2.7 - 25.15 off the seat.
     air, engagement = crank.drive_pin_front_clearances(
         crank.DRIVE_PIN_PROUD_RANGE, hub_rear=crank.HUB_LENGTH, **_CRANK_SEAT
     )
     assert crank.DRIVE_PIN_PROUD_RANGE == pytest.approx((2.046, 2.754))
-    assert air == pytest.approx(30.0 - 2.754 - 27.05)
+    assert air == pytest.approx(28.2 - 2.754 - 25.25)
     assert engagement == pytest.approx(2.046 - 0.95)
     assert (air, engagement) == (
         crank.DRIVE_PIN_HUB_AIR_WORST,
@@ -156,3 +157,17 @@ def test_crank_pin_check_refuses_a_hub_the_old_plate_check_passed() -> None:
         crank.drive_pin_front_clearances(
             proud, hub_rear=crank.HUB_LENGTH - 1.1, **_CRANK_SEAT
         )
+
+
+def test_moved_seat_refuses_the_hub_it_left_behind() -> None:
+    # Ruling 2026-09-30: the seat face came 1.8 forward (30.5 -> 28.7 from
+    # the dome root) and the hub shortened with it (27.0 -> 25.2).
+    proud = crank.DRIVE_PIN_PROUD_RANGE
+    assert (crank.SEAT_COLLAR, crank.HUB_LENGTH) == pytest.approx((28.7, 25.2))
+    first = dict(_CRANK_SEAT, seat_face=30.5)
+    # The first pair passed with the same air: only the offset matters.
+    air, _ = crank.drive_pin_front_clearances(proud, hub_rear=27.0, **first)
+    assert air == pytest.approx(crank.DRIVE_PIN_HUB_AIR_WORST)
+    # Negative control: the first hub under the moved seat meets the pins.
+    with pytest.raises(AssertionError, match="hub's rear face"):
+        crank.drive_pin_front_clearances(proud, hub_rear=27.0, **_CRANK_SEAT)

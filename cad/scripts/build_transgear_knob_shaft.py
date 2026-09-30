@@ -11,11 +11,10 @@ reeding recipe needs an X-axis layout and this part's stack is sized along
 its axis).
 
 The seat is the one both removable shafts share (transgear_removable_spec):
-a O17.5 x 3.6 collar (the crank's seat-spigot diameter) whose FRONT face is
+a O17.5 x 5.4 collar (the crank's seat-spigot diameter) whose FRONT face is
 the seat face the wheel's rear face bears on, the wheel piloted on the plain
 O9.525 shaft in front of it, and two MHA-155 dowels pressed into holes reamed
-THROUGH the collar on the wheel's O14 pin circle (a blind floor in a 3.6
-collar would be a web under the 1.5 wall floor). No floor stops the press:
+THROUGH the collar on the wheel's O14 pin circle. No floor stops the press:
 each pin is pressed in from the seat face onto a stop that leaves it
 DRIVE_PIN_PROUD out (knob_pin.PROUD_RANGE, printed on the MHA-155 sheet),
 its pressed end PIN_PRESS_DEPTH behind the seat face and inside the collar,
@@ -80,14 +79,16 @@ MATERIAL = "Brass"
 
 SHAFT_DIA = 0.375 * IN  # 9.525 (low): pilot, thread stub and hub ride
 # Pilot + thumbnut stub in front of the seat face. The nut neck stands
-# THUMBNUT_AIR in front of the wheel (-155.55..-166.55); the shaft front
+# THUMBNUT_AIR in front of the wheel (-157.35..-168.35); the shaft front
 # lands 0.45 inside the nut's front face, past its disc mid-depth
 # (paper-drive's thumbnut-fit assert pins both).
 PILOT_LEN = 13.6
 COLLAR_DIA = removable.SEAT_SPIGOT_DIA  # 17.5, the crank's seat spigot
-# Seat face to the collar rear (machine -152.5..-148.9), DISC_AIR in front of
-# the 120T disc / third gear front face (-148.4).
-COLLAR_LEN = 3.6
+# Seat face to the collar rear (machine -154.3..-148.9), DISC_AIR in front of
+# the 120T disc / third gear front face (-148.4): the collar took up the 1.8
+# the seat moved forward (user ruling 2026-09-30).  Paper-drive owns the disc
+# station and asserts this air from both sides.
+COLLAR_LEN = 5.4
 DISC_AIR = 0.5
 SEAT_DIA = 5.0  # turned-down third-gear seat (12T DP38 root < 3/8" surface)
 SEAT_LEN = DISC_AIR + 4.0 + 1.5  # air + third gear face 4 + 1.5 (to z -142.9)
@@ -160,7 +161,7 @@ PIN_REAR_INSET_WORST = pin_rear_inset(
     COLLAR_LEN - crankshaft_spec.STATION_ROW,
     knob_pin.LENGTH + crankshaft_spec.DRIVE_PIN_LENGTH_GRADE,
     min(knob_pin.PROUD_RANGE),
-)  # 0.08
+)  # 1.88
 if PIN_REAR_INSET_WORST < 0.0:
     raise AssertionError(
         "a pressed knob drive pin stands out of the collar's rear face"

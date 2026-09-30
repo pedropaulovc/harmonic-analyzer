@@ -109,12 +109,12 @@ CROSS_HOLE_CALLOUT = "\n".join(
 # overall length -- not the arm's stock thickness -- places its rear face.
 #   Links:
 #     crank face                    CRANK_FACE_Z                     -183
-#     hub overall, front to rear    HUB_LENGTH +/- HUB_LENGTH_TOL    27 +/-0.05
+#     hub overall, front to rear    HUB_LENGTH +/- HUB_LENGTH_TOL    25.2 +/-0.05
 #     relief, back from rear face   RELIEF_LENGTH +/- RELIEF_LENGTH_TOL
 #                                                                    3.6 +/-0.05
 #     removable seat face           transgear_removable_spec.SEAT_FACE_Z
 #                                   + crankshaft_spec.SEAT_COLLAR_BAND
-#                                                                    -152.5 +0.1/-0.5
+#                                                                    -154.3 +0.1/-0.5
 #     T12 wheel plate               PLATE + PLATE_BAND               2.8 +0/-0.10
 #     chain reach ahead of seat     CHAIN_REACH_FRONT = W/2 + G      6.2865
 #                                   (ANSI_ROLLER_WIDTH 3.175 / 2 + ANSI_HALF_WIDTH
@@ -123,12 +123,12 @@ CROSS_HOLE_CALLOUT = "\n".join(
 #        (SEAT_FACE_Z + min(SEAT_COLLAR_BAND) - CHAIN_REACH_FRONT)
 #        - (CRANK_FACE_Z + HUB_LENGTH + HUB_LENGTH_TOL
 #           - (RELIEF_LENGTH - RELIEF_LENGTH_TOL))
-#        = (-152.5 - 0.5 - 6.2865) - (-183 + 27.05 - 3.55)
-#        = -159.2865 - (-159.5)                   = 0.2135  (nominal 0.81)
+#        = (-154.3 - 0.5 - 6.2865) - (-183 + 25.25 - 3.55)
+#        = -161.0865 - (-161.3)                   = 0.2135  (nominal 0.8135)
 #   B  hub rear face -> T12 front face:
 #        (SEAT_FACE_Z + min(SEAT_COLLAR_BAND) - (PLATE + max(PLATE_BAND)))
 #        - (CRANK_FACE_Z + HUB_LENGTH + HUB_LENGTH_TOL)
-#        = (-152.5 - 0.5 - 2.8) - (-183 + 27.05)
-#        = -155.8 - (-155.95)                     = 0.15    (nominal 0.7)
+#        = (-154.3 - 0.5 - 2.8) - (-183 + 25.25)
+#        = -157.6 - (-157.75)                     = 0.15    (nominal 0.7)
 #   Worst case in both: seat collar at its forward limit, hub long; A with the
 #   relief short, B with the plate thick.

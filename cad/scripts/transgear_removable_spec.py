@@ -130,9 +130,11 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 }
 
 # --- shared machine z band (both shafts) -------------------------------------
-SEAT_FACE_Z = -152.5  # wheel rear face = shaft seat face (the stack datum)
-BAND_FRONT_Z = SEAT_FACE_Z - PLATE  # -155.3, wheel front face
-CHAIN_MID_Z = SEAT_FACE_Z - PLATE / 2.0  # -153.9, the ONE chain plane
+# User ruling 2026-09-30: 1.8 forward of the first seat (-152.5); the chain
+# plane, both wheels and both shafts' seat faces moved with it.
+SEAT_FACE_Z = -154.3  # wheel rear face = shaft seat face (the stack datum)
+BAND_FRONT_Z = SEAT_FACE_Z - PLATE  # -157.1, wheel front face
+CHAIN_MID_Z = SEAT_FACE_Z - PLATE / 2.0  # -155.7, the ONE chain plane
 
 # --- drive-pin seat interface (both shafts carry it) -------------------------
 # Two purchased 3/32 dowels pressed into each shaft's seat face, rounded end
@@ -141,7 +143,7 @@ CHAIN_MID_Z = SEAT_FACE_Z - PLATE / 2.0  # -153.9, the ONE chain plane
 # lengths and press depths are the shafts'; the diameter is the interface's.
 DRIVE_PIN_DIA = 3.0 / 32.0 * MM_PER_IN  # 2.38125; each pin spec asserts its own
 DRIVE_PIN_PROUD = 2.4  # standing out of the seat face
-DRIVE_PIN_TIP_Z = SEAT_FACE_Z - DRIVE_PIN_PROUD  # -154.9
+DRIVE_PIN_TIP_Z = SEAT_FACE_Z - DRIVE_PIN_PROUD  # -156.7
 DRIVE_PIN_HOLE_DIA = 2.38  # reamed for the press (3/32 nominal)
 
 # --- shaft seat face (both shafts carry the same seat) -----------------------

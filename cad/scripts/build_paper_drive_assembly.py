@@ -35,7 +35,7 @@ verify:kinematics replay, never authored.
 * Transgear group: bracket on the bar's back face (2 slotted screws) carrying
   the stepped stud; on the stud the 120T disc + 12T feed pinion (locked pair,
   O5 seat) and the latch arm's big hub; the arm carries the knob shaft MHA-078
-  with the mounted T24 removable CHAIN-WRAPPED at the z -153.9 chain plane
+  with the mounted T24 removable CHAIN-WRAPPED at the z -155.7 chain plane
   (rear face on the shaft's seat collar, driven by two pressed MHA-155 pins),
   the 12T DP38 third gear on the shaft's O5 seat, and the thumb knob; the
   knurled thumbnut on the shaft's front pilot retains the T24 (ch23 p.58/59).
@@ -48,7 +48,7 @@ verify:kinematics replay, never authored.
 
 Cross-subassembly fits (checked at the top level): the column-clamp arcs ride
 the O25.4 columns (frame.SLDASM); the roller chain spans this sub's knob shaft
-and the drive-train crankshaft -- both share the z -153.9 chain plane.
+and the drive-train crankshaft -- both share the z -155.7 chain plane.
 
 Fix-all strategy (M6.2): every structural component inserted at its exact final
 transform and fixed; the platen group and the gear train are left free and
@@ -341,8 +341,8 @@ from build_transgear_thumbnut import (  # noqa: E402
 # BAND_FRONT_Z, rear face on the shaft's seat collar at SEAT_FACE_Z, and the
 # chain mid-plane between (transgear_removable_spec). Each is placed on its
 # FRONT face (the part's Front Plane), identity: holes on machine +/-Y.
-REMOVABLE_Z0 = REMOVABLE.BAND_FRONT_Z  # -155.3
-T24_MID_Z = REMOVABLE.CHAIN_MID_Z  # -153.9
+REMOVABLE_Z0 = REMOVABLE.BAND_FRONT_Z  # -157.1
+T24_MID_Z = REMOVABLE.CHAIN_MID_Z  # -155.7
 CHAIN_MID_Z = REMOVABLE.CHAIN_MID_Z  # both wheels coplanar; the crank T12 matches
 REMOVABLE_TIP_R = {
     name: REMOVABLE.outside_dia(teeth) / 2.0 for name, teeth in REMOVABLE.CONFIGS
@@ -358,12 +358,12 @@ if REMOVABLE.PIN_HOLE_ANGLES_DEG != (90.0, 270.0):
 # Knob shaft MHA-078 (Rx+90: local +Y -> +Z, the stack runs to the knob at
 # the back): its SeatCollar station sits on the band's seat face, so its
 # origin (the pilot's front tip) is that far in front.
-KNOB_SHAFT_Z0 = REMOVABLE.SEAT_FACE_Z - KNOB_SEAT_COLLAR  # -166.1
+KNOB_SHAFT_Z0 = REMOVABLE.SEAT_FACE_Z - KNOB_SEAT_COLLAR  # -167.9
 KNOB_COLLAR_REAR_Z = KNOB_SHAFT_Z0 + KNOB_COLLAR_REAR  # -148.9
 # The two MHA-155 dowels pressed through the collar's reamed holes (Rx-90: pin
 # +Y -> -Z), pressed end on DrivePinFloor (the press stop's station, inside
 # the collar), rounded end in the wheel's pin holes.
-KNOB_DRIVE_PIN_Z0 = KNOB_SHAFT_Z0 + KNOB_DRIVE_PIN_FLOOR  # -150.1375
+KNOB_DRIVE_PIN_Z0 = KNOB_SHAFT_Z0 + KNOB_DRIVE_PIN_FLOOR  # -151.9375
 if abs(KNOB_DRIVE_PIN_Z0 - KNOB_PIN.LENGTH - REMOVABLE.DRIVE_PIN_TIP_Z) > 1e-9:
     raise AssertionError("knob drive-pin tips are off the removable's DRIVE_PIN_TIP_Z")
 if abs(KNOB_PIN.DIA - REMOVABLE.DRIVE_PIN_DIA) > 1e-12:
@@ -382,7 +382,7 @@ if abs(DISC_Z0 - KNOB_COLLAR_REAR_Z - KNOB_DISC_AIR) > 1e-9 or THIRD_Z0 != DISC_
 CHAIN_REACH_REAR_WORST = REMOVABLE.CHAIN_REACH_REAR_WORST  # 3.587
 CHAIN_DISC_AXIAL_AIR_WORST = DISC_Z0 - (
     REMOVABLE.SEAT_FACE_Z + CHAIN_REACH_REAR_WORST
-)  # 0.5135 = 4.1 - 3.5865
+)  # 2.3135 = 5.9 - 3.5865
 if CHAIN_DISC_AXIAL_AIR_WORST <= 0.0:
     raise AssertionError(
         f"bought #25 chain reaches the 120T disc: air {CHAIN_DISC_AXIAL_AIR_WORST:.4f}"
@@ -406,12 +406,12 @@ if KNOB_COLLAR_R_WORST >= T24_CHAIN_INNER_R:
 # it; the shaft's pilot runs on into the nut. Rx(-90): local +Y -> -Z,
 # so the nut spans THUMBNUT_Z0 .. THUMBNUT_Z0 - 11 (disc at the front).
 THUMBNUT_AIR = 0.25
-THUMBNUT_Z0 = REMOVABLE_Z0 - THUMBNUT_AIR  # -155.55 (neck's gear-side face)
-THUMBNUT_FRONT_Z = THUMBNUT_Z0 - THUMBNUT_LEN  # -166.55
+THUMBNUT_Z0 = REMOVABLE_Z0 - THUMBNUT_AIR  # -157.35 (neck's gear-side face)
+THUMBNUT_FRONT_Z = THUMBNUT_Z0 - THUMBNUT_LEN  # -168.35
 _THUMBNUT_DISC_MID_Z = (
     THUMBNUT_Z0 - THUMBNUT_NECK_LEN - THUMBNUT_DISC_LEN / 2.0
-)  # -163.05
-KNOB_SHAFT_FRONT_Z = KNOB_SHAFT_Z0  # -166.1, the pilot's front tip
+)  # -164.85
+KNOB_SHAFT_FRONT_Z = KNOB_SHAFT_Z0  # -167.9, the pilot's front tip
 _nut_bore_gap = (THUMBNUT_BORE_DIA - KNOB_SHAFT_DIA) / 2.0  # 0.0375 radial
 if not (0.0 < _nut_bore_gap < 0.1):
     raise AssertionError(
@@ -441,10 +441,10 @@ _chain_inner_wrap_r = PITCH_R_T24 - CHAIN_PLATE_HALF_H  # 21.92
 if THUMBNUT_DISC_DIA / 2.0 + THUMBNUT_AIR > _chain_inner_wrap_r:
     raise AssertionError("thumbnut disc reaches the chain's inner plate wrap")
 # The bought chain floated FRONTMOST reaches CHAIN_REACH_FRONT ahead of the
-# seat face (-158.79): inside the nut's neck span, still behind its disc
-# (-159.55). The whole nut (and the shaft) lies radially inside the ANSI
+# seat face (-160.59): inside the nut's neck span, still behind its disc
+# (-161.35). The whole nut (and the shaft) lies radially inside the ANSI
 # plates' inner edge, so no axial stack exists there; assert the radial one.
-CHAIN_FRONT_Z_WORST = REMOVABLE.SEAT_FACE_Z - REMOVABLE.CHAIN_REACH_FRONT  # -158.786
+CHAIN_FRONT_Z_WORST = REMOVABLE.SEAT_FACE_Z - REMOVABLE.CHAIN_REACH_FRONT  # -160.5865
 if max(THUMBNUT_DISC_DIA, THUMBNUT_NECK_DIA) / 2.0 + THUMBNUT_AIR > T24_CHAIN_INNER_R:
     raise AssertionError("thumbnut reaches the bought chain's inner plate edge")
 
@@ -854,7 +854,7 @@ def _assert_knob_shaft_clearance() -> None:
         raise RuntimeError(f"mounted T24 to stub-collar gap {t24_collar_gap:.2f} < 0.5")
     # The T24 overlaps the disc rim in XY -- they must stay z-separated.
     t24_back = REMOVABLE.SEAT_FACE_Z  # the wheel's BACK face on the seat collar
-    z_gap = DISC_Z0 - t24_back  # -148.4 - (-152.5) = 4.1
+    z_gap = DISC_Z0 - t24_back  # -148.4 - (-154.3) = 5.9
     if z_gap < 2.0:
         raise RuntimeError(f"T24/disc z gap {z_gap:.2f} < 2.0")
     # The seat collar's rear face stands DISC_AIR in front of the disc's front

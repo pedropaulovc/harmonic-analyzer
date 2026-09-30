@@ -539,7 +539,7 @@ def test_rig_aft_shift_is_the_one_rig_to_frame_move() -> None:
     assert block_east - (drive.X_DRUM + ped.FOOT_WIDTH / 2.0) >= 19.0
     # The grip keeps opening from the crank cluster.  Nominal floor re-pinned
     # for the P1-2 rig shift (12.5 -> 12.0: the rig sits 0.776 further south);
-    # the worst case gates it (RIG_MARGINS' grip crossrod row, 9.312 vs 0.25).
+    # the worst case gates it (RIG_MARGINS' grip crossrod row, 11.112 vs 0.25).
     assert drive._GRIP_ROD_Z[0] - drive.REMOVABLE.SEAT_FACE_Z >= 12.0
     assert (
         drive.RIG_MARGINS["grip crossrod to the T12 chain wheel"][0]
@@ -567,6 +567,37 @@ def test_crank_seat_stack_keeps_its_air_at_both_ends() -> None:
     collar_rear_aft = drive.CRANKSHAFT_Z0 + cs.COLLAR_REAR + max(cs.COLLAR_REAR_BAND)
     washer_rear_aft = collar_rear_aft + washer.THICKNESS + max(washer.THICKNESS_BAND)
     assert drive._POST_BOSS_SOUTH - washer_rear_aft > 0.0
+
+
+def test_chain_shift_moves_the_crank_seat_hub_and_knob_seat_together(
+    monkeypatch,
+) -> None:
+    """Ruling 2026-09-30: the chain plane came 1.8 forward on both shafts; the
+    crank's spigot grew into the gap and its hub shortened to keep 0.7 air."""
+    import build_paper_drive_assembly as paper
+    import build_transgear_knob_shaft as knob
+    import crank_hub_geometry as hub
+    import crankshaft_spec as cs
+    import transgear_removable_spec as removable
+
+    crank_seat = drive.CRANKSHAFT_Z0 + cs.SEAT_COLLAR
+    knob_seat = paper.KNOB_SHAFT_Z0 + knob.SEAT_COLLAR
+    assert crank_seat == pytest.approx(-154.3)
+    assert knob_seat == pytest.approx(crank_seat)
+    assert paper.CHAIN_MID_Z == pytest.approx(crank_seat - removable.PLATE / 2.0)
+    # The body stays put: spigot -154.3..-148.5, body -148.5..-144.
+    assert drive.CRANK_SPIGOT_FRONT_Z == pytest.approx(-148.5)
+    assert drive.CRANK_SEAT_WASHER_Z0 == pytest.approx(-144.0)
+    assert drive.CRANK_HUB_REAR_Z == pytest.approx(-157.8)
+    # Stack C grew by the 1.8: 5.8 - 0.05 - 3.5865.
+    assert drive.CHAIN_SPIGOT_AXIAL_AIR_WORST == pytest.approx(2.1635)
+    # Negative control: the first seat (-152.5) against the moved collar.
+    with pytest.raises(AssertionError, match="SeatCollar datum"):
+        _drive_with(monkeypatch, removable, "SEAT_FACE_Z", -152.5)
+    monkeypatch.undo()
+    # Negative control: the first hub (27.0) leaves the T12 only -1.1 air.
+    with pytest.raises(AssertionError, match="contracted 0.7"):
+        _drive_with(monkeypatch, hub, "HUB_LENGTH", 27.0)
 
 
 def _follower_stations() -> tuple[list[float], list[float]]:

@@ -650,7 +650,7 @@ CRANK_SEAT_WASHER_REAR_Z = CRANK_SEAT_WASHER_Z0 + SEAT_WASHER.THICKNESS
 # the hub rear face.  Both let the #25 plates wrapping the T12 pass inside
 # the collar/barrel diameters (Main's ruling, 2026-09-30).
 CRANK_SPIGOT_FRONT_Z = CRANKSHAFT_Z0 + SPIGOT_END  # body front face, -148.5
-CRANK_HUB_BARREL_REAR_Z = CRANK_HUB_REAR_Z - HUB_RELIEF_LENGTH  # -159.6
+CRANK_HUB_BARREL_REAR_Z = CRANK_HUB_REAR_Z - HUB_RELIEF_LENGTH  # -161.4
 # Chain-plate clearance: the plate's inner edge against the spigot
 # (print-worst, largest) and the hub relief, radially, for the CAD link and a
 # real ANSI #25 plate; axially, a bought chain's envelope (REMOVABLE.ANSI_*)
@@ -683,7 +683,7 @@ _CHAIN_REACH_REAR_WORST = REMOVABLE.CHAIN_REACH_REAR_WORST
 # A: chain floated frontmost, seat forward, hub long, relief short.
 CHAIN_BARREL_AXIAL_AIR = (
     REMOVABLE.SEAT_FACE_Z - REMOVABLE.CHAIN_REACH_FRONT - CRANK_HUB_BARREL_REAR_Z
-)  # 0.81
+)  # 0.8135
 CHAIN_BARREL_AXIAL_AIR_WORST = (
     _SEAT_FACE_Z_WORST
     - REMOVABLE.CHAIN_REACH_FRONT
@@ -697,10 +697,10 @@ CRANK_HUB_T12_AIR_PRINT_WORST = (
 # and the body front face both ride the seat, so the seat band cancels.
 CHAIN_SPIGOT_AXIAL_AIR = SPIGOT_LENGTH - REMOVABLE.chain_reach_rear(
     REMOVABLE.PLATE
-)  # 0.5135 on nominal spigot and plate
+)  # 2.3135 on nominal spigot and plate
 CHAIN_SPIGOT_AXIAL_AIR_WORST = (
     SPIGOT_LENGTH - SPIGOT_LENGTH_TOL - _CHAIN_REACH_REAR_WORST
-)  # 0.3635
+)  # 2.1635
 for _what, _air in (
     ("chain / hub relief shoulder", CHAIN_BARREL_AXIAL_AIR_WORST),
     ("hub rear face / T12 front face", CRANK_HUB_T12_AIR_PRINT_WORST),

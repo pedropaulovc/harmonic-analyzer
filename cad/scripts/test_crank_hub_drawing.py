@@ -39,11 +39,13 @@ def test_u27_walls_hold_two_millimetres_at_the_printed_bands() -> None:
 
 
 def test_mha024_ream_ligaments_meet_rule_12_at_the_printed_bands() -> None:
-    # CONTRACT-crank MHA-137: 8 seat + 19 of hub behind the shoulder, the ream
+    # CONTRACT-crank MHA-137: 8 seat + 17.2 of hub behind the shoulder (19
+    # until the seat face moved 1.8 forward, ruling 2026-09-30), the ream
     # station unchanged 5.6 from the shoulder at .XX.  The rear 3.6 is the
-    # chain-plate relief (Main, 2026-09-30), so the Ø20.6 barrel is 15.4.
+    # chain-plate relief (Main, 2026-09-30), so the Ø20.6 barrel is 13.6.
     assert geometry.HUB_BARREL_DIA == 20.6
-    assert geometry.HUB_LENGTH == 27.0 and geometry.HUB_BARREL_LENGTH == 15.4
+    assert geometry.HUB_LENGTH == pytest.approx(25.2)
+    assert geometry.HUB_BARREL_LENGTH == pytest.approx(13.6)
     assert geometry.SERVICE_PIN_FROM_SHOULDER == 5.6
     assert geometry.SERVICE_PIN_STATION == pytest.approx(13.6)
     assert crank_hub_spec.DRAWING_PRECISION["ServicePinStationReference"] == {
@@ -57,23 +59,24 @@ def test_mha024_ream_ligaments_meet_rule_12_at_the_printed_bands() -> None:
     )
     assert geometry.HUB_BARREL_DIA / 2 - ream_r == pytest.approx(7.33, abs=0.01)
     assert geometry.SERVICE_PIN_FROM_SHOULDER - ream_r == pytest.approx(2.63, abs=0.01)
-    # The ream now ends at the relief shoulder, not the rear face (10.43).
-    assert rear_from_shoulder - ream_r == pytest.approx(6.83, abs=0.01)
+    # The ream ends at the relief shoulder, not the rear face.
+    assert rear_from_shoulder - ream_r == pytest.approx(5.03, abs=0.01)
     # Worst case at the printed bands (rule 12): the shoulder side governs.
     # Behind the ream the relief shoulder is placed from the front face by
     # the .XX overall less the .XX relief, the ream by the .X seat length and
-    # the .XX station: 23.3 - 8.8 - 6.11 - 2.97.
+    # the .XX station: 21.5 - 8.8 - 6.11 - 2.97.
     assert geometry.SERVICE_PIN_SHOULDER_LIGAMENT_WORST_MM == pytest.approx(2.121, abs=1e-3)
-    assert geometry.SERVICE_PIN_REAR_LIGAMENT_WORST_MM == pytest.approx(5.421, abs=1e-3)
+    assert geometry.SERVICE_PIN_REAR_LIGAMENT_WORST_MM == pytest.approx(3.621, abs=1e-3)
     assert geometry.SERVICE_PIN_BARREL_WALL_WORST_MM == pytest.approx(6.931, abs=1e-3)
 
 
 def test_rear_relief_clears_the_t12_chain_plates_and_keeps_its_wall() -> None:
     # Ruling 2026-09-30 (bought ANSI #25 chain at print-worst): Ø16.5 x 3.6,
-    # rear face unchanged at station 27 (machine -156), barrel shoulder at
-    # 23.4 (machine -159.6).
+    # rear face at station 25.2 (machine -157.8, 0.7 in front of the T12
+    # after the seat face moved 1.8 forward), barrel shoulder at 21.6
+    # (machine -161.4).
     assert (geometry.RELIEF_DIA, geometry.RELIEF_LENGTH) == (16.5, 3.6)
-    assert geometry.RELIEF_STATION == pytest.approx(23.4)
+    assert geometry.RELIEF_STATION == pytest.approx(21.6)
     assert geometry.RELIEF_STATION == pytest.approx(
         geometry.HUB_SEAT_LENGTH + geometry.HUB_BARREL_LENGTH
     )

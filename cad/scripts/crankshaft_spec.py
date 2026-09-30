@@ -218,15 +218,18 @@ PIN_HOLE_HEIGHT = SERVICE_PIN_STATION
 # it, with the radial air for the CAD link and a real ANSI plate).  The seat
 # diameter is the interface both shafts share, so it is the removable spec's.
 SPIGOT_DIA = transgear_removable_spec.SEAT_SPIGOT_DIA
-SPIGOT_LENGTH = 4.0
+# User ruling 2026-09-30: the seat face moved 1.8 forward with the shared
+# band and the Ø20.6 body stayed put, so the spigot grew 4.0 -> 5.8 and the
+# collar 8.5 -> 10.3; the body's front and rear faces keep their stations.
+SPIGOT_LENGTH = 5.8
 COLLAR_DIA = 20.6
-COLLAR_LENGTH = 8.5  # seat face to rear face, spigot included
+COLLAR_LENGTH = 10.3  # seat face to rear face, spigot included
 # Local stations from the dome root (the crank face, machine -183.0 as the
-# drive train's CRANK_FACE_Z): 30.5 behind it is SEAT_FACE_Z -152.5, which
+# drive train's CRANK_FACE_Z): 28.7 behind it is SEAT_FACE_Z -154.3, which
 # build_drive_train_assembly asserts from both sides.
-SEAT_COLLAR = 30.5
+SEAT_COLLAR = 28.7
 SPIGOT_END = SEAT_COLLAR + SPIGOT_LENGTH  # the body's front face, -148.5
-COLLAR_REAR = SEAT_COLLAR + COLLAR_LENGTH
+COLLAR_REAR = SEAT_COLLAR + COLLAR_LENGTH  # -144.0
 # Two pressed MHA-173 dowels on the wheel's pin circle at its +/-Y holes,
 # which the placed shaft (local z = machine -y) carries on local -/+Z.  The
 # pins' pressed ends bear on the blind holes' flat floor, so the depth is set

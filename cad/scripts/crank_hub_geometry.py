@@ -66,11 +66,12 @@ HUB_SEAT_DIA = round(PHOTO_HUB_SEAT_DIA - 0.1, 1)
 HUB_SEAT_LENGTH = ARM_THICKNESS
 # CONTRACT-crank MHA-137: the barrel behind the arm is Ø20.6 (observed Ø≈20,
 # review Q4) -- turned to its own size, narrower than the 1-in arm -- and the
-# hub runs 19 from the arm shoulder to a flat rear face 0.7 clear of the
+# hub runs 17.2 from the arm shoulder to a flat rear face 0.7 clear of the
 # MHA-081 removable, which it keeps from walking forward (the drive train
-# asserts the air against transgear_removable_spec).
+# asserts the air against transgear_removable_spec).  It followed the seat
+# face 1.8 forward (user ruling 2026-09-30): 19 -> 17.2.
 HUB_BARREL_DIA = 20.6
-HUB_SHOULDER_TO_REAR = 19.0
+HUB_SHOULDER_TO_REAR = 17.2
 # The #25 plates wrapping the crank T12 overhang the removable's front face
 # toward the hub, so the rear end is turned down to a Ø16.5 relief the plates
 # pass over; the barrel's rear shoulder stands ahead of the link.  3.6 long,

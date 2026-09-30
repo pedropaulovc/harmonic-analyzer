@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import math
 
+import pytest
+
 import _chain as chain
 import build_paper_drive_assembly as assembly
 import build_transgear_knob_shaft as knob_shaft
@@ -149,6 +151,25 @@ def test_chain_wheels_share_the_spec_band_and_the_chain_straddles_it() -> None:
     assert assembly.REMOVABLE_Z0 - front_inner >= chain.SPROCKET_CLEAR - 1e-9
     assert rear_inner - knob_seat_z >= chain.SPROCKET_CLEAR - 1e-9
     assert 2.0 * chain.BUSH_HALF_LEN >= band.PLATE
+
+
+def test_knob_collar_took_up_the_seat_shift_to_the_disc(monkeypatch) -> None:
+    # Ruling 2026-09-30: the seat face came 1.8 forward and the disc stayed,
+    # so the collar grew 3.6 -> 5.4 to keep its 0.5 air to the disc.
+    import importlib.util
+
+    assert knob_shaft.COLLAR_LEN == 5.4
+    assert math.isclose(assembly.KNOB_COLLAR_REAR_Z, assembly.DISC_Z0 - 0.5)
+    assert math.isclose(assembly.KNOB_SHAFT_Z0, -167.9)
+    # Negative control: the first 3.6 collar under the moved seat stands
+    # 2.3 off the disc, and paper-drive refuses the placement.
+    monkeypatch.setattr(knob_shaft, "COLLAR_REAR", knob_shaft.SEAT_COLLAR + 3.6)
+    spec = importlib.util.spec_from_file_location(
+        "_paper_drive_perturbed", assembly.__file__
+    )
+    fresh = importlib.util.module_from_spec(spec)
+    with pytest.raises(AssertionError, match="clear of the disc"):
+        spec.loader.exec_module(fresh)
 
 
 def test_refitted_platen_clears_fixed_support_hardware() -> None:

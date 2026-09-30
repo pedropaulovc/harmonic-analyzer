@@ -65,7 +65,7 @@ WRAP_R_B = PITCH_R_T12  # crank T12 pitch circle
 SAG_NOMINAL = 14.0  # slack-run droop seed (p006 crop read 18; was trimmed
 # from 18 to clear the cone-pivot-post top, but the ch30 GT re-anchor retired
 # that constraint: the post (now the p1 swing bracket at machine z -113..-87)
-# no longer shares a z corridor with the chain plane (z -153.9). 14 kept
+# no longer shares a z corridor with the chain plane (z -155.7). 14 kept
 # conservatively as the seed.
 # The BUILT droop is SAG below: solved off this seed so the loop closes on an
 # integer number of standard-pitch links (a real chain's length is quantised;

@@ -141,7 +141,7 @@ def test_assembly_keeps_common_face_and_established_inboard_stations() -> None:
     # MHA-024 moved 1.6 inboard with the rule-12 hub station (13.6).
     assert drive.CRANK_PIN_Z == pytest.approx(-169.4)
     # The hub rear reaches the removable: 0.7 air to its front face.
-    assert drive.CRANK_HUB_REAR_Z == -156.0
+    assert drive.CRANK_HUB_REAR_Z == pytest.approx(-157.8)
     assert (
         transgear_removable_spec.BAND_FRONT_Z - drive.CRANK_HUB_REAR_Z
         == pytest.approx(0.7)

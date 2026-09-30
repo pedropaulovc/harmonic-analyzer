@@ -107,7 +107,7 @@ def test_seat_collar_lands_the_wheel_seat_and_clears_the_post_boss() -> None:
 
     assert bdt.CRANKSHAFT_Z0 + spec.SEAT_COLLAR == pytest.approx(removable.SEAT_FACE_Z)
     assert spec.SPIGOT_DIA == removable.SEAT_SPIGOT_DIA < spec.COLLAR_DIA
-    # Ruling 2026-09-30: spigot -152.5..-148.5, body -148.5..-144.
+    # Ruling 2026-09-30: spigot -154.3..-148.5, body -148.5..-144.
     assert bdt.CRANKSHAFT_Z0 + spec.SPIGOT_END == pytest.approx(-148.5)
     # The blind drive-pin holes end in the spigot, short of its step.
     assert spec.SEAT_COLLAR < spec.DRIVE_PIN_FLOOR < spec.SPIGOT_END
