@@ -247,7 +247,7 @@ class DSection(NamedTuple):
 # mm past the line, so B, C and D piled onto each other, onto the tip's
 # diameter lines and onto R0.10 3X (codex review, #1128).  They are cut on
 # DETAIL E instead, the tip at 4:1 in the empty field above the side view,
-# where the three lands are 28 mm apart.  The detail carries no dimension:
+# where their lines stand 27 and 28 mm apart.  The detail carries no dimension:
 # DragModelDimension refuses to re-home a model dimension into a detail view,
 # so every diameter and station stays on the side view.  The circle on the
 # side view (stations 165.6..183.6) spans lands 2..4 only, 3 mm short of the
@@ -277,19 +277,29 @@ PARTIAL_CUT_PARENTS = frozenset({CutParent.TIP_DETAIL})
 # (nothing beyond the plane prints), each enlarged to about 16..19 mm across
 # so the smallest AF, 1.460 on the Ø1.588, reads with its band.  A-A cuts land
 # 1 on the side view, left of the Ø9.525 line; its reach puts the lower letter
-# 2.6 mm under the land.  B, C and D cut the detail, each line's arrows and
-# letters clear of the others' by the layout audit's 2 mm (and the letters 3.2
-# mm apart): C's arrows run between D's letters and B's line at the same
-# height as B's, and D's stand lower, under C's.  The four stand in a 2 x 2
+# 2.6 mm under the land.  B, C and D cut the detail.  A line's arrows look
+# toward the big end (sheet +x) and its letter's right edge lands 19.9..21.3
+# mm past the line, a spread SolidWorks sets per line and per seat (leaves
+# 20260929T221513Z-1-22b951a7, 20260929T235413Z-1-6ebc5952), so side by side
+# the lines must stand at least 23 mm (that run and the next arrow's 1.7 mm
+# half-width) plus the layout audit's 2 mm apart.  The three stations are
+# spread over their lands for that: B and C 0.6 and 0.8 mm short of the step
+# at their land's small end, D 8.0 mm past the detail's centre and inside its
+# circle, so the lines stand 26.8 and 28.0 mm apart at 4:1: C's letters clear
+# B's arrows by 3.8 mm and D's clear C's by 5.0 mm on the worst seat measured,
+# and B's letters clear land 1 by 3.7 mm.  At the old 24 mm (C on the
+# detail's centre) D's letter crowded C's arrow at 1.7 mm on swmaker00000f.
+# B's reach puts its lower letter 3.5 mm under land 2 and C's matches it; D's,
+# on the thinnest land, is shorter.  The four stand in a 2 x 2
 # grid right of the side view, under the pictorial, each over its caption,
 # the bottom row's captions above the title block (x > 0.216, y < 0.066).
 # The across-flat is the part's own dimension (Sec{i}AF, sketched on the
 # land's end plane, parallel to the cut), so it prints its model band.
 D_SECTIONS = (
     DSection(1, "A", 137.6, CutParent.SIDE, 0.0125, (0.337, 0.165), (2, 1)),
-    DSection(2, "B", 168.5, CutParent.TIP_DETAIL, 0.0210, (0.393, 0.165), (3, 1)),
-    DSection(3, "C", 174.6, CutParent.TIP_DETAIL, 0.0210, (0.337, 0.100), (5, 1)),
-    DSection(4, "D", 180.6, CutParent.TIP_DETAIL, 0.0155, (0.393, 0.100), (10, 1)),
+    DSection(2, "B", 168.9, CutParent.TIP_DETAIL, 0.0210, (0.393, 0.165), (3, 1)),
+    DSection(3, "C", 175.6, CutParent.TIP_DETAIL, 0.0210, (0.337, 0.100), (5, 1)),
+    DSection(4, "D", 182.6, CutParent.TIP_DETAIL, 0.0155, (0.393, 0.100), (10, 1)),
 )
 # Each across-flat's text, centred over its section.
 D_SECTION_KEEP = {

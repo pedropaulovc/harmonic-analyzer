@@ -21,6 +21,7 @@ import cone_tip_block_spec
 import cone_tip_bushing_spec
 import draw_cone_gear_shaft as drawing
 import pytest
+from _drawing_annotation_extent import CLEAR_GAP_M
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 
@@ -651,6 +652,28 @@ def test_each_d_section_cuts_its_own_land_clear_of_its_neighbours() -> None:
     for index, a in enumerate(cells):
         for b in cells[index + 1 :]:
             assert a[2] < b[0] or b[2] < a[0] or a[3] < b[1] or b[3] < a[1], (a, b)
+
+
+# How far past its line a detail cutting line's letter reaches toward the big
+# end: 19.9..21.3 mm measured (leaves 20260929T221513Z-1-22b951a7 and
+# 20260929T235413Z-1-6ebc5952), SolidWorks' own placement, varying by seat.
+_SECTION_LETTER_RUN_M = 0.0213
+
+
+def test_each_detail_cutting_line_clears_the_next_by_a_margin() -> None:
+    """Every arrow looks toward the big end, so each detail line's arrows and
+    letters run toward its big-end neighbour's line.  At 24 mm apart D's letter
+    crowded C's arrow at 1.7 mm on one seat (#1136); the worst measured letter
+    must now clear the next line's arrow by the proof's 2 mm and 1.5 mm more."""
+    enlarge = drawing.TIP_DETAIL_SCALE[0] / drawing.TIP_DETAIL_SCALE[1]
+    lines = sorted(
+        (s for s in drawing.D_SECTIONS if s.parent is drawing.CutParent.TIP_DETAIL),
+        key=lambda section: section.station_mm,
+    )
+    for ahead, behind in zip(lines, lines[1:]):
+        spacing = (behind.station_mm - ahead.station_mm) * enlarge / 1000.0
+        gap = spacing - _SECTION_LETTER_RUN_M - drawing.SECTION_ARROW_HALF_WIDTH
+        assert gap >= CLEAR_GAP_M + 0.0015, (behind.label, ahead.label, gap)
 
 
 def test_the_tip_detail_stands_in_the_frame_above_the_side_view() -> None:
