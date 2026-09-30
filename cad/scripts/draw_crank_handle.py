@@ -27,10 +27,9 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, _early_bound, check, run_build
+from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_edge_dimension,
     add_property_linked_note,
     assert_imported_precision,
     create_section_view,
@@ -47,17 +46,13 @@ from _drawing_common import (
 from _drawing_registry import DRAWINGS_BY_NAME
 from _section_axis import create_section_axis_centerline, position_section_caption
 from crank_handle_spec import (
-    COUNTERBORE_R,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
-    DRAWING_REFERENCE_PRECISION,
     HANDLE_MAX_DIA,
-    PIVOT_BORE_DIA,
     REFERENCE_DIMENSIONS,
     SHOULDER_X,
     TENON_DIA,
     TENON_X0,
-    TRIM_R,
     TRIM_X,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -102,7 +97,8 @@ def _front_y(model_y_mm: float) -> float:
 
 
 FRONT_KEEP = {
-    "WoodLength": (0.155, 0.128),
+    # The oak overall from the tenon end face, the one faced end.
+    "OverallLength": (0.150, 0.128),
     "TenonLength": (_front_x((TENON_X0 + SHOULDER_X) / 2.0), 0.212),
     "TenonDia": (0.068, 0.178),
     "PeakStation": (0.150, 0.242),
@@ -119,31 +115,6 @@ DIMENSION_CALLOUTS = {
 }
 CUT_START = (RIGHT_CENTER[0], RIGHT_CENTER[1] - END_R - 0.006)
 CUT_END = (RIGHT_CENTER[0], RIGHT_CENTER[1] + END_R + 0.006)
-# The reference overall runs from the tenon's end face to the butt face, each
-# picked on its cut edge midway up the wood.
-OVERALL_P0 = (_front_x(TENON_X0), _front_y((TENON_R + PIVOT_BORE_DIA / 2.0) / 2.0))
-OVERALL_P1 = (_front_x(TRIM_X), _front_y((TRIM_R + COUNTERBORE_R) / 2.0))
-OVERALL_TEXT_XY = (0.150, 0.112)
-
-
-def _set_reference_precision(adapter: Any, display: Any, label: str) -> None:
-    """Give the one SHEET-derived dimension its spec-authored decimal places.
-
-    ``SetPrecision3`` reports rejection through its return status rather than
-    by raising, so the side effect is read back (the draw_crank_arm pattern).
-    """
-    places = DRAWING_REFERENCE_PRECISION[label]
-    display = _early_bound(display, "IDisplayDimension")
-    adapter._attempt(
-        lambda: display.SetPrecision3(DRAWING_REFERENCE_PRECISION[label], -1, -1, -1)
-    )
-    applied = adapter._attempt(display.GetPrimaryPrecision2)
-    if applied != places:
-        raise RuntimeError(
-            f"{label}: sheet dimension prints {applied} decimal places, not {places}"
-        )
-
-
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -233,24 +204,6 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     if not auto_center_marks(adapter, right, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to crank-handle end view")
-
-    # Tenon end to butt face, a reference for stock cut-off (MHA-022 review:
-    # the 48.7 wood length alone read like an overall).
-    overall = add_edge_dimension(
-        adapter,
-        front,
-        p0=OVERALL_P0,
-        p1=OVERALL_P1,
-        text_xy=OVERALL_TEXT_XY,
-        label="overall length reference",
-        orientation="horizontal",
-    )
-    set_reference_dimension(
-        adapter,
-        _early_bound(overall, "IDisplayDimension").GetAnnotation(),
-        label="overall length reference",
-    )
-    _set_reference_precision(adapter, overall, "overall length reference")
 
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.086)
     add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.205)

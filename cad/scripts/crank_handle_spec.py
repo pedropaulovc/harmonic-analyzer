@@ -138,7 +138,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "HandleProfile": {
         "TenonDia",
         "TenonLength",
-        "WoodLength",
+        "OverallLength",
         "PeakStation",
         "CounterboreDia",
         "CounterboreDepth",
@@ -152,7 +152,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "HandleProfile": {
         "TenonDia": 1,
         "TenonLength": 1,
-        "WoodLength": 1,
+        "OverallLength": 1,
         "PeakStation": 1,
         "CounterboreDia": 1,
         "CounterboreDepth": 1,
@@ -170,31 +170,30 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
 # feature-control frames and the basic profile: a decorative oak grip is
 # turned to its arcs by eye and template, within a contour allowance.
 REFERENCE_DIMENSIONS = frozenset({"TenonDia", "CounterboreDia"})
-# Tenon end to butt face: a reference overall for stock cut-off, printed from
-# the sheet (the profile carries no such dimension).  Its places are
-# specification, read by the sheet from here (policy rule 2).
-OVERALL_REFERENCE = TENON_LENGTH + WOOD_LENGTH
-DRAWING_REFERENCE_PRECISION: dict[str, int] = {"overall length reference": 1}
+# Every axial station reads from the tenon's end face, the one faced end, so
+# the oak's overall (for stock cut-off) is a marked dimension of its own.
+OVERALL_LENGTH = TRIM_X - TENON_X0
 
 FERRULE_NUMBER = "MHA-150"
 CUP_NUMBER = "MHA-153"
 SCREW_NUMBER = "MHA-139"
 
-_PEAK_B = PEAK_X - SHOULDER_X
-_END_B = HANDLE_LENGTH - SHOULDER_X
+_SHOULDER_E = SHOULDER_X - TENON_X0
+_PEAK_E = PEAK_X - TENON_X0
+_END_E = HANDLE_LENGTH - TENON_X0
 DRAWING_NOTES = "\n".join(
     (
-        "AXIAL STATIONS ARE FROM THE TENON SHOULDER; THE COUNTERBORE DEPTH IS",
+        "AXIAL STATIONS ARE FROM THE TENON END FACE; THE COUNTERBORE DEPTH IS",
         "  FROM THE BUTT FACE.",
         f"TURN THE TENON TO SUIT THE {FERRULE_NUMBER} FERRULE BORE AND BORE THE BUTT",
         f"  COUNTERBORE TO SUIT THE {CUP_NUMBER} CUP BODY, EACH FOR "
         f"{TENON_GLUE_LINE[0]:.2f}-{TENON_GLUE_LINE[1]:.2f} DIAMETRAL",
         "  CLEARANCE; EPOXY BOTH IN AT ASSEMBLY.",
         f"THE REAMED BORE RUNS ON THE {SCREW_NUMBER} SHOULDER; ITS LIMITS APPLY FULL LENGTH.",
-        f"GRIP CONTOUR: <MOD-DIAM>{2.0 * NECK_R:.1f} AT THE SHOULDER, <MOD-DIAM>{HANDLE_MAX_DIA:.1f} AT "
-        f"{_PEAK_B:.1f}; ARCS",
-        f"  R{FRONT_PROFILE_R:.1f} AND R{REAR_PROFILE_R:.1f}, TANGENT AT {_PEAK_B:.1f}, RUNNING ON TO "
-        f"<MOD-DIAM>{2.0 * CAP_R:.1f} AT {_END_B:.1f}",
+        f"GRIP CONTOUR: <MOD-DIAM>{2.0 * NECK_R:.1f} AT THE SHOULDER ({_SHOULDER_E:.1f}), "
+        f"<MOD-DIAM>{HANDLE_MAX_DIA:.1f} AT {_PEAK_E:.1f};",
+        f"  ARCS R{FRONT_PROFILE_R:.1f} AND R{REAR_PROFILE_R:.1f}, TANGENT AT {_PEAK_E:.1f}, "
+        f"RUNNING ON TO <MOD-DIAM>{2.0 * CAP_R:.1f} AT {_END_E:.1f}",
         f"  (PAST THE BUTT FACE). TURN WITHIN {CONTOUR_ALLOWANCE_DIA:.1f} ON DIAMETER.",
         "USE CLEAR STRAIGHT GRAIN PARALLEL TO TURNING AXIS.",
     )

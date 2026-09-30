@@ -249,17 +249,18 @@ async def build(adapter) -> dict[str, str]:
         await adapter.add_sketch_dimension(shoulder, None, "linear", NECK_R - TENON_R),
     )
     profile.record("ShoulderStep", '"NeckR" - "TenonDia" / 2')
-    # Wood from the shoulder's outer corner to the butt face's outer corner:
-    # both on the silhouette, so the print's extension lines leave real edges.
+    # The oak overall, tenon end face to butt face, both corners on the
+    # silhouette: every axial station reads from the tenon end, the one faced
+    # end (MHA-022 re-review: the wood length alone read like an overall).
     await dimension_between(
         adapter,
-        f"{shoulder}.end",
+        f"{tenon_end}.end",
         f"{butt_face}.start",
         "horizontal_distance",
-        WOOD_LENGTH,
-        "wood length from the tenon shoulder",
+        TRIM_X - TENON_X0,
+        "oak overall from the tenon end",
     )
-    profile.record("WoodLength", '"WoodLength"')
+    profile.record("OverallLength", '"TenonLength" + "WoodLength"')
     check(
         "counterbore depth",
         await adapter.add_sketch_dimension(
@@ -275,16 +276,16 @@ async def build(adapter) -> dict[str, str]:
         "CounterboreDia",
     )
     profile.record("CounterboreDia", '"CounterboreDia"')
-    # The peak station prints from the tenon shoulder (datum B).
+    # The peak station prints from the tenon end face too.
     await anchor_point_to_point(
         adapter,
-        f"{shoulder}.end",
+        f"{tenon_end}.end",
         f"{peak_station}.start",
-        PEAK_X - SHOULDER_X,
-        _WITNESS_Y0 - NECK_R,
-        "peak station from the tenon shoulder",
+        PEAK_X - TENON_X0,
+        _WITNESS_Y0 - TENON_R,
+        "peak station from the tenon end",
     )
-    profile.record("PeakStation", '"PeakX" - "FerruleLength"')
+    profile.record("PeakStation", '"PeakX" - "FerruleLength" + "TenonLength"')
     profile.record(None, None)
     check(
         "peak witness construction length",

@@ -41,7 +41,7 @@ def test_oak_ends_in_a_ferrule_tenon_and_a_cup_counterbore() -> None:
     assert marked == {
         "TenonDia",
         "TenonLength",
-        "WoodLength",
+        "OverallLength",
         "PeakStation",
         "CounterboreDia",
         "CounterboreDepth",
@@ -52,6 +52,7 @@ def test_oak_ends_in_a_ferrule_tenon_and_a_cup_counterbore() -> None:
         crank_handle_spec.HANDLE_LENGTH - cup.FLANGE_THICKNESS
     )
     assert crank_handle_spec.WOOD_LENGTH == pytest.approx(48.7)
+    assert crank_handle_spec.OVERALL_LENGTH == pytest.approx(53.7)
     assert crank_handle_spec.TENON_X0 > 0.0  # no oak reaches the arm face
     assert abs(cup.FLANGE_DIA - 2.0 * crank_handle_spec.TRIM_R) <= 0.1
     assert crank_handle_spec.COUNTERBORE_MOUTH_WALL >= 0.6
@@ -109,8 +110,7 @@ def test_counterbore_reads_on_a_section_and_the_end_view_shares_its_axis() -> No
     assert "set_hidden_lines_visible" not in source
     assert drawing.RIGHT_CENTER[1] == drawing.FRONT_CENTER[1]
     # The reference overall, tenon end to butt face, for stock cut-off.
-    assert crank_handle_spec.OVERALL_REFERENCE == pytest.approx(53.7)
-    assert crank_handle_spec.DRAWING_REFERENCE_PRECISION == {"overall length reference": 1}
+    assert crank_handle_spec.OVERALL_LENGTH == pytest.approx(53.7)
 
 
 def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
@@ -131,7 +131,7 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     assert "LIMITS APPLY FULL LENGTH" in notes
     assert "RUNS ON THE MHA-139 SHOULDER" in notes
     assert "STRAIGHT GRAIN PARALLEL TO TURNING AXIS" in notes
-    assert "AXIAL STATIONS ARE FROM THE TENON SHOULDER" in notes
+    assert "AXIAL STATIONS ARE FROM THE TENON END FACE" in notes
     assert "COUNTERBORE DEPTH IS\n  FROM THE BUTT FACE" in notes
     assert "DATUM" not in notes and "PROFILE 0.50" not in notes
     assert all(len(line) <= 90 for line in notes.splitlines())
@@ -154,7 +154,7 @@ def test_sheet_carries_no_gdt() -> None:
 
 def test_model_owns_every_printed_band() -> None:
     source = Path(handle.__file__).read_text(encoding="utf-8")
-    for name in ("WoodLength", "TenonDia", "CounterboreDia", "PivotBoreDia"):
+    for name in ("OverallLength", "TenonDia", "CounterboreDia", "PivotBoreDia"):
         assert f'"{name}"' in source
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in source
     assert "_paint_collar_brass" not in source
