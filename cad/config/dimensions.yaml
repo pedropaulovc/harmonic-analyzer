@@ -182,7 +182,7 @@ sections:
         - scaled
         - med
       - - Taper pin + keeper ring (MHA-024)
-        - '45-long 1:48 pin through separate hub MHA-137 + crankshaft only at local station 13.6 (world z −169.4); big end 3.95 proud of the hub barrel; round Ø10 brass wire ring (Ø1.0 wire, `crank-pin-ring` MHA-128) through a Ø2.1 cross-hole 3.2 from the big end, sized for the ring''s wire arc; tied to the arm''s wire eye (MHA-130) by one loop of keeper chain (MHA-149) through eye and ring, closed by an MHA-150 loop link (`keeper_chain_spec.py`)'
+        - '45-long 1:48 pin through separate hub MHA-137 + crankshaft only at local station 13.6 (world z −169.4); big end 4.45 proud of the hub barrel; round Ø10 brass wire ring (Ø1.0 wire, `crank-pin-ring` MHA-128) through a Ø2.1 cross-hole 3.7 from the big end, sized for the ring''s wire arc; tied to the arm''s wire eye (MHA-130) by one loop of keeper chain (MHA-149) through eye and ring, closed by an MHA-150 loop link (`keeper_chain_spec.py`)'
         - —
         - 'ch11 p.14 page002_img01 (removable pin head and brass ring) + primary crank construction photo; the hub #14 and shaft #9 pilots are match-reamed together. The arm is outboard of this station and is not drilled by MHA-024. The fillister anchor and wire eye remain on the arm; the chain is lost, and is reconstructed with McMaster 3606T118 #3 brass bead chain looped through both and joined by a 3606T811 loop link, each strand long enough to draw the pin fully out of the hub.'
         - scaled + construction

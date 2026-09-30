@@ -21,7 +21,7 @@ BIG_END_DIA = SMALL_END_DIA + PIN_LENGTH / 48.0  # 5.9375
 # brass ring hangs from a hole in the pin's head), perpendicular to the axis.
 # Sized for the round Ø10 ring's wire arc (crank_pin_ring_spec asserts the air).
 RING_HOLE_DIA = 2.1
-RING_HOLE_X = 3.2  # from the big end: a 1.5 ligament at the worst-case band
+RING_HOLE_X = 3.7  # from the big end: a 2.0 ligament at the worst-case band
 TAPER_HALF_ANGLE_DEGREES = math.degrees(
     math.atan((BIG_END_DIA - SMALL_END_DIA) / (2.0 * PIN_LENGTH))
 )

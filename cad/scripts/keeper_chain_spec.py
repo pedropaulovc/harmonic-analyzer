@@ -156,6 +156,11 @@ def _catmull_rom(points: list[Vec], samples: int = 40) -> list[Vec]:
         t2 = t1 + _dist(p1, p2) ** 0.5
         t3 = t2 + _dist(p2, p3) ** 0.5
         for k in range(samples):
+            if k == 0:
+                # Exactly the knot, not its float reconstruction: a strand
+                # starts on its wrap bead, which the loop then names by value.
+                out.append(p1)
+                continue
             t = t1 + (t2 - t1) * k / samples
 
             def lerp(pa: Vec, pb: Vec, ta: float, tb: float) -> Vec:

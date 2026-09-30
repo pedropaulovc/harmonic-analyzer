@@ -94,6 +94,10 @@ def test_crank_keeper_ring_threads_the_pin_hole_clear_of_the_arm() -> None:
     assert ring.HOLE_AIR >= ring.RING_HOLE_AIR
     wall = (ring.PIN_DIA_AT_HOLE - crank_pin_spec.RING_HOLE_DIA) / 2.0
     assert wall >= 1.5  # machined-web floor, drawing-simplicity rule 12
+    # The ligament to the big-end face meets the 2.0 target at the worst case
+    # of the printed bands (.XX station, DRILLED HOLES +0.10).
+    ligament = crank_pin_spec.RING_HOLE_X - 0.51 - (crank_pin_spec.RING_HOLE_DIA + 0.10) / 2.0
+    assert ligament >= 2.0
     # It hangs clear of the pin: the ring's inside edge below the pin surface.
     pin_radius = ring.PIN_DIA_AT_HOLE / 2.0
     assert ring.RING_BOTTOM_X - ring.WIRE_DIA / 2.0 - pin_radius >= 3.0
