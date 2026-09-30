@@ -64,7 +64,7 @@ Each chapter ends with **"Now make:"** — a real part from the machine.
 | 15 | Indexing and the dividing head | `cylinder-gear` 0.4 mm alignment notches, co-phased |
 | 16 | **Making your own gear cutters** | Eureka-method form cutters for DP 49.82 — **off-the-shelf cutters for this pitch do not exist** |
 | 17 | **Cutting the gears** | first `cone-gear` (T120, the easy end) |
-| 18 | Fitting D-bores and a solid gear stack | Gauge the MHA-014 flats and mating gear D-bores; fit 64T and twenty touching cone gears, then set the tip block with a 0.45 mm feeler |
+| 18 | Fitting D-bores and a solid gear stack | Gauge the MHA-014 flats and mating gear D-bores; fit 64T and twenty touching cone gears, then lock the stack collar on a 0.45 mm feeler |
 | 19 | Finishing | Draw filing, stoning, polishing, blacking; matching the original's finishes |
 
 ## Part IV — Making the parts
