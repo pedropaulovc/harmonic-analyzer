@@ -96,7 +96,13 @@ BORE_DIA_BAND = (  # (upper, lower) deviations
 
 FACE_WIDTH = 9.5  # teeth shortened at the north end; south face stays seated
 # The south face and boss length stay where they were. The 64T row is now
-# 7.2113 wide; the assembly's exact rim scan proves T120 air and gear overlap.
+# 7.2113 wide. Codex P1 on #1128 (user ruling 2026-09-29, band the face
+# only): at the .X row's +0.8 the north face ran 0.51 into the inclined T120
+# rim, and at its -0.8 it covered 81% of the 64T row. So the face prints its
+# own band, and the assembly's exact rim scan proves the T120 air at its long
+# limit and the row engagement at its short limit.
+FACE_WIDTH_BAND = (0.0, -0.30)  # (upper, lower) deviations
+FACE_WIDTH_LIMITS = deviations(FACE_WIDTH_BAND)  # (lower, upper)
 
 # --- Hub boss + retention pin (ch. 12 p. 19, page002_img02 / img06) ---------
 #
@@ -213,7 +219,13 @@ OVERALL_LENGTH_PLACES = 1
 SHAFT_LENGTH_PLACES = 1  # crankshaft_spec prints its Depth here
 FACE_WIDTH_PLACES = 1
 OVERALL_LENGTH_GRADE_MM = printed_band_mm(OVERALL_LENGTH_PLACES)
-FACE_WIDTH_GRADE_MM = printed_band_mm(FACE_WIDTH_PLACES)
+# W15 sizes the boss for a face accepted anywhere in the .X row. The printed
+# band sits inside that row, so the boss keeps its length (no geometry change
+# under the ruling) and every W15 stack only gains margin.
+W15_FACE_ALLOWANCE_MM = printed_band_mm(FACE_WIDTH_PLACES)
+_FACE_LOWER, _FACE_UPPER = FACE_WIDTH_LIMITS
+if _FACE_LOWER < -W15_FACE_ALLOWANCE_MM or _FACE_UPPER > W15_FACE_ALLOWANCE_MM:
+    raise AssertionError("the 16T face band left the .X row W15 sizes the boss for")
 SHAFT_LENGTH_SHORT_MM = 0.40  # preserved W15 unilateral +0/-0.40 shaft band
 SHAFT_END_RECESS_MIN_WORST = 0.25
 SHAFT_END_RECESS_MIN = SHAFT_END_RECESS_MIN_WORST + OVERALL_LENGTH_GRADE_MM
@@ -225,7 +237,7 @@ _PIN_HOLE_RADIUS_GROWTH = float(_config.title_block("drilled_hole")["plus_mm"]) 
 _PIN_EDGE_CLOSING_TERMS = (
     SHAFT_LENGTH_SHORT_MM
     + SEAT_GAP_MAX_MM - SEAT_FEELER_MM
-    + (FACE_WIDTH_GRADE_MM + OVERALL_LENGTH_GRADE_MM) / 2.0
+    + (W15_FACE_ALLOWANCE_MM + OVERALL_LENGTH_GRADE_MM) / 2.0
     + PIN_STATION_LAYOUT_ALLOWANCE_MM
     + _PIN_HOLE_RADIUS_GROWTH
 )
@@ -253,7 +265,7 @@ for _name, _value, _places in (
 PIN_STATION = FACE_WIDTH + BOSS_LENGTH / 2.0
 PIN_AXIAL_LIGAMENT_FLOOR_MM = 0.5
 PIN_AXIAL_LIGAMENT_WORST = (
-    (BOSS_LENGTH - FACE_WIDTH_GRADE_MM - OVERALL_LENGTH_GRADE_MM) / 2.0
+    (BOSS_LENGTH - W15_FACE_ALLOWANCE_MM - OVERALL_LENGTH_GRADE_MM) / 2.0
     - PIN_DIA / 2.0
     - _PIN_HOLE_RADIUS_GROWTH
     - PIN_STATION_LAYOUT_ALLOWANCE_MM
@@ -341,9 +353,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # ``GetPrimaryPrecision2()`` back off the sheet.
 #
 # The bore is the only size fit on the part and prints three places with its
-# derived band. The outside diameter prints two with its own +/-0.10. Face
-# width prints one place at the title-block .X row; the assembly checks the
-# nominal north-face air to T120 and actual overlap with the grown 64T.
+# derived band. The outside diameter prints two with its own +/-0.10. The face
+# width prints one place with its own +0/-0.30 (FACE_WIDTH_BAND): the assembly
+# proves the north-face air to T120 and the 64T row overlap at both limits.
 # The boss diameter is routine .XX, not a running surface. The match-drilled
 # pin station is absent: its callout locates it at boss mid-length and the
 # crankshaft/pinion stack sets it. The overall length prints one place like

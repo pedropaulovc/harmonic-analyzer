@@ -65,7 +65,9 @@ CRANK_SUPPORT_NORTH_MIN = (
     shaft.SHAFT_LENGTH + shaft.SHAFT_LENGTH_BAND[1]
     - shaft.JOURNAL_INBOARD_STATION - shaft.STATION_ROW
 )
-_FACE_UPPER = pinion.printed_deviations(pinion.FACE_WIDTH, pinion.FACE_WIDTH_PLACES)[1]
+_FACE_UPPER = pinion.printed_deviations(
+    pinion.FACE_WIDTH, pinion.FACE_WIDTH_PLACES, pinion.FACE_WIDTH_LIMITS
+)[1]
 PINION_HALF_FACE_MAX = (pinion.FACE_WIDTH + _FACE_UPPER) / 2.0
 CRANK_OVERHANG = (
     shaft.SEAT_PINION + pinion.SEAT_GAP_MAX_MM - pinion.SEAT_FEELER_MM

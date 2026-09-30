@@ -287,14 +287,11 @@ def test_bore_finish_lands_lower_right_clear_of_the_cutting_line() -> None:
     assert "_bore_leaders_clear_section_line(adapter, front, bore_fit, finish)" in _source()
 
 
-def test_the_bore_is_the_only_feature_that_earns_a_band() -> None:
-    # cad/docs/tolerance-policy.md: a feature is toleranced tighter than its
-    # title-block general grade only through the named chain. On this part
-    # exactly one feature can cite it -- the fit over the crankshaft -- and
-    # the native Right-plane dimension carrying it is the one the sheet keeps.
-    assert [name for name in dir(spec) if name.endswith("_BAND")] == ["BORE_DIA_BAND"]
+def test_the_bore_fit_is_the_only_three_place_dimension() -> None:
+    # Policy rule 2: the places a dimension prints select its band. Only the
+    # fit over the crankshaft needs three, and the native Right-plane
+    # dimension carrying it is the one the sheet keeps.
     assert "BoreDia" in spec.DRAWING_DIMENSIONS["BossProfile"]
-    # ... and it is the only three-decimal dimension for the same reason.
     assert [
         name
         for name, places in spec.DRAWING_PRECISION_BY_NAME.items()

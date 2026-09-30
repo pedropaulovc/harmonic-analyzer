@@ -21,7 +21,9 @@ def test_gear_seat_runout_and_shortened_pinion_face_reach_the_stack() -> None:
         / 2.0
     )
     face_deviation = stack.pinion.printed_deviations(
-        stack.pinion.FACE_WIDTH, stack.pinion.FACE_WIDTH_PLACES
+        stack.pinion.FACE_WIDTH,
+        stack.pinion.FACE_WIDTH_PLACES,
+        stack.pinion.FACE_WIDTH_LIMITS,
     )[1]
     assert stack.pinion.FACE_WIDTH == 9.5
     assert stack.PINION_HALF_FACE_MAX == pytest.approx(

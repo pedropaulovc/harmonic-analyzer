@@ -762,6 +762,8 @@ from crank_pinion_spec import (  # noqa: E402
     PIN_DIA as PINION_PIN_DIA,
     PIN_LENGTH as PINION_PIN_LENGTH,
     FACE_WIDTH_PLACES as PINION_FACE_WIDTH_PLACES,
+    FACE_WIDTH_LIMITS as PINION_FACE_LIMITS,
+    W15_FACE_ALLOWANCE_MM as PINION_W15_FACE_ALLOWANCE,
     OVERALL_LENGTH_PLACES as PINION_OVERALL_LENGTH_PLACES,
     SHAFT_LENGTH_PLACES as PINION_SHAFT_LENGTH_PLACES,
     PIN_EDGE_MIN_WORST as PINION_PIN_EDGE_MIN_WORST,
@@ -1494,15 +1496,16 @@ def pinion_pin_edge_stack(
     Each term comes from the source that owns it: the shaft printed at its
     lower limit (crankshaft_spec), the seat gap opening from its nominal to the
     range's ceiling (the pinion, and its pin, move north), the boss mid-length
-    the pin is laid out at moving north with a long face and overall length
-    (each at its printed row), the laid-out station's allowance
+    the pin is laid out at moving north with a long face (W15's .X allowance,
+    which the face's printed band sits inside) and a long overall length (its
+    printed row), the laid-out station's allowance
     (crank_pinion_spec), and the title block's drilled-hole oversize on the
     pin's radius.
     """
     shaft_lower, _ = printed_deviations(
         shaft_length, PINION_SHAFT_LENGTH_PLACES, _SHAFT_LENGTH_LIMITS
     )
-    _, face_upper = printed_deviations(PINION_FACE, PINION_FACE_WIDTH_PLACES)
+    face_upper = PINION_W15_FACE_ALLOWANCE
     _, overall_upper = printed_deviations(pinion_overall_length, PINION_OVERALL_LENGTH_PLACES)
     return {
         "nominal": edge_nominal,
@@ -1562,7 +1565,13 @@ if sum(PINION_RECESS_STACK.values()) < PINION_RECESS_MIN_WORST:
 # rim point is the south face's axis point (the station moved along the
 # inclined axis, so both x and z shift) plus the in-plane radius.  Wherever
 # that rim enters the 16T's tip cylinder, the pinion's north face must keep
-# 0.25 mm axial air under it.
+# 0.25 mm axial air under it.  The south face is set on the feeler, so the
+# printed face band moves only the north face: the air is proved at the band's
+# long limit, the 64T row engagement below at its short limit (Codex P1 on
+# #1128).
+_PINION_FACE_SHORT, _PINION_FACE_LONG = printed_deviations(
+    PINION_FACE, PINION_FACE_WIDTH_PLACES, PINION_FACE_LIMITS
+)
 _T120_SOUTH_CENTRE = cone_station(_T120_SOUTH_FACE_STATION)
 _TIP120 = _cone_tip_radius_max(120)
 _T120_SOUTH = math.inf  # no radial overlap -> no T120 bound at all
@@ -1574,21 +1583,22 @@ for _k in range(72000):
         <= R16 + ADD16
     ):
         _T120_SOUTH = min(_T120_SOUTH, _T120_SOUTH_CENTRE[2] - _c * SIN_I)
-T120_PINION_NORTH_AIR = _T120_SOUTH - (PINION_TOOTH_Z + PINION_FACE / 2.0)
+T120_PINION_NORTH_AIR = _T120_SOUTH - (_PINION_SOUTH + PINION_FACE + _PINION_FACE_LONG)
 T120_PINION_AIR_FLOOR = 0.25
 if T120_PINION_NORTH_AIR < T120_PINION_AIR_FLOOR:
     raise AssertionError(
         f"16T north face leaves {T120_PINION_NORTH_AIR:.3f} mm to the inclined T120 rim, "
         f"below the {T120_PINION_AIR_FLOOR:.2f}-mm axial-air floor"
     )
-# ... and must still cover the 64T row (>= 85% of its face) -- an engagement
-# floor so a future station edit cannot quietly starve the mesh.
+# ... and must still cover the 64T row (>= 85% of its face) at the short
+# limit -- an engagement floor so a future station edit cannot quietly starve
+# the mesh.
 _G64_BAND = (
     _GEAR64_CONTACT_Z - GEAR64_FACE / 2.0 * COS_I,
     _GEAR64_CONTACT_Z + GEAR64_FACE / 2.0 * COS_I,
 )
-_ENGAGED = min(PINION_TOOTH_Z + PINION_FACE / 2.0, _G64_BAND[1]) - max(
-    PINION_TOOTH_Z - PINION_FACE / 2.0, _G64_BAND[0]
+_ENGAGED = min(_PINION_SOUTH + PINION_FACE + _PINION_FACE_SHORT, _G64_BAND[1]) - max(
+    _PINION_SOUTH, _G64_BAND[0]
 )
 CRANK_ROW_ENGAGEMENT_FRACTION = _ENGAGED / (GEAR64_FACE * COS_I)
 if CRANK_ROW_ENGAGEMENT_FRACTION < 0.85:
@@ -3458,11 +3468,12 @@ async def build(adapter) -> dict[str, str]:
     )
     _telemetry.info(
         f"16T/boss north-face feeler {_BOSS_NORTH_GAP:.4f} mm; "
-        f"16T/T120 north air {T120_PINION_NORTH_AIR:.4f} "
+        f"16T/T120 north air at face {_PINION_FACE_LONG:+.2f} {T120_PINION_NORTH_AIR:.4f} "
         f">= {T120_PINION_AIR_FLOOR:.2f} mm"
     )
     _telemetry.info(
-        f"16T/64T row engagement {_ENGAGED:.4f}/{GEAR64_FACE * COS_I:.4f} mm "
+        f"16T/64T row engagement at face {_PINION_FACE_SHORT:+.2f} "
+        f"{_ENGAGED:.4f}/{GEAR64_FACE * COS_I:.4f} mm "
         f"= {CRANK_ROW_ENGAGEMENT_FRACTION:.2%} >= 85%"
     )
     # #893: the W15 stacks are import-time asserts, so a passing build would

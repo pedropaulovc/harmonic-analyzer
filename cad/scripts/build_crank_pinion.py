@@ -77,6 +77,7 @@ from crank_pinion_spec import (
     DRAWING_NOTES,
     DRAWING_PRECISION,
     FACE_WIDTH,
+    FACE_WIDTH_LIMITS,
     GEAR_DATA,
     OUTSIDE_DIA,
     OUTSIDE_DIA_TOLERANCE_MM,
@@ -412,6 +413,11 @@ async def build(adapter) -> dict[str, str]:
     # the boss -- nothing runs on it.
     set_dimension_symmetric_tolerance(
         adapter, "BossProfile", "OutsideDia", OUTSIDE_DIA_TOLERANCE_MM
+    )
+    # The face's own +0/-0.30: the drive train proves the T120 air at its long
+    # limit and the 64T row engagement at its short one (Codex P1 on #1128).
+    set_dimension_bilateral_tolerance(
+        adapter, "GearBlank", "FaceWidth", *FACE_WIDTH_LIMITS
     )
     await volume_check(
         adapter, "driven crank pinion (equations neutral)", volume, 0.01 * v_bore
