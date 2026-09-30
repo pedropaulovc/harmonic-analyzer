@@ -246,7 +246,9 @@ async def build(adapter) -> dict[str, str]:
         await adapter.set_active_configuration(INSTALLED_CONFIG),
     )
     await _cut_end_round(adapter)
-    end_round = _early_bound(adapter.currentModel.FeatureByName("EndRound"), "IFeature")
+    end_round = _early_bound(
+        _early_bound(adapter.currentModel, "IPartDoc").FeatureByName("EndRound"), "IFeature"
+    )
     # swSuppressFeature / swUnSuppressFeature, swSpecifyConfiguration.
     if not bool(end_round.SetSuppression2(0, 3, bstr_array([default_config]))):
         raise RuntimeError(f"EndRound would not suppress in {default_config}")
