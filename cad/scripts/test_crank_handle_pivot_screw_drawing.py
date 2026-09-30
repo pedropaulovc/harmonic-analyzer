@@ -81,6 +81,7 @@ def test_model_owns_places_and_bands() -> None:
         ("ScrewProfile", "ThreadLength"): "*deviations(THREAD_LENGTH_BAND)",
         ("ScrewProfile", "TipChamfer"): "*deviations(TIP_CHAMFER_BAND)",
         ("DriverSlot", "SlotDepth"): "SLOT_DEPTH_TOL",
+        ("ScrewProfile", "ReliefLead"): "RELIEF_LEAD_TOL",
     }
     assert spec.SHOULDER_DIA == 4.00
     assert spec.SHOULDER_DIA_BAND == (-0.03, -0.08)
@@ -160,6 +161,11 @@ def test_thread_relief_sits_below_the_minor_with_a_45_degree_lead() -> None:
     assert spec.RELIEF_WIDTH == 1.5
     assert spec.RELIEF_LEAD == 0.4
     assert spec.RELIEF_LEAD_LIMITS == (0.3, 0.5)
+    # The printed limits are the model band's (Codex P2 on #1139).
+    assert spec.RELIEF_LEAD_LIMITS == pytest.approx(
+        (spec.RELIEF_LEAD - spec.RELIEF_LEAD_TOL, spec.RELIEF_LEAD + spec.RELIEF_LEAD_TOL)
+    )
+    assert spec.RELIEF_CALLOUT == "0.3-0.5 X 45 DEG LEAD"
     assert spec.RELIEF_END_STATION == pytest.approx(spec.SEAT_STATION + 1.5)
     # At or below the #6-32 external minor: the P/8-flat UN root
     # (3.505 - 1.299038 x 0.79375 = Ø2.474) and the UNR-2A reference max
@@ -179,12 +185,14 @@ def test_thread_relief_sits_below_the_minor_with_a_45_degree_lead() -> None:
     assert spec.NECK_AREA == pytest.approx(math.pi / 4.0 * 2.3**2)
     assert spec.TENSILE_STRESS_AREA == pytest.approx(5.86, abs=0.01)
     assert spec.NECK_TO_STRESS_AREA == pytest.approx(0.708, abs=0.001)
-    # The relief sizes are routine under the title block, not model bands; the
-    # lead prints as limits in its callout and the tip chamfer carries its own
-    # band (MHA-139 re-review: at .X either could print as nothing).
+    # The relief diameter and width are routine under the title block; the
+    # lead's band is model-owned and prints as limits in its callout, and the
+    # tip chamfer carries its own band (MHA-139 re-review: at .X either could
+    # print as nothing).
     toleranced = {name for _, name in model_toleranced_dimensions(part)}
-    assert not toleranced & {"ReliefDia", "ReliefWidth", "ReliefLead"}
-    assert "TipChamfer" in toleranced
+    assert not toleranced & {"ReliefDia", "ReliefWidth"}
+    assert {"ReliefLead", "TipChamfer"} <= toleranced
+    assert "ReliefLead" not in set().union(*spec.DRAWING_DIMENSIONS.values())
 
 
 def test_engagement_meets_the_1_5d_rule_governed_by_the_stock_arm() -> None:

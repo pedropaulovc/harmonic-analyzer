@@ -144,7 +144,14 @@ RELIEF_WIDTH = 1.5
 # an equation, and printed as a callout on the lead's axial size, as limits
 # (MHA-139 re-review: at .X the lead could print as nothing).
 RELIEF_LEAD = 0.4
-RELIEF_LEAD_LIMITS = (0.3, 0.5)
+# The model owns the band (policy rule 2; Codex P2 on #1139): the ReliefLead
+# dimension carries +/-0.10 and the callout prints the limits it gives, so a
+# nominal edit cannot leave the printed limits behind.
+RELIEF_LEAD_TOL = 0.10
+RELIEF_LEAD_LIMITS = (
+    round(RELIEF_LEAD - RELIEF_LEAD_TOL, 6),
+    round(RELIEF_LEAD + RELIEF_LEAD_TOL, 6),
+)
 CHAMFER_CALLOUT = "X 45 DEG"
 # The 45-degree lead rides the relief's Ø callout rather than a third
 # dimension crowded into the 1.5-mm groove at 3:1 (machinist review).

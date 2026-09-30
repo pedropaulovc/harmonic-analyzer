@@ -83,6 +83,7 @@ from crank_handle_pivot_screw_spec import (
     RELIEF_DIA,
     RELIEF_END_STATION,
     RELIEF_LEAD,
+    RELIEF_LEAD_TOL,
     RELIEF_WIDTH,
     SEAT_STATION,
     SHOULDER_DIA,
@@ -452,6 +453,11 @@ async def build(adapter) -> dict[str, str]:
         adapter, "ScrewProfile", "TipChamfer", *deviations(TIP_CHAMFER_BAND)
     )
     set_dimension_symmetric_tolerance(adapter, "DriverSlot", "SlotDepth", SLOT_DEPTH_TOL)
+    # The relief lead prints as limits in the relief callout; the model owns
+    # its band all the same (Codex P2 on #1139).
+    set_dimension_symmetric_tolerance(
+        adapter, "ScrewProfile", "ReliefLead", RELIEF_LEAD_TOL
+    )
     set_dimension_bilateral_tolerance(
         adapter, "ScrewProfile", "ThreadLength", *deviations(THREAD_LENGTH_BAND)
     )
