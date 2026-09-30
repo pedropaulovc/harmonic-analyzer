@@ -63,7 +63,7 @@ def test_model_owns_places_and_bands() -> None:
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
     # The running fit, the head's cup-floor bearing band, and the relief
     # width that holds the U33b floor.
-    running_fit = {"ShoulderDia", "HeadDia", "TipChamfer", "SlotDepth"}
+    running_fit = {"ShoulderDia", "HeadDia", "HeadLength", "TipChamfer", "SlotDepth"}
     for name, places in spec.DRAWING_PRECISION_BY_NAME.items():
         assert places == (2 if name in running_fit else 1), name
     # User ruling 2026-09-29 (MHA-139 review): the shoulder is turned to suit
@@ -76,13 +76,14 @@ def test_model_owns_places_and_bands() -> None:
     assert model_toleranced_dimensions(part) == {
         ("ScrewProfile", "ShoulderDia"): "*deviations(SHOULDER_DIA_BAND)",
         ("ScrewProfile", "HeadDia"): "HEAD_DIA_TOL",
+        ("ScrewProfile", "HeadLength"): "HEAD_LENGTH_TOL",
         ("ScrewProfile", "ThreadLength"): "*deviations(THREAD_LENGTH_BAND)",
         ("ScrewProfile", "TipChamfer"): "*deviations(TIP_CHAMFER_BAND)",
         ("DriverSlot", "SlotDepth"): "SLOT_DEPTH_TOL",
     }
     assert spec.SHOULDER_DIA == 6.00
     assert spec.SHOULDER_DIA_BAND == (-0.03, -0.08)
-    assert spec.SHOULDER_LENGTH == pytest.approx(53.5)
+    assert spec.SHOULDER_LENGTH == pytest.approx(53.0)
     assert not hasattr(spec, "SHOULDER_LENGTH_TOL")
     assert spec.THREAD_LENGTH == 10.0
     assert spec.THREAD_LENGTH_BAND == (0.0, -0.5)
@@ -111,15 +112,16 @@ def test_geometry_matches_the_u33_ruling() -> None:
     assert spec.SLOT_WIDTH == 1.0
     assert spec.SLOT_DEPTH == 1.0
     assert spec.SLOT_DEPTH_TOL == 0.20
-    assert spec.SLOT_WEB_MIN == pytest.approx(2.0)
+    # The head length is banded (Codex P2 on #1139), so the web grew to 2.7.
+    assert spec.SLOT_WEB_MIN == pytest.approx(2.7)
     # The tip chamfer is banded so it always exists and never cuts past the
     # thread depth.
     assert (spec.TIP_CHAMFER_MIN, spec.TIP_CHAMFER_MAX) == pytest.approx((0.3, 0.45))
     assert spec.THREAD_SIZE == "#8-32"
     assert spec.THREAD_MODEL_DIA == THREAD_MAJOR_MM["#8-32"] == 4.166
     assert spec.THREAD_PITCH == pytest.approx(25.4 / 32.0)
-    assert spec.SEAT_STATION == pytest.approx(57.5)
-    assert spec.OVERALL_LENGTH == pytest.approx(67.5)
+    assert spec.SEAT_STATION == pytest.approx(57.0)
+    assert spec.OVERALL_LENGTH == pytest.approx(67.0)
     assert spec.TIP_CHAMFER == 0.4
     # The tip chamfer stays within the 0.49 thread depth (17/24 H).
     assert spec.TIP_CHAMFER <= 0.61343 * 25.4 / 32.0
@@ -134,9 +136,9 @@ def test_u33_running_fit_end_play_and_engagement() -> None:
     assert handle.PIVOT_BORE_DIA + handle.PIVOT_BORE_BAND[0] == pytest.approx(6.15)
     assert geometry.ARM_THICKNESS == 8.0
 
-    # The fitted shoulder: ferrule 7.0 + oak 48.7 + flange 2.3 - pocket 5.0
-    # = 53.0 of bonded handle, plus the modelled 0.5 of end play.
-    assert spec.HANDLE_STACK_NOMINAL == pytest.approx(53.0)
+    # The fitted shoulder: ferrule 7.0 + oak 48.7 + flange 2.3 - pocket 5.5
+    # = 52.5 of bonded handle, plus the modelled 0.5 of end play.
+    assert spec.HANDLE_STACK_NOMINAL == pytest.approx(52.5)
     assert spec.END_PLAY_RANGE == (0.25, 1.00)
     assert spec.END_PLAY_NOMINAL == pytest.approx(0.5)
     # Bore 6.10..6.15 over shoulder 5.92..5.97, on diameter.
@@ -286,7 +288,7 @@ def test_notes_stay_within_rule_six() -> None:
 
 def test_modelled_volume_is_the_turned_body_less_the_slot() -> None:
     head = math.pi * 4.0**2 * 4.0
-    shoulder = math.pi * 3.0**2 * 53.5
+    shoulder = math.pi * 3.0**2 * 53.0
     relief = math.pi * (3.0 / 2.0) ** 2 * 1.5
     thread = math.pi * (4.166 / 2.0) ** 2 * 8.5
     # Pappus: the lead's 0.5 x 0.5 corner triangle, centroid 1.5 + 0.5/3 out,

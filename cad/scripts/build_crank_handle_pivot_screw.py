@@ -74,6 +74,7 @@ from crank_handle_pivot_screw_spec import (
     HEAD_DIA,
     HEAD_DIA_TOL,
     HEAD_LENGTH,
+    HEAD_LENGTH_TOL,
     INSTALLED_CONFIG,
     INSTALLED_THREAD_LENGTH,
     INSTALLED_TIP_CHAMFER,
@@ -440,6 +441,11 @@ async def build(adapter) -> dict[str, str]:
         adapter, "ScrewProfile", "ShoulderDia", *deviations(SHOULDER_DIA_BAND)
     )
     set_dimension_symmetric_tolerance(adapter, "ScrewProfile", "HeadDia", HEAD_DIA_TOL)
+    # The head length keeps the head below the MHA-153 flange at the widest
+    # end play (Codex P2 on #1139).
+    set_dimension_symmetric_tolerance(
+        adapter, "ScrewProfile", "HeadLength", HEAD_LENGTH_TOL
+    )
     # The two small features the MHA-139 re-review found could print as
     # nothing at .X: the tip chamfer and the slot depth.
     set_dimension_bilateral_tolerance(

@@ -11,8 +11,10 @@ After the MHA-153 machinist review (user rulings 2026-09-29): every section
 holds 1.5 mm at its worst case, which grew the handle's butt; the pocket is
 bored to suit the MHA-139 head; and the handle's end play is fitted on the
 screw shoulder at assembly, so no length here is a stack term and all but the
-body diameter are routine (.X) sizes.  The body diameter keeps a +/-0.10 band
-because it sets the pocket wall.
+body diameter and the pocket depth are routine (.X) sizes.  The body diameter
+keeps a +/-0.10 band because it sets the pocket wall; the pocket depth keeps
+one because it sets how far the head sits below the flange (Codex P2 on
+#1139, user ruling 2026-09-30).
 
 Local frame: the axis is local +X and the origin plane is the flange's outer
 face; the flange, body and floor run toward -X (into the handle).  In the
@@ -34,9 +36,14 @@ BODY_DIA = 11.6
 BODY_DIA_TOL = 0.10
 # Every axial size reads from the flange face, the one faced end (MHA-153
 # re-review): overall, flange and pocket depth.  The floor is what remains, so
-# the overall carries enough that even the .X worst case of both leaves 1.5.
+# the overall carries enough that its .X worst case, over the deepest banded
+# pocket, still leaves 1.5.
 OVERALL_LENGTH = 8.1
-POCKET_DEPTH = 5.0
+# Deep enough that the longest banded MHA-139 head, at the widest fitted end
+# play, still sits below the flange face (Codex P2 on #1139: at 5.0 .X against
+# a 4.0 .X head it could stand 1.6 proud).  User ruling 2026-09-30.
+POCKET_DEPTH = 5.5
+POCKET_DEPTH_TOL = 0.10
 # Bored to suit the MHA-139 head (reference size); POCKET_CLEARANCE is the
 # diametral clearance the note asks for, and POCKET_DIA_MAX its hard limit
 # (the largest head plus the widest clearance).
@@ -53,7 +60,7 @@ BODY_LENGTH = OVERALL_LENGTH - FLANGE_THICKNESS
 GENERAL_1PL_MM = 0.8
 WALL_FLOOR_MM = 1.5
 BODY_LENGTH_MAX = (OVERALL_LENGTH + GENERAL_1PL_MM) - (FLANGE_THICKNESS - GENERAL_1PL_MM)
-FLOOR_THICKNESS_MIN = round(FLOOR_THICKNESS - 2.0 * GENERAL_1PL_MM, 6)
+FLOOR_THICKNESS_MIN = round(FLOOR_THICKNESS - GENERAL_1PL_MM - POCKET_DEPTH_TOL, 6)
 POCKET_WALL_MIN = round(((BODY_DIA - BODY_DIA_TOL) - POCKET_DIA_MAX) / 2.0, 6)
 
 for _ok, _what in (
@@ -81,15 +88,16 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "FloorHoleDia",
     },
 }
-# Decimal places are the tolerance (policy rule 2): the body diameter prints
-# its band at two places; every other size is routine (.X).
+# Decimal places are the tolerance (policy rule 2): the body diameter and the
+# pocket depth print their bands at two places; every other size is routine
+# (.X).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "CupProfile": {
         "FlangeDia": 1,
         "FlangeThickness": 1,
         "BodyDia": 2,
         "OverallLength": 1,
-        "PocketDepth": 1,
+        "PocketDepth": 2,
         "PocketDia": 1,
         "FloorHoleDia": 1,
     },

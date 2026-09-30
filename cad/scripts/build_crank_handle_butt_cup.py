@@ -61,6 +61,7 @@ from crank_handle_butt_cup_spec import (
     ISOMETRIC_VIEW_NOTE,
     OVERALL_LENGTH,
     POCKET_DEPTH,
+    POCKET_DEPTH_TOL,
     POCKET_DIA,
 )
 
@@ -204,10 +205,14 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven butt cup (equations neutral)", V_CUP, 0.005 * V_CUP
     )
 
-    # The one model-owned band (policy rule 2): the body diameter that holds
-    # the pocket wall.  Every other size is routine (.X); the pocket is bored
-    # to suit the MHA-139 head.
+    # The model-owned bands (policy rule 2): the body diameter that holds the
+    # pocket wall, and the pocket depth that keeps the MHA-139 head below the
+    # flange.  Every other size is routine (.X); the pocket is bored to suit
+    # the head's diameter.
     set_dimension_symmetric_tolerance(adapter, "CupProfile", "BodyDia", BODY_DIA_TOL)
+    set_dimension_symmetric_tolerance(
+        adapter, "CupProfile", "PocketDepth", POCKET_DEPTH_TOL
+    )
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)
     await report_mass_properties(adapter)

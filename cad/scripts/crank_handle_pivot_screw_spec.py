@@ -32,6 +32,7 @@ from crank_handle_butt_cup_spec import (
     FLOOR_HOLE_DIA as CUP_FLOOR_HOLE_DIA,
     POCKET_CLEARANCE as CUP_POCKET_CLEARANCE,
     POCKET_DEPTH as CUP_POCKET_DEPTH,
+    POCKET_DEPTH_TOL as CUP_POCKET_DEPTH_TOL,
     POCKET_DIA as CUP_POCKET_DIA,
     WALL_FLOOR_MM,
 )
@@ -62,8 +63,10 @@ HEAD_DIA = 8.0
 HEAD_DIA_TOL = 0.10
 # A 4.0 head (user ruling 2026-09-29, MHA-139 machinist review): with the
 # slot's own band below, the worst case leaves 2.0 of head under the slot,
-# not 0.4.
+# not 0.4.  Banded (Codex P2 on #1139, user ruling 2026-09-30): at .X the
+# longest head, at the widest fitted end play, stood 1.6 proud of the cup.
 HEAD_LENGTH = 4.0
+HEAD_LENGTH_TOL = 0.10
 SLOT_WIDTH = 1.0
 # Banded (MHA-139 re-review): at .X the slot could print as nothing.
 SLOT_DEPTH = 1.0
@@ -178,13 +181,23 @@ HANDLE_BORE_MIN, HANDLE_BORE_MAX = _limits(PIVOT_BORE_DIA, PIVOT_BORE_BAND)
 # Head top below the cup's flange face at nominal: the head reads recessed in
 # the cup (the photographs).
 HEAD_RECESS_NOMINAL = round(HANDLE_LENGTH - (SHOULDER_LENGTH + HEAD_LENGTH), 6)
+# ... and at the printed worst case (Codex P2 on #1139): the shallowest pocket
+# over the longest head, with the handle pushed to the arm so the fitted end
+# play opens under the head at its widest.  The shoulder is fitted to the
+# cup floor, so neither the handle stack nor the cup overall enters.
+HEAD_RECESS_WORST = round(
+    (CUP_POCKET_DEPTH - CUP_POCKET_DEPTH_TOL)
+    - (HEAD_LENGTH + HEAD_LENGTH_TOL)
+    - END_PLAY_RANGE[1],
+    6,
+)
 # The pocket is bored to suit the actual head, so its wall is judged at the
 # largest head plus the widest clearance, inside the smallest cup body.
 POCKET_MAX = HEAD_DIA + HEAD_DIA_TOL + CUP_POCKET_CLEARANCE[1]
 CUP_POCKET_WALL_MIN = round(((CUP_BODY_DIA - CUP_BODY_DIA_TOL) - POCKET_MAX) / 2.0, 6)
-# The slot's worst-case web: both routine (.X) sizes at their limits.
+# The slot's worst-case web: the shortest head under the deepest slot.
 SLOT_WEB_MIN = round(
-    HEAD_LENGTH - GENERAL_1PL_TOL_MM - (SLOT_DEPTH + SLOT_DEPTH_TOL), 6
+    HEAD_LENGTH - HEAD_LENGTH_TOL - (SLOT_DEPTH + SLOT_DEPTH_TOL), 6
 )
 TIP_CHAMFER_MIN, TIP_CHAMFER_MAX = (
     round(TIP_CHAMFER + TIP_CHAMFER_BAND[1], 6),
@@ -375,9 +388,13 @@ for _ok, _what in (
         "the MHA-153 floor hole does not pass the shoulder",
     ),
     (HEAD_RECESS_NOMINAL >= 0.0, "the head stands proud of the cup at nominal"),
+    (
+        HEAD_RECESS_WORST > 0.0,
+        "the longest head stands proud of the shallowest cup pocket at full end play",
+    ),
     (SHOULDER_DIA_MIN > THREAD_MODEL_DIA, "shoulder has no seat annulus"),
     (HEAD_LENGTH - SLOT_DEPTH >= 2.0, "under 2.0 of head remains under the slot"),
-    (SLOT_WEB_MIN >= WALL_FLOOR_MM, "under 1.5 of head remains under the slot at .X"),
+    (SLOT_WEB_MIN >= WALL_FLOOR_MM, "under 1.5 of head remains under the slot at its limits"),
 ):
     if not _ok:
         raise AssertionError(f"MHA-139: {_what}")
@@ -413,7 +430,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "ScrewProfile": {
         "HeadDia": 2,
-        "HeadLength": 1,
+        "HeadLength": 2,
         "ShoulderDia": 2,
         "ThreadLength": 1,
         "ReliefDia": 1,

@@ -11,7 +11,7 @@ import build_crank_handle_butt_cup as part
 import crank_handle_butt_cup_spec as spec
 import crank_handle_pivot_screw_spec as screw
 import draw_crank_handle_butt_cup as drawing
-from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
+from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -34,9 +34,15 @@ def test_part_and_drawing_share_the_marked_dimension_contract() -> None:
     assert drawing.DIMENSION_CALLOUTS == {"FloorHoleDia": "DRILL THRU"}
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in source
-    # The one band: the body diameter that holds the pocket wall.
-    assert source.count("set_dimension_symmetric_tolerance(adapter") == 1
-    assert '"CupProfile", "BodyDia", BODY_DIA_TOL' in source
+    # Two bands: the body diameter that holds the pocket wall, and the pocket
+    # depth that keeps the MHA-139 head below the flange (Codex P2 on #1139).
+    assert model_toleranced_dimensions(part) == {
+        ("CupProfile", "BodyDia"): "BODY_DIA_TOL",
+        ("CupProfile", "PocketDepth"): "POCKET_DEPTH_TOL",
+    }
+    assert {
+        name for name, places in spec.DRAWING_PRECISION_BY_NAME.items() if places == 2
+    } == {"BodyDia", "PocketDepth"}
     assert "set_dimension_bilateral_tolerance" not in source
 
 
@@ -44,9 +50,9 @@ def test_every_section_holds_1_5_at_its_worst_case() -> None:
     # User ruling 2026-09-29 (MHA-153 review): the butt grew instead of
     # accepting 0.54 / 0.85 / 0.75 sections.
     assert spec.FLANGE_THICKNESS - 0.8 == pytest.approx(1.5)
-    # The floor is what the overall leaves after the pocket depth, both .X
-    # from the flange face (re-review: one faced end).
-    assert spec.FLOOR_THICKNESS_MIN == pytest.approx(1.5)
+    # The floor is what the overall (.X) leaves after the banded pocket depth,
+    # both from the flange face (re-review: one faced end).
+    assert spec.FLOOR_THICKNESS_MIN == pytest.approx(1.7)
     assert spec.POCKET_WALL_MIN == pytest.approx(1.5)
     assert screw.CUP_POCKET_WALL_MIN == pytest.approx(1.5)
     assert screw.POCKET_MAX <= spec.POCKET_DIA_MAX
@@ -58,7 +64,14 @@ def test_every_section_holds_1_5_at_its_worst_case() -> None:
 
 
 def test_head_sits_recessed_and_end_play_is_fitted() -> None:
-    assert screw.HEAD_RECESS_NOMINAL == pytest.approx(0.5)
+    assert screw.HEAD_RECESS_NOMINAL == pytest.approx(1.0)
+    # Codex P2 on #1139 (user ruling 2026-09-30): pocket 5.5 +/-0.10 over a
+    # 4.0 +/-0.10 head keeps the head 0.3 below the flange with the handle
+    # pushed to the arm at the widest 1.00 end play; at 5.0 .X over 4.0 .X
+    # it stood 1.6 proud.
+    assert (spec.POCKET_DEPTH, spec.POCKET_DEPTH_TOL) == (5.5, 0.10)
+    assert (screw.HEAD_LENGTH, screw.HEAD_LENGTH_TOL) == (4.0, 0.10)
+    assert screw.HEAD_RECESS_WORST == pytest.approx(0.3)
     assert screw.END_PLAY_NOMINAL == pytest.approx(0.5)
     assert screw.SHOULDER_LENGTH == pytest.approx(screw.HANDLE_STACK_NOMINAL + 0.5)
 
