@@ -107,10 +107,13 @@ _PIN_HOLE_DIA = blind_cut_dia_mm(PIN_HOLE_SPEC)
 SHEET_SCALE = (2.0, 1.0)
 VIEW_SCALE = (2, 1)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1]
-SIDE_CENTER = (0.210, 0.180)
+# The profile sits 18 mm right of the sheet's middle so the gap between the
+# end view and the dome tip holds the drive-pin locations' text left of the
+# dome's extension lines; the isometric moves 8 mm right to keep clear of it.
+SIDE_CENTER = (0.228, 0.180)
 # Third-angle left view of the dome end, on the profile's axis.
 END_CENTER = (0.036, SIDE_CENTER[1])
-ISO_CENTER = (0.390, SIDE_CENTER[1])
+ISO_CENTER = (0.398, SIDE_CENTER[1])
 ISO_SCALE = (1, 1)
 # The *Right view rotated -90 degrees: model +Y runs to paper-right.
 SIDE_VIEW_ANGLE = -math.pi / 2.0
@@ -168,7 +171,8 @@ END_DIAMETERS = {
 # The drive-pin holes' locations stay in the end view, the one view that
 # shows them as true (visible) circles: each hole from the shaft axis, its
 # dimension line just right of the view, text beyond the view's top (+Z hole)
-# and bottom (-Z hole), left of the dome's extension lines.
+# and bottom (-Z hole), running right into the gap before the dome's
+# extension lines.
 END_PIN_KEEP = {
     "DrivePinOffset1": (0.058, 0.210),
     "DrivePinOffset2": (0.058, 0.150),
@@ -184,11 +188,14 @@ SIDE_KEEP = {
     "CollarRearStation": ((COLLAR_REAR_X + FAR_END_X) / 2.0, _ROW_Y[5]),
     "CollarSeatStation": ((COLLAR_SEAT_X + FAR_END_X) / 2.0 - 0.020, _ROW_Y[6]),
     "PinHoleStation": ((PIN_X + FAR_END_X) / 2.0, _ROW_Y[7]),
-    "Depth": ((DOME_ROOT_X + FAR_END_X) / 2.0, _ROW_Y[8]),
+    # Its "0.0 / 135.4" block sits right of the overall's "(137.4) / OVERALL"
+    # on the next row down, not over it: the two rows are 9.5 mm apart.
+    "Depth": ((DOME_ROOT_X + FAR_END_X) / 2.0 + 0.035, _ROW_Y[8]),
     "OverallLength": ((DOME_TIP_X + FAR_END_X) / 2.0, _ROW_Y[9]),
-    # Up-right of the dome tip, above the +Z drive-pin location's text and
-    # left of the Ø9.525 dimension: the radial leader runs down to the dome.
-    "DomeSphereRadius": (DOME_TIP_X + 0.008, 0.230),
+    # Above the dome, between the +Z drive-pin location's text and the
+    # Ø9.525 dimension: the radial leader runs down, right of the one and
+    # left of the other, to the dome's sphere.
+    "DomeSphereRadius": (DOME_TIP_X - 0.005, 0.230),
     # The seat spigot's length from the seat face: text below-left of the
     # spigot, between the cross-hole's and the collar seat's extension lines,
     # above every row that spans it.
@@ -205,8 +212,10 @@ SIDE_KEEP = {
 # ran along the silhouette over it, and the hole callout's leader had to cross
 # one (leader-crosses-line, af13c8ff8).  The Ø9.0 seat's on the seat, left of
 # the pinion pin hole. The Ø11.388's 2X/limit stack rises above its dimension:
-# place its arrow near the outboard land's relief shoulder and lower its row
-# 5 mm, so the 2X clears both LIGHT DRIVE FIT and the taper note's landing line.
+# place its arrow on the outboard land 6.9 mm short of the relief shoulder,
+# right of the rear-face finish symbol's text and left of the outboard land's
+# own symbol, and lower its row 5 mm, so the 2X clears both LIGHT DRIVE FIT
+# and the taper note's landing line.
 _DIAMETER_ROW_Y = (0.212, 0.223)
 # The spigot's Ø17.5 on the spigot and the collar body's Ø20.6 on the body
 # (each sketch starts at its section's front face), the spigot's text a row
@@ -215,7 +224,7 @@ _DIAMETER_ROW_Y = (0.212, 0.223)
 # journal's finish symbol.
 DIAMETER_POSITIONS = {
     "ShaftDiaDim": (PIN_X - 0.016, _DIAMETER_ROW_Y[0]),
-    "JournalDiaDim": (RELIEF_START_X - 0.002, _DIAMETER_ROW_Y[1]),
+    "JournalDiaDim": (RELIEF_START_X - 0.0069, _DIAMETER_ROW_Y[1]),
     "ReliefDiaDim": (RELIEF_START_X + 0.030, _DIAMETER_ROW_Y[0]),
     "PinionSeatDiaDim": (SEAT_STEP_X + 0.010, _DIAMETER_ROW_Y[0]),
     "SpigotDiaDim": (COLLAR_SEAT_X + 0.002, _DIAMETER_ROW_Y[1]),
@@ -228,16 +237,16 @@ DIAMETER_POSITIONS = {
 CALLOUTS_ABOVE = {"ShaftDiaDim": "2X", "JournalDiaDim": "2X"}
 CALLOUTS_BELOW = {"OverallLength": "OVERALL"}
 # Both running lands carry separate part-owned finish symbols. The outboard
-# symbol keeps its arrow at land mid-length and sits right of the collar's
-# Ø20.6 text, left of the Ø11.388 leader; the inboard symbol retains its
+# symbol sits right of the Ø11.388 dimension line, its leader landing on the
+# land just short of the relief shoulder; the inboard symbol retains its
 # clear spot above the relief.  The collar's rear (washer) face takes its
-# own symbol on that face's edge-on line under the axis, the symbol in the
-# free pocket right of the journal-start extension line, above row 4.
-_OUTBOARD_FINISH_X = _sheet_x((JOURNAL_START + RELIEF_START) / 2.0)
+# own symbol on that face's edge-on line ABOVE the axis, the symbol in the
+# pocket over the outboard land under the collar's Ø20.6 text: under the axis
+# every way to that face crosses a station's extension line.
 JOURNAL_FINISHES = {
     "outboard_journal": (
-        (_OUTBOARD_FINISH_X, JOURNAL_FLANK_Y),
-        (_OUTBOARD_FINISH_X + 0.004, 0.203),
+        (RELIEF_START_X - 0.0009, JOURNAL_FLANK_Y),
+        (RELIEF_START_X - 0.003, 0.203),
     ),
     "inboard_journal": (
         (RELIEF_END_X + 0.015, JOURNAL_FLANK_Y),
@@ -245,14 +254,14 @@ JOURNAL_FINISHES = {
     ),
 }
 COLLAR_REAR_FINISH = (
-    (COLLAR_REAR_X, _sheet_y(-(COLLAR_DIA / 2.0 - 1.0))),
-    ((JOURNAL_START_X + RELIEF_START_X) / 2.0, 0.148),
+    (COLLAR_REAR_X, _sheet_y(COLLAR_DIA / 2.0 - 1.0)),
+    (COLLAR_REAR_X + 0.0069, 0.195),
 )
 # The drive-pin holes' native REAM callout (size and depth from the cut)
-# with the press prose under it: its leader picks the lower hole's rim and
-# the text sits below-left of the end view, clear of the view and above the
-# notes.
-DRIVE_PIN_CALLOUT_XY = (0.034, 0.130)
+# with the press prose under it on two long rows (four rows in all): its
+# leader picks the upper hole's rim and the text sits above the end view and
+# the dome, left of the cross-hole callout, inside the top border.
+DRIVE_PIN_CALLOUT_XY = (0.066, 0.250)
 # Text centred up-right of the cross-hole: the callout's leader leaves the
 # text's left end and runs down-left at ~53 deg through the hole centre, a
 # clean crossing of the 118.0 station's extension line rather than a near
@@ -277,7 +286,7 @@ HOLE_CALLOUT_XY = (PIN_X + 0.072, 0.247)
 # window instead (run1b-e7fd1a2ec: the leader tip, not the text, read 0.3 mm
 # under the floor).
 PINION_PIN_X = _sheet_x(PINION_PIN_STATION_Y)
-PINION_PIN_NOTE_XY = (0.258, 0.250)
+PINION_PIN_NOTE_XY = (0.270, 0.250)
 PINION_PIN_NOTE_FIELD = (
     HOLE_CALLOUT_XY[0] + 0.032,
     SIDE_CENTER[1],
@@ -294,7 +303,7 @@ PINION_PIN_HOLE_WINDOW = (
 )
 NOTE_FIELD_MARGIN = 0.001
 NOTES_XY = (0.016, 0.062)
-ISO_NOTE_XY = (0.368, 0.108)
+ISO_NOTE_XY = (0.376, 0.108)
 
 
 def _set_callout_below(display: Any, text: str, label: str) -> None:
@@ -446,11 +455,11 @@ def _visible_cross_hole_edge(
     return candidates[0]
 
 
-def _is_lower_seat_rim(edge: Any) -> bool:
-    """Whether an edge is the -Z drive-pin hole's rim on the spigot's seat face.
+def _is_upper_seat_rim(edge: Any) -> bool:
+    """Whether an edge is the +Z drive-pin hole's rim on the spigot's seat face.
 
-    The *Bottom end view prints model +Z up, so the -Z hole (DrivePinAxis2) is
-    the lower one, nearest its callout; its seat-face rim, not its floor.
+    The *Bottom end view prints model +Z up, so the +Z hole is the upper one,
+    nearest its callout above the view; its seat-face rim, not its floor.
     """
     curve = _early_bound(edge.GetCurve(), "ICurve")
     if not curve.IsCircle():
@@ -459,7 +468,7 @@ def _is_lower_seat_rim(edge: Any) -> bool:
     return (
         abs(cx) < 1e-3
         and abs(cy - SEAT_COLLAR) < 1e-3
-        and abs(cz + DRIVE_PIN_CIRCLE_RADIUS) < 1e-3
+        and abs(cz - DRIVE_PIN_CIRCLE_RADIUS) < 1e-3
     )
 
 
@@ -702,7 +711,7 @@ async def build(adapter: Any) -> dict[str, str]:
             end,
             DRIVE_PIN_HOLE_DIA,
             view_label="end",
-            accept=_is_lower_seat_rim,
+            accept=_is_upper_seat_rim,
         ),
         process=DRIVE_PIN_HOLE_PROCESS,
     )

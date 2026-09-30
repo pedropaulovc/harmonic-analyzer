@@ -66,13 +66,15 @@ GEAR_DATA_XY = (0.225, 0.262)
 MANUFACTURING_NOTES_XY = (0.018, 0.060)
 
 # Each pin centre dimension runs from the bore axis to its hole; the two
-# stack into one vertical chain right of the teeth.
+# stack into one vertical chain right of the teeth.  Each one's text sits
+# beyond its own hole, above the chain for +Y and below it for -Y: printed
+# inside the chain, each text was struck by the other's outside arrow tail.
 _PIN_CHAIN_X = FRONT_CENTER[0] + 0.070
 FRONT_KEEP = {
     "BoreDiaDim": (FRONT_CENTER[0] + 0.070, FRONT_CENTER[1] - 0.052),
     "PinPosDia": (FRONT_CENTER[0] - 0.075, FRONT_CENTER[1] + 0.060),
-    "PinPosY": (_PIN_CHAIN_X, FRONT_CENTER[1] + 0.007),
-    "PinNegY": (_PIN_CHAIN_X, FRONT_CENTER[1] - 0.007),
+    "PinPosY": (_PIN_CHAIN_X, FRONT_CENTER[1] + 0.021),
+    "PinNegY": (_PIN_CHAIN_X, FRONT_CENTER[1] - 0.021),
 }
 TOP_KEEP = {
     "BlankWidth": (TOP_CENTER[0] + 0.065, TOP_CENTER[1] + PLATE * _S / 2000.0),

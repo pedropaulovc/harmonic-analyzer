@@ -25,20 +25,15 @@ CROSS_HOLE_CALLOUT = "\n".join(
 # the printed worst case (crankshaft_spec rounds it down): stated as the fact
 # the shop holds, under the holes' own callout.
 # Named exception: MHA-026 rim (drawing-simplicity-policy.md, "Named exceptions").
-DRIVE_PIN_RIM_NOTE = "\n".join(
-    (
-        "DRIVE-PIN HOLE TO",
-        f"SPIGOT RIM {DRIVE_PIN_SPIGOT_RIM_WORST:.2f} MIN.",
-    )
-)
+DRIVE_PIN_RIM_NOTE = f"DRIVE-PIN HOLE TO SPIGOT RIM {DRIVE_PIN_SPIGOT_RIM_WORST:.2f} MIN."
 
 # Under the native REAM callout on the seat spigot's two blind holes: the
 # purchased dowel each receives and how it goes in (bottomed, which is what
-# sets its proud length into the removable sprocket), then their rim.
+# sets its proud length into the removable sprocket), then their rim.  One
+# row each keeps the callout to four rows with the REAM line's stacked limit.
 DRIVE_PIN_CALLOUT = "\n".join(
     (
-        "PRESS FIT DRIVE PIN",
-        "MHA-173 TO HOLE FLOOR",
+        "PRESS FIT DRIVE PIN MHA-173 TO HOLE FLOOR",
         DRIVE_PIN_RIM_NOTE,
     )
 )

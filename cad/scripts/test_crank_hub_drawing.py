@@ -296,7 +296,6 @@ def test_side_view_lies_as_in_the_lathe_with_one_outboard_baseline() -> None:
     }
     assert "BarrelLength" not in printed and "HubLength" in printed
     assert drawing.SHOULDER_X > drawing.SERVICE_PIN_CENTER[0] > drawing.RELIEF_X
-    assert drawing.RELIEF_X > drawing.SIDE_KEEP["ReliefLength"][0] > drawing.INBOARD_X
     # The relief's toleranced length and the pin station share the seat row
     # without their text meeting (~2.5 mm per character).
     relief_right = drawing.SIDE_KEEP["ReliefLength"][0] + len("3.60±0.05") * 0.00125

@@ -102,10 +102,13 @@ def _sheet_x(model_y_mm: float) -> float:
 
 # Each face's pick lies on its O.D. edge, between the bore and the O.D. radii
 # (below the axis, clear of the thickness dimension above), where no bore
-# edge projects onto the same line.  The symbols stand below and outboard.
+# edge projects onto the same line.  The boss face's symbol stands below and
+# outboard, its leader rising up-left to the pick.  The collar face's stands
+# ABOVE the pick and outboard, so its leader runs down-right under its own
+# text: from below, that leader rose up-right through the text.
 _FACE_PICK_Y = SIDE_CENTER[1] - (ID + OD) / 4.0 * _S / 1000.0
 FACE_FINISHES = {
-    "collar_face": ((_sheet_x(0.0), _FACE_PICK_Y), (_sheet_x(0.0) - 0.025, 0.110)),
+    "collar_face": ((_sheet_x(0.0), _FACE_PICK_Y), (_sheet_x(0.0) - 0.025, 0.146)),
     "boss_face": (
         (_sheet_x(THICKNESS), _FACE_PICK_Y),
         (_sheet_x(THICKNESS) + 0.025, 0.110),

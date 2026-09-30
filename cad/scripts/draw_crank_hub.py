@@ -133,7 +133,9 @@ SIDE_KEEP = {
     "SeatLength": ((OUTBOARD_X + SHOULDER_X) / 2.0, _ROW_Y[0]),
     "ServicePinFromShoulder": ((SHOULDER_X + SERVICE_PIN_CENTER[0]) / 2.0, _ROW_Y[0]),
     "HubLength": ((OUTBOARD_X + INBOARD_X) / 2.0, _ROW_Y[1]),
-    "ReliefLength": ((RELIEF_X + INBOARD_X) / 2.0, _ROW_Y[0]),
+    # Its toleranced text is wider than the relief: it prints outside the
+    # span, left of the rear face, the dimension line running out to it.
+    "ReliefLength": (INBOARD_X - 0.013, _ROW_Y[0]),
     "ReliefDia": (INBOARD_X - 0.012, SIDE_CENTER[1]),
     "BarrelDia": (INBOARD_X - 0.034, SIDE_CENTER[1]),
     "SeatDia": (OUTBOARD_X + 0.020, 0.225),
