@@ -6,15 +6,17 @@ knob shaft's, both in the ONE chain plane (the third is the loose spare). One
 part, three configurations (T12/T18/T24). Every number is
 ``transgear_removable_spec``'s; this script only turns them into features.
 
-Tooth form (spec docstring): a roller seating arc ``SEAT_CURVE_R`` centred on
-the pitch circle, straight flanks tangent to it, a ``TIP_FLAT`` chord on the
-outside diameter. One tooth gap is six equation curves referencing
-equation-manager globals, cut, then circularly patterned. ``ToothCount`` is
-the only configuration-specific global; pitch/outside radius, tip half-angle,
-flank corner and seat tangency are all equations of it (the manager-side
-mirror of ``spec.gap_geometry``, each round-tripped against it at T24), so
-every configuration re-solves its own gap and each configuration's volume is
-checked against ``spec.part_volume``.
+Tooth form (spec docstring): the ANSI B29.1 (ACA) #25 standard form -- the
+``SEAT_CURVE_R`` seating arc centred on the pitch circle, the
+``WORKING_CURVE_R`` working arc, the straight yz and the topping arc out to
+the turned outside diameter. One tooth gap is ten equation curves
+referencing equation-manager globals, cut, then circularly patterned.
+``ToothCount`` is the only configuration-specific global; pitch/outside
+radius, the ACA angles A and B, the working and topping centres, the
+topping radius F and the OD corner are all equations of it (the
+manager-side mirror of ``spec.gap_geometry``, each round-tripped against it
+at T24), so every configuration re-solves its own gap and each
+configuration's volume is checked against ``spec.part_volume``.
 
 Config-independent mounting interface, cut after the tooth pattern: bore
 ``BORE_DIA`` and two ``PIN_HOLE_DIA`` drive-pin holes on ``PIN_CIRCLE_RADIUS``
@@ -115,12 +117,12 @@ PIN_HOLE_CENTRES = tuple(
 )
 if any(abs(x) > 1e-9 for x, _y in PIN_HOLE_CENTRES):
     raise AssertionError("drive-pin holes must sit on local +/-Y")
-# atan2(vy, vx) of the flank corner about the seat centre is written as a
-# plain atn(vy / vx) in the equation manager: valid only while vx > 0.
+# The equation manager writes atan2 as a plain atn(vy / vx): valid only while
+# vx > 0, for b's bearing about the axis and the corner's about b.
 for _name, _teeth in spec.CONFIGS:
     _g = spec.gap_geometry(_teeth)
-    if _g["corner_x"] <= _g["rp"]:
-        raise AssertionError(f"{_name}: tip corner inside the pitch radius")
+    if _g["topping_cx"] <= 0.0 or _g["corner_x"] <= _g["topping_cx"]:
+        raise AssertionError(f"{_name}: topping-curve bearings leave atn's half-plane")
 
 
 _TOL_BILAT = 2  # swTolType_e.swTolBILAT
@@ -184,56 +186,80 @@ def gap_globals(atn_rad: str, teeth: int) -> list[tuple[str, str, float]]:
 
     Lengths are INCHES (the part template is IPS and equation curves evaluate
     in document units); the manager's direct trig takes DEGREES, so the
-    ``*Deg`` globals feed it, while ``Half``/``Phi``/``SeatStart`` are RADIANS
-    for the equation curves (whose trig is radian). ``atn_rad`` is the probed
-    ``atn`` dialect with its result in radians. ``value`` is the expected
-    evaluation at ``teeth`` from ``spec.gap_geometry`` -- the round trip is
-    the dialect test.
+    ``*Deg`` globals feed it, while ``Half``, ``SeatStart``, ``WorkEnd``,
+    ``TopStart``, ``TopEnd`` and ``Corner`` are RADIANS for the equation
+    curves (whose trig is radian). ``atn_rad`` is the probed ``atn`` dialect
+    with its result in radians. ``value`` is the expected evaluation at
+    ``teeth`` from ``spec.gap_geometry`` -- the round trip is the dialect test.
+    The centres are in the gap's own frame (gap centred on +X, upper flank's
+    centres); :func:`gap_curves` turns them onto the seed gap.
     """
     g = spec.gap_geometry(teeth)
-    sin_phi = math.sin(g["tip_half_angle"])
-    seat_vx = g["corner_x"] - g["rp"]
-    cos_seat = g["seat_r"] / math.hypot(seat_vx, g["corner_y"])
-    # atan2(vy, vx) + acos(R / d); atn(vy / vx) holds for vx > 0 (asserted at
-    # import), acos is written as pi/2 - asin and asin through atn.
-    seat_direction = atn_rad % '"CornerY" / "SeatVX"'
-    seat_offset = atn_rad % '"CosSeat" / sqr(1 - "CosSeat" * "CosSeat")'
+    top_dist = math.hypot(g["topping_cx"], g["topping_cy"])
+    ra = g["ra"]
+    cos_gamma = (top_dist**2 + ra**2 - g["topping_r"] ** 2) / (2.0 * top_dist * ra)
+    # The OD corner is b's bearing less the law-of-cosines angle gamma:
+    # atan2 as atn(vy / vx) (vx > 0, asserted at import), acos as pi/2 - asin
+    # and asin through atn.
+    bearing = atn_rad % '"TopCY" / "TopCX"'
+    asin_gamma = atn_rad % '"CosGamma" / sqr(1 - "CosGamma" * "CosGamma")'
+    to_rad = f"* {PI_LIT} / 180"
     return [
         ("ToothCount", str(teeth), float(teeth)),
         ("ChainPitch", repr(spec.CHAIN_PITCH / IN), spec.CHAIN_PITCH / IN),
         ("SeatR", repr(spec.SEAT_CURVE_R / IN), spec.SEAT_CURVE_R / IN),
-        ("TipFlat", repr(spec.TIP_FLAT / IN), spec.TIP_FLAT / IN),
+        ("WorkR", repr(spec.WORKING_CURVE_R / IN), spec.WORKING_CURVE_R / IN),
+        (
+            "WorkOffset",
+            repr(spec.WORKING_CENTRE_OFFSET / IN),
+            spec.WORKING_CENTRE_OFFSET / IN,
+        ),
+        (
+            "TopOffset",
+            repr(spec.TOPPING_CENTRE_OFFSET / IN),
+            spec.TOPPING_CENTRE_OFFSET / IN,
+        ),
         ("HalfDeg", '180 / "ToothCount"', math.degrees(g["half_pitch_angle"])),
         ("Half", f'{PI_LIT} / "ToothCount"', g["half_pitch_angle"]),
         ("Rp", '"ChainPitch" / sin("HalfDeg") / 2', g["rp"] / IN),
         # spec.outside_dia's ANSI p (0.6 + cot(180/N)), halved.
-        ("Ra", '"ChainPitch" * (0.6 + 1 / tan("HalfDeg")) / 2', g["ra"] / IN),
-        ("SinPhi", '"TipFlat" / 2 / "Ra"', sin_phi),
+        ("Ra", '"ChainPitch" * (0.6 + 1 / tan("HalfDeg")) / 2', ra / IN),
+        # ACA A = 35 + 60/N and B = 18 - 56/N.
+        ("ADeg", '35 + 60 / "ToothCount"', math.degrees(spec.working_angle(teeth))),
+        ("BDeg", '18 - 56 / "ToothCount"', math.degrees(spec.working_arc(teeth))),
+        ("SeatStart", f'("ADeg" + 90) {to_rad}', g["seat_start"]),
+        ("WorkEnd", f'("ADeg" - "BDeg" + 90) {to_rad}', g["working_end"]),
+        ("WorkCX", '"Rp" + "WorkOffset" * sin("ADeg")', g["working_cx"] / IN),
+        ("WorkCY", '0 - "WorkOffset" * cos("ADeg")', g["working_cy"] / IN),
+        # ACA F = Dr [0.8 cos B + 1.4 cos(17 - 64/N) - 1.3025] - 0.0015 in,
+        # written as the tangency it encodes: 17 - 64/N = A - B - 180/N.
         (
-            "Phi",
-            atn_rad % '"SinPhi" / sqr(1 - "SinPhi" * "SinPhi")',
-            g["tip_half_angle"],
+            "TopR",
+            '"WorkOffset" * cos("BDeg") '
+            '+ "TopOffset" * cos("ADeg" - "BDeg" - "HalfDeg") - "WorkR"',
+            g["topping_r"] / IN,
         ),
+        ("TopCX", '"Rp" - "TopOffset" * sin("HalfDeg")', g["topping_cx"] / IN),
+        ("TopCY", '"TopOffset" * cos("HalfDeg")', g["topping_cy"] / IN),
+        ("TopStart", f'("ADeg" - "BDeg" - 90) {to_rad}', g["topping_start"]),
+        ("TopDist", 'sqr("TopCX" * "TopCX" + "TopCY" * "TopCY")', top_dist / IN),
         (
-            "CornerDeg",
-            f'"HalfDeg" - "Phi" * 180 / {PI_LIT}',
-            math.degrees(g["corner_angle"]),
+            "CosGamma",
+            '("TopDist" * "TopDist" + "Ra" * "Ra" - "TopR" * "TopR") '
+            '/ (2 * "TopDist" * "Ra")',
+            cos_gamma,
         ),
+        ("Corner", f"{bearing} - {PI_LIT} / 2 + {asin_gamma}", g["corner_angle"]),
+        ("CornerDeg", f'"Corner" * 180 / {PI_LIT}', math.degrees(g["corner_angle"])),
         ("CornerX", '"Ra" * cos("CornerDeg")', g["corner_x"] / IN),
         ("CornerY", '"Ra" * sin("CornerDeg")', g["corner_y"] / IN),
-        ("SeatVX", '"CornerX" - "Rp"', seat_vx / IN),
         (
-            "CosSeat",
-            '"SeatR" / sqr("SeatVX" * "SeatVX" + "CornerY" * "CornerY")',
-            cos_seat,
-        ),
-        (
-            "SeatStart",
-            f"{seat_direction} + {PI_LIT} / 2 - {seat_offset}",
-            g["seat_start"],
+            "TopEnd",
+            atn_rad % '("CornerY" - "TopCY") / ("CornerX" - "TopCX")',
+            g["topping_end"],
         ),
         # Clearance radius for closing the cut outside the blank (removes nothing).
-        ("RClear", '2 * "Ra"', 2.0 * g["ra"] / IN),
+        ("RClear", '2 * "Ra"', 2.0 * ra / IN),
     ]
 
 
@@ -254,49 +280,90 @@ def _segment(p: tuple[str, str], q: tuple[str, str]) -> tuple[str, str]:
     )
 
 
+def _about(cx: str, cy: str, radius: str, angle: str, upper: bool) -> tuple[str, str]:
+    """A point ``radius`` from a gap-frame centre (cx, cy) at gap-frame
+    ``angle``, on the seed gap: the upper flank's as given, the lower flank's
+    mirrored in the gap centreline, both then turned by ``Half``."""
+    if upper:
+        centre = (
+            f'{cx} * cos("Half") - {cy} * sin("Half")',
+            f'{cx} * sin("Half") + {cy} * cos("Half")',
+        )
+        return _plus(centre, _at(radius, f'("Half" + {angle})'))
+    centre = (
+        f'{cx} * cos("Half") + {cy} * sin("Half")',
+        f'{cx} * sin("Half") - {cy} * cos("Half")',
+    )
+    return _plus(centre, _at(radius, f'("Half" - {angle})'))
+
+
+def _sweep(start: str, end: str) -> str:
+    """Angle ``start`` -> ``end`` over t in [0, 1]."""
+    return f"({start} + t * ({end} - {start}))"
+
+
+def _working(angle: str, upper: bool) -> tuple[str, str]:
+    return _about('"WorkCX"', '"WorkCY"', '"WorkR"', angle, upper)
+
+
+def _topping(angle: str, upper: bool) -> tuple[str, str]:
+    return _about('"TopCX"', '"TopCY"', '"TopR"', angle, upper)
+
+
 def gap_curves() -> list[tuple[str, str, str]]:
     """The seed gap's closed loop as ``(label, x(t), y(t))`` equation curves.
 
     Centred on angle ``Half`` (pi/N, the first gap off the +X tooth), in
-    order: seating arc upper tangent -> bottom -> lower tangent, lower flank
-    to the tip-flat corner at angle ``Phi``, out to ``RClear``, around, back
-    to the upper corner at ``2 Half - Phi``, upper flank to the upper tangent.
+    order: seating arc upper x -> bottom -> lower x', lower working arc to
+    y', the straight y'z', lower topping arc to the OD corner at
+    ``Half - Corner``, out to ``RClear``, around, back to the upper corner at
+    ``Half + Corner``, upper topping arc to z, the straight zy, upper working
+    arc back to x.
     """
-    centre = _at('"Rp"', '"Half"')
-    upper_tangent = _plus(centre, _at('"SeatR"', '("Half" + "SeatStart")'))
-    lower_tangent = _plus(centre, _at('"SeatR"', '("Half" - "SeatStart")'))
-    lower_corner = _at('"Ra"', '"Phi"')
-    upper_corner = _at('"Ra"', '(2 * "Half" - "Phi")')
     seat = _plus(
-        centre,
+        _at('"Rp"', '"Half"'),
         _at(
             '"SeatR"', f'("Half" + "SeatStart" + t * (2 * {PI_LIT} - 2 * "SeatStart"))'
         ),
     )
     return [
         ("seating arc", *seat),
-        ("lower flank", *_segment(lower_tangent, lower_corner)),
-        ("lower clearance ray", *_at('("Ra" + t * ("RClear" - "Ra"))', '"Phi"')),
+        ("lower working arc", *_working(_sweep('"SeatStart"', '"WorkEnd"'), False)),
+        (
+            "lower flank",
+            *_segment(_working('"WorkEnd"', False), _topping('"TopStart"', False)),
+        ),
+        ("lower topping arc", *_topping(_sweep('"TopStart"', '"TopEnd"'), False)),
+        (
+            "lower clearance ray",
+            *_at('("Ra" + t * ("RClear" - "Ra"))', '("Half" - "Corner")'),
+        ),
         (
             "outer clearance arc",
-            *_at('"RClear"', '("Phi" + t * (2 * "Half" - 2 * "Phi"))'),
+            *_at('"RClear"', '("Half" - "Corner" + 2 * t * "Corner")'),
         ),
         (
             "upper clearance ray",
-            *_at('("RClear" + t * ("Ra" - "RClear"))', '(2 * "Half" - "Phi")'),
+            *_at('("RClear" + t * ("Ra" - "RClear"))', '("Half" + "Corner")'),
         ),
-        ("upper flank", *_segment(upper_corner, upper_tangent)),
+        ("upper topping arc", *_topping(_sweep('"TopEnd"', '"TopStart"'), True)),
+        (
+            "upper flank",
+            *_segment(_topping('"TopStart"', True), _working('"WorkEnd"', True)),
+        ),
+        ("upper working arc", *_working(_sweep('"WorkEnd"', '"SeatStart"'), True)),
     ]
 
 
 async def gap_curve(adapter, label: str, x_expr: str, y_expr: str) -> str:
     """Add one gap curve over t in [0, 1] with UNLOCKED end points.
 
-    The six curves share their end points in one closed loop. With locked
+    The ten curves share their end points in one closed loop. With locked
     ends (the ``CreateEquationSpline2`` default) the fix escalation closed
     that loop redundantly: the fourth fix left the sketch at swNoSolution
-    with no over-defining relation (farm, 2026-09-30). Unlocked, each fix
-    pins only its own curve and the sixth fully defines the sketch.
+    with no over-defining relation (farm, 2026-09-30, six-curve form).
+    Unlocked, each fix pins only its own curve and the last fully defines
+    the sketch.
     """
     from solidworks_mcp.adapters.base import CreateEquationCurveParameters
 
@@ -458,7 +525,7 @@ async def build(adapter) -> dict[str, str]:
     # ------------------------------------------------------------------
     check("create_sketch gap", await adapter.create_sketch("Front"))
     curves = [await gap_curve(adapter, *curve) for curve in gap_curves()]
-    # Whitelisted fix escalation: the gap profile is six equation-driven
+    # Whitelisted fix escalation: the gap profile is ten equation-driven
     # curves whose shape and position re-solve from the equation globals
     # on every configuration change (ToothCount 12/18/24) -- no static
     # relation/dimension scheme can define them without breaking that.
@@ -466,7 +533,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, "gap sketch", fix_entities=curves, allow_fix_escalation=True
     )
     check("exit_sketch gap", await adapter.exit_sketch())
-    # Named only, no SketchDims: the six curves are equation-driven (they carry
+    # Named only, no SketchDims: the ten curves are equation-driven (they carry
     # no display dimensions), and static dims would break the per-configuration
     # re-solve of the gap.
     name_last_feature(adapter, "ToothGapProfile")
@@ -486,8 +553,8 @@ async def build(adapter) -> dict[str, str]:
         ),
     ).name
     adapter._zoom_to_fit(adapter.currentModel)
-    # The seed gap spans angles Phi..2 Half - Phi (under 15 deg at T24); the
-    # OD candidates below stay on uncut blank.
+    # The seed gap spans angles Half - Corner..Half + Corner (under 15 deg at
+    # T24); the OD candidates below stay on uncut blank.
     candidates = [[0.0, 0.0, spec.PLATE / 2.0]]
     for angle_deg in (-45.0, -90.0, -135.0, 135.0, 45.0):
         a = math.radians(angle_deg)

@@ -48,15 +48,16 @@ def _per_configuration(render: Callable[[int], str]) -> str:
 
 # The one sheet draws T24; this block is the whole difference between the
 # three configurations, which differ only in their tooth count.  The OD is a
-# one-place blank size; the pitch and the as-cut bottom diameters follow from
-# the chain and the tooth form, so they are reference values.
+# one-place blank size; the pitch and bottom diameters follow from the chain
+# and the ANSI B29.1 tooth form a #25 cutter reproduces, so they are reference
+# values.
 _GEAR_DATA_ROWS = (
     (
         "CHAIN",
         f"ANSI #25 ROLLER, PITCH {spec.CHAIN_PITCH:.2f}, ROLLER Ø{spec.ROLLER_DIA:.2f}",
     ),
-    ("TOOTH FORM (REF)", f"ROLLER SEAT R{spec.SEAT_CURVE_R:.2f} ON THE PITCH CIRCLE,"),
-    ("", f"STRAIGHT FLANKS, TIP FLAT {spec.TIP_FLAT:.1f}"),
+    ("TOOTH FORM (REF)", "ANSI B29.1 #25 STANDARD FORM,"),
+    ("", f"ROLLER SEAT R{spec.SEAT_CURVE_R:.2f} ON THE PITCH CIRCLE"),
     ("CONFIGURATION", "  /  ".join(name for name, _teeth in spec.CONFIGS)),
     ("NUMBER OF TEETH", _per_configuration(str)),
     (
@@ -69,7 +70,7 @@ _GEAR_DATA_ROWS = (
     ),
     (
         "BOTTOM DIAMETER (mm, REF)",
-        _per_configuration(lambda teeth: f"{spec.seat_bottom_dia(teeth):.2f}"),
+        _per_configuration(lambda teeth: f"{spec.bottom_dia(teeth):.2f}"),
     ),
 )
 GEAR_DATA = "\n".join(

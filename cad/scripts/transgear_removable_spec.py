@@ -15,13 +15,24 @@ runs in one plane, ``CHAIN_MID_Z``, on both shafts.  Each shaft's seat is a
 flat ``SEAT_SPIGOT_DIA`` face carrying two pressed 3/32 dowels: small enough
 that the #25 chain's plates wrap the T12 clear of it.
 
-Tooth form (ANSI B29.1 / ISO 606 proportions): a roller seating curve of
-radius ``SEAT_CURVE_R`` centred on the pitch circle, straight flanks tangent
-to it, and a flat tip ``TIP_FLAT`` wide (chord) on the outside diameter.  The
-exact commercial profile differs slightly (Toolbox/hobbed), but pitch,
-outside and bottom diameters are the standard ones.  :func:`gap_area` is the
-exact in-plate area one tooth gap removes, so the part's volume check tests
-the tooth SHAPE, not merely that some cut happened.
+Tooth form: the ANSI B29.1 standard (American Chain Association) #25
+roller-chain sprocket form, the one a #25 sprocket cutter reproduces, in
+every configuration.  Seating curve ``SEAT_CURVE_R`` = 0.5025 Dr + 0.0015 in
+centred on the pitch circle (point a); working curve ``WORKING_CURVE_R``
+(E = 1.3025 Dr + 0.0015 in) about c, ``WORKING_CENTRE_OFFSET`` (ac = 0.8 Dr)
+from a at A = 35 + 60/N deg, spanning B = 18 - 56/N deg; the straight yz
+tangent to it; the topping curve F about b, ``TOPPING_CENTRE_OFFSET``
+(ab = 1.4 Dr) from a along the pitch chord, out to the turned outside
+diameter p (0.6 + cot(180/N)).  The bottom diameter is PD - Dr (for even N
+also the caliper diameter); its minus-only commercial tolerance
+0.002 P sqrt(N) + 0.006 in holds the as-cut seat bottom PD - 2 R.  Sources:
+the ACA formulas as reproduced in GEARS-IDS "Designing and Drawing a
+Sprocket", p. 2 Table 1 (http://www.gearseds.com/files/design_draw_sprocket_5.pdf);
+diameters, caliper diameter and tolerances, Machinery's Handbook 31st ed.
+pp. 2621-2623 (https://online.flippingbook.com/view/954046886/1316/ to
+/1318/).  :func:`gap_area` is the exact in-plate area one tooth gap removes,
+so the part's volume check tests the tooth SHAPE, not merely that some cut
+happened.
 
 Part frame (``build_transgear_removable``): axis Z through the origin, plate
 z = 0..PLATE, drive-pin holes on local +/-Y, a TOOTH (not a gap) centred on
@@ -50,9 +61,47 @@ ANSI_ROLLER_WIDTH = 0.125 * MM_PER_IN  # 3.175
 ANSI_HALF_WIDTH = 0.185 * MM_PER_IN  # 4.699
 CHAIN_PITCH = 0.25 * MM_PER_IN  # 6.35
 ROLLER_DIA = 3.30  # 0.130 in
-# ISO 606 maximum roller-seating radius (mm formula): 0.505 d1 + 0.069 d1^(1/3).
-SEAT_CURVE_R = 0.505 * ROLLER_DIA + 0.069 * ROLLER_DIA ** (1.0 / 3.0)  # 1.769
-TIP_FLAT = 1.6  # tip flat width (chord on the OD)
+
+# --- ANSI B29.1 (ACA) standard tooth form --------------------------------------
+# The standard writes its formulas in inches; every one is linear in Dr and its
+# 0.0015 in clearance, so they hold in mm with the clearance converted.
+ACA_CLEARANCE = 0.0015 * MM_PER_IN  # 0.0381
+SEAT_CURVE_R = 0.5025 * ROLLER_DIA + ACA_CLEARANCE  # R = Ds / 2, 1.696
+WORKING_CURVE_R = 1.3025 * ROLLER_DIA + ACA_CLEARANCE  # E, 4.336
+WORKING_CENTRE_OFFSET = 0.8 * ROLLER_DIA  # ac = E - R, 2.640
+TOPPING_CENTRE_OFFSET = 1.4 * ROLLER_DIA  # ab, 4.620
+
+
+def working_angle(teeth: int) -> float:
+    """ACA A = 35 deg + 60 deg / N (rad): the line c-a-x off the pitch tangent."""
+    return math.radians(35.0 + 60.0 / teeth)
+
+
+def working_arc(teeth: int) -> float:
+    """ACA B = 18 deg - 56 deg / N (rad): the working curve's arc x-y about c."""
+    return math.radians(18.0 - 56.0 / teeth)
+
+
+def topping_curve_r(teeth: int) -> float:
+    """ACA topping-curve radius F (mm).
+
+    F = Dr [0.8 cos(18 - 56/N) + 1.4 cos(17 - 64/N) - 1.3025] - 0.0015 in.
+    """
+    return (
+        ROLLER_DIA
+        * (
+            0.8 * math.cos(working_arc(teeth))
+            + 1.4 * math.cos(math.radians(17.0 - 64.0 / teeth))
+            - 1.3025
+        )
+        - ACA_CLEARANCE
+    )
+
+
+def caliper_minus_tol(teeth: int) -> float:
+    """Commercial minus-only caliper tolerance 0.002 P sqrt(N) + 0.006 in (mm)."""
+    return (0.002 * CHAIN_PITCH / MM_PER_IN * math.sqrt(teeth) + 0.006) * MM_PER_IN
+
 
 # --- plate and mounting interface (all three configurations) -----------------
 PLATE = 2.8  # 0.110 in, the #25 tooth width; flat both faces, no hub
@@ -187,7 +236,7 @@ def outside_dia(teeth: int) -> float:
 
 
 def bottom_dia(teeth: int) -> float:
-    """ANSI B29.1 bottom diameter PD - roller (the caliper root)."""
+    """ANSI B29.1 bottom diameter PD - roller (even N: the caliper diameter)."""
     return pitch_dia(teeth) - ROLLER_DIA
 
 
@@ -199,42 +248,82 @@ def seat_bottom_dia(teeth: int) -> float:
 def gap_geometry(teeth: int) -> dict[str, float]:
     """One tooth gap in its own frame (gap centred on +X, lengths mm, angles rad).
 
-    ``corner`` is the tip-flat corner on the OD (upper side), ``tangent`` the
-    point where the straight flank meets the seating curve, ``seat_start`` its
-    angle about the pocket centre; the pocket arc runs from ``seat_start`` to
-    ``2 pi - seat_start`` through the bottom (angle pi).
+    The pocket centre (ACA point a) is (``rp``, 0); these are the upper
+    (+Y) side's curves, the lower side is their mirror in the X axis.  In
+    boundary order from the bottom out, angles about each curve's centre:
+
+    * seating arc about a, radius ``seat_r``, from pi (the bottom) to
+      ``seat_start`` = pi/2 + A at x;
+    * working arc about c (``working_cx``, ``working_cy``), radius
+      ``working_r``, from ``seat_start`` at x (c, a and x are collinear) to
+      ``working_end`` = pi/2 + A - B at y (``flank_start``);
+    * the straight yz, tangent to the working arc at y and to the topping arc
+      at z (``flank_end``);
+    * topping arc about b (``topping_cx``, ``topping_cy``), radius
+      ``topping_r``, from ``topping_start`` = A - B - pi/2 at z to
+      ``topping_end`` at the ``corner`` where it meets the outside diameter,
+      ``corner_angle`` off the gap centreline about the axis.
     """
     half = math.pi / teeth
     ra = outside_dia(teeth) / 2.0
     rp = pitch_dia(teeth) / 2.0
-    r = SEAT_CURVE_R
-    phi = math.asin(TIP_FLAT / 2.0 / ra)
-    corner_ang = half - phi
+    a_ang, b_ang = working_angle(teeth), working_arc(teeth)
+    r, e, f = SEAT_CURVE_R, WORKING_CURVE_R, topping_curve_r(teeth)
+    # c sits ac back from a along x -> a, on the far side of the gap centreline
+    # (ACA offsets M = ac cos A along the pitch tangent, T = ac sin A outward).
+    wx = rp + WORKING_CENTRE_OFFSET * math.sin(a_ang)
+    wy = -WORKING_CENTRE_OFFSET * math.cos(a_ang)
+    seat_start = math.pi / 2.0 + a_ang
+    working_end = seat_start - b_ang
+    yx, yy = wx + e * math.cos(working_end), wy + e * math.sin(working_end)
+    # b sits ab from a along the chord to the next pocket (ACA offsets
+    # W = ab cos(180/N) along the tangent, V = ab sin(180/N) inward).
+    tx = rp - TOPPING_CENTRE_OFFSET * math.sin(half)
+    ty = TOPPING_CENTRE_OFFSET * math.cos(half)
+    topping_start = a_ang - b_ang - math.pi / 2.0
+    zx, zy = tx + f * math.cos(topping_start), ty + f * math.sin(topping_start)
+    # The turned OD meets the topping circle ``gamma`` short of b's bearing.
+    dist = math.hypot(tx, ty)
+    cos_gamma = (dist * dist + ra * ra - f * f) / (2.0 * dist * ra)
+    if not -1.0 < cos_gamma < 1.0:
+        raise AssertionError(f"T{teeth}: the outside diameter misses the topping curve")
+    corner_ang = math.atan2(ty, tx) - math.acos(cos_gamma)
     cx, cy = ra * math.cos(corner_ang), ra * math.sin(corner_ang)
-    vx, vy = cx - rp, cy
-    d = math.hypot(vx, vy)
-    if d <= r:
-        raise AssertionError(f"T{teeth}: tip corner inside the seating curve")
-    seat_start = math.atan2(vy, vx) + math.acos(r / d)
-    if not math.pi / 2.0 < seat_start < math.pi:
-        raise AssertionError(f"T{teeth}: flank tangency off the seat's upper quadrant")
+    topping_end = math.atan2(cy - ty, cx - tx)
+    x_r = math.hypot(rp + r * math.cos(seat_start), r * math.sin(seat_start))
+    if not x_r < math.hypot(yx, yy) < math.hypot(zx, zy) < ra:
+        raise AssertionError(f"T{teeth}: the tooth flank does not rise to the OD")
+    if not topping_start < topping_end:
+        raise AssertionError(f"T{teeth}: the OD cuts the topping curve before z")
+    if not 0.0 < corner_ang < half:
+        raise AssertionError(f"T{teeth}: the turned OD leaves no tip land")
     return {
         "half_pitch_angle": half,
         "ra": ra,
         "rp": rp,
         "seat_r": r,
-        "tip_half_angle": phi,
+        "seat_start": seat_start,
+        "working_r": e,
+        "working_cx": wx,
+        "working_cy": wy,
+        "working_end": working_end,
+        "flank_start_x": yx,
+        "flank_start_y": yy,
+        "flank_end_x": zx,
+        "flank_end_y": zy,
+        "topping_r": f,
+        "topping_cx": tx,
+        "topping_cy": ty,
+        "topping_start": topping_start,
+        "topping_end": topping_end,
         "corner_angle": corner_ang,
         "corner_x": cx,
         "corner_y": cy,
-        "seat_start": seat_start,
-        "tangent_x": rp + r * math.cos(seat_start),
-        "tangent_y": r * math.sin(seat_start),
     }
 
 
 def _arc_term(cx: float, cy: float, r: float, a1: float, a2: float) -> float:
-    """Green's-theorem term (x dy - y dx) of a CCW arc, doubled."""
+    """Green's-theorem term (x dy - y dx) of an arc run from a1 to a2, doubled."""
     return r * r * (a2 - a1) + r * (
         cx * (math.sin(a2) - math.sin(a1)) - cy * (math.cos(a2) - math.cos(a1))
     )
@@ -243,19 +332,23 @@ def _arc_term(cx: float, cy: float, r: float, a1: float, a2: float) -> float:
 def gap_area(teeth: int) -> float:
     """Exact in-plate area (mm^2) one tooth gap removes, by Green's theorem.
 
-    CCW boundary: OD arc lower corner -> upper corner, upper flank to its
-    seating-curve tangent, the seating arc through the bottom, lower flank
-    back to the lower corner (the beyond-OD part of the cut removes nothing).
+    The gap is symmetric about the X axis, so its area is twice the upper
+    half's, whose CCW boundary is: along the axis from the seat bottom to the
+    OD (no term), the OD arc to the corner, the topping arc back to z, the
+    straight to y, the working arc to x, the seating arc to the bottom (the
+    beyond-OD part of the cut removes nothing).
     """
     g = gap_geometry(teeth)
-    cx, cy, tx, ty = g["corner_x"], g["corner_y"], g["tangent_x"], g["tangent_y"]
-    twice = _arc_term(0.0, 0.0, g["ra"], -g["corner_angle"], g["corner_angle"])
-    twice += cx * ty - tx * cy  # upper flank corner -> tangent
-    twice += _arc_term(
-        g["rp"], 0.0, g["seat_r"], g["seat_start"], 2.0 * math.pi - g["seat_start"]
-    )
-    twice += tx * (-cy) - cx * (-ty)  # lower flank tangent' -> corner'
-    return twice / 2.0
+    top = (g["topping_cx"], g["topping_cy"], g["topping_r"])
+    work = (g["working_cx"], g["working_cy"], g["working_r"])
+    y = (g["flank_start_x"], g["flank_start_y"])
+    z = (g["flank_end_x"], g["flank_end_y"])
+    twice = _arc_term(0.0, 0.0, g["ra"], 0.0, g["corner_angle"])
+    twice += _arc_term(*top, g["topping_end"], g["topping_start"])
+    twice += z[0] * y[1] - y[0] * z[1]  # the straight z -> y
+    twice += _arc_term(*work, g["working_end"], g["seat_start"])
+    twice += _arc_term(g["rp"], 0.0, g["seat_r"], g["seat_start"], math.pi)
+    return twice  # 2 x (twice / 2)
 
 
 # Static cross-section the bore and two pin holes remove (mm^2).
@@ -287,5 +380,7 @@ def root_to_pin_hole(teeth: int) -> float:
 for _name, _n in CONFIGS:
     if seat_bottom_dia(_n) / 2.0 <= PIN_CIRCLE_RADIUS + PIN_HOLE_DIA / 2.0:
         raise AssertionError(f"{_name}: seating curve breaks into the pin holes")
+    if not 0.0 <= bottom_dia(_n) - seat_bottom_dia(_n) <= caliper_minus_tol(_n):
+        raise AssertionError(f"{_name}: seat bottom outside the ANSI caliper tolerance")
     if gap_area(_n) <= 0.0:
         raise AssertionError(f"{_name}: tooth gap has no area")
