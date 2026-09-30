@@ -35,7 +35,7 @@ def test_part_and_drawing_share_the_marked_dimension_contract() -> None:
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in source
     # Two bands: the body diameter that holds the pocket wall, and the pocket
-    # depth that keeps the MHA-139 head below the flange (Codex P2 on #1139).
+    # depth that keeps the MHA-139 head below the face (Codex P2 on #1139).
     assert model_toleranced_dimensions(part) == {
         ("CupProfile", "BodyDia"): "BODY_DIA_TOL",
         ("CupProfile", "PocketDepth"): "POCKET_DEPTH_TOL",
@@ -46,19 +46,25 @@ def test_part_and_drawing_share_the_marked_dimension_contract() -> None:
     assert "set_dimension_bilateral_tolerance" not in source
 
 
-def test_every_section_holds_1_5_at_its_worst_case() -> None:
-    # User ruling 2026-09-29 (MHA-153 review): the butt grew instead of
-    # accepting 0.54 / 0.85 / 0.75 sections.
-    assert spec.FLANGE_THICKNESS - 0.8 == pytest.approx(1.5)
+def test_the_floor_holds_1_5_and_the_wall_its_named_exception() -> None:
+    # User rulings 2026-09-30 (ch30 eight-views-4, concept v4): a plain cup
+    # sized to the photographed Ø6 head.  The pocket wall is the named 0.8
+    # exception; the floor keeps the 1.5 floor.
+    assert not hasattr(spec, "FLANGE_DIA") and not hasattr(spec, "FLANGE_THICKNESS")
     # The floor is what the overall (.X) leaves after the banded pocket depth,
-    # both from the flange face (re-review: one faced end).
+    # both from the face (re-review: one faced end).
     assert spec.FLOOR_THICKNESS_MIN == pytest.approx(1.7)
-    assert spec.POCKET_WALL_MIN == pytest.approx(1.5)
-    assert screw.CUP_POCKET_WALL_MIN == pytest.approx(1.5)
+    assert spec.POCKET_WALL_FLOOR_MM == 0.8
+    assert spec.POCKET_WALL_MIN == pytest.approx(0.8)
+    assert screw.CUP_POCKET_WALL_MIN == pytest.approx(0.8)
     assert screw.POCKET_MAX <= spec.POCKET_DIA_MAX
-    # 3/4-in stock clears the Ø17.0 flange at its .X upper limit.
-    assert "3/4 in" in _config.parts("crank-handle-butt-cup")["material"]
-    assert spec.FLANGE_DIA + 0.8 < 0.75 * 25.4
+    policy = (Path(spec.__file__).parents[1] / "docs" / "drawing-simplicity-policy.md")
+    assert "| MHA-153 crank handle butt cup, pocket bored to suit" in policy.read_text(
+        encoding="utf-8"
+    )
+    # 3/8-in stock clears the Ø8.20 body at its upper limit.
+    assert "3/8 in" in _config.parts("crank-handle-butt-cup")["material"]
+    assert spec.BODY_DIA + spec.BODY_DIA_TOL < 0.375 * 25.4
     assert screw.HEAD_BEARING_RADIAL_MIN > 0.0
     assert spec.FLOOR_HOLE_DIA > screw.SHOULDER_DIA_MAX
 
@@ -66,7 +72,7 @@ def test_every_section_holds_1_5_at_its_worst_case() -> None:
 def test_head_sits_recessed_and_end_play_is_fitted() -> None:
     assert screw.HEAD_RECESS_NOMINAL == pytest.approx(1.0)
     # Codex P2 on #1139 (user ruling 2026-09-30): pocket 5.5 +/-0.10 over a
-    # 4.0 +/-0.10 head keeps the head 0.3 below the flange with the handle
+    # 4.0 +/-0.10 head keeps the head 0.3 below the face with the handle
     # pushed to the arm at the widest 1.00 end play; at 5.0 .X over 4.0 .X
     # it stood 1.6 proud.
     assert (spec.POCKET_DEPTH, spec.POCKET_DEPTH_TOL) == (5.5, 0.10)
@@ -89,8 +95,9 @@ def test_notes_name_the_mates_and_the_band_reason() -> None:
     notes = spec.DRAWING_NOTES
     assert f"{spec.HANDLE_NUMBER} {spec.HANDLE_NAME}" in notes
     assert f"{spec.SCREW_NUMBER} {spec.SCREW_NAME}" in notes
-    assert "TO SUIT" in notes and "MIN POCKET WALL 1.5" in notes
-    assert "8.5 MAX" in notes
+    assert "TO SUIT" in notes and "MIN POCKET WALL 0.8; MIN FLOOR 1.5." in notes
+    assert "6.5 MAX" in notes
+    assert "FACE FLUSH; TURN ITS END" in notes
     assert all(len(line) <= 90 for line in notes.splitlines())
 
 
@@ -112,5 +119,5 @@ def test_sheet_layout_keeps_annotations_inside_the_field() -> None:
         assert 0.012 < x < 0.420
         assert 0.012 < y < 0.267
         assert not (x > 0.216 and y < 0.070)
-    assert drawing.END_CENTER[0] + drawing.FLANGE_R < drawing.SECTION_KEEP["FloorHoleDia"][0] - 0.005
+    assert drawing.END_CENTER[0] + drawing.BODY_R < drawing.SECTION_KEEP["FloorHoleDia"][0] - 0.005
     assert drawing.SECTION_KEEP["PocketDia"][0] + 0.020 < drawing.ISO_NOTE_POS[0]

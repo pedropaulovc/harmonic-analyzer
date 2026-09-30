@@ -288,6 +288,7 @@ def _e(x: float) -> float:
     return x - TENON_X0
 
 
+# Named exception: MHA-022 oak feathers (drawing-simplicity-policy.md, "Named exceptions").
 DRAWING_NOTES = "\n".join(
     (
         "AXIAL STATIONS ARE FROM THE TENON END FACE.",

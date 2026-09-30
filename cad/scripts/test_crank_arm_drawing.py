@@ -280,9 +280,10 @@ def test_handle_pivot_is_tapped_for_the_mha139_screw_with_a_2mm_web() -> None:
     assert spec.HANDLE_PIVOT_HOLE_SPEC.kind == "tapped"
     import crank_handle_pivot_screw_spec as screw
 
-    assert spec.HANDLE_PIVOT_HOLE_SPEC.size == screw.THREAD_SIZE == "#8-32"
+    # User ruling 2026-09-30: the handle pivot screw is #6-32.
+    assert spec.HANDLE_PIVOT_HOLE_SPEC.size == screw.THREAD_SIZE == "#6-32"
     assert spec.HANDLE_PIVOT_HOLE_SPEC.end == "through_all"
-    assert spec.PIVOT_END_WEB_NOMINAL == pytest.approx(10.617)
+    assert spec.PIVOT_END_WEB_NOMINAL == pytest.approx(12.7 - 3.505 / 2.0)
     assert spec.PIVOT_END_WEB_WORST >= 2.0
 
 
@@ -300,15 +301,12 @@ def test_station_reference_is_saved_hidden_and_imported_per_view() -> None:
     assert "StationReference" in spec.DRAWING_DIMENSIONS
 
 
-def test_arm_states_the_mha139_engagement_exception_it_is_tapped_for() -> None:
-    # User ruling 2026-09-25 (MHA-020 review B2): the tapped arm states the
-    # named exception with the same worst case the MHA-139 sheet prints.
-    import crank_handle_pivot_screw_spec as screw
-
-    assert spec.DRAWING_NOTES.splitlines()[-1] == screw.ENGAGEMENT_NOTE.replace(
-        "THREAD ENGAGEMENT", f"{screw.THREAD_SIZE} THREAD ENGAGEMENT"
-    )
-    assert spec.DRAWING_NOTES.splitlines()[-1] == "#8-32 THREAD ENGAGEMENT 1.26D MIN."
+def test_arm_states_no_engagement_exception_for_the_6_32_pivot() -> None:
+    # The #6-32 handle pivot (user ruling 2026-09-30) meets the 1.5D rule, so
+    # the tapped arm no longer states the #8-32's named exception.
+    assert not hasattr(spec, "PIVOT_ENGAGEMENT_NOTE")
+    assert "THREAD ENGAGEMENT" not in spec.DRAWING_NOTES
+    assert spec.DRAWING_NOTES.splitlines()[-1] == spec.STOCK_NOTE
     # The stock line comes from the one stock constant.
     assert spec.ARM_STOCK_THICKNESS == pytest.approx(7.9375)
     assert spec.STOCK_NOTE == "25.4 x 8.0 SECTION: 1 x 5/16 IN CF FLAT BAR AS SUPPLIED."
@@ -325,10 +323,10 @@ def _thinnest_accepted_arm() -> float:
     return spec.ARM_THICKNESS - geometry.GENERAL_1PL_TOL_MM
 
 
-def test_engagement_exception_holds_at_the_thinnest_accepted_arm() -> None:
+def test_engagement_rule_holds_at_the_thinnest_accepted_arm() -> None:
     # Codex #892 (PRRT_kwDOPHDy386mMvsy): at a printed 8.0 +/-0.8 an arm
-    # accepted at 7.2 leaves min(8.0, 7.2 - 0.25) - 2.01 = 4.94 = 1.02D, under
-    # both the note's 1.17D and U33b's 1.15D floor.
+    # accepted at 7.2 would leave min(9.1, 7.2 - 0.25) - 2.3 = 4.65 = 1.33D,
+    # under the 1.5D rule; the stock reference keeps it at 1.51D.
     import crank_handle_pivot_screw_spec as screw
 
     thinnest = _thinnest_accepted_arm()
@@ -337,9 +335,8 @@ def test_engagement_exception_holds_at_the_thinnest_accepted_arm() -> None:
         - screw.RELIEF_WIDTH_MAX
     )
     assert worst >= screw.ENGAGEMENT_FLOOR, (thinnest, worst / screw.THREAD_MODEL_DIA)
-    # The note never claims more than the thinnest accepted arm delivers.
+    # The spec's worst case is the thinnest accepted arm's.
     assert screw.FULL_THREAD_WORST == pytest.approx(worst)
-    assert screw.FULL_THREAD_WORST_DIAMETERS_PRINTED <= worst / screw.THREAD_MODEL_DIA
 
 
 def test_arm_thickness_prints_as_a_reference_to_the_supplied_stock() -> None:

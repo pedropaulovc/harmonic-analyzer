@@ -333,10 +333,10 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(("fillister-screw-1", "crank-arm-1")): _annulus_limit(
                 2.8448, 2.261, 5.33
             ),
-            # MHA-139 #8-32 major 4.166 in the #29 tap drill 3.454: 6.5 of
+            # MHA-139 #6-32 major 3.505 in the #36 tap drill 2.705: 6.5 of
             # full thread past the 1.5 relief plus the 0.5 lead cone.
             frozenset(("crank-handle-pivot-screw-1", "crank-arm-1")): _annulus_limit(
-                4.166, 3.454, 7.0
+                3.505, 2.705, 7.0
             ),
             # U30 I22: each MHA-142 1/4-20 in its #7 MHA-091 tap, its cut
             # length past the post's grip deep.

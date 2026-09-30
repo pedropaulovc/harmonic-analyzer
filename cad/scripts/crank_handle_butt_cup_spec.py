@@ -58,8 +58,8 @@ FLOOR_THICKNESS = OVERALL_LENGTH - POCKET_DEPTH
 
 GENERAL_1PL_MM = 0.8
 WALL_FLOOR_MM = 1.5
-# Named exception: MHA-153 pocket wall (drawing-simplicity-policy.md, "Named
-# exceptions").  The floor still holds the 1.5 floor.
+# The pocket wall is a named drawing-simplicity-policy exception (the sheet
+# states it below); the floor still holds the 1.5 floor.
 POCKET_WALL_FLOOR_MM = 0.8
 FLOOR_THICKNESS_MIN = round(FLOOR_THICKNESS - GENERAL_1PL_MM - POCKET_DEPTH_TOL, 6)
 POCKET_WALL_MIN = round(((BODY_DIA - BODY_DIA_TOL) - POCKET_DIA_MAX) / 2.0, 6)
@@ -115,13 +115,15 @@ HANDLE_NAME = "CRANK HANDLE"
 SCREW_NUMBER = "MHA-139"
 SCREW_NAME = "CRANK HANDLE PIVOT SCREW"
 FLOOR_HOLE_CALLOUT = "DRILL THRU"
+# Named exception: MHA-153 pocket wall (drawing-simplicity-policy.md, "Named exceptions").
 DRAWING_NOTES = "\n".join(
     (
         f"BORE THE POCKET TO SUIT THE {SCREW_NUMBER} {SCREW_NAME} HEAD FOR",
         f"  {POCKET_CLEARANCE[0]:.1f}-{POCKET_CLEARANCE[1]:.1f} DIAMETRAL CLEARANCE,"
         f" <MOD-DIAM>{POCKET_DIA_MAX:.1f} MAX; THE HEAD BEARS ON THE FLOOR.",
         f"MIN POCKET WALL {POCKET_WALL_FLOOR_MM:.1f}; MIN FLOOR {WALL_FLOOR_MM:.1f}.",
-        f"EPOXY IN THE {HANDLE_NUMBER} BUTT, FACE FLUSH; TURN THE END ROUND WITH IT.",
+        f"EPOXY IN THE {HANDLE_NUMBER} {HANDLE_NAME} BUTT, FACE FLUSH; TURN ITS END",
+        "  ROUND ACROSS THE CUP AFTER CURE.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 4:1"

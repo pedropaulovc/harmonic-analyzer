@@ -47,41 +47,44 @@ def test_oak_ends_in_a_ferrule_tenon_and_a_cup_counterbore() -> None:
         "CounterboreDepth",
         "PivotBoreDia",
     }
-    assert crank_handle_spec.SHOULDER_X == ferrule.LENGTH
-    assert crank_handle_spec.TRIM_X == pytest.approx(
-        crank_handle_spec.HANDLE_LENGTH - cup.FLANGE_THICKNESS
-    )
-    assert crank_handle_spec.WOOD_LENGTH == pytest.approx(48.7)
-    assert crank_handle_spec.OVERALL_LENGTH == pytest.approx(53.7)
-    assert crank_handle_spec.TENON_X0 > 0.0  # no oak reaches the arm face
-    assert abs(cup.FLANGE_DIA - 2.0 * crank_handle_spec.TRIM_R) <= 0.1
-    assert crank_handle_spec.COUNTERBORE_MOUTH_WALL >= 0.6
-    # User ruling 2026-09-29 (MHA-153 review): the butt grew from Ø10 so the
-    # cup keeps 1.5 mm sections.
-    # ... and again for 1.5 mm of oak round the cup counterbore (MHA-022 review).
-    assert crank_handle_spec.CAP_R == pytest.approx(8.0)
-    assert crank_handle_spec.COUNTERBORE_DIA_MAX == pytest.approx(11.9)
-    assert "11.9 MAX" in crank_handle_spec.DRAWING_NOTES
-    assert crank_handle_spec.COUNTERBORE_MOUTH_WALL >= 1.5
-    # Codex P2 on #1139: the contour may run its whole diametral allowance
-    # small, so the radius loses 0.25, not 0.125 (2.08 -> 1.96).
-    assert crank_handle_spec.COUNTERBORE_MOUTH_WALL == pytest.approx(1.958, abs=0.005)
+    spec = crank_handle_spec
+    assert spec.SHOULDER_X == ferrule.LENGTH
+    # The cup bottoms with its face on the handle's basic length, a tenth past
+    # the oak's feather edge at the counterbore mouth (user rulings 2026-09-30,
+    # concept v4).
+    assert spec.OAK_END_X == pytest.approx(57.9)
+    assert spec.COUNTERBORE_DEPTH == pytest.approx(cup.OVERALL_LENGTH - 0.1)
+    assert spec.WOOD_LENGTH == pytest.approx(50.9)
+    assert spec.OVERALL_LENGTH == pytest.approx(55.9)
+    assert spec.TENON_X0 > 0.0  # no oak reaches the arm face
+    assert spec.COUNTERBORE_DIA_MAX == pytest.approx(8.5)
+    assert "<MOD-DIAM>8.5 MAX" in spec.DRAWING_NOTES
+    # The feathered edge is the named exception; 1.0 in, the oak holds 1.5
+    # again at the contour allowance over the largest counterbore.
+    assert spec.FEATHER_DEPTH == 1.0
+    assert spec.OAK_WALL_BEHIND_FEATHER == pytest.approx(1.78, abs=0.01)
 
 
 def test_tenon_and_counterbore_are_fitted_to_the_parts_they_take() -> None:
     # User ruling 2026-09-29 (after the machinist reviews): turned and bored to
     # suit, so the sizes print as references and the note carries the fit.
     spec = crank_handle_spec
-    assert spec.REFERENCE_DIMENSIONS == {"TenonDia", "CounterboreDia"}
+    # The counterbore depth seats the cup face flush, so it is fitted too.
+    assert spec.REFERENCE_DIMENSIONS == {"TenonDia", "CounterboreDia", "CounterboreDepth"}
     assert spec.TENON_DIA == pytest.approx(ferrule.BORE_DIA - 0.1)
     assert spec.COUNTERBORE_DIA == pytest.approx(cup.BODY_DIA + 0.1)
     assert "TURN THE TENON TO SUIT THE MHA-150 FERRULE BORE" in spec.DRAWING_NOTES
     assert "COUNTERBORE TO SUIT THE MHA-153 CUP BODY" in spec.DRAWING_NOTES
-    # Codex P2 on #1139 (user ruling 2026-09-30): the butt is blended to the
-    # bonded flange so no end grain shows, keeping 1.5 of oak round the
-    # largest counterbore under the smallest .X flange.
-    assert "AFTER CURE, BLEND THE BUTT FLUSH WITH THE MHA-153 FLANGE." in spec.DRAWING_NOTES
-    assert spec.BLENDED_BUTT_WALL == pytest.approx(2.15)
+    assert "DEPTH TO SEAT THE CUP\n  FACE FLUSH" in spec.DRAWING_NOTES
+    # User ruling 2026-09-30 (concept v4): after the cure the oak is turned
+    # flush with the ferrule and the end round is turned across the cup.
+    assert "AFTER CURE, TURN THE SHOULDER FLUSH WITH MHA-150 AND THE END ROUND" in spec.DRAWING_NOTES
+    assert "ACROSS THE OAK AND MHA-153; THE OAK FEATHERS OUT ON THE CUP." in spec.DRAWING_NOTES
+    # The fitted tenon keeps its ferrule seat and 1.5 over the bore.
+    assert spec.SHOULDER_R == pytest.approx(ferrule.OUTER_DIA / 2.0)
+    assert spec.FERRULE_SEAT_RADIAL_MIN == pytest.approx(2.225)
+    assert spec.TENON_WALL_MIN == pytest.approx(1.55)
+    assert spec.WAIST_WALL_MIN == pytest.approx(2.425)
     source = Path(handle.__file__).read_text(encoding="utf-8")
     assert source.count("set_dimension_bilateral_tolerance(") == 1  # the reamed bore
     assert "set_dimension_symmetric_tolerance" not in source
@@ -92,11 +95,27 @@ def test_tenon_and_counterbore_are_fitted_to_the_parts_they_take() -> None:
 def test_grip_contour_is_a_note_with_a_loose_allowance() -> None:
     # User ruling 2026-09-29 (MHA-022 review): the contour is turned to its
     # arcs within an allowance, not held by a basic profile and a frame.
-    notes = crank_handle_spec.DRAWING_NOTES
-    assert "GRIP CONTOUR:" in notes
-    assert f"R{crank_handle_spec.FRONT_PROFILE_R:.1f}" in notes
-    assert f"R{crank_handle_spec.REAR_PROFILE_R:.1f}" in notes
-    assert "TURN WITHIN 0.5 ON DIAMETER" in notes
+    spec = crank_handle_spec
+    notes = spec.DRAWING_NOTES
+    assert "GRIP CONTOUR, TANGENT ARCS IN TURN:" in notes
+    for radius in (
+        spec.FLARE_R,
+        spec.S_CONCAVE_R,
+        spec.S_CONVEX_R,
+        spec.DOME_R,
+        spec.END_ROUND_R,
+    ):
+        assert f"R{radius:.1f}" in notes
+    # User rulings 2026-09-30 (ch30 eight-views-4, concept v4): the waist, the
+    # inflection and the swell, printed from the tenon end face.
+    assert "<MOD-DIAM>9.5 WAIST AT 10.0" in notes
+    assert "INFLECTION AT 18.0" in notes
+    assert "<MOD-DIAM>21.0 AT 40.0" in notes
+    assert (spec.FLARE_R, spec.S_CONCAVE_R, spec.S_CONVEX_R, spec.DOME_R) == pytest.approx(
+        (9.083, 21.636, 59.500, 30.694), abs=0.001
+    )
+    assert spec.END_ROUND_R == pytest.approx(4.433, abs=0.001)
+    assert "TURN WITHIN 0.5 ON DIAMETER; CHECK WITH A TEMPLATE." in notes
     assert "BASIC" not in notes
     assert not hasattr(crank_handle_spec, "BASIC_DIMENSIONS")
     assert not hasattr(crank_handle_spec, "GEOMETRIC_TOLERANCES_MM")
@@ -106,9 +125,11 @@ def test_peak_station_uses_visible_construction_geometry() -> None:
     build_source = Path(handle.__file__).read_text(encoding="utf-8")
     drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'profile.record("PeakStation",' in build_source
-    assert 'profile.record("FrontArcCx",' in build_source
+    # The two swell centres sit on the peak station, driven by "PeakX".
+    assert """(s_convex, S_CONVEX_CENTER, "S convex centre", '"PeakX"')""" in build_source
+    assert """(dome, DOME_CENTER, "dome centre", '"PeakX"')""" in build_source
     assert '"PeakStation":' in drawing_source
-    assert '"FrontArcCx":' not in drawing_source
+    assert "CentreX" not in drawing_source
     assert "peak station construction line" in build_source
 
 
@@ -119,8 +140,8 @@ def test_counterbore_reads_on_a_section_and_the_end_view_shares_its_axis() -> No
     assert "create_section_axis_centerline(" in source
     assert "set_hidden_lines_visible" not in source
     assert drawing.RIGHT_CENTER[1] == drawing.FRONT_CENTER[1]
-    # The reference overall, tenon end to butt face, for stock cut-off.
-    assert crank_handle_spec.OVERALL_LENGTH == pytest.approx(53.7)
+    # The overall, tenon end to the oak's end, for stock cut-off.
+    assert crank_handle_spec.OVERALL_LENGTH == pytest.approx(55.9)
 
 
 def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
@@ -142,7 +163,6 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     assert "RUNS ON THE MHA-139 SHOULDER" in notes
     assert "STRAIGHT GRAIN PARALLEL TO TURNING AXIS" in notes
     assert "AXIAL STATIONS ARE FROM THE TENON END FACE" in notes
-    assert "COUNTERBORE DEPTH IS\n  FROM THE BUTT FACE" in notes
     assert "DATUM" not in notes and "PROFILE 0.50" not in notes
     assert all(len(line) <= 90 for line in notes.splitlines())
     assert drawing.DIMENSION_CALLOUTS["PivotBoreDia"] == "THRU - REAM"

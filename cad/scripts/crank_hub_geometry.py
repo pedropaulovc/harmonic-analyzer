@@ -42,9 +42,9 @@ ARM_WIDTH_STOCK_MINUS = float(ARM_STOCK_MILL_MINUS_IN) * MM_PER_IN
 ARM_THICKNESS = 8.0
 # The bar's as-supplied thickness, which the tapped MHA-139 pivot engages
 # (crank_handle_pivot_screw_spec) and the arm's stock note names
-# (crank_arm_spec).  It lives here, below both, because the arm prints the
-# screw's engagement: a stock change re-runs that engagement's 1D and U33b
-# floors at import.
+# (crank_arm_spec).  It lives here, below both, because the screw's worst-case
+# engagement is taken in this stock: a stock change re-runs that engagement's
+# 1.5D check at import.
 ARM_STOCK_THICKNESS_IN = Fraction(5, 16)
 ARM_STOCK_THICKNESS = float(ARM_STOCK_THICKNESS_IN) * MM_PER_IN
 # The arm prints its thickness as a reference to that stock (crank_arm_spec),

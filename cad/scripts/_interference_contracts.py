@@ -152,13 +152,13 @@ _DRIVE_TRAIN_ALLOWED_PAIRS = {
     frozenset(("fillister-screw-1", "crank-arm-1")): _smooth_annulus_limit_mm3(
         2.8448, 2.261, 5.33
     ),
-    # MHA-139 #8-32 major in the arm's #29 tap drill: the full thread past the
+    # MHA-139 #6-32 major in the arm's #36 tap drill: the full thread past the
     # 1.5 relief (6.5 of the 8.0 arm) plus its 0.5 lead cone.  The size is
     # named here, not imported from crank_handle_pivot_screw_spec, so every
     # assembly's recipe stays clear of the handle specs; the MHA-139 tests pin
     # it to that spec's THREAD_SIZE.
     frozenset(("crank-handle-pivot-screw-1", "crank-arm-1")): _smooth_annulus_limit_mm3(
-        THREAD_MAJOR_MM["#8-32"], TAP_DRILL_MM["#8-32"], 7.0
+        THREAD_MAJOR_MM["#6-32"], TAP_DRILL_MM["#6-32"], 7.0
     ),
     # Rule-12 E11: #10-32 94025A164 in the tapped block, observed above.
     frozenset(
