@@ -24,6 +24,8 @@ from crank_hub_geometry import (
     CRANK_FACE_SHIFT,
     FIDUCIAL_MODEL_DEPTH,  # noqa: F401 -- re-exported to the drawing contract
     FIDUCIAL_MODEL_DIA,  # noqa: F401 -- re-exported to the drawing contract
+    HUB_LENGTH,
+    HUB_LENGTH_TOL,
     SERVICE_PIN_STATION,
     SHAFT_DIA,
     SHAFT_DIA_BAND,
@@ -261,8 +263,8 @@ if not _PIN_HOLE_OUTER_R < SPIGOT_DIA / 2.0 < COLLAR_DIA / 2.0:
 #   located +/-0.025 from the axis spends 0.05 of it here, leaving the
 #   wheel the same share.  Printed at .XXX.
 # - Pressed to the floor, the pin stands PROUD = LENGTH - depth: the depth
-#   band plus the dowel's +/-0.010 in length grade must keep the tip inside
-#   the wheel's 2.8 plate and engaged.  +/-0.10 at .XX.
+#   band plus the dowel's +/-0.010 in length grade must keep the tip clear
+#   of the crank hub and engaged in the wheel.  +/-0.10 at .XX.
 COLLAR_STATION_PLACES = 2
 COLLAR_STATION_TOL = 0.10
 COLLAR_DIA_TOL = 0.10
@@ -286,7 +288,9 @@ _DOWEL_OD = tuple(
     crank_seat_drive_pin_spec.DIA + inch * crank_seat_drive_pin_spec.MM_PER_IN
     for inch in crank_seat_drive_pin_spec.DIA_BAND_IN
 )
-_DOWEL_LENGTH_GRADE = 0.010 * transgear_removable_spec.MM_PER_IN
+# The stock dowel's length grade, +/-0.010 in (the knob shaft's MHA-155 is the
+# same 98381A family and reads it here too).
+DRIVE_PIN_LENGTH_GRADE = 0.010 * transgear_removable_spec.MM_PER_IN
 DRIVE_PIN_PRESS_INTERFERENCE = (
     _DOWEL_OD[0] - (DRIVE_PIN_HOLE_DIA + DRIVE_PIN_HOLE_BAND[0]),
     _DOWEL_OD[1] - (DRIVE_PIN_HOLE_DIA + DRIVE_PIN_HOLE_BAND[1]),
@@ -316,16 +320,58 @@ if (
     raise AssertionError("shaft + wheel pin spacing error exceeds the slip clearance")
 _PROUD = crank_seat_drive_pin_spec.LENGTH - DRIVE_PIN_DEPTH
 DRIVE_PIN_PROUD_RANGE = (
-    _PROUD - DRIVE_PIN_DEPTH_TOL - _DOWEL_LENGTH_GRADE,
-    _PROUD + DRIVE_PIN_DEPTH_TOL + _DOWEL_LENGTH_GRADE,
-)
-if (
-    not 0.0
-    < DRIVE_PIN_PROUD_RANGE[0]
-    < DRIVE_PIN_PROUD_RANGE[1]
-    < transgear_removable_spec.PLATE
-):
-    raise AssertionError("a pressed drive pin leaves the wheel's plate at print-worst")
+    _PROUD - DRIVE_PIN_DEPTH_TOL - DRIVE_PIN_LENGTH_GRADE,
+    _PROUD + DRIVE_PIN_DEPTH_TOL + DRIVE_PIN_LENGTH_GRADE,
+)  # 2.046 .. 2.754
+if not 0.0 < DRIVE_PIN_PROUD_RANGE[0] < DRIVE_PIN_PROUD_RANGE[1]:
+    raise AssertionError("a pressed drive pin sinks below the seat face at print-worst")
+
+
+# What the proud tips can meet.  Nothing bears on the T12's front face: the
+# first thing in front of it is the crank hub's rear face (the end face of
+# its Ø16.5 relief, which covers the pin circle), the drive train's gap B
+# away.  The hub is set flush with the dome root, so its rear face sits at
+# local HUB_LENGTH +/-HUB_LENGTH_TOL.  The longest pin stands past the
+# THINNEST wheel's front face (2.754 > 2.7) into that gap, which is harmless;
+# what must hold is the tip's air to the hub (seat forward, hub long) and,
+# with the thinnest wheel floated forward onto the hub (seat aft, hub short),
+# the shortest pin's reach into the wheel's hole.
+def drive_pin_front_clearances(
+    proud_range: tuple[float, float],
+    *,
+    seat_face: float,
+    seat_face_band: tuple[float, float],
+    hub_rear: float,
+    hub_rear_tol: float,
+    plate_min: float,
+) -> tuple[float, float]:
+    """Worst-case ``(tip air to the hub rear face, floated engagement)`` of the
+    seat's drive pins, local stations from the dome root; raises when either
+    closes."""
+    seat_fwd = seat_face + min(seat_face_band)
+    seat_aft = seat_face + max(seat_face_band)
+    hub_air = seat_fwd - max(proud_range) - (hub_rear + hub_rear_tol)
+    wheel_float = seat_aft - plate_min - (hub_rear - hub_rear_tol)
+    engagement = min(proud_range) - wheel_float
+    if hub_air <= 0.0:
+        raise AssertionError(
+            f"the longest drive pin reaches the crank hub's rear face: air {hub_air:.3f}"
+        )
+    if engagement <= 0.0:
+        raise AssertionError(
+            f"the wheel floated onto the hub leaves the drive pins: {engagement:.3f}"
+        )
+    return hub_air, engagement
+
+
+DRIVE_PIN_HUB_AIR_WORST, DRIVE_PIN_ENGAGEMENT_WORST = drive_pin_front_clearances(
+    DRIVE_PIN_PROUD_RANGE,
+    seat_face=SEAT_COLLAR,
+    seat_face_band=SEAT_COLLAR_BAND,
+    hub_rear=HUB_LENGTH,
+    hub_rear_tol=HUB_LENGTH_TOL,
+    plate_min=transgear_removable_spec.PLATE + min(transgear_removable_spec.PLATE_BAND),
+)  # 0.196, 1.096
 # The collar stays clear of the outboard journal land at both print limits.
 if COLLAR_REAR + COLLAR_STATION_TOL >= JOURNAL_START - STATION_ROW:
     raise AssertionError(

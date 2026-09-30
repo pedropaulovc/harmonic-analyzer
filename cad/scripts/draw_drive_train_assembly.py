@@ -72,6 +72,7 @@ from crank_pinion_spec import (
     SEAT_FEELER_MM as PINION_SEAT_FEELER,
     T120_FITUP_ASSEMBLY_CHECK,
 )
+from crank_hub_notes import FRONT_FACE_DATUM as HUB_FRONT_FACE_DATUM
 from keeper_chain_spec import BEAD_COUNT as KEEPER_CHAIN_BEADS
 from drive_train_assembly_spec import (
     CLUSTERS,
@@ -538,7 +539,7 @@ CONE_CRANK_STEPS = "\n".join(
         # handle rides the MHA-139 shoulder screw. Wording from crankhub.
         "6. PRESS MHA-137 INTO MHA-020 TO THE SHOULDER, FACES FLUSH.",
         "   MATCH-DRILL/REAM THE SEAM Ø4 X 4.0 DEEP; DRIVE MHA-138 FLUSH. SLIDE",
-        "   ONTO MHA-026 AND SET THE HUB FRONT FACE FLUSH WITH THE SHAFT END,",
+        f"   ONTO MHA-026, SET HUB FRONT FACE FLUSH WITH THE {HUB_FRONT_FACE_DATUM},",
         "   PUNCH MARKS ALIGNED; ONLY THEN TAPER-REAM 1:48 THROUGH HUB AND",
         "   SHAFT; LIGHT-DRIVE MHA-024, REMOVABLE BY TAP ON SMALL END. HANG",
         # Codex #1140: the keeper chain's length and topology belong on the

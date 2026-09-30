@@ -360,8 +360,9 @@ if REMOVABLE.PIN_HOLE_ANGLES_DEG != (90.0, 270.0):
 # origin (the pilot's front tip) is that far in front.
 KNOB_SHAFT_Z0 = REMOVABLE.SEAT_FACE_Z - KNOB_SEAT_COLLAR  # -166.1
 KNOB_COLLAR_REAR_Z = KNOB_SHAFT_Z0 + KNOB_COLLAR_REAR  # -148.9
-# The two MHA-155 dowels pressed into the collar's blind holes (Rx-90: pin
-# +Y -> -Z), pressed end on DrivePinFloor, rounded end in the wheel's pin holes.
+# The two MHA-155 dowels pressed through the collar's reamed holes (Rx-90: pin
+# +Y -> -Z), pressed end on DrivePinFloor (the press stop's station, inside
+# the collar), rounded end in the wheel's pin holes.
 KNOB_DRIVE_PIN_Z0 = KNOB_SHAFT_Z0 + KNOB_DRIVE_PIN_FLOOR  # -150.1375
 if abs(KNOB_DRIVE_PIN_Z0 - KNOB_PIN.LENGTH - REMOVABLE.DRIVE_PIN_TIP_Z) > 1e-9:
     raise AssertionError("knob drive-pin tips are off the removable's DRIVE_PIN_TIP_Z")
@@ -425,7 +426,8 @@ if not (THUMBNUT_FRONT_Z < KNOB_SHAFT_FRONT_Z <= _THUMBNUT_DISC_MID_Z):
     )
 # The neck must actually RETAIN the wheel: cover its bore with a shoulder.
 # It bears across the pin circle, so the drive pins must end inside the
-# wheel's plate, short of the neck by at least the same air.
+# wheel's plate, short of the neck by at least the same air (at the press
+# stop's worst and the thinnest wheel, KNOB_PIN.TIP_INSET_WORST holds it).
 if THUMBNUT_NECK_DIA < REMOVABLE.BORE_DIA + 1.0:
     raise AssertionError(
         "thumbnut neck slips into the removable's bore -- retains nothing"
@@ -1720,10 +1722,10 @@ async def build(adapter) -> dict[str, str]:
         verify=(knob_shaft, shaft_o),
         witness_local=[0.0, KNOB_SEAT_COLLAR, REMOVABLE.PIN_CIRCLE_RADIUS],
     )
-    # The two MHA-155 dowels pressed into the seat collar's blind holes: pressed
-    # end on DrivePinFloor, rounded end forward in the T24's pin holes (Rx-90:
-    # pin +Y -> machine -Z). DrivePinAxis1 lies on the shaft's local +Z (machine
-    # -Y), DrivePinAxis2 opposite -- the crankshaft's convention.
+    # The two MHA-155 dowels pressed through the seat collar's reamed holes:
+    # pressed end on DrivePinFloor, rounded end forward in the T24's pin holes
+    # (Rx-90: pin +Y -> machine -Z). DrivePinAxis1 lies on the shaft's local +Z
+    # (machine -Y), DrivePinAxis2 opposite -- the crankshaft's convention.
     knob_pins = [
         await place_component(
             adapter,

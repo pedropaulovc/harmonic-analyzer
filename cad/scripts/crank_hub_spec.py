@@ -60,8 +60,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "HubProfile": {
         "SeatLength": 1,
         # Two places: front face to rear face with HUB_LENGTH_TOL.  The front
-        # face is set flush with the crankshaft end before the MHA-024 ream,
-        # so this length places the rear face against the removable.
+        # face is set flush with the crankshaft's dome root before the MHA-024
+        # ream, so this length places the rear face against the removable.
         "HubLength": 2,
         # Two places: printed from the rear face with RELIEF_LENGTH_TOL, the
         # length that keeps the #25 plates clear of the barrel's rear shoulder.

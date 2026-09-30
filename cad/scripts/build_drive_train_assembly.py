@@ -674,9 +674,9 @@ for _what, _air in (
 ):
     if _air < CHAIN_RADIAL_AIR_MIN - 1e-9:
         raise AssertionError(f"{_what} radial air {_air:.3f} < {CHAIN_RADIAL_AIR_MIN}")
-# The fitter lines the hub's front face up flush with the shaft end before
-# the match-ream, so the hub rear face is CRANK_FACE_Z + the printed hub
-# length; the arm's stock thickness is out of the stack.
+# The fitter lines the hub's front face up flush with the shaft's dome root
+# (CRANK_FACE_Z) before the match-ream, so the hub rear face is CRANK_FACE_Z
+# + the printed hub length; the arm's stock thickness is out of the stack.
 _HUB_REAR_Z_WORST = CRANK_HUB_REAR_Z + HUB_LENGTH_TOL
 _SEAT_FACE_Z_WORST = REMOVABLE.SEAT_FACE_Z + min(SEAT_COLLAR_BAND)
 _CHAIN_REACH_REAR_WORST = REMOVABLE.CHAIN_REACH_REAR_WORST

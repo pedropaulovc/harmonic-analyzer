@@ -164,3 +164,66 @@ def test_pin_chain_sits_right_of_the_teeth(name: str) -> None:
     """The location chain stands clear of the T24 tips on the face view."""
     tip_x = drawing.FRONT_CENTER[0] + spec.outside_dia(24) / 2.0 * drawing._S / 1000.0
     assert drawing.FRONT_KEEP[name][0] > tip_x + 0.005
+
+
+class _Result:
+    is_success = True
+    data = None
+    error = None
+
+
+class _Tolerance:
+    def __init__(self, kind: int, lower_mm: float, upper_mm: float) -> None:
+        self.Type = kind
+        self._limits = (lower_mm / 1000.0, upper_mm / 1000.0)
+
+    def GetMinValue(self) -> float:
+        return self._limits[0]
+
+    def GetMaxValue(self) -> float:
+        return self._limits[1]
+
+
+class _Configurations:
+    """A part whose tolerances are read per active configuration."""
+
+    def __init__(self, bands: dict[str, dict]) -> None:
+        self.bands = bands
+        self.active = spec.DEFAULT_CONFIG
+        self.visited: list[str] = []
+
+    async def set_active_configuration(self, name: str) -> _Result:
+        self.active = name
+        self.visited.append(name)
+        return _Result()
+
+
+def _readback(monkeypatch, adapter: _Configurations) -> None:
+    import asyncio
+    from types import SimpleNamespace
+
+    def named(_adapter, feature: str, dimension: str):
+        band = adapter.bands[adapter.active][(feature, dimension)]
+        return None, SimpleNamespace(Tolerance=_Tolerance(*band))
+
+    monkeypatch.setattr(part, "_named_dimension", named)
+    monkeypatch.setattr(part, "_early_bound", lambda obj, _interface: obj)
+    asyncio.run(part.assert_bands_in_every_configuration(adapter))
+
+
+def test_every_configuration_must_read_the_family_bands_back(monkeypatch) -> None:
+    """The sheet prints the plate and pin-location bands once for all three
+    sprockets, so the build reads them back in each configuration."""
+    bands = part.family_bands()
+    assert bands[("BlankProfile", "BlankWidth")][1:] == (-0.10, 0.0)
+    adapter = _Configurations({name: dict(bands) for name, _teeth in spec.CONFIGS})
+    _readback(monkeypatch, adapter)
+    assert adapter.visited == [name for name, _teeth in spec.CONFIGS] + [
+        spec.DEFAULT_CONFIG
+    ]
+    # Negative control: a band that stayed in the default configuration only
+    # (T12 untoleranced) must stop the build.
+    untoleranced = {name: dict(bands) for name, _teeth in spec.CONFIGS}
+    untoleranced["T12"][("BlankProfile", "BlankWidth")] = (0, 0.0, 0.0)
+    with pytest.raises(RuntimeError, match=r"T12: BlankWidth@BlankProfile"):
+        _readback(monkeypatch, _Configurations(untoleranced))

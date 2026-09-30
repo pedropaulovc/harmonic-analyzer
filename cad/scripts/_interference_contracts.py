@@ -367,8 +367,9 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
     frozenset(("bracket-screw-3", "support-bar-1")): _smooth_annulus_limit_mm3(
         4.1656, 3.454, 9.0
     ),
-    # The two MHA-155 dowels pressed into MHA-078's blind reamed seat-collar
-    # holes (ø2.38125 pin in a ø2.38 ream over the press depth): the press fit.
+    # The two MHA-155 dowels pressed into MHA-078's seat-collar holes, reamed
+    # through (ø2.38125 pin in a ø2.38 ream over the press depth, the pin's
+    # length inside the collar): the press fit.
     **_numbered_pairs(
         "transgear-knob-drive-pin",
         range(1, 3),

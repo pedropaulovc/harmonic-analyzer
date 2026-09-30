@@ -13,11 +13,14 @@ its axis).
 The seat is the one both removable shafts share (transgear_removable_spec):
 a O17.5 x 3.6 collar (the crank's seat-spigot diameter) whose FRONT face is
 the seat face the wheel's rear face bears on, the wheel piloted on the plain
-O9.525 shaft in front of it, and two MHA-155 dowels pressed into BLIND holes
-reamed PRESS_DEPTH into the collar from the seat face on the wheel's O14 pin
-circle. Each pin stands DRIVE_PIN_PROUD out of the seat face; the hole floor
-sits PIN_FLOOR_WALL in front of the collar's rear face, which stands
-DISC_AIR clear of the 120T disc (paper-drive asserts it).
+O9.525 shaft in front of it, and two MHA-155 dowels pressed into holes reamed
+THROUGH the collar on the wheel's O14 pin circle (a blind floor in a 3.6
+collar would be a web under the 1.5 wall floor). No floor stops the press:
+each pin is pressed in from the seat face onto a stop that leaves it
+DRIVE_PIN_PROUD out (knob_pin.PROUD_RANGE, printed on the MHA-155 sheet),
+its pressed end PIN_PRESS_DEPTH behind the seat face and inside the collar,
+whose rear face stands DISC_AIR clear of the 120T disc (paper-drive asserts
+it).
 
 Layout: axis +Y, origin at the FRONT tip of the pilot; the assembly rotates
 +Y to +Z (machine back) and places the seat face on the removable band's
@@ -27,9 +30,10 @@ rear section (latch small hub near the knob), knob.
 
 Named datums (blanked, selectable): ``Axis1`` the shaft axis; planes
 ``SeatCollar`` (seat face), ``CollarRear`` and ``DrivePinFloor`` (the pins'
-pressed-end station); axes ``DrivePinAxis1`` (local +Z) and
-``DrivePinAxis2`` (local -Z) through the pin holes -- the same names the
-crankshaft MHA-026 carries for the identical seat.
+pressed-end station -- the name the crankshaft's blind floor carries; here it
+is the press stop's station inside the through holes); axes ``DrivePinAxis1``
+(local +Z) and ``DrivePinAxis2`` (local -Z) through the pin holes -- the same
+names the crankshaft MHA-026 carries for the identical seat.
 
 Walls below the 1.5 floor: pin hole to the O9.525 shaft core 1.05
 (reported), pin hole to the collar rim (DRIVE_PIN_COLLAR_RIM_NOTE).
@@ -93,16 +97,34 @@ KNOB_LEN = 6.5
 
 PIN_CIRCLE_RADIUS = removable.PIN_CIRCLE_RADIUS  # 7, the wheel's pin circle
 PIN_HOLE_DIA = removable.DRIVE_PIN_HOLE_DIA  # 2.38 reamed for the press
-PIN_PRESS_DEPTH = knob_pin.PRESS_DEPTH  # 2.3625, blind from the seat face
+PIN_PRESS_DEPTH = knob_pin.PRESS_DEPTH  # 2.3625, pressed end behind the seat face
 
 # Local stations along +Y.
 SEAT_COLLAR = PILOT_LEN  # the seat face (SeatCollar datum)
 COLLAR_REAR = SEAT_COLLAR + COLLAR_LEN
-DRIVE_PIN_FLOOR = SEAT_COLLAR + PIN_PRESS_DEPTH  # blind holes' floor station
-PIN_FLOOR_WALL = COLLAR_LEN - PIN_PRESS_DEPTH  # 1.2375 to the collar rear
+DRIVE_PIN_FLOOR = SEAT_COLLAR + PIN_PRESS_DEPTH  # the pins' pressed-end station
+PIN_HOLE_DEPTH = COLLAR_LEN  # reamed THROUGH, seat face to rear face
 SEAT_END = COLLAR_REAR + SEAT_LEN
 KNOB_FACE = SEAT_END + REAR_LEN
 TIP = KNOB_FACE + KNOB_LEN
+
+# Drive-pin hole guards.
+WALL_FLOOR = 1.5  # drawing-simplicity policy rule 12 hard floor
+
+
+def pin_hole_meets_wall_floor(collar_len: float, hole_depth: float) -> bool:
+    """A drive-pin hole reamed ``hole_depth`` from the seat face into a collar
+    ``collar_len`` long either runs through it or leaves at least the wall
+    floor between its floor and the collar's rear face (pass print-worst
+    values: the longest hole in the shortest collar)."""
+    return hole_depth >= collar_len or collar_len - hole_depth >= WALL_FLOOR
+
+
+def pin_rear_inset(collar_len: float, pin_length: float, proud: float) -> float:
+    """How far a pin set ``proud`` out of the seat face keeps its pressed end
+    inside the collar's rear face (negative: it stands out of the rear)."""
+    return collar_len - (pin_length - proud)
+
 
 # Wall report (policy 2.0 target / 1.5 floor).
 PIN_HOLE_R = PIN_HOLE_DIA / 2.0
@@ -128,8 +150,21 @@ DRIVE_PIN_COLLAR_RIM_NOTE = (
     f"DRIVE-PIN HOLE TO COLLAR RIM {DRIVE_PIN_COLLAR_RIM_WORST:.2f} MIN."
 )
 
-if PIN_FLOOR_WALL <= 0.0:
-    raise AssertionError("the blind drive-pin holes break through the collar rear")
+if not pin_hole_meets_wall_floor(COLLAR_LEN, PIN_HOLE_DEPTH):
+    raise AssertionError("the drive-pin holes leave a floor under the 1.5 wall floor")
+# The stop sets the tip, so the longest dowel set lowest reaches furthest
+# back.  It must stay inside the collar even with the collar at the title
+# block's loosest .X row: behind the rear face lies only DISC_AIR before the
+# 120T disc, whose teeth sweep the pin circle.
+PIN_REAR_INSET_WORST = pin_rear_inset(
+    COLLAR_LEN - crankshaft_spec.STATION_ROW,
+    knob_pin.LENGTH + crankshaft_spec.DRIVE_PIN_LENGTH_GRADE,
+    min(knob_pin.PROUD_RANGE),
+)  # 0.08
+if PIN_REAR_INSET_WORST < 0.0:
+    raise AssertionError(
+        "a pressed knob drive pin stands out of the collar's rear face"
+    )
 _rim = COLLAR_DIA / 2.0 - PIN_CIRCLE_RADIUS - PIN_HOLE_R
 if abs(_rim - DRIVE_PIN_COLLAR_RIM) > 0.01:
     raise AssertionError("knob collar rim disagrees with SEAT_SPIGOT_RIM")
@@ -144,7 +179,7 @@ V_SHAFT = math.pi * (
     + (SEAT_DIA / 2.0) ** 2 * SEAT_LEN
     + (KNOB_DIA / 2.0) ** 2 * KNOB_LEN
 )
-V_PIN_HOLES = 2.0 * math.pi * PIN_HOLE_R**2 * PIN_PRESS_DEPTH
+V_PIN_HOLES = 2.0 * math.pi * PIN_HOLE_R**2 * PIN_HOLE_DEPTH
 V_TOTAL = V_SHAFT - V_PIN_HOLES
 
 
@@ -275,13 +310,14 @@ async def build(adapter) -> dict[str, str]:
         adapter, tuple((plane, "PLANE") for plane, _, _ in stations)
     )
 
-    # BLIND drive-pin holes, sketched on the DrivePinFloor station and cut
-    # toward Top (a cut's default runs opposite the sketch normal): PRESS_DEPTH
-    # through the collar to the seat face, then out into air over the O9.525
-    # pilot, so the extra millimetre only guarantees a clean break-out; the
-    # volume gate fails loud on a wrong-side cut.
+    # THROUGH drive-pin holes, sketched on the CollarRear station and cut
+    # toward Top (a cut's default runs opposite the sketch normal): the whole
+    # collar to the seat face, then out into air over the O9.525 pilot, so the
+    # extra millimetre only guarantees a clean break-out (behind the rear face
+    # lies only the O5 seat, well inside the holes); the volume gate fails loud
+    # on a wrong-side cut.
     holes = SketchDims()
-    check("create_sketch pin holes", await adapter.create_sketch("DrivePinFloor"))
+    check("create_sketch pin holes", await adapter.create_sketch("CollarRear"))
     set_sketch_direct_db(adapter, True)
     for label, z in (("PinPos", PIN_CIRCLE_RADIUS), ("PinNeg", -PIN_CIRCLE_RADIUS)):
         await define_circle(
@@ -302,7 +338,7 @@ async def build(adapter) -> dict[str, str]:
     check(
         "cut pin holes",
         await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=PIN_PRESS_DEPTH + 1.0)
+            ExtrusionParameters(depth=PIN_HOLE_DEPTH + 1.0)
         ),
     )
     name_last_feature(adapter, "PinHoles")
@@ -338,8 +374,9 @@ async def build(adapter) -> dict[str, str]:
     _telemetry.info(
         f"seat collar walls (floor 1.5): pin hole to shaft core"
         f" {WALL_PIN_TO_CORE:.2f}; {DRIVE_PIN_COLLAR_RIM_NOTE} (nominal"
-        f" {DRIVE_PIN_COLLAR_RIM:.2f}); blind-hole floor {PIN_FLOOR_WALL:.4f} in"
-        f" front of the collar rear"
+        f" {DRIVE_PIN_COLLAR_RIM:.2f}); pin holes reamed through, pins set"
+        f" {min(knob_pin.PROUD_RANGE):.2f}..{max(knob_pin.PROUD_RANGE):.2f} proud,"
+        f" pressed end {PIN_REAR_INSET_WORST:.4f} min inside the collar rear"
     )
 
     await apply_material(adapter, MATERIAL)

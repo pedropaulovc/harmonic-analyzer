@@ -22,8 +22,9 @@ trip up anyone reasoning about this model:
    (0.538) — with FACE members no definition-level route touches the mate. AXIS
    members give the mate no face to steal from, so the typed diameters drive it
    exactly (measured +0.5000 live; see [[belt-chain-feature-com-binding]]). The
-   probe asserts BOTH: ratio 0.500 ± 0.03 (tip-face 0.538 fails it) AND same
-   sign of the two sprockets' SIGNED Z rotations.
+   probe asserts BOTH: ratio 0.500 ± `CHAIN_RATIO_TOL` (≈0.0011, derived from a
+   0.02° per-reading slack; rejects the OD 0.5286, the tip-face 0.538 and the
+   pitch-circle 0.5043) AND same sign of the two sprockets' SIGNED Z rotations.
 
 2. **The knob shaft's modeled spin axis is PERPENDICULAR to the sprockets'.** T24
    and the fine pinion spin about global Z; the `transgear-knob-shaft` (placed

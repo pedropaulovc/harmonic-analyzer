@@ -86,13 +86,16 @@ SEAT_CALLOUT = seat_callout("MHA-020")
 SEAM_CALLOUT = seam_callout("MHA-020")
 # The cross-hole is drilled, then taper-reamed through hub and shaft together.
 # The ream fixes the hub on the shaft for good, so the front face is set flush
-# with the crankshaft's end first (the arm front is already flush with the hub
-# front from the seat press); the prose reads under the native #14 drill size,
-# in the order the work is done.
+# with the crankshaft's dome root first -- the crank face, CRANK_FACE_Z, where
+# the 3/8 in cylinder meets the dome; the dome stands proud of the hub (the
+# arm front is already flush with the hub front from the seat press).  The
+# MHA-A03 hub step prints the same datum.  The prose reads under the native
+# #14 drill size, in the order the work is done.
+FRONT_FACE_DATUM = "MHA-026 DOME ROOT"
 CROSS_HOLE_CALLOUT = "\n".join(
     (
         "FRONT FACE FLUSH WITH",
-        "CRANKSHAFT MHA-026 END;",
+        f"{FRONT_FACE_DATUM};",
         "MATCH TAPER-REAM 1:48 FOR",
         "MHA-024: LIGHT DRIVE FIT",
     )
@@ -101,9 +104,9 @@ CROSS_HOLE_CALLOUT = "\n".join(
 # Axial stack at the printed worst case (Main, 2026-09-30), machine z, -Z =
 # FRONT, with a bought ANSI #25 chain on the crank T12.  Not printed: the
 # drive train asserts both from the same names (build_drive_train_assembly).
-# The hub is placed by the fitter (front face flush with the shaft end, the
-# crank face z -183, before the match-ream), so its printed overall length --
-# not the arm's stock thickness -- places its rear face.
+# The hub is placed by the fitter (front face flush with the shaft's dome
+# root, the crank face z -183, before the match-ream), so its printed
+# overall length -- not the arm's stock thickness -- places its rear face.
 #   Links:
 #     crank face                    CRANK_FACE_Z                     -183
 #     hub overall, front to rear    HUB_LENGTH +/- HUB_LENGTH_TOL    27 +/-0.05

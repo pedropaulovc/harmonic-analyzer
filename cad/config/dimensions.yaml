@@ -212,7 +212,7 @@ sections:
         - user ruling
         - med
       - - Separate crank hub MHA-137
-        - 'Ø19.4 × 8 through-seat; Ø20.6 rear barrel × 15.4 (z −175..−159.6) then a Ø16.5 × 3.6 chain-relief spigot to overall length 27 ±0.05 from the front face (lined up flush with the shaft end before the MHA-024 match-ream) (rear face z −156, 0.7 air in front of the removable T12; the #25 plates wrapping the T12 pass over the relief); Ø9.550 +0.030/−0.000 through bore'
+        - 'Ø19.4 × 8 through-seat; Ø20.6 rear barrel × 15.4 (z −175..−159.6) then a Ø16.5 × 3.6 chain-relief spigot to overall length 27 ±0.05 from the front face (front face lined up flush with the MHA-026 dome root, z −183, before the MHA-024 match-ream) (rear face z −156, 0.7 air in front of the removable T12; the #25 plates wrapping the T12 pass over the relief); Ø9.550 +0.030/−0.000 through bore'
         - —
         - 'primary construction photo and user-confirmed through-hub topology. The arm and hub are a matched light arbor-press fit against the shoulder; the bore reuses the project shaft-in-bushing fit, giving 0.025..0.075 diametral shaft clearance.'
         - derived construction
@@ -1670,7 +1670,7 @@ sections:
         - scaled + derived
         - med
       - - Knob shaft (rework E8)
-        - 'stepped Ø9.525, through the latch small hub at pre-mirror (42.575, 252.367), spanning machine z −166.1 → −130: front pilot −166.1..−152.5 (thumbnut and the removable sprocket''s Ø10.3 bore), integral Ø17.5 × 3.6 seat collar −152.5..−148.9 (0.5 air to the third gear) carrying two 3/32 × 3/16 dowels (MHA-155) pressed in blind holes, standing 2.4 proud of the seat face (T24 sprocket plate −155.3..−152.5, #25 chain plane −153.9), Ø5 third-gear seat −148.4..−142.9 (12T DP38 at −148.4..−144.4), hub ride to −130; Ø20 × 6.5 brass thumb knob ending at −123.5'
+        - 'stepped Ø9.525, through the latch small hub at pre-mirror (42.575, 252.367), spanning machine z −166.1 → −130: front pilot −166.1..−152.5 (thumbnut and the removable sprocket''s Ø10.3 bore), integral Ø17.5 × 3.6 seat collar −152.5..−148.9 (0.5 air to the third gear) carrying two 3/32 × 3/16 dowels (MHA-155) pressed from the seat face into Ø2.38 holes reamed through the collar, set 2.3..2.5 proud of the seat face on a press stop (T24 sprocket plate −155.3..−152.5, #25 chain plane −153.9), Ø5 third-gear seat −148.4..−142.9 (12T DP38 at −148.4..−144.4), hub ride to −130; Ø20 × 6.5 brass thumb knob ending at −123.5'
         - —
         - '`v4_transgear_008/020` + ch. 23 topology; stack derived from the disc window −148.4..−145.4 (0.3 in front of the platen furniture''s deepest reach) and the −153.9 chain plane both shafts share (`transgear_removable_spec`)'
         - scaled + derived

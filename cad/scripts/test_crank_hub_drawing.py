@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -165,14 +166,47 @@ def test_matched_fits_and_distinct_pins_live_on_their_feature_callouts() -> None
     assert seam.splitlines()[0] == "(<MOD-DIAM>4.0) <HOLE-DEPTH> 4.0"
     assert "O'CLOCK" not in seam
     # The taper-pin cross-hole names both mates and the fit on its callout,
-    # after the front face is set flush with the shaft end it is reamed with.
+    # after the front face is set flush with the datum it is reamed at.
     cross_hole = crank_hub_notes.CROSS_HOLE_CALLOUT
     assert "MHA-024" in cross_hole and "MHA-026" in cross_hole
     assert "LIGHT DRIVE FIT" in cross_hole
     flush = cross_hole.index("FRONT FACE FLUSH")
-    assert "END" in cross_hole[flush:] and flush < cross_hole.index("TAPER-REAM")
+    assert flush < cross_hole.index("TAPER-REAM")
     # The bore band governs; the clearance is a reference restatement.
     assert crank_hub_notes.BORE_CALLOUT.splitlines()[1].startswith("(")
+
+
+def _hub_front_face_datum(text: str) -> str:
+    """The feature a printed text sets the hub's front face flush with."""
+    _, found, after = " ".join(text.split()).partition("FRONT FACE FLUSH WITH ")
+    assert found, text
+    return re.split(r"[;,]", after.removeprefix("THE "), maxsplit=1)[0]
+
+
+def _names_the_dome_root(datum: str) -> bool:
+    words = datum.split()
+    return datum.endswith("DOME ROOT") and "MHA-026" in words and "END" not in words
+
+
+def test_hub_front_face_is_set_on_the_dome_root_the_model_places_it_at() -> None:
+    """The model seats the hub front face on the crankshaft's dome root (the
+    shaft part's origin, CRANK_FACE_Z); the dome tip stands proud of it.  Set
+    flush with the shaft END, the hub would sit a dome height forward and open
+    the hub/T12 air past the drive pins' proud length.  Both texts that place
+    the hub -- its cross-hole callout and the MHA-A03 hub step -- name the root."""
+    import build_drive_train_assembly as assembly
+    import draw_drive_train_assembly as package
+
+    assert assembly.CRANK_HUB_Z0 == assembly.CRANKSHAFT_Z0 == assembly.CRANK_FACE_Z
+    hub_step = package.CONE_CRANK_STEPS.split("\n6. ")[1].split("\n7. ")[0]
+    for text in (crank_hub_notes.CROSS_HOLE_CALLOUT, hub_step):
+        assert _names_the_dome_root(_hub_front_face_datum(text)), text
+    # Negative control: the shaft-END wording both texts printed fails the check.
+    for old in (
+        "FRONT FACE FLUSH WITH\nCRANKSHAFT MHA-026 END;\nMATCH TAPER-REAM 1:48 FOR",
+        "SET THE HUB FRONT FACE FLUSH WITH THE\n   SHAFT END, PUNCH MARKS ALIGNED;",
+    ):
+        assert not _names_the_dome_root(_hub_front_face_datum(old)), old
 
 
 def test_seam_callout_attaches_to_the_hub_seam_clear_of_the_bore_callout() -> None:

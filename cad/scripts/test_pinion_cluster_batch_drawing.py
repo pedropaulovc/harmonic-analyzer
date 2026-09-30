@@ -521,7 +521,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(("bracket-screw-3", "support-bar-1")): _annulus_limit(
                 4.1656, 3.454, 9.0
             ),
-            # MHA-155 3/32 x 3/16 dowels pressed into MHA-078's blind 2.38 reams.
+            # MHA-155 3/32 x 3/16 dowels pressed into MHA-078's through 2.38 reams.
             **_expected_numbered_pairs(
                 "transgear-knob-drive-pin",
                 range(1, 3),

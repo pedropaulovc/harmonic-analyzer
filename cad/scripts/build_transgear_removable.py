@@ -55,6 +55,7 @@ from _common import (
     IN,
     OUT_PNG,
     SketchDims,
+    _early_bound,
     add_line_chain,
     apply_material,
     check,
@@ -70,6 +71,7 @@ from _common import (
     set_sketch_direct_db,
 )
 from _drawing_marks import (
+    _named_dimension,
     apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -120,6 +122,62 @@ for _name, _teeth in spec.CONFIGS:
     _g = spec.gap_geometry(_teeth)
     if _g["corner_x"] <= _g["rp"]:
         raise AssertionError(f"{_name}: tip corner inside the pitch radius")
+
+
+_TOL_BILAT = 2  # swTolType_e.swTolBILAT
+_TOL_SYMMETRIC = 4  # swTolType_e.swTolSYMMETRIC
+
+
+def family_bands() -> dict[tuple[str, str], tuple[int, float, float]]:
+    """``(feature, dimension) -> (tolerance type, lower, upper)`` in mm: the
+    bands the sheet prints once for T12, T18 and T24 (they share the plate
+    and the pin holes), as the build sets them below."""
+    pin = (_TOL_SYMMETRIC, -spec.DRIVE_PIN_OFFSET_TOL, spec.DRIVE_PIN_OFFSET_TOL)
+    return {
+        ("BlankProfile", "BlankWidth"): (_TOL_BILAT, *deviations(spec.PLATE_BAND)),
+        ("BorePinsProfile", "PinPosY"): pin,
+        ("BorePinsProfile", "PinNegY"): pin,
+    }
+
+
+async def assert_bands_in_every_configuration(adapter) -> None:
+    """Read the family's bands back in each configuration.
+
+    ``SetValues`` writes them with the default configuration active and names
+    no configuration, so nothing else proves T12 and T18 carry them.  The
+    sheet's views show T24, but the shop makes all three from it.
+    """
+    expected = family_bands()
+    for name, _teeth in spec.CONFIGS:
+        check(
+            f"activate {name} for the band readback",
+            await adapter.set_active_configuration(name),
+        )
+        for (feature, dimension_name), (kind, lower, upper) in expected.items():
+            _display, dimension = _named_dimension(adapter, feature, dimension_name)
+            tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+            observed = (
+                int(tolerance.Type),
+                float(tolerance.GetMinValue()) * 1000.0,
+                float(tolerance.GetMaxValue()) * 1000.0,
+            )
+            if (
+                observed[0] != kind
+                or abs(observed[1] - lower) > 1e-6
+                or abs(observed[2] - upper) > 1e-6
+            ):
+                raise RuntimeError(
+                    f"{name}: {dimension_name}@{feature} tolerance reads "
+                    f"type {observed[0]} {observed[1]:+g}/{observed[2]:+g} mm, "
+                    f"expected type {kind} {lower:+g}/{upper:+g} mm"
+                )
+    check(
+        f"re-activate {spec.DEFAULT_CONFIG} after the band readback",
+        await adapter.set_active_configuration(spec.DEFAULT_CONFIG),
+    )
+    _telemetry.success(
+        f"plate and pin-location bands read back in {len(spec.CONFIGS)} configurations"
+    )
 
 
 def gap_globals(atn_rad: str, teeth: int) -> list[tuple[str, str, float]]:
@@ -671,6 +729,7 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_symmetric_tolerance(
         adapter, "BorePinsProfile", "PinNegY", spec.DRIVE_PIN_OFFSET_TOL
     )
+    await assert_bands_in_every_configuration(adapter)
     apply_drawing_precision(adapter, spec.DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
