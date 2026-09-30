@@ -37,11 +37,16 @@ SURFACE_FINISHES = (
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PinProfile": {"Length"},
 }
+# One place: the pin length is a hand-fitted part's overall size, held to the
+# general .X band.
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "PinProfile": {"Length": 1},
+}
 
 DRAWING_NOTES = "\n".join(
     (
         "CUSTOM 1:48 SELF-HOLDING TAPER (0.9375 ON DIA OVER 45.0) BETWEEN THE END "
-        "DIAMETERS SHOWN: TURN IN ONE CONTINUOUS PASS; NO STEPS.",
+        "DIAMETERS SHOWN; NO STEPS.",
         "HAND-FIT TO THE CRANK-HUB CROSS-HOLE, TAPER-REAMED WITH THE SHAFT AT "
         "ASSEMBLY TO THE SAME 1:48; LIGHT DRIVE FIT, REMOVABLE BY TAP ON SMALL END.",
         f"DRILL DIA {RING_HOLE_DIA:.2f} THRU ACROSS THE AXIS {RING_HOLE_X:.2f} FROM THE BIG END "
