@@ -2,13 +2,15 @@ r"""Purchased keeper chain: McMaster-Carr 3606T118 brass bead chain (MHA-149).
 
 The chain tying the crank's removable taper pin to the arm (ch11 p.14; the
 original is lost), cut to ``keeper_chain_spec.BEAD_COUNT`` beads and modelled
-in its installed rest pose. It is authored in the spec's crank frame, and the
-drive train places it with an identity rotation.
+in its installed rest pose. It is authored in machine axes with its origin on
+its first bead (``keeper_chain_spec.CHAIN_PART_ORIGIN``), and the drive train
+places it there with an identity rotation. (Authored in the crank frame, with
+a reference plane for the seed, its drawing views came out at 1:4 on an empty
+sheet.)
 
 Recipe:
 
-1. ``SeedBead``, one bead revolved on a Front-parallel plane through the first
-   centre.
+1. ``SeedBead``, one bead revolved on the Front plane at the origin.
 2. ``BeadPoints``, a 3D sketch holding a point at every other bead centre.
 3. ``Beads``, a sketch-driven BODY pattern of the seed onto those points,
    using the seed's centroid (its centre) as the reference point.
@@ -59,9 +61,8 @@ from _common import (
 )
 from _drawing_marks import apply_drawing_properties
 from _saved_part_guard import require_saved_drawing_properties
-from _visibility import blank_reference_geometry
 from keeper_chain_spec import (
-    BEAD_CENTRES,
+    CHAIN_PART_BEADS as BEAD_CENTRES,
     BEAD_COUNT,
     BEAD_R,
     CHAIN_DRAWING_NOTES,
@@ -115,17 +116,12 @@ def _body_count(adapter) -> int:
 
 
 async def _seed_bead(adapter) -> None:
-    from solidworks_mcp.adapters.base import CreatePlaneParameters, RevolveParameters
+    from solidworks_mcp.adapters.base import RevolveParameters
 
-    x0, y0, z0 = BEAD_CENTRES[0]
-    check(
-        "seed plane",
-        await adapter.create_plane(
-            CreatePlaneParameters(mode="offset", base_plane="Front Plane", offset=z0)
-        ),
-    )
-    name_last_feature(adapter, "SeedPlane")
-    check("create_sketch seed bead", await adapter.create_sketch("SeedPlane"))
+    # The part's origin is the first bead's centre: the seed sits on the
+    # Front plane at the origin and needs no reference plane.
+    x0, y0, _ = BEAD_CENTRES[0]
+    check("create_sketch seed bead", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     check("seed axis", await adapter.add_centerline(x0, y0 - BEAD_R, x0, y0 + BEAD_R))
     arc = check(
@@ -277,7 +273,6 @@ async def build(adapter) -> dict[str, str]:
     if max(abs(g - w) for g, w in zip(got, want)) > 0.02:
         raise RuntimeError(f"keeper chain centre of mass {got} != analytic {want}")
     _telemetry.success(f"keeper chain: centre of mass {got} matches {want}")
-    blank_reference_geometry(adapter, (("SeedPlane", "PLANE"),))
     blank_reference_sketches(adapter, ("BeadPoints",))
     await apply_material(adapter, MATERIAL)
     apply_custom_properties(adapter, STOCK_PROPERTIES)

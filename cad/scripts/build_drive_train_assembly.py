@@ -4190,7 +4190,7 @@ async def build(adapter) -> dict[str, str]:
     chain = await place_component(
         adapter,
         "keeper-chain",
-        list(CRANK_FRAME_ORIGIN),
+        [c + o for c, o in zip(CRANK_FRAME_ORIGIN, keeper_chain_spec.CHAIN_PART_ORIGIN)],
         [0.0, 0.0, 0.0],
         IDENTITY,
         ground=False,

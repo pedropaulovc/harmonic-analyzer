@@ -550,3 +550,10 @@ def link_volume(steps: int = 72) -> float:
 # 94 characters, ran 0.204 m and failed drawing:keeper_chain).
 CHAIN_DRAWING_NOTES = f"CUT TO {BEAD_COUNT} BEADS ({CHAIN_LENGTH:.0f} MM); CLOSED BY MHA-150."
 LINK_DRAWING_NOTES = "JOINS THE MHA-149 ENDS: ONE BEAD PER DOME."
+
+# The chain part's own frame: machine axes, origin on its first bead (the
+# ring-side end bead, inside the link). Its seed bead then needs no
+# reference plane, and the part's origin sits on its body. The drive train
+# places it at the crank frame plus CHAIN_PART_ORIGIN.
+CHAIN_PART_ORIGIN: Vec = BEAD_CENTRES[0]
+CHAIN_PART_BEADS: tuple[Vec, ...] = tuple(_sub(p, CHAIN_PART_ORIGIN) for p in BEAD_CENTRES)
