@@ -336,6 +336,15 @@ def _holddown_z_text_box() -> tuple[float, float, float, float]:
     return (x - 0.013, y - 0.0025, x, y + 0.0025)
 
 
+def _holddown_x_text_box() -> tuple[float, float, float, float]:
+    """HoldDownX's text frame as the audit read it (run 20260930T041147948Z):
+    centred on the keep x, standing on its dimension line."""
+    x, y = drawing.DETAIL_KEEP["HoldDownX"]
+    w, h = drawing.HOLDDOWN_X_TEXT_SIZE
+    line_y = y - drawing.HOLDDOWN_X_LINE_DROP
+    return (x - w / 2.0, line_y, x + w / 2.0, line_y + h)
+
+
 def _holddown_callout_box() -> tuple[float, float, float, float]:
     x, y = drawing.HOLDDOWN_CALLOUT_XY
     return (x - 0.025, y - 0.010, x + 0.025, y + 0.004)
@@ -408,6 +417,7 @@ def test_holddown_band_clears_border_title_block_and_captions() -> None:
         "detail label": (label_x, label_y, label_x + 0.0315, label_y + 0.0162),
         "detail outline": outline,
         "10.45": _holddown_z_text_box(),
+        "1.00 ±0.1": _holddown_x_text_box(),
         "C-C strip": _holddown_strip(),
         "C-C label": _holddown_label(),
         "hold-down callout": _holddown_callout_box(),
@@ -422,8 +432,13 @@ def test_holddown_band_clears_border_title_block_and_captions() -> None:
         for caption in captions:
             assert not _boxes_overlap(box, caption), (name, caption)
     names = list(ours)
+    # HoldDownX is detail B's own dimension, so its text may stand in the
+    # detail's padded outline (the test below keeps it off the circle).
+    own = {("detail outline", "1.00 ±0.1")}
     for i, first in enumerate(names):
         for second in names[i + 1 :]:
+            if (first, second) in own:
+                continue
             assert not _boxes_overlap(ours[first], ours[second]), (first, second)
     # The 10.45 text sits outside its own extension-line span (pivot to hole),
     # so SolidWorks hangs it off the line instead of centring the line through
@@ -550,44 +565,38 @@ def test_holddown_hole_is_the_ruled_counterbore_for_the_tip_block_screw() -> Non
     assert block.FOOT_TAP_OFFSET_X == spec.HOLDDOWN_LOCAL_X
 
 
-def test_holddown_x_is_a_banded_dimension_hanging_inside_detail_b() -> None:
+def test_holddown_x_is_a_banded_dimension_hanging_right_of_detail_b() -> None:
     """User ruling 2026-09-29: the hole's lateral station prints as HoldDownX
-    at .XX with +/-0.10, in detail B.  Its 2 mm span cannot hold the text, so
-    the text hangs sheet-right, between the pivot relief and the hole's rim,
-    with every corner inside the detail's circle (not just its bounding
-    square: run 20260930T030604208Z ran the text out through the circle)."""
+    at .XX with +/-0.10, in detail B.  Its 2 mm span cannot hold the text,
+    and inside the circle the text either ran out through the outline (run
+    20260930T030604208Z) or under the plate's east edge (run
+    20260930T041147948Z), so it hangs sheet-right OUTSIDE the circle (user
+    ruling 2026-09-30): every corner off the circle, clear of section C-C's
+    strip and label, its line clear of the hole's rim and the pivot relief."""
     assert drawing_spec.DRAWING_PRECISION["HoldDownHole"] == {
         "HoldDownX": 2,
         "HoldDownZ": 2,
     }
     assert spec.HOLDDOWN_STATION_TOL_MM == 0.10
-    x, y = drawing.DETAIL_KEEP["HoldDownX"]
-    # "1.00 ±0.1" at 3.5 mm rendered 19.5 wide, centred ~1.2 left of its keep
-    # x (run 20260930T030604208Z); pad a millimetre each way.
-    text = (x - 0.0115, y - 0.0025, x + 0.0095, y + 0.0025)
-    s = drawing._DETAIL_S
-    rim = spec.HOLDDOWN_CLEARANCE_DIA / 2.0 * s
-    hole = (
-        drawing.DETAIL_HOLDDOWN_X - rim,
-        drawing.DETAIL_HOLDDOWN_Y - rim,
-        drawing.DETAIL_HOLDDOWN_X + rim,
-        drawing.DETAIL_HOLDDOWN_Y + rim,
-    )
-    relief_r = spec.PIVOT_BEARING_RELIEF_DIAMETER / 2.0 * s
-    relief = (
-        drawing.DETAIL_CENTER[0] - relief_r,
-        drawing.DETAIL_PIVOT_Y - relief_r,
-        drawing.DETAIL_CENTER[0] + relief_r,
-        drawing.DETAIL_PIVOT_Y + relief_r,
-    )
-    assert not _boxes_overlap(text, hole)
-    assert not _boxes_overlap(text, relief)
-    # Outside its own extension-line span, so SolidWorks hangs it.
-    assert text[0] > max(drawing.DETAIL_HOLDDOWN_X, drawing.DETAIL_CENTER[0])
+    text = _holddown_x_text_box()
     cx, cy = drawing.DETAIL_CENTER
     for corner_x in (text[0], text[2]):
         for corner_y in (text[1], text[3]):
-            assert math.dist((corner_x, corner_y), (cx, cy)) <= drawing.DETAIL_SHEET_RADIUS
+            assert (
+                math.dist((corner_x, corner_y), (cx, cy))
+                >= drawing.DETAIL_SHEET_RADIUS + 0.001 - 1e-9
+            )
+    # The audit boxed section C-C's view 26 mm left of its centre (run
+    # 20260930T041147948Z); the text ends 2 mm short of it.
+    strip_left = drawing.HOLDDOWN_SECTION_CENTER[0] - 0.026
+    assert text[2] <= strip_left - 0.002
+    assert text[1] >= drawing.HOLDDOWN_SECTION_LABEL_LOWER_LEFT[1] + 0.0162 + 0.004
+    s = drawing._DETAIL_S
+    line_y = text[1]
+    rim_bottom = drawing.DETAIL_HOLDDOWN_Y - spec.HOLDDOWN_CLEARANCE_DIA / 2.0 * s
+    relief_top = drawing.DETAIL_PIVOT_Y + spec.PIVOT_BEARING_RELIEF_DIAMETER / 2.0 * s
+    arrow_half = 0.0005
+    assert relief_top + arrow_half < line_y < rim_bottom - arrow_half
 
 
 def test_holddown_print_worst_stack_keeps_its_margins() -> None:

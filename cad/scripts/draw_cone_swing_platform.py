@@ -73,7 +73,6 @@ from cone_swing_platform_spec import (
     HOLDDOWN_CLEARANCE_DIA,
     HOLDDOWN_LOCAL_X,
     HOLDDOWN_LOCAL_Z,
-    PIVOT_BEARING_RELIEF_DIAMETER,
     PIVOT_HOLE_DIA,
     PLATE_STOCK_CALLOUT,
     PLATE_THICKNESS,
@@ -211,19 +210,33 @@ DETAIL_HOLDDOWN_X = DETAIL_CENTER[0] + HOLDDOWN_LOCAL_X * _DETAIL_S
 # above the detail label, leaving the band's right half to section C-C.
 # HoldDownX (1.00, pivot bore to hole, 2 mm apart at 2:1) is far too short
 # to hold its text, so the text hangs off its dimension line to sheet-right.
-# Above the hole's rim the circle is too narrow for it: at 0.0634 the ~19.5
-# mm "1.00 ±0.1" ran out through the detail outline (run
-# 20260930T030604208Z, machinist review 2026-09-30).  So the line runs
-# through the 7.35 mm band between the pivot relief (sheet-down) and the
-# hole's rim, the text centred in it; its far corner is 22.5 mm from the
-# detail centre, inside the 24 mm circle.
-HOLDDOWN_X_TEXT_BAND = (
-    DETAIL_PIVOT_Y + PIVOT_BEARING_RELIEF_DIAMETER / 2.0 * _DETAIL_S,
-    DETAIL_HOLDDOWN_Y - HOLDDOWN_CLEARANCE_DIA / 2.0 * _DETAIL_S,
+# Inside the circle it has no clean home: above the hole's rim (0.0634) the
+# ~18.5 mm "1.00 ±0.1" ran out through the detail outline (run
+# 20260930T030604208Z, machinist review 2026-09-30), and in the band under
+# the rim the plate's east edge struck through its "0.1" (run
+# 20260930T041147948Z).  So the text stands OUTSIDE the circle, right of
+# it, and its dimension line runs out across the plate edge and the outline
+# (user ruling 2026-09-30).  On that run the audit read the text frame
+# (" 1.00 ±0.1 ", spaces included) 21.96 x 3.5 mm, centred on the keep x
+# and standing on the dimension line, 2.78 mm under the keep y.  Here the
+# line passes 1.1 mm under the hole's rim, the frame's lower-left corner
+# stands 1 mm off the circle, its right end 4 mm short of section C-C's
+# view box and its foot 5 mm over that section's label (top 0.0447).
+HOLDDOWN_X_TEXT_SIZE = (0.02196, 0.0035)
+HOLDDOWN_X_LINE_DROP = 0.00278
+HOLDDOWN_X_LINE_Y = (
+    DETAIL_HOLDDOWN_Y - HOLDDOWN_CLEARANCE_DIA / 2.0 * _DETAIL_S - 0.0011
+)
+_HOLDDOWN_X_TEXT_X = (
+    DETAIL_CENTER[0]
+    + math.sqrt(
+        (DETAIL_SHEET_RADIUS + 0.001) ** 2 - (HOLDDOWN_X_LINE_Y - DETAIL_CENTER[1]) ** 2
+    )
+    + HOLDDOWN_X_TEXT_SIZE[0] / 2.0
 )
 DETAIL_KEEP = {
     "HoldDownZ": (0.044, DETAIL_HOLDDOWN_Y + 0.0045),
-    "HoldDownX": (DETAIL_HOLDDOWN_X + 0.0145, sum(HOLDDOWN_X_TEXT_BAND) / 2.0),
+    "HoldDownX": (_HOLDDOWN_X_TEXT_X, HOLDDOWN_X_LINE_Y + HOLDDOWN_X_LINE_DROP),
 }
 # The native "DETAIL B / SCALE 2:1" label, moved by its measured extent:
 # lower left of its box, in the band's lower-left corner.
@@ -256,22 +269,25 @@ ENGAGEMENT_NOTE_XY = (0.222, 0.0795)
 # width (5.5 model mm at 1:2) plus 1.5.
 HOLDDOWN_SECTION_LINE_X_MM = (-26.0, 24.0)
 # 1:1, full width: the strip is the plate edge-on, 27.06 x 6.35 (sheet
-# x 0.1295..0.1565, y 0.0493..0.0557; ~4 mm outline padding), in the free
-# band's right half: right of detail B's outline (x 0.1179), its native label
-# centred under it and above the relief note (y 0.0275).
-HOLDDOWN_SECTION_CENTER = (0.143, 0.0525)
+# x 0.1465..0.1735, y 0.0493..0.0557; ~4 mm outline padding), in the free
+# band's right half, its native label centred under it and above the relief
+# note (y 0.0275).  It stands 17 mm right of where it began (0.143) so
+# HoldDownX's text can hang outside detail B: the audit boxed this view 26
+# mm left of its centre (run 20260930T041147948Z), now x 0.134, 4 mm past
+# that text's end.
+HOLDDOWN_SECTION_CENTER = (0.160, 0.0525)
 # The native label box measured 46.5 x 16.2 mm; centred under the strip,
 # its top (0.0447) under the strip's padded outline (0.0453).
 HOLDDOWN_SECTION_LABEL_LOWER_LEFT = (HOLDDOWN_SECTION_CENTER[0] - 0.02325, 0.0285)
 # The hold-down callout (the drilled Ø3.05 THRU ALL, then the Ø5.56
 # counterbore and its 3.50 depth), above and right of the strip.  RD1's
 # render put the text's centre on the requested x and its baseline 2.7 mm
-# under the requested y, so the two lines sit in ~x 0.133..0.183,
+# under the requested y, so the two lines sit in ~x 0.150..0.200,
 # y 0.062..0.076: over the strip's padded outline (0.0597), under the plan
 # captions (0.0805), left of the title block (0.216).  Its leader drops to
-# the counterbore's sheet-right wall (x ~0.148: the wall is 15.66 west of
+# the counterbore's sheet-right wall (x ~0.165: the wall is 15.66 west of
 # the strip's east end).
-HOLDDOWN_CALLOUT_XY = (0.158, 0.072)
+HOLDDOWN_CALLOUT_XY = (HOLDDOWN_SECTION_CENTER[0] + 0.015, 0.072)
 # The lock-notch caption sits directly under its own view, not on the plan
 # caption row (aa9766da printed it there, where it read as a section's
 # caption).  Its 59.7 x 4.8 mm box, anchored upper-left and centred under
