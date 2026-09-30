@@ -63,6 +63,9 @@ def test_oak_ends_in_a_ferrule_tenon_and_a_cup_counterbore() -> None:
     assert crank_handle_spec.COUNTERBORE_DIA_MAX == pytest.approx(11.9)
     assert "11.9 MAX" in crank_handle_spec.DRAWING_NOTES
     assert crank_handle_spec.COUNTERBORE_MOUTH_WALL >= 1.5
+    # Codex P2 on #1139: the contour may run its whole diametral allowance
+    # small, so the radius loses 0.25, not 0.125 (2.08 -> 1.96).
+    assert crank_handle_spec.COUNTERBORE_MOUTH_WALL == pytest.approx(1.958, abs=0.005)
 
 
 def test_tenon_and_counterbore_are_fitted_to_the_parts_they_take() -> None:

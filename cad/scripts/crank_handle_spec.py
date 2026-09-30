@@ -117,7 +117,9 @@ _TRIM_X_LONGEST = TRIM_X + 2.0 * _GENERAL_1PL
 TRIM_R_WORST = (
     REAR_PROFILE_CY
     + math.sqrt(REAR_PROFILE_R**2 - (_TRIM_X_LONGEST - PEAK_X) ** 2)
-    - CONTOUR_ALLOWANCE_DIA / 4.0
+    # The note lets the diameter run the whole allowance small, so the radius
+    # loses half of it (Codex P2 on #1139: /4 assumed a symmetric band).
+    - CONTOUR_ALLOWANCE_DIA / 2.0
 )
 COUNTERBORE_MOUTH_WALL = TRIM_R_WORST - COUNTERBORE_DIA_MAX / 2.0
 
