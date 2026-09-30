@@ -159,8 +159,7 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "TipHoles")
 
-    # Top Plane's normal is +Y: the bead window and the rod slot are cut up
-    # through the +Y wall only.
+    # The bead window and the rod slot go through the +Y wall only.
     for name, half_x, half_z in (
         ("Window", LINK_WINDOW_LENGTH / 2.0, LINK_WINDOW_WIDTH / 2.0),
         ("RodSlot", LINK_LENGTH / 2.0 + 1.0, LINK_SLOT_WIDTH / 2.0),
@@ -170,7 +169,14 @@ async def build(adapter) -> dict[str, str]:
         await ensure_fully_defined(adapter, f"{name} sketch")
         check(f"exit_sketch {name}", await adapter.exit_sketch())
         name_last_feature(adapter, f"{name}Profile")
-        check(f"cut {name}", await adapter.create_cut_extrude(ExtrusionParameters(depth=r_out + 0.5)))
+        # A Top-plane cut runs toward -Y by default (farm leaf 20260930T023931Z:
+        # openings on -Y); reversed, it cuts the +Y wall.
+        check(
+            f"cut {name}",
+            await adapter.create_cut_extrude(
+                ExtrusionParameters(depth=r_out + 0.5, reverse_direction=True)
+            ),
+        )
         name_last_feature(adapter, name)
 
     want = link_volume()
