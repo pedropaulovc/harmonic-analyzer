@@ -628,7 +628,7 @@ def test_the_package_switches_and_explodes_every_view_before_the_bom(monkeypatch
         drawing._configure_view(adapter, view, exploded=False, role=role, label=orientation)
         return view
 
-    def assembled(_adapter) -> list[str]:
+    def assembled(_adapter, _facts) -> list[str]:
         for orientation in ("*Front", "*Top", "*Right", "*Isometric"):
             reference(1, orientation, (1.0, 3.0))
         return []

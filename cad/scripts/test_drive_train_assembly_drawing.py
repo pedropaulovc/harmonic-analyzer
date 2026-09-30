@@ -154,6 +154,43 @@ def test_note_lines_fit_a_half_sheet_field() -> None:
             assert len(line) <= 70, line
 
 
+def _stacked_height(blocks: tuple[tuple[str, str], ...]) -> float:
+    """Blocks stacked in one field (metres): NOTE_LINE_PITCH a rendered line,
+    NOTE_FIELD_INSET above each block (the anchor target), NOTE_BLOCK_GAP
+    between blocks."""
+    lines = sum(len(text.splitlines()) for _label, text in blocks)
+    return (
+        lines * drawing.NOTE_LINE_PITCH
+        + len(blocks) * drawing.NOTE_FIELD_INSET
+        + (len(blocks) - 1) * drawing.NOTE_BLOCK_GAP
+    )
+
+
+def _spare(field: drawing.NoteField) -> float:
+    return field.bounds[1] - field.bounds[3] - _stacked_height(field.blocks)
+
+
+def test_every_note_field_holds_its_stacked_blocks() -> None:
+    """77c165b5d stacked 43 step lines and the 4-line general notes in sheet
+    6's 217 mm left field (219.7 mm here); natively the notes ended at 32.28 mm,
+    under the field's 35.00 mm bottom. The census formats the texts at the
+    counts the width test uses."""
+    instances = _instances()
+    cones = sorted(i.name for i in instances if i.stem == "cone-gear")
+    configurations = {name: f"T{6 * n:03d}" for n, name in enumerate(cones, start=1)}
+    fields = drawing.package_note_fields(drawing.SourceFacts(instances, configurations))
+    for field in fields:
+        assert _spare(field) >= 0, (field.label, _spare(field))
+    # Main's arrangement, the general notes under the steps, is over budget.
+    (notes,) = (field for field in fields if field.sheet == 1)
+    (steps,) = (
+        field
+        for field in fields
+        if field.label == f"sheet {drawing.SEQUENCE_SHEET} left note field"
+    )
+    assert _spare(steps._replace(blocks=steps.blocks + notes.blocks)) < 0
+
+
 def test_sheet_numbers_are_pinned_where_the_sheets_cite_them() -> None:
     names = drawing.SHEET_NAMES
     assert len(names) == 10
