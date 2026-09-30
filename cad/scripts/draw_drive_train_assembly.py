@@ -72,6 +72,10 @@ from crank_pinion_spec import (
     SEAT_FEELER_MM as PINION_SEAT_FEELER,
     T120_FITUP_ASSEMBLY_CHECK,
 )
+from crank_pinion_spec import SHAFT_END_RECESS_MAX as PINION_RECESS_MAX
+from crank_pinion_spec import SHAFT_END_RECESS_MIN as PINION_RECESS_MIN
+from crank_seat_washer_spec import GAP_MAX as WASHER_GAP_MAX
+from crank_seat_washer_spec import GAP_MIN as WASHER_GAP_MIN
 from crank_hub_notes import FRONT_FACE_DATUM as HUB_FRONT_FACE_DATUM
 from keeper_chain_spec import BEAD_COUNT as KEEPER_CHAIN_BEADS
 from drive_train_assembly_spec import (
@@ -516,17 +520,20 @@ CONE_CRANK_STEPS = "\n".join(
         # User ruling 2026-09-28: the crank journal runs directly in the post;
         # the centres are fixed, and the only mesh requirement is no binding.
         # CONTRACT-crank: MHA-173 press to the blind-hole floor (their proud
-        # length is the result); MHA-172 cannot pass the collar forward, so it
-        # goes on from the rear end before the journal enters the bore.
+        # length is the result).  User ruling 2026-09-30 (MHA-172 floor 0.5):
+        # MHA-172 is faced to fit at assembly; it goes on from the rear end
+        # before the journal enters the bore, and MHA-025's pin is
+        # match-drilled, so the gap is taken in a trial fit before either
+        # (CRANK_WASHER_FIT_NOTES, sheet 8).
         # User ruling 2026-09-30 (#1154): the 16T's shoulder and turned band
         # are feeler-checked against T120 before the pin is drilled.  The
         # pair may rub on T120 until that check closes, so the seat and the
         # check come first, turning by hand, and the free-running revolution
         # after them (Codex P2 on #1154, review 3).  The check's last line is
         # short; the step carries on after it.
-        "4. PRESS 2X MHA-173 TO THE MHA-026 COLLAR HOLE FLOORS; SLIDE MHA-172",
-        "   ON FROM THE REAR, FLAT ON THE COLLAR. FIT MHA-026 IN THE MHA-016",
-        "   CRANK BORE; SLIDE MHA-025 ON UNPINNED, TOOTH IN GAP WITH MHA-021.",
+        "4. PRESS 2X MHA-173 TO THE MHA-026 COLLAR HOLE FLOORS. FIT MHA-026 IN",
+        "   THE MHA-016 CRANK BORE; SLIDE MHA-025 ON UNPINNED, TOOTH IN GAP",
+        f"   WITH MHA-021. FIT MHA-172 PER SHEET {FIT_SHEET}. WITH MHA-172 SEATED,",
         f"   SET MHA-025 {PINION_SEAT_FEELER:.2f} OFF THE MHA-016 BOSS NORTH FACE WITH A FEELER.",
         T120_FITUP_ASSEMBLY_CHECK + " THEN",
         "   TURN MHA-021 ONE FULL REVOLUTION; IT MUST NEVER BIND (ELSE CHECK",
@@ -857,6 +864,30 @@ FIT_PLACEHOLDER = "\n".join(
         # by the rig-located step and check 7, the taper pin by step 6.
         "16T:64T CENTRE DISTANCE FIXED BY MHA-016 BORE SPACING; VERIFY NO",
         "BINDING THROUGH ONE CRANK TURN (CHECK 2).",
+    )
+)
+
+# User ruling 2026-09-30 (MHA-172 floor 0.5): MHA-172 goes on from the rear
+# before MHA-026 enters the bore and MHA-025's pin is match-drilled, so the
+# gap is measured in a trial fit without either, at the pinion's feeler and
+# the shaft end's mid-window recess; the washer is faced to it and slid on,
+# and the parts refitted.  Seated, the washer leaves the feeler as the end
+# play, and the recess lands in the window the 16T boss was sized for.
+_RECESS_MID = (PINION_RECESS_MIN + PINION_RECESS_MAX) / 2.0
+CRANK_WASHER_FIT_NOTES = "\n".join(
+    (
+        f"MHA-172 THRUST WASHER FIT (STEP {steps.step_number('crank-mesh-checked')})",
+        "A. TRIAL FIT WITHOUT MHA-172, MHA-025 UNPINNED ON THE "
+        f"{PINION_SEAT_FEELER:.2f} FEELER,",
+        f"   MHA-026 END {_RECESS_MID:.2f} BELOW MHA-025 NORTH FACE: MEASURE MHA-026 "
+        "COLLAR",
+        "   REAR FACE TO MHA-016 BOSS SOUTH FACE "
+        f"({WASHER_GAP_MIN:.2f}-{WASHER_GAP_MAX:.2f}).",
+        "B. WITHDRAW BOTH. FACE MHA-172 TO THAT GAP; SLIDE IT ONTO MHA-026",
+        "   FROM THE REAR, FLAT ON THE COLLAR. REFIT MHA-026 AND MHA-025.",
+        "C. MHA-172 SEATED ON THE BOSS AND MHA-025 ON THE FEELER: MHA-026 END",
+        f"   {PINION_RECESS_MIN:.2f}-{PINION_RECESS_MAX:.2f} BELOW MHA-025 NORTH FACE, "
+        f"END PLAY {PINION_SEAT_FEELER:.2f}.",
     )
 )
 
@@ -1281,6 +1312,7 @@ def package_note_fields(facts: SourceFacts) -> tuple[NoteField, ...]:
             (
                 ("cone station table", station_table_text(facts.cone_rows())),
                 ("fit placeholder", FIT_PLACEHOLDER),
+                ("crank washer fit", CRANK_WASHER_FIT_NOTES),
             ),
         ),
         NoteField(

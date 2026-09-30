@@ -19,17 +19,22 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_property_linked_note,
     add_surface_finish,
     assert_imported_precision,
     curate_view_dimensions,
+    dimension_name,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    set_dimension_callouts,
     set_hidden_lines_removed,
+    set_reference_dimension,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
+from drive_train_steps import step_ref
 from crank_seat_washer_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
@@ -37,6 +42,7 @@ from crank_seat_washer_spec import (
     OD,
     SURFACE_FINISHES,
     THICKNESS,
+    THICKNESS_CALLOUT,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -56,8 +62,8 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# A O20.6 x 1.5 washer: 4:1 keeps both diameters, the thickness and the two
-# face finishes legible without crowding the landscape sheet.
+# A O20.6 washer, drawn as fitted: 4:1 keeps both diameters, the thickness
+# and the two face finishes legible without crowding the landscape sheet.
 SHEET_SCALE = (4.0, 1.0)
 VIEW_SCALE = (4, 1)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1]
@@ -67,6 +73,12 @@ SIDE_CENTER = (0.180, 0.170)
 # Third-angle left view of the collar face, on the profile's axis.
 END_CENTER = (0.090, SIDE_CENTER[1])
 ISO_CENTER = (0.310, SIDE_CENTER[1])
+
+# Faced to fit at MHA-A03's crank step; the pointer comes from the registry.
+FIT_STEP_KEY = "crank-mesh-checked"
+DIMENSION_CALLOUTS = {
+    "DiscThick": f"{THICKNESS_CALLOUT},\nPER {step_ref(FIT_STEP_KEY)}"
+}
 
 DRAWING_PRECISION_BY_NAME = {
     name: digits
@@ -115,8 +127,15 @@ async def build(adapter: Any) -> dict[str, str]:
             "Material Specification",
             "Finish",
             "Quantity",
+            "Manufacturing Notes",
         ),
-        required=("Number", "Material Specification", "Finish", "Quantity"),
+        required=(
+            "Number",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Manufacturing Notes",
+        ),
     )
     drawing_model, _sheet = new_project_drawing(
         adapter, property_view=PART_STEM, scale=SHEET_SCALE, layout=SPEC.layout
@@ -166,6 +185,18 @@ async def build(adapter: Any) -> dict[str, str]:
     # Decimal places (and so the general-tolerance row each dimension claims)
     # are authored on the part; the sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    # Faced to fit at assembly: the modelled thickness prints as a REFERENCE
+    # value and the callout under it is the requirement; the blank it is
+    # faced from is the Manufacturing Notes' make-to size.
+    thickness_annotations = [
+        annotation
+        for annotation in annotations
+        if dimension_name(adapter, annotation) == "DiscThick"
+    ]
+    if len(thickness_annotations) != 1:
+        raise RuntimeError("edge view does not carry exactly one washer thickness")
+    set_reference_dimension(adapter, thickness_annotations[0], label="washer thickness")
+    set_dimension_callouts(adapter, thickness_annotations, DIMENSION_CALLOUTS)
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the washer face view")
     for key, label in (
@@ -182,6 +213,7 @@ async def build(adapter: Any) -> dict[str, str]:
             label=label,
             char_height=0.0025,
         )
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.085)
 
     return await finalize_drawing(
         adapter,

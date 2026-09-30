@@ -95,11 +95,11 @@ def test_shaft_prints_exactly_and_reaches_the_restored_post_boss() -> None:
     assert -183.0 + spec.POST_BORE_END == pytest.approx(post_boss_north)
 
 
-def test_seat_collar_lands_the_wheel_seat_and_clears_the_post_boss() -> None:
+def test_seat_collar_lands_the_wheel_seat_and_leaves_the_washer_its_fit() -> None:
     # The collar's front is the Ø17.5 seat spigot, whose face is the removable
     # sprocket's seat on the shared plane, stepping up to the Ø20.6 body; its
-    # rear face stays short of the outboard journal land (and the post boss)
-    # by more than the washer, at the printed limits too.
+    # rear face stands off the post boss by the gap MHA-172 is faced to fill,
+    # and stays short of the outboard journal land.
     import build_drive_train_assembly as bdt
     import cone_pivot_post_spec as post
     import crank_seat_washer_spec as washer
@@ -107,19 +107,25 @@ def test_seat_collar_lands_the_wheel_seat_and_clears_the_post_boss() -> None:
 
     assert bdt.CRANKSHAFT_Z0 + spec.SEAT_COLLAR == pytest.approx(removable.SEAT_FACE_Z)
     assert spec.SPIGOT_DIA == removable.SEAT_SPIGOT_DIA < spec.COLLAR_DIA
-    # Ruling 2026-09-30: spigot -154.3..-148.5, body -148.5..-144.
+    # Ruling 2026-09-30: spigot -154.3..-148.5; MHA-172 floor 0.5: body
+    # -148.5..-144.5.
     assert bdt.CRANKSHAFT_Z0 + spec.SPIGOT_END == pytest.approx(-148.5)
     # The blind drive-pin holes end in the spigot, short of its step.
     assert spec.SEAT_COLLAR < spec.DRIVE_PIN_FLOOR < spec.SPIGOT_END
-    assert bdt.CRANKSHAFT_Z0 + spec.COLLAR_REAR == pytest.approx(-144.0)
+    assert bdt.CRANKSHAFT_Z0 + spec.COLLAR_REAR == pytest.approx(-144.5)
+    # The gap from the post's own boss face, not the washer spec's chain.
     boss_south = spec.POST_BORE_END - post.CRANK_BOSS_LENGTH
-    float_worst = (
-        boss_south
-        - (spec.COLLAR_REAR + max(spec.COLLAR_REAR_BAND))
-        - (washer.THICKNESS + max(washer.THICKNESS_BAND))
+    assert boss_south - spec.COLLAR_REAR == pytest.approx(washer.GAP_NOMINAL)
+    assert washer.GAP_MIN >= washer.THICKNESS_FLOOR - 1e-9
+    # The body keeps length at print-worst: both stations and the spigot.
+    body_worst = (
+        spec.COLLAR_LENGTH
+        - spec.SPIGOT_LENGTH
+        - 2.0 * spec.COLLAR_STATION_TOL
+        - spec.SPIGOT_LENGTH_TOL
     )
-    assert float_worst > 0.0
-    assert spec.COLLAR_REAR < spec.JOURNAL_START
+    assert body_worst > 0.0
+    assert spec.COLLAR_REAR + spec.COLLAR_STATION_TOL < spec.JOURNAL_START
     # Bottomed dowels stand proud by the drive-train's pin length budget.
     assert (
         bdt.CRANKSHAFT_Z0 + spec.DRIVE_PIN_FLOOR - spec.crank_seat_drive_pin_spec.LENGTH

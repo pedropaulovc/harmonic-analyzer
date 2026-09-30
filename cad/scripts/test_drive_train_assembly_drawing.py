@@ -122,6 +122,7 @@ def test_package_text_cites_only_bom_or_external_part_numbers() -> None:
         drawing.SETUP_NOTES,
         drawing.INTERFACE_NOTES,
         drawing.FIT_PLACEHOLDER,
+        drawing.CRANK_WASHER_FIT_NOTES,
         *drawing.BOM_DESCRIPTIONS.values(),
     )
     cited = set(re.findall(r"MHA-\d{3}", "\n".join(texts)))
@@ -139,6 +140,7 @@ def test_note_lines_fit_a_half_sheet_field() -> None:
         drawing.SETUP_NOTES,
         drawing.INTERFACE_NOTES,
         drawing.FIT_PLACEHOLDER,
+        drawing.CRANK_WASHER_FIT_NOTES,
         drawing.CONSUMABLES_NOTES,
     ):
         for line in text.format(
@@ -189,6 +191,14 @@ def test_every_note_field_holds_its_stacked_blocks() -> None:
         if field.label == f"sheet {drawing.SEQUENCE_SHEET} left note field"
     )
     assert _spare(steps._replace(blocks=steps.blocks + notes.blocks)) < 0
+    # The MHA-172 fit-up rides the FIT sheet; step 4 on sheet 6 only cites it.
+    (fit,) = (
+        field
+        for field in fields
+        if field.label == f"sheet {drawing.FIT_SHEET} right note field"
+    )
+    assert drawing.CRANK_WASHER_FIT_NOTES in dict(fit.blocks).values()
+    assert f"PER SHEET {drawing.FIT_SHEET}" in drawing.CONE_CRANK_STEPS
 
 
 def test_sheet_numbers_are_pinned_where_the_sheets_cite_them() -> None:

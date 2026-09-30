@@ -125,13 +125,6 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
         "the 5/8 bar's supplied size band, indexed for the thrust ring's "
         "worst-case width (THRUST_RING_MIN)"
     ),
-    ("crank_seat_washer_spec", "THICKNESS_BAND"): (
-        "indexed by the drive train's washer-float stack; the build sets the "
-        "same band natively from THICKNESS_TOL"
-    ),
-    ("crankshaft_spec", "COLLAR_REAR_BAND"): (
-        "the collar rear face's station deviations, indexed for the washer float"
-    ),
     ("crankshaft_spec", "SEAT_COLLAR_BAND"): (
         "the seat face's station deviations, indexed for the hub-to-sprocket air"
     ),

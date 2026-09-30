@@ -3,7 +3,8 @@ r"""Reproduction script: crank seat thrust washer (MHA-172; ch. 23; 1 used).
 The turned steel washer on the crankshaft between the integral seat collar's
 rear face and the cone-pivot-post crank boss (``crank_seat_washer_spec``).
 It goes on over the shaft's rear end, so its bore clears the outboard journal
-land; the float to the boss is the stack's only axial air.
+land; it is faced to fit the gap to the boss at assembly, and the model is
+the washer as fitted to parts at their nominals.
 
 Layout: Top-plane annulus at the origin (OD, bore) extruded +Y by the
 thickness, so the collar face is the Top Plane (y = 0) and the boss face is
@@ -45,19 +46,18 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_tolerance,
 )
 from _fit_limits import deviations
 from _part_pmi import author_part_pmi
 from crank_seat_washer_spec import (
     DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
     DRAWING_PRECISION,
     ID,
     ID_BAND,
     OD,
     SURFACE_FINISHES,
     THICKNESS,
-    THICKNESS_TOL,
 )
 
 PART_NAME = "crank-seat-washer"
@@ -144,7 +144,8 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "RingProfile", "BoreDia", *deviations(ID_BAND)
     )
-    set_dimension_symmetric_tolerance(adapter, "Disc", "DiscThick", THICKNESS_TOL)
+    # The thickness is faced to fit at assembly: no band on the model; the
+    # sheet prints it as a reference under its callout.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
@@ -152,7 +153,7 @@ async def build(adapter) -> dict[str, str]:
     # Both running faces, resolved by outward normal and offset: a washer
     # extruded -Y would have no +Y face at y = THICKNESS and refuse here.
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
-    apply_drawing_properties(adapter, PART_NAME)
+    apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})
     return await save_part_and_images(adapter, PART_NAME)
 
 

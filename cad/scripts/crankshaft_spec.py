@@ -219,17 +219,21 @@ PIN_HOLE_HEIGHT = SERVICE_PIN_STATION
 # diameter is the interface both shafts share, so it is the removable spec's.
 SPIGOT_DIA = transgear_removable_spec.SEAT_SPIGOT_DIA
 # User ruling 2026-09-30: the seat face moved 1.8 forward with the shared
-# band and the Ø20.6 body stayed put, so the spigot grew 4.0 -> 5.8 and the
-# collar 8.5 -> 10.3; the body's front and rear faces keep their stations.
+# band and the Ø20.6 body's front face stayed put, so the spigot grew
+# 4.0 -> 5.8 and the collar 8.5 -> 10.3.  User ruling 2026-09-30 (MHA-172
+# floor 0.5) then took 0.5 off the body's rear, 10.3 -> 9.8: the body is 4.0
+# long (3.75 at print-worst) and the rear face stands far enough forward that
+# the MHA-172 washer, faced to fit at assembly, never goes under its 0.5 floor
+# (crank_seat_washer_spec).
 SPIGOT_LENGTH = 5.8
 COLLAR_DIA = 20.6
-COLLAR_LENGTH = 10.3  # seat face to rear face, spigot included
+COLLAR_LENGTH = 9.8  # seat face to rear face, spigot included
 # Local stations from the dome root (the crank face, machine -183.0 as the
 # drive train's CRANK_FACE_Z): 28.7 behind it is SEAT_FACE_Z -154.3, which
 # build_drive_train_assembly asserts from both sides.
 SEAT_COLLAR = 28.7
 SPIGOT_END = SEAT_COLLAR + SPIGOT_LENGTH  # the body's front face, -148.5
-COLLAR_REAR = SEAT_COLLAR + COLLAR_LENGTH  # -144.0
+COLLAR_REAR = SEAT_COLLAR + COLLAR_LENGTH  # -144.5
 # Two pressed MHA-173 dowels on the wheel's pin circle at its +/-Y holes,
 # which the placed shaft (local z = machine -y) carries on local -/+Z.  The
 # pins' pressed ends bear on the blind holes' flat floor, so the depth is set
@@ -252,7 +256,9 @@ if not _PIN_HOLE_OUTER_R < SPIGOT_DIA / 2.0 < COLLAR_DIA / 2.0:
 # - The two collar faces print from the far end like every station, but at
 #   .X the seat face could come 0.8 + the Depth's 0.4 toward the crank and
 #   close the contracted 0.7 air between the hub's rear face and the wheel,
-#   and the rear face could eat the washer's 0.25 float.  +/-0.10 at .XX.
+#   and the rear face's station is a link of the range MHA-172 is faced to
+#   (crank_seat_washer_spec): its 0.8 would drive the washer under its 0.5
+#   floor.  +/-0.10 at .XX.
 # - The spigot diameter is held under nominal, (0, -0.10) at .XX: over it
 #   the ANSI #25 plates wrapping the T12 lose their 0.15 radial air, under
 #   it the rim to the pin holes thins (DRIVE_PIN_SPIGOT_RIM_WORST).
@@ -276,14 +282,13 @@ SPIGOT_LENGTH_TOL = 0.05
 DRIVE_PIN_OFFSET_PLACES = transgear_removable_spec.DRIVE_PIN_OFFSET_PLACES
 DRIVE_PIN_OFFSET_TOL = transgear_removable_spec.DRIVE_PIN_OFFSET_TOL
 DRIVE_PIN_DEPTH_TOL = 0.10
-# Local (dome-root) deviations of the two faces as (upper, lower): a station
+# Local (dome-root) deviations of the seat face as (upper, lower): a station
 # printed from the far end moves by its own band plus the Depth's.  The drive
-# train's hub-air and washer-float stacks read these.
+# train's hub-air stack reads it.
 SEAT_COLLAR_BAND = (
     SHAFT_LENGTH_BAND[0] + COLLAR_STATION_TOL,
     SHAFT_LENGTH_BAND[1] - COLLAR_STATION_TOL,
 )
-COLLAR_REAR_BAND = SEAT_COLLAR_BAND
 # Reamed for a light press of the stock hardened 3/32 dowel (its catalogue
 # diameter tolerance is crank_seat_drive_pin_spec.DIA_BAND_IN).
 DRIVE_PIN_HOLE_BAND = (0.000, -0.010)
@@ -382,7 +387,7 @@ if COLLAR_REAR + COLLAR_STATION_TOL >= JOURNAL_START - STATION_ROW:
     )
 # Both Ø11.388 lands run in MHA-016 and therefore need their own Ra 1.6
 # control on the native cylindrical face and their own drawing leader.  The
-# collar's rear face runs against the floating MHA-172 thrust washer, so it
+# collar's rear face runs against the fitted MHA-172 thrust washer, so it
 # carries the running grade too; the wheel's seat face is a static sprocket
 # seat and stays "cast/machined" (rule 5).
 SURFACE_FINISHES = (

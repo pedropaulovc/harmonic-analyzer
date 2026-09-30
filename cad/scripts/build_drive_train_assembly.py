@@ -580,7 +580,6 @@ import transgear_removable_spec as REMOVABLE  # noqa: E402
 from crankshaft_spec import (  # noqa: E402
     COLLAR_DIA,
     COLLAR_REAR,
-    COLLAR_REAR_BAND,
     DRIVE_PIN_DEPTH,
     DRIVE_PIN_FLOOR,
     PIN_HOLE_HEIGHT,
@@ -642,7 +641,7 @@ if CRANK_HUB_T12_AIR_WORST <= 0.0:
         f"crank hub rear/T12 air closes at the SeatCollar band: {CRANK_HUB_T12_AIR_WORST:.3f}"
     )
 # Behind the seat: the integral collar, then the turned MHA-172 thrust washer
-# flat on the collar's rear face (its y = 0 face), floating to the post boss.
+# flat on the collar's rear face (its y = 0 face), faced to fit the post boss.
 CRANK_SEAT_WASHER_Z0 = CRANKSHAFT_Z0 + COLLAR_REAR
 CRANK_SEAT_WASHER_REAR_Z = CRANK_SEAT_WASHER_Z0 + SEAT_WASHER.THICKNESS
 # The seat is a Ø17.5 spigot (SEAT_FACE_Z..SPIGOT_END) ahead of the Ø20.6
@@ -1723,30 +1722,49 @@ if abs(POST_CRANK_Y - (Y_CRANK - Y_BASE_TOP - PLAT_T)) > 1e-6:
 # reverses local Z, so the harvested asymmetric boss now runs from
 # post.z - (start + length) to post.z - start.  South of it the crank seat
 # stack closes the gap to the chain wheel's seat face: the integral collar,
-# the MHA-172 washer flat on its rear face, then the float to the cast south
-# face -- the stack's only air, taken at the boss end, never at the wheel.
+# then MHA-172, flat on its rear face and faced at assembly to fill the gap to
+# the cast south face.  The shaft's only end play is the 16T's feeler gap to
+# the boss's north face.
 # The 16T follows the translated 64T contact row to the boss's north.
 _POST_BOSS_SOUTH = _PPOST[2] - (POST_CRANK_BOSS_START_Z + POST_CRANK_BOSS_LENGTH)
 _PINION_SOUTH = PINION_TOOTH_Z - PINION_FACE / 2.0
+CRANK_SEAT_WASHER_GAP = _POST_BOSS_SOUTH - CRANK_SEAT_WASHER_Z0
 CRANK_SEAT_WASHER_FLOAT = _POST_BOSS_SOUTH - CRANK_SEAT_WASHER_REAR_Z
-# The collar rear face's functional band and the washer's own thickness band
-# both move the washer's rear face toward the boss.
-CRANK_SEAT_WASHER_FLOAT_WORST = (
-    CRANK_SEAT_WASHER_FLOAT - max(COLLAR_REAR_BAND) - max(SEAT_WASHER.THICKNESS_BAND)
-)
 _BOSS_NORTH_GAP = _PINION_SOUTH - _POST_BOSS_NORTH
 # The feeler sets the south face directly off the restored boss (MHA-A03).
 PINION_BOSS_NORTH_GAP_RANGE = (PINION_SEAT_FEELER, PINION_SEAT_GAP_MAX)
 _GAP_LO, _GAP_HI = PINION_BOSS_NORTH_GAP_RANGE
-for _float, _case in (
-    (CRANK_SEAT_WASHER_FLOAT, "nominal"),
-    (CRANK_SEAT_WASHER_FLOAT_WORST, "at the CollarRear and thickness bands"),
+# (1) The modelled gap is the washer spec's nominal fit, and the washer, at
+# that thickness, is seated on both faces.
+if abs(CRANK_SEAT_WASHER_GAP - SEAT_WASHER.GAP_NOMINAL) > 1e-6:
+    raise AssertionError(
+        f"MHA-172 gap {CRANK_SEAT_WASHER_GAP:.4f} in the layout is not the washer "
+        f"spec's nominal fit {SEAT_WASHER.GAP_NOMINAL:.4f}"
+    )
+if abs(CRANK_SEAT_WASHER_FLOAT) > 1e-6:
+    raise AssertionError(
+        f"MHA-172 is not seated on both faces: {CRANK_SEAT_WASHER_FLOAT:.4f} float"
+    )
+# (2) Every accepted set of parts is fitted from the blank without going under
+# the floor.
+_BLANK_FACEABLE = SEAT_WASHER.BLANK_THICKNESS_MIN - SEAT_WASHER.FACING_ALLOWANCE
+if not (
+    SEAT_WASHER.THICKNESS_FLOOR - 1e-9
+    <= SEAT_WASHER.GAP_MIN
+    <= SEAT_WASHER.GAP_MAX
+    <= _BLANK_FACEABLE + 1e-9
 ):
-    if _float <= 0.0:
-        raise AssertionError(
-            f"MHA-172 ({SEAT_WASHER.THICKNESS} thick) leaves no float to the crank "
-            f"boss south face {_case}: {_float:.3f}"
-        )
+    raise AssertionError(
+        f"MHA-172 fit range {SEAT_WASHER.GAP_MIN:.3f}-{SEAT_WASHER.GAP_MAX:.3f} "
+        f"is outside {SEAT_WASHER.THICKNESS_FLOOR}-{_BLANK_FACEABLE:.3f}"
+    )
+# (3) With the washer seated, the shaft's end play is the 16T's feeler gap.
+CRANK_SHAFT_END_PLAY = _BOSS_NORTH_GAP + CRANK_SEAT_WASHER_FLOAT
+if abs(CRANK_SHAFT_END_PLAY - PINION_SEAT_FEELER) > 1e-6:
+    raise AssertionError(
+        f"crankshaft end play {CRANK_SHAFT_END_PLAY:.4f} is not the "
+        f"{PINION_SEAT_FEELER} 16T feeler gap"
+    )
 if not (
     _GAP_LO - 1e-6
     <= _BOSS_NORTH_GAP
@@ -5638,9 +5656,10 @@ async def build(adapter) -> dict[str, str]:
         verify=(seam_pin, seam_o),
     )
 
-    # MHA-172 rides the shaft flat against CollarRear; the boss float is its
-    # only axial air, so it is modelled seated on the collar.  A revolved
-    # washer's spin is immaterial: the parallel closes it like MHA-138's.
+    # MHA-172 rides the shaft flat against CollarRear; faced to fit, its rear
+    # face lands on the boss's south face with no float, so the collar mate
+    # places it.  A revolved washer's spin is immaterial: the parallel closes
+    # it like MHA-138's.
     washer_o = _org(adapter, seat_washer)
     await coincident_mate(
         adapter,

@@ -3,13 +3,17 @@
 from __future__ import annotations
 
 import ast
+import importlib.util
 from pathlib import Path
+
+import pytest
 
 import _config
 import build_crank_seat_washer as part
 import crank_seat_washer_spec as spec
 import crankshaft_spec
 import draw_crank_seat_washer as drawing
+import drive_train_steps as steps
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
@@ -39,14 +43,90 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
     }
 
 
-def test_bore_and_thickness_carry_the_spec_bands() -> None:
-    """The bore must pass the journal land and the thickness eats the boss
-    float: both bands live on the model dimension, from the spec."""
+def test_only_the_bore_carries_a_model_band() -> None:
+    """The bore must pass the journal land, so its band lives on the model
+    dimension.  The thickness is faced to fit at assembly: the model's is the
+    nominal fit, never a toleranced make-to size."""
     assert model_toleranced_dimensions(part) == {
         ("RingProfile", "BoreDia"): "*deviations(ID_BAND)",
-        ("Disc", "DiscThick"): "THICKNESS_TOL",
     }
-    assert spec.THICKNESS_BAND == (spec.THICKNESS_TOL, -spec.THICKNESS_TOL)
+    fitted = f"{spec.THICKNESS:.2f}"
+    assert fitted not in spec.DRAWING_NOTES
+    assert fitted not in drawing.DIMENSION_CALLOUTS["DiscThick"]
+
+
+def test_every_accepted_part_set_is_faced_from_the_blank_above_the_floor() -> None:
+    """User ruling 2026-09-30: the washer is faced to the gap it fills and
+    never goes under 0.5; the blank is thick enough to face to the widest gap
+    any accepted MHA-026, MHA-025 and MHA-016 leave."""
+    assert spec.THICKNESS_FLOOR == 0.5
+    assert spec.GAP_MIN >= spec.THICKNESS_FLOOR - 1e-9
+    assert spec.GAP_MIN < spec.THICKNESS < spec.GAP_MAX
+    assert spec.BLANK_THICKNESS_MIN >= spec.GAP_MAX + spec.FACING_ALLOWANCE - 1e-9
+    # The sheet states the range it is faced to and where it is set.
+    callout = drawing.DIMENSION_CALLOUTS["DiscThick"]
+    assert f"{spec.GAP_MIN:.2f}-{spec.GAP_MAX:.2f}" in callout
+    assert steps.step_ref(drawing.FIT_STEP_KEY) in callout
+    assert drawing.FIT_STEP_KEY in steps.SEQUENCE
+    assert f"{spec.BLANK_THICKNESS_MIN:.2f} MIN" in spec.DRAWING_NOTES
+
+
+def _washer_spec_with(monkeypatch, module, name: str, value):
+    """A fresh execution of the washer spec with one upstream value patched:
+    the spec's own gate is observed, not re-derived here."""
+    monkeypatch.setattr(module, name, value)
+    fresh_spec = importlib.util.spec_from_file_location(
+        "_washer_perturbed", spec.__file__
+    )
+    fresh = importlib.util.module_from_spec(fresh_spec)
+    fresh_spec.loader.exec_module(fresh)
+    return fresh
+
+
+def test_the_floor_and_the_blank_refuse_a_fit_they_cannot_make(monkeypatch) -> None:
+    # Positive control: the ruled collar re-executes clean.
+    ruled = _washer_spec_with(
+        monkeypatch, crankshaft_spec, "COLLAR_LENGTH", crankshaft_spec.COLLAR_LENGTH
+    )
+    assert ruled.GAP_MIN == pytest.approx(spec.GAP_MIN)
+    # Negative control: the 10.3 collar the ruling shortened leaves the
+    # thinnest fit under the floor.
+    with pytest.raises(AssertionError, match="floor"):
+        _washer_spec_with(monkeypatch, crankshaft_spec, "COLLAR_LENGTH", 10.3)
+    monkeypatch.undo()
+    # Negative control: a blank whose low limit is under the widest gap.
+    spec.check_fit_up(spec.GAP_MIN, spec.GAP_MAX, spec.GAP_MAX + spec.FACING_ALLOWANCE)
+    with pytest.raises(AssertionError, match="facing allowance"):
+        spec.check_fit_up(spec.GAP_MIN, spec.GAP_MAX, spec.GAP_MAX - 0.01)
+
+
+def _crank_step_body() -> str:
+    import draw_drive_train_assembly as assembly
+
+    number = steps.step_number("crank-mesh-checked")
+    lines = assembly.CONE_CRANK_STEPS.splitlines()
+    start = next(i for i, line in enumerate(lines) if line.startswith(f"{number}. "))
+    end = next(i for i, line in enumerate(lines) if line.startswith(f"{number + 1}. "))
+    return " ".join(line.strip() for line in lines[start:end])
+
+
+def test_the_fit_is_taken_before_the_washer_goes_on_and_the_pin_is_drilled() -> None:
+    """MHA-172 goes on over the shaft's rear end before the journal enters the
+    bore, and MHA-025's pin is match-drilled for good: the gap is measured in a
+    trial fit without either, then the washer is faced, slid on and the parts
+    refitted, and only then is the pin drilled."""
+    import draw_drive_train_assembly as assembly
+
+    body = _crank_step_body()
+    assert body.index(f"PER SHEET {assembly.FIT_SHEET}") < body.index("MATCH-DRILL")
+    fit = " ".join(
+        line.strip() for line in assembly.CRANK_WASHER_FIT_NOTES.splitlines()
+    )
+    assert f"STEP {steps.step_number('crank-mesh-checked')}" in fit
+    order = ("WITHOUT MHA-172", "MEASURE", "FACE MHA-172", "FROM THE REAR", "SEATED")
+    positions = [fit.index(phrase) for phrase in order]
+    assert positions == sorted(positions)
+    assert f"({spec.GAP_MIN:.2f}-{spec.GAP_MAX:.2f})" in fit
 
 
 def test_smallest_bore_passes_the_largest_journal_land() -> None:
@@ -91,13 +171,19 @@ def test_the_part_carries_every_property_its_drawing_requires(monkeypatch) -> No
     )
     carried = dict(_common.part_properties(part.PART_NAME))
     stamp = _calls(part.__file__)["apply_drawing_properties"]
-    assert [ast.unparse(a) for a in stamp.args] == ["adapter", "PART_NAME"]
+    assert [ast.unparse(a) for a in stamp.args] == [
+        "adapter",
+        "PART_NAME",
+        "{'Manufacturing Notes': DRAWING_NOTES}",
+    ]
     stamped: dict[str, str] = {}
     monkeypatch.setattr(
         _drawing_marks,
         "apply_custom_properties",
         lambda _adapter, props: stamped.update(props),
     )
-    _drawing_marks.apply_drawing_properties(None, part.PART_NAME)
+    _drawing_marks.apply_drawing_properties(
+        None, part.PART_NAME, {"Manufacturing Notes": spec.DRAWING_NOTES}
+    )
     carried.update(stamped)
     assert [name for name in required if not str(carried.get(name) or "").strip()] == []
