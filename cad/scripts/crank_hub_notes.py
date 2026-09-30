@@ -111,7 +111,7 @@ CROSS_HOLE_CALLOUT = "\n".join(
 #     crank face                    CRANK_FACE_Z                     -183
 #     hub overall, front to rear    HUB_LENGTH +/- HUB_LENGTH_TOL    25.2 +/-0.05
 #     relief, back from rear face   RELIEF_LENGTH +/- RELIEF_LENGTH_TOL
-#                                                                    3.6 +/-0.05
+#                                                                    3.85 +/-0.05
 #     removable seat face           transgear_removable_spec.SEAT_FACE_Z
 #                                   + crankshaft_spec.SEAT_COLLAR_BAND
 #                                                                    -154.3 +0.1/-0.5
@@ -119,16 +119,25 @@ CROSS_HOLE_CALLOUT = "\n".join(
 #     chain reach ahead of seat     CHAIN_REACH_FRONT = W/2 + G      6.2865
 #                                   (ANSI_ROLLER_WIDTH 3.175 / 2 + ANSI_HALF_WIDTH
 #                                   4.699, chain floated frontmost)
-#   A  chain -> relief shoulder:
+#   A  chain -> relief shoulder, in two poses (crank_hub_geometry.
+#      chain_shoulder_axial_air; floor CHAIN_SHOULDER_AIR_MIN 0.2135):
+#      seated, the wheel on the seat face:
 #        (SEAT_FACE_Z + min(SEAT_COLLAR_BAND) - CHAIN_REACH_FRONT)
 #        - (CRANK_FACE_Z + HUB_LENGTH + HUB_LENGTH_TOL
 #           - (RELIEF_LENGTH - RELIEF_LENGTH_TOL))
-#        = (-154.3 - 0.5 - 6.2865) - (-183 + 25.25 - 3.55)
-#        = -161.0865 - (-161.3)                   = 0.2135  (nominal 0.8135)
+#        = (-154.3 - 0.5 - 6.2865) - (-183 + 25.25 - 3.80)
+#        = -161.0865 - (-161.55)                  = 0.4635  (nominal 1.0635)
+#      floated, the wheel walked forward off its pins onto the hub rear face
+#      (the hub and seat stations cancel):
+#        (RELIEF_LENGTH - RELIEF_LENGTH_TOL) + (PLATE + min(PLATE_BAND))
+#        - CHAIN_REACH_FRONT
+#        = 3.80 + 2.70 - 6.2865                   = 0.2135  (nominal 0.3635)
+#      The floated pose governs and sizes the relief: 3.6 left it -0.0365.
 #   B  hub rear face -> T12 front face:
 #        (SEAT_FACE_Z + min(SEAT_COLLAR_BAND) - (PLATE + max(PLATE_BAND)))
 #        - (CRANK_FACE_Z + HUB_LENGTH + HUB_LENGTH_TOL)
 #        = (-154.3 - 0.5 - 2.8) - (-183 + 25.25)
 #        = -157.6 - (-157.75)                     = 0.15    (nominal 0.7)
-#   Worst case in both: seat collar at its forward limit, hub long; A with the
-#   relief short, B with the plate thick.
+#   Worst case: A seated and B with the seat collar at its forward limit and
+#   the hub long, A with the relief short, B with the plate thick; A floated
+#   with the relief short and the plate thin.

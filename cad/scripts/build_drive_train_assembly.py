@@ -563,7 +563,7 @@ from crank_hub_geometry import (  # noqa: E402
     RELIEF_DIA_MAX as HUB_RELIEF_DIA_MAX,
     HUB_LENGTH_TOL,
     RELIEF_LENGTH as HUB_RELIEF_LENGTH,
-    RELIEF_LENGTH_TOL as HUB_RELIEF_LENGTH_TOL,
+    chain_shoulder_axial_air,
 )
 from crank_arm_spec import (  # noqa: E402
     ANCHOR_HOLE_SPEC,
@@ -650,7 +650,7 @@ CRANK_SEAT_WASHER_REAR_Z = CRANK_SEAT_WASHER_Z0 + SEAT_WASHER.THICKNESS
 # the hub rear face.  Both let the #25 plates wrapping the T12 pass inside
 # the collar/barrel diameters (Main's ruling, 2026-09-30).
 CRANK_SPIGOT_FRONT_Z = CRANKSHAFT_Z0 + SPIGOT_END  # body front face, -148.5
-CRANK_HUB_BARREL_REAR_Z = CRANK_HUB_REAR_Z - HUB_RELIEF_LENGTH  # -161.4
+CRANK_HUB_BARREL_REAR_Z = CRANK_HUB_REAR_Z - HUB_RELIEF_LENGTH  # -161.65
 # Chain-plate clearance: the plate's inner edge against the spigot
 # (print-worst, largest) and the hub relief, radially, for the CAD link and a
 # real ANSI #25 plate; axially, a bought chain's envelope (REMOVABLE.ANSI_*)
@@ -680,15 +680,24 @@ for _what, _air in (
 _HUB_REAR_Z_WORST = CRANK_HUB_REAR_Z + HUB_LENGTH_TOL
 _SEAT_FACE_Z_WORST = REMOVABLE.SEAT_FACE_Z + min(SEAT_COLLAR_BAND)
 _CHAIN_REACH_REAR_WORST = REMOVABLE.CHAIN_REACH_REAR_WORST
-# A: chain floated frontmost, seat forward, hub long, relief short.
-CHAIN_BARREL_AXIAL_AIR = (
+# A: chain floated frontmost against the relief shoulder, in both wheel
+# poses (crank_hub_geometry): seated (seat forward, hub long, relief short)
+# and floated forward onto the hub rear face (thinnest wheel, relief short).
+# Local stations from the dome root, where the hub's front face is set.
+_STACK_A = chain_shoulder_axial_air(
+    relief_length=HUB_RELIEF_LENGTH,
+    seat_face=REMOVABLE.SEAT_FACE_Z - CRANK_HUB_Z0,
+    seat_face_band=SEAT_COLLAR_BAND,
+)
+CHAIN_BARREL_AXIAL_AIR = _STACK_A["seated"]  # 1.0635
+CHAIN_BARREL_AXIAL_AIR_WORST = _STACK_A["seated_worst"]  # 0.4635
+CHAIN_BARREL_AXIAL_AIR_FLOATED = _STACK_A["floated"]  # 0.3635
+CHAIN_BARREL_AXIAL_AIR_FLOATED_WORST = _STACK_A["floated_worst"]  # 0.2135
+_STACK_A_MODELLED = (
     REMOVABLE.SEAT_FACE_Z - REMOVABLE.CHAIN_REACH_FRONT - CRANK_HUB_BARREL_REAR_Z
-)  # 0.8135
-CHAIN_BARREL_AXIAL_AIR_WORST = (
-    _SEAT_FACE_Z_WORST
-    - REMOVABLE.CHAIN_REACH_FRONT
-    - (_HUB_REAR_Z_WORST - (HUB_RELIEF_LENGTH - HUB_RELIEF_LENGTH_TOL))
-)  # 0.2135
+)
+if abs(CHAIN_BARREL_AXIAL_AIR - _STACK_A_MODELLED) > 1e-9:
+    raise AssertionError("stack A left the modelled hub shoulder station")
 # B: thickest wheel, seat forward, hub long.
 CRANK_HUB_T12_AIR_PRINT_WORST = (
     _SEAT_FACE_Z_WORST - (REMOVABLE.PLATE + max(REMOVABLE.PLATE_BAND))
@@ -702,7 +711,11 @@ CHAIN_SPIGOT_AXIAL_AIR_WORST = (
     SPIGOT_LENGTH - SPIGOT_LENGTH_TOL - _CHAIN_REACH_REAR_WORST
 )  # 2.1635
 for _what, _air in (
-    ("chain / hub relief shoulder", CHAIN_BARREL_AXIAL_AIR_WORST),
+    ("chain / hub relief shoulder, wheel seated", CHAIN_BARREL_AXIAL_AIR_WORST),
+    (
+        "chain / hub relief shoulder, wheel floated onto the hub",
+        CHAIN_BARREL_AXIAL_AIR_FLOATED_WORST,
+    ),
     ("hub rear face / T12 front face", CRANK_HUB_T12_AIR_PRINT_WORST),
     ("chain / crank collar body front face", CHAIN_SPIGOT_AXIAL_AIR_WORST),
 ):

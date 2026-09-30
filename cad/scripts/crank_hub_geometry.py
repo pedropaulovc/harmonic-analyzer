@@ -17,9 +17,11 @@ shaft's spherical dome projects outboard.  Positive station runs inboard.
 
 from __future__ import annotations
 
+import math
 from fractions import Fraction
 
 import _config
+import transgear_removable_spec as _removable
 from crank_pin_spec import BIG_END_DIA as SERVICE_PIN_BIG_END_DIA
 
 
@@ -74,17 +76,38 @@ HUB_BARREL_DIA = 20.6
 HUB_SHOULDER_TO_REAR = 17.2
 # The #25 plates wrapping the crank T12 overhang the removable's front face
 # toward the hub, so the rear end is turned down to a Ø16.5 relief the plates
-# pass over; the barrel's rear shoulder stands ahead of the link.  3.6 long,
-# so a bought ANSI #25 chain (not just the CAD link) clears the shoulder at
-# the printed worst case (crank_hub_notes carries the axial stack); the drive
+# pass over; the barrel's rear shoulder stands ahead of the link.  The drive
 # train asserts the radial and axial air from these names (RELIEF_STATION is
 # the shoulder's local station; its machine z is the drive train's
-# crank-face datum plus it).
+# crank-face datum plus it); crank_hub_notes carries the axial stack.
 RELIEF_DIA = 16.5
 # Printed from the rear face at .XX with a functional ±0.05: with the hub
 # length below it places the shoulder the chain must clear.
-RELIEF_LENGTH = 3.6
 RELIEF_LENGTH_TOL = 0.05
+# Stack A, a bought ANSI #25 chain floated frontmost against the relief
+# shoulder, has two poses.  Seated, the wheel's rear face is on the shaft's
+# seat face.  Floated, the wheel has walked forward off its drive pins onto
+# the hub's rear face (crankshaft_spec.drive_pin_front_clearances admits
+# that pose): then the wheel's front face and the shoulder both ride the hub
+# rear face, the hub and seat stations cancel, and the air is the relief
+# plus the wheel's plate less the chain's reach ahead of the wheel's rear
+# face.  That pose governs (the seated one has stack B's 0.7 air on top), so
+# the relief is the shortest .XX length whose worst floated air, thinnest
+# wheel and shortest relief, holds CHAIN_SHOULDER_AIR_MIN: the seated worst
+# PR1 accepted before the float was counted (Main, PR1 Codex review 2).
+CHAIN_SHOULDER_AIR_MIN = 0.2135
+_PLATE_MIN = _removable.PLATE + min(_removable.PLATE_BAND)
+RELIEF_LENGTH = round(
+    math.ceil(
+        round(
+            (CHAIN_SHOULDER_AIR_MIN + _removable.CHAIN_REACH_FRONT - _PLATE_MIN) * 100,
+            6,
+        )
+    )
+    / 100
+    + RELIEF_LENGTH_TOL,
+    2,
+)  # 3.85
 HUB_BARREL_LENGTH = round(HUB_SHOULDER_TO_REAR - RELIEF_LENGTH, 6)
 HUB_LENGTH = HUB_SEAT_LENGTH + HUB_SHOULDER_TO_REAR
 # The hub prints its overall length, front face to rear face, at .XX with a
@@ -95,6 +118,44 @@ HUB_LENGTH = HUB_SEAT_LENGTH + HUB_SHOULDER_TO_REAR
 HUB_LENGTH_TOL = 0.05
 RELIEF_STATION = round(HUB_LENGTH - RELIEF_LENGTH, 6)
 HUB_SHOULDER_STATION = HUB_SEAT_LENGTH
+
+
+def chain_shoulder_axial_air(
+    *,
+    relief_length: float,
+    seat_face: float,
+    seat_face_band: tuple[float, float],
+    plate: float = _removable.PLATE,
+    plate_band: tuple[float, float] = _removable.PLATE_BAND,
+    reach_front: float = _removable.CHAIN_REACH_FRONT,
+) -> dict[str, float]:
+    """Stack A, chain envelope front to the relief shoulder, in both poses at
+    nominal and at the printed worst case; local stations from the dome root
+    (+ rearward).  Raises when either worst case falls under
+    CHAIN_SHOULDER_AIR_MIN."""
+    shoulder = HUB_LENGTH - relief_length
+    shoulder_fwd = HUB_LENGTH + HUB_LENGTH_TOL - (relief_length - RELIEF_LENGTH_TOL)
+    seat_fwd = seat_face + min(seat_face_band)
+    relief_short = relief_length - RELIEF_LENGTH_TOL
+    plate_thin = plate + min(plate_band)
+    airs = {
+        # Wheel on the seat face; worst: seat forward, hub long, relief short.
+        "seated": seat_face - reach_front - shoulder,
+        "seated_worst": seat_fwd - reach_front - shoulder_fwd,
+        # Wheel floated onto the hub rear face; worst: thinnest wheel, relief
+        # short (the hub and seat stations cancel).
+        "floated": relief_length + plate - reach_front,
+        "floated_worst": relief_short + plate_thin - reach_front,
+    }
+    for pose in ("seated_worst", "floated_worst"):
+        if airs[pose] < CHAIN_SHOULDER_AIR_MIN - 1e-9:
+            raise AssertionError(
+                f"chain / hub relief shoulder air {pose} {airs[pose]:.4f}"
+                f" < {CHAIN_SHOULDER_AIR_MIN}"
+            )
+    return airs
+
+
 # Named ratio deviation (U29): the stock arm stands 1.309x the hub seat where
 # the photograph shows 1.208x; the extra width is what gives the arm cheek
 # around the seat a 2-mm wall.

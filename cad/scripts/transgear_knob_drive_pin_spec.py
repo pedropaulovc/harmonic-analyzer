@@ -3,10 +3,10 @@ r"""MHA-155 transgear-knob-drive-pin: McMaster 98381A433 stock dowel.
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure.  Two are pressed into the knob shaft's Ø17.5 seat collar (MHA-078)
 and stand ``transgear_removable_spec.DRIVE_PIN_PROUD`` out of its seat face,
-where the removable sprocket's two holes drop over them.  The collar is only
-3.6 long, so the knob takes the 3/16 length of the crank's 3/32 dowel, and
-its holes are reamed THROUGH the collar: a blind floor there would be under
-the 1.5 wall floor.
+where the removable sprocket's two holes drop over them.  The knob takes the
+3/16 length of the crank's 3/32 dowel, and its holes are reamed THROUGH the
+5.4-long collar (first 3.6, where a blind floor would have been under the 1.5
+wall floor), the press depth set from the seat face by a stop.
 
 Catalogue: 3/32 x 3/16 alloy-steel dowel, Round x Chamfer ends; the size row
 and the diameter tolerance are ``diagnostics.diag_mcmaster_dowel``'s.
