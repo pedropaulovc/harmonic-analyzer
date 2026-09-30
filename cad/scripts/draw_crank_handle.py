@@ -1,7 +1,7 @@
 r"""Create the curated machinist drawing for the crank handle.
 
 A turned, ebonized oak pear grip (book ch. 11).  User ruling 2026-09-29: the
-brass ferrule MHA-150 and the steel butt cup MHA-153 are separate parts, so
+brass ferrule MHA-152 and the steel butt cup MHA-153 are separate parts, so
 this sheet prints only the oak -- a tenon for the ferrule at the crank end, a
 flared waist, an S-curve swell to the Ø21 max, and a domed butt whose end
 round feathers out on the counterbore the cup is bonded into (user rulings

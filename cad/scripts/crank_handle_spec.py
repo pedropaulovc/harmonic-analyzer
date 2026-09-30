@@ -3,7 +3,7 @@ manufacturing drawing.
 
 PURE DATA, no SolidWorks/COM imports.  A turned, ebonized oak pear grip on the
 crank-arm pivot.  User ruling 2026-09-29 (ch11 p.14 and p.15 photographs): the
-bright ring at the crank end is a separate brass ferrule MHA-150 on a turned
+bright ring at the crank end is a separate brass ferrule MHA-152 on a turned
 tenon, and the bright disc at the butt a steel cup MHA-153 in a counterbore,
 the pivot screw's slotted head recessed inside it.
 
@@ -67,7 +67,7 @@ PIVOT_BORE_BAND = (0.025, -0.025)
 # face.  The oak leaves it flush with the ferrule's OD (user, handle2.png).
 SHOULDER_X = FERRULE_LENGTH
 SHOULDER_R = FERRULE_OUTER_DIA / 2.0
-# The tenon is turned to suit the actual MHA-150 bore for an epoxy line; the
+# The tenon is turned to suit the actual MHA-152 bore for an epoxy line; the
 # model carries the size that line gives on a nominal bore.
 TENON_GLUE_LINE = FERRULE_TENON_GLUE_LINE
 TENON_DIA = FERRULE_BORE_DIA - sum(TENON_GLUE_LINE) / 2.0
@@ -278,7 +278,7 @@ REFERENCE_DIMENSIONS = frozenset({"TenonDia", "CounterboreDia", "CounterboreDept
 # the oak's overall (for stock cut-off) is a marked dimension of its own.
 OVERALL_LENGTH = OAK_END_X - TENON_X0
 
-FERRULE_NUMBER = "MHA-150"
+FERRULE_NUMBER = "MHA-152"
 CUP_NUMBER = "MHA-153"
 SCREW_NUMBER = "MHA-139"
 

@@ -73,12 +73,12 @@ def test_tenon_and_counterbore_are_fitted_to_the_parts_they_take() -> None:
     assert spec.REFERENCE_DIMENSIONS == {"TenonDia", "CounterboreDia", "CounterboreDepth"}
     assert spec.TENON_DIA == pytest.approx(ferrule.BORE_DIA - 0.1)
     assert spec.COUNTERBORE_DIA == pytest.approx(cup.BODY_DIA + 0.1)
-    assert "TURN THE TENON TO SUIT THE MHA-150 FERRULE BORE" in spec.DRAWING_NOTES
+    assert "TURN THE TENON TO SUIT THE MHA-152 FERRULE BORE" in spec.DRAWING_NOTES
     assert "COUNTERBORE TO SUIT THE MHA-153 CUP BODY" in spec.DRAWING_NOTES
     assert "DEPTH TO SEAT THE CUP\n  FACE FLUSH" in spec.DRAWING_NOTES
     # User ruling 2026-09-30 (concept v4): after the cure the oak is turned
     # flush with the ferrule and the end round is turned across the cup.
-    assert "AFTER CURE, TURN THE SHOULDER FLUSH WITH MHA-150 AND THE END ROUND" in spec.DRAWING_NOTES
+    assert "AFTER CURE, TURN THE SHOULDER FLUSH WITH MHA-152 AND THE END ROUND" in spec.DRAWING_NOTES
     assert "ACROSS THE OAK AND MHA-153; THE OAK FEATHERS OUT ON THE CUP." in spec.DRAWING_NOTES
     # The fitted tenon keeps its ferrule seat and 1.5 over the bore.
     assert spec.SHOULDER_R == pytest.approx(ferrule.OUTER_DIA / 2.0)

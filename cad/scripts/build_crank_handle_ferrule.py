@@ -1,4 +1,4 @@
-r"""Build MHA-150, the brass ferrule at the crank end of the handle.
+r"""Build MHA-152, the brass ferrule at the crank end of the handle.
 
 User ruling 2026-09-29 (ch11 p.14/p.15 photographs): the bright ring between
 the crank arm and the ebonized grip is a separate brass ferrule, epoxied on

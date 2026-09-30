@@ -4458,7 +4458,7 @@ async def build(adapter) -> dict[str, str]:
         ROT_Y_POS90,
         ground=False,
     )
-    # User ruling 2026-09-29 (ch11 p.14/p.15): the brass ferrule MHA-150 and the
+    # User ruling 2026-09-29 (ch11 p.14/p.15): the brass ferrule MHA-152 and the
     # steel butt cup MHA-153 are bonded to the oak, each authored in the
     # handle's own frame -- the ferrule from the arm face at x=0, the cup from
     # its face at the basic overall length -- so both take the handle's
@@ -4470,7 +4470,7 @@ async def build(adapter) -> dict[str, str]:
         [0.0, 90.0, 0.0],
         ROT_Y_POS90,
         ground=False,
-        label="crank-handle-ferrule (MHA-150, on the handle tenon)",
+        label="crank-handle-ferrule (MHA-152, on the handle tenon)",
     )
     handle_cup = await place_component(
         adapter,
@@ -4677,7 +4677,7 @@ async def build(adapter) -> dict[str, str]:
     )
     # The bonded ferrule and butt cup ride the handle rigidly (epoxy).
     for bonded, what in (
-        (handle_ferrule, "MHA-150 ferrule"),
+        (handle_ferrule, "MHA-152 ferrule"),
         (handle_cup, "MHA-153 butt cup"),
     ):
         await lock_mate(

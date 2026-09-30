@@ -1,4 +1,4 @@
-"""Offline contracts for MHA-150, the crank handle ferrule, and its drawing."""
+"""Offline contracts for MHA-152, the crank handle ferrule, and its drawing."""
 
 from __future__ import annotations
 
@@ -35,7 +35,7 @@ def test_part_and_drawing_share_the_marked_dimension_contract() -> None:
 
 
 def test_only_the_bore_is_banded() -> None:
-    # User ruling 2026-09-29 (MHA-150 review): the tenon is turned to suit this
+    # User ruling 2026-09-29 (MHA-152 review): the tenon is turned to suit this
     # bore and the end play is fitted on the MHA-139 shoulder.  The bore keeps
     # +/-0.10 (Codex P1/P2 on #1139, user ruling 2026-09-30): at .X the fitted
     # tenon could outgrow the MHA-022 seat shoulder or thin the oak over the
@@ -85,7 +85,7 @@ def test_note_names_the_mating_tenon() -> None:
 
 def test_registry_row_is_the_title_block_source() -> None:
     row = _config.parts("crank-handle-ferrule")
-    assert row["number"] == "MHA-150"
+    assert row["number"] == "MHA-152"
     assert row["title"] == "Crank Handle Ferrule"
     assert len(str(row["material"])) <= 36
     assert int(row["quantity"]) == 1

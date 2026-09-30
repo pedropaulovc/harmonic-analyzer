@@ -4,7 +4,7 @@ The longitudinal section is a turned part's length view (policy rule 7): its
 explicit centerline says which edges are the faced ends, and the cut exposes
 the bores so their diameters never land on hidden lines.  Lifted from
 ``draw_crank_pinion`` for the small turned parts that share the layout
-(MHA-150, MHA-153); only their drawings import it.
+(MHA-152, MHA-153); only their drawings import it.
 """
 
 from __future__ import annotations

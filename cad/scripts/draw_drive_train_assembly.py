@@ -359,7 +359,7 @@ BOM_PART_NUMBERS = {
     "keeper-chain-link": "MHA-150",
     "fillister-screw": "MHA-030",
     "crank-handle": "MHA-022",
-    "crank-handle-ferrule": "MHA-150",
+    "crank-handle-ferrule": "MHA-152",
     "crank-handle-butt-cup": "MHA-153",
     "crank-handle-pivot-screw": "MHA-139",
     "crank-hub": "MHA-137",
@@ -530,7 +530,7 @@ CONE_CRANK_STEPS = "\n".join(
         # sheet; the bead count is the spec's solve, never a typed number.
         f"   CUT MHA-149 TO {KEEPER_CHAIN_BEADS} BEADS; THREAD IT THROUGH THE MHA-130",
         "   LOOP AND MHA-128; SNAP ONE END BEAD INTO EACH DOME OF MHA-150.",
-        "7. EPOXY MHA-150 ON THE MHA-022 TENON, MHA-153 IN ITS BUTT; CURE.",
+        "7. EPOXY MHA-152 ON THE MHA-022 TENON, MHA-153 IN ITS BUTT; CURE.",
         "   SLIDE MHA-022 ONTO MHA-139; THREAD MHA-139 INTO THE MHA-020 TAP",
         "   WITH LOCTITE 222, SHOULDER TIGHT ON THE ARM. END PLAY 0.25-1.0.",
         "   FILE THE TIP FLUSH WITH THE ARM'S INBOARD FACE; BREAK EDGE.",
