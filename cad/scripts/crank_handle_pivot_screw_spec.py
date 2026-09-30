@@ -36,10 +36,15 @@ from crank_handle_butt_cup_spec import (
     POCKET_WALL_FLOOR_MM as CUP_POCKET_WALL_FLOOR_MM,
     WALL_FLOOR_MM,
 )
+from crank_handle_ferrule_spec import (
+    BORE_DIA as FERRULE_BORE_DIA,
+    BORE_DIA_TOL as FERRULE_BORE_DIA_TOL,
+)
 from crank_handle_spec import (
     HANDLE_LENGTH,
     PIVOT_BORE_BAND,
     PIVOT_BORE_DIA,
+    TENON_X0,
 )
 from crank_hub_geometry import (
     ARM_STOCK_THICKNESS,
@@ -78,6 +83,16 @@ SLOT_DEPTH_TOL = 0.20
 # annulus on the arm face and the tenon keeps 1.5 of oak over its bore.
 SHOULDER_DIA = 4.00
 SHOULDER_DIA_BAND = (-0.03, -0.08)
+# Seat collar (local review of 1f3067ef2, user's recommended option taken when
+# the question timed out): the Ø4 shoulder alone has no seat on the arm --
+# the #6-32 hole's mouth opens to Ø4.0 after its edge break, wider than the
+# shoulder's flat.  A Ø6 collar at the arm end of the shoulder seats on the
+# arm face; it lies in the ferrule's open bore end, where no oak reaches
+# (the tenon stops TENON_X0 short of the arm face).  Its OD is routine (.X);
+# its length is banded so the longest collar clears the shortest tenon end.
+COLLAR_DIA = 6.0
+COLLAR_LENGTH = 1.0
+COLLAR_LENGTH_TOL = 0.10
 # Arm face to the head's underside, which bears on the MHA-153 cup floor.
 # User ruling 2026-09-29 (after the machinist reviews): the shoulder is
 # turned to suit the bonded handle -- its measured length from the ferrule's
@@ -142,6 +157,9 @@ RELIEF_DIA = 2.2
 RELIEF_DIA_TOL = 0.10
 RELIEF_DIA_MAX = round(RELIEF_DIA + RELIEF_DIA_TOL, 6)
 RELIEF_WIDTH = 1.5
+# Banded (local review of 1f3067ef2): at .X the groove could be 0.7, under one
+# #6-32 pitch, too short for the die's incomplete threads to run out.
+RELIEF_WIDTH_TOL = 0.10
 # A 45-degree lead from the relief floor up into the seat face, so the groove
 # leaves no sharp inside corner.  0.5 keeps the lead inside the Ø3.505 thread
 # major, i.e. inside the arm's tapped hole, so the whole seat annulus that
@@ -243,7 +261,8 @@ ENGAGEMENT_FLOOR = ENGAGEMENT_RULE_D * THREAD_MODEL_DIA
 ARM_PRINTED_THICKNESS_MAX = ARM_THICKNESS + GENERAL_1PL_TOL_MM
 # The relief width is a routine .X size (MHA-139 re-review, 2026-09-29); the
 # #6-32 thread clears the 1.5D rule with it at .X (asserted below).
-RELIEF_WIDTH_MAX = round(RELIEF_WIDTH + GENERAL_1PL_TOL_MM, 6)
+RELIEF_WIDTH_MAX = round(RELIEF_WIDTH + RELIEF_WIDTH_TOL, 6)
+RELIEF_WIDTH_MIN = round(RELIEF_WIDTH - RELIEF_WIDTH_TOL, 6)
 # The title-block edge break on the tapped hole's inboard exit edge takes up
 # to its size of thread off the arm end of the engagement.
 TAP_EXIT_BREAK = EDGE_BREAK_MAX_MM
@@ -301,20 +320,34 @@ FILE_ALLOWANCE_MIN = round(FULL_THREAD_REACH_MIN - ARM_STOCK_THICKNESS_MAX, 6)
 DRAWING_NOTES = "\n".join(
     (
         "FACE THE UNDER-HEAD TO SUIT THE BONDED MHA-022: UNDER-HEAD TO SEAT FACE",
-        "  (THE SHOULDER'S THREAD-END FACE, ON MHA-020) = FERRULE FACE TO CUP",
+        "  (THE COLLAR'S THREAD-END FACE, ON MHA-020) = FERRULE FACE TO CUP",
         f"  FLOOR PLUS {END_PLAY_RANGE[0]:.2f}-{END_PLAY_RANGE[1]:.2f}. "
         f"HEAD BEARS ON MHA-153 FLOOR; DIA BAND KEEPS {HEAD_BEARING_RADIAL_MIN:.1f}",
         "  BEARING; LENGTH BAND KEEPS IT BELOW THE CUP FACE.",
     )
 )
 
-# Flat seat annulus that bears on the arm face, outside the 45-degree lead:
-# nominal, and after the minimum shoulder and the title-block edge break.
-SEAT_FLAT_ANNULUS_AREA = math.pi / 4.0 * (SHOULDER_DIA**2 - SEAT_FLAT_INNER_DIA**2)
+# The collar's seat on the arm face: from the arm's tapped mouth (the thread
+# major plus its title-block edge break, the larger of it and the relief
+# lead's envelope) out to the smallest .X collar less its own edge break.
+TAPPED_MOUTH_DIA_MAX = round(THREAD_MODEL_DIA + 2.0 * EDGE_BREAK_MAX_MM, 6)
+SEAT_CONTACT_INNER_DIA = max(TAPPED_MOUTH_DIA_MAX, SEAT_FLAT_INNER_DIA_MAX)
+SEAT_CONTACT_OUTER_DIA_MIN = round(
+    COLLAR_DIA - GENERAL_1PL_TOL_MM - 2.0 * EDGE_BREAK_MAX_MM, 6
+)
+SEAT_RADIAL_MIN = round((SEAT_CONTACT_OUTER_DIA_MIN - SEAT_CONTACT_INNER_DIA) / 2.0, 6)
+SEAT_FLAT_ANNULUS_AREA = math.pi / 4.0 * (COLLAR_DIA**2 - TAPPED_MOUTH_DIA_MAX**2)
 SEAT_FLAT_ANNULUS_AREA_MIN = (
-    math.pi
-    / 4.0
-    * ((SHOULDER_DIA_MIN - 2.0 * EDGE_BREAK_MAX_MM) ** 2 - SEAT_FLAT_INNER_DIA_MAX**2)
+    math.pi / 4.0 * (SEAT_CONTACT_OUTER_DIA_MIN**2 - SEAT_CONTACT_INNER_DIA**2)
+)
+# The collar in the ferrule's open bore end: radial clearance to the smallest
+# bore, and axial clearance to the shortest tenon's end (the handle pushed to
+# the arm).
+COLLAR_BORE_CLEARANCE_MIN = round(
+    ((FERRULE_BORE_DIA - FERRULE_BORE_DIA_TOL) - (COLLAR_DIA + GENERAL_1PL_TOL_MM)) / 2.0, 6
+)
+COLLAR_TENON_CLEARANCE_MIN = round(
+    (TENON_X0 - GENERAL_1PL_TOL_MM) - (COLLAR_LENGTH + COLLAR_LENGTH_TOL), 6
 )
 # The relief neck is the screw's weakest section: pi/4 x 2.3^2 = 4.15 mm^2
 # against the #6-32 UNC tensile stress area of 0.00909 in^2 = 5.86 mm^2, about
@@ -341,6 +374,13 @@ for _ok, _what in (
         "relief lead reaches past the thread major into the seat annulus",
     ),
     (SEAT_FLAT_ANNULUS_AREA_MIN > 0.0, "no flat seat annulus is left"),
+    (SEAT_RADIAL_MIN >= 0.3, "the collar's seat on the arm face is under 0.3 radial"),
+    (COLLAR_BORE_CLEARANCE_MIN > 0.0, "the collar can touch the ferrule bore"),
+    (COLLAR_TENON_CLEARANCE_MIN > 0.0, "the longest collar can reach the shortest tenon"),
+    (
+        RELIEF_WIDTH_MIN >= 1.5 * THREAD_PITCH,
+        "the shortest relief is under 1.5 pitches of die run-out",
+    ),
     (
         FULL_THREAD_WORST >= ENGAGEMENT_FLOOR,
         "stock-arm worst-case engagement is under the 1.5D rule",
@@ -406,6 +446,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "HeadDia",
         "HeadLength",
         "ShoulderDia",
+        "CollarDia",
+        "CollarLength",
         "ThreadLength",
         "ReliefDia",
         "ReliefWidth",
@@ -426,9 +468,11 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "HeadDia": 2,
         "HeadLength": 2,
         "ShoulderDia": 2,
+        "CollarDia": 1,
+        "CollarLength": 2,
         "ThreadLength": 1,
         "ReliefDia": 2,
-        "ReliefWidth": 1,
+        "ReliefWidth": 2,
         "TipChamfer": 2,
     },
     "SlotProfile": {"SlotWidth": 1},

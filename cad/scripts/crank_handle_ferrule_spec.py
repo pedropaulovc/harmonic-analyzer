@@ -27,14 +27,19 @@ from __future__ import annotations
 # reads ~Ø11-12, not the Ø15 first derived).  The bore follows the smaller
 # MHA-139 shoulder: the tenon over the Ø4.1 pivot bore keeps its 1.5 wall.
 OUTER_DIA = 12.5
-BORE_DIA = 7.5
+# Banded (local review of 1f3067ef2): the oak shoulder is turned flush with
+# this OD after cure, so the OD's spread must sit inside the grip's 0.5
+# contour allowance; at .X it spanned 1.6.
+OUTER_DIA_TOL = 0.20
+# 7.7 (local review of 1f3067ef2): the fitted tenon keeps 1.5 of oak over the
+# reamed pivot bore with 0.10 of eccentricity between them.
+BORE_DIA = 7.7
 BORE_DIA_TOL = 0.10
 LENGTH = 7.0
 
-# Brass wall, on radius, at the worst case: the .X outside over the banded
-# bore.
-GENERAL_1PL_MM = 0.8
-WALL_WORST = ((OUTER_DIA - GENERAL_1PL_MM) - (BORE_DIA + BORE_DIA_TOL)) / 2.0
+# Brass wall, on radius, at the worst case: the banded outside over the
+# banded bore.
+WALL_WORST = ((OUTER_DIA - OUTER_DIA_TOL) - (BORE_DIA + BORE_DIA_TOL)) / 2.0
 if WALL_WORST < 1.5:
     raise AssertionError("MHA-152 ferrule wall is under 1.5 at the .X worst case")
 
@@ -42,7 +47,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "FerruleProfile": {"OuterDia", "BoreDia", "Length"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "FerruleProfile": {"OuterDia": 1, "BoreDia": 2, "Length": 1},
+    "FerruleProfile": {"OuterDia": 2, "BoreDia": 2, "Length": 1},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places

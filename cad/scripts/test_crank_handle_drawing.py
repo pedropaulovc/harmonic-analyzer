@@ -84,11 +84,16 @@ def test_tenon_and_counterbore_are_fitted_to_the_parts_they_take() -> None:
     # flush with the ferrule and the end round is turned across the cup.
     assert "AFTER CURE, TURN THE SHOULDER FLUSH WITH MHA-152 AND THE END ROUND" in spec.DRAWING_NOTES
     assert "ACROSS THE OAK AND MHA-153; THE OAK FEATHERS OUT ON THE CUP." in spec.DRAWING_NOTES
-    # The fitted tenon keeps its ferrule seat and 1.5 over the bore.
+    # The fitted tenon keeps its ferrule seat and 1.5 over the bore, with
+    # 0.10 of bore eccentricity budgeted (local review of 1f3067ef2).
     assert spec.SHOULDER_R == pytest.approx(ferrule.OUTER_DIA / 2.0)
-    assert spec.FERRULE_SEAT_RADIAL_MIN == pytest.approx(2.225)
+    assert spec.BORE_ECCENTRICITY == pytest.approx(0.10)
+    assert spec.FERRULE_SEAT_RADIAL_MIN == pytest.approx(2.125)
     assert spec.TENON_WALL_MIN == pytest.approx(1.55)
-    assert spec.WAIST_WALL_MIN == pytest.approx(2.425)
+    assert spec.WAIST_WALL_MIN == pytest.approx(2.325)
+    # Turning the shoulder flush with the banded ferrule OD stays inside the
+    # grip's contour allowance.
+    assert 2.0 * ferrule.OUTER_DIA_TOL <= spec.CONTOUR_ALLOWANCE_DIA
     source = Path(handle.__file__).read_text(encoding="utf-8")
     assert source.count("set_dimension_bilateral_tolerance(") == 1  # the reamed bore
     assert "set_dimension_symmetric_tolerance" not in source

@@ -47,6 +47,7 @@ from _drawing_marks import (
 from crank_handle_ferrule_spec import (
     BORE_DIA,
     BORE_DIA_TOL,
+    OUTER_DIA_TOL,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
@@ -153,6 +154,9 @@ async def build(adapter) -> dict[str, str]:
     # pivot bore.  Every other size is routine (.X); the handle's end play is
     # fitted on the MHA-139 shoulder.
     set_dimension_symmetric_tolerance(adapter, "FerruleProfile", "BoreDia", BORE_DIA_TOL)
+    # The OD is banded so the oak shoulder turned flush with it stays inside
+    # the grip's contour allowance (local review of 1f3067ef2).
+    set_dimension_symmetric_tolerance(adapter, "FerruleProfile", "OuterDia", OUTER_DIA_TOL)
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
     clear_dimensions_for_drawing(adapter)

@@ -34,20 +34,24 @@ def test_part_and_drawing_share_the_marked_dimension_contract() -> None:
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in source
 
 
-def test_only_the_bore_is_banded() -> None:
+def test_bore_and_outside_are_banded() -> None:
     # User ruling 2026-09-29 (MHA-152 review): the tenon is turned to suit this
     # bore and the end play is fitted on the MHA-139 shoulder.  The bore keeps
     # +/-0.10 (Codex P1/P2 on #1139, user ruling 2026-09-30): at .X the fitted
     # tenon could outgrow the MHA-022 seat shoulder or thin the oak over the
-    # pivot bore to 1.45.
-    assert spec.DRAWING_PRECISION_BY_NAME == {"OuterDia": 1, "BoreDia": 2, "Length": 1}
-    assert (spec.BORE_DIA, spec.BORE_DIA_TOL) == (7.5, 0.10)
+    # pivot bore to 1.45.  Local review of 1f3067ef2: the bore grows to 7.7
+    # for the bore's eccentricity, and the OD takes +/-0.20 so the oak turned
+    # flush with it stays inside the grip's contour allowance.
+    assert spec.DRAWING_PRECISION_BY_NAME == {"OuterDia": 2, "BoreDia": 2, "Length": 1}
+    assert (spec.BORE_DIA, spec.BORE_DIA_TOL) == (7.7, 0.10)
+    assert (spec.OUTER_DIA, spec.OUTER_DIA_TOL) == (12.5, 0.20)
     assert model_toleranced_dimensions(part) == {
-        ("FerruleProfile", "BoreDia"): "BORE_DIA_TOL"
+        ("FerruleProfile", "BoreDia"): "BORE_DIA_TOL",
+        ("FerruleProfile", "OuterDia"): "OUTER_DIA_TOL",
     }
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "set_dimension_bilateral_tolerance" not in source
-    assert spec.WALL_WORST == pytest.approx(2.05)
+    assert spec.WALL_WORST == pytest.approx(2.25)
 
 
 def test_fitted_tenon_keeps_its_seat_and_wall() -> None:
@@ -55,9 +59,10 @@ def test_fitted_tenon_keeps_its_seat_and_wall() -> None:
 
     # The oak leaves the ferrule face flush with its OD (user ruling
     # 2026-09-30, concept v3), so the seat is the whole face over the tenon;
-    # the Ø7.5 bore keeps 1.5 of oak over the Ø4.1 pivot bore.
+    # the Ø7.7 bore keeps 1.5 of oak over the Ø4.1 pivot bore with 0.10 of
+    # eccentricity.
     assert handle.SHOULDER_R == pytest.approx(spec.OUTER_DIA / 2.0)
-    assert handle.FERRULE_SEAT_RADIAL_MIN == pytest.approx(2.225)
+    assert handle.FERRULE_SEAT_RADIAL_MIN == pytest.approx(2.125)
     assert handle.TENON_WALL_MIN == pytest.approx(1.55)
 
 
@@ -71,7 +76,7 @@ def test_bore_reads_on_a_section_not_hidden_lines() -> None:
 def test_ring_matches_the_photographed_brass_collar() -> None:
     assert spec.OUTER_DIA == pytest.approx(12.5)  # eight-views-4, user 2026-09-30
     assert spec.LENGTH == pytest.approx(7.0)
-    assert part.V_FERRULE == pytest.approx(math.pi * (6.25**2 - 3.75**2) * 7.0)
+    assert part.V_FERRULE == pytest.approx(math.pi * (6.25**2 - 3.85**2) * 7.0)
     assert part.MATERIAL == "Brass"
 
 

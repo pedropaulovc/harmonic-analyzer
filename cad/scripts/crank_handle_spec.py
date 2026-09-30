@@ -48,6 +48,7 @@ from crank_handle_ferrule_spec import (
     BORE_DIA_TOL as FERRULE_BORE_DIA_TOL,
     LENGTH as FERRULE_LENGTH,
     OUTER_DIA as FERRULE_OUTER_DIA,
+    OUTER_DIA_TOL as FERRULE_OUTER_DIA_TOL,
     TENON_GLUE_LINE as FERRULE_TENON_GLUE_LINE,
 )
 
@@ -196,12 +197,18 @@ TENON_DIA_MIN = FERRULE_BORE_DIA - FERRULE_BORE_DIA_TOL - FERRULE_TENON_GLUE_LIN
 FERRULE_SEAT_RADIAL_MIN = (
     (2.0 * SHOULDER_R - CONTOUR_ALLOWANCE_DIA) - TENON_DIA_MAX
 ) / 2.0
+# The reamed bore and the turned tenon/grip are not held concentric by any
+# frame, so the walls over the bore budget 0.10 of eccentricity (local review
+# of 1f3067ef2: 1.55 on diameters alone left 1.45 at 0.10 off-centre).
+BORE_ECCENTRICITY = 0.10
 # Oak between the smallest tenon and the largest reamed pivot bore.
-TENON_WALL_MIN = (TENON_DIA_MIN - (PIVOT_BORE_DIA + PIVOT_BORE_BAND[0])) / 2.0
+TENON_WALL_MIN = (
+    (TENON_DIA_MIN - (PIVOT_BORE_DIA + PIVOT_BORE_BAND[0])) / 2.0 - BORE_ECCENTRICITY
+)
 # Oak at the waist over the largest bore, the contour its whole allowance small.
 WAIST_WALL_MIN = (
     (2.0 * WAIST_R - CONTOUR_ALLOWANCE_DIA) - (PIVOT_BORE_DIA + PIVOT_BORE_BAND[0])
-) / 2.0
+) / 2.0 - BORE_ECCENTRICITY
 
 for _ok, _what in (
     (
@@ -214,6 +221,10 @@ for _ok, _what in (
         "the largest fitted tenon leaves under 0.5 of shoulder for the ferrule",
     ),
     (TENON_WALL_MIN >= 1.5, "the smallest fitted tenon leaves under 1.5 over the bore"),
+    (
+        2.0 * FERRULE_OUTER_DIA_TOL <= CONTOUR_ALLOWANCE_DIA,
+        "turning the shoulder flush with the ferrule leaves the contour allowance",
+    ),
     (WAIST_WALL_MIN >= 1.5, "the waist leaves under 1.5 over the bore"),
     (
         OAK_WALL_BEHIND_FEATHER >= 1.5,
