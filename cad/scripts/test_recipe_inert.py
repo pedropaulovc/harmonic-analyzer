@@ -65,7 +65,8 @@ CALL_SITES: dict[tuple[str, str], frozenset[str]] = {
         {"capture_missing_properties"}
     ),
     # A sheet-coordinate pick that selected nothing: reads the seat's windows
-    # and session, then raises the pick's own failure.  Nothing after it runs.
+    # and session, then raises the pick's own failure. It never returns, but a
+    # caller can catch the RuntimeError and retry; draw_rocker_arm does so.
     ("_drawing_common.py", "_select_view_entity"): frozenset({"capture_pick_miss"}),
     # PRE-save, after the sheet is fitted: records the window the drawing's
     # coordinate picks hit-test in.  Rule 3 proves it reads only.
@@ -73,8 +74,8 @@ CALL_SITES: dict[tuple[str, str], frozenset[str]] = {
 }
 # Allowed anywhere, but only as a statement whose value is the call: it always raises.
 TERMINAL = frozenset({"capture_com_failure"})
-# Pinned captures that must raise like a terminal, though only their CALL_SITES
-# may name them.
+# Pinned captures that never return, though only their CALL_SITES may name them.
+# This does not imply callers cannot catch their exceptions and continue.
 PINNED_TERMINALS = frozenset(
     {"capture_rebuild_failure", "capture_missing_properties", "capture_pick_miss"}
 )
@@ -305,9 +306,9 @@ def test_rule3_inert_module_runs_no_com_mutator_before_a_save(name):
         stray = callers - roots
         if stray:
             violations.append(f"{holder} (a pinned mutator) is reached from {sorted(stray)}")
-    # A terminal call is allowed anywhere only because it always raises, and a
+    # A terminal call is allowed anywhere only because it never returns, and a
     # pinned capture is held to the same: each ends in a raise, or in a call to
-    # a terminal that does.
+    # a terminal that does. A caller may still catch the exception and continue.
     for terminal in (TERMINAL | PINNED_TERMINALS) & set(functions):
         capture = functions[terminal]
         returns = ast.unparse(capture.returns) if capture.returns is not None else ""

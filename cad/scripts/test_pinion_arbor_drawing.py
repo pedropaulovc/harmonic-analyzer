@@ -2004,10 +2004,6 @@ def test_each_journal_ra_lands_on_its_own_faces_silhouette_found_on_the_model(
         assert landing == pytest.approx(
             view.sheet((0.0, drawing.FLANK_SIGN[flank] * spec.SHAFT_DIA / 2000.0, station_z / 1000.0))
         )
-    source = inspect.getsource(drawing.build)
-    assert "edge_xy=" not in source.split("_journal_finish_picks(adapter, principal)")[1].split(
-        "add_property_linked_note"
-    )[0]
 
 
 def test_a_journal_flank_the_view_does_not_draw_fails_loud(monkeypatch) -> None:

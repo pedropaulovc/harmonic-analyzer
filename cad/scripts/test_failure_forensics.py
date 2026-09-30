@@ -2332,6 +2332,34 @@ class _PickDrawing:
         self.ActiveView = _View(px_per_mm=2.7)
 
 
+@pytest.mark.parametrize("session_id", [0, 1])
+def test_a_service_session_is_not_labelled_as_a_disconnected_interactive_desktop(
+    capture_telemetry, monkeypatch, session_id
+):
+    spans, logs = capture_telemetry
+    monkeypatch.setattr(_seat_forensics, "_process_session_id", lambda pid: session_id)
+    monkeypatch.setattr(_seat_forensics, "_session_connect_state", lambda session: "disconnected")
+    monkeypatch.setattr(_seat_forensics, "_frame_geometry", lambda adapter: {})
+    with _telemetry.span("drawing.new_from_template"):
+        _seat_forensics.record_drawing_display(
+            _Adapter(sw=_Seat(), model=_PickDrawing()), "session comparison"
+        )
+    (event,) = [
+        e for s in spans.get_finished_spans() for e in s.events if e.name == "seat.drawing_display"
+    ]
+    assert event.attributes["seat_session_id"] == session_id
+    assert event.attributes["seat_session_state"] == "disconnected"
+    (record,) = [r.log_record for r in logs.get_finished_logs()]
+    seat = json.loads(record.attributes["seat"])
+    assert seat["seat_session_id"] == session_id
+    assert seat["seat_session_state"] == "disconnected"
+    if session_id == 0:
+        assert "session=noninteractive_service(id=0,wts=disconnected)" in str(record.body)
+    else:
+        assert "session=disconnected " in str(record.body)
+        assert "noninteractive_service" not in str(record.body)
+
+
 def test_a_missed_coordinate_pick_names_its_window_and_keeps_its_message(
     capture_telemetry, monkeypatch
 ):
@@ -2355,26 +2383,57 @@ def test_a_missed_coordinate_pick_names_its_window_and_keeps_its_message(
     assert event.attributes["view_visible_width_px"] == 1700
     assert (event.attributes["sheet_x"], event.attributes["sheet_y"]) == (0.25355, 0.166)
     (record,) = [
-        r.log_record for r in logs.get_finished_logs() if r.log_record.severity_text == "ERROR"
+        r.log_record for r in logs.get_finished_logs() if r.log_record.severity_text == "WARN"
     ]
     assert str(record.body).startswith(f"[forensics] {message}: view='Drawing View2' session=active")
     assert "frame=1536x864" in str(record.body)
     assert "view_window=1700x1160" in str(record.body)
     capture = json.loads(record.attributes["capture"])
     assert capture["seat"]["seat_pid"] == 4242
+    assert not [r for r in logs.get_finished_logs() if r.log_record.severity_text == "ERROR"]
 
 
-def test_a_pick_miss_capture_that_reads_nothing_still_raises_the_pick_failure(monkeypatch):
-    def explode(*_args, **_kwargs):
-        raise OSError("seat gone")
+@pytest.mark.parametrize("pick_miss", [False, True], ids=["drawing_display", "pick_miss"])
+def test_failed_window_and_seat_probes_preserve_both_causes_and_still_emit(
+    capture_telemetry, monkeypatch, pick_miss
+):
+    spans, logs = capture_telemetry
 
-    monkeypatch.setattr(_seat_forensics, "display_geometry", explode)
-    monkeypatch.setattr(_seat_forensics, "seat_provenance", explode)
-    with pytest.raises(RuntimeError, match=r"^failed to select x edge at sheet \(0.1, 0.2\)$"):
-        _seat_forensics.capture_pick_miss(
-            object(), "failed to select x edge at sheet (0.1, 0.2)",
-            view="v", entity_type="EDGE", sheet_xy=(0.1, 0.2),
-        )
+    def unreadable_display(_adapter):
+        raise OSError("graphics window unavailable")
+
+    def unreadable_seat(_adapter):
+        raise RuntimeError("seat identity unavailable")
+
+    monkeypatch.setattr(_seat_forensics, "display_geometry", unreadable_display)
+    monkeypatch.setattr(_seat_forensics, "seat_provenance", unreadable_seat)
+    message = "failed to select x edge at sheet (0.1, 0.2)"
+    with _telemetry.span("drawing.window_probe"):
+        if pick_miss:
+            with pytest.raises(RuntimeError) as raised:
+                _seat_forensics.capture_pick_miss(
+                    object(), message, view="v", entity_type="EDGE", sheet_xy=(0.1, 0.2)
+                )
+            assert type(raised.value) is RuntimeError and str(raised.value) == message
+        else:
+            _seat_forensics.record_drawing_display(object(), "unreadable drawing")
+    event_name = "drawing.pick_miss" if pick_miss else "seat.drawing_display"
+    (event,) = [
+        e for s in spans.get_finished_spans() for e in s.events if e.name == event_name
+    ]
+    assert event.attributes["display_capture_error"] == "OSError: graphics window unavailable"
+    assert event.attributes["seat_capture_error"] == "RuntimeError: seat identity unavailable"
+    (record,) = [r.log_record for r in logs.get_finished_logs()]
+    assert record.severity_text == ("WARN" if pick_miss else "INFO")
+    if pick_miss:
+        capture = json.loads(record.attributes["capture"])
+    else:
+        capture = {
+            "display": json.loads(record.attributes["display"]),
+            "seat": json.loads(record.attributes["seat"]),
+        }
+    assert capture["display"]["display_capture_error"] == "OSError: graphics window unavailable"
+    assert capture["seat"]["seat_capture_error"] == "RuntimeError: seat identity unavailable"
 
 
 def test_every_drawing_records_the_window_its_picks_hit_test_in(capture_telemetry, monkeypatch):
@@ -2394,12 +2453,24 @@ def test_every_drawing_records_the_window_its_picks_hit_test_in(capture_telemetr
     assert any(b.startswith("drawing display new landscape drawing: session=active") for b in bodies)
 
 
-def test_a_coordinate_pick_miss_in_a_drawing_goes_through_the_capture(monkeypatch):
+def test_a_retried_pivot_bore_pick_can_succeed_without_an_error_log(
+    capture_telemetry, monkeypatch
+):
+    import math
     import _drawing_common
+    import draw_rocker_arm
 
-    class _Drawing:
+    bore = object()
+
+    class _PickSeat(_Seat):
+        def IsSame(self, left, right):  # noqa: N802
+            return int(left is right)
+
+    class _Drawing(_PickDrawing):
         def __init__(self) -> None:
+            super().__init__()
             self.Extension = self
+            self.SelectionManager = self
             self.picks: list[tuple] = []
 
         def ActivateView(self, name):  # noqa: N802
@@ -2410,32 +2481,38 @@ def test_a_coordinate_pick_miss_in_a_drawing_goes_through_the_capture(monkeypatc
 
         def SelectByID2(self, *args):  # noqa: N802
             self.picks.append(args)
-            return False
+            return len(self.picks) == 2
+
+        def GetSelectedObjectCount2(self, _mark):  # noqa: N802
+            return 1
+
+        def GetSelectedObject6(self, _index, _mark):  # noqa: N802
+            return bore
 
     class _SheetView:
         def UpdateViewDisplayGeometry(self):  # noqa: N802
             return True
 
+    spans, logs = capture_telemetry
     drawing = _Drawing()
-    captured: list[dict] = []
-
-    def capture(adapter, message, **kwargs):
-        captured.append({"message": message, **kwargs})
-        raise RuntimeError(message)
-
+    centre = (0.2, 0.15)
     monkeypatch.setattr(_drawing_common, "view_name", lambda adapter, view: "Drawing View2")
-    monkeypatch.setattr(_seat_forensics, "capture_pick_miss", capture)
-    with pytest.raises(RuntimeError, match=r"^failed to select arbor finish silhouette at sheet"):
-        _drawing_common._select_view_entity(
-            SimpleNamespace(currentModel=drawing), _SheetView(), "SILHOUETTE", (0.25355, 0.166),
-            label="arbor finish",
+    monkeypatch.setattr(_seat_forensics, "_frame_geometry", lambda adapter: {})
+    with _telemetry.span("drawing.pivot_datum"):
+        xy = draw_rocker_arm._pick_pivot_bore(
+            _Adapter(sw=_PickSeat(), model=drawing), _SheetView(), bore, centre
         )
-    assert captured == [
-        {
-            "message": "failed to select arbor finish silhouette at sheet (0.25355, 0.166)",
-            "view": "Drawing View2",
-            "entity_type": "SILHOUETTE",
-            "sheet_xy": (0.25355, 0.166),
-        }
-    ]
-    assert drawing.picks[0][1:4] == ("SILHOUETTE", 0.25355, 0.166)
+    picked_xy = [args[2:4] for args in drawing.picks]
+    assert [
+        math.dist(point, centre) / draw_rocker_arm.PIVOT_BORE_SHEET_R for point in picked_xy
+    ] == pytest.approx(draw_rocker_arm.PIVOT_PICK_FRACTIONS)
+    assert xy == picked_xy[-1]
+    events = [e for s in spans.get_finished_spans() for e in s.events]
+    (miss,) = [e for e in events if e.name == "drawing.pick_miss"]
+    assert (miss.attributes["sheet_x"], miss.attributes["sheet_y"]) == picked_xy[0]
+    assert [e.attributes["same"] for e in events if e.name == "datum.bore_pick"] == [-2, 1]
+    (record,) = [r.log_record for r in logs.get_finished_logs()]
+    assert record.severity_text == "WARN"
+    capture = json.loads(record.attributes["capture"])
+    assert capture["entity_type"] == "EDGE"
+    assert capture["sheet_xy"] == list(picked_xy[0])

@@ -759,9 +759,12 @@ enforces it, and derives its scope from that one constant:
    `_drawing_common._select_view_entity` (`capture_pick_miss`, a sheet-point
    pick that selected nothing), `_drawing_common.new_project_drawing`
    (`record_drawing_display`, read-only) and `package_native._release_seat`.
-   The one exception is
-   `capture_com_failure(...)` as a bare statement: it always raises. A new call
-   site fails loud with file:line.
+   The pinned failure captures never return, but a caller can catch their
+   exceptions and continue: `draw_rocker_arm` retries a missed pivot-bore pick. Therefore
+   `capture_pick_miss` preserves the pick's `RuntimeError` and logs WARN, not a
+   terminal-failure verdict. The one exception is `capture_com_failure(...)`
+   as a bare statement: it always raises. A new call site fails loud with
+   file:line.
 3. **No COM write before a save.** The module calls no mutator verb
    (`Save*`/`Set*`/`Add*`/`Insert*`/`Create*`/`Edit*`/`Select*`/…, which covers
    custom-property and dimension writes) and stores no attribute on a foreign
@@ -770,7 +773,7 @@ enforces it, and derives its scope from that one constant:
    `capture_com_failure`, and `SetCurrentWorkingDirectory` under
    `teardown_seat`. Nothing reachable from a PRE-save entry point
    (`record_authoring_context`, `record_seat_provenance`,
-   `note_seats_before_connect`) reaches any of them.
+   `note_seats_before_connect`, `record_drawing_display`) reaches any of them.
 4. **Pinned reads.** The module reads tracked code only as attributes from a
    pinned list (`_common._read_member`, `_common._early_bound`, …,
    `_sketch_closure._sketch_state`). There are no from-imports, because
@@ -788,6 +791,13 @@ reason `_watchdog`'s aborts are inert.
 If you need a new inert entry point, add it to the gate's `CALL_SITES` only if
 it runs after the save or provably reads nothing into the model. Otherwise put
 the code in a tracked module.
+
+Drawing-display and pick-miss records preserve each unreadable probe as
+`display_capture_error` or `seat_capture_error`, so simultaneous failures
+still emit both causes in the event and log. The console summary labels
+session 0 as a noninteractive service session while retaining its session ID
+and raw WTS state; a service session's `disconnected` state is not an RDP-freeze
+diagnosis or a verdict on seat health.
 
 ## Verify suites (renamed)
 

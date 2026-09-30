@@ -416,7 +416,8 @@ def seat_provenance(adapter: Any) -> dict[str, Any]:
         prov.update(_seat_working_directory(adapter))
     except Exception as exc:  # noqa: BLE001 - provenance is never fatal
         prov["seat_liveness_error"] = f"{type(exc).__name__}: {exc}"
-    # Re-read per call: a session is disconnected long after its seat started.
+    # Re-read per call: an interactive session can disconnect after seat startup.
+    # Keep the raw WTS state, including session 0's noninteractive service state.
     session = prov.get("seat_session_id")
     if isinstance(session, int):
         try:
@@ -1206,11 +1207,10 @@ def _model_view_window(adapter: Any, view: Any) -> dict[str, Any]:
 
 
 # ``WTS_INFO_CLASS.WTSConnectState``, and the ``WTS_CONNECTSTATE_CLASS`` names in
-# enum order. The pool's screen capture freezes when a worker's interactive
-# session is left DISCONNECTED by an RDP connect; ``GetSystemMetrics`` still
-# reports the old desktop then (swmaker00000a@10 read 1920x1080 on one monitor
-# while its frame had been frozen for hours, 2026-09-29), so the session's own
-# state is the only record of it.
+# enum order. An interactive session left DISCONNECTED by RDP can freeze the
+# pool's screen capture while ``GetSystemMetrics`` still reports the old desktop
+# (swmaker00000a@10, 2026-09-29). WTS records connection state, not seat health:
+# session 0 is a noninteractive service session, not a disconnected RDP desktop.
 _WTS_CONNECT_STATE = 8
 _WTS_CONNECT_STATES = (
     "active",
@@ -1308,8 +1308,11 @@ def record_authoring_context(adapter: Any, label: str) -> dict[str, Any]:
 
 def _display_summary(display: Mapping[str, Any], seat: Mapping[str, Any]) -> str:
     """One console line for the hit-test surface: session, windows, zoom."""
+    session = seat.get("seat_session_state", "unknown")
+    if seat.get("seat_session_id") == 0:
+        session = f"noninteractive_service(id=0,wts={session})"
     return (
-        f"session={seat.get('seat_session_state', 'unknown')} "
+        f"session={session} "
         f"screen={display.get('screen_px', '?')} "
         f"frame={display.get('frame_width_px', '?')}x{display.get('frame_height_px', '?')}"
         f"({display.get('frame_state', 'unknown')}) "
@@ -1322,11 +1325,11 @@ def _display_summary(display: Mapping[str, Any], seat: Mapping[str, Any]) -> str
 def _display_bags(adapter: Any) -> tuple[dict[str, Any], dict[str, Any]]:
     """``(display_geometry, seat_provenance)``, each unreadable as its own error."""
     bags: list[dict[str, Any]] = []
-    for probe in (display_geometry, seat_provenance):
+    for name, probe in (("display", display_geometry), ("seat", seat_provenance)):
         try:
             bags.append(dict(probe(adapter)))
         except Exception as exc:  # noqa: BLE001 - forensics never raise
-            bags.append({"capture_error": f"{type(exc).__name__}: {exc}"})
+            bags.append({f"{name}_capture_error": f"{type(exc).__name__}: {exc}"})
     return bags[0], bags[1]
 
 
@@ -1355,6 +1358,7 @@ def record_drawing_display(adapter: Any, label: str) -> None:
             f"drawing display {label}: {_display_summary(display, seat)}",
             label=label,
             display=json.dumps(display, default=str, sort_keys=True),
+            seat=json.dumps(seat, default=str, sort_keys=True),
         )
 
 
@@ -1375,7 +1379,9 @@ def capture_pick_miss(
     size and zoom, the session's display), which the model cannot show and the
     leaf log did not record. Paired with :func:`record_drawing_display` on the
     leaves that passed, this is the comparison a worker-dependent miss needs.
-    Every probe is guarded; the caller's message always survives.
+    Every probe is guarded; the caller's message always survives. This capture
+    never returns, but a caller can catch the RuntimeError and retry another
+    pick. The forensic line is therefore WARN, not a terminal-failure verdict.
     """
     display, seat = _display_bags(adapter)
     report = {
@@ -1393,8 +1399,9 @@ def capture_pick_miss(
             sheet_x=float(sheet_xy[0]),
             sheet_y=float(sheet_xy[1]),
             **_common._attributes_of(display),
+            **_common._attributes_of(seat),
         )
-        _telemetry.error(
+        _telemetry.warn(
             f"[forensics] {message}: view={view!r} {_display_summary(display, seat)}",
             capture=json.dumps(report, default=str, sort_keys=True),
             view=view,
