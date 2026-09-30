@@ -11,7 +11,7 @@ import _config
 import build_crank_handle_ferrule as part
 import crank_handle_ferrule_spec as spec
 import draw_crank_handle_ferrule as drawing
-from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
+from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -34,14 +34,30 @@ def test_part_and_drawing_share_the_marked_dimension_contract() -> None:
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in source
 
 
-def test_every_size_is_routine_after_the_machinist_review() -> None:
+def test_only_the_bore_is_banded() -> None:
     # User ruling 2026-09-29 (MHA-150 review): the tenon is turned to suit this
-    # bore and the end play is fitted on the MHA-139 shoulder, so no band here.
-    assert set(spec.DRAWING_PRECISION_BY_NAME.values()) == {1}
+    # bore and the end play is fitted on the MHA-139 shoulder.  The bore keeps
+    # +/-0.10 (Codex P1/P2 on #1139, user ruling 2026-09-30): at .X the fitted
+    # tenon could outgrow the MHA-022 seat shoulder or thin the oak over the
+    # pivot bore to 1.45.
+    assert spec.DRAWING_PRECISION_BY_NAME == {"OuterDia": 1, "BoreDia": 2, "Length": 1}
+    assert (spec.BORE_DIA, spec.BORE_DIA_TOL) == (10.0, 0.10)
+    assert model_toleranced_dimensions(part) == {
+        ("FerruleProfile", "BoreDia"): "BORE_DIA_TOL"
+    }
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert "set_dimension_bilateral_tolerance" not in source
-    assert "set_dimension_symmetric_tolerance" not in source
-    assert spec.WALL_WORST >= 1.5
+    assert spec.WALL_WORST == pytest.approx(2.05)
+
+
+def test_fitted_tenon_keeps_its_seat_and_wall() -> None:
+    import crank_handle_spec as handle
+
+    # Neck grown to Ø12 (user ruling 2026-09-30) so the shoulder survives the
+    # contour allowance under the largest fitted tenon.
+    assert handle.NECK_R == pytest.approx(6.0)
+    assert handle.FERRULE_SEAT_RADIAL_MIN == pytest.approx(0.725)
+    assert handle.TENON_WALL_MIN == pytest.approx(1.80)
 
 
 def test_bore_reads_on_a_section_not_hidden_lines() -> None:

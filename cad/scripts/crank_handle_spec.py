@@ -42,6 +42,7 @@ from crank_handle_butt_cup_spec import (
 )
 from crank_handle_ferrule_spec import (
     BORE_DIA as FERRULE_BORE_DIA,
+    BORE_DIA_TOL as FERRULE_BORE_DIA_TOL,
     LENGTH as FERRULE_LENGTH,
     TENON_GLUE_LINE as FERRULE_TENON_GLUE_LINE,
 )
@@ -52,7 +53,10 @@ from crank_handle_ferrule_spec import (
 # ferrule and the cup flange now take its two ends.
 HANDLE_LENGTH = 58.0  # basic: ferrule arm face to cup flange face
 HANDLE_MAX_DIA = 21.0  # max diameter at the swell
-NECK_R = 5.5  # waist at the tenon shoulder (neck Ø11)
+# Waist at the tenon shoulder.  Ø11 in the photo re-derive; grown to Ø12
+# (Codex P1 on #1139, user ruling 2026-09-30) so the shoulder the ferrule
+# seats on survives the contour allowance under the largest fitted tenon.
+NECK_R = 6.0
 PEAK_X = 36.0  # axial station of the maximum diameter, from x=0
 # Theoretical butt radius at HANDLE_LENGTH.  Ø10 in the photo re-derive; grown
 # (user rulings 2026-09-29, MHA-153 and MHA-022 reviews) to Ø15 so the oak
@@ -127,6 +131,18 @@ COUNTERBORE_MOUTH_WALL = TRIM_R_WORST - COUNTERBORE_DIA_MAX / 2.0
 # proud of the smallest .X flange, exposing end grain.  Blending down to the
 # smallest flange must still leave 1.5 of oak round the largest counterbore.
 BLENDED_BUTT_WALL = (CUP_FLANGE_DIA - _GENERAL_1PL) / 2.0 - COUNTERBORE_DIA_MAX / 2.0
+# The tenon is turned to suit the actual ferrule bore (Codex P1/P2 on #1139):
+# the largest banded bore with the tightest glue line gives the largest tenon,
+# and the smallest bore with the widest line the smallest.
+TENON_DIA_MAX = FERRULE_BORE_DIA + FERRULE_BORE_DIA_TOL - FERRULE_TENON_GLUE_LINE[0]
+TENON_DIA_MIN = FERRULE_BORE_DIA - FERRULE_BORE_DIA_TOL - FERRULE_TENON_GLUE_LINE[1]
+# The shoulder the ferrule seats on, radially, at its worst: the neck turned
+# its whole allowance small over the largest tenon.
+FERRULE_SEAT_RADIAL_MIN = (
+    (2.0 * NECK_R - CONTOUR_ALLOWANCE_DIA) - TENON_DIA_MAX
+) / 2.0
+# Oak between the smallest tenon and the largest reamed pivot bore.
+TENON_WALL_MIN = (TENON_DIA_MIN - (PIVOT_BORE_DIA + PIVOT_BORE_BAND[0])) / 2.0
 
 for _ok, _what in (
     (
@@ -135,6 +151,11 @@ for _ok, _what in (
     ),
     (TENON_LENGTH - _GENERAL_1PL >= 4.0, "the shortest tenon leaves under 4.0 of glue length"),
     (TENON_R < NECK_R, "the tenon leaves no shoulder for the ferrule to seat on"),
+    (
+        FERRULE_SEAT_RADIAL_MIN >= 0.5,
+        "the largest fitted tenon leaves under 0.5 of shoulder for the ferrule",
+    ),
+    (TENON_WALL_MIN >= 1.5, "the smallest fitted tenon leaves under 1.5 over the bore"),
     (
         COUNTERBORE_DEPTH - _GENERAL_1PL > CUP_BODY_LENGTH_MAX,
         "the cup body can bottom in the shallowest counterbore before its flange seats",
