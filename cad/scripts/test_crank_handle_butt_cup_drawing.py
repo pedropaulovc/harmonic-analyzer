@@ -50,7 +50,7 @@ def test_every_section_holds_1_5_at_its_worst_case() -> None:
     assert spec.POCKET_WALL_MIN == pytest.approx(1.5)
     assert screw.CUP_POCKET_WALL_MIN == pytest.approx(1.5)
     assert screw.POCKET_MAX <= spec.POCKET_DIA_MAX
-    # 3/4-in stock clears the Ø16.2 flange at its .X upper limit.
+    # 3/4-in stock clears the Ø17.0 flange at its .X upper limit.
     assert "3/4 in" in _config.parts("crank-handle-butt-cup")["material"]
     assert spec.FLANGE_DIA + 0.8 < 0.75 * 25.4
     assert screw.HEAD_BEARING_RADIAL_MIN > 0.0

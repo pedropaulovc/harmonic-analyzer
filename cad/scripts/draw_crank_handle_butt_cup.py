@@ -72,7 +72,7 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (5.0, 1.0)
 VIEW_SCALE = (5, 1)
 ISO_SCALE = (4, 1)
-END_CENTER = (0.080, 0.165)
+END_CENTER = (0.074, 0.165)
 SECTION_CENTER = (0.215, 0.165)
 ISO_CENTER = (0.368, 0.215)
 # Left of the pocket-depth text and above the notes (farm run
@@ -95,12 +95,12 @@ FLANGE_SEAT_X = FLANGE_RIGHT_X - FLANGE_THICKNESS * _S
 SECTION_KEEP = {
     "FlangeDia": (FLANGE_RIGHT_X + 0.020, SECTION_CENTER[1]),
     "PocketDia": (FLANGE_RIGHT_X + 0.040, SECTION_CENTER[1]),
-    # The Ø6.2 DRILL THRU block stands well left of and above the Ø11.60
-    # band so the two never touch (MHA-153 re-review 3).
+    # The Ø6.2 DRILL THRU block stands well left of the Ø11.60 band and below
+    # the hole's lower extension line, clear of its arrows (MHA-153 re-reviews).
     "BodyDia": (SECTION_CENTER[0] - HALF_LENGTH - 0.018, SECTION_CENTER[1]),
     "FloorHoleDia": (
         SECTION_CENTER[0] - HALF_LENGTH - 0.058,
-        SECTION_CENTER[1] + 0.014,
+        SECTION_CENTER[1] - 0.024,
     ),
     "FlangeThickness": ((FLANGE_RIGHT_X + FLANGE_SEAT_X) / 2.0, SECTION_CENTER[1] + FLANGE_R + 0.009),
     "OverallLength": (SECTION_CENTER[0], SECTION_CENTER[1] + FLANGE_R + 0.021),

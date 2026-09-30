@@ -59,7 +59,7 @@ PEAK_X = 36.0  # axial station of the maximum diameter, from x=0
 # round the cup counterbore keeps 1.5 mm at its worst case -- the longest
 # overall puts the butt face furthest down the taper -- and the trim face is
 # as wide as the cup flange.
-CAP_R = 7.5
+CAP_R = 8.0
 # The turned grip contour's allowance, on diameter, against its two arcs: the
 # wood grip is checked by eye and template, not by a profile frame (MHA-022
 # review, user ruling 2026-09-29).
@@ -111,7 +111,9 @@ _GENERAL_1PL = GENERAL_1PL_TOL_MM
 COUNTERBORE_DIA_MAX = round(
     CUP_BODY_DIA + CUP_BODY_DIA_TOL + COUNTERBORE_GLUE_LINE[1] + 0.05, 1
 )
-_TRIM_X_LONGEST = TRIM_X + _GENERAL_1PL
+# The butt face at its longest AND the crown station at its shortest (both .X)
+# put the trim face furthest down the rear arc (MHA-022 re-review 2).
+_TRIM_X_LONGEST = TRIM_X + 2.0 * _GENERAL_1PL
 TRIM_R_WORST = (
     REAR_PROFILE_CY
     + math.sqrt(REAR_PROFILE_R**2 - (_TRIM_X_LONGEST - PEAK_X) ** 2)
