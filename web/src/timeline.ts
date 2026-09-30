@@ -232,6 +232,8 @@ export class VideoReference {
   private readonly frames: CompiledFrame[]
   private readonly sample: SourceSample = { state: 'unavailable', timeSeconds: 0, reason: '', views: [] }
   private readonly pools = new Map<string, PlaybackView>()
+  /** Private scratch for select(); never exposed, so getState() stays observably side-effect free. */
+  private readonly selection: { t: number, index: number, state: ReferenceState, from: CompiledFrame | null } = { t: 0, index: 0, state: 'unavailable', from: null }
 
   constructor(data: ReferenceFile, video: Video) {
     if (data.schemaVersion !== 1 || data.source?.videoId !== video.id || data.source.sha256 !== video.sourceSha256) throw new Error('Reference footage identity does not match this video.')
@@ -292,7 +294,9 @@ export class VideoReference {
     this.frames = frames
   }
 
-  at(timeSeconds: number): SourceSample {
+  /** Frame index plus required/held/no-machine selection shared by at() and getState(). */
+  private select(timeSeconds: number): typeof this.selection {
+    const s = this.selection
     const t = Math.max(0, Math.min(this.data.source.durationSeconds, finite(timeSeconds, 'Playback time')))
     let lo = 0
     let hi = this.frames.length
@@ -303,34 +307,47 @@ export class VideoReference {
     }
     const index = Math.max(0, lo - 1)
     const current = this.frames[index]!
+    s.t = t
+    s.index = index
+    s.from = null
+    if (current.reference.timeSeconds > t) {
+      s.state = 'unavailable'
+    } else if (current.requirement === 'not-required') {
+      // Exempt source: show an actual earlier matched pose, or explicitly assert none.
+      if (current.heldFrom < 0) {
+        s.state = 'no-machine'
+      } else {
+        const held = this.frames[current.heldFrom]!
+        s.state = held.matched ? 'held' : 'unavailable'
+        if (held.matched) s.from = held
+      }
+    } else if (!current.matched) {
+      s.state = 'unavailable'
+    } else {
+      s.state = 'matched'
+      s.from = current
+    }
+    return s
+  }
+
+  /** Reference state at a time without touching the sample, its views, or the pooled draw state. */
+  getState(timeSeconds: number): ReferenceState {
+    return this.select(timeSeconds).state
+  }
+
+  at(timeSeconds: number): SourceSample {
+    const { t, index, state, from } = this.select(timeSeconds)
+    const current = this.frames[index]!
     this.sample.timeSeconds = t
     this.sample.views.length = 0
+    this.sample.state = state
     if (current.reference.timeSeconds > t) {
-      this.sample.state = 'unavailable'
       this.sample.reason = `No source observation exists before ${current.reference.timeSeconds.toFixed(3)}s.`
       return this.sample
     }
     this.sample.reason = current.reason
-    let from = current
-    if (current.requirement === 'not-required') {
-      // Exempt source: show an actual earlier matched pose, or explicitly assert none.
-      if (current.heldFrom < 0) {
-        this.sample.state = 'no-machine'
-        return this.sample
-      }
-      from = this.frames[current.heldFrom]!
-      if (!from.matched) {
-        this.sample.state = 'unavailable'
-        return this.sample
-      }
-      this.sample.state = 'held'
-    } else if (!current.matched) {
-      this.sample.state = 'unavailable'
-      return this.sample
-    } else {
-      this.sample.state = 'matched'
-    }
-    const next = this.sample.state === 'matched' ? this.frames[index + 1] : undefined
+    if (!from) return this.sample
+    const next = state === 'matched' ? this.frames[index + 1] : undefined
     const continuous = next !== undefined && next.matched && next.reference.shotId === from.reference.shotId
     const mix = continuous ? Math.max(0, Math.min(1, (t - from.reference.timeSeconds) / (next.reference.timeSeconds - from.reference.timeSeconds))) : 0
     for (const view of from.views) {

@@ -1,76 +1,87 @@
-# Interactive simulator
+# Harmonic analyzer video companion
 
-The harmonic analyzer running in a browser. Turn the crank, watch twenty sine
-waves get added by gears and springs, and see the pen draw the answer.
+Seven engineerguy videos share an interactive view of the CAD-exported analyzer.
+The original YouTube player sits in the model area's lower-right corner. Pause
+for manual exploration, then orbit, pan, zoom, turn the crank or adjust the twenty
+channels. Compact mode keeps the same visible player and its audio.
 
-It runs on the same CAD model the physical machine is built from, which is the
-GLB that `doit export` writes. So what you see is the geometry that gets
-machined rather than an artist's impression. The narration follows the pacing of
-the [engineerguy video series](https://www.youtube.com/playlist?list=PL2FF649D0C4407B30),
-so anyone who watched those lands somewhere familiar.
-
-## Implementation coverage
-
-Current Website workstream status and sequencing live in the
+Website workstream status lives on the
 [Harmonic Analyzer project](https://github.com/users/pedropaulovc/projects/1).
-The implementation loads the model, resolves the joints, drives them from the
-real gear ratios and draws the output trace. Narration chapters exist as
-structured data with placeholder copy. Camera moves and the amplitude-bar UI are
-not built yet. See [`DESIGN.md`](DESIGN.md).
+Implementation and fidelity limits are described in [`DESIGN.md`](DESIGN.md).
 
-## Run it
+## Run locally
 
-```powershell
-cd web
-npm install
-npm run fetch-model     # copies cad/out/gltf/*.glb -> public/models/
-npm run dev
+```sh
+npm --prefix web ci
+npm --prefix web run fetch-model -- /path/to/harmonic-analyzer.glb
+npm --prefix web run dev
 ```
 
-No GLB is the normal state of a fresh checkout, since the model is a build
-artefact. Either run `uv run python -m doit export` on the SolidWorks seat, or
-download a release bundle and pass the file with
-`npm run fetch-model -- path/to.glb`. Without one the page still loads and tells
-you so instead of failing silently.
+The model is a generated artifact, absent from a fresh checkout. Use the exact
+CAD export identified by `src/mechanics-data.ts`; incompatible bytes are rejected.
+`fetch-model` can also copy the existing `cad/out/gltf/` export. Missing models
+and failed YouTube playback produce visible errors.
 
-```powershell
-npm run build       # typecheck + production bundle -> dist/
-npm run preview     # serve the bundle
+Routes accept a slug or the corresponding YouTube ID:
+
+| Page | Query |
+|---|---|
+| Intro / History | `?video=intro-history` |
+| Synthesis | `?video=synthesis` |
+| Analysis | `?video=analysis` |
+| Operation | `?video=operation` |
+| PDF guide | `?video=page-by-page-guide` |
+| Machine spin | `?video=machine-spin` |
+| Rocker arms | `?video=rocker-arms` |
+
+The video embeds use the official YouTube IFrame API. Downloaded source videos,
+reference screenshots and the GLB remain untracked; the site does not host or
+redistribute the footage.
+
+## Fidelity and verification
+
+The interactive mechanism uses CAD-derived eccentric cams, connecting rods,
+finite rocker arcs, amplitude bars, twenty loaded extension springs, the counter
+spring, wire and magnifier. It solves quasistatic torque balance. It does not
+simulate tooth collisions, friction or inertia. The amplitude controls show CAD
+station millimetres; calibration to the video's engraved measuring sticks is
+not established.
+
+Source playback requires measured camera and complete physical input for each
+view. An incomplete required interval is visibly unavailable. A source interval
+without a corresponding machine can retain a previously matched pose; without
+one, the exploratory pose remains unchanged and no source match is claimed.
+
+All seven observation files currently have incomplete camera/mechanism coverage.
+In particular, the guide's post/thumbclamp at 771.6709–779.211767 seconds has no
+established correspondence to a native CAD part. That interval is still required;
+it has not been exempted or replaced. Full footage fidelity is **not verified**.
+
+```sh
+npm --prefix web run build
+npm --prefix web run preview
+
+# Full acceptance, once the source prerequisites are complete:
+export HARMONIC_REFERENCE_ROOT=/path/to/private-reference-root
+npm --prefix web run build && npm --prefix web run verify:sync
 ```
 
-## Layout
+`HARMONIC_REFERENCE_ROOT` defaults to `/tmp/harmonic-web-reference`. The root
+must contain the original seven MP4 files under `videos/`. The verifier serves
+`dist/`, launches headed Chromium, exercises the real YouTube media, and checks
+every integer second and recorded change. It fails on unavailable prerequisites,
+missing source evidence, landmark errors above 38.4 pixels or clock skew above
+0.5 seconds. `?verify=1` enables diagnostic GPU landmark readback; mathematical
+camera fitting alone does not count as rendered-pixel evidence.
 
-```
-web/
-  index.html            shell: canvas, narration panel, output trace
-  src/
-    main.ts             wiring, animation loop, the trace plot
-    scene.ts            three.js setup, GLB load, joint resolution
-    bindings.ts         THE CONTRACT: logical joint -> glTF node name pattern
-    kinematics.ts       the machine's maths, no three.js, unit-testable
-    narration.ts        the guided tour, chapter by chapter
-  content/script.md     narration copy, sourced from the video transcripts
-  scripts/fetch-model.mjs
-```
+Reports and local screenshots go to `web/.vite/verification-output/` and are
+ignored. `HARMONIC_CHROME` selects the Chromium executable; `HARMONIC_HEADLESS=1`
+is available for automation. External-media restrictions are failures, not skips.
 
-## The two ideas worth knowing
+## Deployment
 
-Geometry and motion are separate. The GLB supplies shapes and rest positions,
-while `kinematics.ts` supplies the motion, derived from the 1898 paper and
-`cad/config/machine/gear_train.yaml`. A re-export therefore cannot silently
-change the physics, and the physics can be tested without a browser.
-
-Joints bind by name, not by index. `bindings.ts` matches glTF node names
-(`cylinder-gear-7`, `crank-arm-1`, which are the SolidWorks component instances)
-with regexes, and the channel number comes from the node's own name. A binding
-that doesn't resolve logs a named warning and leaves that joint static, so a
-renamed component degrades gracefully instead of blanking the page or, worse,
-putting the wrong harmonic on the wrong gear.
-
-## Deploying
-
-Static files. `base` in `vite.config.ts` defaults to `/harmonic-analyzer/` for a
-GitHub Pages project site. Override it with `SIMULATOR_BASE` for anywhere else.
-
-The GLB is large. Before shipping publicly, run it through `gltfpack` or Draco.
-See [`DESIGN.md`](DESIGN.md#asset-budget).
+`npm --prefix web run build` produces static files under `web/dist/`. The default
+base path is `/harmonic-analyzer/`; set `SIMULATOR_BASE` consistently for both the
+build and verifier when deploying elsewhere. The authentic model is approximately
+223 MB, so its first load is substantial. Fidelity verification uses all twenty
+channels and the full export; it must not substitute reduced geometry.

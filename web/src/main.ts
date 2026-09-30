@@ -1,9 +1,9 @@
-import { createViewer, loadMachine, createProjection, type Anchor, type CameraRecord, type Machine, type SourceView } from './scene'
+import { createViewer, loadMachine, type CameraRecord, type Machine, type SourceView } from './scene'
 import { createMechanismInput, MECHANISM_DATA, type MechanismInput } from './mechanics'
 import { MAGNIFIER_RATIO_MIN, MAGNIFIER_RATIO_MAX, squareWave } from './kinematics'
 import { VIDEOS, resolveVideo, type Video } from './video-catalog'
 import { createVideoPlayer, type PlaybackState, type VideoPlayer } from './youtube-player'
-import { loadReference, serializeInput, type PlaybackView, type ReferenceAnchor, type ReferenceState, type VideoReference } from './timeline'
+import { loadReference, serializeInput, type PlaybackView, type ReferenceState, type VideoReference } from './timeline'
 
 function element<T extends HTMLElement>(selector: string): T {
   const found = document.querySelector<T>(selector)
@@ -50,6 +50,7 @@ const stateLabels: Record<PlaybackState, string> = {
   buffering: 'Buffering', ended: 'Video ended', error: 'Playback unavailable',
 }
 const input = createMechanismInput()
+const reviewRollbackInput = createMechanismInput()
 let machine: Machine | null = null
 let reference: VideoReference | null = null
 let player: VideoPlayer | null = null
@@ -57,6 +58,7 @@ let video: Video | null = null
 let selectionAbort: AbortController | null = null
 let playbackState: PlaybackState = 'unstarted'
 let mode: 'following-video' | 'exploring' | 'reference-review' = 'exploring'
+let referenceSeek: 'idle' | 'seeking' = 'idle'
 let referenceState: ReferenceState = 'unavailable'
 let modelState: 'loading' | 'ready' | 'unavailable' = 'loading'
 let modelTime = 0
@@ -69,7 +71,6 @@ let activeViews: readonly PlaybackView[] = []
 let initialCamera: CameraRecord | null = null
 let lastTick = performance.now()
 let lastHud = 0
-const projected = createProjection()
 const channelInputs: { amplitude: HTMLInputElement; phase: HTMLInputElement; value: HTMLOutputElement }[] = []
 
 function notice(target: HTMLElement, message: string): void {
@@ -77,13 +78,13 @@ function notice(target: HTMLElement, message: string): void {
   target.hidden = message.length === 0
 }
 
-function copyInput(source: MechanismInput): void {
-  input.crankTurns = source.crankTurns
-  input.amplitudes.set(source.amplitudes)
-  input.phases.set(source.phases)
-  input.gearing = source.gearing
-  input.magnification = source.magnification
-  Object.assign(input.setup, source.setup)
+function copyInput(source: MechanismInput, target = input): void {
+  target.crankTurns = source.crankTurns
+  target.amplitudes.set(source.amplitudes)
+  target.phases.set(source.phases)
+  target.gearing = source.gearing
+  target.magnification = source.magnification
+  Object.assign(target.setup, source.setup)
 }
 
 function cameraRecord(): CameraRecord {
@@ -302,6 +303,7 @@ async function selectVideo(next: Video): Promise<void> {
   reference = null
   activeViews = []
   viewer.setLandmarkProbe(null)
+  referenceSeek = 'idle'
   video = next
   videoContainer.replaceChildren()
   playbackState = 'unstarted'
@@ -339,8 +341,9 @@ async function selectVideo(next: Video): Promise<void> {
       playbackState = state
       if (state === 'playing') {
         notice(videoError, '')
-        following()
-      } else if (state === 'paused' || state === 'ended') {
+        if (mode === 'reference-review' && referenceSeek === 'seeking') player?.pause()
+        else following()
+      } else if ((state === 'paused' || state === 'ended') && mode !== 'reference-review') {
         explore()
       }
       updateControlState()
@@ -440,8 +443,7 @@ function tick(now: number): void {
   if (now - lastHud >= 100) { updateHud(); lastHud = now }
 }
 
-const viewer = createViewer(canvas)
-viewer.controls.addEventListener('change', () => { paintRevision = 'pending' })
+const viewer = createViewer(canvas, () => { paintRevision = 'pending' })
 new ResizeObserver(() => { paintRevision = 'pending' }).observe(canvas.parentElement!)
 buildVideoNavigation()
 buildChannelControls()
@@ -518,44 +520,66 @@ if (new URLSearchParams(location.search).get('verify') === '1') {
       }
     },
     referenceData() { return reference?.data ?? null },
-    reviewReferenceFrame(timeSeconds: number) {
-      if (player?.getState() !== 'paused') throw new Error('Pause the actual source video before reviewing a reference frame.')
+    async reviewReferenceFrame(timeSeconds: number) {
+      const nativePlayer = player
+      if (nativePlayer?.getState() !== 'paused') throw new Error('Pause the actual source video before reviewing a reference frame.')
       if (!reference) throw new Error('Source observations are unavailable.')
+      if (physicsState !== 'available') throw new Error('Restore a valid mechanical setup before reviewing a source frame.')
+      if (referenceSeek === 'seeking') throw new Error('A native reference seek is already active.')
       if (!Number.isFinite(timeSeconds) || timeSeconds < 0) throw new Error('Reference time must be finite and nonnegative.')
-      if (Math.abs(player.getTime() - timeSeconds) > 0.5) throw new Error('Seek the actual source video to the reference time before reviewing it.')
-      if (reference.at(timeSeconds).state === 'unavailable') throw new Error('The requested source frame has no validated corresponding pose.')
-      const previousMode = mode
+      if (reference.getState(timeSeconds) === 'unavailable') throw new Error('The requested source frame has no validated corresponding pose.')
+      const previousView = mode === 'exploring' ? undefined : primaryView()
+      const sourceCamera = previousView?.camera ?? cameraRecord()
+      const previousCamera: CameraRecord = {
+        positionMetres: [...sourceCamera.positionMetres],
+        quaternion: [...sourceCamera.quaternion],
+        verticalFovDegrees: sourceCamera.verticalFovDegrees,
+      }
+      const previousOverrides = previousView?.partOverrides
+      copyInput(input, reviewRollbackInput)
       try {
         mode = 'reference-review'
+        referenceSeek = 'seeking'
         viewer.setInteraction('following-video')
         updateControlState()
+        nativePlayer.seek(timeSeconds)
+        await new Promise<void>((resolve) => window.setTimeout(resolve, 40))
+        const deadline = performance.now() + 20_000
+        while (nativePlayer.getState() !== 'paused' || Math.abs(nativePlayer.getTime() - timeSeconds) > 0.002) {
+          if (nativePlayer !== player) throw new Error('The source video changed during reference review.')
+          if (nativePlayer.getState() === 'error' || nativePlayer.getState() === 'ended') throw new Error('The actual source video cannot display the requested reference time.')
+          if (performance.now() >= deadline) throw new Error('The actual source video did not settle at the requested paused reference time.')
+          await new Promise<void>((resolve) => window.setTimeout(resolve, 40))
+        }
+        if (nativePlayer !== player) throw new Error('The source video changed during reference review.')
+        referenceSeek = 'idle'
         renderSource(timeSeconds)
         if (referenceState === 'unavailable') throw new Error('The requested source frame has no validated corresponding pose.')
         return this.snapshot()
       } catch (error) {
-        mode = previousMode
-        viewer.setInteraction(previousMode === 'exploring' ? 'exploring' : 'following-video')
-        updateControlState()
+        if (nativePlayer === player) {
+          referenceSeek = 'idle'
+          mode = 'exploring'
+          activeViews = []
+          referenceState = 'unavailable'
+          copyInput(reviewRollbackInput)
+          updateMachine(input, previousOverrides)
+          viewer.applyCamera(previousCamera)
+          viewer.setInteraction('exploring')
+          nativePlayer.pause()
+          notice(physicsError, error instanceof Error ? error.message : String(error))
+          updateControlState()
+        }
         throw error
       }
     },
     endReferenceReview() {
       if (player?.getState() !== 'paused') throw new Error('Pause the actual source video before entering manual exploration.')
+      if (referenceSeek === 'seeking') throw new Error('Wait for the active native reference seek before entering manual exploration.')
       explore()
       return this.snapshot()
     },
-    seekVideo(timeSeconds: number) {
-      if (!player) throw new Error('The native source player is unavailable.')
-      player.seek(timeSeconds)
-    },
     renderedLandmarks(viewId: string) { return viewer.readRenderedLandmarks(viewId) },
-    projectAnchor(anchor: ReferenceAnchor | Anchor, viewId?: string) {
-      if (!machine || machine.availability !== 'available') return null
-      const view = viewId ? activeViews.find((candidate) => candidate.id === viewId) : mode === 'exploring' ? undefined : primaryView()
-      if (view) { applyView(view); viewer.applyCamera(view.camera) }
-      const point: Anchor | null = 'worldMetres' in anchor && anchor.worldMetres ? { worldMetres: anchor.worldMetres } : 'partPath' in anchor && anchor.partPath && 'partLocalMetres' in anchor && anchor.partLocalMetres ? { partPath: anchor.partPath, partLocalMetres: anchor.partLocalMetres } : null
-      return point ? machine.projectAnchor(point, viewer, projected, view) : null
-    },
     followVideo() {
       following()
       if (player) renderSource(player.getTime())

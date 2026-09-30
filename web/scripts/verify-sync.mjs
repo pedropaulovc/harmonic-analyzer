@@ -3,16 +3,43 @@ import { mkdir, writeFile, stat } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { VIDEO_IDS, MODEL_SHA256, MODEL_COMMIT, PIXEL_LIMIT, CLOCK_LIMIT, loadReferences, frameViews, sourceNeedsMachine, errorStats, jsonDigest } from './verify-reference.mjs'
+import { VIDEO_IDS, MODEL_SHA256, MODEL_COMMIT, PIXEL_LIMIT, CLOCK_LIMIT, loadReferences, frameViews, sourceNeedsMachine, requiredRuns, frameIndexAt, errorStats, jsonDigest } from './verify-reference.mjs'
 import { distManifest, serveDist } from './verify-server.mjs'
 
 const WEB_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const CRANK_ANCHOR = { partPath: 'harmonic-analyzer/drive-train/crank-handle-1', partLocalMetres: [0, 0, 0] }
+/** Independent DOM-letterbox cross-check of GPU marker canvas vs source coordinates, in CSS px. */
+const VIEWPORT_MAPPING_LIMIT_PX = 0.75
+/** Media identity only (rejects ads/wrong content); not a fidelity threshold. */
+const NATIVE_DURATION_TOLERANCE_SECONDS = 1
+/** A paused HTMLMediaElement may not advance more than this. */
+const PAUSED_DRIFT_SECONDS = 0.1
+/** Bounded wait for the official player's own seek/decode after reviewReferenceFrame resolves. */
+const NATIVE_SEEK_TIMEOUT_MS = 15_000
+const NATIVE_SEEK_POLL_MS = 50
+/** Frame-identity window: a requested source time must be the nearest native exposure (half a frame). */
+const seekToleranceSeconds = record => 0.5 / record.native.fps
+/** Held poses are exact copies of an earlier required frame's observed camera. */
+const CAMERA_TOLERANCE = 1e-7
+/** No-machine samples must leave exploratory geometry/camera untouched. */
+const UNCHANGED_TOLERANCE = 1e-9
+/** Clock proof needs >=1 s of draws inside a required run with a CLOCK_LIMIT guard band at each end. */
+const MIN_CLOCK_RUN_SECONDS = 1 + 2 * CLOCK_LIMIT + 0.5
 const digest = bytes => createHash('sha256').update(bytes).digest('hex')
 const delay = ms => new Promise(done => setTimeout(done, ms))
 const finite = value => typeof value === 'number' && Number.isFinite(value)
+const vec2 = value => Array.isArray(value) && value.length === 2 && value.every(finite)
 function requireCondition(condition, message) { if (!condition) throw new Error(message) }
 function fail(report, code, detail, extra = {}) { report.failures.push({ code, detail, ...extra }) }
+function nearlyEqual(a, b, tolerance) {
+  if (finite(a) && finite(b)) return Math.abs(a - b) <= tolerance
+  if (Array.isArray(a) && Array.isArray(b)) return a.length === b.length && a.every((value, index) => nearlyEqual(value, b[index], tolerance))
+  if (a && b && typeof a === 'object' && typeof b === 'object') {
+    const keys = Object.keys(a)
+    return keys.length === Object.keys(b).length && keys.every(key => Object.hasOwn(b, key) && nearlyEqual(a[key], b[key], tolerance))
+  }
+  return a === b
+}
+const sameCamera = (a, b) => !!a && !!b && nearlyEqual(a.positionMetres, b.positionMetres, CAMERA_TOLERANCE) && nearlyEqual(a.quaternion, b.quaternion, CAMERA_TOLERANCE) && nearlyEqual(a.verticalFovDegrees, b.verticalFovDegrees, CAMERA_TOLERANCE)
 
 async function apiSnapshot(page) { return page.evaluate(() => window.harmonicAnalyzer.snapshot()) }
 async function waitState(page, state, timeout = 20_000) {
@@ -29,6 +56,38 @@ function checkSnapshot(snapshot, id) {
   requireCondition(['equilibriumResidualNm', 'platenTravelM', 'summingAngleRad'].every(key => finite(physics[key])), 'Physical equilibrium/output data is unavailable')
 }
 
+/**
+ * Reads the renderer's last ACTUAL GPU marker capture per view (a pure read, not a
+ * rerender or CPU projection) plus the real #stage canvas geometry. #stage is
+ * itself the canvas element.
+ */
+function readRenderedState(viewIds) {
+  const api = window.harmonicAnalyzer
+  if (typeof api?.renderedLandmarks !== 'function') throw new Error('Verification bridge lacks renderedLandmarks(viewId)')
+  const copy = value => value == null ? null : Array.from(value)
+  const captures = viewIds.map(viewId => {
+    const capture = api.renderedLandmarks(viewId)
+    return {
+      viewId,
+      capture: capture ? {
+        method: capture.method, timeSeconds: capture.timeSeconds,
+        landmarks: Array.isArray(capture.landmarks) ? capture.landmarks.map(item => ({ id: item.id, state: item.state, reason: item.reason ?? null, canvasPixels: copy(item.canvasPixels), sourcePixels: copy(item.sourcePixels), uncertaintyCanvasPixels: item.uncertaintyCanvasPixels ?? null })) : null,
+      } : null,
+    }
+  })
+  const canvas = document.querySelector('#stage')
+  return { captures, canvas: { tag: canvas?.tagName ?? null, clientWidth: canvas?.clientWidth ?? 0, clientHeight: canvas?.clientHeight ?? 0, width: canvas?.width ?? 0, height: canvas?.height ?? 0, devicePixelRatio: window.devicePixelRatio } }
+}
+
+/** The real stage canvas must be visible and its backing store sized to its current layout. */
+function stageGate(canvas) {
+  requireCondition(canvas.tag === 'CANVAS', `#stage is not the rendered canvas element: ${canvas.tag}`)
+  requireCondition(canvas.clientWidth > 0 && canvas.clientHeight > 0, 'Actual source-render canvas viewport is hidden/empty')
+  requireCondition(Math.abs(canvas.width - canvas.clientWidth * canvas.devicePixelRatio) <= 1 && Math.abs(canvas.height - canvas.clientHeight * canvas.devicePixelRatio) <= 1, `Stale WebGL backing store ${canvas.width}×${canvas.height} for layout ${canvas.clientWidth}×${canvas.clientHeight}@${canvas.devicePixelRatio}`)
+  const width = Math.min(canvas.clientWidth, canvas.clientHeight * 1920 / 1080), height = width * 1080 / 1920
+  return { x: (canvas.clientWidth - width) / 2, y: (canvas.clientHeight - height) / 2, width, height }
+}
+
 async function nativeFrame(page, id) {
   const iframe = page.locator('#video-player iframe')
   requireCondition(await iframe.count() === 1, 'Exactly one visible native YouTube iframe is required')
@@ -41,48 +100,280 @@ async function nativeFrame(page, id) {
   return { iframe, handle, frame, src }
 }
 
+/** Reads YouTube's own main HTMLMediaElement inside the official iframe, never an app alias. */
 async function nativeMedia(frame) {
   return frame.evaluate(() => {
-    const video = document.querySelector('video')
+    const player = document.querySelector('#movie_player')
+    const video = player?.querySelector('video.html5-main-video') ?? null
     const control = document.querySelector('.ytp-play-button')
     const controls = document.querySelector('.ytp-chrome-bottom')
     const buttonRect = control?.getBoundingClientRect(), rect = controls?.getBoundingClientRect()
-    return { mediaPresent: !!video, paused: video?.paused, muted: video?.muted, volume: video?.volume, mediaTime: video?.currentTime, controls: !!controls && !!control, controlsHeight: rect?.height ?? 0, playButtonWidth: buttonRect?.width ?? 0, playButtonHeight: buttonRect?.height ?? 0, error: document.querySelector('.ytp-error-content-wrap, .ytp-error')?.textContent?.trim() ?? '' }
+    return {
+      mediaPresent: !!video, paused: video?.paused, seeking: video?.seeking, ended: video?.ended, muted: video?.muted, volume: video?.volume,
+      mediaTime: video?.currentTime, duration: video?.duration, readyState: video?.readyState ?? 0, videoWidth: video?.videoWidth ?? 0, videoHeight: video?.videoHeight ?? 0,
+      adShowing: !!player?.classList.contains('ad-showing'),
+      controls: !!controls && !!control, controlsHeight: rect?.height ?? 0, playButtonWidth: buttonRect?.width ?? 0, playButtonHeight: buttonRect?.height ?? 0,
+      error: document.querySelector('.ytp-error-content-wrap, .ytp-error')?.textContent?.trim() ?? '',
+    }
   })
 }
 
-async function playbackProof(page, id, report) {
-  const embed = await nativeFrame(page, id)
+/** Proves the official player holds a decoded frame of this actual source, not an ad or placeholder. */
+function requireNativeContent(actual, record, label) {
+  requireCondition(actual.mediaPresent, `${label}: no actual YouTube main HTMLMediaElement`)
+  requireCondition(!actual.error, `${label}: native YouTube error: ${actual.error}`)
+  requireCondition(!actual.adShowing, `${label}: YouTube is showing an ad, not the source content`)
+  requireCondition(actual.readyState >= 2 && actual.videoWidth > 0 && actual.videoHeight > 0, `${label}: native media has no decoded current frame (${JSON.stringify(actual)})`)
+  requireCondition(finite(actual.duration) && Math.abs(actual.duration - record.native.durationSeconds) <= NATIVE_DURATION_TOLERANCE_SECONDS, `${label}: native media duration ${actual.duration}s is not the ${record.native.durationSeconds}s source`)
+  requireCondition(finite(actual.mediaTime), `${label}: native media clock is not finite`)
+}
+
+async function pauseActual(page, embed) {
+  const current = await apiSnapshot(page)
+  if (current.playerState === 'playing' || current.playerState === 'buffering') await page.locator('#pause-video').click()
+  await waitState(page, 'paused')
+  const before = await nativeMedia(embed.frame)
+  await delay(500)
+  const after = await nativeMedia(embed.frame)
+  requireCondition(before.paused === true && after.paused === true && finite(before.mediaTime) && finite(after.mediaTime) && Math.abs(after.mediaTime - before.mediaTime) <= PAUSED_DRIFT_SECONDS, 'Actual native HTMLMediaElement continues while paused')
+}
+
+/** Manual controls main.ts updateControlState enables only in ready exploration. */
+async function explorationControls(page) {
+  return page.evaluate(() => Object.fromEntries(['#drive-controls', '#channel-fieldset', '#fit-view'].map(selector => [selector, document.querySelector(selector)?.disabled === false])))
+}
+
+async function endReview(page) {
+  await page.evaluate(async () => {
+    const api = window.harmonicAnalyzer
+    if (typeof api?.endReferenceReview !== 'function') throw new Error('Verification bridge lacks endReferenceReview()')
+    await api.endReferenceReview()
+  })
+  const after = await apiSnapshot(page), controls = await explorationControls(page)
+  requireCondition(after.mode === 'exploring' && after.playerState === 'paused', `endReferenceReview did not restore paused exploration: ${after.mode}/${after.playerState}`)
+  requireCondition(Object.values(controls).every(Boolean), `endReferenceReview did not re-enable manual exploration controls: ${JSON.stringify(controls)}`)
+  return after
+}
+
+/** Leaves reference review with paused exploration and usable controls, whatever state a failed review left. */
+async function restoreExploration(page, embed) {
+  const current = await apiSnapshot(page), controls = await explorationControls(page)
+  if (current.mode === 'exploring' && current.playerState === 'paused' && Object.values(controls).every(Boolean)) return current
+  if (current.playerState !== 'paused') await pauseActual(page, embed)
+  return endReview(page)
+}
+
+const SEEK_OBSERVER_KEY = '__harmonicAnalyzerVerifySeekObserver'
+
+/**
+ * Registers listeners on YouTube's own main HTMLMediaElement BEFORE the bridge
+ * commands a seek, so every seeking/seeked event the command causes is observed
+ * and ordered after the recorded pre-command state.
+ */
+async function armSeekObserver(frame) {
+  return frame.evaluate(key => {
+    window[key]?.detach()
+    const video = document.querySelector('#movie_player video.html5-main-video')
+    if (!video) throw new Error('No actual YouTube main HTMLMediaElement to observe')
+    const events = []
+    const types = ['seeking', 'seeked', 'error', 'emptied', 'abort']
+    const record = event => events.push({ type: event.type, mediaTime: video.currentTime, paused: video.paused, seeking: video.seeking, readyState: video.readyState })
+    for (const type of types) video.addEventListener(type, record)
+    const pre = { mediaTime: video.currentTime, paused: video.paused, seeking: video.seeking, ended: video.ended, readyState: video.readyState }
+    const observer = {
+      video, events, pre,
+      detach() {
+        for (const type of types) video.removeEventListener(type, record)
+        if (window[key] === observer) delete window[key]
+      },
+    }
+    window[key] = observer
+    return pre
+  }, SEEK_OBSERVER_KEY)
+}
+
+async function readSeekObserver(frame) {
+  return frame.evaluate(key => {
+    const observer = window[key]
+    if (!observer) return null
+    const video = observer.video
+    return {
+      sameElement: video === document.querySelector('#movie_player video.html5-main-video') && video.isConnected,
+      pre: observer.pre, events: observer.events.slice(),
+      now: { mediaTime: video.currentTime, paused: video.paused, seeking: video.seeking, ended: video.ended, readyState: video.readyState, error: video.error ? (video.error.message || `code ${video.error.code}`) : null },
+    }
+  }, SEEK_OBSERVER_KEY)
+}
+
+async function disarmSeekObserver(frame) {
+  await frame.evaluate(key => window[key]?.detach(), SEEK_OBSERVER_KEY).catch(() => {})
+}
+
+/**
+ * Post-command settlement of the ACTUAL media element: paused, not seeking, a
+ * decoded current frame, currentTime on the requested exposure, and either a
+ * seeking event raised after the command at the target followed by seeked, or
+ * a legitimate no-op where the settled pre-command frame already was the target.
+ * A pre-command frame at a different (even adjacent) time can never satisfy this.
+ */
+function seekSettlement(observed, target, tolerance) {
+  if (!observed) return { fatal: 'Seek observer vanished from the official player frame' }
+  if (!observed.sameElement) return { fatal: 'YouTube replaced/detached the observed main media element during the seek' }
+  if (observed.now.error || observed.events.some(event => event.type === 'error')) return { fatal: `Native media error during seek: ${observed.now.error ?? 'error event'}` }
+  const { pre, events, now } = observed
+  const onTarget = time => finite(time) && Math.abs(time - target) <= tolerance
+  const settled = now.paused === true && !now.seeking && !now.ended && now.readyState >= 2 && onTarget(now.mediaTime)
+  let lastSeeking = -1
+  events.forEach((event, index) => { if (event.type === 'seeking') lastSeeking = index })
+  if (lastSeeking >= 0) {
+    const commanded = onTarget(events[lastSeeking].mediaTime) && events.slice(lastSeeking + 1).some(event => event.type === 'seeked')
+    return { done: settled && commanded, proof: 'seeking-then-seeked-after-command' }
+  }
+  const noOp = pre.paused === true && !pre.seeking && !pre.ended && pre.readyState >= 2 && onTarget(pre.mediaTime)
+  return { done: settled && noOp, proof: 'same-time-no-op' }
+}
+
+async function awaitNativeSeek(embed, target, tolerance) {
+  const deadline = Date.now() + NATIVE_SEEK_TIMEOUT_MS
+  for (;;) {
+    const observed = await readSeekObserver(embed.frame)
+    const verdict = seekSettlement(observed, target, tolerance)
+    requireCondition(!verdict.fatal, `Official player seek to ${target}s failed: ${verdict.fatal}`)
+    if (verdict.done) return { proof: verdict.proof, pre: observed.pre, events: observed.events, settled: observed.now }
+    requireCondition(Date.now() < deadline, `Official player did not settle a decoded paused frame at ${target}s (±${tolerance.toFixed(4)}s) within ${NATIVE_SEEK_TIMEOUT_MS}ms after the command: ${JSON.stringify(observed)}`)
+    await delay(NATIVE_SEEK_POLL_MS)
+  }
+}
+
+/**
+ * The bridge commands the ACTUAL official YouTube player to seek to t and draws
+ * the source sample at t. The YouTube IFrame API cannot acknowledge the decode,
+ * so the verifier independently observes the official iframe's HTMLMediaElement
+ * (listeners armed before the command) until it settles on t, then reads the
+ * last actual GPU capture.
+ */
+async function reviewAt(page, embed, record, timeSeconds, viewIds) {
+  const tolerance = seekToleranceSeconds(record)
+  await armSeekObserver(embed.frame)
+  let snapshot, seek
+  try {
+    snapshot = await page.evaluate(async timeSeconds => {
+      const api = window.harmonicAnalyzer
+      await api.reviewReferenceFrame(timeSeconds)
+      return api.snapshot()
+    }, timeSeconds)
+    seek = await awaitNativeSeek(embed, timeSeconds, tolerance)
+  } finally { await disarmSeekObserver(embed.frame) }
+  const ids = [...new Set([...viewIds, ...(snapshot.views ?? []).map(view => view.id)])]
+  const response = { snapshot, ...await page.evaluate(readRenderedState, ids) }
+  const native = await nativeMedia(embed.frame)
+  checkSnapshot(response.snapshot, record.id)
+  requireNativeContent(native, record, `Reviewed source ${timeSeconds}s`)
+  requireCondition(response.snapshot.mode === 'reference-review' && response.snapshot.playerState === 'paused', `Static reference review must hold actual paused playback at ${timeSeconds}s: ${response.snapshot.mode}/${response.snapshot.playerState}`)
+  requireCondition(native.paused === true && native.seeking === false && !native.ended, `Official player did not stay settled paused at ${timeSeconds}s: ${JSON.stringify(native)}`)
+  requireCondition(Math.abs(native.mediaTime - timeSeconds) <= tolerance, `Official player native media is at ${native.mediaTime}s, not the reviewed source exposure ${timeSeconds}s (±${tolerance}s)`)
+  return { ...response, native, seek: { proof: seek.proof, preMediaTime: seek.pre.mediaTime, settledMediaTime: seek.settled.mediaTime, events: seek.events.map(event => event.type) } }
+}
+
+/** Validates one view's last actual capture as a fresh GPU draw at the reviewed/played time. */
+function freshCapture(entry, timeSeconds, nativeTimes, label) {
+  const capture = entry?.capture
+  requireCondition(capture?.method === 'gpu-readback' && Array.isArray(capture.landmarks) && finite(capture.timeSeconds), `${label}: no actual GPU-readback capture for view ${entry?.viewId}`)
+  if (timeSeconds !== null) requireCondition(Math.abs(capture.timeSeconds - timeSeconds) <= 1e-6, `${label}: stale draw — captured ${capture.timeSeconds}s for ${timeSeconds}s`)
+  const skewSeconds = Math.max(...nativeTimes.map(time => Math.abs(capture.timeSeconds - time)))
+  requireCondition(skewSeconds <= CLOCK_LIMIT, `${label}: native media ${nativeTimes.join('/')}s vs captured draw ${capture.timeSeconds}s exceeds ${CLOCK_LIMIT}s`)
+  return { capture, skewSeconds }
+}
+
+function longestRun(record) {
+  const runs = requiredRuns(record.data).filter(run => run.endSeconds - run.startSeconds >= MIN_CLOCK_RUN_SECONDS)
+  return runs.reduce((best, run) => !best || run.endSeconds - run.startSeconds > best.endSeconds - best.startSeconds ? run : best, null)
+}
+
+/** Seek the official player into a required run through reference review, end review, then press Play. */
+async function playRequiredRun(page, embed, record, run) {
+  await pauseActual(page, embed)
+  const firstIndex = frameIndexAt(record.data.frames, run.startSeconds)
+  const views = frameViews(record.data.frames[firstIndex]).map(view => view.id)
+  const reviewed = await reviewAt(page, embed, record, run.startSeconds, views)
+  requireCondition(reviewed.snapshot.referenceState === 'matched', `Required run start ${run.startSeconds}s is not physically matched: ${reviewed.snapshot.referenceState}`)
+  await endReview(page)
+  await page.locator('#pause-video').click()
+  await waitState(page, 'playing')
+  await page.waitForFunction(() => window.harmonicAnalyzer.snapshot().mode === 'following-video', undefined, { timeout: 5000 })
+}
+
+/**
+ * Brackets the app's last actual GPU capture between two reads of YouTube's own
+ * HTMLMediaElement. Only samples well inside a required run are clock evidence.
+ */
+async function clockSample(page, embed, record, run) {
+  const before = await nativeMedia(embed.frame)
+  const snapshot = await apiSnapshot(page)
+  const app = { snapshot, ...await page.evaluate(readRenderedState, (snapshot.views ?? []).map(view => view.id)) }
+  const after = await nativeMedia(embed.frame)
+  checkSnapshot(app.snapshot, record.id)
+  requireNativeContent(before, record, 'Playback'); requireNativeContent(after, record, 'Playback')
+  requireCondition(!before.paused && !after.paused && !after.muted && after.volume > 0, `Actual native playback paused/muted: ${JSON.stringify(after)}`)
+  requireCondition(app.snapshot.mode === 'following-video' && app.snapshot.playerState === 'playing', `Native playback left following mode: ${app.snapshot.playerState}/${app.snapshot.mode}`)
+  const inRun = before.mediaTime - CLOCK_LIMIT >= run.startSeconds && after.mediaTime + CLOCK_LIMIT <= run.endSeconds
+  const sample = { nativeBefore: before.mediaTime, nativeAfter: after.mediaTime, inRequiredRun: inRun, referenceState: app.snapshot.referenceState, captureTimeSeconds: null, skewSeconds: null }
+  if (!inRun) return sample
+  requireCondition(app.snapshot.referenceState === 'matched' && app.snapshot.views?.length > 0, `Required source not matched/drawn during actual playback at native ${before.mediaTime}s: ${app.snapshot.referenceState}`)
+  const measured = app.captures.map(entry => freshCapture(entry, null, [before.mediaTime, after.mediaTime], `Playback at native ${before.mediaTime}s`))
+  requireCondition(measured.every(item => item.capture.timeSeconds === measured[0].capture.timeSeconds), 'Views of one required-source draw carry different capture times')
+  sample.captureTimeSeconds = measured[0].capture.timeSeconds
+  sample.skewSeconds = Math.max(...measured.map(item => item.skewSeconds))
+  return sample
+}
+
+function requireAdvancingDraws(samples, minimumCount, minimumAdvance, label) {
+  const inRun = samples.filter(sample => sample.inRequiredRun)
+  requireCondition(inRun.length >= minimumCount, `${label}: only ${inRun.length}/${minimumCount} samples measured required-source draws`)
+  for (let index = 1; index < inRun.length; index++) requireCondition(inRun[index].captureTimeSeconds >= inRun[index - 1].captureTimeSeconds, `${label}: captured draw time went backwards`)
+  requireCondition(inRun.at(-1).captureTimeSeconds - inRun[0].captureTimeSeconds >= minimumAdvance, `${label}: required-source GPU capture time is stale (advanced ${inRun.at(-1).captureTimeSeconds - inRun[0].captureTimeSeconds}s)`)
+  requireCondition(inRun.at(-1).nativeAfter - inRun[0].nativeBefore >= minimumAdvance, `${label}: native HTMLMediaElement clock did not advance`)
+  return Math.max(...inRun.map(sample => sample.skewSeconds))
+}
+
+async function playbackProof(page, record, run, report) {
+  const embed = await nativeFrame(page, record.id)
   const before = await apiSnapshot(page)
   if (before.playerState === 'playing') { await page.locator('#pause-video').click(); await waitState(page, 'paused') }
   await page.locator('#follow-video').click()
-  // This is an actual browser click, not evaluate(playVideo), a fake clock or a seek.
+  // Actual browser clicks on the public control, never evaluate(playVideo) or a fake clock.
   await page.locator('#pause-video').click()
   await waitState(page, 'playing')
   const samples = []
-  report.playback = { samples, native: null, maxClockSkewSeconds: null, iframeSrc: embed.src, userGesture: '#pause-video click; no seek/review clock injection' }
-  for (let index = 0; index < 12; index++) {
-    await delay(250)
-    const sample = await apiSnapshot(page)
-    checkSnapshot(sample, id)
-    requireCondition(sample.mode === 'following-video' && sample.playerState === 'playing', `Native playback stopped or left following mode at sample ${index}: ${sample.playerState}/${sample.mode}`)
-    requireCondition(finite(sample.videoTime) && finite(sample.modelTime), 'Native/model clocks must be finite')
-    const skewSeconds = Math.abs(sample.videoTime - sample.modelTime)
-    samples.push({ videoTime: sample.videoTime, modelTime: sample.modelTime, skewSeconds, playerState: sample.playerState, referenceState: sample.referenceState, mode: sample.mode })
-    report.playback.maxClockSkewSeconds = Math.max(report.playback.maxClockSkewSeconds ?? 0, skewSeconds)
-    requireCondition(skewSeconds <= CLOCK_LIMIT, `Video/model clock error ${skewSeconds.toFixed(3)}s exceeds ${CLOCK_LIMIT}s`)
+  report.playback = { samples, requiredRun: run, native: null, maxClockSkewSeconds: null, iframeSrc: embed.src, clockEvidence: null, userGesture: '#pause-video click; seeks only through the official player via reviewReferenceFrame' }
+  const started = await nativeMedia(embed.frame)
+  requireNativeContent(started, record, 'Initial playback')
+  if (!run) {
+    requireCondition(record.report.machineFrames === 0, `Required source frames exist but no contiguous required run >= ${MIN_CLOCK_RUN_SECONDS}s exists to measure the draw clock`)
+    await delay(1250)
+    const later = await nativeMedia(embed.frame)
+    requireCondition(!later.paused && later.mediaTime - started.mediaTime >= 1, 'Actual native HTMLMediaElement did not advance during user-gesture playback')
+    report.playback.clockEvidence = 'No required source frames in this video; no model draw clock is claimed'
+  } else {
+    await playRequiredRun(page, embed, record, run)
+    for (let index = 0; index < 12; index++) {
+      await delay(250)
+      samples.push(await clockSample(page, embed, record, run))
+    }
+    report.playback.maxClockSkewSeconds = requireAdvancingDraws(samples, 4, 1, 'Playback')
+    report.playback.clockEvidence = 'YouTube iframe HTMLMediaElement.currentTime bracketing renderedLandmarks(viewId).timeSeconds of required-source GPU captures'
   }
-  requireCondition(samples.at(-1).videoTime - samples[0].videoTime >= 1, 'Real YouTube getCurrentTime did not advance during user-gesture playback')
   const actual = await nativeMedia(embed.frame), snapshot = await apiSnapshot(page)
   report.playback.native = actual
-  requireCondition(actual.mediaPresent && !actual.paused && !actual.muted && actual.volume > 0 && actual.controls && actual.controlsHeight > 0 && actual.playButtonWidth > 0, `Actual native media/audio/controls unavailable: ${JSON.stringify(actual)}`)
-  requireCondition(finite(actual.mediaTime) && Math.abs(actual.mediaTime - snapshot.videoTime) <= CLOCK_LIMIT, 'Actual native HTML media clock disagrees with YouTube getCurrentTime; synthetic/ad/unavailable playback is not synchronization proof')
+  requireNativeContent(actual, record, 'Playback')
+  requireCondition(!actual.paused && !actual.muted && actual.volume > 0 && actual.controls && actual.controlsHeight > 0 && actual.playButtonWidth > 0, `Actual native media/audio/controls unavailable: ${JSON.stringify(actual)}`)
   requireCondition(snapshot.playerAudio?.state === 'audible' && snapshot.playerAudio.volume > 0, 'YouTube API reports muted/inaudible playback')
   return embed
 }
 
-async function compactProof(page, id, embed, report, outputDirectory) {
-  const initial = await apiSnapshot(page)
+async function compactProof(page, record, embed, run, report, outputDirectory) {
+  if (run) await playRequiredRun(page, embed, record, run)
+  const initial = await nativeMedia(embed.frame)
   await page.locator('#minimize-player').click()
   requireCondition(await page.locator('#video-dock').getAttribute('data-size') === 'compact', 'Player did not enter visible compact state')
   requireCondition(await embed.handle.evaluate(element => element === document.querySelector('#video-player iframe') && element.isConnected), 'Minimization replaced/detached the native playing iframe')
@@ -93,21 +384,26 @@ async function compactProof(page, id, embed, report, outputDirectory) {
   requireCondition(box.x >= 0 && box.y >= 0 && box.x + box.width <= viewport.width + 1 && box.y + box.height <= viewport.height + 1, 'Compact player is clipped outside the visible browser viewport')
   await embed.iframe.hover()
   const actual = await nativeMedia(embed.frame)
+  requireNativeContent(actual, record, 'Compact playback')
   requireCondition(actual.controls && actual.controlsHeight > 0 && actual.playButtonWidth >= 20 && actual.playButtonHeight >= 20 && !actual.paused && !actual.muted && actual.volume > 0, `Compact native controls/audio unusable: ${JSON.stringify(actual)}`)
-  await delay(1250)
-  const after = await apiSnapshot(page)
-  checkSnapshot(after, id)
-  requireCondition(after.playerState === 'playing' && after.playerAudio?.state === 'audible' && after.playerAudio.volume > 0 && after.videoTime - initial.videoTime >= 0.5, 'Minimizing paused/muted/stalled actual playback')
-  requireCondition(Math.abs(after.modelTime - after.videoTime) <= CLOCK_LIMIT, 'Compact native playback lost model synchronization')
-  const screenshot = `${id}-compact.png`
+  const samples = []
+  if (run) {
+    for (let index = 0; index < 5; index++) { await delay(250); samples.push(await clockSample(page, embed, record, run)) }
+  } else await delay(1250)
+  const after = await nativeMedia(embed.frame), snapshot = await apiSnapshot(page)
+  checkSnapshot(snapshot, record.id)
+  requireCondition(snapshot.playerState === 'playing' && snapshot.playerAudio?.state === 'audible' && snapshot.playerAudio.volume > 0 && !after.paused && !after.muted && after.mediaTime - initial.mediaTime >= 0.5, 'Minimizing paused/muted/stalled actual native playback')
+  const maxClockSkewSeconds = run ? requireAdvancingDraws(samples, 2, 0.25, 'Compact playback') : null
+  const screenshot = `${record.id}-compact.png`
   await page.screenshot({ path: resolve(outputDirectory, screenshot) })
-  report.compact = { sameIframe: true, bounds: box, native: actual, elapsedVideoSeconds: after.videoTime - initial.videoTime, audio: after.playerAudio, screenshot }
+  report.compact = { sameIframe: true, bounds: box, native: actual, elapsedNativeSeconds: after.mediaTime - initial.mediaTime, audio: snapshot.playerAudio, samples, maxClockSkewSeconds, screenshot }
   // Prove the shrunken native controls are hit-testable, not merely painted.
   await embed.frame.locator('.ytp-play-button').click()
   await waitState(page, 'paused')
-  const paused = await apiSnapshot(page)
+  const paused = await nativeMedia(embed.frame)
   await delay(350)
-  requireCondition(Math.abs((await apiSnapshot(page)).videoTime - paused.videoTime) <= 0.1, 'Compact native pause control did not pause the real clock')
+  const still = await nativeMedia(embed.frame)
+  requireCondition(paused.paused && still.paused && Math.abs(still.mediaTime - paused.mediaTime) <= PAUSED_DRIFT_SECONDS, 'Compact native pause control did not pause the actual HTMLMediaElement')
   await embed.iframe.hover()
   await embed.frame.locator('.ytp-play-button').click()
   await waitState(page, 'playing')
@@ -116,75 +412,76 @@ async function compactProof(page, id, embed, report, outputDirectory) {
   requireCondition(await page.locator('#video-dock').getAttribute('data-size') === 'expanded', 'Player did not restore expanded state')
 }
 
-async function pauseActual(page) {
-  const current = await apiSnapshot(page)
-  if (current.playerState === 'playing') await page.locator('#pause-video').click()
-  await waitState(page, 'paused')
-  const before = await apiSnapshot(page)
-  await delay(500)
-  const after = await apiSnapshot(page)
-  requireCondition(Math.abs(after.videoTime - before.videoTime) <= 0.1, 'Actual native video clock continues while paused')
-}
-
-async function referenceProof(page, record, report, outputDirectory) {
-  await pauseActual(page)
+async function referenceProof(page, embed, record, report, outputDirectory) {
+  await pauseActual(page, embed)
   const builtReference = await page.evaluate(() => window.harmonicAnalyzer.referenceData())
   requireCondition(jsonDigest(builtReference) === record.digest, 'Actually loaded built reference observations differ from the independently checked content file')
-  const errors = [], fitErrors = [], measurements = []
+  const errors = [], fitErrors = [], measurements = [], clockSkews = []
   const shots = new Map(record.data.shots.map(shot => [shot.id, shot]))
-  const anchors = new Map(record.data.anchors.map(anchor => [anchor.id, anchor]))
-  const canvasSize = await page.locator('#stage canvas').evaluate(canvas => ({ width: canvas.clientWidth, height: canvas.clientHeight }))
-  const gateWidth = Math.min(canvasSize.width, canvasSize.height * 1920 / 1080)
-  const gateHeight = gateWidth * 1080 / 1920
-  const gateX = (canvasSize.width - gateWidth) / 2, gateY = (canvasSize.height - gateHeight) / 2
-  requireCondition(gateWidth > 0 && gateHeight > 0, 'Actual source-render canvas viewport is hidden/empty')
-  let viewCount = 0, matchedFrames = 0, heldFrames = 0, firstMachineScreenshot = null
-  const expectedClock = (await apiSnapshot(page)).videoTime
+  const frames = record.data.frames
+  const required = frames.map(frame => sourceNeedsMachine(frame, shots.get(frame.shotId)))
+  // Exploratory state immediately before review; no-machine samples must leave it untouched.
+  const exploratory = await apiSnapshot(page)
+  let viewCount = 0, matchedFrames = 0, heldFrames = 0, noMachineFrames = 0, firstMachineScreenshot = null
+  let lastRequired = -1, lastMatched = -1
   try {
-    for (const frame of record.data.frames) {
-      const needsMachine = sourceNeedsMachine(frame, shots.get(frame.shotId))
-      const response = await page.evaluate(({ timeSeconds, views, landmarks }) => {
-        const api = window.harmonicAnalyzer
-        const snapshot = api.reviewReferenceFrame(timeSeconds)
-        const projected = landmarks.map(item => {
-          const result = api.projectAnchor(item.anchor, item.viewId ?? 'main')
-          // The renderer deliberately reuses its hot-path output buffer. Capture
-          // each actual result before another anchor/view mutates that buffer.
-          const projection = result ? { sourcePixels: [...result.sourcePixels], viewportPixels: [...result.viewportPixels], visibility: result.visibility, depth: result.depth } : null
-          return { anchorId: item.anchorId, viewId: item.viewId ?? 'main', role: item.role, pixel: item.pixel, projection }
-        })
-        return { snapshot, projected, views }
-      }, { timeSeconds: frame.timeSeconds, views: frameViews(frame).map(view => ({ id: view.id, rectSourcePixels: view.rectSourcePixels, presentation: view.presentation })), landmarks: needsMachine ? frame.landmarks.map(item => ({ anchorId: item.anchorId, viewId: item.viewId, role: item.role, pixel: item.pixel, anchor: anchors.get(item.anchorId) })) : [] })
-      const snapshot = response.snapshot
-      checkSnapshot(snapshot, record.id)
-      requireCondition(snapshot.mode === 'reference-review' && snapshot.playerState === 'paused', 'Static reference review must remain distinct from actual paused YouTube playback')
-      requireCondition(Math.abs(snapshot.videoTime - expectedClock) <= 0.1, 'Reference review improperly seeks/fakes the real native video clock')
-      if (!needsMachine) {
-        requireCondition(snapshot.referenceState === 'held', `Unsupported no-mechanism hold at ${frame.timeSeconds}s: ${snapshot.referenceState}`)
-        heldFrames++
+    for (let index = 0; index < frames.length; index++) {
+      const frame = frames[index], t = frame.timeSeconds
+      const expectedViews = required[index] ? frameViews(frame) : lastRequired >= 0 ? frameViews(frames[lastRequired]) : []
+      const response = await reviewAt(page, embed, record, t, expectedViews.map(view => view.id))
+      const snapshot = response.snapshot, native = response.native
+      if (!required[index]) {
+        if (snapshot.referenceState === 'no-machine') {
+          requireCondition(lastRequired < 0, `no-machine at ${t}s although required frame ${frames[lastRequired]?.timeSeconds}s precedes it; a calibrated hold is required`)
+          requireCondition(Array.isArray(snapshot.views) && snapshot.views.length === 0, `no-machine at ${t}s drew source views`)
+          requireCondition(nearlyEqual(snapshot.camera, exploratory.camera, UNCHANGED_TOLERANCE) && nearlyEqual(snapshot.input, exploratory.input, UNCHANGED_TOLERANCE), `no-machine at ${t}s replaced exploratory geometry/camera with an invented pose`)
+          noMachineFrames++
+        } else {
+          requireCondition(snapshot.referenceState === 'held', `Unsupported exempt-source state at ${t}s: ${snapshot.referenceState}`)
+          requireCondition(lastRequired >= 0 && lastMatched === lastRequired, `held at ${t}s without an actual preceding calibrated matched pose`)
+          requireCondition(Array.isArray(snapshot.views) && snapshot.views.length === expectedViews.length && expectedViews.every(view => {
+            const rendered = snapshot.views.find(candidate => candidate.id === view.id)
+            return rendered && jsonDigest(rendered.rectSourcePixels) === jsonDigest(view.rectSourcePixels) && rendered.presentation === view.presentation && sameCamera(rendered.camera, view.camera)
+          }), `held at ${t}s does not draw the exact views of the preceding matched frame ${frames[lastRequired].timeSeconds}s`)
+          for (const view of expectedViews) clockSkews.push(freshCapture(response.captures.find(entry => entry.viewId === view.id), t, [native.mediaTime], `Held ${t}s`).skewSeconds)
+          heldFrames++
+        }
         continue
       }
-      requireCondition(snapshot.referenceState === 'matched' && Math.abs(snapshot.modelTime - frame.timeSeconds) <= 1e-6, `Visible physical-source sample unavailable/wrong at ${frame.timeSeconds}s`)
-      requireCondition(Array.isArray(snapshot.views) && snapshot.views.length === response.views.length, `Rendered per-view scene missing at ${frame.timeSeconds}s`)
-      for (const view of response.views) {
+      lastRequired = index
+      requireCondition(snapshot.referenceState === 'matched' && Math.abs(snapshot.modelTime - t) <= 1e-6, `Required physical-source sample unavailable/wrong at ${t}s: ${snapshot.referenceState}`)
+      requireCondition(Array.isArray(snapshot.views) && snapshot.views.length === expectedViews.length, `Rendered per-view scene missing at ${t}s`)
+      for (const view of expectedViews) {
         const rendered = snapshot.views.find(candidate => candidate.id === view.id)
-        requireCondition(rendered && jsonDigest(rendered.rectSourcePixels) === jsonDigest(view.rectSourcePixels) && rendered.presentation === view.presentation, `Actual ROI/mirror view mismatch at ${frame.timeSeconds}s/${view.id}`)
+        requireCondition(rendered && jsonDigest(rendered.rectSourcePixels) === jsonDigest(view.rectSourcePixels) && rendered.presentation === view.presentation, `Actual ROI/mirror view mismatch at ${t}s/${view.id}`)
       }
-      matchedFrames++; viewCount += response.views.length
-      for (const item of response.projected) {
-        const projection = item.projection
-        if (!projection || projection.visibility !== 'visible' || !finite(projection.depth) || projection.depth <= 0 || !Array.isArray(projection.sourcePixels) || projection.sourcePixels.length !== 2 || !projection.sourcePixels.every(finite) || !Array.isArray(projection.viewportPixels) || projection.viewportPixels.length !== 2 || !projection.viewportPixels.every(finite)) {
-          fail(report, 'unprojectable-rendered-anchor', 'Actual articulated native point missing/hidden/unprojectable', { timeSeconds: frame.timeSeconds, viewId: item.viewId, anchorId: item.anchorId, projection })
+      const gate = stageGate(response.canvas)
+      const captured = new Map()
+      for (const view of expectedViews) {
+        const { capture, skewSeconds } = freshCapture(response.captures.find(entry => entry.viewId === view.id), t, [native.mediaTime], `Required ${t}s`)
+        clockSkews.push(skewSeconds)
+        captured.set(view.id, { capture, rect: view.rectSourcePixels, byId: new Map(capture.landmarks.map(item => [item.id, item])) })
+      }
+      lastMatched = index
+      matchedFrames++; viewCount += expectedViews.length
+      for (const item of frame.landmarks) {
+        const viewId = item.viewId ?? 'main', view = captured.get(viewId)
+        const landmark = view?.byId.get(item.anchorId) ?? null
+        const context = { timeSeconds: t, viewId, anchorId: item.anchorId, role: item.role, captureTimeSeconds: view?.capture.timeSeconds ?? null, nativeMediaTime: native.mediaTime, landmark }
+        if (!landmark || landmark.state !== 'rendered' || !vec2(landmark.sourcePixels) || !vec2(landmark.canvasPixels)) {
+          fail(report, 'unrendered-gpu-landmark', 'Required landmark has no actual GPU-rendered marker pixel in this view', context)
           continue
         }
-        const expectedViewport = [gateX + projection.sourcePixels[0] / 1920 * gateWidth, gateY + projection.sourcePixels[1] / 1080 * gateHeight]
-        const viewportMappingErrorPx = Math.hypot(projection.viewportPixels[0] - expectedViewport[0], projection.viewportPixels[1] - expectedViewport[1])
-        if (viewportMappingErrorPx > 0.75) fail(report, 'actual-viewport-mapping', 'Projection is not through the actual source-letterboxed canvas viewport', { timeSeconds: frame.timeSeconds, viewId: item.viewId, anchorId: item.anchorId, viewportMappingErrorPx })
-        const errorPx = Math.hypot(projection.sourcePixels[0] - item.pixel[0], projection.sourcePixels[1] - item.pixel[1])
-        const measured = { timeSeconds: frame.timeSeconds, decodedTimeSeconds: frame.decodedTimeSeconds, viewId: item.viewId, anchorId: item.anchorId, role: item.role, observedSourcePixels: item.pixel, renderedSourcePixels: projection.sourcePixels, renderedViewportPixels: projection.viewportPixels, depthMetres: projection.depth, viewportMappingErrorPx, errorPx }
+        const [rx, ry, rw, rh] = view.rect
+        if (landmark.sourcePixels[0] < rx || landmark.sourcePixels[1] < ry || landmark.sourcePixels[0] > rx + rw || landmark.sourcePixels[1] > ry + rh) fail(report, 'rendered-outside-view', 'GPU marker lies outside its source view rectangle', context)
+        const expectedCanvas = [gate.x + landmark.sourcePixels[0] / 1920 * gate.width, gate.y + landmark.sourcePixels[1] / 1080 * gate.height]
+        const viewportMappingErrorPx = Math.hypot(landmark.canvasPixels[0] - expectedCanvas[0], landmark.canvasPixels[1] - expectedCanvas[1])
+        if (viewportMappingErrorPx > VIEWPORT_MAPPING_LIMIT_PX) fail(report, 'actual-viewport-mapping', 'GPU marker canvas position is not on the source-letterboxed #stage gate', { ...context, viewportMappingErrorPx })
+        const errorPx = Math.hypot(landmark.sourcePixels[0] - item.pixel[0], landmark.sourcePixels[1] - item.pixel[1])
+        const measured = { timeSeconds: t, decodedTimeSeconds: frame.decodedTimeSeconds, nativeMediaTime: native.mediaTime, captureTimeSeconds: view.capture.timeSeconds, method: view.capture.method, viewId, anchorId: item.anchorId, role: item.role, observedSourcePixels: item.pixel, renderedSourcePixels: landmark.sourcePixels, renderedCanvasPixels: landmark.canvasPixels, uncertaintyCanvasPixels: landmark.uncertaintyCanvasPixels, viewportMappingErrorPx, errorPx }
         measurements.push(measured)
         if (item.role === 'check') errors.push(errorPx); else fitErrors.push(errorPx)
-        if (errorPx > PIXEL_LIMIT) fail(report, 'rendered-landmark-error', `Actual ${item.role} error ${errorPx.toFixed(3)}px exceeds ${PIXEL_LIMIT}px`, measured)
+        if (errorPx > PIXEL_LIMIT) fail(report, 'rendered-landmark-error', `Actual GPU-rendered ${item.role} error ${errorPx.toFixed(3)}px exceeds ${PIXEL_LIMIT}px`, measured)
       }
       if (!firstMachineScreenshot) {
         firstMachineScreenshot = `${record.id}-matched.png`
@@ -192,54 +489,67 @@ async function referenceProof(page, record, report, outputDirectory) {
       }
     }
   } finally {
-    report.reference = { matchedFrames, heldFrames, renderedViewCount: viewCount, expectedMachineFrames: record.report.machineFrames, expectedViewCount: record.report.requiredViews, expectedChecks: record.report.checkLandmarks, heldOut: errorStats(errors), fitting: errorStats(fitErrors), firstMachineScreenshot, measurementsFile: `${record.id}-landmarks.json`, staticReviewIsPlaybackEvidence: false }
+    report.reference = { matchedFrames, heldFrames, noMachineFrames, renderedViewCount: viewCount, expectedMachineFrames: record.report.machineFrames, expectedExemptFrames: record.report.exemptFrames, expectedViewCount: record.report.requiredViews, expectedFits: record.report.fitLandmarks, expectedChecks: record.report.checkLandmarks, heldOut: errorStats(errors), fitting: errorStats(fitErrors), maxDrawClockSkewSeconds: clockSkews.length ? Math.max(...clockSkews) : null, pixelSource: 'renderedLandmarks(viewId) gpu-readback of the last actual renderViews draw', firstMachineScreenshot, measurementsFile: `${record.id}-landmarks.json`, staticReviewIsPlaybackEvidence: false }
     await writeFile(resolve(outputDirectory, report.reference.measurementsFile), `${JSON.stringify(measurements, null, 2)}\n`)
+    try { await restoreExploration(page, embed) } catch (error) { fail(report, 'end-reference-review', error.message) }
   }
-  requireCondition(matchedFrames === record.report.machineFrames && viewCount === record.report.requiredViews && errors.length === record.report.checkLandmarks, 'Actual-rendered reference measurement coverage is incomplete')
+  requireCondition(matchedFrames === record.report.machineFrames && heldFrames + noMachineFrames === record.report.exemptFrames && viewCount === record.report.requiredViews && errors.length === record.report.checkLandmarks && fitErrors.length === record.report.fitLandmarks, 'Actual GPU-rendered reference measurement coverage is incomplete')
   requireCondition(!record.report.machineFrames || errors.length >= 2, 'No independent rendered check measurements exist')
   requireCondition(!report.failures.length, 'One or more actual source-to-render errors exceed the fidelity gate')
 }
 
-async function interactionProof(page, id, report, outputDirectory) {
-  await pauseActual(page)
+async function interactionProof(page, embed, id, report, outputDirectory) {
+  await pauseActual(page, embed)
+  if ((await apiSnapshot(page)).mode === 'reference-review') await endReview(page)
+  const ready = await apiSnapshot(page)
+  requireCondition(ready.mode === 'exploring' && ready.playerState === 'paused', `Manual interaction requires paused exploration, found ${ready.mode}/${ready.playerState}`)
   await page.locator('#fit-view').click()
   const range = page.locator('#crank')
   requireCondition(await range.isEnabled(), 'Paused crank exploration control is disabled')
-  const stage = page.locator('#stage canvas')
-  requireCondition(await stage.count() === 1, 'Exactly one real rendered mechanism canvas is required')
+  // #stage IS the canvas element; there is no descendant canvas.
+  const stage = page.locator('#stage')
+  requireCondition(await stage.count() === 1 && await stage.evaluate(element => element instanceof HTMLCanvasElement), 'Exactly one real rendered #stage canvas is required')
+  // Mask the overlaid native player so only mechanism canvas pixels are compared.
+  const shot = () => stage.screenshot({ mask: [page.locator('#video-dock'), page.locator('#loading')], animations: 'disabled' })
   const before = await apiSnapshot(page)
-  const projectionBefore = await page.evaluate(anchor => window.harmonicAnalyzer.projectAnchor(anchor), CRANK_ANCHOR)
-  const pixelsBefore = await stage.screenshot()
+  const nativeBefore = await nativeMedia(embed.frame)
+  const pixelsBefore = await shot()
   const input = await range.evaluate(element => ({ value: Number(element.value), min: Number(element.min), max: Number(element.max), step: Number(element.step) || 0.01 }))
   requireCondition(input.max > input.min, 'Manual crank has no actual travel')
   const direction = input.value + 0.125 <= input.max ? 'ArrowRight' : 'ArrowLeft'
   const presses = Math.max(1, Math.round(0.125 / input.step))
-  // Native range keyboard gestures use the public control's documented turns.
-  // Avoid whole-turn endpoints which can legitimately return to the same pose.
+  // Native range keyboard gestures; avoid whole-turn endpoints which can return to the same pose.
   await range.focus()
   for (let count = 0; count < presses; count++) await range.press(direction)
   await page.waitForFunction(initial => Math.abs(window.harmonicAnalyzer.snapshot().input.crankTurns - initial) > 1e-6, before.input.crankTurns, { timeout: 5000 })
   await page.evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))))
   const after = await apiSnapshot(page)
-  const projectionAfter = await page.evaluate(anchor => window.harmonicAnalyzer.projectAnchor(anchor), CRANK_ANCHOR)
-  const pixelsAfter = await stage.screenshot()
-  requireCondition(after.mode === 'exploring' && after.playerState === 'paused' && Math.abs(after.videoTime - before.videoTime) <= 0.1, 'Manual crank must explore geometry with the real video paused')
+  const pixelsAfter = await shot()
+  const nativeAfter = await nativeMedia(embed.frame)
+  requireCondition(after.mode === 'exploring' && after.playerState === 'paused' && nativeAfter.paused && Math.abs(nativeAfter.mediaTime - nativeBefore.mediaTime) <= PAUSED_DRIFT_SECONDS, 'Manual crank must explore geometry with the actual native video paused')
   requireCondition(jsonDigest(after.camera) === jsonDigest(before.camera), 'Manual crank proof moved camera instead of only articulating mechanism')
-  requireCondition(projectionBefore && projectionAfter && Math.hypot(projectionAfter.sourcePixels[0] - projectionBefore.sourcePixels[0], projectionAfter.sourcePixels[1] - projectionBefore.sourcePixels[1]) > 1, 'Actual native crank-handle transform did not visibly move')
   requireCondition(digest(pixelsBefore) !== digest(pixelsAfter), 'Manual crank did not change actual rendered canvas pixels')
   const crankScreenshot = `${id}-manual-crank.png`
   await writeFile(resolve(outputDirectory, crankScreenshot), pixelsAfter)
-  const box = await stage.boundingBox()
-  const x = box.x + box.width * 0.6, y = box.y + box.height * 0.45
-  await page.mouse.move(x, y); await page.mouse.down(); await page.mouse.move(x + Math.min(140, box.width * 0.15), y + 45, { steps: 8 }); await page.mouse.up()
+  // Drag only where the canvas itself receives the pointer (not the overlaid player).
+  const point = await stage.evaluate(canvas => {
+    const rect = canvas.getBoundingClientRect()
+    for (const [fx, fy] of [[0.6, 0.45], [0.4, 0.45], [0.5, 0.3], [0.3, 0.3], [0.5, 0.6], [0.25, 0.6], [0.7, 0.25]]) {
+      const x = rect.left + rect.width * fx, y = rect.top + rect.height * fy, dx = Math.min(140, rect.width * 0.15)
+      if (document.elementFromPoint(x, y) === canvas && document.elementFromPoint(x + dx, y + 45) === canvas) return { x, y, dx }
+    }
+    return null
+  })
+  requireCondition(point, 'No unobstructed #stage canvas region receives pointer input')
+  await page.mouse.move(point.x, point.y); await page.mouse.down(); await page.mouse.move(point.x + point.dx, point.y + 45, { steps: 8 }); await page.mouse.up()
   await page.evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))))
-  const orbit = await apiSnapshot(page), pixelsOrbit = await stage.screenshot()
+  const orbit = await apiSnapshot(page), pixelsOrbit = await shot(), nativeOrbit = await nativeMedia(embed.frame)
   requireCondition(jsonDigest(orbit.camera) !== jsonDigest(after.camera), 'Paused native canvas orbit did not change actual rendered camera')
   requireCondition(digest(pixelsAfter) !== digest(pixelsOrbit), 'Paused orbit did not change actual rendered scene pixels')
-  requireCondition(orbit.playerState === 'paused' && Math.abs(orbit.videoTime - before.videoTime) <= 0.1, 'Orbit restarted/faked video playback')
+  requireCondition(orbit.playerState === 'paused' && nativeOrbit.paused && Math.abs(nativeOrbit.mediaTime - nativeBefore.mediaTime) <= PAUSED_DRIFT_SECONDS, 'Orbit restarted/faked video playback')
   const orbitScreenshot = `${id}-manual-orbit.png`
   await writeFile(resolve(outputDirectory, orbitScreenshot), pixelsOrbit)
-  report.interaction = { actualCrankTurns: [before.input.crankTurns, after.input.crankTurns], crankProbePixels: [projectionBefore.sourcePixels, projectionAfter.sourcePixels], crankCanvasSha256: [digest(pixelsBefore), digest(pixelsAfter)], orbitCamera: [after.camera, orbit.camera], orbitCanvasSha256: digest(pixelsOrbit), screenshots: [crankScreenshot, orbitScreenshot] }
+  report.interaction = { actualCrankTurns: [before.input.crankTurns, after.input.crankTurns], crankCanvasSha256: [digest(pixelsBefore), digest(pixelsAfter)], orbitCamera: [after.camera, orbit.camera], orbitCanvasSha256: digest(pixelsOrbit), nativeMediaTime: nativeBefore.mediaTime, screenshots: [crankScreenshot, orbitScreenshot], pixelEvidence: '#stage canvas screenshots with the native player overlay masked' }
 }
 
 export async function webglPositiveControl(page) {
@@ -262,7 +572,7 @@ export async function verifySync() {
   const startedAt = new Date().toISOString()
   const outputDirectory = resolve(WEB_ROOT, '.vite/verification-output', startedAt.replace(/[:.]/g, '-'))
   await mkdir(outputDirectory, { recursive: true })
-  const report = { startedAt, finishedAt: null, status: 'failed', limits: { sourceLandmarkPx: PIXEL_LIMIT, videoModelClockSeconds: CLOCK_LIMIT, compactViewportPixels: [200, 200] }, outputDirectory, failures: [], sources: [], videos: [], builtAssets: [], serverRequests: [], browserLog: [], verificationMode: 'actual built scene and native YouTube; no mocks, source seeks, synthetic clocks or skip-green' }
+  const report = { startedAt, finishedAt: null, status: 'failed', limits: { sourceLandmarkPx: PIXEL_LIMIT, videoModelClockSeconds: CLOCK_LIMIT, viewportMappingPx: VIEWPORT_MAPPING_LIMIT_PX, compactViewportPixels: [200, 200] }, outputDirectory, failures: [], sources: [], videos: [], builtAssets: [], serverRequests: [], browserLog: [], verificationMode: 'Built app in native Chromium; landmark pixels from GPU-readback markers of the last actual renderViews draw (depth test off: no occlusion claim); clock from the official YouTube iframe HTMLMediaElement.currentTime versus captured required-source draw time; seeks only through the official player; no mocks, CPU projections, synthetic clocks or skip-green' }
   const abort = new AbortController()
   const interrupt = () => abort.abort(new Error('Verification interrupted'))
   process.once('SIGINT', interrupt); process.once('SIGTERM', interrupt)
@@ -310,10 +620,12 @@ export async function verifySync() {
         requireCondition(snapshot.playerState !== 'error', `Native YouTube external-media prerequisite failed for ${record.id}`)
         const links = await page.locator('#videos a').evaluateAll(elements => elements.map(element => new URL(element.href).searchParams.get('video')))
         requireCondition(links.length === 7 && new Set(links).size === 7, 'All seven direct video navigation links must be present and distinct')
-        const embed = await playbackProof(page, record.id, video)
-        await compactProof(page, record.id, embed, video, outputDirectory)
-        await referenceProof(page, record, video, outputDirectory)
-        if (record.report.machineFrames && !report.videos.some(item => item.interaction)) await interactionProof(page, record.id, video, outputDirectory)
+        const run = longestRun(record)
+        video.requiredClockRun = run
+        const embed = await playbackProof(page, record, run, video)
+        await compactProof(page, record, embed, run, video, outputDirectory)
+        await referenceProof(page, embed, record, video, outputDirectory)
+        if (record.report.machineFrames && !report.videos.some(item => item.interaction)) await interactionProof(page, embed, record.id, video, outputDirectory)
         video.status = 'passed'
       } catch (error) {
         video.status = 'failed'
@@ -351,7 +663,7 @@ export async function verifySync() {
       heldOut.count += stats.count; heldOut.maxPx = Math.max(heldOut.maxPx ?? 0, stats.maxPx); squared += stats.count * stats.rmsPx * stats.rmsPx
     }
     if (heldOut.count) heldOut.rmsPx = Math.sqrt(squared / heldOut.count)
-    const clockMeasurements = report.videos.map(video => video.playback?.maxClockSkewSeconds).filter(finite)
+    const clockMeasurements = report.videos.flatMap(video => [video.playback?.maxClockSkewSeconds, video.compact?.maxClockSkewSeconds, video.reference?.maxDrawClockSkewSeconds]).filter(finite)
     const summary = { status: report.status, videoCount: report.videos.length, sourceCount: report.sources.length, failureCount: report.failures.length, report: resolve(outputDirectory, 'report.json'), maxClockSkewSeconds: clockMeasurements.length ? Math.max(...clockMeasurements) : null, heldOut }
     console.log(JSON.stringify(summary, null, 2))
   }

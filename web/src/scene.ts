@@ -15,20 +15,60 @@ export interface CameraRecord {
   principalPointViewportPixels?: readonly [number, number]
 }
 export type InteractionMode = 'following-video' | 'exploring'
+export type Presentation = 'native' | 'horizontal-mirror'
 export interface SourceView {
+  /** Stable view identity; GPU landmark captures are keyed by it. */
+  id: string
   camera: CameraRecord
   /** Top-left source pixels, then width and height; source is 1920 × 1080. */
   rectSourcePixels: readonly [number, number, number, number]
-  presentation?: 'native' | 'horizontal-mirror'
+  presentation?: Presentation
 }
-export interface Projection {
-  sourcePixels: [number, number]
-  viewportPixels: [number, number]
-  visibility: 'visible' | 'outside-viewport' | 'behind-camera'
-  /** Positive camera-forward distance in metres. */
-  depth: number
+/**
+ * Diagnostic landmark located by exactly one of `partLocalMetres` (native node
+ * frame of `partPath`) or `worldMetres`. With `partPath`, as every source
+ * observation has, `worldMetres` is that part's CAD-world point at its
+ * exported rest pose and follows the part's visibility and overrides; without
+ * it, `worldMetres` is a stateless diagnostic point. Malformed anchors and
+ * missing parts are reported unresolved, never guessed.
+ */
+export interface LandmarkAnchor {
+  readonly id: string
+  readonly partPath?: string
+  readonly partLocalMetres?: Point3
+  readonly worldMetres?: Point3
 }
-export type Anchor = { partPath: string; partLocalMetres: Point3 } | { worldMetres: Point3 }
+export interface LandmarkProbeAnchor {
+  readonly id: string
+  readonly state: 'measurable' | 'unresolved'
+  readonly reason: string | null
+}
+/** GPU diagnostic markers attached to native nodes; never alters native geometry. */
+export interface LandmarkProbe {
+  readonly anchors: readonly LandmarkProbeAnchor[]
+  readonly status: 'active' | 'disposed'
+  dispose(): void
+}
+export type RenderedLandmarkState = 'rendered' | 'unresolved' | 'not-visible'
+export interface RenderedLandmark {
+  id: string
+  state: RenderedLandmarkState
+  /** CSS pixels from the canvas top-left, y down; continuous (pixel centres at +0.5). */
+  canvasPixels: [number, number] | null
+  /** 1920 × 1080 source-frame pixels, top-left origin, y down; continuous. */
+  sourcePixels: [number, number] | null
+  /** Per-axis raster/resampling quantization bound of canvasPixels, CSS pixels. */
+  uncertaintyCanvasPixels: number | null
+  reason: string | null
+}
+export interface RenderedLandmarks {
+  method: 'gpu-readback'
+  viewId: string
+  presentation: Presentation
+  /** Source time given to the capturing renderViews; null for exploring render(). */
+  timeSeconds: number | null
+  landmarks: RenderedLandmark[]
+}
 export interface PartOverride {
   partPath: string
   visibility?: 'visible' | 'hidden'
@@ -52,51 +92,164 @@ export interface Machine {
   readonly provenance: ModelProvenance
   readonly partPaths: readonly string[]
   update(input: MechanismInput, overrides?: readonly PartOverride[]): void
-  anchorWorld(anchor: Anchor, target?: Float64Array): Float64Array | null
-  projectAnchor(anchor: Anchor, viewer: Pick<Viewer, 'projectWorld'>, target?: Projection, view?: SourceView): Projection | null
   /** Add another genuine native part instance, sharing its original geometry. */
   addPartInstance(sourcePartPath: string, instancePath: string): 'added' | 'already-present' | 'missing-source'
+  /** Diagnostic GPU markers on actual native nodes; install with Viewer.setLandmarkProbe. */
+  createLandmarkProbe(anchors: readonly LandmarkAnchor[]): LandmarkProbe
+  /** Remove the native root from the scene and free its GPU resources and probes. */
+  dispose(): void
+}
+export interface LoadMachineOptions {
+  /** GLB location; defaults to the pinned harmonic-analyzer export. */
+  url?: string
 }
 
 export interface Viewer {
   renderer: THREE.WebGLRenderer
   scene: THREE.Scene
   camera: THREE.PerspectiveCamera
-  controls: OrbitControls
+  /**
+   * Live exploring controls. OrbitControls fixes its orbit axis from camera.up
+   * at construction, so a new up basis replaces this instance: never cache it
+   * or attach listeners; its 'change' events reach createViewer's onControlsChange.
+   */
+  readonly controls: OrbitControls
   resize(): void
+  /** Exploring/rest draw; captures landmarks under EXPLORING_VIEW_ID when a probe is installed. */
   render(): void
-  renderViews(views: readonly SourceView[], beforeView?: (view: SourceView, index: number) => void): void
+  renderViews(views: readonly SourceView[], beforeView: ((view: SourceView, index: number) => void) | undefined, timeSeconds: number): void
   applyCamera(record: CameraRecord): void
   setInteraction(mode: InteractionMode): void
   fitView(object?: THREE.Object3D): void
-  projectWorld(world: ArrayLike<number>, target?: Projection, view?: SourceView): Projection
+  /** Install a probe (disposing any previous one), or null to restore plain native rendering. */
+  setLandmarkProbe(probe: LandmarkProbe | null): void
+  /** Read the capture made by the most recent draw of viewId; never rerenders. */
+  readRenderedLandmarks(viewId: string): RenderedLandmarks | null
 }
 
+export const EXPLORING_VIEW_ID = 'exploring'
 const SOURCE_WIDTH = 1920
 const SOURCE_HEIGHT = 1080
+const FULL_FRAME: readonly [number, number, number, number] = [0, 0, SOURCE_WIDTH, SOURCE_HEIGHT]
 const MODEL_URL = `${import.meta.env.BASE_URL}models/harmonic-analyzer.glb`
 const Z = new THREE.Vector3(0, 0, 1)
 const Y = new THREE.Vector3(0, 1, 0)
 
-export function createProjection(): Projection {
-  return { sourcePixels: [0, 0], viewportPixels: [0, 0], visibility: 'outside-viewport', depth: 0 }
+/** Diagnostic markers live only on this layer; native cameras never enable it. */
+const PROBE_LAYER = 31
+/** One bit per marker across RGBA8; additive blending keeps overlapping markers separable. */
+const SLOTS_PER_PASS = 32
+/** Reference markers at these NDC corners measure each view's actual viewport placement. */
+const REFERENCE_NDC = 0.75
+const REFERENCE_SOURCE_LOW = (1 - REFERENCE_NDC) / 2
+const REFERENCE_SOURCE_SPAN = REFERENCE_NDC
+const ACCUMULATOR_STRIDE = 7
+
+interface ProbeMarker {
+  id: string
+  /** Global marker slot; -1 when unresolved at probe creation. */
+  slot: number
+  reason: string | null
+  object: THREE.Points | null
+}
+interface ProbeInternals {
+  readonly markers: readonly ProbeMarker[]
+  readonly passes: number
+  readonly pass: { value: number }
+  readonly pointSize: { value: number }
+}
+const probeInternals = new WeakMap<LandmarkProbe, ProbeInternals>()
+
+// The native deformation hooks rewrite these two includes, so the probe keeps them.
+const MARKER_VERTEX = `
+attribute float landmarkSlot;
+uniform float landmarkPass;
+uniform float landmarkPointSize;
+varying float landmarkBit;
+void main() {
+#include <beginnormal_vertex>
+#include <begin_vertex>
+#include <project_vertex>
+  float pass = floor((landmarkSlot + 0.5) / ${SLOTS_PER_PASS.toFixed(1)});
+  landmarkBit = landmarkSlot - pass * ${SLOTS_PER_PASS.toFixed(1)};
+  gl_PointSize = landmarkPointSize;
+  if (abs(pass - landmarkPass) > 0.5) gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
+}
+`
+const REFERENCE_VERTEX = `
+attribute float landmarkSlot;
+varying float landmarkBit;
+void main() {
+  landmarkBit = landmarkSlot;
+  gl_PointSize = 1.0;
+  gl_Position = vec4(position.xy, 0.0, 1.0);
+}
+`
+const MARKER_FRAGMENT = `
+varying float landmarkBit;
+void main() {
+  float bit = floor(landmarkBit + 0.5);
+  float channel = floor(bit / 8.0);
+  float value = exp2(bit - channel * 8.0) / 255.0;
+  gl_FragColor = vec4(channel == 0.0 ? value : 0.0, channel == 1.0 ? value : 0.0, channel == 2.0 ? value : 0.0, channel == 3.0 ? value : 0.0);
+}
+`
+
+function markerMaterial(vertexShader: string, uniforms: Record<string, THREE.IUniform>): THREE.ShaderMaterial {
+  return new THREE.ShaderMaterial({
+    uniforms, vertexShader, fragmentShader: MARKER_FRAGMENT,
+    depthTest: false, depthWrite: false,
+    blending: THREE.CustomBlending, blendEquation: THREE.AddEquation, blendSrc: THREE.OneFactor, blendDst: THREE.OneFactor,
+    blendEquationAlpha: THREE.AddEquation, blendSrcAlpha: THREE.OneFactor, blendDstAlpha: THREE.OneFactor,
+  })
 }
 
-/** Source cameras and every mechanical point remain in the original metre CAD frame. */
-export function createViewer(canvas: HTMLCanvasElement): Viewer {
+interface ViewCapture {
+  epoch: number
+  presentation: Presentation
+  timeSeconds: number | null
+  /** 0 rendered, 1 unresolved, 2 not-visible. */
+  states: Uint8Array
+  /** Per marker: canvas x/y, source x/y, uncertainty. */
+  values: Float64Array
+  reasons: (string | null)[]
+}
+const CAPTURE_STATES: readonly RenderedLandmarkState[] = ['rendered', 'unresolved', 'not-visible']
+/** Every public OrbitControls tunable (three r180), carried across a basis rebuild. */
+const ORBIT_SETTINGS = [
+  'enabled', 'minDistance', 'maxDistance', 'minZoom', 'maxZoom', 'minTargetRadius', 'maxTargetRadius',
+  'minPolarAngle', 'maxPolarAngle', 'minAzimuthAngle', 'maxAzimuthAngle', 'enableDamping', 'dampingFactor',
+  'enableZoom', 'zoomSpeed', 'enableRotate', 'rotateSpeed', 'keyRotateSpeed', 'enablePan', 'panSpeed',
+  'screenSpacePanning', 'keyPanSpeed', 'zoomToCursor', 'autoRotate', 'autoRotateSpeed', 'keys', 'mouseButtons',
+  'touches', 'zoom0',
+] as const satisfies readonly (keyof OrbitControls)[]
+
+/**
+ * Source cameras and every mechanical point remain in the original metre CAD
+ * frame. `onControlsChange` receives every exploring-controls 'change' event,
+ * across control rebuilds.
+ */
+export function createViewer(canvas: HTMLCanvasElement, onControlsChange: () => void): Viewer {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2))
   renderer.outputColorSpace = THREE.SRGBColorSpace
   renderer.autoClear = false
+  const gl = renderer.getContext()
+  // WebGL returns ALIASED_POINT_SIZE_RANGE as a Float32Array [min, max].
+  const pointSizeRange: Float32Array = gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE)
+  const maxPointSize = pointSizeRange[1]!
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0x11131a)
   const camera = new THREE.PerspectiveCamera(35, SOURCE_WIDTH / SOURCE_HEIGHT, 0.005, 100)
   camera.setViewOffset(SOURCE_WIDTH, SOURCE_HEIGHT, 0, 0, SOURCE_WIDTH, SOURCE_HEIGHT)
   camera.clearViewOffset()
   camera.position.set(1.2, 1, 1.6)
-  const controls = new OrbitControls(camera, canvas)
+  // The orbit basis the live controls were constructed for (camera.up then).
+  const controlsUp = camera.up.clone()
+  let controls = new OrbitControls(camera, canvas)
   controls.target.set(0, 0.68, 0)
   controls.enableDamping = false
+  controls.addEventListener('change', onControlsChange)
   let mode: InteractionMode = 'exploring'
   scene.add(new THREE.HemisphereLight(0xffffff, 0x404050, 1.6))
   const key = new THREE.DirectionalLight(0xffffff, 2.2)
@@ -104,14 +257,13 @@ export function createViewer(canvas: HTMLCanvasElement): Viewer {
   scene.add(key)
 
   const gate = { x: 0, y: 0, width: 1, height: 1 }
-  const point = new THREE.Vector3()
   const forward = new THREE.Vector3()
-  const projectionCamera = new THREE.PerspectiveCamera(35, SOURCE_WIDTH / SOURCE_HEIGHT, 0.005, 100)
-  projectionCamera.setViewOffset(SOURCE_WIDTH, SOURCE_HEIGHT, 0, 0, SOURCE_WIDTH, SOURCE_HEIGHT)
-  projectionCamera.clearViewOffset()
   const bounds = new THREE.Box3()
+  const box = new THREE.Box3()
   const centre = new THREE.Vector3()
   const size = new THREE.Vector3()
+  const savedPosition = new THREE.Vector3()
+  const savedQuaternion = new THREE.Quaternion()
   const mirrorTarget = new THREE.WebGLRenderTarget(1, 1)
   const mirrorScene = new THREE.Scene()
   const mirrorCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
@@ -123,6 +275,27 @@ export function createViewer(canvas: HTMLCanvasElement): Viewer {
   })
   // This screen-space blit is presentation only, never replacement machine geometry.
   mirrorScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mirrorMaterial))
+
+  // GPU landmark readback state. Targets/buffers allocate on first capture or
+  // actual size change only; the steady-state frame loop allocates nothing.
+  let probe: LandmarkProbe | null = null
+  let probeTarget: THREE.WebGLRenderTarget | null = null
+  let probeMirrorTarget: THREE.WebGLRenderTarget | null = null
+  let readback = new Uint8Array(0)
+  let readbackWords = new Uint32Array(0)
+  const accumulators = new Float64Array(SLOTS_PER_PASS * ACCUMULATOR_STRIDE)
+  const captures = new Map<string, ViewCapture>()
+  let drawEpoch = 0
+  const probeViewport = new THREE.Vector4()
+  const savedClearColor = new THREE.Color()
+  const referenceGeometry = new THREE.BufferGeometry()
+  referenceGeometry.setAttribute('position', new THREE.Float32BufferAttribute([-REFERENCE_NDC, REFERENCE_NDC, 0, REFERENCE_NDC, -REFERENCE_NDC, 0], 3))
+  referenceGeometry.setAttribute('landmarkSlot', new THREE.Float32BufferAttribute([0, 1], 1))
+  const referenceMaterial = markerMaterial(REFERENCE_VERTEX, {})
+  const referencePoints = new THREE.Points(referenceGeometry, referenceMaterial)
+  referencePoints.frustumCulled = false
+  const referenceScene = new THREE.Scene()
+  referenceScene.add(referencePoints)
 
   function resize() {
     const w = canvas.clientWidth
@@ -136,6 +309,8 @@ export function createViewer(canvas: HTMLCanvasElement): Viewer {
     camera.aspect = SOURCE_WIDTH / SOURCE_HEIGHT
     camera.updateProjectionMatrix()
     mirrorTarget.setSize(Math.max(1, Math.round(gate.width * renderer.getPixelRatio())), Math.max(1, Math.round(gate.height * renderer.getPixelRatio())))
+    // Resizing clears the canvas; earlier captures no longer describe it.
+    drawEpoch++
   }
   addEventListener('resize', resize)
 
@@ -150,27 +325,65 @@ export function createViewer(canvas: HTMLCanvasElement): Viewer {
     target.updateMatrixWorld(true)
   }
 
+  // OrbitControls derives its orbit axis from camera.up once, in its
+  // constructor, and update() keeps using that cached basis; three r180 has
+  // no public way to change it. A new up basis therefore needs a new
+  // instance carrying every public setting, the target and the change listener.
+  function syncControlsBasis() {
+    if (camera.up.equals(controlsUp)) return
+    const previous = controls
+    previous.removeEventListener('change', onControlsChange)
+    previous.dispose()
+    savedPosition.copy(camera.position)
+    savedQuaternion.copy(camera.quaternion)
+    const next = new OrbitControls(camera, canvas)
+    // Its constructor's update() aimed the camera at the default origin target.
+    camera.position.copy(savedPosition)
+    camera.quaternion.copy(savedQuaternion)
+    Object.assign(next, Object.fromEntries(ORBIT_SETTINGS.map(key => [key, previous[key]])))
+    next.target.copy(previous.target)
+    next.cursor.copy(previous.cursor)
+    next.target0.copy(previous.target0)
+    next.position0.copy(previous.position0)
+    next.addEventListener('change', onControlsChange)
+    controls = next
+    controlsUp.copy(camera.up)
+  }
+
+  // Rebuild OrbitControls from the exact current pose, including roll. It
+  // orbits about the camera's own up axis: forward stays perpendicular to it
+  // (polar angle π/2, clear of the poles) and lookAt reproduces the exact roll.
+  function rebaseControls() {
+    const distance = Math.max(camera.position.distanceTo(controls.target), 0.1)
+    forward.set(0, 0, -1).applyQuaternion(camera.quaternion)
+    camera.up.set(0, 1, 0).applyQuaternion(camera.quaternion)
+    syncControlsBasis()
+    controls.target.copy(camera.position).addScaledVector(forward, distance)
+    controls.update()
+  }
+
   function applyCamera(record: CameraRecord) {
     writeCamera(camera, record, SOURCE_WIDTH, SOURCE_HEIGHT)
+    if (mode === 'exploring') rebaseControls()
   }
 
   function setInteraction(next: InteractionMode) {
     if (next === mode) return
     mode = next
     controls.enabled = next === 'exploring'
-    if (next === 'exploring') {
-      // Rebuild OrbitControls from this exact source pose, including roll. No
-      // stale spherical delta from a previous exploration may hit a source shot.
-      const distance = Math.max(camera.position.distanceTo(controls.target), 0.1)
-      forward.set(0, 0, -1).applyQuaternion(camera.quaternion)
-      controls.target.copy(camera.position).addScaledVector(forward, distance)
-      camera.up.set(0, 1, 0).applyQuaternion(camera.quaternion)
-      controls.update()
-    }
+    if (next === 'exploring') rebaseControls()
   }
 
   function fitView(object: THREE.Object3D = scene) {
-    bounds.setFromObject(object)
+    // Native geometry only: diagnostic markers must not move the operator view.
+    bounds.makeEmpty()
+    object.updateWorldMatrix(true, true)
+    object.traverse(node => {
+      if (node.userData.landmarkMarker || !(node instanceof THREE.Mesh || node instanceof THREE.Line || node instanceof THREE.Points)) return
+      const geometry = node.geometry
+      if (!geometry.boundingBox) geometry.computeBoundingBox()
+      bounds.union(box.copy(geometry.boundingBox!).applyMatrix4(node.matrixWorld))
+    })
     if (bounds.isEmpty()) return
     bounds.getCenter(centre)
     bounds.getSize(size)
@@ -186,10 +399,14 @@ export function createViewer(canvas: HTMLCanvasElement): Viewer {
     camera.lookAt(centre)
     camera.updateProjectionMatrix()
     camera.updateMatrixWorld(true)
-    if (mode === 'exploring') controls.update()
+    if (mode === 'exploring') {
+      syncControlsBasis()
+      controls.update()
+    }
   }
 
   function beginFrame() {
+    renderer.setRenderTarget(null)
     renderer.setScissorTest(false)
     renderer.setViewport(0, 0, canvas.clientWidth, canvas.clientHeight)
     renderer.clear(true, true, true)
@@ -206,70 +423,276 @@ export function createViewer(canvas: HTMLCanvasElement): Viewer {
     renderer.setScissor(left, bottom, w, h)
   }
 
+  /**
+   * One view's draw into `output` (null = canvas). The landmark probe calls
+   * this same function, so its markers take the identical viewport/scissor
+   * calls, mirror stage and blit as the native image.
+   */
+  function drawView(rect: readonly [number, number, number, number], presentation: Presentation, output: THREE.WebGLRenderTarget | null, mirrorStage: THREE.WebGLRenderTarget, clearOutput: boolean) {
+    if (presentation === 'horizontal-mirror') {
+      // The mirror stage uses its own full viewport with scissor disabled;
+      // renderer.setViewport would wrongly scale it by the canvas pixel ratio.
+      renderer.setRenderTarget(mirrorStage)
+      renderer.clear(true, true, true)
+      renderer.render(scene, camera)
+      renderer.setRenderTarget(output)
+      renderer.setScissorTest(true)
+      viewport(rect[0], rect[1], rect[2], rect[3])
+      if (clearOutput) renderer.clear(true, false, false)
+      mirrorMaterial.uniforms.image!.value = mirrorStage.texture
+      renderer.render(mirrorScene, mirrorCamera)
+    } else {
+      renderer.setRenderTarget(output)
+      renderer.setScissorTest(true)
+      viewport(rect[0], rect[1], rect[2], rect[3])
+      if (clearOutput) renderer.clear(true, false, false)
+      renderer.render(scene, camera)
+    }
+  }
+
   function render() {
     if (mode === 'exploring') controls.update()
+    drawEpoch++
     beginFrame()
     camera.aspect = SOURCE_WIDTH / SOURCE_HEIGHT
     camera.updateProjectionMatrix()
-    viewport(0, 0, SOURCE_WIDTH, SOURCE_HEIGHT)
-    renderer.render(scene, camera)
+    drawView(FULL_FRAME, 'native', null, mirrorTarget, false)
+    captureView(EXPLORING_VIEW_ID, FULL_FRAME, 'native', null)
     renderer.setScissorTest(false)
   }
 
-  function renderViews(views: readonly SourceView[], beforeView?: (view: SourceView, index: number) => void) {
+  function renderViews(views: readonly SourceView[], beforeView: ((view: SourceView, index: number) => void) | undefined, timeSeconds: number) {
+    drawEpoch++
     beginFrame()
     for (let i = 0; i < views.length; i++) {
       const view = views[i]!
       const rect = view.rectSourcePixels
+      const presentation = view.presentation ?? 'native'
       beforeView?.(view, i)
       writeCamera(camera, view.camera, rect[2], rect[3])
-      if (view.presentation === 'horizontal-mirror') {
-        renderer.setRenderTarget(mirrorTarget)
-        renderer.setScissorTest(false)
-        renderer.setViewport(0, 0, mirrorTarget.width, mirrorTarget.height)
-        renderer.clear(true, true, true)
-        renderer.render(scene, camera)
-        renderer.setRenderTarget(null)
-        renderer.setScissorTest(true)
-        viewport(rect[0], rect[1], rect[2], rect[3])
-        renderer.render(mirrorScene, mirrorCamera)
-      } else {
-        viewport(rect[0], rect[1], rect[2], rect[3])
-        renderer.render(scene, camera)
-      }
+      drawView(rect, presentation, null, mirrorTarget, false)
+      // Same pose, camera and GL state as the draw just issued.
+      captureView(view.id, rect, presentation, timeSeconds)
     }
     renderer.setScissorTest(false)
   }
 
-  function projectWorld(world: ArrayLike<number>, target = createProjection(), view?: SourceView): Projection {
-    let selectedCamera = camera
-    let rx = 0, ry = 0, rw = SOURCE_WIDTH, rh = SOURCE_HEIGHT
-    if (view) {
-      const rect = view.rectSourcePixels
-      rx = rect[0]; ry = rect[1]; rw = rect[2]; rh = rect[3]
-      writeCamera(projectionCamera, view.camera, rw, rh)
-      selectedCamera = projectionCamera
-    } else {
-      selectedCamera.updateMatrixWorld(true)
+  function ensureProbeTargets(): [THREE.WebGLRenderTarget, THREE.WebGLRenderTarget] {
+    // Actual drawing-buffer size, not the renderer's cached logical size.
+    const width = gl.drawingBufferWidth
+    const height = gl.drawingBufferHeight
+    const options = { depthBuffer: false, stencilBuffer: false, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, generateMipmaps: false, type: THREE.UnsignedByteType }
+    if (!probeTarget) probeTarget = new THREE.WebGLRenderTarget(width, height, options)
+    else if (probeTarget.width !== width || probeTarget.height !== height) probeTarget.setSize(width, height)
+    if (!probeMirrorTarget) probeMirrorTarget = new THREE.WebGLRenderTarget(mirrorTarget.width, mirrorTarget.height, options)
+    else if (probeMirrorTarget.width !== mirrorTarget.width || probeMirrorTarget.height !== mirrorTarget.height) probeMirrorTarget.setSize(mirrorTarget.width, mirrorTarget.height)
+    return [probeTarget, probeMirrorTarget]
+  }
+
+  /** Read one pass over [x0,x1)×[y0,y1) backing pixels and accumulate per-bit centroids. */
+  function readPass(target: THREE.WebGLRenderTarget, x0: number, y0: number, x1: number, y1: number) {
+    for (let bit = 0; bit < SLOTS_PER_PASS; bit++) {
+      const o = bit * ACCUMULATOR_STRIDE
+      accumulators[o] = 0; accumulators[o + 1] = 0; accumulators[o + 2] = 0
+      accumulators[o + 3] = Infinity; accumulators[o + 4] = -Infinity
+      accumulators[o + 5] = Infinity; accumulators[o + 6] = -Infinity
     }
-    point.set(world[0]!, world[1]!, world[2]!).applyMatrix4(selectedCamera.matrixWorldInverse)
-    target.depth = -point.z
-    point.applyMatrix4(selectedCamera.projectionMatrix)
-    const localX = (point.x + 1) * rw / 2
-    const sx = rx + (view?.presentation === 'horizontal-mirror' ? rw - 1 - localX : localX)
-    const sy = ry + (1 - point.y) * rh / 2
-    target.sourcePixels[0] = sx
-    target.sourcePixels[1] = sy
-    target.viewportPixels[0] = gate.x + sx / SOURCE_WIDTH * gate.width
-    target.viewportPixels[1] = gate.y + sy / SOURCE_HEIGHT * gate.height
-    target.visibility = target.depth <= 0 ? 'behind-camera'
-      : point.x < -1 || point.x > 1 || point.y < -1 || point.y > 1 || point.z < -1 || point.z > 1
-        ? 'outside-viewport' : 'visible'
-    return target
+    const width = x1 - x0
+    const height = y1 - y0
+    if (width <= 0 || height <= 0) return
+    const count = width * height
+    if (readbackWords.length < count) {
+      readback = new Uint8Array(count * 4)
+      readbackWords = new Uint32Array(readback.buffer)
+    }
+    readbackWords.fill(0, 0, count)
+    renderer.readRenderTargetPixels(target, x0, y0, width, height, readback)
+    for (let i = 0; i < count; i++) {
+      if (readbackWords[i] === 0) continue
+      const px = x0 + (i % width) + 0.5
+      const py = y0 + Math.floor(i / width) + 0.5
+      for (let channel = 0; channel < 4; channel++) {
+        let byte = readback[i * 4 + channel]!
+        while (byte !== 0) {
+          const low = byte & -byte
+          byte ^= low
+          const o = (channel * 8 + 31 - Math.clz32(low)) * ACCUMULATOR_STRIDE
+          accumulators[o]! += 1
+          accumulators[o + 1]! += px
+          accumulators[o + 2]! += py
+          if (px < accumulators[o + 3]!) accumulators[o + 3] = px
+          if (px > accumulators[o + 4]!) accumulators[o + 4] = px
+          if (py < accumulators[o + 5]!) accumulators[o + 5] = py
+          if (py > accumulators[o + 6]!) accumulators[o + 6] = py
+        }
+      }
+    }
+  }
+
+  function nativelyHidden(object: THREE.Object3D): boolean {
+    for (let node: THREE.Object3D | null = object; node; node = node.parent) if (!node.visible) return true
+    return false
+  }
+
+  function captureView(viewId: string, rect: readonly [number, number, number, number], presentation: Presentation, timeSeconds: number | null) {
+    const internals = probe?.status === 'active' ? probeInternals.get(probe) : undefined
+    if (!internals) return
+    const markers = internals.markers
+    let capture = captures.get(viewId)
+    if (!capture) {
+      capture = { epoch: -1, presentation, timeSeconds, states: new Uint8Array(markers.length), values: new Float64Array(markers.length * 5), reasons: new Array<string | null>(markers.length).fill(null) }
+      captures.set(viewId, capture)
+    }
+    capture.epoch = drawEpoch
+    capture.presentation = presentation
+    capture.timeSeconds = timeSeconds
+    for (let i = 0; i < markers.length; i++) {
+      capture.states[i] = 1
+      capture.reasons[i] = markers[i]!.slot < 0 ? markers[i]!.reason : 'GPU capture did not reach this marker'
+    }
+    if (internals.passes === 0) return
+    const [target, mirrorStage] = ensureProbeTargets()
+    const savedBackground = scene.background
+    const savedLayers = camera.layers.mask
+    renderer.getClearColor(savedClearColor)
+    const savedClearAlpha = renderer.getClearAlpha()
+    scene.background = null
+    renderer.setClearColor(0x000000, 0)
+    try {
+      // The final stage's actual GL viewport for this view, in backing pixels.
+      renderer.setRenderTarget(target)
+      renderer.setScissorTest(true)
+      viewport(rect[0], rect[1], rect[2], rect[3])
+      renderer.getCurrentViewport(probeViewport)
+      const x0 = Math.max(0, probeViewport.x)
+      const y0 = Math.max(0, probeViewport.y)
+      const x1 = Math.min(target.width, probeViewport.x + probeViewport.z)
+      const y1 = Math.min(target.height, probeViewport.y + probeViewport.w)
+      renderer.clear(true, false, false)
+      renderer.render(referenceScene, mirrorCamera)
+      readPass(target, x0, y0, x1, y1)
+      if (accumulators[0] === 0 || accumulators[ACCUMULATOR_STRIDE] === 0) {
+        markAll(capture, markers, 'view reference markers were not rendered; viewport mapping unmeasured')
+        return
+      }
+      const ax = accumulators[1]! / accumulators[0]!
+      const ay = accumulators[2]! / accumulators[0]!
+      const bx = accumulators[ACCUMULATOR_STRIDE + 1]! / accumulators[ACCUMULATOR_STRIDE]!
+      const by = accumulators[ACCUMULATOR_STRIDE + 2]! / accumulators[ACCUMULATOR_STRIDE]!
+      if (bx === ax || by === ay) {
+        markAll(capture, markers, 'view reference markers coincide; viewport mapping degenerate')
+        return
+      }
+      const cssX = canvas.clientWidth / gl.drawingBufferWidth
+      const cssY = canvas.clientHeight / gl.drawingBufferHeight
+      const mirror = presentation === 'horizontal-mirror'
+      const ratioX = mirror ? mirrorStage.width / probeViewport.z : 1
+      const ratioY = mirror ? mirrorStage.height / probeViewport.w : 1
+      // Nearest-sampled through the real blit, a marker must span at least one
+      // destination sample; an odd square keeps its centre on the anchor.
+      const pointSize = mirror ? 2 * Math.ceil(Math.max(ratioX, ratioY, 1) / 2) + 1 : 1
+      if (pointSize > maxPointSize) {
+        markAll(capture, markers, `mirror downscale needs ${pointSize}px GPU points; device maximum is ${maxPointSize}px`)
+        return
+      }
+      camera.layers.set(PROBE_LAYER)
+      internals.pointSize.value = pointSize
+      for (let pass = 0; pass < internals.passes; pass++) {
+        internals.pass.value = pass
+        drawView(rect, presentation, target, mirrorStage, true)
+        readPass(target, x0, y0, x1, y1)
+        for (let i = 0; i < markers.length; i++) {
+          const marker = markers[i]!
+          if (marker.slot < 0 || Math.floor(marker.slot / SLOTS_PER_PASS) !== pass) continue
+          const o = (marker.slot % SLOTS_PER_PASS) * ACCUMULATOR_STRIDE
+          const count = accumulators[o]!
+          if (count === 0) {
+            capture.states[i] = 2
+            capture.reasons[i] = nativelyHidden(marker.object!) ? 'native part or ancestor hidden in this view'
+              : 'no marker pixels: clipped by camera frustum, near/far planes or view scissor'
+            continue
+          }
+          const px = accumulators[o + 1]! / count
+          const py = accumulators[o + 2]! / count
+          let uncertaintyX = 0.5
+          let uncertaintyY = 0.5
+          if (mirror) {
+            uncertaintyX += 0.5 / ratioX
+            uncertaintyY += 0.5 / ratioY
+            // A marker cut by the view edge loses part of its square.
+            if (accumulators[o + 3]! - 0.5 <= x0 || accumulators[o + 4]! + 0.5 >= x1) uncertaintyX += pointSize / (2 * ratioX)
+            if (accumulators[o + 5]! - 0.5 <= y0 || accumulators[o + 6]! + 0.5 >= y1) uncertaintyY += pointSize / (2 * ratioY)
+          }
+          const v = i * 5
+          capture.states[i] = 0
+          capture.reasons[i] = null
+          capture.values[v] = px * cssX
+          capture.values[v + 1] = (gl.drawingBufferHeight - py) * cssY
+          capture.values[v + 2] = rect[0] + rect[2] * (REFERENCE_SOURCE_LOW + REFERENCE_SOURCE_SPAN * (px - ax) / (bx - ax))
+          capture.values[v + 3] = rect[1] + rect[3] * (REFERENCE_SOURCE_LOW + REFERENCE_SOURCE_SPAN * (py - ay) / (by - ay))
+          capture.values[v + 4] = Math.max(uncertaintyX * cssX, uncertaintyY * cssY)
+        }
+      }
+    } finally {
+      internals.pass.value = 0
+      camera.layers.mask = savedLayers
+      scene.background = savedBackground
+      renderer.setClearColor(savedClearColor, savedClearAlpha)
+      renderer.setRenderTarget(null)
+      renderer.setScissorTest(true)
+    }
+  }
+
+  function markAll(capture: ViewCapture, markers: readonly ProbeMarker[], reason: string) {
+    for (let i = 0; i < markers.length; i++) if (markers[i]!.slot >= 0) capture.reasons[i] = reason
+  }
+
+  function releaseProbeTargets() {
+    probeTarget?.dispose()
+    probeMirrorTarget?.dispose()
+    probeTarget = null
+    probeMirrorTarget = null
+    readback = new Uint8Array(0)
+    readbackWords = new Uint32Array(0)
+    referenceGeometry.dispose()
+    referenceMaterial.dispose()
+  }
+
+  function setLandmarkProbe(next: LandmarkProbe | null) {
+    if (next === probe) return
+    if (next && !probeInternals.has(next)) throw new Error('Landmark probe was not created by Machine.createLandmarkProbe or is disposed.')
+    probe?.dispose()
+    probe = next
+    captures.clear()
+    if (!next) releaseProbeTargets()
+  }
+
+  function readRenderedLandmarks(viewId: string): RenderedLandmarks | null {
+    const internals = probe?.status === 'active' ? probeInternals.get(probe) : undefined
+    const capture = captures.get(viewId)
+    if (!internals || !capture || capture.epoch !== drawEpoch) return null
+    return {
+      method: 'gpu-readback', viewId, presentation: capture.presentation, timeSeconds: capture.timeSeconds,
+      landmarks: internals.markers.map((marker, i) => {
+        const rendered = capture.states[i] === 0
+        const v = i * 5
+        return {
+          id: marker.id,
+          state: CAPTURE_STATES[capture.states[i]!]!,
+          canvasPixels: rendered ? [capture.values[v]!, capture.values[v + 1]!] : null,
+          sourcePixels: rendered ? [capture.values[v + 2]!, capture.values[v + 3]!] : null,
+          uncertaintyCanvasPixels: rendered ? capture.values[v + 4]! : null,
+          reason: capture.reasons[i]!,
+        }
+      }),
+    }
   }
 
   resize()
-  return { renderer, scene, camera, controls, resize, render, renderViews, applyCamera, setInteraction, fitView, projectWorld }
+  return {
+    renderer, scene, camera, resize, render, renderViews, applyCamera, setInteraction, fitView, setLandmarkProbe, readRenderedLandmarks,
+    get controls() { return controls },
+  }
 }
 
 interface RestPart {
@@ -296,8 +719,14 @@ interface RestPart {
   finalEpoch: number
 }
 
-/** Missing files/names warn and remain inspectable; they never count as verified fidelity. */
-export async function loadMachine(scene: THREE.Scene): Promise<Machine> {
+/**
+ * Missing files/names warn and remain inspectable; they never count as verified
+ * fidelity. Only an identity-matched GLB is parsed and added to the shared
+ * scene; a mismatched export is rejected before parsing, and a parse/binding
+ * failure disposes the detached root, so Retry never stacks or leaks roots.
+ */
+export async function loadMachine(scene: THREE.Scene, options: LoadMachineOptions = {}): Promise<Machine> {
+  const url = options.url ?? MODEL_URL
   const input = createMechanismInput()
   const pose = createMechanismPose()
   const missing: string[] = []
@@ -307,71 +736,84 @@ export async function loadMachine(scene: THREE.Scene): Promise<Machine> {
   let overrideEpoch = 0
   const driven: RestPart[] = []
   const overridesSeen = new Set<string>()
+  const probes = new Set<LandmarkProbe>()
   const provenance: ModelProvenance = {
     sourceCommit: MECHANISM_DATA.provenance.sourceCommit,
     expectedSha256: MECHANISM_DATA.provenance.modelSha256,
-    observedSha256: null, generator: null, identity: 'unavailable', url: MODEL_URL,
+    observedSha256: null, generator: null, identity: 'unavailable', url,
   }
   let availability: Machine['availability'] = 'unavailable'
   let loadError: string | null = null
   let root: THREE.Object3D | null = null
+  let parsed: THREE.Object3D | null = null
   try {
-    const response = await fetch(MODEL_URL)
+    const response = await fetch(url)
     if (!response.ok) throw new Error(`Model request returned HTTP ${response.status}`)
     const buffer = await response.arrayBuffer()
     const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', buffer))
     provenance.observedSha256 = Array.from(digest, byte => byte.toString(16).padStart(2, '0')).join('')
-    const gltf = await new GLTFLoader().parseAsync(buffer, new URL('.', new URL(MODEL_URL, location.href)).href)
-    provenance.generator = gltf.asset.generator ?? null
     provenance.identity = provenance.observedSha256 === provenance.expectedSha256 ? 'matched' : 'mismatched'
-    availability = provenance.identity === 'matched' ? 'available' : 'incompatible'
-    root = gltf.scene
-    scene.add(root)
-    root.updateMatrixWorld(true)
-    function visit(node: THREE.Object3D, parentPath: string) {
-      const originalName = typeof node.userData.name === 'string' ? node.userData.name : node.name
-      const path = parentPath ? `${parentPath}/${originalName}` : originalName
-      if (node !== root) {
-        const part: RestPart = {
-          path, shortName: originalName, node, position: node.position.clone(), quaternion: node.quaternion.clone(),
-          scale: node.scale.clone(), world: node.matrixWorld.clone(),
-          parentInverse: node.parent!.matrixWorld.clone().invert(), visible: node.visible, station: -1,
-          overrideWorld: new THREE.Matrix4(), finalWorld: new THREE.Matrix4(), overrideEpoch: -1, finalEpoch: -1,
+    if (provenance.identity === 'mismatched') {
+      availability = 'incompatible'
+      missing.push(`Model identity mismatch: ${provenance.observedSha256}; model not parsed or added to the scene`)
+    } else {
+      const gltf = await new GLTFLoader().parseAsync(buffer, new URL('.', new URL(url, location.href)).href)
+      provenance.generator = gltf.asset.generator ?? null
+      const loaded = gltf.scene
+      parsed = loaded
+      loaded.updateMatrixWorld(true)
+      const visit = (node: THREE.Object3D, parentPath: string) => {
+        const originalName = typeof node.userData.name === 'string' ? node.userData.name : node.name
+        const path = parentPath ? `${parentPath}/${originalName}` : originalName
+        if (node !== loaded) {
+          const part: RestPart = {
+            path, shortName: originalName, node, position: node.position.clone(), quaternion: node.quaternion.clone(),
+            scale: node.scale.clone(), world: node.matrixWorld.clone(),
+            parentInverse: node.parent!.matrixWorld.clone().invert(), visible: node.visible, station: -1,
+            overrideWorld: new THREE.Matrix4(), finalWorld: new THREE.Matrix4(), overrideEpoch: -1, finalEpoch: -1,
+          }
+          parts.set(path, part)
+          partsByNode.set(node, part)
+          paths.push(path)
         }
-        parts.set(path, part)
-        partsByNode.set(node, part)
-        paths.push(path)
+        for (const child of node.children) visit(child, node === loaded ? '' : path)
       }
-      for (const child of node.children) visit(child, node === root ? '' : path)
+      visit(loaded, '')
+      for (const binding of BINDINGS) {
+        const resolved: RestPart[] = []
+        for (const part of parts.values()) {
+          if (!binding.pattern.test(part.path)) continue
+          part.binding = binding
+          part.station = binding.kind === 'indexed' ? instanceIndex(part.path, binding.pattern) - 1 : -1
+          resolved.push(part)
+          driven.push(part)
+          if (binding.motion === 'lever-wire' || binding.motion === 'pen-wire') part.wireLengthM = nativeWireLength(part)
+          if (binding.motion === 'channel-spring' || binding.motion === 'counter-spring') {
+            const counter = binding.motion === 'counter-spring'
+            const restLengthM = counter ? MECHANISM_DATA.counter.nativeReference.length_mm / 1000
+              : MECHANISM_DATA.restChannels[part.station]!.nativeSpring.length_mm / 1000
+            part.spring = createSpringDeformer(part.node, restLengthM, counter ? 'counter' : 'channel')
+          }
+        }
+        if (resolved.length !== binding.expected) {
+          missing.push(`${binding.id}: resolved ${resolved.length}/${binding.expected} (${binding.pattern})`)
+        }
+        if (binding.kind === 'indexed') {
+          for (let station = 0; station < 20; station++) {
+            if (!resolved.some(part => part.station === station)) missing.push(`${binding.id}: missing physical instance ${station + 1}`)
+          }
+        }
+      }
+      scene.add(loaded)
+      root = loaded
+      availability = 'available'
     }
-    visit(root, '')
-    for (const binding of BINDINGS) {
-      const resolved: RestPart[] = []
-      for (const part of parts.values()) {
-        if (!binding.pattern.test(part.path)) continue
-        part.binding = binding
-        part.station = binding.kind === 'indexed' ? instanceIndex(part.path, binding.pattern) - 1 : -1
-        resolved.push(part)
-        driven.push(part)
-        if (binding.motion === 'lever-wire' || binding.motion === 'pen-wire') part.wireLengthM = nativeWireLength(part)
-        if (binding.motion === 'channel-spring' || binding.motion === 'counter-spring') {
-          const counter = binding.motion === 'counter-spring'
-          const restLengthM = counter ? MECHANISM_DATA.counter.nativeReference.length_mm / 1000
-            : MECHANISM_DATA.restChannels[part.station]!.nativeSpring.length_mm / 1000
-          part.spring = createSpringDeformer(part.node, restLengthM, counter ? 'counter' : 'channel')
-        }
-      }
-      if (resolved.length !== binding.expected) {
-        missing.push(`${binding.id}: resolved ${resolved.length}/${binding.expected} (${binding.pattern})`)
-      }
-      if (binding.kind === 'indexed') {
-        for (let station = 0; station < 20; station++) {
-          if (!resolved.some(part => part.station === station)) missing.push(`${binding.id}: missing physical instance ${station + 1}`)
-        }
-      }
-    }
-    if (availability === 'incompatible') missing.push(`Model identity mismatch: ${provenance.observedSha256}; source pivots are not applied`)
   } catch (error) {
+    if (parsed && !root) disposeNativeObject(parsed)
+    parsed = null
+    parts.clear()
+    paths.length = 0
+    driven.length = 0
     loadError = error instanceof Error ? error.message : String(error)
     availability = 'unavailable'
     missing.push(`model unavailable: ${loadError}`)
@@ -391,7 +833,6 @@ export async function loadMachine(scene: THREE.Scene): Promise<Machine> {
   const local = new THREE.Matrix4()
   const origin = new THREE.Vector3()
   const restAnchor = new THREE.Vector3()
-  const outputAnchor = new Float64Array(3)
   const knife = new THREE.Vector3().fromArray(MECHANISM_DATA.summing.knifeMm).multiplyScalar(0.001)
   const crankPart = parts.get('harmonic-analyzer/drive-train/crankshaft-1')
   const conePart = parts.get('harmonic-analyzer/drive-train/cone-gear-shaft-1')
@@ -694,35 +1135,167 @@ export async function loadMachine(scene: THREE.Scene): Promise<Machine> {
     }
   }
 
-  function anchorWorld(anchor: Anchor, target = outputAnchor): Float64Array | null {
-    if ('worldMetres' in anchor) {
-      target[0] = anchor.worldMetres[0]; target[1] = anchor.worldMetres[1]; target[2] = anchor.worldMetres[2]
-      return target
+  function springOwner(part: RestPart): RestPart | null {
+    for (let node: THREE.Object3D | null = part.node; node && node !== root; node = node.parent) {
+      const owner = partsByNode.get(node)
+      if (owner?.spring) return owner
     }
-    const part = parts.get(anchor.partPath)
-    if (!part) return null
-    part.node.updateWorldMatrix(true, false)
-    origin.fromArray(anchor.partLocalMetres)
-    if (part.spring) part.spring.mapPoint(origin)
-    origin.applyMatrix4(part.node.matrixWorld)
-    target[0] = origin.x; target[1] = origin.y; target[2] = origin.z
-    return target
+    return null
   }
-  function projectAnchor(anchor: Anchor, viewer: Pick<Viewer, 'projectWorld'>, target?: Projection, view?: SourceView) {
-    if ('partPath' in anchor) {
+
+  function unsupportedDeformation(node: THREE.Object3D): string | null {
+    let reason: string | null = null
+    node.traverse(child => {
+      if (reason || child.userData.landmarkMarker) return
+      if (child instanceof THREE.SkinnedMesh) reason = 'native part uses GPU skinning, which the probe does not reproduce'
+      else if (child instanceof THREE.InstancedMesh || child instanceof THREE.BatchedMesh) reason = 'native part uses GPU instancing/batching, which the probe does not reproduce'
+      else if (child instanceof THREE.Mesh && Object.keys(child.geometry.morphAttributes).length > 0) reason = 'native part uses morph targets, which the probe does not reproduce'
+    })
+    return reason
+  }
+
+  function finitePoint(value: unknown): value is Point3 {
+    return Array.isArray(value) && value.length === 3 && value.every(item => typeof item === 'number' && Number.isFinite(item))
+  }
+
+  function createLandmarkProbe(anchors: readonly LandmarkAnchor[]): LandmarkProbe {
+    const pass = { value: 0 }
+    const pointSize = { value: 1 }
+    const rigidMaterial = markerMaterial(MARKER_VERTEX, { landmarkPass: pass, landmarkPointSize: pointSize })
+    const materials: THREE.Material[] = [rigidMaterial]
+    const springMaterials = new Map<SpringDeformer, THREE.ShaderMaterial>()
+    const objects: THREE.Points[] = []
+    const markers: ProbeMarker[] = []
+    const seen = new Set<string>()
+    const point = new THREE.Vector3()
+    const relative = new THREE.Matrix4()
+    const firstRelative = new THREE.Matrix4()
+    const coordinates: SpringCoordinates = { kind: 0, t: 0, centre: new THREE.Vector3(), tangent: new THREE.Vector3() }
+    let slots = 0
+    root?.updateMatrixWorld(true)
+
+    function marker(id: string, position: THREE.Vector3, material: THREE.ShaderMaterial, spring: SpringCoordinates | null): THREE.Points {
+      const geometry = new THREE.BufferGeometry()
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute([position.x, position.y, position.z], 3))
+      geometry.setAttribute('landmarkSlot', new THREE.Float32BufferAttribute([slots], 1))
+      if (spring) {
+        // Exactly the per-vertex attributes the native swept-wire mesh carries.
+        geometry.setAttribute('springCoordinate', new THREE.Float32BufferAttribute([spring.kind, spring.t], 2))
+        geometry.setAttribute('springRestCentre', new THREE.Float32BufferAttribute(spring.centre.toArray(), 3))
+        geometry.setAttribute('springRestTangent', new THREE.Float32BufferAttribute(spring.tangent.toArray(), 3))
+      }
+      const object = new THREE.Points(geometry, material)
+      object.name = `landmark-probe:${id}`
+      object.layers.set(PROBE_LAYER)
+      object.frustumCulled = false
+      object.userData.landmarkMarker = true
+      objects.push(object)
+      return object
+    }
+
+    function place(anchor: LandmarkAnchor, id: string): { object: THREE.Points } | { reason: string } {
+      if (availability !== 'available' || !root) return { reason: `native model ${availability}; no native scene graph to measure` }
+      const hasWorld = anchor.worldMetres !== undefined
+      if (hasWorld === (anchor.partLocalMetres !== undefined)) return { reason: 'anchor needs exactly one of partLocalMetres or worldMetres' }
+      if (anchor.partPath === undefined && hasWorld) {
+        // Diagnostic only: no named part, so a stateless fixed CAD-world point.
+        // Source observations always name their part and take the branch below.
+        if (!finitePoint(anchor.worldMetres)) return { reason: 'worldMetres must be three finite metres' }
+        const object = marker(id, point.fromArray(anchor.worldMetres), rigidMaterial, null)
+        scene.add(object)
+        return { object }
+      }
+      if (typeof anchor.partPath !== 'string') return { reason: 'partPath must name the anchor\'s native part' }
       const part = parts.get(anchor.partPath)
-      if (!part) return null
-      let node: THREE.Object3D | null = part.node
-      while (node) { if (!node.visible) return null; node = node.parent }
+      if (!part) return { reason: `native part missing: ${anchor.partPath}` }
+      if (hasWorld) {
+        if (!finitePoint(anchor.worldMetres)) return { reason: 'worldMetres must be three finite metres' }
+        if (part.world.determinant() === 0) return { reason: 'native part rest matrix is singular; worldMetres has no part-local coordinate' }
+        // A fixed CAD-world point of the named part at its exported rest pose.
+        // Its rest-local coordinate from the part's original matrix lands
+        // exactly on worldMetres at rest, and follows the part's actual
+        // visibility and any source override like its native geometry.
+        point.fromArray(anchor.worldMetres).applyMatrix4(relative.copy(part.world).invert())
+      } else {
+        if (!finitePoint(anchor.partLocalMetres)) return { reason: 'partLocalMetres must be three finite metres' }
+        point.fromArray(anchor.partLocalMetres)
+      }
+      const unsupported = unsupportedDeformation(part.node)
+      if (unsupported) return { reason: unsupported }
+      const owner = springOwner(part)
+      if (!owner) {
+        // Rigid or affine (wire) native node: the marker inherits its exact matrixWorld.
+        const object = marker(id, point, rigidMaterial, null)
+        part.node.add(object)
+        return { object }
+      }
+      if (owner !== part) return { reason: 'anchor lies inside a deformed spring subtree; anchor the spring part itself' }
+      const spring = owner.spring!
+      const mesh = spring.meshes[0]
+      if (!mesh) return { reason: 'spring has no deformed native mesh' }
+      firstRelative.copy(mesh.matrixWorld).invert().multiply(owner.node.matrixWorld)
+      for (const other of spring.meshes) {
+        relative.copy(other.matrixWorld).invert().multiply(owner.node.matrixWorld)
+        for (let i = 0; i < 16; i++) {
+          if (Math.abs(relative.elements[i]! - firstRelative.elements[i]!) > 1e-9) return { reason: 'deformed spring meshes have differing geometry frames; deformation of this anchor is ambiguous' }
+        }
+      }
+      // Into the mesh geometry frame, where the native vertex deformation acts.
+      point.applyMatrix4(firstRelative)
+      spring.markerCoordinates(point, coordinates)
+      let material = springMaterials.get(spring)
+      if (!material) {
+        material = markerMaterial(MARKER_VERTEX, { landmarkPass: pass, landmarkPointSize: pointSize })
+        spring.deform(material)
+        springMaterials.set(spring, material)
+        materials.push(material)
+      }
+      const object = marker(id, point, material, coordinates)
+      mesh.add(object)
+      return { object }
     }
-    const world = anchorWorld(anchor)
-    return world ? viewer.projectWorld(world, target, view) : null
+
+    for (const anchor of anchors) {
+      const id = typeof anchor?.id === 'string' ? anchor.id : ''
+      let placed: { object: THREE.Points } | { reason: string }
+      if (!id) placed = { reason: 'anchor id missing' }
+      else if (seen.has(id)) placed = { reason: 'duplicate anchor id' }
+      else placed = place(anchor, id)
+      if (id) seen.add(id)
+      if ('object' in placed) markers.push({ id, slot: slots++, reason: null, object: placed.object })
+      else markers.push({ id, slot: -1, reason: placed.reason, object: null })
+    }
+
+    let status: LandmarkProbe['status'] = 'active'
+    const probe: LandmarkProbe = {
+      anchors: markers.map(item => ({ id: item.id, state: item.slot >= 0 ? 'measurable' : 'unresolved', reason: item.reason })),
+      get status() { return status },
+      dispose() {
+        if (status === 'disposed') return
+        status = 'disposed'
+        for (const object of objects) {
+          object.removeFromParent()
+          object.geometry.dispose()
+        }
+        for (const material of materials) material.dispose()
+        probes.delete(probe)
+        probeInternals.delete(probe)
+      },
+    }
+    probes.add(probe)
+    probeInternals.set(probe, { markers, passes: Math.ceil(slots / SLOTS_PER_PASS), pass, pointSize })
+    return probe
   }
+
   function addPartInstance(sourcePartPath: string, instancePath: string): 'added' | 'already-present' | 'missing-source' {
     if (parts.has(instancePath)) return 'already-present'
     const source = parts.get(sourcePartPath)
     if (!source || !root) { warnOverride(sourcePartPath); return 'missing-source' }
     const node = source.node.clone(true)
+    // Diagnostic markers belong to their probe, never to a new native instance.
+    const clonedMarkers: THREE.Object3D[] = []
+    node.traverse(child => { if (child.userData.landmarkMarker) clonedMarkers.push(child) })
+    for (const marker of clonedMarkers) marker.removeFromParent()
     source.node.parent!.add(node)
     node.userData.nativeInstanceSource = sourcePartPath
     const instance: RestPart = {
@@ -736,8 +1309,47 @@ export async function loadMachine(scene: THREE.Scene): Promise<Machine> {
     paths.push(instancePath)
     return 'added'
   }
+
+  function dispose() {
+    for (const probe of [...probes]) probe.dispose()
+    if (root) {
+      root.removeFromParent()
+      disposeNativeObject(root)
+    }
+    root = null
+    availability = 'unavailable'
+    parts.clear()
+    paths.length = 0
+    driven.length = 0
+  }
+
   solveMechanism(input, pose)
-  return { input, pose, missing, availability, loadError, provenance, partPaths: paths, update, anchorWorld, projectAnchor, addPartInstance }
+  return {
+    input, pose, missing, loadError, provenance, partPaths: paths, update, addPartInstance, createLandmarkProbe, dispose,
+    get availability() { return availability },
+  }
+}
+
+/** Free a detached native subtree's geometries, materials and textures. */
+function disposeNativeObject(object: THREE.Object3D) {
+  const geometries = new Set<THREE.BufferGeometry>()
+  const materials = new Set<THREE.Material>()
+  const textures = new Set<THREE.Texture>()
+  object.traverse(node => {
+    if (!(node instanceof THREE.Mesh || node instanceof THREE.Line || node instanceof THREE.Points)) return
+    geometries.add(node.geometry)
+    for (const material of Array.isArray(node.material) ? node.material : [node.material]) materials.add(material)
+  })
+  for (const material of materials) {
+    for (const value of Object.values(material)) if (value instanceof THREE.Texture) textures.add(value)
+    material.dispose()
+  }
+  for (const geometry of geometries) geometry.dispose()
+  for (const texture of textures) {
+    texture.dispose()
+    const image: unknown = texture.source.data
+    if (typeof ImageBitmap !== 'undefined' && image instanceof ImageBitmap) image.close()
+  }
 }
 
 function nativeWireLength(part: RestPart): number {
@@ -753,7 +1365,12 @@ function nativeWireLength(part: RestPart): number {
 
 interface SpringDeformer {
   length: { value: number }
-  mapPoint(point: THREE.Vector3): void
+  /** Meshes whose vertices this deformer's shader moves. */
+  readonly meshes: readonly THREE.Mesh[]
+  /** Install this spring's exact native vertex deformation on a material. */
+  deform(material: THREE.Material): void
+  /** The native per-vertex deformation attributes for a point in mesh geometry metres. */
+  markerCoordinates(point: THREE.Vector3, out: SpringCoordinates): void
 }
 type SpringStock = 'channel' | 'counter'
 interface SpringCoordinates {
@@ -784,11 +1401,7 @@ function createSpringDeformer(node: THREE.Object3D, restLengthM: number, stock: 
   const inset = counter ? 0.0102997 : source.insideDiameterMm / 1000
   const endCorrection = counter ? wireRadius : 0
   const point = new THREE.Vector3()
-  const centre = new THREE.Vector3()
-  const tangent = new THREE.Vector3()
-  const oldTangent = new THREE.Vector3()
   const residue = new THREE.Vector3()
-  const q = new THREE.Quaternion()
   const coordinates: SpringCoordinates = { kind: 0, t: 0, centre: new THREE.Vector3(), tangent: new THREE.Vector3() }
   const trial = new THREE.Vector3()
   const trialTangent = new THREE.Vector3()
@@ -941,6 +1554,32 @@ void springCurve(out vec3 centre, out vec3 tangent) {
   }
 }
 `
+  // The single deformation hook: native spring meshes and probe markers both
+  // compile exactly this vertex code against the same length uniforms.
+  function deform(material: THREE.Material) {
+    material.onBeforeCompile = shader => {
+      shader.uniforms.springLength = length
+      shader.uniforms.springRestLength = rest
+      shader.vertexShader = shaderFunctions + shader.vertexShader
+      shader.vertexShader = shader.vertexShader.replace('#include <beginnormal_vertex>', `
+#include <beginnormal_vertex>
+vec3 springNewCentre;
+vec3 springNewTangent;
+springCurve(springNewCentre, springNewTangent);
+objectNormal = springTurn(objectNormal, springRestTangent, springNewTangent);
+`)
+      shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', `
+vec3 transformed = springNewCentre + springTurn(position - springRestCentre, springRestTangent, springNewTangent);
+`)
+    }
+    material.customProgramCacheKey = () => `native-stock-spring:${stock}`
+  }
+  const deformedClone = (sourceMaterial: THREE.Material) => {
+    const result = sourceMaterial.clone()
+    deform(result)
+    return result
+  }
+  const meshes: THREE.Mesh[] = []
   node.traverse(object => {
     if (!(object instanceof THREE.Mesh)) return
     const original = object.geometry
@@ -970,48 +1609,26 @@ void springCurve(out vec3 centre, out vec3 tangent) {
     object.geometry = geometry
     // Source bounding spheres describe the saved length, not the extended coil.
     object.frustumCulled = false
-    function material(sourceMaterial: THREE.Material) {
-      const result = sourceMaterial.clone()
-      result.onBeforeCompile = shader => {
-        shader.uniforms.springLength = length
-        shader.uniforms.springRestLength = rest
-        shader.vertexShader = shaderFunctions + shader.vertexShader
-        shader.vertexShader = shader.vertexShader.replace('#include <beginnormal_vertex>', `
-#include <beginnormal_vertex>
-vec3 springNewCentre;
-vec3 springNewTangent;
-springCurve(springNewCentre, springNewTangent);
-objectNormal = springTurn(objectNormal, springRestTangent, springNewTangent);
-`)
-        shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', `
-vec3 transformed = springNewCentre + springTurn(position - springRestCentre, springRestTangent, springNewTangent);
-`)
-      }
-      result.customProgramCacheKey = () => `native-stock-spring:${stock}`
-      return result
-    }
-    object.material = Array.isArray(object.material) ? object.material.map(material) : material(object.material)
+    meshes.push(object)
+    object.material = Array.isArray(object.material) ? object.material.map(deformedClone) : deformedClone(object.material)
   })
   return {
     length,
-    mapPoint(vertex) {
+    meshes,
+    deform,
+    markerCoordinates(vertex, out) {
       // Eye/bore anchors are in a rigid end assembly even though their bore
-      // centres do not lie on the swept-wire surface used for classification.
+      // centres do not lie on the swept-wire surface used for classification;
+      // kind ±2 makes the native shader translate them with that assembly.
       const restEyeX = (restLengthM - source.insideDiameterMm / 1000) / 2
       if (Math.abs(vertex.x) >= restEyeX) {
-        vertex.x += Math.sign(vertex.x) * (length.value - restLengthM) / 2
+        out.kind = vertex.x < 0 ? -2 : 2
+        out.t = 0
+        out.centre.copy(vertex)
+        out.tangent.set(1, 0, 0)
         return
       }
-      classify(vertex, coordinates)
-      if (Math.abs(coordinates.kind) > 1.5) {
-        vertex.x += Math.sign(coordinates.kind) * (length.value - restLengthM) / 2
-      } else {
-        residue.subVectors(vertex, coordinates.centre)
-        oldTangent.copy(coordinates.tangent)
-        curve(coordinates.kind, coordinates.t, length.value, centre, tangent)
-        q.setFromUnitVectors(oldTangent, tangent)
-        vertex.copy(residue.applyQuaternion(q)).add(centre)
-      }
+      classify(vertex, out)
     },
   }
 }
