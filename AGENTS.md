@@ -265,6 +265,22 @@ such build:
 | `cache_status` | **no** | no (diagnostic) | no |
 | `build` (default), `build_bare`, `release` | meta | — | no (`release` publishes) |
 
+Root pytest discovery and required build gates are different scopes. The
+recursive, repository-path-keyed contract in
+`cad/scripts/test_check_gate_enrollment.py` gives every maintained root pytest
+module a required-gate, opt-in, or explicitly reasoned test-runner-only
+disposition. There is no pending-triage bypass. `check:recipe` explicitly
+includes the maintained `cad/scripts/diagnostics/test_*.py` modules as well as
+the offline contracts formerly outside the gates. Runtime-loaded diagnostic
+helpers and archived receipt/data inputs must be declared as `file_dep`s; the
+recipe stamp also tracks the root test-path manifest, so additions/removals
+rerun enrollment. `check:verify_telemetry` remains opt-in because its calibrated
+latency simulation audits span shape rather than every-build CAD output.
+The root launcher/containment/discovery tests and comparison pose-conversion
+test retain documented test-runner-only dispositions in the enrollment
+contract. Gate enrollment is not evidence that an oracle is strong or that
+host effects are contained; containment must precede collection or execution.
+
 - `build` is the **one** fully-safe entry: every part + assembly + every gate.
   (`verify.py` has no `--suite all` anymore — `build` replaced it.) It offers the
   SAME closure under both executors: every COM task, gates included, is a

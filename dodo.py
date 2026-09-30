@@ -3079,6 +3079,34 @@ def task_check():
         # members, an incomplete before-walk refuses to diff, and the created
         # feature is picked by type, never an auxiliary one beside it.
         SCRIPTS_DIR / "test_adapter_feature_resolution.py",
+        # Maintained offline contracts formerly outside the required gates,
+        # including recursively discovered diagnostic tests.
+        SCRIPTS_DIR / "test_assembly_save.py",
+        SCRIPTS_DIR / "test_base_serial.py",
+        SCRIPTS_DIR / "test_channel_installation_cascade.py",
+        SCRIPTS_DIR / "test_diag_dump_part.py",
+        SCRIPTS_DIR / "test_face_identity_diff.py",
+        SCRIPTS_DIR / "test_frame_fastener_fit.py",
+        SCRIPTS_DIR / "test_gear.py",
+        SCRIPTS_DIR / "test_hole_spec.py",
+        SCRIPTS_DIR / "test_holes_face_selection.py",
+        SCRIPTS_DIR / "test_layout_geometry.py",
+        SCRIPTS_DIR / "test_machinist_review_eval.py",
+        SCRIPTS_DIR / "test_magnifier_drawing_metadata.py",
+        SCRIPTS_DIR / "test_motion_study_default_free_pen.py",
+        SCRIPTS_DIR / "test_named_views.py",
+        SCRIPTS_DIR / "test_or_flag_fallback_names.py",
+        SCRIPTS_DIR / "test_owned_assembly_health_session.py",
+        SCRIPTS_DIR / "test_platen_refit.py",
+        SCRIPTS_DIR / "test_stock_spring_mounts.py",
+        SCRIPTS_DIR / "test_summing_hanger_stack.py",
+        SCRIPTS_DIR / "test_targeted_model_items.py",
+        SCRIPTS_DIR / "test_vm2_rack_source_save.py",
+        SCRIPTS_DIR / "diagnostics" / "test_vm2_rack_finish_attachment.py",
+        SCRIPTS_DIR / "diagnostics" / "test_vm2_datum_probe.py",
+        SCRIPTS_DIR / "diagnostics" / "test_vm2_datum_ownership.py",
+        SCRIPTS_DIR / "diagnostics" / "test_vm2_datum_lifecycle.py",
+        SCRIPTS_DIR / "diagnostics" / "test_vm2_datum_clearance.py",
     ]
     # These are runtime-read rather than imported, so module_deps_of cannot
     # discover them. A prompt/schema edit must invalidate check:recipe and rerun
@@ -3091,6 +3119,20 @@ def task_check():
         # removed row must rerun its tagged-emitter check.
         SCRIPTS_DIR.parent / "docs" / "drawing-simplicity-policy.md",
     ]
+    # The enrollment contract scans the configured root pytest populations.
+    # Path manifests also invalidate the stamp on addition/removal, which
+    # file_dep alone cannot detect.
+    import tomllib
+
+    pytest_scope = REPO_ROOT / "pyproject.toml"
+    pytest_testpaths = tomllib.loads(pytest_scope.read_text(encoding="utf-8"))[
+        "tool"
+    ]["pytest"]["ini_options"]["testpaths"]
+    root_test_modules = sorted(
+        path.relative_to(REPO_ROOT).as_posix()
+        for testpath in pytest_testpaths
+        for path in (REPO_ROOT / testpath).rglob("test_*.py")
+    )
     # test_adapter_feature_resolution exercises the vendored adapter, which
     # module_deps_of never walks (an installed package, see SUBMODULE_SRC). Its
     # real import closure (package __init__s, transitive helpers) is wider than
@@ -3118,6 +3160,7 @@ def task_check():
             *(str(path.resolve()) for path in machinist_review_contract_deps),
             *adapter_contract_deps,
             *scanned_by_binding_gate,
+            str(pytest_scope.resolve()),
             str(
                 (REPO_ROOT / "cad" / "comparisons" / "tools" / "composite.py").resolve()
             ),
@@ -3258,7 +3301,8 @@ def task_check():
                     {
                         "submodule_sources": [
                             _rel_tag(path) for path in adapter_contract_deps
-                        ]
+                        ],
+                        "root_test_modules": root_test_modules,
                     }
                 )
             ],
@@ -3466,6 +3510,16 @@ def task_check():
                 *_config_deps(entry),
             )
         }
+        if (
+            "-m" in spec["cmd"]
+            and spec["cmd"][spec["cmd"].index("-m") + 1] == "pytest"
+        ):
+            # Pytest installs the containment boundary before test imports.
+            # A guard edit must not reuse a stamp produced by an older boundary.
+            executed.update(
+                str((REPO_ROOT / path).resolve())
+                for path in ("conftest.py", "_test_guard.py")
+            )
         yield {
             "name": name,
             "file_dep": sorted({*spec["file_dep"], *executed}),

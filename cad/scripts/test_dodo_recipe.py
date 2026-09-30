@@ -2257,6 +2257,38 @@ def test_deleting_a_submodule_source_reruns_check_recipe(tmp_path):
     assert not recipe_is_current(saved)[0], "a deleted source must re-run the gate"
 
 
+def test_root_test_addition_and_removal_rerun_recipe_gate(tmp_path, monkeypatch):
+    """An unenrolled nested root test must not hide behind a green recipe stamp."""
+    dodo = _load_dodo()
+    dodo.subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.pytest.ini_options]\ntestpaths = ["tests"]\n',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(dodo, "REPO_ROOT", tmp_path)
+    test_dir = tmp_path / "tests" / "nested"
+    test_dir.mkdir(parents=True)
+    existing = test_dir / "test_existing.py"
+    existing.write_text("", encoding="utf-8")
+
+    def checker():
+        recipe = next(task for task in dodo.task_check() if task["name"] == "recipe")
+        (current,) = recipe["uptodate"]
+        return current
+
+    original = checker()
+    saved = {"_config_changed": original.config_digest}
+    assert checker()(None, saved), "an unchanged inventory must remain current"
+    added = test_dir / "test_unenrolled.py"
+    added.write_text("", encoding="utf-8")
+    expanded = checker()
+    assert not expanded(None, saved), "a new nested test must rerun gate enrollment"
+    expanded_saved = {"_config_changed": expanded.config_digest}
+    assert checker()(None, expanded_saved)
+    existing.unlink()
+    assert not checker()(None, expanded_saved), "a removed test must rerun enrollment"
+
+
 def test_part_relevant_submodule_change_flips_part_cache_key(tmp_path):
     """A PART-RELEVANT submodule source change -- a committed pin bump OR a dirty
     local edit -- flips every part's COM cache key; a no-op recompute leaves it stable
@@ -2444,56 +2476,26 @@ def test_submodule_digest_is_location_independent(tmp_path):
     )
 
 
-def test_recipe_gate_enrolls_component_pattern_contract_once():
-    dodo = _load_dodo()
-    recipe = next(task for task in dodo.task_check() if task["name"] == "recipe")
-    contract = str(dodo.SCRIPTS_DIR / "test_component_patterns.py")
-    assert recipe["actions"][0][1][0].count(contract) == 1
-    assert recipe["file_dep"].count(contract) == 1
-    assert str(dodo.SCRIPTS_DIR / "_assembly_patterns.py") in recipe["file_dep"]
-
-
 def test_recipe_gate_tracks_sources_imported_by_its_tests():
     """Editing code exercised by the drawing tests must stale the
     ``check:recipe`` stamp even when the test files themselves are unchanged."""
     dodo = _load_dodo()
     recipe = next(task for task in dodo.task_check() if task["name"] == "recipe")
-    deps = {Path(path).name for path in recipe["file_dep"]}
+    deps = {Path(path).resolve() for path in recipe["file_dep"]}
     assert {
-        "_holes.py",
-        "build_platen_guide.py",
-        "test_pen_summing_drawing_batch_contract.py",
+        dodo.SCRIPTS_DIR / "_holes.py",
+        dodo.SCRIPTS_DIR / "_assembly_patterns.py",
+        dodo.SCRIPTS_DIR / "build_platen_guide.py",
     } <= deps
     assert {
         str(template.path.resolve()) for template in dodo.DRAWING_TEMPLATES.values()
     } <= set(recipe["file_dep"])
-    pytest_command = recipe["actions"][0][1][0]
-    assert {
-        "test_drawing_marks.py",
-        "test_cone_drawing_batch_contract.py",
-        "test_fastener_catalog.py",
-        "test_drawing_specification_purity.py",
-        "test_drawing_surface_finish_validation.py",
-        "test_gtol_spec.py",
-        "test_part_owned_geometric_tolerances.py",
-        "test_probe_surface_finish_pmi_telemetry.py",
-        "test_surface_finish.py",
-        "test_surface_finish_ownership_a.py",
-        "test_pose_manifest.py",
-        "test_render_offline.py",
-    } <= {Path(argument).name for argument in pytest_command}
 
     assert {
-        "composite.py",
-        "pose_manifest.py",
-        "render_offline.py",
+        REPO_ROOT / "cad" / "comparisons" / "tools" / "composite.py",
+        REPO_ROOT / "cad" / "comparisons" / "tools" / "pose_manifest.py",
+        REPO_ROOT / "cad" / "comparisons" / "tools" / "render_offline.py",
     } <= deps
-
-    command = recipe["actions"][0][1][0]
-    assert any(
-        Path(argument).name == "test_pen_summing_drawing_batch_contract.py"
-        for argument in command
-    ), "the pen/summing metadata contract must execute under check:recipe"
 
 
 def test_recipe_gate_tracks_machinist_prompt_and_schema_contract() -> None:
@@ -2842,6 +2844,10 @@ def test_check_gates_depend_on_everything_they_execute():
                 *dodo._config_deps(entry),
             )
         }
+        if "-m" in command and command[command.index("-m") + 1] == "pytest":
+            containment = [REPO_ROOT / "conftest.py", REPO_ROOT / "_test_guard.py"]
+            assert all(path.is_file() for path in containment)
+            executed.update(str(path.resolve()) for path in containment)
         missing = sorted(executed - declared)
         if missing:
             gaps[task["name"]] = [
