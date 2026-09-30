@@ -520,6 +520,9 @@ from crankshaft_spec import (  # noqa: E402
     SHAFT_LENGTH_BAND as CRANKSHAFT_LENGTH_BAND,
 )
 from crank_handle_spec import HANDLE_LENGTH as HANDLE_BASIC_LENGTH  # noqa: E402
+from crank_handle_butt_cup_spec import (  # noqa: E402
+    INSTALLED_CONFIG as HANDLE_CUP_INSTALLED_CONFIG,
+)
 from crank_handle_pivot_screw_spec import (  # noqa: E402
     INSTALLED_CONFIG as HANDLE_SCREW_INSTALLED_CONFIG,
     INSTALLED_THREAD_LENGTH as HANDLE_SCREW_INSTALLED_THREAD,
@@ -4479,6 +4482,9 @@ async def build(adapter) -> dict[str, str]:
         [0.0, 90.0, 0.0],
         ROT_Y_POS90,
         ground=False,
+        # As assembly leaves it: the handle's end round turned across its
+        # face (Codex P2 on #1139).
+        configuration=HANDLE_CUP_INSTALLED_CONFIG,
         label="crank-handle-butt-cup (MHA-153, in the handle butt)",
     )
     # MHA-139 carries the handle: head outboard, local +Z (head -> tip) along

@@ -63,6 +63,11 @@ WALL_FLOOR_MM = 1.5
 POCKET_WALL_FLOOR_MM = 0.8
 FLOOR_THICKNESS_MIN = round(FLOOR_THICKNESS - GENERAL_1PL_MM - POCKET_DEPTH_TOL, 6)
 POCKET_WALL_MIN = round(((BODY_DIA - BODY_DIA_TOL) - POCKET_DIA_MAX) / 2.0, 6)
+# The drive train places the cup as assembly leaves it: bonded, with the
+# handle's end round turned across its face (Codex P2 on #1139).  The default
+# stays the as-turned cup the drawing prints; both carry one MHA-153 BOM
+# identity.
+INSTALLED_CONFIG = "INSTALLED"
 # Turned from 3/8-in cold-finished rod: the largest body plus a cleanup cut.
 STOCK_DIA = 0.375 * 25.4
 

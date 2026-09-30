@@ -121,3 +121,40 @@ def test_sheet_layout_keeps_annotations_inside_the_field() -> None:
         assert not (x > 0.216 and y < 0.070)
     assert drawing.END_CENTER[0] + drawing.BODY_R < drawing.SECTION_KEEP["FloorHoleDia"][0] - 0.005
     assert drawing.SECTION_KEEP["PocketDia"][0] + 0.020 < drawing.ISO_NOTE_POS[0]
+
+
+def test_installed_configuration_turns_the_end_round_across_the_cup() -> None:
+    # Codex P2 on #1139: the drive train shows the cup as assembly leaves it,
+    # the handle's end round turned across its face; the default stays the
+    # as-turned cup the drawing prints (the MHA-135/MHA-139 precedent).
+    import build_drive_train_assembly as drive_train
+    import crank_handle_spec as handle
+
+    assert spec.INSTALLED_CONFIG == "INSTALLED"
+    assert part.END_ROUND_CX_LOCAL == pytest.approx(
+        handle.END_ROUND_CENTER[0] - handle.HANDLE_LENGTH
+    )
+    # The crown is the steel outside the handle's own end round: under a cubic
+    # millimetre, and never touching the pocket rim.
+    assert 0.5 < part.V_CROWN < 1.5
+    assert handle.END_ROUND_CENTER[1] > spec.POCKET_DIA / 2.0
+    assert part.V_INSTALLED == pytest.approx(part.V_CUP - part.V_CROWN)
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    split = source.index("create_configuration {INSTALLED_CONFIG}")
+    for edit in (
+        "set_dimension_symmetric_tolerance(adapter,",
+        "apply_material(adapter,",
+        "apply_color(adapter,",
+        "mark_dimensions_for_drawing(adapter,",
+        "apply_drawing_precision(adapter,",
+    ):
+        assert source.index(edit) < split, edit
+    assert "SetSuppression2(0, 3, bstr_array([default_config]))" in source
+    assert "SetSuppression2(1, 3, bstr_array([INSTALLED_CONFIG]))" in source
+    assert "apply_grouped_bom_properties(" in source
+    assert "require_material_in_every_configuration(" in source
+    assert "assert_saved_configurations_regenerate(adapter, PART_NAME)" in source
+    assert drive_train.HANDLE_CUP_INSTALLED_CONFIG == spec.INSTALLED_CONFIG
+    dt_source = Path(drive_train.__file__).read_text(encoding="utf-8")
+    assert "configuration=HANDLE_CUP_INSTALLED_CONFIG," in dt_source
+    assert _config.parts("crank-handle-butt-cup")["description"] == "CRANK HANDLE BUTT CUP"
