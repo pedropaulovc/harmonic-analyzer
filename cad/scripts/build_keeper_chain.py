@@ -4,9 +4,8 @@ The chain tying the crank's removable taper pin to the arm (ch11 p.14; the
 original is lost), cut to ``keeper_chain_spec.BEAD_COUNT`` beads and modelled
 in its installed rest pose. It is authored in machine axes with its origin on
 its first bead (``keeper_chain_spec.CHAIN_PART_ORIGIN``), and the drive train
-places it there with an identity rotation. (Authored in the crank frame, with
-a reference plane for the seed, its drawing views came out at 1:4 on an empty
-sheet.)
+places it there with an identity rotation, so its seed bead needs no reference
+plane.
 
 Recipe:
 

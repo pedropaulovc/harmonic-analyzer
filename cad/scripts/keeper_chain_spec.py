@@ -545,7 +545,7 @@ def link_volume(steps: int = 72) -> float:
     return total * dx * dr * dr
 
 
-# The purchased-part identification sheets (build_purchased_spring_drawing).
+# The purchased-part identification sheets (build_purchased_part_drawing).
 # One short line each: the sheet reserves ~0.19 m for the note (the first cut,
 # 94 characters, ran 0.204 m and failed drawing:keeper_chain).
 CHAIN_DRAWING_NOTES = f"CUT TO {BEAD_COUNT} BEADS ({CHAIN_LENGTH:.0f} MM); CLOSED BY MHA-150."

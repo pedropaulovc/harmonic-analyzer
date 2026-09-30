@@ -13,7 +13,7 @@ from typing import Any
 import _telemetry
 from _common import run_build
 from _drawing_registry import DRAWINGS_BY_NAME
-from _purchased_fastener_drawing import build_purchased_spring_drawing
+from _purchased_part_drawing import build_purchased_part_drawing
 
 
 SPEC = DRAWINGS_BY_NAME["keeper_chain"]
@@ -21,7 +21,7 @@ PART_STEM = SPEC.artifact_stem
 
 
 async def build(adapter: Any) -> dict[str, str]:
-    return await build_purchased_spring_drawing(adapter, SPEC)
+    return await build_purchased_part_drawing(adapter, SPEC)
 
 
 def _parse_args() -> argparse.Namespace:
