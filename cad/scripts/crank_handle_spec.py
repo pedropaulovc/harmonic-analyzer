@@ -55,9 +55,14 @@ HANDLE_MAX_DIA = 21.0  # max diameter at the swell
 NECK_R = 5.5  # waist at the tenon shoulder (neck Ø11)
 PEAK_X = 36.0  # axial station of the maximum diameter, from x=0
 # Theoretical butt radius at HANDLE_LENGTH.  Ø10 in the photo re-derive; grown
-# to Ø11.5 (user ruling 2026-09-29, MHA-153 review) so the oak at the trim face
-# is as wide as the cup flange that keeps 1.5 mm sections.
-CAP_R = 5.75
+# (user rulings 2026-09-29, MHA-153 and MHA-022 reviews) to Ø14 so the oak
+# round the cup counterbore keeps 1.5 mm at its worst case and the trim face
+# is as wide as the cup flange.
+CAP_R = 7.0
+# The turned grip contour's allowance, on diameter, against its two arcs: the
+# wood grip is checked by eye and template, not by a profile frame (MHA-022
+# review, user ruling 2026-09-29).
+CONTOUR_ALLOWANCE_DIA = 0.5
 PIVOT_BORE_DIA = 6.125  # final reamed bore limits 6.10-6.15
 # Symmetric ream band about the mid nominal: 6.15 MAX / 6.10 MIN.
 PIVOT_BORE_BAND = (0.025, -0.025)
@@ -100,7 +105,7 @@ _GENERAL_1PL = GENERAL_1PL_TOL_MM
 # Oak left around the counterbore at its mouth, under the cup flange, when the
 # largest cup body takes the widest glue line.
 _COUNTERBORE_MAX = CUP_BODY_DIA + CUP_BODY_DIA_TOL + COUNTERBORE_GLUE_LINE[1]
-COUNTERBORE_MOUTH_WALL = TRIM_R - _COUNTERBORE_MAX / 2.0
+COUNTERBORE_MOUTH_WALL = (TRIM_R - CONTOUR_ALLOWANCE_DIA / 4.0) - _COUNTERBORE_MAX / 2.0
 
 for _ok, _what in (
     (
@@ -113,7 +118,10 @@ for _ok, _what in (
         COUNTERBORE_DEPTH - _GENERAL_1PL > CUP_BODY_LENGTH_MAX,
         "the cup body can bottom in the shallowest counterbore before its flange seats",
     ),
-    (COUNTERBORE_MOUTH_WALL >= 0.6, "oak at the counterbore mouth is under 0.6"),
+    (
+        COUNTERBORE_MOUTH_WALL >= 1.5,
+        "oak at the counterbore mouth is under 1.5 at the contour allowance",
+    ),
     (
         abs(CUP_FLANGE_DIA - 2.0 * TRIM_R) <= 0.1,
         "the cup flange does not match the oak at the trim face",
@@ -145,7 +153,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "TenonDia": 1,
         "TenonLength": 1,
         "WoodLength": 1,
-        "PeakStation": 2,
+        "PeakStation": 1,
         "CounterboreDia": 1,
         "CounterboreDepth": 1,
     },
@@ -158,40 +166,37 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 }
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked MHA-022 dimension needs authored places")
-BASIC_DIMENSIONS = frozenset({"PeakStation"})
+# The MHA-022 review (user ruling 2026-09-29) dropped the datums, the three
+# feature-control frames and the basic profile: a decorative oak grip is
+# turned to its arcs by eye and template, within a contour allowance.
 REFERENCE_DIMENSIONS = frozenset({"TenonDia", "CounterboreDia"})
+# Tenon end to butt face: a reference overall for stock cut-off, printed from
+# the sheet (the profile carries no such dimension).  Its places are
+# specification, read by the sheet from here (policy rule 2).
+OVERALL_REFERENCE = TENON_LENGTH + WOOD_LENGTH
+DRAWING_REFERENCE_PRECISION: dict[str, int] = {"overall length reference": 1}
 
 FERRULE_NUMBER = "MHA-150"
 CUP_NUMBER = "MHA-153"
+SCREW_NUMBER = "MHA-139"
 
-_B = f"{0.0:.2f}"
 _PEAK_B = PEAK_X - SHOULDER_X
 _END_B = HANDLE_LENGTH - SHOULDER_X
 DRAWING_NOTES = "\n".join(
     (
-        f"DATUM A IS THE <MOD-DIAM>{PIVOT_BORE_DIA:.2f} REAMED BORE AXIS. DATUM B IS THE TENON",
-        "  SHOULDER FACE. FINAL BORE LIMITS APPLY FULL LENGTH.",
-        "ALL AXIAL STATIONS ARE FROM B.",
+        "AXIAL STATIONS ARE FROM THE TENON SHOULDER; THE COUNTERBORE DEPTH IS",
+        "  FROM THE BUTT FACE.",
         f"TURN THE TENON TO SUIT THE {FERRULE_NUMBER} FERRULE BORE AND BORE THE BUTT",
         f"  COUNTERBORE TO SUIT THE {CUP_NUMBER} CUP BODY, EACH FOR "
         f"{TENON_GLUE_LINE[0]:.2f}-{TENON_GLUE_LINE[1]:.2f} DIAMETRAL",
         "  CLEARANCE; EPOXY BOTH IN AT ASSEMBLY.",
-        f"BASIC TRUE GRIP PROFILE (ALL VALUES BASIC): <MOD-DIAM>{2.0 * NECK_R:.2f} AT X{_B};",
-        f"  <MOD-DIAM>{HANDLE_MAX_DIA:.2f} AT X{_PEAK_B:.2f}; <MOD-DIAM>{2.0 * CAP_R:.2f} AT X{_END_B:.2f}. TWO CIRCULAR ARCS",
-        f"  TANGENT AT X{_PEAK_B:.2f}: R{FRONT_PROFILE_R:.6f} FROM X{_B} TO X{_PEAK_B:.2f};",
-        f"  R{REAR_PROFILE_R:.6f} FROM X{_PEAK_B:.2f} TO X{_END_B:.2f}.",
-        "PROFILE 0.50 | A | B APPLIES TO BOTH ARCS FROM B TO THE ACTUAL BUTT",
-        f"  FACE; THEORETICAL PROFILE EXTENDS TO X{_END_B:.2f}.",
-        "SHOULDER AND BUTT EDGES SHARP. NO BLEND, RADIUS, OR CHAMFER.",
+        f"THE REAMED BORE RUNS ON THE {SCREW_NUMBER} SHOULDER; ITS LIMITS APPLY FULL LENGTH.",
+        f"GRIP CONTOUR: <MOD-DIAM>{2.0 * NECK_R:.1f} AT THE SHOULDER, <MOD-DIAM>{HANDLE_MAX_DIA:.1f} AT "
+        f"{_PEAK_B:.1f}; ARCS",
+        f"  R{FRONT_PROFILE_R:.1f} AND R{REAR_PROFILE_R:.1f}, TANGENT AT {_PEAK_B:.1f}, RUNNING ON TO "
+        f"<MOD-DIAM>{2.0 * CAP_R:.1f} AT {_END_B:.1f}",
+        f"  (PAST THE BUTT FACE). TURN WITHIN {CONTOUR_ALLOWANCE_DIA:.1f} ON DIAMETER.",
         "USE CLEAR STRAIGHT GRAIN PARALLEL TO TURNING AXIS.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"
-
-
-# Manufacturing GD&T limits consumed by the part's drawing projection.
-GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "shoulder perpendicularity": "0.10",
-    "tenon total runout": "0.10",
-    "turned handle profile": "0.50",
-}

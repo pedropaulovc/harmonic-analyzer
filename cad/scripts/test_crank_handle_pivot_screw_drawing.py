@@ -68,7 +68,10 @@ def test_model_owns_places_and_bands() -> None:
         assert places == (2 if name in running_fit else 1), name
     # User ruling 2026-09-29 (MHA-139 review): the shoulder is turned to suit
     # the bonded handle, so its length is a reference.
-    assert spec.REFERENCE_DIMENSIONS == {"OverallLength", "ShoulderLength"}
+    assert spec.REFERENCE_DIMENSIONS == {"OverallLength", "SeatLocation"}
+    # Every axial location reads from the head face (re-review): the seat
+    # is located from it, not sized from the under-head face.
+    assert "ShoulderLength" not in spec.DRAWING_PRECISION_BY_NAME
     # Every band comes from a named spec constant, never a typed number.
     assert model_toleranced_dimensions(part) == {
         ("ScrewProfile", "ShoulderDia"): "*deviations(SHOULDER_DIA_BAND)",
@@ -238,8 +241,8 @@ def test_notes_state_the_engagement_the_fitted_shoulder_and_the_head_band() -> N
     assert lines[0] == spec.ENGAGEMENT_NOTE
     # User ruling 2026-09-29 (MHA-139 review): the shoulder is turned to suit
     # the bonded handle; the head's band is for its bearing on the cup floor.
-    assert "TURN THE SHOULDER TO SUIT THE BONDED MHA-022" in spec.DRAWING_NOTES
-    assert "0.25-1.00 END PLAY" in spec.DRAWING_NOTES
+    assert "TURN THE SEAT FACE TO SUIT THE BONDED MHA-022" in spec.DRAWING_NOTES
+    assert "PLUS 0.25-1.00." in spec.DRAWING_NOTES
     assert "HEAD BEARS ON THE\n  MHA-153 FLOOR" in spec.DRAWING_NOTES
     assert "0.3 BEARING OUTSIDE ITS HOLE" in spec.DRAWING_NOTES
     assert all(len(line) <= 72 for line in lines)

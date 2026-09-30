@@ -26,7 +26,7 @@ from __future__ import annotations
 
 # The flange matches the oak's diameter at the butt trim face (the handle
 # spec asserts it); it is a free outer surface.
-FLANGE_DIA = 13.5
+FLANGE_DIA = 15.4
 FLANGE_THICKNESS = 2.3
 # Holds the pocket wall at 1.5 (the screw spec asserts it against the bored
 # pocket's largest size).

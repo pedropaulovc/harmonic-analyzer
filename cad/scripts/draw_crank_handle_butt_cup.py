@@ -93,8 +93,13 @@ FLANGE_SEAT_X = FLANGE_RIGHT_X - FLANGE_THICKNESS * _S
 SECTION_KEEP = {
     "FlangeDia": (FLANGE_RIGHT_X + 0.020, SECTION_CENTER[1]),
     "PocketDia": (FLANGE_RIGHT_X + 0.040, SECTION_CENTER[1]),
-    "BodyDia": (SECTION_CENTER[0] - HALF_LENGTH - 0.020, SECTION_CENTER[1]),
-    "FloorHoleDia": (SECTION_CENTER[0] - HALF_LENGTH - 0.042, SECTION_CENTER[1]),
+    # The Ø6.2 DRILL THRU block stands well left of and above the Ø11.60
+    # band so the two never touch (MHA-153 re-review 3).
+    "BodyDia": (SECTION_CENTER[0] - HALF_LENGTH - 0.018, SECTION_CENTER[1]),
+    "FloorHoleDia": (
+        SECTION_CENTER[0] - HALF_LENGTH - 0.058,
+        SECTION_CENTER[1] + 0.014,
+    ),
     "FlangeThickness": ((FLANGE_RIGHT_X + FLANGE_SEAT_X) / 2.0, SECTION_CENTER[1] + FLANGE_R + 0.009),
     "OverallLength": (SECTION_CENTER[0], SECTION_CENTER[1] + FLANGE_R + 0.021),
     # From the flange face too: every axial size shares that one faced end.

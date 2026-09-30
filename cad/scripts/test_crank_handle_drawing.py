@@ -57,7 +57,9 @@ def test_oak_ends_in_a_ferrule_tenon_and_a_cup_counterbore() -> None:
     assert crank_handle_spec.COUNTERBORE_MOUTH_WALL >= 0.6
     # User ruling 2026-09-29 (MHA-153 review): the butt grew from Ø10 so the
     # cup keeps 1.5 mm sections.
-    assert crank_handle_spec.CAP_R == pytest.approx(5.75)
+    # ... and again for 1.5 mm of oak round the cup counterbore (MHA-022 review).
+    assert crank_handle_spec.CAP_R == pytest.approx(7.0)
+    assert crank_handle_spec.COUNTERBORE_MOUTH_WALL >= 1.5
 
 
 def test_tenon_and_counterbore_are_fitted_to_the_parts_they_take() -> None:
@@ -76,15 +78,17 @@ def test_tenon_and_counterbore_are_fitted_to_the_parts_they_take() -> None:
     assert "for name in sorted(REFERENCE_DIMENSIONS):" in drawing_source
 
 
-def test_diameters_are_a_basic_profile_note_not_marked_dims() -> None:
+def test_grip_contour_is_a_note_with_a_loose_allowance() -> None:
+    # User ruling 2026-09-29 (MHA-022 review): the contour is turned to its
+    # arcs within an allowance, not held by a basic profile and a frame.
     notes = crank_handle_spec.DRAWING_NOTES
-    assert "BASIC TRUE GRIP PROFILE" in notes
-    assert "ALL VALUES BASIC" in notes
-    assert f"R{crank_handle_spec.FRONT_PROFILE_R:.6f}" in notes
-    assert f"R{crank_handle_spec.REAR_PROFILE_R:.6f}" in notes
-    # Stations read from datum B, the tenon shoulder.
-    assert "AT X0.00;" in notes and "AT X29.00;" in notes and "AT X51.00." in notes
-    assert crank_handle_spec.BASIC_DIMENSIONS == {"PeakStation"}
+    assert "GRIP CONTOUR:" in notes
+    assert f"R{crank_handle_spec.FRONT_PROFILE_R:.1f}" in notes
+    assert f"R{crank_handle_spec.REAR_PROFILE_R:.1f}" in notes
+    assert "TURN WITHIN 0.5 ON DIAMETER" in notes
+    assert "BASIC" not in notes
+    assert not hasattr(crank_handle_spec, "BASIC_DIMENSIONS")
+    assert not hasattr(crank_handle_spec, "GEOMETRIC_TOLERANCES_MM")
 
 
 def test_peak_station_uses_visible_construction_geometry() -> None:
@@ -97,10 +101,16 @@ def test_peak_station_uses_visible_construction_geometry() -> None:
     assert "peak station construction line" in build_source
 
 
-def test_bored_profile_has_end_view_center_marks() -> None:
+def test_counterbore_reads_on_a_section_and_the_end_view_shares_its_axis() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "auto_center_marks" in source
-    assert "add_view_centerline" in source
+    assert "create_section_view(" in source
+    assert "create_section_axis_centerline(" in source
+    assert "set_hidden_lines_visible" not in source
+    assert drawing.RIGHT_CENTER[1] == drawing.FRONT_CENTER[1]
+    # The reference overall, tenon end to butt face, for stock cut-off.
+    assert crank_handle_spec.OVERALL_REFERENCE == pytest.approx(53.7)
+    assert crank_handle_spec.DRAWING_REFERENCE_PRECISION == {"overall length reference": 1}
 
 
 def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:
@@ -118,29 +128,28 @@ def test_linked_notes_are_functional_and_carry_no_general_tolerance() -> None:
     assert "BRASS" not in notes
     assert "LINEAR +/-" not in notes
     assert "X.XX" not in notes
-    assert "NO BLEND, RADIUS, OR CHAMFER" in notes
-    assert "FINAL BORE LIMITS APPLY FULL LENGTH" in notes
+    assert "LIMITS APPLY FULL LENGTH" in notes
+    assert "RUNS ON THE MHA-139 SHOULDER" in notes
     assert "STRAIGHT GRAIN PARALLEL TO TURNING AXIS" in notes
-    assert "ALL AXIAL STATIONS ARE FROM B." in notes
-    assert "PROFILE 0.50 | A | B APPLIES" in notes
+    assert "AXIAL STATIONS ARE FROM THE TENON SHOULDER" in notes
+    assert "COUNTERBORE DEPTH IS\n  FROM THE BUTT FACE" in notes
+    assert "DATUM" not in notes and "PROFILE 0.50" not in notes
     assert all(len(line) <= 90 for line in notes.splitlines())
     assert drawing.DIMENSION_CALLOUTS["PivotBoreDia"] == "THRU - REAM"
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert 'add_property_linked_note(adapter, "Manufacturing Notes"' in source
 
 
-def test_feature_requirements_use_datum_based_controls() -> None:
+def test_sheet_carries_no_gdt() -> None:
+    # User ruling 2026-09-29 (MHA-022 review): a plain sheet.
     source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert source.count("add_datum_feature(") == 2
-    assert source.count("add_feature_control_frame(") == 3
-    assert 'characteristic="perpendicularity"' in source
-    assert 'quantity="DATUM B FACE"' in source
-    assert 'characteristic="total_runout"' in source
-    assert 'quantity="TENON OD"' in source
-    assert 'characteristic="profile_surface"' in source
-    assert 'quantity="TURNED GRIP PROFILE - SEE NOTE"' in source
-    assert "set_basic_dimension(" in source
-    assert "add_surface_finish(" not in source
+    for helper in (
+        "add_datum_feature(",
+        "add_feature_control_frame(",
+        "set_basic_dimension(",
+        "add_surface_finish(",
+    ):
+        assert helper not in source
 
 
 def test_model_owns_every_printed_band() -> None:

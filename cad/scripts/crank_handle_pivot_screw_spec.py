@@ -285,9 +285,9 @@ ENGAGEMENT_NOTE = (
 DRAWING_NOTES = "\n".join(
     (
         ENGAGEMENT_NOTE,
-        "TURN THE SHOULDER TO SUIT THE BONDED MHA-022 CRANK HANDLE: FERRULE",
-        "  FACE TO CUP FLOOR PLUS "
-        f"{END_PLAY_RANGE[0]:.2f}-{END_PLAY_RANGE[1]:.2f} END PLAY. THE HEAD BEARS ON THE",
+        "TURN THE SEAT FACE TO SUIT THE BONDED MHA-022: UNDER-HEAD TO SEAT =",
+        "  ITS FERRULE FACE TO CUP FLOOR PLUS "
+        f"{END_PLAY_RANGE[0]:.2f}-{END_PLAY_RANGE[1]:.2f}. THE HEAD BEARS ON THE",
         f"  MHA-153 FLOOR; THE BAND KEEPS {HEAD_BEARING_RADIAL_MIN:.1f} BEARING OUTSIDE ITS HOLE.",
     )
 )
@@ -383,22 +383,18 @@ for _ok, _what in (
     if not _ok:
         raise AssertionError(f"MHA-139: {_what}")
 
-# Lengths are one baseline from the UNDER-HEAD face (policy rule 7): the head
-# and the shoulder both start there, it is the face the handle runs against,
-# and it is the face the shop indicates after reversing the part to face and
-# slot the head.  The shoulder length is turned to suit the bonded handle, so
-# it prints as a reference under its to-suit callout.  The thread length is the SIZE
-# of the threaded feature from the arm seat face, not a location; printing it
-# as a 66.50 station from the under-head face would stack the shoulder's
-# +/-0.25 onto the thread's -0.5 that the engagement check needs separate.
-# The relief width and the two 45-degree legs are likewise sizes.  The overall
-# is a reference restatement for stock cut-off.
+# Every axial LOCATION reads from the slotted HEAD face, the one faced end
+# (MHA-139 re-review, user ruling 2026-09-29): the under-head face (the head
+# length), the seat face (SeatLocation, a reference: the shoulder is turned to
+# suit the bonded handle) and the tip (the reference overall, for stock
+# cut-off).  The thread length stays the SIZE of the threaded feature from the
+# seat face, with its own band for the engagement check, as do the relief
+# width, the two 45-degree legs and the slot depth.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ScrewProfile": {
         "HeadDia",
         "HeadLength",
         "ShoulderDia",
-        "ShoulderLength",
         "ThreadLength",
         "ReliefDia",
         "ReliefWidth",
@@ -406,7 +402,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     },
     "SlotProfile": {"SlotWidth"},
     "DriverSlot": {"SlotDepth"},
-    "StationReference": {"OverallLength"},
+    "StationReference": {"OverallLength", "SeatLocation"},
 }
 # Decimal places ARE the tolerance (policy rule 2): the shoulder diameter is
 # the running fit and prints its band at two places, the head diameter its
@@ -419,7 +415,6 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "HeadDia": 2,
         "HeadLength": 1,
         "ShoulderDia": 2,
-        "ShoulderLength": 1,
         "ThreadLength": 1,
         "ReliefDia": 1,
         "ReliefWidth": 2,
@@ -427,7 +422,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     },
     "SlotProfile": {"SlotWidth": 1},
     "DriverSlot": {"SlotDepth": 2},
-    "StationReference": {"OverallLength": 1},
+    "StationReference": {"OverallLength": 1, "SeatLocation": 1},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
@@ -436,6 +431,6 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 }
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked MHA-139 dimension needs authored places")
-REFERENCE_DIMENSIONS = frozenset({"OverallLength", "ShoulderLength"})
+REFERENCE_DIMENSIONS = frozenset({"OverallLength", "SeatLocation"})
 
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW\nSCALE 1:1"

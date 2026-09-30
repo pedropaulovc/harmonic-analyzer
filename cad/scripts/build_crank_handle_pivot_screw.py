@@ -361,6 +361,38 @@ async def build(adapter) -> dict[str, str]:
         "overall length reference",
     )
     stations.record("OverallLength", '"HeadLength" + "ShoulderLength" + "ThreadLength"')
+    # The seat face's location from the same head face (MHA-139 re-review:
+    # every axial location reads from one faced end).  It runs along the
+    # shoulder's lower flank so both of its ends sit on real faces -- the head
+    # face and the seat face -- and it prints as a reference: the shoulder is
+    # turned to suit the bonded handle.
+    set_sketch_direct_db(adapter, True)
+    seat_line = check(
+        "seat location reference line",
+        await adapter.add_line(0.0, -SHOULDER_R, -SEAT_STATION, -SHOULDER_R),
+    )
+    set_sketch_direct_db(adapter, False)
+    segment = _early_bound(adapter._sketch_entities[seat_line], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError("seat location reference line did not take construction flag")
+    check(
+        "seat location reference horizontal",
+        await adapter.add_sketch_constraint(seat_line, None, "horizontal"),
+    )
+    await anchor_point_to_origin(
+        adapter, f"{seat_line}.start", 0.0, -SHOULDER_R, "seat location on the head face"
+    )
+    stations.record("SeatLocationY", '"ShoulderDia" / 2')
+    await dimension_between(
+        adapter,
+        f"{seat_line}.start",
+        f"{seat_line}.end",
+        "horizontal_distance",
+        SEAT_STATION,
+        "seat location reference",
+    )
+    stations.record("SeatLocation", '"HeadLength" + "ShoulderLength"')
     await ensure_fully_defined(adapter, "station reference sketch")
     check("exit_sketch station reference", await adapter.exit_sketch())
     name_last_feature(adapter, "StationReference")

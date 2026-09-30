@@ -4,13 +4,16 @@ A turned, ebonized oak pear grip (book ch. 11).  User ruling 2026-09-29: the
 brass ferrule MHA-150 and the flanged steel butt cup MHA-153 are separate
 parts, so this sheet prints only the oak -- a tenon for the ferrule at the
 crank end, a waisted neck, a smooth twin-arc swell to the Ø21 max, and a
-trimmed butt with a counterbore for the cup.  The pear silhouette is two
-internally-tangent arcs, so the swell/neck/butt diameters derive from the
-profile and cannot be marked without over-defining; the print dimensions the
-tenon, the axial stations from the tenon shoulder (datum B) and the
-counterbore in the front profile view, and gives the diameters as a
-basic-profile note.  The profile sketches on the Front plane, so every marked
-profile dimension imports into the front view (handle axis horizontal).
+trimmed butt with a counterbore for the cup.
+
+After the MHA-022 machinist review (user ruling 2026-09-29) the sheet is plain:
+no datums, feature-control frames or basic dimensions -- the grip is turned to
+its arcs within a contour allowance stated in the note.  The longitudinal
+section A-A, taken on the end view's vertical centre line, is the handle's
+length view (policy rule 7): it shows the counterbore step on cut edges and
+carries every profile dimension, since the profile sketches on the Front plane
+the section lies in.  The end view stands on the section's axis and carries the
+reamed bore.
 
 Run with SolidWorks open::
 
@@ -24,40 +27,37 @@ import sys
 from typing import Any
 
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_feature_control_frame,
+    add_edge_dimension,
     add_property_linked_note,
-    add_view_centerline,
     assert_imported_precision,
+    create_section_view,
     curate_view_dimensions,
     dimension_name,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    set_basic_dimension,
     set_dimension_callouts,
     set_hidden_lines_removed,
-    set_hidden_lines_visible,
     set_reference_dimension,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _section_axis import create_section_axis_centerline, position_section_caption
 from crank_handle_spec import (
-    BASIC_DIMENSIONS,
+    COUNTERBORE_R,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
-    GEOMETRIC_TOLERANCES_MM,
+    DRAWING_REFERENCE_PRECISION,
     HANDLE_MAX_DIA,
-    NECK_R,
-    PEAK_X,
     PIVOT_BORE_DIA,
     REFERENCE_DIMENSIONS,
     SHOULDER_X,
     TENON_DIA,
     TENON_X0,
+    TRIM_R,
     TRIM_X,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -80,14 +80,17 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (2.0, 1.0)
 
-# Front view (XY): the pear lies horizontal, axis along +X, tenon at the left
-# and butt at the right.  SolidWorks centres the view on the oak's extent.
+# The section lays the handle axis horizontal, tenon at the left and butt at
+# the right (the part's +X to the right, as MHA-153's section showed), centred
+# on the oak's extent.  The end view stands on the same axis height.
 FRONT_BBOX_CX = (TENON_X0 + TRIM_X) / 2.0
 FRONT_CENTER = (0.150, 0.178)
-RIGHT_CENTER = (0.285, 0.205)
-ISO_CENTER = (0.350, 0.150)
+RIGHT_CENTER = (0.300, FRONT_CENTER[1])
+ISO_CENTER = (0.365, 0.240)
+CAPTION_XY = (0.215, 0.114)
 
 TENON_R = TENON_DIA / 2.0
+END_R = HANDLE_MAX_DIA * SHEET_SCALE[0] / 2000.0
 
 
 def _front_x(model_x_mm: float) -> float:
@@ -107,18 +110,38 @@ FRONT_KEEP = {
     "CounterboreDia": (0.232, 0.178),
 }
 RIGHT_KEEP = {
-    "PivotBoreDia": (0.360, 0.220),
+    "PivotBoreDia": (0.362, 0.165),
 }
 # Every band renders from its model dimension; the callout retains only
 # process intent.
 DIMENSION_CALLOUTS = {
     "PivotBoreDia": "THRU - REAM",
 }
+CUT_START = (RIGHT_CENTER[0], RIGHT_CENTER[1] - END_R - 0.006)
+CUT_END = (RIGHT_CENTER[0], RIGHT_CENTER[1] + END_R + 0.006)
+# The reference overall runs from the tenon's end face to the butt face, each
+# picked on its cut edge midway up the wood.
+OVERALL_P0 = (_front_x(TENON_X0), _front_y((TENON_R + PIVOT_BORE_DIA / 2.0) / 2.0))
+OVERALL_P1 = (_front_x(TRIM_X), _front_y((TRIM_R + COUNTERBORE_R) / 2.0))
+OVERALL_TEXT_XY = (0.150, 0.112)
 
-# Datum B is the tenon shoulder, picked on its lower edge so the upper side
-# stays free for the tenon runout frame.
-SHOULDER_PICK = (_front_x(SHOULDER_X), _front_y(-(TENON_R + NECK_R) / 2.0))
-TENON_PICK = (_front_x((TENON_X0 + SHOULDER_X) / 2.0), _front_y(TENON_R))
+
+def _set_reference_precision(adapter: Any, display: Any, label: str) -> None:
+    """Give the one SHEET-derived dimension its spec-authored decimal places.
+
+    ``SetPrecision3`` reports rejection through its return status rather than
+    by raising, so the side effect is read back (the draw_crank_arm pattern).
+    """
+    places = DRAWING_REFERENCE_PRECISION[label]
+    display = _early_bound(display, "IDisplayDimension")
+    adapter._attempt(
+        lambda: display.SetPrecision3(DRAWING_REFERENCE_PRECISION[label], -1, -1, -1)
+    )
+    applied = adapter._attempt(display.GetPrimaryPrecision2)
+    if applied != places:
+        raise RuntimeError(
+            f"{label}: sheet dimension prints {applied} decimal places, not {places}"
+        )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -161,12 +184,21 @@ async def build(adapter: Any) -> dict[str, str]:
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
-    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(2, 1))
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(2, 1))
+    front = create_section_view(
+        adapter,
+        right,
+        line_start=CUT_START,
+        line_end=CUT_END,
+        view_xy=FRONT_CENTER,
+        section_label="A",
+        scale=(2, 1),
+        label="crank handle longitudinal section",
+    )
+    position_section_caption(adapter, front, CAPTION_XY, label="crank handle")
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
-    set_hidden_lines_removed(adapter, iso)
-    for view in (front, right):
-        set_hidden_lines_visible(adapter, view)
+    for view in (front, right, iso):
+        set_hidden_lines_removed(adapter, view)
     front.SetDisplayTangentEdges2(0)
     if int(front.GetDisplayTangentEdges2()) != 0:
         raise RuntimeError("failed to hide crank-handle tangent edges")
@@ -176,7 +208,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         front,
         keep=FRONT_KEEP,
-        view_label="front",
+        view_label="longitudinal section",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     right_annotations = curate_view_dimensions(
@@ -196,91 +228,32 @@ async def build(adapter: Any) -> dict[str, str]:
         set_reference_dimension(
             adapter, front_by_name[name], label=f"MHA-022 {name}", diameter=True
         )
-    for station in sorted(BASIC_DIMENSIONS):
-        annotation = front_by_name[station]
-        display = adapter._attempt(lambda a=annotation: a.GetSpecificAnnotation())
-        if display is None:
-            raise RuntimeError(f"{station} has no display dimension to box")
-        set_basic_dimension(adapter, display, label=f"{station} profile station")
-    add_view_centerline(
-        adapter,
-        front,
-        face_xy=(_front_x(PEAK_X - 1.0), _front_y(0.0)),
-        label="crank handle turning axis",
+    create_section_axis_centerline(
+        adapter, front, length_mm=TRIM_X - TENON_X0, label="crank handle axis"
     )
     if not auto_center_marks(adapter, right, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to crank-handle end view")
 
-    bore_top = (
-        RIGHT_CENTER[0],
-        RIGHT_CENTER[1] + PIVOT_BORE_DIA * SHEET_SCALE[0] / 2000.0,
-    )
-    profile_peak = (
-        _front_x(PEAK_X),
-        _front_y(HANDLE_MAX_DIA / 2.0),
-    )
-    add_datum_feature(
-        adapter,
-        right,
-        edge_xy=bore_top,
-        symbol_xy=(RIGHT_CENTER[0], 0.245),
-        datum="A",
-        label="reamed bore datum axis",
-    )
-    add_datum_feature(
+    # Tenon end to butt face, a reference for stock cut-off (MHA-022 review:
+    # the 48.7 wood length alone read like an overall).
+    overall = add_edge_dimension(
         adapter,
         front,
-        edge_xy=SHOULDER_PICK,
-        # Below the perpendicularity frame's "DATUM B FACE" caption (farm run
-        # 20260929T221540276Z drew the symbol on top of it at (0.050, 0.150)).
-        symbol_xy=(0.075, 0.135),
-        datum="B",
-        label="tenon shoulder face",
+        p0=OVERALL_P0,
+        p1=OVERALL_P1,
+        text_xy=OVERALL_TEXT_XY,
+        label="overall length reference",
+        orientation="horizontal",
     )
-    add_feature_control_frame(
+    set_reference_dimension(
         adapter,
-        front,
-        edge_xy=SHOULDER_PICK,
-        # Above the datum B leader (a horizontal at y=0.150 into the shoulder
-        # line): from below at 0.120 the frame's leader crossed it (farm leaf
-        # 20260929T194845Z layout audit).
-        frame_xy=(0.020, 0.158),
-        characteristic="perpendicularity",
-        tolerance=GEOMETRIC_TOLERANCES_MM["shoulder perpendicularity"],
-        datums=("A",),
-        quantity="DATUM B FACE",
-        label="tenon shoulder perpendicularity",
+        _early_bound(overall, "IDisplayDimension").GetAnnotation(),
+        label="overall length reference",
     )
-    add_feature_control_frame(
-        adapter,
-        front,
-        edge_xy=TENON_PICK,
-        frame_xy=(0.020, 0.250),
-        characteristic="total_runout",
-        tolerance=GEOMETRIC_TOLERANCES_MM["tenon total runout"],
-        datums=("A",),
-        quantity="TENON OD",
-        label="tenon total runout",
-        # A cylinder's side-view outline is a silhouette, not a model edge
-        # (farm leaf 20260929T192327Z: an EDGE pick found nothing there).
-        entity_type="SILHOUETTE",
-    )
-    add_feature_control_frame(
-        adapter,
-        front,
-        edge_xy=profile_peak,
-        frame_xy=(0.180, 0.263),
-        characteristic="profile_surface",
-        tolerance=GEOMETRIC_TOLERANCES_MM["turned handle profile"],
-        datums=("A", "B"),
-        quantity="TURNED GRIP PROFILE - SEE NOTE",
-        label="turned handle profile",
-        entity_type="SILHOUETTE",
-    )
+    _set_reference_precision(adapter, overall, "overall length reference")
 
-    # 14 lines: the block starts a little higher than the former 13-line one.
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.086)
-    add_property_linked_note(adapter, "Isometric View Note", 0.325, 0.116)
+    add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.205)
 
     return await finalize_drawing(
         adapter,
