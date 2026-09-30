@@ -1,8 +1,8 @@
 crank-handle-ferrule:
   title: Crank Handle Ferrule
   number: MHA-150
-  material: C36000 brass rod, 5/8 in
-  material_specification: C36000 free-machining brass rod, 5/8 in
+  material: C36000 brass rod, 9/16 in
+  material_specification: C36000 free-machining brass rod, 9/16 in
   finish: bright turned, clear lacquer
   quantity: 1
   tolerance_class: machined_block

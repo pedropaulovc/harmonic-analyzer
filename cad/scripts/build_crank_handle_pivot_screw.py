@@ -441,7 +441,7 @@ async def build(adapter) -> dict[str, str]:
         adapter, "ScrewProfile", "ShoulderDia", *deviations(SHOULDER_DIA_BAND)
     )
     set_dimension_symmetric_tolerance(adapter, "ScrewProfile", "HeadDia", HEAD_DIA_TOL)
-    # The head length keeps the head below the MHA-153 flange at the widest
+    # The head length keeps the head below the MHA-153 face at the widest
     # end play (Codex P2 on #1139).
     set_dimension_symmetric_tolerance(
         adapter, "ScrewProfile", "HeadLength", HEAD_LENGTH_TOL

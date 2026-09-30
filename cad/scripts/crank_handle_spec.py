@@ -2,26 +2,30 @@ r"""Pure-data dimensional contract shared by the crank handle and its
 manufacturing drawing.
 
 PURE DATA, no SolidWorks/COM imports.  A turned, ebonized oak pear grip on the
-crank-arm pivot: a waisted neck, a smooth twin-arc swell to the Ø21 max, and a
-blunt butt.  User ruling 2026-09-29 (ch11 p.14 and p.15 photographs): the
+crank-arm pivot.  User ruling 2026-09-29 (ch11 p.14 and p.15 photographs): the
 bright ring at the crank end is a separate brass ferrule MHA-150 on a turned
-tenon, and the bright disc at the butt is a flanged steel cup MHA-153 in a
-counterbore, the pivot screw's slotted head recessed inside it.  The oak
-therefore ends in a tenon at the crank end and a trimmed butt face with a
-counterbore at the other.
+tenon, and the bright disc at the butt a steel cup MHA-153 in a counterbore,
+the pivot screw's slotted head recessed inside it.
 
-After the machinist reviews (user rulings 2026-09-29): the tenon and the
-counterbore are turned and bored to suit the ferrule and cup they take, the
-handle's end play is fitted on the MHA-139 shoulder at assembly, so the oak's
-lengths are routine (.X) sizes, and the butt grew (Ø10 -> Ø11.5 theoretical)
-so the cup keeps 1.5 mm sections.
+User rulings 2026-09-30 (ch30 eight-views-4, the true side view, and the
+approved CadQuery concept v4): the grip leaves the ferrule face flush with its
+OD, flares down to a slim waist, swells in an S-curve to the Ø21 maximum at
+0.72 of the length, and domes down to an end round turned across the oak AND
+the bonded cup together, so wood and steel read as one rounded butt.  Five
+tangent arcs, in turn:
 
-The pear silhouette is two internally-tangent arcs, so the swell/neck/butt
-DIAMETERS derive from the profile geometry and cannot be marked without
-over-defining; the drawing dimensions the clean AXIAL stations from the
-tenon shoulder (datum B) and gives the diameters as a basic-profile note.
-The nominals drive the part's named equation globals AND the drawing's
-coordinate math (``test_crank_handle_drawing.py``).
+* flare      -- concave, from the ferrule OD at the shoulder to the waist;
+* S concave  -- from the waist (horizontal tangent) to the inflection;
+* S convex   -- from the inflection to the swell (horizontal tangent);
+* dome       -- convex, from the swell towards the butt;
+* end round  -- convex, tangent to the dome, down to the counterbore mouth.
+
+Every centre except the end round's sits on a station with a horizontal
+tangent (the waist or the swell), so the radii follow from the stations and
+diameters below; the end round is solved from its tangency to the dome.  The
+diameters derive from the geometry, so the drawing dimensions the axial
+stations and states the contour in a note, turned within an allowance and
+checked with a template (MHA-022 review, user ruling 2026-09-29).
 
 Frame: the handle axis is local +X and x=0 is the ferrule's arm-bearing face,
 the plane the drive train seats on the arm.  No oak reaches x=0: the tenon
@@ -36,45 +40,33 @@ from crank_hub_geometry import GENERAL_1PL_TOL_MM
 from crank_handle_butt_cup_spec import (
     BODY_DIA as CUP_BODY_DIA,
     BODY_DIA_TOL as CUP_BODY_DIA_TOL,
-    BODY_LENGTH_MAX as CUP_BODY_LENGTH_MAX,
-    FLANGE_DIA as CUP_FLANGE_DIA,
-    FLANGE_THICKNESS as CUP_FLANGE_THICKNESS,
+    OVERALL_LENGTH as CUP_LENGTH,
+    POCKET_DIA as CUP_POCKET_DIA,
 )
 from crank_handle_ferrule_spec import (
     BORE_DIA as FERRULE_BORE_DIA,
     BORE_DIA_TOL as FERRULE_BORE_DIA_TOL,
     LENGTH as FERRULE_LENGTH,
+    OUTER_DIA as FERRULE_OUTER_DIA,
     TENON_GLUE_LINE as FERRULE_TENON_GLUE_LINE,
 )
 
-# 2026-09-02 user re-read of the pass-2 model against ch11 p.14 and the ch30
-# p002 front view: overall 58 from the arm face, swell 21 across at 0.62 of
-# the length, neck Ø11.  The basic profile still runs the whole 58: the
-# ferrule and the cup flange now take its two ends.
-HANDLE_LENGTH = 58.0  # basic: ferrule arm face to cup flange face
+# 2026-09-02 user re-read: overall 58 from the arm face; the ferrule and the
+# cup take its two ends.
+HANDLE_LENGTH = 58.0  # basic: ferrule arm face to cup face
 HANDLE_MAX_DIA = 21.0  # max diameter at the swell
-# Waist at the tenon shoulder.  Ø11 in the photo re-derive; grown to Ø12
-# (Codex P1 on #1139, user ruling 2026-09-30) so the shoulder the ferrule
-# seats on survives the contour allowance under the largest fitted tenon.
-NECK_R = 6.0
-PEAK_X = 36.0  # axial station of the maximum diameter, from x=0
-# Theoretical butt radius at HANDLE_LENGTH.  Ø10 in the photo re-derive; grown
-# (user rulings 2026-09-29, MHA-153 and MHA-022 reviews) to Ø15 so the oak
-# round the cup counterbore keeps 1.5 mm at its worst case -- the longest
-# overall puts the butt face furthest down the taper -- and the trim face is
-# as wide as the cup flange.
-CAP_R = 8.0
-# The turned grip contour's allowance, on diameter, against its two arcs: the
-# wood grip is checked by eye and template, not by a profile frame (MHA-022
-# review, user ruling 2026-09-29).
+# The turned grip contour's allowance, on diameter, against its arcs: the wood
+# grip is checked by eye and template, not by a profile frame (MHA-022 review,
+# user ruling 2026-09-29).
 CONTOUR_ALLOWANCE_DIA = 0.5
-PIVOT_BORE_DIA = 6.125  # final reamed bore limits 6.10-6.15
-# Symmetric ream band about the mid nominal: 6.15 MAX / 6.10 MIN.
+# Reamed running bore on the MHA-139 Ø4.00 shoulder: limits 4.10-4.15.
+PIVOT_BORE_DIA = 4.125
 PIVOT_BORE_BAND = (0.025, -0.025)
 
-# The tenon shoulder (datum B) is where the ferrule seats, FERRULE_LENGTH from
-# the arm face.
+# The tenon shoulder is where the ferrule seats, FERRULE_LENGTH from the arm
+# face.  The oak leaves it flush with the ferrule's OD (user, handle2.png).
 SHOULDER_X = FERRULE_LENGTH
+SHOULDER_R = FERRULE_OUTER_DIA / 2.0
 # The tenon is turned to suit the actual MHA-150 bore for an epoxy line; the
 # model carries the size that line gives on a nominal bore.
 TENON_GLUE_LINE = FERRULE_TENON_GLUE_LINE
@@ -83,66 +75,138 @@ TENON_DIA = FERRULE_BORE_DIA - sum(TENON_GLUE_LINE) / 2.0
 # arm face, so the oak never bears on the arm.
 TENON_LENGTH = 5.0
 TENON_X0 = SHOULDER_X - TENON_LENGTH
+TENON_R = TENON_DIA / 2.0
 
-# The butt is trimmed where the cup flange seats: the flange face lands on the
-# basic HANDLE_LENGTH.  Wood from datum B to the trim face, a routine size.
-TRIM_X = HANDLE_LENGTH - CUP_FLANGE_THICKNESS
-WOOD_LENGTH = TRIM_X - SHOULDER_X
-# The counterbore is bored to suit the actual MHA-153 body for an epoxy line.
+# Grip stations (x from the arm face) and radii, fitted to eight-views-4.
+WAIST_X = 12.0
+WAIST_R = 9.5 / 2.0
+INFLECTION_X = 20.0
+PEAK_X = 42.0
+PEAK_R = HANDLE_MAX_DIA / 2.0
+# The dome is the circle through the swell (horizontal tangent) and this
+# theoretical point on the cup face plane; the end round replaces it at the
+# butt.
+DOME_THEORETICAL_R = 6.0
+
+# The counterbore is bored to suit the actual MHA-153 body for an epoxy line;
+# the oak ends at its mouth, the end round running out on the cup.
 COUNTERBORE_GLUE_LINE = (0.05, 0.15)
 COUNTERBORE_DIA = CUP_BODY_DIA + sum(COUNTERBORE_GLUE_LINE) / 2.0
-COUNTERBORE_DEPTH = 9.0
-TENON_R = TENON_DIA / 2.0
 COUNTERBORE_R = COUNTERBORE_DIA / 2.0
+OAK_END_X = 57.9
+# The cup bottoms in the counterbore with its face on the handle's basic
+# length, a tenth past the oak's feather edge.
+COUNTERBORE_DEPTH = round(CUP_LENGTH - (HANDLE_LENGTH - OAK_END_X), 6)
+COUNTERBORE_FLOOR_X = OAK_END_X - COUNTERBORE_DEPTH
+# The end round crests just outside the cup's pocket rim.
+END_ROUND_CY = CUP_POCKET_DIA / 2.0 + 0.25
 
-_FRONT_DX = PEAK_X - SHOULDER_X
-_FRONT_DH = HANDLE_MAX_DIA / 2.0 - NECK_R
-FRONT_PROFILE_R = (_FRONT_DX**2 + _FRONT_DH**2) / (2.0 * _FRONT_DH)
-_REAR_DX = HANDLE_LENGTH - PEAK_X
-_REAR_DH = HANDLE_MAX_DIA / 2.0 - CAP_R
-REAR_PROFILE_R = (_REAR_DX**2 + _REAR_DH**2) / (2.0 * _REAR_DH)
-REAR_PROFILE_CY = HANDLE_MAX_DIA / 2.0 - REAR_PROFILE_R
-# The oak's radius where the butt is trimmed.
-TRIM_R = REAR_PROFILE_CY + math.sqrt(REAR_PROFILE_R**2 - (TRIM_X - PEAK_X) ** 2)
+# Flare: concave, centre above the waist, through the shoulder point.
+FLARE_R = ((WAIST_X - SHOULDER_X) ** 2 + (SHOULDER_R - WAIST_R) ** 2) / (
+    2.0 * (SHOULDER_R - WAIST_R)
+)
+FLARE_CENTER = (WAIST_X, WAIST_R + FLARE_R)
+# S-curve: two arcs, horizontal at the waist and at the swell, tangent at the
+# inflection, so their centres are |S| apart with S = R_concave + R_convex.
+_S_DX, _S_DH = PEAK_X - WAIST_X, PEAK_R - WAIST_R
+_S = (_S_DX**2 + _S_DH**2) / (2.0 * _S_DH)
+S_CONCAVE_R = _S * (INFLECTION_X - WAIST_X) / _S_DX
+S_CONVEX_R = _S - S_CONCAVE_R
+S_CONCAVE_CENTER = (WAIST_X, WAIST_R + S_CONCAVE_R)
+S_CONVEX_CENTER = (PEAK_X, PEAK_R - S_CONVEX_R)
+INFLECTION = (
+    S_CONCAVE_CENTER[0] + S_CONCAVE_R / _S * (S_CONVEX_CENTER[0] - S_CONCAVE_CENTER[0]),
+    S_CONCAVE_CENTER[1] + S_CONCAVE_R / _S * (S_CONVEX_CENTER[1] - S_CONCAVE_CENTER[1]),
+)
+# Dome: convex, centre below the swell.
+DOME_R = ((HANDLE_LENGTH - PEAK_X) ** 2 + (PEAK_R - DOME_THEORETICAL_R) ** 2) / (
+    2.0 * (PEAK_R - DOME_THEORETICAL_R)
+)
+DOME_CENTER = (PEAK_X, PEAK_R - DOME_R)
+
+
+def _end_round() -> tuple[float, float]:
+    """(centre x, radius) of the end round: centre on y=END_ROUND_CY, through
+    the oak's end at the counterbore mouth, internally tangent to the dome."""
+
+    def gap(cx: float) -> float:
+        r = math.hypot(OAK_END_X - cx, COUNTERBORE_R - END_ROUND_CY)
+        return math.hypot(cx - DOME_CENTER[0], END_ROUND_CY - DOME_CENTER[1]) + r - DOME_R
+
+    lo, hi = PEAK_X, OAK_END_X
+    for _ in range(200):
+        mid = (lo + hi) / 2.0
+        if gap(lo) * gap(mid) <= 0.0:
+            hi = mid
+        else:
+            lo = mid
+    cx = (lo + hi) / 2.0
+    return cx, math.hypot(OAK_END_X - cx, COUNTERBORE_R - END_ROUND_CY)
+
+
+END_ROUND_CX, END_ROUND_R = _end_round()
+END_ROUND_CENTER = (END_ROUND_CX, END_ROUND_CY)
+_d = math.hypot(END_ROUND_CX - DOME_CENTER[0], END_ROUND_CY - DOME_CENTER[1])
+DOME_END = (
+    DOME_CENTER[0] + DOME_R * (END_ROUND_CX - DOME_CENTER[0]) / _d,
+    DOME_CENTER[1] + DOME_R * (END_ROUND_CY - DOME_CENTER[1]) / _d,
+)
+
+
+def profile_radius(x: float) -> float:
+    """The grip's nominal radius at station ``x`` (shoulder to oak end)."""
+
+    def upper(center: tuple[float, float], r: float) -> float:
+        return center[1] + math.sqrt(r * r - (x - center[0]) ** 2)
+
+    def lower(center: tuple[float, float], r: float) -> float:
+        return center[1] - math.sqrt(r * r - (x - center[0]) ** 2)
+
+    if x <= WAIST_X:
+        return lower(FLARE_CENTER, FLARE_R)
+    if x <= INFLECTION[0]:
+        return lower(S_CONCAVE_CENTER, S_CONCAVE_R)
+    if x <= PEAK_X:
+        return upper(S_CONVEX_CENTER, S_CONVEX_R)
+    if x <= DOME_END[0]:
+        return upper(DOME_CENTER, DOME_R)
+    return upper(END_ROUND_CENTER, END_ROUND_R)
+
+
+WOOD_LENGTH = OAK_END_X - SHOULDER_X
 
 # The title block's .X band on the routine sizes below.
 _GENERAL_1PL = GENERAL_1PL_TOL_MM
-# Oak left around the counterbore at its mouth, under the cup flange, at the
-# worst case (MHA-022 re-review): the longest .X overall moves the butt face
-# down the taper, the contour turns to its full undersize, and the largest cup
-# body takes the widest glue line -- a maximum the note states, so the
-# fitted bore is bounded.
 COUNTERBORE_DIA_MAX = round(
     CUP_BODY_DIA + CUP_BODY_DIA_TOL + COUNTERBORE_GLUE_LINE[1] + 0.05, 1
 )
-# The butt face at its longest AND the crown station at its shortest (both .X)
-# put the trim face furthest down the rear arc (MHA-022 re-review 2).
-_TRIM_X_LONGEST = TRIM_X + 2.0 * _GENERAL_1PL
-TRIM_R_WORST = (
-    REAR_PROFILE_CY
-    + math.sqrt(REAR_PROFILE_R**2 - (_TRIM_X_LONGEST - PEAK_X) ** 2)
-    # The note lets the diameter run the whole allowance small, so the radius
-    # loses half of it (Codex P2 on #1139: /4 assumed a symmetric band).
+# The end round feathers the oak to nothing at the counterbore mouth -- a
+# named drawing-simplicity-policy exception (user ruling 2026-09-30): it is
+# turned across the bonded steel cup, which backs the edge.  One millimetre in
+# from the oak's end the oak round the largest counterbore, with the contour
+# turned its whole allowance small, holds the 1.5 floor again.
+FEATHER_DEPTH = 1.0
+OAK_WALL_BEHIND_FEATHER = (
+    profile_radius(OAK_END_X - FEATHER_DEPTH)
+    - COUNTERBORE_DIA_MAX / 2.0
     - CONTOUR_ALLOWANCE_DIA / 2.0
 )
-COUNTERBORE_MOUTH_WALL = TRIM_R_WORST - COUNTERBORE_DIA_MAX / 2.0
-# The butt is blended flush with the bonded cup flange (Codex P2 on #1139,
-# user ruling 2026-09-30): a contour turned to its allowance can stand ~0.65
-# proud of the smallest .X flange, exposing end grain.  Blending down to the
-# smallest flange must still leave 1.5 of oak round the largest counterbore.
-BLENDED_BUTT_WALL = (CUP_FLANGE_DIA - _GENERAL_1PL) / 2.0 - COUNTERBORE_DIA_MAX / 2.0
 # The tenon is turned to suit the actual ferrule bore (Codex P1/P2 on #1139):
 # the largest banded bore with the tightest glue line gives the largest tenon,
 # and the smallest bore with the widest line the smallest.
 TENON_DIA_MAX = FERRULE_BORE_DIA + FERRULE_BORE_DIA_TOL - FERRULE_TENON_GLUE_LINE[0]
 TENON_DIA_MIN = FERRULE_BORE_DIA - FERRULE_BORE_DIA_TOL - FERRULE_TENON_GLUE_LINE[1]
-# The shoulder the ferrule seats on, radially, at its worst: the neck turned
-# its whole allowance small over the largest tenon.
+# The shoulder the ferrule seats on, radially, at its worst: the oak turned
+# its whole allowance small at the shoulder over the largest tenon.
 FERRULE_SEAT_RADIAL_MIN = (
-    (2.0 * NECK_R - CONTOUR_ALLOWANCE_DIA) - TENON_DIA_MAX
+    (2.0 * SHOULDER_R - CONTOUR_ALLOWANCE_DIA) - TENON_DIA_MAX
 ) / 2.0
 # Oak between the smallest tenon and the largest reamed pivot bore.
 TENON_WALL_MIN = (TENON_DIA_MIN - (PIVOT_BORE_DIA + PIVOT_BORE_BAND[0])) / 2.0
+# Oak at the waist over the largest bore, the contour its whole allowance small.
+WAIST_WALL_MIN = (
+    (2.0 * WAIST_R - CONTOUR_ALLOWANCE_DIA) - (PIVOT_BORE_DIA + PIVOT_BORE_BAND[0])
+) / 2.0
 
 for _ok, _what in (
     (
@@ -150,36 +214,33 @@ for _ok, _what in (
         "the longest tenon reaches the shortest ferrule's arm face",
     ),
     (TENON_LENGTH - _GENERAL_1PL >= 4.0, "the shortest tenon leaves under 4.0 of glue length"),
-    (TENON_R < NECK_R, "the tenon leaves no shoulder for the ferrule to seat on"),
     (
         FERRULE_SEAT_RADIAL_MIN >= 0.5,
         "the largest fitted tenon leaves under 0.5 of shoulder for the ferrule",
     ),
     (TENON_WALL_MIN >= 1.5, "the smallest fitted tenon leaves under 1.5 over the bore"),
+    (WAIST_WALL_MIN >= 1.5, "the waist leaves under 1.5 over the bore"),
     (
-        COUNTERBORE_DEPTH - _GENERAL_1PL > CUP_BODY_LENGTH_MAX,
-        "the cup body can bottom in the shallowest counterbore before its flange seats",
+        OAK_WALL_BEHIND_FEATHER >= 1.5,
+        "oak 1.0 in from the feathered end is under 1.5 round the counterbore",
+    ),
+    (WAIST_R < SHOULDER_R and WAIST_R < PEAK_R, "the waist is not the neck's minimum"),
+    (
+        DOME_CENTER[0] < END_ROUND_CX < OAK_END_X and 0.0 < END_ROUND_R < DOME_R,
+        "the end round does not sit inside the dome",
     ),
     (
-        COUNTERBORE_MOUTH_WALL >= 1.5,
-        "oak at the counterbore mouth is under 1.5 at the contour allowance",
-    ),
-    (
-        abs(CUP_FLANGE_DIA - 2.0 * TRIM_R) <= 0.1,
-        "the cup flange does not match the oak at the trim face",
-    ),
-    (
-        BLENDED_BUTT_WALL >= 1.5,
-        "blending the butt to the smallest cup flange leaves under 1.5 of oak",
+        END_ROUND_CX + END_ROUND_R >= HANDLE_LENGTH - 0.05,
+        "the end round does not reach the cup face",
     ),
     (COUNTERBORE_R > PIVOT_BORE_DIA / 2.0, "counterbore is inside the pivot bore"),
 ):
     if not _ok:
         raise AssertionError(f"MHA-022: {_what}")
 
-# Marked dimensions.  The profile sketch owns the tenon, the wood length from
-# datum B, the peak station from datum B and the counterbore; the bore sketch
-# owns the reamed bore.
+# Marked dimensions.  The profile sketch owns the tenon, the oak overall from
+# the tenon end, the peak station and the counterbore; the bore sketch owns
+# the reamed bore.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "HandleProfile": {
         "TenonDia",
@@ -192,8 +253,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "PivotBoreProfile": {"PivotBoreDia"},
 }
 # Decimal places are the tolerance (policy rule 2): the reamed bore prints its
-# band and the basic peak station at two places; every other size is routine
-# (.X), the two fitted diameters as references under their to-suit callouts.
+# band at two places; every other size is routine (.X), the fitted tenon and
+# counterbore as references under their to-suit callouts.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "HandleProfile": {
         "TenonDia": 1,
@@ -212,37 +273,38 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 }
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked MHA-022 dimension needs authored places")
-# The MHA-022 review (user ruling 2026-09-29) dropped the datums, the three
-# feature-control frames and the basic profile: a decorative oak grip is
-# turned to its arcs by eye and template, within a contour allowance.
-REFERENCE_DIMENSIONS = frozenset({"TenonDia", "CounterboreDia"})
+REFERENCE_DIMENSIONS = frozenset({"TenonDia", "CounterboreDia", "CounterboreDepth"})
 # Every axial station reads from the tenon's end face, the one faced end, so
 # the oak's overall (for stock cut-off) is a marked dimension of its own.
-OVERALL_LENGTH = TRIM_X - TENON_X0
+OVERALL_LENGTH = OAK_END_X - TENON_X0
 
 FERRULE_NUMBER = "MHA-150"
 CUP_NUMBER = "MHA-153"
 SCREW_NUMBER = "MHA-139"
 
-_SHOULDER_E = SHOULDER_X - TENON_X0
-_PEAK_E = PEAK_X - TENON_X0
-_END_E = HANDLE_LENGTH - TENON_X0
+
+def _e(x: float) -> float:
+    """A station from the tenon end face, as the sheet prints it."""
+    return x - TENON_X0
+
+
 DRAWING_NOTES = "\n".join(
     (
-        "AXIAL STATIONS ARE FROM THE TENON END FACE; THE COUNTERBORE DEPTH IS",
-        "  FROM THE BUTT FACE.",
+        "AXIAL STATIONS ARE FROM THE TENON END FACE.",
         f"TURN THE TENON TO SUIT THE {FERRULE_NUMBER} FERRULE BORE AND BORE THE BUTT",
         f"  COUNTERBORE TO SUIT THE {CUP_NUMBER} CUP BODY, EACH FOR "
         f"{TENON_GLUE_LINE[0]:.2f}-{TENON_GLUE_LINE[1]:.2f} DIAMETRAL",
-        f"  CLEARANCE, COUNTERBORE <MOD-DIAM>{COUNTERBORE_DIA_MAX:.1f} MAX; "
-        "EPOXY BOTH IN AT ASSEMBLY.",
-        f"AFTER CURE, BLEND THE BUTT FLUSH WITH THE {CUP_NUMBER} FLANGE.",
+        f"  CLEARANCE, COUNTERBORE <MOD-DIAM>{COUNTERBORE_DIA_MAX:.1f} MAX, DEPTH TO SEAT THE CUP",
+        "  FACE FLUSH; EPOXY BOTH IN AT ASSEMBLY.",
+        f"AFTER CURE, TURN THE SHOULDER FLUSH WITH {FERRULE_NUMBER} AND THE END ROUND",
+        f"  ACROSS THE OAK AND {CUP_NUMBER}; THE OAK FEATHERS OUT ON THE CUP.",
         f"THE REAMED BORE RUNS ON THE {SCREW_NUMBER} SHOULDER; ITS LIMITS APPLY FULL LENGTH.",
-        f"GRIP CONTOUR: <MOD-DIAM>{2.0 * NECK_R:.1f} AT THE SHOULDER ({_SHOULDER_E:.1f}), "
-        f"<MOD-DIAM>{HANDLE_MAX_DIA:.1f} AT {_PEAK_E:.1f};",
-        f"  ARCS R{FRONT_PROFILE_R:.1f} AND R{REAR_PROFILE_R:.1f}, TANGENT AT {_PEAK_E:.1f}, "
-        f"RUNNING ON TO <MOD-DIAM>{2.0 * CAP_R:.1f} AT {_END_E:.1f}",
-        f"  (PAST THE BUTT FACE). TURN WITHIN {CONTOUR_ALLOWANCE_DIA:.1f} ON DIAMETER.",
+        f"GRIP CONTOUR, TANGENT ARCS IN TURN: R{FLARE_R:.1f} FROM THE SHOULDER TO A",
+        f"  <MOD-DIAM>{2.0 * WAIST_R:.1f} WAIST AT {_e(WAIST_X):.1f}; "
+        f"R{S_CONCAVE_R:.1f} AND R{S_CONVEX_R:.1f} (INFLECTION AT {_e(INFLECTION_X):.1f})",
+        f"  TO <MOD-DIAM>{HANDLE_MAX_DIA:.1f} AT {_e(PEAK_X):.1f}; R{DOME_R:.1f}; "
+        f"R{END_ROUND_R:.1f} END ROUND TO THE OAK END.",
+        f"  TURN WITHIN {CONTOUR_ALLOWANCE_DIA:.1f} ON DIAMETER; CHECK WITH A TEMPLATE.",
         "USE CLEAR STRAIGHT GRAIN PARALLEL TO TURNING AXIS.",
     )
 )

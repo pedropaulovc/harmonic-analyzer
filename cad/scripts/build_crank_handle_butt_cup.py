@@ -1,13 +1,14 @@
-r"""Build MHA-153, the flanged steel cup at the butt of the crank handle.
+r"""Build MHA-153, the plain steel cup at the butt of the crank handle.
 
 User ruling 2026-09-29 (ch11 p.14/p.15 photographs): the butt of the ebonized
 grip carries a bright steel cup with the pivot screw's slotted head recessed
-inside it.  The flange covers the oak's end grain, the body is epoxied into
-the MHA-022 counterbore, and MHA-139's head bears on the floor.  Dimensions
-live in ``crank_handle_butt_cup_spec``.
+inside it.  The body is epoxied into the MHA-022 counterbore, face flush, and
+MHA-139's head bears on the floor; user rulings 2026-09-30 (concept v4) made it
+a plain cup, the handle's end round turned across oak and cup together.
+Dimensions live in ``crank_handle_butt_cup_spec``.
 
-Layout: one revolve about local +X.  The flange's outer face is the origin
-plane (x=0); the flange, body and floor run toward -X, into the handle, so in
+Layout: one revolve about local +X.  The cup's outer face is the origin
+plane (x=0); the body and floor run toward -X, into the handle, so in
 the handle's frame the cup sits at the basic overall length with the handle's
 own orientation.  ``Axis1`` is the cup axis.
 
@@ -28,7 +29,6 @@ from _common import (
     apply_color,
     apply_material,
     check,
-    dimension_between,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
@@ -55,8 +55,6 @@ from crank_handle_butt_cup_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
-    FLANGE_DIA,
-    FLANGE_THICKNESS,
     FLOOR_HOLE_DIA,
     ISOMETRIC_VIEW_NOTE,
     OVERALL_LENGTH,
@@ -68,13 +66,11 @@ from crank_handle_butt_cup_spec import (
 PART_NAME = "crank-handle-butt-cup"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
-FLANGE_R = FLANGE_DIA / 2.0
 BODY_R = BODY_DIA / 2.0
 POCKET_R = POCKET_DIA / 2.0
 FLOOR_HOLE_R = FLOOR_HOLE_DIA / 2.0
 V_CUP = math.pi * (
-    FLANGE_R**2 * FLANGE_THICKNESS
-    + BODY_R**2 * (OVERALL_LENGTH - FLANGE_THICKNESS)
+    BODY_R**2 * OVERALL_LENGTH
     - POCKET_R**2 * POCKET_DEPTH
     - FLOOR_HOLE_R**2 * (OVERALL_LENGTH - POCKET_DEPTH)
 )
@@ -87,8 +83,6 @@ async def build(adapter) -> dict[str, str]:
     # The mm suffix is load-bearing: the equation manager reads bare numbers in
     # document units (see build_crankshaft).
     for name, value in (
-        ("FlangeDia", FLANGE_DIA),
-        ("FlangeThickness", FLANGE_THICKNESS),
         ("BodyDia", BODY_DIA),
         ("OverallLength", OVERALL_LENGTH),
         ("PocketDia", POCKET_DIA),
@@ -100,8 +94,8 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs: list[tuple[str, str]] = []
 
     # Stepped section on the Front plane, revolved about the X axis: pocket
-    # mouth -> flange face -> flange OD -> flange seat -> body OD -> bottom ->
-    # floor hole -> floor top -> pocket wall.  Nothing touches the axis: the
+    # mouth -> face -> body OD -> bottom -> floor hole -> floor top -> pocket
+    # wall.  Nothing touches the axis: the
     # floor hole passes the screw shoulder.
     profile = SketchDims()
     check("create_sketch cup profile", await adapter.create_sketch("Front"))
@@ -112,9 +106,7 @@ async def build(adapter) -> dict[str, str]:
     )
     points = [
         (0.0, POCKET_R),
-        (0.0, FLANGE_R),
-        (-FLANGE_THICKNESS, FLANGE_R),
-        (-FLANGE_THICKNESS, BODY_R),
+        (0.0, BODY_R),
         (-OVERALL_LENGTH, BODY_R),
         (-OVERALL_LENGTH, FLOOR_HOLE_R),
         (-POCKET_DEPTH, FLOOR_HOLE_R),
@@ -122,16 +114,7 @@ async def build(adapter) -> dict[str, str]:
     ]
     lines = await add_line_chain(adapter, points)
     set_sketch_direct_db(adapter, False)
-    (
-        flange_face,
-        flange_od,
-        flange_seat,
-        body_od,
-        bottom,
-        floor_hole,
-        floor_top,
-        pocket_wall,
-    ) = lines
+    face, body_od, bottom, floor_hole, floor_top, pocket_wall = lines
     check("axis horizontal", await adapter.add_sketch_constraint(axis, None, "horizontal"))
     for index, line in enumerate(lines):
         (u0, v0), (u1, v1) = points[index], points[(index + 1) % len(points)]
@@ -145,10 +128,8 @@ async def build(adapter) -> dict[str, str]:
         await adapter.add_sketch_constraint(f"{axis}.start", "origin", "coincident"),
     )
     check(
-        "flange face on the origin plane",
-        await adapter.add_sketch_constraint(
-            f"{flange_face}.start", "origin", "vertical_points"
-        ),
+        "face on the origin plane",
+        await adapter.add_sketch_constraint(f"{face}.start", "origin", "vertical_points"),
     )
     # Dimensions in creation order.
     check(
@@ -157,20 +138,11 @@ async def build(adapter) -> dict[str, str]:
     )
     profile.record("AxisLength", '"OverallLength"')
     check(
-        "flange thickness",
-        await adapter.add_sketch_dimension(flange_od, None, "linear", FLANGE_THICKNESS),
-    )
-    profile.record("FlangeThickness", '"FlangeThickness"')
-    await dimension_between(
-        adapter,
-        f"{flange_od}.start",
-        f"{bottom}.start",
-        "horizontal_distance",
-        OVERALL_LENGTH,
         "cup overall length",
+        await adapter.add_sketch_dimension(body_od, None, "linear", OVERALL_LENGTH),
     )
     profile.record("OverallLength", '"OverallLength"')
-    # Every axial size reads from the flange face (MHA-153 re-review); the
+    # Every axial size reads from the face (MHA-153 re-review); the
     # floor is what the overall leaves.
     check(
         "pocket depth",
@@ -178,8 +150,7 @@ async def build(adapter) -> dict[str, str]:
     )
     profile.record("PocketDepth", '"PocketDepth"')
     for name, line, u_mid, radius in (
-        ("FlangeDia", flange_od, -FLANGE_THICKNESS / 2.0, FLANGE_R),
-        ("BodyDia", body_od, -(FLANGE_THICKNESS + OVERALL_LENGTH) / 2.0, BODY_R),
+        ("BodyDia", body_od, -OVERALL_LENGTH / 2.0, BODY_R),
         ("PocketDia", pocket_wall, -POCKET_DEPTH / 2.0, POCKET_R),
         ("FloorHoleDia", floor_hole, -(POCKET_DEPTH + OVERALL_LENGTH) / 2.0, FLOOR_HOLE_R),
     ):
@@ -193,7 +164,7 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += profile.apply(adapter, "CupProfile")
     check("revolve cup", await adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "Cup")
-    await volume_check(adapter, "flanged butt cup", V_CUP, 0.005 * V_CUP)
+    await volume_check(adapter, "butt cup", V_CUP, 0.005 * V_CUP)
 
     await name_bore_axis(adapter, "Front Plane", 0.0, "Top Plane", 0.0, "cup axis")
 
@@ -207,7 +178,7 @@ async def build(adapter) -> dict[str, str]:
 
     # The model-owned bands (policy rule 2): the body diameter that holds the
     # pocket wall, and the pocket depth that keeps the MHA-139 head below the
-    # flange.  Every other size is routine (.X); the pocket is bored to suit
+    # face.  Every other size is routine (.X); the pocket is bored to suit
     # the head's diameter.
     set_dimension_symmetric_tolerance(adapter, "CupProfile", "BodyDia", BODY_DIA_TOL)
     set_dimension_symmetric_tolerance(

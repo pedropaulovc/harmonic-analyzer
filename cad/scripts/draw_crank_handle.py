@@ -1,10 +1,11 @@
 r"""Create the curated machinist drawing for the crank handle.
 
 A turned, ebonized oak pear grip (book ch. 11).  User ruling 2026-09-29: the
-brass ferrule MHA-150 and the flanged steel butt cup MHA-153 are separate
-parts, so this sheet prints only the oak -- a tenon for the ferrule at the
-crank end, a waisted neck, a smooth twin-arc swell to the Ø21 max, and a
-trimmed butt with a counterbore for the cup.
+brass ferrule MHA-150 and the steel butt cup MHA-153 are separate parts, so
+this sheet prints only the oak -- a tenon for the ferrule at the crank end, a
+flared waist, an S-curve swell to the Ø21 max, and a domed butt whose end
+round feathers out on the counterbore the cup is bonded into (user rulings
+2026-09-30, concept v4).
 
 After the MHA-022 machinist review (user ruling 2026-09-29) the sheet is plain:
 no datums, feature-control frames or basic dimensions -- the grip is turned to
@@ -52,8 +53,8 @@ from crank_handle_spec import (
     REFERENCE_DIMENSIONS,
     SHOULDER_X,
     TENON_DIA,
+    OAK_END_X,
     TENON_X0,
-    TRIM_X,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -78,7 +79,7 @@ SHEET_SCALE = (2.0, 1.0)
 # The section lays the handle axis horizontal, tenon at the left and butt at
 # the right (the part's +X to the right, as MHA-153's section showed), centred
 # on the oak's extent.  The end view stands on the same axis height.
-FRONT_BBOX_CX = (TENON_X0 + TRIM_X) / 2.0
+FRONT_BBOX_CX = (TENON_X0 + OAK_END_X) / 2.0
 FRONT_CENTER = (0.150, 0.178)
 RIGHT_CENTER = (0.300, FRONT_CENTER[1])
 ISO_CENTER = (0.365, 0.240)
@@ -197,10 +198,13 @@ async def build(adapter: Any) -> dict[str, str]:
     # to-suit note), so their sizes print as references.
     for name in sorted(REFERENCE_DIMENSIONS):
         set_reference_dimension(
-            adapter, front_by_name[name], label=f"MHA-022 {name}", diameter=True
+            adapter,
+            front_by_name[name],
+            label=f"MHA-022 {name}",
+            diameter=name.endswith("Dia"),
         )
     create_section_axis_centerline(
-        adapter, front, length_mm=TRIM_X - TENON_X0, label="crank handle axis"
+        adapter, front, length_mm=OAK_END_X - TENON_X0, label="crank handle axis"
     )
     if not auto_center_marks(adapter, right, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to crank-handle end view")

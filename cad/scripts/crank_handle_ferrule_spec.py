@@ -23,8 +23,11 @@ PURE DATA, no SolidWorks/COM imports.
 
 from __future__ import annotations
 
-OUTER_DIA = 15.0
-BORE_DIA = 10.0
+# Ø12.5 x 7 (user ruling 2026-09-30, ch30 eight-views-4 side view: the ring
+# reads ~Ø11-12, not the Ø15 first derived).  The bore follows the smaller
+# MHA-139 shoulder: the tenon over the Ø4.1 pivot bore keeps its 1.5 wall.
+OUTER_DIA = 12.5
+BORE_DIA = 7.5
 BORE_DIA_TOL = 0.10
 LENGTH = 7.0
 

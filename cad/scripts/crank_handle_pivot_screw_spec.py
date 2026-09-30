@@ -1,8 +1,8 @@
 r"""Pure-data contract for MHA-139, the crank handle pivot screw (user ruling U33).
 
-A made slotted shoulder screw turned from 3/8-in cold-finished rod.  The oak
+A made slotted shoulder screw turned from 1/4-in cold-finished rod.  The oak
 handle MHA-022 spins on the shoulder; the thread screws into the crank arm
-MHA-020's #8-32 tapped through hole and the shoulder seats tight on the arm
+MHA-020's #6-32 tapped through hole and the shoulder seats tight on the arm
 face, so the shoulder length alone sets the handle's end play.  The tip is
 filed flush with the arm's inboard face at assembly (``INSTALLED_CONFIG``).
 
@@ -28,20 +28,18 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from crank_handle_butt_cup_spec import (
     BODY_DIA as CUP_BODY_DIA,
     BODY_DIA_TOL as CUP_BODY_DIA_TOL,
-    FLANGE_THICKNESS as CUP_FLANGE_THICKNESS,
     FLOOR_HOLE_DIA as CUP_FLOOR_HOLE_DIA,
     POCKET_CLEARANCE as CUP_POCKET_CLEARANCE,
     POCKET_DEPTH as CUP_POCKET_DEPTH,
     POCKET_DEPTH_TOL as CUP_POCKET_DEPTH_TOL,
     POCKET_DIA as CUP_POCKET_DIA,
+    POCKET_WALL_FLOOR_MM as CUP_POCKET_WALL_FLOOR_MM,
     WALL_FLOOR_MM,
 )
-from crank_handle_ferrule_spec import LENGTH as FERRULE_LENGTH
 from crank_handle_spec import (
     HANDLE_LENGTH,
     PIVOT_BORE_BAND,
     PIVOT_BORE_DIA,
-    WOOD_LENGTH,
 )
 from crank_hub_geometry import (
     ARM_STOCK_THICKNESS,
@@ -53,13 +51,15 @@ from crank_hub_geometry import (
 )
 
 
-STOCK_DIA = 0.375 * MM_PER_IN
+STOCK_DIA = 0.25 * MM_PER_IN
 
 # User ruling 2026-09-29 (ch11 p.14): the head sits recessed in the MHA-153
 # butt cup's pocket, which is bored to suit it, and bears on the cup floor.
 # Its +/-0.10 band keeps a bearing annulus outside the drilled floor hole at
-# the worst case, after an edge break on each.
-HEAD_DIA = 8.0
+# the worst case, after an edge break on each.  Ø6 (user ruling 2026-09-30,
+# ch30 eight-views-4): the photographed head, which lets the cup and the butt
+# shrink to the photographed size.
+HEAD_DIA = 6.0
 HEAD_DIA_TOL = 0.10
 # A 4.0 head (user ruling 2026-09-29, MHA-139 machinist review): with the
 # slot's own band below, the worst case leaves 2.0 of head under the slot,
@@ -73,8 +73,10 @@ SLOT_DEPTH = 1.0
 SLOT_DEPTH_TOL = 0.20
 
 # The running surface under the oak bore.  (upper, lower) deviations from the
-# Ø6.00 nominal; the model carries the band natively (policy rule 2).
-SHOULDER_DIA = 6.00
+# Ø4.00 nominal; the model carries the band natively (policy rule 2).  Ø4.00
+# over a #6-32 thread (user ruling 2026-09-30): the shoulder leaves a seat
+# annulus on the arm face and the tenon keeps 1.5 of oak over its bore.
+SHOULDER_DIA = 4.00
 SHOULDER_DIA_BAND = (-0.03, -0.08)
 # Arm face to the head's underside, which bears on the MHA-153 cup floor.
 # User ruling 2026-09-29 (after the machinist reviews): the shoulder is
@@ -84,17 +86,16 @@ SHOULDER_DIA_BAND = (-0.03, -0.08)
 # nominal end play, printed as a reference under the to-suit callout.
 END_PLAY_RANGE = (0.25, 1.00)
 END_PLAY_NOMINAL = 0.5
-HANDLE_STACK_NOMINAL = round(
-    FERRULE_LENGTH + WOOD_LENGTH + CUP_FLANGE_THICKNESS - CUP_POCKET_DEPTH, 6
-)
+# The cup's face sits on the handle's basic length, so the stack from the
+# ferrule's arm face to the cup floor is that length less the pocket.
+HANDLE_STACK_NOMINAL = round(HANDLE_LENGTH - CUP_POCKET_DEPTH, 6)
 SHOULDER_LENGTH = round(HANDLE_STACK_NOMINAL + END_PLAY_NOMINAL, 6)
 
-# #8-32, not U33's #10-24 (Main, U29/1.25D follow-up, 2026-09-25): the arm
-# governs the worst-case engagement, so the only lever on its D count at the
-# current bands is D itself.  #10-24 gave 1.15D, 0.005D over the U33b floor;
-# #8-32 gives 1.34D with the same relief width and thread length.
-THREAD_SIZE = "#8-32"
-# The threaded section is modelled as a plain cylinder at the basic #8 major
+# #6-32 (user ruling 2026-09-30): the smaller Ø4 shoulder the photographed
+# head calls for.  In the 5/16-in arm it clears the policy's 1.5D engagement
+# at the worst case, so the #8-32's U33b exception (1.26D) is retired.
+THREAD_SIZE = "#6-32"
+# The threaded section is modelled as a plain cylinder at the basic #6 major
 # diameter, the fleet convention for a stock screw in a tap-drill-modelled hole.
 THREAD_MODEL_DIA = THREAD_MAJOR_MM[THREAD_SIZE]
 # 10.0 +0/-0.5: the shortest thread section, 9.5, less the relief and 1.5
@@ -116,28 +117,28 @@ TIP_CHAMFER_BAND = (0.05, -0.10)
 THREAD_CALLOUT = f"{THREAD_SIZE} UNC"
 THREADS_PER_IN = 32
 THREAD_PITCH = MM_PER_IN / THREADS_PER_IN
-# #8-32 external minor diameter.  ASSUMPTION, not sourced from ASME B1.1 in
+# #6-32 external minor diameter.  ASSUMPTION, not sourced from ASME B1.1 in
 # this repo: the UN basic profile with its P/8 root flat puts the root at
-# major - 1.5 H = major - 1.299038 P = 3.135 (the same construction gives
+# major - 1.5 H = major - 1.299038 P = 2.474 (the same construction gives
 # #10-24's 3.451, the root the McMaster 91829A560 vendor model cuts).  The
-# UNR-2A reference maximum, 2A major max 0.1631 in (0.164 basic less the
-# 0.0009 allowance) less 1.226869 P (17/24 H each side), is 0.1248 in =
-# 3.169.  The relief floor sits at or below the smaller of the two so the
+# UNR-2A reference maximum, 2A major max 0.1372 in (0.138 basic less the
+# 0.0008 allowance) less 1.226869 P (17/24 H each side), is 0.0989 in =
+# 2.511.  The relief floor sits at or below the smaller of the two so the
 # die's incomplete threads clear it.
-THREAD_MAJOR_2A_MAX_IN = 0.1631
+THREAD_MAJOR_2A_MAX_IN = 0.1372
 THREAD_MINOR_BASIC_ROOT = THREAD_MODEL_DIA - 1.5 * math.sqrt(3.0) / 2.0 * THREAD_PITCH
 THREAD_MINOR_UNR_2A_MAX = (
     THREAD_MAJOR_2A_MAX_IN - 1.226869 / THREADS_PER_IN
 ) * MM_PER_IN
-# Thread relief (Main's ruling on the die-runout doubt; Ø3.0 under the #8-32
+# Thread relief (Main's ruling on the die-runout doubt; Ø2.3 under the #6-32
 # root): a groove in the first RELIEF_WIDTH of the threaded section, against
 # the seat face, so the die's incomplete lead threads run out into air and the shoulder
 # pulls down tight on the arm face.  Routine (.X) sizes under the title-block
 # band.
-RELIEF_DIA = 3.0
+RELIEF_DIA = 2.3
 RELIEF_WIDTH = 1.5
 # A 45-degree lead from the relief floor up into the seat face, so the groove
-# leaves no sharp inside corner.  0.5 keeps the lead inside the Ø4.166 thread
+# leaves no sharp inside corner.  0.5 keeps the lead inside the Ø3.505 thread
 # major, i.e. inside the arm's tapped hole, so the whole seat annulus that
 # bears on the arm face stays flat.  The 45 degrees is enforced in the model by
 # an equation, and printed as a callout on the lead's axial size, as limits
@@ -178,7 +179,7 @@ SHOULDER_DIA_MIN, SHOULDER_DIA_MAX = _limits(SHOULDER_DIA, SHOULDER_DIA_BAND)
 THREAD_LENGTH_MIN, THREAD_LENGTH_MAX = _limits(THREAD_LENGTH, THREAD_LENGTH_BAND)
 HANDLE_BORE_MIN, HANDLE_BORE_MAX = _limits(PIVOT_BORE_DIA, PIVOT_BORE_BAND)
 
-# Head top below the cup's flange face at nominal: the head reads recessed in
+# Head top below the cup's face at nominal: the head reads recessed in
 # the cup (the photographs).
 HEAD_RECESS_NOMINAL = round(HANDLE_LENGTH - (SHOULDER_LENGTH + HEAD_LENGTH), 6)
 # ... and at the printed worst case (Codex P2 on #1139): the shallowest pocket
@@ -215,12 +216,10 @@ DIAMETRAL_CLEARANCE_MIN = round(HANDLE_BORE_MIN - SHOULDER_DIA_MAX, 6)
 DIAMETRAL_CLEARANCE_MAX = round(HANDLE_BORE_MAX - SHOULDER_DIA_MIN, 6)
 # Engagement in the MHA-020 tapped through hole.  The relief sits in the arm's
 # first RELIEF_WIDTH below the seat face, so only the full thread beyond it
-# engages, and never deeper than the arm is thick.
-#
-# U33b (2026-09-23): user accepted ~1.2D steel-in-steel for MHA-139 in the
-# MHA-020 arm; exception to the 1.5D rule.
-ENGAGEMENT_EXCEPTION_FLOOR_D = 1.15
-ENGAGEMENT_FLOOR = ENGAGEMENT_EXCEPTION_FLOOR_D * THREAD_MODEL_DIA
+# engages, and never deeper than the arm is thick.  The drawing-simplicity
+# policy's 1.5D rule holds at the worst case, with no exception.
+ENGAGEMENT_RULE_D = 1.5
+ENGAGEMENT_FLOOR = ENGAGEMENT_RULE_D * THREAD_MODEL_DIA
 # The arm is 5/16-in cold-finished flat bar left at stock thickness
 # (crank_hub_geometry.ARM_STOCK_THICKNESS).  Its sheet prints the 8.0 as a
 # reference to that stock (Codex #892: a toleranced 8.0 took the .X band and
@@ -228,10 +227,8 @@ ENGAGEMENT_FLOOR = ENGAGEMENT_EXCEPTION_FLOOR_D * THREAD_MODEL_DIA
 # ARM_STOCK_THICKNESS_MIN.  The thick side keeps the .X band as a bound on
 # what the model allows.
 ARM_PRINTED_THICKNESS_MAX = ARM_THICKNESS + GENERAL_1PL_TOL_MM
-# The relief width is a routine .X size (MHA-139 re-review, 2026-09-29).  The
-# .XX band it once carried held the #10-24 thread over the U33b floor; the
-# #8-32 thread clears the floor at .X too (asserted below), and the printed
-# engagement minimum follows from it.
+# The relief width is a routine .X size (MHA-139 re-review, 2026-09-29); the
+# #6-32 thread clears the 1.5D rule with it at .X (asserted below).
 RELIEF_WIDTH_MAX = round(RELIEF_WIDTH + GENERAL_1PL_TOL_MM, 6)
 # The title-block edge break on the tapped hole's inboard exit edge takes up
 # to its size of thread off the arm end of the engagement.
@@ -282,26 +279,15 @@ INSTALLED_TIP_CHAMFER = EDGE_BREAK_MAX_MM
 ARM_STOCK_THICKNESS_MAX = 2.0 * ARM_STOCK_THICKNESS - ARM_STOCK_THICKNESS_MIN
 FILE_ALLOWANCE_MAX = round(THREAD_LENGTH_MAX - ARM_STOCK_THICKNESS_MIN, 6)
 FILE_ALLOWANCE_MIN = round(FULL_THREAD_REACH_MIN - ARM_STOCK_THICKNESS_MAX, 6)
-# The one manufacturing note: the named exception, stated with the worst-case
-# engagement its policy row records (the stock arm, after the exit break) and
-# worded like the other sheets' rule-12 statements.  The ruling ID (U33b)
-# stays here; it means nothing to the book's reader.
-# A MIN never rounds up: 1.155 prints 1.15, floored to two places.
-FULL_THREAD_WORST_DIAMETERS_PRINTED = math.floor(FULL_THREAD_WORST_DIAMETERS * 100.0) / 100.0
-# Named exception: MHA-139 engagement (drawing-simplicity-policy.md, "Named exceptions").
-ENGAGEMENT_NOTE = (
-    f"THREAD ENGAGEMENT {FULL_THREAD_WORST_DIAMETERS_PRINTED:.2f}D MIN."
-)
 # The fitted shoulder and both head bands' reasons, stated once (user ruling
 # 2026-09-29, after the MHA-139 machinist review; the length band's reason
 # after the 1d2be3aaf re-review called it over-specification unstated).
 DRAWING_NOTES = "\n".join(
     (
-        ENGAGEMENT_NOTE,
         "FACE THE UNDER-HEAD TO SUIT THE BONDED MHA-022: UNDER-HEAD TO SEAT =",
         "  FERRULE FACE TO CUP FLOOR PLUS "
         f"{END_PLAY_RANGE[0]:.2f}-{END_PLAY_RANGE[1]:.2f}. HEAD BEARS ON MHA-153 FLOOR;",
-        f"  DIA BAND KEEPS {HEAD_BEARING_RADIAL_MIN:.1f} BEARING; LENGTH BAND KEEPS IT BELOW THE CUP FLANGE.",
+        f"  DIA BAND KEEPS {HEAD_BEARING_RADIAL_MIN:.1f} BEARING; LENGTH BAND KEEPS IT BELOW THE CUP FACE.",
     )
 )
 
@@ -313,25 +299,15 @@ SEAT_FLAT_ANNULUS_AREA_MIN = (
     / 4.0
     * ((SHOULDER_DIA_MIN - 2.0 * EDGE_BREAK_MAX_MM) ** 2 - SEAT_FLAT_INNER_DIA**2)
 )
-# The relief neck is the screw's weakest section: pi/4 x 3.0^2 = 7.07 mm^2
-# against the #8-32 UNC tensile stress area of 0.0140 in^2 = 9.03 mm^2, about
-# 78 percent.  Seating torque is therefore limited by the neck, not the thread;
+# The relief neck is the screw's weakest section: pi/4 x 2.3^2 = 4.15 mm^2
+# against the #6-32 UNC tensile stress area of 0.00909 in^2 = 5.86 mm^2, about
+# 71 percent.  Seating torque is therefore limited by the neck, not the thread;
 # the handle's working load is a hand grip and never loads it axially.
 NECK_AREA = math.pi / 4.0 * RELIEF_DIA**2
-TENSILE_STRESS_AREA = 0.0140 * MM_PER_IN**2
+TENSILE_STRESS_AREA = 0.00909 * MM_PER_IN**2
 NECK_TO_STRESS_AREA = NECK_AREA / TENSILE_STRESS_AREA
 
-# User ruling 2026-09-25 (MHA-020 review B2): the exception stands because a
-# steel screw in a steel tap develops full strength at about 1D of full
-# thread.  Below 1D that reason is gone, whatever the U33b floor says.
-FULL_STRENGTH_ENGAGEMENT_D = 1.0
 for _ok, _what in (
-    (
-        min(FULL_THREAD_WORST, FULL_THREAD_WORST_PRINTED_ARM)
-        >= FULL_STRENGTH_ENGAGEMENT_D * THREAD_MODEL_DIA,
-        "worst-case engagement is under 1D: the steel-in-steel full-strength "
-        "reason for the named exception no longer holds",
-    ),
     (
         END_PLAY_RANGE[0] <= END_PLAY_NOMINAL <= END_PLAY_RANGE[1],
         "the modelled end play is outside the fitted band",
@@ -350,11 +326,11 @@ for _ok, _what in (
     (SEAT_FLAT_ANNULUS_AREA_MIN > 0.0, "no flat seat annulus is left"),
     (
         FULL_THREAD_WORST >= ENGAGEMENT_FLOOR,
-        "stock-arm worst-case engagement is under the U33b floor",
+        "stock-arm worst-case engagement is under the 1.5D rule",
     ),
     (
         FULL_THREAD_WORST_PRINTED_ARM >= ENGAGEMENT_FLOOR,
-        "printed-arm worst-case engagement is under the U33b floor",
+        "printed-arm worst-case engagement is under the 1.5D rule",
     ),
     (
         FILE_ALLOWANCE_MIN > 0.0,
@@ -378,10 +354,10 @@ for _ok, _what in (
         "an MHA-139 note line is over 72 characters",
     ),
     (HEAD_DIA > HANDLE_BORE_MAX, "head passes through the handle bore"),
-    (HEAD_DIA < STOCK_DIA, "head is not turnable from 3/8-in rod"),
+    (HEAD_DIA + HEAD_DIA_TOL < STOCK_DIA, "head is not turnable from 1/4-in rod"),
     (
-        CUP_POCKET_WALL_MIN >= WALL_FLOOR_MM,
-        "the MHA-153 pocket bored to suit the largest head leaves under 1.5 of wall",
+        CUP_POCKET_WALL_MIN >= CUP_POCKET_WALL_FLOOR_MM,
+        "the MHA-153 pocket bored to suit the largest head leaves under its 0.8 wall",
     ),
     (HEAD_BEARING_RADIAL_MIN > 0.0, "no under-head bearing is left on the cup floor"),
     (
@@ -425,7 +401,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # Decimal places ARE the tolerance (policy rule 2): the shoulder diameter is
 # the running fit and prints its band at two places, the head diameter its
 # cup-floor bearing band, and the relief width prints at two places for the
-# U33b engagement floor; every other size is routine (.X), the fitted
+# 1.5D engagement rule; every other size is routine (.X), the fitted
 # shoulder length a reference.  The thread length carries its own +0/-0.5
 # band at one place.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {

@@ -1,6 +1,7 @@
 r"""Create the curated machinist drawing for MHA-153, the crank handle butt cup.
 
-A flanged steel cup (user ruling 2026-09-29, ch11 p.14/p.15).  The end view
+A plain steel cup (user rulings 2026-09-29 and 2026-09-30, ch11 p.14/p.15 and
+ch30 eight-views-4).  The end view
 carries only its centre mark and the cutting plane; the longitudinal section
 A-A is the cup's length view (policy rule 7) and takes every dimension, so
 the pocket and the floor hole read on cut edges rather than hidden lines (the
@@ -43,8 +44,7 @@ from _section_axis import create_section_axis_centerline, position_section_capti
 from crank_handle_butt_cup_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
-    FLANGE_DIA,
-    FLANGE_THICKNESS,
+    BODY_DIA,
     FLOOR_HOLE_CALLOUT,
     OVERALL_LENGTH,
     POCKET_DEPTH,
@@ -68,7 +68,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# Ø13.5 x 8.1 at 5:1 reads 68 x 41 on the sheet.
+# Ø8.2 x 8.1 at 5:1 reads 41 x 41 on the sheet.
 SHEET_SCALE = (5.0, 1.0)
 VIEW_SCALE = (5, 1)
 ISO_SCALE = (4, 1)
@@ -82,37 +82,33 @@ MANUFACTURING_NOTES_POS = (0.022, 0.085)
 ISO_NOTE_POS = (0.335, 0.170)
 
 _S = VIEW_SCALE[0] / 1000.0
-FLANGE_R = FLANGE_DIA * _S / 2.0  # 0.03375
-HALF_LENGTH = OVERALL_LENGTH * _S / 2.0  # 0.01825
+BODY_R = BODY_DIA * _S / 2.0  # 0.0205
+HALF_LENGTH = OVERALL_LENGTH * _S / 2.0  # 0.02025
 # The section lays the part's +X to the right (the draw_crank_pinion
-# convention), so the flange face is the right edge and the floor the left.
-FLANGE_RIGHT_X = SECTION_CENTER[0] + HALF_LENGTH
-FLANGE_SEAT_X = FLANGE_RIGHT_X - FLANGE_THICKNESS * _S
+# convention), so the face is the right edge and the floor the left.
+FACE_X = SECTION_CENTER[0] + HALF_LENGTH
 
-# Diameters that open at the flange face stand right of the section, the body
-# and the floor hole left of it; the axial sizes stack above (from the flange
-# face) and below (the floor).
+# The pocket, which opens at the face, stands right of the section; the body
+# and the floor hole left of it; the axial sizes stack above (the overall) and
+# below (the pocket depth), both from the face.
 SECTION_KEEP = {
-    "FlangeDia": (FLANGE_RIGHT_X + 0.020, SECTION_CENTER[1]),
-    "PocketDia": (FLANGE_RIGHT_X + 0.040, SECTION_CENTER[1]),
-    # The Ø6.2 DRILL THRU block stands well left of the Ø11.60 band and below
-    # the hole's lower extension line, clear of its arrows (MHA-153 re-reviews).
+    "PocketDia": (FACE_X + 0.022, SECTION_CENTER[1]),
+    # The DRILL THRU block stands well left of the body band and below the
+    # hole's lower extension line, clear of its arrows (MHA-153 re-reviews).
     "BodyDia": (SECTION_CENTER[0] - HALF_LENGTH - 0.018, SECTION_CENTER[1]),
     "FloorHoleDia": (
         SECTION_CENTER[0] - HALF_LENGTH - 0.058,
         SECTION_CENTER[1] - 0.024,
     ),
-    "FlangeThickness": ((FLANGE_RIGHT_X + FLANGE_SEAT_X) / 2.0, SECTION_CENTER[1] + FLANGE_R + 0.009),
-    "OverallLength": (SECTION_CENTER[0], SECTION_CENTER[1] + FLANGE_R + 0.021),
-    # From the flange face too: every axial size shares that one faced end.
+    "OverallLength": (SECTION_CENTER[0], SECTION_CENTER[1] + BODY_R + 0.012),
     "PocketDepth": (
-        FLANGE_RIGHT_X - POCKET_DEPTH * _S / 2.0,
-        SECTION_CENTER[1] - FLANGE_R - 0.010,
+        FACE_X - POCKET_DEPTH * _S / 2.0,
+        SECTION_CENTER[1] - BODY_R - 0.010,
     ),
 }
 DIMENSION_CALLOUTS = {"FloorHoleDia": FLOOR_HOLE_CALLOUT}
-CUT_START = (END_CENTER[0], END_CENTER[1] - FLANGE_R - 0.006)
-CUT_END = (END_CENTER[0], END_CENTER[1] + FLANGE_R + 0.006)
+CUT_START = (END_CENTER[0], END_CENTER[1] - BODY_R - 0.006)
+CUT_END = (END_CENTER[0], END_CENTER[1] + BODY_R + 0.006)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -151,7 +147,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Crank Handle Butt Cup Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "crank handle butt cup; turned steel flanged cup",
+            3: "crank handle butt cup; turned plain steel cup",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
