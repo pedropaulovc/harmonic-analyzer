@@ -55,10 +55,11 @@ HANDLE_MAX_DIA = 21.0  # max diameter at the swell
 NECK_R = 5.5  # waist at the tenon shoulder (neck Ø11)
 PEAK_X = 36.0  # axial station of the maximum diameter, from x=0
 # Theoretical butt radius at HANDLE_LENGTH.  Ø10 in the photo re-derive; grown
-# (user rulings 2026-09-29, MHA-153 and MHA-022 reviews) to Ø14 so the oak
-# round the cup counterbore keeps 1.5 mm at its worst case and the trim face
-# is as wide as the cup flange.
-CAP_R = 7.0
+# (user rulings 2026-09-29, MHA-153 and MHA-022 reviews) to Ø15 so the oak
+# round the cup counterbore keeps 1.5 mm at its worst case -- the longest
+# overall puts the butt face furthest down the taper -- and the trim face is
+# as wide as the cup flange.
+CAP_R = 7.5
 # The turned grip contour's allowance, on diameter, against its two arcs: the
 # wood grip is checked by eye and template, not by a profile frame (MHA-022
 # review, user ruling 2026-09-29).
@@ -102,10 +103,21 @@ TRIM_R = REAR_PROFILE_CY + math.sqrt(REAR_PROFILE_R**2 - (TRIM_X - PEAK_X) ** 2)
 
 # The title block's .X band on the routine sizes below.
 _GENERAL_1PL = GENERAL_1PL_TOL_MM
-# Oak left around the counterbore at its mouth, under the cup flange, when the
-# largest cup body takes the widest glue line.
-_COUNTERBORE_MAX = CUP_BODY_DIA + CUP_BODY_DIA_TOL + COUNTERBORE_GLUE_LINE[1]
-COUNTERBORE_MOUTH_WALL = (TRIM_R - CONTOUR_ALLOWANCE_DIA / 4.0) - _COUNTERBORE_MAX / 2.0
+# Oak left around the counterbore at its mouth, under the cup flange, at the
+# worst case (MHA-022 re-review): the longest .X overall moves the butt face
+# down the taper, the contour turns to its full undersize, and the largest cup
+# body takes the widest glue line -- a maximum the note states, so the
+# fitted bore is bounded.
+COUNTERBORE_DIA_MAX = round(
+    CUP_BODY_DIA + CUP_BODY_DIA_TOL + COUNTERBORE_GLUE_LINE[1] + 0.05, 1
+)
+_TRIM_X_LONGEST = TRIM_X + _GENERAL_1PL
+TRIM_R_WORST = (
+    REAR_PROFILE_CY
+    + math.sqrt(REAR_PROFILE_R**2 - (_TRIM_X_LONGEST - PEAK_X) ** 2)
+    - CONTOUR_ALLOWANCE_DIA / 4.0
+)
+COUNTERBORE_MOUTH_WALL = TRIM_R_WORST - COUNTERBORE_DIA_MAX / 2.0
 
 for _ok, _what in (
     (
@@ -188,7 +200,8 @@ DRAWING_NOTES = "\n".join(
         f"TURN THE TENON TO SUIT THE {FERRULE_NUMBER} FERRULE BORE AND BORE THE BUTT",
         f"  COUNTERBORE TO SUIT THE {CUP_NUMBER} CUP BODY, EACH FOR "
         f"{TENON_GLUE_LINE[0]:.2f}-{TENON_GLUE_LINE[1]:.2f} DIAMETRAL",
-        "  CLEARANCE; EPOXY BOTH IN AT ASSEMBLY.",
+        f"  CLEARANCE, COUNTERBORE <MOD-DIAM>{COUNTERBORE_DIA_MAX:.1f} MAX; "
+        "EPOXY BOTH IN AT ASSEMBLY.",
         f"THE REAMED BORE RUNS ON THE {SCREW_NUMBER} SHOULDER; ITS LIMITS APPLY FULL LENGTH.",
         f"GRIP CONTOUR: <MOD-DIAM>{2.0 * NECK_R:.1f} AT THE SHOULDER ({_SHOULDER_E:.1f}), "
         f"<MOD-DIAM>{HANDLE_MAX_DIA:.1f} AT {_PEAK_E:.1f};",

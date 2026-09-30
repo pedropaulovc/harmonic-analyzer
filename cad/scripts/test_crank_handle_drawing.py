@@ -59,7 +59,9 @@ def test_oak_ends_in_a_ferrule_tenon_and_a_cup_counterbore() -> None:
     # User ruling 2026-09-29 (MHA-153 review): the butt grew from Ø10 so the
     # cup keeps 1.5 mm sections.
     # ... and again for 1.5 mm of oak round the cup counterbore (MHA-022 review).
-    assert crank_handle_spec.CAP_R == pytest.approx(7.0)
+    assert crank_handle_spec.CAP_R == pytest.approx(7.5)
+    assert crank_handle_spec.COUNTERBORE_DIA_MAX == pytest.approx(11.9)
+    assert "11.9 MAX" in crank_handle_spec.DRAWING_NOTES
     assert crank_handle_spec.COUNTERBORE_MOUTH_WALL >= 1.5
 
 
