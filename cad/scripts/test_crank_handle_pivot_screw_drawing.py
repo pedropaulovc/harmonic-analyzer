@@ -242,7 +242,7 @@ def test_notes_state_the_engagement_the_fitted_shoulder_and_the_head_band() -> N
     assert lines[0] == spec.ENGAGEMENT_NOTE
     # User ruling 2026-09-29 (MHA-139 review): the shoulder is turned to suit
     # the bonded handle; the head's band is for its bearing on the cup floor.
-    assert "TURN THE SEAT FACE TO SUIT THE BONDED MHA-022" in spec.DRAWING_NOTES
+    assert "FACE THE UNDER-HEAD TO SUIT THE BONDED MHA-022" in spec.DRAWING_NOTES
     assert "PLUS 0.25-1.00." in spec.DRAWING_NOTES
     assert "HEAD BEARS ON THE\n  MHA-153 FLOOR" in spec.DRAWING_NOTES
     assert "0.3 BEARING OUTSIDE ITS HOLE" in spec.DRAWING_NOTES
