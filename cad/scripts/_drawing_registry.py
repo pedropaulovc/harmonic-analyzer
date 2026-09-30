@@ -369,6 +369,20 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="keeper_chain",
+        part="keeper_chain",
+        artifact_stem="keeper-chain",
+        script_name="draw_keeper_chain.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="keeper_chain_link",
+        part="keeper_chain_link",
+        artifact_stem="keeper-chain-link",
+        script_name="draw_keeper_chain_link.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="channel_spring_installed",
         part="channel_spring_installed",
         artifact_stem="channel-spring-installed",

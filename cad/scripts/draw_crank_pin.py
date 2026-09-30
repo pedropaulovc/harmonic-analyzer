@@ -21,7 +21,7 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
-from crank_pin_spec import PIN_LENGTH, SURFACE_FINISHES
+from crank_pin_spec import BIG_END_DIA, PIN_LENGTH, SMALL_END_DIA, SURFACE_FINISHES
 from solidworks_mcp.adapters import sw_type_info as _sw_type_info
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -57,6 +57,14 @@ ISO_CENTER = (0.340, 0.205)
 _HALF_LENGTH = PIN_LENGTH * SHEET_SCALE[0] / 2000.0
 BIG_END_EDGE = (FRONT_CENTER[0] - _HALF_LENGTH, FRONT_CENTER[1])
 SMALL_END_EDGE = (FRONT_CENTER[0] + _HALF_LENGTH, FRONT_CENTER[1])
+# The upper taper outline at model x = TAPER_PICK_X, where the pin's radius
+# is interpolated between its end diameters.
+TAPER_PICK_X = PIN_LENGTH * 0.45
+_TAPER_PICK_R = (BIG_END_DIA - (BIG_END_DIA - SMALL_END_DIA) * TAPER_PICK_X / PIN_LENGTH) / 2.0
+TAPER_SILHOUETTE_PICK = (
+    BIG_END_EDGE[0] + TAPER_PICK_X * SHEET_SCALE[0] / 1000.0,
+    FRONT_CENTER[1] + _TAPER_PICK_R * SHEET_SCALE[0] / 1000.0,
+)
 
 FRONT_KEEP = {
     "Length": (FRONT_CENTER[0], FRONT_CENTER[1] - 0.033),
@@ -179,13 +187,14 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, right, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to pin end view")
 
-    # The cone's side-view outline is a SILHOUETTE, not a selectable model
-    # edge, so the taper-seat finish symbol attaches to the big-end circle —
-    # the taper surface's own boundary edge.
+    # The finish belongs to the tapered seat, so its leader lands on the
+    # cone's upper side-view outline (a SILHOUETTE pick), mid-taper and clear
+    # of the ring cross-hole, not on the big-end face.
     add_surface_finish(
         adapter,
         front,
-        edge_xy=BIG_END_EDGE,
+        edge_xy=TAPER_SILHOUETTE_PICK,
+        entity_type="SILHOUETTE",
         symbol_xy=(FRONT_CENTER[0] - 0.018, FRONT_CENTER[1] + 0.022),
         control=surface_finish_by_key(SURFACE_FINISHES, "taper_seat"),
         label="taper seating finish",

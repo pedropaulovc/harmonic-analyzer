@@ -2925,7 +2925,11 @@ def test_a_bushing_sharing_its_bores_outline_is_ballooned_on_its_own_listed_edge
 
 
 
-@pytest.mark.parametrize("listed", [0, 65], ids=["none-listed", "over-the-cap"])
+@pytest.mark.parametrize(
+    "listed",
+    [0, drawing_common._VISIBLE_EDGES_PER_INSTANCE + 1],
+    ids=["none-listed", "over-the-cap"],
+)
 def test_walk_without_a_hit_or_a_listed_edge_fails_naming_what_it_tried(monkeypatch, listed):
     """No hit and nothing listed (or too much to fetch) for the first
     instance fails, even though the second's own walk point is drawn and
@@ -2954,7 +2958,7 @@ def test_walk_without_a_hit_or_a_listed_edge_fails_naming_what_it_tried(monkeypa
         RuntimeError,
         match=r"cone-gear has no verifiably visible edge: no hit test found ink of cone-gear-1 "
         rf"at sheet mm \[\(0\.00, 50\.00\)\]: 1 body extreme points, then 0 points along "
-        rf"its {listed} listed visible edges \(sampled when 1-64\)",
+        rf"its {listed} listed visible edges \(sampled when 1-{drawing_common._VISIBLE_EDGES_PER_INSTANCE}\)",
     ):
         _balloon(monkeypatch, sheet, view, {"cone-gear": _WALK})
     assert sheet.balloons == []

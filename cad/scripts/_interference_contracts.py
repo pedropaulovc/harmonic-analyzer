@@ -29,6 +29,7 @@ from crank_pin_spec import (
     PIN_LENGTH as _PIN_L,
     SMALL_END_DIA as _PIN_D1,
 )
+from crank_pin_ring_spec import PIN_PROUD as _PIN_PROUD
 # The shaft diameter's owner, not crankshaft_spec: every assembly imports this
 # module, so a crankshaft length or station edit must not re-key them all.
 from crank_hub_geometry import SHAFT_DIA as _CS_DIA
@@ -85,7 +86,6 @@ def _numbered_pairs(
 # no MHA-024 overlap.
 
 _CS_PILOT = 4.978  # #9 drill (build_crankshaft's wizard cross-hole)
-_PIN_PROUD = 3.85  # build_drive_train_assembly.PIN_PROUD (kept in step by test)
 
 
 def _pin_overlap(s0: float, s1: float, hole_dia: float) -> float:

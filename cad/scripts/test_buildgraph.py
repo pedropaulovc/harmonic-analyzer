@@ -109,7 +109,7 @@ _INSERTED_SOURCES = {
     "crank_pin_eye crank_pin_ring "
     "crank_pinion crank_pinion_pin crankshaft cylinder_end_disc cylinder_gear "
     "cylinder_gear_shaft "
-    "fillister_screw foot_screw pedestal_hold_down_screw pinion_arbor pinion_arbor_collar pinion_bracket pinion_cam "
+    "fillister_screw foot_screw keeper_chain keeper_chain_link pedestal_hold_down_screw pinion_arbor pinion_arbor_collar pinion_bracket pinion_cam "
     "pinion_cam_pin pinion_handle pinion_lever pinion_lever_pin pinion_lift_rod "
     "pinion_pivot_block pinion_pivot_shaft pinion_spring pinion_strap_pin post_mount_screw slotted_screw "
     "swing_stop_screw",
@@ -1445,12 +1445,6 @@ _GRANDFATHERED_BUILDER_EDGES = {
     ),
     ("build_drive_train_assembly.py", "build_cone_tip_pinch_screw"): (
         "dtrefactor: reads SHANK_LEN, THREAD"
-    ),
-    ("build_drive_train_assembly.py", "build_crank_pin_eye"): (
-        "dtrefactor: reads LOOP_R, TAIL_LEN, WIRE_DIA"
-    ),
-    ("build_drive_train_assembly.py", "build_crank_pin_ring"): (
-        "dtrefactor: reads WIRE_DIA"
     ),
     ("build_drive_train_assembly.py", "build_crankshaft"): (
         "dtrefactor: reads PINION_PIN_STATION_Y, SEAT_ARM, SEAT_PINION, SEAT_T12, SHAFT_LENGTH"

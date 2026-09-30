@@ -69,6 +69,7 @@ from cone_gear_stack import COUNT as CONE_GEAR_COUNT, STACK_L20_ACCEPT
 from cone_stack_end_play import COLLAR_FEELER, SHAFT_END_PLAY
 from cone_tip_block_spec import ADJUSTER_ENGAGEMENT_ASSEMBLY_FACT
 from crank_pinion_spec import SEAT_FEELER_MM as PINION_SEAT_FEELER
+from keeper_chain_spec import BEAD_COUNT as KEEPER_CHAIN_BEADS
 from drive_train_assembly_spec import (
     CLUSTERS,
     EXPLODED_VIEW_NAME,
@@ -344,6 +345,8 @@ BOM_PART_NUMBERS = {
     "crank-pin": "MHA-024",
     "crank-pin-ring": "MHA-128",
     "crank-pin-eye": "MHA-130",
+    "keeper-chain": "MHA-149",
+    "keeper-chain-link": "MHA-150",
     "fillister-screw": "MHA-030",
     "crank-handle": "MHA-022",
     "crank-handle-pivot-screw": "MHA-139",
@@ -393,7 +396,9 @@ BOM_DESCRIPTIONS = {
     "crank-arm": "CRANK ARM",
     "crank-pin": "CRANK TAPER PIN, 1:48",
     "crank-pin-ring": "TAPER PIN KEEPER RING",
-    "crank-pin-eye": "KEEPER RING ANCHOR EYE",
+    "crank-pin-eye": "KEEPER CHAIN ANCHOR EYE",
+    "keeper-chain": "#3 BRASS BEAD CHAIN, MCMASTER 3606T118",
+    "keeper-chain-link": "LOOP LINK, MCMASTER 3606T811",
     "fillister-screw": "#4-40 BRASS FILLISTER, MCMASTER 90114A511",
     "crank-handle": "CRANK HANDLE",
     "crank-handle-pivot-screw": "CRANK HANDLE PIVOT SCREW",
@@ -507,6 +512,10 @@ CONE_CRANK_STEPS = "\n".join(
         "   TAPER-REAM 1:48 THROUGH HUB AND SHAFT; LIGHT-DRIVE MHA-024,",
         "   REMOVABLE BY TAP ON SMALL END. HANG MHA-128 FROM THE PIN HEAD;",
         "   CLAMP MHA-130 UNDER MHA-030.",
+        # Codex #1140: the keeper chain's length and topology belong on the
+        # sheet; the bead count is the spec's solve, never a typed number.
+        f"   CUT MHA-149 TO {KEEPER_CHAIN_BEADS} BEADS; THREAD IT THROUGH THE MHA-130",
+        "   LOOP AND MHA-128; SNAP ONE END BEAD INTO EACH DOME OF MHA-150.",
         "7. SLIDE MHA-022 ONTO MHA-139. THREAD MHA-139 INTO THE MHA-020",
         "   PIVOT TAP WITH LOCTITE 222 (REMOVABLE); SEAT THE SHOULDER TIGHT",
         "   ON THE ARM FACE. HANDLE TURNS FREELY; END PLAY 0.25-1.0.",

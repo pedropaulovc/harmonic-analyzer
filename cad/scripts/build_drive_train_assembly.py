@@ -688,9 +688,12 @@ from crank_pin_spec import (  # noqa: E402
     RING_HOLE_DIA as PIN_RING_HOLE_DIA,
     RING_HOLE_X as PIN_RING_HOLE_X,
 )
-from build_crank_pin_ring import WIRE_DIA as CRANK_RING_WIRE_DIA  # noqa: E402
-from build_crank_pin_eye import (  # noqa: E402
-    LOOP_R as EYE_LOOP_R,
+from crank_pin_ring_spec import (  # noqa: E402
+    PIN_PROUD,
+    WIRE_DIA as CRANK_RING_WIRE_DIA,
+)
+from crank_pin_eye_spec import (  # noqa: E402
+    ANCHOR_AIR,
     TAIL_LEN as EYE_TAIL_LEN,
     WIRE_DIA as EYE_WIRE_DIA,
 )
@@ -698,9 +701,8 @@ from fillister_screw_spec import (  # noqa: E402
     SHANK_DIA as ANCHOR_SCREW_SHANK_DIA,
     SHANK_LEN as ANCHOR_SCREW_SHANK_LEN,
 )
+import keeper_chain_spec  # noqa: E402
 
-CRANK_RING_ARM_CLEARANCE = 0.25
-PIN_PROUD = PIN_RING_HOLE_X + CRANK_RING_WIRE_DIA / 2.0 + CRANK_RING_ARM_CLEARANCE
 CRANK_PIN_Z = CRANK_FACE_Z + PIN_HOLE_HEIGHT  # -169.4: behind the 8-mm arm
 CRANK_PIN_X0 = X_CRANK - HUB_BARREL_DIA / 2.0 - PIN_PROUD
 # The ring lies in machine YZ. Its straight local-Z leg is concentric with the
@@ -716,20 +718,39 @@ if abs(AXIAL_PIN_LENGTH - ARM_THICKNESS / 2.0) > 1e-9:
     raise AssertionError("MHA-138 no longer has half-arm-thickness engagement")
 # Keeper-ring anchor (ch11 p.14): the arm's front (south, machine -z) face is
 # CRANK_ARM_Z0; arm local (x, y) -> machine (X_CRANK - y, Y_CRANK - x) (the
-# placed rows: local +x -> -Y, local +y -> -X). The brass eyelet lies flat on
-# that face (wire centre a wire radius + air south of it), its tail pointing
-# UP the arm at the screw and ending at the shank; the fillister-screw's
-# under-head plane rides on the wire (one wire diameter + air off the face),
-# shank pointing +z into the arm's #4-40 tap.
-ANCHOR_AIR = 0.02
+# placed rows: local +x -> -Y, local +y -> -X). The brass eyelet's tail lies
+# flat on that face (wire centre a wire radius + air south of it), pointing UP
+# the arm at the screw and ending at the shank; its loop stands off the face
+# below the tail. The fillister-screw's under-head plane rides on the wire
+# (one wire diameter + air off the face), shank pointing +z into the arm's
+# #4-40 tap.
 ANCHOR_SCREW_XY = (X_CRANK - ANCHOR_SCREW_Y, Y_CRANK - ANCHOR_SCREW_X)
 ANCHOR_HEAD_Z = CRANK_ARM_Z0 - EYE_WIRE_DIA - ANCHOR_AIR
 EYE_Z = CRANK_ARM_Z0 - EYE_WIRE_DIA / 2.0 - ANCHOR_AIR
-# the tail's end touches the shank: loop centre (tail root) sits LOOP_R + TAIL_LEN
-# + shank radius + air below the screw axis
-EYE_CENTER_Y = ANCHOR_SCREW_XY[1] - (
-    ANCHOR_SCREW_SHANK_DIA / 2.0 + ANCHOR_AIR + EYE_TAIL_LEN + EYE_LOOP_R
+# the tail's end touches the shank: the eye's origin (the tail root, where it
+# runs tangent into the loop) sits TAIL_LEN + shank radius + air below the
+# screw axis
+EYE_ROOT_Y = ANCHOR_SCREW_XY[1] - (
+    ANCHOR_SCREW_SHANK_DIA / 2.0 + ANCHOR_AIR + EYE_TAIL_LEN
 )
+# Keeper chain (MHA-149) + loop link (MHA-150): authored in the crank
+# frame, whose origin is the crank axis on the arm's outboard face. The spec
+# derives the eye and ring poses from the part specs alone; they must be the
+# ones placed here.
+CRANK_FRAME_ORIGIN = (X_CRANK, Y_CRANK, CRANK_ARM_Z0)
+for _got, _want, _what in (
+    (keeper_chain_spec.EYE_ROOT, (ANCHOR_SCREW_XY[0], EYE_ROOT_Y, EYE_Z), "eye root"),
+    (
+        (keeper_chain_spec.RING_X, 0.0, keeper_chain_spec.PIN_Z),
+        (CRANK_PIN_X0 + PIN_RING_HOLE_X, CRANK_RING_Y, CRANK_PIN_Z),
+        "keeper-ring through leg",
+    ),
+):
+    _placed = tuple(g + o for g, o in zip(_got, CRANK_FRAME_ORIGIN))
+    if max(abs(p - w) for p, w in zip(_placed, _want)) > 1e-9:
+        raise AssertionError(f"keeper_chain_spec {_what} {_placed} != placed {_want}")
+if min(keeper_chain_spec.clearance_report().values()) < 0.0:
+    raise AssertionError("keeper chain touches a part it must clear")
 ANCHOR_THREAD_ENGAGEMENT = ANCHOR_HEAD_Z + ANCHOR_SCREW_SHANK_LEN - CRANK_ARM_Z0
 # The #4-40 is tapped THRU the arm (rule 12, W7): nothing to bottom on; the
 # screw tip must stay short of the inboard face.
@@ -4376,7 +4397,7 @@ async def build(adapter) -> dict[str, str]:
     eye = await place_component(
         adapter,
         "crank-pin-eye",
-        [ANCHOR_SCREW_XY[0], EYE_CENTER_Y, EYE_Z],
+        [ANCHOR_SCREW_XY[0], EYE_ROOT_Y, EYE_Z],
         [0.0, 0.0, 0.0],
         IDENTITY,
         ground=False,
@@ -4402,6 +4423,45 @@ async def build(adapter) -> dict[str, str]:
         named_ref(f"Front Plane@{anchor}", "PLANE"),
         named_ref(f"Front Plane@{arm}", "PLANE"),
         label="anchor screw locked to the arm",
+    )
+    # Keeper chain (MHA-149): one loop through the eye and the pin's ring,
+    # closed by the MHA-150 loop link. Both lock to the arm: the eye, the pin
+    # and the ring all turn with the crank, so the loop's rest drape rides
+    # with it.
+    chain = await place_component(
+        adapter,
+        "keeper-chain",
+        [c + o for c, o in zip(CRANK_FRAME_ORIGIN, keeper_chain_spec.CHAIN_PART_ORIGIN)],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+        ground=False,
+        label="keeper chain",
+    )
+    await lock_mate(
+        adapter,
+        named_ref(f"Front Plane@{chain}", "PLANE"),
+        named_ref(f"Front Plane@{arm}", "PLANE"),
+        label="keeper chain locked to the arm",
+    )
+    # The link is authored along local X; its axis runs along machine z
+    # beside the arm edge (ROT_Y_POS90: local X -> machine -Z; the link is
+    # symmetric end for end, and its +Y seam stays up).
+    if keeper_chain_spec.LINK_AXIS != (0.0, 0.0, 1.0):
+        raise AssertionError("keeper-chain link placement assumes an axis along machine z")
+    link = await place_component(
+        adapter,
+        "keeper-chain-link",
+        [o + c for o, c in zip(keeper_chain_spec.LINK_ORIGIN, CRANK_FRAME_ORIGIN)],
+        [0.0, 90.0, 0.0],
+        ROT_Y_POS90,
+        ground=False,
+        label="keeper chain loop link",
+    )
+    await lock_mate(
+        adapter,
+        named_ref(f"Front Plane@{link}", "PLANE"),
+        named_ref(f"Front Plane@{arm}", "PLANE"),
+        label="keeper chain loop link locked to the arm",
     )
     # Handle pivot rides the arm tip, now ARM_C2C below the crankshaft. Its grip
     # axis stays parallel to the crankshaft (ROT_Y_POS90 -> assembly -Z).

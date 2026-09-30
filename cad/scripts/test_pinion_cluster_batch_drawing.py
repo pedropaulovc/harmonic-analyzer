@@ -618,8 +618,10 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
     hub_pair = frozenset(("crank-pin-1", "crank-hub-1"))
     shaft_pair = frozenset(("crank-pin-1", "crankshaft-1"))
     # The U29 hub barrel (Ø25.4) sets the MHA-024 pilot spans: a longer hub
-    # chord, and the shaft crossing further down the taper.
-    assert 136.0 < crank_allowed[hub_pair] < 137.0
-    assert 53.0 < crank_allowed[shaft_pair] < 54.0
+    # chord, and the shaft crossing further down the taper. #1140 stood the
+    # pin 0.6 further proud (PIN_PROUD 4.45, keeper-ring hole at 3.7), so a
+    # thinner stretch of the taper sits in both receivers.
+    assert 134.0 < crank_allowed[hub_pair] < 135.0
+    assert 52.0 < crank_allowed[shaft_pair] < 53.0
     assert _interference_contracts.allowed_interference_pairs("channel") == {}
     assert _interference_contracts.allowed_interference_pairs("unknown") == {}

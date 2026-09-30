@@ -85,18 +85,35 @@ def test_part_stamps_make_critical_properties() -> None:
 
 
 def test_crank_keeper_ring_threads_the_pin_hole_clear_of_the_arm() -> None:
-    import build_crank_pin_ring as ring
     import build_drive_train_assembly as drive
+    import crank_pin_ring_spec as ring
     import pytest
 
-    radial_clearance = (crank_pin_spec.RING_HOLE_DIA - ring.WIRE_DIA) / 2.0
+    # The round ring's wire arc, centred in the straight cross-hole, keeps air
+    # to the hole wall across the whole pin section.
+    assert ring.HOLE_AIR >= ring.RING_HOLE_AIR
+    # The side web is a named exception (under the 2.0 target): at the printed
+    # worst case it holds the 1.5 floor, and the sheet states that value.
+    worst_web = (
+        crank_pin_spec.PIN_DIA_AT_RING_HOLE_MIN - crank_pin_spec.RING_HOLE_DIA - 0.10
+    ) / 2.0
+    assert worst_web >= 1.5
+    assert crank_pin_spec.CROSS_HOLE_WEB_MIN <= worst_web < crank_pin_spec.CROSS_HOLE_WEB_MIN + 0.01
+    assert f"{crank_pin_spec.CROSS_HOLE_WEB_MIN:.2f} MIN" in crank_pin_spec.DRAWING_NOTES
+    # The ligament to the big-end face meets the 2.0 target at the worst case
+    # of the printed bands (.XX station, DRILLED HOLES +0.10).
+    ligament = crank_pin_spec.RING_HOLE_X - 0.51 - (crank_pin_spec.RING_HOLE_DIA + 0.10) / 2.0
+    assert ligament >= 2.0
+    # It hangs clear of the pin: the ring's inside edge below the pin surface.
     pin_radius = ring.PIN_DIA_AT_HOLE / 2.0
-    assert radial_clearance >= 0.1
-    assert ring.STRAIGHT_HALF - pin_radius - ring.WIRE_DIA / 2.0 >= 0.25
-    assert ring.LOOP_WIDTH - pin_radius - ring.WIRE_DIA / 2.0 >= 0.25
-    assert drive.PIN_PROUD == pytest.approx(
-        crank_pin_spec.RING_HOLE_X
-        + ring.WIRE_DIA / 2.0
-        + drive.CRANK_RING_ARM_CLEARANCE
+    assert ring.RING_BOTTOM_X - ring.WIRE_DIA / 2.0 - pin_radius >= 3.0
+    assert ring.PIN_PROUD == pytest.approx(
+        crank_pin_spec.RING_HOLE_X + ring.WIRE_DIA / 2.0 + ring.HUB_CLEARANCE
     )
+    # One pin station everywhere: the drive train places the pin, and the
+    # interference contract sizes the pin's allowed overlaps, at that value.
+    import _interference_contracts as contracts
+
+    assert drive.PIN_PROUD == ring.PIN_PROUD
+    assert contracts._PIN_PROUD == ring.PIN_PROUD
     assert drive.CRANK_RING_Y == pytest.approx(drive.Y_CRANK)
