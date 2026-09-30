@@ -9,15 +9,6 @@ import pytest
 import transgear_removable_spec as spec
 
 
-def test_bore_to_pin_hole_web_is_the_recorded_shortfall() -> None:
-    # A named exception under the 1.5 floor: the part has no sheet, so the
-    # record states the untoleranced web, never more than the geometry gives.
-    web = spec.PIN_CIRCLE_DIA / 2.0 - spec.PIN_HOLE_DIA / 2.0 - spec.BORE_DIA / 2.0
-    assert 0.0 < web < 1.5
-    assert spec.BORE_PIN_WEB_MIN <= web + 1e-9 < spec.BORE_PIN_WEB_MIN + 0.01
-    assert f"WEB {spec.BORE_PIN_WEB_MIN:.2f} MIN" in spec.BORE_PIN_WEB_NOTE
-
-
 def test_seat_spigot_rim_is_the_recorded_shortfall() -> None:
     rim = (
         spec.SEAT_SPIGOT_DIA / 2.0

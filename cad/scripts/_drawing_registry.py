@@ -600,6 +600,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="transgear_removable",
+        part="transgear_removable",
+        artifact_stem="transgear-removable",
+        script_name="draw_transgear_removable.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="cone_gear_shaft",
         part="cone_gear_shaft",
         artifact_stem="cone-gear-shaft",

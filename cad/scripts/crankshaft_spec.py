@@ -268,8 +268,8 @@ COLLAR_STATION_TOL = 0.10
 COLLAR_DIA_TOL = 0.10
 SPIGOT_DIA_BAND = (0.0, -0.10)
 SPIGOT_LENGTH_TOL = 0.05
-DRIVE_PIN_OFFSET_PLACES = 3
-DRIVE_PIN_OFFSET_TOL = 0.025
+DRIVE_PIN_OFFSET_PLACES = transgear_removable_spec.DRIVE_PIN_OFFSET_PLACES
+DRIVE_PIN_OFFSET_TOL = transgear_removable_spec.DRIVE_PIN_OFFSET_TOL
 DRIVE_PIN_DEPTH_TOL = 0.10
 # Local (dome-root) deviations of the two faces as (upper, lower): a station
 # printed from the far end moves by its own band plus the Depth's.  The drive

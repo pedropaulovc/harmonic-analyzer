@@ -19,8 +19,14 @@ checked against ``spec.part_volume``.
 Config-independent mounting interface, cut after the tooth pattern: bore
 ``BORE_DIA`` and two ``PIN_HOLE_DIA`` drive-pin holes on ``PIN_CIRCLE_RADIUS``
 at ``PIN_HOLE_ANGLES_DEG`` (local +/-Y). The bore/pin-hole web
-(``spec.BORE_PIN_WEB``, 0.60) sits below the 1.5 wall floor as contracted; it
-awaits the user's ruling.
+(``spec.BORE_PIN_WEB``, 0.60 nominal) sits below the 1.5 wall floor as a
+Named exception; the sheet states its printed worst case
+(``transgear_removable_notes.BORE_PIN_WEB_NOTE``).
+
+Drawing marks (``draw_transgear_removable``): ``spec.DRAWING_DIMENSIONS`` at
+``spec.DRAWING_PRECISION``, the plate thickness banded ``spec.PLATE_BAND``
+and each pin centre +/-``spec.DRIVE_PIN_OFFSET_TOL``; the sheet's SPROCKET
+DATA and notes are file properties.
 
 Part frame: axis Z through the origin, plate z = 0..PLATE (the Front Plane is
 the wheel's FRONT face; ``RearFace`` at z = PLATE seats on the shaft's seat
@@ -63,9 +69,19 @@ from _common import (
     run_build,
     set_sketch_direct_db,
 )
+from _drawing_marks import (
+    apply_drawing_precision,
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
+)
 from _drawing_simplified import save_simplified_part
+from _fit_limits import deviations
 from _grouped_bom_properties import apply_grouped_bom_properties
 from _visibility import blank_reference_geometry
+from transgear_removable_notes import DRAWING_NOTES, GEAR_DATA
 
 # ``set_global`` is imported from _common under a distinct name: the gap-math
 # globals below use involute_gear's stricter 4-arg ``set_global`` (asserts the
@@ -85,6 +101,7 @@ PART_NAME = "transgear-removable"
 MATERIAL = "Plain Carbon Steel"  # contract: bright plain-carbon steel plate
 
 DEFAULT_TEETH = spec.TEETH[spec.DEFAULT_CONFIG]
+DRAWING_DIMENSIONS = spec.DRAWING_DIMENSIONS
 
 # The pin holes are placed as on-axis circles and their axes as Right Plane x
 # (Top Plane offset): both constructions assume the spec's angles are +/-Y.
@@ -641,6 +658,28 @@ async def build(adapter) -> dict[str, str]:
         await adapter.set_active_configuration(spec.DEFAULT_CONFIG),
     )
     await report_mass_properties(adapter)
+    # Manufacturing drawing support: the plate is faced never over nominal and
+    # each pin centre holds its location band; the bore and pin-hole sizes are
+    # drilled (the title block's DRILLED HOLES row governs them).  The places
+    # are the part's (policy rule 2).
+    set_dimension_bilateral_tolerance(
+        adapter, "BlankProfile", "BlankWidth", *deviations(spec.PLATE_BAND)
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "BorePinsProfile", "PinPosY", spec.DRIVE_PIN_OFFSET_TOL
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "BorePinsProfile", "PinNegY", spec.DRIVE_PIN_OFFSET_TOL
+    )
+    apply_drawing_precision(adapter, spec.DRAWING_PRECISION)
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {"Gear Data": GEAR_DATA, "Manufacturing Notes": DRAWING_NOTES},
+    )
     # paper-drive places T12 and T18 while the part saves on T24, so their
     # saved caches are what it rebuilds: save_simplified_part reopens the file
     # and proves every configuration the way it loads them (cg-fx1: the same

@@ -82,20 +82,52 @@ PIN_CIRCLE_DIA = 14.0
 PIN_CIRCLE_RADIUS = PIN_CIRCLE_DIA / 2.0
 # Two holes at 180 deg on the part's (and the shafts') +/-Y: 12 and 6 o'clock.
 PIN_HOLE_ANGLES_DEG = (90.0, 270.0)
+# Each drive pin (in either shaft's seat) and each of these holes is located
+# +/-0.025 from the axis, printed at .XXX: the holes slip over the pins with
+# 0.119 diametral clearance, which absorbs the spacing error of both parts,
+# each spending half of it.  The shafts read these (crankshaft_spec).
+DRIVE_PIN_OFFSET_PLACES = 3
+DRIVE_PIN_OFFSET_TOL = 0.025
 
 # Bore <-> pin-hole web.  Photo-faithful to the p.56 catalog view, where the
 # holes nearly touch the bore; under the policy's 1.5 wall floor, accepted by
-# name (drawing-simplicity-policy.md, "Named exceptions").
+# name (drawing-simplicity-policy.md, "Named exceptions").  Its printed worst
+# case is sheet text (transgear_removable_notes.BORE_PIN_WEB_WORST): it reads
+# the title block's drilled-hole row, which this module's importers must not.
 BORE_PIN_WEB = PIN_CIRCLE_RADIUS - PIN_HOLE_DIA / 2.0 - BORE_DIA / 2.0  # 0.60
-# The part has no sheet, so the web is its untoleranced nominal, rounded down;
-# this line is its record.
-BORE_PIN_WEB_MIN = math.floor(BORE_PIN_WEB * 100.0 + 1e-9) / 100.0
-# Named exception: MHA-081 web (drawing-simplicity-policy.md, "Named exceptions").
-BORE_PIN_WEB_NOTE = f"BORE TO DRIVE-PIN HOLE WEB {BORE_PIN_WEB_MIN:.2f} MIN."
 
 CONFIGS: tuple[tuple[str, int], ...] = (("T12", 12), ("T18", 18), ("T24", 24))
 TEETH = dict(CONFIGS)
 DEFAULT_CONFIG = "T24"  # the part saves on T24
+
+# --- manufacturing drawing (one sheet, the T24 views; SPROCKET DATA lists all
+# three configurations) --------------------------------------------------------
+# The plate thickness carries PLATE_BAND; the bore and the pin holes are
+# drilled (the title block's DRILLED HOLES row governs them); each pin centre
+# carries +/-DRIVE_PIN_OFFSET_TOL at .XXX.  PinNegDia is the same global as
+# PinPosDia and prints once as its "2X".
+DRAWING_DIMENSIONS: dict[str, set[str]] = {
+    "BlankProfile": {"BlankWidth"},
+    "BorePinsProfile": {"BoreDiaDim", "PinPosDia", "PinPosY", "PinNegY"},
+}
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "BlankProfile": {"BlankWidth": 2},
+    "BorePinsProfile": {
+        "BoreDiaDim": 2,
+        "PinPosDia": 2,
+        "PinPosY": DRIVE_PIN_OFFSET_PLACES,
+        "PinNegY": DRIVE_PIN_OFFSET_PLACES,
+    },
+}
+if {feature: set(names) for feature, names in DRAWING_PRECISION.items()} != (
+    DRAWING_DIMENSIONS
+):
+    raise AssertionError("every marked dimension prints at part-authored places")
+DRAWING_PRECISION_BY_NAME: dict[str, int] = {
+    name: places
+    for names in DRAWING_PRECISION.values()
+    for name, places in names.items()
+}
 
 # --- shared machine z band (both shafts) -------------------------------------
 SEAT_FACE_Z = -152.5  # wheel rear face = shaft seat face (the stack datum)

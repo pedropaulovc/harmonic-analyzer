@@ -2301,6 +2301,7 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         "post_mount_screw_spec",
         "spring_hook_spec",
         "swing_stop_screw_spec",
+        "transgear_removable_notes",
     }
 )
 
