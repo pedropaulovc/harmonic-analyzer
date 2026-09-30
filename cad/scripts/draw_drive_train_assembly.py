@@ -467,16 +467,22 @@ CONE_CRANK_STEPS = "\n".join(
         "   JOURNAL MHA-014 IN MHA-016. SLIP MHA-096 ON THE TIP STUB.",
         "   STAND MHA-092 ON MHA-091 AT ITS HOLE; MHA-140 UP FROM",
         "   UNDER THE PLATE THROUGH THE COUNTERBORE INTO THE MHA-092 FOOT,",
-        "   SNUG.",
+        "   SNUG. LEAVE MHA-142 LOOSE ENOUGH TO TURN MHA-016.",
         # User ruling 2026-09-29: the stack's north float is held on the
         # shaft by MHA-096, set off T006 by one feeler and locked on the
         # D-flat; the cup screw alone then sets MHA-014's end play
         # (cone_stack_end_play).  U32 (user, 2026-09-23): option 1A turn-set,
-        # worded without the pitch (#10-32: 1/8 turn is ~0.10).
+        # worded without the pitch (#10-32: 1/8 turn is ~0.10).  The tip's
+        # lateral error is taken up by turning MHA-016 on its screws'
+        # clearance (TIP_LATERAL_CAPACITY_MM in build_drive_train_assembly),
+        # so the fitter centres the tip in the cup before locking the post
+        # (Codex P1 on #1136, 9e9982c5d).
         "3. PUSH THE STACK ONTO THE MHA-014 COLLAR. PUSH MHA-096 ONTO A",
         f"   {COLLAR_FEELER:.2f} FEELER ON T006; LOCK ITS SET SCREW ON THE FLAT.",
-        "   THREAD MHA-097 INTO MHA-092 UNTIL MHA-014 JUST STOPS SHUTTLING",
-        "   AND STILL TURNS FREELY; BACK OFF 1/8 TURN; TIGHTEN",
+        "   THREAD MHA-097 INTO MHA-092 TO THE TIP. TURN MHA-016 ON ITS",
+        "   SCREWS UNTIL THE TIP CENTRES IN THE CUP; TIGHTEN BOTH MHA-142",
+        "   AND RECHECK. THREAD MHA-097 ON UNTIL MHA-014 JUST STOPS",
+        "   SHUTTLING AND STILL TURNS FREELY; BACK OFF 1/8 TURN; TIGHTEN",
         "   MHA-098 ACROSS THE SLIT. END PLAY "
         f"{SHAFT_END_PLAY[0]:.2f}-{SHAFT_END_PLAY[1]:.2f}, BY FEEL OR INDICATOR.",
         "   MHA-097 " + ADJUSTER_ENGAGEMENT_ASSEMBLY_FACT,

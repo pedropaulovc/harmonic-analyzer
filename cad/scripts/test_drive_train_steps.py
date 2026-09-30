@@ -76,19 +76,28 @@ def test_the_tip_step_sets_the_collar_before_the_end_play() -> None:
     locked first, so the stack's float is fixed on the shaft before the cup
     screw sets MHA-014's end play and the pinch screw locks it."""
     fitup = _step_body("tip-adjuster-set")
+    # The tip's lateral error is taken up by turning MHA-016 on its screws
+    # (build_drive_train_assembly.TIP_LATERAL_CAPACITY_MM), so the post stays
+    # turnable until the tip is centred in the cup, and is locked before the
+    # end play is set (Codex P1 on #1136).
     order = (
         f"PUSH MHA-096 ONTO A {cone_stack_end_play.COLLAR_FEELER:.2f} FEELER ON T006",
         "LOCK ITS SET SCREW",
         "THREAD MHA-097 INTO MHA-092",
+        "TURN MHA-016 ON ITS SCREWS UNTIL THE TIP CENTRES IN THE CUP",
+        "TIGHTEN BOTH MHA-142",
+        "JUST STOPS SHUTTLING",
         "TIGHTEN MHA-098",
     )
     positions = [fitup.find(phrase) for phrase in order]
     assert -1 not in positions, positions
     assert positions == sorted(positions)
-    # The block is placed by its hold-down alone: nothing is set against it.
+    # The block is placed by its hold-down alone: nothing is set against it,
+    # and the post is left free to turn.
     placed = _step_body("post-and-tip-block")
     assert "MHA-140 UP FROM UNDER THE PLATE" in placed
     assert "FEELER" not in placed
+    assert "LEAVE MHA-142 LOOSE ENOUGH TO TURN MHA-016" in placed
 
 
 def test_the_printed_shaft_end_play_is_the_band_the_stacks_book() -> None:
