@@ -540,7 +540,7 @@ def test_rig_aft_shift_is_the_one_rig_to_frame_move() -> None:
     # The grip keeps opening from the crank cluster.  Nominal floor re-pinned
     # for the P1-2 rig shift (12.5 -> 12.0: the rig sits 0.776 further south);
     # the worst case gates it (RIG_MARGINS' grip crossrod row, 9.312 vs 0.25).
-    assert drive._GRIP_ROD_Z[0] - (drive.REMOVABLE_Z0 + 5.0) >= 12.0
+    assert drive._GRIP_ROD_Z[0] - drive.REMOVABLE.SEAT_FACE_Z >= 12.0
     assert (
         drive.RIG_MARGINS["grip crossrod to the T12 chain wheel"][0]
         >= 0.25 + RIG.RIG_MARGIN_SPARE
@@ -549,6 +549,24 @@ def test_rig_aft_shift_is_the_one_rig_to_frame_move() -> None:
     assert drive._GRIP_HEAD_Z[0] - (drive.CRANK_ARM_Z0 + drive.ARM_THICKNESS) >= 21.0
     # The base rim still stands far past the rod's reach and every seat.
     assert base.TOP_WIDTH / 2.0 - base.LIP_W - RIG.BACK_BLOCK_OUTER_Z >= 25.0
+
+
+def test_crank_seat_stack_keeps_its_air_at_both_ends() -> None:
+    """Worst case over the collar's functional bands: the T12 plate, seated on
+    the collar, keeps air to the hub rear face, and the washer on the collar's
+    rear face keeps float to the post boss's south face."""
+    import crank_seat_washer_spec as washer
+    import crankshaft_spec as cs
+    import transgear_removable_spec as removable
+
+    seat_face_fwd = drive.CRANKSHAFT_Z0 + cs.SEAT_COLLAR + min(cs.SEAT_COLLAR_BAND)
+    assert removable.SEAT_FACE_Z - removable.PLATE - drive.CRANK_HUB_REAR_Z == (
+        pytest.approx(0.7)
+    )
+    assert seat_face_fwd - removable.PLATE - drive.CRANK_HUB_REAR_Z > 0.0
+    collar_rear_aft = drive.CRANKSHAFT_Z0 + cs.COLLAR_REAR + max(cs.COLLAR_REAR_BAND)
+    washer_rear_aft = collar_rear_aft + washer.THICKNESS + max(washer.THICKNESS_BAND)
+    assert drive._POST_BOSS_SOUTH - washer_rear_aft > 0.0
 
 
 def _follower_stations() -> tuple[list[float], list[float]]:

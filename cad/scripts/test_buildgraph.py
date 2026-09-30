@@ -107,7 +107,7 @@ _INSERTED_SOURCES = {
     "cone_tip_adjuster cone_tip_block cone_tip_block_screw cone_tip_collar cone_tip_pinch_screw "
     "crank_arm crank_drive_gear crank_handle crank_handle_butt_cup crank_handle_ferrule "
     "crank_handle_pivot_screw crank_hub crank_hub_pin crank_pin "
-    "crank_pin_eye crank_pin_ring "
+    "crank_pin_eye crank_pin_ring crank_seat_drive_pin crank_seat_washer "
     "crank_pinion crank_pinion_pin crankshaft cylinder_end_disc cylinder_gear "
     "cylinder_gear_shaft "
     "fillister_screw foot_screw keeper_chain keeper_chain_link pedestal_hold_down_screw pinion_arbor pinion_arbor_collar pinion_bracket pinion_cam "
@@ -125,7 +125,7 @@ _INSERTED_SOURCES = {
     "paper_drive": "bracket_screw chain_inner_link chain_outer_link clamp_screw "
     "column_clamp_back column_clamp_front fillister_screw guide_lock latch_hook "
     "platen platen_clip platen_guide platen_paper platen_rack rack_pinion support_bar "
-    "transgear_bracket transgear_feed_pinion transgear_knob_shaft transgear_latch "
+    "transgear_bracket transgear_feed_pinion transgear_knob_drive_pin transgear_knob_shaft transgear_latch "
     "transgear_pinion transgear_removable transgear_stub transgear_thumbnut",
     "harmonic_analyzer": "measuring_stick measuring_stick_stop frame drive_train "
     "channel summing magnifier pen paper_drive",
@@ -1448,7 +1448,7 @@ _GRANDFATHERED_BUILDER_EDGES = {
         "dtrefactor: reads SHANK_LEN, THREAD"
     ),
     ("build_drive_train_assembly.py", "build_crankshaft"): (
-        "dtrefactor: reads PINION_PIN_STATION_Y, SEAT_ARM, SEAT_PINION, SEAT_T12, SHAFT_LENGTH"
+        "dtrefactor: reads PINION_PIN_STATION_Y, SEAT_PINION, SHAFT_LENGTH"
     ),
     ("build_drive_train_assembly.py", "build_cylinder_end_disc"): (
         "dtrefactor: reads DISC_DIA, DISC_THICK"
@@ -1523,16 +1523,13 @@ _GRANDFATHERED_BUILDER_EDGES = {
         "dtrefactor: reads DP, FACE_WIDTH, TEETH"
     ),
     ("build_paper_drive_assembly.py", "build_transgear_knob_shaft"): (
-        "dtrefactor: reads FRONT_STUB, SHAFT_DIA"
+        "dtrefactor: reads COLLAR_REAR, DRIVE_PIN_FLOOR, SEAT_COLLAR, SHAFT_DIA"
     ),
     ("build_paper_drive_assembly.py", "build_transgear_latch"): (
         "dtrefactor: reads C2C, THICKNESS"
     ),
     ("build_paper_drive_assembly.py", "build_transgear_pinion"): (
         "dtrefactor: reads DP, FACE_WIDTH, TEETH"
-    ),
-    ("build_paper_drive_assembly.py", "build_transgear_removable"): (
-        "dtrefactor: reads BORE_DIAMETER, FACE_WIDTH, PIN_CIRCLE_RADIUS, PIN_HOLE_DIAMETER"
     ),
     ("build_paper_drive_assembly.py", "build_transgear_thumbnut"): (
         "dtrefactor: reads BORE_DIA, DISC_DIA, DISC_LEN, NECK_DIA, NECK_LEN, TOTAL_LEN"

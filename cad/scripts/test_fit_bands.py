@@ -105,6 +105,10 @@ NOT_FIT_BANDS: dict[tuple[str, str], str] = {
     ("build_drive_train_assembly", "_SPRING_Z_BAND"): (
         "plan z extent of the return spring for the engage-swing sweep"
     ),
+    ("build_drive_train_assembly", "CRANK_COLUMN_BANDS"): (
+        "(z front, z rear, diameter, name) crank-seat column extents for the "
+        "radial clearance sweep"
+    ),
     ("pinion_spring_geometry", "FORMED_CONTACT_BANDS"): (
         "names of the formed dimensions the contact corners perturb, not a band"
     ),
@@ -120,6 +124,20 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
     ("cone_gear_shaft_spec", "STOCK_DIA_BAND"): (
         "the 5/8 bar's supplied size band, indexed for the thrust ring's "
         "worst-case width (THRUST_RING_MIN)"
+    ),
+    ("crank_seat_washer_spec", "THICKNESS_BAND"): (
+        "indexed by the drive train's washer-float stack; the build sets the "
+        "same band natively from THICKNESS_TOL"
+    ),
+    ("crankshaft_spec", "COLLAR_REAR_BAND"): (
+        "the collar rear face's station deviations, indexed for the washer float"
+    ),
+    ("crankshaft_spec", "SEAT_COLLAR_BAND"): (
+        "the seat face's station deviations, indexed for the hub-to-sprocket air"
+    ),
+    ("transgear_removable_spec", "PLATE_BAND"): (
+        "the wheel plate's thickness deviations, indexed for the hub-to-sprocket "
+        "air and the chain envelope's reach"
     ),
     ("connecting_rod_spec", "RING_THICKNESS_BAND"): (
         "indexed by cylinder_bank_layout for the thickest ring its cam slot holds"

@@ -2976,6 +2976,9 @@ def task_check():
         # The keeper chain's rest-pose solve: whole pitches, clearances, and a
         # length that lets the taper pin come fully out.
         SCRIPTS_DIR / "test_keeper_chain.py",
+        # The removable sprocket's seat interface: its recorded web/rim
+        # shortfalls and the #25 plates' clearance over the shared seat.
+        SCRIPTS_DIR / "test_transgear_removable_seat.py",
         # No part or assembly saves construction geometry shown, and the
         # per-part sketch allowances only shrink (#880).
         SCRIPTS_DIR / "test_reference_visibility.py",

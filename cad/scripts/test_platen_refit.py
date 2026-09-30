@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import math
 
+import _chain as chain
 import build_paper_drive_assembly as assembly
+import build_transgear_knob_shaft as knob_shaft
+import transgear_removable_spec as band
 import platen_spec as platen
 import build_platen_clip as clip
 import build_platen_guide as guide
@@ -122,6 +125,30 @@ def test_cascaded_drive_geometry_closes() -> None:
     assembly._assert_gear_mesh()
     assembly._assert_knob_shaft_clearance()
     assembly._assert_chain_layout()
+
+
+def test_chain_wheels_share_the_spec_band_and_the_chain_straddles_it() -> None:
+    # One chain plane, the spec's, for the links and both wheels.
+    assert assembly.CHAIN_MID_Z == band.CHAIN_MID_Z
+    # Both wheels (crank T12, knob T24) sit on the one band: front face at
+    # the band front, rear face on the knob shaft's seat collar.
+    knob_seat_z = assembly.KNOB_SHAFT_Z0 + knob_shaft.SEAT_COLLAR
+    assert math.isclose(knob_seat_z, band.SEAT_FACE_Z)
+    assert math.isclose(assembly.REMOVABLE_Z0 + band.PLATE, knob_seat_z)
+    assert math.isclose(
+        (assembly.REMOVABLE_Z0 + knob_seat_z) / 2.0, assembly.CHAIN_MID_Z
+    )
+    # The knob drive pins end inside the wheel plate, short of its front face.
+    tip_z = assembly.KNOB_DRIVE_PIN_Z0 - assembly.KNOB_PIN.LENGTH
+    assert math.isclose(tip_z, band.DRIVE_PIN_TIP_Z)
+    assert assembly.REMOVABLE_Z0 < tip_z < knob_seat_z
+    # The chain's inner plates straddle the plate with running air each side,
+    # and its rollers span the whole plate.
+    front_inner = assembly.CHAIN_MID_Z - chain.INNER_PLATE_INNER_Z
+    rear_inner = assembly.CHAIN_MID_Z + chain.INNER_PLATE_INNER_Z
+    assert assembly.REMOVABLE_Z0 - front_inner >= chain.SPROCKET_CLEAR - 1e-9
+    assert rear_inner - knob_seat_z >= chain.SPROCKET_CLEAR - 1e-9
+    assert 2.0 * chain.BUSH_HALF_LEN >= band.PLATE
 
 
 def test_refitted_platen_clears_fixed_support_hardware() -> None:

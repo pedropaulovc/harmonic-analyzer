@@ -60,6 +60,9 @@ allowed_free_stems:
   - crank-pin-ring
   - crank-pinion
   - crank-pinion-pin
+  # MHA-172/173: closed on the crankshaft, they turn with the freed crank spin.
+  - crank-seat-drive-pin
+  - crank-seat-washer
   - crankshaft
   - cylinder-gear
   - fillister-screw

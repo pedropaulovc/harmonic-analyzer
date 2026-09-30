@@ -212,7 +212,7 @@ sections:
         - user ruling
         - med
       - - Separate crank hub MHA-137
-        - 'Ø19.4 × 8 through-seat; Ø25.4 rear barrel/shoulder to overall length 20; Ø9.550 +0.030/−0.000 through bore'
+        - 'Ø19.4 × 8 through-seat; Ø20.6 rear barrel × 15.4 (z −175..−159.6) then a Ø16.5 × 3.6 chain-relief spigot to overall length 27 ±0.05 from the front face (lined up flush with the shaft end before the MHA-024 match-ream) (rear face z −156, 0.7 air in front of the removable T12; the #25 plates wrapping the T12 pass over the relief); Ø9.550 +0.030/−0.000 through bore'
         - —
         - 'primary construction photo and user-confirmed through-hub topology. The arm and hub are a matched light arbor-press fit against the shoulder; the bore reuses the project shaft-in-bushing fit, giving 0.025..0.075 diametral shaft clearance.'
         - derived construction
@@ -224,9 +224,9 @@ sections:
         - scaled + stated topology
         - med
       - - Crankshaft diameter
-        - 9.525 mm (3/8") on the T12 and crank-hub seats; restored integral Ø11.388 journal runs directly in MHA-016; the 16T pinion sits on a Ø9.0 seat step (local 111.3)
+        - 9.525 mm (3/8") on the crank-hub seat and the removable-sprocket pilot; integral seat collar z −152.5..−144: Ø17.5 × 4.0 seat spigot (a bought #25 chain wrapping the T12 passes over it) then Ø20.6 body, 2 × Ø2.38 reamed blind drive-pin holes on Ø14 BC in the spigot face; restored integral Ø11.388 journal runs directly in MHA-016; the 16T pinion sits on a Ø9.0 seat step (local 111.3)
         - '0.375'
-        - 'User ruling 2026-09-28 restores the integral running journal while retaining the single-cutter 16T seat and existing T12 and hub geometry. The smaller pinion root needs the Ø9.0 seat to keep its boss wall over 1.5 at print-worst.'
+        - 'User ruling 2026-09-28 restores the integral running journal while retaining the single-cutter 16T seat and existing hub geometry. The smaller pinion root needs the Ø9.0 seat to keep its boss wall over 1.5 at print-worst. The removable T12 seats on the collar''s front face (ch23 p.56 catalog shot: two drive pins through the sprocket); a Ø20.6 × 1.5 washer closes the collar to the post boss with 0.25 float. The pin hole to spigot rim (0.56 nominal, 0.48 print-worst) is a named exception, User 2026-09-30.'
         - legacy
         - med
       - - Crankshaft bearing
@@ -268,7 +268,7 @@ sections:
       - - Crankshaft length
         - 137.5 mm cylindrical length plus 2-mm integral outboard dome
         - '5.39 in initial reference; lengthened with the grown 16T teeth, the 16T boss kept at its shortest W15-compliant length'
-        - 'The outboard cylinder/arm/hub face remains at world z −183, with T12 at z −155. The inboard shaft end is now z −45.5, recessed 1.14 inside the 16T pinion boss; it followed the 16T teeth growing 9.5 → 11.6 north (user ruling 2026-09-30, c″ variant B, then rulings R9-55 and R9-56), and every far-end station grew the same 2.1. With the original pin and printed bands unchanged, its W15 pin-edge wall is 2.023 mm at print-worst (2.0 floor); a boss one .X step shorter would give 1.973. Length prints at one place, +0/−0.4.'
+        - 'The outboard cylinder/arm/hub face remains at world z −183, with the removable T12 seat face at z −152.5 (sprocket −155.3..−152.5, chain plane −153.9). The inboard shaft end is now z −45.7, recessed 1.14 inside the 16T pinion boss; it followed the 16T teeth growing 9.5 → 11.4 north (user ruling 2026-09-30, c″ variant B, then ruling R9-55), and every far-end station grew the same 1.9. With the original pin and printed bands unchanged, its W15 pin-edge wall is 2.023 mm at print-worst (2.0 floor); a boss one .X step shorter would give 1.973. Length prints at one place, +0/−0.4.'
         - derived
         - high
   - prose: |2
@@ -585,12 +585,12 @@ sections:
         - mesh plane alignment
         - high
       - - Crankshaft
-        - 'Along Z on the restored fixed crank axis (x, y) = (−129.336, 129.850). The frame-reference c2c is 39.735, with 0.423 slack for the single-cutter pair. User ruling 2026-09-28 requires positive worst-case tight backlash without a prescribed window. The 137.5-mm shaft spans z −183..−45.5 with its integral dome outboard. T12 remains at z −155. The restored boss runs z −142.245..−70.210; the pinion south face is feeler-set 0.25 north of it, at z −69.960 (local 113.039505572). The 16T teeth grew 2.1 north, 9.5 → 11.6 mm (user ruling 2026-09-30, then rulings R9-55 and R9-56): full OD over the 8.5 shoulder, the north 3.1 turned to Ø16.21. Its 14.0-mm boss length past the south-to-north gear face is unchanged, yielding 25.6 mm overall. Its Ø3.175 pin station, 18.6, follows the grown face parametrically. The integral Ø11.388 journal runs directly in the post; the Ø9.0 pinion seat step starts at local 111.6.'
+        - 'Along Z on the restored fixed crank axis (x, y) = (−129.336, 129.850). The frame-reference c2c is 39.735, with 0.423 slack for the single-cutter pair. User ruling 2026-09-28 requires positive worst-case tight backlash without a prescribed window. The 137.2-mm shaft spans z −183..−45.8 with its integral dome outboard. Its integral seat collar spans z −152.5..−144 (the removable T12 seats on its front face, sprocket −155.3..−152.5); a 1.5 washer and 0.25 float close it to the post boss. The restored boss runs z −142.245..−70.210; the pinion south face is feeler-set 0.25 north of it, at z −69.960 (local 113.039505572). The 16T teeth grew 1.8 north, 9.5 → 11.3 mm (user ruling 2026-09-30): full OD over the 8.5 shoulder, the north 2.8 turned to Ø16.21. Its 14.0-mm boss length past the south-to-north gear face is unchanged, yielding 25.3 mm overall. Its Ø3.175 pin station, 18.3, follows the grown face parametrically. The integral Ø11.388 journal runs directly in the post; the Ø9.0 pinion seat step starts at local 111.3.'
         - 'cone-pivot-post-v2 is the physical authority for x/y. The ch30 GT crank_sprocket result (−122.84, 144.78) remains independent image evidence, while the primary crank construction photo governs the separate through hub and flush outboard face. The crossed-helical accommodation and historical 0.25 mm transverse-DP centre reference remain; neither is a backlash target.'
         - high (GT + mesh)
       - - Chain run
-        - crank T12 sprocket on the restored fixed axis (−129.336, 129.850, z −155 chain plane) up to the transgear knob-shaft T24; ANSI #25 link count and sag are solved by _chain.py from those centres
-        - v2 cast-in crank-axis cascade; chain remains in the z −155 plane (T12 band −157.5..−152.5)
+        - crank T12 sprocket on the restored fixed axis (−129.336, 129.850, z −153.9 chain plane) up to the transgear knob-shaft T24; ANSI #25 link count and sag are solved by _chain.py from those centres
+        - v2 cast-in crank-axis cascade; both sprockets share one band −155.3..−152.5, chain plane −153.9 (`transgear_removable_spec`)
         - med
       - - Cone pivot
         - 'the whole cone set rides a pivoting black wedge PLATFORM (p.18 top-down: the "pivot" label sits at the TIP end of the plate): big end journaled in the green post; the thin tip is end-play located by the cup-ended adjuster carried in the black block, and the MHA-096 set-screw collar retains the gear stack on the shaft. The post and block both stand ON the plate — the swing is horizontal (out of mesh) about the tip-end vertical pivot, so the big gears (needing the most separation) get the largest throw'
@@ -1609,26 +1609,26 @@ sections:
         - '4/4 video narration + FFT ring count + pitch-ratio cross-check (2.660/2.101 = 1.266); OD ≈ 82 ± 2.5 measured on ch30 p002; memory/paper-drive-rework.md E7'
         - counted + scaled
         - med
-      - - Removable gear module
-        - 2.0 mm (≈ DP 12.7)
+      - - Removable gear tooth form
+        - 'ANSI #25 roller-chain sprocket (6.35 pitch, Ø3.30 roller): B29.1 seating curve R = 0.505·Dr + 0.069·Dr^(1/3) = 1.769, straight flanks, 1.6 tip flat; T12 / T18 / T24 PD 24.53 / 36.57 / 48.65, OD 27.5 / 39.8 / 52.0, bottom Ø 21.23 / 33.27 / 45.35 (`transgear_removable_spec`)'
         - —
-        - 24T gear OD ≈ 51 mm in `v4_transgear_030` (scale via DP 30 rack pitch) ⟹ m = OD/(N+2) ≈ 1.96; m = 2.0 makes every swap combo's centre distance m(12+24)/2 = 36 mm exactly
-        - scaled
+        - 'ch23 p.56 catalog shot (sprocket, not a spur gear: the chain rollers sit in the tooth pockets) + p.58-59 + video f_0215; supersedes the m2 spur-gear read (24T OD ≈ 51 in `v4_transgear_030` stays within 1 mm of the #25 T24 OD 52)'
+        - standard + scaled
         - med
-      - - Removable gear face / bore / pins
-        - 2.4 thick; common bore Ø12; 2 × Ø3.5 pin holes on Ø19 BC
+      - - Removable gear plate / bore / pins
+        - '2.8 flat plate (the #25 tooth width), no hub; common bore Ø10.3 (13/32, 0.39 radial over the Ø9.525 pilot); 2 × Ø2.5 through holes on Ø14 BC at ±Y, over two Ø3/32 drive pins standing 2.4 proud of each shaft''s seat face; bore/pin-hole web 0.60 (photo-faithful, below the 1.5 floor, awaiting ruling)'
         - —
-        - '`v4_transgear_015` (catalog shot) + `v4_transgear_020/025/030` (mounted on the oval-pin stub shaft); face 5 → 2.4 (rework E6): ch23 p.58-59 shows the chain plates STRADDLING the thin wheel — the chain is wider than the sprocket'
-        - scaled
-        - low
+        - 'ch23 p.56 catalog shot (the pin holes nearly touch the bore) + `v4_transgear_020/025/030`; CQ sketch CONTRACT-crank'
+        - scaled + derived
+        - med
       - - Chain wheels
-        - 'the two MOUNTED removable gears themselves (knob shaft T24, crankshaft T12): the roller chain rides their m2 teeth — that is how gear swaps change the platen ratio, and why the latch slackens the chain'
+        - 'the two MOUNTED removable sprockets themselves (knob shaft T24, crankshaft T12): the #25 roller chain rides their teeth — that is how gear swaps change the platen ratio, and why the latch slackens the chain. Both sit in ONE band, rear face on the shaft''s seat face at z −152.5, front face −155.3, chain mid-plane −153.9'
         - —
         - 'M6.8 supersedes the M4c "17T sprockets both ends": ch. 23 text + `v4_transgear_002/008/012` (chain visibly wraps the removable''s coarse teeth); ch30 p002 full-res: upper wrap tips Ø ≈ 53.6 ≈ T24 OD 52 at post-mirror (−65, ~248); crank wheel small ≈ Ø30 (`v2_gears_010`) ≈ T12 OD 28. `chain-sprocket.SLDPRT` retired from the assemblies'
         - counted + scaled
         - med
       - - Drive chain (roller chain; paper-drive rework 2026-07-07)
-        - 'real roller chain (alternating `chain-inner-link`/`chain-outer-link` through the native connected-linkage pattern): pitch-circle centres are knob T24 (−42.575, 252.367) and crank T12 on the restored fixed axis (−129.336, 129.850); _chain.py solves the exact ANSI #25 link count and sag. Link pin plane remains z −155.'
+        - 'real roller chain (alternating `chain-inner-link`/`chain-outer-link` through the native connected-linkage pattern): pitch-circle centres are knob T24 (−42.575, 252.367) and crank T12 on the restored fixed axis (−129.336, 129.850); _chain.py solves the exact ANSI #25 link count and sag on the sprockets'' pitch circles. Link pin plane z −153.9 (`transgear_removable_spec.CHAIN_MID_Z`), the same on both shafts.'
         - —
         - ch30 p002/p005/p006 (taut run + visibly drooping slack run) + ch. 23 p.58-59 (chain wider than the wheel); crank centre from ch30 GT; knob centre = stud + latch c2c 44.766 @ −18°
         - scaled + derived
@@ -1670,9 +1670,9 @@ sections:
         - scaled + derived
         - med
       - - Knob shaft (rework E8)
-        - 'stepped Ø9.525, through the latch small hub at pre-mirror (42.575, 252.367), spanning machine z −157.5 → −130: removable seat z −157.5..−148.4 (T24 chain-wrapped at −156.2..−153.8), Ø5 third-gear seat −148.4..−142.9 (12T DP38 at −148.4..−144.4), hub ride to −130; Ø20 × 6.5 brass thumb knob ending at −123.5'
+        - 'stepped Ø9.525, through the latch small hub at pre-mirror (42.575, 252.367), spanning machine z −166.1 → −130: front pilot −166.1..−152.5 (thumbnut and the removable sprocket''s Ø10.3 bore), integral Ø17.5 × 3.6 seat collar −152.5..−148.9 (0.5 air to the third gear) carrying two 3/32 × 3/16 dowels (MHA-155) pressed in blind holes, standing 2.4 proud of the seat face (T24 sprocket plate −155.3..−152.5, #25 chain plane −153.9), Ø5 third-gear seat −148.4..−142.9 (12T DP38 at −148.4..−144.4), hub ride to −130; Ø20 × 6.5 brass thumb knob ending at −123.5'
         - —
-        - '`v4_transgear_008/020` + ch. 23 topology; stack derived from the disc window −148.4..−145.4 (0.3 in front of the platen furniture''s deepest reach) and the −155 chain plane'
+        - '`v4_transgear_008/020` + ch. 23 topology; stack derived from the disc window −148.4..−145.4 (0.3 in front of the platen furniture''s deepest reach) and the −153.9 chain plane both shafts share (`transgear_removable_spec`)'
         - scaled + derived
         - low/med
       - - Latch hook (2026-09-02; replaces the 2026-09 latch strip)
@@ -1682,7 +1682,7 @@ sections:
         - scaled
         - low
       - - Transgear thumbnut (2026-09-02)
-        - 'knurled brass nut Ø26 x 7 with a Ø14 x 4 neck, outermost on the knob shaft in FRONT of the removable gear (z -156.45..-167.45); the shaft gains a 9.5 front stub; knurl not modelled'
+        - 'knurled brass nut Ø26 x 7 with a Ø14 x 4 neck, outermost on the knob shaft in FRONT of the removable sprocket (z −155.55..−166.55); knurl not modelled'
         - —
         - 'ch23 p.58/59 (page002_img03/04) + video 4/4 "unscrew the nut that holds the other gear in place" (`build_transgear_thumbnut.py`)'
         - scaled
@@ -1698,7 +1698,7 @@ sections:
       and M6.8 readings and CLOSES Appendix C #8): the six gears, per the 4/4
       video narration, are (1) the crank removable chain wheel (T12 mounted)
       and (2) the knob removable chain wheel (T24 mounted) — the roller chain
-      rides their m2 teeth; (3) the 12T DP38 THIRD gear pinned on the knob
+      rides their #25 sprocket teeth; (3) the 12T DP38 THIRD gear pinned on the knob
       shaft just behind the removable; (4) the 120T DP38 reducer disc on the
       stud, in PERMANENT mesh with (3) at c2c 44.766 — the latch arm pivots ON
       the stud, so this centre distance never changes and the old two-distance
@@ -1710,7 +1710,7 @@ sections:
       edge to mesh (6) the teeth-down rack. Net feed with T12/T24 mounted:
       0.5 × (12/120) × π × 10.16 = 1.596 mm per crank revolution. The spare
       removable (T18) lies loose on the base (machine (−160, 53.2, −15)). The
-      mixed-pitch jam note (m2 vs DP 30/38) still bars any literal
+      mixed-pitch jam note (#25 sprocket vs DP 30/38) still bars any literal
       removable-on-gear mesh; it never happens in this topology. The measuring
       stick (ch. 16, hand tool) lies flat on the base at (−158, 53.8, −133),
       graduations up (M6.5).
@@ -2154,9 +2154,9 @@ sections:
          acceptance (`crank_mesh_stack`). Exact-solid phase and row engagement
          are evaluated at the actual grown-gear centre
          (`diagnostics/crank_mesh_backlash_study.py`: every case keeps the
-         −1.49 seed inside its common interval, nominal −2.79..−0.22). The
-         137.5-mm crankshaft retains the outboard face z −183 and T12 at
-         z −155; the 16T boss is the shortest printable length holding the
+         −1.49 seed inside its common interval, nominal −2.79..−0.21). The
+         137.3-mm crankshaft retains the outboard face z −183, with the
+         removable T12 seat face at z −152.5; the 16T boss is the shortest printable length holding the
          existing W15 pin-edge and shaft-end-recess floors.
       10. **Alignment-pinion mechanism removed (2026-06-18) — RESTORED
          2026-07-02** (ch. 25). The removal-era impossibility used the now-

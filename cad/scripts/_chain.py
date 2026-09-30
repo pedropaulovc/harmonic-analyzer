@@ -1,21 +1,22 @@
 """Drive-chain centreline geometry (book ch. 23/30).
 
-The roller chain loops the two CHAIN-WRAPPED removable gears (crank shaft
-T12 -> knob shaft T24; ch. 23: the chain rides the removables' m2 teeth --
-swapping them is what changes the platen ratio). Every chain-side ch30
-plate (p002/p005/p006) shows it: a taut run on the pinion-bar side and a
+The ANSI #25 roller chain loops the two CHAIN-WRAPPED removable sprockets
+(crank shaft T12 -> knob shaft T24; ch. 23: the chain rides the removables'
+teeth -- swapping them is what changes the platen ratio). Every chain-side
+ch30 plate (p002/p005/p006) shows it: a taut run on the pinion-bar side and a
 visibly drooping slack run on the other.
 
 Pure math only -- the roller chain's alternating inner/outer links are
 explicitly placed along this centreline loop (build_paper_drive_assembly
 ._insert_roller_chain); the M6.8 rigid-band stand-in and the #13 bead-chain
-stand-in are both retired.
+stand-in are both retired. Sprocket and chain numbers (pitch, roller, pitch
+and outside diameters, plate width) come from ``transgear_removable_spec``.
 
 Geometry (local frame: knob wrap centre at the origin, machine xy
 pre-mirror; crank centre from cone_line X_CRANK / Y_CRANK minus
 build_paper_drive_assembly KNOB_SHAFT_XY): two UNEQUAL wrap arcs whose
-centreline rides each gear's PITCH circle (where a real chain seats -- the
-rollers rest in the tooth valleys, the plates STRADDLE the 2.4-wide
+centreline rides each sprocket's PITCH circle (where a real chain seats -- the
+rollers rest in the tooth seats, the plates STRADDLE the 2.8-wide
 sprocket, and the tips pass between them; only the roller<->tooth seating
 remains as intended contact, whitelisted in
 build_paper_drive_assembly.check_no_interference), the common
@@ -29,6 +30,8 @@ solved numerically for the SAG droop).
 from __future__ import annotations
 
 import math
+
+import transgear_removable_spec as _removable
 from cone_line import X_CRANK, Y_CRANK
 
 
@@ -43,26 +46,27 @@ KNOB_CENTRE = (42.575, 252.3672)  # build_paper_drive_assembly KNOB_SHAFT_XY:
 CRANK_CENTRE = (-X_CRANK, Y_CRANK)
 # The chain count and droop below are re-solved from this centre automatically.
 
-TIP_R_T24 = 26.0  # mounted removables, module 2: tip r = (T + 2) * 2 / 2
-TIP_R_T12 = 14.0
-PITCH_R_T24 = 24.0  # module 2 pitch r = T * 2 / 2 -- the chain pin centreline
-PITCH_R_T12 = 12.0  # rides here (rollers seat in the tooth valleys)
-# The roller chain SEATS on each sprocket: its pin centreline rides the gear
-# PITCH circle (the pitch polygon a real chain wraps), so the rollers rest in
-# the tooth valleys and the tips poke out past the chain -- "on the base, not
-# the teeth". Because the chain and the removables share one z-plane (a
-# coplanar single-plane stand-in for a chain that really straddles the
-# sprocket), the links necessarily overlap the teeth in that plane; that
+# Mounted removables (ANSI #25, transgear_removable_spec): tip r = OD / 2.
+TIP_R_T24 = _removable.outside_dia(_removable.TEETH["T24"]) / 2.0  # 26.0
+TIP_R_T12 = _removable.outside_dia(_removable.TEETH["T12"]) / 2.0  # 13.75
+# Pitch r = p / (2 sin(180/N)) -- the chain pin centreline rides here.
+PITCH_R_T24 = _removable.pitch_dia(_removable.TEETH["T24"]) / 2.0  # 24.33
+PITCH_R_T12 = _removable.pitch_dia(_removable.TEETH["T12"]) / 2.0  # 12.27
+# The roller chain SEATS on each sprocket: its pin centreline rides the
+# sprocket PITCH circle (the pitch polygon a real chain wraps), so the rollers
+# rest in the tooth seats and the tips poke out past the chain -- "on the
+# base, not the teeth". The plates straddle the wheel (z stack below), but the
+# rollers and the tooth seats share the chain plane; that roller<->tooth
 # contact is intended mesh, whitelisted in
 # build_paper_drive_assembly.check_no_interference (chain-link <->
 # transgear-removable), exactly as link<->link contact already is.
-WRAP_R_A = PITCH_R_T24  # 24.0 (knob T24 pitch circle)
-WRAP_R_B = PITCH_R_T12  # 16.91 -> 12.0 (crank T12 pitch circle)
+WRAP_R_A = PITCH_R_T24  # knob T24 pitch circle
+WRAP_R_B = PITCH_R_T12  # crank T12 pitch circle
 SAG_NOMINAL = 14.0  # slack-run droop seed (p006 crop read 18; was trimmed
 # from 18 to clear the cone-pivot-post top, but the ch30 GT re-anchor retired
 # that constraint: the post (now the p1 swing bracket at machine z -113..-87)
-# no longer shares a z corridor with the chain plane (z -155). 14 kept
-# conservatively -- exact 66-link closure now resolves to 16.471 mm droop.
+# no longer shares a z corridor with the chain plane (z -153.9). 14 kept
+# conservatively as the seed.
 # The BUILT droop is SAG below: solved off this seed so the loop closes on an
 # integer number of standard-pitch links (a real chain's length is quantised;
 # the sag is the underdefined member that absorbs the slack).
@@ -154,8 +158,9 @@ def _loop_length(sag: float) -> float:
 # SAG so the centreline lands EXACTLY on count * pitch. The sag -- not the
 # pitch -- absorbs the slack, exactly like a real chain (move an axle and the
 # droop responds).
-LINK_PITCH = 6.35  # ANSI #25 pitch (1/4 in), EXACT: the link parts and the
-# chain-pattern spacing carry this standard pitch; closure comes from the sag.
+LINK_PITCH = _removable.CHAIN_PITCH  # ANSI #25 pitch (1/4 in), EXACT: the link
+# parts and the chain-pattern spacing carry this standard pitch; closure comes
+# from the sag.
 LINK_COUNT = 2 * round(_loop_length(SAG_NOMINAL) / (2.0 * LINK_PITCH))
 CENTRELINE_LEN = LINK_COUNT * LINK_PITCH
 
@@ -174,9 +179,8 @@ for _ in range(80):
 SAG = 0.5 * (_LO_SAG + _HI_SAG)  # the BUILT droop (solved for LINK_COUNT).
 # The count quantisation moves the target length by at most LINK_PITCH / 2
 # (~3.2 mm); the slack run's length-vs-droop sensitivity is ~0.85 mm/mm here,
-# so the solved sag stays inside the +-8 bracket. At the 2026-07-23 platen
-# layout the selected even count and sag are derived above while preserving
-# exact standard-pitch closure.
+# so the solved sag stays inside the +-8 bracket. The selected even count and
+# sag are derived above while preserving exact standard-pitch closure.
 assert abs(_loop_length(SAG) - CENTRELINE_LEN) < 1e-6
 
 SLACK_R = _solve_slack_radius(SAG)
@@ -203,39 +207,44 @@ assert abs(
 ) < 1e-6
 
 # --- roller chain ------------------------------------------------------------
-# A real ANSI-#25-proportioned roller chain (pitch 1/4 in EXACT, see
-# LINK_PITCH/LINK_COUNT above): alternating INNER links (2 inner plates + 2
-# rollers) and OUTER links (2 outer plates + 2 pins), filled along the
-# centreline loop by the connected-linkage chain pattern
-# (build_paper_drive_assembly._insert_roller_chain). Every dimension stays
-# inside a +-2.4 in-plane / +-2.1 z envelope (the retired #13 ball chain's 4.8
-# bead) so the band-tuned M6.8/M6.9 clearances transfer untouched.
+# A real ANSI #25 roller chain (pitch 1/4 in EXACT, roller Ø3.30 from
+# transgear_removable_spec; see LINK_PITCH/LINK_COUNT above): alternating
+# INNER links (2 inner plates + 2 rollers) and OUTER links (2 outer plates + 2
+# pins), filled along the centreline loop by the connected-linkage chain
+# pattern (build_paper_drive_assembly._insert_roller_chain). The in-plane
+# envelope stays +-2.4 (the retired #13 ball chain's 4.8 bead).
 
 # Every clearance is >= 0.25 mm and nothing relies on exact tangency: the
 # M6.x interference checker flags ~0.00 mm^3 slivers, so the links FLOAT as a
 # multibody (disconnected bodies in a part are allowed). The z stack is sized
-# so the chain STRADDLES the 2.4-wide removable sprockets (ch23 p.58-59:
-# chain wider than the wheel -- paper-drive rework E6): sprocket faces +-1.2,
-# inner-plate INNER faces at +-1.45 (0.25 clear per side), so the tooth tips
-# pass BETWEEN the plates instead of through them.
+# so the chain STRADDLES the removable sprocket's plate (ch23 p.58-59: chain
+# wider than the wheel): sprocket faces +-PLATE/2 about the chain plane,
+# inner-plate INNER faces SPROCKET_CLEAR outside them, so the tooth tips pass
+# BETWEEN the plates instead of through them.
 PLATE_HEIGHT = 4.8  # obround plate height (in-plane envelope, unchanged)
 PLATE_HALF_H = PLATE_HEIGHT / 2.0  # 2.4, the obround end-arc radius
 PLATE_THICK = 0.8  # side-plate thickness (z)
+SPROCKET_CLEAR = 0.25  # sprocket face -> inner-plate inner face, per side
+PLATE_GAP = 0.3  # inner-plate outer face -> outer-plate inner face
+FLOAT = 0.3  # radial float of a round body in its plate hole
 
-ROLLER_DIA = 2.5  # roller/bushing outer diameter (~0.52 of plate height, #25)
-ROLLER_R = ROLLER_DIA / 2.0  # 1.25
+ROLLER_DIA = _removable.ROLLER_DIA  # 3.30, the #25 roller/bushing OD
+ROLLER_R = ROLLER_DIA / 2.0  # 1.65
 BUSH_BORE_R = 1.0  # bushing through-bore; pin floats inside (0.35 clearance)
-BUSH_HALF_LEN = 1.45  # bushing spans the inner plates (z -1.45..1.45)
-INNER_PLATE_HOLE_R = 1.55  # bushing OD floats inside (0.30); web 0.85
+INNER_PLATE_HOLE_R = ROLLER_R + FLOAT  # 1.95: bushing OD floats inside; web 0.45
 
 PIN_DIA = 1.3  # outer-link pin (floats in the bushing bore and plate holes)
 PIN_R = PIN_DIA / 2.0  # 0.65
-PIN_HALF_LEN = 3.35  # pin reach along the pin axis (flush with the outer plates)
-OUTER_PLATE_HOLE_R = 0.95  # pin floats inside (0.30); web 1.45
+OUTER_PLATE_HOLE_R = PIN_R + FLOAT  # 0.95: pin floats inside; web 1.45
 
 # z stack (pin axis), symmetric about the chain mid-plane:
-INNER_PLATE_Z = 1.85  # inner-plate centre (faces 1.45..2.25, sprocket 0.25 clear)
-OUTER_PLATE_Z = 2.95  # outer-plate centre (faces 2.55..3.35, 0.3 gap to inner)
+INNER_PLATE_INNER_Z = _removable.PLATE / 2.0 + SPROCKET_CLEAR  # 1.65
+BUSH_HALF_LEN = INNER_PLATE_INNER_Z  # bushing spans between the inner plates
+INNER_PLATE_Z = INNER_PLATE_INNER_Z + PLATE_THICK / 2.0  # 2.05 (faces 1.65..2.45)
+OUTER_PLATE_Z = INNER_PLATE_Z + PLATE_THICK + PLATE_GAP  # 3.15 (faces 2.75..3.55)
+PIN_HALF_LEN = OUTER_PLATE_Z + PLATE_THICK / 2.0  # 3.55, flush with the outer plates
+if PLATE_HALF_H - INNER_PLATE_HOLE_R < SPROCKET_CLEAR:
+    raise AssertionError("inner-plate hole leaves no web around the #25 roller")
 
 
 def loop_point_tangent(

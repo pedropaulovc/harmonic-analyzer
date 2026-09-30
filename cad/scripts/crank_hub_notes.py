@@ -84,14 +84,48 @@ BORE_CALLOUT = (
 # it, so its nominal prints as a reference under the match-fit callout.
 SEAT_CALLOUT = seat_callout("MHA-020")
 SEAM_CALLOUT = seam_callout("MHA-020")
-# The cross-hole is drilled, then taper-reamed through hub and shaft together;
-# the prose reads under the native #14 drill size and matches the crankshaft
-# MHA-026 callout for the same operation.
+# The cross-hole is drilled, then taper-reamed through hub and shaft together.
+# The ream fixes the hub on the shaft for good, so the front face is set flush
+# with the crankshaft's end first (the arm front is already flush with the hub
+# front from the seat press); the prose reads under the native #14 drill size,
+# in the order the work is done.
 CROSS_HOLE_CALLOUT = "\n".join(
     (
-        "MATCH TAPER-REAM 1:48",
-        "WITH CRANKSHAFT MHA-026",
-        "TO TAPER PIN MHA-024:",
-        "LIGHT DRIVE FIT",
+        "FRONT FACE FLUSH WITH",
+        "CRANKSHAFT MHA-026 END;",
+        "MATCH TAPER-REAM 1:48 FOR",
+        "MHA-024: LIGHT DRIVE FIT",
     )
 )
+
+# Axial stack at the printed worst case (Main, 2026-09-30), machine z, -Z =
+# FRONT, with a bought ANSI #25 chain on the crank T12.  Not printed: the
+# drive train asserts both from the same names (build_drive_train_assembly).
+# The hub is placed by the fitter (front face flush with the shaft end, the
+# crank face z -183, before the match-ream), so its printed overall length --
+# not the arm's stock thickness -- places its rear face.
+#   Links:
+#     crank face                    CRANK_FACE_Z                     -183
+#     hub overall, front to rear    HUB_LENGTH +/- HUB_LENGTH_TOL    27 +/-0.05
+#     relief, back from rear face   RELIEF_LENGTH +/- RELIEF_LENGTH_TOL
+#                                                                    3.6 +/-0.05
+#     removable seat face           transgear_removable_spec.SEAT_FACE_Z
+#                                   + crankshaft_spec.SEAT_COLLAR_BAND
+#                                                                    -152.5 +0.1/-0.5
+#     T12 wheel plate               PLATE + PLATE_BAND               2.8 +0/-0.10
+#     chain reach ahead of seat     CHAIN_REACH_FRONT = W/2 + G      6.2865
+#                                   (ANSI_ROLLER_WIDTH 3.175 / 2 + ANSI_HALF_WIDTH
+#                                   4.699, chain floated frontmost)
+#   A  chain -> relief shoulder:
+#        (SEAT_FACE_Z + min(SEAT_COLLAR_BAND) - CHAIN_REACH_FRONT)
+#        - (CRANK_FACE_Z + HUB_LENGTH + HUB_LENGTH_TOL
+#           - (RELIEF_LENGTH - RELIEF_LENGTH_TOL))
+#        = (-152.5 - 0.5 - 6.2865) - (-183 + 27.05 - 3.55)
+#        = -159.2865 - (-159.5)                   = 0.2135  (nominal 0.81)
+#   B  hub rear face -> T12 front face:
+#        (SEAT_FACE_Z + min(SEAT_COLLAR_BAND) - (PLATE + max(PLATE_BAND)))
+#        - (CRANK_FACE_Z + HUB_LENGTH + HUB_LENGTH_TOL)
+#        = (-152.5 - 0.5 - 2.8) - (-183 + 27.05)
+#        = -155.8 - (-155.95)                     = 0.15    (nominal 0.7)
+#   Worst case in both: seat collar at its forward limit, hub long; A with the
+#   relief short, B with the plate thick.

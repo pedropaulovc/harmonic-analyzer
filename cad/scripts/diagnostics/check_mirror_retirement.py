@@ -982,6 +982,19 @@ expect(
     "removable T24",
     **_SOLV,
 )
+for _k, _side in ((1, -1.0), (2, 1.0)):
+    expect(
+        PD,
+        f"transgear-knob-drive-pin-{_k}",
+        [
+            p.KNOB_SHAFT_XY[0],
+            p.KNOB_SHAFT_XY[1] + _side * p.REMOVABLE.PIN_CIRCLE_RADIUS,
+            p.KNOB_DRIVE_PIN_Z0,
+        ],
+        p.ROT_X_NEG90,
+        f"knob drive pin {_k}",
+        **_SOLV,
+    )
 expect(
     PD,
     "transgear-removable-2",

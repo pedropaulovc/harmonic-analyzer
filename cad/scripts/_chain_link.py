@@ -10,7 +10,7 @@ Each link is authored in its own frame: plates in the Front (XY) plane, the
 pin axis along local Z. Two named reference axes -- Axis1 at the x=0 station,
 Axis2 at the x=P station -- are the chain pattern's PathLink1/PathLink2 (their
 spacing IS the pattern pitch). See _chain.py for the clearance rationale (all
-gaps >= 0.3 mm; the links float as disconnected multibody solids).
+gaps >= 0.25 mm; the links float as disconnected multibody solids).
 """
 
 from __future__ import annotations

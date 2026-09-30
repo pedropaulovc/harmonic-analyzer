@@ -63,9 +63,36 @@ ARM_STOCK_THICKNESS_MIN = float(ARM_STOCK_THICKNESS_IN - ARM_STOCK_MILL_MINUS_IN
 # deviation, inside the photograph's own rounding.
 PHOTO_HUB_SEAT_DIA = round(PHOTO_HUB * PHOTO_MM_PER_UNIT * OUTBOARD_SCALE, 1)
 HUB_SEAT_DIA = round(PHOTO_HUB_SEAT_DIA - 0.1, 1)
-HUB_BARREL_DIA = ARM_WIDTH
 HUB_SEAT_LENGTH = ARM_THICKNESS
-HUB_LENGTH = 20.0
+# CONTRACT-crank MHA-137: the barrel behind the arm is Ø20.6 (observed Ø≈20,
+# review Q4) -- turned to its own size, narrower than the 1-in arm -- and the
+# hub runs 19 from the arm shoulder to a flat rear face 0.7 clear of the
+# MHA-081 removable, which it keeps from walking forward (the drive train
+# asserts the air against transgear_removable_spec).
+HUB_BARREL_DIA = 20.6
+HUB_SHOULDER_TO_REAR = 19.0
+# The #25 plates wrapping the crank T12 overhang the removable's front face
+# toward the hub, so the rear end is turned down to a Ø16.5 relief the plates
+# pass over; the barrel's rear shoulder stands ahead of the link.  3.6 long,
+# so a bought ANSI #25 chain (not just the CAD link) clears the shoulder at
+# the printed worst case (crank_hub_notes carries the axial stack); the drive
+# train asserts the radial and axial air from these names (RELIEF_STATION is
+# the shoulder's local station; its machine z is the drive train's
+# crank-face datum plus it).
+RELIEF_DIA = 16.5
+# Printed from the rear face at .XX with a functional ±0.05: with the hub
+# length below it places the shoulder the chain must clear.
+RELIEF_LENGTH = 3.6
+RELIEF_LENGTH_TOL = 0.05
+HUB_BARREL_LENGTH = round(HUB_SHOULDER_TO_REAR - RELIEF_LENGTH, 6)
+HUB_LENGTH = HUB_SEAT_LENGTH + HUB_SHOULDER_TO_REAR
+# The hub prints its overall length, front face to rear face, at .XX with a
+# functional ±0.05.  The fitter sets the front face flush with the crankshaft
+# end before the MHA-024 match-ream, so this band (not the arm's stock
+# thickness) places the rear face: the 0.7 air to the removable and, with
+# the relief, the chain's air to the shoulder.
+HUB_LENGTH_TOL = 0.05
+RELIEF_STATION = round(HUB_LENGTH - RELIEF_LENGTH, 6)
 HUB_SHOULDER_STATION = HUB_SEAT_LENGTH
 # Named ratio deviation (U29): the stock arm stands 1.309x the hub seat where
 # the photograph shows 1.208x; the extra width is what gives the arm cheek
@@ -74,10 +101,8 @@ ARM_TO_HUB_RATIO = ARM_WIDTH / HUB_SEAT_DIA
 PHOTO_ARM_TO_HUB_RATIO = PHOTO_ARM / PHOTO_HUB
 
 # MHA-024's match-ream is fully behind the 8-mm arm, located from the arm
-# shoulder it must not break into.  The hub rear stays at station 20 (BDT pins
-# the 5.5-mm T12 air gap), so the 12-mm barrel -- printed from the shoulder --
-# holds the 1:48 ream with a centred station: policy rule 12 ligaments below.
-HUB_BARREL_LENGTH = HUB_LENGTH - HUB_SEAT_LENGTH
+# shoulder it must not break into; the barrel -- printed from the shoulder --
+# carries the 1:48 ream at that station: policy rule 12 ligaments below.
 SERVICE_PIN_FROM_SHOULDER = 5.6
 SERVICE_PIN_STATION = HUB_SEAT_LENGTH + SERVICE_PIN_FROM_SHOULDER
 CRANK_FACE_SHIFT = ARM_THICKNESS
@@ -130,19 +155,30 @@ GENERAL_2PL_TOL_MM = round(
     float(_config.title_block("linear_2pl")["value_in"]) * MM_PER_IN, 2
 )
 # Policy rule 12 (U27): MHA-024 ream ligaments at the worst case of the printed
-# bands -- the .XX station from the shoulder and the .X barrel length.  The
-# ream never exceeds the pin's big end, which stands proud of the hub.
+# bands.  The ream never exceeds the pin's big end, which stands proud of the
+# hub.  Ahead of it the arm shoulder: the .XX station printed from it.  Behind
+# it the relief shoulder, which the print places from the front face through
+# the .XX overall and the .XX relief back from the rear face, while the ream
+# is placed through the .X seat length and the .XX station.
 SERVICE_PIN_REAM_RADIUS_MAX = SERVICE_PIN_BIG_END_DIA / 2.0
 SERVICE_PIN_SHOULDER_LIGAMENT_WORST_MM = (
     SERVICE_PIN_FROM_SHOULDER - SERVICE_PIN_REAM_RADIUS_MAX - GENERAL_2PL_TOL_MM
 )
 SERVICE_PIN_REAR_LIGAMENT_WORST_MM = (
-    HUB_BARREL_LENGTH
-    - SERVICE_PIN_FROM_SHOULDER
+    (HUB_LENGTH - HUB_LENGTH_TOL)
+    - (RELIEF_LENGTH + RELIEF_LENGTH_TOL)
+    - (HUB_SEAT_LENGTH + GENERAL_1PL_TOL_MM)
+    - (SERVICE_PIN_FROM_SHOULDER + GENERAL_2PL_TOL_MM)
     - SERVICE_PIN_REAM_RADIUS_MAX
-    - GENERAL_1PL_TOL_MM
-    - GENERAL_2PL_TOL_MM
 )
+# The relief is a clearance diameter at the title block's .X band: the
+# largest it can come out is what the #25 plates must clear, the smallest is
+# the relief's wall over the bore.
+RELIEF_DIA_MAX = RELIEF_DIA + GENERAL_1PL_TOL_MM
+# The barrel wall standing beside the big end of the ream, across the axis.
+SERVICE_PIN_BARREL_WALL_WORST_MM = (
+    HUB_BARREL_DIA - GENERAL_1PL_TOL_MM
+) / 2.0 - SERVICE_PIN_REAM_RADIUS_MAX
 
 
 def wall_after_edge_break(outer_dia: float, inner_dia: float) -> float:
@@ -156,14 +192,30 @@ SEAM_WEB_WORST_MM = wall_after_edge_break(
 ARM_CHEEK_WORST_MM = wall_after_edge_break(
     ARM_WIDTH - ARM_WIDTH_STOCK_MINUS, HUB_SEAT_DIA_MAX_GENERAL
 )
+# The relief's wall over the bore: Ø16.5 at its .X lower limit against the
+# bore's upper limit, both edges broken.
+RELIEF_WALL_WORST_MM = wall_after_edge_break(
+    RELIEF_DIA - GENERAL_1PL_TOL_MM, HUB_BORE_DIA_MAX
+)
 for _wall, _label in (
     (SEAM_WEB_WORST_MM, "MHA-137 seam-to-bore web"),
     (ARM_CHEEK_WORST_MM, "MHA-020 cheek around the hub seat"),
     (SERVICE_PIN_SHOULDER_LIGAMENT_WORST_MM, "MHA-024 ream to the MHA-137 shoulder"),
-    (SERVICE_PIN_REAR_LIGAMENT_WORST_MM, "MHA-024 ream to the MHA-137 rear face"),
+    (
+        SERVICE_PIN_REAR_LIGAMENT_WORST_MM,
+        "MHA-024 ream to the MHA-137 relief shoulder",
+    ),
+    (SERVICE_PIN_BARREL_WALL_WORST_MM, "MHA-137 barrel beside the MHA-024 ream"),
+    (RELIEF_WALL_WORST_MM, "MHA-137 rear relief over the bore"),
 ):
     if _wall < WALL_TARGET_MM:
         raise AssertionError(f"{_label} is only {_wall:.3f} mm at worst case")
+if HUB_BARREL_DIA <= HUB_SEAT_DIA:
+    raise AssertionError("MHA-137 barrel leaves no shoulder against the arm")
+if not HUB_BORE_DIA < RELIEF_DIA < HUB_BARREL_DIA:
+    raise AssertionError("MHA-137 relief is not a step between the bore and barrel")
+if SERVICE_PIN_STATION >= RELIEF_STATION:
+    raise AssertionError("MHA-024 station lies on the rear relief")
 if SHAFT_DIA + SHAFT_DIA_BAND[0] >= HUB_BORE_DIA + HUB_BORE_BAND[1]:
     raise AssertionError("shaft dome cannot withdraw through the hub bore")
 if HUB_SHOULDER_STATION >= SERVICE_PIN_STATION:

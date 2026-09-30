@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import re
 from pathlib import Path
 
 import pytest
@@ -42,9 +43,22 @@ def test_policy_migrated_sheet_carries_no_gdt_and_model_owned_places() -> None:
     assert "draw_crankshaft.py" in PRECISION_MIGRATED_DRAWINGS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
-    functional_fits = {"ShaftDiaDim", "JournalDiaDim", "PinionSeatDiaDim"}
+    # Running/seat fits print at three places; the seat collar's functional
+    # bands (rule 12) at the places that hold them; the rest at one.
+    functional_places = {
+        "ShaftDiaDim": 3,
+        "JournalDiaDim": 3,
+        "PinionSeatDiaDim": 3,
+        "CollarDiaDim": 2,
+        "SpigotDiaDim": 2,
+        "SpigotLength": 2,
+        "CollarSeatStation": 2,
+        "CollarRearStation": 2,
+        "DrivePinOffset1": 3,
+        "DrivePinOffset2": 3,
+    }
     for name, places in spec.DRAWING_PRECISION_BY_NAME.items():
-        assert places == (3 if name in functional_fits else 1), name
+        assert places == functional_places.get(name, 1), name
     assert spec.REFERENCE_DIMENSIONS <= marked
     assert spec.SPHERICAL_DIMENSIONS <= spec.REFERENCE_DIMENSIONS
 
@@ -79,7 +93,86 @@ def test_shaft_prints_exactly_and_reaches_the_restored_post_boss() -> None:
 
     post_boss_north = cone_line.cone_station(cone_line.POST_STATION)[2] - post.CRANK_BOSS_START_Z
     assert -183.0 + spec.POST_BORE_END == pytest.approx(post_boss_north)
-    assert part.SEAT_T12 < spec.POST_BORE_END
+
+
+def test_seat_collar_lands_the_wheel_seat_and_clears_the_post_boss() -> None:
+    # The collar's front is the Ø17.5 seat spigot, whose face is the removable
+    # sprocket's seat on the shared plane, stepping up to the Ø20.6 body; its
+    # rear face stays short of the outboard journal land (and the post boss)
+    # by more than the washer, at the printed limits too.
+    import build_drive_train_assembly as bdt
+    import cone_pivot_post_spec as post
+    import crank_seat_washer_spec as washer
+    import transgear_removable_spec as removable
+
+    assert bdt.CRANKSHAFT_Z0 + spec.SEAT_COLLAR == pytest.approx(removable.SEAT_FACE_Z)
+    assert spec.SPIGOT_DIA == removable.SEAT_SPIGOT_DIA < spec.COLLAR_DIA
+    # Ruling 2026-09-30: spigot -152.5..-148.5, body -148.5..-144.
+    assert bdt.CRANKSHAFT_Z0 + spec.SPIGOT_END == pytest.approx(-148.5)
+    # The blind drive-pin holes end in the spigot, short of its step.
+    assert spec.SEAT_COLLAR < spec.DRIVE_PIN_FLOOR < spec.SPIGOT_END
+    assert bdt.CRANKSHAFT_Z0 + spec.COLLAR_REAR == pytest.approx(-144.0)
+    boss_south = spec.POST_BORE_END - post.CRANK_BOSS_LENGTH
+    float_worst = (
+        boss_south
+        - (spec.COLLAR_REAR + max(spec.COLLAR_REAR_BAND))
+        - (washer.THICKNESS + max(washer.THICKNESS_BAND))
+    )
+    assert float_worst > 0.0
+    assert spec.COLLAR_REAR < spec.JOURNAL_START
+    # Bottomed dowels stand proud by the drive-train's pin length budget.
+    assert (
+        bdt.CRANKSHAFT_Z0 + spec.DRIVE_PIN_FLOOR - spec.crank_seat_drive_pin_spec.LENGTH
+        == (pytest.approx(removable.DRIVE_PIN_TIP_Z))
+    )
+
+
+_POLICY = (
+    Path(spec.__file__).resolve().parents[1] / "docs" / "drawing-simplicity-policy.md"
+)
+
+
+def _floor_2(value: float) -> float:
+    return math.floor(value * 100.0 + 1e-9) / 100.0
+
+
+def test_spigot_rim_is_the_named_exception_the_sheet_states() -> None:
+    # The drive-pin holes' rim to the Ø17.5 seat spigot is under the policy's
+    # wall floor (a named exception, MHA-026): the worst case of the printed
+    # bands is what the sheet states under the holes' callout and what the
+    # policy row records, rounded down so neither claims more rim than exists.
+    policy = _POLICY.read_text(encoding="utf-8")
+    floor = re.search(r"hard floor of \*\*(\d+(?:\.\d+)?) mm\*\*", policy)
+    assert floor
+    section = policy.split("\n## Named exceptions", 1)[1].split("\n## ", 1)[0]
+    rows = [
+        [cell.strip() for cell in line.strip().strip("|").split("|")]
+        for line in section.splitlines()
+        if line.startswith("| MHA-026 ")
+    ]
+    (shortfall,) = [cells[1] for cells in rows if "spigot" in cells[0]]
+    recorded = re.search(
+        r"spigot rim (\d+\.\d\d) nominal, (\d+\.\d\d) at the worst case",
+        shortfall,
+        re.IGNORECASE,
+    )
+    assert recorded, shortfall
+    hole_r = spec.DRIVE_PIN_HOLE_DIA / 2.0
+    nominal = spec.SPIGOT_DIA / 2.0 - (spec.DRIVE_PIN_CIRCLE_RADIUS + hole_r)
+    worst = (spec.SPIGOT_DIA + spec.SPIGOT_DIA_BAND[1]) / 2.0 - (
+        spec.DRIVE_PIN_CIRCLE_RADIUS
+        + spec.DRIVE_PIN_OFFSET_TOL
+        + hole_r
+        + spec.DRIVE_PIN_HOLE_BAND[0] / 2.0
+    )
+    rim = spec.DRIVE_PIN_SPIGOT_RIM_WORST
+    assert rim == _floor_2(worst)
+    assert 0.0 < rim < float(floor.group(1))
+    printed = re.search(r"SPIGOT RIM (\d+\.\d\d) MIN\.", notes.DRIVE_PIN_CALLOUT)
+    assert printed
+    assert float(printed.group(1)) == rim
+    assert float(recorded.group(2)) == rim
+    assert float(recorded.group(1)) == _floor_2(nominal) == spec.DRIVE_PIN_SPIGOT_RIM
 
 
 def test_integral_dome_is_the_only_outboard_shaft_projection() -> None:
@@ -141,7 +234,8 @@ def test_horizontal_profile_and_left_end_view_are_third_angle_aligned() -> None:
     # *Bottom (X right, Z up) is then the true left view, on the same axis.
     assert drawing.SIDE_VIEW_ANGLE == pytest.approx(-math.pi / 2.0)
     assert drawing.END_CENTER[1] == drawing.SIDE_CENTER[1]
-    end_radius = spec.SHAFT_DIA * drawing.SHEET_SCALE[0] / 2000.0
+    # The collar is the end view's largest circle.
+    end_radius = spec.COLLAR_DIA * drawing.SHEET_SCALE[0] / 2000.0
     assert drawing.END_CENTER[0] + end_radius < drawing.DOME_TIP_X
 
 
@@ -156,7 +250,10 @@ def test_sheet_placements_stay_inside_the_border() -> None:
         drawing.NOTES_XY,
         drawing.ISO_NOTE_XY,
         *(symbol for _, symbol in drawing.JOURNAL_FINISHES.values()),
+        drawing.COLLAR_REAR_FINISH[1],
+        drawing.DRIVE_PIN_CALLOUT_XY,
         *drawing.SIDE_KEEP.values(),
+        *drawing.END_PIN_KEEP.values(),
         *drawing.DIAMETER_POSITIONS.values(),
     ]
     for x, y in points:
@@ -182,9 +279,9 @@ def test_sheet_placements_stay_inside_the_border() -> None:
         "outboard_journal": (spec.JOURNAL_START, spec.RELIEF_START),
         "inboard_journal": (spec.RELIEF_END, spec.JOURNAL_END),
     }
-    assert set(drawing.JOURNAL_FINISHES) == {control.key for control in spec.SURFACE_FINISHES}
+    journal_controls = [c for c in spec.SURFACE_FINISHES if c.key in lands]
     assert set(drawing.JOURNAL_FINISHES) == set(lands)
-    for control in spec.SURFACE_FINISHES:
+    for control in journal_controls:
         start, end = lands[control.key]
         assert control.roughness_um == MACHINED_UM
         assert control.face.diameter_mm == spec.JOURNAL_DIA
@@ -193,6 +290,16 @@ def test_sheet_placements_stay_inside_the_border() -> None:
         assert drawing._sheet_x(start) < pick[0] < drawing._sheet_x(end)
         assert pick[1] == pytest.approx(drawing.JOURNAL_FLANK_Y)
         assert drawing._sheet_x(start) < symbol[0] < drawing._sheet_x(end)
+    # The collar's rear face runs on the thrust washer: its own control, its
+    # leader on that face's edge-on line inside the collar's silhouette.
+    (washer_face,) = [c for c in spec.SURFACE_FINISHES if c.key not in lands]
+    assert washer_face.key == "collar_rear_face"
+    pick, _symbol = drawing.COLLAR_REAR_FINISH
+    assert pick[0] == pytest.approx(drawing._sheet_x(washer_face.face.offset_mm))
+    assert (
+        abs(pick[1] - drawing.SIDE_CENTER[1])
+        < spec.COLLAR_DIA * drawing.SHEET_SCALE[0] / 2000.0
+    )
 
 
 def test_integral_lands_run_in_the_restored_post_at_every_size_limit() -> None:

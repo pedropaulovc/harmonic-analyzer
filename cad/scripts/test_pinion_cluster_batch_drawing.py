@@ -21,6 +21,7 @@ import pinion_lever_spec
 import pinion_pivot_shaft_spec
 import pinion_spring_spec
 import post_mount_screw_spec
+import transgear_knob_drive_pin_spec
 from _buildgraph import module_deps_of
 
 
@@ -361,6 +362,16 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 6.35,
                 second_number=None,
             ),
+            # CONTRACT-crank: 2x MHA-173 3/32 dowel (2.38125) pressed into
+            # MHA-026's 2.38 reamed collar holes, 3.95 deep.
+            **_expected_numbered_pairs(
+                "crank-seat-drive-pin",
+                range(1, 3),
+                "crankshaft",
+                2.38125,
+                2.38,
+                3.95,
+            ),
         },
         "frame": {
             **_expected_numbered_pairs(
@@ -510,6 +521,15 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(("bracket-screw-3", "support-bar-1")): _annulus_limit(
                 4.1656, 3.454, 9.0
             ),
+            # MHA-155 3/32 x 3/16 dowels pressed into MHA-078's blind 2.38 reams.
+            **_expected_numbered_pairs(
+                "transgear-knob-drive-pin",
+                range(1, 3),
+                "transgear-knob-shaft",
+                2.38125,
+                2.38,
+                transgear_knob_drive_pin_spec.PRESS_DEPTH,
+            ),
         },
         "harmonic-analyzer": {
             # Twenty stock 9489T111 #6-32 anchors engage only the 0.2-in
@@ -617,11 +637,11 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
     crank_allowed = _interference_contracts.allowed_interference_pairs("drive-train")
     hub_pair = frozenset(("crank-pin-1", "crank-hub-1"))
     shaft_pair = frozenset(("crank-pin-1", "crankshaft-1"))
-    # The U29 hub barrel (Ø25.4) sets the MHA-024 pilot spans: a longer hub
-    # chord, and the shaft crossing further down the taper. #1140 stood the
-    # pin 0.6 further proud (PIN_PROUD 4.45, keeper-ring hole at 3.7), so a
-    # thinner stretch of the taper sits in both receivers.
-    assert 134.0 < crank_allowed[hub_pair] < 135.0
-    assert 52.0 < crank_allowed[shaft_pair] < 53.0
+    # The CONTRACT-crank hub barrel (Ø20.6) sets the MHA-024 pilot spans: a
+    # shorter hub chord, and the shaft crossing further up the taper. #1140
+    # stood the pin 0.6 further proud (PIN_PROUD 4.45, keeper-ring hole at
+    # 3.7), so a thinner stretch of the taper sits in both receivers.
+    assert 98.5 < crank_allowed[hub_pair] < 99.2
+    assert 56.7 < crank_allowed[shaft_pair] < 57.2
     assert _interference_contracts.allowed_interference_pairs("channel") == {}
     assert _interference_contracts.allowed_interference_pairs("unknown") == {}

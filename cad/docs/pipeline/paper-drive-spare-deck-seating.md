@@ -86,13 +86,18 @@ This is not caused by the health traversal change:
   `2026-09-07T14:41:12.889111Z`: `transgear-removable-3 placed at [160.0, 53.2, -15.0]`.
   The span identifies configuration T18 and fixed placement; the existing placement
   checker also checks the rotation. This proves the authored pose, not contact.
-- `build_transgear_removable` constructs the common face thickness along local
-  `Z=0..FACE_WIDTH`, with `FACE_WIDTH=2.4`; its blank mass check expects centre Z=1.2.
-  Only tooth count changes between T12/T18/T24. The retained default-T24 STL,
-  `cad/out/stl/transgear-removable.STL`, independently reads Z bounds
+- At that commit `build_transgear_removable` constructed the common face thickness
+  along local `Z=0..FACE_WIDTH`, with `FACE_WIDTH=2.4`; its blank mass check
+  expected centre Z=1.2. Only tooth count changed between T12/T18/T24. The retained
+  default-T24 STL, `cad/out/stl/transgear-removable.STL`, independently reads Z bounds
   `[-3.0357660829594124e-15, 2.4000000953674316]` mm, SHA-256
   `75ccc27aadbe1c3b982747c1ca1c2637e0b581fdd215460fbdcc5e38961fa52c`.
   This is a common-thickness cross-check, not a separate native T18 contact probe.
+  Since the ANSI #25 rebuild the plate is `transgear_removable_spec.PLATE` = 2.8
+  (local `Z=0..PLATE`, centre Z=1.4, still common to all three configurations) and
+  the T18 tip radius is `outside_dia(18) / 2` = 19.91, inside the 20 mm envelope
+  the storage station above was cleared for; the spare-footprint tests read both
+  from the spec.
 - `_assembly.world_point` and the adapter's transform writer use `world = local·R+t`.
   `ROT_X_NEG90` maps local +Z to machine +Y. Thus the old underside/top are
   Y=53.2/55.6, while `harmonic_base_spec.STACK_HEIGHT` puts the deck at Y=50.8.

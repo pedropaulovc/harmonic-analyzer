@@ -34,6 +34,7 @@ allowed_free_stems:
   - platen-rack
   - rack-pinion
   - transgear-feed-pinion
+  - transgear-knob-drive-pin  # MHA-155 pair pressed in the free knob shaft (PR1)
   - transgear-knob-shaft
   - transgear-pinion
   - transgear-removable

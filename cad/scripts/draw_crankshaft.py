@@ -12,6 +12,8 @@ horizontal, as it sits in the lathe: dome on the left, far end on the right,
 the MHA-024 cross-hole seen as a true circle.  The crank-end view is the
 ``*Bottom`` orientation, which is exactly the third-angle LEFT view of that
 rotated profile, so it sits on the profile's axis to its left at sheet scale.
+It looks onto the seat spigot's face, so the two drive-pin holes show there
+as true circles and are located and called out in that view.
 
 Run with SolidWorks open::
 
@@ -23,7 +25,7 @@ from __future__ import annotations
 import argparse
 import math
 import sys
-from typing import Any, Sequence
+from typing import Any, Callable, Sequence
 
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
@@ -52,9 +54,14 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import blind_cut_dia_mm
 from _surface_finish import surface_finish_by_key
 from crankshaft_spec import (
+    COLLAR_DIA,
+    COLLAR_REAR,
     CROSS_HOLE_PROCESS,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    DRIVE_PIN_CIRCLE_RADIUS,
+    DRIVE_PIN_HOLE_DIA,
+    DRIVE_PIN_HOLE_PROCESS,
     PIN_HOLE_HEIGHT,
     PIN_HOLE_SPEC,
     PINION_SEAT_DIA,
@@ -64,17 +71,19 @@ from crankshaft_spec import (
     JOURNAL_END,
     RELIEF_START,
     RELIEF_END,
+    SEAT_COLLAR,
     SEAT_STEP,
     SHAFT_DIA,
     SHAFT_DOME_HEIGHT,
     SHAFT_LENGTH,
     SPHERICAL_DIMENSIONS,
+    SPIGOT_END,
     SURFACE_FINISHES,
 )
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from build_crankshaft import PINION_PIN_DIA, PINION_PIN_STATION_Y
 from crank_pinion_spec import CRANKSHAFT_PIN_HOLE_PROCESS
-from crankshaft_notes import CROSS_HOLE_CALLOUT
+from crankshaft_notes import CROSS_HOLE_CALLOUT, DRIVE_PIN_CALLOUT
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -129,26 +138,42 @@ JOURNAL_END_X = _sheet_x(JOURNAL_END)
 RELIEF_START_X = _sheet_x(RELIEF_START)
 RELIEF_END_X = _sheet_x(RELIEF_END)
 SEAT_STEP_X = _sheet_x(SEAT_STEP)
+COLLAR_SEAT_X = _sheet_x(SEAT_COLLAR)
+SPIGOT_END_X = _sheet_x(SPIGOT_END)
+COLLAR_REAR_X = _sheet_x(COLLAR_REAR)
 FAR_END_X = _sheet_x(SHAFT_LENGTH)
 JOURNAL_FLANK_Y = _sheet_y(JOURNAL_DIA / 2.0)
 
 # Baseline rows below the profile, all from the FAR END and stacked
-# shortest-first so no extension line crosses a dimension line; rows are 12
-# mm apart because the text sits ~3 mm above its requested point and the
-# dimension line ~5 mm below it.  The 2.0 dome height shares the first row at
-# the far left, where no baseline reaches. Restoring the journal and relief
-# returns the eight baseline rows; the last clears the title block.
-_ROW_Y = (0.160, 0.148, 0.136, 0.124, 0.112, 0.100, 0.088, 0.076)
-# The four diameters are authored in end-profile sketches; the end view
+# shortest-first so no extension line crosses a dimension line.  The text
+# sits ~3 mm above its requested point and the dimension line ~5 mm below
+# it; the two seat-collar stations make ten rows between the Ø20.6 collar's
+# underside and the title block, so the pitch closes from 12 to 9.5 mm.  The
+# 2.0 dome height shares the first row at the far left, where no baseline
+# reaches; the last row clears the title block.
+_ROW_PITCH = 0.0095
+_ROW_Y = tuple(round(0.162 - k * _ROW_PITCH, 4) for k in range(10))
+# The six diameters are authored in end-profile sketches; the end view
 # receives them first and they are then dragged onto the profile (rule 7:
 # diameters on the side view).  Their temporary end-view spots are clear of
 # everything else on the sheet.
-END_KEEP = {
+END_DIAMETERS = {
     "ShaftDiaDim": (0.036, 0.215),
     "JournalDiaDim": (0.036, 0.228),
     "ReliefDiaDim": (0.036, 0.241),
     "PinionSeatDiaDim": (0.036, 0.254),
+    "SpigotDiaDim": (0.024, 0.241),
+    "CollarDiaDim": (0.024, 0.254),
 }
+# The drive-pin holes' locations stay in the end view, the one view that
+# shows them as true (visible) circles: each hole from the shaft axis, its
+# dimension line just right of the view, text beyond the view's top (+Z hole)
+# and bottom (-Z hole), left of the dome's extension lines.
+END_PIN_KEEP = {
+    "DrivePinOffset1": (0.058, 0.210),
+    "DrivePinOffset2": (0.058, 0.150),
+}
+END_KEEP = {**END_DIAMETERS, **END_PIN_KEEP}
 SIDE_KEEP = {
     "DomeHeight": (DOME_TIP_X - 0.016, _ROW_Y[0]),
     "PinionSeatStation": ((SEAT_STEP_X + FAR_END_X) / 2.0, _ROW_Y[0]),
@@ -156,12 +181,18 @@ SIDE_KEEP = {
     "ReliefInboardStation": ((RELIEF_END_X + FAR_END_X) / 2.0, _ROW_Y[2]),
     "ReliefOutboardStation": ((RELIEF_START_X + FAR_END_X) / 2.0, _ROW_Y[3]),
     "JournalOutboardStation": ((JOURNAL_START_X + FAR_END_X) / 2.0 - 0.020, _ROW_Y[4]),
-    "PinHoleStation": ((PIN_X + FAR_END_X) / 2.0, _ROW_Y[5]),
-    "Depth": ((DOME_ROOT_X + FAR_END_X) / 2.0, _ROW_Y[6]),
-    "OverallLength": ((DOME_TIP_X + FAR_END_X) / 2.0, _ROW_Y[7]),
-    # Above-left of the dome, where no extension line rises: the radial
-    # leader runs down-right to the dome silhouette.
-    "DomeSphereRadius": (DOME_TIP_X - 0.022, 0.205),
+    "CollarRearStation": ((COLLAR_REAR_X + FAR_END_X) / 2.0, _ROW_Y[5]),
+    "CollarSeatStation": ((COLLAR_SEAT_X + FAR_END_X) / 2.0 - 0.020, _ROW_Y[6]),
+    "PinHoleStation": ((PIN_X + FAR_END_X) / 2.0, _ROW_Y[7]),
+    "Depth": ((DOME_ROOT_X + FAR_END_X) / 2.0, _ROW_Y[8]),
+    "OverallLength": ((DOME_TIP_X + FAR_END_X) / 2.0, _ROW_Y[9]),
+    # Up-right of the dome tip, above the +Z drive-pin location's text and
+    # left of the Ø9.525 dimension: the radial leader runs down to the dome.
+    "DomeSphereRadius": (DOME_TIP_X + 0.008, 0.230),
+    # The seat spigot's length from the seat face: text below-left of the
+    # spigot, between the cross-hole's and the collar seat's extension lines,
+    # above every row that spans it.
+    "SpigotLength": ((PIN_X + COLLAR_SEAT_X) / 2.0, 0.148),
 }
 # A dragged diameter prints its dimension line at the requested X with the
 # text running to its RIGHT (run 20260923T030252135Z-49e46990).  Its
@@ -177,11 +208,18 @@ SIDE_KEEP = {
 # place its arrow near the outboard land's relief shoulder and lower its row
 # 5 mm, so the 2X clears both LIGHT DRIVE FIT and the taper note's landing line.
 _DIAMETER_ROW_Y = (0.212, 0.223)
+# The spigot's Ø17.5 on the spigot and the collar body's Ø20.6 on the body
+# (each sketch starts at its section's front face), the spigot's text a row
+# above the body's so each dimension line stays clear of the other's text:
+# right of them under the cross-hole callout's prose and left of the outboard
+# journal's finish symbol.
 DIAMETER_POSITIONS = {
     "ShaftDiaDim": (PIN_X - 0.016, _DIAMETER_ROW_Y[0]),
     "JournalDiaDim": (RELIEF_START_X - 0.002, _DIAMETER_ROW_Y[1]),
     "ReliefDiaDim": (RELIEF_START_X + 0.030, _DIAMETER_ROW_Y[0]),
     "PinionSeatDiaDim": (SEAT_STEP_X + 0.010, _DIAMETER_ROW_Y[0]),
+    "SpigotDiaDim": (COLLAR_SEAT_X + 0.002, _DIAMETER_ROW_Y[1]),
+    "CollarDiaDim": (SPIGOT_END_X + 0.002, _DIAMETER_ROW_Y[0]),
 }
 # The 2X Ø9.525 names the dome-side core and the short exposed core between
 # the inboard journal land and Ø9 pinion-seat step. The 2X Ø11.388 names both
@@ -189,20 +227,32 @@ DIAMETER_POSITIONS = {
 # outboard land, and the equal-size callout also governs the inboard land.
 CALLOUTS_ABOVE = {"ShaftDiaDim": "2X", "JournalDiaDim": "2X"}
 CALLOUTS_BELOW = {"OverallLength": "OVERALL"}
-# Both running lands carry separate part-owned finish symbols. Move the
-# outboard symbol left of the Ø11.388 leader, but keep its arrow at land
-# mid-length; the inboard symbol retains its clear spot above the relief.
+# Both running lands carry separate part-owned finish symbols. The outboard
+# symbol keeps its arrow at land mid-length and sits right of the collar's
+# Ø20.6 text, left of the Ø11.388 leader; the inboard symbol retains its
+# clear spot above the relief.  The collar's rear (washer) face takes its
+# own symbol on that face's edge-on line under the axis, the symbol in the
+# free pocket right of the journal-start extension line, above row 4.
 _OUTBOARD_FINISH_X = _sheet_x((JOURNAL_START + RELIEF_START) / 2.0)
 JOURNAL_FINISHES = {
     "outboard_journal": (
         (_OUTBOARD_FINISH_X, JOURNAL_FLANK_Y),
-        (_OUTBOARD_FINISH_X - 0.010, 0.205),
+        (_OUTBOARD_FINISH_X + 0.004, 0.203),
     ),
     "inboard_journal": (
         (RELIEF_END_X + 0.015, JOURNAL_FLANK_Y),
         (RELIEF_END_X + 0.012, 0.200),
     ),
 }
+COLLAR_REAR_FINISH = (
+    (COLLAR_REAR_X, _sheet_y(-(COLLAR_DIA / 2.0 - 1.0))),
+    ((JOURNAL_START_X + RELIEF_START_X) / 2.0, 0.148),
+)
+# The drive-pin holes' native REAM callout (size and depth from the cut)
+# with the press prose under it: its leader picks the lower hole's rim and
+# the text sits below-left of the end view, clear of the view and above the
+# notes.
+DRIVE_PIN_CALLOUT_XY = (0.034, 0.130)
 # Text centred up-right of the cross-hole: the callout's leader leaves the
 # text's left end and runs down-left at ~53 deg through the hole centre, a
 # clean crossing of the 118.0 station's extension line rather than a near
@@ -346,8 +396,19 @@ def _place_note_text_in_field(
         raise RuntimeError(f"{label}: leader tip {tip} is off the hole window {hole}")
 
 
-def _visible_cross_hole_edge(adapter: Any, view: Any, diameter_mm: float) -> Any:
-    """Return a visible rim edge adjacent to a modeled cross-hole cylinder."""
+def _visible_cross_hole_edge(
+    adapter: Any,
+    view: Any,
+    diameter_mm: float,
+    *,
+    view_label: str = "side",
+    accept: Callable[[Any], bool] | None = None,
+) -> Any:
+    """Return a visible rim edge adjacent to a modeled hole cylinder.
+
+    ``accept`` narrows the candidates further (an ``IEdge`` predicate) when a
+    view shows more than one rim of that size.
+    """
     expected_radius_m = diameter_mm / 2000.0
     candidates: list[Any] = []
     components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
@@ -374,14 +435,32 @@ def _visible_cross_hole_edge(adapter: Any, view: Any, diameter_mm: float) -> Any
                 parameters = surface.CylinderParams
                 if abs(float(parameters[6]) - expected_radius_m) > 1e-6:
                     continue
-                candidates.append(edge)
+                if accept is None or accept(edge):
+                    candidates.append(edge)
                 break
     if not candidates:
         raise RuntimeError(
-            "crankshaft side view has no visible edge adjacent to the pin-hole "
-            f"cylindrical face at radius {expected_radius_m:g} m"
+            f"crankshaft {view_label} view has no visible edge adjacent to a "
+            f"hole cylindrical face at radius {expected_radius_m:g} m"
         )
     return candidates[0]
+
+
+def _is_lower_seat_rim(edge: Any) -> bool:
+    """Whether an edge is the -Z drive-pin hole's rim on the spigot's seat face.
+
+    The *Bottom end view prints model +Z up, so the -Z hole (DrivePinAxis2) is
+    the lower one, nearest its callout; its seat-face rim, not its floor.
+    """
+    curve = _early_bound(edge.GetCurve(), "ICurve")
+    if not curve.IsCircle():
+        return False
+    cx, cy, cz = (float(v) * 1000.0 for v in tuple(curve.CircleParams)[:3])
+    return (
+        abs(cx) < 1e-3
+        and abs(cy - SEAT_COLLAR) < 1e-3
+        and abs(cz + DRIVE_PIN_CIRCLE_RADIUS) < 1e-3
+    )
 
 
 def _visible_cylindrical_face(adapter: Any, view: Any, diameter_mm: float) -> Any:
@@ -565,8 +644,16 @@ async def build(adapter: Any) -> dict[str, str]:
             source_view=end,
         )
         for annotation in end_annotations
+        if dimension_name(adapter, annotation) in END_DIAMETERS
     ]
-    annotations = [*moved, *side_annotations]
+    end_kept = [
+        annotation
+        for annotation in end_annotations
+        if dimension_name(adapter, annotation) in END_PIN_KEEP
+    ]
+    if len(end_kept) != len(END_PIN_KEEP):
+        raise RuntimeError("the end view lost a drive-pin hole location dimension")
+    annotations = [*moved, *end_kept, *side_annotations]
     set_dimension_callouts(adapter, annotations, CALLOUTS_ABOVE, location="above")
     set_dimension_callouts(adapter, annotations, CALLOUTS_BELOW)
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
@@ -605,6 +692,21 @@ async def build(adapter: Any) -> dict[str, str]:
         process=CROSS_HOLE_PROCESS,
     )
     _set_callout_below(cross_hole, CROSS_HOLE_CALLOUT, "tapered-pin cross-hole")
+    drive_pins = add_native_hole_callout(
+        adapter,
+        end,
+        callout_xy=DRIVE_PIN_CALLOUT_XY,
+        label="seat-collar drive-pin holes",
+        edge=_visible_cross_hole_edge(
+            adapter,
+            end,
+            DRIVE_PIN_HOLE_DIA,
+            view_label="end",
+            accept=_is_lower_seat_rim,
+        ),
+        process=DRIVE_PIN_HOLE_PROCESS,
+    )
+    _set_callout_below(drive_pins, DRIVE_PIN_CALLOUT, "seat-collar drive-pin holes")
     pinion_note = add_attached_note(
         adapter,
         side,
@@ -638,6 +740,15 @@ async def build(adapter: Any) -> dict[str, str]:
         control=surface_finish_by_key(SURFACE_FINISHES, "inboard_journal"),
         label="crankshaft inboard journal finish",
         entity_type="SILHOUETTE",
+        char_height=0.0025,
+    )
+    add_surface_finish(
+        adapter,
+        side,
+        edge_xy=COLLAR_REAR_FINISH[0],
+        symbol_xy=COLLAR_REAR_FINISH[1],
+        control=surface_finish_by_key(SURFACE_FINISHES, "collar_rear_face"),
+        label="crankshaft collar rear (thrust washer) face finish",
         char_height=0.0025,
     )
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)

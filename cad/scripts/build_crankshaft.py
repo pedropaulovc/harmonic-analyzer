@@ -4,7 +4,10 @@ The cylindrical shaft starts at local y=0, the common outboard plane where
 MHA-020 and through hub MHA-137 finish flush.  Only the shaft's same-diameter
 spherical dome projects outboard (negative Y), so the crank can still withdraw
 through the hub bore after removable taper pin MHA-024 is removed.  The shared
-8-mm face shift preserves the established bearing and T12 interfaces.  Near
+8-mm face shift preserves the established bearing interfaces.  Behind the
+hub, an integral collar's front spigot seats the removable sprocket MHA-081,
+driven by two MHA-173 dowels pressed into blind reamed holes in its face
+(ch. 23; crankshaft_spec owns the seat).  Near
 the far end, the 1/8 in
 straight-pin cross-hole keys the 16T pinion's hub boss to the shaft (ch12
 p.19 page002_img02; crank_pinion_spec owns the pin), its entry turned
@@ -52,6 +55,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
 )
 from _fit_limits import deviations
 from _hole_spec import blind_cut_dia_mm
@@ -65,11 +69,26 @@ from crank_pinion_spec import (
     PIN_HOLE_SPEC as PINION_PIN_HOLE_SPEC,
 )
 from crankshaft_spec import (
+    COLLAR_DIA,
+    COLLAR_DIA_TOL,
+    COLLAR_LENGTH,
+    COLLAR_REAR,
+    COLLAR_STATION_TOL,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
+    DRIVE_PIN_CIRCLE_RADIUS,
+    DRIVE_PIN_DEPTH,
+    DRIVE_PIN_DEPTH_TOL,
+    DRIVE_PIN_FLOOR,
+    DRIVE_PIN_HOLE_BAND,
+    DRIVE_PIN_HOLE_DIA,
+    DRIVE_PIN_OFFSET_TOL,
+    DRIVE_PIN_SPIGOT_RIM,
+    DRIVE_PIN_SPIGOT_RIM_WORST,
     FIDUCIAL_MODEL_DEPTH,
     FIDUCIAL_MODEL_DIA,
+    HOLE_CALLOUT_PRECISION,
     ISOMETRIC_VIEW_NOTE,
     JOURNAL_DIA,
     JOURNAL_DIA_BAND,
@@ -83,6 +102,7 @@ from crankshaft_spec import (
     PIN_HOLE_HEIGHT,
     PINION_SEAT_DIA,
     PINION_SEAT_DIA_BAND,
+    SEAT_COLLAR,
     SEAT_STEP,
     SHAFT_DIA,
     SHAFT_DIA_BAND,
@@ -91,6 +111,11 @@ from crankshaft_spec import (
     SEAT_PINION,
     SHAFT_LENGTH,
     SHAFT_LENGTH_BAND,
+    SPIGOT_DIA,
+    SPIGOT_DIA_BAND,
+    SPIGOT_END,
+    SPIGOT_LENGTH,
+    SPIGOT_LENGTH_TOL,
     SURFACE_FINISHES,
 )
 from crank_native_acceptance import assert_signed_circle_center
@@ -99,10 +124,9 @@ PART_NAME = "crankshaft"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
 # Dimensions live in crankshaft_spec / crank_hub_geometry. The crank face,
-# T12 station and restored post bore stay fixed while the shaft's north end
+# collar seat and restored post bore stay fixed while the shaft's north end
 # follows the shortest W15-compliant pinion boss; MHA-024 still crosses the
 # separate hub behind the arm.
-SEAT_T12 = 25.5
 # The pinion's retention-pin cross-hole station: the pinion's own PIN_STATION
 # (from its toothed south face) measured from the SeatPinion datum that face
 # sits on. Machine z = CRANKSHAFT_Z0 + this. The recess of the shaft end inside
@@ -205,6 +229,8 @@ _STATIONS = {
     "ReliefInboardStation": RELIEF_START + RELIEF_LENGTH,
     "ReliefOutboardStation": RELIEF_START,
     "JournalOutboardStation": JOURNAL_START,
+    "CollarRearStation": COLLAR_REAR,
+    "CollarSeatStation": SEAT_COLLAR,
     "PinHoleStation": PIN_HOLE_HEIGHT,
 }
 _STATION_DRIVES = {
@@ -213,6 +239,8 @@ _STATION_DRIVES = {
     "ReliefInboardStation": '"ShaftLength" - "ReliefStart" - "ReliefLength"',
     "ReliefOutboardStation": '"ShaftLength" - "ReliefStart"',
     "JournalOutboardStation": '"ShaftLength" - "JournalStart"',
+    "CollarRearStation": '"ShaftLength" - "SeatCollar" - "CollarLength"',
+    "CollarSeatStation": '"ShaftLength" - "SeatCollar"',
     "PinHoleStation": '"ShaftLength" - "PinHoleHeight"',
 }
 
@@ -280,6 +308,65 @@ async def _cut_annulus_inboard(
     return math.pi * ((turned_dia / 2.0) ** 2 - (inner_dia / 2.0) ** 2) * length
 
 
+async def _collar_section(
+    adapter,
+    name: str,
+    *,
+    plane: str,
+    station: float,
+    station_expr: str,
+    dia: float,
+    dia_global: str,
+    length: float,
+    length_name: str,
+    length_expr: str,
+    drive_jobs: list[tuple[str, str]],
+) -> float:
+    """Extrude a Ø ``dia`` collar section inboard from a new datum at its front face.
+
+    The Top-parallel datum ``plane`` at ``station`` is the section's own
+    sketch plane, so the diameter the drawing drags onto the profile has its
+    extension lines start on this section's silhouette.  The profile is
+    ``<name>Profile`` with ``<name>DiaDim``; the blind extrude ``name``
+    carries ``length_name``.  Returns the volume added over the shaft.
+    """
+    from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
+
+    check(
+        f"create_plane {plane}",
+        await adapter.create_plane(
+            CreatePlaneParameters(mode="offset", base_plane="Top Plane", offset=station)
+        ),
+    )
+    name_last_feature(adapter, plane)
+    plane_dim = name_dimensions(adapter, plane, [f"{plane}Offset"])
+    drive_jobs += [(plane_dim[0], station_expr)]
+    dims = SketchDims()
+    check(f"create_sketch {name}", await adapter.create_sketch(plane))
+    await define_circle(
+        adapter,
+        0.0,
+        0.0,
+        dia / 2.0,
+        f"{name} circle",
+        dims=dims,
+        names=(f"{name}Cx", f"{name}Cz", f"{name}DiaDim"),
+        drives=(None, None, f'"{dia_global}"'),
+    )
+    await ensure_fully_defined(adapter, f"{name} sketch")
+    check(f"exit_sketch {name}", await adapter.exit_sketch())
+    name_last_feature(adapter, f"{name}Profile")
+    drive_jobs += dims.apply(adapter, f"{name}Profile")
+    check(
+        f"extrude {name}",
+        await adapter.create_extrusion(ExtrusionParameters(depth=length)),
+    )
+    name_last_feature(adapter, name)
+    length_dim = name_dimensions(adapter, name, [length_name])
+    drive_jobs += [(length_dim[0], length_expr)]
+    return math.pi * ((dia / 2.0) ** 2 - (SHAFT_DIA / 2.0) ** 2) * length
+
+
 async def _volume(adapter) -> float:
     result = await adapter.get_mass_properties()
     return result.data.volume if result.is_success else float("nan")
@@ -318,6 +405,14 @@ async def build(adapter) -> dict[str, str]:
     # coordinates below retain the witness's quadrant.
     await set_global(adapter, "FiducialX", f"{abs(FIDUCIAL_MODEL_X)}mm")
     await set_global(adapter, "FiducialZ", f"{abs(FIDUCIAL_MODEL_Z)}mm")
+    await set_global(adapter, "SeatCollar", f"{SEAT_COLLAR}mm")
+    await set_global(adapter, "CollarLength", f"{COLLAR_LENGTH}mm")
+    await set_global(adapter, "CollarDia", f"{COLLAR_DIA}mm")
+    await set_global(adapter, "SpigotDia", f"{SPIGOT_DIA}mm")
+    await set_global(adapter, "SpigotLength", f"{SPIGOT_LENGTH}mm")
+    await set_global(adapter, "DrivePinCircleRadius", f"{DRIVE_PIN_CIRCLE_RADIUS}mm")
+    await set_global(adapter, "DrivePinHoleDia", f"{DRIVE_PIN_HOLE_DIA}mm")
+    await set_global(adapter, "DrivePinDepth", f"{DRIVE_PIN_DEPTH}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -640,6 +735,120 @@ async def build(adapter) -> dict[str, str]:
     v_final -= v_pinion_pin
     await volume_check(adapter, "shaft + pinion pin hole", v_final, 0.02 * v_pinion_pin)
 
+    # ch. 23 seat collar, integral with the shaft (CONTRACT-crank), turned in
+    # two sections: the seat spigot, whose face on the SeatCollar datum is the
+    # removable sprocket's seat and which the #25 plates wrapping the T12 pass
+    # over, then the body from the spigot's step (the SpigotEnd datum) to the
+    # CollarRear face the MHA-172 washer rides.  The step is sharp: the title
+    # block's general edge break covers its corners.
+    v_final += await _collar_section(
+        adapter,
+        "Spigot",
+        plane="SeatCollar",
+        station=SEAT_COLLAR,
+        station_expr='"SeatCollar"',
+        dia=SPIGOT_DIA,
+        dia_global="SpigotDia",
+        length=SPIGOT_LENGTH,
+        length_name="SpigotLength",
+        length_expr='"SpigotLength"',
+        drive_jobs=drive_jobs,
+    )
+    await volume_check(adapter, "shaft + seat spigot", v_final, 0.005 * v_final)
+    v_final += await _collar_section(
+        adapter,
+        "Collar",
+        plane="SpigotEnd",
+        station=SPIGOT_END,
+        station_expr='"SeatCollar" + "SpigotLength"',
+        dia=COLLAR_DIA,
+        dia_global="CollarDia",
+        length=COLLAR_LENGTH - SPIGOT_LENGTH,
+        length_name="CollarBodyLength",
+        length_expr='"CollarLength" - "SpigotLength"',
+        drive_jobs=drive_jobs,
+    )
+    await volume_check(adapter, "shaft + seat collar", v_final, 0.005 * v_final)
+
+    # Two blind, flat-bottomed holes reamed into the seat face for the pressed
+    # MHA-173 dowels, on the wheel's pin circle at local +Z (#1) and -Z (#2);
+    # the Top-parallel sketch reads (u, v) = (x, -z).  A cut from a mid-body
+    # plane runs back toward Top by default -- into air in front of the seat --
+    # so it takes reverse_direction, and the volume gate fails loud on the
+    # wrong side.  The pin holes' rim to the spigot is logged below.
+    pins = SketchDims()
+    check("create_sketch drive-pin holes", await adapter.create_sketch("SeatCollar"))
+    for index, sketch_v in (
+        (1, -DRIVE_PIN_CIRCLE_RADIUS),
+        (2, DRIVE_PIN_CIRCLE_RADIUS),
+    ):
+        await define_circle(
+            adapter,
+            0.0,
+            sketch_v,
+            DRIVE_PIN_HOLE_DIA / 2.0,
+            f"drive-pin hole {index}",
+            dims=pins,
+            names=(None, f"DrivePinOffset{index}", f"DrivePinHoleDia{index}"),
+            drives=(None, '"DrivePinCircleRadius"', '"DrivePinHoleDia"'),
+        )
+    await ensure_fully_defined(adapter, "drive-pin hole sketch")
+    check("exit_sketch drive-pin holes", await adapter.exit_sketch())
+    name_last_feature(adapter, "DrivePinProfile")
+    drive_jobs += pins.apply(adapter, "DrivePinProfile")
+    check(
+        "cut drive-pin holes",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=DRIVE_PIN_DEPTH, reverse_direction=True)
+        ),
+    )
+    name_last_feature(adapter, "DrivePinHoles")
+    pin_depth_dim = name_dimensions(adapter, "DrivePinHoles", ["DrivePinDepth"])
+    drive_jobs += [(pin_depth_dim[0], '"DrivePinDepth"')]
+    v_pin_holes = 2.0 * math.pi * (DRIVE_PIN_HOLE_DIA / 2.0) ** 2 * DRIVE_PIN_DEPTH
+    v_final -= v_pin_holes
+    await volume_check(
+        adapter, "seat collar drive-pin holes", v_final, 0.05 * v_pin_holes
+    )
+    _telemetry.info(
+        f"seat spigot rim (floor 1.5): drive-pin hole to the Ø{SPIGOT_DIA:g}"
+        f" spigot {DRIVE_PIN_SPIGOT_RIM:.2f} nominal,"
+        f" {DRIVE_PIN_SPIGOT_RIM_WORST:.2f} at the printed worst case"
+    )
+    for plane, station, expr in (
+        ("CollarRear", COLLAR_REAR, '"SeatCollar" + "CollarLength"'),
+        ("DrivePinFloor", DRIVE_PIN_FLOOR, '"SeatCollar" + "DrivePinDepth"'),
+    ):
+        check(
+            f"create_plane {plane} (Top Plane + {station:g})",
+            await adapter.create_plane(
+                CreatePlaneParameters(
+                    mode="offset", base_plane="Top Plane", offset=station
+                )
+            ),
+        )
+        name_last_feature(adapter, plane)
+        plane_dim = name_dimensions(adapter, plane, [f"{plane}Offset"])
+        drive_jobs += [(plane_dim[0], expr)]
+    # The pins' axes for the drive-train mates: DrivePinAxis1 on local +Z
+    # (machine -Y once placed), DrivePinAxis2 opposite; created after the
+    # shaft's Axis1 so that name stays put.
+    for axis_name, z in (
+        ("DrivePinAxis1", DRIVE_PIN_CIRCLE_RADIUS),
+        ("DrivePinAxis2", -DRIVE_PIN_CIRCLE_RADIUS),
+    ):
+        await name_bore_axis(
+            adapter,
+            "Right Plane",
+            0.0,
+            "Front Plane",
+            z,
+            axis_name,
+            drive_b='"DrivePinCircleRadius"',
+            drive_jobs=drive_jobs,
+        )
+        name_last_feature(adapter, axis_name)
+
     # Drawing-only station reference.  The print baselines every axial
     # station from the FAR END, the one faced end a machinist zeroes on
     # (policy rule 7), but the model's features measure from the dome root.
@@ -786,26 +995,51 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "Shaft", "Depth", *deviations(SHAFT_LENGTH_BAND)
     )
+    # The seat collar's functional bands (crankshaft_spec, rule 12): the two
+    # far-end stations, the body OD, the seat spigot's diameter and its length
+    # from the seat face, and the drive-pin holes' location, press size and
+    # depth.
+    for name in ("CollarSeatStation", "CollarRearStation"):
+        set_dimension_symmetric_tolerance(
+            adapter, "StationReference", name, COLLAR_STATION_TOL
+        )
+    set_dimension_symmetric_tolerance(
+        adapter, "CollarProfile", "CollarDiaDim", COLLAR_DIA_TOL
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "SpigotProfile", "SpigotDiaDim", *deviations(SPIGOT_DIA_BAND)
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "Spigot", "SpigotLength", SPIGOT_LENGTH_TOL
+    )
+    for index in (1, 2):
+        set_dimension_symmetric_tolerance(
+            adapter, "DrivePinProfile", f"DrivePinOffset{index}", DRIVE_PIN_OFFSET_TOL
+        )
+        set_dimension_bilateral_tolerance(
+            adapter,
+            "DrivePinProfile",
+            f"DrivePinHoleDia{index}",
+            *deviations(DRIVE_PIN_HOLE_BAND),
+        )
+    set_dimension_symmetric_tolerance(
+        adapter, "DrivePinHoles", "DrivePinDepth", DRIVE_PIN_DEPTH_TOL
+    )
     await volume_check(adapter, "driven crankshaft (equations neutral)", v_final, 50.0)
 
-    # Inboard keyed-chain seat datums.  The through hub seats at the shaft's
-    # Top/origin plane, so the retired arm-seat datum is removed.
-
-    for seat_name, station in (
-        ("SeatT12", SEAT_T12),
-        ("SeatPinion", SEAT_PINION),
-    ):
-        check(
-            f"create_plane {seat_name} (Top Plane, +{station:.3f})",
-            await adapter.create_plane(
-                CreatePlaneParameters(
-                    mode="offset",
-                    base_plane="Top Plane",
-                    offset=station,
-                )
-            ),
-        )
-        name_last_feature(adapter, seat_name)
+    # The 16T's seat datum.  The through hub seats at the shaft's Top/origin
+    # plane; the wheel's seat datums were made with the collar.
+    check(
+        f"create_plane SeatPinion (Top Plane, +{SEAT_PINION:.3f})",
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="offset",
+                base_plane="Top Plane",
+                offset=SEAT_PINION,
+            )
+        ),
+    )
+    name_last_feature(adapter, "SeatPinion")
     # Every surviving plane (the rejected clocking attempt was deleted); the
     # seat datums stay selectable by name for the drive-train mates.
     blank_reference_geometry(
@@ -820,7 +1054,10 @@ async def build(adapter) -> dict[str, str]:
                 "PinHoleStationPlane",
                 "PinionPinStationPlane",
                 "PinionPinClockingPlane",
-                "SeatT12",
+                "SeatCollar",
+                "SpigotEnd",
+                "CollarRear",
+                "DrivePinFloor",
                 "SeatPinion",
             )
         ),
@@ -832,6 +1069,9 @@ async def build(adapter) -> dict[str, str]:
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
+    # The drive-pin holes print through their native callout, which reads the
+    # cut's own size and depth dimensions at these places.
+    apply_drawing_precision(adapter, HOLE_CALLOUT_PRECISION)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,

@@ -158,7 +158,7 @@ from _common import (
 )
 from _drawing_marks import DRAWN_BY
 from _printed_tolerance import printed_deviations
-from _transforms import ROT_Y_180, compose_rows, euler_from_rows
+from _transforms import ROT_X_NEG90, ROT_Y_180, compose_rows, euler_from_rows
 from channel_frame_geom import (
     CAM_SHAFT_XY,
     CYLINDER_LOCK_PHASE_DEG,
@@ -560,6 +560,10 @@ from crank_hub_geometry import (  # noqa: E402
     HUB_BARREL_DIA,
     HUB_LENGTH,
     HUB_SEAT_LENGTH,
+    RELIEF_DIA_MAX as HUB_RELIEF_DIA_MAX,
+    HUB_LENGTH_TOL,
+    RELIEF_LENGTH as HUB_RELIEF_LENGTH,
+    RELIEF_LENGTH_TOL as HUB_RELIEF_LENGTH_TOL,
 )
 from crank_arm_spec import (  # noqa: E402
     ANCHOR_HOLE_SPEC,
@@ -569,10 +573,26 @@ from crank_arm_spec import (  # noqa: E402
     ARM_THICKNESS,
 )
 from _fit_limits import deviations  # noqa: E402
+import _chain  # noqa: E402
+import crank_seat_drive_pin_spec as SEAT_PIN  # noqa: E402
+import crank_seat_washer_spec as SEAT_WASHER  # noqa: E402
+import transgear_removable_spec as REMOVABLE  # noqa: E402
 from crankshaft_spec import (  # noqa: E402
+    COLLAR_DIA,
+    COLLAR_REAR,
+    COLLAR_REAR_BAND,
+    DRIVE_PIN_DEPTH,
+    DRIVE_PIN_FLOOR,
     PIN_HOLE_HEIGHT,
+    SEAT_COLLAR,
+    SEAT_COLLAR_BAND,
     SHAFT_LENGTH as CRANKSHAFT_LENGTH,
     SHAFT_LENGTH_BAND as CRANKSHAFT_LENGTH_BAND,
+    SPIGOT_DIA,
+    SPIGOT_DIA_BAND,
+    SPIGOT_END,
+    SPIGOT_LENGTH,
+    SPIGOT_LENGTH_TOL,
 )
 from crank_handle_spec import HANDLE_LENGTH as HANDLE_BASIC_LENGTH  # noqa: E402
 from crank_handle_ferrule_spec import (  # noqa: E402
@@ -595,21 +615,110 @@ CRANK_HUB_PIN_ORIGIN = [
     Y_CRANK - AXIAL_PIN_RADIUS_FROM_AXIS,
     CRANK_FACE_Z,
 ]
-# The common crank face and T12 plane retain their photo-backed stations.
-# The arm occupies -183..-175 and the hub continues behind it to -163.
+# The common crank face keeps its photo-backed station.  The arm occupies
+# -183..-175 and the hub continues behind it to its rear face.
 # The shaft cylinder starts flush at -183; only its dome projects outboard.
 if abs(CRANK_ARM_ORIGIN_Z - (CRANK_FACE_Z + HUB_SEAT_LENGTH)) > 1e-9:
     raise AssertionError("arm inboard face left the hub shoulder station")
 
-# T12 remains on its established world station after the crank-face shift.
-REMOVABLE_Z0 = -157.5  # mounted T12 band -157.5..-152.5, centre -155
-# This is the front chain plane (ch30 GT: solved-camera z-ticks bracket the
-# physical chain run at -153 +- 3), between the merged crank column and the
-# arm/hub cluster.  The separate hub ends at -163, leaving 5.5 axial air.
-if abs(REMOVABLE_Z0 - CRANK_HUB_REAR_Z - 5.5) > 1e-9:
-    raise AssertionError("crank hub rear/T12 air gap drifted")
-# The small removable gear is the chain wheel (ch. 23 -- bead chain on its
-# m2 teeth; v2_gears_010).
+# The removable sprocket MHA-081 (T12 here) is the front chain wheel: its
+# plate spans BAND_FRONT_Z..SEAT_FACE_Z, the rear face on the crankshaft's
+# integral collar, one chain plane with the knob shaft's T24 (ch. 23 p.56).
+# The T12 itself lives in paper-drive; this module owns the seat it sits on.
+if abs((CRANKSHAFT_Z0 + SEAT_COLLAR) - REMOVABLE.SEAT_FACE_Z) > 1e-9:
+    raise AssertionError("crankshaft SeatCollar datum off the removable's SEAT_FACE_Z")
+# The hub rear face is what stops the removable walking forward once the
+# taper pin is in: the contract's 0.7 axial air, derived from both parts.
+# The seat station's functional band moves the wheel against the hub; at its
+# most-forward limit the air must still be open.
+CRANK_HUB_T12_AIR = REMOVABLE.BAND_FRONT_Z - CRANK_HUB_REAR_Z
+CRANK_HUB_T12_AIR_WORST = CRANK_HUB_T12_AIR + min(SEAT_COLLAR_BAND)
+if abs(CRANK_HUB_T12_AIR - 0.7) > 1e-9:
+    raise AssertionError(
+        f"crank hub rear/T12 air {CRANK_HUB_T12_AIR:.3f} left the contracted 0.7"
+    )
+if CRANK_HUB_T12_AIR_WORST <= 0.0:
+    raise AssertionError(
+        f"crank hub rear/T12 air closes at the SeatCollar band: {CRANK_HUB_T12_AIR_WORST:.3f}"
+    )
+# Behind the seat: the integral collar, then the turned MHA-172 thrust washer
+# flat on the collar's rear face (its y = 0 face), floating to the post boss.
+CRANK_SEAT_WASHER_Z0 = CRANKSHAFT_Z0 + COLLAR_REAR
+CRANK_SEAT_WASHER_REAR_Z = CRANK_SEAT_WASHER_Z0 + SEAT_WASHER.THICKNESS
+# The seat is a Ø17.5 spigot (SEAT_FACE_Z..SPIGOT_END) ahead of the Ø20.6
+# body; the hub's rear Ø16.5 relief runs from its barrel's rear shoulder to
+# the hub rear face.  Both let the #25 plates wrapping the T12 pass inside
+# the collar/barrel diameters (Main's ruling, 2026-09-30).
+CRANK_SPIGOT_FRONT_Z = CRANKSHAFT_Z0 + SPIGOT_END  # body front face, -148.5
+CRANK_HUB_BARREL_REAR_Z = CRANK_HUB_REAR_Z - HUB_RELIEF_LENGTH  # -159.6
+# Chain-plate clearance: the plate's inner edge against the spigot
+# (print-worst, largest) and the hub relief, radially, for the CAD link and a
+# real ANSI #25 plate; axially, a bought chain's envelope (REMOVABLE.ANSI_*)
+# against the shoulders, every link at its printed worst (the CAD link sits
+# inside that envelope, so it needs no axial check of its own).
+_T12 = REMOVABLE.TEETH["T12"]
+_SPIGOT_R_WORST = (SPIGOT_DIA + max(SPIGOT_DIA_BAND)) / 2.0
+_HUB_RELIEF_R_WORST = HUB_RELIEF_DIA_MAX / 2.0
+_CHAIN_R_CAD = REMOVABLE.chain_plate_inner_radius(_T12, _chain.PLATE_HEIGHT)
+_CHAIN_R_ANSI = REMOVABLE.chain_plate_inner_radius(_T12, REMOVABLE.ANSI_PLATE_HEIGHT)
+CHAIN_SPIGOT_RADIAL_AIR_CAD = _CHAIN_R_CAD - _SPIGOT_R_WORST  # 0.699
+CHAIN_SPIGOT_RADIAL_AIR_ANSI = _CHAIN_R_ANSI - _SPIGOT_R_WORST  # 0.178
+CHAIN_RELIEF_RADIAL_AIR_CAD = _CHAIN_R_CAD - _HUB_RELIEF_R_WORST  # 0.799
+CHAIN_RELIEF_RADIAL_AIR_ANSI = _CHAIN_R_ANSI - _HUB_RELIEF_R_WORST  # 0.278
+CHAIN_RADIAL_AIR_MIN = 0.15
+for _what, _air in (
+    ("CAD link / seat spigot", CHAIN_SPIGOT_RADIAL_AIR_CAD),
+    ("ANSI #25 plate / seat spigot", CHAIN_SPIGOT_RADIAL_AIR_ANSI),
+    ("CAD link / hub relief", CHAIN_RELIEF_RADIAL_AIR_CAD),
+    ("ANSI #25 plate / hub relief", CHAIN_RELIEF_RADIAL_AIR_ANSI),
+):
+    if _air < CHAIN_RADIAL_AIR_MIN - 1e-9:
+        raise AssertionError(f"{_what} radial air {_air:.3f} < {CHAIN_RADIAL_AIR_MIN}")
+# The fitter lines the hub's front face up flush with the shaft end before
+# the match-ream, so the hub rear face is CRANK_FACE_Z + the printed hub
+# length; the arm's stock thickness is out of the stack.
+_HUB_REAR_Z_WORST = CRANK_HUB_REAR_Z + HUB_LENGTH_TOL
+_SEAT_FACE_Z_WORST = REMOVABLE.SEAT_FACE_Z + min(SEAT_COLLAR_BAND)
+_CHAIN_REACH_REAR_WORST = REMOVABLE.CHAIN_REACH_REAR_WORST
+# A: chain floated frontmost, seat forward, hub long, relief short.
+CHAIN_BARREL_AXIAL_AIR = (
+    REMOVABLE.SEAT_FACE_Z - REMOVABLE.CHAIN_REACH_FRONT - CRANK_HUB_BARREL_REAR_Z
+)  # 0.81
+CHAIN_BARREL_AXIAL_AIR_WORST = (
+    _SEAT_FACE_Z_WORST
+    - REMOVABLE.CHAIN_REACH_FRONT
+    - (_HUB_REAR_Z_WORST - (HUB_RELIEF_LENGTH - HUB_RELIEF_LENGTH_TOL))
+)  # 0.2135
+# B: thickest wheel, seat forward, hub long.
+CRANK_HUB_T12_AIR_PRINT_WORST = (
+    _SEAT_FACE_Z_WORST - (REMOVABLE.PLATE + max(REMOVABLE.PLATE_BAND))
+) - _HUB_REAR_Z_WORST  # 0.15
+# C: chain floated rearmost on the thinnest wheel, spigot short; the chain
+# and the body front face both ride the seat, so the seat band cancels.
+CHAIN_SPIGOT_AXIAL_AIR = SPIGOT_LENGTH - REMOVABLE.chain_reach_rear(
+    REMOVABLE.PLATE
+)  # 0.5135 on nominal spigot and plate
+CHAIN_SPIGOT_AXIAL_AIR_WORST = (
+    SPIGOT_LENGTH - SPIGOT_LENGTH_TOL - _CHAIN_REACH_REAR_WORST
+)  # 0.3635
+for _what, _air in (
+    ("chain / hub relief shoulder", CHAIN_BARREL_AXIAL_AIR_WORST),
+    ("hub rear face / T12 front face", CRANK_HUB_T12_AIR_PRINT_WORST),
+    ("chain / crank collar body front face", CHAIN_SPIGOT_AXIAL_AIR_WORST),
+):
+    if _air <= 0.0:
+        raise AssertionError(f"{_what} axial air closes at print-worst: {_air:.4f}")
+# The two MHA-173 drive pins stand in blind holes drilled from the seat face
+# to DrivePinFloor, on the removable's pin circle.  Each pin's pressed end
+# bears on the hole floor; its rounded lead end points machine front.
+# MHA-173 is crank-only; the knob carries its own MHA-155 pins.
+CRANK_DRIVE_PIN_Z0 = CRANKSHAFT_Z0 + DRIVE_PIN_FLOOR  # pressed end face
+if abs(DRIVE_PIN_DEPTH - (SEAT_PIN.LENGTH - REMOVABLE.DRIVE_PIN_PROUD)) > 1e-9:
+    raise AssertionError("crank drive-pin depth left the pin length less its proud")
+if abs(CRANK_DRIVE_PIN_Z0 - SEAT_PIN.LENGTH - REMOVABLE.DRIVE_PIN_TIP_Z) > 1e-9:
+    raise AssertionError("crank drive-pin tips are off the removable's DRIVE_PIN_TIP_Z")
+if abs(SEAT_PIN.DIA - REMOVABLE.DRIVE_PIN_DIA) > 1e-12:
+    raise AssertionError("crank-seat-drive-pin is not the removable's drive pin")
 from build_cylinder_end_disc import DISC_DIA as END_DISC_DIA  # noqa: E402
 from build_cylinder_end_disc import DISC_THICK as END_DISC_THICK  # noqa: E402
 
@@ -735,7 +844,6 @@ if PINION_TOOTH_Z + PINION_FACE / 2.0 > CRANKSHAFT_Z0 + CRANKSHAFT_LENGTH:
 from _hole_spec import THREAD_MAJOR_MM, blind_cut_dia_mm  # noqa: E402
 from build_crankshaft import (  # noqa: E402
     SEAT_PINION as CS_SEAT_PINION,
-    SEAT_T12 as CS_SEAT_T12,
     SHAFT_LENGTH as CS_SHAFT_LENGTH,
 )
 
@@ -824,8 +932,6 @@ if ANCHOR_TIP_RESERVE < 0.5:
 
 if abs(CS_SHAFT_LENGTH - CRANKSHAFT_LENGTH) > 1e-9:
     raise AssertionError("crankshaft part length does not cover the moved pinion")
-if abs((CRANKSHAFT_Z0 + CS_SEAT_T12) - REMOVABLE_Z0) > 1e-6:
-    raise AssertionError("crankshaft SeatT12 datum off the REMOVABLE_Z0 station")
 if abs((CRANKSHAFT_Z0 + CS_SEAT_PINION) - (PINION_TOOTH_Z - PINION_FACE / 2.0)) > 1e-6:
     raise AssertionError("crankshaft SeatPinion datum off the 16T station")
 # Pinion retention pin (ch12 p.19): a plain 1/8 in straight pin through the
@@ -1107,6 +1213,8 @@ from pinion_lever_pin_geometry import (  # noqa: E402
 from pinion_handle_geometry import (  # noqa: E402
     ROD_DIA as HANDLE_ROD_DIA,
     ROD_DIA_BAND as HANDLE_ROD_DIA_BAND,
+    ROD_DOWN as HANDLE_ROD_DOWN,
+    ROD_UP as HANDLE_ROD_UP,
 )
 from pinion_spring_geometry import (  # noqa: E402
     BEND_EXIT as SPR_BEND_EXIT_L,
@@ -1600,24 +1708,32 @@ if abs(POST_CRANK_Y - (Y_CRANK - Y_BASE_TOP - PLAT_T)) > 1e-6:
     raise AssertionError("column CRANK_BORE_Y != Y_CRANK - Y_BASE_TOP - PLAT_T")
 # Axial closure around the v2 boss after the casting's exact Ry(180).  The turn
 # reverses local Z, so the harvested asymmetric boss now runs from
-# post.z - (start + length) to post.z - start.  The photo-anchored T12 remains
-# south of it while the 16T follows the translated 64T contact row to its north;
-# the two positive clearances are intentionally no longer equal.
+# post.z - (start + length) to post.z - start.  South of it the crank seat
+# stack closes the gap to the chain wheel's seat face: the integral collar,
+# the MHA-172 washer flat on its rear face, then the float to the cast south
+# face -- the stack's only air, taken at the boss end, never at the wheel.
+# The 16T follows the translated 64T contact row to the boss's north.
 _POST_BOSS_SOUTH = _PPOST[2] - (POST_CRANK_BOSS_START_Z + POST_CRANK_BOSS_LENGTH)
-_T12_NORTH = REMOVABLE_Z0 + 5.0
 _PINION_SOUTH = PINION_TOOTH_Z - PINION_FACE / 2.0
-_BOSS_SOUTH_GAP = _POST_BOSS_SOUTH - _T12_NORTH
+CRANK_SEAT_WASHER_FLOAT = _POST_BOSS_SOUTH - CRANK_SEAT_WASHER_REAR_Z
+# The collar rear face's functional band and the washer's own thickness band
+# both move the washer's rear face toward the boss.
+CRANK_SEAT_WASHER_FLOAT_WORST = (
+    CRANK_SEAT_WASHER_FLOAT - max(COLLAR_REAR_BAND) - max(SEAT_WASHER.THICKNESS_BAND)
+)
 _BOSS_NORTH_GAP = _PINION_SOUTH - _POST_BOSS_NORTH
 # The feeler sets the south face directly off the restored boss (MHA-A03).
 PINION_BOSS_NORTH_GAP_RANGE = (PINION_SEAT_FEELER, PINION_SEAT_GAP_MAX)
 _GAP_LO, _GAP_HI = PINION_BOSS_NORTH_GAP_RANGE
-if _BOSS_SOUTH_GAP < 0.25:
-    raise AssertionError("restored boss must clear the T12 north face by 0.25 mm")
-# The boss-face distance is the placement datum; the independent shaft
-# station agrees with it at import above.
-# Keep both independently derived gaps visible to import-time geometry checks.
-if not 10.0 < _BOSS_SOUTH_GAP < 10.5:
-    raise AssertionError("v2 crank boss south/T12 clearance left its derived band")
+for _float, _case in (
+    (CRANK_SEAT_WASHER_FLOAT, "nominal"),
+    (CRANK_SEAT_WASHER_FLOAT_WORST, "at the CollarRear and thickness bands"),
+):
+    if _float <= 0.0:
+        raise AssertionError(
+            f"MHA-172 ({SEAT_WASHER.THICKNESS} thick) leaves no float to the crank "
+            f"boss south face {_case}: {_float:.3f}"
+        )
 if not (
     _GAP_LO - 1e-6
     <= _BOSS_NORTH_GAP
@@ -3643,28 +3759,53 @@ _SWING_RIG_BANDS = (
     (PIVOT_SHAFT_Z0, PIVOT_SHAFT_Z0 + RIG.TORQUE_SHAFT_LEN, "pivot shaft"),
     (RIG.STRAP_Z_OUTER[0], RIG.STRAP_Z_INNER[0], "front strap"),
 )
+# The crank column behind the hub, each body a solid of revolution about the
+# crank axis (z band, diameter): the T12 plate paper-drive seats on it, the
+# collar's seat spigot and body, and the MHA-172 washer on the body's rear.
+T12_TIP_DIA = REMOVABLE.outside_dia(REMOVABLE.TEETH["T12"])
+CRANK_COLUMN_BANDS = (
+    (REMOVABLE.BAND_FRONT_Z, REMOVABLE.SEAT_FACE_Z, T12_TIP_DIA, "T12 chain wheel"),
+    (REMOVABLE.SEAT_FACE_Z, CRANK_SPIGOT_FRONT_Z, SPIGOT_DIA, "crank seat spigot"),
+    (CRANK_SPIGOT_FRONT_Z, CRANK_SEAT_WASHER_Z0, COLLAR_DIA, "crank collar body"),
+    (
+        CRANK_SEAT_WASHER_Z0,
+        CRANK_SEAT_WASHER_REAR_Z,
+        SEAT_WASHER.OD,
+        "crank seat washer",
+    ),
+)
+_CRANK_TO_GRIP_AXIS = math.hypot(X_CRANK - APINION_X, Y_CRANK - APINION_Y)
 for _lo, _hi, _what in (
     *_SWING_RIG_BANDS,
-    (REMOVABLE_Z0, REMOVABLE_Z0 + 5.0, "T12 chain wheel"),
+    *((lo, hi, what) for lo, hi, _dia, what in CRANK_COLUMN_BANDS),
     (CRANK_ARM_Z0, CRANK_ARM_Z0 + ARM_THICKNESS, "crank arm"),
     (CRANK_HUB_Z0, CRANK_HUB_REAR_Z, "crank hub"),
 ):
     if _GRIP_ROD_Z[1] > _lo - 0.25 and _GRIP_ROD_Z[0] < _hi + 0.25:
         raise AssertionError(f"grip-crossrod sweep band reaches the {_what}")
+# At its worst south travel (RIG_MARGINS' stack) the crossrod enters the
+# washer's z band, so the crank column is cleared radially as well: the rod's
+# farther reach plus its radius against each body's radius.
+_GRIP_ROD_REACH = max(HANDLE_ROD_DOWN, HANDLE_ROD_UP) + HANDLE_ROD_DIA / 2.0
+for _lo, _hi, _dia, _what in CRANK_COLUMN_BANDS:
+    if _CRANK_TO_GRIP_AXIS - _GRIP_ROD_REACH - _dia / 2.0 < 0.25:
+        raise AssertionError(f"grip-crossrod sweep circle reaches the {_what}")
 # The integral head's own band (front crown apex to neck shoulder) spins with
 # the arbor and is wider than the crossrod's, so it is proved against the same
-# swing-rig bodies directly rather than inferred from the rod band.  The T12
-# wheel and the crank arm keep their own head checks below.
+# swing-rig bodies directly rather than inferred from the rod band.
 for _lo, _hi, _what in _SWING_RIG_BANDS:
     if _GRIP_HEAD_Z[1] > _lo - 0.25 and _GRIP_HEAD_Z[0] < _hi + 0.25:
         raise AssertionError(f"integral grip-head band reaches the {_what}")
-# The head's wider z band clips the T12 plane, so use radial clearance instead.
-# The crank arm/hub/handle sweep is axially disjoint from the integral head.
-if (
-    math.hypot(X_CRANK - APINION_X, Y_CRANK - APINION_Y)
-    < ARBOR_HEAD_DIA / 2.0 + 16.0 + 0.25
-):  # T12 OD/2 ~14 + margin
-    raise AssertionError("integral grip head reaches the T12 chain wheel")
+# The head's wider z band clips the crank column (collar and washer), so a
+# column body sharing its band is cleared radially instead.  The crank
+# arm/hub/handle sweep is axially disjoint from the integral head.
+for _lo, _hi, _dia, _what in CRANK_COLUMN_BANDS:
+    if (
+        _GRIP_HEAD_Z[1] > _lo - 0.25
+        and _GRIP_HEAD_Z[0] < _hi + 0.25
+        and _CRANK_TO_GRIP_AXIS < ARBOR_HEAD_DIA / 2.0 + _dia / 2.0 + 0.25
+    ):
+        raise AssertionError(f"integral grip head reaches the {_what}")
 if _GRIP_HEAD_Z[0] < CRANK_HUB_REAR_Z + 0.25:
     raise AssertionError("integral grip-head band reaches the crank hub")
 
@@ -3677,6 +3818,13 @@ HANDLE_SCREW_Z0 = CRANK_ARM_Z0 - HANDLE_SCREW_SEAT_STATION  # slotted head face
 HANDLE_SCREW_TIP_Z = CRANK_ARM_Z0 + HANDLE_SCREW_INSTALLED_THREAD
 if abs(HANDLE_SCREW_TIP_Z - CRANK_ARM_ORIGIN_Z) > 1e-9:
     raise AssertionError("MHA-139's filed tip is not flush with the arm's inboard face")
+for _lo, _what in (
+    (REMOVABLE.BAND_FRONT_Z, "T12 chain wheel"),
+    (_GRIP_HEAD_Z[0], "integral grip head"),
+    (_GRIP_ROD_Z[0], "grip crossrod"),
+):
+    if HANDLE_SCREW_TIP_Z > _lo - 0.25:
+        raise AssertionError(f"MHA-139's filed tip reaches the {_what}")
 if ARM_C2C - HANDLE_SCREW_THREAD_MAJOR / 2.0 < HUB_BARREL_DIA / 2.0 + 0.25:
     raise AssertionError("MHA-139 thread reaches the crank hub barrel")
 
@@ -3830,8 +3978,11 @@ RIG_MARGINS = {
         _worst(SPRING_Z - SPRING_W / 2.0 - RIG.G19_BACK_FACE_Z, SPRING_TO_J19_STACK),
         0.25,
     ),
+    # Axial against the T12 plate, the widest crank-column body.  Worst-case
+    # travel does enter the collar/washer band behind it; those are cleared
+    # radially instead (CRANK_COLUMN_BANDS above).
     "grip crossrod to the T12 chain wheel": (
-        _worst(_GRIP_ROD_Z[0] - (REMOVABLE_Z0 + 5.0), GRIP_ROD_SOUTH_TRAVEL_STACK),
+        _worst(_GRIP_ROD_Z[0] - REMOVABLE.SEAT_FACE_Z, GRIP_ROD_SOUTH_TRAVEL_STACK),
         0.25,
     ),
     "grip head to the crank arm": (
@@ -4419,7 +4570,7 @@ async def _seat_on_crank(
     """Journal a keyed crank part with semantic mates.
 
     The part is coaxial on the crank axis and its Z-normal Front plane seats
-    coincident to a named crankshaft datum (SeatT12 or SeatPinion).  Coincident
+    coincident to a named crankshaft datum (e.g. SeatPinion).  Coincident
     replaces the old UNSIGNED plane-plane distance, whose two solution branches
     let the free-spinning crank family reflect about the shaft origin on a
     re-solve: the 16T rendered floating ~200 south of its seat with every gate
@@ -5109,13 +5260,39 @@ async def build(adapter) -> dict[str, str]:
         ground=False,
         label="MHA-138 six-o'clock axial seam pin",
     )
+    # The crank seat behind the chain wheel: MHA-172 flat on the collar's rear
+    # face (local +Y -> machine +Z, rearward), and the two MHA-173 drive pins
+    # standing in the collar's blind holes, pressed end on DrivePinFloor and
+    # rounded lead end forward (local +Y -> machine -Z).  DrivePinAxis1 lies
+    # on the shaft's local +Z (machine -Y), DrivePinAxis2 opposite.
+    seat_washer = await place_component(
+        adapter,
+        "crank-seat-washer",
+        [X_CRANK, Y_CRANK, CRANK_SEAT_WASHER_Z0],
+        [90.0, 0.0, 0.0],
+        ROT_X_POS90,
+        ground=False,
+        label="MHA-172 on the crank collar's rear face",
+    )
+    seat_pins = [
+        await place_component(
+            adapter,
+            "crank-seat-drive-pin",
+            [X_CRANK, Y_CRANK + side * REMOVABLE.PIN_CIRCLE_RADIUS, CRANK_DRIVE_PIN_Z0],
+            euler_from_rows(ROT_X_NEG90),
+            ROT_X_NEG90,
+            ground=False,
+            label=f"MHA-173 drive pin in DrivePinAxis{k}",
+        )
+        for k, side in ((1, -1.0), (2, 1.0))
+    ]
     # The crank-end T12 chain wheel is NOT placed here: paper-drive now OWNS the
     # whole crank->paper chain drive (both sprockets + roller chain + belt), so the
     # single crank chain wheel lives in paper-drive (codex #189 :605). Placing it
     # here too made two coincident T12 wheels at the crank centre once both
     # subassemblies are inserted at the top level -> interference. Drive-train
-    # keeps the shaft, hub, arm, handle, both crank pins and 16T pinion; the
-    # crank spin DOF remains keyed through the arm.
+    # keeps the shaft, its seat washer and drive pins, hub, arm, handle, both
+    # crank pins and 16T pinion; the crank spin DOF remains keyed through the arm.
     # Crank rest pose: the arm hangs straight DOWN (ch30 eight-views -- the
     # handle reads "down" in all eight roll angles, which only a -Y arm does,
     # since a downward vector lies on the views' vertical rotation axis). The
@@ -5447,6 +5624,57 @@ async def build(adapter) -> dict[str, str]:
         label="MHA-138 rotational closure",
         verify=(seam_pin, seam_o),
     )
+
+    # MHA-172 rides the shaft flat against CollarRear; the boss float is its
+    # only axial air, so it is modelled seated on the collar.  A revolved
+    # washer's spin is immaterial: the parallel closes it like MHA-138's.
+    washer_o = _org(adapter, seat_washer)
+    await coincident_mate(
+        adapter,
+        named_ref(f"Axis1@{seat_washer}", "AXIS"),
+        crank_axis,
+        label="MHA-172 coaxial on crankshaft",
+        verify=(seat_washer, washer_o),
+    )
+    await coincident_mate(
+        adapter,
+        named_ref(f"Top Plane@{seat_washer}", "PLANE"),
+        named_ref(f"CollarRear@{crankshaft}", "PLANE"),
+        label="MHA-172 flat on the collar rear face",
+        verify=(seat_washer, washer_o),
+    )
+    await parallel_mate(
+        adapter,
+        named_ref(f"Right Plane@{seat_washer}", "PLANE"),
+        cs_right,
+        label="MHA-172 rotational closure",
+        verify=(seat_washer, washer_o),
+    )
+    # Each MHA-173 is pressed to the hole floor; its axis is the collar's
+    # drilled pin axis, and the parallel closes the revolved pin's spin.
+    for k, seat_pin in enumerate(seat_pins, start=1):
+        seat_pin_o = _org(adapter, seat_pin)
+        await coincident_mate(
+            adapter,
+            named_ref(f"ScrewAxis@{seat_pin}", "AXIS"),
+            named_ref(f"DrivePinAxis{k}@{crankshaft}", "AXIS"),
+            label=f"MHA-173 #{k} coaxial in DrivePinAxis{k}",
+            verify=(seat_pin, seat_pin_o),
+        )
+        await coincident_mate(
+            adapter,
+            named_ref(f"Top Plane@{seat_pin}", "PLANE"),
+            named_ref(f"DrivePinFloor@{crankshaft}", "PLANE"),
+            label=f"MHA-173 #{k} pressed to DrivePinFloor",
+            verify=(seat_pin, seat_pin_o),
+        )
+        await parallel_mate(
+            adapter,
+            named_ref(f"Right Plane@{seat_pin}", "PLANE"),
+            cs_right,
+            label=f"MHA-173 #{k} rotational closure",
+            verify=(seat_pin, seat_pin_o),
+        )
 
     # Crank handle: rides the arm's PIVOT pin (Axis2@arm), NOT the crankshaft --
     # a real pin joint. Coaxial to the arm pivot bore + an axial seat (its

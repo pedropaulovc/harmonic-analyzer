@@ -1,0 +1,12 @@
+transgear-knob-drive-pin:
+  title: Knob Shaft Drive Pin
+  number: MHA-155
+  stock_name: Alloy Steel Dowel Pin
+  supplier: McMaster-Carr
+  supplier_skus: [98381A433]
+  material: Alloy Steel
+  material_specification: "Alloy steel dowel pin, 3/32 x 3/16, Round x Chamfer ends; McMaster-Carr 98381A433"
+  finish: plain; no coating
+  quantity: 2
+  tolerance_class: machined_block
+  process: purchased

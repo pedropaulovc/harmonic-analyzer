@@ -367,6 +367,8 @@ BOM_PART_NUMBERS = {
     "crank-handle-pivot-screw": "MHA-139",
     "crank-hub": "MHA-137",
     "crank-hub-pin": "MHA-138",
+    "crank-seat-washer": "MHA-172",
+    "crank-seat-drive-pin": "MHA-173",
     "alignment-pinion": "MHA-002",
     "pinion-bracket": "MHA-056",
     "pinion-pivot-block": "MHA-061",
@@ -421,6 +423,8 @@ BOM_DESCRIPTIONS = {
     "crank-handle-pivot-screw": "CRANK HANDLE PIVOT SCREW",
     "crank-hub": "CRANK HUB",
     "crank-hub-pin": "CRANK HUB AXIAL PIN",
+    "crank-seat-washer": "CRANK SEAT THRUST WASHER",
+    "crank-seat-drive-pin": "3/32 X 1/4 DOWEL PIN, MCMASTER 98381A434",
     "alignment-pinion": "ALIGNMENT PINION",
     "pinion-bracket": "PINION BRACKET STRAP",
     "pinion-pivot-block": "PINION PIVOT BLOCK",
@@ -510,40 +514,44 @@ CONE_CRANK_STEPS = "\n".join(
         "   MHA-097 " + ADJUSTER_ENGAGEMENT_ASSEMBLY_FACT,
         # User ruling 2026-09-28: the crank journal runs directly in the post;
         # the centres are fixed, and the only mesh requirement is no binding.
+        # CONTRACT-crank: MHA-173 press to the blind-hole floor (their proud
+        # length is the result); MHA-172 cannot pass the collar forward, so it
+        # goes on from the rear end before the journal enters the bore.
         # User ruling 2026-09-30 (#1154): the 16T's shoulder and turned band
         # are feeler-checked against T120 before the pin is drilled.  The
         # pair may rub on T120 until that check closes, so the seat and the
         # check come first, turning by hand, and the free-running revolution
         # after them (Codex P2 on #1154, review 3).  The check's last line is
         # short; the step carries on after it.
-        "4. FIT MHA-026 DIRECTLY IN THE MHA-016 CRANK BORE. SLIDE MHA-025",
-        "   ON, NOT YET PINNED, AND MESH IT WITH MHA-021 TOOTH IN GAP.",
+        "4. PRESS 2X MHA-173 TO THE MHA-026 COLLAR HOLE FLOORS; SLIDE MHA-172",
+        "   ON FROM THE REAR, FLAT ON THE COLLAR. FIT MHA-026 IN THE MHA-016",
+        "   CRANK BORE; SLIDE MHA-025 ON UNPINNED, TOOTH IN GAP WITH MHA-021.",
         f"   SET MHA-025 {PINION_SEAT_FEELER:.2f} OFF THE MHA-016 BOSS NORTH FACE WITH A FEELER.",
         T120_FITUP_ASSEMBLY_CHECK + " THEN",
         "   TURN MHA-021 ONE FULL REVOLUTION; IT MUST NEVER BIND (ELSE CHECK",
         "   THE PARTS AND BORE SPACING). THEN MATCH-DRILL/REAM MHA-134 AT BOSS",
         "   MID-LENGTH WITH MHA-026, FLUSH BOTH SIDES; RE-CHECK NO BINDING.",
-        "5. THE PAPER-DRIVE T12 WHEEL GOES ON MHA-026 BEFORE THE ARM.",
+        "5. PAPER-DRIVE T12 ON MHA-026 BEFORE THE ARM, HOLES OVER 2X MHA-173.",
         # U33 (user, 2026-09-23): crank hub MHA-137 pressed into the arm and
         # seam-pinned by MHA-138 (a 4 m6 dowel, 4.0 long = half the arm); the
         # MHA-024 cross-hole runs behind the arm through the hub barrel. The
         # handle rides the MHA-139 shoulder screw. Wording from crankhub.
         "6. PRESS MHA-137 INTO MHA-020 TO THE SHOULDER, FACES FLUSH.",
-        "   MATCH-DRILL/REAM THE SEAM Ø4 X 4.0 DEEP; DRIVE MHA-138 FLUSH.",
-        "   SLIDE ONTO MHA-026, SHAFT END FLUSH, PUNCH MARKS ALIGNED.",
-        "   TAPER-REAM 1:48 THROUGH HUB AND SHAFT; LIGHT-DRIVE MHA-024,",
-        "   REMOVABLE BY TAP ON SMALL END. HANG MHA-128 FROM THE PIN HEAD;",
-        "   CLAMP MHA-130 UNDER MHA-030.",
+        "   MATCH-DRILL/REAM THE SEAM Ø4 X 4.0 DEEP; DRIVE MHA-138 FLUSH. SLIDE",
+        "   ONTO MHA-026 AND SET THE HUB FRONT FACE FLUSH WITH THE SHAFT END,",
+        "   PUNCH MARKS ALIGNED; ONLY THEN TAPER-REAM 1:48 THROUGH HUB AND",
+        "   SHAFT; LIGHT-DRIVE MHA-024, REMOVABLE BY TAP ON SMALL END. HANG",
         # Codex #1140: the keeper chain's length and topology belong on the
         # sheet; the bead count is the spec's solve, never a typed number.
-        f"   CUT MHA-149 TO {KEEPER_CHAIN_BEADS} BEADS; THREAD IT THROUGH THE MHA-130",
-        "   LOOP AND MHA-128; SNAP ONE END BEAD INTO EACH DOME OF MHA-150.",
+        "   MHA-128 FROM THE PIN HEAD; CLAMP MHA-130 UNDER MHA-030. CUT MHA-149",
+        f"   TO {KEEPER_CHAIN_BEADS} BEADS; THREAD IT THROUGH THE MHA-130 LOOP AND MHA-128; SNAP",
+        "   ONE END BEAD INTO EACH DOME OF MHA-150.",
         # Local review of 747487c71: the cup cures centred on the screw, or
         # its offset can bind the head and shoulder.
         "7. EPOXY MHA-152 ON THE MHA-022 TENON, MHA-153 IN ITS BUTT; CURE ON",
         "   THE WAXED MHA-139 THROUGH BOTH. FIT IT; SLIDE MHA-022 ON; THREAD IT",
         "   INTO MHA-020 WITH LOCTITE 222, SHOULDER TIGHT; END PLAY 0.25-1.0.",
-        "   FILE THE TIP FLUSH WITH THE ARM'S INBOARD FACE; BREAK EDGE.",
+        "   FILE THE TIP FLUSH WITH THE ARM'S INBOARD FACE; BREAK EDGE."
         f"   CYLINDER BANK: SHEET {BANK_SHEET}.",
     )
 )

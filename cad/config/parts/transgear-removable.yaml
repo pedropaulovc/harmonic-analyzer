@@ -1,7 +1,9 @@
 transgear-removable:
+  title: Removable Chain Sprocket
   number: MHA-081
-  description: "CHAIN SPROCKET, T12/T18/T24; 1 EACH"
+  description: "ANSI #25 CHAIN SPROCKET, T12/T18/T24; 1 EACH"
   material: Plain Carbon Steel
+  material_specification: Bright plain-carbon steel plate; no plating
+  finish: bright, unplated; edges deburred
   tolerance_class: machined_block
-  fit_class: gear_mesh
-  process: "gear cutting (hob/shaper)"
+  process: "machined (steel plate)"
