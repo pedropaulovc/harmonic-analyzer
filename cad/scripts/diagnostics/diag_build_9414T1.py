@@ -21,10 +21,14 @@ y = WIDTH, set screw along +X at y = WIDTH / 2):
 * the set-screw hole: SET_SCREW_MAJOR_DIA revolved-cut about the screw axis,
   from the collar axis out past the OD (threads are not modelled);
 * the set screw as material: a SET_SCREW_MAJOR_DIA cylinder revolved about the
-  same axis from the cup rim (SET_SCREW_CUP_RADIUS) to SET_SCREW_END_RADIUS,
-  with SET_SCREW_END_CHAMFER at 45 deg on the socket end.  The cup point is
-  modelled as a plain flat end at the cup rim, not a conical recess: the rim
-  radius is what bears on the shaft flat and the recess has no fit role;
+  same axis, its cup rim at ``cup_radius`` from the collar axis (the
+  as-supplied SET_SCREW_CUP_RADIUS by default) and its socket end the screw's
+  length (SET_SCREW_END_RADIUS - SET_SCREW_CUP_RADIUS) further out, with
+  SET_SCREW_END_CHAMFER at 45 deg on the socket end.  An installed collar
+  passes the radius its screw is tightened to, so the screw reads seated on
+  its shaft.  The cup point is modelled as a plain flat end at the cup rim,
+  not a conical recess: the rim radius is what bears on the shaft flat and
+  the recess has no fit role;
 * the hex socket SET_SCREW_SOCKET_AF across flats, cut blind
   SET_SCREW_SOCKET_DEPTH in from the screw's outer end.
 
@@ -147,12 +151,20 @@ async def _revolve_about_screw_axis(adapter, label: str, points, *, is_cut: bool
     name_last_feature(adapter, label)
 
 
-async def build_9414T1(adapter, truth=None):
+async def build_9414T1(adapter, truth=None, *, cup_radius: float = SET_SCREW_CUP_RADIUS):
     from _common import _early_bound, _feature_by_name, _read_member, add_line_chain
     from solidworks_mcp.adapters.base import RevolveParameters
     from diagnostics.diag_mcmaster_lib import no_sketch_inference
 
     c = EDGE_BREAK
+    end_radius = cup_radius + (SET_SCREW_END_RADIUS - SET_SCREW_CUP_RADIUS)
+    if not 0.0 < cup_radius <= SET_SCREW_CUP_RADIUS:
+        raise ValueError(
+            f"{PART_NO} set screw cup at {cup_radius} mm: it can only be "
+            f"tightened in from the as-supplied {SET_SCREW_CUP_RADIUS} mm"
+        )
+    if end_radius <= _OUTER_R:
+        raise ValueError(f"{PART_NO} set screw socket end sinks inside the collar OD")
 
     # --- ring section revolved about Y, four 45 deg breaks ------------------
     check("create_sketch ring", await adapter.create_sketch("Front"))
@@ -205,16 +217,16 @@ async def build_9414T1(adapter, truth=None):
         adapter,
         "SetScrew",
         [
-            (SET_SCREW_CUP_RADIUS, _SCREW_Y),
-            (SET_SCREW_CUP_RADIUS, _SCREW_Y + _SCREW_R),
-            (SET_SCREW_END_RADIUS - ch, _SCREW_Y + _SCREW_R),
-            (SET_SCREW_END_RADIUS, _SCREW_Y + _SCREW_R - ch),
-            (SET_SCREW_END_RADIUS, _SCREW_Y),
+            (cup_radius, _SCREW_Y),
+            (cup_radius, _SCREW_Y + _SCREW_R),
+            (end_radius - ch, _SCREW_Y + _SCREW_R),
+            (end_radius, _SCREW_Y + _SCREW_R - ch),
+            (end_radius, _SCREW_Y),
         ],
         is_cut=False,
     )
-    # The screw lies wholly in the emptied hole or outside the ring, so it
-    # adds its own volume exactly.
+    # The screw lies wholly in the emptied hole, the bore or outside the ring,
+    # so it adds its own volume exactly.
     screw = screw_volume()
     v = await volume_check(adapter, "set screw", v + screw, 0.005 * screw)
 
@@ -223,7 +235,7 @@ async def build_9414T1(adapter, truth=None):
     # symmetric about sketch x = 0, so the sign of Z does not matter.  As in
     # 91251A108's socket, the default blind direction runs against the plane
     # normal, here -X into the screw.
-    offset_plane(adapter, "SetScrewEndPlane", SET_SCREW_END_RADIUS, base="Right Plane")
+    offset_plane(adapter, "SetScrewEndPlane", end_radius, base="Right Plane")
     check("create_sketch socket", await adapter.create_sketch("SetScrewEndPlane"))
     flat = SET_SCREW_SOCKET_AF / 2.0
     corner = _SOCKET_CORNER_R

@@ -14,6 +14,12 @@ gate, and no McMaster .SLDPRT is committed or used.
 Frame: collar axis +Y, south face at y = 0, north face at y = WIDTH, the set
 screw along +X at mid-width.  The bore axis is published as ``ScrewAxis``
 (Front ∩ Right), the stock-part mate contract the drive train keys it by.
+
+Installed, not as supplied: the set screw is modelled tightened, its cup rim
+on the Sec4 D-flat (``cone_gear_shaft_spec.FLAT_OFFSETS`` of the terminal
+land), which the drive train lays on the collar's +X.  That contact is what
+retains the gear stack; as supplied the rim stands 0.2545 short of it
+(Codex P2 on #1136, 48e27dedf).
 """
 
 from __future__ import annotations
@@ -23,18 +29,28 @@ import sys
 from _common import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import StockComponent, build_stock_fastener
+from cone_gear_shaft_spec import FLAT_LANDS, FLAT_OFFSETS
 from diagnostics.diag_build_9414T1 import build_9414T1
 
 PART_NAME = "cone-tip-collar"
 SPEC = fastener(PART_NAME)
 MATERIAL = SPEC.material
+# The collar rides the terminal land's flat (build_drive_train_assembly
+# asserts its whole width stays on Sec4).
+SEATED_CUP_RADIUS = FLAT_OFFSETS[FLAT_LANDS[-1]]
 
 
 async def build(adapter) -> dict[str, str]:
     return await build_stock_fastener(
         adapter,
         part_name=PART_NAME,
-        components=(StockComponent(sku="9414T1", author=build_9414T1),),
+        components=(
+            StockComponent(
+                sku="9414T1",
+                author=build_9414T1,
+                parameters={"cup_radius": SEATED_CUP_RADIUS},
+            ),
+        ),
         material=MATERIAL,
         screw_axis_planes=("Front Plane", "Right Plane"),
     )
