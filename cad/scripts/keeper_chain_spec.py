@@ -546,10 +546,7 @@ def link_volume(steps: int = 72) -> float:
 
 
 # The purchased-part identification sheets (build_purchased_spring_drawing).
-CHAIN_DRAWING_NOTES = (
-    f"CUT LENGTH {BEAD_COUNT} BEADS, {CHAIN_LENGTH:.0f} MM BETWEEN END BEAD CENTRES. "
-    "SHOWN AS INSTALLED, CLOSED BY MHA-150."
-)
-LINK_DRAWING_NOTES = (
-    "CLOSES MHA-149 INTO ONE LOOP: ONE END BEAD SNAPS INTO EACH DOME."
-)
+# One short line each: the sheet reserves ~0.19 m for the note (the first cut,
+# 94 characters, ran 0.204 m and failed drawing:keeper_chain).
+CHAIN_DRAWING_NOTES = f"CUT TO {BEAD_COUNT} BEADS ({CHAIN_LENGTH:.0f} MM); CLOSED BY MHA-150."
+LINK_DRAWING_NOTES = "JOINS THE MHA-149 ENDS: ONE BEAD PER DOME."
