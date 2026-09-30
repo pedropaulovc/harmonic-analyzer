@@ -69,6 +69,7 @@ from cone_swing_platform_spec import POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT
 from crank_drive_gear_notes import ATTACHMENT_ALTERNATIVE as CRANK_GEAR_ALTERNATIVE
 from crank_drive_gear_notes import ATTACHMENT_PROCESS as CRANK_GEAR_JOINT
 from crank_pinion_spec import SEAT_FEELER_MM as PINION_SEAT_FEELER
+from keeper_chain_spec import BEAD_COUNT as KEEPER_CHAIN_BEADS
 from drive_train_assembly_spec import (
     CLUSTERS,
     EXPLODED_VIEW_NAME,
@@ -81,7 +82,7 @@ from drive_train_assembly_spec import (
 )
 from pinion_spring_section import SCREW_EAST_OF_PIVOT as SPRING_SCREW_EAST_OF_PIVOT
 from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view, view_name
+from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 
 SPEC = DRAWINGS_BY_NAME["drive_train_assembly"]
 ARTIFACT_STEM = SPEC.artifact_stem
@@ -504,6 +505,11 @@ CONE_CRANK_STEPS = "\n".join(
         "   TAPER-REAM 1:48 THROUGH HUB AND SHAFT; LIGHT-DRIVE MHA-024,",
         "   REMOVABLE BY TAP ON SMALL END. HANG MHA-128 FROM THE PIN HEAD;",
         "   CLAMP MHA-130 UNDER MHA-030.",
+        # Codex #1140: the keeper chain's length and topology belong on the
+        # sheet; the bead count is the spec's solve, never a typed number.
+        f"   CUT MHA-149 TO {KEEPER_CHAIN_BEADS} BEADS. PASS ONE END THROUGH THE",
+        "   MHA-130 LOOP, THE OTHER THROUGH MHA-128. AT EACH END THREAD THE",
+        "   CHAIN THROUGH AN MHA-150 CROSS-HOLE; SNAP THE END BEAD INTO IT.",
         "7. SLIDE MHA-022 ONTO MHA-139. THREAD MHA-139 INTO THE MHA-020",
         "   PIVOT TAP WITH LOCTITE 222 (REMOVABLE); SEAT THE SHOULDER TIGHT",
         "   ON THE ARM FACE. HANDLE TURNS FREELY; END PLAY 0.25-1.0.",
