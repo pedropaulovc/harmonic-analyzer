@@ -35,7 +35,7 @@ SECTION_DIA_BANDS: tuple[tuple[float, float], ...] = (
     GEAR_SEAT_BAND,  # Sec1: T030-T120 seats
     GEAR_SEAT_BAND,  # Sec2: T024 seat
     GEAR_SEAT_BAND,  # Sec3: T018 seat
-    RUNNING_DIA_BAND,  # Sec4: T012 + T006 seats + tip thrust spacer
+    RUNNING_DIA_BAND,  # Sec4: T012 + T006 seats + MHA-096 stack collar
 )
 # The cone gears each section carries (U40 S1), index-aligned with
 # SECTION_DIA_BANDS.  The 64T crank-drive gear also rides Sec1.
