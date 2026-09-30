@@ -583,7 +583,7 @@ export async function verifySync() {
     report.sources = references.records.map(record => ({ ...record.report, observationDigest: record.digest, source: { sha256: record.native.observedSha256, width: record.native.width, height: record.native.height, durationSeconds: record.native.durationSeconds, fps: record.native.fps, nativeFrameCount: record.native.nativeFrameCount } }))
     report.failures.push(...references.failures)
     for (const source of report.sources) for (const failure of source.failures) report.failures.push({ videoId: source.videoId, ...failure })
-    requireCondition(references.records.length === VIDEO_IDS.length && !report.failures.length, 'Independent full-seven source prerequisites/coverage failed; see report.json. No camera/timeline self-grading or external-media skip is permitted.')
+    requireCondition(references.records.length === VIDEO_IDS.length && !report.failures.length, `Independent all-${VIDEO_IDS.length} source prerequisites/coverage failed; see report.json. No camera/timeline self-grading or external-media skip is permitted.`)
     const dist = resolve(WEB_ROOT, 'dist')
     await stat(resolve(dist, 'index.html'))
     report.builtAssets = await distManifest(dist)
@@ -619,7 +619,7 @@ export async function verifySync() {
         requireCondition(snapshot.modelState === 'ready', 'Actual articulated model is unavailable; no missing-GLB green path')
         requireCondition(snapshot.playerState !== 'error', `Native YouTube external-media prerequisite failed for ${record.id}`)
         const links = await page.locator('#videos a').evaluateAll(elements => elements.map(element => new URL(element.href).searchParams.get('video')))
-        requireCondition(links.length === 7 && new Set(links).size === 7, 'All seven direct video navigation links must be present and distinct')
+        requireCondition(links.length === VIDEO_IDS.length && new Set(links).size === VIDEO_IDS.length, `All ${VIDEO_IDS.length} direct video navigation links must be present and distinct`)
         const run = longestRun(record)
         video.requiredClockRun = run
         const embed = await playbackProof(page, record, run, video)
@@ -642,7 +642,7 @@ export async function verifySync() {
         report.failures.push(...video.failures.map(failure => ({ videoId: record.id, ...failure })))
       }
     }
-    requireCondition(report.videos.length === 7 && report.videos.every(video => video.status === 'passed') && report.videos.some(video => video.interaction), 'Native full-seven verification or actual paused interaction proof failed')
+    requireCondition(report.videos.length === VIDEO_IDS.length && report.videos.every(video => video.status === 'passed') && report.videos.some(video => video.interaction), `Native all-${VIDEO_IDS.length} verification or actual paused interaction proof failed`)
     requireCondition(!report.browserLog.some(item => item.type === 'pageerror'), 'Native browser has unhandled page errors')
     report.status = 'passed'
   } catch (error) { fail(report, 'verification-prerequisite', error.message) }
@@ -671,6 +671,6 @@ export async function verifySync() {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  if (process.argv.includes('--help')) console.log('Usage: npm run verify:sync\nRequires an existing production dist, all seven private source MP4s/complete independent observations, playwright and native /usr/bin/google-chrome.\nEnvironment: HARMONIC_REFERENCE_ROOT (default /tmp/harmonic-web-reference), SIMULATOR_BASE (must match build), HARMONIC_CHROME, HARMONIC_HEADLESS=1 (default headed).\nOutput: web/.vite/verification-output/<timestamp>/report.json and actual native screenshots/measurements. External YouTube restrictions fail; nothing is mocked or skipped.')
+  if (process.argv.includes('--help')) console.log(`Usage: npm run verify:sync\nRequires an existing production dist, all ${VIDEO_IDS.length} private source MP4s/complete independent observations (${VIDEO_IDS.join(', ')}), playwright and native /usr/bin/google-chrome.\nEnvironment: HARMONIC_REFERENCE_ROOT (default /tmp/harmonic-web-reference), SIMULATOR_BASE (must match build), HARMONIC_CHROME, HARMONIC_HEADLESS=1 (default headed).\nOutput: web/.vite/verification-output/<timestamp>/report.json and actual native screenshots/measurements. External YouTube restrictions fail; nothing is mocked or skipped.`)
   else process.exitCode = await verifySync()
 }

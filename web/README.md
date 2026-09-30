@@ -1,6 +1,6 @@
 # Harmonic analyzer video companion
 
-Seven engineerguy videos share an interactive view of the CAD-exported analyzer.
+Six engineerguy videos share an interactive view of the CAD-exported analyzer.
 The original YouTube player sits in the model area's lower-right corner. Pause
 for manual exploration, then orbit, pan, zoom, turn the crank or adjust the twenty
 channels. Compact mode keeps the same visible player and its audio.
@@ -30,9 +30,12 @@ Routes accept a slug or the corresponding YouTube ID:
 | Synthesis | `?video=synthesis` |
 | Analysis | `?video=analysis` |
 | Operation | `?video=operation` |
-| PDF guide | `?video=page-by-page-guide` |
 | Machine spin | `?video=machine-spin` |
 | Rocker arms | `?video=rocker-arms` |
+
+The PDF page-by-page guide video (`rMHw9GCAtE8`) is excluded by user scope. It
+has no route, observation file or verifier page; its MP4 and source intervals
+are not acceptance prerequisites.
 
 The video embeds use the official YouTube IFrame API. Downloaded source videos,
 reference screenshots and the GLB remain untracked; the site does not host or
@@ -52,10 +55,8 @@ view. An incomplete required interval is visibly unavailable. A source interval
 without a corresponding machine can retain a previously matched pose; without
 one, the exploratory pose remains unchanged and no source match is claimed.
 
-All seven observation files currently have incomplete camera/mechanism coverage.
-In particular, the guide's post/thumbclamp at 771.6709–779.211767 seconds has no
-established correspondence to a native CAD part. That interval is still required;
-it has not been exempted or replaced. Full footage fidelity is **not verified**.
+All six observation files currently have incomplete camera/mechanism coverage.
+Full footage fidelity is **not verified**.
 
 ```sh
 npm --prefix web run build
@@ -67,12 +68,13 @@ npm --prefix web run build && npm --prefix web run verify:sync
 ```
 
 `HARMONIC_REFERENCE_ROOT` defaults to `/tmp/harmonic-web-reference`. The root
-must contain the original seven MP4 files under `videos/`. The verifier serves
-`dist/`, launches headed Chromium, exercises the real YouTube media, and checks
-every integer second and recorded change. It fails on unavailable prerequisites,
-missing source evidence, landmark errors above 38.4 pixels or clock skew above
-0.5 seconds. `?verify=1` enables diagnostic GPU landmark readback; mathematical
-camera fitting alone does not count as rendered-pixel evidence.
+must contain the six original MP4 files for the routes above under `videos/`.
+The verifier serves `dist/`, launches headed Chromium, exercises the real YouTube
+media, and checks every integer second and recorded change. It fails on
+unavailable prerequisites, missing source evidence, landmark errors above 38.4
+pixels or clock skew above 0.5 seconds. `?verify=1` enables diagnostic GPU
+landmark readback; mathematical camera fitting alone does not count as
+rendered-pixel evidence.
 
 Reports and local screenshots go to `web/.vite/verification-output/` and are
 ignored. `HARMONIC_CHROME` selects the Chromium executable; `HARMONIC_HEADLESS=1`

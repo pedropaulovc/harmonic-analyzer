@@ -7,11 +7,11 @@ The CAD export supplies native geometry and rest transforms. Generated
 values used by `mechanics.ts`. `export-mechanics.py` and `export-magnifier.py`
 read CAD authority; the website does not infer dimensions from video pixels.
 
-`video-catalog.ts` identifies the seven original videos and their local reference
-hashes. `youtube-player.ts` owns the visible official embed. `timeline.ts` reads
-independent source observations and selects measured camera/physical input per
-view. `main.ts` changes between following playback and paused exploration;
-`scene.ts` applies the physical pose to the full native GLB.
+`video-catalog.ts` identifies the six original videos in scope and their local
+reference hashes. `youtube-player.ts` owns the visible official embed.
+`timeline.ts` reads independent source observations and selects measured
+camera/physical input per view. `main.ts` changes between following playback and
+paused exploration; `scene.ts` applies the physical pose to the full native GLB.
 
 The GLB hash and source revision must match the generated mechanical data.
 A rejected load never enters the visible scene. Bindings resolve genuine native
@@ -70,17 +70,17 @@ incomplete footage never falls back to a held pose. The player remains usable
 when source matching is unavailable; the warning distinguishes video playback
 from verified geometry synchronization.
 
-The current observation corpus is incomplete for all seven videos. The guide
-interval 771.6709–779.211767 seconds contains a post/thumbclamp whose native CAD
-correspondence has not been established. It remains required and blocks footage
-acceptance. Source-camera reprojection results conditional on unmeasured poses
-are not a complete physical match.
+The current observation corpus is incomplete for all six videos, so footage
+acceptance is not met. Source-camera reprojection results conditional on
+unmeasured poses are not a complete physical match. The PDF page-by-page guide
+video (`rMHw9GCAtE8`) is excluded by user scope; its footage is not part of the
+catalog, observations or acceptance.
 
 ## Browser verification
 
 `verify:sync` checks the original media identity, decoded samples, source-image
 provenance and complete observations before launching the production site. It
-requires all seven pages, every integer-second sample and recorded change, a
+requires all six pages, every integer-second sample and recorded change, a
 38.4-pixel maximum landmark error and 0.5-second maximum timing error. Missing
 media, blocked external playback and missing native geometry fail the command.
 

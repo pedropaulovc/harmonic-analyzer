@@ -26,7 +26,6 @@ import { MECHANISM_DATA } from './mechanics-data'
  * offset in L; the circumferential wrap remains in that lane. This is the
  * quasistatic installed/guided-wrap branch, not a simulation of slack, slip,
  * unravelling, axial wrap migration, elastic wire or contact-force dynamics.
- * Guide video 593–612 s explicitly describes accidental wire slip as a fault.
  *
  * Both wires wind in the same circumferential sense, leaving opposite sides
  * of the wheel: positive global +Z spin pays out the hub run and takes up the

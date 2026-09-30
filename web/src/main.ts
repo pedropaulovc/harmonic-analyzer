@@ -43,7 +43,7 @@ const forceReadout = element<HTMLOutputElement>('#force-readout')
 const videoLabels: Record<string, string> = {
   NAsM30MAHLg: 'Intro / History', '8KmVDxkia_w': 'Synthesis',
   '6dW6VYXp9HM': 'Analysis', 'jfH-NbsmvD4': 'Operation',
-  rMHw9GCAtE8: 'PDF guide', XPQwKRt4Y2k: 'Machine spin', '4mBuyixt22U': 'Rocker arms',
+  XPQwKRt4Y2k: 'Machine spin', '4mBuyixt22U': 'Rocker arms',
 }
 const stateLabels: Record<PlaybackState, string> = {
   unstarted: 'Ready to play', cued: 'Ready to play', playing: 'Playing', paused: 'Paused',
