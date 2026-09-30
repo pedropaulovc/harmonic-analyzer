@@ -516,9 +516,9 @@ CONE_CRANK_STEPS = "\n".join(
         "   BIND. IF IT BINDS, STOP AND CHECK THE PARTS AND BORE SPACING.",
         f"   SET MHA-025 {PINION_SEAT_FEELER:.2f} OFF THE MHA-016 BOSS NORTH FACE WITH A FEELER.",
         # User ruling 2026-09-30 (#1154): the 16T's shoulder and turned band
-        # are feeler-checked against T120 before the pin is drilled.
-        T120_FITUP_ASSEMBLY_CHECK,
-        "   ONLY THEN MATCH-DRILL AND REAM FOR MHA-134 AT",
+        # are feeler-checked against T120 before the pin is drilled.  The
+        # check's last line is short; the step carries on after it.
+        T120_FITUP_ASSEMBLY_CHECK + " ONLY THEN MATCH-DRILL AND REAM FOR MHA-134 AT",
         "   BOSS MID-LENGTH WITH MHA-026; SEAT FLUSH BOTH SIDES PER THE",
         "   MHA-025 PRINT. RE-CHECK THAT THE MESH NEVER BINDS AFTER PINNING.",
         "5. THE PAPER-DRIVE T12 WHEEL GOES ON MHA-026 BEFORE THE ARM.",

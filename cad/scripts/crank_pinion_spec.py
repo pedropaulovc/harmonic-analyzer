@@ -127,16 +127,23 @@ TURNED_DIA_TOLERANCE_MM = 0.10
 TURNED_LENGTH = FACE_WIDTH - SHOULDER_LENGTH
 # Fit-up of the 16T under T120 (user, 2026-09-30, #1154).  With every fit
 # offset and axis pose of the drive train summed at its worst, the shoulder
-# and the turned band can close on T120 (the policy's Named exceptions row
-# "MHA-025 ... T120"; build_drive_train_assembly pins its figures), so the
-# pair is checked on a feeler at fit-up instead of by a tighter stack.  A
-# band that stops the feeler is turned down, never under TURNED_DIA_FITUP_MIN:
-# a band that size clears T120 by geometry at every corner of that stack
-# (build_drive_train_assembly proves it) and keeps a stub addendum over the
-# pitch circle.  A shoulder that stops it is faced back, never under its
-# printed short limit, where the air again clears by geometry.
+# and the turned band can close on T120 by these clearances (negative: an
+# overlap), rounded down to 0.01 -- the policy's Named exceptions row
+# "MHA-025 ... T120"; build_drive_train_assembly derives them and fails if
+# they are not its figures.  Both sheets state them.
+T120_SHOULDER_AIR_WORST = -0.10
+T120_TURNED_BAND_RADIAL_WORST = -0.12
+# So the pair is checked on a feeler at fit-up instead of by a tighter
+# stack, MHA-025 and T120 pushed toward each other: those two pushes take up
+# every play that can still move afterwards, so what passes the feeler keeps
+# it in service.  A band that stops the feeler is turned down, never under
+# TURNED_DIA_FITUP_MIN: a band that size clears T120 by the feeler at every
+# corner of that stack, and still meshes with the 64T wherever the check can
+# call for it (build_drive_train_assembly proves both).  A shoulder that
+# stops it is faced back, never under its printed short limit, where the air
+# again clears the feeler by geometry.
 T120_FITUP_FEELER_MM = 0.10
-TURNED_DIA_FITUP_MIN = 15.48
+TURNED_DIA_FITUP_MIN = 15.78
 SHOULDER_LENGTH_FITUP_MIN = SHOULDER_LENGTH + SHOULDER_LENGTH_LIMITS[0]
 
 # --- Hub boss + retention pin (ch. 12 p. 19, page002_img02 / img06) ---------
@@ -505,28 +512,36 @@ BOSS_WALL_NOTE = (
 )
 # The drive-train fit-up may turn the band down past its printed band (the
 # T120 feeler check, MHA-A03's crank step); the sheet permits it and states
-# the floor, so the part stays conforming after the fit-up cut.
+# the floor, so the part stays conforming after the fit-up cut, and states
+# the worst-case clearances to T120 that the check is there for.
 # Named exception: MHA-025 turned band (drawing-simplicity-policy.md, "Named exceptions").
-TURNED_BAND_FITUP_NOTE = (
-    "TURNED BAND MAY BE TURNED DOWN AT FIT-UP TO "
-    f"Ø{TURNED_DIA_FITUP_MIN:.{TURNED_DIA_PLACES}f} MIN."
+TURNED_BAND_FITUP_NOTE = "\n".join(
+    (
+        "TURNED BAND MAY BE TURNED DOWN AT FIT-UP TO "
+        f"Ø{TURNED_DIA_FITUP_MIN:.{TURNED_DIA_PLACES}f} MIN.",
+        f"WORST-CASE CLEARANCE TO MHA-013 T120: BAND {T120_TURNED_BAND_RADIAL_WORST:.2f}, "
+        f"SHOULDER {T120_SHOULDER_AIR_WORST:.2f}.",
+    )
 )
 DRAWING_NOTES = "\n".join((TOOTH_EDGE_NOTE, BOSS_WALL_NOTE, TURNED_BAND_FITUP_NOTE))
 # The MHA-A03 crank step's T120 check (user, 2026-09-30, #1154), printed by
-# draw_drive_train_assembly: the pinion on its seat feeler, the crank's
-# journal play taken up toward the cone, one T120 turn.  Either fit-up limit
-# passes the feeler at every corner (build_drive_train_assembly asserts it),
-# so the check always closes.
+# draw_drive_train_assembly: the pinion on its seat feeler, MHA-025 and T120
+# pushed toward each other (taking up every running play), one turn.  Either
+# fit-up limit passes the feeler at every corner (build_drive_train_assembly
+# asserts it), so the check always closes.  Its last line is short: the step
+# carries on after it on the same line.
+T120_FITUP_PUSHED = (PINION_NUMBER, "T120")
 # Named exception: MHA-025 turned band (drawing-simplicity-policy.md, "Named exceptions").
 T120_FITUP_ASSEMBLY_CHECK = "\n".join(
     (
-        "   PUSH MHA-026 IN ITS BORE TOWARD MHA-014; ROTATE MHA-021 ONE TURN.",
-        f"   A {T120_FITUP_FEELER_MM:.2f} FEELER MUST PASS "
-        "MHA-025 TURNED BAND TO T120 TIPS, SHOULDER",
-        "   TO T120 SOUTH FACE. IF NOT, TURN THE BAND DOWN, "
-        f"Ø{TURNED_DIA_FITUP_MIN:.{TURNED_DIA_PLACES}f} MIN, OR",
-        "   FACE THE SHOULDER BACK, "
-        f"{SHOULDER_LENGTH_FITUP_MIN:.{SHOULDER_LENGTH_PLACES}f} MIN; "
-        "RESET ON THE FEELER AND RECHECK.",
+        f"   WORST-CASE T120 CLEARANCE: TURNED BAND {T120_TURNED_BAND_RADIAL_WORST:.2f}, "
+        f"SHOULDER {T120_SHOULDER_AIR_WORST:.2f}. PUSH",
+        f"   {T120_FITUP_PUSHED[0]} AND {T120_FITUP_PUSHED[1]} TOWARD EACH OTHER; "
+        f"TURN MHA-021 ONCE. A {T120_FITUP_FEELER_MM:.2f}",
+        "   FEELER MUST PASS BAND TO T120 TIPS, SHOULDER TO T120 SOUTH FACE. IF",
+        "   NOT, TURN BAND DOWN, "
+        f"Ø{TURNED_DIA_FITUP_MIN:.{TURNED_DIA_PLACES}f} MIN, OR FACE SHOULDER BACK, "
+        f"{SHOULDER_LENGTH_FITUP_MIN:.{SHOULDER_LENGTH_PLACES}f} MIN;",
+        "   RESET, RECHECK.",
     )
 )

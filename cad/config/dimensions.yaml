@@ -2137,10 +2137,12 @@ sections:
          so its south face is z −69.960. They run at full OD for the 8.5
          shoulder and are turned to Ø16.21 north of it: with every printed
          band, fit offset and axis pose at its worst the shoulder's axial air
-         to T120 is −0.085 and the turned band's radial −0.116 (a named
-         exception, user 2026-09-30, #1154; +0.12 / +0.11 RSS, +0.313 /
+         to T120 is −0.090 and the turned band's radial −0.116 (a named
+         exception, user 2026-09-30, #1154; +0.12 / +0.11 RSS, +0.311 /
          +0.251 on the nominal axes), so the pair is checked on a 0.10
-         feeler at fit-up; the teeth cover 0.862 of the grown 64T tooth row
+         feeler at fit-up with MHA-025 and T120 pushed together, the band
+         turned down to Ø15.78 MIN (still in 16T:64T contact) if it stops
+         the feeler; the teeth cover 0.862 of the grown 64T tooth row
          with the cone stack floated 0.80 north (>=85% required; stub teeth
          counted).
          Positive worst-case tight backlash, not a backlash window, is the

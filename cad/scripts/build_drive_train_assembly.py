@@ -1716,9 +1716,13 @@ from cone_pivot_post_spec import (  # noqa: E402
 from cone_stack_end_play import STACK_FLOAT  # noqa: E402
 from crank_drive_gear_spec import FACE_WIDTH_BAND as GEAR64_FACE_WIDTH_BAND  # noqa: E402
 from crank_mesh_stack import (  # noqa: E402
+    BASE_PITCH_MM as CRANK_MESH_BASE_PITCH,
     CRANK_BEARING_LENGTH as CRANK_MESH_BEARING_LENGTH,
     CRANK_OVERHANG as CRANK_MESH_OVERHANG,
+    DC_PER_DX as CRANK_MESH_DC_PER_DX,
+    DC_PER_DY as CRANK_MESH_DC_PER_DY,
     MESH_LEVER as CRANK_MESH_LEVER,
+    OPEN_TERMS as CRANK_MESH_OPEN_TERMS,
     PINION_HALF_FACE_MAX as CRANK_MESH_PINION_HALF_FACE_MAX,
     POST_ANGLE_DEG as CRANK_MESH_POST_ANGLE_DEG,
     TOOTH_RUNOUT_TIR_MM as CRANK_MESH_TOOTH_RUNOUT_TIR,
@@ -1732,6 +1736,9 @@ from crank_pinion_spec import (  # noqa: E402
     SHOULDER_LENGTH_FITUP_MIN as PINION_SHOULDER_LENGTH_FITUP_MIN,
     SHOULDER_LENGTH_LIMITS as PINION_SHOULDER_LIMITS,
     T120_FITUP_FEELER_MM as PINION_T120_FITUP_FEELER,
+    T120_FITUP_PUSHED as PINION_T120_FITUP_PUSHED,
+    T120_SHOULDER_AIR_WORST as T120_SHOULDER_AIR_STATED_WORST,
+    T120_TURNED_BAND_RADIAL_WORST as T120_TURNED_BAND_RADIAL_STATED_WORST,
     TURNED_DIA as PINION_TURNED_DIA,
     TURNED_DIA_FITUP_MIN as PINION_TURNED_DIA_FITUP_MIN,
     TURNED_DIA_TOLERANCE_MM as PINION_TURNED_DIA_TOLERANCE,
@@ -1752,12 +1759,13 @@ _PINION_TIP_RADIUS_BAND = tuple(
         (-PINION_OUTSIDE_DIA_TOLERANCE, PINION_OUTSIDE_DIA_TOLERANCE),
     )
 )
-# Only the turned band's largest radius can close on T120.
-_PINION_TURNED_RADIUS_UP = printed_deviations(
+_PINION_TURNED_DIA_BAND = printed_deviations(
     PINION_TURNED_DIA,
     PINION_DRAWING_PRECISION["TurnedDia"],
     (-PINION_TURNED_DIA_TOLERANCE, PINION_TURNED_DIA_TOLERANCE),
-)[1] / 2.0
+)
+# Only the turned band's largest radius can close on T120.
+_PINION_TURNED_RADIUS_UP = _PINION_TURNED_DIA_BAND[1] / 2.0
 _BOSS_NORTH_BAND = printed_deviations(
     POST_CRANK_BOSS_NORTH_FACE, POST_DRAWING_PRECISION["CrankBossStartZ"]
 )
@@ -1778,13 +1786,13 @@ _CRANK_HEIGHT_BAND = printed_deviations(
 PINION_END_PLAY = (-PINION_SEAT_FEELER, 0.0)
 # The cone stack's in-service float north of its model pose, along its axis.
 CONE_FLOAT_NORTH = SHAFT_END_PLAY[1] + STACK_FLOAT[1]
+_CONE_FLOATS = (0.0, CONE_FLOAT_NORTH / 2.0, CONE_FLOAT_NORTH)
 
 _TIP120 = _cone_tip_radius_max(120)
-# T120 as sampled solid: its tip cylinder over the face and rings over the
-# outer 3 mm of both faces, 0.05 deg and 0.05 mm apart, kept within reach of
-# the 16T (tip radius 8.74).
+# T120 as a solid: its tip cylinder from its south face to its north face,
+# the teeth and web inside it counted as metal.  The 16T (tip radius 8.74)
+# reaches no further than _T120_REACH from its axis.
 _T120_REACH = 10.0
-_T120_FACE_DEPTH = 3.0
 # T120's own face band past its south face; _cone_corners already moves the
 # south face by the 64T's band, so the stack's face_band would count it twice.
 _T120_NORTH_BAND = CONE_GEAR_FACE_WIDTH_BAND  # (upper, lower)
@@ -1859,69 +1867,110 @@ T120_POSE_RADIAL = sum(radial for radial, _ in T120_POSE_TERMS.values())
 T120_POSE_AXIAL = sum(axial for _, axial in T120_POSE_TERMS.values())
 
 
-def _t120_rings(
-    stations: np.ndarray, rhos: np.ndarray, dy: float, theta: np.ndarray
+# T120 in the cone plane: horizontal p = x - x0 and vertical w = z - z0 from
+# the cone axis's station 0 (cone_station runs (sin I, 0, cos I) per station),
+# b = y - Y_DRIVE across it.  A point is in T120 when its station
+# p sin I + w cos I lies between T120's faces and its offset a = p cos I -
+# w sin I from the axis satisfies a^2 + b^2 <= tip^2: a convex solid, as is
+# the 16T's reach (a vertical cylinder about the crank axis).  So both checks
+# are convex minimisations; each reduces in closed form to one variable, p,
+# minimised by golden section to far below any printed place.  Codex P1 on
+# #1154: a 0.05-deg sampling of T120's rim missed the lowest point between
+# its samples by 0.005.
+_T120_ORIGIN = cone_station(0.0)
+_T120_CRANK_P = X_CRANK - _T120_ORIGIN[0]
+_GOLDEN = (math.sqrt(5.0) - 1.0) / 2.0
+# Weight on leaving T120 or the window: steeper than any slope of either
+# objective in p, so the minimum never sits outside.
+_T120_OUTSIDE_WEIGHT = 100.0
+
+
+def _golden_min(f, lo: np.ndarray, hi: np.ndarray) -> np.ndarray:
+    """Minimum of each convex ``f`` over [``lo``, ``hi``], element-wise: 60
+    golden-section steps shrink the bracket to 3e-13 of its width."""
+    x1, x2 = hi - _GOLDEN * (hi - lo), lo + _GOLDEN * (hi - lo)
+    f1, f2 = f(x1), f(x2)
+    for _ in range(60):
+        left = f1 <= f2
+        lo, hi = np.where(left, lo, x1), np.where(left, x2, hi)
+        kept_x, kept_f = np.where(left, x1, x2), np.where(left, f1, f2)
+        new = np.where(left, hi - _GOLDEN * (hi - lo), lo + _GOLDEN * (hi - lo))
+        f_new = f(new)
+        x1, f1 = np.where(left, new, kept_x), np.where(left, f_new, kept_f)
+        x2, f2 = np.where(left, kept_x, new), np.where(left, kept_f, f_new)
+    return np.minimum(f1, f2)
+
+
+def _t120_lowest(south: np.ndarray, dy: np.ndarray, reach: float) -> np.ndarray:
+    """T120's lowest machine z within ``reach`` of the crank axis, per corner:
+    T120's south face at station ``south``, the crank ``dy`` above its model
+    height; inf where T120 is out of reach."""
+    north = south + CONE_FACE + _T120_NORTH_BAND[0]
+    above = Y_CRANK + dy - Y_DRIVE
+
+    def lowest(p: np.ndarray) -> np.ndarray:
+        # Across the reach at p, the b nearest the cone axis leaves T120 the
+        # widest offset q, which lowers its underside and widens its span.
+        half = np.sqrt(np.maximum(reach**2 - (p - _T120_CRANK_P) ** 2, 0.0))
+        b = np.clip(0.0, above - half, above + half)
+        q = np.sqrt(np.maximum(_TIP120**2 - b**2, 0.0))
+        low = np.maximum((south - p * SIN_I) / COS_I, (p * COS_I - q) / SIN_I)
+        high = np.minimum((north - p * SIN_I) / COS_I, (p * COS_I + q) / SIN_I)
+        outside = np.maximum(low - high, 0.0) + np.maximum(np.abs(b) - _TIP120, 0.0)
+        return low + _T120_OUTSIDE_WEIGHT * outside
+
+    centre = np.full_like(south, _T120_CRANK_P)
+    w = _golden_min(lowest, centre - reach, centre + reach)
+    return np.where(np.abs(above) - _TIP120 > reach, np.inf, _T120_ORIGIN[2] + w)
+
+
+def _t120_nearest(
+    south: np.ndarray, dy: np.ndarray, z_low: float, z_high: float
+) -> np.ndarray:
+    """T120's least distance from the crank axis between machine z ``z_low``
+    and ``z_high``, per corner (``south`` and ``dy`` as _t120_lowest)."""
+    north = south + CONE_FACE + _T120_NORTH_BAND[0]
+    above = np.abs(Y_CRANK + dy - Y_DRIVE)
+    w_low, w_high = z_low - _T120_ORIGIN[2], z_high - _T120_ORIGIN[2]
+
+    def distance(p: np.ndarray) -> np.ndarray:
+        # T120's span in w at p, and its offset from the axis nearest zero
+        # over that span: T120 reaches |b| up to q there.
+        low = np.maximum(w_low, (south - p * SIN_I) / COS_I)
+        high = np.minimum(w_high, (north - p * SIN_I) / COS_I)
+        a = np.maximum(
+            np.maximum(p * COS_I - high * SIN_I, low * SIN_I - p * COS_I), 0.0
+        )
+        q = np.sqrt(np.maximum(_TIP120**2 - a**2, 0.0))
+        outside = np.maximum(low - high, 0.0) + np.maximum(a - _TIP120, 0.0)
+        return (
+            np.hypot(p - _T120_CRANK_P, np.maximum(above - q, 0.0))
+            + _T120_OUTSIDE_WEIGHT * outside
+        )
+
+    centre = np.full_like(south, _T120_CRANK_P)
+    return _golden_min(distance, centre - _T120_REACH, centre + _T120_REACH)
+
+
+def _cone_corners(
+    cone_floats: tuple[float, ...], crank_heights: tuple[float, ...]
 ) -> tuple[np.ndarray, np.ndarray]:
-    """(r to the crank axis, machine z) of T120's rings, radius ``rhos[k]`` at
-    ``stations[k]``, the crank axis ``dy`` above its model height."""
-    centres = np.array([cone_station(float(station)) for station in stations])
-    radial = rhos[:, None] * np.cos(theta)[None, :]
-    x = centres[:, 0, None] + radial * COS_I
-    y = Y_DRIVE + rhos[:, None] * np.sin(theta)[None, :]
-    return (
-        np.hypot(x - X_CRANK, y - (Y_CRANK + dy)).ravel(),
-        (centres[:, 2, None] - radial * SIN_I).ravel(),
-    )
-
-
-_T120_ALL_THETA = np.radians(np.arange(0.0, 360.0, 0.05))
-_T120_THETA = _T120_ALL_THETA[
-    _t120_rings(np.array([_T120_SOUTH_FACE_STATION]), np.array([_TIP120]), 0.0, _T120_ALL_THETA)[0]
-    < _T120_REACH + 3.0
-]
-_T120_FACE_RHOS = np.arange(_TIP120 - _T120_FACE_DEPTH, _TIP120 + 1e-9, 0.05)
-# The face rings reach deep enough: T120's face inside them is out of reach.
-if _t120_rings(
-    np.array([_T120_SOUTH_FACE_STATION]), _T120_FACE_RHOS[:1], 0.0, _T120_THETA
-)[0].min() <= _T120_REACH:
-    raise AssertionError("the T120 face sampling stops inside the 16T's reach")
-_T120_CLOUDS: dict[tuple[float, float], tuple[np.ndarray, np.ndarray]] = {}
-
-
-def _t120_cloud(shift: float, dy: float) -> tuple[np.ndarray, np.ndarray]:
-    """T120's sampled points within reach, (r, z) sorted by z, the cone stack
-    moved ``shift`` north along its axis."""
-    key = (round(shift, 9), round(dy, 9))
-    if key not in _T120_CLOUDS:
-        south = _T120_SOUTH_FACE_STATION + shift
-        north = south + CONE_FACE
-        tip_stations = np.linspace(south, north + _T120_NORTH_BAND[0], 161)
-        face_stations = np.repeat(
-            [south, north + _T120_NORTH_BAND[1], north + _T120_NORTH_BAND[0]], _T120_FACE_RHOS.size
-        )
-        r, z = _t120_rings(
-            np.concatenate((tip_stations, face_stations)),
-            np.concatenate((np.full(tip_stations.size, _TIP120), np.tile(_T120_FACE_RHOS, 3))),
-            dy,
-            _T120_THETA,
-        )
-        keep = r < _T120_REACH
-        order = np.argsort(z[keep])
-        _T120_CLOUDS[key] = (r[keep][order], z[keep][order])
-    return _T120_CLOUDS[key]
-
-
-def _cone_corners() -> list[tuple[float, float]]:
     """(T120's shift north along the cone axis, crank height) per corner: the
     post's cone boss and the collar the 64T stands on, the 64T's face under
     T120, and the stack's float."""
-    floats = (0.0, CONE_FLOAT_NORTH / 2.0, CONE_FLOAT_NORTH)
-    return [
-        (b2 + b3 + b4 + f, dy)
-        for b2, b3, b4, f, dy in itertools.product(
-            _CONE_BOSS_NORTH_BAND, _COLLAR_WIDTH_BAND, _GEAR64_FACE_LIMITS, floats, _CRANK_HEIGHT_BAND
-        )
-    ]
+    corners = np.array(
+        [
+            (b2 + b3 + b4 + f, dy)
+            for b2, b3, b4, f, dy in itertools.product(
+                _CONE_BOSS_NORTH_BAND,
+                _COLLAR_WIDTH_BAND,
+                _GEAR64_FACE_LIMITS,
+                cone_floats,
+                crank_heights,
+            )
+        ]
+    )
+    return corners[:, 0], corners[:, 1]
 
 
 def pinion_t120_clearances(
@@ -1931,6 +1980,9 @@ def pinion_t120_clearances(
     face: float = PINION_FACE,
     pose_radial: float = T120_POSE_RADIAL,
     pose_axial: float = T120_POSE_AXIAL,
+    end_plays: tuple[float, ...] = PINION_END_PLAY,
+    cone_floats: tuple[float, ...] = _CONE_FLOATS,
+    crank_heights: tuple[float, ...] = _CRANK_HEIGHT_BAND,
 ) -> dict[str, float]:
     """Worst 16T-to-T120 clearances over every printed corner.
 
@@ -1941,33 +1993,47 @@ def pinion_t120_clearances(
     upper limit.  ``shoulder_length`` None models teeth at full OD to their
     end (no turned band).  Every T120 point may also close on the 16T by
     ``pose_radial`` toward the crank axis and ``pose_axial`` along it (the
-    fit offsets and axis poses, T120_POSE_TERMS).
+    fit offsets and axis poses, T120_POSE_TERMS).  The crank's end play, the
+    stack's float and the crank height range over ``end_plays``,
+    ``cone_floats`` and ``crank_heights``.
     """
-    air = radial = math.inf
     # The largest tip and turned radii close on T120 first.
     tip_r = R16 + ADD16 + max(_PINION_TIP_RADIUS_BAND)
     turned_r = turned_dia / 2.0 + _PINION_TURNED_RADIUS_UP
-    for shift, dy in _cone_corners():
-        r, z = _t120_cloud(shift, dy)
-        lowest_inside = (
-            float(z[r <= tip_r + pose_radial].min(initial=math.inf)) - pose_axial
+    shoulders, ends = [], []
+    for b1, play, d_face in itertools.product(
+        _BOSS_NORTH_BAND, end_plays, _PINION_FACE_BAND
+    ):
+        south = _POST_BOSS_NORTH + b1 + PINION_SEAT_FEELER + play
+        end = south + face + d_face
+        ends.append(end)
+        if shoulder_length is None:
+            shoulders.append(end)
+        else:
+            shoulders.extend(
+                min(south + shoulder_length + d_shoulder, end)
+                for d_shoulder in _PINION_SHOULDER_BAND
+            )
+    shift, dy = _cone_corners(cone_floats, crank_heights)
+    t120_south = _T120_SOUTH_FACE_STATION + shift
+    air = (
+        float(_t120_lowest(t120_south, dy, tip_r + pose_radial).min())
+        - pose_axial
+        - max(shoulders)
+    )
+    if shoulder_length is None:
+        return {"shoulder air": air, "turned band radial": math.inf}
+    # The band's axial windows all overlap, so their union is one window.
+    nearest = float(
+        _t120_nearest(
+            t120_south, dy, min(shoulders) - pose_axial, max(ends) + pose_axial
+        ).min()
+    )
+    if nearest >= _T120_REACH:
+        raise AssertionError(
+            "T120's nearest point to the turned band lies beyond the searched reach"
         )
-        for b1, play, d_face in itertools.product(
-            _BOSS_NORTH_BAND, PINION_END_PLAY, _PINION_FACE_BAND
-        ):
-            south = _POST_BOSS_NORTH + b1 + PINION_SEAT_FEELER + play
-            end = south + face + d_face
-            if shoulder_length is None:
-                air = min(air, lowest_inside - end)
-                continue
-            for d_shoulder in _PINION_SHOULDER_BAND:
-                shoulder = min(south + shoulder_length + d_shoulder, end)
-                air = min(air, lowest_inside - shoulder)
-                lo = int(np.searchsorted(z, shoulder - pose_axial, side="left"))
-                hi = int(np.searchsorted(z, end + pose_axial, side="right"))
-                if hi > lo:
-                    radial = min(radial, float(r[lo:hi].min()) - pose_radial - turned_r)
-    return {"shoulder air": air, "turned band radial": radial}
+    return {"shoulder air": air, "turned band radial": nearest - pose_radial - turned_r}
 
 
 PINION_T120_CLEARANCES = pinion_t120_clearances()
@@ -1993,28 +2059,78 @@ if PINION_T120_CONCENTRIC["turned band radial"] < T120_TURNED_BAND_RADIAL_FLOOR:
 # MHA-025 turned band and shoulder row; user, 2026-09-30, #1154).  With every
 # fit offset and axis pose summed at its worst (T120_POSE_TERMS) the shoulder
 # air and the band's radial clearance fall under their floors, so the pair is
-# feeler-checked at fit-up (draw_drive_train_assembly).  The row states these
-# figures; a change that takes either past what it states fails here.
-T120_SHOULDER_AIR_STATED_WORST = -0.09
-T120_TURNED_BAND_RADIAL_STATED_WORST = -0.12
-if T120_SHOULDER_AIR < T120_SHOULDER_AIR_STATED_WORST:
-    raise AssertionError(
-        f"16T full-OD shoulder air to T120 {T120_SHOULDER_AIR:.3f} mm at the worst fit "
-        f"offsets and poses, past the stated {T120_SHOULDER_AIR_STATED_WORST:.2f}"
+# feeler-checked at fit-up (draw_drive_train_assembly).  Both sheets and the
+# row state these figures rounded down to 0.01 (crank_pinion_spec); a change
+# that moves either off what they state fails here.
+for _name, _worst, _stated in (
+    ("shoulder air", T120_SHOULDER_AIR, T120_SHOULDER_AIR_STATED_WORST),
+    (
+        "turned band radial",
+        T120_TURNED_BAND_RADIAL,
+        T120_TURNED_BAND_RADIAL_STATED_WORST,
+    ),
+):
+    if not math.isclose(math.floor(_worst * 100.0) / 100.0, _stated):
+        raise AssertionError(
+            f"16T {_name} to T120 is {_worst:.4f} mm at the worst fit offsets and poses; "
+            f"the sheets state {_stated:.2f} (state it rounded down to 0.01)"
+        )
+
+# The fit-up check (crank_pinion_spec.T120_FITUP_ASSEMBLY_CHECK) reads the
+# pair with the 16T on its seat feeler (its end play's north end) and the
+# stack resting at its model pose, MHA-025 and T120 pushed toward each other.
+# Each running play that can still move after the check is taken up by one of
+# those pushes: MHA-025 takes up its own bore and MHA-026's journal, T120 the
+# cone shaft in the post boss.  The rest of T120_POSE_TERMS are fixed once
+# assembled, and the check's full turn sweeps them.  Codex P2 on #1154: a
+# check that pushed only MHA-026 passed a Ø16.043 band that then closed to
+# 0.018 when the cone shaft moved.
+T120_RUNNING_PLAY = {
+    "crank journal float": "MHA-025",
+    "16T bore on the crankshaft": "MHA-025",
+    "cone shaft float in the post boss": "T120",
+}
+
+
+def t120_fitup_reading(
+    *, pushed: tuple[str, ...] = PINION_T120_FITUP_PUSHED, **geometry
+) -> dict[str, float]:
+    """The least the fit-up feeler can read at the check's pose: every fixed
+    offset and pose at its worst, the running play of each part in
+    ``pushed`` taken up toward T120 and the rest left centred."""
+    left = [
+        T120_POSE_TERMS[name]
+        for name, part in T120_RUNNING_PLAY.items()
+        if part not in pushed
+    ]
+    return pinion_t120_clearances(
+        pose_radial=T120_POSE_RADIAL - sum(radial for radial, _ in left),
+        pose_axial=T120_POSE_AXIAL - sum(axial for _, axial in left),
+        end_plays=(max(PINION_END_PLAY),),
+        cone_floats=(0.0,),
+        **geometry,
     )
-if T120_TURNED_BAND_RADIAL < T120_TURNED_BAND_RADIAL_STATED_WORST:
-    raise AssertionError(
-        f"16T turned band radial clearance to T120 {T120_TURNED_BAND_RADIAL:.3f} mm at the "
-        f"worst fit offsets and poses, past the stated {T120_TURNED_BAND_RADIAL_STATED_WORST:.2f}"
-    )
+
+
+if not set(T120_RUNNING_PLAY.values()) <= set(PINION_T120_FITUP_PUSHED):
+    raise AssertionError("the T120 fit-up check leaves running play unpushed")
+# So what the check reads is the pair's worst in service: a band or shoulder
+# that passes the feeler keeps that clearance however the plays then move.
+T120_FITUP_READING = t120_fitup_reading()
+for _name, _reading in T120_FITUP_READING.items():
+    if _reading > PINION_T120_CLEARANCES[_name] + 1e-9:
+        raise AssertionError(
+            f"the T120 fit-up check reads {_name} {_reading:.4f}, more than its service "
+            f"worst {PINION_T120_CLEARANCES[_name]:.4f}: its pose is not the closing one"
+        )
 # The fit-up can always close: a band turned down to its fit-up minimum, or a
 # shoulder faced back to its short limit, passes the fit-up feeler at every
 # corner of the same stack.  The minimum is an actual size, not a toleranced one.
 T120_FITUP_LIMIT_CLEARANCES = {
-    "turned band radial": pinion_t120_clearances(
+    "turned band radial": t120_fitup_reading(
         turned_dia=PINION_TURNED_DIA_FITUP_MIN - 2.0 * _PINION_TURNED_RADIUS_UP
     )["turned band radial"],
-    "shoulder air": pinion_t120_clearances(
+    "shoulder air": t120_fitup_reading(
         shoulder_length=PINION_SHOULDER_LENGTH_FITUP_MIN
     )["shoulder air"],
 }
@@ -2025,12 +2141,98 @@ for _name, _clearance in T120_FITUP_LIMIT_CLEARANCES.items():
             f"{PINION_T120_FITUP_FEELER:.2f} fit-up feeler"
         )
 
+# ... and a band turned down must still mesh.  Codex P1 on #1154: at Ø15.48
+# and the open centre distance the band's contact path is -0.63, no contact.
+# The band is turned only where the check stops the feeler on it, and the
+# check reads the pair's worst, so only a crank no higher than
+# T120_BAND_CHECK_CRANK_HEIGHT above its model height is ever turned down
+# (every other term taken at its closing worst there: a superset).  A lower
+# crank also closes the 16T:64T centres, so the floor need keep contact only
+# up to that height, every other open-corner term open (worst to worst only
+# on the terms the two checks do not share).
+
+
+def crank_band_contact_path(turned_dia: float, crank_height: float) -> float:
+    """16T:64T contact path (mm) on the turned band at the 16T's north end:
+    the band ``turned_dia`` less its runout to the bore, the 64T tip at its
+    printed lower limit, the crank ``crank_height`` above its model height,
+    and every other crank_mesh_stack open-corner term open, their tilts
+    carried on out to the band's end."""
+    to_end = _BAND_END_PAST_MESH
+    centre = (
+        CRANK_ACTUAL_C2C
+        + CRANK_MESH_OPEN_CENTRE_DISTANCE
+        - CRANK_MESH_OPEN_TERMS["crank bore spacing"]
+        + crank_height * CRANK_MESH_DC_PER_DY
+        + to_end * (_CRANK_TILT + _CONE_TILT / COS_I) * CRANK_MESH_DC_PER_DY
+        + to_end * _POST_ANGLE * (1.0 + CRANK_MESH_DC_PER_DX / COS_I)
+    )
+    return (
+        crank_mesh_contact_ratio(
+            centre_distance=centre,
+            tip_dia_16=turned_dia - CRANK_MESH_TOOTH_RUNOUT_TIR,
+            tip_dia_64=_GEAR64_TIP_DIA_LOW,
+        )
+        * CRANK_MESH_BASE_PITCH
+    )
+
+
+if not math.isclose(
+    CRANK_MESH_OPEN_TERMS["crank bore spacing"],
+    max(_CRANK_HEIGHT_BAND) * CRANK_MESH_DC_PER_DY,
+):
+    raise AssertionError(
+        "the mesh's open crank height is not the crank-height band's top"
+    )
+
+
+def _band_check_crank_height() -> float:
+    """Highest crank height at which the fit-up check can stop the feeler on
+    the band at its printed upper limit (the reading grows as the crank
+    rises)."""
+
+    def reads(height: float) -> float:
+        return t120_fitup_reading(crank_heights=(height,))["turned band radial"]
+
+    low, high = _CRANK_HEIGHT_BAND
+    if reads(high) < PINION_T120_FITUP_FEELER:
+        return high
+    for _ in range(50):
+        middle = (low + high) / 2.0
+        low, high = (
+            (middle, high)
+            if reads(middle) < PINION_T120_FITUP_FEELER
+            else (low, middle)
+        )
+    return high
+
+
+T120_BAND_CHECK_CRANK_HEIGHT = _band_check_crank_height()
+
+
+def crank_band_contact_paths(turned_dia_fitup_min: float) -> dict[str, float]:
+    """The turned band's least contact path: as printed (its lower limit) at
+    any crank height, and turned down to ``turned_dia_fitup_min`` wherever
+    the fit-up check can call for it."""
+    return {
+        "printed": crank_band_contact_path(
+            PINION_TURNED_DIA + _PINION_TURNED_DIA_BAND[0], max(_CRANK_HEIGHT_BAND)
+        ),
+        "fit-up floor": crank_band_contact_path(
+            turned_dia_fitup_min, T120_BAND_CHECK_CRANK_HEIGHT
+        ),
+    }
+
+
+CRANK_BAND_CONTACT_PATHS = crank_band_contact_paths(PINION_TURNED_DIA_FITUP_MIN)
+
 # ... and the teeth must still cover the 64T row (>= 85% of its face) at
 # every corner -- an engagement floor so a future station edit cannot quietly
 # starve the mesh.  The row counts the turned stub teeth north of the
 # shoulder (reading (ii), which this face-extent check has always implied;
 # user ruling 2026-09-30): they are the 16T's own teeth, cut full depth and
-# turned to a shorter addendum.  The full-depth share alone (reading (i)) is
+# turned to a shorter addendum, and count only while that band keeps contact
+# (crank_band_contact_paths).  The full-depth share alone (reading (i)) is
 # reported, not gated.
 _G64_BAND = (
     _GEAR64_CONTACT_Z - GEAR64_FACE / 2.0 * COS_I,
@@ -2066,10 +2268,24 @@ def crank_row_engagement(
     return worst
 
 
-CRANK_ROW_ENGAGEMENT_FRACTION = crank_row_engagement(PINION_FACE, _PINION_FACE_BAND, CONE_FLOAT_NORTH)
-CRANK_ROW_ENGAGEMENT_UNFLOATED = crank_row_engagement(PINION_FACE, _PINION_FACE_BAND, 0.0)
+def crank_row_teeth(turned_dia_fitup_min: float) -> tuple[float, tuple[float, float]]:
+    """The 16T tooth length (and its printed deviations) the 64T row may
+    count: the whole toothed length while the turned band keeps contact
+    (crank_band_contact_paths), else the full-OD shoulder alone."""
+    if min(crank_band_contact_paths(turned_dia_fitup_min).values()) > 0.0:
+        return PINION_FACE, _PINION_FACE_BAND
+    return PINION_SHOULDER_LENGTH, _PINION_SHOULDER_BAND
+
+
+_CRANK_ROW_TEETH = crank_row_teeth(PINION_TURNED_DIA_FITUP_MIN)
+CRANK_ROW_ENGAGEMENT_FRACTION = crank_row_engagement(
+    *_CRANK_ROW_TEETH, CONE_FLOAT_NORTH
+)
+CRANK_ROW_ENGAGEMENT_UNFLOATED = crank_row_engagement(*_CRANK_ROW_TEETH, 0.0)
 CRANK_ROW_FULL_DEPTH_FRACTION = min(
-    crank_row_engagement(PINION_SHOULDER_LENGTH, _PINION_SHOULDER_BAND, CONE_FLOAT_NORTH),
+    crank_row_engagement(
+        PINION_SHOULDER_LENGTH, _PINION_SHOULDER_BAND, CONE_FLOAT_NORTH
+    ),
     CRANK_ROW_ENGAGEMENT_FRACTION,
 )
 if CRANK_ROW_ENGAGEMENT_FRACTION < CRANK_ROW_ENGAGEMENT_FLOOR:
@@ -4099,12 +4315,16 @@ async def build(adapter) -> dict[str, str]:
         f"{T120_PINION_AIR_FLOOR:.2f} mm, turned band radial "
         f"{PINION_T120_CONCENTRIC['turned band radial']:.4f} >= "
         f"{T120_TURNED_BAND_RADIAL_FLOOR:.2f} mm on the nominal axes; at the worst fit "
-        f"offsets and poses {T120_SHOULDER_AIR:.4f} >= {T120_SHOULDER_AIR_STATED_WORST:.2f} "
-        f"and {T120_TURNED_BAND_RADIAL:.4f} >= {T120_TURNED_BAND_RADIAL_STATED_WORST:.2f} mm "
-        f"(checked at fit-up on a {PINION_T120_FITUP_FEELER:.2f} feeler)"
+        f"offsets and poses {T120_SHOULDER_AIR:.4f} (stated {T120_SHOULDER_AIR_STATED_WORST:.2f}) "
+        f"and {T120_TURNED_BAND_RADIAL:.4f} (stated {T120_TURNED_BAND_RADIAL_STATED_WORST:.2f}) mm, "
+        f"checked at fit-up on a {PINION_T120_FITUP_FEELER:.2f} feeler; band turned down to "
+        f"{PINION_TURNED_DIA_FITUP_MIN:.2f} keeps contact path "
+        f"{CRANK_BAND_CONTACT_PATHS['fit-up floor']:.4f} mm at crank height "
+        f"{T120_BAND_CHECK_CRANK_HEIGHT:.4f}, printed band {CRANK_BAND_CONTACT_PATHS['printed']:.4f}"
     )
     _telemetry.info(
-        f"16T/64T row engagement (stub teeth counted) {CRANK_ROW_ENGAGEMENT_UNFLOATED:.2%} "
+        f"16T/64T row engagement (stub teeth counted while in contact) "
+        f"{CRANK_ROW_ENGAGEMENT_UNFLOATED:.2%} "
         f"unfloated, {CRANK_ROW_ENGAGEMENT_FRACTION:.2%} with the cone stack floated "
         f"{CONE_FLOAT_NORTH:.2f} >= {CRANK_ROW_ENGAGEMENT_FLOOR:.0%}; full depth only "
         f"{CRANK_ROW_FULL_DEPTH_FRACTION:.2%}"

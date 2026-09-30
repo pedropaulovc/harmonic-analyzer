@@ -81,6 +81,9 @@ NOT_FIT_BANDS: dict[tuple[str, str], str] = {
     ("build_drive_train_assembly", "_PINION_TIP_RADIUS_BAND"): (
         "16T tip-radius print-worst deviations (T120 air corners)"
     ),
+    ("build_drive_train_assembly", "_PINION_TURNED_DIA_BAND"): (
+        "16T turned-band diameter print-worst deviations (T120 radial and band contact corners)"
+    ),
     ("build_drive_train_assembly", "_BOSS_NORTH_BAND"): (
         "post crank-boss north face print-worst deviations (16T station corners)"
     ),
