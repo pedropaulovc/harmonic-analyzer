@@ -9,16 +9,15 @@ part, three configurations (T12/T18/T24). Every number is
 Tooth form (spec docstring): the ANSI B29.1 (ACA) #25 standard form -- the
 ``SEAT_CURVE_R`` seating arc centred on the pitch circle, the
 ``WORKING_CURVE_R`` working arc, the straight yz and the topping arc out to
-the turned outside diameter. One tooth gap is four equation curves (the
-whole in-disc profile as one tangent-continuous curve, closed outside the
-blank by two rays and an arc) referencing equation-manager globals, cut,
-then circularly patterned.
+the turned outside diameter. One tooth gap is one sketch of native arcs and
+lines (the in-disc profile, its six joins tangent, closed outside the blank
+by two lines to an apex), every dimension driven by an equation-manager
+global, cut, then circularly patterned.
 ``ToothCount`` is the only configuration-specific global; pitch/outside
-radius, the ACA angles A and B, the working and topping centres, the
-topping radius F and the OD corner are all equations of it (the
-manager-side mirror of ``spec.gap_geometry``, each round-tripped against it
-at T24), so every configuration re-solves its own gap and each
-configuration's volume is checked against ``spec.part_volume``.
+radius, the ACA angles A and B and the topping radius F are all equations of
+it (each round-tripped against ``spec.gap_geometry`` at T24), so every
+configuration re-solves its own gap and each configuration's volume is
+checked against ``spec.part_volume``.
 
 Config-independent mounting interface, cut after the tooth pattern: bore
 ``BORE_DIA`` and two ``PIN_HOLE_DIA`` drive-pin holes on ``PIN_CIRCLE_RADIUS``
@@ -95,11 +94,9 @@ from transgear_removable_notes import DRAWING_NOTES, GEAR_DATA
 # mm length knobs use _common's 3-arg upsert.
 from _common import set_global as set_global_mm
 from involute_gear import (
-    PI_LIT,
     pattern_count_dimension,
     read_dimension,
     set_global,
-    set_global_read,
 )
 
 PART_NAME = "transgear-removable"
@@ -119,12 +116,6 @@ PIN_HOLE_CENTRES = tuple(
 )
 if any(abs(x) > 1e-9 for x, _y in PIN_HOLE_CENTRES):
     raise AssertionError("drive-pin holes must sit on local +/-Y")
-# The equation manager writes atan2 as a plain atn(vy / vx): valid only while
-# vx > 0, for b's bearing about the axis and the corner's about b.
-for _name, _teeth in spec.CONFIGS:
-    _g = spec.gap_geometry(_teeth)
-    if _g["topping_cx"] <= 0.0 or _g["corner_x"] <= _g["topping_cx"]:
-        raise AssertionError(f"{_name}: topping-curve bearings leave atn's half-plane")
 
 
 _TOL_BILAT = 2  # swTolType_e.swTolBILAT
@@ -200,11 +191,12 @@ def log_gap_state(
 ) -> None:
     """Log what regenerated in ``configuration`` ahead of its volume check.
 
-    The gap sketch's solve status and the radial span of its points (the loop
-    corners sit on Ra and ``RClear`` = 2 Ra, so a sketch left at another
-    configuration's gap shows there), and each gap feature's
-    ``GetErrorCode2`` (swFeatureError_e, 0 = clean). Read-only: an unreadable
-    state is logged, never raised -- the volume check stays the gate.
+    The gap sketch's solve status and the radial span of its points off the
+    origin (from the seat's x points out to the apex at ``RClear`` = 2 Ra, so
+    a sketch left at another configuration's gap shows there), and each gap
+    feature's ``GetErrorCode2`` (swFeatureError_e, 0 = clean). Read-only: an
+    unreadable state is logged, never raised -- the volume check stays the
+    gate.
     """
     fields: dict[str, str] = {}
     try:
@@ -214,11 +206,15 @@ def log_gap_state(
         status = int(sketch.GetConstrainedStatus())
         fields["gap_sketch_status"] = _SKETCH_STATUS.get(status, str(status))
         radii = [
-            math.hypot(float(point.X), float(point.Y)) * 1000.0
-            for point in (
-                _early_bound(raw, "ISketchPoint")
-                for raw in sketch.GetSketchPoints2() or ()
+            radius
+            for radius in (
+                math.hypot(float(point.X), float(point.Y)) * 1000.0
+                for point in (
+                    _early_bound(raw, "ISketchPoint")
+                    for raw in sketch.GetSketchPoints2() or ()
+                )
             )
+            if radius > 1e-6
         ]
         if radii:
             fields["gap_sketch_r_mm"] = f"{min(radii):.2f}..{max(radii):.2f}"
@@ -234,41 +230,16 @@ def log_gap_state(
     _telemetry.info(f"{configuration}: {summary}", **fields)
 
 
-def gap_globals(atn_rad: str, teeth: int) -> list[tuple[str, str, float]]:
+def gap_globals(teeth: int) -> list[tuple[str, str, float]]:
     """Equation-manager globals of one tooth gap: ``(name, expression, value)``.
 
-    Lengths are INCHES (the part template is IPS and equation curves evaluate
-    in document units); the manager's direct trig takes DEGREES, so the
-    ``*Deg`` globals feed it, while ``Half``, ``SeatStart``, ``WorkEnd``,
-    ``TopStart``, ``TopEnd``, ``Corner`` and ``Flank`` are RADIANS for the
-    equation curves (whose trig is radian). ``atn_rad`` is the probed ``atn``
-    dialect with its result in radians. ``value`` is the expected evaluation
-    at ``teeth`` from ``spec.gap_geometry`` -- the round trip is the dialect
-    test.
-    The centres are in the gap's own frame (gap centred on +X, upper flank's
-    centres); :func:`gap_curves` turns them onto the seed gap. The ``L*``
-    lengths and ``Break*`` shares lay the in-disc profile's seven pieces end
-    to end by arc length (lower topping arc first, junctions z', y', x', x,
-    y, z), so its one curve runs at one speed.
+    Lengths are INCHES (the part template is IPS) and the manager's trig
+    takes DEGREES. ``value`` is the expected evaluation at ``teeth`` from
+    ``spec.gap_geometry`` -- the round trip is the dialect test.
+    ``ToothCount`` is the only configuration-specific one; :data:`GAP_DIMENSIONS`
+    drive the gap sketch from the rest.
     """
     g = spec.gap_geometry(teeth)
-    top_dist = math.hypot(g["topping_cx"], g["topping_cy"])
-    ra = g["ra"]
-    cos_gamma = (top_dist**2 + ra**2 - g["topping_r"] ** 2) / (2.0 * top_dist * ra)
-    l_top = g["topping_r"] * (g["topping_end"] - g["topping_start"])
-    l_flank = math.hypot(
-        g["flank_end_x"] - g["flank_start_x"], g["flank_end_y"] - g["flank_start_y"]
-    )
-    l_work = g["working_r"] * (g["seat_start"] - g["working_end"])
-    l_seat = g["seat_r"] * (2.0 * math.pi - 2.0 * g["seat_start"])
-    l_profile = 2.0 * (l_top + l_flank + l_work) + l_seat
-    breaks = [l_top, l_top + l_flank, l_top + l_flank + l_work]
-    # The OD corner is b's bearing less the law-of-cosines angle gamma:
-    # atan2 as atn(vy / vx) (vx > 0, asserted at import), acos as pi/2 - asin
-    # and asin through atn.
-    bearing = atn_rad % '"TopCY" / "TopCX"'
-    asin_gamma = atn_rad % '"CosGamma" / sqr(1 - "CosGamma" * "CosGamma")'
-    to_rad = f"* {PI_LIT} / 180"
     return [
         ("ToothCount", str(teeth), float(teeth)),
         ("ChainPitch", repr(spec.CHAIN_PITCH / IN), spec.CHAIN_PITCH / IN),
@@ -285,17 +256,12 @@ def gap_globals(atn_rad: str, teeth: int) -> list[tuple[str, str, float]]:
             spec.TOPPING_CENTRE_OFFSET / IN,
         ),
         ("HalfDeg", '180 / "ToothCount"', math.degrees(g["half_pitch_angle"])),
-        ("Half", f'{PI_LIT} / "ToothCount"', g["half_pitch_angle"]),
         ("Rp", '"ChainPitch" / sin("HalfDeg") / 2', g["rp"] / IN),
         # spec.outside_dia's ANSI p (0.6 + cot(180/N)), halved.
-        ("Ra", '"ChainPitch" * (0.6 + 1 / tan("HalfDeg")) / 2', ra / IN),
+        ("Ra", '"ChainPitch" * (0.6 + 1 / tan("HalfDeg")) / 2', g["ra"] / IN),
         # ACA A = 35 + 60/N and B = 18 - 56/N.
         ("ADeg", '35 + 60 / "ToothCount"', math.degrees(spec.working_angle(teeth))),
         ("BDeg", '18 - 56 / "ToothCount"', math.degrees(spec.working_arc(teeth))),
-        ("SeatStart", f'("ADeg" + 90) {to_rad}', g["seat_start"]),
-        ("WorkEnd", f'("ADeg" - "BDeg" + 90) {to_rad}', g["working_end"]),
-        ("WorkCX", '"Rp" + "WorkOffset" * sin("ADeg")', g["working_cx"] / IN),
-        ("WorkCY", '0 - "WorkOffset" * cos("ADeg")', g["working_cy"] / IN),
         # ACA F = Dr [0.8 cos B + 1.4 cos(17 - 64/N) - 1.3025] - 0.0015 in,
         # written as the tangency it encodes: 17 - 64/N = A - B - 180/N.
         (
@@ -304,200 +270,213 @@ def gap_globals(atn_rad: str, teeth: int) -> list[tuple[str, str, float]]:
             '+ "TopOffset" * cos("ADeg" - "BDeg" - "HalfDeg") - "WorkR"',
             g["topping_r"] / IN,
         ),
-        ("TopCX", '"Rp" - "TopOffset" * sin("HalfDeg")', g["topping_cx"] / IN),
-        ("TopCY", '"TopOffset" * cos("HalfDeg")', g["topping_cy"] / IN),
-        ("TopStart", f'("ADeg" - "BDeg" - 90) {to_rad}', g["topping_start"]),
-        ("TopDist", 'sqr("TopCX" * "TopCX" + "TopCY" * "TopCY")', top_dist / IN),
-        (
-            "CosGamma",
-            '("TopDist" * "TopDist" + "Ra" * "Ra" - "TopR" * "TopR") '
-            '/ (2 * "TopDist" * "Ra")',
-            cos_gamma,
-        ),
-        ("Corner", f"{bearing} - {PI_LIT} / 2 + {asin_gamma}", g["corner_angle"]),
-        ("CornerDeg", f'"Corner" * 180 / {PI_LIT}', math.degrees(g["corner_angle"])),
-        ("CornerX", '"Ra" * cos("CornerDeg")', g["corner_x"] / IN),
-        ("CornerY", '"Ra" * sin("CornerDeg")', g["corner_y"] / IN),
-        (
-            "TopEnd",
-            atn_rad % '("CornerY" - "TopCY") / ("CornerX" - "TopCX")',
-            g["topping_end"],
-        ),
-        ("LTop", '"TopR" * ("TopEnd" - "TopStart")', l_top / IN),
-        # yz is tangent to both arcs, so its length is the centre offset c->b
-        # along the flank direction A - B.
-        (
-            "LFlank",
-            '("TopCX" - "WorkCX") * cos("ADeg" - "BDeg") '
-            '+ ("TopCY" - "WorkCY") * sin("ADeg" - "BDeg")',
-            l_flank / IN,
-        ),
-        # The upper flank's outward direction y -> z (radians, curve trig).
-        (
-            "Flank",
-            f'("ADeg" - "BDeg") {to_rad}',
-            math.atan2(
-                g["flank_end_y"] - g["flank_start_y"],
-                g["flank_end_x"] - g["flank_start_x"],
-            ),
-        ),
-        ("LWork", '"WorkR" * ("SeatStart" - "WorkEnd")', l_work / IN),
-        (
-            "LProfile",
-            '2 * ("LTop" + "LFlank" + "LWork") '
-            f'+ "SeatR" * (2 * {PI_LIT} - 2 * "SeatStart")',
-            l_profile / IN,
-        ),
-        ("BreakZL", '"LTop" / "LProfile"', breaks[0] / l_profile),
-        ("BreakYL", '("LTop" + "LFlank") / "LProfile"', breaks[1] / l_profile),
-        (
-            "BreakXL",
-            '("LTop" + "LFlank" + "LWork") / "LProfile"',
-            breaks[2] / l_profile,
-        ),
-        ("BreakXU", '1 - "BreakXL"', 1.0 - breaks[2] / l_profile),
-        ("BreakYU", '1 - "BreakYL"', 1.0 - breaks[1] / l_profile),
-        ("BreakZU", '1 - "BreakZL"', 1.0 - breaks[0] / l_profile),
         # Clearance radius for closing the cut outside the blank (removes nothing).
-        ("RClear", '2 * "Ra"', 2.0 * ra / IN),
+        ("RClear", '2 * "Ra"', 2.0 * g["ra"] / IN),
     ]
 
 
-def _at(radius: str, angle: str) -> tuple[str, str]:
-    """Polar point (curve dialect: radian trig)."""
-    return f"{radius} * cos({angle})", f"{radius} * sin({angle})"
+Point = tuple[float, float]
 
 
-def _minus(a: tuple[str, str], b: tuple[str, str]) -> tuple[str, str]:
-    return f"({a[0]}) - ({b[0]})", f"({a[1]}) - ({b[1]})"
+def gap_points(teeth: int) -> dict[str, Point]:
+    """The seed gap's named points (mm), centred on angle pi/N off +X.
 
+    ``spec.gap_geometry``'s upper side (``_u``) and its mirror (``_l``),
+    turned onto the seed gap: pocket centre ``a``, working centres ``c``,
+    topping centres ``b``, the seat/working tangency ``x``, the flank's
+    tangencies ``y`` (working) and ``z`` (topping), the OD corner ``k`` and
+    the clearance apex ``q`` at ``RClear`` = 2 Ra on the gap centreline.
+    """
+    g = spec.gap_geometry(teeth)
+    cos_h, sin_h = math.cos(g["half_pitch_angle"]), math.sin(g["half_pitch_angle"])
 
-def _share(start: str, end: str) -> str:
-    """A profile piece's own parameter: t over [start, end] mapped onto
-    [0, 1], held at 0 before and at 1 after -- (|t - start| - |t - end| +
-    end - start) / 2 (end - start). |v| is written sqr(v * v): sqr is in the
-    equation-curve function set, abs is not listed there."""
-    below, above = f"(t - {start})", f"(t - {end})"
-    return (
-        f"((sqr({below} * {below}) - sqr({above} * {above}) + {end} - {start})"
-        f" / (2 * ({end} - {start})))"
+    def seed(x: float, y: float) -> Point:
+        return x * cos_h - y * sin_h, x * sin_h + y * cos_h
+
+    seat = (
+        g["rp"] + g["seat_r"] * math.cos(g["seat_start"]),
+        g["seat_r"] * math.sin(g["seat_start"]),
     )
+    side = {
+        "x": seat,
+        "c": (g["working_cx"], g["working_cy"]),
+        "y": (g["flank_start_x"], g["flank_start_y"]),
+        "z": (g["flank_end_x"], g["flank_end_y"]),
+        "b": (g["topping_cx"], g["topping_cy"]),
+        "k": (g["corner_x"], g["corner_y"]),
+    }
+    points = {
+        "origin": (0.0, 0.0),
+        "a": seed(g["rp"], 0.0),
+        "q": seed(2.0 * g["ra"], 0.0),
+    }
+    for name, (x, y) in side.items():
+        points[f"{name}_u"] = seed(x, y)
+        points[f"{name}_l"] = seed(x, -y)
+    return points
 
 
-def _sweep(start: str, end: str, s: str) -> str:
-    """Angle ``start`` -> ``end`` over s in [0, 1]."""
-    return f"({start} + {s} * ({end} - {start}))"
+# The gap sketch: ``name -> (centre, start, end)`` point names (centre None
+# for a line). Arcs run CCW from start to end. In loop order from the upper
+# seat/working tangency x_u: the seating arc round the bottom, the lower
+# working arc, flank and topping arc out to the OD corner, a clearance line
+# to the apex q and back to the upper corner, the upper topping arc, flank
+# and working arc. ``GAP_AXIS`` is the construction centreline O -> q.
+GAP_AXIS = "GapAxis"
+GAP_ENTITIES: dict[str, tuple[str | None, str, str]] = {
+    GAP_AXIS: (None, "origin", "q"),
+    "Seat": ("a", "x_u", "x_l"),
+    "WorkLower": ("c_l", "x_l", "y_l"),
+    "FlankLower": (None, "y_l", "z_l"),
+    "TopLower": ("b_l", "k_l", "z_l"),
+    "ClearLower": (None, "k_l", "q"),
+    "ClearUpper": (None, "q", "k_u"),
+    "TopUpper": ("b_u", "z_u", "k_u"),
+    "FlankUpper": (None, "z_u", "y_u"),
+    "WorkUpper": ("c_u", "y_u", "x_u"),
+}
 
+# Relations over entity names / ``<entity>.<start|end|center>`` / ``origin``.
+# Shared end points are not related: drawn at identical coordinates with
+# inference off, they merge (the _chain_link obround recipe). With the
+# dimensions below they leave the sketch fully defined (45 entity DOF = 20
+# merged-point + 12 relation + 13 dimension equations). B is not dimensioned:
+# the flank's two tangencies imply it (``TopR`` encodes that tangency).
+GAP_RELATIONS: tuple[tuple[str, str, str], ...] = (
+    ("coincident", f"{GAP_AXIS}.start", "origin"),
+    ("coincident", "Seat.center", GAP_AXIS),
+    ("tangent", "Seat", "WorkUpper"),
+    ("tangent", "Seat", "WorkLower"),
+    ("tangent", "WorkUpper", "FlankUpper"),
+    ("tangent", "WorkLower", "FlankLower"),
+    ("tangent", "FlankUpper", "TopUpper"),
+    ("tangent", "FlankLower", "TopLower"),
+    ("equal", "WorkLower", "WorkUpper"),
+    ("equal", "TopLower", "TopUpper"),
+    # b sits TopOffset from a square to the next pocket: straight below a on
+    # the side whose neighbouring tooth is on +X.
+    ("vertical_points", "Seat.center", "TopLower.center"),
+)
 
-def _arc_move(
-    radius: str, start: str, end: str, s: str, upper: bool
-) -> tuple[str, str]:
-    """How far a point moves on a gap arc of ``radius`` from gap-frame angle
-    ``start`` to ``start + s (end - start)``, on the seed gap's upper or
-    (mirrored) lower side. The arc's centre drops out of the move."""
-    turn = "+" if upper else "-"
-    return _minus(
-        _at(radius, f'("Half" {turn} {_sweep(start, end, s)})'),
-        _at(radius, f'("Half" {turn} {start})'),
-    )
-
-
-# The in-disc profile's pieces in curve order, from the lower OD corner, and
-# the global break at which each ends (the last ends at t = 1).
-PROFILE_PIECES = (
-    ("lower topping arc", '"BreakZL"'),
-    ("lower flank", '"BreakYL"'),
-    ("lower working arc", '"BreakXL"'),
-    ("seating arc", '"BreakXU"'),
-    ("upper working arc", '"BreakYU"'),
-    ("upper flank", '"BreakZU"'),
-    ("upper topping arc", "1"),
+# ``(name, kind, ref, other ref, drive)``, in creation order. Every one is
+# measured from the origin or from the pocket centre a, so a configuration
+# change moves the gap mostly as a whole.
+GAP_DIMENSIONS: tuple[tuple[str, str, str, str | None, str], ...] = (
+    ("GapSeatR", "radial", "Seat", None, '"SeatR"'),
+    ("GapWorkR", "radial", "WorkUpper", None, '"WorkR"'),
+    ("GapTopR", "radial", "TopUpper", None, '"TopR"'),
+    (
+        "GapSeatX",
+        "horizontal_distance",
+        "Seat.center",
+        "origin",
+        '"Rp" * cos("HalfDeg")',
+    ),
+    ("GapSeatY", "vertical_distance", "Seat.center", "origin", '"ChainPitch" / 2'),
+    ("GapClear", "distance", f"{GAP_AXIS}.end", "origin", '"RClear"'),
+    (
+        "GapWorkUpper",
+        "vertical_distance",
+        "Seat.center",
+        "WorkUpper.center",
+        '"WorkOffset" * cos("ADeg" + "HalfDeg")',
+    ),
+    (
+        "GapWorkLower",
+        "horizontal_distance",
+        "Seat.center",
+        "WorkLower.center",
+        '"WorkOffset" * sin("ADeg" - "HalfDeg")',
+    ),
+    (
+        "GapTopLower",
+        "vertical_distance",
+        "Seat.center",
+        "TopLower.center",
+        '"TopOffset"',
+    ),
+    (
+        "GapTopUpperX",
+        "horizontal_distance",
+        "Seat.center",
+        "TopUpper.center",
+        '"TopOffset" * sin(2 * "HalfDeg")',
+    ),
+    (
+        "GapTopUpperY",
+        "vertical_distance",
+        "Seat.center",
+        "TopUpper.center",
+        '"TopOffset" * cos(2 * "HalfDeg")',
+    ),
+    ("GapCornerUpper", "distance", "TopUpper.end", "origin", '"Ra"'),
+    ("GapCornerLower", "distance", "TopLower.start", "origin", '"Ra"'),
 )
 
 
-def _profile() -> tuple[str, str]:
-    """The in-disc profile as ONE curve over t in [0, 1]: the lower OD corner
-    plus each piece's move up to t. Every piece before t has made its whole
-    move and every piece after t none, so the sum telescopes to the point on
-    the piece t is in."""
-    starts = ["0", *(end for _label, end in PROFILE_PIECES[:-1])]
-    s = [
-        _share(a, end) for a, (_label, end) in zip(starts, PROFILE_PIECES, strict=True)
-    ]
-    moves = [
-        _arc_move('"TopR"', '"TopEnd"', '"TopStart"', s[0], False),
-        # Straight z'y': the upper flank's outward direction, mirrored, inward.
-        _at(f'{s[1]} * "LFlank"', f'("Half" - "Flank" + {PI_LIT})'),
-        _arc_move('"WorkR"', '"WorkEnd"', '"SeatStart"', s[2], False),
-        # About the pocket centre a: lower x' round the bottom to upper x.
-        _arc_move(
-            '"SeatR"', '"SeatStart"', f'(2 * {PI_LIT} - "SeatStart")', s[3], False
-        ),
-        _arc_move('"WorkR"', '"SeatStart"', '"WorkEnd"', s[4], True),
-        _at(f'{s[5]} * "LFlank"', '("Half" + "Flank")'),
-        _arc_move('"TopR"', '"TopStart"', '"TopEnd"', s[6], True),
-    ]
-    x, y = _at('"Ra"', '("Half" - "Corner")')
-    for move_x, move_y in moves:
-        x, y = f"{x} + {move_x}", f"{y} + {move_y}"
-    return x, y
+def gap_point(points: dict[str, Point], ref: str) -> Point:
+    """The point a ``<entity>.<start|end|center>`` or ``origin`` ref names."""
+    if ref == "origin":
+        return points["origin"]
+    entity, _, suffix = ref.partition(".")
+    centre, start, end = GAP_ENTITIES[entity]
+    name = {"center": centre, "start": start, "end": end}[suffix]
+    if name is None:
+        raise ValueError(f"{ref}: a line has no centre")
+    return points[name]
 
 
-def gap_curves() -> list[tuple[str, str, str]]:
-    """The seed gap's closed loop as ``(label, x(t), y(t))`` equation curves.
-
-    Centred on angle ``Half`` (pi/N, the first gap off the +X tooth), in
-    order: the in-disc profile from the lower OD corner at ``Half - Corner``
-    (lower topping arc, straight z'y', lower working arc, seating arc round
-    the bottom, upper working arc, straight yz, upper topping arc) to the
-    upper corner at ``Half + Corner``, out to ``RClear``, around, and back in.
-
-    The profile is one curve because its six inner junctions are tangent
-    (G1): as separate unlocked curves each such end is re-found as a
-    grazing intersection of two re-solved curves on every configuration
-    change. The loop's four junctions left are transversal corners, two on
-    the OD and two at ``RClear``.
-    """
-    return [
-        ("in-disc profile", *_profile()),
-        (
-            "upper clearance ray",
-            *_at('("Ra" + t * ("RClear" - "Ra"))', '("Half" + "Corner")'),
-        ),
-        (
-            "outer clearance arc",
-            *_at('"RClear"', '("Half" + "Corner" - 2 * t * "Corner")'),
-        ),
-        (
-            "lower clearance ray",
-            *_at('("RClear" + t * ("Ra" - "RClear"))', '("Half" - "Corner")'),
-        ),
-    ]
+def gap_dimension_value(
+    points: dict[str, Point], kind: str, ref: str, other: str | None
+) -> float:
+    """What a :data:`GAP_DIMENSIONS` row measures on ``points`` (mm)."""
+    if kind == "radial":
+        centre, start, _end = GAP_ENTITIES[ref]
+        return math.dist(points[centre], points[start])
+    (x1, y1), (x2, y2) = gap_point(points, ref), gap_point(points, other)
+    return {
+        "horizontal_distance": abs(x2 - x1),
+        "vertical_distance": abs(y2 - y1),
+        "distance": math.hypot(x2 - x1, y2 - y1),
+    }[kind]
 
 
-async def gap_curve(adapter, label: str, x_expr: str, y_expr: str) -> str:
-    """Add one gap curve over t in [0, 1] with UNLOCKED end points.
+async def draw_gap_sketch(adapter, teeth: int, dims: SketchDims) -> None:
+    """Draw, relate and dimension the seed gap in the active sketch at
+    ``teeth``, recording each dimension's name and drive in ``dims``."""
+    points = gap_points(teeth)
+    ids: dict[str, str] = {}
+    set_sketch_direct_db(adapter, True)
+    for name, (centre, start, end) in GAP_ENTITIES.items():
+        if name == GAP_AXIS:
+            res = await adapter.add_centerline(*points[start], *points[end])
+        elif centre is None:
+            res = await adapter.add_line(*points[start], *points[end])
+        else:
+            res = await adapter.add_arc(*points[centre], *points[start], *points[end])
+        ids[name] = check(f"gap {name}", res)
+    set_sketch_direct_db(adapter, False)
 
-    The four curves share their end points in one closed loop. With locked
-    ends (the ``CreateEquationSpline2`` default) the fix escalation closed
-    that loop redundantly: the fourth fix left the sketch at swNoSolution
-    with no over-defining relation (farm, 2026-09-30, six-curve form).
-    Unlocked, each fix pins only its own curve and the last fully defines
-    the sketch.
-    """
-    from solidworks_mcp.adapters.base import CreateEquationCurveParameters
+    def entity_ref(ref: str) -> str:
+        entity, dot, suffix = ref.partition(".")
+        return ref if ref == "origin" else ids[entity] + dot + suffix
 
-    res = await adapter.create_equation_driven_curve(
-        CreateEquationCurveParameters(
-            x_expression=x_expr,
-            y_expression=y_expr,
-            range_start="0",
-            range_end="1",
-            lock_start=False,
-            lock_end=False,
+    for relation, ref, other in GAP_RELATIONS:
+        check(
+            f"gap {relation} {ref} / {other}",
+            await adapter.add_sketch_constraint(
+                entity_ref(ref), entity_ref(other), relation
+            ),
         )
-    )
-    return check(f"curve {label}", res)
+    for name, kind, ref, other, drive in GAP_DIMENSIONS:
+        value = gap_dimension_value(points, kind, ref, other)
+        check(
+            f"gap {name} = {value:.4f}",
+            await adapter.add_sketch_dimension(
+                entity_ref(ref), entity_ref(other) if other else None, kind, value
+            ),
+        )
+        dims.record(name, drive)
 
 
 async def build(adapter) -> dict[str, str]:
@@ -515,18 +494,10 @@ async def build(adapter) -> dict[str, str]:
     check("create_part", await adapter.create_part())
 
     # ------------------------------------------------------------------
-    # Equation-manager globals (dialect probes first -- see build_cone_gear).
+    # Equation-manager globals (trig dialect probe first -- see build_cone_gear).
     # ------------------------------------------------------------------
     await set_global(adapter, "TrigProbe", "cos(60)", 0.5)
-    await set_global(adapter, "SqrProbe", "sqr(2)", math.sqrt(2.0))
-    atn_probe = await set_global_read(adapter, "AtnProbe", "atn(1)")
-    if abs(atn_probe - 45.0) < 1e-6:
-        atn_rad = f"atn(%s) * {PI_LIT} / 180"
-    elif abs(atn_probe - math.pi / 4.0) < 1e-6:
-        atn_rad = "atn(%s)"
-    else:
-        raise RuntimeError(f"atn(1) evaluated to {atn_probe!r} -- unknown dialect")
-    for name, expression, expected in gap_globals(atn_rad, DEFAULT_TEETH):
+    for name, expression, expected in gap_globals(DEFAULT_TEETH):
         await set_global(adapter, name, expression, expected)
 
     # Plain length knobs for the config-independent geometry (plate + the
@@ -641,23 +612,16 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # ------------------------------------------------------------------
-    # One tooth gap (global-referencing equation curves, t in [0,1]).
+    # One tooth gap: native arcs and lines, every dimension driven by the
+    # globals, so each configuration re-solves it from its own ToothCount.
     # ------------------------------------------------------------------
+    gap_dims = SketchDims()
     check("create_sketch gap", await adapter.create_sketch("Front"))
-    curves = [await gap_curve(adapter, *curve) for curve in gap_curves()]
-    # Whitelisted fix escalation: the gap profile is four equation-driven
-    # curves whose shape and position re-solve from the equation globals
-    # on every configuration change (ToothCount 12/18/24) -- no static
-    # relation/dimension scheme can define them without breaking that, and
-    # nothing but a Fix defines an equation curve, so each curve takes one.
-    await ensure_fully_defined(
-        adapter, "gap sketch", fix_entities=curves, allow_fix_escalation=True
-    )
+    await draw_gap_sketch(adapter, DEFAULT_TEETH, gap_dims)
+    await ensure_fully_defined(adapter, "gap sketch")
     check("exit_sketch gap", await adapter.exit_sketch())
-    # Named only, no SketchDims: the four curves are equation-driven (they
-    # carry no display dimensions), and static dims would break the
-    # per-configuration re-solve of the gap.
     gap_profile = name_last_feature(adapter, "ToothGapProfile")
+    drive_jobs += gap_dims.apply(adapter, gap_profile)
     check(
         "cut tooth gap",
         await adapter.create_cut_extrude(ExtrusionParameters(depth=spec.PLATE + 1.0)),
@@ -684,9 +648,9 @@ async def build(adapter) -> dict[str, str]:
         )
     pattern = None
     for point in candidates:
-        # geometry_pattern: per-instance re-solve of the global-driven
-        # equation-curve profile produces corrupt sliver cuts (live SW 2026
-        # finding, this part); verbatim geometry copies are exact.
+        # geometry_pattern: per-instance re-solve of the global-driven gap
+        # profile produced corrupt sliver cuts (live SW 2026 finding, this
+        # part's equation-curve form); verbatim geometry copies are exact.
         res = await adapter.circular_pattern_feature(
             CircularPatternParameters(
                 axis_point=point,

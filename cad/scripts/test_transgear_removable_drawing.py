@@ -5,7 +5,6 @@ from __future__ import annotations
 import ast
 import math
 import re
-from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -176,7 +175,6 @@ _IN = 25.4
 _P, _DR = 0.25, 0.130
 
 Point = tuple[float, float]
-Curve = Callable[[float], Point]
 
 
 def _sind(degrees: float) -> float:
@@ -187,14 +185,14 @@ def _cosd(degrees: float) -> float:
     return math.cos(math.radians(degrees))
 
 
-def _equation(expression: str, values: dict[str, float], *, degrees: bool, t=0.0):
-    """One SolidWorks equation: quoted globals, ``sqr``, ``atn`` in radians;
-    the equation manager's trig takes degrees, an equation curve's radians."""
-    names = {"_v": values, "t": t, "sqr": math.sqrt, "atn": math.atan}
-    if degrees:
-        names.update(sin=_sind, cos=_cosd, tan=lambda d: math.tan(math.radians(d)))
-    else:
-        names.update(sin=math.sin, cos=math.cos, tan=math.tan)
+def _equation(expression: str, values: dict[str, float]) -> float:
+    """One SolidWorks equation: quoted globals, trig in degrees."""
+    names = {
+        "_v": values,
+        "sin": _sind,
+        "cos": _cosd,
+        "tan": lambda d: math.tan(math.radians(d)),
+    }
     code = re.sub(r'"(\w+)"', r'_v["\1"]', expression)
     return eval(code, {"__builtins__": {}}, names)
 
@@ -205,56 +203,74 @@ def _solved_globals(teeth: int) -> list[tuple[str, float, float]]:
     re-solves them from its own ToothCount)."""
     values: dict[str, float] = {}
     solved = []
-    for name, expression, expected in part.gap_globals("atn(%s)", teeth):
-        values[name] = _equation(expression, values, degrees=True)
+    for name, expression, expected in part.gap_globals(teeth):
+        values[name] = _equation(expression, values)
         solved.append((name, values[name], expected))
     return solved
 
 
-def _constructed_gap(teeth: int) -> dict[str, Curve]:
-    """The seed gap the build cuts at ``teeth`` (mm), in loop order: the
-    in-disc profile curve sliced at its solved breaks into its seven pieces
-    (each over s in [0, 1]), then the clearance curves."""
+def _driven(teeth: int) -> dict[str, float]:
+    """Each gap sketch dimension (mm) as its drive equation sets it when a
+    configuration's ToothCount is ``teeth``."""
     values = {name: value for name, value, _expected in _solved_globals(teeth)}
-
-    def curve(x: str, y: str) -> Curve:
-        return lambda t: (
-            _equation(x, values, degrees=False, t=t) * _IN,
-            _equation(y, values, degrees=False, t=t) * _IN,
-        )
-
-    loop = {label: curve(x, y) for label, x, y in part.gap_curves()}
-    profile = loop.pop("in-disc profile")
-    ends = [
-        _equation(end, values, degrees=False) for _label, end in part.PROFILE_PIECES
-    ]
-    pieces = {
-        label: (lambda s, a=a, b=b: profile(a + s * (b - a)))
-        for (label, _end), a, b in zip(
-            part.PROFILE_PIECES, [0.0, *ends[:-1]], ends, strict=True
-        )
+    return {
+        name: _equation(drive, values) * _IN
+        for name, _kind, _ref, _other, drive in part.GAP_DIMENSIONS
     }
-    return pieces | loop
 
 
-def _profile_curve(teeth: int) -> tuple[Curve, float]:
-    """The in-disc profile curve (mm) and its solved length ``LProfile``."""
-    values = {name: value for name, value, _expected in _solved_globals(teeth)}
-    x, y = {label: (x, y) for label, x, y in part.gap_curves()}["in-disc profile"]
-    return (
-        lambda t: (
-            _equation(x, values, degrees=False, t=t) * _IN,
-            _equation(y, values, degrees=False, t=t) * _IN,
-        ),
-        values["LProfile"] * _IN,
-    )
+def _sweep(points: dict[str, Point], name: str) -> float:
+    """An arc's CCW sweep from its start to its end (radians, 0..2 pi)."""
+    centre, start, end = (points[p] for p in part.GAP_ENTITIES[name])
+    a0 = math.atan2(start[1] - centre[1], start[0] - centre[0])
+    a1 = math.atan2(end[1] - centre[1], end[0] - centre[0])
+    return (a1 - a0) % (2.0 * math.pi)
 
 
-def _fitted_radius(curve: Curve) -> float:
-    """Radius of the circle through the curve's ends and midpoint."""
-    p, q, r = curve(0.0), curve(0.5), curve(1.0)
-    cross = (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0])
-    return math.dist(p, q) * math.dist(q, r) * math.dist(r, p) / (2.0 * abs(cross))
+def _trace(points: dict[str, Point], name: str, n: int) -> list[Point]:
+    """``n`` + 1 points along an entity from its start to its end."""
+    centre, start, end = part.GAP_ENTITIES[name]
+    (x0, y0), (x1, y1) = points[start], points[end]
+    if centre is None:
+        return [(x0 + k / n * (x1 - x0), y0 + k / n * (y1 - y0)) for k in range(n + 1)]
+    cx, cy = points[centre]
+    radius = math.hypot(x0 - cx, y0 - cy)
+    a0, sweep = math.atan2(y0 - cy, x0 - cx), _sweep(points, name)
+    return [
+        (
+            cx + radius * math.cos(a0 + k / n * sweep),
+            cy + radius * math.sin(a0 + k / n * sweep),
+        )
+        for k in range(n + 1)
+    ]
+
+
+def _loop(points: dict[str, Point], n: int) -> list[Point]:
+    """The cut profile walked end to end from x_u, each entity traced in
+    whichever direction continues the walk; fails unless it closes."""
+    left = [name for name in part.GAP_ENTITIES if name != part.GAP_AXIS]
+    at, walk = "x_u", []
+    while left:
+        name = next(name for name in left if at in part.GAP_ENTITIES[name][1:])
+        left.remove(name)
+        _centre, start, end = part.GAP_ENTITIES[name]
+        trace = _trace(points, name, n)
+        walk += (trace if start == at else trace[::-1])[:-1]
+        at = end if start == at else start
+    assert at == "x_u", "the profile does not close"
+    return walk
+
+
+def _tangent(points: dict[str, Point], name: str, at: str) -> Point:
+    """Unit direction of an entity at one of its end points."""
+    centre, start, end = part.GAP_ENTITIES[name]
+    if centre is None:
+        dx, dy = points[end][0] - points[start][0], points[end][1] - points[start][1]
+    else:
+        dx = -(points[at][1] - points[centre][1])
+        dy = points[at][0] - points[centre][0]
+    length = math.hypot(dx, dy)
+    return dx / length, dy / length
 
 
 _TEETH = [teeth for _name, teeth in spec.CONFIGS]
@@ -269,22 +285,86 @@ def test_every_configuration_solves_the_gap_the_spec_defines(teeth: int) -> None
 
 
 @pytest.mark.parametrize("teeth", _TEETH)
+def test_the_driven_dimensions_hold_the_spec_gap(teeth: int) -> None:
+    """Every gap dimension's drive equation, solved at a configuration's
+    ToothCount, is what that dimension measures on ``spec.gap_geometry``'s
+    gap -- so re-solving the sketch there lands on the spec's tooth form."""
+    points = part.gap_points(teeth)
+    driven = _driven(teeth)
+    for name, kind, ref, other, _drive in part.GAP_DIMENSIONS:
+        measured = part.gap_dimension_value(points, kind, ref, other)
+        assert measured > 1e-3, name  # a zero-valued dimension is invalid
+        assert driven[name] == pytest.approx(measured, rel=1e-9), name
+
+
+@pytest.mark.parametrize("teeth", _TEETH)
+def test_the_gap_relations_hold_in_every_configuration(teeth: int) -> None:
+    """Each sketch relation is satisfied by the spec gap at every tooth
+    count, and every arc's two ends lie on its circle."""
+    points = part.gap_points(teeth)
+    for name, (centre, start, end) in part.GAP_ENTITIES.items():
+        if centre is not None:
+            assert math.dist(points[centre], points[start]) == pytest.approx(
+                math.dist(points[centre], points[end]), abs=1e-9
+            ), name
+    for relation, ref, other in part.GAP_RELATIONS:
+        if relation == "tangent":
+            (at,) = set(part.GAP_ENTITIES[ref][1:]) & set(part.GAP_ENTITIES[other][1:])
+            (ux, uy), (vx, vy) = _tangent(points, ref, at), _tangent(points, other, at)
+            assert ux * vy - uy * vx == pytest.approx(0.0, abs=1e-9), (ref, other)
+        elif relation == "equal":
+            radius = part.gap_dimension_value
+            assert radius(points, "radial", ref, None) == pytest.approx(
+                radius(points, "radial", other, None), abs=1e-9
+            ), (ref, other)
+        elif relation == "vertical_points":
+            x1, _ = part.gap_point(points, ref)
+            x2, _ = part.gap_point(points, other)
+            assert x1 == pytest.approx(x2, abs=1e-9), (ref, other)
+        elif relation == "coincident" and ("." in other or other == "origin"):
+            assert part.gap_point(points, ref) == pytest.approx(
+                part.gap_point(points, other), abs=1e-9
+            ), (ref, other)
+        elif relation == "coincident":  # a point on a line
+            px, py = part.gap_point(points, ref)
+            _centre, start, end = part.GAP_ENTITIES[other]
+            (x0, y0), (x1, y1) = points[start], points[end]
+            cross = (x1 - x0) * (py - y0) - (y1 - y0) * (px - x0)
+            assert cross / math.dist((x0, y0), (x1, y1)) == pytest.approx(0.0, abs=1e-9)
+        else:
+            raise AssertionError(f"unchecked relation {relation}")
+
+
+@pytest.mark.parametrize("teeth", _TEETH)
+def test_the_gap_draws_as_one_loop_of_minor_arcs_outside_the_disc(teeth: int) -> None:
+    """CreateArc runs CCW from start to end, so each arc's start/end order
+    must pick the short way round; the profile closes; the clearance lines
+    never enter the blank."""
+    points = part.gap_points(teeth)
+    for name, (centre, _start, _end) in part.GAP_ENTITIES.items():
+        if centre is not None:
+            assert 0.0 < _sweep(points, name) < math.pi, name
+    _loop(points, 4)
+    ra = spec.outside_dia(teeth) / 2.0
+    for name in ("ClearLower", "ClearUpper"):
+        radii = [math.hypot(*p) for p in _trace(points, name, 400)]
+        assert min(radii) == pytest.approx(ra, abs=1e-9), name
+
+
+@pytest.mark.parametrize("teeth", _TEETH)
 def test_the_cut_gap_is_the_ansi_b29_1_standard_form(teeth: int) -> None:
-    gap = _constructed_gap(teeth)
-    labels = list(gap)
-    for here, after in zip(labels, labels[1:] + labels[:1], strict=True):
-        assert math.dist(gap[here](1.0), gap[after](0.0)) < 1e-6, (here, after)
+    points = part.gap_points(teeth)
+
+    def radius(name: str) -> float:
+        return part.gap_dimension_value(points, "radial", name, None)
 
     half = 180.0 / teeth
     pitch_dia = _P / _sind(half) * _IN
     # Seating curve R = Ds / 2 = 0.5025 Dr + 0.0015 in.
     seat_r = (0.5025 * _DR + 0.0015) * _IN
-    assert _fitted_radius(gap["seating arc"]) == pytest.approx(seat_r, abs=0.005)
+    assert radius("Seat") == pytest.approx(seat_r, abs=0.005)
     # Bottom diameter PD - Dr, minus-only 0.002 P sqrt(N) + 0.006 in.
-    inside_od = [label for label in labels if "clearance" not in label]
-    bottom = 2.0 * min(
-        math.hypot(*gap[label](k / 200.0)) for label in inside_od for k in range(201)
-    )
+    bottom = 2.0 * min(math.hypot(*p) for p in _loop(points, 400))
     shortfall = pitch_dia - _DR * _IN - bottom
     assert 0.0 <= shortfall <= (0.002 * _P * math.sqrt(teeth) + 0.006) * _IN
 
@@ -294,82 +374,59 @@ def test_the_cut_gap_is_the_ansi_b29_1_standard_form(teeth: int) -> None:
     yz = _DR * (1.4 * _sind(17.0 - 64.0 / teeth) - 0.8 * _sind(b_deg)) * _IN
     topping = _DR * (0.8 * _cosd(b_deg) + 1.4 * _cosd(17.0 - 64.0 / teeth) - 1.3025)
     topping_r = (topping - 0.0015) * _IN
-    for side, x_at in (("upper", 0.0), ("lower", 1.0)):
-        working = gap[f"{side} working arc"]
-        flank = gap[f"{side} flank"]
-        # Working curve E about c; its arc x-y is B long about c.
-        assert _fitted_radius(working) == pytest.approx(working_r, abs=0.005)
-        x, y = working(x_at), working(1.0 - x_at)
-        assert math.dist(x, y) == pytest.approx(xy, abs=0.005)
-        assert math.dist(flank(0.0), flank(1.0)) == pytest.approx(yz, abs=0.005)
-        topping_arc = gap[f"{side} topping arc"]
-        assert _fitted_radius(topping_arc) == pytest.approx(topping_r, abs=0.005)
-    # The seat meets the working curve at x, A below the pitch-circle tangent
-    # at the pocket centre a: at 90 + A from the outward radial about a.
-    centre = (pitch_dia / 2.0 * _cosd(half), pitch_dia / 2.0 * _sind(half))
-    x_upper = gap["seating arc"](1.0)
-    bearing = math.atan2(x_upper[1] - centre[1], x_upper[0] - centre[0])
-    assert math.degrees(bearing) - half == pytest.approx(90.0 + a_deg, abs=1e-6)
     # The tips are turned to the OD p (0.6 + cot(180/N)).
     outside = _P * (0.6 + _cosd(half) / _sind(half)) * _IN
-    for corner in (gap["lower topping arc"](0.0), gap["upper topping arc"](1.0)):
-        assert 2.0 * math.hypot(*corner) == pytest.approx(outside, abs=0.005)
-
-
-@pytest.mark.parametrize("teeth", _TEETH)
-def test_the_profile_is_one_tangent_continuous_curve(teeth: int) -> None:
-    """The in-disc profile is one curve with no corner between the OD
-    corners: it runs at one speed (its length per unit t) and its direction
-    turns smoothly across every junction of seat, working, flank and
-    topping."""
-    profile, length = _profile_curve(teeth)
-    h = 1e-6
-
-    def velocity(t: float) -> Point:
-        p, q = profile(t - h), profile(t + h)
-        return ((q[0] - p[0]) / (2 * h), (q[1] - p[1]) / (2 * h))
-
-    for k in range(1, 1000):
-        assert math.hypot(*velocity(k / 1000.0)) == pytest.approx(length, rel=1e-6)
-    values = {name: value for name, value, _expected in _solved_globals(teeth)}
-    for _label, end in part.PROFILE_PIECES[:-1]:
-        at = _equation(end, values, degrees=False)
-        before, after = velocity(at - 1e-4), velocity(at + 1e-4)
-        turn = math.atan2(
-            before[0] * after[1] - before[1] * after[0],
-            before[0] * after[0] + before[1] * after[1],
+    for side, working, topping_arc in (
+        ("u", "WorkUpper", "TopUpper"),
+        ("l", "WorkLower", "TopLower"),
+    ):
+        # Working curve E about c; its arc x-y is B long about c.
+        assert radius(working) == pytest.approx(working_r, abs=0.005)
+        x, y, z = (points[f"{p}_{side}"] for p in "xyz")
+        assert math.dist(x, y) == pytest.approx(xy, abs=0.005)
+        assert math.dist(y, z) == pytest.approx(yz, abs=0.005)
+        assert radius(topping_arc) == pytest.approx(topping_r, abs=0.005)
+        assert 2.0 * math.hypot(*points[f"k_{side}"]) == pytest.approx(
+            outside, abs=0.005
         )
-        # +/-1e-4 of t is under 2 um of profile: on arcs of R >= 1.69 mm a
-        # smooth turn stays under 2e-3 rad, where a corner shows in full.
-        assert abs(turn) < 1e-2, end
+    # The seat meets the working curve at x, A below the pitch-circle tangent
+    # at the pocket centre a: at 90 + A from the outward radial about a.
+    centre = points["a"]
+    assert 2.0 * math.hypot(*centre) == pytest.approx(pitch_dia, abs=1e-9)
+    x_upper = points["x_u"]
+    bearing = math.atan2(x_upper[1] - centre[1], x_upper[0] - centre[0])
+    assert math.degrees(bearing) - half == pytest.approx(90.0 + a_deg, abs=1e-6)
 
 
 def test_the_published_30_tooth_example_constructs() -> None:
     """GEARS-IDS worked example, #25 x 30T: R .0668, E .1708, F .1050 in."""
-    gap = _constructed_gap(30)
-    for label, published in (
-        ("seating arc", 0.0668),
-        ("upper working arc", 0.1708),
-        ("upper topping arc", 0.1050),
+    driven = _driven(30)
+    for name, published in (
+        ("GapSeatR", 0.0668),
+        ("GapWorkR", 0.1708),
+        ("GapTopR", 0.1050),
     ):
-        assert _fitted_radius(gap[label]) / _IN == pytest.approx(published, abs=2e-4)
+        assert driven[name] / _IN == pytest.approx(published, abs=2e-4)
 
 
 @pytest.mark.parametrize("teeth", _TEETH)
-def test_the_volume_check_reads_the_area_the_curves_cut(teeth: int) -> None:
+def test_the_volume_check_reads_the_area_the_sketch_cuts(teeth: int) -> None:
     """The build's per-configuration volume check uses ``spec.gap_area``:
-    the cut loop's area inside the OD (the loop less its clearance sector)."""
-    gap = _constructed_gap(teeth)
-    points = [gap[label](k / 2000.0) for label in gap for k in range(2000)]
-    shifted = points[1:] + points[:1]
-    loop = 0.5 * abs(
-        sum(p[0] * q[1] - q[0] * p[1] for p, q in zip(points, shifted, strict=True))
+    the cut loop's area inside the OD (the loop less the region its
+    clearance lines close outside the OD)."""
+    points = part.gap_points(teeth)
+    loop = _loop(points, 2000)
+    shifted = loop[1:] + loop[:1]
+    area = 0.5 * abs(
+        sum(p[0] * q[1] - q[0] * p[1] for p, q in zip(loop, shifted, strict=True))
     )
     ra = spec.outside_dia(teeth) / 2.0
-    corner_x, corner_y = gap["upper topping arc"](1.0)
-    corner = math.atan2(corner_y, corner_x) - math.pi / teeth
-    in_disc = loop - corner * ((2.0 * ra) ** 2 - ra**2)
-    assert in_disc == pytest.approx(spec.gap_area(teeth), rel=1e-4)
+    k_l, q, k_u = points["k_l"], points["q"], points["k_u"]
+    # The fan O-k_l-q-k_u less the OD sector between the corners.
+    fan = 0.5 * sum(p[0] * r[1] - r[0] * p[1] for p, r in ((k_l, q), (q, k_u)))
+    corner = math.atan2(k_u[1], k_u[0]) - math.atan2(k_l[1], k_l[0])
+    outside = fan - 0.5 * ra * ra * corner
+    assert area - outside == pytest.approx(spec.gap_area(teeth), rel=1e-5)
 
 
 class _Result:
