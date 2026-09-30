@@ -64,7 +64,7 @@ def test_model_owns_places_and_bands() -> None:
     # The running fit, the head's cup-floor bearing band, the head length that
     # keeps it below the cup face, and the two small features that could
     # print as nothing at .X.
-    running_fit = {"ShoulderDia", "HeadDia", "HeadLength", "TipChamfer", "SlotDepth"}
+    running_fit = {"ShoulderDia", "HeadDia", "HeadLength", "TipChamfer", "SlotDepth", "ReliefDia"}
     for name, places in spec.DRAWING_PRECISION_BY_NAME.items():
         assert places == (2 if name in running_fit else 1), name
     # User ruling 2026-09-29 (MHA-139 review): the shoulder is turned to suit
@@ -82,6 +82,7 @@ def test_model_owns_places_and_bands() -> None:
         ("ScrewProfile", "TipChamfer"): "*deviations(TIP_CHAMFER_BAND)",
         ("DriverSlot", "SlotDepth"): "SLOT_DEPTH_TOL",
         ("ScrewProfile", "ReliefLead"): "RELIEF_LEAD_TOL",
+        ("ScrewProfile", "ReliefDia"): "RELIEF_DIA_TOL",
     }
     assert spec.SHOULDER_DIA == 4.00
     assert spec.SHOULDER_DIA_BAND == (-0.03, -0.08)
@@ -157,7 +158,8 @@ def test_u33_running_fit_end_play_and_engagement() -> None:
 
 
 def test_thread_relief_sits_below_the_minor_with_a_45_degree_lead() -> None:
-    assert spec.RELIEF_DIA == 2.3
+    # Banded (Codex P1 on #1139): the largest relief stays under the root.
+    assert (spec.RELIEF_DIA, spec.RELIEF_DIA_TOL, spec.RELIEF_DIA_MAX) == (2.2, 0.10, 2.3)
     assert spec.RELIEF_WIDTH == 1.5
     assert spec.RELIEF_LEAD == 0.4
     assert spec.RELIEF_LEAD_LIMITS == (0.3, 0.5)
@@ -172,26 +174,30 @@ def test_thread_relief_sits_below_the_minor_with_a_45_degree_lead() -> None:
     # ((0.1372 - 1.226869 / 32) x 25.4 = Ø2.511).
     assert spec.THREAD_MINOR_BASIC_ROOT == pytest.approx(2.4739, abs=1e-4)
     assert spec.THREAD_MINOR_UNR_2A_MAX == pytest.approx(2.5110, abs=1e-4)
-    assert spec.RELIEF_DIA <= spec.THREAD_MINOR_BASIC_ROOT
-    # The lead tops out at Ø3.1 (Ø3.3 at its largest), inside the thread
-    # major, leaving a flat seat.
-    assert spec.SEAT_FLAT_INNER_DIA == pytest.approx(3.1)
+    assert spec.RELIEF_DIA_MAX <= spec.THREAD_MINOR_BASIC_ROOT
+    # The lead tops out at Ø3.0 (Ø3.3 with the largest relief and lead),
+    # inside the thread major and the edge-broken Ø3.42 shoulder minimum,
+    # leaving a flat seat at the printed worst case.
+    assert spec.SEAT_FLAT_INNER_DIA == pytest.approx(3.0)
+    assert spec.SEAT_FLAT_INNER_DIA_MAX == pytest.approx(3.3)
+    assert spec.SEAT_FLAT_INNER_DIA_MAX < spec.SHOULDER_DIA_MIN - 2.0 * 0.25
     assert spec.RELIEF_DIA + 2.0 * spec.RELIEF_LEAD_LIMITS[1] < spec.THREAD_MODEL_DIA
-    assert spec.SEAT_FLAT_ANNULUS_AREA == pytest.approx(math.pi / 4.0 * (16.0 - 3.1**2))
+    assert spec.SEAT_FLAT_ANNULUS_AREA == pytest.approx(math.pi / 4.0 * (16.0 - 3.0**2))
+    assert spec.SEAT_FLAT_ANNULUS_AREA_MIN == pytest.approx(math.pi / 4.0 * (3.42**2 - 3.3**2))
     assert 0.0 < spec.SEAT_FLAT_ANNULUS_AREA_MIN < spec.SEAT_FLAT_ANNULUS_AREA
     assert spec.CHAMFER_CALLOUT == "X 45 DEG"
     assert drawing.CHAMFER_CALLOUT is spec.CHAMFER_CALLOUT
-    # The neck is ~71 percent of the #6-32 tensile stress area (0.00909 in^2).
-    assert spec.NECK_AREA == pytest.approx(math.pi / 4.0 * 2.3**2)
+    # The neck is ~65 percent of the #6-32 tensile stress area (0.00909 in^2).
+    assert spec.NECK_AREA == pytest.approx(math.pi / 4.0 * 2.2**2)
     assert spec.TENSILE_STRESS_AREA == pytest.approx(5.86, abs=0.01)
-    assert spec.NECK_TO_STRESS_AREA == pytest.approx(0.708, abs=0.001)
+    assert spec.NECK_TO_STRESS_AREA == pytest.approx(0.648, abs=0.001)
     # The relief diameter and width are routine under the title block; the
     # lead's band is model-owned and prints as limits in its callout, and the
     # tip chamfer carries its own band (MHA-139 re-review: at .X either could
     # print as nothing).
     toleranced = {name for _, name in model_toleranced_dimensions(part)}
-    assert not toleranced & {"ReliefDia", "ReliefWidth"}
-    assert {"ReliefLead", "TipChamfer"} <= toleranced
+    assert not toleranced & {"ReliefWidth"}
+    assert {"ReliefDia", "ReliefLead", "TipChamfer"} <= toleranced
     assert "ReliefLead" not in set().union(*spec.DRAWING_DIMENSIONS.values())
 
 
@@ -302,11 +308,11 @@ def test_notes_stay_within_rule_six() -> None:
 def test_modelled_volume_is_the_turned_body_less_the_slot() -> None:
     head = math.pi * 3.0**2 * 4.0
     shoulder = math.pi * 2.0**2 * 53.0
-    relief = math.pi * (2.3 / 2.0) ** 2 * 1.5
+    relief = math.pi * (2.2 / 2.0) ** 2 * 1.5
     thread = math.pi * (3.505 / 2.0) ** 2 * 8.5
-    # Pappus: the lead's 0.4 x 0.4 corner triangle, centroid 1.15 + 0.4/3 out,
+    # Pappus: the lead's 0.4 x 0.4 corner triangle, centroid 1.1 + 0.4/3 out,
     # stays; the tip chamfer's 0.4 x 0.4, centroid 1.7525 - 0.4/3 out, goes.
-    lead = 2.0 * math.pi * (1.15 + 0.4 / 3.0) * (0.4 * 0.4 / 2.0)
+    lead = 2.0 * math.pi * (1.1 + 0.4 / 3.0) * (0.4 * 0.4 / 2.0)
     tip = 2.0 * math.pi * (3.505 / 2.0 - 0.4 / 3.0) * (0.4 * 0.4 / 2.0)
     assert part.V_LEAD == pytest.approx(lead)
     assert part.V_BODY == pytest.approx(head + shoulder + relief + thread + lead - tip)

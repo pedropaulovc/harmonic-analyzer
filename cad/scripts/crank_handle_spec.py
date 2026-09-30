@@ -36,12 +36,12 @@ from __future__ import annotations
 
 import math
 
-from crank_hub_geometry import GENERAL_1PL_TOL_MM
+from crank_hub_geometry import EDGE_BREAK_MAX_MM, GENERAL_1PL_TOL_MM
 from crank_handle_butt_cup_spec import (
     BODY_DIA as CUP_BODY_DIA,
     BODY_DIA_TOL as CUP_BODY_DIA_TOL,
     OVERALL_LENGTH as CUP_LENGTH,
-    POCKET_DIA as CUP_POCKET_DIA,
+    POCKET_DIA_MAX as CUP_POCKET_DIA_MAX,
 )
 from crank_handle_ferrule_spec import (
     BORE_DIA as FERRULE_BORE_DIA,
@@ -93,13 +93,12 @@ DOME_THEORETICAL_R = 6.0
 COUNTERBORE_GLUE_LINE = (0.05, 0.15)
 COUNTERBORE_DIA = CUP_BODY_DIA + sum(COUNTERBORE_GLUE_LINE) / 2.0
 COUNTERBORE_R = COUNTERBORE_DIA / 2.0
-OAK_END_X = 57.9
-# The cup bottoms in the counterbore with its face on the handle's basic
-# length, a tenth past the oak's feather edge.
-COUNTERBORE_DEPTH = round(CUP_LENGTH - (HANDLE_LENGTH - OAK_END_X), 6)
-COUNTERBORE_FLOOR_X = OAK_END_X - COUNTERBORE_DEPTH
-# The end round crests just outside the cup's pocket rim.
-END_ROUND_CY = CUP_POCKET_DIA / 2.0 + 0.25
+# The end round crests square to the axis on the cup's face (the handle's
+# basic length), at a radius that clears the largest bored pocket and its
+# edge break with a flat rim to spare (Codex P1 on #1139: at r 3.4 the
+# pocket's edge break could take the whole face).
+CUP_FACE_RIM_MIN = 0.1
+END_ROUND_CY = CUP_POCKET_DIA_MAX / 2.0 + EDGE_BREAK_MAX_MM + CUP_FACE_RIM_MIN
 
 # Flare: concave, centre above the waist, through the shoulder point.
 FLARE_R = ((WAIST_X - SHOULDER_X) ** 2 + (SHOULDER_R - WAIST_R) ** 2) / (
@@ -125,27 +124,19 @@ DOME_R = ((HANDLE_LENGTH - PEAK_X) ** 2 + (PEAK_R - DOME_THEORETICAL_R) ** 2) / 
 DOME_CENTER = (PEAK_X, PEAK_R - DOME_R)
 
 
-def _end_round() -> tuple[float, float]:
-    """(centre x, radius) of the end round: centre on y=END_ROUND_CY, through
-    the oak's end at the counterbore mouth, internally tangent to the dome."""
-
-    def gap(cx: float) -> float:
-        r = math.hypot(OAK_END_X - cx, COUNTERBORE_R - END_ROUND_CY)
-        return math.hypot(cx - DOME_CENTER[0], END_ROUND_CY - DOME_CENTER[1]) + r - DOME_R
-
-    lo, hi = PEAK_X, OAK_END_X
-    for _ in range(200):
-        mid = (lo + hi) / 2.0
-        if gap(lo) * gap(mid) <= 0.0:
-            hi = mid
-        else:
-            lo = mid
-    cx = (lo + hi) / 2.0
-    return cx, math.hypot(OAK_END_X - cx, COUNTERBORE_R - END_ROUND_CY)
-
-
-END_ROUND_CX, END_ROUND_R = _end_round()
+# End round: crest (rightmost point) on the cup face at END_ROUND_CY, so its
+# centre sits END_ROUND_R inside that face, internally tangent to the dome:
+# (L - R - Xd)^2 + (Cy - Yd)^2 = (Rd - R)^2, solved for R in closed form.
+_E_DX = HANDLE_LENGTH - DOME_CENTER[0]
+_E_DY = END_ROUND_CY - DOME_CENTER[1]
+END_ROUND_R = (DOME_R**2 - _E_DX**2 - _E_DY**2) / (2.0 * (DOME_R - _E_DX))
+END_ROUND_CX = HANDLE_LENGTH - END_ROUND_R
 END_ROUND_CENTER = (END_ROUND_CX, END_ROUND_CY)
+# The oak feathers out where the end round meets the counterbore mouth; the
+# cup bottoms in the counterbore with its face on the basic length.
+OAK_END_X = END_ROUND_CX + math.sqrt(END_ROUND_R**2 - (COUNTERBORE_R - END_ROUND_CY) ** 2)
+COUNTERBORE_DEPTH = round(CUP_LENGTH - (HANDLE_LENGTH - OAK_END_X), 6)
+COUNTERBORE_FLOOR_X = OAK_END_X - COUNTERBORE_DEPTH
 _d = math.hypot(END_ROUND_CX - DOME_CENTER[0], END_ROUND_CY - DOME_CENTER[1])
 DOME_END = (
     DOME_CENTER[0] + DOME_R * (END_ROUND_CX - DOME_CENTER[0]) / _d,
@@ -230,9 +221,14 @@ for _ok, _what in (
         "the end round does not sit inside the dome",
     ),
     (
-        END_ROUND_CX + END_ROUND_R >= HANDLE_LENGTH - 0.05,
-        "the end round does not reach the cup face",
+        abs(END_ROUND_CX + END_ROUND_R - HANDLE_LENGTH) < 1e-9,
+        "the end round does not crest on the cup face",
     ),
+    (
+        END_ROUND_CY - CUP_POCKET_DIA_MAX / 2.0 - EDGE_BREAK_MAX_MM >= CUP_FACE_RIM_MIN,
+        "the end round leaves no flat cup rim outside the largest pocket's edge break",
+    ),
+    (OAK_END_X < HANDLE_LENGTH, "the oak runs past the cup face"),
     (COUNTERBORE_R > PIVOT_BORE_DIA / 2.0, "counterbore is inside the pivot bore"),
 ):
     if not _ok:

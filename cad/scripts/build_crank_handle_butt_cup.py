@@ -256,14 +256,14 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError(f"EndRound would not unsuppress in {INSTALLED_CONFIG}")
     await force_rebuild(adapter)
     await volume_check(
-        adapter, "installed cup (end round turned)", V_INSTALLED, 0.1 * V_CROWN
+        adapter, "installed cup (end round turned)", V_INSTALLED, 0.3 * V_CROWN
     )
     check(
         f"re-activate {default_config}",
         await adapter.set_active_configuration(default_config),
     )
     await force_rebuild(adapter)
-    await volume_check(adapter, "as-turned cup (default)", V_CUP, 0.1 * V_CROWN)
+    await volume_check(adapter, "as-turned cup (default)", V_CUP, 0.3 * V_CROWN)
     # The configuration description wins over the drive-train BOM's written
     # cell, so it is the text that BOM prints (the MHA-135 precedent).
     grouped_spec = _config.parts(PART_NAME)

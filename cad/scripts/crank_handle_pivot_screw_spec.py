@@ -135,7 +135,12 @@ THREAD_MINOR_UNR_2A_MAX = (
 # the seat face, so the die's incomplete lead threads run out into air and the shoulder
 # pulls down tight on the arm face.  Routine (.X) sizes under the title-block
 # band.
-RELIEF_DIA = 2.3
+# Banded (Codex P1 on #1139): at .X a #6-32 relief could reach Ø3.1, above
+# the thread root (no die run-out) and, with the lead, past the shoulder's
+# seat.  +/-0.10 keeps the largest relief under the root and a flat seat.
+RELIEF_DIA = 2.2
+RELIEF_DIA_TOL = 0.10
+RELIEF_DIA_MAX = round(RELIEF_DIA + RELIEF_DIA_TOL, 6)
 RELIEF_WIDTH = 1.5
 # A 45-degree lead from the relief floor up into the seat face, so the groove
 # leaves no sharp inside corner.  0.5 keeps the lead inside the Ø3.505 thread
@@ -159,6 +164,8 @@ RELIEF_CALLOUT = (
     f"{RELIEF_LEAD_LIMITS[0]:.1f}-{RELIEF_LEAD_LIMITS[1]:.1f} {CHAMFER_CALLOUT} LEAD"
 )
 SEAT_FLAT_INNER_DIA = RELIEF_DIA + 2.0 * RELIEF_LEAD
+# ... and at its printed worst: the largest relief under the longest lead.
+SEAT_FLAT_INNER_DIA_MAX = round(RELIEF_DIA_MAX + 2.0 * RELIEF_LEAD_LIMITS[1], 6)
 
 SEAT_STATION = HEAD_LENGTH + SHOULDER_LENGTH
 RELIEF_END_STATION = SEAT_STATION + RELIEF_WIDTH
@@ -307,7 +314,7 @@ SEAT_FLAT_ANNULUS_AREA = math.pi / 4.0 * (SHOULDER_DIA**2 - SEAT_FLAT_INNER_DIA*
 SEAT_FLAT_ANNULUS_AREA_MIN = (
     math.pi
     / 4.0
-    * ((SHOULDER_DIA_MIN - 2.0 * EDGE_BREAK_MAX_MM) ** 2 - SEAT_FLAT_INNER_DIA**2)
+    * ((SHOULDER_DIA_MIN - 2.0 * EDGE_BREAK_MAX_MM) ** 2 - SEAT_FLAT_INNER_DIA_MAX**2)
 )
 # The relief neck is the screw's weakest section: pi/4 x 2.3^2 = 4.15 mm^2
 # against the #6-32 UNC tensile stress area of 0.00909 in^2 = 5.86 mm^2, about
@@ -324,13 +331,13 @@ for _ok, _what in (
     ),
     (DIAMETRAL_CLEARANCE_MIN > 0.0, "shoulder can bind in the oak bore"),
     (
-        RELIEF_DIA <= min(THREAD_MINOR_BASIC_ROOT, THREAD_MINOR_UNR_2A_MAX),
+        RELIEF_DIA_MAX <= min(THREAD_MINOR_BASIC_ROOT, THREAD_MINOR_UNR_2A_MAX),
         f"relief floor stands above the {THREAD_SIZE} external minor diameter",
     ),
     (RELIEF_WIDTH < THREAD_LENGTH, "relief consumes the whole thread section"),
     (RELIEF_LEAD < RELIEF_WIDTH, "relief lead consumes the relief floor"),
     (
-        SEAT_FLAT_INNER_DIA < THREAD_MODEL_DIA,
+        SEAT_FLAT_INNER_DIA_MAX < THREAD_MODEL_DIA,
         "relief lead reaches past the thread major into the seat annulus",
     ),
     (SEAT_FLAT_ANNULUS_AREA_MIN > 0.0, "no flat seat annulus is left"),
@@ -420,7 +427,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "HeadLength": 2,
         "ShoulderDia": 2,
         "ThreadLength": 1,
-        "ReliefDia": 1,
+        "ReliefDia": 2,
         "ReliefWidth": 1,
         "TipChamfer": 2,
     },

@@ -134,10 +134,11 @@ def test_installed_configuration_turns_the_end_round_across_the_cup() -> None:
     assert part.END_ROUND_CX_LOCAL == pytest.approx(
         handle.END_ROUND_CENTER[0] - handle.HANDLE_LENGTH
     )
-    # The crown is the steel outside the handle's own end round: under a cubic
-    # millimetre, and never touching the pocket rim.
-    assert 0.5 < part.V_CROWN < 1.5
-    assert handle.END_ROUND_CENTER[1] > spec.POCKET_DIA / 2.0
+    # The crown is the steel outside the handle's own end round: a fraction of
+    # a cubic millimetre, starting outside the largest pocket's edge break so
+    # a flat rim remains (Codex P1 on #1139).
+    assert 0.05 < part.V_CROWN < 0.5
+    assert handle.END_ROUND_CENTER[1] - 0.25 - spec.POCKET_DIA_MAX / 2.0 >= 0.1
     assert part.V_INSTALLED == pytest.approx(part.V_CUP - part.V_CROWN)
     source = Path(part.__file__).read_text(encoding="utf-8")
     split = source.index("create_configuration {INSTALLED_CONFIG}")
