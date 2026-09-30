@@ -316,10 +316,12 @@ async def _build_reference_sheet(
     installation_notes: str = "",
     reference_notes: str = "",
     document_title: str | None = None,
+    cells: tuple | None = None,
 ) -> dict[str, str]:
     source = spec.source
     template = DRAWING_TEMPLATES[spec.layout]
-    cells = _SPRING_VIEW_CELLS if reference_notes else _VIEW_CELLS
+    if cells is None:
+        cells = _SPRING_VIEW_CELLS if reference_notes else _VIEW_CELLS
     draw, sheet = new_project_drawing(adapter, layout=spec.layout)
     title_block_notes = _purchased_title_block(
         adapter,

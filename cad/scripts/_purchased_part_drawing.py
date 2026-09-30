@@ -16,7 +16,17 @@ from typing import Any
 from _common import _early_bound, check
 from _drawing_common import read_required_properties
 from _drawing_registry import DrawingSpec
-from _purchased_fastener_drawing import _PROPERTIES, _build_reference_sheet
+from _purchased_fastener_drawing import _PROPERTIES, _VIEW_CELLS, _build_reference_sheet
+
+# The fastener cells, with the Isometric cell run down the free right column
+# (the installation note ends at x=0.225). A compact loop's pictorial is its
+# tallest view: the keeper chain's 1:1 isometric outline, with its fixed
+# sheet-space border, overran the 60 mm fastener cell and dropped every view
+# to 1:2.
+_PART_VIEW_CELLS = (
+    *(cell for cell in _VIEW_CELLS if cell[0] != "*Isometric"),
+    ("*Isometric", (0.310, 0.2155), (0.240, 0.176, 0.380, 0.255)),
+)
 
 
 async def build_purchased_part_drawing(adapter: Any, spec: DrawingSpec) -> dict[str, str]:
@@ -37,4 +47,5 @@ async def build_purchased_part_drawing(adapter: Any, spec: DrawingSpec) -> dict[
         finish=properties["Finish"],
         material_property="Material Specification",
         installation_notes=properties["Manufacturing Notes"],
+        cells=_PART_VIEW_CELLS,
     )
