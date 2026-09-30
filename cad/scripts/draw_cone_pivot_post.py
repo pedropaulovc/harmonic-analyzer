@@ -230,18 +230,16 @@ JOURNAL_KEEP = {
 }
 # Both chained heights share the dimension line at JOURNAL_KEEP's x, and the
 # crank spacing's extension line runs up it past the 33.37's text, so that text
-# must end left of the line.  Its text box (value plus the ±0.25 stack) runs
-# 20.4 mm right of the offset point: the layout check on leaf w3-1026 read the
-# box as 176.4..210.4 mm with the offset point at 190.0, so 210.4 - 190.0
-# (a measured box, not a per-character estimate), and the 208.0 line crossed
-# it.
-_JOURNAL_AXIS_TEXT_RIGHT = 0.0204
+# must end left of the line.  Its x here is only a start:
+# ``_clear_journal_axis_text`` moves it by the box the layout check itself
+# reads once the sheet is complete.  That box is an estimate (glyph count x
+# height x an advance calibrated from the sheet's notes), so it outruns the
+# printed ink and moves when any note on the sheet changes: leaf w3-1026 read
+# it 34.0 mm wide, the 8f4aea333 control 36.0 mm over 27.1 mm of printed ink.
+# A width fixed from one reading crossed the line on the next.
 _TEXT_LINE_CLEARANCE = 0.002
 JOURNAL_TEXT_OFFSETS = {
-    "JournalAxisY": (
-        JOURNAL_KEEP["CrankAboveCone"][0] - _JOURNAL_AXIS_TEXT_RIGHT - _TEXT_LINE_CLEARANCE,
-        0.157,
-    ),
+    "JournalAxisY": (0.1856, 0.157),
     "CrankAboveCone": (0.193, 0.183),
 }
 # The non-preferred bore limits tell the shop what to inspect without imposing
@@ -784,6 +782,75 @@ def _view_outline(view: Any) -> tuple[float, float, float, float]:
     return outline
 
 
+def journal_axis_text_shift(sheet: Any) -> tuple[Any, float, float]:
+    """The 33.37 text box the layout check reads, the crank spacing line
+    beside it, and the x shift that leaves the box ``_TEXT_LINE_CLEARANCE``
+    left of that line (negative moves it left)."""
+    from _layout_geometry import union_boxes
+
+    texts = [a for a in sheet.annotations if a.label == "JournalAxisY"]
+    if len(texts) != 1:
+        raise RuntimeError(
+            f"expected one JournalAxisY on the sheet, found {len(texts)}"
+        )
+    box = union_boxes(list(texts[0].text_boxes))
+    if box is None:
+        raise RuntimeError("JournalAxisY has no text box to place")
+    spacings = [a for a in sheet.annotations if a.label == "CrankAboveCone"]
+    if len(spacings) != 1:
+        raise RuntimeError(
+            f"expected one CrankAboveCone on the sheet, found {len(spacings)}"
+        )
+    beside = [
+        segment.x0
+        for segment in spacings[0].segments
+        if abs(segment.x1 - segment.x0) < 1e-9
+        and segment.x0 > box.xmin
+        and min(segment.y0, segment.y1) < box.ymax
+        and max(segment.y0, segment.y1) > box.ymin
+    ]
+    if not beside:
+        raise RuntimeError(
+            "no vertical CrankAboveCone line beside the JournalAxisY text "
+            f"{box.format_mm()}: the 33.37 placement premise no longer holds"
+        )
+    line_x = min(beside)
+    return box, line_x, line_x - _TEXT_LINE_CLEARANCE - box.xmax
+
+
+def _clear_journal_axis_text(adapter: Any, journal_annotations: list[Any]) -> None:
+    """Move the 33.37 text so the box the layout check reads on this finished
+    sheet ends ``_TEXT_LINE_CLEARANCE`` left of the crank spacing line."""
+    from diagnostics.drawing_layout_audit import collect_document
+
+    sheets = collect_document(adapter)
+    if len(sheets) != 1:
+        raise RuntimeError(
+            f"cone pivot post must have one drawing sheet: {len(sheets)}"
+        )
+    box, line_x, shift = journal_axis_text_shift(sheets[0])
+    dimensions = [
+        annotation
+        for annotation in journal_annotations
+        if dimension_name(adapter, annotation) == "JournalAxisY"
+    ]
+    if len(dimensions) != 1:
+        raise RuntimeError(
+            f"expected one JournalAxisY in the cone journal view, found {len(dimensions)}"
+        )
+    annotation = _early_bound(dimensions[0], "IAnnotation")
+    position = tuple(float(value) for value in annotation.GetPosition())
+    if len(position) < 2:
+        raise RuntimeError(f"JournalAxisY text has no position: {position!r}")
+    if not annotation.SetPosition2(position[0] + shift, position[1], 0.0):
+        raise RuntimeError("failed to move the JournalAxisY text clear of its line")
+    rebuild_drawing(adapter, label="clear the 33.37 text of the crank spacing line")
+    _telemetry.info(
+        f"JournalAxisY text box {box.format_mm()} vs line x={line_x * 1000.0:.2f} mm: "
+        f"moved text {shift * 1000.0:+.2f} mm from x={position[0] * 1000.0:.2f} mm"
+    )
+
+
 def _pin_sheet_scale(adapter: Any) -> None:
     """Re-pin the sheet's scale before the native gate reads (or its failure
     PDF prints) the title block.
@@ -998,12 +1065,22 @@ def _assert_native_layout(
             "cone pivot post native annotation layout failed:\n"
             f"{format_findings(findings)}"
         )
+    axis_box, line_x, shift = journal_axis_text_shift(sheet)
+    if shift < -1e-4:
+        raise RuntimeError(
+            f"JournalAxisY text {axis_box.format_mm()} ends "
+            f"{(line_x - axis_box.xmax) * 1000.0:.2f} mm left of the crank spacing "
+            f"line at x={line_x * 1000.0:.2f} mm; it must clear it by "
+            f"{_TEXT_LINE_CLEARANCE * 1000.0:.2f} mm"
+        )
     _telemetry.info(
         "cone pivot post native layout: "
         f"journal={journal_box.format_mm()}; "
         f"finish={finish_box.format_mm()} in {finish_cell.format_mm()}; "
         f"Ra={[box.format_mm() for box in surface_boxes]}; "
-        f"self-overlap mm={own_overlaps}"
+        f"self-overlap mm={own_overlaps}; "
+        f"JournalAxisY text={axis_box.format_mm()} clears x={line_x * 1000.0:.2f} "
+        f"by {(line_x - axis_box.xmax) * 1000.0:.2f} mm"
     )
 
 
@@ -1344,6 +1421,7 @@ async def build(adapter: Any) -> dict[str, str]:
     _pin_sheet_scale(adapter)
     rebuild_drawing(adapter, label="final cone pivot post native layout")
     _show_section_scale_in_caption(adapter, section)
+    _clear_journal_axis_text(adapter, journal_annotations)
     _assert_native_layout_with_evidence(
         adapter,
         journal,
