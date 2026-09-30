@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Independent source observations in the original CAD frame",
+  "type": "object",
+  "required": ["schemaVersion", "source", "model", "anchors", "shots", "frames", "coverage"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "source": {
+      "type": "object",
+      "required": ["videoId", "sha256", "width", "height", "durationSeconds", "fps"],
+      "properties": {
+        "videoId": {"type": "string"},
+        "sha256": {"$ref": "#/$defs/hash"},
+        "width": {"type": "integer", "minimum": 1},
+        "height": {"type": "integer", "minimum": 1},
+        "durationSeconds": {"type": "number", "exclusiveMinimum": 0},
+        "fps": {"oneOf": [{"type": "number", "exclusiveMinimum": 0}, {"type": "string"}, {"type": "object", "required": ["numerator", "denominator"], "properties": {"numerator": {"type": "integer", "minimum": 1}, "denominator": {"type": "integer", "minimum": 1}}}]}
+      }
+    },
+    "model": {
+      "type": "object",
+      "required": ["sha256", "sourceCommit", "units", "axes"],
+      "properties": {"sha256": {"$ref": "#/$defs/hash"}, "sourceCommit": {"type": "string"}, "units": {"const": "metres"}, "axes": {"const": "X-width/Y-height/Z-depth"}}
+    },
+    "anchors": {"type": "array", "items": {"$ref": "#/$defs/anchor"}},
+    "shots": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "startSeconds", "endSeconds", "classification", "reason"],
+        "properties": {"id": {"type": "string"}, "startSeconds": {"type": "number", "minimum": 0}, "endSeconds": {"type": "number", "exclusiveMinimum": 0}, "classification": {"$ref": "#/$defs/classification"}, "reason": {"type": "string", "minLength": 1}, "hasCorrespondingMachine": {"type": "boolean"}}
+      }
+    },
+    "frames": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/frame"}},
+    "coverage": {
+      "type": "object",
+      "required": ["status", "blockers", "requiredEveryIntegerSecond"],
+      "properties": {"status": {"enum": ["complete", "blocked"]}, "blockers": {"type": "array", "items": {"type": "string"}}, "requiredEveryIntegerSecond": {"const": true}, "requiredEveryChange": {"const": true}, "changeTimesSeconds": {"type": "array", "items": {"type": "number", "minimum": 0}}, "changeCensusEvidence": {"type": "string", "minLength": 1}}
+    }
+  },
+  "$defs": {
+    "hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "xyz": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "number"}},
+    "xyzw": {"type": "array", "minItems": 4, "maxItems": 4, "items": {"type": "number"}},
+    "classification": {"enum": ["machine", "non-machine", "transition", "unobservable"]},
+    "sourceImage": {
+      "type": "object",
+      "required": ["frameIndex", "sha256Bgr8", "pixelFormat", "width", "height", "sourceSha256"],
+      "properties": {"frameIndex": {"type": "integer", "minimum": 0}, "sha256Bgr8": {"$ref": "#/$defs/hash"}, "pixelFormat": {"const": "bgr8"}, "width": {"type": "integer", "minimum": 1}, "height": {"type": "integer", "minimum": 1}, "sourceSha256": {"$ref": "#/$defs/hash"}}
+    },
+    "cameraFit": {
+      "type": "object",
+      "properties": {"fitPrincipalPoint": {"type": "boolean"}, "verticalFovDegrees": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 180}, "evidence": {"type": "string", "minLength": 1}}
+    },
+    "anchor": {
+      "type": "object",
+      "required": ["id", "kind", "partPath", "description", "correspondenceEvidence"],
+      "oneOf": [{"required": ["partLocalMetres"], "not": {"required": ["worldMetres"]}}, {"required": ["worldMetres"], "not": {"required": ["partLocalMetres"]}}],
+      "properties": {"id": {"type": "string"}, "kind": {"enum": ["section-center", "physical-feature"]}, "partPath": {"type": "string"}, "partLocalMetres": {"$ref": "#/$defs/xyz"}, "worldMetres": {"$ref": "#/$defs/xyz"}, "description": {"type": "string"}, "correspondenceEvidence": {"type": "string", "minLength": 1}}
+    },
+    "landmark": {
+      "type": "object",
+      "required": ["anchorId", "role", "pixel", "status", "method", "uncertaintyPx"],
+      "properties": {"anchorId": {"type": "string"}, "viewId": {"type": "string"}, "role": {"enum": ["fit", "check"]}, "pixel": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "number"}}, "status": {"const": "observed"}, "method": {"enum": ["manual", "optical-flow", "image-edge", "template-match"]}, "uncertaintyPx": {"type": "number", "minimum": 0}}
+    },
+    "mechanismInput": {
+      "type": "object",
+      "description": "Arrays are physical GLB station/instance order: harmonic 20 down to 1, not ascending harmonic order.",
+      "required": ["crankTurns", "amplitudes", "phases", "gearing", "magnification", "setup"],
+      "properties": {
+        "crankTurns": {"type": "number"},
+        "amplitudes": {"type": "array", "minItems": 20, "maxItems": 20, "items": {"type": "number", "minimum": -1, "maximum": 1}},
+        "phases": {"type": "array", "minItems": 20, "maxItems": 20, "items": {"type": "number"}},
+        "gearing": {"enum": ["small-large", "medium-medium", "large-small"]},
+        "magnification": {"type": "number", "exclusiveMinimum": 0},
+        "setup": {"type": "object", "required": ["counterHeightM", "meanLineAngleRad", "platenOffsetM", "coneSwingRad", "pinionCamRad", "heldChannelTurns", "driveCrankOffsetTurns", "wireFixtureOffsetM"], "properties": {"counterHeightM": {"type": ["number", "null"]}, "meanLineAngleRad": {"type": "number"}, "platenOffsetM": {"type": "number"}, "coneSwingRad": {"type": "number"}, "pinionCamRad": {"type": "number"}, "heldChannelTurns": {"type": "number"}, "driveCrankOffsetTurns": {"type": "number", "description": "Measured crank-to-bank offset: engaged drive uses crankTurns minus this. Never defaulted for source footage."}, "wireFixtureOffsetM": {"type": "number"}}}
+      }
+    },
+    "mechanicalState": {
+      "type": "object",
+      "required": ["status", "evidence", "input"],
+      "properties": {"status": {"enum": ["observed", "unobservable", "not-applicable"]}, "evidence": {"type": "string", "minLength": 1}, "input": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/mechanismInput"}]}, "visiblePoseCompleteness": {"enum": ["complete", "partial"]}}
+    },
+    "camera": {
+      "type": ["object", "null"],
+      "required": ["positionMetres", "quaternion", "verticalFovDegrees", "fitRmsPx", "heldOutMaxPx", "status"],
+      "properties": {"positionMetres": {"$ref": "#/$defs/xyz"}, "quaternion": {"$ref": "#/$defs/xyzw"}, "verticalFovDegrees": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 180}, "fitRmsPx": {"type": "number", "minimum": 0}, "heldOutMaxPx": {"type": "number", "minimum": 0}, "status": {"enum": ["passed", "failed"]}}
+    },
+    "view": {
+      "type": "object",
+      "required": ["id", "rectSourcePixels", "presentation", "camera", "mechanicalState"],
+      "properties": {
+        "id": {"type": "string"},
+        "rectSourcePixels": {"$ref": "#/$defs/xyzw"},
+        "presentation": {"enum": ["native", "horizontal-mirror"]},
+        "camera": {"$ref": "#/$defs/camera"},
+        "mechanicalState": {"$ref": "#/$defs/mechanicalState"},
+        "partOverrides": {"type": "array", "items": {"type": "object", "required": ["partPath", "visibility"], "properties": {"partPath": {"type": "string"}, "visibility": {"enum": ["visible", "hidden"]}, "worldPositionMetres": {"$ref": "#/$defs/xyz"}, "worldQuaternion": {"$ref": "#/$defs/xyzw"}}}}
+      }
+    },
+    "frame": {
+      "type": "object",
+      "required": ["timeSeconds", "decodedTimeSeconds", "shotId", "classification", "landmarks", "unavailable", "mechanicalState", "camera"],
+      "allOf": [{"if": {"properties": {"landmarks": {"minItems": 1}}}, "then": {"required": ["sourceImage"]}}],
+      "properties": {
+        "timeSeconds": {"type": "number", "minimum": 0}, "decodedTimeSeconds": {"type": "number", "minimum": 0}, "shotId": {"type": "string"}, "classification": {"$ref": "#/$defs/classification"},
+        "landmarks": {"type": "array", "items": {"$ref": "#/$defs/landmark"}},
+        "unavailable": {"type": "array", "items": {"type": "object", "required": ["anchorId", "reason"], "properties": {"anchorId": {"type": "string"}, "reason": {"type": "string"}}}},
+        "mechanicalState": {"$ref": "#/$defs/mechanicalState"}, "camera": {"$ref": "#/$defs/camera"}, "views": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/view"}},
+        "sourceImage": {"$ref": "#/$defs/sourceImage"}, "cameraFit": {"$ref": "#/$defs/cameraFit"}, "anchorPoseMissing": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  }
+}

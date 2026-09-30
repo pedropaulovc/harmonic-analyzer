@@ -9,6 +9,7 @@
     "fetch-model": "node scripts/fetch-model.mjs",
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "verify:sync": "node scripts/verify-sync.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit"
   },
@@ -17,6 +18,7 @@
   },
   "devDependencies": {
     "@types/three": "^0.180.0",
+    "playwright": "1.63.0",
     "typescript": "^5.6.0",
     "vite": "^7.0.0"
   }
