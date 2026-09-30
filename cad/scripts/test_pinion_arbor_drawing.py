@@ -162,7 +162,7 @@ def test_only_the_two_journal_lands_carry_the_running_band_and_finish() -> None:
     assert spec.JOURNAL_DIA_BAND == (-0.01, -0.03)
     # Both stacked bands print at 2 places: "-0.01/-0.03" and "-0.01/-0.10".
     for band in (spec.JOURNAL_DIA_BAND, spec.SHAFT_DIA_BAND):
-        assert _drawing_marks._tolerance_precision_mm(*_fit_limits.deviations(band)) == 2
+        assert _drawing_marks._tolerance_places(*_fit_limits.deviations(band)) == 2
     assert _fit_limits.band_text(spec.JOURNAL_DIA_BAND) == "-0.01/-0.03"
     assert spec.SHAFT_DIA_BAND == (-0.01, -0.10)
     assert model_toleranced_dimensions(part) == {

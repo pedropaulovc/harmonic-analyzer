@@ -106,33 +106,35 @@ def _named_dimension(
     return _named_dimensions(adapter, feature_name, {dimension_name})[dimension_name]
 
 
-def _tolerance_precision_mm(*deviations_mm: float) -> int:
-    """Return the fewest decimals that preserve every millimetre deviation.
+def _tolerance_places(*deviations: float) -> int:
+    """Return the fewest decimals that preserve every deviation, in the
+    dimension's display unit (millimetres, or degrees for an angle).
 
-    SOLIDWORKS stores tolerance values in metres but renders them in the
-    document's display units.  The drawing template defaults tolerance values
-    to two decimal places, which would turn a real 0.004 mm deviation into
-    0.00.  Derive the override from the source values rather than maintaining a
-    second per-drawing precision table.
+    SOLIDWORKS stores tolerance values in metres or radians but renders them
+    in the document's display units.  The drawing template defaults tolerance
+    values to two decimal places, which would turn a real 0.004 mm deviation
+    into 0.00, and angular tolerances to one, which printed a 0.25 deg band as
+    +/-0.3.  Derive the override from the source values rather than
+    maintaining a second per-drawing precision table.
     """
     for digits in range(9):
         if all(
             math.isclose(value, round(value, digits), rel_tol=0.0, abs_tol=1e-12)
-            for value in deviations_mm
+            for value in deviations
         ):
             return digits
     raise ValueError(
-        f"dimension tolerance needs more than 8 decimal places: {deviations_mm!r}"
+        f"dimension tolerance needs more than 8 decimal places: {deviations!r}"
     )
 
 
 @_telemetry.traced("dim.tolerance_precision", label_param="label")
 def _set_tolerance_precision(
-    display: Any, deviations_mm: tuple[float, ...], *, label: str
+    display: Any, deviations: tuple[float, ...], *, label: str
 ) -> int:
     """Set and verify a model display dimension's primary tolerance precision."""
     display = _early_bound(display, "IDisplayDimension")
-    digits = _tolerance_precision_mm(*deviations_mm)
+    digits = _tolerance_places(*deviations)
     do_not_change = -1  # swDimensionPrecisionSettings_e
     display.SetPrecision3(do_not_change, do_not_change, digits, do_not_change)
     applied = int(display.GetPrimaryTolPrecision2())
@@ -337,7 +339,7 @@ def set_dimension_symmetric_angular_tolerance(
     """Tolerance one angular model dimension; SolidWorks stores radians."""
     if tolerance_degrees <= 0.0:
         raise ValueError("symmetric angular tolerance must be positive")
-    _, dimension = _named_dimension(adapter, feature_name, dimension_name)
+    display, dimension = _named_dimension(adapter, feature_name, dimension_name)
     if require_driven and int(_read_member(dimension, "DrivenState")) != 1:
         raise RuntimeError(
             f"{dimension_name}@{feature_name}: expected a driven reference dimension"
@@ -357,8 +359,14 @@ def set_dimension_symmetric_angular_tolerance(
             f"{dimension_name}@{feature_name}: angular tolerance readback "
             f"{minimum:g}/{maximum:g} rad != +/-{tolerance_rad:g} rad"
         )
+    precision = _set_tolerance_precision(
+        display,
+        (-tolerance_degrees, tolerance_degrees),
+        label=f"{dimension_name}@{feature_name}",
+    )
     _telemetry.success(
-        f"toleranced {dimension_name}@{feature_name}: +/-{tolerance_degrees:.2f} deg"
+        f"toleranced {dimension_name}@{feature_name}: +/-{tolerance_degrees:g} deg "
+        f"({precision} decimals)"
     )
 
 
