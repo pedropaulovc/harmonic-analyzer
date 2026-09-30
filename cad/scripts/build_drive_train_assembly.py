@@ -445,6 +445,33 @@ _DY16 = Y_CRANK - Y_DRIVE  # vertical leg in both gear planes
 if _DX16 <= 0.0:
     raise AssertionError("the 64T no longer lies +x of the crank (crank_mesh_stack premise)")
 CRANK_ACTUAL_C2C = math.hypot(_DX16, _DY16)
+# The pair's contact ratio (user ruling 2026-09-30: under rule 12's 1.1 and
+# printed on both gear sheets as a plain fact). Nominal at the modelled centre
+# and tips; worst at crank_mesh_stack's open corner with both tips at their
+# printed lower limits. Each sheet prints the worst rounded down.
+from crank_drive_gear_notes import WORST_CONTACT_RATIO as CRANK_MESH_PRINTED_CONTACT_RATIO  # noqa: E402
+from crank_drive_gear_spec import OUTSIDE_DIA as _GEAR64_TIP_DIA  # noqa: E402
+from crank_mesh_stack import (  # noqa: E402
+    OPEN_CENTRE_DISTANCE_MM as CRANK_MESH_OPEN_CENTRE_DISTANCE,
+    TIP_DIA_LOW_16 as _PINION_TIP_DIA_LOW,
+    TIP_DIA_LOW_64 as _GEAR64_TIP_DIA_LOW,
+    contact_ratio as crank_mesh_contact_ratio,
+)
+from crank_pinion_spec import OUTSIDE_DIA as _PINION_TIP_DIA  # noqa: E402
+
+CRANK_MESH_CONTACT_RATIO_NOMINAL = crank_mesh_contact_ratio(
+    centre_distance=CRANK_ACTUAL_C2C, tip_dia_16=_PINION_TIP_DIA, tip_dia_64=_GEAR64_TIP_DIA
+)
+CRANK_MESH_CONTACT_RATIO_WORST = crank_mesh_contact_ratio(
+    centre_distance=CRANK_ACTUAL_C2C + CRANK_MESH_OPEN_CENTRE_DISTANCE,
+    tip_dia_16=_PINION_TIP_DIA_LOW,
+    tip_dia_64=_GEAR64_TIP_DIA_LOW,
+)
+if not 0.0 <= CRANK_MESH_CONTACT_RATIO_WORST - CRANK_MESH_PRINTED_CONTACT_RATIO < 0.01:
+    raise AssertionError(
+        f"the sheets print a 16T:64T worst-case contact ratio of {CRANK_MESH_PRINTED_CONTACT_RATIO:.2f}; "
+        f"the mesh gives {CRANK_MESH_CONTACT_RATIO_WORST:.4f} (print it rounded down)"
+    )
 # Contact azimuths (from each gear's centre toward the other axis, in that
 # gear's own plane, ccw from the in-plane horizontal). The 64T plane rides
 # the inclined cone shaft; the 16T plane is a plain machine-Z section.
@@ -1666,49 +1693,257 @@ if sum(PINION_RECESS_STACK.values()) < PINION_RECESS_MIN_WORST:
         f"{_stack_text(PINION_RECESS_STACK)} < {PINION_RECESS_MIN_WORST}"
     )
 
-# The inclined T120 reaches toward the crank axis above the 16T.  The exact
-# arc scan walks T120's SOUTH face rim (printed tip at its upper limit): the
-# rim point is the south face's axis point (the station moved along the
-# inclined axis, so both x and z shift) plus the in-plane radius.  Wherever
-# that rim enters the 16T's tip cylinder, the pinion's north face must keep
-# 0.25 mm axial air under it.  The south face is set on the feeler, so the
-# printed face band moves only the north face: the air is proved at the band's
-# long limit, the 64T row engagement below at its short limit (Codex P1 on
-# #1128).
-_PINION_FACE_SHORT, _PINION_FACE_LONG = printed_deviations(
-    PINION_FACE, PINION_FACE_WIDTH_PLACES, PINION_FACE_LIMITS
+# --- The 16T's north end under the inclined T120 (user ruling c'' variant B,
+# 2026-09-30) ----------------------------------------------------------------
+# The inclined T120 reaches toward the crank axis above the 16T. Its teeth run
+# past the 64T row so the row stays covered, and their north end is turned
+# down so it passes under the T120 rim: full OD for the printed shoulder,
+# the turned diameter beyond it (crank_pinion_spec). Every check is the worst
+# over the corners of every printed band that moves the parts, at both crank
+# end-play extremes -- the pinion as set on its feeler, and run south onto the
+# boss -- with the cone stack anywhere in its north float.
+import itertools  # noqa: E402
+
+import numpy as np  # noqa: E402
+
+from cone_gear_shaft_spec import COLLAR_THICKNESS as SHAFT_COLLAR_THICKNESS  # noqa: E402
+from cone_pivot_post_spec import (  # noqa: E402
+    CRANK_ABOVE_CONE as POST_CRANK_ABOVE_CONE,
+    CRANK_ABOVE_CONE_BAND as POST_CRANK_ABOVE_CONE_BAND,
+    CRANK_BOSS_NORTH_FACE as POST_CRANK_BOSS_NORTH_FACE,
 )
-_T120_SOUTH_CENTRE = cone_station(_T120_SOUTH_FACE_STATION)
+from cone_stack_end_play import STACK_FLOAT  # noqa: E402
+from crank_drive_gear_spec import FACE_WIDTH_BAND as GEAR64_FACE_WIDTH_BAND  # noqa: E402
+from crank_pinion_spec import (  # noqa: E402
+    DRAWING_PRECISION_BY_NAME as PINION_DRAWING_PRECISION,
+    OUTSIDE_DIA as PINION_OUTSIDE_DIA,
+    OUTSIDE_DIA_TOLERANCE_MM as PINION_OUTSIDE_DIA_TOLERANCE,
+    SHOULDER_LENGTH as PINION_SHOULDER_LENGTH,
+    SHOULDER_LENGTH_LIMITS as PINION_SHOULDER_LIMITS,
+    TURNED_DIA as PINION_TURNED_DIA,
+    TURNED_DIA_TOLERANCE_MM as PINION_TURNED_DIA_TOLERANCE,
+)
+
+# (lower, upper) deviation of each moving surface from the model; + is north
+# (crank +Z, cone +station), or up for the crank height.
+_PINION_FACE_BAND = printed_deviations(PINION_FACE, PINION_FACE_WIDTH_PLACES, PINION_FACE_LIMITS)
+_PINION_SHOULDER_BAND = printed_deviations(
+    PINION_SHOULDER_LENGTH, PINION_DRAWING_PRECISION["ShoulderLength"], PINION_SHOULDER_LIMITS
+)
+_PINION_TIP_RADIUS_BAND = tuple(
+    d / 2.0
+    for d in printed_deviations(
+        PINION_OUTSIDE_DIA,
+        PINION_DRAWING_PRECISION["OutsideDia"],
+        (-PINION_OUTSIDE_DIA_TOLERANCE, PINION_OUTSIDE_DIA_TOLERANCE),
+    )
+)
+# Only the turned band's largest radius can close on T120.
+_PINION_TURNED_RADIUS_UP = printed_deviations(
+    PINION_TURNED_DIA,
+    PINION_DRAWING_PRECISION["TurnedDia"],
+    (-PINION_TURNED_DIA_TOLERANCE, PINION_TURNED_DIA_TOLERANCE),
+)[1] / 2.0
+_BOSS_NORTH_BAND = printed_deviations(
+    POST_CRANK_BOSS_NORTH_FACE, POST_DRAWING_PRECISION["CrankBossStartZ"]
+)
+_CONE_BOSS_NORTH_BAND = tuple(
+    d / 2.0
+    for d in printed_deviations(POST_CONE_BOSS_LENGTH, POST_DRAWING_PRECISION["ConeBossLen"])
+)
+_COLLAR_WIDTH_BAND = printed_deviations(
+    SHAFT_COLLAR_THICKNESS, SHAFT_DRAWING_PRECISION["CollarWidth"]
+)
+_GEAR64_FACE_LIMITS = deviations(GEAR64_FACE_WIDTH_BAND)
+_CRANK_HEIGHT_BAND = printed_deviations(
+    POST_CRANK_ABOVE_CONE,
+    POST_DRAWING_PRECISION["CrankAboveCone"],
+    deviations(POST_CRANK_ABOVE_CONE_BAND),
+)
+# The crank's end play: set on the feeler, or run south onto the boss.
+PINION_END_PLAY = (-PINION_SEAT_FEELER, 0.0)
+# The cone stack's in-service float north of its model pose, along its axis.
+CONE_FLOAT_NORTH = SHAFT_END_PLAY[1] + STACK_FLOAT[1]
+
 _TIP120 = _cone_tip_radius_max(120)
-_T120_SOUTH = math.inf  # no radial overlap -> no T120 bound at all
-for _k in range(72000):
-    _c = _TIP120 * math.cos(math.radians(0.005 * _k))
-    _s = _TIP120 * math.sin(math.radians(0.005 * _k))
-    if (
-        math.hypot(_T120_SOUTH_CENTRE[0] + _c * COS_I - X_CRANK, Y_DRIVE + _s - Y_CRANK)
-        <= R16 + ADD16
-    ):
-        _T120_SOUTH = min(_T120_SOUTH, _T120_SOUTH_CENTRE[2] - _c * SIN_I)
-T120_PINION_NORTH_AIR = _T120_SOUTH - (_PINION_SOUTH + PINION_FACE + _PINION_FACE_LONG)
+# T120 as sampled solid: its tip cylinder over the face and rings over the
+# outer 3 mm of both faces, 0.05 deg and 0.05 mm apart, kept within reach of
+# the 16T (tip radius 8.74).
+_T120_REACH = 10.0
+_T120_FACE_DEPTH = 3.0
+_T120_NORTH_BAND = cone_gear_stack.face_band(0, "north")  # (upper, lower)
+
+
+def _t120_rings(
+    stations: np.ndarray, rhos: np.ndarray, dy: float, theta: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    """(r to the crank axis, machine z) of T120's rings, radius ``rhos[k]`` at
+    ``stations[k]``, the crank axis ``dy`` above its model height."""
+    centres = np.array([cone_station(float(station)) for station in stations])
+    radial = rhos[:, None] * np.cos(theta)[None, :]
+    x = centres[:, 0, None] + radial * COS_I
+    y = Y_DRIVE + rhos[:, None] * np.sin(theta)[None, :]
+    return (
+        np.hypot(x - X_CRANK, y - (Y_CRANK + dy)).ravel(),
+        (centres[:, 2, None] - radial * SIN_I).ravel(),
+    )
+
+
+_T120_ALL_THETA = np.radians(np.arange(0.0, 360.0, 0.05))
+_T120_THETA = _T120_ALL_THETA[
+    _t120_rings(np.array([_T120_SOUTH_FACE_STATION]), np.array([_TIP120]), 0.0, _T120_ALL_THETA)[0]
+    < _T120_REACH + 3.0
+]
+_T120_FACE_RHOS = np.arange(_TIP120 - _T120_FACE_DEPTH, _TIP120 + 1e-9, 0.05)
+# The face rings reach deep enough: T120's face inside them is out of reach.
+if _t120_rings(
+    np.array([_T120_SOUTH_FACE_STATION]), _T120_FACE_RHOS[:1], 0.0, _T120_THETA
+)[0].min() <= _T120_REACH:
+    raise AssertionError("the T120 face sampling stops inside the 16T's reach")
+_T120_CLOUDS: dict[tuple[float, float], tuple[np.ndarray, np.ndarray]] = {}
+
+
+def _t120_cloud(shift: float, dy: float) -> tuple[np.ndarray, np.ndarray]:
+    """T120's sampled points within reach, (r, z) sorted by z, the cone stack
+    moved ``shift`` north along its axis."""
+    key = (round(shift, 9), round(dy, 9))
+    if key not in _T120_CLOUDS:
+        south = _T120_SOUTH_FACE_STATION + shift
+        north = south + CONE_FACE
+        tip_stations = np.linspace(south, north + _T120_NORTH_BAND[0], 161)
+        face_stations = np.repeat(
+            [south, north + _T120_NORTH_BAND[1], north + _T120_NORTH_BAND[0]], _T120_FACE_RHOS.size
+        )
+        r, z = _t120_rings(
+            np.concatenate((tip_stations, face_stations)),
+            np.concatenate((np.full(tip_stations.size, _TIP120), np.tile(_T120_FACE_RHOS, 3))),
+            dy,
+            _T120_THETA,
+        )
+        keep = r < _T120_REACH
+        order = np.argsort(z[keep])
+        _T120_CLOUDS[key] = (r[keep][order], z[keep][order])
+    return _T120_CLOUDS[key]
+
+
+def _cone_corners() -> list[tuple[float, float]]:
+    """(T120's shift north along the cone axis, crank height) per corner: the
+    post's cone boss and the collar the 64T stands on, the 64T's face under
+    T120, and the stack's float."""
+    floats = (0.0, CONE_FLOAT_NORTH / 2.0, CONE_FLOAT_NORTH)
+    return [
+        (b2 + b3 + b4 + f, dy)
+        for b2, b3, b4, f, dy in itertools.product(
+            _CONE_BOSS_NORTH_BAND, _COLLAR_WIDTH_BAND, _GEAR64_FACE_LIMITS, floats, _CRANK_HEIGHT_BAND
+        )
+    ]
+
+
+def pinion_t120_clearances(
+    *,
+    shoulder_length: float | None = PINION_SHOULDER_LENGTH,
+    turned_dia: float = PINION_TURNED_DIA,
+    face: float = PINION_FACE,
+) -> dict[str, float]:
+    """Worst 16T-to-T120 clearances over every printed corner.
+
+    ``shoulder air``: T120's lowest point inside the 16T's tip cylinder, above
+    the full-OD shoulder at its long limit.  ``turned band radial``: T120's
+    nearest point to the crank axis over the turned band's length (shoulder
+    to tooth end, each at either limit), outside the turned diameter at its
+    upper limit.  ``shoulder_length`` None models teeth at full OD to their
+    end (no turned band).
+    """
+    air = radial = math.inf
+    # The largest tip and turned radii close on T120 first.
+    tip_r = R16 + ADD16 + max(_PINION_TIP_RADIUS_BAND)
+    turned_r = turned_dia / 2.0 + _PINION_TURNED_RADIUS_UP
+    for shift, dy in _cone_corners():
+        r, z = _t120_cloud(shift, dy)
+        lowest_inside = float(z[r <= tip_r].min(initial=math.inf))
+        for b1, play, d_face in itertools.product(
+            _BOSS_NORTH_BAND, PINION_END_PLAY, _PINION_FACE_BAND
+        ):
+            south = _POST_BOSS_NORTH + b1 + PINION_SEAT_FEELER + play
+            end = south + face + d_face
+            if shoulder_length is None:
+                air = min(air, lowest_inside - end)
+                continue
+            for d_shoulder in _PINION_SHOULDER_BAND:
+                shoulder = min(south + shoulder_length + d_shoulder, end)
+                air = min(air, lowest_inside - shoulder)
+                lo = int(np.searchsorted(z, shoulder, side="left"))
+                hi = int(np.searchsorted(z, end, side="right"))
+                if hi > lo:
+                    radial = min(radial, float(r[lo:hi].min()) - turned_r)
+    return {"shoulder air": air, "turned band radial": radial}
+
+
+PINION_T120_CLEARANCES = pinion_t120_clearances()
+T120_SHOULDER_AIR = PINION_T120_CLEARANCES["shoulder air"]
+T120_TURNED_BAND_RADIAL = PINION_T120_CLEARANCES["turned band radial"]
 T120_PINION_AIR_FLOOR = 0.25
-if T120_PINION_NORTH_AIR < T120_PINION_AIR_FLOOR:
+T120_TURNED_BAND_RADIAL_FLOOR = 0.25
+if T120_SHOULDER_AIR < T120_PINION_AIR_FLOOR:
     raise AssertionError(
-        f"16T north face leaves {T120_PINION_NORTH_AIR:.3f} mm to the inclined T120 rim, "
+        f"16T full-OD shoulder leaves {T120_SHOULDER_AIR:.3f} mm to the inclined T120, "
         f"below the {T120_PINION_AIR_FLOOR:.2f}-mm axial-air floor"
     )
-# ... and must still cover the 64T row (>= 85% of its face) at the short
-# limit -- an engagement floor so a future station edit cannot quietly starve
-# the mesh.
+if T120_TURNED_BAND_RADIAL < T120_TURNED_BAND_RADIAL_FLOOR:
+    raise AssertionError(
+        f"16T turned band passes {T120_TURNED_BAND_RADIAL:.3f} mm inside the T120 rim, "
+        f"below the {T120_TURNED_BAND_RADIAL_FLOOR:.2f}-mm radial floor"
+    )
+
+# ... and the teeth must still cover the 64T row (>= 85% of its face) at
+# every corner -- an engagement floor so a future station edit cannot quietly
+# starve the mesh.  The row counts the turned stub teeth north of the
+# shoulder (reading (ii), which this face-extent check has always implied;
+# user ruling 2026-09-30): they are the 16T's own teeth, cut full depth and
+# turned to a shorter addendum.  The full-depth share alone (reading (i)) is
+# reported, not gated.
 _G64_BAND = (
     _GEAR64_CONTACT_Z - GEAR64_FACE / 2.0 * COS_I,
     _GEAR64_CONTACT_Z + GEAR64_FACE / 2.0 * COS_I,
 )
-_ENGAGED = min(_PINION_SOUTH + PINION_FACE + _PINION_FACE_SHORT, _G64_BAND[1]) - max(
-    _PINION_SOUTH, _G64_BAND[0]
+CRANK_ROW_ENGAGEMENT_FLOOR = 0.85
+
+
+def crank_row_engagement(
+    tooth_length: float, length_band: tuple[float, float], cone_float: float
+) -> float:
+    """Worst share of the 64T row (its face along the crank axis) that 16T
+    teeth ``tooth_length`` long (``length_band`` its printed deviations) cover,
+    the cone stack floated north anywhere up to ``cone_float``."""
+    worst = math.inf
+    for b1, b2, b3, b4, d_length, play, f in itertools.product(
+        _BOSS_NORTH_BAND,
+        _CONE_BOSS_NORTH_BAND,
+        _COLLAR_WIDTH_BAND,
+        _GEAR64_FACE_LIMITS,
+        length_band,
+        PINION_END_PLAY,
+        (0.0, cone_float),
+    ):
+        south = _POST_BOSS_NORTH + b1 + PINION_SEAT_FEELER + play
+        north = south + tooth_length + d_length
+        row_south = _G64_BAND[0] + (b2 + b3 + f) * COS_I
+        row_north = _G64_BAND[1] + (b2 + b3 + b4 + f) * COS_I
+        worst = min(worst, min(north, row_north) - max(south, row_south))
+    return worst / (GEAR64_FACE * COS_I)
+
+
+CRANK_ROW_ENGAGEMENT_FRACTION = crank_row_engagement(PINION_FACE, _PINION_FACE_BAND, CONE_FLOAT_NORTH)
+CRANK_ROW_ENGAGEMENT_UNFLOATED = crank_row_engagement(PINION_FACE, _PINION_FACE_BAND, 0.0)
+CRANK_ROW_FULL_DEPTH_FRACTION = min(
+    crank_row_engagement(PINION_SHOULDER_LENGTH, _PINION_SHOULDER_BAND, CONE_FLOAT_NORTH),
+    CRANK_ROW_ENGAGEMENT_FRACTION,
 )
-CRANK_ROW_ENGAGEMENT_FRACTION = _ENGAGED / (GEAR64_FACE * COS_I)
-if CRANK_ROW_ENGAGEMENT_FRACTION < 0.85:
-    raise AssertionError("16T covers less than 85% of the 64T tooth row")
+if CRANK_ROW_ENGAGEMENT_FRACTION < CRANK_ROW_ENGAGEMENT_FLOOR:
+    raise AssertionError(
+        f"16T covers {CRANK_ROW_ENGAGEMENT_FRACTION:.1%} of the 64T tooth row at worst, "
+        f"below {CRANK_ROW_ENGAGEMENT_FLOOR:.0%}"
+    )
 # The base's pivot-screw hole sits exactly under the swing pivot -- both are
 # authored in the machine frame, so the coordinates agree directly (pre-#151
 # this module derived in the mirrored frame and the hole's x was the NEGATED
@@ -3727,13 +3962,19 @@ async def build(adapter) -> dict[str, str]:
     )
     _telemetry.info(
         f"16T/boss north-face feeler {_BOSS_NORTH_GAP:.4f} mm; "
-        f"16T/T120 north air at face {_PINION_FACE_LONG:+.2f} {T120_PINION_NORTH_AIR:.4f} "
-        f">= {T120_PINION_AIR_FLOOR:.2f} mm"
+        f"16T/T120 shoulder air {T120_SHOULDER_AIR:.4f} >= {T120_PINION_AIR_FLOOR:.2f} mm; "
+        f"turned band radial {T120_TURNED_BAND_RADIAL:.4f} >= {T120_TURNED_BAND_RADIAL_FLOOR:.2f} mm"
     )
     _telemetry.info(
-        f"16T/64T row engagement at face {_PINION_FACE_SHORT:+.2f} "
-        f"{_ENGAGED:.4f}/{GEAR64_FACE * COS_I:.4f} mm "
-        f"= {CRANK_ROW_ENGAGEMENT_FRACTION:.2%} >= 85%"
+        f"16T/64T row engagement (stub teeth counted) {CRANK_ROW_ENGAGEMENT_UNFLOATED:.2%} "
+        f"unfloated, {CRANK_ROW_ENGAGEMENT_FRACTION:.2%} with the cone stack floated "
+        f"{CONE_FLOAT_NORTH:.2f} >= {CRANK_ROW_ENGAGEMENT_FLOOR:.0%}; full depth only "
+        f"{CRANK_ROW_FULL_DEPTH_FRACTION:.2%}"
+    )
+    _telemetry.info(
+        f"16T/64T contact ratio {CRANK_MESH_CONTACT_RATIO_NOMINAL:.4f} nominal, "
+        f"{CRANK_MESH_CONTACT_RATIO_WORST:.4f} worst (open centres, tips low), "
+        f"printed {CRANK_MESH_PRINTED_CONTACT_RATIO:.2f}"
     )
     # #893: the W15 stacks are import-time asserts, so a passing build would
     # otherwise leave no record of their sums or margins in the leaf log.

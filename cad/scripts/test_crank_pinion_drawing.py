@@ -57,6 +57,8 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
             "BoreDia",
             "BossDia",
             "OverallLength",
+            "ShoulderLength",
+            "TurnedDia",
         }
     )
     assert set(drawing.DIMENSION_CALLOUTS) <= kept
@@ -71,6 +73,8 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
         "BossDia",
         "FaceWidth",
         "OverallLength",
+        "ShoulderLength",
+        "TurnedDia",
     }
     assert spec.DRAWING_DIMENSIONS["BossProfile"] == {
         "OutsideDia",
@@ -114,6 +118,8 @@ def test_precision_is_authored_on_the_part_and_only_read_by_the_sheet() -> None:
         "BoreDia": 3,
         "BossDia": 1,
         "OverallLength": 1,
+        "ShoulderLength": 1,
+        "TurnedDia": 2,
     }
     assert "draw_crank_pinion.py" in PRECISION_MIGRATED_DRAWINGS
     source = _source()
@@ -124,14 +130,22 @@ def test_precision_is_authored_on_the_part_and_only_read_by_the_sheet() -> None:
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in _build_source()
 
 
-def test_north_shortened_face_keeps_the_south_seat_and_boss_length() -> None:
-    # The old 10.4 face retreats 0.9 at the north; W15 sizes the boss from
-    # its own limits, so the boss and shaft recess follow without moving the
-    # fixed south seat on MHA-016.
-    assert spec.FACE_WIDTH == pytest.approx(9.5)
-    assert spec.BOSS_LENGTH == pytest.approx(spec.OVERALL_LENGTH - spec.FACE_WIDTH)
+def test_grown_teeth_keep_the_south_seat_and_boss_length() -> None:
+    # c'' variant B (user ruling 2026-09-30): the teeth grow 1.8 north of the
+    # 9.5 face; the boss keeps its 14.0 so the W15 pin wall is unchanged, and
+    # the south seat on MHA-016 does not move.
+    assert spec.FACE_WIDTH == pytest.approx(9.5 + 1.8)
+    assert spec.BOSS_LENGTH == pytest.approx(14.0)
+    assert spec.OVERALL_LENGTH == pytest.approx(spec.FACE_WIDTH + spec.BOSS_LENGTH)
     assert spec.PIN_STATION == pytest.approx(spec.FACE_WIDTH + spec.BOSS_LENGTH / 2.0)
-    assert spec.OVERALL_LENGTH == pytest.approx(10.4 + spec.BOSS_LENGTH - 0.9)
+    # The turned band is a real band at every accepted size.
+    shoulder_long = spec.SHOULDER_LENGTH + spec.SHOULDER_LENGTH_LIMITS[1]
+    assert shoulder_long < spec.FACE_WIDTH + spec.FACE_WIDTH_LIMITS[0]
+    assert spec.BOSS_DIA < spec.TURNED_DIA - spec.TURNED_DIA_TOLERANCE_MM
+    assert (
+        spec.TURNED_DIA + spec.TURNED_DIA_TOLERANCE_MM
+        < spec.OUTSIDE_DIA - spec.OUTSIDE_DIA_TOLERANCE_MM
+    )
 
 
 def test_the_boss_is_the_root_circle_and_the_pin_hole_stays_in_its_wall() -> None:
@@ -495,12 +509,18 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
     bore_x, bore_y = drawing.RIGHT_KEEP["BoreDia"]
     assert drawing.FRONT_CENTER[0] + half_od < bore_x < drawing._side_x(0.0)
     assert bore_y > outside_y + 0.010
-    for name in ("FaceWidth", "OverallLength"):
+    for name in ("ShoulderLength", "FaceWidth", "OverallLength"):
         assert drawing.RIGHT_KEEP[name][1] < drawing.RIGHT_CENTER[1] - half_od, name
+    # Baseline-stacked from the south face, shortest innermost.
     assert (
-        drawing.RIGHT_KEEP["FaceWidth"][1]
+        drawing.RIGHT_KEEP["ShoulderLength"][1]
+        > drawing.RIGHT_KEEP["FaceWidth"][1]
         > drawing.RIGHT_KEEP["OverallLength"][1]
     )
+    # The turned diameter reads above its band, clear of the tip diameter.
+    turned_x, turned_y = drawing.RIGHT_KEEP["TurnedDia"]
+    assert drawing._side_x(spec.SHOULDER_LENGTH) < turned_x < drawing._side_x(spec.FACE_WIDTH)
+    assert turned_y > outside_y + 0.010
     # The pin-hole note hangs above-right of the section. Its leader reaches
     # the sectioned cross-hole through the boss instead of crossing its own
     # text, the toothed rectangle, or the outside-diameter extension line.
@@ -579,8 +599,9 @@ def test_w15_boss_hides_the_shaft_end_and_walls_the_pin_at_every_limit() -> None
     assert spec.PIN_AXIAL_LIGAMENT_WORST >= spec.PIN_AXIAL_LIGAMENT_FLOOR_MM
     # The seat feeler is directly against the restored boss north face.
     assert spec.SEAT_FEELER_MM == pytest.approx(0.25)
-    assert bdt.T120_PINION_NORTH_AIR >= bdt.T120_PINION_AIR_FLOOR
-    assert bdt.CRANK_ROW_ENGAGEMENT_FRACTION >= 0.85
+    assert bdt.T120_SHOULDER_AIR >= bdt.T120_PINION_AIR_FLOOR
+    assert bdt.T120_TURNED_BAND_RADIAL >= bdt.T120_TURNED_BAND_RADIAL_FLOOR
+    assert bdt.CRANK_ROW_ENGAGEMENT_FRACTION >= bdt.CRANK_ROW_ENGAGEMENT_FLOOR
     assert sum(bdt.PINION_RECESS_STACK.values()) >= spec.SHAFT_END_RECESS_MIN_WORST
     # Codex P2 on #892: 4d4e038e3 (recess 1.02, pinion 24.615 printed 24.6,
     # shaft 136.6345 printed 136.6) passed only against the inch grade 0.762;
@@ -732,3 +753,46 @@ def test_boss_gate_wants_the_boss_cylinder_not_just_the_length(_plain_binding) -
     boss_less = _pinion(spec.OVERALL_LENGTH, boss=False)
     with pytest.raises(RuntimeError, match="hub boss: face spec"):
         asyncio.run(part.assert_boss_present(boss_less, "boss-less"))
+
+
+def test_turned_band_clears_t120_and_each_negative_control_flips() -> None:
+    # c'' variant B (user ruling 2026-09-30), print-worst at both end-play
+    # extremes and every cone-stack float: shoulder air, turned-band radial
+    # and the row (stub teeth counted, reading (ii)) each hold their floor,
+    # and each fails when its own geometry is taken away.
+    import build_drive_train_assembly as bdt
+
+    clear = bdt.pinion_t120_clearances()
+    assert clear["shoulder air"] == pytest.approx(0.3128, abs=2e-3)
+    assert clear["turned band radial"] == pytest.approx(0.2512, abs=2e-3)
+    assert bdt.CRANK_ROW_ENGAGEMENT_UNFLOATED == pytest.approx(0.9760, abs=2e-3)
+    assert bdt.CRANK_ROW_ENGAGEMENT_FRACTION == pytest.approx(0.8650, abs=2e-3)
+    # Turned to the tip-circle row's +0.60, the band reaches T120.
+    oversize = bdt.pinion_t120_clearances(turned_dia=spec.TURNED_DIA + 0.60)
+    assert oversize["turned band radial"] < bdt.T120_TURNED_BAND_RADIAL_FLOOR
+    # A shoulder 1.0 longer, or no turned band at all, runs into T120.
+    longer = bdt.pinion_t120_clearances(shoulder_length=spec.SHOULDER_LENGTH + 1.0)
+    assert longer["shoulder air"] < bdt.T120_PINION_AIR_FLOOR
+    no_band = bdt.pinion_t120_clearances(shoulder_length=None)
+    assert no_band["shoulder air"] < bdt.T120_PINION_AIR_FLOOR
+    # Grown only 1.4, the floated row drops under 85%.
+    short = bdt.crank_row_engagement(
+        9.5 + 1.4, bdt._PINION_FACE_BAND, bdt.CONE_FLOAT_NORTH
+    )
+    assert short < bdt.CRANK_ROW_ENGAGEMENT_FLOOR
+
+
+def test_both_gear_sheets_print_the_worst_contact_ratio_rounded_down() -> None:
+    # User ruling 2026-09-30: the 16T:64T contact ratio is under rule 12's
+    # 1.1 at the open corner, and both GEAR DATA blocks state it, never
+    # claiming more than the mesh gives.
+    import build_drive_train_assembly as bdt
+    import crank_drive_gear_notes
+
+    worst = bdt.CRANK_MESH_CONTACT_RATIO_WORST
+    printed = crank_drive_gear_notes.WORST_CONTACT_RATIO
+    assert printed == math.floor(worst * 100.0) / 100.0
+    assert worst < 1.1 < bdt.CRANK_MESH_CONTACT_RATIO_NOMINAL
+    assert bdt.CRANK_MESH_CONTACT_RATIO_NOMINAL == pytest.approx(1.3846, abs=1e-3)
+    assert f"{printed:.2f}" in spec.GEAR_DATA
+    assert f"{printed:.2f}" in crank_drive_gear_notes.GEAR_DATA

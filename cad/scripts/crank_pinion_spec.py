@@ -27,6 +27,7 @@ from __future__ import annotations
 import math
 
 import _config
+import crank_drive_gear_notes
 import crank_drive_gear_spec
 import crank_hub_geometry
 from _fit_limits import deviations
@@ -94,15 +95,35 @@ BORE_DIA_BAND = (  # (upper, lower) deviations
     round(_SHAFT_UPPER + _CLEARANCE_MIN, 3),
 )
 
-FACE_WIDTH = 9.5  # teeth shortened at the north end; south face stays seated
-# The south face and boss length stay where they were. The 64T row is now
-# 7.2113 wide. Codex P1 on #1128 (user ruling 2026-09-29, band the face
-# only): at the .X row's +0.8 the north face ran 0.51 into the inclined T120
-# rim, and at its -0.8 it covered 81% of the 64T row. So the face prints its
-# own band, and the assembly's exact rim scan proves the T120 air at its long
-# limit and the row engagement at its short limit.
+FACE_WIDTH = 11.3  # teeth grown north past the 64T row; south face stays seated
+# The south face and boss length stay where they were. The 64T row is 7.2113
+# wide. Codex P1 on #1128 (user ruling 2026-09-29) banded the tooth length
+# at +0/-0.30; the user's c'' ruling (variant B, 2026-09-30) then grew the
+# teeth 1.8 north so the row stays covered with the pinion on the boss and
+# the cone stack floated north, and turned the grown north end down so it
+# passes under the inclined T120 rim. FACE_WIDTH is the whole tooth length
+# (the part's GearBlank extrusion) and still prints: it places the boss step.
+# Functional reason for its band inside the .X row: at the row's -0.8 the
+# teeth cover under 85% of the 64T row, and its long limit bounds the turned
+# band's T120 clearance (build_drive_train_assembly proves both).
 FACE_WIDTH_BAND = (0.0, -0.30)  # (upper, lower) deviations
 FACE_WIDTH_LIMITS = deviations(FACE_WIDTH_BAND)  # (lower, upper)
+# Full-OD shoulder: the teeth run at OutsideDia SHOULDER_LENGTH from the south
+# face, stated like FaceWidth (+0/-0.30 at .X). Functional reason for the band
+# inside the .X row: at the row's +0.8 the full-OD shoulder runs into the
+# inclined T120 (build_drive_train_assembly proves the 0.25 axial air at the
+# band's long limit).
+SHOULDER_LENGTH = 8.5
+SHOULDER_LENGTH_BAND = (0.0, -0.30)  # (upper, lower) deviations
+SHOULDER_LENGTH_LIMITS = deviations(SHOULDER_LENGTH_BAND)  # (lower, upper)
+# North of the shoulder the teeth are turned to TURNED_DIA, stated like the
+# OutsideDia it cuts into (+/-0.10 at .XX). Functional reason for the band
+# inside the .XX row: build_drive_train_assembly proves the T120 tip circle
+# 0.25 radially clear of the turned band at its upper limit; at the row's
+# +0.51 that air falls to about 0.05.
+TURNED_DIA = 16.21
+TURNED_DIA_TOLERANCE_MM = 0.10
+TURNED_LENGTH = FACE_WIDTH - SHOULDER_LENGTH
 
 # --- Hub boss + retention pin (ch. 12 p. 19, page002_img02 / img06) ---------
 #
@@ -218,6 +239,8 @@ PINION_BOSS_NORTH_GAP_RANGE = (SEAT_FEELER_MM, SEAT_GAP_MAX_MM)
 OVERALL_LENGTH_PLACES = 1
 SHAFT_LENGTH_PLACES = 1  # crankshaft_spec prints its Depth here
 FACE_WIDTH_PLACES = 1
+SHOULDER_LENGTH_PLACES = FACE_WIDTH_PLACES  # stated like FaceWidth
+TURNED_DIA_PLACES = 2  # stated like the OutsideDia it cuts into
 OVERALL_LENGTH_GRADE_MM = printed_band_mm(OVERALL_LENGTH_PLACES)
 # W15 sizes the boss for a face accepted anywhere in the .X row. The printed
 # band sits inside that row, so the boss keeps its length (no geometry change
@@ -259,9 +282,21 @@ OVERALL_LENGTH = round(FACE_WIDTH + BOSS_LENGTH, OVERALL_LENGTH_PLACES)
 for _name, _value, _places in (
     ("FACE_WIDTH", FACE_WIDTH, FACE_WIDTH_PLACES),
     ("OVERALL_LENGTH", OVERALL_LENGTH, OVERALL_LENGTH_PLACES),
+    ("SHOULDER_LENGTH", SHOULDER_LENGTH, SHOULDER_LENGTH_PLACES),
+    ("TURNED_DIA", TURNED_DIA, TURNED_DIA_PLACES),
 ):
     if abs(_value - round(_value, _places)) > 1e-9:
         raise AssertionError(f"{_name} {_value!r} does not print exactly at {_places} places")
+# The turned band is a real band of stub teeth at every accepted size: the
+# shoulder ends short of the tooth end, and the turned diameter stays above
+# the root (where the boss is) and below the tip.
+if SHOULDER_LENGTH + SHOULDER_LENGTH_LIMITS[1] >= FACE_WIDTH + FACE_WIDTH_LIMITS[0]:
+    raise AssertionError("the 16T full-OD shoulder reaches the tooth end")
+if not (
+    BOSS_DIA < TURNED_DIA - TURNED_DIA_TOLERANCE_MM
+    and TURNED_DIA + TURNED_DIA_TOLERANCE_MM < OUTSIDE_DIA - OUTSIDE_DIA_TOLERANCE_MM
+):
+    raise AssertionError("the 16T turned band must lie between the root and the tip")
 PIN_STATION = FACE_WIDTH + BOSS_LENGTH / 2.0
 PIN_AXIAL_LIGAMENT_FLOOR_MM = 0.5
 PIN_AXIAL_LIGAMENT_WORST = (
@@ -338,10 +373,13 @@ SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = (
 # ``BossDia`` and ``OverallLength`` drive the revolve, while ``OutsideDia`` and
 # ``BoreDia`` are equation-driven native reference dimensions attached to the
 # matching axial extents (rule 2's reference-sketch allowance and rule 7's
-# turned-part layout). ---
+# turned-part layout). The ``TurnedBandProfile`` is the Right-plane revolve
+# cut that turns the teeth down north of the shoulder; its shoulder length
+# (from the same faced end) and turned diameter drive it. ---
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "GearBlank": {"FaceWidth"},
     "BossProfile": {"OutsideDia", "BoreDia", "BossDia", "OverallLength"},
+    "TurnedBandProfile": {"ShoulderLength", "TurnedDia"},
 }
 
 # --- Decimal places, authored ON THE PART ------------------------------------
@@ -355,7 +393,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # The bore is the only size fit on the part and prints three places with its
 # derived band. The outside diameter prints two with its own +/-0.10. The face
 # width prints one place with its own +0/-0.30 (FACE_WIDTH_BAND): the assembly
-# proves the north-face air to T120 and the 64T row overlap at both limits.
+# proves the 64T row overlap at its short limit and the turned band's T120
+# clearance at its long one. The shoulder length prints one place and the
+# turned diameter two, each with the band its reason is recorded at above.
 # The boss diameter is routine .XX, not a running surface. The match-drilled
 # pin station is absent: its callout locates it at boss mid-length and the
 # crankshaft/pinion stack sets it. The overall length prints one place like
@@ -367,6 +407,10 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "BoreDia": 3,
         "BossDia": BOSS_DIA_PLACES,
         "OverallLength": OVERALL_LENGTH_PLACES,
+    },
+    "TurnedBandProfile": {
+        "ShoulderLength": SHOULDER_LENGTH_PLACES,
+        "TurnedDia": TURNED_DIA_PLACES,
     },
 }
 
@@ -394,6 +438,14 @@ def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> 
     """Render an aligned gear/sprocket data block for a property-linked note."""
     return "\n".join([title] + [f"{label}:  {value}" for label, value in rows])
 
+# The pair's worst-case contact ratio, rounded down, as the MHA-021 sheet
+# prints it (crank_drive_gear_notes owns the one value; user ruling 2026-09-30).
+# Named exception: MHA-025 contact ratio (drawing-simplicity-policy.md, "Named exceptions").
+CONTACT_RATIO_ROW = (
+    "CONTACT RATIO WITH MHA-021, WORST CASE (REF)",
+    f"{crank_drive_gear_notes.WORST_CONTACT_RATIO:.2f}",
+)
+
 # Rule 6's gear-data block: the tooth system a cut-gear drawing cannot express
 # as ordinary view dimensions. Cutter inputs and derived diameters are REF;
 # circular tooth thickness is the shop's controlling acceptance and carries
@@ -417,6 +469,7 @@ GEAR_DATA = gear_data_note(
         ),
         ("TOOTH FORM", "SPUR INVOLUTE, FULL DEPTH"),
         ("MATES WITH", "CRANK DRIVE GEAR MHA-021, 64T"),
+        CONTACT_RATIO_ROW,
     ]
 )
 

@@ -47,9 +47,21 @@ NORMAL_TOOTH_THICKNESS_DEVIATIONS = tuple(
 )
 
 
+# The pair's worst-case contact ratio, rounded down so a sheet never claims
+# more (user ruling 2026-09-30). crank_mesh_stack derives it at the open
+# corner with both tips at their printed lower limits; this module is below
+# that stack, so the printed value is a literal the assembly's import and
+# test_crank_mesh_stack hold to the derivation. Both gear sheets print it.
+WORST_CONTACT_RATIO = 0.57
+
+
 def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> str:
     """Render an aligned gear/sprocket data block for a property-linked note."""
     return "\n".join([title] + [f"{label}:  {value}" for label, value in rows])
+
+
+# Named exception: MHA-021 contact ratio (drawing-simplicity-policy.md, "Named exceptions").
+CONTACT_RATIO_ROW = ("CONTACT RATIO WITH MHA-025, WORST CASE (REF)", f"{WORST_CONTACT_RATIO:.2f}")
 
 
 # Rule 6's gear-data block: the tooth system a cut-gear drawing cannot express
@@ -92,6 +104,7 @@ GEAR_DATA = gear_data_note(
         ),
         ("TOOTH FORM", "HELICAL INVOLUTE, FULL DEPTH, ARC ROOT FLOOR"),
         ("MATES WITH", "CRANK PINION MHA-025, 16T STRAIGHT SPUR, FULL THICKNESS"),
+        CONTACT_RATIO_ROW,
     ]
 )
 

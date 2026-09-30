@@ -232,7 +232,7 @@ def test_outside_diameter_prints_the_tip_band_the_mesh_stack_takes() -> None:
     assert spec.FACE_WIDTH == 7.2113
     assert spec.FACE_WIDTH_BAND == (0.025, -0.025)
     assert spec.DRAWING_PRECISION["GearBlank"]["FaceWidth"] == 4
-    assert pinion_spec.FACE_WIDTH == 9.5
+    assert pinion_spec.FACE_WIDTH == 11.3
 
 
 def test_print_carries_no_gdt_or_basic_dimensions() -> None:
