@@ -433,11 +433,15 @@ def test_notes_carry_the_tooth_edge_override_and_the_boss_wall_fact() -> None:
     # worst case, rounded down. The policy requires the sheet to state its
     # named exception (Codex #857 P2), but exception and ruling labels never
     # print (fleet ruling, 2026-09-26); the policy row keeps the provenance.
-    assert lines == [
-        "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS.",
-        f"BOSS WALL {math.floor(spec.BOSS_WALL_WORST * 100.0) / 100.0:.2f} MIN AT BORE.",
-    ]
-    assert lines[1] == "BOSS WALL 1.67 MIN AT BORE."
+    assert spec.TOOTH_EDGE_NOTE in lines
+    wall = f"{math.floor(spec.BOSS_WALL_WORST * 100.0) / 100.0:.2f}"
+    assert wall == "1.67"
+    assert any(line.startswith("BOSS WALL") and f"{wall} MIN" in line for line in lines)
+    # The T120 fit-up may turn the band down; the sheet states its floor.
+    assert any(
+        "TURNED BAND" in line and f"Ø{spec.TURNED_DIA_FITUP_MIN:.2f} MIN" in line
+        for line in lines
+    )
     assert len(lines) <= 4
     assert not hasattr(spec, "BOSS_WALL_EXCEPTION")
     for internal in ("EXCEPTION", "ACCEPTED", "RULING", "POLICY", "RULE "):
@@ -599,8 +603,9 @@ def test_w15_boss_hides_the_shaft_end_and_walls_the_pin_at_every_limit() -> None
     assert spec.PIN_AXIAL_LIGAMENT_WORST >= spec.PIN_AXIAL_LIGAMENT_FLOOR_MM
     # The seat feeler is directly against the restored boss north face.
     assert spec.SEAT_FEELER_MM == pytest.approx(0.25)
-    assert bdt.T120_SHOULDER_AIR >= bdt.T120_PINION_AIR_FLOOR
-    assert bdt.T120_TURNED_BAND_RADIAL >= bdt.T120_TURNED_BAND_RADIAL_FLOOR
+    concentric = bdt.PINION_T120_CONCENTRIC
+    assert concentric["shoulder air"] >= bdt.T120_PINION_AIR_FLOOR
+    assert concentric["turned band radial"] >= bdt.T120_TURNED_BAND_RADIAL_FLOOR
     assert bdt.CRANK_ROW_ENGAGEMENT_FRACTION >= bdt.CRANK_ROW_ENGAGEMENT_FLOOR
     assert sum(bdt.PINION_RECESS_STACK.values()) >= spec.SHAFT_END_RECESS_MIN_WORST
     # Codex P2 on #892: 4d4e038e3 (recess 1.02, pinion 24.615 printed 24.6,
@@ -757,29 +762,177 @@ def test_boss_gate_wants_the_boss_cylinder_not_just_the_length(_plain_binding) -
 
 def test_turned_band_clears_t120_and_each_negative_control_flips() -> None:
     # c'' variant B (user ruling 2026-09-30), print-worst at both end-play
-    # extremes and every cone-stack float: shoulder air, turned-band radial
-    # and the row (stub teeth counted, reading (ii)) each hold their floor,
-    # and each fails when its own geometry is taken away.
+    # extremes and every cone-stack float, T120 and the crank on their
+    # nominal axes: shoulder air, turned-band radial and the row (stub teeth
+    # counted, reading (ii)) each hold their floor, and each fails when its
+    # own geometry is taken away.
     import build_drive_train_assembly as bdt
 
-    clear = bdt.pinion_t120_clearances()
-    assert clear["shoulder air"] == pytest.approx(0.3128, abs=2e-3)
-    assert clear["turned band radial"] == pytest.approx(0.2512, abs=2e-3)
-    assert bdt.CRANK_ROW_ENGAGEMENT_UNFLOATED == pytest.approx(0.9760, abs=2e-3)
-    assert bdt.CRANK_ROW_ENGAGEMENT_FRACTION == pytest.approx(0.8650, abs=2e-3)
+    def nominal_axes(**geometry) -> dict[str, float]:
+        return bdt.pinion_t120_clearances(pose_radial=0.0, pose_axial=0.0, **geometry)
+
+    clear = nominal_axes()
+    assert clear == bdt.PINION_T120_CONCENTRIC
+    assert clear["shoulder air"] >= bdt.T120_PINION_AIR_FLOOR
+    assert clear["turned band radial"] >= bdt.T120_TURNED_BAND_RADIAL_FLOOR
+    # Each corner's own row width (Codex P2 on #1154).
+    assert bdt.CRANK_ROW_ENGAGEMENT_UNFLOATED == pytest.approx(0.9726, abs=2e-3)
+    assert bdt.CRANK_ROW_ENGAGEMENT_FRACTION == pytest.approx(0.8620, abs=2e-3)
     # Turned to the tip-circle row's +0.60, the band reaches T120.
-    oversize = bdt.pinion_t120_clearances(turned_dia=spec.TURNED_DIA + 0.60)
+    oversize = nominal_axes(turned_dia=spec.TURNED_DIA + 0.60)
     assert oversize["turned band radial"] < bdt.T120_TURNED_BAND_RADIAL_FLOOR
     # A shoulder 1.0 longer, or no turned band at all, runs into T120.
-    longer = bdt.pinion_t120_clearances(shoulder_length=spec.SHOULDER_LENGTH + 1.0)
+    longer = nominal_axes(shoulder_length=spec.SHOULDER_LENGTH + 1.0)
     assert longer["shoulder air"] < bdt.T120_PINION_AIR_FLOOR
-    no_band = bdt.pinion_t120_clearances(shoulder_length=None)
+    no_band = nominal_axes(shoulder_length=None)
     assert no_band["shoulder air"] < bdt.T120_PINION_AIR_FLOOR
     # Grown only 1.4, the floated row drops under 85%.
     short = bdt.crank_row_engagement(
         9.5 + 1.4, bdt._PINION_FACE_BAND, bdt.CONE_FLOAT_NORTH
     )
     assert short < bdt.CRANK_ROW_ENGAGEMENT_FLOOR
+
+
+def test_t120_radial_carries_every_fit_offset_and_axis_pose() -> None:
+    # Codex P1 on #1154: T120 held concentric on the nominal cone axis read
+    # 0.251 radial at the old turned 16.21, but its 0.105 seat clearance
+    # alone lets it sit (0.025, 0.046165) off centre, and the crank journal,
+    # 16T bore, runout, cone shaft and both post bores move the pair further.
+    # The budget is re-derived here from the fits, summed at print-worst.
+    import build_drive_train_assembly as bdt
+    import cone_line
+    import cone_pivot_post_spec as post
+    import crank_mesh_stack as mesh
+    from gear_seat_fit import GEAR_SEAT_CLEARANCE
+
+    codex_offset = math.hypot(0.025, 0.046165)
+    assert codex_offset <= GEAR_SEAT_CLEARANCE[1] / 2.0 + 1e-6
+    running = _config.fit("shaft_in_bushing")["diametral_clearance_mm"][1]
+    angle = math.tan(math.radians(post.CRANK_BORE_ANGLE_LIMIT_DEG))
+    sin_i = math.sin(math.radians(cone_line.INCLINE_DEG))
+    band_end = mesh.CRANK_OVERHANG + mesh.PINION_HALF_FACE_MAX
+    lever = mesh.MESH_LEVER + mesh.PINION_HALF_FACE_MAX
+    crank_side = (
+        running / 2.0
+        + running / mesh.CRANK_BEARING_LENGTH * band_end
+        + spec.BORE_DIAMETRAL_CLEARANCE[1] / 2.0
+        + mesh.TOOTH_RUNOUT_TIR_MM / 2.0
+        + lever * angle
+    )
+    rim, overhang = bdt._TIP120, bdt._T120_OVERHANG
+    cone_radial = (
+        GEAR_SEAT_CLEARANCE[1] / 2.0
+        + running / 2.0
+        + running / post.CONE_BOSS_LENGTH * overhang
+        + (overhang + post.CONE_BOSS_LENGTH / 2.0) * angle
+    )
+    cone_axial = running / post.CONE_BOSS_LENGTH * rim + rim * angle
+    budget = crank_side + cone_radial + cone_axial * sin_i
+    assert bdt.T120_POSE_RADIAL >= budget - 1e-9
+
+    def concentric(turned_dia: float) -> float:
+        return bdt.pinion_t120_clearances(
+            turned_dia=turned_dia, pose_radial=0.0, pose_axial=0.0
+        )["turned band radial"]
+
+    floor = bdt.T120_TURNED_BAND_RADIAL_FLOOR
+    # The old band: Codex's corner alone takes it under the floor.
+    assert concentric(16.21) - codex_offset < floor
+    # With every offset and pose summed the printed band is under the floor,
+    # at least as far as the hand budget takes it (the named exception's
+    # radial figure).
+    assert concentric(spec.TURNED_DIA) - budget < floor
+    assert bdt.T120_TURNED_BAND_RADIAL <= concentric(spec.TURNED_DIA) - budget + 1e-9
+
+
+def _t120_policy_row() -> str:
+    policy = (
+        Path(spec.__file__).parents[1] / "docs" / "drawing-simplicity-policy.md"
+    ).read_text(encoding="utf-8")
+    rows = [
+        line
+        for line in policy.split("\n## Named exceptions", 1)[1].splitlines()
+        if line.startswith("| MHA-025") and "T120" in line.split("|")[1]
+    ]
+    assert len(rows) == 1
+    return rows[0]
+
+
+def test_t120_shortfall_is_the_named_exception_the_policy_states() -> None:
+    # User ruling 2026-09-30 on Codex P1 (#1154): the band stays Ø16.21 and
+    # the shoulder 8.5.  At the arithmetic worst of every fit offset and axis
+    # pose the pair can close on T120 by the row's figures (worst case and
+    # RSS), and the build refuses anything worse than it states.
+    import build_drive_train_assembly as bdt
+
+    air, radial = bdt.T120_SHOULDER_AIR, bdt.T120_TURNED_BAND_RADIAL
+    assert air == pytest.approx(-0.0851, abs=5e-4)
+    assert radial == pytest.approx(-0.1157, abs=5e-4)
+    assert bdt.T120_SHOULDER_AIR_STATED_WORST <= air < 0.0
+    assert bdt.T120_TURNED_BAND_RADIAL_STATED_WORST <= radial < 0.0
+    rss = bdt.pinion_t120_clearances(
+        pose_radial=math.hypot(*(r for r, _ in bdt.T120_POSE_TERMS.values())),
+        pose_axial=math.hypot(*(a for _, a in bdt.T120_POSE_TERMS.values())),
+    )
+    assert rss["shoulder air"] == pytest.approx(0.1233, abs=5e-4)
+    assert rss["turned band radial"] == pytest.approx(0.1052, abs=5e-4)
+    # The stated bounds are tight: 0.02 more band or 0.1 more shoulder
+    # breaks them.
+    wider = bdt.pinion_t120_clearances(turned_dia=spec.TURNED_DIA + 0.02)
+    assert wider["turned band radial"] < bdt.T120_TURNED_BAND_RADIAL_STATED_WORST
+    longer = bdt.pinion_t120_clearances(shoulder_length=spec.SHOULDER_LENGTH + 0.1)
+    assert longer["shoulder air"] < bdt.T120_SHOULDER_AIR_STATED_WORST
+    # The row states the build's figures, the fit-up feeler and its limits.
+    row = _t120_policy_row()
+    concentric = bdt.PINION_T120_CONCENTRIC
+    for figure in (
+        f"air −{-air:.3f}",
+        f"radial −{-radial:.3f}",
+        f"−{-bdt.T120_SHOULDER_AIR_STATED_WORST:.2f} / "
+        f"−{-bdt.T120_TURNED_BAND_RADIAL_STATED_WORST:.2f}",
+        f"+{rss['shoulder air']:.2f} / +{rss['turned band radial']:.2f}",
+        f"+{concentric['shoulder air']:.3f} / +{concentric['turned band radial']:.3f}",
+        f"{spec.T120_FITUP_FEELER_MM:.2f} feeler",
+        f"Ø{spec.TURNED_DIA_FITUP_MIN:.2f} MIN",
+        f"{spec.SHOULDER_LENGTH_FITUP_MIN:.1f} MIN",
+    ):
+        assert figure in row, figure
+
+
+def test_t120_fit_up_closes_and_both_sheets_state_it() -> None:
+    # Either fit-up cut, taken to its limit, passes the feeler at every
+    # corner of the same stack; the minimum band is an actual size.
+    import build_drive_train_assembly as bdt
+    import draw_drive_train_assembly as drawing
+    import drive_train_steps
+
+    feeler = spec.T120_FITUP_FEELER_MM
+    turned_down = bdt.pinion_t120_clearances(
+        turned_dia=spec.TURNED_DIA_FITUP_MIN - 2.0 * bdt._PINION_TURNED_RADIUS_UP
+    )
+    faced_back = bdt.pinion_t120_clearances(
+        shoulder_length=spec.SHOULDER_LENGTH_FITUP_MIN
+    )
+    assert turned_down["turned band radial"] >= feeler
+    assert faced_back["shoulder air"] >= feeler
+    # The shoulder's fit-up limit is its printed short limit; the band's
+    # keeps a stub addendum over the pitch circle.
+    assert spec.SHOULDER_LENGTH_FITUP_MIN == pytest.approx(
+        spec.SHOULDER_LENGTH + spec.SHOULDER_LENGTH_LIMITS[0]
+    )
+    assert spec.PITCH_DIA < spec.TURNED_DIA_FITUP_MIN < spec.TURNED_DIA
+    # The part sheet permits the turn-down to its floor.
+    turn_down = f"Ø{spec.TURNED_DIA_FITUP_MIN:.2f} MIN"
+    assert turn_down in spec.DRAWING_NOTES
+    # The drive-train crank step checks the pair before the pin is drilled.
+    number = drive_train_steps.step_number("crank-mesh-checked")
+    step = drawing.CONE_CRANK_STEPS.split(f"\n{number}. ", 1)[1]
+    step = " ".join(step.split(f"\n{number + 1}. ")[0].split())
+    check = step.index(f"{feeler:.2f} FEELER")
+    drill = step.index("MATCH-DRILL")
+    assert step.index("TOWARD MHA-014") < check < drill
+    assert check < step.index(turn_down) < drill
+    assert check < step.index(f"{spec.SHOULDER_LENGTH_FITUP_MIN:.1f} MIN") < drill
 
 
 def test_both_gear_sheets_print_the_worst_contact_ratio_rounded_down() -> None:

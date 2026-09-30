@@ -267,7 +267,7 @@ sections:
         - med
       - - Crankshaft length
         - 137.2 mm cylindrical length plus 2-mm integral outboard dome
-        - '5.39 in initial reference; shortened for the shortest W15-compliant 16T boss'
+        - '5.39 in initial reference; lengthened with the grown 16T teeth, the 16T boss kept at its shortest W15-compliant length'
         - 'The outboard cylinder/arm/hub face remains at world z −183, with T12 at z −155. The inboard shaft end is now z −45.8, recessed 1.14 inside the 16T pinion boss; it followed the 16T teeth growing 9.5 → 11.3 north (user ruling 2026-09-30, c″ variant B), and every far-end station grew the same 1.8. With the original pin and printed bands unchanged, its W15 pin-edge wall is 2.023 mm at print-worst (2.0 floor); a boss one .X step shorter would give 1.973. Length prints at one place, +0/−0.4.'
         - derived
         - high
@@ -585,7 +585,7 @@ sections:
         - mesh plane alignment
         - high
       - - Crankshaft
-        - 'Along Z on the restored fixed crank axis (x, y) = (−129.336, 129.850). The frame-reference c2c is 39.735, with 0.423 slack for the single-cutter pair. User ruling 2026-09-28 requires positive worst-case tight backlash without a prescribed window. The 135.4-mm shaft spans z −183..−47.6 with its integral dome outboard. T12 remains at z −155. The restored boss runs z −142.245..−70.210; the pinion south face is feeler-set 0.25 north of it, at z −69.960 (local 113.039505572). The 16T face is 9.5 mm, shortened from its north end; its 14.0-mm boss length past the south-to-north gear face is unchanged, yielding 23.5 mm overall. Its Ø3.175 pin station follows the shortened face parametrically. The integral Ø11.388 journal runs directly in the post; the Ø9.0 pinion seat step starts at local 111.3.'
+        - 'Along Z on the restored fixed crank axis (x, y) = (−129.336, 129.850). The frame-reference c2c is 39.735, with 0.423 slack for the single-cutter pair. User ruling 2026-09-28 requires positive worst-case tight backlash without a prescribed window. The 137.2-mm shaft spans z −183..−45.8 with its integral dome outboard. T12 remains at z −155. The restored boss runs z −142.245..−70.210; the pinion south face is feeler-set 0.25 north of it, at z −69.960 (local 113.039505572). The 16T teeth grew 1.8 north, 9.5 → 11.3 mm (user ruling 2026-09-30): full OD over the 8.5 shoulder, the north 2.8 turned to Ø16.21. Its 14.0-mm boss length past the south-to-north gear face is unchanged, yielding 25.3 mm overall. Its Ø3.175 pin station, 18.3, follows the grown face parametrically. The integral Ø11.388 journal runs directly in the post; the Ø9.0 pinion seat step starts at local 111.3.'
         - 'cone-pivot-post-v2 is the physical authority for x/y. The ch30 GT crank_sprocket result (−122.84, 144.78) remains independent image evidence, while the primary crank construction photo governs the separate through hub and flush outboard face. The crossed-helical accommodation and historical 0.25 mm transverse-DP centre reference remain; neither is a backlash target.'
         - high (GT + mesh)
       - - Chain run
@@ -2135,10 +2135,14 @@ sections:
          stack (user ruling 2026-09-28). The 16T teeth (grown to 11.3 north,
          user ruling 2026-09-30) sit 0.25 off the restored boss at z −70.210,
          so its south face is z −69.960. They run at full OD for the 8.5
-         shoulder and are turned to Ø16.21 north of it: at print-worst the
-         shoulder leaves 0.313 axial air to T120 and the turned band 0.251
-         radial, and the teeth cover 0.865 of the grown 64T tooth row with the
-         cone stack floated 0.80 north (>=85% required; stub teeth counted).
+         shoulder and are turned to Ø16.21 north of it: with every printed
+         band, fit offset and axis pose at its worst the shoulder's axial air
+         to T120 is −0.085 and the turned band's radial −0.116 (a named
+         exception, user 2026-09-30, #1154; +0.12 / +0.11 RSS, +0.313 /
+         +0.251 on the nominal axes), so the pair is checked on a 0.10
+         feeler at fit-up; the teeth cover 0.862 of the grown 64T tooth row
+         with the cone stack floated 0.80 north (>=85% required; stub teeth
+         counted).
          Positive worst-case tight backlash, not a backlash window, is the
          acceptance (`crank_mesh_stack`). Exact-solid phase and row engagement
          are evaluated at the actual grown-gear centre

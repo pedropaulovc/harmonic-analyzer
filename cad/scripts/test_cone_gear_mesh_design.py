@@ -297,7 +297,7 @@ def test_drive_train_clearance_scans_use_the_printed_cone_tip() -> None:
         assert assembly._cone_tip_radius_max(teeth) == pytest.approx(
             (spec.outside_dia_mm(teeth) + spec.BLANK_DIA_BAND[0]) / 2.0
         )
-    assert assembly.T120_SHOULDER_AIR >= 0.25
+    assert assembly.PINION_T120_CONCENTRIC["shoulder air"] >= 0.25
 
 
 # Face-width lower limit against the axial stacks the gear sits in.  The

@@ -112,18 +112,32 @@ FACE_WIDTH_LIMITS = deviations(FACE_WIDTH_BAND)  # (lower, upper)
 # face, stated like FaceWidth (+0/-0.30 at .X). Functional reason for the band
 # inside the .X row: at the row's +0.8 the full-OD shoulder runs into the
 # inclined T120 (build_drive_train_assembly proves the 0.25 axial air at the
-# band's long limit).
+# band's long limit with T120 on its nominal axis; the fit offsets and axis
+# poses are the fit-up check below).
 SHOULDER_LENGTH = 8.5
 SHOULDER_LENGTH_BAND = (0.0, -0.30)  # (upper, lower) deviations
 SHOULDER_LENGTH_LIMITS = deviations(SHOULDER_LENGTH_BAND)  # (lower, upper)
 # North of the shoulder the teeth are turned to TURNED_DIA, stated like the
 # OutsideDia it cuts into (+/-0.10 at .XX). Functional reason for the band
 # inside the .XX row: build_drive_train_assembly proves the T120 tip circle
-# 0.25 radially clear of the turned band at its upper limit; at the row's
-# +0.51 that air falls to about 0.05.
+# 0.25 radially clear of the turned band at its upper limit, T120 on its
+# nominal axis; at the row's +0.51 that air falls to about 0.05.
 TURNED_DIA = 16.21
 TURNED_DIA_TOLERANCE_MM = 0.10
 TURNED_LENGTH = FACE_WIDTH - SHOULDER_LENGTH
+# Fit-up of the 16T under T120 (user, 2026-09-30, #1154).  With every fit
+# offset and axis pose of the drive train summed at its worst, the shoulder
+# and the turned band can close on T120 (the policy's Named exceptions row
+# "MHA-025 ... T120"; build_drive_train_assembly pins its figures), so the
+# pair is checked on a feeler at fit-up instead of by a tighter stack.  A
+# band that stops the feeler is turned down, never under TURNED_DIA_FITUP_MIN:
+# a band that size clears T120 by geometry at every corner of that stack
+# (build_drive_train_assembly proves it) and keeps a stub addendum over the
+# pitch circle.  A shoulder that stops it is faced back, never under its
+# printed short limit, where the air again clears by geometry.
+T120_FITUP_FEELER_MM = 0.10
+TURNED_DIA_FITUP_MIN = 15.48
+SHOULDER_LENGTH_FITUP_MIN = SHOULDER_LENGTH + SHOULDER_LENGTH_LIMITS[0]
 
 # --- Hub boss + retention pin (ch. 12 p. 19, page002_img02 / img06) ---------
 #
@@ -284,6 +298,7 @@ for _name, _value, _places in (
     ("OVERALL_LENGTH", OVERALL_LENGTH, OVERALL_LENGTH_PLACES),
     ("SHOULDER_LENGTH", SHOULDER_LENGTH, SHOULDER_LENGTH_PLACES),
     ("TURNED_DIA", TURNED_DIA, TURNED_DIA_PLACES),
+    ("TURNED_DIA_FITUP_MIN", TURNED_DIA_FITUP_MIN, TURNED_DIA_PLACES),
 ):
     if abs(_value - round(_value, _places)) > 1e-9:
         raise AssertionError(f"{_name} {_value!r} does not print exactly at {_places} places")
@@ -297,6 +312,9 @@ if not (
     and TURNED_DIA + TURNED_DIA_TOLERANCE_MM < OUTSIDE_DIA - OUTSIDE_DIA_TOLERANCE_MM
 ):
     raise AssertionError("the 16T turned band must lie between the root and the tip")
+# The fit-up turn-down leaves stub teeth: above the pitch circle, below the band.
+if not PITCH_DIA < TURNED_DIA_FITUP_MIN < TURNED_DIA - TURNED_DIA_TOLERANCE_MM:
+    raise AssertionError("the 16T fit-up turn-down must stay over the pitch circle")
 PIN_STATION = FACE_WIDTH + BOSS_LENGTH / 2.0
 PIN_AXIAL_LIGAMENT_FLOOR_MM = 0.5
 PIN_AXIAL_LIGAMENT_WORST = (
@@ -485,4 +503,30 @@ TOOTH_EDGE_NOTE = "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS.
 BOSS_WALL_NOTE = (
     f"BOSS WALL {math.floor(BOSS_WALL_WORST * 100.0) / 100.0:.2f} MIN AT BORE."
 )
-DRAWING_NOTES = "\n".join((TOOTH_EDGE_NOTE, BOSS_WALL_NOTE))
+# The drive-train fit-up may turn the band down past its printed band (the
+# T120 feeler check, MHA-A03's crank step); the sheet permits it and states
+# the floor, so the part stays conforming after the fit-up cut.
+# Named exception: MHA-025 turned band (drawing-simplicity-policy.md, "Named exceptions").
+TURNED_BAND_FITUP_NOTE = (
+    "TURNED BAND MAY BE TURNED DOWN AT FIT-UP TO "
+    f"Ø{TURNED_DIA_FITUP_MIN:.{TURNED_DIA_PLACES}f} MIN."
+)
+DRAWING_NOTES = "\n".join((TOOTH_EDGE_NOTE, BOSS_WALL_NOTE, TURNED_BAND_FITUP_NOTE))
+# The MHA-A03 crank step's T120 check (user, 2026-09-30, #1154), printed by
+# draw_drive_train_assembly: the pinion on its seat feeler, the crank's
+# journal play taken up toward the cone, one T120 turn.  Either fit-up limit
+# passes the feeler at every corner (build_drive_train_assembly asserts it),
+# so the check always closes.
+# Named exception: MHA-025 turned band (drawing-simplicity-policy.md, "Named exceptions").
+T120_FITUP_ASSEMBLY_CHECK = "\n".join(
+    (
+        "   PUSH MHA-026 IN ITS BORE TOWARD MHA-014; ROTATE MHA-021 ONE TURN.",
+        f"   A {T120_FITUP_FEELER_MM:.2f} FEELER MUST PASS "
+        "MHA-025 TURNED BAND TO T120 TIPS, SHOULDER",
+        "   TO T120 SOUTH FACE. IF NOT, TURN THE BAND DOWN, "
+        f"Ø{TURNED_DIA_FITUP_MIN:.{TURNED_DIA_PLACES}f} MIN, OR",
+        "   FACE THE SHOULDER BACK, "
+        f"{SHOULDER_LENGTH_FITUP_MIN:.{SHOULDER_LENGTH_PLACES}f} MIN; "
+        "RESET ON THE FEELER AND RECHECK.",
+    )
+)
