@@ -70,6 +70,9 @@ def _required(draw: Path) -> set[str]:
         return set(purchased._PROPERTIES)
     if "build_purchased_spring_drawing" in imported:
         return set(purchased._PROPERTIES) | _SPRING_EXTRA
+    # The non-fastener purchased builder reads the spring builder's set.
+    if "build_purchased_part_drawing" in imported:
+        return set(purchased._PROPERTIES) | _SPRING_EXTRA
     assigned = {
         target.id: node.value
         for node in ast.walk(tree)
