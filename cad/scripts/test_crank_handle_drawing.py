@@ -77,6 +77,11 @@ def test_tenon_and_counterbore_are_fitted_to_the_parts_they_take() -> None:
     assert spec.COUNTERBORE_DIA == pytest.approx(cup.BODY_DIA + 0.1)
     assert "TURN THE TENON TO SUIT THE MHA-150 FERRULE BORE" in spec.DRAWING_NOTES
     assert "COUNTERBORE TO SUIT THE MHA-153 CUP BODY" in spec.DRAWING_NOTES
+    # Codex P2 on #1139 (user ruling 2026-09-30): the butt is blended to the
+    # bonded flange so no end grain shows, keeping 1.5 of oak round the
+    # largest counterbore under the smallest .X flange.
+    assert "AFTER CURE, BLEND THE BUTT FLUSH WITH THE MHA-153 FLANGE." in spec.DRAWING_NOTES
+    assert spec.BLENDED_BUTT_WALL == pytest.approx(2.15)
     source = Path(handle.__file__).read_text(encoding="utf-8")
     assert source.count("set_dimension_bilateral_tolerance(") == 1  # the reamed bore
     assert "set_dimension_symmetric_tolerance" not in source

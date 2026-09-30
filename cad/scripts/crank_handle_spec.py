@@ -122,6 +122,11 @@ TRIM_R_WORST = (
     - CONTOUR_ALLOWANCE_DIA / 2.0
 )
 COUNTERBORE_MOUTH_WALL = TRIM_R_WORST - COUNTERBORE_DIA_MAX / 2.0
+# The butt is blended flush with the bonded cup flange (Codex P2 on #1139,
+# user ruling 2026-09-30): a contour turned to its allowance can stand ~0.65
+# proud of the smallest .X flange, exposing end grain.  Blending down to the
+# smallest flange must still leave 1.5 of oak round the largest counterbore.
+BLENDED_BUTT_WALL = (CUP_FLANGE_DIA - _GENERAL_1PL) / 2.0 - COUNTERBORE_DIA_MAX / 2.0
 
 for _ok, _what in (
     (
@@ -141,6 +146,10 @@ for _ok, _what in (
     (
         abs(CUP_FLANGE_DIA - 2.0 * TRIM_R) <= 0.1,
         "the cup flange does not match the oak at the trim face",
+    ),
+    (
+        BLENDED_BUTT_WALL >= 1.5,
+        "blending the butt to the smallest cup flange leaves under 1.5 of oak",
     ),
     (COUNTERBORE_R > PIVOT_BORE_DIA / 2.0, "counterbore is inside the pivot bore"),
 ):
@@ -206,6 +215,7 @@ DRAWING_NOTES = "\n".join(
         f"{TENON_GLUE_LINE[0]:.2f}-{TENON_GLUE_LINE[1]:.2f} DIAMETRAL",
         f"  CLEARANCE, COUNTERBORE <MOD-DIAM>{COUNTERBORE_DIA_MAX:.1f} MAX; "
         "EPOXY BOTH IN AT ASSEMBLY.",
+        f"AFTER CURE, BLEND THE BUTT FLUSH WITH THE {CUP_NUMBER} FLANGE.",
         f"THE REAMED BORE RUNS ON THE {SCREW_NUMBER} SHOULDER; ITS LIMITS APPLY FULL LENGTH.",
         f"GRIP CONTOUR: <MOD-DIAM>{2.0 * NECK_R:.1f} AT THE SHOULDER ({_SHOULDER_E:.1f}), "
         f"<MOD-DIAM>{HANDLE_MAX_DIA:.1f} AT {_PEAK_E:.1f};",
