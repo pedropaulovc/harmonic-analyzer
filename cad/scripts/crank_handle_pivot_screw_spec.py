@@ -292,15 +292,16 @@ FULL_THREAD_WORST_DIAMETERS_PRINTED = math.floor(FULL_THREAD_WORST_DIAMETERS * 1
 ENGAGEMENT_NOTE = (
     f"THREAD ENGAGEMENT {FULL_THREAD_WORST_DIAMETERS_PRINTED:.2f}D MIN."
 )
-# The fitted shoulder and the head band's reason, stated once (user ruling
-# 2026-09-29, after the MHA-139 machinist review).
+# The fitted shoulder and both head bands' reasons, stated once (user ruling
+# 2026-09-29, after the MHA-139 machinist review; the length band's reason
+# after the 1d2be3aaf re-review called it over-specification unstated).
 DRAWING_NOTES = "\n".join(
     (
         ENGAGEMENT_NOTE,
         "FACE THE UNDER-HEAD TO SUIT THE BONDED MHA-022: UNDER-HEAD TO SEAT =",
-        "  ITS FERRULE FACE TO CUP FLOOR PLUS "
-        f"{END_PLAY_RANGE[0]:.2f}-{END_PLAY_RANGE[1]:.2f}. THE HEAD BEARS ON THE",
-        f"  MHA-153 FLOOR; THE BAND KEEPS {HEAD_BEARING_RADIAL_MIN:.1f} BEARING OUTSIDE ITS HOLE.",
+        "  FERRULE FACE TO CUP FLOOR PLUS "
+        f"{END_PLAY_RANGE[0]:.2f}-{END_PLAY_RANGE[1]:.2f}. HEAD BEARS ON MHA-153 FLOOR;",
+        f"  DIA BAND KEEPS {HEAD_BEARING_RADIAL_MIN:.1f} BEARING; LENGTH BAND KEEPS IT BELOW THE CUP FLANGE.",
     )
 )
 

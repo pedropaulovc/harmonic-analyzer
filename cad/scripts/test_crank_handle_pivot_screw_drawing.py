@@ -246,8 +246,11 @@ def test_notes_state_the_engagement_the_fitted_shoulder_and_the_head_band() -> N
     # the bonded handle; the head's band is for its bearing on the cup floor.
     assert "FACE THE UNDER-HEAD TO SUIT THE BONDED MHA-022" in spec.DRAWING_NOTES
     assert "PLUS 0.25-1.00." in spec.DRAWING_NOTES
-    assert "HEAD BEARS ON THE\n  MHA-153 FLOOR" in spec.DRAWING_NOTES
-    assert "0.3 BEARING OUTSIDE ITS HOLE" in spec.DRAWING_NOTES
+    assert "HEAD BEARS ON MHA-153 FLOOR;" in spec.DRAWING_NOTES
+    # Each head band states its reason (the 1d2be3aaf re-review called the
+    # unexplained length band over-specification).
+    assert "DIA BAND KEEPS 0.3 BEARING;" in spec.DRAWING_NOTES
+    assert "LENGTH BAND KEEPS IT BELOW THE CUP FLANGE." in spec.DRAWING_NOTES
     assert all(len(line) <= 72 for line in lines)
     policy = (Path(spec.__file__).parents[1] / "docs" / "drawing-simplicity-policy.md")
     row = next(
