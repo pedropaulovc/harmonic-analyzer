@@ -1,4 +1,4 @@
-r"""Crank-pin keeper chain (MHA-149) and its splicing links (MHA-150), pure data.
+r"""Crank-pin keeper chain (MHA-149) and its loop link (MHA-150), pure data.
 
 The ch11 p.14 photographs show the brass eye on the crank arm and the brass
 ring on the taper pin's head; the chain that tied the removable pin to the arm
@@ -6,38 +6,40 @@ is lost. It is reconstructed with purchased McMaster-Carr bead chain:
 
 * 3606T118 -- unfinished brass bead chain, trade size 3, 3/32 in beads,
   20 lbf, cut to BEAD_COUNT beads.
-* 3606T813 -- brass splicing links for trade-size-3 chain, two per chain. Each
-  chain end passes through the eye (or the ring), and its end bead snaps into
-  one end of a link. The running chain threads the link's cross-hole.
+* 3606T811 -- brass loop link for trade-size-3 chain: the capsule coupler that
+  snaps over an end bead at each end and closes the cut length into a loop.
 
-McMaster publishes neither CAD nor dimensions for either item (read
-2026-09-29). The bead diameter is the catalogue's. The pitch is the trade-size
-3 average of 94 beads per foot (Ball Chain Mfg. and Frank Winne size charts).
-The rod and link dimensions are assumptions, named below; each one only
-decides clearances the functions here prove.
+The chain is one closed loop through the eye and the ring, with a single
+joint. McMaster publishes no CAD, and no dimension beyond the bead diameter,
+for either item (read 2026-09-29). The pitch is the trade-size-3 average of 94
+beads per foot (Ball Chain Mfg. and Frank Winne size charts). The link is
+9 mm long, as #3 connectors are listed, and its proportions are read off
+McMaster's 3606T811 photograph. The rod and the link's wall, crimps, tip holes
+and window are assumptions named below; each only decides clearances the
+functions here prove.
 
 Frame ("crank frame"): machine axes, origin on the crank axis at the arm's
 front (outboard) face, machine z -183. The arm fills z 0..ARM_THICKNESS and
 the hub barrel ARM_THICKNESS..HUB_LENGTH. The chain part is authored in this
-frame, and the drive train places it with an identity rotation at that
-machine point. Splice links are authored with their axis on +X and their
-cross-hole on +Y, and placed with an identity rotation at ``SPLICE_ORIGINS``.
+frame and placed with an identity rotation. The link is authored along local
+X with its window and rod slot on +Y, and placed at LINK_ORIGIN with its axis
+on machine Z.
 
-Geometry, rest pose (arm hanging down, gravity -Y):
+Geometry, rest pose (arm hanging down, gravity -Y). The loop hangs from two
+wires:
 
-* eye end, plane z = EYE_LOOP_Z: the chain passes through the eye along X, and
-  its rod bears on the inside of the loop's bottom wire with a bead either
-  side. Both strands drop to a splice link below, the end bead in the link's
-  -X cup and the running bead in its cross-hole.
-* ring end, plane z = RING_PLANE_Z: the same wrap on the ring's return leg,
-  bottom, ~9.5 below the pin, where the hub-side bead clears the barrel.
-* the run leaves each link's cross-hole straight down, then drapes round the
-  arm's -X edge: forward of the arm face at the eye end, beside the edge, and
-  behind the arm up to the ring. Its low point is solved so the run closes on
-  a whole number of pitches.
+* eye, plane z = EYE_LOOP_Z: the chain crosses the eye along X, its rod
+  bearing on the inside of the loop's bottom wire with a bead either side.
+* ring, plane z = RING_PLANE_Z: the same wrap on the ring's lowest point.
+* two strands join the wraps round the arm's -X edge, nested so they never
+  cross. The inner strand runs from the eye's +X bead to the ring's hub-side
+  bead, beside the edge at INNER_SIDE_X. The outer strand runs from the eye's
+  -X bead to the ring's outboard bead, further out at OUTER_SIDE_X and
+  lower. The link sits on the outer strand, axis along z beside the arm edge.
+  Each strand's sag is solved so it closes on a whole number of pitches.
 
-``BEAD_COUNT`` is the length to cut. It is chosen so the taper pin can be
-drawn fully out of the hub (PIN_WITHDRAWAL) with the chain still attached.
+Both strands pull straight when the taper pin is drawn out of the hub
+(PIN_WITHDRAWAL), so each is at least that reach plus STRAND_SLACK_PITCHES.
 """
 
 from __future__ import annotations
@@ -56,13 +58,14 @@ from fillister_screw_spec import HEAD_DIA as SCREW_HEAD_DIA
 from fillister_screw_spec import HEAD_H as SCREW_HEAD_H
 from fillister_screw_spec import SHANK_DIA as SCREW_SHANK_DIA
 
+
 Vec = tuple[float, float, float]
 
 MM_PER_IN = 25.4
 
 # --- purchased-part nominals --------------------------------------------------
 CHAIN_SKU = "3606T118"
-SPLICE_SKU = "3606T813"
+LINK_SKU = "3606T811"
 BEAD_DIA = 3.0 / 32.0 * MM_PER_IN  # 2.38125, the catalogue bead diameter
 BEAD_R = BEAD_DIA / 2.0
 PITCH = 12.0 * MM_PER_IN / 94.0  # 3.2426, trade size 3 average
@@ -70,13 +73,23 @@ PITCH = 12.0 * MM_PER_IN / 94.0  # 3.2426, trade size 3 average
 # the ~0.9 mm between them.
 ROD_DIA = 0.5
 ROD_R = ROD_DIA / 2.0
-# Assumption: the splicing-link envelope. It is a tube whose bore takes a bead
-# at each end, cross-drilled at mid-length for the running chain.
-SPLICE_OD = 3.1
-SPLICE_BORE = 2.5
-SPLICE_LENGTH = 8.4
-SPLICE_CROSS_HOLE = 1.2  # passes the rod; the running bead sits in the bore
-SPLICE_END_BEAD_X = 2.9  # end-bead centre from the link centre, in the -X cup
+# The loop link: a rolled capsule, domed at both ends, the end beads caught in
+# the domes behind a crimp. LINK_LENGTH is the listed #3 size; LINK_OD is the
+# 0.37 diameter-to-length read off the photograph; the rest are assumptions.
+LINK_LENGTH = 9.0
+LINK_OD = 3.3
+LINK_WALL = 0.3
+LINK_END_BEAD_X = LINK_LENGTH / 2.0 - LINK_OD / 2.0  # end-bead centre = dome centre
+LINK_CRIMP_X = 1.45  # crimp groove centre, just inboard of each end bead
+LINK_CRIMP_DEPTH = 0.15
+LINK_TIP_HOLE = 0.7  # the rod leaves each dome through this
+# How the link goes on (the dark band in the photograph, on +Y): each end bead
+# is pushed in through the central window and slid into its dome, its rod
+# riding the slot that runs along the top to the tip.
+LINK_WINDOW_LENGTH = 2.6
+LINK_WINDOW_WIDTH = 2.5  # wider than a bead
+LINK_SLOT_WIDTH = LINK_TIP_HOLE
+LINK_BEAD_SPACING = 2.0 * LINK_END_BEAD_X  # the joint's gap between end beads
 
 AIR = 0.02  # minimum air the solve leaves between parts that must not touch
 
@@ -105,8 +118,6 @@ RING_PLANE_Z = PIN_Z
 PIN_WITHDRAWAL_MARGIN = 3.0
 PIN_WITHDRAWAL = PIN_X0 + PIN_LENGTH + HUB_R + PIN_WITHDRAWAL_MARGIN
 
-# The run drapes outboard of the arm's -X edge at this x.
-RUN_SIDE_X = -(HALF_WIDTH + BEAD_R + 1.6)
 
 
 def _add(a: Vec, b: Vec) -> Vec:
@@ -133,60 +144,6 @@ def _dist(a: Vec, b: Vec) -> float:
     return _norm(_sub(a, b))
 
 
-def _solve_splice(wire_x: float, rod_y: float) -> tuple[float, float]:
-    """Link centre (x, y) below a wrap whose rod crosses x=wire_x at rod_y.
-
-    The link hangs outboard (-X) of the wire. The wrap beads sit half a pitch
-    either side of the wire. The end bead sits in the link's +X cup, and its
-    neighbour leaves the cup along +X to meet the +X wrap bead one pitch away.
-    The running bead's upper neighbour, one pitch above the link centre, meets
-    the -X wrap bead one pitch away. That is two circles, and the solution
-    below the wrap is taken.
-    """
-    s = PITCH / 2.0
-    # a = x_link - wire_x, b = y_link - rod_y.
-    # (a + END + P - s)^2 + b^2 = P^2 ; (a + s)^2 + (b + P)^2 = P^2
-    c1 = (-(SPLICE_END_BEAD_X + PITCH - s), 0.0)
-    c2 = (-s, -PITCH)
-    dx, dy = c2[0] - c1[0], c2[1] - c1[1]
-    d = math.hypot(dx, dy)
-    if d > 2.0 * PITCH or d == 0.0:
-        raise AssertionError("splice-link wrap has no closing geometry")
-    h = math.sqrt(PITCH**2 - (d / 2.0) ** 2)
-    mx, my = c1[0] + dx / 2.0, c1[1] + dy / 2.0
-    candidates = (
-        (mx + h * dy / d, my - h * dx / d),
-        (mx - h * dy / d, my + h * dx / d),
-    )
-    a, b = min(candidates, key=lambda ab: ab[1])
-    return wire_x + a, rod_y + b
-
-
-def _end_loop(wire_x: float, rod_y: float, z: float) -> tuple[list[Vec], Vec]:
-    """Beads from the end bead to the running bead, and the link centre."""
-    s = PITCH / 2.0
-    lx, ly = _solve_splice(wire_x, rod_y)
-    link = (lx, ly, z)
-    end = (lx + SPLICE_END_BEAD_X, ly, z)
-    beads = [
-        end,
-        (end[0] + PITCH, ly, z),
-        (wire_x + s, rod_y, z),
-        (wire_x - s, rod_y, z),
-        (lx, ly + PITCH, z),
-        link,
-    ]
-    return beads, link
-
-
-EYE_ROD_Y = EYE_LOOP_CENTRE[1] - LOOP_INNER_R + ROD_R + AIR
-RING_ROD_Y = -RING_BOTTOM_X + RING_WIRE_DIA / 2.0 + ROD_R + AIR
-EYE_LOOP, EYE_LINK = _end_loop(EYE_ROOT[0], EYE_ROD_Y, EYE_LOOP_Z)
-RING_LOOP, RING_LINK = _end_loop(RING_X, RING_ROD_Y, RING_PLANE_Z)
-SPLICE_ORIGINS: tuple[Vec, Vec] = (EYE_LINK, RING_LINK)
-
-
-# --- the run -------------------------------------------------------------------
 def _catmull_rom(points: list[Vec], samples: int = 40) -> list[Vec]:
     """Centripetal Catmull-Rom polyline through points[1:-1]."""
     out: list[Vec] = []
@@ -214,21 +171,6 @@ def _catmull_rom(points: list[Vec], samples: int = 40) -> list[Vec]:
     return out
 
 
-def _run_curve(low_y: float) -> list[Vec]:
-    start = _sub(EYE_LINK, (0.0, PITCH, 0.0))
-    end = _sub(RING_LINK, (0.0, PITCH, 0.0))
-    return _catmull_rom(
-        [
-            EYE_LINK,
-            start,
-            (RUN_SIDE_X, low_y, EYE_LOOP_Z),
-            (RUN_SIDE_X, low_y, RING_PLANE_Z),
-            end,
-            RING_LINK,
-        ]
-    )
-
-
 def _chord_walk(curve: list[Vec], steps: int) -> list[Vec]:
     """``steps`` chords of exactly PITCH along the polyline from curve[0]."""
     beads = [curve[0]]
@@ -251,66 +193,162 @@ def _chord_walk(curve: list[Vec], steps: int) -> list[Vec]:
     return beads
 
 
-def _run_beads(links: int) -> tuple[list[Vec], float]:
-    """Run beads from below the eye link to below the ring link, inclusive.
 
-    ``links`` pitches separate them. The low point is bisected until the
-    last chord closes exactly on the bead below the ring link.
+
+# --- the two wraps ---------------------------------------------------------------
+EYE_ROD_Y = EYE_LOOP_CENTRE[1] - LOOP_INNER_R + ROD_R + AIR
+RING_ROD_Y = -RING_BOTTOM_X + RING_WIRE_DIA / 2.0 + ROD_R + AIR
+_HALF = PITCH / 2.0
+_UP: Vec = (0.0, PITCH, 0.0)
+EYE_OUTER: Vec = (EYE_ROOT[0] - _HALF, EYE_ROD_Y, EYE_LOOP_Z)
+EYE_INNER: Vec = (EYE_ROOT[0] + _HALF, EYE_ROD_Y, EYE_LOOP_Z)
+RING_OUTER: Vec = (RING_X - _HALF, RING_ROD_Y, RING_PLANE_Z)
+RING_INNER: Vec = (RING_X + _HALF, RING_ROD_Y, RING_PLANE_Z)
+
+# The strands drape outboard of the arm's -X edge at these x.
+INNER_SIDE_X = -(HALF_WIDTH + BEAD_R + 1.6)
+OUTER_SIDE_X = INNER_SIDE_X - (BEAD_DIA + 1.2)
+STRAND_SLACK_PITCHES = 2
+# The link's height below the eye's wrap, and how far the inner strand's
+# lowest bead hangs below the outer strand's. Seen from the front, the eye's
+# +X bead is to the right of its -X bead, so the inner strand must pass below
+# and right of the outer one to keep the U's nested.
+LINK_DROP = 18.0
+STRAND_GAP = BEAD_DIA + 1.6
+
+
+
+def _close(curve_for, steps: int, end: Vec) -> tuple[list[Vec], float] | None:
+    """Beads from the curve's start to ``end``, ``steps`` pitches apart.
+
+    ``curve_for(low_y)`` gives the polyline for a sag; the low point is
+    bisected until the last chord closes on ``end`` exactly. None when no sag
+    in range closes this many pitches.
     """
-    end = _sub(RING_LINK, (0.0, PITCH, 0.0))
 
     def residual(low_y: float) -> float:
-        beads = _chord_walk(_run_curve(low_y), links - 1)
-        if len(beads) < links:
+        beads = _chord_walk(curve_for(low_y), steps - 1)
+        if len(beads) < steps:
             return -PITCH  # curve too short: the walk ran off its end
         return _dist(beads[-1], end) - PITCH
 
-    lo, hi = EYE_LINK[1] - 80.0, EYE_LINK[1] - PITCH - 1.0
+    lo, hi = end[1] - 90.0, max(end[1], curve_for(0.0)[0][1]) - 1.0
     if residual(lo) <= 0.0 or residual(hi) >= 0.0:
-        raise AssertionError(f"keeper-chain run of {links} pitches does not close")
-    for _ in range(56):  # 80 mm / 2**56: far below any COM tolerance
+        return None
+    for _ in range(56):  # 90 mm / 2**56: far below any COM tolerance
         mid = (lo + hi) / 2.0
         if residual(mid) > 0.0:
             lo = mid
         else:
             hi = mid
     low_y = (lo + hi) / 2.0
-    beads = _chord_walk(_run_curve(low_y), links - 1) + [end]
-    return beads, low_y
+    if abs(residual(low_y)) > 1e-7:
+        return None  # bisected onto the walk's run-off edge, not a closure
+    return _chord_walk(curve_for(low_y), steps - 1) + [end], low_y
 
 
-def _withdrawal_reach() -> float:
-    """Shortest run from below the eye link to below the withdrawn ring link.
+def _reach(start: Vec, end: Vec) -> float:
+    """Shortest strand from ``start`` to ``end`` once the pin is drawn out.
 
-    It is a straight line to the arm's front -X corner, then a straight line
-    to the ring link after the pin's withdrawal, minimised over the height
-    where it rounds the corner.
+    Straight to the arm's front -X corner, then straight to ``end`` moved out
+    with the pin, minimised over the height where it rounds the corner.
     """
-    start = _sub(EYE_LINK, (0.0, PITCH, 0.0))
-    end = _add(_sub(RING_LINK, (0.0, PITCH, 0.0)), (-PIN_WITHDRAWAL, 0.0, 0.0))
-    corner_x = -(HALF_WIDTH + BEAD_R)
-    corner_z = -BEAD_R
+    moved = _add(end, (-PIN_WITHDRAWAL, 0.0, 0.0))
+    corner_x, corner_z = -(HALF_WIDTH + BEAD_R), -BEAD_R
     return min(
-        _dist(start, (corner_x, y, corner_z)) + _dist((corner_x, y, corner_z), end)
+        _dist(start, (corner_x, y, corner_z)) + _dist((corner_x, y, corner_z), moved)
         for y in (start[1] + 0.25 * k for k in range(-200, 200))
     )
 
 
-WITHDRAWAL_REACH = _withdrawal_reach()
-# Enough pitches to reach the withdrawn ring with a few in hand, so the pin
-# can be set down beside the machine without dragging on the chain.
-RUN_SLACK_PITCHES = 3
-RUN_LINKS = math.ceil(WITHDRAWAL_REACH / PITCH) + RUN_SLACK_PITCHES
-RUN_BEADS, RUN_LOW_Y = _run_beads(RUN_LINKS)
+def _inner_curve(low_y: float) -> list[Vec]:
+    return _catmull_rom(
+        [
+            _add(EYE_INNER, _UP),
+            EYE_INNER,
+            (INNER_SIDE_X, low_y, EYE_LOOP_Z),
+            (INNER_SIDE_X, low_y, RING_PLANE_Z),
+            RING_INNER,
+            _add(RING_INNER, _UP),
+        ]
+    )
 
-# Chain order: eye end bead ... eye link bead, run, ring link bead ... ring end
-# bead. The two link beads are the ends of the run.
-BEAD_CENTRES: tuple[Vec, ...] = tuple(EYE_LOOP + RUN_BEADS + RING_LOOP[::-1])
+
+INNER_REACH = _reach(EYE_INNER, RING_INNER)
+OUTER_REACH = _reach(EYE_OUTER, RING_OUTER)
+
+
+# --- the loop link, on the outer strand beside the arm edge --------------------
+LINK_ORIGIN: Vec = (OUTER_SIDE_X, EYE_ROD_Y - LINK_DROP, (EYE_LOOP_Z + RING_PLANE_Z) / 2.0)
+LINK_AXIS: Vec = (0.0, 0.0, 1.0)
+LINK_END_EYE: Vec = _sub(LINK_ORIGIN, (0.0, 0.0, LINK_END_BEAD_X))
+LINK_END_RING: Vec = _add(LINK_ORIGIN, (0.0, 0.0, LINK_END_BEAD_X))
+# The rods leave the domes along the axis: the beads next to the end beads
+# sit on it too.
+_BEFORE_LINK: Vec = _sub(LINK_END_EYE, (0.0, 0.0, PITCH))
+_AFTER_LINK: Vec = _add(LINK_END_RING, (0.0, 0.0, PITCH))
+
+
+def _outer_eye_curve(low_y: float) -> list[Vec]:
+    return _catmull_rom(
+        [_add(EYE_OUTER, _UP), EYE_OUTER, (OUTER_SIDE_X, low_y, EYE_LOOP_Z), _BEFORE_LINK, LINK_END_EYE]
+    )
+
+
+def _outer_ring_curve(low_y: float) -> list[Vec]:
+    return _catmull_rom(
+        [LINK_END_RING, _AFTER_LINK, (OUTER_SIDE_X, low_y, RING_PLANE_Z), RING_OUTER, _add(RING_OUTER, _UP)]
+    )
+
+
+def _solve_half(curve_for, end: Vec) -> tuple[list[Vec], float]:
+    """The pitch count whose solved sag sits nearest the link's height."""
+    best: tuple[float, list[Vec], float] | None = None
+    for steps in range(2, 30):
+        solved = _close(curve_for, steps, end)
+        if solved is None:
+            continue
+        miss = abs(solved[1] - LINK_ORIGIN[1])
+        if best is None or miss < best[0]:
+            best = (miss, *solved)
+    if best is None:
+        raise AssertionError("keeper chain's outer strand does not close")
+    return best[1], best[2]
+
+
+OUTER_EYE_BEADS, OUTER_EYE_LOW_Y = _solve_half(_outer_eye_curve, _BEFORE_LINK)
+OUTER_RING_BEADS, OUTER_RING_LOW_Y = _solve_half(_outer_ring_curve, RING_OUTER)
+OUTER_BOTTOM_Y = min(p[1] for p in OUTER_EYE_BEADS + OUTER_RING_BEADS)
+
+
+def _solve_inner() -> tuple[list[Vec], float]:
+    """The shortest closing inner strand that reaches and hangs below the outer."""
+    steps = math.ceil(INNER_REACH / PITCH) + STRAND_SLACK_PITCHES
+    for extra in range(20):
+        solved = _close(_inner_curve, steps + extra, RING_INNER)
+        if solved is not None and min(p[1] for p in solved[0]) <= OUTER_BOTTOM_Y - STRAND_GAP:
+            return solved
+    raise AssertionError("keeper chain's inner strand does not close below the outer")
+
+
+INNER_BEADS, INNER_LOW_Y = _solve_inner()
+
+# Chain order: the ring-side end bead in the link, the outer strand to the
+# ring, round the ring, the inner strand back to the eye, round the eye, the
+# outer strand to the eye-side end bead in the link.
+BEAD_CENTRES: tuple[Vec, ...] = tuple(
+    [LINK_END_RING]
+    + OUTER_RING_BEADS
+    + INNER_BEADS[::-1]
+    + OUTER_EYE_BEADS
+    + [LINK_END_EYE]
+)
 BEAD_COUNT = len(BEAD_CENTRES)
 CHAIN_LENGTH = (BEAD_COUNT - 1) * PITCH
-
-
-# --- clearance proof -----------------------------------------------------------
+INNER_LENGTH = (len(INNER_BEADS) - 1) * PITCH
+OUTER_LENGTH = (
+    (len(OUTER_EYE_BEADS) - 1 + len(OUTER_RING_BEADS) - 1 + 2) * PITCH + LINK_BEAD_SPACING
+)
 def _seg_point_dist(p: Vec, a: Vec, b: Vec) -> float:
     d = _sub(b, a)
     t = max(0.0, min(1.0, _dot(_sub(p, a), d) / _dot(d, d)))
@@ -388,47 +426,56 @@ def _solid_gap(p: Vec, r: float) -> dict[str, float]:
     return gaps
 
 
-def _splice_axis(origin: Vec) -> tuple[Vec, Vec]:
-    return (
-        (origin[0] - SPLICE_LENGTH / 2.0, origin[1], origin[2]),
-        (origin[0] + SPLICE_LENGTH / 2.0, origin[1], origin[2]),
-    )
 
 
-def _splice_gap(p: Vec, link: Vec) -> float:
-    """Distance from p to the outside of a link's flat-ended tube."""
-    axial = max(0.0, abs(p[0] - link[0]) - SPLICE_LENGTH / 2.0)
-    radial = max(0.0, math.hypot(p[1] - link[1], p[2] - link[2]) - SPLICE_OD / 2.0)
-    if axial == 0.0 and radial == 0.0:
-        return 0.0
-    return math.hypot(axial, radial)
+def _link_local(p: Vec) -> tuple[float, float, float]:
+    """``p`` in the link's frame: axial, then the radial offsets."""
+    rel = _sub(p, LINK_ORIGIN)
+    axial = _dot(rel, LINK_AXIS)
+    radial = _norm(_sub(rel, _scale(LINK_AXIS, axial)))
+    return axial, radial, 0.0
+
+
+def _link_gap(p: Vec) -> float:
+    """Distance from p to the outside of the link's domed capsule."""
+    axial, radial, _ = _link_local(p)
+    r = LINK_OD / 2.0
+    over = abs(axial) - LINK_END_BEAD_X
+    if over <= 0.0:
+        return max(0.0, radial - r)
+    return max(0.0, math.hypot(over, radial) - r)
+
+
+def _captured_gap(p: Vec) -> float:
+    """Air between a captured end bead and its dome's inside."""
+    axial, radial, _ = _link_local(p)
+    dome = math.hypot(abs(axial) - LINK_END_BEAD_X, radial)
+    return LINK_OD / 2.0 - LINK_WALL - dome - BEAD_R
 
 
 def clearance_report() -> dict[str, float]:
     """Smallest air (mm) per contact class; every value must be >= 0.
 
-    A captured bead inside a link is proved against the bore, and every other
+    The two end beads are proved against their domes' insides, every other
     bead against the link's outside.
     """
     beads = BEAD_CENTRES
+    captured = {0, len(beads) - 1}
     worst: dict[str, float] = {}
 
     def note(key: str, value: float) -> None:
         worst[key] = min(worst.get(key, math.inf), value)
 
-    captured = {0: EYE_LINK, len(EYE_LOOP) - 1: EYE_LINK, BEAD_COUNT - 1: RING_LINK}
-    captured[BEAD_COUNT - len(RING_LOOP)] = RING_LINK
     for i, p in enumerate(beads):
         for key, gap in _solid_gap(p, BEAD_R).items():
             note(f"bead-{key}", gap)
-        for link in SPLICE_ORIGINS:
-            a, b = _splice_axis(link)
-            if captured.get(i) == link:
-                radial = math.hypot(p[1] - link[1], p[2] - link[2])
-                note("bead-in-bore", SPLICE_BORE / 2.0 - radial - BEAD_R)
-                continue
-            note("bead-splice", _splice_gap(p, link) - BEAD_R)
+        if i in captured:
+            note("bead-in-link", _captured_gap(p))
+        else:
+            note("bead-link", _link_gap(p) - BEAD_R)
         for j in range(i + 2, len(beads)):
+            if {i, j} == captured:
+                continue  # the two end beads face each other inside the link
             note("bead-bead", _dist(p, beads[j]) - BEAD_DIA)
     for i in range(len(beads) - 1):
         a, b = beads[i], beads[i + 1]
@@ -436,12 +483,10 @@ def clearance_report() -> dict[str, float]:
             q = _add(a, _scale(_sub(b, a), k / 8.0))
             for key, gap in _solid_gap(q, ROD_R).items():
                 note(f"rod-{key}", gap)
-    for link in SPLICE_ORIGINS:
-        a, b = _splice_axis(link)
-        for k in range(0, 9):
-            q = _add(a, _scale(_sub(b, a), k / 8.0))
-            for key, gap in _solid_gap(q, SPLICE_OD / 2.0).items():
-                note(f"splice-{key}", gap)
+    for k in range(0, 9):
+        q = _add(LINK_ORIGIN, _scale(LINK_AXIS, (k / 8.0 - 0.5) * LINK_LENGTH))
+        for key, gap in _solid_gap(q, LINK_OD / 2.0).items():
+            note(f"link-{key}", gap)
     return worst
 
 
@@ -452,15 +497,40 @@ def pitch_errors() -> list[float]:
     ]
 
 
-def splice_volume() -> float:
-    """Link tube volume less the cross-hole's two wall plugs (numeric)."""
-    a, b, rh = SPLICE_OD / 2.0, SPLICE_BORE / 2.0, SPLICE_CROSS_HOLE / 2.0
-    tube = math.pi * (a * a - b * b) * SPLICE_LENGTH
-    n = 400
-    plugs = 0.0
-    for i in range(n):  # midpoint rule over the hole disk, strips along x
-        z = -rh + (i + 0.5) * 2.0 * rh / n
-        chord = 2.0 * math.sqrt(rh * rh - z * z)
-        wall = 2.0 * (math.sqrt(a * a - z * z) - math.sqrt(max(0.0, b * b - z * z)))
-        plugs += chord * wall * (2.0 * rh / n)
-    return tube - plugs
+def _link_solid(x: float, y: float, z: float) -> bool:
+    """Whether local point (x, y, z) is brass: the link's own CSG, axis X."""
+    r = math.hypot(y, z)
+    ro = LINK_OD / 2.0
+    ri = ro - LINK_WALL
+    over = abs(x) - LINK_END_BEAD_X
+    if over > ro:
+        return False
+    dome = math.hypot(over, r) if over > 0.0 else r
+    if dome > ro or dome < ri:
+        return False
+    crimp_r = 0.3
+    crimp_c = ro + crimp_r - LINK_CRIMP_DEPTH
+    if math.hypot(abs(x) - LINK_CRIMP_X, r - crimp_c) < crimp_r:
+        return False
+    if r < LINK_TIP_HOLE / 2.0:
+        return False
+    if y <= 0.0:
+        return True
+    in_window = abs(x) < LINK_WINDOW_LENGTH / 2.0 and abs(z) < LINK_WINDOW_WIDTH / 2.0
+    return not (in_window or abs(z) < LINK_SLOT_WIDTH / 2.0)
+
+
+def link_volume(steps: int = 72) -> float:
+    """The link's volume by midpoint integration of ``_link_solid``."""
+    ro = LINK_OD / 2.0
+    half = LINK_LENGTH / 2.0
+    dx, dr = LINK_LENGTH / (2 * steps), LINK_OD / steps
+    total = 0
+    for ix in range(2 * steps):
+        x = -half + (ix + 0.5) * dx
+        for iy in range(steps):
+            y = -ro + (iy + 0.5) * dr
+            for iz in range(steps):
+                if _link_solid(x, y, -ro + (iz + 0.5) * dr):
+                    total += 1
+    return total * dx * dr * dr

@@ -5873,9 +5873,9 @@ def _anchor_model_points(
 _WALK_POINTS_PER_INSTANCE = 12
 # The visible-edge fallback samples every visible edge of the instance, so
 # it refuses one with more: pins and screws draw 2-50, the keeper bead chain
-# 66 (two rod/bead circles per link; its spheres draw only silhouettes, so it
+# 110 (two rod/bead circles per link; its spheres draw only silhouettes, so it
 # can only be claimed here), a gear over 1,000.
-_VISIBLE_EDGES_PER_INSTANCE = 96
+_VISIBLE_EDGES_PER_INSTANCE = 128
 # Where along a listed edge's parameter range the fallback samples points to
 # hit-test: inside the edge, off the vertices it shares with its neighbours.
 _EDGE_SAMPLE_FRACTIONS = (0.1, 0.3, 0.5, 0.7, 0.9)

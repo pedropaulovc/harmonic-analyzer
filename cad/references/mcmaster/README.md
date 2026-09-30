@@ -16,7 +16,7 @@ recipes:
 | part number | production part stem(s) | stock item |
 |---|---|---|
 | 3606T118 | `keeper-chain` (catalogue-only; no vendor model) | Bead Chain, Unfinished Brass, Trade Size 3 |
-| 3606T813 | `keeper-chain-splice` (catalogue-only; no vendor model) | Splicing Link for Brass Trade Size 3 Bead Chain |
+| 3606T811 | `keeper-chain-link` (catalogue-only; no vendor model) | Loop Link for Brass Trade Size 3 Bead Chain |
 | 90114A511 | `fillister-screw` | Brass Fillister Head Slotted Screw |
 | 90126A211 | `knife-hanger-washer` | Zinc-Plated Steel SAE Washer |
 | 90280A108 | `foot-screw` | Steel Narrow Fillister Head Slotted Screw |
@@ -183,14 +183,17 @@ Catalog specifications checked on September 10, 2026:
   harvested for it yet.
 
 - [3606T118](https://www.mcmaster.com/3606T118/) (`keeper-chain`, MHA-149)
-  and [3606T813](https://www.mcmaster.com/3606T813/) (`keeper-chain-splice`,
-  MHA-150) tie the crank's taper pin to the arm. Both product pages were read
-  on September 29, 2026. 3606T118 is unfinished brass bead chain, trade size 3,
-  3/32 in beads, 20 lbf, not for lifting. 3606T813 is the brass splicing link
-  for trade-size-3 chain. McMaster publishes neither dimensions beyond the bead
-  diameter nor CAD for either item. The 3.2426 mm pitch is the trade-size-3
-  average of 94 beads per foot (Ball Chain Mfg. and Frank Winne size charts).
-  The rod and splicing-link envelope are assumptions named in
+  and [3606T811](https://www.mcmaster.com/3606T811/) (`keeper-chain-link`,
+  MHA-150) tie the crank's taper pin to the arm as one loop through the eye
+  and the ring. Both product pages were read on September 29, 2026. 3606T118 is
+  unfinished brass bead chain, trade size 3, 3/32 in beads, 20 lbf, not for
+  lifting. 3606T811 is the brass loop link that joins the cut ends into a loop.
+  McMaster publishes no CAD for either item, and no dimension beyond the bead
+  diameter. The 3.2426 mm pitch is the trade-size-3 average of 94 beads per foot
+  (Ball Chain Mfg. and Frank Winne size charts). The link's 9 mm length is the
+  listed #3 connector size, and its proportions (domed capsule, crimps, central
+  bead window, rod slot along the top) are read off McMaster's 3606T811
+  photograph. The rod and the link's wall and openings are assumptions named in
   `keeper_chain_spec.py`, so neither part has a replica gate.
 
 Ground rules (mirrored in the diagnostics themselves): the vendor files are

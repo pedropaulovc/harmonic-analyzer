@@ -715,7 +715,7 @@ EYE_Z = CRANK_ARM_Z0 - EYE_WIRE_DIA / 2.0 - ANCHOR_AIR
 EYE_ROOT_Y = ANCHOR_SCREW_XY[1] - (
     ANCHOR_SCREW_SHANK_DIA / 2.0 + ANCHOR_AIR + EYE_TAIL_LEN
 )
-# Keeper chain (MHA-149) + splicing links (MHA-150): authored in the crank
+# Keeper chain (MHA-149) + loop link (MHA-150): authored in the crank
 # frame, whose origin is the crank axis on the arm's outboard face. The spec
 # derives the eye and ring poses from the part specs alone; they must be the
 # ones placed here.
@@ -4184,10 +4184,10 @@ async def build(adapter) -> dict[str, str]:
         named_ref(f"Front Plane@{arm}", "PLANE"),
         label="anchor screw locked to the arm",
     )
-    # Keeper chain (MHA-149) from the eye to the pin's ring, each end spliced
-    # back on itself by an MHA-150 link. All three lock to the arm: the eye,
-    # the pin and the ring all turn with the crank, so the chain's rest drape
-    # rides with it.
+    # Keeper chain (MHA-149): one loop through the eye and the pin's ring,
+    # closed by the MHA-150 loop link. Both lock to the arm: the eye, the pin
+    # and the ring all turn with the crank, so the loop's rest drape rides
+    # with it.
     chain = await place_component(
         adapter,
         "keeper-chain",
@@ -4203,22 +4203,26 @@ async def build(adapter) -> dict[str, str]:
         named_ref(f"Front Plane@{arm}", "PLANE"),
         label="keeper chain locked to the arm",
     )
-    for end, origin in zip(("eye", "ring"), keeper_chain_spec.SPLICE_ORIGINS):
-        splice = await place_component(
-            adapter,
-            "keeper-chain-splice",
-            [o + c for o, c in zip(origin, CRANK_FRAME_ORIGIN)],
-            [0.0, 0.0, 0.0],
-            IDENTITY,
-            ground=False,
-            label=f"keeper chain {end} splice",
-        )
-        await lock_mate(
-            adapter,
-            named_ref(f"Front Plane@{splice}", "PLANE"),
-            named_ref(f"Front Plane@{arm}", "PLANE"),
-            label=f"keeper chain {end} splice locked to the arm",
-        )
+    # The link is authored along local X; its axis runs along machine z
+    # beside the arm edge (ROT_Y_POS90: local X -> machine -Z; the link is
+    # symmetric end for end, and its +Y seam stays up).
+    if keeper_chain_spec.LINK_AXIS != (0.0, 0.0, 1.0):
+        raise AssertionError("keeper-chain link placement assumes an axis along machine z")
+    link = await place_component(
+        adapter,
+        "keeper-chain-link",
+        [o + c for o, c in zip(keeper_chain_spec.LINK_ORIGIN, CRANK_FRAME_ORIGIN)],
+        [0.0, 90.0, 0.0],
+        ROT_Y_POS90,
+        ground=False,
+        label="keeper chain loop link",
+    )
+    await lock_mate(
+        adapter,
+        named_ref(f"Front Plane@{link}", "PLANE"),
+        named_ref(f"Front Plane@{arm}", "PLANE"),
+        label="keeper chain loop link locked to the arm",
+    )
     # Handle pivot rides the arm tip, now ARM_C2C below the crankshaft. Its grip
     # axis stays parallel to the crankshaft (ROT_Y_POS90 -> assembly -Z).
     handle = await place_component(

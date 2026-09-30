@@ -62,7 +62,7 @@ allowed_free_stems:
   - fillister-screw
   # MHA-149/150: lock-mated to the arm, they ride the crank spin.
   - keeper-chain
-  - keeper-chain-splice
+  - keeper-chain-link
   - pinion-arbor
   # MHA-144: lock-mated to MHA-102, it rides the freed engage swing.
   - pinion-arbor-collar

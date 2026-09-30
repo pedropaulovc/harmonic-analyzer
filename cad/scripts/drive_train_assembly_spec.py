@@ -57,7 +57,7 @@ CLUSTERS: dict[Cluster, tuple[str, ...]] = {
         "crank-pin-ring",
         "crank-pin-eye",
         "keeper-chain",
-        "keeper-chain-splice",
+        "keeper-chain-link",
         "fillister-screw",
         "crank-handle",
         "crank-handle-pivot-screw",
@@ -147,7 +147,7 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
             "crank-pin-ring",
             "crank-pin-eye",
             "keeper-chain",
-            "keeper-chain-splice",
+            "keeper-chain-link",
             "fillister-screw",
             "crank-handle",
             "crank-handle-pivot-screw",
@@ -167,11 +167,11 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     # out together, then the chain drops clear of the arm.
     ExplodeStep(
         "taper pin",
-        ("crank-pin", "crank-pin-ring", "keeper-chain", "keeper-chain-splice"),
+        ("crank-pin", "crank-pin-ring", "keeper-chain", "keeper-chain-link"),
         "x",
         -25.0,
     ),
-    ExplodeStep("keeper chain", ("keeper-chain", "keeper-chain-splice"), "y", -20.0),
+    ExplodeStep("keeper chain", ("keeper-chain", "keeper-chain-link"), "y", -20.0),
     ExplodeStep("anchor screw", ("fillister-screw",), "z", -20.0),
     ExplodeStep("anchor eyelet", ("crank-pin-eye",), "z", -10.0),
     # alignment pinion rig
