@@ -27,6 +27,8 @@ import _config
 import _seat_forensics
 import _telemetry
 import connecting_rod_spec as rod
+import crank_drive_gear_spec as crank_gear
+import crank_pinion_spec as crank_pinion
 import cylinder_bank_layout as bank
 import drive_train_steps as steps
 import pinion_rig_fitup as FITUP
@@ -800,14 +802,22 @@ CONSUMABLES_NOTES = "\n".join(
     )
 )
 
+# Step 4 and check 2 prove the crank mesh over one full MHA-021 turn, which
+# is this many crank turns (#1144 blocker 3: sheet 8 said one crank turn).
+if crank_gear.TEETH % crank_pinion.TEETH:
+    raise AssertionError("one MHA-021 turn is no longer a whole number of crank turns")
+CRANK_TURNS_PER_GEAR_TURN = crank_gear.TEETH // crank_pinion.TEETH
+
 FIT_PLACEHOLDER = "\n".join(
     (
         # U31 (pivot): the bored spacing fixes the mesh; check 2 proves it.
         # The rest of the old placeholder is owned elsewhere now: each cone
         # gear's mesh by the MHA-013 print (check 2), the pinion engagement
         # by the rig-located step and check 7, the taper pin by step 6.
-        "16T:64T CENTRE DISTANCE FIXED BY MHA-016 BORE SPACING; VERIFY NO",
-        "BINDING THROUGH ONE CRANK TURN (CHECK 2).",
+        f"{crank_pinion.TEETH}T:{crank_gear.TEETH}T CENTRE DISTANCE FIXED BY"
+        " MHA-016 BORE SPACING; VERIFY NO",
+        "BINDING THROUGH ONE FULL MHA-021 TURN"
+        f" ({CRANK_TURNS_PER_GEAR_TURN} CRANK TURNS; CHECK 2).",
     )
 )
 
