@@ -92,7 +92,6 @@ from transgear_removable_notes import DRAWING_NOTES, GEAR_DATA
 from _common import set_global as set_global_mm
 from involute_gear import (
     PI_LIT,
-    equation_curve,
     pattern_count_dimension,
     read_dimension,
     set_global,
@@ -290,6 +289,30 @@ def gap_curves() -> list[tuple[str, str, str]]:
     ]
 
 
+async def gap_curve(adapter, label: str, x_expr: str, y_expr: str) -> str:
+    """Add one gap curve over t in [0, 1] with UNLOCKED end points.
+
+    The six curves share their end points in one closed loop. With locked
+    ends (the ``CreateEquationSpline2`` default) the fix escalation closed
+    that loop redundantly: the fourth fix left the sketch at swNoSolution
+    with no over-defining relation (farm, 2026-09-30). Unlocked, each fix
+    pins only its own curve and the sixth fully defines the sketch.
+    """
+    from solidworks_mcp.adapters.base import CreateEquationCurveParameters
+
+    res = await adapter.create_equation_driven_curve(
+        CreateEquationCurveParameters(
+            x_expression=x_expr,
+            y_expression=y_expr,
+            range_start="0",
+            range_end="1",
+            lock_start=False,
+            lock_end=False,
+        )
+    )
+    return check(f"curve {label}", res)
+
+
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         CircularPatternParameters,
@@ -434,7 +457,7 @@ async def build(adapter) -> dict[str, str]:
     # One tooth gap (global-referencing equation curves, t in [0,1]).
     # ------------------------------------------------------------------
     check("create_sketch gap", await adapter.create_sketch("Front"))
-    curves = [await equation_curve(adapter, *curve) for curve in gap_curves()]
+    curves = [await gap_curve(adapter, *curve) for curve in gap_curves()]
     # Whitelisted fix escalation: the gap profile is six equation-driven
     # curves whose shape and position re-solve from the equation globals
     # on every configuration change (ToothCount 12/18/24) -- no static
