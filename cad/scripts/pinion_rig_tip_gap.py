@@ -11,20 +11,13 @@ from __future__ import annotations
 import pinion_rig_park_geometry as park
 from pinion_rig_fitup import FEELER_GAGE_LEAVES_MM, FEELER_GAGE_NAME
 from pinion_rig_layout import FEELER_LEAF_STEP
+from pinion_rig_park_geometry import TIP_GAP_ACCEPT, TIP_GAP_ACCEPT_BAND, TIP_GAP_FEELER
 
 
 SETUP_TIP_GAP = park.APINION_GAP
 REST_TIP_GAP = park.REST_TIP_GAP
 if not REST_TIP_GAP > SETUP_TIP_GAP:
     raise AssertionError("rest tip gap must exceed the level-centre construction gap")
-# Round the saved rest pose to the gage's leaf step (not to a fictional model
-# air gap); both front and back pins share this cam-contact swing.
-TIP_GAP_FEELER = round(round(REST_TIP_GAP / FEELER_LEAF_STEP) * FEELER_LEAF_STEP, 2)
-TIP_GAP_ACCEPT_BAND = 0.2
-TIP_GAP_ACCEPT = (
-    round(TIP_GAP_FEELER - TIP_GAP_ACCEPT_BAND, 2),
-    round(TIP_GAP_FEELER + TIP_GAP_ACCEPT_BAND, 2),
-)
 
 
 def leaf_stack(setting: float) -> tuple[float, ...]:

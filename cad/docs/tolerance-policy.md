@@ -435,44 +435,70 @@ come out of the same solution. The model is a hypothesis about a hand-formed
 part, not a measurement: the first leaf's force, contact station and
 permanent set are still checked physically (bend coupon row above).
 
-The gate walks the full printed envelope, every band at each end
-independently: the five contact dimensions (`FootLen`, `BendR`,
-`FreeKinkH`, `FreeKinkV`, `KinkR`, ±0.5 each), stock thickness
-(0.381 ±0.019), strip width (.XX), pad width and length (.XX), the strap's
-two cap radii (.X, ±0.8 each end), its c2c (.XX, ±0.51), the strap's parked
-lean (±1°), the SPRING SET error (feeler class + #4 screw float, ±0.3095),
-the pad hole (.XX), parked and engaged — 65 536 cases in the test, and the
-same gate on a 4 096-case correlated-cap subset at import. The flick's own
-two bands (`FlatLen`, `FreeTipH`) are swept at nine combinations on every
-solved shape for the tip clearances. Doubling, quadrupling and octupling the
-elastica's integration steps moves the worst preload ratio by 0.1 % and the
-worst yield SF by 0.05 %, so the discretisation is converged for the gate's
-margins.
+The gate walks the full printed envelope, every band at each end:
+the five contact dimensions (`FootLen`, `BendR`, `FreeKinkH`, `FreeKinkV`,
+`KinkR`, ±0.5 each about their **printed tenth-mm** nominals), stock
+thickness (0.381 ±0.019), strip width (.XX), pad width and length (.XX),
+the strap's two cap radii (.X, ±0.8 each end), its bore c2c (.XX,
+±0.51), final parked lean (±1°), SPRING SET error (feeler class + #4
+screw float, ±0.3095), and the pad hole (.XX). RIG SET locates each
+strap's pivot from its parked lean and a 2.30–2.70 tooth-tip gap; the
+engaged pose reaches that pivot's tooth-seated centre distance, rather
+than an angle held fixed across different c2c or pivot positions.
+The cam set screws remain loose through SPRING SET and are tightened
+at COLLAR SET. Consequently SPRING SET may have seen a different parked
+lean: the finished CHECK 7 tip-gap interval allows as much as 0.84°
+of post-set lean at the short-c2c corner. Set and final lean are
+coupled by that interval rather than swept as impossible independent
+extremes. Explicit pose identity chooses the parked or engaged gravity
+moment. The test sweeps 163 840 physically located cases; the import
+gate uses a 10 240-case correlated subset. The flick's own printed
+`FlatLen` and `FreeTipH` bands are swept at nine combinations on every
+solved shape for tip clearance. On the limiting SF, parked/engaged
+preload and crest corners, repeating the RK4 solve at 2×, 4× and 8×
+steps leaves SF ≥1.5123 and parked preload ≥1.5117×;
+discretisation does not consume their spare. Physical qualification
+remains separate.
 
-**MHA-114 is no longer blocked.** The seat, foot and pad are unchanged
-(screw 21.3 east of the pivot, 9.5 foot, 9.5 square pad): the leaf is only
-bent more. The free form is `FreeKinkH` 19.1, `FreeKinkV` 28.0, `FreeTipH`
-17.1, both radii R3.3, a 55° crest (was 28°) and a 2.0 flat. East-west the
-pad is stationed by SPRING SET (`pinion_rig_fitup.RIG_SET_STEP`): with the
-straps parked, the leaf slides west until its crest touches the parked back
-flank, then a feeler stack gaged off the north MHA-004 pedestal's west flank
-pushes the pad 3.7 further west before MHA-103 is tightened and the seat
-spotted. The strap itself is the reference, so the strap's cap and c2c bands
-and its parked lean no longer enter the crest's penetration; the pedestal is
-only the relative reference between the two readings. The nominal set lands
-the pad 0.005 from the model seat and the crest 19.0 up the strap at 1.96 N.
+**MHA-114 passes the analytic gate, not yet physical qualification.**
+The seat, foot and pad are unchanged (screw 21.3 east of the pivot,
+9.5 foot, 9.5 square pad). The rederived free form prints
+`FreeKinkH` 19.2, `FreeKinkV` 28.9, `FreeTipH` 17.2, both radii
+R3.3, a 55° crest and a 2.0 flat. The unrounded free-tip
+construction is 17.16; the tolerance proof centres its tip cases
+on the **printed** 17.2. East-west the pad is stationed by SPRING SET
+(`pinion_rig_fitup.RIG_SET_STEP`): with straps parked, the leaf
+slides west until its crest touches the parked back flank, then a
+feeler stack gaged off the north MHA-004 pedestal's west flank
+pushes the pad 3.9 further west before MHA-103 is tightened and
+the seat spotted. The strap itself references the touch, so cap,
+c2c and parked-lean bands do not enter penetration at the time of
+setting; the pedestal is the reference between readings. Re-forming
+the kink with the push lands the nominal pad within 0.001 of the
+model seat, with loaded crest 19.88 up the strap at 1.903 N.
 
-Worst corners over the full envelope: parked preload 1.604× gravity,
-engaged 1.645×, yield SF 1.556, loaded crest reserve 3.47° blade-side /
-17.0° flick-side, contact station ≥ 17.15 up the strap (end-cap spare
-3.63), the flat tip ≥ 0.92 off the flank with no second contact, the foot
-never lifting, peak force 5.04 N. The pad's SPRING SET station ranges
-−2.10/+2.17 about the model seat over the envelope; that west extreme plus
-the formed band is what the lift-rod and drum end-disc gates book.
+Why the pose matters: a fixed-pivot tooth seat varied by c2c makes
+the preceding leaf's yield SF 1.490 (<1.5); holding the tooth seat
+constant instead reported 1.515. Even after locating the pivot,
+the former 19.0/28.1 free form at 3.6 SPRING SET gives parked
+preload only 1.423× if lean moves after setting. The revised form
+at 3.9 over the full 163 840-case located envelope gives parked
+preload 1.514× gravity (spare 0.014×), engaged preload 1.609×,
+yield SF 1.513 (spare 0.013), loaded crest reserve 3.05° blade-side
+(spare 0.05°) / 16.86° flick-side (minimum 3°), contact ≥18.03
+up the straight flank, arbor end-cap spare ≥2.54 (minimum 0.25),
+tip ≥0.90 off the flank (minimum 0.25), no second contact or foot
+lift, peak force 5.03 N. The pad's set station spans −2.12/+2.17
+about the model seat. The engaged throw reaches at most 3.45 mm
+along the strap; assembly gates book the corresponding lift-rod/cam
+sweep, drum end disc and gear clearances. This analytic spring gate
+is **not** a native loaded-motion collision or finite-element/contact
+proof. The blade-side crest reserve has only 0.05° spare beyond the
+policy floor; inspect the first formed leaf and its contact sweep.
 
 Still to prove physically: Condition C's modulus (200 GPa stand-in), the
-55° crest and 90° bend coupons at the band's R2.8 low limit, and the first
-leaf's force through the throw and permanent set.
+55° crest and 90° bend coupons at the band's R2.8 low limit, and the
+first leaf's force through the throw, contact and permanent set.
 
 ## Fit classes (interfaces that must carry a rule)
 

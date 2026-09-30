@@ -1921,6 +1921,7 @@ from pinion_rig_park_geometry import (  # noqa: E402
     SPR_N as _SPR_N,
     SPR_U as _SPR_U,
     STRAP_LEAN_DEG,
+    TIP_GAP_ACCEPT,
     TIP_APINION,
     TIP_DRUM120,
 )
@@ -2327,14 +2328,17 @@ def _cam_pin_contact_faces(
 
 # Engage swing angle from the c2c triangle (pivot, drum axis, pinion axis):
 # parked ray angle minus engaged ray angle about the pivot, both from +x.
-_PD = math.hypot(X_DRUM - PIVOT_X, Y_DRIVE - PIVOT_Y)  # 68.05 pivot -> drum
-_ANG_PARKED = math.atan2(APINION_Y - PIVOT_Y, APINION_X - PIVOT_X)
-_ANG_ENGAGED = math.atan2(Y_DRIVE - PIVOT_Y, X_DRUM - PIVOT_X) - math.acos(
-    max(
-        -1.0,
-        min(1.0, (STRAP_C2C**2 + _PD**2 - ENGAGED_C2C**2) / (2.0 * STRAP_C2C * _PD)),
+def _strap_ray(c2c: float, pivot_x: float, reach: float) -> float:
+    """The strap's ray angle about a pivot at ``pivot_x`` (from +x) that
+    puts its pinion axis ``reach`` from the drum axis, on the mesh side."""
+    pd = math.hypot(X_DRUM - pivot_x, Y_DRIVE - PIVOT_Y)
+    return math.atan2(Y_DRIVE - PIVOT_Y, X_DRUM - pivot_x) - math.acos(
+        max(-1.0, min(1.0, (c2c**2 + pd**2 - reach**2) / (2.0 * c2c * pd)))
     )
-)
+
+
+_ANG_PARKED = math.atan2(APINION_Y - PIVOT_Y, APINION_X - PIVOT_X)
+_ANG_ENGAGED = _strap_ray(STRAP_C2C, PIVOT_X, ENGAGED_C2C)
 _PHI_ENG = _ANG_ENGAGED - _ANG_PARKED  # CCW from live contact to tooth seat
 if not 0.01 < _PHI_ENG < math.radians(10.0):
     raise AssertionError("engage swing angle out of the expected band")
@@ -2490,14 +2494,52 @@ _SPR_C2C_DEV = printed_deviations(STRAP_C2C, 2)[1]  # its bore c2c prints .XX
 # the pin seats and the pivot fits stack into the strap's parked angle.
 SPRING_PARKED_LEAN_BAND_DEG = 1.0
 _SPR_HOLE_DEV = printed_deviations(SPR_HOLE_FROM_END, 2)[1]  # the pad hole locates .XX
+# The tooth seat is not one angle.  "rig-located" (MHA-A03) slides the loose
+# blocks until the parked pins-on-cams tip gap takes the TIP_GAP feeler, so
+# each strap's pivot is LOCATED from its own c2c and lean, and its seat
+# follows that pivot.  SPRING SET comes next, but the cam set screws stay
+# loose until COLLAR SET, so the parked lean may still move after the set;
+# the only printed bound on that is CHECK 7, the finished rig's parked tip
+# gap back inside the same ACCEPT band.  So each strap walks its final lean
+# at both band ends and its final tip gap at both accept ends (which fix the
+# pivot and the seat), and SPRING SET's lean on that pivot at both accept
+# ends, held to the lean band.
+_SPR_TIP_SUM = TIP_DRUM120 + TIP_APINION
+
+
+def _located_pivot_x(c2c: float, lean: float, tip_gap: float) -> float:
+    """Pivot x that parks a ``c2c`` strap at ``lean`` with ``tip_gap``."""
+    th = _ANG_PARKED + lean
+    dy = PIVOT_Y + c2c * math.sin(th) - Y_DRIVE
+    return X_DRUM + math.sqrt((tip_gap + _SPR_TIP_SUM) ** 2 - dy**2) - c2c * math.cos(th)
+
+
+def spring_strap_poses(dc: float) -> tuple[tuple[float, float, float], ...]:
+    """``(set lean, swing, pose)`` rows for a strap ``dc`` off its c2c, all
+    radians from nominal park: parked at its final lean, engaged at the tooth
+    seat of its located pivot, each against every lean SPRING SET saw."""
+    band = math.radians(SPRING_PARKED_LEAN_BAND_DEG)
+    c2c = STRAP_C2C + dc
+    rows: dict[tuple[float, float, float], None] = {}
+    for lean in (-band, band):
+        for gap in TIP_GAP_ACCEPT:
+            pivot_x = _located_pivot_x(c2c, lean, gap)
+            seat = _strap_ray(c2c, pivot_x, ENGAGED_C2C) - _ANG_PARKED
+            for set_gap in TIP_GAP_ACCEPT:
+                set_lean = lean if set_gap == gap else min(band, max(-band, (
+                    _strap_ray(c2c, pivot_x, set_gap + _SPR_TIP_SUM) - _ANG_PARKED
+                )))
+                rows[(set_lean, lean, 0.0)] = None
+                rows[(set_lean, seat, 1.0)] = None
+    return tuple(rows)
 
 
 def spring_envelope(full: bool) -> dict[str, np.ndarray]:
-    """The printed envelope the load gates walk.  ``full`` takes every band
-    independently (65536 cases, the test suite's proof); the import-time gate
-    walks the 4096-case subset with the strap's two caps moved together, its
-    c2c and the pad's blank at nominal."""
-    park = math.radians(SPRING_PARKED_LEAN_BAND_DEG)
+    """The printed envelope the load gates walk. ``full`` takes every band
+    independently (163840 cases, the test suite's proof); the import-time gate
+    walks the 10240-case subset with the strap's two caps moved together, its
+    c2c and the pad's blank at nominal.  Every strap's poses are
+    :func:`spring_strap_poses`: engaged is its own located tooth seat."""
     if full:
         caps = tuple(itertools.product((-_SPR_CAP_DEV, _SPR_CAP_DEV), repeat=2))
         c2c, pad_w, pad_l = (-_SPR_C2C_DEV, _SPR_C2C_DEV), _SPR_PAD_W, _SPR_PAD_L
@@ -2513,8 +2555,7 @@ def spring_envelope(full: bool) -> dict[str, np.ndarray]:
         taper_len=(SPR_LEAF_DESIGN.taper_len,),
         caps=caps,
         c2c=c2c,
-        park=(-park, park),
-        engage=(_PHI_ENG,),
+        strap_poses=spring_strap_poses,
         set_error=(-SPR_SET_ERROR, SPR_SET_ERROR),
         hole=(-_SPR_HOLE_DEV, _SPR_HOLE_DEV),
         formed_band=SPR_FORMED_BAND,
@@ -2528,7 +2569,7 @@ def spring_gates(cases: dict[str, np.ndarray], chunk: int = 8192) -> dict[str, f
     for start in range(0, n, chunk):
         sub = {k: v[start : start + chunk] for k, v in cases.items()}
         r = spr_loaded(sub)
-        engaged = sub["swing"] > sub["park"] + 1e-9
+        engaged = sub["pose"] == 1.0
         gravity = np.where(engaged, SWING_GRAVITY_CORNER_NMM[1], SWING_GRAVITY_CORNER_NMM[0])
         ratio = r.force * r.arm / gravity
         part = {
@@ -2627,16 +2668,19 @@ SPRING_TO_LIFT_ROD = (
 )
 if SPRING_TO_LIFT_ROD < 0.25:
     raise AssertionError("spring leaf reaches the lift rod's collar sweep")
-# The engaged blade flexes east toward the cylinder drum: the crest and the
-# flick tip, carried east by the swing's penetration at the contact, the
-# SPRING SET's east extreme and the formed band, keep 0.25 to the north end
-# disc beside them (the gears themselves end axially short of the leaf).
-_spr_push = (
-    (STRAP_C2C - 1.0) * _PHI_ENG
-    + SPRING_SET_SHIFT[1]
-    + SPR_PARKED_AIR
-    + SPR_FORMED_BAND
+# The engaged blade flexes east toward the cylinder drum: use the largest
+# throw any printed strap makes from the lean SPRING SET saw to its own
+# located tooth seat (spring_strap_poses), at the top of its flank.  The
+# SPRING SET's east extreme (its own set-lean corner included), plus the
+# formed band, bound the crest and flick tip against the north end disc.
+# The gears themselves end axially short of the leaf.
+SPRING_ENGAGE_THROW_MM = max(
+    (STRAP_C2C + _dc - 1.0) * (_swing - _set)
+    for _dc in (-_SPR_C2C_DEV, _SPR_C2C_DEV)
+    for _set, _swing, _pose in spring_strap_poses(_dc)
+    if _pose == 1.0
 )
+_spr_push = SPRING_ENGAGE_THROW_MM + SPRING_SET_SHIFT[1] + SPR_PARKED_AIR + SPR_FORMED_BAND
 for _label, _p in (("crest", SPRING_CREST), ("flick tip", SPRING_FLAT_TIP)):
     _q = (_p[0] + _spr_push * _SPR_N[0], _p[1] + _spr_push * _SPR_N[1])
     if (

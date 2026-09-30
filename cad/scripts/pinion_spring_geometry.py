@@ -114,12 +114,14 @@ FORMED_BAND_MM = 0.5
 YIELD_MPA = 1205.0
 
 # The FREE (as-formed) profile the print holds, from the foot's free end
-# (policy rule 7): the kink (crest) start FREE_KINK_H west and FREE_KINK_V up,
-# the flick tip FREE_TIP_H west.  Chosen (PR #1127 bend-only search, full
-# printed envelope) so that with SPRING SET the loaded leaf keeps preload
-FREE_KINK_H = 19.12
-FREE_KINK_V = 28.0
-FREE_TIP_H = 17.09
+# (policy rule 7). The located tooth seat and a parked lean that may still
+# move after SPRING SET (drive train spring_strap_poses) need a taller kink
+# and a 3.9 push: FreeKinkH is re-formed with them so the nominal SPRING SET
+# still spots the original screw seat. The manufactured FreeTipH prints
+# 17.2; the unrounded value closes the 55-degree crest.
+FREE_KINK_H = 19.2
+FREE_KINK_V = 28.9
+FREE_TIP_H = 17.16
 FORMED_CONTACT_BANDS = ("FootLen", "BendR", "FreeKinkH", "FreeKinkV", "KinkR")
 
 # SPRING SET (pinion_rig_fitup.RIG_SET_STEP, pinion_rig_layout): straps
@@ -271,8 +273,10 @@ STRAP = load_model.Strap(
 )
 MATERIAL = load_model.Material(MODULUS_MPA, YIELD_MPA)
 PAD_SET = load_model.PadSet(SET_TOUCH_LEAF_MM, SET_PUSH_MM)
+# The formed dimensions are printed to tenths, so both extremes are measured
+# from their printed nominal, not the unrounded FreeTipH construction value.
 TIP_CASES = tuple(
-    (FREE_TIP_H + dh, FLAT_LEN + dl)
+    (round(FREE_TIP_H, 1) + dh, round(FLAT_LEN, 1) + dl)
     for dh in (-FORMED_BAND_MM, 0.0, FORMED_BAND_MM)
     for dl in (-FORMED_BAND_MM, 0.0, FORMED_BAND_MM)
 )
@@ -286,7 +290,7 @@ def loaded(cases: dict[str, np.ndarray]) -> load_model.Loaded:
 # chosen for it) and the crest bears part-way up the straight flank.
 _NOMINAL = loaded(
     load_model.nominal_case(
-        LEAF_DESIGN, thick=THICK, width=WIDTH, pad_width=PAD_WIDTH, swing=0.0
+        LEAF_DESIGN, thick=THICK, width=WIDTH, pad_width=PAD_WIDTH, swing=0.0, pose=0
     )
 )
 NOMINAL_SET_SHIFT = float(_NOMINAL.shift[0])  # pad east of the model seat, mm

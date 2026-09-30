@@ -1845,7 +1845,33 @@ sections:
         - stated
         - high
       - - Return spring (leaf)
-        - 0.381 × 6.5 17-7 PH stainless strip, Condition C (0.015 in, McMaster-Carr 2325K19 sheared 6.50 mm wide from the same 6 in × 50 in roll; PR 859 ruling 4, 2026-09-25, supersedes the 0.5 × 6.0 C51000 of O1-b — stainless departs from the p.68 brass look for stress margin and corrosion resistance); foot screwed down 21.3 EAST of the pivot bore, outboard of the back strap, on a 9.5 square pad flush with the strip's aft edge (widening forward only, PR 859 option (iv)); R3.3 bend straight off the pad; straight blade leaning ~5.4° west of vertical (~13.0° in to the rested flank); crest R3.3 bearing on the east flank about 19 up the strap; 55° flick back east, 2.0 flat. Modelled installed (0.15 air at the spring crest; the separate cam/pin contact has zero air) as the rigid turn of the free form the print holds (FreeKinkH 19.1, FreeKinkV 28.0, FreeTipH 17.1 — crest preset ~3.7 into the flank, 8.7° more bend). PR 1127 (user — bend the spring a bit more, seat and pedestal unchanged) — the load is the root-compliant elastica (pinion_spring_load) solved over the full printed envelope — five formed bands, stock, strip and pad widths, strap caps and c2c, parked lean ±1°, SPRING SET error ±0.31 — 65 536 cases; worst parked/engaged preload 1.604/1.645 times worst gravity, yield SF 1.556, loaded crest reserve 3.47° blade-side / 17.0° flick-side, station ≥ 17.15 up the strap (end-cap spare 3.63), flat tip ≥ 0.92 off the flank, peak force 5.04 N. East-west the pad is SPRING SET off the parked strap itself (crest touching, then pushed 3.7 west on feelers gaged off the north MHA-004 pedestal; RIG SET note), which retires known issue 1037. The Condition-C modulus, the 55° coupon and the first leaf's force and set remain physical checks.
+        - >-
+          0.381 × 6.5 17-7 PH stainless strip, Condition C (0.015 in,
+          McMaster-Carr 2325K19 sheared 6.50 mm wide from the same 6 in × 50 in
+          roll; PR 859 ruling 4 supersedes the 0.5 × 6.0 C51000 of O1-b —
+          stainless departs from the p.68 brass look for stress margin and
+          corrosion resistance); foot screwed down 21.3 EAST of the pivot bore,
+          outboard of the back strap, on a 9.5 square pad flush with the strip's
+          aft edge (widening forward only, PR 859 option (iv)); R3.3 bend
+          straight off the pad, free blade leaning west into the rested flank,
+          R3.3 crest bearing on the east flank about 19 up the strap, 55° flick
+          back east, 2.0 flat. The free printed profile uses FreeKinkH 19.2,
+          FreeKinkV 28.9, FreeTipH 17.2; the installed CAD is its rigid set
+          stand-in (0.15 air at the spring crest, zero air at the separate
+          cam/pin contact). SPRING SET references the actual parked back strap:
+          touch crest, then push the pad 3.9 west using feelers gaged off the
+          north MHA-004 pedestal, preserving the unchanged nominal seat.
+          The root-compliant elastica in `pinion_spring_load.py` solves 163 840
+          printed tolerance cases, including strap c2c, the pivot located by
+          the 2.30–2.70 parked tip-gap acceptance, and parked lean that can
+          move after SPRING SET but must still pass the final gap check:
+          worst parked/engaged preload 1.514/1.609 times worst gravity,
+          yield safety factor 1.513, loaded crest reserve 3.05° blade-side /
+          16.86° flick-side, contact station ≥18.03 up the strap (end-cap
+          spare ≥2.54), flick tip ≥0.90 clear, peak force 5.03 N.
+          These are analytical margins, not physical qualification; Condition-C
+          modulus, coupon bend, first-leaf force, permanent set, and contact
+          sweep still require measurement.
         - —
         - 'p.68–69 + v4_pinion_013/018/019: a brass-coloured leaf bears on the BACK strap''s east flank in both poses and holds the drum disengaged; the front strap stays clear (t00393). img01''s far-left black screw is on the DRUM side (east), not under the strap. The observed shape supports this topology, not a precise crest station or bend angle. MHA-114 uses a 55° free crest and is set from the actual parked back flank with the SPRING SET operation; the elastic contact and tolerance envelope are checked by build_drive_train_assembly, not inferred from the photograph. The pad sits a 0.65 gage leaf off the back block (`SPRING_PAD_LEAF`) to set its axial position (`SPRING_BLADE_INSET`).'
         - scaled

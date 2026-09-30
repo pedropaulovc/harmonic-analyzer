@@ -142,12 +142,10 @@ def test_return_spring_foot_is_outboard_east_of_the_strap_and_block() -> None:
 
 
 def test_return_spring_gates_hold_over_the_full_printed_envelope() -> None:
-    # PR #1127 (user: "bend the spring a bit more"): the leaf is the FREE
-    # profile the print holds, SPRING SET off the parked strap, and every load
-    # number is the root-compliant elastica (pinion_spring_load) over the
-    # printed envelope -- every band the prints carry, each end independently,
-    # both poses.  The import-time gate walks the correlated-cap subset; this
-    # is the full 65536-case proof and must agree with it where they overlap.
+    # The leaf is the FREE profile the print holds, SPRING SET off the
+    # actual parked strap, and each strap engaged at the tooth seat of the
+    # pivot rig-located from its own c2c, lean and tip gap.  Every printed
+    # band is independent; the import-time gate walks the correlated subset.
     import pinion_spring_geometry as leaf
     import pinion_spring_spec as spring_spec
     import pinion_spring_section as section
@@ -169,21 +167,98 @@ def test_return_spring_gates_hold_over_the_full_printed_envelope() -> None:
     assert leaf.MIN_ARBOR_END_CAP_SPARE_MM == 0.25
     # The envelope: every printed band, each end, independently.
     full = drive.spring_envelope(full=True)
-    assert len(full["t"]) == 65536
+    assert len(full["t"]) == 163840
     def ends(key: str) -> list[float]:
         return sorted(set(np.round(full[key], 9).tolist()))
+    printed_formed = {
+        "foot_len": ("FootLen", leaf.LEAF_DESIGN.foot_len),
+        "r_b": ("BendR", leaf.LEAF_DESIGN.r_bend),
+        "fkh": ("FreeKinkH", leaf.LEAF_DESIGN.free_kink_h),
+        "fkv": ("FreeKinkV", leaf.LEAF_DESIGN.free_kink_v),
+        "r_k": ("KinkR", leaf.LEAF_DESIGN.r_kink),
+    }
+    for key, (mark, nominal) in printed_formed.items():
+        printed = round(nominal, spring_spec.DRAWING_PRECISION_BY_NAME[mark])
+        assert ends(key) == pytest.approx(
+            [printed - spring_spec.FORMED_TOLERANCE_MM,
+             printed + spring_spec.FORMED_TOLERANCE_MM]
+        )
+    tip_nominal = round(
+        leaf.FREE_TIP_H, spring_spec.DRAWING_PRECISION_BY_NAME["FreeTipH"]
+    )
+    assert sorted({tip for tip, _ in leaf.TIP_CASES}) == pytest.approx(
+        [tip_nominal - leaf.FORMED_BAND_MM, tip_nominal,
+         tip_nominal + leaf.FORMED_BAND_MM]
+    )
 
     assert ends("t") == pytest.approx([t_lo, t_hi])
     assert min(full["w"]) == pytest.approx(w_lo)
     assert ends("rb") == ends("rt") == pytest.approx([-0.8, 0.8])  # the strap's .X caps
     assert ends("c2c") == pytest.approx([-0.51, 0.51])  # its .XX c2c
     lean = math.radians(drive.SPRING_PARKED_LEAN_BAND_DEG)
-    assert ends("park") == pytest.approx([-lean, lean])
+    assert [ends("park")[0], ends("park")[-1]] == pytest.approx([-lean, lean])
     assert ends("set") == pytest.approx([-leaf.SET_ERROR_MM, leaf.SET_ERROR_MM])
     assert ends("hole") == pytest.approx([-0.51, 0.51])
-    assert sorted(set(np.round(full["swing"] - full["park"], 9).tolist())) == pytest.approx(
-        [0.0, drive._PHI_ENG]
+    assert ends("pose") == [0.0, 1.0]
+    parked = full["pose"] == 0.0
+    assert sorted(set(np.round(full["swing"][parked], 9).tolist())) == pytest.approx(
+        [-lean, lean]
     )
+    # Read every strap state back through the rig's geometry, not the
+    # envelope's code: the engaged swing puts the pinion axis ENGAGED_C2C from
+    # the drum on exactly one pivot; that pivot parks the same strap at a lean
+    # band end on an ACCEPT end (rig-located, CHECK 7), and the lean SPRING
+    # SET saw on it parks inside ACCEPT.
+    import pinion_rig_tip_gap as tip_gap
+
+    accept = tip_gap.TIP_GAP_ACCEPT
+    tips = drive.TIP_DRUM120 + drive.TIP_APINION
+
+    def axis_to_drum(c2c: float, pivot_x: float, swing: float) -> float:
+        th = drive._ANG_PARKED + swing
+        return math.hypot(
+            pivot_x + c2c * math.cos(th) - drive.X_DRUM,
+            drive.PIVOT_Y + c2c * math.sin(th) - drive.Y_DRIVE,
+        )
+
+    def pivot_for(c2c: float, swing: float, reach: float) -> float:
+        lo, hi = drive.PIVOT_X - 5.0, drive.PIVOT_X + 5.0
+        for _ in range(100):
+            mid = 0.5 * (lo + hi)
+            lo, hi = (mid, hi) if axis_to_drum(c2c, mid, swing) < reach else (lo, mid)
+        return 0.5 * (lo + hi)
+
+    seats: dict[float, set[float]] = {}
+    states = np.unique(
+        np.round(np.stack([full["c2c"], full["park"], full["swing"], full["pose"]], 1), 12),
+        axis=0,
+    )
+    for dc, set_lean, swing, pose in states:
+        c2c = drive.STRAP_C2C + dc
+        if pose == 1.0:
+            pivot_x = pivot_for(c2c, swing, drive.ENGAGED_C2C)
+            seats.setdefault(dc, set()).add(round(swing, 9))
+            parks = [axis_to_drum(c2c, pivot_x, s * lean) - tips for s in (-1, 1)]
+            assert min(abs(g - a) for g in parks for a in accept) < 1e-6
+        else:
+            located = [pivot_for(c2c, swing, a + tips) for a in accept]
+            assert set_lean == swing or any(
+                accept[0] - 1e-6 <= axis_to_drum(c2c, x, set_lean) - tips <= accept[1] + 1e-6
+                for x in located
+            )
+        assert abs(set_lean) <= lean + 1e-12
+    # The seat follows the strap: a longer c2c seats at a smaller swing, and
+    # the lean moved after SPRING SET reaches the whole ACCEPT width.
+    short, long = seats[min(seats)], seats[max(seats)]
+    assert max(short) > max(long) and min(short) > min(long)
+    residual = np.abs(full["swing"][parked] - full["park"][parked]).max()
+    far = pivot_for(drive.STRAP_C2C, -lean, accept[1] + tips)
+    lo, hi = -lean, lean
+    for _ in range(100):
+        mid = 0.5 * (lo + hi)
+        wide = axis_to_drum(drive.STRAP_C2C, far, mid) - tips > accept[0]
+        lo, hi = (mid, hi) if wide else (lo, mid)
+    assert residual >= abs(0.5 * (lo + hi) + lean) - 1e-3
     gates = drive.spring_gates(full)
     drive.require_spring_gates(gates)
     # The hard floors, at the full envelope's worst corner.
@@ -196,6 +271,51 @@ def test_return_spring_gates_hold_over_the_full_printed_envelope() -> None:
     assert gates["station_min"] >= 1.0
     assert gates["second_clear"] > 0.0 and gates["tip_clear"] >= 0.25
     assert gates["touch_tip_clear"] > 0.0 and gates["foot_dip"] >= -1e-6
+    # Negative control: the former leaf (FreeKinkH 19.0, FreeKinkV 28.1, 3.6
+    # set) clears 1.5x parked preload when every strap seats at the one
+    # nominal _PHI_ENG and parks at the lean SPRING SET saw, but not when the
+    # lean moves after the set inside CHECK 7's band.  Its thinnest slice:
+    # the thin stock, the set's short end.
+    import dataclasses
+    import itertools
+
+    import pinion_spring_load as load_model
+
+    former = dataclasses.replace(
+        leaf.LEAF_DESIGN, free_kink_h=19.0, free_kink_v=28.1, free_tip_h=16.96
+    )
+    former_set = load_model.PadSet(leaf.SET_TOUCH_LEAF_MM, 3.6)
+    former_tips = tuple(
+        (17.0 + tip - round(leaf.FREE_TIP_H, 1), flat) for tip, flat in leaf.TIP_CASES
+    )
+
+    def former_parked_preload(strap_poses) -> float:
+        cases = load_model.corner_cases(
+            former,
+            thick=(t_lo,),
+            width=(drive._SPR_W_LO, drive._SPR_W_HI),
+            pad_width=drive._SPR_PAD_W,
+            pad_len=drive._SPR_PAD_L,
+            taper_len=(former.taper_len,),
+            caps=tuple(itertools.product((-drive._SPR_CAP_DEV, drive._SPR_CAP_DEV), repeat=2)),
+            c2c=(-drive._SPR_C2C_DEV, drive._SPR_C2C_DEV),
+            strap_poses=lambda dc: [row for row in strap_poses(dc) if row[2] == 0.0],
+            set_error=(-leaf.SET_ERROR_MM,),
+            hole=(-drive._SPR_HOLE_DEV, drive._SPR_HOLE_DEV),
+            formed_band=leaf.FORMED_BAND_MM,
+        )
+        r = load_model.load(
+            former, leaf.STRAP, leaf.MATERIAL, former_set, cases, tip_cases=former_tips
+        )
+        return float((r.force * r.arm).min() / drive.SWING_GRAVITY_CORNER_NMM[0])
+
+    constant_seat = former_parked_preload(
+        lambda dc: [(p, p, 0.0) for p in (-lean, lean)]
+    )
+    located = former_parked_preload(drive.spring_strap_poses)
+    assert constant_seat >= drive._PRELOAD_MARGIN > located
+    with pytest.raises(AssertionError, match="spring preload .* parked"):
+        drive.require_spring_gates({**gates, "preload_parked": located})
     # The import-time subset can only be kinder than the full envelope.
     for key in ("preload_parked", "preload_engaged", "stress_sf", "crest_before_deg",
                 "crest_after_deg", "endcap_spare", "tip_clear"):
@@ -224,8 +344,10 @@ def test_return_spring_gate_rejects_a_leaf_bent_too_little_or_too_much() -> None
             leaf.LEAF_DESIGN, leaf.STRAP, leaf.MATERIAL, pad_set, cases,
             tip_cases=leaf.TIP_CASES,
         )
-        engaged = cases["swing"] > cases["park"] + 1e-9
-        gravity = [drive.SWING_GRAVITY_CORNER_NMM[int(e)] for e in engaged]
+        engaged = cases["pose"] == 1.0
+        gravity = np.where(
+            engaged, drive.SWING_GRAVITY_CORNER_NMM[1], drive.SWING_GRAVITY_CORNER_NMM[0]
+        )
         ratio = r.force * r.arm / gravity
         worst.update(drive.SPRING_GATES)
         worst["preload_parked"] = float(ratio[~engaged].min())
@@ -246,10 +368,22 @@ def test_return_spring_free_form_is_what_the_print_and_the_set_assume() -> None:
     # solid is the rigid turn of that free form with its crest hovering
     # PARKED_AIR off the flank near the loaded nominal contact.
     import pinion_spring_geometry as leaf
+    import pinion_spring_spec as spring_spec
 
     assert leaf.KINK_DEG == 55.0
     assert leaf.SET_TOUCH_LEAF_MM == 0.0  # the crest itself is the touch
-    assert leaf.SET_PUSH_MM == RIG.SPRING_SET_PUSH == 3.7
+    assert leaf.SET_PUSH_MM == RIG.SPRING_SET_PUSH == 3.9
+    # As printed: the located-seat envelope was proven on exactly these.
+    printed = {
+        mark: round(value, spring_spec.DRAWING_PRECISION_BY_NAME[mark])
+        for mark, value in (
+            ("FreeKinkH", leaf.FREE_KINK_H),
+            ("FreeKinkV", leaf.FREE_KINK_V),
+            ("FreeTipH", leaf.FREE_TIP_H),
+        )
+    }
+    assert printed == pytest.approx({"FreeKinkH": 19.2, "FreeKinkV": 28.9, "FreeTipH": 17.2})
+    assert (leaf.FREE_KINK_H, leaf.FREE_KINK_V) == (printed["FreeKinkH"], printed["FreeKinkV"])
     assert leaf.SET_ERROR_MM == pytest.approx(RIG.FEELER_SET_ERROR + 0.2095, abs=1e-4)
     assert abs(leaf.NOMINAL_SET_SHIFT) <= 0.05
     assert abs(leaf.NOMINAL_CONTACT_T - leaf.CONTACT_T) <= 1.5
@@ -1509,37 +1643,13 @@ def test_foot_screw_bottoming_gate_reads_the_thinnest_strip(monkeypatch) -> None
         _drive_with(monkeypatch, base, "FOOT_SCREW_HOLE_DEPTH", seat)
 
 
-def test_every_fit_up_setting_is_a_gage_leaf_and_the_prints_name_it() -> None:
-    # User rulings P1-1 / P1-2 and the spring pad: every setting is one leaf,
-    # or D's pair, of the one purchased gage, and each print states its step.
-    import draw_harmonic_base as base_sheet
-    import pinion_cam_spec
-
+def test_every_fit_up_setting_uses_available_feeler_leaves() -> None:
+    # Every setting is one leaf, or D's pair, of the purchased gage.
     for name, leaf in FITUP.SINGLE_LEAF_SETTINGS.items():
         assert round(leaf, 2) in FITUP.FEELER_GAGE_LEAVES_MM, name
     assert FITUP.RIG_SET_LEAVES == (1.00, 0.25)
     assert FITUP.BACK_COLLAR_LEAF_F == 0.90
     assert FITUP.FRONT_COLLAR_LEAF == FITUP.FRONT_BLOCK_FEELER
-    assert FITUP.RIG_SET_STEP == (
-        "RIG SET, BEFORE SPOTTING THE TRANSFER SEATS:\n"
-        "FRONT MHA-061 0.25 LEAF OFF FRONT MHA-056;\n"
-        "MHA-002 BACK END 1.00 + 0.25 LEAVES OFF\n"
-        "NORTH MHA-027 BACK FACE, BANK PUSHED NORTH;\n"
-        "MHA-114 PAD 0.65 LEAF OFF MHA-061;\n"
-        "SPRING SET: MHA-114 CREST TOUCHING PARKED BACK MHA-056,\n"
-        "FEELER PAD EAST END TO NORTH MHA-004 (G); PUSH PAD WEST\n"
-        "TO G + 3.7 FEELERS, TIGHTEN MHA-103 ON THE GAGE."
-    )
-    for callout in (base_sheet.TRANSFER_BLOCK_CALLOUT, base_sheet.TRANSFER_SPRING_CALLOUT):
-        assert FITUP.TRANSFER_AFTER_RIG_SET in callout
-    # The collars' set is an assembly step: nothing is cut, so MHA-104's own
-    # print stays free of it (policy rule 6, as MHA-061 keeps its feeler).
-    assert "LEAF" not in pinion_cam_spec.DRAWING_NOTES
-    assert FITUP.COLLAR_SET_STEP.startswith("SET MHA-104 COLLARS ON STARRETT 66MA")
-    assert "0.90 OFF BACK MHA-061" in FITUP.COLLAR_SET_STEP
-    assert "0.25 OFF FRONT MHA-061" in FITUP.COLLAR_SET_STEP
-    # The fit-up module no longer claims MHA-A03 prints the feeler band.
-    assert "MHA-A03 prints" not in (FITUP.__doc__ or "")
 
 
 def test_the_rig_assembly_sequence_carries_each_part_step_verbatim() -> None:

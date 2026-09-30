@@ -43,6 +43,7 @@ from __future__ import annotations
 
 import itertools
 import math
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 
 import numpy as np
@@ -130,7 +131,7 @@ def curved_factor(neutral_r, thick):
 
 
 _CASE_KEYS = (
-    "t", "w", "wp", "pl", "tl", "rb", "rt", "c2c", "park", "swing", "set", "hole",
+    "t", "w", "wp", "pl", "tl", "rb", "rt", "c2c", "park", "swing", "pose", "set", "hole",
     "foot_len", "r_b", "fkh", "fkv", "r_k",
 )
 
@@ -145,50 +146,60 @@ def corner_cases(
     taper_len: tuple[float, ...],
     caps: tuple[tuple[float, float], ...],
     c2c: tuple[float, ...],
-    park: tuple[float, ...],
-    engage: tuple[float, ...],
+    strap_poses: Callable[[float], Iterable[tuple[float, float, float]]],
     set_error: tuple[float, ...],
     hole: tuple[float, ...],
     formed_band: float,
 ) -> dict[str, np.ndarray]:
     """Every combination of the given values: FootLen, BendR, FreeKinkH,
-    FreeKinkV and KinkR each end of ``formed_band``; stock ``thick``/``width``;
+    FreeKinkV and KinkR at both ends of their printed tenth-mm nominals
+    plus/minus ``formed_band``; stock ``thick``/``width``;
     the blank's ``pad_width``/``pad_len``/``taper_len``; the strap's
-    (bottom, top) cap radius deviations ``caps`` and ``c2c`` deviation; its
-    parked lean deviation ``park`` (radians), posed parked and at each
-    ``engage`` swing past it; the set's pad error ``set_error`` (mm west,
-    more penetration); the clamp hole's deviation ``hole`` from its nominal
-    distance to the free end.  FreeTipH and FlatLen only end the crest, so
-    :func:`load` walks them on the solved shapes."""
+    (bottom, top) cap radius deviations ``caps`` and ``c2c`` deviation.
+    ``strap_poses(c2c)`` gives that strap's ``(park, swing, pose)`` rows:
+    ``park`` is the lean SPRING SET saw, ``swing`` the loaded pose's, both
+    radians from nominal park, and ``pose`` 0 parked or 1 engaged.  The
+    tooth seat hangs on the strap's own c2c and located pivot, so the caller
+    derives it per strap; never infer ``pose`` from ``swing``.
+    ``set_error`` is mm west (more penetration); ``hole`` is the clamp hole's
+    deviation from nominal distance to the free end. FreeTipH and FlatLen
+    only end the crest, so :func:`load` walks them on the solved shapes."""
     rows = []
     formed = list(itertools.product((-formed_band, formed_band), repeat=5))
-    for (foot, bend, kink_h, kink_v, kink_r), t, w, wp, pl, tl, (rb, rt), dc, p, e, dh in (
+    foot0, bend0, kink_h0, kink_v0, kink_r0 = (
+        round(value, 1) for value in (
+            design.foot_len, design.r_bend, design.free_kink_h,
+            design.free_kink_v, design.r_kink,
+        )
+    )
+    poses = {dc: tuple(strap_poses(dc)) for dc in c2c}
+    for (foot, bend, kink_h, kink_v, kink_r), t, w, wp, pl, tl, (rb, rt), dc, e, dh in (
         itertools.product(
-            formed, thick, width, pad_width, pad_len, taper_len, caps, c2c, park,
+            formed, thick, width, pad_width, pad_len, taper_len, caps, c2c,
             set_error, hole,
         )
     ):
-        for swing in (p, *(p + phi for phi in engage)):
+        for p, swing, pose in poses[dc]:
             rows.append(
                 (
-                    t, w, wp, pl, tl, rb, rt, dc, p, swing, e, dh,
-                    design.foot_len + foot, design.r_bend + bend,
-                    design.free_kink_h + kink_h, design.free_kink_v + kink_v,
-                    design.r_kink + kink_r,
+                    t, w, wp, pl, tl, rb, rt, dc, p, swing, pose, e, dh,
+                    foot0 + foot, bend0 + bend, kink_h0 + kink_h,
+                    kink_v0 + kink_v, kink_r0 + kink_r,
                 )
             )
     return _cases(rows)
 
 
 def nominal_case(
-    design: LeafDesign, *, thick: float, width: float, pad_width: float, swing: float
+    design: LeafDesign, *, thick: float, width: float, pad_width: float, swing: float,
+    pose: int,
 ) -> dict[str, np.ndarray]:
-    """The one case at every nominal, posed ``swing`` past the parked lean."""
+    """The one nominal case at ``swing`` from nominal park, with explicit pose."""
     return _cases(
         [
             (
                 thick, width, pad_width, design.pad_len, design.taper_len,
-                0.0, 0.0, 0.0, 0.0, swing, 0.0, 0.0,
+                0.0, 0.0, 0.0, 0.0, swing, float(pose), 0.0, 0.0,
                 design.foot_len, design.r_bend, design.free_kink_h,
                 design.free_kink_v, design.r_kink,
             )

@@ -489,7 +489,7 @@ SPRING_Z = SPRING_PAD_AFT_Z - SPRING_W / 2.0  # the strip's mid-plane
 # nor the block's .X end.  The set's error, each way, is the feeler class
 # plus the #4 screw's float in the pad's clearance hole (pinion_spring
 # _geometry.SET_ERROR_MM books it in the drive train's load gate).
-SPRING_SET_PUSH = 3.7
+SPRING_SET_PUSH = 3.9
 SPRING_SET_FEEL_ERROR = FEELER_SET_ERROR
 SPRING_PAD_Z = SPRING_PAD_AFT_Z - SPRING_PAD_WIDTH / 2.0  # the pad's, its screw's
 SPRING_BLADE_INSET = SPRING_Z - SPRING_W / 2.0 - STRAP_Z_INNER[1]

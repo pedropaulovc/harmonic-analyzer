@@ -21,6 +21,7 @@ from pinion_bracket_geometry import PIN_DROP as FPIN_DROP
 from pinion_cam_geometry import CAM_OD, ECC as CAM_ECC
 from pinion_cam_pin_geometry import PIN_DIA
 from pinion_pivot_block_geometry import LIFT_BORE_RISE, LIFT_BORE_SPACING
+from pinion_rig_layout import FEELER_LEAF_STEP
 
 # --- alignment pinion (ch. 25): saved rest is live cam contact ---------------
 # U28's level-centre construction fixes the block/pivot seats.  With the
@@ -119,6 +120,15 @@ FPIN_C, SPR_N = _pin_frame(REST_SWING_RAD)
 SPR_U = (SPR_N[1], -SPR_N[0])
 REST_TIP_GAP = math.hypot(APINION_X - X_DRUM, APINION_Y - Y_DRIVE) - (
     TIP_DRUM120 + TIP_APINION
+)
+
+# Bench locate and finished acceptance share this one geometry/feeler interval.
+# Build gates consume it without importing print-facing rig-fitup contracts.
+TIP_GAP_FEELER = round(round(REST_TIP_GAP / FEELER_LEAF_STEP) * FEELER_LEAF_STEP, 2)
+TIP_GAP_ACCEPT_BAND = 0.2
+TIP_GAP_ACCEPT = (
+    round(TIP_GAP_FEELER - TIP_GAP_ACCEPT_BAND, 2),
+    round(TIP_GAP_FEELER + TIP_GAP_ACCEPT_BAND, 2),
 )
 if abs(cam_pin_gap(0.0, 0.0)) > 1e-10:
     raise AssertionError("saved cam-to-pin rest pose is not tangent")
