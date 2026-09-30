@@ -43,6 +43,23 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PinProfile": {"Length": 1},
 }
 
+# The cross-hole's thinnest wall to the pin surface at the printed worst
+# case: the taper at the hole's .XX station, both at their adverse .XX limits,
+# and the drilled hole at +0.10. Rounded DOWN: the sheet never states more web
+# than the limits give.
+_XX_BAND = 0.51
+_DRILL_OVERSIZE = 0.10
+_TAPER_PER_MM = (BIG_END_DIA - SMALL_END_DIA) / PIN_LENGTH
+PIN_DIA_AT_RING_HOLE_MIN = (
+    BIG_END_DIA - _XX_BAND - _TAPER_PER_MM * (RING_HOLE_X + _XX_BAND)
+)
+CROSS_HOLE_WEB_MIN = (
+    math.floor((PIN_DIA_AT_RING_HOLE_MIN - RING_HOLE_DIA - _DRILL_OVERSIZE) / 2.0 * 100.0)
+    / 100.0
+)
+# Named exception: MHA-024 web (drawing-simplicity-policy.md, "Named exceptions").
+CROSS_HOLE_WEB_NOTE = f"CROSS-HOLE WEB TO THE PIN SURFACE {CROSS_HOLE_WEB_MIN:.2f} MIN."
+
 DRAWING_NOTES = "\n".join(
     (
         "CUSTOM 1:48 SELF-HOLDING TAPER (0.9375 ON DIA OVER 45.0) BETWEEN THE END "
@@ -51,6 +68,7 @@ DRAWING_NOTES = "\n".join(
         "ASSEMBLY TO THE SAME 1:48; LIGHT DRIVE FIT, REMOVABLE BY TAP ON SMALL END.",
         f"DRILL DIA {RING_HOLE_DIA:.2f} THRU ACROSS THE AXIS {RING_HOLE_X:.2f} FROM THE BIG END "
         "FOR THE BRASS KEEPER RING.",
+        CROSS_HOLE_WEB_NOTE,
     )
 )
 END_VIEW_NOTE = "END VIEW SCALE 4:1"

@@ -92,8 +92,14 @@ def test_crank_keeper_ring_threads_the_pin_hole_clear_of_the_arm() -> None:
     # The round ring's wire arc, centred in the straight cross-hole, keeps air
     # to the hole wall across the whole pin section.
     assert ring.HOLE_AIR >= ring.RING_HOLE_AIR
-    wall = (ring.PIN_DIA_AT_HOLE - crank_pin_spec.RING_HOLE_DIA) / 2.0
-    assert wall >= 1.5  # machined-web floor, drawing-simplicity rule 12
+    # The side web is a named exception (under the 2.0 target): at the printed
+    # worst case it holds the 1.5 floor, and the sheet states that value.
+    worst_web = (
+        crank_pin_spec.PIN_DIA_AT_RING_HOLE_MIN - crank_pin_spec.RING_HOLE_DIA - 0.10
+    ) / 2.0
+    assert worst_web >= 1.5
+    assert crank_pin_spec.CROSS_HOLE_WEB_MIN <= worst_web < crank_pin_spec.CROSS_HOLE_WEB_MIN + 0.01
+    assert f"{crank_pin_spec.CROSS_HOLE_WEB_MIN:.2f} MIN" in crank_pin_spec.DRAWING_NOTES
     # The ligament to the big-end face meets the 2.0 target at the worst case
     # of the printed bands (.XX station, DRILLED HOLES +0.10).
     ligament = crank_pin_spec.RING_HOLE_X - 0.51 - (crank_pin_spec.RING_HOLE_DIA + 0.10) / 2.0
