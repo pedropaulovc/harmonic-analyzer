@@ -670,7 +670,7 @@ from crank_pin_spec import (  # noqa: E402
     RING_HOLE_X as PIN_RING_HOLE_X,
 )
 from crank_pin_ring_spec import (  # noqa: E402
-    HUB_CLEARANCE as CRANK_RING_ARM_CLEARANCE,
+    PIN_PROUD,
     WIRE_DIA as CRANK_RING_WIRE_DIA,
 )
 from crank_pin_eye_spec import (  # noqa: E402
@@ -684,7 +684,6 @@ from fillister_screw_spec import (  # noqa: E402
 )
 import keeper_chain_spec  # noqa: E402
 
-PIN_PROUD = PIN_RING_HOLE_X + CRANK_RING_WIRE_DIA / 2.0 + CRANK_RING_ARM_CLEARANCE
 CRANK_PIN_Z = CRANK_FACE_Z + PIN_HOLE_HEIGHT  # -169.4: behind the 8-mm arm
 CRANK_PIN_X0 = X_CRANK - HUB_BARREL_DIA / 2.0 - PIN_PROUD
 # The ring lies in machine YZ. Its straight local-Z leg is concentric with the

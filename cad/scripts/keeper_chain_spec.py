@@ -51,7 +51,7 @@ from crank_hub_geometry import HUB_BARREL_DIA, HUB_LENGTH, SERVICE_PIN_STATION
 from crank_pin_eye_spec import ANCHOR_AIR, LOOP_INNER_R, LOOP_R
 from crank_pin_eye_spec import TAIL_LEN as EYE_TAIL_LEN
 from crank_pin_eye_spec import WIRE_DIA as EYE_WIRE_DIA
-from crank_pin_ring_spec import HUB_CLEARANCE, MEAN_R, RING_BOTTOM_X, RING_CENTRE_X
+from crank_pin_ring_spec import MEAN_R, PIN_PROUD, RING_BOTTOM_X, RING_CENTRE_X
 from crank_pin_ring_spec import WIRE_DIA as RING_WIRE_DIA
 from crank_pin_spec import BIG_END_DIA, PIN_LENGTH, RING_HOLE_X, SMALL_END_DIA
 from fillister_screw_spec import HEAD_DIA as SCREW_HEAD_DIA
@@ -100,7 +100,6 @@ HUB_R = HUB_BARREL_DIA / 2.0
 ARM_Z = (0.0, ARM_THICKNESS)
 HUB_Z = (ARM_THICKNESS, HUB_LENGTH)
 PIN_Z = SERVICE_PIN_STATION
-PIN_PROUD = RING_HOLE_X + RING_WIRE_DIA / 2.0 + HUB_CLEARANCE
 PIN_X0 = -HUB_R - PIN_PROUD  # the pin's big end
 RING_X = PIN_X0 + RING_HOLE_X  # the ring's through leg and plane
 SCREW_XY = (-ANCHOR_SCREW_Y, -ANCHOR_SCREW_X)

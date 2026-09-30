@@ -107,9 +107,13 @@ def test_crank_keeper_ring_threads_the_pin_hole_clear_of_the_arm() -> None:
     # It hangs clear of the pin: the ring's inside edge below the pin surface.
     pin_radius = ring.PIN_DIA_AT_HOLE / 2.0
     assert ring.RING_BOTTOM_X - ring.WIRE_DIA / 2.0 - pin_radius >= 3.0
-    assert drive.PIN_PROUD == pytest.approx(
-        crank_pin_spec.RING_HOLE_X
-        + ring.WIRE_DIA / 2.0
-        + drive.CRANK_RING_ARM_CLEARANCE
+    assert ring.PIN_PROUD == pytest.approx(
+        crank_pin_spec.RING_HOLE_X + ring.WIRE_DIA / 2.0 + ring.HUB_CLEARANCE
     )
+    # One pin station everywhere: the drive train places the pin, and the
+    # interference contract sizes the pin's allowed overlaps, at that value.
+    import _interference_contracts as contracts
+
+    assert drive.PIN_PROUD == ring.PIN_PROUD
+    assert contracts._PIN_PROUD == ring.PIN_PROUD
     assert drive.CRANK_RING_Y == pytest.approx(drive.Y_CRANK)

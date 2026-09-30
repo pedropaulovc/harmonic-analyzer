@@ -28,6 +28,10 @@ MEAN_R = 5.0  # Ø10 on the wire centreline
 # The pin stands proud of the hub barrel so the ring clears it by this.
 HUB_CLEARANCE = 0.25
 RING_HOLE_AIR = 0.05  # least radial air between the wire and the hole wall
+# How far the pin's big end stands out of the hub barrel: the ring's wire, in
+# the hole RING_HOLE_X from the end, clears the barrel by HUB_CLEARANCE. The
+# drive train, the keeper chain and the interference contract all read it here.
+PIN_PROUD = RING_HOLE_X + WIRE_DIA / 2.0 + HUB_CLEARANCE
 PIN_DIA_AT_HOLE = BIG_END_DIA - (
     (BIG_END_DIA - SMALL_END_DIA) * RING_HOLE_X / PIN_LENGTH
 )
