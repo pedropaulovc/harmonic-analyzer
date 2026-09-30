@@ -48,7 +48,6 @@ from crank_hub_geometry import (
     ARM_THICKNESS,
     EDGE_BREAK_MAX_MM,
     GENERAL_1PL_TOL_MM,
-    GENERAL_2PL_TOL_MM,
     MM_PER_IN,
 )
 
@@ -216,11 +215,11 @@ ENGAGEMENT_FLOOR = ENGAGEMENT_EXCEPTION_FLOOR_D * THREAD_MODEL_DIA
 # ARM_STOCK_THICKNESS_MIN.  The thick side keeps the .X band as a bound on
 # what the model allows.
 ARM_PRINTED_THICKNESS_MAX = ARM_THICKNESS + GENERAL_1PL_TOL_MM
-# The relief width prints at .XX (Main, on the rule-12 audit note): at .X its
-# +0.8 alone took the stock-arm case under the U33b floor once the tapped
-# hole's exit edge break is counted.  A lathe shoulder length holds 0.5 as
-# easily as the shoulder's own 0.25.
-RELIEF_WIDTH_MAX = round(RELIEF_WIDTH + GENERAL_2PL_TOL_MM, 6)
+# The relief width is a routine .X size (MHA-139 re-review, 2026-09-29).  The
+# .XX band it once carried held the #10-24 thread over the U33b floor; the
+# #8-32 thread clears the floor at .X too (asserted below), and the printed
+# engagement minimum follows from it.
+RELIEF_WIDTH_MAX = round(RELIEF_WIDTH + GENERAL_1PL_TOL_MM, 6)
 # The title-block edge break on the tapped hole's inboard exit edge takes up
 # to its size of thread off the arm end of the engagement.
 TAP_EXIT_BREAK = EDGE_BREAK_MAX_MM
@@ -383,13 +382,14 @@ for _ok, _what in (
     if not _ok:
         raise AssertionError(f"MHA-139: {_what}")
 
-# Every axial LOCATION reads from the slotted HEAD face, the one faced end
-# (MHA-139 re-review, user ruling 2026-09-29): the under-head face (the head
-# length), the seat face (SeatLocation, a reference: the shoulder is turned to
-# suit the bonded handle) and the tip (the reference overall, for stock
-# cut-off).  The thread length stays the SIZE of the threaded feature from the
-# seat face, with its own band for the engagement check, as do the relief
-# width, the two 45-degree legs and the slot depth.
+# Every axial LOCATION reads from the TIP, the one faced end (MHA-139
+# re-reviews, 2026-09-29): the seat face (the thread length, with its own band
+# for the engagement check), the under-head face (UnderHeadLocation, a
+# reference: the shoulder is turned to suit the bonded handle) and the head
+# face (the reference overall, for stock cut-off).  The head length, the slot
+# depth, the relief width and the two 45-degree legs are local sizes of their
+# features.  A head-face origin cannot work: the seat is fitted, so the thread
+# length would ride on the handle stack.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ScrewProfile": {
         "HeadDia",
@@ -402,7 +402,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     },
     "SlotProfile": {"SlotWidth"},
     "DriverSlot": {"SlotDepth"},
-    "StationReference": {"OverallLength", "SeatLocation"},
+    "StationReference": {"OverallLength", "UnderHeadLocation"},
 }
 # Decimal places ARE the tolerance (policy rule 2): the shoulder diameter is
 # the running fit and prints its band at two places, the head diameter its
@@ -417,12 +417,12 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "ShoulderDia": 2,
         "ThreadLength": 1,
         "ReliefDia": 1,
-        "ReliefWidth": 2,
+        "ReliefWidth": 1,
         "TipChamfer": 2,
     },
     "SlotProfile": {"SlotWidth": 1},
     "DriverSlot": {"SlotDepth": 2},
-    "StationReference": {"OverallLength": 1, "SeatLocation": 1},
+    "StationReference": {"OverallLength": 1, "UnderHeadLocation": 1},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
@@ -431,6 +431,6 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 }
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked MHA-139 dimension needs authored places")
-REFERENCE_DIMENSIONS = frozenset({"OverallLength", "SeatLocation"})
+REFERENCE_DIMENSIONS = frozenset({"OverallLength", "UnderHeadLocation"})
 
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW\nSCALE 1:1"

@@ -361,38 +361,47 @@ async def build(adapter) -> dict[str, str]:
         "overall length reference",
     )
     stations.record("OverallLength", '"HeadLength" + "ShoulderLength" + "ThreadLength"')
-    # The seat face's location from the same head face (MHA-139 re-review:
-    # every axial location reads from one faced end).  It runs along the
-    # shoulder's lower flank so both of its ends sit on real faces -- the head
-    # face and the seat face -- and it prints as a reference: the shoulder is
-    # turned to suit the bonded handle.
+    # The under-head face located from the TIP, the one faced end every axial
+    # location reads from (MHA-139 re-reviews): the seat is the thread length
+    # from the tip, the under-head face this reference -- the shoulder is
+    # turned to suit the bonded handle -- and the head face the overall.  It
+    # runs at mid-height of the under-head annulus so its head end sits on
+    # that face.
+    under_head_v = -(SHOULDER_R + HEAD_R) / 2.0
     set_sketch_direct_db(adapter, True)
-    seat_line = check(
-        "seat location reference line",
-        await adapter.add_line(0.0, -SHOULDER_R, -SEAT_STATION, -SHOULDER_R),
+    under_head_line = check(
+        "under-head location reference line",
+        await adapter.add_line(-OVERALL_LENGTH, under_head_v, -HEAD_LENGTH, under_head_v),
     )
     set_sketch_direct_db(adapter, False)
-    segment = _early_bound(adapter._sketch_entities[seat_line], "ISketchSegment")
+    segment = _early_bound(adapter._sketch_entities[under_head_line], "ISketchSegment")
     segment.ConstructionGeometry = True
     if not bool(segment.ConstructionGeometry):
-        raise RuntimeError("seat location reference line did not take construction flag")
+        raise RuntimeError("under-head location reference line did not take construction flag")
     check(
-        "seat location reference horizontal",
-        await adapter.add_sketch_constraint(seat_line, None, "horizontal"),
+        "under-head location reference horizontal",
+        await adapter.add_sketch_constraint(under_head_line, None, "horizontal"),
     )
     await anchor_point_to_origin(
-        adapter, f"{seat_line}.start", 0.0, -SHOULDER_R, "seat location on the head face"
+        adapter,
+        f"{under_head_line}.start",
+        -OVERALL_LENGTH,
+        under_head_v,
+        "under-head location from the tip",
     )
-    stations.record("SeatLocationY", '"ShoulderDia" / 2')
+    stations.record(
+        "UnderHeadTipX", '"HeadLength" + "ShoulderLength" + "ThreadLength"'
+    )
+    stations.record("UnderHeadY", '( "ShoulderDia" + "HeadDia" ) / 4')
     await dimension_between(
         adapter,
-        f"{seat_line}.start",
-        f"{seat_line}.end",
+        f"{under_head_line}.start",
+        f"{under_head_line}.end",
         "horizontal_distance",
-        SEAT_STATION,
-        "seat location reference",
+        OVERALL_LENGTH - HEAD_LENGTH,
+        "under-head location reference",
     )
-    stations.record("SeatLocation", '"HeadLength" + "ShoulderLength"')
+    stations.record("UnderHeadLocation", '"ShoulderLength" + "ThreadLength"')
     await ensure_fully_defined(adapter, "station reference sketch")
     check("exit_sketch station reference", await adapter.exit_sketch())
     name_last_feature(adapter, "StationReference")

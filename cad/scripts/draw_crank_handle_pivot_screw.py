@@ -132,8 +132,8 @@ _ROW_Y = (SIDE_CENTER[1] - 0.034, SIDE_CENTER[1] - 0.049, SIDE_CENTER[1] - 0.064
 SIDE_KEEP = {
     "ThreadLength": ((TIP_X + SEAT_X) / 2.0, _ROW_Y[0]),
     "HeadLength": ((UNDERHEAD_X + HEAD_FACE_X) / 2.0, _ROW_Y[0]),
-    # The seat face located from the head face, like every axial location.
-    "SeatLocation": ((HEAD_FACE_X + SEAT_X) / 2.0, _ROW_Y[1]),
+    # The under-head face located from the tip, like every axial location.
+    "UnderHeadLocation": ((TIP_X + UNDERHEAD_X) / 2.0, _ROW_Y[1]),
     "OverallLength": ((TIP_X + HEAD_FACE_X) / 2.0, _ROW_Y[2]),
     # Diameters on the side view (rule 7).  The shoulder's dimension line
     # crosses the shoulder near its thread end; the head's stands clear of the

@@ -63,14 +63,14 @@ def test_model_owns_places_and_bands() -> None:
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
     # The running fit, the head's cup-floor bearing band, and the relief
     # width that holds the U33b floor.
-    running_fit = {"ShoulderDia", "ReliefWidth", "HeadDia", "TipChamfer", "SlotDepth"}
+    running_fit = {"ShoulderDia", "HeadDia", "TipChamfer", "SlotDepth"}
     for name, places in spec.DRAWING_PRECISION_BY_NAME.items():
         assert places == (2 if name in running_fit else 1), name
     # User ruling 2026-09-29 (MHA-139 review): the shoulder is turned to suit
     # the bonded handle, so its length is a reference.
-    assert spec.REFERENCE_DIMENSIONS == {"OverallLength", "SeatLocation"}
-    # Every axial location reads from the head face (re-review): the seat
-    # is located from it, not sized from the under-head face.
+    assert spec.REFERENCE_DIMENSIONS == {"OverallLength", "UnderHeadLocation"}
+    # Every axial location reads from the tip (re-reviews): the under-head
+    # face is located from it, not sized from the seat.
     assert "ShoulderLength" not in spec.DRAWING_PRECISION_BY_NAME
     # Every band comes from a named spec constant, never a typed number.
     assert model_toleranced_dimensions(part) == {
@@ -194,22 +194,23 @@ def test_u33b_engagement_exception_is_governed_by_the_stock_arm() -> None:
     # Nominal: min(10.0 - 0.4, arm 8.0) - 1.5 = 6.5 of full thread, 1.56 D.
     assert spec.FULL_THREAD_NOMINAL == pytest.approx(6.5)
     assert spec.FULL_THREAD_NOMINAL_DIAMETERS == pytest.approx(6.5 / 4.166)
-    # Thinnest stock 5/16-in arm (mill -0.004 in on a 1-in flat): min(8.1,
-    # 7.8359 - the 0.25 exit break) - (1.5 + the .XX band 0.51) = 5.58,
-    # 1.338 D.  The arm governs.
-    assert geometry.GENERAL_2PL_TOL_MM == pytest.approx(0.51)
+    # Thinnest stock 5/16-in arm (mill -0.004 in on a 1-in flat): min(9.1,
+    # 7.8359 - the 0.25 exit break) - (1.5 + the .X band 0.8) = 5.29,
+    # 1.269 D.  The arm governs.  (The relief width went .XX -> .X on the
+    # MHA-139 re-review, 2026-09-29: 1.338 D -> 1.269 D.)
+    assert geometry.GENERAL_1PL_TOL_MM == pytest.approx(0.8)
     assert spec.TAP_EXIT_BREAK == pytest.approx(0.25)
     assert spec.ARM_STOCK_THICKNESS == pytest.approx(7.9375)
-    assert spec.RELIEF_WIDTH_MAX == pytest.approx(2.01)
+    assert spec.RELIEF_WIDTH_MAX == pytest.approx(2.3)
     assert spec.ARM_STOCK_THICKNESS_MIN == pytest.approx(7.8359)
-    assert spec.FULL_THREAD_WORST == pytest.approx(5.5759)
-    assert spec.FULL_THREAD_WORST_DIAMETERS == pytest.approx(1.3384, abs=1e-4)
+    assert spec.FULL_THREAD_WORST == pytest.approx(5.2859)
+    assert spec.FULL_THREAD_WORST_DIAMETERS == pytest.approx(1.2688, abs=1e-4)
     assert spec.ENGAGEMENT_GOVERNED_BY == "arm"
-    # Arm at its printed maximum 8.8: min(9.1, 8.8 - 0.25) - 2.01 = 6.54,
-    # 1.57 D; the arm still governs.
+    # Arm at its printed maximum 8.8: min(9.1, 8.8 - 0.25) - 2.3 = 6.25,
+    # 1.50 D; the arm still governs.
     assert spec.ARM_PRINTED_THICKNESS_MAX == pytest.approx(8.8)
-    assert spec.FULL_THREAD_WORST_PRINTED_ARM == pytest.approx(6.54)
-    assert spec.FULL_THREAD_WORST_PRINTED_ARM_DIAMETERS == pytest.approx(1.570, abs=1e-3)
+    assert spec.FULL_THREAD_WORST_PRINTED_ARM == pytest.approx(6.25)
+    assert spec.FULL_THREAD_WORST_PRINTED_ARM_DIAMETERS == pytest.approx(1.500, abs=1e-3)
     # The MHA-139 review's own count: the shortest section less the widest
     # relief and 1.5 pitches of die run-in still spans the stock arm's
     # full-thread need.
@@ -232,8 +233,8 @@ def test_u33b_engagement_exception_is_governed_by_the_stock_arm() -> None:
 def test_notes_state_the_engagement_the_fitted_shoulder_and_the_head_band() -> None:
     # The sheet states the worst case its Named exceptions row records, as a
     # plain fact.
-    # A MIN is floored, never rounded up: 1.338 prints 1.33.
-    assert spec.FULL_THREAD_WORST_DIAMETERS_PRINTED == 1.33
+    # A MIN is floored, never rounded up: 1.269 prints 1.26.
+    assert spec.FULL_THREAD_WORST_DIAMETERS_PRINTED == 1.26
     assert spec.FULL_THREAD_WORST_DIAMETERS_PRINTED <= spec.FULL_THREAD_WORST_DIAMETERS
     worst = f"{spec.FULL_THREAD_WORST_DIAMETERS_PRINTED:.2f}D"
     assert spec.ENGAGEMENT_NOTE == f"THREAD ENGAGEMENT {worst} MIN."
@@ -471,7 +472,7 @@ def test_installed_configuration_is_split_from_a_finished_default() -> None:
 def test_quarter_inch_arm_stock_fails_the_full_strength_floor(monkeypatch) -> None:
     # User ruling 2026-09-25: the exception holds only while a steel screw in
     # the steel arm keeps >= 1D of full thread.  1/4-in bar would leave
-    # min(8.0, 6.35 - 0.25) - 2.01 = 4.09, 0.85D.
+    # min(8.0, 6.35 - 0.25) - 2.3 = 3.8, 0.91D.
     # Executed as a separate, unregistered module: reloading the real one
     # would swap its band tuples for new objects under every importer
     # (test_fit_bands tracks them by identity).
@@ -509,7 +510,7 @@ def test_worst_engagement_clears_the_novice_margin_by_geometry() -> None:
     # the worst case by geometry, at the current (or looser) bands.
     assert spec.FULL_THREAD_WORST_DIAMETERS >= 1.25
     assert spec.RELIEF_WIDTH_MAX == pytest.approx(
-        spec.RELIEF_WIDTH + geometry.GENERAL_2PL_TOL_MM
+        spec.RELIEF_WIDTH + geometry.GENERAL_1PL_TOL_MM
     )
 
 
