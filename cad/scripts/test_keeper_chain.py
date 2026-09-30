@@ -57,11 +57,13 @@ def test_strands_nest_without_crossing() -> None:
 
 
 def test_link_goes_on_and_holds_its_end_beads() -> None:
-    # A bead enters through the window and slides into its dome; its rod rides
-    # the slot to the tip hole.
-    assert chain.LINK_WINDOW_WIDTH > chain.BEAD_DIA
-    assert chain.LINK_WINDOW_LENGTH > chain.BEAD_DIA
+    # Each dome's side mouth is narrower than a bead: the end bead snaps in as
+    # the wall flexes and cannot fall back out, while its rod rides the slot
+    # to the tip hole. Axially the tip hole and the far dome hold it too.
+    assert chain.LINK_MOUTH_WIDTH < chain.BEAD_DIA
+    assert chain.LINK_MOUTH_LENGTH < chain.BEAD_DIA
     assert chain.ROD_DIA < chain.LINK_SLOT_WIDTH
+    assert chain.LINK_TIP_HOLE < chain.BEAD_DIA
     assert chain.ROD_DIA < chain.LINK_TIP_HOLE
     assert chain.LINK_END_BEAD_X + chain.BEAD_R < chain.LINK_LENGTH / 2.0
     assert chain.LINK_OD / 2.0 - chain.LINK_WALL > chain.BEAD_R
@@ -73,7 +75,7 @@ def test_link_volume_matches_its_shape() -> None:
     ro, ri = chain.LINK_OD / 2.0, chain.LINK_OD / 2.0 - chain.LINK_WALL
     e = chain.LINK_END_BEAD_X
     shell = math.pi * (ro**2 - ri**2) * 2.0 * e + 4.0 / 3.0 * math.pi * (ro**3 - ri**3)
-    # Grooves, tip holes, the bead window and the rod slot come off the shell.
+    # Grooves, tip holes, the bead mouths and the rod slot come off the shell.
     assert 0.7 * shell < chain.link_volume() < shell
 
 

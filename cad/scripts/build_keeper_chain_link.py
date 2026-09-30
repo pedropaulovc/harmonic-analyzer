@@ -2,16 +2,17 @@ r"""Purchased loop link for the keeper chain: McMaster-Carr 3606T811 (MHA-150).
 
 The brass trade-size-3 loop link that closes the cut chain into one loop: a
 rolled capsule, domed at both ends, with an end bead caught in each dome
-behind a crimp. Each end bead goes in through a central window on +Y and
-slides into its dome, its rod riding a slot along the top to the tip hole. McMaster gives no dimensions or CAD,
+behind a crimp. Each dome has a side mouth on +Y narrower than a bead: the
+end bead snaps in as the wall flexes and cannot come back out, its rod riding
+a slot along the top to the tip hole. McMaster gives no dimensions or CAD,
 so the shape follows its 3606T811 photograph at the listed 9 mm length (see
 ``keeper_chain_spec``). The axis is local X, the openings on +Y, and the origin at
 mid-length.
 
 Recipe (only features this seat has built cleanly): a mid-plane tube, two
 revolved domes, a mid-plane bore cut and two revolved dome cavities, two
-revolved crimp grooves, a mid-plane tip-hole cut, and the bead window and
-rod slot cut down through the +Y wall. The volume is proved against the spec's
+revolved crimp grooves, a mid-plane tip-hole cut, and the two bead mouths
+and the rod slot cut through the +Y wall. The volume is proved against the spec's
 own CSG, and the openings' side by the centre of mass.
 
 Run with SolidWorks open::
@@ -31,7 +32,9 @@ from _common import (
     apply_material,
     check,
     define_centered_rectangle,
+    add_line_chain,
     define_circle,
+    define_rectilinear_chain,
     ensure_fully_defined,
     name_last_feature,
     report_mass_properties,
@@ -49,8 +52,8 @@ from keeper_chain_spec import (
     LINK_SLOT_WIDTH,
     LINK_TIP_HOLE,
     LINK_WALL,
-    LINK_WINDOW_LENGTH,
-    LINK_WINDOW_WIDTH,
+    LINK_MOUTH_LENGTH,
+    LINK_MOUTH_WIDTH,
     link_volume,
 )
 
@@ -159,13 +162,28 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "TipHoles")
 
-    # The bead window and the rod slot go through the +Y wall only.
-    for name, half_x, half_z in (
-        ("Window", LINK_WINDOW_LENGTH / 2.0, LINK_WINDOW_WIDTH / 2.0),
-        ("RodSlot", LINK_LENGTH / 2.0 + 1.0, LINK_SLOT_WIDTH / 2.0),
+    # The two bead mouths and the rod slot go through the +Y wall only. A
+    # Top-plane sketch maps (x, y) -> global (X, -Z); the mouths are centred on
+    # the domes at x = +/-LINK_END_BEAD_X.
+    for name, centre_x, half_x, half_z in (
+        ("MouthEye", -e, LINK_MOUTH_LENGTH / 2.0, LINK_MOUTH_WIDTH / 2.0),
+        ("MouthRing", e, LINK_MOUTH_LENGTH / 2.0, LINK_MOUTH_WIDTH / 2.0),
+        ("RodSlot", 0.0, LINK_LENGTH / 2.0 + 1.0, LINK_SLOT_WIDTH / 2.0),
     ):
         check(f"create_sketch {name}", await adapter.create_sketch("Top"))
-        await define_centered_rectangle(adapter, half_x, half_z, name, dims=SketchDims())
+        if centre_x == 0.0:
+            await define_centered_rectangle(adapter, half_x, half_z, name, dims=SketchDims())
+        else:
+            corners = [
+                (centre_x - half_x, -half_z),
+                (centre_x + half_x, -half_z),
+                (centre_x + half_x, half_z),
+                (centre_x - half_x, half_z),
+            ]
+            set_sketch_direct_db(adapter, True)
+            lines = await add_line_chain(adapter, corners)
+            set_sketch_direct_db(adapter, False)
+            await define_rectilinear_chain(adapter, lines, corners, label=name, dims=SketchDims())
         await ensure_fully_defined(adapter, f"{name} sketch")
         check(f"exit_sketch {name}", await adapter.exit_sketch())
         name_last_feature(adapter, f"{name}Profile")
@@ -188,7 +206,7 @@ async def build(adapter) -> dict[str, str]:
     mass = await adapter.get_mass_properties()
     if not mass.is_success:
         raise RuntimeError(f"loop link: get_mass_properties failed: {mass.error}")
-    # The only asymmetry is the window and slot: cut through the +Y wall,
+    # The only asymmetry is the mouths and slot: cut through the +Y wall,
     # they pull the centre of mass toward -Y.
     com_y = float(mass.data.center_of_mass[1])
     if com_y >= 0.0:

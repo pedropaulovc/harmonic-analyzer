@@ -15,14 +15,14 @@ for either item (read 2026-09-29). The pitch is the trade-size-3 average of 94
 beads per foot (Ball Chain Mfg. and Frank Winne size charts). The link is
 9 mm long, as #3 connectors are listed, and its proportions are read off
 McMaster's 3606T811 photograph. The rod and the link's wall, crimps, tip holes
-and window are assumptions named below; each only decides clearances the
+and mouths are assumptions named below; each only decides clearances the
 functions here prove.
 
 Frame ("crank frame"): machine axes, origin on the crank axis at the arm's
 front (outboard) face, machine z -183. The arm fills z 0..ARM_THICKNESS and
 the hub barrel ARM_THICKNESS..HUB_LENGTH. The chain part is authored in this
 frame and placed with an identity rotation. The link is authored along local
-X with its window and rod slot on +Y, and placed at LINK_ORIGIN with its axis
+X with its mouths and rod slot on +Y, and placed at LINK_ORIGIN with its axis
 on machine Z.
 
 Geometry, rest pose (arm hanging down, gravity -Y). The loop hangs from two
@@ -83,11 +83,13 @@ LINK_END_BEAD_X = LINK_LENGTH / 2.0 - LINK_OD / 2.0  # end-bead centre = dome ce
 LINK_CRIMP_X = 1.45  # crimp groove centre, just inboard of each end bead
 LINK_CRIMP_DEPTH = 0.15
 LINK_TIP_HOLE = 0.7  # the rod leaves each dome through this
-# How the link goes on (the dark band in the photograph, on +Y): each end bead
-# is pushed in through the central window and slid into its dome, its rod
-# riding the slot that runs along the top to the tip.
-LINK_WINDOW_LENGTH = 2.6
-LINK_WINDOW_WIDTH = 2.5  # wider than a bead
+# How the link goes on and holds (the dark band in the photograph, on +Y):
+# each dome has a side mouth NARROWER than a bead. The end bead snaps in
+# through it as the rolled wall flexes, and it cannot come back out; its rod
+# rides the slot that runs along the top to the tip hole. The grooves at
+# LINK_CRIMP_X are the rolled crimps' outside form, not a retainer.
+LINK_MOUTH_LENGTH = 2.0  # along the axis, centred on each dome
+LINK_MOUTH_WIDTH = 2.1  # under BEAD_DIA: the bead snaps past it
 LINK_SLOT_WIDTH = LINK_TIP_HOLE
 LINK_BEAD_SPACING = 2.0 * LINK_END_BEAD_X  # the joint's gap between end beads
 
@@ -516,8 +518,11 @@ def _link_solid(x: float, y: float, z: float) -> bool:
         return False
     if y <= 0.0:
         return True
-    in_window = abs(x) < LINK_WINDOW_LENGTH / 2.0 and abs(z) < LINK_WINDOW_WIDTH / 2.0
-    return not (in_window or abs(z) < LINK_SLOT_WIDTH / 2.0)
+    in_mouth = (
+        abs(abs(x) - LINK_END_BEAD_X) < LINK_MOUTH_LENGTH / 2.0
+        and abs(z) < LINK_MOUTH_WIDTH / 2.0
+    )
+    return not (in_mouth or abs(z) < LINK_SLOT_WIDTH / 2.0)
 
 
 def link_volume(steps: int = 72) -> float:

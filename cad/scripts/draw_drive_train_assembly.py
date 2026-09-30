@@ -508,7 +508,7 @@ CONE_CRANK_STEPS = "\n".join(
         # Codex #1140: the keeper chain's length and topology belong on the
         # sheet; the bead count is the spec's solve, never a typed number.
         f"   CUT MHA-149 TO {KEEPER_CHAIN_BEADS} BEADS; THREAD IT THROUGH THE MHA-130",
-        "   LOOP AND MHA-128, THEN JOIN ITS ENDS WITH MHA-150 INTO ONE LOOP.",
+        "   LOOP AND MHA-128; SNAP ONE END BEAD INTO EACH DOME OF MHA-150.",
         "7. SLIDE MHA-022 ONTO MHA-139. THREAD MHA-139 INTO THE MHA-020",
         "   PIVOT TAP WITH LOCTITE 222 (REMOVABLE); SEAT THE SHOULDER TIGHT",
         "   ON THE ARM FACE. HANDLE TURNS FREELY; END PLAY 0.25-1.0.",

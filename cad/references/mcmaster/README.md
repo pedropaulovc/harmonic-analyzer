@@ -191,9 +191,9 @@ Catalog specifications checked on September 10, 2026:
   McMaster publishes no CAD for either item, and no dimension beyond the bead
   diameter. The 3.2426 mm pitch is the trade-size-3 average of 94 beads per foot
   (Ball Chain Mfg. and Frank Winne size charts). The link's 9 mm length is the
-  listed #3 connector size, and its proportions (domed capsule, crimps, central
-  bead window, rod slot along the top) are read off McMaster's 3606T811
-  photograph. The rod and the link's wall and openings are assumptions named in
+  listed #3 connector size, and its proportions (domed capsule, crimps, a side
+  mouth over each dome narrower than a bead, rod slot along the top) are read
+  off McMaster's 3606T811 photograph. The rod and the link's wall and openings are assumptions named in
   `keeper_chain_spec.py`, so neither part has a replica gate.
 
 Ground rules (mirrored in the diagnostics themselves): the vendor files are
