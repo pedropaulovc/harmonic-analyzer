@@ -96,7 +96,21 @@ def test_tenon_and_counterbore_are_fitted_to_the_parts_they_take() -> None:
     assert 2.0 * ferrule.OUTER_DIA_TOL <= spec.CONTOUR_ALLOWANCE_DIA
     source = Path(handle.__file__).read_text(encoding="utf-8")
     assert source.count("set_dimension_bilateral_tolerance(") == 1  # the reamed bore
-    assert "set_dimension_symmetric_tolerance" not in source
+    # The tenon length is banded: it and the ferrule length set the gap the
+    # MHA-139 collar lies in (local review of 4b46c8b53).
+    assert source.count("set_dimension_symmetric_tolerance(") == 1
+    assert '"TenonLength", TENON_LENGTH_TOL' in source
+    assert spec.TENON_LENGTH_TOL == pytest.approx(0.10)
+    assert spec.DRAWING_PRECISION_BY_NAME["TenonLength"] == 2
+    assert spec.TENON_END_GAP_MIN == pytest.approx((7.0 - 0.8) - (5.0 + 0.1))
+    # The off-centre budget is printed as process plus an inspectable wall,
+    # and the cup cures centred on the screw (user ruling 2026-09-30).
+    flat = " ".join(spec.DRAWING_NOTES.split())
+    assert "REAM THE BORE AND BORE THE COUNTERBORE IN ONE SETUP" in flat
+    assert "TURN THE OUTSIDE ON A MANDREL IN THE BORE." in flat
+    assert "MIN OAK WALL 1.5 OVER THE BORE." in flat
+    assert "THE CUP CENTRED ON THE WAXED MHA-139 SCREW." in flat
+    assert spec.CUP_OFFSET_MAX == pytest.approx(0.175)
     drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "for name in sorted(REFERENCE_DIMENSIONS):" in drawing_source
 

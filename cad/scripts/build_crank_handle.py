@@ -60,6 +60,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
 )
 from _fit_limits import deviations
 from _saved_part_guard import require_saved_drawing_properties
@@ -96,6 +97,7 @@ from crank_handle_spec import (  # noqa: E402
     TENON_DIA,
     TENON_LENGTH,
     TENON_R,
+    TENON_LENGTH_TOL,
     TENON_X0,
     WAIST_R,
     WAIST_X,
@@ -388,15 +390,17 @@ async def build(adapter) -> dict[str, str]:
     # selection (M6 mated-DOF drive train).
     await name_bore_axis(adapter, "Front Plane", 0.0, "Top Plane", 0.0, "handle axis")
 
-    # Manufacturing drawing support: the model owns the one printed band
-    # (policy rule 2), the reamed bore, and the places every mark prints with.
-    # The tenon and the counterbore are fitted to the parts they take.
+    # Manufacturing drawing support: the model owns the printed bands (policy
+    # rule 2), the reamed bore and the tenon length the MHA-139 collar clears,
+    # and the places every mark prints with.  The tenon and the counterbore
+    # diameters are fitted to the parts they take.
     set_dimension_bilateral_tolerance(
         adapter,
         "PivotBoreProfile",
         "PivotBoreDia",
         *deviations(PIVOT_BORE_BAND),
     )
+    set_dimension_symmetric_tolerance(adapter, "HandleProfile", "TenonLength", TENON_LENGTH_TOL)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

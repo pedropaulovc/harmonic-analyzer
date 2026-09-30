@@ -332,8 +332,8 @@ def test_notes_stay_within_rule_six() -> None:
 
 def test_modelled_volume_is_the_turned_body_less_the_slot() -> None:
     head = math.pi * 3.0**2 * 4.0
-    shoulder = math.pi * 2.0**2 * 52.0
-    collar = math.pi * 3.0**2 * 1.0
+    shoulder = math.pi * 2.0**2 * 52.4
+    collar = math.pi * 3.0**2 * 0.6
     relief = math.pi * (2.2 / 2.0) ** 2 * 1.5
     thread = math.pi * (3.505 / 2.0) ** 2 * 8.5
     # Pappus: the lead's 0.4 x 0.4 corner triangle, centroid 1.1 + 0.4/3 out,
@@ -560,14 +560,19 @@ def test_worst_engagement_clears_the_novice_margin_by_geometry() -> None:
 
 def test_seat_collar_lies_in_the_ferrule_bore_clear_of_the_tenon() -> None:
     # Local review of 1f3067ef2 (P1; the user's recommended option, taken when
-    # the question timed out): a Ø6 x 1.0 collar at the arm end of the
-    # shoulder, inside the MHA-152 bore end the oak tenon leaves open.
-    assert (spec.COLLAR_DIA, spec.COLLAR_LENGTH, spec.COLLAR_LENGTH_TOL) == (6.0, 1.0, 0.10)
+    # the question timed out): a Ø6 collar at the arm end of the shoulder,
+    # inside the MHA-152 bore end the oak tenon leaves open.  0.6 long
+    # (local review of 4b46c8b53).
+    assert (spec.COLLAR_DIA, spec.COLLAR_LENGTH, spec.COLLAR_LENGTH_TOL) == (6.0, 0.6, 0.10)
     # Smallest Ø7.6 bore over the largest .X collar Ø6.8: 0.4 radial.
     assert spec.COLLAR_BORE_CLEARANCE_MIN == pytest.approx(0.4)
-    # Shortest tenon end (TENON_X0 - 0.8) past the longest collar 1.1.
-    assert spec.COLLAR_TENON_CLEARANCE_MIN == pytest.approx(0.1)
-    assert spec.COLLAR_TENON_CLEARANCE_MIN > 0.0
+    # Axially, from the printed limits of both parts that set the gap: the
+    # shortest .X ferrule (7.0 - 0.8) less the longest banded tenon
+    # (5.0 + 0.1) is 1.1, less the longest collar 0.7 leaves 0.4.
+    ferrule_min = 7.0 - 0.8
+    tenon_max = 5.0 + 0.1
+    assert spec.COLLAR_TENON_CLEARANCE_MIN == pytest.approx(ferrule_min - tenon_max - 0.7)
+    assert spec.COLLAR_TENON_CLEARANCE_MIN == pytest.approx(0.4)
 
 
 def test_station_reference_is_saved_hidden_and_imported_per_view() -> None:

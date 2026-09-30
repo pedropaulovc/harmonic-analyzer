@@ -75,6 +75,10 @@ TENON_DIA = FERRULE_BORE_DIA - sum(TENON_GLUE_LINE) / 2.0
 # Short enough that the longest tenon stops short of the shortest ferrule's
 # arm face, so the oak never bears on the arm.
 TENON_LENGTH = 5.0
+# Banded (local review of 4b46c8b53): the gap the MHA-139 seat collar lies in
+# is the ferrule length (.X) less this length, so at .X on both the gap fell
+# to 0.4.
+TENON_LENGTH_TOL = 0.10
 TENON_X0 = SHOULDER_X - TENON_LENGTH
 TENON_R = TENON_DIA / 2.0
 
@@ -197,10 +201,26 @@ TENON_DIA_MIN = FERRULE_BORE_DIA - FERRULE_BORE_DIA_TOL - FERRULE_TENON_GLUE_LIN
 FERRULE_SEAT_RADIAL_MIN = (
     (2.0 * SHOULDER_R - CONTOUR_ALLOWANCE_DIA) - TENON_DIA_MAX
 ) / 2.0
-# The reamed bore and the turned tenon/grip are not held concentric by any
-# frame, so the walls over the bore budget 0.10 of eccentricity (local review
-# of 1f3067ef2: 1.55 on diameters alone left 1.45 at 0.10 off-centre).
+# The bore is reamed and the counterbore bored in one setup, and the outside
+# turned on a mandrel in the bore (the sheet says so, and prints the 1.5 wall
+# as an inspectable minimum at the tenon end face).  The walls still budget
+# 0.10 of eccentricity for the mandrel's fit (local reviews of 1f3067ef2 and
+# 4b46c8b53).
 BORE_ECCENTRICITY = 0.10
+# The printed minimum oak wall over the bore (checked at the tenon end face).
+TENON_WALL_FLOOR_MM = 1.5
+# The MHA-153 cup can sit off the bore axis by this eccentricity plus half its
+# widest glue line, 0.175 -- more than the screw's head and floor-hole
+# clearances plus its float in the bore take up (0.165, local review of
+# 4b46c8b53).  So the cup is epoxied in centred on the waxed MHA-139 screw
+# through it and the bore (user ruling 2026-09-30): it cures where the screw
+# fits, and the screw only turns about its own axis after.
+CUP_OFFSET_MAX = BORE_ECCENTRICITY + COUNTERBORE_GLUE_LINE[1] / 2.0
+# Arm face to the shortest tenon's end: the shortest .X ferrule less the
+# longest banded tenon.  The MHA-139 seat collar lies in this gap.
+TENON_END_GAP_MIN = round(
+    (FERRULE_LENGTH - _GENERAL_1PL) - (TENON_LENGTH + TENON_LENGTH_TOL), 6
+)
 # Oak between the smallest tenon and the largest reamed pivot bore.
 TENON_WALL_MIN = (
     (TENON_DIA_MIN - (PIVOT_BORE_DIA + PIVOT_BORE_BAND[0])) / 2.0 - BORE_ECCENTRICITY
@@ -212,15 +232,21 @@ WAIST_WALL_MIN = (
 
 for _ok, _what in (
     (
-        TENON_LENGTH + _GENERAL_1PL < FERRULE_LENGTH - _GENERAL_1PL,
+        TENON_END_GAP_MIN > 0.0,
         "the longest tenon reaches the shortest ferrule's arm face",
     ),
-    (TENON_LENGTH - _GENERAL_1PL >= 4.0, "the shortest tenon leaves under 4.0 of glue length"),
+    (
+        TENON_LENGTH - TENON_LENGTH_TOL >= 4.0,
+        "the shortest tenon leaves under 4.0 of glue length",
+    ),
     (
         FERRULE_SEAT_RADIAL_MIN >= 0.5,
         "the largest fitted tenon leaves under 0.5 of shoulder for the ferrule",
     ),
-    (TENON_WALL_MIN >= 1.5, "the smallest fitted tenon leaves under 1.5 over the bore"),
+    (
+        TENON_WALL_MIN >= TENON_WALL_FLOOR_MM,
+        "the smallest fitted tenon leaves under 1.5 over the bore",
+    ),
     (
         2.0 * FERRULE_OUTER_DIA_TOL <= CONTOUR_ALLOWANCE_DIA,
         "turning the shoulder flush with the ferrule leaves the contour allowance",
@@ -270,7 +296,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "HandleProfile": {
         "TenonDia": 1,
-        "TenonLength": 1,
+        "TenonLength": 2,
         "OverallLength": 1,
         "PeakStation": 1,
         "CounterboreDia": 1,
@@ -308,10 +334,12 @@ DRAWING_NOTES = "\n".join(
         f"  COUNTERBORE TO SUIT THE {CUP_NUMBER} CUP BODY, EACH FOR "
         f"{TENON_GLUE_LINE[0]:.2f}-{TENON_GLUE_LINE[1]:.2f} DIAMETRAL",
         f"  CLEARANCE, COUNTERBORE <MOD-DIAM>{COUNTERBORE_DIA_MAX:.1f} MAX, DEPTH TO SEAT THE CUP",
-        "  FACE FLUSH; EPOXY BOTH IN AT ASSEMBLY.",
+        f"  FACE FLUSH; EPOXY BOTH IN, THE CUP CENTRED ON THE WAXED {SCREW_NUMBER} SCREW.",
         f"AFTER CURE, TURN THE SHOULDER FLUSH WITH {FERRULE_NUMBER} AND THE END ROUND",
         f"  ACROSS THE OAK AND {CUP_NUMBER}; THE OAK FEATHERS OUT ON THE CUP.",
         f"THE REAMED BORE RUNS ON THE {SCREW_NUMBER} SHOULDER; ITS LIMITS APPLY FULL LENGTH.",
+        "REAM THE BORE AND BORE THE COUNTERBORE IN ONE SETUP; TURN THE OUTSIDE ON A",
+        f"  MANDREL IN THE BORE.  MIN OAK WALL {TENON_WALL_FLOOR_MM:.1f} OVER THE BORE.",
         f"GRIP CONTOUR, TANGENT ARCS IN TURN: R{FLARE_R:.1f} FROM THE SHOULDER TO A",
         f"  <MOD-DIAM>{2.0 * WAIST_R:.1f} WAIST AT {_e(WAIST_X):.1f}; "
         f"R{S_CONCAVE_R:.1f} AND R{S_CONVEX_R:.1f} (INFLECTION AT {_e(INFLECTION_X):.1f})",

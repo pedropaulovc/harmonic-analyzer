@@ -97,7 +97,8 @@ def test_notes_name_the_mates_and_the_band_reason() -> None:
     assert f"{spec.SCREW_NUMBER} {spec.SCREW_NAME}" in notes
     assert "TO SUIT" in notes and "MIN POCKET WALL 0.8; MIN FLOOR 1.5." in notes
     assert "6.5 MAX" in notes
-    assert "FACE FLUSH; TURN ITS END" in notes
+    assert "FACE FLUSH, CENTRED ON THE" in notes
+    assert "WAXED MHA-139 SCREW; TURN ITS END ROUND" in notes
     assert all(len(line) <= 90 for line in notes.splitlines())
 
 

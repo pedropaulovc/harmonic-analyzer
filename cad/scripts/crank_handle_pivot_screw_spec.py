@@ -44,7 +44,7 @@ from crank_handle_spec import (
     HANDLE_LENGTH,
     PIVOT_BORE_BAND,
     PIVOT_BORE_DIA,
-    TENON_X0,
+    TENON_END_GAP_MIN,
 )
 from crank_hub_geometry import (
     ARM_STOCK_THICKNESS,
@@ -88,10 +88,11 @@ SHOULDER_DIA_BAND = (-0.03, -0.08)
 # the #6-32 hole's mouth opens to Ø4.0 after its edge break, wider than the
 # shoulder's flat.  A Ø6 collar at the arm end of the shoulder seats on the
 # arm face; it lies in the ferrule's open bore end, where no oak reaches
-# (the tenon stops TENON_X0 short of the arm face).  Its OD is routine (.X);
-# its length is banded so the longest collar clears the shortest tenon end.
+# (the tenon stops short of the arm face).  Its OD is routine (.X); its
+# length is banded and short (local review of 4b46c8b53) so the longest
+# collar clears the shortest tenon end in the shortest ferrule.
 COLLAR_DIA = 6.0
-COLLAR_LENGTH = 1.0
+COLLAR_LENGTH = 0.6
 COLLAR_LENGTH_TOL = 0.10
 # Arm face to the head's underside, which bears on the MHA-153 cup floor.
 # User ruling 2026-09-29 (after the machinist reviews): the shoulder is
@@ -347,7 +348,7 @@ COLLAR_BORE_CLEARANCE_MIN = round(
     ((FERRULE_BORE_DIA - FERRULE_BORE_DIA_TOL) - (COLLAR_DIA + GENERAL_1PL_TOL_MM)) / 2.0, 6
 )
 COLLAR_TENON_CLEARANCE_MIN = round(
-    (TENON_X0 - GENERAL_1PL_TOL_MM) - (COLLAR_LENGTH + COLLAR_LENGTH_TOL), 6
+    TENON_END_GAP_MIN - (COLLAR_LENGTH + COLLAR_LENGTH_TOL), 6
 )
 # The relief neck is the screw's weakest section: pi/4 x 2.3^2 = 4.15 mm^2
 # against the #6-32 UNC tensile stress area of 0.00909 in^2 = 5.86 mm^2, about
