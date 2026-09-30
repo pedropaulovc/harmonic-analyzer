@@ -258,7 +258,8 @@ SECTION_KEEP: dict[str, tuple[float, float]] = {}
 # its dimension line printed on the block's top edge.
 #
 # r3: the pinch-hole height from the foot stands past the block's south face,
-# on the right; its witness leaves the foot at the south corner.
+# on the right; both witnesses leave the south face, whose outline hides the
+# model's reference line (build_cone_tip_block, PinchHeightReference).
 PINCH_HEIGHT_LINE_X = _right_x(Z_SOUTH) + 0.010
 RIGHT_KEEP = {
     "PinchDepthCenter": (
@@ -349,10 +350,13 @@ PINCH_THREAD_CALLOUT_XY = (LEFT_CENTER[0] + 0.015, 0.190)
 # than the tap's shortest approach.  6.6 mm over the north edge clears the
 # outline under the text and the Width's east arrow over it.
 FOOT_TAP_CALLOUT_XY = (FOOT_TAP_CENTER[0] + 0.035, _bottom_y(Z_NORTH) + 0.0066)
-# Under section A-A, over its native label (287c: 5.4 mm under the view).
+# Under section A-A's native label (SECTION_LABEL_BOX), centred on it with
+# 2.0 mm of air.  At 5.4 under the view (287c, when a 3:2 section printed a
+# SCALE line under its label) it overprinted the label on the 2:1 sheet
+# (machinist review of cc7f631ab).
 ROTATED_NOTE_XY = (
-    SECTION_CENTER[0] - 0.015,
-    SECTION_CENTER[1] - BLOCK_Z * _S / 2.0 - 0.0054,
+    SECTION_CENTER[0] - 0.0257 / 2.0,
+    SECTION_CENTER[1] - BLOCK_Z * _S / 2.0 - 0.0116 - 0.002,
 )
 # The locating foot's finish symbol, on the elevation named here.  On the
 # front view (287c) its "Ra 3.2" stood 0.2 mm off an arrow, and no leader can
@@ -501,15 +505,17 @@ _NOTE_EXTENTS = {
     # Thirteen glyphs of "HOLD-DOWN TAP" at SHAFT ENTRY's width per glyph.
     "BOTTOM VIEW\nHOLD-DOWN TAP": (0.0, 0.0081, 0.0335, 0.0),
 }
-# SolidWorks places section A-A's "SECTION A-A / SCALE 2:1" label under the
-# view; its ink relative to SECTION_CENTER.  Measured on the I31 render: 45.4
-# wide, its top 14.6 under the view's lower edge, 14.5 tall.
+# SolidWorks places section A-A's "SECTION A-A" label under the view; its ink
+# relative to SECTION_CENTER.  At the sheet's own 2:1 it prints no SCALE line.
+# Measured on the cc7f631ab render (run 20260929T224514758Z): 45.2 wide,
+# centred, its top 5.25 under the view's lower edge, 6.3 tall.  (The I31
+# box, 14.6 under and 14.5 tall, was a 3:2 section's two-line label.)
 _SECTION_HALF_DEPTH = BLOCK_Z * _S / 2.0
 SECTION_LABEL_BOX = (
     -0.0227,
-    -_SECTION_HALF_DEPTH - 0.0291,
+    -_SECTION_HALF_DEPTH - 0.0116,
     0.0227,
-    -_SECTION_HALF_DEPTH - 0.0146,
+    -_SECTION_HALF_DEPTH - 0.0052,
 )
 # Section A-A's cutting-plane arrows.  SolidWorks draws one from each end of
 # the chain line (SECTION_LINE_OVERSHOOT past the plan's ends) toward the
@@ -837,11 +843,12 @@ def sheet_dimension_ink(
             drop("PinchDepthCenter"),
             out,
         ),
-        # r3: from the foot's south corner to the pinch hole's centre.
+        # From the foot's south corner to the pinch hole's height, both
+        # witnesses off the south face.
         "PinchHeight": (
             v,
             (foot, _elevation_y(PINCH_HEIGHT, RIGHT_CENTER)),
-            (_right_x(Z_SOUTH), _right_x(0.0)),
+            (_right_x(Z_SOUTH),) * 2,
             keeps["PinchHeight"][0],
             inside,
         ),

@@ -234,64 +234,6 @@ async def _author_reference_dimension(
     await force_rebuild(adapter)
 
 
-async def _author_offset_reference_dimension(
-    adapter,
-    *,
-    plane: str,
-    start: tuple[float, float],
-    end_y: float,
-    dimension_type: str,
-    value_mm: float,
-    feature_name: str,
-    dimension_name: str,
-    drive_expression: str,
-    start_drives: tuple[str, ...],
-) -> None:
-    """Author one construction-only location whose witness leaves a corner.
-
-    r3: a location measured from a face whose own witness would run along
-    that face's outline (the foot in section A-A, the south face on the plan)
-    starts from the face's outer corner instead, so the line is diagonal: no
-    orientation relation, the end on the sketch's vertical axis, the start
-    anchored at the corner (its anchor dimensions driven by ``start_drives``,
-    in anchor order) and the marked dimension ``dimension_type`` between them.
-    """
-    check(f"create_sketch {feature_name}", await adapter.create_sketch(plane))
-    set_sketch_direct_db(adapter, True)
-    reference = check(
-        f"{feature_name} line",
-        await adapter.add_line(*start, 0.0, end_y),
-    )
-    set_sketch_direct_db(adapter, False)
-    _as_construction(adapter, reference)
-    await dimension_between(
-        adapter,
-        f"{reference}.start",
-        f"{reference}.end",
-        dimension_type,
-        value_mm,
-        feature_name,
-    )
-    check(
-        f"{feature_name} end on the axis",
-        await adapter.add_sketch_constraint(
-            f"{reference}.end", "origin", "vertical_points"
-        ),
-    )
-    await anchor_point_to_origin(adapter, f"{reference}.start", *start, feature_name)
-    await ensure_fully_defined(adapter, f"{feature_name} sketch")
-    check(f"exit_sketch {feature_name}", await adapter.exit_sketch())
-    name_last_feature(adapter, feature_name)
-    names = name_dimensions(
-        adapter,
-        feature_name,
-        [dimension_name, *(f"{feature_name}Start{i}" for i in range(len(start_drives)))],
-    )
-    for full_name, expression in zip(names, (drive_expression, *start_drives), strict=True):
-        await drive_dimension(adapter, full_name, expression)
-    await force_rebuild(adapter)
-
-
 def _blank_reference_sketches(adapter, sketches: tuple[str, ...]) -> None:
     """Hide the reference sketches in the part so no instance renders them.
 
@@ -545,21 +487,24 @@ async def build(adapter) -> dict[str, str]:
         dimension_name="PinchDepthCenter",
         drive_expression='"PinchDepthCenter"',
     )
-    # r3: the pinch-hole centre straight from the foot.  The right view shows
-    # the hole end-on and the foot edge-on along the whole block, so the
-    # witness leaves the foot's south corner (the Right plane reads south as
-    # sketch +x) and runs clear of the outline.
-    await _author_offset_reference_dimension(
+    # The pinch-hole centre straight from the foot, on the south face's
+    # outline (the Right plane reads south as sketch +x).  The drawing must
+    # keep this sketch shown in the right view to keep its dimension
+    # (_drawing_hidden_sketches, r21), so its line lies under the face's edge,
+    # as AxisHeight's does under the -X face.  The r3 diagonal from the south
+    # corner to the hole centre printed as a stray line across the view
+    # (machinist review of cc7f631ab, clarity).
+    await _author_reference_dimension(
         adapter,
         plane="Right",
         start=(BLOCK_Z / 2.0, 0.0),
-        end_y=PINCH_BORE_Y,
+        end=(BLOCK_Z / 2.0, PINCH_BORE_Y),
+        orientation="vertical",
         dimension_type="vertical_distance",
         value_mm=PINCH_BORE_Y,
         feature_name="PinchHeightReference",
         dimension_name="PinchHeight",
         drive_expression='"PinchBoreY"',
-        start_drives=('"BlockZ" / 2',),
     )
     # The foot tap from the -X face (the PassageCenter datum) and from the
     # north face (the face the pivot screw's head gap is measured to).  The

@@ -673,13 +673,6 @@ def test_pinch_hole_height_is_located_from_the_foot() -> None:
     spec = cone_tip_block_spec
     assert spec.DRAWING_DIMENSIONS["PinchHeightReference"] == {"PinchHeight"}
     assert "PinchHeight" in drawing.RIGHT_KEEP
-    source = Path(part.__file__).read_text(encoding="utf-8")
-    body = source[source.index("async def build(") :]
-    call = _reference_call(body, "PinchHeightReference")
-    # Its witness leaves the foot (sketch y 0) at the prism's south corner.
-    assert "start=(BLOCK_Z / 2.0, 0.0)" in call
-    assert "end_y=PINCH_BORE_Y" in call
-    assert "drive_expression='\"PinchBoreY\"'" in call
     # Its value stands past the south face, short of VIEW B, at half height.
     text_x, text_y = drawing.RIGHT_KEEP["PinchHeight"]
     half = drawing.VALUE_TEXT_HALF_WIDTH
