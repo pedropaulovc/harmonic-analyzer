@@ -6,7 +6,7 @@ Imported ONLY by ``draw_crankshaft`` and its offline test (codex #361; see
 
 from __future__ import annotations
 
-from crankshaft_spec import DRIVE_PIN_SPIGOT_RIM_WORST
+from crankshaft_spec import DRIVE_PIN_DEPTH_TOL, DRIVE_PIN_SPIGOT_RIM_WORST
 
 # Matched-fit requirement on the feature callout (rule 6), naming both mates
 # and the acceptance of the custom 1:48 taper pin (crank_pin_spec).  It reads
@@ -37,3 +37,18 @@ DRIVE_PIN_CALLOUT = "\n".join(
         DRIVE_PIN_RIM_NOTE,
     )
 )
+
+# The native REAM callout prints the hole depth bare, so it reads under the
+# title block's .XX +/-0.51, though the cut's depth carries the part's
+# +/-0.10 (crankshaft_spec: pressed to the floor, the depth sets the pin's
+# proud length).  The band is appended to the depth at the end of the
+# callout's own format text.
+DRIVE_PIN_DEPTH_BAND = f"<MOD-PM>{DRIVE_PIN_DEPTH_TOL:.2f}"
+
+# Under the lower 7.000 location: the mate the +/-0.025 serves.  The MHA-081
+# holes (2.5, drilled +0.10/0) slip over the pressed dowels (Ø2.389 max) with
+# 0.111 diametral clearance, which must absorb the pin-spacing error of both
+# parts: 2 x (2 x 0.025) = 0.100 < 0.111.  The title block's .XXX +/-0.13
+# would need 4 x 0.13 = 0.52; the widest per-part band the clearance allows is
+# +/-0.0278 (crankshaft_spec DRIVE_PIN_SPACING_ERROR_MAX check).
+DRIVE_PIN_LOCATION_CALLOUT = "PINS SLIP INTO\nSPROCKET MHA-081"

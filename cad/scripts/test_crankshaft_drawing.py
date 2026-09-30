@@ -181,6 +181,28 @@ def test_spigot_rim_is_the_named_exception_the_sheet_states() -> None:
     assert float(recorded.group(1)) == _floor_2(nominal) == spec.DRIVE_PIN_SPIGOT_RIM
 
 
+def test_drive_pin_depth_prints_its_band_after_the_native_depth() -> None:
+    # Machinist review of f7c9771b3: the bare 3.95 read under the title
+    # block's .XX and left 5.75 - 4.46 = 1.29 of spigot under the holes.  The
+    # callout carries the cut's own band, the one the proud stack reads.
+    assert notes.DRIVE_PIN_DEPTH_BAND == f"<MOD-PM>{spec.DRIVE_PIN_DEPTH_TOL:.2f}"
+    floor = (spec.SPIGOT_LENGTH - spec.SPIGOT_LENGTH_TOL) - (
+        spec.DRIVE_PIN_DEPTH + spec.DRIVE_PIN_DEPTH_TOL
+    )
+    assert floor >= 1.5
+    native = "REAM <MOD-DIAM><hw-diam> <HOLE-DEPTH> <hw-depth>"
+    band = notes.DRIVE_PIN_DEPTH_BAND
+    assert drawing._depth_banded_definition(native, band) == f"{native} {band}"
+    for broken in (
+        "REAM <MOD-DIAM><hw-diam> THRU ALL",
+        f"{native} {band}",
+        f"{native}\nPRESS FIT",
+        f"<HOLE-DEPTH> 1.0 {native}",
+    ):
+        with pytest.raises(RuntimeError):
+            drawing._depth_banded_definition(broken, band)
+
+
 def test_integral_dome_is_the_only_outboard_shaft_projection() -> None:
     assert spec.SHAFT_DIA == geometry.SHAFT_DIA
     assert spec.SHAFT_DIA == pytest.approx(9.525, abs=1e-12)

@@ -43,6 +43,8 @@ from crank_hub_spec import (
 from crank_hub_notes import (
     BORE_CALLOUT,
     CROSS_HOLE_CALLOUT,
+    HUB_LENGTH_CALLOUT,
+    RELIEF_LENGTH_CALLOUT,
     SEAM_CALLOUT,
     SEAT_CALLOUT,
 )
@@ -109,6 +111,7 @@ BARREL_FACE_PICK = ((RELIEF_X + SERVICE_PIN_CENTER[0]) / 2.0, SIDE_CENTER[1] + 0
 #   the arm shoulder (policy rule 12) and the relief from the rear face on
 #   one row below the profile; the toleranced overall, front face to rear
 #   face, on the row below it.  The barrel is the remainder, not printed.
+#   The two banded lengths carry the mate they serve under their text.
 # - Relief and barrel diameters: left of the inboard end, the relief nearer.
 #   Seat diameter: between the profile and the end view, its value and
 #   light-press callout above.
@@ -133,9 +136,10 @@ SIDE_KEEP = {
     "SeatLength": ((OUTBOARD_X + SHOULDER_X) / 2.0, _ROW_Y[0]),
     "ServicePinFromShoulder": ((SHOULDER_X + SERVICE_PIN_CENTER[0]) / 2.0, _ROW_Y[0]),
     "HubLength": ((OUTBOARD_X + INBOARD_X) / 2.0, _ROW_Y[1]),
-    # Its toleranced text is wider than the relief: it prints outside the
-    # span, left of the rear face, the dimension line running out to it.
-    "ReliefLength": (INBOARD_X - 0.013, _ROW_Y[0]),
+    # Its toleranced text and callout are wider than the relief: they print
+    # outside the span, left of the rear face, the dimension line running out
+    # to them, the callout ending short of the overall's dimension line.
+    "ReliefLength": (INBOARD_X - 0.030, _ROW_Y[0]),
     "ReliefDia": (INBOARD_X - 0.012, SIDE_CENTER[1]),
     "BarrelDia": (INBOARD_X - 0.034, SIDE_CENTER[1]),
     "SeatDia": (OUTBOARD_X + 0.020, 0.225),
@@ -145,6 +149,8 @@ ISO_NOTE_XY = (0.345, 0.180)
 DIMENSION_CALLOUTS = {
     "BoreDia": BORE_CALLOUT,
     "SeatDia": SEAT_CALLOUT,
+    "HubLength": HUB_LENGTH_CALLOUT,
+    "ReliefLength": RELIEF_LENGTH_CALLOUT,
 }
 
 

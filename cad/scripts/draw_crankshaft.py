@@ -83,7 +83,12 @@ from crankshaft_spec import (
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from build_crankshaft import PINION_PIN_DIA, PINION_PIN_STATION_Y
 from crank_pinion_spec import CRANKSHAFT_PIN_HOLE_PROCESS
-from crankshaft_notes import CROSS_HOLE_CALLOUT, DRIVE_PIN_CALLOUT
+from crankshaft_notes import (
+    CROSS_HOLE_CALLOUT,
+    DRIVE_PIN_CALLOUT,
+    DRIVE_PIN_DEPTH_BAND,
+    DRIVE_PIN_LOCATION_CALLOUT,
+)
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -235,7 +240,12 @@ DIAMETER_POSITIONS = {
 # bearing lands on either side of the relief; the displayed arrow picks the
 # outboard land, and the equal-size callout also governs the inboard land.
 CALLOUTS_ABOVE = {"ShaftDiaDim": "2X", "JournalDiaDim": "2X"}
-CALLOUTS_BELOW = {"OverallLength": "OVERALL"}
+# The lower drive-pin location names the mate its +/-0.025 serves
+# (crankshaft_notes), in the clear field under its text.
+CALLOUTS_BELOW = {
+    "OverallLength": "OVERALL",
+    "DrivePinOffset2": DRIVE_PIN_LOCATION_CALLOUT,
+}
 # Both running lands carry separate part-owned finish symbols. The outboard
 # symbol sits right of the Ø11.388 dimension line, its leader landing on the
 # land just short of the relief shoulder; the inboard symbol retains its
@@ -257,7 +267,8 @@ COLLAR_REAR_FINISH = (
     (COLLAR_REAR_X, _sheet_y(COLLAR_DIA / 2.0 - 1.0)),
     (COLLAR_REAR_X + 0.0069, 0.195),
 )
-# The drive-pin holes' native REAM callout (size and depth from the cut)
+# The drive-pin holes' native REAM callout (size and depth from the cut, the
+# depth's band appended by _band_hole_depth)
 # with the press prose under it on two long rows (four rows in all): its
 # leader picks the upper hole's rim and the text sits above the end view and
 # the dome, left of the cross-hole callout, inside the top border.
@@ -318,6 +329,39 @@ def _set_callout_below(display: Any, text: str, label: str) -> None:
     applied = str(display.GetText(4) or "")
     if applied.replace("\r", "") != text:
         raise RuntimeError(f"{label}: callout-below text did not persist: {applied!r}")
+
+
+def _depth_banded_definition(definition: str, band: str) -> str:
+    """The hole callout's format text with ``band`` after its closing depth.
+
+    The native callout ends on ``<HOLE-DEPTH>`` and the depth; anything else
+    (no depth, two, a row after it, a band already there) fails loud.
+    """
+    head, marker, tail = definition.rpartition("<HOLE-DEPTH>")
+    if (
+        not marker
+        or "<HOLE-DEPTH>" in head
+        or len(tail.split()) != 1
+        or band in definition
+    ):
+        raise RuntimeError(f"hole callout has no single closing depth: {definition!r}")
+    return f"{definition.rstrip()} {band}"
+
+
+def _band_hole_depth(display: Any, band: str, label: str) -> None:
+    """Print the part's depth band after the native callout's depth.
+
+    The cut's depth carries the band in the part, but the callout prints the
+    depth bare; the band joins the format text (PrefixDefinition), which the
+    native size and depth stay associative in.  Read back like the prose.
+    """
+    display = _early_bound(display, "IDisplayDimension")
+    definition = str(display.GetText(5) or "")  # swDimensionTextPrefixDefinition
+    updated = _depth_banded_definition(definition, band)
+    display.SetText(1, updated)  # swDimensionTextPrefix
+    applied = str(display.GetText(5) or "")
+    if applied.replace("\r", "") != updated.replace("\r", ""):
+        raise RuntimeError(f"{label}: depth band did not persist: {applied!r}")
 
 
 Box = tuple[float, float, float, float]
@@ -715,6 +759,7 @@ async def build(adapter: Any) -> dict[str, str]:
         ),
         process=DRIVE_PIN_HOLE_PROCESS,
     )
+    _band_hole_depth(drive_pins, DRIVE_PIN_DEPTH_BAND, "seat-collar drive-pin holes")
     _set_callout_below(drive_pins, DRIVE_PIN_CALLOUT, "seat-collar drive-pin holes")
     pinion_note = add_attached_note(
         adapter,

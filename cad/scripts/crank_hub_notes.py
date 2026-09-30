@@ -101,6 +101,13 @@ CROSS_HOLE_CALLOUT = "\n".join(
     )
 )
 
+# The two axial bands state the mate they serve, under their dimensions
+# (rule 2): the overall places the rear face against the removable sprocket
+# (stack B below), the relief places the barrel's rear shoulder ahead of the
+# #25 chain wrapping it (stack A).
+HUB_LENGTH_CALLOUT = "REAR FACE CLEARS\nSPROCKET MHA-081"
+RELIEF_LENGTH_CALLOUT = "CLEARS #25 CHAIN ON\nSPROCKET MHA-081"
+
 # Axial stack at the printed worst case (Main, 2026-09-30), machine z, -Z =
 # FRONT, with a bought ANSI #25 chain on the crank T12.  Not printed: the
 # drive train asserts both from the same names (build_drive_train_assembly).

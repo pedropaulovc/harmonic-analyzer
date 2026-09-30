@@ -301,6 +301,13 @@ def test_side_view_lies_as_in_the_lathe_with_one_outboard_baseline() -> None:
     relief_right = drawing.SIDE_KEEP["ReliefLength"][0] + len("3.60±0.05") * 0.00125
     pin_left = drawing.SIDE_KEEP["ServicePinFromShoulder"][0] - len("5.60") * 0.00125
     assert relief_right < pin_left
+    # The relief's mate callout reads under its text, on the overall's row;
+    # it must end short of the rear face, where that row's dimension line
+    # starts (~2.5 mm per character, centred on the text).
+    widest = max(
+        len(line) for line in crank_hub_notes.RELIEF_LENGTH_CALLOUT.splitlines()
+    )
+    assert drawing.SIDE_KEEP["ReliefLength"][0] + widest * 0.00125 < drawing.INBOARD_X
 
 
 def test_callouts_stand_clear_of_views_and_each_other() -> None:

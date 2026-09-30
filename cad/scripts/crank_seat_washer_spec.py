@@ -98,7 +98,8 @@ GAP_MAX = GAP_NOMINAL + sum(link[2] for link in GAP_LINKS.values())
 # The model is the washer as fitted to parts at their nominals.
 THICKNESS = GAP_NOMINAL
 
-# Supplied as a blank faced both sides, one face faced again to fit.  The
+# Supplied as a blank faced both sides (the two MACHINED finish symbols say
+# so; the note does not repeat them), one face faced again to fit.  The
 # blank is a MIN, the loosest supply spec that works: any excess is just more
 # facing.  Its MIN keeps FACING_ALLOWANCE -- one finishing cut -- over the
 # thickest fit, so the fitted face is always freshly cut.
@@ -128,8 +129,8 @@ check_fit_up(GAP_MIN, GAP_MAX, BLANK_THICKNESS_MIN)
 THICKNESS_CALLOUT = f"SET AT ASSEMBLY {GAP_MIN:.2f}-{GAP_MAX:.2f}\nFACED TO FIT"
 DRAWING_NOTES = "\n".join(
     (
-        f"SUPPLY {BLANK_THICKNESS_MIN:.2f} MIN THICK, BOTH FACES FACED.",
-        "ONE FACE IS FACED AGAIN TO FIT AT ASSEMBLY.",
+        f"SUPPLY {BLANK_THICKNESS_MIN:.2f} MIN THICK.",
+        "ONE FACE IS FACED TO FIT AT ASSEMBLY.",
     )
 )
 
