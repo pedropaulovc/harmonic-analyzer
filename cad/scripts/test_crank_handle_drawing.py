@@ -54,19 +54,19 @@ def test_oak_ends_in_a_ferrule_tenon_and_a_cup_counterbore() -> None:
     # with its face on the basic length (user rulings 2026-09-30, concept
     # v4; the crest radius clears the largest pocket's edge break, Codex P1).
     assert spec.END_ROUND_CX + spec.END_ROUND_R == pytest.approx(spec.HANDLE_LENGTH)
-    assert spec.END_ROUND_CY == pytest.approx(cup.POCKET_DIA_MAX / 2.0 + 0.25 + 0.1)
-    assert spec.OAK_END_X == pytest.approx(57.963, abs=0.001)
+    assert spec.END_ROUND_CY == pytest.approx(cup.POCKET_DIA_MAX / 2.0 + 0.25 + 0.1 + 0.25)
+    assert spec.OAK_END_X == pytest.approx(57.988, abs=0.001)
     assert spec.COUNTERBORE_DEPTH == pytest.approx(
         cup.OVERALL_LENGTH - (spec.HANDLE_LENGTH - spec.OAK_END_X)
     )
-    assert spec.OVERALL_LENGTH == pytest.approx(55.963, abs=0.001)  # prints 56.0
+    assert spec.OVERALL_LENGTH == pytest.approx(55.988, abs=0.001)  # prints 56.0
     assert spec.TENON_X0 > 0.0  # no oak reaches the arm face
     assert spec.COUNTERBORE_DIA_MAX == pytest.approx(8.5)
     assert "<MOD-DIAM>8.5 MAX" in spec.DRAWING_NOTES
     # The feathered edge is the named exception; 1.0 in, the oak holds 1.5
     # again at the contour allowance over the largest counterbore.
     assert spec.FEATHER_DEPTH == 1.0
-    assert spec.OAK_WALL_BEHIND_FEATHER == pytest.approx(1.82, abs=0.01)
+    assert spec.OAK_WALL_BEHIND_FEATHER == pytest.approx(1.88, abs=0.01)
 
 
 def test_tenon_and_counterbore_are_fitted_to_the_parts_they_take() -> None:
@@ -118,7 +118,7 @@ def test_grip_contour_is_a_note_with_a_loose_allowance() -> None:
     assert (spec.FLARE_R, spec.S_CONCAVE_R, spec.S_CONVEX_R, spec.DOME_R) == pytest.approx(
         (9.083, 21.636, 59.500, 30.694), abs=0.001
     )
-    assert spec.END_ROUND_R == pytest.approx(4.082, abs=0.001)
+    assert spec.END_ROUND_R == pytest.approx(3.675, abs=0.001)
     assert "TURN WITHIN 0.5 ON DIAMETER; CHECK WITH A TEMPLATE." in notes
     assert "BASIC" not in notes
     assert not hasattr(crank_handle_spec, "BASIC_DIMENSIONS")
@@ -145,7 +145,7 @@ def test_counterbore_reads_on_a_section_and_the_end_view_shares_its_axis() -> No
     assert "set_hidden_lines_visible" not in source
     assert drawing.RIGHT_CENTER[1] == drawing.FRONT_CENTER[1]
     # The overall, tenon end to the oak's end, for stock cut-off.
-    assert crank_handle_spec.OVERALL_LENGTH == pytest.approx(55.963, abs=0.001)
+    assert crank_handle_spec.OVERALL_LENGTH == pytest.approx(55.988, abs=0.001)
 
 
 def test_sheet_runs_at_2_to_1_with_1_to_1_isometric() -> None:

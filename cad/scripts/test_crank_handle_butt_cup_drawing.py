@@ -137,8 +137,10 @@ def test_installed_configuration_turns_the_end_round_across_the_cup() -> None:
     # The crown is the steel outside the handle's own end round: a fraction of
     # a cubic millimetre, starting outside the largest pocket's edge break so
     # a flat rim remains (Codex P1 on #1139).
-    assert 0.05 < part.V_CROWN < 0.5
-    assert handle.END_ROUND_CENTER[1] - 0.25 - spec.POCKET_DIA_MAX / 2.0 >= 0.1
+    assert 0.005 < part.V_CROWN < 0.5
+    # ... even with the contour turned its whole 0.5 allowance small.
+    assert handle.END_ROUND_CENTER[1] - 0.25 - 0.25 - spec.POCKET_DIA_MAX / 2.0 >= 0.1 - 1e-9
+    assert "IsSuppressed()" in Path(part.__file__).read_text(encoding="utf-8")
     assert part.V_INSTALLED == pytest.approx(part.V_CUP - part.V_CROWN)
     source = Path(part.__file__).read_text(encoding="utf-8")
     split = source.index("create_configuration {INSTALLED_CONFIG}")

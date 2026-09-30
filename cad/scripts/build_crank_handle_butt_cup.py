@@ -254,16 +254,23 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError(f"EndRound would not suppress in {default_config}")
     if not bool(end_round.SetSuppression2(1, 3, bstr_array([INSTALLED_CONFIG]))):
         raise RuntimeError(f"EndRound would not unsuppress in {INSTALLED_CONFIG}")
+    # The crown is a few hundredths of a cubic millimetre, under the volume
+    # check's resolution, so each configuration proves the cut's state
+    # directly and the volume only as a sanity bound.
     await force_rebuild(adapter)
+    if bool(end_round.IsSuppressed()):
+        raise RuntimeError(f"EndRound is suppressed in {INSTALLED_CONFIG}")
     await volume_check(
-        adapter, "installed cup (end round turned)", V_INSTALLED, 0.3 * V_CROWN
+        adapter, "installed cup (end round turned)", V_INSTALLED, 0.005 * V_CUP
     )
     check(
         f"re-activate {default_config}",
         await adapter.set_active_configuration(default_config),
     )
     await force_rebuild(adapter)
-    await volume_check(adapter, "as-turned cup (default)", V_CUP, 0.3 * V_CROWN)
+    if not bool(end_round.IsSuppressed()):
+        raise RuntimeError(f"EndRound is not suppressed in {default_config}")
+    await volume_check(adapter, "as-turned cup (default)", V_CUP, 0.005 * V_CUP)
     # The configuration description wins over the drive-train BOM's written
     # cell, so it is the text that BOM prints (the MHA-135 precedent).
     grouped_spec = _config.parts(PART_NAME)

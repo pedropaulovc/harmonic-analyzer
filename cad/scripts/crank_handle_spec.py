@@ -98,7 +98,11 @@ COUNTERBORE_R = COUNTERBORE_DIA / 2.0
 # edge break with a flat rim to spare (Codex P1 on #1139: at r 3.4 the
 # pocket's edge break could take the whole face).
 CUP_FACE_RIM_MIN = 0.1
-END_ROUND_CY = CUP_POCKET_DIA_MAX / 2.0 + EDGE_BREAK_MAX_MM + CUP_FACE_RIM_MIN
+# The contour allowance applies to the end round too, so the crest keeps the
+# rim even turned its whole allowance small (Codex P1 on #1139, a8b49d537).
+END_ROUND_CY = (
+    CUP_POCKET_DIA_MAX / 2.0 + EDGE_BREAK_MAX_MM + CUP_FACE_RIM_MIN + CONTOUR_ALLOWANCE_DIA / 2.0
+)
 
 # Flare: concave, centre above the waist, through the shoulder point.
 FLARE_R = ((WAIST_X - SHOULDER_X) ** 2 + (SHOULDER_R - WAIST_R) ** 2) / (
@@ -225,7 +229,8 @@ for _ok, _what in (
         "the end round does not crest on the cup face",
     ),
     (
-        END_ROUND_CY - CUP_POCKET_DIA_MAX / 2.0 - EDGE_BREAK_MAX_MM >= CUP_FACE_RIM_MIN,
+        END_ROUND_CY - CONTOUR_ALLOWANCE_DIA / 2.0 - CUP_POCKET_DIA_MAX / 2.0 - EDGE_BREAK_MAX_MM
+        >= CUP_FACE_RIM_MIN - 1e-9,
         "the end round leaves no flat cup rim outside the largest pocket's edge break",
     ),
     (OAK_END_X < HANDLE_LENGTH, "the oak runs past the cup face"),
