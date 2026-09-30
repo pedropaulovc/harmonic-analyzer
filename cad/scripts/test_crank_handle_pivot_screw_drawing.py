@@ -245,13 +245,16 @@ def test_notes_state_the_fitted_shoulder_and_the_head_bands() -> None:
     assert lines[0].startswith("FACE THE UNDER-HEAD")
     # User ruling 2026-09-29 (MHA-139 review): the shoulder is turned to suit
     # the bonded handle; the head's band is for its bearing on the cup floor.
-    assert "FACE THE UNDER-HEAD TO SUIT THE BONDED MHA-022" in spec.DRAWING_NOTES
-    assert "PLUS 0.25-1.00." in spec.DRAWING_NOTES
-    assert "HEAD BEARS ON MHA-153 FLOOR;" in spec.DRAWING_NOTES
+    flat = " ".join(spec.DRAWING_NOTES.split())
+    assert "FACE THE UNDER-HEAD TO SUIT THE BONDED MHA-022" in flat
+    # The v4 re-review: the note names which face the fitted length ends at.
+    assert "UNDER-HEAD TO SEAT FACE (THE SHOULDER'S THREAD-END FACE, ON MHA-020)" in flat
+    assert "PLUS 0.25-1.00." in flat
+    assert "HEAD BEARS ON MHA-153 FLOOR;" in flat
     # Each head band states its reason (the 1d2be3aaf re-review called the
     # unexplained length band over-specification).
-    assert "DIA BAND KEEPS 0.3 BEARING;" in spec.DRAWING_NOTES
-    assert "LENGTH BAND KEEPS IT BELOW THE CUP FACE." in spec.DRAWING_NOTES
+    assert "DIA BAND KEEPS 0.3 BEARING;" in flat
+    assert "LENGTH BAND KEEPS IT BELOW THE CUP FACE." in flat
     assert all(len(line) <= 72 for line in lines)
     policy = (Path(spec.__file__).parents[1] / "docs" / "drawing-simplicity-policy.md")
     assert not any(
