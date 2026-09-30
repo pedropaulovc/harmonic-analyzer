@@ -6,10 +6,11 @@ tip and bore diameters, common face width, and a native driving tooth-thickness
 dimension with the cone-specific deepened-mesh band.
 
 This module stays free of tolerances.yaml because assemblies import it.  The
-bore band derives from the shaft's land bands (cone_shaft_land_bands) through
-the shared bonded-joint fit (retained_joint_fit), two small import-free
-modules; every other band is a cone-specific constant.  The drawing merely
-imports the resulting native model dimensions, precision, and tolerances.
+bore bands -- the round bore and its across-flat -- derive from the shaft's
+land bands (cone_shaft_land_bands) through the gear seat fit (gear_seat_fit),
+two small import-free modules; every other band is a cone-specific constant.
+The drawing merely imports the resulting native model dimensions, precision,
+and tolerances.
 """
 
 from __future__ import annotations
@@ -19,8 +20,13 @@ import math
 import _config
 from _gtol_spec import CylinderFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
-from cone_shaft_land_bands import SECTION_CONE_GEAR_TEETH, SECTION_DIA_BANDS
-from retained_joint_fit import bonded_bore_band
+from cone_shaft_land_bands import (
+    FLAT_AF_BAND,
+    SECTION_CONE_GEAR_TEETH,
+    SECTION_DIA_BANDS,
+    SECTION_FLAT_AF,
+)
+from gear_seat_fit import flat_bore_af_band, seat_bore_band
 
 
 MM_PER_IN = 25.4
@@ -49,7 +55,7 @@ STANDARD_TOOTH_THICKNESS = math.pi * MODULE_MM / 2.0
 # ``MESH_BACKLASH_MIN_MM``.  Tightest case: thickest tooth with the cone
 # bore-on-land and drum bore-on-arbor runouts closing the deep-edge centre
 # distance at the as-posed interleave.  The cone runout is sized for the
-# 0/-0.05 soldered shaft seats (#839) under this +0.05/0 bore: 0.05 radial.
+# 0/-0.05 shaft seat lands under this +0.05/0 bore: 0.05 radial.
 # Least engagement adds the journal and arbor float opening.  Each OD is the
 # smallest that reaches worst-case CR 1.20 (T060+), else the largest
 # that keeps the tip land >= 0.10 at the thinnest tooth and largest OD and the
@@ -124,21 +130,25 @@ OUTSIDE_DIA = outside_dia_mm(TEETH)
 TOOTH_THICKNESS = tooth_thickness_mm(TEETH)
 
 BORE_DIA = 0.375 * MM_PER_IN  # 9.525 (3/8") at T120; smaller on the tip gears
-# U27 face width (Main ruling, 2026-09-23): 6.0 at the .X band keeps the
-# widest gear (6.8) inside the 6.889 seat pitch; 6.5 +/-0.51 could reach
-# 7.01 and overlap a neighbour.  The drum's engaged zone spans
-# [-0.75, +1.35] mm about the narrowed gear's centre.
-FACE_WIDTH = 6.0
-# #914 (user ruling, 2026-09-25): the face is the cone set's axial margin
-# against the drum.  At the .X minimum (5.2) the north side keeps only 1.25,
-# which the cylinder bank's 1.175 all but consumes; +/-0.10 (5.9 minimum)
-# keeps 1.60, leaving ~0.425 for the cone set's own Z.  Facing both sides to
-# a micrometer is a novice-holdable step.  The stacks that bound it today:
-# the upper limit keeps 0.53 of neighbour air with the +/-0.13 solder
-# stations (6.8, the .X maximum, would collide), and the lower limit keeps
-# 1.05 north / 1.10 south of the re-derived R1 cone/drum stack --
-# test_cone_gear_mesh_design.test_face_width_band_holds_both_axial_stacks.
-FACE_WIDTH_BAND = (0.10, -0.10)
+# Face width (user ruling 2026-09-28): the cone set is a solid stack.  Every
+# gear is one seat pitch thick, so each bears on its neighbour and the stack
+# on MHA-021 sets every station (cone_gear_stack); no gear is bonded.  The
+# face is SEAT_PITCH floored to the four places it prints, so the modelled
+# stack closes without interference.  Every gear grew SOUTH: its north face
+# stays on the station layout (cone_line), so T006's north face -- the tip
+# bushing's seat -- does not move.  The band is the cylinder bank's L20 d'
+# rule (+/-0.025 per gear, the 20-gear stack accepted at +/-0.20), so it is
+# faced to a micrometer on both sides.
+SEAT_PITCH = 6.888787817263312  # cone_line.SEAT_PITCH, pinned by test
+FACE_WIDTH = math.floor(SEAT_PITCH * 1e4) / 1e4  # 6.8887
+FACE_WIDTH_BAND = (0.025, -0.025)
+# Flat clock (user ruling 2026-09-28): the bore's D-flat is the gear's
+# angular datum on MHA-014, and its outward normal passes through the centre
+# of the phase-0 tooth on local +X, so every gear keeps the clock it is
+# placed at.  Index the teeth off the flat on one setup; the native
+# BoreFlatClock angular dimension carries this band (error_budget.yaml
+# cone_flat_clock), the cylinder gear's CAM_PHASE_TOLERANCE_DEG precedent.
+FLAT_CLOCK_TOLERANCE_DEG = 0.25
 
 
 def chord_floor_radius_mm(
@@ -287,11 +297,13 @@ def material_specification(teeth: int) -> str:
 
 FAMILY_BORES_MM = {teeth: bore_dia_mm(teeth) for teeth in CONFIGURATION_TEETH}
 
-# U27 / policy rule 12: machined webs target >= 2.0 mm with a hard floor of
-# 1.5 mm, between the printed MIN floor diameter and the maximum bore.  U40
-# (user, 2026-09-23): T012, T018 and T024 each drop one shaft land so their
-# webs meet the target; T006 has no compliant construction (its floor sits at
-# r 1.44) and its web is the one named exception (book fidelity).
+# Policy rule 12: machined webs target >= 2.0 mm with a hard floor of 1.5 mm,
+# between the printed MIN floor diameter and the maximum bore.  The D-flat
+# only adds material inside the round bore, so the thinnest web stays on the
+# round side and these values are the round bore's.  U40 (user, 2026-09-23):
+# T012, T018 and T024 each drop one shaft land so their webs meet the target;
+# T006 has no compliant construction (its floor sits at r 1.44) and its web
+# is the one named exception (book fidelity).
 MACHINED_WEB_FLOOR_MM = 1.5
 MACHINED_WEB_TARGET_MM = 2.0
 WEB_EXCEPTIONS_MM: dict[int, float] = {6: 0.621}
@@ -305,13 +317,12 @@ BORE_BAND_PLACES = 3
 # per-configuration IDimensionTolerance.SetValues2 on some dimension types
 # (_drawing_marks).  And T006's named web (U40) caps the largest bore under its
 # printed MIN floor: a per-land +0.085 would cut that web to 0.604.  So the one
-# band is the intersection of the shared retained-joint fit (Main,
-# 2026-09-25) over every land that carries a gear, with its upper limit the
-# lower of two named limits.
-def _bonded_fit_band() -> tuple[float, float]:
-    """(upper, lower): the retained-joint fit that holds on every gear land."""
+# band is the intersection of the gear seat fit over every land that carries a
+# gear, with its upper limit the lower of two named limits.
+def _seat_fit_band() -> tuple[float, float]:
+    """(upper, lower): the round seat fit that holds on every gear land."""
     carried = [
-        bonded_bore_band(band)
+        seat_bore_band(band)
         for band, teeth in zip(SECTION_DIA_BANDS, SECTION_CONE_GEAR_TEETH)
         if teeth
     ]
@@ -325,19 +336,71 @@ def _t006_web_upper() -> float:
     return math.floor(web_cap * scale + 1e-9) / scale
 
 
-BORE_BAND_FIT_UPPER, BORE_BAND_LOWER = _bonded_fit_band()  # +0.055, +0.025
+BORE_BAND_FIT_UPPER, BORE_BAND_LOWER = _seat_fit_band()  # +0.055, +0.025
 BORE_BAND_WEB_UPPER = _t006_web_upper()  # +0.050 (0.0505 floored)
-# (upper, lower): +0.050/+0.025.  Clearance 0.025-0.100 on the soldered seat
-# lands, 0.025-0.070 on the running terminal land.
+# (upper, lower): +0.050/+0.025.  Round clearance 0.025-0.100 on the seat
+# lands, 0.025-0.070 on the running terminal land: inside 0.025-0.105.
 BORE_DIA_BAND = (
     round(min(BORE_BAND_FIT_UPPER, BORE_BAND_WEB_UPPER), BORE_BAND_PLACES),
     round(BORE_BAND_LOWER, BORE_BAND_PLACES),
 )
 if BORE_DIA_BAND[0] - BORE_DIA_BAND[1] < 0.02 - 1e-9:
     raise AssertionError(
-        f"cone-gear bonded bore band {BORE_DIA_BAND[0]:+.3f}/"
+        f"cone-gear seat bore band {BORE_DIA_BAND[0]:+.3f}/"
         f"{BORE_DIA_BAND[1]:+.3f} is under 0.02 wide"
     )
+
+
+# --- D-bore (user ruling 2026-09-28) -----------------------------------------
+#
+# Every bore is a D: the round bore above plus one flat, parallel to the
+# land's flat, whose outward normal is local +X (through the phase-0 tooth,
+# FLAT_CLOCK_TOLERANCE_DEG).  Across-flat (AF) is measured from the flat to
+# the far side of the round bore, the land's own AF nominal; the band keeps
+# 0.01-0.03 AF clearance on the land's FLAT_AF_BAND.  One band for all twenty,
+# so one BoreAF tolerance serves every configuration.
+BORE_AF_BAND = flat_bore_af_band(FLAT_AF_BAND)  # (+0.020, +0.010)
+BORE_AF_PLACES = 3
+
+
+def land_section(teeth: int) -> int:
+    """Index of the MHA-014 land (cone_shaft_land_bands) carrying ``teeth``."""
+    _require_member(teeth)
+    for section, carried in enumerate(SECTION_CONE_GEAR_TEETH):
+        if teeth in carried:
+            return section
+    raise AssertionError(f"no MHA-014 land carries the T{teeth:03d} cone gear")
+
+
+def bore_flat_af_mm(teeth: int) -> float:
+    """Return the configuration's nominal bore across-flat."""
+    across_flat = SECTION_FLAT_AF[land_section(teeth)]
+    if across_flat is None:
+        raise AssertionError(f"the T{teeth:03d} land has no flat")
+    return across_flat
+
+
+def bore_flat_offset_mm(teeth: int) -> float:
+    """Distance from the bore axis to the flat (AF minus the bore radius)."""
+    return bore_flat_af_mm(teeth) - bore_dia_mm(teeth) / 2.0
+
+
+def bore_flat_segment_area_mm2(teeth: int) -> float:
+    """Area the flat leaves standing inside the round bore (a circular
+    segment), per unit face: the solid gains this over a round bore."""
+    radius = bore_dia_mm(teeth) / 2.0
+    offset = bore_flat_offset_mm(teeth)
+    return radius * radius * math.acos(offset / radius) - offset * math.sqrt(
+        radius * radius - offset * offset
+    )
+
+
+for _teeth in CONFIGURATION_TEETH:
+    if not 0.0 < bore_flat_offset_mm(_teeth) < bore_dia_mm(_teeth) / 2.0:
+        raise AssertionError(
+            f"T{_teeth:03d} bore AF {bore_flat_af_mm(_teeth)} does not cut a "
+            f"flat into its Ø{bore_dia_mm(_teeth)} bore"
+        )
 
 
 def bore_surface_finish(teeth: int) -> SurfaceFinishControl:
@@ -377,7 +440,7 @@ REFERENCE_SKETCHES = (TOOTH_REFERENCE_SKETCH, GAP_FLOOR_SKETCH)
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "BlankProfile": {"BlankDia"},
     "Blank": {"FaceWidth"},
-    "BoreProfile": {"BoreCutDia"},
+    "BoreProfile": {"BoreCutDia", "BoreAF", "BoreFlatClock"},
     TOOTH_REFERENCE_SKETCH: {"ToothThickness"},
     GAP_FLOOR_SKETCH: {"FloorDia"},
 }
@@ -407,14 +470,17 @@ def configuration_number(part_number: str, teeth: int) -> str:
 # --- Decimal places, authored ON THE PART ------------------------------------
 #
 # Policy rule 2: places and bands are model properties.  Three places belong
-# on the two fit dimensions (the bore and circular tooth thickness) and on
-# the gap-floor limits, whose T006 window is 0.049 wide.  Tip diameter prints
-# two places with its own BLANK_DIA_BAND (below); face width prints two
-# places with its FACE_WIDTH_BAND (#914).
+# on the fit dimensions (the bore, its across-flat and circular tooth
+# thickness) and on the gap-floor limits, whose T006 window is 0.049 wide.
+# Tip diameter prints two places with its own BLANK_DIA_BAND (below); face
+# width prints four, like the cylinder gear's OverallThickness under the same
+# rule: three would round one limit of the +/-0.025 band inward.  The flat
+# clock prints one place of degrees, the cylinder gear's NotchPhase precedent:
+# +/-0.25 needs no more.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "BlankProfile": {"BlankDia": 2},
-    "Blank": {"FaceWidth": 2},
-    "BoreProfile": {"BoreCutDia": 3},
+    "Blank": {"FaceWidth": 4},
+    "BoreProfile": {"BoreCutDia": 3, "BoreAF": BORE_AF_PLACES, "BoreFlatClock": 1},
     TOOTH_REFERENCE_SKETCH: {"ToothThickness": 3},
     GAP_FLOOR_SKETCH: {"FloorDia": 3},
 }

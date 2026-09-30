@@ -9,10 +9,10 @@ no two diametric leaders cross at the centre. There are no
 datums or feature-control frames: a spacer bushing is not on the GD&T allowlist,
 and the retired OD-runout and end-face-parallelism frames said nothing a hobby
 shop could hold that turning the OD, bore, and faces in one chucking does not
-already give. The sole roughness symbol is rule 5's running-surface case: the
-bore runs on the shaft's tip journal. Decimal places are the part's
-(``cone_tip_bushing_spec.DRAWING_PRECISION``, applied natively by
-``build_cone_tip_bushing``); this script only reads them back off the sheet.
+already give. The sole roughness symbol is rule 5's running-surface case:
+the round bore can run on the flatted shaft tip's cylindrical arc. Decimal
+places are the part's (``cone_tip_bushing_spec.DRAWING_PRECISION``, applied
+natively by ``build_cone_tip_bushing``); this script reads them off the sheet.
 """
 
 from __future__ import annotations

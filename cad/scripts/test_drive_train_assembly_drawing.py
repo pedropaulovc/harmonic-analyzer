@@ -178,7 +178,6 @@ def test_sheet_numbers_are_pinned_where_the_sheets_cite_them() -> None:
     assert "BALLOONS ON SHEETS 3-5" in drawing.BOM_REFERENCE_CAPTION
     assert f"STATIONS: SHEET {drawing.FIT_SHEET}" in drawing.BOM_REFERENCE_CAPTION
     assert f"CYLINDER BANK: SHEET {drawing.BANK_SHEET}." in drawing.CONE_CRANK_STEPS
-    assert f"(STATION TABLE, SHEET {drawing.FIT_SHEET})" in drawing.CONE_CRANK_STEPS
     assert all(text.count(",") <= 1 for text in drawing.BOM_DESCRIPTIONS.values())
 
 
@@ -236,7 +235,8 @@ def test_step_one_sets_the_64t_against_the_shaft_collar() -> None:
     gear = drawing.BOM_PART_NUMBERS["crank-drive-gear"]
     shaft_number = drawing.BOM_PART_NUMBERS["cone-gear-shaft"]
     step_one = drawing.CONE_CRANK_STEPS.split("\n2. ")[0]
-    assert f"{gear} FRONT OF T120, AGAINST THE {shaft_number} COLLAR:" in step_one
+    first_line = step_one.split("\n1. ")[1].split("\n")[0]
+    assert gear in first_line and shaft_number in first_line and "COLLAR" in first_line
 
 
 def test_cone_swing_check_stops_disengaged_at_the_swing_stop() -> None:
@@ -987,6 +987,27 @@ def test_handle_pivot_screw_is_built_released_and_backs_out_of_the_handle() -> N
     # Relative to the handle, the tip starts THREAD_LENGTH past its inboard
     # end; it must travel the whole handle and clear it.
     assert -back_out.distance_mm > screw_spec.THREAD_LENGTH + handle_spec.HANDLE_LENGTH
+
+
+def test_the_cone_rotor_withdraws_clear_of_the_post_and_the_tip_block() -> None:
+    """With the cone gears touching, the collar on the post and the tip in
+    its block, no MHA-014 face showed in place and its balloon leader landed
+    on the tip block (run 7).  The rotor leaves along the cone axis until the
+    whole journal clears the post, and the tip hardware leads it by more than
+    the tip runs into the block."""
+    import cone_gear_shaft_spec as shaft
+
+    steps = {step.label: step for step in spec.EXPLODE_STEPS}
+    rotor, tip = steps["cone rotor withdraws"], steps["tip block slides off"]
+    assert rotor.axis == tip.axis == "cone"
+    assert "cone-gear-shaft" in rotor.stems and "cone-tip-block" in tip.stems
+    # The collar bears on the post's north face, where the journal ends.
+    assert rotor.distance_mm > shaft.JOURNAL_END
+    tip_in_block = shaft.T006_TIP_STATION - shaft.TIP_BLOCK_SOUTH_FACE_STATION
+    assert tip_in_block > 0.0
+    assert tip.distance_mm - rotor.distance_mm > tip_in_block
+    # The adjuster and pinch screw are threaded into the block: they go with it.
+    assert {"cone-tip-adjuster", "cone-tip-pinch-screw"} <= set(tip.stems)
 
 
 def test_bank_fitup_limits_are_the_layout_bands() -> None:

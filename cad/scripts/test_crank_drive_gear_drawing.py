@@ -2,9 +2,9 @@
 
 The print is recreated under ``cad/docs/drawing-simplicity-policy.md``: a 64T
 helical gear slipped onto the cone shaft's land carries no datums and no frames,
-its three turned sizes are native model dimensions whose places and bands the
-PART owns, and the tooth system it cannot dimension -- helix angle, hand, tooth
-thinning -- lives in the gear-data block.
+its blank, bore and south-entry sizes are native model dimensions whose places
+and bands the PART owns, and the tooth system it cannot dimension -- helix
+angle, hand, tooth thinning -- lives in the gear-data block.
 """
 
 from __future__ import annotations
@@ -18,13 +18,12 @@ import _config
 import build_crank_drive_gear as part
 import cone_gear_shaft_spec
 import cone_shaft_land_bands
-import retained_joint_fit
+import gear_seat_fit
 import crank_drive_gear_notes as notes
 import crank_drive_gear_spec as spec
 import crank_pinion_spec as pinion_spec
 import draw_crank_drive_gear as drawing
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
-from _fit_limits import deviations
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -51,8 +50,10 @@ def test_spec_is_the_single_source_of_the_marked_dimension_set() -> None:
     # mirrored in the other fails here, offline.
     assert part.DRAWING_DIMENSIONS is spec.DRAWING_DIMENSIONS
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
-    kept = set(drawing.FRONT_KEEP) | set(drawing.RIGHT_KEEP)
-    assert kept == marked == {"OutsideDia", "FaceWidth", "BoreDia"}
+    kept = set(drawing.FRONT_KEEP) | set(drawing.SECTION_KEEP)
+    assert kept == marked == {
+        "OutsideDia", "FaceWidth", "BoreDia", "BoreAF", "BoreSouthChamferSize"
+    }
     assert set(drawing.DIMENSION_CALLOUTS) <= kept
 
 
@@ -93,8 +94,10 @@ def test_precision_is_authored_on_the_part_and_only_read_by_the_sheet() -> None:
     # claims, so the model owns them.
     assert spec.DRAWING_PRECISION_BY_NAME == {
         "OutsideDia": 2,
-        "FaceWidth": 1,
+        "FaceWidth": 4,
         "BoreDia": 3,
+        "BoreAF": 3,
+        "BoreSouthChamferSize": 2,
     }
     assert "draw_crank_drive_gear.py" in PRECISION_MIGRATED_DRAWINGS
     source = _source()
@@ -105,43 +108,109 @@ def test_precision_is_authored_on_the_part_and_only_read_by_the_sheet() -> None:
     assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in _build_source()
 
 
-def test_the_bore_is_the_only_feature_that_earns_a_band() -> None:
-    # cad/docs/tolerance-policy.md: a feature is toleranced tighter than its
-    # title-block general grade only through the named chain. On this part
-    # exactly one feature can cite it -- the fit over the cone shaft's land.
-    build = _build_source()
-    assert build.count("set_dimension_bilateral_tolerance(") == 1
-    assert '"BoreProfile", "BoreDia", *deviations(BORE_DIA_BAND)' in build
-    assert [name for name in dir(spec) if name.endswith("_BAND")] == []
-    assert [name for name in dir(part) if name.endswith("_BAND")] == ["BORE_DIA_BAND"]
-    # ... and it is the only three-decimal dimension for the same reason.
-    assert [
-        name for name, places in spec.DRAWING_PRECISION_BY_NAME.items() if places > 2
-    ] == ["BoreDia"]
-
-
-def test_bore_band_is_derived_from_its_fit_class_not_written_by_hand() -> None:
-    # A bonded joint needs a real gap on BOTH mating limits, so the bore's
-    # limits are computed from the shared retained-joint fit class and the
-    # shaft land's own published limits. Move either input and the bore must
-    # move with it -- that is what this pins, not the literal pair of numbers.
-    low, high = retained_joint_fit.RETAINED_JOINT_CLEARANCE
-    land_upper, land_lower = cone_gear_shaft_spec.SECTION_DIA_BANDS[1]
-    assert (land_upper, land_lower) == cone_shaft_land_bands.GEAR_SEAT_BAND
-    assert spec.BORE_DIA == pytest.approx(cone_gear_shaft_spec.SECTION_DIAS[1])
-    assert part.BORE_DIA_BAND == (
-        pytest.approx(land_lower + high),
-        pytest.approx(land_upper + low),
-    )
+def test_bore_bands_fit_both_sec1_land_dimensions_at_every_limit() -> None:
+    land_upper, land_lower = cone_shaft_land_bands.SECTION_DIA_BANDS[1]
     bore_upper, bore_lower = part.BORE_DIA_BAND
-    minimum = bore_lower - land_upper
-    maximum = bore_upper - land_lower
-    assert (minimum, maximum) == (pytest.approx(low), pytest.approx(high))
-    # The fit-class read stays OUT of the shared spec: it is imported by the
-    # assemblies that need OUTSIDE_DIA, and a _config.fit there would make
-    # tolerances.yaml a rebuild dependency of the frame (test_dodo_recipe's
-    # fine-grained-config contract).
-    assert "_config.fit(" not in Path(spec.__file__).read_text(encoding="utf-8")
+    assert (
+        bore_lower - land_upper,
+        bore_upper - land_lower,
+    ) == pytest.approx(gear_seat_fit.GEAR_SEAT_CLEARANCE)
+    assert spec.BORE_DIA == pytest.approx(cone_gear_shaft_spec.SECTION_DIAS[1])
+    assert spec.BORE_AF == cone_shaft_land_bands.SECTION_FLAT_AF[1] == 8.763
+    bore_upper, bore_lower = spec.BORE_AF_BAND
+    land_upper, land_lower = cone_shaft_land_bands.FLAT_AF_BAND
+    assert (
+        bore_lower - land_upper,
+        bore_upper - land_lower,
+    ) == pytest.approx(gear_seat_fit.FLAT_AF_CLEARANCE)
+    assert spec.BORE_AF_BAND == pytest.approx((0.020, 0.010))
+    assert set(spec.DRAWING_DIMENSIONS["BoreProfile"]) == {"BoreDia", "BoreAF"}
+    assert set(spec.DRAWING_PRECISION["BoreProfile"]) == {"BoreDia", "BoreAF"}
+
+
+def test_D_bore_cut_area_is_smaller_than_a_round_bore() -> None:
+    r = spec.BORE_DIA / 2.0
+    flat_x = spec.BORE_AF - r
+    assert 0 < flat_x < r
+    # The closing chord is to the +X side of centre; the remaining arc goes
+    # through -X (not the short discarded cap on +X).
+    assert 360.0 - 2.0 * math.degrees(math.acos(flat_x / r)) > 180.0
+    segment = r * r * math.acos(flat_x / r) - flat_x * math.sqrt(r * r - flat_x * flat_x)
+    assert segment > 0
+    assert math.pi * r * r - segment > 0
+
+
+def test_south_chamfer_covers_print_worst_end_mill_crescent() -> None:
+    shaft_r = (
+        cone_gear_shaft_spec.SECTION_DIAS[1]
+        + cone_shaft_land_bands.SECTION_DIA_BANDS[1][0]
+    ) / 2
+    flat_offset = (
+        cone_shaft_land_bands.SECTION_FLAT_AF[1]
+        + cone_shaft_land_bands.FLAT_AF_BAND[1]
+        - shaft_r
+    )
+    half_chord = math.sqrt(shaft_r**2 - flat_offset**2)
+    cutter_r = spec.MIN_FLAT_CUTTER_RADIUS
+    assert cutter_r == 4.0  # minimum Ø8 cutter: anything larger leaves less runout
+
+    def horn_plus_runout(y: float) -> float:
+        return (
+            math.sqrt(shaft_r**2 - y**2) - flat_offset
+            + cutter_r - math.sqrt(cutter_r**2 - y**2)
+        )
+
+    # The derivative is y(1/sqrt(Rc²-y²)-1/sqrt(Rshaft²-y²))>0
+    # throughout the half-chord because Rc<Rshaft: the corner is the max.
+    samples = [horn_plus_runout(half_chord * i / 128) for i in range(129)]
+    assert samples == sorted(samples)
+    assert spec.MAX_FLAT_CRESCENT == pytest.approx(samples[-1])
+    assert spec.MAX_FLAT_CRESCENT == pytest.approx(0.959821716, abs=1e-8)
+    assert spec.BORE_SOUTH_CHAMFER == 1.00
+    assert spec.BORE_SOUTH_CHAMFER_BAND == (0.10, 0.00)
+    assert spec.MAX_FLAT_CRESCENT < spec.BORE_SOUTH_CHAMFER + spec.BORE_SOUTH_CHAMFER_BAND[1]
+
+
+def test_chamfer_leaves_a_collar_bearing_annulus_and_flat_engagement() -> None:
+    collar_min_r = (
+        cone_gear_shaft_spec.COLLAR_DIA
+        + cone_gear_shaft_spec.STOCK_DIA_BAND[1]
+    ) / 2
+    bore_max_r = (spec.BORE_DIA + part.BORE_DIA_BAND[0]) / 2
+    chamfer_max = spec.BORE_SOUTH_CHAMFER + spec.BORE_SOUTH_CHAMFER_BAND[0]
+    annulus = collar_min_r - bore_max_r - chamfer_max
+    assert spec.COLLAR_BEARING_ANNULUS == pytest.approx(annulus)
+    assert annulus == pytest.approx(2.0221)
+    assert spec.FACE_WIDTH - spec.BORE_SOUTH_CHAMFER == pytest.approx(6.2113)
+    assert spec.FLAT_ENGAGEMENT_MIN == pytest.approx(
+        spec.FACE_WIDTH + spec.FACE_WIDTH_BAND[1] - chamfer_max
+    )
+    assert spec.FLAT_ENGAGEMENT_MIN == pytest.approx(6.0863)
+    assert spec.FLAT_ENGAGEMENT_MIN > 0
+
+
+def test_chamfer_volume_tracks_both_D_bore_walls() -> None:
+    radius = spec.BORE_DIA / 2
+    flat_x = spec.BORE_AF - radius
+    leg = spec.BORE_SOUTH_CHAMFER
+    # Independent axial integration of the D-shaped section: the circular
+    # arc and the straight flat both advance by the 45° leg at the mouth.
+    def area(offset: float) -> float:
+        r, chord = radius + offset, flat_x + offset
+        return math.pi * r * r - (
+            r * r * math.acos(chord / r)
+            - chord * math.sqrt(r * r - chord * chord)
+        )
+
+    baseline = area(0)
+    slices = 1024
+    reference = sum(
+        (area(leg * i / slices) - baseline) * (0.5 if i in (0, slices) else 1)
+        for i in range(slices + 1)
+    ) * leg / slices
+    removed = part._bore_south_chamfer_volume(radius, flat_x, leg)
+    assert removed == pytest.approx(reference, abs=0.001)
+    assert 0 < removed < math.pi * leg**2 * (radius + leg / 3)
 
 
 def test_outside_diameter_prints_the_tip_band_the_mesh_stack_takes() -> None:
@@ -157,52 +226,13 @@ def test_outside_diameter_prints_the_tip_band_the_mesh_stack_takes() -> None:
         'set_dimension_symmetric_tolerance(\n        adapter, "OutsideDiaReference", '
         '"OutsideDia", OUTSIDE_DIA_TOLERANCE_MM\n    )'
     ) in _build_source()
-    # The face width is the one free length: one place, so the title block's
-    # .X grade is the band it claims, and the mating pinion's face is wider
-    # than this one by more than that band at every allowed axial position.
-    assert spec.DRAWING_PRECISION["GearBlank"]["FaceWidth"] == 1
-    face_band = _config.title_block("linear_1pl")["value_in"] * 25.4
-    assert pinion_spec.FACE_WIDTH - spec.FACE_WIDTH > face_band
-
-
-def test_bore_callout_states_the_process_and_how_far_it_goes() -> None:
-    # Rule 7: the Ø and its limits come from the dimension; the callout adds
-    # the process and extent, then the bond gap as a reference (crank hub
-    # precedent), computed from the printed limits.
-    assert drawing.DIMENSION_CALLOUTS == {
-        "BoreDia": "REAM THRU\n(0.025-0.105 DIAMETRAL\nGAP ON MHA-014)"
-    }
-
-
-def test_bond_gap_is_a_reamable_band_inside_the_loctite_648_fill_limit() -> None:
-    # Main ruling 2026-09-25 (64T): the shaft_in_bushing running fit on the
-    # 0.05-wide gear-seat land left a ZERO-width bore band (+0.025/+0.025).
-    upper, lower = part.BORE_DIA_BAND
-    assert (upper, lower) == (pytest.approx(0.055), pytest.approx(0.025))
-    assert spec.BORE_DIA + lower == pytest.approx(9.550)
-    assert spec.BORE_DIA + upper == pytest.approx(9.580)
-    assert upper - lower >= 0.02
-    gap_min, gap_max = part.BORE_DIAMETRAL_GAP
-    assert (gap_min, gap_max) == (pytest.approx(0.025), pytest.approx(0.105))
-    assert gap_max <= part.LOCTITE_648_GAP_FILL_MAX - 0.02
-    # A +0.001 in oversize 3/8 reamer (9.5504) cuts inside the band.
-    assert spec.BORE_DIA + lower <= (0.375 + 0.001) * 25.4 <= spec.BORE_DIA + upper
-
-
-def test_bore_band_survives_the_model_setter_and_every_limit_pair_bonds() -> None:
-    # warm-c486 (farm, 2026-09-25) died in part:crank_drive_gear on
-    # deviations((0.025, 0.025)): "fit band is inverted".  The build hands the
-    # band to the model through deviations(), so an offline call must pass,
-    # and the worst-case pairs of printed limits -- smallest bore on largest
-    # land, largest bore on smallest land -- must stay inside the ruled
-    # retained-joint window.
-    bore_lower, bore_upper = deviations(part.BORE_DIA_BAND)
-    assert bore_upper - bore_lower >= 0.02
-    land_upper, land_lower = cone_shaft_land_bands.GEAR_SEAT_BAND
-    tightest = bore_lower - land_upper
-    loosest = bore_upper - land_lower
-    low, high = retained_joint_fit.RETAINED_JOINT_CLEARANCE
-    assert low - 1e-9 <= tightest <= loosest <= high + 1e-9
+    # The stack interface fixes both ends: the 64T north face touches T120;
+    # the 16T remains longer but needs a measured axial overlap, not a simple
+    # difference of face-width nominal sizes.
+    assert spec.FACE_WIDTH == 7.2113
+    assert spec.FACE_WIDTH_BAND == (0.025, -0.025)
+    assert spec.DRAWING_PRECISION["GearBlank"]["FaceWidth"] == 4
+    assert pinion_spec.FACE_WIDTH == 9.5
 
 
 def test_print_carries_no_gdt_or_basic_dimensions() -> None:
@@ -370,69 +400,12 @@ def test_gear_data_numbers_track_the_part_geometry() -> None:
     assert spec.NORMAL_MODULE_MM == pytest.approx(pinion_spec.MODULE_MM)
 
 
-def test_notes_carry_the_part_specific_facts_and_never_the_title_block() -> None:
-    text = notes.DRAWING_NOTES
-    lines = text.splitlines()
-    # The title block orders every sharp edge broken R0.25 / 0.25 chamfer max.
-    # On a 2.13 whole-depth tooth that is more than a tenth of the tooth, so
-    # the print states the exception.
-    assert lines[0] == "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS."
-    # The attachment (rule-11 flag closed 2026-09-21): the bore is the only
-    # attachment feature on the part, so the note names the mate and says the
-    # bore is plain and fixed there. HOW it is fixed is an assembly method
-    # (rule 6; #906, Main 2026-09-26): the solder/braze route and the
-    # retaining-compound permission print on the drive-train sheet's step 1,
-    # from the same two constants.
-    assert lines[1] == (
-        f"PLAIN BORE, NO KEYWAY: FIXED TO THE {notes.SHAFT_MATE_NUMBER} SHAFT SEAT"
-        " AT ASSEMBLY."
-    )
-    assert notes.ATTACHMENT_PROCESS not in text
-    assert notes.ATTACHMENT_ALTERNATIVE not in text
-    import draw_drive_train_assembly as dt
-
-    assert notes.ATTACHMENT_PROCESS in dt.CONE_CRANK_STEPS
-    assert notes.ATTACHMENT_ALTERNATIVE in dt.CONE_CRANK_STEPS
-    # Both routes are permitted, so the line that offers the alternative has
-    # to read as a permission, not as a second instruction.
-    assert "ACCEPTABLE" in notes.ATTACHMENT_ALTERNATIVE
-    # The mate is the cone gear shaft, whatever the registry calls it -- and
-    # not this gear's own number.
+def test_notes_do_not_substitute_for_native_fit_dimensions() -> None:
+    assert notes.DRAWING_NOTES == "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS."
     assert notes.SHAFT_MATE_NUMBER == _config.parts("cone-gear-shaft")["number"]
-    assert notes.SHAFT_MATE_NUMBER != _config.parts("crank-drive-gear")["number"]
-    # Rule 6, "never a dimension": the ONLY digits allowed anywhere in the
-    # notes block are the mate's part number.
-    named = text.replace(notes.SHAFT_MATE_NUMBER, "")
-    assert not any(ch.isdigit() for ch in named)
-    # Rule 6's budget: at most four short lines, each short enough to clear
-    # the title-block keep-out from the notes anchor at x = 16 mm.
-    assert len(lines) == 2
-    assert all(len(line) <= 90 for line in lines)
-    # The attachment note must not re-print the bore that the face view
-    # already dimensions and bands, and must not invent an axial requirement:
-    # the gear is set against the MHA-014 collar at assembly and leaves air
-    # to T120, so the station is an assembly fact.
-    for banned in ("9.525", "BUTTED", "T120", "FLUSH"):
-        assert banned not in text, banned
-    # Retired with the migration: the general-tolerance restatements, the
-    # method instructions, the heat-treatment negative, the duplicate of the
-    # bore fit, the hand-of-helix narration the data block now states, and the
-    # pair commissioning protocol that was never part acceptance.
-    for banned in (
-        "CUT TEETH",
-        "HARDNESS",
-        "DIAMETRAL CLEARANCE",
-        "ROOT DIAMETER",
-        "ROOT FLOOR",
-        "POSITIVE HELIX",
-        "COMMISSIONING",
-        "ACCEPTANCE",
-        "MHA-025",
-        "N*m",
-        "RPM",
-        "+/-",
-    ):
-        assert banned not in text, banned
+    assert drawing.SHAFT_MATE_NAME == _config.parts("cone-gear-shaft")["title"].upper()
+    assert not hasattr(notes, "ATTACHMENT_PROCESS")
+    assert not hasattr(notes, "ATTACHMENT_ALTERNATIVE")
 
 
 def test_sheet_runs_at_3_to_2_with_every_view_at_sheet_scale() -> None:
@@ -446,20 +419,48 @@ def test_sheet_runs_at_3_to_2_with_every_view_at_sheet_scale() -> None:
 
 
 def test_hidden_lines_are_off_and_helical_tangent_edges_are_dropped() -> None:
-    # The only internal feature is a straight reamed bore whose callout says
-    # THRU. The 64 helical flanks, by contrast, project 128 tangent curves
-    # across the side view's 12 mm face -- dropped on both orthographic views,
-    # kept on the isometric, where the helix is what is being shown.
+    # The face view shows the arc and flat in solid lines, and the centre
+    # section cuts the bore open, so hidden edges add no requirement; the
+    # helical flanks project dense tangent curves, removed from orthographic
+    # views only.
     source = _source()
     assert (
-        "for view in (front, right, iso):\n        set_hidden_lines_removed" in source
+        "for view in (front, section, iso):\n        set_hidden_lines_removed" in source
     )
     assert "set_hidden_lines_visible" not in source
     assert '_hide_tangent_edges(front, "front")' in source
-    assert '_hide_tangent_edges(right, "side")' in source
+    assert '_hide_tangent_edges(section, "section")' in source
     assert "_hide_tangent_edges(iso" not in source
     assert "SetDisplayTangentEdges2(0)" in source
     assert "GetDisplayTangentEdges2()" in source
+
+
+# Dimension text centres on its keep point. Metrics off the round-bore 3:2 64T
+# sheet of farm run 20260929T061401240Z (e0f6636): "(0.025-0.105 DIAMETRAL"
+# is 52 mm for 22 characters, the five-line bore block stands 25 mm tall, and
+# the title block's top edge is at 64.7 mm. A stacked tolerance puts the
+# value on two lines.
+_CHAR_WIDTH = 0.00236
+_LINE_HEIGHT = 0.005
+_TITLE_BLOCK_TOP = 0.0647
+# Outline pad the layout audit adds round an uncropped view (cone-gear T084).
+_VIEW_OUTLINE_PAD = 0.0056
+# The native section caption, "SECTION A-A" over its scale, stands 16.5 mm
+# tall on the crank-pinion sheet and is placed by its top centre.
+_CAPTION_HEIGHT = 0.0165
+
+
+def _text_box(xy: tuple[float, float], callout: str, value: str) -> tuple[float, ...]:
+    lines = callout.lstrip().split("\n")
+    width = _CHAR_WIDTH * max(len(value), *(len(line) for line in lines))
+    height = _LINE_HEIGHT * (2 + len(lines))
+    return (xy[0] - width / 2, xy[1] - height / 2, xy[0] + width / 2, xy[1] + height / 2)
+
+
+def _box_distance(box: tuple[float, ...], point: tuple[float, float]) -> float:
+    dx = max(box[0] - point[0], 0.0, point[0] - box[2])
+    dy = max(box[1] - point[1], 0.0, point[1] - box[3])
+    return math.hypot(dx, dy)
 
 
 def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
@@ -471,11 +472,12 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
     for name, (x, y) in drawing.FRONT_KEEP.items():
         reach = math.hypot(x - drawing.FRONT_CENTER[0], y - drawing.FRONT_CENTER[1])
         assert reach > half_od + 0.010, name
-    for name, (x, y) in drawing.RIGHT_KEEP.items():
-        assert y > drawing.RIGHT_CENTER[1] + half_od, name
+    sx, sy = drawing.SECTION_CENTER
+    face_half = drawing.FACE_WIDTH_HALF
+    assert drawing.SECTION_KEEP["FaceWidth"][1] > sy + half_od
     positions = (
         *drawing.FRONT_KEEP.values(),
-        *drawing.RIGHT_KEEP.values(),
+        *drawing.SECTION_KEEP.values(),
         drawing.GEAR_DATA_POS,
         drawing.MANUFACTURING_NOTES_POS,
     )
@@ -483,13 +485,32 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
         assert 0.012 < x < 0.420
         assert 0.012 < y < 0.267
         assert not (x > 0.216 and y < 0.070), (x, y)  # title-block keep-out
-    # The three views march left to right without overlapping: face view, side
-    # view, isometric.
-    face_half = drawing.FACE_WIDTH_HALF
-    assert drawing.FRONT_CENTER[0] + half_od < drawing.RIGHT_CENTER[0] - face_half
-    assert drawing.RIGHT_CENTER[0] + face_half < drawing.ISO_CENTER[0] - half_od
+    # The three views march left to right without overlapping: face view,
+    # centre section, isometric.
+    assert drawing.FRONT_CENTER[0] + half_od < sx - face_half
+    assert sx + face_half < drawing.ISO_CENTER[0] - half_od
     # The gear-data column stays left of every dimension the face view places.
     assert drawing.GEAR_DATA_POS[0] < min(x for x, _ in drawing.FRONT_KEEP.values())
+    # The AF callout and the chamfer stand in the lane between the tooth tips
+    # and the section's south face, the chamfer under the AF block.
+    af = _text_box(drawing.FRONT_KEEP["BoreAF"], drawing.AF_CALLOUT, "8.763 +0.020")
+    chamfer = _text_box(
+        drawing.SECTION_KEEP["BoreSouthChamferSize"],
+        drawing.DIMENSION_CALLOUTS["BoreSouthChamferSize"],
+        "1.00 +0.10",
+    )
+    section_left = sx - face_half - _VIEW_OUTLINE_PAD
+    for box in (af, chamfer):
+        assert _box_distance(box, drawing.FRONT_CENTER) > half_od + _VIEW_OUTLINE_PAD + 0.003
+        assert box[2] < section_left - 0.003
+    assert chamfer[3] < af[1] - 0.003
+    # The chamfer's leg dimension runs off the south face at bore height.
+    assert sy - half_od < drawing.SECTION_KEEP["BoreSouthChamferSize"][1] < sy
+    # The caption hangs under the section and over the title block.
+    cap_x, cap_top = drawing.SECTION_CAPTION_XY
+    assert cap_x == pytest.approx(sx)
+    assert cap_top < sy - half_od - 0.005
+    assert cap_top - _CAPTION_HEIGHT > _TITLE_BLOCK_TOP + 0.003
 
 
 def test_part_stamps_make_critical_properties() -> None:
@@ -525,19 +546,13 @@ def test_outside_dia_reference_is_saved_hidden_and_imported_per_view() -> None:
     assert "OutsideDiaReference" in spec.DRAWING_DIMENSIONS
 
 
-def test_bore_finish_reads_at_note_height_and_no_leader_crosses_at_the_bore() -> None:
-    # Eye pass of w15-301f4bf4e (present on the 2026-09-21 SHIP render too):
-    # "Ra 1.6" printed at twice the note height, and the tip diameter's line
-    # ran through the bore centre while the finish leader rose to the bore
-    # bottom between it and the bore callout.
+def test_bore_finish_reads_at_note_height_and_leaders_have_separate_landings() -> None:
+    # The round diameter, AF and finish all need room around the D-bore;
+    # the tip-diameter arrow belongs on the near tooth silhouette, and only
+    # the AF dimension (it spans the axis) may meet the A-A cutting line.
     import _drawing_leaders as leaders
 
     assert drawing.FINISH_CHAR_HEIGHT == 0.0025  # the Gear Data / notes height
-    source = _source()
-    assert "char_height=FINISH_CHAR_HEIGHT" in source
-    assert '"Gear Data", *GEAR_DATA_POS, char_height=0.0025' in source
-    assert "_bore_leaders_clear(adapter, front_annotations, finish)" in source
-    assert 'set_near_side_diameter(tip, "tip diameter")' in source
 
     cx, cy = drawing.FRONT_CENTER
     r = drawing.BORE_SHEET_RADIUS
@@ -547,21 +562,57 @@ def test_bore_finish_reads_at_note_height_and_no_leader_crosses_at_the_bore() ->
     assert ax > cx and ay < cy  # lower right, opposite the bore callout
     tip_text = drawing.FRONT_KEEP["OutsideDia"]
     bore_text = drawing.FRONT_KEEP["BoreDia"]
-    assert bore_text[0] < cx and bore_text[1] < cy  # bore callout lower left
+    af_text = drawing.FRONT_KEEP["BoreAF"]
+    assert bore_text[0] < cx and bore_text[1] < cy
+    assert af_text[0] > cx and af_text[1] > cy
     angle = math.atan2(bore_text[1] - cy, bore_text[0] - cx)
     bore = [(bore_text, (cx + r * math.cos(angle), cy + r * math.sin(angle)))]
-    old_tip = [(tip_text, (cx, cy - drawing.HALF_OD))]
-    new_tip = [(tip_text, (cx, cy + drawing.HALF_OD))]
+    flat_x = (spec.BORE_AF - spec.BORE_DIA / 2) * drawing.VIEW_SCALE[0] / (
+        1000 * drawing.VIEW_SCALE[1]
+    )
+    af = [(af_text, (cx + flat_x, cy))]
+    # The broken leader leaves the text's near end aimed at the centre
+    # ("65.11 +/-0.1" is 28 mm wide on the round-bore sheet).
+    near_end = (tip_text[0] + 0.014, tip_text[1])
+    aim = math.atan2(near_end[1] - cy, near_end[0] - cx)
+    rim = (math.cos(aim) * drawing.HALF_OD, math.sin(aim) * drawing.HALF_OD)
+    old_tip = [(near_end, (cx - rim[0], cy - rim[1]))]
+    new_tip = [(near_end, (cx + rim[0], cy + rim[1]))]
     finish = [(drawing.FINISH_SYMBOL, drawing.FINISH_ATTACH)]
+    reach = drawing.HALF_OD + drawing.SECTION_LINE_OVERRUN
+    cutting_line = [((cx - reach, cy), (cx + reach, cy))]
     assert leaders.distance_to_point(old_tip[0], (cx, cy)) < drawing.TIP_DIA_KEEP_OUT
     leaders.assert_leaders_clear(
-        {"OutsideDia": new_tip, "BoreDia": bore, "BoreFinish": finish},
+        {"OutsideDia": new_tip, "BoreDia": bore, "BoreAF": af, "BoreFinish": finish},
         centre=(cx, cy),
         keep_out={"OutsideDia": drawing.TIP_DIA_KEEP_OUT},
         lands_within={
             "OutsideDia": drawing.TIP_DIA_LANDING,
             "BoreDia": drawing.BORE_LANDING,
+            "BoreAF": drawing.BORE_LANDING,
             "BoreFinish": drawing.BORE_LANDING,
         },
         label="gear bore layout",
     )
+    leaders.assert_leaders_clear(
+        {
+            "OutsideDia": new_tip,
+            "BoreDia": bore,
+            "BoreFinish": finish,
+            "SectionLine": cutting_line,
+        },
+        centre=(cx, cy),
+        keep_out={},
+        lands_within={
+            "OutsideDia": drawing.TIP_DIA_LANDING,
+            "BoreDia": drawing.BORE_LANDING,
+            "BoreFinish": drawing.BORE_LANDING,
+            "SectionLine": drawing.SECTION_LINE_LANDING,
+        },
+        label="gear leaders vs A-A",
+    )
+    # The cut runs along the bore axis through the flat: the tip leader stays
+    # above it, the bore and finish leaders below it.
+    assert min(new_tip[0][0][1], new_tip[0][1][1]) > cy + 0.005
+    for name, segments in (("BoreDia", bore), ("BoreFinish", finish)):
+        assert max(segments[0][0][1], segments[0][1][1]) < cy, name

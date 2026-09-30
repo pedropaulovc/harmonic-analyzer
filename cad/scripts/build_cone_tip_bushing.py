@@ -1,11 +1,11 @@
 r"""Reproduction script: cone tip bushing (item 5, v4_t00471 / 7:49).
 
-Small brass bushing on the cone shaft's 1/16" tip journal, between the
-smallest (6T) gear and the tip block: the axial spacer the adjuster
-screw loads against, part of the end-play takeup stack (bushing ->
-partially hollow adjuster screw -> pinch-locked block).
+Small brass thrust spacer between T006 and the feeler-set tip block, on the
+continuous D-flat of the 1/16-in shaft tip. Its round bore fits over the flat
+and can run on the remaining cylindrical arc; the thrust faces bound the
+gear stack's north end play.
 
-Plain sleeve: O6 x 4 long, 1/16" bore, extruded from the Top plane
+Plain sleeve: Ø6 x 4 long, round 1/16-in bore, extruded from the Top plane
 (the assembly lays it along the shaft like the gears).
 
 Run (SolidWorks already open)::
@@ -61,16 +61,14 @@ MATERIAL = "Brass"
 
 OD = OUTER_DIA  # spec nominal; the assembly reads BORE_DIA/LENGTH from here too
 
-# The bore over the shaft's tip journal is this part's ONE critical fit, and a
-# running fit exists only if the size limits on BOTH mating features are
-# narrower than the clearance band it claims (cad/docs/tolerance-policy.md
-# step 6b). So the band is DERIVED -- never a per-part number -- from the
-# named fit class (cone-tip-bushing.yaml: shaft_in_bushing) and the journal's
-# own published limits: bore_min = journal_max + clearance_min, bore_max =
-# journal_min + clearance_max. Move either input and this moves with it. It
-# lives in the BUILD script, not in the shared spec: reading a fit class in
-# cone_tip_bushing_spec would put tolerances.yaml in the import closure of
-# the drawing, and only the part needs the limits.
+# The bore around the shaft's D-flat tip is this part's ONE critical fit. Its
+# remaining cylindrical arc can run against the round bore; the diameter
+# limits on both mating features must preserve the named clearance band
+# (cad/docs/tolerance-policy.md step 6b). The bore band is DERIVED from
+# shaft_in_bushing and the shaft's terminal land diameter: bore_min =
+# diameter_max + clearance_min; bore_max = diameter_min + clearance_max.
+# Move either input and this moves with it. Keep the fit-class read in the
+# part build, not the pure drawing spec.
 _CLEARANCE_MIN, _CLEARANCE_MAX = (
     float(value)
     for value in _config.fit("shaft_in_bushing")["diametral_clearance_mm"]

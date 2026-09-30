@@ -872,26 +872,79 @@ def _datum_b_frame_clears_the_notes(tag_y: float) -> bool:
     return frame_bottom >= drawing.NOTES_ANCHOR[1] + drawing._DATUM_NOTES_CLEARANCE - 1e-12
 
 
-def _journal_axis_text_clears_the_spacing_line(text_x: float) -> bool:
-    right = text_x + drawing._JOURNAL_AXIS_TEXT_RIGHT
-    line_x = drawing.JOURNAL_KEEP["CrankAboveCone"][0]
-    return right <= line_x - drawing._TEXT_LINE_CLEARANCE + 1e-12
+def _journal_sheet(text_box, spacing_segments):
+    return SimpleNamespace(
+        annotations=(
+            layout.AnnotationGeometry(
+                label="JournalAxisY", kind="dim", owner="v", text_boxes=(text_box,)
+            ),
+            layout.AnnotationGeometry(
+                label="CrankAboveCone",
+                kind="dim",
+                owner="v",
+                segments=tuple(spacing_segments),
+            ),
+        )
+    )
 
 
-def test_datum_b_and_the_33_37_text_clear_what_crossed_them() -> None:
+# The 8f4aea333 control's audit: text [172.0,154.2]..[208.0,157.7] mm, crossed
+# by CrankAboveCone's line (208.0,150.4)->(208.0,170.0) mm.
+_CONTROL_TEXT = layout.Box(0.1720, 0.1542, 0.2080, 0.1577)
+_SPACING_LINE = layout.Segment(0.2080, 0.1504, 0.2080, 0.1700, "line")
+
+
+def test_datum_b_frame_clears_what_crossed_it() -> None:
     """Leaf w3-1026 (layout check with #1026's degenerate-line fix): datum B's
-    frame sat on the manufacturing notes, and the crank spacing's extension
-    line at x 208.0 crossed the 33.37 text.  Both placements now derive from
-    the measured extents; the old ones are the positive control."""
+    frame sat on the manufacturing notes.  The placement now derives from the
+    measured extents; the old one is the positive control."""
     assert not _datum_b_frame_clears_the_notes(drawing._front_y(-9.0))
     assert _datum_b_frame_clears_the_notes(drawing.DATUM_B_TAG_XY[1])
     # Still below the foot seat it tags.
     assert drawing.DATUM_B_TAG_XY[1] < drawing._front_y(0.0)
-    assert not _journal_axis_text_clears_the_spacing_line(0.190)
-    assert _journal_axis_text_clears_the_spacing_line(
-        drawing.JOURNAL_TEXT_OFFSETS["JournalAxisY"][0]
+
+
+def test_33_37_text_is_placed_from_the_box_the_check_reads() -> None:
+    """The audit's box width follows the sheet's calibrated glyph advance
+    (34.0 mm on w3-1026, 36.0 mm on the 8f4aea333 control), so the shift comes
+    from the box itself: the control's crossed box moves 2 mm left, and a
+    narrower box moves right up to the same clearance."""
+    box, line_x, shift = drawing.journal_axis_text_shift(
+        _journal_sheet(_CONTROL_TEXT, [_SPACING_LINE])
     )
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "JOURNAL_TEXT_OFFSETS,\n" in source
-    assert "position=DATUM_B_TAG_XY," in source
-    assert '"Manufacturing Notes", *NOTES_ANCHOR)' in source
+    assert box == _CONTROL_TEXT
+    assert line_x == pytest.approx(0.2080)
+    assert shift == pytest.approx(-0.002)
+
+    narrow = layout.Box(0.1720, 0.1542, 0.2060 - 0.005, 0.1577)
+    _, _, shift = drawing.journal_axis_text_shift(
+        _journal_sheet(narrow, [_SPACING_LINE])
+    )
+    assert shift == pytest.approx(0.005)
+
+
+def test_33_37_text_takes_the_nearest_line_beside_it() -> None:
+    """Only a vertical line that runs alongside the text and lies right of its
+    left edge bounds it; the nearest such line wins."""
+    segments = [
+        # Below the text: does not run alongside it.
+        layout.Segment(0.2000, 0.1400, 0.2000, 0.1530, "line"),
+        # Left of the text's left edge.
+        layout.Segment(0.1700, 0.1500, 0.1700, 0.1700, "line"),
+        # Horizontal.
+        layout.Segment(0.1900, 0.1560, 0.2200, 0.1560, "line"),
+        layout.Segment(0.2150, 0.1500, 0.2150, 0.1700, "line"),
+        _SPACING_LINE,
+    ]
+    _, line_x, _ = drawing.journal_axis_text_shift(
+        _journal_sheet(_CONTROL_TEXT, segments)
+    )
+    assert line_x == pytest.approx(0.2080)
+
+
+def test_33_37_placement_fails_loud_without_its_line() -> None:
+    """With no spacing line alongside, the placement premise is gone: it must
+    raise rather than leave the text wherever it landed."""
+    below = layout.Segment(0.2080, 0.1400, 0.2080, 0.1530, "line")
+    with pytest.raises(RuntimeError, match="no vertical CrankAboveCone line"):
+        drawing.journal_axis_text_shift(_journal_sheet(_CONTROL_TEXT, [below]))

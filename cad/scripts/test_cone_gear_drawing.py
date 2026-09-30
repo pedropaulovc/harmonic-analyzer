@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import re
 from pathlib import Path
 
@@ -39,7 +40,7 @@ def test_every_configuration_has_one_complete_sheet_and_native_scale() -> None:
         numerator, denominator = drawing.SHEET_SCALES[name]
         drawn_od = drawing.outside_dia_mm(teeth) * numerator / denominator
         # The smallest six-tooth member is necessarily limited by the common
-        # 6.5 mm face width; every other face lands in the useful 40-95 mm band.
+        # 6.8887 mm face width; every other face lands in the useful 40-95 mm band.
         assert 30.0 < drawn_od < 95.0
         assert drawing.rendered_half_od(teeth) == pytest.approx(drawn_od / 2000.0)
 
@@ -51,19 +52,34 @@ def test_part_and_drawing_share_the_complete_native_dimension_contract() -> None
         "BlankDia",
         "FaceWidth",
         "BoreCutDia",
+        "BoreAF",
+        "BoreFlatClock",
         "ToothThickness",
         "FloorDia",
     }
     for teeth in spec.CONFIGURATION_TEETH:
-        kept = set(drawing.front_keep(teeth)) | set(drawing.right_keep(teeth))
-        assert kept == marked
+        views = (
+            drawing.front_keep(teeth),
+            drawing.right_keep(teeth),
+            drawing.bore_view_keep(teeth),
+        )
+        kept = [name for keep in views for name in keep]
+        # Every marked dimension prints exactly once per sheet.
+        assert sorted(kept) == sorted(marked)
+        # The whole D-bore prints in the bore view, and only there.
+        assert set(drawing.bore_view_keep(teeth)) == spec.DRAWING_DIMENSIONS["BoreProfile"]
 
 
-def test_model_owns_precision_for_both_fit_dimensions() -> None:
+def test_model_owns_precision_for_every_printed_dimension() -> None:
     assert spec.DRAWING_PRECISION_BY_NAME == {
         "BlankDia": 2,
-        "FaceWidth": 2,
+        # 6.8887 is floor4(SEAT_PITCH): fewer places would print a face that
+        # rounds up past the 6.8888 seat pitch.
+        "FaceWidth": 4,
         "BoreCutDia": 3,
+        # The AF band is 0.010 wide; three places print both limits exactly.
+        "BoreAF": 3,
+        "BoreFlatClock": 1,
         "ToothThickness": 3,
         # The T006 floor window is 0.049 wide: two places would print the
         # upper limit rounded up (probe 834-gapfloor-c301 showed .049 as .05).
@@ -84,15 +100,15 @@ def test_tip_diameter_carries_its_own_mesh_depth_band() -> None:
     )
 
 
-def test_face_width_carries_the_cone_set_z_band() -> None:
-    # User ruling (#914, 2026-09-25): the .X +/-0.8 face let a 5.2 gear eat
-    # the cone set's whole axial allowance against the drum; +/-0.10 leaves
-    # ~0.425 after the bank's 1.175.  Applied on the model like the others.
-    assert spec.FACE_WIDTH_BAND == (0.10, -0.10)
+def test_face_width_fills_the_seat_pitch_without_crossing_it() -> None:
+    # Solid touching stack: twenty gears end to end on SEAT_PITCH centres.
+    # The nominal is the seat pitch floored to 4 places, so it never prints
+    # longer than the pitch; cone_gear_stack owns the stack's band.
+    assert spec.FACE_WIDTH == pytest.approx(6.8887, abs=1e-12)
+    assert spec.FACE_WIDTH <= spec.SEAT_PITCH < spec.FACE_WIDTH + 1e-4
+    assert spec.FACE_WIDTH_BAND == (0.025, -0.025)
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert '"Blank", "FaceWidth", *deviations(FACE_WIDTH_BAND)' in source
-    # still inside the 6.889 seat pitch at the upper limit
-    assert spec.FACE_WIDTH + spec.FACE_WIDTH_BAND[0] < 6.889 - 0.5
 
 
 def test_each_configuration_sheet_carries_its_own_drawing_number() -> None:
@@ -107,17 +123,19 @@ def test_each_configuration_sheet_carries_its_own_drawing_number() -> None:
     assert '"Number": configuration_number(part_number, teeth)' in source
 
 
-def test_bore_band_is_the_derived_retained_joint_band() -> None:
-    # Main (2026-09-25): every bonded bore takes the shared retained-joint fit
-    # against its land (retained_joint_fit); the family's one BoreCutDia band
-    # is +0.050/+0.025 (test_cone_gear_seat_fit proves every seat).
+def test_bore_bands_are_the_derived_seat_fit_bands() -> None:
+    # Every gear slides onto its D-flat land (gear_seat_fit): the family's one
+    # BoreCutDia band is +0.050/+0.025 and its one BoreAF band +0.020/+0.010
+    # (test_cone_gear_seat_fit proves every seat at the print extremes).
     assert part.BORE_DIA_BAND is spec.BORE_DIA_BAND
     assert spec.BORE_DIA_BAND == (0.05, 0.025)
+    assert spec.BORE_AF_BAND == pytest.approx((0.02, 0.01))
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert '"BoreProfile", "BoreCutDia", *deviations(BORE_DIA_BAND)' in source
+    assert '"BoreProfile", "BoreAF", *deviations(BORE_AF_BAND)' in source
 
-    # Every configured bore seats on a published cone-shaft land and retains
-    # the approved enlarged 1/16-inch tip journal at T006.
+    # Every configured bore seats on a published cone-shaft land; T006 and
+    # T012 slide straight onto the flatted 1/16-inch tip land.
     assert spec.bore_dia_mm(6) == pytest.approx(1.5875)
     assert spec.FAMILY_BORES_MM[6] == pytest.approx(
         cone_gear_shaft_spec.SECTION_DIAS[-1]
@@ -253,25 +271,27 @@ def test_configuration_owned_bores_and_title_block_alloys_cover_the_family() -> 
         assert spec.material_specification(teeth) == expected
 
 
-def test_notes_state_only_the_plain_bore_with_no_method_or_review_record() -> None:
-    # Rule 6: the joint is a method (it moves to the drive-train assembly
-    # step, which imports ATTACHMENT).  The U42/U40 shortfalls print once
-    # each, as GEAR DATA rows (test_named_shortfalls_print_as_facts_on_their_
-    # sheets), so the notes never repeat them.  Every sheet prints the same
-    # three lines.
+def test_notes_state_no_bore_joint_method_or_review_record() -> None:
+    # Rule 6: the D-bore and its fit print as native dimensions in the bore
+    # view; no joint, keyway or retaining method is named.  The U42/U40
+    # shortfalls print once each, as GEAR DATA rows (test_named_shortfalls_
+    # print_as_facts_on_their_sheets), so the notes never repeat them.  Every
+    # sheet prints the same two lines.
     expected = [
         "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS.",
         "MAKE ONE GEAR FROM EACH SHEET IN THIS PACKAGE.",
-        "PLAIN BORE, NO KEYWAY.",
     ]
     assert notes.DRAWING_NOTES.splitlines() == expected
+    assert not hasattr(notes, "ATTACHMENT")
     for teeth in spec.CONFIGURATION_TEETH:
         text = notes.drawing_notes(teeth)
         assert text.splitlines() == expected
         for review_or_method in (
-            notes.ATTACHMENT,
             "SOLDER",
+            "BRAZE",
             "LOCTITE",
+            "BOND",
+            "KEYWAY",
             "AT ASSEMBLY",
             "EXCEPTION",
             "BOOK FIDELITY",
@@ -283,9 +303,7 @@ def test_notes_state_only_the_plain_bore_with_no_method_or_review_record() -> No
             assert unsupported not in text
         for retired in ("RUNOUT", "DATUM", "+/-", "PITCH DIA="):
             assert retired not in text
-    assert notes.ATTACHMENT == "SOLDER, SILVER-BRAZE OR LOCTITE 638/648"
     assert notes.CYLINDER_MATE_NUMBER == _config.parts("cylinder-gear")["number"]
-    assert notes.SHAFT_MATE_NUMBER == _config.parts("cone-gear-shaft")["number"]
     source = Path(part.__file__).read_text(encoding="utf-8")
     assert '"Manufacturing Notes": drawing_notes(teeth)' in source
 
@@ -360,7 +378,8 @@ def test_every_sheet_layout_keeps_views_dimensions_and_title_block_separate() ->
         half_face = drawing.rendered_half_face_width(teeth)
         front = drawing.front_keep(teeth)
         right = drawing.right_keep(teeth)
-        for x, y in (*front.values(), *right.values()):
+        bore = drawing.bore_view_keep(teeth)
+        for x, y in (*front.values(), *right.values(), *bore.values()):
             assert 0.012 < x < 0.420
             assert 0.012 < y < 0.267
             assert not (x > 0.216 and y < 0.070)
@@ -390,29 +409,18 @@ def test_every_sheet_layout_keeps_views_dimensions_and_title_block_separate() ->
         else:
             assert text_x - text_half >= drawing.RIGHT_CENTER[0] + half_face + clearance
             assert text_x + text_half < drawing.ISO_CENTER[0] - half_od - 0.005
-        assert drawing.face_width_text_inside(teeth) == (teeth <= 24)
         # Thickness text (~65 mm callout centred on its x) sits below the gear,
         # left of the side view and its face-width dimension.
         ctt_x, ctt_y = front["ToothThickness"]
         assert ctt_y < drawing.FRONT_CENTER[1] - half_od - 0.015
         assert ctt_x + 0.0325 < drawing.RIGHT_CENTER[0] - half_face - 0.020
-        assert ctt_x - 0.0325 > front["BoreCutDia"][0] + 0.0165 + 0.010
+        assert ctt_x - 0.0325 > bore["BoreCutDia"][0] + _BORE_DIA_TEXT_HALF_WIDTH + 0.010
         # The bore finish sits above-left of the gear, inside the border and
         # below the manufacturing notes.
         (edge_x, edge_y), (symbol_x, symbol_y) = drawing.bore_finish_xy(teeth)
         assert edge_x < drawing.FRONT_CENTER[0] and edge_y > drawing.FRONT_CENTER[1]
         assert 0.015 < symbol_x < drawing.FRONT_CENTER[0] - half_od * 0.7
         assert drawing.FRONT_CENTER[1] + half_od * 0.7 < symbol_y < 0.225
-        assert front["BoreCutDia"][0] < drawing.FRONT_CENTER[0] - half_od
-        assert front["BoreCutDia"][0] == pytest.approx(
-            drawing.BORE_CALLOUT_LANE_X
-        )
-        assert (
-            drawing.FRONT_CENTER[0]
-            - half_od
-            - drawing.BORE_CALLOUT_LANE_X
-            >= 0.008
-        )
         assert front["ToothThickness"][0] > drawing.FRONT_CENTER[0] + half_od
         # The gap-floor limit stack (two 3-place values plus "GAP FLOOR",
         # ~17 x 11 mm) stands right of the tip circle, above the thickness
@@ -445,6 +453,103 @@ def test_every_sheet_layout_keeps_views_dimensions_and_title_block_separate() ->
         assert floor_y >= usual - 1e-12
         if floor_y > usual:
             assert shelf_y - tail_y == pytest.approx(_drawing_leaders.ARROW_TEXT_CLEARANCE)
+
+
+# Text half-widths in the bore view, sheet metres: the stacked diameter
+# (~33 mm, measured when its callout still read "REAM THRU"; "THRU" is
+# narrower) and the clock value over "TO TOOTH CENTERLINE" (~42 mm,
+# estimated at the fleet's 2.5 mm text), and the two-line title.
+_BORE_DIA_TEXT_HALF_WIDTH = 0.0165
+_BORE_CALLOUT_TEXT_HALF_WIDTH = 0.021
+_BORE_TEXT_HALF_HEIGHT = 0.005
+_BORE_TITLE_HEIGHT = 0.008
+_THICKNESS_TEXT_HALF_WIDTH = 0.0325
+# The layout audit compares IView.GetOutline boxes, which pad the geometry:
+# ~5.5 mm round an uncropped view (T084 front [54.8, 99.8, 155.2, 200.2]
+# about a 44.66 mm half tip circle) and 10.1-10.75 mm past a bore view's crop
+# circle (T006-T024 and T030+ sheets; 11.3 is taken as the pad), inside the
+# sheet format's 12.7 mm zone band (_drawing_common.sheet_drawable_region;
+# farm run 20260929T061328212Z at 70d2e52).
+_FRONT_OUTLINE_PAD = 0.0056
+_CROPPED_OUTLINE_PAD = 0.0113
+_ZONE_MARGIN = 0.0127
+
+
+def test_bore_view_enlarges_every_d_bore_clear_of_its_neighbours() -> None:
+    ladder = [n / d for n, d in drawing.BORE_VIEW_SCALE_LADDER]
+    cx, cy = drawing.BORE_VIEW_CENTER
+    for teeth in spec.CONFIGURATION_TEETH:
+        numerator, denominator = drawing._SCALE_BY_TEETH[teeth]
+        sheet_ratio = numerator / denominator
+        view_numerator, view_denominator = drawing.bore_view_scale(teeth)
+        ratio = view_numerator / view_denominator
+        bore = spec.bore_dia_mm(teeth)
+        # Enlarged past the sheet, to the smallest ladder ratio that renders
+        # the bore legibly, with the flat at least 2.5 mm deep on paper.
+        assert ratio > sheet_ratio
+        assert bore * ratio / 1000.0 >= drawing.BORE_VIEW_BORE_MIN
+        assert all(
+            bore * smaller / 1000.0 < drawing.BORE_VIEW_BORE_MIN
+            for smaller in ladder
+            if sheet_ratio < smaller < ratio
+        )
+        depth = (bore / 2.0 - spec.bore_flat_offset_mm(teeth)) * ratio / 1000.0
+        assert depth >= 0.0025, teeth
+        crop = drawing.bore_view_crop_radius(teeth)
+        assert crop > bore * ratio / 2000.0
+        # The crop circle stands inside the border and clear of the front
+        # view's tip circle, and the boxes the audit compares stay apart: the
+        # views overlap in x, so the bore view's box must sit under the front
+        # view's on every sheet (T084 met it at y 0.066 with a 7 mm margin).
+        assert cx - crop - _CROPPED_OUTLINE_PAD > _ZONE_MARGIN
+        assert cy - crop - _CROPPED_OUTLINE_PAD > _ZONE_MARGIN
+        half_od = drawing.rendered_half_od(teeth)
+        assert math.dist((cx, cy), drawing.FRONT_CENTER) > crop + half_od + 0.010
+        front_bottom = drawing.FRONT_CENTER[1] - half_od - _FRONT_OUTLINE_PAD
+        assert cy + crop + _CROPPED_OUTLINE_PAD + 0.002 < front_bottom, teeth
+        keep = drawing.bore_view_keep(teeth)
+        for x, y in keep.values():
+            assert math.dist((x, y), drawing.FRONT_CENTER) > half_od + 0.015
+        dia_x, dia_y = keep["BoreCutDia"]
+        assert dia_x - _BORE_DIA_TEXT_HALF_WIDTH > 0.012
+        assert dia_y - _BORE_TEXT_HALF_HEIGHT > cy + crop - 0.003
+        # The across-flat text stands wholly right of the flat's witness,
+        # left of the title block, above the title, which stays inside the
+        # border, and under the clock's text.
+        af_x, af_y = keep["BoreAF"]
+        flat = spec.bore_flat_offset_mm(teeth) * ratio / 1000.0
+        assert af_x - drawing.BORE_VIEW_AF_HALF_WIDTH > cx + flat + 0.002
+        assert af_x + drawing.BORE_VIEW_AF_HALF_WIDTH < 0.216
+        assert af_y < cy - crop
+        title_top = drawing.bore_view_label_top(teeth)
+        assert af_y - 2.0 * _BORE_TEXT_HALF_HEIGHT > title_top
+        assert title_top - _BORE_TITLE_HEIGHT > _ZONE_MARGIN + 0.001
+        assert af_y + 2.0 * _BORE_TEXT_HALF_HEIGHT < keep["BoreFlatClock"][1] - 0.010
+        # The clock text stands wholly right of the circle and clear of the
+        # thickness callout under the front view.
+        clock_x, clock_y = keep["BoreFlatClock"]
+        assert clock_x - _BORE_CALLOUT_TEXT_HALF_WIDTH > cx + crop
+        ctt_x, ctt_y = drawing.front_keep(teeth)["ToothThickness"]
+        assert (
+            ctt_x - _THICKNESS_TEXT_HALF_WIDTH
+            > clock_x + _BORE_CALLOUT_TEXT_HALF_WIDTH + 0.005
+            or ctt_y - clock_y > 4.0 * _BORE_TEXT_HALF_HEIGHT
+        ), teeth
+        # The clock's arc centres where the flat crosses the axis and swings
+        # through its text, in the quadrant right of the flat and above the
+        # axis: clear of the diameter's upper-left lane and under the front
+        # view. Left in the sketch's upper-left quadrant, it crossed the
+        # diameter's shoulder on every 4:1 sheet.
+        vx, vy = drawing.bore_flat_vertex(teeth)
+        assert (vx, vy) == pytest.approx((cx + flat, cy))
+        assert clock_x > vx and clock_y > vy
+        reach = math.dist((vx, vy), (clock_x, clock_y))
+        assert dia_x + _BORE_DIA_TEXT_HALF_WIDTH < vx - 0.005
+        assert vy + reach + 0.003 < front_bottom, teeth
+        assert drawing.bore_view_label(teeth).splitlines() == [
+            "BORE PROFILE",
+            f"SCALE {view_numerator:g} : {view_denominator:g}",
+        ]
 
 
 def test_dimension_arrow_length_is_read_from_the_drawing() -> None:
@@ -583,18 +688,13 @@ def test_a_rejected_configuration_limit_fails_the_part_build(
 
 def test_only_the_front_view_shows_the_authoring_sketches() -> None:
     """Both sketches' dimensions live on the front view, which takes the
-    opt-in import; the side and iso views show the part as saved."""
+    opt-in import; the side, iso and bore views show the part as saved."""
     for sketch in (spec.TOOTH_REFERENCE_SKETCH, spec.GAP_FLOOR_SKETCH):
         owned = spec.DRAWING_DIMENSIONS[sketch]
         for teeth in spec.CONFIGURATION_TEETH:
             assert owned <= set(drawing.front_keep(teeth))
             assert not owned & set(drawing.right_keep(teeth))
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    body = source[source.index("async def build(") :]
-    assert body.count("hidden_sketches.curate_view_dimensions(") == 1
-    call = body[body.index("hidden_sketches.curate_view_dimensions(") :]
-    assert call.index("front,") < call.index(")")
-    assert "BlankSketch" not in source
+            assert not owned & set(drawing.bore_view_keep(teeth))
 
 
 # Measured by the layout audit on the T006 sheet (layoutcal2, cone-gear.json):
@@ -629,10 +729,11 @@ def test_invalid_family_member_is_rejected() -> None:
         notes.gear_data(7)
 
 
-def test_root_to_bore_webs_meet_u27_except_the_named_t006() -> None:
+def test_root_to_bore_webs_meet_rule_12_except_the_named_t006() -> None:
     # Policy rule 12 at the worst case: the printed MIN floor diameter against
-    # the maximum bore.  U40 (user): T012/T018/T024 moved one shaft land down
-    # to meet the target; T006 is the one named exception.
+    # the maximum bore.  The D-flat only adds material on +X, so the round
+    # side is the thinnest web.  U40 (user): T012/T018/T024 moved one shaft
+    # land down to meet the target; T006 is the one named exception.
     upper = part.BORE_DIA_BAND[0]
     for teeth in spec.CONFIGURATION_TEETH:
         web = spec.floor_radius_mm(teeth) - (spec.bore_dia_mm(teeth) + upper) / 2.0
@@ -641,6 +742,10 @@ def test_root_to_bore_webs_meet_u27_except_the_named_t006() -> None:
             assert web == pytest.approx(spec.WEB_EXCEPTIONS_MM[teeth], abs=0.0005)
             continue
         assert web >= spec.MACHINED_WEB_TARGET_MM, teeth
+    # The flat is a chord of the round bore on the axis's +X side: it only
+    # ever leaves material, so no web is thinner than the round side's.
+    for teeth in spec.CONFIGURATION_TEETH:
+        assert 0.0 < spec.bore_flat_offset_mm(teeth) < spec.bore_dia_mm(teeth) / 2.0
     # T012's MIN floor is its web limit: 2.05, one printed step deeper breaks it.
     t012_bore = (spec.bore_dia_mm(12) + upper) / 2.0
     assert spec.floor_radius_mm(12) - t012_bore >= 2.05
@@ -658,19 +763,11 @@ def test_root_to_bore_webs_meet_u27_except_the_named_t006() -> None:
 
 def test_dimensions_record_gear_bores_row_follows_the_spec() -> None:
     # The narrative record is read by no part, so nothing rebuilds when the
-    # bores move: it kept the pre-S1 map (9.5 on T024-T120) after U40.
-    inch = {0.0625: "1/16", 0.125: "1/8", 0.25: "1/4", 0.375: "3/8"}
+    # bores move: it kept the pre-S1 map (9.5 on T024-T120) after U40.  It
+    # must name every round seat, its gears and its across-flat.
     groups: dict[float, list[int]] = {}
     for teeth in spec.CONFIGURATION_TEETH:
         groups.setdefault(spec.bore_dia_mm(teeth), []).append(teeth)
-    cells = []
-    for bore, teeth in sorted(groups.items(), reverse=True):
-        span = f"T{teeth[0]:03d}" if len(teeth) == 1 else f"T{teeth[0]:03d}–T{teeth[-1]:03d}"
-        cells.append(f'{bore + 1e-9:.3f} ({inch[round(bore / spec.MM_PER_IN, 4)]}") {span}')
-    expected = (
-        "snug on the stepped shaft (M6.7 perpendicular seats) AND inside each "
-        "gear's root circle: " + "; ".join(cells) + "; no keyway"
-    )
     record = yaml.safe_load(
         (Path(part.__file__).resolve().parents[1] / "config" / "dimensions.yaml")
         .read_text(encoding="utf-8")
@@ -686,4 +783,10 @@ def test_dimensions_record_gear_bores_row_follows_the_spec() -> None:
                 rows.append(node)
             stack.extend(node)
     assert len(rows) == 1
-    assert rows[0][1] == expected
+    row = rows[0][1]
+    printed_bores = sorted({float(value) for value in re.findall(r"Ø(\d+\.\d+)", row)})
+    assert printed_bores == pytest.approx(sorted(groups))
+    for bore, teeth in groups.items():
+        span = f"T{teeth[0]:03d}" if len(teeth) == 1 else f"T{teeth[0]:03d}–T{teeth[-1]:03d}"
+        assert span in row, span
+        assert f"{spec.bore_flat_af_mm(teeth[0]):.3f}" in row, bore

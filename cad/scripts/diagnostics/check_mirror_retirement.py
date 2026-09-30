@@ -549,7 +549,7 @@ for j in range(20):
     expect(
         DT,
         f"cone-gear-{j + 1}",
-        # BDT: seed at the shifted T120 station, narrowed from the south face.
+        # BDT: seed at the shifted T120 station, grown from the south face.
         on_shaft(
             d.SHAFT_T120_STATION
             + d.GEAR_AXIS_SHIFT

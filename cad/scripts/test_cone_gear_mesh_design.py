@@ -32,6 +32,9 @@ import build_drive_train_assembly as assembly
 import cone_gear_notes
 import cone_gear_shaft_spec
 import cone_gear_spec as spec
+import cone_gear_stack
+import cone_shaft_land_bands
+import cone_stack_end_play
 import cylinder_gear_notes
 import cylinder_gear_spec as drum
 
@@ -47,10 +50,10 @@ DRUM_FLOOR_R = spec.chord_floor_radius_mm(120, thickness_mm=DRUM_THICKNESS)
 BASE_PITCH = math.pi * M * math.cos(PRESSURE_ANGLE)
 
 # Radial play.  Runouts turn with their gear, so they close the mesh at some
-# angle; float can open it.  The cone runout is sized for the soldered seats
-# #839 prints (0/-0.05), the looser of that and the current shaft land band.
-SEAT_LAND_LOWER = min(cone_gear_shaft_spec.GEAR_SEAT_BAND[1], -0.05)
-CONE_RUNOUT = (spec.BORE_DIA_BAND[0] - SEAT_LAND_LOWER) / 2.0
+# angle; float can open it.  Every gear slides onto its D-flat land
+# (gear_seat_fit), so the cone runout is half the loosest printed slip fit:
+# the bore's upper limit over the gear-seat land's lower limit.
+CONE_RUNOUT = (spec.BORE_DIA_BAND[0] - cone_shaft_land_bands.GEAR_SEAT_BAND[1]) / 2.0
 DRUM_RUNOUT = drum.BORE_DIAMETRAL_CLEARANCE_MM[1] / 2.0
 _JOURNAL = max(_config.fit("shaft_in_bushing")["diametral_clearance_mm"]) / 2.0
 RUNOUT = CONE_RUNOUT + DRUM_RUNOUT
@@ -298,28 +301,34 @@ def test_drive_train_clearance_scans_use_the_printed_cone_tip() -> None:
     assert assembly._T120_SOUTH - pinion_north >= 0.25
 
 
-# Face-width band (#914 user ruling, 2026-09-25) against the two axial stacks
-# it sits in.  The #834 machinist review asked what needs +/-0.10.
-# * Upper limit -- neighbour air.  Adjacent gears sit one seat pitch apart and
-#   each is soldered to its station within +/-0.13 (#914 user ruling), so two
-#   gears at the upper limit, stations closing, keep
-#   SEAT_PITCH - upper - 2 x 0.13.  At the .X band (6.8) that is -0.17: the
-#   gears would collide, so the face needs a band tighter than .X.
-# * Lower limit -- the drum's engaged zone, [-0.75, +1.35] about the narrowed
-#   gear's centre (cone_gear_spec), against the in-service cone/drum stack
-#   retention743 re-derived for R1 on 2026-09-26 with the fit-up centring:
-#   +0.55 north, -1.10 south (dt-logs/handoffs/retention743-routing-notes.md).
-SOLDER_STATION_TOL = 0.13
-ENGAGED_ZONE = (-0.75, 1.35)
+# Face-width lower limit against the axial stacks the gear sits in.  The
+# drum's engaged zone was [-0.75, +1.35] about the 6.0 gear's centre, 0.25
+# north of the 6.5 reference centre every station is laid out on; the solid
+# stack's gear grew SOUTH to the seat pitch, so its centre is
+# (reference - face)/2 south of that reference and the zone moves north
+# about it by the difference.
+# * The drum side keeps the in-service cone/drum stack retention743 re-derived
+#   for R1 on 2026-09-26: +0.55 north, -1.10 south.
+# * The cone side is the solid stack: any face's station band
+#   (cone_gear_stack.STATION_BAND, 64T included), the collar web's printed
+#   band it stands on, and in service the stack's float north off the collar
+#   (cone_stack_end_play.STACK_FLOAT).
+# Both margins keep the fleet's MARGIN_SPARE.
+_OLD_CENTRE_NORTH = (assembly.CONE_FACE_STATION_REFERENCE - 6.0) / 2.0
+_NEW_CENTRE_NORTH = (assembly.CONE_FACE_STATION_REFERENCE - spec.FACE_WIDTH) / 2.0
+ENGAGED_ZONE = tuple(
+    edge + _OLD_CENTRE_NORTH - _NEW_CENTRE_NORTH for edge in (-0.75, 1.35)
+)
 CONE_DRUM_Z_STACK = (-1.10, 0.55)
 
 
-def test_face_width_band_holds_both_axial_stacks() -> None:
-    upper = spec.FACE_WIDTH + spec.FACE_WIDTH_BAND[0]
+def test_face_width_band_holds_the_drum_engaged_zone() -> None:
     lower = spec.FACE_WIDTH + spec.FACE_WIDTH_BAND[1]
-    air = assembly.SEAT_PITCH - upper - 2.0 * SOLDER_STATION_TOL
-    assert air == pytest.approx(0.529, abs=0.001)
-    assert assembly.SEAT_PITCH - (spec.FACE_WIDTH + 0.8) - 2.0 * SOLDER_STATION_TOL < 0.0
-    north = lower / 2.0 - ENGAGED_ZONE[1] - CONE_DRUM_Z_STACK[1]
-    south = lower / 2.0 + ENGAGED_ZONE[0] + CONE_DRUM_Z_STACK[0]
-    assert (round(north, 2), round(south, 2)) == (1.05, 1.10)
+    station_upper, station_lower = cone_gear_stack.STATION_BAND
+    collar = cone_gear_shaft_spec.printed_band("CollarWidth")
+    cone_north = station_upper + collar + cone_stack_end_play.STACK_FLOAT[1]
+    cone_south = -station_lower + collar
+    # A cone gear south of nominal moves the zone north on its face.
+    north = lower / 2.0 - ENGAGED_ZONE[1] - CONE_DRUM_Z_STACK[1] - cone_south
+    south = lower / 2.0 + ENGAGED_ZONE[0] + CONE_DRUM_Z_STACK[0] - cone_north
+    assert min(north, south) >= cone_stack_end_play.MARGIN_SPARE

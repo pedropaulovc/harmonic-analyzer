@@ -19,6 +19,7 @@ import math
 import numpy as np
 import pytest
 
+import _config
 import error_budget as eb
 
 NOMINAL_FIELD = {
@@ -79,7 +80,10 @@ def test_every_toleranced_nominal_is_the_cad_constant(budget, nom):
     budget cannot silently drift from the geometry it tolerances."""
     for key, feat in budget["critical_features"].items():
         if feat["nominal"] is None:
-            assert key in ("cam_phase", "mesh_lag_spread", "station_setting"), key
+            assert key in (
+                "cam_phase", "mesh_lag_spread", "cone_flat_clock",
+                "cone_land_clock", "cone_flat_play", "station_setting",
+            ), key
             continue
         assert key in NOMINAL_FIELD, f"{key}: no Nominal field mapped"
         assert _resolve(feat["nominal"]) == pytest.approx(
@@ -1186,6 +1190,148 @@ def test_reference_inputs_stay_on_the_lifting_side():
     put a bar at a negative station."""
     for name, x in eb.reference_inputs().items():
         assert np.all(x >= 0.0), name
+
+
+def test_cone_flat_phase_follows_gear_ratio_and_print_worst_lever(budget):
+    """The index removes only the Ø9.525-land lag, not differences between
+    flats or the clearance variation between individual gears. The lever is
+    the shortest flat the print accepts: the land at its least diameter and
+    greatest AF, less the title block's edge break on the torque corner
+    (Codex, #1128), unless the least bore flat is shorter still. The residual
+    is booked against the longest unbroken Ø9.525 flat."""
+    import cone_gear_spec
+    import cone_shaft_land_bands
+    import gear_seat_fit
+
+    def chord(diameter, af):
+        radius = diameter / 2.0
+        return math.sqrt(radius**2 - (af - radius) ** 2)
+
+    profiles = eb.phase_profiles()
+    clearance_lo, clearance_hi = gear_seat_fit.FLAT_AF_CLEARANCE
+    mean = (clearance_lo + clearance_hi) / 2.0
+    clock = budget["critical_features"]["cone_flat_clock"]["tolerance"]
+    play = budget["critical_features"]["cone_flat_play"]["tolerance"]
+    assert clock == cone_gear_spec.FLAT_CLOCK_TOLERANCE_DEG
+    assert play == pytest.approx((clearance_hi - clearance_lo) / 2.0)
+    assert gear_seat_fit.FLAT_AF_CLEARANCE == (0.010, 0.030)
+    edge_break = _config.title_block("edge_break")
+    lever_loss = max(edge_break["radius_mm"], edge_break["chamfer_max_mm"])
+    af_upper, af_lower = cone_shaft_land_bands.FLAT_AF_BAND
+    bore_af_upper, _ = gear_seat_fit.flat_bore_af_band(
+        cone_shaft_land_bands.FLAT_AF_BAND
+    )
+
+    reference_upper, _ = cone_shaft_land_bands.SECTION_DIA_BANDS[1]
+    reference_chord = chord(
+        cone_gear_spec.bore_dia_mm(120) + reference_upper,
+        cone_shaft_land_bands.SECTION_FLAT_AF[1] + af_lower,
+    )
+    for section, (band, af, carried) in enumerate(
+        zip(
+            cone_shaft_land_bands.SECTION_DIA_BANDS,
+            cone_shaft_land_bands.SECTION_FLAT_AF,
+            cone_shaft_land_bands.SECTION_CONE_GEAR_TEETH,
+            strict=True,
+        )
+    ):
+        if not carried:
+            assert section == 0 and af is None
+            continue
+        assert af is not None
+        diameter = cone_gear_spec.bore_dia_mm(carried[0])
+        _, lower = band
+        _, bore_lower = gear_seat_fit.seat_bore_band(band)
+        lever = min(
+            chord(diameter + lower, af + af_upper) - lever_loss,
+            chord(diameter + bore_lower, af + bore_af_upper),
+        )
+        for teeth in carried:
+            index = teeth // 6 - 1
+            ratio = teeth / 120.0
+            assert cone_gear_spec.bore_dia_mm(teeth) == pytest.approx(diameter)
+            assert profiles["cone_flat_clock"][0][index] * clock == pytest.approx(
+                math.radians(clock) * ratio
+            )
+            per_unit, residual = profiles["cone_flat_play"]
+            for clearance in (clearance_lo, mean, clearance_hi):
+                phase = (clearance - mean) * per_unit[index] + residual[index]
+                if section == 1:
+                    expected = (clearance - mean) / lever * ratio
+                else:
+                    expected = (clearance / lever - mean / reference_chord) * ratio
+                assert phase == pytest.approx(expected, abs=1e-12)
+            if section == 1:
+                assert residual[index] == pytest.approx(0.0, abs=1e-12)
+            else:
+                assert residual[index] > 0.0
+
+
+def test_shaft_flat_clock_is_printed_and_booked_per_land(budget):
+    """MHA-014's four flats share one clock by note, at the title block's
+    angle, and the budget draws that angle once per land: gears on one land
+    turn together, and the Ø9.525 land (the 64T and T030..T120) is the
+    reference its own clock cannot move."""
+    import cone_gear_shaft_spec
+    import cone_shaft_land_bands
+
+    angle = float(_config.title_block("angular")["value_deg"])
+    assert budget["critical_features"]["cone_land_clock"]["tolerance"] == angle
+    assert "ALL FLATS PARALLEL." in cone_gear_shaft_spec.DRAWING_NOTES.splitlines()
+
+    land = eb.draw_groups()["cone_land_clock"]
+    for carried in cone_shaft_land_bands.SECTION_CONE_GEAR_TEETH:
+        columns = {int(land[teeth // 6 - 1]) for teeth in carried}
+        if 120 in carried:
+            assert columns == {-1}
+            continue
+        assert len(columns) <= 1
+    assert sorted(set(land.tolist()) - {-1}) == [0, 1, 2]
+
+    dev = eb.draw_feature(np.random.default_rng(3), "cone_land_clock", angle, 500, 1)
+    assert dev.shape == (500, eb.N_ELEMENTS)
+    assert np.all(dev[:, 4:] == 0.0)  # T030..T120
+    assert np.array_equal(dev[:, 0], dev[:, 1])  # T006, T012: the tip flat
+    assert not np.array_equal(dev[:, 1], dev[:, 2])
+    assert not np.array_equal(dev[:, 2], dev[:, 3])
+    assert np.max(np.abs(dev)) <= angle
+
+
+def test_flat_phase_propagates_through_physical_readout(nom):
+    """A mixed-land pair retains both its clock error and smaller-land
+    systematic play after the common crank-index shift."""
+    import gear_seat_fit
+
+    x = np.zeros(eb.N_ELEMENTS)
+    x[[0, 19]] = 1.0  # T006 and T120, the two extremes of the flat size
+    clock = np.zeros((1, eb.N_ELEMENTS))
+    clock[0, 0] = 0.25
+    play = np.zeros((1, eb.N_ELEMENTS))
+    play[0, 0] = gear_seat_fit.FLAT_AF_CLEARANCE[1] - sum(
+        gear_seat_fit.FLAT_AF_CLEARANCE
+    ) / 2.0
+    dev = {"cone_flat_clock": clock, "cone_flat_play": play}
+    actual = eb._channel_model(x, nom, dev, eb.gain_sensitivities(nom))
+    t = eb.cycle_table(nom)
+    stations = x * nom.d_max
+    read = np.interp(stations, t.stations, t.read)
+    kappa = np.interp(stations, t.stations, t.kappa)
+    profiles = eb.phase_profiles()
+    phi = sum(
+        v * profiles[key][0] + profiles[key][1] for key, v in dev.items()
+    )
+    gains = np.ones((1, eb.N_ELEMENTS))
+    measured = eb._read_draws(
+        x, t, gains, phi, stations[None, :], read, kappa
+    )
+    base = eb._read_draws(
+        x, t, gains, np.zeros_like(phi), stations[None, :], read, kappa
+    )
+    expected = 100.0 * (measured - base) / np.max(
+        np.abs(eb.ideal_coefficients(x))
+    )
+    assert np.max(np.abs(actual)) > 0.01
+    assert actual == pytest.approx(expected, abs=1e-9)
 
 
 def test_drawing_limits_agree_with_the_budget(budget):

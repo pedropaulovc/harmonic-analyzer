@@ -1,9 +1,9 @@
 """Offline contracts for the 64T against the v36 MHA-016's north side
 (crank_boss_rim) and its SolidWorks positive control (gear64_post_measure).
 
-User ruling 2026-09-28: the v36 post is restored, the 64T keeps its north
-face and narrows from the south to the widest face its printed places allow
-with every post feature at FLOOR_CLEARANCE_MM at print-worst.
+The collar still seats the 64T's south face after its northward growth to
+T120. Every post feature holds FLOOR_CLEARANCE_MM at print-worst, independent
+of the northward face-width band.
 """
 
 from __future__ import annotations
@@ -23,26 +23,24 @@ FEATURES = {"crank boss", "head", "body", "cone boss end"}
 SEATED = rim.seated_gear_offset()
 
 
-def test_the_8_face_reaches_into_the_restored_crank_boss() -> None:
-    """Positive control: on the v36 post the 8.0 face, seated on the collar,
-    already overlaps the crank boss at nominal -- the clash the ruling
-    narrows the gear for."""
-    nominal = rim.clearances(gear_offset=SEATED, face_width=8.0, worst=False)
-    assert nominal["crank boss"] < 0.0
-    assert set(rim.worst_shortfalls(SEATED, face_width=8.0)) >= {"crank boss"}
+def test_a_collar_thinned_past_the_margin_fails_the_boss_floor() -> None:
+    # CollarWidth prints .XXX, so a single 0.001 step does NOT consume the
+    # ~0.093 mm spare. A geometrically meaningful reduction does.
+    thin = rim.THINNER_COLLAR
+    new_offset = rim.seated_gear_offset(collar_thickness=thin)
+    assert rim.THINNER_COLLAR_CLEARANCE < rim.FLOOR_CLEARANCE_MM
+    assert "crank boss" in rim.worst_shortfalls(new_offset, collar_thickness=thin)
+    assert rim.COLLAR_MARGIN_MM > 0.001
 
 
-def test_the_printed_face_is_the_widest_that_holds_the_floor_everywhere() -> None:
+def test_the_seated_south_face_holds_the_floor_everywhere() -> None:
     worst = rim.clearances(gear_offset=SEATED)
     assert set(worst) == FEATURES
     assert rim.worst_shortfalls(SEATED) == {}
     assert min(worst, key=worst.get) == "crank boss"
     assert worst["crank boss"] == pytest.approx(0.343, abs=2e-3)
-    # One printed place wider, only the crank boss misses the floor.
-    wider = gear64.FACE_WIDTH + 10.0 ** -gear64.DRAWING_PRECISION_BY_NAME["FaceWidth"]
-    assert set(rim.worst_shortfalls(SEATED, face_width=wider)) == {"crank boss"}
-    assert gear64.FACE_WIDTH == 6.5
-    assert gear64.DRAWING_PRECISION_BY_NAME["FaceWidth"] == 1
+    assert gear64.FACE_WIDTH == pytest.approx(7.2113)
+    assert gear64.DRAWING_PRECISION_BY_NAME["FaceWidth"] == 4
 
 
 def test_the_floor_is_the_ruled_quarter_millimetre() -> None:
@@ -63,10 +61,9 @@ def test_the_64t_station_is_the_collar_stack() -> None:
 
 
 def test_the_face_width_band_never_moves_the_seated_south_face(monkeypatch) -> None:
-    """#1049: the south face sits on the collar, so however loose the face
-    width's band, no margin to the post changes."""
+    """The face-width band extends north; the entire post proof is invariant."""
     before = rim.clearances(gear_offset=SEATED)
-    monkeypatch.setattr(rim, "GEAR_FACE_GROWTH_NORTH", 5.0)
+    monkeypatch.setattr(gear64, "FACE_WIDTH_BAND", (5.0, -5.0))
     assert rim.clearances(gear_offset=SEATED) == pytest.approx(before, abs=1e-9)
 
 

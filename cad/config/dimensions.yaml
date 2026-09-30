@@ -224,13 +224,13 @@ sections:
         - scaled + stated topology
         - med
       - - Crankshaft diameter
-        - 9.525 mm (3/8") on the T12 and crank-hub seats; restored integral Ø11.388 journal runs directly in MHA-016; the 16T pinion sits on a Ø9.0 seat step (local 112.2)
+        - 9.525 mm (3/8") on the T12 and crank-hub seats; restored integral Ø11.388 journal runs directly in MHA-016; the 16T pinion sits on a Ø9.0 seat step (local 111.3)
         - '0.375'
         - 'User ruling 2026-09-28 restores the integral running journal while retaining the single-cutter 16T seat and existing T12 and hub geometry. The smaller pinion root needs the Ø9.0 seat to keep its boss wall over 1.5 at print-worst.'
         - legacy
         - med
       - - Crankshaft bearing
-        - 'Integral Ø11.388 journal in the restored MHA-016 Ø11.438 crank bore; relieved middle Ø10.4, journal local stations 40.755105572..108.6 and relief 55.3..93.6.'
+        - 'Integral Ø11.388 journal in the restored MHA-016 Ø11.438 crank bore; relieved middle Ø10.4, journal local stations 40.755105572..107.7 and relief 54.4..92.7.'
         - —
         - 'User ruling 2026-09-28: restore the journal and its relief. The shaft runs directly in the post, with the shaft_in_bushing clearance class; there is no separate crank bearing sleeve.'
         - derived
@@ -266,9 +266,9 @@ sections:
         - scaled
         - med
       - - Crankshaft length
-        - 136.3 mm cylindrical length plus 2-mm integral outboard dome
+        - 135.4 mm cylindrical length plus 2-mm integral outboard dome
         - '5.39 in initial reference; shortened for the shortest W15-compliant 16T boss'
-        - 'The outboard cylinder/arm/hub face remains at world z −183, with T12 at z −155. The inboard shaft end is now z −46.7, recessed 1.14 inside the 16T pinion boss. With the original pin and printed bands unchanged, its W15 pin-edge wall is 2.023 mm at print-worst (2.0 floor); a boss one .X step shorter would give 1.973. Length prints at one place, +0/−0.4.'
+        - 'The outboard cylinder/arm/hub face remains at world z −183, with T12 at z −155. The inboard shaft end is now z −47.6, recessed 1.14 inside the 16T pinion boss; it followed the 16T face 10.4 → 9.5 (user ruling 2026-09-28). With the original pin and printed bands unchanged, its W15 pin-edge wall is 2.023 mm at print-worst (2.0 floor); a boss one .X step shorter would give 1.973. Length prints at one place, +0/−0.4.'
         - derived
         - high
   - prose: |2
@@ -298,13 +298,13 @@ sections:
       - - Gear face width
         - 7 mm
         - '0.276'
-        - photo callout p.18 — the annotated 7/7.5/150 trio is mutually inconsistent with the frame-locked drum grid; the build trims the as-built face to clear the seat pitch (a model detail, see build_cone_gear.py)
+        - photo callout p.18 — historical 7 mm; the 2026-09-28 user-ruled touching stack instead sets the model face to 6.8887 ±0.025 (`cone_gear_spec.FACE_WIDTH`), one 6.888787817263312-mm seat pitch
         - annotated
         - high
       - - Cone set axial length
         - 150 mm
         - '5.91'
-        - photo callout p.18; with the finer DP 49.82 module the gear stack shrank to 19 × 6.889 + 6.0 ≈ 136.9 mm (6.0 faces narrowed from the south on the 6.5 reference stations; + 64T face 6.5, narrowed from the south by user ruling 2026-09-28, + air) — the 150 arrow no longer matches cleanly and is flagged (the annotated 7/7.5/150 trio was already inconsistent with the drum grid)
+        - photo callout p.18; the 2026-09-28 model has twenty touching 6.8887 ±0.025 faces, accepted as a 137.774 ±0.20 stack (`cone_gear_stack.STACK_L20`); the adjacent 64T is 7.2113 ±0.025, bearing on the shaft collar. The photographed 150-mm arrow remains a separate, inconsistent historical annotation.
         - annotated
         - high
       - - Gear count
@@ -328,7 +328,7 @@ sections:
       - - Axial gear pitch
         - 7.2204 mm
         - '0.284'
-        - 'along the cone axis (= machine.yaml drum_seat_nominal); RE-TUNED from 7.5 so its Z-projection stays 7.0565 = the frame-locked drum grid (gates, channels — Appendix C #3) when the module shrank to DP 49.82. The along-shaft seat pitch is now 6.889 (clears the shallower 12.52° incline) — a model detail.'
+        - 'along the cone axis (= machine.yaml drum_seat_nominal); RE-TUNED from 7.5 so its Z-projection stays 7.0565 = the frame-locked drum grid. The along-shaft seat pitch is 6.888787817263312; the 2026-09-28 model gives each touching cone gear a 6.8887 ±0.025 face.'
         - derived
         - low
       - - Diametral pitch / module
@@ -344,50 +344,48 @@ sections:
         - derived
         - low
       - - Cone shaft length
-        - 200.8856869456 mm overall
-        - '~7.91'
-        - 'The final coupled layout puts the shaft front end at cone station −61.9068609979: post centre −39.90136099793, 42.011 axial body, plus 1.0 proud. Adding the 49.6068609979 stub delta preserves the journal and every gear-seat world station; only the terminal 1/16" endpoint is shortened 7.29350 mm to local station 200.8856869456 / machine station 138.9788259477 for exact contact with the McMaster 94025A164 cup apex (rule-12 E11).'
+        - 199.3356869456 mm overall (shaft-local station of tip)
+        - '~7.85'
+        - 'The front end remains cone station −61.9068609979; shaft-local station = cone-axis station +61.9068609979. The 2026-09-28 tip shortening is 1.55: tip at cone station 137.4288259477 / shaft-local station 199.3356869456, mating the McMaster 94025A164 cup apex. The pivot station and large-end journal do not move.'
         - derived
         - high
       - - Cone shaft diameter
-        - 'stepped from the front end: Ø12.2308 journal z 0–43.011; Ø15.875 integral thrust collar (the 5/8 bar''s OD as supplied, #916) z 43.011–44.6922184176 (#914: bears on the post''s north boss face, the 64T soldered against it; the collar face is the print''s length origin); Ø9.525 (3/8") to 164.0684295852; Ø6.35 (1/4") to 170.9572174024; Ø3.175 (1/8") to 177.8460052197; Ø1.5875 (1/16") to 200.8856869456 (U40 S1: each small land one gear station toward the big end; each step centred in its air gap, 0.444 to both 6.0 gear faces)'
+        - 'stepped from the front end: Ø12.2308 journal shaft-local 0–43.011; Ø15.875 integral thrust collar shaft-local 43.011–44.6922184176 (north face supports the 64T south face and is the drawing length origin); Ø9.525 / 6.35 / 3.175 / 1.5875 gear lands with co-clocked local +X flats, nominal AF 8.763 / 5.842 / 2.921 / 1.460 respectively, each +0/−0.010. The three seat steps are 1.0 mm south of the T030/T024/T018 interfaces at cone stations 100.717 / 107.606 / 114.495; the Ø1.5875 land ends at shaft-local 199.3356869456 (cone station 137.4288259477). Its flat runs from the T018 step through the tip end, including under the round-bore thrust spacer MHA-096.'
         - 12.2308/9.525/6.35/3.175/1.5875
-        - 'The integral front journal is derived from the manually rederived `cone-pivot-post-v2` Ø12.2808 cone bore with 0.05 mm diametral running clearance. It spans the 42.011 post body plus 1.0 mm proud. Gear seats and world stations are unchanged; the terminal 1/16" endpoint is shortened 7.29350 mm to machine station 138.9788259477, the McMaster 94025A164 conical cup apex at 9.5 mm thread engagement (rule-12 E11). The 23.0396817259 mm tip land carries the T012 and T006 seats and the bushing (U40), turned with tailstock support at L/D 14.5; it was 1/32" until the T006 rim was recomputed against the as-cut (base-chord) root, which allows 1/16" — `build_cone_gear_shaft.py`.'
+        - 'The Ø12.2308 front journal runs in the Ø12.2808 post bore with 0.05 diametral clearance and spans the 42.011 post body plus 1.0 proud. The four shaft gear lands gain one milled flat each at the same +X clock. Gears are slip-fitted, faces touching from the collar-supported 64T through T006; the unchanged round bore of thrust spacer MHA-096 rides the terminal D-flat, not a round running journal. The tip is 1.55 shorter than before; cone-axis station 137.4288259477 + shaft-local offset 61.9068609979 = shaft-local station 199.3356869456. The pivot does not shift.'
         - legacy + derived
         - high
-      - - Gear bores (configured `BoreDia`)
-        - 'snug on the stepped shaft (M6.7 perpendicular seats) AND inside each gear''s root circle: 9.525 (3/8") T030–T120; 6.350 (1/4") T024; 3.175 (1/8") T018; 1.588 (1/16") T006–T012; no keyway'
+      - - Gear bores (configured `BoreDia`, with matching D-flat)
+        - 'D-bores on stepped shaft: round seat nominal Ø9.525 T030–T120 and 64T; Ø6.350 T024; Ø3.175 T018; Ø1.5875 T006–T012. One +X flat per bore; AF 8.763 / 5.842 / 2.921 / 1.460 respectively on shaft, +0/−0.010; bore AF +0.010/+0.020 over corresponding nominal AF. Flat clearance 0.01–0.03, round diametral slip clearance 0.025–0.105.'
         - —
-        - 'Appendix C #7: bore = shaft section at the seat (perpendicular gears need no ellipse margin). At the finer module T006 takes a 1/16" bore. Its gap floor is printed at 2.880 mm MIN diameter (U40), so the nominal bore leaves a 0.646 mm radial web and the maximum allowed bore 0.621 mm, the one named web exception (cone_gear_spec.WEB_EXCEPTIONS_MM). The p.21 macro shows solder blobs fixing the small gears — no keyway evidence anywhere.'
+        - '2026-09-28 user ruling: each gear is rotationally located by its D-bore, cone gear flat normal through phase-0 tooth; no adhesive. The p.21 macro shows solder blobs on the small gears: this is an acknowledged departure from book fidelity for adhesive-free alignment. At T006 the Ø2.880 MIN gap floor and maximum round bore give a 0.621 mm minimum radial web (named exception); the D-flat cuts into, not out from, the round bore envelope.'
         - derived
         - low
       - - Crank-drive gear (dark steel gear at the large end, "This gear engages the crank" p.20)
-        - '64T at transverse DP 25.7311 (normal DP 26.306, one cutter for the pair, #906): PD 63.176 mm, OD 65.108 mm; mates a 16T pinion cut straight by the same cutter (4:1, PD 15.449, OD 17.380). The fixed v36 post keeps both bore axes. User ruling 2026-09-28 narrows the 64T only from the south face, preserving its north face and growing the thrust-collar web by the same amount. No backlash window: crank_mesh_stack requires positive worst-case tight backlash. Cut as a true 12.00° helix with 0.15 transverse tooth thinning and root-relieved floors. Held like the cone gears: plain Ø9.525 bore, no keyway, pin, set screw or hub; soldered or silver-brazed to the shaft, with Loctite 638/648 retaining compound an approved alternative. The unchanged north face preserves the gap to T120.'
+        - '64T at transverse DP 25.7311 (normal DP 26.306, one cutter for the pair, #906): PD 63.176 mm, OD 65.108 mm; mates a 16T pinion cut straight by the same cutter (4:1, PD 15.449, OD 17.380). The fixed v36 post keeps both bore axes. True 12.00° helix, 0.15 transverse tooth thinning and root-relieved floors. The 64T has a matching Ø9.525 D-bore (shaft AF 8.763 +0/−0.010; bore AF +0.010/+0.020 over nominal), 7.2113 ±0.025 face. Its south face bears on the thrust collar; its north face touches T120. The 16T pinion has a 9.5-mm face, shortened from the north, and keeps its south face and boss length.'
         - —
-        - 'p.20 supplies the 4:1 reduction and the visibly coarser pair; the manually rederived v2 post supplies the harder geometric constraint. With its world placement and both bores fixed, the recentered 64T station closes the axes at c2c 39.735, so DP = 25.7311 (solved against a transverse-DP 16T at the 0.25 mm `fits.crank_mesh.c2c_slack_mm` design slack; the single-cutter 16T is smaller, and the frame keeps the c2c, so that pinion inherits the difference). The exact-solid phase sweep rederives the tooth inclination to 12.00°. Attachment (rule-11 flag closed 2026-09-21, dt-logs/geometry-decisions.md): p.20 `page003_img03.jpeg` shows the 64T face-on to T120 with no hub, fillet or pin head, p.21 `page003_img02.jpeg` shows solder at the same shaft''s small gears, and engineerguy `v4_t00399`/`v2_t00069` leave ~1 mm between the far face and the pivot post — no room for a boss either side. Confidence high on no-hub/no-pin; geometry unchanged.'
+        - 'p.20 supplies the 4:1 reduction and the visibly coarser pair; the v2 post constrains fixed bore axes at c2c 39.735, giving DP 25.7311 against a transverse-DP 16T at 0.25 mm design slack; exact-solid phase sweep gives the 12.00° inclination. p.20 `page003_img03.jpeg` shows the 64T face-on to T120 without a hub, fillet or pin head, and p.21 `page003_img02.jpeg` shows solder on small gears on the same shaft. User ruling 2026-09-28 replaces the historical joint interpretation with D-bores and touching faces; the 64T grows from the collar northward.'
         - scaled
         - low
   - prose: |2
 
-      Notes: all 20 gears fixed to one shaft, rotate together. Engagement with cylinder
-      gears is at an oblique angle (partial engagement → distinct wear). The four smallest
-      gears (T006–T024, the cone tip) look "slightly more yellow … a different, perhaps
-      harder metal" (p.21). Period-accurate reading: a harder high-zinc yellow metal —
-      Muntz metal (60/40 Cu-Zn) or manganese bronze, both more golden and markedly harder
-      than the ~70/30 alpha brass of the larger gears — cut from drawn rod on a wheel-
-      cutting / dividing engine and soldered to the shaft (the p.21 solder blobs), chosen
-      because the finest teeth wear/break most. Modeled as the `muntz_yellow` appearance on
-      those four configs (materials.yaml, applied in the Phase 3 rebuild). Cone set pivots
-      out of engagement via a knob (for sine/cosine alignment, ch. 25). A 6-tooth involute
-      gear is severely undercut at standard proportions — `build_cone_gear.py` (M4) models it
-      stub-form (gap floor at the base-circle chord, no trochoid root), validated against
-      an analytic profile integral to ≤ 0.015% per configuration. All 20 tooth counts are
-      configurations T006..T120 of the single parametric part `cone-gear.SLDPRT`
-      (equation-driven involutes from ToothCount/DP/PA globals) with a configured bore
-      (`BoreDia` global per configuration, no keyway — Appendix C #7 resolved; the
-      mating shaft steps down accordingly, see the shaft rows). The dark coarse-tooth
-      steel gear beside the 120T ("This gear engages the crank", p.20) is a separate
-      drive component — Appendix C #9.
+      Notes: all 20 gears rotate together on one D-flat shaft. Their 6.8887 ±0.025
+      faces touch from the collar-supported 64T to T006; accept the twenty-gear
+      stack at 137.774 ±0.20. The 4-mm tip bushing bears on T006; set the tip
+      block 0.45 mm off its north face with a feeler for 0.35–0.55 mm end play.
+      Engagement with cylinder gears is oblique (partial engagement → distinct
+      wear). The four smallest gears (T006–T024) look "slightly more yellow …
+      a different, perhaps harder metal" (p.21). A harder high-zinc yellow
+      metal — Muntz metal (60/40 Cu-Zn) or manganese bronze — is a plausible
+      interpretation, not a proven material; the model uses `muntz_yellow`.
+      The p.21 macro shows solder blobs on the small gears, but the
+      2026-09-28 user ruling chooses co-clocked D-flats and matching D-bores
+      to align the gears without adhesive: a deliberate departure from that
+      photographed detail. The cone set pivots out of engagement for sine/cosine
+      alignment (ch. 25). The 6-tooth involute is severely undercut at standard
+      proportions, so `build_cone_gear.py` models stub-form gap floors. All 20
+      tooth counts are configurations T006..T120 of `cone-gear.SLDPRT` with
+      configured bores. The separate dark 64T beside T120 engages the crank (p.20).
 - heading: Chapter 13 — Cylinder Gear Set (pp. 22–25)
   elements:
   - prose: ''
@@ -570,8 +568,8 @@ sections:
         - 'M6.7: a perpendicular gear''s contact tooth sits r·sin i along-shaft south of its centre, so each centre rides r_j·sin i NORTH of its drum plane. The +55 ± 5 photo blob NO LONGER agrees in x (the smaller cone pulled the big-end inboard to +13.9) — flagged consequence of the 62.2 anchor'
         - low
       - - 64T drive gear
-        - perpendicular on the 3/8" pivot journal at effective shaft station −12.465, centre (x, z) = (−123.389, −64.801), 6.5 mm face; its north face and axial air to T120 are unchanged
-        - p.20 (directly beside the 120T); DP 25.7311 is fixed by the v36 post crank-axis centre distance. The face narrows 8.0 → 6.5 mm from the south, with the MHA-014 thrust collar growing by 1.5 mm to keep the gear's north face fixed. The v36 post's print-worst crank boss clearance is 0.343 mm, above its 0.25 floor; a 6.6-mm face would leave only 0.244 mm. The fixed-centre mesh is required not to bind, with no backlash window.
+        - perpendicular on the 3/8" land at effective shaft station −12.109, centre (x, z) = (−123.312, −64.454), 7.2113 mm face; its south face bears on the MHA-014 thrust collar (unchanged) and its north face touches T120's south face (no axial air)
+        - p.20 (directly beside the 120T); DP 25.7311 is fixed by the v36 post crank-axis centre distance. User ruling 2026-09-28 grows the face 6.5 → 7.2113 mm northward from the unchanged collar face until it meets T120, the first joint of the solid gear stack; its D-bore locates it rotationally. The south face does not move, so the v36 post's print-worst crank boss clearance stays 0.343 mm, above its 0.25 floor. The fixed-centre mesh is required not to bind; the re-measured backlash study keeps ≥ 0.163 mm at the tightest corner.
         - low
       - - Cone gear j (j = 0 big … 19 small)
         - shaft seat station 28.25 + 6.889j; centre x_j = −84.702 − (30.59 − 1.5295j)·cos i, z_j = −31.685 + 7.0565j + (30.59 − 1.5295j)·sin i, y = 90.518; ALL 20 perpendicular to the shaft (true cone, p.18)
@@ -586,7 +584,7 @@ sections:
         - mesh plane alignment
         - high
       - - Crankshaft
-        - 'Along Z on the restored fixed crank axis (x, y) = (−129.336, 129.850). The frame-reference c2c is 39.735, with 0.423 slack for the single-cutter pair. User ruling 2026-09-28 requires positive worst-case tight backlash without a prescribed window. The 136.3-mm shaft spans z −183..−46.7 with its integral dome outboard. T12 remains at z −155. The restored boss runs z −142.245..−70.210; the pinion south face is feeler-set 0.25 north of it, at z −69.960 (local 113.039505572). The pinion has the shortest boss meeting all printed W15 floors: 14.0 mm past its 10.4 face, 24.4 overall; its Ø3.175 pin stays at boss mid-length. The integral Ø11.388 journal runs directly in the post; the Ø9.0 pinion seat step starts at local 112.2.'
+        - 'Along Z on the restored fixed crank axis (x, y) = (−129.336, 129.850). The frame-reference c2c is 39.735, with 0.423 slack for the single-cutter pair. User ruling 2026-09-28 requires positive worst-case tight backlash without a prescribed window. The 135.4-mm shaft spans z −183..−47.6 with its integral dome outboard. T12 remains at z −155. The restored boss runs z −142.245..−70.210; the pinion south face is feeler-set 0.25 north of it, at z −69.960 (local 113.039505572). The 16T face is 9.5 mm, shortened from its north end; its 14.0-mm boss length past the south-to-north gear face is unchanged, yielding 23.5 mm overall. Its Ø3.175 pin station follows the shortened face parametrically. The integral Ø11.388 journal runs directly in the post; the Ø9.0 pinion seat step starts at local 111.3.'
         - 'cone-pivot-post-v2 is the physical authority for x/y. The ch30 GT crank_sprocket result (−122.84, 144.78) remains independent image evidence, while the primary crank construction photo governs the separate through hub and flush outboard face. The crossed-helical accommodation and historical 0.25 mm transverse-DP centre reference remain; neither is a backlash target.'
         - high (GT + mesh)
       - - Chain run
@@ -624,8 +622,8 @@ sections:
         - 'User ruling 2026-09-28 restores the v36 post geometry, including its Ø42.7506 head. Manual height rederivation from ch30 Eight Views station 2 (references/albert-michelsons-harmonic-analyzer/ch30_images/page003_img01.png), with proportions from ch11 page002_img05.jpeg and page002_img06.jpeg; other feature dimensions harvested from cone-pivot-post-v2.SLDPRT.'
         - 'med (86 mm height and proportions photo-derived; other restored v36 feature dimensions exact)'
       - - '`cone-tip-block` (adjuster carrier + end-play lock, on the plate — GT cone_back realized)'
-        - 'black steel block 17 × 12 × 46.83 tall on a 1.10 nominal fit-up shim pack; #10-32 UNF-2B thread tapped THROUGH on the cone axis 32.27 above the foot, with a 90° countersink to Ø5.0 at both ends (rule-12 E11/W1), carrying the cup-ended cone-tip-adjuster from the north face while the shaft tip enters from the south; 1.2-wide top slit with its floor 0.65 below the axis, crossed by a #4-40 pinch joint 41.12 above the foot, 8.85 over the axis (McMaster 91794A112; its Ø3.264 normal-clearance near jaw is drilled to the slot, the far jaw tapped through to it; the axis and the flange slot print from the -X face, the pinch screw''s far side). A south foot flange (20.8 × 3.50) carries the hold-down slot, its arc centres 6.5 and 14.9 from the body''s south face. Every web keeps 2.0 at the printed title-block and hole bands.'
-        - 'centre (−90.067, +85.281) = cone shaft station 141.272, standing ON the swing platform beside T006; at the 9.5 mm fit-up adjuster engagement (working window 7.72..10.72), the shaft tip contacts the McMaster 94025A164 conical cup apex at station 138.9788259477.'
+        - 'black steel block 17 × 12 × 46.83 tall on a 1.10 nominal fit-up shim pack; #10-32 UNF-2B thread tapped THROUGH on the cone axis 32.27 above the foot, with a 90° countersink to Ø5.0 at both ends (rule-12 E11/W1), carrying the cup-ended cone-tip-adjuster from the north face while the shaft tip enters from the south; 1.2-wide top slit with its floor 0.65 below the axis, crossed by a #4-40 pinch joint 41.12 above the foot, 8.85 over the axis (McMaster 91794A112; its Ø3.264 normal-clearance near jaw is drilled to the slot, the far jaw tapped through to it; the axis and the flange slot print from the -X face, the pinch screw''s far side). A south foot flange (20.8 × 3.50) carries the hold-down slot, its arc centres 6.5 and 14.9 from the body''s south face. Every web keeps 2.0 at the printed title-block and hole bands. Axial thickness (`BLOCK_Z`) is 12.000 mm.'
+        - 'cone-axis block south face 133.7223 (0.45 mm feeler north of the bushing end 133.2723), north face 145.7223; centre 139.7223, 1.55 south of the former station. The swing-platform pivot stays fixed; slide the block in its slot until the feeler nips, snug, then seat the shaft tip with the adjuster cup apex at cone station 137.4288259477.'
         - 'ch30 GT (cone_back); p.18 tip clamp + v4_t00471 (7:49 full tip-stack geometry); 2026-09-21 user-approved DFM correction grows only the block top and controls the pinch axis relative to the unchanged adjuster axis'
         - med (GT-anchored)
       - - '`cone-lock-knob` (clamps the swing plate engaged/disengaged)'
@@ -643,14 +641,14 @@ sections:
         - 'base-threaded STATIC at (−140.050, +2.403), derived so the 223.354-long plate''s EAST taper edge just touches the head flank at the 4.686° disengaged swing. The disengage swing walks the knob stud out of the notch mouth and advances the east edge onto the stop; the engaged edge retains 8.569 mm signed clearance to the head (derived and asserted against the base hole).'
         - 'McMaster-Carr 90280A108 recipe (`cad/scripts/diagnostics/diag_mcmaster_fillister.py`); embed and receiver depths from `cad/scripts/build_swing_stop_screw.py` and `cad/scripts/build_harmonic_base.py`; user review (v4: small screw the platform bumps against); position derived from the notch/knob geometry'
         - high (stock dimensions exact; function and placement derived)
-      - - '`cone-tip-bushing` (T006 spacer on the tip stub)'
-        - brass sleeve Ø6 × 4, Ø1.588 (1/16") bore
-        - 'on the shaft''s tip stub at stations 129.2723..133.2723, directly north of T006 and 2 mm south of the tip block — the axial spacer the adjuster loads the shaft stack against'
+      - - '`cone-tip-bushing` (MHA-096 thrust spacer against T006)'
+        - brass sleeve Ø6 × 4.000 mm, unchanged round bore Ø1.5875 +0.055/+0.025
+        - 'MHA-096 rides the shaft''s continuous terminal D-flat at cone-axis stations 129.2723..133.2723; its south face bears on T006, north face is 0.45 mm from the fitted tip-block south face (133.7223). It is an axial thrust spacer, not a bearing on a round shaft journal.'
         - v4_t00471 / 7:49 (brass collar between the smallest gear and the tip block)
         - med (role high, dims low)
       - - '`cone-tip-adjuster` (axial end-play screw, partially hollow)'
         - McMaster-Carr 94025A164 slotted 18-8 stainless #10-32 × 3/8 cup-tip set screw (rule-12 E11); vendor 45° conical cup depth 1.2065 from the cup rim to its apex (Sketch2 Line7)
-        - 'threaded 9.5 mm into the tip block''s north face (the through #10-32 tap), placing the stock cup rim at station 137.7723259477 and its apex at 138.9788259477, exactly coincident with the shaft tip — turning it takes up the cone stack''s axial end play so the 20 gears stay registered against the cylinder set; the block''s slit + pinch screw lock the setting'
+        - 'threaded 9.5 mm into the tip block''s north face (through #10-32 tap), placing the cup rim at cone-axis station 136.2223 and its apex at 137.4288259477, coincident with the shortened shaft tip; turn in to seat the tip, retain the spin-free alignment and 1/8-turn back-off, then lock with the block''s slit and pinch screw. The fitted 0.45-mm feeler gap sets 0.35–0.55 mm stack end play.'
         - v4_t00471 / 7:49 (t00147: hollow slotted screw the cone shaft rests in)
         - med (role high, dims low)
       - - '`cone-tip-pinch-screw` (locks the adjuster)'
@@ -2052,25 +2050,21 @@ sections:
          (0.5 air per side in the 4.5 gap) with the 3.0 rod ring riding the cam
          (0.25 axial clearance per side). Legacy 10.2 cam thickness refuted;
          `build_cylinder_gear.py` updated (face 7 → 3, cam 10.16 → 3.5). The
-         ch. 12 "7 mm" face callout applies to the CONE gears, trimmed to 6.5
-         in M6.7 by the 6.584 exact-tracking seat pitch (ch. 12 face row).
-      7. **Small cone gears cannot carry the 9.5 mm shaft bore** (ch. 12) —
-         **RESOLVED in M4c: configured bore + stepped shaft, no keyway.** At
-         DP 30 the 6T gear's OD is 6.77 mm and the 12T root circle is 8.0 mm,
-         both smaller than the 9.5 mm cone shaft. Resolution: the cone-gear
-         part carries a configured `BoreDia` global computed by `bore_dia_in`
-         (snug on the shaft section at the seat: 3/8" T024–T120, 1/4" T018,
-         3/16" T012, 1/8" T006 — M6.7 perpendicular seats need no ellipse
-         margin) and the shaft (`build_cone_gear_shaft.py`)
-         steps 3/8 → 1/4 → 3/16 → 1/8" at stations 136.88/143.47/150.05
-         (each in the 0.08 air gap between gear faces, ch. 12 rows). No
-         keyway anywhere: the book never shows the attachment and the p.21
-         macro shows solder blobs at the small gears, so gears are modeled
-         plain-bored (key/solder hardware out of scope). Implementation note:
-         the configured bore forced the gear blank from a revolve to an
-         extruded disc — on SW 2026 a dimension-driven cut through a revolved
-         body freezes at its creation-time size (skill learning
-         `cut-on-revolved-body-freezes-at-creation-size.md`).
+         ch. 12 "7 mm" face callout applies to the CONE gears; the 2026-09-28
+         touching-stack model uses 6.8887 ±0.025 per gear instead (ch. 12 face row).
+      7. **Small cone gears cannot carry the 9.525 mm shaft bore** (ch. 12) —
+         **RESOLVED: configured D-bore + stepped D-flat shaft.** The smallest
+         gears need Ø1.5875 seats; T018 uses Ø3.175, T024 Ø6.35, and T030–T120
+         Ø9.525. The shaft has one common-clock +X flat per gear land, with AF
+         1.460/2.921/5.842/8.763 for increasing land diameter and +0/−0.010
+         band. Each matching bore AF is +0.010/+0.020 above the shaft nominal
+         (0.01–0.03 flat clearance); the round diametral slip fit is
+         0.025–0.105. The 2026-09-28 user ruling replaces the former plain
+         bore/air-gap interpretation with twenty 6.8887 ±0.025 gears touching
+         in a 137.774 ±0.20 stack. The p.21 macro shows solder blobs on the
+         small gears; D-flats are an intentional fidelity departure for
+         alignment without adhesive. The configured bore drove the gear blank
+         from a revolve to an extruded disc in the original parametric build.
       8. **Translational gearing fixed-reduction topology** (ch. 23) — found in
          M4c keyframe measurement: a small fine-tooth steel pinion (≈ Ø21 mm,
          est. 24T DP 30) rides coaxially with the 120T rack pinion
@@ -2135,18 +2129,21 @@ sections:
          (0.25 design slack; #906 then cut both gears with one DP 26.306 normal
          cutter, leaving 0.423 reference slack). User ruling 2026-09-28
          restores that fixed crank axis and the unrelieved v36 post boss.
-         The 64T narrows only from its south face; its north face remains
-         fixed and the thrust collar grows by the removed width. The 10.4
-         pinion face sits 0.25 off the restored boss at z −70.210, so its
-         south face is z −69.960. It leaves 0.533 mm axial air to the T120
-         rim and covers the narrowed 64T tooth row completely (>=85% required).
+         The 64T keeps its south face on the unchanged 3.181 thrust collar
+         and grows north to 7.2113 so it bears on T120 in the solid cone
+         stack (user ruling 2026-09-28). The 9.5 pinion face (shortened from
+         its north end) sits 0.25 off the restored boss at z −70.210, so its
+         south face is z −69.960. The exact T120 south-rim scan leaves
+         0.2925 mm axial air, and the pinion covers 0.9235 of the grown 64T
+         tooth row (>=85% required).
          Positive worst-case tight backlash, not a backlash window, is the
          acceptance (`crank_mesh_stack`). Exact-solid phase and row engagement
-         are evaluated at the actual narrowed-gear centre
-         (`diagnostics/crank_mesh_backlash_study.py`). The 136.3-mm
-         crankshaft retains the outboard face z −183 and T12 at z −155;
-         the 16T boss is the shortest printable length holding the existing
-         W15 pin-edge and shaft-end-recess floors.
+         are evaluated at the actual grown-gear centre
+         (`diagnostics/crank_mesh_backlash_study.py`: every case keeps the
+         −1.49 seed inside its common interval, nominal −2.79..−0.21). The
+         135.4-mm crankshaft retains the outboard face z −183 and T12 at
+         z −155; the 16T boss is the shortest printable length holding the
+         existing W15 pin-edge and shaft-end-recess floors.
       10. **Alignment-pinion mechanism removed (2026-06-18) — RESTORED
          2026-07-02** (ch. 25). The removal-era impossibility used the now-
          superseded pre-correction drum against the 12.56 mm frustum/64T

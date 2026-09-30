@@ -40,12 +40,12 @@ def test_model_owns_the_printed_precision() -> None:
     assert spec.DRAWING_PRECISION_BY_NAME == {
         "ODDim": 1,
         "BoreDiaDim": 3,
-        "Depth": 1,
+        "Depth": 3,
     }
     assert "draw_cone_tip_bushing.py" in PRECISION_MIGRATED_DRAWINGS
 
 
-def test_bore_band_is_derived_live_from_the_enlarged_tip_journal_and_fit() -> None:
+def test_bore_band_is_derived_live_from_the_flatted_tip_land_and_fit() -> None:
     assert _config.parts("cone-tip-bushing")["fit_class"] == "shaft_in_bushing"
     minimum, maximum = _config.fit("shaft_in_bushing")["diametral_clearance_mm"]
     journal_upper, journal_lower = cone_gear_shaft_spec.SECTION_DIA_BANDS[-1]
@@ -60,7 +60,7 @@ def test_bore_band_is_derived_live_from_the_enlarged_tip_journal_and_fit() -> No
     assert bore_upper - journal_lower == pytest.approx(maximum)
 
 
-def test_enlarged_journal_leaves_a_practical_plain_bushing_wall() -> None:
+def test_thrust_spacer_has_a_practical_wall_around_its_round_bore() -> None:
     radial_wall = (spec.OUTER_DIA - spec.BORE_DIA) / 2.0
     assert radial_wall > spec.BORE_DIA
     assert spec.LENGTH > spec.BORE_DIA
@@ -90,7 +90,7 @@ def test_note_identifies_the_mate_and_required_fit_without_a_duplicate_size() ->
         assert method_or_duplicate not in text
 
 
-def test_no_gdt_and_only_the_running_bore_has_a_surface_finish() -> None:
+def test_only_the_bore_around_the_flatted_tip_has_a_surface_finish() -> None:
     assert not hasattr(spec, "GEOMETRIC_TOLERANCES_MM")
     assert not hasattr(spec, "GEOMETRIC_CONTROLS")
     assert not hasattr(spec, "PART_DATUMS")
@@ -171,8 +171,8 @@ def _dimension_rows(node: object):
 
 
 def test_dimensions_record_carries_the_bushing_bore() -> None:
-    # Codex (#811): the tip-journal row moved to 1/16 in while the bushing's
-    # own row still printed the retired 1/32 in (0.79) bore.
+    # The round bore on the D-flat tip is still 1/16 in, not the retired
+    # 1/32 in (0.79) bore.
     record = yaml.safe_load(
         (Path(part.__file__).resolve().parents[1] / "config" / "dimensions.yaml")
         .read_text(encoding="utf-8")
@@ -183,7 +183,10 @@ def test_dimensions_record_carries_the_bushing_bore() -> None:
         if row[0].startswith("`cone-tip-bushing`")
     ]
     assert len(rows) == 1
-    assert rows[0][1] == (
-        f"brass sleeve Ø{spec.OUTER_DIA:g} × {spec.LENGTH:g}, "
-        f"Ø{spec.BORE_DIA + 1e-9:.3f} (1/16\") bore"
-    )
+    text = rows[0][1]
+    bore_upper, bore_lower = part.BORE_DIA_BAND
+    assert f"Ø{spec.OUTER_DIA:g}" in text
+    assert f"{spec.LENGTH:.3f}" in text
+    assert "round bore" in text.lower()
+    assert f"Ø{spec.BORE_DIA:g}" in text
+    assert f"+{bore_upper:.3f}/+{bore_lower:.3f}" in text

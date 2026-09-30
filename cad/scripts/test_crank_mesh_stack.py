@@ -11,6 +11,26 @@ def test_print_worst_closing_corner_cannot_bind() -> None:
     assert stack.TIGHT_BACKLASH_MM > 0.0
     assert stack.TIGHT_BACKLASH_MM < stack.NOMINAL_TIGHT_BACKLASH_MM
 
+def test_gear_seat_runout_and_shortened_pinion_face_reach_the_stack() -> None:
+    from gear_seat_fit import GEAR_SEAT_CLEARANCE
+
+    terms = {term.name: term.tight for term in stack.TERMS}
+    assert terms["gear bore runout"] == pytest.approx(
+        -stack.KC
+        * (stack.pinion.BORE_DIAMETRAL_CLEARANCE[1] + GEAR_SEAT_CLEARANCE[1])
+        / 2.0
+    )
+    face_deviation = stack.pinion.printed_deviations(
+        stack.pinion.FACE_WIDTH,
+        stack.pinion.FACE_WIDTH_PLACES,
+        stack.pinion.FACE_WIDTH_LIMITS,
+    )[1]
+    assert stack.pinion.FACE_WIDTH == 9.5
+    assert stack.PINION_HALF_FACE_MAX == pytest.approx(
+        (stack.pinion.FACE_WIDTH + face_deviation) / 2.0
+    )
+    assert stack.MESH_LEVER > stack.post.CRANK_BOSS_NORTH_FACE
+
 
 def test_closing_bore_spacing_consumes_backlash() -> None:
     def tight(spacing: float) -> float:

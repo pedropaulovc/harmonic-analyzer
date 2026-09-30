@@ -2,10 +2,11 @@
 
 Mirrors ``build_summing_assembly._create_summing_explode``: the builder owns
 the presentation, the drawing only consumes it. Each step of
-``drive_train_assembly_spec.EXPLODE_STEPS`` is authored along a global axis,
-read back as a world translation of exactly the intended instances, and the
-assembly is collapsed again before save -- the saved operational pose (the
-free kinematic model) is proven unchanged, transform for transform. The same
+``drive_train_assembly_spec.EXPLODE_STEPS`` is authored along a global axis or
+along the cone axis (the stationary post's journal), read back as a world
+translation of exactly the intended instances, and the assembly is collapsed
+again before save -- the saved operational pose (the free kinematic model) is
+proven unchanged, transform for transform. The same
 steps are authored in Default and in Default Simplified (as
 ``DRIVE_TRAIN_EXPLODED Simplified``): a drawing view shows the explode of the
 configuration it references, and the small exploded views reference the
@@ -17,19 +18,37 @@ from __future__ import annotations
 import math
 import sys
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, NamedTuple, Sequence
 
 import _telemetry
 from _assembly_patterns import ensure_global_pattern_axis
 from _common import _early_bound
 from _drawing_simplified import simplified_name
+from cone_line import COS_I, SIN_I
 from drive_train_assembly_spec import (
+    CONE_AXIS_SOURCE,
     EXPLODED_VIEW_NAME,
     SOURCE_CONFIGURATION,
     Instance,
     Role,
     plan_explode,
 )
+
+# On the seat the post's journal reads on the layout's exact axis: deviation
+# 5.3e-16 in farm run 20260929T174651337Z.  A wrong axis is degrees off.  The
+# readback moves along the MEASURED axis, the one the rotor is mated to, so
+# this bound only has to tell the journal from anything else.
+_CONE_AXIS_TOLERANCE = 1e-5
+
+
+class _Direction(NamedTuple):
+    """A selectable explode direction: its name, whether the axis's own sense
+    runs along the step key's positive direction, and that direction as a
+    world unit vector."""
+
+    select_name: str
+    positive: bool
+    unit: tuple[float, float, float]
 
 
 def _presentation_transform(component: Any) -> tuple[float, ...]:
@@ -52,26 +71,85 @@ def exploded_view_name(configuration: str) -> str:
     raise ValueError(f"{EXPLODED_VIEW_NAME}: no explode is authored in {configuration!r}")
 
 
-def _global_axes(adapter: Any, assembly: Any) -> dict[str, tuple[str, bool]]:
-    """World axis name per key, and whether it points along +key."""
-    axes = {}
+def _axis_vector(feature: Any, label: str) -> tuple[float, float, float]:
+    if feature is None or str(feature.GetTypeName2()) != "RefAxis":
+        raise RuntimeError(f"{EXPLODED_VIEW_NAME}: missing reference axis {label}")
+    axis = _early_bound(feature.GetSpecificFeature2(), "IRefAxis")
+    points = tuple(float(value) for value in axis.GetRefAxisParams())
+    if len(points) != 6 or not all(math.isfinite(value) for value in points):
+        raise RuntimeError(f"{label}: invalid axis endpoints {points!r}")
+    vector = (points[3] - points[0], points[4] - points[1], points[5] - points[2])
+    length = math.sqrt(sum(value * value for value in vector))
+    if length <= 1e-12:
+        raise RuntimeError(f"{label}: degenerate axis endpoints {points!r}")
+    return (vector[0] / length, vector[1] / length, vector[2] / length)
+
+
+def _global_directions(adapter: Any, assembly: Any) -> dict[str, _Direction]:
+    """World axis per key, and whether it points along +key."""
+    directions = {}
     for index, key in enumerate("xyz"):
         axis_name = ensure_global_pattern_axis(adapter, key)
-        feature = _early_bound(assembly.FeatureByName(axis_name), "IFeature")
-        if feature is None or str(feature.GetTypeName2()) != "RefAxis":
-            raise RuntimeError(f"{EXPLODED_VIEW_NAME}: missing reference axis {axis_name}")
-        axis = _early_bound(feature.GetSpecificFeature2(), "IRefAxis")
-        points = tuple(float(value) for value in axis.GetRefAxisParams())
-        if len(points) != 6 or not all(math.isfinite(value) for value in points):
-            raise RuntimeError(f"{axis_name}: invalid axis endpoints {points!r}")
-        vector = tuple(points[i + 3] - points[i] for i in range(3))
-        length = math.sqrt(sum(value * value for value in vector))
-        if length <= 1e-12 or any(
-            abs(vector[i] / length) > 1e-9 for i in range(3) if i != index
-        ):
+        vector = _axis_vector(
+            _early_bound(assembly.FeatureByName(axis_name), "IFeature"), axis_name
+        )
+        if any(abs(vector[i]) > 1e-9 for i in range(3) if i != index):
             raise RuntimeError(f"{axis_name}: not aligned with world {key.upper()}: {vector!r}")
-        axes[key] = (axis_name, vector[index] > 0.0)
-    return axes
+        unit = tuple(1.0 if i == index else 0.0 for i in range(3))
+        directions[key] = _Direction(axis_name, vector[index] > 0.0, unit)
+    return directions
+
+
+def _cone_direction(
+    adapter: Any,
+    instances: Sequence[Instance],
+    by_name: Mapping[str, Any],
+    baseline: Mapping[str, tuple[float, ...]],
+) -> _Direction:
+    """The post journal's axis in world space, positive toward the cone tip.
+
+    Read off the part and carried through the post's saved transform: the
+    rotor is mated to this axis, so it is the line the rotor withdraws along.
+    """
+    from solidworks_mcp.adapters.solidworks.assembly import _qualify_entity_name
+
+    stem, feature_name = CONE_AXIS_SOURCE
+    owners = [instance.name for instance in instances if instance.stem == stem]
+    if len(owners) != 1:
+        raise RuntimeError(f"{EXPLODED_VIEW_NAME}: cone axis needs one {stem}, found {owners!r}")
+    owner = owners[0]
+    part = _early_bound(by_name[owner].GetModelDoc2(), "IPartDoc")
+    if part is None:
+        raise RuntimeError(f"{EXPLODED_VIEW_NAME}: {owner} has no resolved part document")
+    label = f"{feature_name}@{owner}"
+    local = _axis_vector(_early_bound(part.FeatureByName(feature_name), "IFeature"), label)
+    rows = baseline[owner]
+    world = tuple(
+        local[0] * rows[i] + local[1] * rows[3 + i] + local[2] * rows[6 + i] for i in range(3)
+    )
+    length = math.sqrt(sum(value * value for value in world))
+    layout = (SIN_I, 0.0, COS_I)
+    positive = sum(world[i] * layout[i] for i in range(3)) > 0.0
+    sense = 1.0 if positive else -1.0
+    unit = (
+        sense * world[0] / length,
+        sense * world[1] / length,
+        sense * world[2] / length,
+    )
+    deviation = max(abs(unit[i] - layout[i]) for i in range(3))
+    _telemetry.event(
+        "assembly.drive_train_explode.cone_axis",
+        axis=label,
+        unit=unit,
+        positive=positive,
+        deviation=deviation,
+    )
+    if deviation > _CONE_AXIS_TOLERANCE:
+        raise RuntimeError(
+            f"{label}: world direction {unit!r} is not the cone axis {layout!r} "
+            f"(deviation {deviation:.3g})"
+        )
+    return _Direction(_qualify_entity_name(adapter, label), positive, unit)
 
 
 def _create_named_view(
@@ -158,7 +236,10 @@ def create_drive_train_explode(
     except ValueError as exc:
         raise RuntimeError(f"{view_name}: {exc}") from exc
     expected = {name: [0.0, 0.0, 0.0] for name in by_name}
-    axes = _global_axes(adapter, assembly)
+    directions = {
+        **_global_directions(adapter, assembly),
+        "cone": _cone_direction(adapter, instances, by_name, baseline),
+    }
 
     _create_named_view(model, assembly, configuration_name, view_name)
     if not assembly.ShowExploded2(True, view_name):
@@ -189,15 +270,22 @@ def create_drive_train_explode(
                 for name in names:
                     if not by_name[name].Select4(True, data, False):
                         raise RuntimeError(f"{label}: cannot select {name}")
-                axis_name, positive = axes[step.axis]
+                direction = directions[step.axis]
                 if not model.Extension.SelectByID2(
-                    axis_name, "AXIS", 0.0, 0.0, 0.0, True, 2, null_callout(), 0
+                    direction.select_name, "AXIS", 0.0, 0.0, 0.0, True, 2, null_callout(), 0
                 ):
                     raise RuntimeError(
-                        f"{label}: cannot select global direction {axis_name} with mark 2"
+                        f"{label}: cannot select direction {direction.select_name} with mark 2"
                     )
                 result = configuration.AddExplodeStep2(
-                    abs(distance), -1, (distance > 0.0) != positive, 0.0, -1, False, True, False
+                    abs(distance),
+                    -1,
+                    (distance > 0.0) != direction.positive,
+                    0.0,
+                    -1,
+                    False,
+                    True,
+                    False,
                 )
                 model.ClearSelection2(True)
                 if not isinstance(result, tuple) or len(result) != 2:
@@ -226,7 +314,8 @@ def create_drive_train_explode(
                         f"{label}: step component/distance readback mismatch: {actual!r}"
                     )
                 for name in names:
-                    expected[name]["xyz".index(step.axis)] += distance
+                    for i in range(3):
+                        expected[name][i] += distance * direction.unit[i]
                 mismatches = []
                 for name, component in by_name.items():
                     current = _presentation_transform(component)
@@ -244,7 +333,7 @@ def create_drive_train_explode(
                     "assembly.drive_train_explode.readback",
                     step=label,
                     moved=names,
-                    axis=axis_name,
+                    axis=direction.select_name,
                     signed_distance_mm=step.distance_mm,
                     mismatches=tuple(mismatches),
                 )

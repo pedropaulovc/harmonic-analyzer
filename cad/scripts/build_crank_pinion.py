@@ -12,8 +12,8 @@ carries the 1/8 in retention pin that keys the pinion to the crankshaft
 through a match-drilled radial cross-hole (crank_pinion_spec).
 
 Dimensions: cad/config/dimensions.yaml ch12 crank-drive gear row +
-Appendix C #9. Face slightly wider than the drive gear's (meshing-pair
-practice, axial alignment slack).
+Appendix C #9. The 9.5 face remains wider than the drive gear's 7.2113
+face; the south face stays against its restored MHA-016 boss-side datum.
 
 Layout: gear axis = Z through the origin, teeth z = 0..FACE_WIDTH, boss
 z = FACE_WIDTH..OVERALL_LENGTH, pin at FACE_WIDTH + BOSS_LENGTH / 2 (W15).
@@ -77,6 +77,7 @@ from crank_pinion_spec import (
     DRAWING_NOTES,
     DRAWING_PRECISION,
     FACE_WIDTH,
+    FACE_WIDTH_LIMITS,
     GEAR_DATA,
     OUTSIDE_DIA,
     OUTSIDE_DIA_TOLERANCE_MM,
@@ -94,11 +95,9 @@ MATERIAL = "Plain Carbon Steel"  # steel like its mate (p.19/20)
 TEETH = 16  # DIMENSIONS.md ch12 / Appendix C #9 estimate (low)
 DP = DIAMETRAL_PITCH  # the 64T's normal-plane cutter, cut square (crank_pinion_spec)
 PA_DEG = PRESSURE_ANGLE_DEG
-# FACE_WIDTH (10.4: spans the 64T row north of the v2 crank boss) lives in
-# crank_pinion_spec with the boss and pin it sizes; build_drive_train_assembly's
-# PINION_FACE asserts equality. (The old 12.0 "slightly wider than the drive
-# gear's 10" was a low-confidence read; 11.0 fit the line-of-centres overhang
-# model but grazed the true rim minimum at the tight 2026-07-14 fit.)
+# FACE_WIDTH (9.5) and BOSS_LENGTH are in crank_pinion_spec; only the
+# toothed north end and the boss/pin north of it retreat from the old 10.4.
+# build_drive_train_assembly checks the installed south face and overlap.
 BORE_DIAMETER = BORE_DIA  # the crankshaft's Ø9.0 pinion seat (crank_pinion_spec)
 
 # The hub boss as the runtime gate reads it (#906 diag v3, d6ca08eb7): a boss
@@ -414,6 +413,11 @@ async def build(adapter) -> dict[str, str]:
     # the boss -- nothing runs on it.
     set_dimension_symmetric_tolerance(
         adapter, "BossProfile", "OutsideDia", OUTSIDE_DIA_TOLERANCE_MM
+    )
+    # The face's own +0/-0.30: the drive train proves the T120 air at its long
+    # limit and the 64T row engagement at its short one (Codex P1 on #1128).
+    set_dimension_bilateral_tolerance(
+        adapter, "GearBlank", "FaceWidth", *FACE_WIDTH_LIMITS
     )
     await volume_check(
         adapter, "driven crank pinion (equations neutral)", volume, 0.01 * v_bore

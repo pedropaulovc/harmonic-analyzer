@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import re
 
+import cone_gear_stack
+import cone_stack_end_play
 import draw_cone_tip_shim as shim
 import draw_drive_train_assembly as drawing
 import drive_train_steps as steps
@@ -59,27 +61,31 @@ def test_each_typed_step_cite_names_the_step_that_does_it(
     assert phrase in _step_body(key)
 
 
-def test_the_cone_gear_joint_prints_in_the_step_that_bonds_the_gears() -> None:
-    """#834 (rule 6) took the MHA-013 joining method off every cone gear sheet,
-    so the step that bonds the gears states it, and the adhesive note sends
-    the fitter to that step, not to a print that no longer carries it."""
-    import cone_gear_notes
-    import cone_gear_spec
+def test_the_cone_stack_step_prints_measured_limits_and_feeler() -> None:
+    """The fitter accepts the touching gear stack before setting the tip gap."""
+    low, high = cone_gear_stack.STACK_L20_ACCEPT
+    stack = _step_body("cone-gears-stacked")
+    fitup = _step_body("post-and-tip-block")
+    assert "MHA-021" in stack and "MHA-013" in stack
+    assert "T120 FIRST THROUGH T006" in stack
+    assert "EACH FLAT TO FLAT AND AGAINST THE LAST" in stack
+    assert f"{low:.3f}-{high:.3f}" in stack
+    assert "RE-FACE A LONG STACK" in stack
+    assert "REMAKE THE THINNEST GEAR OF A SHORT ONE" in stack
+    assert f"{cone_stack_end_play.TIP_BLOCK_FEELER:.2f} FEELER ON MHA-096" in fitup
+    assert "IT NIPS; SNUG MHA-140" in fitup
 
-    joint = cone_gear_notes.ATTACHMENT
-    for teeth in cone_gear_spec.CONFIGURATION_TEETH:
-        assert joint not in cone_gear_notes.drawing_notes(teeth)
-        assert joint not in cone_gear_notes.gear_data(teeth)
-    body = _step_body("cone-gears-bonded")
-    assert "MHA-013" in body and joint in body
-    adhesive = next(
-        line
-        for line in drawing.CONSUMABLES_NOTES.splitlines()
-        if line.startswith("ADHESIVE:")
-    )
-    assert "MHA-013" in adhesive
-    assert f"STEP {steps.step_number('cone-gears-bonded')}" in adhesive
-    assert "PRINT" not in adhesive
+
+def test_the_printed_shaft_end_play_keeps_the_bushing_off_the_tip_block() -> None:
+    """Codex P1 on #1128: the collar carries the stack north by MHA-014's end
+    play, so the printed top spends the stack's float.  At the tightest feeler
+    setting the bushing must still run MIN_END_PLAY off the block."""
+    match = re.search(r"END PLAY (\d+\.\d+)-(\d+\.\d+)", _step_body("tip-adjuster-set"))
+    assert match is not None
+    low, high = (float(value) for value in match.groups())
+    assert 0.0 < low < high
+    running = cone_stack_end_play.STACK_FLOAT[0] - high
+    assert running >= cone_stack_end_play.MIN_END_PLAY - 1e-9, running
 
 
 def test_a_cite_to_the_wrong_step_is_caught() -> None:

@@ -91,22 +91,29 @@ Role = Literal["arbor-collar-pin"]
 COLLAR_PIN_ROLE: Role = "arbor-collar-pin"
 
 
+# The cone set's true axis, read off the post's journal: the rotor withdraws
+# along the bore it turns in. The post is stationary, so the direction the
+# steps are authored along never moves under them.
+CONE_AXIS_SOURCE = ("cone-pivot-post", "journal axis")
+
+
 @dataclass(frozen=True)
 class ExplodeStep:
     """One native explode step: every instance of ``stems`` meeting ALL
     ``picks`` -- and, when ``roles`` is set, carrying one of them -- moves
-    ``distance_mm`` along the world ``axis`` (sign = direction)."""
+    ``distance_mm`` along ``axis`` (sign = direction): a world axis, or
+    ``"cone"``, the post journal's axis, positive toward the cone's tip."""
 
     label: str
     stems: tuple[str, ...]
-    axis: Literal["x", "y", "z"]
+    axis: Literal["x", "y", "z", "cone"]
     distance_mm: float
     picks: tuple[Pick, ...] = ()
     roles: tuple[Role, ...] = ()
 
 
 # Machine frame: +Y up, -Z front (south), the drum arbor along Z. Every family
-# not listed in a step stays put (STATIONARY): the gear stacks, shafts, straps
+# not listed in a step stays put (STATIONARY): the drum stack, shafts, straps
 # and castings carry the balloons in place; only what hides or overlaps moves.
 EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     # cylinder bank: slide the retention stack off each end of the arbor
@@ -128,14 +135,36 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     ExplodeStep("north thrust washer", ("cylinder-end-disc",), "z", 15.0, ("north",)),
     ExplodeStep("pedestal screws lift", ("pedestal-hold-down-screw",), "y", 30.0),
     ExplodeStep("apex set screws lift", ("arbor-set-screw",), "y", 20.0),
-    # cone set: base hardware up, swing plate down
+    # cone set: base hardware up, swing plate down.  The rotor (shaft, gears,
+    # tip bushing) withdraws north out of the post along its own axis, so the
+    # MHA-014 journal stands clear of the post (user ruling 2026-09-29: run 7's
+    # touching gears, collar and tip hardware left no shaft face in view).
+    # The journal is 43.011 long, so 50 leaves ~7 of air south of it; the tip
+    # hardware goes 12 further, which clears the 3.7 the tip runs into the
+    # block by ~8.
     ExplodeStep("swing plate drops", ("cone-swing-platform",), "y", -30.0),
     ExplodeStep("post mount screws lift", ("post-mount-screw",), "y", 100.0),
     ExplodeStep("pivot screw lifts", ("cone-pivot-screw",), "y", 35.0),
     ExplodeStep("lock knob lifts", ("cone-lock-knob",), "y", 30.0),
-    ExplodeStep("swing stop lifts", ("swing-stop-screw",), "y", 25.0),
+    # The withdrawn cone's upper silhouette covers a 25 lift: run
+    # 20260929T174651337Z found no swing-stop-screw ink at any of 24 points
+    # and anchored its balloon on cone-gear-5.  50 puts its head ~2.9 mm of
+    # sheet (1:4) above that silhouette.
+    ExplodeStep("swing stop lifts", ("swing-stop-screw",), "y", 50.0),
+    ExplodeStep(
+        "cone rotor withdraws",
+        ("cone-gear-shaft", "cone-gear", "crank-drive-gear", "cone-tip-bushing"),
+        "cone",
+        50.0,
+    ),
+    ExplodeStep(
+        "tip block slides off",
+        ("cone-tip-block", "cone-tip-adjuster", "cone-tip-pinch-screw"),
+        "cone",
+        62.0,
+    ),
     ExplodeStep("tip pinch screw lifts", ("cone-tip-pinch-screw",), "y", 25.0),
-    ExplodeStep("tip adjuster backs out", ("cone-tip-adjuster",), "z", 30.0),
+    ExplodeStep("tip adjuster backs out", ("cone-tip-adjuster",), "cone", 30.0),
     # crank: the arm group comes off the crankshaft's front end
     ExplodeStep(
         "crank arm group",
@@ -185,12 +214,7 @@ STATIONARY_STEMS = frozenset(
     {
         "cylinder-gear-shaft",
         "cylinder-gear",
-        "cone-gear-shaft",
-        "cone-gear",
-        "crank-drive-gear",
         "cone-pivot-post",
-        "cone-tip-block",
-        "cone-tip-bushing",
         "cone-tip-shim",
         "crankshaft",
         "crank-pinion",
@@ -205,6 +229,9 @@ STATIONARY_STEMS = frozenset(
         "pinion-cam",
     }
 )
+if CONE_AXIS_SOURCE[0] not in STATIONARY_STEMS:
+    raise AssertionError(f"the cone axis's owner {CONE_AXIS_SOURCE[0]!r} must stay put")
+
 
 @dataclass(frozen=True)
 class Instance:

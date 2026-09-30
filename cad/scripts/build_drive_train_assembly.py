@@ -58,15 +58,15 @@ Those centres lie on ONE straight shaft iff sin(i) = 2.54/Z_PITCH ->
 i = 21.0976 deg (the retired arcsin(2.54/7.5) = 19.8 put the tracking
 on the wrong leg of the triangle: it produced a 0.44/station z-drift
 and 0.15/station radial error -- "most gears not meshing"), with seat
-pitch Z_PITCH*cos(i) = 6.5839 along the shaft. The 6.5839 pitch forces
-CONE_FACE down to 6.5 (annotated 7 mm faces would overlap 0.42): the
-book's annotated cone figures (face 7, pitch 7.5, stack 150) are
-mutually inconsistent with the photo-measured drum grid -- the drum
-grid wins (it anchors the gates and all channel machinery), and the
-150 mm annotation reconciles as gear stack 131.6 + 64T face 8 + air.
-Self-consistency: tan(cone half-angle) = 2.54/6.5839 = tan(i), so the
-cone's drum-side generator runs PARALLEL to the drum axis -- the p.18
-seam.
+pitch Z_PITCH*cos(i) along the shaft (cone_line.SEAT_PITCH, 6.8888).
+CONE_FACE is that pitch floored to four places (6.8887), so the gears
+stack solid, face to face (user ruling 2026-09-28): the book's
+annotated cone figures (face 7, pitch 7.5, stack 150) are mutually
+inconsistent with the photo-measured drum grid -- the drum grid wins
+(it anchors the gates and all channel machinery).
+Self-consistency: tan(cone half-angle) = RADIUS_STEP/SEAT_PITCH =
+tan(i), so the cone's drum-side generator runs PARALLEL to the drum
+axis -- the p.18 seam.
 
 The engagement is intentionally PARTIAL ("oblique angle ... partial
 engagement, distinct wear", ch. 12): the contact tooth crosses the
@@ -89,7 +89,7 @@ a crossed-helical pair, gear helix = shaft angle, pinion straight), and
 the pinion stands PROUD of the pivot post's uncut casting face (img06:
 no relief pocket in the casting). Its south tooth face seats 0.25 mm
 north of that boss face; the span checks below keep it off the T120
-and cover at least 85% of the narrowed 64T row. The fixed-centre
+and cover at least 85% of the grown 64T row. The fixed-centre
 mesh's only backlash requirement is positive clearance at the worst
 closing corner, proved by crank_mesh_stack.
 The perpendicular 64T presents its contact tooth r*cos(alpha)*sin(i)
@@ -305,20 +305,25 @@ def _cone_tip_radius_max(teeth: int) -> float:
     """
     return (cone_gear_outside_dia_mm(teeth) + CONE_GEAR_BLANK_DIA_BAND[0]) / 2.0
 
-# Cone gear face (cone_gear_spec.FACE_WIDTH, 6.0 since the U27 ruling of
-# 2026-09-23).  Every station, the 64T gap and the T006 -> bushing -> tip-block
-# stack stay on the historical 6.5 reference face: each gear is narrowed from
-# its SOUTH face only (seed placed (reference - face)/2 north of its station),
-# so all north faces -- and the tip end-play stack against T006 -- are
-# unchanged; the drum's engaged zone ([-0.50, +1.60] about the reference
-# centre) stays inside the minimum 5.2 face.
+# Cone gear face (cone_gear_spec.FACE_WIDTH = 6.8887: the seat pitch floored
+# to the four places it prints).  The cone set is a SOLID STACK (user ruling
+# 2026-09-28, cone_gear_stack): collar -> 64T -> T120 ... T006, each gear
+# bearing on the one before it.  Every station and the T006 -> bushing ->
+# tip-block stack stay on the historical 6.5 reference face: each gear grew
+# from its SOUTH face only (seed placed (reference - face)/2 = 0.19435 SOUTH
+# of its station), so all north faces -- and the tip end-play stack against
+# T006 -- are unchanged.  The drum's engaged zone keeps its place about the
+# reference centre (test_cone_gear_mesh_design re-expresses it about the grown
+# centre and holds it inside the face under the stack's axial stations).
 CONE_FACE = CONE_GEAR_FACE_WIDTH
 from crank_drive_gear_spec import (  # noqa: E402
     FACE_WIDTH as GEAR64_FACE,
     CENTRE_SHIFT_NORTH as GEAR64_CENTRE_SHIFT_NORTH,
-    NORTH_FACE_REFERENCE_WIDTH as GEAR64_NORTH_FACE_REFERENCE_WIDTH,
+    LAYOUT_FACE_WIDTH as GEAR64_LAYOUT_FACE,
+    SOUTH_FACE_SHIFT_NORTH as GEAR64_SOUTH_FACE_SHIFT_NORTH,
 )
-# The 10 mm reference preserves the original station derivation.
+# The 19.9 layout station was first drawn for a 10 mm 64T face 0.1 south of
+# a 6.5 T120; the number is kept so every station derived from it stands.
 GEAR64_CENTRE_REFERENCE_FACE = 10.0
 from crank_pinion_spec import FACE_WIDTH as PINION_FACE  # noqa: E402
 
@@ -360,17 +365,28 @@ for _j in range(20):
     if abs(_p[0] - _x) > 1e-9 or abs(_p[2] - _z) > 1e-9:
         raise AssertionError(f"cone seat {_j} off the shaft line: {(_x, _z)} vs {_p}")
 
-# The 64T narrows only from the south; its north face and T120 gap are fixed.
+# The 64T's SOUTH face stays on MHA-014's collar, 1.5 north of the 8.0 layout
+# face's (#1126), and the gear grew NORTH until it bears on T120's grown south
+# face (crank_drive_gear_spec, user ruling 2026-09-28): the solid stack's
+# first joint.  GEAR64_STATION is the 19.9 layout station.
 GEAR64_STATION = (
     SHAFT_T120_STATION - (CONE_FACE_STATION_REFERENCE + GEAR64_CENTRE_REFERENCE_FACE) / 2.0 - 0.1
 )  # 19.9
 GEAR64_CENTRE_STATION = GEAR64_STATION + GEAR_AXIS_SHIFT + GEAR64_CENTRE_SHIFT_NORTH
+_T120_SOUTH_FACE_STATION = (
+    SHAFT_T120_STATION + GEAR_AXIS_SHIFT + CONE_FACE_STATION_REFERENCE / 2.0 - CONE_FACE
+)
 if not math.isclose(
-    GEAR64_CENTRE_STATION + GEAR64_FACE / 2.0,
-    GEAR64_STATION + GEAR_AXIS_SHIFT + GEAR64_NORTH_FACE_REFERENCE_WIDTH / 2.0,
+    GEAR64_CENTRE_STATION - GEAR64_FACE / 2.0,
+    GEAR64_STATION + GEAR_AXIS_SHIFT - GEAR64_LAYOUT_FACE / 2.0 + GEAR64_SOUTH_FACE_SHIFT_NORTH,
     abs_tol=1e-9,
+) or not math.isclose(
+    GEAR64_CENTRE_STATION + GEAR64_FACE / 2.0, _T120_SOUTH_FACE_STATION, abs_tol=1e-9
 ):
-    raise AssertionError("64T must narrow from the south with its north face fixed (user ruling 2026-09-28)")
+    raise AssertionError(
+        "64T must keep its south face on the collar and bear on T120's south face "
+        "(user ruling 2026-09-28)"
+    )
 GEAR64_SEAT = cone_station(GEAR64_CENTRE_STATION)
 R64 = (64.0 / DP_CRANK) * 25.4 / 2.0
 R16 = (16.0 / DP_CRANK_CUTTER) * 25.4 / 2.0
@@ -469,9 +485,10 @@ if not math.isclose(
 # study if the slack, band or backlash ever changes.
 _TP64 = 360.0 / 64.0
 DELTA64 = round(ALPHA64 / _TP64) * _TP64 - ALPHA64  # 1.57: 64T tooth lead
-# Exact-solid nine-phase sweep of the restored fixed axis and 6.5 face
-# (2026-09-28): common free seed-offset interval [-2.775957, -0.205645].
-# Its midpoint rounded to 0.01 deg retains over 1.28 deg on either side.
+# Exact-solid nine-phase sweep of the restored fixed axis at the grown 7.2113
+# 64T face and the 9.5 pinion face (2026-09-28,
+# dt-logs/crank-mesh-backlash-72113-95-20260928.jsonl): common free
+# seed-offset interval [-2.789, -0.215]; -1.49 keeps over 1.27 deg each side.
 MESH_WINDOW_CENTRE_DEG = -1.49
 PINION_SEED_DEG = (
     (ALPHA16 + 180.0) - DELTA64 * (64.0 / 16.0) - 22.5 / 2.0
@@ -745,9 +762,10 @@ from crank_pinion_spec import (  # noqa: E402
     PIN_DIA as PINION_PIN_DIA,
     PIN_LENGTH as PINION_PIN_LENGTH,
     FACE_WIDTH_PLACES as PINION_FACE_WIDTH_PLACES,
+    FACE_WIDTH_LIMITS as PINION_FACE_LIMITS,
+    W15_FACE_ALLOWANCE_MM as PINION_W15_FACE_ALLOWANCE,
     OVERALL_LENGTH_PLACES as PINION_OVERALL_LENGTH_PLACES,
     SHAFT_LENGTH_PLACES as PINION_SHAFT_LENGTH_PLACES,
-    printed_band_mm,
     PIN_EDGE_MIN_WORST as PINION_PIN_EDGE_MIN_WORST,
     PIN_STATION as PINION_PIN_STATION,
     PIN_STATION_LAYOUT_ALLOWANCE_MM as PINION_PIN_LAYOUT_ALLOWANCE,
@@ -798,9 +816,10 @@ PINION_PIN_EDGE_NOMINAL_ACTUAL = _SHAFT_NORTH_END - (
 # north of the shaft's rear end, so on disengage the BIG end -- where the
 # gears need the most working-depth separation -- swings the farthest
 # (throw ~ distance from pivot).
-# T006 is the reference gear for the tip-end stack. The bushing sits directly
-# against its north face; the block follows after one bushing-half-width of
-# clearance, and the pivot keeps its established 11 mm offset from the block
+# T006 is the reference gear for the tip-end stack. The bushing bears on its
+# north face; the block is feeler-set one TIP_BLOCK_FEELER off the bushing
+# (cone_stack_end_play, user ruling 2026-09-28), and the pivot stays where it
+# was, now 12.55 north of the block (the platform's TIP_SCREW_LOCAL_Z)
 # (T006_CENTER_STATION, T006_NORTH_FACE, TIP_BLOCK_STATION and PIVOT_STATION
 # come from cone_line; the check below holds them to the parts).
 
@@ -840,7 +859,7 @@ from cone_swing_platform_spec import (  # noqa: E402
     POST_MOUNT_SPEC,
     POST_MOUNT_TAP_EDGE_BREAK,
     POST_MOUNT_THREAD_DIA,
-    PLATE_STOCK_BAND as PLAT_STOCK_BAND,
+    TIP_SCREW_LOCAL_Z as PLAT_TIP_SCREW_LOCAL_Z,
 )
 from cone_tip_shim_spec import (  # noqa: E402
     SHIM_NORTH_Z as TIP_SHIM_NORTH_Z,
@@ -861,7 +880,6 @@ from cone_lock_knob_spec import (  # noqa: E402
 )
 from cone_pivot_screw_spec import (  # noqa: E402
     HEAD_DIA as PSCREW_HEAD_DIA,
-    HEAD_H as PSCREW_HEAD_H,
     SHOULDER_DIA as PSCREW_SHOULDER_DIA,
     SHOULDER_LEN as PSCREW_SHOULDER_LEN,
     THREAD as PSCREW_THREAD,
@@ -1077,9 +1095,6 @@ from cone_tip_block_spec import (  # noqa: E402
     BLOCK_Z as TIP_BLOCK_Z,
     FIT_UP_SHIM_MARGIN_MM as TIP_FIT_UP_SHIM_MARGIN_MM,
     FLANGE_LEN as TIP_FLANGE_LEN,
-    FOOT_SHIM_RANGE_MM as TIP_FOOT_SHIM_RANGE,
-    HEEL_RELIEF_DEPTH as TIP_HEEL_RELIEF_DEPTH,
-    HEEL_RELIEF_HEIGHT as TIP_HEEL_RELIEF_HEIGHT,
     PASSAGE_CENTER_DATUM as TIP_PASSAGE_CENTER_DATUM,
     PINCH_BORE_SPEC as TIP_PINCH_BORE_SPEC,
     PINCH_CLEARANCE_SPEC as TIP_PINCH_CLEARANCE_SPEC,
@@ -1107,13 +1122,13 @@ from build_cone_tip_pinch_screw import (  # noqa: E402
     THREAD as PINCH_THREAD,
 )
 from cone_gear_shaft_spec import (  # noqa: E402
-    DRAWING_PRECISION_BY_NAME as SHAFT_DRAWING_PRECISION,
     ADJUSTER_EMBED as ADJ_EMBED,
     COLLAR_END_STATION as SHAFT_COLLAR_END,
     COLLAR_START_STATION as SHAFT_COLLAR_START,
     FRONT_STUB as SHAFT_FRONT_STUB,
     SECTIONS as SHAFT_SECTIONS,
 )
+from cone_stack_end_play import TIP_BLOCK_FEELER  # noqa: E402
 
 
 def _require_tapped_thread(
@@ -1139,12 +1154,14 @@ def _require_clearance_size(label: str, screw_thread: str, hole_spec) -> None:
         )
 
 
-_TIP_BLOCK_STACK = T006_NORTH_FACE + BUSH_LEN + BUSH_LEN / 2.0 + TIP_BLOCK_Z / 2.0
+# The block is feeler-set off the bushing, and the platform's tip-screw slot
+# is laid out from the pivot to the block's station.
+_TIP_BLOCK_STACK = T006_NORTH_FACE + BUSH_LEN + TIP_BLOCK_FEELER + TIP_BLOCK_Z / 2.0
 if (
     abs(TIP_BLOCK_STATION - _TIP_BLOCK_STACK) > 1e-9
-    or abs(PIVOT_STATION - (TIP_BLOCK_STATION + 11.0)) > 1e-9
+    or abs(TIP_BLOCK_STATION - PIVOT_STATION - PLAT_TIP_SCREW_LOCAL_Z) > 1e-9
 ):
-    raise AssertionError("cone_line tip-end stack drifted from the bushing/block parts")
+    raise AssertionError("cone_line tip-end stack drifted from the bushing/block/platform parts")
 # One journal drive height across the platform and both riders: plate
 # thickness under each foot + bore height = 54 above the base top.
 if (
@@ -1163,15 +1180,14 @@ if POST_JOURNAL_AXIS_HEIGHT_TOLERANCE_MM > TIP_FIT_UP_SHIM_MARGIN_MM:
     raise AssertionError("the tip-block shim margin no longer covers the post's axis-height band")
 # U30 stack (I24): PlateTop | MHA-141 shim pack | block foot. The shim is
 # modelled at the nominal pack and covers the block's foot face exactly -- the
-# full width, from the I31 foot flange's south end to the heel relief's inner
-# face -- so the foot rests on it across the whole face and nothing reaches
-# under the pivot-screw head the relief clears.
+# full width, from the I31 foot flange's south end to the block's north face
+# -- so the foot rests on it across the whole face.
 if abs(TIP_SHIM_T - TIP_SHIM_NOMINAL) > 1e-9:
     raise AssertionError("MHA-141 shim thickness differs from the block's nominal pack")
 if (
     abs(TIP_SHIM_X - TIP_BLOCK_X) > 1e-9
     or abs(TIP_SHIM_SOUTH_Z - (-TIP_BLOCK_Z / 2.0 - TIP_FLANGE_LEN)) > 1e-9
-    or abs(TIP_SHIM_NORTH_Z - (TIP_BLOCK_Z / 2.0 - TIP_HEEL_RELIEF_DEPTH)) > 1e-9
+    or abs(TIP_SHIM_NORTH_Z - TIP_BLOCK_Z / 2.0) > 1e-9
 ):
     raise AssertionError("MHA-141 shim footprint differs from the tip block foot face")
 # U30 post mount (I22): each MHA-142 seats on the MHA-016 counterbore floor and
@@ -1448,7 +1464,7 @@ if not (
 ):
     raise AssertionError("v2 crank boss north/pinion clearance left its derived band")
 
-# The narrowed 64T clears every restored post feature at print-worst.
+# The grown 64T clears every restored post feature at print-worst.
 GEAR64_POST_OFFSET = GEAR64_CENTRE_STATION - POST_STATION
 _GEAR64_FROM_POST = [a - b for a, b in zip(GEAR64_SEAT, _PPOST, strict=True)]
 if (
@@ -1480,15 +1496,16 @@ def pinion_pin_edge_stack(
     Each term comes from the source that owns it: the shaft printed at its
     lower limit (crankshaft_spec), the seat gap opening from its nominal to the
     range's ceiling (the pinion, and its pin, move north), the boss mid-length
-    the pin is laid out at moving north with a long face and overall length
-    (each at its printed row), the laid-out station's allowance
+    the pin is laid out at moving north with a long face (W15's .X allowance,
+    which the face's printed band sits inside) and a long overall length (its
+    printed row), the laid-out station's allowance
     (crank_pinion_spec), and the title block's drilled-hole oversize on the
     pin's radius.
     """
     shaft_lower, _ = printed_deviations(
         shaft_length, PINION_SHAFT_LENGTH_PLACES, _SHAFT_LENGTH_LIMITS
     )
-    _, face_upper = printed_deviations(PINION_FACE, PINION_FACE_WIDTH_PLACES)
+    face_upper = PINION_W15_FACE_ALLOWANCE
     _, overall_upper = printed_deviations(pinion_overall_length, PINION_OVERALL_LENGTH_PLACES)
     return {
         "nominal": edge_nominal,
@@ -1543,41 +1560,49 @@ if sum(PINION_RECESS_STACK.values()) < PINION_RECESS_MIN_WORST:
         f"{_stack_text(PINION_RECESS_STACK)} < {PINION_RECESS_MIN_WORST}"
     )
 
-# The relocated v2 crank axis also clears the inclined T120 rim radially. Keep
-# the exact arc scan as a tripwire: if a later diameter/station change restores
-# radial overlap, the pinion's north face must retain 0.25 mm axial air.
-_T120_SEAT = cone_station(SHAFT_T120_STATION + GEAR_AXIS_SHIFT)
+# The inclined T120 reaches toward the crank axis above the 16T.  The exact
+# arc scan walks T120's SOUTH face rim (printed tip at its upper limit): the
+# rim point is the south face's axis point (the station moved along the
+# inclined axis, so both x and z shift) plus the in-plane radius.  Wherever
+# that rim enters the 16T's tip cylinder, the pinion's north face must keep
+# 0.25 mm axial air under it.  The south face is set on the feeler, so the
+# printed face band moves only the north face: the air is proved at the band's
+# long limit, the 64T row engagement below at its short limit (Codex P1 on
+# #1128).
+_PINION_FACE_SHORT, _PINION_FACE_LONG = printed_deviations(
+    PINION_FACE, PINION_FACE_WIDTH_PLACES, PINION_FACE_LIMITS
+)
+_T120_SOUTH_CENTRE = cone_station(_T120_SOUTH_FACE_STATION)
 _TIP120 = _cone_tip_radius_max(120)
 _T120_SOUTH = math.inf  # no radial overlap -> no T120 bound at all
-for _k in range(7200):
-    _c = _TIP120 * math.cos(math.radians(0.05 * _k))
-    _s = _TIP120 * math.sin(math.radians(0.05 * _k))
+for _k in range(72000):
+    _c = _TIP120 * math.cos(math.radians(0.005 * _k))
+    _s = _TIP120 * math.sin(math.radians(0.005 * _k))
     if (
-        math.hypot(_T120_SEAT[0] + _c * COS_I - X_CRANK, Y_DRIVE + _s - Y_CRANK)
+        math.hypot(_T120_SOUTH_CENTRE[0] + _c * COS_I - X_CRANK, Y_DRIVE + _s - Y_CRANK)
         <= R16 + ADD16
     ):
-        _T120_SOUTH = min(
-            _T120_SOUTH, _T120_SEAT[2] - _c * SIN_I + (CONE_FACE_STATION_REFERENCE / 2.0 - CONE_FACE) * COS_I
-        )
-T120_PINION_NORTH_AIR = _T120_SOUTH - (PINION_TOOTH_Z + PINION_FACE / 2.0)
+        _T120_SOUTH = min(_T120_SOUTH, _T120_SOUTH_CENTRE[2] - _c * SIN_I)
+T120_PINION_NORTH_AIR = _T120_SOUTH - (_PINION_SOUTH + PINION_FACE + _PINION_FACE_LONG)
 T120_PINION_AIR_FLOOR = 0.25
 if T120_PINION_NORTH_AIR < T120_PINION_AIR_FLOOR:
     raise AssertionError(
         f"16T north face leaves {T120_PINION_NORTH_AIR:.3f} mm to the inclined T120 rim, "
         f"below the {T120_PINION_AIR_FLOOR:.2f}-mm axial-air floor"
     )
-# ... and must still cover the 64T row (>= 85% of its face) -- an engagement
-# floor so a future station edit cannot quietly starve the mesh.
+# ... and must still cover the 64T row (>= 85% of its face) at the short
+# limit -- an engagement floor so a future station edit cannot quietly starve
+# the mesh.
 _G64_BAND = (
     _GEAR64_CONTACT_Z - GEAR64_FACE / 2.0 * COS_I,
     _GEAR64_CONTACT_Z + GEAR64_FACE / 2.0 * COS_I,
 )
-_ENGAGED = min(PINION_TOOTH_Z + PINION_FACE / 2.0, _G64_BAND[1]) - max(
-    PINION_TOOTH_Z - PINION_FACE / 2.0, _G64_BAND[0]
+_ENGAGED = min(_PINION_SOUTH + PINION_FACE + _PINION_FACE_SHORT, _G64_BAND[1]) - max(
+    _PINION_SOUTH, _G64_BAND[0]
 )
 CRANK_ROW_ENGAGEMENT_FRACTION = _ENGAGED / (GEAR64_FACE * COS_I)
 if CRANK_ROW_ENGAGEMENT_FRACTION < 0.85:
-    raise AssertionError("16T covers less than 85% of the narrowed 64T tooth row")
+    raise AssertionError("16T covers less than 85% of the 64T tooth row")
 # The base's pivot-screw hole sits exactly under the swing pivot -- both are
 # authored in the machine frame, so the coordinates agree directly (pre-#151
 # this module derived in the mirrored frame and the hole's x was the NEGATED
@@ -1603,51 +1628,6 @@ _require_tapped_thread(
     "cone pivot", PSCREW_THREAD, BASE_PIVOT_SEAT_SPEC, kind="tapped_bottoming"
 )
 require_base_seat_fit("cone pivot", BASE_PIVOT_SEAT_SPEC, PSCREW_THREAD_TAIL_LEN)
-# I31 heel relief, judged at the worst case: the pivot-screw head stands on
-# its shoulder at station PIVOT_STATION, only HEEL_NOMINAL_GAP off the block's
-# north face.  At fit-up the block's north face follows the shaft tip (the
-# cup seats at a fixed embed from that face), so it can come north by the
-# shaft's overall-length band (Sec4End); the head floats in the plate's pivot
-# hole (drilled band on the hole, stock shoulder).  The relief must clear the
-# head by HEEL_AIR in plan at that extreme, and in height from the lowest foot
-# (thinnest stock plate, thinnest shim stack) to the head top.  The block
-# spec's printed .XX values must cover both, at their own low limits, and be
-# sized from them (no oversize past one .XX band, rounded up).
-_GENERAL_1PL_MM = float(str(_config.title_block("linear_1pl")["display"]).lstrip("±"))
-_GENERAL_2PL_MM = float(str(_config.title_block("linear_2pl")["display"]).lstrip("±"))
-_DRILLED_HOLE_PLUS_MM = float(
-    str(_config.title_block("drilled_hole")["display_plus"]).lstrip("+")
-)
-_BAND_BY_PLACES = {1: _GENERAL_1PL_MM, 2: _GENERAL_2PL_MM}
-HEEL_AIR = 0.20
-HEEL_NOMINAL_GAP = (
-    PIVOT_STATION - (TIP_BLOCK_STATION + TIP_BLOCK_Z / 2.0)
-) - PSCREW_HEAD_DIA / 2.0
-HEEL_TIP_TRAVEL = _BAND_BY_PLACES[SHAFT_DRAWING_PRECISION["Sec4End"]]
-HEEL_HEAD_FLOAT = (
-    PLAT_PIVOT_HOLE_DIA + _DRILLED_HOLE_PLUS_MM - PSCREW_SHOULDER_DIA
-) / 2.0
-HEEL_DEPTH_REQUIRED = HEEL_TIP_TRAVEL + HEEL_HEAD_FLOAT + HEEL_AIR - HEEL_NOMINAL_GAP
-HEEL_HEIGHT_REQUIRED = (
-    (PSCREW_SHOULDER_LEN + PSCREW_HEAD_H)
-    - (PLAT_T - PLAT_STOCK_BAND + TIP_FOOT_SHIM_RANGE[0])
-    + HEEL_AIR
-)
-for _lbl, _printed, _required in (
-    ("depth", TIP_HEEL_RELIEF_DEPTH, HEEL_DEPTH_REQUIRED),
-    ("height", TIP_HEEL_RELIEF_HEIGHT, HEEL_HEIGHT_REQUIRED),
-):
-    if _printed - _GENERAL_2PL_MM < _required - 1e-9:
-        raise AssertionError(
-            f"tip-block heel relief {_lbl} {_printed:.2f} .XX does not clear the "
-            f"pivot-screw head at the worst case (needs {_required:.3f} at its "
-            "low limit)"
-        )
-    if _printed > math.ceil((_required + _GENERAL_2PL_MM) * 100.0 - 1e-6) / 100.0:
-        raise AssertionError(
-            f"tip-block heel relief {_lbl} {_printed:.2f} is not sized from the "
-            f"worst-case stack ({_required:.3f} + .XX band)"
-        )
 
 
 # --- cone lock knob and swing stop -------------------------------------------
@@ -3326,9 +3306,14 @@ async def _key_to_shaft(
     and shaft share the inclined orientation (ROT_Y_INCLINE), so their Right
     planes are parallel at the keyed phase -- the parallel pins the spin with
     no tuned angle (the lag-screw idiom). Removes the same 6 DOF the lock did;
-    no fix/lock.  The seat is a Front-plane distance along the shaft axis
-    (read live) unless ``seat_plane`` names the shaft plane the gear's south
-    face sits ON (see :func:`_axial_seat`)."""
+    no fix/lock.  On the cone shaft the parallel IS the D-flat (user ruling
+    2026-09-28): every gear land's flat and every cone-gear/64T D-bore flat
+    face outward on their part's local +X, the Right-plane normal, so the
+    mate states the physical joint; a gear flipped 180 deg would put its flat
+    into the land, which the interference gate catches.  The seat is a
+    Front-plane distance along the shaft axis (read live) unless
+    ``seat_plane`` names the shaft plane the gear's south face sits ON (see
+    :func:`_axial_seat`)."""
     p_o = _org(adapter, part)
     await coincident_mate(
         adapter,
@@ -3483,11 +3468,12 @@ async def build(adapter) -> dict[str, str]:
     )
     _telemetry.info(
         f"16T/boss north-face feeler {_BOSS_NORTH_GAP:.4f} mm; "
-        f"16T/T120 north air {T120_PINION_NORTH_AIR:.4f} "
+        f"16T/T120 north air at face {_PINION_FACE_LONG:+.2f} {T120_PINION_NORTH_AIR:.4f} "
         f">= {T120_PINION_AIR_FLOOR:.2f} mm"
     )
     _telemetry.info(
-        f"16T/64T row engagement {_ENGAGED:.4f}/{GEAR64_FACE * COS_I:.4f} mm "
+        f"16T/64T row engagement at face {_PINION_FACE_SHORT:+.2f} "
+        f"{_ENGAGED:.4f}/{GEAR64_FACE * COS_I:.4f} mm "
         f"= {CRANK_ROW_ENGAGEMENT_FRACTION:.2%} >= 85%"
     )
     # #893: the W15 stacks are import-time asserts, so a passing build would

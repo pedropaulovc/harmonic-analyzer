@@ -24,7 +24,7 @@ index does not repeat it.
 | M08 | [Hole patterns, reaming and tapping](m08-hole-patterns-reaming-and-tapping.md) | 12 | `rocker-arm-support` feet, spring-hole pattern |
 | M09 | [The dividing head and indexing](m09-the-dividing-head-and-indexing.md) | 20 | `cylinder-gear` alignment notches |
 | M10 | [Gear cutting](m10-gear-cutting-making-the-cutter-then-the-gear.md) | 60+ | form cutters, then `cone-gear` T120 → the whole train |
-| M11 | [Soldering, finishing, assembly craft](m11-soldering-finishing-and-assembly-craft.md) | 16 | cone gear set soldered to its shaft |
+| M11 | [Soldering, finishing, assembly craft](m11-soldering-finishing-and-assembly-craft.md) | 16 | cone gear stack on its D-flat shaft |
 
 Total `[EST]` ≈ **236 h**, and M10 is certainly underestimated.
 

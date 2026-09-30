@@ -50,6 +50,9 @@ import channel_spring_installed_spec
 import connecting_rod_spec
 import counter_spring_spec
 import cylinder_gear_spec
+import cone_gear_spec
+import cone_shaft_land_bands
+import gear_seat_fit
 import lever_wire_geom
 import magnifying_clamp_geom
 import magnifying_lever_geom
@@ -841,6 +844,145 @@ def finite_difference_check(
 # --------------------------------------------------------------------------
 
 
+def flat_edge_break_mm() -> float:
+    """The flat half-chord the title block's edge break may take off a
+    D-flat's torque corner. A C0.25 chamfer's leg along the flat is at most
+    0.25; an R0.25 break sets back R*cot(a/2) < R, since every flat meets
+    its land at an obtuse corner (a ~ 147 deg on the Ø1.5875 tip land)."""
+    row = _config.title_block("edge_break")
+    return max(float(row["radius_mm"]), float(row["chamfer_max_mm"]))
+
+
+def _flat_half_chord(diameter: float, af: float) -> float:
+    """Half the width of a D-flat with across-flat ``af`` on a ``diameter`` land."""
+    return math.sqrt((diameter - af) * af)
+
+
+def _flat_chord_range(
+    diameter: float,
+    af: float,
+    dia_band: tuple[float, float],
+    af_band: tuple[float, float],
+) -> tuple[float, float]:
+    """(shortest, longest) flat half-chord a print accepts. For a fixed AF
+    the chord grows with the diameter; for a fixed diameter it shrinks as the
+    AF grows, because every flat is shallow (AF > D/2). Both extremes are
+    therefore corners of the limit box."""
+    chords = [
+        _flat_half_chord(diameter + d_dev, af + af_dev)
+        for d_dev in dia_band
+        for af_dev in af_band
+    ]
+    return min(chords), max(chords)
+
+
+def phase_profiles() -> dict[str, tuple[np.ndarray, np.ndarray]]:
+    """Phase radians = drawn deviation * per-channel scale + fixed residual.
+
+    Cone gear T_i has T_i/120 of its phase at the 120T cylinder cam.
+    The D-flat's AF clearance turns each gear by c / lever, where the lever is
+    how far along the flat the gear's bore can bear before contact runs out.
+    Every term is bounded at the print's worst, not averaged: the lever is
+    the shortest shaft flat MHA-014 accepts (land at its smallest diameter
+    and largest AF) less the title block's edge break on its torque corner
+    (``flat_edge_break_mm``), or the shortest bore flat if that is shorter.
+    The bore flat's corner is an inside corner, which the title block does
+    not break. Each land's residual is that lag against the longest unbroken
+    Ø9.525 flat. The crank index removes the Ø9.525 land's own lag whatever
+    its size or break, since that lag is proportional to i and only shifts
+    the index. Per-land departures and per-gear scatter cannot be removed by
+    that index. A shaft land's flat clocked off the Ø9.525 land's turns every
+    gear on it by the same angle (``cone_land_clock``, drawn per land by
+    ``draw_groups``).
+    """
+    teeth = 6 * np.arange(1, N_ELEMENTS + 1)
+    ratio = teeth / 120.0
+    edge_break = flat_edge_break_mm()
+    land_af_band = cone_shaft_land_bands.FLAT_AF_BAND
+    bore_af_band = gear_seat_fit.flat_bore_af_band(land_af_band)
+    levers = np.empty(N_ELEMENTS)
+    reference_land = np.zeros(N_ELEMENTS, dtype=bool)
+    reference_chord = math.nan
+    for dia_band, af, carried in zip(
+        cone_shaft_land_bands.SECTION_DIA_BANDS,
+        cone_shaft_land_bands.SECTION_FLAT_AF,
+        cone_shaft_land_bands.SECTION_CONE_GEAR_TEETH,
+        strict=True,
+    ):
+        if af is None:
+            continue  # pivot journal, with no gear and no flat
+        bore_band = gear_seat_fit.seat_bore_band(dia_band)
+        # The configured gear's bore is the nominal diameter of its shaft
+        # section; the section's bands set the land's and bores' limits.
+        for count in carried:
+            diameter = cone_gear_spec.bore_dia_mm(count)
+            shaft_short, shaft_long = _flat_chord_range(
+                diameter, af, dia_band, land_af_band
+            )
+            bore_short, _ = _flat_chord_range(diameter, af, bore_band, bore_af_band)
+            if shaft_short <= edge_break:
+                raise ValueError(
+                    f"the {edge_break} edge break leaves no D-flat lever on the "
+                    f"Ø{diameter:.4f} land: shortest half-chord {shaft_short:.4f}"
+                )
+            levers[count // 6 - 1] = min(shaft_short - edge_break, bore_short)
+            if 120 not in carried:
+                continue
+            reference_land[count // 6 - 1] = True
+            reference_chord = shaft_long
+    clearance_lo, clearance_hi = gear_seat_fit.FLAT_AF_CLEARANCE
+    clearance_mean = (clearance_lo + clearance_hi) / 2.0
+    residual = np.where(
+        reference_land,
+        0.0,
+        clearance_mean * ratio * (1.0 / levers - 1.0 / reference_chord),
+    )
+    deg = math.pi / 180.0
+    return {
+        "cam_phase": (np.full(N_ELEMENTS, deg), np.zeros(N_ELEMENTS)),
+        "mesh_lag_spread": (np.full(N_ELEMENTS, deg), np.zeros(N_ELEMENTS)),
+        "cone_flat_clock": (ratio * deg, np.zeros(N_ELEMENTS)),
+        "cone_land_clock": (ratio * deg, np.zeros(N_ELEMENTS)),
+        "cone_flat_play": (ratio / levers, residual),
+    }
+
+
+def draw_groups() -> dict[str, np.ndarray]:
+    """Features whose one draw moves several channels together.
+
+    ``group[i]`` is channel i's draw column, -1 a channel the feature never
+    moves. ``cone_land_clock`` is each flatted shaft land's clock off the
+    Ø9.525 land's flat: that land carries T030..T120 and the 64T, so it is
+    the reference, and turning it turns the whole train (a crank-index
+    shift). Every other land turns its own gears together -- T006 and T012
+    share the tip land's single flat.
+    """
+    land = np.full(N_ELEMENTS, -1)
+    column = 0
+    for carried in cone_shaft_land_bands.SECTION_CONE_GEAR_TEETH:
+        if not carried or 120 in carried:
+            continue  # the pivot journal, and the reference land
+        for count in carried:
+            land[count // 6 - 1] = column
+        column += 1
+    return {"cone_land_clock": land}
+
+
+def draw_feature(
+    rng: np.random.Generator, key: str, tolerance: float, draws: int, n_axes: int
+) -> np.ndarray:
+    """One feature's deviations, uniform within +/-``tolerance``: draws x 20,
+    or draws x 20 x axes for a position zone (``feature_axes``). A grouped
+    feature (``draw_groups``) takes one column per group, shared by its
+    channels."""
+    groups = draw_groups().get(key)
+    if groups is not None:
+        columns = rng.uniform(-tolerance, tolerance, size=(draws, int(groups.max()) + 1))
+        return np.where(groups >= 0, columns[:, np.maximum(groups, 0)], 0.0)
+    size = (draws, N_ELEMENTS) if n_axes == 1 else (draws, N_ELEMENTS, n_axes)
+    return rng.uniform(-tolerance, tolerance, size=size)
+
+
 def load_budget(path: Path = BUDGET_YAML) -> dict[str, Any]:
     """The allocation config (cad/config/error_budget.yaml)."""
     return yaml.safe_load(path.read_text(encoding="utf-8"))
@@ -878,6 +1020,7 @@ def _channel_model(
     axes = feature_axes(nom)
     d = np.broadcast_to(scale * x * nom.d_max, (draws, N_ELEMENTS)).copy()
     bias = np.zeros(N_ELEMENTS)
+    phases = phase_profiles()
     for key, v in dev.items():
         if key in axes:
             # the linearised deviated cycle: its gain AND its shape, per axis
@@ -887,8 +1030,9 @@ def _channel_model(
                 shape[field] = shape.get(field, 0.0) + per_mm * comp
         elif key in sens:
             log_g += np.log1p(sens[key] / 100.0 * v)
-        elif key in ("cam_phase", "mesh_lag_spread"):
-            phi += np.radians(v)
+        elif key in phases:
+            per_unit, residual = phases[key]
+            phi += v * per_unit + residual
         elif key == "station_setting":
             # A bar can be set neither below the pivot (build_channel_assembly
             # rejects amplitude_mm < 0) nor past amplitude.max_travel_mm (the
@@ -1007,11 +1151,8 @@ def monte_carlo(
     axes = feature_axes(nom)
 
     def draw(key: str, f: dict[str, Any]) -> np.ndarray:
-        # one column per axis the feature moves: a position zone's radial AND
-        # tangential offsets, each uniform within +/-tol (feature_axes)
         n_axes = len(axes.get(key, ((key, 1.0),)))
-        size = (draws, N_ELEMENTS) if n_axes == 1 else (draws, N_ELEMENTS, n_axes)
-        return rng.uniform(-f["tolerance"], f["tolerance"], size=size)
+        return draw_feature(rng, key, f["tolerance"], draws, n_axes)
 
     all_dev = {
         key: draw(key, f)
@@ -1048,11 +1189,15 @@ def monte_carlo(
         }
 
     per_feature = {key: stats({key: all_dev[key]}) for key in feats}
-    # Errors scale linearly with a feature's tolerance (uniform draws, small
-    # deviations), so the tolerance at which a feature ALONE would consume its
-    # allocation share follows by proportion -- the number a drawing may relax to.
+    # A linear allowable applies only to zero-centred deviations. A fixed
+    # per-land phase residual survives even at zero clearance scatter; changing
+    # the half-width alone cannot scale that effect proportionally.
     share = budget["allocation_share"]
+    phases = phase_profiles()
     for key, s in per_feature.items():
+        if key in phases and np.any(phases[key][1]):
+            s["allowable_tolerance"] = None
+            continue
         pair = s["per_input"]["pair_1_20"]["p99_max"]
         factor = min(share["mae_fs_pct"] / s["mae"], share["pair_p99_pct"] / pair)
         s["allowable_tolerance"] = feats[key]["tolerance"] * factor
@@ -1494,8 +1639,7 @@ def pair_joint_worst(
     dev = {}
     for key, f in feats.items():
         n_axes = len(axes.get(key, ((key, 1.0),)))
-        size = (draws, N_ELEMENTS) if n_axes == 1 else (draws, N_ELEMENTS, n_axes)
-        dev[key] = rng.uniform(-f["tolerance"], f["tolerance"], size=size)
+        dev[key] = draw_feature(rng, key, f["tolerance"], draws, n_axes)
     scatter = _channel_model(
         x,
         nom,
@@ -1723,9 +1867,11 @@ def _print_report(r: dict[str, Any], budget: dict[str, Any]) -> None:
     mc = r["monte_carlo"]
     for key, s in mc["per_feature"].items():
         unit = feats[key].get("unit", "mm")
+        allowable = s["allowable_tolerance"]
+        allowable_text = f"{allowable:.3f}" if allowable is not None else "n/a"
         p(
             f"{key:<24} {feats[key]['tolerance']:>6.3f} {unit:<3}{s['mae']:>7.3f} {s['rms']:>7.3f} {s['p99_max']:>8.3f} "
-            f"{s['per_input']['pair_1_20']['p99_max']:>9.3f} {s['allowable_tolerance']:>10.3f}"
+            f"{s['per_input']['pair_1_20']['p99_max']:>9.3f} {allowable_text:>10}"
         )
     c = mc["combined"]
     p(

@@ -174,7 +174,7 @@ PINION_PIN_EDGE_STACK = {
     "nominal": PINION_PIN_EDGE_TO_END,
     "shaft length": SHAFT_LENGTH_BAND[1],
     "seat gap": -SEAT_GAP_NORTH_RANGE,
-    "boss mid-length": -(crank_pinion_spec.FACE_WIDTH_GRADE_MM + crank_pinion_spec.OVERALL_LENGTH_GRADE_MM) / 2.0,
+    "boss mid-length": -(crank_pinion_spec.W15_FACE_ALLOWANCE_MM + crank_pinion_spec.OVERALL_LENGTH_GRADE_MM) / 2.0,
     "pin layout": -crank_pinion_spec.PIN_STATION_LAYOUT_ALLOWANCE_MM,
     "drill oversize": -float(_config.title_block("drilled_hole")["plus_mm"]) / 2.0,
 }

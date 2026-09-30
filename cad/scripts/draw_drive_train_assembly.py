@@ -64,10 +64,9 @@ from _drawing_simplified import simplified_name
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME, DrawingLayout
 from _drive_train_balloon_anchors import DRIVE_TRAIN_BALLOON_ANCHORS
-from cone_gear_notes import ATTACHMENT as CONE_GEAR_JOINT
 from cone_swing_platform_spec import POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT
-from crank_drive_gear_notes import ATTACHMENT_ALTERNATIVE as CRANK_GEAR_ALTERNATIVE
-from crank_drive_gear_notes import ATTACHMENT_PROCESS as CRANK_GEAR_JOINT
+from cone_gear_stack import COUNT as CONE_GEAR_COUNT, STACK_L20_ACCEPT
+from cone_stack_end_play import MIN_END_PLAY, STACK_FLOAT, TIP_BLOCK_FEELER
 from crank_pinion_spec import SEAT_FEELER_MM as PINION_SEAT_FEELER
 from drive_train_assembly_spec import (
     CLUSTERS,
@@ -81,7 +80,7 @@ from drive_train_assembly_spec import (
 )
 from pinion_spring_section import SCREW_EAST_OF_PIVOT as SPRING_SCREW_EAST_OF_PIVOT
 from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view, view_name
+from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
 
 SPEC = DRAWINGS_BY_NAME["drive_train_assembly"]
 ARTIFACT_STEM = SPEC.artifact_stem
@@ -436,22 +435,28 @@ ASSEMBLED_HEADING = (
     f"FULL DETAIL: SHEET {FULL_DETAIL_SHEET}."
 )
 
+# MHA-014's end play at step 3.  Backing the cup screw off lets the collar
+# carry the stack north toward the tip block, so the top of the band spends the
+# stack's float: it stops where the tightest feeler setting still leaves the
+# bushing MIN_END_PLAY off the block, with no MARGIN_SPARE at that corner (user
+# ruling 2026-09-29, Codex P1 on #1128, over a thicker feeler that would move
+# the block and lengthen the shaft).  Derived here, not in cone_stack_end_play:
+# that module sits in the recipe closure of every cone_line reader, and this
+# sheet is the band's only consumer.  0.05: the shaft never runs clamped.
+SHAFT_END_PLAY = (0.05, STACK_FLOAT[0] - MIN_END_PLAY)  # (0.05, 0.25)
+
 
 CONE_CRANK_STEPS = "\n".join(
     (
         "ASSEMBLY SEQUENCE - CONE SET AND CRANK",
-        # #834 (rule 6): the cone gears' joining method left the MHA-013
-        # sheets for this step; the wording is the gear's own constant.
-        "1. BOND {cone_gears}X MHA-013 TO THEIR MHA-014 SEATS, TIP FIRST, WITH",
-        f"   {CONE_GEAR_JOINT}: T006 AT THE BACK THROUGH",
-        f"   T120 AT THE FRONT (STATION TABLE, SHEET {FIT_SHEET}).",
-        # #906 (Main 2026-09-26): MHA-021's joining method moved here from its
-        # print (rule 6); the wording is the gear's own constants.  #916: the
-        # shaft's thrust collar is the 64T's axial stop, so the step names it
-        # (Main 2026-09-27; crank_boss_rim books the collar stack).
-        "   MHA-021 FRONT OF T120, AGAINST THE MHA-014 COLLAR:",
-        f"   {CRANK_GEAR_JOINT} ITS SEAT;",
-        f"   {CRANK_GEAR_ALTERNATIVE}.",
+        # Slide the one flat of every gear onto the shaft and close the
+        # accepted stack against its collar before setting tip end play.
+        "1. SLIDE MHA-021 ONTO THE MHA-014 D-FLAT AGAINST ITS COLLAR.",
+        "   SLIDE {cone_gears}X MHA-013 ON, T120 FIRST THROUGH T006,",
+        f"   EACH FLAT TO FLAT AND AGAINST THE LAST. MEASURE THE {CONE_GEAR_COUNT}-GEAR",
+        f"   STACK T120 SOUTH FACE TO T006 NORTH FACE: {STACK_L20_ACCEPT[0]:.3f}-"
+        f"{STACK_L20_ACCEPT[1]:.3f}.",
+        "   RE-FACE A LONG STACK; REMAKE THE THINNEST GEAR OF A SHORT ONE.",
         # U37c (user, 2026-09-23): MHA-142 is MSC 40923898, 1/4-20 x 3-1/2
         # slotted fillister, through the 6.02 counterbore.  Cut each screw
         # against its own MHA-016/MHA-091 matched holes, never proud of the
@@ -467,18 +472,21 @@ CONE_CRANK_STEPS = "\n".join(
         # up through the MHA-091 slot, height and side set by the shim pack at
         # fit-up. Wording from swing (dt-tip-block-attachment-options-20260923.md
         # section 2(a)).
-        "   JOURNAL MHA-014 IN MHA-016. SLIP MHA-096 ON THE TIP STUB AGAINST",
-        "   T006. SET MHA-092 ON A 1.10 MHA-141 SHIM PACK OVER THE MHA-091",
-        "   SLOT; MHA-140 UP THROUGH THE SLOT, FINGER-TIGHT. RUN MHA-097 IN",
-        "   UNTIL ITS CUP SEATS THE TIP. SLIDE MHA-092 IN THE SLOT AND CHANGE",
-        "   SHIMS UNTIL MHA-014 SPINS FREE, NO TIGHT SPOT AT THE MHA-016",
-        "   JOURNAL; SNUG MHA-140 AND RECHECK. RECORD THE SHIM STACK.",
+        "   JOURNAL MHA-014 IN MHA-016. SLIP MHA-096 ON AGAINST T006;",
+        "   PUSH THE STACK ONTO THE MHA-014 COLLAR. SET MHA-092 ON",
+        "   ITS MHA-141 SHIM PACK IN THE MHA-091 SLOT. LAY A",
+        f"   {TIP_BLOCK_FEELER:.2f} FEELER ON MHA-096; SLIDE MHA-092 ONTO IT UNTIL",
+        "   IT NIPS; SNUG MHA-140. RUN MHA-097 IN UNTIL ITS CUP SEATS",
+        "   THE TIP. CHANGE SHIMS UNTIL MHA-014 SPINS FREE, WITH NO",
+        "   TIGHT SPOT AT THE MHA-016 JOURNAL; SNUG MHA-140 AND",
+        "   RECHECK. RECORD THE SHIM STACK.",
         # U32 (user, 2026-09-23): option 1A turn-set, dt-pending-rulings
         # packet section 1. Worded without the pitch so it survives E11
         # (MHA-097 5/16-18 -> #10-32: 1/8 turn is ~0.18 -> ~0.10).
         "3. THREAD MHA-097 INTO MHA-092 UNTIL MHA-014 JUST STOPS SHUTTLING",
         "   AND STILL TURNS FREELY; BACK OFF 1/8 TURN; TIGHTEN",
-        "   MHA-098 ACROSS THE SLIT. END PLAY 0.05-0.40, BY FEEL OR INDICATOR.",
+        "   MHA-098 ACROSS THE SLIT. END PLAY "
+        f"{SHAFT_END_PLAY[0]:.2f}-{SHAFT_END_PLAY[1]:.2f}, BY FEEL OR INDICATOR.",
         # User ruling 2026-09-28: the crank journal runs directly in the post;
         # the centres are fixed, and the only mesh requirement is no binding.
         "4. FIT MHA-026 DIRECTLY IN THE MHA-016 CRANK BORE. SLIDE MHA-025",
@@ -793,7 +801,6 @@ INTERFACE_NOTES = "\n".join(
 CONSUMABLES_NOTES = "\n".join(
     (
         "GENERAL ASSEMBLY NOTES",
-        "ADHESIVE: MHA-013 AND MHA-021 PER STEP 1.",
         "OIL THE MHA-027/MHA-028 JOURNALS AND ALL PIVOTS WITH ISO VG 32",
         "MACHINE OIL. NO THREADLOCKER UNLESS A STEP OR PRINT CALLS FOR IT",
         "(LOCTITE 222 ON MHA-139, STEP 7). #4-40, #6-32, #8-32 SCREWS: SNUG.",

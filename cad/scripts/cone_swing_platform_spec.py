@@ -126,9 +126,8 @@ POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT = (
 # face. The slot runs across the cone axis so the block can be shifted +/-2.25
 # at fit-up; a shim pack under the foot sets its height. Both slots share the
 # same two end centres, TIP_SCREW_HALF_TRAVEL either side of the cone axis, at
-# the tip block's station (11.0 south of the pivot, from the drive-train
-# layout: PIVOT_STATION = TIP_BLOCK_STATION + 11.0).
-TIP_SCREW_LOCAL_Z = -11.0
+# the tip block's new station, 12.55 south of the UNCHANGED pivot seat.
+TIP_SCREW_LOCAL_Z = -12.55
 TIP_SCREW_HALF_TRAVEL = 2.0
 TIP_SCREW_MAJOR = 3.505  # #6-32 basic major
 # McMaster 91255A148 lists one head size, 0.262 dia x 0.073 high, taken as the

@@ -21,6 +21,7 @@ import _config
 from cone_pivot_post_installation import DRUM_X, GEAR_AXIS_SHIFT
 from cone_tip_block_spec import BLOCK_Z as TIP_BLOCK_Z
 from cone_tip_bushing_spec import LENGTH as BUSH_LEN
+from cone_stack_end_play import TIP_BLOCK_FEELER
 
 Y_BASE_TOP = 50.8  # harmonic-base top face
 Y_DRIVE = Y_BASE_TOP + 6.35 + 33.368  # 90.518: v2 casting's journal axis
@@ -57,8 +58,9 @@ SEC_I = 1.0 / COS_I
 INCLINE_DEG = math.degrees(math.asin(SIN_I))  # 12.5182
 SEAT_PITCH = Z_PITCH * COS_I  # 6.8888: seat pitch along the shaft
 
-# Every station stays on the historical 6.5 cone reference face (the gears
-# are narrowed from their SOUTH faces only; build_drive_train_assembly).
+# Every station stays on the historical 6.5 cone reference face: the gears
+# grew SOUTH to the full seat pitch with their north faces fixed, so they
+# touch (cone_gear_stack; build_drive_train_assembly).
 CONE_FACE_STATION_REFERENCE = 6.5
 DRUM_FACE = 3.0  # cylinder gear face (gear z = 0..3, cam 3..6.5)
 
@@ -114,14 +116,13 @@ POST_STATION = -39.90136099792956
 X_CRANK = cone_station(POST_STATION)[0]  # -129.336: Ry180 v2 installation
 Y_CRANK = Y_BASE_TOP + 6.35 + 72.7  # 129.850: v2 cast-in crank-axis height
 
-# T006 is the reference gear for the tip-end stack. The bushing sits directly
-# against its north face; the block follows after one bushing-half-width of
-# clearance, and the pivot keeps its established 11 mm offset from the block.
+# T006's north face is the fixed layout reference. MHA-096 bears on the
+# gear stack; slide the block south until a 0.45 feeler nips between them.
+# The base's pivot seat is independent of that fit-up, so it stays put.
 T006_CENTER_STATION = SHAFT_T120_STATION + GEAR_AXIS_SHIFT + 19 * SEAT_PITCH
 T006_NORTH_FACE = T006_CENTER_STATION + CONE_FACE_STATION_REFERENCE / 2.0
-TIP_BLOCK_STATION = T006_NORTH_FACE + BUSH_LEN + BUSH_LEN / 2.0 + TIP_BLOCK_Z / 2.0
-# The swing platform pivots about a vertical axis here, just north of the
-# shaft's rear end; the base's pivot-screw seat sits directly under it.
-PIVOT_STATION = TIP_BLOCK_STATION + 11.0
+TIP_BLOCK_STATION = T006_NORTH_FACE + BUSH_LEN + TIP_BLOCK_FEELER + TIP_BLOCK_Z / 2.0
+# Base pivot-seat layout: T006 north face + 23 mm, independent of the block.
+PIVOT_STATION = T006_NORTH_FACE + 23.0
 _PIVOT = cone_station(PIVOT_STATION)
 PIVOT_XZ = (_PIVOT[0], _PIVOT[2])

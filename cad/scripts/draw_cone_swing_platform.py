@@ -207,26 +207,17 @@ DETAIL_OUTLINE_PAD = 0.0104
 DETAIL_SHEET_RADIUS = DETAIL_RADIUS_MM * _DETAIL_S
 _PIVOT_Y = DETAIL_CENTER[1] + DETAIL_MODEL_Z * _DETAIL_S
 _SLOT_Y = DETAIL_CENTER[1] + (DETAIL_MODEL_Z - TIP_SCREW_LOCAL_Z) * _DETAIL_S
-# Between its extension lines a vertical dimension's text is CENTRED on its
-# dimension line, which then runs through it (81788ce9: "SLOT|THRU",
-# "11.|00"); outside them the text hangs outward, one edge on the line,
-# centred on the keep y.  So every vertical dimension here parks its text
-# OUTSIDE its span.  The three spans all overlap (pivot-to-slot 33..55,
-# counterbore 47..63, slot 51..59), so no layout of them is crossing-free:
-# the one left is the slot's dimension line running down past the
-# counterbore's lower extension line to its text.  The slot sits nearest
-# the part, the counterbore outboard (its extension lines then never cross
-# the slot's dimension line inside the slot's span), and pivot-to-slot alone
-# on the right.  The cutters are named by leadered notes, not dimension text.
+# Between its extension lines a vertical dimension's text is centred on its
+# dimension line and can collide with it; outside them it hangs outward.
+# Park the pivot-to-slot, slot-width and counterbore-width texts outside
+# their overlapping spans. The slot sits nearest the part, the counterbore
+# outboard, and the pivot-to-slot location alone on the right. The cutters
+# are named by leadered notes, not dimension text.
 DETAIL_KEEP = {
-    # Right, alone, OUTBOARD of both cutter notes: text above the slot-centre
-    # extension line (0.055), hanging right, short of the title block
-    # (0.216). The counterbore's lower arc sits inside this dimension's
-    # frame (pivot 0.033 to slot 0.055), so its note's leader, entering from
-    # the right, crossed the dimension line when that line stood between
-    # the circle and the notes (was DETAIL_CENTER[0] + 0.030;
-    # leader-crosses-line). Out here the note sits inside the frame and its
-    # leader reaches the arc without meeting either witness.
+    # Right, alone, outboard of both cutter notes: text above the slot-centre
+    # extension line, hanging right and short of the title block. Placing
+    # the dimension line nearer the slot crossed the counterbore note's
+    # leader (the measured drawing layout from the earlier station).
     "TipSlotZ": (0.175, _SLOT_Y + 0.0045),
     # Above the circle, each 2.00 outside its own extension lines and under
     # the plan caption row (y >= 0.0805).  The west one sits in toward the
