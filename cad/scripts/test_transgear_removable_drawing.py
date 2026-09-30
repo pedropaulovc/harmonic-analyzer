@@ -212,7 +212,9 @@ def _solved_globals(teeth: int) -> list[tuple[str, float, float]]:
 
 
 def _constructed_gap(teeth: int) -> dict[str, Curve]:
-    """The seed gap the build cuts at ``teeth``: its equation curves (mm)."""
+    """The seed gap the build cuts at ``teeth`` (mm), in loop order: the
+    in-disc profile curve sliced at its solved breaks into its seven pieces
+    (each over s in [0, 1]), then the clearance curves."""
     values = {name: value for name, value, _expected in _solved_globals(teeth)}
 
     def curve(x: str, y: str) -> Curve:
@@ -221,7 +223,31 @@ def _constructed_gap(teeth: int) -> dict[str, Curve]:
             _equation(y, values, degrees=False, t=t) * _IN,
         )
 
-    return {label: curve(x, y) for label, x, y in part.gap_curves()}
+    loop = {label: curve(x, y) for label, x, y in part.gap_curves()}
+    profile = loop.pop("in-disc profile")
+    ends = [
+        _equation(end, values, degrees=False) for _label, end in part.PROFILE_PIECES
+    ]
+    pieces = {
+        label: (lambda s, a=a, b=b: profile(a + s * (b - a)))
+        for (label, _end), a, b in zip(
+            part.PROFILE_PIECES, [0.0, *ends[:-1]], ends, strict=True
+        )
+    }
+    return pieces | loop
+
+
+def _profile_curve(teeth: int) -> tuple[Curve, float]:
+    """The in-disc profile curve (mm) and its solved length ``LProfile``."""
+    values = {name: value for name, value, _expected in _solved_globals(teeth)}
+    x, y = {label: (x, y) for label, x, y in part.gap_curves()}["in-disc profile"]
+    return (
+        lambda t: (
+            _equation(x, values, degrees=False, t=t) * _IN,
+            _equation(y, values, degrees=False, t=t) * _IN,
+        ),
+        values["LProfile"] * _IN,
+    )
 
 
 def _fitted_radius(curve: Curve) -> float:
@@ -268,7 +294,7 @@ def test_the_cut_gap_is_the_ansi_b29_1_standard_form(teeth: int) -> None:
     yz = _DR * (1.4 * _sind(17.0 - 64.0 / teeth) - 0.8 * _sind(b_deg)) * _IN
     topping = _DR * (0.8 * _cosd(b_deg) + 1.4 * _cosd(17.0 - 64.0 / teeth) - 1.3025)
     topping_r = (topping - 0.0015) * _IN
-    for side, x_at in (("upper", 1.0), ("lower", 0.0)):
+    for side, x_at in (("upper", 0.0), ("lower", 1.0)):
         working = gap[f"{side} working arc"]
         flank = gap[f"{side} flank"]
         # Working curve E about c; its arc x-y is B long about c.
@@ -281,13 +307,41 @@ def test_the_cut_gap_is_the_ansi_b29_1_standard_form(teeth: int) -> None:
     # The seat meets the working curve at x, A below the pitch-circle tangent
     # at the pocket centre a: at 90 + A from the outward radial about a.
     centre = (pitch_dia / 2.0 * _cosd(half), pitch_dia / 2.0 * _sind(half))
-    x_upper = gap["seating arc"](0.0)
+    x_upper = gap["seating arc"](1.0)
     bearing = math.atan2(x_upper[1] - centre[1], x_upper[0] - centre[0])
     assert math.degrees(bearing) - half == pytest.approx(90.0 + a_deg, abs=1e-6)
     # The tips are turned to the OD p (0.6 + cot(180/N)).
     outside = _P * (0.6 + _cosd(half) / _sind(half)) * _IN
-    for corner in (gap["lower topping arc"](1.0), gap["upper topping arc"](0.0)):
+    for corner in (gap["lower topping arc"](0.0), gap["upper topping arc"](1.0)):
         assert 2.0 * math.hypot(*corner) == pytest.approx(outside, abs=0.005)
+
+
+@pytest.mark.parametrize("teeth", _TEETH)
+def test_the_profile_is_one_tangent_continuous_curve(teeth: int) -> None:
+    """The in-disc profile is one curve with no corner between the OD
+    corners: it runs at one speed (its length per unit t) and its direction
+    turns smoothly across every junction of seat, working, flank and
+    topping."""
+    profile, length = _profile_curve(teeth)
+    h = 1e-6
+
+    def velocity(t: float) -> Point:
+        p, q = profile(t - h), profile(t + h)
+        return ((q[0] - p[0]) / (2 * h), (q[1] - p[1]) / (2 * h))
+
+    for k in range(1, 1000):
+        assert math.hypot(*velocity(k / 1000.0)) == pytest.approx(length, rel=1e-6)
+    values = {name: value for name, value, _expected in _solved_globals(teeth)}
+    for _label, end in part.PROFILE_PIECES[:-1]:
+        at = _equation(end, values, degrees=False)
+        before, after = velocity(at - 1e-4), velocity(at + 1e-4)
+        turn = math.atan2(
+            before[0] * after[1] - before[1] * after[0],
+            before[0] * after[0] + before[1] * after[1],
+        )
+        # +/-1e-4 of t is under 2 um of profile: on arcs of R >= 1.69 mm a
+        # smooth turn stays under 2e-3 rad, where a corner shows in full.
+        assert abs(turn) < 1e-2, end
 
 
 def test_the_published_30_tooth_example_constructs() -> None:
@@ -312,7 +366,7 @@ def test_the_volume_check_reads_the_area_the_curves_cut(teeth: int) -> None:
         sum(p[0] * q[1] - q[0] * p[1] for p, q in zip(points, shifted, strict=True))
     )
     ra = spec.outside_dia(teeth) / 2.0
-    corner_x, corner_y = gap["upper topping arc"](0.0)
+    corner_x, corner_y = gap["upper topping arc"](1.0)
     corner = math.atan2(corner_y, corner_x) - math.pi / teeth
     in_disc = loop - corner * ((2.0 * ra) ** 2 - ra**2)
     assert in_disc == pytest.approx(spec.gap_area(teeth), rel=1e-4)
