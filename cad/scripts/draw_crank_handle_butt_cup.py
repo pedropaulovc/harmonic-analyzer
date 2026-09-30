@@ -75,7 +75,9 @@ ISO_SCALE = (4, 1)
 END_CENTER = (0.080, 0.165)
 SECTION_CENTER = (0.215, 0.165)
 ISO_CENTER = (0.368, 0.215)
-CAPTION_XY = (0.195, 0.100)
+# Left of the pocket-depth text and above the notes (farm run
+# 20260930T011912336Z: at (0.195, 0.100) it overlapped the note block).
+CAPTION_XY = (0.150, 0.114)
 MANUFACTURING_NOTES_POS = (0.022, 0.085)
 ISO_NOTE_POS = (0.335, 0.170)
 
