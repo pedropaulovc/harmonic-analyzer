@@ -63,7 +63,7 @@ def test_model_owns_places_and_bands() -> None:
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
     # The running fit, the head's cup-floor bearing band, and the relief
     # width that holds the U33b floor.
-    running_fit = {"ShoulderDia", "ReliefWidth", "HeadDia"}
+    running_fit = {"ShoulderDia", "ReliefWidth", "HeadDia", "TipChamfer", "SlotDepth"}
     for name, places in spec.DRAWING_PRECISION_BY_NAME.items():
         assert places == (2 if name in running_fit else 1), name
     # User ruling 2026-09-29 (MHA-139 review): the shoulder is turned to suit
@@ -74,6 +74,8 @@ def test_model_owns_places_and_bands() -> None:
         ("ScrewProfile", "ShoulderDia"): "*deviations(SHOULDER_DIA_BAND)",
         ("ScrewProfile", "HeadDia"): "HEAD_DIA_TOL",
         ("ScrewProfile", "ThreadLength"): "*deviations(THREAD_LENGTH_BAND)",
+        ("ScrewProfile", "TipChamfer"): "*deviations(TIP_CHAMFER_BAND)",
+        ("DriverSlot", "SlotDepth"): "SLOT_DEPTH_TOL",
     }
     assert spec.SHOULDER_DIA == 6.00
     assert spec.SHOULDER_DIA_BAND == (-0.03, -0.08)
@@ -99,12 +101,17 @@ def test_policy_sheet_carries_no_gdt_or_render_time_precision() -> None:
 def test_geometry_matches_the_u33_ruling() -> None:
     assert spec.HEAD_DIA == 8.0
     assert spec.HEAD_DIA_TOL == 0.10
-    # User ruling 2026-09-29 (MHA-139 review): 4.0 x 0.8 leaves 1.6 of head
-    # under the slot at the .X worst case, not 0.4.
+    # User ruling 2026-09-29 (MHA-139 review): a 4.0 head and a banded
+    # 1.00 +/-0.20 slot leave 2.0 of head under the slot at the worst case,
+    # and the slot can never print as nothing (re-review).
     assert spec.HEAD_LENGTH == 4.0
     assert spec.SLOT_WIDTH == 1.0
-    assert spec.SLOT_DEPTH == 0.8
-    assert spec.SLOT_WEB_MIN == pytest.approx(1.6)
+    assert spec.SLOT_DEPTH == 1.0
+    assert spec.SLOT_DEPTH_TOL == 0.20
+    assert spec.SLOT_WEB_MIN == pytest.approx(2.0)
+    # The tip chamfer is banded so it always exists and never cuts past the
+    # thread depth.
+    assert (spec.TIP_CHAMFER_MIN, spec.TIP_CHAMFER_MAX) == pytest.approx((0.3, 0.45))
     assert spec.THREAD_SIZE == "#8-32"
     assert spec.THREAD_MODEL_DIA == THREAD_MAJOR_MM["#8-32"] == 4.166
     assert spec.THREAD_PITCH == pytest.approx(25.4 / 32.0)
@@ -143,17 +150,19 @@ def test_u33_running_fit_end_play_and_engagement() -> None:
 def test_thread_relief_sits_below_the_minor_with_a_45_degree_lead() -> None:
     assert spec.RELIEF_DIA == 3.0
     assert spec.RELIEF_WIDTH == 1.5
-    assert spec.RELIEF_LEAD == 0.5
+    assert spec.RELIEF_LEAD == 0.4
+    assert spec.RELIEF_LEAD_LIMITS == (0.3, 0.5)
     assert spec.RELIEF_END_STATION == pytest.approx(spec.SEAT_STATION + 1.5)
     # At or below the #8-32 external minor: the P/8-flat UN root (Ø3.135)
     # and the UNR-2A reference max (Ø3.169).
     assert spec.THREAD_MINOR_BASIC_ROOT == pytest.approx(3.1349, abs=1e-4)
     assert spec.THREAD_MINOR_UNR_2A_MAX == pytest.approx(3.1689, abs=1e-4)
     assert spec.RELIEF_DIA <= spec.THREAD_MINOR_BASIC_ROOT
-    # The lead tops out at Ø4.0, inside the thread major, leaving a flat seat.
-    assert spec.SEAT_FLAT_INNER_DIA == pytest.approx(4.0)
-    assert spec.SEAT_FLAT_INNER_DIA < spec.THREAD_MODEL_DIA
-    assert spec.SEAT_FLAT_ANNULUS_AREA == pytest.approx(math.pi / 4.0 * (36.0 - 4.0**2))
+    # The lead tops out at Ø3.8 (Ø4.0 at its largest), inside the thread
+    # major, leaving a flat seat.
+    assert spec.SEAT_FLAT_INNER_DIA == pytest.approx(3.8)
+    assert spec.RELIEF_DIA + 2.0 * spec.RELIEF_LEAD_LIMITS[1] < spec.THREAD_MODEL_DIA
+    assert spec.SEAT_FLAT_ANNULUS_AREA == pytest.approx(math.pi / 4.0 * (36.0 - 3.8**2))
     assert 0.0 < spec.SEAT_FLAT_ANNULUS_AREA_MIN < spec.SEAT_FLAT_ANNULUS_AREA
     assert spec.CHAMFER_CALLOUT == "X 45 DEG"
     assert drawing.CHAMFER_CALLOUT is spec.CHAMFER_CALLOUT
@@ -161,9 +170,12 @@ def test_thread_relief_sits_below_the_minor_with_a_45_degree_lead() -> None:
     assert spec.NECK_AREA == pytest.approx(math.pi / 4.0 * 3.0**2)
     assert spec.TENSILE_STRESS_AREA == pytest.approx(9.03, abs=0.01)
     assert spec.NECK_TO_STRESS_AREA == pytest.approx(0.783, abs=0.001)
-    # The relief sizes are routine .X under the title block, not model bands.
+    # The relief sizes are routine under the title block, not model bands; the
+    # lead prints as limits in its callout and the tip chamfer carries its own
+    # band (MHA-139 re-review: at .X either could print as nothing).
     toleranced = {name for _, name in model_toleranced_dimensions(part)}
-    assert not toleranced & {"ReliefDia", "ReliefWidth", "ReliefLead", "TipChamfer"}
+    assert not toleranced & {"ReliefDia", "ReliefWidth", "ReliefLead"}
+    assert "TipChamfer" in toleranced
 
 
 def test_u33b_engagement_exception_is_governed_by_the_stock_arm() -> None:
@@ -226,9 +238,10 @@ def test_notes_state_the_engagement_the_fitted_shoulder_and_the_head_band() -> N
     assert lines[0] == spec.ENGAGEMENT_NOTE
     # User ruling 2026-09-29 (MHA-139 review): the shoulder is turned to suit
     # the bonded handle; the head's band is for its bearing on the cup floor.
-    assert "TURN THE SHOULDER LENGTH TO SUIT THE BONDED MHA-022" in spec.DRAWING_NOTES
+    assert "TURN THE SHOULDER TO SUIT THE BONDED MHA-022" in spec.DRAWING_NOTES
     assert "0.25-1.00 END PLAY" in spec.DRAWING_NOTES
-    assert "HEAD BEARS ON THE MHA-153" in spec.DRAWING_NOTES
+    assert "HEAD BEARS ON THE\n  MHA-153 FLOOR" in spec.DRAWING_NOTES
+    assert "0.3 BEARING OUTSIDE ITS HOLE" in spec.DRAWING_NOTES
     assert all(len(line) <= 72 for line in lines)
     policy = (Path(spec.__file__).parents[1] / "docs" / "drawing-simplicity-policy.md")
     row = next(
@@ -274,7 +287,7 @@ def test_modelled_volume_is_the_turned_body_less_the_slot() -> None:
     thread = math.pi * (4.166 / 2.0) ** 2 * 8.5
     # Pappus: the lead's 0.5 x 0.5 corner triangle, centroid 1.5 + 0.5/3 out,
     # stays; the tip chamfer's 0.4 x 0.4, centroid 2.083 - 0.4/3 out, goes.
-    lead = 2.0 * math.pi * (1.5 + 0.5 / 3.0) * (0.5 * 0.5 / 2.0)
+    lead = 2.0 * math.pi * (1.5 + 0.4 / 3.0) * (0.4 * 0.4 / 2.0)
     tip = 2.0 * math.pi * (4.166 / 2.0 - 0.4 / 3.0) * (0.4 * 0.4 / 2.0)
     assert part.V_LEAD == pytest.approx(lead)
     assert part.V_BODY == pytest.approx(head + shoulder + relief + thread + lead - tip)
@@ -384,7 +397,7 @@ def test_sheet_placements_stay_inside_the_border() -> None:
     assert end_y - drawing.SIDE_KEEP["ThreadLength"][1] >= 0.005
     # The 45-degree lead rides the Ø callout; only the width stands above.
     assert "ReliefLead" not in drawing.SIDE_KEEP
-    assert spec.RELIEF_CALLOUT == "0.5 X 45 DEG LEAD"
+    assert spec.RELIEF_CALLOUT == "0.3-0.5 X 45 DEG LEAD"
     assert drawing.SIDE_KEEP["ReliefWidth"][1] > drawing.RELIEF_TOP_Y
     # The thread note stands up and right of its pick, so the leader slants.
     note_x, note_y = drawing.THREAD_NOTE_XY

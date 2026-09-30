@@ -62,7 +62,8 @@ def test_note_names_the_mating_tenon() -> None:
     row = _config.parts("crank-handle")
     assert spec.HANDLE_NUMBER == row["number"]
     assert f"{spec.HANDLE_NUMBER} {spec.HANDLE_NAME}" in spec.DRAWING_NOTES
-    assert len(spec.DRAWING_NOTES.splitlines()) == 1
+    assert len(spec.DRAWING_NOTES.splitlines()) == 2
+    assert "TURNED TO SUIT THIS BORE" in spec.DRAWING_NOTES
 
 
 def test_registry_row_is_the_title_block_source() -> None:

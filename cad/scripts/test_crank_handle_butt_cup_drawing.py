@@ -44,8 +44,13 @@ def test_every_section_holds_1_5_at_its_worst_case() -> None:
     # User ruling 2026-09-29 (MHA-153 review): the butt grew instead of
     # accepting 0.54 / 0.85 / 0.75 sections.
     assert spec.FLANGE_THICKNESS - 0.8 == pytest.approx(1.5)
-    assert spec.FLOOR_THICKNESS - 0.8 == pytest.approx(1.5)
+    # The floor is what the overall leaves after the pocket depth, both .X
+    # from the flange face (re-review: one faced end).
+    assert spec.FLOOR_THICKNESS_MIN == pytest.approx(1.5)
+    assert spec.POCKET_WALL_MIN == pytest.approx(1.5)
     assert screw.CUP_POCKET_WALL_MIN == pytest.approx(1.5)
+    assert screw.POCKET_MAX <= spec.POCKET_DIA_MAX
+    assert "5/8 in" in _config.parts("crank-handle-butt-cup")["material"]
     assert screw.HEAD_BEARING_RADIAL_MIN > 0.0
     assert spec.FLOOR_HOLE_DIA > screw.SHOULDER_DIA_MAX
 
@@ -69,7 +74,8 @@ def test_notes_name_the_mates_and_the_band_reason() -> None:
     notes = spec.DRAWING_NOTES
     assert f"{spec.HANDLE_NUMBER} {spec.HANDLE_NAME}" in notes
     assert f"{spec.SCREW_NUMBER} {spec.SCREW_NAME}" in notes
-    assert "TO SUIT" in notes and "1.5 POCKET WALL" in notes
+    assert "TO SUIT" in notes and "MIN POCKET WALL 1.5" in notes
+    assert "8.5 MAX" in notes
     assert all(len(line) <= 90 for line in notes.splitlines())
 
 

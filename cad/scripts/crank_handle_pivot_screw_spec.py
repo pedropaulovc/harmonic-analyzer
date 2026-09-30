@@ -61,11 +61,14 @@ STOCK_DIA = 0.375 * MM_PER_IN
 # the worst case, after an edge break on each.
 HEAD_DIA = 8.0
 HEAD_DIA_TOL = 0.10
-# 4.0 x 0.8 (user ruling 2026-09-29, MHA-139 machinist review): at the .X
-# worst case the slot leaves 1.6 of head under it, not 0.4.
+# A 4.0 head (user ruling 2026-09-29, MHA-139 machinist review): with the
+# slot's own band below, the worst case leaves 2.0 of head under the slot,
+# not 0.4.
 HEAD_LENGTH = 4.0
 SLOT_WIDTH = 1.0
-SLOT_DEPTH = 0.8
+# Banded (MHA-139 re-review): at .X the slot could print as nothing.
+SLOT_DEPTH = 1.0
+SLOT_DEPTH_TOL = 0.20
 
 # The running surface under the oak bore.  (upper, lower) deviations from the
 # Ø6.00 nominal; the model carries the band natively (policy rule 2).
@@ -102,8 +105,11 @@ THREAD_LENGTH = 10.0
 THREAD_LENGTH_BAND = (0.0, -0.5)
 # 45-degree thread-start chamfer on the tip, inside the 0.49 thread depth.
 # Like the relief lead, the model holds the 45 degrees by equation and the
-# print gives the axial leg with an "X 45 DEG" callout.
+# print gives the axial leg with an "X 45 DEG" callout.  Banded (MHA-139
+# re-review): at .X the 0.4 could print as nothing; +0.05/-0.10 keeps a real
+# chamfer that never cuts past the thread depth.
 TIP_CHAMFER = 0.4
+TIP_CHAMFER_BAND = (0.05, -0.10)
 # The title block states the UN thread class, so the callout names no class.
 THREAD_CALLOUT = f"{THREAD_SIZE} UNC"
 THREADS_PER_IN = 32
@@ -132,12 +138,16 @@ RELIEF_WIDTH = 1.5
 # leaves no sharp inside corner.  0.5 keeps the lead inside the Ø4.166 thread
 # major, i.e. inside the arm's tapped hole, so the whole seat annulus that
 # bears on the arm face stays flat.  The 45 degrees is enforced in the model by
-# an equation, and printed as a callout on the lead's axial size.
-RELIEF_LEAD = 0.5
+# an equation, and printed as a callout on the lead's axial size, as limits
+# (MHA-139 re-review: at .X the lead could print as nothing).
+RELIEF_LEAD = 0.4
+RELIEF_LEAD_LIMITS = (0.3, 0.5)
 CHAMFER_CALLOUT = "X 45 DEG"
 # The 45-degree lead rides the relief's Ø callout rather than a third
 # dimension crowded into the 1.5-mm groove at 3:1 (machinist review).
-RELIEF_CALLOUT = f"{RELIEF_LEAD:.1f} {CHAMFER_CALLOUT} LEAD"
+RELIEF_CALLOUT = (
+    f"{RELIEF_LEAD_LIMITS[0]:.1f}-{RELIEF_LEAD_LIMITS[1]:.1f} {CHAMFER_CALLOUT} LEAD"
+)
 SEAT_FLAT_INNER_DIA = RELIEF_DIA + 2.0 * RELIEF_LEAD
 
 SEAT_STATION = HEAD_LENGTH + SHOULDER_LENGTH
@@ -174,7 +184,13 @@ HEAD_RECESS_NOMINAL = round(HANDLE_LENGTH - (SHOULDER_LENGTH + HEAD_LENGTH), 6)
 POCKET_MAX = HEAD_DIA + HEAD_DIA_TOL + CUP_POCKET_CLEARANCE[1]
 CUP_POCKET_WALL_MIN = round(((CUP_BODY_DIA - CUP_BODY_DIA_TOL) - POCKET_MAX) / 2.0, 6)
 # The slot's worst-case web: both routine (.X) sizes at their limits.
-SLOT_WEB_MIN = round(HEAD_LENGTH - SLOT_DEPTH - 2.0 * GENERAL_1PL_TOL_MM, 6)
+SLOT_WEB_MIN = round(
+    HEAD_LENGTH - GENERAL_1PL_TOL_MM - (SLOT_DEPTH + SLOT_DEPTH_TOL), 6
+)
+TIP_CHAMFER_MIN, TIP_CHAMFER_MAX = (
+    round(TIP_CHAMFER + TIP_CHAMFER_BAND[1], 6),
+    round(TIP_CHAMFER + TIP_CHAMFER_BAND[0], 6),
+)
 # Under-head bearing annulus on the cup floor at the worst case: the smallest
 # head over the largest drilled floor hole, less a title-block edge break on
 # each.
@@ -269,10 +285,10 @@ ENGAGEMENT_NOTE = (
 DRAWING_NOTES = "\n".join(
     (
         ENGAGEMENT_NOTE,
-        "TURN THE SHOULDER LENGTH TO SUIT THE BONDED MHA-022 CRANK HANDLE:",
-        "  ITS FERRULE FACE TO CUP FLOOR, PLUS "
-        f"{END_PLAY_RANGE[0]:.2f}-{END_PLAY_RANGE[1]:.2f} END PLAY.",
-        "THE HEAD BEARS ON THE MHA-153 BUTT CUP FLOOR.",
+        "TURN THE SHOULDER TO SUIT THE BONDED MHA-022 CRANK HANDLE: FERRULE",
+        "  FACE TO CUP FLOOR PLUS "
+        f"{END_PLAY_RANGE[0]:.2f}-{END_PLAY_RANGE[1]:.2f} END PLAY. THE HEAD BEARS ON THE",
+        f"  MHA-153 FLOOR; THE BAND KEEPS {HEAD_BEARING_RADIAL_MIN:.1f} BEARING OUTSIDE ITS HOLE.",
     )
 )
 
@@ -337,7 +353,7 @@ for _ok, _what in (
         "the fitted edge break is not smaller than the as-turned tip chamfer",
     ),
     (
-        TIP_CHAMFER <= 0.61343 * THREAD_PITCH,
+        TIP_CHAMFER_MAX <= 0.61343 * THREAD_PITCH,
         f"tip chamfer cuts deeper than the {THREAD_SIZE} thread (17/24 H)",
     ),
     (
@@ -407,10 +423,10 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "ThreadLength": 1,
         "ReliefDia": 1,
         "ReliefWidth": 2,
-        "TipChamfer": 1,
+        "TipChamfer": 2,
     },
     "SlotProfile": {"SlotWidth": 1},
-    "DriverSlot": {"SlotDepth": 1},
+    "DriverSlot": {"SlotDepth": 2},
     "StationReference": {"OverallLength": 1},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {

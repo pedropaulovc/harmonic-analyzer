@@ -137,7 +137,7 @@ SIDE_KEEP = {
     # Diameters on the side view (rule 7).  The shoulder's dimension line
     # crosses the shoulder near its thread end; the head's stands clear of the
     # head face, left of the end view.
-    "ShoulderDia": (SEAT_X + 0.050, SIDE_CENTER[1] + 0.030),
+    "ShoulderDia": (SEAT_X + 0.056, SIDE_CENTER[1] + 0.030),
     "HeadDia": (HEAD_FACE_X + 0.014, SIDE_CENTER[1]),
     # The thread-relief groove against the seat face.  Its width from the seat
     # face reads above it alone; its Ø reads below it with the 45-degree lead
@@ -161,7 +161,7 @@ SIDE_KEEP = {
 # text's left edge stands 3.5 mm right of the seat face, and 21 mm below
 # the axis the leader drops steeply enough to pass under the seat-face
 # corner rather than through the shoulder.  The Ø6.00 arrow is right of it.
-RELIEF_DIA_TEXT_WIDTH = 0.041
+RELIEF_DIA_TEXT_WIDTH = 0.045  # "0.3-0.5 X 45 DEG LEAD": 41 mm measured for "0.5 ...", +4 chars
 RELIEF_DIA_TEXT_UNDERLINE_DROP = 0.0056
 RELIEF_DIA_TEXT_CLEARANCE = 0.0035
 RELIEF_DIA_TEXT_XY = (
@@ -185,7 +185,7 @@ THREAD_NOTE_XY = (THREAD_START_X + 0.013, SIDE_CENTER[1] + 0.042)
 FINISH_PICK = (UNDERHEAD_X - 0.060, SHOULDER_TOP_Y)
 FINISH_SYMBOL = (UNDERHEAD_X - 0.050, SIDE_CENTER[1] + 0.030)
 # A point on the shoulder face, clear of the Ø6.00 dimension line.
-CENTERLINE_PICK = (UNDERHEAD_X - 0.100, SIDE_CENTER[1] + 0.003)
+CENTERLINE_PICK = (UNDERHEAD_X - 0.080, SIDE_CENTER[1] + 0.003)
 ISO_NOTE_XY = (0.352, 0.200)
 # Bottom-left, above the title-block line, like the other crank sheets.
 NOTES_XY = (0.016, 0.070)

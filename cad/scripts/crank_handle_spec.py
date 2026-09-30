@@ -43,6 +43,7 @@ from crank_handle_butt_cup_spec import (
 from crank_handle_ferrule_spec import (
     BORE_DIA as FERRULE_BORE_DIA,
     LENGTH as FERRULE_LENGTH,
+    TENON_GLUE_LINE as FERRULE_TENON_GLUE_LINE,
 )
 
 # 2026-09-02 user re-read of the pass-2 model against ch11 p.14 and the ch30
@@ -66,7 +67,7 @@ PIVOT_BORE_BAND = (0.025, -0.025)
 SHOULDER_X = FERRULE_LENGTH
 # The tenon is turned to suit the actual MHA-150 bore for an epoxy line; the
 # model carries the size that line gives on a nominal bore.
-TENON_GLUE_LINE = (0.05, 0.15)
+TENON_GLUE_LINE = FERRULE_TENON_GLUE_LINE
 TENON_DIA = FERRULE_BORE_DIA - sum(TENON_GLUE_LINE) / 2.0
 # Short enough that the longest tenon stops short of the shortest ferrule's
 # arm face, so the oak never bears on the arm.
@@ -80,7 +81,7 @@ WOOD_LENGTH = TRIM_X - SHOULDER_X
 # The counterbore is bored to suit the actual MHA-153 body for an epoxy line.
 COUNTERBORE_GLUE_LINE = (0.05, 0.15)
 COUNTERBORE_DIA = CUP_BODY_DIA + sum(COUNTERBORE_GLUE_LINE) / 2.0
-COUNTERBORE_DEPTH = 8.0
+COUNTERBORE_DEPTH = 9.0
 TENON_R = TENON_DIA / 2.0
 COUNTERBORE_R = COUNTERBORE_DIA / 2.0
 

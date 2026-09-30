@@ -49,7 +49,15 @@ if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
 # offline test checks it against the registry.
 HANDLE_NUMBER = "MHA-022"
 HANDLE_NAME = "CRANK HANDLE"
-DRAWING_NOTES = (
-    f"EPOXY ON THE {HANDLE_NUMBER} {HANDLE_NAME} TENON, SEATED ON ITS SHOULDER."
+# The oak tenon is turned to suit this bore for an epoxy line (the handle spec
+# reads it from here); stated on this sheet too, so the bore's loose band has
+# its acceptance (MHA-150 re-review).
+TENON_GLUE_LINE = (0.05, 0.15)
+DRAWING_NOTES = "\n".join(
+    (
+        f"THE {HANDLE_NUMBER} {HANDLE_NAME} TENON IS TURNED TO SUIT THIS BORE FOR",
+        f"  {TENON_GLUE_LINE[0]:.2f}-{TENON_GLUE_LINE[1]:.2f} DIAMETRAL CLEARANCE; "
+        "EPOXY THE RING ON, SEATED ON ITS SHOULDER.",
+    )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"

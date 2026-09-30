@@ -58,7 +58,6 @@ from crank_handle_butt_cup_spec import (
     FLANGE_DIA,
     FLANGE_THICKNESS,
     FLOOR_HOLE_DIA,
-    FLOOR_THICKNESS,
     ISOMETRIC_VIEW_NOTE,
     OVERALL_LENGTH,
     POCKET_DEPTH,
@@ -92,7 +91,7 @@ async def build(adapter) -> dict[str, str]:
         ("BodyDia", BODY_DIA),
         ("OverallLength", OVERALL_LENGTH),
         ("PocketDia", POCKET_DIA),
-        ("FloorThickness", FLOOR_THICKNESS),
+        ("PocketDepth", POCKET_DEPTH),
         ("FloorHoleDia", FLOOR_HOLE_DIA),
     ):
         await set_global(adapter, name, f"{value}mm")
@@ -170,17 +169,13 @@ async def build(adapter) -> dict[str, str]:
         "cup overall length",
     )
     profile.record("OverallLength", '"OverallLength"')
-    # The floor, bottom face to pocket floor: the section the 1.5 floor rule
-    # reads, so it is the printed size and the pocket depth derives.
-    await dimension_between(
-        adapter,
-        f"{bottom}.start",
-        f"{floor_top}.start",
-        "horizontal_distance",
-        FLOOR_THICKNESS,
-        "cup floor thickness",
+    # Every axial size reads from the flange face (MHA-153 re-review); the
+    # floor is what the overall leaves.
+    check(
+        "pocket depth",
+        await adapter.add_sketch_dimension(pocket_wall, None, "linear", POCKET_DEPTH),
     )
-    profile.record("FloorThickness", '"FloorThickness"')
+    profile.record("PocketDepth", '"PocketDepth"')
     for name, line, u_mid, radius in (
         ("FlangeDia", flange_od, -FLANGE_THICKNESS / 2.0, FLANGE_R),
         ("BodyDia", body_od, -(FLANGE_THICKNESS + OVERALL_LENGTH) / 2.0, BODY_R),

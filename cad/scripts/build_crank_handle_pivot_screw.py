@@ -88,12 +88,14 @@ from crank_handle_pivot_screw_spec import (
     SHOULDER_DIA_BAND,
     SHOULDER_LENGTH,
     SLOT_DEPTH,
+    SLOT_DEPTH_TOL,
     SLOT_WIDTH,
     SURFACE_FINISHES,
     THREAD_LENGTH,
     THREAD_LENGTH_BAND,
     THREAD_MODEL_DIA,
     TIP_CHAMFER,
+    TIP_CHAMFER_BAND,
 )
 
 
@@ -397,6 +399,12 @@ async def build(adapter) -> dict[str, str]:
         adapter, "ScrewProfile", "ShoulderDia", *deviations(SHOULDER_DIA_BAND)
     )
     set_dimension_symmetric_tolerance(adapter, "ScrewProfile", "HeadDia", HEAD_DIA_TOL)
+    # The two small features the MHA-139 re-review found could print as
+    # nothing at .X: the tip chamfer and the slot depth.
+    set_dimension_bilateral_tolerance(
+        adapter, "ScrewProfile", "TipChamfer", *deviations(TIP_CHAMFER_BAND)
+    )
+    set_dimension_symmetric_tolerance(adapter, "DriverSlot", "SlotDepth", SLOT_DEPTH_TOL)
     set_dimension_bilateral_tolerance(
         adapter, "ScrewProfile", "ThreadLength", *deviations(THREAD_LENGTH_BAND)
     )

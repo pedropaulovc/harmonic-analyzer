@@ -32,22 +32,29 @@ FLANGE_THICKNESS = 2.3
 # pocket's largest size).
 BODY_DIA = 11.6
 BODY_DIA_TOL = 0.10
-OVERALL_LENGTH = 7.3
-FLOOR_THICKNESS = 2.3
+# Every axial size reads from the flange face, the one faced end (MHA-153
+# re-review): overall, flange and pocket depth.  The floor is what remains, so
+# the overall carries enough that even the .X worst case of both leaves 1.5.
+OVERALL_LENGTH = 8.1
+POCKET_DEPTH = 5.0
 # Bored to suit the MHA-139 head (reference size); POCKET_CLEARANCE is the
-# diametral clearance the callout asks for.
+# diametral clearance the note asks for, and POCKET_DIA_MAX its hard limit
+# (the largest head plus the widest clearance).
 POCKET_DIA = 8.3
 POCKET_CLEARANCE = (0.2, 0.4)
+POCKET_DIA_MAX = 8.5
 # The floor hole passes the MHA-139 shoulder: a drilled hole under the title
 # block's DRILLED HOLES band (+0.10/0).
 FLOOR_HOLE_DIA = 6.2
 
-POCKET_DEPTH = OVERALL_LENGTH - FLOOR_THICKNESS
+FLOOR_THICKNESS = OVERALL_LENGTH - POCKET_DEPTH
 BODY_LENGTH = OVERALL_LENGTH - FLANGE_THICKNESS
 
 GENERAL_1PL_MM = 0.8
 WALL_FLOOR_MM = 1.5
 BODY_LENGTH_MAX = (OVERALL_LENGTH + GENERAL_1PL_MM) - (FLANGE_THICKNESS - GENERAL_1PL_MM)
+FLOOR_THICKNESS_MIN = round(FLOOR_THICKNESS - 2.0 * GENERAL_1PL_MM, 6)
+POCKET_WALL_MIN = round(((BODY_DIA - BODY_DIA_TOL) - POCKET_DIA_MAX) / 2.0, 6)
 
 for _ok, _what in (
     (FLANGE_DIA > BODY_DIA + BODY_DIA_TOL, "flange does not overhang the body"),
@@ -55,10 +62,8 @@ for _ok, _what in (
         round(FLANGE_THICKNESS - GENERAL_1PL_MM, 6) >= WALL_FLOOR_MM,
         "flange is under 1.5 at .X",
     ),
-    (
-        round(FLOOR_THICKNESS - GENERAL_1PL_MM, 6) >= WALL_FLOOR_MM,
-        "cup floor is under 1.5 at .X",
-    ),
+    (FLOOR_THICKNESS_MIN >= WALL_FLOOR_MM, "cup floor is under 1.5 at .X"),
+    (POCKET_WALL_MIN >= WALL_FLOOR_MM, "pocket wall is under 1.5 at its limits"),
     (FLOOR_HOLE_DIA < POCKET_DIA, "floor hole leaves no floor"),
     (POCKET_DEPTH > FLANGE_THICKNESS, "pocket does not reach past the flange"),
 ):
@@ -71,7 +76,7 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "FlangeThickness",
         "BodyDia",
         "OverallLength",
-        "FloorThickness",
+        "PocketDepth",
         "PocketDia",
         "FloorHoleDia",
     },
@@ -84,7 +89,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "FlangeThickness": 1,
         "BodyDia": 2,
         "OverallLength": 1,
-        "FloorThickness": 1,
+        "PocketDepth": 1,
         "PocketDia": 1,
         "FloorHoleDia": 1,
     },
@@ -108,9 +113,9 @@ FLOOR_HOLE_CALLOUT = "DRILL THRU"
 DRAWING_NOTES = "\n".join(
     (
         f"BORE THE POCKET TO SUIT THE {SCREW_NUMBER} {SCREW_NAME} HEAD FOR",
-        f"  {POCKET_CLEARANCE[0]:.1f}-{POCKET_CLEARANCE[1]:.1f} DIAMETRAL CLEARANCE;"
-        " THE HEAD BEARS ON THE FLOOR.",
-        f"THE <MOD-DIAM>{BODY_DIA:.2f} BAND HOLDS THE 1.5 POCKET WALL.",
+        f"  {POCKET_CLEARANCE[0]:.1f}-{POCKET_CLEARANCE[1]:.1f} DIAMETRAL CLEARANCE,"
+        f" <MOD-DIAM>{POCKET_DIA_MAX:.1f} MAX; THE HEAD BEARS ON THE FLOOR.",
+        f"MIN POCKET WALL {WALL_FLOOR_MM:.1f}; MIN FLOOR {WALL_FLOOR_MM:.1f}.",
         f"EPOXY IN THE {HANDLE_NUMBER} {HANDLE_NAME} BUTT COUNTERBORE, FLANGE SEATED.",
     )
 )

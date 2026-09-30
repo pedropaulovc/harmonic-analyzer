@@ -47,6 +47,7 @@ from crank_handle_butt_cup_spec import (
     FLANGE_THICKNESS,
     FLOOR_HOLE_CALLOUT,
     OVERALL_LENGTH,
+    POCKET_DEPTH,
     REFERENCE_DIMENSIONS,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -67,7 +68,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# Ø13.5 x 7.3 at 5:1 reads 68 x 37 on the sheet.
+# Ø13.5 x 8.1 at 5:1 reads 68 x 41 on the sheet.
 SHEET_SCALE = (5.0, 1.0)
 VIEW_SCALE = (5, 1)
 ISO_SCALE = (4, 1)
@@ -96,7 +97,11 @@ SECTION_KEEP = {
     "FloorHoleDia": (SECTION_CENTER[0] - HALF_LENGTH - 0.042, SECTION_CENTER[1]),
     "FlangeThickness": ((FLANGE_RIGHT_X + FLANGE_SEAT_X) / 2.0, SECTION_CENTER[1] + FLANGE_R + 0.009),
     "OverallLength": (SECTION_CENTER[0], SECTION_CENTER[1] + FLANGE_R + 0.021),
-    "FloorThickness": (SECTION_CENTER[0] - HALF_LENGTH, SECTION_CENTER[1] - FLANGE_R - 0.010),
+    # From the flange face too: every axial size shares that one faced end.
+    "PocketDepth": (
+        FLANGE_RIGHT_X - POCKET_DEPTH * _S / 2.0,
+        SECTION_CENTER[1] - FLANGE_R - 0.010,
+    ),
 }
 DIMENSION_CALLOUTS = {"FloorHoleDia": FLOOR_HOLE_CALLOUT}
 CUT_START = (END_CENTER[0], END_CENTER[1] - FLANGE_R - 0.006)

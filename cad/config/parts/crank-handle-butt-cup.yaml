@@ -1,8 +1,8 @@
 crank-handle-butt-cup:
   title: Crank Handle Butt Cup
   number: MHA-153
-  material: AISI 12L14 CF rod, 1/2 in
-  material_specification: AISI 12L14 cold-finished steel rod, 1/2 in
+  material: AISI 12L14 CF rod, 5/8 in
+  material_specification: AISI 12L14 cold-finished steel rod, 5/8 in
   finish: bright turned, oiled
   quantity: 1
   tolerance_class: machined_block
