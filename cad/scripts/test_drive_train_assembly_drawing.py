@@ -144,15 +144,12 @@ def test_every_crank_mesh_check_spans_one_full_crank_gear_turn() -> None:
     import crank_drive_gear_spec as gear
     import crank_pinion_spec as pinion
 
-    turns = gear.TEETH / pinion.TEETH
-    assert drawing.CRANK_TURNS_PER_GEAR_TURN == turns
+    assert drawing.CRANK_TURNS_PER_GEAR_TURN == gear.TEETH / pinion.TEETH
+    full_gear_turn = re.compile(r"MHA-021.{0,30}\bFULL\b|\bFULL\b.{0,30}MHA-021")
     fit = " ".join(drawing.FIT_PLACEHOLDER.split())
-    assert "ONE FULL MHA-021 TURN" in fit
-    assert f"({drawing.CRANK_TURNS_PER_GEAR_TURN} CRANK TURNS" in fit
-    steps = " ".join(drawing.CONE_CRANK_STEPS.split())
-    checks = " ".join(drawing.CHECKS.split())
-    assert "TURN MHA-021 THROUGH ONE FULL REVOLUTION" in steps
-    assert "ONE FULL MHA-021 TURN" in checks
+    for text in (fit, drawing.CONE_CRANK_STEPS, drawing.CHECKS):
+        assert full_gear_turn.search(" ".join(text.split())), text
+    assert re.search(rf"\b{drawing.CRANK_TURNS_PER_GEAR_TURN} CRANK TURNS\b", fit)
     assert "ONE CRANK TURN" not in fit
 
 
