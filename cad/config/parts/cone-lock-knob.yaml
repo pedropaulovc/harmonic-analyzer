@@ -1,12 +1,12 @@
 cone-lock-knob:
-  title: Steel Raised Knurled-Head Thumb Screw
+  title: 18-8 SS High-Profile Knurled Thumb Screw
   number: MHA-093
-  stock_name: Steel Raised Knurled-Head Thumb Screw
+  stock_name: Stainless Steel High-Profile Knurled-Head Thumb Screw
   supplier: McMaster-Carr
-  supplier_skus: [91882A425]
-  material: Plain Carbon Steel
-  material_specification: Steel, McMaster-Carr 91882A425
-  finish: black oxide, as supplied
+  supplier_skus: [93585A190]
+  material: 18-8 stainless steel
+  material_specification: 18-8 stainless steel, McMaster-Carr 93585A190
+  finish: plain
   quantity: 1
   tolerance_class: machined_block
   fit_class: fastener_clearance

@@ -53,8 +53,9 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
     ),
     "cone-lock-knob": _stock(
         "cone-lock-knob",
-        "Steel Raised Knurled-Head Thumb Screw",
-        "91882A425",
+        "Stainless Steel High-Profile Knurled-Head Thumb Screw",
+        "93585A190",
+        material="AISI 304",
     ),
     "cone-pivot-screw": _stock(
         "cone-pivot-screw",

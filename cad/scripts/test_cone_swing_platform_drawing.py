@@ -188,7 +188,7 @@ def test_disengaged_collar_margin_survives_general_bands() -> None:
     stop_hole = stop_gain * base_axis * (abs(normal[0]) + abs(normal[1])) / norm
     stud_hole = base_axis * (abs(geometry.SLOT_TX) + abs(geometry.SLOT_TZ))
     diameters = 0.35
-    worst = geometry.DISENGAGE_COLLAR_MARGIN - (
+    worst = geometry.DISENGAGE_HEAD_MARGIN - (
         east_edge + west_edge + stop_hole + stud_hole + diameters
     )
     assert worst >= 2.0

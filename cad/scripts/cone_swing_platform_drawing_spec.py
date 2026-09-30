@@ -47,8 +47,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # 2), so the MODEL owns them: build_cone_swing_platform applies this map to the
 # .SLDPRT and draw_cone_swing_platform only reads it back. The whole plate
 # outline prints one place (+/-0.8): the east edge at the swing stop and the
-# west edge at the notch mouth spend the disengaged lock-collar margin, which
-# build_cone_swing_platform.DISENGAGE_COLLAR_MARGIN sizes to keep >= 2.0 mm
+# west edge at the notch mouth spend the disengaged lock-knob head margin,
+# which cone_swing_platform_geometry.DISENGAGE_HEAD_MARGIN sizes to keep >= 2.0 mm
 # at this band.  Relief diameter, tapped-hole pattern and notch stay at the
 # .XX grade. Relief
 # depth is a reference nominal governed by the matched fit above. The Hole

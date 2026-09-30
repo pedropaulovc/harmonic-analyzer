@@ -14,7 +14,6 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-from cone_lock_knob_spec import HEAD_DIA as LOCK_HEAD_DIA
 from cone_swing_platform_spec import (
     PIVOT_BEARING_RELIEF_DEPTH,
     PIVOT_BEARING_THICKNESS,
@@ -32,7 +31,7 @@ WEST_HALF_N = 8.0  # north half-width, WEST side.  The recentered north arbor
 # clearance while retaining the close photo relationship in ch12 img09.
 EAST_HALF_S = 24.0  # widened for the v2 post's Ø42.011 casting foot
 WEST_HALF_S = 37.0  # west half-width at the south end: the flare that makes
-# the pivot -> lock-knob line solid plate (covers the notch seat + collar)
+# the pivot -> lock-knob line solid plate (covers the notch seat + knob head)
 NORTH_OVERHANG = 7.0  # pivot -> north edge (plate continues past the pivot)
 
 if abs(PLATE_T - PIVOT_BEARING_RELIEF_DEPTH - PIVOT_BEARING_THICKNESS) > 1e-9:
@@ -87,8 +86,8 @@ if POST_MOUNT_HALF_PITCH + POST_MOUNT_TAP_DIA / 2.0 > _POST_R:
 
 # The open-ended lock notch cuts from the engaged stud seat straight out
 # through the plate's WEST edge. The cone-lock-knob stud is fixed to the base;
-# on disengage the plate swings until its edge passes the stud and collar.
-# Tightened with no plate under it, the collar fences the mouth and locks the
+# on disengage the plate swings until its edge passes the stud and head.
+# Tightened with no plate under it, the head fences the mouth and locks the
 # plate disengaged; tightened on the plate it clamps the engaged pose.
 # The notch runs along the swing arc's CHORD: at R~192 over ~3 deg to the
 # mouth the sagitta is ~0.07, absorbed by the O6.35-stud-in-8.0 clearance.
@@ -98,14 +97,15 @@ if POST_MOUNT_HALF_PITCH + POST_MOUNT_TAP_DIA / 2.0 > _POST_R:
 # at the engaged pose -- every west-side feature below (the flare, the lock
 # notch) is authored at local +x, east-side features at local -x.
 SLOT_W = 8.0  # Ø6.35 stud clearance plus chord-vs-arc slack
-# The stock O25.4 head must clear both the O42.011 post foot and the nearby
-# T120/64T gear row.  The northern solution beside the post clears the post but
-# overlaps both gears; use the southern solution and move the stud west until
-# the head retains the established 2 mm post gap with useful plate edge stock.
+# The notch seat was placed for the former stock O25.4-head knob (91882A425):
+# the northern solution beside the post cleared the post but overlapped the
+# T120/64T gear row, so the stud moved west to x 33.0 on the southern solution
+# where that head kept a 2 mm post gap.  The O15.875 93585A190 head keeps the
+# same seat (plate and base unchanged) with a wider post gap; the drive train
+# re-checks the head against the post, gears and stop at import.
 SLOT_E_X = 33.0
+SLOT_E_Z = -205.8075686471163
 LOCK_HEAD_POST_CLEARANCE = 2.0
-_LOCK_POST_C2C = LOCK_HEAD_DIA / 2.0 + POST_MAIN_DIA / 2.0 + LOCK_HEAD_POST_CLEARANCE
-SLOT_E_Z = POST_LOCAL_Z - math.sqrt(_LOCK_POST_C2C**2 - SLOT_E_X**2)
 SLOT_R = math.hypot(SLOT_E_X, SLOT_E_Z)
 # The plate swings toward disengage (big end away from the drum), so in PLATE
 # coords the fixed stud sweeps the INVERSE rotation: unit direction (-z, x)/R
@@ -129,7 +129,7 @@ def _chord_exit_travel(x0: float, z0: float) -> float:
 
 
 # Stud travel from the engaged seat to the mouth. Past this the stud is out of
-# the plate; the shared hardware calculation adds the exact collar radius to
+# the plate; the shared hardware calculation adds the knob head radius to
 # derive the disengaged pose.
 NOTCH_EXIT_TRAVEL = _chord_exit_travel(SLOT_E_X, SLOT_E_Z)
 _MOUTH_OVERSHOOT = 4.0  # cut ends past the edge so the mouth opens clean
@@ -155,27 +155,27 @@ class SwingHardwareGeometry:
     stop_engaged_gap: float
 
 
-# Designed clear air between the lock-knob collar and the notch mouth at the
-# disengaged stop, so the collar can be tightened onto bare base to fence the
+# Designed clear air between the lock-knob head and the notch mouth at the
+# disengaged stop, so the knob can be tightened onto bare base to fence the
 # mouth.  Sized so the linear worst case keeps >= 2.0 mm (U27) with the plate
 # outline at .X (+/-0.8) and the base stop/stud holes at .XX (+/-0.51/axis):
 # east edge at the stop 2 x 0.8 (lever 105.6 vs SLOT_R 208.4), west edge at the
-# mouth 0.99 x 0.8, stop hole ~1.1, stud hole ~0.59, collar/shank ~0.35 -- 4.41
+# mouth 0.99 x 0.8, stop hole ~1.1, stud hole ~0.59, head/shank ~0.35 -- 4.41
 # in all.  The base derives its swing-stop hole from this function.
-DISENGAGE_COLLAR_MARGIN = 6.5
+DISENGAGE_HEAD_MARGIN = 6.5
 
 
 def swing_hardware_geometry(
     pivot_xz: tuple[float, float],
     *,
-    lock_collar_dia: float,
+    lock_head_dia: float,
     stop_contact_dia: float,
 ) -> SwingHardwareGeometry:
     """Derive the lock seat and stop contact once from the platform outline.
 
     ``stop_contact_dia`` is the stop diameter the plate edge bears on (the
     seated screw's head)."""
-    if lock_collar_dia <= 0.0 or stop_contact_dia <= 0.0:
+    if lock_head_dia <= 0.0 or stop_contact_dia <= 0.0:
         raise ValueError("swing hardware diameters must be positive")
 
     def placed(x_local: float, z_local: float, angle_rad: float) -> tuple[float, float]:
@@ -188,7 +188,7 @@ def swing_hardware_geometry(
     incline_rad = math.radians(INCLINE_DEG)
     lock_xz = placed(SLOT_E_X, SLOT_E_Z, incline_rad)
     disengage_deg = math.degrees(
-        (NOTCH_EXIT_TRAVEL + lock_collar_dia / 2.0 + DISENGAGE_COLLAR_MARGIN) / SLOT_R
+        (NOTCH_EXIT_TRAVEL + lock_head_dia / 2.0 + DISENGAGE_HEAD_MARGIN) / SLOT_R
     )
     disengaged_rad = incline_rad + math.radians(disengage_deg)
 

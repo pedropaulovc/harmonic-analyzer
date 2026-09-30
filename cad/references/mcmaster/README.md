@@ -32,11 +32,12 @@ recipes:
 | 92240A540 | `lag-screw` | 18-8 Stainless Steel Hex Head Screw |
 | 91829A560 | `cone-pivot-screw` | Slotted 18-8 Stainless Steel Precision Shoulder Screw |
 | 91882A221 | `thumb-screw` | Steel Raised Knurled-Head Thumb Screw |
-| 91882A425 | `cone-lock-knob` | Steel Raised Knurled-Head Thumb Screw |
+| 91882A425 | — (diagnostic recipe; `cone-lock-knob` until 2026-09-29) | Steel Raised Knurled-Head Thumb Screw |
 | 9275K141 | `tube-frame-cap` | Metal Round Cap |
 | 92865A585 | `hex-bolt` | Medium-Strength Grade 5 Steel Hex Head Screw |
 | 93075A150 | `cone-tip-block-screw` (catalogue-only; no vendor model) | Low-Strength Zinc-Plated Steel Hex Head Screw |
 | 93075A194 | `hanger-screw` | Low-Strength Zinc-Plated Steel Hex Head Screw |
+| 93585A190 | `cone-lock-knob` | Stainless Steel High-Profile Knurled-Head Thumb Screw |
 | 94025A150 | — (diagnostic recipe; `cone-tip-adjuster` until rule-12 E11) | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
 | 94025A164 | `cone-tip-adjuster` | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
 | 98296A027 | `pinion-strap-pin` | 1050-1095 Spring Steel Slotted Spring Pin |
@@ -86,6 +87,24 @@ Catalog specifications checked on September 10, 2026:
 - [91882A425](https://www.mcmaster.com/91882A425/) is black-oxide steel,
   with a 1/4-20 thread and a 19.05 mm (3/4 in) stud. The catalog's material
   field supplies the finish specification absent from the CAD properties.
+  It was the `cone-lock-knob` until September 29, 2026.
+- [93585A190](https://www.mcmaster.com/93585A190/) is an 18-8 stainless high-profile knurled-head thumb screw,
+  1/4-20 x 3/4 in, selected by the user on September 29, 2026 for the
+  `cone-lock-knob`. The product page returned HTTP 403 to automated fetches,
+  so the facts come from the supplied SolidWorks model (custom properties
+  PartNo 93585A190, Material "18-8 Stainless Steel"; no finish is named):
+  Ø15.875 x 12.7 collarless head with 131 straight knurl ridges and
+  0.79375 x 45° rim chamfers, 1/4-20 stud 19.05 long, 0.9525 tip chamfer.
+  The model, supplied as `93585A190_Stainless Steel High-Profile
+  Knurled-Head Thumb Screw.SLDPRT`, is stored locally as `93585A190.SLDPRT`
+  and was harvested read-only (`cad/out/reports/mcmaster-93585A190-dump.json`).
+  `diag_build_93585A190.py` passed the replica gate against it on
+  September 29, 2026: volume 2899.1341 vs 2899.1341 mm^3, area 1853.6392
+  vs 1853.6393 mm^2, 535 faces each with the same face-area multiset
+  (largest per-face delta 0.0001 mm^2), and matching centre of mass
+  (`cad/out/reference/93585A190-replica-report.json`).
+  Evidence SHA-256: native SLDPRT
+  `f168d0847e364090ace8e7401b3563a388a8a01307ef9590decd5ac2218e5555`.
 - [90280A837](https://www.mcmaster.com/90280A837/) was selected on September
   13, 2026 from the user-supplied `90280A837.pdf`: #10-32 UNF-2A,
   1-3/4 in (44.45 mm) long, fully threaded zinc-plated steel, flat tip,

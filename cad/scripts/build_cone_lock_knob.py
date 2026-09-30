@@ -1,13 +1,13 @@
-r"""Purchased cone lock knob: McMaster 91882A425 in its stock local frame."""
+r"""Purchased cone lock knob: McMaster 93585A190 in its stock local frame."""
 
 from __future__ import annotations
 
 import sys
 
-from _common import PANEL_BLACK, run_build
+from _common import run_build
 from _fastener_catalog import fastener
 from _stock_fastener import RigidTransform, StockComponent, build_stock_fastener
-from diagnostics.diag_build_91882A425 import build_91882A425
+from diagnostics.diag_build_93585A190 import build_93585A190
 
 PART_NAME = "cone-lock-knob"
 SPEC = fastener(PART_NAME)
@@ -20,13 +20,12 @@ async def build(adapter) -> dict[str, str]:
         part_name=PART_NAME,
         components=(
             StockComponent(
-                sku="91882A425",
-                author=build_91882A425,
+                sku="93585A190",
+                author=build_93585A190,
                 transform=RigidTransform(),
             ),
         ),
         material=MATERIAL,
-        color=PANEL_BLACK,
     )
 
 
