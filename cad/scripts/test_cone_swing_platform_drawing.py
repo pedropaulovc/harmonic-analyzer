@@ -553,15 +553,18 @@ def test_holddown_hole_is_the_ruled_counterbore_for_the_tip_block_screw() -> Non
 def test_holddown_x_is_a_banded_dimension_hanging_inside_detail_b() -> None:
     """User ruling 2026-09-29: the hole's lateral station prints as HoldDownX
     at .XX with +/-0.10, in detail B.  Its 2 mm span cannot hold the text, so
-    the text hangs sheet-right of the hole's rim, clear of it and of the
-    pivot relief, inside the detail's outline."""
+    the text hangs sheet-right, between the pivot relief and the hole's rim,
+    with every corner inside the detail's circle (not just its bounding
+    square: run 20260930T030604208Z ran the text out through the circle)."""
     assert drawing_spec.DRAWING_PRECISION["HoldDownHole"] == {
         "HoldDownX": 2,
         "HoldDownZ": 2,
     }
     assert spec.HOLDDOWN_STATION_TOL_MM == 0.10
     x, y = drawing.DETAIL_KEEP["HoldDownX"]
-    text = (x - 0.008, y - 0.0025, x + 0.008, y + 0.0025)  # "1.00±0.10", 3.5 mm
+    # "1.00 ±0.1" at 3.5 mm rendered 19.5 wide, centred ~1.2 left of its keep
+    # x (run 20260930T030604208Z); pad a millimetre each way.
+    text = (x - 0.0115, y - 0.0025, x + 0.0095, y + 0.0025)
     s = drawing._DETAIL_S
     rim = spec.HOLDDOWN_CLEARANCE_DIA / 2.0 * s
     hole = (
@@ -581,10 +584,10 @@ def test_holddown_x_is_a_banded_dimension_hanging_inside_detail_b() -> None:
     assert not _boxes_overlap(text, relief)
     # Outside its own extension-line span, so SolidWorks hangs it.
     assert text[0] > max(drawing.DETAIL_HOLDDOWN_X, drawing.DETAIL_CENTER[0])
-    pad = drawing.DETAIL_SHEET_RADIUS
     cx, cy = drawing.DETAIL_CENTER
-    assert cx - pad <= text[0] and text[2] <= cx + pad
-    assert cy - pad <= text[1] and text[3] <= cy + pad
+    for corner_x in (text[0], text[2]):
+        for corner_y in (text[1], text[3]):
+            assert math.dist((corner_x, corner_y), (cx, cy)) <= drawing.DETAIL_SHEET_RADIUS
 
 
 def test_holddown_print_worst_stack_keeps_its_margins() -> None:

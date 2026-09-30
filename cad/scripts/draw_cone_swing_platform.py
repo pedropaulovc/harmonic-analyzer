@@ -73,6 +73,7 @@ from cone_swing_platform_spec import (
     HOLDDOWN_CLEARANCE_DIA,
     HOLDDOWN_LOCAL_X,
     HOLDDOWN_LOCAL_Z,
+    PIVOT_BEARING_RELIEF_DIAMETER,
     PIVOT_HOLE_DIA,
     PLATE_STOCK_CALLOUT,
     PLATE_THICKNESS,
@@ -209,12 +210,20 @@ DETAIL_HOLDDOWN_X = DETAIL_CENTER[0] + HOLDDOWN_LOCAL_X * _DETAIL_S
 # the hole's extension line, hanging left toward the border (0.0127) and
 # above the detail label, leaving the band's right half to section C-C.
 # HoldDownX (1.00, pivot bore to hole, 2 mm apart at 2:1) is far too short
-# to hold its text, so its dimension line runs south of the hole's rim
-# (sheet-up) and the text hangs off it to sheet-right, inside the detail,
-# clear of the rim and of the 10.45's extension lines on the left.
+# to hold its text, so the text hangs off its dimension line to sheet-right.
+# Above the hole's rim the circle is too narrow for it: at 0.0634 the ~19.5
+# mm "1.00 ±0.1" ran out through the detail outline (run
+# 20260930T030604208Z, machinist review 2026-09-30).  So the line runs
+# through the 7.35 mm band between the pivot relief (sheet-down) and the
+# hole's rim, the text centred in it; its far corner is 22.5 mm from the
+# detail centre, inside the 24 mm circle.
+HOLDDOWN_X_TEXT_BAND = (
+    DETAIL_PIVOT_Y + PIVOT_BEARING_RELIEF_DIAMETER / 2.0 * _DETAIL_S,
+    DETAIL_HOLDDOWN_Y - HOLDDOWN_CLEARANCE_DIA / 2.0 * _DETAIL_S,
+)
 DETAIL_KEEP = {
     "HoldDownZ": (0.044, DETAIL_HOLDDOWN_Y + 0.0045),
-    "HoldDownX": (DETAIL_HOLDDOWN_X + 0.012, DETAIL_HOLDDOWN_Y + 0.0095),
+    "HoldDownX": (DETAIL_HOLDDOWN_X + 0.0145, sum(HOLDDOWN_X_TEXT_BAND) / 2.0),
 }
 # The native "DETAIL B / SCALE 2:1" label, moved by its measured extent:
 # lower left of its box, in the band's lower-left corner.
