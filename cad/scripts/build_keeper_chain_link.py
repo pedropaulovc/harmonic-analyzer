@@ -24,9 +24,11 @@ from __future__ import annotations
 
 import sys
 
+import _config
 import _telemetry
 from _common import (
     SketchDims,
+    apply_custom_properties,
     _early_bound,
     anchor_point_to_origin,
     apply_material,
@@ -43,7 +45,10 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
+from _drawing_marks import apply_drawing_properties
+from _saved_part_guard import require_saved_drawing_properties
 from keeper_chain_spec import (
+    LINK_DRAWING_NOTES,
     LINK_CRIMP_DEPTH,
     LINK_CRIMP_X,
     LINK_END_BEAD_X,
@@ -59,6 +64,12 @@ from keeper_chain_spec import (
 
 PART_NAME = "keeper-chain-link"
 MATERIAL = "Brass"
+_PART = _config.parts(PART_NAME)
+STOCK_PROPERTIES = {
+    "Stock Name": str(_PART["stock_name"]),
+    "Supplier": str(_PART["supplier"]),
+    "Supplier SKUs": ", ".join(str(sku) for sku in _PART["supplier_skus"]),
+}
 
 CRIMP_R = 0.3  # the crimp tool's radius (keeper_chain_spec._link_solid)
 
@@ -213,8 +224,24 @@ async def build(adapter) -> dict[str, str]:
         raise RuntimeError(f"loop link openings cut the -Y wall (centre of mass y {com_y:.4f})")
     _telemetry.success(f"loop link: openings on +Y (centre of mass y {com_y:.4f})")
     await apply_material(adapter, MATERIAL)
+    apply_custom_properties(adapter, STOCK_PROPERTIES)
+    apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": LINK_DRAWING_NOTES})
     await report_mass_properties(adapter)
-    return await save_part_and_images(adapter, PART_NAME)
+    artefacts = await save_part_and_images(adapter, PART_NAME)
+    require_saved_drawing_properties(
+        adapter,
+        (
+            "Number",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Stock Name",
+            "Supplier",
+            "Supplier SKUs",
+            "Manufacturing Notes",
+        ),
+    )
+    return artefacts
 
 
 if __name__ == "__main__":

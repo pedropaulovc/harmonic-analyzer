@@ -544,3 +544,13 @@ def link_volume(steps: int = 72) -> float:
                 if _link_solid(x, y, -ro + (iz + 0.5) * dr):
                     total += 1
     return total * dx * dr * dr
+
+
+# The purchased-part identification sheets (build_purchased_spring_drawing).
+CHAIN_DRAWING_NOTES = (
+    f"CUT LENGTH {BEAD_COUNT} BEADS, {CHAIN_LENGTH:.0f} MM BETWEEN END BEAD CENTRES. "
+    "SHOWN AS INSTALLED, CLOSED BY MHA-150."
+)
+LINK_DRAWING_NOTES = (
+    "CLOSES MHA-149 INTO ONE LOOP: ONE END BEAD SNAPS INTO EACH DOME."
+)

@@ -39,8 +39,10 @@ from __future__ import annotations
 import math
 import sys
 
+import _config
 import _telemetry
 from _common import (
+    apply_custom_properties,
     _early_bound,
     anchor_point_to_origin,
     apply_material,
@@ -55,11 +57,27 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
+from _drawing_marks import apply_drawing_properties
+from _saved_part_guard import require_saved_drawing_properties
 from _visibility import blank_reference_geometry
-from keeper_chain_spec import BEAD_CENTRES, BEAD_COUNT, BEAD_R, PITCH, ROD_DIA, ROD_R
+from keeper_chain_spec import (
+    BEAD_CENTRES,
+    BEAD_COUNT,
+    BEAD_R,
+    CHAIN_DRAWING_NOTES,
+    PITCH,
+    ROD_DIA,
+    ROD_R,
+)
 
 PART_NAME = "keeper-chain"
 MATERIAL = "Brass"
+_PART = _config.parts(PART_NAME)
+STOCK_PROPERTIES = {
+    "Stock Name": str(_PART["stock_name"]),
+    "Supplier": str(_PART["supplier"]),
+    "Supplier SKUs": ", ".join(str(sku) for sku in _PART["supplier_skus"]),
+}
 
 SW_FM_SWEEP = 17  # swFeatureNameID_e.swFmSweep (swconst.tlb R2026x)
 SW_TWIST_FOLLOW_PATH = 0  # swTwistControlType_e.swTwistControlFollowPath
@@ -262,8 +280,24 @@ async def build(adapter) -> dict[str, str]:
     blank_reference_geometry(adapter, (("SeedPlane", "PLANE"),))
     blank_reference_sketches(adapter, ("BeadPoints",))
     await apply_material(adapter, MATERIAL)
+    apply_custom_properties(adapter, STOCK_PROPERTIES)
+    apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": CHAIN_DRAWING_NOTES})
     await report_mass_properties(adapter)
-    return await save_part_and_images(adapter, PART_NAME)
+    artefacts = await save_part_and_images(adapter, PART_NAME)
+    require_saved_drawing_properties(
+        adapter,
+        (
+            "Number",
+            "Material Specification",
+            "Finish",
+            "Quantity",
+            "Stock Name",
+            "Supplier",
+            "Supplier SKUs",
+            "Manufacturing Notes",
+        ),
+    )
+    return artefacts
 
 
 if __name__ == "__main__":
