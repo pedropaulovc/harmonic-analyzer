@@ -312,8 +312,14 @@ SECTION_CAPTION_SIZE = (0.046, 0.017)
 SECTION_CAPTION_GAP = 0.003
 # The detail's caption stands this far right of its rightmost ink, B's letters.
 DETAIL_CAPTION_GAP = 0.004
-# A caption lands within this of its target (its anchor is not its box).
-CAPTION_SETTLE_M = 0.0003
+# A caption lands within this of its target (its anchor is not its box).  A
+# note's extent reads on a grid that differs by session: on two seats (leaves
+# 20260930T011635Z-1-c8539f7a, 20260930T011941Z-1-30339b73) C-C's caption top
+# settled 0.30 mm under the target and D-D's 0.31 mm over the same y, both to
+# the micron on both seats, so 0.3 mm was half a step and refused D-D.  At
+# 0.6 mm the caption still stands 2.4 mm or more under its face.
+# The layout proof measures the placed box, so the slack costs no clearance.
+CAPTION_SETTLE_M = 0.0006
 # The section's centre mark keeps only its cross, arms this long on the sheet:
 # the template's mark scales with the view, so at 10:1 its arms and extended
 # lines ran 104 mm, over the AF text, the right border and the title block.
