@@ -493,21 +493,15 @@ I31_TEXT_MM = {
     "Adjuster": ("front", "ADJUSTER\nENTRY\nTHRU ALL", (85.60, 106.51, 142.66, 122.68)),
 }
 I31_RIGHT_BODY_MM = (141.31, 93.81, 159.43, 164.17)
-I31_HEEL_HEIGHT_LINE_MM = ((119.25, 87.55), (119.25, 108.46))
 
 
 def test_mha_092_i31_ink_fails_on_every_collision_the_eye_pass_found():
-    """Positive control on the I31 render's own ink: all four of Main's
-    collisions gate -- "20.8"/"8.42" 0.68 mm apart, the pinch callout on the
-    6.0, the adjuster callout over the right view's body, and the 5.56
-    heel-height line through the adjuster callout."""
+    """Positive control on the I31 render's own ink: Main's text collisions
+    gate -- "20.8"/"8.42" 0.68 mm apart, the pinch callout on the 6.0, and the
+    adjuster callout over the right view's body."""
     by_view = {"plan": [], "front": [], "right": []}
     for name, (view, text, box) in I31_TEXT_MM.items():
         by_view[view].append(_note(name, text, tuple(v / 1000.0 for v in box)))
-    (hx0, hy0), (hx1, hy1) = I31_HEEL_HEIGHT_LINE_MM
-    by_view["front"].append(
-        _dim("HeelReliefHt", "5.56", 0.1100, 0.0950, lines=[(hx0 / 1000, hy0 / 1000, hx1 / 1000, hy1 / 1000)])
-    )
     x0, y0, x1, y1 = (v / 1000.0 for v in I31_RIGHT_BODY_MM)
     pad = 0.003  # GetOutline pads the body with whitespace
     dump = _dump(
@@ -527,7 +521,6 @@ def test_mha_092_i31_ink_fails_on_every_collision_the_eye_pass_found():
     assert len(near) == 1 and near[0].extra["gap_mm"] == pytest.approx(0.68, abs=0.01)
     assert hits("text-clearance", "PinchClearance", "PinchDepthCenter")
     assert hits("text-on-view", "Adjuster", "view right")
-    assert hits("text-on-line", "HeelReliefHt", "Adjuster")
 
 
 def test_a_shoulder_crossed_by_a_foreign_dimension_line_is_found():
@@ -1092,7 +1085,10 @@ CSP_DETAIL_B = [1.0, -1.0, 0.1768134, 0.1406615, 0.0, 0.1828134, 0.1406615, 0.0,
                 3.0, 0.1849758, 0.1445509, -0.0, 0.00635, 0.0]
 CSP_DETAIL_B_SPAN = ["B", 0.1860114, 0.1383209, 0.1896602, 0.1444931]
 # Detail View B: the C'BORE SLOT note's leader crosses 11.00's dimension line
-# mid-span -- the one true leader crossing on the sheet.
+# mid-span -- the one true leader crossing on the sheet.  Recorded ink from
+# the retired slot layout (user ruling 2026-09-29 replaced the slot with the
+# HoldDownZ counterbored hole, whose callout prints on section C-C, not in
+# detail B); it stays verbatim as the audit's leader-crossing control.
 CSP_SLOT_NOTE = {
     "type": 6,
     "name": "DetailItem375",

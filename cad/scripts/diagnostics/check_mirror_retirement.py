@@ -327,7 +327,7 @@ def platform_station(station):
 _ppv = platform_station(d.PIVOT_STATION)
 _pps = platform_station(d.POST_STATION)
 _ptp = platform_station(d.TIP_BLOCK_STATION)
-_pbu = platform_station(d.BUSH_STATION)
+_pcl = platform_station(d.COLLAR_STATION)
 _pad = platform_station(d.ADJ_HEAD_STATION)
 expect(
     DT,
@@ -352,10 +352,10 @@ expect(
 )
 expect(
     DT,
-    "cone-tip-bushing-1",
-    [_pbu[0], d.Y_DRIVE, _pbu[2]],
+    "cone-tip-collar-1",
+    [_pcl[0], d.Y_DRIVE, _pcl[2]],
     d.ROT_SHAFT_NORTH,
-    "cone-tip-bushing",
+    "cone-tip-collar",
 )
 expect(
     DT,
@@ -366,11 +366,22 @@ expect(
 )
 expect(
     DT,
+    "cone-tip-block-screw-1",
+    [
+        _ptp[0] + d.PLAT_HOLDDOWN_LOCAL_X * d.COS_I,
+        d.Y_BASE_TOP + d.PLAT_HOLDDOWN_CBORE_DEPTH,
+        _ptp[2] - d.PLAT_HOLDDOWN_LOCAL_X * d.SIN_I,
+    ],
+    d.ROT_X_180,
+    "cone-tip-block-screw",
+)
+expect(
+    DT,
     "cone-tip-pinch-screw-1",
     [
-        _ptp[0] - (d.TIP_BLOCK_X / 2.0) * d.COS_I,
+        _ptp[0] + (d.TIP_BLOCK_X / 2.0) * d.COS_I,
         d.Y_BASE_TOP + d.PLAT_T + d.TIP_PINCH_Y,
-        _ptp[2] + (d.TIP_BLOCK_X / 2.0) * d.SIN_I,
+        _ptp[2] - (d.TIP_BLOCK_X / 2.0) * d.SIN_I,
     ],
     d.ROT_PINCH_WEST,
     "cone-tip-pinch-screw",

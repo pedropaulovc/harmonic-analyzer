@@ -64,7 +64,7 @@ Each chapter ends with **"Now make:"** — a real part from the machine.
 | 15 | Indexing and the dividing head | `cylinder-gear` 0.4 mm alignment notches, co-phased |
 | 16 | **Making your own gear cutters** | Eureka-method form cutters for DP 49.82 — **off-the-shelf cutters for this pitch do not exist** |
 | 17 | **Cutting the gears** | first `cone-gear` (T120, the easy end) |
-| 18 | Fitting D-bores and a solid gear stack | Gauge the MHA-014 flats and mating gear D-bores; fit 64T and twenty touching cone gears, then set the tip block with a 0.45 mm feeler |
+| 18 | Fitting D-bores and a solid gear stack | Gauge the MHA-014 flats and mating gear D-bores; fit 64T and twenty touching cone gears, then lock the stack collar on a 0.45 mm feeler |
 | 19 | Finishing | Draw filing, stoning, polishing, blacking; matching the original's finishes |
 
 ## Part IV — Making the parts
@@ -76,7 +76,7 @@ stock, setups, operations, inspection, and what went wrong the first time.
 |---|---|---|
 | 20 | Frame and base | `harmonic-base`, `tube-frame`, `top-frame`, `support-bar`, `rocker-arm-support`, feet |
 | 21 | The crank and drive train | `crank-arm`, `crank-handle`, `crank-pin`, `crankshaft`, `crank-drive-gear`, `crank-pinion` |
-| 22 | **The cone gear set** | `cone-gear` ×20 (T006–T120), `cone-gear-shaft`, the swing platform and its pivot, tip bushing, tip block and adjuster. **The hardest chapter in the book** — the T006 gear has a 0.621 mm minimum root-to-bore wall on its Ø1.5875 mm round bore. |
+| 22 | **The cone gear set** | `cone-gear` ×20 (T006–T120), `cone-gear-shaft`, the swing platform and its pivot, tip collar, tip block and adjuster. **The hardest chapter in the book** — the T006 gear has a 0.621 mm minimum root-to-bore wall on its Ø1.5875 mm round bore. |
 | 23 | The cylinder gear set | `cylinder-gear` ×20 with integral eccentric cam and 0.4 mm index notch; `cylinder-gear-shaft`, `arbor-pedestal` |
 | 24 | The alignment pinion | `alignment-pinion`, `pinion-arbor`, bracket, lever, cam and lift rod — the sine/cosine setup mechanism |
 | 25 | A channel, twenty times | `connecting-rod`, `rocker-arm`, `amplitude-bar`, `channel-lever`, `pivot-bushing`, `lever-bushing`, springs. Batch strategy: how to make twenty identical things by hand without drift. |

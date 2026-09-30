@@ -32,7 +32,7 @@ flip_invert:
   - pinion cam back set pin axial
   - pinion cam front set pin axial
   - tip block axial seat
-  - tip bushing axial seat
+  - tip collar axial seat
   # Option E-a: the pinned torque shaft's axial station (pc-ea run).
   - torque shaft axial
 allowed_free_stems:
@@ -43,9 +43,9 @@ allowed_free_stems:
   - cone-swing-platform
   - cone-tip-adjuster
   - cone-tip-block
-  - cone-tip-bushing
+  - cone-tip-block-screw
+  - cone-tip-collar
   - cone-tip-pinch-screw
-  - cone-tip-shim
   - crank-arm
   - crank-drive-gear
   - crank-handle

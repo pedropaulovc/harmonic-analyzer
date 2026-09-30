@@ -1,4 +1,4 @@
-"""Offline contracts for the MHA-140 cone tip block hold-down screw (I31)."""
+"""Offline contracts for the MHA-140 cone tip block hold-down screw."""
 
 from __future__ import annotations
 
@@ -14,60 +14,36 @@ import _common
 import _config
 import _telemetry
 import build_cone_tip_block_screw as part
+import cone_tip_block_screw_spec as screw
 import cone_tip_block_spec as block
 import draw_cone_tip_block_screw as drawing
 from _drawing_registry import DRAWINGS_BY_NAME
-from _hole_spec import THREAD_MAJOR_MM
 from _stock_fastener import STOCK_RECIPES
-from diagnostics import diag_build_93075A150 as recipe
-from diagnostics import diag_build_93075A194 as family_source
-from diagnostics import diag_mcmaster_hex_head as family
+from diagnostics import diag_build_91251A108 as recipe
 from diagnostics import diag_mcmaster_lib
 
 IN = 25.4
 
 
-def test_recipe_is_the_catalogue_screw_the_hold_down_is_sized_for() -> None:
-    """93075A150: #6-32 x 5/8, hex head 1/4 x 3/32 (the tip block spec's
-    HOLDDOWN_* stack is computed for exactly this screw)."""
-    assert part.THREAD == block.FOOT_THREAD == "#6-32"
-    assert recipe.PART_NO == "93075A150"
-    assert part.SHANK_DIA == pytest.approx(0.138 * IN)
-    assert part.SHANK_DIA == pytest.approx(THREAD_MAJOR_MM[block.FOOT_THREAD], abs=5e-4)
-    assert part.THREAD_PITCH == block.HOLDDOWN_PITCH_MM == IN / 32.0
-    assert part.SHANK_LEN == block.HOLDDOWN_SCREW_LENGTH == 0.625 * IN
-    assert part.HEAD_AF == 0.25 * IN
-    assert part.HEAD_H == 3.0 / 32.0 * IN
+def test_recipe_is_the_catalogue_screw() -> None:
+    """91251A108 per mcmaster.com (2026-09-29): #4-40 x 3/8, socket head
+    0.183 x 0.112, 3/32 hex drive; socket depth is ASME B18.3's #4 minimum
+    key engagement, 0.055 in."""
+    dims = recipe.DIMS
+    assert dims.part_no == "91251A108"
+    assert dims.major_dia == pytest.approx(0.112 * IN)
+    assert dims.pitch == pytest.approx(IN / 40.0)
+    assert dims.length == pytest.approx(0.375 * IN)
+    assert dims.head_dia == pytest.approx(0.183 * IN)
+    assert dims.head_h == pytest.approx(0.112 * IN)
+    assert dims.socket_af == pytest.approx(3.0 / 32.0 * IN)
+    assert dims.socket_depth == pytest.approx(0.055 * IN)
+    assert dims.underside_y == 0.0
 
 
-def test_screw_stands_a_pitch_past_the_nut_at_the_thickest_stack() -> None:
-    """Main's condition 3: the screw protrudes one pitch past the nylon insert
-    at worst case.  No insert height is published, so the whole 11/64 nut
-    counts; the block spec asserts this at import from the same length."""
-    thinnest, thickest = block.HOLDDOWN_PROTRUSION_MM
-    assert thinnest >= part.THREAD_PITCH
-    assert thickest > thinnest
-    # Full form past the nut once the family's P*0.851 tip chamfer is taken
-    # off: reported, not a requirement (the protrusion rule counts the tip).
-    assert thinnest - recipe.DIMS.tip_chamfer > 0.0
-
-
-def test_family_laws_are_93075A194s() -> None:
-    """At 93075A194's dimensions the family's derived frame is that recipe's."""
-    dims = family.HexHeadScrew(
-        part_no="93075A194",
-        major_dia=2.0 * family_source.HX_MAJOR_R,
-        pitch=family_source.HX_PITCH,
-        length=family_source.HX_LEN,
-        head_af=family_source.HX_HW,
-        head_h=family_source.HX_HH,
-    )
-    assert dims.underside_y == pytest.approx(family_source.HX_UNDERSIDE, abs=1e-9)
-    assert dims.top_y == pytest.approx(7.747, abs=1e-9)
-    assert dims.tip_y == pytest.approx(-7.747, abs=1e-9)
-    assert dims.crown_r == pytest.approx(2.8575, abs=1e-9)
-    assert dims.crown_d == pytest.approx(0.2794, abs=1e-9)
-    assert dims.helix_revs == pytest.approx(17.0, abs=1e-9)
+def test_screw_is_the_tip_blocks_hold_down() -> None:
+    assert screw.THREAD == block.HOLDDOWN_THREAD
+    assert screw.SHANK_LEN == pytest.approx(block.HOLDDOWN_SCREW_LENGTH)
 
 
 class _Recorder:
@@ -131,8 +107,7 @@ def _norm(value):
 
 
 class _Float(float):
-    """Compares equal within 1e-12 relative: 93075A194 types its frame
-    (4.953) where the family computes it ((12.7 - 2.794) / 2)."""
+    """Compares equal within 1e-12 relative."""
 
     def __eq__(self, other) -> bool:
         if not isinstance(other, float):
@@ -168,13 +143,16 @@ def _record(monkeypatch, author) -> list[tuple]:
         yield
         adapter.log("no_sketch_inference.exit")
 
-    for module in (family_source, family):
-        monkeypatch.setattr(module, "check", logger("check", True))
-        monkeypatch.setattr(module, "name_last_feature", logger("name_last_feature"))
-        monkeypatch.setattr(module, "volume_check", async_logger("volume_check"))
-        monkeypatch.setattr(module, "insert_helix", logger("insert_helix"))
-        monkeypatch.setattr(module, "offset_plane", logger("offset_plane"))
-        monkeypatch.setattr(module, "thread_sweep_cut", logger("thread_sweep_cut"))
+    monkeypatch.setattr(recipe, "check", logger("check", True))
+    monkeypatch.setattr(recipe, "name_last_feature", logger("name_last_feature"))
+    async def volume_check(_adapter, label, expected, tol):
+        adapter.log("volume_check", (label, expected, tol))
+        return expected
+
+    monkeypatch.setattr(recipe, "volume_check", volume_check)
+    monkeypatch.setattr(recipe, "insert_helix", logger("insert_helix"))
+    monkeypatch.setattr(recipe, "offset_plane", logger("offset_plane"))
+    monkeypatch.setattr(recipe, "thread_sweep_cut", logger("thread_sweep_cut"))
     monkeypatch.setattr(_common, "add_line_chain", async_logger("add_line_chain"))
     monkeypatch.setattr(_common, "_early_bound", lambda obj, _iface: obj)
     monkeypatch.setattr(
@@ -196,49 +174,32 @@ def _record(monkeypatch, author) -> list[tuple]:
     )
     monkeypatch.setattr(_telemetry, "info", lambda *a, **k: None)
     asyncio.run(author(adapter))
-    adapter.log("_mcm_com_map", tuple(adapter._mcm_com_map(["x", "y", "z"])))
     return adapter.events
 
-
-def test_family_builder_replays_93075A194_call_for_call(monkeypatch) -> None:
-    """The proof the family laws are 93075A194's: at that screw's dimensions
-    the shared builder issues exactly the calls its replica-gated recipe does."""
-    dims = family.HexHeadScrew(
-        part_no="93075A194",
-        major_dia=2.0 * family_source.HX_MAJOR_R,
-        pitch=family_source.HX_PITCH,
-        length=family_source.HX_LEN,
-        head_af=family_source.HX_HW,
-        head_h=family_source.HX_HH,
-    )
-    source_calls = _record(monkeypatch, family_source.build_93075A194)
-    family_calls = _record(
-        monkeypatch, lambda adapter: family.build_hex_head_screw(adapter, dims)
-    )
-    assert len(source_calls) > 40
-    assert family_calls == source_calls
-
-
-def test_93075A150_is_the_family_at_its_catalogue_dimensions(monkeypatch) -> None:
-    calls = _record(monkeypatch, recipe.build_93075A150)
-    offsets = {args[1]: args[2] for name, args, _kw in calls if name == "offset_plane"}
-    dims = recipe.DIMS
-    assert offsets["UndersidePlane"] == pytest.approx((15.875 - 2.38125) / 2.0)
-    assert offsets["TipPlane"] == pytest.approx(dims.underside_y - 15.875)
-    assert offsets["HeadTopPlane"] == pytest.approx(dims.underside_y + 2.38125)
-    helix = next(args for name, args, _kw in calls if name == "insert_helix")
-    assert helix[1:3] == (IN / 32.0, 15.875 / (IN / 32.0) + 1.0)
+def test_recipe_cuts_the_catalogue_socket_and_thread(monkeypatch) -> None:
+    calls = _record(monkeypatch, recipe.build_91251A108)
+    (cut,) = [c for c in calls if c[0] == "fm.FeatureCut4"]
+    assert cut[1][5] == recipe.DIMS.socket_depth / 1000.0
+    (helix,) = [c for c in calls if c[0] == "insert_helix"]
+    assert helix[1][1:3] == (IN / 40.0, 0.375 * IN / (IN / 40.0) + 1.0)
+    sweeps = [c for c in calls if c[0] == "thread_sweep_cut"]
+    assert [c[1][-1] for c in sweeps] == ["ThreadGroove"]
+    assert ("split_at_plane", ("Top Plane", "HeadSplit"), ()) in calls
 
 
 def test_stock_build_uses_its_registered_recipe_head_up_on_the_origin(
     monkeypatch,
 ) -> None:
-    metadata = STOCK_RECIPES["93075A150"]
+    metadata = STOCK_RECIPES["91251A108"]
     assert metadata.module == recipe.__name__
-    assert metadata.callable_name == recipe.build_93075A150.__name__
-    assert part.SPEC.skus == ("93075A150",)
-    assert part.SPEC.stock_name == "Low-Strength Zinc-Plated Steel Hex Head Screw"
-    assert part.MATERIAL == "Plain Carbon Steel"
+    assert metadata.callable_name == recipe.build_91251A108.__name__
+    assert metadata.threaded
+    assert part.SPEC.skus == ("91251A108",)
+    assert part.SPEC.stock_name == "Black-Oxide Alloy Steel Socket Head Screw"
+    assert part.MATERIAL == "Alloy Steel"
+    row = _config.parts(part.PART_NAME)
+    assert row["number"] == "MHA-140"
+    assert row["supplier_skus"] == ["91251A108"]
 
     seen: dict = {}
 
@@ -249,34 +210,11 @@ def test_stock_build_uses_its_registered_recipe_head_up_on_the_origin(
     monkeypatch.setattr(part, "build_stock_fastener", fake_build)
     asyncio.run(part.build(None))
     (component,) = seen["components"]
-    assert component.sku == "93075A150"
-    assert component.author is recipe.build_93075A150
-    # The vendor frame puts the underside (L - HH)/2 above mid-overall; the
-    # part moves it to y = 0 so the assembly mates the bearing face at origin.
-    assert component.transform.translation_mm == (0.0, -recipe.DIMS.underside_y, 0.0)
+    assert component.sku == "91251A108"
+    assert component.author is recipe.build_91251A108
+    assert component.transform.translation_mm == (0.0, 0.0, 0.0)
     assert component.transform.rotation_radians == (0.0, 0.0, 0.0)
     assert seen["screw_axis_planes"] == ("Front Plane", "Right Plane")
-
-
-def test_docstring_names_the_real_geometry_source() -> None:
-    """Codex P2 (PRRT_kwDOPHDy386l6TBe): the old docstring claimed catalogue
-    dimensions while the recipe replayed a vendor model.  It must name the
-    catalogue page, the family laws and the gate that proves them, and state
-    that no McMaster .SLDPRT is committed."""
-    doc = " ".join((part.__doc__ or "").split())
-    assert "McMaster product page for 93075A150" in doc
-    assert "1/4 in across flats x 3/32 in high" in doc
-    assert "diagnostics/diag_build_93075A150.py" in doc
-    assert "diagnostics/diag_mcmaster_hex_head.py" in doc
-    assert "diagnostics/diag_build_93075A194.py" in doc
-    assert "replica gate" in doc
-    assert "test_cone_tip_block_screw_drawing.py" in doc
-    assert "No McMaster .SLDPRT is committed or used." in doc
-    assert "diag_build_91255A148" in doc and "no production part builds from it" in doc
-    recipe_doc = " ".join((recipe.__doc__ or "").split())
-    assert "https://www.mcmaster.com/93075A150/" in recipe_doc
-    assert "no replica gate of its own" in recipe_doc
-    assert "catalog-only" in recipe_doc
 
 
 def test_standalone_recipe_run_is_catalog_only() -> None:
@@ -285,14 +223,11 @@ def test_standalone_recipe_run_is_catalog_only() -> None:
     source = Path(recipe.__file__).read_text(encoding="utf-8")
     assert "replica_main(" not in source and "import replica_main" not in source
     assert "run_build(build_catalog)" in source
-    assert "diag_build_93075A150.py" in (recipe.__doc__ or "")
 
 
 def test_no_vendor_model_of_the_new_hardware_is_tracked() -> None:
     root = Path(__file__).resolve().parents[2]
-    for sku in ("93075A150", "90631A007"):
-        assert not list(root.glob(f"cad/references/**/{sku}*.SLDPRT"))
-
+    assert not list(root.glob("cad/references/**/91251A108*.SLDPRT"))
 
 _DIMENSION = re.compile(r"\d")
 

@@ -1,4 +1,4 @@
-"""Create the purchased reference drawing for the cone tip block hold-down nut."""
+"""Create the purchased reference drawing for the cone tip stack collar."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
 
 
-SPEC = DRAWINGS_BY_NAME["cone_tip_block_nut"]
+SPEC = DRAWINGS_BY_NAME["cone_tip_collar"]
 
 
 async def build(adapter: Any) -> dict[str, str]:

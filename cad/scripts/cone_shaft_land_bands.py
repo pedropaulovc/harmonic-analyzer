@@ -18,8 +18,8 @@ from _fit_limits import SHAFT_H
 # The Ø12.231 pivot journal RUNS, so it keeps the shared ground-shaft h band:
 # it turns in the pivot post's Ø12.2808 bore (0.05 nominal clearance).  The
 # Ø1.588 tip land keeps the same h band: it carries the T012 and T006 seats
-# and, flatted through to the tip, the MHA-096 thrust spacer, whose bore
-# (build_cone_tip_bushing.BORE_DIA_BAND) slides on it at 0.025..0.075.
+# and, flatted through to the tip, the MHA-096 set-screw collar, whose stock
+# 1/16 in bore (cone_tip_collar_spec.BORE_DIA) slips over it.
 RUNNING_DIA_BAND = SHAFT_H
 # GEAR_SEAT_BAND (U27, 2026-09-23): the three intermediate lands only carry
 # gears, slid on against the stack (gear_seat_fit).  The upper limit stays at
@@ -35,7 +35,7 @@ SECTION_DIA_BANDS: tuple[tuple[float, float], ...] = (
     GEAR_SEAT_BAND,  # Sec1: T030-T120 seats
     GEAR_SEAT_BAND,  # Sec2: T024 seat
     GEAR_SEAT_BAND,  # Sec3: T018 seat
-    RUNNING_DIA_BAND,  # Sec4: T012 + T006 seats + tip thrust spacer
+    RUNNING_DIA_BAND,  # Sec4: T012 + T006 seats + MHA-096 stack collar
 )
 # The cone gears each section carries (U40 S1), index-aligned with
 # SECTION_DIA_BANDS.  The 64T crank-drive gear also rides Sec1.

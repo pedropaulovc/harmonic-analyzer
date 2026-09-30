@@ -30,12 +30,14 @@ south of the north face of the last gear on the larger land
 * 3/8 in to 100.717 -- 64T + seats T120..T030
 * 1/4 in to 107.606 -- T024 seat
 * 1/8 in to 114.495 -- T018 seat
-* 1/16 in to 137.429 -- T012 and T006 seats and the MHA-096 spacer; its end
-  contacts the exact McMaster 94025A164 conical cup apex at 9.5 mm thread
-  engagement (rule-12 E11), the tip block one 0.45 feeler off the spacer.
-  The land runs at L/D 14.5 and is turned with tailstock support (a drawing
-  note).  The 1/16 in step leaves T006 the 0.621 mm worst-case web accepted
-  as its named exception (U40) -- see cone_gear_shaft_spec.SECTIONS.
+* 1/16 in to 139.734 -- T012 and T006 seats and the MHA-096 set-screw
+  collar (locked on this land's flat one 0.45 feeler off T006); its end
+  contacts the exact McMaster 94025A164 conical cup apex at the 8.17 mm
+  nominal embed in the tip block (rule-12 E11, with the adjuster's 1.0D
+  engagement exception, user ruling 2026-09-29).  The land runs at L/D 15.9
+  and is turned with tailstock support (a drawing note).  The 1/16 in step
+  leaves T006 the 0.621 mm worst-case web accepted as its named exception
+  (U40) -- see cone_gear_shaft_spec.SECTIONS.
 
 Every gear land's flat (SECTION_FLAT_AF, across flat) runs the whole land;
 the terminal land's runs out through the tip, so its end face is a D.

@@ -344,15 +344,15 @@ sections:
         - derived
         - low
       - - Cone shaft length
-        - 199.3356869456 mm overall (shaft-local station of tip)
+        - 201.6406869456 mm overall (shaft-local station of tip)
         - '~7.85'
-        - 'The front end remains cone station −61.9068609979; shaft-local station = cone-axis station +61.9068609979. The 2026-09-28 tip shortening is 1.55: tip at cone station 137.4288259477 / shaft-local station 199.3356869456, mating the McMaster 94025A164 cup apex. The pivot station and large-end journal do not move.'
+        - 'The front end remains cone station −61.9068609979; shaft-local station = cone-axis station +61.9068609979. User ruling 2026-09-29 fixes the tip block''s north face 5.575 south of the pivot (the pivot-screw head''s air) and grows the block south, so the tip reaches the adjuster cup at cone station 139.7338259477 / shaft-local station 201.6406869456, 2.305 longer than the 2026-09-28 tip. The pivot station and large-end journal do not move.'
         - derived
         - high
       - - Cone shaft diameter
-        - 'stepped from the front end: Ø12.2308 journal shaft-local 0–43.011; Ø15.875 integral thrust collar shaft-local 43.011–44.6922184176 (north face supports the 64T south face and is the drawing length origin); Ø9.525 / 6.35 / 3.175 / 1.5875 gear lands with co-clocked local +X flats, nominal AF 8.763 / 5.842 / 2.921 / 1.460 respectively, each +0/−0.010. The three seat steps are 1.0 mm south of the T030/T024/T018 interfaces at cone stations 100.717 / 107.606 / 114.495; the Ø1.5875 land ends at shaft-local 199.3356869456 (cone station 137.4288259477). Its flat runs from the T018 step through the tip end, including under the round-bore thrust spacer MHA-096.'
+        - 'stepped from the front end: Ø12.2308 journal shaft-local 0–43.011; Ø15.875 integral thrust collar shaft-local 43.011–44.6922184176 (north face supports the 64T south face and is the drawing length origin); Ø9.525 / 6.35 / 3.175 / 1.5875 gear lands with co-clocked local +X flats, nominal AF 8.763 / 5.842 / 2.921 / 1.460 respectively, each +0/−0.010. The three seat steps are 1.0 mm south of the T030/T024/T018 interfaces at cone stations 100.717 / 107.606 / 114.495; the Ø1.5875 land ends at shaft-local 201.6406869456 (cone station 139.7338259477). Its flat runs from the T018 step through the tip end, and the MHA-096 set-screw collar locks on it.'
         - 12.2308/9.525/6.35/3.175/1.5875
-        - 'The Ø12.2308 front journal runs in the Ø12.2808 post bore with 0.05 diametral clearance and spans the 42.011 post body plus 1.0 proud. The four shaft gear lands gain one milled flat each at the same +X clock. Gears are slip-fitted, faces touching from the collar-supported 64T through T006; the unchanged round bore of thrust spacer MHA-096 rides the terminal D-flat, not a round running journal. The tip is 1.55 shorter than before; cone-axis station 137.4288259477 + shaft-local offset 61.9068609979 = shaft-local station 199.3356869456. The pivot does not shift.'
+        - 'The Ø12.2308 front journal runs in the Ø12.2808 post bore with 0.05 diametral clearance and spans the 42.011 post body plus 1.0 proud. The four shaft gear lands gain one milled flat each at the same +X clock. Gears are slip-fitted, faces touching from the collar-supported 64T through T006; the MHA-096 stock collar (McMaster 9414T1) is set 0.45 off T006 and its set screw locked on the terminal D-flat. Cone-axis station 139.7338259477 + shaft-local offset 61.9068609979 = shaft-local station 201.6406869456. The pivot does not shift.'
         - legacy + derived
         - high
       - - Gear bores (configured `BoreDia`, with matching D-flat)
@@ -371,8 +371,9 @@ sections:
 
       Notes: all 20 gears rotate together on one D-flat shaft. Their 6.8887 ±0.025
       faces touch from the collar-supported 64T to T006; accept the twenty-gear
-      stack at 137.774 ±0.20. The 4-mm tip bushing bears on T006; set the tip
-      block 0.45 mm off its north face with a feeler for 0.35–0.55 mm end play.
+      stack at 137.774 ±0.20. The MHA-096 set-screw collar is pushed onto a
+      0.45 mm feeler against T006 and locked on the D-flat, for 0.35–0.55 mm
+      stack end play; the tip block never touches it.
       Engagement with cylinder gears is oblique (partial engagement → distinct
       wear). The four smallest gears (T006–T024) look "slightly more yellow …
       a different, perhaps harder metal" (p.21). A harder high-zinc yellow
@@ -569,7 +570,7 @@ sections:
         - low
       - - 64T drive gear
         - perpendicular on the 3/8" land at effective shaft station −12.109, centre (x, z) = (−123.312, −64.454), 7.2113 mm face; its south face bears on the MHA-014 thrust collar (unchanged) and its north face touches T120's south face (no axial air)
-        - p.20 (directly beside the 120T); DP 25.7311 is fixed by the v36 post crank-axis centre distance. User ruling 2026-09-28 grows the face 6.5 → 7.2113 mm northward from the unchanged collar face until it meets T120, the first joint of the solid gear stack; its D-bore locates it rotationally. The south face does not move, so the v36 post's print-worst crank boss clearance stays 0.343 mm, above its 0.25 floor. The fixed-centre mesh is required not to bind; the re-measured backlash study keeps ≥ 0.163 mm at the tightest corner.
+        - p.20 (directly beside the 120T); DP 25.7311 is fixed by the v36 post crank-axis centre distance. User ruling 2026-09-28 grows the face 6.5 → 7.2113 mm northward from the unchanged collar face until it meets T120, the first joint of the solid gear stack; its D-bore locates it rotationally. The south face does not move; with the post's ConeBossLen printed .XX (user ruling 2026-09-29), the v36 post's print-worst crank boss clearance is 0.486 mm, above its 0.25 floor. The fixed-centre mesh is required not to bind; the re-measured backlash study keeps ≥ 0.163 mm at the tightest corner.
         - low
       - - Cone gear j (j = 0 big … 19 small)
         - shaft seat station 28.25 + 6.889j; centre x_j = −84.702 − (30.59 − 1.5295j)·cos i, z_j = −31.685 + 7.0565j + (30.59 − 1.5295j)·sin i, y = 90.518; ALL 20 perpendicular to the shaft (true cone, p.18)
@@ -592,7 +593,7 @@ sections:
         - v2 cast-in crank-axis cascade; chain remains in the z −155 plane (T12 band −157.5..−152.5)
         - med
       - - Cone pivot
-        - 'the whole cone set rides a pivoting black wedge PLATFORM (p.18 top-down: the "pivot" label sits at the TIP end of the plate): big end journaled in the green post; the thin tip is end-play located by the external spacer and cup-ended adjuster carried in the black block. The post and block both stand ON the plate — the swing is horizontal (out of mesh) about the tip-end vertical pivot, so the big gears (needing the most separation) get the largest throw'
+        - 'the whole cone set rides a pivoting black wedge PLATFORM (p.18 top-down: the "pivot" label sits at the TIP end of the plate): big end journaled in the green post; the thin tip is end-play located by the cup-ended adjuster carried in the black block, and the MHA-096 set-screw collar retains the gear stack on the shaft. The post and block both stand ON the plate — the swing is horizontal (out of mesh) about the tip-end vertical pivot, so the big gears (needing the most separation) get the largest throw'
         - p.18 + ch. 12 notes; v4 stills (t00393/t00396/t00417 engage/disengage)
         - high
   - prose: |2
@@ -622,8 +623,8 @@ sections:
         - 'User ruling 2026-09-28 restores the v36 post geometry, including its Ø42.7506 head. Manual height rederivation from ch30 Eight Views station 2 (references/albert-michelsons-harmonic-analyzer/ch30_images/page003_img01.png), with proportions from ch11 page002_img05.jpeg and page002_img06.jpeg; other feature dimensions harvested from cone-pivot-post-v2.SLDPRT.'
         - 'med (86 mm height and proportions photo-derived; other restored v36 feature dimensions exact)'
       - - '`cone-tip-block` (adjuster carrier + end-play lock, on the plate — GT cone_back realized)'
-        - 'black steel block 17 × 12 × 46.83 tall on a 1.10 nominal fit-up shim pack; #10-32 UNF-2B thread tapped THROUGH on the cone axis 32.27 above the foot, with a 90° countersink to Ø5.0 at both ends (rule-12 E11/W1), carrying the cup-ended cone-tip-adjuster from the north face while the shaft tip enters from the south; 1.2-wide top slit with its floor 0.65 below the axis, crossed by a #4-40 pinch joint 41.12 above the foot, 8.85 over the axis (McMaster 91794A112; its Ø3.264 normal-clearance near jaw is drilled to the slot, the far jaw tapped through to it; the axis and the flange slot print from the -X face, the pinch screw''s far side). A south foot flange (20.8 × 3.50) carries the hold-down slot, its arc centres 6.5 and 14.9 from the body''s south face. Every web keeps 2.0 at the printed title-block and hole bands. Axial thickness (`BLOCK_Z`) is 12.000 mm.'
-        - 'cone-axis block south face 133.7223 (0.45 mm feeler north of the bushing end 133.2723), north face 145.7223; centre 139.7223, 1.55 south of the former station. The swing-platform pivot stays fixed; slide the block in its slot until the feeler nips, snug, then seat the shaft tip with the adjuster cup apex at cone station 137.4288259477.'
+        - 'black steel straight prism 17 × 9.750 × 47.93 tall standing directly on the swing platform (2026-09-29 user ruling, eight-views-4 photo); #10-32 UNF-2B thread tapped THROUGH on the cone axis 33.368 above the foot (±0.10), 90° countersinks to Ø5.0 both ends, carrying the cup-ended cone-tip-adjuster from the north face while the shaft tip enters from the south; 1.2-wide top slit, floor 0.65 below the axis, crossed by the #4-40 pinch joint 42.22 above the foot, 8.85 over the axis (McMaster 91794A112, head on the +X (west) face); held down by one #4-40 × 3/8 socket head cap screw (MHA-140, McMaster 91251A108) from under the platform into a blind tapped hole in the foot, 1.00 east of the cone axis like the platform''s hold-down hole off the cone line (both ±0.10). Width and depth print .XXX for the platform containment, the adjuster''s embed window and the collar air. No shim, flange, slot or heel.'
+        - 'centre (−89.948, +85.818) = cone shaft station 141.822, standing ON the swing platform beside T006; north face 146.697 (5.575 south of the pivot, the pivot-screw head''s air, ≥ 0.20 at print-worst), south face 136.947, which the block grows toward. At the 7.38 mm nominal adjuster engagement (1.0D working window 5.31..9.14, 5.35..9.10 at print-worst), the shaft tip contacts the McMaster 94025A164 conical cup apex at station 139.734.'
         - 'ch30 GT (cone_back); p.18 tip clamp + v4_t00471 (7:49 full tip-stack geometry); 2026-09-21 user-approved DFM correction grows only the block top and controls the pinch axis relative to the unchanged adjuster axis'
         - med (GT-anchored)
       - - '`cone-lock-knob` (clamps the swing plate engaged/disengaged)'
@@ -641,19 +642,19 @@ sections:
         - 'base-threaded STATIC at (−140.050, +2.403), derived so the 223.354-long plate''s EAST taper edge just touches the head flank at the 4.686° disengaged swing. The disengage swing walks the knob stud out of the notch mouth and advances the east edge onto the stop; the engaged edge retains 8.569 mm signed clearance to the head (derived and asserted against the base hole).'
         - 'McMaster-Carr 90280A108 recipe (`cad/scripts/diagnostics/diag_mcmaster_fillister.py`); embed and receiver depths from `cad/scripts/build_swing_stop_screw.py` and `cad/scripts/build_harmonic_base.py`; user review (v4: small screw the platform bumps against); position derived from the notch/knob geometry'
         - high (stock dimensions exact; function and placement derived)
-      - - '`cone-tip-bushing` (MHA-096 thrust spacer against T006)'
-        - brass sleeve Ø6 × 4.000 mm, unchanged round bore Ø1.5875 +0.055/+0.025
-        - 'MHA-096 rides the shaft''s continuous terminal D-flat at cone-axis stations 129.2723..133.2723; its south face bears on T006, north face is 0.45 mm from the fitted tip-block south face (133.7223). It is an axial thrust spacer, not a bearing on a round shaft journal.'
-        - v4_t00471 / 7:49 (brass collar between the smallest gear and the tip block)
-        - med (role high, dims low)
+      - - '`cone-tip-collar` (MHA-096 set-screw collar retaining the gear stack)'
+        - 'McMaster-Carr 9414T1 black-oxide steel set-screw shaft collar: Ø6.35 (1/4 in) OD × 4.7625 (3/16 in) wide, Ø1.5875 (1/16 in) bore, one #2-56 cup-point set screw'
+        - 'on the shaft''s terminal land at cone-axis stations 129.7223..134.4848: pushed onto a 0.45 feeler against T006 and its set screw locked on the D-flat, so the collar, not the tip block, holds the 0.35–0.55 stack float. Its north face stays 2.46 south of the tip block (≥ 0.11 at print-worst); it never touches the block.'
+        - McMaster-Carr 9414T1 (stock); v4_t00471 / 7:49 (collar between the smallest gear and the tip block); user ruling 2026-09-29
+        - high (stock dimensions exact; role by user ruling)
       - - '`cone-tip-adjuster` (axial end-play screw, partially hollow)'
         - McMaster-Carr 94025A164 slotted 18-8 stainless #10-32 × 3/8 cup-tip set screw (rule-12 E11); vendor 45° conical cup depth 1.2065 from the cup rim to its apex (Sketch2 Line7)
-        - 'threaded 9.5 mm into the tip block''s north face (through #10-32 tap), placing the cup rim at cone-axis station 136.2223 and its apex at 137.4288259477, coincident with the shortened shaft tip; turn in to seat the tip, retain the spin-free alignment and 1/8-turn back-off, then lock with the block''s slit and pinch screw. The fitted 0.45-mm feeler gap sets 0.35–0.55 mm stack end play.'
+        - 'threaded into the tip block''s north face (through #10-32 tap) to 7.38 mm nominal engagement, never under 1.0D of full thread at print-worst (user-ruled exception to 1.5D: it carries only the shaft''s end-play thrust), its cup seating the shaft tip at cone-axis station 139.734; run in until the shaft just stops shuttling, back off 1/8 turn for 0.05–0.25 mm shaft end play, then lock with the block''s slit and pinch screw. The stack''s 0.35–0.55 mm float is the MHA-096 collar''s, set by its 0.45 feeler.'
         - v4_t00471 / 7:49 (t00147: hollow slotted screw the cone shaft rests in)
         - med (role high, dims low)
       - - '`cone-tip-pinch-screw` (locks the adjuster)'
-        - 'McMaster-Carr 91794A112 18-8 stainless fillister-head slotted screw: head Ø4.6482 × 2.7178, #4-40 shank Ø2.8448 × 15.875 (rule-12 E1: 5.21 = 1.83D of far-jaw thread, from the slit''s far wall, at the printed worst case; tip 0.325 inside the -X face at the width minimum).'
-        - 'across the tip block''s top slit (head on the east face, y 110.35): the near jaw is normal-clearance and the far jaw is native #4-40 UNC-2B; tightening pinches the slit closed around the #10-32 adjuster so its end-play setting cannot back off.'
+        - 'McMaster-Carr 91794A112 18-8 stainless fillister-head slotted screw: head Ø4.6482 × 2.7178, #4-40 shank Ø2.8448 × 15.875 (rule-12 E1: 6.26 = 2.20D of far-jaw thread, from the slit''s far wall, at the printed worst case; tip 0.995 inside the -X face at the width minimum).'
+        - 'across the tip block''s top slit (head on the +X (west) face, y 110.35): the near jaw is normal-clearance and the far jaw is native #4-40 UNC-2B; tightening pinches the slit closed around the #10-32 adjuster so its end-play setting cannot back off.'
         - McMaster-Carr 91794A112 recipe + v4_t00471 / 7:49 (small perpendicular screw at the block top)
         - high (stock dimensions exact; function photo-derived)
   - prose: |2

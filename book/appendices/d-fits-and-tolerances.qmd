@@ -30,12 +30,14 @@ The MHA-014 gear-land AF sizes are 8.763/5.842/2.921/1.460 mm, each
 AF. Check 0.01–0.03 mm flat clearance and 0.025–0.105 mm diametral
 round slip clearance (`cad/scripts/cone_shaft_land_bands.py`,
 `cad/scripts/gear_seat_fit.py`). Check the twenty touching
-6.8887 ±0.025 mm cone gears as a stack at 137.774 ±0.20 mm, and set the
-tip block 0.45 mm off the bushing on T006 for 0.35–0.55 mm stack end play.
-Then hold the shaft's own end play at the cup screw to 0.05–0.25 mm: the
-collar carries the stack north by it, and at 0.25 mm the tightest setting
-still leaves 0.10 mm between the bushing and the block
-(`cad/scripts/cone_gear_stack.py`, `cad/scripts/cone_stack_end_play.py`).
+6.8887 ±0.025 mm cone gears as a stack at 137.774 ±0.20 mm, then push the
+MHA-096 stack collar onto a 0.45 mm feeler on T006 and lock its set screw
+on the D-flat, for 0.35–0.55 mm stack end play (`COLLAR_FEELER`,
+`STACK_FLOAT`). Then hold the shaft's own end play at the cup screw to
+0.05–0.25 mm (`SHAFT_END_PLAY`). The collar never touches the tip block:
+at the printed limits at least 0.11 mm of air remains between them
+(`TIP_COLLAR_WORST_AIR` in `cad/scripts/build_drive_train_assembly.py`;
+`cad/scripts/cone_gear_stack.py`, `cad/scripts/cone_stack_end_play.py`).
 
 ## The geometric callouts and how to inspect each one
 

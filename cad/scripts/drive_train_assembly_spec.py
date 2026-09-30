@@ -41,10 +41,10 @@ CLUSTERS: dict[Cluster, tuple[str, ...]] = {
         "cone-swing-platform",
         "cone-pivot-post",
         "cone-tip-block",
-        "cone-tip-bushing",
+        "cone-tip-collar",
         "cone-tip-adjuster",
         "cone-tip-pinch-screw",
-        "cone-tip-shim",
+        "cone-tip-block-screw",
         "post-mount-screw",
         "cone-lock-knob",
         "cone-pivot-screw",
@@ -136,12 +136,12 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     ExplodeStep("pedestal screws lift", ("pedestal-hold-down-screw",), "y", 30.0),
     ExplodeStep("apex set screws lift", ("arbor-set-screw",), "y", 20.0),
     # cone set: base hardware up, swing plate down.  The rotor (shaft, gears,
-    # tip bushing) withdraws north out of the post along its own axis, so the
-    # MHA-014 journal stands clear of the post (user ruling 2026-09-29: run 7's
-    # touching gears, collar and tip hardware left no shaft face in view).
-    # The journal is 43.011 long, so 50 leaves ~7 of air south of it; the tip
-    # hardware goes 12 further, which clears the 3.7 the tip runs into the
-    # block by ~8.
+    # the MHA-096 collar locked on it) withdraws north out of the post along
+    # its own axis, so the MHA-014 journal stands clear of the post (user
+    # ruling 2026-09-29: run 7's touching gears, collar and tip hardware left
+    # no shaft face in view).  The journal is 43.011 long, so 50 leaves ~7 of
+    # air south of it; the tip hardware goes 12 further, which clears the
+    # 2.79 the tip runs into the block by ~9.
     ExplodeStep("swing plate drops", ("cone-swing-platform",), "y", -30.0),
     ExplodeStep("post mount screws lift", ("post-mount-screw",), "y", 100.0),
     ExplodeStep("pivot screw lifts", ("cone-pivot-screw",), "y", 35.0),
@@ -153,7 +153,7 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
     ExplodeStep("swing stop lifts", ("swing-stop-screw",), "y", 50.0),
     ExplodeStep(
         "cone rotor withdraws",
-        ("cone-gear-shaft", "cone-gear", "crank-drive-gear", "cone-tip-bushing"),
+        ("cone-gear-shaft", "cone-gear", "crank-drive-gear", "cone-tip-collar"),
         "cone",
         50.0,
     ),
@@ -164,6 +164,9 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
         62.0,
     ),
     ExplodeStep("tip pinch screw lifts", ("cone-tip-pinch-screw",), "y", 25.0),
+    # MHA-140 comes down out of the dropped plate's counterbore: 50 carries
+    # its tip ~7 below the plate's underside after the plate's 30.
+    ExplodeStep("tip block screw drops", ("cone-tip-block-screw",), "y", -50.0),
     ExplodeStep("tip adjuster backs out", ("cone-tip-adjuster",), "cone", 30.0),
     # crank: the arm group comes off the crankshaft's front end
     ExplodeStep(
@@ -215,7 +218,7 @@ STATIONARY_STEMS = frozenset(
         "cylinder-gear-shaft",
         "cylinder-gear",
         "cone-pivot-post",
-        "cone-tip-shim",
+
         "crankshaft",
         "crank-pinion",
         "crank-pinion-pin",

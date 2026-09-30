@@ -18,7 +18,7 @@ import cone_pivot_post_installation
 import cone_shaft_land_bands
 import cone_stack_end_play
 import cone_tip_block_spec
-import cone_tip_bushing_spec
+import cone_tip_collar_spec
 import draw_cone_gear_shaft as drawing
 import pytest
 from _drawing_annotation_extent import CLEAR_GAP_M
@@ -65,11 +65,9 @@ def test_section_fits_are_toleranced_on_the_model() -> None:
     forked = list(spec.SECTION_DIA_BANDS)
     forked[0] = (0.000, -0.020)
     assert not _lands_ride_named_bands(tuple(forked))
-    # The tip land's round still clears the MHA-096 spacer's round bore.
-    import build_cone_tip_bushing as bushing
-
+    # The tip land's round never exceeds the MHA-096 collar's stock bore.
     tip_max = spec.SECTION_DIAS[-1] + spec.SECTION_DIA_BANDS[-1][0]
-    assert bushing.BORE_DIA + bushing.BORE_DIA_BAND[1] - tip_max >= 0.0
+    assert cone_tip_collar_spec.BORE_DIA - tip_max >= 0.0
     # Every flat rides the one named across-flat band.
     assert spec.FLAT_AF_BAND is cone_shaft_land_bands.FLAT_AF_BAND
     # Applied in ONE loop per family over the named bands, so the AST reports
@@ -94,9 +92,10 @@ def test_display_precision_is_owned_by_the_part() -> None:
     )
     # Every diameter and across-flat carries its named band, so its places
     # are only spelling.  The stations carry no band, so their places ARE the
-    # grade they are held to: three for the land steps booked in the setback
-    # and for the tip, which sits in the axial stack, one for the journal
-    # length, which nothing seats against.
+    # grade they are held to: three for the land steps booked in the setback;
+    # two for the tip (user ruling 2026-09-29), whose .XX band the cone-tip
+    # adjuster's embed window absorbs (build_drive_train_assembly); one for the
+    # journal length, which nothing seats against.
     by_name = cone_gear_shaft_spec.DRAWING_PRECISION_BY_NAME
     assert by_name == {
         "Sec0Dia": 3,
@@ -108,7 +107,7 @@ def test_display_precision_is_owned_by_the_part() -> None:
         "Sec1End": 3,
         "Sec2End": 3,
         "Sec3End": 3,
-        "Sec4End": 3,
+        "Sec4End": 2,
         "Sec1AF": 3,
         "Sec2AF": 3,
         "Sec3AF": 3,
@@ -153,7 +152,7 @@ def test_the_gears_are_a_touching_stack_on_the_collar() -> None:
     for (_south, north), (next_south, _north) in zip(faces, faces[1:]):
         assert 0.0 <= next_south - north <= tolerance
     assert all(north - south == pytest.approx(6.8887) for south, north in faces)
-    # T006's north face, the tip spacer's seat, stays on the 6.5 reference.
+    # T006's north face, the collar's feeler reference, stays on the 6.5 reference.
     assert faces[19][1] == pytest.approx(spec.T006_CENTER_STATION + 3.25)
     assert faces[0][0] - spec.GEAR64_NORTH_FACE_STATION == pytest.approx(0.0, abs=tolerance)
     assert spec.GEAR64_SOUTH_FACE_STATION == pytest.approx(
@@ -732,31 +731,35 @@ def test_sections_are_a_monotonic_stepped_shaft() -> None:
     assert cone_gear_shaft_spec.JOURNAL_END == pytest.approx(43.011)
     assert dias == pytest.approx((12.2308, 9.525, 6.35, 3.175, 1.5875))
     assert cone_gear_shaft_spec.FRONT_STUB == pytest.approx(61.9068609979)
-    # The tip chain stacks from the touching gears (user ruling 2026-09-28):
-    # T006's north face, the 4 mm bushing against it, the feeler-set gap,
-    # the 12 mm block.  Every length is its owner's, not a copy.
+    # The tip chain (user ruling 2026-09-29): the MHA-096 collar stands one
+    # feeler off T006's north face; the block's north face stands the
+    # pivot-screw head's air south of the pivot and the block grows south.
+    # Every length is its owner's, not a copy.
     assert cone_gear_shaft_spec.T006_NORTH_FACE_STATION == pytest.approx(
         cone_line.T006_NORTH_FACE
     )
-    assert cone_gear_shaft_spec.TIP_BUSHING_LENGTH == cone_tip_bushing_spec.LENGTH
+    assert cone_gear_shaft_spec.TIP_COLLAR_WIDTH == cone_tip_collar_spec.WIDTH
+    assert cone_gear_shaft_spec.TIP_COLLAR_START_STATION == pytest.approx(
+        cone_gear_shaft_spec.T006_NORTH_FACE_STATION + cone_stack_end_play.COLLAR_FEELER
+    )
     assert cone_gear_shaft_spec.TIP_BLOCK_LENGTH == cone_tip_block_spec.BLOCK_Z
-    assert cone_gear_shaft_spec.TIP_BLOCK_SOUTH_FACE_STATION == pytest.approx(
-        cone_gear_shaft_spec.TIP_BUSHING_END_STATION + cone_stack_end_play.TIP_BLOCK_FEELER
+    assert cone_gear_shaft_spec.TIP_BLOCK_NORTH_FACE_STATION == pytest.approx(
+        cone_line.TIP_BLOCK_NORTH_FACE
     )
     assert cone_gear_shaft_spec.TIP_BLOCK_SOUTH_FACE_STATION + (
         cone_gear_shaft_spec.TIP_BLOCK_LENGTH / 2.0
     ) == pytest.approx(cone_line.TIP_BLOCK_STATION)
     assert cone_gear_shaft_spec.TIP_BLOCK_NORTH_FACE_STATION == pytest.approx(
-        145.72232594770454
+        146.69732594770454
     )
-    # Rule-12 E11: #10-32 94025A164 at the block spec's 9.5 fit-up embed.
+    # Rule-12 E11: #10-32 94025A164 at the block spec's fit-up embed.
     assert cone_gear_shaft_spec.ADJUSTER_EMBED == cone_tip_block_spec.ADJUSTER_EMBED
     assert cone_gear_shaft_spec.ADJUSTER_CUP_RIM_STATION == pytest.approx(
-        136.22232594770454
+        138.52732594770455
     )
     # Vendor Sketch2 Line7 (harvested 2026-09-24): 45 deg cup, depth = rim radius.
     assert cone_gear_shaft_spec.MCM_94025A164_CUP_DEPTH == pytest.approx(1.2065)
-    assert cone_gear_shaft_spec.T006_TIP_STATION == pytest.approx(137.42882594770452)
+    assert cone_gear_shaft_spec.T006_TIP_STATION == pytest.approx(139.73382594770456)
     assert cone_gear_shaft_spec.SHAFT_LENGTH == (
         cone_gear_shaft_spec.FRONT_STUB + cone_gear_shaft_spec.T006_TIP_STATION
     )
@@ -770,25 +773,25 @@ def test_sections_are_a_monotonic_stepped_shaft() -> None:
         )
     )
     # Printed baseline stations from the big (journal) end.
-    assert ends[1:] == pytest.approx((162.624, 169.513, 176.402, 199.336), abs=1e-3)
+    assert ends[1:] == pytest.approx((162.624, 169.513, 176.402, 201.641), abs=1e-3)
     assert ends[-1] == pytest.approx(
-        cone_gear_shaft_spec.FRONT_STUB + 137.42882594770452
+        cone_gear_shaft_spec.FRONT_STUB + 139.73382594770456
     )
-    # The terminal stub supports the entire 4 mm bushing.
+    # The terminal stub carries the whole MHA-096 collar.
     assert cone_gear_shaft_spec.TIP_STUB_START_STATION == pytest.approx(
         114.495, abs=1e-3
     )
-    assert cone_gear_shaft_spec.TIP_STUB_LENGTH == pytest.approx(22.934, abs=1e-3)
+    assert cone_gear_shaft_spec.TIP_STUB_LENGTH == pytest.approx(25.239, abs=1e-3)
     assert ends[-1] - ends[-2] == pytest.approx(
         cone_gear_shaft_spec.TIP_STUB_LENGTH
     )
     assert (
         cone_gear_shaft_spec.TIP_STUB_START_STATION
-        <= cone_gear_shaft_spec.TIP_BUSHING_START_STATION
+        <= cone_gear_shaft_spec.TIP_COLLAR_START_STATION
     )
     assert (
-        cone_gear_shaft_spec.TIP_BUSHING_END_STATION
-        <= cone_gear_shaft_spec.T006_TIP_STATION
+        cone_gear_shaft_spec.TIP_COLLAR_END_STATION
+        <= cone_gear_shaft_spec.TIP_BLOCK_SOUTH_FACE_STATION
     )
 
 
@@ -850,7 +853,7 @@ def test_shoulder_roots_are_modelled_not_noted() -> None:
     # or a check of its own (no MUST), and carries
     # no number but the mates' part numbers, no tolerance, datum or method
     # word -- except the tailstock line, a user-ruled process requirement
-    # (U40, 2026-09-23: the 22.93 mm Ø1.588 tip land at L/D 14.4 is only
+    # (U40, 2026-09-23: the 25.24 mm Ø1.588 tip land at L/D 15.9 is only
     # turnable supported), so "TURN" is allowed in that one line only.  The
     # three-place-stations lines went in the U27 round: the places already
     # say it.
@@ -908,8 +911,8 @@ def test_the_sheet_carries_no_datums_or_feature_control_frames() -> None:
         "add_datum_feature(",
     ):
         assert banned not in source
-    # The journal that runs and the tip land the bushing and thrust spacer
-    # ride keep their roughness symbol; nothing else does.
+    # The journal that runs and the tip land T012, T006 and the MHA-096
+    # collar ride keep their roughness symbol; nothing else does.
     assert source.count("add_surface_finish(") == 2
     assert tuple(control.key for control in cone_gear_shaft_spec.SURFACE_FINISHES) == (
         "pivot_journal",
@@ -1370,12 +1373,13 @@ def test_one_length_origin_is_the_collar_face() -> None:
     assert spec.SECTION_KNOBS[0] == spec.JOURNAL_END
     # #917 R5 (a): the tip is a station from the collar face too, so the
     # collar-to-tip chain is one length, not the journal plus the overall.
-    # It prints at three places: the tip flat's stack is held to it.
+    # It prints at two places (user ruling 2026-09-29): the adjuster's embed
+    # window absorbs its band.
     for i in (1, 2, 3, 4):
         assert spec.SECTION_KNOBS[i] == pytest.approx(
             spec.SECTION_ENDS[i] - spec.COLLAR_START_STATION
         )
-    assert spec.DRAWING_PRECISION_BY_NAME["Sec4End"] == 3
+    assert spec.DRAWING_PRECISION_BY_NAME["Sec4End"] == 2
     # The front-to-tip overall is the one sheet-derived dimension: a read-only
     # sum with its places handed over by the spec (drawing contract).
     assert spec.DRAWING_REFERENCE_PRECISION == 1

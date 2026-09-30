@@ -34,9 +34,9 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "PostMountEastZ",
     },
     "LockNotchCapEProfile": {"CapECx", "CapECz", "CapEDia"},
-    "TipScrewSlotProfile": {"TipSlotEastCx", "TipSlotWestCx", "TipSlotZ", "TipSlotW"},
-    "TipScrewCboreProfile": {"TipCboreW"},
-    "TipScrewCbore": {"TipCboreDepth"},
+    # The tip-block hold-down's two stations from the pivot bore; the native
+    # Hole Wizard callout carries its sizes.
+    "HoldDownHole": {"HoldDownX", "HoldDownZ"},
     "CornerNE": {"CornerNER"},
     "CornerNW": {"CornerNWR"},
     "CornerSW": {"CornerSWR"},
@@ -49,10 +49,11 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # outline prints one place (+/-0.8): the east edge at the swing stop and the
 # west edge at the notch mouth spend the disengaged lock-knob head margin,
 # which cone_swing_platform_geometry.DISENGAGE_HEAD_MARGIN sizes to keep >= 2.0 mm
-# at this band.  Relief diameter, tapped-hole pattern and notch stay at the
-# .XX grade. Relief
-# depth is a reference nominal governed by the matched fit above. The Hole
-# Wizard owns the pivot-hole size/callout.
+# at this band.  Relief diameter and notch stay at the .XX grade; the
+# tapped-hole pattern and the hold-down station print .XX and carry the
+# explicit +/-0.10 bands the tip-block stacks need (cone_swing_platform_spec).
+# Relief depth is a reference nominal governed by the matched fit above. The
+# Hole Wizard owns the pivot- and hold-down-hole sizes/callouts.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PlateProfile": {
         "NorthEastX": 1,
@@ -72,15 +73,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "PostMountEastZ": 2,
     },
     "LockNotchCapEProfile": {"CapECx": 2, "CapECz": 2, "CapEDia": 2},
-    # The slot ends are .XX so the +/-2.25 fit-up travel keeps >= +/-1.74.
-    "TipScrewSlotProfile": {
-        "TipSlotEastCx": 2,
-        "TipSlotWestCx": 2,
-        "TipSlotZ": 2,
-        "TipSlotW": 1,
-    },
-    "TipScrewCboreProfile": {"TipCboreW": 2},
-    "TipScrewCbore": {"TipCboreDepth": 2},
+    # Printed .XX, banded +/-0.10 on the part (HOLDDOWN_STATION_TOL_MM).
+    "HoldDownHole": {"HoldDownX": 2, "HoldDownZ": 2},
     "CornerNE": {"CornerNER": 1},
     "CornerNW": {"CornerNWR": 1},
     "CornerSW": {"CornerSWR": 1},

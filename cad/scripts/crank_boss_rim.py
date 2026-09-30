@@ -73,7 +73,7 @@ HEAD_EDGE_LOW = (
 #   the head, HeadDia at .X; the turned body, MainBodyDia at .X
 HEAD_GROWTH = _row(post.DRAWING_PRECISION_BY_NAME["HeadDia"]) / 2.0
 BODY_GROWTH = _row(post.DRAWING_PRECISION_BY_NAME["MainBodyDia"]) / 2.0
-#   the cone boss's end faces, ConeBossLen at .X, symmetric about the post
+#   the cone boss's end faces, ConeBossLen at .XX, symmetric about the post
 #   axis: the north end SHORT brings the seated collar and 64T toward the
 #   post; the boss itself, ConeBossDia at .X
 CONE_BOSS_END_GROWTH = _row(post.DRAWING_PRECISION_BY_NAME["ConeBossLen"]) / 2.0

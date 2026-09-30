@@ -41,7 +41,7 @@ hours_actual: 0
 
 ## Now make — the real part this unlocks
 
-The **cone gear stack on its D-flat shaft**: the 64T and twenty cone gears slid on flat to flat, touching, with the tip block set off a feeler. Silver-solder the `crank-pin-ring` ends. Then finish the `crank-handle` and a `connecting-rod`.
+The **cone gear stack on its D-flat shaft**: the 64T and twenty cone gears slid on flat to flat, touching, with the stack collar locked off a feeler. Silver-solder the `crank-pin-ring` ends. Then finish the `crank-handle` and a `connecting-rod`.
 
 ## Competency check
 

@@ -63,15 +63,11 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "91829A560",
         material="AISI 304",
     ),
-    "cone-tip-block-nut": _stock(
-        "cone-tip-block-nut",
-        "Zinc-Plated Steel Nylon-Insert Locknut",
-        "90631A007",
-    ),
     "cone-tip-block-screw": _stock(
         "cone-tip-block-screw",
-        "Low-Strength Zinc-Plated Steel Hex Head Screw",
-        "93075A150",
+        "Black-Oxide Alloy Steel Socket Head Screw",
+        "91251A108",
+        material="Alloy Steel",
     ),
     "cone-tip-adjuster": _stock(
         "cone-tip-adjuster",
@@ -183,6 +179,11 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "boss-hook",
         "Zinc-Plated Steel #10-24 Open Routing Eyebolt (Trimmed Shank)",
         "9490T1",
+    ),
+    "cone-tip-collar": _stock(
+        "cone-tip-collar",
+        "Black-Oxide Carbon Steel Set Screw Shaft Collar",
+        "9414T1",
     ),
     "tube-frame-cap": _stock(
         "tube-frame-cap",

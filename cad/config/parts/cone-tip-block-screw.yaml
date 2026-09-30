@@ -1,12 +1,12 @@
 cone-tip-block-screw:
   title: Cone Tip Block Hold-Down Screw
   number: MHA-140
-  stock_name: Low-Strength Zinc-Plated Steel Hex Head Screw
+  stock_name: Black-Oxide Alloy Steel Socket Head Screw
   supplier: McMaster-Carr
-  supplier_skus: [93075A150]
-  material: Plain Carbon Steel
-  material_specification: Low-strength steel, McMaster-Carr 93075A150
-  finish: zinc plated
+  supplier_skus: [91251A108]
+  material: Alloy Steel
+  material_specification: "Alloy steel, black oxide, ASTM A574, Rockwell C37; McMaster-Carr 91251A108"
+  finish: black oxide
   quantity: 1
   tolerance_class: machined_block
   fit_class: fastener_clearance

@@ -179,8 +179,8 @@ def test_no_part_reads_the_assembly_step_registry():
 
     A step pointer is sheet text, so renumbering the sequence re-keys the
     drawings that print it, never a part (Main's TbPB ruling 2, 2026-09-27:
-    the cone tip shim's spec imported ``drive_train_steps`` for its note, so
-    every sequence edit re-keyed the part and the assemblies above it).
+    a part spec that imported ``drive_train_steps`` for its note re-keyed the
+    part and the assemblies above it on every sequence edit).
     """
     offenders = sorted(
         script.name

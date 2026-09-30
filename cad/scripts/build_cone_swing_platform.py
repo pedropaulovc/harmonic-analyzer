@@ -80,7 +80,7 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
-    set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
 )
 from _holes import wizard_holes
 from _part_pmi import author_part_pmi
@@ -122,6 +122,13 @@ from cone_swing_platform_geometry import (
     WEST_HALF_S,
 )
 from cone_swing_platform_spec import (
+    HOLDDOWN_CBORE_DEPTH,
+    HOLDDOWN_CBORE_DIA,
+    HOLDDOWN_CLEARANCE_DIA,
+    HOLDDOWN_HOLE_SPEC,
+    HOLDDOWN_LOCAL_X,
+    HOLDDOWN_LOCAL_Z,
+    HOLDDOWN_STATION_TOL_MM,
     PIVOT_BEARING_RELIEF_DEPTH,
     PIVOT_BEARING_RELIEF_DIAMETER,
     PIVOT_HOLE_DIA,
@@ -129,14 +136,9 @@ from cone_swing_platform_spec import (
     PIVOT_RELIEF_FIT_REQUIREMENT,
     POST_MOUNT_ENGAGEMENT_NOTE,
     POST_MOUNT_SPEC,
+    POST_MOUNT_STATION_TOL_MM,
     POST_MOUNT_TAP_DIA,
     SURFACE_FINISHES,
-    TIP_CBORE_DEPTH,
-    TIP_CBORE_W,
-    TIP_SCREW_HALF_TRAVEL,
-    TIP_SCREW_LOCAL_Z,
-    TIP_SLOT_W,
-    TIP_SLOT_W_BAND,
 )
 
 PART_NAME = "cone-swing-platform"
@@ -239,67 +241,6 @@ async def _add_notch_run_angle(
     dims.record("NotchRunAngle")
 
 
-async def _sketch_tip_screw_slot(
-    adapter, *, width: float, label: str, prefix: str
-) -> SketchDims:
-    """Top-plane straight slot across the cone axis at the tip-block station.
-
-    Two lines and two end arcs whose centres sit TIP_SCREW_HALF_TRAVEL either
-    side of the pivot's cone-axis line, so the shop sets each end from the
-    pivot centre. The width is dimensioned between the two lines (it is the
-    end-mill size); tangency makes the arcs full radius."""
-    dims = SketchDims()
-    c, r = TIP_SCREW_HALF_TRAVEL, width / 2.0
-    y = -TIP_SCREW_LOCAL_Z  # sketch y -> part -Z
-    check(f"create_sketch {label}", await adapter.create_sketch("Top"))
-    set_sketch_direct_db(adapter, True)
-    line_a = check(f"{label} line a", await adapter.add_line(-c, y - r, c, y - r))
-    arc_w = check(
-        f"{label} west arc", await adapter.add_arc(c, y, c, y - r, c, y + r)
-    )
-    line_b = check(f"{label} line b", await adapter.add_line(c, y + r, -c, y + r))
-    arc_e = check(
-        f"{label} east arc", await adapter.add_arc(-c, y, -c, y + r, -c, y - r)
-    )
-    set_sketch_direct_db(adapter, False)
-    await anchor_point_to_origin(adapter, f"{arc_e}.center", -c, y, f"{label} east end")
-    dims.record(f"{prefix}EastCx")
-    dims.record(f"{prefix}Z")
-    check(
-        f"{label} end centres level",
-        await adapter.add_sketch_constraint(
-            f"{arc_e}.center", f"{arc_w}.center", "horizontal_points"
-        ),
-    )
-    await dimension_between(
-        adapter, f"{arc_w}.center", "origin", "horizontal_distance", c,
-        f"{label} west end",
-    )
-    dims.record(f"{prefix}WestCx")
-    check(
-        f"horizontal {label} line a",
-        await adapter.add_sketch_constraint(line_a, None, "horizontal"),
-    )
-    for junction, e1, e2 in (
-        ("a-west", line_a, arc_w),
-        ("west-b", arc_w, line_b),
-        ("b-east", line_b, arc_e),
-        ("east-a", arc_e, line_a),
-    ):
-        check(
-            f"{label} tangent {junction}",
-            await adapter.add_sketch_constraint(e1, e2, "tangent"),
-        )
-    await dimension_between(
-        adapter, f"{line_a}.start", f"{line_b}.end", "vertical_distance", width,
-        f"{label} width",
-    )
-    dims.record(f"{prefix}W")
-    await ensure_fully_defined(adapter, f"{label} sketch")
-    check(f"exit_sketch {label}", await adapter.exit_sketch())
-    return dims
-
-
 # The top relief's sketch runs this far past the north edge, so its cut
 # opens the edge cleanly (the plate stops at NORTH_OVERHANG).
 PIVOT_RELIEF_RUNOUT = 3.0
@@ -384,10 +325,6 @@ def _north_fillet_relief_overlap(label: str, r: float) -> float:
     )
 
 
-def _slot_area(width: float) -> float:
-    return math.pi * (width / 2.0) ** 2 + width * 2.0 * TIP_SCREW_HALF_TRAVEL
-
-
 # --- rounded plan corners (item: they echo the neighbouring hardware) --------
 # (authored x, local z, radius): north pair ~ the pivot screw head, south-east
 # ~ the green column foot.  The south-west fillet is reduced around the
@@ -461,6 +398,9 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "PostLocalZ", f"{POST_LOCAL_Z}mm")
     await set_global(adapter, "PostMountX", f"{POST_MOUNT_X}mm")
     await set_global(adapter, "PostMountDZ", f"{POST_MOUNT_DZ}mm")
+    await set_global(adapter, "HoldDownOffset", f"{-HOLDDOWN_LOCAL_Z}mm")
+    # Unsigned: the placement point keeps its authored -x side.
+    await set_global(adapter, "HoldDownLateral", f"{abs(HOLDDOWN_LOCAL_X)}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -651,43 +591,31 @@ async def build(adapter) -> dict[str, str]:
         adapter, "v2 post mount taps", volume - v_post_mounts, 0.01 * v_post_mounts
     )
 
-    # U30 tip-block hold-down: a through slot for the #6-32 shank, then a
-    # counterbored slot from the underside that sinks the socket head below
-    # the slide face. Same end centres, so the head bears on a uniform ledge.
-    tip_slot = await _sketch_tip_screw_slot(
-        adapter, width=TIP_SLOT_W, label="tip screw slot", prefix="TipSlot"
+    # Tip-block hold-down (user ruling 2026-09-29): one #4-40 socket head cap
+    # screw rises from under the plate into the block.  A native counterbored
+    # #4 close-clearance hole drilled from the underside sinks the head below
+    # the slide face; both its stations are driven from the pivot bore.
+    holddown_cut = wizard_holes(
+        adapter,
+        HOLDDOWN_HOLE_SPEC,
+        [[HOLDDOWN_LOCAL_X, 0.0, HOLDDOWN_LOCAL_Z]],
+        (0.0, -1.0, 0.0),
+        "tip-block hold-down (#4 counterbore from underside)",
+        name="HoldDownHole",
+        expect_dia_mm=HOLDDOWN_CLEARANCE_DIA,
+        placement_dims=[
+            (("HoldDownX", '"HoldDownLateral"'), ("HoldDownZ", '"HoldDownOffset"'))
+        ],
     )
-    name_last_feature(adapter, "TipScrewSlotProfile")
-    drive_jobs += tip_slot.apply(adapter, "TipScrewSlotProfile")
-    check(
-        "cut tip screw slot",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
-        ),
+    drive_jobs += holddown_cut.placement_drive_jobs
+    v_holddown = (
+        math.pi * (HOLDDOWN_CLEARANCE_DIA / 2.0) ** 2 * PLATE_T
+        + math.pi
+        * ((HOLDDOWN_CBORE_DIA / 2.0) ** 2 - (HOLDDOWN_CLEARANCE_DIA / 2.0) ** 2)
+        * HOLDDOWN_CBORE_DEPTH
     )
-    name_last_feature(adapter, "TipScrewSlot")
-    v_tip_slot = _slot_area(TIP_SLOT_W) * PLATE_T
     volume = await volume_check(
-        adapter, "tip screw slot", volume - v_tip_slot, 0.01 * v_tip_slot
-    )
-    tip_cbore = await _sketch_tip_screw_slot(
-        adapter, width=TIP_CBORE_W, label="tip screw counterbore", prefix="TipCbore"
-    )
-    name_last_feature(adapter, "TipScrewCboreProfile")
-    drive_jobs += tip_cbore.apply(adapter, "TipScrewCboreProfile")
-    # Sketched on the plate underside (Top Plane); the cut runs +Y into the
-    # plate, against the default into-the-sketch-normal direction.
-    check(
-        "cut tip screw counterbore",
-        await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=TIP_CBORE_DEPTH, reverse_direction=True)
-        ),
-    )
-    name_last_feature(adapter, "TipScrewCbore")
-    name_dimensions(adapter, "TipScrewCbore", ["TipCboreDepth"])
-    v_tip_cbore = (_slot_area(TIP_CBORE_W) - _slot_area(TIP_SLOT_W)) * TIP_CBORE_DEPTH
-    volume = await volume_check(
-        adapter, "tip screw counterbore", volume - v_tip_cbore, 0.01 * v_tip_cbore
+        adapter, "tip-block hold-down hole", volume - v_holddown, 0.01 * v_holddown
     )
 
     # Lock notch: open-ended channel = rotated rectangle cut (engaged seat ->
@@ -884,12 +812,20 @@ async def build(adapter) -> dict[str, str]:
     # Decimal places for imported model dimensions live on the PART.  The
     # Hole Wizard owns the pivot-hole precision and native size callout.
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-    for feature_name, dimension_name in (
-        ("TipScrewSlotProfile", "TipSlotW"),
-        ("TipScrewCboreProfile", "TipCboreW"),
+    # The tip-block stacks run through the hold-down stations and the post
+    # taps, so those placement dimensions carry +/-0.10 instead of .XX.
+    for dimension_name in ("HoldDownX", "HoldDownZ"):
+        set_dimension_symmetric_tolerance(
+            adapter, "HoldDownHole", dimension_name, HOLDDOWN_STATION_TOL_MM
+        )
+    for dimension_name in (
+        "PostMountWestX",
+        "PostMountWestZ",
+        "PostMountEastX",
+        "PostMountEastZ",
     ):
-        set_dimension_bilateral_tolerance(
-            adapter, feature_name, dimension_name, *TIP_SLOT_W_BAND
+        set_dimension_symmetric_tolerance(
+            adapter, "PostMountHoles", dimension_name, POST_MOUNT_STATION_TOL_MM
         )
     await volume_check(
         adapter, "driven platform (equations neutral)", volume, 0.01 * v_hole

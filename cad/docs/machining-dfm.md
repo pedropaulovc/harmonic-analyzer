@@ -26,8 +26,8 @@ geometry is casting-shaped, not milling-shaped.
      **21.717 mm unsupported** past each end of a casting-shaped organic lever. Delicate (nicks/rounds)
      *and* fixturing-hostile from bar. Per §6 the edge should be a **separate hardened tool-steel
      insert**, not this parent — which also removes it from this part's machining hazard.
-  3. **`cone-gear-shaft` tip** — a **Ø1.5875 mm terminal land, about 22.9 mm long in steel (L/D 14.5)**
-     after the 1.55 mm tip shortening, carrying the T012/T006 seats and the tip thrust spacer.
+  3. **`cone-gear-shaft` tip** — a **Ø1.5875 mm terminal land, about 25.2 mm long in steel (L/D 15.9)**,
+     carrying the T012/T006 seats and the MHA-096 stack collar, its cup tip seated in the MHA-097 adjuster.
      Support the slender work with a follower/steady and take a light finishing cut;
      the terminal D-flat continues from the T018 step through the shaft tip.
 
@@ -113,7 +113,7 @@ Applied from the [thread-depth DFM walkthrough](https://www.youtube.com/watch?v=
 | part | stock / form | key features | machinability hazards | setups | route |
 |---|---|---|---|---|---|
 | **`cone-gear`** ×20 (T006→T120) | round brass bar, extruded disc, face **6.8887 ±0.025** each, long-addendum OD printed per gear at DP 49.82 → **4.28 (T006) → 62.93 (T120)**; tip gears T006–T024 harder yellow metal | D-bore matching the land's single +X flat, clocked to the phase-0 tooth: round seat Ø by config (T006/T012 1.5875, T018 3.175, T024 6.350, T030+ 9.525); bore AF +0.010/+0.020 over shaft nominal AF (0.01–0.03 clearance), diametral slip clearance 0.025–0.105; 6–120 involute teeth PA14.5°, 2.5D through-cut | **T006 wall 0.646 mm nominal / 0.621 mm at maximum round bore** (the flat cuts inward from that circle); whole gear tiny → difficult workholding, especially forming and gauging the D without damaging the teeth | ≥2 (turn/bore, indexed teeth, plus D-bore finishing) | **single-point fly cutter ground to the gap form, indexed** for teeth; form the bore flat to the AF gauge (filing or broaching is a hobby-shop possibility, not a selected route; EDM or a D-shaped punch needs process/fixture approval). Measure all 20 touching faces as a stack: **137.774 ±0.20** |
-| **`cone-gear-shaft`** ×1 | stepped steel bar; integral Ø12.2308 post journal, thrust collar then Ø9.525→6.35→3.175→1.5875 gear lands | turned steps plus **one milled +X D-flat on each gear land**, nominal AF **8.763/5.842/2.921/1.460** respectively, each +0/−0.010; the Ø1.5875 flat continues through the tip end and the unchanged round-bore MHA-096 thrust spacer rides the D. Finish the post journal for 0.05 diametral clearance | slender terminal land needs tailstock support; flat machining adds an indexed milling setup and inspection against the mating D-bores | lathe + at least 1 indexed milling setup | manual lathe **+ steady/follower**, then mill/gauge the co-clocked flats; do not leave a round section under the tip thrust spacer |
+| **`cone-gear-shaft`** ×1 | stepped steel bar; integral Ø12.2308 post journal, thrust collar then Ø9.525→6.35→3.175→1.5875 gear lands | turned steps plus **one milled +X D-flat on each gear land**, nominal AF **8.763/5.842/2.921/1.460** respectively, each +0/−0.010; the Ø1.5875 flat continues through the tip end and the MHA-096 stack collar's set screw locks on it. Finish the post journal for 0.05 diametral clearance | slender terminal land needs tailstock support; flat machining adds an indexed milling setup and inspection against the mating D-bores | lathe + at least 1 indexed milling setup | manual lathe **+ steady/follower**, then mill/gauge the co-clocked flats; do not leave a round section under the MHA-096 collar |
 
 ### Pivots, bushings, shafts (T1 — the 19-channel stacks)
 

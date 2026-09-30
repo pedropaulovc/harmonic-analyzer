@@ -312,7 +312,9 @@ def test_drive_train_clearance_scans_use_the_printed_cone_tip() -> None:
 # * The cone side is the solid stack: any face's station band
 #   (cone_gear_stack.STATION_BAND, 64T included), the collar web's printed
 #   band it stands on, and in service the stack's float north off the collar
-#   (cone_stack_end_play.STACK_FLOAT).
+#   (cone_stack_end_play.STACK_FLOAT).  Since the MHA-096 collar that bounds
+#   that float rides the shaft (user ruling 2026-09-29), MHA-014's own end
+#   play (cone_stack_end_play.SHAFT_END_PLAY) adds to it.
 # Both margins keep the fleet's MARGIN_SPARE.
 _OLD_CENTRE_NORTH = (assembly.CONE_FACE_STATION_REFERENCE - 6.0) / 2.0
 _NEW_CENTRE_NORTH = (assembly.CONE_FACE_STATION_REFERENCE - spec.FACE_WIDTH) / 2.0
@@ -326,7 +328,12 @@ def test_face_width_band_holds_the_drum_engaged_zone() -> None:
     lower = spec.FACE_WIDTH + spec.FACE_WIDTH_BAND[1]
     station_upper, station_lower = cone_gear_stack.STATION_BAND
     collar = cone_gear_shaft_spec.printed_band("CollarWidth")
-    cone_north = station_upper + collar + cone_stack_end_play.STACK_FLOAT[1]
+    cone_north = (
+        station_upper
+        + collar
+        + cone_stack_end_play.STACK_FLOAT[1]
+        + cone_stack_end_play.SHAFT_END_PLAY[1]
+    )
     cone_south = -station_lower + collar
     # A cone gear south of nominal moves the zone north on its face.
     north = lower / 2.0 - ENGAGED_ZONE[1] - CONE_DRUM_Z_STACK[1] - cone_south

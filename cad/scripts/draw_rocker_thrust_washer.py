@@ -80,7 +80,7 @@ def _set_stock_text(adapter: Any, annotations: list[Any]) -> None:
     mill's tolerance governs the thickness, not the .XX row. Prefix and
     suffix, not a whole-text override: the value between them stays the
     model's dimension at its model-owned places, and the parentheses mark it
-    as reference (the cone tip shim's stack text is the same channel).
+    as reference.
     """
     for annotation in annotations:
         if dimension_name(adapter, annotation) != "DiscThick":

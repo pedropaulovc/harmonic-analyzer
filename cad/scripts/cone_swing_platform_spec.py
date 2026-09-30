@@ -1,8 +1,9 @@
 r"""Pure-data dimensional contract shared by the cone swing platform and drawing.
 
-PURE DATA, no SolidWorks/COM imports: plate stock, holes, the tip-screw slot
-and the surface-finish controls.  The print-only data (marked-dimension names,
-decimal places, view captions) lives in ``cone_swing_platform_drawing_spec`` and
+PURE DATA, no SolidWorks/COM imports: plate stock, holes, the tip-block
+hold-down hole and the surface-finish controls.  The print-only data
+(marked-dimension names, decimal places, view captions) lives in
+``cone_swing_platform_drawing_spec`` and
 the plan outline in ``cone_swing_platform_geometry``, so the harmonic base and
 the drive train, which read this module and the geometry, do not re-key when
 the print changes.
@@ -12,8 +13,9 @@ from __future__ import annotations
 
 import math
 
+import _config
 from _gtol_spec import PlanarFace
-from _hole_spec import HoleSpec, blind_cut_dia_mm
+from _hole_spec import CLEARANCE_MM, HoleSpec, blind_cut_dia_mm
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
 
 import cone_pivot_post_spec
@@ -118,52 +120,78 @@ POST_MOUNT_ENGAGEMENT_ASSEMBLY_FACT = (
 )
 
 
-# U30 (2026-09-23): the cone tip block is held by one hidden #6-32 x 1/2
-# BUTTON-head socket cap screw (McMaster 91255A148, black-oxide alloy steel;
-# rule-12 audit W22, Main 2026-09-23: the low head leaves a 2.9 ledge where a
-# socket head's 4.2 counterbore left 1.51) coming up from under the plate
-# through a lateral slot; a counterbored slot sinks the head below the slide
-# face. The slot runs across the cone axis so the block can be shifted +/-2.25
-# at fit-up; a shim pack under the foot sets its height. Both slots share the
-# same two end centres, TIP_SCREW_HALF_TRAVEL either side of the cone axis, at
-# the tip block's new station, 12.55 south of the UNCHANGED pivot seat.
-TIP_SCREW_LOCAL_Z = -12.55
-TIP_SCREW_HALF_TRAVEL = 2.0
-TIP_SCREW_MAJOR = 3.505  # #6-32 basic major
-# McMaster 91255A148 lists one head size, 0.262 dia x 0.073 high, taken as the
-# max; the B18.3 #6 button-head minimum diameter, 0.250, bounds the bearing.
-TIP_SCREW_HEAD_DIA = (0.250 * 25.4, 0.262 * 25.4)
-TIP_SCREW_HEAD_H_MAX = 0.073 * 25.4
-# The slot widths are cut in one pass by an end mill of that size, so they
-# carry the same one-sided +0.10/0 band as the title block's DRILLED HOLES
-# row: the cutter makes the size, the machinist holds nothing tight.
-TIP_SLOT_W = 4.0
-TIP_CBORE_W = 7.94  # a 5/16 end mill
-TIP_SLOT_W_BAND = (0.0, 0.10)
-TIP_CBORE_DEPTH = 2.8  # .XX
-_XX = 0.51
-TIP_SLOT_SCREW_CLEARANCE = TIP_SLOT_W - TIP_SCREW_MAJOR
-TIP_SLOT_HEAD_BEARING = (
-    TIP_SCREW_HEAD_DIA[0] - (TIP_SLOT_W + TIP_SLOT_W_BAND[1])
-) / 2.0
-TIP_CBORE_HEAD_CLEARANCE = TIP_CBORE_W - TIP_SCREW_HEAD_DIA[1]
-TIP_HEAD_RECESS = TIP_CBORE_DEPTH - _XX - TIP_SCREW_HEAD_H_MAX
-# Ledge under the head: the stock plate less the .XX counterbore depth, both
-# bands (rule-12 audit W22: the first cut left out the plate's band).
-TIP_LEDGE_RANGE = (
-    PLATE_THICKNESS - PLATE_STOCK_BAND - TIP_CBORE_DEPTH - _XX,
-    PLATE_THICKNESS + PLATE_STOCK_BAND - TIP_CBORE_DEPTH + _XX,
+# User ruling 2026-09-29 (photo eight-views-4.png, lower right): the cone tip
+# block is a plain prism standing straight on this plate, held by ONE #4-40
+# socket head cap screw (MHA-140, McMaster 91251A108) rising from under the
+# plate into a blind tap in the block's bottom face.  The plate carries one
+# counterbored close-clearance hole; the counterbore is on the UNDERSIDE, which
+# slides on the base deck, so the head must sit below that face.
+# Pivot bore centre to tip-block centre, cone_line.TIP_BLOCK_PIVOT_OFFSET
+# (asserted equal by build_drive_train_assembly).  Same frame and sign as the
+# pivot-origin plate: -z runs south from the pivot along the cone axis.
+HOLDDOWN_LOCAL_Z = -10.45
+# 1.00 to -x of the cone-axis line, with the block's foot tap the same 1.00
+# to -x of its adjuster axis (cone_tip_block_spec.FOOT_TAP_OFFSET_X), so the
+# block body still stands centred on the cone line.  The offset exists only
+# so the hole's lateral station is a real dimension (HoldDownX): on the line
+# it was a zero-valued placement, which a sketch can hold only as a relation,
+# and so it printed at the .XX +/-0.51 the tip block's containment and
+# lateral stacks cannot absorb (user ruling 2026-09-29: HoldDownX +/-0.10
+# from the pivot bore).  -x (east) rather than +x because it leaves the larger
+# webs on both parts: the hole's web to the narrow west edge grows from 6.3
+# on the line to 7.3 (5.3 at +x), and the block's foot tap moves off its +X
+# side, where the width's band sits, keeping a 5.98 least web (5.85 at +x).
+HOLDDOWN_LOCAL_X = -1.0
+# The explicit band on both printed stations from the pivot bore (HoldDownX,
+# HoldDownZ): the block's lateral and axial stacks need +/-0.10 rather than
+# the .XX +/-0.51.
+HOLDDOWN_STATION_TOL_MM = 0.10
+# The same stacks run through the post-mount taps, whose placement dimensions
+# (PostMountWestX/WestZ/EastX/EastZ) carry this band instead of .XX.
+POST_MOUNT_STATION_TOL_MM = 0.10
+# McMaster 91251A108 product page (read 2026-09-29): #4-40 x 3/8 black-oxide
+# alloy steel socket head screw, head 0.183 dia x 0.112 high.  Held here as
+# numbers so this pure-data module never imports a SolidWorks builder;
+# build_drive_train_assembly asserts them equal to the MHA-140 part.
+HOLDDOWN_SCREW_HEAD_DIA = 0.183 * 25.4
+HOLDDOWN_SCREW_HEAD_H = 0.112 * 25.4
+_XX = float(str(_config.title_block("linear_2pl")["display"]).lstrip("±"))
+_DRILL_OVERSIZE = float(_config.title_block("drilled_hole")["plus_mm"])
+# #4 CLOSE clearance, drilled: the title block's DRILLED HOLES +0.10/0 row.
+HOLDDOWN_CLEARANCE_DIA = CLEARANCE_MM[("#4", "close")]
+HOLDDOWN_CBORE_DIA = 5.56  # .XX
+HOLDDOWN_CBORE_DEPTH = 3.50  # .XX, from the underside
+HOLDDOWN_HOLE_SPEC = HoleSpec(
+    "counterbore_socket",
+    "#4",
+    overrides_mm={
+        "HoleDiameter": HOLDDOWN_CLEARANCE_DIA,
+        "CounterBoreDiameter": HOLDDOWN_CBORE_DIA,
+        "CounterBoreDepth": HOLDDOWN_CBORE_DEPTH,
+    },
 )
-if TIP_SLOT_SCREW_CLEARANCE < 0.25:
-    raise AssertionError("tip-block screw slot does not clear the #6-32 major")
-if TIP_SLOT_HEAD_BEARING < 0.5:
-    raise AssertionError("tip-block screw head bears on under 0.5 mm per side")
-if TIP_CBORE_HEAD_CLEARANCE < 0.25:
-    raise AssertionError("tip-block counterbore slot does not clear the screw head")
-if TIP_HEAD_RECESS < 0.1:
-    raise AssertionError("tip-block screw head can stand proud of the slide face")
-if TIP_LEDGE_RANGE[0] < 2.0:
-    raise AssertionError("tip-block counterbore ledge is below the U27 2.0 target")
+# Print-worst checks (rule 12): .XX counterbore sizes, drilled-hole oversize,
+# the stock plate's mill band.
+HOLDDOWN_HEAD_RECESS = HOLDDOWN_CBORE_DEPTH - _XX - HOLDDOWN_SCREW_HEAD_H
+HOLDDOWN_CBORE_HEAD_CLEARANCE = HOLDDOWN_CBORE_DIA - _XX - HOLDDOWN_SCREW_HEAD_DIA
+HOLDDOWN_HEAD_BEARING = (
+    HOLDDOWN_SCREW_HEAD_DIA - (HOLDDOWN_CLEARANCE_DIA + _DRILL_OVERSIZE)
+) / 2.0
+# Ledge from the counterbore floor to the top face, both bands.
+HOLDDOWN_LEDGE_RANGE = (
+    PLATE_THICKNESS - PLATE_STOCK_BAND - (HOLDDOWN_CBORE_DEPTH + _XX),
+    PLATE_THICKNESS + PLATE_STOCK_BAND - (HOLDDOWN_CBORE_DEPTH - _XX),
+)
+if HOLDDOWN_HEAD_RECESS < 0.1:
+    raise AssertionError("hold-down screw head can stand proud of the slide face")
+if HOLDDOWN_CBORE_HEAD_CLEARANCE < 0.25:
+    raise AssertionError("hold-down counterbore does not clear the screw head")
+if HOLDDOWN_HEAD_BEARING < 0.5:
+    raise AssertionError("hold-down screw head bears on under 0.5 mm per side")
+if HOLDDOWN_LEDGE_RANGE[0] < 2.0:
+    raise AssertionError("hold-down counterbore ledge is below the U27 2.0 target")
+# The webs from this hole to the pivot bore/relief, the post taps and the plate
+# outline are asserted in cone_swing_platform_geometry, which owns the outline.
 
 
 # Only functional sliding/locating surfaces carry roughness.  The existing

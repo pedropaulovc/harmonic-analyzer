@@ -19,7 +19,8 @@ from cone_shaft_land_bands import (  # noqa: F401  re-exported for the shaft bui
     SECTION_DIA_BANDS,
     SECTION_FLAT_AF,
 )
-from cone_stack_end_play import MARGIN_SPARE, TIP_BLOCK_FEELER
+from cone_stack_end_play import COLLAR_FEELER, MARGIN_SPARE
+from cone_tip_collar_spec import WIDTH as TIP_COLLAR_WIDTH
 from crank_drive_gear_spec import CENTRE_SHIFT_NORTH as GEAR64_CENTRE_SHIFT_NORTH
 from crank_drive_gear_spec import FACE_WIDTH as GEAR64_FACE_WIDTH
 from crank_drive_gear_spec import LAYOUT_FACE_WIDTH as GEAR64_LAYOUT_FACE_WIDTH
@@ -128,9 +129,8 @@ POST_JOURNAL_RIM_BREAK = f"RIMS BREAK {THRUST_EDGE_BREAK_MAX:.1f} MAX"
 # the drive-train assembly owns both, and test_cone_gear_shaft_drawing pins
 # the duplicates to it.  The gears are a solid stack (user ruling
 # 2026-09-28): each is cone_gear_spec.FACE_WIDTH thick, grown SOUTH from the
-# reference north face (centre + 3.25), so every north face -- T006's, the
-# tip bushing's seat, included -- stays where it was, and each gear bears on
-# the one before it.
+# reference north face (centre + 3.25), so every north face -- T006's
+# included -- stays where it was, and each gear bears on the one before it.
 T006_CENTER_STATION = 126.02232594770454
 CONE_FACE_STATION_REFERENCE = 6.5
 T006_NORTH_FACE_STATION = T006_CENTER_STATION + CONE_FACE_STATION_REFERENCE / 2.0
@@ -155,23 +155,30 @@ if not (
         f"{gear_faces(0)[0]:.6f} within 0..{PITCH_LOCKSTEP_TOLERANCE}"
     )
 
-# The tip stack (user ruling 2026-09-28, "Block 1.55 S, tip shortened"): the
-# 4 mm MHA-096 bushing bears on T006's north face, the MHA-092 tip block sits
-# one TIP_BLOCK_FEELER off the bushing's north face, and Rule-12 E11's #10-32
-# McMaster 94025A164 is threaded ADJUSTER_EMBED (9.5, the block spec's fit-up
-# setting) into the block's north face.  The vendor Sketch2 profile (Line7,
-# harvested 2026-09-24) puts the 45 deg conical cup apex 1.2065 mm beyond the
-# cup rim (4.7625 - 3.556), so the terminal shaft endpoint contacts that apex.
-# The block length, embed and cup depth duplicate the block spec and the
-# replica so this spec imports no build module; test_cone_gear_shaft_drawing
-# pins them and the drive-train assembly asserts tip == apex.
-TIP_BUSHING_LENGTH = 4.0
-TIP_BLOCK_LENGTH = 12.0
-TIP_BUSHING_START_STATION = T006_NORTH_FACE_STATION
-TIP_BUSHING_END_STATION = TIP_BUSHING_START_STATION + TIP_BUSHING_LENGTH
-TIP_BLOCK_SOUTH_FACE_STATION = TIP_BUSHING_END_STATION + TIP_BLOCK_FEELER
-TIP_BLOCK_NORTH_FACE_STATION = TIP_BLOCK_SOUTH_FACE_STATION + TIP_BLOCK_LENGTH
-ADJUSTER_EMBED = 9.5
+# The tip end (user ruling 2026-09-29).  The MHA-096 stack collar (McMaster
+# 9414T1) is set one COLLAR_FEELER north of T006's face and locked on the
+# Sec4 D-flat.  The MHA-092 tip block is a straight prism fixed by its
+# hold-down: its north face stands TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET south of
+# the pivot, itself PIVOT_FROM_T006_NORTH_FACE north of T006's face
+# (cone_line's constants).  Rule-12 E11's #10-32 McMaster 94025A164 cup
+# adjuster sits ADJUSTER_EMBED (the block spec's) in from that face with its
+# apex on the tip.  The vendor Sketch2 profile (Line7, harvested 2026-09-24)
+# puts the 45 deg conical cup apex 1.2065 mm beyond the cup rim
+# (4.7625 - 3.556), so this spec ends the shaft there; the assembly backs the
+# adjuster out by the stub's seat depth on the cup wall.  The block, pivot
+# and embed constants duplicate cone_line, the block spec and the replica so
+# this spec imports no layout or build module; test_cone_gear_shaft_drawing
+# pins them and the drive-train assembly asserts the seat.
+TIP_COLLAR_START_STATION = T006_NORTH_FACE_STATION + COLLAR_FEELER
+TIP_COLLAR_END_STATION = TIP_COLLAR_START_STATION + TIP_COLLAR_WIDTH
+TIP_BLOCK_LENGTH = 9.75
+PIVOT_FROM_T006_NORTH_FACE = 23.0
+TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET = 5.575
+TIP_BLOCK_NORTH_FACE_STATION = (
+    T006_NORTH_FACE_STATION + PIVOT_FROM_T006_NORTH_FACE - TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET
+)
+TIP_BLOCK_SOUTH_FACE_STATION = TIP_BLOCK_NORTH_FACE_STATION - TIP_BLOCK_LENGTH
+ADJUSTER_EMBED = 8.17
 ADJUSTER_CUP_RIM_STATION = TIP_BLOCK_NORTH_FACE_STATION - ADJUSTER_EMBED
 MCM_94025A164_CUP_DEPTH = 1.2065
 T006_TIP_STATION = ADJUSTER_CUP_RIM_STATION + MCM_94025A164_CUP_DEPTH
@@ -215,9 +222,10 @@ TIP_STUB_LENGTH = T006_TIP_STATION - TIP_STUB_START_STATION
 # 0.646 mm nominal web, 0.621 mm at maximum bore -- the one named web
 # exception (cone_gear_spec.WEB_EXCEPTIONS_MM) -- on a near-torque-free gear.
 # Since U40 the land carries T012 as well, so it runs from the T018 step to
-# the E11 cup apex at L/D 14.5.  A manual lathe turns that only with the tip
-# held on a tailstock centre -- unsupported, it whips off the tool -- which
-# is why the tailstock note below is a requirement (U40), not a method.
+# the E11 cup apex, at L/D 15.9 since the 2026-09-29 prism tip block.  A
+# manual lathe turns that only with the tip held on a tailstock centre --
+# unsupported, it whips off the tool -- which is why the tailstock note below
+# is a requirement (U40), not a method.
 # The shaft still decreases monotonically toward the tip: the cone is
 # assembled tip-first, and every gear's tip diameter exceeds the next inboard
 # gear's bore (T006 4.28 > T012 bore 1.5875; T012 7.55 > T018 3.175; T018
@@ -229,7 +237,7 @@ SECTIONS: tuple[tuple[float, float], ...] = (
     (0.375, FRONT_STUB + seat_step_station(15)),  # 64T + T120..T030 seats
     (0.25, FRONT_STUB + seat_step_station(16)),  # T024 seat
     (0.125, FRONT_STUB + TIP_LAND_START_STATION),  # T018 seat
-    (0.0625, FRONT_STUB + T006_TIP_STATION),  # T012 + T006 seats, tip bushing, tip
+    (0.0625, FRONT_STUB + T006_TIP_STATION),  # T012 + T006 seats, stack collar, tip
 )
 
 SECTION_DIAS = tuple(dia_in * MM_PER_IN for dia_in, _end in SECTIONS)
@@ -284,11 +292,11 @@ for _land in FLAT_LANDS[:-1]:
 # front stub, and the three land steps and the tip run forward from it.
 # Measuring the steps from the same face as the gear stack keeps the
 # journal's .X length out from between them.  The tip is a station too (#917
-# R5 (a), Main 2026-09-26): the collar is what the tip cup and the tip
-# block's fit-up are set against, and front-to-tip as the controlling length
-# stacked the journal's .X on the overall's, doubling the collar-to-tip band;
-# the front-to-tip overall is a reference.  Each land's end plane is offset
-# from SECTION_ORIGINS[i] by SECTION_KNOBS[i], the value its SecEnd{i} global
+# R5 (a), Main 2026-09-26): the collar is what the tip cup's embed is set
+# against, and front-to-tip as the controlling length stacked the journal's
+# .X on the overall's, doubling the collar-to-tip band; the front-to-tip
+# overall is a reference.  Each land's end plane is offset from
+# SECTION_ORIGINS[i] by SECTION_KNOBS[i], the value its SecEnd{i} global
 # carries; land 0 is the journal, extruded from the front face.  Each flat is
 # cut from the collar face to its land's end by the same knob.
 DATUM_STATION = COLLAR_START_STATION
@@ -347,7 +355,7 @@ SURFACE_FINISHES = (
 # no digits but the mates' numbers, no method words but one.  Lines stay
 # short: the note block starts 58 mm in and the title block begins at 216 mm.
 # The tailstock line is that one process word, by user ruling (U40,
-# 2026-09-23): the Ø1.588 terminal land (L/D 14.5) cannot be turned
+# 2026-09-23): the Ø1.588 terminal land (L/D 15.9) cannot be turned
 # unsupported, so the support IS the requirement (rule 6's exception), not a
 # method preference.  The parallel line is the flats' relative clock (codex,
 # fca59e2b): each land's flat turns every gear on it, so the four must share
@@ -397,13 +405,15 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # the collar's, the stack's and the fillet's in that 1.0; the .XX grade
 # (+-0.51) alone would take half of it.
 #
-# Tip station Sec4End: three places.  The tip now sits in the axial stack
-# (user ruling 2026-09-28): the tip block is feeler-set off the bushing, and
-# the adjuster's cup meets the tip at a fixed embed, so the tip's band is the
-# cup's.  Journal length Sec0End (collar face back to the front stub): one
-# place, the routine grade the fleet's plain lengths print; it only sets how
-# far the stub stands proud of the post's south face.  Step radius: two
-# places; nothing depends on it beyond the setback proof.
+# Tip station Sec4End (collar face to the tip): two places, the title
+# block's .XX grade (+-0.51), by user ruling 2026-09-29.  The tip block is
+# fixed by its hold-down, so this band lands on the adjuster's embed;
+# build_drive_train_assembly closes that stack by the block's depth and the
+# 1.0D adjuster engagement instead of a tighter length.  Journal length
+# Sec0End (collar face back to the front stub): one place, the routine grade
+# the fleet's plain lengths print; it only sets how far the stub stands proud
+# of the post's south face.  Step radius: two places; nothing depends on it
+# beyond the setback proof.
 #
 # Collar (#914): the diameter is the bar's as supplied (STOCK_DIA), so it
 # prints as a two-place reference, 15.88, the bar's own size; the web
@@ -421,7 +431,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "Sec1": {"Sec1End": 3},
     "Sec2": {"Sec2End": 3},
     "Sec3": {"Sec3End": 3},
-    "Sec4": {"Sec4End": 3},
+    "Sec4": {"Sec4End": 2},
     "Sec1FlatProfile": {"Sec1AF": 3},
     "Sec2FlatProfile": {"Sec2AF": 3},
     "Sec3FlatProfile": {"Sec3AF": 3},

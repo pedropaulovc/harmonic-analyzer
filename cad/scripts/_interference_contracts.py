@@ -132,10 +132,17 @@ _CRANK_PIN_SHAFT_MM3 = _pin_overlap(_CS_S0, _CS_S1, _CS_PILOT)
 #   bodies.  It replaces the smooth-annulus bound (major 4.826 in the #21
 #   4.0386 drill, 9.5 deep: 57.29), 3.5x the reading, loose enough to hide a
 #   regression.
+#
+# The MHA-140 hold-down (91251A108 #4-40 x 3/8 SHCS) up through the platform
+# into the MHA-092 foot tap: 5.6585 mm3, read by the first prism-block
+# drive-train leaf (cc7f631ab, farm run 20260929T224514758Z,
+# assembly:drive_train log line 465).
 _TIP_PINCH_OBSERVED_MM3 = 7.8008
 _TIP_PINCH_GATE_LIMIT_MM3 = _TIP_PINCH_OBSERVED_MM3 * 1.10
 _TIP_ADJUSTER_OBSERVED_MM3 = 16.4412
 _TIP_ADJUSTER_GATE_LIMIT_MM3 = _TIP_ADJUSTER_OBSERVED_MM3 * 1.10
+_TIP_HOLDDOWN_OBSERVED_MM3 = 5.6585
+_TIP_HOLDDOWN_GATE_LIMIT_MM3 = _TIP_HOLDDOWN_OBSERVED_MM3 * 1.10
 _ADJUSTER_THRUST_GATE_LIMIT_MM3 = 0.13 * 8.0 * 1.10
 
 _DRIVE_TRAIN_ALLOWED_PAIRS = {
@@ -160,6 +167,9 @@ _DRIVE_TRAIN_ALLOWED_PAIRS = {
     frozenset(
         ("cone-tip-pinch-screw-1", "cone-tip-block-1")
     ): _TIP_PINCH_GATE_LIMIT_MM3,
+    frozenset(
+        ("cone-tip-block-screw-1", "cone-tip-block-1")
+    ): _TIP_HOLDDOWN_GATE_LIMIT_MM3,
     frozenset(
         ("cone-tip-adjuster-1", "cone-gear-shaft-1")
     ): _ADJUSTER_THRUST_GATE_LIMIT_MM3,
