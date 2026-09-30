@@ -144,14 +144,14 @@ def test_dimension_prefix_uses_native_readback_after_void_setter(
 def test_sub_hundredth_model_bands_get_exact_tolerance_precision(
     band: tuple[float, float], expected: int
 ) -> None:
-    assert _drawing_marks._tolerance_precision_mm(*band) == expected
+    assert _drawing_marks._tolerance_places(*band) == expected
 
 
 @pytest.mark.parametrize("band", [PIN_DIA_BAND, CAM_BORE_BAND])
 def test_u27_slip_fit_bands_print_at_two_places(band: tuple[float, float]) -> None:
     # U27 (Main, 2026-09-23): the cam bore and cam pin moved from micron press
     # and slide bands to hundredth slip-fit bands a novice can hold.
-    assert _drawing_marks._tolerance_precision_mm(*band) == 2
+    assert _drawing_marks._tolerance_places(*band) == 2
 
 
 def test_display_precision_times_each_com_step_on_its_own_span(
@@ -239,6 +239,52 @@ def test_bilateral_tolerance_sets_and_verifies_display_precision(
 
     assert tolerance.Type == 2
     assert display.calls == [(-1, -1, 4, -1)]
+
+
+@pytest.mark.parametrize(("tolerance_deg", "places"), [(0.25, 2), (0.5, 1), (1.0, 0)])
+def test_angular_tolerance_prints_every_place_of_its_band(
+    monkeypatch: pytest.MonkeyPatch, tolerance_deg: float, places: int
+) -> None:
+    # The template's one-place angular default printed the cone gear's and
+    # cylinder gear's +/-0.25 deg phase bands as +/-0.3, wider than the
+    # error budget closes on.
+    class Tolerance:
+        Type = 0
+
+        def SetValues(self, minimum: float, maximum: float) -> bool:
+            self.minimum, self.maximum = minimum, maximum
+            return True
+
+        def GetMinValue(self) -> float:
+            return self.minimum
+
+        def GetMaxValue(self) -> float:
+            return self.maximum
+
+    class PrecisionDisplay:
+        tolerance_precision = 1
+
+        def SetPrecision3(
+            self, _primary: int, _dual: int, primary_tol: int, _dual_tol: int
+        ) -> int:
+            self.tolerance_precision = primary_tol
+            return 0
+
+        def GetPrimaryTolPrecision2(self) -> int:
+            return self.tolerance_precision
+
+    display = PrecisionDisplay()
+    dimension = SimpleNamespace(Tolerance=Tolerance(), DrivenState=1)
+    monkeypatch.setattr(
+        _drawing_marks, "_named_dimension", lambda *_args: (display, dimension)
+    )
+    monkeypatch.setattr(_drawing_marks, "_early_bound", lambda value, _type: value)
+
+    _drawing_marks.set_dimension_symmetric_angular_tolerance(
+        object(), "BoreProfile", "BoreFlatClock", tolerance_deg, require_driven=True
+    )
+
+    assert display.tolerance_precision == places
 
 
 def test_tolerance_precision_rejects_silent_com_failure(
