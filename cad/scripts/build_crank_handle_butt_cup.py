@@ -246,19 +246,11 @@ async def build(adapter) -> dict[str, str]:
         await adapter.set_active_configuration(INSTALLED_CONFIG),
     )
     await _cut_end_round(adapter)
-    end_round = _early_bound(
-        _early_bound(adapter.currentModel, "IPartDoc").FeatureByName("EndRound"), "IFeature"
-    )
-    # swSuppressFeature / swUnSuppressFeature, swSpecifyConfiguration.
-    if not bool(end_round.SetSuppression2(0, 3, bstr_array([default_config]))):
-        raise RuntimeError(f"EndRound would not suppress in {default_config}")
-    if not bool(end_round.SetSuppression2(1, 3, bstr_array([INSTALLED_CONFIG]))):
-        raise RuntimeError(f"EndRound would not unsuppress in {INSTALLED_CONFIG}")
     # The crown is a few hundredths of a cubic millimetre, under the volume
     # check's resolution, so each configuration proves the cut's state
     # directly and the volume only as a sanity bound.
     await force_rebuild(adapter)
-    if bool(end_round.IsSuppressed()):
+    if bool(_end_round_feature(adapter).IsSuppressed()):
         raise RuntimeError(f"EndRound is suppressed in {INSTALLED_CONFIG}")
     await volume_check(
         adapter, "installed cup (end round turned)", V_INSTALLED, 0.005 * V_CUP
@@ -267,8 +259,14 @@ async def build(adapter) -> dict[str, str]:
         f"re-activate {default_config}",
         await adapter.set_active_configuration(default_config),
     )
+    # Suppress with the target configuration active (the _drawing_simplified
+    # order): specified while INSTALLED was active, SetSuppression2 returned
+    # True yet left the cut live in the default (crank-v4-10).
+    # swSuppressFeature, swSpecifyConfiguration.
+    if not bool(_end_round_feature(adapter).SetSuppression2(0, 3, bstr_array([default_config]))):
+        raise RuntimeError(f"EndRound would not suppress in {default_config}")
     await force_rebuild(adapter)
-    if not bool(end_round.IsSuppressed()):
+    if not bool(_end_round_feature(adapter).IsSuppressed()):
         raise RuntimeError(f"EndRound is not suppressed in {default_config}")
     await volume_check(adapter, "as-turned cup (default)", V_CUP, 0.005 * V_CUP)
     # The configuration description wins over the drive-train BOM's written
@@ -302,6 +300,13 @@ async def build(adapter) -> dict[str, str]:
     check(f"reopen saved {PART_NAME}", await adapter.open_model(artefacts["part"]))
     assert_saved_configurations_regenerate(adapter, PART_NAME)
     return artefacts
+
+
+def _end_round_feature(adapter):
+    """The EndRound cut, looked up afresh: a configuration switch can leave an
+    earlier IFeature pointer reading the old configuration's state."""
+    part = _early_bound(adapter.currentModel, "IPartDoc")
+    return _early_bound(part.FeatureByName("EndRound"), "IFeature")
 
 
 async def _cut_end_round(adapter) -> None:

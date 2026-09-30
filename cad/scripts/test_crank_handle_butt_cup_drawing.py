@@ -153,7 +153,9 @@ def test_installed_configuration_turns_the_end_round_across_the_cup() -> None:
     ):
         assert source.index(edit) < split, edit
     assert "SetSuppression2(0, 3, bstr_array([default_config]))" in source
-    assert "SetSuppression2(1, 3, bstr_array([INSTALLED_CONFIG]))" in source
+    # Suppressed with the default active (crank-v4-10: specified from
+    # INSTALLED it returned True but stayed live).
+    assert source.index("re-activate {default_config}") < source.index("SetSuppression2(0, 3")
     assert "apply_grouped_bom_properties(" in source
     assert "require_material_in_every_configuration(" in source
     assert "assert_saved_configurations_regenerate(adapter, PART_NAME)" in source
