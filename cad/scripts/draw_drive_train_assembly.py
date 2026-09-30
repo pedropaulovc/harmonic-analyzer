@@ -21,7 +21,7 @@ import textwrap
 from datetime import UTC, datetime
 from itertools import combinations
 from pathlib import Path
-from typing import Any, Callable, Literal, Sequence
+from typing import Any, Callable, Literal, NamedTuple, Sequence
 
 import _config
 import _seat_forensics
@@ -211,10 +211,16 @@ SHEET_SCALES = package_sheet_scales(CLUSTER_SCALES)
 PROJECTED_GROUP_ORIGIN = (0.024, 0.068)
 PROJECTED_GAP = 0.014
 PROJECTED_REGION = (0.018, 0.068, 0.300, 0.262)
-# The right half between the four-line heading (bottom ~0.238) and the title block
+# The right half between the four-line heading (bottom ~0.245) and the title block
 # (top 0.0655): a 1:3 isometric outline is ~130 mm, 1.5x baseline-5's 1:4.
 ASSEMBLED_ISO_CENTER = (0.320, 0.155)
 VIEW_CAPTION_GAP = 0.004
+# The general notes sit between the heading and the isometric (see
+# general_notes_field). Main's last green build measured the isometric's outline
+# top at 0.2117; only the offline budget reads this, the placement reads the
+# placed view. The notes clear the view as a caption does.
+ASSEMBLED_ISO_TOP = 0.2117
+GENERAL_NOTES_ISO_GAP = VIEW_CAPTION_GAP
 
 # --- sheet 2: BOM in two columns + reference isometric -----------------------
 BOM_COLUMN_WIDTHS = {
@@ -284,13 +290,17 @@ HEADING_XY = (0.018, 0.263)
 ASSEMBLED_HEADING_XY = (0.222, 0.263)
 SHEET_NUMBER_XY = (0.018, 0.025)
 REFERENCE_ISO_CENTER = (0.380, 0.110)
-# Notes pitch 4.525 mm a line (summing-assembly.pdf): ~47 lines fit the full
-# left column, ~24 the right one above the 1:8 reference view that every sheet
-# needs for its title-block property links (finalize_drawing refuses a sheet
-# without a view: r8, leaf 20260923T214354Z-1-4126331f). Sheet 6 carries steps
-# 1-7 and the general notes on the left, its right field kept free for D1; the
-# bank's steps 8-10 fill sheet 7's left field; the rig's steps continue on sheet 8
-# beside the station table (Main, B1 re-ruling 2026-09-26).
+# Notes print at 4.525 mm a line (summing-assembly.pdf; this package's telemetry:
+# 47 lines measure 212.33 mm).
+NOTE_LINE_PITCH = 0.004525
+# ~47 lines fit the full left column, ~24 the right one above the 1:8 reference
+# view that every sheet needs for its title-block property links
+# (finalize_drawing refuses a sheet without a view: r8, leaf
+# 20260923T214354Z-1-4126331f). Sheet 6 carries steps 1-7 alone on the left, its
+# right field kept free for D1 (#957); the general notes sit on sheet 1 under its
+# heading; the bank's steps 8-10 fill sheet 7's left field; the rig's steps
+# continue on sheet 8 beside the station table (Main, B1 re-ruling 2026-09-26).
+# package_note_fields lists every field and its blocks.
 ISO_RIGHT_FIELD = (NOTE_FIELD_RIGHT[0], NOTE_FIELD_RIGHT[1], NOTE_FIELD_RIGHT[2], 0.140)
 REFERENCE_ISO_CAPTION_XY = (0.330, 0.082)
 
@@ -1154,6 +1164,126 @@ def station_table_text(rows: Sequence[tuple[int, str]]) -> str:
     return "\n".join(lines)
 
 
+def heading_text(sheet_number: int, text: str = "") -> str:
+    """A sheet heading: the drawing number and sheet name, then ``text``."""
+    lines = [f"{DRAWING_NUMBER} - {SHEET_NAMES[sheet_number - 1]}"]
+    if text:
+        lines.append(text)
+    return "\n".join(lines)
+
+
+def general_notes_field(
+    heading_bottom: float, iso_top: float
+) -> tuple[float, float, float, float]:
+    """Sheet 1's general-notes field: under the heading, over the isometric."""
+    return (
+        ASSEMBLED_HEADING_XY[0],
+        heading_bottom - NOTE_BLOCK_GAP,
+        NOTE_FIELD_RIGHT[2],
+        iso_top + GENERAL_NOTES_ISO_GAP,
+    )
+
+
+class NoteField(NamedTuple):
+    """One fixed-text note field: ``blocks`` stack top-down inside ``bounds``."""
+
+    sheet: int
+    label: str
+    bounds: tuple[float, float, float, float]
+    blocks: tuple[tuple[str, str], ...]
+
+
+def package_note_fields(facts: SourceFacts) -> tuple[NoteField, ...]:
+    """Every note field the package stacks, in placement order.
+
+    Sheet 1's bounds here are nominal (the heading's lines at NOTE_LINE_PITCH
+    under ASSEMBLED_HEADING_XY, the isometric's top at ASSEMBLED_ISO_TOP); its
+    placement re-derives them from the measured heading and isometric. Sheet
+    6's right field stays empty: it is reserved for D1 (#957).
+    """
+    heading_lines = len(heading_text(1, ASSEMBLED_HEADING).splitlines())
+    cone_gears = facts.count("cone-gear")
+    return (
+        NoteField(
+            1,
+            "sheet 1 general notes field",
+            general_notes_field(
+                ASSEMBLED_HEADING_XY[1] - heading_lines * NOTE_LINE_PITCH,
+                ASSEMBLED_ISO_TOP,
+            ),
+            (("general assembly notes", CONSUMABLES_NOTES),),
+        ),
+        NoteField(
+            SEQUENCE_SHEET,
+            f"sheet {SEQUENCE_SHEET} left note field",
+            NOTE_FIELD_LEFT,
+            (
+                (
+                    "cone and crank sequence",
+                    CONE_CRANK_STEPS.format(cone_gears=cone_gears),
+                ),
+            ),
+        ),
+        NoteField(
+            BANK_SHEET,
+            f"sheet {BANK_SHEET} left note field",
+            NOTE_FIELD_LEFT,
+            (
+                (
+                    "cylinder bank sequence",
+                    BANK_STEPS.format(cylinder_gears=facts.count("cylinder-gear")),
+                ),
+            ),
+        ),
+        NoteField(
+            FIT_SHEET,
+            f"sheet {FIT_SHEET} left note field",
+            NOTE_FIELD_LEFT,
+            (
+                (
+                    "pinion rig sequence",
+                    rig_steps(
+                        pivot_blocks=facts.count("pinion-pivot-block"),
+                        cams=facts.count("pinion-cam"),
+                        slotted=facts.count("slotted-screw"),
+                    ),
+                ),
+            ),
+        ),
+        NoteField(
+            FIT_SHEET,
+            f"sheet {FIT_SHEET} right note field",
+            ISO_RIGHT_FIELD,
+            (
+                ("cone station table", station_table_text(facts.cone_rows())),
+                ("fit placeholder", FIT_PLACEHOLDER),
+            ),
+        ),
+        NoteField(
+            CHECKS_SHEET,
+            f"sheet {CHECKS_SHEET} left note field",
+            NOTE_FIELD_LEFT,
+            (("functional checks", CHECKS.format(cone_gears=cone_gears)),),
+        ),
+        NoteField(
+            CHECKS_SHEET,
+            f"sheet {CHECKS_SHEET} right note field",
+            ISO_RIGHT_FIELD,
+            (
+                ("saved pose", SETUP_NOTES),
+                (
+                    "external interfaces",
+                    INTERFACE_NOTES.format(
+                        slotted=facts.count("slotted-screw"),
+                        foot=facts.count("foot-screw"),
+                        hold_down=facts.count("pedestal-hold-down-screw"),
+                    ),
+                ),
+            ),
+        ),
+    )
+
+
 # ============================ COM helpers =======================================
 
 
@@ -1252,6 +1382,17 @@ def _stack_note_field(
         if violations:
             findings.append(f"{label}: {block_label} leaves its note field: " + "; ".join(violations))
         y = extent[1] - NOTE_BLOCK_GAP
+    return findings
+
+
+def _stack_sheet_note_fields(adapter: Any, facts: SourceFacts, sheet: int) -> list[str]:
+    """Stack every ``package_note_fields`` field of one fixed-field sheet."""
+    findings = []
+    for field in package_note_fields(facts):
+        if field.sheet == sheet:
+            findings += _stack_note_field(
+                adapter, field.blocks, field.bounds, label=field.label
+            )
     return findings
 
 
@@ -2069,11 +2210,13 @@ def _create_package_sheets(adapter: Any) -> None:
 
 def _heading(
     adapter: Any, sheet_number: int, text: str = "", *, xy: tuple[float, float] = HEADING_XY
-) -> None:
-    lines = [f"{DRAWING_NUMBER} - {SHEET_NAMES[sheet_number - 1]}"]
-    if text:
-        lines.append(text)
-    _add_note_block(adapter, "\n".join(lines), xy, label=f"sheet {sheet_number} heading")
+) -> Any:
+    return _add_note_block(
+        adapter,
+        heading_text(sheet_number, text),
+        xy,
+        label=f"sheet {sheet_number} heading",
+    )
 
 
 def _reference_iso(
@@ -2091,7 +2234,7 @@ def _reference_iso(
     return view
 
 
-def _place_assembled_sheet(adapter: Any) -> list[str]:
+def _place_assembled_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
     _activate_sheet(adapter, SHEET_NAMES[0])
     front = place_view(adapter, str(SOURCE), "*Front", 0.080, 0.110, scale=ASSEMBLED_SCALE)
     top = place_view(adapter, str(SOURCE), "*Top", 0.080, 0.200, scale=ASSEMBLED_SCALE)
@@ -2143,7 +2286,20 @@ def _place_assembled_sheet(adapter: Any) -> list[str]:
         group_mm=tuple(value * 1000.0 for value in group),
         findings=tuple(findings),
     )
-    _heading(adapter, 1, ASSEMBLED_HEADING, xy=ASSEMBLED_HEADING_XY)
+    heading = _heading(adapter, 1, ASSEMBLED_HEADING, xy=ASSEMBLED_HEADING_XY)
+    # The general notes fill the slot between the measured heading and the
+    # measured isometric: an isometric grown upward fails the gate, not overlaps.
+    (notes,) = (field for field in package_note_fields(facts) if field.sheet == 1)
+    heading_box = _note_extent(adapter, heading, label="sheet 1 heading")
+    iso_box = _view_outline(iso)
+    bounds = general_notes_field(heading_box[1], iso_box[3])
+    _telemetry.event(
+        "drawing.general_notes_field",
+        heading_mm=tuple(value * 1000.0 for value in heading_box),
+        iso_mm=tuple(value * 1000.0 for value in iso_box),
+        field_mm=tuple(value * 1000.0 for value in bounds),
+    )
+    findings += _stack_note_field(adapter, notes.blocks, bounds, label=notes.label)
     scale = f"{int(ASSEMBLED_SCALE[0])}:{int(ASSEMBLED_SCALE[1])}"
     _caption_under(adapter, front, f"FRONT {scale}", label="front caption")
     _caption_under(adapter, top, f"TOP {scale}", label="top caption")
@@ -2323,68 +2479,22 @@ def _place_sequence_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
     _reference_iso(
         adapter, caption="FINISHED ASSEMBLY 1:8", label="sequence reference isometric"
     )
-    findings = _stack_note_field(
-        adapter,
-        (
-            (
-                "cone and crank sequence",
-                CONE_CRANK_STEPS.format(cone_gears=facts.count("cone-gear")),
-            ),
-            ("general assembly notes", CONSUMABLES_NOTES),
-        ),
-        NOTE_FIELD_LEFT,
-        label=f"sheet {SEQUENCE_SHEET} left note field",
-    )
-    # The right field stays empty: it is reserved for D1.
-    return findings
+    # The right field stays empty: it is reserved for D1 (#957).
+    return _stack_sheet_note_fields(adapter, facts, SEQUENCE_SHEET)
 
 
 def _place_bank_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
     _activate_sheet(adapter, SHEET_NAMES[BANK_SHEET - 1])
     _heading(adapter, BANK_SHEET)
     _reference_iso(adapter, caption="FINISHED ASSEMBLY 1:8", label="bank reference isometric")
-    return _stack_note_field(
-        adapter,
-        (
-            (
-                "cylinder bank sequence",
-                BANK_STEPS.format(cylinder_gears=facts.count("cylinder-gear")),
-            ),
-        ),
-        NOTE_FIELD_LEFT,
-        label=f"sheet {BANK_SHEET} left note field",
-    )
+    return _stack_sheet_note_fields(adapter, facts, BANK_SHEET)
 
 
 def _place_fit_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
     _activate_sheet(adapter, SHEET_NAMES[FIT_SHEET - 1])
     _heading(adapter, FIT_SHEET)
     _reference_iso(adapter, caption="FINISHED ASSEMBLY 1:8", label="fit reference isometric")
-    findings = _stack_note_field(
-        adapter,
-        (
-            (
-                "pinion rig sequence",
-                rig_steps(
-                    pivot_blocks=facts.count("pinion-pivot-block"),
-                    cams=facts.count("pinion-cam"),
-                    slotted=facts.count("slotted-screw"),
-                ),
-            ),
-        ),
-        NOTE_FIELD_LEFT,
-        label=f"sheet {FIT_SHEET} left note field",
-    )
-    findings += _stack_note_field(
-        adapter,
-        (
-            ("cone station table", station_table_text(facts.cone_rows())),
-            ("fit placeholder", FIT_PLACEHOLDER),
-        ),
-        ISO_RIGHT_FIELD,
-        label=f"sheet {FIT_SHEET} right note field",
-    )
-    return findings
+    return _stack_sheet_note_fields(adapter, facts, FIT_SHEET)
 
 
 def _place_checks_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
@@ -2393,29 +2503,7 @@ def _place_checks_sheet(adapter: Any, facts: SourceFacts) -> list[str]:
     _reference_iso(
         adapter, caption="CHECK REFERENCE 1:8", label="checks reference isometric"
     )
-    findings = _stack_note_field(
-        adapter,
-        (("functional checks", CHECKS.format(cone_gears=facts.count("cone-gear"))),),
-        NOTE_FIELD_LEFT,
-        label=f"sheet {CHECKS_SHEET} left note field",
-    )
-    findings += _stack_note_field(
-        adapter,
-        (
-            ("saved pose", SETUP_NOTES),
-            (
-                "external interfaces",
-                INTERFACE_NOTES.format(
-                    slotted=facts.count("slotted-screw"),
-                    foot=facts.count("foot-screw"),
-                    hold_down=facts.count("pedestal-hold-down-screw"),
-                ),
-            ),
-        ),
-        ISO_RIGHT_FIELD,
-        label=f"sheet {CHECKS_SHEET} right note field",
-    )
-    return findings
+    return _stack_sheet_note_fields(adapter, facts, CHECKS_SHEET)
 
 
 def _place_full_detail_sheet(adapter: Any) -> tuple[float, float]:
@@ -2480,7 +2568,7 @@ def _place_package(
     full-detail view stays in Default, so it switches nothing.
     """
     _create_package_sheets(adapter)
-    findings = _place_assembled_sheet(adapter)
+    findings = _place_assembled_sheet(adapter, facts)
     bom_view = _place_bom_view(adapter)
     findings += _place_sequence_sheet(adapter, facts)
     findings += _place_bank_sheet(adapter, facts)
