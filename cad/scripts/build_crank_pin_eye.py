@@ -125,7 +125,9 @@ async def build(adapter) -> dict[str, str]:
     # The loop is symmetric in Y about the origin, so only the tail moves the
     # centre of mass along Y: a tail extruded into -Y lands it below zero.
     mass = await adapter.get_mass_properties()
-    if not mass.is_success or float(mass.data.center_of_mass[1]) <= 0.0:
+    if not mass.is_success:
+        raise RuntimeError(f"eye: get_mass_properties failed: {mass.error}")
+    if float(mass.data.center_of_mass[1]) <= 0.0:
         raise RuntimeError("tail extruded along -Y, away from the screw -- flip the extrude")
 
     await force_rebuild(adapter)
