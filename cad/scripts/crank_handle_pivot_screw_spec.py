@@ -242,9 +242,11 @@ RELIEF_WIDTH_MAX = round(RELIEF_WIDTH + GENERAL_1PL_TOL_MM, 6)
 TAP_EXIT_BREAK = EDGE_BREAK_MAX_MM
 # The tip chamfer's threads are partial, so full thread ends TIP_CHAMFER short
 # of the tip: FULL_THREAD_REACH is the full-thread end measured from the seat
-# face.  Which side governs each case is the smaller term of the min().
+# face.  Which side governs each case is the smaller term of the min().  The
+# shortest reach takes the longest printed chamfer (Codex P2 on #1138: the
+# nominal chamfer overstated it, and with it the filing allowance).
 FULL_THREAD_REACH_NOMINAL = round(THREAD_LENGTH - TIP_CHAMFER, 6)
-FULL_THREAD_REACH_MIN = round(THREAD_LENGTH_MIN - TIP_CHAMFER, 6)
+FULL_THREAD_REACH_MIN = round(THREAD_LENGTH_MIN - TIP_CHAMFER_MAX, 6)
 FULL_THREAD_NOMINAL = round(
     min(FULL_THREAD_REACH_NOMINAL, ARM_THICKNESS) - RELIEF_WIDTH, 6
 )

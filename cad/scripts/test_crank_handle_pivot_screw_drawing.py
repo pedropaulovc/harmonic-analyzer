@@ -203,9 +203,9 @@ def test_engagement_meets_the_1_5d_rule_governed_by_the_stock_arm() -> None:
     source = Path(spec.__file__).read_text(encoding="utf-8")
     assert "the #8-32's U33b exception (1.26D) is retired" in source
     assert spec.ENGAGEMENT_FLOOR == pytest.approx(1.5 * 3.505)
-    # The chamfer's partial threads are excluded: full thread reaches 9.5 - 0.4
-    # = 9.1 from the seat face at the shortest thread section.
-    assert spec.FULL_THREAD_REACH_MIN == pytest.approx(9.1)
+    # The chamfer's partial threads are excluded: full thread reaches 9.5 - the
+    # longest printed chamfer 0.45 = 9.05 from the seat face (Codex P2 on #1138).
+    assert spec.FULL_THREAD_REACH_MIN == pytest.approx(9.05)
     # Nominal: min(10.0 - 0.4, arm 8.0) - 1.5 = 6.5 of full thread, 1.85 D.
     assert spec.FULL_THREAD_NOMINAL == pytest.approx(6.5)
     assert spec.FULL_THREAD_NOMINAL_DIAMETERS == pytest.approx(6.5 / 3.505)
@@ -236,11 +236,11 @@ def test_engagement_meets_the_1_5d_rule_governed_by_the_stock_arm() -> None:
     # The 1.5 D rule itself is met, with no exception to record.
     assert spec.FULL_THREAD_WORST >= 1.5 * 3.505
     # User ruling 2026-09-29: the tip is filed flush at assembly.  Filing
-    # removes 10.0 - 7.8359 = 2.16 at most, and even 9.1 of full thread in an
+    # removes 10.0 - 7.8359 = 2.16 at most, and even 9.05 of full thread in an
     # 8.0391 stock arm still reaches the face first.
     assert not hasattr(spec, "PROUD_INBOARD_MAX")
     assert spec.FILE_ALLOWANCE_MAX == pytest.approx(10.0 - 7.8359, abs=1e-4)
-    assert spec.FILE_ALLOWANCE_MIN == pytest.approx(9.1 - 8.0391, abs=1e-4)
+    assert spec.FILE_ALLOWANCE_MIN == pytest.approx(9.05 - 8.0391, abs=1e-4)
     assert spec.FILE_ALLOWANCE_MIN > 0.0
 
 
