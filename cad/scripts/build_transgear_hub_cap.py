@@ -108,10 +108,13 @@ def _chamfer_max_limit(adapter) -> None:
     lower, upper = deviations(FRONT_CHAMFER_BAND)
     _, dimension = _named_dimension(adapter, "CapProfile", "FrontChamfer")
     label = "FrontChamfer@CapProfile"
-    if not math.isclose(
-        float(dimension.SystemValue), FRONT_CHAMFER / 1000.0, abs_tol=1e-12
-    ):
-        raise RuntimeError(f"{label}: nominal is not the band's max")
+    # Driven by a global the build writes in inches to 8 decimals, so match at
+    # the 1e-9 m every other readback uses.
+    value = float(dimension.SystemValue)
+    if not math.isclose(value, FRONT_CHAMFER / 1000.0, abs_tol=1e-9):
+        raise RuntimeError(
+            f"{label}: nominal {value * 1000.0:.7f} is not the band's max {FRONT_CHAMFER}"
+        )
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
     tolerance.Type = FRONT_CHAMFER_TOL_TYPE
     if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):

@@ -205,3 +205,9 @@ def test_part_record_and_finishes() -> None:
     assert faces["core"].diameter_mm == spec.CORE_DIA
     assert spec.THREAD_END_Z < faces["core"].contains_z_mm < 0.0
     assert drawing.DIMENSION_CALLOUTS_BELOW == {"TipChamfer": spec.CHAMFER_CALLOUT}
+
+
+def test_every_note_line_fits_the_note_field() -> None:
+    lines = spec.DRAWING_NOTES.split("\n")
+    assert len(lines) <= 4
+    assert [line for line in lines if len(line) > 70] == []

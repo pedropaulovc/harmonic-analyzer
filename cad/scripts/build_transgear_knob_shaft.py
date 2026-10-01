@@ -73,7 +73,7 @@ from _drawing_marks import (
 )
 from _drawing_simplified import save_simplified_part
 from _fit_limits import deviations
-from _gear import build_fixed_gear, pattern_about_z, volume_check
+from _gear import build_fixed_gear, volume_check
 from _holes import blind_hole_volume_mm3, wizard_holes
 from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry
@@ -522,6 +522,8 @@ async def _runout_slot_seed(adapter: Any) -> list[tuple[str, str]]:
 
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
+        CircularPatternParameters,
+        CreateAxisParameters,
         CreatePlaneParameters,
         ExtrusionParameters,
         RevolveParameters,
@@ -618,8 +620,30 @@ async def build(adapter) -> dict[str, str]:
     volume = await volume_check(
         adapter, "seed run-out slot", volume - V_RUNOUT_SLOT, 0.05 * V_RUNOUT_SLOT
     )
-    await pattern_about_z(adapter, "RunoutSlot", TEETH, _R_JOURNAL, PINION_REAR_Z)
+    # A feature pattern, not _gear.pattern_about_z's geometry pattern, which
+    # failed natively here (run 20261001T011714683Z).  The likely cause is the
+    # seed's chord lying in the journal's front shoulder plane, a coplanar
+    # boundary a geometry copy cannot re-trim; each instance here re-cuts the
+    # transformed arc-and-chord profile instead.
+    axis = check(
+        "create_axis Z (Top x Right)",
+        await adapter.create_axis(
+            CreateAxisParameters(mode="two_planes", planes=["Top Plane", "Right Plane"])
+        ),
+    )
+    check(
+        f"run-out slot pattern about {axis.name}",
+        await adapter.circular_pattern_feature(
+            CircularPatternParameters(
+                axis_name=axis.name,
+                features=["RunoutSlot"],
+                count=TEETH,
+                geometry_pattern=False,
+            )
+        ),
+    )
     name_last_feature(adapter, "RunoutSlots")
+    blank_reference_geometry(adapter, ((axis.name, "AXIS"),))
     volume = await volume_check(
         adapter,
         "twelve run-out slots",

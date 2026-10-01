@@ -121,8 +121,14 @@ def _root_min_limit(adapter) -> None:
     lower, upper = ROOT_DIA_DEVIATIONS
     _, dimension = _named_dimension(adapter, "SleeveProfile", "RootDia")
     label = "RootDia@SleeveProfile"
-    if not math.isclose(float(dimension.SystemValue), ROOT_DIA / 1000.0, abs_tol=1e-12):
-        raise RuntimeError(f"{label}: nominal is not the modelled root")
+    # RootDia is driven by its global, which the build writes in inches to 8
+    # decimals (8.0433334 mm against the spec's 8.0433333), so a 1e-12 m match
+    # never holds; 1e-9 m is the convention every other readback here uses.
+    if not math.isclose(float(dimension.SystemValue), ROOT_DIA / 1000.0, abs_tol=1e-9):
+        raise RuntimeError(
+            f"{label}: nominal {float(dimension.SystemValue) * 1000.0:.7f} is not "
+            f"the modelled root {ROOT_DIA:.7f}"
+        )
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
     tolerance.Type = ROOT_DIA_TOL_TYPE
     if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):

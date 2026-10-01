@@ -756,13 +756,21 @@ async def build(adapter: Any) -> dict[str, str]:
             f"Csk{index}Dia",
         )
         csk.record(f"Csk{index}Dia", '"CskDia"')
-        check(
-            f"countersink {index} half angle",
-            await adapter.add_sketch_dimension(
-                csk_lines[0], csk_lines[3], "angular", _CSK_HALF_ANGLE
-            ),
+        # The cone's apex depth below the rim fixes the 82-deg seat, not an
+        # angular dimension: one between the cone and the axis side may read
+        # the 139-deg supplement, and driving that to 41 would carry the apex
+        # past the rim into a self-crossing profile.  The revolve failed right
+        # after the angular form (run 20261001T011714683Z, countersink 1).  The
+        # drive keeps the angle when CskDia moves.
+        await dimension_between(
+            adapter,
+            f"{csk_lines[0]}.start",
+            f"{csk_lines[1]}.start",
+            "vertical_distance",
+            REAR_FACE_Z - _CSK_APEX_Z,
+            f"countersink {index} apex depth",
         )
-        csk.record(f"Csk{index}HalfAngle")
+        csk.record(f"Csk{index}ApexDepth", f'"CskDia" / 2 / tan({_CSK_HALF_ANGLE:g})')
         await dimension_between(
             adapter,
             f"{csk_lines[1]}.start",

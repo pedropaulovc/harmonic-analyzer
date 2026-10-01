@@ -212,3 +212,7 @@ def test_the_part_carries_every_property_its_drawing_requires(monkeypatch) -> No
     )
     carried.update(stamped)
     assert [name for name in required if not str(carried.get(name) or "").strip()] == []
+
+
+def test_every_note_line_fits_the_note_field() -> None:
+    assert [line for line in spec.DRAWING_NOTES.split("\n") if len(line) > 70] == []

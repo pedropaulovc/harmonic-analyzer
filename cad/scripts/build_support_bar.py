@@ -219,10 +219,13 @@ async def build(adapter) -> dict[str, str]:
     check("exit_sketch pivot tap drill", await adapter.exit_sketch())
     name_last_feature(adapter, "PivotTapProfile")
     drive_jobs += pivot.apply(adapter, "PivotTapProfile")
+    # BackFace's normal is +Z, out of the bar, so the default cut runs -Z into
+    # it.  Reversed, the cut missed the body and flipped its side to cut,
+    # leaving 21422 of 88036 mm^3 (run 20261001T011714683Z).
     check(
         "cut pivot tap drill (flat, blind)",
         await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=PIVOT_TAP_DRILL_DEPTH, reverse_direction=True)
+            ExtrusionParameters(depth=PIVOT_TAP_DRILL_DEPTH)
         ),
     )
     name_last_feature(adapter, "PivotTap")

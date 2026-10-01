@@ -129,10 +129,13 @@ def _single_limit_relief(adapter) -> None:
     lower, upper = deviations(RELIEF_DIA_BAND)
     _, dimension = _named_dimension(adapter, "StudProfile", "ReliefDia")
     label = "ReliefDia@StudProfile"
-    if not math.isclose(
-        float(dimension.SystemValue), RELIEF_DIA / 1000.0, abs_tol=1e-12
-    ):
-        raise RuntimeError(f"{label}: nominal is not the band's max")
+    # Driven by a global the build writes in inches to 8 decimals (2.4 mm reads
+    # back 2.40000003), so match at the 1e-9 m every other readback uses.
+    value = float(dimension.SystemValue)
+    if not math.isclose(value, RELIEF_DIA / 1000.0, abs_tol=1e-9):
+        raise RuntimeError(
+            f"{label}: nominal {value * 1000.0:.7f} is not the band's max {RELIEF_DIA}"
+        )
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
     tolerance.Type = RELIEF_DIA_TOL_TYPE
     if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
