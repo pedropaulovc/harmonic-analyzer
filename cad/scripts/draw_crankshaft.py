@@ -263,6 +263,8 @@ JOURNAL_FINISHES = {
         (RELIEF_END_X + 0.012, 0.200),
     ),
 }
+# The landing on the rear face's edge-on line, 1 mm inside the collar's
+# silhouette; the rim itself is selected as a model edge (_collar_rear_rim).
 COLLAR_REAR_FINISH = (
     (COLLAR_REAR_X, _sheet_y(COLLAR_DIA / 2.0 - 1.0)),
     (COLLAR_REAR_X + 0.0069, 0.195),
@@ -535,6 +537,47 @@ def _is_upper_seat_rim(edge: Any) -> bool:
         abs(cx) < 1e-3
         and abs(cy - SEAT_COLLAR) < 1e-3
         and abs(cz - DRIVE_PIN_CIRCLE_RADIUS) < 1e-3
+    )
+
+
+def _collar_rear_rim(adapter: Any, view: Any) -> Any:
+    """Return the Ø20.6 collar's rear-face rim, seen edge-on in the side view.
+
+    A sheet pick on that vertical line found no edge natively (run
+    20261001T035353825Z) though the same pick passed on f7c9771b3.  The
+    model circle centred on the shaft axis at the rear-face station is
+    unambiguous; the collar's other Ø20.6 rim sits at its seat face,
+    SEAT_COLLAR.
+    """
+    radius_mm = COLLAR_DIA / 2.0
+    components = adapter._attempt(lambda: view.GetVisibleComponents(), default=()) or ()
+    for component in components:
+        edges = (
+            adapter._attempt(
+                lambda c=component: visible_component_entities(
+                    view, c, 1
+                ),  # swViewEntityType_Edge
+                default=(),
+            )
+            or ()
+        )
+        for edge in edges:
+            edge = _early_bound(edge, "IEdge")
+            curve = _early_bound(edge.GetCurve(), "ICurve")
+            if not curve.IsCircle():
+                continue
+            params = tuple(curve.CircleParams)
+            cx, cy, cz = (float(v) * 1000.0 for v in params[:3])
+            if (
+                abs(cx) < 1e-3
+                and abs(cz) < 1e-3
+                and abs(cy - COLLAR_REAR) < 1e-3
+                and abs(float(params[6]) * 1000.0 - radius_mm) < 1e-3
+            ):
+                return edge
+    raise RuntimeError(
+        f"crankshaft side view has no visible Ø{COLLAR_DIA} rim at the collar "
+        f"rear station {COLLAR_REAR}"
     )
 
 
@@ -821,7 +864,8 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         side,
-        edge_xy=COLLAR_REAR_FINISH[0],
+        edge_entity=_collar_rear_rim(adapter, side),
+        leader_attach_xy=COLLAR_REAR_FINISH[0],
         symbol_xy=COLLAR_REAR_FINISH[1],
         control=surface_finish_by_key(SURFACE_FINISHES, "collar_rear_face"),
         label="crankshaft collar rear (thrust washer) face finish",
