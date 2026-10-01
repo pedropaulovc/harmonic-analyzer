@@ -991,7 +991,12 @@ def test_t120_fit_up_closes_and_both_sheets_state_it() -> None:
     step = " ".join(step.split(f"\n{number + 1}. ")[0].split())
     check = step.index(f"{feeler:.2f} FEELER")
     drill = step.index("MATCH-DRILL")
-    assert step.index("PUSH MHA-025 AND T120 TOWARD EACH OTHER") < check < drill
+    # The push names both parts the check closes on, before the reading; the
+    # wording around them is free (Codex P3 on #1154, review 4).
+    push = step.index("PUSH")
+    sentence = step[push : step.index(";", push)]
+    assert all(part in sentence for part in spec.T120_FITUP_PUSHED)
+    assert push < check < drill
     assert check < step.index(turn_down) < drill
     assert check < step.index(f"{spec.SHOULDER_LENGTH_FITUP_MIN:.1f} MIN") < drill
 
