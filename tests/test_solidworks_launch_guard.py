@@ -170,10 +170,6 @@ def test_solidworks_mcp_launch_entry_points_are_refused(
     )
 
 
-def test_autostart_is_off_unless_a_test_opts_in():
-    assert os.environ.get("HARMONIC_SW_AUTOSTART") == "0"
-
-
 def test_swallowed_autostart_launch_still_fails_the_test(
     solidworks_launch_refusals, monkeypatch
 ):

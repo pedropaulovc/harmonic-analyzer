@@ -1,11 +1,9 @@
-"""Every offline test file under ``cad/scripts`` runs inside some ``check:*`` gate.
+"""Every root pytest module has a required, opt-in, or test-runner disposition.
 
-``dodo`` enrolls tests explicitly (plus the ``test_*_drawing.py`` glob), so a new
-test file that nobody enrolls passes in the local suite and never runs in a
-``doit`` build -- a green gate that checks nothing.  Codex on #844 and #814:
-``test_mirror_retirement_expectations.py`` shipped that way.  This guard reads
-the pytest arguments of every ``check:*`` task and fails on any ``test_*.py``
-that none of them collects, unless it is exempted below with a reason.
+Gate reach is derived from the actual commands produced by ``dodo.task_check``.
+Discovery follows the root pytest paths recursively, keyed by repository-relative
+path rather than basename. A new module must be enrolled or given a concrete
+test-runner-only reason; there is no grandfathered orphan allowance.
 """
 
 from __future__ import annotations
@@ -16,37 +14,52 @@ from pathlib import Path
 SCRIPTS = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPTS.parents[1]
 
-# Test files that deliberately run in no check:* gate, each with its reason.
-EXEMPT: dict[str, str] = {}
+# These test root-runner/launcher infrastructure rather than CAD recipes. Keep
+# their root-pytest invocation separate from the local CAD check commands.
+TEST_RUNNER_ONLY = {
+    "tests/test_solidworks_launch_guard.py": (
+        "Exercises the root conftest process/launch refusal boundary; run with "
+        "ordinary root pytest suite, not a CAD recipe check."
+    ),
+    "tests/test_pytest_scope.py": (
+        "Validates root pytest discovery and vendored-suite exclusions, not CAD output."
+    ),
+    "tests/test_farm_mode.py": (
+        "Farm executor/CLI selection contracts belong to the root launcher suite."
+    ),
+    "tests/test_farm_launcher.py": (
+        "Farm launcher submission, retries and output-handling contracts belong "
+        "to the ordinary root launcher suite, not the offline CAD check."
+    ),
+    "tests/test_farm_checkout_drift.py": (
+        "Worker checkout/identity drift contracts belong to the root launcher suite."
+    ),
+    "cad/comparisons/tools/test_pose_to_meshprobe.py": (
+        "Comparison-tool pose conversion is not on the CAD build/release gate path; "
+        "run explicitly or through root pytest."
+    ),
+}
+OPT_IN = {
+    "cad/scripts/test_verify_telemetry.py": (
+        "check:verify_telemetry simulates calibrated COM latency to audit span "
+        "shape; deliberately excluded from the every-build/release checks."
+    ),
+}
 
-# Pre-existing orphans found when this guard landed (all on main before #844).
-# Main assigns their triage (enroll, or move to EXEMPT with a reason); until
-# then they are listed here so the guard fails only on NEW orphans.
-PENDING_TRIAGE: frozenset[str] = frozenset(
-    {
-        "test_assembly_save.py",
-        "test_base_serial.py",
-        "test_channel_installation_cascade.py",
-        "test_diag_dump_part.py",
-        "test_face_identity_diff.py",
-        "test_frame_fastener_fit.py",
-        "test_gear.py",
-        "test_hole_spec.py",
-        "test_holes_face_selection.py",
-        "test_layout_geometry.py",
-        "test_machinist_review_eval.py",
-        "test_magnifier_drawing_metadata.py",
-        "test_motion_study_default_free_pen.py",
-        "test_named_views.py",
-        "test_or_flag_fallback_names.py",
-        "test_owned_assembly_health_session.py",
-        "test_platen_refit.py",
-        "test_stock_spring_mounts.py",
-        "test_summing_hanger_stack.py",
-        "test_targeted_model_items.py",
-        "test_vm2_rack_source_save.py",
+
+def _inventory(root: Path) -> set[str]:
+    """Maintained test trees; pytest scope itself is checked by test_pytest_scope."""
+    return {
+        path.relative_to(root).as_posix()
+        for directory in ("cad/scripts", "cad/comparisons/tools", "tests")
+        for pattern in ("test_*.py", "*_test.py")
+        for path in (root / directory).rglob(pattern)
+        if path.is_file()
+        if not any(
+            part == "references" or part.startswith(".")
+            for part in path.relative_to(root).parts[:-1]
+        )
     }
-)
 
 
 def _load_dodo():
@@ -57,40 +70,67 @@ def _load_dodo():
     return module
 
 
-def _collected_by_check_gates() -> dict[str, list[str]]:
-    """Test file name -> the check:* tasks whose pytest command collects it."""
-    collected: dict[str, list[str]] = {}
-    for task in _load_dodo().task_check():
+def _collected_by_check_gates(dodo) -> dict[str, set[str]]:
+    """Repository-relative module path -> gates that actually invoke pytest."""
+    collected: dict[str, set[str]] = {}
+    for task in dodo.task_check():
         _run, (cmd, *_rest) = task["actions"][0]
+        if "-m" not in cmd or cmd[cmd.index("-m") + 1] != "pytest":
+            continue
         for arg in cmd:
             path = Path(str(arg))
-            if path.suffix != ".py" or not path.name.startswith("test_"):
+            if path.suffix != ".py":
                 continue
-            if path.resolve().parent != SCRIPTS:
-                continue
-            collected.setdefault(path.name, []).append(task["name"])
+            if not path.is_absolute():
+                path = REPO_ROOT / path
+            relative = path.resolve().relative_to(REPO_ROOT).as_posix()
+            collected.setdefault(relative, set()).add(task["name"])
     return collected
 
 
-def test_every_offline_test_file_runs_in_a_check_gate() -> None:
-    collected = _collected_by_check_gates()
-    on_disk = {path.name for path in SCRIPTS.glob("test_*.py")}
-    orphans = sorted(on_disk - set(collected) - set(EXEMPT) - PENDING_TRIAGE)
+def test_every_root_pytest_module_has_a_gate_disposition() -> None:
+    dodo = _load_dodo()
+    collected = _collected_by_check_gates(dodo)
+    on_disk = _inventory(REPO_ROOT)
+    required = set(dodo._CHECK_NAMES)
+    optional = set(dodo._OPTIONAL_CHECK_NAMES)
+    assert on_disk and collected and required and optional
+    assert not required & optional
+    assert set(collected) <= on_disk, "gates name tests outside maintained root discovery"
+    default = {
+        path for path, gates in collected.items() if gates & required
+    }
+    opt_in = set(collected) - default
+    assert default, "no root tests execute under the required checks"
+    assert opt_in == set(OPT_IN), (
+        f"opt-in module dispositions drifted: {sorted(opt_in ^ set(OPT_IN))}"
+    )
+    assert all(collected[path] <= optional for path in opt_in)
+    assert not set(TEST_RUNNER_ONLY) & set(collected), (
+        "a test-runner-only module is now gated; remove its old disposition"
+    )
+    assert set(TEST_RUNNER_ONLY) <= on_disk, "stale test-runner-only dispositions"
+    assert all(reason.strip() for reason in (*TEST_RUNNER_ONLY.values(), *OPT_IN.values()))
+    orphans = sorted(on_disk - default - opt_in - set(TEST_RUNNER_ONLY))
     assert not orphans, (
-        "test files no check:* gate collects (enroll them in dodo.task_check, "
-        f"or exempt them with a reason): {orphans}"
+        "root pytest modules with no default/opt-in/test-runner-only disposition: "
+        f"{orphans}"
     )
 
 
-def test_exemptions_name_real_uncollected_files() -> None:
-    collected = _collected_by_check_gates()
-    on_disk = {path.name for path in SCRIPTS.glob("test_*.py")}
-    listed = set(EXEMPT) | PENDING_TRIAGE
-    assert not (listed - on_disk), (
-        f"exempted files that no longer exist: {sorted(listed - on_disk)}"
-    )
-    assert not (listed & set(collected)), (
-        f"exempted files a gate now collects -- drop them: {sorted(listed & set(collected))}"
-    )
-    assert all(reason.strip() for reason in EXEMPT.values())
-    assert not (set(EXEMPT) & PENDING_TRIAGE)
+def test_recursive_inventory_preserves_distinct_module_paths(tmp_path) -> None:
+    maintained = {
+        "cad/scripts/test_contract.py",
+        "cad/scripts/diagnostics/test_contract.py",
+        "tests/test_contract.py",
+        "tests/contract_test.py",
+    }
+    excluded = {
+        "cad/scripts/references/test_contract.py",
+        "cad/scripts/.scratch/test_contract.py",
+    }
+    for relative in maintained | excluded:
+        path = tmp_path / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("", encoding="utf-8")
+    assert _inventory(tmp_path) == maintained

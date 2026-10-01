@@ -1680,36 +1680,44 @@ def test_data_deps_of_nameplate_lists_engraving_dxf():
     assert data_deps_of(SCRIPTS_DIR / "build_platen.py") == []
 
 
-def test_data_deps_of_keeps_missing_referenced_artefact():
+def test_data_deps_of_keeps_missing_referenced_artefact(tmp_path, monkeypatch):
     """A referenced DXF is listed even when absent, so doit fails loud on it
     (a deleted runtime input must not read as up-to-date)."""
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    references = tmp_path / "references"
+    references.mkdir()
+    monkeypatch.setattr(bg, "SCRIPTS_DIR", scripts)
+    monkeypatch.setattr(bg, "REFERENCES_DIR", references)
     missing_name = "does-not-exist-xyz.dxf"
-    assert not (REFERENCES_DIR / missing_name).exists()
-    with tempfile.NamedTemporaryFile(
-        "w", suffix=".py", dir=SCRIPTS_DIR, delete=False
-    ) as fh:
-        fh.write(f'PATH = REFERENCES_DIR / "{missing_name}"\n')
-        script = Path(fh.name)
+    assert not (references / missing_name).exists()
+    script = scripts / "helper.py"
+    script.write_text(f'PATH = REFERENCES_DIR / "{missing_name}"\n', encoding="utf-8")
+    bg.clear_import_caches()
     try:
         deps = data_deps_of(script)
         assert [Path(d).name for d in deps] == [missing_name], deps
     finally:
-        script.unlink()
+        bg.clear_import_caches()
 
 
-def test_data_deps_of_follows_a_same_tick_rewrite():
+def test_data_deps_of_follows_a_same_tick_rewrite(tmp_path, monkeypatch):
     """Source texts are memoized per process, but an edit must still move the
     graph: once the script names new.dxf, a stale old.dxf edge would leave the
     real input out of the cache key. Same-length names AND a pinned identical
     mtime reproduce two writes landing in one file-time tick (~15.6 ms on
     Windows), where (mtime_ns, size) cannot tell the texts apart; this raced
     on the farm (run 20260928T124706229Z)."""
-    with tempfile.NamedTemporaryFile(
-        "w", suffix=".py", dir=SCRIPTS_DIR, delete=False
-    ) as fh:
-        fh.write('PATH = REFERENCES_DIR / "old-xyz.dxf"\n')
-        script = Path(fh.name)
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    references = tmp_path / "references"
+    references.mkdir()
+    monkeypatch.setattr(bg, "SCRIPTS_DIR", scripts)
+    monkeypatch.setattr(bg, "REFERENCES_DIR", references)
+    script = scripts / "helper.py"
+    script.write_text('PATH = REFERENCES_DIR / "old-xyz.dxf"\n', encoding="utf-8")
     tick = (time.time_ns(),) * 2
+    bg.clear_import_caches()
     try:
         os.utime(script, ns=tick)
         assert [Path(d).name for d in data_deps_of(script)] == ["old-xyz.dxf"]
@@ -1717,7 +1725,7 @@ def test_data_deps_of_follows_a_same_tick_rewrite():
         os.utime(script, ns=tick)
         assert [Path(d).name for d in data_deps_of(script)] == ["new-xyz.dxf"]
     finally:
-        script.unlink()
+        bg.clear_import_caches()
 
 
 def _tokens(text: str) -> frozenset[str]:

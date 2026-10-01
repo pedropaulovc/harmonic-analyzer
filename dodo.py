@@ -3079,6 +3079,34 @@ def task_check():
         # members, an incomplete before-walk refuses to diff, and the created
         # feature is picked by type, never an auxiliary one beside it.
         SCRIPTS_DIR / "test_adapter_feature_resolution.py",
+        # Maintained offline contracts formerly outside the required gates,
+        # including recursively discovered diagnostic tests.
+        SCRIPTS_DIR / "test_assembly_save.py",
+        SCRIPTS_DIR / "test_base_serial.py",
+        SCRIPTS_DIR / "test_channel_installation_cascade.py",
+        SCRIPTS_DIR / "test_diag_dump_part.py",
+        SCRIPTS_DIR / "test_face_identity_diff.py",
+        SCRIPTS_DIR / "test_frame_fastener_fit.py",
+        SCRIPTS_DIR / "test_gear.py",
+        SCRIPTS_DIR / "test_hole_spec.py",
+        SCRIPTS_DIR / "test_holes_face_selection.py",
+        SCRIPTS_DIR / "test_layout_geometry.py",
+        SCRIPTS_DIR / "test_machinist_review_eval.py",
+        SCRIPTS_DIR / "test_magnifier_drawing_metadata.py",
+        SCRIPTS_DIR / "test_motion_study_default_free_pen.py",
+        SCRIPTS_DIR / "test_named_views.py",
+        SCRIPTS_DIR / "test_or_flag_fallback_names.py",
+        SCRIPTS_DIR / "test_owned_assembly_health_session.py",
+        SCRIPTS_DIR / "test_platen_refit.py",
+        SCRIPTS_DIR / "test_stock_spring_mounts.py",
+        SCRIPTS_DIR / "test_summing_hanger_stack.py",
+        SCRIPTS_DIR / "test_targeted_model_items.py",
+        SCRIPTS_DIR / "test_vm2_rack_source_save.py",
+        SCRIPTS_DIR / "diagnostics" / "test_vm2_rack_finish_attachment.py",
+        SCRIPTS_DIR / "diagnostics" / "test_vm2_datum_probe.py",
+        SCRIPTS_DIR / "diagnostics" / "test_vm2_datum_ownership.py",
+        SCRIPTS_DIR / "diagnostics" / "test_vm2_datum_lifecycle.py",
+        SCRIPTS_DIR / "diagnostics" / "test_vm2_datum_clearance.py",
     ]
     # These are runtime-read rather than imported, so module_deps_of cannot
     # discover them. A prompt/schema edit must invalidate check:recipe and rerun
@@ -3091,6 +3119,37 @@ def task_check():
         # removed row must rerun its tagged-emitter check.
         SCRIPTS_DIR.parent / "docs" / "drawing-simplicity-policy.md",
     ]
+    # These tests load probe modules by filename, not by a syntactic import.
+    # Follow their helper closures explicitly as well as tracking the probe.
+    diagnostic_contract_sources = [
+        SCRIPTS_DIR / "diagnostics" / name
+        for name in (
+            "probe_vm2_rack_finish_attachment.py",
+            "probe_vm2_datum_ownership.py",
+            "probe_vm2_datum_attachment.py",
+            "probe_vm2_datum_lifecycle.py",
+            "analyze_vm2_datum_clearance.py",
+        )
+    ]
+    evidence_probes = (
+        REPO_ROOT / "cad" / "docs" / "pipeline" / "evidence"
+        / "vm2-datum-placement" / "probes"
+    )
+    recorded_contract_deps = [
+        REPO_ROOT / "cad" / "references" / "base-serial.dxf",
+        *(
+            evidence_probes / name / "receipt.json"
+            for name in (
+                "rack-source-save-full",
+                "rack-source-save-precision",
+                "rack-source-save-callout",
+                "rack-native-lifecycle-original",
+                "rack-native-lifecycle-above",
+                "rack-production-lifecycle-33696944",
+                "rod-production-lifecycle-33696944",
+            )
+        ),
+    ]
     # test_adapter_feature_resolution exercises the vendored adapter, which
     # module_deps_of never walks (an installed package, see SUBMODULE_SRC). Its
     # real import closure (package __init__s, transitive helpers) is wider than
@@ -3098,7 +3157,11 @@ def task_check():
     # tiers hash: any submodule bump re-runs the gate (codex #1101). The files,
     # not a digest sidecar -- the sidecars are COM cache-key inputs, which no
     # check:* task may carry (test_com_deps_include_submodule_and_checks_do_not).
-    adapter_contract_deps = [str(path) for path in _submodule_src_files()]
+    # test_or_flag_fallback_names also scans the sibling src/utils files,
+    # so the scan boundary is the whole adapter src tree, not just its package.
+    adapter_contract_deps = sorted(
+        str(path.resolve()) for path in SUBMODULE_SRC.parent.rglob("*.py")
+    )
     # test_out_param_binding SCANS sources instead of importing them (it reads
     # every top-level build script and every diagnostics/*.py looking for
     # VT_BYREF), so module_deps_of cannot see them -- an import graph does not
@@ -3118,6 +3181,24 @@ def task_check():
             *(str(path.resolve()) for path in machinist_review_contract_deps),
             *adapter_contract_deps,
             *scanned_by_binding_gate,
+            *(str(_resolved(path)) for path in SCRIPTS_DIR.rglob("*.py")),
+            *(
+                str(path.resolve())
+                for root in (REPO_ROOT / "tests", REPO_ROOT / "cad/comparisons/tools")
+                for pattern in ("test_*.py", "*_test.py")
+                for path in root.rglob(pattern)
+                if not any(
+                    part.startswith(".") or part == "references"
+                    for part in path.relative_to(REPO_ROOT).parts
+                )
+            ),
+            *(str(path.resolve()) for path in diagnostic_contract_sources),
+            *(
+                dep
+                for path in diagnostic_contract_sources
+                for dep in module_deps_of(path)
+            ),
+            *(str(path.resolve()) for path in recorded_contract_deps),
             str(
                 (REPO_ROOT / "cad" / "comparisons" / "tools" / "composite.py").resolve()
             ),
@@ -3466,6 +3547,9 @@ def task_check():
                 *_config_deps(entry),
             )
         }
+        command = spec["cmd"]
+        if "-m" in command and command[command.index("-m") + 1] == "pytest":
+            executed.add(str((REPO_ROOT / "conftest.py").resolve()))
         yield {
             "name": name,
             "file_dep": sorted({*spec["file_dep"], *executed}),

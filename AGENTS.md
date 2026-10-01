@@ -259,11 +259,48 @@ such build:
 | `verify_soundness:<stem>`, `verify:kinematics` | yes | yes | yes |
 | `preflight`, `export`, `package:release` | yes | yes | yes |
 | `verify:soundness` | no (aggregator) | no | — (its leaves are) |
-| `check:math`, `check:config`, `check:graph`, `check:undefined_names`, `check:nameplate`, `check:numerals`, `check:recipe`, `check:cache`, `check:partiso`, `check:inert`, `check:budget` | **no** | no (parallel) | no (runs locally) |
+| `check:math`, `check:config`, `check:graph`, `check:undefined_names`, `check:nameplate`, `check:numerals`, `check:recipe`, `check:cache`, `check:telemetry`, `check:watchdog`, `check:freshness`, `check:flagonly`, `check:partiso`, `check:inert`, `check:budget` | **no** | no (parallel) | no (runs locally) |
 | `check:verify_telemetry` | **no** | no (opt-in — NOT in build/release) | no |
 | `gallery` | **no** (Blender + GPU) | no | no (no worker has Blender) |
 | `cache_status` | **no** | no (diagnostic) | no |
 | `build` (default), `build_bare`, `release` | meta | — | no (`release` publishes) |
+
+Root pytest discovery does not enroll tests in build gates. `check:recipe`
+explicitly includes the formerly omitted offline contracts and five maintained
+diagnostic test modules, with runtime-loaded helpers and receipt/data inputs
+tracked as dependencies. The enrollment test checks recursive, repository-relative
+module paths without a pending-triage bypass. `check:verify_telemetry` remains
+opt-in; root launcher/discovery/safety tests and comparison pose conversion keep
+concrete test-runner-only reasons. Enrollment is not proof of oracle quality.
+
+### Known-hazard test isolation
+
+Run the existing runner after edits are complete:
+
+```powershell
+.venv/Scripts/python.exe -m pytest -q
+```
+
+Root `conftest.py` disables cache and inherited farm execution, removes
+credential environment variables, blanks global and signal-specific OTLP
+endpoints, and redirects telemetry before product imports. Local telemetry
+normally writes to `cad/out/reports/telemetry`; `HARMONIC_TELEMETRY_DIR` redirects
+it, with unset or empty retaining the production default.
+
+The existing SolidWorks-specific tripwire refuses launcher/process commands,
+SolidWorks COM activation/attachment and lifecycle entry points. It also
+replaces the watchdog's hard-exit transport before collection and per test;
+explicit callback tests remain independent. Recorded refusals fail the test
+even if the code under test swallowed the exception. Watchdog thread tests use
+fake health probes and exits and join their real threads. Synthetic buildgraph
+sources and telemetry writer children belong to their fixtures.
+
+This is minimal protection against known hazards in trusted repository tests,
+**not an OS boundary or sandbox**. It does not mediate arbitrary filesystem,
+network, native calls or child processes, or protect pytest/plugin startup
+before root conftest loads. `NOSW_GUARD=0` retains the existing deliberate
+operator opt-out for the SolidWorks tripwire. Never prove a dangerous path by
+executing it: replace the actual transport with a harmless recorder first.
 
 - `build` is the **one** fully-safe entry: every part + assembly + every gate.
   (`verify.py` has no `--suite all` anymore — `build` replaced it.) It offers the
@@ -1150,8 +1187,10 @@ scripts that `from _common import log, check` are instrumented unchanged.
   a one-second deadline. Shutdown can make one call per queued batch.
 - **Where it goes.** Console (stderr) by default; full span/log JSON is also
   captured (best-effort, never fatal) under `cad/out/reports/telemetry/`
-  (`traces.jsonl` / `logs.jsonl`, gitignored). Pass `configure(console=False)` to
-  suppress the console channels without touching capture.
+  (`traces.jsonl` / `logs.jsonl`, gitignored). `HARMONIC_TELEMETRY_DIR` overrides
+  that directory before configuration, allowing a caller to retain real JSONL
+  semantics in owned scratch. Pass `configure(console=False)` to suppress the
+  console channels without touching capture.
 - **Debug from the capture, not scrollback.** Each line of those two files is one
   OTel record: `traces.jsonl` spans carry `name`, start/end, `status`, the task
   `attributes` (label, cmd) and a `resource` whose `service.name` is the pipeline

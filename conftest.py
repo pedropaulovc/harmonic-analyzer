@@ -4,9 +4,51 @@ import os
 import subprocess
 import tempfile
 import traceback
-from pathlib import PureWindowsPath
+from pathlib import Path, PureWindowsPath
 
 import pytest
+
+# Set these before any product import: collection can configure exporters and
+# choose cache/farm backends, before an autouse fixture has a chance to run.
+_test_scratch = tempfile.TemporaryDirectory(prefix="harmonic-tests-")
+os.environ["HARMONIC_BUILDGRAPH_CACHE"] = "off"
+os.environ["HARMONIC_REMOTE_CACHE_MODE"] = "off"
+os.environ["HARMONIC_EXECUTOR"] = "local"
+os.environ["HARMONIC_SW_AUTOSTART"] = "0"
+os.environ["SOLIDWORKS_POOL_CONFIG"] = str(
+    Path(_test_scratch.name) / "no-pool-config.json"
+)
+os.environ["HARMONIC_TELEMETRY_DIR"] = str(
+    Path(_test_scratch.name) / "telemetry"
+)
+os.environ["OTEL_RESOURCE_ATTRIBUTES"] = ",".join(
+    entry
+    for entry in os.environ.get("OTEL_RESOURCE_ATTRIBUTES", "").split(",")
+    if entry.partition("=")[0].strip() != "farm.execution"
+)
+for _name in (
+    "HARMONIC_CACHE_SAS",
+    "AZURE_CLIENT_ID",
+    "AZURE_CLIENT_SECRET",
+    "AZURE_TENANT_ID",
+    "AZURE_CLIENT_CERTIFICATE_PATH",
+    "AZURE_CLIENT_CERTIFICATE_PASSWORD",
+    "AZURE_FEDERATED_TOKEN_FILE",
+    "AZURE_STORAGE_CONNECTION_STRING",
+    "AZURE_STORAGE_KEY",
+    "AZURE_STORAGE_SAS_TOKEN",
+    "HARMONIC_FARM_COMMIT",
+    "HARMONIC_FARM_RUN",
+    "HARMONIC_FARM_REQUESTS",
+):
+    os.environ.pop(_name, None)
+for _name in (
+    "OTEL_EXPORTER_OTLP_ENDPOINT",
+    "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+    "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT",
+    "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT",
+):
+    os.environ[_name] = ""
 
 # A test process never starts (or kills) SolidWorks. On amet a start takes the
 # licence farm worker w6 shares; on a worker it takes the seat from the build.
@@ -96,12 +138,12 @@ def _install_launch_guard():
 # ``sw_recovery``'s connector launch only reaches Popen after a registry walk
 # a test can fake. Each is replaced for the whole session, collection included.
 _COM_ACTIVATORS = {
-    "win32com.client": ("Dispatch", "DispatchEx", "GetObject"),
+    "win32com.client": ("Dispatch", "DispatchEx", "GetObject", "GetActiveObject"),
     "win32com.client.dynamic": ("Dispatch", "DumbDispatch"),
     "win32com.client.gencache": ("EnsureDispatch",),
-    "pythoncom": ("CoCreateInstance", "CoCreateInstanceEx"),
+    "pythoncom": ("CoCreateInstance", "CoCreateInstanceEx", "GetActiveObject", "connect"),
     "comtypes": ("CoCreateInstance",),
-    "comtypes.client": ("CreateObject", "CoGetObject"),
+    "comtypes.client": ("CreateObject", "CoGetObject", "GetActiveObject"),
 }
 _LAUNCH_ENTRY_POINTS = {
     "solidworks_mcp.adapters.sw_recovery": (
@@ -180,16 +222,28 @@ def _install_activation_guard():
             setattr(module, attribute, _refuse_launch(module_name, attribute))
 
 
+def _refuse_watchdog_exit(code):
+    _refuse("_watchdog._hard_exit", code)
+
+
+def _install_watchdog_guard():
+    import sys
+
+    scripts = str(Path(__file__).parent / "cad" / "scripts")
+    sys.path.insert(0, scripts)
+    try:
+        import _watchdog
+    finally:
+        sys.path.remove(scripts)
+    _watchdog._hard_exit = _refuse_watchdog_exit
+
+
 def pytest_configure(config):
     """Isolate the test session from the machine it runs on.
 
-    Point the machine-wide build-graph syntax-facts store at a throwaway
-    directory. ``_buildgraph`` persists parse results in ``%LOCALAPPDATA%`` so
-    real graph loads skip re-parsing unchanged sources. A test may patch
-    analyzer internals; were its results saved to the real store they would be
-    served, under a genuine content key, to every later build on this machine.
-    Tests therefore never read or write the real store. An explicit setting
-    (``off`` or a path) is respected.
+    Disable remote cache and farm execution and redirect telemetry before
+    product imports. Syntax facts are disabled so patched analyzers cannot
+    contaminate the machine-wide build-graph store.
 
     Refuse every SolidWorks start from this process: ``subprocess`` argv naming
     ``os.startfile``, a ``.lnk`` or a SolidWorks/3DEXPERIENCE launcher image
@@ -198,13 +252,10 @@ def pytest_configure(config):
     SolidworksMCP start/stop/launch entry points. A refusal raises with the
     caller's stack and fails the test even if the code under test swallowed it.
     """
-    if "HARMONIC_BUILDGRAPH_CACHE" not in os.environ:
-        os.environ["HARMONIC_BUILDGRAPH_CACHE"] = tempfile.mkdtemp(
-            prefix="buildgraph-facts-"
-        )
     if not _guard_disabled():
         _install_launch_guard()
         _install_activation_guard()
+    _install_watchdog_guard()
 
 
 @pytest.fixture
@@ -236,3 +287,11 @@ def _solidworks_autostart_off(monkeypatch):
     logic sets the variable itself and patches the lifecycle calls it reaches.
     """
     monkeypatch.setenv("HARMONIC_SW_AUTOSTART", "0")
+
+
+@pytest.fixture(autouse=True)
+def _watchdog_exit_off(monkeypatch):
+    """Reapply the exit tripwire after a preceding test reloaded the module."""
+    import _watchdog
+
+    monkeypatch.setattr(_watchdog, "_hard_exit", _refuse_watchdog_exit)
