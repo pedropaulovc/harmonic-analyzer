@@ -454,7 +454,8 @@ def report(findings: list[Finding]) -> dict[str, object]:
             "instances": sum(j.instances() for j in rows),
             "findings": sum(1 for f in findings if f.assembly == assembly),
         }
-    joint_ids = {j.id for j in JOINTS}
+    # A deleted row is still a joint: its OMITTED finding names a registered id.
+    joint_ids = {j.id for j in JOINTS} | set(REQUIRED_JOINTS)
     return {
         "enforcement": str(ENFORCEMENT),
         "rows": len(JOINTS),

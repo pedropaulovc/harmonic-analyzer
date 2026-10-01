@@ -358,7 +358,9 @@ def test_every_registered_joint_cites_a_live_source_occurrence() -> None:
     assert stale == []
 
 
-def test_deleting_a_row_whose_parts_other_rows_name_is_omitted() -> None:
+def test_deleting_a_row_whose_parts_other_rows_name_is_omitted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     # The latch-hook screw shares bracket_screw and support_bar with the
     # bracket-screw row, so only the registry notices it is gone.
     gone = "paper-drive/latch-hook-screw-in-bar"
@@ -373,6 +375,8 @@ def test_deleting_a_row_whose_parts_other_rows_name_is_omitted() -> None:
         required=jr.REQUIRED_JOINTS,
     )
     assert {f.subject for f in findings if f.kind is Kind.OMITTED} == {gone}
+    monkeypatch.setattr(jr, "JOINTS", table)
+    assert gone in jr.report(findings)["failing_joints"]
 
 
 # Joints whose hardware the drawings call for but no builder places. A row
