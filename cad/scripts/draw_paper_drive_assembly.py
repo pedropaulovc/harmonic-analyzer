@@ -101,14 +101,18 @@ SHEET_LAYOUTS = {name: DrawingLayout.LANDSCAPE for name in SHEET_NAMES}
 # Farm run 20261001T142942518Z placed the isometric at 1:3 and read its
 # outline 187.7 mm tall (ring 221.7 > the 198.0 room); its width passed. The
 # outline is the model's projected box, about 1.4x the ink the 1:5 render
-# showed. At 1:4 it is 140.8 tall, its ring 174.8 inside the room. The front
-# and right views (1:5 ink 94 x 59 and 14 x 58 mm) grow to 118 x 74 and
-# 18 x 73 above the free lower-left field, the isometric right of them over
-# the title block.
+# showed, and SolidWorks pads it by a fixed sheet-space margin, so a rescale
+# is read back, never predicted (step_down_to_fit). At 1:4 the content alone
+# is 140.8 tall, its ring 174.8 inside the room. The front and right views
+# (1:5 ink 94 x 59 and 14 x 58 mm) grow to 118 x 74 and 18 x 73 above the
+# free lower-left field, the isometric right of them over the title block.
 ASSEMBLED_SCALE = (1.0, 4.0)
 FRONT_CENTER = (0.095, 0.190)
 RIGHT_CENTER = (0.205, 0.190)
 ISO_CENTER = (0.330, 0.170)
+# The isometric steps down to 1:5 if its native ring overflows at 1:4. It is
+# the full-detail view, which references Default at every scale.
+ISO_SCALE_LADDER = (ASSEMBLED_SCALE, (1.0, 5.0))
 # The isometric's balloon ring: left of it the right view, below it the
 # title block (top 0.066), the sheet's drawing border round the rest.
 ISO_RING_LIMITS = (0.235, 0.069, 0.418, 0.267)
@@ -168,7 +172,7 @@ INNER_CAPTION_GAP = 0.002
 # The builder's PAPER_DRIVE_EXPLODED shows only these families here. No run
 # has read its outline yet, and sheet 1's showed the outline (the projected
 # box) well past the ink, so the view takes the largest ladder scale whose
-# ring fits right of the steps and over the title block (ladder_scale). Every
+# ring fits right of the steps and over the title block (step_down_to_fit). Every
 # ladder scale is 1:2 or smaller, so a rescale keeps the simplified
 # configuration the explode is shown in.
 EXPLODED_SCALE_LADDER = ((1.0, 3.0), (1.0, 4.0), (1.0, 5.0))
@@ -510,40 +514,46 @@ def ring_fit_shift(outline: Box, limits: Box, *, name: str) -> tuple[float, floa
     )
 
 
-def ladder_scale(
-    outline: Box,
-    placed: tuple[float, float],
+def step_down_to_fit(
+    outline_at: Callable[[tuple[float, float]], Box],
     ladder: tuple[tuple[float, float], ...],
     limits: Box,
     *,
     name: str,
-) -> tuple[float, float]:
-    """The largest ``ladder`` scale at which the view's ring fits ``limits``.
+) -> tuple[tuple[float, float], Box]:
+    """The first ``ladder`` scale, largest first, whose ring fits ``limits``.
 
-    ``outline`` is read at ``placed``; a rescale grows it about its centre.
-    Raises naming each scale's overflow when none fits.
+    ``outline_at`` applies a scale to the placed view and returns the outline
+    SolidWorks reads back. The outline carries a fixed sheet-space padding, so
+    no scale's outline is predicted from another's: each candidate is applied
+    and re-read. Returns the scale and its outline; raises naming every
+    scale's overflow when the smallest still overflows.
     """
     findings = []
-    centre = ((outline[0] + outline[2]) / 2.0, (outline[1] + outline[3]) / 2.0)
     for scale in ladder:
-        factor = (scale[0] / scale[1]) / (placed[0] / placed[1])
-        half = (
-            (outline[2] - outline[0]) * factor / 2.0,
-            (outline[3] - outline[1]) * factor / 2.0,
-        )
-        scaled = (
-            centre[0] - half[0],
-            centre[1] - half[1],
-            centre[0] + half[0],
-            centre[1] + half[1],
-        )
+        outline = outline_at(scale)
         try:
-            ring_fit_shift(scaled, limits, name=f"{name} at {_scale_text(scale)}")
+            ring_fit_shift(outline, limits, name=f"{name} at {_scale_text(scale)}")
         except ValueError as error:
             findings.append(str(error))
             continue
-        return scale
+        return scale, outline
     raise ValueError(f"no {name} scale fits: {' | '.join(findings)}")
+
+
+def _native_outline_at(
+    adapter: Any, view: Any, placed: tuple[float, float], *, label: str
+) -> Callable[[tuple[float, float]], Box]:
+    """``outline_at`` for step_down_to_fit on a placed drawing view."""
+    current = [placed]
+
+    def outline_at(scale: tuple[float, float]) -> Box:
+        if scale != current[0]:
+            _set_view_scale(adapter, view, scale, label=label)
+            current[0] = scale
+        return _view_outline(view)
+
+    return outline_at
 
 
 def inner_view_shift(iso_outline: Box, inner_outline: Box) -> tuple[float, float]:
@@ -905,17 +915,21 @@ EXPLODED_CAPTION_XY = (
     PLATEN_NOTE_XY[0],
     PLATEN_NOTE_XY[1] - (len(PLATEN_STEPS.splitlines()) + 1) * 0.0045,
 )
-# Sheet 1: which removable is which, and where every other item balloons.
-ASSEMBLED_CAPTION = "\n".join(
-    textwrap.wrap(
-        f"ISOMETRIC: THE {_N['transgear-removable']} ON THE BASE DECK IS THE T18 "
-        "SPARE, STORED LOOSE; THE T24 IS ON THE KNOB, THE T12 ON THE CRANK. "
-        "PLATEN AND SUPPORT ITEMS: SHEET "
-        f"{SHEET_NAMES.index('PLATEN AND SUPPORT') + 1}; TRANSGEAR ITEMS: SHEET "
-        f"{SHEET_NAMES.index('BILL OF MATERIALS') + 1}.",
-        width=FITUP_LINE_WIDTH,
+# Sheet 1, at each scale its isometric may take: which removable is which,
+# and where every other item balloons.
+ASSEMBLED_CAPTIONS = {
+    scale: "\n".join(
+        textwrap.wrap(
+            f"ISOMETRIC {_scale_text(scale)}: THE {_N['transgear-removable']} ON "
+            "THE BASE DECK IS THE T18 SPARE, STORED LOOSE; THE T24 IS ON THE "
+            "KNOB, THE T12 ON THE CRANK. PLATEN AND SUPPORT ITEMS: SHEET "
+            f"{SHEET_NAMES.index('PLATEN AND SUPPORT') + 1}; TRANSGEAR ITEMS: SHEET "
+            f"{SHEET_NAMES.index('BILL OF MATERIALS') + 1}.",
+            width=FITUP_LINE_WIDTH,
+        )
     )
-)
+    for scale in ISO_SCALE_LADDER
+}
 TRANSGEAR_CAPTION = (
     f"TRANSGEAR {TRANSGEAR_VIEW_SCALE[0]:g}:{TRANSGEAR_VIEW_SCALE[1]:g}; "
     f"ASSEMBLY AND FIT-UP: SHEET {SHEET_NAMES.index('ASSEMBLY AND FIT-UP') + 1}"
@@ -934,7 +948,7 @@ SHEET_TEXTS = (
     PLATEN_STEPS,
     *FITUP_NOTES,
     *EXPLODED_CAPTIONS.values(),
-    ASSEMBLED_CAPTION,
+    *ASSEMBLED_CAPTIONS.values(),
     TRANSGEAR_CAPTION,
     *INNER_CAPTIONS.values(),
     FITUP_REFERENCE_CAPTION,
@@ -1152,15 +1166,19 @@ def _place_assembled_sheet(adapter: Any) -> Any:
         apply_view_configuration(
             adapter, view, role=role, label=f"paper drive {view_name}"
         )
-    label = "paper drive *Isometric"
-    shift = ring_fit_shift(
-        _view_outline(view), ISO_RING_LIMITS, name="sheet 1 isometric"
+    label = "sheet 1 isometric"
+    scale, outline = step_down_to_fit(
+        _native_outline_at(adapter, view, ASSEMBLED_SCALE, label=label),
+        ISO_SCALE_LADDER,
+        ISO_RING_LIMITS,
+        name=label,
     )
+    shift = ring_fit_shift(outline, ISO_RING_LIMITS, name=label)
     _shift_view(adapter, view, shift, label=f"{label} ring fit")
     _place_sheet_note(
         adapter,
         SHEET_NAMES[0],
-        ASSEMBLED_CAPTION,
+        ASSEMBLED_CAPTIONS[scale],
         ASSEMBLED_CAPTION_XY,
         label="assembled-views caption",
     )
@@ -1346,17 +1364,13 @@ def _place_exploded_sheet(adapter: Any, table: Any, items: dict[str, str]) -> li
     isolate_drawing_view_components(
         adapter, view, visible_stems=explode.SHOWN_STEMS, label=label
     )
-    scale = ladder_scale(
-        _view_outline(view),
-        EXPLODED_SCALE,
+    scale, outline = step_down_to_fit(
+        _native_outline_at(adapter, view, EXPLODED_SCALE, label=label),
         EXPLODED_SCALE_LADDER,
         EXPLODED_RING_LIMITS,
         name=label,
     )
-    if scale != EXPLODED_SCALE:
-        _set_view_scale(adapter, view, scale, label=label)
-    # The ladder predicted the fit; the re-read outline is the proof.
-    shift = ring_fit_shift(_view_outline(view), EXPLODED_RING_LIMITS, name=label)
+    shift = ring_fit_shift(outline, EXPLODED_RING_LIMITS, name=label)
     _shift_view(adapter, view, shift, label=f"{label} ring fit")
     _link_view_to_bom(view, table, label=label)
     landings = add_component_bom_balloons(

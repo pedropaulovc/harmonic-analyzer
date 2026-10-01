@@ -608,7 +608,8 @@ def test_every_bom_item_is_ballooned_on_some_sheet() -> None:
     assert repeated == {"transgear-removable"}
     spare = drawing.ASSEMBLED_BALLOON_ANCHORS["transgear-removable"].instance
     assert spare == "transgear-removable-3"
-    assert "T18 SPARE, STORED LOOSE" in " ".join(drawing.ASSEMBLED_CAPTION.split())
+    for caption in drawing.ASSEMBLED_CAPTIONS.values():
+        assert "T18 SPARE, STORED LOOSE" in " ".join(caption.split())
 
 
 def test_the_exploded_sheet_balloons_exactly_the_platen_group() -> None:
@@ -743,55 +744,67 @@ def test_a_balloon_ring_is_centred_in_its_room_or_refused() -> None:
 ISO_OUTLINE_AT_1_3 = (0.250, 0.075, 0.250 + 0.149, 0.075 + 0.1877)
 
 
-def _rescaled(outline, ratio):
-    cx, cy = (outline[0] + outline[2]) / 2.0, (outline[1] + outline[3]) / 2.0
-    hw, hh = (
-        (outline[2] - outline[0]) * ratio / 2.0,
-        (outline[3] - outline[1]) * ratio / 2.0,
-    )
-    return (cx - hw, cy - hh, cx + hw, cy + hh)
+class _PaddedView:
+    """A view whose read-back outline is its content, which scales, plus a
+    fixed sheet-space padding, which does not (SolidWorks' outline)."""
+
+    def __init__(self, size_m, at_scale, padding_m):
+        self.content = tuple(
+            (side - padding_m) / (at_scale[0] / at_scale[1]) for side in size_m
+        )
+        self.padding = padding_m
+        self.applied = []
+
+    def outline_at(self, scale):
+        self.applied.append(scale)
+        ratio = scale[0] / scale[1]
+        width, height = (side * ratio + self.padding for side in self.content)
+        return (0.2, 0.1, 0.2 + width, 0.1 + height)
 
 
 def test_the_sheet_one_isometric_ring_fits_at_the_sheet_scale() -> None:
     """The 1:3 isometric's ring overflowed natively (221.7 > 198.0 mm); at the
-    sheet's scale the same outline's ring fits its room."""
+    sheet's scale the same view's ring fits, whatever its fixed padding."""
     with pytest.raises(ValueError, match=r"height 221\.7 mm > room 198\.0 mm"):
         drawing.ring_fit_shift(
             ISO_OUTLINE_AT_1_3, drawing.ISO_RING_LIMITS, name="sheet 1 isometric"
         )
-    numerator, denominator = drawing.ASSEMBLED_SCALE
-    outline = _rescaled(ISO_OUTLINE_AT_1_3, 3.0 * numerator / denominator)
-    dx, dy = drawing.ring_fit_shift(outline, drawing.ISO_RING_LIMITS, name="t")
-    ring = drawing._grown(
-        (outline[0] + dx, outline[1] + dy, outline[2] + dx, outline[3] + dy),
-        drawing.BALLOON_RING_REACH,
+    size = (
+        ISO_OUTLINE_AT_1_3[2] - ISO_OUTLINE_AT_1_3[0],
+        ISO_OUTLINE_AT_1_3[3] - ISO_OUTLINE_AT_1_3[1],
     )
-    left, bottom, right, top = drawing.ISO_RING_LIMITS
-    assert left <= ring[0] and ring[2] <= right
-    assert bottom <= ring[1] and ring[3] <= top
+    assert drawing.ISO_SCALE_LADDER[0] == drawing.ASSEMBLED_SCALE
+    for padding in (0.0, 0.0127, 0.0254):
+        view = _PaddedView(size, (1.0, 3.0), padding)
+        scale, _outline = drawing.step_down_to_fit(
+            view.outline_at, drawing.ISO_SCALE_LADDER, drawing.ISO_RING_LIMITS, name="t"
+        )
+        assert scale == drawing.ASSEMBLED_SCALE, padding
+    # Every scale the isometric may take has its caption.
+    assert set(drawing.ASSEMBLED_CAPTIONS) == set(drawing.ISO_SCALE_LADDER)
 
 
-def test_the_exploded_view_steps_down_its_ladder_to_the_first_fit() -> None:
-    placed = drawing.EXPLODED_SCALE
+def test_the_exploded_view_steps_down_on_its_native_outline() -> None:
+    """Codex P2 (aa9d3b681): a 211.9 mm wide outline at 1:3 with 12.7 mm of
+    fixed padding, scaled whole, predicts a 192.9 mm ring at 1:4 in the 193.0
+    room; natively it is 196.1, so the view must go on to 1:5 (166.2)."""
+    ladder = drawing.EXPLODED_SCALE_LADDER
     limits = drawing.EXPLODED_RING_LIMITS
-    fits = (0.25, 0.1, 0.25 + 0.120, 0.1 + 0.120)
+    assert limits[2] - limits[0] == pytest.approx(0.193)
+    view = _PaddedView((0.2119, 0.100), (1.0, 3.0), 0.0127)
+    scale, outline = drawing.step_down_to_fit(view.outline_at, ladder, limits, name="t")
+    assert scale == (1.0, 5.0)
+    assert view.applied == list(ladder)
+    assert outline == view.outline_at(scale)
+    # A view that fits as placed is not rescaled.
+    view = _PaddedView((0.120, 0.120), (1.0, 3.0), 0.0127)
     assert (
-        drawing.ladder_scale(
-            fits, placed, drawing.EXPLODED_SCALE_LADDER, limits, name="t"
-        )
-        == placed
+        drawing.step_down_to_fit(view.outline_at, ladder, limits, name="t")[0]
+        == (ladder[0])
     )
-    # Sheet 1's measured isometric, were the exploded view as tall.
-    assert drawing.ladder_scale(
-        ISO_OUTLINE_AT_1_3, placed, drawing.EXPLODED_SCALE_LADDER, limits, name="t"
-    ) == (1.0, 4.0)
-    with pytest.raises(ValueError, match="no t scale fits"):
-        drawing.ladder_scale(
-            (0.0, 0.0, 0.5, 0.5),
-            placed,
-            drawing.EXPLODED_SCALE_LADDER,
-            limits,
-            name="t",
-        )
-    # Every scale the view may take has its caption.
-    assert set(drawing.EXPLODED_CAPTIONS) == set(drawing.EXPLODED_SCALE_LADDER)
+    assert view.applied == [ladder[0]]
+    # Only when 1:5 still overflows does it refuse, naming every scale.
+    view = _PaddedView((0.5, 0.5), (1.0, 3.0), 0.0127)
+    with pytest.raises(ValueError, match=r"no t scale fits: .*1:3.*1:4.*1:5"):
+        drawing.step_down_to_fit(view.outline_at, ladder, limits, name="t")
+    assert set(drawing.EXPLODED_CAPTIONS) == set(ladder)

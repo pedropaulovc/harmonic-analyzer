@@ -388,6 +388,15 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Transgear Thumbnut Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        # SolidWorks pins its own "1/4-20 Tapped Hole" note to the face view
+        # once the tap carries a hole callout; the callout already states the
+        # thread.  Its leader drops onto the countersink right beside the
+        # tap drill, so the callout's radial leader crossed it (run
+        # 20261001T151531763Z), and it cannot route clear while the callout's
+        # text stays inside the left border.  finalize removes it before its
+        # layout audit.
+        redundant_note_substrings=("Tapped Hole",),
+        expected_redundant_notes=1,
     )
 
 

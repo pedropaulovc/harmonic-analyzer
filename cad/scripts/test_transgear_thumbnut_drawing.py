@@ -17,6 +17,7 @@ import draw_transgear_thumbnut as drawing
 import transgear_removable_spec
 import transgear_thumbnut_spec as spec
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
+from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
 from _drawing_registry import DRAWINGS_BY_NAME
 
 # The B landscape template's inner border, left edge (sheet metres).
@@ -214,6 +215,52 @@ def test_the_part_carries_every_property_its_drawing_requires(monkeypatch) -> No
     _drawing_marks.apply_drawing_properties(None, part.PART_NAME)
     carried.update(stamped)
     assert [name for name in required if not str(carried.get(name) or "").strip()] == []
+
+
+# Face view, run 20261001T151531763Z, as its layout audit measured them: the
+# thread callout's leader, from its arrow on the tap drill to its knee, and
+# the shoulder of SolidWorks' own "1/4-20 Tapped Hole" note.  The note's drop
+# to its arrow on the countersink is the 19e33c6c2 audit's (the same note,
+# DetailItem348; the run's audit reported only the shoulder it crossed).
+_THREAD_CALLOUT_LEADER = LeaderSegment(
+    "hole-callout RD1", "note", 0.0873, 0.1723, 0.1014, 0.2166
+)
+_TAPPED_HOLE_NOTE_LEADER = (
+    LeaderSegment("note DetailItem348", "note", 0.0977, 0.1866, 0.0913, 0.1866),
+    LeaderSegment("note DetailItem348", "note", 0.0908, 0.1863, 0.0850, 0.1745),
+)
+
+
+def test_the_tapped_hole_note_whose_leader_the_callout_crossed_is_removed() -> None:
+    """Run 20261001T151531763Z failed its layout audit on leader-crosses-leader
+    at (91.9, 186.6) mm: the callout's leader through the auto-inserted note's
+    shoulder.  The note restates the callout's thread, so finalize deletes it
+    before the audit, as every sibling tapped-hole sheet does."""
+    [crossing] = find_leader_leader_crossings(
+        [_THREAD_CALLOUT_LEADER, *_TAPPED_HOLE_NOTE_LEADER]
+    )
+    assert {crossing.a.label, crossing.b.label} == {
+        "hole-callout RD1",
+        "note DetailItem348",
+    }
+    assert (crossing.x, crossing.y) == pytest.approx((0.0919, 0.1866), abs=1e-4)
+    finalize = _calls(drawing.__file__)["finalize_drawing"]
+    removal = {
+        k.arg: ast.literal_eval(k.value)
+        for k in finalize.keywords
+        if k.arg in ("redundant_note_substrings", "expected_redundant_notes")
+    }
+    assert removal == {
+        "redundant_note_substrings": ("Tapped Hole",),
+        "expected_redundant_notes": 1,
+    }
+    # The removal reaches the note, and the callout itself is no note to lose.
+    note_text = "1/4-20 Tapped Hole".lower()
+    assert all(s.lower() in note_text for s in removal["redundant_note_substrings"])
+    callout_text = f"1/4-20 UNC - 2B THRU ALL\n{spec.CSK_QUALIFIER}".lower()
+    assert not any(
+        s.lower() in callout_text for s in removal["redundant_note_substrings"]
+    )
 
 
 def test_the_knurl_is_the_designated_din_82_raa_1_0() -> None:
