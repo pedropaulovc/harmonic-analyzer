@@ -27,6 +27,7 @@ from transgear_knob_retaining_screw_spec import (
     HEAD_H,
     SHANK_DIA,
     SHANK_LEN,
+    SHANK_LEN_BAND,
 )
 
 OD = 19.0
@@ -78,13 +79,13 @@ for _name, _wall in (
 
 # --- The screw's side of its engagement (contract §7) -------------------------
 # The shank reaches past the cup's front face -- into the shaft's tap -- by
-# its length under the head less the floor.  Worst case: the thickest floor
-# the sheet accepts, less the incomplete first thread.  The shaft's side (its
-# tap entry countersink, its full-thread depth) is MHA-078's and is added by
-# the assembly.
+# its length under the head less the floor.  Worst case: the shortest screw
+# its B18.6.3 band allows in the thickest floor the sheet accepts, less the
+# incomplete first thread.  The shaft's side (its tap entry countersink, its
+# full-thread depth) is MHA-078's and is added by the assembly.
 REACH = SHANK_LEN - FLOOR
-REACH_MIN = SHANK_LEN - (FLOOR + _FLOOR_HI)
-REACH_MAX = SHANK_LEN - FLOOR_WORST
+REACH_MIN = SHANK_LEN - SHANK_LEN_BAND[1] - (FLOOR + _FLOOR_HI)
+REACH_MAX = SHANK_LEN + SHANK_LEN_BAND[0] - FLOOR_WORST
 ENGAGEMENT_OWN_WORST = REACH_MIN - FIRST_THREAD_LOSS
 if ENGAGEMENT_OWN_WORST < ENGAGEMENT_FLOOR_D * SHANK_DIA - 1e-9:
     raise AssertionError(

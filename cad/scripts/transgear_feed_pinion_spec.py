@@ -101,10 +101,12 @@ SLEEVE_LENGTH_TOL = STATION_TOL
 # The spigot is the disc's slip fit: turned to the SHAFT_H band under the
 # disc's REAM_SLIDE bore (rack_pinion_spec owns the pair, so the disc sheet's
 # fit note and this model band are one constant).  The shank is the hub's
-# press seat (its bore Ø8.200 .XXX) at the title block's .XXX row.
+# press seat, turned to the band transgear_disc_hub_spec sets over the hub's
+# reamed bore (that module owns the pair and its interference, R9-45).
 SPIGOT_DIA = rack_pinion_spec.SPIGOT_DIA
 SPIGOT_DIA_BAND = rack_pinion_spec.SPIGOT_DIA_BAND  # (upper, lower) deviations
-SHANK_DIA = 8.2
+SHANK_DIA = transgear_disc_hub_spec.SHANK_DIA
+SHANK_DIA_BAND = transgear_disc_hub_spec.SHANK_DIA_BAND  # (upper, lower) deviations
 DIA_PLACES = 3
 if rack_pinion_spec.SLEEVE_NUMBER != SLEEVE_NUMBER:
     raise AssertionError("the disc's fit note names another part than this sleeve")
@@ -189,9 +191,9 @@ _BORE_MAX = BORE_DIA + BORE_DIA_BAND[0]  # 3.930
 # Under the root: (8.0433 − 3.900)/2 = 2.072 nominal; (8.04 MIN − 3.930)/2 = 2.055.
 ROOT_WALL = (ROOT_DIA - BORE_DIA) / 2.0
 ROOT_WALL_WORST = (ROOT_DIA_MIN - _BORE_MAX) / 2.0
-# Shank: (8.2 − 3.9)/2 = 2.15; (8.07 − 3.93)/2 = 2.07.
+# Shank: (8.2 − 3.9)/2 = 2.15; (8.225 − 3.93)/2 = 2.147 (its band lies above it).
 SHANK_WALL = (SHANK_DIA - BORE_DIA) / 2.0
-SHANK_WALL_WORST = (SHANK_DIA - _BAND[DIA_PLACES] - _BORE_MAX) / 2.0
+SHANK_WALL_WORST = (SHANK_DIA + SHANK_DIA_BAND[1] - _BORE_MAX) / 2.0
 # Spigot: (10 − 3.9)/2 = 3.05; (9.98 − 3.93)/2 = 3.025.
 SPIGOT_WALL = (SPIGOT_DIA - BORE_DIA) / 2.0
 SPIGOT_WALL_WORST = (SPIGOT_DIA + SPIGOT_DIA_BAND[1] - _BORE_MAX) / 2.0
@@ -315,6 +317,7 @@ for _feature, _dimensions in DRAWING_PRECISION.items():
 STATION_DEVIATIONS = (-STATION_TOL, STATION_TOL)
 BORE_DEVIATIONS = deviations(BORE_DIA_BAND)
 SPIGOT_DIA_DEVIATIONS = deviations(SPIGOT_DIA_BAND)
+SHANK_DIA_DEVIATIONS = deviations(SHANK_DIA_BAND)
 OUTSIDE_DIA_DEVIATIONS = deviations(OUTSIDE_DIA_BAND)
 # swTolMIN records the floor as its lower deviation from the model nominal.
 ROOT_DIA_DEVIATIONS = (ROOT_DIA_MIN - ROOT_DIA, 0.0)

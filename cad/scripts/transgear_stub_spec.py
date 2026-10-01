@@ -52,8 +52,13 @@ REAR_DOME_SAG = 1.0
 REAR_DOME_R = ((REAR_THREAD_MAJOR / 2.0) ** 2 + REAR_DOME_SAG**2) / (
     2.0 * REAR_DOME_SAG
 )
+# The screw-cutting run-out at 32 tpi (R9-5): both threads run out into a
+# relief at least this long.
+SCREW_CUT_RUNOUT = 1.0
 FACE_RELIEF_DIA = 5.40
-FACE_RELIEF_DEPTH = 1.00
+# 1.60 at .XX: its 1.09 minimum still holds the 1.0 run-out behind the seat
+# face (at 1.00 the 0.49 minimum left 0.51 of run-out in the arm's tap).
+FACE_RELIEF_DEPTH = 1.60
 
 # --- Collar, thrust step, journal ---------------------------------------------
 COLLAR_DIA = 12.0
@@ -190,18 +195,23 @@ ARM_THICKNESS_MIN = round(ARM.THICKNESS - ARM.THICKNESS_BAND, 6)
 ARM_CSK_LOSS_NOMINAL = (STUD_TAP_CSK_DIA - REAR_THREAD_MAJOR) / 2.0
 ARM_CSK_LOSS_MAX = (STUD_TAP_CSK_DIA + drilled_oversize_mm() - REAR_THREAD_MAJOR) / 2.0
 REAR_THREAD_LENGTH_MIN = round(REAR_THREAD_LENGTH - _band("RearThreadLength"), 6)
-# The face relief lets full thread reach the collar face, so the engaged
-# length runs from the front csk to the nearer of the dome base and the rear
-# csk: nominal min(8.0, 7.9375 - 0.087) - 0.087 = 7.764 = 1.61D;
-# worst min(7.49, 7.9121 - 0.137) - 0.137 = 7.353 = 1.52D.
+FACE_RELIEF_DEPTH_MIN = round(FACE_RELIEF_DEPTH - _band("FaceReliefDepth"), 6)
+# Full thread starts SCREW_CUT_RUNOUT past the relief floor; whatever of the
+# run-out the shallowest relief does not hold stands in the arm's tap.
+REAR_RUNOUT_IN_ARM_NOMINAL = max(0.0, SCREW_CUT_RUNOUT - FACE_RELIEF_DEPTH)
+REAR_RUNOUT_IN_ARM_MAX = max(0.0, SCREW_CUT_RUNOUT - FACE_RELIEF_DEPTH_MIN)
+# The engaged length runs from the farther of the front csk and the run-out's
+# end to the nearer of the dome base and the rear csk: nominal
+# min(8.0, 7.9375 - 0.087) - max(0.087, 0) = 7.764 = 1.61D; worst
+# min(7.49, 7.9121 - 0.137) - max(0.137, 1.0 - 1.09) = 7.353 = 1.52D.
 REAR_ENGAGEMENT_NOMINAL = round(
     min(REAR_THREAD_LENGTH, ARM.THICKNESS - ARM_CSK_LOSS_NOMINAL)
-    - ARM_CSK_LOSS_NOMINAL,
+    - max(ARM_CSK_LOSS_NOMINAL, REAR_RUNOUT_IN_ARM_NOMINAL),
     6,
 )
 REAR_ENGAGEMENT_WORST = round(
     min(REAR_THREAD_LENGTH_MIN, ARM_THICKNESS_MIN - ARM_CSK_LOSS_MAX)
-    - ARM_CSK_LOSS_MAX,
+    - max(ARM_CSK_LOSS_MAX, REAR_RUNOUT_IN_ARM_MAX),
     6,
 )
 REAR_ENGAGEMENT_NOMINAL_D = REAR_ENGAGEMENT_NOMINAL / REAR_THREAD_MAJOR
@@ -250,8 +260,13 @@ for _ok, _what in (
     ),
     (RELIEF_DIA == RELIEF_DIA_MAX, "swTolMAX prints the nominal: it must be the max"),
     (
-        RELIEF_WIDTH_MIN >= 1.0 and RELIEF_WIDTH_MAX <= 1.2,
+        RELIEF_WIDTH_MIN >= SCREW_CUT_RUNOUT and RELIEF_WIDTH_MAX <= 1.2,
         "relief width leaves R9-5's 1.0-1.2 window",
+    ),
+    (
+        FACE_RELIEF_DEPTH_MIN >= SCREW_CUT_RUNOUT,
+        f"face relief depth {FACE_RELIEF_DEPTH_MIN:.2f} minimum does not hold the "
+        f"{SCREW_CUT_RUNOUT} run-out: incomplete thread stands proud of the seat",
     ),
     (
         COLLAR_WALL_WORST >= 2.0,

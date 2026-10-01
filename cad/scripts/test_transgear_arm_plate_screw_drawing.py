@@ -15,12 +15,14 @@ import _config
 import _telemetry
 import build_transgear_arm_plate_screw as part
 import draw_transgear_arm_plate_screw as drawing
+import transgear_arm_geometry as arm
 import transgear_arm_plate_geometry as plate
 import transgear_arm_plate_screw_spec as screw
+import transgear_hanger_joints as joints
 from _drawing_registry import DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS
 from _stock_fastener import STOCK_RECIPES
-from diagnostics import diag_build_91790A194 as entry
+from diagnostics import diag_build_91790A196 as entry
 from diagnostics import diag_mcmaster_lib
 from diagnostics import diag_mcmaster_oval as recipe
 
@@ -28,25 +30,40 @@ IN = 25.4
 
 
 def test_spec_is_the_catalogue_screw() -> None:
-    """91790A194 per mcmaster.com (2026-09-30): 8-32 x 1/2 from the top of
-    the bevel, 82 deg oval head Ø0.312 x 0.152 total, crown 0.052."""
-    assert screw.SKU == "91790A194"
+    """91790A196 ([INFERENCE] SKU; the series per mcmaster.com, 2026-09-30):
+    8-32 x 5/8 from the top of the bevel, 82 deg oval head Ø0.312 x 0.152
+    total, crown 0.052, the B18.6.3 length band +0/-0.03 in."""
+    assert screw.SKU == "91790A196"
     assert screw.THREAD == "#8-32"
     assert screw.THREAD_MAJOR == pytest.approx(0.164 * IN)
     assert screw.PITCH == pytest.approx(IN / 32.0)
-    assert screw.LENGTH == pytest.approx(0.5 * IN)
+    assert screw.STOCK_LENGTH == pytest.approx(0.625 * IN)
+    assert screw.STOCK_LENGTH_BAND == pytest.approx((0.0, 0.03 * IN))
     assert screw.HEAD_DIA == pytest.approx(0.312 * IN)
     assert screw.HEAD_H == pytest.approx(0.152 * IN)
     assert screw.CROWN_H == pytest.approx(0.052 * IN)
     assert screw.HEAD_ANGLE_DEG == 82.0
+    # The shared recipe's row is the supplied screw, not the cut one.
     assert recipe.OVAL_SIZES[screw.SKU] == (
         screw.THREAD_MAJOR,
-        screw.LENGTH,
+        screw.STOCK_LENGTH,
         screw.HEAD_DIA,
         screw.CROWN_H,
         screw.HEAD_ANGLE_DEG,
         screw.PITCH,
     )
+
+
+def test_the_cut_is_flush_with_the_arm_front_face() -> None:
+    """Bevel top flush with the plate's rear face, so the tip is flush with
+    the arm's front face after the plate's over-arm section and the arm."""
+    assert screw.CUT_LENGTH == pytest.approx(plate.THICKNESS_OVER_ARM + arm.THICKNESS)
+    assert screw.LENGTH == screw.CUT_LENGTH
+    assert screw.CUT_END_BREAK_MAX == pytest.approx(0.1)
+    # Even the shortest in-band screw is cut on full thread, below its
+    # factory tip.
+    shortest = screw.STOCK_LENGTH - screw.STOCK_LENGTH_BAND[1]
+    assert shortest - recipe.TIP_CHAMFER_PER_PITCH * screw.PITCH > screw.CUT_LENGTH
 
 
 class _Recorder:
@@ -103,7 +120,9 @@ def _junction_y() -> float:
     return -(screw.HEAD_DIA - screw.THREAD_MAJOR) / 2.0 / math.tan(half)
 
 
-def _record(monkeypatch) -> list[tuple]:
+def _record(monkeypatch, *, supplied: bool = False) -> list[tuple]:
+    """Record the part's build (the installed, cut screw) or, ``supplied``,
+    the recipe's own catalog build of the screw as bought."""
     adapter = _Recorder()
 
     def logger(name, result=None):
@@ -148,7 +167,21 @@ def _record(monkeypatch) -> list[tuple]:
         )[1],
     )
     monkeypatch.setattr(_telemetry, "info", lambda *a, **k: None)
-    asyncio.run(entry.build_91790A194(adapter))
+
+    async def stock_build(_adapter, **kwargs):
+        # As build_stock_fastener calls each component's recipe.
+        for component in kwargs["components"]:
+            if component.parameters is None:
+                await component.author(adapter, None)
+            else:
+                await component.author(adapter, None, **component.parameters)
+        return {}
+
+    if supplied:
+        asyncio.run(entry.build_91790A196(adapter))
+    else:
+        monkeypatch.setattr(part, "build_stock_fastener", stock_build)
+        asyncio.run(part.build(adapter))
     return adapter.events
 
 
@@ -169,10 +202,77 @@ def test_recipe_puts_the_top_of_the_bevel_on_the_top_plane(monkeypatch) -> None:
     # y = 0, the plane that sits flush with the plate's rear face.
     assert apex[:2] == pytest.approx((0.0, screw.CROWN_H / 1000.0))
     assert rim[:2] == pytest.approx((screw.HEAD_DIA / 2000.0, 0.0))
-    # The shank runs LENGTH from the top of the bevel to the tip.
+    # The modelled shank runs LENGTH from the top of the bevel to the cut end.
     profile = _chains(calls)[0]
     assert min(y for _x, y in profile) == pytest.approx(-screw.LENGTH)
     assert max(x for x, _y in profile) == pytest.approx(screw.HEAD_DIA / 2.0)
+
+
+def _revolved_volume(length: float, end_chamfer: float) -> float:
+    """Crown cap + 82 deg bevel frustum + shank + 45 deg end frustum,
+    independent of the recipe's arithmetic."""
+    head_r, major_r = screw.HEAD_DIA / 2.0, screw.THREAD_MAJOR / 2.0
+    crown = screw.CROWN_H
+    bevel = -_junction_y()
+
+    def frustum(h: float, r1: float, r2: float) -> float:
+        return math.pi * h * (r1 * r1 + r1 * r2 + r2 * r2) / 3.0
+
+    return (
+        math.pi * crown * (3.0 * head_r**2 + crown**2) / 6.0
+        + frustum(bevel, head_r, major_r)
+        + math.pi * major_r**2 * (length - bevel - end_chamfer)
+        + frustum(end_chamfer, major_r, major_r - end_chamfer)
+    )
+
+
+def _end_of_shank(calls) -> list[tuple[float, float]]:
+    profile = _chains(calls)[0]
+    major_r = screw.THREAD_MAJOR / 2.0
+    start = max(i for i, (x, _y) in enumerate(profile) if x == pytest.approx(major_r))
+    return list(profile[start : start + 2])
+
+
+def test_part_is_the_installed_screw_cut_flush_with_its_end_broken(monkeypatch) -> None:
+    """The part ends at the cut (y = -CUT_LENGTH) with a 45 deg break of
+    CUT_END_BREAK_MAX in place of the factory tip, and the revolved body's
+    volume check expects that cut body."""
+    calls = _record(monkeypatch)
+    major_r = screw.THREAD_MAJOR / 2.0
+    brk = screw.CUT_END_BREAK_MAX
+    assert _end_of_shank(calls) == pytest.approx(
+        [(major_r, -(screw.CUT_LENGTH - brk)), (major_r - brk, -screw.CUT_LENGTH)]
+    )
+    (volume,) = [c for c in calls if c[0] == "volume_check"]
+    assert volume[1][1] == pytest.approx(_revolved_volume(screw.CUT_LENGTH, brk))
+
+
+def test_catalog_build_is_the_supplied_screw(monkeypatch) -> None:
+    """Without a cut the recipe builds the screw as bought: STOCK_LENGTH with
+    the family's 45 deg x 0.7P factory tip."""
+    calls = _record(monkeypatch, supplied=True)
+    major_r = screw.THREAD_MAJOR / 2.0
+    tip = 0.7 * screw.PITCH
+    assert _end_of_shank(calls) == pytest.approx(
+        [(major_r, -(screw.STOCK_LENGTH - tip)), (major_r - tip, -screw.STOCK_LENGTH)]
+    )
+    (volume,) = [c for c in calls if c[0] == "volume_check"]
+    assert volume[1][1] == pytest.approx(_revolved_volume(screw.STOCK_LENGTH, tip))
+
+
+@pytest.mark.parametrize(
+    ("cut_length", "cut_end_break"),
+    [
+        (screw.CUT_LENGTH, None),  # half a cut
+        (None, screw.CUT_END_BREAK_MAX),
+        (screw.STOCK_LENGTH, screw.CUT_END_BREAK_MAX),  # leaves the factory tip
+        (screw.CUT_LENGTH, 0.0),  # an unbroken cut end
+        (-_junction_y(), screw.CUT_END_BREAK_MAX),  # no shank under the bevel
+    ],
+)
+def test_recipe_refuses_a_cut_it_cannot_draw(cut_length, cut_end_break) -> None:
+    with pytest.raises(ValueError):
+        recipe.revolved_volume(screw.SKU, cut_length, cut_end_break)
 
 
 def test_head_seats_in_the_plate_countersink_without_interference(monkeypatch) -> None:
@@ -244,7 +344,7 @@ def test_stock_build_uses_its_registered_recipe_head_up_on_the_origin(
 ) -> None:
     metadata = STOCK_RECIPES[screw.SKU]
     assert metadata.module == entry.__name__
-    assert metadata.callable_name == entry.build_91790A194.__name__
+    assert metadata.callable_name == entry.build_91790A196.__name__
     assert metadata.threaded
     assert FASTENERS[part.PART_NAME] is part.SPEC
     assert part.SPEC.skus == (screw.SKU,)
@@ -265,7 +365,7 @@ def test_stock_build_uses_its_registered_recipe_head_up_on_the_origin(
     asyncio.run(part.build(None))
     (component,) = seen["components"]
     assert component.sku == screw.SKU
-    assert component.author is entry.build_91790A194
+    assert component.author is entry.build_91790A196
     assert component.transform.translation_mm == (0.0, 0.0, 0.0)
     assert component.transform.rotation_radians == (0.0, 0.0, 0.0)
     assert seen["screw_axis_planes"] == ("Front Plane", "Right Plane")
@@ -284,7 +384,7 @@ def test_standalone_recipe_run_is_catalog_only(monkeypatch) -> None:
 
     monkeypatch.setattr(entry, "catalog_run", fake_catalog_run)
     asyncio.run(entry.build_catalog(None))
-    assert seen == [(screw.SKU, entry.build_91790A194)]
+    assert seen == [(screw.SKU, entry.build_91790A196)]
 
 
 def test_no_vendor_model_of_the_new_hardware_is_tracked() -> None:
@@ -297,13 +397,24 @@ def test_no_vendor_model_of_the_new_hardware_is_tracked() -> None:
 _SIZE = re.compile(r"#\d|\d+/\d+|\d\s*(?:mm|in\b|\")|\d\s*[xX]\s*\d|°")
 
 
-def test_sheet_carries_no_installation_note_and_no_size_in_a_note() -> None:
-    """The purchased sheet prints only the registry's stock name, supplier and
-    SKU besides its fixed footer, so none of those may carry a size (Rule 6)."""
+def test_sheet_states_the_cut_and_no_size_in_the_registry_names() -> None:
+    """The purchased sheet prints the registry's stock name, supplier and
+    SKU besides its fixed footer, so none of those may carry a size; the
+    installation note states the cut to fit (the joint's proud allowance,
+    as the paper-drive assembly step prints it) and the cut end's break."""
     row = _config.parts(part.PART_NAME)
-    assert "installation_notes" not in row
     for field in ("title", "stock_name", "supplier", "finish", "material"):
         assert not _SIZE.search(str(row[field])), (field, row[field])
+    lines = row["installation_notes"].splitlines()
+    assert len(lines) <= 4
+    assert all(len(line) <= 70 for line in lines), lines
+    flat = " ".join(lines)
+    proud = joints.PLATE_SCREW_CUT_PROUD_MAX
+    assert (
+        f"CUT EACH TIP FLUSH TO {proud:.2f} PROUD OF THE MHA-164 ARM FRONT FACE "
+        "AT ASSEMBLY;"
+    ) in flat
+    assert f"BREAK THE CUT END {screw.CUT_END_BREAK_MAX:.1f} MAX." in flat
 
 
 def test_drawing_is_the_purchased_reference_sheet() -> None:

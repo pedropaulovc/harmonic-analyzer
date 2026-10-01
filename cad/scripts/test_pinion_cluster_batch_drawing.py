@@ -516,7 +516,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 "transgear-arm",
                 4.1656,
                 3.454,
-                7.7,
+                7.9375,
             ),
             frozenset(("transgear-pivot-screw-1", "support-bar-1")): _annulus_limit(
                 4.1656, 3.454, 3.5687

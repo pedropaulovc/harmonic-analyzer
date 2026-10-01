@@ -24,6 +24,8 @@ THREAD = "#8-32"
 THREAD_CLASS = "2A"
 SHANK_DIA = 0.164 * IN
 SHANK_LEN = 7.0 / 16.0 * IN  # under the head
+# (plus, minus): ASME B18.6.3 machine-screw length tolerance, to 1 in long.
+SHANK_LEN_BAND = (0.0, 0.03 * IN)
 HEAD_DIA = 0.322 * IN
 HEAD_H = 0.096 * IN
 PITCH = IN / 32.0

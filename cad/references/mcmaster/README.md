@@ -32,7 +32,7 @@ recipes:
 | 91255A148 | — (diagnostic recipe; a former `cone-tip-block-screw`) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91375A106 | `arbor-set-screw` | Alloy Steel Cup-Tip Set Screw |
 | 91410A538 | `gooseneck-set-screw` | Steel Square-Head Cup-Point Set Screw |
-| 91790A194 | `transgear-arm-plate-screw` (catalogue-only; no vendor model) | 18-8 Stainless Steel Oval Head Slotted Screw |
+| 91790A196 | `transgear-arm-plate-screw` (catalogue-only; no vendor model; SKU not yet read live) | 18-8 Stainless Steel Oval Head Slotted Screw |
 | 91794A112 | `cone-tip-pinch-screw` | 18-8 Stainless Steel Fillister Head Slotted Screw |
 | 91794A055 | `transgear-disc-screw` | 18-8 Stainless Steel Fillister Head Slotted Screw |
 | 92240A540 | `lag-screw` | 18-8 Stainless Steel Hex Head Screw |
@@ -309,21 +309,29 @@ Catalog specifications checked on September 10, 2026:
   91794A055` runs the replica gate against the vendor's volume 13.8241 mm³,
   surface 64.5474 mm² and 26-face area multiset. Evidence SHA-256: native
   SLDPRT `3b7b3ee38a51864b0c9d495e44ade30c80816d4b5498b8801211b8edb82676dc`.
-- [91790A194](https://www.mcmaster.com/91790A194/) (`transgear-arm-plate-screw`,
+- [91790A196](https://www.mcmaster.com/91790A196/) (`transgear-arm-plate-screw`,
   MHA-166, two) holds the transgear arm plate on the arm: each head sits flush
-  in a plate countersink and the thread enters the arm's through tap. The
-  91790A series was read live on September 30, 2026 (91790A192 at 3/8 in and
-  91790A194 at 1/2 in): 18-8 stainless steel, bright, slotted 82° oval head,
-  8-32 UNC class 2A, fully threaded, ASME B18.6.3; head Ø0.312 in, 0.152 in
-  total height of which the oval top is 0.052 in; the length is measured
-  from the top of the bevel. The page gives no slot, tip or crown radius, so
-  `diag_mcmaster_oval.py` models the crown as a spherical cap through the
-  head rim, runs the 82° bevel down to the thread major (the catalog's
-  0.100 in bevel reaches the cone's theoretical sharp, inside the shank), and
-  takes the slot, tip and thread-runout laws of the 90280A fillister family
-  (slot 0.135 of the head Ø wide and 1.5 widths deep). It is catalogue-only:
-  no vendor model is downloaded or kept here, so it has no replica gate, and
-  its standalone diagnostic is a catalog-only run.
+  in a plate countersink and the thread enters the arm's through tap; at
+  assembly each tip is cut flush with the arm's front face and the cut end
+  broken 0.1 max (R9-44: with the ASME B18.6.3 length band, +0/-0.03 in, no
+  fixed length gives 1.5D in the tap and keeps the tip out of the guide-lock
+  sweep). The SKU is [INFERENCE]: the 5/8 in length of the series by the
+  90280A numbering this file records (194 = 1/2 in, 197 = 3/4 in), not yet
+  read live; the vendor check is pending. The 91790A series was read live on
+  September 30, 2026 at 3/8 in (91790A192) and 1/2 in: 18-8 stainless steel,
+  bright, slotted 82° oval head, 8-32 UNC class 2A, fully threaded, ASME
+  B18.6.3; head Ø0.312 in, 0.152 in total height of which the oval top is
+  0.052 in; the length is measured from the top of the bevel. The page gives
+  no slot, tip or crown radius, so `diag_mcmaster_oval.py` models the crown
+  as a spherical cap through the head rim, runs the 82° bevel down to the
+  thread major (the catalog's 0.100 in bevel reaches the cone's theoretical
+  sharp, inside the shank), and takes the slot, tip and thread-runout laws
+  of the 90280A fillister family (slot 0.135 of the head Ø wide and 1.5
+  widths deep). Its catalog build is the supplied 5/8 in screw; the
+  production part draws it cut to the installed length with the break in
+  place of the factory tip. It is catalogue-only: no vendor model is
+  downloaded or kept here, so it has no replica gate, and its standalone
+  diagnostic is a catalog-only run.
 - [97482A010](https://www.mcmaster.com/97482A010/) (`latch-hook-rivet`,
   MHA-175, two) joins the latch hook's strip to the latch-hook bracket's
   flap; the flap's holes are drilled at assembly through the hook's. The

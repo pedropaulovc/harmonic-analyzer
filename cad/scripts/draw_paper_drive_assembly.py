@@ -542,7 +542,13 @@ def _step_text() -> dict[str, str]:
         "arm-plate-fitted": (
             f"FIT THE {_N['transgear-arm-plate']} PLATE TO THE ARM WITH "
             f"{TRANSGEAR_QUANTITIES['transgear-arm-plate-screw']} "
-            f"{_N['transgear-arm-plate-screw']} SCREWS IN THE ARM'S THROUGH TAPS."
+            f"{_N['transgear-arm-plate-screw']} SCREWS IN THE ARM'S THROUGH TAPS; "
+            "SNUG BOTH, THEN TIGHTEN THEM IN TURN."
+        ),
+        "arm-plate-screws-cut": (
+            f"CUT BOTH {_N['transgear-arm-plate-screw']} TIPS FLUSH TO "
+            f"{joints.PLATE_SCREW_CUT_PROUD_MAX:.2f} PROUD OF THE ARM'S FRONT "
+            f"FACE; BREAK THE CUT EDGE {plate_screw.CUT_END_BREAK_TEXT}."
         ),
         "hanger-pivoted": (
             f"HANG THE ARM ON THE {_N['support-bar']} BAR: THE "

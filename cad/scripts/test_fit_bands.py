@@ -120,6 +120,14 @@ NOT_FIT_BANDS: dict[tuple[str, str], str] = {
         "the rear tap's entry countersink diameter: nothing mates it; indexed "
         "for the printed note and the engagement loss"
     ),
+    ("transgear_arm_plate_screw_spec", "STOCK_LENGTH_BAND"): (
+        "the oval-head screw's B18.6.3 length tolerance (plus, minus): indexed "
+        "for the shortest stock left proud of the arm before its cut"
+    ),
+    ("transgear_knob_retaining_screw_spec", "SHANK_LEN_BAND"): (
+        "the pan-head screw's B18.6.3 length tolerance (plus, minus): indexed "
+        "for the shortest reach into the knob shaft's tap"
+    ),
 }
 
 # (upper, lower) fit bands that no helper reads: the owning module indexes them

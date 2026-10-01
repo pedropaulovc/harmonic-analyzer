@@ -406,14 +406,15 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
         _smooth_annulus_limit_mm3(2.8448, 2.261, 4.35),
         second_number=2,
     ),
-    # MHA-166 #8-32 x 1/2 (transgear_arm_plate_screw_spec; 12.7 from the top
-    # of the flat head, flush in the plate's countersink) through the 5.0
-    # plate's Ø4.5 clearance: 12.7 - 5.0 = 7.7 in the arm's #29 through tap.
+    # MHA-166 #8-32 x 5/8 (transgear_arm_plate_screw_spec; from the top of the
+    # oval head's bevel, flush in the plate's countersink) through the 5.0
+    # plate's Ø4.5 clearance, cut flush with the arm's front face (R9-44): the
+    # cut length 12.9375 - 5.0 = the arm's 7.9375 in its #29 through tap.
     **_numbered_pairs(
         "transgear-arm-plate-screw",
         range(1, 3),
         "transgear-arm",
-        _smooth_annulus_limit_mm3(4.1656, 3.454, 12.7 - 5.0),
+        _smooth_annulus_limit_mm3(4.1656, 3.454, 12.9375 - 5.0),
     ),
     # MHA-168 (transgear_pivot_screw_spec) in the support bar's blind #8-32
     # tap: its 4.7625 thread less the 1.1938 neck flat under the shoulder,

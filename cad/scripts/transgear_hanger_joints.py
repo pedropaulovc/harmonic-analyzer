@@ -12,9 +12,12 @@ may import it; no part build does.
   worst = that - one pitch (first thread).  The tap's entry countersink lies
   inside the neck zone and costs nothing more (contract §7, ruling R9-7).
   Approved below 1.5 D (the named exception).
-* MHA-166 plate screws (91790A194) in the MHA-164 arm's through #8-32 taps:
-  the bevel top sits flush with the MHA-165 plate's rear face, so the thread
-  in the arm is the length less the plate's over-arm section.
+* MHA-166 plate screws (5/8 stock, cut to fit) in the MHA-164 arm's through
+  #8-32 taps: the bevel top sits flush with the MHA-165 plate's rear face and
+  each tip is cut at assembly flush with the arm's front face, so the thread
+  in the arm is the arm less its two tap countersinks.  Every stock screw,
+  head riding its countersink on the plate-to-arm pitch mismatch, must stand
+  proud of the arm far enough for the cut to take its incomplete lead.
 * The pivot head's end play in the arm's spot face: shoulder - spacer -
   spot-face floor (from the arm's front face).
 * The MHA-169 latch pin pressed to the floor of the arm's blind end-face
@@ -95,10 +98,16 @@ HEAD_PLAY_MAX = (
 )
 if not 0.0 < HEAD_PLAY_MIN <= HEAD_PLAY_NOMINAL <= HEAD_PLAY_MAX:
     raise AssertionError("the pivot head can clamp the arm")
-# Head in the spot face; the shoulder in the arm and spacer bores.
+# Head in the spot face; the shoulder in the arm and spacer bores, at the
+# smallest bore their .XXX rows accept on the largest shoulder.
 HEAD_RADIAL_CLEARANCE = (ARM.SPOT_FACE_DIA - PIVOT.HEAD_DIA) / 2.0
 SHOULDER_RADIAL_CLEARANCE = (
-    ARM.PIVOT_BORE_DIA - PIVOT.SHOULDER_DIA - PIVOT.SHOULDER_DIA_LIMITS[1]
+    min(
+        ARM.PIVOT_BORE_DIA - ARM.PIVOT_BORE_DIA_BAND,
+        SPACER.BORE_DIA - SPACER.BORE_DIA_BAND,
+    )
+    - PIVOT.SHOULDER_DIA
+    - PIVOT.SHOULDER_DIA_LIMITS[1]
 ) / 2.0
 if HEAD_RADIAL_CLEARANCE <= 0.0 or SHOULDER_RADIAL_CLEARANCE <= 0.0:
     raise AssertionError("the pivot screw binds in the arm")
@@ -112,54 +121,12 @@ if abs(PLATE_SCREW.HEAD_DIA - PLATE.CSK_DIA) > 1e-9:
     raise AssertionError("the plate's countersink is not the oval head's Ø")
 if PLATE_SCREW.HEAD_ANGLE_DEG != PLATE.CSK_ANGLE_DEG:
     raise AssertionError("the plate's countersink angle is not the head's")
-_PLATE_TAP_CSK_LOSS = (ARM.PLATE_TAP_CSK_DIA - PLATE_SCREW.THREAD_MAJOR) / 2.0
-# A countersink cut large or small by its printed band seats the oval head
-# sunk or proud of the plate's rear face by this much.
-PLATE_SCREW_SEAT_SHIFT = (
-    PLATE.CSK_DIA_BAND / 2.0 / math.tan(math.radians(PLATE.CSK_ANGLE_DEG / 2.0))
-)
-PLATE_SCREW_ENGAGEMENT_NOMINAL = min(
-    PLATE_SCREW.LENGTH - PLATE.THICKNESS_OVER_ARM, ARM.THICKNESS
-)
-# Thick plate, head proud: the tip is inside the arm, so the first thread
-# counts against it.  Thin plate and thin arm stock: the tip is proud of the
-# front face, and the arm's two tap countersinks bound the thread instead.
-PLATE_SCREW_ENGAGEMENT_WORST = min(
-    PLATE_SCREW.LENGTH
-    - (PLATE.THICKNESS_OVER_ARM + PLATE.BAND_XX)
-    - PLATE_SCREW_SEAT_SHIFT
-    - PLATE_SCREW.FIRST_THREAD_LOSS
-    - _PLATE_TAP_CSK_LOSS,
-    ARM.THICKNESS - ARM.THICKNESS_BAND - 2.0 * _PLATE_TAP_CSK_LOSS,
-)
-PLATE_SCREW_ENGAGEMENT_NOMINAL_D = (
-    PLATE_SCREW_ENGAGEMENT_NOMINAL / PLATE_SCREW.THREAD_MAJOR
-)
-PLATE_SCREW_ENGAGEMENT_WORST_D = PLATE_SCREW_ENGAGEMENT_WORST / PLATE_SCREW.THREAD_MAJOR
-if PLATE_SCREW_ENGAGEMENT_WORST_D < ENGAGEMENT_TARGET_D:
-    raise AssertionError(
-        f"MHA-166 worst engagement {PLATE_SCREW_ENGAGEMENT_WORST_D:.3f}D < 1.5D"
-    )
-# The tip ends short of (positive) or proud of (negative) the arm's front face.
-PLATE_SCREW_TIP_INSIDE_NOMINAL = ARM.THICKNESS - (
-    PLATE_SCREW.LENGTH - PLATE.THICKNESS_OVER_ARM
-)
-# Furthest the tip can stand proud of the arm's front face (thin plate, thin
-# arm stock, head sunk): the assembly holds the lock-station sweep clear of
-# this.
-PLATE_SCREW_TIP_PROUD_MAX = (
-    PLATE_SCREW.LENGTH
-    + PLATE_SCREW_SEAT_SHIFT
-    - (PLATE.THICKNESS_OVER_ARM - PLATE.BAND_XX)
-    - (ARM.THICKNESS - ARM.THICKNESS_BAND)
-)
 # Both screws enter their taps only if the plate's hole pitch and the arm's
 # tap pitch disagree by no more than the shanks' float in the two holes.  Each
 # part's pitch moves by both its holes' printed position bands (the arm's
 # tap stations and the plate's hole stations, ±HOLE_POSITION_BAND each, the
 # bands both builds apply); the smallest drilled hole floats on the largest
-# (basic) #8-32 major.  The 82° heads then seat off their countersinks' axes
-# by up to half the mismatch, opposite ways.
+# (basic) #8-32 major.
 PLATE_SCREW_PITCH_MISMATCH_MAX = 2.0 * ARM.HOLE_POSITION_BAND + 2.0 * (
     PLATE.HOLE_POSITION_BAND
 )
@@ -172,6 +139,78 @@ if PLATE_SCREW_PITCH_MARGIN <= 0.0:
         f"{PLATE_SCREW_PITCH_MISMATCH_MAX:.3f} > shank float "
         f"{PLATE_SCREW_PITCH_FLOAT:.3f}"
     )
+# The heads, snugged together and then tightened in turn (the MHA-A06 step),
+# seat off their countersinks' axes by half that mismatch, opposite ways.  An
+# 82° head seated e off its countersink's axis rides up the cone by
+# e / tan(41°) before it bears, and the screw stops that much short in the arm.
+PLATE_SCREW_SEAT_ECCENTRICITY = PLATE_SCREW_PITCH_MISMATCH_MAX / 2.0
+if PLATE_SCREW_SEAT_ECCENTRICITY > PLATE_SCREW_PITCH_FLOAT / 2.0:
+    raise AssertionError("an MHA-166 shank bears in its hole before its head seats")
+PLATE_SCREW_ECCENTRIC_LIFT = PLATE_SCREW_SEAT_ECCENTRICITY / math.tan(
+    math.radians(PLATE.CSK_ANGLE_DEG / 2.0)
+)
+_PLATE_TAP_CSK_LOSS = (ARM.PLATE_TAP_CSK_DIA - PLATE_SCREW.THREAD_MAJOR) / 2.0
+# A countersink cut large or small by its printed band seats the oval head
+# sunk or proud of the plate's rear face by this much.
+PLATE_SCREW_SEAT_SHIFT = (
+    PLATE.CSK_DIA_BAND / 2.0 / math.tan(math.radians(PLATE.CSK_ANGLE_DEG / 2.0))
+)
+# R9-44: with ASME B18.6.3's +0/-0.03 in length band no stock length both
+# holds 1.5 D in the arm and keeps its tip out of the guide-lock sweep, so
+# the 5/8 screws are cut at assembly, flush to PLATE_SCREW_CUT_PROUD_MAX
+# proud of the arm's front face, the cut edge broken (MHA-139's filed tip).
+PLATE_SCREW_CUT_PROUD_MAX = 0.2
+# Before the cut, the shortest stock screw in the thickest plate and arm, its
+# head proud on a small countersink and riding its eccentric seat, still
+# stands proud of the arm by its first thread past the highest cut, so every
+# cut takes the incomplete lead and leaves full thread to the face.
+PLATE_SCREW_STOCK_PROUD_MIN = (
+    PLATE_SCREW.STOCK_LENGTH
+    - PLATE_SCREW.STOCK_LENGTH_BAND[1]
+    - (PLATE.THICKNESS_OVER_ARM + PLATE.BAND_XX)
+    - PLATE_SCREW_SEAT_SHIFT
+    - PLATE_SCREW_ECCENTRIC_LIFT
+    - (ARM.THICKNESS + ARM.THICKNESS_BAND)
+)
+if (
+    PLATE_SCREW_STOCK_PROUD_MIN
+    < PLATE_SCREW_CUT_PROUD_MAX + PLATE_SCREW.FIRST_THREAD_LOSS
+):
+    raise AssertionError(
+        f"MHA-166 stock screw stands {PLATE_SCREW_STOCK_PROUD_MIN:.3f} proud of "
+        "the arm: too short to cut its lead off"
+    )
+PLATE_SCREW_ENGAGEMENT_NOMINAL = min(
+    PLATE_SCREW.LENGTH - PLATE.THICKNESS_OVER_ARM, ARM.THICKNESS
+)
+# Thinnest arm stock, cut flush: full thread from the rear tap countersink to
+# the front face, where the front countersink and the cut-end break overlap.
+PLATE_SCREW_ENGAGEMENT_WORST = (
+    ARM.THICKNESS
+    - ARM.THICKNESS_BAND
+    - _PLATE_TAP_CSK_LOSS
+    - max(_PLATE_TAP_CSK_LOSS, PLATE_SCREW.CUT_END_BREAK_MAX)
+)
+PLATE_SCREW_ENGAGEMENT_NOMINAL_D = (
+    PLATE_SCREW_ENGAGEMENT_NOMINAL / PLATE_SCREW.THREAD_MAJOR
+)
+PLATE_SCREW_ENGAGEMENT_WORST_D = PLATE_SCREW_ENGAGEMENT_WORST / PLATE_SCREW.THREAD_MAJOR
+if PLATE_SCREW_ENGAGEMENT_WORST_D < ENGAGEMENT_TARGET_D:
+    raise AssertionError(
+        f"MHA-166 worst engagement {PLATE_SCREW_ENGAGEMENT_WORST_D:.3f}D < 1.5D"
+    )
+# The modelled (cut) tip ends short of (positive) or proud of (negative) the
+# arm's front face: flush.
+PLATE_SCREW_TIP_INSIDE_NOMINAL = ARM.THICKNESS - (
+    PLATE_SCREW.LENGTH - PLATE.THICKNESS_OVER_ARM
+)
+if abs(PLATE_SCREW_TIP_INSIDE_NOMINAL) > 1e-9:
+    raise AssertionError(
+        "MHA-166's modelled cut is not flush with the arm's front face"
+    )
+# Furthest a cut tip stands proud of the arm's front face: the assembly holds
+# the lock-station sweep clear of this.
+PLATE_SCREW_TIP_PROUD_MAX = PLATE_SCREW_CUT_PROUD_MAX
 
 # The plate's notch face clears the arm's lower edge (the screws locate the
 # plate).  Closing it, in plate-frame y: the face's .XX corner heights, the

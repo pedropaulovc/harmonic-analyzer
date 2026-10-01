@@ -53,13 +53,6 @@ def test_pivot_head_never_clamps_the_arm(monkeypatch) -> None:
         _reload_joints()
 
 
-def test_plate_screws_refuse_a_plate_that_starves_their_engagement(monkeypatch) -> None:
-    assert joints.PLATE_SCREW_ENGAGEMENT_WORST_D >= joints.ENGAGEMENT_TARGET_D
-    monkeypatch.setattr(plate, "THICKNESS_OVER_ARM", plate.THICKNESS_OVER_ARM + 2.0)
-    with pytest.raises(AssertionError, match="MHA-166 worst engagement"):
-        _reload_joints()
-
-
 def test_both_plate_screws_enter_their_taps_at_the_worst_pitch_mismatch(
     monkeypatch,
 ) -> None:
@@ -88,6 +81,84 @@ def test_both_plate_screws_enter_their_taps_at_the_worst_pitch_mismatch(
     # The former Ø4.4 hole floats 0.234 over a 0.260 mismatch: refused.
     monkeypatch.setattr(plate, "SCREW_HOLE_DIA", 4.4)
     with pytest.raises(AssertionError, match="cannot enter both arm taps"):
+        _reload_joints()
+
+
+def _eccentric_corner():
+    """The plate-screw corner from the printed rows, independent of the
+    joint module: (eccentric lift, countersink seat shift, tap entry loss)."""
+    import transgear_arm_plate_screw_spec as screw
+    import transgear_arm_plate_spec as plate_spec
+    import transgear_arm_spec as arm_spec
+
+    taps = arm.PLATE_TAP_STATIONS
+    holes = [x for x, _y in plate.SCREW_HOLES]
+    # The tap pitch at one limit, the hole pitch at the other.
+    mismatch = max(
+        abs(
+            (taps[1] + da2 * arm_spec.HOLE_POSITION_TOLERANCE)
+            - (taps[0] + da1 * arm_spec.HOLE_POSITION_TOLERANCE)
+            - (holes[1] + dp2 * plate_spec.HOLE_POSITION_TOLERANCE)
+            + (holes[0] + dp1 * plate_spec.HOLE_POSITION_TOLERANCE)
+        )
+        for da1, da2, dp1, dp2 in itertools.product((-1.0, 1.0), repeat=4)
+    )
+    # Each head seats half the mismatch off its countersink's axis and rides
+    # up the 82° cone before it bears.
+    cone = math.tan(math.radians(screw.HEAD_ANGLE_DEG / 2.0))
+    lift = mismatch / 2.0 / cone
+    shift = plate_spec.BAND_BY_PLACES[plate_spec.CSK_DIA_PLACES] / 2.0 / cone
+    entry = (arm.PLATE_TAP_CSK_DIA - screw.THREAD_MAJOR) / 2.0
+    return lift, shift, entry
+
+
+def test_every_stock_plate_screw_stands_past_the_cut_on_an_eccentric_seat(
+    monkeypatch,
+) -> None:
+    """R9-44: shortest stock screw (ASME B18.6.3, +0/-0.03 in), thickest
+    plate and arm, head proud on a small countersink and riding its eccentric
+    seat: the tip still clears the highest cut by its incomplete first thread."""
+    import transgear_arm_plate_screw_spec as screw
+    import transgear_arm_plate_spec as plate_spec
+
+    lift, shift, entry = _eccentric_corner()
+    assert lift == pytest.approx(0.1495, abs=5e-4)
+    thick_plate = (
+        plate.THICKNESS_OVER_ARM
+        + plate_spec.BAND_BY_PLACES[plate_spec.THICKNESS_PLACES]
+    )
+    shortest = screw.STOCK_LENGTH - 0.03 * 25.4
+    proud = shortest - thick_plate - shift - lift - (arm.THICKNESS + arm.THICKNESS_BAND)
+    assert proud >= joints.PLATE_SCREW_CUT_PROUD_MAX + screw.PITCH
+    assert joints.PLATE_SCREW_STOCK_PROUD_MIN == pytest.approx(proud)
+    # The uncut 1/2 in screw this replaced stopped inside the arm, where its
+    # own corner (lead and entry countersink lost) held only 1.28 D.
+    uncut = 0.5 * 25.4 - 0.03 * 25.4 - thick_plate - shift - lift
+    uncut -= screw.PITCH + entry
+    assert uncut / screw.THREAD_MAJOR == pytest.approx(1.2826, abs=5e-4)
+    monkeypatch.setattr(screw, "STOCK_LENGTH", 0.5 * 25.4)
+    with pytest.raises(AssertionError, match="too short to cut its lead off"):
+        _reload_joints()
+
+
+def test_cut_plate_screws_hold_one_and_a_half_d_in_the_thinnest_arm(
+    monkeypatch,
+) -> None:
+    """Cut flush: full thread from the rear tap countersink to the front face,
+    where the front countersink and the cut-end break overlap."""
+    import transgear_arm_plate_screw_spec as screw
+
+    _lift, _shift, entry = _eccentric_corner()
+    worst = arm.THICKNESS - arm.THICKNESS_BAND - entry - max(entry, 0.1)
+    assert worst / screw.THREAD_MAJOR >= 1.5
+    assert joints.PLATE_SCREW_ENGAGEMENT_WORST == pytest.approx(worst)
+    # The model is the screw as cut: its tip on the arm's front face.
+    assert screw.LENGTH == pytest.approx(plate.THICKNESS_OVER_ARM + arm.THICKNESS)
+    assert joints.PLATE_SCREW_TIP_INSIDE_NOMINAL == pytest.approx(0.0, abs=1e-9)
+    assert joints.PLATE_SCREW_TIP_PROUD_MAX == joints.PLATE_SCREW_CUT_PROUD_MAX
+    # A cut-end break past the arm's 1.5 D margin starves the joint.
+    monkeypatch.setattr(screw, "CUT_END_BREAK_MAX", 1.7)
+    with pytest.raises(AssertionError, match="MHA-166 worst engagement"):
         _reload_joints()
 
 

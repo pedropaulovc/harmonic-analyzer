@@ -30,6 +30,7 @@ SEQUENCE: tuple[str, ...] = (
     "latch-pin-pressed",
     "stud-fitted",
     "arm-plate-fitted",
+    "arm-plate-screws-cut",
     "hanger-pivoted",
     # Disc cluster (R9-5, R9-8, R9-9).
     "disc-cluster-pressed",

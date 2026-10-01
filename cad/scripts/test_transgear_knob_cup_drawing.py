@@ -13,6 +13,7 @@ import build_transgear_knob_cup as part
 import draw_transgear_knob_cup as drawing
 import transgear_knob_cup_spec as spec
 import transgear_knob_retaining_screw_spec as screw
+import transgear_knob_shaft_spec as knob_shaft
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
@@ -90,13 +91,18 @@ def test_the_pan_head_enters_the_smallest_counterbore() -> None:
 
 
 def test_the_screw_engages_1_5_d_at_the_thickest_printed_floor() -> None:
-    """The screw reaches past the front face by its length less the floor;
-    the thickest floor the sheet accepts, less the incomplete first thread,
-    still leaves 1.5 D before the shaft's own entry terms."""
+    """The shortest screw ASME B18.6.3 allows (+0/-0.03 in) reaches past the
+    front face by its length less the floor; the thickest floor the sheet
+    accepts, less the incomplete first thread, still leaves 1.5 D before the
+    shaft's own entry terms."""
     thickest = spec.FLOOR + _band(spec.FLOOR_PLACES)
-    reach = screw.SHANK_LEN - thickest - screw.PITCH
+    reach = screw.SHANK_LEN - 0.03 * 25.4 - thickest - screw.PITCH
     assert reach >= 1.5 * screw.SHANK_DIA
     assert spec.ENGAGEMENT_OWN_WORST == pytest.approx(reach, abs=0.01)
+    # With the shaft's largest tap countersink the joint still holds 1.5 D.
+    shaft_side = reach - (knob_shaft.TAP_CSK_DIA + 0.10 - knob_shaft.TAP_MAJOR) / 2.0
+    assert shaft_side >= 1.5 * screw.SHANK_DIA
+    assert knob_shaft.ENGAGEMENT_WORST == pytest.approx(shaft_side, abs=0.01)
 
 
 def _cup_spec_with(monkeypatch, name: str, value):

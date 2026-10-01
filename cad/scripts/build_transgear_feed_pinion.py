@@ -83,6 +83,7 @@ from transgear_feed_pinion_spec import (
     ROOT_DIA_MIN,
     ROOT_DIA_TOL_TYPE,
     SHANK_DIA,
+    SHANK_DIA_DEVIATIONS,
     SPIGOT_DIA,
     SPIGOT_DIA_DEVIATIONS,
     SPIGOT_FRONT_STATION,
@@ -418,8 +419,8 @@ async def build(adapter) -> dict[str, str]:
 
     # Bands (transgear_feed_pinion_spec): the three stations ±0.05 (R9-5), the
     # reamed bore, the spigot's slip band under the disc's reamed bore, the
-    # tip's +0/-0.10, the root as a MIN floor. The shank carries the title
-    # block's .XXX row.
+    # shank's press band under the hub's reamed bore (R9-45), the tip's
+    # +0/-0.10, the root as a MIN floor.
     set_dimension_symmetric_tolerance(adapter, "GearBlank", "FaceWidth", STATION_TOL)
     set_dimension_symmetric_tolerance(
         adapter, "SleeveProfile", "SpigotFront", STATION_TOL
@@ -432,6 +433,9 @@ async def build(adapter) -> dict[str, str]:
     )
     set_dimension_bilateral_tolerance(
         adapter, "SleeveProfile", "SpigotDia", *SPIGOT_DIA_DEVIATIONS
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "SleeveProfile", "ShankDia", *SHANK_DIA_DEVIATIONS
     )
     set_dimension_bilateral_tolerance(
         adapter, "SleeveProfile", "OutsideDia", *OUTSIDE_DIA_DEVIATIONS

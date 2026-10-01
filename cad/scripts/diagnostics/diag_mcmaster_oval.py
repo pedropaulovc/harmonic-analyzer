@@ -2,7 +2,8 @@ r"""Shared recipe for the McMaster 91790A* 18-8 stainless steel slotted 82 deg
 oval head screws (catalog-only: no vendor model is downloaded or committed).
 
 Live-page facts (``transgear-evidence/mcmaster-skus.md``, R3 and the round-7
-family check, verified 2026-09-30 on 91790A192 and 91790A194): 18-8
+family check, verified 2026-09-30 on the series' 3/8 in and 1/2 in lengths;
+the 5/8 in 91790A196 row is [INFERENCE], not yet read live): 18-8
 stainless, bright, slotted oval head, standard profile, 82 deg, head
 Ø0.312 in, total head height 0.152 in of which the oval top (crown) is
 0.052 in, 8-32 UNC class 2A, fully threaded, ASME B18.6.3; the length is
@@ -39,6 +40,14 @@ checking the solid and saving it under cad/out/reference for inspection.
 Frame: axis +Y, head UP, the top of the bevel at y = 0 (Top Plane); the
 crown rises to y = crown_h, the tip is at y = -length.
 
+Cut to fit (optional, ``cut_length`` with ``cut_end_break``): a screw cut
+at assembly, as MHA-166's are, is drawn as installed.  The revolve profile
+ends the shank at y = -cut_length with a 45 deg break of radial leg
+``cut_end_break`` in place of the factory 0.7P tip chamfer; everything else
+(head, slot, split, helix to P past the end, thread, runout) is the stock
+build's, and ``revolved_volume`` follows the cut.  Without them the build is
+the supplied screw at the row's length, which the catalog run builds.
+
 Per-part entry points: ``diag_build_91790A*.py``.
 """
 
@@ -66,16 +75,24 @@ from transgear_arm_plate_screw_spec import (  # noqa: E402
     CROWN_H,
     HEAD_ANGLE_DEG,
     HEAD_DIA,
-    LENGTH,
     PITCH,
+    STOCK_LENGTH,
     THREAD_MAJOR,
 )
 
 OVAL_SIZES = {
     # part: (major dia, length from the top of the bevel, head dia at the top
     #        of the bevel, crown height, head angle deg, pitch)
-    # 8-32 x 1/2, fully threaded (MHA-166, the transgear arm-plate screws).
-    "91790A194": (THREAD_MAJOR, LENGTH, HEAD_DIA, CROWN_H, HEAD_ANGLE_DEG, PITCH),
+    # 8-32 x 5/8, fully threaded (MHA-166, the transgear arm-plate screws,
+    # supplied; the part cuts them to fit).
+    "91790A196": (
+        THREAD_MAJOR,
+        STOCK_LENGTH,
+        HEAD_DIA,
+        CROWN_H,
+        HEAD_ANGLE_DEG,
+        PITCH,
+    ),
 }
 
 # The fillister-derived slot and tip laws ([INFERENCE] for an oval head).
@@ -96,17 +113,46 @@ def slot_depth(part_no: str) -> float:
     return OVAL_SIZES[part_no][2] * SLOT_WIDTH_FRACTION * SLOT_DEPTH_PER_WIDTH
 
 
-def revolved_volume(part_no: str) -> float:
+def shank_end(
+    part_no: str,
+    cut_length: float | None = None,
+    cut_end_break: float | None = None,
+) -> tuple[float, float]:
+    """(length from the top of the bevel, 45 deg end chamfer leg): the
+    supplied screw's factory tip, or the cut end of a screw cut to fit."""
+    major_d, length, _hd, _crown_h, _angle, pitch = OVAL_SIZES[part_no]
+    tip_ch = TIP_CHAMFER_PER_PITCH * pitch
+    if cut_length is None and cut_end_break is None:
+        return length, tip_ch
+    if cut_length is None or cut_end_break is None:
+        raise ValueError(f"{part_no}: a cut needs both its length and its end break")
+    if not cut_length < length - tip_ch:
+        raise ValueError(
+            f"{part_no}: a {cut_length} mm cut does not clear the supplied "
+            f"{length} mm screw's factory tip"
+        )
+    if not 0.0 < cut_end_break < major_d / 2.0:
+        raise ValueError(f"{part_no}: cut end break {cut_end_break} mm")
+    if not cone_depth(part_no) < cut_length - cut_end_break:
+        raise ValueError(f"{part_no}: the {cut_length} mm cut leaves no shank")
+    return cut_length, cut_end_break
+
+
+def revolved_volume(
+    part_no: str,
+    cut_length: float | None = None,
+    cut_end_break: float | None = None,
+) -> float:
     """The revolved body before the slot and thread: crown, bevel, shank."""
-    major_d, length, hd, crown_h, _angle, pitch = OVAL_SIZES[part_no]
+    major_d, _length, hd, crown_h, _angle, _pitch = OVAL_SIZES[part_no]
+    length, end_ch = shank_end(part_no, cut_length, cut_end_break)
     major_r, head_r = major_d / 2.0, hd / 2.0
     bevel = cone_depth(part_no)
-    tip_ch = TIP_CHAMFER_PER_PITCH * pitch
     return (
         _spherical_cap_volume(head_r, crown_h)
         + _rev_frustum(bevel, head_r, major_r)
-        + math.pi * major_r**2 * (length - bevel - tip_ch)
-        + _rev_frustum(tip_ch, major_r, major_r - tip_ch)
+        + math.pi * major_r**2 * (length - bevel - end_ch)
+        + _rev_frustum(end_ch, major_r, major_r - end_ch)
     )
 
 
@@ -117,7 +163,13 @@ for _part_no, _row in OVAL_SIZES.items():
         raise ValueError(f"{_part_no}: the driver slot falls through the oval head")
 
 
-async def build_oval(adapter, part_no: str):
+async def build_oval(
+    adapter,
+    part_no: str,
+    *,
+    cut_length: float | None = None,
+    cut_end_break: float | None = None,
+):
     from _common import add_line_chain
     from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
     from diagnostics.diag_mcmaster_lib import (
@@ -126,13 +178,13 @@ async def build_oval(adapter, part_no: str):
         split_at_plane,
     )
 
-    major_d, length, hd, crown_h, _angle, pitch = OVAL_SIZES[part_no]
+    major_d, _length, hd, crown_h, _angle, pitch = OVAL_SIZES[part_no]
+    length, tip_ch = shank_end(part_no, cut_length, cut_end_break)
     major_r = major_d / 2.0
     head_r = hd / 2.0
     junction_y = -cone_depth(part_no)
     slot_w = hd * SLOT_WIDTH_FRACTION
     slot_d = slot_depth(part_no)
-    tip_ch = TIP_CHAMFER_PER_PITCH * pitch
     h_sharp = pitch * math.sqrt(3.0) / 2.0
     root_r = major_r - 0.75 * h_sharp
     revs = length / pitch + 1.0
@@ -175,7 +227,7 @@ async def build_oval(adapter, part_no: str):
             [
                 (head_r, 0.0),
                 (major_r, junction_y),  # the 82 deg bevel
-                (major_r, -(length - tip_ch)),
+                (major_r, -(length - tip_ch)),  # factory tip or cut-end break
                 (major_r - tip_ch, -length),
                 (0.0, -length),
                 (0.0, apex_y),
@@ -189,7 +241,7 @@ async def build_oval(adapter, part_no: str):
         await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=False)),
     )
     name_last_feature(adapter, "Body")
-    v = revolved_volume(part_no)
+    v = revolved_volume(part_no, cut_length, cut_end_break)
     await volume_check(adapter, "revolved body", v, 0.005 * v)
 
     # --- driver slot (from the crown apex) ----------------------------------

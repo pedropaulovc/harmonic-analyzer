@@ -225,7 +225,7 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
     "transgear-arm-plate-screw": _stock(
         "transgear-arm-plate-screw",
         "18-8 Stainless Steel Oval Head Slotted Screw",
-        "91790A194",
+        "91790A196",
         material="AISI 304",
     ),
     "transgear-pivot-screw": _stock(

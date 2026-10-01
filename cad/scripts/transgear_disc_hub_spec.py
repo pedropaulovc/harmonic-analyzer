@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import math
 
+from _fit_limits import deviations
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from diagnostics.diag_mcmaster_fillister import FILLISTER_SIZES
 from transgear_disc_hub_geometry import (
@@ -64,8 +65,30 @@ HUB_LENGTH_PLACES = 3
 # The hub body (flange front face to hub front face) is the remainder of the
 # two printed lengths; it is modelled, never printed.
 HUB_BODY_LENGTH = HUB_LENGTH - FLANGE_THICK
-BORE_DIA = 8.2  # pressed on the sleeve's Ø8.2 front shank (0 modelled)
+# Pressed on the sleeve's Ø8.2 front shank (line to line modelled).  Both
+# printed .XXX ±0.13, the pair ran from 0.26 clearance to 0.26 interference,
+# and the press is all that holds the flange's clamp on the disc and carries
+# its torque (R9-45).  So this module owns the pair, as rack_pinion_spec owns
+# the disc's slip pair: the bore is reamed to ISO H7 at 6-10 mm, and the
+# sleeve's shank turned to a SHAFT_H-wide band above it (its model reads
+# SHANK_DIA_BAND here), for 0.010-0.045 diametral interference -- close to
+# ANSI FN2 at this size (0.013-0.041), never line to line.
+BORE_DIA = 8.2
 BORE_PLACES = 3
+BORE_BAND = (0.015, 0.0)  # (upper, lower) deviations, reamed
+BORE_DEVIATIONS = deviations(BORE_BAND)
+SHANK_DIA = BORE_DIA
+SHANK_DIA_BAND = (0.045, 0.025)  # (upper, lower) deviations, turned
+PRESS_INTERFERENCE_FLOOR = 0.010  # the fleet's light-press floor (crank hub)
+# (least, greatest) diametral interference.
+PRESS_INTERFERENCE = (
+    round(SHANK_DIA + SHANK_DIA_BAND[1] - (BORE_DIA + BORE_BAND[0]), 3),
+    round(SHANK_DIA + SHANK_DIA_BAND[0] - (BORE_DIA + BORE_BAND[1]), 3),
+)
+if PRESS_INTERFERENCE[0] < PRESS_INTERFERENCE_FLOOR - 1e-9:
+    raise AssertionError(
+        f"MHA-159 bore loses its press on the MHA-110 shank: {PRESS_INTERFERENCE}"
+    )
 # The hub-to-flange corner stays sharp: the #0-80 heads sit beside it.
 CORNER_RADIUS_MAX = 0.1
 
@@ -98,9 +121,8 @@ def _smallest_dia(nominal: float, places: int) -> float:
 
 # --- worst-case walls at the printed bands (policy rule 12) ------------------
 HUB_WALL_NOMINAL = (HUB_DIA - BORE_DIA) / 2.0
-HUB_WALL_WORST = (
-    _smallest_dia(HUB_DIA, HUB_DIA_PLACES) - _largest_dia(BORE_DIA, BORE_PLACES)
-) / 2.0
+_BORE_MAX = BORE_DIA + BORE_BAND[0]
+HUB_WALL_WORST = (_smallest_dia(HUB_DIA, HUB_DIA_PLACES) - _BORE_MAX) / 2.0
 
 _SCREW_HOLE_MAX_R = (SCREW_HOLE_DIA + DRILL_OVERSIZE) / 2.0
 _OIL_HOLE_MAX_R = (OIL_HOLE_DIA + DRILL_OVERSIZE) / 2.0
@@ -111,9 +133,7 @@ HOLE_TO_RIM_NOMINAL = FLANGE_DIA / 2.0 - BOLT_CIRCLE_DIA / 2.0 - SCREW_HOLE_DIA 
 HOLE_TO_RIM_WORST = _floor2(
     _smallest_dia(FLANGE_DIA, FLANGE_DIA_PLACES) / 2.0 - _BC_R_MAX - _SCREW_HOLE_MAX_R
 )
-HOLE_TO_BORE_WORST = (
-    _BC_R_MIN - _SCREW_HOLE_MAX_R - _largest_dia(BORE_DIA, BORE_PLACES) / 2.0
-)
+HOLE_TO_BORE_WORST = _BC_R_MIN - _SCREW_HOLE_MAX_R - _BORE_MAX / 2.0
 # The station is dimensioned from the hub front face itself: no length stack.
 OIL_HOLE_TO_FRONT_NOMINAL = OIL_HOLE_STATION - OIL_HOLE_DIA / 2.0
 OIL_HOLE_TO_FRONT_WORST = (
@@ -178,7 +198,14 @@ OIL_HOLE_CALLOUT_BELOW = "\n".join(
         "THRU HUB WALL AND SLEEVE AFTER PRESSING",
     )
 )
-BORE_CALLOUT = f"PRESS ON {SLEEVE_NUMBER} SHANK"
+# The bore's native limits print with the dimension; the callout adds the
+# process, names the mate and states the interference the pair gives.
+BORE_CALLOUT = "\n".join(
+    (
+        f"REAM THRU, PRESS ON {SLEEVE_NUMBER} SHANK",
+        f"{PRESS_INTERFERENCE[0]:.3f}-{PRESS_INTERFERENCE[1]:.3f} DIAMETRAL INTERFERENCE",
+    )
+)
 
 # Marked model dimensions and the places the model authors on them (policy
 # rule 2).  Face view: the four diameters and the bolt circle; edge view: the

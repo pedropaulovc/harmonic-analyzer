@@ -401,9 +401,9 @@ def test_the_collar_gap_stop_is_the_seat_limit_less_the_collar() -> None:
 
 
 def test_the_fitup_steps_and_the_collar_note_print_one_setting_drill_and_cut() -> None:
-    """R9-30: steps 14-16 and the MHA-177 fit-up note (which this sheet also
-    prints) state the collar setting, the core drill and the stud cut in the
-    same words, so the two instructions cannot drift apart."""
+    """R9-30: the collar steps and the MHA-177 fit-up note (which this sheet
+    also prints) state the collar setting, the core drill and the stud cut in
+    the same words, so the two instructions cannot drift apart."""
     note = " ".join(collar.FIT_UP_NOTE.split())
     for key, phrase in (
         ("collar-gap-measured", collar.FIT_UP_OFFSET_SET_TEXT),
@@ -439,6 +439,26 @@ def test_the_cluster_float_and_pin_bands_print_their_spec_ranges() -> None:
     assert "0.20 TO 0.40" in _step_body("disc-cluster-hung")
     assert "2.30 TO 2.50 PROUD" in _step_body("collar-pins-pressed")
     assert "12.49 TO 13.51 PROUD" in _step_body("latch-pin-pressed")
+
+
+def test_the_plate_screws_are_cut_to_the_limit_the_lock_sweep_clears() -> None:
+    """R9-44: the 5/8 stock screws are cut once the plate is tightened and
+    before the arm is hung, to the proud limit the guide-lock sweep is held
+    clear of; the screw sheet's installation note states the same limit."""
+    import transgear_hanger_joints as joints
+
+    order = ["arm-plate-fitted", "arm-plate-screws-cut", "hanger-pivoted"]
+    numbers = [steps.step_number(key) for key in order]
+    assert numbers == list(range(numbers[0], numbers[0] + 3))
+    body = _step_body("arm-plate-screws-cut")
+    limit = f"FLUSH TO {joints.PLATE_SCREW_CUT_PROUD_MAX:.2f} PROUD"
+    assert limit in body
+    assert "BREAK THE CUT EDGE 0.1 MAX" in body
+    assert joints.PLATE_SCREW_TIP_PROUD_MAX == joints.PLATE_SCREW_CUT_PROUD_MAX
+    row = _config.parts("transgear-arm-plate-screw")
+    assert limit in " ".join(row["installation_notes"].split())
+    # Positive control: the fit step itself does not mention the cut.
+    assert "CUT" not in _step_body("arm-plate-fitted")
 
 
 def _spare_world_point(monkeypatch, local):

@@ -924,9 +924,13 @@ def _assert_fastener_stacks() -> None:
             f"plate-screw engagement {HANGER.PLATE_SCREW_ENGAGEMENT_WORST_D:.3f} D"
             f" worst is under {HANGER.ENGAGEMENT_TARGET_D} D"
         )
+    # R9-44: the screws are cut flush with the arm's front face at assembly
+    # (MHA-139's filed-tip idiom), and the model carries the cut length.
     plate_screw_tip = PLATE_SCREW_Z0 - PLATE_SCREW.LENGTH
     if abs(plate_screw_tip - (ARM_Z0 + HANGER.PLATE_SCREW_TIP_INSIDE_NOMINAL)) > 1e-9:
-        raise AssertionError("plate-screw tips are off their stack inside the arm")
+        raise AssertionError(
+            "MHA-166's cut tips are not flush with the arm's front face"
+        )
     latch_pin_proud = LATCH_PIN.LENGTH - ARM.PIN_HOLE_DEPTH
     low, high = HANGER.LATCH_PIN_PROUD_RANGE
     if abs(latch_pin_proud - LATCH_PIN.PROUD) > 1e-9 or not (

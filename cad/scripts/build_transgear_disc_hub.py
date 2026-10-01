@@ -53,6 +53,7 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
 )
 from transgear_disc_hub_geometry import (
     BOLT_CIRCLE_DIA,
@@ -61,6 +62,7 @@ from transgear_disc_hub_geometry import (
     screw_centres,
 )
 from transgear_disc_hub_spec import (
+    BORE_DEVIATIONS,
     BORE_DIA,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
@@ -385,8 +387,12 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
-    # No model band: every printed size is governed by its places, the holes
-    # by the title block's DRILLED HOLES row (the spec's DRAWING_PRECISION).
+    # The reamed press bore carries its band on the model (R9-45); every other
+    # size is governed by its places, the holes by the title block's DRILLED
+    # HOLES row (the spec's DRAWING_PRECISION).
+    set_dimension_bilateral_tolerance(
+        adapter, "BoreProfile", "BoreDia", *BORE_DEVIATIONS
+    )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

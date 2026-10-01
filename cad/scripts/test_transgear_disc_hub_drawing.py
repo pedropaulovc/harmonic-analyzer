@@ -67,17 +67,48 @@ def test_the_sheet_prints_the_overall_and_the_flange_never_the_hub_body() -> Non
     assert spec.HUB_DIA == pytest.approx(12.9) and _places("HubDia") == 2
 
 
-def test_no_printed_size_carries_a_model_band() -> None:
-    """Every size is governed by its printed places and the holes by the
-    title block's DRILLED HOLES row: no band tightened on the model."""
-    assert model_toleranced_dimensions(part) == {}
+def test_only_the_press_bore_carries_a_model_band() -> None:
+    """Every other size is governed by its printed places and the holes by
+    the title block's DRILLED HOLES row (R9-45)."""
+    assert model_toleranced_dimensions(part) == {
+        ("BoreProfile", "BoreDia"): "*BORE_DEVIATIONS"
+    }
+
+
+def _printed_limits(build, spec_module, feature: str, name: str, nominal: float):
+    """(least, greatest) size the sheet prints: the model band the build
+    applies, else the title block's row for the dimension's places."""
+    expr = model_toleranced_dimensions(build).get((feature, name))
+    if expr is None:
+        row = _row(spec_module.DRAWING_PRECISION_BY_NAME[name])
+        return nominal - row, nominal + row
+    lower, upper = getattr(build, expr.lstrip("*"))
+    return nominal + lower, nominal + upper
+
+
+def test_the_bore_keeps_its_press_on_the_sleeve_shank_at_every_printed_limit() -> None:
+    """The flange's clamp on the disc and the disc's torque ride on this
+    press alone; the two parts are made apart, each to its own sheet."""
+    import build_transgear_feed_pinion as sleeve_part
+    import transgear_feed_pinion_spec as sleeve
+
+    bore = _printed_limits(part, spec, "BoreProfile", "BoreDia", spec.BORE_DIA)
+    shank = _printed_limits(
+        sleeve_part, sleeve, "SleeveProfile", "ShankDia", sleeve.SHANK_DIA
+    )
+    least, greatest = shank[0] - bore[1], shank[1] - bore[0]
+    # Both at .XXX ±0.13 ran from 0.26 clearance to 0.26 interference.
+    assert least >= 0.010 - 1e-9
+    assert (least, greatest) == pytest.approx(spec.PRESS_INTERFERENCE)
+    callout = drawing.DIMENSION_CALLOUTS_BELOW["BoreDia"]
+    assert f"{least:.3f}-{greatest:.3f} DIAMETRAL INTERFERENCE" in callout
+    assert f"PRESS ON {sleeve.SLEEVE_NUMBER} SHANK" in callout
 
 
 def test_walls_hold_at_the_worst_case_the_sheet_prints() -> None:
     """Policy rule 12, recomputed from the title block's rows."""
     hub_wall = (
-        (spec.HUB_DIA - _row(_places("HubDia")))
-        - (spec.BORE_DIA + _row(_places("BoreDia")))
+        (spec.HUB_DIA - _row(_places("HubDia"))) - (spec.BORE_DIA + spec.BORE_BAND[0])
     ) / 2.0
     oil_r = (spec.OIL_HOLE_DIA + DRILL_PLUS) / 2.0
     station_band = _row(_places("OilHoleStation"))
@@ -90,9 +121,9 @@ def test_walls_hold_at_the_worst_case_the_sheet_prints() -> None:
     )
     screw_r = (spec.SCREW_HOLE_DIA + DRILL_PLUS) / 2.0
     bc_r_min = joint.BOLT_CIRCLE_DIA / 2.0 - joint.BOLT_CIRCLE_POSITION_TOL
-    hole_to_bore = bc_r_min - screw_r - (spec.BORE_DIA + _row(_places("BoreDia"))) / 2.0
+    hole_to_bore = bc_r_min - screw_r - (spec.BORE_DIA + spec.BORE_BAND[0]) / 2.0
 
-    assert hub_wall == pytest.approx(2.03, abs=0.005) and hub_wall >= WALL_FLOOR
+    assert hub_wall == pytest.approx(2.0875, abs=0.005) and hub_wall >= WALL_FLOOR
     assert oil_to_front == pytest.approx(2.05, abs=0.005) and oil_to_front >= WALL_FLOOR
     assert hole_to_bore >= WALL_FLOOR
     # Toward the flange the hole edge meets the flange face: an edge
@@ -237,6 +268,7 @@ def test_hole_and_diameter_equations_reproduce_the_modelled_geometry(
         "set_sketch_direct_db",
         "_as_construction",
         "_check_z_span",
+        "set_dimension_bilateral_tolerance",
         "apply_drawing_precision",
         "clear_dimensions_for_drawing",
         "mark_dimensions_for_drawing",
