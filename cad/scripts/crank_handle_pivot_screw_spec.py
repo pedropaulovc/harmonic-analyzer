@@ -143,9 +143,11 @@ THREAD_MINOR_UNR_2A_MAX = (
 # band.
 # Banded (Codex P1 on #1139): at .X the relief could stand above the thread
 # root (no die run-out) and, with the lead, reach past the shoulder's seat.
-# Ø1.95 +/-0.05 keeps the largest relief under the #4-40 root with the most
-# neck the root allows.
-RELIEF_DIA = 1.95
+# Ø1.90 +/-0.05 keeps the largest relief 0.07 under the #4-40 basic root and
+# 0.10 under the UNR-2A reference maximum (local review of 747487c71: no
+# minimum die-cut root is sourced in this repo, so the floor keeps a margin
+# under both rather than sitting on them).
+RELIEF_DIA = 1.90
 RELIEF_DIA_TOL = 0.05
 RELIEF_DIA_MAX = round(RELIEF_DIA + RELIEF_DIA_TOL, 6)
 RELIEF_WIDTH = 1.5
@@ -338,9 +340,9 @@ SEAT_FLAT_ANNULUS_AREA = math.pi / 4.0 * (SHOULDER_DIA**2 - TAPPED_MOUTH_DIA_MAX
 SEAT_FLAT_ANNULUS_AREA_MIN = (
     math.pi / 4.0 * (SEAT_CONTACT_OUTER_DIA_MIN**2 - SEAT_CONTACT_INNER_DIA**2)
 )
-# The relief neck is the screw's weakest section: pi/4 x 1.95^2 = 2.99 mm^2
+# The relief neck is the screw's weakest section: pi/4 x 1.90^2 = 2.84 mm^2
 # against the #4-40 UNC tensile stress area of 0.00604 in^2 = 3.90 mm^2, about
-# 77 percent.  Seating torque is therefore limited by the neck, not the thread;
+# 73 percent.  Seating torque is therefore limited by the neck, not the thread;
 # the handle's working load is a hand grip and never loads it axially.
 NECK_AREA = math.pi / 4.0 * RELIEF_DIA**2
 TENSILE_STRESS_AREA = 0.00604 * MM_PER_IN**2
@@ -364,6 +366,10 @@ for _ok, _what in (
     ),
     (SEAT_FLAT_ANNULUS_AREA_MIN > 0.0, "no flat seat annulus is left"),
     (SEAT_RADIAL_MIN >= 0.3, "the shoulder's seat on the arm face is under 0.3 radial"),
+    (
+        THREAD_MINOR_BASIC_ROOT - RELIEF_DIA_MAX >= 0.05,
+        "the largest relief keeps under 0.05 of margin below the thread root",
+    ),
     (
         RELIEF_WIDTH_MIN >= 1.5 * THREAD_PITCH,
         "the shortest relief is under 1.5 pitches of die run-out",

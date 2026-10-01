@@ -530,9 +530,11 @@ CONE_CRANK_STEPS = "\n".join(
         # sheet; the bead count is the spec's solve, never a typed number.
         f"   CUT MHA-149 TO {KEEPER_CHAIN_BEADS} BEADS; THREAD IT THROUGH THE MHA-130",
         "   LOOP AND MHA-128; SNAP ONE END BEAD INTO EACH DOME OF MHA-150.",
-        "7. EPOXY MHA-152 ON THE MHA-022 TENON, MHA-153 IN ITS BUTT; CURE.",
-        "   SLIDE MHA-022 ONTO MHA-139; THREAD MHA-139 INTO THE MHA-020 TAP",
-        "   WITH LOCTITE 222, SHOULDER TIGHT ON THE ARM. END PLAY 0.25-1.0.",
+        # Local review of 747487c71: the cup cures centred on the screw, or
+        # its offset can bind the head and shoulder.
+        "7. EPOXY MHA-152 ON THE MHA-022 TENON, MHA-153 IN ITS BUTT; CURE ON",
+        "   THE WAXED MHA-139 THROUGH BOTH. FIT IT; SLIDE MHA-022 ON; THREAD IT",
+        "   INTO MHA-020 WITH LOCTITE 222, SHOULDER TIGHT; END PLAY 0.25-1.0.",
         "   FILE THE TIP FLUSH WITH THE ARM'S INBOARD FACE; BREAK EDGE.",
         f"   CYLINDER BANK: SHEET {BANK_SHEET}.",
     )

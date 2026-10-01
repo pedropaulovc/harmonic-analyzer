@@ -8,7 +8,8 @@ the cup's floor, steel on steel, instead of on end-grain wood.
 
 User rulings 2026-09-30 (ch30 eight-views-4 side view, approved CadQuery
 concept v4): the cup is a plain cup, no flange, seated flush with the oak's
-end; after the epoxy cures the handle's end round is turned across the oak and
+end; after the epoxy cures the handle's end round is turned on the oak, clear of the
+cup, whose face stays flat (local review of fbf82ad96).  Formerly: turned across the oak and
 the cup together, so wood and steel read as one rounded butt.  The smaller
 MHA-139 head (Ø6) lets the cup shrink to the photographed size, and the pocket
 wall is thin -- 0.8 at its worst case -- a named drawing-simplicity-policy
@@ -121,7 +122,8 @@ DRAWING_NOTES = "\n".join(
         f"BORE THE POCKET TO SUIT THE {SCREW_NUMBER} {SCREW_NAME} HEAD FOR",
         f"  {POCKET_CLEARANCE[0]:.1f}-{POCKET_CLEARANCE[1]:.1f} DIAMETRAL CLEARANCE,"
         f" <MOD-DIAM>{POCKET_DIA_MAX:.1f} MAX; THE HEAD BEARS ON THE FLOOR.",
-        f"MIN POCKET WALL {POCKET_WALL_FLOOR_MM:.1f}; MIN FLOOR {WALL_FLOOR_MM:.1f}.",
+        f"MIN POCKET WALL {POCKET_WALL_FLOOR_MM:.1f}; MIN FLOOR {WALL_FLOOR_MM:.1f}; "
+        "CORNERS EXCEPTED.",
         f"EPOXY IN THE {HANDLE_NUMBER} {HANDLE_NAME} BUTT, FACE FLUSH, CENTRED ON THE",
         f"  WAXED {SCREW_NUMBER} SCREW.  THE FACE STAYS FLAT; THE OAK ROUNDS OVER IT.",
     )

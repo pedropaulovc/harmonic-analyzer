@@ -117,7 +117,9 @@ def test_tenon_and_counterbore_are_fitted_to_the_parts_they_take() -> None:
     flat = " ".join(spec.DRAWING_NOTES.split())
     assert "REAM THE BORE AND BORE THE COUNTERBORE IN ONE SETUP" in flat
     assert "TURN THE OUTSIDE ON A MANDREL IN THE BORE." in flat
-    assert "MIN OAK WALL 1.5 OVER THE BORE." in flat
+    # Measured on the wall, clear of the end face's edge breaks (local
+    # review of 747487c71).
+    assert "MIN OAK WALL 1.5 OVER THE BORE, CORNERS EXCEPTED." in flat
     assert "THE CUP CENTRED ON THE WAXED MHA-139 SCREW." in flat
     assert spec.CUP_OFFSET_MAX == pytest.approx(0.175)
     drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")

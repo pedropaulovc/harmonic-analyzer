@@ -4,7 +4,7 @@ User ruling 2026-09-29 (ch11 p.14/p.15 photographs): the butt of the ebonized
 grip carries a bright steel cup with the pivot screw's slotted head recessed
 inside it.  The body is epoxied into the MHA-022 counterbore, face flush, and
 MHA-139's head bears on the floor; user rulings 2026-09-30 (concept v4) made it
-a plain cup, the handle's end round turned across oak and cup together.
+a plain cup with a flat face; the handle's end round is turned on the oak only.
 Dimensions live in ``crank_handle_butt_cup_spec``.
 
 Layout: one revolve about local +X.  The cup's outer face is the origin

@@ -95,7 +95,9 @@ def test_notes_name_the_mates_and_the_band_reason() -> None:
     notes = spec.DRAWING_NOTES
     assert f"{spec.HANDLE_NUMBER} {spec.HANDLE_NAME}" in notes
     assert f"{spec.SCREW_NUMBER} {spec.SCREW_NAME}" in notes
-    assert "TO SUIT" in notes and "MIN POCKET WALL 0.8; MIN FLOOR 1.5." in notes
+    assert "TO SUIT" in notes
+    assert "MIN POCKET WALL 0.8; MIN FLOOR 1.5; CORNERS EXCEPTED." in notes
+    assert "turned clear of it" in _config.parts("crank-handle-butt-cup")["process"]
     assert "6.5 MAX" in notes
     assert "FACE FLUSH, CENTRED ON THE" in notes
     # The oak's end round is turned clear of the cup (local review of
