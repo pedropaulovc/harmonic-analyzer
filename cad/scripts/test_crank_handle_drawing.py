@@ -109,6 +109,10 @@ def test_tenon_and_counterbore_are_fitted_to_the_parts_they_take() -> None:
     assert not hasattr(spec, "TENON_LENGTH_TOL")
     assert spec.DRAWING_PRECISION_BY_NAME["TenonLength"] == 1
     assert spec.TENON_END_GAP_MIN == pytest.approx((7.0 - 0.8) - (5.0 + 0.8))
+    # The shortest tenon's bonded length after the tenon-end and bore-mouth
+    # edge breaks (local review of 21bb244c5).
+    assert spec.TENON_GLUE_LENGTH_MIN == pytest.approx(5.0 - 0.8 - 0.25 - 0.25)
+    assert spec.TENON_GLUE_LENGTH_MIN >= 3.5
     # The reamed bore prints 4.10 +0.05/0, its two-place nominal the limit
     # itself (local review of fbf82ad96: 4.125 printed 4.13 +/-0.025).
     assert (spec.PIVOT_BORE_DIA, spec.PIVOT_BORE_BAND) == (4.10, (0.05, 0.0))

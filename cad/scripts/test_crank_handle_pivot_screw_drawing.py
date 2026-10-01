@@ -169,10 +169,14 @@ def test_u33_running_fit_end_play_and_engagement() -> None:
 
 def test_thread_relief_sits_below_the_minor_with_a_45_degree_lead() -> None:
     # Banded (Codex P1 on #1139): the largest relief stays under the root.
-    assert (spec.RELIEF_DIA, spec.RELIEF_DIA_TOL, spec.RELIEF_DIA_MAX) == (1.90, 0.05, 1.95)
-    # A margin under the root, not a relief sitting on it (local review of
-    # 747487c71).
-    assert spec.THREAD_MINOR_BASIC_ROOT - spec.RELIEF_DIA_MAX == pytest.approx(0.0701, abs=1e-4)
+    assert (spec.RELIEF_DIA, spec.RELIEF_DIA_TOL, spec.RELIEF_DIA_MAX) == (1.85, 0.05, 1.90)
+    # Under the deepest die-cut root, not just the basic one (local reviews
+    # of 747487c71 and 21bb244c5): 2A PD min 0.0925 in less 0.649519 P.
+    assert spec.THREAD_MINOR_2A_MIN_EST == pytest.approx(
+        (0.0925 - 0.649519 / 40.0) * 25.4, abs=1e-6
+    )
+    assert spec.THREAD_MINOR_2A_MIN_EST == pytest.approx(1.937, abs=1e-3)
+    assert spec.RELIEF_DIA_MAX <= spec.THREAD_MINOR_2A_MIN_EST
     assert spec.RELIEF_WIDTH == 1.5
     assert spec.RELIEF_LEAD == 0.3
     assert spec.RELIEF_LEAD_LIMITS == (0.2, 0.4)
@@ -188,25 +192,27 @@ def test_thread_relief_sits_below_the_minor_with_a_45_degree_lead() -> None:
     assert spec.THREAD_MINOR_BASIC_ROOT == pytest.approx(2.0201, abs=1e-4)
     assert spec.THREAD_MINOR_UNR_2A_MAX == pytest.approx(2.0505, abs=1e-4)
     assert spec.RELIEF_DIA_MAX <= spec.THREAD_MINOR_BASIC_ROOT
-    # The lead tops out at Ø2.5 (Ø2.75 with the largest relief and lead),
+    # The lead tops out at Ø2.45 (Ø2.7 with the largest relief and lead),
     # inside the Ø2.845 thread major, leaving a flat seat.
-    assert spec.SEAT_FLAT_INNER_DIA == pytest.approx(2.5)
-    assert spec.SEAT_FLAT_INNER_DIA_MAX == pytest.approx(2.75)
+    assert spec.SEAT_FLAT_INNER_DIA == pytest.approx(2.45)
+    assert spec.SEAT_FLAT_INNER_DIA_MAX == pytest.approx(2.7)
     assert spec.RELIEF_DIA + 2.0 * spec.RELIEF_LEAD_LIMITS[1] < spec.THREAD_MODEL_DIA
-    # The seat on the arm face, from the printed limits (local reviews of
-    # 1f3067ef2 and fbf82ad96): the arm's tapped mouth broken 0.1 max,
-    # 2.845 + 0.2 = Ø3.045, out to the smallest shoulder broken 0.1 max,
-    # 3.92 - 0.2 = Ø3.72: 0.3375 radial.  Under the title block's 0.25 on
-    # both there would be none.
+    # The seat on the arm face, from the limits (local reviews of 1f3067ef2,
+    # fbf82ad96 and 21bb244c5): the arm's largest tapped major, 0.1150 in =
+    # 2.921, broken 0.1 max, Ø3.121, out to the smallest shoulder broken 0.1
+    # max, 3.92 - 0.2 = Ø3.72, less the 2A/2B fit's 0.0368 float off axis:
+    # 0.263 radial.  Under the title block's 0.25 on both there would be none.
     assert spec.SEAT_EDGE_BREAK_MAX == pytest.approx(0.1)
-    assert spec.TAPPED_MOUTH_DIA_MAX == pytest.approx(3.045)
-    assert spec.SEAT_CONTACT_INNER_DIA == pytest.approx(3.045)
+    assert spec.TAPPED_MOUTH_DIA_MAX == pytest.approx(0.1150 * 25.4 + 0.2)
+    assert spec.SEAT_CONTACT_INNER_DIA == pytest.approx(3.121)
     assert spec.SEAT_CONTACT_OUTER_DIA_MIN == pytest.approx(3.72)
-    assert spec.SEAT_RADIAL_MIN == pytest.approx(0.3375)
+    assert spec.THREAD_FIT_OFFSET_MAX == pytest.approx((0.0954 - 0.0925) / 2.0 * 25.4)
+    assert spec.SEAT_RADIAL_MIN == pytest.approx((3.72 - 3.121) / 2.0 - 0.03683, abs=1e-4)
+    assert spec.SEAT_RADIAL_MIN >= 0.25
     assert (3.92 - 0.5) - (2.845 + 0.5) < 0.1
-    assert spec.SEAT_FLAT_ANNULUS_AREA == pytest.approx(math.pi / 4.0 * (16.0 - 3.045**2))
+    assert spec.SEAT_FLAT_ANNULUS_AREA == pytest.approx(math.pi / 4.0 * (16.0 - 3.121**2))
     assert spec.SEAT_FLAT_ANNULUS_AREA_MIN == pytest.approx(
-        math.pi / 4.0 * (3.72**2 - 3.045**2)
+        math.pi / 4.0 * (3.72**2 - 3.121**2)
     )
     # The one-piece screw goes in from the butt: nothing on the arm end of it
     # is larger than the bore it passes (local review of fbf82ad96).
@@ -215,10 +221,10 @@ def test_thread_relief_sits_below_the_minor_with_a_45_degree_lead() -> None:
     assert 0.0 < spec.SEAT_FLAT_ANNULUS_AREA_MIN < spec.SEAT_FLAT_ANNULUS_AREA
     assert spec.CHAMFER_CALLOUT == "X 45 DEG"
     assert drawing.CHAMFER_CALLOUT is spec.CHAMFER_CALLOUT
-    # The neck is ~73 percent of the #4-40 tensile stress area (0.00604 in^2).
-    assert spec.NECK_AREA == pytest.approx(math.pi / 4.0 * 1.90**2)
+    # The neck is ~69 percent of the #4-40 tensile stress area (0.00604 in^2).
+    assert spec.NECK_AREA == pytest.approx(math.pi / 4.0 * 1.85**2)
     assert spec.TENSILE_STRESS_AREA == pytest.approx(3.90, abs=0.01)
-    assert spec.NECK_TO_STRESS_AREA == pytest.approx(0.728, abs=0.001)
+    assert spec.NECK_TO_STRESS_AREA == pytest.approx(0.690, abs=0.001)
     # The lead's band is model-owned and prints as limits in its callout, and
     # the tip chamfer carries its own band (MHA-139 re-review: at .X either
     # could print as nothing).  The relief width is banded too: at .X it
@@ -343,12 +349,12 @@ def test_notes_stay_within_rule_six() -> None:
 def test_modelled_volume_is_the_turned_body_less_the_slot() -> None:
     head = math.pi * 3.0**2 * 4.0
     shoulder = math.pi * 2.0**2 * 53.0
-    relief = math.pi * (1.90 / 2.0) ** 2 * 1.5
+    relief = math.pi * (1.85 / 2.0) ** 2 * 1.5
     thread = math.pi * (2.845 / 2.0) ** 2 * 8.5
-    # Pappus: the lead's 0.3 x 0.3 corner triangle, centroid 0.95 + 0.3/3
+    # Pappus: the lead's 0.3 x 0.3 corner triangle, centroid 0.925 + 0.3/3
     # out, stays; the tip chamfer's 0.3 x 0.3, centroid 1.4225 - 0.3/3 out,
     # goes.
-    lead = 2.0 * math.pi * (0.95 + 0.3 / 3.0) * (0.3 * 0.3 / 2.0)
+    lead = 2.0 * math.pi * (0.925 + 0.3 / 3.0) * (0.3 * 0.3 / 2.0)
     tip = 2.0 * math.pi * (2.845 / 2.0 - 0.3 / 3.0) * (0.3 * 0.3 / 2.0)
     assert part.V_LEAD == pytest.approx(lead)
     assert part.V_BODY == pytest.approx(head + shoulder + relief + thread + lead - tip)

@@ -36,7 +36,7 @@ from __future__ import annotations
 
 import math
 
-from crank_hub_geometry import GENERAL_1PL_TOL_MM
+from crank_hub_geometry import EDGE_BREAK_MAX_MM, GENERAL_1PL_TOL_MM
 from crank_handle_butt_cup_spec import (
     BODY_DIA as CUP_BODY_DIA,
     BODY_DIA_TOL as CUP_BODY_DIA_TOL,
@@ -215,6 +215,10 @@ TENON_DIA_MIN = FERRULE_BORE_DIA - FERRULE_BORE_DIA_TOL - FERRULE_TENON_GLUE_LIN
 FERRULE_SEAT_RADIAL_MIN = (
     (2.0 * SHOULDER_R - CONTOUR_ALLOWANCE_DIA) - TENON_DIA_MAX
 ) / 2.0
+# The shortest tenon's unbroken bonded length inside the ferrule, less the
+# title-block edge break on the tenon end and on the ferrule's bore mouth
+# (local review of 21bb244c5): 3.7, half the ferrule's length and more.
+TENON_GLUE_LENGTH_MIN = round(TENON_LENGTH - _GENERAL_1PL - 2.0 * EDGE_BREAK_MAX_MM, 6)
 # The printed minimum oak wall over the bore (checked at the tenon end face).
 TENON_WALL_FLOOR_MM = 1.5
 # Arm face to the shortest tenon's end: the shortest .X ferrule less the
@@ -237,8 +241,8 @@ for _ok, _what in (
         "the longest tenon reaches the shortest ferrule's arm face",
     ),
     (
-        TENON_LENGTH - _GENERAL_1PL >= 4.0,
-        "the shortest tenon leaves under 4.0 of glue length",
+        TENON_GLUE_LENGTH_MIN >= 3.5,
+        "the shortest tenon leaves under 3.5 of unbroken glue length",
     ),
     (
         FERRULE_SEAT_RADIAL_MIN >= 0.5,

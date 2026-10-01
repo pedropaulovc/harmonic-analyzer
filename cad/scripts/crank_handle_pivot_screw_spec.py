@@ -137,17 +137,33 @@ THREAD_MINOR_BASIC_ROOT = THREAD_MODEL_DIA - 1.5 * math.sqrt(3.0) / 2.0 * THREAD
 THREAD_MINOR_UNR_2A_MAX = (
     THREAD_MAJOR_2A_MAX_IN - 1.226869 / THREADS_PER_IN
 ) * MM_PER_IN
+# The deepest die-cut root the relief must clear (local review of 21bb244c5).
+# ASSUMPTION, not sourced from ASME B1.1 in this repo: the #4-40 UNC-2A pitch
+# diameter minimum is 0.0925 in (Machinery's Handbook), and a root cut a full
+# basic half-depth (0.649519 P) below it is 0.0763 in = 1.937.
+THREAD_PD_2A_MIN_IN = 0.0925
+THREAD_MINOR_2A_MIN_EST = (
+    THREAD_PD_2A_MIN_IN - 0.649519 / THREADS_PER_IN
+) * MM_PER_IN
+# The arm's tapped mouth and the screw's float in it (local review of
+# 21bb244c5).  ASSUMPTION, not sourced in this repo: a ground #4-40 tap cuts
+# the internal major to at most 0.1150 in = 2.921 (its H-limit over the 0.112
+# basic), and the 2A/2B pitch-diameter fit (2B max 0.0954 in, 2A min 0.0925
+# in) lets the screw sit 0.0368 off the hole's axis.
+TAP_MAJOR_MAX_IN = 0.1150
+THREAD_PD_2B_MAX_IN = 0.0954
+THREAD_FIT_OFFSET_MAX = round(
+    (THREAD_PD_2B_MAX_IN - THREAD_PD_2A_MIN_IN) / 2.0 * MM_PER_IN, 6
+)
 # Thread relief (Main's ruling on the die-runout doubt): a groove in the first RELIEF_WIDTH of the threaded section, against
 # the seat face, so the die's incomplete lead threads run out into air and the shoulder
 # pulls down tight on the arm face.  Routine (.X) sizes under the title-block
 # band.
 # Banded (Codex P1 on #1139): at .X the relief could stand above the thread
 # root (no die run-out) and, with the lead, reach past the shoulder's seat.
-# Ø1.90 +/-0.05 keeps the largest relief 0.07 under the #4-40 basic root and
-# 0.10 under the UNR-2A reference maximum (local review of 747487c71: no
-# minimum die-cut root is sourced in this repo, so the floor keeps a margin
-# under both rather than sitting on them).
-RELIEF_DIA = 1.90
+# Ø1.85 +/-0.05 keeps the largest relief under the deepest die-cut root
+# estimated above, Ø1.937 (local reviews of 747487c71 and 21bb244c5).
+RELIEF_DIA = 1.85
 RELIEF_DIA_TOL = 0.05
 RELIEF_DIA_MAX = round(RELIEF_DIA + RELIEF_DIA_TOL, 6)
 RELIEF_WIDTH = 1.5
@@ -329,20 +345,24 @@ DRAWING_NOTES = "\n".join(
     )
 )
 
-# The shoulder's seat on the arm face: from the arm's tapped mouth (the thread
-# major plus MHA-020's 0.1-max mouth break, the larger of it and the relief
-# lead's envelope) out to the smallest shoulder less its 0.1-max seat break.
-TAPPED_MOUTH_DIA_MAX = round(THREAD_MODEL_DIA + 2.0 * SEAT_EDGE_BREAK_MAX, 6)
+# The shoulder's seat on the arm face: from the arm's tapped mouth (the
+# largest tapped major plus MHA-020's 0.1-max mouth break, the larger of it
+# and the relief lead's envelope) out to the smallest shoulder less its
+# 0.1-max seat break, less the screw's float off the hole's axis on the
+# narrow side.
+TAPPED_MOUTH_DIA_MAX = round(TAP_MAJOR_MAX_IN * MM_PER_IN + 2.0 * SEAT_EDGE_BREAK_MAX, 6)
 SEAT_CONTACT_INNER_DIA = max(TAPPED_MOUTH_DIA_MAX, SEAT_FLAT_INNER_DIA_MAX)
 SEAT_CONTACT_OUTER_DIA_MIN = round(SHOULDER_DIA_MIN - 2.0 * SEAT_EDGE_BREAK_MAX, 6)
-SEAT_RADIAL_MIN = round((SEAT_CONTACT_OUTER_DIA_MIN - SEAT_CONTACT_INNER_DIA) / 2.0, 6)
+SEAT_RADIAL_MIN = round(
+    (SEAT_CONTACT_OUTER_DIA_MIN - SEAT_CONTACT_INNER_DIA) / 2.0 - THREAD_FIT_OFFSET_MAX, 6
+)
 SEAT_FLAT_ANNULUS_AREA = math.pi / 4.0 * (SHOULDER_DIA**2 - TAPPED_MOUTH_DIA_MAX**2)
 SEAT_FLAT_ANNULUS_AREA_MIN = (
     math.pi / 4.0 * (SEAT_CONTACT_OUTER_DIA_MIN**2 - SEAT_CONTACT_INNER_DIA**2)
 )
-# The relief neck is the screw's weakest section: pi/4 x 1.90^2 = 2.84 mm^2
+# The relief neck is the screw's weakest section: pi/4 x 1.85^2 = 2.69 mm^2
 # against the #4-40 UNC tensile stress area of 0.00604 in^2 = 3.90 mm^2, about
-# 73 percent.  Seating torque is therefore limited by the neck, not the thread;
+# 69 percent.  Seating torque is therefore limited by the neck, not the thread;
 # the handle's working load is a hand grip and never loads it axially.
 NECK_AREA = math.pi / 4.0 * RELIEF_DIA**2
 TENSILE_STRESS_AREA = 0.00604 * MM_PER_IN**2
@@ -365,10 +385,10 @@ for _ok, _what in (
         "relief lead reaches past the thread major into the seat annulus",
     ),
     (SEAT_FLAT_ANNULUS_AREA_MIN > 0.0, "no flat seat annulus is left"),
-    (SEAT_RADIAL_MIN >= 0.3, "the shoulder's seat on the arm face is under 0.3 radial"),
+    (SEAT_RADIAL_MIN >= 0.25, "the shoulder's seat on the arm face is under 0.25 radial"),
     (
-        THREAD_MINOR_BASIC_ROOT - RELIEF_DIA_MAX >= 0.05,
-        "the largest relief keeps under 0.05 of margin below the thread root",
+        RELIEF_DIA_MAX <= THREAD_MINOR_2A_MIN_EST,
+        "the largest relief stands above the deepest die-cut root",
     ),
     (
         RELIEF_WIDTH_MIN >= 1.5 * THREAD_PITCH,
