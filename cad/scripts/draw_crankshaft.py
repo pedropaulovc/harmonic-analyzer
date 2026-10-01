@@ -73,6 +73,7 @@ from crankshaft_spec import (
     RELIEF_END,
     SEAT_COLLAR,
     SEAT_STEP,
+    SHAFT_CORE_LANDS,
     SHAFT_DIA,
     SHAFT_DOME_HEIGHT,
     SHAFT_LENGTH,
@@ -237,11 +238,13 @@ DIAMETER_POSITIONS = {
     "SpigotDiaDim": (COLLAR_SEAT_X + 0.002, _DIAMETER_ROW_Y[1]),
     "CollarDiaDim": (SPIGOT_END_X + 0.002, _DIAMETER_ROW_Y[0]),
 }
-# The 2X Ø9.525 names the dome-side core and the short exposed core between
-# the inboard journal land and Ø9 pinion-seat step. The 2X Ø11.388 names both
-# bearing lands on either side of the relief; the displayed arrow picks the
-# outboard land, and the equal-size callout also governs the inboard land.
-CALLOUTS_ABOVE = {"ShaftDiaDim": "2X", "JournalDiaDim": "2X"}
+# The Ø9.525 callout counts every bare core land (SHAFT_CORE_LANDS: the
+# dome-side shank, the washer's land behind the collar and the land before
+# the Ø9 seat step); machinist review of 8b5e1f354 found the 2X it carried
+# named two of the three.  The 2X Ø11.388 names both bearing lands on either
+# side of the relief; the displayed arrow picks the outboard land, and the
+# equal-size callout also governs the inboard land.
+CALLOUTS_ABOVE = {"ShaftDiaDim": f"{len(SHAFT_CORE_LANDS)}X", "JournalDiaDim": "2X"}
 # The lower drive-pin location names the mate its +/-0.025 serves
 # (crankshaft_notes), in the clear field under its text.
 CALLOUTS_BELOW = {

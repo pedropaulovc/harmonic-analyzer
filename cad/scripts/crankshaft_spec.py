@@ -405,6 +405,17 @@ if COLLAR_REAR + COLLAR_STATION_TOL >= JOURNAL_START - STATION_ROW:
     raise AssertionError(
         "the collar runs into the outboard journal land at print-worst"
     )
+# The Ø9.525 core is turned bare in three places: the dome-side shank (dome
+# root to the seat face), the washer's land behind the collar (rear face to
+# the outboard journal) and the land past the inboard journal (to the Ø9
+# seat step).  The one ShaftDiaDim callout sizes every one of them.
+SHAFT_CORE_LANDS = (
+    (0.0, SEAT_COLLAR),
+    (COLLAR_REAR, JOURNAL_START),
+    (JOURNAL_END, SEAT_STEP),
+)
+if any(start >= end for start, end in SHAFT_CORE_LANDS):
+    raise AssertionError("every bare Ø9.525 core land must have a length")
 # Both Ø11.388 lands run in MHA-016 and therefore need their own Ra 1.6
 # control on the native cylindrical face and their own drawing leader.  The
 # collar's rear face runs against the fitted MHA-172 thrust washer, so it

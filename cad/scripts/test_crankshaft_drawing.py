@@ -379,6 +379,33 @@ def test_sheet_placements_stay_inside_the_border() -> None:
     )
 
 
+def test_shaft_diameter_callout_counts_every_bare_core_land() -> None:
+    # Machinist review of 8b5e1f354: the 2X Ø9.525 sat with three bare core
+    # lands in the side view and did not say which two it meant.  The core
+    # runs dome root to far end; the collar, the journal (its relief stays
+    # proud of the core) and the Ø9 seat cover the rest, as the build lays
+    # them, so the callout counts every land left bare.
+    covers = sorted(
+        [
+            (spec.SEAT_COLLAR, spec.SEAT_COLLAR + spec.COLLAR_LENGTH),
+            (spec.JOURNAL_START, spec.JOURNAL_START + spec.JOURNAL_LENGTH),
+            (spec.SEAT_STEP, spec.SHAFT_LENGTH),
+        ]
+    )
+    bare: list[tuple[float, float]] = []
+    edge = 0.0
+    for start, end in covers:
+        if start > edge:
+            bare.append((edge, start))
+        edge = max(edge, end)
+    assert edge == pytest.approx(spec.SHAFT_LENGTH)
+    assert spec.RELIEF_DIA > spec.SHAFT_DIA > spec.PINION_SEAT_DIA
+    assert [v for land in spec.SHAFT_CORE_LANDS for v in land] == pytest.approx(
+        [v for land in bare for v in land]
+    )
+    assert drawing.CALLOUTS_ABOVE["ShaftDiaDim"] == f"{len(bare)}X" == "3X"
+
+
 def test_integral_lands_run_in_the_restored_post_at_every_size_limit() -> None:
     import cone_pivot_post_spec as post
 
