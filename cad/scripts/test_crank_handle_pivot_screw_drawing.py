@@ -175,7 +175,7 @@ def test_thread_relief_sits_below_the_minor_with_a_45_degree_lead() -> None:
     )
     assert spec.THREAD_MINOR_2A_MIN_EST == pytest.approx(1.937, abs=1e-3)
     assert spec.RELIEF_DIA_MAX <= spec.THREAD_MINOR_2A_MIN_EST
-    assert spec.RELIEF_WIDTH == 2.0
+    assert spec.RELIEF_WIDTH == 2.2
     assert spec.RELIEF_LEAD == 0.3
     assert spec.RELIEF_LEAD_LIMITS == (0.2, 0.4)
     # The printed limits are the model band's (Codex P2 on #1139).
@@ -183,7 +183,7 @@ def test_thread_relief_sits_below_the_minor_with_a_45_degree_lead() -> None:
         (spec.RELIEF_LEAD - spec.RELIEF_LEAD_TOL, spec.RELIEF_LEAD + spec.RELIEF_LEAD_TOL)
     )
     assert spec.RELIEF_CALLOUT == "0.2-0.4 X 45 DEG LEAD"
-    assert spec.RELIEF_END_STATION == pytest.approx(spec.SEAT_STATION + 2.0)
+    assert spec.RELIEF_END_STATION == pytest.approx(spec.SEAT_STATION + 2.2)
     # At or below the #4-40 external minor: the P/8-flat UN root
     # (2.845 - 1.299038 x 0.635 = Ø2.020) and the UNR-2A reference max
     # ((0.1114 - 1.226869 / 40) x 25.4 = Ø2.051).
@@ -226,14 +226,15 @@ def test_thread_relief_sits_below_the_minor_with_a_45_degree_lead() -> None:
     assert spec.NECK_TO_STRESS_AREA == pytest.approx(0.690, abs=0.001)
     # The lead's band is model-owned and prints as limits in its callout, and
     # the tip chamfer carries its own band (MHA-139 re-review: at .X either
-    # could print as nothing).  The relief width is routine at 2.0: at .X it
-    # keeps 1.5 #4-40 pitches (machinist review of crank-v4-16 called its band
-    # over-specification).
+    # could print as nothing).  The relief width is routine at 2.2: at .X its
+    # straight floor past the longest lead keeps 1.5 #4-40 pitches (machinist
+    # review of crank-v4-16; local review of 20dac9d3f).
     toleranced = {name for _, name in model_toleranced_dimensions(part)}
     assert {"ReliefDia", "ReliefLead", "TipChamfer"} <= toleranced
     assert "ReliefWidth" not in toleranced
-    assert spec.RELIEF_WIDTH_MIN == pytest.approx(1.2)
-    assert spec.RELIEF_WIDTH_MIN >= 1.5 * spec.THREAD_PITCH
+    assert spec.RELIEF_WIDTH_MIN == pytest.approx(1.4)
+    assert spec.RELIEF_FLOOR_MIN == pytest.approx(1.4 - 0.4)
+    assert spec.RELIEF_FLOOR_MIN >= 1.5 * 25.4 / 40.0
     assert "ReliefLead" not in set().union(*spec.DRAWING_DIMENSIONS.values())
 
 
@@ -248,25 +249,25 @@ def test_engagement_meets_the_1_5d_rule_governed_by_the_stock_arm() -> None:
     # The chamfer's partial threads are excluded: full thread reaches 9.5 - the
     # longest printed chamfer 0.35 = 9.15 from the seat face (Codex P2 on #1138).
     assert spec.FULL_THREAD_REACH_MIN == pytest.approx(9.15)
-    # Nominal: min(10.0 - 0.3, arm 8.0) - 2.0 = 6.0 of full thread, 2.11 D.
-    assert spec.FULL_THREAD_NOMINAL == pytest.approx(6.0)
-    assert spec.FULL_THREAD_NOMINAL_DIAMETERS == pytest.approx(6.0 / 2.845)
+    # Nominal: min(10.0 - 0.3, arm 8.0) - 2.2 = 5.8 of full thread, 2.04 D.
+    assert spec.FULL_THREAD_NOMINAL == pytest.approx(5.8)
+    assert spec.FULL_THREAD_NOMINAL_DIAMETERS == pytest.approx(5.8 / 2.845)
     # Thinnest stock 5/16-in arm (mill -0.004 in on a 1-in flat): min(9.15,
-    # 7.8359 - the 0.25 exit break) - (2.0 + the .X band 0.8) = 4.79,
-    # 1.68 D.  The arm governs.
+    # 7.8359 - the 0.25 exit break) - (2.2 + the .X band 0.8) = 4.59,
+    # 1.61 D.  The arm governs.
     assert geometry.GENERAL_1PL_TOL_MM == pytest.approx(0.8)
     assert spec.TAP_EXIT_BREAK == pytest.approx(0.25)
     assert spec.ARM_STOCK_THICKNESS == pytest.approx(7.9375)
-    assert spec.RELIEF_WIDTH_MAX == pytest.approx(2.8)
+    assert spec.RELIEF_WIDTH_MAX == pytest.approx(3.0)
     assert spec.ARM_STOCK_THICKNESS_MIN == pytest.approx(7.8359)
-    assert spec.FULL_THREAD_WORST == pytest.approx(4.7859)
-    assert spec.FULL_THREAD_WORST_DIAMETERS == pytest.approx(4.7859 / 2.845, abs=1e-4)
+    assert spec.FULL_THREAD_WORST == pytest.approx(4.5859)
+    assert spec.FULL_THREAD_WORST_DIAMETERS == pytest.approx(4.5859 / 2.845, abs=1e-4)
     assert spec.ENGAGEMENT_GOVERNED_BY == "arm"
-    # Arm at its printed maximum 8.8: min(9.15, 8.8 - 0.25) - 2.8 = 5.75,
-    # 2.02 D; the arm still governs.
+    # Arm at its printed maximum 8.8: min(9.15, 8.8 - 0.25) - 3.0 = 5.55,
+    # 1.95 D; the arm still governs.
     assert spec.ARM_PRINTED_THICKNESS_MAX == pytest.approx(8.8)
-    assert spec.FULL_THREAD_WORST_PRINTED_ARM == pytest.approx(5.75)
-    assert spec.FULL_THREAD_WORST_PRINTED_ARM_DIAMETERS == pytest.approx(5.75 / 2.845, abs=1e-3)
+    assert spec.FULL_THREAD_WORST_PRINTED_ARM == pytest.approx(5.55)
+    assert spec.FULL_THREAD_WORST_PRINTED_ARM_DIAMETERS == pytest.approx(5.55 / 2.845, abs=1e-3)
     # The MHA-139 review's own count: the shortest section less the widest
     # relief and 1.5 pitches of die run-in still spans the stock arm's
     # full-thread need.
@@ -350,8 +351,8 @@ def test_notes_stay_within_rule_six() -> None:
 def test_modelled_volume_is_the_turned_body_less_the_slot() -> None:
     head = math.pi * 3.0**2 * 4.0
     shoulder = math.pi * 2.0**2 * 53.0
-    relief = math.pi * (1.85 / 2.0) ** 2 * 2.0
-    thread = math.pi * (2.845 / 2.0) ** 2 * 8.0
+    relief = math.pi * (1.85 / 2.0) ** 2 * 2.2
+    thread = math.pi * (2.845 / 2.0) ** 2 * 7.8
     # Pappus: the lead's 0.3 x 0.3 corner triangle, centroid 0.925 + 0.3/3
     # out, stays; the tip chamfer's 0.3 x 0.3, centroid 1.4225 - 0.3/3 out,
     # goes.
@@ -359,8 +360,8 @@ def test_modelled_volume_is_the_turned_body_less_the_slot() -> None:
     tip = 2.0 * math.pi * (2.845 / 2.0 - 0.3 / 3.0) * (0.3 * 0.3 / 2.0)
     assert part.V_LEAD == pytest.approx(lead)
     assert part.V_BODY == pytest.approx(head + shoulder + relief + thread + lead - tip)
-    # Filed flush: 6.0 of full thread past the relief, a 0.25 edge break.
-    fitted_thread = math.pi * (2.845 / 2.0) ** 2 * 6.0
+    # Filed flush: 5.8 of full thread past the relief, a 0.25 edge break.
+    fitted_thread = math.pi * (2.845 / 2.0) ** 2 * 5.8
     fitted_tip = 2.0 * math.pi * (2.845 / 2.0 - 0.25 / 3.0) * (0.25 * 0.25 / 2.0)
     assert part.turned_volume(8.0, 0.25) == pytest.approx(
         head + shoulder + relief + fitted_thread + lead - fitted_tip
@@ -535,7 +536,7 @@ def test_installed_configuration_is_split_from_a_finished_default() -> None:
 
 def test_quarter_inch_arm_stock_fails_the_1_5d_rule(monkeypatch) -> None:
     # The arm stock governs the worst-case engagement: 1/4-in bar would leave
-    # min(9.15, 6.2484 - 0.25) - 2.8 = 3.20, 1.12D, under the 1.5D rule.
+    # min(9.15, 6.2484 - 0.25) - 3.0 = 3.00, 1.05D, under the 1.5D rule.
     # Executed as a separate, unregistered module: reloading the real one
     # would swap its band tuples for new objects under every importer
     # (test_fit_bands tracks them by identity).
@@ -551,7 +552,7 @@ def test_quarter_inch_arm_stock_fails_the_1_5d_rule(monkeypatch) -> None:
     with pytest.raises(AssertionError, match="under the 1.5D rule"):
         probe_spec.loader.exec_module(probe)
     assert probe.ARM_STOCK_THICKNESS == pytest.approx(6.35)
-    assert probe.FULL_THREAD_WORST == pytest.approx(0.246 * 25.4 - 0.25 - 2.8)
+    assert probe.FULL_THREAD_WORST == pytest.approx(0.246 * 25.4 - 0.25 - 3.0)
     assert probe.FULL_THREAD_WORST < 1.5 * probe.THREAD_MODEL_DIA
 
 

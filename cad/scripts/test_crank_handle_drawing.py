@@ -92,7 +92,7 @@ def test_tenon_and_counterbore_are_fitted_to_the_parts_they_take() -> None:
     assert "THE OAK ONLY, CLEAR OF MHA-153; AT WORST THE OAK FEATHERS AT THE CUP." in spec.DRAWING_NOTES
     assert "R2.4 END ROUND TO A FLAT OAK END, CREST <MOD-DIAM>9.2." in spec.DRAWING_NOTES
     # crank-v4-16's sheet: two more lines ran the block into the border.
-    assert len(spec.DRAWING_NOTES.splitlines()) <= 14
+    assert len(spec.DRAWING_NOTES.splitlines()) <= 15
     # The fitted tenon keeps its ferrule seat and 1.5 over the bore, with
     # 0.10 of bore eccentricity budgeted (local review of 1f3067ef2).
     assert spec.SHOULDER_R == pytest.approx(ferrule.OUTER_DIA / 2.0)
@@ -121,11 +121,15 @@ def test_tenon_and_counterbore_are_fitted_to_the_parts_they_take() -> None:
     # The off-centre budget is printed as process plus an inspectable wall,
     # and the cup cures centred on the screw (user ruling 2026-09-30).
     flat = " ".join(spec.DRAWING_NOTES.split())
-    # A requirement, not a method (machinist review of crank-v4-16).
+    # A requirement, not a method (machinist review of crank-v4-16), and the
+    # eccentricity the walls and the cup offset budget is printed as a
+    # run-out (local review of 20dac9d3f).
     assert "ONE SETUP" not in flat and "MANDREL" not in flat
+    assert spec.BORE_RUNOUT_TIR == pytest.approx(0.2)
+    assert "THE OUTSIDE AND THE COUNTERBORE RUN TRUE TO THE BORE WITHIN 0.2 TIR." in flat
     # Measured on the wall, clear of the end face's edge breaks (local
     # review of 747487c71).
-    assert "MIN OAK WALL 1.5 OVER THE BORE, CORNERS EXCEPTED." in flat
+    assert "MIN OAK WALL 1.5 OVER THE BORE, CORNERS EXCEPTED;" in flat
     assert "THE CUP CENTRED ON THE WAXED MHA-139 SCREW." in flat
     assert spec.CUP_OFFSET_MAX == pytest.approx(0.175)
     drawing_source = Path(drawing.__file__).read_text(encoding="utf-8")

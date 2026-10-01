@@ -101,6 +101,10 @@ COUNTERBORE_R = COUNTERBORE_DIA / 2.0
 # eccentricity between the bore and the turned outside (local reviews of
 # 1f3067ef2 and 4b46c8b53).
 BORE_ECCENTRICITY = 0.10
+# ... printed as a run-out the turner can check on a mandrel in the bore
+# (local review of 20dac9d3f: the minimum wall alone allowed 0.30 off-centre,
+# enough to stop the screw seating through both the bore and the cup).
+BORE_RUNOUT_TIR = 2.0 * BORE_ECCENTRICITY
 # The MHA-153 cup can sit off the bore axis by this eccentricity plus half its
 # widest glue line, 0.175 -- more than the screw's head and floor-hole
 # clearances plus its float in the bore take up (0.165, local review of
@@ -342,7 +346,8 @@ DRAWING_NOTES = "\n".join(
         f"AFTER CURE, TURN THE SHOULDER FLUSH WITH {FERRULE_NUMBER} AND THE END ROUND ON",
         f"  THE OAK ONLY, CLEAR OF {CUP_NUMBER}; AT WORST THE OAK FEATHERS AT THE CUP.",
         f"THE REAMED BORE RUNS ON THE {SCREW_NUMBER} SHOULDER; ITS LIMITS APPLY FULL LENGTH.",
-        f"MIN OAK WALL {TENON_WALL_FLOOR_MM:.1f} OVER THE BORE, CORNERS EXCEPTED.",
+        f"MIN OAK WALL {TENON_WALL_FLOOR_MM:.1f} OVER THE BORE, CORNERS EXCEPTED; THE OUTSIDE AND",
+        f"  THE COUNTERBORE RUN TRUE TO THE BORE WITHIN {BORE_RUNOUT_TIR:.1f} TIR.",
         f"GRIP CONTOUR, TANGENT ARCS IN TURN: R{FLARE_R:.1f} FROM THE SHOULDER TO A",
         f"  <MOD-DIAM>{2.0 * WAIST_R:.1f} WAIST AT {_e(WAIST_X):.1f}; "
         f"R{S_CONCAVE_R:.1f} AND R{S_CONVEX_R:.1f} (INFLECTION AT {_e(INFLECTION_X):.1f})",

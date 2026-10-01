@@ -167,10 +167,12 @@ THREAD_FIT_OFFSET_MAX = round(
 RELIEF_DIA = 1.85
 RELIEF_DIA_TOL = 0.05
 RELIEF_DIA_MAX = round(RELIEF_DIA + RELIEF_DIA_TOL, 6)
-# Routine at 2.0 (MHA-139 machinist review of crank-v4-16 called the 1.5
-# +/-0.10 band over-specification): the #4-40's finer pitch lets the .X width
-# keep 1.5 pitches of die run-out at 1.2 and the 1.5D engagement at 2.8.
-RELIEF_WIDTH = 2.0
+# Routine at 2.2 (the MHA-139 machinist review of crank-v4-16 called a
+# +/-0.10 band over-specification): at .X the straight floor past the
+# longest lead, 1.4 - 0.4 = 1.0, keeps 1.5 #4-40 pitches of die run-out
+# (local review of 20dac9d3f: the lead is not floor), and the widest 3.0
+# still leaves the 1.5D engagement.
+RELIEF_WIDTH = 2.2
 # A 45-degree lead from the relief floor up into the seat face, so the groove
 # leaves no sharp inside corner.  0.3 keeps the lead inside the Ø2.845 thread
 # major, i.e. inside the arm's tapped hole, so the whole seat annulus that
@@ -282,6 +284,9 @@ ARM_PRINTED_THICKNESS_MAX = ARM_THICKNESS + GENERAL_1PL_TOL_MM
 # rule with it at .X (asserted below).
 RELIEF_WIDTH_MAX = round(RELIEF_WIDTH + GENERAL_1PL_TOL_MM, 6)
 RELIEF_WIDTH_MIN = round(RELIEF_WIDTH - GENERAL_1PL_TOL_MM, 6)
+# The straight floor the die's incomplete teeth run out into: the shortest
+# relief less the longest lead.
+RELIEF_FLOOR_MIN = round(RELIEF_WIDTH_MIN - RELIEF_LEAD_LIMITS[1], 6)
 # The title-block edge break on the tapped hole's inboard exit edge takes up
 # to its size of thread off the arm end of the engagement.
 TAP_EXIT_BREAK = EDGE_BREAK_MAX_MM
@@ -394,8 +399,8 @@ for _ok, _what in (
         "the largest relief stands above the deepest die-cut root",
     ),
     (
-        RELIEF_WIDTH_MIN >= 1.5 * THREAD_PITCH,
-        "the shortest relief is under 1.5 pitches of die run-out",
+        RELIEF_FLOOR_MIN >= 1.5 * THREAD_PITCH,
+        "the shortest relief's straight floor is under 1.5 pitches of die run-out",
     ),
     (
         FULL_THREAD_WORST >= ENGAGEMENT_FLOOR,
