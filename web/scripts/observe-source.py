@@ -11,6 +11,9 @@ features. Track only anchors explicitly classified as physical-feature. A failed
 ends permanently until a genuinely observed manual seed, with no extrapolation/recovery
 from CAD projections. Forward/backward flow and source-patch correlation reject occlusion,
 appearance discontinuity and drift. These checks are conservative, not semantic proof.
+Same-exposure aliases reuse a manual physical measurement only when its recorded
+source-image identity matches the target's actual decoded frame, including its BGR hash.
+They remain manual observations, not new flow or template-match measurements.
 """
 
 import argparse
@@ -267,6 +270,49 @@ def needs_machine(classification, shot):
     return shot.get("hasCorrespondingMachine") is not False
 
 
+def exact_exposure_landmarks(seed, frame, source_image, kinds):
+    """Reuse manual physical pixels only for a proven identical decoded exposure."""
+    identity_keys = (
+        "frameIndex", "sourceSha256", "sha256Bgr8", "pixelFormat", "width", "height"
+    )
+    if (
+        seed["shotId"] != frame["shotId"]
+        or not isinstance(source_image, dict)
+        or any(key not in source_image for key in identity_keys)
+    ):
+        return []
+    identities = (seed.get("sourceImage"), frame.get("sourceImage", source_image))
+    if any(
+        not isinstance(identity, dict)
+        or any(
+            key not in identity or identity[key] != source_image[key]
+            for key in identity_keys
+        )
+        for identity in identities
+    ):
+        return []
+    seed_views = {
+        view["id"]: view["rectSourcePixels"] for view in seed.get("views", [])
+    }
+    target_views = {
+        view["id"]: view["rectSourcePixels"]
+        for view in frame.get("views", seed.get("views", []))
+    }
+    return [
+        copy.deepcopy(item)
+        for item in seed["landmarks"]
+        if kinds[item["anchorId"]] == "physical-feature"
+        and item["method"] == "manual"
+        and (
+            item.get("viewId") is None
+            or (
+                item["viewId"] in seed_views
+                and target_views.get(item["viewId"]) == seed_views[item["viewId"]]
+            )
+        )
+    ]
+
+
 def observe(data, source_path, match_repeated_view=False):
     if digest(source_path) != data["source"]["sha256"]:
         raise ValueError("Private source hash does not match observation provenance")
@@ -336,6 +382,24 @@ def observe(data, source_path, match_repeated_view=False):
     wanted.update(index / fps for index, values in tracked.items() if values)
     wanted.update(item["timeSeconds"] for item in failures)
     wanted.update(existing)
+    source_images = {}
+
+    def source_image(index):
+        if index not in source_images:
+            cap.set(cv2.CAP_PROP_POS_FRAMES, index)
+            ok, image = cap.read()
+            if not ok:
+                raise ValueError(f"Cannot reproduce source observation frame {index}")
+            source_images[index] = {
+                "frameIndex": index,
+                "sha256Bgr8": hashlib.sha256(image.tobytes()).hexdigest(),
+                "pixelFormat": "bgr8",
+                "width": width,
+                "height": height,
+                "sourceSha256": data["source"]["sha256"],
+            }
+        return source_images[index]
+
     all_frames = []
     for t in sorted(wanted):
         if not 0 <= t < data["source"]["durationSeconds"]:
@@ -387,6 +451,26 @@ def observe(data, source_path, match_repeated_view=False):
                         view["camera"] = None
                         view["mechanicalState"] = copy.deepcopy(state)
         if not frame["landmarks"] and frame["classification"] == "machine":
+            exposure_index = round(frame["decodedTimeSeconds"] * fps)
+            for seed in manual_seeds:
+                if (
+                    seed["shotId"] != frame["shotId"]
+                    or round(seed["decodedTimeSeconds"] * fps) != exposure_index
+                    or not seed.get("sourceImage")
+                    or ("sourceImage" in frame and not frame["sourceImage"])
+                ):
+                    continue
+                aliases = exact_exposure_landmarks(
+                    seed, frame, source_image(exposure_index), kinds
+                )
+                if aliases:
+                    frame["landmarks"] = aliases
+                    if not frame.get("views") and seed.get("views"):
+                        frame["views"] = copy.deepcopy(seed["views"])
+                        for view in frame["views"]:
+                            view["camera"] = None
+                    break
+        if not frame["landmarks"] and frame["classification"] == "machine":
             frame["landmarks"] = copy.deepcopy(tracked.get(index, []))
         observed_ids = {item["anchorId"] for item in frame["landmarks"]}
         if frame["classification"] == "machine":
@@ -408,21 +492,8 @@ def observe(data, source_path, match_repeated_view=False):
             if frame["landmarks"]
         }
     )
-    source_images = {}
     for index in measured_indices:
-        if round(cap.get(cv2.CAP_PROP_POS_FRAMES)) != index:
-            cap.set(cv2.CAP_PROP_POS_FRAMES, index)
-        ok, image = cap.read()
-        if not ok:
-            raise ValueError(f"Cannot reproduce source observation frame {index}")
-        source_images[index] = {
-            "frameIndex": index,
-            "sha256Bgr8": hashlib.sha256(image.tobytes()).hexdigest(),
-            "pixelFormat": "bgr8",
-            "width": width,
-            "height": height,
-            "sourceSha256": data["source"]["sha256"],
-        }
+        source_image(index)
     for frame in all_frames:
         if frame["landmarks"]:
             frame["sourceImage"] = source_images[
