@@ -9,9 +9,9 @@ read CAD authority; the website does not infer dimensions from video pixels.
 
 `video-catalog.ts` identifies the six original videos in scope and their local
 reference hashes. `youtube-player.ts` owns the visible official embed.
-`timeline.ts` reads independent source observations and selects measured
-camera/physical input per view. `main.ts` changes between following playback and
-paused exploration; `scene.ts` applies the physical pose to the full native GLB.
+`timeline.ts` selects compact source camera and physical-input tracks per view.
+`main.ts` follows the original playback clock or permits paused exploration;
+`scene.ts` applies the physical pose to the full native GLB.
 
 The GLB hash and source revision must match the generated mechanical data.
 A rejected load never enters the visible scene. Bindings resolve genuine native
@@ -78,166 +78,86 @@ The HUD distinguishes the rod-head assumption from the lower-rocker exception;
 reports and visibility bindings retain the exact records. Neither declaration
 establishes whole-part correspondence or makes unavailable source data matched.
 Original hole contours remain diagnostics, not fabricated source pixels, native
-holes or textures. The full 435-part census, all other features, pose, camera,
-motion, 38.4-source-pixel and 0.5-second requirements remain unchanged.
+holes or textures. Native inventory integrity, all other features, pose and
+motion remain required. The staged image tolerances below replace the former
+38.4-source-pixel limit; timing remains bounded by 0.5 seconds.
 
-## Source coverage
+## Iterative synchronization plan
 
-Each observation identifies the original MP4 hash, source dimensions, decoded
-presentation time, shot classification, camera and independently observed
-landmarks. Camera fitting uses fit points and held-out check points. Mechanism
-input must be complete and finite. It may be fully observed, or a chosen feasible
-reconstruction constrained by source measurements. Unidentified coordinates in
-the latter are explicitly unobserved; they are not recovered historical settings.
+The approved sequence is **50% → 20% → 10% → 5% of source frame width**.
+These are maximum landmark-position errors, not percentages of videos covered.
+At 1920 pixels wide the limits are 960, 384, 192 and 96 pixels respectively.
+The final target is 5%; video/model timing stays within 0.5 seconds at every stage.
 
-Every required frame needs a passing camera and complete physical input for all
-of its views, with a source correspondence census covering the native drawable
-inventory. Both observed inputs and constrained reconstructions require a bound
-visibility proof. Physical photographs and transitions remain required when they
-show a corresponding native mechanism.
+Start with working approximate camera and mechanism tracking across **all six**
+videos, then present an actual headed-browser demo before refining to 20%, 10%
+and 5%. Complete one coarse pass across the collection rather than perfecting
+one video while the others remain unavailable. Each stage reports its measured
+coverage, maximum errors and unresolved intervals; unmeasured is not passed.
 
-The user permits source-non-identifiable structural fixed parts in a complete
-feasible reconstruction. They stay rendered and in the native visibility census,
-with their actual dark/cropped source region and fixed-motion evidence recorded.
-The HUD and reports list them as not geometric-fidelity passed. Moving, deforming
-or source-overridden parts cannot use this category; identified-feature error
-and timing limits do not change.
+### Runtime tracks
 
-An independently measured opaque human hand may exclude a native part from
-source correspondence only with the distinct `source-occluded` reason. Its
-closed `sourceOcclusion` record binds the exact original decoded image, a
-convex nondegenerate in-image hand-interior polygon, source-mask uncertainty
-and measurement evidence. It is not a shadow/darkness heuristic, a general
-object waiver or permission to hide/fabricate native geometry.
+Reuse the existing official player, native scene, physical solver and camera/input
+interpolation. Author compact per-video shot tracks with camera keys, complete
+feasible physical inputs, discrete setup changes and source view layouts.
+Cuts switch atomically; interpolation is confined to compatible continuous shots.
+Unobserved inputs may be chosen feasibly and must remain labelled as chosen,
+not historically recovered. No second solver, proxy geometry, fake visibility
+certificates or arbitrary individual-part adjustments are permitted.
 
-Ordinary rounded requested-time rows and held/interpolated samples cannot use
-this point-only certificate. They remain **UNAVAILABLE** unless independently
-source-qualified. Actual per-exposure hand masks and any separately qualified
-temporal closure remain source prerequisites; neither is inferred from an
-earlier mask or native capture time. Other reasons retain the 0.5-second timing
-limit unchanged.
+Production playback does not require semantic source certificates for every one
+of the 435 native drawables at every exposure. Native model identity, complete
+inventory and coherent attached-part motion still matter. Offline source evidence
+is separate from compact runtime tracks; full decoded-frame observation corpora
+are not a prerequisite for displaying an honestly labelled approximation.
 
-This certificate is one point at the original native decoded time, not a held
-or interpolated interval. The native consumer independently receives the current
-source-frame identity, and requires a fresh full-435 depth-tested GPU capture
-with the exact witness view, time, camera, ROI, presentation and ordered support
-layout. Every positive native ID pixel cell's conservative extent must lie
-strictly inside the polygon with margin at least source-mask uncertainty plus
-actual native source-pixel uncertainty. A centre or sparse contour is insufficient.
-Legacy `outside`, `occluded` and `absent` exclusions still require zero actual
-native ID pixels. The new bucket remains **SOURCE-OCCLUDED**, not source-corresponded
-or geometry-passed; a feasible whole pose is still chosen, not historically
-recovered. A source/CPU proposal cannot certify GPU/source coverage or promote
-canonical source availability.
+Required coverage includes every retained video's corresponding machine views:
+close-ups, moving mechanisms, insets, mirrored views, photographs and montages.
+A difficult view does not become exempt because it cannot yet be matched.
+Intervals without a corresponding machine may retain the preceding pose.
+Unsupported required intervals remain explicit in the UI and reports.
 
-Runtime states:
+### Measurement and refinement
 
-| State | Meaning |
-|---|---|
-| `matched` | Every required view has a passing camera and complete observed input or source-compatible constrained reconstruction. |
-| `unavailable` | Required evidence is missing, incomplete or outside the observation record. |
-| `held` | An exempt source interval retains an actual earlier matched pose. |
-| `no-machine` | An exempt interval has no earlier match; current exploratory geometry/camera stay unchanged. |
+Use original hashed footage and timestamped source observations. Evaluate every
+integer second and visible camera/mechanism change, with additional intermediate
+checks around fast motion, cuts and nonlinear interpolation. Reference landmarks
+must include spatially distributed fixed features and visible moving features;
+a favorable camera fit alone cannot prove the mechanism state.
 
-Interpolation requires compatible, source-evidenced motion and view regimes.
-Every observed or reconstructed view must cover the requested time with its
-visibility certificate. A decoded exposure can be held inside that explicit
-interval; point certificates do not cover gaps or expired tails. Preparation uses
-a separate reusable sample bank. Mechanical/source validity and device target
-capacity must pass before publishing views, input, camera or proof metadata.
-Required incomplete footage never falls back to a held pose. The player remains
-usable when source matching is unavailable; the warning distinguishes video
-playback from verified geometry synchronization.
+Compare the actual rendered native model with source landmarks and inspect
+source/render overlays and silhouettes. Report source-localization uncertainty
+and known geometry exceptions separately; do not relabel unknown correspondences
+or uncertain measurements as precise passes. Existing hard foot/guide/pen failures
+remain useful regression diagnostics, not obligations to solve an exhaustive
+part-identification problem before showing any animation.
 
-The current observation corpus is incomplete for all six videos, so footage
-acceptance is not met. Source-camera reprojection results conditional on
-unmeasured poses are not a complete physical match. The PDF page-by-page guide
-video (`rMHw9GCAtE8`) is excluded by user scope; its footage is not part of the
-catalog, observations or acceptance.
+Per-video verification is incremental and repeatable, without an acceptance-run
+quota. The all-video final gate retains all six pages and the 5%/0.5-second limits.
+A coarse demo or a passing subset does not establish final acceptance.
+On a failed stage, refine the worst source-visible discrepancy, rerun the affected
+shot, then rerun the collection. Escalate actual missing geometry outside approved
+exceptions rather than hiding it with a camera warp or an occlusion claim.
 
-Measured photo/page transforms use the `source-image-plane-registered` camera
-evidence kind and an authored `imagePlaneWarp`. Ordered physical
-corner identities and the unwarped viewport determine the sole homography;
-independent interior checks cannot be reused fitting corners. The reference
-camera must be qualified independently. Native pose, field of view and reference
-aspect stay unchanged; intrinsics scale uniformly rather than taking the target
-ROI's aspect. No homography-coefficient interpolation or invented camera
-trajectory is used. Manual exploration drops the image-plane presentation.
+### Browser verification
 
-Each crossfade image has an explicit `imageLayerId`. Its ordered native subviews
-compose opaquely into one transparent image, then receive the image's common
-weight once. Higher same-image subviews mask lower colour and diagnostic samples
-inside their actual rectangle/quad support. Different fading images do not mask
-each other. Support-union weights are checked spatially, including nested insets;
-disjoint regions do not create an artificial global opacity sum.
+Exercise the original visible audible player and use its actual media time,
+not two aliases of an application clock. Seeking, buffering or unavailable media
+cannot provide timing evidence. Check deterministic seek/follow behavior and
+pause/manual/resume transitions against the actual rendered scene.
 
-## Browser verification
+Paused exploration must permit orbit, pan, zoom and mechanism operation without
+advancing the source video. Compact mode retains the same visible usable player
+at least 200 by 200 pixels, with advancing audio and working pause/resume controls.
+Verify all six routes; present a headed demo of the working implementation.
 
-`verify:sync` checks the original media identity, decoded samples, source-image
-provenance and complete observations before launching the production site. It
-requires all six pages, every integer-second sample and recorded change, a
-38.4-pixel maximum landmark error and 0.5-second maximum timing error. Missing
-media, blocked external playback and missing native geometry fail the command.
+Native WebGL landmark readback remains available for rendered-pixel measurements.
+CPU projection alone is not final rendered evidence. Existing raster, finite-line,
+contour, masking and per-part certificate machinery is diagnostic legacy work:
+its historical results are preserved, but completing its entire pending queue is
+not a prerequisite for this iterative delivery plan. If a measurement uses a
+particular diagnostic path, that path's known correctness defects still matter.
 
-The verifier clicks the real YouTube controls and reads the iframe's actual
-HTMLMediaElement state, decoded size, duration and currentTime. It rejects ads,
-muted playback, seeking/buffering samples and incorrect native content. Reference
-review seeks the official player, waits for a paused decoded frame and restores
-exploration afterwards. Compact mode must keep the same visible iframe at least
-200 by 200 pixels with working pause/resume controls and advancing audible media.
-
-With `?verify=1`, diagnostic three-dimensional landmark markers follow native
-node transforms and supported native deformation shaders. They pass through the
-same viewport, scissor, mirror, image-plane warp and ordered image mask as the
-scene. Marker readback proves projection only: depth-off markers do not prove
-that a native surface is visible. The separate depth-tested part-ID capture
-covers all native drawable paths and records their actual raster visibility.
-Proof bindings and captures include the source exposure, camera, input, overrides,
-geometry assumptions, authored/resolved warp or explicit nulls, and full ordered
-support layout. Source/native uncertainty belongs in the final error bound;
-raw reprojection error below 38.4 pixels alone is not acceptance.
-Ordinary landmark coordinates use exact destination pixel-cell mapping.
-Rasterized reference markers independently verify that mapping rather than
-calibrating it. Marker, blit and warped-cell errors remain explicit native terms.
-General warped marker centroids require the full native-cell diameter bound.
-Only an exactly separable affine warp with an uncut footprint retains the
-tighter half-cell bound. Outer clipping and higher same-image masks invalidate
-that shortcut. The centroid remains the actual readback value; a larger bound
-can reject the 38.4-pixel limit even when the surviving marker is visible.
-CPU camera projection and two aliases of the player's clock are insufficient
-evidence. Native WebGL readback may use a software renderer; it does not imply
-hardware acceleration.
-
-Finite native-line diagnostics return actual clipped GPU samples. Warped line
-samples require the full native-cell bound even for separable affine transforms;
-the marker-centroid shortcut does not apply. Every declared segment must stay
-inside its native drawable's rest bounding box; that alone does not identify a
-physical surface or axis. The ledger uses Euclidean distance to the finite fitted
-sample segment, not an infinite axis, then adds source localization, certified
-axis geometry, native quantization and raster-fit deviation once each. A bundled
-axis allowance requires an explicit decomposition to avoid counting localization
-twice. Independently observed endpoints, edge-row midpoints and contour points
-must remain inside unmasked source support; surviving fragments cannot certify
-a masked observation.
-
-Contour samples are actual mesh-owned ID-boundary pixel centres with a qualifying
-mesh/background neighbor. Readback, ROI, scissor, image-mask and nonmesh-footprint
-edges do not establish geometric contour witnesses. The complete boundary-witness
-footprint must remain inside its own support and outside later blocking masks.
-Its bound adds transformed native half-cell quantization to the maximum destination
-axis spacing, plus any nominal/rounded-viewport discrepancy. A depth-ID contour
-describes the effective rendered scene's visible boundary, not necessarily an
-original material edge; physical feature identity remains a separate requirement.
-
-Fixed-part source-region containment uses the full exclusive pixel-cell extent,
-not sampled contours. Warped diagnostics include native and destination raster
-cell bounds transformed into source pixels. They retain full depth-tested support
-rather than substituting CPU bounds.
-
-Paused interaction checks the actual canvas pixels, crank input and unchanged
-camera, then verifies pointer-driven orbit while native media remains paused.
-A positive mathematical or renderer diagnostic proves only its exercised path;
-it does not certify missing footage observations.
 
 ## Assets and rights
 

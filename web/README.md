@@ -50,11 +50,11 @@ simulate tooth collisions, friction or inertia. The amplitude controls show CAD
 station millimetres; calibration to the video's engraved measuring sticks is
 not established.
 
-Source playback requires a measured camera and complete physical input for each
-view. Hidden settings may be chosen as a feasible source-compatible
-reconstruction, labelled as unobserved. An incomplete required interval remains
-visibly unavailable. An interval without a corresponding machine can retain a
-previously matched pose, or leave the exploratory pose unchanged.
+Source-following tracks combine source cameras with complete feasible physical
+inputs. Hidden settings may be chosen and are labelled unobserved, not recovered
+historical settings. Playback distinguishes a working approximation from measured
+fidelity. Unsupported required intervals remain explicit; intervals without a
+corresponding machine may retain the preceding pose.
 
 The filmed U-shaped connecting-rod junction and the native plate-like head are
 treated as functionally equivalent for animation, with the user's approval
@@ -67,44 +67,35 @@ They are absent from all twenty native rockers and remain explicitly
 **uncertified**, not pending a promised CAD correction. The closed declaration
 names both exact source features and only `harmonic-analyzer/channel/rocker-arm-1..20`
 paths. The HUD identifies this exception separately from the rod-head mapping;
-reports and proof bindings retain both exact records when declared.
+reports retain both exact records when declared.
 
-Neither exception establishes correspondence for an entire moving part or
-makes incomplete source data matched. Original hole contours remain diagnostics;
-no source pixels, native holes or textures are fabricated. The full 435-part
-census, all other features, pose, camera, motion, 38.4-pixel and 0.5-second
-requirements remain unchanged.
+Neither exception establishes correspondence for an entire moving part. No source
+pixels, native holes or textures are fabricated. The native inventory and coherent
+mechanism motion remain required; per-part source certificates at every exposure
+are no longer prerequisites for approximate playback.
 
 Structural fixed parts that the source cannot identify may remain rendered in
 a complete feasible reconstruction, with the user's approval. They are listed
 as source-non-identifiable, not geometric-fidelity passed. Moving parts and all
 identifiable-feature and timing checks retain their requirements.
 
-Source occlusion by an independently measured opaque human hand is separate from
-those geometry exceptions. A `source-occluded` record must bind the exact original
-image and decoded-time point certificate. A fresh all-435 depth GPU capture must
-put every positive native ID pixel cell strictly inside its convex source hand
-polygon, including the combined source-mask/native uncertainty margin. Source
-identity is supplied independently, never inferred from native capture time.
-Other exclusions still require zero native ID pixels. These parts remain
-**SOURCE-OCCLUDED**, not source-corresponded or geometry-passed; a single-image
-mask cannot certify held/interpolated images or times, and a CPU proposal cannot
-make unavailable canonical source data matched.
+The iterative plan is **50% → 20% → 10% → 5% of source frame width**, across
+all six videos at each stage. These are maximum landmark errors, not fractions
+of coverage. At 1920 pixels wide the limits are 960, 384, 192 and 96 pixels.
+The final tolerance is 5%; timing remains within 0.5 seconds throughout.
 
-Ordinary rounded requested-time rows and held/interpolated samples remain
-**UNAVAILABLE** unless separately source-qualified; the point-only hand mask
-cannot supply that qualification. Actual per-exposure masks or separately
-qualified temporal closure are source prerequisites, never inferred from an
-earlier mask. The 0.5-second timing limit for other reasons is unchanged.
-
-All six observation files currently have incomplete camera/mechanism coverage.
-Full footage fidelity is **not verified**.
+First demonstrate working coarse camera/mechanism tracking across the collection
+in a headed browser, then refine the largest visible discrepancies. Verify every
+integer second and visible change using distributed fixed and moving landmarks,
+actual rendered pixels and visual overlays. Close-ups, insets and montages remain
+required. Report uncertainty, exceptions and unavailable measurements explicitly.
+Coarse playback is not final footage acceptance.
 
 ```sh
 npm --prefix web run build
 npm --prefix web run preview
 
-# Full acceptance, once the source prerequisites are complete:
+# Final all-video acceptance:
 export HARMONIC_REFERENCE_ROOT=/path/to/private-reference-root
 npm --prefix web run build && npm --prefix web run verify:sync
 ```
@@ -113,26 +104,18 @@ npm --prefix web run build && npm --prefix web run verify:sync
 does not survive a host reboot. Prefer durable ignored storage such as
 `web/.vite/reference-root` and set the variable explicitly. The root must contain
 the six original MP4 files for the routes above under `videos/`.
-The verifier serves `dist/`, launches headed Chromium, exercises the real YouTube
-media, and checks every integer second and recorded change. It fails on
-unavailable prerequisites, missing source evidence, landmark errors above 38.4
-pixels or clock skew above 0.5 seconds. `?verify=1` enables native WebGL landmark
-and depth-tested part-visibility readback. Mathematical camera fitting alone
-does not count as rendered-pixel evidence.
+The verifier serves `dist/`, exercises the original media, and reports per-video
+coverage, rendered landmark errors and timing. Incremental runs are repeatable;
+there is no acceptance-attempt quota. The default final target is 5% of each
+source frame's width, with clock skew no greater than 0.5 seconds.
+`?verify=1` enables native WebGL landmark readback. Mathematical camera fitting
+alone does not count as rendered-pixel evidence.
 
-Finite-line checks use Euclidean distance to the finite fitted GPU segment.
-Contour checks use supported mesh/background depth-ID boundaries, not artificial
-image cuts or point/line footprint edges. Their final bounds include independent
-source, native and geometry terms; raw error below the limit alone is insufficient.
-Filtering contour candidates preserves the full native census and every rendered
-ID pixel's extent.
-
-Measured image-plane warps retain a qualified reference camera and native
-geometry, with independently identified corners and interior checks. A decoded
-exposure is held only inside its explicit certificate; transforms are not invented
-between measurements. Nested montage subviews compose into a named image before
-fading once, with matching colour/diagnostic masks and spatial opacity checks.
-This presentation support does not qualify the incomplete source corpus.
+Legacy full-part visibility, finite-line, contour and raster-bound diagnostics
+remain historical evidence, not an exhaustive queue that must finish before
+source-following animation can be demonstrated. Preserve their real bug fixes
+when using those measurement paths. See [`DESIGN.md`](DESIGN.md) for the current
+track, coverage and verification contract.
 
 Reports and local screenshots go to `web/.vite/verification-output/` and are
 ignored. `HARMONIC_CHROME` selects the Chromium executable; `HARMONIC_HEADLESS=1`
