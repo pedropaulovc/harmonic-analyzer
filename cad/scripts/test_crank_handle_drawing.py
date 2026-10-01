@@ -160,7 +160,8 @@ def test_grip_contour_is_a_note_with_a_loose_allowance() -> None:
         (9.083, 21.636, 59.500, 30.694), abs=0.001
     )
     assert spec.END_ROUND_R == pytest.approx(2.260, abs=0.001)
-    assert "TURN WITHIN 0.5 ON DIAMETER; CHECK WITH A TEMPLATE." in notes
+    # No inspection method (machinist review of crank-v4-22).
+    assert "TURN WITHIN 0.5 ON DIAMETER." in notes and "TEMPLATE" not in notes
     assert "BASIC" not in notes
     assert not hasattr(crank_handle_spec, "BASIC_DIMENSIONS")
     assert not hasattr(crank_handle_spec, "GEOMETRIC_TOLERANCES_MM")
