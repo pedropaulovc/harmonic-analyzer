@@ -259,7 +259,7 @@ such build:
 | `verify_soundness:<stem>`, `verify:kinematics` | yes | yes | yes |
 | `preflight`, `export`, `package:release` | yes | yes | yes |
 | `verify:soundness` | no (aggregator) | no | — (its leaves are) |
-| `check:math`, `check:config`, `check:graph`, `check:undefined_names`, `check:nameplate`, `check:numerals`, `check:recipe`, `check:cache`, `check:partiso`, `check:inert`, `check:budget` | **no** | no (parallel) | no (runs locally) |
+| `check:math`, `check:config`, `check:graph`, `check:undefined_names`, `check:nameplate`, `check:numerals`, `check:recipe`, `check:cache`, `check:partiso`, `check:inert`, `check:budget`, `check:joint_retention` (audit-only: reports, never fails) | **no** | no (parallel) | no (runs locally) |
 | `check:verify_telemetry` | **no** | no (opt-in — NOT in build/release) | no |
 | `gallery` | **no** (Blender + GPU) | no | no (no worker has Blender) |
 | `cache_status` | **no** | no (diagnostic) | no |
