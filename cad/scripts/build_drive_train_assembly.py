@@ -1874,20 +1874,21 @@ T120_POSE_AXIAL = sum(axial for _, axial in T120_POSE_TERMS.values())
 # w sin I from the axis satisfies a^2 + b^2 <= tip^2: a convex solid, as is
 # the 16T's reach (a vertical cylinder about the crank axis).  So both checks
 # are convex minimisations; each reduces in closed form to one variable, p,
-# minimised by golden section to far below any printed place.  Codex P1 on
-# #1154: a 0.05-deg sampling of T120's rim missed the lowest point between
-# its samples by 0.005.
+# over the interval of p where the section is not empty, minimised by golden
+# section to far below any printed place.  Codex P1 on #1154: a 0.05-deg
+# sampling of T120's rim missed the lowest point between its samples by
+# 0.005.  Codex P2 on #1154 (review 3): a finite penalty for leaving that
+# interval made the objective multimodal, so the interval is found first.
 _T120_ORIGIN = cone_station(0.0)
 _T120_CRANK_P = X_CRANK - _T120_ORIGIN[0]
 _GOLDEN = (math.sqrt(5.0) - 1.0) / 2.0
-# Weight on leaving T120 or the window: steeper than any slope of either
-# objective in p, so the minimum never sits outside.
-_T120_OUTSIDE_WEIGHT = 100.0
 
 
-def _golden_min(f, lo: np.ndarray, hi: np.ndarray) -> np.ndarray:
-    """Minimum of each convex ``f`` over [``lo``, ``hi``], element-wise: 60
-    golden-section steps shrink the bracket to 3e-13 of its width."""
+def _golden_min(f, lo: np.ndarray, hi: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """(argument, value) of the least of each convex ``f`` over [``lo``,
+    ``hi``], its ends included, element-wise: 60 golden-section steps shrink
+    the bracket to 3e-13 of its width."""
+    ends = (lo, hi)
     x1, x2 = hi - _GOLDEN * (hi - lo), lo + _GOLDEN * (hi - lo)
     f1, f2 = f(x1), f(x2)
     for _ in range(60):
@@ -1898,7 +1899,40 @@ def _golden_min(f, lo: np.ndarray, hi: np.ndarray) -> np.ndarray:
         f_new = f(new)
         x1, f1 = np.where(left, new, kept_x), np.where(left, f_new, kept_f)
         x2, f2 = np.where(left, kept_x, new), np.where(left, kept_f, f_new)
-    return np.minimum(f1, f2)
+    x, value = np.where(f1 <= f2, x1, x2), np.minimum(f1, f2)
+    for end in ends:
+        f_end = f(end)
+        x, value = np.where(f_end < value, end, x), np.minimum(f_end, value)
+    return x, value
+
+
+def _feasible_edge(g, inside: np.ndarray, outside: np.ndarray) -> np.ndarray:
+    """The end of the interval where the convex ``g`` <= 0, between
+    ``inside`` (in it) and ``outside``, element-wise and on its feasible side:
+    ``outside`` itself when it is in the interval, else 60 bisections."""
+    reached = g(outside) <= 0.0
+    for _ in range(60):
+        middle = (inside + outside) / 2.0
+        kept = g(middle) <= 0.0
+        inside, outside = (
+            np.where(kept, middle, inside),
+            np.where(kept, outside, middle),
+        )
+    return np.where(reached, outside, inside)
+
+
+def _convex_min_where(f, constraints, lo: np.ndarray, hi: np.ndarray) -> np.ndarray:
+    """Least of ``f`` over the p in [``lo``, ``hi``] where every constraint g
+    has g(p) <= 0, element-wise; inf where no p qualifies.  Each g is convex
+    on the interval the earlier ones leave, so each narrows it to an interval
+    (its least point, then both edges), and ``f`` is convex on the last."""
+    feasible = np.ones(np.shape(lo), dtype=bool)
+    for g in constraints:
+        seed, least = _golden_min(g, lo, hi)
+        feasible &= least <= 0.0
+        lo, hi = _feasible_edge(g, seed, lo), _feasible_edge(g, seed, hi)
+    _, value = _golden_min(f, lo, hi)
+    return np.where(feasible, value, np.inf)
 
 
 def _t120_lowest(south: np.ndarray, dy: np.ndarray, reach: float) -> np.ndarray:
@@ -1908,48 +1942,73 @@ def _t120_lowest(south: np.ndarray, dy: np.ndarray, reach: float) -> np.ndarray:
     north = south + CONE_FACE + _T120_NORTH_BAND[0]
     above = Y_CRANK + dy - Y_DRIVE
 
-    def lowest(p: np.ndarray) -> np.ndarray:
-        # Across the reach at p, the b nearest the cone axis leaves T120 the
-        # widest offset q, which lowers its underside and widens its span.
+    # Across the reach at p, the b nearest the cone axis leaves T120 the
+    # widest offset q, which lowers its underside and widens its span; |b| is
+    # convex in p.  Where |b| <= tip, q is concave, so T120's underside at p
+    # (low) is convex, its top (high) concave.
+    def across(p: np.ndarray) -> np.ndarray:
         half = np.sqrt(np.maximum(reach**2 - (p - _T120_CRANK_P) ** 2, 0.0))
-        b = np.clip(0.0, above - half, above + half)
-        q = np.sqrt(np.maximum(_TIP120**2 - b**2, 0.0))
+        return np.clip(0.0, above - half, above + half)
+
+    def span(p: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        q = np.sqrt(np.maximum(_TIP120**2 - across(p) ** 2, 0.0))
         low = np.maximum((south - p * SIN_I) / COS_I, (p * COS_I - q) / SIN_I)
         high = np.minimum((north - p * SIN_I) / COS_I, (p * COS_I + q) / SIN_I)
-        outside = np.maximum(low - high, 0.0) + np.maximum(np.abs(b) - _TIP120, 0.0)
-        return low + _T120_OUTSIDE_WEIGHT * outside
+        return low, high
+
+    def in_tip(p: np.ndarray) -> np.ndarray:
+        return np.abs(across(p)) - _TIP120
+
+    def in_faces(p: np.ndarray) -> np.ndarray:
+        low, high = span(p)
+        return low - high
 
     centre = np.full_like(south, _T120_CRANK_P)
-    w = _golden_min(lowest, centre - reach, centre + reach)
-    return np.where(np.abs(above) - _TIP120 > reach, np.inf, _T120_ORIGIN[2] + w)
+    w = _convex_min_where(
+        lambda p: span(p)[0], (in_tip, in_faces), centre - reach, centre + reach
+    )
+    return _T120_ORIGIN[2] + w
 
 
 def _t120_nearest(
     south: np.ndarray, dy: np.ndarray, z_low: float, z_high: float
 ) -> np.ndarray:
     """T120's least distance from the crank axis between machine z ``z_low``
-    and ``z_high``, per corner (``south`` and ``dy`` as _t120_lowest)."""
+    and ``z_high``, per corner (``south`` and ``dy`` as _t120_lowest); inf
+    where T120 has no point between them."""
     north = south + CONE_FACE + _T120_NORTH_BAND[0]
     above = np.abs(Y_CRANK + dy - Y_DRIVE)
     w_low, w_high = z_low - _T120_ORIGIN[2], z_high - _T120_ORIGIN[2]
 
-    def distance(p: np.ndarray) -> np.ndarray:
-        # T120's span in w at p, and its offset from the axis nearest zero
-        # over that span: T120 reaches |b| up to q there.
+    # T120's span in w at p (low convex, high concave), and its offset from
+    # the axis nearest zero over that span (convex): T120 reaches |b| up to q
+    # there, q concave where a <= tip, so the distance is convex.
+    def span(p: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         low = np.maximum(w_low, (south - p * SIN_I) / COS_I)
         high = np.minimum(w_high, (north - p * SIN_I) / COS_I)
-        a = np.maximum(
+        return low, high
+
+    def offset(p: np.ndarray) -> np.ndarray:
+        low, high = span(p)
+        return np.maximum(
             np.maximum(p * COS_I - high * SIN_I, low * SIN_I - p * COS_I), 0.0
         )
-        q = np.sqrt(np.maximum(_TIP120**2 - a**2, 0.0))
-        outside = np.maximum(low - high, 0.0) + np.maximum(a - _TIP120, 0.0)
-        return (
-            np.hypot(p - _T120_CRANK_P, np.maximum(above - q, 0.0))
-            + _T120_OUTSIDE_WEIGHT * outside
-        )
+
+    def in_window(p: np.ndarray) -> np.ndarray:
+        low, high = span(p)
+        return low - high
+
+    def in_tip(p: np.ndarray) -> np.ndarray:
+        return offset(p) - _TIP120
+
+    def distance(p: np.ndarray) -> np.ndarray:
+        q = np.sqrt(np.maximum(_TIP120**2 - offset(p) ** 2, 0.0))
+        return np.hypot(p - _T120_CRANK_P, np.maximum(above - q, 0.0))
 
     centre = np.full_like(south, _T120_CRANK_P)
-    return _golden_min(distance, centre - _T120_REACH, centre + _T120_REACH)
+    return _convex_min_where(
+        distance, (in_window, in_tip), centre - _T120_REACH, centre + _T120_REACH
+    )
 
 
 def _cone_corners(
@@ -2143,13 +2202,40 @@ for _name, _clearance in T120_FITUP_LIMIT_CLEARANCES.items():
 
 # ... and a band turned down must still mesh.  Codex P1 on #1154: at Ø15.48
 # and the open centre distance the band's contact path is -0.63, no contact.
-# The band is turned only where the check stops the feeler on it, and the
-# check reads the pair's worst, so only a crank no higher than
+# Each cut is called for by its own reading alone (t120_fitup_cuts): the band
+# is turned down only where the feeler stops between it and the T120 tips,
+# and the check reads the pair's worst, so only a crank no higher than
 # T120_BAND_CHECK_CRANK_HEIGHT above its model height is ever turned down
-# (every other term taken at its closing worst there: a superset).  A lower
+# (every other term taken at its closing worst there: a superset).  A
+# shoulder faced back leaves the band reading as it was: the band's window
+# already starts at the shoulder's short limit, the facing's floor.  A lower
 # crank also closes the 16T:64T centres, so the floor need keep contact only
 # up to that height, every other open-corner term open (worst to worst only
-# on the terms the two checks do not share).
+# on the terms the two checks do not share).  Codex P1 on #1154 (review 3):
+# a check that let either failure turn the band down would turn it at crank
+# +0.300, where only the shoulder stops the feeler, and lose contact there.
+
+
+def t120_fitup_cuts(reading: dict[str, float]) -> frozenset[str]:
+    """The clearances whose own fit-up cut the check calls for at
+    ``reading`` (crank_pinion_spec.T120_FITUP_ASSEMBLY_CHECK): the band is
+    turned down only for ``turned band radial``, the shoulder faced back only
+    for ``shoulder air``, each where its own reading stops the feeler."""
+    return frozenset(
+        name for name, value in reading.items() if value < PINION_T120_FITUP_FEELER
+    )
+
+
+# The band reading moves with the crank height only through the crank axis's
+# height over T120's (``above`` in _t120_nearest), and T120's distance from
+# the crank axis never falls as that height grows; the contact path falls as
+# the 16T:64T centres open with it.  So the band-turn heights run from the
+# band's bottom up to one height, and its least contact is at that height.
+if Y_CRANK + min(_CRANK_HEIGHT_BAND) <= Y_DRIVE or CRANK_MESH_DC_PER_DY <= 0.0:
+    raise AssertionError(
+        "the T120 band reading or the 16T:64T contact path is not monotonic over "
+        "the crank height band"
+    )
 
 
 def crank_band_contact_path(turned_dia: float, crank_height: float) -> float:
@@ -2187,23 +2273,20 @@ if not math.isclose(
 
 
 def _band_check_crank_height() -> float:
-    """Highest crank height at which the fit-up check can stop the feeler on
-    the band at its printed upper limit (the reading grows as the crank
-    rises)."""
+    """Highest crank height at which the fit-up check can call for the band
+    to be turned down: its own reading, the band at its printed upper limit,
+    stops the feeler (the reading grows as the crank rises)."""
 
-    def reads(height: float) -> float:
-        return t120_fitup_reading(crank_heights=(height,))["turned band radial"]
+    def turns_band(height: float) -> bool:
+        reading = t120_fitup_reading(crank_heights=(height,))
+        return "turned band radial" in t120_fitup_cuts(reading)
 
     low, high = _CRANK_HEIGHT_BAND
-    if reads(high) < PINION_T120_FITUP_FEELER:
+    if turns_band(high):
         return high
     for _ in range(50):
         middle = (low + high) / 2.0
-        low, high = (
-            (middle, high)
-            if reads(middle) < PINION_T120_FITUP_FEELER
-            else (low, middle)
-        )
+        low, high = (middle, high) if turns_band(middle) else (low, middle)
     return high
 
 

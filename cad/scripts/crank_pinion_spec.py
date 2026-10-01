@@ -511,13 +511,17 @@ BOSS_WALL_NOTE = (
     f"BOSS WALL {math.floor(BOSS_WALL_WORST * 100.0) / 100.0:.2f} MIN AT BORE."
 )
 # The drive-train fit-up may turn the band down past its printed band (the
-# T120 feeler check, MHA-A03's crank step); the sheet permits it and states
-# the floor, so the part stays conforming after the fit-up cut, and states
-# the worst-case clearances to T120 that the check is there for.
+# T120 feeler check, MHA-A03's crank step), and only when the band itself
+# fails that check (a shoulder failure is the shoulder's to correct); the
+# sheet permits it only as that check directs and states the floor, so the
+# part stays conforming after the fit-up cut, and states the worst-case
+# clearances to T120 that the check is there for.  Codex P1 on #1154
+# (review 3).  The note names the check, not its step number: a part never
+# reads the step registry (Main's TbPB ruling 2; test_part_isolation).
 # Named exception: MHA-025 turned band (drawing-simplicity-policy.md, "Named exceptions").
 TURNED_BAND_FITUP_NOTE = "\n".join(
     (
-        "TURNED BAND MAY BE TURNED DOWN AT FIT-UP TO "
+        "TURNED BAND MAY BE TURNED DOWN PER MHA-A03 T120 CHECK, "
         f"Ø{TURNED_DIA_FITUP_MIN:.{TURNED_DIA_PLACES}f} MIN.",
         f"WORST-CASE CLEARANCE TO MHA-013 T120: BAND {T120_TURNED_BAND_RADIAL_WORST:.2f}, "
         f"SHOULDER {T120_SHOULDER_AIR_WORST:.2f}.",
@@ -526,10 +530,13 @@ TURNED_BAND_FITUP_NOTE = "\n".join(
 DRAWING_NOTES = "\n".join((TOOTH_EDGE_NOTE, BOSS_WALL_NOTE, TURNED_BAND_FITUP_NOTE))
 # The MHA-A03 crank step's T120 check (user, 2026-09-30, #1154), printed by
 # draw_drive_train_assembly: the pinion on its seat feeler, MHA-025 and T120
-# pushed toward each other (taking up every running play), one turn.  Either
-# fit-up limit passes the feeler at every corner (build_drive_train_assembly
-# asserts it), so the check always closes.  Its last line is short: the step
-# carries on after it on the same line.
+# pushed toward each other (taking up every running play), turned by hand and
+# read all round before the step's free-running revolution (it may rub until
+# the check closes: Codex P2 on #1154, review 3).  Each cut answers its own
+# reading only (build_drive_train_assembly.t120_fitup_cuts).  Either fit-up
+# limit passes the feeler at every corner (build_drive_train_assembly asserts
+# it), so the check always closes.  Its last line is short: the step carries
+# on after it on the same line.
 T120_FITUP_PUSHED = (PINION_NUMBER, "T120")
 # Named exception: MHA-025 turned band (drawing-simplicity-policy.md, "Named exceptions").
 T120_FITUP_ASSEMBLY_CHECK = "\n".join(
@@ -537,11 +544,12 @@ T120_FITUP_ASSEMBLY_CHECK = "\n".join(
         f"   WORST-CASE T120 CLEARANCE: TURNED BAND {T120_TURNED_BAND_RADIAL_WORST:.2f}, "
         f"SHOULDER {T120_SHOULDER_AIR_WORST:.2f}. PUSH",
         f"   {T120_FITUP_PUSHED[0]} AND {T120_FITUP_PUSHED[1]} TOWARD EACH OTHER; "
-        f"TURN MHA-021 ONCE. A {T120_FITUP_FEELER_MM:.2f}",
-        "   FEELER MUST PASS BAND TO T120 TIPS, SHOULDER TO T120 SOUTH FACE. IF",
-        "   NOT, TURN BAND DOWN, "
-        f"Ø{TURNED_DIA_FITUP_MIN:.{TURNED_DIA_PLACES}f} MIN, OR FACE SHOULDER BACK, "
-        f"{SHOULDER_LENGTH_FITUP_MIN:.{SHOULDER_LENGTH_PLACES}f} MIN;",
-        "   RESET, RECHECK.",
+        "TURN MHA-021 SLOWLY BY HAND,",
+        f"   READING A {T120_FITUP_FEELER_MM:.2f} FEELER ALL ROUND. BAND TO T120 TIPS: "
+        "IF THE FEELER",
+        "   STOPS, TURN BAND DOWN, "
+        f"Ø{TURNED_DIA_FITUP_MIN:.{TURNED_DIA_PLACES}f} MIN. SHOULDER TO T120 SOUTH FACE: IF",
+        "   THE FEELER STOPS, FACE SHOULDER BACK, "
+        f"{SHOULDER_LENGTH_FITUP_MIN:.{SHOULDER_LENGTH_PLACES}f} MIN. RESET, RECHECK.",
     )
 )

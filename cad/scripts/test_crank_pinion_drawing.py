@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import math
+import re
 from pathlib import Path
 
 import pytest
@@ -938,6 +939,31 @@ def test_t120_shoulder_air_is_no_higher_than_a_point_between_rim_samples() -> No
     assert bdt.T120_SHOULDER_AIR_STATED_WORST <= witness
 
 
+def test_t120_search_never_looks_outside_the_section() -> None:
+    # Codex P2 on #1154 (review 3): the search priced a point outside T120's
+    # section with a finite penalty, so its objective rose to 955.6 there and
+    # fell again to 157.9, and golden section's convexity no longer held.  The
+    # section's interval is found first and only its points are searched,
+    # its ends included; the worst case stays the same.
+    import numpy as np
+
+    import build_drive_train_assembly as bdt
+
+    lo, hi = np.array([0.0]), np.array([10.0])
+
+    # Inside p <= 3 the objective falls to -3 at the end; outside it is far
+    # lower, low enough that any finite penalty of 100 per mm would win.
+    def objective(p: np.ndarray) -> np.ndarray:
+        return np.where(p <= 3.0, -p, -1000.0 + p)
+
+    least = bdt._convex_min_where(objective, (lambda p: p - 3.0,), lo, hi)
+    assert least[0] == pytest.approx(-3.0, abs=1e-9)
+    nowhere = bdt._convex_min_where(objective, (lambda p: p + 1.0,), lo, hi)
+    assert nowhere[0] == math.inf
+    assert bdt.T120_SHOULDER_AIR == pytest.approx(-0.090474, abs=2e-6)
+    assert bdt.T120_TURNED_BAND_RADIAL == pytest.approx(-0.115742, abs=2e-6)
+
+
 def test_t120_fit_up_closes_and_both_sheets_state_it() -> None:
     # Either fit-up cut, taken to its limit, passes the feeler at every
     # corner of the same stack; the minimum band is an actual size.
@@ -1044,30 +1070,135 @@ def test_t120_turn_down_floor_keeps_the_band_in_mesh() -> None:
     )
 
 
-def test_both_sheets_state_the_t120_shortfall_the_build_derives() -> None:
-    # Codex P2 on #1154 (review 2): the policy has both affected sheets state
-    # the shortfall and its value; the tagged emitters print the build's
-    # worst-case figures, rounded down.
-    import build_drive_train_assembly as bdt
+def _sentences(text: str) -> list[str]:
+    """The sentences of sheet text, whatever its line breaks."""
+    return [part for part in re.split(r"[.;]\s+|[.;]$", " ".join(text.split())) if part]
+
+
+_FEATURE = re.compile(r"\b(BAND|SHOULDER)\b")
+_SHORTFALL = re.compile(r"(?<![\w.])-\d+\.\d+")
+
+
+def _t120_shortfalls(text: str) -> dict[str, set[float]]:
+    """The negative figures each sentence naming T120 ties to the band and
+    to the shoulder: each figure goes to the nearer of the two words."""
+    found: dict[str, set[float]] = {"BAND": set(), "SHOULDER": set()}
+    for sentence in _sentences(text):
+        if "T120" not in sentence:
+            continue
+        words = [
+            (match.span(), match.group(1)) for match in _FEATURE.finditer(sentence)
+        ]
+        for figure in _SHORTFALL.finditer(sentence):
+            # Characters between the figure and the word, either side of it.
+            gaps = [
+                (max(start - figure.end(), figure.start() - end), word)
+                for (start, end), word in words
+            ]
+            found[min(gaps)[1]].add(round(float(figure.group()), 2))
+    return found
+
+
+# MHA-A03's crank step, which carries the T120 check.  The part spec never
+# reads the step registry (test_part_isolation), so the key lives here.
+_T120_CHECK_STEP_KEY = "crank-mesh-checked"
+
+
+def _crank_step() -> str:
     import draw_drive_train_assembly as drawing
     import drive_train_steps
 
-    band = f"{math.floor(bdt.T120_TURNED_BAND_RADIAL * 100.0) / 100.0:.2f}"
-    shoulder = f"{math.floor(bdt.T120_SHOULDER_AIR * 100.0) / 100.0:.2f}"
-    assert (band, shoulder) == ("-0.12", "-0.10")
-    part_fact = [
-        line for line in spec.TURNED_BAND_FITUP_NOTE.splitlines() if "T120" in line
-    ]
-    assert part_fact == [
-        f"WORST-CASE CLEARANCE TO MHA-013 T120: BAND {band}, SHOULDER {shoulder}."
-    ]
-    assert part_fact[0] in spec.DRAWING_NOTES.splitlines()
-    number = drive_train_steps.step_number("crank-mesh-checked")
+    number = drive_train_steps.step_number(_T120_CHECK_STEP_KEY)
     step = drawing.CONE_CRANK_STEPS.split(f"\n{number}. ", 1)[1]
-    step = " ".join(step.split(f"\n{number + 1}. ")[0].split())
-    fact = f"WORST-CASE T120 CLEARANCE: TURNED BAND {band}, SHOULDER {shoulder}."
-    assert fact in " ".join(spec.T120_FITUP_ASSEMBLY_CHECK.split())
-    assert fact in step
+    return step.split(f"\n{number + 1}. ")[0]
+
+
+def test_both_sheets_state_the_t120_shortfall_the_build_derives() -> None:
+    # Codex P2 on #1154 (review 2): the policy has both affected sheets state
+    # the shortfall and its value; the tagged emitters print the build's
+    # worst-case figures, rounded down.  Codex P3 (review 3): each sheet must
+    # tie each figure to its own feature, however the sentence is worded.
+    import build_drive_train_assembly as bdt
+
+    band = round(math.floor(bdt.T120_TURNED_BAND_RADIAL * 100.0) / 100.0, 2)
+    shoulder = round(math.floor(bdt.T120_SHOULDER_AIR * 100.0) / 100.0, 2)
+    assert band != shoulder
+    for text in (spec.DRAWING_NOTES, _crank_step()):
+        assert _t120_shortfalls(text) == {"BAND": {band}, "SHOULDER": {shoulder}}
+
+
+def test_each_t120_cut_answers_only_its_own_failed_reading() -> None:
+    # Codex P1 on #1154 (review 3): at crank +0.300 the band reads 0.1817 and
+    # passes while the shoulder reads 0.0636 and fails.  A check that let
+    # either failure turn the band down would cut it to Ø15.78 there, where
+    # its 16T:64T contact path is -0.0667: no contact, yet the row counted it.
+    import build_drive_train_assembly as bdt
+
+    witness = bdt.t120_fitup_reading(crank_heights=(0.300,))
+    assert witness["turned band radial"] == pytest.approx(0.181654, abs=2e-6)
+    assert witness["shoulder air"] == pytest.approx(0.063603, abs=2e-6)
+    assert bdt.t120_fitup_cuts(witness) == {"shoulder air"}
+    assert bdt.crank_band_contact_path(spec.TURNED_DIA_FITUP_MIN, 0.300) < 0.0
+    # Facing the shoulder alone closes that check.
+    faced = bdt.t120_fitup_reading(
+        crank_heights=(0.300,), shoulder_length=spec.SHOULDER_LENGTH_FITUP_MIN
+    )
+    assert bdt.t120_fitup_cuts(faced) == frozenset()
+    # Wherever the check does call for the band, the floor keeps contact.
+    low, high = bdt._CRANK_HEIGHT_BAND
+    turned = [
+        height
+        for height in (low + (high - low) * i / 40.0 for i in range(41))
+        if "turned band radial"
+        in bdt.t120_fitup_cuts(bdt.t120_fitup_reading(crank_heights=(height,)))
+    ]
+    assert turned and max(turned) <= bdt.T120_BAND_CHECK_CRANK_HEIGHT
+    assert all(
+        bdt.crank_band_contact_path(spec.TURNED_DIA_FITUP_MIN, height) > 0.0
+        for height in turned
+    )
+    # Both sheets give each cut its own condition: the turn-down floor is
+    # stated with the band and its check only, the facing floor with the
+    # shoulder only.  The part sheet points at the MHA-A03 T120 check, which
+    # carries the band-only condition, by name and never by step number (a
+    # sequence edit must not re-key the part).
+    turn_down = f"Ø{spec.TURNED_DIA_FITUP_MIN:.2f} MIN"
+    face_back = f"{spec.SHOULDER_LENGTH_FITUP_MIN:.1f} MIN"
+    for text in (spec.DRAWING_NOTES, _crank_step()):
+        for floor, own, other in (
+            (turn_down, "BAND", "SHOULDER"),
+            (face_back, "SHOULDER", "BAND"),
+        ):
+            for sentence in _sentences(text):
+                if floor in sentence:
+                    assert own in sentence and other not in sentence, sentence
+    import drive_train_steps
+
+    assert any(
+        turn_down in sentence
+        and drive_train_steps.DRAWING_NUMBER in sentence
+        and "T120" in sentence
+        for sentence in _sentences(spec.DRAWING_NOTES)
+    )
+    assert not re.search(r"STEP\s+\d", spec.DRAWING_NOTES)
+
+
+def test_crank_step_runs_free_only_after_the_t120_check_closes() -> None:
+    # Codex P2 on #1154 (review 3): the step asked for a full revolution that
+    # must never bind before the T120 check, yet the unadjusted pair may rub
+    # (-0.10 / -0.12).  The seat is set and the check closed first; the
+    # free-running revolution follows, then the match-drill.
+    import draw_drive_train_assembly as drawing
+
+    step = " ".join(_crank_step().split())
+    seat = step.index(f"{drawing.PINION_SEAT_FEELER:.2f} OFF")
+    check = step.index(f"{spec.T120_FITUP_FEELER_MM:.2f} FEELER")
+    cuts = max(
+        step.index(f"Ø{spec.TURNED_DIA_FITUP_MIN:.2f} MIN"),
+        step.index(f"{spec.SHOULDER_LENGTH_FITUP_MIN:.1f} MIN"),
+    )
+    free = step.index("BIND")
+    assert seat < check < cuts < free < step.index("MATCH-DRILL")
 
 
 def test_both_gear_sheets_print_the_worst_contact_ratio_rounded_down() -> None:

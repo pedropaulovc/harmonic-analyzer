@@ -2140,9 +2140,12 @@ sections:
          to T120 is −0.090 and the turned band's radial −0.116 (a named
          exception, user 2026-09-30, #1154; +0.12 / +0.11 RSS, +0.311 /
          +0.251 on the nominal axes), so the pair is checked on a 0.10
-         feeler at fit-up with MHA-025 and T120 pushed together, the band
-         turned down to Ø15.78 MIN (still in 16T:64T contact) if it stops
-         the feeler; the teeth cover 0.862 of the grown 64T tooth row
+         feeler at fit-up with MHA-025 and T120 pushed together, before the
+         free-running revolution; each cut answers its own reading: the band
+         is turned down to Ø15.78 MIN (still in 16T:64T contact wherever its
+         reading can fail) only if the band stops the feeler, the shoulder
+         faced back to 8.2 MIN only if the shoulder does; the teeth cover
+         0.862 of the grown 64T tooth row
          with the cone stack floated 0.80 north (>=85% required; stub teeth
          counted).
          Positive worst-case tight backlash, not a backlash window, is the

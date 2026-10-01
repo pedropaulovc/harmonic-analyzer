@@ -510,17 +510,20 @@ CONE_CRANK_STEPS = "\n".join(
         "   MHA-097 " + ADJUSTER_ENGAGEMENT_ASSEMBLY_FACT,
         # User ruling 2026-09-28: the crank journal runs directly in the post;
         # the centres are fixed, and the only mesh requirement is no binding.
-        "4. FIT MHA-026 DIRECTLY IN THE MHA-016 CRANK BORE. SLIDE MHA-025",
-        "   ON, NOT YET PINNED, AND MESH IT WITH MHA-021 TOOTH IN GAP.",
-        "   TURN MHA-021 THROUGH ONE FULL REVOLUTION: THE MESH MUST NEVER",
-        "   BIND. IF IT BINDS, STOP AND CHECK THE PARTS AND BORE SPACING.",
-        f"   SET MHA-025 {PINION_SEAT_FEELER:.2f} OFF THE MHA-016 BOSS NORTH FACE WITH A FEELER.",
         # User ruling 2026-09-30 (#1154): the 16T's shoulder and turned band
         # are feeler-checked against T120 before the pin is drilled.  The
-        # check's last line is short; the step carries on after it.
-        T120_FITUP_ASSEMBLY_CHECK + " ONLY THEN MATCH-DRILL AND REAM FOR MHA-134 AT",
-        "   BOSS MID-LENGTH WITH MHA-026; SEAT FLUSH BOTH SIDES PER THE",
-        "   MHA-025 PRINT. RE-CHECK THAT THE MESH NEVER BINDS AFTER PINNING.",
+        # pair may rub on T120 until that check closes, so the seat and the
+        # check come first, turning by hand, and the free-running revolution
+        # after them (Codex P2 on #1154, review 3).  The check's last line is
+        # short; the step carries on after it.
+        "4. FIT MHA-026 DIRECTLY IN THE MHA-016 CRANK BORE. SLIDE MHA-025",
+        "   ON, NOT YET PINNED, AND MESH IT WITH MHA-021 TOOTH IN GAP.",
+        f"   SET MHA-025 {PINION_SEAT_FEELER:.2f} OFF THE MHA-016 BOSS NORTH FACE WITH A FEELER.",
+        T120_FITUP_ASSEMBLY_CHECK + " THEN",
+        "   TURN MHA-021 ONE FULL REVOLUTION; IT MUST NEVER BIND. IF IT DOES,",
+        "   STOP AND CHECK THE PARTS AND BORE SPACING. ONLY THEN MATCH-DRILL",
+        "   AND REAM FOR MHA-134 AT BOSS MID-LENGTH WITH MHA-026; SEAT FLUSH",
+        "   BOTH SIDES PER MHA-025 PRINT. RE-CHECK NO BINDING AFTER PINNING.",
         "5. THE PAPER-DRIVE T12 WHEEL GOES ON MHA-026 BEFORE THE ARM.",
         # U33 (user, 2026-09-23): crank hub MHA-137 pressed into the arm and
         # seam-pinned by MHA-138 (a 4 m6 dowel, 4.0 long = half the arm); the
