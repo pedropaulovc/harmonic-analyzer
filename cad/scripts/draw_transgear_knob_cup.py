@@ -92,18 +92,23 @@ SECTION_KEEP = {
 
 
 def _section_y(model_y_mm: float) -> float:
-    """Sheet Y of a model-Y station on the section (rear face up)."""
-    return SECTION_CENTER[1] + (model_y_mm - LENGTH / 2.0) * _S / 1000.0
+    """Sheet Y of a model-Y station on the section (front face up).
+
+    The section is cut from the *Top face view, and it shows model +Y down:
+    mapped rear face up, the front-face pick landed on the y = LENGTH face
+    (run 20261001T011714683Z).
+    """
+    return SECTION_CENTER[1] - (model_y_mm - LENGTH / 2.0) * _S / 1000.0
 
 
 # The front face's pick lies on its cut edge, midway between the bore and
-# the O.D. on the right half; the symbol stands below and outboard, clear of
-# the length dimension on the right.
+# the O.D. on the right half; the symbol stands above and outboard, clear of
+# the length dimension's upper extension line on the right.
 _FRONT_PICK = (
     SECTION_CENTER[0] + (BORE_DIA + OD) / 4.0 * _S / 1000.0,
     _section_y(0.0),
 )
-FRONT_FINISH = (_FRONT_PICK, (_FRONT_PICK[0] + 0.020, 0.140))
+FRONT_FINISH = (_FRONT_PICK, (_FRONT_PICK[0] + 0.020, _FRONT_PICK[1] + 0.022))
 
 
 async def build(adapter: Any) -> dict[str, str]:
