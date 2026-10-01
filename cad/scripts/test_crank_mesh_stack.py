@@ -83,3 +83,47 @@ def test_platform_axis_maps_to_the_restored_crank_axis() -> None:
     assert machine_x == pytest.approx(line.X_CRANK, abs=1e-6)
     assert line.Y_BASE_TOP + platform.CRANK_AXIS_Y == pytest.approx(line.Y_CRANK)
     assert math.hypot(x, z) == pytest.approx(platform.CRANK_AXIS_OFF)
+
+
+def test_open_corner_carries_the_cone_stack_north_float() -> None:
+    # Codex P2 on #1154: at the stack's north float the 64T slides up the
+    # inclined cone axis and the centres open further; the printed worst-case
+    # contact ratio must count it.
+    import build_drive_train_assembly as bdt
+    import crank_drive_gear_notes
+    from cone_line import COS_I, SIN_I
+    from cone_stack_end_play import CONE_FLOAT_NORTH, SHAFT_END_PLAY, STACK_FLOAT
+
+    assert CONE_FLOAT_NORTH == SHAFT_END_PLAY[1] + STACK_FLOAT[1]
+    float_term = stack.OPEN_TERMS["cone stack north float"]
+    assert float_term == pytest.approx(
+        CONE_FLOAT_NORTH * SIN_I * COS_I * stack.DC_PER_DX
+    )
+    # The exact opening at the physical centres: the 64T's in-plane leg grows
+    # by the float's projection; the booked linear term stays within 0.002.
+    exact = (
+        math.hypot(bdt._DX16 + CONE_FLOAT_NORTH * SIN_I * COS_I, bdt._DY16)
+        - bdt.CRANK_ACTUAL_C2C
+    )
+    assert exact == pytest.approx(bdt.CRANK_MESH_FLOAT_OPENING_EXACT)
+    assert 0.0 < exact - float_term < 0.002
+
+    def worst(opening: float) -> float:
+        return stack.contact_ratio(
+            centre_distance=bdt.CRANK_ACTUAL_C2C + opening,
+            tip_dia_16=stack.TIP_DIA_LOW_16,
+            tip_dia_64=stack.TIP_DIA_LOW_64,
+        )
+
+    unfloated = worst(stack.OPEN_CENTRE_DISTANCE_MM - float_term)
+    printed = crank_drive_gear_notes.WORST_CONTACT_RATIO
+    assert worst(stack.OPEN_CENTRE_DISTANCE_MM) == pytest.approx(
+        bdt.CRANK_MESH_CONTACT_RATIO_WORST
+    )
+    # Without the float the sheets would print a figure the floated mesh
+    # does not reach; with it (booked or exact) the print holds.
+    assert math.floor(unfloated * 100.0) / 100.0 > worst(
+        stack.OPEN_CENTRE_DISTANCE_MM - float_term + exact
+    )
+    assert printed == math.floor(bdt.CRANK_MESH_CONTACT_RATIO_WORST * 100.0) / 100.0
+    assert worst(stack.OPEN_CENTRE_DISTANCE_MM - float_term + exact) >= printed

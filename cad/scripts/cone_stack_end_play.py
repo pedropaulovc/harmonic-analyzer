@@ -42,3 +42,6 @@ STACK_FLOAT = (
 # collar-to-block air, the adjuster's embed window and the drum's engaged-zone
 # margin book for it.
 SHAFT_END_PLAY = (0.05, 0.25)
+# The stack's in-service float north of its model pose along the cone axis:
+# the shaft at the far end of its play and the stack at the far end of its own.
+CONE_FLOAT_NORTH = SHAFT_END_PLAY[1] + STACK_FLOAT[1]

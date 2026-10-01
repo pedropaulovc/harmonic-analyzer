@@ -52,7 +52,7 @@ NORMAL_TOOTH_THICKNESS_DEVIATIONS = tuple(
 # corner with both tips at their printed lower limits; this module is below
 # that stack, so the printed value is a literal the assembly's import and
 # test_crank_mesh_stack hold to the derivation. Both gear sheets print it.
-WORST_CONTACT_RATIO = 0.57
+WORST_CONTACT_RATIO = 0.55
 
 
 def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> str:

@@ -450,10 +450,12 @@ CRANK_ACTUAL_C2C = math.hypot(_DX16, _DY16)
 # printed on both gear sheets as a plain fact). Nominal at the modelled centre
 # and tips; worst at crank_mesh_stack's open corner with both tips at their
 # printed lower limits. Each sheet prints the worst rounded down.
+from cone_stack_end_play import CONE_FLOAT_NORTH  # noqa: E402
 from crank_drive_gear_notes import WORST_CONTACT_RATIO as CRANK_MESH_PRINTED_CONTACT_RATIO  # noqa: E402
 from crank_drive_gear_spec import OUTSIDE_DIA as _GEAR64_TIP_DIA  # noqa: E402
 from crank_mesh_stack import (  # noqa: E402
     OPEN_CENTRE_DISTANCE_MM as CRANK_MESH_OPEN_CENTRE_DISTANCE,
+    OPEN_TERMS as CRANK_MESH_OPEN_TERMS,
     TIP_DIA_LOW_16 as _PINION_TIP_DIA_LOW,
     TIP_DIA_LOW_64 as _GEAR64_TIP_DIA_LOW,
     contact_ratio as crank_mesh_contact_ratio,
@@ -472,6 +474,28 @@ if not 0.0 <= CRANK_MESH_CONTACT_RATIO_WORST - CRANK_MESH_PRINTED_CONTACT_RATIO 
     raise AssertionError(
         f"the sheets print a 16T:64T worst-case contact ratio of {CRANK_MESH_PRINTED_CONTACT_RATIO:.2f}; "
         f"the mesh gives {CRANK_MESH_CONTACT_RATIO_WORST:.4f} (print it rounded down)"
+    )
+# crank_mesh_stack books the cone stack's north float linearly on its frame
+# reference (0.02405); at these physical centres the 64T sliding
+# CONE_FLOAT_NORTH up the cone axis opens them by the exact 0.02538, 0.0013
+# more. The printed figure must hold with the exact opening in its place.
+CRANK_MESH_FLOAT_OPENING_EXACT = (
+    math.hypot(_DX16 + CONE_FLOAT_NORTH * SIN_I * COS_I, _DY16) - CRANK_ACTUAL_C2C
+)
+if (
+    crank_mesh_contact_ratio(
+        centre_distance=CRANK_ACTUAL_C2C
+        + CRANK_MESH_OPEN_CENTRE_DISTANCE
+        - CRANK_MESH_OPEN_TERMS["cone stack north float"]
+        + CRANK_MESH_FLOAT_OPENING_EXACT,
+        tip_dia_16=_PINION_TIP_DIA_LOW,
+        tip_dia_64=_GEAR64_TIP_DIA_LOW,
+    )
+    < CRANK_MESH_PRINTED_CONTACT_RATIO
+):
+    raise AssertionError(
+        "the printed 16T:64T worst-case contact ratio fails with the cone stack's "
+        "north float opened exactly at the physical centres"
     )
 # Contact azimuths (from each gear's centre toward the other axis, in that
 # gear's own plane, ccw from the in-plane horizontal). The 64T plane rides
@@ -1713,7 +1737,6 @@ from cone_pivot_post_spec import (  # noqa: E402
     CRANK_ABOVE_CONE_BAND as POST_CRANK_ABOVE_CONE_BAND,
     CRANK_BOSS_NORTH_FACE as POST_CRANK_BOSS_NORTH_FACE,
 )
-from cone_stack_end_play import STACK_FLOAT  # noqa: E402
 from crank_drive_gear_spec import FACE_WIDTH_BAND as GEAR64_FACE_WIDTH_BAND  # noqa: E402
 from crank_mesh_stack import (  # noqa: E402
     BASE_PITCH_MM as CRANK_MESH_BASE_PITCH,
@@ -1722,7 +1745,6 @@ from crank_mesh_stack import (  # noqa: E402
     DC_PER_DX as CRANK_MESH_DC_PER_DX,
     DC_PER_DY as CRANK_MESH_DC_PER_DY,
     MESH_LEVER as CRANK_MESH_LEVER,
-    OPEN_TERMS as CRANK_MESH_OPEN_TERMS,
     PINION_HALF_FACE_MAX as CRANK_MESH_PINION_HALF_FACE_MAX,
     POST_ANGLE_DEG as CRANK_MESH_POST_ANGLE_DEG,
     TOOTH_RUNOUT_TIR_MM as CRANK_MESH_TOOTH_RUNOUT_TIR,
@@ -1784,8 +1806,6 @@ _CRANK_HEIGHT_BAND = printed_deviations(
 )
 # The crank's end play: set on the feeler, or run south onto the boss.
 PINION_END_PLAY = (-PINION_SEAT_FEELER, 0.0)
-# The cone stack's in-service float north of its model pose, along its axis.
-CONE_FLOAT_NORTH = SHAFT_END_PLAY[1] + STACK_FLOAT[1]
 _CONE_FLOATS = (0.0, CONE_FLOAT_NORTH / 2.0, CONE_FLOAT_NORTH)
 
 _TIP120 = _cone_tip_radius_max(120)

@@ -18,6 +18,8 @@ import crank_drive_gear_notes
 import crank_drive_gear_spec as gear64
 import crank_pinion_spec as pinion
 import crankshaft_spec as shaft
+from cone_line import COS_I, SIN_I
+from cone_stack_end_play import CONE_FLOAT_NORTH
 from gear_seat_fit import GEAR_SEAT_CLEARANCE
 
 R64 = gear64.PITCH_DIA / 2.0
@@ -148,13 +150,22 @@ if TIGHT_BACKLASH_MM <= 0.0:
 # spacing at its +0.37 end and every centre term at the end that parts the
 # axes, the cone shaft floating on its largest running clearance. Only centre
 # translations enter; tooth thinning, the fitted pose losses and the linear
-# residual move no centre.
+# residual move no centre. The 64T stands at its model pose at the closing
+# corner (the stack's south stop) and floats north at the open one.
 def open_terms(*, spacing_printed: float, plan_limit_deg: float, crank_bearing_length: float) -> dict[str, float]:
     """Centre-distance opening (mm) per term at the open corner."""
     return {
         "crank bore spacing": (spacing_printed + post.CRANK_ABOVE_CONE_BAND[0] - FRAME_DY) * DC_PER_DY,
         "cone bore plan angle": PLAN_DX_PER_DEG * plan_limit_deg * DC_PER_DX,
         "64T axial station": STATION_64T_DC,
+        # The stack's north float slides the 64T up the inclined cone axis,
+        # lengthening the in-plane horizontal leg by F*sin(i)*cos(i). Booked
+        # linearly on the frame reference's DC_PER_DX, as the plan-angle term
+        # is: 0.02405, 0.0013 under the 0.02538 exact at the assembly's
+        # physical centres (leg 5.881, not 5.647). Chosen, not missed:
+        # build_drive_train_assembly asserts the printed contact ratio holds
+        # with the exact opening in its place.
+        "cone stack north float": CONE_FLOAT_NORTH * SIN_I * COS_I * DC_PER_DX,
         "crank float at rest": _float_at_rest(_RUNNING[1], crank_bearing_length, CRANK_OVERHANG) * DC_PER_DY,
         "cone float at rest": _float_at_rest(_RUNNING[1], post.CONE_BOSS_LENGTH, CONE_OVERHANG) * DC_PER_DY,
         "gear bore runout": (pinion.BORE_DIAMETRAL_CLEARANCE[1] + GEAR_SEAT_CLEARANCE[1]) / 2.0,
