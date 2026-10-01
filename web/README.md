@@ -120,10 +120,12 @@ pixels or clock skew above 0.5 seconds. `?verify=1` enables native WebGL landmar
 and depth-tested part-visibility readback. Mathematical camera fitting alone
 does not count as rendered-pixel evidence.
 
-Finite-line and contour checks compare independently measured source pixels with
-actual native GPU rasters. Their final bounds include source and native
-uncertainty; raw error below the limit alone is insufficient. Fixed-part coverage
-uses every rendered ID pixel's extent.
+Finite-line checks use Euclidean distance to the finite fitted GPU segment.
+Contour checks use supported mesh/background depth-ID boundaries, not artificial
+image cuts or point/line footprint edges. Their final bounds include independent
+source, native and geometry terms; raw error below the limit alone is insufficient.
+Filtering contour candidates preserves the full native census and every rendered
+ID pixel's extent.
 
 Measured image-plane warps retain a qualified reference camera and native
 geometry, with independently identified corners and interior checks. A decoded

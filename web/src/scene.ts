@@ -890,43 +890,83 @@ void main() {
     viewport(rect[0], rect[1], rect[2], rect[3])
   }
 
+  function supportIntersects(polygon: readonly number[], left: number, top: number, right: number, bottom: number) {
+    if (polygon.length < 6) return false
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+    for (let j = 0; j < polygon.length; j += 2) {
+      minX = Math.min(minX, polygon[j]!)
+      minY = Math.min(minY, polygon[j + 1]!)
+      maxX = Math.max(maxX, polygon[j]!)
+      maxY = Math.max(maxY, polygon[j + 1]!)
+    }
+    if (right < minX || left > maxX || bottom < minY || top > maxY) return false
+    // Separating axes of the actual convex source mask, not its camera ROI.
+    for (let j = 0; j < polygon.length; j += 2) {
+      const next = (j + 2) % polygon.length
+      const nx = polygon[next + 1]! - polygon[j + 1]!, ny = polygon[j]! - polygon[next]!
+      let minProjection = Infinity, maxProjection = -Infinity
+      for (let k = 0; k < polygon.length; k += 2) {
+        const projection = nx * polygon[k]! + ny * polygon[k + 1]!
+        minProjection = Math.min(minProjection, projection)
+        maxProjection = Math.max(maxProjection, projection)
+      }
+      const rectangleMin = nx * (nx < 0 ? right : left) + ny * (ny < 0 ? bottom : top)
+      const rectangleMax = nx * (nx < 0 ? left : right) + ny * (ny < 0 ? top : bottom)
+      if (rectangleMax < minProjection || rectangleMin > maxProjection) return false
+    }
+    return true
+  }
+
   function higherMaskIntersects(left: number, top: number, right: number, bottom: number) {
     const composite = activeView?.composite
     if (!renderedViews || composite?.mode !== 'crossfade') return false
     for (let i = activeViewIndex + 1; i < renderedViews.length; i++) {
       const view = renderedViews[i]!, member = view.composite
       if (member?.mode !== 'crossfade' || member.groupId !== composite.groupId || member.imageLayerId !== composite.imageLayerId) break
-      const polygon = sourceSupport(view).polygon
-      if (polygon.length < 6) continue
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-      for (let j = 0; j < polygon.length; j += 2) {
-        minX = Math.min(minX, polygon[j]!)
-        minY = Math.min(minY, polygon[j + 1]!)
-        maxX = Math.max(maxX, polygon[j]!)
-        maxY = Math.max(maxY, polygon[j + 1]!)
-      }
-      if (right < minX || left > maxX || bottom < minY || top > maxY) continue
-      // Separating axes of the actual convex source mask, not its camera ROI.
-      let separated = false
-      for (let j = 0; j < polygon.length; j += 2) {
-        const next = (j + 2) % polygon.length
-        const nx = polygon[next + 1]! - polygon[j + 1]!, ny = polygon[j]! - polygon[next]!
-        let minProjection = Infinity, maxProjection = -Infinity
-        for (let k = 0; k < polygon.length; k += 2) {
-          const projection = nx * polygon[k]! + ny * polygon[k + 1]!
-          minProjection = Math.min(minProjection, projection)
-          maxProjection = Math.max(maxProjection, projection)
-        }
-        const rectangleMin = nx * (nx < 0 ? right : left) + ny * (ny < 0 ? bottom : top)
-        const rectangleMax = nx * (nx < 0 ? left : right) + ny * (ny < 0 ? top : bottom)
-        if (rectangleMax < minProjection || rectangleMin > maxProjection) {
-          separated = true
-          break
-        }
-      }
-      if (!separated) return true
+      if (supportIntersects(sourceSupport(view).polygon, left, top, right, bottom)) return true
     }
     return false
+  }
+
+  function sourcePointSupported(view: SourceView, x: number, y: number, inverse: readonly number[] | null) {
+    const rect = view.rectSourcePixels
+    if (x < 0 || y < 0 || x >= SOURCE_WIDTH || y >= SOURCE_HEIGHT
+      || x < rect[0] || y < rect[1] || x >= rect[0] + rect[2] || y >= rect[1] + rect[3]) return false
+    const warp = view.imagePlaneWarp
+    if (!warp) return true
+    const m = inverse!
+    const d = m[2]! * x + m[5]! * y + m[8]!
+    const u = (m[0]! * x + m[3]! * y + m[6]!) / d
+    const v = (m[1]! * x + m[4]! * y + m[7]!) / d
+    return u >= 0 && v >= 0 && u < warp.unwarpedViewportPixels[0] && v < warp.unwarpedViewportPixels[1]
+  }
+
+  function sourceRegionUnmasked(left: number, top: number, right: number, bottom: number) {
+    if (!activeView) return false
+    const inverse = activeView.imagePlaneWarp ? sourceSupport(activeView).inverse.elements : null
+    if (!sourcePointSupported(activeView, left, top, inverse) || !sourcePointSupported(activeView, left, bottom, inverse)
+      || !sourcePointSupported(activeView, right, top, inverse) || !sourcePointSupported(activeView, right, bottom, inverse)) return false
+    if (!renderedViews) return true
+    const own = activeView.composite
+    for (let i = activeViewIndex + 1; i < renderedViews.length; i++) {
+      const view = renderedViews[i]!, later = view.composite
+      const sameGroup = own?.mode === 'crossfade' && later?.mode === 'crossfade' && own.groupId === later.groupId
+      const sameImage = sameGroup && own.imageLayerId === later.imageLayerId
+      if (sameGroup && !sameImage) continue
+      if ((sameImage || !later || later.mode === 'opaque' || later.opacity === 1)
+        && supportIntersects(sourceSupport(view).polygon, left, top, right, bottom)) return false
+    }
+    return true
+  }
+
+  function viewportSourceDiscrepancy(rect: readonly [number, number, number, number], sourcePerPixelX: number, sourcePerPixelY: number) {
+    if (activeView?.imagePlaneWarp) return 0
+    const left = probeViewport.x * sourcePerPixelX - gate.x * SOURCE_WIDTH / gate.width - rect[0]
+    const top = (gl.drawingBufferHeight - probeViewport.y - probeViewport.w) * sourcePerPixelY - gate.y * SOURCE_HEIGHT / gate.height - rect[1]
+    return Math.hypot(
+      Math.max(Math.abs(left), Math.abs(left + probeViewport.z * sourcePerPixelX - rect[2])),
+      Math.max(Math.abs(top), Math.abs(top + probeViewport.w * sourcePerPixelY - rect[3])),
+    )
   }
 
   function warpQuantization() {
@@ -1366,6 +1406,13 @@ void main() {
       const pointSize = mirror ? 2 * Math.ceil(Math.max(ratioX, ratioY, 1) / 2) + 1 : 1
       const warped = !!activeView?.imagePlaneWarp
       const nativeCellUncertainty = warpQuantization()
+      const homography = activeView?.imagePlaneWarp?.renderToSourcePixels
+      // Validation above already excludes singular transforms. Only exact
+      // separable affine cells form a Cartesian product of destination samples
+      // with a mean within half a destination cell of the native-cell midpoint.
+      // Oblique/projective cells can alias to one edge even without clipping.
+      const separableWarp = homography !== undefined && homography[6] === 0 && homography[7] === 0
+        && ((homography[1] === 0 && homography[3] === 0) || (homography[0] === 0 && homography[4] === 0))
       // Two samples in one native texel differ by at most twice its
       // half-cell Jacobian bound; a mirrored square has the given full span.
       const footprintWidth = mirror ? pointSize / ratioX * sourcePerPixelX : 2 * nativeCellUncertainty
@@ -1413,9 +1460,9 @@ void main() {
               uncertaintyY += 0.5 / ratioY
               if (clippedX || masked) uncertaintyX += pointSize / (2 * ratioX)
               if (clippedY || masked) uncertaintyY += pointSize / (2 * ratioY)
-            } else if (clippedX || clippedY || masked) {
-              // A truncated nearest-sampled texel can move the final mean to
-              // either edge, so the native cell's full diameter is required.
+            } else if (!separableWarp || clippedX || clippedY || masked) {
+              // Without the uncut separable-cell mean guarantee, the feature
+              // and observed mean can differ by the native cell's full diameter.
               warpUncertainty += nativeCellUncertainty
             }
           }
@@ -1561,8 +1608,14 @@ void main() {
       contourFlags.fill(0, 0, pixelCount)
       const sourcePerPixelX = SOURCE_WIDTH / gate.width * canvas.clientWidth / target.width
       const sourcePerPixelY = SOURCE_HEIGHT / gate.height * canvas.clientHeight / target.height
-      capture.uncertaintySourcePixels = Math.hypot(sourcePerPixelX, sourcePerPixelY) / 2 + warpQuantization()
-      if (presentation === 'horizontal-mirror' && !activeView?.imagePlaneWarp) capture.uncertaintySourcePixels += Math.hypot(rect[2] / stage.width, rect[3] / stage.height) / 2
+      const nativeHalfCell = warpQuantization()
+        + (presentation === 'horizontal-mirror' && !activeView?.imagePlaneWarp
+          ? Math.hypot(probeViewport.z * sourcePerPixelX / stage.width, probeViewport.w * sourcePerPixelY / stage.height) / 2 : 0)
+      const nativeRadius = nativeHalfCell + viewportSourceDiscrepancy(rect, sourcePerPixelX, sourcePerPixelY)
+      // Differing neighbouring native surface samples bracket an ID boundary.
+      // Their warped centres are within Q of the final cells, so Q + Dmax
+      // bounds the boundary distance (and the exclusive cell-corner distance).
+      capture.uncertaintySourcePixels = Math.max(sourcePerPixelX, sourcePerPixelY) + nativeRadius
       for (let i = 0; i < width * height; i++) {
         const pixel = i * 4
         const id = visibilityPixels[pixel]! + visibilityPixels[pixel + 1]! * 256 + visibilityPixels[pixel + 2]! * 65536
@@ -1575,9 +1628,17 @@ void main() {
         if (top < capture.values[o + 2]!) capture.values[o + 2] = top
         if (left + 1 > capture.values[o + 3]!) capture.values[o + 3] = left + 1
         if (top + 1 > capture.values[o + 4]!) capture.values[o + 4] = top + 1
-        if (nativeContourPixel(i, id, width, pixelCount)) {
-          capture.contourCounts[id - 1]!++
-          contourFlags[i] = 1
+        if (nativeContourPixel(i, id, width, pixelCount, entries)) {
+          const sx = ((left + 0.5) * canvas.clientWidth / target.width - gate.x) * SOURCE_WIDTH / gate.width
+          const sy = ((top + 0.5) * canvas.clientHeight / target.height - gate.y) * SOURCE_HEIGHT / gate.height
+          // All adjacent final centres and their native-centre offsets lie in
+          // this box. Require its complete convex footprint, not sparse
+          // endpoints alone, to remain inside support and outside later masks.
+          if (sourceRegionUnmasked(sx - sourcePerPixelX - nativeRadius, sy - sourcePerPixelY - nativeRadius,
+            sx + sourcePerPixelX + nativeRadius, sy + sourcePerPixelY + nativeRadius)) {
+            capture.contourCounts[id - 1]!++
+            contourFlags[i] = 1
+          }
         }
       }
       let sampleTotal = 0
@@ -1615,11 +1676,17 @@ void main() {
     return visibilityPixels[offset]! + visibilityPixels[offset + 1]! * 256 + visibilityPixels[offset + 2]! * 65536
   }
 
-  function nativeContourPixel(pixel: number, id: number, width: number, count: number): boolean {
+  function nativeContourPixel(pixel: number, id: number, width: number, count: number, entries: readonly NativeDrawable[]): boolean {
     const x = pixel % width
-    return x === 0 || x === width - 1 || pixel < width || pixel >= count - width
-      || nativePixelId(pixel - 1) !== id || nativePixelId(pixel + 1) !== id
-      || nativePixelId(pixel - width) !== id || nativePixelId(pixel + width) !== id
+    if (!(entries[id - 1]?.object instanceof THREE.Mesh) || x === 0 || x === width - 1 || pixel < width || pixel >= count - width) return false
+    // A sprite/line ID is not evidence of a triangle-surface boundary.
+    return meshBoundaryNeighbor(pixel - 1, id, entries) || meshBoundaryNeighbor(pixel + 1, id, entries)
+      || meshBoundaryNeighbor(pixel - width, id, entries) || meshBoundaryNeighbor(pixel + width, id, entries)
+  }
+
+  function meshBoundaryNeighbor(pixel: number, id: number, entries: readonly NativeDrawable[]): boolean {
+    const neighbor = nativePixelId(pixel)
+    return neighbor !== id && (neighbor === 0 || entries[neighbor - 1]?.object instanceof THREE.Mesh)
   }
 
 
@@ -1744,8 +1811,7 @@ void main() {
     const scaleY = SOURCE_HEIGHT / gate.height * cssY
     const sourceOriginX = -gate.x * SOURCE_WIDTH / gate.width
     const sourceOriginY = -gate.y * SOURCE_HEIGHT / gate.height
-    const uncertainty = Math.hypot(scaleX, scaleY) / 2 + warpQuantization()
-      + (presentation === 'horizontal-mirror' && !activeView?.imagePlaneWarp ? Math.hypot(rect[2] / stage.width, rect[3] / stage.height) / 2 : 0)
+    let uncertainty = 0
     const background = scene.background
     const layers = camera.layers.mask
     renderer.getClearColor(savedClearColor)
@@ -1758,6 +1824,16 @@ void main() {
       for (let pass = 0; pass < internals.passes; pass++) {
         internals.pass.value = pass
         drawView(rect, presentation, target, stage, true)
+        if (pass === 0) {
+          // A line's native raster centre and its final nearest-sampled cell
+          // each contribute at most a native half-cell. Unlike a point mean,
+          // no separable-affine shortcut is valid for individual line samples.
+          // Read the actual post-draw stage size: mirror drawView may resize it.
+          const nativeHalfCell = warpQuantization()
+            + (presentation === 'horizontal-mirror' && !activeView?.imagePlaneWarp
+              ? Math.hypot(probeViewport.z * scaleX / stage.width, probeViewport.w * scaleY / stage.height) / 2 : 0)
+          uncertainty = Math.hypot(scaleX, scaleY) / 2 + 2 * nativeHalfCell + viewportSourceDiscrepancy(rect, scaleX, scaleY)
+        }
         readPass(target, x0, y0, x1, y1)
         linePassIndices.fill(-1)
         linePassOrdinals.fill(0)

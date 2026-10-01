@@ -3,7 +3,7 @@ import { mkdir, writeFile, stat } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { VIDEO_IDS, MODEL_SHA256, MODEL_COMMIT, PIXEL_LIMIT, CLOCK_LIMIT, loadReferences, frameViews, sourceNeedsMachine, sourceCompositeErrors, sourceLayoutForViews, independentlyResolvedWarp, sameResolvedImagePlaneWarp, sameSourceLayout, sourcePointUnmasked, sourceLocalizationFootprintBounds, nativeLineAxisGeometryBound, nonIdentifiableFixedPartErrors, sourceOcclusionErrors, sourceImageError, canonicalJson, requiredRuns, frameIndexAt, errorStats, jsonDigest } from './verify-reference.mjs'
+import { VIDEO_IDS, MODEL_SHA256, MODEL_COMMIT, PIXEL_LIMIT, CLOCK_LIMIT, loadReferences, frameViews, sourceNeedsMachine, sourceCompositeErrors, sourceLayoutForViews, independentlyResolvedWarp, sameResolvedImagePlaneWarp, sameSourceLayout, sourcePointUnmasked, sourceSupportPolygon, sourceLocalizationFootprintBounds, nativeLineAxisGeometryBound, nonIdentifiableFixedPartErrors, sourceOcclusionErrors, sourceImageError, canonicalJson, requiredRuns, frameIndexAt, errorStats, jsonDigest } from './verify-reference.mjs'
 import { distManifest, serveDist } from './verify-server.mjs'
 
 const WEB_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -65,18 +65,57 @@ export function renderedCertificateErrors(rendered,timeSeconds) {
   } else if(sampling.mix>0&&!covers(rendered.visibilityProofEnd)) errors.push('Continuous native draw is outside its separately bound endpoint certificate interval')
   return errors
 }
+/** Conservative closed SAT: touching a later blocking support is not unmasked. */
+function rectangleIntersectsSourcePolygon(rectangle,polygon) {
+  if(polygon.length<3) return false
+  const axes=[[1,0],[0,1]]
+  for(let i=0;i<polygon.length;i++) {
+    const a=polygon[i],b=polygon[(i+1)%polygon.length]
+    axes.push([a[1]-b[1],b[0]-a[0]])
+  }
+  for(const [x,y] of axes) {
+    const rectangleProjection=rectangle.map(point=>point[0]*x+point[1]*y),polygonProjection=polygon.map(point=>point[0]*x+point[1]*y)
+    if(Math.max(...rectangleProjection)<Math.min(...polygonProjection)||Math.max(...polygonProjection)<Math.min(...rectangleProjection)) return false
+  }
+  return true
+}
+/** The full possible continuous ID-boundary witness must remain unmasked. */
+function nativeContourSupportErrors(view,capture,part,minimum) {
+  const errors=[],layout=expectedLayout(view),index=layout?.findIndex(item=>item.viewId===view.id),cell=capture.destinationCellSourcePixels
+  if(!Array.isArray(part.contourSourcePixels)||!part.contourSourcePixels.every(vec2)||!Number.isInteger(part.contourPixelCount)||part.contourPixelCount<part.contourSourcePixels.length) return [`Actual visible native part lacks qualified depth-ID boundary pixels: ${part.partPath}`]
+  if(!finite(part.uncertaintySourcePixels)||part.uncertaintySourcePixels<0) return [`Actual native contour has unknown continuous-boundary support uncertainty: ${part.partPath}`]
+  // The independently required native Q cannot be understated. A producer's
+  // additional mirror-stage/rounded-camera term must also expand the witness.
+  const q=Math.max(0,minimum-Math.max(...cell),part.uncertaintySourcePixels-Math.max(...cell)),own=layout[index],a=own.composite??{mode:'opaque'},blocking=[]
+  for(const later of layout.slice(index+1)) {
+    const b=later.composite??{mode:'opaque'},sameImage=a.mode==='crossfade'&&b.mode==='crossfade'&&a.groupId===b.groupId&&a.imageLayerId===b.imageLayerId
+    const independentFade=a.mode==='crossfade'&&b.mode==='crossfade'&&a.groupId===b.groupId&&!sameImage
+    if(!independentFade&&(sameImage||b.mode==='opaque'||b.opacity===1)) blocking.push(sourceSupportPolygon(later))
+  }
+  if(part.contourSourcePixels.some(([x,y])=>{
+    const neighbours=[[x,y],[x-cell[0],y],[x+cell[0],y],[x,y-cell[1]],[x,y+cell[1]]]
+    const dx=cell[0]+q,dy=cell[1]+q,rectangle=[[x-dx,y-dy],[x+dx,y-dy],[x+dx,y+dy],[x-dx,y+dy]]
+    return neighbours.some(point=>!sourcePointUnmasked(layout,index,point))
+      ||rectangle.some(point=>!sourcePointUnmasked(layout,index,point))
+      ||blocking.some(polygon=>rectangleIntersectsSourcePolygon(rectangle,polygon))
+  })) errors.push(`Actual native contour lacks four supported neighbours and a fully unmasked continuous-boundary witness rectangle: ${part.partPath}`)
+  return errors
+}
 /** Independently inspect actual sparse readback support; no CPU visibility surrogate. */
 export function nativeRasterSupportErrors(view,capture) {
   const errors=sourceCaptureBindingErrors(view,capture)
   if(capture?.method!=='gpu-readback'||capture.status!=='captured'||!['depth-off-landmark-projection','depth-off-native-line-projection','depth-tested-native-surfaces'].includes(capture.visibilityMode)) return [...errors,'Native support requires a fresh actual GPU diagnostic raster, not CPU visibility/projection']
   const layout=expectedLayout(view),index=layout?.findIndex(item=>item.viewId===view.id)
   if(index===undefined||index<0) return [...errors,'Native support layout omits the actual view identity']
+  let minimum
+  try { minimum=minimumRasterUncertaintyBound(view,capture) } catch(error) { errors.push(error.message);return errors }
   const points=[]
   if(capture.visibilityMode==='depth-tested-native-surfaces') {
     if(!Array.isArray(capture.parts)||capture.parts.length<435||new Set(capture.parts.map(part=>part.partPath)).size!==capture.parts.length) errors.push('Native support requires the complete unique all435 depth-ID census')
     for(const part of capture.parts??[]) if(part.pixelCount>0) {
-      if(!Array.isArray(part.contourSourcePixels)||!part.contourSourcePixels.length||!part.contourSourcePixels.every(vec2)) errors.push(`Actual visible native part lacks depth-ID boundary pixels: ${part.partPath}`)
-      else points.push(...part.contourSourcePixels)
+      const contourErrors=nativeContourSupportErrors(view,capture,part,minimum)
+      errors.push(...contourErrors)
+      if(!contourErrors.length) points.push(...part.contourSourcePixels)
     }
   } else if(capture.visibilityMode==='depth-off-native-line-projection') {
     for(const line of capture.lines??[]) if(line.state==='rendered') points.push(...(line.sourceSamples??[]))
@@ -84,29 +123,56 @@ export function nativeRasterSupportErrors(view,capture) {
     for(const landmark of capture.landmarks??[]) if(landmark.state==='rendered') points.push(landmark.sourcePixels)
   }
   if(points.some(point=>!vec2(point)||!sourcePointUnmasked(layout,index,point))) errors.push('Actual GPU pixel-centre readback lies outside measured quad/ROI support or behind later same-image masking')
-  if(view.imagePlaneWarp) {
-    let minimum
-    try { minimum=warpedRasterUncertaintyBound(view,capture) } catch(error) { errors.push(error.message);return errors }
-    const entries=capture.visibilityMode==='depth-tested-native-surfaces'?(capture.parts??[]).filter(part=>part.pixelCount>0):capture.visibilityMode==='depth-off-native-line-projection'?(capture.lines??[]).filter(line=>line.state==='rendered'):(capture.landmarks??[]).filter(landmark=>landmark.state==='rendered')
-    if(entries.some(entry=>!finite(entry.uncertaintySourcePixels)||entry.uncertaintySourcePixels+1e-6<minimum)) errors.push('Actual GPU uncertainty omits independently bounded transformed native/destination raster quantization')
-  }
+  const entries=capture.visibilityMode==='depth-tested-native-surfaces'?(capture.parts??[]).filter(part=>part.pixelCount>0):capture.visibilityMode==='depth-off-native-line-projection'?(capture.lines??[]).filter(line=>line.state==='rendered'):(capture.landmarks??[]).filter(landmark=>landmark.state==='rendered')
+  if(entries.some(entry=>!finite(entry.uncertaintySourcePixels)||entry.uncertaintySourcePixels+1e-6<minimum)) errors.push('Actual GPU uncertainty omits independently bounded representation-specific native/destination raster quantization')
   return errors
 }
-/** Independent conservative half-cell propagation and final destination readback bound. */
+/** Necessary mode-specific source-pixel floor; never certifies an uncut marker footprint. */
 export function warpedRasterUncertaintyBound(view,capture) {
-  const warp=independentlyResolvedWarp(view)
-  if(!warp) return null
+  requireCondition(capture?.method==='gpu-readback'&&capture.status==='captured'&&['depth-off-landmark-projection','depth-off-native-line-projection','depth-tested-native-surfaces'].includes(capture.visibilityMode),'Raster uncertainty needs a fresh actual GPU capture with a known sampling representation')
+  const entries=capture.visibilityMode==='depth-tested-native-surfaces'?capture.parts:capture.visibilityMode==='depth-off-native-line-projection'?capture.lines:capture.landmarks
+  requireCondition(Array.isArray(entries),'Raster uncertainty needs the actual representation-specific GPU readback entries')
+  requireCondition(typeof view.id==='string'&&view.id.length>0&&capture.viewId===view.id&&sourceCaptureBindingErrors(view,capture).length===0&&expectedLayout(view)?.some(member=>member.viewId===view.id),'Raster uncertainty needs the actual view, resolved homography, presentation and ordered support binding')
   const native=capture.nativeViewportBackingPixels,destination=capture.destinationCellSourcePixels
-  requireCondition(vec2(native)&&native.every(value=>Number.isInteger(value)&&value>0)&&vec2(destination)&&destination.every(value=>value>0),'Warp raster needs actual native backing dimensions and final destination source-cell dimensions')
+  requireCondition(vec2(destination)&&destination.every(value=>value>0),'Raster uncertainty needs actual final destination source-cell dimensions')
+  const warp=independentlyResolvedWarp(view)
+  if(!warp) {
+    requireCondition(native===null,'Ordinary raster capture must explicitly identify its inapplicable warped native backing dimensions')
+    return null
+  }
+  requireCondition(vec2(native)&&native.every(value=>Number.isInteger(value)&&value>0),'Warp raster needs actual native backing dimensions')
   const [w,h]=warp.unwarpedViewportPixels,m=warp.renderToSourcePixels,points=[[0,0],[w,0],[w,h],[0,h]]
-  const denominator=Math.min(...points.map(p=>m[6]*p[0]+m[7]*p[1]+m[8]))**2
+  const denominators=points.map(p=>m[6]*p[0]+m[7]*p[1]+m[8])
+  requireCondition(denominators.every(value=>finite(value)&&value>1e-10),'Raster uncertainty crosses the positive projective branch')
+  const denominator=Math.min(...denominators)**2
   const derivative=[
     p=>(m[0]*m[7]-m[1]*m[6])*p[1]+m[0]*m[8]-m[2]*m[6],
     p=>(m[1]*m[6]-m[0]*m[7])*p[0]+m[1]*m[8]-m[2]*m[7],
     p=>(m[3]*m[7]-m[4]*m[6])*p[1]+m[3]*m[8]-m[5]*m[6],
     p=>(m[4]*m[6]-m[3]*m[7])*p[0]+m[4]*m[8]-m[5]*m[7]]
   const maxima=derivative.map(fn=>Math.max(...points.map(p=>Math.abs(fn(p))))/denominator),dx=w/native[0]/2,dy=h/native[1]/2
-  return Math.hypot(maxima[0]*dx+maxima[1]*dy,maxima[2]*dx+maxima[3]*dy)+Math.hypot(...destination)/2
+  const q=Math.hypot(maxima[0]*dx+maxima[1]*dy,maxima[2]*dx+maxima[3]*dy)
+  let minimum
+  if(capture.visibilityMode==='depth-tested-native-surfaces') {
+    // A genuine supported four-neighbour ID transition crosses a rendered
+    // surface boundary: its final centre is within Q + one neighbour spacing.
+    // The producer must exclude readback cuts and non-surface primitives.
+    minimum=q+Math.max(...destination)
+  } else {
+    // A line sample can lie at the opposite native-cell edge from its true
+    // segment even for diagonal H. Only an exact separable affine marker
+    // centroid has the uncut-cell mean shortcut. Q is its necessary minimum;
+    // the producer still owes 2Q whenever ROI/scissor/later masks cut it.
+    const separableMarker=capture.visibilityMode==='depth-off-landmark-projection'&&m[6]===0&&m[7]===0&&((m[1]===0&&m[3]===0)||(m[0]===0&&m[4]===0))
+    minimum=(separableMarker?q:2*q)+Math.hypot(...destination)/2
+  }
+  requireCondition(finite(minimum),'Raster uncertainty propagation is unbounded')
+  return minimum
+}
+
+function minimumRasterUncertaintyBound(view,capture) {
+  const warped=warpedRasterUncertaintyBound(view,capture)
+  return warped??(capture.visibilityMode==='depth-tested-native-surfaces'?Math.max(...capture.destinationCellSourcePixels):Math.hypot(...capture.destinationCellSourcePixels)/2)
 }
 
 /** All qualified observation uncertaintyPx values are already final source-global pixels. */
@@ -120,11 +186,8 @@ export function sourceRasterErrorLedger(view,observation,points,native,capture,r
   const sourceLocalization=sourceMeasurementUncertaintyLedger(view,observation,points)
   requireCondition(finite(native?.uncertaintySourcePixels)&&native.uncertaintySourcePixels>=0,'Actual native source-pixel raster uncertainty is unavailable')
   requireCondition([rawResidualPx,geometryBiasSourcePixels,rasterFitDeviationSourcePixels].every(value=>finite(value)&&value>=0),'Raster residual, geometry bias and fit deviation must be finite nonnegative source-pixel bounds')
-  let minimumNativeRasterUncertaintySourcePixels=warpedRasterUncertaintyBound(view,capture)
-  if(minimumNativeRasterUncertaintySourcePixels===null) {
-    requireCondition(vec2(capture.destinationCellSourcePixels)&&capture.destinationCellSourcePixels.every(value=>value>0),'Ordinary native raster needs actual destination source-cell dimensions')
-    minimumNativeRasterUncertaintySourcePixels=Math.hypot(...capture.destinationCellSourcePixels)/2
-  }
+  const minimumNativeRasterUncertaintySourcePixels=minimumRasterUncertaintyBound(view,capture)
+  if(capture.visibilityMode==='depth-tested-native-surfaces') requireCondition(native.pixelCount>0&&native.contourSourcePixels?.length>0&&nativeContourSupportErrors(view,capture,native,minimumNativeRasterUncertaintySourcePixels).length===0,'Actual native contour lacks a supported four-neighbour and fully unmasked continuous-boundary witness')
   requireCondition(native.uncertaintySourcePixels+1e-6>=minimumNativeRasterUncertaintySourcePixels,'Actual native uncertainty omits independently bounded native/destination raster quantization')
   return {type:'source-global-raster-error-ledger',coordinateSpace:'source-global',rawResidualPx,sourceLocalization,sourceMeasurementUncertaintyPx:sourceLocalization.boundPx,nativeRasterUncertaintySourcePixels:native.uncertaintySourcePixels,minimumNativeRasterUncertaintySourcePixels,geometryBiasSourcePixels,rasterFitDeviationSourcePixels,errorPx:rawResidualPx+sourceLocalization.boundPx+native.uncertaintySourcePixels+geometryBiasSourcePixels+rasterFitDeviationSourcePixels}
 }
@@ -532,12 +595,19 @@ export function nativeLineRasterProof(view, captured, visibility, timeSeconds) {
     const perpendicular = point => Math.abs((point[0] - mean[0]) * axis[1] - (point[1] - mean[1]) * axis[0])
     let minimum = Infinity, maximum = -Infinity
     for (const sample of line.sourceSamples) { const value = along(sample); minimum = Math.min(minimum, value); maximum = Math.max(maximum, value) }
+    // Distance to the finite fitted hull, not its infinite supporting axis.
+    // Fit deviation reaches actual extreme samples; native uncertainty reaches
+    // their true finite segment. Each bound enters the ledger exactly once.
+    const finiteSegmentDistance = point => {
+      const position=along(point)
+      return Math.hypot(perpendicular(point),Math.max(minimum-position,position-maximum,0))
+    }
     const observed = [...check.sourceLinePixels, ...check.measurementEvidence.edgeRows.map(row => [(row.left + row.right) / 2, row.y])]
     const rasterFitDeviationPx = Math.max(...line.sourceSamples.map(perpendicular))
     let axisBias,errorLedger
     try {
       axisBias=finalSourceAxisBiasLedger(view,check,observed)
-      errorLedger=sourceRasterErrorLedger(view,check,observed,line,captured,Math.max(...observed.map(perpendicular)),axisBias.geometryBiasSourcePixels,rasterFitDeviationPx)
+      errorLedger=sourceRasterErrorLedger(view,check,observed,line,captured,Math.max(...observed.map(finiteSegmentDistance)),axisBias.geometryBiasSourcePixels,rasterFitDeviationPx)
     } catch(error) { reject('native-line-uncertainty-unknown',error.message,{lineId:check.id,sourceMeasurementUncertaintyPx:check.uncertaintyPx??null});continue }
     const layout=expectedLayout(view),layoutIndex=layout.findIndex(item=>item.viewId===view.id)
     if(line.sourceSamples.some(point=>!sourcePointUnmasked(layout,layoutIndex,point))) reject('native-line-support-mask','Actual line readback includes pixels outside its quad or behind a later same-image subview',{lineId:check.id})

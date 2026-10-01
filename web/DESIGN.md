@@ -199,24 +199,36 @@ raw reprojection error below 38.4 pixels alone is not acceptance.
 Ordinary landmark coordinates use exact destination pixel-cell mapping.
 Rasterized reference markers independently verify that mapping rather than
 calibrating it. Marker, blit and warped-cell errors remain explicit native terms.
-Clipping an enlarged mirrored or warped marker adds a conservative footprint
-term for higher same-image insets and outer raster/source boundaries. The
-centroid remains the actual readback value; a larger bound can reject the
-38.4-pixel limit even when the surviving marker is visible.
+General warped marker centroids require the full native-cell diameter bound.
+Only an exactly separable affine warp with an uncut footprint retains the
+tighter half-cell bound. Outer clipping and higher same-image masks invalidate
+that shortcut. The centroid remains the actual readback value; a larger bound
+can reject the 38.4-pixel limit even when the surviving marker is visible.
 CPU camera projection and two aliases of the player's clock are insufficient
 evidence. Native WebGL readback may use a software renderer; it does not imply
 hardware acceleration.
 
-Finite native-line diagnostics return the clipped GPU raster and its source-pixel
-quantization bound. Every declared segment must stay inside its native drawable's
-rest bounding box; that check alone does not identify a physical surface or axis.
-The final ledger adds source localization, independently certified axis geometry,
-native quantization and raster-fit deviation. A bundled axis allowance requires
-an explicit decomposition so source localization is counted exactly once.
-Contour bounds add source localization to nearest depth-boundary distance and
-native quantization. Independently observed line endpoints, edge-row midpoints
-and contour points must lie inside the view's unmasked image support; a nearby
-surviving boundary cannot certify an observation hidden by a higher inset.
+Finite native-line diagnostics return actual clipped GPU samples. Warped line
+samples require the full native-cell bound even for separable affine transforms;
+the marker-centroid shortcut does not apply. Every declared segment must stay
+inside its native drawable's rest bounding box; that alone does not identify a
+physical surface or axis. The ledger uses Euclidean distance to the finite fitted
+sample segment, not an infinite axis, then adds source localization, certified
+axis geometry, native quantization and raster-fit deviation once each. A bundled
+axis allowance requires an explicit decomposition to avoid counting localization
+twice. Independently observed endpoints, edge-row midpoints and contour points
+must remain inside unmasked source support; surviving fragments cannot certify
+a masked observation.
+
+Contour samples are actual mesh-owned ID-boundary pixel centres with a qualifying
+mesh/background neighbor. Readback, ROI, scissor, image-mask and nonmesh-footprint
+edges do not establish geometric contour witnesses. The complete boundary-witness
+footprint must remain inside its own support and outside later blocking masks.
+Its bound adds transformed native half-cell quantization to the maximum destination
+axis spacing, plus any nominal/rounded-viewport discrepancy. A depth-ID contour
+describes the effective rendered scene's visible boundary, not necessarily an
+original material edge; physical feature identity remains a separate requirement.
+
 Fixed-part source-region containment uses the full exclusive pixel-cell extent,
 not sampled contours. Warped diagnostics include native and destination raster
 cell bounds transformed into source pixels. They retain full depth-tested support
