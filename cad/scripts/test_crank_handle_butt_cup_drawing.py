@@ -98,7 +98,10 @@ def test_notes_name_the_mates_and_the_band_reason() -> None:
     assert "TO SUIT" in notes
     assert "MIN POCKET WALL 0.8; MIN FLOOR 1.5; CORNERS EXCEPTED." in notes
     # Machinist review of crank-v4-16: the depth band states its reason.
-    assert "THE DEPTH BAND KEEPS THE LONGEST MHA-139 HEAD BELOW THE FACE AT FULL END PLAY." in notes
+    assert "DEPTH BAND KEEPS THE LONGEST MHA-139 HEAD BELOW THE FACE." in notes
+    # crank-v4-17: a 78-character line pushed the block 4.8 mm into the title
+    # block (2.55 mm a character from x=21.9, title block at x=216).
+    assert max(len(line.replace("<MOD-DIAM>", "@")) for line in notes.splitlines()) <= 74
     assert "turned clear of it" in _config.parts("crank-handle-butt-cup")["process"]
     assert "6.5 MAX" in notes
     assert "FACE FLUSH, CENTRED ON THE" in notes
