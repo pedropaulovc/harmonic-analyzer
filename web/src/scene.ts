@@ -210,6 +210,14 @@ export interface LoadMachineOptions {
   url?: string
 }
 
+/** Predictable device-capacity refusal, before a prepared source sample is published. */
+export class ViewCapacityError extends RangeError {
+  constructor(message: string) {
+    super(message)
+    this.name = 'ViewCapacityError'
+  }
+}
+
 export interface Viewer {
   renderer: THREE.WebGLRenderer
   scene: THREE.Scene
@@ -223,6 +231,8 @@ export interface Viewer {
   resize(): void
   /** Exploring/rest draw; captures landmarks under EXPLORING_VIEW_ID when a probe is installed. */
   render(): void
+  /** Pure hardware/target-size check; never allocates targets or changes draw/camera state. */
+  preflightViews(views: readonly SourceView[]): void
   renderViews(views: readonly SourceView[], beforeView: ((view: SourceView, index: number) => void) | undefined, timeSeconds: number): void
   applyCamera(record: CameraRecord): void
   setInteraction(mode: InteractionMode): void
@@ -252,10 +262,9 @@ const PROBE_LAYER = 31
 const LINE_PROBE_LAYER = 30
 /** One bit per marker across RGBA8; additive blending keeps overlapping markers separable. */
 const SLOTS_PER_PASS = 32
-/** Reference markers at these NDC corners measure each view's actual viewport placement. */
+/** Independent one-cell witnesses of the actual GL viewport and its axis orientation. */
 const REFERENCE_NDC = 0.75
 const REFERENCE_SOURCE_LOW = (1 - REFERENCE_NDC) / 2
-const REFERENCE_SOURCE_SPAN = REFERENCE_NDC
 const ACCUMULATOR_STRIDE = 7
 /** Bounded, deterministic raster readback samples; total coverage is separate. */
 const RASTER_SAMPLE_LIMIT = 256
@@ -570,6 +579,8 @@ export function createViewer(canvas: HTMLCanvasElement, onControlsChange: () => 
   // WebGL returns ALIASED_POINT_SIZE_RANGE as a Float32Array [min, max].
   const pointSizeRange: Float32Array = gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE)
   const maxPointSize = pointSizeRange[1]!
+  const maxRenderbufferSize = gl.getParameter(gl.MAX_RENDERBUFFER_SIZE) as number
+  const maxViewportDimensions = gl.getParameter(gl.MAX_VIEWPORT_DIMS) as Int32Array
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0x11131a)
   const camera = new THREE.PerspectiveCamera(35, SOURCE_WIDTH / SOURCE_HEIGHT, 0.005, 100)
@@ -925,9 +936,14 @@ void main() {
       return
     }
     if (presentation === 'horizontal-mirror') {
+      // A preceding warp may have resized this shared stage to its native grid.
+      const width = Math.max(1, Math.round(gate.width * renderer.getPixelRatio()))
+      const height = Math.max(1, Math.round(gate.height * renderer.getPixelRatio()))
+      if (mirrorStage.width !== width || mirrorStage.height !== height) mirrorStage.setSize(width, height)
       // The mirror stage uses its own full viewport with scissor disabled;
       // renderer.setViewport would wrongly scale it by the canvas pixel ratio.
       renderer.setRenderTarget(mirrorStage)
+      renderer.setScissorTest(false)
       renderer.clear(true, true, true)
       renderer.render(scene, camera)
       renderer.setRenderTarget(output)
@@ -1052,14 +1068,40 @@ void main() {
     renderer.setScissorTest(false)
   }
 
-  function renderViews(views: readonly SourceView[], beforeView: ((view: SourceView, index: number) => void) | undefined, timeSeconds: number) {
-    if (disposed) throw new Error('Viewer is disposed.')
-    assertSourceCompositeWeights(views)
-    for (let i = 0; i < views.length; i++) {
-      const view = views[i]!, grid = view.imagePlaneWarp?.unwarpedViewportPixels
-      if (grid && (Math.ceil(grid[0]) > renderer.capabilities.maxTextureSize || Math.ceil(grid[1]) > renderer.capabilities.maxTextureSize)) throw new Error('Native warp viewport exceeds GPU texture capacity.')
-      for (let j = 0; j < i; j++) if (views[j]!.id === view.id) throw new Error('Simultaneous source view IDs must be unique.')
+  function assertTargetCapacity(width: number, height: number, label: string, viewId?: string) {
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width < 1 || height < 1
+      || width > renderer.capabilities.maxTextureSize || height > renderer.capabilities.maxTextureSize
+      || width > maxRenderbufferSize || height > maxRenderbufferSize
+      || width > maxViewportDimensions[0]! || height > maxViewportDimensions[1]!) {
+      throw new ViewCapacityError(`${label}${viewId ? ` for view "${viewId}"` : ''} ${width}×${height}px exceeds GPU limits (texture ${renderer.capabilities.maxTextureSize}px, renderbuffer ${maxRenderbufferSize}px, viewport ${maxViewportDimensions[0]}×${maxViewportDimensions[1]}px).`)
     }
+  }
+
+  function preflightViews(views: readonly SourceView[]) {
+    if (disposed) throw new Error('Viewer is disposed.')
+    // Every destination/diagnostic/composite target is the actual full backing
+    // store, not merely the source gate. All stages have depth attachments.
+    assertTargetCapacity(gl.drawingBufferWidth, gl.drawingBufferHeight, 'Full destination')
+    const ratio = renderer.getPixelRatio()
+    assertTargetCapacity(Math.max(1, Math.round(gate.width * ratio)), Math.max(1, Math.round(gate.height * ratio)), 'Native mirror viewport')
+    for (let i = 0; i < views.length; i++) {
+      const view = views[i]!, rect = view.rectSourcePixels, grid = view.imagePlaneWarp?.unwarpedViewportPixels
+      if (grid) assertTargetCapacity(Math.ceil(grid[0]), Math.ceil(grid[1]), 'Native warp viewport', view.id)
+      // The viewport is independently rounded by three.js; a subpixel source
+      // ROI may legitimately have no raster support and is not an allocation.
+      const width = Math.round(rect[2] / SOURCE_WIDTH * gate.width * ratio)
+      const height = Math.round(rect[3] / SOURCE_HEIGHT * gate.height * ratio)
+      if (!Number.isFinite(width) || !Number.isFinite(height) || width < 0 || height < 0
+        || width > maxViewportDimensions[0]! || height > maxViewportDimensions[1]!) {
+        throw new ViewCapacityError(`Source destination viewport for view "${view.id}" ${width}×${height}px exceeds GPU viewport capacity ${maxViewportDimensions[0]}×${maxViewportDimensions[1]}px.`)
+      }
+      for (let j = 0; j < i; j++) if (views[j]!.id === view.id) throw new Error(`Simultaneous source view IDs must be unique: "${view.id}".`)
+    }
+  }
+
+  function renderViews(views: readonly SourceView[], beforeView: ((view: SourceView, index: number) => void) | undefined, timeSeconds: number) {
+    preflightViews(views)
+    assertSourceCompositeWeights(views)
     drawEpoch++
     renderedViews = views
     capturedViewOrder.length = probe || visibilityProbe || lineProbe ? views.length : 0
@@ -1250,12 +1292,33 @@ void main() {
       const ay = accumulators[2]! / accumulators[0]!
       const bx = accumulators[ACCUMULATOR_STRIDE + 1]! / accumulators[ACCUMULATOR_STRIDE]!
       const by = accumulators[ACCUMULATOR_STRIDE + 2]! / accumulators[ACCUMULATOR_STRIDE]!
-      if (bx === ax || by === ay) {
-        markAll(capture, markers, 'view reference markers coincide; viewport mapping degenerate')
+      // Reference centroids are independent verification, never the mapping
+      // authority. A boundary point can land in either adjacent cell; even
+      // coincident centroids in a one-pixel viewport are valid witnesses.
+      const referenceTolerance = 8 * Number.EPSILON * Math.max(target.width, target.height, 1)
+      if (Math.abs(ax - (probeViewport.x + REFERENCE_SOURCE_LOW * probeViewport.z)) > 0.5 + referenceTolerance
+        || Math.abs(bx - (probeViewport.x + (1 - REFERENCE_SOURCE_LOW) * probeViewport.z)) > 0.5 + referenceTolerance
+        || Math.abs(ay - (probeViewport.y + (1 - REFERENCE_SOURCE_LOW) * probeViewport.w)) > 0.5 + referenceTolerance
+        || Math.abs(by - (probeViewport.y + REFERENCE_SOURCE_LOW * probeViewport.w)) > 0.5 + referenceTolerance
+        || bx < ax || by > ay) {
+        markAll(capture, markers, 'view reference cells disagree with actual GL viewport or axis orientation')
         return
       }
       const cssX = canvas.clientWidth / gl.drawingBufferWidth
       const cssY = canvas.clientHeight / gl.drawingBufferHeight
+      const sourcePerPixelX = cssX * SOURCE_WIDTH / gate.width
+      const sourcePerPixelY = cssY * SOURCE_HEIGHT / gate.height
+      // Ordinary cameras use the real rounded GL viewport; source pixel cells
+      // use the continuous source gate. Bound their affine discrepancy at both
+      // viewport endpoints, including subjects outside the reference pair.
+      let viewportQuantizationX = 0
+      let viewportQuantizationY = 0
+      if (!activeView?.imagePlaneWarp) {
+        const leftError = probeViewport.x * sourcePerPixelX - gate.x * SOURCE_WIDTH / gate.width - rect[0]
+        const topError = (gl.drawingBufferHeight - probeViewport.y - probeViewport.w) * sourcePerPixelY - gate.y * SOURCE_HEIGHT / gate.height - rect[1]
+        viewportQuantizationX = Math.max(Math.abs(leftError), Math.abs(leftError + probeViewport.z * sourcePerPixelX - rect[2])) / sourcePerPixelX
+        viewportQuantizationY = Math.max(Math.abs(topError), Math.abs(topError + probeViewport.w * sourcePerPixelY - rect[3])) / sourcePerPixelY
+      }
       const mirror = presentation === 'horizontal-mirror' && !activeView?.imagePlaneWarp
       const ratioX = mirror ? mirrorStage.width / probeViewport.z : 1
       const ratioY = mirror ? mirrorStage.height / probeViewport.w : 1
@@ -1285,8 +1348,8 @@ void main() {
           }
           const px = accumulators[o + 1]! / count
           const py = accumulators[o + 2]! / count
-          let uncertaintyX = 0.5
-          let uncertaintyY = 0.5
+          let uncertaintyX = 0.5 + viewportQuantizationX
+          let uncertaintyY = 0.5 + viewportQuantizationY
           if (mirror) {
             uncertaintyX += 0.5 / ratioX
             uncertaintyY += 0.5 / ratioY
@@ -1299,9 +1362,9 @@ void main() {
           capture.reasons[i] = null
           capture.values[v] = px * cssX
           capture.values[v + 1] = (gl.drawingBufferHeight - py) * cssY
-          capture.values[v + 2] = activeView?.imagePlaneWarp ? (px * cssX - gate.x) * SOURCE_WIDTH / gate.width : rect[0] + rect[2] * (REFERENCE_SOURCE_LOW + REFERENCE_SOURCE_SPAN * (px - ax) / (bx - ax))
-          capture.values[v + 3] = activeView?.imagePlaneWarp ? ((gl.drawingBufferHeight - py) * cssY - gate.y) * SOURCE_HEIGHT / gate.height : rect[1] + rect[3] * (REFERENCE_SOURCE_LOW + REFERENCE_SOURCE_SPAN * (py - ay) / (by - ay))
-          capture.sourceUncertainties[i] = Math.hypot(uncertaintyX * cssX * SOURCE_WIDTH / gate.width, uncertaintyY * cssY * SOURCE_HEIGHT / gate.height) + warpQuantization()
+          capture.values[v + 2] = (px * cssX - gate.x) * SOURCE_WIDTH / gate.width
+          capture.values[v + 3] = ((gl.drawingBufferHeight - py) * cssY - gate.y) * SOURCE_HEIGHT / gate.height
+          capture.sourceUncertainties[i] = Math.hypot(uncertaintyX * sourcePerPixelX, uncertaintyY * sourcePerPixelY) + warpQuantization()
           capture.values[v + 4] = Math.max(uncertaintyX * cssX, uncertaintyY * cssY) + warpQuantization() * Math.max(gate.width / SOURCE_WIDTH, gate.height / SOURCE_HEIGHT)
         }
       }
@@ -1770,7 +1833,7 @@ void main() {
   }
   resize()
   return {
-    renderer, scene, camera, resize, render, renderViews, applyCamera, setInteraction, fitView, setLandmarkProbe, readRenderedLandmarks,
+    renderer, scene, camera, resize, render, preflightViews, renderViews, applyCamera, setInteraction, fitView, setLandmarkProbe, readRenderedLandmarks,
     setNativeLineProbe, readRenderedNativeLines,
     setPartVisibilityProbe, readRenderedPartVisibility, dispose,
     get controls() { return controls },

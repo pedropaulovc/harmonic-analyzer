@@ -2,7 +2,7 @@ import { Matrix4, Quaternion } from 'three'
 import { deriveImagePlaneWarp, projectImagePlanePixel } from './image-plane-homography'
 import { createMechanismInput, createMechanismPose, MECHANISM_DATA, type MechanismInput, type MechanismPose } from './mechanics'
 import { assertSourceCompositeWeights, type CameraRecord, type ImagePlaneWarp, type PartOverride, type SourceComposite, type SourceLayoutEntry, type SourceView } from './scene'
-import { compileInput, compileWitness, equalRecord, inputValue, solveSourceInput, validateVisibilityProof, validateNativeGeometryAssumptions, SETUP_KEYS, type InputField, type MechanicalObservation, type MechanicalProvenance, type SerializedInput, type SourceConstraint, type SourceImageIdentity, type SourceImagePlaneWarp, type NativeLineCheck, type SourceContourCheck, type NativeGeometryAssumption, type SourceNonIdentifiableFixedPart } from './source-witness'
+import { compileInput, compileWitness, equalRecord, inputValue, solveSourceInput, validateVisibilityProof, validateNativeGeometryAssumptions, validateNativeLineAxisBiasComponents, SETUP_KEYS, type InputField, type MechanicalObservation, type MechanicalProvenance, type SerializedInput, type SourceConstraint, type SourceImageIdentity, type SourceImagePlaneWarp, type NativeLineCheck, type SourceContourCheck, type NativeGeometryAssumption, type SourceNonIdentifiableFixedPart } from './source-witness'
 export type { MechanicalObservation, SerializedInput } from './source-witness'
 import type { Video } from './video-catalog'
 
@@ -82,6 +82,7 @@ export interface ReferenceFrame {
   shotId: string
   sourceImage?: SourceImageIdentity
   classification: Classification
+  sourceMachineRequirement?: 'required'
   landmarks: Landmark[]
   unavailable: { anchorId: string; reason: string }[]
   mechanicalState: MechanicalObservation
@@ -424,12 +425,12 @@ function blendInput(target: MechanismInput, a: MechanismInput, b: MechanismInput
 }
 
 /**
- * Physical matching is required unless the shot census explicitly exempts it. Classification
- * alone never exempts a shot declared to contain the mechanism (transitions, photographs).
+ * Physical matching is required unless the shot census explicitly exempts it. An actual-source
+ * per-frame required annotation can only strengthen coverage; it never grants an absence waiver.
  * Must agree with sourceNeedsMachine in scripts/verify-reference.mjs.
  */
-function requiresMachine(classification: Classification, hasCorrespondingMachine: boolean | undefined): boolean {
-  if (classification === 'machine') return true
+function requiresMachine(classification: Classification, hasCorrespondingMachine: boolean | undefined, sourceMachineRequirement?: 'required'): boolean {
+  if (sourceMachineRequirement === 'required' || classification === 'machine') return true
   if (classification === 'non-machine') return hasCorrespondingMachine === true
   return hasCorrespondingMachine !== false
 }
@@ -593,9 +594,10 @@ export class VideoReference {
       if (t <= previous || t < 0 || t > video.durationSeconds + 0.05) throw new Error('Reference timestamps must be strictly increasing within the source duration.')
       previous = t
       if (!classifications[reference.classification]) throw new Error(`Unknown source classification at ${t}s.`)
+      if (Object.hasOwn(reference, 'sourceMachineRequirement') && reference.sourceMachineRequirement !== 'required') throw new Error(`Invalid source machine requirement at ${t}s; only required can strengthen source coverage.`)
       const shot = shotsById.get(reference.shotId)
       if (!shot) throw new Error(`Unknown source shot at ${t}s.`)
-      const requirement = requiresMachine(reference.classification, shot.hasCorrespondingMachine) ? 'required' : 'not-required'
+      const requirement = requiresMachine(reference.classification, shot.hasCorrespondingMachine, reference.sourceMachineRequirement) ? 'required' : 'not-required'
       const observations = observationsByFrame[index]!
       const sourceLayout: SourceLayoutEntry[] = observations.map((observation) => ({
         viewId: observation.id, rectSourcePixels: [...observation.rectSourcePixels], presentation: observation.presentation,
@@ -617,6 +619,9 @@ export class VideoReference {
         if (new Set((observation.partOverrides ?? noOverrides).map((override) => override.partPath)).size !== (observation.partOverrides ?? noOverrides).length) throw new Error(`${label}: duplicate part override.`)
         for (const checks of [observation.nativeLineChecks ?? [], observation.sourceContourChecks ?? []]) {
           if (new Set(checks.map((check) => check.id)).size !== checks.length) throw new Error(`${label}: duplicate source geometry check ID.`)
+        }
+        for (const line of observation.nativeLineChecks ?? []) {
+          validateNativeLineAxisBiasComponents(line, observation.imagePlaneWarp != null, `${label}/${line.id}`)
         }
         for (const override of observation.partOverrides ?? noOverrides) {
           const sourced = override as SourcePartOverride

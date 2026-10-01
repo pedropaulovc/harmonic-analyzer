@@ -261,8 +261,15 @@ def repeated_source_views(cap, seed, shot, shots, fps, frame_count):
     return result, evidence
 
 
-def needs_machine(classification, shot):
-    """Same rule as fit-source.py needs_machine and verify-reference.mjs sourceNeedsMachine."""
+def needs_machine(frame, shot):
+    """Same monotonic frame/shot rule as the fitter and acceptance consumer."""
+    if "sourceMachineRequirement" in frame:
+        if frame["sourceMachineRequirement"] != "required":
+            raise ValueError(
+                "Source frame sourceMachineRequirement must be the literal required"
+            )
+        return True
+    classification = frame["classification"]
     if classification == "machine":
         return True
     if classification == "non-machine":
@@ -273,7 +280,12 @@ def needs_machine(classification, shot):
 def exact_exposure_landmarks(seed, frame, source_image, kinds):
     """Reuse manual physical pixels only for a proven identical decoded exposure."""
     identity_keys = (
-        "frameIndex", "sourceSha256", "sha256Bgr8", "pixelFormat", "width", "height"
+        "frameIndex",
+        "sourceSha256",
+        "sha256Bgr8",
+        "pixelFormat",
+        "width",
+        "height",
     )
     if (
         seed["shotId"] != frame["shotId"]
@@ -412,7 +424,16 @@ def observe(data, source_path, match_repeated_view=False):
         )
         frame = existing.get(t)
         if frame is None:
-            required = needs_machine(shot["classification"], shot)
+            frame = {
+                "timeSeconds": t,
+                "decodedTimeSeconds": index / fps,
+                "shotId": shot["id"],
+                "classification": shot["classification"],
+                "landmarks": [],
+                "unavailable": [],
+                "camera": None,
+            }
+            required = needs_machine(frame, shot)
             state = copy.deepcopy(
                 shot.get(
                     "mechanicalState",
@@ -425,16 +446,7 @@ def observe(data, source_path, match_repeated_view=False):
                     },
                 )
             )
-            frame = {
-                "timeSeconds": t,
-                "decodedTimeSeconds": index / fps,
-                "shotId": shot["id"],
-                "classification": shot["classification"],
-                "landmarks": [],
-                "unavailable": [],
-                "camera": None,
-                "mechanicalState": state,
-            }
+            frame["mechanicalState"] = state
             seed_times = [
                 item["trackingEvidence"]["seedTimeSeconds"]
                 for item in tracked.get(index, [])
@@ -450,6 +462,7 @@ def observe(data, source_path, match_repeated_view=False):
                     for view in frame["views"]:
                         view["camera"] = None
                         view["mechanicalState"] = copy.deepcopy(state)
+        required = needs_machine(frame, shot)
         if not frame["landmarks"] and frame["classification"] == "machine":
             exposure_index = round(frame["decodedTimeSeconds"] * fps)
             for seed in manual_seeds:
@@ -473,7 +486,7 @@ def observe(data, source_path, match_repeated_view=False):
         if not frame["landmarks"] and frame["classification"] == "machine":
             frame["landmarks"] = copy.deepcopy(tracked.get(index, []))
         observed_ids = {item["anchorId"] for item in frame["landmarks"]}
-        if frame["classification"] == "machine":
+        if required:
             frame["unavailable"] = [
                 {
                     "anchorId": anchor["id"],

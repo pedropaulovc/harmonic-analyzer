@@ -37,7 +37,8 @@ function group(id: string, path: string, names: string, motion: Motion, expected
 }
 
 export const BINDINGS: readonly Binding[] = [
-  group('crank', drive, '(?:crankshaft|crank-arm|crank-hub|crank-hub-pin|crank-pin|crank-pin-eye|crank-handle-pivot-screw|crank-pin-ring|crank-handle|crank-pinion|crank-pinion-pin)-1', 'crank', 11),
+  // Pinned release build_drive_train_assembly:4225-4241 locks the anchor screw to the arm.
+  group('crank', drive, '(?:crankshaft|crank-arm|crank-hub|crank-hub-pin|crank-pin|crank-pin-eye|crank-handle-pivot-screw|crank-pin-ring|crank-handle|crank-pinion|crank-pinion-pin|fillister-screw)-1', 'crank', 12),
   family('coneGears', drive, 'cone-gear', 'cone-spin'),
   group('coneShaft', drive, '(?:cone-gear-shaft|crank-drive-gear)-1', 'cone-spin', 2),
   // Source build_drive_train_assembly:4505-4555 carries post/fasteners;
@@ -60,8 +61,10 @@ export const BINDINGS: readonly Binding[] = [
   group('leverWire', magnifier, 'lever-wire-1', 'lever-wire', 1),
   group('penWire', pen, 'pen-wire-1', 'pen-wire', 1),
   group('pen', pen, '(?:pen-rod|pen-v-block|pen-frame|pen-marker|pen-set-screw)-1', 'pen', 5),
+  // Pinned release build_paper_drive_assembly:1170-1458 locks all 33 native
+  // carriage bodies to the platen, including guides, locks and screws 1..22.
   // Flat native siblings: screws 1/2 attach to clip 1, screws 3/4 to clip 2.
-  group('platen', paper, '(?:platen|platen-rack|platen-paper)-1|platen-clip-[12]|fillister-screw-[1-4]', 'platen', 9),
+  group('platen', paper, '(?:platen|platen-rack|platen-paper)-1|(?:platen-clip|platen-guide)-[12]|guide-lock-[1-4]|fillister-screw-(?:[1-9]|1[0-9]|2[0-2])', 'platen', 33),
   group('alignmentPinionSwing', drive, 'pinion-bracket-[12]|alignment-pinion-1|pinion-arbor-1|pinion-strap-pin-[123]|pinion-handle-1|pinion-arbor-collar-1', 'pinion-swing', 9),
   group('alignmentPinionCam', drive, 'pinion-cam-[12]|pinion-lift-rod-1|pinion-cam-pin-[12]', 'pinion-cam', 5),
   group('alignmentPinionLever', drive, 'pinion-lever-1|pinion-lever-pin-1', 'pinion-lever', 2),

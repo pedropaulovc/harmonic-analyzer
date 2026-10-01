@@ -316,10 +316,14 @@ export function runTool(binary, args, { timeoutMs = 120_000, signal, maxBytes = 
  * physically matched when it shows the machine, when its shot declares a
  * corresponding machine (whatever its classification: transition, photograph,
  * overlay…), or when a transition/unobservable shot does not explicitly exempt
- * it. Only non-machine shots without a declared machine, or shots explicitly
- * declaring hasCorrespondingMachine=false, are exempt.
+ * it. A frame's literal sourceMachineRequirement='required' monotonically
+ * tightens this rule; it can never create an exemption or promote a source pose.
  */
 export function sourceNeedsMachine(frame, shot) {
+  if (Object.hasOwn(frame,'sourceMachineRequirement')) {
+    if (frame.sourceMachineRequirement!=='required') throw new Error('Source frame sourceMachineRequirement must be the literal required; invalid values cannot create an exemption')
+    return true
+  }
   if (frame.classification === 'machine' || shot?.hasCorrespondingMachine === true) return true
   if (frame.classification === 'non-machine' || shot?.hasCorrespondingMachine === false) return false
   return true
@@ -364,6 +368,22 @@ function measuredImageErrors(item, image) {
   }
   return errors
 }
+/** Explicit decomposition only: an inclusive allowance cannot be guessed from its size or prose. */
+export function nativeLineAxisBiasComponents(line) {
+  const evidence=line?.measurementEvidence,components=evidence?.axisPerspectiveBiasComponents
+  if (!finite(line?.uncertaintyPx)||line.uncertaintyPx<0) throw new Error('Native line source localization/raster uncertainty is unknown; null cannot become zero')
+  if (!finite(evidence?.axisPerspectiveBiasBoundPx)||evidence.axisPerspectiveBiasBoundPx<0
+    ||!exactKeys(components,['kind','geometryBoundPx','sourceLocalizationBoundPx','evidence'])
+    ||!['independent-geometry','includes-source-localization'].includes(components.kind)
+    ||!finite(components.geometryBoundPx)||components.geometryBoundPx<0
+    ||!finite(components.sourceLocalizationBoundPx)||components.sourceLocalizationBoundPx<0||!text(components.evidence)
+    ||Math.abs(components.geometryBoundPx+components.sourceLocalizationBoundPx-evidence.axisPerspectiveBiasBoundPx)>1e-9*Math.max(1,evidence.axisPerspectiveBiasBoundPx)) throw new Error('Native line axis bias needs an explicit independently evidenced additive decomposition certificate')
+  if (components.kind==='independent-geometry') {
+    if (components.sourceLocalizationBoundPx!==0) throw new Error('Independent geometry certificate cannot contain source localization')
+  } else if ((evidence.axisPerspectiveBiasSpace??'source-global')!=='source-global'
+    ||components.sourceLocalizationBoundPx!==line.uncertaintyPx) throw new Error('Inclusive axis certificate must identify the same final-source localization bound exactly once')
+  return components
+}
 export function nativeLineErrors(lines, image, rect, overrides = []) {
   const errors = [], ids = new Set()
   for (const line of lines) {
@@ -372,7 +392,8 @@ export function nativeLineErrors(lines, image, rect, overrides = []) {
     if (!text(line?.id) || ids.has(line.id) || !text(line.partPath) || !line.partPath.startsWith('harmonic-analyzer/') || !Array.isArray(local) || local.length !== 2 || !local.every(point => vector(point, 3)) || distance(local[0], local[1]) <= 1e-9
       || !Array.isArray(source) || source.length !== 2 || !source.every(point => inRect(point, rect)) || distance(source[0], source[1]) <= 1e-6 || !finite(line.uncertaintyPx) || line.uncertaintyPx < 0 || line.uncertaintyPx > PIXEL_LIMIT) { reject('Invalid/degenerate native geometry or actual source segment'); continue }
     ids.add(line.id)
-    if (canonicalJson(evidence?.sourceImage) !== canonicalJson(image) || !text(evidence?.detector) || !text(evidence?.axisPerspectiveEvidence) || !finite(evidence?.axisPerspectiveBiasBoundPx) || evidence.axisPerspectiveBiasBoundPx < 0 || evidence.axisPerspectiveBiasBoundPx > line.uncertaintyPx) { reject('Need current exposure, actual edge detector and conservative independently justified axis perspective bias'); continue }
+    if (canonicalJson(evidence?.sourceImage) !== canonicalJson(image) || !text(evidence?.detector) || !text(evidence?.axisPerspectiveEvidence) || !finite(evidence?.axisPerspectiveBiasBoundPx) || evidence.axisPerspectiveBiasBoundPx < 0 || evidence.axisPerspectiveBiasBoundPx > PIXEL_LIMIT) { reject('Need current exposure, actual edge detector and conservative independently justified axis perspective bias'); continue }
+    try { nativeLineAxisBiasComponents(line) } catch(error) { reject(error.message); continue }
     const rows = evidence.edgeRows
     if (!Array.isArray(rows) || rows.length < 2 || new Set(rows.map(row => row?.y)).size < 2) { reject('Need distinct actually observed paired-edge rows'); continue }
     const delta = source[1].map((value, i) => value - source[0][i]), squared = delta.reduce((sum, value) => sum + value * value, 0)

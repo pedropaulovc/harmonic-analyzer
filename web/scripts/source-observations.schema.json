@@ -131,15 +131,28 @@
         "id": {"type": "string", "minLength": 1}, "partPath": {"type": "string", "minLength": 1},
         "partLocalLineMetres": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"$ref": "#/$defs/xyz"}, "description": "Finite independently qualified native geometry segment; never reconstructed from the camera being checked."},
         "sourceLinePixels": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"$ref": "#/$defs/pixelPair"}, "description": "Actually measured source-global segment, not named 3D endpoints at invented image rows."},
-        "uncertaintyPx": {"type": "number", "minimum": 0},
+        "uncertaintyPx": {"type": "number", "minimum": 0, "description": "Independent conservative Euclidean final source-global localization/raster-quantization bound, matching landmark uncertaintyPx. It excludes native raster, geometry/perspective and raster-fit error. H never transforms this already-source-global term; warped observations require a bounded supported localization footprint."},
         "measurementEvidence": {
           "type": "object",
-          "required": ["sourceImage", "detector", "edgeRows", "axisPerspectiveBiasBoundPx", "axisPerspectiveEvidence"],
+          "required": ["sourceImage", "detector", "edgeRows", "axisPerspectiveBiasBoundPx", "axisPerspectiveBiasComponents", "axisPerspectiveEvidence"],
+          "allOf": [{"if": {"properties": {"axisPerspectiveBiasComponents": {"properties": {"kind": {"const": "includes-source-localization"}}}}}, "then": {"properties": {"axisPerspectiveBiasSpace": {"const": "source-global"}}}}],
           "properties": {
             "sourceImage": {"$ref": "#/$defs/sourceImage"},
             "detector": {"type": "string", "minLength": 1, "pattern": "\\S"},
             "edgeRows": {"type": "array", "minItems": 2, "items": {"type": "object", "required": ["y", "left", "right", "contrast"], "properties": {"y": {"type": "number"}, "left": {"type": "number"}, "right": {"type": "number"}, "contrast": {"type": "number", "exclusiveMinimum": 0}}}},
             "axisPerspectiveBiasBoundPx": {"type": "number", "minimum": 0},
+            "axisPerspectiveBiasComponents": {
+              "type": "object", "additionalProperties": false,
+              "required": ["kind", "geometryBoundPx", "sourceLocalizationBoundPx", "evidence"],
+              "properties": {
+                "kind": {"enum": ["independent-geometry", "includes-source-localization"]},
+                "geometryBoundPx": {"type": "number", "minimum": 0},
+                "sourceLocalizationBoundPx": {"type": "number", "minimum": 0},
+                "evidence": {"$ref": "#/$defs/sourceEvidence"}
+              },
+              "allOf": [{"if": {"properties": {"kind": {"const": "independent-geometry"}}}, "then": {"properties": {"sourceLocalizationBoundPx": {"const": 0}}}}],
+              "description": "Independently evidenced additive decomposition in axisPerspectiveBiasSpace (ordinary default source-global). Components must sum to the unchanged authored axis bound. Inclusive certificates are source-global only and sourceLocalizationBoundPx must equal the check's unchanged uncertaintyPx; only the geometry component is added alongside that localization term. No subtraction inferred from magnitude or prose."
+            },
             "axisPerspectiveBiasSpace": {"enum": ["source-global", "unwarped-viewport"], "description": "Mandatory for homography views; unwarped bounds are propagated by an independently recomputed H Jacobian, never reused as final-source pixels."},
             "axisPerspectiveBiasRegionViewportPixels": {"$ref": "#/$defs/xyzw"},
             "axisPerspectiveEvidence": {"type": "string", "minLength": 1, "pattern": "\\S", "description": "Physical justification and independent bound for silhouette midpoint versus projected cylinder-axis perspective asymmetry; source-image edge pairs remain the observations."}
@@ -156,7 +169,7 @@
         "id": {"$ref": "#/$defs/sourceEvidence"},
         "partPath": {"$ref": "#/$defs/nativePartPath"},
         "sourceContourPixels": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/pixelPair"}, "description": "Independently measured source-global contour samples, bound to the actual decoded exposure; never native projections used as source observations."},
-        "uncertaintyPx": {"type": "number", "minimum": 0},
+        "uncertaintyPx": {"type": "number", "minimum": 0, "description": "Independent conservative Euclidean final source-global localization/raster-quantization bound, matching landmarks and native line checks. Added exactly once to nearest captured boundary distance and native raster uncertainty; unknown/null fails closed. H does not transform an already-source-global bound; warped localization footprints must remain bounded and supported."},
         "measurementEvidence": {"type": "object", "required": ["sourceImage", "evidence"], "additionalProperties": false, "properties": {"sourceImage": {"$ref": "#/$defs/sourceImage"}, "evidence": {"$ref": "#/$defs/sourceEvidence"}}}
       }
     },
@@ -377,6 +390,7 @@
       ],
       "properties": {
         "timeSeconds": {"type": "number", "minimum": 0}, "decodedTimeSeconds": {"type": "number", "minimum": 0}, "shotId": {"type": "string"}, "classification": {"$ref": "#/$defs/classification"},
+        "sourceMachineRequirement": {"enum": ["required"], "description": "Optional monotonic strict-required declaration for this exact decoded source frame. Overrides a broader shot exemption without splitting or weakening its census; never exempts a frame, qualifies a camera/input/alpha/H, or promotes a source pose."},
         "landmarks": {"type": "array", "items": {"$ref": "#/$defs/landmark"}},
         "unavailable": {"type": "array", "items": {"type": "object", "required": ["anchorId", "reason"], "properties": {"anchorId": {"type": "string"}, "reason": {"type": "string"}}}},
         "mechanicalState": {"$ref": "#/$defs/mechanicalState"}, "camera": {"$ref": "#/$defs/camera"}, "views": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/view"}},

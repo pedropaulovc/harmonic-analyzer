@@ -38,8 +38,10 @@ the film uses the same routing or that a fixture adjustment held other inputs fi
 Pen travel moves the native rod, v-block, frame, marker and set-screw together.
 The hanger and its screw remain fixed. Source-evidenced setup lifts and yaw use
 qualified rigid-part overrides; the pen wire remains a separately solved run.
-The platen, its rack, paper and two clips move with their four clip screws.
-Unrelated paper-drive fillister screws and structural guides remain fixed.
+The platen carries its rack, paper, two clips, all twenty-two fillister screws,
+two guides and four guide locks as one 33-part group. The crank arm carries its
+anchor screw. These attachments follow the released assembly mates pinned to
+the native export; frame-mounted hardware remains fixed.
 
 Interactive amplitude is a normalized CAD slide station, bounded by the native
 mechanism. The displayed millimetres are not a calibration of the video's
@@ -98,8 +100,8 @@ Interpolation requires compatible, source-evidenced motion and view regimes.
 Every observed or reconstructed view must cover the requested time with its
 visibility certificate. A decoded exposure can be held inside that explicit
 interval; point certificates do not cover gaps or expired tails. Preparation uses
-a separate reusable sample bank: native preflight must pass before publishing
-views, so a rejected candidate cannot overwrite the active source input.
+a separate reusable sample bank. Mechanical/source validity and device target
+capacity must pass before publishing views, input, camera or proof metadata.
 Required incomplete footage never falls back to a held pose. The player remains
 usable when source matching is unavailable; the warning distinguishes video
 playback from verified geometry synchronization.
@@ -151,6 +153,9 @@ Proof bindings and captures include the source exposure, camera, input, override
 geometry assumptions, authored/resolved warp or explicit nulls, and full ordered
 support layout. Source/native uncertainty belongs in the final error bound;
 raw reprojection error below 38.4 pixels alone is not acceptance.
+Ordinary landmark coordinates use exact destination pixel-cell mapping.
+Rasterized reference markers independently verify that mapping rather than
+calibrating it. Marker, blit and warped-cell errors remain explicit native terms.
 CPU camera projection and two aliases of the player's clock are insufficient
 evidence. Native WebGL readback may use a software renderer; it does not imply
 hardware acceleration.
@@ -158,11 +163,17 @@ hardware acceleration.
 Finite native-line diagnostics return the clipped GPU raster and its source-pixel
 quantization bound. Every declared segment must stay inside its native drawable's
 rest bounding box; that check alone does not identify a physical surface or axis.
-Contour checks use depth-tested native-ID boundaries. Fixed-part source-region
-containment uses the full exclusive pixel-cell extent, not sampled contours.
-Warped diagnostics include the native and destination raster-cell bounds
-transformed into source pixels. Fixed-part containment and contour checks retain
-their full depth-tested support rather than substituting CPU bounds.
+The final ledger adds source localization, independently certified axis geometry,
+native quantization and raster-fit deviation. A bundled axis allowance requires
+an explicit decomposition so source localization is counted exactly once.
+Contour bounds add source localization to nearest depth-boundary distance and
+native quantization. Independently observed line endpoints, edge-row midpoints
+and contour points must lie inside the view's unmasked image support; a nearby
+surviving boundary cannot certify an observation hidden by a higher inset.
+Fixed-part source-region containment uses the full exclusive pixel-cell extent,
+not sampled contours. Warped diagnostics include native and destination raster
+cell bounds transformed into source pixels. They retain full depth-tested support
+rather than substituting CPU bounds.
 
 Paused interaction checks the actual canvas pixels, crank input and unchanged
 camera, then verifies pointer-driven orbit while native media remains paused.

@@ -84,13 +84,30 @@ export type SourceCoverage =
   | { kind: 'native-line-checks'; lineCheckIds: string[] }
   | { kind: 'source-contour'; contourCheckIds: string[] }
   | { kind: 'rigid-native-attachment'; attachedToPartPath: string }
+export type AxisPerspectiveBiasComponents = {
+  geometryBoundPx: number
+  evidence: string
+} & (
+  | { kind: 'independent-geometry'; sourceLocalizationBoundPx: 0 }
+  | { kind: 'includes-source-localization'; sourceLocalizationBoundPx: number }
+)
 export interface NativeLineCheck {
   id: string
   partPath: string
   partLocalLineMetres: [[number, number, number], [number, number, number]]
   sourceLinePixels: [[number, number], [number, number]]
   uncertaintyPx: number
-  measurementEvidence: { sourceImage: SourceImageIdentity; [key: string]: unknown }
+  measurementEvidence: {
+    sourceImage: SourceImageIdentity
+    detector: string
+    edgeRows: Array<{ y: number; left: number; right: number; contrast: number; [key: string]: unknown }>
+    axisPerspectiveBiasBoundPx: number
+    axisPerspectiveBiasComponents: AxisPerspectiveBiasComponents
+    axisPerspectiveEvidence: string
+    axisPerspectiveBiasSpace?: 'source-global' | 'unwarped-viewport'
+    axisPerspectiveBiasRegionViewportPixels?: [number, number, number, number]
+    [key: string]: unknown
+  }
 }
 export interface SourceContourCheck {
   id: string
@@ -98,6 +115,27 @@ export interface SourceContourCheck {
   sourceContourPixels: [number, number][]
   uncertaintyPx: number
   measurementEvidence: { sourceImage: SourceImageIdentity; evidence: string }
+}
+/** Closed budget semantics match the independent static/GPU acceptance certificate. */
+export function validateNativeLineAxisBiasComponents(line: NativeLineCheck, warped: boolean, label: string): void {
+  const sourceUncertainty = finite(line.uncertaintyPx, `${label}.uncertaintyPx`)
+  if (sourceUncertainty < 0) throw new Error(`${label}: source localization uncertainty must be nonnegative.`)
+  const measured = line.measurementEvidence, components = measured?.axisPerspectiveBiasComponents
+  if (!measured || !components) throw new Error(`${label}: an explicit axis-bias decomposition certificate is required.`)
+  keys(components, ['kind', 'geometryBoundPx', 'sourceLocalizationBoundPx', 'evidence'], label)
+  const total = finite(measured.axisPerspectiveBiasBoundPx, `${label}.axisPerspectiveBiasBoundPx`)
+  const geometry = finite(components.geometryBoundPx, `${label}.geometryBoundPx`)
+  const source = finite(components.sourceLocalizationBoundPx, `${label}.sourceLocalizationBoundPx`)
+  evidence(components.evidence, label)
+  if (total < 0 || geometry < 0 || source < 0
+    || Math.abs(geometry + source - total) > 1e-9 * Math.max(1, total)) throw new Error(`${label}: axis components do not close the unchanged authored bound.`)
+  const space = measured.axisPerspectiveBiasSpace
+  if (warped ? !['source-global', 'unwarped-viewport'].includes(space ?? '') : space !== undefined && space !== 'source-global') throw new Error(`${label}: axis-bias coordinate space is missing or unsupported.`)
+  if (components.kind === 'independent-geometry') {
+    if (source !== 0) throw new Error(`${label}: independent geometry cannot contain source localization.`)
+  } else if (components.kind === 'includes-source-localization') {
+    if ((space ?? 'source-global') !== 'source-global' || source !== sourceUncertainty) throw new Error(`${label}: inclusive axis must certify the same final-source localization exactly once.`)
+  } else throw new Error(`${label}: unknown axis-bias decomposition kind.`)
 }
 export const SOURCE_NON_IDENTIFIABLE_FIXED_POLICY = {
   status: 'user-approved-source-non-identifiable',

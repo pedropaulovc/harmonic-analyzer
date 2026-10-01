@@ -1,4 +1,4 @@
-import { assertSourceCompositeWeights, createViewer, loadMachine, type CameraRecord, type Machine, type NativeLineAnchor, type SourceView } from './scene'
+import { assertSourceCompositeWeights, createViewer, loadMachine, ViewCapacityError, type CameraRecord, type Machine, type NativeLineAnchor, type SourceView } from './scene'
 import { createMechanismInput, MECHANISM_DATA, type MechanismInput } from './mechanics'
 import { MAGNIFIER_RATIO_MIN, MAGNIFIER_RATIO_MAX, physicalChannelAngle, squareWave } from './kinematics'
 import { VIDEOS, resolveVideo, type Video } from './video-catalog'
@@ -367,7 +367,10 @@ function renderSource(timeSeconds: number): void {
     return
   }
   const prepared = reference.prepareAt(timeSeconds)
-  if (prepared.state !== 'unavailable') validateSourceViews(prepared.views, reference.sourcePartOverrides)
+  if (prepared.state !== 'unavailable') {
+    validateSourceViews(prepared.views, reference.sourcePartOverrides)
+    viewer.preflightViews(prepared.views)
+  }
   const sample = reference.commitPrepared()
   referenceState = sample.state
   activeViews = sample.views
@@ -661,13 +664,17 @@ function tick(now: number): void {
       paintRevision = 'clean'
     }
   } catch (error) {
-    manualMotion = 'idle'
-    manualRevision = 'clean'
-    physicsState = 'unavailable'
-    manualRunButton.textContent = 'Turn crank'
-    referenceState = 'unavailable'
     notice(physicsError, error instanceof Error ? error.message : String(error))
-    renderPending()
+    if (!(error instanceof ViewCapacityError)) {
+      // Unforeseeable draw/solver failures remain fail closed. A predictable
+      // pre-commit capacity refusal leaves the last accepted native frame alone.
+      manualMotion = 'idle'
+      manualRevision = 'clean'
+      physicsState = 'unavailable'
+      manualRunButton.textContent = 'Turn crank'
+      referenceState = 'unavailable'
+      renderPending()
+    }
   }
   if (now - lastHud >= 100) { updateHud(); lastHud = now }
 }
@@ -778,7 +785,9 @@ if (new URLSearchParams(location.search).get('verify') === '1') {
         verticalFovDegrees: sourceCamera.verticalFovDegrees,
       }
       const previousOverrides = previousView?.partOverrides
-      validateSourceViews(reference.prepareAt(timeSeconds).views, reference.sourcePartOverrides)
+      const prepared = reference.prepareAt(timeSeconds)
+      validateSourceViews(prepared.views, reference.sourcePartOverrides)
+      viewer.preflightViews(prepared.views)
       copyInput(input, reviewRollbackInput)
       try {
         mode = 'reference-review'

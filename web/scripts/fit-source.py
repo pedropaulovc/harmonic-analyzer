@@ -5,7 +5,10 @@ Requires numpy, scipy, opencv-python-headless (source-fit-requirements.txt).
 Example: python web/scripts/fit-source.py web/content/XPQwKRt4Y2k.observations.json
   --inventory /tmp/harmonic-web-model/model-inventory.json --output /tmp/spin-fitted.json
 The inventory supplies named part-local-to-world matrices. Output is numeric data only.
-Exit 0 means all measured fits pass, NOT that whole-video coverage is complete.
+Exit 0 means measured CPU candidates pass, NOT GPU/source acceptance or video coverage.
+Native line CHECK scores add the unchanged final-source localization/raster bound
+once, plus explicitly certified independent geometry; no extra source raster allowance.
+Image-plane homographies are unsupported here and fail closed without adapting observations.
 --require-complete additionally fails on missing camera/mechanism evidence.
 """
 
@@ -45,12 +48,17 @@ SETUP_KEYS = (
 )
 
 
-def needs_machine(classification, shot):
+def needs_machine(frame, shot):
     """Mirror of verify-reference.mjs sourceNeedsMachine and timeline.ts requiresMachine.
 
-    Only an explicit shot-census exemption removes the physical-match requirement;
-    transition/photograph classifications alone never do.
+    An explicit required frame cannot be exempted by classification or shot census.
+    Absent that monotonic override, the existing source/shot classification rule applies.
     """
+    if "sourceMachineRequirement" in frame:
+        if frame["sourceMachineRequirement"] != "required":
+            raise ValueError("sourceMachineRequirement must be the literal 'required'")
+        return True
+    classification = frame["classification"]
     if classification == "machine":
         return True
     if classification == "non-machine":
@@ -247,7 +255,11 @@ def fit_camera(frame, points, width, height, threshold_px=None, camera_fit=None)
         fixed_fov = finite_vector([fixed_fov], 1, "Known vertical FOV")[0]
         if not 0 < fixed_fov < 180:
             raise ValueError("Known vertical FOV must be between 0 and 180 degrees")
-    if fit_principal_point or fixed_principal_point is not None or fixed_fov is not None:
+    if (
+        fit_principal_point
+        or fixed_principal_point is not None
+        or fixed_fov is not None
+    ):
         evidence = options.get("evidence")
         if not isinstance(evidence, str) or not evidence.strip():
             raise ValueError(
@@ -319,7 +331,11 @@ def fit_camera(frame, points, width, height, threshold_px=None, camera_fit=None)
             dict.fromkeys(
                 float(np.clip(candidate, minimum_focal, maximum_focal))
                 for candidate in (
-                    width * 0.4, width * 0.7, width, width * 1.8, width * 3
+                    width * 0.4,
+                    width * 0.7,
+                    width,
+                    width * 1.8,
+                    width * 3,
                 )
             )
         )
@@ -467,15 +483,26 @@ def source_image_key(image, source, label):
         raise ValueError(f"{label}: missing decoded source image identity")
     pixel_format = image.get("pixelFormat")
     hash_name = {"bgr8": "sha256Bgr8", "gray8": "sha256Gray8"}.get(pixel_format)
-    if hash_name is None or ({"sha256Bgr8", "sha256Gray8"} - {hash_name}) & image.keys():
+    if (
+        hash_name is None
+        or ({"sha256Bgr8", "sha256Gray8"} - {hash_name}) & image.keys()
+    ):
         raise ValueError(f"{label}: ambiguous or unsupported decoded pixel format")
     for name in ("frameIndex", "width", "height"):
         value = image.get(name)
-        if isinstance(value, bool) or not isinstance(value, int) or value < (0 if name == "frameIndex" else 1):
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, int)
+            or value < (0 if name == "frameIndex" else 1)
+        ):
             raise ValueError(f"{label}: invalid {name}")
     for name in (hash_name, "sourceSha256"):
         value = image.get(name)
-        if not isinstance(value, str) or len(value) != 64 or any(c not in "0123456789abcdef" for c in value):
+        if (
+            not isinstance(value, str)
+            or len(value) != 64
+            or any(c not in "0123456789abcdef" for c in value)
+        ):
             raise ValueError(f"{label}: invalid {name}")
     if (
         image["sourceSha256"] != source["sha256"]
@@ -483,9 +510,17 @@ def source_image_key(image, source, label):
         or image["height"] != source["height"]
     ):
         raise ValueError(f"{label}: stale or incompatible source image")
-    return tuple(image[name] for name in (
-        "frameIndex", hash_name, "pixelFormat", "width", "height", "sourceSha256"
-    ))
+    return tuple(
+        image[name]
+        for name in (
+            "frameIndex",
+            hash_name,
+            "pixelFormat",
+            "width",
+            "height",
+            "sourceSha256",
+        )
+    )
 
 
 def finite_evidence(value):
@@ -503,7 +538,12 @@ def finite_evidence(value):
 
 
 def measurement_evidence(measurement, label):
-    if measurement.get("method") not in ("manual", "optical-flow", "image-edge", "template-match"):
+    if measurement.get("method") not in (
+        "manual",
+        "optical-flow",
+        "image-edge",
+        "template-match",
+    ):
         raise ValueError(f"{label}: unknown measurement method")
     uncertainty = finite_vector([measurement.get("uncertaintyPx")], 1, label)[0]
     if uncertainty < 0:
@@ -525,7 +565,9 @@ def measurement_image_identity(measurement, image, source, label):
         raise ValueError(f"{label}: stale measurement source image")
     for format_name, digest_name in (("Bgr8", "sha256Bgr8"), ("Gray8", "sha256Gray8")):
         evidence_name = "sourceSha256" + format_name
-        if evidence_name in evidence and evidence[evidence_name] != image.get(digest_name):
+        if evidence_name in evidence and evidence[evidence_name] != image.get(
+            digest_name
+        ):
             raise ValueError(f"{label}: stale measurement pixel hash")
 
 
@@ -533,10 +575,15 @@ def rig_phase_parameters(rig, phase):
     reference = rig["worldToReferenceCameraCV"]
     rotation = Rotation.from_rotvec(reference["rotationVectorRad"]).as_matrix()
     rotation = rotation @ Rotation.from_euler("y", 2 * math.pi * phase / 71).as_matrix()
-    translation = np.array(reference["translationMetres"]) - rotation @ np.array(rig["axisPointWorldMetres"])
+    translation = np.array(reference["translationMetres"]) - rotation @ np.array(
+        rig["axisPointWorldMetres"]
+    )
     return np.r_[
-        Rotation.from_matrix(rotation).as_rotvec(), translation,
-        math.log(reference["focalPixels"]), 960.0, 540.0,
+        Rotation.from_matrix(rotation).as_rotvec(),
+        translation,
+        math.log(reference["focalPixels"]),
+        960.0,
+        540.0,
     ]
 
 
@@ -549,10 +596,16 @@ def prepare_camera_rigs(observations, points):
         rig_id = rig.get("id")
         if not isinstance(rig_id, str) or not rig_id or rig_id in prepared:
             raise ValueError("Missing or duplicate source camera rig ID")
-        if rig.get("kind") != "turntable" or type(rig.get("phaseCount")) is not int or rig["phaseCount"] != 71:
+        if (
+            rig.get("kind") != "turntable"
+            or type(rig.get("phaseCount")) is not int
+            or rig["phaseCount"] != 71
+        ):
             raise ValueError(f"{rig_id}: expected a 71-phase turntable rig")
         if (source["width"], source["height"]) != (1920, 1080):
-            raise ValueError(f"{rig_id}: turntable rig requires the full 1920x1080 source")
+            raise ValueError(
+                f"{rig_id}: turntable rig requires the full 1920x1080 source"
+            )
         reference = rig["worldToReferenceCameraCV"]
         finite_vector(reference.get("rotationVectorRad"), 3, f"{rig_id}/rotation")
         finite_vector(reference.get("translationMetres"), 3, f"{rig_id}/translation")
@@ -569,8 +622,18 @@ def prepare_camera_rigs(observations, points):
             images[phase] = item["sourceImage"]
         if set(images) != set(range(71)):
             raise ValueError(f"{rig_id}: every phase requires an actual source image")
-        if len({source_image_key(image, source, rig_id)[1:3] for image in images.values()}) != 71:
-            raise ValueError(f"{rig_id}: phase images do not establish 71 unique appearances")
+        if (
+            len(
+                {
+                    source_image_key(image, source, rig_id)[1:3]
+                    for image in images.values()
+                }
+            )
+            != 71
+        ):
+            raise ValueError(
+                f"{rig_id}: phase images do not establish 71 unique appearances"
+            )
         loop = rig.get("independentLoopEvidence", {})
         if (
             loop.get("sourceSha256") != source["sha256"]
@@ -590,27 +653,49 @@ def prepare_camera_rigs(observations, points):
             image["frameIndex"] >= loop["decodedNativeFrameCount"]
             for image in images.values()
         ):
-            raise ValueError(f"{rig_id}: phase image lies outside the measured native loop census")
+            raise ValueError(
+                f"{rig_id}: phase image lies outside the measured native loop census"
+            )
         comparison = loop.get("periodPixelComparison", {})
         period_error, adjacent_error = finite_vector(
-            [comparison.get("nativeOffset142MedianMAD"), comparison.get("adjacentOffsetMedianMAD")],
-            2, f"{rig_id}/period pixel comparison",
+            [
+                comparison.get("nativeOffset142MedianMAD"),
+                comparison.get("adjacentOffsetMedianMAD"),
+            ],
+            2,
+            f"{rig_id}/period pixel comparison",
         )
         if not 0 <= period_error < adjacent_error:
             raise ValueError(f"{rig_id}: pixels do not distinguish the measured loop")
         source_map = {}
         for item in loop.get("sourceFrameMap", []):
-            key = source_image_key(item.get("sourceImage"), source, f"{rig_id}/source map")
+            key = source_image_key(
+                item.get("sourceImage"), source, f"{rig_id}/source map"
+            )
             if key in source_map:
                 raise ValueError(f"{rig_id}: duplicate source image registration")
             phase = item.get("referencePhaseIndex")
-            if type(phase) is not int or phase not in images or type(item.get("phaseAccepted")) is not bool:
+            if (
+                type(phase) is not int
+                or phase not in images
+                or type(item.get("phaseAccepted")) is not bool
+            ):
                 raise ValueError(f"{rig_id}: invalid source image phase registration")
-            ref_key = source_image_key(item.get("referenceSourceImage"), source, f"{rig_id}/reference map")
-            if ref_key != source_image_key(images[phase], source, f"{rig_id}/phase identity"):
+            ref_key = source_image_key(
+                item.get("referenceSourceImage"), source, f"{rig_id}/reference map"
+            )
+            if ref_key != source_image_key(
+                images[phase], source, f"{rig_id}/phase identity"
+            ):
                 raise ValueError(f"{rig_id}: stale reference phase image")
-            ncc, second = finite_vector([item.get("ncc"), item.get("secondBestPhaseNcc")], 2, f"{rig_id}/NCC")
-            if not -1 <= second <= 1 or not -1 <= ncc <= 1 or (item["phaseAccepted"] and ncc <= second):
+            ncc, second = finite_vector(
+                [item.get("ncc"), item.get("secondBestPhaseNcc")], 2, f"{rig_id}/NCC"
+            )
+            if (
+                not -1 <= second <= 1
+                or not -1 <= ncc <= 1
+                or (item["phaseAccepted"] and ncc <= second)
+            ):
                 raise ValueError(f"{rig_id}: ambiguous accepted source phase")
             source_map[key] = item
         if not source_map:
@@ -623,38 +708,62 @@ def prepare_camera_rigs(observations, points):
         for measurement in rig.get("measurements", []):
             measurement_evidence(measurement, f"{rig_id}/measurement")
             phase, anchor = measurement.get("phaseIndex"), measurement.get("anchorId")
-            if type(phase) is not int or phase not in images or anchor not in points or (phase, anchor) in seen:
+            if (
+                type(phase) is not int
+                or phase not in images
+                or anchor not in points
+                or (phase, anchor) in seen
+            ):
                 raise ValueError(f"{rig_id}: invalid or duplicate native landmark")
             measurement_image_identity(measurement, images[phase], source, rig_id)
             seen.add((phase, anchor))
             pixel = finite_vector(measurement.get("pixel"), 2, f"{rig_id}/{anchor}")
             if not 0 <= pixel[0] < 1920 or not 0 <= pixel[1] < 1080:
                 raise ValueError(f"{rig_id}: measurement outside actual source image")
-            prediction, depth = project(parameters[phase], np.array([points[anchor]]), 1920, 1080)
+            prediction, depth = project(
+                parameters[phase], np.array([points[anchor]]), 1920, 1080
+            )
             error = float(np.linalg.norm(prediction[0] - pixel))
             positive_depths = positive_depths and bool(depth[0] > 0)
             if measurement["role"] == "fit":
                 fit_errors.append(error)
-                fit_geometry.append(Rotation.from_euler("y", 2 * math.pi * phase / 71).apply(
-                    points[anchor] - np.array(rig["axisPointWorldMetres"])
-                ))
+                fit_geometry.append(
+                    Rotation.from_euler("y", 2 * math.pi * phase / 71).apply(
+                        points[anchor] - np.array(rig["axisPointWorldMetres"])
+                    )
+                )
             else:
                 check_errors.append(error)
             measurements[phase].append(measurement)
-        if len(fit_geometry) < 6 or np.linalg.matrix_rank(
-            np.array(fit_geometry) - np.mean(fit_geometry, axis=0), tol=1e-6
-        ) < 2:
-            raise ValueError(f"{rig_id}: need >=6 nondegenerate global fitting measurements")
-        if any(sum(item["role"] == "check" for item in items) < 2 for items in measurements.values()):
-            raise ValueError(f"{rig_id}: every phase needs >=2 actual held-out landmarks")
+        if (
+            len(fit_geometry) < 6
+            or np.linalg.matrix_rank(
+                np.array(fit_geometry) - np.mean(fit_geometry, axis=0), tol=1e-6
+            )
+            < 2
+        ):
+            raise ValueError(
+                f"{rig_id}: need >=6 nondegenerate global fitting measurements"
+            )
+        if any(
+            sum(item["role"] == "check" for item in items) < 2
+            for items in measurements.values()
+        ):
+            raise ValueError(
+                f"{rig_id}: every phase needs >=2 actual held-out landmarks"
+            )
         prepared[rig_id] = {
-            "images": images, "sourceMap": source_map, "parameters": parameters,
+            "images": images,
+            "sourceMap": source_map,
+            "parameters": parameters,
             "measurements": measurements,
             "passed": positive_depths and max(fit_errors + check_errors) <= threshold,
             "proof": {
-                "globalFitCount": len(fit_errors), "globalCheckCount": len(check_errors),
+                "globalFitCount": len(fit_errors),
+                "globalCheckCount": len(check_errors),
                 "globalFitRmsPx": float(np.sqrt(np.mean(np.square(fit_errors)))),
-                "globalFitMaxPx": max(fit_errors), "globalHeldOutMaxPx": max(check_errors),
+                "globalFitMaxPx": max(fit_errors),
+                "globalHeldOutMaxPx": max(check_errors),
             },
         }
     return prepared
@@ -667,110 +776,307 @@ def prepare_native_line_checks(observations, contexts, inventory):
     source = observations["source"]
     for key, (frame, view, _, _) in contexts.items():
         lines, ids = [], set()
+        if (
+            view.get("imagePlaneWarp") is not None
+            or view.get("resolvedImagePlaneWarp") is not None
+            or frame.get("imagePlaneWarp") is not None
+        ):
+            raise ValueError(
+                f"{key}: CPU native-line candidate objective does not support image-plane homographies"
+            )
+        presentation = view.get("presentation", "native")
+        if presentation not in ("native", "horizontal-mirror"):
+            raise ValueError(
+                f"{key}: unsupported CPU source presentation {presentation}"
+            )
         for line in view.get("nativeLineChecks", []):
             identity, path = line.get("id"), line.get("partPath")
-            if not isinstance(identity, str) or not identity or identity in ids or path not in parts:
-                raise ValueError(f"{key}: missing/duplicate native line ID or unknown native part")
+            if (
+                not isinstance(identity, str)
+                or not identity
+                or identity in ids
+                or path not in parts
+            ):
+                raise ValueError(
+                    f"{key}: missing/duplicate native line ID or unknown native part"
+                )
             ids.add(identity)
             local = line.get("partLocalLineMetres")
             pixels = line.get("sourceLinePixels")
-            if not isinstance(local, list) or len(local) != 2 or not isinstance(pixels, list) or len(pixels) != 2:
-                raise ValueError("Native/source lines require exactly two independent endpoints")
-            local = np.array([finite_vector(point, 3, "native line endpoint") for point in local])
-            pixels = np.array([finite_vector(point, 2, "observed source line endpoint") for point in pixels])
-            if np.linalg.norm(local[1] - local[0]) <= 1e-9 or np.linalg.norm(pixels[1] - pixels[0]) <= 1e-6:
+            if (
+                not isinstance(local, list)
+                or len(local) != 2
+                or not isinstance(pixels, list)
+                or len(pixels) != 2
+            ):
+                raise ValueError(
+                    "Native/source lines require exactly two independent endpoints"
+                )
+            local = np.array(
+                [finite_vector(point, 3, "native line endpoint") for point in local]
+            )
+            pixels = np.array(
+                [
+                    finite_vector(point, 2, "observed source line endpoint")
+                    for point in pixels
+                ]
+            )
+            if (
+                np.linalg.norm(local[1] - local[0]) <= 1e-9
+                or np.linalg.norm(pixels[1] - pixels[0]) <= 1e-6
+            ):
                 raise ValueError("Native/source line segments must be nondegenerate")
             x, y, width, height = view["rectSourcePixels"]
             if np.any(pixels < [x, y]) or np.any(pixels >= [x + width, y + height]):
-                raise ValueError("Actual source line segment lies outside its source viewport")
-            uncertainty = finite_vector([line.get("uncertaintyPx")], 1, "source line uncertainty")[0]
+                raise ValueError(
+                    "Actual source line segment lies outside its source viewport"
+                )
+            uncertainty = finite_vector(
+                [line.get("uncertaintyPx")], 1, "source line uncertainty"
+            )[0]
             evidence = line.get("measurementEvidence")
-            if uncertainty < 0 or not isinstance(evidence, dict) or not finite_evidence(evidence):
+            if (
+                uncertainty < 0
+                or not isinstance(evidence, dict)
+                or not finite_evidence(evidence)
+            ):
                 raise ValueError("Native line requires finite actual-edge evidence")
-            if source_image_key(evidence.get("sourceImage"), source, str(key)) != source_image_key(frame.get("sourceImage"), source, str(key)):
+            if source_image_key(
+                evidence.get("sourceImage"), source, str(key)
+            ) != source_image_key(frame.get("sourceImage"), source, str(key)):
                 raise ValueError("Native line edge evidence has a stale source image")
             for name in ("detector", "axisPerspectiveEvidence"):
-                if not isinstance(evidence.get(name), str) or not evidence[name].strip():
-                    raise ValueError("Native axis requires a justified actual paired-edge measurement")
-            bias = finite_vector([evidence.get("axisPerspectiveBiasBoundPx")], 1, "axis perspective bias bound")[0]
-            if not 0 <= bias <= uncertainty:
-                raise ValueError("Axis perspective bias must be bounded within source measurement uncertainty")
+                if (
+                    not isinstance(evidence.get(name), str)
+                    or not evidence[name].strip()
+                ):
+                    raise ValueError(
+                        "Native axis requires a justified actual paired-edge measurement"
+                    )
+            bias = finite_vector(
+                [evidence.get("axisPerspectiveBiasBoundPx")],
+                1,
+                "axis perspective bias bound",
+            )[0]
+            components = evidence.get("axisPerspectiveBiasComponents")
+            if not isinstance(components, dict) or components.keys() != {
+                "kind",
+                "geometryBoundPx",
+                "sourceLocalizationBoundPx",
+                "evidence",
+            }:
+                raise ValueError(
+                    "Native axis requires a closed explicit additive bias component certificate"
+                )
+            geometry, included_source = finite_vector(
+                [
+                    components.get("geometryBoundPx"),
+                    components.get("sourceLocalizationBoundPx"),
+                ],
+                2,
+                "axis perspective bias components",
+            )
+            if (
+                bias < 0
+                or geometry < 0
+                or included_source < 0
+                or components["kind"]
+                not in ("independent-geometry", "includes-source-localization")
+                or not isinstance(components["evidence"], str)
+                or not components["evidence"].strip()
+                or abs(geometry + included_source - bias) > 1e-9 * max(1, bias)
+            ):
+                raise ValueError(
+                    "Native axis bias needs an independently evidenced additive decomposition"
+                )
+            bias_space = evidence.get("axisPerspectiveBiasSpace", "source-global")
+            if bias_space != "source-global":
+                raise ValueError(
+                    "Ordinary CPU native-line axis bias must be in source-global pixels"
+                )
+            if components["kind"] == "independent-geometry":
+                if included_source != 0:
+                    raise ValueError(
+                        "Independent geometry certificate cannot contain source localization"
+                    )
+            elif included_source != uncertainty:
+                raise ValueError(
+                    "Inclusive axis certificate must identify the unchanged source localization bound exactly once"
+                )
             rows = evidence.get("edgeRows")
             if not isinstance(rows, list) or len(rows) < 2:
-                raise ValueError("Native axis check needs actual edge pairs at >=2 source rows")
+                raise ValueError(
+                    "Native axis check needs actual edge pairs at >=2 source rows"
+                )
             midpoints = []
             for row in rows:
                 row_y, left, right, contrast = finite_vector(
-                    [row.get("y"), row.get("left"), row.get("right"), row.get("contrast")],
-                    4, "actual source edge pair",
+                    [
+                        row.get("y"),
+                        row.get("left"),
+                        row.get("right"),
+                        row.get("contrast"),
+                    ],
+                    4,
+                    "actual source edge pair",
                 )
-                if not y <= row_y < y + height or not x <= left < right < x + width or contrast <= 0:
-                    raise ValueError("Actual edge pair is unobservable or outside the source viewport")
+                if (
+                    not y <= row_y < y + height
+                    or not x <= left < right < x + width
+                    or contrast <= 0
+                ):
+                    raise ValueError(
+                        "Actual edge pair is unobservable or outside the source viewport"
+                    )
                 midpoints.append([(left + right) / 2, row_y])
             midpoints = np.array(midpoints)
             if np.ptp(midpoints[:, 1]) <= 1e-6:
-                raise ValueError("Native axis evidence must span distinct actual source rows")
+                raise ValueError(
+                    "Native axis evidence must span distinct actual source rows"
+                )
             delta = pixels[1] - pixels[0]
             fractions = np.clip((midpoints - pixels[0]) @ delta / (delta @ delta), 0, 1)
-            if np.any(np.linalg.norm(midpoints - (pixels[0] + fractions[:, None] * delta), axis=1) > uncertainty):
-                raise ValueError("Source line is not supported by its independently measured edge pairs")
-            if np.min(pixels[:, 1]) < midpoints[:, 1].min() - uncertainty or np.max(pixels[:, 1]) > midpoints[:, 1].max() + uncertainty:
-                raise ValueError("Source line extends beyond its observed edge-pair support")
+            if np.any(
+                np.linalg.norm(
+                    midpoints - (pixels[0] + fractions[:, None] * delta), axis=1
+                )
+                > uncertainty
+            ):
+                raise ValueError(
+                    "Source line is not supported by its independently measured edge pairs"
+                )
+            if (
+                np.min(pixels[:, 1]) < midpoints[:, 1].min() - uncertainty
+                or np.max(pixels[:, 1]) > midpoints[:, 1].max() + uncertainty
+            ):
+                raise ValueError(
+                    "Source line extends beyond its observed edge-pair support"
+                )
             world = np.array(parts[path]["world"], dtype=float).reshape(4, 4, order="F")
             accumulated = np.eye(4)
             for override in sorted(
-                (item for item in view.get("partOverrides", [])
-                 if path == item["partPath"] or path.startswith(item["partPath"] + "/")),
+                (
+                    item
+                    for item in view.get("partOverrides", [])
+                    if path == item["partPath"]
+                    or path.startswith(item["partPath"] + "/")
+                ),
                 key=lambda item: len(item["partPath"]),
             ):
-                if override["partPath"] not in parts or override.get("visibility") == "hidden":
-                    raise ValueError("Observed native line belongs to unknown or source-hidden geometry")
-                rest = np.array(parts[override["partPath"]]["world"]).reshape(4, 4, order="F")
+                if (
+                    override["partPath"] not in parts
+                    or override.get("visibility") == "hidden"
+                ):
+                    raise ValueError(
+                        "Observed native line belongs to unknown or source-hidden geometry"
+                    )
+                rest = np.array(parts[override["partPath"]]["world"]).reshape(
+                    4, 4, order="F"
+                )
                 current = accumulated @ rest
                 transformed = current.copy()
                 if "worldQuaternion" in override:
-                    quaternion = finite_vector(override["worldQuaternion"], 4, "native line part quaternion")
+                    quaternion = finite_vector(
+                        override["worldQuaternion"], 4, "native line part quaternion"
+                    )
                     if abs(float(np.linalg.norm(quaternion)) - 1) > 0.001:
-                        raise ValueError("Native line part quaternion must have unit length")
+                        raise ValueError(
+                            "Native line part quaternion must have unit length"
+                        )
                     transformed[:3, :3] = Rotation.from_quat(quaternion).as_matrix()
                 if "worldPositionMetres" in override:
-                    transformed[:3, 3] = finite_vector(override["worldPositionMetres"], 3, "native line part position")
+                    transformed[:3, 3] = finite_vector(
+                        override["worldPositionMetres"], 3, "native line part position"
+                    )
                 accumulated = transformed @ np.linalg.inv(current) @ accumulated
             world = accumulated @ world
             world_points = (np.c_[local, np.ones(2)] @ world.T)[:, :3]
-            viewport_pixels = pixels - [x, y]
-            if view.get("presentation", "native") == "horizontal-mirror":
+            viewport_pixels = np.vstack((pixels, midpoints)) - [x, y]
+            if presentation == "horizontal-mirror":
                 viewport_pixels[:, 0] = width - 1 - viewport_pixels[:, 0]
-            lines.append({
-                "id": identity, "partPath": path, "worldMetres": world_points,
-                "viewportPixels": viewport_pixels, "biasBoundPx": float(bias),
-            })
+            lines.append(
+                {
+                    "id": identity,
+                    "partPath": path,
+                    "worldMetres": world_points,
+                    "viewportPixels": viewport_pixels[:2],
+                    "viewportObservedPixels": viewport_pixels,
+                    "sourceUncertaintyPx": float(uncertainty),
+                    "geometryBoundPx": float(geometry),
+                    "axisPerspectiveBiasComponents": dict(components),
+                    "biasBoundPx": float(bias),
+                }
+            )
         prepared[key] = lines
     return prepared
+
+
+def native_line_candidate_residual(parameters, line, width, height):
+    """Held-out CPU objective; neither these checks nor their rows fit the camera."""
+    source, geometry = finite_vector(
+        [line.get("sourceUncertaintyPx"), line.get("geometryBoundPx")],
+        2,
+        "native line independent candidate bounds",
+    )
+    if source < 0 or geometry < 0:
+        raise ValueError("Native line candidate bounds must be nonnegative")
+    predicted, depths = project(parameters, line["worldMetres"], width, height)
+    delta = predicted[1] - predicted[0]
+    squared_length = float(delta @ delta)
+    if (
+        not np.all(np.isfinite(predicted))
+        or squared_length <= 1e-12
+        or np.any(depths <= 0)
+    ):
+        raise ValueError(
+            "Native line is degenerate in projection or behind the source camera"
+        )
+    observed = line["viewportObservedPixels"]
+    fractions = (observed - predicted[0]) @ delta / squared_length
+    errors = np.linalg.norm(
+        observed - (predicted[0] + fractions[:, None] * delta), axis=1
+    )
+    covered = bool(np.all((fractions >= 0) & (fractions <= 1)))
+    # Source localization already includes its frozen raster allowance. Only the
+    # certified geometry component is added, never the possibly inclusive axis total.
+    return predicted, errors, errors + source + geometry, covered
 
 
 def evaluate_native_lines(parameters, lines, width, height, threshold):
     results = []
     for line in lines:
-        predicted, depths = project(parameters, line["worldMetres"], width, height)
-        delta = predicted[1] - predicted[0]
-        squared_length = float(delta @ delta)
-        if squared_length <= 1e-12 or np.any(depths <= 0):
-            raise ValueError("Native line is degenerate in projection or behind the source camera")
+        predicted, errors, candidate_residual, covered = native_line_candidate_residual(
+            parameters, line, width, height
+        )
         observed = line["viewportPixels"]
-        fractions = (observed - predicted[0]) @ delta / squared_length
-        errors = np.linalg.norm(observed - (predicted[0] + fractions[:, None] * delta), axis=1)
-        covered = bool(np.all((fractions >= 0) & (fractions <= 1)))
-        conservative_error = float(errors.max()) + line["biasBoundPx"]
-        results.append({
-            "id": line["id"], "partPath": line["partPath"],
-            "observedLinePixels": observed.tolist(), "projectedLinePixels": predicted.tolist(),
-            "endpointPerpendicularErrorsPx": errors.tolist(),
-            "perpendicularMaxPx": float(errors.max()),
-            "axisPerspectiveBiasBoundPx": line["biasBoundPx"],
-            "errorPx": conservative_error, "nativeSegmentCoversObservation": covered,
-            "status": "passed" if covered and conservative_error <= threshold else "failed",
-        })
+        conservative_error = float(candidate_residual.max())
+        results.append(
+            {
+                "id": line["id"],
+                "partPath": line["partPath"],
+                "observedLinePixels": observed.tolist(),
+                "projectedLinePixels": predicted.tolist(),
+                "observedEdgeMidpointPixels": line["viewportObservedPixels"][
+                    2:
+                ].tolist(),
+                "endpointPerpendicularErrorsPx": errors[:2].tolist(),
+                "edgeMidpointPerpendicularErrorsPx": errors[2:].tolist(),
+                "perpendicularMaxPx": float(errors.max()),
+                "sourceUncertaintyPx": line["sourceUncertaintyPx"],
+                "geometryBoundPx": line["geometryBoundPx"],
+                "axisPerspectiveBiasBoundPx": line["biasBoundPx"],
+                "axisPerspectiveBiasComponents": dict(
+                    line["axisPerspectiveBiasComponents"]
+                ),
+                "candidateOnly": True,
+                "gpuAcceptanceEvaluated": False,
+                "errorPx": conservative_error,
+                "nativeSegmentCoversObservation": covered,
+                "status": "passed"
+                if covered and conservative_error <= threshold
+                else "failed",
+            }
+        )
     return results
 
 
@@ -781,12 +1087,15 @@ def camera_cv_parameters(camera, width, height):
     focal = height / (2 * math.tan(math.radians(camera["verticalFovDegrees"]) / 2))
     return np.r_[
         Rotation.from_matrix(rotation).as_rotvec(),
-        -rotation @ np.array(camera["positionMetres"]), math.log(focal),
+        -rotation @ np.array(camera["positionMetres"]),
+        math.log(focal),
         camera.get("principalPointViewportPixels", [width / 2, height / 2]),
     ]
 
 
-def evaluate_bound_camera(parameters, context, threshold, evidence, parent_passed=True, native_lines=None):
+def evaluate_bound_camera(
+    parameters, context, threshold, evidence, parent_passed=True, native_lines=None
+):
     """Reproject actual current native landmarks; inherited status is never an oracle."""
     frame, view, landmarks, points = context
     width, height = view["rectSourcePixels"][2:]
@@ -813,19 +1122,26 @@ def evaluate_bound_camera(parameters, context, threshold, evidence, parent_passe
                 raise ValueError("Native landmark has invalid source tracking evidence")
             measurement_image_identity(
                 {"measurementEvidence": landmark["trackingEvidence"]},
-                image, source, "native landmark",
+                image,
+                source,
+                "native landmark",
             )
     predicted, depths = project(
-        parameters, np.array([points[item["anchorId"]] for item in landmarks]).reshape(-1, 3),
-        width, height,
+        parameters,
+        np.array([points[item["anchorId"]] for item in landmarks]).reshape(-1, 3),
+        width,
+        height,
     )
     errors = np.linalg.norm(
-        predicted - np.array([item["pixel"] for item in landmarks]).reshape(-1, 2), axis=1
+        predicted - np.array([item["pixel"] for item in landmarks]).reshape(-1, 2),
+        axis=1,
     )
     fit_indices = [i for i, item in enumerate(landmarks) if item["role"] == "fit"]
     check_indices = [i for i, item in enumerate(landmarks) if item["role"] == "check"]
     fit_errors, check_errors = errors[fit_indices], errors[check_indices]
-    line_errors = evaluate_native_lines(parameters, native_lines or [], width, height, threshold)
+    line_errors = evaluate_native_lines(
+        parameters, native_lines or [], width, height, threshold
+    )
     held_out_max = max(
         float(check_errors.max()) if check else 0.0,
         max((item["errorPx"] for item in line_errors), default=0.0),
@@ -833,8 +1149,12 @@ def evaluate_bound_camera(parameters, context, threshold, evidence, parent_passe
     rotation = Rotation.from_rotvec(parameters[:3]).as_matrix()
     return {
         "positionMetres": (-rotation.T @ parameters[3:6]).tolist(),
-        "quaternion": Rotation.from_matrix(rotation.T @ np.diag([1, -1, -1])).as_quat().tolist(),
-        "verticalFovDegrees": math.degrees(2 * math.atan(height / (2 * math.exp(parameters[6])))),
+        "quaternion": Rotation.from_matrix(rotation.T @ np.diag([1, -1, -1]))
+        .as_quat()
+        .tolist(),
+        "verticalFovDegrees": math.degrees(
+            2 * math.atan(height / (2 * math.exp(parameters[6])))
+        ),
         "principalPointViewportPixels": parameters[7:9].tolist(),
         "intrinsicsEvidence": evidence,
         "intrinsicsIdentifiability": "Independently constrained shared/source-registered camera; no per-view fitting",
@@ -844,13 +1164,23 @@ def evaluate_bound_camera(parameters, context, threshold, evidence, parent_passe
         "fitWeights": [],
         "heldOutMaxPx": held_out_max,
         "thresholdPx": threshold,
-        "status": "passed" if parent_passed and np.all(depths > 0) and np.all(errors <= threshold) and all(item["status"] == "passed" for item in line_errors) else "failed",
+        "status": "passed"
+        if parent_passed
+        and np.all(depths > 0)
+        and np.all(errors <= threshold)
+        and all(item["status"] == "passed" for item in line_errors)
+        else "failed",
         "projection": "pinhole; independently fixed square-pixel source camera; no fitted lens distortion",
         "coordinateConvention": "camera-to-CAD-world; quaternion xyzw; looks along local -Z with local +Y up",
-        "checkErrors": [{
-            "anchorId": landmarks[i]["anchorId"], "observedPixel": landmarks[i]["pixel"],
-            "projectedPixel": predicted[i].tolist(), "errorPx": float(errors[i]),
-        } for i in check_indices],
+        "checkErrors": [
+            {
+                "anchorId": landmarks[i]["anchorId"],
+                "observedPixel": landmarks[i]["pixel"],
+                "projectedPixel": predicted[i].tolist(),
+                "errorPx": float(errors[i]),
+            }
+            for i in check_indices
+        ],
         "nativeLineCheckErrors": line_errors,
     }, None
 
@@ -865,7 +1195,11 @@ def resolve_camera_contexts(observations, contexts, points, inventory=None):
 
     def rig_reference(reference):
         rig_id, phase = reference.get("rigId"), reference.get("phaseIndex")
-        if rig_id not in rigs or type(phase) is not int or phase not in rigs[rig_id]["images"]:
+        if (
+            rig_id not in rigs
+            or type(phase) is not int
+            or phase not in rigs[rig_id]["images"]
+        ):
             raise ValueError("Missing camera rig or invalid reference phase")
         rig = rigs[rig_id]
         return rig, phase
@@ -881,21 +1215,36 @@ def resolve_camera_contexts(observations, contexts, points, inventory=None):
         context = contexts[key]
         frame, view, landmarks, posed_points = context
         width, height = view["rectSourcePixels"][2:]
-        evidence = view.get("cameraEvidence", frame.get("cameraEvidence", {"kind": "direct-fit"}))
+        evidence = view.get(
+            "cameraEvidence", frame.get("cameraEvidence", {"kind": "direct-fit"})
+        )
         kind = evidence.get("kind")
         if kind == "direct-fit":
-            result = fit_camera({
-                "landmarks": landmarks,
-                "anchorPoseMissing": view.get("anchorPoseMissing", frame.get("anchorPoseMissing", [])),
-            }, posed_points, width, height, threshold, view.get("cameraFit", frame.get("cameraFit", {})))
+            result = fit_camera(
+                {
+                    "landmarks": landmarks,
+                    "anchorPoseMissing": view.get(
+                        "anchorPoseMissing", frame.get("anchorPoseMissing", [])
+                    ),
+                },
+                posed_points,
+                width,
+                height,
+                threshold,
+                view.get("cameraFit", frame.get("cameraFit", {})),
+            )
             if result[0] and native_lines[key]:
                 line_errors = evaluate_native_lines(
                     camera_cv_parameters(result[0], width, height),
-                    native_lines[key], width, height, threshold,
+                    native_lines[key],
+                    width,
+                    height,
+                    threshold,
                 )
                 result[0]["nativeLineCheckErrors"] = line_errors
                 result[0]["heldOutMaxPx"] = max(
-                    result[0]["heldOutMaxPx"], max(item["errorPx"] for item in line_errors)
+                    result[0]["heldOutMaxPx"],
+                    max(item["errorPx"] for item in line_errors),
                 )
                 if any(item["status"] != "passed" for item in line_errors):
                     result[0]["status"] = "failed"
@@ -903,21 +1252,45 @@ def resolve_camera_contexts(observations, contexts, points, inventory=None):
             if view.get("cameraFit") or frame.get("cameraFit"):
                 raise ValueError("Derived cameras cannot also specify cameraFit")
             rig, phase = rig_reference(evidence)
-            if view["rectSourcePixels"] != [0, 0, 1920, 1080] or view.get("presentation", "native") != "native":
-                raise ValueError("Shared turntable cameras require a full native source viewport")
+            if (
+                view["rectSourcePixels"] != [0, 0, 1920, 1080]
+                or view.get("presentation", "native") != "native"
+            ):
+                raise ValueError(
+                    "Shared turntable cameras require a full native source viewport"
+                )
             identity = source_image_key(frame.get("sourceImage"), source, str(key))
             registration = rig["sourceMap"].get(identity)
-            if not registration or not registration["phaseAccepted"] or registration["referencePhaseIndex"] != phase:
-                raise ValueError(f"{key}: actual source image does not establish the claimed rig phase")
-            result = evaluate_bound_camera(rig["parameters"][phase], context, threshold,
-                "Independent native-image 71-phase rigid turntable calibration", rig["passed"], native_lines[key])
+            if (
+                not registration
+                or not registration["phaseAccepted"]
+                or registration["referencePhaseIndex"] != phase
+            ):
+                raise ValueError(
+                    f"{key}: actual source image does not establish the claimed rig phase"
+                )
+            result = evaluate_bound_camera(
+                rig["parameters"][phase],
+                context,
+                threshold,
+                "Independent native-image 71-phase rigid turntable calibration",
+                rig["passed"],
+                native_lines[key],
+            )
             if result[0]:
-                result[0]["sharedRigValidation"] = {"rigId": evidence["rigId"], "phaseIndex": phase, **rig["proof"]}
+                result[0]["sharedRigValidation"] = {
+                    "rigId": evidence["rigId"],
+                    "phaseIndex": phase,
+                    **rig["proof"],
+                }
         elif kind == "source-registered":
             if view.get("cameraFit") or frame.get("cameraFit"):
                 raise ValueError("Derived cameras cannot also specify cameraFit")
             own_image = source_image_key(frame.get("sourceImage"), source, str(key))
-            if source_image_key(evidence.get("sourceImage"), source, str(key)) != own_image:
+            if (
+                source_image_key(evidence.get("sourceImage"), source, str(key))
+                != own_image
+            ):
                 raise ValueError(f"{key}: stale registration source image")
             reference = evidence.get("reference", {})
             if "rigId" in reference:
@@ -928,53 +1301,123 @@ def resolve_camera_contexts(observations, contexts, points, inventory=None):
                 parent_image, parent_passed = rig["images"][phase], rig["passed"]
                 parent_rect = [0, 0, 1920, 1080]
             else:
-                time = finite_vector([reference.get("timeSeconds")], 1, "reference sample")[0]
-                if "viewId" not in reference or not (reference["viewId"] is None or isinstance(reference["viewId"], str)):
-                    raise ValueError("Registration requires an explicit reference view ID")
+                time = finite_vector(
+                    [reference.get("timeSeconds")], 1, "reference sample"
+                )[0]
+                if "viewId" not in reference or not (
+                    reference["viewId"] is None or isinstance(reference["viewId"], str)
+                ):
+                    raise ValueError(
+                        "Registration requires an explicit reference view ID"
+                    )
                 parent_key = (time, reference["viewId"])
                 parent_camera, reason = resolve(parent_key)
-                if reason or parent_camera is None or parent_camera["status"] != "passed":
-                    raise ValueError(f"{key}: reference camera has not independently passed")
+                if (
+                    reason
+                    or parent_camera is None
+                    or parent_camera["status"] != "passed"
+                ):
+                    raise ValueError(
+                        f"{key}: reference camera has not independently passed"
+                    )
                 parent_frame, parent_view, _, _ = contexts[parent_key]
                 if parent_view.get("presentation", "native") != "native":
-                    raise ValueError("Positive-scale source registration requires a native parent")
-                parent_image, parent_rect = parent_frame.get("sourceImage"), parent_view["rectSourcePixels"]
-                parameters = camera_cv_parameters(parent_camera, parent_rect[2], parent_rect[3])
+                    raise ValueError(
+                        "Positive-scale source registration requires a native parent"
+                    )
+                parent_image, parent_rect = (
+                    parent_frame.get("sourceImage"),
+                    parent_view["rectSourcePixels"],
+                )
+                parameters = camera_cv_parameters(
+                    parent_camera, parent_rect[2], parent_rect[3]
+                )
                 parent_passed = True
-            if source_image_key(evidence.get("referenceSourceImage"), source, str(key)) != source_image_key(parent_image, source, str(key)):
+            if source_image_key(
+                evidence.get("referenceSourceImage"), source, str(key)
+            ) != source_image_key(parent_image, source, str(key)):
                 raise ValueError(f"{key}: stale registration reference image")
-            affine = finite_vector(evidence.get("sourceToViewportPixels"), 6, "source registration affine")
+            affine = finite_vector(
+                evidence.get("sourceToViewportPixels"), 6, "source registration affine"
+            )
             scale = affine[0]
-            if scale <= 0 or not np.allclose(affine[[1, 3, 4]], [0, 0, scale], rtol=0, atol=1e-9):
-                raise ValueError("Source registration supports only positive uniform scale without shear/rotation")
+            if scale <= 0 or not np.allclose(
+                affine[[1, 3, 4]], [0, 0, scale], rtol=0, atol=1e-9
+            ):
+                raise ValueError(
+                    "Source registration supports only positive uniform scale without shear/rotation"
+                )
             rows, ids, source_pixels, viewport_pixels = [], set(), set(), set()
             for item in evidence.get("correspondences", []):
                 measurement_evidence(item, "source registration")
                 measurement_image_identity(item, frame["sourceImage"], source, str(key))
                 identity = item.get("id")
-                source_pixel = finite_vector(item.get("sourcePixel"), 2, "registration reference pixel")
-                viewport_pixel = finite_vector(item.get("viewportPixel"), 2, "registration observed pixel")
-                if not isinstance(identity, str) or not identity or identity in ids or tuple(source_pixel) in source_pixels or tuple(viewport_pixel) in viewport_pixels:
-                    raise ValueError("Registration fit/check correspondences must be distinct and disjoint")
-                if not 0 <= source_pixel[0] < source["width"] or not 0 <= source_pixel[1] < source["height"] or not 0 <= viewport_pixel[0] < width or not 0 <= viewport_pixel[1] < height:
-                    raise ValueError("Registration correspondence lies outside its actual image")
+                source_pixel = finite_vector(
+                    item.get("sourcePixel"), 2, "registration reference pixel"
+                )
+                viewport_pixel = finite_vector(
+                    item.get("viewportPixel"), 2, "registration observed pixel"
+                )
+                if (
+                    not isinstance(identity, str)
+                    or not identity
+                    or identity in ids
+                    or tuple(source_pixel) in source_pixels
+                    or tuple(viewport_pixel) in viewport_pixels
+                ):
+                    raise ValueError(
+                        "Registration fit/check correspondences must be distinct and disjoint"
+                    )
+                if (
+                    not 0 <= source_pixel[0] < source["width"]
+                    or not 0 <= source_pixel[1] < source["height"]
+                    or not 0 <= viewport_pixel[0] < width
+                    or not 0 <= viewport_pixel[1] < height
+                ):
+                    raise ValueError(
+                        "Registration correspondence lies outside its actual image"
+                    )
                 ids.add(identity)
                 source_pixels.add(tuple(source_pixel))
                 viewport_pixels.add(tuple(viewport_pixel))
                 prediction = scale * source_pixel + affine[[2, 5]]
-                rows.append({"id": identity, "role": item["role"], "observedPixel": viewport_pixel.tolist(),
-                    "projectedPixel": prediction.tolist(), "errorPx": float(np.linalg.norm(prediction - viewport_pixel))})
-            if any(sum(row["role"] == role for row in rows) < 2 for role in ("fit", "check")):
-                raise ValueError("Registration requires >=2 distinct fit and >=2 disjoint actual-image check correspondences")
+                rows.append(
+                    {
+                        "id": identity,
+                        "role": item["role"],
+                        "observedPixel": viewport_pixel.tolist(),
+                        "projectedPixel": prediction.tolist(),
+                        "errorPx": float(np.linalg.norm(prediction - viewport_pixel)),
+                    }
+                )
+            if any(
+                sum(row["role"] == role for row in rows) < 2
+                for role in ("fit", "check")
+            ):
+                raise ValueError(
+                    "Registration requires >=2 distinct fit and >=2 disjoint actual-image check correspondences"
+                )
             parameters[6] += math.log(scale)
-            parameters[7:9] = scale * (parameters[7:9] + parent_rect[:2]) + affine[[2, 5]]
-            result = evaluate_bound_camera(parameters, context, threshold,
+            parameters[7:9] = (
+                scale * (parameters[7:9] + parent_rect[:2]) + affine[[2, 5]]
+            )
+            result = evaluate_bound_camera(
+                parameters,
+                context,
+                threshold,
                 "Actual-image uniform-scale source registration of independently validated camera",
-                parent_passed and all(row["errorPx"] <= threshold for row in rows), native_lines[key])
+                parent_passed and all(row["errorPx"] <= threshold for row in rows),
+                native_lines[key],
+            )
             if result[0]:
                 result[0]["registrationValidation"] = {
-                    "scale": float(scale), "fitMaxPx": max(row["errorPx"] for row in rows if row["role"] == "fit"),
-                    "heldOutMaxPx": max(row["errorPx"] for row in rows if row["role"] == "check"),
+                    "scale": float(scale),
+                    "fitMaxPx": max(
+                        row["errorPx"] for row in rows if row["role"] == "fit"
+                    ),
+                    "heldOutMaxPx": max(
+                        row["errorPx"] for row in rows if row["role"] == "check"
+                    ),
                     "correspondenceErrors": rows,
                 }
         else:
@@ -999,10 +1442,14 @@ def run(observations, inventory):
     for frame in fitted["frames"]:
         frame["camera"] = None
         shot = shots[frame["shotId"]]
-        if not needs_machine(frame["classification"], shot):
+        if not needs_machine(frame, shot):
             continue
         targets = frame.get("views") or [
             {
+                "presentation": frame.get("presentation", "native"),
+                "imagePlaneWarp": frame.get("imagePlaneWarp"),
+                "nativeLineChecks": frame.get("nativeLineChecks", []),
+                "partOverrides": frame.get("partOverrides", []),
                 "id": None,
                 "rectSourcePixels": [
                     0,
@@ -1095,7 +1542,10 @@ def run(observations, inventory):
                     raise ValueError(f"Unknown posed anchor {key}")
                 posed_points[key] = finite_vector(value, 3, key)
             contexts[(frame["timeSeconds"], view["id"])] = (
-                frame, view, landmarks, posed_points
+                frame,
+                view,
+                landmarks,
+                posed_points,
             )
     cameras = resolve_camera_contexts(observations, contexts, points, inventory)
     for key, (frame, view, _, _) in contexts.items():
@@ -1124,12 +1574,8 @@ def run(observations, inventory):
             camera["presentation"] = presentation
             for error in camera["checkErrors"]:
                 if presentation == "horizontal-mirror":
-                    error["observedPixel"][0] = (
-                        width - 1 - error["observedPixel"][0]
-                    )
-                    error["projectedPixel"][0] = (
-                        width - 1 - error["projectedPixel"][0]
-                    )
+                    error["observedPixel"][0] = width - 1 - error["observedPixel"][0]
+                    error["projectedPixel"][0] = width - 1 - error["projectedPixel"][0]
                 error["observedPixel"] = [
                     error["observedPixel"][0] + x,
                     error["observedPixel"][1] + y,
@@ -1139,7 +1585,11 @@ def run(observations, inventory):
                     error["projectedPixel"][1] + y,
                 ]
             for error in camera.get("nativeLineCheckErrors", []):
-                for field in ("observedLinePixels", "projectedLinePixels"):
+                for field in (
+                    "observedLinePixels",
+                    "observedEdgeMidpointPixels",
+                    "projectedLinePixels",
+                ):
                     for pixel in error[field]:
                         if presentation == "horizontal-mirror":
                             pixel[0] = width - 1 - pixel[0]
@@ -1163,8 +1613,7 @@ def run(observations, inventory):
         or view["mechanicalState"].get("input") is None
     ]
     no_machine_source = not required_frames and all(
-        not needs_machine(frame["classification"], shots[frame["shotId"]])
-        for frame in fitted["frames"]
+        not needs_machine(frame, shots[frame["shotId"]]) for frame in fitted["frames"]
     )
     complete = (
         (bool(measured) or no_machine_source)
@@ -1176,6 +1625,8 @@ def run(observations, inventory):
     report = {
         "videoId": observations["source"]["videoId"],
         "sourceSha256": observations["source"]["sha256"],
+        "candidateOnly": True,
+        "gpuAcceptanceEvaluated": False,
         "sampleCount": len(fitted["frames"]),
         "measuredFitCount": len(measured),
         "failedFitTimes": failures,
