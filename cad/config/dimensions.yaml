@@ -1616,7 +1616,7 @@ sections:
         - standard + scaled
         - med
       - - Removable gear plate / bore / pins
-        - '2.8 flat plate (the #25 tooth width), no hub; common bore Ø10.3 (13/32, 0.39 radial over the Ø9.525 pilot); 2 × Ø2.5 through holes on Ø14 BC at ±Y, over two Ø3/32 drive pins standing 2.4 proud of each shaft''s seat face; bore/pin-hole web 0.60 (photo-faithful, below the 1.5 floor, awaiting ruling)'
+        - '2.8 flat plate (the #25 tooth width), no hub; common bore Ø10.3 (13/32, 0.39 radial over the Ø9.525 pilot); 2 × Ø2.5 through holes on Ø14 BC at ±Y, over two Ø3/32 drive pins standing 2.4 proud of each shaft''s seat face; bore/pin-hole web 0.60 nominal, 0.47 MIN at the printed bands (photo-faithful, below the 1.5 floor; accepted by the user 2026-09-30, drawing-simplicity-policy.md exception table)'
         - —
         - 'ch23 p.56 catalog shot (the pin holes nearly touch the bore) + `v4_transgear_020/025/030`; CQ sketch CONTRACT-crank'
         - scaled + derived
