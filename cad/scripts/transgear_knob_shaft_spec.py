@@ -13,7 +13,7 @@ Contract §1.1 (round 10): one turned steel shaft, front to rear --
   clamps the T24 on the drive collar's front face; the stud end is cut to
   fit at rearward collar settings (§13.2) and is modelled uncut at the
   nominal setting;
-* a plain Ø6.35 core, the sliding seat of the brass drive collar (MHA-152),
+* a plain Ø6.35 core, the sliding seat of the brass drive collar (MHA-177),
   which is set on it at assembly; the Ø1.6 hole for the MHA-154 spring pin
   is drilled through the core AT ASSEMBLY along the collar's rear slot and
   is not on this sheet (R9-6);

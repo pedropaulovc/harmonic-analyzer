@@ -3,7 +3,7 @@ r"""MHA-154 transgear-collar-cross-pin: McMaster 98296A026 stock spring pin.
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure.  One 1/16 x 9/16 slotted spring pin to ASME B18.8.2 is sprung
 diametrally through the MHA-078 knob shaft's core, in a hole drilled at
-assembly along the MHA-152 drive collar's rear slot, and lies in that slot,
+assembly along the MHA-177 drive collar's rear slot, and lies in that slot,
 so collar and shaft turn as one (contract §1.3, fit-up E).  The collar has
 no cross hole; the pin drives through the slot's walls.  The sprung pin
 fills the hole; nothing is modelled between them.

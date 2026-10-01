@@ -559,7 +559,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(
                 ("transgear-thumbnut-1", "transgear-knob-shaft-1")
             ): _annulus_limit(6.35, 5.105, 14.9),
-            # MHA-155 3/32 x 3/16 dowels pressed 2.3625 into MHA-152's 2.38 reams.
+            # MHA-155 3/32 x 3/16 dowels pressed 2.3625 into MHA-177's 2.38 reams.
             **_expected_numbered_pairs(
                 "transgear-knob-drive-pin",
                 range(1, 3),

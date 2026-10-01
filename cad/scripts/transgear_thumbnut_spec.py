@@ -3,7 +3,7 @@ r"""MHA-126 transgear-thumbnut: the knurled brass nut on the knob shaft's stud.
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure.  The nut runs on the 1/4-20 stud of the knob shaft (MHA-078) and
 clamps the removable chain wheel (MHA-081, T24) against the drive collar
-(MHA-152): its rear face bears on the wheel's front face only, round the
+(MHA-177): its rear face bears on the wheel's front face only, round the
 wheel's Ø10.3 bore.  Contract §1.6 (round 10): knurled head Ø20.5 × 8.7 with a
 dished front face (chord 15, sagitta 1.2), a Ø11 waist × 2.4 (ruling 5), a
 Ø12.4 flange to the seat face, 16.10 long, 1/4-20 UNC-2B through with an

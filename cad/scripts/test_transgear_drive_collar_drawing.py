@@ -1,4 +1,4 @@
-"""Offline contracts for the transgear drive collar (MHA-152) and its drawing."""
+"""Offline contracts for the transgear drive collar (MHA-177) and its drawing."""
 
 from __future__ import annotations
 
@@ -247,7 +247,7 @@ def test_volume_gate_strip_area_is_a_disc_band() -> None:
 
 def test_registry_row_is_the_turned_brass_mha_152() -> None:
     row = _config.parts(part.PART_NAME)
-    assert row["number"] == "MHA-152"
+    assert row["number"] == "MHA-177"
     assert int(row["quantity"]) == 1
     assert "C36000" in row["material_specification"]
     assert row["material"] == part.MATERIAL

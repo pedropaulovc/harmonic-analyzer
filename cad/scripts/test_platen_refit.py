@@ -225,7 +225,7 @@ def test_chain_wheels_share_the_spec_band_and_the_chain_straddles_it() -> None:
     assert assembly.CHAIN_MID_Z == band.CHAIN_MID_Z
     # Both wheels (crank T12, knob T24) sit on the one band: front face at
     # the band front, rear face on the seat face (the knob side's is the
-    # MHA-152 drive collar's front face, set in front of the 12T's face F).
+    # MHA-177 drive collar's front face, set in front of the 12T's face F).
     knob_seat_z = assembly.KNOB_COLLAR_Z0
     assert math.isclose(knob_seat_z, band.SEAT_FACE_Z)
     assert math.isclose(assembly.KNOB_SHAFT_Z0 - collar.SET_NOMINAL, knob_seat_z)
@@ -250,7 +250,7 @@ def test_knob_drive_collar_sits_between_the_seat_and_the_12t(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     # Round 10: the seat collar is no longer turned on the knob shaft; it is
-    # the separate 4.0-long MHA-152, set at fit-up SET_NOMINAL in front of the
+    # the separate 4.0-long MHA-177, set at fit-up SET_NOMINAL in front of the
     # 12T's front face F.  Pushed fully rearward its rear face meets F, and
     # the disc's front face still stands behind F.
     assert collar.LENGTH == 4.0

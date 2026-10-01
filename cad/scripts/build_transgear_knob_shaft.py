@@ -1,7 +1,7 @@
 r"""Reproduction script: transgear knob shaft MHA-078 (book ch. 23, pp. 56-59).
 
 One turned steel shaft on the knob axis K, front to rear: the 1/4-20 stud end
-the thumbnut runs on, the plain Ø6.35 core the brass drive collar (MHA-152)
+the thumbnut runs on, the plain Ø6.35 core the brass drive collar (MHA-177)
 slides on, the integral 12T DP38 pinion meshing the 120T disc, and the Ø8.5
 journal running in the arm plate's bore, with the #8-32 rear tap for the cup's
 retaining screw.  Every number and the part frame live in

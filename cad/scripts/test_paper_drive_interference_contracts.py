@@ -55,7 +55,7 @@ def _pair(first: str, second: str) -> frozenset[str]:
 
 
 def _collar():
-    # MHA-152's spec (KnobShaftRound10); imported here so a missing or
+    # MHA-177's spec (KnobShaftRound10); imported here so a missing or
     # renamed collar fails this test rather than the whole module.
     return importlib.import_module("transgear_drive_collar_spec")
 
@@ -169,7 +169,7 @@ def test_head_seat_rows_admit_less_than_a_micron_of_sink() -> None:
 
 
 def test_drive_pins_press_into_the_collar_not_the_shaft() -> None:
-    """MHA-155's reams moved from the shaft's integral collar to MHA-152; the
+    """MHA-155's reams moved from the shaft's integral collar to MHA-177; the
     pins press over their length behind the seat face, inside the collar."""
     collar = _collar()
     allowed = _allowed()

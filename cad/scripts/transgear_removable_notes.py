@@ -38,7 +38,7 @@ if abs(BORE_PIN_WEB_WORST - 0.47) > 1e-9:
 BORE_PIN_WEB_NOTE = f"BORE TO DRIVE-PIN HOLE WEB {BORE_PIN_WEB_WORST:.2f} MIN."
 
 CRANKSHAFT_NUMBER = "MHA-026"
-KNOB_COLLAR_NUMBER = "MHA-152"
+KNOB_COLLAR_NUMBER = "MHA-177"
 
 
 def _per_configuration(render: Callable[[int], str]) -> str:

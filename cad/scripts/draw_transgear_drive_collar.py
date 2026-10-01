@@ -1,4 +1,4 @@
-r"""Create the manufacturing drawing for the transgear drive collar (MHA-152).
+r"""Create the manufacturing drawing for the transgear drive collar (MHA-177).
 
 The end view is the ``*Back`` orientation, looking at the front (seat) face:
 it carries the O.D., the pilot, the reamed bore and the two reamed drive-pin

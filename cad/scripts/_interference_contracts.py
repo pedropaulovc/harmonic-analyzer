@@ -487,7 +487,7 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
     # The cross pin's whole tube chord through the core (above).
     frozenset(("transgear-collar-cross-pin-1", "transgear-knob-shaft-1")): 1.10
     * _CROSS_PIN_CORE_MM3,
-    # The two MHA-155 dowels pressed into the MHA-152 collar's through reams,
+    # The two MHA-155 dowels pressed into the MHA-177 collar's through reams,
     # the crank-seat twin (the collar's PIN_HOLE_DIA is the seat interface's
     # DRIVE_PIN_HOLE_DIA): the pin's length behind the seat face.
     **_numbered_pairs(

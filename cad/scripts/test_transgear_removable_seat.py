@@ -1,4 +1,4 @@
-"""The removable #25 sprocket's seat interface (MHA-081 on MHA-026 / MHA-152)."""
+"""The removable #25 sprocket's seat interface (MHA-081 on MHA-026 / MHA-177)."""
 
 from __future__ import annotations
 

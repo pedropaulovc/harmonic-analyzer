@@ -5,7 +5,7 @@ SEQUENCE, so inserting a step renumbers every later one and every pointer that
 cites a step by key follows. The sheet prints the step text
 (draw_paper_drive_assembly); this module holds the order and the few fit-up
 values no part spec owns, because they belong to the assembly procedure, not
-to a part. The collar setting, core drill and stud cut are the MHA-152
+to a part. The collar setting, core drill and stud cut are the MHA-177
 collar's (its sheet prints the same fit-up, R9-30). Pure data: no
 SolidWorks, no config reads.
 """

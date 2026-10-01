@@ -1,4 +1,4 @@
-r"""MHA-152 transgear-drive-collar: the brass drive collar on the knob shaft.
+r"""MHA-177 transgear-drive-collar: the brass drive collar on the knob shaft.
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure.  ``build_transgear_drive_collar`` marks and tolerances exactly
@@ -128,7 +128,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
 if {feature: set(names) for feature, names in DRAWING_PRECISION.items()} != (
     DRAWING_DIMENSIONS
 ):
-    raise AssertionError("every marked MHA-152 dimension needs authored places")
+    raise AssertionError("every marked MHA-177 dimension needs authored places")
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
     for dimensions in DRAWING_PRECISION.values()
@@ -301,7 +301,7 @@ for _ok, _what in (
     ),
 ):
     if not _ok:
-        raise AssertionError(f"MHA-152: {_what}")
+        raise AssertionError(f"MHA-177: {_what}")
 
 BORE_CALLOUT = "REAM THROUGH"
 PIN_HOLE_CALLOUT = "2X REAM THROUGH"
@@ -350,9 +350,9 @@ FIT_UP_NOTE = "\n".join(
 
 # The sheet states the approved shortfalls (contract §10.1); the ruling IDs
 # stay here.
-# Named exception: MHA-152 collar rim (drawing-simplicity-policy.md, "Named exceptions").
-# Named exception: MHA-152 pilot wall (drawing-simplicity-policy.md, "Named exceptions").
-# Named exception: MHA-152 slot floor to front face (drawing-simplicity-policy.md, "Named exceptions").
+# Named exception: MHA-177 collar rim (drawing-simplicity-policy.md, "Named exceptions").
+# Named exception: MHA-177 pilot wall (drawing-simplicity-policy.md, "Named exceptions").
+# Named exception: MHA-177 slot floor to front face (drawing-simplicity-policy.md, "Named exceptions").
 DRAWING_NOTES = "\n".join(
     (
         f"DRIVE-PIN HOLE TO COLLAR RIM {DRIVE_PIN_COLLAR_RIM_WORST:.2f} MIN.",

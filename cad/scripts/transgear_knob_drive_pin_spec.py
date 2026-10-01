@@ -1,7 +1,7 @@
 r"""MHA-155 transgear-knob-drive-pin: McMaster 98381A433 stock dowel.
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
-closure.  Two are pressed into the brass knob drive collar (MHA-152) and
+closure.  Two are pressed into the brass knob drive collar (MHA-177) and
 stand ``transgear_removable_spec.DRIVE_PIN_PROUD`` out of its front (seat)
 face, where the removable sprocket's two holes drop over them.  The knob
 takes the 3/16 length of the crank's 3/32 dowel, and its holes are reamed
@@ -36,7 +36,7 @@ if abs(DIA - DRIVE_PIN_DIA) > 1e-12:
 PROUD_SET_TOL = 0.10
 PROUD_RANGE = (DRIVE_PIN_PROUD - PROUD_SET_TOL, DRIVE_PIN_PROUD + PROUD_SET_TOL)
 # The nominal pin's pressed end stands this far behind the seat face, inside
-# the MHA-152 collar's through hole: the press fit's engaged length.
+# the MHA-177 collar's through hole: the press fit's engaged length.
 PRESS_DEPTH = LENGTH - DRIVE_PIN_PROUD  # 2.3625
 
 # The thumbnut's Ø14 neck clamps the T24 on its front face and covers the

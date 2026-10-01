@@ -599,7 +599,7 @@ def test_chain_shift_moves_the_crank_seat_hub_and_knob_seat_together(
     import transgear_removable_spec as removable
 
     crank_seat = drive.CRANKSHAFT_Z0 + cs.SEAT_COLLAR
-    # The knob side's seat is the MHA-152 drive collar's front face, set
+    # The knob side's seat is the MHA-177 drive collar's front face, set
     # SET_NOMINAL in front of the knob shaft's 12T front face.
     knob_seat = paper.KNOB_COLLAR_Z0
     assert crank_seat == pytest.approx(-154.3)

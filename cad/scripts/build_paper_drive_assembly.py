@@ -466,7 +466,7 @@ if REMOVABLE.PIN_HOLE_ANGLES_DEG != (90.0, 270.0):
 
 # Knob stack on K (front -> back): thumbnut | T24 | drive collar | the
 # shaft's 12T | thrust ring | arm-plate hub | plate | boss | knob cup. The
-# collar MHA-152 seats its front face on the T24's rear face (the band's seat
+# collar MHA-177 seats its front face on the T24's rear face (the band's seat
 # face) and is set SET_NOMINAL in front of the shaft's 12T front face F, the
 # shaft's datum (identity + spin: local +Z runs to the knob at the back).
 KNOB_COLLAR_Z0 = REMOVABLE.SEAT_FACE_Z  # -154.3

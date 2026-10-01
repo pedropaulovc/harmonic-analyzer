@@ -145,7 +145,7 @@ FITUP_REFERENCE_CENTER = (0.100, 0.045)
 FITUP_LINE_WIDTH = 68  # characters; default-format note text
 # Each note's top-left corner, then its right limit and lowest y: the left
 # column stops above the reference view; the right column stops above the
-# MHA-152 collar's own fit-up note, which stops above the title block (top
+# MHA-177 collar's own fit-up note, which stops above the title block (top
 # 0.066).
 FITUP_NOTE_XY = ((0.018, 0.262), (0.215, 0.262), (0.215, 0.150))
 FITUP_NOTE_LIMITS = ((0.210, 0.075), (0.418, 0.152), (0.418, 0.072))

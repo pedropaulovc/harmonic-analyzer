@@ -401,7 +401,7 @@ def test_the_collar_gap_stop_is_the_seat_limit_less_the_collar() -> None:
 
 
 def test_the_fitup_steps_and_the_collar_note_print_one_setting_drill_and_cut() -> None:
-    """R9-30: steps 14-16 and the MHA-152 fit-up note (which this sheet also
+    """R9-30: steps 14-16 and the MHA-177 fit-up note (which this sheet also
     prints) state the collar setting, the core drill and the stud cut in the
     same words, so the two instructions cannot drift apart."""
     note = " ".join(collar.FIT_UP_NOTE.split())

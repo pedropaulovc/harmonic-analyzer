@@ -1,4 +1,4 @@
-r"""Build MHA-152, the transgear drive collar (contract §1.2, round 10).
+r"""Build MHA-177, the transgear drive collar (contract §1.2, round 10).
 
 A brass collar reamed to slide on the knob shaft's plain Ø6.35 core, set and
 pinned at assembly; its front face seats the removable T24, whose bore takes
