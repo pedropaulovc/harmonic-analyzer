@@ -42,6 +42,29 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "Lock": {"Depth"},
 }
 
+# Places and explicit bands the print carries on those dimensions, the ones the
+# paper-drive lock-station sweep judges the plate at (policy rule 12). The
+# bottom-station plate's far edge passes 0.135 from the pivot spacer and 0.47
+# from the latch-hook bracket, and its back face carries the button heads past
+# the hanger arm. So the height never runs over 15 (+0/-0.25), and the
+# thickness of the cold-rolled strip prints .XXX (±0.13). The width stays at
+# the .XX row.
+DRAWING_PRECISION: dict[str, dict[str, int]] = {
+    "LockProfile": {"Width": 2, "Height": 2},
+    "Lock": {"Depth": 3},
+}
+DRAWING_PRECISION_BY_NAME: dict[str, int] = {
+    name: places
+    for dimensions in DRAWING_PRECISION.values()
+    for name, places in dimensions.items()
+}
+if DRAWING_PRECISION.keys() != DRAWING_DIMENSIONS.keys() or any(
+    set(DRAWING_PRECISION[feature]) != names
+    for feature, names in DRAWING_DIMENSIONS.items()
+):
+    raise AssertionError("every marked guide-lock dimension needs authored places")
+LOCK_HEIGHT_BAND = (0.0, -0.25)  # (upper, lower), native on Height
+
 # True free-text instructions only. Geometry, datum structure, form, and
 # roughness live in native dimensions / datum tags / FCFs / surface symbols.
 # The part build stamps these strings into the SLDPRT; the drawing displays

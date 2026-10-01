@@ -140,7 +140,9 @@ SIDE_KEEP = {
     "ReliefWidth": (RELIEF_MID_X, COLLAR_TOP_Y + 0.004),
     "ReliefDia": (RELIEF_MID_X, SIDE_CENTER[1] - 0.012),
     "FrontDomeR": (TIP_X - 0.012, SIDE_CENTER[1] - 0.016),
-    "RearDomeR": (REAR_TIP_X + 0.004, SIDE_CENTER[1] - 0.030),
+    # Below row 0's extension ends, so its shoulder clears the rear thread
+    # length's extension line at the thread end (run 20261001T051043622Z).
+    "RearDomeR": (REAR_TIP_X + 0.004, _ROW_Y[0] - 0.008),
 }
 RELIEF_DIA_TEXT_XY = ((RELIEF_END_X + FRONT_END_X) / 2.0, SIDE_CENTER[1] - 0.020)
 # Each thread callout lands on its own full-thread silhouette and stands out

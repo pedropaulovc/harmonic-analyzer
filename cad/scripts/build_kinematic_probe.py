@@ -169,17 +169,29 @@ def _rot_angle_deg(after: list[float], before: list[float]) -> float:
 
 
 def _rel_z_angle_deg(after: list[float], before: list[float]) -> float:
-    """SIGNED rotation about +Z (deg) of ``after @ before^T``.
+    """SIGNED rotation about Z (deg) between two ``Transform2`` rotations.
 
     Every rotating part of the feed train (sprockets, drive collar, knob shaft,
-    disc, feed pinion) spins about global Z, so the sign is meaningful --
+    disc, feed pinion) spins about global Z, so the sign is meaningful.
+    ``Transform2.ArrayData`` stores the rotation with the part's axes as its
+    ROWS (R = M^T for the column-vector matrix M), so the global spin
+    ``M_after @ M_before^T`` is ``after^T @ before``.  The old
+    ``after @ before^T`` read ``M_after^T @ M_before``, the spin in the
+    part's OWN frame: the global spin's transpose for a part inserted with
+    its Z along +Z, its reverse for one inserted Ry180 -- the Ry180 feed
+    sleeve Lock-mated to the identity disc read +1.50 against the disc's
+    -1.50 (run 20261001T051043622Z).  This returns ``before^T @ after``, the
+    global spin's transpose for EVERY insertion frame, so a part with its Z
+    along +Z reads exactly what it did before (the sign GEAR_SENSE and
+    FEED_SIGN were calibrated against).
+
     Z-rotation by theta has ``m = [[c,-s,.],[s,c,.],...]``, hence
     ``atan2(m[1][0] - m[0][1], m[0][0] + m[1][1]) = theta``."""
     bt = [before[0], before[3], before[6],
           before[1], before[4], before[7],
           before[2], before[5], before[8]]          # before^T
-    m = [sum(after[r * 3 + k] * bt[k * 3 + c] for k in range(3))
-         for r in range(3) for c in range(3)]        # after @ before^T
+    m = [sum(bt[r * 3 + k] * after[k * 3 + c] for k in range(3))
+         for r in range(3) for c in range(3)]        # before^T @ after
     return math.degrees(math.atan2(m[3] - m[1], m[0] + m[4]))
 
 

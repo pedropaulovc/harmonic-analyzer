@@ -41,19 +41,24 @@ from _common import (
     volume_check,
 )
 from _drawing_marks import (
+    apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
 )
+from _fit_limits import deviations
 from _hole_spec import blind_cut_dia_mm
 from _holes import wizard_holes
 from guide_lock_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
+    DRAWING_PRECISION,
     HOLE_SPEC,
     HOLE_XY,
     ISOMETRIC_VIEW_NOTE,
     LOCK_HEIGHT,
+    LOCK_HEIGHT_BAND,
     LOCK_THICK,
     LOCK_WIDTH,
 )
@@ -149,9 +154,16 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven lock (equations neutral)", v_final, 0.005 * v_plate
     )
 
-    # Manufacturing drawing support: mark exactly the print's dimensions (the
-    # drawing recipe imports the marked set and must find every one of these),
-    # and stamp the make-critical title-block properties.
+    # Manufacturing drawing support: the height's explicit band and every
+    # printed dimension's places live on the model (policy rule 2; the
+    # paper-drive lock-station sweep reads the same constants), then mark
+    # exactly the print's dimensions (the drawing recipe imports the marked set
+    # and must find every one of these), and stamp the make-critical
+    # title-block properties.
+    set_dimension_bilateral_tolerance(
+        adapter, "LockProfile", "Height", *deviations(LOCK_HEIGHT_BAND)
+    )
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

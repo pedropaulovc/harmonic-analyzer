@@ -223,6 +223,90 @@ def test_sheet_two_shows_and_balloons_exactly_the_transgear() -> None:
     )
 
 
+# The transgear families the sheet-2 isometric draws no reachable ink of (farm
+# run 20261001T051043622Z failed on the sleeve): they balloon on the inner view.
+HIDDEN_BY_THE_ISOMETRIC = {
+    "transgear-feed-pinion",
+    "transgear-knob-shaft",
+    "transgear-drive-collar",
+    "transgear-collar-cross-pin",
+    "transgear-knob-drive-pin",
+    "transgear-knob-retaining-screw",
+    "transgear-arm-plate-screw",
+    "transgear-latch-pin",
+}
+
+
+def test_each_transgear_family_balloons_once_on_the_view_that_shows_it() -> None:
+    # Item numbers against the dict order, so the order must come from them.
+    items = {
+        stem: str(len(drawing.BOM_PART_NUMBERS) - index)
+        for index, stem in enumerate(drawing.BOM_PART_NUMBERS)
+    }
+    iso, inner = drawing.transgear_balloon_items(items)
+    iso_stems = {stem for stem, _item in iso}
+    inner_stems = {stem for stem, _item in inner}
+    assert inner_stems == HIDDEN_BY_THE_ISOMETRIC
+    assert iso_stems == set(CONTRACT_TRANSGEAR_QUANTITIES) - HIDDEN_BY_THE_ISOMETRIC
+    for balloons in (iso, inner):
+        assert all(items[stem] == item for stem, item in balloons)
+        numbers = [int(item) for _stem, item in balloons]
+        assert numbers == sorted(numbers)
+    # The inner view shows every instance of its families and nothing else,
+    # so no outer part covers them there.
+    assert drawing.INNER_INSTANCES == {
+        f"{stem}-{index}"
+        for stem in inner_stems
+        for index in range(1, CONTRACT_TRANSGEAR_QUANTITIES[stem] + 1)
+    }
+    assert drawing.INNER_INSTANCES <= drawing.TRANSGEAR_INSTANCES
+
+
+# The isolated transgear's outline on sheet 2 at 2:3 with the view centred at
+# x 315 mm: the farm run's sleeve extreme points (20261001T051043622Z) fix the
+# projection, the builder's stations the extent. The inner view's from the
+# same stations: machine z -172.0 to -102.7 by y 225.8 to 293.2 at 2:3.
+ISO_OUTLINE_AT_315 = (0.2832, 0.1438, 0.3503, 0.2319)
+INNER_OUTLINE = (0.2171, 0.1676, 0.2633, 0.2125)
+
+
+def _iso_outline(center_x: float) -> tuple[float, float, float, float]:
+    dx = center_x - 0.315
+    x0, y0, x1, y1 = ISO_OUTLINE_AT_315
+    return (x0 + dx, y0, x1 + dx, y1)
+
+
+def test_the_inner_ring_sits_between_the_bom_and_the_isometric_ring() -> None:
+    iso = _iso_outline(drawing.TRANSGEAR_VIEW_CENTER[0])
+    dx, dy = drawing.inner_view_shift(iso, INNER_OUTLINE)
+    reach = drawing.BALLOON_RING_REACH
+    left = INNER_OUTLINE[0] + dx - reach
+    right = INNER_OUTLINE[2] + dx + reach
+    assert left >= drawing.BOM_RIGHT + 0.003
+    assert drawing.BOM_RIGHT == pytest.approx(0.182)
+    assert right <= iso[0] - reach - drawing.SHEET_TWO_RING_GAP
+    # Level with the isometric.
+    assert (INNER_OUTLINE[1] + INNER_OUTLINE[3]) / 2.0 + dy == pytest.approx(
+        (iso[1] + iso[3]) / 2.0
+    )
+    # Its caption stands under the ring, over the title block.
+    template = DRAWING_TEMPLATES[drawing.SPEC.layout]
+    caption_top = INNER_OUTLINE[1] + dy - reach - drawing.INNER_CAPTION_GAP
+    assert caption_top - NOTE_LINE_PITCH > template.title_block_top_m
+    assert left + len(drawing.INNER_CAPTION) * NOTE_CHAR_WIDTH < iso[0] - reach
+
+
+def test_the_inner_ring_has_no_room_beside_an_isometric_left_at_315() -> None:
+    """Where the isometric stood alone, its ring left 77 mm for an 80 mm one."""
+    with pytest.raises(ValueError, match="inner view ring"):
+        drawing.inner_view_shift(_iso_outline(0.315), INNER_OUTLINE)
+
+
+def test_an_isometric_ring_past_the_sheet_edge_is_refused() -> None:
+    with pytest.raises(ValueError, match="isometric ring right"):
+        drawing.inner_view_shift(_iso_outline(0.365), INNER_OUTLINE)
+
+
 def test_no_sheet_prints_a_forbidden_word() -> None:
     texts = (*drawing.SHEET_TEXTS, *drawing.BOM_DESCRIPTIONS.values())
     for text in texts:

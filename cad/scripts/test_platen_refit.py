@@ -17,6 +17,7 @@ import build_platen_paper as paper
 import build_platen_rack as rack
 import build_support_bar as support
 import fillister_screw_spec as fillister
+from _printed_tolerance import printed_deviations
 
 
 def test_platen_envelope_preserves_fitted_top_left_and_ratio() -> None:
@@ -166,13 +167,56 @@ def test_guide_lock_stations_sweep_clear_of_the_hanger(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     # The lock stations ride the platen across its whole feed; R9-31's low
-    # button heads pass under the hanger arm's front face.
-    assembly._assert_lock_station_sweep()
-    monkeypatch.setattr(assembly, "LOCK_SCREW_HEAD_H", 2.0)
+    # button heads pass under the hanger arm's front face at the printed
+    # worst case.
     assembly._assert_lock_station_sweep()
     # Negative control: the stock fillister head stands into the arm.
     monkeypatch.setattr(assembly, "LOCK_SCREW_HEAD_H", fillister.HEAD_H)
     with pytest.raises(AssertionError, match="sweep into the arm"):
+        assembly._assert_lock_station_sweep()
+
+
+@pytest.mark.parametrize(
+    ("deviation", "looser", "collides"),
+    [
+        # A rail printed at the plain .XX row stands the heads into the plate.
+        (
+            "_GUIDE_DEPTH_DEV",
+            printed_deviations(assembly.GUIDE_DEPTH, 2),
+            "heads .* into the arm plate as",
+        ),
+        # So does a lock plate whose strip thickness prints .XX...
+        (
+            "_LOCK_THICK_DEV",
+            printed_deviations(assembly.LOCK_THICK, 2),
+            "heads .* into the arm plate as",
+        ),
+        # ...and an arm plate whose notch depth prints .X.
+        (
+            "_NOTCH_DEPTH_DEV",
+            printed_deviations(assembly.ARM_PLATE.NOTCH_DEPTH, 1),
+            "heads .* into the arm plate as",
+        ),
+        # A lock plate that may run tall at .XX sweeps into the pivot spacer.
+        (
+            "_LOCK_HEIGHT_DEV",
+            printed_deviations(assembly.LOCK_HEIGHT, 2),
+            "lock plates .* into the pivot spacer",
+        ),
+        # A rail that may run 0.9 shallow rubs its plates on the bar.
+        ("_GUIDE_DEPTH_DEV", (-0.9, 0.0), "bar's back face"),
+    ],
+)
+def test_guide_lock_sweep_judges_every_section_at_its_printed_band(
+    monkeypatch: pytest.MonkeyPatch,
+    deviation: str,
+    looser: tuple[float, float],
+    collides: str,
+) -> None:
+    # Every one of these stacks clears at nominal; a part the looser print
+    # accepts would still interfere, so the sweep must refuse it.
+    monkeypatch.setattr(assembly, deviation, looser)
+    with pytest.raises(AssertionError, match=collides):
         assembly._assert_lock_station_sweep()
 
 

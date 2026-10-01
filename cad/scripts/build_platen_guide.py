@@ -48,14 +48,16 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
 )
+from _fit_limits import deviations
 from _hole_spec import DRILL_POINT_H, blind_cut_dia_mm
 from _holes import blind_hole_volume_mm3, wizard_holes
 from fillister_screw_spec import SHANK_LEN as FILLISTER_SHANK_LEN
 from guide_lock_screw_spec import SHANK_LEN as LOCK_SCREW_SHANK_LEN
 from platen_spec import CBORE_DEPTH as PLATEN_CBORE_DEPTH, PLATE_THICKNESS
 from guide_lock_spec import LOCK_THICK
-from platen_guide_spec import TAPPED_HOLE_SPEC
+from platen_guide_spec import GUIDE_DEPTH_BAND, TAPPED_HOLE_SPEC
 
 PART_NAME = "platen-guide"
 MATERIAL = "Plain Carbon Steel"
@@ -229,6 +231,11 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven guide (equations neutral)", v_final, 0.02 * v_holes
     )
 
+    # The depth's one-sided band is the paper-drive lock-station sweep's
+    # (platen_guide_spec), native on the model so the sheet prints it.
+    set_dimension_bilateral_tolerance(
+        adapter, "Guide", "Depth", *deviations(GUIDE_DEPTH_BAND)
+    )
     clear_dimensions_for_drawing(adapter)
     mark_dimensions_for_drawing(adapter, "GuideProfile", {"Length", "Height"})
     mark_dimensions_for_drawing(adapter, "Guide", {"Depth"})

@@ -210,6 +210,17 @@ from build_guide_lock import (  # noqa: E402
     LOCK_THICK,
     LOCK_WIDTH,
 )
+
+# The printed bands the lock-station sweep judges the platen's lock stack at:
+# the same spec constants the guide and lock builds author on their model
+# dimensions, so the sheets and the sweep read one source.
+from _fit_limits import deviations  # noqa: E402
+from _printed_tolerance import printed_deviations  # noqa: E402
+from guide_lock_spec import (  # noqa: E402
+    DRAWING_PRECISION_BY_NAME as LOCK_PRECISION,
+    LOCK_HEIGHT_BAND,
+)
+from platen_guide_spec import GUIDE_DEPTH_BAND, GUIDE_DEPTH_PLACES  # noqa: E402
 from build_platen_clip import (  # noqa: E402
     CLIP_LENGTH,
     CLIP_THICKNESS,
@@ -291,6 +302,7 @@ from build_transgear_feed_pinion import (  # noqa: E402
 import crankshaft_spec  # noqa: E402
 import rack_pinion_spec as DISC_SPEC  # noqa: E402
 import transgear_arm_plate_geometry as ARM_PLATE  # noqa: E402
+import transgear_arm_plate_spec as ARM_PLATE_SPEC  # noqa: E402
 import transgear_arm_plate_screw_spec as PLATE_SCREW  # noqa: E402
 import transgear_collar_cross_pin_spec as CROSS_PIN  # noqa: E402
 import transgear_disc_hub_geometry as DISC_HUB_GEOM  # noqa: E402
@@ -308,6 +320,7 @@ import transgear_pivot_screw_spec as PIVOT_SCREW  # noqa: E402
 import transgear_pivot_spacer_spec as SPACER  # noqa: E402
 import transgear_stub_spec as STUB  # noqa: E402
 import latch_hook_bracket_screw_spec as HOOK_BRACKET_SCREW  # noqa: E402
+import latch_hook_bracket_spec as HOOK_BRACKET_SPEC  # noqa: E402
 import latch_hook_rivet_spec as HOOK_RIVET  # noqa: E402
 
 FEED_PD = FEED_TEETH / FEED_DP * IN  # 10.16 -- meshes the DP30 rack
@@ -989,25 +1002,100 @@ def _latch_hook_sections(step: float = 0.05) -> list[tuple[float, float, float, 
     return sections
 
 
+# The lock-station sweep judges every section at the printed worst case
+# (policy rule 12): each section is the envelope its printed bands allow,
+# grown toward its neighbours, and each pair must keep LOCK_SWEEP_FLOOR of
+# running clearance. The bar's back face is the datum the hanger stands on and
+# the platen rides its front face, so the thinnest bar carries the whole lock
+# stack rearward toward the hanger, and the deepest rail and thickest strip
+# stand the button heads further back again. The arm sits on the shortest
+# spacer, its plate's lower section on the thinnest arm stock and the deepest
+# notch. Deviations are (lower, upper) from the model, read from the specs the
+# parts author on their model dimensions, so the sheets and the sweep agree.
+LOCK_SWEEP_FLOOR = 0.10
+_BAR_DEPTH_DEV = (-BAR.BAR_DEPTH_BAND, BAR.BAR_DEPTH_BAND)
+_GUIDE_DEPTH_DEV = printed_deviations(
+    GUIDE_DEPTH, GUIDE_DEPTH_PLACES, deviations(GUIDE_DEPTH_BAND)
+)
+# The rail's sheet prints its other sizes at the same document places.
+_GUIDE_HEIGHT_DEV = printed_deviations(GUIDE_HEIGHT, GUIDE_DEPTH_PLACES)
+_LOCK_THICK_DEV = printed_deviations(LOCK_THICK, LOCK_PRECISION["Depth"])
+_LOCK_HEIGHT_DEV = printed_deviations(
+    LOCK_HEIGHT, LOCK_PRECISION["Height"], deviations(LOCK_HEIGHT_BAND)
+)
+_SPACER_LENGTH_DEV = (-SPACER.LENGTH_BAND, SPACER.LENGTH_BAND)
+_NOTCH_DEPTH_DEV = printed_deviations(
+    ARM_PLATE.NOTCH_DEPTH, ARM_PLATE_SPEC.NOTCH_DEPTH_PLACES
+)
+_PLATE_OUTLINE_BAND = ARM_PLATE_SPEC.BAND_BY_PLACES[ARM_PLATE_SPEC.OUTLINE_PLACES]
+_HUB_DIA_DEV = printed_deviations(ARM_PLATE.HUB_DIA, ARM_PLATE_SPEC.HUB_DIA_PLACES)
+_BRACKET_WIDTH_DEV = printed_deviations(
+    HOOK_BRACKET.WIDTH,
+    HOOK_BRACKET_SPEC.WIDTH_PLACES,
+    (-HOOK_BRACKET_SPEC.WIDTH_TOL, HOOK_BRACKET_SPEC.WIDTH_TOL),
+)
+_BRACKET_FLAP_DEV = printed_deviations(
+    HOOK_BRACKET.FLAP_HEIGHT, HOOK_BRACKET_SPEC.FLAP_HEIGHT_PLACES
+)
+
+
+def _grown(
+    section: tuple[float, float, float, float], dy: float, dz0: float, dz1: float
+) -> tuple[float, float, float, float]:
+    """A (y0, y1, z0, z1) section grown by dy each side in y, dz0 forward and
+    dz1 rearward in z."""
+    y0, y1, z0, z1 = section
+    return (y0 - dy, y1 + dy, z0 - dz0, z1 + dz1)
+
+
 def _assert_lock_station_sweep() -> None:
     """The guide-lock stations ride the platen across its whole feed, so each
     sweeps a band unbounded in x: its (y, z) section must clear every fixed
-    part behind the bar at every platen position (contract lock sweep; R9-31
-    fits the low guide-lock screw heads so they pass the hanger arm)."""
+    part behind the bar at every platen position, and the plates the bar's
+    back face, by LOCK_SWEEP_FLOOR at the printed worst case (contract lock
+    sweep; R9-31 fits the low guide-lock screw heads so they pass the hanger
+    arm)."""
+    # How far the lock stack's faces can stand from the model: forward (the
+    # thickest bar, the shallowest rail, the thinnest strip) and rearward.
+    front_forward = _BAR_DEPTH_DEV[1] - _GUIDE_DEPTH_DEV[0]
+    back_forward = front_forward - _LOCK_THICK_DEV[0]
+    front_rear = -_BAR_DEPTH_DEV[0] + _GUIDE_DEPTH_DEV[1]
+    back_rear = front_rear + _LOCK_THICK_DEV[1]
     lock_back = LOCK_Z0 + LOCK_THICK
-    head_r = LOCK_SCREW_HEAD_DIA / 2.0
+    head_r = LOCK_SCREW_HEAD_DIA / 2.0  # the catalogue head, Ø and height
+    plate_grow = max(_LOCK_HEIGHT_DEV[1], 0.0)
     moving = []
     for gy, (y0, y1) in zip(GUIDE_Y, LOCK_PLATE_Y, strict=True):
         yc = gy + GUIDE_HEIGHT / 2.0
         moving += [
-            (f"lock plates y{y0:.1f}", (y0, y1, LOCK_Z0, lock_back)),
+            (
+                f"lock plates y{y0:.1f}",
+                _grown(
+                    (y0, y1, LOCK_Z0, lock_back), plate_grow, front_forward, back_rear
+                ),
+            ),
             (
                 f"lock-screw heads y{yc:.1f}",
-                (yc - head_r, yc + head_r, lock_back, lock_back + LOCK_SCREW_HEAD_H),
+                _grown(
+                    (
+                        yc - head_r,
+                        yc + head_r,
+                        lock_back,
+                        lock_back + LOCK_SCREW_HEAD_H,
+                    ),
+                    0.0,
+                    back_forward,
+                    back_rear,
+                ),
             ),
             (
                 f"guide rail rear lip y{gy:.1f}",
-                (gy, gy + GUIDE_HEIGHT, BAR_BACK_Z, LOCK_Z0),
+                _grown(
+                    (gy, gy + GUIDE_HEIGHT, BAR_BACK_Z, LOCK_Z0),
+                    max(_GUIDE_HEIGHT_DEV[1], 0.0),
+                    0.0,
+                    front_rear,
+                ),
             ),
         ]
     tip_y = _on_arm(ARM.TIP_STATION)[1]
@@ -1019,35 +1107,63 @@ def _assert_lock_station_sweep() -> None:
     ky = KNOB_SHAFT_XY[1]
     spacer_r = (SPACER.OD + SPACER.OD_BAND) / 2.0
     bracket_y = HOOK_BRACKET.MACHINE_ORIGIN[1]
-    bracket_screw_z = BAR_BACK_Z + HOOK_BRACKET.SHEET_T
+    bracket_screw_z = BAR_BACK_Z + HOOK_BRACKET.SHEET_T + HOOK_BRACKET.SHEET_T_PLUS
+    # The arm's front face on the shortest spacer; its plate's lower section
+    # stands proud of it by the deepest notch on the thinnest arm stock.
+    arm_forward = -_SPACER_LENGTH_DEV[0]
+    plate_forward = arm_forward + ARM.THICKNESS_BAND + _NOTCH_DEPTH_DEV[1]
+    hook_set = HOOK_BRACKET_SPEC.HOOK_SET_RANGE
     fixed: list[tuple[str, tuple[float, float, float, float]]] = [
-        ("arm", (tip_y - ARM.TIP_END_R, py + ARM.PIVOT_END_R, ARM_Z0, PLATE_Z0)),
+        (
+            "arm",
+            _grown(
+                (tip_y - ARM.TIP_END_R, py + ARM.PIVOT_END_R, ARM_Z0, PLATE_Z0),
+                ARM.BAND_X + ARM.TIP_STATION_BAND,
+                arm_forward,
+                0.0,
+            ),
+        ),
         (
             "arm plate",
-            (
-                ky - ARM_PLATE.END_R,
-                plate_corner_y,
-                PLATE_Z0 + ARM_PLATE.FRONT_FACE_Z,
-                PLATE_Z0 + ARM_PLATE.BOSS_FACE_Z,
+            _grown(
+                (
+                    ky - ARM_PLATE.END_R,
+                    plate_corner_y,
+                    PLATE_Z0 + ARM_PLATE.FRONT_FACE_Z,
+                    PLATE_Z0 + ARM_PLATE.BOSS_FACE_Z,
+                ),
+                _PLATE_OUTLINE_BAND,
+                plate_forward,
+                0.0,
             ),
         ),
         (
             "arm plate hub",
-            (
-                ky - ARM_PLATE.HUB_DIA / 2.0,
-                ky + ARM_PLATE.HUB_DIA / 2.0,
-                PLATE_Z0 + ARM_PLATE.HUB_FACE_Z,
-                ARM_Z0,
+            _grown(
+                (
+                    ky - ARM_PLATE.HUB_DIA / 2.0,
+                    ky + ARM_PLATE.HUB_DIA / 2.0,
+                    PLATE_Z0 + ARM_PLATE.HUB_FACE_Z,
+                    ARM_Z0,
+                ),
+                _HUB_DIA_DEV[1] / 2.0,
+                arm_forward,
+                0.0,
             ),
         ),
         *(
             (
                 "arm plate-screw tip (worst proud)",
-                (
-                    y - PLATE_SCREW.THREAD_MAJOR / 2.0,
-                    y + PLATE_SCREW.THREAD_MAJOR / 2.0,
-                    ARM_Z0 - HANGER.PLATE_SCREW_TIP_PROUD_MAX,
-                    PLATE_SCREW_Z0,
+                _grown(
+                    (
+                        y - PLATE_SCREW.THREAD_MAJOR / 2.0,
+                        y + PLATE_SCREW.THREAD_MAJOR / 2.0,
+                        ARM_Z0 - HANGER.PLATE_SCREW_TIP_PROUD_MAX,
+                        PLATE_SCREW_Z0,
+                    ),
+                    ARM.HOLE_POSITION_BAND,
+                    arm_forward,
+                    0.0,
                 ),
             )
             for _, y in PLATE_SCREW_XY
@@ -1072,12 +1188,13 @@ def _assert_lock_station_sweep() -> None:
             ),
         ),
         (
+            # y = 0 is the base's datum edge: the width band grows the far one.
             "latch-hook bracket",
             (
                 bracket_y,
-                bracket_y + HOOK_BRACKET.WIDTH,
+                bracket_y + HOOK_BRACKET.WIDTH + _BRACKET_WIDTH_DEV[1],
                 BAR_BACK_Z,
-                BAR_BACK_Z + HOOK_BRACKET.FLAP_HEIGHT,
+                BAR_BACK_Z + HOOK_BRACKET.FLAP_HEIGHT + _BRACKET_FLAP_DEV[1],
             ),
         ),
         (
@@ -1089,32 +1206,52 @@ def _assert_lock_station_sweep() -> None:
                 bracket_screw_z + HOOK_BRACKET_SCREW.HEAD_H,
             ),
         ),
+        # The hook is set at fit-up up to HOOK_SET_RANGE either way in y and z
+        # before its rivet holes are match-drilled.
         *(
             (
                 "latch-hook rivet head",
-                (
-                    y - HOOK_RIVET.HEAD_DIA / 2.0,
-                    y + HOOK_RIVET.HEAD_DIA / 2.0,
-                    z - HOOK_RIVET.HEAD_DIA / 2.0,
-                    z + HOOK_RIVET.HEAD_DIA / 2.0,
+                _grown(
+                    (
+                        y - HOOK_RIVET.HEAD_DIA / 2.0,
+                        y + HOOK_RIVET.HEAD_DIA / 2.0,
+                        z - HOOK_RIVET.HEAD_DIA / 2.0,
+                        z + HOOK_RIVET.HEAD_DIA / 2.0,
+                    ),
+                    hook_set,
+                    hook_set,
+                    hook_set,
                 ),
             )
             for _, y, z in HOOK_RIVET_POS
         ),
-        *(("latch hook", section) for section in _latch_hook_sections()),
+        *(
+            ("latch hook", _grown(section, hook_set, hook_set, hook_set))
+            for section in _latch_hook_sections()
+        ),
     ]
     minima: dict[str, float] = {}
     for fixed_label, fixed_section in fixed:
         for moving_label, moving_section in moving:
             gap = _section_gap(moving_section, fixed_section)
-            if gap <= 0.0:
+            if gap < LOCK_SWEEP_FLOOR:
                 raise AssertionError(
                     f"the platen's {moving_label} would sweep into the"
-                    f" {fixed_label} as it feeds (gap {gap:.3f})"
+                    f" {fixed_label} as it feeds (worst-case gap {gap:.3f}"
+                    f" < {LOCK_SWEEP_FLOOR})"
                 )
             minima[fixed_label] = min(minima.get(fixed_label, math.inf), gap)
+    # The plates bridge behind the bar: the thickest bar and the shallowest
+    # rail bring their front faces closest to its back face.
+    bar_gap = LOCK_Z0 - front_forward - BAR_BACK_Z
+    if bar_gap < LOCK_SWEEP_FLOOR:
+        raise AssertionError(
+            f"the platen's lock plates would rub the bar's back face as it feeds"
+            f" (worst-case gap {bar_gap:.3f} < {LOCK_SWEEP_FLOOR})"
+        )
+    minima["bar back face"] = bar_gap
     log(
-        "guide-lock station sweep clears the hanger: "
+        "guide-lock station sweep clears the hanger at the printed worst case: "
         + ", ".join(f"{label} {gap:.3f}" for label, gap in minima.items())
     )
 

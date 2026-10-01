@@ -31,6 +31,7 @@ from _drawing_common import (
     add_feature_control_frame,
     add_native_hole_callout,
     add_property_linked_note,
+    assert_imported_precision,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
@@ -44,6 +45,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import blind_cut_dia_mm
 
 from guide_lock_spec import (
+    DRAWING_PRECISION_BY_NAME,
     HOLE_SPEC,
     HOLE_XY,
     LOCK_HEIGHT,
@@ -162,11 +164,15 @@ async def build(adapter: Any) -> dict[str, str]:
     # holes' through extents.
     set_hidden_lines_visible(adapter, right)
 
-    # No callout/precision overrides: the imported Width/Height/Depth read
-    # fine at the document default, and the hole size ships as a native
+    # The places and the height's band are authored on the part (the
+    # paper-drive lock-station sweep reads the same spec); the sheet only
+    # proves the import kept the places. The hole size ships as a native
     # wizard callout below.
-    curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front")
-    curate_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right")
+    annotations = [
+        *curate_view_dimensions(adapter, front, keep=FRONT_KEEP, view_label="front"),
+        *curate_view_dimensions(adapter, right, keep=RIGHT_KEEP, view_label="right"),
+    ]
+    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
 
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to front view")

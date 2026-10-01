@@ -58,3 +58,45 @@ def test_wrong_diameter_coupling_is_rejected(wrong_ratio: float) -> None:
 def test_dropped_belt_mate_is_rejected() -> None:
     with pytest.raises(RuntimeError, match="chain ratio"):
         check_chain_ratio(0.0, DRIVE_DEG)
+
+
+def _sw_rotation(m: list[list[float]]) -> list[float]:
+    """``Transform2.ArrayData``'s rotation for column-vector matrix ``m``:
+    the part's axes are its rows, i.e. ``m`` transposed, flattened."""
+    return [m[c][r] for r in range(3) for c in range(3)]
+
+
+def _matmul(a: list[list[float]], b: list[list[float]]) -> list[list[float]]:
+    return [
+        [sum(a[r][k] * b[k][c] for k in range(3)) for c in range(3)] for r in range(3)
+    ]
+
+
+def _rz(deg: float) -> list[list[float]]:
+    import math
+
+    c, s = math.cos(math.radians(deg)), math.sin(math.radians(deg))
+    return [[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]]
+
+
+@pytest.mark.parametrize(
+    "frame",
+    [
+        [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],  # identity disc
+        [[-1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, -1.0]],  # Ry180 feed sleeve
+        [[1.0, 0.0, 0.0], [0.0, -1.0, 0.0], [0.0, 0.0, -1.0]],  # Rx180
+    ],
+)
+def test_signed_spin_reads_alike_whatever_the_insertion_frame(
+    frame: list[list[float]],
+) -> None:
+    """Two parts Lock-mated on one global Z axis spin by the same signed angle
+    even when one was inserted flipped (run 20261001T051043622Z read the Ry180
+    feed sleeve +1.50 against its identity disc's -1.50)."""
+    from build_kinematic_probe import _rel_z_angle_deg
+
+    for spin in (1.5, -7.0, 30.0):
+        before = _sw_rotation(_matmul(_rz(40.0), frame))
+        after = _sw_rotation(_matmul(_rz(40.0 + spin), frame))
+        # The identity frame keeps the sign the probe's constants were set on.
+        assert _rel_z_angle_deg(after, before) == pytest.approx(-spin)
