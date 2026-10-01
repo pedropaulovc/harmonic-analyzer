@@ -192,8 +192,13 @@ def test_u33b_engagement_exception_is_governed_by_the_stock_arm() -> None:
         assert engaged >= spec.ENGAGEMENT_FLOOR
     # The 1.5 D rule itself is not met; that is the accepted exception.
     assert spec.FULL_THREAD_WORST < 1.5 * 4.166
-    # The price: the tip may stand up to 9.0 - 7.9375 past the inboard face.
-    assert spec.PROUD_INBOARD_MAX == pytest.approx(1.0625)
+    # User ruling 2026-09-29: the tip is filed flush at assembly.  Filing
+    # removes 9.0 - 7.8359 = 1.16 at most, and even 8.1 of full thread in an
+    # 8.0391 stock arm still reaches the face first.
+    assert not hasattr(spec, "PROUD_INBOARD_MAX")
+    assert spec.FILE_ALLOWANCE_MAX == pytest.approx(9.0 - 7.8359, abs=1e-4)
+    assert spec.FILE_ALLOWANCE_MIN == pytest.approx(8.1 - 8.0391, abs=1e-4)
+    assert spec.FILE_ALLOWANCE_MIN > 0.0
 
 
 def test_u33b_note_is_the_only_manufacturing_note() -> None:
@@ -253,9 +258,14 @@ def test_modelled_volume_is_the_turned_body_less_the_slot() -> None:
     lead = 2.0 * math.pi * (1.5 + 0.5 / 3.0) * (0.5 * 0.5 / 2.0)
     tip = 2.0 * math.pi * (4.166 / 2.0 - 0.4 / 3.0) * (0.4 * 0.4 / 2.0)
     assert part.V_LEAD == pytest.approx(lead)
-    assert part.V_TIP_CHAMFER == pytest.approx(tip)
     assert part.V_BODY == pytest.approx(head + shoulder + relief + thread + lead - tip)
-    assert part.V_RELIEF + part.V_TIP_CHAMFER == pytest.approx(part.V_TURNED - part.V_BODY)
+    # Filed flush: 6.5 of full thread past the relief, a 0.25 edge break.
+    fitted_thread = math.pi * (4.166 / 2.0) ** 2 * 6.5
+    fitted_tip = 2.0 * math.pi * (4.166 / 2.0 - 0.25 / 3.0) * (0.25 * 0.25 / 2.0)
+    assert part.turned_volume(8.0, 0.25) == pytest.approx(
+        head + shoulder + relief + fitted_thread + lead - fitted_tip
+    )
+    assert part.V_INSTALLED == pytest.approx(part.turned_volume(8.0, 0.25) - part.V_SLOT)
     # A 1.0 strip across a Ø8 circle: integrate the chord 2*sqrt(r^2 - y^2)
     # over |y| <= 0.5 independently of the closed form.
     steps = 10_000
@@ -387,22 +397,40 @@ def test_printed_material_fits_one_title_block_line() -> None:
     assert "cold-finished" in str(row["material_specification"])
 
 
-def test_assembly_seats_the_shoulder_on_the_arm_and_bounds_the_tip() -> None:
+def test_assembly_seats_the_shoulder_on_the_arm_and_files_the_tip_flush() -> None:
     """#831 P1 (Codex PRRT_kwDOPHDy386lqC_R): MHA-139 is inserted in the drive
-    train with ArmSeat on the arm's outboard face, and its tip stands at most
-    PROUD_INBOARD_MAX past the arm's inboard face (I57)."""
+    train with ArmSeat on the arm's outboard face.  User ruling 2026-09-29
+    (ch11 p.14): its tip is filed flush with the arm's inboard face, so the
+    drive train places the INSTALLED configuration (the MHA-135 precedent)."""
     import build_drive_train_assembly as assembly
 
     assert assembly.HANDLE_SCREW_Z0 + spec.SEAT_STATION == pytest.approx(
         assembly.CRANK_ARM_Z0
     )
-    proud = assembly.HANDLE_SCREW_TIP_Z - assembly.CRANK_ARM_ORIGIN_Z
-    assert proud == pytest.approx(spec.THREAD_LENGTH - geometry.ARM_THICKNESS)
-    assert 0.0 < proud <= spec.PROUD_INBOARD_MAX
-    stock_inboard_face = assembly.CRANK_ARM_Z0 + spec.ARM_STOCK_THICKNESS
-    assert assembly.HANDLE_SCREW_TIP_Z_MAX - stock_inboard_face == pytest.approx(
-        spec.PROUD_INBOARD_MAX
-    )
+    assert assembly.HANDLE_SCREW_TIP_Z == pytest.approx(assembly.CRANK_ARM_ORIGIN_Z)
+    assert spec.INSTALLED_THREAD_LENGTH == pytest.approx(geometry.ARM_THICKNESS)
+    assert spec.INSTALLED_TIP_CHAMFER == pytest.approx(geometry.EDGE_BREAK_MAX_MM)
+    assert assembly.HANDLE_SCREW_INSTALLED_CONFIG == spec.INSTALLED_CONFIG == "INSTALLED"
+    source = Path(assembly.__file__).read_text(encoding="utf-8")
+    assert "configuration=HANDLE_SCREW_INSTALLED_CONFIG," in source
+
+
+def test_installed_configuration_is_split_from_a_finished_default() -> None:
+    import build_crank_handle_pivot_screw as part
+
+    source = Path(part.__file__).read_text(encoding="utf-8")
+    split = source.index("create_configuration {INSTALLED_CONFIG}")
+    for edit in (
+        "await apply_material(adapter, MATERIAL)",
+        "author_part_pmi(adapter",
+        'blank_sketch(adapter, "StationReference")',
+        "apply_drawing_precision(adapter, DRAWING_PRECISION)",
+    ):
+        assert source.index(edit) < split, edit
+    assert "assert_saved_configurations_regenerate(adapter, PART_NAME)" in source
+    assert "require_material_in_every_configuration(" in source
+    assert part.V_INSTALLED < part.V_FINAL
+    assert _config.parts("crank-handle-pivot-screw")["description"] == "CRANK HANDLE PIVOT SCREW"
 
 
 def test_quarter_inch_arm_stock_fails_the_full_strength_floor(monkeypatch) -> None:

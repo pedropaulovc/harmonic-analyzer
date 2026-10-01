@@ -25,14 +25,17 @@ from __future__ import annotations
 import math
 import sys
 
+import _config
 from _common import (
     POLISHED_STEEL,
     SketchDims,
     _early_bound,
+    active_configuration_name,
     add_line_chain,
     anchor_point_to_origin,
     apply_color,
     apply_material,
+    assert_saved_configurations_regenerate,
     blank_sketch,
     check,
     define_centered_rectangle,
@@ -59,7 +62,9 @@ from _drawing_marks import (
     set_dimension_bilateral_tolerance,
     set_dimension_symmetric_tolerance,
 )
+from _configuration_material import require_material_in_every_configuration
 from _fit_limits import deviations
+from _grouped_bom_properties import apply_grouped_bom_properties
 from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry
 from crank_handle_pivot_screw_spec import (
@@ -68,6 +73,9 @@ from crank_handle_pivot_screw_spec import (
     DRAWING_PRECISION,
     HEAD_DIA,
     HEAD_LENGTH,
+    INSTALLED_CONFIG,
+    INSTALLED_THREAD_LENGTH,
+    INSTALLED_TIP_CHAMFER,
     ISOMETRIC_VIEW_NOTE,
     OVERALL_LENGTH,
     RELIEF_DIA,
@@ -99,20 +107,29 @@ RELIEF_R = RELIEF_DIA / 2.0
 # Over-length of the slot rectangle along X: it only has to clear the head.
 SLOT_SPAN = HEAD_DIA + 2.0
 
-V_TURNED = math.pi * (
-    HEAD_R**2 * HEAD_LENGTH
-    + SHOULDER_R**2 * SHOULDER_LENGTH
-    + THREAD_R**2 * THREAD_LENGTH
-)
 # The thread-relief groove: the thread-major -> relief-floor annulus
 # RELIEF_WIDTH long, less the 45-degree lead's corner triangle (legs
 # RELIEF_LEAD, centroid RELIEF_R + RELIEF_LEAD/3 from the axis) left standing.
 V_LEAD = math.pi * RELIEF_LEAD**2 * (RELIEF_R + RELIEF_LEAD / 3.0)
 V_RELIEF = math.pi * (THREAD_R**2 - RELIEF_R**2) * RELIEF_WIDTH - V_LEAD
-# The 45-degree thread-start chamfer: the tip corner triangle (legs
-# TIP_CHAMFER, centroid THREAD_R - TIP_CHAMFER/3 from the axis) removed.
-V_TIP_CHAMFER = math.pi * TIP_CHAMFER**2 * (THREAD_R - TIP_CHAMFER / 3.0)
-V_BODY = V_TURNED - V_RELIEF - V_TIP_CHAMFER
+
+
+def turned_volume(thread_length: float, tip_chamfer: float) -> float:
+    """Revolved body volume for a threaded section and tip chamfer.
+
+    The 45-degree tip chamfer removes the corner triangle (legs
+    ``tip_chamfer``, centroid ``THREAD_R - tip_chamfer/3`` from the axis).
+    """
+    turned = math.pi * (
+        HEAD_R**2 * HEAD_LENGTH
+        + SHOULDER_R**2 * SHOULDER_LENGTH
+        + THREAD_R**2 * thread_length
+    )
+    chamfer = math.pi * tip_chamfer**2 * (THREAD_R - tip_chamfer / 3.0)
+    return turned - V_RELIEF - chamfer
+
+
+V_BODY = turned_volume(THREAD_LENGTH, TIP_CHAMFER)
 
 
 def slot_strip_area(radius: float, width: float) -> float:
@@ -125,13 +142,16 @@ def slot_strip_area(radius: float, width: float) -> float:
 
 V_SLOT = slot_strip_area(HEAD_R, SLOT_WIDTH) * SLOT_DEPTH
 V_FINAL = V_BODY - V_SLOT
+V_INSTALLED = turned_volume(INSTALLED_THREAD_LENGTH, INSTALLED_TIP_CHAMFER) - V_SLOT
 
 
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
+        CreateConfigurationParameters,
         CreatePlaneParameters,
         ExtrusionParameters,
         RevolveParameters,
+        SetGlobalVariableParameters,
     )
 
     check("create_part", await adapter.create_part())
@@ -383,14 +403,79 @@ async def build(adapter) -> dict[str, str]:
         adapter, "ScrewProfile", "ThreadLength", *deviations(THREAD_LENGTH_BAND)
     )
 
+    # Every model edit -- the material, the appearance, the drawing marks, the
+    # PMI and the hidden reference sketch -- precedes the INSTALLED split, so
+    # the split copies a finished default (the MHA-135 lesson: an edit after
+    # it touches the active configuration only and leaves the other stale).
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)
-    await report_mass_properties(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
+    # The reference sketch owns printed dimensions but no geometry: hide it so
+    # no assembly instance renders it (#880).  The drawing shows it per view
+    # through _drawing_hidden_sketches to import those dimensions.
+    blank_sketch(adapter, "StationReference")
+
+    # Installed configuration (user ruling 2026-09-29): the drive train places
+    # the screw as assembly leaves it, its tip filed flush with the arm's
+    # inboard face and the edge broken.  The default stays the as-turned
+    # screw the drawing prints; both carry one MHA-139 BOM identity.  The two
+    # globals are set per configuration in each, so neither inherits the
+    # other's value.
+    default_config = active_configuration_name(adapter)
+    check(
+        f"create_configuration {INSTALLED_CONFIG}",
+        await adapter.create_configuration(
+            CreateConfigurationParameters(
+                name=INSTALLED_CONFIG,
+                comment="tip filed flush with the arm's inboard face",
+            )
+        ),
+    )
+    for name, thread_length, tip_chamfer in (
+        (default_config, THREAD_LENGTH, TIP_CHAMFER),
+        (INSTALLED_CONFIG, INSTALLED_THREAD_LENGTH, INSTALLED_TIP_CHAMFER),
+    ):
+        for global_name, value in (
+            ("ThreadLength", thread_length),
+            ("TipChamfer", tip_chamfer),
+        ):
+            check(
+                f"{global_name} = {value} in {name}",
+                await adapter.set_global_variable(
+                    SetGlobalVariableParameters(
+                        name=global_name, expression=f"{value}mm", configuration=name
+                    )
+                ),
+            )
+    check(
+        f"activate {INSTALLED_CONFIG}",
+        await adapter.set_active_configuration(INSTALLED_CONFIG),
+    )
+    await force_rebuild(adapter)
+    await volume_check(adapter, "installed screw (tip filed flush)", V_INSTALLED, 0.02 * V_SLOT)
+    check(
+        f"re-activate {default_config}",
+        await adapter.set_active_configuration(default_config),
+    )
+    await force_rebuild(adapter)
+    await volume_check(adapter, "as-turned screw (default)", V_FINAL, 0.02 * V_SLOT)
+    # The configuration description wins over the drive-train BOM's written
+    # cell, so it is the text that BOM prints (the MHA-135 precedent).
+    grouped_spec = _config.parts(PART_NAME)
+    apply_grouped_bom_properties(
+        adapter,
+        [default_config, INSTALLED_CONFIG],
+        part_number=str(grouped_spec["number"]),
+        description=str(grouped_spec["description"]),
+    )
+    await report_mass_properties(adapter)
+    require_material_in_every_configuration(
+        adapter, PART_NAME, MATERIAL, (default_config, INSTALLED_CONFIG)
+    )
     apply_drawing_properties(
         adapter,
         PART_NAME,
@@ -399,11 +484,18 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
-    # The reference sketch owns printed dimensions but no geometry: hide it so
-    # no assembly instance renders it (#880).  The drawing shows it per view
-    # through _drawing_hidden_sketches to import those dimensions.
-    blank_sketch(adapter, "StationReference")
-    return await save_part_and_images(adapter, PART_NAME)
+    artefacts = await save_part_and_images(adapter, PART_NAME)
+    # The drive train places INSTALLED while the part saves on its default, so
+    # INSTALLED's saved cache is what it rebuilds.  Reopen and prove it the way
+    # the assembly loads it (cg-fx1).
+    part_title = str(_early_bound(adapter.currentModel, "IModelDoc2").GetTitle())
+    adapter.swApp.CloseDoc(part_title)
+    adapter.currentModel = None
+    check(
+        f"reopen saved {PART_NAME}", await adapter.open_model(artefacts["part"])
+    )
+    assert_saved_configurations_regenerate(adapter, PART_NAME)
+    return artefacts
 
 
 if __name__ == "__main__":
