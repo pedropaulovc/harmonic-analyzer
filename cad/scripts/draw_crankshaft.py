@@ -263,10 +263,12 @@ JOURNAL_FINISHES = {
         (RELIEF_END_X + 0.012, 0.200),
     ),
 }
-# The landing on the rear face's edge-on line, 1 mm inside the collar's
-# silhouette; the rim itself is selected as a model edge (_collar_rear_rim).
+# The landing on the rear face's edge-on line at the collar's silhouette: the
+# rim itself is selected as a model edge (_collar_rear_rim), and SolidWorks
+# lands a point on an edge-on circle at its projected extreme, not 1 mm
+# inside it (run 20261001T051043622Z: requested y 0.1986, landed 0.2006).
 COLLAR_REAR_FINISH = (
-    (COLLAR_REAR_X, _sheet_y(COLLAR_DIA / 2.0 - 1.0)),
+    (COLLAR_REAR_X, _sheet_y(COLLAR_DIA / 2.0)),
     (COLLAR_REAR_X + 0.0069, 0.195),
 )
 # The drive-pin holes' native REAM callout (size and depth from the cut, the

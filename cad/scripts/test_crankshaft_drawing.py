@@ -332,14 +332,14 @@ def test_sheet_placements_stay_inside_the_border() -> None:
         assert pick[1] == pytest.approx(drawing.JOURNAL_FLANK_Y)
         assert drawing._sheet_x(start) < symbol[0] < drawing._sheet_x(end)
     # The collar's rear face runs on the thrust washer: its own control, its
-    # leader on that face's edge-on line inside the collar's silhouette.
+    # leader landing on that face's edge-on rim, at the collar's silhouette
+    # where SolidWorks lands a point on an edge-on circle.
     (washer_face,) = [c for c in spec.SURFACE_FINISHES if c.key not in lands]
     assert washer_face.key == "collar_rear_face"
     pick, _symbol = drawing.COLLAR_REAR_FINISH
     assert pick[0] == pytest.approx(drawing._sheet_x(washer_face.face.offset_mm))
-    assert (
-        abs(pick[1] - drawing.SIDE_CENTER[1])
-        < spec.COLLAR_DIA * drawing.SHEET_SCALE[0] / 2000.0
+    assert pick[1] - drawing.SIDE_CENTER[1] == pytest.approx(
+        spec.COLLAR_DIA * drawing.SHEET_SCALE[0] / 2000.0
     )
 
 
