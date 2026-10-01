@@ -3452,6 +3452,9 @@ def task_check():
             "file_dep": sorted(
                 {
                     str((REPO_ROOT / "dodo.py").resolve()),
+                    # references_of runs here, but module_deps_of skips
+                    # _buildgraph itself, so name it.
+                    str((SCRIPTS_DIR / "_buildgraph.py").resolve()),
                     *(
                         str((SCRIPTS_DIR / f"build_{s}_assembly.py").resolve())
                         for s in ASSEMBLY_ORDER
