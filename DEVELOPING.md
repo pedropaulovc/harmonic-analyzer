@@ -168,15 +168,14 @@ failure names its other likely causes instead.
 ### Supervised farm releases
 
 Never launch the `release` target through `farm-run.ps1`: it runs in a
-disposable snapshot, and its cleanup would discard the publisher's post-release
-tracked image and `release.yaml` updates. Launch only the farm prerequisites
-there, for example `-Targets "preflight,export,package:release"`. Once the run
-succeeds, restore its complete `cad/out` from the `.done` `outputs` path
-(normally `<LogDirectory>\<run-id>.out`) into the owning worktree. Then run
-`uv run python -m doit release` in that worktree. The local release closure
-runs the gallery and publisher there, so successful publication can install the
-prepared images and `next_revision` bump in the checkout that will carry the
-follow-up PR.
+disposable snapshot, and cleanup would discard the publisher's post-release
+tracked image and `release.yaml` updates. Launch with
+`-Targets "build,export,package:release,preflight"` (`build` supplies drawing
+and check gates). Once successful, restore the complete `cad/out` from the
+recorded `.done` `outputs` path (normally `<LogDirectory>\<run-id>.out`) into
+the owning worktree. Then run `uv run --frozen python -m doit -s gallery`
+followed by `uv run --frozen python -m doit -s release -- vNN` there. This keeps
+the gallery and publish in the owning worktree without local COM redispatch.
 
 ### Starting one under the supervisor
 

@@ -6,27 +6,28 @@ gitignored and regenerated; this folder is not.
 
 ## README-generated CAD images
 
-The seven assembly thumbnails and the CAD pose render are generated from one
-pinned release package, not a mixture of whichever files happen to be in
-`cad/out/`. For a deliberate manual refresh:
+The seven root README assembly thumbnails and CAD pose render are generated
+from one pinned release package, not mixed from whichever files happen to be
+in `cad/out/`. The refresh also keeps `hero.png` current; that image is not
+linked from the root README. For a deliberate manual refresh:
 
 ```powershell
 uv run python cad/scripts/trim_renders.py --release-root cad/out/release/harmonic-analyzer-vNN
 ```
 
 `--release-root` names the versioned package directory and supplies its `png/`,
-`pdf/` and `gltf/` inputs. The command refreshes the README-linked assembly
+`pdf/` and `gltf/` inputs. The generator refreshes the README-linked assembly
 thumbnails, drawing illustrations below and `cad-model-display-pose.png`. The
 pose keeps the meshprobe camera, illumination and render settings documented
 below. The real-machine photograph is fixed and is never regenerated here.
 
 The manual command writes tracked files, so run it deliberately, not before the
-release clean-tree preflight. The publisher runs the same CLI against the
-versioned package with `--output-dir` pointed at untracked staging. That
-precomputes the README image set before the tag; missing inputs or rendering
-tools fail the release before publication. Only after successful publication
-does it install the prepared images here alongside `cad/config/release.yaml`'s
-`next_revision` bump. It never falls back to stale tracked images.
+release clean-tree preflight. The publisher calls the same image generator
+in-process against the staged versioned package, writing into untracked
+staging. Missing inputs or rendering tools fail before the tag; only after
+successful publication does it install the prepared images alongside
+`cad/config/release.yaml`'s `next_revision` bump. It never falls back to stale
+tracked images.
 
 ## Drawing illustrations
 
@@ -34,10 +35,11 @@ The part-sheet examples (`rocker-arm-support-drawing.png` and
 `pinion-arbor-drawing.png`) are copied from the matching full-sheet PNGs in the
 package's `png/` directory. The assembly examples are rendered from selected
 pages of its multi-sheet PDFs: zero-based PDF page 3 is drive-train assembly
-sheet 4, **Cone Set + Crank Exploded (MHA-A03)**; page 2 is frame assembly sheet
-3, **Fitting + Assembly (MHA-A04)**. These are selected PDF pages, not the
-all-pages drawing contact previews. Keep the mappings in `trim_renders.py` so
-the README cannot silently retain a sheet from an older release.
+sheet 4, **Cone Set + Crank Exploded (MHA-A03)**; page 2 is frame assembly
+sheet 3, **Match-Fit and Assembly Sequence (MHA-A04)** (recipe `FITTING + ASSEMBLY`).
+These are selected PDF pages, not the all-pages drawing contact previews. Keep
+the mappings in `trim_renders.py` so the README cannot silently retain a sheet
+from an older release.
 
 ## The matched pair: `real-machine-display-case.jpg` + `cad-model-display-pose.png`
 
@@ -96,7 +98,7 @@ against the photograph; don't change them casually:
 
 ```powershell
 uv run meshprobe -s ha illumination-set high_key --background-srgb 1 1 1
-uv run meshprobe -s ha view-frame --all --azimuth 95 --elevation 8 --margin 0.60 --aspect-ratio 0.3198
+uv run meshprobe -s ha view-frame --all --azimuth 95 --elevation 8 --margin 0.71 --aspect-ratio 0.3198
 uv run meshprobe -s ha render-image --output cad/docs/images/cad-model-display-pose.png `
     --width 1180 --height 3690 --style screen_edges --samples 128
 ```
@@ -112,10 +114,10 @@ Four things in there are load-bearing, and each one cost a wasted render:
 - **`--aspect-ratio` must equal `width / height`** (1180 / 3690 = 0.3198, which
   is the photograph's aspect). `view-frame` persists the framing it computed,
   and `render-image` warns and reframes if the resolution disagrees.
-- **`--margin 0.60`**, not the 1.25 default. The default fits a bounding sphere,
-  and this machine is 1394 mm tall in a 468 x 405 mm footprint, so the sphere is
-  nearly three times the silhouette and the machine ends up filling half the
-  frame.
+- **`--margin 0.71`**, calibrated against the v38 silhouette after meshprobe
+  1.4 changed to tight per-component corner fitting. On the 424-component
+  release model, 0.71 preserves 94.0% width against 94.3% original; the legacy
+  0.60 clips, while 1.0 shrinks the silhouette to 66.8% width.
 - **`--background-srgb`, not `--background-rgb`.** The latter is
   linear-referred and tone-mapped, so `1 1 1` comes out mid-grey.
 - **`high_key`.** `neutral_studio` washes the teal out and `raking_left` renders

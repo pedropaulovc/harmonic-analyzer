@@ -289,11 +289,14 @@ such build:
   generated README image files. It may merge immediately. Code, prose, docs,
   README markup/layout or any other change stays in an ordinary PR and MUST pass
   every gate.
-- For a supervised farm release, run only `preflight,export,package:release`
-  through `scripts/farm-run.ps1`, restore its successful `cad/out` to the
-  owning worktree, then run `uv run python -m doit release` there. Never publish
-  from the disposable snapshot: cleanup would discard its tracked post-release
-  image and revision updates. See
+- For a supervised farm release, launch only
+  `-Targets "build,export,package:release,preflight"` through
+  `scripts/farm-run.ps1` (`build` supplies drawing and check gates). On recorded
+  success restore the complete `cad/out` from `.done`'s `outputs` path to the
+  owning worktree, then run `uv run --frozen python -m doit -s gallery` and
+  `uv run --frozen python -m doit -s release -- vNN` there. This avoids
+  postpublish changes being discarded with the snapshot and prevents local COM
+  redispatch. See
   [`DEVELOPING.md`](DEVELOPING.md#supervised-farm-releases).
 - The tracked `cad/config/release.yaml` value is the Revision on every
   `.SLDPRT`, `.SLDASM`, and linked drawing title block. The publisher advances

@@ -32,22 +32,30 @@ What it does, in order:
      so the comparison gallery renders from the bundle with no SolidWorks.
      Everything is staged and zipped into ONE bundle
      ``cad/out/release/harmonic-analyzer-<version>.zip`` (``solidworks/`` native +
-     ``step/`` + ``stl/`` + ``boxes/`` + ``png/`` + ``diff/``). Records the SW
-     revision. (Build logs ship as a SEPARATE logs asset, not in this zip.)
+     ``slddrw/`` + ``step/`` + ``stl/`` + ``gltf/`` + ``boxes/`` + ``png/`` +
+     ``pdf/`` + ``diff/``). Records the SW revision. (Build logs ship as a
+     SEPARATE logs asset, not in this zip.)
   4. diff: render the changed-parts highlight (this staged bundle vs the previous
      release, fetched from GitHub) into ``stage/diff`` so it ships in the zip.
-  5. git: annotated tag at HEAD, pushed to origin.
-  6. gh: create the GitHub release for the tag (auto-generated notes header + our
+  5. Before publication, regenerate every README-generated picture from the
+     versioned staged bundle into an untracked temporary directory, and validate
+     and stage the ``release.yaml`` next-revision update. Missing images, PDF
+     sheets, or rendering tools fail before any tag/push. Requires the project's
+     meshprobe/PDFium dependencies and Blender >= 5.2; no local COM is used.
+  6. git: annotated tag at HEAD, pushed to origin.
+  7. gh: create the GitHub release for the tag (auto-generated notes header + our
      provenance block + an inline changed-parts gallery) and upload the bundle,
      the diff PNGs, and a LOGS asset -- the per-task build logs (``cad/out/logs``,
      teed by dodo.py) plus this run's ``*-release.log``, zipped into
      ``<top>-<version>-logs.zip`` when there are several (a lone log goes up
-     as-is). ``--no-publish`` runs everything EXCEPT this step (no git tag/push,
-     no gh) and just reports the assets it would have uploaded.
-  7. Before publication, validate and stage the ``release.yaml`` next-revision
-     update. On successful publication, install it atomically and warn the release
-     agent to commit and merge that tracked version bump. A failed post-publication
-     install reports the published version and required manual ``next_revision``.
+     as-is). ``--no-publish`` prepares everything but does not tag/push, invoke
+     gh, or change tracked images/revision.
+  8. Only after successful publication, install the prepared README images and
+     next-revision update. The release agent must put both into one generated-only
+     follow-up PR before the next release; that narrowly scoped PR is exempt from
+     regular review and may merge immediately. Executable code, README prose, and
+     release-process changes still require normal review. A failed post-publication
+     install reports the published version and exact manual recovery command.
 
 Run (no SolidWorks needed -- but ``doit package:release`` must have produced
 ``cad/out/release/native/`` first, on a seat or on a farm worker):
@@ -81,6 +89,7 @@ from _drawing_registry import DRAWINGS
 from export_models import stage_release_neutral
 
 import _telemetry
+import trim_renders
 
 REPO_ROOT = CAD_ROOT.parent
 TOP_ASSEMBLY = "harmonic-analyzer"
@@ -1270,37 +1279,61 @@ def main() -> int:
                 traceback.print_exc()
                 return 1
 
-            if opts.no_publish:
-                report_no_publish(version, zip_path, facts, log_path)
-                url = None
-            else:
-                prepared = prepare_configured_revision_advance(version)
-                try:
-                    url = publish(version, zip_path, facts, opts.draft, log_path)
-                except Exception:
-                    prepared.discard()
-                    raise
-                try:
-                    next_revision = prepared.commit()
-                except Exception as exc:
-                    prepared.discard()
-                    message = (
-                        f"release {version} was published at {url}, but could not "
-                        f"advance {RELEASE_VERSION_FILE}; manually set "
-                        f"next_revision: {prepared.next_version} and commit/merge "
-                        "that version bump before cutting the next release"
+            release_root = RELEASE_DIR / f"{TOP_ASSEMBLY}-{version}"
+            with tempfile.TemporaryDirectory(
+                dir=RELEASE_DIR, prefix=f".{version}-readme-images-"
+            ) as temporary:
+                prepared_images = Path(temporary)
+                # The source is exactly the bundle staged above, never whatever
+                # a later build happens to leave in cad/out. Nothing tracked is
+                # written until publish() has returned successfully.
+                trim_renders.regenerate_readme_images(release_root, prepared_images)
+                if opts.no_publish:
+                    report_no_publish(version, zip_path, facts, log_path)
+                    log(
+                        "--no-publish: prepared all README images; tracked images "
+                        "and next_revision are unchanged"
                     )
-                    _telemetry.error(message)
-                    rel.record_exception(exc)
-                    rel.set_status(
-                        _telemetry.Status(_telemetry.StatusCode.ERROR, message)
+                    url = None
+                else:
+                    prepared = prepare_configured_revision_advance(version)
+                    try:
+                        url = publish(version, zip_path, facts, opts.draft, log_path)
+                        try:
+                            trim_renders.install_readme_images(
+                                prepared_images, trim_renders.DOCS_IMAGES
+                            )
+                            next_revision = prepared.commit()
+                        except Exception as exc:
+                            message = (
+                                f"release {version} was published at {url}, but could not "
+                                "install all generated README images and the revision bump; "
+                                "recover with `uv run python cad/scripts/trim_renders.py "
+                                f"--release-root cad/out/release/{TOP_ASSEMBLY}-{version}`, "
+                                f"set {RELEASE_VERSION_FILE} to "
+                                f"next_revision: {prepared.next_version}, and commit both "
+                                "in one generated-only follow-up PR before the next release. "
+                                "That image+revision-only PR is exempt from regular review "
+                                "and may merge immediately; any code or process changes "
+                                "still require normal review"
+                            )
+                            _telemetry.error(message)
+                            rel.record_exception(exc)
+                            rel.set_status(
+                                _telemetry.Status(_telemetry.StatusCode.ERROR, message)
+                            )
+                            raise RuntimeError(message) from exc
+                    finally:
+                        prepared.discard()
+                    _telemetry.warn(
+                        "POST-RELEASE PR REQUIRED: refreshed generated README images in "
+                        f"{trim_renders.DOCS_IMAGES} and advanced "
+                        f"{RELEASE_VERSION_FILE} to {next_revision}. Commit both in one "
+                        "generated-only follow-up PR before cutting the next release. "
+                        "That narrowly image+revision-only PR is exempt from regular review "
+                        "and may merge immediately; code, README prose, and release-process "
+                        "changes remain subject to normal review"
                     )
-                    raise RuntimeError(message) from exc
-                _telemetry.warn(
-                    f"VERSION BUMP REQUIRED: {RELEASE_VERSION_FILE} now contains "
-                    f"{next_revision}; commit and merge this version bump before "
-                    "cutting the next release"
-                )
             _telemetry.success(f"Done in {time.perf_counter() - started:.1f}s.")
             _telemetry.info(f"version: {version}")
             _telemetry.info(
