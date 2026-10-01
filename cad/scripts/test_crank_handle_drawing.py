@@ -89,7 +89,7 @@ def test_tenon_and_counterbore_are_fitted_to_the_parts_they_take() -> None:
     # flush with the ferrule; the end round is turned on the oak only, clear
     # of the cup (local review of fbf82ad96).
     assert "AFTER CURE, TURN THE SHOULDER FLUSH WITH MHA-152 AND THE END ROUND ON" in spec.DRAWING_NOTES
-    assert "THE OAK ONLY, CLEAR OF MHA-153; THE OAK END MAY FEATHER AT THE CUP." in spec.DRAWING_NOTES
+    assert "THE OAK ONLY, CLEAR OF MHA-153; AT WORST THE OAK FEATHERS AT THE CUP." in spec.DRAWING_NOTES
     assert "CRESTING AT <MOD-DIAM>9.2 ON THE FLAT OAK END FLUSH WITH THE CUP." in spec.DRAWING_NOTES
     # The fitted tenon keeps its ferrule seat and 1.5 over the bore, with
     # 0.10 of bore eccentricity budgeted (local review of 1f3067ef2).
