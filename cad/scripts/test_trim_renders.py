@@ -81,6 +81,39 @@ def test_incomplete_prepared_set_cannot_partially_replace_images(tmp_path: Path)
     assert (target / first).read_bytes() == b"previous image"
 
 
+def test_partial_install_reports_replaced_images_and_preserves_remaining_files(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    prepared = tmp_path / "prepared"
+    prepared.mkdir()
+    target = tmp_path / "images"
+    target.mkdir()
+    names = trim_renders.README_IMAGE_NAMES
+    failed = names[3]
+    for name in names:
+        (prepared / name).write_bytes(f"new {name}".encode())
+        (target / name).write_bytes(f"old {name}".encode())
+    replace = trim_renders.os.replace
+
+    def locked_replace(source: Path, destination: Path) -> None:
+        if destination == target / failed:
+            raise PermissionError(f"locked image: {failed}")
+        replace(source, destination)
+
+    monkeypatch.setattr(trim_renders.os, "replace", locked_replace)
+    with pytest.raises(PermissionError, match="locked image") as failure:
+        trim_renders.install_readme_images(prepared, target)
+
+    assert failure.value.__notes__ == [
+        f"partially installed README images: {', '.join(names[:3])}"
+    ]
+    for name in names[:3]:
+        assert (target / name).read_bytes() == f"new {name}".encode()
+    for name in names[3:]:
+        assert (target / name).read_bytes() == f"old {name}".encode()
+    assert not list(target.glob("*.tmp"))
+
+
 @pytest.mark.parametrize("edge", ["left", "top", "right", "bottom"])
 def test_display_pose_rejects_a_machine_clipped_at_any_edge(
     tmp_path: Path, edge: str

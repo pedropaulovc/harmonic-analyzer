@@ -7,8 +7,9 @@ Use a versioned release to keep the README tied to the published geometry::
 ``--output-dir`` prepares the complete image set outside the tracked tree. The
 publisher uses the same generator before tagging, then installs those prepared
 images only after publication succeeds, alongside the next-revision bump.
-Explicit refreshes stage first too, so a missing input or failed renderer cannot
-silently leave a mixture of current and stale tracked pictures.
+Explicit refreshes stage first too, so missing inputs and failed renderers leave
+tracked pictures unchanged. Installation replaces files individually; a failed
+replacement reports which images were already installed.
 
 Assembly previews are cropped deterministically; single-sheet drawing PNGs are
 copied unchanged; selected PDF sheets are rasterized at 300 dpi. The display-pose
@@ -266,6 +267,7 @@ def install_readme_images(prepared_dir: Path, output_dir: Path) -> None:
         if not source.is_file():
             raise FileNotFoundError(f"required prepared README image is missing: {source}")
     output_dir.mkdir(parents=True, exist_ok=True)
+    installed: list[str] = []
     for name in README_IMAGE_NAMES:
         temporary: Path | None = None
         try:
@@ -275,6 +277,11 @@ def install_readme_images(prepared_dir: Path, output_dir: Path) -> None:
                 temporary = Path(target.name)
             copyfile(prepared_dir / name, temporary)
             os.replace(temporary, output_dir / name)
+            installed.append(name)
+        except BaseException as exc:
+            if installed:
+                exc.add_note(f"partially installed README images: {', '.join(installed)}")
+            raise
         finally:
             if temporary is not None:
                 temporary.unlink(missing_ok=True)
