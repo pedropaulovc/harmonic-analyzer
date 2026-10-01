@@ -95,7 +95,7 @@ BORE_DIA_BAND = (  # (upper, lower) deviations
     round(_SHAFT_UPPER + _CLEARANCE_MIN, 3),
 )
 
-FACE_WIDTH = 11.4  # teeth grown north past the 64T row; south face stays seated
+FACE_WIDTH = 11.6  # teeth grown north past the 64T row; south face stays seated
 # The south face and boss length stay where they were. The 64T row is 7.2113
 # wide. Codex P1 on #1128 (user ruling 2026-09-29) banded the tooth length
 # at +0/-0.30; the user's c'' ruling (variant B, 2026-09-30) then grew the
@@ -104,7 +104,9 @@ FACE_WIDTH = 11.4  # teeth grown north past the 64T row; south face stays seated
 # passes under the inclined T120 rim. Ruling R9-55 grew them a further 0.1
 # north once the row was taken slice by slice: each 64T slice meshes at its
 # own contact azimuth, and the floated north slices reach farther north than
-# a translated nominal row. FACE_WIDTH is the whole tooth length
+# a translated nominal row. Ruling R9-56 grew them 0.2 more once the row
+# also carried every permitted axis pose (build_drive_train_assembly
+# crank_row_engagement). FACE_WIDTH is the whole tooth length
 # (the part's GearBlank extrusion) and still prints: it places the boss step.
 # Functional reason for its band inside the .X row: at the row's -0.8 the
 # teeth cover under 85% of the 64T row, and its long limit bounds the turned

@@ -52,7 +52,7 @@ NORMAL_TOOTH_THICKNESS_DEVIATIONS = tuple(
 # corner with both tips at their printed lower limits; this module is below
 # that stack, so the printed value is a literal the assembly's import and
 # test_crank_mesh_stack hold to the derivation. Both gear sheets print it.
-WORST_CONTACT_RATIO = 0.55
+WORST_CONTACT_RATIO = 0.60
 
 
 def gear_data_note(rows: list[tuple[str, str]], *, title: str = "GEAR DATA") -> str:
@@ -102,7 +102,10 @@ GEAR_DATA = gear_data_note(
             "TRANSVERSE BACKLASH WITH MHA-025, ACCEPT AT ASSEMBLY (mm)",
             f"{BACKLASH_MM[0]:.2f} TO {BACKLASH_MM[1]:.2f}",
         ),
-        ("TOOTH FORM", "HELICAL INVOLUTE, FULL DEPTH, ARC ROOT FLOOR"),
+        (
+            "TOOTH FORM",
+            f"HELICAL INVOLUTE, LONG ADDENDUM (+{spec.LONG_ADDENDUM_MM:.2f} mm), ARC ROOT FLOOR",
+        ),
         ("MATES WITH", "CRANK PINION MHA-025, 16T STRAIGHT SPUR, FULL THICKNESS"),
         CONTACT_RATIO_ROW,
     ]

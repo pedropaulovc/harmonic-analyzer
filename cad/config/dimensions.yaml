@@ -266,9 +266,9 @@ sections:
         - scaled
         - med
       - - Crankshaft length
-        - 137.3 mm cylindrical length plus 2-mm integral outboard dome
+        - 137.5 mm cylindrical length plus 2-mm integral outboard dome
         - '5.39 in initial reference; lengthened with the grown 16T teeth, the 16T boss kept at its shortest W15-compliant length'
-        - 'The outboard cylinder/arm/hub face remains at world z −183, with T12 at z −155. The inboard shaft end is now z −45.7, recessed 1.14 inside the 16T pinion boss; it followed the 16T teeth growing 9.5 → 11.4 north (user ruling 2026-09-30, c″ variant B, then ruling R9-55), and every far-end station grew the same 1.9. With the original pin and printed bands unchanged, its W15 pin-edge wall is 2.023 mm at print-worst (2.0 floor); a boss one .X step shorter would give 1.973. Length prints at one place, +0/−0.4.'
+        - 'The outboard cylinder/arm/hub face remains at world z −183, with T12 at z −155. The inboard shaft end is now z −45.5, recessed 1.14 inside the 16T pinion boss; it followed the 16T teeth growing 9.5 → 11.6 north (user ruling 2026-09-30, c″ variant B, then rulings R9-55 and R9-56), and every far-end station grew the same 2.1. With the original pin and printed bands unchanged, its W15 pin-edge wall is 2.023 mm at print-worst (2.0 floor); a boss one .X step shorter would give 1.973. Length prints at one place, +0/−0.4.'
         - derived
         - high
   - prose: |2
@@ -362,7 +362,7 @@ sections:
         - derived
         - low
       - - Crank-drive gear (dark steel gear at the large end, "This gear engages the crank" p.20)
-        - '64T at transverse DP 25.7311 (normal DP 26.306, one cutter for the pair, #906): PD 63.176 mm, OD 65.108 mm; mates a 16T pinion cut straight by the same cutter (4:1, PD 15.449, OD 17.380). The fixed v36 post keeps both bore axes. True 12.00° helix, 0.15 transverse tooth thinning and root-relieved floors. The 64T has a matching Ø9.525 D-bore (shaft AF 8.763 +0/−0.010; bore AF +0.010/+0.020 over nominal), 7.2113 ±0.025 face. Its south face bears on the thrust collar; its north face touches T120. The 16T pinion has a 9.5-mm face, shortened from the north, and keeps its south face and boss length.'
+        - '64T at transverse DP 25.7311 (normal DP 26.306, one cutter for the pair, #906): PD 63.176 mm, OD 65.208 mm (turned 0.05 long in addendum, ruling R9-56); mates a 16T pinion cut straight by the same cutter (4:1, PD 15.449, OD 17.380). The fixed v36 post keeps both bore axes. True 12.00° helix, 0.15 transverse tooth thinning and root-relieved floors. The 64T has a matching Ø9.525 D-bore (shaft AF 8.763 +0/−0.010; bore AF +0.010/+0.020 over nominal), 7.2113 ±0.025 face. Its south face bears on the thrust collar; its north face touches T120. The 16T pinion has a 9.5-mm face, shortened from the north, and keeps its south face and boss length.'
         - —
         - 'p.20 supplies the 4:1 reduction and the visibly coarser pair; the v2 post constrains fixed bore axes at c2c 39.735, giving DP 25.7311 against a transverse-DP 16T at 0.25 mm design slack; exact-solid phase sweep gives the 12.00° inclination. p.20 `page003_img03.jpeg` shows the 64T face-on to T120 without a hub, fillet or pin head, and p.21 `page003_img02.jpeg` shows solder on small gears on the same shaft. User ruling 2026-09-28 replaces the historical joint interpretation with D-bores and touching faces; the 64T grows from the collar northward.'
         - scaled
@@ -570,7 +570,7 @@ sections:
         - low
       - - 64T drive gear
         - perpendicular on the 3/8" land at effective shaft station −12.109, centre (x, z) = (−123.312, −64.454), 7.2113 mm face; its south face bears on the MHA-014 thrust collar (unchanged) and its north face touches T120's south face (no axial air)
-        - p.20 (directly beside the 120T); DP 25.7311 is fixed by the v36 post crank-axis centre distance. User ruling 2026-09-28 grows the face 6.5 → 7.2113 mm northward from the unchanged collar face until it meets T120, the first joint of the solid gear stack; its D-bore locates it rotationally. The south face does not move; with the post's ConeBossLen printed .XX (user ruling 2026-09-29), the v36 post's print-worst crank boss clearance is 0.486 mm, above its 0.25 floor. The fixed-centre mesh is required not to bind; the re-measured backlash study keeps ≥ 0.163 mm at the tightest corner.
+        - p.20 (directly beside the 120T); DP 25.7311 is fixed by the v36 post crank-axis centre distance. User ruling 2026-09-28 grows the face 6.5 → 7.2113 mm northward from the unchanged collar face until it meets T120, the first joint of the solid gear stack; its D-bore locates it rotationally. The south face does not move; with the post's ConeBossLen printed .XX (user ruling 2026-09-29), the v36 post's print-worst crank boss clearance is 0.479 mm (the 64T turned 0.05 long in addendum, R9-56), above its 0.25 floor. The fixed-centre mesh is required not to bind; the re-measured backlash study keeps ≥ 0.162 mm at the tightest corner.
         - low
       - - Cone gear j (j = 0 big … 19 small)
         - shaft seat station 28.25 + 6.889j; centre x_j = −84.702 − (30.59 − 1.5295j)·cos i, z_j = −31.685 + 7.0565j + (30.59 − 1.5295j)·sin i, y = 90.518; ALL 20 perpendicular to the shaft (true cone, p.18)
@@ -585,7 +585,7 @@ sections:
         - mesh plane alignment
         - high
       - - Crankshaft
-        - 'Along Z on the restored fixed crank axis (x, y) = (−129.336, 129.850). The frame-reference c2c is 39.735, with 0.423 slack for the single-cutter pair. User ruling 2026-09-28 requires positive worst-case tight backlash without a prescribed window. The 137.2-mm shaft spans z −183..−45.8 with its integral dome outboard. T12 remains at z −155. The restored boss runs z −142.245..−70.210; the pinion south face is feeler-set 0.25 north of it, at z −69.960 (local 113.039505572). The 16T teeth grew 1.8 north, 9.5 → 11.3 mm (user ruling 2026-09-30): full OD over the 8.5 shoulder, the north 2.8 turned to Ø16.21. Its 14.0-mm boss length past the south-to-north gear face is unchanged, yielding 25.3 mm overall. Its Ø3.175 pin station, 18.3, follows the grown face parametrically. The integral Ø11.388 journal runs directly in the post; the Ø9.0 pinion seat step starts at local 111.3.'
+        - 'Along Z on the restored fixed crank axis (x, y) = (−129.336, 129.850). The frame-reference c2c is 39.735, with 0.423 slack for the single-cutter pair. User ruling 2026-09-28 requires positive worst-case tight backlash without a prescribed window. The 137.5-mm shaft spans z −183..−45.5 with its integral dome outboard. T12 remains at z −155. The restored boss runs z −142.245..−70.210; the pinion south face is feeler-set 0.25 north of it, at z −69.960 (local 113.039505572). The 16T teeth grew 2.1 north, 9.5 → 11.6 mm (user ruling 2026-09-30, then rulings R9-55 and R9-56): full OD over the 8.5 shoulder, the north 3.1 turned to Ø16.21. Its 14.0-mm boss length past the south-to-north gear face is unchanged, yielding 25.6 mm overall. Its Ø3.175 pin station, 18.6, follows the grown face parametrically. The integral Ø11.388 journal runs directly in the post; the Ø9.0 pinion seat step starts at local 111.6.'
         - 'cone-pivot-post-v2 is the physical authority for x/y. The ch30 GT crank_sprocket result (−122.84, 144.78) remains independent image evidence, while the primary crank construction photo governs the separate through hub and flush outboard face. The crossed-helical accommodation and historical 0.25 mm transverse-DP centre reference remain; neither is a backlash target.'
         - high (GT + mesh)
       - - Chain run
@@ -2132,8 +2132,8 @@ sections:
          restores that fixed crank axis and the unrelieved v36 post boss.
          The 64T keeps its south face on the unchanged 3.181 thrust collar
          and grows north to 7.2113 so it bears on T120 in the solid cone
-         stack (user ruling 2026-09-28). The 16T teeth (grown to 11.4 north,
-         user ruling 2026-09-30, then R9-55) sit 0.25 off the restored boss at z −70.210,
+         stack (user ruling 2026-09-28). The 16T teeth (grown to 11.6 north,
+         user ruling 2026-09-30, then R9-55 and R9-56) sit 0.25 off the restored boss at z −70.210,
          so its south face is z −69.960. They run at full OD for the 8.5
          shoulder and are turned to Ø16.21 north of it: with every printed
          band, fit offset and axis pose at its worst the shoulder's axial air
@@ -2144,16 +2144,18 @@ sections:
          free-running revolution; each cut answers its own reading: the band
          is turned down to Ø15.78 MIN (still in 16T:64T contact wherever its
          reading can fail) only if the band stops the feeler, the shoulder
-         faced back to 8.2 MIN only if the shoulder does; the teeth cover
-         0.857 of the grown 64T tooth row, each 64T slice at its own contact azimuth,
-         with the cone stack floated 0.80 north (>=85% required; stub teeth
-         counted).
+         faced back to 8.2 MIN only if the shoulder does; the teeth cover and
+         mesh 0.860 of the grown 64T tooth row, each 64T slice at its own contact
+         azimuth and centre distance, every axis pose summed and the cone stack
+         floated 0.80 north (>=85% required; stub teeth counted while in
+         contact). The 64T is turned 0.05 long in addendum (OD 65.21, R9-56) so
+         the band keeps contact across the row.
          Positive worst-case tight backlash, not a backlash window, is the
          acceptance (`crank_mesh_stack`). Exact-solid phase and row engagement
          are evaluated at the actual grown-gear centre
          (`diagnostics/crank_mesh_backlash_study.py`: every case keeps the
-         −1.49 seed inside its common interval, nominal −2.79..−0.21). The
-         137.3-mm crankshaft retains the outboard face z −183 and T12 at
+         −1.49 seed inside its common interval, nominal −2.79..−0.22). The
+         137.5-mm crankshaft retains the outboard face z −183 and T12 at
          z −155; the 16T boss is the shortest printable length holding the
          existing W15 pin-edge and shaft-end-recess floors.
       10. **Alignment-pinion mechanism removed (2026-06-18) — RESTORED

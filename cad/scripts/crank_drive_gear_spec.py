@@ -78,10 +78,15 @@ PRESSURE_ANGLE_DEG = math.degrees(  # transverse: 14.81
 MODULE_MM = MM_PER_IN / DIAMETRAL_PITCH  # transverse
 NORMAL_MODULE_MM = MM_PER_IN / CUTTER_DIAMETRAL_PITCH
 PITCH_DIA = TEETH / DIAMETRAL_PITCH * MM_PER_IN
-# The cutter's addendum and depth: a standard full-depth tooth of the NORMAL
-# module, whatever plane the profile is read in.
-OUTSIDE_DIA = PITCH_DIA + 2.0 * NORMAL_MODULE_MM
-WHOLE_DEPTH = 2.157 * NORMAL_MODULE_MM
+# The cutter's depth below the pitch circle: a standard dedendum of the NORMAL
+# module, whatever plane the profile is read in.  The blank is turned
+# LONG_ADDENDUM_MM over the cutter's standard addendum (R9-56, 2026-09-30) so
+# the 16T's turned band keeps contact over the 64T row at every printed
+# corner (build_drive_train_assembly.crank_row_engagement); the cutter, sunk
+# to its own depth below the pitch circle, leaves the root where it was.
+LONG_ADDENDUM_MM = 0.05
+OUTSIDE_DIA = PITCH_DIA + 2.0 * (NORMAL_MODULE_MM + LONG_ADDENDUM_MM)
+WHOLE_DEPTH = 2.157 * NORMAL_MODULE_MM + LONG_ADDENDUM_MM
 # The gap floor is a root arc one standard dedendum below the pitch circle
 # (``_gear.build_fixed_gear(root_relief=True)``, required by the helix path):
 # the cutter's depth of cut produces it, so it is REF on the print.

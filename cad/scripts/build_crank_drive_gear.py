@@ -100,6 +100,7 @@ from crank_drive_gear_spec import (
     DRAWING_PRECISION,
     FACE_WIDTH,
     FACE_WIDTH_BAND,
+    LONG_ADDENDUM_MM,
     OUTSIDE_DIA,
     OUTSIDE_DIA_TOLERANCE_MM,
     PRESSURE_ANGLE_DEG,
@@ -212,12 +213,13 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs: list[tuple[str, str]] = []
 
     # Normal-defined (#906): the transverse DP/PA place the involute, the
-    # cutter's DP sets the depth.
+    # cutter's DP sets the depth; the blank is turned long (R9-56).
     disc = await build_fixed_gear(
         adapter, TEETH, FACE_WIDTH, dp=DP, pa_deg=PA_DEG,
         helix_deg=HELIX_DEG,
         backlash_mm=BACKLASH_MM, root_relief=True,
         depth_dp=CUTTER_DIAMETRAL_PITCH,
+        long_addendum_mm=LONG_ADDENDUM_MM,
     )
     volume = disc.volume
 

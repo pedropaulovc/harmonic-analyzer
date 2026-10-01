@@ -118,9 +118,16 @@ class GearDef:
         return lut[key]
 
 
-# #906: one cutter, the 64T normal-defined, at the frame's centre distance.
+# #906: one cutter, the 64T normal-defined, at the frame's centre distance,
+# its blank turned long (R9-56).
 SHIPPED16 = GearDef(16, dp_n=cms.DP_CRANK_CUTTER)
-SHIPPED64 = GearDef(64, cms.HELIX_DEG, dp_n=cms.DP_CRANK_CUTTER, definition="normal")
+SHIPPED64 = GearDef(
+    64,
+    cms.HELIX_DEG,
+    dp_n=cms.DP_CRANK_CUTTER,
+    definition="normal",
+    tip_mm=cms.LONG_ADDENDUM64_MM,
+)
 SHIPPED_EXTRA = cms.SLACK
 assert math.isclose(SHIPPED16.rp, cms.R16) and math.isclose(SHIPPED64.rp, cms.R64)
 assert math.isclose(SHIPPED16.root, cms.ROOT16) and math.isclose(SHIPPED64.root, cms.ROOT64)

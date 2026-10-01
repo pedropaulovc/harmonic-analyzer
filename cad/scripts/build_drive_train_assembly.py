@@ -428,7 +428,9 @@ MESH16_C2C = (
     + _config.fit("crank_mesh", "c2c_slack_mm")
 )  # 39.735
 MESH16_C2C_SLACK = MESH16_C2C - R64 - R16  # 0.423
-TIP16_C2C = R64 + R16 + 2.0 * ADD16
+from crank_drive_gear_spec import LONG_ADDENDUM_MM as _GEAR64_LONG_ADDENDUM  # noqa: E402
+
+TIP16_C2C = R64 + R16 + 2.0 * ADD16 + _GEAR64_LONG_ADDENDUM
 CRANK_MESH_DEPTH = TIP16_C2C - MESH16_C2C
 # Depth band: above ~1.2*ADD (really engaged), below 2*ADD minus the root
 # clearance floor (slack + 0.157*ADD16 of tip-to-root air stays positive).
@@ -453,6 +455,7 @@ CRANK_ACTUAL_C2C = math.hypot(_DX16, _DY16)
 from cone_stack_end_play import CONE_FLOAT_NORTH  # noqa: E402
 from crank_drive_gear_notes import WORST_CONTACT_RATIO as CRANK_MESH_PRINTED_CONTACT_RATIO  # noqa: E402
 from crank_drive_gear_spec import OUTSIDE_DIA as _GEAR64_TIP_DIA  # noqa: E402
+from crank_drive_gear_spec import OUTSIDE_DIA_TOLERANCE_MM as _GEAR64_TIP_DIA_TOLERANCE  # noqa: E402
 from crank_mesh_stack import (  # noqa: E402
     OPEN_CENTRE_DISTANCE_MM as CRANK_MESH_OPEN_CENTRE_DISTANCE,
     OPEN_TERMS as CRANK_MESH_OPEN_TERMS,
@@ -1843,18 +1846,28 @@ _CRANK_TILT = _RUNNING_CLEARANCE / CRANK_MESH_BEARING_LENGTH
 _PINION_COCK = PINION_BORE_DIAMETRAL_CLEARANCE[1] / PINION_OVERALL_LENGTH
 _CONE_TILT = _RUNNING_CLEARANCE / POST_CONE_BOSS_LENGTH
 _POST_ANGLE = math.tan(math.radians(CRANK_MESH_POST_ANGLE_DEG))
-# Cone-frame (radial, axial) moves of T120's rim.
-_T120_MOVES = {
-    "T120 seat eccentricity": (GEAR_SEAT_CLEARANCE[1] / 2.0, 0.0),
-    "cone shaft float in the post boss": (
-        _RUNNING_CLEARANCE / 2.0 + _CONE_TILT * _T120_OVERHANG,
-        _CONE_TILT * _TIP120,
-    ),
-    "post cone-bore angle": (
-        (_T120_OVERHANG + POST_CONE_BOSS_LENGTH / 2.0) * _POST_ANGLE,
-        _TIP120 * _POST_ANGLE,
-    ),
-}
+
+
+def _cone_frame_moves(
+    gear: str, overhang: float, rim: float
+) -> dict[str, tuple[float, float]]:
+    """Cone-frame (radial, axial) moves of a cone-shaft gear's rim ``rim``
+    from its axis, the rim ``overhang`` north of the post's cone-boss north
+    face."""
+    return {
+        f"{gear} seat eccentricity": (GEAR_SEAT_CLEARANCE[1] / 2.0, 0.0),
+        "cone shaft float in the post boss": (
+            _RUNNING_CLEARANCE / 2.0 + _CONE_TILT * overhang,
+            _CONE_TILT * rim,
+        ),
+        "post cone-bore angle": (
+            (overhang + POST_CONE_BOSS_LENGTH / 2.0) * _POST_ANGLE,
+            rim * _POST_ANGLE,
+        ),
+    }
+
+
+_T120_MOVES = _cone_frame_moves("T120", _T120_OVERHANG, _TIP120)
 T120_POSE_TERMS = {
     "crank journal float": (
         _RUNNING_CLEARANCE / 2.0
@@ -1885,6 +1898,33 @@ T120_POSE_TERMS = {
 }
 T120_POSE_RADIAL = sum(radial for radial, _ in T120_POSE_TERMS.values())
 T120_POSE_AXIAL = sum(axial for _, axial in T120_POSE_TERMS.values())
+
+# The same poses move the 64T's tooth row along the crank axis against the
+# 16T's teeth (Codex P2 on #1154): the 16T side as T120_POSE_TERMS carries
+# it, and the 64T's own rim (its tip at the printed upper limit, its north
+# face with the stack at its north float) moved in the cone frame.
+_GEAR64_RIM = (_GEAR64_TIP_DIA + _GEAR64_TIP_DIA_TOLERANCE) / 2.0
+_GEAR64_OVERHANG = (
+    _T120_SOUTH_FACE_STATION
+    + max(_GEAR64_FACE_LIMITS)
+    + max(_COLLAR_WIDTH_BAND)
+    + CONE_FLOAT_NORTH
+    - _POST_NORTH_STATION
+)
+CRANK_ROW_POSE_TERMS = {
+    **{
+        name: axial
+        for name, (_, axial) in T120_POSE_TERMS.items()
+        if name not in _T120_MOVES
+    },
+    **{
+        name: a * SIN_I + b * COS_I
+        for name, (a, b) in _cone_frame_moves(
+            "64T", _GEAR64_OVERHANG, _GEAR64_RIM
+        ).items()
+    },
+}
+CRANK_ROW_POSE_AXIAL = sum(CRANK_ROW_POSE_TERMS.values())
 
 
 # T120 in the cone plane: horizontal p = x - x0 and vertical w = z - z0 from
@@ -2258,31 +2298,6 @@ if Y_CRANK + min(_CRANK_HEIGHT_BAND) <= Y_DRIVE or CRANK_MESH_DC_PER_DY <= 0.0:
     )
 
 
-def crank_band_contact_path(turned_dia: float, crank_height: float) -> float:
-    """16T:64T contact path (mm) on the turned band at the 16T's north end:
-    the band ``turned_dia`` less its runout to the bore, the 64T tip at its
-    printed lower limit, the crank ``crank_height`` above its model height,
-    and every other crank_mesh_stack open-corner term open, their tilts
-    carried on out to the band's end."""
-    to_end = _BAND_END_PAST_MESH
-    centre = (
-        CRANK_ACTUAL_C2C
-        + CRANK_MESH_OPEN_CENTRE_DISTANCE
-        - CRANK_MESH_OPEN_TERMS["crank bore spacing"]
-        + crank_height * CRANK_MESH_DC_PER_DY
-        + to_end * (_CRANK_TILT + _CONE_TILT / COS_I) * CRANK_MESH_DC_PER_DY
-        + to_end * _POST_ANGLE * (1.0 + CRANK_MESH_DC_PER_DX / COS_I)
-    )
-    return (
-        crank_mesh_contact_ratio(
-            centre_distance=centre,
-            tip_dia_16=turned_dia - CRANK_MESH_TOOTH_RUNOUT_TIR,
-            tip_dia_64=_GEAR64_TIP_DIA_LOW,
-        )
-        * CRANK_MESH_BASE_PITCH
-    )
-
-
 if not math.isclose(
     CRANK_MESH_OPEN_TERMS["crank bore spacing"],
     max(_CRANK_HEIGHT_BAND) * CRANK_MESH_DC_PER_DY,
@@ -2313,29 +2328,13 @@ def _band_check_crank_height() -> float:
 T120_BAND_CHECK_CRANK_HEIGHT = _band_check_crank_height()
 
 
-def crank_band_contact_paths(turned_dia_fitup_min: float) -> dict[str, float]:
-    """The turned band's least contact path: as printed (its lower limit) at
-    any crank height, and turned down to ``turned_dia_fitup_min`` wherever
-    the fit-up check can call for it."""
-    return {
-        "printed": crank_band_contact_path(
-            PINION_TURNED_DIA + _PINION_TURNED_DIA_BAND[0], max(_CRANK_HEIGHT_BAND)
-        ),
-        "fit-up floor": crank_band_contact_path(
-            turned_dia_fitup_min, T120_BAND_CHECK_CRANK_HEIGHT
-        ),
-    }
-
-
-CRANK_BAND_CONTACT_PATHS = crank_band_contact_paths(PINION_TURNED_DIA_FITUP_MIN)
-
 # ... and the teeth must still cover the 64T row (>= 85% of its face) at
 # every corner -- an engagement floor so a future station edit cannot quietly
 # starve the mesh.  The row counts the turned stub teeth north of the
 # shoulder (reading (ii), which this face-extent check has always implied;
 # user ruling 2026-09-30): they are the 16T's own teeth, cut full depth and
-# turned to a shorter addendum, and count only while that band keeps contact
-# (crank_band_contact_paths).  The full-depth share alone (reading (i)) is
+# turned to a shorter addendum, and count only where the band keeps contact
+# with the 64T slice it meets.  The full-depth share alone (reading (i)) is
 # reported, not gated.
 def gear64_contact_z(station_shift: float) -> float:
     """Crank-axis z of the 64T's contact point in its slice ``station_shift``
@@ -2352,15 +2351,117 @@ if not math.isclose(gear64_contact_z(0.0), _GEAR64_CONTACT_Z, abs_tol=1e-9):
     raise AssertionError("gear64_contact_z disagrees with the seated contact azimuth")
 CRANK_ROW_ENGAGEMENT_FLOOR = 0.85
 
+# Each 64T slice meshes at its OWN centre distance (Codex P1 on #1154): the
+# crank_mesh_stack open corner with the crank-height term at the corner's
+# height, the stack's north float and the 64T's axial station taken exactly
+# by the slice's own station on the cone axis, and the crank-journal,
+# cone-shaft and post tilts carried from the 16T's mesh plane out to the
+# slice's contact.  A slice farther north sits farther from the crank, so
+# the path falls monotonically northward along the row.
+_CRANK_SLICE_OPEN_TERMS = (
+    CRANK_MESH_OPEN_CENTRE_DISTANCE
+    - CRANK_MESH_OPEN_TERMS["crank bore spacing"]
+    - CRANK_MESH_OPEN_TERMS["cone stack north float"]
+    - CRANK_MESH_OPEN_TERMS["64T axial station"]
+)
+_CRANK_MESH_PLANE_Z = (
+    _POST_BOSS_NORTH + PINION_SEAT_GAP_MAX + CRANK_MESH_PINION_HALF_FACE_MAX
+)
+_CRANK_TILT_OPENING = (
+    _CRANK_TILT + _CONE_TILT / COS_I
+) * CRANK_MESH_DC_PER_DY + _POST_ANGLE * (1.0 + CRANK_MESH_DC_PER_DX / COS_I)
+
+
+def crank_slice_contact_path(
+    tip_dia_16: float, station_shift: float, pose_shift: float, crank_height: float
+) -> float:
+    """16T:64T contact path (mm) between 16T teeth of tip ``tip_dia_16`` and
+    the 64T slice ``station_shift`` north of its seat, the 64T tip at its
+    printed lower limit, the row moved ``pose_shift`` along the crank axis by
+    the axis poses, the crank ``crank_height`` above its model height and
+    every other open-corner term open."""
+    lever = gear64_contact_z(station_shift) + pose_shift - _CRANK_MESH_PLANE_Z
+    centre = (
+        math.hypot(_DX16 + station_shift * SIN_I * COS_I, _DY16)
+        + _CRANK_SLICE_OPEN_TERMS
+        + crank_height * CRANK_MESH_DC_PER_DY
+        + max(0.0, lever) * _CRANK_TILT_OPENING
+    )
+    return (
+        crank_mesh_contact_ratio(
+            centre_distance=centre,
+            tip_dia_16=tip_dia_16,
+            tip_dia_64=_GEAR64_TIP_DIA_LOW,
+        )
+        * CRANK_MESH_BASE_PITCH
+    )
+
+
+# The slice stations every printed row can reach, with room to spare.
+_ROW_STATION_REACH = (-GEAR64_FACE, GEAR64_FACE + CONE_FLOAT_NORTH)
+
+
+def crank_contact_north_z(
+    tip_dia_16: float, pose_shift: float, crank_height: float
+) -> float:
+    """Crank-axis z of the northmost 64T slice still in contact with 16T
+    teeth of tip ``tip_dia_16`` (crank_slice_contact_path): +inf if every
+    reachable slice is, -inf if none is."""
+
+    def path(station: float) -> float:
+        return crank_slice_contact_path(tip_dia_16, station, pose_shift, crank_height)
+
+    low, high = _ROW_STATION_REACH
+    if path(high) > 0.0:
+        return math.inf
+    if path(low) <= 0.0:
+        return -math.inf
+    for _ in range(60):
+        middle = (low + high) / 2.0
+        low, high = (middle, high) if path(middle) > 0.0 else (low, middle)
+    return gear64_contact_z(low) + pose_shift
+
+
+# The band's two least-contact corners: as printed (its lower limit) at the
+# top of the crank-height band, and turned down to its fit-up minimum at the
+# highest crank the fit-up check can turn it at.
+CRANK_BAND_CORNERS = (
+    (max(_CRANK_HEIGHT_BAND), PINION_TURNED_DIA + _PINION_TURNED_DIA_BAND[0]),
+    (T120_BAND_CHECK_CRANK_HEIGHT, PINION_TURNED_DIA_FITUP_MIN),
+)
+
 
 def crank_row_engagement(
-    tooth_length: float, length_band: tuple[float, float], cone_float: float
+    tooth_length: float,
+    length_band: tuple[float, float],
+    cone_float: float,
+    *,
+    band_corners: tuple[tuple[float, float], ...] = CRANK_BAND_CORNERS,
+    pose_axial: float = CRANK_ROW_POSE_AXIAL,
+    count_band: bool = True,
 ) -> float:
     """Worst share of the 64T row (its face along the crank axis) that 16T
-    teeth ``tooth_length`` long (``length_band`` its printed deviations) cover,
-    the cone stack floated north anywhere up to ``cone_float``."""
+    teeth ``tooth_length`` long (``length_band`` its printed deviations) cover
+    AND mesh, the cone stack floated north anywhere up to ``cone_float`` and
+    the row moved either way along the crank axis by ``pose_axial`` (summed
+    arithmetically).  A slice counts on the full-OD shoulder (its printed
+    short limit) while the 16T tip at its printed lower limit keeps contact
+    there, and on the turned band, at each of ``band_corners`` (crank height,
+    band diameter less its runout to the bore), while the band keeps contact
+    (never, without ``count_band``)."""
+    shoulder = PINION_SHOULDER_LENGTH + min(_PINION_SHOULDER_BAND)
+    reach = {
+        (shift, height, band_dia): (
+            crank_contact_north_z(_PINION_TIP_DIA_LOW, shift, height),
+            crank_contact_north_z(band_dia - CRANK_MESH_TOOTH_RUNOUT_TIR, shift, height)
+            if count_band
+            else -math.inf,
+        )
+        for shift in {-pose_axial, pose_axial}
+        for height, band_dia in band_corners
+    }
     worst = math.inf
-    for b1, b2, b3, b4, d_length, play, f in itertools.product(
+    for b1, b2, b3, b4, d_length, play, f, corner in itertools.product(
         _BOSS_NORTH_BAND,
         _CONE_BOSS_NORTH_BAND,
         _COLLAR_WIDTH_BAND,
@@ -2368,37 +2469,30 @@ def crank_row_engagement(
         length_band,
         PINION_END_PLAY,
         (0.0, cone_float),
+        reach,
     ):
+        shift = corner[0]
+        full_od, band = reach[corner]
         south = _POST_BOSS_NORTH + b1 + PINION_SEAT_FEELER + play
         north = south + tooth_length + d_length
-        row_south = gear64_contact_z(-GEAR64_FACE / 2.0 + b2 + b3 + f)
-        row_north = gear64_contact_z(GEAR64_FACE / 2.0 + b2 + b3 + b4 + f)
+        row_south = gear64_contact_z(-GEAR64_FACE / 2.0 + b2 + b3 + f) + shift
+        row_north = gear64_contact_z(GEAR64_FACE / 2.0 + b2 + b3 + b4 + f) + shift
+        top = min(north, row_north, full_od, max(south + shoulder, band))
         worst = min(
             worst,
-            (min(north, row_north) - max(south, row_south)) / (row_north - row_south),
+            max(0.0, top - max(south, row_south)) / (row_north - row_south),
         )
     return worst
 
 
-def crank_row_teeth(turned_dia_fitup_min: float) -> tuple[float, tuple[float, float]]:
-    """The 16T tooth length (and its printed deviations) the 64T row may
-    count: the whole toothed length while the turned band keeps contact
-    (crank_band_contact_paths), else the full-OD shoulder alone."""
-    if min(crank_band_contact_paths(turned_dia_fitup_min).values()) > 0.0:
-        return PINION_FACE, _PINION_FACE_BAND
-    return PINION_SHOULDER_LENGTH, _PINION_SHOULDER_BAND
-
-
-_CRANK_ROW_TEETH = crank_row_teeth(PINION_TURNED_DIA_FITUP_MIN)
 CRANK_ROW_ENGAGEMENT_FRACTION = crank_row_engagement(
-    *_CRANK_ROW_TEETH, CONE_FLOAT_NORTH
+    PINION_FACE, _PINION_FACE_BAND, CONE_FLOAT_NORTH
 )
-CRANK_ROW_ENGAGEMENT_UNFLOATED = crank_row_engagement(*_CRANK_ROW_TEETH, 0.0)
-CRANK_ROW_FULL_DEPTH_FRACTION = min(
-    crank_row_engagement(
-        PINION_SHOULDER_LENGTH, _PINION_SHOULDER_BAND, CONE_FLOAT_NORTH
-    ),
-    CRANK_ROW_ENGAGEMENT_FRACTION,
+CRANK_ROW_ENGAGEMENT_UNFLOATED = crank_row_engagement(
+    PINION_FACE, _PINION_FACE_BAND, 0.0
+)
+CRANK_ROW_FULL_DEPTH_FRACTION = crank_row_engagement(
+    PINION_FACE, _PINION_FACE_BAND, CONE_FLOAT_NORTH, count_band=False
 )
 if CRANK_ROW_ENGAGEMENT_FRACTION < CRANK_ROW_ENGAGEMENT_FLOOR:
     raise AssertionError(
@@ -2617,7 +2711,7 @@ require_lock_seat_fit(BASE_LOCK_SEAT_SPEC, PLAT_T, KNOB_STUD_LEN)
 # every tooth phase.
 _KNOB_GEAR_CLEARANCE = 0.25
 _KNOB_R = KNOB_HEAD_DIA / 2.0
-_GEAR64_TIP_R = R64 + ADD16
+_GEAR64_TIP_R = _GEAR64_TIP_DIA / 2.0
 if (
     math.hypot(KNOB_X - GEAR64_SEAT[0], KNOB_Z - GEAR64_SEAT[2])
     - _KNOB_R
@@ -3002,7 +3096,7 @@ for _j in range(20):
         raise AssertionError(f"pinion drum crowds cone gear {_j}")
 if (
     math.hypot(APINION_X - GEAR64_SEAT[0], Y_DRIVE - APINION_Y)
-    < R64 + ADD16 + TIP_APINION + 0.25
+    < _GEAR64_TIP_R + TIP_APINION + 0.25
 ):
     raise AssertionError("pinion drum crowds the 64T crank-drive gear")
 if STRAP_C2C < TIP_APINION + 3.175 + 0.25:
@@ -4430,12 +4524,12 @@ async def build(adapter) -> dict[str, str]:
         f"offsets and poses {T120_SHOULDER_AIR:.4f} (stated {T120_SHOULDER_AIR_STATED_WORST:.2f}) "
         f"and {T120_TURNED_BAND_RADIAL:.4f} (stated {T120_TURNED_BAND_RADIAL_STATED_WORST:.2f}) mm, "
         f"checked at fit-up on a {PINION_T120_FITUP_FEELER:.2f} feeler; band turned down to "
-        f"{PINION_TURNED_DIA_FITUP_MIN:.2f} keeps contact path "
-        f"{CRANK_BAND_CONTACT_PATHS['fit-up floor']:.4f} mm at crank height "
-        f"{T120_BAND_CHECK_CRANK_HEIGHT:.4f}, printed band {CRANK_BAND_CONTACT_PATHS['printed']:.4f}"
+        f"{PINION_TURNED_DIA_FITUP_MIN:.2f} only at crank height <= "
+        f"{T120_BAND_CHECK_CRANK_HEIGHT:.4f}"
     )
     _telemetry.info(
-        f"16T/64T row engagement (stub teeth counted while in contact) "
+        f"16T/64T row engagement (each 64T slice at its own centre, stub teeth counted "
+        f"while in contact, axis poses +/-{CRANK_ROW_POSE_AXIAL:.4f}) "
         f"{CRANK_ROW_ENGAGEMENT_UNFLOATED:.2%} "
         f"unfloated, {CRANK_ROW_ENGAGEMENT_FRACTION:.2%} with the cone stack floated "
         f"{CONE_FLOAT_NORTH:.2f} >= {CRANK_ROW_ENGAGEMENT_FLOOR:.0%}; full depth only "

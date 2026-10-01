@@ -77,4 +77,4 @@ def test_yawed_backlash_window_honors_the_band(yawed_pose: backlash.Pose) -> Non
     # Full-OD teeth over the whole face close the window at -2.991 deg
     # (2.468 wide); the shipped band clears that north-end tip contact.
     res = backlash.window(yawed_pose, backlash.dta.MESH_WINDOW_CENTRE_DEG)
-    assert res["width_deg"] == pytest.approx(2.4902, abs=0.002)
+    assert res["width_deg"] == pytest.approx(2.4873, abs=0.002)

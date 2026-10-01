@@ -69,9 +69,11 @@ def test_the_outside_diameter_is_a_native_reference_sketch_dimension() -> None:
     assert '_verify_named_dimension(adapter, "OutsideDia@OutsideDiaReference"' in build
     assert "OutsideDiaReference" in spec.DRAWING_DIMENSIONS
     # #906: normal-defined -- the transverse pitch circle plus the CUTTER's
-    # addendum on each side.
+    # addendum on each side, the blank turned 0.05 long over it (R9-56).
+    assert spec.LONG_ADDENDUM_MM == 0.05
     assert spec.OUTSIDE_DIA == pytest.approx(
-        part.TEETH / part.DP * spec.MM_PER_IN + 2.0 * spec.MM_PER_IN / spec.CUTTER_DIAMETRAL_PITCH
+        part.TEETH / part.DP * spec.MM_PER_IN
+        + 2.0 * (spec.MM_PER_IN / spec.CUTTER_DIAMETRAL_PITCH + spec.LONG_ADDENDUM_MM)
     )
     # ... and therefore never as text beside the generating data.
     assert "OUTSIDE DIAMETER" not in notes.GEAR_DATA
@@ -232,7 +234,7 @@ def test_outside_diameter_prints_the_tip_band_the_mesh_stack_takes() -> None:
     assert spec.FACE_WIDTH == 7.2113
     assert spec.FACE_WIDTH_BAND == (0.025, -0.025)
     assert spec.DRAWING_PRECISION["GearBlank"]["FaceWidth"] == 4
-    assert pinion_spec.FACE_WIDTH == 11.4
+    assert pinion_spec.FACE_WIDTH == 11.6
 
 
 def test_print_carries_no_gdt_or_basic_dimensions() -> None:
@@ -384,7 +386,9 @@ def test_gear_data_numbers_track_the_part_geometry() -> None:
     assert spec.CUTTER_DIAMETRAL_PITCH == pinion_spec.DIAMETRAL_PITCH
     assert spec.CUTTER_PRESSURE_ANGLE_DEG == pinion_spec.PRESSURE_ANGLE_DEG
     assert 'depth_dp=CUTTER_DIAMETRAL_PITCH' in _build_source()
-    assert spec.WHOLE_DEPTH == pytest.approx(2.157 * spec.NORMAL_MODULE_MM)
+    assert spec.WHOLE_DEPTH == pytest.approx(
+        2.157 * spec.NORMAL_MODULE_MM + spec.LONG_ADDENDUM_MM
+    )
     assert spec.ROOT_DIA == pytest.approx(spec.PITCH_DIA - 2.0 * 1.157 * spec.NORMAL_MODULE_MM)
     assert spec.TRANSVERSE_CIRCULAR_TOOTH_THICKNESS == pytest.approx(
         math.pi * spec.MODULE_MM / 2.0 - spec.BACKLASH_MM

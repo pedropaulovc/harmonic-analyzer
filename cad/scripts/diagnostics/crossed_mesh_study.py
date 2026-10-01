@@ -49,15 +49,17 @@ import build_drive_train_assembly as dta
 from _gear import gap_area_in_disc_ext  # noqa: F401  (re-exported for callers)
 from involute_gear import PA_DEG, gear_facts
 from build_crank_drive_gear import BACKLASH_MM, HELIX_DEG
+from crank_drive_gear_spec import LONG_ADDENDUM_MM as LONG_ADDENDUM64_MM
 from crank_drive_gear_spec import PRESSURE_ANGLE_DEG as PA64_T  # transverse
 from crank_pinion_spec import SHOULDER_LENGTH as PINION_SHOULDER
 from crank_pinion_spec import TURNED_DIA as PINION_TURNED_DIA
 
 IN = 25.4
 DP_CRANK = dta.DP_CRANK
-# #906: one cutter for the pair -- the 16T's DP, and the 64T's normal DP.
+# #906: one cutter for the pair -- the 16T's DP, and the 64T's normal DP;
+# the 64T blank turned long (R9-56).
 DP_CRANK_CUTTER = dta.DP_CRANK_CUTTER
-ADDENDUM64_EXTRA_IN = 1.0 / DP_CRANK_CUTTER - 1.0 / DP_CRANK
+ADDENDUM64_EXTRA_IN = 1.0 / DP_CRANK_CUTTER - 1.0 / DP_CRANK + LONG_ADDENDUM64_MM / IN
 GEAR64_SEAT = dta.GEAR64_SEAT
 GEAR64_FACE = dta.GEAR64_FACE
 PINION_FACE = dta.PINION_FACE
