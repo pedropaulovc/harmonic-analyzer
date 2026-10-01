@@ -30,12 +30,10 @@ from _drawing_common import (
     add_surface_finish,
     add_view_centerline,
     assert_imported_precision,
-    check_drawing_layout,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    rebuild_drawing,
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_hole_callout_precision,
@@ -306,14 +304,18 @@ async def build(adapter: Any) -> dict[str, str]:
     add_property_linked_note(
         adapter, "Manufacturing Notes", *NOTES_XY, char_height=0.0025
     )
-    rebuild_drawing(adapter, label="knob shaft layout audit")
-    check_drawing_layout(adapter, layout=SPEC.layout, stem=PART_STEM)
     return await finalize_drawing(
         adapter,
         OUTPUTS,
         pdf_title="Transgear Knob Shaft Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        # SolidWorks pins its own "#8-32 Tapped Hole" note to the end view
+        # once the tap carries a hole callout (run 20261001T035353825Z: it
+        # sat across the side view); the callout already states the thread.
+        # finalize removes it before its own layout audit.
+        redundant_note_substrings=("Tapped Hole",),
+        expected_redundant_notes=1,
     )
 
 

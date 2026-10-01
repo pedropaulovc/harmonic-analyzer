@@ -140,11 +140,14 @@ BORE_FIT_ATTACH = (
 )
 # The section's native caption sits below the stacked lengths.
 SECTION_CAPTION = (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.050)
+# The finish stands lower LEFT of the end view: the section line's arrows and
+# their "A" labels point right, toward the section, and a lower-right leader
+# ran through the lower label (run 20261001T035353825Z layout audit).
 FINISH_ATTACH = (
-    FRONT_CENTER[0] + _BORE_SHEET_RADIUS * math.cos(math.radians(-45.0)),
-    FRONT_CENTER[1] + _BORE_SHEET_RADIUS * math.sin(math.radians(-45.0)),
+    FRONT_CENTER[0] + _BORE_SHEET_RADIUS * math.cos(math.radians(-135.0)),
+    FRONT_CENTER[1] + _BORE_SHEET_RADIUS * math.sin(math.radians(-135.0)),
 )
-FINISH_SYMBOL = (FRONT_CENTER[0] + HALF_OD + 0.010, FRONT_CENTER[1] - 0.030)
+FINISH_SYMBOL = (FRONT_CENTER[0] - HALF_OD - 0.010, FRONT_CENTER[1] - 0.030)
 
 
 @_telemetry.traced("drawing.planar_centerline", label_param="label")

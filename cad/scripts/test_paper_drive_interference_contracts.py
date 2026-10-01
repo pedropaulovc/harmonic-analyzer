@@ -150,6 +150,24 @@ def test_knob_stack_rows_follow_the_shaft_cup_collar_and_nut() -> None:
     assert allowed[pair] == pytest.approx(1.10 * tube)
 
 
+def test_head_seat_rows_admit_less_than_a_micron_of_sink() -> None:
+    """The flush-head rows (R9-35) bound numeric slivers of coincident seats;
+    a head sunk 1 um into its seat must still exceed them."""
+    allowed = _allowed()
+    sink = 0.001
+    # The 82-degree countersink cone between the hole and the head rim.
+    half = math.radians(plate.CSK_ANGLE_DEG / 2.0)
+    r0, r1 = plate.SCREW_HOLE_DIA / 2.0, plate.CSK_DIA / 2.0
+    cone_area = math.pi * (r0 + r1) * (r1 - r0) / math.sin(half)
+    for n in (1, 2):
+        pair = _pair(f"transgear-arm-plate-screw-{n}", "transgear-arm-plate-1")
+        assert 0.0 < allowed[pair] < cone_area * sink
+    # The pan head's bearing annulus on the cup's counterbore floor.
+    floor_area = math.pi * (retaining_screw.HEAD_DIA**2 - cup.BORE_DIA**2) / 4.0
+    pair = _pair("transgear-knob-retaining-screw-1", "transgear-knob-cup-1")
+    assert 0.0 < allowed[pair] < floor_area * sink
+
+
 def test_drive_pins_press_into_the_collar_not_the_shaft() -> None:
     """MHA-155's reams moved from the shaft's integral collar to MHA-152; the
     pins press over their length behind the seat face, inside the collar."""

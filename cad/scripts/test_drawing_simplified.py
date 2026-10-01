@@ -672,7 +672,8 @@ def test_the_package_switches_and_explodes_every_view_before_the_bom(monkeypatch
     }.items():
         monkeypatch.setattr(drawing, name, stub)
 
-    drawing._place_package(adapter, _cluster_facts(drawing))
+    steps: list[str] = []
+    drawing._place_package(adapter, _cluster_facts(drawing), steps.append)
 
     fake = adapter.currentModel
     assert fake.dirtied_source == []

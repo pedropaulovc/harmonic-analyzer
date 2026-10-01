@@ -461,6 +461,21 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
     frozenset(
         ("transgear-knob-retaining-screw-1", "transgear-knob-shaft-1")
     ): _smooth_annulus_limit_mm3(4.1656, 3.454, 11.1125 - 2.6),
+    # Seats modelled line to line that the gate read as solid overlap on run
+    # 20261001T035353825Z (assembly:paper_drive, R9-35): each MHA-166 oval
+    # head in its 82-degree countersink (0.00809 mm^3) and the MHA-158 pan
+    # head on the cup's counterbore floor (5.26e-5 mm^3).  Sub-micron slivers
+    # of coincident faces; the observed reading plus ten percent, so a head
+    # sunk even 1 um into its seat (~0.05 / ~0.04 mm^3) still fails.
+    **_numbered_pairs(
+        "transgear-arm-plate-screw",
+        range(1, 3),
+        "transgear-arm-plate",
+        1.10 * 0.00809042475,
+    ),
+    frozenset(("transgear-knob-retaining-screw-1", "transgear-knob-cup-1")): (
+        1.10 * 5.26003719e-05
+    ),
     # MHA-126's 1/4-20 tap drill 5.105 (transgear_thumbnut_spec) on MHA-078's
     # plain Ø6.35 stud at the nominal collar setting: the tip 23.9 in front
     # of F, the nut seated on the T24's front face 6.2 (collar set,

@@ -233,6 +233,7 @@ async def build(adapter: Any) -> dict[str, str]:
         entity_xy=FRONT_THREAD_PICK,
         note_xy=FRONT_THREAD_NOTE_XY,
         label="MHA-082 front thread callout",
+        entity_type="SILHOUETTE",
     )
     add_attached_note(
         adapter,
@@ -241,6 +242,7 @@ async def build(adapter: Any) -> dict[str, str]:
         entity_xy=REAR_THREAD_PICK,
         note_xy=REAR_THREAD_NOTE_XY,
         label="MHA-082 rear thread callout",
+        entity_type="SILHOUETTE",
     )
     add_surface_finish(
         adapter,

@@ -546,6 +546,16 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(
                 ("transgear-knob-retaining-screw-1", "transgear-knob-shaft-1")
             ): _annulus_limit(4.1656, 3.454, 8.5125),
+            # R9-35: flush-head seat slivers, observed + 10 %.
+            frozenset(("transgear-arm-plate-screw-1", "transgear-arm-plate-1")): (
+                1.10 * 0.00809042475
+            ),
+            frozenset(("transgear-arm-plate-screw-2", "transgear-arm-plate-1")): (
+                1.10 * 0.00809042475
+            ),
+            frozenset(("transgear-knob-retaining-screw-1", "transgear-knob-cup-1")): (
+                1.10 * 5.26003719e-05
+            ),
             frozenset(
                 ("transgear-thumbnut-1", "transgear-knob-shaft-1")
             ): _annulus_limit(6.35, 5.105, 14.9),
