@@ -88,7 +88,7 @@ def main() -> None:
                     "hookMm": hook,
                     "hubContactMm": point,
                     "wheelAngleRad": wheel_angle,
-                    "penTravelMm": rim * wheel_angle,
+                    "penTravelMm": -rim * wheel_angle,
                     "wireLengthResidualMm": length
                     + radius * (a - wheel_angle)
                     - (length0 + radius * a0),

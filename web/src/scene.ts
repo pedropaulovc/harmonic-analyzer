@@ -17,7 +17,25 @@ export interface CameraRecord {
 export type InteractionMode = 'following-video' | 'exploring'
 export type Presentation = 'native' | 'horizontal-mirror'
 /** Rendered-image contributions, never native mesh material opacity. */
-export type SourceComposite = { mode: 'opaque' } | { mode: 'crossfade'; groupId: string; opacity: number }
+export type SourceComposite = { mode: 'opaque' } | { mode: 'crossfade'; groupId: string; imageLayerId: string; opacity: number }
+export interface ImagePlaneWarp {
+  kind: 'homography'
+  unwarpedViewportPixels: readonly [number, number]
+  renderToSourcePixels: readonly [number, number, number, number, number, number, number, number, number]
+}
+export interface SourceLayoutEntry {
+  viewId: string
+  rectSourcePixels: readonly [number, number, number, number]
+  presentation: Presentation
+  composite: SourceComposite | null
+  resolvedImagePlaneWarp: ImagePlaneWarp | null
+}
+interface RenderedSourceSupport {
+  resolvedImagePlaneWarp: ImagePlaneWarp | null
+  sourceLayout: SourceLayoutEntry[]
+  nativeViewportBackingPixels: [number, number] | null
+  destinationCellSourcePixels: [number, number]
+}
 export interface SourceView {
   /** Stable view identity; GPU landmark captures are keyed by it. */
   id: string
@@ -26,6 +44,7 @@ export interface SourceView {
   rectSourcePixels: readonly [number, number, number, number]
   presentation?: Presentation
   composite?: SourceComposite
+  imagePlaneWarp?: ImagePlaneWarp
 }
 /**
  * Diagnostic landmark located by exactly one of `partLocalMetres` (native node
@@ -61,11 +80,13 @@ export interface RenderedLandmark {
   canvasPixels: [number, number] | null
   /** 1920 × 1080 source-frame pixels, top-left origin, y down; continuous. */
   sourcePixels: [number, number] | null
+  /** Euclidean source-pixel raster uncertainty, including the warp Jacobian. */
+  uncertaintySourcePixels: number | null
   /** Per-axis raster/resampling quantization bound of canvasPixels, CSS pixels. */
   uncertaintyCanvasPixels: number | null
   reason: string | null
 }
-export interface RenderedLandmarks {
+export interface RenderedLandmarks extends RenderedSourceSupport {
   method: 'gpu-readback'
   visibilityMode: 'depth-off-landmark-projection'
   status: 'captured'
@@ -88,7 +109,7 @@ export interface NativeLineProbe {
   readonly status: 'active' | 'disposed'
   dispose(): void
 }
-export interface RenderedNativeLines {
+export interface RenderedNativeLines extends RenderedSourceSupport {
   method: 'gpu-readback'
   visibilityMode: 'depth-off-native-line-projection'
   status: 'captured' | 'stale' | 'unavailable' | 'disposed'
@@ -119,7 +140,7 @@ export interface PartVisibilityProbe {
   readonly status: 'active' | 'disposed'
   dispose(): void
 }
-export interface RenderedPartVisibility {
+export interface RenderedPartVisibility extends RenderedSourceSupport {
   method: 'gpu-readback'
   visibilityMode: 'depth-tested-native-surfaces'
   status: 'captured' | 'stale' | 'unavailable' | 'disposed'
@@ -335,6 +356,7 @@ interface ViewCapture {
   states: Uint8Array
   /** Per marker: canvas x/y, source x/y, uncertainty. */
   values: Float64Array
+  sourceUncertainties: Float64Array
   reasons: (string | null)[]
   sourceOpacity: number
 }
@@ -372,64 +394,154 @@ interface PartVisibilityCapture {
 const partVisibilityInternals = new WeakMap<PartVisibilityProbe, PartVisibilityInternals>()
 const COMPOSITE_TOLERANCE = 1e-6
 const compositeValidationGroups = new Set<string>()
-let compositeValidationXEdges = new Float64Array(0)
-let compositeValidationYEdges = new Float64Array(0)
+const compositeValidationImages = new Set<string>()
+const supportCache = new WeakMap<object, { valid: boolean; values: Float64Array; polygon: number[]; scratch: number[]; inverse: THREE.Matrix3; quantization: number }>()
+const validationEdges: number[] = []
+const validationCrossings: number[] = []
+const validationCoveredImages = new Set<string>()
 
-/** Pure per-pixel support validation for simultaneously active source views. */
-export function assertSourceCompositeWeights(views: readonly Pick<SourceView, 'rectSourcePixels' | 'composite'>[]): void {
+/** Convex source support, clipped separately from the native camera viewport. */
+function sourceSupport(view: Pick<SourceView, 'rectSourcePixels' | 'imagePlaneWarp'>) {
+  let cache = supportCache.get(view)
+  if (!cache) {
+    cache = { valid: false, values: new Float64Array(15).fill(NaN), polygon: [], scratch: [], inverse: new THREE.Matrix3(), quantization: 0 }
+    supportCache.set(view, cache)
+  }
+  const rect = view.rectSourcePixels, warp = view.imagePlaneWarp
+  if (rect.length !== 4) throw new Error('Source support requires a four-number rectangle.')
+  if (warp && (warp.kind !== 'homography' || warp.unwarpedViewportPixels.length !== 2 || warp.renderToSourcePixels.length !== 9 || warp.unwarpedViewportPixels[0] <= 0 || warp.unwarpedViewportPixels[1] <= 0)) throw new Error('Invalid compiled source warp shape.')
+  let changed = false
+  for (let i = 0; i < 15; i++) {
+    const value = i < 4 ? rect[i]! : i < 6 ? warp?.unwarpedViewportPixels[i - 4] ?? 0 : warp?.renderToSourcePixels[i - 6] ?? 0
+    if (!Number.isFinite(value)) throw new Error('Source support requires finite numbers.')
+    if (cache.values[i] !== value) { cache.values[i] = value; cache.valid = false; changed = true }
+  }
+  if (!changed && cache.valid) return cache
+  cache.valid = false
+  if (rect[2] <= 0 || rect[3] <= 0 || !Number.isFinite(rect[0] + rect[2]) || !Number.isFinite(rect[1] + rect[3])) throw new Error('Source support rectangle must have finite positive dimensions.')
+  const polygon = cache.polygon
+  polygon.length = 0
+  cache.quantization = 0
+  if (warp) {
+    const [w, h] = warp.unwarpedViewportPixels, m = warp.renderToSourcePixels
+    cache.inverse.set(m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7], m[8])
+    if (!Number.isFinite(cache.inverse.determinant()) || cache.inverse.determinant() === 0) throw new Error('Singular source image-plane warp.')
+    cache.inverse.invert()
+    let sign = 0, minimumDenominator = Infinity
+    let numeratorXU = 0, numeratorXV = 0, numeratorYU = 0, numeratorYV = 0
+    for (let corner = 0; corner < 4; corner++) {
+      const u = corner === 1 || corner === 2 ? w : 0, v = corner >= 2 ? h : 0
+      const d = m[6] * u + m[7] * v + m[8]
+      if (d === 0 || (sign !== 0 && Math.sign(d) !== sign)) throw new Error('Source warp crosses a projective horizon.')
+      sign = Math.sign(d)
+      minimumDenominator = Math.min(minimumDenominator, Math.abs(d))
+      const x = m[0] * u + m[1] * v + m[2], y = m[3] * u + m[4] * v + m[5]
+      polygon.push(x / d, y / d)
+      numeratorXU = Math.max(numeratorXU, Math.abs(m[0] * d - m[6] * x))
+      numeratorXV = Math.max(numeratorXV, Math.abs(m[1] * d - m[7] * x))
+      numeratorYU = Math.max(numeratorYU, Math.abs(m[3] * d - m[6] * y))
+      numeratorYV = Math.max(numeratorYV, Math.abs(m[4] * d - m[7] * y))
+    }
+    // Derivative numerators are affine; extrema and denominator minimum occur
+    // at corners. This bounds every native half-pixel cell over the whole image.
+    cache.quantization = Math.hypot(numeratorXU * w / Math.ceil(w) + numeratorXV * h / Math.ceil(h), numeratorYU * w / Math.ceil(w) + numeratorYV * h / Math.ceil(h)) / (2 * minimumDenominator ** 2)
+    if (!polygon.every(Number.isFinite) || !Number.isFinite(cache.quantization)) throw new Error('Nonfinite transformed source support.')
+  } else polygon.push(rect[0], rect[1], rect[0] + rect[2], rect[1], rect[0] + rect[2], rect[1] + rect[3], rect[0], rect[1] + rect[3])
+  for (let edge = 0; edge < 4; edge++) {
+    const axis = edge % 2, lower = edge < 2
+    const bound = lower ? Math.max(0, rect[axis]!) : Math.min(axis === 0 ? SOURCE_WIDTH : SOURCE_HEIGHT, rect[axis]! + rect[axis + 2]!)
+    const scratch = cache.scratch
+    scratch.length = 0
+    for (let a = 0; a < polygon.length; a += 2) {
+      const b = (a + 2) % polygon.length
+      const da = (polygon[a + axis]! - bound) * (lower ? 1 : -1), db = (polygon[b + axis]! - bound) * (lower ? 1 : -1)
+      if (da >= 0) scratch.push(polygon[a]!, polygon[a + 1]!)
+      if ((da < 0) !== (db < 0)) {
+        const t = da / (da - db)
+        scratch.push(polygon[a]! + t * (polygon[b]! - polygon[a]!), polygon[a + 1]! + t * (polygon[b + 1]! - polygon[a + 1]!))
+      }
+    }
+    polygon.length = 0
+    for (const coordinate of scratch) polygon.push(coordinate)
+  }
+  cache.valid = true
+  return cache
+}
+
+/** Exact positive-area arrangement slabs; one weight per image support union. */
+export function assertSourceCompositeWeights(views: readonly Pick<SourceView, 'rectSourcePixels' | 'composite' | 'imagePlaneWarp'>[]): void {
   compositeValidationGroups.clear()
+  for (const view of views) sourceSupport(view)
   for (let i = 0; i < views.length;) {
     const composite = views[i]!.composite
     if (!composite || composite.mode === 'opaque') { i++; continue }
     if (typeof composite.groupId !== 'string' || !composite.groupId || compositeValidationGroups.has(composite.groupId)) throw new Error('Crossfade groups must have a nonempty ID and contiguous views.')
     compositeValidationGroups.add(composite.groupId)
+    compositeValidationImages.clear()
     const start = i
-    do {
-      const view = views[i]!
-      const member = view.composite
-      if (!member || member.mode !== 'crossfade' || member.groupId !== composite.groupId) break
+    let previousImage = '', previousOpacity = -1
+    while (i < views.length) {
+      const member = views[i]!.composite
+      if (member?.mode !== 'crossfade' || member.groupId !== composite.groupId) break
       if (!Number.isFinite(member.opacity) || member.opacity < 0 || member.opacity > 1) throw new Error('Crossfade source opacity must be finite and in [0,1].')
-      const rect = view.rectSourcePixels
-      for (let axis = 0; axis < 4; axis++) if (typeof rect[axis] !== 'number' || !Number.isFinite(rect[axis])) throw new Error('Crossfade source rectangle must contain finite numbers.')
-      if (rect[2] <= 0 || rect[3] <= 0 || !Number.isFinite(rect[0] + rect[2]) || !Number.isFinite(rect[1] + rect[3])) throw new Error('Crossfade source rectangle must have finite positive dimensions.')
+      if (typeof member.imageLayerId !== 'string' || !member.imageLayerId) throw new Error('Crossfade requires an explicit imageLayerId.')
+      if (previousImage !== member.imageLayerId) {
+        if (compositeValidationImages.has(member.imageLayerId)) throw new Error('Crossfade images must have contiguous views.')
+        compositeValidationImages.add(member.imageLayerId)
+        previousImage = member.imageLayerId
+        previousOpacity = member.opacity
+      } else if (previousOpacity !== member.opacity) throw new Error('Views of one image must have identical opacity.')
       i++
-    } while (i < views.length)
-    const capacity = (i - start) * 2
-    if (compositeValidationXEdges.length < capacity) {
-      compositeValidationXEdges = new Float64Array(capacity)
-      compositeValidationYEdges = new Float64Array(capacity)
     }
-    compositeValidationXEdges.fill(Infinity)
-    compositeValidationYEdges.fill(Infinity)
-    let edgeCount = 0
-    for (let member = start; member < i; member++) {
-      const rect = views[member]!.rectSourcePixels
-      const left = Math.max(0, rect[0]), right = Math.min(SOURCE_WIDTH, rect[0] + rect[2])
-      const top = Math.max(0, rect[1]), bottom = Math.min(SOURCE_HEIGHT, rect[1] + rect[3])
-      if (left >= right || top >= bottom) continue
-      compositeValidationXEdges[edgeCount] = left; compositeValidationXEdges[edgeCount + 1] = right
-      compositeValidationYEdges[edgeCount] = top; compositeValidationYEdges[edgeCount + 1] = bottom
-      edgeCount += 2
-    }
-    compositeValidationXEdges.sort()
-    compositeValidationYEdges.sort()
-    for (let x = 0; x < edgeCount - 1; x++) {
-      const left = compositeValidationXEdges[x]!, right = compositeValidationXEdges[x + 1]!
-      if (left === right) continue
-      const centreX = left + (right - left) / 2
-      for (let y = 0; y < edgeCount - 1; y++) {
-        const top = compositeValidationYEdges[y]!, bottom = compositeValidationYEdges[y + 1]!
-        if (top === bottom) continue
-        const centreY = top + (bottom - top) / 2
-        let sum = 0
-        for (let member = start; member < i; member++) {
-          const view = views[member]!
-          const weight = view.composite
-          const rect = view.rectSourcePixels
-          if (weight?.mode === 'crossfade' && rect[0] <= centreX && centreX < rect[0] + rect[2]
-            && rect[1] <= centreY && centreY < rect[1] + rect[3]) sum += weight.opacity
+    validationEdges.length = 0
+    for (let a = start; a < i; a++) {
+      const p = sourceSupport(views[a]!).polygon
+      for (let e = 0; e < p.length; e += 2) {
+        validationEdges.push(p[e]!)
+        const en = (e + 2) % p.length
+        const ax = p[e]!, ay = p[e + 1]!, dx = p[en]! - ax, dy = p[en + 1]! - ay
+        for (let b = a + 1; b < i; b++) {
+          const q = sourceSupport(views[b]!).polygon
+          for (let f = 0; f < q.length; f += 2) {
+            const fn = (f + 2) % q.length, ex = q[fn]! - q[f]!, ey = q[fn + 1]! - q[f + 1]!
+            const determinant = dx * ey - dy * ex
+            if (determinant === 0) continue
+            const rx = q[f]! - ax, ry = q[f + 1]! - ay
+            const t = (rx * ey - ry * ex) / determinant, s = (rx * dy - ry * dx) / determinant
+            if (t > 0 && t < 1 && s > 0 && s < 1) validationEdges.push(ax + t * dx)
+          }
         }
-        if (sum > 1 + COMPOSITE_TOLERANCE) throw new Error(`Crossfade group ${composite.groupId} source opacities sum to more than one in ROI cell [${left},${top},${right},${bottom}]: ${sum}.`)
+      }
+    }
+    validationEdges.sort((a, b) => a - b)
+    for (let slab = 1; slab < validationEdges.length; slab++) {
+      if (validationEdges[slab] === validationEdges[slab - 1]) continue
+      const x = (validationEdges[slab]! + validationEdges[slab - 1]!) / 2
+      validationCrossings.length = 0
+      for (let a = start; a < i; a++) {
+        const p = sourceSupport(views[a]!).polygon
+        for (let e = 0; e < p.length; e += 2) {
+          const n = (e + 2) % p.length
+          if ((p[e]! <= x && x < p[n]!) || (p[n]! <= x && x < p[e]!))
+            validationCrossings.push(p[e + 1]! + (x - p[e]!) * (p[n + 1]! - p[e + 1]!) / (p[n]! - p[e]!))
+        }
+      }
+      validationCrossings.sort((a, b) => a - b)
+      for (let row = 1; row < validationCrossings.length; row++) {
+        if (validationCrossings[row] === validationCrossings[row - 1]) continue
+        const y = (validationCrossings[row]! + validationCrossings[row - 1]!) / 2
+        validationCoveredImages.clear()
+        let sum = 0
+        for (let a = start; a < i; a++) {
+          const member = views[a]!.composite
+          if (member?.mode !== 'crossfade' || validationCoveredImages.has(member.imageLayerId)) continue
+          const p = sourceSupport(views[a]!).polygon
+          let inside = false
+          for (let e = 0, previous = p.length - 2; e < p.length; previous = e, e += 2)
+            if ((p[e + 1]! > y) !== (p[previous + 1]! > y) && x < (p[previous]! - p[e]!) * (y - p[e + 1]!) / (p[previous + 1]! - p[e + 1]!) + p[e]!) inside = !inside
+          if (inside) { validationCoveredImages.add(member.imageLayerId); sum += member.opacity }
+        }
+        if (sum > 1 + COMPOSITE_TOLERANCE) throw new Error(`Crossfade group ${composite.groupId} image support weights exceed one: ${sum}.`)
       }
     }
   }
@@ -496,6 +608,34 @@ export function createViewer(canvas: HTMLCanvasElement, onControlsChange: () => 
   // This screen-space blit is presentation only, never replacement machine geometry.
   const quadGeometry = new THREE.PlaneGeometry(2, 2)
   mirrorScene.add(new THREE.Mesh(quadGeometry, mirrorMaterial))
+  const warpScene = new THREE.Scene()
+  const warpInverse = new THREE.Matrix3()
+  const warpGrid = new THREE.Vector2()
+  const warpRect = new THREE.Vector4()
+  const sourceFromBacking = new THREE.Vector4()
+  const warpMaterial = new THREE.ShaderMaterial({
+    uniforms: { image: { value: mirrorTarget.texture }, inverseH: { value: warpInverse }, grid: { value: warpGrid },
+      sourceFromBacking: { value: sourceFromBacking }, rect: { value: warpRect }, warped: { value: false }, mask: { value: false } },
+    vertexShader: mirrorMaterial.vertexShader,
+    fragmentShader: `uniform sampler2D image; uniform mat3 inverseH; uniform vec2 grid;
+uniform vec4 sourceFromBacking; uniform vec4 rect; uniform bool warped; uniform bool mask;
+void main() {
+  vec2 source = gl_FragCoord.xy * sourceFromBacking.xy + sourceFromBacking.zw;
+  if (any(lessThan(source, rect.xy)) || any(greaterThanEqual(source, rect.xy + rect.zw))) discard;
+  vec3 local = inverseH * vec3(source, 1.0);
+  vec2 p = warped ? local.xy / local.z : source - rect.xy;
+  vec2 dimensions = warped ? grid : rect.zw;
+  if (any(lessThan(p, vec2(0.0))) || any(greaterThanEqual(p, dimensions))) discard;
+  if (mask) { gl_FragColor = vec4(0.0); return; }
+  gl_FragColor = texture2D(image, vec2(p.x / dimensions.x, 1.0 - p.y / dimensions.y));
+  #include <colorspace_fragment>
+}`,
+    depthTest: false, depthWrite: false, blending: THREE.NoBlending, toneMapped: false,
+  })
+  warpScene.add(new THREE.Mesh(quadGeometry, warpMaterial))
+  let activeView: SourceView | null = null
+  let activeViewIndex = -1
+  let diagnosticDraw = false
   const compositeScene = new THREE.Scene()
   const compositeImageRect = new THREE.Vector4()
   const compositeBackground = new THREE.Color()
@@ -512,7 +652,7 @@ void main() {
   vec3 colour = layer.rgb;
   if (stage < 0.5) {
     colour = mix(12.92 * colour, 1.055 * pow(max(colour, vec3(0.0)), vec3(1.0 / 2.4)) - 0.055, step(vec3(0.0031308), colour));
-    gl_FragColor = vec4(colour * weight, weight);
+    gl_FragColor = vec4(colour * weight * layer.a, weight * layer.a);
   } else {
     if (layer.a <= 0.0) discard;
     gl_FragColor = vec4(colour + background * max(0.0, 1.0 - layer.a), 1.0);
@@ -551,7 +691,7 @@ void main() {
   const lineCaptures = new Map<string, NativeLineCapture>()
   const linePassIndices = new Int32Array(SLOTS_PER_PASS)
   const linePassOrdinals = new Uint32Array(SLOTS_PER_PASS)
-  const viewSnapshots = new Map<string, { epoch: number; view: SourceView; groupId: string | null; presentation: Presentation; values: Float64Array }>()
+  const viewSnapshots = new Map<string, { epoch: number; view: SourceView; groupId: string | null; imageLayerId: string | null; id: string; warpKind: string | null; presentation: Presentation; values: Float64Array }>()
   const frameCameraPosition = new THREE.Vector3()
   const frameCameraQuaternion = new THREE.Quaternion()
   const frameCameraProjection = new THREE.Matrix4()
@@ -712,12 +852,78 @@ void main() {
     renderer.setScissor(viewScissorPixels.x / ratio, viewScissorPixels.y / ratio, viewScissorPixels.z / ratio, viewScissorPixels.w / ratio)
   }
 
+  function configureSupport(view: SourceView, mask: boolean) {
+    const warp = view.imagePlaneWarp, rect = view.rectSourcePixels
+    warpInverse.copy(sourceSupport(view).inverse)
+    warpGrid.set(warp?.unwarpedViewportPixels[0] ?? rect[2], warp?.unwarpedViewportPixels[1] ?? rect[3])
+    warpRect.fromArray(rect)
+    const sx = SOURCE_WIDTH / gate.width * canvas.clientWidth / gl.drawingBufferWidth
+    const sy = SOURCE_HEIGHT / gate.height * canvas.clientHeight / gl.drawingBufferHeight
+    sourceFromBacking.set(sx, -sy, -gate.x * SOURCE_WIDTH / gate.width, (canvas.clientHeight - gate.y) * SOURCE_HEIGHT / gate.height)
+    warpMaterial.uniforms.warped!.value = !!warp
+    warpMaterial.uniforms.mask!.value = mask
+  }
+
+  function maskHigherViews(output: THREE.WebGLRenderTarget, rect: readonly [number, number, number, number]) {
+    const composite = activeView?.composite
+    if (!renderedViews || composite?.mode !== 'crossfade') return
+    for (let i = activeViewIndex + 1; i < renderedViews.length; i++) {
+      const view = renderedViews[i]!, member = view.composite
+      if (member?.mode !== 'crossfade' || member.groupId !== composite.groupId || member.imageLayerId !== composite.imageLayerId) break
+      configureSupport(view, true)
+      renderer.setRenderTarget(output)
+      renderer.setScissorTest(true)
+      viewport(view.rectSourcePixels[0], view.rectSourcePixels[1], view.rectSourcePixels[2], view.rectSourcePixels[3])
+      renderer.render(warpScene, mirrorCamera)
+    }
+    viewport(rect[0], rect[1], rect[2], rect[3])
+  }
+
+  function warpQuantization() {
+    return activeView?.imagePlaneWarp ? sourceSupport(activeView).quantization : 0
+  }
+
+  function capturedSupport(viewId: string): RenderedSourceSupport {
+    const snapshot = viewSnapshots.get(viewId)
+    const view = snapshot?.epoch === drawEpoch ? snapshot.view : undefined
+    const warp = view?.imagePlaneWarp
+    // Public readbacks own copies: callers cannot mutate retained capture state.
+    const copyWarp = (value: ImagePlaneWarp | undefined): ImagePlaneWarp | null => value ? { kind: 'homography', unwarpedViewportPixels: [...value.unwarpedViewportPixels], renderToSourcePixels: [...value.renderToSourcePixels] } : null
+    return {
+      resolvedImagePlaneWarp: copyWarp(warp),
+      nativeViewportBackingPixels: warp ? [Math.ceil(warp.unwarpedViewportPixels[0]), Math.ceil(warp.unwarpedViewportPixels[1])] : null,
+      destinationCellSourcePixels: [SOURCE_WIDTH / gate.width * canvas.clientWidth / gl.drawingBufferWidth, SOURCE_HEIGHT / gate.height * canvas.clientHeight / gl.drawingBufferHeight],
+      sourceLayout: capturedViewOrder.map(member => ({ viewId: member.id, rectSourcePixels: [...member.rectSourcePixels], presentation: member.presentation ?? 'native', composite: member.composite ? { ...member.composite } : null, resolvedImagePlaneWarp: copyWarp(member.imagePlaneWarp) })),
+    }
+  }
+
   /**
    * One view's draw into `output` (null = canvas). The landmark probe calls
    * this same function, so its markers take the identical viewport/scissor
    * calls, mirror stage and blit as the native image.
    */
   function drawView(rect: readonly [number, number, number, number], presentation: Presentation, output: THREE.WebGLRenderTarget | null, mirrorStage: THREE.WebGLRenderTarget, clearOutput: boolean) {
+    const warp = activeView?.imagePlaneWarp
+    if (warp) {
+      const width = Math.ceil(warp.unwarpedViewportPixels[0]), height = Math.ceil(warp.unwarpedViewportPixels[1])
+      if (mirrorStage.width !== width || mirrorStage.height !== height) mirrorStage.setSize(width, height)
+      renderer.setRenderTarget(mirrorStage)
+      renderer.setScissorTest(false)
+      renderer.clear(true, true, true)
+      renderer.render(scene, camera)
+      renderer.setRenderTarget(output)
+      renderer.setScissorTest(true)
+      viewport(rect[0], rect[1], rect[2], rect[3])
+      // Native colour preserves previous layers outside the quad. Diagnostic
+      // targets clear the ROI first so old pass bits cannot survive.
+      if (diagnosticDraw) renderer.clear(true, true, false)
+      else renderer.clear(false, true, false)
+      configureSupport(activeView!, false)
+      warpMaterial.uniforms.image!.value = mirrorStage.texture
+      renderer.render(warpScene, mirrorCamera)
+      if (diagnosticDraw && output) maskHigherViews(output, rect)
+      return
+    }
     if (presentation === 'horizontal-mirror') {
       // The mirror stage uses its own full viewport with scissor disabled;
       // renderer.setViewport would wrongly scale it by the canvas pixel ratio.
@@ -737,6 +943,7 @@ void main() {
       if (clearOutput) renderer.clear(true, true, false)
       renderer.render(scene, camera)
     }
+    if (diagnosticDraw && output) maskHigherViews(output, rect)
   }
 
   function ensureCompositeTargets() {
@@ -763,13 +970,17 @@ void main() {
     if (!probe && !visibilityProbe && !lineProbe) return
     let snapshot = viewSnapshots.get(view.id)
     if (!snapshot) {
-      snapshot = { epoch: -1, view, groupId: null, presentation: 'native', values: new Float64Array(15) }
+      snapshot = { epoch: -1, view, groupId: null, imageLayerId: null, id: view.id, warpKind: null, presentation: 'native', values: new Float64Array(27) }
       viewSnapshots.set(view.id, snapshot)
     }
     snapshot.epoch = drawEpoch
     snapshot.view = view
     snapshot.groupId = view.composite?.mode === 'crossfade' ? view.composite.groupId : null
     snapshot.presentation = view.presentation ?? 'native'
+    snapshot.id = view.id
+    snapshot.imageLayerId = view.composite?.mode === 'crossfade' ? view.composite.imageLayerId : null
+    snapshot.warpKind = view.imagePlaneWarp?.kind ?? null
+    for (let i = 0; i < 11; i++) snapshot.values[i + 15] = i < 2 ? view.imagePlaneWarp?.unwarpedViewportPixels[i] ?? NaN : view.imagePlaneWarp?.renderToSourcePixels[i - 2] ?? NaN
     const values = snapshot.values
     for (let i = 0; i < 3; i++) values[i] = view.camera.positionMetres[i]!
     for (let i = 0; i < 4; i++) values[i + 3] = view.camera.quaternion[i]!
@@ -778,6 +989,7 @@ void main() {
     values[9] = view.camera.principalPointViewportPixels?.[1] ?? NaN
     for (let i = 0; i < 4; i++) values[i + 10] = view.rectSourcePixels[i]!
     values[14] = view.composite?.mode === 'crossfade' ? view.composite.opacity : 1
+    values[26] = view.composite ? view.composite.mode === 'opaque' ? 1 : 2 : 0
   }
 
   function capturesFresh() {
@@ -791,7 +1003,11 @@ void main() {
       if (snapshot.epoch !== drawEpoch) continue
       const view = snapshot.view
       const values = snapshot.values
+      if (view.rectSourcePixels.length !== 4 || (view.imagePlaneWarp && (view.imagePlaneWarp.unwarpedViewportPixels.length !== 2 || view.imagePlaneWarp.renderToSourcePixels.length !== 9))) return false
+      if (values[26] !== (view.composite ? view.composite.mode === 'opaque' ? 1 : 2 : 0)) return false
       if (snapshot.groupId !== (view.composite?.mode === 'crossfade' ? view.composite.groupId : null) || snapshot.presentation !== (view.presentation ?? 'native')) return false
+      if (snapshot.id !== view.id || snapshot.imageLayerId !== (view.composite?.mode === 'crossfade' ? view.composite.imageLayerId : null) || snapshot.warpKind !== (view.imagePlaneWarp?.kind ?? null)) return false
+      for (let i = 0; i < 11; i++) if (!Object.is(values[i + 15], i < 2 ? view.imagePlaneWarp?.unwarpedViewportPixels[i] ?? NaN : view.imagePlaneWarp?.renderToSourcePixels[i - 2] ?? NaN)) return false
       for (let i = 0; i < 3; i++) if (values[i] !== view.camera.positionMetres[i]) return false
       for (let i = 0; i < 4; i++) if (values[i + 3] !== view.camera.quaternion[i]) return false
       if (values[7] !== view.camera.verticalFovDegrees || !Object.is(values[8], view.camera.principalPointViewportPixels?.[0] ?? NaN)
@@ -820,14 +1036,18 @@ void main() {
     if (mode === 'exploring') controls.update()
     drawEpoch++
     renderedViews = null
+    activeView = null
+    activeViewIndex = -1
     capturedViewOrder.length = 0
     beginFrame()
     camera.aspect = SOURCE_WIDTH / SOURCE_HEIGHT
     camera.updateProjectionMatrix()
     drawView(FULL_FRAME, 'native', null, mirrorTarget, false)
+    diagnosticDraw = true
     captureView(EXPLORING_VIEW_ID, FULL_FRAME, 'native', null, 1)
     capturePartVisibility(EXPLORING_VIEW_ID, FULL_FRAME, 'native', null, 1)
     captureNativeLines(EXPLORING_VIEW_ID, FULL_FRAME, 'native', null, 1)
+    diagnosticDraw = false
     finishCaptures()
     renderer.setScissorTest(false)
   }
@@ -835,6 +1055,11 @@ void main() {
   function renderViews(views: readonly SourceView[], beforeView: ((view: SourceView, index: number) => void) | undefined, timeSeconds: number) {
     if (disposed) throw new Error('Viewer is disposed.')
     assertSourceCompositeWeights(views)
+    for (let i = 0; i < views.length; i++) {
+      const view = views[i]!, grid = view.imagePlaneWarp?.unwarpedViewportPixels
+      if (grid && (Math.ceil(grid[0]) > renderer.capabilities.maxTextureSize || Math.ceil(grid[1]) > renderer.capabilities.maxTextureSize)) throw new Error('Native warp viewport exceeds GPU texture capacity.')
+      for (let j = 0; j < i; j++) if (views[j]!.id === view.id) throw new Error('Simultaneous source view IDs must be unique.')
+    }
     drawEpoch++
     renderedViews = views
     capturedViewOrder.length = probe || visibilityProbe || lineProbe ? views.length : 0
@@ -853,6 +1078,8 @@ void main() {
         renderer.setClearColor(savedClearColor, alpha)
       }
       do {
+        activeView = views[i]!
+        activeViewIndex = i
         const view = views[i]!
         const member = view.composite
         if (group !== null && (member?.mode !== 'crossfade' || member.groupId !== group)) break
@@ -860,12 +1087,24 @@ void main() {
         const rect = view.rectSourcePixels
         const presentation = view.presentation ?? 'native'
         beforeView?.(view, i)
-        writeCamera(camera, view.camera, rect[2], rect[3])
+        const grid = view.imagePlaneWarp?.unwarpedViewportPixels
+        writeCamera(camera, view.camera, grid?.[0] ?? rect[2], grid?.[1] ?? rect[3])
         snapshotView(view)
         if (probe || visibilityProbe || lineProbe) capturedViewOrder[i] = view
+        const previous = i > 0 ? views[i - 1]!.composite : undefined
+        if (group !== null && member?.mode === 'crossfade' && (previous?.mode !== 'crossfade' || previous.groupId !== group || previous.imageLayerId !== member.imageLayerId)) {
+          renderer.getClearColor(savedClearColor)
+          const alpha = renderer.getClearAlpha()
+          renderer.setRenderTarget(compositeImageTarget)
+          renderer.setScissorTest(false)
+          renderer.setClearColor(0x000000, 0)
+          renderer.clear(true, true, false)
+          renderer.setClearColor(savedClearColor, alpha)
+        }
         if (opacity > 0) {
           drawView(rect, presentation, group === null ? null : compositeImageTarget, mirrorTarget, true)
-          if (group !== null) {
+          const next = views[i + 1]?.composite
+          if (group !== null && member?.mode === 'crossfade' && (next?.mode !== 'crossfade' || next.groupId !== group || next.imageLayerId !== member.imageLayerId)) {
             compositeMaterial.uniforms.stage!.value = 0
             compositeMaterial.uniforms.weight!.value = opacity
             compositeMaterial.blending = THREE.CustomBlending
@@ -875,14 +1114,15 @@ void main() {
             compositeMaterial.blendEquationAlpha = THREE.AddEquation
             compositeMaterial.blendSrcAlpha = THREE.OneFactor
             compositeMaterial.blendDstAlpha = THREE.OneFactor
-            compositeBlit(rect, compositeSumTarget, compositeImageTarget!)
+            compositeBlit(FULL_FRAME, compositeSumTarget, compositeImageTarget!)
           }
         }
-        // Per-view witnesses use the same native pose/camera, before a later
-        // inset or group replaces the canvas; source correspondence is separate.
+        // Higher subviews of this same image mask every diagnostic raster too.
+        diagnosticDraw = true
         captureView(view.id, rect, presentation, timeSeconds, opacity)
         capturePartVisibility(view.id, rect, presentation, timeSeconds, opacity)
         captureNativeLines(view.id, rect, presentation, timeSeconds, opacity)
+        diagnosticDraw = false
         i++
         if (group === null) break
       } while (i < views.length)
@@ -961,7 +1201,7 @@ void main() {
     const markers = internals.markers
     let capture = captures.get(viewId)
     if (!capture) {
-      capture = { epoch: -1, presentation, timeSeconds, sourceOpacity, states: new Uint8Array(markers.length), values: new Float64Array(markers.length * 5), reasons: new Array<string | null>(markers.length).fill(null) }
+      capture = { epoch: -1, presentation, timeSeconds, sourceOpacity, states: new Uint8Array(markers.length), values: new Float64Array(markers.length * 5), sourceUncertainties: new Float64Array(markers.length), reasons: new Array<string | null>(markers.length).fill(null) }
       captures.set(viewId, capture)
     }
     capture.epoch = drawEpoch
@@ -1016,7 +1256,7 @@ void main() {
       }
       const cssX = canvas.clientWidth / gl.drawingBufferWidth
       const cssY = canvas.clientHeight / gl.drawingBufferHeight
-      const mirror = presentation === 'horizontal-mirror'
+      const mirror = presentation === 'horizontal-mirror' && !activeView?.imagePlaneWarp
       const ratioX = mirror ? mirrorStage.width / probeViewport.z : 1
       const ratioY = mirror ? mirrorStage.height / probeViewport.w : 1
       // Nearest-sampled through the real blit, a marker must span at least one
@@ -1059,9 +1299,10 @@ void main() {
           capture.reasons[i] = null
           capture.values[v] = px * cssX
           capture.values[v + 1] = (gl.drawingBufferHeight - py) * cssY
-          capture.values[v + 2] = rect[0] + rect[2] * (REFERENCE_SOURCE_LOW + REFERENCE_SOURCE_SPAN * (px - ax) / (bx - ax))
-          capture.values[v + 3] = rect[1] + rect[3] * (REFERENCE_SOURCE_LOW + REFERENCE_SOURCE_SPAN * (py - ay) / (by - ay))
-          capture.values[v + 4] = Math.max(uncertaintyX * cssX, uncertaintyY * cssY)
+          capture.values[v + 2] = activeView?.imagePlaneWarp ? (px * cssX - gate.x) * SOURCE_WIDTH / gate.width : rect[0] + rect[2] * (REFERENCE_SOURCE_LOW + REFERENCE_SOURCE_SPAN * (px - ax) / (bx - ax))
+          capture.values[v + 3] = activeView?.imagePlaneWarp ? ((gl.drawingBufferHeight - py) * cssY - gate.y) * SOURCE_HEIGHT / gate.height : rect[1] + rect[3] * (REFERENCE_SOURCE_LOW + REFERENCE_SOURCE_SPAN * (py - ay) / (by - ay))
+          capture.sourceUncertainties[i] = Math.hypot(uncertaintyX * cssX * SOURCE_WIDTH / gate.width, uncertaintyY * cssY * SOURCE_HEIGHT / gate.height) + warpQuantization()
+          capture.values[v + 4] = Math.max(uncertaintyX * cssX, uncertaintyY * cssY) + warpQuantization() * Math.max(gate.width / SOURCE_WIDTH, gate.height / SOURCE_HEIGHT)
         }
       }
     } finally {
@@ -1103,6 +1344,7 @@ void main() {
     if (!internals || !capture || capture.epoch !== drawEpoch || internals.revision.value !== renderedProbeRevision || disposed || !capturesFresh()) return null
     return {
       method: 'gpu-readback', visibilityMode: 'depth-off-landmark-projection', status: 'captured', sourceOpacity: capture.sourceOpacity,
+      ...capturedSupport(viewId),
       viewId, presentation: capture.presentation, timeSeconds: capture.timeSeconds,
       landmarks: internals.markers.map((marker, i) => {
         const rendered = capture.states[i] === 0
@@ -1113,6 +1355,7 @@ void main() {
           canvasPixels: rendered ? [capture.values[v]!, capture.values[v + 1]!] : null,
           sourcePixels: rendered ? [capture.values[v + 2]!, capture.values[v + 3]!] : null,
           uncertaintyCanvasPixels: rendered ? capture.values[v + 4]! : null,
+          uncertaintySourcePixels: rendered ? capture.sourceUncertainties[i]! : null,
           reason: capture.reasons[i]!,
         }
       }),
@@ -1150,8 +1393,8 @@ void main() {
     camera.position.toArray(capture.cameraValues, 0)
     camera.quaternion.toArray(capture.cameraValues, 3)
     capture.cameraValues[7] = camera.fov
-    capture.cameraValues[8] = rect[2] / 2 - (camera.view?.enabled ? camera.view.offsetX : 0)
-    capture.cameraValues[9] = rect[3] / 2 - (camera.view?.enabled ? camera.view.offsetY : 0)
+    capture.cameraValues[8] = (activeView?.imagePlaneWarp?.unwarpedViewportPixels[0] ?? rect[2]) / 2 - (camera.view?.enabled ? camera.view.offsetX : 0)
+    capture.cameraValues[9] = (activeView?.imagePlaneWarp?.unwarpedViewportPixels[1] ?? rect[3]) / 2 - (camera.view?.enabled ? camera.view.offsetY : 0)
     for (let i = 0; i < entries.length; i++) {
       const o = i * 5
       capture.values[o] = 0
@@ -1193,8 +1436,8 @@ void main() {
       contourFlags.fill(0, 0, pixelCount)
       const sourcePerPixelX = SOURCE_WIDTH / gate.width * canvas.clientWidth / target.width
       const sourcePerPixelY = SOURCE_HEIGHT / gate.height * canvas.clientHeight / target.height
-      capture.uncertaintySourcePixels = Math.hypot(sourcePerPixelX, sourcePerPixelY) / 2
-      if (presentation === 'horizontal-mirror') capture.uncertaintySourcePixels += Math.hypot(rect[2] / stage.width, rect[3] / stage.height) / 2
+      capture.uncertaintySourcePixels = Math.hypot(sourcePerPixelX, sourcePerPixelY) / 2 + warpQuantization()
+      if (presentation === 'horizontal-mirror' && !activeView?.imagePlaneWarp) capture.uncertaintySourcePixels += Math.hypot(rect[2] / stage.width, rect[3] / stage.height) / 2
       for (let i = 0; i < width * height; i++) {
         const pixel = i * 4
         const id = visibilityPixels[pixel]! + visibilityPixels[pixel + 1]! * 256 + visibilityPixels[pixel + 2]! * 65536
@@ -1276,7 +1519,7 @@ void main() {
     const capture = visibilityCaptures.get(viewId)
     const status: RenderedPartVisibility['status'] = disposed || visibilityProbe?.status === 'disposed' ? 'disposed' : !internals ? 'unavailable'
       : !capture || capture.epoch !== drawEpoch || capture.inventoryRevision !== internals.inventoryRevision.value || renderedVisibilityRevision !== internals.revision.value || !capturesFresh() ? 'stale' : 'captured'
-    if (status !== 'captured' || !internals || !capture) return { method: 'gpu-readback', visibilityMode: 'depth-tested-native-surfaces', status, viewId, presentation: null, timeSeconds: null, rectSourcePixels: null, camera: null, sourceOpacity: null, parts: [] }
+    if (status !== 'captured' || !internals || !capture) return { method: 'gpu-readback', visibilityMode: 'depth-tested-native-surfaces', status, viewId, presentation: null, timeSeconds: null, rectSourcePixels: null, camera: null, sourceOpacity: null, resolvedImagePlaneWarp: null, sourceLayout: [], nativeViewportBackingPixels: null, destinationCellSourcePixels: [0, 0], parts: [] }
     const cssX = canvas.clientWidth / gl.drawingBufferWidth
     const cssY = canvas.clientHeight / gl.drawingBufferHeight
     const rect = capture.rect
@@ -1284,6 +1527,7 @@ void main() {
     const top = gate.y + rect[1] / SOURCE_HEIGHT * gate.height
     return {
       method: 'gpu-readback', visibilityMode: 'depth-tested-native-surfaces', status,
+      ...capturedSupport(viewId),
       viewId, presentation: capture.presentation, timeSeconds: capture.timeSeconds,
       rectSourcePixels: [...rect], sourceOpacity: capture.sourceOpacity,
       camera: {
@@ -1331,8 +1575,8 @@ void main() {
     // A finite one-pixel diagnostic line must not vanish in a large mirror
     // downsample. Rasterize its mirror stage at the destination's actual size;
     // the same camera, clipping, viewport and real mirror blit are retained.
-    const mirrorWidth = Math.max(1, probeViewport.z)
-    const mirrorHeight = Math.max(1, probeViewport.w)
+    const mirrorWidth = Math.max(1, Math.ceil(activeView?.imagePlaneWarp?.unwarpedViewportPixels[0] ?? probeViewport.z))
+    const mirrorHeight = Math.max(1, Math.ceil(activeView?.imagePlaneWarp?.unwarpedViewportPixels[1] ?? probeViewport.w))
     if (!lineMirrorTarget) lineMirrorTarget = new THREE.WebGLRenderTarget(mirrorWidth, mirrorHeight, probeTargetOptions)
     else if (lineMirrorTarget.width !== mirrorWidth || lineMirrorTarget.height !== mirrorHeight) lineMirrorTarget.setSize(mirrorWidth, mirrorHeight)
   }
@@ -1375,7 +1619,8 @@ void main() {
     const scaleY = SOURCE_HEIGHT / gate.height * cssY
     const sourceOriginX = -gate.x * SOURCE_WIDTH / gate.width
     const sourceOriginY = -gate.y * SOURCE_HEIGHT / gate.height
-    const uncertainty = Math.hypot(scaleX, scaleY) / 2
+    const uncertainty = Math.hypot(scaleX, scaleY) / 2 + warpQuantization()
+      + (presentation === 'horizontal-mirror' && !activeView?.imagePlaneWarp ? Math.hypot(rect[2] / stage.width, rect[3] / stage.height) / 2 : 0)
     const background = scene.background
     const layers = camera.layers.mask
     renderer.getClearColor(savedClearColor)
@@ -1478,9 +1723,10 @@ void main() {
     const capture = lineCaptures.get(viewId)
     const status: RenderedNativeLines['status'] = disposed || lineProbe?.status === 'disposed' ? 'disposed' : !internals ? 'unavailable'
       : !capture || capture.epoch !== drawEpoch || renderedLineRevision !== internals.revision.value || !capturesFresh() ? 'stale' : 'captured'
-    if (status !== 'captured' || !internals || !capture) return { method: 'gpu-readback', visibilityMode: 'depth-off-native-line-projection', status, viewId, presentation: null, timeSeconds: null, rectSourcePixels: null, sourceOpacity: null, lines: [] }
+    if (status !== 'captured' || !internals || !capture) return { method: 'gpu-readback', visibilityMode: 'depth-off-native-line-projection', status, viewId, presentation: null, timeSeconds: null, rectSourcePixels: null, sourceOpacity: null, resolvedImagePlaneWarp: null, sourceLayout: [], nativeViewportBackingPixels: null, destinationCellSourcePixels: [0, 0], lines: [] }
     return {
       method: 'gpu-readback', visibilityMode: 'depth-off-native-line-projection', status, viewId,
+      ...capturedSupport(viewId),
       presentation: capture.presentation, timeSeconds: capture.timeSeconds, rectSourcePixels: [...capture.rect], sourceOpacity: capture.sourceOpacity,
       lines: internals.markers.map((marker, i): RenderedNativeLines['lines'][number] => {
         const o = i * 11
@@ -1518,6 +1764,7 @@ void main() {
     releaseProbeTargets()
     referenceGeometry.dispose(); referenceMaterial.dispose()
     mirrorTarget.dispose(); mirrorMaterial.dispose(); quadGeometry.dispose()
+    warpMaterial.dispose()
     compositeImageTarget?.dispose(); compositeSumTarget?.dispose(); compositeMaterial.dispose()
     renderer.dispose()
   }

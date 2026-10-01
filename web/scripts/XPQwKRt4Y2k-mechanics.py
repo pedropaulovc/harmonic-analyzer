@@ -236,7 +236,7 @@ console.log(JSON.stringify({{data:MECHANISM_DATA,pose,gauge}},(k,v)=>k==='_work'
         azimuth = math.atan2(dy, dx) - math.acos(hub_radius/math.sqrt(d2))
         length = math.sqrt(d2-hub_radius*hub_radius+(hook[2]-contact_z)**2)
         wheel_angle = azimuth-rest_azimuth+(length-rest_length)/hub_radius
-        pen_travel = rim_radius*wheel_angle
+        pen_travel = -rim_radius*wheel_angle
         pen = np.array([-.01035,.36325+pen_travel,-.14365])
         return {'magnifier.clamp': clamp, 'magnifier.fixture': fixture, 'pen.nib': pen,
                 'wheelAngleRad': wheel_angle, 'penTravelM': pen_travel, 'hookM': hook}

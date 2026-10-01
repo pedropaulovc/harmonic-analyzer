@@ -4,7 +4,7 @@ import { MAGNIFIER_RATIO_MIN, MAGNIFIER_RATIO_MAX, physicalChannelAngle, squareW
 import { VIDEOS, resolveVideo, type Video } from './video-catalog'
 import { createVideoPlayer, type PlaybackState, type VideoPlayer } from './youtube-player'
 import { loadReference, serializeInput, type PlaybackView, type ReferenceState, type VideoReference } from './timeline'
-import { INPUT_FIELDS, evaluateConstraints, type InputField, type SourceNonIdentifiableFixedPart } from './source-witness'
+import { INPUT_FIELDS, equalRecord, evaluateConstraints, type InputField, type SourceNonIdentifiableFixedPart } from './source-witness'
 
 function element<T extends HTMLElement>(selector: string): T {
   const found = document.querySelector<T>(selector)
@@ -82,6 +82,9 @@ interface MechanismDraw {
   unobservedInputFields: readonly InputField[]
   nativeGeometryAssumptions: PlaybackView['nativeGeometryAssumptions']
   sourceNonIdentifiableFixedParts: PlaybackView['sourceNonIdentifiableFixedParts']
+  imagePlaneWarp: PlaybackView['authoredImagePlaneWarp']
+  resolvedImagePlaneWarp: NonNullable<PlaybackView['imagePlaneWarp']> | null
+  sourceLayout: PlaybackView['sourceLayout']
   channelAnglesRad: Float64Array
   platenTravelM: number
   penTravelM: number
@@ -179,6 +182,31 @@ function validateSourceViews(views: readonly PlaybackView[], sourceOverrides: re
   if (machine.missing.length) throw new Error(`Source reconstruction has unresolved native joints: ${machine.missing.join(', ')}.`)
   assertSourceCompositeWeights(views)
   for (const view of views) {
+    if (!Object.hasOwn(view, 'authoredImagePlaneWarp') || !Object.hasOwn(view, 'sourceLayout')
+      || view.authoredImagePlaneWarp === undefined || !Array.isArray(view.sourceLayout)
+      || view.sourceLayout.length !== views.length
+      || (view.authoredImagePlaneWarp !== null) !== (view.imagePlaneWarp !== undefined)) throw new Error(`Source view ${view.id} lacks explicit image-plane/layout metadata.`)
+    for (let index = 0; index < views.length; index++) {
+      const actual = views[index]!
+      const entry = view.sourceLayout[index]!
+      if (!entry || Object.keys(entry).length !== 5 || entry.viewId !== actual.id
+        || !equalRecord(entry.rectSourcePixels, actual.rectSourcePixels)
+        || entry.presentation !== actual.presentation || !equalRecord(entry.composite, actual.composite)
+        || !Object.hasOwn(entry, 'resolvedImagePlaneWarp')
+        || !equalRecord(entry.resolvedImagePlaneWarp, actual.imagePlaneWarp ?? null)) throw new Error(`Source view ${view.id} has stale or incomplete ordered source support.`)
+    }
+    for (let endpoint = 0; endpoint < 2; endpoint++) {
+      const proof = endpoint === 0 ? view.visibilityProof : view.visibilityProofEnd
+      if (!proof) continue
+      const binding = proof.binding
+      if (!Object.hasOwn(binding, 'imagePlaneWarp') || !Object.hasOwn(binding, 'resolvedImagePlaneWarp')
+        || !Object.hasOwn(binding, 'sourceLayout')
+        || !equalRecord(binding.imagePlaneWarp, view.authoredImagePlaneWarp)
+        || !equalRecord(binding.resolvedImagePlaneWarp, view.imagePlaneWarp ?? null)
+        || !equalRecord(binding.sourceLayout, view.sourceLayout)) throw new Error(`Source view ${view.id} visibility proof does not bind its actual image-plane support.`)
+    }
+  }
+  for (const view of views) {
     for (const override of view.partOverrides) if (!machine.partPaths.includes(override.partPath)) throw new Error(`Source override names unknown native part ${override.partPath}.`)
     machine.assertNativeLinesWithinRestBounds(view.nativeLineChecks)
     machine.assertNativeStructuralFixedParts(view.sourceNonIdentifiableFixedParts.map((part) => part.nativePartPath), sourceOverrides)
@@ -231,6 +259,7 @@ function applyView(view: PlaybackView): void {
   if (!draw) {
     draw = { status: 'solved-for-draw', viewId: view.id, timeSeconds: sourceDrawTimeSeconds, sourceDrawRevision,
       input: createMechanismInput(), mechanicalProvenance: view.mechanicalProvenance, unobservedInputFields: view.unobservedInputFields, nativeGeometryAssumptions: view.nativeGeometryAssumptions, sourceNonIdentifiableFixedParts: view.sourceNonIdentifiableFixedParts,
+      imagePlaneWarp: view.authoredImagePlaneWarp, resolvedImagePlaneWarp: view.imagePlaneWarp ?? null, sourceLayout: view.sourceLayout,
       channelAnglesRad: new Float64Array(20), platenTravelM: 0, penTravelM: 0, effectiveBankDriveTurns: 0 }
     mechanismDraws.set(view.id, draw)
   }
@@ -242,6 +271,9 @@ function applyView(view: PlaybackView): void {
   draw.unobservedInputFields = view.unobservedInputFields
   draw.nativeGeometryAssumptions = view.nativeGeometryAssumptions
   draw.sourceNonIdentifiableFixedParts = view.sourceNonIdentifiableFixedParts
+  draw.imagePlaneWarp = view.authoredImagePlaneWarp
+  draw.resolvedImagePlaneWarp = view.imagePlaneWarp ?? null
+  draw.sourceLayout = view.sourceLayout
   draw.channelAnglesRad.set(machine.pose.channelAnglesRad)
   draw.platenTravelM = machine.pose.platenTravelM
   draw.penTravelM = machine.pose.magnifier.penTravelM
@@ -277,7 +309,7 @@ function drawSourceViews(views: readonly PlaybackView[], timeSeconds: number): v
 
 function renderedMechanism(viewId: string) {
   const draw = mechanismDraws.get(viewId)
-  if (!draw) return { status: 'unavailable' as const, viewId }
+  if (!draw) return { status: 'unavailable' as const, viewId, imagePlaneWarp: null, resolvedImagePlaneWarp: null, sourceLayout: [] }
   return {
     status: mode === 'exploring' || referenceState === 'unavailable' || draw.timeSeconds !== modelTime ? 'stale' as const : draw.status,
     viewId, timeSeconds: draw.timeSeconds, sourceDrawRevision: draw.sourceDrawRevision,
@@ -285,12 +317,31 @@ function renderedMechanism(viewId: string) {
     mechanicalProvenance: draw.mechanicalProvenance, unobservedInputFields: draw.unobservedInputFields,
     nativeGeometryAssumptions: draw.nativeGeometryAssumptions,
     sourceNonIdentifiableFixedParts: draw.sourceNonIdentifiableFixedParts,
+    imagePlaneWarp: draw.imagePlaneWarp, resolvedImagePlaneWarp: draw.resolvedImagePlaneWarp, sourceLayout: draw.sourceLayout,
     channelAnglesRad: Array.from(draw.channelAnglesRad), platenTravelM: draw.platenTravelM, penTravelM: draw.penTravelM, effectiveBankDriveTurns: draw.effectiveBankDriveTurns,
   }
 }
 
+function sourceCapture<T extends {
+  status: string
+  viewId: string
+  timeSeconds: number | null
+  resolvedImagePlaneWarp: NonNullable<PlaybackView['imagePlaneWarp']> | null
+  sourceLayout: PlaybackView['sourceLayout']
+}>(capture: T) {
+  const draw = mechanismDraws.get(capture.viewId)
+  const bound = draw?.status === 'rendered' && draw.timeSeconds === capture.timeSeconds
+    && equalRecord(draw.resolvedImagePlaneWarp, capture.resolvedImagePlaneWarp)
+    && equalRecord(draw.sourceLayout, capture.sourceLayout)
+  return {
+    ...capture,
+    status: capture.status === 'captured' && (!bound || mode === 'exploring' || referenceState === 'unavailable' || capture.timeSeconds !== modelTime) ? 'stale' as const : capture.status,
+    imagePlaneWarp: bound ? draw.imagePlaneWarp : null,
+  }
+}
+
 function nativeLines(viewId: string) {
-  const capture = viewer.readRenderedNativeLines(viewId)
+  const capture = sourceCapture(viewer.readRenderedNativeLines(viewId))
   const view = activeViews.find((candidate) => candidate.id === viewId)
   if (!view || mode === 'exploring') return { ...capture, status: capture.status === 'captured' ? 'stale' as const : capture.status, lines: [] }
   if (capture.status !== 'captured') return capture
@@ -315,8 +366,9 @@ function renderSource(timeSeconds: number): void {
     renderPending()
     return
   }
-  const sample = reference.at(timeSeconds)
-  if (sample.state !== 'unavailable') validateSourceViews(sample.views, reference.sourcePartOverrides)
+  const prepared = reference.prepareAt(timeSeconds)
+  if (prepared.state !== 'unavailable') validateSourceViews(prepared.views, reference.sourcePartOverrides)
+  const sample = reference.commitPrepared()
   referenceState = sample.state
   activeViews = sample.views
   if (sample.state === 'unavailable') {
@@ -690,10 +742,14 @@ window.addEventListener('popstate', selectRoute)
 if (new URLSearchParams(location.search).get('verify') === '1') {
   const bridge = {
     snapshot() {
+      const chosen = mode === 'exploring' ? undefined : primaryView()
       return {
         videoId: video?.id ?? null, playerVideoId: player?.getVideoId() ?? null, mode, playerState: player?.getState() ?? playbackState,
         videoTime: player?.getTime() ?? null, modelTime, referenceState, modelState, missingBindings: machine?.missing ?? [],
         modelProvenance: machine?.provenance ?? null, camera: cameraRecord(), input: serializeInput(input),
+        imagePlaneWarp: chosen ? chosen.authoredImagePlaneWarp : null,
+        resolvedImagePlaneWarp: chosen?.imagePlaneWarp ?? null,
+        sourceLayout: chosen?.sourceLayout ?? [],
         mechanicalProvenance: mode === 'exploring' ? null : primaryView()?.mechanicalProvenance ?? null,
         unobservedInputFields: mode === 'exploring' ? INPUT_FIELDS : primaryView()?.unobservedInputFields ?? INPUT_FIELDS,
         constraintSummary: mode === 'exploring' ? [] : primaryView()?.constraintSummary ?? [],
@@ -702,7 +758,7 @@ if (new URLSearchParams(location.search).get('verify') === '1') {
         sourceNonIdentifiableFixedParts: mode === 'exploring' ? explorationSourceNonIdentifiableFixedParts : activeViews.flatMap((view) => view.sourceNonIdentifiableFixedParts),
         physics: machine && physicsState === 'available' ? { renderedViewId: mode === 'exploring' ? 'exploring' : activeViews[activeViews.length - 1]?.id ?? null, mechanicalProvenance: mode === 'exploring' ? null : activeViews[activeViews.length - 1]?.mechanicalProvenance ?? null, springForcesN: Array.from(machine.pose.springForcesN), springLengthsM: Array.from(machine.pose.springLengthsM), equilibriumResidualNm: machine.pose.equilibriumResidualNm, platenTravelM: machine.pose.platenTravelM, summingAngleRad: machine.pose.summingAngleRad } : null,
         playerAudio: player?.getAudio() ?? null,
-        views: activeViews.map((view) => ({ id: view.id, rectSourcePixels: view.rectSourcePixels, presentation: view.presentation, composite: view.composite, compositeEvidence: view.compositeEvidence, camera: view.camera, input: serializeInput(view.input), mechanicalProvenance: view.mechanicalProvenance, unobservedInputFields: view.unobservedInputFields, constraintSummary: view.constraintSummary, visibilityProof: view.visibilityProof, visibilityProofEnd: view.visibilityProofEnd, sourceSampling: view.sourceSampling, continuity: view.continuity, partOverrides: view.partOverrides, nativeGeometryAssumptions: view.nativeGeometryAssumptions, sourceNonIdentifiableFixedParts: view.sourceNonIdentifiableFixedParts, nativeLineChecks: view.nativeLineChecks, sourceContourChecks: view.sourceContourChecks, renderedMechanism: renderedMechanism(view.id) })),
+        views: activeViews.map((view) => ({ id: view.id, rectSourcePixels: view.rectSourcePixels, presentation: view.presentation, composite: view.composite, compositeEvidence: view.compositeEvidence, imagePlaneWarp: view.authoredImagePlaneWarp, resolvedImagePlaneWarp: view.imagePlaneWarp ?? null, sourceLayout: view.sourceLayout, camera: view.camera, input: serializeInput(view.input), mechanicalProvenance: view.mechanicalProvenance, unobservedInputFields: view.unobservedInputFields, constraintSummary: view.constraintSummary, visibilityProof: view.visibilityProof, visibilityProofEnd: view.visibilityProofEnd, sourceSampling: view.sourceSampling, continuity: view.continuity, partOverrides: view.partOverrides, nativeGeometryAssumptions: view.nativeGeometryAssumptions, sourceNonIdentifiableFixedParts: view.sourceNonIdentifiableFixedParts, nativeLineChecks: view.nativeLineChecks, sourceContourChecks: view.sourceContourChecks, renderedMechanism: renderedMechanism(view.id) })),
       }
     },
     referenceData() { return reference?.data ?? null },
@@ -722,8 +778,8 @@ if (new URLSearchParams(location.search).get('verify') === '1') {
         verticalFovDegrees: sourceCamera.verticalFovDegrees,
       }
       const previousOverrides = previousView?.partOverrides
+      validateSourceViews(reference.prepareAt(timeSeconds).views, reference.sourcePartOverrides)
       copyInput(input, reviewRollbackInput)
-      validateSourceViews(reference.at(timeSeconds).views, reference.sourcePartOverrides)
       try {
         mode = 'reference-review'
         referenceSeek = 'seeking'
@@ -766,8 +822,11 @@ if (new URLSearchParams(location.search).get('verify') === '1') {
       explore()
       return this.snapshot()
     },
-    renderedLandmarks(viewId: string) { return viewer.readRenderedLandmarks(viewId) },
-    renderedPartVisibility(viewId: string) { return viewer.readRenderedPartVisibility(viewId) },
+    renderedLandmarks(viewId: string) {
+      const capture = viewer.readRenderedLandmarks(viewId)
+      return capture ? sourceCapture(capture) : null
+    },
+    renderedPartVisibility(viewId: string) { return sourceCapture(viewer.readRenderedPartVisibility(viewId)) },
     renderedMechanism,
     nativeLines,
     assertNativeLinesWithinRestBounds(anchors: readonly NativeLineAnchor[]): void {

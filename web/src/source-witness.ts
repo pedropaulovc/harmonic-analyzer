@@ -1,6 +1,6 @@
 import { createMechanismPose, solveMechanism, type MechanismInput, type MechanismPose } from './mechanics'
 import { physicalChannelAngle } from './kinematics'
-import type { CameraRecord, PartOverride, SourceComposite } from './scene'
+import type { CameraRecord, ImagePlaneWarp, PartOverride, SourceComposite, SourceLayoutEntry } from './scene'
 
 export const ROD_HEAD_FUNCTIONAL_EQUIVALENCE = {
   id: 'rod-head-functional-equivalence',
@@ -52,6 +52,33 @@ export type SourceConstraint = (
 export type SourceImageIdentity = {
   frameIndex: number; width: number; height: number; sourceSha256: string
 } & ({ pixelFormat: 'bgr8'; sha256Bgr8: string; sha256Gray8?: never } | { pixelFormat: 'gray8'; sha256Gray8: string; sha256Bgr8?: never })
+export interface SourceImagePlaneWarp {
+  kind: 'homography'
+  unwarpedViewportPixels: [number, number]
+  cornersSourcePixels: [[number, number], [number, number], [number, number], [number, number]]
+  sourceImage: SourceImageIdentity
+  referenceSourceImage: SourceImageIdentity
+  cornerMeasurementEvidence: {
+    sourceImage: SourceImageIdentity
+    referenceSourceImage: SourceImageIdentity
+    evidence: string
+    [key: string]: unknown
+  }
+  correspondences: Array<{
+    id: string
+    role: 'fit' | 'check'
+    referencePixelSource: [number, number]
+    pixelSource: [number, number]
+    method: 'manual' | 'optical-flow' | 'image-edge' | 'template-match'
+    uncertaintyPx: number
+    measurementEvidence: {
+      sourceImage: SourceImageIdentity
+      referenceSourceImage: SourceImageIdentity
+      evidence: string
+      [key: string]: unknown
+    }
+  }>
+}
 export type SourceCoverage =
   | { kind: 'landmarks'; landmarkIds: string[] }
   | { kind: 'native-line-checks'; lineCheckIds: string[] }
@@ -100,6 +127,9 @@ export interface WitnessBinding {
   rectSourcePixels: [number, number, number, number]
   presentation: 'native' | 'horizontal-mirror'
   composite: SourceComposite
+  imagePlaneWarp: SourceImagePlaneWarp | null
+  resolvedImagePlaneWarp: ImagePlaneWarp | null
+  sourceLayout: readonly SourceLayoutEntry[]
   partOverrides: readonly PartOverride[]
   constraints: readonly SourceConstraint[]
   continuity: RuntimeWitness['continuity'] | null
@@ -257,9 +287,63 @@ export function equalRecord(a: unknown, b: unknown): boolean {
   const bKeys = Object.keys(b)
   return aKeys.length === bKeys.length && aKeys.every((key) => Object.hasOwn(b, key) && equalRecord((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key]))
 }
+function validateResolvedImagePlaneWarp(warp: ImagePlaneWarp | null, label: string): void {
+  if (warp === null) return
+  keys(warp, ['kind', 'unwarpedViewportPixels', 'renderToSourcePixels'], label)
+  if (warp.kind !== 'homography') throw new Error(`${label}: unknown image-plane warp kind.`)
+  if (!Array.isArray(warp.unwarpedViewportPixels) || warp.unwarpedViewportPixels.length !== 2) throw new Error(`${label}: two unwarped viewport dimensions are required.`)
+  for (const value of warp.unwarpedViewportPixels) {
+    if (finite(value, label) <= 0) throw new Error(`${label}: positive finite unwarped viewport dimensions are required.`)
+  }
+  if (!Array.isArray(warp.renderToSourcePixels) || warp.renderToSourcePixels.length !== 9) throw new Error(`${label}: a nine-coefficient derived homography is required.`)
+  for (const value of warp.renderToSourcePixels) finite(value, label)
+}
+function validateSourceLayout(expected: Omit<WitnessBinding, 'intervalSeconds'>, label: string): void {
+  validateResolvedImagePlaneWarp(expected.resolvedImagePlaneWarp, `${label}.resolvedImagePlaneWarp`)
+  if ((expected.imagePlaneWarp === null) !== (expected.resolvedImagePlaneWarp === null)) throw new Error(`${label}: authored and resolved image-plane warp must both be explicit null or both be present.`)
+  if (expected.imagePlaneWarp !== null) {
+    keys(expected.imagePlaneWarp, ['kind', 'unwarpedViewportPixels', 'cornersSourcePixels', 'sourceImage', 'referenceSourceImage', 'cornerMeasurementEvidence', 'correspondences'], `${label}.imagePlaneWarp`)
+    if (expected.imagePlaneWarp.kind !== 'homography'
+      || !equalRecord(expected.imagePlaneWarp.unwarpedViewportPixels, expected.resolvedImagePlaneWarp!.unwarpedViewportPixels)
+      || !equalRecord(expected.imagePlaneWarp.sourceImage, expected.sourceImage)) throw new Error(`${label}: authored warp must bind its resolved viewport and actual source image.`)
+  }
+  if (!Array.isArray(expected.sourceLayout) || !expected.sourceLayout.length) throw new Error(`${label}: complete ordered source layout is required.`)
+  const viewIds = new Set<string>()
+  for (const entry of expected.sourceLayout) {
+    keys(entry, ['viewId', 'rectSourcePixels', 'presentation', 'composite', 'resolvedImagePlaneWarp'], `${label}.sourceLayout`)
+    evidence(entry.viewId, `${label}.sourceLayout.viewId`)
+    if (viewIds.has(entry.viewId)) throw new Error(`${label}: duplicate source layout view.`)
+    viewIds.add(entry.viewId)
+    if (!Array.isArray(entry.rectSourcePixels) || entry.rectSourcePixels.length !== 4) throw new Error(`${label}: source layout rectangle needs four coordinates.`)
+    for (const value of entry.rectSourcePixels) finite(value, label)
+    const [x, y, width, height] = entry.rectSourcePixels
+    if (x < 0 || y < 0 || width <= 0 || height <= 0
+      || x + width > expected.sourceImage.width || y + height > expected.sourceImage.height) throw new Error(`${label}: source layout rectangle exceeds the actual source image.`)
+    if (entry.presentation !== 'native' && entry.presentation !== 'horizontal-mirror') throw new Error(`${label}: unknown source layout presentation.`)
+    if (entry.composite !== null) {
+      const composite = entry.composite
+      if (composite.mode === 'opaque') keys(composite, ['mode'], `${label}.sourceLayout.composite`)
+      else if (composite.mode === 'crossfade') {
+        keys(composite, ['mode', 'groupId', 'imageLayerId', 'opacity'], `${label}.sourceLayout.composite`)
+        evidence(composite.groupId, label)
+        evidence(composite.imageLayerId, label)
+        const opacity = finite(composite.opacity, label)
+        if (opacity < 0 || opacity > 1) throw new Error(`${label}: source layout opacity must be between zero and one.`)
+      } else throw new Error(`${label}: unknown source layout composite mode.`)
+    }
+    validateResolvedImagePlaneWarp(entry.resolvedImagePlaneWarp, `${label}.sourceLayout.resolvedImagePlaneWarp`)
+    if (entry.viewId === expected.viewId
+      && (!equalRecord(entry.rectSourcePixels, expected.rectSourcePixels)
+        || entry.presentation !== expected.presentation
+        || !equalRecord(entry.composite, expected.composite)
+        || !equalRecord(entry.resolvedImagePlaneWarp, expected.resolvedImagePlaneWarp))) throw new Error(`${label}: own source layout entry does not match the visibility binding.`)
+  }
+  if (!viewIds.has(expected.viewId)) throw new Error(`${label}: source layout omits the bound view.`)
+}
 export function validateVisibilityProof(proof: VisibilityProof, expected: Omit<WitnessBinding, 'intervalSeconds'>, anchors: readonly { id: string; partPath?: string }[], label: string): void {
   keys(proof, ['binding', 'sourceVisibleParts', 'excludedParts', 'unresolvedParts', 'sourceNonIdentifiableFixedParts', 'evidence'], label)
   evidence(proof.evidence, label)
+  keys(expected, ['sourceVideoId', 'sourceSha256', 'sourceImage', 'modelSha256', 'modelSourceCommit', 'shotId', 'viewId', 'timeSeconds', 'decodedTimeSeconds', 'input', 'camera', 'rectSourcePixels', 'presentation', 'composite', 'imagePlaneWarp', 'resolvedImagePlaneWarp', 'sourceLayout', 'partOverrides', 'constraints', 'continuity', 'nativeGeometryAssumptions', 'sourceNonIdentifiableFixedParts'], `${label}.expected`)
   keys(proof.binding, [...Object.keys(expected), 'intervalSeconds'], `${label}.binding`)
   for (const key of Object.keys(expected) as (keyof typeof expected)[]) {
     if (!equalRecord(proof.binding[key], expected[key])) throw new Error(`${label}: visibility proof does not bind ${key}.`)
@@ -271,6 +355,7 @@ export function validateVisibilityProof(proof: VisibilityProof, expected: Omit<W
   const digest = image[digestKey as keyof SourceImageIdentity]
   if (typeof digest !== 'string' || !/^[a-f0-9]{64}$/.test(digest) || image.sourceSha256 !== expected.sourceSha256
     || image.width !== 1920 || image.height !== 1080 || !Number.isInteger(image.frameIndex) || image.frameIndex < 0) throw new Error(`${label}: invalid decoded source image identity.`)
+  validateSourceLayout(expected, label)
   const bounds = proof.binding.intervalSeconds
   if (!Array.isArray(bounds) || bounds.length !== 2) throw new Error(`${label}: missing visibility interval.`)
   interval(bounds[0], bounds[1], label)

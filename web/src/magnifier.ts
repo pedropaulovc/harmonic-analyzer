@@ -8,8 +8,8 @@ import { MECHANISM_DATA } from './mechanics-data'
  * The surviving twenty-channel machine adds the coaxial pulley: Synthesis
  * https://www.youtube.com/watch?v=8KmVDxkia_w&t=243 and Operation
  * https://www.youtube.com/watch?v=jfH-NbsmvD4&t=330 show the separate hub and
- * rim wires. Operation 350–359 s demonstrates that raising the fixture raises
- * the pen. The 100/20 mm diameters are the nominal thin-wire fivefold gain.
+ * rim wires. The 100/20 mm diameters give the nominal unsigned thin-wire gain;
+ * source-video handedness must be checked against the released routing below.
  *
  * Geometry is the released CAD's lever_wire_geom.py, pen_wire_geom.py and
  * magnifying_wheel_geom.py at MECHANISM_DATA.provenance.sourceCommit. Its
@@ -27,9 +27,10 @@ import { MECHANISM_DATA } from './mechanics-data'
  * quasistatic installed/guided-wrap branch, not a simulation of slack, slip,
  * unravelling, axial wrap migration, elastic wire or contact-force dynamics.
  *
- * Both wires wind in the same circumferential sense, leaving opposite sides
- * of the wheel: positive global +Z spin pays out the hub run and takes up the
- * hanging rim run. Therefore penTravel = rimPitchRadius * wheelAngle.
+ * On the released minus tangent, hub -> hook points along the wheel's +Z
+ * circumferential velocity. The left-rim hanging run also leaves along that
+ * velocity (global -Y). Positive global +Z spin therefore pays out both runs:
+ * the pen descends, so penTravel = -rimPitchRadius * wheelAngle.
  * Changing clamp position does NOT secretly reset the wire's installed length.
  */
 
@@ -131,7 +132,7 @@ export function solveMagnifier(input: MagnifierInput, pose: MagnifierPose): void
   const azimuth = bearing - Math.acos(HUB_RADIUS / d)
   const length = Math.sqrt(d2 - HUB_RADIUS * HUB_RADIUS + (hz - CONTACT_Z) ** 2)
   const wheelAngle = azimuth - REST_AZIMUTH + (length - REST_LENGTH) / HUB_RADIUS
-  const penTravel = RIM_RADIUS * wheelAngle
+  const penTravel = -RIM_RADIUS * wheelAngle
   const penWireY = REST_PEN_WIRE_Y + penTravel
   if (penWireY >= CY) {
     throw new RangeError('Pen wire has exhausted its hanging run; reset the physical output fixture before using this clamp setting')

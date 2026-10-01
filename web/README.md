@@ -78,8 +78,10 @@ export HARMONIC_REFERENCE_ROOT=/path/to/private-reference-root
 npm --prefix web run build && npm --prefix web run verify:sync
 ```
 
-`HARMONIC_REFERENCE_ROOT` defaults to `/tmp/harmonic-web-reference`. The root
-must contain the six original MP4 files for the routes above under `videos/`.
+`HARMONIC_REFERENCE_ROOT` defaults to `/tmp/harmonic-web-reference`; that location
+does not survive a host reboot. Prefer durable ignored storage such as
+`web/.vite/reference-root` and set the variable explicitly. The root must contain
+the six original MP4 files for the routes above under `videos/`.
 The verifier serves `dist/`, launches headed Chromium, exercises the real YouTube
 media, and checks every integer second and recorded change. It fails on
 unavailable prerequisites, missing source evidence, landmark errors above 38.4
@@ -88,9 +90,16 @@ and depth-tested part-visibility readback. Mathematical camera fitting alone
 does not count as rendered-pixel evidence.
 
 Finite-line and contour checks compare independently measured source pixels with
-actual native GPU rasters. Fixed-part coverage uses every rendered ID pixel's
-extent. Disjoint panels share an opacity budget only where their source regions
-overlap; nested montage composition is not yet implemented.
+actual native GPU rasters. Their final bounds include source and native
+uncertainty; raw error below the limit alone is insufficient. Fixed-part coverage
+uses every rendered ID pixel's extent.
+
+Measured image-plane warps retain a qualified reference camera and native
+geometry, with independently identified corners and interior checks. A decoded
+exposure is held only inside its explicit certificate; transforms are not invented
+between measurements. Nested montage subviews compose into a named image before
+fading once, with matching colour/diagnostic masks and spatial opacity checks.
+This presentation support does not qualify the incomplete source corpus.
 
 Reports and local screenshots go to `web/.vite/verification-output/` and are
 ignored. `HARMONIC_CHROME` selects the Chromium executable; `HARMONIC_HEADLESS=1`
