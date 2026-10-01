@@ -725,7 +725,7 @@ _STACK_A = chain_shoulder_axial_air(
     seat_face_band=SEAT_COLLAR_BAND,
 )
 CHAIN_BARREL_AXIAL_AIR = _STACK_A["seated"]  # 1.0635
-CHAIN_BARREL_AXIAL_AIR_WORST = _STACK_A["seated_worst"]  # 0.4635
+CHAIN_BARREL_AXIAL_AIR_WORST = _STACK_A["seated_worst"]  # 0.4135
 CHAIN_BARREL_AXIAL_AIR_FLOATED = _STACK_A["floated"]  # 0.3635
 CHAIN_BARREL_AXIAL_AIR_FLOATED_WORST = _STACK_A["floated_worst"]  # 0.2135
 _STACK_A_MODELLED = (
@@ -736,7 +736,7 @@ if abs(CHAIN_BARREL_AXIAL_AIR - _STACK_A_MODELLED) > 1e-9:
 # B: thickest wheel, seat forward, hub long.
 CRANK_HUB_T12_AIR_PRINT_WORST = (
     _SEAT_FACE_Z_WORST - (REMOVABLE.PLATE + max(REMOVABLE.PLATE_BAND))
-) - _HUB_REAR_Z_WORST  # 0.15
+) - _HUB_REAR_Z_WORST  # 0.10
 # C: chain floated rearmost on the thinnest wheel, spigot short; the chain
 # and the body front face both ride the seat, so the seat band cancels.
 CHAIN_SPIGOT_AXIAL_AIR = SPIGOT_LENGTH - REMOVABLE.chain_reach_rear(

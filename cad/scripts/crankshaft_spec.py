@@ -399,7 +399,7 @@ DRIVE_PIN_HUB_AIR_WORST, DRIVE_PIN_ENGAGEMENT_WORST = drive_pin_front_clearances
     hub_rear=HUB_LENGTH,
     hub_rear_tol=HUB_LENGTH_TOL,
     plate_min=transgear_removable_spec.PLATE + min(transgear_removable_spec.PLATE_BAND),
-)  # 0.196, 1.096
+)  # 0.146, 1.046
 # The collar stays clear of the outboard journal land at both print limits.
 if COLLAR_REAR + COLLAR_STATION_TOL >= JOURNAL_START - STATION_ROW:
     raise AssertionError(

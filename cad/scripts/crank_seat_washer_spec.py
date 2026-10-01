@@ -32,8 +32,10 @@ from crankshaft_spec import COLLAR_DIA, JOURNAL_DIA, JOURNAL_DIA_BAND
 
 OD = COLLAR_DIA  # the collar body's Ø20.6
 ID = 11.6
-# Slips over the journal land, never under the bore (drilled/bored class).
+# Slips over the journal land, never under the bore: an Ø11.60 jobber drill
+# through the blank, so the band is the title block's DRILLED HOLES row.
 ID_BAND = (0.10, 0.0)  # (upper, lower) deviations
+BORE_CALLOUT = "DRILL THRU"
 
 # The smallest bore still passes the largest journal land on the way on.
 JOURNAL_PASS_CLEARANCE_WORST = (ID + min(ID_BAND)) - (

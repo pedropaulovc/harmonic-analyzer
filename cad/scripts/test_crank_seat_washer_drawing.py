@@ -55,6 +55,13 @@ def test_only_the_bore_carries_a_model_band() -> None:
     assert fitted not in drawing.DIMENSION_CALLOUTS["DiscThick"]
 
 
+def test_the_bore_callout_names_its_drilled_process() -> None:
+    """Rule 7: a hole callout states its process.  The +0.10/0 bore is the
+    title block's DRILLED HOLES class, so it is drilled, not reamed."""
+    assert drawing.DIMENSION_CALLOUTS["BoreDia"] == "DRILL THRU"
+    assert spec.ID_BAND == (0.10, 0.0)
+
+
 def test_every_accepted_part_set_is_faced_from_the_blank_above_the_floor() -> None:
     """User ruling 2026-09-30: the washer is faced to the gap it fills and
     never goes under 0.5; the blank is thick enough to face to the widest gap

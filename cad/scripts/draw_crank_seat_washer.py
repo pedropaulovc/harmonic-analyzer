@@ -36,6 +36,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from drive_train_steps import step_ref
 from crank_seat_washer_spec import (
+    BORE_CALLOUT,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     ID,
@@ -77,7 +78,8 @@ ISO_CENTER = (0.310, SIDE_CENTER[1])
 # Faced to fit at MHA-A03's crank step; the pointer comes from the registry.
 FIT_STEP_KEY = "crank-mesh-checked"
 DIMENSION_CALLOUTS = {
-    "DiscThick": f"{THICKNESS_CALLOUT},\nPER {step_ref(FIT_STEP_KEY)}"
+    "BoreDia": BORE_CALLOUT,
+    "DiscThick": f"{THICKNESS_CALLOUT},\nPER {step_ref(FIT_STEP_KEY)}",
 }
 
 DRAWING_PRECISION_BY_NAME = {
@@ -199,7 +201,7 @@ async def build(adapter: Any) -> dict[str, str]:
     if len(thickness_annotations) != 1:
         raise RuntimeError("edge view does not carry exactly one washer thickness")
     set_reference_dimension(adapter, thickness_annotations[0], label="washer thickness")
-    set_dimension_callouts(adapter, thickness_annotations, DIMENSION_CALLOUTS)
+    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the washer face view")
     for key, label in (

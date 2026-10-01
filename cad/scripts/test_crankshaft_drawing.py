@@ -280,6 +280,42 @@ def test_horizontal_profile_and_left_end_view_are_third_angle_aligned() -> None:
     assert drawing.END_CENTER[0] + end_radius < drawing.DOME_TIP_X
 
 
+# Measured on the 19e33c6c2 stack-top render (3.5 mm text, 2:1 sheet): the
+# "7.000 ±0.025" value is 27.5 mm wide, and the uppercase callout rows run
+# 2.75 mm a character ("SPROCKET MHA-081", 44 mm).
+_PIN_VALUE_TEXT_WIDTH = 0.0275
+_CALLOUT_CHAR_WIDTH = 0.00275
+
+
+def test_lower_pin_location_text_ends_before_the_dome_extension_lines() -> None:
+    # Machinist review of 19e33c6c2: the text block runs right from the
+    # dimension line beside the end view, and the old two-row callout carried
+    # the value and its mate note across the dome tip's and dome root's
+    # extension lines.  Every row must end, with air, before the dome tip.
+    x, _y = drawing.END_PIN_KEEP["DrivePinOffset2"]
+    rows = notes.DRIVE_PIN_LOCATION_CALLOUT.splitlines()
+    assert "MHA-081" in rows and "SPROCKET" in " ".join(rows)
+    block = max(
+        _PIN_VALUE_TEXT_WIDTH,
+        max(len(row) for row in rows) * _CALLOUT_CHAR_WIDTH,
+    )
+    assert x + block + 0.001 < drawing.DOME_TIP_X
+
+
+def test_blind_pin_holes_bottom_in_the_collar_body_not_the_spigot_end() -> None:
+    # Machinist review of 19e33c6c2 read 5.75 - 4.05 = 1.70 behind the holes,
+    # taking the 5.80 spigot step for the end of material.  The holes lie
+    # wholly inside the spigot, and the Ø20.6 body continues behind it to the
+    # rear face: the floor is the collar's worst-case length less the
+    # deepest hole, over the 2.0 wall target.
+    assert spec.DRIVE_PIN_CIRCLE_RADIUS + spec.DRIVE_PIN_HOLE_DIA / 2.0 < (
+        spec.SPIGOT_DIA / 2.0
+    )
+    collar_min = spec.COLLAR_LENGTH - 2.0 * spec.COLLAR_STATION_TOL
+    deepest = spec.DRIVE_PIN_DEPTH + spec.DRIVE_PIN_DEPTH_TOL
+    assert collar_min - deepest >= 2.0
+
+
 def test_sheet_placements_stay_inside_the_border() -> None:
     inner = (0.0127, 0.0127, 0.4191, 0.2667)  # ASME B landscape inner border
     title_block = (0.218, 0.065)  # x >= and y <=

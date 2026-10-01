@@ -105,7 +105,7 @@ RELIEF_LENGTH_CALLOUT = "CLEARS #25 CHAIN ON\nSPROCKET MHA-081"
 # overall length -- not the arm's stock thickness -- places its rear face.
 #   Links:
 #     crank face                    CRANK_FACE_Z                     -183
-#     hub overall, front to rear    HUB_LENGTH +/- HUB_LENGTH_TOL    25.2 +/-0.05
+#     hub overall, front to rear    HUB_LENGTH +/- HUB_LENGTH_TOL    25.2 +/-0.10
 #     relief, back from rear face   RELIEF_LENGTH +/- RELIEF_LENGTH_TOL
 #                                                                    3.85 +/-0.05
 #     removable seat face           transgear_removable_spec.SEAT_FACE_Z
@@ -121,8 +121,8 @@ RELIEF_LENGTH_CALLOUT = "CLEARS #25 CHAIN ON\nSPROCKET MHA-081"
 #        (SEAT_FACE_Z + min(SEAT_COLLAR_BAND) - CHAIN_REACH_FRONT)
 #        - (CRANK_FACE_Z + HUB_LENGTH + HUB_LENGTH_TOL
 #           - (RELIEF_LENGTH - RELIEF_LENGTH_TOL))
-#        = (-154.3 - 0.5 - 6.2865) - (-183 + 25.25 - 3.80)
-#        = -161.0865 - (-161.55)                  = 0.4635  (nominal 1.0635)
+#        = (-154.3 - 0.5 - 6.2865) - (-183 + 25.30 - 3.80)
+#        = -161.0865 - (-161.50)                  = 0.4135  (nominal 1.0635)
 #      floated, the wheel walked forward off its pins onto the hub rear face
 #      (the hub and seat stations cancel):
 #        (RELIEF_LENGTH - RELIEF_LENGTH_TOL) + (PLATE + min(PLATE_BAND))
@@ -132,8 +132,8 @@ RELIEF_LENGTH_CALLOUT = "CLEARS #25 CHAIN ON\nSPROCKET MHA-081"
 #   B  hub rear face -> T12 front face:
 #        (SEAT_FACE_Z + min(SEAT_COLLAR_BAND) - (PLATE + max(PLATE_BAND)))
 #        - (CRANK_FACE_Z + HUB_LENGTH + HUB_LENGTH_TOL)
-#        = (-154.3 - 0.5 - 2.8) - (-183 + 25.25)
-#        = -157.6 - (-157.75)                     = 0.15    (nominal 0.7)
+#        = (-154.3 - 0.5 - 2.8) - (-183 + 25.30)
+#        = -157.6 - (-157.70)                     = 0.10    (nominal 0.7)
 #   Worst case: A seated and B with the seat collar at its forward limit and
 #   the hub long, A with the relief short, B with the plate thick; A floated
 #   with the relief short and the plate thin.

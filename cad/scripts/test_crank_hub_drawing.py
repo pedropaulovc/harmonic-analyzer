@@ -97,7 +97,7 @@ def test_mha024_ream_ligaments_meet_rule_12_at_the_printed_bands() -> None:
     assert geometry.SERVICE_PIN_SHOULDER_LIGAMENT_WORST_MM == pytest.approx(
         2.121, abs=1e-3
     )
-    assert geometry.SERVICE_PIN_REAR_LIGAMENT_WORST_MM == pytest.approx(3.371, abs=1e-3)
+    assert geometry.SERVICE_PIN_REAR_LIGAMENT_WORST_MM == pytest.approx(3.321, abs=1e-3)
     assert geometry.SERVICE_PIN_BARREL_WALL_WORST_MM == pytest.approx(7.901, abs=1e-3)
 
 
@@ -114,11 +114,11 @@ def test_rear_relief_clears_the_t12_chain_plates_and_keeps_its_wall() -> None:
     # Title-block .XX on the clearance diameter (R9-37: 0.23 to a real #25
     # plate on the floated T12, 0.08 at .X; test_transgear_removable_seat
     # judges that corner); the length carries the functional ±0.05 that holds
-    # the chain's axial air at print-worst, and so does the overall that
-    # places the rear face it is printed from.
+    # the chain's floated axial air exactly at its floor, and the overall that
+    # places the rear face it is printed from carries ±0.10.
     assert geometry.RELIEF_DIA_MAX == pytest.approx(17.01)
     assert geometry.RELIEF_LENGTH_TOL == 0.05
-    assert geometry.HUB_LENGTH_TOL == 0.05
+    assert geometry.HUB_LENGTH_TOL == 0.10
     assert crank_hub_spec.DRAWING_PRECISION["HubProfile"]["ReliefLength"] == 2
     assert crank_hub_spec.DRAWING_PRECISION["HubProfile"]["HubLength"] == 2
     assert crank_hub_spec.DRAWING_PRECISION["HubProfile"]["ReliefDia"] == 2
@@ -130,6 +130,34 @@ def test_rear_relief_clears_the_t12_chain_plates_and_keeps_its_wall() -> None:
         geometry.SERVICE_PIN_STATION + geometry.SERVICE_PIN_REAM_RADIUS_MAX
         < geometry.RELIEF_STATION
     )
+
+
+def test_hub_overall_band_is_loosened_to_what_the_rear_face_stacks_hold() -> None:
+    # Machinist review of 19e33c6c2: 25.20 +/-0.05 was tighter than the rear
+    # face needs.  At +/-0.10 the drive-pin tips keep air to it and the wheel
+    # floated onto it stays on its pins; the title block's .XX +/-0.51 would
+    # stand the hub on the pin tips.
+    kwargs = dict(
+        seat_face=crankshaft_spec.SEAT_COLLAR,
+        seat_face_band=crankshaft_spec.SEAT_COLLAR_BAND,
+        hub_rear=geometry.HUB_LENGTH,
+        plate_min=crankshaft_spec.transgear_removable_spec.PLATE
+        + min(crankshaft_spec.transgear_removable_spec.PLATE_BAND),
+    )
+    air, engagement = crankshaft_spec.drive_pin_front_clearances(
+        crankshaft_spec.DRIVE_PIN_PROUD_RANGE,
+        hub_rear_tol=geometry.HUB_LENGTH_TOL,
+        **kwargs,
+    )
+    assert geometry.HUB_LENGTH_TOL == 0.10
+    assert air == pytest.approx(0.146, abs=1e-9)
+    assert engagement == pytest.approx(1.046, abs=1e-9)
+    with pytest.raises(AssertionError, match="hub's rear face"):
+        crankshaft_spec.drive_pin_front_clearances(
+            crankshaft_spec.DRIVE_PIN_PROUD_RANGE,
+            hub_rear_tol=geometry.GENERAL_2PL_TOL_MM,
+            **kwargs,
+        )
 
 
 def _stack_a(relief_length: float) -> dict[str, float]:
@@ -145,13 +173,19 @@ def test_chain_clears_the_relief_shoulder_with_the_wheel_floated_onto_the_hub() 
     # its front face meets the hub rear face (the pin check admits it).  The
     # thinnest wheel there, with the shortest relief, brings a bought chain's
     # frontmost envelope nearest the barrel shoulder; the old 3.6 relief let
-    # it cut 0.0365 into the shoulder while the seated check read 0.2135.
+    # it cut 0.0365 into the shoulder while the seated check passed.  (With the
+    # hub's +/-0.10 the seated pose also closes on 3.6, so the seat is set 1.0
+    # aft here to leave the floated pose, which ignores it, as the only fault.)
     with pytest.raises(AssertionError, match="floated_worst -0.0365"):
-        _stack_a(3.6)
+        geometry.chain_shoulder_axial_air(
+            relief_length=3.6,
+            seat_face=crankshaft_spec.SEAT_COLLAR + 1.0,
+            seat_face_band=crankshaft_spec.SEAT_COLLAR_BAND,
+        )
     airs = _stack_a(geometry.RELIEF_LENGTH)
     assert airs["floated_worst"] == pytest.approx(0.2135, abs=1e-9)
     assert airs["floated"] == pytest.approx(0.3635, abs=1e-9)
-    assert airs["seated_worst"] == pytest.approx(0.4635, abs=1e-9)
+    assert airs["seated_worst"] == pytest.approx(0.4135, abs=1e-9)
     assert airs["seated"] == pytest.approx(1.0635, abs=1e-9)
     # The floated pose governs, and the relief is the shortest .XX length
     # that holds the floor there.

@@ -51,4 +51,8 @@ DRIVE_PIN_DEPTH_BAND = f"<MOD-PM>{DRIVE_PIN_DEPTH_TOL:.2f}"
 # parts: 2 x (2 x 0.025) = 0.100 < 0.111.  The title block's .XXX +/-0.13
 # would need 4 x 0.13 = 0.52; the widest per-part band the clearance allows is
 # +/-0.0278 (crankshaft_spec DRIVE_PIN_SPACING_ERROR_MAX check).
-DRIVE_PIN_LOCATION_CALLOUT = "PINS SLIP INTO\nSPROCKET MHA-081"
+# Four short rows, none wider than the 7.000 value above them: the text runs
+# right from the dimension line beside the end view and must end before the
+# dome tip's extension lines (machinist review of 19e33c6c2: the two-row
+# form ran ~44 mm wide, across them).
+DRIVE_PIN_LOCATION_CALLOUT = "PINS SLIP\nINTO\nSPROCKET\nMHA-081"

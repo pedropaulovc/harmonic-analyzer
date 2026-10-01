@@ -177,10 +177,12 @@ END_DIAMETERS = {
 # shows them as true (visible) circles: each hole from the shaft axis, its
 # dimension line just right of the view, text beyond the view's top (+Z hole)
 # and bottom (-Z hole), running right into the gap before the dome's
-# extension lines.
+# extension lines.  That gap (dimension line to dome tip) is ~30 mm, just the
+# 7.000 value's width, so the lower one's mate callout is set in rows no
+# wider than it; the lower text sits 5 mm under the 2.0 dome height's shelf.
 END_PIN_KEEP = {
     "DrivePinOffset1": (0.058, 0.210),
-    "DrivePinOffset2": (0.058, 0.150),
+    "DrivePinOffset2": (0.058, 0.145),
 }
 END_KEEP = {**END_DIAMETERS, **END_PIN_KEEP}
 SIDE_KEEP = {

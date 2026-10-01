@@ -210,14 +210,14 @@ _CRANK_SEAT = dict(
 
 def test_crank_pin_tips_are_checked_against_the_hub_rear_face() -> None:
     # Hand check, dome-root stations: seat forward 28.7 - 0.5, tip 2.754 in
-    # front of it, hub rear long 25.2 + 0.05; floated onto the short hub the
-    # thinnest wheel moves 28.8 - 2.7 - 25.15 off the seat.
+    # front of it, hub rear long 25.2 + 0.10; floated onto the short hub the
+    # thinnest wheel moves 28.8 - 2.7 - 25.10 off the seat.
     air, engagement = crank.drive_pin_front_clearances(
         crank.DRIVE_PIN_PROUD_RANGE, hub_rear=crank.HUB_LENGTH, **_CRANK_SEAT
     )
     assert crank.DRIVE_PIN_PROUD_RANGE == pytest.approx((2.046, 2.754))
-    assert air == pytest.approx(28.2 - 2.754 - 25.25)
-    assert engagement == pytest.approx(2.046 - 0.95)
+    assert air == pytest.approx(28.2 - 2.754 - 25.30)
+    assert engagement == pytest.approx(2.046 - 1.0)
     assert (air, engagement) == (
         crank.DRIVE_PIN_HUB_AIR_WORST,
         crank.DRIVE_PIN_ENGAGEMENT_WORST,

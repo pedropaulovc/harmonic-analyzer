@@ -123,11 +123,13 @@ RELIEF_LENGTH = round(
 HUB_BARREL_LENGTH = round(HUB_SHOULDER_TO_REAR - RELIEF_LENGTH, 6)
 HUB_LENGTH = HUB_SEAT_LENGTH + HUB_SHOULDER_TO_REAR
 # The hub prints its overall length, front face to rear face, at .XX with a
-# functional ±0.05.  The fitter sets the front face flush with the crankshaft's
+# functional ±0.10.  The fitter sets the front face flush with the crankshaft's
 # dome root (CRANK_FACE_Z) before the MHA-024 match-ream, so this band (not the arm's stock
 # thickness) places the rear face: the 0.7 air to the removable and, with
-# the relief, the chain's air to the shoulder.
-HUB_LENGTH_TOL = 0.05
+# the relief, the chain's air to the shoulder.  At ±0.10 the worst hub-to-T12
+# air is 0.10 and the drive-pin tips' 0.146; the title block's ±0.51 would
+# close both (machinist review of 19e33c6c2 loosened it from ±0.05).
+HUB_LENGTH_TOL = 0.10
 RELIEF_STATION = round(HUB_LENGTH - RELIEF_LENGTH, 6)
 HUB_SHOULDER_STATION = HUB_SEAT_LENGTH
 
