@@ -103,6 +103,12 @@ def test_a_missing_joint_row_is_an_omitted_threaded_part() -> None:
     assert _kinds(findings) == {("screw", Kind.OMITTED), ("base", Kind.OMITTED)}
 
 
+def test_threaded_lock_hardware_needs_its_own_row() -> None:
+    # The stud row names the jam nut as its lock; that does not cover the nut.
+    findings = _audit((STUD, CAP, SCREW))
+    assert _kinds(findings) == {("jam_nut", Kind.OMITTED)}
+
+
 def test_a_part_the_assembly_references_must_be_classified() -> None:
     findings = _audit(VALID, unthreaded=UNTHREADED - {"shim"})
     assert _kinds(findings) == {("shim", Kind.UNCLASSIFIED_PART)}
@@ -192,9 +198,37 @@ def test_the_locking_operation_must_be_a_step_of_the_assembly() -> None:
     assert _kinds(_audit(_with_stud(lock_step=""))) == {
         (STUD.id, Kind.LOCK_STEP_ABSENT)
     }
-    # An assembly without a keyed step list cannot be checked for it.
+    # Without a keyed step list the printed step text is accepted, but a lock
+    # that no step installs is still reported.
     unkeyed = Inventory({"paper_drive": PARTS})
     assert _audit(_with_stud(lock_step="SHEET 4 STEP 9"), unkeyed) == []
+    assert _kinds(_audit(_with_stud(lock_step=""), unkeyed)) == {
+        (STUD.id, Kind.LOCK_STEP_ABSENT)
+    }
+
+
+def test_hardware_the_drawings_call_for_but_no_assembly_places_is_reported() -> None:
+    # The arm's set screw is drilled for but never modelled: the row is
+    # reported as missing hardware (not as an unknown part) and, exposed with
+    # no lock, as unlocked.
+    set_screw = Joint(
+        id="paper-drive/arm-set-screw",
+        assembly="paper_drive",
+        member=jr.UNMODELLED,
+        receiver="arm",
+        thread="unresolved",
+        installed_at="",
+        exposure=Exposure.OSCILLATING,
+        exposure_reason="pins the arm to the rocking shaft",
+        axial_capture="none modelled",
+        lock=Lock.NONE,
+        evidence="fixture",
+    )
+    findings = _audit((set_screw, CAP, SCREW, NUT, STUD))
+    assert _kinds(findings) == {
+        (set_screw.id, Kind.HARDWARE_UNMODELLED),
+        (set_screw.id, Kind.UNLOCKED),
+    }
 
 
 def test_a_row_naming_a_part_outside_its_assembly_fails() -> None:

@@ -85,6 +85,10 @@ class Lock(StrEnum):
 
 NOT_A_LOCK = frozenset({Lock.NONE, Lock.THREADLOCKER_ONLY})
 
+# Stands in for a member or receiver the drawings call for but no assembly
+# places (no part stem exists); the audit always reports it.
+UNMODELLED = "<unmodelled>"
+
 
 @dataclass(frozen=True)
 class Joint:
@@ -96,8 +100,11 @@ class Joint:
     step installs it. ``lock_part`` is the locking component's stem, or
     ``"<stem>:<feature>"`` for a modelled feature of the member or receiver;
     ``lock_binds`` names the two parts whose relative rotation the lock
-    stops, which must be this joint's member and receiver. ``exception`` is a
-    ``RULINGS`` key, and only a user ruling creates one.
+    stops, which must be this joint's member and receiver. A locking part is
+    not itself covered by naming it here: threaded lock hardware needs its own
+    row. ``member`` or ``receiver`` is ``UNMODELLED`` where the hardware is
+    called for but not modelled. ``exception`` is a ``RULINGS`` key, and only
+    a user ruling creates one.
     """
 
     id: str
@@ -123,6 +130,7 @@ class Kind(StrEnum):
     OMITTED = "omitted"
     DUPLICATE_ID = "duplicate_id"
     UNKNOWN_PART = "unknown_part"
+    HARDWARE_UNMODELLED = "hardware_unmodelled"
     UNCLASSIFIED_EXPOSURE = "unclassified_exposure"
     UNREASONED_STATIC_CLAMP = "unreasoned_static_clamp"
     UNLOCKED = "unlocked"
@@ -211,10 +219,7 @@ def audit(
     # appears in a row of its assembly or of an assembly containing it.
     named: dict[str, set[str]] = {}
     for joint in joints:
-        stems = {joint.member, joint.receiver}
-        if joint.lock_part:
-            stems.add(_lock_part_stem(joint.lock_part))
-        named.setdefault(joint.assembly, set()).update(stems)
+        named.setdefault(joint.assembly, set()).update({joint.member, joint.receiver})
     for assembly, parts in sorted(inventory.parts.items()):
         rows = set().union(
             *(named.get(a, set()) for a in inventory.containers(assembly))
@@ -257,7 +262,12 @@ def audit(
 
         in_assembly = inventory.all_parts(joint.assembly)
         for role, stem in (("member", joint.member), ("receiver", joint.receiver)):
-            if stem not in in_assembly:
+            if stem == UNMODELLED:
+                bad(
+                    Kind.HARDWARE_UNMODELLED,
+                    f"{role} is called for but no assembly places it",
+                )
+            elif stem not in in_assembly:
                 bad(Kind.UNKNOWN_PART, f"{role} {stem} is not in {joint.assembly}")
 
         steps = inventory.steps.get(joint.assembly)
@@ -308,10 +318,12 @@ def audit(
                 Kind.LOCK_WRONG_INTERFACE,
                 f"lock binds {bound}, not {joint.member} to {joint.receiver}",
             )
-        if steps is not None and joint.lock_step not in steps:
+        if not joint.lock_step:
+            bad(Kind.LOCK_STEP_ABSENT, "no assembly step installs the lock")
+        elif steps is not None and joint.lock_step not in steps:
             bad(
                 Kind.LOCK_STEP_ABSENT,
-                f"locking step {joint.lock_step or '(none)'!r} is not in the step list",
+                f"locking step {joint.lock_step!r} is not in the step list",
             )
 
     return sorted(findings)
@@ -353,6 +365,8 @@ def audit_table() -> list[Finding]:
 
 
 def _part_number(stem: str) -> str:
+    if stem == UNMODELLED:
+        return ""
     try:
         return str(_config.parts(stem.replace("_", "-")).get("number", ""))
     except KeyError:
@@ -473,6 +487,7 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "pen_frame",  # #4-40 UNC-2B tapped hole up through the bottom rail, receiver of pen_set_screw
         "pen_hanger",  # #8-32 tapped hole in the strap, receiver of hanger_screw
         "pen_set_screw",  # #4-40 UNC (McMaster 99607A213 knurled thumb screw), member into the pen-frame rail
+        "pen_v_block",  # receiver: Ø2.5 rod set-screw hole drilled thru, "THREAD/FIT TO SUIT SET SCREW AT ASSEMBLY"; the screw is not modelled
         "pinion_cam",  # M2.5 x 0.45 6H tap + supplied ISO 4026 M2.5 x 5 flat-point set screw, member (collar) gripping pinion_lift_rod
         "platen",  # #4-40 tapped through (platen_spec.SOCKET_SPEC), receiver of the 4 clip screws
         "platen_guide",  # #4-40 bottoming-tapped blind, front (guide screws) + rear (lock screws), receiver
@@ -537,7 +552,6 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "nameplate",  # brass plate, #4 clearance holes only
         "pen_marker",  # plain barrel; the thumb-screw tip bears on it (no thread)
         "pen_rod",  # square brass bar; #47 drilled wire hole only
-        "pen_v_block",  # its rod set-screw hole is a Ø2.5 drill "thread/fit to suit set screw at assembly" but NO set screw is modelled/BOMed -- see Notes
         "pen_wire",  # Ø0.80 wire, tied off (tie-off not modelled)
         "pinion_arbor",  # journal + grip head, crossrod bonded, collar spring-pinned
         "pinion_arbor_collar",  # spring-pinned by MHA-145 (arbor-collar-pinned)
@@ -1310,6 +1324,35 @@ JOINTS: tuple[Joint, ...] = (
             "presses the marker'), SET_SCREW_POS/_SCREW_TIP_LOCAL_Y, riders lock_mate (CAD only); "
             "build_pen_frame.py: SET_SCREW_TAP_SPEC HoleSpec('tapped','#4-40'); pen_frame_spec.py note 2; "
             "pen-set-screw.yaml (99607A213)"
+        ),
+    ),
+    Joint(
+        id="pen/v-block-set-screw-on-rod",
+        assembly="pen",
+        member=UNMODELLED,
+        receiver="pen_v_block",
+        thread="unresolved: Ø2.5 drill, thread or fit to suit the set screw at assembly",
+        quantity=1,
+        installed_at="",
+        exposure=Exposure.OSCILLATING,
+        exposure_reason=(
+            "the side set screw is the only thing pinning the v-block, and with it the marker, to the "
+            "bottom of the reciprocating pen rod; the block rides the rod's up/down travel and the nib "
+            "drag on the paper reverses with pen direction, so the load the screw carries reverses every "
+            "stroke"
+        ),
+        axial_capture=(
+            "none modelled: the rod drops 13 into the block's rod bore and the block is lock-mated to the "
+            "rod; the set screw the drawing calls for is not a part, so no BOM row, length, point or lock "
+            "exists"
+        ),
+        lock=Lock.NONE,
+        evidence=(
+            "pen_v_block_spec.py: comment 'a side set screw (front face, over that bore) pins it', "
+            "SCREW_HOLE_DIA/SCREW_HOLE_XY, DRAWING_NOTES ('ROD SET-SCREW HOLE Ø2.5 DRILL THRU ... "
+            "THREAD/FIT TO SUIT SET SCREW AT ASSEMBLY'); build_pen_assembly.py module docstring "
+            "('a side set screw pins it in the real device', 'lock-mated to the rod'); "
+            "build_pen_v_block.py docstring ('a small front hole for the rod set screw')"
         ),
     ),
     Joint(
