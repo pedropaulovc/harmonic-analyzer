@@ -675,6 +675,28 @@ def test_each_detail_cutting_line_clears_the_next_by_a_margin() -> None:
         assert gap >= CLEAR_GAP_M + 0.0015, (behind.label, ahead.label, gap)
 
 
+# How far above a side-view cutting line's lower end its letter's top stands:
+# 4.8 mm on most seats, 6.3 mm on swmaker00000a (the 19e33c6c2 build).
+_SECTION_LETTER_RISE_M = 0.0063
+
+
+def test_each_side_view_cutting_line_letter_clears_its_land() -> None:
+    """A side-view line's lower letter rises from the line's end back toward
+    the land it cuts.  At a 12.5 mm reach A's letter stood 1.4 mm under land
+    1 on one seat and the section proof refused it (19e33c6c2); the worst
+    measured letter must clear the land by the proof's 2 mm and 1.5 mm more."""
+    lines = [s for s in drawing.D_SECTIONS if s.parent is drawing.CutParent.SIDE]
+    assert lines
+    scale = drawing.CUT_PARENT_SCALE[drawing.CutParent.SIDE]
+    axis_y = drawing.SIDE_CENTER[1]
+    for section in lines:
+        half = cone_gear_shaft_spec.SECTION_DIAS[section.land] / 2000.0
+        land_bottom = axis_y - half * scale[0] / scale[1]
+        letter_top = axis_y - section.reach + _SECTION_LETTER_RISE_M
+        gap = land_bottom - letter_top
+        assert gap >= CLEAR_GAP_M + 0.0015, (section.label, gap)
+
+
 def test_the_tip_detail_stands_in_the_frame_above_the_side_view() -> None:
     """The tip detail's cutting lines, letters included, run inside the
     frame's top and clear above the side view's highest diameter text; its

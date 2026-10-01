@@ -278,11 +278,14 @@ PARTIAL_CUT_PARENTS = frozenset({CutParent.TIP_DETAIL})
 # is only readable end-on: each land is cut across and shown cut-only
 # (nothing beyond the plane prints), each enlarged to about 16..19 mm across
 # so the smallest AF, 1.460 on the Ø1.588, reads with its band.  A-A cuts land
-# 1 on the side view, left of the Ø9.525 line; its reach puts the lower letter
-# 2.6 mm under the land.  B, C and D cut the detail.  A line's arrows look
-# toward the big end (sheet +x) and its letter's right edge lands 19.9..21.3
-# mm past the line, a spread SolidWorks sets per line and per seat (leaves
-# 20260929T221513Z-1-22b951a7, 20260929T235413Z-1-6ebc5952), so side by side
+# 1 on the side view, left of the Ø9.525 line.  Its lower letter's top stands
+# 4.8..6.3 mm above the line's end, by seat (6.3 on swmaker00000a in the
+# 19e33c6c2 build, where a 12.5 mm reach left it 1.4 mm under land 1); the
+# 15 mm reach leaves the worst 3.9 mm under the land.  B, C and D cut the
+# detail.  A line's arrows look toward the big end (sheet +x) and its
+# letter's right edge lands 19.9..21.3 mm past the line, a spread SolidWorks
+# sets per line and per seat (leaves 20260929T221513Z-1-22b951a7,
+# 20260929T235413Z-1-6ebc5952), so side by side
 # the lines must stand at least 23 mm (that run and the next arrow's 1.7 mm
 # half-width) plus the layout audit's 2 mm apart.  The three stations are
 # spread over their lands for that: B and C 0.6 and 0.8 mm short of the step
@@ -298,7 +301,7 @@ PARTIAL_CUT_PARENTS = frozenset({CutParent.TIP_DETAIL})
 # The across-flat is the part's own dimension (Sec{i}AF, sketched on the
 # land's end plane, parallel to the cut), so it prints its model band.
 D_SECTIONS = (
-    DSection(1, "A", 137.6, CutParent.SIDE, 0.0125, (0.337, 0.165), (2, 1)),
+    DSection(1, "A", 137.6, CutParent.SIDE, 0.0150, (0.337, 0.165), (2, 1)),
     DSection(2, "B", 168.9, CutParent.TIP_DETAIL, 0.0210, (0.393, 0.165), (3, 1)),
     DSection(3, "C", 175.6, CutParent.TIP_DETAIL, 0.0210, (0.337, 0.100), (5, 1)),
     DSection(4, "D", 182.6, CutParent.TIP_DETAIL, 0.0155, (0.393, 0.100), (10, 1)),

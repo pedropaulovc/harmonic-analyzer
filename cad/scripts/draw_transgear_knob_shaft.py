@@ -129,7 +129,13 @@ SIDE_KEEP: dict[str, tuple[float, float]] = {
     "OutsideDia": ((F_X + PINION_REAR_X) / 2.0, _ABOVE_Y),
     "CoreDia": ((F_X + CORE_END_X) / 2.0, _ABOVE_Y),
     "ReliefDia": ((CORE_END_X + THREAD_END_X) / 2.0, _ABOVE_Y + 0.010),
-    "ThreadBlankDia": ((THREAD_END_X + CHAMFER_START_X) / 2.0, _ABOVE_Y),
+    # A Ø's line stands at its point; right of the view's centre the text
+    # hangs LEFT of it (the 12T's and core's, run 20261001T085006647Z), and
+    # the blank's banded text and shoulder run 27.5 mm (19e33c6c2: from the
+    # blank's mid the shoulder crossed the relief's line).  12.5 mm in from
+    # the chamfer the shoulder starts 10.7 mm right of the relief's line and
+    # the line stays 12.5 mm off the thread callout's leader to the chamfer.
+    "ThreadBlankDia": (CHAMFER_START_X - 0.0125, _ABOVE_Y),
     "JournalDia": ((PINION_REAR_X + REAR_X) / 2.0, _ABOVE_Y),
     "FaceWidth": ((F_X + PINION_REAR_X) / 2.0, _ROW_Y[0]),
     "CoreLength": ((F_X + CORE_END_X) / 2.0, _ROW_Y[0]),

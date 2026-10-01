@@ -99,6 +99,43 @@ def test_face_relief_clears_the_thread_and_the_collar_keeps_its_wall() -> None:
     assert spec.COLLAR_WALL_WORST >= 2.0
 
 
+# Each axial dimension's text centres between its two stations; its extension
+# lines rise from those stations' x and end 3.8 mm under its row.
+_AXIAL_STATIONS = {
+    "StepLength": ("COLLAR_FRONT_X", "THRUST_X"),
+    "JournalLength": ("THRUST_X", "SHOULDER_X"),
+    "ThrustStation": ("SEAT_X", "THRUST_X"),
+    "FrontThreadEnd": ("SHOULDER_X", "FRONT_END_X"),
+    "RearThreadEnd": ("REAR_END_X", "SEAT_X"),
+}
+_EXTENSION_PAST_ROW_M = 0.0038
+# A dome radius's shoulder, from its text point: 7.5 mm left to 5.9 mm right,
+# 2.8 mm under (runs 20261001T051043622Z and 19e33c6c2).
+_RADIUS_SHOULDER = (-0.0075, 0.0059, -0.0028)
+
+
+def test_dome_radius_shoulders_cross_no_axial_extension_line() -> None:
+    """The layout audit refuses a shoulder that crosses another dimension's
+    line.  At 19e33c6c2 the rear dome's R3.4 shoulder ran across the rear
+    thread's end line, which runs down to row 2; every dome shoulder keeps
+    2 mm off each extension line that reaches below it."""
+    lines = []
+    for name, stations in _AXIAL_STATIONS.items():
+        x, row_y = drawing.SIDE_KEEP[name]
+        xs = [getattr(drawing, station) for station in stations]
+        assert x == pytest.approx(sum(xs) / 2.0), name
+        lines.extend((station_x, row_y - _EXTENSION_PAST_ROW_M) for station_x in xs)
+    left, right, drop = _RADIUS_SHOULDER
+    for name in ("FrontDomeR", "RearDomeR"):
+        x, y = drawing.SIDE_KEEP[name]
+        shoulder_y = y + drop
+        for line_x, line_bottom in lines:
+            if line_bottom >= shoulder_y:
+                continue
+            gap = max(x + left - line_x, line_x - (x + right))
+            assert gap >= 0.002, (name, line_x, gap)
+
+
 def test_the_journal_carries_the_one_machined_finish() -> None:
     (journal,) = spec.SURFACE_FINISHES
     assert journal.key == "journal"

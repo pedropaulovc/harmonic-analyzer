@@ -44,6 +44,36 @@ def test_every_marked_dimension_is_placed_once_and_has_places() -> None:
     assert set(spec.DRAWING_PRECISION_BY_NAME) == marked
 
 
+# Right of the view's centre a Ø's text hangs LEFT of its line.  The thread
+# blank's banded text and shoulder run 27.5 mm, the shoulder 4.5 mm under the
+# text point; an unbanded Ø's line rises to 2.8 mm under its text point, a
+# banded one's less far (19e33c6c2).
+_BLANK_SHOULDER_RUN_M = 0.0275
+_BLANK_SHOULDER_DROP_M = 0.0045
+_PLAIN_LINE_DROP_M = 0.0028
+
+
+def test_the_thread_blank_shoulder_crosses_no_diameter_line() -> None:
+    """The layout audit refuses a shoulder that crosses another dimension's
+    line.  At 19e33c6c2 the blank's line stood at its land's mid and its
+    shoulder ran across the relief Ø's line, which rises past it to its own
+    text one step higher.  Every Ø line rising above the shoulder keeps 2 mm
+    off it; the blank's line stands on its land, left of the thread
+    callout's leader to the chamfer."""
+    x, y = drawing.SIDE_KEEP["ThreadBlankDia"]
+    assert x > drawing.SIDE_CENTER[0]
+    left = x - _BLANK_SHOULDER_RUN_M
+    shoulder_y = y - _BLANK_SHOULDER_DROP_M
+    for name in ("OutsideDia", "CoreDia", "ReliefDia", "JournalDia"):
+        line_x, text_y = drawing.SIDE_KEEP[name]
+        if text_y - _PLAIN_LINE_DROP_M <= shoulder_y:
+            continue
+        gap = max(left - line_x, line_x - x)
+        assert gap >= 0.002, (name, gap)
+    assert drawing.THREAD_END_X < x < drawing.CHAMFER_START_X
+    assert x + 0.002 <= drawing.THREAD_PICK[0]
+
+
 def test_sheet_authors_no_manufacturing_value() -> None:
     # Rule 2: places and bands come from the part; the sheet reads them back.
     assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
