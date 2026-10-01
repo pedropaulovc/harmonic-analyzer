@@ -93,10 +93,170 @@ def test_sprocket_data_lists_every_configuration() -> None:
     assert values("NUMBER OF TEETH") == [str(teeth) for _name, teeth in spec.CONFIGS]
     # T12 hand check: p / sin 15 deg = 6.35 / 0.258819 = 24.535.
     assert values("PITCH DIAMETER (mm, REF)")[0] == "24.53"
-    assert values("OUTSIDE DIAMETER (mm)") == ["27.5", "39.8", "52.0"]
     # PD - Dr, Dr = 0.130 in: T12 24.535 - 3.302 = 21.233.
     assert values("BOTTOM DIAMETER (mm, REF)") == ["21.23", "33.27", "45.35"]
     assert rows["CHAIN"] == "ANSI #25 ROLLER, PITCH 6.35, ROLLER Ø3.30"
+
+
+def test_the_outside_diameter_is_a_model_dimension_not_sheet_text() -> None:
+    """The turned diameter is held to the title block's .X row: the part owns
+    those places on BlankDia, so the sheet never types the value."""
+    assert "BlankDia" in spec.DRAWING_DIMENSIONS["BlankProfile"]
+    assert spec.DRAWING_PRECISION_BY_NAME["BlankDia"] == 1
+    assert "OUTSIDE DIAMETER" not in notes.GEAR_DATA
+    # p (0.6 + cot(180/N)): T12 6.35 (0.6 + 3.732) = 27.51.
+    assert [f"{spec.outside_dia(teeth):.1f}" for _name, teeth in spec.CONFIGS] == [
+        "27.5",
+        "39.8",
+        "52.0",
+    ]
+
+
+def test_every_configuration_prints_its_outside_diameter_once() -> None:
+    """T24's prints on the main edge view; T12's and T18's each on a view of
+    their own configuration -- one view per configuration, none twice."""
+    printed = {spec.DEFAULT_CONFIG: drawing.TOP_KEEP} | {
+        configuration: drawing.configuration_keep(configuration)
+        for configuration in drawing.CONFIGURATION_VIEW_CENTERS
+    }
+    assert sorted(printed) == sorted(spec.TEETH)
+    assert len(drawing.CONFIGURATION_VIEW_CENTERS) == len(spec.CONFIGS) - 1
+    assert all("BlankDia" in keep for keep in printed.values())
+    # A configuration view carries nothing but its diameter.
+    for configuration in drawing.CONFIGURATION_VIEW_CENTERS:
+        assert set(drawing.configuration_keep(configuration)) == {"BlankDia"}
+        assert drawing.configuration_label(configuration).startswith(configuration)
+
+
+def test_sheet_text_lines_are_short_and_carry_no_governance() -> None:
+    labels = [
+        drawing.configuration_label(configuration)
+        for configuration in drawing.CONFIGURATION_VIEW_CENTERS
+    ]
+    lines = [*notes.GEAR_DATA.splitlines(), *notes.DRAWING_NOTES.splitlines(), *labels]
+    assert max(len(line) for line in lines) <= 70
+    text = "\n".join(lines).upper()
+    for word in ("EXCEPTION", "ACCEPTED", "RULING", "POLICY", "BOOK FIDELITY"):
+        assert word not in text
+
+
+# Measured on the farm render 20260930T232554670Z (sheet metres): the pin
+# chain's "7.000 ±0.025" shelves end at x 0.209, the isometric view starts at
+# x 0.296 and SPROCKET DATA ends at y 0.231.  GetOutline pads an uncropped
+# view ~5.5 mm (draw_cone_gear's T084 front); one character of default text
+# is ~2.3 mm wide and ~3.5 mm tall.
+_PIN_CHAIN_TEXT_RIGHT = 0.209
+_ISO_LEFT = 0.296
+_GEAR_DATA_BOTTOM = 0.231
+_OUTLINE_PAD = 0.0055
+_CHAR_W, _CHAR_H = 0.0023, 0.0035
+
+
+def _configuration_view_box(configuration: str) -> tuple[float, float, float, float]:
+    """A configuration view's padded outline, its dimension and its label."""
+    x, y = drawing.CONFIGURATION_VIEW_CENTERS[configuration]
+    scale = drawing.CONFIGURATION_VIEW_SCALE[0] / drawing.CONFIGURATION_VIEW_SCALE[1]
+    half = spec.outside_dia(spec.TEETH[configuration]) * scale / 2000.0
+    label_x, label_top = drawing.configuration_label_xy(configuration)
+    label_right = label_x + len(drawing.configuration_label(configuration)) * _CHAR_W
+    dimension_top = drawing.configuration_keep(configuration)["BlankDia"][1] + _CHAR_H
+    return (
+        min(x - half, label_x) - _OUTLINE_PAD,
+        label_top - _CHAR_H,
+        max(x + half, label_right) + _OUTLINE_PAD,
+        dimension_top,
+    )
+
+
+@pytest.mark.parametrize("configuration", ["T12", "T18"])
+def test_configuration_view_stands_in_free_sheet_space(configuration: str) -> None:
+    left, bottom, right, top = _configuration_view_box(configuration)
+    assert left > _PIN_CHAIN_TEXT_RIGHT
+    assert right < _ISO_LEFT
+    assert top < _GEAR_DATA_BOTTOM
+    # The label hangs below its own view's padded outline: a free note the
+    # view owns still collides with it.
+    _x, y = drawing.CONFIGURATION_VIEW_CENTERS[configuration]
+    scale = drawing.CONFIGURATION_VIEW_SCALE[0] / drawing.CONFIGURATION_VIEW_SCALE[1]
+    outline_bottom = y - spec.PLATE * scale / 2000.0 - _OUTLINE_PAD
+    assert drawing.configuration_label_xy(configuration)[1] < outline_bottom
+
+
+def test_configuration_views_do_not_meet() -> None:
+    upper = _configuration_view_box("T12")
+    lower = _configuration_view_box("T18")
+    assert lower[3] < upper[1]
+
+
+class _Dimension:
+    def __init__(self, values_m: dict[str, float]) -> None:
+        self._values = values_m
+
+    def GetSystemValue3(self, which: int, configuration: str):
+        assert which == 3  # swSpecifyConfiguration
+        return (self._values[configuration],)
+
+
+class _Display:
+    def __init__(self, places: int, values_m: dict[str, float]) -> None:
+        self._places = places
+        self._dimension = _Dimension(values_m)
+
+    def GetPrimaryPrecision2(self) -> int:
+        return self._places
+
+    def GetDimension2(self, index: int) -> _Dimension:
+        return self._dimension
+
+
+class _Annotation:
+    def __init__(self, name: str, display: _Display) -> None:
+        self.name = name
+        self._display = display
+
+    def GetSpecificAnnotation(self) -> _Display:
+        return self._display
+
+
+def _od_annotations(monkeypatch, places: int, values_m: dict[str, float]):
+    monkeypatch.setattr(drawing, "_early_bound", lambda obj, _iface: obj)
+    monkeypatch.setattr(drawing, "dimension_name", lambda _adapter, a: a.name)
+    display = _Display(places, values_m)
+    return [_Annotation("BlankWidth", display), _Annotation("BlankDia", display)]
+
+
+_OD_M = {name: spec.outside_dia(teeth) / 1000.0 for name, teeth in spec.CONFIGS}
+
+
+@pytest.mark.parametrize("configuration", [name for name, _teeth in spec.CONFIGS])
+def test_each_view_reads_its_own_configurations_diameter(
+    monkeypatch, configuration: str
+) -> None:
+    annotations = _od_annotations(monkeypatch, 1, _OD_M)
+    drawing._assert_outside_diameter(None, annotations, configuration)
+
+
+def test_a_view_showing_another_configurations_diameter_is_refused(monkeypatch) -> None:
+    """One model dimension holds all three values: a T12 view reading T24's
+    is the failure the per-view readback exists to catch."""
+    values = dict(_OD_M, T12=_OD_M["T24"])
+    annotations = _od_annotations(monkeypatch, 1, values)
+    with pytest.raises(RuntimeError, match=r"T12: sheet BlankDia reads 52\.04"):
+        drawing._assert_outside_diameter(None, annotations, "T12")
+
+
+def test_a_diameter_that_lost_its_part_places_is_refused(monkeypatch) -> None:
+    annotations = _od_annotations(monkeypatch, 2, _OD_M)
+    with pytest.raises(RuntimeError, match=r"at 2 places, expected .* at 1"):
+        drawing._assert_outside_diameter(None, annotations, "T18")
+
+
+def test_a_view_without_exactly_one_diameter_is_refused(monkeypatch) -> None:
+    annotations = _od_annotations(monkeypatch, 1, _OD_M)
+    with pytest.raises(RuntimeError, match="expected one BlankDia"):
+        drawing._assert_outside_diameter(None, annotations[:1], "T24")
+    with pytest.raises(RuntimeError, match="expected one BlankDia"):
+        drawing._assert_outside_diameter(None, annotations * 2, "T24")
 
 
 def test_notes_stay_within_four_lines_and_never_restate_the_title_block() -> None:

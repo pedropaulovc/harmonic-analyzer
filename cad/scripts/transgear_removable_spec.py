@@ -149,18 +149,20 @@ CONFIGS: tuple[tuple[str, int], ...] = (("T12", 12), ("T18", 18), ("T24", 24))
 TEETH = dict(CONFIGS)
 DEFAULT_CONFIG = "T24"  # the part saves on T24
 
-# --- manufacturing drawing (one sheet, the T24 views; SPROCKET DATA lists all
-# three configurations) --------------------------------------------------------
+# --- manufacturing drawing (one sheet: the T24 views plus one edge view each
+# of T12 and T18; SPROCKET DATA lists all three configurations) --------------
 # The plate thickness carries PLATE_BAND; the bore and the pin holes are
 # drilled (the title block's DRILLED HOLES row governs them); each pin centre
 # carries +/-DRIVE_PIN_OFFSET_TOL at .XXX.  PinNegDia is the same global as
-# PinPosDia and prints once as its "2X".
+# PinPosDia and prints once as its "2X".  BlankDia, the turned outside
+# diameter, is configuration-driven ("2 * Ra") and prints once per
+# configuration at .X, the title block's one-place row.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "BlankProfile": {"BlankWidth"},
+    "BlankProfile": {"BlankDia", "BlankWidth"},
     "BorePinsProfile": {"BoreDiaDim", "PinPosDia", "PinPosY", "PinNegY"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "BlankProfile": {"BlankWidth": 2},
+    "BlankProfile": {"BlankDia": 1, "BlankWidth": 2},
     "BorePinsProfile": {
         "BoreDiaDim": 2,
         "PinPosDia": 2,

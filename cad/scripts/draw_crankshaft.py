@@ -331,37 +331,59 @@ def _set_callout_below(display: Any, text: str, label: str) -> None:
         raise RuntimeError(f"{label}: callout-below text did not persist: {applied!r}")
 
 
-def _depth_banded_definition(definition: str, band: str) -> str:
-    """The hole callout's format text with ``band`` after its closing depth.
+# Format-definition parts of a display dimension and the writable part each
+# one is set through (swDimensionTextParts_e): prefix, suffix, callout above,
+# callout below.
+_DEFINITION_TO_WRITABLE = {5: 1, 6: 2, 7: 3, 8: 4}
 
-    The native callout ends on ``<HOLE-DEPTH>`` and the depth; anything else
-    (no depth, two, a row after it, a band already there) fails loud.
+
+def _depth_banded_definition(definitions: dict[int, str], band: str) -> tuple[int, str]:
+    """The one format part ending on the callout's depth, with ``band`` after it.
+
+    A native hole callout splits its text across the prefix, suffix and
+    callout compartments; on the farm the drive-pin callout's prefix read
+    ``REAM <MOD-DIAM>`` and its depth sat in another part (run
+    20261001T011714683Z).  Exactly one part may carry ``<HOLE-DEPTH>``, once,
+    followed by the depth alone; anything else (no depth, two, text after it,
+    a band already there) fails loud.
     """
-    head, marker, tail = definition.rpartition("<HOLE-DEPTH>")
-    if (
-        not marker
-        or "<HOLE-DEPTH>" in head
-        or len(tail.split()) != 1
-        or band in definition
-    ):
-        raise RuntimeError(f"hole callout has no single closing depth: {definition!r}")
-    return f"{definition.rstrip()} {band}"
+    if set(definitions) != set(_DEFINITION_TO_WRITABLE):
+        raise RuntimeError(f"unexpected hole callout parts: {definitions!r}")
+    holders = [part for part, text in definitions.items() if "<HOLE-DEPTH>" in text]
+    joined = "\n".join(definitions.values())
+    if len(holders) != 1 or band in joined:
+        raise RuntimeError(f"hole callout has no single closing depth: {definitions!r}")
+    part = holders[0]
+    definition = definitions[part]
+    head, _marker, tail = definition.rpartition("<HOLE-DEPTH>")
+    if "<HOLE-DEPTH>" in head or len(tail.split()) != 1:
+        raise RuntimeError(f"hole callout has no single closing depth: {definitions!r}")
+    return part, f"{definition.rstrip()} {band}"
 
 
 def _band_hole_depth(display: Any, band: str, label: str) -> None:
     """Print the part's depth band after the native callout's depth.
 
     The cut's depth carries the band in the part, but the callout prints the
-    depth bare; the band joins the format text (PrefixDefinition), which the
-    native size and depth stay associative in.  Read back like the prose.
+    depth bare; the band joins the format text of the part holding the depth,
+    where the native size and depth stay associative.  Read back like the
+    prose.  The callout-below compartment is rewritten by the matched-fit
+    prose afterwards, so a depth there is refused rather than lost.
     """
     display = _early_bound(display, "IDisplayDimension")
-    definition = str(display.GetText(5) or "")  # swDimensionTextPrefixDefinition
-    updated = _depth_banded_definition(definition, band)
-    display.SetText(1, updated)  # swDimensionTextPrefix
-    applied = str(display.GetText(5) or "")
+    definitions = {
+        part: str(display.GetText(part) or "") for part in _DEFINITION_TO_WRITABLE
+    }
+    part, updated = _depth_banded_definition(definitions, band)
+    if part == 8:
+        raise RuntimeError(
+            f"{label}: depth is in the callout-below text: {definitions!r}"
+        )
+    display.SetText(_DEFINITION_TO_WRITABLE[part], updated)
+    applied = str(display.GetText(part) or "")
     if applied.replace("\r", "") != updated.replace("\r", ""):
         raise RuntimeError(f"{label}: depth band did not persist: {applied!r}")
+    _telemetry.info(f"{label}: depth band joined format part {part}: {updated!r}")
 
 
 Box = tuple[float, float, float, float]

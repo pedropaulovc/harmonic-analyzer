@@ -28,8 +28,9 @@ Named exception; the sheet states its printed worst case
 
 Drawing marks (``draw_transgear_removable``): ``spec.DRAWING_DIMENSIONS`` at
 ``spec.DRAWING_PRECISION``, the plate thickness banded ``spec.PLATE_BAND``
-and each pin centre +/-``spec.DRIVE_PIN_OFFSET_TOL``; the sheet's SPROCKET
-DATA and notes are file properties.
+and each pin centre +/-``spec.DRIVE_PIN_OFFSET_TOL``; the outside diameter
+``BlankDia`` is driven per configuration, so each configuration's view prints
+its own.  The sheet's SPROCKET DATA and notes are file properties.
 
 Part frame: axis Z through the origin, plate z = 0..PLATE (the Front Plane is
 the wheel's FRONT face; ``RearFace`` at z = PLATE seats on the shaft's seat
@@ -75,6 +76,7 @@ from _common import (
 )
 from _drawing_marks import (
     _named_dimension,
+    add_diametric_linear_dimension,
     apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -503,8 +505,8 @@ async def build(adapter) -> dict[str, str]:
     # Plain length knobs for the config-independent geometry (plate + the
     # mounting interface). mm suffix is load-bearing -- this is an INCH
     # document, so a bare number would be read as inches and blow the part up
-    # 25.4x. The blank's RADIAL extent is NOT a knob here: it is config-driven by
-    # the "Ra" equation link below.
+    # 25.4x. The blank's outside diameter is NOT a knob here: it is
+    # config-driven by the "Ra" equation link below.
     await set_global_mm(adapter, "Plate", f"{spec.PLATE}mm")
     await set_global_mm(adapter, "BoreDia", f"{spec.BORE_DIA}mm")
     await set_global_mm(adapter, "PinHoleDia", f"{spec.PIN_HOLE_DIA}mm")
@@ -516,12 +518,20 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs: list[tuple[str, str]] = []
 
     # ------------------------------------------------------------------
-    # Blank: revolved dimensioned rectangle, radial dim equation-linked to
-    # "Ra" (the canonical configuration pattern from build_cone_gear).
+    # Blank: revolved dimensioned rectangle, its outside diameter equation-linked
+    # to 2 * "Ra" (the canonical configuration pattern from build_cone_gear).
     # ------------------------------------------------------------------
     ra_default_mm = spec.outside_dia(DEFAULT_TEETH) / 2.0
     blank = SketchDims()
     check("create_sketch blank", await adapter.create_sketch("Top"))
+    # The axis centerline spans the on-axis edge exactly, so its endpoints merge
+    # into the (0, 0) / (0, -PLATE) corners and the chain's own relations define
+    # it (the build_crank_hub_pin pattern); the diameter is measured from it.
+    set_sketch_direct_db(adapter, True)
+    axis = check(
+        "add_centerline axis",
+        await adapter.add_centerline(0.0, 0.0, 0.0, -spec.PLATE),
+    )
     blank_lines = await add_line_chain(
         adapter,
         [
@@ -531,6 +541,7 @@ async def build(adapter) -> dict[str, str]:
             (0.0, -spec.PLATE),
         ],
     )
+    set_sketch_direct_db(adapter, False)
     radial_line, side_line, _inner_line, axis_edge = blank_lines
     for ent, relation in (
         (radial_line, "horizontal"),
@@ -539,16 +550,17 @@ async def build(adapter) -> dict[str, str]:
         (axis_edge, "vertical"),
     ):
         check(f"blank {relation}", await adapter.add_sketch_constraint(ent, None, relation))
-    check(
-        "blank radial dim (D1)",
-        await adapter.add_sketch_dimension(radial_line, None, "linear", ra_default_mm),
+    # The turned outside diameter, doubled off the axis so the model owns the
+    # diameter a drawing prints (not a radius a sheet would have to double).
+    await add_diametric_linear_dimension(
+        adapter, axis, side_line, (ra_default_mm / 2.0, 4.0), "BlankDia"
     )
-    # Record in creation order. The radial dim is left UNDRIVEN here (drive None):
+    # Record in creation order. The diameter is left UNDRIVEN here (drive None):
     # it is bound to the config-driving "Ra" global by the explicit create_equation
     # block below, so adding it to drive_jobs would double-drive it.
-    blank.record("BlankRadial", None)
+    blank.record("BlankDia", None)
     check(
-        "blank width dim (D2)",
+        "blank width dim",
         await adapter.add_sketch_dimension(side_line, None, "linear", spec.PLATE),
     )
     blank.record("BlankWidth", '"Plate"')
@@ -558,12 +570,6 @@ async def build(adapter) -> dict[str, str]:
         "blank corner -> origin",
         await adapter.add_sketch_constraint(f"{radial_line}.start", "origin", "coincident"),
     )
-    set_sketch_direct_db(adapter, True)
-    check(
-        "add_centerline axis",
-        await adapter.add_centerline(0.0, -1.0, 0.0, -(spec.PLATE - 1.0)),
-    )
-    set_sketch_direct_db(adapter, False)
     await ensure_fully_defined(adapter, "blank sketch")
     check("exit_sketch blank", await adapter.exit_sketch())
     blank_sketch = name_last_feature(adapter, "BlankProfile")
@@ -590,24 +596,22 @@ async def build(adapter) -> dict[str, str]:
         )
     _telemetry.success(f"blank volume {blank_volume:.1f} mm^3 (com z {com_z:.2f})")
 
-    # The radial dim was renamed D1 -> BlankRadial by blank.apply above, so the
+    # The diameter was renamed D1 -> BlankDia by blank.apply above, so the
     # captured auto-name "D1@..." would be stale -- reference the new name.
-    radial_dim = f"BlankRadial@{blank_sketch}"
-    ra_default_in = ra_default_mm / IN
-    before = read_dimension(adapter, radial_dim)
-    if abs(before - ra_default_in) < 1e-6 * ra_default_in:
+    od_dim = f"BlankDia@{blank_sketch}"
+    od_default_in = 2.0 * ra_default_mm / IN
+    before = read_dimension(adapter, od_dim)
+    if abs(before - od_default_in) < 1e-6 * od_default_in:
         dim_unit = 1.0
-    elif abs(before - ra_default_mm) < 1e-6 * ra_default_mm:
+    elif abs(before - 2.0 * ra_default_mm) < 1e-6 * 2.0 * ra_default_mm:
         dim_unit = IN
     else:
-        raise RuntimeError(
-            f"{radial_dim} reads {before!r}, matches neither inches nor mm"
-        )
-    _telemetry.debug(f"{radial_dim} reads {before:g} (unit factor {dim_unit:g})")
+        raise RuntimeError(f"{od_dim} reads {before!r}, matches neither inches nor mm")
+    _telemetry.debug(f"{od_dim} reads {before:g} (unit factor {dim_unit:g})")
     check(
-        f"link {radial_dim} to Ra",
+        f"link {od_dim} to 2 * Ra",
         await adapter.create_equation(
-            CreateEquationParameters(equation=f'"{radial_dim}" = "Ra"')
+            CreateEquationParameters(equation=f'"{od_dim}" = 2 * "Ra"')
         ),
     )
 
@@ -842,11 +846,11 @@ async def build(adapter) -> dict[str, str]:
         volumes[name] = volume
         _telemetry.success(f"{name}: count {count:g}, volume {volume:.1f} (analytic {expected:.1f})")
 
-        radial = read_dimension(adapter, radial_dim)
-        ra_in = spec.outside_dia(teeth) / 2.0 / IN
-        if abs(radial - ra_in * dim_unit) > 1e-4 * ra_in * dim_unit:
+        outside = read_dimension(adapter, od_dim)
+        od_in = spec.outside_dia(teeth) / IN
+        if abs(outside - od_in * dim_unit) > 1e-4 * od_in * dim_unit:
             raise RuntimeError(
-                f"{name}: {radial_dim} reads {radial:g}, expected {ra_in * dim_unit:g}"
+                f"{name}: {od_dim} reads {outside:g}, expected {od_in * dim_unit:g}"
             )
 
         img = (png_dir / f"{PART_NAME}_{name}_isometric.png").resolve()

@@ -46,11 +46,12 @@ def _per_configuration(render: Callable[[int], str]) -> str:
     return "  /  ".join(render(teeth) for _name, teeth in spec.CONFIGS)
 
 
-# The one sheet draws T24; this block is the whole difference between the
-# three configurations, which differ only in their tooth count.  The OD is a
-# one-place blank size; the pitch and bottom diameters follow from the chain
-# and the ANSI B29.1 tooth form a #25 cutter reproduces, so they are reference
-# values.
+# The sheet's main views draw T24; this block is the whole difference between
+# the three configurations, which differ only in their tooth count.  The
+# outside diameter is not here: it is the part's BlankDia, printed natively on
+# each configuration's view.  The pitch and bottom diameters follow from the
+# chain and the ANSI B29.1 tooth form a #25 cutter reproduces, so they are
+# reference values.
 _GEAR_DATA_ROWS = (
     (
         "CHAIN",
@@ -63,10 +64,6 @@ _GEAR_DATA_ROWS = (
     (
         "PITCH DIAMETER (mm, REF)",
         _per_configuration(lambda teeth: f"{spec.pitch_dia(teeth):.2f}"),
-    ),
-    (
-        "OUTSIDE DIAMETER (mm)",
-        _per_configuration(lambda teeth: f"{spec.outside_dia(teeth):.1f}"),
     ),
     (
         "BOTTOM DIAMETER (mm, REF)",
@@ -86,8 +83,8 @@ GEAR_DATA = "\n".join(
 DRAWING_NOTES = "\n".join(
     (
         "MAKE ONE SPROCKET OF EACH CONFIGURATION IN SPROCKET DATA.",
-        "DRIVE-PIN HOLES SLIP OVER THE PRESSED PINS OF CRANKSHAFT "
-        f"{CRANKSHAFT_NUMBER} AND KNOB SHAFT {KNOB_SHAFT_NUMBER}.",
+        f"DRIVE-PIN HOLES SLIP OVER THE PRESSED PINS OF CRANKSHAFT {CRANKSHAFT_NUMBER}",
+        f"    AND KNOB SHAFT {KNOB_SHAFT_NUMBER}.",
         BORE_PIN_WEB_NOTE,
     )
 )

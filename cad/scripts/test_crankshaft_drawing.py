@@ -190,14 +190,27 @@ def test_drive_pin_depth_prints_its_band_after_the_native_depth() -> None:
         spec.DRIVE_PIN_DEPTH + spec.DRIVE_PIN_DEPTH_TOL
     )
     assert floor >= 1.5
-    native = "REAM <MOD-DIAM><hw-diam> <HOLE-DEPTH> <hw-depth>"
     band = notes.DRIVE_PIN_DEPTH_BAND
-    assert drawing._depth_banded_definition(native, band) == f"{native} {band}"
+    # The farm's native split: the process and diameter modifier in the
+    # prefix, the depth in a later compartment.
+    depth = "<HOLE-DEPTH> <hw-depth>"
+
+    def parts(prefix: str = "REAM <MOD-DIAM>", suffix: str = depth) -> dict:
+        return {5: prefix, 6: suffix, 7: "", 8: ""}
+
+    assert drawing._depth_banded_definition(parts(), band) == (6, f"{depth} {band}")
+    whole = "REAM <MOD-DIAM><hw-diam> <HOLE-DEPTH> <hw-depth>"
+    assert drawing._depth_banded_definition(parts(prefix=whole, suffix=""), band) == (
+        5,
+        f"{whole} {band}",
+    )
     for broken in (
-        "REAM <MOD-DIAM><hw-diam> THRU ALL",
-        f"{native} {band}",
-        f"{native}\nPRESS FIT",
-        f"<HOLE-DEPTH> 1.0 {native}",
+        parts(suffix="THRU ALL"),
+        parts(suffix=f"{depth} {band}"),
+        parts(suffix=f"{depth} PRESS FIT"),
+        parts(suffix=f"<HOLE-DEPTH> 1.0 {depth}"),
+        parts(prefix=f"REAM {depth}"),
+        {5: "REAM <MOD-DIAM>", 6: depth},
     ):
         with pytest.raises(RuntimeError):
             drawing._depth_banded_definition(broken, band)
