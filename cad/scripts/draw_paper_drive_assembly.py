@@ -98,14 +98,16 @@ if SPEC.layout is not DrawingLayout.LANDSCAPE:
 SHEET_LAYOUTS = {name: DrawingLayout.LANDSCAPE for name in SHEET_NAMES}
 
 # --- sheet 1: the whole paper drive, front, right and isometric -------------
-# At 1:3 the 1:5 layout's views (farm run 20261001T110844152Z: front 94 x 59,
-# right 14 x 58, isometric 72 x 80 mm) grow to 157 x 99, 23 x 97 and
-# 120 x 133: the front and right views above the free lower-left field, the
-# isometric right of them over the title block, its balloon ring inside the
-# sheet (_assert_ring_inside reads the placed outline).
-ASSEMBLED_SCALE = (1.0, 3.0)
-FRONT_CENTER = (0.100, 0.190)
-RIGHT_CENTER = (0.215, 0.190)
+# Farm run 20261001T142942518Z placed the isometric at 1:3 and read its
+# outline 187.7 mm tall (ring 221.7 > the 198.0 room); its width passed. The
+# outline is the model's projected box, about 1.4x the ink the 1:5 render
+# showed. At 1:4 it is 140.8 tall, its ring 174.8 inside the room. The front
+# and right views (1:5 ink 94 x 59 and 14 x 58 mm) grow to 118 x 74 and
+# 18 x 73 above the free lower-left field, the isometric right of them over
+# the title block.
+ASSEMBLED_SCALE = (1.0, 4.0)
+FRONT_CENTER = (0.095, 0.190)
+RIGHT_CENTER = (0.205, 0.190)
 ISO_CENTER = (0.330, 0.170)
 # The isometric's balloon ring: left of it the right view, below it the
 # title block (top 0.066), the sheet's drawing border round the rest.
@@ -163,10 +165,21 @@ SHEET_TWO_RING_GAP = 0.004
 INNER_CAPTION_GAP = 0.002
 
 # --- sheet 3: the platen-and-support steps, the ballooned exploded view -----
-# The builder's PAPER_DRIVE_EXPLODED shows only these families here; its
-# estimated isometric spans 445 x 371 mm (paper_drive_explode_spec), 148 x
-# 124 at 1:3, right of the steps and over the title block.
-EXPLODED_SCALE = (1.0, 3.0)
+# The builder's PAPER_DRIVE_EXPLODED shows only these families here. No run
+# has read its outline yet, and sheet 1's showed the outline (the projected
+# box) well past the ink, so the view takes the largest ladder scale whose
+# ring fits right of the steps and over the title block (ladder_scale). Every
+# ladder scale is 1:2 or smaller, so a rescale keeps the simplified
+# configuration the explode is shown in.
+EXPLODED_SCALE_LADDER = ((1.0, 3.0), (1.0, 4.0), (1.0, 5.0))
+if any(
+    view_configuration(scale, _SW_SHADED_EDGES) != SIMPLIFIED_VIEW_CONFIGURATION
+    for scale in EXPLODED_SCALE_LADDER
+):
+    raise AssertionError(
+        "a rescale on the exploded-view ladder would switch configuration"
+    )
+EXPLODED_SCALE = EXPLODED_SCALE_LADDER[0]
 EXPLODED_CENTER = (0.318, 0.168)
 PLATEN_NOTE_XY = (0.018, 0.262)
 # The steps' right limit, left of the exploded view's balloon ring.
@@ -497,6 +510,42 @@ def ring_fit_shift(outline: Box, limits: Box, *, name: str) -> tuple[float, floa
     )
 
 
+def ladder_scale(
+    outline: Box,
+    placed: tuple[float, float],
+    ladder: tuple[tuple[float, float], ...],
+    limits: Box,
+    *,
+    name: str,
+) -> tuple[float, float]:
+    """The largest ``ladder`` scale at which the view's ring fits ``limits``.
+
+    ``outline`` is read at ``placed``; a rescale grows it about its centre.
+    Raises naming each scale's overflow when none fits.
+    """
+    findings = []
+    centre = ((outline[0] + outline[2]) / 2.0, (outline[1] + outline[3]) / 2.0)
+    for scale in ladder:
+        factor = (scale[0] / scale[1]) / (placed[0] / placed[1])
+        half = (
+            (outline[2] - outline[0]) * factor / 2.0,
+            (outline[3] - outline[1]) * factor / 2.0,
+        )
+        scaled = (
+            centre[0] - half[0],
+            centre[1] - half[1],
+            centre[0] + half[0],
+            centre[1] + half[1],
+        )
+        try:
+            ring_fit_shift(scaled, limits, name=f"{name} at {_scale_text(scale)}")
+        except ValueError as error:
+            findings.append(str(error))
+            continue
+        return scale
+    raise ValueError(f"no {name} scale fits: {' | '.join(findings)}")
+
+
 def inner_view_shift(iso_outline: Box, inner_outline: Box) -> tuple[float, float]:
     """Shift that centres the inner view's balloon ring between the BOM and
     the isometric's ring, level with the isometric.
@@ -652,7 +701,8 @@ def _step_text() -> dict[str, str]:
         ),
         "guide-locks-set": (
             f"SNUG EACH {_N['guide-lock']} LOCK'S {_N['guide-lock-screw']} SCREWS, "
-            "PUSH THE LOCK AWAY FROM THE BAR TILL ITS HOLES BEAR ON THEM; TIGHTEN."
+            "PUSH THE LOCK AT ITS MIDDLE AWAY FROM THE BAR TILL ITS HOLES BEAR ON "
+            "THEM; TIGHTEN."
         ),
         "lock-seats-faced": (
             f"FACE LOCK SEATS TO {platen_guide.LOCK_GAP_FIT_TEXT} PLATEN FLOAT; "
@@ -844,10 +894,12 @@ PLATEN_STEPS, *_FITUP = _step_columns()
 FITUP_COLUMNS: tuple[str, str] = (_FITUP[0], _FITUP[1])
 FITUP_STEPS = "\n".join((PLATEN_STEPS, *FITUP_COLUMNS))
 FITUP_NOTES = FITUP_COLUMNS
-EXPLODED_CAPTION = (
-    f"PLATEN AND SUPPORT EXPLODED {EXPLODED_SCALE[0]:g}:{EXPLODED_SCALE[1]:g}; "
+# The exploded view's caption at each scale it may take.
+EXPLODED_CAPTIONS = {
+    scale: f"PLATEN AND SUPPORT EXPLODED {_scale_text(scale)}; "
     f"BOM: SHEET {SHEET_NAMES.index('BILL OF MATERIALS') + 1}"
-)
+    for scale in EXPLODED_SCALE_LADDER
+}
 # One blank line under the steps (default note text, 4.5 mm line pitch).
 EXPLODED_CAPTION_XY = (
     PLATEN_NOTE_XY[0],
@@ -881,7 +933,7 @@ FITUP_REFERENCE_CAPTION = (
 SHEET_TEXTS = (
     PLATEN_STEPS,
     *FITUP_NOTES,
-    EXPLODED_CAPTION,
+    *EXPLODED_CAPTIONS.values(),
     ASSEMBLED_CAPTION,
     TRANSGEAR_CAPTION,
     *INNER_CAPTIONS.values(),
@@ -1294,6 +1346,16 @@ def _place_exploded_sheet(adapter: Any, table: Any, items: dict[str, str]) -> li
     isolate_drawing_view_components(
         adapter, view, visible_stems=explode.SHOWN_STEMS, label=label
     )
+    scale = ladder_scale(
+        _view_outline(view),
+        EXPLODED_SCALE,
+        EXPLODED_SCALE_LADDER,
+        EXPLODED_RING_LIMITS,
+        name=label,
+    )
+    if scale != EXPLODED_SCALE:
+        _set_view_scale(adapter, view, scale, label=label)
+    # The ladder predicted the fit; the re-read outline is the proof.
     shift = ring_fit_shift(_view_outline(view), EXPLODED_RING_LIMITS, name=label)
     _shift_view(adapter, view, shift, label=f"{label} ring fit")
     _link_view_to_bom(view, table, label=label)
@@ -1311,7 +1373,7 @@ def _place_exploded_sheet(adapter: Any, table: Any, items: dict[str, str]) -> li
     _place_sheet_note(
         adapter,
         SHEET_NAMES[2],
-        EXPLODED_CAPTION,
+        EXPLODED_CAPTIONS[scale],
         EXPLODED_CAPTION_XY,
         label="exploded-view caption",
     )

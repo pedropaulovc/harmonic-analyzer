@@ -283,6 +283,108 @@ def test_the_section_stands_rim_up_or_is_refused() -> None:
         drawing._rim_is_up((0.2, 0.15), (0.248, 0.15))
 
 
+class _SectionView:
+    """Section A-A as run 20261001T142942518Z saw it: Position reads where the
+    view was put, ``SetViewPosition`` moves the ink by the difference from it,
+    and reversing the cut swings the ink about the seat face while Position
+    stays put.  It starts as created: rim down, outline on SECTION_CENTER."""
+
+    MARGIN = 0.005588  # the 19e33c6c2 views' outline padding
+
+    def __init__(self, *, moves: bool = True) -> None:
+        half = spec.OVERALL_LENGTH * drawing._S / 2000.0
+        self.seat = (drawing.SECTION_CENTER[0], drawing.SECTION_CENTER[1] + half)
+        self.up = -1.0
+        self.Position = drawing.SECTION_CENTER
+        self.Angle = 0.0
+        self.moves = moves
+        self.reversed = False
+
+    def project(self, xyz: tuple[float, float, float]) -> tuple[float, float]:
+        return (
+            self.seat[0] + xyz[0] * drawing._S,
+            self.seat[1] + self.up * xyz[1] * drawing._S,
+        )
+
+    def GetOutline(self) -> tuple[float, float, float, float]:
+        rim_y = self.project((0.0, spec.OVERALL_LENGTH / 1000.0, 0.0))[1]
+        half = drawing.HALF_HEAD
+        return (
+            self.seat[0] - half - self.MARGIN,
+            min(self.seat[1], rim_y) - self.MARGIN,
+            self.seat[0] + half + self.MARGIN,
+            max(self.seat[1], rim_y) + self.MARGIN,
+        )
+
+    def SetViewPosition(self, xy, _update: bool = False) -> bool:
+        if self.moves:
+            dx, dy = xy[0] - self.Position[0], xy[1] - self.Position[1]
+            self.seat = (self.seat[0] + dx, self.seat[1] + dy)
+        self.Position = tuple(xy)
+        return True
+
+    def GetSection(self):
+        view = self
+
+        class Cut:
+            def GetReversedCutDirection(self) -> bool:
+                return view.reversed
+
+            def SetReversedCutDirection(self, reversed_cut: bool) -> None:
+                view.reversed = reversed_cut
+                view.up = -view.up
+
+        return Cut()
+
+
+def _stand(monkeypatch, view: _SectionView) -> None:
+    monkeypatch.setattr(drawing, "_early_bound", lambda value, _kind: value)
+    monkeypatch.setattr(drawing, "rebuild_drawing", lambda *_a, **_k: None)
+    monkeypatch.setattr(drawing, "double_array", list)
+    monkeypatch.setattr(
+        drawing, "model_point_in_view", lambda _a, v, xyz, label: v.project(xyz)
+    )
+    drawing._stand_section_rim_up(object(), view)
+
+
+def test_the_reversed_section_is_centred_by_its_outline(monkeypatch) -> None:
+    """Run 20261001T142942518Z: re-centred on its stale Position, the
+    reversed section projected its seat at y 0.18915, one nut length above
+    the 0.14085 every SECTION_KEEP place assumes."""
+    view = _SectionView()
+    _stand(monkeypatch, view)
+    assert view.reversed
+    assert view.project((0.0, 0.0, 0.0)) == pytest.approx(
+        (drawing.SECTION_CENTER[0], drawing._section_y(0.0))
+    )
+    rim = view.project((0.0, spec.OVERALL_LENGTH / 1000.0, 0.0))
+    assert rim[1] == pytest.approx(drawing._section_y(spec.OVERALL_LENGTH))
+    # Negative control: the stale Position the run re-centred on.
+    run = _SectionView()
+    run.GetSection().SetReversedCutDirection(True)
+    run.SetViewPosition(drawing.SECTION_CENTER)
+    assert run.project((0.0, 0.0, 0.0))[1] == pytest.approx(0.18915)
+
+
+def test_a_section_whose_ink_will_not_move_is_refused(monkeypatch) -> None:
+    with pytest.raises(RuntimeError, match="outline centre stayed"):
+        _stand(monkeypatch, _SectionView(moves=False))
+
+
+def test_the_outline_must_be_the_nut_on_its_axis() -> None:
+    view = _SectionView()
+    outline = view.GetOutline()
+    assert drawing._outline_is_the_nut_on_end(outline)
+    # The 19e33c6c2 section A-A outline, read by the layout audit.
+    assert drawing._outline_is_the_nut_on_end((0.178662, 0.135262, 0.251338, 0.194738))
+    # The same nut lying on its side.
+    x0, y0, x1, y1 = outline
+    centre = ((x0 + x1) / 2.0, (y0 + y1) / 2.0)
+    w, h = (x1 - x0) / 2.0, (y1 - y0) / 2.0
+    turned = (centre[0] - h, centre[1] - w, centre[0] + h, centre[1] + w)
+    assert not drawing._outline_is_the_nut_on_end(turned)
+
+
 def test_the_thread_callout_stays_inside_the_left_border() -> None:
     """Codex on 19e33c6c2: centred 0.050 left of the face view, the
     countersink line ran off the sheet's left edge."""

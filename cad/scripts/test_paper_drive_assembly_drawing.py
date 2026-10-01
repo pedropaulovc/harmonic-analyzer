@@ -736,3 +736,62 @@ def test_a_balloon_ring_is_centred_in_its_room_or_refused() -> None:
     assert ring[1] - limits[1] == pytest.approx(limits[3] - ring[3])
     with pytest.raises(ValueError, match="width"):
         drawing.ring_fit_shift((0.0, 0.0, 0.19, 0.1), limits, name="t")
+
+
+# Farm run 20261001T142942518Z (8689c2a0d) read sheet 1's isometric at 1:3:
+# its outline 187.7 mm tall; its width passed, so at most 149 mm.
+ISO_OUTLINE_AT_1_3 = (0.250, 0.075, 0.250 + 0.149, 0.075 + 0.1877)
+
+
+def _rescaled(outline, ratio):
+    cx, cy = (outline[0] + outline[2]) / 2.0, (outline[1] + outline[3]) / 2.0
+    hw, hh = (
+        (outline[2] - outline[0]) * ratio / 2.0,
+        (outline[3] - outline[1]) * ratio / 2.0,
+    )
+    return (cx - hw, cy - hh, cx + hw, cy + hh)
+
+
+def test_the_sheet_one_isometric_ring_fits_at_the_sheet_scale() -> None:
+    """The 1:3 isometric's ring overflowed natively (221.7 > 198.0 mm); at the
+    sheet's scale the same outline's ring fits its room."""
+    with pytest.raises(ValueError, match=r"height 221\.7 mm > room 198\.0 mm"):
+        drawing.ring_fit_shift(
+            ISO_OUTLINE_AT_1_3, drawing.ISO_RING_LIMITS, name="sheet 1 isometric"
+        )
+    numerator, denominator = drawing.ASSEMBLED_SCALE
+    outline = _rescaled(ISO_OUTLINE_AT_1_3, 3.0 * numerator / denominator)
+    dx, dy = drawing.ring_fit_shift(outline, drawing.ISO_RING_LIMITS, name="t")
+    ring = drawing._grown(
+        (outline[0] + dx, outline[1] + dy, outline[2] + dx, outline[3] + dy),
+        drawing.BALLOON_RING_REACH,
+    )
+    left, bottom, right, top = drawing.ISO_RING_LIMITS
+    assert left <= ring[0] and ring[2] <= right
+    assert bottom <= ring[1] and ring[3] <= top
+
+
+def test_the_exploded_view_steps_down_its_ladder_to_the_first_fit() -> None:
+    placed = drawing.EXPLODED_SCALE
+    limits = drawing.EXPLODED_RING_LIMITS
+    fits = (0.25, 0.1, 0.25 + 0.120, 0.1 + 0.120)
+    assert (
+        drawing.ladder_scale(
+            fits, placed, drawing.EXPLODED_SCALE_LADDER, limits, name="t"
+        )
+        == placed
+    )
+    # Sheet 1's measured isometric, were the exploded view as tall.
+    assert drawing.ladder_scale(
+        ISO_OUTLINE_AT_1_3, placed, drawing.EXPLODED_SCALE_LADDER, limits, name="t"
+    ) == (1.0, 4.0)
+    with pytest.raises(ValueError, match="no t scale fits"):
+        drawing.ladder_scale(
+            (0.0, 0.0, 0.5, 0.5),
+            placed,
+            drawing.EXPLODED_SCALE_LADDER,
+            limits,
+            name="t",
+        )
+    # Every scale the view may take has its caption.
+    assert set(drawing.EXPLODED_CAPTIONS) == set(drawing.EXPLODED_SCALE_LADDER)

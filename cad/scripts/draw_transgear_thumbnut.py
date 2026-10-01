@@ -132,6 +132,9 @@ THREAD_CALLOUT_XY = (FACE_CENTER[0] - 0.020, FACE_CENTER[1] + 0.060)
 # How far the section's seat-face point may land from where SECTION_KEEP
 # assumes it (sheet metres).
 _SEAT_PLACEMENT_TOL = 0.001
+# How far the section's outline centre may land from SECTION_CENTER, and its
+# extent from the nut's silhouette stood on end (sheet metres).
+_OUTLINE_TOL = 0.0002
 
 
 def _rim_is_up(seat: tuple[float, float], rim: tuple[float, float]) -> bool:
@@ -143,6 +146,63 @@ def _rim_is_up(seat: tuple[float, float], rim: tuple[float, float]) -> bool:
     return dy > 0.0
 
 
+def _outline_centre(outline: tuple[float, ...]) -> tuple[float, float]:
+    return ((outline[0] + outline[2]) / 2.0, (outline[1] + outline[3]) / 2.0)
+
+
+def _outline_is_the_nut_on_end(outline: tuple[float, ...]) -> bool:
+    """Whether ``outline`` boxes the nut's silhouette with its axis vertical.
+
+    SolidWorks pads a view's outline by one margin all round (5.588 mm on
+    both axes of the 19e33c6c2 section and face views), so the margin drops
+    out of height minus width: that is the overall length less the knurl
+    diameter, at the sheet scale, exactly when the axis stands vertical.
+    """
+    width, height = outline[2] - outline[0], outline[3] - outline[1]
+    expected = (OVERALL_LENGTH - HEAD_DIA) * _S / 1000.0
+    return abs((height - width) - expected) <= _OUTLINE_TOL
+
+
+def _centre_section_outline(adapter: Any, view: Any) -> tuple[float, ...]:
+    """Move section A-A until its outline (the ink) is centred on SECTION_CENTER.
+
+    Reversing the cut swings the section's ink without moving the Position
+    that ``SetViewPosition`` measures its move from: on run
+    20261001T142942518Z, ``SetViewPosition(SECTION_CENTER)`` after the
+    reversal left the seat projected at y 0.18915 -- where it sat rim-down,
+    and one nut length (48.3 mm at 3:1) above where a centred rim-up section
+    puts it.  As for a fresh detail view (layout-tuning catalogue j), the
+    view is placed by its outline: ``SetViewPosition`` moves the ink by the
+    difference from the Position it reads.
+    """
+    for attempt in range(4):
+        outline = tuple(float(value) for value in view.GetOutline())
+        position = tuple(float(value) for value in view.Position)
+        centre = _outline_centre(outline)
+        _telemetry.info(
+            f"thumbnut section pass {attempt}: position={position} "
+            f"outline={outline} outline_centre={centre}"
+        )
+        if math.dist(centre, SECTION_CENTER) <= _OUTLINE_TOL:
+            break
+        moved = [
+            position[axis] + SECTION_CENTER[axis] - centre[axis] for axis in (0, 1)
+        ]
+        if not view.SetViewPosition(double_array(moved), False):
+            raise RuntimeError("failed to re-centre thumbnut section A-A")
+        rebuild_drawing(adapter, label="thumbnut section re-centred")
+    else:
+        raise RuntimeError(
+            f"thumbnut section A-A outline centre stayed at {centre}, "
+            f"requested {SECTION_CENTER}"
+        )
+    if not _outline_is_the_nut_on_end(outline):
+        raise RuntimeError(
+            f"thumbnut section A-A outline {outline} is not the nut standing on its axis"
+        )
+    return outline
+
+
 def _stand_section_rim_up(adapter: Any, section: Any) -> None:
     """Turn section A-A so the dished rim is up and the seat face down.
 
@@ -150,6 +210,9 @@ def _stand_section_rim_up(adapter: Any, section: Any) -> None:
     placed for a rim-up section and with the stem's diameters below the seat
     face on the SECTION A-A caption.  Looking from the other side of the cut
     should stand the nut up; if it does not, the view turns 180° instead.
+    The rim test reads only the projection's direction; the section is then
+    centred by its ink, and its projection re-read until the seat lands
+    where SECTION_KEEP puts it.
     """
     native = _early_bound(section, "IView")
 
@@ -166,17 +229,22 @@ def _stand_section_rim_up(adapter: Any, section: Any) -> None:
         if not rim_is_up():
             native.Angle = float(native.Angle) + math.pi
             rebuild_drawing(adapter, label="thumbnut section turned")
-    if not native.SetViewPosition(double_array(list(SECTION_CENTER)), False):
-        raise RuntimeError("failed to re-centre thumbnut section A-A")
-    rebuild_drawing(adapter, label="thumbnut section re-centred")
-    seat, rim = _seat_and_rim(adapter, native)
+    outline = _centre_section_outline(adapter, native)
     expected = (SECTION_CENTER[0], _section_y(0.0))
-    if not _rim_is_up(seat, rim) or math.dist(seat, expected) > _SEAT_PLACEMENT_TOL:
+    for attempt in range(3):
+        seat, rim = _seat_and_rim(adapter, native)
+        if _rim_is_up(seat, rim) and math.dist(seat, expected) <= _SEAT_PLACEMENT_TOL:
+            break
+        rebuild_drawing(adapter, label=f"settle thumbnut section, read {attempt}")
+    else:
         raise RuntimeError(
             f"thumbnut section A-A is not rim up on its centre: seat={seat} "
-            f"(expected {expected}), rim={rim}"
+            f"(expected {expected}), rim={rim}, outline={outline}"
         )
-    _telemetry.info(f"thumbnut section rim up: angle={float(native.Angle):.6f} rad")
+    _telemetry.info(
+        f"thumbnut section rim up: angle={float(native.Angle):.6f} rad, "
+        f"seat={seat}, rim={rim}, outline={outline}"
+    )
 
 
 def _seat_and_rim(

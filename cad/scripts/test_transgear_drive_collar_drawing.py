@@ -5,6 +5,7 @@ from __future__ import annotations
 import ast
 import math
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -65,6 +66,139 @@ def test_turned_diameters_and_lengths_print_on_the_side_view() -> None:
         < drawing._REAR_X
     )
     assert drawing.SIDE_KEEP["PilotDia"][0] > drawing._PILOT_X
+
+
+class _SideViewSeat:
+    """The *Right side view's hit test, hidden lines removed, built from the spec.
+
+    The view centres on the part's box (run 20261001T142942518Z projected the
+    rear face to sheet x 0.2232), sheet right is model -Z and up is +Y.  Each
+    planar face's circles stand edge-on as model EDGEs; only the turned flanks
+    are SILHOUETTEs.  A pick lands on a line within half a sheet millimetre.
+    """
+
+    TOLERANCE_M = 0.0005
+
+    def __init__(self) -> None:
+        od_r, pilot_r = spec.OD / 2.0, spec.PILOT_DIA / 2.0
+        slot_r, floor = spec.SLOT_WIDTH / 2.0, spec.SLOT_FLOOR_Z
+        length, pilot = spec.LENGTH, spec.PILOT_LENGTH
+        # (kind, (z, y), (z, y)) in model millimetres.
+        self.segments = [
+            ("EDGE", (-pilot, -pilot_r), (-pilot, pilot_r)),  # pilot front
+            ("EDGE", (0.0, -od_r), (0.0, od_r)),  # seat face
+            ("EDGE", (floor, -slot_r), (floor, slot_r)),  # slot floor
+            ("EDGE", (length, slot_r), (length, od_r)),  # rear face, either
+            ("EDGE", (length, -od_r), (length, -slot_r)),  # side of the slot
+            ("EDGE", (floor, slot_r), (length, slot_r)),  # slot walls
+            ("EDGE", (floor, -slot_r), (length, -slot_r)),
+            ("SILHOUETTE", (0.0, od_r), (length, od_r)),
+            ("SILHOUETTE", (0.0, -od_r), (length, -od_r)),
+            ("SILHOUETTE", (-pilot, pilot_r), (0.0, pilot_r)),
+            ("SILHOUETTE", (-pilot, -pilot_r), (0.0, -pilot_r)),
+        ]
+        self.selected: list[tuple[tuple[float, float], tuple[float, float]]] = []
+        self.picked: list[tuple[tuple[float, float], tuple[float, float]]] = []
+        self.display: _Display | None = None
+        self.Extension = self
+
+    @staticmethod
+    def _sheet(point: tuple[float, float]) -> tuple[float, float]:
+        z, y = point
+        mid = (spec.LENGTH - spec.PILOT_LENGTH) / 2.0
+        cx, cy = drawing.SIDE_CENTER
+        return cx - (z - mid) * drawing._S / 1000.0, cy + y * drawing._S / 1000.0
+
+    def _distance(self, xy, a, b) -> float:
+        (ax, ay), (bx, by) = self._sheet(a), self._sheet(b)
+        dx, dy = bx - ax, by - ay
+        t = ((xy[0] - ax) * dx + (xy[1] - ay) * dy) / (dx * dx + dy * dy)
+        t = min(1.0, max(0.0, t))
+        return math.dist(xy, (ax + t * dx, ay + t * dy))
+
+    def ActivateView(self, _name: str) -> bool:
+        return True
+
+    def ClearSelection2(self, _all: bool) -> bool:
+        self.selected.clear()
+        return True
+
+    def SelectByID2(self, _name, kind, x, y, _z, append, *_rest) -> bool:
+        hits = [
+            (self._distance((x, y), a, b), (a, b))
+            for k, a, b in self.segments
+            if k == kind and self._distance((x, y), a, b) <= self.TOLERANCE_M
+        ]
+        if not hits:
+            return False
+        if not append:
+            self.selected.clear()
+        self.selected.append(min(hits)[1])
+        return True
+
+    def AddHorizontalDimension2(self, _x, _y, _z) -> _Display | None:
+        stations = {a[0] for a, b in self.selected if a[0] == b[0]}
+        if len(self.selected) != 2 or len(stations) != 2:
+            return None
+        self.picked = list(self.selected)
+        self.display = _Display(abs(max(stations) - min(stations)) / 1000.0)
+        return self.display
+
+
+class _Display:
+    def __init__(self, value_m: float) -> None:
+        self.value_m = value_m
+        self.precision = -1
+
+    def GetDimension2(self, _index: int) -> SimpleNamespace:
+        return SimpleNamespace(SystemValue=self.value_m)
+
+    def GetAnnotation(self) -> object:
+        return self
+
+    def SetPrecision3(self, primary: int, *_rest: int) -> bool:
+        self.precision = primary
+        return True
+
+    def GetPrimaryPrecision2(self) -> int:
+        return self.precision
+
+
+def test_the_overall_reference_picks_both_end_faces_as_drawn_edges(
+    monkeypatch,
+) -> None:
+    """Run 20261001T142942518Z: the rear-face pick asked for a SILHOUETTE
+    where only the face's edge-on circle (a model EDGE) is drawn, and the
+    sheet stopped.  Both picks land on end-face edges and measure 5.9."""
+    import _drawing_common
+
+    monkeypatch.setattr(_drawing_common, "view_name", lambda _a, _v: "Drawing View2")
+    monkeypatch.setattr(_drawing_common, "null_callout", lambda: None)
+    references: list[str] = []
+    monkeypatch.setattr(
+        drawing,
+        "set_reference_dimension",
+        lambda _adapter, _annotation, *, label: references.append(label),
+    )
+    seat = _SideViewSeat()
+    drawing._overall_reference(SimpleNamespace(currentModel=seat), object())
+    assert [a[0] for a, _b in seat.picked] == pytest.approx(
+        [-spec.PILOT_LENGTH, spec.LENGTH]
+    )
+    assert references == ["drive-collar overall length reference"]
+    assert seat.display is not None
+    assert seat.display.precision == spec.DRAWING_REFERENCE_PRECISION
+
+    # Negative control: on the axis the rear face is the slot's air.
+    monkeypatch.setattr(
+        drawing,
+        "OVERALL_PICKS",
+        tuple((x, drawing.SIDE_CENTER[1]) for x, _y in drawing.OVERALL_PICKS),
+    )
+    with pytest.raises(RuntimeError, match=r"reference edge 1 at sheet"):
+        drawing._overall_reference(
+            SimpleNamespace(currentModel=_SideViewSeat()), object()
+        )
 
 
 def _segments_cross(a, b, c, d) -> bool:

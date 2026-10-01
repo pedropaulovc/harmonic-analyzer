@@ -26,7 +26,6 @@ from _drawing_common import (
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
-    model_point_in_view,
     read_required_properties,
     set_dimension_callouts,
     set_hidden_lines_removed,
@@ -103,6 +102,13 @@ SIDE_KEEP = {
     "SlotWidth": (_REAR_X - 0.014, SIDE_CENTER[1]),
 }
 OVERALL_TEXT_XY = ((_REAR_X + _PILOT_X) / 2.0, SIDE_CENTER[1] - HALF_OD - 0.040)
+# The overall's picks, pilot front face then rear face.  Each face's outer
+# circle stands edge-on here, so it is a model EDGE; only the turned flanks
+# are drawing silhouettes, and a SILHOUETTE pick on the rear face missed
+# (run 20261001T142942518Z).  Half the pilot radius up: off the slot
+# (half-width 0.9), inside the pilot (r 5.0), clear of the pin holes (r 5.81+).
+_OVERALL_PICK_Y = SIDE_CENTER[1] + PILOT_DIA * _S / 4000.0
+OVERALL_PICKS = ((_PILOT_X, _OVERALL_PICK_Y), (_REAR_X, _OVERALL_PICK_Y))
 DIMENSION_CALLOUTS_BELOW = {
     "BoreDia": BORE_CALLOUT,
     "PinPosDia": PIN_HOLE_CALLOUT,
@@ -116,23 +122,14 @@ NOTES_XY = (0.016, 0.070)
 def _overall_reference(adapter: Any, side: Any) -> None:
     """The (5.9) overall, pilot front face to rear face (rule 7)."""
     label = "drive-collar overall length reference"
-    # Off the slot (half-width 0.9) and inside the pilot (r 5.0).
-    y = PILOT_DIA / 4000.0
-    pilot_front = model_point_in_view(
-        adapter, side, (0.0, y, -PILOT_LENGTH / 1000.0), label="collar pilot front"
-    )
-    rear_face = model_point_in_view(
-        adapter, side, (0.0, y, LENGTH / 1000.0), label="collar rear face"
-    )
     display = add_edge_dimension(
         adapter,
         side,
-        p0=pilot_front,
-        p1=rear_face,
+        p0=OVERALL_PICKS[0],
+        p1=OVERALL_PICKS[1],
         text_xy=OVERALL_TEXT_XY,
         label=label,
         orientation="horizontal",
-        entity_types=("EDGE", "SILHOUETTE"),
     )
     display = _early_bound(display, "IDisplayDimension")
     dimension = _early_bound(display.GetDimension2(0), "IDimension")
