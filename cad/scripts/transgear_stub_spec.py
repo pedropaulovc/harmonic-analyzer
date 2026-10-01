@@ -1,20 +1,20 @@
 r"""Pure-data contract for MHA-082, the transgear stud (contract §2.1, ruling R9-5).
 
 The fixed steel stud the disc cluster runs on.  Its Ø12 collar seats on the
-arm MHA-164's front face with the #10-32 rear thread screwed through the arm's
-tapped hole; the feed-pinion sleeve runs on the Ø3.9 journal between the Ø9
-thrust step and the journal shoulder; the MHA-160 hub cap screws onto the
-#6-32 front thread and seats on that shoulder, so the cap is torqued against
-the stud and never against the cluster.
+MHA-178 shim, which seats on the arm MHA-164's front face, with the #10-32
+rear thread screwed through the shim and the arm's tapped hole; the
+feed-pinion sleeve runs on the Ø3.9 journal between the Ø9 thrust step and
+the journal shoulder; the MHA-160 hub cap screws onto the #6-32 front thread
+and seats on that shoulder, so the cap is torqued against the stud and never
+against the cluster.
 
-Frame: one revolve about local +Z.  Local z = 0 is the collar's rear face (the
-arm seat, machine z -124.4) and local +Z runs toward the machine front, so
-machine z = ``ARM_SEAT_MACHINE_Z`` - local z.  Named planes: ``ArmSeat`` is
-the Front Plane (z 0); ``SleeveThrust`` (z 10.75 as fitted, the Ø9 step
-face); ``CapShoulder`` (z 33.65, the journal shoulder).  ``Axis1`` is the
-stud axis.  The arm seat is faced to fit at assembly (R9-47), so every
-make-to axial size datums on the thrust face and the model carries the
-as-fitted nominal.
+Frame: one revolve about local +Z.  Local z = 0 is the collar's rear face
+(the seat on the shim, machine z -127.45 as fitted) and local +Z runs
+toward the machine front, so machine z = ``SEAT_MACHINE_Z`` - local z.
+Named planes: ``SleeveThrust`` (z 7.7, the Ø9 step face); ``CapShoulder``
+(z 30.6, the journal shoulder).  ``Axis1`` is the stud axis.  The shim, not
+the stud, is faced to fit at assembly (R9-65), so the stud is made to size
+and every axial size datums on the thrust face.
 
 PURE DATA: the build and the drawing both import it; neither imports the
 other.  The sleeve spec (``transgear_feed_pinion_spec``) imports the journal
@@ -28,12 +28,34 @@ import math
 from _fit_limits import SHAFT_H
 from _gtol_spec import CylinderFace
 from _hole_spec import THREAD_MAJOR_MM
-from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from _printed_tolerance import printed_band_mm
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 import transgear_arm_geometry as ARM
-from transgear_arm_geometry import MM_PER_IN, STUD_TAP_CSK_DIA, STUD_TAP_SPEC
+from transgear_arm_geometry import MM_PER_IN, STUD_TAP_SPEC
 
-ARM_SEAT_MACHINE_Z = ARM.FRONT_FACE_MACHINE_Z
+# --- Faced to fit (R9-47, R9-65) -----------------------------------------------
+# m is the air from F to the MHA-070 disc's front face, read on feelers with
+# the knob shaft rearward, the MHA-177 drive collar slid back on the 12T and
+# the disc cluster pushed forward.  F, the window's one referent, is the
+# MHA-078 knob shaft's 12T front face: the drive collar's rearward stop.  The
+# MHA-178 shim between the arm and the stud's collar is faced until m reads
+# STUD_FIT_WINDOW; ``transgear_stud_fit`` holds the knob chain, the fitted
+# band and the shim thickness it takes.
+STUD_FIT_WINDOW = (0.10, 0.20)
+STUD_FIT_WINDOW_TEXT = f"{STUD_FIT_WINDOW[0]:.2f}-{STUD_FIT_WINDOW[1]:.2f}"
+# The arm's front face to the Ø9 step face as the model is fitted: m at the
+# window's centre 0.15 on the nominal knob chain 10.90 (``transgear_stud_fit``
+# asserts it).  The thrust face stands at machine z -135.15.
+FITTED_THRUST_STATION = 10.75
+# The stud's own seat to the thrust face, a routine .X make-to size: the
+# shim takes up the rest, 3.05 in the model.
+SLEEVE_THRUST_STATION = 7.7
+SEAT_MACHINE_Z = round(
+    ARM.FRONT_FACE_MACHINE_Z - (FITTED_THRUST_STATION - SLEEVE_THRUST_STATION), 6
+)
+# Make-to sizes datum on the Ø9 step face (the sleeve's rear thrust face).
+STEP_LENGTH = 4.2  # the Ø12 collar's front face to the thrust face
+REAR_THREAD_END_FROM_THRUST = 20.0  # the thrust face to the rear thread's end
 
 # --- Threads -----------------------------------------------------------------
 # One thread authority for the cap: the MHA-160 spec taps this size.
@@ -46,34 +68,10 @@ FRONT_THREAD_MAJOR = THREAD_MAJOR_MM[FRONT_THREAD]  # 3.505
 REAR_THREAD_MAJOR = THREAD_MAJOR_MM[REAR_THREAD]  # 4.826
 FRONT_THREAD_PITCH = MM_PER_IN / 32.0
 
-# --- Faced to fit (R9-47) ------------------------------------------------------
-# m is the air from F to the MHA-070 disc's front face, read on feelers with
-# the knob shaft rearward, the MHA-177 drive collar slid back on the 12T and
-# the disc cluster pushed forward.  F, the window's one referent, is the
-# MHA-078 knob shaft's 12T front face: the drive collar's rearward stop.  The
-# stud is turned long on its thrust station and the collar's rear face (the
-# arm seat) is faced until m reads STUD_FIT_WINDOW; ``transgear_stud_fit``
-# holds the knob chain, the fitted band and the facing it takes.
-STUD_FIT_WINDOW = (0.10, 0.20)
-STUD_FIT_WINDOW_TEXT = f"{STUD_FIT_WINDOW[0]:.2f}-{STUD_FIT_WINDOW[1]:.2f}"
-TURN_THRUST_STATION_MIN = 11.5
-TURN_THRUST_STATION = 12.2  # as turned
-# The model carries the as-fitted nominal: m at the window's centre 0.15 on
-# the nominal knob chain 10.90 leaves 10.75, i.e. 1.45 faced from the 12.2
-# turned (``transgear_stud_fit`` asserts it).
-SLEEVE_THRUST_STATION = 10.75
-# Make-to sizes datum on the Ø9 step face (the sleeve's rear thrust face),
-# which the facing never touches; each is a routine .X size.
-STEP_LENGTH = 4.2  # the Ø12 collar's front face to the thrust face
-FACE_RELIEF_FLOOR_FROM_THRUST = 8.2  # the thrust face to the face relief's floor
-REAR_THREAD_END_FROM_THRUST = 20.0  # the thrust face to the rear thread's end
-
-# --- Rear: #10-32 through the arm, domed end ----------------------------------
-# The thread runs from the collar face (through the Ø5.40 face relief, which
-# takes the screw-cutting run-out so full thread starts at the arm's face) to
-# the dome base, REAR_THREAD_END_FROM_THRUST from the thrust face: the more
-# the seat is faced, the further the dome stands behind the arm (as fitted,
-# 9.25 from the seat).
+# --- Rear: #10-32 through the shim and the arm, domed end ---------------------
+# The thread runs from the rear relief at the seat, through the shim, to the
+# dome base, REAR_THREAD_END_FROM_THRUST from the thrust face (9.25 behind
+# the arm's front face as fitted).
 REAR_THREAD_LENGTH = round(REAR_THREAD_END_FROM_THRUST - SLEEVE_THRUST_STATION, 6)
 REAR_DOME_SAG = 1.0
 REAR_DOME_R = ((REAR_THREAD_MAJOR / 2.0) ** 2 + REAR_DOME_SAG**2) / (
@@ -82,15 +80,19 @@ REAR_DOME_R = ((REAR_THREAD_MAJOR / 2.0) ** 2 + REAR_DOME_SAG**2) / (
 # The screw-cutting run-out at 32 tpi (R9-5): both threads run out into a
 # relief at least this long.
 SCREW_CUT_RUNOUT = 1.0
-FACE_RELIEF_DIA = 5.40
-# As fitted the floor stands 2.55 inside the seat face; the fit-up keeps its
-# least depth over the run-out (``transgear_stud_fit``).
-FACE_RELIEF_DEPTH = round(SLEEVE_THRUST_STATION - FACE_RELIEF_FLOOR_FROM_THRUST, 6)
+# Rear thread relief at the seat (R9-65), the front relief's form: Ø3.7 MAX
+# under the #10-32 root (a single MAX limit, its nominal at the band's top),
+# 1.1 ±0.1 wide (the run-out needs 1.0; the shim holds 1.2 and more).  The
+# whole relief stands inside the shim, so full thread starts before the arm.
+REAR_RELIEF_DIA = 3.7
+REAR_RELIEF_DIA_BAND = (0.0, -0.3)  # (upper, lower)
+REAR_RELIEF_WIDTH = 1.1
+REAR_RELIEF_WIDTH_TOL = 0.1
 
 # --- Collar, thrust step, journal ---------------------------------------------
 COLLAR_DIA = 12.0
 STEP_DIA = 9.0
-# As fitted: the seat face to the collar's front face, 6.55.
+# The seat face to the collar's front face, 3.5.
 COLLAR_LENGTH = round(SLEEVE_THRUST_STATION - STEP_LENGTH, 6)
 # The Ø9 step face is the sleeve's rear thrust face (machine z -135.15 as
 # fitted).
@@ -149,17 +151,15 @@ def _limits(nominal: float, band: tuple[float, float]) -> tuple[float, float]:
 
 
 # --- Decimal places ARE the tolerance (policy rule 2) --------------------------
-# .XX on the face relief Ø (it clears the #10-32 major at its minimum).  The
-# journal Ø prints its fit band at three places, its length its ±0.05 at two,
-# the relief its MAX and ±0.1 at one.  The axial make-to sizes datum on the
-# thrust face at routine .X (``transgear_stud_fit`` holds their worst cases
-# over the fitted band); the thrust station prints as a REFERENCE, as fitted,
-# under its turn-and-face callout.
+# The journal Ø prints its fit band at three places, its length its ±0.05 at
+# two, each relief its MAX and ±0.1 at one.  The axial make-to sizes datum on
+# the thrust face at routine .X (``transgear_stud_fit`` holds their worst
+# cases over the fitted band).
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "StudProfile": {
         "RearThreadEnd",
-        "FaceReliefDia",
-        "FaceReliefFloor",
+        "RearReliefDia",
+        "RearReliefWidth",
         "CollarDia",
         "StepLength",
         "StepDia",
@@ -176,12 +176,12 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "StudProfile": {
         "RearThreadEnd": 1,
-        "FaceReliefDia": 2,
-        "FaceReliefFloor": 1,
+        "RearReliefDia": 1,
+        "RearReliefWidth": 1,
         "CollarDia": 1,
         "StepLength": 1,
         "StepDia": 1,
-        "ThrustStation": 2,
+        "ThrustStation": 1,
         "JournalDia": 3,
         "JournalLength": 2,
         "ReliefDia": 1,
@@ -198,11 +198,6 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 }
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked MHA-082 dimension needs authored places")
-# Faced to fit: the as-fitted station is a reference and the callout under it
-# is the requirement (the MHA-172 seat washer idiom); the drawing appends the
-# MHA-A06 step pointer.
-REFERENCE_DIMENSIONS = frozenset({"ThrustStation"})
-THRUST_STATION_CALLOUT = f"TURN {TURN_THRUST_STATION_MIN:.1f} MIN, FACED TO FIT"
 
 
 def _band(name: str) -> float:
@@ -217,15 +212,17 @@ RELIEF_DIA_MIN, RELIEF_DIA_MAX = _limits(RELIEF_DIA, RELIEF_DIA_BAND)
 RELIEF_WIDTH_MIN, RELIEF_WIDTH_MAX = _limits(
     RELIEF_WIDTH, (RELIEF_WIDTH_TOL, -RELIEF_WIDTH_TOL)
 )
+REAR_RELIEF_DIA_MIN, REAR_RELIEF_DIA_MAX = _limits(
+    REAR_RELIEF_DIA, REAR_RELIEF_DIA_BAND
+)
+REAR_RELIEF_WIDTH_MIN, REAR_RELIEF_WIDTH_MAX = _limits(
+    REAR_RELIEF_WIDTH, (REAR_RELIEF_WIDTH_TOL, -REAR_RELIEF_WIDTH_TOL)
+)
 FRONT_THREAD_END_MIN = round(FRONT_THREAD_END - _band("FrontThreadEnd"), 6)
 STEP_LENGTH_MAX = round(STEP_LENGTH + _band("StepLength"), 6)
 STEP_LENGTH_MIN = round(STEP_LENGTH - _band("StepLength"), 6)
-FACE_RELIEF_FLOOR_MIN = round(
-    FACE_RELIEF_FLOOR_FROM_THRUST - _band("FaceReliefFloor"), 6
-)
-FACE_RELIEF_FLOOR_MAX = round(
-    FACE_RELIEF_FLOOR_FROM_THRUST + _band("FaceReliefFloor"), 6
-)
+SLEEVE_THRUST_STATION_MIN = round(SLEEVE_THRUST_STATION - _band("ThrustStation"), 6)
+SLEEVE_THRUST_STATION_MAX = round(SLEEVE_THRUST_STATION + _band("ThrustStation"), 6)
 REAR_THREAD_END_MIN = round(REAR_THREAD_END_FROM_THRUST - _band("RearThreadEnd"), 6)
 REAR_THREAD_END_MAX = round(REAR_THREAD_END_FROM_THRUST + _band("RearThreadEnd"), 6)
 
@@ -234,38 +231,32 @@ REAR_THREAD_END_MAX = round(REAR_THREAD_END_FROM_THRUST + _band("RearThreadEnd")
 # supplied, at the arm module's thickness and stock band.  The engagement
 # over the fitted thrust-station band is ``transgear_stud_fit``'s.
 ARM_THICKNESS_MIN = round(ARM.THICKNESS - ARM.THICKNESS_BAND, 6)
-# Countersink Ø5.0 +0.10/0 on both arm faces: each takes (csk - major)/2 of
-# thread.  Conservative: both faces deducted (the rear one lies under the dome
-# only when the dome base clears the rear face).
-ARM_CSK_LOSS_NOMINAL = (STUD_TAP_CSK_DIA - REAR_THREAD_MAJOR) / 2.0
-ARM_CSK_LOSS_MAX = (STUD_TAP_CSK_DIA + drilled_oversize_mm() - REAR_THREAD_MAJOR) / 2.0
 ENGAGEMENT_RULE_D = 1.5
 
-# --- #6-32 root, relief and neck ----------------------------------------------
+# --- Thread roots, reliefs and necks -------------------------------------------
 # ASSUMPTION (the MHA-139 construction, not sourced from ASME B1.1 here): the
 # basic-profile root is major - 1.299038 P; the UNR-2A reference minimum is
-# the 2A major max (0.1380 - 0.0008 in) less 1.226869 P.  The relief floor
-# stays under both so the thread's last full form clears it.
+# the 2A major max (#6-32: 0.1380 - 0.0008 in; #10-32: 0.1900 - 0.0010 in)
+# less 1.226869 P.  Each relief floor stays under both so the thread's last
+# full form clears it.
 FRONT_THREAD_ROOT_BASIC = (
     FRONT_THREAD_MAJOR - 1.5 * math.sqrt(3.0) / 2.0 * FRONT_THREAD_PITCH
 )
 FRONT_THREAD_MINOR_UNR_2A = (0.1372 - 1.226869 / 32.0) * MM_PER_IN
+REAR_THREAD_PITCH = MM_PER_IN / 32.0
+REAR_THREAD_ROOT_BASIC = (
+    REAR_THREAD_MAJOR - 1.5 * math.sqrt(3.0) / 2.0 * REAR_THREAD_PITCH
+)
+REAR_THREAD_MINOR_UNR_2A = (0.1890 - 1.226869 / 32.0) * MM_PER_IN
 # The neck is the stud's weakest section at its minimum: pi/4 x 2.1^2 = 3.46
 # mm^2 against the #6-32 tensile stress area 0.00909 in^2 = 5.86 mm^2 (59 %).
 # The cap is set by hand with a pin spanner and the stud carries no axial
-# working load, so the neck is not a limit.
+# working load, so the neck is not a limit.  The rear neck, pi/4 x 3.4^2 =
+# 9.08 mm^2, carries only the stud's hand-tight seat on the shim.
 NECK_AREA_MIN = math.pi / 4.0 * RELIEF_DIA_MIN**2
 FRONT_TENSILE_STRESS_AREA = 0.00909 * MM_PER_IN**2
 
 # --- Walls (contract §8) --------------------------------------------------------
-# Collar over the face relief: (12.0 - 5.40)/2 = 3.30 nominal;
-# (11.2 - 5.91)/2 = 2.645 at the collar .X minimum and the relief .XX maximum.
-COLLAR_WALL_NOMINAL = (COLLAR_DIA - FACE_RELIEF_DIA) / 2.0
-COLLAR_WALL_WORST = (
-    COLLAR_DIA - _band("CollarDia") - (FACE_RELIEF_DIA + _band("FaceReliefDia"))
-) / 2.0
-# Face relief Ø at its minimum still clears the #10-32 major: 4.89 > 4.826.
-FACE_RELIEF_DIA_MIN = round(FACE_RELIEF_DIA - _band("FaceReliefDia"), 6)
 # Informational (solid stud, no bore): the Ø9 step over the #10-32 major,
 # (9.0 - 4.826)/2 = 2.087 nominal, (8.2 - 4.826)/2 = 1.687 at .X.
 STEP_WALL_NOMINAL = (STEP_DIA - REAR_THREAD_MAJOR) / 2.0
@@ -273,7 +264,7 @@ STEP_WALL_WORST = (STEP_DIA - _band("StepDia") - REAR_THREAD_MAJOR) / 2.0
 
 # The model's stations, as fitted (R9-47: 0.25 forward of the contract §2
 # stations; the cluster, cap and front tip move with the thrust face).
-THRUST_MACHINE_Z = round(ARM_SEAT_MACHINE_Z - SLEEVE_THRUST_STATION, 6)
+THRUST_MACHINE_Z = round(SEAT_MACHINE_Z - SLEEVE_THRUST_STATION, 6)
 
 for _ok, _what in (
     (
@@ -287,40 +278,36 @@ for _ok, _what in (
         "relief width leaves R9-5's 1.0-1.2 window",
     ),
     (
-        TURN_THRUST_STATION >= TURN_THRUST_STATION_MIN,
-        "the as-turned thrust station is under its TURN MIN",
+        REAR_RELIEF_DIA_MAX < min(REAR_THREAD_ROOT_BASIC, REAR_THREAD_MINOR_UNR_2A),
+        f"rear relief Ø{REAR_RELIEF_DIA_MAX} MAX is not under the #10-32 root "
+        f"{REAR_THREAD_ROOT_BASIC:.3f} / 2A minor {REAR_THREAD_MINOR_UNR_2A:.3f}",
     ),
     (
-        math.isclose(COLLAR_LENGTH + STEP_LENGTH, SLEEVE_THRUST_STATION, abs_tol=1e-9)
-        and math.isclose(
-            FACE_RELIEF_DEPTH + FACE_RELIEF_FLOOR_FROM_THRUST,
-            SLEEVE_THRUST_STATION,
-            abs_tol=1e-9,
-        ),
-        "the as-fitted collar and face relief do not datum on the thrust face",
+        REAR_RELIEF_DIA == REAR_RELIEF_DIA_MAX,
+        "swTolMAX prints the nominal: the rear relief's must be the max",
     ),
     (
-        COLLAR_WALL_WORST >= 2.0,
-        f"collar wall over the face relief {COLLAR_WALL_WORST:.3f} under 2.0",
+        REAR_RELIEF_WIDTH_MIN >= SCREW_CUT_RUNOUT,
+        "the rear relief does not hold the screw-cutting run-out",
     ),
     (
-        FACE_RELIEF_DIA_MIN > REAR_THREAD_MAJOR,
-        "face relief Ø at its minimum does not clear the #10-32 major",
+        math.isclose(COLLAR_LENGTH + STEP_LENGTH, SLEEVE_THRUST_STATION, abs_tol=1e-9),
+        "the collar does not datum on the thrust face",
     ),
     (
-        FACE_RELIEF_DIA > STUD_TAP_CSK_DIA + drilled_oversize_mm(),
-        "face relief inside the arm's countersink: the collar would bear on it",
+        SLEEVE_THRUST_STATION < FITTED_THRUST_STATION,
+        "the stud's seat leaves no shim between it and the arm",
     ),
     (
         FRONT_THREAD_END_STATION + FRONT_DOME_SAG == TIP_STATION,
         "front tip station",
     ),
     (
-        math.isclose(ARM_SEAT_MACHINE_Z - TIP_STATION, -166.35, abs_tol=1e-6),
+        math.isclose(SEAT_MACHINE_Z - TIP_STATION, -166.35, abs_tol=1e-6),
         "front tip is not at machine z -166.35 as fitted (R9-47)",
     ),
     (
-        math.isclose(ARM_SEAT_MACHINE_Z - CAP_SHOULDER_STATION, -158.05, abs_tol=1e-6),
+        math.isclose(SEAT_MACHINE_Z - CAP_SHOULDER_STATION, -158.05, abs_tol=1e-6),
         "cap shoulder is not at machine z -158.05 as fitted (R9-47)",
     ),
     (
@@ -328,7 +315,7 @@ for _ok, _what in (
         "sleeve thrust step is not at machine z -135.15 as fitted (R9-47)",
     ),
     (
-        math.isclose(ARM_SEAT_MACHINE_Z - REAR_TIP_STATION, -114.15, abs_tol=1e-6),
+        math.isclose(SEAT_MACHINE_Z - REAR_TIP_STATION, -114.15, abs_tol=1e-6),
         "rear dome tip is not at machine z -114.15 as fitted (R9-47)",
     ),
     (FRONT_DOME_SAG < FRONT_DOME_R, "front end is not a spherical cap"),

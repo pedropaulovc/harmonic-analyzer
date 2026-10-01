@@ -873,6 +873,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="transgear_stud_shim",
+        part="transgear_stud_shim",
+        artifact_stem="transgear-stud-shim",
+        script_name="draw_transgear_stud_shim.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="transgear_hub_cap",
         part="transgear_hub_cap",
         artifact_stem="transgear-hub-cap",

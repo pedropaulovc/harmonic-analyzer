@@ -4,16 +4,15 @@ The fixed steel stud the disc cluster runs on.  Dimensions and the derived
 fit facts live in ``transgear_stub_spec``.
 
 Layout: one stepped revolve about local +Z on the Right plane, origin at the
-collar's rear face (the arm seat).  From the rear: the #10-32 thread (through
-the arm) with a Ø5.40 face relief in the collar's rear face, the Ø12 collar,
-the Ø9 thrust step, the Ø3.9 journal, the Ø2.4 MAX thread relief at the
-journal shoulder and the #6-32 front thread.  Two spherical ends are separate
-revolves on the same plane.  Named planes ``SleeveThrust`` (the Ø9 step face)
-and ``CapShoulder`` (the journal shoulder) and ``Axis1`` serve the assembly
-mates; the arm seat is the Front Plane.  The arm seat is faced to fit (R9-47):
-``ThrustStation`` carries the as-fitted station and the rear stations (the
-step, the face relief's floor, the rear thread's end) dimension from the
-thrust face, so the facing moves none of them.
+collar's rear face (the seat on the MHA-178 shim).  From the rear: the
+#10-32 thread (through the shim and the arm), the Ø3.7 MAX rear thread
+relief at the seat, the Ø12 collar, the Ø9 thrust step, the Ø3.9 journal,
+the Ø2.4 MAX thread relief at the journal shoulder and the #6-32 front
+thread.  Two spherical ends are separate revolves on the same plane.  Named
+planes ``SleeveThrust`` (the Ø9 step face) and ``CapShoulder`` (the journal
+shoulder) and ``Axis1`` serve the assembly mates; the seat is the Front
+Plane.  The shim, not the stud, is faced to fit (R9-65): every axial size
+but the rear relief's width dimensions from the thrust face.
 
 Run (SolidWorks already open)::
 
@@ -68,9 +67,6 @@ from transgear_stub_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
-    FACE_RELIEF_DEPTH,
-    FACE_RELIEF_DIA,
-    FACE_RELIEF_FLOOR_FROM_THRUST,
     FRONT_DOME_R,
     FRONT_DOME_SAG,
     FRONT_THREAD_END,
@@ -83,6 +79,10 @@ from transgear_stub_spec import (
     JOURNAL_LENGTH_TOL,
     REAR_DOME_R,
     REAR_DOME_SAG,
+    REAR_RELIEF_DIA,
+    REAR_RELIEF_DIA_BAND,
+    REAR_RELIEF_WIDTH,
+    REAR_RELIEF_WIDTH_TOL,
     REAR_THREAD_END_FROM_THRUST,
     REAR_THREAD_LENGTH,
     REAR_THREAD_MAJOR,
@@ -102,7 +102,7 @@ PART_NAME = "transgear-stub"
 MATERIAL = "Plain Carbon Steel"  # 12L14/1215 (the registry row names it)
 
 R_REAR = REAR_THREAD_MAJOR / 2.0
-R_FACE_RELIEF = FACE_RELIEF_DIA / 2.0
+R_REAR_RELIEF = REAR_RELIEF_DIA / 2.0
 R_COLLAR = COLLAR_DIA / 2.0
 R_STEP = STEP_DIA / 2.0
 R_JOURNAL = JOURNAL_DIA / 2.0
@@ -110,9 +110,9 @@ R_RELIEF = RELIEF_DIA / 2.0
 R_FRONT = FRONT_THREAD_MAJOR / 2.0
 
 V_PROFILE = math.pi * (
-    R_REAR**2 * REAR_THREAD_LENGTH
+    R_REAR**2 * (REAR_THREAD_LENGTH - REAR_RELIEF_WIDTH)
+    + R_REAR_RELIEF**2 * REAR_RELIEF_WIDTH
     + R_COLLAR**2 * COLLAR_LENGTH
-    - (R_FACE_RELIEF**2 - R_REAR**2) * FACE_RELIEF_DEPTH
     + R_STEP**2 * (SLEEVE_THRUST_STATION - COLLAR_LENGTH)
     + R_JOURNAL**2 * JOURNAL_LENGTH
     + R_RELIEF**2 * RELIEF_WIDTH
@@ -130,17 +130,18 @@ V_FRONT_DOME = _cap_volume(FRONT_DOME_SAG, FRONT_DOME_R)
 V_TOTAL = V_PROFILE + V_REAR_DOME + V_FRONT_DOME
 
 
-def _single_limit_relief(adapter) -> None:
-    """ReliefDia as a MAX single limit carrying the band's deviations."""
-    lower, upper = deviations(RELIEF_DIA_BAND)
-    _, dimension = _named_dimension(adapter, "StudProfile", "ReliefDia")
-    label = "ReliefDia@StudProfile"
+def _single_limit_relief(
+    adapter, name: str, nominal: float, lower: float, upper: float
+) -> None:
+    """A relief Ø as a MAX single limit carrying its band's deviations."""
+    _, dimension = _named_dimension(adapter, "StudProfile", name)
+    label = f"{name}@StudProfile"
     # Driven by a global the build writes in inches to 8 decimals (2.4 mm reads
     # back 2.40000003), so match at the 1e-9 m every other readback uses.
     value = float(dimension.SystemValue)
-    if not math.isclose(value, RELIEF_DIA / 1000.0, abs_tol=1e-9):
+    if not math.isclose(value, nominal / 1000.0, abs_tol=1e-9):
         raise RuntimeError(
-            f"{label}: nominal {value * 1000.0:.7f} is not the band's max {RELIEF_DIA}"
+            f"{label}: nominal {value * 1000.0:.7f} is not the band's max {nominal}"
         )
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
     tolerance.Type = RELIEF_DIA_TOL_TYPE
@@ -156,7 +157,7 @@ def _single_limit_relief(adapter) -> None:
         )
     ):
         raise RuntimeError(f"{label}: MAX-limit tolerance readback changed")
-    _telemetry.success(f"{label}: single limit {RELIEF_DIA:g} MAX")
+    _telemetry.success(f"{label}: single limit {nominal:g} MAX")
 
 
 async def _dome(
@@ -253,8 +254,8 @@ async def build(adapter) -> dict[str, str]:
     for name, value in (
         ("RearThreadDia", REAR_THREAD_MAJOR),
         ("RearThreadEnd", REAR_THREAD_END_FROM_THRUST),
-        ("FaceReliefDia", FACE_RELIEF_DIA),
-        ("FaceReliefFloor", FACE_RELIEF_FLOOR_FROM_THRUST),
+        ("RearReliefDia", REAR_RELIEF_DIA),
+        ("RearReliefWidth", REAR_RELIEF_WIDTH),
         ("CollarDia", COLLAR_DIA),
         ("StepLength", STEP_LENGTH),
         ("StepDia", STEP_DIA),
@@ -273,12 +274,11 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs: list[tuple[str, str]] = []
 
     # --- Stepped profile ------------------------------------------------------
-    # Right sketch (u, v) maps to model (-Z, Y): negative u runs from the arm
+    # Right sketch (u, v) maps to model (-Z, Y): negative u runs from the
     # seat (origin) toward the front thread; the rear thread lies at u > 0.
-    # The face relief is a notch in the collar's rear face: the #10-32
-    # cylinder runs FACE_RELIEF_DEPTH into the collar before the floor steps
-    # out to the relief Ø and back to the seat face.  The rear stations
-    # dimension from the thrust face (R9-47: the seat is faced to fit).
+    # The rear relief is a groove at the seat: the #10-32 cylinder steps down
+    # to the relief Ø REAR_RELIEF_WIDTH behind the seat face.  The other rear
+    # stations dimension from the thrust face.
     u_rear = REAR_THREAD_LENGTH
     u_front = -FRONT_THREAD_END_STATION
     profile = SketchDims()
@@ -290,9 +290,9 @@ async def build(adapter) -> dict[str, str]:
     points = [
         (u_rear, 0.0),
         (u_rear, R_REAR),
-        (-FACE_RELIEF_DEPTH, R_REAR),
-        (-FACE_RELIEF_DEPTH, R_FACE_RELIEF),
-        (0.0, R_FACE_RELIEF),
+        (REAR_RELIEF_WIDTH, R_REAR),
+        (REAR_RELIEF_WIDTH, R_REAR_RELIEF),
+        (0.0, R_REAR_RELIEF),
         (0.0, R_COLLAR),
         (-COLLAR_LENGTH, R_COLLAR),
         (-COLLAR_LENGTH, R_STEP),
@@ -317,8 +317,8 @@ async def build(adapter) -> dict[str, str]:
     (
         rear_end,
         rear_thread,
-        face_relief_floor,
-        face_relief_wall,
+        _rear_relief_flank,
+        rear_relief_floor,
         seat_face,
         collar,
         _collar_front,
@@ -339,7 +339,7 @@ async def build(adapter) -> dict[str, str]:
         ),
     )
     check(
-        "arm seat on the origin",
+        "seat on the origin",
         await adapter.add_sketch_constraint(
             f"{seat_face}.start", "origin", "vertical_points"
         ),
@@ -352,10 +352,10 @@ async def build(adapter) -> dict[str, str]:
             REAR_THREAD_END_FROM_THRUST,
         ),
         (
-            "FaceReliefFloor",
-            f"{face_relief_floor}.end",
-            f"{thrust_face}.start",
-            FACE_RELIEF_FLOOR_FROM_THRUST,
+            "RearReliefWidth",
+            f"{rear_relief_floor}.start",
+            f"{rear_relief_floor}.end",
+            REAR_RELIEF_WIDTH,
         ),
         ("StepLength", f"{step}.start", f"{step}.end", STEP_LENGTH),
         (
@@ -379,7 +379,12 @@ async def build(adapter) -> dict[str, str]:
         profile.record(name, f'"{name}"')
     for name, line, u_mid, radius in (
         ("RearThreadDia", rear_thread, u_rear / 2.0, R_REAR),
-        ("FaceReliefDia", face_relief_wall, -FACE_RELIEF_DEPTH / 2.0, R_FACE_RELIEF),
+        (
+            "RearReliefDia",
+            rear_relief_floor,
+            REAR_RELIEF_WIDTH / 2.0,
+            R_REAR_RELIEF,
+        ),
         ("CollarDia", collar, -COLLAR_LENGTH / 2.0, R_COLLAR),
         (
             "StepDia",
@@ -504,8 +509,8 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # Model-owned bands (policy rule 2): the running-fit journal and its
-    # length (cluster float), the relief width (R9-5's window) and the relief
-    # Ø's single MAX limit.
+    # length (cluster float), each relief's width (the 1.0-1.2 window) and
+    # each relief Ø's single MAX limit.
     set_dimension_bilateral_tolerance(
         adapter, "StudProfile", "JournalDia", *deviations(JOURNAL_DIA_BAND)
     )
@@ -515,7 +520,13 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_symmetric_tolerance(
         adapter, "StudProfile", "ReliefWidth", RELIEF_WIDTH_TOL
     )
-    _single_limit_relief(adapter)
+    set_dimension_symmetric_tolerance(
+        adapter, "StudProfile", "RearReliefWidth", REAR_RELIEF_WIDTH_TOL
+    )
+    _single_limit_relief(adapter, "ReliefDia", RELIEF_DIA, *deviations(RELIEF_DIA_BAND))
+    _single_limit_relief(
+        adapter, "RearReliefDia", REAR_RELIEF_DIA, *deviations(REAR_RELIEF_DIA_BAND)
+    )
 
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)

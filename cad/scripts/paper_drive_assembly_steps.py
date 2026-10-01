@@ -12,8 +12,12 @@ SolidWorks, no config reads.
 
 from __future__ import annotations
 
+import math
+
 import drive_train_steps
+import latch_hook_bracket_spec as hook_bracket
 import transgear_drive_collar_spec as collar
+import transgear_feed_pinion_spec as feed_pinion
 import transgear_stub_spec as stub
 
 DRAWING_NUMBER = "MHA-A06"
@@ -59,13 +63,15 @@ SEQUENCE: tuple[str, ...] = (
     # Knob stack, front to rear (contract §1).
     "collar-pins-pressed",
     "knob-stack-fitted",
-    # Latch (R9-15, R9-24).
+    # Latch (R9-15, R9-24). The hanger is meshed in the rack and run over the
+    # platen's travel first; the hook is then set to hold that mesh.
     "latch-bracket-fitted",
+    "hanger-meshed",
     "hook-set-and-riveted",
     # Chain fit-up (contract §13.2 procedure (2)-(8)).
     "fitup-pose-set",
-    # R9-47: the stud's arm seat faced to the F-to-disc window in that pose
-    # (transgear_stub_spec.STUD_FIT_WINDOW).
+    # R9-47, R9-65: the stud's MHA-178 shim faced to the F-to-disc window in
+    # that pose (transgear_stub_spec.STUD_FIT_WINDOW).
     "stud-faced-to-fit",
     "collar-gap-measured",
     "collar-pinned",
@@ -100,9 +106,23 @@ BAR_TOP_ABOVE_DECK = 266.934
 # The rack's crests below the platen's bottom edge (the builder's PLATE_Y0
 # less RACK_TIP_Y). The latched hanger cannot take up a rack set off this: the
 # hook's set range (0.51 at the hook) spans only ±0.25 of rack height, so the
-# band is held at the solder joint (Main, 2026-10-01).
-RACK_CREST_DROP = 2.0
+# band is held at the solder joint (Main, 2026-10-01). R9-62: 2.25, which puts
+# the feed mesh at its 0.55 centre extension (contact ratio 1.25).
+RACK_CREST_DROP = 2.25
 RACK_CREST_TOL = 0.05
+# R9-62: the feed pinion's mesh in the rack, set before the hook is
+# match-drilled: the platen's shake along the rack with the knob held, i.e. the
+# backlash at the pitch line, 2 * e * tan(pressure angle) for a centre
+# extension e over the standard centres (0.20..0.35: e 0.39..0.68, contact
+# ratio about 1.5..1.05). A mesh the hook's set range cannot hold is reported.
+MESH_BACKLASH_RANGE = (0.20, 0.35)
+
+
+def mesh_extension(backlash: float) -> float:
+    """The feed pinion's centre extension that gives ``backlash``."""
+    return backlash / (2.0 * math.tan(math.radians(feed_pinion.PRESSURE_ANGLE_DEG)))
+
+
 # The collar is set to transgear_drive_collar_spec.FIT_UP_OFFSET_SET_TEXT and
 # accepted within OFFSET_ACCEPT_TOL of the same target at the re-check
 # (procedure (8): "-0.05 ±0.10" in machine z, forward is -z).
@@ -121,6 +141,8 @@ COLLAR_DISC_AIR_MIN = stub.STUD_FIT_WINDOW[0]
 OFFSET_ACCEPT_TEXT = f"{collar.FIT_UP_OFFSET_TARGET:.2f} \u00b1{OFFSET_ACCEPT_TOL:.2f}"
 COLLAR_DISC_AIR_TEXT = f"{COLLAR_DISC_AIR_MIN:.2f} MIN"
 RACK_CREST_TEXT = f"{RACK_CREST_DROP:.2f} \u00b1{RACK_CREST_TOL:.2f}"
+MESH_BACKLASH_TEXT = f"{MESH_BACKLASH_RANGE[0]:.2f} TO {MESH_BACKLASH_RANGE[1]:.2f}"
+HOOK_SET_TEXT = f"\u00b1{hook_bracket.HOOK_SET_RANGE:.2f}"
 # The collar's seat limit (transgear_drive_collar_spec.SEAT_MAX_FROM_F).
 T24_SEAT_MAX_TEXT = f"{collar.SEAT_MAX_FROM_F:.2f} MAX"
 # The collar's rear face never passes the 12T's front face (the MHA-177

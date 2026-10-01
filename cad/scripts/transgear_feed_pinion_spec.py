@@ -174,8 +174,8 @@ if NOSE_PROUD_WORST < 0.34 - 1e-9:
     )
 
 # The spigot stays inside the disc bore, so the flange clamps the disc:
-# (9.45 + 2.87) − 12.25 = 0.07 at the worst case; it still locates the disc
-# over 12.15 − 9.55 = 2.60.
+# (9.45 + 2.87) − 12.25 = 0.07 at the worst case.  The step is 12.15 − 9.55 =
+# 2.60 long at the worst case; the cutter's run-out slots its rear end (below).
 SPIGOT_RECESS_WORST = (
     GEAR_FACE_STATION - STATION_TOL + DISC_THICKNESS - _DISC_BAND
 ) - (SPIGOT_FRONT_STATION + STATION_TOL)
@@ -184,6 +184,99 @@ SPIGOT_LENGTH_MIN = (
 )
 if SPIGOT_RECESS_WORST <= 0.0:
     raise AssertionError(f"spigot stands proud of the disc: {SPIGOT_RECESS_WORST:.3f}")
+
+# --- 12T form-cutter run-out (R9-67, on the knob shaft's R9-21) ---------------
+# The 12T is cut with a form cutter on a dividing head from the open rear
+# face: full depth from the rear face to FULL_DEPTH, then the cutter's arc runs
+# out behind that station, leaving partial-depth gaps over the rest of the
+# face and slotting the Ø10 spigot (proud of the gap floor) at its rear end.
+# The sheet prints the full-depth length as a window from the rear face, the
+# run-out's end as a limit and the largest cutter that keeps a window.
+FULL_DEPTH = 5.45
+FULL_DEPTH_PLACES = 3
+CUTTER_RUNOUT_MAX = 10.50  # from the rear face, a limit
+CUTTER_DIA_MAX_IN = 1.00
+CUTTER_DIA_MAX = CUTTER_DIA_MAX_IN * MM_PER_IN  # 25.4
+_FULL_DEPTH_BAND = printed_band_mm(FULL_DEPTH_PLACES)
+FULL_DEPTH_MIN = FULL_DEPTH - _FULL_DEPTH_BAND  # 5.32
+FULL_DEPTH_MAX = FULL_DEPTH + _FULL_DEPTH_BAND  # 5.58
+FULL_DEPTH_NOTE = (
+    f"12T FULL DEPTH FROM REAR FACE TO {FULL_DEPTH:.3f} \u00b1{_FULL_DEPTH_BAND:.2f}."
+)
+CUTTER_NOTE = (
+    f"CUTTER RUN-OUT {CUTTER_RUNOUT_MAX:.2f} MAX FROM REAR FACE; "
+    f"CUTTER \u00d8{CUTTER_DIA_MAX_IN:.2f} in MAX."
+)
+
+
+def cutter_runout(cutter_dia: float, rise: float) -> float:
+    """Axial length behind the full-depth station over which a form cutter of
+    ``cutter_dia`` still cuts a surface ``rise`` above the gap floor: the
+    chord half-length of its circle at that height, √(Rc² − (Rc − rise)²)."""
+    radius = cutter_dia / 2.0
+    if not 0.0 <= rise <= radius:
+        raise ValueError(f"rise {rise} is off a Ø{cutter_dia} cutter")
+    return (radius**2 - (radius - rise) ** 2) ** 0.5
+
+
+# The rack's worst reach from the rear face is the assembly's stack
+# (build_paper_drive_assembly.RACK_FRONT_FROM_SLEEVE_REAR_WORST, 5.24), which
+# asserts FULL_DEPTH_MIN covers it.  The longest run-out: the spigot at its
+# largest radius over the shallowest-printed gap floor (the root's MIN),
+# 5.000 − 4.020 = 0.98 -> 4.89 behind the deepest full-depth station.
+RUNOUT_RISE_WORST = (SPIGOT_DIA + SPIGOT_DIA_BAND[0]) / 2.0 - ROOT_DIA_MIN / 2.0
+CUTTER_RUNOUT_END_WORST = FULL_DEPTH_MAX + cutter_runout(
+    CUTTER_DIA_MAX, RUNOUT_RISE_WORST
+)  # 10.47
+# The spigot's unslotted length at the worst case: the run-out limit to the
+# spigot front's nearest station, 12.15 − 10.50 = 1.65.
+SPIGOT_FULL_ROUND_MIN = SPIGOT_FRONT_STATION - STATION_TOL - CUTTER_RUNOUT_MAX
+if FULL_DEPTH_MAX >= GEAR_FACE_STATION - STATION_TOL:
+    raise AssertionError("the 12T full-depth window reaches the disc seat")
+if CUTTER_RUNOUT_END_WORST > CUTTER_RUNOUT_MAX + 1e-9:
+    raise AssertionError(
+        f"a Ø{CUTTER_DIA_MAX:.2f} cutter's run-out reaches "
+        f"{CUTTER_RUNOUT_END_WORST:.3f}, past the printed {CUTTER_RUNOUT_MAX:.2f}"
+    )
+if SPIGOT_FULL_ROUND_MIN < 0.5 * DISC_THICKNESS:
+    raise AssertionError(
+        f"the run-out leaves {SPIGOT_FULL_ROUND_MIN:.2f} of round spigot, under "
+        f"half the {DISC_THICKNESS:.2f} disc it locates"
+    )
+
+# The model cuts at the nominal full depth with the largest cutter: its axis
+# lies across the seed gap's centre line, CUTTER_AXIS_R from the sleeve axis
+# at z = FULL_DEPTH, and the slots end RUNOUT_SLOT_END_Z from the rear face.
+CUTTER_AXIS_R = ROOT_DIA / 2.0 + CUTTER_DIA_MAX / 2.0  # 16.72
+CUTTER_AXIS_Z = FULL_DEPTH
+RUNOUT_SLOT_END_Z = FULL_DEPTH + cutter_runout(
+    CUTTER_DIA_MAX, SPIGOT_DIA / 2.0 - ROOT_DIA / 2.0
+)  # 10.33
+if not GEAR_FACE_STATION < RUNOUT_SLOT_END_Z < CUTTER_RUNOUT_MAX:
+    raise AssertionError("the modelled run-out slots leave the spigot's rear end")
+
+
+def gap_chord(radius: float) -> float:
+    """Chordal width of a standard 12T tooth gap at ``radius`` (mm): the gap
+    angle is π/N − 2 inv φ at the pitch circle plus 2 inv φ at ``radius``
+    (radial flanks below the base circle)."""
+    phi = math.radians(PRESSURE_ANGLE_DEG)
+    base_r = PITCH_DIA / 2.0 * math.cos(phi)
+    inv_r = 0.0
+    if radius > base_r:
+        phi_r = math.acos(base_r / radius)
+        inv_r = math.tan(phi_r) - phi_r
+    angle = math.pi / TEETH - 2.0 * (math.tan(phi) - phi) + 2.0 * inv_r
+    return 2.0 * radius * math.sin(angle / 2.0)
+
+
+# The model's slots are flat-walled at the gap's width where the cutter
+# leaves the spigot surface (a simplification: the form cutter's walls follow
+# the gap's involute, narrower below).
+RUNOUT_SLOT_WIDTH = gap_chord(SPIGOT_DIA / 2.0)
+# The seed gap _gear.cut_tooth_gap cuts is centred half a pitch CCW of local
+# +X (tooth 0 is centred on +X); the pattern repeats it every 30 degrees.
+GAP_AZIMUTH_DEG = 180.0 / TEETH
 
 # --- walls (rule 12: target 2.0, floor 1.5, at the printed bands) --------------
 WALL_TARGET = 2.0
@@ -342,4 +435,4 @@ GEAR_DATA = gear_data_note(
 
 # The title block's 0.25 edge break is 14% of this fine tooth's whole depth.
 TOOTH_EDGE_NOTE = "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS."
-DRAWING_NOTES = TOOTH_EDGE_NOTE
+DRAWING_NOTES = "\n".join((TOOTH_EDGE_NOTE, FULL_DEPTH_NOTE, CUTTER_NOTE))

@@ -206,8 +206,12 @@ if CSK_DIA >= T24_BORE_DIA:
 REAR_THREAD_LOSS = CSK_DEPTH
 
 # The Ø20.5 dimension is the diameter over the knurl; the designation gives
-# the pitch and the 90° tooth, so no tooth count prints (R9-57).
-KNURL_CALLOUT = f"STRAIGHT KNURL {KNURL_DESIGNATION}\nDIA OVER KNURL"
+# the pitch and the 90° tooth, so no tooth count prints (R9-57).  One line:
+# it prints in the dimension's above-callout compartment, and SolidWorks
+# keeps a two-line above callout in the document but prints none of it (run
+# 20261001T154021634Z: "...\nDIA OVER KNURL" read back over Ø20.5 and was
+# missing from the PDF).
+KNURL_CALLOUT = f"STRAIGHT KNURL {KNURL_DESIGNATION}; DIA OVER KNURL"
 
 # No roughness symbol: the seat face clamps the wheel (a clamp face, not a
 # running, sliding or locating surface; policy rule 5).

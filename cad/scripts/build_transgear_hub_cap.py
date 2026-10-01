@@ -9,12 +9,12 @@ Front Plane).
 
 * ``CapProfile``: one revolve on the Right plane with the 45° front O.D.
   break in the profile.
-* ``ThreadBore``: #6-32 UNC-2B through, Hole Wizard from the rear face.
-* ``Countersink``: the 90° front entry countersink, a revolved cut.
+* ``ThreadBore``: #6-32 UNC-2B through, Hole Wizard from the rear face.  Its
+  front mouth carries only the title block's edge break (R9-66), unmodelled.
 * ``FlatsProfile`` / ``Flats``: two wrench flats square to local X, cut from
   the ``FrontFace`` plane through the whole length (R9-58).
 
-``FrontFace`` (z 5.80) and ``Axis1`` serve the assembly mates; the rear face
+``FrontFace`` (z 6.00) and ``Axis1`` serve the assembly mates; the rear face
 is the Front Plane.
 
 Run (SolidWorks already open)::
@@ -35,7 +35,6 @@ from _common import (
     anchor_point_to_origin,
     apply_material,
     check,
-    define_polygon_chain,
     dimension_between,
     drive_dimension,
     ensure_fully_defined,
@@ -65,7 +64,6 @@ from _visibility import blank_reference_geometry
 from transgear_hub_cap_spec import (
     CAP_DIA,
     CAP_LENGTH,
-    CSK_DIA,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
@@ -83,11 +81,8 @@ PART_NAME = "transgear-hub-cap"
 MATERIAL = "Brass"  # C36000 free-machining brass (the registry row names it)
 
 CAP_R = CAP_DIA / 2.0
-CSK_R = CSK_DIA / 2.0
 DRILL_R = TAP_DRILL_DIA / 2.0
 FLAT_X = FLATS_ACROSS / 2.0
-# How far the countersink cutter runs past the front face into air.
-_CSK_OVERRUN = 1.0
 # How far the flats' sketch rectangles stand clear of the O.D., and how far
 # their cut runs past the rear face into air.
 _FLAT_REACH = CAP_R + 1.0
@@ -97,10 +92,6 @@ V_PROFILE = math.pi * CAP_R**2 * CAP_LENGTH - math.pi * FRONT_CHAMFER**2 * (
     CAP_R - FRONT_CHAMFER / 3.0
 )
 V_THREAD = math.pi * DRILL_R**2 * CAP_LENGTH
-# The cone r = s (s from the apex, 0..CSK_R) less what the drill already took.
-V_CSK = math.pi * (CSK_R**3 - DRILL_R**3) / 3.0 - math.pi * DRILL_R**2 * (
-    CSK_R - DRILL_R
-)
 
 
 def _flat_segment_area(radius: float) -> float:
@@ -128,7 +119,7 @@ def _flats_volume(steps: int = 64) -> float:
 
 
 V_FLATS = _flats_volume()
-V_TOTAL = V_PROFILE - V_THREAD - V_CSK - V_FLATS
+V_TOTAL = V_PROFILE - V_THREAD - V_FLATS
 
 
 def _as_construction(adapter, entity_id: str) -> None:
@@ -276,37 +267,6 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += thread.placement_drive_jobs
     volume = await volume_check(
         adapter, "tapped through", volume - V_THREAD, 0.02 * V_THREAD
-    )
-
-    # --- 90° front entry countersink: one revolved cut ----------------------
-    # The region in front of the cone z = apex + r, apex on the axis CSK_R
-    # behind the front face; the triangle's far edge lies in air.
-    reach = CSK_R + _CSK_OVERRUN
-    apex_u = -(CAP_LENGTH - CSK_R)
-    csk = [
-        (apex_u, 0.0),
-        (apex_u - reach, reach),
-        (apex_u - reach, 0.0),
-    ]
-    check("create_sketch countersink", await adapter.create_sketch("Right"))
-    set_sketch_direct_db(adapter, True)
-    check(
-        "countersink axis",
-        await adapter.add_centerline(apex_u, 0.0, apex_u - reach, 0.0),
-    )
-    csk_lines = await add_line_chain(adapter, csk)
-    set_sketch_direct_db(adapter, False)
-    await define_polygon_chain(adapter, csk_lines, csk, label="front countersink")
-    await ensure_fully_defined(adapter, "countersink profile")
-    check("exit_sketch countersink", await adapter.exit_sketch())
-    name_last_feature(adapter, "CountersinkProfile")
-    check(
-        "revolve countersink",
-        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
-    )
-    name_last_feature(adapter, "Countersink")
-    volume = await volume_check(
-        adapter, "front countersink", volume - V_CSK, 0.03 * V_CSK + 0.05
     )
 
     # --- Front face station and the wrench flats -----------------------------

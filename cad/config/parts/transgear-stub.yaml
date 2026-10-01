@@ -6,4 +6,4 @@ transgear-stub:
   finish: bright turned, oiled
   quantity: 1
   tolerance_class: machined_block
-  process: "turned from bar (steel): turn the collar, step and journal, cut the face relief and the thread relief, screw-cut #10-32 UNF and #6-32 UNC, dome both ends"
+  process: "turned from bar (steel): turn the collar, step and journal, cut both thread reliefs, screw-cut #10-32 UNF and #6-32 UNC, dome both ends"

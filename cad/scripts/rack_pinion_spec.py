@@ -15,7 +15,7 @@ The #0-80 taps are TRANSFERRED at assembly (ruling R9-9): with the disc on
 the spigot and the hub pressed on, each tap is spotted through its MHA-159
 flange hole, then drilled and tapped, and disc and flange are match-marked.
 The model places the taps on the flange's bolt circle (the one authority);
-the sheet prints the tap, its countersink and the transfer, never the
+the sheet prints the tap, its mouth breaks and the transfer, never the
 bolt-circle position.
 """
 
@@ -114,25 +114,18 @@ TAP_MAJOR_ALLOWANCE = 0.05
 TAP_COUNT = SCREW_COUNT
 TAP_CENTRES = screw_centres()
 
-# 90° entry countersink at the FRONT face, drilled-hole class; the rear face
-# gets a burr break only.
-CSK_DIA = 1.7
-CSK_BAND = (0.10, 0.0)  # (upper, lower)
-CSK_ANGLE_DEG = 90.0
-CSK_DIA_MAX = CSK_DIA + max(CSK_BAND)
-if CSK_DIA <= TAP_MAJOR:
-    raise AssertionError("the tap countersink must open past the #0-80 major")
-# The modelled 45° leg on the tap-drill rim.
-CSK_LEG = (CSK_DIA - TAP_DRILL_DIA) / 2.0
-REAR_BREAK_MAX = 0.05
+# No countersink (R9-63): a 90° countersink opening past the 1.524 major
+# costs at least (1.524 - 1.191) / 2 = 0.167 of full thread at its mouth on
+# the 3.0 disc, so both mouths carry a burr break only (not modelled).  Full
+# thread starts where the break's 45° leg meets the tap drill.
+MOUTH_BREAK_MAX = 0.10
 
 # --- the tap's thread losses (contract §7) -------------------------------------
 # The MHA-161 screws are cut to fit at assembly (R9-47): their tips stop
 # inside the rear face, so the joint's engagement, the cut window and the
 # stock's reach are judged in transgear_disc_screw_spec from these losses.
 ENGAGEMENT_FLOOR_D = 1.5
-CSK_THREAD_LOSS = (CSK_DIA - TAP_MAJOR) / 2.0
-CSK_THREAD_LOSS_WORST = (CSK_DIA_MAX - TAP_MAJOR) / 2.0
+MOUTH_THREAD_LOSS = MOUTH_BREAK_MAX
 
 # --- tap to bore wall (contract §8) ---------------------------------------------
 # The disc prints no tap position, so its worst case is the transfer chain:
@@ -153,22 +146,12 @@ if TAP_TO_BORE_WALL_WORST < WALL_FLOOR - 1e-9:
     raise AssertionError(
         f"MHA-070 tap to bore wall {TAP_TO_BORE_WALL_WORST:.3f} worst < {WALL_FLOOR}"
     )
-# The countersink's mouth to the bore edge on the front face: a 0.14-deep
-# lip, informational (reported with the wall, never under the 1.5 floor).
-CSK_TO_BORE_WORST = (
-    BOLT_CIRCLE_DIA / 2.0 - TAP_POSITION_ERROR - CSK_DIA_MAX / 2.0 - BORE_DIA_MAX / 2.0
-)
-if CSK_TO_BORE_WORST < 1.5 - 1e-9:
-    raise AssertionError(f"MHA-070 countersink to bore {CSK_TO_BORE_WORST:.3f} < 1.5")
 
 # --- sheet -------------------------------------------------------------------------
 HUB_NUMBER = "MHA-159"
-# Lines appended under the native "#0-80 UNF-2B THRU" hole callout.  The
-# face view looks at the REAR face (*Front, from +Z): the countersink is on
-# the far side, the burr break on the near side.
+# Lines appended under the native "#0-80 UNF-2B THRU" hole callout.
 TAP_CALLOUT_LINES = (
-    f"{CSK_ANGLE_DEG:.0f}\u00b0 CSK \u00d8{CSK_DIA:.1f} +{CSK_BAND[0]:.2f}/0 FAR SIDE",
-    f"NEAR SIDE BREAK EDGE {REAR_BREAK_MAX:.2f} MAX",
+    f"BREAK EDGE {MOUTH_BREAK_MAX:.2f} MAX BOTH SIDES",
     f"SPOT THRU {HUB_NUMBER} FLANGE HOLES AT ASSY,",
     "THEN DRILL AND TAP; MATCH-MARK DISC AND FLANGE",
 )

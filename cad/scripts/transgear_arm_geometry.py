@@ -26,7 +26,7 @@ from __future__ import annotations
 import math
 from fractions import Fraction
 
-from _hole_spec import THREAD_MAJOR_MM, HoleSpec
+from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
 
 MM_PER_IN = 25.4
 # The assembly's anchor for the arm: its front face on the spacer.
@@ -83,10 +83,20 @@ SPOT_FACE_FLOOR_FROM_FRONT = 7.0
 SPOT_FACE_FLOOR_BAND = 0.05
 SPOT_FACE_DEPTH = THICKNESS - SPOT_FACE_FLOOR_FROM_FRONT
 
-# --- Stud at S: #10-32 THROUGH, countersunk both faces ----------------------
+# --- Stud at S: #10-32 THROUGH, mouths broken by the title block -----------
+# Full thread starts where a mouth's 45-degree leg meets the tap drill, so
+# a mouth takes (mouth - drill) / 2 of thread (R9-63).  A 5.0 countersink on
+# both faces left 6.95 (1.44D) of full thread in the thinnest stock, and any
+# countersink large enough to open past the major leaves under 1.5D.  So the
+# stud tap has none: the title block's R0.25 OR CHAMFER 0.25 MAX break
+# governs each mouth.
 STUD_STATION = 68.815  # |S - P|, printed .XXX (hole position)
 STUD_TAP_SPEC = HoleSpec("tapped", "#10-32")
-STUD_TAP_CSK_DIA = 5.0  # MAX, both faces
+STUD_TAP_MOUTH_LOSS_MAX = 0.25  # title-block edge break, each face
+TAP_DRILL_GROWTH = 0.10  # +0.10/0 (drilled row)
+STUD_TAP_MOUTH_DIA_MAX = (
+    blind_cut_dia_mm(STUD_TAP_SPEC) + TAP_DRILL_GROWTH + 2.0 * STUD_TAP_MOUTH_LOSS_MAX
+)
 # --- Plate taps: 2 x #8-32 THROUGH on the centreline, countersunk both ends -
 PLATE_SCREW_PITCH = 15.0
 PLATE_SCREW_MID_STATION = 33.542  # the plate's centreline (MHA-165)
@@ -97,6 +107,9 @@ PLATE_TAP_STATIONS = (
 PLATE_TAP_SPEC = HoleSpec("tapped", "#8-32")
 PLATE_TAP_CSK_DIA = 4.3  # MAX, both ends
 TAP_CSK_ANGLE_DEG = 90.0
+# Thread each plate-tap countersink takes at its largest, over the smallest
+# tap drill (R9-63): (4.3 - 3.454) / 2 = 0.423.
+PLATE_TAP_MOUTH_LOSS_MAX = (PLATE_TAP_CSK_DIA - blind_cut_dia_mm(PLATE_TAP_SPEC)) / 2.0
 
 # --- Latch pin: reamed press hole along -X into the square end, flat floor --
 PIN_HOLE_DIA = 3.175
@@ -189,9 +202,9 @@ for _name, (_nominal, _worst) in WALLS.items():
         raise AssertionError(f"arm {_name} wall {_worst:.3f} < {WALL_TARGET}")
 
 # The latch pin's hole, at its deepest, must stop short of the stud tap's
-# countersink.
+# broken mouth.
 if (
     TIP_STATION - TIP_STATION_BAND - PIN_HOLE_DEPTH - PIN_HOLE_DEPTH_BAND
-    <= STUD_STATION + STUD_TAP_CSK_DIA
+    <= STUD_STATION + STUD_TAP_MOUTH_DIA_MAX
 ):
     raise AssertionError("latch-pin hole reaches the stud tap")

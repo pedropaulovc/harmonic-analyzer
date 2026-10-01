@@ -27,6 +27,7 @@ import transgear_stud_fit as stud_fit
 from _drawing_common import DRAWING_TEMPLATES
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM
 
 
 def _band(places: int) -> float:
@@ -205,22 +206,22 @@ def test_the_section_cuts_through_the_pivot_and_the_square_end() -> None:
     assert x1 > drawing._front_x(geometry.TIP_STATION)
 
 
-def test_the_countersink_lines_ride_the_tap_thread_compartment() -> None:
+def test_the_qualifier_lines_ride_the_tap_thread_compartment() -> None:
     definitions = {
         5: "",
         6: "<MOD-DIAM><hw-tapdrilldia> THRU\n<hw-tapsize> - <hw-threadclass> THRU",
         7: "",
         8: "",
     }
-    updated = drawing.tap_callout_definitions(definitions, spec.STUD_TAP_CSK_CALLOUT)
+    updated = drawing.tap_callout_definitions(definitions, drawing.PLATE_TAP_QUALIFIER)
     assert "<hw-threadclass>" not in updated[6].lower()
-    assert updated[6].endswith(f"\n{spec.STUD_TAP_CSK_CALLOUT}")
+    assert updated[6].endswith(f"\n{drawing.PLATE_TAP_QUALIFIER}")
     assert {part: updated[part] for part in (5, 7, 8)} == {5: "", 7: "", 8: ""}
     with pytest.raises(RuntimeError):
         drawing.tap_callout_definitions({5: "", 6: "", 7: "", 8: ""}, "X")
 
 
-_ENGAGEMENT_LINE = re.compile(r"ENGAGEMENT (\d+\.\d{2}) MIN \((\d\.\d)D\)")
+_ENGAGEMENT_LINE = re.compile(r"ENGAGEMENT (\d+\.\d{2}) MIN \((\d\.\d{2})D\)")
 
 
 def test_each_tap_callout_states_its_worst_case_full_thread_engagement() -> None:
@@ -241,9 +242,36 @@ def test_each_tap_callout_states_its_worst_case_full_thread_engagement() -> None
         printed_mm, printed_d = float(match[1]), float(match[2])
         worst_mm, major = worst[label]
         assert worst_mm - 0.01 < printed_mm <= worst_mm, label
-        assert joints.ENGAGEMENT_TARGET_D <= printed_d <= worst_mm / major, label
+        assert worst_mm / major - 0.01 < printed_d <= worst_mm / major, label
+        assert printed_d >= joints.ENGAGEMENT_TARGET_D, label
     # A MIN never rounds up.
-    assert spec.engagement_line(7.749, 1.59) == "ENGAGEMENT 7.74 MIN (1.5D)"
+    assert spec.engagement_line(7.749, 1.599) == "ENGAGEMENT 7.74 MIN (1.59D)"
+
+
+def test_the_stud_tap_mouths_take_only_the_title_block_break() -> None:
+    """Machinist review of 8b5e1f354 (blocker): full thread starts where a
+    mouth's 45° leg meets the tap drill, so Ø5.0 countersinks on both faces
+    left 6.95 (1.44D) and no countersink opening past the major reached
+    1.5D.  R9-63 drops them: the title block's edge break governs."""
+    stud_qualifier = drawing.STUD_TAP_QUALIFIER
+    assert "CSK" not in stud_qualifier and "\u00d8" not in stud_qualifier
+    assert "CSK" in drawing.PLATE_TAP_QUALIFIER
+    break_max = _config.title_block("edge_break")["chamfer_max_mm"]
+    assert geometry.STUD_TAP_MOUTH_LOSS_MAX == break_max
+    assert not hasattr(part, "STUD_CSK")
+    drill = TAP_DRILL_MM["#10-32"]
+    assert geometry.STUD_TAP_MOUTH_DIA_MAX == pytest.approx(
+        drill + 0.10 + 2.0 * break_max
+    )
+    # Any countersink that opens past the major takes more than 1.5D allows
+    # from the thinnest stock on two faces.
+    major = THREAD_MAJOR_MM["#10-32"]
+    thinnest = geometry.THICKNESS - geometry.THICKNESS_BAND
+    assert thinnest - 2.0 * (major - drill) / 2.0 < 1.5 * major
+    # The plate taps keep theirs, each charged to the tap drill.
+    assert geometry.PLATE_TAP_MOUTH_LOSS_MAX == pytest.approx(
+        (geometry.PLATE_TAP_CSK_DIA - TAP_DRILL_MM["#8-32"]) / 2.0
+    )
 
 
 def test_the_pivot_bore_is_reamed_as_the_shoulder_running_fit() -> None:
@@ -273,23 +301,55 @@ def _centred_box(lines: list[str], xy: tuple[float, float]) -> tuple[float, ...]
     )
 
 
+# Measured on 8b5e1f354's render (transgear-arm.pdf, 300 dpi): outside its
+# witnesses the floor depth's text hangs LEFT of its dimension line, right
+# edge on the line; "FLOOR FROM" set 30.0 mm wide, and the 14.0 8.8 mm wide,
+# centred on its line.  The section arrow stands 5 mm past the square end.
+_CAPS_CHAR_WIDTH = 0.0030
+_END_WIDTH_TEXT = 0.0088
+
+
+def _hanging_left_box(lines: list[str], xy: tuple[float, float]) -> tuple[float, ...]:
+    width = max(map(len, lines)) * _CAPS_CHAR_WIDTH
+    half_height = len(lines) * _LINE_PITCH / 2.0
+    return (xy[0] - width, xy[1] - half_height, xy[0], xy[1] + half_height)
+
+
 def test_the_section_texts_stand_inside_the_left_border_and_off_the_section() -> None:
-    """Review of 19e33c6c2: the counterbore text crossed the left border and
-    the floor-depth text ran off the sheet over the section's pivot end."""
-    floor = _centred_box(
-        ["7.00 \u00b10.05", *spec.FLOOR_DEPTH_CALLOUT.splitlines()],
-        drawing.SECTION_KEEP["FloorDepth"],
-    )
+    """Machinist reviews of 19e33c6c2 and 8b5e1f354: the floor-depth text
+    crossed the left border (rendered at x 1.5 mm), and the counterbore text
+    crossed it before."""
+    lines = ["7.00 \u00b10.05", *spec.FLOOR_DEPTH_CALLOUT.splitlines()]
+    floor = _hanging_left_box(lines, drawing.SECTION_KEEP["FloorDepth"])
     section_bottom = (
         drawing.SECTION_CENTER[1] - geometry.THICKNESS * drawing._S / 2000.0
     )
-    assert floor[0] > _BORDER + 0.003
+    assert floor[0] > _BORDER + 0.0015
     assert floor[3] < section_bottom - 0.002
+    # The line stands off the pivot end it dimensions.
+    pivot_end_x = drawing._front_x(-geometry.PIVOT_END_R)
+    assert drawing.SECTION_KEEP["FloorDepth"][0] < pivot_end_x
+    # Positive control: 8b5e1f354's keep reproduces its rendered left edge.
+    old_line_x = pivot_end_x - (drawing.FRONT_CENTER[0] - 0.178) - 0.005
+    assert _hanging_left_box(lines, (old_line_x, 0.0))[0] == pytest.approx(
+        0.0015, abs=0.001
+    )
     counterbore = _centred_box(
         ["\u00d89.525 +0.1", *spec.SPOT_FACE_CALLOUT.splitlines()],
         drawing.SECTION_KEEP["SpotFaceDia"],
     )
     assert counterbore[0] > _BORDER + 0.003
+
+
+def test_the_end_width_text_clears_the_section_arrow_and_the_end_view() -> None:
+    """The front view moved right for the floor-depth text; its 14.0 still
+    stands between the A-A arrow and the end view's outline."""
+    line_x = drawing.FRONT_KEEP["EndWidth"][0]
+    text = (line_x - _END_WIDTH_TEXT / 2.0, line_x + _END_WIDTH_TEXT / 2.0)
+    arrow_x = drawing.SECTION_LINE[1][0]
+    end_left = drawing.END_CENTER[0] - geometry.THICKNESS * drawing._S / 2000.0
+    assert text[0] - arrow_x >= 0.002
+    assert end_left - text[1] >= 0.002
 
 
 def test_the_tap_callouts_stand_inside_the_upper_border() -> None:

@@ -276,6 +276,20 @@ def test_the_knurl_is_the_designated_din_82_raa_1_0() -> None:
     assert math.pi * spec.HEAD_DIA / 60 - spec.KNURL_PITCH > 0.01
 
 
+def test_the_knurl_designation_is_authored_where_it_prints() -> None:
+    """Run 20261001T154021634Z's machinist review: the sheet showed Ø20.5 and
+    no knurl.  The designation rode a two-line above-callout, which SolidWorks
+    stored but did not print; one line in that compartment prints."""
+    above = drawing.DIMENSION_CALLOUTS_ABOVE
+    assert spec.KNURL_DESIGNATION in above["HeadDia"]
+    assert "DIA OVER KNURL" in above["HeadDia"]
+    assert drawing._printable_above_callouts(above) == above
+    with pytest.raises(RuntimeError, match="HeadDia"):
+        drawing._printable_above_callouts(
+            {"HeadDia": f"STRAIGHT KNURL {spec.KNURL_DESIGNATION}\nDIA OVER KNURL"}
+        )
+
+
 def test_the_shortest_nut_keeps_full_thread_for_the_stud() -> None:
     """The overall length prints at .X; the shortest nut it admits still
     gives the stud 1.5D of the nut's full thread."""

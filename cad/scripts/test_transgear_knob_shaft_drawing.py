@@ -74,6 +74,74 @@ def test_the_thread_blank_shoulder_crosses_no_diameter_line() -> None:
     assert x + 0.002 <= drawing.THREAD_PICK[0]
 
 
+# Default-format text, measured on r743-rocker-fix3's render (as
+# test_transgear_arm_drawing uses them); the landscape border.  SolidWorks
+# centres a hole callout's lines on its point (8b5e1f354: the knob shaft's
+# three lines centred on x 15).
+_CHAR_WIDTH = 0.00276
+_LINE_PITCH = 0.0045
+_BORDER = 0.0127
+
+
+def test_the_rear_tap_callout_stands_inside_the_left_border() -> None:
+    """Review of 8b5e1f354 (blocker): the callout, centred 30 mm left of the
+    end view, ran through the left border; the thread line and the
+    countersink's 90 degrees were cut off.  Every line stands inside the
+    border with air, short of the side view's rear end and its extension
+    lines, and under the end view's tooth tips."""
+    lines = [
+        f"\u00d8{spec.TAP_DRILL_DIA:.2f} \u21a7 {spec.TAP_DRILL_DEPTH:.1f}",
+        f"{spec.TAP_SIZE} UNC - 2B \u21a7 {spec.TAP_FULL_THREAD:.1f}",
+        *spec.TAP_CSK_QUALIFIER.splitlines(),
+    ]
+    assert spec.TAP_CSK_QUALIFIER.startswith("90\u00b0 CSK")
+    x, y = drawing.TAP_CALLOUT_XY
+    half_width = max(map(len, lines)) * _CHAR_WIDTH / 2.0
+    half_height = len(lines) * _LINE_PITCH / 2.0
+    assert x - half_width >= _BORDER + 0.003
+    assert x + half_width <= drawing.REAR_X - 0.003
+    assert y + half_height <= drawing.END_CENTER[1] - drawing.HALF_OD - 0.003
+
+
+# Measured text boxes (8b5e1f354's PDF), relative to the keep point: a plain
+# Ø's text runs 13.0 mm, a banded one's 30.2 mm, ending 1.3 mm short of its
+# line on the side the text hangs; plain text spans -3.1..+3.2 mm about the
+# point, banded -4.9..+6.0.  Right of the view's centre text hangs left.
+_PLAIN_BOX = (-0.0143, -0.0031, -0.0013, 0.0032)
+_BANDED_BOX = (-0.0315, -0.0049, -0.0013, 0.0060)
+_DIAMETERS = ("OutsideDia", "CoreDia", "ReliefDia", "ThreadBlankDia", "JournalDia")
+
+
+def _diameter_text_box(name: str) -> tuple[float, float, float, float]:
+    banded = {key[1] for key in model_toleranced_dimensions(part)}
+    x0, y0, x1, y1 = _BANDED_BOX if name in banded else _PLAIN_BOX
+    x, y = drawing.SIDE_KEEP[name]
+    if x < drawing.SIDE_CENTER[0]:
+        x0, x1 = -x1, -x0
+    return (x + x0, y + y0, x + x1, y + y1)
+
+
+def test_no_diameter_text_overlaps_another_or_its_line() -> None:
+    """Review of 8b5e1f354: the core's Ø8.350 text ran over the 12T's Ø9.36.
+    Every pair of Ø texts keeps 1 mm of air, and no Ø line, rising from the
+    axis to its own text, crosses another Ø's text."""
+    boxes = {name: _diameter_text_box(name) for name in _DIAMETERS}
+    for a in _DIAMETERS:
+        ax0, ay0, ax1, ay1 = boxes[a]
+        line_x = drawing.SIDE_KEEP[a][0]
+        for b in _DIAMETERS:
+            if a >= b:
+                continue
+            bx0, by0, bx1, by1 = boxes[b]
+            air = max(bx0 - ax1, ax0 - bx1, by0 - ay1, ay0 - by1)
+            assert air >= 0.001, (a, b, air)
+        for b in _DIAMETERS:
+            if b == a:
+                continue
+            bx0, by0, bx1, _ = boxes[b]
+            assert not (bx0 <= line_x <= bx1 and by0 <= ay0), (a, b)
+
+
 def test_sheet_authors_no_manufacturing_value() -> None:
     # Rule 2: places and bands come from the part; the sheet reads them back.
     assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS

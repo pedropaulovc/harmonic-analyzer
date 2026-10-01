@@ -293,10 +293,11 @@ LOCK_Z0 = BAR_FRONT_Z + GUIDE_DEPTH  # -128.9: lock plates on the guide backs,
 # 1.0 behind the bar's back face -- they bridge the bar so the platen cannot
 # fall off it.
 
-# Rack: teeth-down at the platen's bottom edge, crests protruding 2 below it.
-RACK_TIP_Y = PLATE_Y0 - 2.0  # 271.234
-RACK_PITCH_Y = RACK_TIP_Y + RACK_ADDENDUM  # 272.0807
-RACK_Y0 = RACK_TIP_Y + RACK_BAR_HEIGHT  # 283.234 (Rx180: local y 0..12 maps down)
+# Rack: teeth-down at the platen's bottom edge, crests protruding 2.25 below it
+# (R9-62: 0.25 deeper than the first 2.00, which set the feed mesh at e 0.80).
+RACK_TIP_Y = PLATE_Y0 - 2.25  # 270.984
+RACK_PITCH_Y = RACK_TIP_Y + RACK_ADDENDUM  # 271.8307
+RACK_Y0 = RACK_TIP_Y + RACK_BAR_HEIGHT  # 282.984 (Rx180: local y 0..12 maps down)
 RACK_BACK_Z = BAR_FRONT_Z + RACK_BAR_THICKNESS  # -132.9 (on the platen back)
 
 # --- transgear (the real six-gear train) -------------------------------------
@@ -331,16 +332,18 @@ import transgear_pivot_screw_spec as PIVOT_SCREW  # noqa: E402
 import transgear_pivot_spacer_spec as SPACER  # noqa: E402
 import transgear_stub_spec as STUB  # noqa: E402
 import transgear_stud_fit as STUD_FIT  # noqa: E402
+import transgear_stud_shim_spec as SHIM  # noqa: E402
 import latch_hook_bracket_screw_spec as HOOK_BRACKET_SCREW  # noqa: E402
 import latch_hook_bracket_spec as HOOK_BRACKET_SPEC  # noqa: E402
 import latch_hook_rivet_spec as HOOK_RIVET  # noqa: E402
 
 FEED_PD = FEED_TEETH / FEED_DP * IN  # 10.16 -- meshes the DP30 rack
-# Centre extension of the feed-pinion/rack mesh: the _gear recipe cuts tooth
-# gaps down to the BASE circle (rb = 4.918 for 12T DP30), which sits above the
-# rack crests' reach at nominal centres -- extend like the drive-train's
-# checker-arbitrated mesh slacks (rb - (PD/2 - addendum) = 0.685, +0.115).
-RACK_MESH_EXT = 0.8
+# Centre extension of the feed-pinion/rack mesh (R9-62): 0.55, contact ratio
+# 1.25, the hook's +/-0.25 set reach centred on it. The sleeve's teeth are cut
+# to the 1.25/P root (root relief), so the rack crests clear the gap floors;
+# the bound is involute interference, the crests' reach into the pinion no
+# deeper than r*sin^2(PA) (e 0.528 at 12T DP30 14.5 deg).
+RACK_MESH_EXT = 0.55
 # The stud S sits on machine x 0; its y is the feed pinion's mesh line under
 # the rack. The arm's printed stud station is |S - P| from the MHA-168 pivot
 # tap P in the bar.
@@ -419,16 +422,17 @@ if _pin_hole_offset + LATCH_PIN.DIA / 2.0 >= HOOK.PIN_HOLE_DIA / 2.0:
         f"latch pin axis is {_pin_hole_offset:.3f} off the hook's pin hole centre"
     )
 
-# Stud / disc cluster on S. The stud MHA-082 seats on the arm's front face
-# (Ry180: its stations run to machine -Z); the feed sleeve thrusts on its
-# collar, the disc sits on the sleeve's seat, the brass hub presses on the
-# sleeve in front of the disc, and the hub cap closes the stack.
-STUB_Z0 = STUB.ARM_SEAT_MACHINE_Z  # -124.4
-if abs(STUB_Z0 - ARM_Z0) > 1e-9:
-    raise AssertionError("the stud's seat is off the arm's front face")
-# The thrust station is faced to fit (R9-47, transgear_stud_fit); the model
-# carries the as-fitted nominal, so the cluster sits 0.25 forward of the
-# contract §2 stations.
+# Stud / disc cluster on S. The MHA-178 shim sits on the arm's front face and
+# the stud MHA-082 seats on the shim (Ry180: its stations run to machine -Z);
+# the feed sleeve thrusts on its step, the disc sits on the sleeve's seat, the
+# brass hub presses on the sleeve in front of the disc, and the hub cap closes
+# the stack.  The shim is faced to fit (R9-47, R9-65, transgear_stud_fit); the
+# model carries it as fitted to nominal parts, so the cluster sits 0.25
+# forward of the contract §2 stations.
+SHIM_Z0 = ARM_Z0 - SHIM.THICKNESS  # -127.45: its collar face, +Z to the arm
+STUB_Z0 = STUB.SEAT_MACHINE_Z  # -127.45
+if abs(STUB_Z0 - SHIM_Z0) > 1e-9:
+    raise AssertionError("the stud's seat is off the shim's collar face")
 FEED_Z0 = STUB_Z0 - STUB.SLEEVE_THRUST_STATION  # -135.15 (Ry180, teeth to -144.65)
 DISC_Z0 = FEED_Z0 - FEED.GEAR_FACE_STATION - FEED.DISC_THICKNESS  # -147.65
 if abs(FEED.DISC_THICKNESS - DISC_FACE) > 1e-9:
@@ -442,7 +446,7 @@ DISC_SCREW_XY = tuple(
     for angle in DISC_HUB_GEOM.SCREW_ANGLES_DEG
 )
 DISC_SCREW_Z0 = DISC_Z0 - DISC_HUB.FLANGE_THICK  # -150.05: heads on the flange
-CAP_Z0 = CAP.REAR_FACE_MACHINE_Z  # -158.05 (Ry180: the cap runs to -163.85)
+CAP_Z0 = CAP.REAR_FACE_MACHINE_Z  # -158.05 (Ry180: the cap runs to -164.05)
 
 import transgear_knob_drive_pin_spec as KNOB_PIN  # noqa: E402
 import transgear_removable_spec as REMOVABLE  # noqa: E402
@@ -569,16 +573,48 @@ if DISC_PLATEN_AIR_WORST < 0.0:
         "MHA-070 disc rear face strikes the platen front face at the printed "
         f"worst case: air {DISC_PLATEN_AIR_WORST:.4f} (R9-47)"
     )
+# R9-67: the feed sleeve's 12T cuts full depth from its rear face over the
+# rack's whole width.  The rack's front face is the platen's back face, so
+# the stack above sets how far forward of the sleeve's rear face it reaches,
+# less the terms that do not lie between the sleeve and the platen's back
+# (the platen's own band, the disc face's squareness, the rim's tilt, which
+# comes back as the tilt at the 12T tips):
+# 9.55 - (0.0531 + 0.13 + 0.05 + 0.0813 - 0.0041 + 4.0) = 5.24 < 5.32 MIN.
+CLUSTER_TILT_AT_FEED_TIPS = (
+    (FEED.OUTSIDE_DIA - (STUB.STEP_DIA - printed_band_mm(1)))
+    / 2.0
+    * FEED.BORE_DIAMETRAL_CLEARANCE[1]
+    / (FEED.SLEEVE_LENGTH - FEED.SLEEVE_LENGTH_TOL)
+)  # 0.0041
+RACK_FRONT_FROM_SLEEVE_REAR_WORST = (
+    FEED.GEAR_FACE_STATION
+    + FEED.STATION_TOL
+    - DISC_PLATEN_AIR_WORST
+    - _PLATEN_THICKNESS_BAND
+    - DISC_FACE_SQUARENESS
+    - CLUSTER_TILT_AT_DISC_RIM
+    + CLUSTER_TILT_AT_FEED_TIPS
+    - PLATE_THICKNESS
+)  # 5.24
+if FEED.FULL_DEPTH_MIN < RACK_FRONT_FROM_SLEEVE_REAR_WORST:
+    raise AssertionError(
+        f"MHA-110 12T full depth may stop {FEED.FULL_DEPTH_MIN:.3f} from the rear "
+        f"face, inside the rack's worst reach {RACK_FRONT_FROM_SLEEVE_REAR_WORST:.3f}"
+    )
 # The stud's Ø12 collar front face to the MHA-069 rack's back face: the arm
 # forward on the shortest spacer, the bar thinnest, the rack thickest, the
-# collar longest the fit-up can leave it.  1.95 - 0.05 - 0.13 - 0.13 - 1.4654.
+# shim and collar longest the fit-up can leave them.
+# 1.95 - 0.05 - 0.13 - 0.13 - 1.4654.
 COLLAR_RACK_AIR_NOMINAL = STUB_Z0 - STUB.COLLAR_LENGTH - RACK_BACK_Z  # 1.95
 COLLAR_RACK_AIR_WORST = (
     COLLAR_RACK_AIR_NOMINAL
     - SPACER.LENGTH_BAND
     - BAR.BAR_DEPTH_BAND
     - _RACK_THICKNESS_BAND
-    - (STUD_FIT.COLLAR_LENGTH_FITTED_MAX - STUB.COLLAR_LENGTH)
+    - (
+        STUD_FIT.COLLAR_FRONT_STATION_FITTED_MAX
+        - (STUB.FITTED_THRUST_STATION - STUB.STEP_LENGTH)
+    )
 )  # 0.1746
 if COLLAR_RACK_AIR_WORST < 0.0:
     raise AssertionError(
@@ -804,6 +840,7 @@ LOCK_SCREW_XY = tuple(
 CHAIN_PLANE_ENVELOPES = (
     ("hub cap", STUD_XY, CAP.CAP_DIA / 2.0, CAP_Z0 - CAP.CAP_LENGTH, CAP_Z0),
     ("stud", STUD_XY, STUB.COLLAR_DIA / 2.0, STUB_Z0 - STUB.TIP_STATION, STUB_Z0),
+    ("stud shim", STUD_XY, SHIM.OD / 2.0, SHIM_Z0, ARM_Z0),
     (
         "disc hub",
         STUD_XY,
@@ -1457,19 +1494,33 @@ def _assert_rack_mesh() -> None:
         raise RuntimeError(
             f"feed pinion reaches only {z_overlap:.2f} into the rack band"
         )
-    # Radial safety: the rack crests must clear the pinion's base-circle gap
-    # floor, and the pinion tips the rack's root line.
-    rb = FEED_PD / 2.0 * math.cos(math.radians(14.5))
-    crest_reach = FEED_PD / 2.0 + RACK_MESH_EXT - RACK_ADDENDUM
-    if crest_reach <= rb + 0.05:
+    # Radial safety: the rack crests stay above the interference point (the
+    # line of action's tangency with the base circle) and clear the 1.25/P
+    # root; the contact ratio stays at or over 1.2.
+    phi = math.radians(14.5)
+    r = FEED_PD / 2.0
+    crest_depth = RACK_ADDENDUM - RACK_MESH_EXT  # crests past the pitch circle
+    interference_margin = r * math.sin(phi) ** 2 - crest_depth
+    if interference_margin < 0.0:
         raise RuntimeError(
-            f"rack crests reach {crest_reach:.3f} into the pinion"
-            f" gap floor at rb {rb:.3f}"
+            f"rack crests {crest_depth:.3f} past the pinion's pitch circle,"
+            f" {-interference_margin:.3f} beyond the involute interference point"
         )
+    root_clearance = r - crest_depth - FEED.ROOT_DIA_MIN / 2.0
+    if root_clearance < 0.25:
+        raise RuntimeError(f"rack crests {root_clearance:.3f} off the pinion root")
+    rb = r * math.cos(phi)
+    ra = FEED.OUTSIDE_DIA / 2.0
+    contact_ratio = (
+        math.sqrt(ra * ra - rb * rb) - r * math.sin(phi) + crest_depth / math.sin(phi)
+    ) / (math.pi * FEED_PD / FEED_TEETH * math.cos(phi))
+    if contact_ratio < 1.2:
+        raise RuntimeError(f"feed mesh contact ratio {contact_ratio:.2f} < 1.2")
     log(
         f"rack mesh: pitch line y {RACK_PITCH_Y:.2f}, extension {ext:.2f},"
-        f" rack gap centred over the stud, crest/floor margin"
-        f" {crest_reach - rb:.3f}"
+        f" rack gap centred over the stud, interference margin"
+        f" {interference_margin:.3f}, root clearance {root_clearance:.3f},"
+        f" contact ratio {contact_ratio:.2f}"
     )
 
 
@@ -2383,7 +2434,15 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # --- disc cluster on the stud S -------------------------------------------
-    # Ry(180): the stud's stations run from the arm's front face to -Z.
+    # The shim's collar face at SHIM_Z0, its arm face on the arm.
+    await place_component(
+        adapter,
+        "transgear-stud-shim",
+        [STUD_XY[0], STUD_XY[1], SHIM_Z0],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
+    )
+    # Ry(180): the stud's stations run from its seat on the shim to -Z.
     await place_component(
         adapter,
         "transgear-stub",

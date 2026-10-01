@@ -1657,10 +1657,10 @@ sections:
         - 'ch. 14 pp. 26–29 + ch. 30 front view: clevis grips the pivot ball at (−72, 252) — M6.5 apex crop; ch30 p008 (brightened) shows the full windowed frame; the M6.4 "ears grip the pinion bar" read is REFUTED (bar now floats)'
         - scaled
         - med
-      - - Transgear stud (MHA-082, round 10, R9-5)
-        - 'fixed steel stud on axis S: #10-32 rear thread × 7.94 through the arm (z −124.4..−116.46, 1.64 D) ending in a spherical dome 1 proud of the arm''s rear face; Ø12 × 8 collar seated on the arm''s front face (z −132.4..−124.4, Ø5.4 face relief for the die run-out); Ø9 × 2.5 thrust step (−134.9..−132.4); Ø3.9 × 22.9 journal (−157.8..−134.9) on which the feed-pinion sleeve turns; Ø2.4 MAX thread relief and a #6-32 front thread to the dome tip −166.1 for the brass cap nut MHA-160, which seats on the journal shoulder −157.8 (cluster end float 0.2..0.4)'
+      - - Transgear stud (MHA-082, round 10, R9-5, R9-47, R9-65) and its shim (MHA-178)
+        - 'fixed steel stud on axis S, seated on the steel shim MHA-178 (Ø12, faced to fit at assembly 1.58..4.52, 3.05 in the model, z −127.45..−124.4) on the arm''s front face: #10-32 rear thread × 12.3 through shim and arm (z −127.45..−115.15, Ø3.7 MAX × 1.1 run-out groove at the seat, inside the shim; 7.41 = 1.53 D worst engagement in the arm) ending in a spherical dome to −114.15; Ø12 × 3.5 collar (−130.95..−127.45); Ø9 × 4.2 thrust step (−135.15..−130.95); Ø3.9 × 22.9 journal (−158.05..−135.15) on which the feed-pinion sleeve turns; Ø2.4 MAX thread relief and a #6-32 front thread to the dome tip −166.35 for the brass cap nut MHA-160, which seats on the journal shoulder −158.05 (cluster end float 0.2..0.4)'
         - —
-        - 'CONTRACT-paper-drive §2 / §2.1 (R9-5); `transgear_stub_spec`; ch23 p.59 page002_img04 (bright brass cap)'
+        - 'CONTRACT-paper-drive §2 / §2.1 (R9-5); rulings R9-47 / R9-65; `transgear_stub_spec`, `transgear_stud_fit`, `transgear_stud_shim_spec`; ch23 p.59 page002_img04 (bright brass cap)'
         - derived
         - low
       - - Transgear latch (round 10, rulings 2 / 7 / R9-10 / R9-15)

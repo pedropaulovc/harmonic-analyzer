@@ -13,8 +13,8 @@ face, +X to the square end, +Z to the rear face):
   extruded ``THICKNESS`` toward +Z as ``Arm``.
 * ``PivotBore``: the Ø4.9 running bore through at P.
 * ``StudTap`` / ``PlateTaps``: native Hole Wizard taps through from the rear
-  face, each mouth countersunk (``StudTapCountersinks``,
-  ``PlateTapCountersinks``).
+  face.  The plate taps' mouths are countersunk (``PlateTapCountersinks``);
+  the stud tap's are not (R9-63), so the title-block edge break governs them.
 * ``SpotFace``: the rear spot face, a revolved cut whose profile (Top plane,
   the arm's centreline section) dimensions its floor from the FRONT face.
 * ``PinHole``: the blind, flat-floored latch-pin hole (reamed for the dowel's
@@ -97,7 +97,6 @@ from transgear_arm_geometry import (
     SPOT_FACE_DIA,
     SPOT_FACE_FLOOR_FROM_FRONT,
     STUD_STATION,
-    STUD_TAP_CSK_DIA,
     STUD_TAP_SPEC,
     THICKNESS,
     TIP_STATION,
@@ -131,8 +130,8 @@ _R_SPOT = SPOT_FACE_DIA / 2.0
 _R_PIN = PIN_HOLE_DIA / 2.0
 _R_STUD = blind_cut_dia_mm(STUD_TAP_SPEC) / 2.0
 _R_PLATE = blind_cut_dia_mm(PLATE_TAP_SPEC) / 2.0
-# 90-degree countersinks: one 45-degree chamfer leg on each tap-drill mouth.
-STUD_CSK = STUD_TAP_CSK_DIA / 2.0 - _R_STUD
+# 90-degree countersinks: one 45-degree chamfer leg on each plate-tap drill
+# mouth.
 PLATE_CSK = PLATE_TAP_CSK_DIA / 2.0 - _R_PLATE
 
 
@@ -163,7 +162,6 @@ V_ARM = _outline_area() * THICKNESS
 V_BORE = math.pi * _R_BORE**2 * THICKNESS
 V_STUD = math.pi * _R_STUD**2 * THICKNESS
 V_PLATE = len(PLATE_TAP_STATIONS) * math.pi * _R_PLATE**2 * THICKNESS
-V_STUD_CSK = 2.0 * _csk_volume(STUD_CSK, _R_STUD)
 V_PLATE_CSK = 2.0 * len(PLATE_TAP_STATIONS) * _csk_volume(PLATE_CSK, _R_PLATE)
 V_SPOT = math.pi * (_R_SPOT**2 - _R_BORE**2) * SPOT_FACE_DEPTH
 V_PIN = math.pi * _R_PIN**2 * PIN_HOLE_DEPTH
@@ -370,7 +368,8 @@ async def build(adapter: Any) -> dict[str, str]:
     expected -= V_BORE
     await volume_check(adapter, "arm with pivot bore", expected, 0.01 * V_BORE)
 
-    # --- Taps through from the rear face, then both mouths countersunk -------
+    # --- Taps through from the rear face, then the plate taps' mouths
+    # countersunk ---------------------------------------------------------
     stud = wizard_holes(
         adapter,
         STUD_TAP_SPEC,
@@ -398,33 +397,22 @@ async def build(adapter: Any) -> dict[str, str]:
     drive_jobs += plate.placement_drive_jobs
     expected -= V_STUD + V_PLATE
     await volume_check(adapter, "arm with taps", expected, 0.03 * (V_STUD + V_PLATE))
-    for label, feature, csk, radius, stations, removed in (
-        ("stud", "StudTapCountersinks", STUD_CSK, _R_STUD, (STUD_STATION,), V_STUD_CSK),
-        (
-            "plate",
-            "PlateTapCountersinks",
+    check(
+        "countersink plate-tap mouths",
+        await adapter.add_chamfer(
             PLATE_CSK,
-            _R_PLATE,
-            PLATE_TAP_STATIONS,
-            V_PLATE_CSK,
+            [
+                [x + _R_PLATE, 0.0, z_face]
+                for x in PLATE_TAP_STATIONS
+                for z_face in (0.0, THICKNESS)
+            ],
         ),
-    ):
-        check(
-            f"countersink {label}-tap mouths",
-            await adapter.add_chamfer(
-                csk,
-                [
-                    [x + radius, 0.0, z_face]
-                    for x in stations
-                    for z_face in (0.0, THICKNESS)
-                ],
-            ),
-        )
-        name_last_feature(adapter, feature)
-        expected -= removed
-        await volume_check(
-            adapter, f"{label}-tap countersinks", expected, 0.03 * removed + 0.05
-        )
+    )
+    name_last_feature(adapter, "PlateTapCountersinks")
+    expected -= V_PLATE_CSK
+    await volume_check(
+        adapter, "plate-tap countersinks", expected, 0.03 * V_PLATE_CSK + 0.05
+    )
 
     # --- Rear spot face: revolved in the centreline section so its floor is
     # dimensioned from the FRONT face (the pivot end play, contract §13).

@@ -234,8 +234,31 @@ def test_slot_placement_prints_the_stacks_centring_term() -> None:
     # the sheet must hold the slot to that, not leave it to appearance.
     assert f"{spec.POSITION_TOL:.3f}" in spec.SLOT_CALLOUT
     assert spec.POSITION_TOL == pytest.approx(0.065)
-    for line in spec.SLOT_CALLOUT.splitlines():
+    # Review of 8b5e1f354: the two-line above callout never printed, so the
+    # slot read as unlocated.  The centring is one printable above line, and
+    # the slot's square to the pin line prints under the pin holes' callout.
+    above = drawing.DIMENSION_CALLOUTS_ABOVE
+    assert above == {"SlotDepth": spec.SLOT_CALLOUT}
+    assert drawing._printable_above_callouts(above) == above
+    with pytest.raises(RuntimeError, match="SlotDepth"):
+        drawing._printable_above_callouts({"SlotDepth": "A\nB"})
+    pin_lines = drawing.DIMENSION_CALLOUTS_BELOW["PinPosDia"].splitlines()
+    assert pin_lines == ["2X REAM THROUGH", spec.SLOT_ORIENTATION]
+    assert "90\u00b0" in spec.SLOT_ORIENTATION
+    for line in (spec.SLOT_CALLOUT, *pin_lines):
         assert len(line) <= 70
+
+
+def test_side_view_od_band_stands_clear_of_the_slot_width() -> None:
+    # Review of 8b5e1f354: at 0.032 left of the rear face the Ø17.50's band
+    # touched the slot width's 1.8.  Text estimate: 3.5 mm caps.
+    char = 0.0035 * 0.746
+    od_right = drawing.SIDE_KEEP["CollarDia"][0] + char * len("\u00d817.50 -0.1") / 2.0
+    slot_left = drawing.SIDE_KEEP["SlotWidth"][0] - char * len("1.8") / 2.0
+    assert slot_left - od_right >= 0.0035
+    end_view_right = drawing.END_CENTER[0] + drawing.HALF_OD
+    od_left = drawing.SIDE_KEEP["CollarDia"][0] - char * len("\u00d817.50 -0.1") / 2.0
+    assert od_left - end_view_right >= 0.010
 
 
 def test_fits_carry_named_bands_and_the_lengths_print_their_places() -> None:

@@ -533,8 +533,10 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(("transgear-stub-1", "transgear-arm-1")): _annulus_limit(
                 4.826, 4.0386, 7.9375
             ),
+            # R9-66: the 6.00 cap less the stud's 1.1 relief (a literal oracle,
+            # independent of the row under test).
             frozenset(("transgear-hub-cap-1", "transgear-stub-1")): _annulus_limit(
-                3.505, 2.705, 4.7
+                3.505, 2.705, 4.9
             ),
             **_expected_numbered_pairs(
                 "transgear-disc-screw",

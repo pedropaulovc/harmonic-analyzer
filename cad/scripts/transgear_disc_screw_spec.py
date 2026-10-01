@@ -36,13 +36,11 @@ import math
 
 from _printed_tolerance import printed_band_mm
 from rack_pinion_spec import (
-    CSK_THREAD_LOSS,
-    CSK_THREAD_LOSS_WORST,
     ENGAGEMENT_FLOOR_D,
     FACE_WIDTH,
     FACE_WIDTH_MAX,
     FACE_WIDTH_MIN,
-    REAR_BREAK_MAX,
+    MOUTH_THREAD_LOSS,
 )
 from transgear_disc_hub_spec import FLANGE_THICK, FLANGE_THICK_PLACES
 
@@ -165,19 +163,19 @@ STOCK_TIP_INSIDE_REAR_MAX = (
 )
 
 # Engagement in the disc's through tap (contract §7): the disc less the
-# front countersink's thread loss and, at the rear, the largest of the tap's
-# burr break, the deepest cut with its break, and an uncut tip's depth with
-# its incomplete first thread.
+# front mouth's burr break and, at the rear, the largest of that break, the
+# deepest cut with its break, and an uncut tip's depth with its incomplete
+# first thread.  Each break is charged from the tap drill (R9-63).
 REAR_THREAD_LOSS_WORST = max(
-    REAR_BREAK_MAX,
+    MOUTH_THREAD_LOSS,
     TIP_BELOW_REAR_FACE[1] + CUT_END_BREAK_MAX,
     STOCK_TIP_INSIDE_REAR_MAX + FIRST_THREAD_LOSS,
 )
-ENGAGEMENT_WORST = FACE_WIDTH_MIN - CSK_THREAD_LOSS_WORST - REAR_THREAD_LOSS_WORST
+ENGAGEMENT_WORST = FACE_WIDTH_MIN - MOUTH_THREAD_LOSS - REAR_THREAD_LOSS_WORST
 ENGAGEMENT_NOMINAL = (
     FACE_WIDTH
-    - CSK_THREAD_LOSS
-    - max(REAR_BREAK_MAX, TIP_BELOW_REAR_FACE_MODEL + CUT_END_BREAK_MAX)
+    - MOUTH_THREAD_LOSS
+    - max(MOUTH_THREAD_LOSS, TIP_BELOW_REAR_FACE_MODEL + CUT_END_BREAK_MAX)
 )
 ENGAGEMENT_WORST_D = ENGAGEMENT_WORST / SHANK_DIA
 ENGAGEMENT_NOMINAL_D = ENGAGEMENT_NOMINAL / SHANK_DIA

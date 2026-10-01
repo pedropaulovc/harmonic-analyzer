@@ -199,10 +199,11 @@ FITUP_LINE_WIDTH = 68  # characters; default-format note text
 # title block (top 0.066).
 FITUP_NOTE_XY = ((0.018, 0.262), (0.215, 0.262))
 FITUP_NOTE_LIMITS = ((0.210, 0.075), (0.418, 0.072))
-# The platen's locks open sheet 4; the chain fit-up (§13.2) opens its second
-# column.
+# The platen's locks open sheet 4; the hook step, then the chain fit-up (§13.2)
+# under its own heading, fill its second column.
 FITUP_FIRST_COLUMN_KEY = "guide-locks-set"
-FITUP_SECOND_COLUMN_KEY = "fitup-pose-set"
+FITUP_SECOND_COLUMN_KEY = "hook-set-and-riveted"
+FITUP_CHAIN_KEY = "fitup-pose-set"
 
 SHEET_SCALES = {
     SHEET_NAMES[0]: ASSEMBLED_SCALE,
@@ -240,6 +241,7 @@ BOM_PART_NUMBERS = {
     "latch-hook": _config.parts("latch-hook")["number"],
     "latch-hook-rivet": _config.parts("latch-hook-rivet")["number"],
     "transgear-stub": _config.parts("transgear-stub")["number"],
+    "transgear-stud-shim": _config.parts("transgear-stud-shim")["number"],
     "transgear-feed-pinion": _config.parts("transgear-feed-pinion")["number"],
     "transgear-disc-hub": _config.parts("transgear-disc-hub")["number"],
     "transgear-hub-cap": _config.parts("transgear-hub-cap")["number"],
@@ -318,6 +320,7 @@ BOM_DESCRIPTIONS = {
     "latch-hook": "LATCH HOOK",
     "latch-hook-rivet": f"DOMED SOLID RIVET, MCMASTER {_SKU['latch-hook-rivet']}",
     "transgear-stub": "TRANSGEAR STUD",
+    "transgear-stud-shim": "TRANSGEAR STUD SHIM",
     "transgear-feed-pinion": "TRANSGEAR FEED PINION SLEEVE",
     "transgear-disc-hub": "TRANSGEAR DISC HUB",
     "transgear-hub-cap": "TRANSGEAR HUB CAP NUT",
@@ -371,6 +374,7 @@ TRANSGEAR_QUANTITIES = {
     "latch-hook": 1,
     "latch-hook-rivet": len(hook_geometry.RIVET_YZ),
     "transgear-stub": 1,
+    "transgear-stud-shim": 1,
     "transgear-feed-pinion": 1,
     "transgear-disc-hub": 1,
     "transgear-hub-cap": 1,
@@ -413,11 +417,16 @@ TRANSGEAR_BALLOON_ANCHORS = {
 # * the knob shaft: only its 0.7 mm stud tip stands past the thumbnut, and
 #   its 12T and threads are past the edge fallback too;
 # * the knob screw inside the knob cup, the arm-plate screws' heads on the
-#   plate's rear face, the latch pin in the arm behind the latch bracket.
+#   plate's rear face, the latch pin in the arm behind the latch bracket;
+# * the stud's shim (Ø12, z -127.45 to -124.4) behind the Ø81.5 disc: its
+#   rear rim's ray leaves the disc's rear face at radius
+#   6 + (144.65 - 124.4) * sqrt(2) = 34.6 < 40.75.
 # From the right, with only these shown, each has at least half its surface
 # in view (the knob stack at x -43.8 overlaps the sleeve at x 0 only below
 # y 265.6, the sleeve reaching 272.1; the spring pin's end shows down its
-# slot; the drive pins stand 2.4 proud of the collar, above and below it).
+# slot; the drive pins stand 2.4 proud of the collar, above and below it; the
+# shim at x 0 shares no z with the sleeve, and the latch pin nearer the
+# eye at x 43.5 stands at y 238.4, under the shim's 260.2).
 INNER_STEMS = frozenset(
     {
         "transgear-feed-pinion",
@@ -428,6 +437,7 @@ INNER_STEMS = frozenset(
         "transgear-knob-retaining-screw",
         "transgear-arm-plate-screw",
         "transgear-latch-pin",
+        "transgear-stud-shim",
     }
 )
 if not INNER_STEMS < set(TRANSGEAR_QUANTITIES):
@@ -725,7 +735,8 @@ def _step_text() -> dict[str, str]:
         ),
         "stud-fitted": (
             f"SCREW THE {_N['transgear-stub']} STUD'S {stub.REAR_THREAD_CALLOUT} END "
-            "INTO THE ARM'S STUD TAP UNTIL ITS COLLAR SEATS ON THE ARM'S FRONT FACE."
+            f"THROUGH THE {_N['transgear-stud-shim']} SHIM INTO THE ARM'S STUD TAP "
+            "TILL THE SHIM SEATS ON THE ARM."
         ),
         "arm-plate-fitted": (
             f"FIT THE {_N['transgear-arm-plate']} PLATE TO THE ARM WITH "
@@ -791,14 +802,22 @@ def _step_text() -> dict[str, str]:
             f"{TRANSGEAR_QUANTITIES['latch-hook-bracket-screw']} "
             f"{_N['latch-hook-bracket-screw']} SCREWS."
         ),
+        "hanger-meshed": (
+            f"SWING THE HANGER UP TILL THE {_N['transgear-feed-pinion']} TEETH "
+            f"ENTER THE {_N['platen-rack']} RACK. KNOB HELD, SET "
+            f"{steps.MESH_BACKLASH_TEXT} PLATEN SHAKE ALONG THE RACK (DIAL ON ITS "
+            "EDGE); CLAMP THE ARM TO THE BAR. RUN THE FULL TRAVEL: NO TIGHT SPOT, "
+            "SHAKE AT EVERY TOOTH."
+        ),
         "hook-set-and-riveted": (
-            f"LATCH THE HANGER. SET THE {_N['latch-hook']} HOOK ON THE BRACKET "
-            f"FLAP SO THE {_N['transgear-latch-pin']} PIN ENTERS ITS HOLE "
-            "WITHOUT TOUCHING; CLAMP IT. DRILL THE FLAP THROUGH THE HOOK'S "
+            f"HOLDING THAT MESH, SET THE {_N['latch-hook']} HOOK ON THE BRACKET "
+            f"FLAP, THE {_N['transgear-latch-pin']} PIN CLEAR IN ITS HOLE (HOOK "
+            f"OVER {steps.HOOK_SET_TEXT} OFF ITS DRAWN PLACE: STOP AND REPORT); "
+            "CLAMP. DRILL THE FLAP THROUGH ITS "
             f"{TRANSGEAR_QUANTITIES['latch-hook-rivet']} RIVET HOLES (SEE "
             f"{_N['latch-hook-bracket']}); SET "
             f"{TRANSGEAR_QUANTITIES['latch-hook-rivet']} "
-            f"{_N['latch-hook-rivet']} RIVETS."
+            f"{_N['latch-hook-rivet']} RIVETS. UNCLAMP, LATCH, RE-RUN THE TRAVEL."
         ),
         "fitup-pose-set": (
             "HANGER LATCHED. PULL THE CRANK SHAFT FORWARD AND THE ARM FORWARD "
@@ -808,7 +827,7 @@ def _step_text() -> dict[str, str]:
         ),
         "stud-faced-to-fit": (
             "CLUSTER FORWARD, FEEL THE COLLAR TO DISC AIR. FACE THE "
-            f"{_N['transgear-stub']} STUD'S ARM SEAT TILL IT IS "
+            f"{_N['transgear-stud-shim']} SHIM TILL IT IS "
             f"{stub.STUD_FIT_WINDOW_TEXT}; ELSE STOP AND REPORT."
         ),
         "collar-gap-measured": (
@@ -881,6 +900,7 @@ def _step_columns() -> tuple[str, str, str]:
         raise AssertionError("paper-drive step text must cover exactly the sequence")
     first = steps.step_number(FITUP_FIRST_COLUMN_KEY) - 1
     second = steps.step_number(FITUP_SECOND_COLUMN_KEY) - 1
+    chain_start = steps.step_number(FITUP_CHAIN_KEY) - 1
     return (
         _step_column(
             f"PLATEN AND SUPPORT; STEP {steps.step_number(FITUP_FIRST_COLUMN_KEY)} "
@@ -891,10 +911,15 @@ def _step_columns() -> tuple[str, str, str]:
         _step_column(
             "PLATEN LOCKS, THEN THE TRANSGEAR", steps.SEQUENCE[first:second], text
         ),
-        _step_column(
-            f"CHAIN FIT-UP, CRANK SIDE DONE PER {steps.CRANK_SIDE_REF}",
-            steps.SEQUENCE[second:],
-            text,
+        "\n".join(
+            (
+                _step_column("", steps.SEQUENCE[second:chain_start], text),
+                _step_column(
+                    f"CHAIN FIT-UP, CRANK SIDE DONE PER {steps.CRANK_SIDE_REF}",
+                    steps.SEQUENCE[chain_start:],
+                    text,
+                ),
+            )
         ),
     )
 

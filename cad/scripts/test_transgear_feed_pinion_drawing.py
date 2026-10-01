@@ -91,6 +91,61 @@ def test_cluster_float_and_nose_proud_hold_worst_case() -> None:
     assert spec.SPIGOT_LENGTH_MIN > 0.5 * spec.DISC_THICKNESS
 
 
+def test_full_depth_covers_the_racks_worst_reach() -> None:
+    """R9-67: the 12T cuts full depth from the rear face over the rack's whole
+    width at the printed worst case of the stack behind the platen."""
+    import build_paper_drive_assembly as assembly
+
+    reach = assembly.RACK_FRONT_FROM_SLEEVE_REAR_WORST
+    assert spec.FULL_DEPTH_MIN >= reach
+    assert spec.FULL_DEPTH_MAX < spec.GEAR_FACE_STATION - spec.STATION_TOL
+    # The platen stands between the rack's front face and the disc seat, so
+    # the rack never reaches within the platen's thickness of the seat.
+    assert reach < spec.GEAR_FACE_STATION + spec.STATION_TOL - assembly.PLATE_THICKNESS
+
+
+def test_cutter_run_out_ends_inside_its_limit_and_leaves_the_spigot_round() -> None:
+    assert spec.CUTTER_RUNOUT_END_WORST <= spec.CUTTER_RUNOUT_MAX
+    assert spec.SPIGOT_FULL_ROUND_MIN >= 0.5 * spec.DISC_THICKNESS
+    # The run-out's rise is the spigot's top over the shallowest-printed root.
+    assert spec.RUNOUT_RISE_WORST == pytest.approx(
+        (spec.SPIGOT_DIA + spec.SPIGOT_DIA_BAND[0] - spec.ROOT_DIA_MIN) / 2.0
+    )
+    # Negative control: a Ø1.25 in cutter at the deepest full-depth limit runs
+    # past the printed limit.
+    big = 1.25 * spec.MM_PER_IN
+    assert (
+        spec.FULL_DEPTH_MAX + spec.cutter_runout(big, spec.RUNOUT_RISE_WORST)
+        > spec.CUTTER_RUNOUT_MAX
+    )
+
+
+def test_sheet_prints_the_full_depth_window_and_the_cutter_limit() -> None:
+    lines = spec.DRAWING_NOTES.splitlines()
+    assert spec.FULL_DEPTH_NOTE in lines and spec.CUTTER_NOTE in lines
+    assert len(lines) <= 4 and max(len(line) for line in lines) <= 70
+    assert f"{spec.FULL_DEPTH:.3f} \u00b1{printed_band_mm(3):.2f}" in (
+        spec.FULL_DEPTH_NOTE
+    )
+    assert f"{spec.CUTTER_RUNOUT_MAX:.2f} MAX" in spec.CUTTER_NOTE
+    assert f"\u00d8{spec.CUTTER_DIA_MAX_IN:.2f} in MAX" in spec.CUTTER_NOTE
+
+
+def test_modelled_run_out_slots_stay_in_the_spigots_rear_end() -> None:
+    assert spec.GEAR_FACE_STATION < spec.RUNOUT_SLOT_END_Z < spec.CUTTER_RUNOUT_MAX
+    # The slot's flat walls are the gap's width where the cutter leaves the
+    # spigot: wider than at the root, narrower than at the tips.
+    root = spec.gap_chord(spec.ROOT_DIA / 2.0)
+    tip = spec.gap_chord(spec.OUTSIDE_DIA / 2.0)
+    assert root < spec.RUNOUT_SLOT_WIDTH < tip
+    # At the pitch circle the gap is half the circular pitch.
+    pitch_r = spec.PITCH_DIA / 2.0
+    assert spec.gap_chord(pitch_r) == pytest.approx(
+        2.0 * pitch_r * math.sin(math.pi / (2.0 * spec.TEETH))
+    )
+    assert 0.0 < part.V_RUNOUT_SLOT < part.V_SPIGOT / spec.TEETH
+
+
 def test_bore_runs_on_the_stud_journal() -> None:
     import transgear_stub_spec as stud
 

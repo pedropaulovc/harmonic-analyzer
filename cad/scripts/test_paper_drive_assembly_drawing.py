@@ -62,6 +62,7 @@ CONTRACT_TRANSGEAR_QUANTITIES = {
     "latch-hook": 1,
     "latch-hook-rivet": 2,
     "transgear-stub": 1,
+    "transgear-stud-shim": 1,  # R9-65: the stud's faced-to-fit shim
     "transgear-feed-pinion": 1,
     "transgear-disc-hub": 1,
     "transgear-hub-cap": 1,
@@ -138,7 +139,7 @@ def test_the_step_registry_names_this_sheet() -> None:
 def test_the_printed_step_heads_are_the_registry_in_order() -> None:
     printed = [int(n) for n in STEP_HEAD.findall(drawing.FITUP_STEPS)]
     assert printed == list(range(1, len(steps.SEQUENCE) + 1))
-    # The chain fit-up opens the second column.
+    # The hook step opens the second column, the chain fit-up under it.
     second = [int(n) for n in STEP_HEAD.findall(drawing.FITUP_COLUMNS[1])]
     assert second[0] == steps.step_number(drawing.FITUP_SECOND_COLUMN_KEY)
 
@@ -161,8 +162,10 @@ def test_the_crank_side_pointer_names_the_sheet_that_prints_those_steps() -> Non
     # SEQUENCE_SHEET.
     printed = set(STEP_HEAD.findall(drive_train.CONE_CRANK_STEPS))
     assert set(wanted) <= printed
-    fitup_ref = STEP_HEAD.findall(drawing.FITUP_COLUMNS[1])[0]
+    fitup_ref = steps.step_number(drawing.FITUP_CHAIN_KEY)
     assert f"STEP {fitup_ref}" in _step_body("fitup-accepted")
+    heading = drawing.FITUP_COLUMNS[1].index("CHAIN FIT-UP")
+    assert drawing.FITUP_COLUMNS[1].index(f"\n{fitup_ref}. ") > heading
 
 
 def test_the_steps_fit_their_fields() -> None:
@@ -243,7 +246,8 @@ def test_sheet_two_shows_and_balloons_exactly_the_transgear() -> None:
 
 
 # The transgear families the sheet-2 isometric draws no reachable ink of (farm
-# run 20261001T051043622Z failed on the sleeve): they balloon on the inner view.
+# run 20261001T051043622Z failed on the sleeve; the stud's shim stands behind
+# the Ø81.5 disc): they balloon on the inner view.
 HIDDEN_BY_THE_ISOMETRIC = {
     "transgear-feed-pinion",
     "transgear-knob-shaft",
@@ -253,6 +257,7 @@ HIDDEN_BY_THE_ISOMETRIC = {
     "transgear-knob-retaining-screw",
     "transgear-arm-plate-screw",
     "transgear-latch-pin",
+    "transgear-stud-shim",
 }
 
 
@@ -683,7 +688,9 @@ def test_the_platen_group_is_built_and_hung_before_its_locks_are_set() -> None:
     )
     # The latched hook cannot take up a rack set off its band (rack-crest
     # ruling): the step prints the crest band itself.
-    assert "CRESTS 2.00 \u00b10.05 BELOW ITS BOTTOM EDGE" in _step_body("rack-soldered")
+    assert f"CRESTS {steps.RACK_CREST_TEXT} BELOW ITS BOTTOM EDGE" in _step_body(
+        "rack-soldered"
+    )
     assert steps.BAR_TOP_ABOVE_DECK == pytest.approx(
         assembly.BAR_TOP_Y - assembly.BASE_DECK_Y, abs=5e-4
     )
@@ -808,3 +815,45 @@ def test_the_exploded_view_steps_down_on_its_native_outline() -> None:
     with pytest.raises(ValueError, match=r"no t scale fits: .*1:3.*1:4.*1:5"):
         drawing.step_down_to_fit(view.outline_at, ladder, limits, name="t")
     assert set(drawing.EXPLODED_CAPTIONS) == set(ladder)
+
+
+def test_the_hook_is_set_on_a_meshed_and_run_hanger() -> None:
+    """Codex (8b5e1f354) / R9-62: the hook was match-drilled with the hanger
+    "latched" but the pinion-in-rack mesh never set nor the platen run."""
+    meshed, hooked = (
+        steps.step_number(key) for key in ("hanger-meshed", "hook-set-and-riveted")
+    )
+    assert hooked == meshed + 1
+    text = drawing._step_text()
+    mesh = " ".join(text["hanger-meshed"].split())
+    assert f"SET {steps.MESH_BACKLASH_TEXT} PLATEN SHAKE ALONG THE RACK" in mesh
+    assert "FULL TRAVEL: NO TIGHT SPOT, SHAKE AT EVERY TOOTH" in mesh
+    hook = " ".join(text["hook-set-and-riveted"].split())
+    assert hook.startswith("HOLDING THAT MESH")
+    assert f"OVER {steps.HOOK_SET_TEXT} OFF ITS DRAWN PLACE: STOP AND REPORT" in hook
+    assert hook.endswith("UNCLAMP, LATCH, RE-RUN THE TRAVEL.")
+
+
+def test_the_feed_mesh_sits_mid_reach_with_a_working_contact_ratio() -> None:
+    """R9-62: at the 2.00 crest drop the nominal mesh ran at e 0.80, contact
+    ratio 0.86; the rack set 2.25 down puts it at 0.55, and the backlash band
+    the fit-up accepts stays inside what the hook's set range can hold."""
+    assert assembly.RACK_MESH_EXT == pytest.approx(0.55)
+    assembly._assert_rack_mesh()
+    # The hook's set range moves the stud by the pivot-to-stud over the
+    # pivot-to-latch lever.
+    lever = (assembly.STUD_X - assembly.BAR.PIVOT_TAP_X) / (
+        sum(assembly.HOOK.PLANE_X) / 2.0 - assembly.BAR.PIVOT_TAP_X
+    )
+    reach = assembly.HOOK_BRACKET_SPEC.HOOK_SET_RANGE * lever
+    low, high = (steps.mesh_extension(b) for b in steps.MESH_BACKLASH_RANGE)
+    assert low < assembly.RACK_MESH_EXT < high
+    assert assembly.RACK_MESH_EXT - reach <= low and high <= (
+        assembly.RACK_MESH_EXT + reach
+    )
+    # A 0.80 extension (the 2.00 drop) runs under one tooth in contact.
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(assembly, "RACK_MESH_EXT", 0.80)
+        patch.setattr(assembly, "RACK_PITCH_Y", assembly.RACK_PITCH_Y + 0.25)
+        with pytest.raises(RuntimeError, match="contact ratio 0.86 < 1.2"):
+            assembly._assert_rack_mesh()

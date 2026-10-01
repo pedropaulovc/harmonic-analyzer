@@ -51,6 +51,11 @@ from transgear_removable_spec import DRIVE_PIN_DIA as _SEAT_PIN_DIA
 from transgear_removable_spec import DRIVE_PIN_HOLE_DIA as _SEAT_PIN_HOLE_DIA
 from crank_seat_drive_pin_spec import PRESS_DEPTH as _CRANK_SEAT_PIN_DEPTH
 from transgear_knob_drive_pin_spec import PRESS_DEPTH as _KNOB_SEAT_PIN_DEPTH
+from transgear_hub_cap_spec import CAP_LENGTH as _HUB_CAP_LENGTH
+from transgear_hub_cap_spec import TAP_DRILL_DIA as _HUB_CAP_TAP_DRILL
+from transgear_stub_spec import FRONT_THREAD_END as _STUD_FRONT_THREAD_END
+from transgear_stub_spec import FRONT_THREAD_MAJOR as _STUD_FRONT_MAJOR
+from transgear_stub_spec import RELIEF_WIDTH as _STUD_RELIEF_WIDTH
 
 
 def _smooth_annulus_limit_mm3(
@@ -437,17 +442,20 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
         _smooth_annulus_limit_mm3(2.8448, 2.261, 9.525 - 1.5),
     ),
     # MHA-082's rear #10-32 (transgear_stub_spec), a plain 4.826 cylinder
-    # 9.25 long from the collar face as fitted (R9-47), fills the arm's #21
-    # through tap over the whole 7.9375 stock (the taps' countersinks only
-    # shrink it).
+    # 12.3 long from its seat on the MHA-178 shim (R9-65: the run-out groove
+    # stands inside the shim, whose Ø5.1 bore clears the thread), fills the
+    # arm's #21 through tap over the whole 7.9375 stock (the taps' mouth
+    # breaks only shrink it).
     frozenset(("transgear-stub-1", "transgear-arm-1")): _smooth_annulus_limit_mm3(
         4.826, 4.0386, 7.9375
     ),
-    # MHA-160 (transgear_hub_cap_spec: 5.8 long, #36 tapped through) seated
-    # on the stud's journal shoulder: the stud's 3.505 #6-32 cylinder starts
-    # past the Ø2.4 x 1.1 relief, so 5.8 - 1.1 = 4.7 of the cap.
+    # MHA-160 (transgear_hub_cap_spec, #36 tapped through) seated on the
+    # stud's journal shoulder: the stud's #6-32 major cylinder starts past
+    # its relief and runs to the cap's front face (6.0 - 1.1 = 4.9).
     frozenset(("transgear-hub-cap-1", "transgear-stub-1")): _smooth_annulus_limit_mm3(
-        3.505, 2.705, 5.8 - 1.1
+        _STUD_FRONT_MAJOR,
+        _HUB_CAP_TAP_DRILL,
+        min(_HUB_CAP_LENGTH, _STUD_FRONT_THREAD_END) - _STUD_RELIEF_WIDTH,
     ),
     # MHA-161 #0-80 x 1/4 (transgear_disc_screw_spec) through the hub
     # flange's Ø1.7 clearance into the disc's 3/64 taps (rack_pinion_spec),

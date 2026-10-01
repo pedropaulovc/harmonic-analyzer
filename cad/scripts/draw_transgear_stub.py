@@ -3,18 +3,17 @@ r"""Create the MHA-082 transgear stud manufacturing drawing.
 The SLDPRT remains authoritative.  A turned stud carries no datum and no
 geometric-control frame (policy rule 3): the running journal keeps its native
 fit band and one bearing-surface finish, the journal length its ±0.05 (the
-cluster float), the thread relief its Ø MAX and width band, and every other
+cluster float), each thread relief its Ø MAX and width band, and every other
 size is an ordinary model dimension at its part-authored places.
 
 The stud axis is model +Z, so the ``*Right`` view lays it horizontal as it
 sits in the lathe: model +Z runs to paper-LEFT, putting the #6-32 front end on
-the left and the #10-32 rear end on the right.  The side view shows hidden
-lines for the one hidden feature, the Ø5.40 face relief in the collar's rear
-face.  The arm seat is faced to fit at assembly (R9-47), so the rear stations
-(the step, the face relief's floor, the rear thread's end) baseline from the
-Ø9 step face and the seat-to-step station prints as a REFERENCE under its
-turn-and-face callout; the journal and front thread chain forward from the
-step face.
+the left and the #10-32 rear end on the right.  Every feature is visible, so
+the side view removes hidden lines.  The MHA-178 shim is faced to fit at
+assembly (R9-65), so the stud is made to size: the rear stations (the step,
+the seat, the rear thread's end) baseline from the Ø9 step face, the rear
+relief's width from the seat, and the journal and front thread chain forward
+from the step face.
 
 Run with SolidWorks open::
 
@@ -36,41 +35,34 @@ from _drawing_common import (
     add_surface_finish,
     add_view_centerline,
     assert_imported_precision,
-    dimension_name,
     finalize_drawing,
     new_project_drawing,
     offset_dimension_text,
     read_required_properties,
-    set_dimension_callouts,
     set_hidden_lines_removed,
-    set_hidden_lines_visible,
-    set_reference_dimension,
     stamp_drawing_summary,
 )
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
-from paper_drive_assembly_steps import step_ref
 from transgear_stub_spec import (
     CAP_SHOULDER_STATION,
     COLLAR_DIA,
     COLLAR_LENGTH,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
-    FACE_RELIEF_DEPTH,
     FRONT_THREAD_CALLOUT,
     FRONT_THREAD_END_STATION,
     FRONT_THREAD_MAJOR,
     JOURNAL_DIA,
+    REAR_RELIEF_WIDTH,
     REAR_THREAD_CALLOUT,
     REAR_THREAD_LENGTH,
     REAR_THREAD_MAJOR,
     REAR_TIP_STATION,
-    REFERENCE_DIMENSIONS,
     RELIEF_END_STATION,
     SLEEVE_THRUST_STATION,
     SURFACE_FINISHES,
-    THRUST_STATION_CALLOUT,
     TIP_STATION,
 )
 from solidworks_mcp.adapters.solidworks.drawing import place_view
@@ -110,8 +102,8 @@ def _sheet_y(radius_mm: float) -> float:
 
 REAR_END_X = _sheet_x(-REAR_THREAD_LENGTH)
 SEAT_X = _sheet_x(0.0)
+REAR_RELIEF_END_X = _sheet_x(-REAR_RELIEF_WIDTH)
 COLLAR_FRONT_X = _sheet_x(COLLAR_LENGTH)
-FACE_RELIEF_FLOOR_X = _sheet_x(FACE_RELIEF_DEPTH)
 THRUST_X = _sheet_x(SLEEVE_THRUST_STATION)
 SHOULDER_X = _sheet_x(CAP_SHOULDER_STATION)
 RELIEF_END_X = _sheet_x(RELIEF_END_STATION)
@@ -121,13 +113,12 @@ REAR_TIP_X = _sheet_x(REAR_TIP_STATION)
 COLLAR_TOP_Y = _sheet_y(COLLAR_DIA / 2.0)
 JOURNAL_TOP_Y = _sheet_y(JOURNAL_DIA / 2.0)
 RELIEF_MID_X = (SHOULDER_X + RELIEF_END_X) / 2.0
+REAR_RELIEF_MID_X = (SEAT_X + REAR_RELIEF_END_X) / 2.0
 
 # Axial rows below the profile, 15 mm apart, nested on the step face: row 0
-# the step and the journal; row 1 the seat-to-step station (reference) and
-# the front thread from the shoulder; row 2 the rear thread's end.  Each
-# extension line lands on a junction of the rows above it, so none crosses
-# a dimension line.  Row 2's text stands over the rear thread, clear of the
-# reference station's two-line callout under row 1.
+# the step and the journal; row 1 the seat-to-step station and the front
+# thread from the shoulder; row 2 the rear thread's end.  Each extension line
+# lands on a junction of the rows above it, so none crosses a dimension line.
 _ROW_Y = (SIDE_CENTER[1] - 0.034, SIDE_CENTER[1] - 0.049, SIDE_CENTER[1] - 0.064)
 SIDE_KEEP = {
     "StepLength": ((COLLAR_FRONT_X + THRUST_X) / 2.0, _ROW_Y[0]),
@@ -135,22 +126,20 @@ SIDE_KEEP = {
     "ThrustStation": ((SEAT_X + THRUST_X) / 2.0, _ROW_Y[1]),
     "FrontThreadEnd": ((SHOULDER_X + FRONT_END_X) / 2.0, _ROW_Y[1]),
     "RearThreadEnd": ((REAR_END_X + SEAT_X) / 2.0, _ROW_Y[2]),
-    # The face relief (hidden) and the collar Ø stand right of the rear tip,
-    # their extension lines clearing the #10-32 silhouette.
-    "FaceReliefDia": (REAR_TIP_X + 0.012, SIDE_CENTER[1]),
+    # The collar Ø stands right of the rear tip, its extension lines clearing
+    # the #10-32 silhouette; the step and journal Ø read above the profile on
+    # their own sections.
     "CollarDia": (REAR_TIP_X + 0.026, SIDE_CENTER[1]),
-    # Above the step Ø's row, from the hidden floor to the step face.
-    "FaceReliefFloor": (
-        (FACE_RELIEF_FLOOR_X + THRUST_X) / 2.0,
-        COLLAR_TOP_Y + 0.026,
-    ),
-    # The step and journal Ø read above the profile on their own sections.
     "StepDia": ((COLLAR_FRONT_X + THRUST_X) / 2.0, COLLAR_TOP_Y + 0.012),
     "JournalDia": (THRUST_X - 0.020, COLLAR_TOP_Y + 0.004),
-    # The relief: width above, Ø below with its text offset clear of the
-    # journal length's extension line at the shoulder.
+    # Each relief: width above, Ø below with its text offset clear of the
+    # neighbouring station's extension line.  The rear width's text stands
+    # over the thread, above the collar Ø's upper extension line and left of
+    # the rear thread callout's leader.
     "ReliefWidth": (RELIEF_MID_X, COLLAR_TOP_Y + 0.004),
     "ReliefDia": (RELIEF_MID_X, SIDE_CENTER[1] - 0.012),
+    "RearReliefWidth": (REAR_RELIEF_END_X + 0.008, COLLAR_TOP_Y + 0.008),
+    "RearReliefDia": (REAR_RELIEF_MID_X, SIDE_CENTER[1] - 0.012),
     "FrontDomeR": (TIP_X - 0.012, SIDE_CENTER[1] - 0.016),
     # Under row 0's extension ends, 12 mm right of the rear tip.  Its shoulder
     # runs from 7.5 mm left to 5.9 mm right of this point, 2.8 mm under it
@@ -160,6 +149,10 @@ SIDE_KEEP = {
     "RearDomeR": (REAR_TIP_X + 0.012, _ROW_Y[0] - 0.008),
 }
 RELIEF_DIA_TEXT_XY = ((RELIEF_END_X + FRONT_END_X) / 2.0, SIDE_CENTER[1] - 0.020)
+REAR_RELIEF_DIA_TEXT_XY = (
+    (REAR_RELIEF_END_X + REAR_END_X) / 2.0,
+    SIDE_CENTER[1] - 0.020,
+)
 # Each thread callout lands on its own full-thread silhouette and stands out
 # past the rows, the front one up-left, the rear one up-right.
 FRONT_THREAD_PICK = (
@@ -179,11 +172,6 @@ FINISH_SYMBOL = ((THRUST_X + SHOULDER_X) / 2.0 - 0.010, COLLAR_TOP_Y + 0.008)
 CENTERLINE_PICK = ((THRUST_X + SHOULDER_X) / 2.0 + 0.010, SIDE_CENTER[1] + 0.001)
 ISO_NOTE_XY = (0.320, 0.185)
 NOTES_XY = (0.016, 0.070)
-# Faced to fit at MHA-A06's stud step; the pointer comes from the registry.
-FIT_STEP_KEY = "stud-faced-to-fit"
-DIMENSION_CALLOUTS = {
-    "ThrustStation": f"{THRUST_STATION_CALLOUT},\nPER {step_ref(FIT_STEP_KEY)}"
-}
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -229,7 +217,7 @@ async def build(adapter: Any) -> dict[str, str]:
 
     side = place_view(adapter, str(SOURCE), "*Right", *SIDE_CENTER, scale=VIEW_SCALE)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
-    set_hidden_lines_visible(adapter, side)
+    set_hidden_lines_removed(adapter, side)
     set_hidden_lines_removed(adapter, iso)
 
     annotations = curate_view_dimensions(
@@ -239,20 +227,12 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="side",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    offset_dimension_text(adapter, annotations, {"ReliefDia": RELIEF_DIA_TEXT_XY})
+    offset_dimension_text(
+        adapter,
+        annotations,
+        {"ReliefDia": RELIEF_DIA_TEXT_XY, "RearReliefDia": REAR_RELIEF_DIA_TEXT_XY},
+    )
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
-    # Faced to fit at assembly: the as-fitted station prints as a REFERENCE
-    # and the callout under it is the requirement.
-    for name in sorted(REFERENCE_DIMENSIONS):
-        matches = [
-            annotation
-            for annotation in annotations
-            if dimension_name(adapter, annotation) == name
-        ]
-        if len(matches) != 1:
-            raise RuntimeError(f"expected one MHA-082 {name} reference dimension")
-        set_reference_dimension(adapter, matches[0], label=f"MHA-082 {name}")
-    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS, location="below")
 
     add_view_centerline(
         adapter,

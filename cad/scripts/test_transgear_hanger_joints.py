@@ -21,6 +21,7 @@ import transgear_hanger_joints as joints
 import transgear_latch_pin_spec as latch_pin
 import transgear_pivot_screw_spec as pivot
 import transgear_pivot_spacer_spec as spacer
+from _hole_spec import TAP_DRILL_MM
 
 
 def _reload_joints() -> None:
@@ -40,6 +41,18 @@ def test_pivot_screw_refuses_a_tap_drill_it_can_bottom_in(monkeypatch) -> None:
         pivot.THREAD_LEN - bar.PIVOT_TAP_DRILL_DEPTH_LIMITS[0],
     )
     with pytest.raises(AssertionError, match="bottoms"):
+        _reload_joints()
+
+
+def test_the_bar_tap_countersink_is_charged_to_the_tap_drill(monkeypatch) -> None:
+    """R9-63: full thread starts where a countersink's 45° leg meets the tap
+    drill, not the major.  A mouth wide enough to reach the screw's full
+    thread from the drill, though not from the major, is refused."""
+    drill, major = bar.PIVOT_TAP_DRILL_DIA, pivot.THREAD_MAJOR
+    csk = (drill + major) / 2.0 + 2.0 * pivot.FULL_THREAD_START
+    assert (csk - major) / 2.0 < pivot.FULL_THREAD_START < (csk - drill) / 2.0
+    monkeypatch.setattr(bar, "PIVOT_TAP_CSK_DIA", csk)
+    with pytest.raises(AssertionError, match="countersink reaches"):
         _reload_joints()
 
 
@@ -108,7 +121,9 @@ def _eccentric_corner():
     cone = math.tan(math.radians(screw.HEAD_ANGLE_DEG / 2.0))
     lift = mismatch / 2.0 / cone
     shift = plate_spec.BAND_BY_PLACES[plate_spec.CSK_DIA_PLACES] / 2.0 / cone
-    entry = (arm.PLATE_TAP_CSK_DIA - screw.THREAD_MAJOR) / 2.0
+    # Full thread starts where the countersink's 45° leg meets the tap drill
+    # (R9-63), not the major: (4.3 - 3.454) / 2 = 0.423.
+    entry = (arm.PLATE_TAP_CSK_DIA - TAP_DRILL_MM["#8-32"]) / 2.0
     return lift, shift, entry
 
 
@@ -152,6 +167,9 @@ def test_cut_plate_screws_hold_one_and_a_half_d_in_the_thinnest_arm(
     worst = arm.THICKNESS - arm.THICKNESS_BAND - entry - max(entry, 0.1)
     assert worst / screw.THREAD_MAJOR >= 1.5
     assert joints.PLATE_SCREW_ENGAGEMENT_WORST == pytest.approx(worst)
+    # Machinist review of 8b5e1f354: counted to the major, the sheet's 7.74
+    # overstated the 7.07 the countersinks leave.
+    assert worst == pytest.approx(7.0661, abs=1e-4)
     # The model is the screw as cut: its tip on the arm's front face.
     assert screw.LENGTH == pytest.approx(plate.THICKNESS_OVER_ARM + arm.THICKNESS)
     assert joints.PLATE_SCREW_TIP_INSIDE_NOMINAL == pytest.approx(0.0, abs=1e-9)

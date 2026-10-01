@@ -130,7 +130,8 @@ _INSERTED_SOURCES = {
     "transgear_disc_hub transgear_disc_screw transgear_drive_collar transgear_feed_pinion "
     "transgear_hub_cap transgear_knob_cup transgear_knob_drive_pin transgear_knob_retaining_screw "
     "transgear_knob_shaft transgear_knob_thrust_ring transgear_latch_pin transgear_pivot_screw "
-    "transgear_pivot_spacer transgear_removable transgear_stub transgear_thumbnut",
+    "transgear_pivot_spacer transgear_removable transgear_stub transgear_stud_shim "
+    "transgear_thumbnut",
     "harmonic_analyzer": "measuring_stick measuring_stick_stop frame drive_train "
     "channel summing magnifier pen paper_drive",
 }

@@ -125,6 +125,23 @@ FACE_KEEP: dict[str, tuple[float, float]] = {}
 # Above the knurl diameter, the outermost of the rim's stack: the below lane
 # would run into the dish chord.
 DIMENSION_CALLOUTS_ABOVE = {"HeadDia": KNURL_CALLOUT}
+
+
+def _printable_above_callouts(callouts: dict[str, str]) -> dict[str, str]:
+    """Refuse an above-callout SolidWorks would keep but not print.
+
+    A line break in the above compartment is stored (``GetDisplayData`` reads
+    it back) yet nothing of the callout reaches the PDF: the two-line knurl
+    designation over Ø20.5 (run 20261001T154021634Z) and the drive collar's
+    two-line slot callout (run 20261001T151531763Z) both went unprinted,
+    while one-line above callouts ("2X") print.
+    """
+    broken = sorted(name for name, text in callouts.items() if "\n" in text)
+    if broken:
+        raise RuntimeError(f"above-callouts with a line break do not print: {broken}")
+    return callouts
+
+
 # Centred over the face view's left half, so its widest line (the
 # countersink) stays inside the left border.
 THREAD_CALLOUT_XY = (FACE_CENTER[0] - 0.020, FACE_CENTER[1] + 0.060)
@@ -367,7 +384,10 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, [*face_annotations, *section_annotations], DRAWING_PRECISION_BY_NAME
     )
     set_dimension_callouts(
-        adapter, section_annotations, DIMENSION_CALLOUTS_ABOVE, location="above"
+        adapter,
+        section_annotations,
+        _printable_above_callouts(DIMENSION_CALLOUTS_ABOVE),
+        location="above",
     )
     if not auto_center_marks(adapter, face, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the thumbnut face view")

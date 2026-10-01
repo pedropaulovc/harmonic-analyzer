@@ -25,7 +25,6 @@ from transgear_arm_geometry import (
     SPOT_FACE_DIA_GROWTH,
     SPOT_FACE_FLOOR_BAND,
     STOCK_THICKNESS_IN,
-    STUD_TAP_CSK_DIA,
     TAP_CSK_ANGLE_DEG,
     TIP_STATION,
     TIP_STATION_BAND,
@@ -84,7 +83,6 @@ HOLE_POSITION_TOLERANCE = HOLE_POSITION_BAND
 STOCK_TEXT_PREFIX = f"{STOCK_THICKNESS_IN} ("
 STOCK_TEXT_SUFFIX = ") GROUND STOCK"
 _CSK = f"{TAP_CSK_ANGLE_DEG:.0f}\u00b0 CSK \u00d8"
-STUD_TAP_CSK_CALLOUT = f"{_CSK}{STUD_TAP_CSK_DIA:.1f} MAX BOTH SIDES"
 PLATE_TAP_CSK_CALLOUT = f"{_CSK}{PLATE_TAP_CSK_DIA:.1f} MAX BOTH SIDES"
 SPOT_FACE_CALLOUT = "COUNTERBORE, REAR FACE"
 # Two short lines: the text stands under the section's pivot end, inside the
@@ -97,10 +95,10 @@ PIVOT_BORE_CALLOUT = "REAM THRU"
 def engagement_line(worst_mm: float, worst_d: float) -> str:
     """The installed full-thread engagement a tap callout states: the
     worst-case length and its multiple of the major diameter, each floored
-    (a MIN never rounds up)."""
+    to two places (a MIN never rounds up), as the policy's rows state it."""
     mm = int(worst_mm * 100.0 + 1e-9) / 100.0
-    d = int(worst_d * 10.0 + 1e-9) / 10.0
-    return f"ENGAGEMENT {mm:.2f} MIN ({d:.1f}D)"
+    d = int(worst_d * 100.0 + 1e-9) / 100.0
+    return f"ENGAGEMENT {mm:.2f} MIN ({d:.2f}D)"
 
 
 # The true overall, pivot-end extreme to the square end, prints as a

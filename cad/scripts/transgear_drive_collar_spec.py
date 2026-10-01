@@ -336,13 +336,15 @@ for _ok, _what in (
         raise AssertionError(f"MHA-177: {_what}")
 
 BORE_CALLOUT = "REAM THROUGH"
-PIN_HOLE_CALLOUT = "2X REAM THROUGH"
 # The slot is cut symmetric about the bore axis (the model's SlotHalfWidth is
 # half the width from the axis) and runs along X, square to the ±Y pin line:
-# its centre plane carries the fleet's unlocated-feature centring term.
-SLOT_CALLOUT = (
-    f"CENTRED ON BORE AXIS \u00b1{POSITION_TOL:.3f}\n90\u00b0 TO DRIVE-PIN HOLE LINE"
-)
+# its centre plane carries the fleet's unlocated-feature centring term.  The
+# centring prints above the slot depth, which takes one line only (a line
+# break in the above compartment never prints, run 20261001T151531763Z); the
+# slot's square to the pin line prints under the pin holes' callout.
+SLOT_CALLOUT = f"CENTRED ON BORE AXIS \u00b1{POSITION_TOL:.3f}"
+SLOT_ORIENTATION = "REAR SLOT 90\u00b0 TO HOLE LINE"
+PIN_HOLE_CALLOUT = f"2X REAM THROUGH\n{SLOT_ORIENTATION}"
 # The overall, pilot front face to rear face, prints as a .X reference.
 OVERALL_LENGTH = LENGTH + PILOT_LENGTH  # 5.9
 DRAWING_REFERENCE_PRECISION = 1

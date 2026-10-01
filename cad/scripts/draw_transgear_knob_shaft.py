@@ -113,12 +113,15 @@ TIP_X = _sheet_x(TIP_Z)
 CHAMFER_START_X = _sheet_x(-(TIP_STATION - TIP_CHAMFER))
 HALF_OD = OUTSIDE_DIA * _S / 2000.0
 
-# Diameters stand above the shaft over their own spans (the narrow relief's
-# one step higher, clear of the core's); the lengths stack below it, 15 mm
-# apart: row 0 carries the face width, the core length from F and the
-# journal length from the 12T's rear face; row 1 the full-thread end from F;
-# row 2 the stud tip from F.  The tip chamfer's leg reads under the tip with
-# its 45-degree callout.
+# Diameters stand above the shaft over their own spans; the lengths stack
+# below it, 15 mm apart: row 0 carries the face width, the core length from F
+# and the journal length from the 12T's rear face; row 1 the full-thread end
+# from F; row 2 the stud tip from F.  The tip chamfer's leg reads under the
+# tip with its 45-degree callout.  Right of the view's centre a Ø's text hangs
+# LEFT of its line, so the core's banded text (181..211 at 8b5e1f354) ran
+# over the 12T's Ø9.36 (181.5..194.5): the core reads one step up, and the
+# narrow relief's Ø, whose text the core's line would otherwise cross, two
+# and a half steps up.
 _ABOVE_Y = SIDE_CENTER[1] + HALF_OD + 0.016
 _ROW_Y = (
     SIDE_CENTER[1] - HALF_OD - 0.016,
@@ -127,8 +130,8 @@ _ROW_Y = (
 )
 SIDE_KEEP: dict[str, tuple[float, float]] = {
     "OutsideDia": ((F_X + PINION_REAR_X) / 2.0, _ABOVE_Y),
-    "CoreDia": ((F_X + CORE_END_X) / 2.0, _ABOVE_Y),
-    "ReliefDia": ((CORE_END_X + THREAD_END_X) / 2.0, _ABOVE_Y + 0.010),
+    "CoreDia": ((F_X + CORE_END_X) / 2.0, _ABOVE_Y + 0.010),
+    "ReliefDia": ((CORE_END_X + THREAD_END_X) / 2.0, _ABOVE_Y + 0.024),
     # A Ø's line stands at its point; right of the view's centre the text
     # hangs LEFT of it (the 12T's and core's, run 20261001T085006647Z), and
     # the blank's banded text and shoulder run 27.5 mm (19e33c6c2: from the
@@ -151,8 +154,11 @@ DIMENSION_CALLOUTS_BELOW = {"TipChamfer": CHAMFER_CALLOUT}
 # chamfer and stands up and left, clear of the tooth-tip Ø over the 12T.
 THREAD_PICK = (CHAMFER_START_X, SIDE_CENTER[1] + 0.002)
 THREAD_NOTE_XY = ((THREAD_END_X + CHAMFER_START_X) / 2.0, _ABOVE_Y + 0.020)
-# The rear tap's callout stands under the end view.
-TAP_CALLOUT_XY = (END_CENTER[0] - 0.030, END_CENTER[1] - HALF_OD - 0.030)
+# The rear tap's callout stands centred under the end view: SolidWorks centres
+# the callout's three lines on this point, and at 8b5e1f354 the 46 mm thread
+# line, centred 30 mm left of the view, ran off the sheet with the
+# countersink's 90 degrees.
+TAP_CALLOUT_XY = (END_CENTER[0], END_CENTER[1] - HALF_OD - 0.030)
 # Finishes: the journal on its rear-face circle in the end view, the core on
 # its upper silhouette just in front of F.
 JOURNAL_FINISH_SYMBOL = (END_CENTER[0] + 0.008, END_CENTER[1] + HALF_OD + 0.012)

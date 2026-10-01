@@ -62,27 +62,31 @@ def test_front_chamfer_prints_a_max_that_the_flats_run_out_through() -> None:
     widest = spec.FLATS_ACROSS + printed_band_mm(
         spec.DRAWING_PRECISION_BY_NAME["FlatsAcross"]
     )
-    assert od_min / 2.0 - spec.FRONT_CHAMFER > widest / 2.0
+    assert od_min / 2.0 - spec.FRONT_CHAMFER > widest / 2.0 + spec.FLATS_POSITION_TOL
 
 
 def test_the_drive_flats_leave_no_wall_under_the_target_at_the_printed_worst() -> None:
     """R9-58: the pin-spanner holes left a 0.685 countersink ligament (19e33c6c2
-    review); the flats' only wall is flat to thread, 2.0 or more at the worst."""
+    review); the flats' only wall is flat to thread, 2.0 or more at the worst,
+    with the flats off the bore axis by their printed centring."""
     band = printed_band_mm(spec.DRAWING_PRECISION_BY_NAME["FlatsAcross"])
+    offset = band / 2.0
     narrowest = spec.FLATS_ACROSS - band
     widest = spec.FLATS_ACROSS + band
     thread_major_max = stud.FRONT_THREAD_MAJOR + 0.05
-    assert (narrowest - thread_major_max) / 2.0 >= 2.0
-    assert spec.FLAT_WALL_WORST == pytest.approx((narrowest - thread_major_max) / 2.0)
+    near_flat = narrowest / 2.0 - offset
+    far_flat = widest / 2.0 + offset
+    assert near_flat - thread_major_max / 2.0 >= 2.0
+    assert spec.FLAT_WALL_WORST == pytest.approx(near_flat - thread_major_max / 2.0)
     # An 11/32 open-end spanner (basic 0.34375 in) takes the widest flats.
     assert widest <= 0.34375 * 25.4
     # The sleeve nose (the hub's press-seat shank at its largest) thrusts on
-    # the rear face inside the narrowest flats.
+    # the rear face inside the nearer of the narrowest flats.
     nose_max = disc_hub.SHANK_DIA + disc_hub.SHANK_DIA_BAND[0]
-    assert narrowest > nose_max
-    # Each flat keeps a real bearing chord at the smallest O.D.
+    assert near_flat > nose_max / 2.0
+    # The farther flat keeps a real bearing chord at the smallest O.D.
     od_min = spec.CAP_DIA - printed_band_mm(spec.DRAWING_PRECISION_BY_NAME["CapDia"])
-    assert 2.0 * math.sqrt((od_min / 2.0) ** 2 - (widest / 2.0) ** 2) > 4.0
+    assert 2.0 * math.sqrt((od_min / 2.0) ** 2 - far_flat**2) > 4.0
     # The build's volume gate charges both flats: an independent midpoint
     # sum of the segments over the length, the chamfer's radius included.
     steps = 2000
@@ -145,37 +149,45 @@ def test_face_view_callouts_stand_clear_of_the_cutting_line() -> None:
     assert flats_y - DIM_TEXT_H / 2.0 > line_top + 0.008
 
 
+def test_the_flats_print_their_centring_on_the_bore_axis_on_one_line() -> None:
+    """8b5e1f354 review: the 8.600 flats were not located from the bore axis.
+    The centring the wall stacks spend prints above the across-flats, on one
+    line, because SolidWorks drops a broken above-callout."""
+    callout = drawing.DIMENSION_CALLOUTS_ABOVE["FlatsAcross"]
+    assert "BORE AXIS" in callout
+    assert f"\u00b1{printed_band_mm(3) / 2.0:.3f}" in callout
+    assert "\n" not in callout and len(callout) <= 70
+    assert set(drawing.DIMENSION_CALLOUTS_ABOVE) <= set(drawing.FACE_KEEP)
+    assert drawing._printable_above_callouts(drawing.DIMENSION_CALLOUTS_ABOVE)
+    with pytest.raises(RuntimeError, match="line break"):
+        drawing._printable_above_callouts({"FlatsAcross": "A\nB"})
+
+
 def test_cap_threads_onto_the_stud_and_seats_on_its_shoulder() -> None:
     assert spec.TAP_SPEC.size == stud.FRONT_THREAD
     # The stud's thread runs past the cap's worst-case engaged length even at
     # its shortest, so the cap (not the stud) bounds the engagement.
-    assert stud.FRONT_THREAD_END_MIN > spec.CAP_LENGTH_MIN - spec.CSK_LOSS_MAX
+    assert stud.FRONT_THREAD_END_MIN > spec.CAP_LENGTH_MIN - spec.TAP_MOUTH_BREAK
     assert spec.REAR_FACE_MACHINE_Z == pytest.approx(
-        stud.ARM_SEAT_MACHINE_Z - stud.CAP_SHOULDER_STATION
+        stud.SEAT_MACHINE_Z - stud.CAP_SHOULDER_STATION
     )
 
 
-def test_engagement_stack_charges_the_relief_and_the_countersink() -> None:
-    nominal = (
-        spec.CAP_LENGTH
-        - stud.RELIEF_WIDTH
-        - (spec.CSK_DIA - stud.FRONT_THREAD_MAJOR) / 2.0
+def test_engagement_stack_charges_the_relief_and_the_front_mouth_to_the_drill() -> None:
+    """R9-63: a tap mouth's loss runs to the TAP DRILL, so a countersink costs
+    at least (major - drill)/2 = 0.40; R9-66 left the front mouth only the
+    title block's 0.25 break and lengthened the cap to hold the named row."""
+    edge_break = max(
+        float(_config.title_block("edge_break")[key])
+        for key in ("radius_mm", "chamfer_max_mm")
     )
-    worst = (
-        spec.CAP_LENGTH_MIN
-        - stud.RELIEF_WIDTH_MAX
-        - (spec.CSK_DIA_MAX - stud.FRONT_THREAD_MAJOR) / 2.0
-    )
+    nominal = spec.CAP_LENGTH - stud.RELIEF_WIDTH - edge_break
+    worst = spec.CAP_LENGTH_MIN - stud.RELIEF_WIDTH_MAX - edge_break
     assert spec.ENGAGEMENT_NOMINAL == pytest.approx(nominal, abs=1e-6)
     assert spec.ENGAGEMENT_WORST == pytest.approx(worst, abs=1e-6)
-    # Short of 1.5D: the policy's named exception carries it at the approved
-    # floor.
-    assert (
-        spec.APPROVED_ENGAGEMENT_FLOOR_D
-        <= spec.ENGAGEMENT_WORST_D
-        < spec.ENGAGEMENT_NOMINAL_D
-        < 1.5
-    )
+    # Short of 1.5D: the policy's named row carries it at 1.15D.
+    assert 1.15 <= spec.ENGAGEMENT_WORST_D < spec.ENGAGEMENT_NOMINAL_D < 1.5
+    assert spec.APPROVED_ENGAGEMENT_FLOOR_D <= spec.ENGAGEMENT_WORST_D
 
 
 def test_sheet_notes_state_the_spec_engagement() -> None:

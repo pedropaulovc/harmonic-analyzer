@@ -2,7 +2,7 @@ r"""Create the manufacturing drawing for the transgear arm (MHA-164).
 
 The principal view is ``*Front``, looking at the REAR face: the outline (the
 pivot radius, the tip station and the end-face width), the pivot bore, both
-tap callouts with their countersinks, and the tap stations from the pivot
+tap callouts with their qualifier lines, and the tap stations from the pivot
 (the blanked ``StationReference`` sketch, shown in this view only).  Section
 A-A cuts it on the centreline -- through the pivot, every tap and the
 latch-pin hole -- so the rear spot face's diameter, its floor from the FRONT
@@ -70,7 +70,6 @@ from transgear_arm_spec import (
     SPOT_FACE_CALLOUT,
     STOCK_TEXT_PREFIX,
     STOCK_TEXT_SUFFIX,
-    STUD_TAP_CSK_CALLOUT,
     engagement_line,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -94,18 +93,19 @@ PNG = OUTPUTS.png
 
 # The arm is 141 mm long: 2:1 spans 0.283 m of the landscape sheet, with the
 # section A-A under it and the end view and isometric to its right, clear of
-# the title block (x > 0.216 below y 0.066).  The front view stands 10 mm
-# right of centre so the section's floor-depth text, under its pivot end,
-# keeps clear of the left border (machinist review of 19e33c6c2: centred,
-# the counterbore text crossed it).
+# the title block (x > 0.216 below y 0.066).  The front view's box centres
+# at x 0.189 so the section's floor-depth text, hanging left of its
+# dimension line under the pivot end, keeps inside the left border
+# (machinist reviews of 19e33c6c2 and 8b5e1f354: at 0.178 it reached x 1.5
+# mm).  The end view moves 2 mm with it, so the 14.0 keeps clear of it.
 SHEET_SCALE = (2.0, 1.0)
 VIEW_SCALE = (2, 1)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1]
-FRONT_CENTER = (0.178, 0.205)
+FRONT_CENTER = (0.189, 0.205)
 # Low enough that the counterbore callout above the section clears the
 # overall-length reference under the station stack.
 SECTION_CENTER = (FRONT_CENTER[0], 0.094)
-END_CENTER = (0.355, FRONT_CENTER[1])
+END_CENTER = (0.357, FRONT_CENTER[1])
 ISO_CENTER = (0.370, 0.115)
 ISO_NOTE_XY = (0.335, 0.080)
 # The front view centres on the outline's bounding box (x -R .. tip).
@@ -169,10 +169,11 @@ OVERALL_PICKS = (
     (_front_x(TIP_STATION), _front_y(3.0)),
 )
 # The floor depth's text stands BELOW the section's pivot end, outside its
-# witness lines: beside the view it crossed the left border.
+# witness lines, where it hangs LEFT of the dimension line (away from the
+# part, right edge on the line): the line runs 2 mm off the pivot end.
 SECTION_KEEP = {
     "SpotFaceDia": (_front_x(0.0), SECTION_CENTER[1] + 0.022),
-    "FloorDepth": (_front_x(-PIVOT_END_R) - 0.005, SECTION_CENTER[1] - 0.020),
+    "FloorDepth": (_front_x(-PIVOT_END_R) - 0.002, SECTION_CENTER[1] - 0.020),
     "PinHoleDepth": (
         _front_x(TIP_STATION - PIN_HOLE_DEPTH / 2.0),
         SECTION_CENTER[1] - 0.020,
@@ -181,7 +182,8 @@ SECTION_KEEP = {
 END_KEEP = {
     "Depth": (END_CENTER[0], _end_y(PIVOT_END_R) + 0.010),
     "PinHoleZ": (_end_x(PIN_HOLE_Z / 2.0), _end_y(-PIVOT_END_R) - 0.010),
-    "PinHoleDia": (END_CENTER[0] + 0.030, _end_y(0.0) + 0.018),
+    # Absolute x: the callout's right edge sits 2 mm inside the right border.
+    "PinHoleDia": (0.385, _end_y(0.0) + 0.018),
 }
 DIMENSION_CALLOUTS = {
     "PivotBoreDia": PIVOT_BORE_CALLOUT,
@@ -190,26 +192,23 @@ DIMENSION_CALLOUTS = {
     "PinHoleDia": PIN_HOLE_CALLOUT,
 }
 
-# Native tap callouts: arrow on the tap-drill rim under the rear countersink
-# (the Hole Wizard's own edge; the countersink mouth is the chamfer's), text
-# above the view, its top inside the upper border (review of 19e33c6c2: at
-# 30 mm over the pivot round it touched the border).  Each carries its
-# countersink line and the mating thread's installed full-thread engagement
-# at the worst case (the screws are cut flush, the stud's run-out sits in its
-# relief, and both taps go through), the hanger joints' and stud fit's
-# figures.
+# Native tap callouts: arrow on the tap-drill rim nearest the rear face (the
+# Hole Wizard's own edge; on the plate taps the countersink mouth is the
+# chamfer's), text above the view, its top inside the upper border (review
+# of 19e33c6c2: at 30 mm over the pivot round it touched the border).  Each
+# carries the mating thread's installed full-thread engagement at the worst
+# case (the screws are cut flush, the stud's run-out sits in its relief, and
+# both taps go through), the hanger joints' and stud fit's figures, each
+# mouth's loss counted to the tap drill (R9-63); the plate taps add their
+# countersink line.  The stud tap has no countersink: the title-block edge
+# break governs its mouths.
 _STUD_DRILL_R = blind_cut_dia_mm(STUD_TAP_SPEC) / 2.0
 _PLATE_DRILL_R = blind_cut_dia_mm(PLATE_TAP_SPEC) / 2.0
 _CALLOUT_Y = _front_y(PIVOT_END_R) + 0.022
 STUD_CALLOUT_XY = (_front_x(STUD_STATION) + 0.036, _CALLOUT_Y)
 PLATE_CALLOUT_XY = (_front_x(PLATE_TAP_STATIONS[0]) + 0.016, _CALLOUT_Y)
-STUD_TAP_QUALIFIER = "\n".join(
-    (
-        STUD_TAP_CSK_CALLOUT,
-        engagement_line(
-            stud_fit.REAR_ENGAGEMENT_WORST, stud_fit.REAR_ENGAGEMENT_WORST_D
-        ),
-    )
+STUD_TAP_QUALIFIER = engagement_line(
+    stud_fit.REAR_ENGAGEMENT_WORST, stud_fit.REAR_ENGAGEMENT_WORST_D
 )
 PLATE_TAP_QUALIFIER = "\n".join(
     (
@@ -262,7 +261,7 @@ def _rear_rim(view: Any, *, radius_mm: float, station_mm: float, label: str) -> 
     """The tap-drill rim nearest the rear face, by radius and station.
 
     Looking down a through hole both drill rims project to one circle; the
-    rear one (largest z) is the one the viewer sees at the countersink's foot.
+    rear one (largest z) is the one the viewer sees at the mouth's foot.
     """
     rims: list[tuple[float, Any]] = []
     nearest_miss = float("inf")
@@ -291,7 +290,7 @@ def tap_callout_definitions(
     definitions: dict[int, str], qualifier: str
 ) -> dict[int, str]:
     """Drop the title-block thread class from the thread compartment and
-    append the countersink line under it; every other compartment and every
+    append the qualifier lines under it; every other compartment and every
     associative Hole Wizard variable stays."""
     if set(definitions) != {5, 6, 7, 8}:
         raise RuntimeError(f"unexpected tap callout parts: {definitions!r}")
@@ -325,7 +324,7 @@ def _set_tap_callout_text(display: Any, qualifier: str, *, label: str) -> None:
         text.rstrip().endswith(qualifier) for text in resolved.values()
     ):
         raise RuntimeError(
-            f"{label} countersink line did not persist: "
+            f"{label} qualifier lines did not persist: "
             f"definitions={persisted!r}, resolved={resolved!r}"
         )
 
@@ -453,7 +452,7 @@ async def build(adapter: Any) -> dict[str, str]:
             raise RuntimeError(f"failed to add ASME centre marks to the {label} view")
 
     # Thread and tap drill ride the native callouts; the class is the title
-    # block's; the countersink and engagement lines are the qualifier's.
+    # block's; the countersink and engagement lines are the qualifiers'.
     for label, station, radius, callout_xy, qualifier in TAP_CALLOUTS:
         callout = add_native_hole_callout(
             adapter,

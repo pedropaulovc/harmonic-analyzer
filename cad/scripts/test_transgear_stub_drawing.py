@@ -44,13 +44,14 @@ def test_every_marked_dimension_prints_once_with_model_places() -> None:
 
 
 def test_only_the_functional_sizes_carry_model_bands() -> None:
-    """The journal's running fit, its length (the cluster float) and the
-    relief width (the 1.0-1.2 window) carry native bands from the spec; every
-    other size prints its places and the title block governs it."""
+    """The journal's running fit, its length (the cluster float) and each
+    relief's width (the 1.0-1.2 window) carry native bands from the spec;
+    every other size prints its places and the title block governs it."""
     assert model_toleranced_dimensions(part) == {
         ("StudProfile", "JournalDia"): "*deviations(JOURNAL_DIA_BAND)",
         ("StudProfile", "JournalLength"): "JOURNAL_LENGTH_TOL",
         ("StudProfile", "ReliefWidth"): "RELIEF_WIDTH_TOL",
+        ("StudProfile", "RearReliefWidth"): "REAR_RELIEF_WIDTH_TOL",
     }
     assert spec.JOURNAL_DIA_BAND == SHAFT_H
     assert spec.DRAWING_PRECISION_BY_NAME["JournalDia"] == 3
@@ -68,10 +69,36 @@ def test_thread_relief_prints_a_max_under_the_thread_root() -> None:
     assert 1.0 <= spec.RELIEF_WIDTH_MIN < spec.RELIEF_WIDTH_MAX <= 1.2
 
 
+def test_rear_relief_is_a_groove_under_the_10_32_root_at_the_seat() -> None:
+    """R9-65: the rear thread runs out into a standard relief groove on the
+    stud at its seat, Ø3.7 MAX under the #10-32 basic root (3.795) and the 2A
+    minor (3.827), 1.1 ±0.1 wide -- not a face relief bored into the collar
+    over the thread's crest."""
+    assert spec.REAR_RELIEF_DIA == spec.REAR_RELIEF_DIA_MAX == 3.7
+    assert spec.REAR_RELIEF_DIA_MIN == pytest.approx(3.4)
+    assert spec.REAR_RELIEF_DIA_MAX < spec.REAR_THREAD_ROOT_BASIC
+    assert spec.REAR_THREAD_ROOT_BASIC == pytest.approx(3.795, abs=5e-4)
+    assert spec.REAR_RELIEF_DIA_MAX < spec.REAR_THREAD_MINOR_UNR_2A
+    assert spec.SCREW_CUT_RUNOUT <= spec.REAR_RELIEF_WIDTH_MIN
+    assert spec.REAR_RELIEF_WIDTH_MAX == pytest.approx(1.2)
+
+
+def test_every_feature_is_visible_so_the_side_view_hides_no_lines() -> None:
+    """The face relief inside the collar was the sheet's one hidden feature,
+    and the 8.2 to its floor ended on a hidden step; the groove is visible."""
+    calls = {
+        node.func.id
+        for node in ast.walk(ast.parse(Path(drawing.__file__).read_text("utf-8")))
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+    }
+    assert "set_hidden_lines_visible" not in calls
+    assert not any("FaceRelief" in name for name in drawing.SIDE_KEEP)
+
+
 @pytest.mark.parametrize(
     ("station", "machine_z"),
     [
-        (0.0, -124.4),
+        (0.0, -127.45),
         (spec.SLEEVE_THRUST_STATION, -135.15),
         (spec.CAP_SHOULDER_STATION, -158.05),
         (spec.TIP_STATION, -166.35),
@@ -80,7 +107,7 @@ def test_thread_relief_prints_a_max_under_the_thread_root() -> None:
 def test_cluster_interfaces_sit_at_their_machine_stations(
     station: float, machine_z: float
 ) -> None:
-    assert spec.ARM_SEAT_MACHINE_Z - station == pytest.approx(machine_z, abs=1e-9)
+    assert spec.SEAT_MACHINE_Z - station == pytest.approx(machine_z, abs=1e-9)
 
 
 def test_journal_length_is_the_step_to_shoulder_span() -> None:
@@ -90,13 +117,6 @@ def test_journal_length_is_the_step_to_shoulder_span() -> None:
     assert spec.JOURNAL_LENGTH_MAX - spec.JOURNAL_LENGTH_MIN == pytest.approx(
         2.0 * spec.JOURNAL_LENGTH_TOL
     )
-
-
-def test_face_relief_clears_the_thread_and_the_collar_keeps_its_wall() -> None:
-    # The face relief lets the thread run to the collar face without cutting
-    # through the collar wall.
-    assert spec.FACE_RELIEF_DIA_MIN > spec.REAR_THREAD_MAJOR
-    assert spec.COLLAR_WALL_WORST >= 2.0
 
 
 # Each axial dimension's text centres between its two stations; its extension

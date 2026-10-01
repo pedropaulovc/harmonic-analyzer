@@ -71,8 +71,29 @@ def test_disc_screw_engages_at_least_one_and_a_half_diameters_worst_case() -> No
     assert (
         disc_screw.ENGAGEMENT_WORST
         < disc_screw.ENGAGEMENT_NOMINAL
-        < spec.FACE_WIDTH - spec.CSK_THREAD_LOSS
+        < spec.FACE_WIDTH - spec.MOUTH_THREAD_LOSS
     )
+
+
+def test_the_tap_mouths_lose_only_their_breaks_counted_from_the_drill() -> None:
+    """Machinist review of 8b5e1f354 (blocker): full thread starts where a
+    mouth's 45° leg meets the tap drill, so the far-side Ø1.8 MAX countersink
+    cost 0.305, not the 0.138 counted to the major, and 1.53D printed over
+    1.48D.  R9-63: no countersink, a 0.10 break on each mouth."""
+    assert spec.MOUTH_THREAD_LOSS == spec.MOUTH_BREAK_MAX == pytest.approx(0.10)
+    rear = max(
+        spec.MOUTH_BREAK_MAX,
+        disc_screw.TIP_BELOW_REAR_FACE[1] + disc_screw.CUT_END_BREAK_MAX,
+        disc_screw.STOCK_TIP_INSIDE_REAR_MAX + spec.SCREW_PITCH,
+    )
+    assert rear == pytest.approx(0.3895, abs=1e-4)
+    worst = spec.FACE_WIDTH_MIN - spec.MOUTH_BREAK_MAX - rear
+    assert disc_screw.ENGAGEMENT_WORST == pytest.approx(worst)
+    assert worst == pytest.approx(2.3805, abs=1e-4)
+    assert worst / spec.TAP_MAJOR >= spec.ENGAGEMENT_FLOOR_D
+    # The old Ø1.7 +0.10/0 countersink, charged to the drill, fell short.
+    old_loss = (1.8 - spec.TAP_DRILL_DIA) / 2.0
+    assert (spec.FACE_WIDTH_MIN - old_loss - rear) / spec.TAP_MAJOR < 1.5
 
 
 def test_disc_tap_drill_cuts_a_2b_minor_at_about_80_percent_thread() -> None:
@@ -93,7 +114,6 @@ def test_disc_tap_drill_cuts_a_2b_minor_at_about_80_percent_thread() -> None:
 def test_tap_to_bore_wall_meets_the_target_worst_case() -> None:
     assert spec.TAP_TO_BORE_WALL_WORST >= 2.0
     assert spec.TAP_TO_BORE_WALL_WORST < spec.TAP_TO_BORE_WALL
-    assert spec.CSK_TO_BORE_WORST >= 1.5
 
 
 def test_the_bore_slips_on_the_sleeve_spigot_at_every_limit() -> None:
@@ -131,14 +151,14 @@ def test_thickness_band_is_the_printed_xxx_band() -> None:
     )
 
 
-def test_tap_callout_carries_countersink_break_and_transfer() -> None:
+def test_tap_callout_carries_both_mouth_breaks_and_transfer() -> None:
     definitions = {5: "", 6: "<hw-threadclass> THRU", 7: "", 8: ""}
     updated = drawing.tap_callout_definitions(definitions)
     assert updated[6].endswith(spec.TAP_CALLOUT_QUALIFIER)
     assert {k: v for k, v in updated.items() if k != 6} == {5: "", 7: "", 8: ""}
     text = spec.TAP_CALLOUT_QUALIFIER
-    assert "CSK" in text and "1.7 +0.10/0" in text
-    assert "BREAK EDGE 0.05" in text
+    assert "CSK" not in text
+    assert f"BREAK EDGE {spec.MOUTH_BREAK_MAX:.2f} MAX BOTH SIDES" in text
     assert "MHA-159" in text and "MATCH-MARK" in text
     for banned in ("EXCEPTION", "ACCEPTED", "RULING", "POLICY", "BOOK FIDELITY"):
         assert banned not in text.upper()

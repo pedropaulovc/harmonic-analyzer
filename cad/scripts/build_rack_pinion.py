@@ -19,9 +19,9 @@ the disc's FRONT face (z = 0, the flange seat), the body runs z = 0..3 and
 
 Features: ``GearBlank`` / ``GearBlankProfile`` (the toothed disc's blank,
 renamed so its depth prints as ``FaceWidth``), the tooth gap + pattern,
-``BoreProfile`` / ``Bore`` (Ø10 through), ``DiscTaps`` (native Hole Wizard
-#0-80 taps through, placed from the rear face on the bolt circle), and
-``DiscTapCountersinks`` (the 90° entry countersinks on the front face).
+``BoreProfile`` / ``Bore`` (Ø10 through) and ``DiscTaps`` (native Hole
+Wizard #0-80 taps through, placed from the rear face on the bolt circle; no
+countersink, each mouth's 0.10 burr break is not modelled, R9-63).
 
 Run (SolidWorks already open)::
 
@@ -66,7 +66,6 @@ from _visibility import blank_reference_geometry
 from rack_pinion_spec import (
     BORE_DEVIATIONS,
     BORE_DIA,
-    CSK_LEG,
     DIAMETRAL_PITCH,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
@@ -88,8 +87,8 @@ from transgear_disc_hub_geometry import (
 from transgear_disc_screw_spec import ENGAGEMENT_WORST_D
 
 # The MHA-161 screw's worst full-thread engagement in the through taps (the
-# tap's lead runs out of the rear face; the losses are the far-side
-# countersink and the cut tip), floored so the MIN never rounds up.
+# tap's lead runs out of the rear face; the losses are the mouths' burr
+# breaks and the cut tip), floored so the MIN never rounds up.
 ENGAGEMENT_WORST_D_PRINTED = math.floor(ENGAGEMENT_WORST_D * 100.0) / 100.0
 MANUFACTURING_NOTES = "\n".join(
     (
@@ -110,8 +109,6 @@ BORE_DIAMETER = BORE_DIA
 _R_TAP = TAP_DRILL_DIA / 2.0
 V_BORE = math.pi * (BORE_DIAMETER / 2.0) ** 2 * FACE_WIDTH
 V_TAPS = len(TAP_CENTRES) * math.pi * _R_TAP**2 * FACE_WIDTH
-# One 45-degree countersink ring on each tap-drill mouth.
-V_CSKS = len(TAP_CENTRES) * math.pi * CSK_LEG**2 * (_R_TAP + CSK_LEG / 3.0)
 
 # The 0° centre lies on +X (y = 0); the 120° / 240° centres carry both
 # coordinates, each driven from the one "BoltCircleDia" global.
@@ -194,7 +191,7 @@ async def build(adapter) -> dict[str, str]:
     await volume_check(adapter, "bore", expected, 0.01 * V_BORE)
 
     # --- #0-80 taps through, placed from the rear face on the flange's bolt
-    # circle; the front mouths countersunk.  The sheet prints no position:
+    # circle.  The sheet prints no position:
     # the shop transfers each tap from its MHA-159 flange hole at assembly.
     taps = wizard_holes(
         adapter,
@@ -209,15 +206,6 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += taps.placement_drive_jobs
     expected -= V_TAPS
     await volume_check(adapter, "disc with taps", expected, 0.03 * V_TAPS + 0.05)
-    check(
-        "countersink disc-tap front mouths",
-        await adapter.add_chamfer(
-            CSK_LEG, [[x + _R_TAP, y, 0.0] for x, y in TAP_CENTRES]
-        ),
-    )
-    name_last_feature(adapter, "DiscTapCountersinks")
-    expected -= V_CSKS
-    await volume_check(adapter, "disc-tap countersinks", expected, 0.03 * V_CSKS + 0.05)
 
     # Apply the deferred drive equations after the whole model + a rebuild exist,
     # then re-check: each equation evaluates to the as-built value, so the

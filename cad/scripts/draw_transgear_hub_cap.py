@@ -1,8 +1,8 @@
 r"""Create the manufacturing drawing for the transgear hub cap (MHA-160).
 
 The face view is the ``*Front`` orientation, looking at the front face: it
-carries the native #6-32 through-thread callout with the front countersink
-named under its thread line, and the wrench flats' across-flats size.
+carries the native #6-32 through-thread callout and the wrench flats'
+across-flats size with their centring on the bore axis above it.
 Section A-A cuts it on the cap axis through the Right plane, clear of both
 flats, so the O.D., the length and the front chamfer print on solid cut
 edges.  The rear face seats on the stud shoulder: its seat roughness symbol
@@ -40,9 +40,9 @@ from transgear_hub_cap_spec import (
     CAP_DIA,
     CAP_LENGTH,
     CHAMFER_CALLOUT,
-    CSK_QUALIFIER,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    FLATS_CALLOUT,
     SURFACE_FINISHES,
     TAP_DRILL_DIA,
 )
@@ -63,7 +63,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# A Ø10.5 × 5.8 cap: 5:1 leaves room round the section for its three
+# A Ø10.5 × 6.0 cap: 5:1 leaves room round the section for its three
 # dimensions and the seat's finish symbol.
 SHEET_SCALE = (5.0, 1.0)
 VIEW_SCALE = (5, 1)
@@ -104,6 +104,10 @@ FACE_KEEP = {
     "FlatsAcross": (FACE_CENTER[0], FACE_CENTER[1] + HALF_OD + 0.016),
 }
 DIMENSION_CALLOUTS_BELOW = {"FrontChamfer": CHAMFER_CALLOUT}
+# The flats' centring reads above their size.  One line only: SolidWorks drops
+# an above-callout holding a line break (drive collar, farm run
+# 20261001T151531763Z: its two-line slot callout never printed).
+DIMENSION_CALLOUTS_ABOVE = {"FlatsAcross": FLATS_CALLOUT}
 # Right of the face view, below the axis: its leader reaches the tap drill's
 # right side, clear of the cutting line, the across-flats extension lines and
 # the lower A.
@@ -112,40 +116,12 @@ ISO_NOTE_XY = (ISO_CENTER[0] - 0.030, ISO_CENTER[1] - 0.040)
 NOTES_XY = (0.016, 0.070)
 
 
-def _thread_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
-    """Append the countersink line to the one compartment holding the thread."""
-    if set(definitions) != {5, 6, 7, 8}:
-        raise RuntimeError(f"unexpected thread callout parts: {definitions!r}")
-    thread_parts = [
-        part for part, text in definitions.items() if "<hw-threadclass>" in text
-    ]
-    if len(thread_parts) != 1:
-        raise RuntimeError(f"thread line is not in one callout part: {definitions!r}")
-    updated = dict(definitions)
-    part = thread_parts[0]
-    updated[part] = f"{updated[part].rstrip()}\n{CSK_QUALIFIER}"
-    return updated
-
-
-def _set_thread_callout_text(display: Any) -> None:
-    """Name the front countersink under the native through-thread line."""
-    definitions = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
-    updated = _thread_callout_definitions(definitions)
-    for definition_part, writable_part in ((5, 1), (6, 2), (7, 3), (8, 4)):
-        if updated[definition_part] != definitions[definition_part]:
-            display.SetText(writable_part, updated[definition_part])
-    persisted = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
-    resolved = {part: str(display.GetText(part) or "") for part in (1, 2, 3, 4)}
-    thread = [text for text in resolved.values() if "UNC" in text]
-    if (
-        persisted != updated
-        or len(thread) != 1
-        or not thread[0].rstrip().endswith(CSK_QUALIFIER)
-    ):
-        raise RuntimeError(
-            "hub cap countersink line did not persist: "
-            f"definitions={persisted!r}, resolved={resolved!r}"
-        )
+def _printable_above_callouts(callouts: dict[str, str]) -> dict[str, str]:
+    """The above-callouts, refused if any holds a line break (it would not print)."""
+    broken = sorted(name for name, text in callouts.items() if "\n" in text)
+    if broken:
+        raise RuntimeError(f"above-callouts with a line break do not print: {broken}")
+    return callouts
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -225,18 +201,23 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(
         adapter, annotations, DIMENSION_CALLOUTS_BELOW, location="below"
     )
+    set_dimension_callouts(
+        adapter,
+        annotations,
+        _printable_above_callouts(DIMENSION_CALLOUTS_ABOVE),
+        location="above",
+    )
     if not auto_center_marks(adapter, face, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the hub cap face view")
-    # The tap-drill edge under the front countersink: the Hole Wizard
-    # feature's one visible circle from the front.
-    thread_callout = add_native_hole_callout(
+    # The tap drill's edge on the front face: the Hole Wizard feature's one
+    # visible circle from the front.
+    add_native_hole_callout(
         adapter,
         face,
         edge=visible_circle_edge(adapter, face, TAP_DRILL_DIA),
         callout_xy=THREAD_CALLOUT_XY,
         label="#6-32 through thread",
     )
-    _set_thread_callout_text(thread_callout)
     position_section_caption(adapter, section, CAPTION_XY, label="hub cap")
     add_surface_finish(
         adapter,

@@ -1,22 +1,26 @@
-"""MHA-082 stud faced to fit (R9-47): the knob chain, the fitted thrust-station
-band and the stud's worst cases over it.
+"""MHA-082 stud fitted on the MHA-178 shim (R9-47, R9-65): the knob chain, the
+fitted thrust-station band, the shim thickness it takes and the stud's worst
+cases over it.
 
 m, the air from F (the MHA-078 knob shaft's 12T front face) to the MHA-070
 disc's front face with the cluster pushed forward, is set on feelers to
-``transgear_stub_spec.STUD_FIT_WINDOW`` by facing the stud's arm seat.  The
-knob chain K is that air with the stud's thrust station TS left out, so the
-faced station is TS = K - m:
+``transgear_stub_spec.STUD_FIT_WINDOW`` by facing the shim between the arm
+and the stud's collar.  The knob chain K is that air with the thrust station
+TS (the arm's front face to the stud's Ø9 step face) left out, so the fitted
+station is TS = K - m and the shim is TS less the stud's own seat-to-step
+size:
 
     K = -journal + sleeve - gear face station - disc - arm + hub face
         + thrust ring + 12T face width
 
-each term at its owning module's printed band.  The make-to sizes datum on
-the thrust face (``transgear_stub_spec``), so every stud check below holds
-over the whole fitted band.  The disc-rear-to-platen air and the collar to
-rack air need the platen and bar stations, so ``build_paper_drive_assembly``
-asserts them from these constants.
+each term at its owning module's printed band.  The stud's make-to sizes
+datum on the thrust face (``transgear_stub_spec``), so every stud check below
+holds over the whole fitted band.  The disc-rear-to-platen air and the
+collar to rack air need the platen and bar stations, so
+``build_paper_drive_assembly`` asserts them from these constants.
 
-Pure data: no SolidWorks.  Nothing a part spec imports reads this module.
+Pure data: no SolidWorks.  Only the shim's spec, of the part specs, reads
+this module, and nothing this module imports reads the shim's spec.
 """
 
 from __future__ import annotations
@@ -71,48 +75,49 @@ KNOB_CHAIN_BAND = round(sum(band for _, _, band, _ in KNOB_CHAIN_TERMS), 6)
 KNOB_CHAIN_MIN = round(KNOB_CHAIN_NOMINAL - KNOB_CHAIN_BAND, 6)  # 10.2846
 KNOB_CHAIN_MAX = round(KNOB_CHAIN_NOMINAL + KNOB_CHAIN_BAND, 6)  # 11.5154
 
-# --- The faced thrust station ---------------------------------------------------
+# --- The fitted thrust station and the shim ---------------------------------------
 # TS = K - m over the chain and the window: 10.0846 .. 11.4154.
 WINDOW_MIN, WINDOW_MAX = STUB.STUD_FIT_WINDOW
 WINDOW_CENTRE = (WINDOW_MIN + WINDOW_MAX) / 2.0
 THRUST_STATION_FITTED_MIN = round(KNOB_CHAIN_MIN - WINDOW_MAX, 6)
 THRUST_STATION_FITTED_MAX = round(KNOB_CHAIN_MAX - WINDOW_MIN, 6)
-# The turned minimum leaves something to face at the longest fitted station
-# (0.0846) and the most to face at the shortest (1.4154); a longer blank
-# only faces more.
-FACING_MIN = round(STUB.TURN_THRUST_STATION_MIN - THRUST_STATION_FITTED_MAX, 6)
-FACING_MAX_AT_TURN_MIN = round(
-    STUB.TURN_THRUST_STATION_MIN - THRUST_STATION_FITTED_MIN, 6
+# The shim fills TS less the stud's seat-to-step size (7.7 at .X):
+# 10.0846 - 8.5 = 1.5846 .. 11.4154 - 6.9 = 4.5154.
+SHIM_THICKNESS_FITTED_MIN = round(
+    THRUST_STATION_FITTED_MIN - STUB.SLEEVE_THRUST_STATION_MAX, 6
 )
-# The model: m at the window centre on the nominal chain, 1.45 faced from the
-# 12.2 turned.
-MODEL_WINDOW_AIR = round(KNOB_CHAIN_NOMINAL - STUB.SLEEVE_THRUST_STATION, 6)
-MODEL_FACING = round(STUB.TURN_THRUST_STATION - STUB.SLEEVE_THRUST_STATION, 6)
+SHIM_THICKNESS_FITTED_MAX = round(
+    THRUST_STATION_FITTED_MAX - STUB.SLEEVE_THRUST_STATION_MIN, 6
+)
+# The stud's rear relief stands wholly inside the thinnest shim, with full
+# thread for RELIEF_COVER before the arm's front face (R9-65): 1.2 + 0.3.
+RELIEF_COVER = 0.3
+SHIM_THICKNESS_FLOOR = round(STUB.REAR_RELIEF_WIDTH_MAX + RELIEF_COVER, 6)
+# The model: m at the window centre on the nominal chain, the shim 3.05.
+MODEL_WINDOW_AIR = round(KNOB_CHAIN_NOMINAL - STUB.FITTED_THRUST_STATION, 6)
+MODEL_SHIM_THICKNESS = round(STUB.FITTED_THRUST_STATION - STUB.SLEEVE_THRUST_STATION, 6)
 
 # --- The stud over the fitted band (make-to sizes at .X from the thrust face) -
-# The rear thread out of the seat face: 7.7846 .. 10.7154.
+# The rear thread out of the arm's front face: 7.7846 .. 10.7154.
 REAR_THREAD_OUT_MIN = round(STUB.REAR_THREAD_END_MIN - THRUST_STATION_FITTED_MAX, 6)
 REAR_THREAD_OUT_MAX = round(STUB.REAR_THREAD_END_MAX - THRUST_STATION_FITTED_MIN, 6)
-# The face relief's depth inside the seat: 1.0846 .. 4.0154.
-FACE_RELIEF_DEPTH_MIN = round(THRUST_STATION_FITTED_MIN - STUB.FACE_RELIEF_FLOOR_MAX, 6)
-FACE_RELIEF_DEPTH_MAX = round(THRUST_STATION_FITTED_MAX - STUB.FACE_RELIEF_FLOOR_MIN, 6)
-# Full thread starts SCREW_CUT_RUNOUT past the relief floor; whatever of the
-# run-out the shallowest relief does not hold stands in the arm's tap.
-REAR_RUNOUT_IN_ARM_MAX = max(0.0, STUB.SCREW_CUT_RUNOUT - FACE_RELIEF_DEPTH_MIN)
-# #10-32 engagement in the arm, from the farther of the front countersink and
-# the run-out's end to the nearer of the dome base and the rear countersink:
-# min(7.7846, 7.9121 - 0.137) - max(0.137, 0) = 7.638 = 1.583D.
+# #10-32 engagement in the arm, from the front mouth's break to the nearer of
+# the dome base and the rear mouth's break, each break (title-block 0.25 MAX,
+# no countersink: R9-63) counted from its leg on the tap drill.  The rear
+# relief and its run-out stand inside the shim (SHIM_THICKNESS_FLOOR), so
+# full thread meets the arm's front face:
+# min(7.7846, 7.9121 - 0.25) - 0.25 = 7.4121 = 1.536D.
 REAR_ENGAGEMENT_WORST = round(
-    min(REAR_THREAD_OUT_MIN, STUB.ARM_THICKNESS_MIN - STUB.ARM_CSK_LOSS_MAX)
-    - max(STUB.ARM_CSK_LOSS_MAX, REAR_RUNOUT_IN_ARM_MAX),
+    min(REAR_THREAD_OUT_MIN, STUB.ARM_THICKNESS_MIN - ARM.STUD_TAP_MOUTH_LOSS_MAX)
+    - ARM.STUD_TAP_MOUTH_LOSS_MAX,
     6,
 )
 REAR_ENGAGEMENT_WORST_D = REAR_ENGAGEMENT_WORST / STUB.REAR_THREAD_MAJOR
-# The Ø12 collar's full-diameter length ahead of the face relief's floor is
-# the floor and step sizes alone (the facing removes both alike): 7.4 - 5.0.
-COLLAR_FULL_DIA_LENGTH_MIN = round(STUB.FACE_RELIEF_FLOOR_MIN - STUB.STEP_LENGTH_MAX, 6)
-# The Ø12 collar as fitted: 5.0846 .. 8.0154 (6.55 in the model).
-COLLAR_LENGTH_FITTED_MAX = round(THRUST_STATION_FITTED_MAX - STUB.STEP_LENGTH_MIN, 6)
+# The arm's front face to the Ø12 collar's front face (the shim and the
+# collar together) as fitted: 5.0846 .. 8.0154 (6.55 in the model).
+COLLAR_FRONT_STATION_FITTED_MAX = round(
+    THRUST_STATION_FITTED_MAX - STUB.STEP_LENGTH_MIN, 6
+)
 # The sleeve's rear face bears on the Ø9 step: (8.2 - 3.93)/2 = 2.135.
 THRUST_ANNULUS_MIN = round(
     (
@@ -128,8 +133,8 @@ THRUST_ANNULUS_MIN = round(
 # the stud's xy: the MHA-171 plate spans arm stations 17.67..49.42, the stud
 # stands at 68.815.
 REAR_DOME_TIP_MACHINE_Z = (
-    round(STUB.ARM_SEAT_MACHINE_Z + REAR_THREAD_OUT_MIN + STUB.REAR_DOME_SAG, 6),
-    round(STUB.ARM_SEAT_MACHINE_Z + REAR_THREAD_OUT_MAX + STUB.REAR_DOME_SAG, 6),
+    round(ARM.FRONT_FACE_MACHINE_Z + REAR_THREAD_OUT_MIN + STUB.REAR_DOME_SAG, 6),
+    round(ARM.FRONT_FACE_MACHINE_Z + REAR_THREAD_OUT_MAX + STUB.REAR_DOME_SAG, 6),
 )
 WALL_TARGET = 2.0  # U27
 
@@ -140,30 +145,24 @@ for _ok, _what in (
     ),
     (
         math.isclose(MODEL_WINDOW_AIR, WINDOW_CENTRE, abs_tol=1e-6),
-        f"the model's thrust station {STUB.SLEEVE_THRUST_STATION} leaves m "
+        f"the model's thrust station {STUB.FITTED_THRUST_STATION} leaves m "
         f"{MODEL_WINDOW_AIR:.4f} on the nominal knob chain, not the window "
         f"centre {WINDOW_CENTRE:.2f}",
     ),
     (
-        FACING_MIN > 0.0,
-        f"TURN {STUB.TURN_THRUST_STATION_MIN} MIN is under the longest fitted "
-        f"thrust station {THRUST_STATION_FITTED_MAX:.4f}: the fit-up cannot "
-        "reach the window",
+        SHIM_THICKNESS_FITTED_MIN >= SHIM_THICKNESS_FLOOR,
+        f"the thinnest fitted shim {SHIM_THICKNESS_FITTED_MIN:.4f} does not hold "
+        f"the {STUB.REAR_RELIEF_WIDTH_MAX} rear relief and {RELIEF_COVER} of "
+        "full thread",
+    ),
+    (
+        SHIM_THICKNESS_FITTED_MIN <= MODEL_SHIM_THICKNESS <= SHIM_THICKNESS_FITTED_MAX,
+        f"the model's shim {MODEL_SHIM_THICKNESS} is outside the fitted band",
     ),
     (
         REAR_ENGAGEMENT_WORST_D >= STUB.ENGAGEMENT_RULE_D,
         f"#10-32 engagement in the arm {REAR_ENGAGEMENT_WORST:.3f} = "
-        f"{REAR_ENGAGEMENT_WORST_D:.3f}D at the most-faced stud, under 1.5D",
-    ),
-    (
-        FACE_RELIEF_DEPTH_MIN >= STUB.SCREW_CUT_RUNOUT,
-        f"face relief depth {FACE_RELIEF_DEPTH_MIN:.4f} at the most-faced stud "
-        f"does not hold the {STUB.SCREW_CUT_RUNOUT} run-out",
-    ),
-    (
-        COLLAR_FULL_DIA_LENGTH_MIN >= WALL_TARGET,
-        f"Ø12 collar ahead of the face relief {COLLAR_FULL_DIA_LENGTH_MIN:.3f} "
-        f"under {WALL_TARGET}",
+        f"{REAR_ENGAGEMENT_WORST_D:.3f}D at the longest fitted station, under 1.5D",
     ),
     (
         THRUST_ANNULUS_MIN >= WALL_TARGET,

@@ -967,8 +967,9 @@ for i, pos in enumerate(p.HOOK_RIVET_POS):
         p.rot_z_rows(90.0),
         f"latch-hook rivet {i + 1}",
     )
-# Disc cluster on the stub at S.
+# Disc cluster on the stub at S, the stub seated on its shim.
 _S = [p.STUD_XY[0], p.STUD_XY[1]]
+expect(PD, "transgear-stud-shim-1", [*_S, p.SHIM_Z0], IDENTITY, "stud shim")
 expect(PD, "transgear-stub-1", [*_S, p.STUB_Z0], p.ROT_Y_180, "transgear-stub")
 expect(
     PD,

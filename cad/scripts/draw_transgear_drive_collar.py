@@ -5,7 +5,8 @@ it carries the reamed bore and the two reamed drive-pin holes with their
 offsets from the axis.  The side view is ``*Right``, looking along the rear
 slot, so the slot shows as a notch in the rear face: the turned diameters,
 both lengths from the seat face, the reference overall and the slot's width,
-depth and placement print on it (policy rule 7).  Every feature is a plain
+depth and centring print on it (policy rule 7); the end view's pin-hole
+callout squares the slot to the pin-hole line.  Every feature is a plain
 through bore, a turned step or the open slot, so no section is needed.  No
 roughness symbol: the seat face is a clamp face (policy rule 5).
 """
@@ -96,7 +97,8 @@ END_KEEP = {
 SIDE_KEEP = {
     "PilotLength": ((_SEAT_X + _PILOT_X) / 2.0, SIDE_CENTER[1] - HALF_OD - 0.012),
     "CollarLength": ((_REAR_X + _SEAT_X) / 2.0, SIDE_CENTER[1] - HALF_OD - 0.026),
-    "CollarDia": (_REAR_X - 0.032, SIDE_CENTER[1]),
+    # 0.040 left: at 0.032 the O.D.'s band touched the slot width's value.
+    "CollarDia": (_REAR_X - 0.040, SIDE_CENTER[1]),
     "PilotDia": (_PILOT_X + 0.014, SIDE_CENTER[1]),
     "SlotDepth": (_REAR_X + 0.004, SIDE_CENTER[1] + HALF_OD + 0.012),
     "SlotWidth": (_REAR_X - 0.014, SIDE_CENTER[1]),
@@ -113,10 +115,20 @@ DIMENSION_CALLOUTS_BELOW = {
     "BoreDia": BORE_CALLOUT,
     "PinPosDia": PIN_HOLE_CALLOUT,
 }
-# The slot's placement reads above its depth, clear of the side view.
+# The slot's centring reads above its depth, clear of the side view.
 DIMENSION_CALLOUTS_ABOVE = {"SlotDepth": SLOT_CALLOUT}
 ISO_NOTE_XY = (ISO_CENTER[0] - 0.030, ISO_CENTER[1] - 0.040)
 NOTES_XY = (0.016, 0.070)
+
+
+def _printable_above_callouts(callouts: dict[str, str]) -> dict[str, str]:
+    """The above-callouts, refused if any holds a line break: SolidWorks keeps
+    such text but never prints it (this sheet's two-line slot callout, run
+    20261001T151531763Z), while one-line above callouts print."""
+    broken = sorted(name for name, text in callouts.items() if "\n" in text)
+    if broken:
+        raise RuntimeError(f"above-callouts with a line break do not print: {broken}")
+    return callouts
 
 
 def _overall_reference(adapter: Any, side: Any) -> None:
@@ -213,7 +225,10 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, annotations, DIMENSION_CALLOUTS_BELOW, location="below"
     )
     set_dimension_callouts(
-        adapter, annotations, DIMENSION_CALLOUTS_ABOVE, location="above"
+        adapter,
+        annotations,
+        _printable_above_callouts(DIMENSION_CALLOUTS_ABOVE),
+        location="above",
     )
     _overall_reference(adapter, side)
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):

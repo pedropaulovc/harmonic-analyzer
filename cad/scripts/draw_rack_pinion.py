@@ -3,7 +3,7 @@ r"""Create the curated manufacturing drawing for the rack-pinion reduction disc 
 Follows the batch gear-drawing pattern (see ``draw_cylinder_gear``). Drawn 1:1;
 the 120T disc is large and thin.  The face view (``*Front``, the rear face)
 prints the bore with its reamed limits and the fit note naming the MHA-110
-spigot, and the native #0-80 tap callout with its countersink and
+spigot, and the native #0-80 tap callout with its mouth-break and
 assembly-transfer lines (no bolt-circle position: the taps are spotted
 through the MHA-159 flange at assembly); the edge view prints the disc
 thickness and the face squareness to datum A.
@@ -120,7 +120,7 @@ TAP_PICK = (
 
 
 def tap_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
-    """Append the countersink and transfer lines to the one thread compartment."""
+    """Append the mouth-break and transfer lines to the one thread compartment."""
     if set(definitions) != {5, 6, 7, 8}:
         raise RuntimeError(f"unexpected tap callout parts: {definitions!r}")
     thread_parts = [
@@ -261,8 +261,8 @@ async def build(adapter: Any) -> dict[str, str]:
     # endpoint setter: that setter drops the semantic association on this symbol.
     add_rack_bore_finish(adapter, front, bore_edge, symbol_xy=BORE_FINISH_POSITION)
 
-    # The native thread and drill ride the callout; the countersink, the burr
-    # break and the assembly transfer are the spec's lines under it.
+    # The native thread and drill ride the callout; the mouth breaks and the
+    # assembly transfer are the spec's lines under it.
     tap_callout = add_native_hole_callout(
         adapter,
         front,

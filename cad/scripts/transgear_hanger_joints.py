@@ -56,8 +56,9 @@ if PIVOT.THREAD != BAR.PIVOT_TAP_THREAD:
     raise AssertionError("the pivot screw's thread is not the bar's pivot tap")
 if BAR.PIVOT_TAP_FULL_THREAD_MIN < PIVOT.THREAD_LEN:
     raise AssertionError("the bar's pivot tap is shorter than the screw's thread")
-# The bar tap's 45° entry countersink stays inside the neck zone.
-_PIVOT_TAP_CSK_DEPTH = (BAR.PIVOT_TAP_CSK_DIA - PIVOT.THREAD_MAJOR) / 2.0
+# The bar tap's 45° entry countersink stays inside the neck zone; its loss
+# runs to where the leg meets the tap drill (R9-63).
+_PIVOT_TAP_CSK_DEPTH = (BAR.PIVOT_TAP_CSK_DIA - BAR.PIVOT_TAP_DRILL_DIA) / 2.0
 if _PIVOT_TAP_CSK_DEPTH > PIVOT.FULL_THREAD_START:
     raise AssertionError(
         "the bar tap's countersink reaches the pivot screw's full thread"
@@ -155,7 +156,9 @@ if PLATE_SCREW_SEAT_ECCENTRICITY > PLATE_SCREW_PITCH_FLOAT / 2.0:
 PLATE_SCREW_ECCENTRIC_LIFT = PLATE_SCREW_SEAT_ECCENTRICITY / math.tan(
     math.radians(PLATE.CSK_ANGLE_DEG / 2.0)
 )
-_PLATE_TAP_CSK_LOSS = (ARM.PLATE_TAP_CSK_DIA - PLATE_SCREW.THREAD_MAJOR) / 2.0
+# Each countersink takes thread to where its 45-degree leg meets the tap
+# drill, not the major (R9-63): 0.423 at Ø4.3 over the Ø3.454 drill.
+_PLATE_TAP_CSK_LOSS = ARM.PLATE_TAP_MOUTH_LOSS_MAX
 # A countersink cut large or small by its printed band seats the oval head
 # sunk or proud of the plate's rear face by this much.
 PLATE_SCREW_SEAT_SHIFT = (

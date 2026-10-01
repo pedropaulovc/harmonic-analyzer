@@ -12,7 +12,8 @@ front thrust face (transgear_feed_pinion_spec, rulings R9-5 / R9-8).
 Layout: origin on the axis at the sleeve's rear end (on the stud's Ø9 step),
 +Z toward the machine front. Teeth z 0..9.5 (root at the 1.25/P full-depth
 floor), spigot to SPIGOT_FRONT_STATION, shank to OVERALL_LENGTH, Ø3.9 bore
-through, Ø1.2 oil hole on +Y at OIL_HOLE_Z. Datums: ``Front Plane`` is the
+through, Ø1.2 oil hole on +Y at OIL_HOLE_Z. The form cutter's run-out slots
+the spigot's rear end behind the gaps (R9-67). Datums: ``Front Plane`` is the
 rear face (``RearFace``); ``GearFace`` and ``SpigotFront`` are offset
 planes; ``Axis1`` is the tooth pattern's Top x Right axis.
 
@@ -25,12 +26,14 @@ from __future__ import annotations
 
 import math
 import sys
+from typing import Any, Callable
 
 import _telemetry
 from _common import (
     SketchDims,
     _early_bound,
     _feature_by_name,
+    _read_member,
     add_line_chain,
     anchor_point_to_origin,
     apply_material,
@@ -65,11 +68,16 @@ from _visibility import blank_reference_geometry
 from transgear_feed_pinion_spec import (
     BORE_DEVIATIONS,
     BORE_DIA,
+    CUTTER_AXIS_R,
+    CUTTER_AXIS_Z,
+    CUTTER_DIA_MAX,
     DEDENDUM_FACTOR,
     DIAMETRAL_PITCH,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
+    FULL_DEPTH,
+    GAP_AZIMUTH_DEG,
     GEAR_DATA,
     GEAR_FACE_STATION,
     OIL_HOLE_DIA,
@@ -82,6 +90,8 @@ from transgear_feed_pinion_spec import (
     ROOT_DIA_DEVIATIONS,
     ROOT_DIA_MIN,
     ROOT_DIA_TOL_TYPE,
+    RUNOUT_SLOT_END_Z,
+    RUNOUT_SLOT_WIDTH,
     SHANK_DIA,
     SHANK_DIA_DEVIATIONS,
     SPIGOT_DIA,
@@ -109,6 +119,221 @@ V_OIL_HOLE = (
     cross_hole_volume_mm3(OIL_HOLE_DIA, SHANK_DIA)
     - cross_hole_volume_mm3(OIL_HOLE_DIA, BORE_DIA)
 ) / 2.0
+
+_R_SPIGOT = SPIGOT_DIA / 2.0
+_R_CUTTER = CUTTER_DIA_MAX / 2.0
+
+
+def runout_slot_volume(steps: int = 400) -> float:
+    """One run-out slot: the flat-walled RUNOUT_SLOT_WIDTH slab of the
+    cutter's circle in front of the gear face, inside the spigot.  At an
+    axial station z the cutter reaches down to f(z) along the gap's centre
+    line; at a tangential offset t the spigot's surface stands at
+    √(Rs² − t²), so the slab removes max(0, √(Rs² − t²) − f(z)) there."""
+    z0, z1 = FACE_WIDTH, RUNOUT_SLOT_END_Z
+    half = RUNOUT_SLOT_WIDTH / 2.0
+    dz, dt = (z1 - z0) / steps, 2.0 * half / steps
+    total = 0.0
+    for i in range(steps):
+        z = z0 + (i + 0.5) * dz
+        floor = CUTTER_AXIS_R - math.sqrt(_R_CUTTER**2 - (z - CUTTER_AXIS_Z) ** 2)
+        for j in range(steps):
+            t = -half + (j + 0.5) * dt
+            total += max(0.0, math.sqrt(_R_SPIGOT**2 - t * t) - floor)
+    return total * dz * dt
+
+
+V_RUNOUT_SLOT = runout_slot_volume()
+
+
+def cutter_arc_points(
+    to_sketch: Callable[[tuple[float, float, float]], tuple[float, float]],
+) -> tuple[tuple[float, float], tuple[float, float], tuple[float, float]]:
+    """``(centre, start, end)`` of the seed slot's cutter arc in sketch
+    coordinates: the arc runs counter-clockwise from ``start`` round the
+    cutter's far (forward) side to ``end``, both on the chord at the gear
+    face, so arc + chord close the region in front of it."""
+    azimuth = math.radians(GAP_AZIMUTH_DEG)
+    radial = (math.cos(azimuth), math.sin(azimuth))
+
+    def model(r: float, z: float) -> tuple[float, float, float]:
+        return (r * radial[0], r * radial[1], z)
+
+    half_chord = math.sqrt(_R_CUTTER**2 - (FACE_WIDTH - CUTTER_AXIS_Z) ** 2)
+    centre = to_sketch(model(CUTTER_AXIS_R, CUTTER_AXIS_Z))
+    near = to_sketch(model(CUTTER_AXIS_R - half_chord, FACE_WIDTH))
+    far = to_sketch(model(CUTTER_AXIS_R + half_chord, FACE_WIDTH))
+    front = to_sketch(model(CUTTER_AXIS_R, CUTTER_AXIS_Z + _R_CUTTER))
+
+    def angle(point: tuple[float, float]) -> float:
+        return math.atan2(point[1] - centre[1], point[0] - centre[0]) % math.tau
+
+    def ccw(a: float, b: float) -> float:
+        return (b - a) % math.tau
+
+    # Counter-clockwise from `near`, the foremost point must come before `far`.
+    if ccw(angle(near), angle(front)) < ccw(angle(near), angle(far)):
+        return centre, near, far
+    return centre, far, near
+
+
+def _plane_normal(adapter: Any, name: str) -> tuple[float, float, float]:
+    """A reference plane's unit normal in model coordinates (the third row of
+    ``IRefPlane::Transform``'s rotation; build_crankshaft's reader)."""
+    feature = _early_bound(_feature_by_name(adapter, name), "IFeature")
+    plane = _early_bound(feature.GetSpecificFeature2(), "IRefPlane")
+    data = [
+        float(v) for v in _read_member(_read_member(plane, "Transform"), "ArrayData")
+    ]
+    return (data[6], data[7], data[8])
+
+
+def _delete_feature(adapter: Any, name: str, kind: str) -> None:
+    from solidworks_mcp.adapters.pywin32_adapter import null_callout
+
+    model = adapter.currentModel
+    model.ClearSelection2(True)
+    if not model.Extension.SelectByID2(
+        name, kind, 0, 0, 0, False, 0, null_callout(), 0
+    ):
+        raise RuntimeError(f"cannot select {name!r} for deletion")
+    if not model.Extension.DeleteSelection2(0):
+        raise RuntimeError(f"DeleteSelection2 refused {name!r}")
+    model.ClearSelection2(True)
+
+
+async def _gap_plane(adapter: Any, name: str) -> None:
+    """The plane through the sleeve axis and the seed gap's centre line.
+
+    ``InsertRefPlane`` has two angled solutions per magnitude; the first
+    attempt is kept only if the gap's radial direction lies in it, else the
+    mirror is built and proven the same way (build_crankshaft's recipe)."""
+    from solidworks_mcp.adapters.base import CreatePlaneParameters
+
+    azimuth = math.radians(GAP_AZIMUTH_DEG)
+    direction = (math.cos(azimuth), math.sin(azimuth), 0.0)
+    for attempt, signed in enumerate((GAP_AZIMUTH_DEG, -GAP_AZIMUTH_DEG)):
+        check(
+            f"create_plane {name} ({signed:+.1f} deg about Axis1)",
+            await adapter.create_plane(
+                CreatePlaneParameters(
+                    mode="angle",
+                    base_plane="Top Plane",
+                    angle=signed,
+                    pivot_axis="Axis1",
+                )
+            ),
+        )
+        name_last_feature(adapter, name)
+        normal = _plane_normal(adapter, name)
+        off_plane = abs(sum(n * d for n, d in zip(normal, direction, strict=True)))
+        _telemetry.info(
+            f"{name}: attempt {attempt + 1} normal {normal}, |n.d| = {off_plane:.3e}"
+        )
+        if off_plane < 1e-6:
+            return
+        _delete_feature(adapter, name, "PLANE")
+    raise RuntimeError(f"{name}: neither angled-plane solution contains the gap")
+
+
+def _sketch_mapper(
+    adapter: Any, *, label: str
+) -> tuple[Callable[[tuple[float, float, float]], tuple[float, float]], int]:
+    """Map model points (mm) into the ACTIVE sketch through
+    ``ModelToSketchTransform``; return the mapper and the sketch axis (0 = u,
+    1 = v) the sleeve axis runs along.  The plane contains the axis and the
+    origin, so the axis must map onto one sketch axis through the origin."""
+    import pythoncom
+    from win32com.client import VARIANT
+
+    active = adapter.currentModel.GetActiveSketch2()
+    if active is None:
+        raise RuntimeError(f"{label}: no active sketch")
+    sketch = _early_bound(active, "ISketch")
+    math_util = _early_bound(adapter.swApp.GetMathUtility(), "IMathUtility")
+    xform = _early_bound(sketch.ModelToSketchTransform, "IMathTransform")
+
+    def raw(model_mm: tuple[float, float, float]) -> tuple[float, ...]:
+        point = math_util.CreatePoint(
+            VARIANT(
+                pythoncom.VT_ARRAY | pythoncom.VT_R8, [c / 1000.0 for c in model_mm]
+            )
+        )
+        mapped = _early_bound(
+            _early_bound(point, "IMathPoint").MultiplyTransform(xform), "IMathPoint"
+        )
+        return tuple(c * 1000.0 for c in mapped.ArrayData)
+
+    origin = raw((0.0, 0.0, 0.0))
+    along = raw((0.0, 0.0, 1.0))
+    if max(abs(c) for c in origin) > 1e-6:
+        raise RuntimeError(f"{label}: the model origin maps to {origin!r}")
+    axial = [abs(along[0]), abs(along[1])]
+    axis = 0 if axial[0] > 0.5 else 1
+    if abs(axial[axis] - 1.0) > 1e-6 or abs(axial[1 - axis]) > 1e-6:
+        raise RuntimeError(f"{label}: the sleeve axis maps to {along!r}")
+
+    def to_sketch(model_mm: tuple[float, float, float]) -> tuple[float, float]:
+        mapped = raw(model_mm)
+        if abs(mapped[2]) > 1e-6:
+            raise RuntimeError(f"{label}: {model_mm!r} is off the sketch plane")
+        return (mapped[0], mapped[1])
+
+    return to_sketch, axis
+
+
+async def _runout_slot_seed(adapter: Any) -> list[tuple[str, str]]:
+    """The seed run-out slot's cutter segment on the gap plane."""
+    profile = SketchDims()
+    check("create_sketch run-out slot", await adapter.create_sketch("GapPlane"))
+    to_sketch, axial = _sketch_mapper(adapter, label="run-out slot sketch")
+    centre, start, end = cutter_arc_points(to_sketch)
+    set_sketch_direct_db(adapter, True)
+    arc = check("cutter arc", await adapter.add_arc(*centre, *start, *end))
+    chord = check("gear-face chord", await adapter.add_line(*end, *start))
+    set_sketch_direct_db(adapter, False)
+    for label, first, second, relation in (
+        ("chord starts at the arc end", f"{chord}.start", f"{arc}.end", "coincident"),
+        ("chord ends at the arc start", f"{chord}.end", f"{arc}.start", "coincident"),
+        (
+            "chord square to the axis",
+            chord,
+            None,
+            "vertical" if axial == 0 else "horizontal",
+        ),
+    ):
+        check(label, await adapter.add_sketch_constraint(first, second, relation))
+    check(
+        "cutter diameter",
+        await adapter.add_sketch_dimension(arc, None, "diameter", CUTTER_DIA_MAX),
+    )
+    profile.record("CutterDia", '"CutterDia"')
+    # The centre's two distances from the origin, horizontal then vertical:
+    # the axial one is the full-depth station, the radial one the gap floor
+    # plus the cutter's radius.
+    await anchor_point_to_origin(adapter, f"{arc}.center", *centre, "cutter centre")
+    drives = {
+        "CutterAxisZ": '"FullDepth"',
+        "CutterAxisR": '"RootDia" / 2 + "CutterDia" / 2',
+    }
+    order = (
+        ("CutterAxisZ", "CutterAxisR") if axial == 0 else ("CutterAxisR", "CutterAxisZ")
+    )
+    for name in order:
+        profile.record(name, drives[name])
+    await dimension_between(
+        adapter,
+        f"{chord}.start",
+        "origin",
+        "horizontal_distance" if axial == 0 else "vertical_distance",
+        FACE_WIDTH,
+        "run-out slot starts at the gear face",
+    )
+    profile.record("SlotStart", '"FaceWidth"')
+    await ensure_fully_defined(adapter, "run-out slot sketch")
+    check("exit_sketch run-out slot", await adapter.exit_sketch())
+    name_last_feature(adapter, "RunoutSlotProfile")
+    return profile.apply(adapter, "RunoutSlotProfile")
 
 
 def _as_construction(adapter, line: str) -> None:
@@ -150,6 +375,8 @@ def _root_min_limit(adapter) -> None:
 
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
+        CircularPatternParameters,
+        CreateAxisParameters,
         CreatePlaneParameters,
         ExtrusionParameters,
         RevolveParameters,
@@ -171,6 +398,9 @@ async def build(adapter) -> dict[str, str]:
         ("OverallLength", OVERALL_LENGTH),
         ("OilHoleDia", OIL_HOLE_DIA),
         ("OilHoleZ", OIL_HOLE_Z),
+        ("FullDepth", FULL_DEPTH),
+        ("CutterDia", CUTTER_DIA_MAX),
+        ("RunoutSlotWidth", RUNOUT_SLOT_WIDTH),
     ):
         await set_global(adapter, name, f"{value}mm")
 
@@ -178,7 +408,10 @@ async def build(adapter) -> dict[str, str]:
 
     # Teeth z 0..FACE_WIDTH off the Front plane (the rear face). Root relief
     # cuts the gap floor at the 1.25/P root the sheet floors (8.04 MIN): the
-    # base-chord floor would leave the rack's tips no working depth.
+    # base-chord floor would leave the rack's tips no working depth.  The
+    # model cuts full depth over the whole face: behind FULL_DEPTH the
+    # cutter's arc leaves the gaps up to 0.66 shallow at the gear face, clear
+    # of the rack, which ends at 5.24 at its worst.
     disc = await build_fixed_gear(
         adapter,
         TEETH,
@@ -326,6 +559,57 @@ async def build(adapter) -> dict[str, str]:
     volume = await volume_check(
         adapter, "spigot and shank", volume + v_sleeve, 0.01 * v_sleeve
     )
+
+    # --- The form cutter's run-out slots (R9-67) -------------------------------
+    await _gap_plane(adapter, "GapPlane")
+    drive_jobs += await _runout_slot_seed(adapter)
+    check(
+        "cut seed run-out slot",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=RUNOUT_SLOT_WIDTH, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "RunoutSlot")
+    drive_jobs.append(
+        (
+            name_dimensions(adapter, "RunoutSlot", ["RunoutSlotWidth"])[0],
+            '"RunoutSlotWidth"',
+        )
+    )
+    # Each slot is only ~0.16 mm^3 (at the gear face the cutter is already
+    # 0.66 up its arc, 0.32 into the Ø10), so the gates allow a quarter of it.
+    volume = await volume_check(
+        adapter, "seed run-out slot", volume - V_RUNOUT_SLOT, 0.25 * V_RUNOUT_SLOT
+    )
+    # A feature pattern, as the knob shaft's (R9-21): each instance re-cuts the
+    # transformed arc-and-chord profile, whose chord lies in the gear-face
+    # shoulder plane, a coplanar boundary a geometry pattern cannot re-trim.
+    axis = check(
+        "create_axis Z (Top x Right)",
+        await adapter.create_axis(
+            CreateAxisParameters(mode="two_planes", planes=["Top Plane", "Right Plane"])
+        ),
+    )
+    check(
+        f"run-out slot pattern about {axis.name}",
+        await adapter.circular_pattern_feature(
+            CircularPatternParameters(
+                axis_name=axis.name,
+                features=["RunoutSlot"],
+                count=TEETH,
+                geometry_pattern=False,
+            )
+        ),
+    )
+    name_last_feature(adapter, "RunoutSlots")
+    blank_reference_geometry(adapter, ((axis.name, "AXIS"),))
+    volume = await volume_check(
+        adapter,
+        "twelve run-out slots",
+        volume - (TEETH - 1) * V_RUNOUT_SLOT,
+        0.25 * TEETH * V_RUNOUT_SLOT,
+    )
+    blank_reference_geometry(adapter, (("GapPlane", "PLANE"),))
 
     # Bore through (centre 0,0): define_circle emits only the diameter dim.
     bore = SketchDims()

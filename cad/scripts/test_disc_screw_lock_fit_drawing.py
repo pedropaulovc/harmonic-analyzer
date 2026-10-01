@@ -29,10 +29,9 @@ PITCH = IN / 80.0
 FLANGE = 2.4
 FACE = 3.0
 THREE_PLACE = 0.13
-# MHA-070's tap mouths: the front countersink's worst thread loss and the rear
-# mouth's 0.05 break (rack_pinion_spec, as printed on its sheet).
-CSK_LOSS_WORST = 0.138
-REAR_BREAK = 0.05
+# MHA-070's tap mouths: a 0.10 burr break on each, its loss counted from the
+# tap drill (rack_pinion_spec, as printed on its sheet; R9-63).
+MOUTH_BREAK = 0.10
 
 
 def _exec_fresh(module) -> None:
@@ -67,10 +66,10 @@ def test_cut_tips_sit_inside_the_disc_and_keep_one_and_a_half_d() -> None:
     assert screw.TIP_BELOW_REAR_FACE_TEXT == "0.00-0.20"
     assert screw.CUT_END_BREAK_TEXT == "0.1 MAX"
     inside = (FLANGE + THREE_PLACE) + (FACE + THREE_PLACE) - (SHANK_LEN - LENGTH_MINUS)
-    rear_loss = max(REAR_BREAK, 0.2 + 0.1, inside + PITCH)
-    worst = (FACE - THREE_PLACE) - CSK_LOSS_WORST - rear_loss
-    assert worst == pytest.approx(2.3425, abs=1e-9)
-    assert worst / MAJOR == pytest.approx(1.537, abs=5e-4)
+    rear_loss = max(MOUTH_BREAK, 0.2 + 0.1, inside + PITCH)
+    worst = (FACE - THREE_PLACE) - MOUTH_BREAK - rear_loss
+    assert worst == pytest.approx(2.3805, abs=1e-9)
+    assert worst / MAJOR == pytest.approx(1.562, abs=5e-4)
     assert worst >= 1.5 * MAJOR
     assert screw.ENGAGEMENT_WORST == pytest.approx(worst)
     assert screw.ENGAGEMENT_WORST_D >= disc.ENGAGEMENT_FLOOR_D == 1.5
