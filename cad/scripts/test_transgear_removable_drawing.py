@@ -7,6 +7,7 @@ import math
 import re
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 import _config
@@ -333,6 +334,104 @@ def test_the_gap_relations_hold_in_every_configuration(teeth: int) -> None:
             assert cross / math.dist((x0, y0), (x1, y1)) == pytest.approx(0.0, abs=1e-9)
         else:
             raise AssertionError(f"unchecked relation {relation}")
+
+
+_AXIS_START = "axis_start"
+
+
+def _relation_residuals(
+    points: dict[str, Point], relation: str, ref: str, other: str
+) -> list[float]:
+    """A relation as equations on the points: zero when it holds."""
+    if relation == "tangent":
+        (at,) = set(part.GAP_ENTITIES[ref][1:]) & set(part.GAP_ENTITIES[other][1:])
+        (ux, uy), (vx, vy) = _tangent(points, ref, at), _tangent(points, other, at)
+        return [ux * vy - uy * vx]
+    if relation == "equal":
+        radius = part.gap_dimension_value
+        return [
+            radius(points, "radial", ref, None) - radius(points, "radial", other, None)
+        ]
+    if relation == "vertical_points":
+        return [part.gap_point(points, ref)[0] - part.gap_point(points, other)[0]]
+    if relation == "coincident" and ("." in other or other == "origin"):
+        (x1, y1), (x2, y2) = part.gap_point(points, ref), part.gap_point(points, other)
+        return [x1 - x2, y1 - y2]
+    if relation == "coincident":  # a point on a line
+        px, py = part.gap_point(points, ref)
+        _centre, start, end = part.GAP_ENTITIES[other]
+        (x0, y0), (x1, y1) = points[start], points[end]
+        return [
+            ((x1 - x0) * (py - y0) - (y1 - y0) * (px - x0))
+            / math.dist((x0, y0), (x1, y1))
+        ]
+    raise AssertionError(f"unmodelled relation {relation}")
+
+
+def _constraint_rank(teeth: int, dimensions, relations) -> tuple[int, int]:
+    """(rank of the constraint Jacobian, unknowns) for the gap sketch.
+
+    Every merged end point and arc centre is a free 2-D point; the sketch
+    origin is fixed.  Each arc's ends lie on its circle, then the relations
+    and dimensions add their equations.  The sketch is fully defined when
+    the rank equals the unknowns.  The axis start is drawn at the origin but
+    is its own point, held there only by its coincident relation."""
+    base = part.gap_points(teeth)
+    base[_AXIS_START] = base["origin"]
+    names = sorted(name for name in base if name != "origin")
+
+    def residuals(points: dict[str, Point]) -> list[float]:
+        out = [
+            math.dist(points[centre], points[start])
+            - math.dist(points[centre], points[end])
+            for centre, start, end in part.GAP_ENTITIES.values()
+            if centre is not None
+        ]
+        for relation, ref, other in relations:
+            out += _relation_residuals(points, relation, ref, other)
+        out += [
+            part.gap_dimension_value(points, kind, ref, other)
+            for _name, kind, ref, other, _drive in dimensions
+        ]
+        return out
+
+    step = 1e-6
+    columns = []
+    for name in names:
+        for axis in (0, 1):
+            plus, minus = dict(base), dict(base)
+            nudged = list(base[name])
+            nudged[axis] += step
+            plus[name] = (nudged[0], nudged[1])
+            nudged[axis] -= 2.0 * step
+            minus[name] = (nudged[0], nudged[1])
+            columns.append(
+                (np.array(residuals(plus)) - np.array(residuals(minus))) / (2.0 * step)
+            )
+    jacobian = np.array(columns).T
+    singular = np.linalg.svd(jacobian, compute_uv=False)
+    return int((singular > 1e-7 * singular[0]).sum()), 2 * len(names)
+
+
+@pytest.mark.parametrize("teeth", _TEETH)
+def test_the_gap_sketch_is_fully_constrained_by_every_row(
+    teeth: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The relations and dimensions leave no free motion in any configuration,
+    and each row is load-bearing: omitting any one of them frees the sketch.
+    Satisfied equations alone cannot show this -- a deleted row leaves every
+    remaining one satisfied."""
+    centre, _start, end = part.GAP_ENTITIES[part.GAP_AXIS]
+    monkeypatch.setitem(part.GAP_ENTITIES, part.GAP_AXIS, (centre, _AXIS_START, end))
+    dimensions, relations = part.GAP_DIMENSIONS, part.GAP_RELATIONS
+    rank, unknowns = _constraint_rank(teeth, dimensions, relations)
+    assert rank == unknowns
+    for index, row in enumerate(dimensions):
+        omitted = dimensions[:index] + dimensions[index + 1 :]
+        assert _constraint_rank(teeth, omitted, relations)[0] < unknowns, row[0]
+    for index, row in enumerate(relations):
+        omitted = relations[:index] + relations[index + 1 :]
+        assert _constraint_rank(teeth, dimensions, omitted)[0] < unknowns, row
 
 
 @pytest.mark.parametrize("teeth", _TEETH)

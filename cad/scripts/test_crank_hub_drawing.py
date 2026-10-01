@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 import pytest
@@ -224,11 +223,8 @@ def test_matched_fits_and_distinct_pins_live_on_their_feature_callouts() -> None
     assert crank_hub_notes.BORE_CALLOUT.splitlines()[1].startswith("(")
 
 
-def _hub_front_face_datum(text: str) -> str:
-    """The feature a printed text sets the hub's front face flush with."""
-    _, found, after = " ".join(text.split()).partition("FRONT FACE FLUSH WITH ")
-    assert found, text
-    return re.split(r"[;,]", after.removeprefix("THE "), maxsplit=1)[0]
+def _flat(text: str) -> str:
+    return " ".join(text.split())
 
 
 def _names_the_dome_root(datum: str) -> bool:
@@ -236,25 +232,36 @@ def _names_the_dome_root(datum: str) -> bool:
     return datum.endswith("DOME ROOT") and "MHA-026" in words and "END" not in words
 
 
+def _sets_hub_on(text: str, datum: str) -> bool:
+    """A printed text places the hub on ``datum``, the one source both read."""
+    return _flat(datum) in _flat(text)
+
+
 def test_hub_front_face_is_set_on_the_dome_root_the_model_places_it_at() -> None:
     """The model seats the hub front face on the crankshaft's dome root (the
     shaft part's origin, CRANK_FACE_Z); the dome tip stands proud of it.  Set
     flush with the shaft END, the hub would sit a dome height forward and open
     the hub/T12 air past the drive pins' proud length.  Both texts that place
-    the hub -- its cross-hole callout and the MHA-A03 hub step -- name the root."""
+    the hub -- its cross-hole callout and the MHA-A03 hub step -- print the
+    one datum, and the callout sets it before the taper-ream."""
     import build_drive_train_assembly as assembly
     import draw_drive_train_assembly as package
 
+    datum = crank_hub_notes.FRONT_FACE_DATUM
+    assert _names_the_dome_root(datum), datum
     assert assembly.CRANK_HUB_Z0 == assembly.CRANKSHAFT_Z0 == assembly.CRANK_FACE_Z
     hub_step = package.CONE_CRANK_STEPS.split("\n6. ")[1].split("\n7. ")[0]
-    for text in (crank_hub_notes.CROSS_HOLE_CALLOUT, hub_step):
-        assert _names_the_dome_root(_hub_front_face_datum(text)), text
-    # Negative control: the shaft-END wording both texts printed fails the check.
+    cross_hole = crank_hub_notes.CROSS_HOLE_CALLOUT
+    for text in (cross_hole, hub_step):
+        assert _sets_hub_on(text, datum), text
+    assert _flat(cross_hole).index(_flat(datum)) < _flat(cross_hole).index("TAPER-REAM")
+    # Negative controls: the shaft-END texts both once printed name no dome root.
     for old in (
         "FRONT FACE FLUSH WITH\nCRANKSHAFT MHA-026 END;\nMATCH TAPER-REAM 1:48 FOR",
         "SET THE HUB FRONT FACE FLUSH WITH THE\n   SHAFT END, PUNCH MARKS ALIGNED;",
     ):
-        assert not _names_the_dome_root(_hub_front_face_datum(old)), old
+        assert not _sets_hub_on(old, datum), old
+    assert not _names_the_dome_root("CRANKSHAFT MHA-026 END")
 
 
 def test_seam_callout_attaches_to_the_hub_seam_clear_of_the_bore_callout() -> None:

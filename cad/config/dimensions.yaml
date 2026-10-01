@@ -224,7 +224,7 @@ sections:
         - scaled + stated topology
         - med
       - - Crankshaft diameter
-        - 9.525 mm (3/8") on the crank-hub seat and the removable-sprocket pilot; integral seat collar z −154.3..−144: Ø17.5 × 5.8 seat spigot (a bought #25 chain wrapping the T12 passes over it) then Ø20.6 body, 2 × Ø2.38 reamed blind drive-pin holes on Ø14 BC in the spigot face; restored integral Ø11.388 journal runs directly in MHA-016; the 16T pinion sits on a Ø9.0 seat step (local 111.3)
+        - 9.525 mm (3/8") on the crank-hub seat and the removable-sprocket pilot; integral seat collar z −154.3..−144.5: Ø17.5 × 5.8 seat spigot (a bought #25 chain wrapping the T12 passes over it) then Ø20.6 body, 2 × Ø2.38 reamed blind drive-pin holes on Ø14 BC in the spigot face; restored integral Ø11.388 journal runs directly in MHA-016; the 16T pinion sits on a Ø9.0 seat step (local 111.3)
         - '0.375'
         - 'User ruling 2026-09-28 restores the integral running journal while retaining the single-cutter 16T seat and existing hub geometry. The smaller pinion root needs the Ø9.0 seat to keep its boss wall over 1.5 at print-worst. The removable T12 seats on the collar''s front face (ch23 p.56 catalog shot: two drive pins through the sprocket); a Ø20.6 washer, faced at assembly to 0.50–4.00 from a 4.30 MIN blank, closes the collar to the post boss. The pin hole to spigot rim (0.56 nominal, 0.48 print-worst) is a named exception, User 2026-09-30.'
         - legacy
