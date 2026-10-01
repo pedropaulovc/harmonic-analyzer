@@ -158,7 +158,7 @@ _DRIVE_TRAIN_ALLOWED_PAIRS = {
     # assembly's recipe stays clear of the handle specs; the MHA-139 tests pin
     # it to that spec's THREAD_SIZE.
     frozenset(("crank-handle-pivot-screw-1", "crank-arm-1")): _smooth_annulus_limit_mm3(
-        THREAD_MAJOR_MM["#6-32"], TAP_DRILL_MM["#6-32"], 7.0
+        THREAD_MAJOR_MM["#4-40"], TAP_DRILL_MM["#4-40"], 7.0
     ),
     # Rule-12 E11: #10-32 94025A164 in the tapped block, observed above.
     frozenset(

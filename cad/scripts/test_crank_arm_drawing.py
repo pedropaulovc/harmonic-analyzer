@@ -280,10 +280,11 @@ def test_handle_pivot_is_tapped_for_the_mha139_screw_with_a_2mm_web() -> None:
     assert spec.HANDLE_PIVOT_HOLE_SPEC.kind == "tapped"
     import crank_handle_pivot_screw_spec as screw
 
-    # User ruling 2026-09-30: the handle pivot screw is #6-32.
-    assert spec.HANDLE_PIVOT_HOLE_SPEC.size == screw.THREAD_SIZE == "#6-32"
+    # User ruling 2026-09-30: the handle pivot screw is #4-40 (after #6-32
+    # left the Ø4 shoulder no seat, local review of fbf82ad96).
+    assert spec.HANDLE_PIVOT_HOLE_SPEC.size == screw.THREAD_SIZE == "#4-40"
     assert spec.HANDLE_PIVOT_HOLE_SPEC.end == "through_all"
-    assert spec.PIVOT_END_WEB_NOMINAL == pytest.approx(12.7 - 3.505 / 2.0)
+    assert spec.PIVOT_END_WEB_NOMINAL == pytest.approx(12.7 - 2.845 / 2.0)
     assert spec.PIVOT_END_WEB_WORST >= 2.0
 
 
@@ -301,12 +302,16 @@ def test_station_reference_is_saved_hidden_and_imported_per_view() -> None:
     assert "StationReference" in spec.DRAWING_DIMENSIONS
 
 
-def test_arm_states_no_engagement_exception_for_the_6_32_pivot() -> None:
-    # The #6-32 handle pivot (user ruling 2026-09-30) meets the 1.5D rule, so
+def test_arm_states_no_engagement_exception_for_the_4_40_pivot() -> None:
+    # The #4-40 handle pivot (user ruling 2026-09-30) meets the 1.5D rule, so
     # the tapped arm no longer states the #8-32's named exception.
     assert not hasattr(spec, "PIVOT_ENGAGEMENT_NOTE")
     assert "THREAD ENGAGEMENT" not in spec.DRAWING_NOTES
-    assert spec.DRAWING_NOTES.splitlines()[-1] == spec.STOCK_NOTE
+    lines = spec.DRAWING_NOTES.splitlines()
+    assert lines[1] == spec.STOCK_NOTE
+    # The tapped mouth's break is held to 0.1 so the MHA-139 shoulder keeps a
+    # seat round it (local review of fbf82ad96).
+    assert lines[2] == "BREAK THE HANDLE PIVOT TAP'S MOUTH 0.1 MAX ON THE HANDLE FACE."
     # The stock line comes from the one stock constant.
     assert spec.ARM_STOCK_THICKNESS == pytest.approx(7.9375)
     assert spec.STOCK_NOTE == "25.4 x 8.0 SECTION: 1 x 5/16 IN CF FLAT BAR AS SUPPLIED."

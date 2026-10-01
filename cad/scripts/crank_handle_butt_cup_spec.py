@@ -63,11 +63,6 @@ WALL_FLOOR_MM = 1.5
 POCKET_WALL_FLOOR_MM = 0.8
 FLOOR_THICKNESS_MIN = round(FLOOR_THICKNESS - GENERAL_1PL_MM - POCKET_DEPTH_TOL, 6)
 POCKET_WALL_MIN = round(((BODY_DIA - BODY_DIA_TOL) - POCKET_DIA_MAX) / 2.0, 6)
-# The drive train places the cup as assembly leaves it: bonded, with the
-# handle's end round turned across its face (Codex P2 on #1139).  The default
-# stays the as-turned cup the drawing prints; both carry one MHA-153 BOM
-# identity.
-INSTALLED_CONFIG = "INSTALLED"
 # Turned from 3/8-in cold-finished rod: the largest body plus a cleanup cut.
 STOCK_DIA = 0.375 * 25.4
 
@@ -128,7 +123,7 @@ DRAWING_NOTES = "\n".join(
         f" <MOD-DIAM>{POCKET_DIA_MAX:.1f} MAX; THE HEAD BEARS ON THE FLOOR.",
         f"MIN POCKET WALL {POCKET_WALL_FLOOR_MM:.1f}; MIN FLOOR {WALL_FLOOR_MM:.1f}.",
         f"EPOXY IN THE {HANDLE_NUMBER} {HANDLE_NAME} BUTT, FACE FLUSH, CENTRED ON THE",
-        f"  WAXED {SCREW_NUMBER} SCREW; TURN ITS END ROUND ACROSS THE CUP AFTER CURE.",
+        f"  WAXED {SCREW_NUMBER} SCREW.  THE FACE STAYS FLAT; THE OAK ROUNDS OVER IT.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 4:1"

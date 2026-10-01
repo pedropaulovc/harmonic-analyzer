@@ -98,7 +98,9 @@ def test_notes_name_the_mates_and_the_band_reason() -> None:
     assert "TO SUIT" in notes and "MIN POCKET WALL 0.8; MIN FLOOR 1.5." in notes
     assert "6.5 MAX" in notes
     assert "FACE FLUSH, CENTRED ON THE" in notes
-    assert "WAXED MHA-139 SCREW; TURN ITS END ROUND" in notes
+    # The oak's end round is turned clear of the cup (local review of
+    # fbf82ad96): its face stays flat.
+    assert "WAXED MHA-139 SCREW.  THE FACE STAYS FLAT; THE OAK ROUNDS OVER IT." in notes
     assert all(len(line) <= 90 for line in notes.splitlines())
 
 
@@ -124,43 +126,19 @@ def test_sheet_layout_keeps_annotations_inside_the_field() -> None:
     assert drawing.SECTION_KEEP["PocketDia"][0] + 0.020 < drawing.ISO_NOTE_POS[0]
 
 
-def test_installed_configuration_turns_the_end_round_across_the_cup() -> None:
-    # Codex P2 on #1139: the drive train shows the cup as assembly leaves it,
-    # the handle's end round turned across its face; the default stays the
-    # as-turned cup the drawing prints (the MHA-135/MHA-139 precedent).
+def test_cup_is_one_configuration_the_oak_rounds_clear_of() -> None:
+    # Local review of fbf82ad96 (recommended option taken when the question
+    # timed out): with the cup's possible offset in the stack the end round
+    # could skim only ~0.001 off the steel, so it is turned on the oak only
+    # and the cup keeps its flat face.  No INSTALLED configuration remains.
     import build_drive_train_assembly as drive_train
     import crank_handle_spec as handle
 
-    assert spec.INSTALLED_CONFIG == "INSTALLED"
-    assert part.END_ROUND_CX_LOCAL == pytest.approx(
-        handle.END_ROUND_CENTER[0] - handle.HANDLE_LENGTH
-    )
-    # The crown is the steel outside the handle's own end round: a fraction of
-    # a cubic millimetre, starting outside the largest pocket's edge break so
-    # a flat rim remains (Codex P1 on #1139).
-    assert 0.005 < part.V_CROWN < 0.5
-    # ... even with the contour turned its whole 0.5 allowance small.
-    assert handle.END_ROUND_CENTER[1] - 0.25 - 0.25 - spec.POCKET_DIA_MAX / 2.0 >= 0.1 - 1e-9
-    assert "IsSuppressed()" in Path(part.__file__).read_text(encoding="utf-8")
-    assert part.V_INSTALLED == pytest.approx(part.V_CUP - part.V_CROWN)
+    assert not hasattr(spec, "INSTALLED_CONFIG")
+    assert not hasattr(drive_train, "HANDLE_CUP_INSTALLED_CONFIG")
     source = Path(part.__file__).read_text(encoding="utf-8")
-    split = source.index("create_configuration {INSTALLED_CONFIG}")
-    for edit in (
-        "set_dimension_symmetric_tolerance(adapter,",
-        "apply_material(adapter,",
-        "apply_color(adapter,",
-        "mark_dimensions_for_drawing(adapter,",
-        "apply_drawing_precision(adapter,",
-    ):
-        assert source.index(edit) < split, edit
-    assert "SetSuppression2(0, 3, bstr_array([default_config]))" in source
-    # Suppressed with the default active (crank-v4-10: specified from
-    # INSTALLED it returned True but stayed live).
-    assert source.index("re-activate {default_config}") < source.index("SetSuppression2(0, 3")
-    assert "apply_grouped_bom_properties(" in source
-    assert "require_material_in_every_configuration(" in source
-    assert "assert_saved_configurations_regenerate(adapter, PART_NAME)" in source
-    assert drive_train.HANDLE_CUP_INSTALLED_CONFIG == spec.INSTALLED_CONFIG
-    dt_source = Path(drive_train.__file__).read_text(encoding="utf-8")
-    assert "configuration=HANDLE_CUP_INSTALLED_CONFIG," in dt_source
+    assert "create_configuration" not in source
+    # The crest, turned its whole allowance small and off the mandrel by the
+    # bore's eccentricity, stays outside the largest counterbore.
+    assert handle.END_ROUND_CY - 0.25 - 0.10 >= handle.COUNTERBORE_DIA_MAX / 2.0 - 1e-9
     assert _config.parts("crank-handle-butt-cup")["description"] == "CRANK HANDLE BUTT CUP"

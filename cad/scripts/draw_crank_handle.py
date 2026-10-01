@@ -4,8 +4,9 @@ A turned, ebonized oak pear grip (book ch. 11).  User ruling 2026-09-29: the
 brass ferrule MHA-152 and the steel butt cup MHA-153 are separate parts, so
 this sheet prints only the oak -- a tenon for the ferrule at the crank end, a
 flared waist, an S-curve swell to the Ø21 max, and a domed butt whose end
-round feathers out on the counterbore the cup is bonded into (user rulings
-2026-09-30, concept v4).
+round crests on a flat oak end flush with the cup bonded into its
+counterbore (user rulings 2026-09-30, concept v4; turned clear of the cup
+after the local review of fbf82ad96).
 
 After the MHA-022 machinist review (user ruling 2026-09-29) the sheet is plain:
 no datums, feature-control frames or basic dimensions -- the grip is turned to

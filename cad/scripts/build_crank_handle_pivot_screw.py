@@ -72,9 +72,6 @@ from crank_handle_pivot_screw_spec import (
     DRAWING_NOTES,
     DRAWING_PRECISION,
     HEAD_DIA,
-    COLLAR_DIA,
-    COLLAR_LENGTH,
-    COLLAR_LENGTH_TOL,
     HEAD_DIA_TOL,
     HEAD_LENGTH,
     HEAD_LENGTH_TOL,
@@ -110,7 +107,6 @@ PART_NAME = "crank-handle-pivot-screw"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
 
 HEAD_R = HEAD_DIA / 2.0
-COLLAR_R = COLLAR_DIA / 2.0
 SHOULDER_R = SHOULDER_DIA / 2.0
 THREAD_R = THREAD_MODEL_DIA / 2.0
 RELIEF_R = RELIEF_DIA / 2.0
@@ -132,8 +128,7 @@ def turned_volume(thread_length: float, tip_chamfer: float) -> float:
     """
     turned = math.pi * (
         HEAD_R**2 * HEAD_LENGTH
-        + SHOULDER_R**2 * (SHOULDER_LENGTH - COLLAR_LENGTH)
-        + COLLAR_R**2 * COLLAR_LENGTH
+        + SHOULDER_R**2 * SHOULDER_LENGTH
         + THREAD_R**2 * thread_length
     )
     chamfer = math.pi * tip_chamfer**2 * (THREAD_R - tip_chamfer / 3.0)
@@ -173,8 +168,6 @@ async def build(adapter) -> dict[str, str]:
         ("HeadLength", HEAD_LENGTH),
         ("ShoulderDia", SHOULDER_DIA),
         ("ShoulderLength", SHOULDER_LENGTH),
-        ("CollarDia", COLLAR_DIA),
-        ("CollarLength", COLLAR_LENGTH),
         ("ThreadDia", THREAD_MODEL_DIA),
         ("ThreadLength", THREAD_LENGTH),
         ("ReliefDia", RELIEF_DIA),
@@ -206,9 +199,7 @@ async def build(adapter) -> dict[str, str]:
         (0.0, HEAD_R),
         (-HEAD_LENGTH, HEAD_R),
         (-HEAD_LENGTH, SHOULDER_R),
-        (-(SEAT_STATION - COLLAR_LENGTH), SHOULDER_R),
-        (-(SEAT_STATION - COLLAR_LENGTH), COLLAR_R),
-        (-SEAT_STATION, COLLAR_R),
+        (-SEAT_STATION, SHOULDER_R),
         (-SEAT_STATION, RELIEF_R + RELIEF_LEAD),
         (-(SEAT_STATION + RELIEF_LEAD), RELIEF_R),
         (-RELIEF_END_STATION, RELIEF_R),
@@ -228,22 +219,20 @@ async def build(adapter) -> dict[str, str]:
             f"screw profile {relation} {line}",
             await adapter.add_sketch_constraint(line, None, relation),
         )
-    head_outline, shoulder_outline, collar_outline = lines[1], lines[3], lines[5]
-    relief_lead, relief_floor, thread_outline = lines[7], lines[8], lines[10]
-    tip_chamfer = lines[11]
+    head_outline, shoulder_outline = lines[1], lines[3]
+    relief_lead, relief_floor, thread_outline = lines[5], lines[6], lines[8]
+    tip_chamfer = lines[9]
     # The threaded section is sized from the seat face to the tip, across the
     # relief; the relief width and the lead's axial leg from the seat face; the
     # tip chamfer's axial leg from the tip.
     for name, start, end, value in (
         ("HeadLength", f"{head_outline}.start", f"{head_outline}.end", HEAD_LENGTH),
-        # Under-head to the seat face, across the collar (the fitted length).
         (
             "ShoulderLength",
             f"{shoulder_outline}.start",
-            f"{collar_outline}.end",
+            f"{shoulder_outline}.end",
             SHOULDER_LENGTH,
         ),
-        ("CollarLength", f"{collar_outline}.start", f"{collar_outline}.end", COLLAR_LENGTH),
         ("ThreadLength", f"{relief_lead}.start", f"{tip_chamfer}.end", THREAD_LENGTH),
         ("ReliefWidth", f"{relief_lead}.start", f"{relief_floor}.end", RELIEF_WIDTH),
         ("ReliefLead", f"{relief_lead}.start", f"{relief_lead}.end", RELIEF_LEAD),
@@ -279,12 +268,6 @@ async def build(adapter) -> dict[str, str]:
             shoulder_outline,
             -(HEAD_LENGTH + SHOULDER_LENGTH / 2.0),
             SHOULDER_R,
-        ),
-        (
-            "CollarDia",
-            collar_outline,
-            -(SEAT_STATION - COLLAR_LENGTH / 2.0),
-            COLLAR_R,
         ),
         (
             "ReliefDia",
@@ -472,19 +455,15 @@ async def build(adapter) -> dict[str, str]:
         adapter, "ScrewProfile", "TipChamfer", *deviations(TIP_CHAMFER_BAND)
     )
     set_dimension_symmetric_tolerance(adapter, "DriverSlot", "SlotDepth", SLOT_DEPTH_TOL)
-    # The relief diameter keeps the die's run-out under the #6-32 root and a
-    # flat seat (Codex P1 on #1139); the relief lead prints as limits in the
-    # relief callout, the model owning its band all the same (Codex P2).
+    # The relief diameter keeps the die's run-out under the thread root and a
+    # flat seat (Codex P1 on #1139), its width 1.5 pitches of run-out (local
+    # review of 1f3067ef2); the relief lead prints as limits in the relief
+    # callout, the model owning its band all the same (Codex P2).
     set_dimension_symmetric_tolerance(
         adapter, "ScrewProfile", "ReliefDia", RELIEF_DIA_TOL
     )
-    # The relief width keeps 1.5 pitches of die run-out, the collar length
-    # its clearance to the shortest tenon (local review of 1f3067ef2).
     set_dimension_symmetric_tolerance(
         adapter, "ScrewProfile", "ReliefWidth", RELIEF_WIDTH_TOL
-    )
-    set_dimension_symmetric_tolerance(
-        adapter, "ScrewProfile", "CollarLength", COLLAR_LENGTH_TOL
     )
     set_dimension_symmetric_tolerance(
         adapter, "ScrewProfile", "ReliefLead", RELIEF_LEAD_TOL

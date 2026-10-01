@@ -60,7 +60,6 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
-    set_dimension_symmetric_tolerance,
 )
 from _fit_limits import deviations
 from _saved_part_guard import require_saved_drawing_properties
@@ -97,7 +96,6 @@ from crank_handle_spec import (  # noqa: E402
     TENON_DIA,
     TENON_LENGTH,
     TENON_R,
-    TENON_LENGTH_TOL,
     TENON_X0,
     WAIST_R,
     WAIST_X,
@@ -168,6 +166,7 @@ async def build(adapter) -> dict[str, str]:
     waist_pt = (WAIST_X, WAIST_R)
     peak_pt = (PEAK_X, PEAK_R)
     oak_end_pt = (OAK_END_X, COUNTERBORE_R)
+    crest_pt = (OAK_END_X, END_ROUND_CENTER[1])
 
     profile = SketchDims()
     check("create_sketch profile", await adapter.create_sketch("Front"))
@@ -199,12 +198,14 @@ async def build(adapter) -> dict[str, str]:
     )
     dome = check("dome arc", await adapter.add_arc(*DOME_CENTER, *DOME_END, *peak_pt))
     end_round = check(
-        "end round arc", await adapter.add_arc(*END_ROUND_CENTER, *oak_end_pt, *DOME_END)
+        "end round arc", await adapter.add_arc(*END_ROUND_CENTER, *crest_pt, *DOME_END)
     )
-    # Oak end -> counterbore wall -> counterbore floor -> axis closure.
-    counterbore_wall, counterbore_floor, _closure = await add_line_chain(
+    # Crest -> flat oak end face -> counterbore wall -> counterbore floor ->
+    # axis closure.
+    oak_end_face, counterbore_wall, counterbore_floor, _closure = await add_line_chain(
         adapter,
         [
+            crest_pt,
             oak_end_pt,
             (COUNTERBORE_FLOOR_X, COUNTERBORE_R),
             (COUNTERBORE_FLOOR_X, 0.0),
@@ -228,6 +229,7 @@ async def build(adapter) -> dict[str, str]:
         ("tenon end", tenon_end, "vertical"),
         ("tenon OD", tenon_top, "horizontal"),
         ("tenon shoulder", shoulder, "vertical"),
+        ("oak end face", oak_end_face, "vertical"),
         ("counterbore wall", counterbore_wall, "horizontal"),
         ("counterbore floor", counterbore_floor, "vertical"),
         ("peak station", peak_station, "vertical"),
@@ -331,6 +333,7 @@ async def build(adapter) -> dict[str, str]:
         (s_concave, s_convex, "inflection"),
         (s_convex, dome, "swell"),
         (dome, end_round, "end round"),
+        (end_round, oak_end_face, "end round crest"),
     ):
         check(
             f"{label} tangent",
@@ -390,17 +393,15 @@ async def build(adapter) -> dict[str, str]:
     # selection (M6 mated-DOF drive train).
     await name_bore_axis(adapter, "Front Plane", 0.0, "Top Plane", 0.0, "handle axis")
 
-    # Manufacturing drawing support: the model owns the printed bands (policy
-    # rule 2), the reamed bore and the tenon length the MHA-139 collar clears,
-    # and the places every mark prints with.  The tenon and the counterbore
-    # diameters are fitted to the parts they take.
+    # Manufacturing drawing support: the model owns the one printed band
+    # (policy rule 2), the reamed bore, and the places every mark prints with.
+    # The tenon and the counterbore are fitted to the parts they take.
     set_dimension_bilateral_tolerance(
         adapter,
         "PivotBoreProfile",
         "PivotBoreDia",
         *deviations(PIVOT_BORE_BAND),
     )
-    set_dimension_symmetric_tolerance(adapter, "HandleProfile", "TenonLength", TENON_LENGTH_TOL)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

@@ -22,19 +22,13 @@ from __future__ import annotations
 import math
 import sys
 
-import _config
 from _common import (
     POLISHED_STEEL,
     SketchDims,
-    _early_bound,
-    active_configuration_name,
     add_line_chain,
-    anchor_point_to_origin,
     apply_color,
     apply_material,
-    assert_saved_configurations_regenerate,
     check,
-    dimension_between,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
@@ -55,9 +49,6 @@ from _drawing_marks import (
     mark_dimensions_for_drawing,
     set_dimension_symmetric_tolerance,
 )
-from _configuration_material import require_material_in_every_configuration
-from _grouped_bom_properties import apply_grouped_bom_properties
-from solidworks_mcp.adapters.com_variant import bstr_array
 from crank_handle_butt_cup_spec import (
     BODY_DIA,
     BODY_DIA_TOL,
@@ -65,15 +56,12 @@ from crank_handle_butt_cup_spec import (
     DRAWING_NOTES,
     DRAWING_PRECISION,
     FLOOR_HOLE_DIA,
-    INSTALLED_CONFIG,
     ISOMETRIC_VIEW_NOTE,
     OVERALL_LENGTH,
     POCKET_DEPTH,
     POCKET_DEPTH_TOL,
     POCKET_DIA,
 )
-
-from crank_handle_spec import END_ROUND_CENTER, END_ROUND_R, HANDLE_LENGTH  # noqa: E402
 
 PART_NAME = "crank-handle-butt-cup"
 MATERIAL = "Plain Carbon Steel"  # see _common.apply_material docstring
@@ -86,35 +74,10 @@ V_CUP = math.pi * (
     - POCKET_R**2 * POCKET_DEPTH
     - FLOOR_HOLE_R**2 * (OVERALL_LENGTH - POCKET_DEPTH)
 )
-# The handle's end round in this part's frame (face at x=0 = the handle's
-# basic length), and the steel it turns off the cup's outer corner.
-END_ROUND_CX_LOCAL = END_ROUND_CENTER[0] - HANDLE_LENGTH
-_CUT_MARGIN = 0.2
-
-
-def _crown_volume(steps: int = 4000) -> float:
-    """Steel outside the end round between its crest radius and the body OD
-    (midpoint rule on 2*pi*r*axial-depth)."""
-    cy = END_ROUND_CENTER[1]
-    r0, r1 = cy, BODY_R
-    h = (r1 - r0) / steps
-    total = 0.0
-    for i in range(steps):
-        r = r0 + (i + 0.5) * h
-        x = END_ROUND_CX_LOCAL + math.sqrt(END_ROUND_R**2 - (r - cy) ** 2)
-        total += 2.0 * math.pi * r * max(0.0, -x) * h
-    return total
-
-
-V_CROWN = _crown_volume()
-V_INSTALLED = V_CUP - V_CROWN
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import (
-        CreateConfigurationParameters,
-        RevolveParameters,
-    )
+    from solidworks_mcp.adapters.base import RevolveParameters
 
     check("create_part", await adapter.create_part())
     # The mm suffix is load-bearing: the equation manager reads bare numbers in
@@ -221,67 +184,13 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_symmetric_tolerance(
         adapter, "CupProfile", "PocketDepth", POCKET_DEPTH_TOL
     )
-    # Every model edit precedes the INSTALLED split, so the split copies a
-    # finished default (the MHA-135 lesson: an edit after it touches the
-    # active configuration only and leaves the other stale).
     await apply_material(adapter, MATERIAL)
     await apply_color(adapter, POLISHED_STEEL)
+    await report_mass_properties(adapter)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_precision(adapter, DRAWING_PRECISION)
-
-    default_config = active_configuration_name(adapter)
-    check(
-        f"create_configuration {INSTALLED_CONFIG}",
-        await adapter.create_configuration(
-            CreateConfigurationParameters(
-                name=INSTALLED_CONFIG,
-                comment="bonded; the handle's end round turned across the face",
-            )
-        ),
-    )
-    check(
-        f"activate {INSTALLED_CONFIG}",
-        await adapter.set_active_configuration(INSTALLED_CONFIG),
-    )
-    await _cut_end_round(adapter)
-    # The crown is a few hundredths of a cubic millimetre, under the volume
-    # check's resolution, so each configuration proves the cut's state
-    # directly and the volume only as a sanity bound.
-    await force_rebuild(adapter)
-    if bool(_end_round_feature(adapter).IsSuppressed()):
-        raise RuntimeError(f"EndRound is suppressed in {INSTALLED_CONFIG}")
-    await volume_check(
-        adapter, "installed cup (end round turned)", V_INSTALLED, 0.005 * V_CUP
-    )
-    check(
-        f"re-activate {default_config}",
-        await adapter.set_active_configuration(default_config),
-    )
-    # Suppress with the target configuration active (the _drawing_simplified
-    # order): specified while INSTALLED was active, SetSuppression2 returned
-    # True yet left the cut live in the default (crank-v4-10).
-    # swSuppressFeature, swSpecifyConfiguration.
-    if not bool(_end_round_feature(adapter).SetSuppression2(0, 3, bstr_array([default_config]))):
-        raise RuntimeError(f"EndRound would not suppress in {default_config}")
-    await force_rebuild(adapter)
-    if not bool(_end_round_feature(adapter).IsSuppressed()):
-        raise RuntimeError(f"EndRound is not suppressed in {default_config}")
-    await volume_check(adapter, "as-turned cup (default)", V_CUP, 0.005 * V_CUP)
-    # The configuration description wins over the drive-train BOM's written
-    # cell, so it is the text that BOM prints (the MHA-135 precedent).
-    grouped_spec = _config.parts(PART_NAME)
-    apply_grouped_bom_properties(
-        adapter,
-        [default_config, INSTALLED_CONFIG],
-        part_number=str(grouped_spec["number"]),
-        description=str(grouped_spec["description"]),
-    )
-    await report_mass_properties(adapter)
-    require_material_in_every_configuration(
-        adapter, PART_NAME, MATERIAL, (default_config, INSTALLED_CONFIG)
-    )
     apply_drawing_properties(
         adapter,
         PART_NAME,
@@ -290,83 +199,7 @@ async def build(adapter) -> dict[str, str]:
             "Isometric View Note": ISOMETRIC_VIEW_NOTE,
         },
     )
-    artefacts = await save_part_and_images(adapter, PART_NAME)
-    # The drive train places INSTALLED while the part saves on its default, so
-    # INSTALLED's saved cache is what it rebuilds.  Reopen and prove it the way
-    # the assembly loads it (cg-fx1).
-    part_title = str(_early_bound(adapter.currentModel, "IModelDoc2").GetTitle())
-    adapter.swApp.CloseDoc(part_title)
-    adapter.currentModel = None
-    check(f"reopen saved {PART_NAME}", await adapter.open_model(artefacts["part"]))
-    assert_saved_configurations_regenerate(adapter, PART_NAME)
-    return artefacts
-
-
-def _end_round_feature(adapter):
-    """The EndRound cut, looked up afresh: a configuration switch can leave an
-    earlier IFeature pointer reading the old configuration's state."""
-    part = _early_bound(adapter.currentModel, "IPartDoc")
-    return _early_bound(part.FeatureByName("EndRound"), "IFeature")
-
-
-async def _cut_end_round(adapter) -> None:
-    """Revolve-cut the handle's end round across the cup face (INSTALLED).
-
-    The circle is MHA-022's own end round, carried into this part's frame
-    (face at x=0), so the two cannot drift apart.  The cut region is outside
-    that circle between its crest radius and a little past the body OD.
-    """
-    from solidworks_mcp.adapters.base import RevolveParameters
-
-    cx, cy = END_ROUND_CX_LOCAL, END_ROUND_CENTER[1]
-    crest = (cx + END_ROUND_R, cy)
-    top_r = BODY_R + _CUT_MARGIN
-    top_on_circle = (cx + math.sqrt(END_ROUND_R**2 - (top_r - cy) ** 2), top_r)
-    right_x = crest[0] + _CUT_MARGIN + 0.25
-    check("create_sketch end round", await adapter.create_sketch("Front"))
-    set_sketch_direct_db(adapter, True)
-    axis = check(
-        "end round axis", await adapter.add_centerline(-1.0, 0.0, 1.0, 0.0)
-    )
-    arc = check(
-        "end round arc", await adapter.add_arc(cx, cy, *crest, *top_on_circle)
-    )
-    bottom, right, top = await add_line_chain(
-        adapter,
-        [crest, (right_x, cy), (right_x, top_r), top_on_circle],
-        close=False,
-    )
-    set_sketch_direct_db(adapter, False)
-    for entity, relation in (
-        (axis, "horizontal"),
-        (bottom, "horizontal"),
-        (right, "vertical"),
-        (top, "horizontal"),
-    ):
-        check(
-            f"end round {relation} {entity}",
-            await adapter.add_sketch_constraint(entity, None, relation),
-        )
-    await anchor_point_to_origin(adapter, f"{axis}.start", -1.0, 0.0, "end round axis start")
-    check("end round axis length", await adapter.add_sketch_dimension(axis, None, "linear", 2.0))
-    await anchor_point_to_origin(adapter, f"{arc}.center", cx, cy, "end round centre")
-    check(
-        "end round radius",
-        await adapter.add_sketch_dimension(arc, None, "radial", END_ROUND_R),
-    )
-    await anchor_point_to_origin(adapter, f"{bottom}.end", right_x, cy, "end round corner")
-    await dimension_between(
-        adapter, f"{right}.start", f"{right}.end", "vertical_distance", top_r - cy,
-        "end round cut height",
-    )
-    await ensure_fully_defined(adapter, "end round sketch")
-    check("exit_sketch end round", await adapter.exit_sketch())
-    name_last_feature(adapter, "EndRoundProfile")
-    check(
-        "revolve-cut end round",
-        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
-    )
-    name_last_feature(adapter, "EndRound")
+    return await save_part_and_images(adapter, PART_NAME)
 
 
 if __name__ == "__main__":

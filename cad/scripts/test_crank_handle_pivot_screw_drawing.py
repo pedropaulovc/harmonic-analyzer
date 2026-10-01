@@ -73,7 +73,6 @@ def test_model_owns_places_and_bands() -> None:
         "SlotDepth",
         "ReliefDia",
         "ReliefWidth",
-        "CollarLength",
     }
     for name, places in spec.DRAWING_PRECISION_BY_NAME.items():
         assert places == (2 if name in running_fit else 1), name
@@ -94,7 +93,6 @@ def test_model_owns_places_and_bands() -> None:
         ("ScrewProfile", "ReliefLead"): "RELIEF_LEAD_TOL",
         ("ScrewProfile", "ReliefDia"): "RELIEF_DIA_TOL",
         ("ScrewProfile", "ReliefWidth"): "RELIEF_WIDTH_TOL",
-        ("ScrewProfile", "CollarLength"): "COLLAR_LENGTH_TOL",
     }
     assert spec.SHOULDER_DIA == 4.00
     assert spec.SHOULDER_DIA_BAND == (-0.03, -0.08)
@@ -119,7 +117,7 @@ def test_policy_sheet_carries_no_gdt_or_render_time_precision() -> None:
 
 def test_geometry_matches_the_u33_ruling() -> None:
     # User ruling 2026-09-30 (ch30 eight-views-4, concept v4): the photographed
-    # Ø6 head on a #6-32 screw.
+    # Ø6 head; #4-40 (user ruling 2026-09-30, local review of fbf82ad96).
     assert spec.HEAD_DIA == 6.0
     assert spec.HEAD_DIA_TOL == 0.10
     # User ruling 2026-09-29 (MHA-139 review): a 4.0 head and a banded
@@ -133,15 +131,15 @@ def test_geometry_matches_the_u33_ruling() -> None:
     assert spec.SLOT_WEB_MIN == pytest.approx(2.7)
     # The tip chamfer is banded so it always exists and never cuts past the
     # thread depth.
-    assert (spec.TIP_CHAMFER_MIN, spec.TIP_CHAMFER_MAX) == pytest.approx((0.3, 0.45))
-    assert spec.THREAD_SIZE == "#6-32"
-    assert spec.THREAD_MODEL_DIA == THREAD_MAJOR_MM["#6-32"] == 3.505
-    assert spec.THREAD_PITCH == pytest.approx(25.4 / 32.0)
+    assert (spec.TIP_CHAMFER_MIN, spec.TIP_CHAMFER_MAX) == pytest.approx((0.2, 0.35))
+    assert spec.THREAD_SIZE == "#4-40"
+    assert spec.THREAD_MODEL_DIA == THREAD_MAJOR_MM["#4-40"] == 2.845
+    assert spec.THREAD_PITCH == pytest.approx(25.4 / 40.0)
     assert spec.SEAT_STATION == pytest.approx(57.0)
     assert spec.OVERALL_LENGTH == pytest.approx(67.0)
-    assert spec.TIP_CHAMFER == 0.4
-    # The tip chamfer stays within the 0.49 thread depth (17/24 H).
-    assert spec.TIP_CHAMFER <= 0.61343 * 25.4 / 32.0
+    assert spec.TIP_CHAMFER == 0.3
+    # The largest tip chamfer stays within the 0.39 thread depth (17/24 H).
+    assert spec.TIP_CHAMFER_MAX <= 0.61343 * 25.4 / 40.0
     assert spec.HEAD_DIA + spec.HEAD_DIA_TOL < spec.STOCK_DIA == pytest.approx(6.35)
 
 
@@ -171,49 +169,53 @@ def test_u33_running_fit_end_play_and_engagement() -> None:
 
 def test_thread_relief_sits_below_the_minor_with_a_45_degree_lead() -> None:
     # Banded (Codex P1 on #1139): the largest relief stays under the root.
-    assert (spec.RELIEF_DIA, spec.RELIEF_DIA_TOL, spec.RELIEF_DIA_MAX) == (2.2, 0.10, 2.3)
+    assert (spec.RELIEF_DIA, spec.RELIEF_DIA_TOL, spec.RELIEF_DIA_MAX) == (1.95, 0.05, 2.0)
     assert spec.RELIEF_WIDTH == 1.5
-    assert spec.RELIEF_LEAD == 0.4
-    assert spec.RELIEF_LEAD_LIMITS == (0.3, 0.5)
+    assert spec.RELIEF_LEAD == 0.3
+    assert spec.RELIEF_LEAD_LIMITS == (0.2, 0.4)
     # The printed limits are the model band's (Codex P2 on #1139).
     assert spec.RELIEF_LEAD_LIMITS == pytest.approx(
         (spec.RELIEF_LEAD - spec.RELIEF_LEAD_TOL, spec.RELIEF_LEAD + spec.RELIEF_LEAD_TOL)
     )
-    assert spec.RELIEF_CALLOUT == "0.3-0.5 X 45 DEG LEAD"
+    assert spec.RELIEF_CALLOUT == "0.2-0.4 X 45 DEG LEAD"
     assert spec.RELIEF_END_STATION == pytest.approx(spec.SEAT_STATION + 1.5)
-    # At or below the #6-32 external minor: the P/8-flat UN root
-    # (3.505 - 1.299038 x 0.79375 = Ø2.474) and the UNR-2A reference max
-    # ((0.1372 - 1.226869 / 32) x 25.4 = Ø2.511).
-    assert spec.THREAD_MINOR_BASIC_ROOT == pytest.approx(2.4739, abs=1e-4)
-    assert spec.THREAD_MINOR_UNR_2A_MAX == pytest.approx(2.5110, abs=1e-4)
+    # At or below the #4-40 external minor: the P/8-flat UN root
+    # (2.845 - 1.299038 x 0.635 = Ø2.020) and the UNR-2A reference max
+    # ((0.1114 - 1.226869 / 40) x 25.4 = Ø2.051).
+    assert spec.THREAD_MINOR_BASIC_ROOT == pytest.approx(2.0201, abs=1e-4)
+    assert spec.THREAD_MINOR_UNR_2A_MAX == pytest.approx(2.0505, abs=1e-4)
     assert spec.RELIEF_DIA_MAX <= spec.THREAD_MINOR_BASIC_ROOT
-    # The lead tops out at Ø3.0 (Ø3.3 with the largest relief and lead),
-    # inside the thread major and the edge-broken Ø3.42 shoulder minimum,
-    # leaving a flat seat at the printed worst case.
-    assert spec.SEAT_FLAT_INNER_DIA == pytest.approx(3.0)
-    assert spec.SEAT_FLAT_INNER_DIA_MAX == pytest.approx(3.3)
-    assert spec.SEAT_FLAT_INNER_DIA_MAX < spec.SHOULDER_DIA_MIN - 2.0 * 0.25
+    # The lead tops out at Ø2.55 (Ø2.8 with the largest relief and lead),
+    # inside the Ø2.845 thread major, leaving a flat seat.
+    assert spec.SEAT_FLAT_INNER_DIA == pytest.approx(2.55)
+    assert spec.SEAT_FLAT_INNER_DIA_MAX == pytest.approx(2.8)
     assert spec.RELIEF_DIA + 2.0 * spec.RELIEF_LEAD_LIMITS[1] < spec.THREAD_MODEL_DIA
-    # The shoulder alone has no seat: the arm's tapped mouth opens to
-    # 3.505 + 2 x 0.25 = Ø4.005 (local review of 1f3067ef2, P1).  The Ø6
-    # collar seats from that mouth out to its smallest edge-broken OD,
-    # 6.0 - 0.8 - 0.5 = Ø4.7: 0.3475 radial at the worst case.
-    assert spec.TAPPED_MOUTH_DIA_MAX == pytest.approx(4.005)
-    assert spec.TAPPED_MOUTH_DIA_MAX > spec.SHOULDER_DIA_MIN - 2.0 * 0.25
-    assert spec.SEAT_CONTACT_INNER_DIA == pytest.approx(4.005)
-    assert spec.SEAT_CONTACT_OUTER_DIA_MIN == pytest.approx(4.7)
-    assert spec.SEAT_RADIAL_MIN == pytest.approx(0.3475)
-    assert spec.SEAT_FLAT_ANNULUS_AREA == pytest.approx(math.pi / 4.0 * (36.0 - 4.005**2))
+    # The seat on the arm face, from the printed limits (local reviews of
+    # 1f3067ef2 and fbf82ad96): the arm's tapped mouth broken 0.1 max,
+    # 2.845 + 0.2 = Ø3.045, out to the smallest shoulder broken 0.1 max,
+    # 3.92 - 0.2 = Ø3.72: 0.3375 radial.  Under the title block's 0.25 on
+    # both there would be none.
+    assert spec.SEAT_EDGE_BREAK_MAX == pytest.approx(0.1)
+    assert spec.TAPPED_MOUTH_DIA_MAX == pytest.approx(3.045)
+    assert spec.SEAT_CONTACT_INNER_DIA == pytest.approx(3.045)
+    assert spec.SEAT_CONTACT_OUTER_DIA_MIN == pytest.approx(3.72)
+    assert spec.SEAT_RADIAL_MIN == pytest.approx(0.3375)
+    assert (3.92 - 0.5) - (2.845 + 0.5) < 0.1
+    assert spec.SEAT_FLAT_ANNULUS_AREA == pytest.approx(math.pi / 4.0 * (16.0 - 3.045**2))
     assert spec.SEAT_FLAT_ANNULUS_AREA_MIN == pytest.approx(
-        math.pi / 4.0 * (4.7**2 - 4.005**2)
+        math.pi / 4.0 * (3.72**2 - 3.045**2)
     )
+    # The one-piece screw goes in from the butt: nothing on the arm end of it
+    # is larger than the bore it passes (local review of fbf82ad96).
+    assert not hasattr(spec, "COLLAR_DIA")
+    assert spec.SHOULDER_DIA_MAX < spec.HANDLE_BORE_MIN
     assert 0.0 < spec.SEAT_FLAT_ANNULUS_AREA_MIN < spec.SEAT_FLAT_ANNULUS_AREA
     assert spec.CHAMFER_CALLOUT == "X 45 DEG"
     assert drawing.CHAMFER_CALLOUT is spec.CHAMFER_CALLOUT
-    # The neck is ~65 percent of the #6-32 tensile stress area (0.00909 in^2).
-    assert spec.NECK_AREA == pytest.approx(math.pi / 4.0 * 2.2**2)
-    assert spec.TENSILE_STRESS_AREA == pytest.approx(5.86, abs=0.01)
-    assert spec.NECK_TO_STRESS_AREA == pytest.approx(0.648, abs=0.001)
+    # The neck is ~77 percent of the #4-40 tensile stress area (0.00604 in^2).
+    assert spec.NECK_AREA == pytest.approx(math.pi / 4.0 * 1.95**2)
+    assert spec.TENSILE_STRESS_AREA == pytest.approx(3.90, abs=0.01)
+    assert spec.NECK_TO_STRESS_AREA == pytest.approx(0.766, abs=0.001)
     # The lead's band is model-owned and prints as limits in its callout, and
     # the tip chamfer carries its own band (MHA-139 re-review: at .X either
     # could print as nothing).  The relief width is banded too: at .X it
@@ -226,35 +228,35 @@ def test_thread_relief_sits_below_the_minor_with_a_45_degree_lead() -> None:
 
 
 def test_engagement_meets_the_1_5d_rule_governed_by_the_stock_arm() -> None:
-    # User ruling 2026-09-30: the #6-32 screw clears the policy's 1.5D rule at
-    # the worst case, so the #8-32's U33b exception is retired.
+    # User ruling 2026-09-30: the #4-40 screw clears the policy's 1.5D rule at
+    # the worst case, so the #8-32's U33b exception stays retired.
     assert spec.ENGAGEMENT_RULE_D == 1.5
     assert not hasattr(spec, "ENGAGEMENT_EXCEPTION_FLOOR_D")
     source = Path(spec.__file__).read_text(encoding="utf-8")
-    assert "the #8-32's U33b exception (1.26D) is retired" in source
-    assert spec.ENGAGEMENT_FLOOR == pytest.approx(1.5 * 3.505)
+    assert "the #8-32's U33b exception (1.26D) stays" in source
+    assert spec.ENGAGEMENT_FLOOR == pytest.approx(1.5 * 2.845)
     # The chamfer's partial threads are excluded: full thread reaches 9.5 - the
-    # longest printed chamfer 0.45 = 9.05 from the seat face (Codex P2 on #1138).
-    assert spec.FULL_THREAD_REACH_MIN == pytest.approx(9.05)
-    # Nominal: min(10.0 - 0.4, arm 8.0) - 1.5 = 6.5 of full thread, 1.85 D.
+    # longest printed chamfer 0.35 = 9.15 from the seat face (Codex P2 on #1138).
+    assert spec.FULL_THREAD_REACH_MIN == pytest.approx(9.15)
+    # Nominal: min(10.0 - 0.3, arm 8.0) - 1.5 = 6.5 of full thread, 2.28 D.
     assert spec.FULL_THREAD_NOMINAL == pytest.approx(6.5)
-    assert spec.FULL_THREAD_NOMINAL_DIAMETERS == pytest.approx(6.5 / 3.505)
-    # Thinnest stock 5/16-in arm (mill -0.004 in on a 1-in flat): min(9.05,
+    assert spec.FULL_THREAD_NOMINAL_DIAMETERS == pytest.approx(6.5 / 2.845)
+    # Thinnest stock 5/16-in arm (mill -0.004 in on a 1-in flat): min(9.15,
     # 7.8359 - the 0.25 exit break) - (1.5 + its 0.1 band) = 5.99,
-    # 1.708 D.  The arm governs.
+    # 2.10 D.  The arm governs.
     assert geometry.GENERAL_1PL_TOL_MM == pytest.approx(0.8)
     assert spec.TAP_EXIT_BREAK == pytest.approx(0.25)
     assert spec.ARM_STOCK_THICKNESS == pytest.approx(7.9375)
     assert spec.RELIEF_WIDTH_MAX == pytest.approx(1.6)
     assert spec.ARM_STOCK_THICKNESS_MIN == pytest.approx(7.8359)
     assert spec.FULL_THREAD_WORST == pytest.approx(5.9859)
-    assert spec.FULL_THREAD_WORST_DIAMETERS == pytest.approx(5.9859 / 3.505, abs=1e-4)
+    assert spec.FULL_THREAD_WORST_DIAMETERS == pytest.approx(5.9859 / 2.845, abs=1e-4)
     assert spec.ENGAGEMENT_GOVERNED_BY == "arm"
-    # Arm at its printed maximum 8.8: min(9.05, 8.8 - 0.25) - 1.6 = 6.95,
-    # 1.98 D; the arm still governs.
+    # Arm at its printed maximum 8.8: min(9.15, 8.8 - 0.25) - 1.6 = 6.95,
+    # 2.44 D; the arm still governs.
     assert spec.ARM_PRINTED_THICKNESS_MAX == pytest.approx(8.8)
     assert spec.FULL_THREAD_WORST_PRINTED_ARM == pytest.approx(6.95)
-    assert spec.FULL_THREAD_WORST_PRINTED_ARM_DIAMETERS == pytest.approx(6.95 / 3.505, abs=1e-3)
+    assert spec.FULL_THREAD_WORST_PRINTED_ARM_DIAMETERS == pytest.approx(6.95 / 2.845, abs=1e-3)
     # The MHA-139 review's own count: the shortest section less the widest
     # relief and 1.5 pitches of die run-in still spans the stock arm's
     # full-thread need.
@@ -264,18 +266,18 @@ def test_engagement_meets_the_1_5d_rule_governed_by_the_stock_arm() -> None:
     for engaged in (spec.FULL_THREAD_WORST, spec.FULL_THREAD_WORST_PRINTED_ARM):
         assert engaged >= spec.ENGAGEMENT_FLOOR
     # The 1.5 D rule itself is met, with no exception to record.
-    assert spec.FULL_THREAD_WORST >= 1.5 * 3.505
+    assert spec.FULL_THREAD_WORST >= 1.5 * 2.845
     # User ruling 2026-09-29: the tip is filed flush at assembly.  Filing
-    # removes 10.0 - 7.8359 = 2.16 at most, and even 9.05 of full thread in an
+    # removes 10.0 - 7.8359 = 2.16 at most, and even 9.15 of full thread in an
     # 8.0391 stock arm still reaches the face first.
     assert not hasattr(spec, "PROUD_INBOARD_MAX")
     assert spec.FILE_ALLOWANCE_MAX == pytest.approx(10.0 - 7.8359, abs=1e-4)
-    assert spec.FILE_ALLOWANCE_MIN == pytest.approx(9.05 - 8.0391, abs=1e-4)
+    assert spec.FILE_ALLOWANCE_MIN == pytest.approx(9.15 - 8.0391, abs=1e-4)
     assert spec.FILE_ALLOWANCE_MIN > 0.0
 
 
 def test_notes_state_the_fitted_shoulder_and_the_head_bands() -> None:
-    # The #6-32 meets the 1.5D rule, so the sheet states no engagement
+    # The #4-40 meets the 1.5D rule, so the sheet states no engagement
     # exception (user ruling 2026-09-30).
     assert not hasattr(spec, "ENGAGEMENT_NOTE")
     assert "THREAD ENGAGEMENT" not in spec.DRAWING_NOTES
@@ -285,15 +287,20 @@ def test_notes_state_the_fitted_shoulder_and_the_head_bands() -> None:
     # the bonded handle; the head's band is for its bearing on the cup floor.
     flat = " ".join(spec.DRAWING_NOTES.split())
     assert "FACE THE UNDER-HEAD TO SUIT THE BONDED MHA-022" in flat
-    # The v4 re-review: the note names which face the fitted length ends at.
-    # The seat collar carries it (local review of 1f3067ef2).
-    assert "UNDER-HEAD TO SEAT FACE (THE COLLAR'S THREAD-END FACE, ON MHA-020)" in flat
+    # The v4 re-review: the note names which face the fitted length ends at,
+    # and its 0.1-max edge break keeps the seat (local review of fbf82ad96).
+    assert "UNDER-HEAD TO SEAT FACE (SHOULDER END, EDGE BROKEN 0.1 MAX, ON MHA-020)" in flat
     assert "PLUS 0.25-1.00." in flat
     assert "HEAD BEARS ON MHA-153 FLOOR;" in flat
     # Each head band states its reason (the 1d2be3aaf re-review called the
-    # unexplained length band over-specification).
-    assert "DIA BAND KEEPS 0.3 BEARING;" in flat
-    assert "LENGTH BAND KEEPS IT BELOW THE CUP FACE." in flat
+    # unexplained length band over-specification).  The bearing is the
+    # narrow side's with the head off-centre by its running play (local
+    # review of fbf82ad96): 0.3 concentric less 0.19.
+    assert spec.HEAD_BEARING_RADIAL_CONCENTRIC_MIN == pytest.approx(0.3)
+    assert spec.HEAD_RUNNING_OFFSET_MAX == pytest.approx(min(0.4 / 2.0, (4.3 - 3.92) / 2.0))
+    assert spec.HEAD_BEARING_RADIAL_MIN == pytest.approx(0.11)
+    assert "DIA BAND KEEPS 0.1 BEARING," in flat
+    assert "LENGTH BAND KEEPS IT BELOW CUP FACE." in flat
     assert all(len(line) <= 72 for line in lines)
     policy = (Path(spec.__file__).parents[1] / "docs" / "drawing-simplicity-policy.md")
     assert not any(
@@ -308,7 +315,7 @@ def test_notes_state_the_fitted_shoulder_and_the_head_bands() -> None:
 
 
 def test_thread_callout_names_the_size_but_not_the_title_block_class() -> None:
-    assert spec.THREAD_CALLOUT == "#6-32 UNC"
+    assert spec.THREAD_CALLOUT == "#4-40 UNC"
     assert "2A" not in spec.THREAD_CALLOUT
     assert drawing.THREAD_CALLOUT is spec.THREAD_CALLOUT
 
@@ -332,21 +339,21 @@ def test_notes_stay_within_rule_six() -> None:
 
 def test_modelled_volume_is_the_turned_body_less_the_slot() -> None:
     head = math.pi * 3.0**2 * 4.0
-    shoulder = math.pi * 2.0**2 * 52.4
-    collar = math.pi * 3.0**2 * 0.6
-    relief = math.pi * (2.2 / 2.0) ** 2 * 1.5
-    thread = math.pi * (3.505 / 2.0) ** 2 * 8.5
-    # Pappus: the lead's 0.4 x 0.4 corner triangle, centroid 1.1 + 0.4/3 out,
-    # stays; the tip chamfer's 0.4 x 0.4, centroid 1.7525 - 0.4/3 out, goes.
-    lead = 2.0 * math.pi * (1.1 + 0.4 / 3.0) * (0.4 * 0.4 / 2.0)
-    tip = 2.0 * math.pi * (3.505 / 2.0 - 0.4 / 3.0) * (0.4 * 0.4 / 2.0)
+    shoulder = math.pi * 2.0**2 * 53.0
+    relief = math.pi * (1.95 / 2.0) ** 2 * 1.5
+    thread = math.pi * (2.845 / 2.0) ** 2 * 8.5
+    # Pappus: the lead's 0.3 x 0.3 corner triangle, centroid 0.975 + 0.3/3
+    # out, stays; the tip chamfer's 0.3 x 0.3, centroid 1.4225 - 0.3/3 out,
+    # goes.
+    lead = 2.0 * math.pi * (0.975 + 0.3 / 3.0) * (0.3 * 0.3 / 2.0)
+    tip = 2.0 * math.pi * (2.845 / 2.0 - 0.3 / 3.0) * (0.3 * 0.3 / 2.0)
     assert part.V_LEAD == pytest.approx(lead)
-    assert part.V_BODY == pytest.approx(head + shoulder + collar + relief + thread + lead - tip)
+    assert part.V_BODY == pytest.approx(head + shoulder + relief + thread + lead - tip)
     # Filed flush: 6.5 of full thread past the relief, a 0.25 edge break.
-    fitted_thread = math.pi * (3.505 / 2.0) ** 2 * 6.5
-    fitted_tip = 2.0 * math.pi * (3.505 / 2.0 - 0.25 / 3.0) * (0.25 * 0.25 / 2.0)
+    fitted_thread = math.pi * (2.845 / 2.0) ** 2 * 6.5
+    fitted_tip = 2.0 * math.pi * (2.845 / 2.0 - 0.25 / 3.0) * (0.25 * 0.25 / 2.0)
     assert part.turned_volume(8.0, 0.25) == pytest.approx(
-        head + shoulder + collar + relief + fitted_thread + lead - fitted_tip
+        head + shoulder + relief + fitted_thread + lead - fitted_tip
     )
     assert part.V_INSTALLED == pytest.approx(part.turned_volume(8.0, 0.25) - part.V_SLOT)
     # A 1.0 strip across a Ø6 circle: integrate the chord 2*sqrt(r^2 - y^2)
@@ -448,7 +455,7 @@ def test_sheet_placements_stay_inside_the_border() -> None:
     assert end_y - drawing.SIDE_KEEP["ThreadLength"][1] >= 0.005
     # The 45-degree lead rides the Ø callout; only the width stands above.
     assert "ReliefLead" not in drawing.SIDE_KEEP
-    assert spec.RELIEF_CALLOUT == "0.3-0.5 X 45 DEG LEAD"
+    assert spec.RELIEF_CALLOUT == "0.2-0.4 X 45 DEG LEAD"
     assert drawing.SIDE_KEEP["ReliefWidth"][1] > drawing.RELIEF_TOP_Y
     # The thread note stands up and right of its pick, so the leader slants.
     note_x, note_y = drawing.THREAD_NOTE_XY
@@ -516,9 +523,10 @@ def test_installed_configuration_is_split_from_a_finished_default() -> None:
     assert _config.parts("crank-handle-pivot-screw")["description"] == "CRANK HANDLE PIVOT SCREW"
 
 
-def test_quarter_inch_arm_stock_fails_the_1_5d_rule(monkeypatch) -> None:
-    # The arm stock governs the worst-case engagement: 1/4-in bar would leave
-    # min(9.1, 6.35 - 0.25) - 2.3 = 3.8, 1.08D, under the 1.5D rule.
+def test_even_quarter_inch_arm_stock_clears_the_1_5d_rule(monkeypatch) -> None:
+    # The arm stock governs the worst-case engagement, and the #4-40 has
+    # margin: even 1/4-in bar leaves min(9.15, 6.2484 - 0.25) - 1.6 = 4.40,
+    # 1.55D, over the 1.5D rule.
     # Executed as a separate, unregistered module: reloading the real one
     # would swap its band tuples for new objects under every importer
     # (test_fit_bands tracks them by identity).
@@ -531,10 +539,10 @@ def test_quarter_inch_arm_stock_fails_the_1_5d_rule(monkeypatch) -> None:
     monkeypatch.setattr(geometry, "ARM_STOCK_THICKNESS_MIN", 0.246 * 25.4)
     probe_spec = importlib.util.spec_from_file_location("_quarter_inch_probe", spec.__file__)
     probe = importlib.util.module_from_spec(probe_spec)
-    with pytest.raises(AssertionError, match="under the 1.5D rule"):
-        probe_spec.loader.exec_module(probe)
+    probe_spec.loader.exec_module(probe)
     assert probe.ARM_STOCK_THICKNESS == pytest.approx(6.35)
-    assert probe.FULL_THREAD_WORST < 1.5 * probe.THREAD_MODEL_DIA
+    assert probe.FULL_THREAD_WORST == pytest.approx(0.246 * 25.4 - 0.25 - 1.6)
+    assert probe.FULL_THREAD_WORST >= 1.5 * probe.THREAD_MODEL_DIA
 
 
 def test_arm_interference_allowance_follows_the_thread_size() -> None:
@@ -553,26 +561,10 @@ def test_arm_interference_allowance_follows_the_thread_size() -> None:
 
 def test_worst_engagement_clears_the_novice_margin_by_geometry() -> None:
     # Main 2026-09-25: reach >= 1.25D at the worst case by geometry; the
-    # #6-32 (user ruling 2026-09-30) reaches the policy's 1.5D.
+    # #4-40 (user ruling 2026-09-30) reaches the policy's 1.5D.
     assert spec.FULL_THREAD_WORST_DIAMETERS >= 1.5
     assert spec.RELIEF_WIDTH_MAX == pytest.approx(spec.RELIEF_WIDTH + spec.RELIEF_WIDTH_TOL)
 
-
-def test_seat_collar_lies_in_the_ferrule_bore_clear_of_the_tenon() -> None:
-    # Local review of 1f3067ef2 (P1; the user's recommended option, taken when
-    # the question timed out): a Ø6 collar at the arm end of the shoulder,
-    # inside the MHA-152 bore end the oak tenon leaves open.  0.6 long
-    # (local review of 4b46c8b53).
-    assert (spec.COLLAR_DIA, spec.COLLAR_LENGTH, spec.COLLAR_LENGTH_TOL) == (6.0, 0.6, 0.10)
-    # Smallest Ø7.6 bore over the largest .X collar Ø6.8: 0.4 radial.
-    assert spec.COLLAR_BORE_CLEARANCE_MIN == pytest.approx(0.4)
-    # Axially, from the printed limits of both parts that set the gap: the
-    # shortest .X ferrule (7.0 - 0.8) less the longest banded tenon
-    # (5.0 + 0.1) is 1.1, less the longest collar 0.7 leaves 0.4.
-    ferrule_min = 7.0 - 0.8
-    tenon_max = 5.0 + 0.1
-    assert spec.COLLAR_TENON_CLEARANCE_MIN == pytest.approx(ferrule_min - tenon_max - 0.7)
-    assert spec.COLLAR_TENON_CLEARANCE_MIN == pytest.approx(0.4)
 
 
 def test_station_reference_is_saved_hidden_and_imported_per_view() -> None:

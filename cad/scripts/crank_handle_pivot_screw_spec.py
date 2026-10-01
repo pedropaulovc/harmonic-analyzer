@@ -2,7 +2,7 @@ r"""Pure-data contract for MHA-139, the crank handle pivot screw (user ruling U3
 
 A made slotted shoulder screw turned from 1/4-in cold-finished rod.  The oak
 handle MHA-022 spins on the shoulder; the thread screws into the crank arm
-MHA-020's #6-32 tapped through hole and the shoulder seats tight on the arm
+MHA-020's #4-40 tapped through hole and the shoulder seats tight on the arm
 face, so the shoulder length alone sets the handle's end play.  The tip is
 filed flush with the arm's inboard face at assembly (``INSTALLED_CONFIG``).
 
@@ -36,15 +36,10 @@ from crank_handle_butt_cup_spec import (
     POCKET_WALL_FLOOR_MM as CUP_POCKET_WALL_FLOOR_MM,
     WALL_FLOOR_MM,
 )
-from crank_handle_ferrule_spec import (
-    BORE_DIA as FERRULE_BORE_DIA,
-    BORE_DIA_TOL as FERRULE_BORE_DIA_TOL,
-)
 from crank_handle_spec import (
     HANDLE_LENGTH,
     PIVOT_BORE_BAND,
     PIVOT_BORE_DIA,
-    TENON_END_GAP_MIN,
 )
 from crank_hub_geometry import (
     ARM_STOCK_THICKNESS,
@@ -79,21 +74,16 @@ SLOT_DEPTH_TOL = 0.20
 
 # The running surface under the oak bore.  (upper, lower) deviations from the
 # Ø4.00 nominal; the model carries the band natively (policy rule 2).  Ø4.00
-# over a #6-32 thread (user ruling 2026-09-30): the shoulder leaves a seat
-# annulus on the arm face and the tenon keeps 1.5 of oak over its bore.
+# (user ruling 2026-09-30): the tenon keeps 1.5 of oak over its bore.
 SHOULDER_DIA = 4.00
 SHOULDER_DIA_BAND = (-0.03, -0.08)
-# Seat collar (local review of 1f3067ef2, user's recommended option taken when
-# the question timed out): the Ø4 shoulder alone has no seat on the arm --
-# the #6-32 hole's mouth opens to Ø4.0 after its edge break, wider than the
-# shoulder's flat.  A Ø6 collar at the arm end of the shoulder seats on the
-# arm face; it lies in the ferrule's open bore end, where no oak reaches
-# (the tenon stops short of the arm face).  Its OD is routine (.X); its
-# length is banded and short (local review of 4b46c8b53) so the longest
-# collar clears the shortest tenon end in the shortest ferrule.
-COLLAR_DIA = 6.0
-COLLAR_LENGTH = 0.6
-COLLAR_LENGTH_TOL = 0.10
+# The shoulder's thread-end face is the seat on the arm face.  Under the
+# title block's 0.25 edge break on it and on the tapped mouth, a #6-32 left no
+# seat (local review of 1f3067ef2); a Ø6 collar cannot pass the oak bore
+# (local review of fbf82ad96).  So the thread is #4-40 (user ruling
+# 2026-09-30) and the sheet breaks the seat edge 0.1 max, as MHA-020 does its
+# tapped mouth: a 0.34 radial seat at the worst case.
+SEAT_EDGE_BREAK_MAX = 0.1
 # Arm face to the head's underside, which bears on the MHA-153 cup floor.
 # User ruling 2026-09-29 (after the machinist reviews): the shoulder is
 # turned to suit the bonded handle -- its measured length from the ferrule's
@@ -107,10 +97,11 @@ END_PLAY_NOMINAL = 0.5
 HANDLE_STACK_NOMINAL = round(HANDLE_LENGTH - CUP_POCKET_DEPTH, 6)
 SHOULDER_LENGTH = round(HANDLE_STACK_NOMINAL + END_PLAY_NOMINAL, 6)
 
-# #6-32 (user ruling 2026-09-30): the smaller Ø4 shoulder the photographed
-# head calls for.  In the 5/16-in arm it clears the policy's 1.5D engagement
-# at the worst case, so the #8-32's U33b exception (1.26D) is retired.
-THREAD_SIZE = "#6-32"
+# #4-40 (user ruling 2026-09-30, after #6-32): the thread that leaves the Ø4
+# shoulder a seat on the arm.  In the 5/16-in arm it clears the policy's 1.5D
+# engagement at the worst case, so the #8-32's U33b exception (1.26D) stays
+# retired.
+THREAD_SIZE = "#4-40"
 # The threaded section is modelled as a plain cylinder at the basic #6 major
 # diameter, the fleet convention for a stock screw in a tap-drill-modelled hole.
 THREAD_MODEL_DIA = THREAD_MAJOR_MM[THREAD_SIZE]
@@ -122,52 +113,52 @@ THREAD_MODEL_DIA = THREAD_MAJOR_MM[THREAD_SIZE]
 # (below).
 THREAD_LENGTH = 10.0
 THREAD_LENGTH_BAND = (0.0, -0.5)
-# 45-degree thread-start chamfer on the tip, inside the 0.49 thread depth.
+# 45-degree thread-start chamfer on the tip, inside the 0.39 thread depth.
 # Like the relief lead, the model holds the 45 degrees by equation and the
 # print gives the axial leg with an "X 45 DEG" callout.  Banded (MHA-139
 # re-review): at .X the 0.4 could print as nothing; +0.05/-0.10 keeps a real
 # chamfer that never cuts past the thread depth.
-TIP_CHAMFER = 0.4
+TIP_CHAMFER = 0.3
 TIP_CHAMFER_BAND = (0.05, -0.10)
 # The title block states the UN thread class, so the callout names no class.
 THREAD_CALLOUT = f"{THREAD_SIZE} UNC"
-THREADS_PER_IN = 32
+THREADS_PER_IN = 40
 THREAD_PITCH = MM_PER_IN / THREADS_PER_IN
-# #6-32 external minor diameter.  ASSUMPTION, not sourced from ASME B1.1 in
+# #4-40 external minor diameter.  ASSUMPTION, not sourced from ASME B1.1 in
 # this repo: the UN basic profile with its P/8 root flat puts the root at
-# major - 1.5 H = major - 1.299038 P = 2.474 (the same construction gives
+# major - 1.5 H = major - 1.299038 P = 2.020 (the same construction gives
 # #10-24's 3.451, the root the McMaster 91829A560 vendor model cuts).  The
-# UNR-2A reference maximum, 2A major max 0.1372 in (0.138 basic less the
-# 0.0008 allowance) less 1.226869 P (17/24 H each side), is 0.0989 in =
-# 2.511.  The relief floor sits at or below the smaller of the two so the
+# UNR-2A reference maximum, 2A major max 0.1114 in (0.112 basic less the
+# 0.0006 allowance) less 1.226869 P (17/24 H each side), is 0.0807 in =
+# 2.051.  The relief floor sits at or below the smaller of the two so the
 # die's incomplete threads clear it.
-THREAD_MAJOR_2A_MAX_IN = 0.1372
+THREAD_MAJOR_2A_MAX_IN = 0.1114
 THREAD_MINOR_BASIC_ROOT = THREAD_MODEL_DIA - 1.5 * math.sqrt(3.0) / 2.0 * THREAD_PITCH
 THREAD_MINOR_UNR_2A_MAX = (
     THREAD_MAJOR_2A_MAX_IN - 1.226869 / THREADS_PER_IN
 ) * MM_PER_IN
-# Thread relief (Main's ruling on the die-runout doubt; Ø2.3 under the #6-32
-# root): a groove in the first RELIEF_WIDTH of the threaded section, against
+# Thread relief (Main's ruling on the die-runout doubt): a groove in the first RELIEF_WIDTH of the threaded section, against
 # the seat face, so the die's incomplete lead threads run out into air and the shoulder
 # pulls down tight on the arm face.  Routine (.X) sizes under the title-block
 # band.
-# Banded (Codex P1 on #1139): at .X a #6-32 relief could reach Ø3.1, above
-# the thread root (no die run-out) and, with the lead, past the shoulder's
-# seat.  +/-0.10 keeps the largest relief under the root and a flat seat.
-RELIEF_DIA = 2.2
-RELIEF_DIA_TOL = 0.10
+# Banded (Codex P1 on #1139): at .X the relief could stand above the thread
+# root (no die run-out) and, with the lead, reach past the shoulder's seat.
+# Ø1.95 +/-0.05 keeps the largest relief under the #4-40 root with the most
+# neck the root allows.
+RELIEF_DIA = 1.95
+RELIEF_DIA_TOL = 0.05
 RELIEF_DIA_MAX = round(RELIEF_DIA + RELIEF_DIA_TOL, 6)
 RELIEF_WIDTH = 1.5
 # Banded (local review of 1f3067ef2): at .X the groove could be 0.7, under one
-# #6-32 pitch, too short for the die's incomplete threads to run out.
+# pitch, too short for the die's incomplete threads to run out.
 RELIEF_WIDTH_TOL = 0.10
 # A 45-degree lead from the relief floor up into the seat face, so the groove
-# leaves no sharp inside corner.  0.5 keeps the lead inside the Ø3.505 thread
+# leaves no sharp inside corner.  0.3 keeps the lead inside the Ø2.845 thread
 # major, i.e. inside the arm's tapped hole, so the whole seat annulus that
 # bears on the arm face stays flat.  The 45 degrees is enforced in the model by
 # an equation, and printed as a callout on the lead's axial size, as limits
 # (MHA-139 re-review: at .X the lead could print as nothing).
-RELIEF_LEAD = 0.4
+RELIEF_LEAD = 0.3
 # The model owns the band (policy rule 2; Codex P2 on #1139): the ReliefLead
 # dimension carries +/-0.10 and the callout prints the limits it gives, so a
 # nominal edit cannot leave the printed limits behind.
@@ -239,11 +230,19 @@ TIP_CHAMFER_MIN, TIP_CHAMFER_MAX = (
 )
 # Under-head bearing annulus on the cup floor at the worst case: the smallest
 # head over the largest drilled floor hole, less a title-block edge break on
-# each.
+# each, on the narrow side with the head pushed off-centre as far as its
+# running play allows (local review of fbf82ad96: the concentric figure
+# overstated it).  The play is the smaller of the head's in the pocket and
+# the shoulder's in the floor hole.
 _FLOOR_HOLE_MAX = CUP_FLOOR_HOLE_DIA + 0.10  # DRILLED HOLES +0.10/0
-HEAD_BEARING_RADIAL_MIN = round(
+HEAD_BEARING_RADIAL_CONCENTRIC_MIN = round(
     ((HEAD_DIA - HEAD_DIA_TOL) - _FLOOR_HOLE_MAX) / 2.0 - 2.0 * EDGE_BREAK_MAX_MM, 6
 )
+HEAD_RUNNING_OFFSET_MAX = round(
+    min(CUP_POCKET_CLEARANCE[1] / 2.0, (_FLOOR_HOLE_MAX - (SHOULDER_DIA + SHOULDER_DIA_BAND[1])) / 2.0),
+    6,
+)
+HEAD_BEARING_RADIAL_MIN = round(HEAD_BEARING_RADIAL_CONCENTRIC_MIN - HEAD_RUNNING_OFFSET_MAX, 6)
 # Wood-on-steel running clearance, on diameter.
 DIAMETRAL_CLEARANCE_MIN = round(HANDLE_BORE_MIN - SHOULDER_DIA_MAX, 6)
 DIAMETRAL_CLEARANCE_MAX = round(HANDLE_BORE_MAX - SHOULDER_DIA_MIN, 6)
@@ -278,7 +277,7 @@ FULL_THREAD_NOMINAL = round(
     min(FULL_THREAD_REACH_NOMINAL, ARM_THICKNESS) - RELIEF_WIDTH, 6
 )
 # Worst case in the thinnest stock arm: min(full-thread reach, arm 7.84 less
-# the exit break) - relief 2.01.
+# the exit break) - the widest relief.
 FULL_THREAD_WORST = round(
     min(FULL_THREAD_REACH_MIN, ARM_STOCK_THICKNESS_MIN - TAP_EXIT_BREAK)
     - RELIEF_WIDTH_MAX,
@@ -321,41 +320,30 @@ FILE_ALLOWANCE_MIN = round(FULL_THREAD_REACH_MIN - ARM_STOCK_THICKNESS_MAX, 6)
 DRAWING_NOTES = "\n".join(
     (
         "FACE THE UNDER-HEAD TO SUIT THE BONDED MHA-022: UNDER-HEAD TO SEAT FACE",
-        "  (THE COLLAR'S THREAD-END FACE, ON MHA-020) = FERRULE FACE TO CUP",
-        f"  FLOOR PLUS {END_PLAY_RANGE[0]:.2f}-{END_PLAY_RANGE[1]:.2f}. "
-        f"HEAD BEARS ON MHA-153 FLOOR; DIA BAND KEEPS {HEAD_BEARING_RADIAL_MIN:.1f}",
-        "  BEARING; LENGTH BAND KEEPS IT BELOW THE CUP FACE.",
+        f"  (SHOULDER END, EDGE BROKEN {SEAT_EDGE_BREAK_MAX:.1f} MAX, ON MHA-020) = FERRULE",
+        f"  FACE TO CUP FLOOR PLUS {END_PLAY_RANGE[0]:.2f}-{END_PLAY_RANGE[1]:.2f}. "
+        f"HEAD BEARS ON MHA-153 FLOOR;",
+        f"  DIA BAND KEEPS {HEAD_BEARING_RADIAL_MIN:.1f} BEARING, LENGTH BAND KEEPS IT BELOW CUP FACE.",
     )
 )
 
-# The collar's seat on the arm face: from the arm's tapped mouth (the thread
-# major plus its title-block edge break, the larger of it and the relief
-# lead's envelope) out to the smallest .X collar less its own edge break.
-TAPPED_MOUTH_DIA_MAX = round(THREAD_MODEL_DIA + 2.0 * EDGE_BREAK_MAX_MM, 6)
+# The shoulder's seat on the arm face: from the arm's tapped mouth (the thread
+# major plus MHA-020's 0.1-max mouth break, the larger of it and the relief
+# lead's envelope) out to the smallest shoulder less its 0.1-max seat break.
+TAPPED_MOUTH_DIA_MAX = round(THREAD_MODEL_DIA + 2.0 * SEAT_EDGE_BREAK_MAX, 6)
 SEAT_CONTACT_INNER_DIA = max(TAPPED_MOUTH_DIA_MAX, SEAT_FLAT_INNER_DIA_MAX)
-SEAT_CONTACT_OUTER_DIA_MIN = round(
-    COLLAR_DIA - GENERAL_1PL_TOL_MM - 2.0 * EDGE_BREAK_MAX_MM, 6
-)
+SEAT_CONTACT_OUTER_DIA_MIN = round(SHOULDER_DIA_MIN - 2.0 * SEAT_EDGE_BREAK_MAX, 6)
 SEAT_RADIAL_MIN = round((SEAT_CONTACT_OUTER_DIA_MIN - SEAT_CONTACT_INNER_DIA) / 2.0, 6)
-SEAT_FLAT_ANNULUS_AREA = math.pi / 4.0 * (COLLAR_DIA**2 - TAPPED_MOUTH_DIA_MAX**2)
+SEAT_FLAT_ANNULUS_AREA = math.pi / 4.0 * (SHOULDER_DIA**2 - TAPPED_MOUTH_DIA_MAX**2)
 SEAT_FLAT_ANNULUS_AREA_MIN = (
     math.pi / 4.0 * (SEAT_CONTACT_OUTER_DIA_MIN**2 - SEAT_CONTACT_INNER_DIA**2)
 )
-# The collar in the ferrule's open bore end: radial clearance to the smallest
-# bore, and axial clearance to the shortest tenon's end (the handle pushed to
-# the arm).
-COLLAR_BORE_CLEARANCE_MIN = round(
-    ((FERRULE_BORE_DIA - FERRULE_BORE_DIA_TOL) - (COLLAR_DIA + GENERAL_1PL_TOL_MM)) / 2.0, 6
-)
-COLLAR_TENON_CLEARANCE_MIN = round(
-    TENON_END_GAP_MIN - (COLLAR_LENGTH + COLLAR_LENGTH_TOL), 6
-)
-# The relief neck is the screw's weakest section: pi/4 x 2.3^2 = 4.15 mm^2
-# against the #6-32 UNC tensile stress area of 0.00909 in^2 = 5.86 mm^2, about
-# 71 percent.  Seating torque is therefore limited by the neck, not the thread;
+# The relief neck is the screw's weakest section: pi/4 x 1.95^2 = 2.99 mm^2
+# against the #4-40 UNC tensile stress area of 0.00604 in^2 = 3.90 mm^2, about
+# 77 percent.  Seating torque is therefore limited by the neck, not the thread;
 # the handle's working load is a hand grip and never loads it axially.
 NECK_AREA = math.pi / 4.0 * RELIEF_DIA**2
-TENSILE_STRESS_AREA = 0.00909 * MM_PER_IN**2
+TENSILE_STRESS_AREA = 0.00604 * MM_PER_IN**2
 NECK_TO_STRESS_AREA = NECK_AREA / TENSILE_STRESS_AREA
 
 for _ok, _what in (
@@ -375,9 +363,7 @@ for _ok, _what in (
         "relief lead reaches past the thread major into the seat annulus",
     ),
     (SEAT_FLAT_ANNULUS_AREA_MIN > 0.0, "no flat seat annulus is left"),
-    (SEAT_RADIAL_MIN >= 0.3, "the collar's seat on the arm face is under 0.3 radial"),
-    (COLLAR_BORE_CLEARANCE_MIN > 0.0, "the collar can touch the ferrule bore"),
-    (COLLAR_TENON_CLEARANCE_MIN > 0.0, "the longest collar can reach the shortest tenon"),
+    (SEAT_RADIAL_MIN >= 0.3, "the shoulder's seat on the arm face is under 0.3 radial"),
     (
         RELIEF_WIDTH_MIN >= 1.5 * THREAD_PITCH,
         "the shortest relief is under 1.5 pitches of die run-out",
@@ -417,7 +403,7 @@ for _ok, _what in (
         CUP_POCKET_WALL_MIN >= CUP_POCKET_WALL_FLOOR_MM,
         "the MHA-153 pocket bored to suit the largest head leaves under its 0.8 wall",
     ),
-    (HEAD_BEARING_RADIAL_MIN > 0.0, "no under-head bearing is left on the cup floor"),
+    (HEAD_BEARING_RADIAL_MIN >= 0.1, "under 0.1 of under-head bearing on the cup floor"),
     (
         CUP_FLOOR_HOLE_DIA > SHOULDER_DIA_MAX,
         "the MHA-153 floor hole does not pass the shoulder",
@@ -447,8 +433,6 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "HeadDia",
         "HeadLength",
         "ShoulderDia",
-        "CollarDia",
-        "CollarLength",
         "ThreadLength",
         "ReliefDia",
         "ReliefWidth",
@@ -469,8 +453,6 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "HeadDia": 2,
         "HeadLength": 2,
         "ShoulderDia": 2,
-        "CollarDia": 1,
-        "CollarLength": 2,
         "ThreadLength": 1,
         "ReliefDia": 2,
         "ReliefWidth": 2,

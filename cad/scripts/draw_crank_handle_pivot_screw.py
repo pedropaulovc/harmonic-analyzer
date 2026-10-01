@@ -59,7 +59,6 @@ from crank_handle_pivot_screw_spec import (
     RELIEF_END_STATION,
     RELIEF_LEAD,
     SEAT_STATION,
-    COLLAR_LENGTH,
     SHOULDER_DIA,
     SURFACE_FINISHES,
     THREAD_CALLOUT,
@@ -119,9 +118,6 @@ SHOULDER_TOP_Y = _sheet_y(SHOULDER_DIA / 2.0)
 THREAD_TOP_Y = _sheet_y(THREAD_MODEL_DIA / 2.0)
 RELIEF_TOP_Y = _sheet_y(RELIEF_DIA / 2.0)
 RELIEF_MID_X = (SEAT_X + RELIEF_END_X) / 2.0
-# The seat collar runs from the seat face toward the head (right).
-COLLAR_END_X = _sheet_x(SEAT_STATION - COLLAR_LENGTH)
-COLLAR_MID_X = (SEAT_X + COLLAR_END_X) / 2.0
 # The relief floor runs from the foot of the 45-degree lead to the flank.
 RELIEF_FLOOR_MID_X = (_sheet_x(SEAT_STATION + RELIEF_LEAD) + RELIEF_END_X) / 2.0
 
@@ -143,11 +139,6 @@ SIDE_KEEP = {
     # crosses the shoulder near its thread end; the head's stands clear of the
     # head face, left of the end view.
     "ShoulderDia": (SEAT_X + 0.056, SIDE_CENTER[1] + 0.030),
-    # The seat collar (local review of 1f3067ef2): its length reads just
-    # above it, text right of the 3-mm span; its Ø stands over the shoulder,
-    # clear of the shoulder Ø and of the relief callout below.
-    "CollarLength": (COLLAR_MID_X + 0.012, SIDE_CENTER[1] + 0.026),
-    "CollarDia": (SEAT_X + 0.030, SIDE_CENTER[1] + 0.036),
     "HeadDia": (HEAD_FACE_X + 0.014, SIDE_CENTER[1]),
     # The thread-relief groove against the seat face.  Its width from the seat
     # face reads above it alone; its Ø reads below it with the 45-degree lead
