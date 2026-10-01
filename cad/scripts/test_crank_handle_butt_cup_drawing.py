@@ -97,6 +97,8 @@ def test_notes_name_the_mates_and_the_band_reason() -> None:
     assert f"{spec.SCREW_NUMBER} {spec.SCREW_NAME}" in notes
     assert "TO SUIT" in notes
     assert "MIN POCKET WALL 0.8; MIN FLOOR 1.5; CORNERS EXCEPTED." in notes
+    # Machinist review of crank-v4-16: the depth band states its reason.
+    assert "THE DEPTH BAND KEEPS THE LONGEST MHA-139 HEAD BELOW THE FACE AT FULL END PLAY." in notes
     assert "turned clear of it" in _config.parts("crank-handle-butt-cup")["process"]
     assert "6.5 MAX" in notes
     assert "FACE FLUSH, CENTRED ON THE" in notes

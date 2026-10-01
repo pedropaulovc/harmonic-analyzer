@@ -166,10 +166,10 @@ THREAD_FIT_OFFSET_MAX = round(
 RELIEF_DIA = 1.85
 RELIEF_DIA_TOL = 0.05
 RELIEF_DIA_MAX = round(RELIEF_DIA + RELIEF_DIA_TOL, 6)
-RELIEF_WIDTH = 1.5
-# Banded (local review of 1f3067ef2): at .X the groove could be 0.7, under one
-# pitch, too short for the die's incomplete threads to run out.
-RELIEF_WIDTH_TOL = 0.10
+# Routine at 2.0 (MHA-139 machinist review of crank-v4-16 called the 1.5
+# +/-0.10 band over-specification): the #4-40's finer pitch lets the .X width
+# keep 1.5 pitches of die run-out at 1.2 and the 1.5D engagement at 2.8.
+RELIEF_WIDTH = 2.0
 # A 45-degree lead from the relief floor up into the seat face, so the groove
 # leaves no sharp inside corner.  0.3 keeps the lead inside the Ø2.845 thread
 # major, i.e. inside the arm's tapped hole, so the whole seat annulus that
@@ -277,10 +277,10 @@ ENGAGEMENT_FLOOR = ENGAGEMENT_RULE_D * THREAD_MODEL_DIA
 # ARM_STOCK_THICKNESS_MIN.  The thick side keeps the .X band as a bound on
 # what the model allows.
 ARM_PRINTED_THICKNESS_MAX = ARM_THICKNESS + GENERAL_1PL_TOL_MM
-# The relief width is a routine .X size (MHA-139 re-review, 2026-09-29); the
-# #6-32 thread clears the 1.5D rule with it at .X (asserted below).
-RELIEF_WIDTH_MAX = round(RELIEF_WIDTH + RELIEF_WIDTH_TOL, 6)
-RELIEF_WIDTH_MIN = round(RELIEF_WIDTH - RELIEF_WIDTH_TOL, 6)
+# The relief width is a routine .X size; the #4-40 thread clears the 1.5D
+# rule with it at .X (asserted below).
+RELIEF_WIDTH_MAX = round(RELIEF_WIDTH + GENERAL_1PL_TOL_MM, 6)
+RELIEF_WIDTH_MIN = round(RELIEF_WIDTH - GENERAL_1PL_TOL_MM, 6)
 # The title-block edge break on the tapped hole's inboard exit edge takes up
 # to its size of thread off the arm end of the engagement.
 TAP_EXIT_BREAK = EDGE_BREAK_MAX_MM
@@ -481,7 +481,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "ShoulderDia": 2,
         "ThreadLength": 1,
         "ReliefDia": 2,
-        "ReliefWidth": 2,
+        "ReliefWidth": 1,
         "TipChamfer": 2,
     },
     "SlotProfile": {"SlotWidth": 1},

@@ -90,7 +90,9 @@ def test_tenon_and_counterbore_are_fitted_to_the_parts_they_take() -> None:
     # of the cup (local review of fbf82ad96).
     assert "AFTER CURE, TURN THE SHOULDER FLUSH WITH MHA-152 AND THE END ROUND ON" in spec.DRAWING_NOTES
     assert "THE OAK ONLY, CLEAR OF MHA-153; AT WORST THE OAK FEATHERS AT THE CUP." in spec.DRAWING_NOTES
-    assert "CRESTING AT <MOD-DIAM>9.2 ON THE FLAT OAK END FLUSH WITH THE CUP." in spec.DRAWING_NOTES
+    assert "R2.4 END ROUND TO A FLAT OAK END, CREST <MOD-DIAM>9.2." in spec.DRAWING_NOTES
+    # crank-v4-16's sheet: two more lines ran the block into the border.
+    assert len(spec.DRAWING_NOTES.splitlines()) <= 14
     # The fitted tenon keeps its ferrule seat and 1.5 over the bore, with
     # 0.10 of bore eccentricity budgeted (local review of 1f3067ef2).
     assert spec.SHOULDER_R == pytest.approx(ferrule.OUTER_DIA / 2.0)
@@ -119,8 +121,8 @@ def test_tenon_and_counterbore_are_fitted_to_the_parts_they_take() -> None:
     # The off-centre budget is printed as process plus an inspectable wall,
     # and the cup cures centred on the screw (user ruling 2026-09-30).
     flat = " ".join(spec.DRAWING_NOTES.split())
-    assert "REAM THE BORE AND BORE THE COUNTERBORE IN ONE SETUP" in flat
-    assert "TURN THE OUTSIDE ON A MANDREL IN THE BORE." in flat
+    # A requirement, not a method (machinist review of crank-v4-16).
+    assert "ONE SETUP" not in flat and "MANDREL" not in flat
     # Measured on the wall, clear of the end face's edge breaks (local
     # review of 747487c71).
     assert "MIN OAK WALL 1.5 OVER THE BORE, CORNERS EXCEPTED." in flat

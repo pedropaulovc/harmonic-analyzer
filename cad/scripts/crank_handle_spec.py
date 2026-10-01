@@ -95,11 +95,11 @@ DOME_THEORETICAL_R = 6.0
 COUNTERBORE_GLUE_LINE = (0.05, 0.15)
 COUNTERBORE_DIA = CUP_BODY_DIA + sum(COUNTERBORE_GLUE_LINE) / 2.0
 COUNTERBORE_R = COUNTERBORE_DIA / 2.0
-# The bore is reamed and the counterbore bored in one setup, and the outside
-# turned on a mandrel in the bore (the sheet says so, and prints the 1.5 wall
-# as an inspectable minimum at the tenon end face).  The walls still budget
-# 0.10 of eccentricity for the mandrel's fit (local reviews of 1f3067ef2 and
-# 4b46c8b53).
+# The sheet prints the 1.5 wall over the bore as an inspectable minimum
+# rather than a method (the MHA-022 machinist review of crank-v4-16 called a
+# one-setup/mandrel note over-specification).  The walls budget 0.10 of
+# eccentricity between the bore and the turned outside (local reviews of
+# 1f3067ef2 and 4b46c8b53).
 BORE_ECCENTRICITY = 0.10
 # The MHA-153 cup can sit off the bore axis by this eccentricity plus half its
 # widest glue line, 0.175 -- more than the screw's head and floor-hole
@@ -342,15 +342,13 @@ DRAWING_NOTES = "\n".join(
         f"AFTER CURE, TURN THE SHOULDER FLUSH WITH {FERRULE_NUMBER} AND THE END ROUND ON",
         f"  THE OAK ONLY, CLEAR OF {CUP_NUMBER}; AT WORST THE OAK FEATHERS AT THE CUP.",
         f"THE REAMED BORE RUNS ON THE {SCREW_NUMBER} SHOULDER; ITS LIMITS APPLY FULL LENGTH.",
-        "REAM THE BORE AND BORE THE COUNTERBORE IN ONE SETUP; TURN THE OUTSIDE ON A",
-        f"  MANDREL IN THE BORE.  MIN OAK WALL {TENON_WALL_FLOOR_MM:.1f} OVER THE BORE, CORNERS",
-        "  EXCEPTED.",
+        f"MIN OAK WALL {TENON_WALL_FLOOR_MM:.1f} OVER THE BORE, CORNERS EXCEPTED.",
         f"GRIP CONTOUR, TANGENT ARCS IN TURN: R{FLARE_R:.1f} FROM THE SHOULDER TO A",
         f"  <MOD-DIAM>{2.0 * WAIST_R:.1f} WAIST AT {_e(WAIST_X):.1f}; "
         f"R{S_CONCAVE_R:.1f} AND R{S_CONVEX_R:.1f} (INFLECTION AT {_e(INFLECTION_X):.1f})",
         f"  TO <MOD-DIAM>{HANDLE_MAX_DIA:.1f} AT {_e(PEAK_X):.1f}; R{DOME_R:.1f}; "
-        f"R{END_ROUND_R:.1f} END ROUND,",
-        f"  CRESTING AT <MOD-DIAM>{2.0 * END_ROUND_CY:.1f} ON THE FLAT OAK END FLUSH WITH THE CUP.",
+        f"R{END_ROUND_R:.1f} END ROUND TO A FLAT OAK END, CREST "
+        f"<MOD-DIAM>{2.0 * END_ROUND_CY:.1f}.",
         f"  TURN WITHIN {CONTOUR_ALLOWANCE_DIA:.1f} ON DIAMETER; CHECK WITH A TEMPLATE.",
         "USE CLEAR STRAIGHT GRAIN PARALLEL TO TURNING AXIS.",
     )

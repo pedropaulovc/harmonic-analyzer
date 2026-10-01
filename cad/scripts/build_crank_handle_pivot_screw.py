@@ -86,7 +86,6 @@ from crank_handle_pivot_screw_spec import (
     RELIEF_LEAD,
     RELIEF_LEAD_TOL,
     RELIEF_WIDTH,
-    RELIEF_WIDTH_TOL,
     SEAT_STATION,
     SHOULDER_DIA,
     SHOULDER_DIA_BAND,
@@ -456,14 +455,10 @@ async def build(adapter) -> dict[str, str]:
     )
     set_dimension_symmetric_tolerance(adapter, "DriverSlot", "SlotDepth", SLOT_DEPTH_TOL)
     # The relief diameter keeps the die's run-out under the thread root and a
-    # flat seat (Codex P1 on #1139), its width 1.5 pitches of run-out (local
-    # review of 1f3067ef2); the relief lead prints as limits in the relief
-    # callout, the model owning its band all the same (Codex P2).
+    # flat seat (Codex P1 on #1139); the relief lead prints as limits in the
+    # relief callout, the model owning its band all the same (Codex P2).
     set_dimension_symmetric_tolerance(
         adapter, "ScrewProfile", "ReliefDia", RELIEF_DIA_TOL
-    )
-    set_dimension_symmetric_tolerance(
-        adapter, "ScrewProfile", "ReliefWidth", RELIEF_WIDTH_TOL
     )
     set_dimension_symmetric_tolerance(
         adapter, "ScrewProfile", "ReliefLead", RELIEF_LEAD_TOL
