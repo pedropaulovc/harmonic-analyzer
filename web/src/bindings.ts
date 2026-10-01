@@ -59,8 +59,9 @@ export const BINDINGS: readonly Binding[] = [
   group('magnifyingWheel', magnifier, 'magnifying-wheel-1', 'wheel', 1),
   group('leverWire', magnifier, 'lever-wire-1', 'lever-wire', 1),
   group('penWire', pen, 'pen-wire-1', 'pen-wire', 1),
-  group('pen', pen, '(?:pen-marker|pen-set-screw|pen-rod|pen-hanger)-1', 'pen', 4),
-  group('platen', paper, '(?:platen|platen-rack|platen-paper)-1|platen-clip-[12]', 'platen', 5),
+  group('pen', pen, '(?:pen-rod|pen-v-block|pen-frame|pen-marker|pen-set-screw)-1', 'pen', 5),
+  // Flat native siblings: screws 1/2 attach to clip 1, screws 3/4 to clip 2.
+  group('platen', paper, '(?:platen|platen-rack|platen-paper)-1|platen-clip-[12]|fillister-screw-[1-4]', 'platen', 9),
   group('alignmentPinionSwing', drive, 'pinion-bracket-[12]|alignment-pinion-1|pinion-arbor-1|pinion-strap-pin-[123]|pinion-handle-1|pinion-arbor-collar-1', 'pinion-swing', 9),
   group('alignmentPinionCam', drive, 'pinion-cam-[12]|pinion-lift-rod-1|pinion-cam-pin-[12]', 'pinion-cam', 5),
   group('alignmentPinionLever', drive, 'pinion-lever-1|pinion-lever-pin-1', 'pinion-lever', 2),

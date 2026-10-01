@@ -29,6 +29,12 @@ counter spring and lever weights participate in the nonlinear quasistatic
 summing equilibrium. The wire and magnifier then determine wheel rotation and
 pen travel. An ideal Fourier sum is not used to drive the physical output.
 
+Pen travel moves the native rod, v-block, frame, marker and set-screw together.
+The hanger and its screw remain fixed. Source-evidenced setup lifts and yaw use
+qualified rigid-part overrides; the pen wire remains a separately solved run.
+The platen, its rack, paper and two clips move with their four clip screws.
+Unrelated paper-drive fillister screws and structural guides remain fixed.
+
 Interactive amplitude is a normalized CAD slide station, bounded by the native
 mechanism. The displayed millimetres are not a calibration of the video's
 engraved scale. Per-channel phase rotates that channel's cam. Source states must
@@ -44,31 +50,48 @@ The model omits friction, inertia and tooth-contact dynamics. Quasistatic
 constraint rejection retains the last valid rendered geometry and shows an
 error. It does not substitute a nominal pose or suppress a failed solve.
 
+The native connecting-rod plate eye is used as the functional counterpart of the
+filmed U-shaped junction, with the user's approval pending a later CAD correction.
+`nativeGeometryAssumptions` identifies the affected rod paths and records that
+approval. Animation uses the existing linkage; the head-shape difference remains
+an assumption in the HUD and reports. It does not authorize geometry edits,
+unrelated omissions or a measured head-topology fidelity claim.
+
 ## Source coverage
 
 Each observation identifies the original MP4 hash, source dimensions, decoded
 presentation time, shot classification, camera and independently observed
 landmarks. Camera fitting uses fit points and held-out check points. Mechanism
-input must be complete, measured and finite; an absent value is not zero.
+input must be complete and finite. It may be fully observed, or a chosen feasible
+reconstruction constrained by source measurements. Unidentified coordinates in
+the latter are explicitly unobserved; they are not recovered historical settings.
 
 Every required frame needs a passing camera and complete physical input for all
-of its views. Physical photographs and transitions can also be required when
-they have a corresponding native mechanism. A shot cannot escape this rule by
-being named a transition or photograph.
+of its views, with a source correspondence census covering the native drawable
+inventory. Both observed inputs and constrained reconstructions require a bound
+visibility proof. Physical photographs and transitions remain required when they
+show a corresponding native mechanism.
+
+The user permits source-non-identifiable structural fixed parts in a complete
+feasible reconstruction. They stay rendered and in the native visibility census,
+with their actual dark/cropped source region and fixed-motion evidence recorded.
+The HUD and reports list them as not geometric-fidelity passed. Moving, deforming
+or source-overridden parts cannot use this category; identified-feature error
+and timing limits do not change.
 
 Runtime states:
 
 | State | Meaning |
 |---|---|
-| `matched` | Every required view has passing camera and measured physical input. |
+| `matched` | Every required view has a passing camera and complete observed input or source-compatible constrained reconstruction. |
 | `unavailable` | Required evidence is missing, incomplete or outside the observation record. |
 | `held` | An exempt source interval retains an actual earlier matched pose. |
 | `no-machine` | An exempt interval has no earlier match; current exploratory geometry/camera stay unchanged. |
 
-Camera interpolation stays within a matched shot and compatible view. Required
-incomplete footage never falls back to a held pose. The player remains usable
-when source matching is unavailable; the warning distinguishes video playback
-from verified geometry synchronization.
+Interpolation requires compatible, source-evidenced motion and view regimes.
+Required incomplete footage never falls back to a held pose. The player remains
+usable when source matching is unavailable; the warning distinguishes video
+playback from verified geometry synchronization.
 
 The current observation corpus is incomplete for all six videos, so footage
 acceptance is not met. Source-camera reprojection results conditional on
@@ -93,12 +116,21 @@ exploration afterwards. Compact mode must keep the same visible iframe at least
 
 With `?verify=1`, diagnostic three-dimensional landmark markers follow native
 node transforms and supported native deformation shaders. They pass through the
-same GPU viewport, scissor and mirror rendering path. Readback measures their
-actual rendered locations; unsupported, hidden or unresolved landmarks fail.
-The diagnostic layer does not replace or mutate native geometry. Captures are
-recorded during the draw, and the bridge only reads them afterwards. CPU camera
-projection and two aliases of the player's clock are not rendered-pixel or
-independent timing evidence.
+same viewport, scissor and mirror path as the scene. Marker readback proves
+projection only: depth-off markers do not prove that a native surface is visible.
+The separate depth-tested part-ID capture covers all native drawable paths and
+records their actual raster visibility. Proof bindings include the source
+exposure, camera, input, overrides and geometry assumptions. CPU camera projection
+and two aliases of the player's clock are insufficient evidence. Native WebGL
+readback may use a software renderer; it does not imply hardware acceleration.
+
+Finite native-line diagnostics return the clipped GPU raster and its source-pixel
+quantization bound. Every declared segment must stay inside its native drawable's
+rest bounding box; that check alone does not identify a physical surface or axis.
+Contour checks use depth-tested native-ID boundaries. Fixed-part source-region
+containment uses the full exclusive pixel-cell extent, not sampled contours.
+Crossfade weights are checked within each supported source region, so disjoint
+incoming panels can share an outgoing image without a global opacity-sum limit.
 
 Paused interaction checks the actual canvas pixels, crank input and unchanged
 camera, then verifies pointer-driven orbit while native media remains paused.

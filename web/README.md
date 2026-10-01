@@ -50,10 +50,21 @@ simulate tooth collisions, friction or inertia. The amplitude controls show CAD
 station millimetres; calibration to the video's engraved measuring sticks is
 not established.
 
-Source playback requires measured camera and complete physical input for each
-view. An incomplete required interval is visibly unavailable. A source interval
-without a corresponding machine can retain a previously matched pose; without
-one, the exploratory pose remains unchanged and no source match is claimed.
+Source playback requires a measured camera and complete physical input for each
+view. Hidden settings may be chosen as a feasible source-compatible
+reconstruction, labelled as unobserved. An incomplete required interval remains
+visibly unavailable. An interval without a corresponding machine can retain a
+previously matched pose, or leave the exploratory pose unchanged.
+
+The filmed U-shaped connecting-rod junction and the native plate-like head are
+treated as functionally equivalent for animation, with the user's approval
+pending a later CAD correction. The HUD and verification reports retain this
+head-shape assumption. Other motion, camera and geometry checks still apply.
+
+Structural fixed parts that the source cannot identify may remain rendered in
+a complete feasible reconstruction, with the user's approval. They are listed
+as source-non-identifiable, not geometric-fidelity passed. Moving parts and all
+identifiable-feature and timing checks retain their requirements.
 
 All six observation files currently have incomplete camera/mechanism coverage.
 Full footage fidelity is **not verified**.
@@ -72,9 +83,14 @@ must contain the six original MP4 files for the routes above under `videos/`.
 The verifier serves `dist/`, launches headed Chromium, exercises the real YouTube
 media, and checks every integer second and recorded change. It fails on
 unavailable prerequisites, missing source evidence, landmark errors above 38.4
-pixels or clock skew above 0.5 seconds. `?verify=1` enables diagnostic GPU
-landmark readback; mathematical camera fitting alone does not count as
-rendered-pixel evidence.
+pixels or clock skew above 0.5 seconds. `?verify=1` enables native WebGL landmark
+and depth-tested part-visibility readback. Mathematical camera fitting alone
+does not count as rendered-pixel evidence.
+
+Finite-line and contour checks compare independently measured source pixels with
+actual native GPU rasters. Fixed-part coverage uses every rendered ID pixel's
+extent. Disjoint panels share an opacity budget only where their source regions
+overlap; nested montage composition is not yet implemented.
 
 Reports and local screenshots go to `web/.vite/verification-output/` and are
 ignored. `HARMONIC_CHROME` selects the Chromium executable; `HARMONIC_HEADLESS=1`

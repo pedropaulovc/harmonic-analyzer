@@ -16,6 +16,8 @@ export interface CameraRecord {
 }
 export type InteractionMode = 'following-video' | 'exploring'
 export type Presentation = 'native' | 'horizontal-mirror'
+/** Rendered-image contributions, never native mesh material opacity. */
+export type SourceComposite = { mode: 'opaque' } | { mode: 'crossfade'; groupId: string; opacity: number }
 export interface SourceView {
   /** Stable view identity; GPU landmark captures are keyed by it. */
   id: string
@@ -23,6 +25,7 @@ export interface SourceView {
   /** Top-left source pixels, then width and height; source is 1920 × 1080. */
   rectSourcePixels: readonly [number, number, number, number]
   presentation?: Presentation
+  composite?: SourceComposite
 }
 /**
  * Diagnostic landmark located by exactly one of `partLocalMetres` (native node
@@ -45,6 +48,7 @@ export interface LandmarkProbeAnchor {
 }
 /** GPU diagnostic markers attached to native nodes; never alters native geometry. */
 export interface LandmarkProbe {
+  readonly visibilityMode: 'depth-off-landmark-projection'
   readonly anchors: readonly LandmarkProbeAnchor[]
   readonly status: 'active' | 'disposed'
   dispose(): void
@@ -63,11 +67,84 @@ export interface RenderedLandmark {
 }
 export interface RenderedLandmarks {
   method: 'gpu-readback'
+  visibilityMode: 'depth-off-landmark-projection'
+  status: 'captured'
+  sourceOpacity: number
   viewId: string
   presentation: Presentation
   /** Source time given to the capturing renderViews; null for exploring render(). */
   timeSeconds: number | null
   landmarks: RenderedLandmark[]
+}
+/** A finite diagnostic segment in the named native node's own metre frame. */
+export interface NativeLineAnchor {
+  readonly id: string
+  readonly partPath: string
+  readonly partLocalLineMetres: readonly [Point3, Point3]
+}
+export interface NativeLineProbe {
+  readonly visibilityMode: 'depth-off-native-line-projection'
+  readonly lines: readonly LandmarkProbeAnchor[]
+  readonly status: 'active' | 'disposed'
+  dispose(): void
+}
+export interface RenderedNativeLines {
+  method: 'gpu-readback'
+  visibilityMode: 'depth-off-native-line-projection'
+  status: 'captured' | 'stale' | 'unavailable' | 'disposed'
+  viewId: string
+  presentation: Presentation | null
+  timeSeconds: number | null
+  rectSourcePixels: readonly [number, number, number, number] | null
+  sourceOpacity: number | null
+  lines: {
+    id: string
+    state: RenderedLandmarkState
+    pixelCount: number
+    /** Actual raster centres, scan-distributed with genuine first/last samples. */
+    sourceSamples: [number, number][]
+    canvasExtentPixels: [number, number, number, number] | null
+    sourceExtentPixels: [number, number, number, number] | null
+    /** Euclidean source-pixel raster/mapping quantization bound. */
+    uncertaintySourcePixels: number | null
+    /** Maximum Euclidean gap between consecutive returned raster samples. */
+    samplingGapSourcePixels: number | null
+    reason: string | null
+  }[]
+}
+/** All native drawable paths, not an anchor-selected subset. */
+export interface PartVisibilityProbe {
+  readonly visibilityMode: 'depth-tested-native-surfaces'
+  readonly partPaths: readonly string[]
+  readonly status: 'active' | 'disposed'
+  dispose(): void
+}
+export interface RenderedPartVisibility {
+  method: 'gpu-readback'
+  visibilityMode: 'depth-tested-native-surfaces'
+  status: 'captured' | 'stale' | 'unavailable' | 'disposed'
+  viewId: string
+  presentation: Presentation | null
+  timeSeconds: number | null
+  rectSourcePixels: readonly [number, number, number, number] | null
+  /** Actual per-view camera, including normalization and resolved principal point. */
+  camera: CameraRecord | null
+  /** Zero source contribution excludes all native geometry from the witness. */
+  sourceOpacity: number | null
+  /** Backing-store samples; extents are [left, top, right, bottom], exclusive. */
+  parts: {
+    partPath: string
+    status: 'visible' | 'not-visible'
+    pixelCount: number
+    canvasExtentPixels: [number, number, number, number] | null
+    sourceExtentPixels: [number, number, number, number] | null
+    /** Actual four-neighbour ID boundaries, including occlusion and ROI cuts. */
+    contourSourcePixels: [number, number][]
+    /** Full raster boundary count, before deterministic bounded sampling. */
+    contourPixelCount: number
+    /** Euclidean source-pixel raster/mirror quantization bound. */
+    uncertaintySourcePixels: number | null
+  }[]
 }
 export interface PartOverride {
   partPath: string
@@ -91,11 +168,19 @@ export interface Machine {
   readonly loadError: string | null
   readonly provenance: ModelProvenance
   readonly partPaths: readonly string[]
+  /** Actual qualified native drawable paths; querying does not allocate GPU resources. */
+  readonly nativeDrawablePartPaths: readonly string[]
   update(input: MechanismInput, overrides?: readonly PartOverride[]): void
   /** Add another genuine native part instance, sharing its original geometry. */
   addPartInstance(sourcePartPath: string, instancePath: string): 'added' | 'already-present' | 'missing-source'
   /** Diagnostic GPU markers on actual native nodes; install with Viewer.setLandmarkProbe. */
   createLandmarkProbe(anchors: readonly LandmarkAnchor[]): LandmarkProbe
+  createPartVisibilityProbe(): PartVisibilityProbe
+  /** Pure cached REST-box qualification only; not physical axis/surface evidence. */
+  assertNativeLinesWithinRestBounds(lines: readonly NativeLineAnchor[]): void
+  /** Pure original-CAD structural identity and motion/override graph qualification. */
+  assertNativeStructuralFixedParts(paths: readonly string[], sourceOverrides: readonly PartOverride[]): void
+  createNativeLineProbe(lines: readonly NativeLineAnchor[]): NativeLineProbe
   /** Remove the native root from the scene and free its GPU resources and probes. */
   dispose(): void
 }
@@ -125,6 +210,12 @@ export interface Viewer {
   setLandmarkProbe(probe: LandmarkProbe | null): void
   /** Read the capture made by the most recent draw of viewId; never rerenders. */
   readRenderedLandmarks(viewId: string): RenderedLandmarks | null
+  setPartVisibilityProbe(probe: PartVisibilityProbe | null): void
+  readRenderedPartVisibility(viewId: string): RenderedPartVisibility
+  setNativeLineProbe(probe: NativeLineProbe | null): void
+  readRenderedNativeLines(viewId: string): RenderedNativeLines
+  /** Remove listeners/controls and dispose every viewer-owned GPU resource. */
+  dispose(): void
 }
 
 export const EXPLORING_VIEW_ID = 'exploring'
@@ -137,6 +228,7 @@ const Y = new THREE.Vector3(0, 1, 0)
 
 /** Diagnostic markers live only on this layer; native cameras never enable it. */
 const PROBE_LAYER = 31
+const LINE_PROBE_LAYER = 30
 /** One bit per marker across RGBA8; additive blending keeps overlapping markers separable. */
 const SLOTS_PER_PASS = 32
 /** Reference markers at these NDC corners measure each view's actual viewport placement. */
@@ -144,6 +236,9 @@ const REFERENCE_NDC = 0.75
 const REFERENCE_SOURCE_LOW = (1 - REFERENCE_NDC) / 2
 const REFERENCE_SOURCE_SPAN = REFERENCE_NDC
 const ACCUMULATOR_STRIDE = 7
+/** Bounded, deterministic raster readback samples; total coverage is separate. */
+const RASTER_SAMPLE_LIMIT = 256
+const NATIVE_LINE_REST_BOUNDS_TOLERANCE_M = 1e-7
 
 interface ProbeMarker {
   id: string
@@ -157,8 +252,36 @@ interface ProbeInternals {
   readonly passes: number
   readonly pass: { value: number }
   readonly pointSize: { value: number }
+  readonly revision: { value: number }
 }
 const probeInternals = new WeakMap<LandmarkProbe, ProbeInternals>()
+interface NativeLineMarker {
+  id: string
+  slot: number
+  reason: string | null
+  object: THREE.Line | null
+}
+interface NativeLineInternals {
+  readonly markers: readonly NativeLineMarker[]
+  readonly passes: number
+  readonly pass: { value: number }
+  readonly revision: { value: number }
+}
+interface NativeLineCapture {
+  epoch: number
+  presentation: Presentation
+  timeSeconds: number | null
+  sourceOpacity: number
+  rect: [number, number, number, number]
+  states: Uint8Array
+  reasons: (string | null)[]
+  /** Per line: count, canvas extent (4), source extent (4), uncertainty, gap. */
+  values: Float64Array
+  sampleCounts: Uint16Array
+  /** Source-pixel centres from actual GPU coverage. */
+  samples: Float64Array
+}
+const nativeLineInternals = new WeakMap<NativeLineProbe, NativeLineInternals>()
 
 // The native deformation hooks rewrite these two includes, so the probe keeps them.
 const MARKER_VERTEX = `
@@ -213,8 +336,105 @@ interface ViewCapture {
   /** Per marker: canvas x/y, source x/y, uncertainty. */
   values: Float64Array
   reasons: (string | null)[]
+  sourceOpacity: number
 }
 const CAPTURE_STATES: readonly RenderedLandmarkState[] = ['rendered', 'unresolved', 'not-visible']
+interface NativeDrawable {
+  path: string
+  object: THREE.Mesh | THREE.Line | THREE.Points
+  original: THREE.Material | THREE.Material[]
+  diagnostic: THREE.Material | THREE.Material[]
+}
+interface PartVisibilityInternals {
+  readonly entries: NativeDrawable[]
+  readonly revision: { value: number }
+  readonly inventoryRevision: { value: number }
+  readonly synchronize: () => void
+}
+interface PartVisibilityCapture {
+  epoch: number
+  inventoryRevision: number
+  presentation: Presentation
+  timeSeconds: number | null
+  rect: [number, number, number, number]
+  sourceOpacity: number
+  cameraValues: Float64Array
+  /** Count, left, top, right, bottom, in backing-store coordinates. */
+  values: Float64Array
+  contourCounts: Uint32Array
+  contourSampleCounts: Uint16Array
+  /** Packed sample starts; invisible paths consume no coordinate capacity. */
+  contourOffsets: Uint32Array
+  /** Backing-store boundary pixel centres, not a bounding-box surrogate. */
+  contourSamples: Float64Array
+  uncertaintySourcePixels: number
+}
+const partVisibilityInternals = new WeakMap<PartVisibilityProbe, PartVisibilityInternals>()
+const COMPOSITE_TOLERANCE = 1e-6
+const compositeValidationGroups = new Set<string>()
+let compositeValidationXEdges = new Float64Array(0)
+let compositeValidationYEdges = new Float64Array(0)
+
+/** Pure per-pixel support validation for simultaneously active source views. */
+export function assertSourceCompositeWeights(views: readonly Pick<SourceView, 'rectSourcePixels' | 'composite'>[]): void {
+  compositeValidationGroups.clear()
+  for (let i = 0; i < views.length;) {
+    const composite = views[i]!.composite
+    if (!composite || composite.mode === 'opaque') { i++; continue }
+    if (typeof composite.groupId !== 'string' || !composite.groupId || compositeValidationGroups.has(composite.groupId)) throw new Error('Crossfade groups must have a nonempty ID and contiguous views.')
+    compositeValidationGroups.add(composite.groupId)
+    const start = i
+    do {
+      const view = views[i]!
+      const member = view.composite
+      if (!member || member.mode !== 'crossfade' || member.groupId !== composite.groupId) break
+      if (!Number.isFinite(member.opacity) || member.opacity < 0 || member.opacity > 1) throw new Error('Crossfade source opacity must be finite and in [0,1].')
+      const rect = view.rectSourcePixels
+      for (let axis = 0; axis < 4; axis++) if (typeof rect[axis] !== 'number' || !Number.isFinite(rect[axis])) throw new Error('Crossfade source rectangle must contain finite numbers.')
+      if (rect[2] <= 0 || rect[3] <= 0 || !Number.isFinite(rect[0] + rect[2]) || !Number.isFinite(rect[1] + rect[3])) throw new Error('Crossfade source rectangle must have finite positive dimensions.')
+      i++
+    } while (i < views.length)
+    const capacity = (i - start) * 2
+    if (compositeValidationXEdges.length < capacity) {
+      compositeValidationXEdges = new Float64Array(capacity)
+      compositeValidationYEdges = new Float64Array(capacity)
+    }
+    compositeValidationXEdges.fill(Infinity)
+    compositeValidationYEdges.fill(Infinity)
+    let edgeCount = 0
+    for (let member = start; member < i; member++) {
+      const rect = views[member]!.rectSourcePixels
+      const left = Math.max(0, rect[0]), right = Math.min(SOURCE_WIDTH, rect[0] + rect[2])
+      const top = Math.max(0, rect[1]), bottom = Math.min(SOURCE_HEIGHT, rect[1] + rect[3])
+      if (left >= right || top >= bottom) continue
+      compositeValidationXEdges[edgeCount] = left; compositeValidationXEdges[edgeCount + 1] = right
+      compositeValidationYEdges[edgeCount] = top; compositeValidationYEdges[edgeCount + 1] = bottom
+      edgeCount += 2
+    }
+    compositeValidationXEdges.sort()
+    compositeValidationYEdges.sort()
+    for (let x = 0; x < edgeCount - 1; x++) {
+      const left = compositeValidationXEdges[x]!, right = compositeValidationXEdges[x + 1]!
+      if (left === right) continue
+      const centreX = left + (right - left) / 2
+      for (let y = 0; y < edgeCount - 1; y++) {
+        const top = compositeValidationYEdges[y]!, bottom = compositeValidationYEdges[y + 1]!
+        if (top === bottom) continue
+        const centreY = top + (bottom - top) / 2
+        let sum = 0
+        for (let member = start; member < i; member++) {
+          const view = views[member]!
+          const weight = view.composite
+          const rect = view.rectSourcePixels
+          if (weight?.mode === 'crossfade' && rect[0] <= centreX && centreX < rect[0] + rect[2]
+            && rect[1] <= centreY && centreY < rect[1] + rect[3]) sum += weight.opacity
+        }
+        if (sum > 1 + COMPOSITE_TOLERANCE) throw new Error(`Crossfade group ${composite.groupId} source opacities sum to more than one in ROI cell [${left},${top},${right},${bottom}]: ${sum}.`)
+      }
+    }
+  }
+}
+
 /** Every public OrbitControls tunable (three r180), carried across a basis rebuild. */
 const ORBIT_SETTINGS = [
   'enabled', 'minDistance', 'maxDistance', 'minZoom', 'maxZoom', 'minTargetRadius', 'maxTargetRadius',
@@ -274,7 +494,35 @@ export function createViewer(canvas: HTMLCanvasElement, onControlsChange: () => 
     depthTest: false, depthWrite: false,
   })
   // This screen-space blit is presentation only, never replacement machine geometry.
-  mirrorScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mirrorMaterial))
+  const quadGeometry = new THREE.PlaneGeometry(2, 2)
+  mirrorScene.add(new THREE.Mesh(quadGeometry, mirrorMaterial))
+  const compositeScene = new THREE.Scene()
+  const compositeImageRect = new THREE.Vector4()
+  const compositeBackground = new THREE.Color()
+  const compositeMaterial = new THREE.ShaderMaterial({
+    uniforms: { image: { value: null }, imageRect: { value: compositeImageRect }, weight: { value: 1 }, background: { value: compositeBackground }, stage: { value: 0 } },
+    vertexShader: mirrorMaterial.vertexShader,
+    // Accumulate encoded image colours with their measured per-pixel weights:
+    // sequential alpha OVER would attenuate earlier contributions. Alpha here
+    // records local ROI support, not a global sum of disjoint image weights.
+    fragmentShader: `uniform sampler2D image; uniform vec4 imageRect; uniform float weight;
+uniform vec3 background; uniform float stage; varying vec2 imageUv;
+void main() {
+  vec4 layer = texture2D(image, imageRect.xy + imageUv * imageRect.zw);
+  vec3 colour = layer.rgb;
+  if (stage < 0.5) {
+    colour = mix(12.92 * colour, 1.055 * pow(max(colour, vec3(0.0)), vec3(1.0 / 2.4)) - 0.055, step(vec3(0.0031308), colour));
+    gl_FragColor = vec4(colour * weight, weight);
+  } else {
+    if (layer.a <= 0.0) discard;
+    gl_FragColor = vec4(colour + background * max(0.0, 1.0 - layer.a), 1.0);
+  }
+}`,
+    depthTest: false, depthWrite: false, toneMapped: false,
+  })
+  compositeScene.add(new THREE.Mesh(quadGeometry, compositeMaterial))
+  let compositeImageTarget: THREE.WebGLRenderTarget | null = null
+  let compositeSumTarget: THREE.WebGLRenderTarget | null = null
 
   // GPU landmark readback state. Targets/buffers allocate on first capture or
   // actual size change only; the steady-state frame loop allocates nothing.
@@ -286,7 +534,35 @@ export function createViewer(canvas: HTMLCanvasElement, onControlsChange: () => 
   const accumulators = new Float64Array(SLOTS_PER_PASS * ACCUMULATOR_STRIDE)
   const captures = new Map<string, ViewCapture>()
   let drawEpoch = 0
+  let disposed = false
+  let renderedProbeRevision = -1
+  let visibilityProbe: PartVisibilityProbe | null = null
+  let renderedVisibilityRevision = -1
+  let visibilityTarget: THREE.WebGLRenderTarget | null = null
+  let visibilityMirrorTarget: THREE.WebGLRenderTarget | null = null
+  let visibilityPixels = new Uint8Array(0)
+  let contourOrdinals = new Uint32Array(0)
+  let contourFlags = new Uint8Array(0)
+  const visibilityCaptures = new Map<string, PartVisibilityCapture>()
+  let lineProbe: NativeLineProbe | null = null
+  let renderedLineRevision = -1
+  let lineTarget: THREE.WebGLRenderTarget | null = null
+  let lineMirrorTarget: THREE.WebGLRenderTarget | null = null
+  const lineCaptures = new Map<string, NativeLineCapture>()
+  const linePassIndices = new Int32Array(SLOTS_PER_PASS)
+  const linePassOrdinals = new Uint32Array(SLOTS_PER_PASS)
+  const viewSnapshots = new Map<string, { epoch: number; view: SourceView; groupId: string | null; presentation: Presentation; values: Float64Array }>()
+  const frameCameraPosition = new THREE.Vector3()
+  const frameCameraQuaternion = new THREE.Quaternion()
+  const frameCameraProjection = new THREE.Matrix4()
+  let frameWidth = 0
+  let frameHeight = 0
+  let frameFov = 0
+  let frameAspect = 0
+  let renderedViews: readonly SourceView[] | null = null
+  const capturedViewOrder: SourceView[] = []
   const probeViewport = new THREE.Vector4()
+  const viewScissorPixels = new THREE.Vector4()
   const savedClearColor = new THREE.Color()
   const referenceGeometry = new THREE.BufferGeometry()
   referenceGeometry.setAttribute('position', new THREE.Float32BufferAttribute([-REFERENCE_NDC, REFERENCE_NDC, 0, REFERENCE_NDC, -REFERENCE_NDC, 0], 3))
@@ -363,6 +639,7 @@ export function createViewer(canvas: HTMLCanvasElement, onControlsChange: () => 
   }
 
   function applyCamera(record: CameraRecord) {
+    drawEpoch++
     writeCamera(camera, record, SOURCE_WIDTH, SOURCE_HEIGHT)
     if (mode === 'exploring') rebaseControls()
   }
@@ -370,6 +647,7 @@ export function createViewer(canvas: HTMLCanvasElement, onControlsChange: () => 
   function setInteraction(next: InteractionMode) {
     if (next === mode) return
     mode = next
+    drawEpoch++
     controls.enabled = next === 'exploring'
     if (next === 'exploring') rebaseControls()
   }
@@ -420,7 +698,18 @@ export function createViewer(canvas: HTMLCanvasElement, onControlsChange: () => 
     const h = height / SOURCE_HEIGHT * gate.height
     const bottom = canvas.clientHeight - top - h
     renderer.setViewport(left, bottom, w, h)
-    renderer.setScissor(left, bottom, w, h)
+    // Shared half-open source support is defined by destination pixel centres,
+    // not independently rounded viewport widths (which overlap at panel seams).
+    // Preserve the native camera viewport; crop only its actual raster support.
+    const scaleX = gl.drawingBufferWidth / canvas.clientWidth
+    const scaleY = gl.drawingBufferHeight / canvas.clientHeight
+    const x0 = Math.max(0, Math.min(gl.drawingBufferWidth, Math.ceil(left * scaleX - 0.5)))
+    const x1 = Math.max(x0, Math.min(gl.drawingBufferWidth, Math.ceil((gate.x + (x + width) / SOURCE_WIDTH * gate.width) * scaleX - 0.5)))
+    const topPixel = Math.max(0, Math.min(gl.drawingBufferHeight, Math.ceil(top * scaleY - 0.5)))
+    const bottomPixel = Math.max(topPixel, Math.min(gl.drawingBufferHeight, Math.ceil((gate.y + (y + height) / SOURCE_HEIGHT * gate.height) * scaleY - 0.5)))
+    viewScissorPixels.set(x0, gl.drawingBufferHeight - bottomPixel, x1 - x0, bottomPixel - topPixel)
+    const ratio = renderer.getPixelRatio()
+    renderer.setScissor(viewScissorPixels.x / ratio, viewScissorPixels.y / ratio, viewScissorPixels.z / ratio, viewScissorPixels.w / ratio)
   }
 
   /**
@@ -438,55 +727,187 @@ export function createViewer(canvas: HTMLCanvasElement, onControlsChange: () => 
       renderer.setRenderTarget(output)
       renderer.setScissorTest(true)
       viewport(rect[0], rect[1], rect[2], rect[3])
-      if (clearOutput) renderer.clear(true, false, false)
+      if (clearOutput) renderer.clear(true, true, false)
       mirrorMaterial.uniforms.image!.value = mirrorStage.texture
       renderer.render(mirrorScene, mirrorCamera)
     } else {
       renderer.setRenderTarget(output)
       renderer.setScissorTest(true)
       viewport(rect[0], rect[1], rect[2], rect[3])
-      if (clearOutput) renderer.clear(true, false, false)
+      if (clearOutput) renderer.clear(true, true, false)
       renderer.render(scene, camera)
     }
   }
 
+  function ensureCompositeTargets() {
+    const width = gl.drawingBufferWidth
+    const height = gl.drawingBufferHeight
+    if (!compositeImageTarget) compositeImageTarget = new THREE.WebGLRenderTarget(width, height, { type: THREE.HalfFloatType, samples: gl.getParameter(gl.SAMPLES) as number })
+    else if (compositeImageTarget.width !== width || compositeImageTarget.height !== height) compositeImageTarget.setSize(width, height)
+    if (!compositeSumTarget) compositeSumTarget = new THREE.WebGLRenderTarget(width, height, { type: THREE.HalfFloatType, depthBuffer: false })
+    else if (compositeSumTarget.width !== width || compositeSumTarget.height !== height) compositeSumTarget.setSize(width, height)
+  }
+
+
+  function compositeBlit(rect: readonly [number, number, number, number], output: THREE.WebGLRenderTarget | null, image: THREE.WebGLRenderTarget) {
+    renderer.setRenderTarget(output)
+    renderer.setScissorTest(true)
+    viewport(rect[0], rect[1], rect[2], rect[3])
+    renderer.getCurrentViewport(probeViewport)
+    compositeImageRect.set(probeViewport.x / image.width, probeViewport.y / image.height, probeViewport.z / image.width, probeViewport.w / image.height)
+    compositeMaterial.uniforms.image!.value = image.texture
+    renderer.render(compositeScene, mirrorCamera)
+  }
+
+  function snapshotView(view: SourceView) {
+    if (!probe && !visibilityProbe && !lineProbe) return
+    let snapshot = viewSnapshots.get(view.id)
+    if (!snapshot) {
+      snapshot = { epoch: -1, view, groupId: null, presentation: 'native', values: new Float64Array(15) }
+      viewSnapshots.set(view.id, snapshot)
+    }
+    snapshot.epoch = drawEpoch
+    snapshot.view = view
+    snapshot.groupId = view.composite?.mode === 'crossfade' ? view.composite.groupId : null
+    snapshot.presentation = view.presentation ?? 'native'
+    const values = snapshot.values
+    for (let i = 0; i < 3; i++) values[i] = view.camera.positionMetres[i]!
+    for (let i = 0; i < 4; i++) values[i + 3] = view.camera.quaternion[i]!
+    values[7] = view.camera.verticalFovDegrees
+    values[8] = view.camera.principalPointViewportPixels?.[0] ?? NaN
+    values[9] = view.camera.principalPointViewportPixels?.[1] ?? NaN
+    for (let i = 0; i < 4; i++) values[i + 10] = view.rectSourcePixels[i]!
+    values[14] = view.composite?.mode === 'crossfade' ? view.composite.opacity : 1
+  }
+
+  function capturesFresh() {
+    if (frameWidth !== canvas.clientWidth || frameHeight !== canvas.clientHeight || frameFov !== camera.fov || frameAspect !== camera.aspect
+      || !frameCameraPosition.equals(camera.position) || !frameCameraQuaternion.equals(camera.quaternion) || !frameCameraProjection.equals(camera.projectionMatrix)) return false
+    if (renderedViews) {
+      if (renderedViews.length !== capturedViewOrder.length) return false
+      for (let i = 0; i < renderedViews.length; i++) if (renderedViews[i] !== capturedViewOrder[i]) return false
+    }
+    for (const snapshot of viewSnapshots.values()) {
+      if (snapshot.epoch !== drawEpoch) continue
+      const view = snapshot.view
+      const values = snapshot.values
+      if (snapshot.groupId !== (view.composite?.mode === 'crossfade' ? view.composite.groupId : null) || snapshot.presentation !== (view.presentation ?? 'native')) return false
+      for (let i = 0; i < 3; i++) if (values[i] !== view.camera.positionMetres[i]) return false
+      for (let i = 0; i < 4; i++) if (values[i + 3] !== view.camera.quaternion[i]) return false
+      if (values[7] !== view.camera.verticalFovDegrees || !Object.is(values[8], view.camera.principalPointViewportPixels?.[0] ?? NaN)
+        || !Object.is(values[9], view.camera.principalPointViewportPixels?.[1] ?? NaN)) return false
+      for (let i = 0; i < 4; i++) if (values[i + 10] !== view.rectSourcePixels[i]) return false
+      if (values[14] !== (view.composite?.mode === 'crossfade' ? view.composite.opacity : 1)) return false
+    }
+    return true
+  }
+
+  function finishCaptures() {
+    renderedProbeRevision = probe?.status === 'active' ? probeInternals.get(probe)!.revision.value : -1
+    renderedVisibilityRevision = visibilityProbe?.status === 'active' ? partVisibilityInternals.get(visibilityProbe)!.revision.value : -1
+    renderedLineRevision = lineProbe?.status === 'active' ? nativeLineInternals.get(lineProbe)!.revision.value : -1
+    frameWidth = canvas.clientWidth
+    frameHeight = canvas.clientHeight
+    frameFov = camera.fov
+    frameAspect = camera.aspect
+    frameCameraPosition.copy(camera.position)
+    frameCameraQuaternion.copy(camera.quaternion)
+    frameCameraProjection.copy(camera.projectionMatrix)
+  }
+
   function render() {
+    if (disposed) throw new Error('Viewer is disposed.')
     if (mode === 'exploring') controls.update()
     drawEpoch++
+    renderedViews = null
+    capturedViewOrder.length = 0
     beginFrame()
     camera.aspect = SOURCE_WIDTH / SOURCE_HEIGHT
     camera.updateProjectionMatrix()
     drawView(FULL_FRAME, 'native', null, mirrorTarget, false)
-    captureView(EXPLORING_VIEW_ID, FULL_FRAME, 'native', null)
+    captureView(EXPLORING_VIEW_ID, FULL_FRAME, 'native', null, 1)
+    capturePartVisibility(EXPLORING_VIEW_ID, FULL_FRAME, 'native', null, 1)
+    captureNativeLines(EXPLORING_VIEW_ID, FULL_FRAME, 'native', null, 1)
+    finishCaptures()
     renderer.setScissorTest(false)
   }
 
   function renderViews(views: readonly SourceView[], beforeView: ((view: SourceView, index: number) => void) | undefined, timeSeconds: number) {
+    if (disposed) throw new Error('Viewer is disposed.')
+    assertSourceCompositeWeights(views)
     drawEpoch++
+    renderedViews = views
+    capturedViewOrder.length = probe || visibilityProbe || lineProbe ? views.length : 0
     beginFrame()
-    for (let i = 0; i < views.length; i++) {
-      const view = views[i]!
-      const rect = view.rectSourcePixels
-      const presentation = view.presentation ?? 'native'
-      beforeView?.(view, i)
-      writeCamera(camera, view.camera, rect[2], rect[3])
-      drawView(rect, presentation, null, mirrorTarget, false)
-      // Same pose, camera and GL state as the draw just issued.
-      captureView(view.id, rect, presentation, timeSeconds)
+    for (let i = 0; i < views.length;) {
+      const first = views[i]!
+      const group = first.composite?.mode === 'crossfade' ? first.composite.groupId : null
+      if (group !== null) {
+        ensureCompositeTargets()
+        renderer.getClearColor(savedClearColor)
+        const alpha = renderer.getClearAlpha()
+        renderer.setRenderTarget(compositeSumTarget)
+        renderer.setScissorTest(false)
+        renderer.setClearColor(0x000000, 0)
+        renderer.clear(true, false, false)
+        renderer.setClearColor(savedClearColor, alpha)
+      }
+      do {
+        const view = views[i]!
+        const member = view.composite
+        if (group !== null && (member?.mode !== 'crossfade' || member.groupId !== group)) break
+        const opacity = member?.mode === 'crossfade' ? member.opacity : 1
+        const rect = view.rectSourcePixels
+        const presentation = view.presentation ?? 'native'
+        beforeView?.(view, i)
+        writeCamera(camera, view.camera, rect[2], rect[3])
+        snapshotView(view)
+        if (probe || visibilityProbe || lineProbe) capturedViewOrder[i] = view
+        if (opacity > 0) {
+          drawView(rect, presentation, group === null ? null : compositeImageTarget, mirrorTarget, true)
+          if (group !== null) {
+            compositeMaterial.uniforms.stage!.value = 0
+            compositeMaterial.uniforms.weight!.value = opacity
+            compositeMaterial.blending = THREE.CustomBlending
+            compositeMaterial.blendEquation = THREE.AddEquation
+            compositeMaterial.blendSrc = THREE.OneFactor
+            compositeMaterial.blendDst = THREE.OneFactor
+            compositeMaterial.blendEquationAlpha = THREE.AddEquation
+            compositeMaterial.blendSrcAlpha = THREE.OneFactor
+            compositeMaterial.blendDstAlpha = THREE.OneFactor
+            compositeBlit(rect, compositeSumTarget, compositeImageTarget!)
+          }
+        }
+        // Per-view witnesses use the same native pose/camera, before a later
+        // inset or group replaces the canvas; source correspondence is separate.
+        captureView(view.id, rect, presentation, timeSeconds, opacity)
+        capturePartVisibility(view.id, rect, presentation, timeSeconds, opacity)
+        captureNativeLines(view.id, rect, presentation, timeSeconds, opacity)
+        i++
+        if (group === null) break
+      } while (i < views.length)
+      if (group !== null) {
+        compositeMaterial.uniforms.stage!.value = 1
+        compositeBackground.copy(scene.background instanceof THREE.Color ? scene.background : savedClearColor).convertLinearToSRGB()
+        compositeMaterial.blending = THREE.NoBlending
+        compositeBlit(FULL_FRAME, null, compositeSumTarget!)
+        renderer.clear(false, true, false)
+      }
     }
+    finishCaptures()
+    renderer.setRenderTarget(null)
     renderer.setScissorTest(false)
   }
 
-  function ensureProbeTargets(): [THREE.WebGLRenderTarget, THREE.WebGLRenderTarget] {
+  const probeTargetOptions = { depthBuffer: false, stencilBuffer: false, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, generateMipmaps: false, type: THREE.UnsignedByteType }
+  function ensureProbeTargets() {
     // Actual drawing-buffer size, not the renderer's cached logical size.
     const width = gl.drawingBufferWidth
     const height = gl.drawingBufferHeight
-    const options = { depthBuffer: false, stencilBuffer: false, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, generateMipmaps: false, type: THREE.UnsignedByteType }
-    if (!probeTarget) probeTarget = new THREE.WebGLRenderTarget(width, height, options)
+    if (!probeTarget) probeTarget = new THREE.WebGLRenderTarget(width, height, probeTargetOptions)
     else if (probeTarget.width !== width || probeTarget.height !== height) probeTarget.setSize(width, height)
-    if (!probeMirrorTarget) probeMirrorTarget = new THREE.WebGLRenderTarget(mirrorTarget.width, mirrorTarget.height, options)
+    if (!probeMirrorTarget) probeMirrorTarget = new THREE.WebGLRenderTarget(mirrorTarget.width, mirrorTarget.height, probeTargetOptions)
     else if (probeMirrorTarget.width !== mirrorTarget.width || probeMirrorTarget.height !== mirrorTarget.height) probeMirrorTarget.setSize(mirrorTarget.width, mirrorTarget.height)
-    return [probeTarget, probeMirrorTarget]
   }
 
   /** Read one pass over [x0,x1)×[y0,y1) backing pixels and accumulate per-bit centroids. */
@@ -534,24 +955,34 @@ export function createViewer(canvas: HTMLCanvasElement, onControlsChange: () => 
     return false
   }
 
-  function captureView(viewId: string, rect: readonly [number, number, number, number], presentation: Presentation, timeSeconds: number | null) {
+  function captureView(viewId: string, rect: readonly [number, number, number, number], presentation: Presentation, timeSeconds: number | null, sourceOpacity: number) {
     const internals = probe?.status === 'active' ? probeInternals.get(probe) : undefined
     if (!internals) return
     const markers = internals.markers
     let capture = captures.get(viewId)
     if (!capture) {
-      capture = { epoch: -1, presentation, timeSeconds, states: new Uint8Array(markers.length), values: new Float64Array(markers.length * 5), reasons: new Array<string | null>(markers.length).fill(null) }
+      capture = { epoch: -1, presentation, timeSeconds, sourceOpacity, states: new Uint8Array(markers.length), values: new Float64Array(markers.length * 5), reasons: new Array<string | null>(markers.length).fill(null) }
       captures.set(viewId, capture)
     }
     capture.epoch = drawEpoch
     capture.presentation = presentation
     capture.timeSeconds = timeSeconds
+    capture.sourceOpacity = sourceOpacity
+    if (sourceOpacity === 0) {
+      for (let i = 0; i < markers.length; i++) {
+        capture.states[i] = markers[i]!.slot < 0 ? 1 : 2
+        capture.reasons[i] = markers[i]!.slot < 0 ? markers[i]!.reason : 'view has zero measured source opacity'
+      }
+      return
+    }
     for (let i = 0; i < markers.length; i++) {
       capture.states[i] = 1
       capture.reasons[i] = markers[i]!.slot < 0 ? markers[i]!.reason : 'GPU capture did not reach this marker'
     }
     if (internals.passes === 0) return
-    const [target, mirrorStage] = ensureProbeTargets()
+    ensureProbeTargets()
+    const target = probeTarget!
+    const mirrorStage = probeMirrorTarget!
     const savedBackground = scene.background
     const savedLayers = camera.layers.mask
     renderer.getClearColor(savedClearColor)
@@ -564,10 +995,10 @@ export function createViewer(canvas: HTMLCanvasElement, onControlsChange: () => 
       renderer.setScissorTest(true)
       viewport(rect[0], rect[1], rect[2], rect[3])
       renderer.getCurrentViewport(probeViewport)
-      const x0 = Math.max(0, probeViewport.x)
-      const y0 = Math.max(0, probeViewport.y)
-      const x1 = Math.min(target.width, probeViewport.x + probeViewport.z)
-      const y1 = Math.min(target.height, probeViewport.y + probeViewport.w)
+      const x0 = Math.max(0, probeViewport.x, viewScissorPixels.x)
+      const y0 = Math.max(0, probeViewport.y, viewScissorPixels.y)
+      const x1 = Math.min(target.width, probeViewport.x + probeViewport.z, viewScissorPixels.x + viewScissorPixels.z)
+      const y1 = Math.min(target.height, probeViewport.y + probeViewport.w, viewScissorPixels.y + viewScissorPixels.w)
       renderer.clear(true, false, false)
       renderer.render(referenceScene, mirrorCamera)
       readPass(target, x0, y0, x1, y1)
@@ -654,8 +1085,7 @@ export function createViewer(canvas: HTMLCanvasElement, onControlsChange: () => 
     probeMirrorTarget = null
     readback = new Uint8Array(0)
     readbackWords = new Uint32Array(0)
-    referenceGeometry.dispose()
-    referenceMaterial.dispose()
+    captures.clear()
   }
 
   function setLandmarkProbe(next: LandmarkProbe | null) {
@@ -670,9 +1100,10 @@ export function createViewer(canvas: HTMLCanvasElement, onControlsChange: () => 
   function readRenderedLandmarks(viewId: string): RenderedLandmarks | null {
     const internals = probe?.status === 'active' ? probeInternals.get(probe) : undefined
     const capture = captures.get(viewId)
-    if (!internals || !capture || capture.epoch !== drawEpoch) return null
+    if (!internals || !capture || capture.epoch !== drawEpoch || internals.revision.value !== renderedProbeRevision || disposed || !capturesFresh()) return null
     return {
-      method: 'gpu-readback', viewId, presentation: capture.presentation, timeSeconds: capture.timeSeconds,
+      method: 'gpu-readback', visibilityMode: 'depth-off-landmark-projection', status: 'captured', sourceOpacity: capture.sourceOpacity,
+      viewId, presentation: capture.presentation, timeSeconds: capture.timeSeconds,
       landmarks: internals.markers.map((marker, i) => {
         const rendered = capture.states[i] === 0
         const v = i * 5
@@ -688,9 +1119,413 @@ export function createViewer(canvas: HTMLCanvasElement, onControlsChange: () => 
     }
   }
 
+  function ensureVisibilityTargets() {
+    const width = gl.drawingBufferWidth
+    const height = gl.drawingBufferHeight
+    if (!visibilityTarget) visibilityTarget = new THREE.WebGLRenderTarget(width, height, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter })
+    else if (visibilityTarget.width !== width || visibilityTarget.height !== height) visibilityTarget.setSize(width, height)
+    if (!visibilityMirrorTarget) visibilityMirrorTarget = new THREE.WebGLRenderTarget(mirrorTarget.width, mirrorTarget.height, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter })
+    else if (visibilityMirrorTarget.width !== mirrorTarget.width || visibilityMirrorTarget.height !== mirrorTarget.height) visibilityMirrorTarget.setSize(mirrorTarget.width, mirrorTarget.height)
+  }
+
+  function capturePartVisibility(viewId: string, rect: readonly [number, number, number, number], presentation: Presentation, timeSeconds: number | null, sourceOpacity: number) {
+    const internals = visibilityProbe?.status === 'active' ? partVisibilityInternals.get(visibilityProbe) : undefined
+    if (!internals) return
+    internals.synchronize()
+    const entries = internals.entries
+    let capture = visibilityCaptures.get(viewId)
+    if (!capture || capture.values.length !== entries.length * 5) {
+      capture = { epoch: -1, inventoryRevision: -1, presentation, timeSeconds, sourceOpacity, rect: [rect[0], rect[1], rect[2], rect[3]], cameraValues: new Float64Array(10), values: new Float64Array(entries.length * 5), contourCounts: new Uint32Array(entries.length), contourSampleCounts: new Uint16Array(entries.length), contourOffsets: new Uint32Array(entries.length), contourSamples: new Float64Array(0), uncertaintySourcePixels: 0 }
+      visibilityCaptures.set(viewId, capture)
+    }
+    capture.epoch = drawEpoch
+    capture.inventoryRevision = internals.inventoryRevision.value
+    capture.presentation = presentation
+    capture.timeSeconds = timeSeconds
+    capture.sourceOpacity = sourceOpacity
+    capture.contourCounts.fill(0)
+    capture.contourSampleCounts.fill(0)
+    capture.uncertaintySourcePixels = 0
+    for (let axis = 0; axis < 4; axis++) capture.rect[axis] = rect[axis]!
+    camera.position.toArray(capture.cameraValues, 0)
+    camera.quaternion.toArray(capture.cameraValues, 3)
+    capture.cameraValues[7] = camera.fov
+    capture.cameraValues[8] = rect[2] / 2 - (camera.view?.enabled ? camera.view.offsetX : 0)
+    capture.cameraValues[9] = rect[3] / 2 - (camera.view?.enabled ? camera.view.offsetY : 0)
+    for (let i = 0; i < entries.length; i++) {
+      const o = i * 5
+      capture.values[o] = 0
+      capture.values[o + 1] = Infinity; capture.values[o + 2] = Infinity
+      capture.values[o + 3] = -Infinity; capture.values[o + 4] = -Infinity
+    }
+    if (sourceOpacity === 0 || entries.length === 0) return
+    ensureVisibilityTargets()
+    const target = visibilityTarget!
+    const stage = visibilityMirrorTarget!
+    const background = scene.background
+    const layers = camera.layers.mask
+    renderer.getClearColor(savedClearColor)
+    const alpha = renderer.getClearAlpha()
+    scene.background = null
+    renderer.setClearColor(0x000000, 0)
+    // No substitute meshes: render the very same native objects, geometry,
+    // transforms, shader deformation, alpha/clipping and material-side rules.
+    for (const entry of entries) entry.object.material = entry.diagnostic
+    try {
+      camera.layers.disable(PROBE_LAYER)
+      camera.layers.disable(LINE_PROBE_LAYER)
+      drawView(rect, presentation, target, stage, true)
+      renderer.getCurrentViewport(probeViewport)
+      const x0 = Math.max(0, probeViewport.x, viewScissorPixels.x)
+      const y0 = Math.max(0, probeViewport.y, viewScissorPixels.y)
+      const x1 = Math.min(target.width, probeViewport.x + probeViewport.z, viewScissorPixels.x + viewScissorPixels.z)
+      const y1 = Math.min(target.height, probeViewport.y + probeViewport.w, viewScissorPixels.y + viewScissorPixels.w)
+      const width = x1 - x0
+      const height = y1 - y0
+      if (width <= 0 || height <= 0) return
+      const bytes = width * height * 4
+      if (visibilityPixels.length < bytes) visibilityPixels = new Uint8Array(bytes)
+      renderer.readRenderTargetPixels(target, x0, y0, width, height, visibilityPixels)
+      if (contourOrdinals.length < entries.length) contourOrdinals = new Uint32Array(entries.length)
+      contourOrdinals.fill(0, 0, entries.length)
+      const pixelCount = width * height
+      if (contourFlags.length < pixelCount) contourFlags = new Uint8Array(pixelCount)
+      contourFlags.fill(0, 0, pixelCount)
+      const sourcePerPixelX = SOURCE_WIDTH / gate.width * canvas.clientWidth / target.width
+      const sourcePerPixelY = SOURCE_HEIGHT / gate.height * canvas.clientHeight / target.height
+      capture.uncertaintySourcePixels = Math.hypot(sourcePerPixelX, sourcePerPixelY) / 2
+      if (presentation === 'horizontal-mirror') capture.uncertaintySourcePixels += Math.hypot(rect[2] / stage.width, rect[3] / stage.height) / 2
+      for (let i = 0; i < width * height; i++) {
+        const pixel = i * 4
+        const id = visibilityPixels[pixel]! + visibilityPixels[pixel + 1]! * 256 + visibilityPixels[pixel + 2]! * 65536
+        if (id === 0 || id > entries.length) continue
+        const o = (id - 1) * 5
+        const left = x0 + i % width
+        const top = target.height - 1 - (y0 + Math.floor(i / width))
+        capture.values[o]!++
+        if (left < capture.values[o + 1]!) capture.values[o + 1] = left
+        if (top < capture.values[o + 2]!) capture.values[o + 2] = top
+        if (left + 1 > capture.values[o + 3]!) capture.values[o + 3] = left + 1
+        if (top + 1 > capture.values[o + 4]!) capture.values[o + 4] = top + 1
+        if (nativeContourPixel(i, id, width, pixelCount)) {
+          capture.contourCounts[id - 1]!++
+          contourFlags[i] = 1
+        }
+      }
+      let sampleTotal = 0
+      for (let path = 0; path < entries.length; path++) {
+        capture.contourOffsets[path] = sampleTotal
+        sampleTotal += Math.min(capture.contourCounts[path]!, RASTER_SAMPLE_LIMIT)
+      }
+      if (capture.contourSamples.length < sampleTotal * 2) capture.contourSamples = new Float64Array(sampleTotal * 2)
+      // Sampling is a subset of actual ID-boundary centres from this same
+      // readback, never rectangle corners or a reconstructed silhouette.
+      for (let pixel = 0; pixel < pixelCount; pixel++) {
+        if (contourFlags[pixel] !== 1) continue
+        const path = nativePixelId(pixel) - 1
+        const ordinal = contourOrdinals[path]!++
+        const sample = capture.contourSampleCounts[path]!
+        const count = capture.contourCounts[path]!
+        const limit = Math.min(count, RASTER_SAMPLE_LIMIT)
+        if (sample >= limit || ordinal !== (limit === 1 ? 0 : Math.floor(sample * (count - 1) / (limit - 1)))) continue
+        const o = (capture.contourOffsets[path]! + sample) * 2
+        capture.contourSamples[o] = x0 + pixel % width + 0.5
+        capture.contourSamples[o + 1] = target.height - (y0 + Math.floor(pixel / width) + 0.5)
+        capture.contourSampleCounts[path] = sample + 1
+      }
+    } finally {
+      for (const entry of entries) entry.object.material = entry.original
+      camera.layers.mask = layers
+      scene.background = background
+      renderer.setClearColor(savedClearColor, alpha)
+      renderer.setRenderTarget(null)
+      renderer.setScissorTest(true)
+    }
+  }
+  function nativePixelId(pixel: number): number {
+    const offset = pixel * 4
+    return visibilityPixels[offset]! + visibilityPixels[offset + 1]! * 256 + visibilityPixels[offset + 2]! * 65536
+  }
+
+  function nativeContourPixel(pixel: number, id: number, width: number, count: number): boolean {
+    const x = pixel % width
+    return x === 0 || x === width - 1 || pixel < width || pixel >= count - width
+      || nativePixelId(pixel - 1) !== id || nativePixelId(pixel + 1) !== id
+      || nativePixelId(pixel - width) !== id || nativePixelId(pixel + width) !== id
+  }
+
+
+  function setPartVisibilityProbe(next: PartVisibilityProbe | null) {
+    if (next === visibilityProbe) return
+    if (next && !partVisibilityInternals.has(next)) throw new Error('Part visibility probe was not created by Machine.createPartVisibilityProbe or is disposed.')
+    visibilityProbe?.dispose()
+    contourOrdinals = new Uint32Array(0)
+    contourFlags = new Uint8Array(0)
+    visibilityProbe = next
+    visibilityCaptures.clear()
+    renderedVisibilityRevision = -1
+    if (!next) {
+      visibilityTarget?.dispose(); visibilityMirrorTarget?.dispose()
+      visibilityTarget = null; visibilityMirrorTarget = null
+      visibilityPixels = new Uint8Array(0)
+    }
+  }
+
+  function readRenderedPartVisibility(viewId: string): RenderedPartVisibility {
+    const internals = visibilityProbe?.status === 'active' ? partVisibilityInternals.get(visibilityProbe) : undefined
+    const capture = visibilityCaptures.get(viewId)
+    const status: RenderedPartVisibility['status'] = disposed || visibilityProbe?.status === 'disposed' ? 'disposed' : !internals ? 'unavailable'
+      : !capture || capture.epoch !== drawEpoch || capture.inventoryRevision !== internals.inventoryRevision.value || renderedVisibilityRevision !== internals.revision.value || !capturesFresh() ? 'stale' : 'captured'
+    if (status !== 'captured' || !internals || !capture) return { method: 'gpu-readback', visibilityMode: 'depth-tested-native-surfaces', status, viewId, presentation: null, timeSeconds: null, rectSourcePixels: null, camera: null, sourceOpacity: null, parts: [] }
+    const cssX = canvas.clientWidth / gl.drawingBufferWidth
+    const cssY = canvas.clientHeight / gl.drawingBufferHeight
+    const rect = capture.rect
+    const left = gate.x + rect[0] / SOURCE_WIDTH * gate.width
+    const top = gate.y + rect[1] / SOURCE_HEIGHT * gate.height
+    return {
+      method: 'gpu-readback', visibilityMode: 'depth-tested-native-surfaces', status,
+      viewId, presentation: capture.presentation, timeSeconds: capture.timeSeconds,
+      rectSourcePixels: [...rect], sourceOpacity: capture.sourceOpacity,
+      camera: {
+        positionMetres: [capture.cameraValues[0]!, capture.cameraValues[1]!, capture.cameraValues[2]!],
+        quaternion: [capture.cameraValues[3]!, capture.cameraValues[4]!, capture.cameraValues[5]!, capture.cameraValues[6]!],
+        verticalFovDegrees: capture.cameraValues[7]!,
+        principalPointViewportPixels: [capture.cameraValues[8]!, capture.cameraValues[9]!],
+      },
+      parts: internals.entries.map((entry, i): RenderedPartVisibility['parts'][number] => {
+        const o = i * 5
+        const count = capture.values[o]!
+        const x0 = capture.values[o + 1]! * cssX
+        const y0 = capture.values[o + 2]! * cssY
+        const x1 = capture.values[o + 3]! * cssX
+        const y1 = capture.values[o + 4]! * cssY
+        const contour: [number, number][] = []
+        for (let sample = 0; sample < capture.contourSampleCounts[i]!; sample++) {
+          const s = (capture.contourOffsets[i]! + sample) * 2
+          contour.push([
+            rect[0] + (capture.contourSamples[s]! * cssX - left) * SOURCE_WIDTH / gate.width,
+            rect[1] + (capture.contourSamples[s + 1]! * cssY - top) * SOURCE_HEIGHT / gate.height,
+          ])
+        }
+        return {
+          partPath: entry.path, status: count > 0 ? 'visible' : 'not-visible', pixelCount: count,
+          canvasExtentPixels: count > 0 ? [x0, y0, x1, y1] : null,
+          sourceExtentPixels: count > 0 ? [rect[0] + (x0 - left) * SOURCE_WIDTH / gate.width, rect[1] + (y0 - top) * SOURCE_HEIGHT / gate.height,
+            rect[0] + (x1 - left) * SOURCE_WIDTH / gate.width, rect[1] + (y1 - top) * SOURCE_HEIGHT / gate.height] : null,
+          contourSourcePixels: contour, contourPixelCount: capture.contourCounts[i]!,
+          uncertaintySourcePixels: count > 0 ? capture.uncertaintySourcePixels : null,
+        }
+      }),
+    }
+  }
+
+  function ensureLineTargets(rect: readonly [number, number, number, number]) {
+    const width = gl.drawingBufferWidth
+    const height = gl.drawingBufferHeight
+    if (!lineTarget) lineTarget = new THREE.WebGLRenderTarget(width, height, probeTargetOptions)
+    else if (lineTarget.width !== width || lineTarget.height !== height) lineTarget.setSize(width, height)
+    renderer.setRenderTarget(lineTarget)
+    renderer.setScissorTest(true)
+    viewport(rect[0], rect[1], rect[2], rect[3])
+    renderer.getCurrentViewport(probeViewport)
+    // A finite one-pixel diagnostic line must not vanish in a large mirror
+    // downsample. Rasterize its mirror stage at the destination's actual size;
+    // the same camera, clipping, viewport and real mirror blit are retained.
+    const mirrorWidth = Math.max(1, probeViewport.z)
+    const mirrorHeight = Math.max(1, probeViewport.w)
+    if (!lineMirrorTarget) lineMirrorTarget = new THREE.WebGLRenderTarget(mirrorWidth, mirrorHeight, probeTargetOptions)
+    else if (lineMirrorTarget.width !== mirrorWidth || lineMirrorTarget.height !== mirrorHeight) lineMirrorTarget.setSize(mirrorWidth, mirrorHeight)
+  }
+
+  function captureNativeLines(viewId: string, rect: readonly [number, number, number, number], presentation: Presentation, timeSeconds: number | null, sourceOpacity: number) {
+    const internals = lineProbe?.status === 'active' ? nativeLineInternals.get(lineProbe) : undefined
+    if (!internals) return
+    const markers = internals.markers
+    let capture = lineCaptures.get(viewId)
+    if (!capture) {
+      capture = { epoch: -1, presentation, timeSeconds, sourceOpacity, rect: [rect[0], rect[1], rect[2], rect[3]], states: new Uint8Array(markers.length), reasons: new Array<string | null>(markers.length).fill(null), values: new Float64Array(markers.length * 11), sampleCounts: new Uint16Array(markers.length), samples: new Float64Array(markers.length * RASTER_SAMPLE_LIMIT * 2) }
+      lineCaptures.set(viewId, capture)
+    }
+    capture.epoch = drawEpoch
+    capture.presentation = presentation
+    capture.timeSeconds = timeSeconds
+    capture.sourceOpacity = sourceOpacity
+    capture.sampleCounts.fill(0)
+    for (let axis = 0; axis < 4; axis++) capture.rect[axis] = rect[axis]!
+    for (let i = 0; i < markers.length; i++) {
+      capture.states[i] = markers[i]!.slot < 0 ? 1 : 2
+      capture.values[i * 11] = 0
+      capture.reasons[i] = markers[i]!.slot < 0 ? markers[i]!.reason : sourceOpacity === 0 ? 'view has zero measured source opacity' : 'no line pixels: finite segment clipped by camera frustum, near/far planes or view scissor'
+    }
+    if (sourceOpacity === 0 || internals.passes === 0) return
+    ensureLineTargets(rect)
+    const target = lineTarget!
+    const stage = lineMirrorTarget!
+    const x0 = Math.max(0, probeViewport.x, viewScissorPixels.x)
+    const y0 = Math.max(0, probeViewport.y, viewScissorPixels.y)
+    const x1 = Math.min(target.width, probeViewport.x + probeViewport.z, viewScissorPixels.x + viewScissorPixels.z)
+    const y1 = Math.min(target.height, probeViewport.y + probeViewport.w, viewScissorPixels.y + viewScissorPixels.w)
+    const width = x1 - x0
+    const height = y1 - y0
+    const cssX = canvas.clientWidth / target.width
+    const cssY = canvas.clientHeight / target.height
+    // Map actual final canvas raster centres, just like landmarks and native
+    // contours; do not stretch a rounded GL viewport back to nominal ROI edges.
+    const scaleX = SOURCE_WIDTH / gate.width * cssX
+    const scaleY = SOURCE_HEIGHT / gate.height * cssY
+    const sourceOriginX = -gate.x * SOURCE_WIDTH / gate.width
+    const sourceOriginY = -gate.y * SOURCE_HEIGHT / gate.height
+    const uncertainty = Math.hypot(scaleX, scaleY) / 2
+    const background = scene.background
+    const layers = camera.layers.mask
+    renderer.getClearColor(savedClearColor)
+    const alpha = renderer.getClearAlpha()
+    scene.background = null
+    renderer.setClearColor(0x000000, 0)
+    try {
+      if (width <= 0 || height <= 0) return
+      camera.layers.set(LINE_PROBE_LAYER)
+      for (let pass = 0; pass < internals.passes; pass++) {
+        internals.pass.value = pass
+        drawView(rect, presentation, target, stage, true)
+        readPass(target, x0, y0, x1, y1)
+        linePassIndices.fill(-1)
+        linePassOrdinals.fill(0)
+        for (let i = 0; i < markers.length; i++) {
+          const marker = markers[i]!
+          if (marker.slot < 0 || Math.floor(marker.slot / SLOTS_PER_PASS) !== pass) continue
+          const bit = marker.slot % SLOTS_PER_PASS
+          const a = bit * ACCUMULATOR_STRIDE
+          const count = accumulators[a]!
+          if (count === 0) {
+            if (nativelyHidden(marker.object!)) capture.reasons[i] = 'native part or ancestor hidden in this view'
+            continue
+          }
+          const o = i * 11
+          const left = accumulators[a + 3]! - 0.5
+          const right = accumulators[a + 4]! + 0.5
+          const bottom = accumulators[a + 5]! - 0.5
+          const top = accumulators[a + 6]! + 0.5
+          capture.states[i] = 0
+          capture.reasons[i] = null
+          capture.values[o] = count
+          capture.values[o + 1] = left * cssX
+          capture.values[o + 2] = (target.height - top) * cssY
+          capture.values[o + 3] = right * cssX
+          capture.values[o + 4] = (target.height - bottom) * cssY
+          capture.values[o + 5] = sourceOriginX + left * scaleX
+          capture.values[o + 6] = sourceOriginY + (target.height - top) * scaleY
+          capture.values[o + 7] = sourceOriginX + right * scaleX
+          capture.values[o + 8] = sourceOriginY + (target.height - bottom) * scaleY
+          capture.values[o + 9] = uncertainty
+          capture.values[o + 10] = 0
+          linePassIndices[bit] = i
+        }
+        // Select genuine first/last and evenly scan-distributed pixels from
+        // the actual coverage. No endpoint projection or extrapolation occurs.
+        for (let pixel = 0; pixel < width * height; pixel++) {
+          for (let channel = 0; channel < 4; channel++) {
+            let byte = readback[pixel * 4 + channel]!
+            while (byte !== 0) {
+              const low = byte & -byte
+              byte ^= low
+              const bit = channel * 8 + 31 - Math.clz32(low)
+              const line = linePassIndices[bit]!
+              if (line < 0) continue
+              const ordinal = linePassOrdinals[bit]!++
+              const sample = capture.sampleCounts[line]!
+              const count = capture.values[line * 11]!
+              const limit = Math.min(count, RASTER_SAMPLE_LIMIT)
+              if (sample >= limit || ordinal !== (limit === 1 ? 0 : Math.floor(sample * (count - 1) / (limit - 1)))) continue
+              const sx = sourceOriginX + (x0 + pixel % width + 0.5) * scaleX
+              const sy = sourceOriginY + (target.height - y0 - Math.floor(pixel / width) - 0.5) * scaleY
+              const o = (line * RASTER_SAMPLE_LIMIT + sample) * 2
+              capture.samples[o] = sx; capture.samples[o + 1] = sy
+              if (sample > 0) {
+                const gap = Math.hypot(sx - capture.samples[o - 2]!, sy - capture.samples[o - 1]!)
+                if (gap > capture.values[line * 11 + 10]!) capture.values[line * 11 + 10] = gap
+              }
+              capture.sampleCounts[line] = sample + 1
+            }
+          }
+        }
+      }
+    } finally {
+      internals.pass.value = 0
+      camera.layers.mask = layers
+      scene.background = background
+      renderer.setClearColor(savedClearColor, alpha)
+      renderer.setRenderTarget(null)
+      renderer.setScissorTest(true)
+    }
+  }
+
+  function setNativeLineProbe(next: NativeLineProbe | null) {
+    if (next === lineProbe) return
+    if (next && !nativeLineInternals.has(next)) throw new Error('Native line probe was not created by Machine.createNativeLineProbe or is disposed.')
+    lineProbe?.dispose()
+    lineProbe = next
+    lineCaptures.clear()
+    renderedLineRevision = -1
+    if (!next) {
+      lineTarget?.dispose(); lineMirrorTarget?.dispose()
+      lineTarget = null; lineMirrorTarget = null
+    }
+  }
+
+  function readRenderedNativeLines(viewId: string): RenderedNativeLines {
+    const internals = lineProbe?.status === 'active' ? nativeLineInternals.get(lineProbe) : undefined
+    const capture = lineCaptures.get(viewId)
+    const status: RenderedNativeLines['status'] = disposed || lineProbe?.status === 'disposed' ? 'disposed' : !internals ? 'unavailable'
+      : !capture || capture.epoch !== drawEpoch || renderedLineRevision !== internals.revision.value || !capturesFresh() ? 'stale' : 'captured'
+    if (status !== 'captured' || !internals || !capture) return { method: 'gpu-readback', visibilityMode: 'depth-off-native-line-projection', status, viewId, presentation: null, timeSeconds: null, rectSourcePixels: null, sourceOpacity: null, lines: [] }
+    return {
+      method: 'gpu-readback', visibilityMode: 'depth-off-native-line-projection', status, viewId,
+      presentation: capture.presentation, timeSeconds: capture.timeSeconds, rectSourcePixels: [...capture.rect], sourceOpacity: capture.sourceOpacity,
+      lines: internals.markers.map((marker, i): RenderedNativeLines['lines'][number] => {
+        const o = i * 11
+        const rendered = capture.states[i] === 0
+        const samples: [number, number][] = []
+        for (let sample = 0; sample < capture.sampleCounts[i]!; sample++) {
+          const s = (i * RASTER_SAMPLE_LIMIT + sample) * 2
+          samples.push([capture.samples[s]!, capture.samples[s + 1]!])
+        }
+        return {
+          id: marker.id, state: CAPTURE_STATES[capture.states[i]!]!, pixelCount: capture.values[o]!, sourceSamples: samples,
+          canvasExtentPixels: rendered ? [capture.values[o + 1]!, capture.values[o + 2]!, capture.values[o + 3]!, capture.values[o + 4]!] : null,
+          sourceExtentPixels: rendered ? [capture.values[o + 5]!, capture.values[o + 6]!, capture.values[o + 7]!, capture.values[o + 8]!] : null,
+          uncertaintySourcePixels: rendered ? capture.values[o + 9]! : null,
+          samplingGapSourcePixels: rendered ? capture.values[o + 10]! : null,
+          reason: capture.reasons[i]!,
+        }
+      }),
+    }
+  }
+
+  function dispose() {
+    if (disposed) return
+    disposed = true
+    drawEpoch++
+    removeEventListener('resize', resize)
+    controls.removeEventListener('change', onControlsChange)
+    viewSnapshots.clear()
+    renderedViews = null
+    capturedViewOrder.length = 0
+    controls.dispose()
+    setLandmarkProbe(null)
+    setPartVisibilityProbe(null)
+    setNativeLineProbe(null)
+    releaseProbeTargets()
+    referenceGeometry.dispose(); referenceMaterial.dispose()
+    mirrorTarget.dispose(); mirrorMaterial.dispose(); quadGeometry.dispose()
+    compositeImageTarget?.dispose(); compositeSumTarget?.dispose(); compositeMaterial.dispose()
+    renderer.dispose()
+  }
   resize()
   return {
     renderer, scene, camera, resize, render, renderViews, applyCamera, setInteraction, fitView, setLandmarkProbe, readRenderedLandmarks,
+    setNativeLineProbe, readRenderedNativeLines,
+    setPartVisibilityProbe, readRenderedPartVisibility, dispose,
     get controls() { return controls },
   }
 }
@@ -704,6 +1539,10 @@ interface RestPart {
   scale: THREE.Vector3
   world: THREE.Matrix4
   parentInverse: THREE.Matrix4
+  /** Authored drawable geometry in this native node's own REST metre frame. */
+  drawableRestBounds: THREE.Box3 | null
+  /** Closed original-CAD body identity; never inherited by added instances. */
+  fixedStructuralBody: string | null
   visible: boolean
   binding?: Binding
   station: number
@@ -718,6 +1557,36 @@ interface RestPart {
   overrideEpoch: number
   finalEpoch: number
 }
+
+// build_frame_assembly.py:630-796,842-896 grounds these exact load-bearing
+// bodies/retention hardware to the fixed base. Cosmetic parts and operable
+// mechanisms are intentionally absent; being unbound or at rest proves nothing.
+const FIXED_STRUCTURAL_NATIVE_BODIES = new Set([
+  'harmonic-analyzer/frame/harmonic-base-1',
+  'harmonic-analyzer/frame/tube-frame-1',
+  'harmonic-analyzer/frame/tube-frame-2',
+  'harmonic-analyzer/frame/tube-frame-3',
+  'harmonic-analyzer/frame/tube-frame-4',
+  'harmonic-analyzer/frame/rocker-arm-support-1',
+  'harmonic-analyzer/frame/top-frame-1',
+  'harmonic-analyzer/frame/tube-frame-cap-1',
+  'harmonic-analyzer/frame/tube-frame-cap-2',
+  'harmonic-analyzer/frame/tube-frame-cap-3',
+  'harmonic-analyzer/frame/tube-frame-cap-4',
+  'harmonic-analyzer/frame/lag-screw-1',
+  'harmonic-analyzer/frame/lag-screw-2',
+  'harmonic-analyzer/frame/lag-screw-3',
+  'harmonic-analyzer/frame/lag-screw-4',
+  'harmonic-analyzer/frame/frame-cross-screw-1',
+  'harmonic-analyzer/frame/frame-cross-screw-2',
+  'harmonic-analyzer/frame/frame-cross-screw-3',
+  'harmonic-analyzer/frame/frame-cross-screw-4',
+  'harmonic-analyzer/frame/frame-cross-screw-5',
+  'harmonic-analyzer/frame/frame-cross-screw-6',
+  'harmonic-analyzer/frame/frame-cross-screw-7',
+  'harmonic-analyzer/frame/frame-cross-screw-8',
+  'harmonic-analyzer/frame/gooseneck-set-screw-1',
+])
 
 /**
  * Missing files/names warn and remain inspectable; they never count as verified
@@ -736,7 +1605,15 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
   let overrideEpoch = 0
   const driven: RestPart[] = []
   const overridesSeen = new Set<string>()
+  const revision = { value: 0 }
+  const inventoryRevision = { value: 0 }
+  const nativeDrawables: Pick<NativeDrawable, 'path' | 'object'>[] = []
+  const nativeDrawablePaths: string[] = []
+  const nativeDrawableSeen = new WeakSet<THREE.Object3D>()
+  let nativeInventoryRevision = -1
+  const visibilityProbes = new Set<PartVisibilityProbe>()
   const probes = new Set<LandmarkProbe>()
+  const lineProbes = new Set<NativeLineProbe>()
   const provenance: ModelProvenance = {
     sourceCommit: MECHANISM_DATA.provenance.sourceCommit,
     expectedSha256: MECHANISM_DATA.provenance.modelSha256,
@@ -762,6 +1639,40 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
       const loaded = gltf.scene
       parsed = loaded
       loaded.updateMatrixWorld(true)
+      const restFrameInverse = new THREE.Matrix4()
+      const primitiveFrame = new THREE.Matrix4()
+      const primitiveBounds = new THREE.Box3()
+      function geometryRestBounds(node: THREE.Mesh | THREE.Line | THREE.Points): THREE.Box3 | null {
+        if (!node.geometry.getAttribute('position')?.count) return null
+        if (!node.geometry.boundingBox) node.geometry.computeBoundingBox()
+        const bounds = node.geometry.boundingBox
+        if (!bounds || bounds.isEmpty()
+          || !Number.isFinite(bounds.min.x) || !Number.isFinite(bounds.min.y) || !Number.isFinite(bounds.min.z)
+          || !Number.isFinite(bounds.max.x) || !Number.isFinite(bounds.max.y) || !Number.isFinite(bounds.max.z)) return null
+        return bounds
+      }
+      function partRestBounds(node: THREE.Object3D): THREE.Box3 | null {
+        if (node.userData.landmarkMarker) return null
+        if (node instanceof THREE.Mesh || node instanceof THREE.Line || node instanceof THREE.Points) return geometryRestBounds(node)?.clone() ?? null
+        // A glTF multi-primitive mesh wrapper is a real exported part, unlike
+        // arbitrary assembly groups. Include only this mesh's own primitives,
+        // mapping each geometry frame exactly into the declared part frame.
+        const meshIndex = gltf.parser.associations.get(node)?.meshes
+        if (!(node instanceof THREE.Group) || meshIndex === undefined) return null
+        restFrameInverse.copy(node.matrixWorld).invert()
+        let bounds: THREE.Box3 | null = null
+        node.traverse(child => {
+          if (child.userData.landmarkMarker || !(child instanceof THREE.Mesh || child instanceof THREE.Line || child instanceof THREE.Points)
+            || gltf.parser.associations.get(child)?.meshes !== meshIndex) return
+          const geometryBounds = geometryRestBounds(child)
+          if (!geometryBounds) return
+          primitiveFrame.multiplyMatrices(restFrameInverse, child.matrixWorld)
+          primitiveBounds.copy(geometryBounds).applyMatrix4(primitiveFrame)
+          if (!bounds) bounds = new THREE.Box3()
+          bounds.union(primitiveBounds)
+        })
+        return bounds
+      }
       const visit = (node: THREE.Object3D, parentPath: string) => {
         const originalName = typeof node.userData.name === 'string' ? node.userData.name : node.name
         const path = parentPath ? `${parentPath}/${originalName}` : originalName
@@ -770,6 +1681,8 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
             path, shortName: originalName, node, position: node.position.clone(), quaternion: node.quaternion.clone(),
             scale: node.scale.clone(), world: node.matrixWorld.clone(),
             parentInverse: node.parent!.matrixWorld.clone().invert(), visible: node.visible, station: -1,
+            drawableRestBounds: partRestBounds(node),
+            fixedStructuralBody: null,
             overrideWorld: new THREE.Matrix4(), finalWorld: new THREE.Matrix4(), overrideEpoch: -1, finalEpoch: -1,
           }
           parts.set(path, part)
@@ -779,6 +1692,17 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
         for (const child of node.children) visit(child, node === loaded ? '' : path)
       }
       visit(loaded, '')
+      // A multi-primitive body shares its real glTF mesh association with its
+      // primitive drawables. Descendant names/assembly prefixes are not evidence.
+      for (const path of FIXED_STRUCTURAL_NATIVE_BODIES) {
+        const body = parts.get(path)
+        const meshIndex = body ? gltf.parser.associations.get(body.node)?.meshes : undefined
+        if (!body?.drawableRestBounds || meshIndex === undefined) continue
+        body.node.traverse(node => {
+          const part = partsByNode.get(node)
+          if (part?.drawableRestBounds && gltf.parser.associations.get(node)?.meshes === meshIndex) part.fixedStructuralBody = path
+        })
+      }
       for (const binding of BINDINGS) {
         const resolved: RestPart[] = []
         for (const part of parts.values()) {
@@ -912,6 +1836,7 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
   }
 
   function update(source: MechanismInput, overrides?: readonly PartOverride[]) {
+    revision.value++
     copyInput(source)
     solveMechanism(input, pose)
     if (availability !== 'available') return
@@ -1268,6 +2193,7 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
 
     let status: LandmarkProbe['status'] = 'active'
     const probe: LandmarkProbe = {
+      visibilityMode: 'depth-off-landmark-projection',
       anchors: markers.map(item => ({ id: item.id, state: item.slot >= 0 ? 'measurable' : 'unresolved', reason: item.reason })),
       get status() { return status },
       dispose() {
@@ -1278,12 +2204,279 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
           object.geometry.dispose()
         }
         for (const material of materials) material.dispose()
+        objects.length = 0
+        materials.length = 0
+        markers.length = 0
+        springMaterials.clear()
         probes.delete(probe)
         probeInternals.delete(probe)
       },
     }
     probes.add(probe)
-    probeInternals.set(probe, { markers, passes: Math.ceil(slots / SLOTS_PER_PASS), pass, pointSize })
+    probeInternals.set(probe, { markers, passes: Math.ceil(slots / SLOTS_PER_PASS), pass, pointSize, revision })
+    return probe
+  }
+
+  function assertNativeLinesWithinRestBounds(anchors: readonly NativeLineAnchor[]): void {
+    for (const anchor of anchors) {
+      const label = `Native line ${anchor?.id || '(missing id)'}`
+      if (availability !== 'available' || !root) throw new Error(`${label}: native model ${availability}; no REST geometry to qualify.`)
+      const part = parts.get(anchor.partPath)
+      if (!part) throw new Error(`${label}: native part missing: ${anchor.partPath}`)
+      const pair = anchor.partLocalLineMetres
+      if (!Array.isArray(pair) || pair.length !== 2 || !finitePoint(pair[0]) || !finitePoint(pair[1])) throw new Error(`${label}: partLocalLineMetres needs exactly two finite native-local metre points.`)
+      if (pair[0][0] === pair[1][0] && pair[0][1] === pair[1][1] && pair[0][2] === pair[1][2]) throw new Error(`${label}: finite native line endpoints coincide.`)
+      const bounds = part.drawableRestBounds
+      if (!bounds) throw new Error(`${label}: no actual drawable REST bounding box: ${anchor.partPath}`)
+      const tolerance = NATIVE_LINE_REST_BOUNDS_TOLERANCE_M
+      for (let endpoint = 0; endpoint < 2; endpoint++) {
+        const point = pair[endpoint]!
+        if (point[0] < bounds.min.x - tolerance || point[0] > bounds.max.x + tolerance
+          || point[1] < bounds.min.y - tolerance || point[1] > bounds.max.y + tolerance
+          || point[2] < bounds.min.z - tolerance || point[2] > bounds.max.z + tolerance) {
+          throw new Error(`${label}: endpoint ${endpoint} is outside actual drawable REST bounding box: ${anchor.partPath} (tolerance ${tolerance}m)`)
+        }
+      }
+    }
+  }
+
+  function assertNativeStructuralFixedParts(paths: readonly string[], sourceOverrides: readonly PartOverride[]): void {
+    function contains(ancestor: THREE.Object3D, descendant: THREE.Object3D): boolean {
+      for (let node: THREE.Object3D | null = descendant; node; node = node.parent) if (node === ancestor) return true
+      return false
+    }
+    function motionReason(node: THREE.Object3D): string | null {
+      const owner = partsByNode.get(node)
+      if (owner?.binding) return `mechanism binding ${owner.binding.id}/${owner.binding.motion}: ${owner.path}`
+      if (owner?.spring || owner?.wireLengthM !== undefined || owner?.chainStationMm !== undefined
+        || node === upperSprocket?.node || node === crankSprocket?.node || node === spareSprocket?.node
+        || node === upperMedium?.node || node === crankMedium?.node) return `native deformation or drive graph: ${owner?.path ?? node.name}`
+      return null
+    }
+    for (const path of paths) {
+      const label = `Source-non-identifiable fixed part ${path}`
+      if (availability !== 'available' || !root || provenance.identity !== 'matched') throw new Error(`${label}: identity-matched native model is unavailable.`)
+      const part = parts.get(path)
+      if (!part || part.node.userData.landmarkMarker || !(part.node instanceof THREE.Mesh || part.node instanceof THREE.Line || part.node instanceof THREE.Points)
+        || !part.node.geometry.getAttribute('position')?.count) throw new Error(`${label}: not an actual original native drawable.`)
+      for (let node: THREE.Object3D | null = part.node; node && node !== root; node = node.parent) {
+        const reason = motionReason(node)
+        if (reason) throw new Error(`${label}: ${reason}.`)
+      }
+      let descendantMotion: string | null = null
+      part.node.traverse(node => {
+        if (!descendantMotion && !node.userData.landmarkMarker) descendantMotion = motionReason(node)
+      })
+      const deformation = unsupportedDeformation(part.node)
+      if (descendantMotion || deformation) throw new Error(`${label}: ${descendantMotion ?? deformation}.`)
+      if (!part.fixedStructuralBody || part.node.userData.nativeInstanceSource) throw new Error(`${label}: not in the closed original-CAD fixed structural catalog; unbound or rest-pose geometry is not fixed evidence.`)
+      for (const override of sourceOverrides) {
+        const overridden = parts.get(override.partPath)
+        if (overridden && (contains(overridden.node, part.node) || contains(part.node, overridden.node))) {
+          throw new Error(`${label}: affected by declared source override ${override.partPath}, including identity/rest/no-op values.`)
+        }
+      }
+    }
+  }
+
+  function createNativeLineProbe(anchors: readonly NativeLineAnchor[]): NativeLineProbe {
+    const pass = { value: 0 }
+    const pointSize = { value: 1 }
+    const rigidMaterial = markerMaterial(MARKER_VERTEX, { landmarkPass: pass, landmarkPointSize: pointSize })
+    const materials: THREE.Material[] = [rigidMaterial]
+    const springMaterials = new Map<SpringDeformer, THREE.ShaderMaterial>()
+    const objects: THREE.Line[] = []
+    const markers: NativeLineMarker[] = []
+    const seen = new Set<string>()
+    const relative = new THREE.Matrix4()
+    const firstRelative = new THREE.Matrix4()
+    const points = [new THREE.Vector3(), new THREE.Vector3()] as const
+    const coordinates: SpringCoordinates = { kind: 0, t: 0, centre: new THREE.Vector3(), tangent: new THREE.Vector3() }
+    let slots = 0
+    root?.updateMatrixWorld(true)
+
+    function place(anchor: NativeLineAnchor, id: string): { object: THREE.Line } | { reason: string } {
+      if (availability !== 'available' || !root) return { reason: `native model ${availability}; no native scene graph to measure` }
+      const part = parts.get(anchor.partPath)
+      if (!part) return { reason: `native part missing: ${anchor.partPath}` }
+      const pair = anchor.partLocalLineMetres
+      if (!Array.isArray(pair) || pair.length !== 2 || !finitePoint(pair[0]) || !finitePoint(pair[1])) return { reason: 'partLocalLineMetres needs exactly two finite native-local metre points' }
+      points[0].fromArray(pair[0]); points[1].fromArray(pair[1])
+      if (points[0].equals(points[1])) return { reason: 'finite native line endpoints coincide' }
+      const unsupported = unsupportedDeformation(part.node)
+      if (unsupported) return { reason: unsupported }
+      const owner = springOwner(part)
+      let parent = part.node
+      let material = rigidMaterial
+      if (owner) {
+        if (owner !== part) return { reason: 'line lies inside a deformed spring subtree; name the spring part itself' }
+        const spring = owner.spring!
+        const mesh = spring.meshes[0]
+        if (!mesh) return { reason: 'spring has no deformed native mesh' }
+        firstRelative.copy(mesh.matrixWorld).invert().multiply(owner.node.matrixWorld)
+        for (const other of spring.meshes) {
+          relative.copy(other.matrixWorld).invert().multiply(owner.node.matrixWorld)
+          for (let i = 0; i < 16; i++) if (Math.abs(relative.elements[i]! - firstRelative.elements[i]!) > 1e-9) return { reason: 'deformed spring meshes have differing geometry frames; this line is ambiguous' }
+        }
+        points[0].applyMatrix4(firstRelative); points[1].applyMatrix4(firstRelative)
+        let deformed = springMaterials.get(spring)
+        if (!deformed) {
+          deformed = markerMaterial(MARKER_VERTEX, { landmarkPass: pass, landmarkPointSize: pointSize })
+          spring.deform(deformed)
+          springMaterials.set(spring, deformed)
+          materials.push(deformed)
+        }
+        material = deformed
+        parent = mesh
+      }
+      // Diagnostic endpoints only: never replace, reconstruct or modify a
+      // native mesh. GL clips this finite segment, including offscreen ends.
+      const geometry = new THREE.BufferGeometry()
+      const position = new Float32Array(6)
+      points[0].toArray(position, 0); points[1].toArray(position, 3)
+      geometry.setAttribute('position', new THREE.BufferAttribute(position, 3))
+      geometry.setAttribute('landmarkSlot', new THREE.Float32BufferAttribute([slots, slots], 1))
+      if (owner) {
+        const parameters = new Float32Array(4)
+        const centres = new Float32Array(6)
+        const tangents = new Float32Array(6)
+        for (let i = 0; i < 2; i++) {
+          owner.spring!.markerCoordinates(points[i]!, coordinates)
+          parameters[i * 2] = coordinates.kind; parameters[i * 2 + 1] = coordinates.t
+          coordinates.centre.toArray(centres, i * 3); coordinates.tangent.toArray(tangents, i * 3)
+        }
+        geometry.setAttribute('springCoordinate', new THREE.BufferAttribute(parameters, 2))
+        geometry.setAttribute('springRestCentre', new THREE.BufferAttribute(centres, 3))
+        geometry.setAttribute('springRestTangent', new THREE.BufferAttribute(tangents, 3))
+      }
+      const object = new THREE.Line(geometry, material)
+      object.name = `native-line-probe:${id}`
+      object.layers.set(LINE_PROBE_LAYER)
+      object.frustumCulled = false
+      object.userData.landmarkMarker = true
+      parent.add(object)
+      objects.push(object)
+      return { object }
+    }
+
+    for (const anchor of anchors) {
+      const id = typeof anchor?.id === 'string' ? anchor.id : ''
+      let placed: { object: THREE.Line } | { reason: string }
+      if (!id) placed = { reason: 'line id missing' }
+      else if (seen.has(id)) placed = { reason: 'duplicate line id' }
+      else placed = place(anchor, id)
+      if (id) seen.add(id)
+      if ('object' in placed) markers.push({ id, slot: slots++, reason: null, object: placed.object })
+      else markers.push({ id, slot: -1, reason: placed.reason, object: null })
+    }
+    let status: NativeLineProbe['status'] = 'active'
+    const probe: NativeLineProbe = {
+      visibilityMode: 'depth-off-native-line-projection',
+      lines: markers.map(marker => ({ id: marker.id, state: marker.slot < 0 ? 'unresolved' : 'measurable', reason: marker.reason })),
+      get status() { return status },
+      dispose() {
+        if (status === 'disposed') return
+        status = 'disposed'
+        for (const object of objects) { object.removeFromParent(); object.geometry.dispose() }
+        for (const material of materials) material.dispose()
+        objects.length = 0; materials.length = 0; markers.length = 0
+        springMaterials.clear()
+        lineProbes.delete(probe)
+        nativeLineInternals.delete(probe)
+      },
+    }
+    lineProbes.add(probe)
+    nativeLineInternals.set(probe, { markers, passes: Math.ceil(slots / SLOTS_PER_PASS), pass, revision })
+    return probe
+  }
+
+  function synchronizeNativeInventory() {
+    if (!root || availability !== 'available' || nativeInventoryRevision === inventoryRevision.value) return
+    root.traverse(object => {
+      if (object.userData.landmarkMarker || nativeDrawableSeen.has(object) || !(object instanceof THREE.Mesh || object instanceof THREE.Line || object instanceof THREE.Points)) return
+      // Exported nodes retain their exact qualified CAD paths. Cloned native
+      // instances inherit the instance owner's path plus their child names.
+      const suffix: string[] = []
+      let owner: RestPart | undefined
+      for (let node: THREE.Object3D | null = object; node && node !== root; node = node.parent) {
+        owner = partsByNode.get(node)
+        if (owner) break
+        suffix.push(typeof node.userData.name === 'string' ? node.userData.name : node.name)
+      }
+      let path = owner ? owner.path : ''
+      for (let i = suffix.length - 1; i >= 0; i--) path += `/${suffix[i]}`
+      if (!path || nativeDrawablePaths.includes(path)) throw new Error(`Native drawable lacks a unique qualified path: ${path}`)
+      nativeDrawables.push({ path, object })
+      nativeDrawablePaths.push(path)
+      nativeDrawableSeen.add(object)
+    })
+    nativeInventoryRevision = inventoryRevision.value
+  }
+
+  function createPartVisibilityProbe(): PartVisibilityProbe {
+    if (availability !== 'available' || !root) throw new Error('Native model is unavailable; a full-geometry visibility probe cannot be created.')
+    const entries: NativeDrawable[] = []
+    const drawablePaths: string[] = []
+    const materials: THREE.Material[] = []
+    let synchronizedRevision = -1
+    let status: PartVisibilityProbe['status'] = 'active'
+
+    function diagnostic(source: THREE.Material, id: number): THREE.Material {
+      const result = source.clone()
+      // Preserve the original shader (including the native swept-wire spring
+      // hook, texture alpha, clipping, side and polygon-offset semantics).
+      const nativeCompile = source.onBeforeCompile
+      const nativeCacheKey = source.customProgramCacheKey()
+      const colour = new THREE.Vector3((id & 255) / 255, ((id >>> 8) & 255) / 255, ((id >>> 16) & 255) / 255)
+      result.onBeforeCompile = (shader, activeRenderer) => {
+        nativeCompile.call(source, shader, activeRenderer)
+        shader.uniforms.nativePathId = { value: colour }
+        shader.fragmentShader = `uniform vec3 nativePathId;\n${shader.fragmentShader}`
+        const end = shader.fragmentShader.lastIndexOf('}')
+        shader.fragmentShader = `${shader.fragmentShader.slice(0, end)}\nif (diffuseColor.a <= 0.0) discard;\ngl_FragColor = vec4(nativePathId, 1.0);\n${shader.fragmentShader.slice(end)}`
+      }
+      result.customProgramCacheKey = () => `${nativeCacheKey}:native-path-id`
+      result.blending = THREE.NoBlending
+      result.depthTest = true
+      result.depthWrite = true
+      result.toneMapped = false
+      materials.push(result)
+      return result
+    }
+
+    function synchronize() {
+      if (status !== 'active' || synchronizedRevision === inventoryRevision.value) return
+      synchronizeNativeInventory()
+      if (nativeDrawables.length > 0xffffff) throw new Error('Native visibility inventory exceeds RGB8 path IDs.')
+      for (let i = entries.length; i < nativeDrawables.length; i++) {
+        const drawable = nativeDrawables[i]!
+        const original = drawable.object.material
+        const id = i + 1
+        const replacement = Array.isArray(original) ? original.map(material => diagnostic(material, id)) : diagnostic(original, id)
+        entries.push({ path: drawable.path, object: drawable.object, original, diagnostic: replacement })
+        drawablePaths.push(drawable.path)
+      }
+      synchronizedRevision = inventoryRevision.value
+    }
+
+    synchronize()
+    const probe: PartVisibilityProbe = {
+      visibilityMode: 'depth-tested-native-surfaces',
+      get partPaths() { synchronize(); return drawablePaths },
+      get status() { return status },
+      dispose() {
+        if (status === 'disposed') return
+        status = 'disposed'
+        for (const material of materials) material.dispose()
+        materials.length = 0
+        entries.length = 0
+        drawablePaths.length = 0
+        visibilityProbes.delete(probe)
+        partVisibilityInternals.delete(probe)
+      },
+    }
+    visibilityProbes.add(probe)
+    partVisibilityInternals.set(probe, { entries, revision, inventoryRevision, synchronize })
     return probe
   }
 
@@ -1298,26 +2491,35 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
     for (const marker of clonedMarkers) marker.removeFromParent()
     source.node.parent!.add(node)
     node.userData.nativeInstanceSource = sourcePartPath
+    node.userData.nativeInstancePath = instancePath
     const instance: RestPart = {
       ...source, path: instancePath, node, position: source.position.clone(), quaternion: source.quaternion.clone(),
       scale: source.scale.clone(), world: source.world.clone(), parentInverse: source.parentInverse.clone(), visible: false,
       overrideWorld: new THREE.Matrix4(), finalWorld: new THREE.Matrix4(), overrideEpoch: -1, finalEpoch: -1,
+      fixedStructuralBody: null,
     }
     node.visible = false
     parts.set(instancePath, instance)
     partsByNode.set(node, instance)
     paths.push(instancePath)
+    revision.value++
+    inventoryRevision.value++
     return 'added'
   }
 
   function dispose() {
     for (const probe of [...probes]) probe.dispose()
+    for (const probe of [...visibilityProbes]) probe.dispose()
+    for (const probe of [...lineProbes]) probe.dispose()
+    revision.value++
     if (root) {
       root.removeFromParent()
       disposeNativeObject(root)
     }
     root = null
     availability = 'unavailable'
+    nativeDrawables.length = 0
+    nativeDrawablePaths.length = 0
     parts.clear()
     paths.length = 0
     driven.length = 0
@@ -1325,8 +2527,9 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
 
   solveMechanism(input, pose)
   return {
-    input, pose, missing, loadError, provenance, partPaths: paths, update, addPartInstance, createLandmarkProbe, dispose,
+    input, pose, missing, loadError, provenance, partPaths: paths, update, addPartInstance, createLandmarkProbe, createNativeLineProbe, assertNativeLinesWithinRestBounds, assertNativeStructuralFixedParts, createPartVisibilityProbe, dispose,
     get availability() { return availability },
+    get nativeDrawablePartPaths() { synchronizeNativeInventory(); return nativeDrawablePaths },
   }
 }
 

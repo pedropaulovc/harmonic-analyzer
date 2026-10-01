@@ -22,6 +22,7 @@
       "required": ["sha256", "sourceCommit", "units", "axes"],
       "properties": {"sha256": {"$ref": "#/$defs/hash"}, "sourceCommit": {"type": "string"}, "units": {"const": "metres"}, "axes": {"const": "X-width/Y-height/Z-depth"}}
     },
+    "nativeGeometryAssumptions": {"type": "array", "minItems": 1, "maxItems": 1, "items": {"$ref": "#/$defs/nativeGeometryAssumption"}, "description": "The sole user-approved rod-head topology mapping, pending a later CAD correction. This is not a measured geometric-fidelity pass and does not exempt source pose, visibility, camera or timing checks."},
     "anchors": {"type": "array", "items": {"$ref": "#/$defs/anchor"}},
     "shots": {
       "type": "array",
@@ -33,10 +34,11 @@
       }
     },
     "frames": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/frame"}},
+    "sourceCameraRigs": {"type": "array", "items": {"$ref": "#/$defs/sourceCameraRig"}},
     "coverage": {
       "type": "object",
       "required": ["status", "blockers", "requiredEveryIntegerSecond"],
-      "properties": {"status": {"enum": ["complete", "blocked"]}, "blockers": {"type": "array", "items": {"type": "string"}}, "requiredEveryIntegerSecond": {"const": true}, "requiredEveryChange": {"const": true}, "changeTimesSeconds": {"type": "array", "items": {"type": "number", "minimum": 0}}, "changeCensusEvidence": {"type": "string", "minLength": 1}}
+      "properties": {"status": {"enum": ["complete", "blocked"]}, "blockers": {"type": "array", "items": {"oneOf": [{"type": "string"}, {"type": "object", "required": ["reason"], "additionalProperties": false, "properties": {"reason": {"$ref": "#/$defs/sourceEvidence"}, "intervalSeconds": {"$ref": "#/$defs/timeInterval"}}}]}}, "requiredEveryIntegerSecond": {"const": true}, "requiredEveryChange": {"const": true}, "changeTimesSeconds": {"type": "array", "items": {"type": "number", "minimum": 0}}, "changeCensusEvidence": {"type": "string", "minLength": 1}}
     }
   },
   "$defs": {
@@ -44,14 +46,136 @@
     "xyz": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"type": "number"}},
     "xyzw": {"type": "array", "minItems": 4, "maxItems": 4, "items": {"type": "number"}},
     "classification": {"enum": ["machine", "non-machine", "transition", "unobservable"]},
+    "sourceEvidence": {"type": "string", "minLength": 1, "pattern": "\\S"},
+    "nativePartPath": {"type": "string", "pattern": "^harmonic-analyzer/[^/*?]+(?:/[^/*?]+)*$"},
+    "timeInterval": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "number", "minimum": 0}},
+    "nativeGeometryAssumption": {
+      "type": "object",
+      "required": ["id", "status", "scope", "nativePartPaths", "authority", "sourceCounterpart", "interpretation"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"const": "rod-head-functional-equivalence"},
+        "status": {"const": "user-approved-pending-cad-match"},
+        "scope": {"const": "rod-head-topology-only"},
+        "nativePartPaths": {"type": "array", "minItems": 1, "maxItems": 20, "uniqueItems": true, "items": {"type": "string", "pattern": "^harmonic-analyzer/channel/connecting-rod-(?:[1-9]|1[0-9]|20)$"}},
+        "authority": {"const": "the one plate-like head vs u crosspiece is a discrepancy but both serve the same purpose; the 3d model will be fixed later to match device; animate assuming they will match later"},
+        "sourceCounterpart": {"const": "Filmed U-shaped connecting-rod junction/crosspiece"},
+        "interpretation": {"const": "Functional linkage mapping for animation only; not a current geometric-fidelity pass."}
+      }
+    },
+    "sourceNonIdentifiableFixedPart": {
+      "type": "object",
+      "required": ["nativePartPath", "status", "scope", "rectSourcePixels", "evidence", "fixedNativeEvidence", "authority", "interpretation"],
+      "additionalProperties": false,
+      "description": "An explicitly approved, rendered native structural fixed part whose actual source region is not identifiable, not excluded or geometric-fidelity passed. Runtime qualification must reject mechanism-driven, deforming and source-overridden parts and cover the actual native ID pixels with this source region.",
+      "properties": {
+        "nativePartPath": {"$ref": "#/$defs/nativePartPath"},
+        "status": {"const": "user-approved-source-non-identifiable"},
+        "scope": {"const": "structural-fixed-part-only"},
+        "rectSourcePixels": {"type": "array", "minItems": 4, "maxItems": 4, "prefixItems": [{"type": "number", "minimum": 0}, {"type": "number", "minimum": 0}, {"type": "number", "exclusiveMinimum": 0}, {"type": "number", "exclusiveMinimum": 0}], "items": false},
+        "evidence": {"$ref": "#/$defs/sourceEvidence"},
+        "fixedNativeEvidence": {"$ref": "#/$defs/sourceEvidence"},
+        "authority": {"const": "Allow explicitly unidentified fixed parts"},
+        "interpretation": {"const": "Rendered source-non-identifiable fixed part; not geometric-fidelity passed."}
+      }
+    },
+    "sourceNonIdentifiableFixedParts": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/sourceNonIdentifiableFixedPart"}, "description": "Explicitly empty when none. Exact record duplicates are rejected here; duplicate native paths, overlapping census classifications, source-region bounds, fixed-motion eligibility and binding equality are runtime-verified against the full native inventory."},
     "sourceImage": {
       "type": "object",
-      "required": ["frameIndex", "sha256Bgr8", "pixelFormat", "width", "height", "sourceSha256"],
-      "properties": {"frameIndex": {"type": "integer", "minimum": 0}, "sha256Bgr8": {"$ref": "#/$defs/hash"}, "pixelFormat": {"const": "bgr8"}, "width": {"type": "integer", "minimum": 1}, "height": {"type": "integer", "minimum": 1}, "sourceSha256": {"$ref": "#/$defs/hash"}}
+      "required": ["frameIndex", "pixelFormat", "width", "height", "sourceSha256"],
+      "additionalProperties": false,
+      "oneOf": [
+        {"properties": {"pixelFormat": {"const": "bgr8"}}, "required": ["sha256Bgr8"], "not": {"required": ["sha256Gray8"]}},
+        {"properties": {"pixelFormat": {"const": "gray8"}}, "required": ["sha256Gray8"], "not": {"required": ["sha256Bgr8"]}}
+      ],
+      "properties": {"frameIndex": {"type": "integer", "minimum": 0}, "sha256Bgr8": {"$ref": "#/$defs/hash"}, "sha256Gray8": {"$ref": "#/$defs/hash"}, "pixelFormat": {"enum": ["bgr8", "gray8"]}, "width": {"type": "integer", "minimum": 1}, "height": {"type": "integer", "minimum": 1}, "sourceSha256": {"$ref": "#/$defs/hash"}}
     },
     "cameraFit": {
       "type": "object",
-      "properties": {"fitPrincipalPoint": {"type": "boolean"}, "verticalFovDegrees": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 180}, "evidence": {"type": "string", "minLength": 1}}
+      "allOf": [
+        {"if": {"required": ["principalPointViewportPixels"]}, "then": {"required": ["evidence"], "properties": {"fitPrincipalPoint": {"const": false}}}},
+        {"if": {"required": ["fitPrincipalPoint"], "properties": {"fitPrincipalPoint": {"const": true}}}, "then": {"required": ["evidence"]}},
+        {"if": {"required": ["verticalFovDegrees"]}, "then": {"required": ["evidence"]}}
+      ],
+      "properties": {"fitPrincipalPoint": {"type": "boolean"}, "principalPointViewportPixels": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "number"}, "description": "Fixed independently evidenced principal point, viewport-local and unmirrored; may lie outside the viewport."}, "verticalFovDegrees": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 180}, "evidence": {"type": "string", "minLength": 1, "pattern": "\\S"}}
+    },
+    "pixelPair": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "number"}},
+    "cameraMeasurement": {
+      "type": "object",
+      "required": ["role", "method", "uncertaintyPx", "measurementEvidence"],
+      "properties": {"role": {"enum": ["fit", "check"]}, "method": {"enum": ["manual", "optical-flow", "image-edge", "template-match"]}, "uncertaintyPx": {"type": "number", "minimum": 0}, "measurementEvidence": {"oneOf": [{"type": "string", "minLength": 1, "pattern": "\\S"}, {"type": "object", "minProperties": 1}]}}
+    },
+    "nativeLineCheck": {
+      "type": "object",
+      "required": ["id", "partPath", "partLocalLineMetres", "sourceLinePixels", "uncertaintyPx", "measurementEvidence"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1}, "partPath": {"type": "string", "minLength": 1},
+        "partLocalLineMetres": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"$ref": "#/$defs/xyz"}, "description": "Finite independently qualified native geometry segment; never reconstructed from the camera being checked."},
+        "sourceLinePixels": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"$ref": "#/$defs/pixelPair"}, "description": "Actually measured source-global segment, not named 3D endpoints at invented image rows."},
+        "uncertaintyPx": {"type": "number", "minimum": 0},
+        "measurementEvidence": {
+          "type": "object",
+          "required": ["sourceImage", "detector", "edgeRows", "axisPerspectiveBiasBoundPx", "axisPerspectiveEvidence"],
+          "properties": {
+            "sourceImage": {"$ref": "#/$defs/sourceImage"},
+            "detector": {"type": "string", "minLength": 1, "pattern": "\\S"},
+            "edgeRows": {"type": "array", "minItems": 2, "items": {"type": "object", "required": ["y", "left", "right", "contrast"], "properties": {"y": {"type": "number"}, "left": {"type": "number"}, "right": {"type": "number"}, "contrast": {"type": "number", "exclusiveMinimum": 0}}}},
+            "axisPerspectiveBiasBoundPx": {"type": "number", "minimum": 0},
+            "axisPerspectiveEvidence": {"type": "string", "minLength": 1, "pattern": "\\S", "description": "Physical justification and independent bound for silhouette midpoint versus projected cylinder-axis perspective asymmetry; source-image edge pairs remain the observations."}
+          }
+        }
+      }
+    },
+    "sourceContourCheck": {
+      "type": "object",
+      "required": ["id", "partPath", "sourceContourPixels", "uncertaintyPx", "measurementEvidence"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"$ref": "#/$defs/sourceEvidence"},
+        "partPath": {"$ref": "#/$defs/nativePartPath"},
+        "sourceContourPixels": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/pixelPair"}, "description": "Independently measured source-global contour samples, bound to the actual decoded exposure; never native projections used as source observations."},
+        "uncertaintyPx": {"type": "number", "minimum": 0},
+        "measurementEvidence": {"type": "object", "required": ["sourceImage", "evidence"], "additionalProperties": false, "properties": {"sourceImage": {"$ref": "#/$defs/sourceImage"}, "evidence": {"$ref": "#/$defs/sourceEvidence"}}}
+      }
+    },
+    "sourceCameraRig": {
+      "type": "object",
+      "required": ["kind", "id", "worldToReferenceCameraCV", "axisPointWorldMetres", "phaseCount", "phaseImages", "measurements", "independentLoopEvidence"],
+      "properties": {
+        "kind": {"const": "turntable"}, "id": {"type": "string", "minLength": 1},
+        "worldToReferenceCameraCV": {"type": "object", "required": ["rotationVectorRad", "translationMetres", "focalPixels"], "properties": {"rotationVectorRad": {"$ref": "#/$defs/xyz"}, "translationMetres": {"$ref": "#/$defs/xyz"}, "focalPixels": {"type": "number", "exclusiveMinimum": 0}}},
+        "axisPointWorldMetres": {"$ref": "#/$defs/xyz"}, "phaseCount": {"const": 71},
+        "phaseImages": {"type": "array", "minItems": 71, "maxItems": 71, "items": {"type": "object", "required": ["phaseIndex", "sourceImage"], "properties": {"phaseIndex": {"type": "integer", "minimum": 0, "maximum": 70}, "sourceImage": {"$ref": "#/$defs/sourceImage"}}}},
+        "measurements": {"type": "array", "minItems": 6, "items": {"allOf": [{"$ref": "#/$defs/cameraMeasurement"}], "required": ["phaseIndex", "anchorId", "pixel"], "properties": {"phaseIndex": {"type": "integer", "minimum": 0, "maximum": 70}, "anchorId": {"type": "string"}, "pixel": {"$ref": "#/$defs/pixelPair"}}}},
+        "independentLoopEvidence": {
+          "type": "object",
+          "required": ["sourceSha256", "decodedNativeFrameCount", "loopNativeFrameCount", "uniqueImageCount", "firstLoopReferenceFrameIndex", "sourceFrameMap", "periodPixelComparison", "evidence"],
+          "properties": {
+            "sourceSha256": {"$ref": "#/$defs/hash"}, "decodedNativeFrameCount": {"type": "integer", "minimum": 142}, "loopNativeFrameCount": {"const": 142}, "uniqueImageCount": {"const": 71}, "firstLoopReferenceFrameIndex": {"type": "integer", "minimum": 0},
+            "sourceFrameMap": {"type": "array", "minItems": 1, "items": {"type": "object", "required": ["sourceImage", "referencePhaseIndex", "referenceSourceImage", "ncc", "secondBestPhaseNcc", "phaseAccepted"], "properties": {"sourceImage": {"$ref": "#/$defs/sourceImage"}, "referencePhaseIndex": {"type": "integer", "minimum": 0, "maximum": 70}, "referenceSourceImage": {"$ref": "#/$defs/sourceImage"}, "ncc": {"type": "number", "minimum": -1, "maximum": 1}, "secondBestPhaseNcc": {"type": "number", "minimum": -1, "maximum": 1}, "phaseAccepted": {"type": "boolean"}}}},
+            "periodPixelComparison": {"type": "object", "required": ["nativeOffset142MedianMAD", "adjacentOffsetMedianMAD"], "properties": {"nativeOffset142MedianMAD": {"type": "number", "minimum": 0}, "adjacentOffsetMedianMAD": {"type": "number", "exclusiveMinimum": 0}}},
+            "evidence": {"type": "string", "minLength": 1, "pattern": "\\S"}
+          }
+        }
+      }
+    },
+    "cameraEvidence": {
+      "oneOf": [
+        {"type": "object", "required": ["kind"], "additionalProperties": false, "properties": {"kind": {"const": "direct-fit"}}},
+        {"type": "object", "required": ["kind", "rigId", "phaseIndex"], "additionalProperties": false, "properties": {"kind": {"const": "shared-rigid-sequence"}, "rigId": {"type": "string", "minLength": 1}, "phaseIndex": {"type": "integer", "minimum": 0, "maximum": 70}}},
+        {
+          "type": "object",
+          "required": ["kind", "reference", "sourceToViewportPixels", "sourceImage", "referenceSourceImage", "correspondences"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": {"const": "source-registered"},
+            "reference": {"oneOf": [{"type": "object", "required": ["timeSeconds", "viewId"], "additionalProperties": false, "properties": {"timeSeconds": {"type": "number", "minimum": 0}, "viewId": {"type": ["string", "null"]}}}, {"type": "object", "required": ["rigId", "phaseIndex"], "additionalProperties": false, "properties": {"rigId": {"type": "string", "minLength": 1}, "phaseIndex": {"type": "integer", "minimum": 0, "maximum": 70}}}]},
+            "sourceToViewportPixels": {"type": "array", "minItems": 6, "maxItems": 6, "items": {"type": "number"}, "description": "Row-major [s,0,tx,0,s,ty], s>0, from reference source-global pixels to unmirrored viewport-local pixels; no shear or rotation."},
+            "sourceImage": {"$ref": "#/$defs/sourceImage"}, "referenceSourceImage": {"$ref": "#/$defs/sourceImage"},
+            "correspondences": {"type": "array", "minItems": 4, "items": {"allOf": [{"$ref": "#/$defs/cameraMeasurement"}], "required": ["id", "sourcePixel", "viewportPixel"], "properties": {"id": {"type": "string", "minLength": 1}, "sourcePixel": {"$ref": "#/$defs/pixelPair"}, "viewportPixel": {"$ref": "#/$defs/pixelPair"}}}}
+          }
+        }
+      ]
     },
     "anchor": {
       "type": "object",
@@ -68,46 +192,171 @@
       "type": "object",
       "description": "Arrays are physical GLB station/instance order: harmonic 20 down to 1, not ascending harmonic order.",
       "required": ["crankTurns", "amplitudes", "phases", "gearing", "magnification", "setup"],
+      "additionalProperties": false,
       "properties": {
         "crankTurns": {"type": "number"},
         "amplitudes": {"type": "array", "minItems": 20, "maxItems": 20, "items": {"type": "number", "minimum": -1, "maximum": 1}},
         "phases": {"type": "array", "minItems": 20, "maxItems": 20, "items": {"type": "number"}},
         "gearing": {"enum": ["small-large", "medium-medium", "large-small"]},
         "magnification": {"type": "number", "exclusiveMinimum": 0},
-        "setup": {"type": "object", "required": ["counterHeightM", "meanLineAngleRad", "platenOffsetM", "coneSwingRad", "pinionCamRad", "heldChannelTurns", "driveCrankOffsetTurns", "wireFixtureOffsetM"], "properties": {"counterHeightM": {"type": ["number", "null"]}, "meanLineAngleRad": {"type": "number"}, "platenOffsetM": {"type": "number"}, "coneSwingRad": {"type": "number"}, "pinionCamRad": {"type": "number"}, "heldChannelTurns": {"type": "number"}, "driveCrankOffsetTurns": {"type": "number", "description": "Measured crank-to-bank offset: engaged drive uses crankTurns minus this. Never defaulted for source footage."}, "wireFixtureOffsetM": {"type": "number"}}}
+        "setup": {"type": "object", "required": ["counterHeightM", "meanLineAngleRad", "platenOffsetM", "coneSwingRad", "pinionCamRad", "heldChannelTurns", "driveCrankOffsetTurns", "wireFixtureOffsetM"], "additionalProperties": false, "properties": {"counterHeightM": {"type": ["number", "null"]}, "meanLineAngleRad": {"type": "number"}, "platenOffsetM": {"type": "number"}, "coneSwingRad": {"type": "number"}, "pinionCamRad": {"type": "number"}, "heldChannelTurns": {"type": "number"}, "driveCrankOffsetTurns": {"type": "number", "description": "Measured crank-to-bank offset: engaged drive uses crankTurns minus this. Never defaulted for source footage."}, "wireFixtureOffsetM": {"type": "number"}}}
+      }
+    },
+    "inputField": {
+      "oneOf": [
+        {"enum": ["crankTurns", "gearing", "magnification", "setup.counterHeightM", "setup.meanLineAngleRad", "setup.platenOffsetM", "setup.coneSwingRad", "setup.pinionCamRad", "setup.heldChannelTurns", "setup.driveCrankOffsetTurns", "setup.wireFixtureOffsetM"]},
+        {"type": "string", "pattern": "^(?:amplitudes|phases)\\[(?:[0-9]|1[0-9])\\]$"}
+      ]
+    },
+    "numericInputField": {"allOf": [{"$ref": "#/$defs/inputField"}, {"not": {"const": "gearing"}}]},
+    "sourceConstraint": {
+      "description": "Closed independently source-measured constraints. Ordered interval bounds, feasible native solutions, unique constraint identities and complete measured-versus-unobserved accounting are also enforced by runtime verification.",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind", "field", "value", "tolerance", "evidence"],
+          "additionalProperties": false,
+          "properties": {"kind": {"const": "input-value"}, "field": {"$ref": "#/$defs/inputField"}, "value": {"type": ["number", "string", "null"]}, "tolerance": {"type": "number", "minimum": 0}, "evidence": {"$ref": "#/$defs/sourceEvidence"}},
+          "oneOf": [
+            {"properties": {"field": {"const": "gearing"}, "value": {"enum": ["small-large", "medium-medium", "large-small"]}, "tolerance": {"const": 0}}},
+            {"properties": {"field": {"const": "setup.counterHeightM"}, "value": {"type": "null"}, "tolerance": {"const": 0}}},
+            {"properties": {"field": {"$ref": "#/$defs/numericInputField"}, "value": {"type": "number"}}}
+          ]
+        },
+        {"type": "object", "required": ["kind", "field", "minimum", "maximum", "evidence"], "additionalProperties": false, "properties": {"kind": {"const": "input-interval"}, "field": {"$ref": "#/$defs/numericInputField"}, "minimum": {"type": "number"}, "maximum": {"type": "number"}, "evidence": {"$ref": "#/$defs/sourceEvidence"}}},
+        {"type": "object", "required": ["kind", "minimumTurns", "maximumTurns", "winding", "evidence"], "additionalProperties": false, "properties": {"kind": {"const": "effective-bank-drive"}, "minimumTurns": {"type": "number"}, "maximumTurns": {"type": "number"}, "winding": {"enum": ["unwrapped", "modulo-one"]}, "evidence": {"$ref": "#/$defs/sourceEvidence"}}},
+        {"type": "object", "required": ["kind", "channelIndex", "minimumRadians", "maximumRadians", "winding", "evidence"], "additionalProperties": false, "properties": {"kind": {"const": "channel-angle"}, "channelIndex": {"type": "integer", "minimum": 0, "maximum": 19}, "minimumRadians": {"type": "number"}, "maximumRadians": {"type": "number"}, "winding": {"enum": ["unwrapped", "modulo-turn"]}, "evidence": {"$ref": "#/$defs/sourceEvidence"}}},
+        {"type": "object", "required": ["kind", "minimumMetres", "maximumMetres", "evidence"], "additionalProperties": false, "properties": {"kind": {"const": "paper-travel"}, "minimumMetres": {"type": "number"}, "maximumMetres": {"type": "number"}, "evidence": {"$ref": "#/$defs/sourceEvidence"}}},
+        {"type": "object", "required": ["kind", "minimumMetres", "maximumMetres", "evidence"], "additionalProperties": false, "properties": {"kind": {"const": "pen-travel"}, "minimumMetres": {"type": "number"}, "maximumMetres": {"type": "number"}, "evidence": {"$ref": "#/$defs/sourceEvidence"}}, "description": "Independently measured pen-travel interval evaluated against the actual solved magnifier.penTravelM output; does not directly observe its unknown input operands."}
+      ]
+    },
+    "sourceCoverage": {
+      "oneOf": [
+        {"type": "object", "required": ["kind", "landmarkIds"], "additionalProperties": false, "properties": {"kind": {"const": "landmarks"}, "landmarkIds": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/sourceEvidence"}}}},
+        {"type": "object", "required": ["kind", "lineCheckIds"], "additionalProperties": false, "properties": {"kind": {"const": "native-line-checks"}, "lineCheckIds": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/sourceEvidence"}}}},
+        {"type": "object", "required": ["kind", "contourCheckIds"], "additionalProperties": false, "properties": {"kind": {"const": "source-contour"}, "contourCheckIds": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/sourceEvidence"}}}},
+        {"type": "object", "required": ["kind", "attachedToPartPath"], "additionalProperties": false, "properties": {"kind": {"const": "rigid-native-attachment"}, "attachedToPartPath": {"$ref": "#/$defs/nativePartPath"}}}
+      ]
+    },
+    "continuity": {"type": "object", "required": ["intervalId", "evidence"], "additionalProperties": false, "properties": {"intervalId": {"$ref": "#/$defs/sourceEvidence"}, "evidence": {"$ref": "#/$defs/sourceEvidence"}}},
+    "sourceComposite": {
+      "oneOf": [
+        {"type": "object", "required": ["mode"], "additionalProperties": false, "properties": {"mode": {"const": "opaque"}}},
+        {"type": "object", "required": ["mode", "groupId", "opacity"], "additionalProperties": false, "properties": {"mode": {"const": "crossfade"}, "groupId": {"$ref": "#/$defs/sourceEvidence"}, "opacity": {"type": "number", "minimum": 0, "maximum": 1}}}
+      ]
+    },
+    "sourcePartOverride": {
+      "type": "object",
+      "required": ["partPath", "evidence", "sourceTimeSeconds", "landmarkIds"],
+      "additionalProperties": false,
+      "properties": {"partPath": {"$ref": "#/$defs/nativePartPath"}, "visibility": {"enum": ["visible", "hidden"]}, "worldPositionMetres": {"$ref": "#/$defs/xyz"}, "worldQuaternion": {"$ref": "#/$defs/xyzw"}, "evidence": {"$ref": "#/$defs/sourceEvidence"}, "sourceTimeSeconds": {"type": "number", "minimum": 0}, "landmarkIds": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/sourceEvidence"}}}
+    },
+    "witnessBinding": {
+      "type": "object",
+      "required": ["sourceVideoId", "sourceSha256", "sourceImage", "modelSha256", "modelSourceCommit", "nativeGeometryAssumptions", "sourceNonIdentifiableFixedParts", "shotId", "viewId", "timeSeconds", "decodedTimeSeconds", "intervalSeconds", "input", "camera", "rectSourcePixels", "presentation", "composite", "partOverrides", "constraints", "continuity"],
+      "additionalProperties": false,
+      "description": "Runtime verification requires exact equality with the enclosing source/model/frame/view identity, complete witness input, camera, ROI, presentation, composite, overrides, constraints, continuity, declared geometry assumptions and the proof's exact source-non-identifiable fixed-part records including their literal authority; this record is not an independent or status-only assertion.",
+      "properties": {
+        "sourceVideoId": {"$ref": "#/$defs/sourceEvidence"}, "sourceSha256": {"$ref": "#/$defs/hash"}, "sourceImage": {"$ref": "#/$defs/sourceImage"},
+        "modelSha256": {"$ref": "#/$defs/hash"}, "modelSourceCommit": {"$ref": "#/$defs/sourceEvidence"},
+        "nativeGeometryAssumptions": {"type": "array", "maxItems": 1, "items": {"$ref": "#/$defs/nativeGeometryAssumption"}},
+        "sourceNonIdentifiableFixedParts": {"$ref": "#/$defs/sourceNonIdentifiableFixedParts"},
+        "shotId": {"$ref": "#/$defs/sourceEvidence"}, "viewId": {"$ref": "#/$defs/sourceEvidence"},
+        "timeSeconds": {"type": "number", "minimum": 0}, "decodedTimeSeconds": {"type": "number", "minimum": 0}, "intervalSeconds": {"$ref": "#/$defs/timeInterval"},
+        "input": {"$ref": "#/$defs/mechanismInput"}, "camera": {"allOf": [{"$ref": "#/$defs/camera"}, {"type": "object"}]},
+        "rectSourcePixels": {"$ref": "#/$defs/xyzw"}, "presentation": {"enum": ["native", "horizontal-mirror"]},
+        "composite": {"$ref": "#/$defs/sourceComposite"}, "partOverrides": {"type": "array", "items": {"$ref": "#/$defs/sourcePartOverride"}},
+        "constraints": {"type": "array", "items": {"$ref": "#/$defs/sourceConstraint"}}, "continuity": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/continuity"}]}
+      }
+    },
+    "visibilityProof": {
+      "type": "object",
+      "required": ["binding", "sourceVisibleParts", "excludedParts", "sourceNonIdentifiableFixedParts", "unresolvedParts", "evidence"],
+      "additionalProperties": false,
+      "description": "Every native inventory path must appear exactly once as independently source-corresponded, evidentially excluded or explicitly user-approved source-non-identifiable structural fixed. Approved fixed parts remain rendered and are not measured/geometric-fidelity passed; moving, deforming or source-overridden parts cannot use that bucket. No unresolved part or rod-head geometry assumption establishes coverage. Full inventory membership, cross-bucket uniqueness, fixed-motion qualification, actual source-region/native ID pixels, references and exact binding records are runtime-verified without relaxing pixel or timing limits.",
+      "anyOf": [{"properties": {"sourceVisibleParts": {"minItems": 1}}}, {"properties": {"excludedParts": {"minItems": 1}}}, {"properties": {"sourceNonIdentifiableFixedParts": {"minItems": 1}}}],
+      "properties": {
+        "binding": {"$ref": "#/$defs/witnessBinding"},
+        "sourceVisibleParts": {"type": "array", "items": {"type": "object", "required": ["partPath", "sourceFeatures", "sourceCoverage", "evidence"], "additionalProperties": false, "properties": {"partPath": {"$ref": "#/$defs/nativePartPath"}, "sourceFeatures": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/sourceEvidence"}}, "sourceCoverage": {"$ref": "#/$defs/sourceCoverage"}, "evidence": {"$ref": "#/$defs/sourceEvidence"}}}},
+        "excludedParts": {"type": "array", "items": {"type": "object", "required": ["partPath", "reason", "evidence"], "additionalProperties": false, "properties": {"partPath": {"$ref": "#/$defs/nativePartPath"}, "reason": {"enum": ["outside", "occluded", "absent"]}, "evidence": {"$ref": "#/$defs/sourceEvidence"}}}},
+        "sourceNonIdentifiableFixedParts": {"$ref": "#/$defs/sourceNonIdentifiableFixedParts"},
+        "unresolvedParts": {"type": "array", "maxItems": 0, "items": {"type": "object", "required": ["partPath", "reason"], "additionalProperties": false, "properties": {"partPath": {"$ref": "#/$defs/nativePartPath"}, "reason": {"$ref": "#/$defs/sourceEvidence"}}}},
+        "evidence": {"$ref": "#/$defs/sourceEvidence"}
+      }
+    },
+    "runtimeWitness": {
+      "type": "object",
+      "required": ["input", "unobservedInputFields", "constraints", "visibilityProof"],
+      "additionalProperties": false,
+      "description": "A chosen feasible source-compatible reconstruction, not recovered hidden history. Runtime accounting requires every one of the 51 scalar coordinates to be directly measured or explicitly unobserved; relation-constrained operands remain individually unobserved.",
+      "allOf": [
+        {"if": {"properties": {"input": {"properties": {"setup": {"properties": {"counterHeightM": {"type": "null"}}}}}}}, "then": {"properties": {"unobservedInputFields": {"contains": {"const": "setup.counterHeightM"}}, "constraints": {"not": {"contains": {"required": ["kind", "field"], "properties": {"field": {"const": "setup.counterHeightM"}}, "anyOf": [{"properties": {"kind": {"const": "input-interval"}}}, {"required": ["value"], "properties": {"kind": {"const": "input-value"}, "value": {"type": "number"}}}]}}}}}},
+        {"if": {"properties": {"constraints": {"contains": {"required": ["kind", "field", "value"], "properties": {"kind": {"const": "input-value"}, "field": {"const": "setup.counterHeightM"}, "value": {"type": "null"}}}}}}, "then": {"properties": {"input": {"properties": {"setup": {"properties": {"counterHeightM": {"type": "null"}}}}}, "unobservedInputFields": {"contains": {"const": "setup.counterHeightM"}}}}}
+      ],
+      "properties": {
+        "input": {"$ref": "#/$defs/mechanismInput"},
+        "unobservedInputFields": {"type": "array", "maxItems": 51, "uniqueItems": true, "items": {"$ref": "#/$defs/inputField"}},
+        "constraints": {"type": "array", "items": {"$ref": "#/$defs/sourceConstraint"}},
+        "visibilityProof": {"$ref": "#/$defs/visibilityProof"},
+        "continuity": {"$ref": "#/$defs/continuity"}
       }
     },
     "mechanicalState": {
       "type": "object",
       "required": ["status", "evidence", "input"],
-      "properties": {"status": {"enum": ["observed", "unobservable", "not-applicable"]}, "evidence": {"type": "string", "minLength": 1}, "input": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/mechanismInput"}]}, "visiblePoseCompleteness": {"enum": ["complete", "partial"]}}
+      "additionalProperties": false,
+      "oneOf": [
+        {"required": ["visiblePoseCompleteness", "visibilityProof"], "properties": {"status": {"const": "observed"}, "input": {"allOf": [{"$ref": "#/$defs/mechanismInput"}, {"properties": {"setup": {"properties": {"counterHeightM": {"type": "number"}}}}}]}, "visiblePoseCompleteness": {"const": "complete"}, "visibilityProof": {"properties": {"binding": {"properties": {"input": {"properties": {"setup": {"properties": {"counterHeightM": {"type": "number"}}}}}, "constraints": {"maxItems": 0}, "continuity": {"type": "null"}}}}}}, "not": {"required": ["runtimeWitness"]}},
+        {"required": ["visiblePoseCompleteness", "runtimeWitness"], "properties": {"status": {"const": "constrained"}, "input": {"type": "null"}, "visiblePoseCompleteness": {"const": "complete"}}, "not": {"required": ["visibilityProof"]}},
+        {"properties": {"status": {"enum": ["unobservable", "not-applicable"]}, "input": {"type": "null"}}, "not": {"anyOf": [{"required": ["runtimeWitness"]}, {"required": ["visibilityProof"]}]}}
+      ],
+      "properties": {"status": {"enum": ["observed", "constrained", "unobservable", "not-applicable"]}, "evidence": {"$ref": "#/$defs/sourceEvidence"}, "input": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/mechanismInput"}]}, "visiblePoseCompleteness": {"enum": ["complete", "partial"]}, "runtimeWitness": {"$ref": "#/$defs/runtimeWitness"}, "visibilityProof": {"$ref": "#/$defs/visibilityProof"}}
     },
     "camera": {
       "type": ["object", "null"],
       "required": ["positionMetres", "quaternion", "verticalFovDegrees", "fitRmsPx", "heldOutMaxPx", "status"],
-      "properties": {"positionMetres": {"$ref": "#/$defs/xyz"}, "quaternion": {"$ref": "#/$defs/xyzw"}, "verticalFovDegrees": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 180}, "fitRmsPx": {"type": "number", "minimum": 0}, "heldOutMaxPx": {"type": "number", "minimum": 0}, "status": {"enum": ["passed", "failed"]}}
+      "properties": {"positionMetres": {"$ref": "#/$defs/xyz"}, "quaternion": {"$ref": "#/$defs/xyzw"}, "verticalFovDegrees": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 180}, "principalPointViewportPixels": {"$ref": "#/$defs/pixelPair"}, "fitRmsPx": {"type": "number", "minimum": 0}, "heldOutMaxPx": {"type": "number", "minimum": 0}, "status": {"enum": ["passed", "failed"]}}
     },
     "view": {
       "type": "object",
       "required": ["id", "rectSourcePixels", "presentation", "camera", "mechanicalState"],
+      "allOf": [{"if": {"required": ["mechanicalState"], "properties": {"mechanicalState": {"required": ["status"], "properties": {"status": {"enum": ["observed", "constrained"]}}}}}, "then": {"properties": {"camera": {"type": "object"}}}}, {"if": {"required": ["composite"], "properties": {"composite": {"required": ["mode"], "properties": {"mode": {"const": "crossfade"}}}}}, "then": {"required": ["compositeEvidence"]}}],
       "properties": {
         "id": {"type": "string"},
         "rectSourcePixels": {"$ref": "#/$defs/xyzw"},
         "presentation": {"enum": ["native", "horizontal-mirror"]},
         "camera": {"$ref": "#/$defs/camera"},
+        "cameraFit": {"$ref": "#/$defs/cameraFit"},
+        "cameraEvidence": {"$ref": "#/$defs/cameraEvidence"},
+        "nativeLineChecks": {"type": "array", "items": {"$ref": "#/$defs/nativeLineCheck"}},
+        "sourceContourChecks": {"type": "array", "items": {"$ref": "#/$defs/sourceContourCheck"}},
+        "composite": {"$ref": "#/$defs/sourceComposite"},
+        "compositeEvidence": {"$ref": "#/$defs/sourceEvidence"},
         "mechanicalState": {"$ref": "#/$defs/mechanicalState"},
-        "partOverrides": {"type": "array", "items": {"type": "object", "required": ["partPath", "visibility"], "properties": {"partPath": {"type": "string"}, "visibility": {"enum": ["visible", "hidden"]}, "worldPositionMetres": {"$ref": "#/$defs/xyz"}, "worldQuaternion": {"$ref": "#/$defs/xyzw"}}}}
+        "partOverrides": {"type": "array", "items": {"$ref": "#/$defs/sourcePartOverride"}}
       }
     },
     "frame": {
       "type": "object",
       "required": ["timeSeconds", "decodedTimeSeconds", "shotId", "classification", "landmarks", "unavailable", "mechanicalState", "camera"],
-      "allOf": [{"if": {"properties": {"landmarks": {"minItems": 1}}}, "then": {"required": ["sourceImage"]}}],
+      "allOf": [
+        {"if": {"properties": {"landmarks": {"minItems": 1}}}, "then": {"required": ["sourceImage"]}},
+        {"if": {"required": ["mechanicalState"], "properties": {"mechanicalState": {"required": ["status"], "properties": {"status": {"enum": ["observed", "constrained"]}}}}}, "then": {"required": ["sourceImage"]}},
+        {"if": {"required": ["views"], "properties": {"views": {"contains": {"required": ["mechanicalState"], "properties": {"mechanicalState": {"required": ["status"], "properties": {"status": {"enum": ["observed", "constrained"]}}}}}}}}, "then": {"required": ["sourceImage"]}},
+        {"if": {"not": {"required": ["views"]}, "properties": {"mechanicalState": {"required": ["status"], "properties": {"status": {"enum": ["observed", "constrained"]}}}}}, "then": {"properties": {"camera": {"type": "object"}}}},
+        {"if": {"required": ["composite"], "properties": {"composite": {"required": ["mode"], "properties": {"mode": {"const": "crossfade"}}}}}, "then": {"required": ["compositeEvidence"]}}
+      ],
       "properties": {
         "timeSeconds": {"type": "number", "minimum": 0}, "decodedTimeSeconds": {"type": "number", "minimum": 0}, "shotId": {"type": "string"}, "classification": {"$ref": "#/$defs/classification"},
         "landmarks": {"type": "array", "items": {"$ref": "#/$defs/landmark"}},
         "unavailable": {"type": "array", "items": {"type": "object", "required": ["anchorId", "reason"], "properties": {"anchorId": {"type": "string"}, "reason": {"type": "string"}}}},
         "mechanicalState": {"$ref": "#/$defs/mechanicalState"}, "camera": {"$ref": "#/$defs/camera"}, "views": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/view"}},
+        "nativeLineChecks": {"type": "array", "items": {"$ref": "#/$defs/nativeLineCheck"}},
+        "sourceContourChecks": {"type": "array", "items": {"$ref": "#/$defs/sourceContourCheck"}},
+        "partOverrides": {"type": "array", "items": {"$ref": "#/$defs/sourcePartOverride"}},
+        "composite": {"$ref": "#/$defs/sourceComposite"},
+        "compositeEvidence": {"$ref": "#/$defs/sourceEvidence"},
+        "cameraEvidence": {"$ref": "#/$defs/cameraEvidence"},
         "sourceImage": {"$ref": "#/$defs/sourceImage"}, "cameraFit": {"$ref": "#/$defs/cameraFit"}, "anchorPoseMissing": {"type": "array", "items": {"type": "string"}}
       }
     }
