@@ -34,6 +34,8 @@ export interface SourceShot {
 export interface ReferenceAnchor {
   id: string
   kind: 'section-center' | 'physical-feature'
+  /** Unknown source motion remains null/absent, never an implied moving/fixed label. */
+  motion?: 'fixed' | 'moving' | null
   partPath?: string
   partLocalMetres?: [number, number, number]
   worldMetres?: [number, number, number]
@@ -46,7 +48,7 @@ export interface Landmark {
   role: 'fit' | 'check'
   pixel: [number, number]
   status: 'observed'
-  method: 'manual' | 'optical-flow' | 'image-edge'
+  method: 'manual' | 'optical-flow' | 'image-edge' | 'template-match'
   uncertaintyPx: number
 }
 interface PlaybackCamera extends CameraRecord {

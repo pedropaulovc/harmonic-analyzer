@@ -19,6 +19,14 @@ component names; missing joints have a separate persistent warning and prevent
 complete synchronization acceptance. Original geometry is not decimated, resized
 or replaced with proxy parts.
 
+The viewer generates a PMREM room environment once for image-based lighting.
+The native steel and brass materials are fully metallic, so diffuse hemisphere
+lighting alone leaves their surfaces dark. The environment contributes reflected
+light only: its room geometry is not added to the machine scene or drawable
+inventory, and native GLB geometry and materials remain unchanged. Temporary room
+and PMREM resources are released after generation; the environment render target
+is released with the viewer.
+
 ## Physical model
 
 All twenty stations contribute to the torque balance, in their CAD row order
@@ -105,6 +113,13 @@ Unobserved inputs may be chosen feasibly and must remain labelled as chosen,
 not historically recovered. No second solver, proxy geometry, fake visibility
 certificates or arbitrary individual-part adjustments are permitted.
 
+Phase offsets interpolate along the shortest angular arc; cumulative crank turns
+remain linear. The Analysis bank's independently fitted inverse cam roots are
+continued on the nearest genuine branch before interpolation. Both roots preserve
+the observed rocker angle, but may change an unobserved cam/rod orientation.
+Retain the original rod bounds, CHECK pixels and branch-choice audit; do not
+suppress an infeasible transition or claim recovered phase history.
+
 Production playback does not require semantic source certificates for every one
 of the 435 native drawables at every exposure. Native model identity, complete
 inventory and coherent attached-part motion still matter. Offline source evidence
@@ -120,10 +135,12 @@ Unsupported required intervals remain explicit in the UI and reports.
 ### Measurement and refinement
 
 Use original hashed footage and timestamped source observations. Evaluate every
-integer second and visible camera/mechanism change, with additional intermediate
-checks around fast motion, cuts and nonlinear interpolation. Reference landmarks
-must include spatially distributed fixed features and visible moving features;
-a favorable camera fit alone cannot prove the mechanism state.
+integer second and visible camera/mechanism change. Additional intermediate probes
+use real independently observed source exposures, never interpolated oracle pixels.
+Their unavailable measurements are diagnostic; an admitted over-limit error still
+fails the stage. Reference landmarks must include spatially distributed fixed
+features and visible moving features; a favorable camera fit alone cannot prove
+the mechanism state.
 
 Compare the actual rendered native model with source landmarks and inspect
 source/render overlays and silhouettes. Report source-localization uncertainty
@@ -131,6 +148,13 @@ and known geometry exceptions separately; do not relabel unknown correspondences
 or uncertain measurements as precise passes. Existing hard foot/guide/pen failures
 remain useful regression diagnostics, not obligations to solve an exhaustive
 part-identification problem before showing any animation.
+
+GPU landmarks explicitly use `depth-off-landmark-projection`. Their errors measure
+projected feature positions, not visible native surfaces: an opaque part can cover
+an accurately projected marker. A favorable landmark result therefore cannot
+replace actual source/render inspection. Use the depth-tested native part-ID
+capture to distinguish genuinely occluding components from dark metallic surfaces;
+lighting changes must not change those surface owners or hide native geometry.
 
 Per-video verification is incremental and repeatable, without an acceptance-run
 quota. The all-video final gate retains all six pages and the 5%/0.5-second limits.

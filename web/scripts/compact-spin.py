@@ -5,6 +5,7 @@ No source video/frames are redistributed, no historical hidden state is recovere
 and no CPU camera diagnostic is promoted to a current native GPU measurement.
 """
 import copy
+import hashlib
 import importlib.util
 import json
 from pathlib import Path
@@ -13,6 +14,62 @@ HERE = Path(__file__).resolve().parent
 spec = importlib.util.spec_from_file_location("compact_source_common", HERE / "compact-source-common.py")
 common = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(common)
+
+
+def retain_phase_point_provenance(data, family):
+    """Copy actual phase/patch evidence; never synthesize generic seed scores."""
+    declaration = family["independentSourcePhaseMap"]
+    path = common.WEB.parent / declaration["path"]
+    raw = path.read_bytes()
+    if hashlib.sha256(raw).hexdigest() != declaration["sha256"]:
+        raise ValueError("Retained Spin phase-map bytes disagree with the declared source evidence hash.")
+    phase_map = json.loads(raw)
+    rig = next(rig for rig in data["sourceCameraRigs"] if rig["id"] == phase_map["rigId"])
+    registrations = {row["sourceImage"]["frameIndex"]: row for row in phase_map["sourceFrameMap"]}
+    references = {row["phaseIndex"]: row["sourceImage"] for row in phase_map["references"]}
+    measurements = {(row["phaseIndex"], row["anchorId"], row["role"]): row for row in rig["measurements"]}
+    recovered = direct_edges = unresolved = 0
+    for frame in data["frames"]:
+        image = frame.get("sourceImage")
+        registration = registrations.get((image or {}).get("frameIndex"))
+        for point in frame.get("landmarks", []):
+            if point.get("method") != "template-match" or point.get("trackingEvidence"):
+                continue
+            evidence = point.get("measurementEvidence") or {}
+            if not registration or registration["sourceImage"] != image or evidence.get("sourceImage") != image:
+                unresolved += 1
+                continue
+            phase_index = registration["referencePhaseIndex"]
+            seed = measurements.get((phase_index, point["anchorId"], point["role"]))
+            reference_image = references[phase_index]
+            if (not seed or seed["measurementEvidence"]["sourceImage"] != reference_image
+                    or registration["referenceSourceImage"] != reference_image
+                    or evidence.get("referenceFrameIndex") != reference_image["frameIndex"]
+                    or evidence.get("referencePixel") != seed["pixel"]):
+                unresolved += 1
+                continue
+            point["trackingEvidence"] = {
+                "kind": "retained-source-phase-patch-reacquisition",
+                "sourceImage": copy.deepcopy(image),
+                "referenceSourceImage": copy.deepcopy(reference_image),
+                "referenceMeasurement": copy.deepcopy(seed),
+                "actualWholeMachineRoiNcc": registration["ncc"],
+                "wholeMachineRoiSourcePixels": copy.deepcopy(registration["roiSourcePixels"]),
+                "actualSourcePatchNcc": evidence["actualPatchNcc"],
+                "actualSearchOffsetPixels": copy.deepcopy(evidence["actualSearchOffsetPixels"]),
+                "phaseMap": copy.deepcopy(declaration),
+                "qualification": "Actual source phase/patch scores and independent image-edge reference, not a manual-seed whole-view template certificate; generic .998/.97 qualifications are not asserted.",
+            }
+            recovered += 1
+            if image == reference_image and point["pixel"] == seed["pixel"] and seed["method"] == "image-edge":
+                # This is the actual independently measured edge exposure itself,
+                # not a later image inferred from that edge or a camera projection.
+                point["method"] = "image-edge"
+                point["measurementEvidence"]["referenceImageEdgeMeasurement"] = copy.deepcopy(seed["measurementEvidence"])
+                direct_edges += 1
+    return {"phaseMap": copy.deepcopy(declaration), "actualRawPointProvenanceRecovered": recovered,
+            "exactReferenceExposureImageEdges": direct_edges, "rawProvenanceUnavailable": unresolved,
+            "qualification": "Source evidence retained, not blanket template admission. Other reacquisitions still need an independently admissible seed and adequate actual target source-view/feature correlations."}
 
 
 def main():
@@ -43,6 +100,7 @@ def main():
         existing_times.add(pts)
     data["compactChangeTimesSeconds"] = [entry["decodedTimeSeconds"] for entry in controls["frames"]]
     family = seeds["staticSourceFamily"]
+    phase_tracking = retain_phase_point_provenance(data, family)
     for amendment in seeds["staticMotion"]["shotAmendments"]:
         shot = next(shot for shot in data["shots"] if shot["id"] == amendment["id"])
         shot.update(copy.deepcopy(amendment))
@@ -87,10 +145,15 @@ def main():
                     "presentation": original.get("presentation", "native"), "camera": camera,
                     "input": common.compact_input(candidate["input"]),
                     "provenance": common.chosen_provenance(evidence, candidate["unobservedInputFields"])}
-            camera_kind = "source-fit" if view_id in ("whole", "closeup") else "source-transfer"
+            camera_kind = "source-transfer"
             if view_id == "endcard-guide":
                 camera_kind = "source-informed-framing"
             camera_family = f'XPQwKRt4Y2k:{view_id}:71-phase-rig' if view_id in ("whole", "closeup") else f'XPQwKRt4Y2k:{view_id}:{seed["candidateId"]}'
+            if view_id in ("whole", "closeup"):
+                evidence += (
+                    f"Camera derives from the single independently source-calibrated71-phase rig {family['id']} "
+                    "and retained target photographic phase/crop registration; not an independent camera fit at every exposure."
+                )
             view["cameraProvenance"] = {"kind": camera_kind, "family": camera_family, "evidence": evidence}
             view["cameraContinuityFamily"] = camera_family
             composite = common.compact_composite(original)
@@ -135,6 +198,13 @@ def main():
     track["sourceMotionFamilies"] = [copy.deepcopy(family)]
     track["sourceMeasurementTracking"] = {"method": controls["method"], "qualification": controls["qualification"],
                                          "summary": controls["summary"], "trackingFailures": controls["trackingFailures"]}
+    track["sourceMeasurementTracking"]["phasePatchReacquisition"] = phase_tracking
+    track["sourceMeasurements"]["status"] = "partial"
+    track["sourceMeasurements"]["blockers"].append(
+        "Whole-view phase/patch reacquisitions retain actual ROI NCC, actual feature NCC and independent image-edge reference measurements. "
+        "Non-reference exposures do not supply the generic manual-seed whole-view .998 / feature .97 template certificate; "
+        "low-correlation fade/blur exposures and missing generic qualifications remain unavailable, not promoted or removed."
+    )
     track["unsupportedSourceMeasurements"] = [
         {"startSeconds": 141.55808333333331, "endSeconds": 169.41924999999998,
          "scope": "Independent fixed/moving landmark checks for all nine photographed montage views at each retained second/change point",

@@ -3,7 +3,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { VIDEO_IDS, MODEL_SHA256, MODEL_COMMIT, CLOCK_LIMIT, probeSource, verifyFrameImages, nearestPtsIndex, sourceNeedsMachine, frameViews, sourcePointUnmasked, jsonDigest } from './verify-reference.mjs'
+import { VIDEO_IDS, MODEL_SHA256, MODEL_COMMIT, CLOCK_LIMIT, probeSource, verifyFrameImages, claimedSourceImages, nearestPtsIndex, sourceNeedsMachine, frameViews, sourcePointUnmasked, jsonDigest } from './verify-reference.mjs'
 import { distManifest, serveDist } from './verify-server.mjs'
 
 const WEB_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -72,6 +72,47 @@ export function sourcePtsInShot(frame, shot) {
   return Boolean(shot && finite(frame.decodedTimeSeconds) && shot.startSeconds <= frame.decodedTimeSeconds && frame.decodedTimeSeconds < shot.endSeconds)
 }
 
+/** Renames need identical declared source support; equal-sized crossfade layers are ambiguous. */
+function compactSourceViewId(original, sourceViewId, views) {
+  if (views.some(view => view.id === sourceViewId)) return { viewId: sourceViewId }
+  const sourceView = frameViews(original).find(view => view.id === sourceViewId)
+  if (!sourceView) return { reason: `Original source view ${sourceViewId} has no declared layout for compact-view mapping` }
+  if (!Array.isArray(sourceView.rectSourcePixels) || sourceView.rectSourcePixels.length !== 4 || !sourceView.rectSourcePixels.every(finite)) return { reason: `Original source view ${sourceViewId} has no measured support for compact-view mapping` }
+  const candidates = views.filter(view => Array.isArray(view.rectSourcePixels) && jsonDigest(view.rectSourcePixels) === jsonDigest(sourceView.rectSourcePixels)
+    && view.presentation === sourceView.presentation
+    && (view.composite?.mode ?? 'opaque') === (sourceView.composite?.mode ?? 'opaque'))
+  const sourcePeers = frameViews(original).filter(view => Array.isArray(view.rectSourcePixels) && jsonDigest(view.rectSourcePixels) === jsonDigest(sourceView.rectSourcePixels)
+    && view.presentation === sourceView.presentation && (view.composite?.mode ?? 'opaque') === (sourceView.composite?.mode ?? 'opaque'))
+  if (sourcePeers.length !== 1) return { reason: `Ambiguous original source view ${sourceViewId} mapping would merge distinct explicit source perspectives` }
+  if (candidates.length !== 1) return { reason: `${candidates.length ? 'Ambiguous' : 'Unavailable'} original source view ${sourceViewId} mapping to declared compact views` }
+  return { viewId: candidates[0].id, sourceViewId, evidence: 'Identical original/compact source ROI, presentation and compositing mode' }
+}
+
+function compactSourceViewRequirement(original, sourceViewId, views) {
+  const sourceView = original.views?.find(view => view.id === sourceViewId)
+  const declared = views.filter(view => view.sourceViewIds?.includes(sourceViewId))
+  if (sourceView && Array.isArray(sourceView.rectSourcePixels) && declared.length > 1 && declared.every(view => Array.isArray(view.sourceViewIds) && view.sourceViewIds.length === 1
+    && typeof view.sourceViewMappingEvidence === 'string' && view.sourceViewMappingEvidence.trim()
+    && jsonDigest(view.rectSourcePixels) === jsonDigest(sourceView.rectSourcePixels) && view.presentation === sourceView.presentation
+    && view.composite?.mode === 'crossfade' && view.composite.groupId === declared[0].composite?.groupId
+    && typeof view.composite.imageLayerId === 'string' && view.composite.imageLayerId.trim())
+    && new Set(declared.map(view => view.composite.imageLayerId)).size === declared.length) {
+    return { viewIds: declared.map(view => view.id), evidence: declared.map(view => view.sourceViewMappingEvidence) }
+  }
+  const mapping = compactSourceViewId(original, sourceViewId, views)
+  return { ...mapping, viewIds: [mapping.viewId ?? sourceViewId] }
+}
+
+function compactSourceLandmarks(original, views, observations = original.landmarks ?? []) {
+  const landmarks = [], unavailable = []
+  for (const observed of observations) {
+    const sourceViewId = observed.viewId ?? 'main', mapping = compactSourceViewId(original, sourceViewId, views)
+    if (!mapping.viewId) { unavailable.push({ anchorId: observed.anchorId, viewId: sourceViewId, reason: mapping.reason }); continue }
+    landmarks.push(mapping.sourceViewId ? { ...observed, viewId: mapping.viewId, originalViewId: sourceViewId, viewMappingEvidence: mapping.evidence } : observed)
+  }
+  return { landmarks, unavailable }
+}
+
 /** Source census is retained separately from authored camera/input candidates. */
 export function sourceCensus(observations, track, native, options) {
   const times = new Map(), sourceShots = track.shots ?? observations.shots
@@ -86,11 +127,7 @@ export function sourceCensus(observations, track, native, options) {
   for (let time = 0; time < native.durationSeconds; time++) add(time, 'every-second')
   for (const time of track.coverage?.changeTimesSeconds ?? []) add(time, 'authored-change-point')
   for (const shot of sourceShots) { add(shot.startSeconds, 'shot-start'); add(shot.endSeconds, 'shot-end') }
-  for (let index = 0; index < track.frames.length; index++) {
-    const frame = track.frames[index], next = track.frames[index + 1]
-    add(frame.timeSeconds, 'authored-sample')
-    if (next && next.shotId === frame.shotId && next.timeSeconds - frame.timeSeconds >= 0.125 && next.timeSeconds - frame.timeSeconds <= 2) add((frame.timeSeconds + next.timeSeconds) / 2, 'mid-interval')
-  }
+  for (const frame of track.frames) add(frame.timeSeconds, 'authored-sample')
   // Preserve real view membership/cut changes, not every exposure of continuous motion.
   let precedingLayout = null
   const framesByShot = new Map()
@@ -99,13 +136,24 @@ export function sourceCensus(observations, track, native, options) {
     if (precedingLayout !== layout) add(frame.timeSeconds, 'retained-layout-change')
     precedingLayout = layout
     const shot = compactShots.get(frame.shotId) ?? originalShots.get(frame.shotId)
-    if (!shot || !finite(frame.decodedTimeSeconds) || frame.decodedTimeSeconds < shot.startSeconds || frame.decodedTimeSeconds >= shot.endSeconds) continue
+    if (!sourcePtsInShot(frame, shot)) continue
     if (!framesByShot.has(frame.shotId)) framesByShot.set(frame.shotId, [])
     framesByShot.get(frame.shotId).push(frame)
   }
   for (const pool of framesByShot.values()) pool.sort((a, b) => a.decodedTimeSeconds - b.decodedTimeSeconds)
+  for (let index = 0; index < track.frames.length - 1; index++) {
+    const from = track.frames[index], to = track.frames[index + 1], gap = to.timeSeconds - from.timeSeconds
+    if (from.shotId !== to.shotId || gap < 0.125 || gap > 2) continue
+    const pool = (framesByShot.get(from.shotId) ?? []).filter(frame => frame.decodedTimeSeconds > from.timeSeconds + 1e-6
+      && frame.decodedTimeSeconds < to.timeSeconds - 1e-6 && frame.landmarks?.some(item => item.status === 'observed' && point(item.pixel)))
+    const original = nearestFrame(pool, (from.timeSeconds + to.timeSeconds) / 2, 'decodedTimeSeconds')
+    // Extra interpolation probes are diagnostic, at actual observed exposures,
+    // not arithmetic midpoints that create an uncollectable mandatory oracle.
+    if (original) add(original.decodedTimeSeconds, 'mid-interval')
+  }
   for (const time of options.times ?? []) add(time, 'requested-sample')
   const rows = [...times.values()].sort((a, b) => a.timeSeconds - b.timeSeconds).map(row => {
+    const diagnosticOnly = row.reasons.every(reason => reason === 'mid-interval')
     const shot = sourceShots.find(shot => shot.startSeconds <= row.timeSeconds && row.timeSeconds < shot.endSeconds)
     const original = nearestFrame(framesByShot.get(shot?.id) ?? [], row.timeSeconds, 'decodedTimeSeconds')
     const authored = nearestFrame(track.frames, row.timeSeconds)
@@ -116,22 +164,36 @@ export function sourceCensus(observations, track, native, options) {
     const originalRequired = original ? sourceNeedsMachine(original, originalShots.get(original.shotId)) : !shot || shot.hasCorrespondingMachine !== false && shot.classification !== 'non-machine'
     const compactRequired = governing ? sourceNeedsMachine(governing, shot) : originalRequired
     const required = originalRequired || compactRequired
-    const expectedViewIds = [...new Set([...(originalRequired && original ? frameViews(original).map(view => view.id) : []), ...(compactRequired ? governing?.views?.map(view => view.id) ?? [] : [])])]
+    // frameViews' implicit main is a legacy convenience, not an independently
+    // declared source perspective. All explicit source views remain required.
+    const sourceViewMappings = originalRequired && original?.views ? original.views.map(view => ({ originalViewId: view.id, ...compactSourceViewRequirement(original, view.id, governing?.views ?? []) })) : []
+    const expectedViewIds = [...new Set([...sourceViewMappings.flatMap(mapping => mapping.viewIds), ...(compactRequired ? governing?.views?.map(view => view.id) ?? [] : [])])]
     const tolerance = row.reasons.includes('every-second') ? 1e-5 : 1 / native.fps + 0.001
     let frame = authored && Math.abs(authored.timeSeconds - row.timeSeconds) <= tolerance && authored.shotId === shot?.id ? authored : null
     let unavailableReason = frame ? null : 'Missing authored sample at retained every-second/change-point source time'
     const between = from && to && from.shotId === shot?.id && to.shotId === shot.id && row.timeSeconds > from.timeSeconds + 1e-6 && row.timeSeconds < to.timeSeconds - 1e-6
     if (between && (row.reasons.includes('mid-interval') || row.reasons.includes('requested-sample'))) {
-      if (original && Math.abs(original.decodedTimeSeconds - row.timeSeconds) <= 1 / native.fps + 0.001) {
-        frame = { timeSeconds: row.timeSeconds, decodedTimeSeconds: original.decodedTimeSeconds, shotId: shot.id, classification: original.classification, landmarks: original.landmarks ?? [], views: from.views ?? [], measuredInterpolation: true, interpolationInterval: [from.timeSeconds, to.timeSeconds], ...(original.sourceImage ? { sourceImage: original.sourceImage } : {}) }
+      if (original && original.decodedTimeSeconds > from.timeSeconds && original.decodedTimeSeconds < to.timeSeconds
+        && Math.abs(original.decodedTimeSeconds - row.timeSeconds) <= 1 / native.fps + 0.001) {
+        const mapped = compactSourceLandmarks(original, from.views ?? [])
+        frame = { timeSeconds: row.timeSeconds, decodedTimeSeconds: original.decodedTimeSeconds, shotId: shot.id, classification: original.classification, landmarks: mapped.landmarks, viewMappingUnavailable: mapped.unavailable, views: from.views ?? [], measuredInterpolation: true, interpolationInterval: [from.timeSeconds, to.timeSeconds], ...(original.sourceImage ? { sourceImage: original.sourceImage } : {}) }
         unavailableReason = null
       } else { frame = null; unavailableReason = 'No independent same-shot source observation within one native frame of the interpolation sample; oracle pixels are never interpolated' }
     }
     if (frame && finite(frame.decodedTimeSeconds) && !sourcePtsInShot(frame, shot)) { frame = null; unavailableReason = 'Observed source PTS lies outside its own half-open source shot' }
-    return { ...row, required, sourceShotId: shot?.id ?? original?.shotId ?? null, originalTimeSeconds: original?.timeSeconds ?? null, expectedViewIds, frame, unavailableReason }
+    if (frame && !frame.measuredInterpolation && frame.landmarks?.some(item => !frame.views?.some(view => view.id === (item.viewId ?? 'main')))) {
+      const source = nearestFrame(framesByShot.get(frame.shotId) ?? [], frame.decodedTimeSeconds, 'decodedTimeSeconds')
+      if (source && Math.abs(source.decodedTimeSeconds - frame.decodedTimeSeconds) <= 0.001) {
+        const mapped = compactSourceLandmarks(source, frame.views ?? [], frame.landmarks)
+        frame = { ...frame, landmarks: mapped.landmarks, viewMappingUnavailable: mapped.unavailable }
+      } else {
+        frame = { ...frame, viewMappingUnavailable: [{ reason: 'Original landmark view identity has no same-exposure source layout for compact-view mapping' }] }
+      }
+    }
+    return { ...row, diagnosticOnly, required, sourceShotId: shot?.id ?? original?.shotId ?? null, originalTimeSeconds: original?.timeSeconds ?? null, expectedViewIds, sourceViewMappings, frame, unavailableReason }
   })
   const selected = rows.filter(row => options.times ? options.times.some(time => Math.abs(time - row.timeSeconds) < 1e-5) : (options.from === null || row.timeSeconds >= options.from) && (options.to === null || row.timeSeconds <= options.to))
-  for (const time of options.times ?? []) if (time >= native.durationSeconds) selected.push({ timeSeconds: time, reasons: ['requested-sample'], required: true, expectedViewIds: [], frame: null, unavailableReason: 'Requested time is outside the original source duration' })
+  for (const time of options.times ?? []) if (time >= native.durationSeconds) selected.push({ timeSeconds: time, reasons: ['requested-sample'], diagnosticOnly: false, required: true, expectedViewIds: [], frame: null, unavailableReason: 'Requested time is outside the original source duration' })
   return { rows, selected }
 }
 
@@ -147,6 +209,53 @@ async function loadRecord(id, referenceRoot, signal) {
   const sourcePath = resolve(referenceRoot, 'videos', `${id}.mp4`)
   const native = await probeSource(sourcePath, track.source, { signal })
   return { id, track, observations, sourcePath, native, digest: jsonDigest(track) }
+}
+
+async function replayCensusImages(record, census, staticControls, video, signal) {
+  const source = record.track.source, replayOptions = { signal, native: record.native, source }
+  const mandatoryData = { frames: census.selected.filter(row => !row.diagnosticOnly).map(row => row.frame).filter(Boolean), staticPhaseImages: staticControls.phaseImages, source }
+  const verifiedImages = new Set()
+  try {
+    video.source.imageReplay = await verifyFrameImages(record.sourcePath, mandatoryData, replayOptions)
+    for (const { image } of claimedSourceImages(mandatoryData)) verifiedImages.add(jsonDigest(image))
+  } catch (error) { video.failures.push({ code: 'source-image-replay', reason: error.message }) }
+  const rows = census.selected.filter(row => row.diagnosticOnly && row.frame), additionalImages = new Map(), additionalRows = []
+  const diagnostics = { status: rows.length ? 'passed' : 'not-required', additionalDeclaredIdentities: 0, reusedSamples: 0, unavailableSamples: 0, failures: [] }
+  const unavailable = (row, reason) => {
+    row.sourceImageReplay = { status: 'unavailable', reason }
+    row.frame = null
+    row.unavailableReason = reason
+    diagnostics.failures.push({ timeSeconds: row.timeSeconds, reason })
+  }
+  for (const row of rows) {
+    const frame = row.frame, image = frame.sourceImage, nativePts = record.native.pts[image?.frameIndex]
+    if (!image || !finite(nativePts) || !finite(frame.decodedTimeSeconds) || Math.abs(nativePts - frame.decodedTimeSeconds) > 0.001) {
+      unavailable(row, 'Diagnostic exposure lacks a replayable source image bound to its actual native PTS')
+      continue
+    }
+    const declared = claimedSourceImages({ frames: [frame] }), extra = declared.filter(({ image }) => !verifiedImages.has(jsonDigest(image)))
+    if (!extra.length) {
+      row.sourceImageReplay = { status: 'passed', proof: 'Exact declared source-image identities already independently replayed with mandatory samples' }
+      diagnostics.reusedSamples++
+    } else {
+      for (const { image } of extra) additionalImages.set(jsonDigest(image), image)
+      additionalRows.push(row)
+    }
+  }
+  diagnostics.additionalDeclaredIdentities = additionalImages.size
+  if (additionalImages.size) {
+    try {
+      // Replay only new declared identities, with the existing decoder. Review
+      // separately checks each diagnostic sample's exact source PTS/image index.
+      diagnostics.result = await verifyFrameImages(record.sourcePath, { frames: [], diagnosticImages: [...additionalImages.values()], source }, replayOptions)
+      for (const row of additionalRows) row.sourceImageReplay = { status: 'passed', proof: 'Additional declared diagnostic source-image identities independently replayed' }
+    } catch (error) {
+      for (const row of additionalRows) unavailable(row, `Diagnostic source image replay unavailable: ${error.message}`)
+    }
+  }
+  diagnostics.unavailableSamples = rows.filter(row => !row.frame).length
+  if (diagnostics.unavailableSamples) diagnostics.status = 'unavailable'
+  video.source.diagnosticImageReplay = diagnostics
 }
 
 /** Admit only the retained Spin source family, never a free-form static assertion. */
@@ -197,7 +306,7 @@ async function openRoute(page, url, record, player) {
   await page.waitForFunction(() => !document.querySelector('#pause-video')?.disabled, undefined, { timeout: 30_000 })
   const actual = await snapshot(page)
   requireModel(actual, record.id)
-  const data = await page.evaluate(() => window.harmonicAnalyzer.compactData?.() ?? window.harmonicAnalyzer.referenceData())
+  const data = await page.evaluate(() => window.harmonicAnalyzer.compactData())
   assert(jsonDigest(data) === record.digest, 'Built runtime compact track differs from the measured content file; rebuild first')
   const selectors = await page.locator('#videos a').evaluateAll(links => links.map(link => new URL(link.href).searchParams.get('video')))
   assert(selectors.length === 6 && new Set(selectors).size === 6, 'All six retained direct video routes must remain available')
@@ -293,7 +402,59 @@ async function review(page, embed, record, frame, required = true) {
   }, (frame.views ?? []).map(view => view.id))
   return { actual, native, seek, beforeMediaTime: before.mediaTime, ...rendered }
 }
-function measureView(view, response, frame, observations, tolerancePx, anchors) {
+function sourceSeedIndex(frames) {
+  const seeds = new Map()
+  for (const frame of frames) for (const item of frame.landmarks ?? []) {
+    if (item.method === 'manual' && item.status === 'observed' && point(item.pixel) && ['fit', 'check'].includes(item.role)) {
+      seeds.set(`${frame.timeSeconds}/${item.originalViewId ?? item.viewId ?? 'main'}/${item.anchorId}`, item)
+    }
+  }
+  return seeds
+}
+
+/** Only method/provenance rejection is excludable; missing pixels/native bodies are not. */
+function sourceMethodIssue(observed, anchor, frame, seeds, viewId) {
+  if (!['manual', 'optical-flow', 'image-edge', 'template-match'].includes(observed.method)) return { code: 'source-method', reason: 'Source measurement method is not an admitted independent pixel technique' }
+  const evidence = observed.trackingEvidence, seed = seeds.get(`${evidence?.seedTimeSeconds}/${observed.originalViewId ?? viewId}/${observed.anchorId}`)
+  if (observed.method === 'template-match' && (!seed || seed.role !== observed.role || evidence?.reacquiredFromActualPixels !== true
+    || !finite(evidence.wholeSourceViewCorrelation) || evidence.wholeSourceViewCorrelation < 0.998
+    || !finite(evidence.sourcePatchCorrelation) || evidence.sourcePatchCorrelation < 0.97)) {
+    return { code: 'template-provenance', reason: 'Independent manual seed and actual source-view/source-feature reacquisition correlations must be retained' }
+  }
+  if (observed.method === 'optical-flow' && (anchor?.kind !== 'physical-feature' || !seed || seed.role !== observed.role
+    || !finite(evidence?.forwardBackwardErrorPx) || evidence.forwardBackwardErrorPx > 1
+    || !finite(evidence?.seedPatchCorrelation) || evidence.seedPatchCorrelation < 0.80
+    || !finite(evidence?.adjacentPatchCorrelation) || evidence.adjacentPatchCorrelation < 0.90)) {
+    return { code: 'flow-provenance', reason: 'Independent physical-feature seed and consistent actual-source flow evidence must be retained' }
+  }
+  const edgeEvidence = observed.measurementEvidence
+  if (observed.method === 'image-edge' && !(typeof edgeEvidence === 'string' && edgeEvidence.trim() || edgeEvidence && typeof edgeEvidence === 'object' && !Array.isArray(edgeEvidence) && Object.keys(edgeEvidence).length)) return { code: 'edge-provenance', reason: 'Actual source edge/search measurement evidence is missing' }
+  const binding = observed.measurementEvidence ?? evidence
+  if (binding && typeof binding === 'object' && (binding.sourceImage && jsonDigest(binding.sourceImage) !== jsonDigest(frame.sourceImage ?? null)
+    || Object.hasOwn(binding, 'sourceSha256Bgr8') && binding.sourceSha256Bgr8 !== frame.sourceImage?.sha256Bgr8
+    || Object.hasOwn(binding, 'sourceSha256Gray8') && binding.sourceSha256Gray8 !== frame.sourceImage?.sha256Gray8)) {
+    return { code: 'measurement-image-binding', reason: 'Source measurement provenance belongs to a different exposure/image hash' }
+  }
+  return null
+}
+
+function distributedLandmarkFloor(measured) {
+  if (measured.length < 3 || !measured.some(item => item.role === 'check')) return false
+  for (let a = 0; a < measured.length - 2; a++) for (let b = a + 1; b < measured.length - 1; b++) for (let c = b + 1; c < measured.length; c++) {
+    const points = [measured[a], measured[b], measured[c]]
+    if (new Set(points.map(item => item.anchorId)).size !== 3 || !points.some(item => item.role === 'check')) continue
+    const [p, q, r] = points.map(item => item.sourcePixels)
+    const distances = [Math.hypot(p[0] - q[0], p[1] - q[1]), Math.hypot(q[0] - r[0], q[1] - r[1]), Math.hypot(r[0] - p[0], r[1] - p[1])]
+    const uncertainty = Math.max(1, points.reduce((sum, item) => sum + item.sourceUncertaintyPx, 0))
+    const twiceArea = Math.abs((q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]))
+    // Three resolvably separated, non-collinear actual features, not duplicate
+    // samples or a cluster smaller than its declared source uncertainty.
+    if (Math.min(...distances) > uncertainty && twiceArea / Math.max(...distances) > uncertainty) return true
+  }
+  return false
+}
+
+export function measureView(view, response, frame, observations, tolerancePx, anchors, seeds = new Map()) {
   const entry = response.captures.find(item => item.viewId === view.id), capture = entry?.capture, mechanism = entry?.mechanism
   const rendered = response.actual.views?.find(item => item.id === view.id)
   assert(capture?.method === 'gpu-readback' && capture.status === 'captured' && capture.visibilityMode === 'depth-off-landmark-projection' && capture.viewId === view.id && finite(capture.timeSeconds) && Math.abs(capture.timeSeconds - frame.timeSeconds) <= 1e-6, 'Missing/stale actual GPU landmark readback')
@@ -315,35 +476,53 @@ function measureView(view, response, frame, observations, tolerancePx, anchors) 
   assert(layoutIndex >= 0, 'Actual GPU capture has no current ordered source support')
   const required = observations.filter(item => (item.viewId ?? 'main') === view.id)
   assert(required.length > 0, 'Required source view has no independently observed landmarks')
-  const measured = [], unavailable = []
-  if (!required.some(item => item.role === 'check')) unavailable.push({ viewId: view.id, reason: 'Required source view has no independent CHECK landmarks; FIT residuals are diagnostic only' })
+  const measured = [], unavailable = [], excluded = []
+  if (!required.some(item => item.role === 'check')) unavailable.push({ viewId: view.id, status: 'source-unavailable', reason: 'Required source view has no independent CHECK landmarks; FIT residuals are diagnostic only' })
   for (const observed of required) {
     const anchor = anchors.get(observed.anchorId), marker = capture.landmarks?.find(item => item.id === observed.anchorId)
     const context = { viewId: view.id, anchorId: observed.anchorId, role: observed.role, motion: anchor?.motion ?? 'unknown', sourcePixels: observed.pixel }
-    if (!anchor?.partPath || (!anchor.partLocalMetres && !anchor.worldMetres) || !anchor.correspondenceEvidence) { unavailable.push({ ...context, reason: 'Source landmark lacks native physical-feature correspondence' }); continue }
-    if (observed.status !== 'observed' || !['manual', 'optical-flow', 'image-edge'].includes(observed.method) || !point(observed.pixel) || !finite(observed.uncertaintyPx) || observed.uncertaintyPx < 0) { unavailable.push({ ...context, reason: 'Independent source landmark pixel/measurement is unavailable' }); continue }
-    if (marker?.state !== 'rendered' || !point(marker.sourcePixels) || !point(marker.canvasPixels) || !finite(marker.uncertaintySourcePixels) || marker.uncertaintySourcePixels < 0) { unavailable.push({ ...context, reason: marker?.reason ?? 'Landmark has no actual GPU-rendered pixels' }); continue }
-    if (!sourcePointUnmasked(capture.sourceLayout, layoutIndex, observed.pixel) || !sourcePointUnmasked(capture.sourceLayout, layoutIndex, marker.sourcePixels)) { unavailable.push({ ...context, reason: 'Source/GPU landmark falls outside its view support or behind an opaque/inset layer' }); continue }
+    if (!anchor?.partPath || (!anchor.partLocalMetres && !anchor.worldMetres) || !anchor.correspondenceEvidence) { unavailable.push({ ...context, status: 'unmeasured-native', reason: 'Source landmark lacks native physical-feature correspondence' }); continue }
+    if (observed.status !== 'observed' || !['fit', 'check'].includes(observed.role) || !point(observed.pixel) || !finite(observed.uncertaintyPx) || observed.uncertaintyPx < 0) { unavailable.push({ ...context, status: 'source-unavailable', reason: 'Independent source landmark pixel/measurement is unavailable' }); continue }
+    const sourceIssue = sourceMethodIssue(observed, anchor, frame, seeds, view.id)
+    if (marker?.state !== 'rendered' || !point(marker.sourcePixels) || !point(marker.canvasPixels) || !finite(marker.uncertaintySourcePixels) || marker.uncertaintySourcePixels < 0) { unavailable.push({ ...context, status: 'unmeasured-native', reason: marker?.reason ?? 'Landmark has no actual GPU-rendered pixels' }); continue }
+    if (!sourcePointUnmasked(capture.sourceLayout, layoutIndex, observed.pixel) || !sourcePointUnmasked(capture.sourceLayout, layoutIndex, marker.sourcePixels)) { unavailable.push({ ...context, status: 'unmeasured-native', reason: 'Source/GPU landmark falls outside its view support or behind an opaque/inset layer' }); continue }
     const canvasPoint = [gate.x + marker.sourcePixels[0] / 1920 * gate.width, gate.y + marker.sourcePixels[1] / 1080 * gate.height]
     const mappingErrorPx = Math.hypot(marker.canvasPixels[0] - canvasPoint[0], marker.canvasPixels[1] - canvasPoint[1])
-    if (mappingErrorPx > 0.75) { unavailable.push({ ...context, reason: `Actual source-to-canvas mapping differs by ${mappingErrorPx}px` }); continue }
+    if (mappingErrorPx > 0.75) { unavailable.push({ ...context, status: 'unmeasured-native', reason: `Actual source-to-canvas mapping differs by ${mappingErrorPx}px` }); continue }
+    if (sourceIssue) { excluded.push({ ...context, status: 'source-inadmissible', method: observed.method, reasonCode: sourceIssue.code, reason: sourceIssue.reason }); continue }
     const rawErrorPx = Math.hypot(marker.sourcePixels[0] - observed.pixel[0], marker.sourcePixels[1] - observed.pixel[1])
     const errorPx = rawErrorPx + observed.uncertaintyPx + marker.uncertaintySourcePixels
     measured.push({ ...context, method: capture.method, nativePixels: marker.sourcePixels, canvasPixels: marker.canvasPixels, rawErrorPx, sourceUncertaintyPx: observed.uncertaintyPx, rasterUncertaintyPx: marker.uncertaintySourcePixels, errorPx, errorFrameWidthPercent: errorPx / 1920 * 100, status: errorPx <= tolerancePx ? 'passed' : 'failed', captureTimeSeconds: capture.timeSeconds, nativeMediaTime: response.native.mediaTime, sourceDrawRevision: mechanism.sourceDrawRevision, sourceSampling: rendered.sourceSampling, independentMidIntervalObservation: frame.measuredInterpolation === true })
   }
-  return { measured, unavailable, clockSkewSeconds: Math.abs(capture.timeSeconds - response.native.mediaTime) }
+  if (excluded.length && !distributedLandmarkFloor(measured)) unavailable.push({ viewId: view.id, status: 'source-unavailable', reason: 'Source-inadmissible exclusions require at least three distributed admitted actual landmarks including an independent CHECK' })
+  return { measured, unavailable, excluded, clockSkewSeconds: Math.abs(capture.timeSeconds - response.native.mediaTime) }
+}
+
+/** Longest complete required same-shot run; a legitimate cut is never our clock probe. */
+export function playbackInterval(record, minimumSeconds = 3) {
+  const shots = new Map(record.track.shots.map(shot => [shot.id, shot])), frames = record.track.frames
+  const ends = new Float64Array(frames.length)
+  let candidate = null
+  for (let index = frames.length - 1; index >= 0; index--) {
+    const frame = frames[index], shot = shots.get(frame.shotId)
+    if (!sourcePtsInShot(frame, shot) || frame.sourceSampleUnavailable === true || !sourceNeedsMachine(frame, shot)
+      || !frame.views?.length || !frame.views.every(view => view.camera && view.input)) continue
+    let endSeconds = Math.min(shot.endSeconds, record.native.durationSeconds)
+    const next = frames[index + 1]
+    if (next && next.timeSeconds < endSeconds) endSeconds = next.shotId === frame.shotId && ends[index + 1] > next.timeSeconds ? ends[index + 1] : next.timeSeconds
+    ends[index] = endSeconds
+    const availableSeconds = endSeconds - Math.max(frame.timeSeconds, frame.decodedTimeSeconds)
+    if (availableSeconds >= minimumSeconds && (!candidate || availableSeconds > candidate.availableSeconds)) candidate = { frame, endSeconds, availableSeconds }
+  }
+  return candidate
 }
 
 async function playbackChecks(page, embed, record, report, outputDirectory) {
   await pause(page, embed)
   await page.evaluate(() => window.harmonicAnalyzer.endReferenceReview())
-  const complete = frame => frame.views?.length && record.native.durationSeconds - frame.timeSeconds > 3 && frame.views.every(view => view.camera && view.input)
-  const animatedCandidate = record.track.frames.find((frame, index) => {
-    const next = record.track.frames[index + 1]
-    return complete(frame) && next && complete(next) && frame.shotId === next.shotId && next.timeSeconds - frame.timeSeconds <= 2 && jsonDigest(frame.views) !== jsonDigest(next.views)
-  })
-  const candidate = animatedCandidate ?? record.track.frames.find(complete)
-  assert(candidate, 'No complete source interval available for actual playback timing')
+  const interval = playbackInterval(record)
+  assert(interval, 'No complete required same-shot source interval with playback-duration margin is available')
+  const candidate = interval.frame
   await page.evaluate(async sample => window.harmonicAnalyzer.reviewReferenceFrame(sample.timeSeconds, sample.decodedTimeSeconds), { timeSeconds: candidate.timeSeconds, decodedTimeSeconds: candidate.decodedTimeSeconds })
   const stage = page.locator('#stage')
   const canvasShot = () => stage.screenshot({ mask: [page.locator('#video-dock'), page.locator('#loading')], animations: 'disabled' })
@@ -366,7 +545,7 @@ async function playbackChecks(page, embed, record, report, outputDirectory) {
     assert(after.mediaTime >= before.mediaTime && !after.paused && actual.mode === 'following-video', 'Actual media/source-following playback stopped')
     const skew = Math.max(0, before.mediaTime - actual.modelTime, actual.modelTime - after.mediaTime)
     assert(finite(skew) && skew <= CLOCK_LIMIT, 'Playing video/native model timing exceeds0.5s')
-    assert(['approximate', 'matched', 'held', 'no-machine'].includes(actual.referenceState), 'Playing source-following draw became unavailable')
+    assert(actual.referenceState === 'approximate', 'Playing required compact source-following draw became unavailable')
     const revisions = new Set()
     for (const entry of rendered.receipts) {
       const native = entry.mechanism, view = actual.views.find(item => item.id === entry.viewId)
@@ -403,9 +582,34 @@ async function playbackChecks(page, embed, record, report, outputDirectory) {
   assert(activeControls.controls, 'Compact original player has no usable native playback controls')
   if (embed.player === 'youtube') await embed.frame.locator('.ytp-play-button').click()
   else {
-    const nativeRect = await page.locator(embed.selector).boundingBox()
-    assert(nativeRect, 'Compact native media controls have no visible surface')
-    await page.mouse.click(nativeRect.x + 20, nativeRect.y + nativeRect.height - 20)
+    const video = page.locator(embed.selector)
+    await video.hover()
+    // Chromium owns this button in a closed user-agent shadow tree. Its actual
+    // box, not the video's bottom-left corner, is the native mouse hit target.
+    const session = await page.context().newCDPSession(page)
+    try {
+      const { result } = await session.send('Runtime.evaluate', { expression: `document.querySelector(${JSON.stringify(embed.selector)})` })
+      assert(result.objectId, 'Compact original media element is unavailable')
+      const { node } = await session.send('DOM.describeNode', { objectId: result.objectId, depth: -1, pierce: true })
+      const findPlayButton = node => {
+        const attributes = node.attributes ?? []
+        if (attributes.some((value, index) => index % 2 === 1 && value === '-webkit-media-controls-play-button')) return node
+        for (const child of [...(node.shadowRoots ?? []), ...(node.children ?? [])]) {
+          const button = findPlayButton(child)
+          if (button) return button
+        }
+        return null
+      }
+      const button = findPlayButton(node)
+      assert(button, 'Compact original player has no native play button')
+      const { model } = await session.send('DOM.getBoxModel', { backendNodeId: button.backendNodeId })
+      const quad = model.border
+      const x = (quad[0] + quad[2] + quad[4] + quad[6]) / 4, y = (quad[1] + quad[3] + quad[5] + quad[7]) / 4
+      assert(model.width > 0 && model.height > 0 && x >= rect.x && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height, 'Compact native play button has no visible in-player hit target')
+      await page.mouse.click(x, y)
+    } finally {
+      await session.detach()
+    }
   }
   await page.waitForFunction(() => window.harmonicAnalyzer.snapshot().playerState === 'playing', undefined, { timeout: 20_000 })
   const compactStarted = await media(embed); requireMedia(compactStarted, record)
@@ -428,16 +632,24 @@ async function playbackChecks(page, embed, record, report, outputDirectory) {
 async function interactionChecks(page, embed, id, outputDirectory) {
   await pause(page, embed); await page.evaluate(() => window.harmonicAnalyzer.endReferenceReview())
   await page.locator('#fit-view').click()
+  if (!await page.locator('#manual-controls').evaluate(details => details.open)) await page.locator('#manual-controls > summary').click()
   const crank = page.locator('#crank'), stage = page.locator('#stage')
-  assert(await crank.isEnabled(), 'Paused native mechanism manual crank is disabled')
+  assert(await crank.isVisible() && await crank.isEnabled(), 'Paused native mechanism manual crank is hidden or disabled')
   const before = await snapshot(page), mediaBefore = await media(embed)
   const take = () => stage.screenshot({ mask: [page.locator('#video-dock'), page.locator('#loading')], animations: 'disabled' })
   const beforePixels = await take()
-  await crank.focus(); await crank.press('ArrowRight'); await crank.press('ArrowRight'); await crank.press('ArrowRight')
-  await page.waitForFunction(turns => Math.abs(window.harmonicAnalyzer.snapshot().input.crankTurns - turns) > 1e-6, before.input.crankTurns)
+  const range = await crank.evaluate(control => ({ value: Number(control.value), min: Number(control.min), max: Number(control.max), step: Number(control.step) }))
+  assert([range.value, range.min, range.max, range.step].every(finite) && range.step > 0 && range.max > range.min, 'Manual crank has invalid physical input bounds')
+  const key = range.max - range.value >= range.value - range.min ? 'ArrowRight' : 'ArrowLeft'
+  await crank.focus()
+  assert(await crank.evaluate(control => document.activeElement === control), 'Manual crank did not receive actual keyboard focus')
+  await crank.press(key); await crank.press(key); await crank.press(key)
+  const changedValue = await crank.evaluate(control => Number(control.value))
+  assert(Math.abs(changedValue - range.value) > 1e-6, 'Actual keyboard interaction did not move the bounded crank range')
+  await page.waitForFunction(turns => Math.abs(window.harmonicAnalyzer.snapshot().input.crankTurns - turns) <= 1e-6, changedValue)
   await page.evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))))
   const after = await snapshot(page), crankPixels = await take()
-  assert(after.mode === 'exploring' && after.playerState === 'paused' && digest(beforePixels) !== digest(crankPixels) && jsonDigest(before.camera) === jsonDigest(after.camera), 'Manual crank must change actual native rendered geometry without moving camera or replaying media')
+  assert(Math.abs(after.input.crankTurns - before.input.crankTurns) > 1e-6 && after.mode === 'exploring' && after.playerState === 'paused' && digest(beforePixels) !== digest(crankPixels) && jsonDigest(before.camera) === jsonDigest(after.camera), 'Manual crank must change actual native rendered geometry without moving camera or replaying media')
   const target = await stage.evaluate(canvas => {
     const rect = canvas.getBoundingClientRect()
     for (const [x, y] of [[0.3, 0.3], [0.6, 0.45], [0.5, 0.6], [0.7, 0.25]]) {
@@ -456,11 +668,23 @@ async function interactionChecks(page, embed, id, outputDirectory) {
   return { status: 'passed', crankTurnsBefore: before.input.crankTurns, crankTurnsAfter: after.input.crankTurns, orbitCameraBefore: after.camera, orbitCameraAfter: orbit.camera, pausedDriftSeconds: Math.abs(mediaAfter.mediaTime - mediaBefore.mediaTime), screenshot }
 }
 
+export function requireSourceViews(row) {
+  const frame = row.frame
+  assert(frame?.views?.length > 0, 'Required source interval has no authored native views (closeups/insets/montages remain required)')
+  const ids = new Set(frame.views.map(view => view.id))
+  assert(row.expectedViewIds.every(id => ids.has(id)), `Required source view(s) omitted: ${row.expectedViewIds.filter(id => !ids.has(id)).join(',')}`)
+  assert(frame.views.every(view => view.camera && view.input), 'Required source sample has a missing camera or complete physical input')
+  assert(!frame.viewMappingUnavailable?.length, frame.viewMappingUnavailable?.map(item => `${item.anchorId}: ${item.reason}`).join('; '))
+  const orphanViews = [...new Set((frame.landmarks ?? []).filter(item => !ids.has(item.viewId ?? 'main')).map(item => item.viewId ?? 'main'))]
+  assert(!orphanViews.length, `Original source landmark view(s) lack an evidenced compact-view mapping: ${orphanViews.join(',')}`)
+}
+
 async function measureSamples(page, embed, record, census, video, tolerancePx, outputDirectory) {
   const anchors = new Map(record.track.anchors.map(anchor => [anchor.id, anchor]))
+  const seeds = sourceSeedIndex([...record.observations.frames, ...record.track.frames])
   const measuredFrames = new Map()
   for (const row of census.selected) {
-    const sample = { timeSeconds: row.timeSeconds, reasons: row.reasons, required: row.required, sourceShotId: row.sourceShotId, sampleTimeSeconds: row.frame?.timeSeconds ?? null, status: 'unavailable', measurements: [], unavailable: [] }
+    const sample = { timeSeconds: row.timeSeconds, reasons: row.reasons, diagnosticOnly: row.diagnosticOnly === true, required: row.required, sourceShotId: row.sourceShotId, sampleTimeSeconds: row.frame?.timeSeconds ?? null, sourceImageReplay: row.sourceImageReplay ?? null, status: 'unavailable', measurements: [], unavailable: [], excluded: [] }
     video.samples.push(sample)
     if (!row.frame) { sample.unavailable.push({ reason: row.unavailableReason }); continue }
     const frame = row.frame
@@ -474,20 +698,17 @@ async function measureSamples(page, embed, record, census, video, tolerancePx, o
         sample.status = 'not-required'
         continue
       }
-      assert(frame.views?.length > 0, 'Required source interval has no authored native views (closeups/insets/montages remain required)')
-      const ids = new Set(frame.views.map(view => view.id))
-      assert(row.expectedViewIds.every(id => ids.has(id)), `Required source view(s) omitted: ${row.expectedViewIds.filter(id => !ids.has(id)).join(',')}`)
-      assert(frame.views.every(view => view.camera && view.input), 'Required source sample has a missing camera or complete physical input')
+      requireSourceViews(row)
       let result = measuredFrames.get(frame.timeSeconds)
       if (!result) {
         const response = await review(page, embed, record, frame)
-        const measurements = [], unavailable = [], clocks = []
+        const measurements = [], unavailable = [], excluded = [], clocks = []
         for (const view of frame.views) {
-          try { const measured = measureView(view, response, frame, frame.landmarks ?? [], tolerancePx, anchors); measurements.push(...measured.measured); unavailable.push(...measured.unavailable); clocks.push(measured.clockSkewSeconds) }
-          catch (error) { unavailable.push({ viewId: view.id, reason: error.message }) }
+          try { const measured = measureView(view, response, frame, frame.landmarks ?? [], tolerancePx, anchors, seeds); measurements.push(...measured.measured); unavailable.push(...measured.unavailable); excluded.push(...measured.excluded); clocks.push(measured.clockSkewSeconds) }
+          catch (error) { unavailable.push({ viewId: view.id, status: 'unmeasured-native', reason: error.message }) }
         }
         const maxClockSkewSeconds = clocks.length ? Math.max(...clocks) : null
-        result = { measurements, unavailable, maxClockSkewSeconds, status: unavailable.length || !measurements.length || maxClockSkewSeconds === null ? 'unavailable' : measurements.some(item => item.status === 'failed') || maxClockSkewSeconds > CLOCK_LIMIT ? 'failed' : 'passed' }
+        result = { measurements, unavailable, excluded, maxClockSkewSeconds, status: measurements.some(item => item.status === 'failed') || maxClockSkewSeconds !== null && maxClockSkewSeconds > CLOCK_LIMIT ? 'failed' : unavailable.length || !measurements.length || maxClockSkewSeconds === null ? 'unavailable' : 'passed' }
         measuredFrames.set(frame.timeSeconds, result)
       }
       Object.assign(sample, result)
@@ -499,17 +720,37 @@ async function measureSamples(page, embed, record, census, video, tolerancePx, o
   }
 }
 export function finishVideo(video, census, options) {
-  const required = video.samples.filter(sample => sample.required), measured = required.filter(sample => sample.measurements.length), passed = required.filter(sample => sample.status === 'passed')
+  const mandatoryRows = census.rows.filter(row => !row.diagnosticOnly), mandatory = video.samples.filter(sample => !sample.diagnosticOnly), diagnostic = video.samples.filter(sample => sample.diagnosticOnly)
+  const required = mandatory.filter(sample => sample.required), measured = required.filter(sample => sample.measurements.length), passed = required.filter(sample => sample.status === 'passed' && !sample.unavailable.length && sample.measurements.length && sample.measurements.every(item => item.status === 'passed') && finite(sample.maxClockSkewSeconds) && sample.maxClockSkewSeconds <= CLOCK_LIMIT)
+  const selectedTimes = new Map(mandatory.map(sample => [sample.timeSeconds.toFixed(6), sample]))
+  const selectedRows = (census.selected ?? census.rows).filter(row => !row.diagnosticOnly)
+  const missingCensusSamples = selectedRows.filter(row => {
+    const sample = selectedTimes.get(row.timeSeconds.toFixed(6))
+    return !sample || sample.required !== row.required
+  }).length
   const unique = new Map()
-  for (const sample of video.samples) for (const item of sample.measurements) unique.set(`${sample.sampleTimeSeconds}/${item.viewId}/${item.anchorId}`, item)
+  for (const sample of mandatory) for (const item of sample.measurements) unique.set(`${sample.sampleTimeSeconds}/${item.viewId}/${item.anchorId}`, item)
   const measurements = [...unique.values()], checks = measurements.filter(item => item.role === 'check')
-  video.coverage = { allSourceCensusSamples: census.rows.length, allRequiredSourceSamples: census.rows.filter(row => row.required).length, selectedCensusSamples: video.samples.length, selectedRequiredSamples: required.length, measuredRequiredSamples: measured.length, passedRequiredSamples: passed.length, failedRequiredSamples: required.filter(sample => sample.status === 'failed').length, unavailableRequiredSamples: required.filter(sample => sample.status === 'unavailable').length, everySecond: { required: census.rows.filter(row => row.reasons.includes('every-second')).length, selected: video.samples.filter(row => row.reasons.includes('every-second')).length }, changePoints: { required: census.rows.filter(row => row.reasons.some(reason => reason !== 'every-second' && reason !== 'requested-sample')).length, selected: video.samples.filter(row => row.reasons.some(reason => reason !== 'every-second' && reason !== 'requested-sample')).length }, complete: !options.scoped && video.samples.length === census.rows.length && required.length > 0 && passed.length === required.length }
-  video.coverage.unavailableCensusSamples = video.samples.filter(sample => sample.status === 'unavailable').length
+  const isChange = row => row.reasons.some(reason => !['every-second', 'requested-sample', 'mid-interval'].includes(reason))
+  video.coverage = { allSourceCensusSamples: census.rows.length, allMandatoryCensusSamples: mandatoryRows.length, allRequiredSourceSamples: mandatoryRows.filter(row => row.required).length, selectedCensusSamples: video.samples.length, selectedMandatoryCensusSamples: mandatory.length, selectedRequiredSamples: required.length, measuredRequiredSamples: measured.length, passedRequiredSamples: passed.length, failedRequiredSamples: required.filter(sample => sample.status === 'failed').length, unavailableRequiredSamples: required.filter(sample => sample.status === 'unavailable').length, missingCensusSamples, diagnosticSamples: { selected: diagnostic.length, measured: diagnostic.filter(sample => sample.measurements.length).length, passed: diagnostic.filter(sample => sample.status === 'passed').length, failed: diagnostic.filter(sample => sample.status === 'failed').length, unavailable: diagnostic.filter(sample => sample.status === 'unavailable').length }, everySecond: { required: mandatoryRows.filter(row => row.reasons.includes('every-second')).length, selected: mandatory.filter(row => row.reasons.includes('every-second')).length }, changePoints: { required: mandatoryRows.filter(isChange).length, selected: mandatory.filter(isChange).length }, complete: !options.scoped && missingCensusSamples === 0 && mandatory.length === mandatoryRows.length && required.length > 0 && passed.length === required.length && mandatory.every(sample => sample.required || sample.status === 'not-required') }
+  video.coverage.unavailableCensusSamples = mandatory.filter(sample => sample.status === 'unavailable').length + missingCensusSamples
   video.coverage.complete &&= video.coverage.unavailableCensusSamples === 0
   video.landmarks = { measured: measurements.length, checks: checks.length, fitting: measurements.length - checks.length, fixedChecks: checks.filter(item => item.motion === 'fixed').length, movingChecks: checks.filter(item => item.motion === 'moving').length, maxErrorPx: maximumField(measurements, 'errorPx'), maxRawErrorPx: maximumField(measurements, 'rawErrorPx'), maxErrorFrameWidthPercent: maximumField(measurements, 'errorFrameWidthPercent') }
-  video.maxErrorPx = video.landmarks.maxErrorPx
+  const diagnosticMeasurements = diagnostic.flatMap(sample => sample.measurements)
+  const diagnosticFailures = diagnosticMeasurements.filter(item => item.status === 'failed')
+  video.diagnosticLandmarks = { measured: diagnosticMeasurements.length, failed: diagnosticFailures.length, maxErrorPx: maximumField(diagnosticMeasurements, 'errorPx'), maxClockSkewSeconds: maximumField(diagnostic, 'maxClockSkewSeconds') }
+  video.maxErrorPx = maximumField([...measurements, ...diagnosticMeasurements], 'errorPx')
   video.maxClockSkewSeconds = maximumField(video.samples, 'maxClockSkewSeconds')
-  video.unavailableReasons = video.samples.flatMap(sample => sample.unavailable.map(item => ({ timeSeconds: sample.timeSeconds, ...item })))
+  if (diagnosticFailures.length) video.failures.push({ code: 'diagnostic-pixel-counterexample', measuredLandmarks: diagnosticFailures.length, maxErrorPx: video.diagnosticLandmarks.maxErrorPx, reason: 'An independently admitted diagnostic source observation exceeds the stage pixel limit; optional missing or inadmissible oracles do not gate completeness, but actual measured counterexamples cannot be ignored.' })
+  video.unavailableReasons = video.samples.flatMap(sample => sample.unavailable.map(item => ({ timeSeconds: sample.timeSeconds, diagnosticOnly: sample.diagnosticOnly === true, ...item })))
+  const exclusionReasons = {}
+  let excludedMandatory = 0, excludedDiagnostic = 0
+  for (const sample of video.samples) for (const item of sample.excluded ?? []) {
+    if (sample.diagnosticOnly) excludedDiagnostic++
+    else excludedMandatory++
+    exclusionReasons[item.reasonCode] = (exclusionReasons[item.reasonCode] ?? 0) + 1
+  }
+  video.sourceLandmarkExclusions = { mandatory: excludedMandatory, diagnostic: excludedDiagnostic, byReasonCode: exclusionReasons, interpretation: 'Source-method/provenance exclusions are reported separately, never measurements. Every affected view must retain three distributed admitted actual landmarks including CHECK; missing source pixels/views/native bodies and masked/unrendered GPU points remain blocking.' }
   if (!video.landmarks.fixedChecks) video.failures.push({ code: 'hard-fixed-landmark-coverage', reason: 'Hard fixed independent CHECK landmarks are required; easy camera-only FIT points cannot pass a video' })
   const shotMap = new Map((video.shots ?? []).map(shot => [shot.id, shot]))
   video.motionCoverage = []
@@ -526,15 +767,15 @@ export function finishVideo(video, census, options) {
   if (!video.interaction || !Object.values(video.playback).some(result => result.status === 'passed')) video.failures.push({ code: 'interaction-unmeasured', reason: 'Actual original playback/audio/compact and paused manual native operation/orbit checks are required' })
   if (options.scoped) video.status = 'partial'
   else video.status = video.coverage.complete && !video.failures.length ? 'passed' : video.coverage.unavailableCensusSamples || !measurements.length ? 'unavailable' : 'failed'
-  const measuredFailure = required.some(sample => sample.status === 'failed' || sample.measurements.some(item => item.status === 'failed'))
-  video.stageMeasurement = { stage: options.stage, tolerancePx: 1920 * options.stage / 100, status: options.scoped ? 'unmeasured' : video.status === 'passed' ? 'passed' : measuredFailure || video.status === 'failed' ? 'failed' : 'unmeasured', scopedSamples: options.scoped ? { status: required.length && passed.length === required.length && !video.failures.length ? 'passed' : measuredFailure ? 'failed' : 'unavailable' } : null }
+  const measuredFailure = required.some(sample => sample.status === 'failed' || sample.measurements.some(item => item.status === 'failed')) || diagnosticFailures.length > 0
+  video.stageMeasurement = { stage: options.stage, tolerancePx: 1920 * options.stage / 100, status: options.scoped ? 'unmeasured' : video.status === 'passed' ? 'passed' : measuredFailure || video.status === 'failed' ? 'failed' : 'unmeasured', scopedSamples: options.scoped ? { status: required.length && passed.length === required.length && missingCensusSamples === 0 && mandatory.length === selectedRows.length && !video.failures.length ? 'passed' : measuredFailure ? 'failed' : 'unavailable' } : null }
 }
 
 export async function verifySync(options = parseOptions(process.argv.slice(2))) {
   if (options.help) { console.log(HELP); return 0 }
   const startedAt = new Date().toISOString(), outputDirectory = resolve(options.output ?? resolve(WEB_ROOT, '.vite/verification-output', `stage-${options.stage}-${startedAt.replace(/[:.]/g, '-')}`))
   await mkdir(outputDirectory, { recursive: true })
-  const report = { schemaVersion: 1, startedAt, finishedAt: null, status: 'unavailable', stage: options.stage, stageLadder: STAGES, scope: options.scoped ? 'time-scoped-diagnostic' : options.videos.length === 6 ? 'all-six-videos' : 'selected-videos', options, limits: { frameWidthPixels: 1920, frameHeightPixels: 1080, errorFrameWidthPercent: options.stage, sourceLandmarkPx: 1920 * options.stage / 100, videoModelClockSeconds: CLOCK_LIMIT, compactViewportPixels: [200, 200] }, model: { sha256: MODEL_SHA256, sourceCommit: MODEL_COMMIT, integrity: 'unmeasured' }, interpretation: 'Chosen feasible hidden inputs are not historical recovery. Compact playback is approximate/unverified until this measured stage passes. Missing/failed samples never pass. GPU marker readback is actual render proof, not CPU projection; diagnostic markers alone do not certify every native surface. Narrow retained geometry exceptions remain uncertified.', videos: [], failures: [], builtAssets: [], browserLog: [], serverRequests: [] }
+  const report = { schemaVersion: 1, startedAt, finishedAt: null, status: 'unavailable', stage: options.stage, stageLadder: STAGES, scope: options.scoped ? 'time-scoped-diagnostic' : options.videos.length === 6 ? 'all-six-videos' : 'selected-videos', options, limits: { frameWidthPixels: 1920, frameHeightPixels: 1080, errorFrameWidthPercent: options.stage, sourceLandmarkPx: 1920 * options.stage / 100, videoModelClockSeconds: CLOCK_LIMIT, compactViewportPixels: [200, 200] }, model: { sha256: MODEL_SHA256, sourceCommit: MODEL_COMMIT, integrity: 'unmeasured' }, interpretation: 'Chosen feasible hidden inputs are not historical recovery. Compact playback is approximate/unverified until this measured stage passes. Every integer second, authored/visible change and actual source view remains mandatory; missing/failed required measurements never pass. Extra interior observations are diagnostic: missing/inadmissible oracles do not add certification prerequisites, but independently admitted measured pixel counterexamples still fail the stage. GPU marker readback is actual render proof, not CPU projection; diagnostic markers alone do not certify every native surface. Narrow retained geometry exceptions remain uncertified.', videos: [], failures: [], builtAssets: [], browserLog: [], serverRequests: [] }
   const abort = new AbortController(), interrupt = () => abort.abort(new Error('Verification interrupted'))
   process.once('SIGINT', interrupt); process.once('SIGTERM', interrupt)
   let server, browser, context, page
@@ -567,9 +808,9 @@ export async function verifySync(options = parseOptions(process.argv.slice(2))) 
         video.shots = record.track.shots.map(shot => ({ id: shot.id, internalMechanismMotion: shot.internalMechanismMotion ?? 'unknown', internalMotionEvidence: shot.internalMotionEvidence ?? null, sourceStaticControls: staticControls.shots.get(shot.id) ?? null }))
         census = sourceCensus(record.observations, record.track, record.native, options)
         assert(census.selected.length > 0, 'Selected time window contains no source census samples')
-        // Only declared images in selected samples are decoded; old435 witnesses are never prerequisites.
-        try { video.source.imageReplay = await verifyFrameImages(record.sourcePath, { frames: census.selected.map(row => row.frame).filter(Boolean), staticPhaseImages: staticControls.phaseImages, source: record.track.source }, { signal: abort.signal, native: record.native, source: record.track.source }) }
-        catch (error) { video.failures.push({ code: 'source-image-replay', reason: error.message }) }
+        // Mandatory original images remain gating; optional interpolation probes
+        // replay only new identities and report missing oracles diagnostically.
+        await replayCensusImages(record, census, staticControls, video, abort.signal)
         const measurementPlayer = options.player === 'youtube' ? 'youtube' : 'local'
         const embed = await openRoute(page, server.url, record, measurementPlayer)
         video.route = embed.route
@@ -592,7 +833,11 @@ export async function verifySync(options = parseOptions(process.argv.slice(2))) 
         }
         finishVideo(video, census, options)
       } catch (error) { video.failures.push({ code: 'video-prerequisite', reason: error.message }); video.unavailableReasons.push({ reason: error.message }) }
-      if (census && video.samples.length < census.selected.length) video.failures.push({ code: 'unmeasured-census', reason: `${census.selected.length - video.samples.length} selected samples were not measured` })
+      if (census) {
+        const measuredTimes = new Set(video.samples.filter(sample => !sample.diagnosticOnly).map(sample => sample.timeSeconds.toFixed(6)))
+        const unmeasured = census.selected.filter(row => !row.diagnosticOnly && !measuredTimes.has(row.timeSeconds.toFixed(6)))
+        if (unmeasured.length) video.failures.push({ code: 'unmeasured-census', reason: `${unmeasured.length} selected mandatory samples were not measured` })
+      }
       if (video.status !== 'passed') report.failures.push({ videoId: id, status: video.status, reasons: video.failures, unavailableSamples: video.coverage?.unavailableRequiredSamples ?? null })
       await writeFile(resolve(outputDirectory, `${id}.json`), `${JSON.stringify(video, null, 2)}\n`)
       console.log(JSON.stringify({ videoId: id, stage: options.stage, status: video.status, coverage: video.coverage, maxErrorPx: video.maxErrorPx, unavailableReasons: video.unavailableReasons.length }))

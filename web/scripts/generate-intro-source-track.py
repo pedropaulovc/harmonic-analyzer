@@ -79,28 +79,19 @@ def main():
             if identity == "end-page-by-page":
                 evidence += " No independently fitted page-by-page camera: whole-machine source framing is a reachable baseline for this photographed machine; exact photo pose/composition remains unmeasured."
             if original_camera:
-                camera_kind = "source-fit"
+                camera_kind = "source-transfer"
                 camera_family = "intro:observed:" + frame["shotId"] + ":" + identity
-                camera_evidence = "Own Intro observation camera at retained decoded PTS; original CPU residual/status retained, no stage/GPU acceptance."
+                camera_evidence = "Retained own Intro source-derived camera family at decoded PTS, including held/registered calibration; not an independently fitted target-exposure camera. Original CPU residual/status retained, no stage/GPU acceptance."
             else:
-                direct_family = {
-                    "cam-bank": "cam", "coefficient-bank": "bank",
-                    "cranking": "crank", "output-fixture": "fixture",
-                    "pen-macro": "macro", "summing": "summing",
-                    "counter-setting": "counter", "base-plaque": "plaque",
-                    "end-book-posters": "photo",
-                }
-                camera_kind = "source-fit" if direct_family.get(identity, identity) == key else "source-transfer"
+                camera_kind = "source-transfer"
                 if identity == "end-page-by-page" or identity in ("cone-bank", "phase-cylinder-left"):
                     camera_kind = "source-informed-framing"
-                if rect != candidate["rect"] and camera_kind == "source-fit":
-                    camera_kind = "source-transfer"
                 camera_family = "intro:retained:" + key + ":" + candidate["sha256"] + ":" + identity
                 camera_evidence = candidate["evidencePath"] + " sha256=" + candidate["sha256"]
-                if camera_kind != "source-fit":
-                    camera_evidence += "; donor branch transferred as chosen framing, not a measurement of this source view."
+                if camera_kind == "source-informed-framing":
+                    camera_evidence += "; donor branch used as neutral source-informed framing, not a measurement of this source view."
                 else:
-                    camera_evidence += "; own Intro conditional source-fit branch; original failure/residual diagnostics retained."
+                    camera_evidence += "; one retained conditional source-fit branch held/transferred across this view family, not independently refitted at each exposure. Original failure/residual diagnostics retained."
                 if rect != candidate["rect"]:
                     camera_evidence += " Normalized viewport resizing is chosen, not a source refit."
                 camera_evidence += " Fixed donor camera within this identity/family; historical camera motion unknown."

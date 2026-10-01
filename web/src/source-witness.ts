@@ -1,6 +1,6 @@
 import { createMechanismPose, solveMechanism, type MechanismInput, type MechanismPose } from './mechanics'
 import { physicalChannelAngle } from './kinematics'
-import type { CameraRecord, ImagePlaneWarp, PartOverride, SourceComposite, SourceLayoutEntry } from './scene'
+import type { SourceLayoutEntry } from './scene'
 import { prepareImagePlaneFootprintContext, imagePlaneSourceFootprintBounds } from './image-plane-homography'
 
 export const ROD_HEAD_FUNCTIONAL_EQUIVALENCE = {
@@ -59,7 +59,6 @@ export const INPUT_FIELDS: readonly InputField[] = [
   ...Array.from({ length: 20 }, (_, i) => `phases[${i}]` as InputField),
   ...SETUP_KEYS.map((key) => `setup.${key}` as InputField),
 ]
-const fieldSet: Record<string, true> = Object.fromEntries(INPUT_FIELDS.map((field) => [field, true]))
 export type SourceConstraint = (
   | { kind: 'input-value'; field: InputField; value: number | MechanismInput['gearing'] | null; tolerance: number }
   | { kind: 'input-interval'; field: InputField; minimum: number; maximum: number }
@@ -71,38 +70,6 @@ export type SourceConstraint = (
 export type SourceImageIdentity = {
   frameIndex: number; width: number; height: number; sourceSha256: string
 } & ({ pixelFormat: 'bgr8'; sha256Bgr8: string; sha256Gray8?: never } | { pixelFormat: 'gray8'; sha256Gray8: string; sha256Bgr8?: never })
-export interface SourceImagePlaneWarp {
-  kind: 'homography'
-  unwarpedViewportPixels: [number, number]
-  cornersSourcePixels: [[number, number], [number, number], [number, number], [number, number]]
-  sourceImage: SourceImageIdentity
-  referenceSourceImage: SourceImageIdentity
-  cornerMeasurementEvidence: {
-    sourceImage: SourceImageIdentity
-    referenceSourceImage: SourceImageIdentity
-    evidence: string
-    [key: string]: unknown
-  }
-  correspondences: Array<{
-    id: string
-    role: 'fit' | 'check'
-    referencePixelSource: [number, number]
-    pixelSource: [number, number]
-    method: 'manual' | 'optical-flow' | 'image-edge' | 'template-match'
-    uncertaintyPx: number
-    measurementEvidence: {
-      sourceImage: SourceImageIdentity
-      referenceSourceImage: SourceImageIdentity
-      evidence: string
-      [key: string]: unknown
-    }
-  }>
-}
-export type SourceCoverage =
-  | { kind: 'landmarks'; landmarkIds: string[] }
-  | { kind: 'native-line-checks'; lineCheckIds: string[] }
-  | { kind: 'source-contour'; contourCheckIds: string[] }
-  | { kind: 'rigid-native-attachment'; attachedToPartPath: string }
 export type AxisPerspectiveBiasComponents = {
   geometryBoundPx: number
   evidence: string
@@ -177,83 +144,6 @@ export function validateNativeLineAxisBiasComponents(line: NativeLineCheck, cont
     }
   }
 }
-export const SOURCE_NON_IDENTIFIABLE_FIXED_POLICY = {
-  status: 'user-approved-source-non-identifiable',
-  scope: 'structural-fixed-part-only',
-  authority: 'Allow explicitly unidentified fixed parts',
-  interpretation: 'Rendered source-non-identifiable fixed part; not geometric-fidelity passed.',
-} as const
-export type SourceNonIdentifiableFixedPart = typeof SOURCE_NON_IDENTIFIABLE_FIXED_POLICY & {
-  nativePartPath: string
-  rectSourcePixels: [number, number, number, number]
-  evidence: string
-  fixedNativeEvidence: string
-}
-export interface WitnessBinding {
-  sourceVideoId: string
-  sourceSha256: string
-  sourceImage: SourceImageIdentity
-  modelSha256: string
-  modelSourceCommit: string
-  shotId: string
-  viewId: string
-  timeSeconds: number
-  decodedTimeSeconds: number
-  intervalSeconds: [number, number]
-  input: SerializedInput
-  camera: CameraRecord
-  rectSourcePixels: [number, number, number, number]
-  presentation: 'native' | 'horizontal-mirror'
-  composite: SourceComposite
-  imagePlaneWarp: SourceImagePlaneWarp | null
-  resolvedImagePlaneWarp: ImagePlaneWarp | null
-  sourceLayout: readonly SourceLayoutEntry[]
-  partOverrides: readonly PartOverride[]
-  constraints: readonly SourceConstraint[]
-  continuity: RuntimeWitness['continuity'] | null
-  nativeGeometryAssumptions: readonly NativeGeometryAssumption[]
-  sourceNonIdentifiableFixedParts: readonly SourceNonIdentifiableFixedPart[]
-}
-export interface SourceOcclusion {
-  kind: 'measured-opaque-human-hand-interior'
-  sourceImage: SourceImageIdentity
-  polygonSourcePixels: [number, number][]
-  uncertaintyPx: number
-  evidence: string
-}
-type SourceExclusion = { partPath: string; evidence: string } & (
-  | { reason: 'outside' | 'occluded' | 'absent'; sourceOcclusion?: never }
-  | { reason: 'source-occluded'; sourceOcclusion: SourceOcclusion }
-)
-export interface VisibilityProof {
-  binding: WitnessBinding
-  sourceVisibleParts: { partPath: string; sourceFeatures: string[]; sourceCoverage: SourceCoverage; evidence: string }[]
-  excludedParts: SourceExclusion[]
-  unresolvedParts: { partPath: string; reason: string }[]
-  sourceNonIdentifiableFixedParts: SourceNonIdentifiableFixedPart[]
-  evidence: string
-}
-export interface RuntimeWitness {
-  input: SerializedInput
-  unobservedInputFields: InputField[]
-  constraints: SourceConstraint[]
-  visibilityProof: VisibilityProof
-  continuity?: { intervalId: string; evidence: string }
-}
-export type MechanicalObservation = (
-  | { status: 'observed'; input: SerializedInput; visiblePoseCompleteness: 'complete'; visibilityProof: VisibilityProof; runtimeWitness?: never }
-  | { status: 'constrained'; input: null; visiblePoseCompleteness: 'complete'; runtimeWitness: RuntimeWitness; visibilityProof?: never }
-  | { status: 'unobservable' | 'not-applicable'; input: null; visiblePoseCompleteness?: 'complete' | 'partial'; runtimeWitness?: never; visibilityProof?: never }
-) & { evidence: string }
-export interface MechanicalProvenance {
-  mechanicalProvenance: 'observed' | 'constrained'
-  unobservedInputFields: readonly InputField[]
-  constraintSummary: readonly SourceConstraint[]
-  visibilityProof: VisibilityProof
-  continuity: NonNullable<RuntimeWitness['continuity']> | null
-  sourceNonIdentifiableFixedParts: readonly SourceNonIdentifiableFixedPart[]
-  nativeGeometryAssumptions: readonly NativeGeometryAssumption[]
-}
 
 function finite(value: unknown, label: string): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) throw new Error(`${label} must be finite.`)
@@ -266,9 +156,6 @@ function keys(value: object, required: readonly string[], label: string): void {
   if (!value || typeof value !== 'object' || Array.isArray(value)
     || Object.keys(value).some((key) => !required.includes(key))
     || required.some((key) => !Object.hasOwn(value, key))) throw new Error(`${label}: missing or unknown fields.`)
-}
-function inputField(value: unknown, label: string): asserts value is InputField {
-  if (typeof value !== 'string' || !Object.hasOwn(fieldSet, value)) throw new Error(`${label}: unknown input field ${String(value)}.`)
 }
 export function inputValue(input: MechanismInput, field: InputField): number | string | null {
   if (field === 'crankTurns' || field === 'gearing' || field === 'magnification') return input[field]
@@ -298,233 +185,12 @@ export function compileInput(raw: SerializedInput, label: string): MechanismInpu
   }
   return { crankTurns: finite(raw.crankTurns, `${label}.crankTurns`), amplitudes, phases, gearing: raw.gearing, magnification: finite(raw.magnification, `${label}.magnification`), setup }
 }
-function interval(minimum: unknown, maximum: unknown, label: string): void {
-  if (finite(minimum, label) > finite(maximum, label)) throw new Error(`${label}: reversed interval.`)
-}
-export function compileWitness(witness: RuntimeWitness, label: string): MechanismInput {
-  keys(witness, ['input', 'unobservedInputFields', 'constraints', 'visibilityProof', ...(Object.hasOwn(witness, 'continuity') ? ['continuity'] : [])], label)
-  const input = compileInput(witness.input, label)
-  if (Object.hasOwn(witness, 'continuity')) {
-    keys(witness.continuity!, ['intervalId', 'evidence'], `${label}.continuity`)
-    evidence(witness.continuity!.intervalId, label)
-    evidence(witness.continuity!.evidence, label)
-  }
-  if (!Array.isArray(witness.unobservedInputFields) || !Array.isArray(witness.constraints)) throw new Error(`${label}: witness accounting is required.`)
-  const accounted = new Set<InputField>()
-  const constraintIds = new Set<string>()
-  for (const field of witness.unobservedInputFields) {
-    inputField(field, label)
-    if (accounted.has(field)) throw new Error(`${label}: duplicate accounting for ${field}.`)
-    accounted.add(field)
-  }
-  for (const constraint of witness.constraints) {
-    evidence(constraint.evidence, label)
-    const identity = constraint.kind === 'input-value' || constraint.kind === 'input-interval' ? `input:${constraint.field}`
-      : constraint.kind === 'channel-angle' ? `channel-angle:${constraint.channelIndex}` : constraint.kind
-    if (constraintIds.has(identity)) throw new Error(`${label}: duplicate source constraint ${identity}.`)
-    constraintIds.add(identity)
-    switch (constraint.kind) {
-      case 'input-value': {
-        keys(constraint, ['kind', 'field', 'value', 'tolerance', 'evidence'], label)
-        inputField(constraint.field, label)
-        if (finite(constraint.tolerance, label) < 0) throw new Error(`${label}: negative tolerance.`)
-        if (constraint.field === 'gearing') {
-          if (typeof constraint.value !== 'string' || !['small-large', 'medium-medium', 'large-small'].includes(constraint.value) || constraint.tolerance !== 0) throw new Error(`${label}: gearing needs an exact enum constraint.`)
-        } else if (constraint.value === null) {
-          if (constraint.field !== 'setup.counterHeightM' || constraint.tolerance !== 0 || !witness.unobservedInputFields.includes(constraint.field)) throw new Error(`${label}: null counter is an exact algorithmic choice and must remain unobserved.`)
-          break
-        } else finite(constraint.value, label)
-        if (accounted.has(constraint.field)) throw new Error(`${label}: duplicate or measured/unobserved accounting for ${constraint.field}.`)
-        accounted.add(constraint.field)
-        break
-      }
-      case 'input-interval':
-        keys(constraint, ['kind', 'field', 'minimum', 'maximum', 'evidence'], label)
-        inputField(constraint.field, label)
-        if (constraint.field === 'gearing') throw new Error(`${label}: enum interval is invalid.`)
-        interval(constraint.minimum, constraint.maximum, label)
-        if (accounted.has(constraint.field)) throw new Error(`${label}: duplicate or measured/unobserved accounting for ${constraint.field}.`)
-        accounted.add(constraint.field)
-        break
-      case 'effective-bank-drive':
-        keys(constraint, ['kind', 'minimumTurns', 'maximumTurns', 'winding', 'evidence'], label)
-        interval(constraint.minimumTurns, constraint.maximumTurns, label)
-        if (!['unwrapped', 'modulo-one'].includes(constraint.winding)) throw new Error(`${label}: unknown bank winding.`)
-        break
-      case 'channel-angle':
-        keys(constraint, ['kind', 'channelIndex', 'minimumRadians', 'maximumRadians', 'winding', 'evidence'], label)
-        if (!Number.isInteger(constraint.channelIndex) || constraint.channelIndex < 0 || constraint.channelIndex >= 20) throw new Error(`${label}: invalid physical channel index.`)
-        interval(constraint.minimumRadians, constraint.maximumRadians, label)
-        if (!['unwrapped', 'modulo-turn'].includes(constraint.winding)) throw new Error(`${label}: unknown channel winding.`)
-        break
-      case 'paper-travel':
-      case 'pen-travel':
-        keys(constraint, ['kind', 'minimumMetres', 'maximumMetres', 'evidence'], label)
-        interval(constraint.minimumMetres, constraint.maximumMetres, label)
-        break
-      default: throw new Error(`${label}: unknown source constraint kind.`)
-    }
-  }
-  for (const field of INPUT_FIELDS) if (!accounted.has(field)) throw new Error(`${label}: unaccounted input field ${field}.`)
-  if (input.setup.counterHeightM === null && !witness.unobservedInputFields.includes('setup.counterHeightM')) throw new Error(`${label}: auto-calibrated counter must be labelled chosen/unobserved.`)
-  return input
-}
 export function equalRecord(a: unknown, b: unknown): boolean {
   if (a === b) return true
   if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return false
   const aKeys = Object.keys(a)
   const bKeys = Object.keys(b)
   return aKeys.length === bKeys.length && aKeys.every((key) => Object.hasOwn(b, key) && equalRecord((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key]))
-}
-function validateResolvedImagePlaneWarp(warp: ImagePlaneWarp | null, label: string): void {
-  if (warp === null) return
-  keys(warp, ['kind', 'unwarpedViewportPixels', 'renderToSourcePixels'], label)
-  if (warp.kind !== 'homography') throw new Error(`${label}: unknown image-plane warp kind.`)
-  if (!Array.isArray(warp.unwarpedViewportPixels) || warp.unwarpedViewportPixels.length !== 2) throw new Error(`${label}: two unwarped viewport dimensions are required.`)
-  for (const value of warp.unwarpedViewportPixels) {
-    if (finite(value, label) <= 0) throw new Error(`${label}: positive finite unwarped viewport dimensions are required.`)
-  }
-  if (!Array.isArray(warp.renderToSourcePixels) || warp.renderToSourcePixels.length !== 9) throw new Error(`${label}: a nine-coefficient derived homography is required.`)
-  for (const value of warp.renderToSourcePixels) finite(value, label)
-}
-function validateSourceLayout(expected: Omit<WitnessBinding, 'intervalSeconds'>, label: string): void {
-  validateResolvedImagePlaneWarp(expected.resolvedImagePlaneWarp, `${label}.resolvedImagePlaneWarp`)
-  if ((expected.imagePlaneWarp === null) !== (expected.resolvedImagePlaneWarp === null)) throw new Error(`${label}: authored and resolved image-plane warp must both be explicit null or both be present.`)
-  if (expected.imagePlaneWarp !== null) {
-    keys(expected.imagePlaneWarp, ['kind', 'unwarpedViewportPixels', 'cornersSourcePixels', 'sourceImage', 'referenceSourceImage', 'cornerMeasurementEvidence', 'correspondences'], `${label}.imagePlaneWarp`)
-    if (expected.imagePlaneWarp.kind !== 'homography'
-      || !equalRecord(expected.imagePlaneWarp.unwarpedViewportPixels, expected.resolvedImagePlaneWarp!.unwarpedViewportPixels)
-      || !equalRecord(expected.imagePlaneWarp.sourceImage, expected.sourceImage)) throw new Error(`${label}: authored warp must bind its resolved viewport and actual source image.`)
-  }
-  if (!Array.isArray(expected.sourceLayout) || !expected.sourceLayout.length) throw new Error(`${label}: complete ordered source layout is required.`)
-  const viewIds = new Set<string>()
-  for (const entry of expected.sourceLayout) {
-    keys(entry, ['viewId', 'rectSourcePixels', 'presentation', 'composite', 'resolvedImagePlaneWarp'], `${label}.sourceLayout`)
-    evidence(entry.viewId, `${label}.sourceLayout.viewId`)
-    if (viewIds.has(entry.viewId)) throw new Error(`${label}: duplicate source layout view.`)
-    viewIds.add(entry.viewId)
-    if (!Array.isArray(entry.rectSourcePixels) || entry.rectSourcePixels.length !== 4) throw new Error(`${label}: source layout rectangle needs four coordinates.`)
-    for (const value of entry.rectSourcePixels) finite(value, label)
-    const [x, y, width, height] = entry.rectSourcePixels
-    if (x < 0 || y < 0 || width <= 0 || height <= 0
-      || x + width > expected.sourceImage.width || y + height > expected.sourceImage.height) throw new Error(`${label}: source layout rectangle exceeds the actual source image.`)
-    if (entry.presentation !== 'native' && entry.presentation !== 'horizontal-mirror') throw new Error(`${label}: unknown source layout presentation.`)
-    if (entry.composite !== null) {
-      const composite = entry.composite
-      if (composite.mode === 'opaque') keys(composite, ['mode'], `${label}.sourceLayout.composite`)
-      else if (composite.mode === 'crossfade') {
-        keys(composite, ['mode', 'groupId', 'imageLayerId', 'opacity'], `${label}.sourceLayout.composite`)
-        evidence(composite.groupId, label)
-        evidence(composite.imageLayerId, label)
-        const opacity = finite(composite.opacity, label)
-        if (opacity < 0 || opacity > 1) throw new Error(`${label}: source layout opacity must be between zero and one.`)
-      } else throw new Error(`${label}: unknown source layout composite mode.`)
-    }
-    validateResolvedImagePlaneWarp(entry.resolvedImagePlaneWarp, `${label}.sourceLayout.resolvedImagePlaneWarp`)
-    if (entry.viewId === expected.viewId
-      && (!equalRecord(entry.rectSourcePixels, expected.rectSourcePixels)
-        || entry.presentation !== expected.presentation
-        || !equalRecord(entry.composite, expected.composite)
-        || !equalRecord(entry.resolvedImagePlaneWarp, expected.resolvedImagePlaneWarp))) throw new Error(`${label}: own source layout entry does not match the visibility binding.`)
-  }
-  if (!viewIds.has(expected.viewId)) throw new Error(`${label}: source layout omits the bound view.`)
-}
-function validateSourceOcclusion(mask: SourceOcclusion, image: SourceImageIdentity, label: string): void {
-  keys(mask, ['kind', 'sourceImage', 'polygonSourcePixels', 'uncertaintyPx', 'evidence'], label)
-  if (mask.kind !== 'measured-opaque-human-hand-interior' || !equalRecord(mask.sourceImage, image)) throw new Error(`${label}: source occlusion needs the exact original image and closed opaque-human-hand kind.`)
-  evidence(mask.evidence, label)
-  if (finite(mask.uncertaintyPx, label) < 0) throw new Error(`${label}: source mask uncertainty must be nonnegative.`)
-  const polygon = mask.polygonSourcePixels
-  if (!Array.isArray(polygon) || polygon.length < 3) throw new Error(`${label}: source hand interior needs a convex nondegenerate polygon.`)
-  let area2 = 0
-  for (let i = 0; i < polygon.length; i++) {
-    const point = polygon[i]!
-    if (!Array.isArray(point) || point.length !== 2 || point.some((value) => typeof value !== 'number' || !Number.isFinite(value))
-      || point[0] < 0 || point[1] < 0 || point[0] > image.width || point[1] > image.height) throw new Error(`${label}: source hand polygon exceeds the original image.`)
-    for (let j = 0; j < i; j++) if (point[0] === polygon[j]![0] && point[1] === polygon[j]![1]) throw new Error(`${label}: duplicate source hand polygon vertex.`)
-  }
-  for (let i = 0; i < polygon.length; i++) {
-    const a = polygon[i]!, b = polygon[(i + 1) % polygon.length]!
-    area2 += a[0] * b[1] - a[1] * b[0]
-  }
-  if (!Number.isFinite(area2) || area2 === 0) throw new Error(`${label}: degenerate source hand polygon.`)
-  const orientation = Math.sign(area2)
-  for (let i = 0; i < polygon.length; i++) {
-    const a = polygon[i]!, b = polygon[(i + 1) % polygon.length]!
-    for (const point of polygon) if (orientation * ((b[0] - a[0]) * (point[1] - a[1]) - (b[1] - a[1]) * (point[0] - a[0])) < 0) throw new Error(`${label}: source hand polygon must be convex and non-self-intersecting.`)
-  }
-}
-export function validateVisibilityProof(proof: VisibilityProof, expected: Omit<WitnessBinding, 'intervalSeconds'>, anchors: readonly { id: string; partPath?: string }[], label: string): void {
-  keys(proof, ['binding', 'sourceVisibleParts', 'excludedParts', 'unresolvedParts', 'sourceNonIdentifiableFixedParts', 'evidence'], label)
-  evidence(proof.evidence, label)
-  keys(expected, ['sourceVideoId', 'sourceSha256', 'sourceImage', 'modelSha256', 'modelSourceCommit', 'shotId', 'viewId', 'timeSeconds', 'decodedTimeSeconds', 'input', 'camera', 'rectSourcePixels', 'presentation', 'composite', 'imagePlaneWarp', 'resolvedImagePlaneWarp', 'sourceLayout', 'partOverrides', 'constraints', 'continuity', 'nativeGeometryAssumptions', 'sourceNonIdentifiableFixedParts'], `${label}.expected`)
-  validateNativeGeometryAssumptions(expected.nativeGeometryAssumptions)
-  keys(proof.binding, [...Object.keys(expected), 'intervalSeconds'], `${label}.binding`)
-  for (const key of Object.keys(expected) as (keyof typeof expected)[]) {
-    if (!equalRecord(proof.binding[key], expected[key])) throw new Error(`${label}: visibility proof does not bind ${key}.`)
-  }
-  const image = expected.sourceImage
-  const digestKey = image.pixelFormat === 'bgr8' ? 'sha256Bgr8' : image.pixelFormat === 'gray8' ? 'sha256Gray8' : null
-  if (!digestKey) throw new Error(`${label}: unknown decoded image pixel format.`)
-  keys(image, ['frameIndex', 'width', 'height', 'sourceSha256', 'pixelFormat', digestKey], `${label}.sourceImage`)
-  const digest = image[digestKey as keyof SourceImageIdentity]
-  if (typeof digest !== 'string' || !/^[a-f0-9]{64}$/.test(digest) || image.sourceSha256 !== expected.sourceSha256
-    || image.width !== 1920 || image.height !== 1080 || !Number.isInteger(image.frameIndex) || image.frameIndex < 0) throw new Error(`${label}: invalid decoded source image identity.`)
-  validateSourceLayout(expected, label)
-  const bounds = proof.binding.intervalSeconds
-  if (!Array.isArray(bounds) || bounds.length !== 2) throw new Error(`${label}: missing visibility interval.`)
-  interval(bounds[0], bounds[1], label)
-  if (expected.timeSeconds < bounds[0] || expected.timeSeconds > bounds[1]) throw new Error(`${label}: frame is outside its visibility interval.`)
-  if (!Array.isArray(proof.sourceVisibleParts) || !Array.isArray(proof.excludedParts) || !Array.isArray(proof.unresolvedParts) || !Array.isArray(proof.sourceNonIdentifiableFixedParts)) throw new Error(`${label}: complete four-bucket native visibility census is required.`)
-  if (proof.unresolvedParts.length) throw new Error(`${label}: unresolved native parts cannot establish a complete visible pose.`)
-  const paths = new Set<string>()
-  for (const part of [...proof.sourceVisibleParts, ...proof.excludedParts]) {
-    if (typeof part.partPath !== 'string' || !part.partPath.includes('/') || /[*?]/.test(part.partPath) || paths.has(part.partPath)) throw new Error(`${label}: invalid or duplicate qualified native path.`)
-    paths.add(part.partPath)
-    evidence(part.evidence, label)
-  }
-  for (const part of proof.sourceNonIdentifiableFixedParts) {
-    keys(part, [...Object.keys(SOURCE_NON_IDENTIFIABLE_FIXED_POLICY), 'nativePartPath', 'rectSourcePixels', 'evidence', 'fixedNativeEvidence'], label)
-    for (const key of Object.keys(SOURCE_NON_IDENTIFIABLE_FIXED_POLICY) as (keyof typeof SOURCE_NON_IDENTIFIABLE_FIXED_POLICY)[]) {
-      if (part[key] !== SOURCE_NON_IDENTIFIABLE_FIXED_POLICY[key]) throw new Error(`${label}: unapproved source-non-identifiable fixed-part ${key}.`)
-    }
-    if (typeof part.nativePartPath !== 'string' || !part.nativePartPath.includes('/') || /[*?]/.test(part.nativePartPath) || paths.has(part.nativePartPath)) throw new Error(`${label}: invalid or overlapping source-non-identifiable fixed native path.`)
-    paths.add(part.nativePartPath)
-    evidence(part.evidence, label)
-    evidence(part.fixedNativeEvidence, label)
-    if (!Array.isArray(part.rectSourcePixels) || part.rectSourcePixels.length !== 4) throw new Error(`${label}: source-non-identifiable region needs four coordinates.`)
-    part.rectSourcePixels.forEach((value) => finite(value, label))
-    const [x, y, w, h] = part.rectSourcePixels
-    if (x < 0 || y < 0 || w <= 0 || h <= 0 || x + w > image.width || y + h > image.height) throw new Error(`${label}: source-non-identifiable region exceeds the actual source image.`)
-  }
-  if (!paths.size) throw new Error(`${label}: empty native visibility census.`)
-  for (const part of proof.sourceVisibleParts) {
-    keys(part, ['partPath', 'sourceFeatures', 'sourceCoverage', 'evidence'], label)
-    if (!Array.isArray(part.sourceFeatures) || !part.sourceFeatures.length) throw new Error(`${label}: independent source features are required.`)
-    for (const feature of part.sourceFeatures) evidence(feature, label)
-    const coverage = part.sourceCoverage
-    if (coverage.kind === 'rigid-native-attachment') {
-      keys(coverage, ['kind', 'attachedToPartPath'], label)
-      if (!part.partPath.startsWith(`${coverage.attachedToPartPath}/`) || !proof.sourceVisibleParts.some((candidate) => candidate.partPath === coverage.attachedToPartPath)) throw new Error(`${label}: rigid attachment needs its evidenced native ancestor.`)
-      continue
-    }
-    const idKey = coverage.kind === 'landmarks' ? 'landmarkIds' : coverage.kind === 'native-line-checks' ? 'lineCheckIds' : coverage.kind === 'source-contour' ? 'contourCheckIds' : null
-    if (!idKey) throw new Error(`${label}: unknown source coverage kind.`)
-    keys(coverage, ['kind', idKey], label)
-    const ids = (coverage as unknown as Record<string, unknown>)[idKey]
-    if (!Array.isArray(ids) || !ids.length || new Set(ids).size !== ids.length) throw new Error(`${label}: unique independent source coverage IDs are required.`)
-    for (const id of ids) {
-      evidence(id, label)
-      if (coverage.kind === 'landmarks' && !anchors.some((anchor) => anchor.id === id && anchor.partPath === part.partPath)) throw new Error(`${label}: unknown native source landmark ${id}.`)
-    }
-  }
-  for (const part of proof.excludedParts) {
-    keys(part, ['partPath', 'reason', 'evidence', ...(part.reason === 'source-occluded' ? ['sourceOcclusion'] : [])], label)
-    if (part.reason === 'source-occluded') {
-      validateSourceOcclusion(part.sourceOcclusion, image, label)
-      if (expected.timeSeconds !== expected.decodedTimeSeconds || bounds[0] !== expected.decodedTimeSeconds || bounds[1] !== expected.decodedTimeSeconds) throw new Error(`${label}: source hand mask requires one exact decoded-exposure point certificate, not a held/interpolated interval.`)
-    } else if (!['outside', 'occluded', 'absent'].includes(part.reason)) throw new Error(`${label}: unknown native exclusion reason.`)
-  }
 }
 function inInterval(value: number, minimum: number, maximum: number, period: number, label: string): void {
   // A modulo interval may straddle its seam by expressing the upper bound above one period.

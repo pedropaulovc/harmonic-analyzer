@@ -12,6 +12,7 @@ export const LANDMARK_LIMIT_PX = SOURCE_WIDTH * 0.05
 const EMPTY_CONSTRAINTS: readonly SourceConstraint[] = []
 const EMPTY_GEOMETRY_ASSUMPTIONS: readonly NativeGeometryAssumption[] = []
 const OPAQUE_COMPOSITE: SourceComposite = { mode: 'opaque' }
+const PHASE_PERIOD_RAD = 2 * Math.PI
 const UNMEASURED_STAGE = Object.freeze({ status: 'unmeasured' as const })
 const UNMEASURED_STAGES = Object.freeze({ 50: UNMEASURED_STAGE, 20: UNMEASURED_STAGE, 10: UNMEASURED_STAGE, 5: UNMEASURED_STAGE })
 export type SourceStagePercentage = typeof SOURCE_STAGE_PERCENTAGES[number]
@@ -25,6 +26,10 @@ export interface SourceStageMeasurement {
 }
 export interface CompactSourceView {
   id: string
+  /** Explicit source-view identities represented by this rendered layer; never inferred aliases. */
+  sourceViewIds?: string[]
+  /** Source/layout evidence for the declared mapping, including authored decomposition. */
+  sourceViewMappingEvidence?: string
   rectSourcePixels: [number, number, number, number]
   presentation: 'native' | 'horizontal-mirror'
   camera: CameraRecord | null
@@ -71,19 +76,33 @@ function copyInput(target: MechanismInput, source: MechanismInput): void {
   Object.assign(target.setup, source.setup)
 }
 
-function blendInput(target: MechanismInput, a: MechanismInput, b: MechanismInput, mix: number): void {
+function blendInput(target: MechanismInput, a: MechanismInput, b: MechanismInput, phaseDeltas: Float64Array, mix: number): void {
   copyInput(target, a)
+  // Crank turns are cumulative physical drive, unlike periodic cam phase offsets.
   target.crankTurns += (b.crankTurns - a.crankTurns) * mix
   target.magnification += (b.magnification - a.magnification) * mix
   for (let i = 0; i < 20; i++) {
     target.amplitudes[i] = a.amplitudes[i]! + (b.amplitudes[i]! - a.amplitudes[i]!) * mix
-    target.phases[i] = a.phases[i]! + (b.phases[i]! - a.phases[i]!) * mix
+    target.phases[i] = a.phases[i]! + phaseDeltas[i]! * mix
   }
   for (const key of SETUP_KEYS) {
     const from = a.setup[key]
     const to = b.setup[key]
     if (from !== null && to !== null) target.setup[key] = from + (to - from) * mix
   }
+}
+
+/** Chosen interpolation only, not recovered source rotation direction. Half-turn ties go negative. */
+function compilePhaseDeltas(a: MechanismInput, b: MechanismInput): Float64Array {
+  const deltas = new Float64Array(a.phases.length)
+  for (let i = 0; i < deltas.length; i++) {
+    // Reduce each finite endpoint first so their difference cannot overflow.
+    let delta = (b.phases[i]! % PHASE_PERIOD_RAD - a.phases[i]! % PHASE_PERIOD_RAD) % PHASE_PERIOD_RAD
+    if (delta >= Math.PI) delta -= PHASE_PERIOD_RAD
+    else if (delta < -Math.PI) delta += PHASE_PERIOD_RAD
+    deltas[i] = delta
+  }
+  return deltas
 }
 
 function finite(value: unknown, label: string): number {
@@ -108,6 +127,7 @@ interface CompiledTrackView {
   input: MechanismInput | null
   unobservedInputFields: InputField[]
   inputChangesToNext: boolean
+  phaseDeltasToNext: Float64Array | null
   cameraInterpolatesToNext: boolean
   inputValidated: boolean
 }
@@ -210,6 +230,12 @@ export class CompactVideoReference {
       }
       const views = frame.views.map((view) => {
         const label = `${video.id}@${t}s/${view.id}`
+        if (view.sourceViewIds !== undefined || view.sourceViewMappingEvidence !== undefined) {
+          if (!Array.isArray(view.sourceViewIds) || !view.sourceViewIds.length
+            || view.sourceViewIds.some((id) => typeof id !== 'string' || !id.trim())
+            || new Set(view.sourceViewIds).size !== view.sourceViewIds.length
+            || typeof view.sourceViewMappingEvidence !== 'string' || !view.sourceViewMappingEvidence.trim()) throw new Error(`${label}: source-view mapping needs nonempty unique identities and explicit evidence.`)
+        }
         if (view.camera) requireCamera(view.camera, label)
         if (!view.provenance || view.provenance.kind !== 'chosen-feasible' || !view.provenance.evidence?.trim() || !Array.isArray(view.provenance.unobservedInputFields)
           || new Set(view.provenance.unobservedInputFields).size !== view.provenance.unobservedInputFields.length || view.provenance.unobservedInputFields.some((field) => !INPUT_FIELDS.includes(field))) throw new Error(`${label}: chosen inputs need explicit unobserved provenance.`)
@@ -218,7 +244,7 @@ export class CompactVideoReference {
         if (input?.setup.counterHeightM === null && !unobservedInputFields.includes('setup.counterHeightM')) unobservedInputFields.push('setup.counterHeightM')
         if (view.cameraProvenance && (!['source-fit', 'source-transfer', 'source-informed-framing'].includes(view.cameraProvenance.kind) || !view.cameraProvenance.evidence?.trim() || !view.cameraProvenance.family?.trim())) throw new Error(`${label}: camera family provenance is incomplete.`)
         if (view.cameraContinuityFamily !== undefined && !view.cameraContinuityFamily.trim()) throw new Error(`${label}: camera continuity family is empty.`)
-        return { observation: view, input, unobservedInputFields, inputChangesToNext: false, cameraInterpolatesToNext: false, inputValidated: false }
+        return { observation: view, input, unobservedInputFields, inputChangesToNext: false, phaseDeltasToNext: null as Float64Array | null, cameraInterpolatesToNext: false, inputValidated: false }
       })
       return { observation: frame, required, layout, views, shotStartSeconds: shot.startSeconds, shotEndSeconds: shot.endSeconds, continuousToNext: false, available: pts !== null && (!required || views.length > 0 && views.every((view) => view.input !== null && view.observation.camera !== null)) }
     })
@@ -234,6 +260,7 @@ export class CompactVideoReference {
           from.views[index]!.inputChangesToNext = !equalRecord(from.views[index]!.observation.input, next.views[index]!.observation.input)
           const a = from.views[index]!
           const b = next.views[index]!
+          if (a.inputChangesToNext) a.phaseDeltasToNext = compilePhaseDeltas(a.input!, b.input!)
           const provenance = a.observation.cameraProvenance
           const nextProvenance = b.observation.cameraProvenance
           a.cameraInterpolatesToNext = typeof a.observation.cameraContinuityFamily === 'string'
@@ -304,7 +331,7 @@ export class CompactVideoReference {
         }
         const b = continuous ? next!.views[i]! : null
         if (b && a.inputChangesToNext && mix > 0) {
-          blendInput(out.input, a.input!, b.input!, mix)
+          blendInput(out.input, a.input!, b.input!, a.phaseDeltasToNext!, mix)
           // A changed/interpolated input must be feasible before any published state changes.
           solveSourceInput(out.input, EMPTY_CONSTRAINTS, this.pose)
         } else {

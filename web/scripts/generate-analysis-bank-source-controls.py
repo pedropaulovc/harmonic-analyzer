@@ -5,6 +5,7 @@ python web/scripts/generate-analysis-bank-source-controls.py
 The parent may merge this packet only after releasing its production measurement
 freeze. Source pixels/uncertainties are copied, never projected or interpolated.
 """
+import copy
 import importlib.util
 import json
 from pathlib import Path
@@ -55,7 +56,12 @@ def build_packet():
                 "description":"Rocker exposed cap centre; source chroma centroid is a FIT proxy, not an independently identified geometric vertex.",
                 "correspondenceEvidence":"Immutable fit-centres204 physicalFaceCentroids and latest serialized native request. Source station1..20 maps native physical instance20..1; measured scalar uncertainty copied unchanged."}
             row["landmarks"].append({"anchorId":anchor_id,"viewId":"bar-bank","role":"fit",
-                "pixel":point["pixel"],"status":"observed","method":point["method"],"uncertaintyPx":point["uncertaintyPx"]})
+                "pixel":point["pixel"],"status":"observed","method":"image-edge","uncertaintyPx":point["uncertaintyPx"],
+                "measurementEvidence":{"sourceImage":copy.deepcopy(centre_frame["sourceImage"]),
+                    "technique":"Source chroma-threshold segmentation and region centroid; FIT proxy, not geometric corner",
+                    "originalMeasurement":copy.deepcopy(point),
+                    "sourcePacket":".playwright-cli/analysis-recovery/fit-centres204.json",
+                    "sourcePacketAuthority":copy.deepcopy(centres["authority"])}})
         rows[index] = row
     for check in ledger["rows"]:
         index = check["frameIndex"]
@@ -75,8 +81,14 @@ def build_packet():
             if original["pixel"] != check["sourcePixel"]:
                 raise ValueError(f"CHECK pixel mismatch: {check['rowId']}")
             row["landmarks"].append({"anchorId":anchor_id,"viewId":"bar-bank","role":"check",
-                "pixel":original["pixel"],"status":"observed","method":"independent source material/background threshold localization",
-                "uncertaintyPx":original["uncertaintyPx"]})
+                "pixel":original["pixel"],"status":"observed","method":"image-edge",
+                "uncertaintyPx":original["uncertaintyPx"],
+                "measurementEvidence":{"sourceImage":copy.deepcopy(check["sourceImage"]),
+                    "technique":"Independent source material/background brightness-step threshold edge localization",
+                    "originalMeasurement":copy.deepcopy(original),
+                    "sourceRowId":check["rowId"],
+                    "sourcePacket":".playwright-cli/analysis-recovery/augmented-face-frozen-check/interior-cap-check-ledger.json",
+                    "sourcePacketSha256":ledger["sourcePacketSha256"]}})
         else:
             row["unavailable"].append({"anchorId":anchor_id,"viewId":"bar-bank","role":"check","status":"unresolved",
                 "pixel":None,"uncertaintyPx":None,"reason":original["reason"]})
@@ -91,6 +103,7 @@ def build_packet():
                 "No old CPU projected/world coordinates, residuals, predictions or GPU claims copied as measured source pixels.",
                 "Merge exact native exposure rows; preserve204 source regimes and include their times as compact useful keys.",
                 "For integer-second controls, copy only when sourceImage/frameIndex/hash matches. Analysis117 authored source row is frame3506 at116.983533333s; its CHECKs exist in this packet. Never interpolate CHECK pixels.",
+                "Schema image-edge names source threshold/segmentation localization; unchanged original centroid/threshold recipes and exact exposure evidence remain on each point. FIT centroids remain proxies, not CHECK vertices.",
                 "Known CHECK nulls remain unresolved. No source motion/control coverage outside112.3122..119.085633333s inferred."]}}
 
 

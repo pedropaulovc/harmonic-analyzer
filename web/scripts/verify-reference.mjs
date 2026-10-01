@@ -929,35 +929,33 @@ export async function verifyFrameImages(sourcePath, data, { signal, timeoutMs = 
   const frames = Array.isArray(data) ? data : data?.frames ?? []
   for (const frame of frames) if (frame.sourceImage && native && (!finite(frame.decodedTimeSeconds) || Math.abs(native.pts[frame.sourceImage.frameIndex] - frame.decodedTimeSeconds) > 0.001 || (frame.decodedFrameIndex !== undefined && frame.decodedFrameIndex !== frame.sourceImage.frameIndex))) throw new Error(`Stale native PTS/index at ${frame.timeSeconds}s`)
   if (!formats.size) return { count: 0, formats: [], frameHashDigest: null, reason: 'No source-image pixels claimed' }
-  const directory = await mkdtemp(join(tmpdir(), 'harmonic-verify-framehash-')), reports = [], allDigest = createHash('sha256')
-  try {
-    for (const [pixelFormat, images] of [...formats].sort(([a], [b]) => a.localeCompare(b))) {
-      const indices = [...images.keys()].sort((a, b) => a - b), spans = []
-      let start = indices[0], last = start
-      for (const index of indices.slice(1)) {
-        if (index === last + 1) last = index
-        else { spans.push(start === last ? `eq(n,${start})` : `between(n,${start},${last})`); start = last = index }
-      }
-      spans.push(start === last ? `eq(n,${start})` : `between(n,${start},${last})`)
-      const filter = join(directory, `${pixelFormat}-select.txt`)
-      await writeFile(filter, `select='${spans.join('+')}'`)
-      const { stdout } = await runTool('ffmpeg', ['-v', 'error', '-threads', '2', '-copyts', '-i', sourcePath, '-an', '-filter_script:v', filter, '-frames:v', String(indices.length), '-fps_mode', 'passthrough', '-pix_fmt', pixelFormat === 'bgr8' ? 'bgr24' : 'gray', '-f', 'framehash', '-hash', 'sha256', 'pipe:1'], { signal, timeoutMs })
-      const output = stdout.toString(), timeBase = output.match(/^#tb 0:\s*(\d+)\/(\d+)/m)
-      const tick = timeBase ? Number(timeBase[1]) / Number(timeBase[2]) : NaN
-      const decoded = output.split('\n').filter(line => line.trim() && !line.startsWith('#')).map(line => line.split(',').map(value => value.trim()))
-      if (decoded.length !== indices.length || !finite(tick) || tick <= 0) throw new Error(`Actual ${pixelFormat} framehash/PTS coverage ${decoded.length}/${indices.length}`)
-      const digest = createHash('sha256'), bytesPerFrame = 1920 * 1080 * (pixelFormat === 'bgr8' ? 3 : 1)
-      for (let i = 0; i < indices.length; i++) {
-        const row = decoded[i], index = indices[i], actual = row[5], actualPts = Number(row[2]) * tick
-        if (row.length !== 6 || Number(row[4]) !== bytesPerFrame || actual !== images.get(index)) throw new Error(`Actual source ${pixelFormat} bytes/hash mismatch at native frame ${index}: ${actual}/${images.get(index)}`)
-        const expectedPts = native?.pts[index] ?? frames.find(frame => frame.sourceImage?.frameIndex === index)?.decodedTimeSeconds
-        if (expectedPts !== undefined && (!finite(actualPts) || Math.abs(actualPts - expectedPts) > tick / 2 + 0.001)) throw new Error(`Stale actual decoded ${pixelFormat} PTS at frame ${index}: ${actualPts}/${expectedPts}`)
-        digest.update(`${index}:${actual}\n`); allDigest.update(`${pixelFormat}:${index}:${actual}\n`)
-      }
-      reports.push({ pixelFormat, count: indices.length, bytesPerFrame, frameHashDigest: digest.digest('hex'), decoder: `ffmpeg native select; passthrough original PTS; SHA256 over actual ${pixelFormat} bytes` })
+  const reports = [], allDigest = createHash('sha256')
+  for (const [pixelFormat, images] of [...formats].sort(([a], [b]) => a.localeCompare(b))) {
+    const indices = [...images.keys()].sort((a, b) => a - b), spans = []
+    let start = indices[0], last = start
+    for (const index of indices.slice(1)) {
+      if (index === last + 1) last = index
+      else { spans.push(start === last ? `eq(n,${start})` : `between(n,${start},${last})`); start = last = index }
     }
-    return { count: reports.reduce((sum, item) => sum + item.count, 0), formats: reports, frameHashDigest: allDigest.digest('hex'), originalSourceSha256: observedSha256 }
-  } finally { await rm(directory, { recursive: true, force: true }) }
+    spans.push(start === last ? `eq(n,${start})` : `between(n,${start},${last})`)
+    // Shell-free argv: any subset of the six-source declared exposures needs at most 23,768 ASCII filter characters.
+    const filter = `select='${spans.join('+')}'`
+    const { stdout } = await runTool('ffmpeg', ['-v', 'error', '-threads', '2', '-copyts', '-i', sourcePath, '-an', '-vf', filter, '-frames:v', String(indices.length), '-fps_mode', 'passthrough', '-pix_fmt', pixelFormat === 'bgr8' ? 'bgr24' : 'gray', '-f', 'framehash', '-hash', 'sha256', 'pipe:1'], { signal, timeoutMs })
+    const output = stdout.toString(), timeBase = output.match(/^#tb 0:\s*(\d+)\/(\d+)/m)
+    const tick = timeBase ? Number(timeBase[1]) / Number(timeBase[2]) : NaN
+    const decoded = output.split('\n').filter(line => line.trim() && !line.startsWith('#')).map(line => line.split(',').map(value => value.trim()))
+    if (decoded.length !== indices.length || !finite(tick) || tick <= 0) throw new Error(`Actual ${pixelFormat} framehash/PTS coverage ${decoded.length}/${indices.length}`)
+    const digest = createHash('sha256'), bytesPerFrame = 1920 * 1080 * (pixelFormat === 'bgr8' ? 3 : 1)
+    for (let i = 0; i < indices.length; i++) {
+      const row = decoded[i], index = indices[i], actual = row[5], actualPts = Number(row[2]) * tick
+      if (row.length !== 6 || Number(row[4]) !== bytesPerFrame || actual !== images.get(index)) throw new Error(`Actual source ${pixelFormat} bytes/hash mismatch at native frame ${index}: ${actual}/${images.get(index)}`)
+      const expectedPts = native?.pts[index] ?? frames.find(frame => frame.sourceImage?.frameIndex === index)?.decodedTimeSeconds
+      if (expectedPts !== undefined && (!finite(actualPts) || Math.abs(actualPts - expectedPts) > tick / 2 + 0.001)) throw new Error(`Stale actual decoded ${pixelFormat} PTS at frame ${index}: ${actualPts}/${expectedPts}`)
+      digest.update(`${index}:${actual}\n`); allDigest.update(`${pixelFormat}:${index}:${actual}\n`)
+    }
+    reports.push({ pixelFormat, count: indices.length, bytesPerFrame, frameHashDigest: digest.digest('hex'), decoder: `ffmpeg native select; passthrough original PTS; SHA256 over actual ${pixelFormat} bytes` })
+  }
+  return { count: reports.reduce((sum, item) => sum + item.count, 0), formats: reports, frameHashDigest: allDigest.digest('hex'), originalSourceSha256: observedSha256 }
 }
 
 /** Reproject native geometry and independently replay actual phase/period source pixels. */

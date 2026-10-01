@@ -3,8 +3,10 @@
 
 Run from any directory with the preserved private evidence in this checkout:
   python web/scripts/generate-analysis-synthesis-source-tracks.py
-This copies numeric evidence only. It loads no CAD/model/browser and does not
-qualify cameras, recover historical settings, or measure any matching stage.
+This retains numeric evidence and chooses continuous Analysis inverse cam roots.
+It loads no CAD/model/browser and does not qualify cameras, recover historical
+settings, or measure any matching stage. Original frozen root choices/costs remain
+immutable; alternative rod projections are predictions, never source observations.
 """
 from __future__ import annotations
 import copy
@@ -82,6 +84,9 @@ class Generator:
         if any(requested[row["frameIndex"]] != row["chosenInput"] for row in self.candidate["frames"]):
             raise ValueError("Frozen Analysis candidate and serialized complete input request differ.")
         self.bank_controls = None
+        self.analysis_snapshots, self.analysis_continuity = None, None
+        if self.analysis:
+            self.analysis_snapshots, self.analysis_continuity = self.continue_analysis_roots()
         if self.analysis:
             controls_spec = importlib.util.spec_from_file_location("analysis_bank_controls", WEB / "scripts/generate-analysis-bank-source-controls.py")
             controls_module = importlib.util.module_from_spec(controls_spec)
@@ -161,9 +166,9 @@ class Generator:
     def camera(self, frame, view, family):
         time, shot = frame["timeSeconds"], frame["shotId"]
         direct = common.compact_camera(view.get("camera") or (frame.get("camera") if view["id"] == "main" else None))
-        if direct: return direct, "Original per-exposure source-derived camera; retained CPU FIT/CHECK status is not a stage pass."
+        if direct: return direct, "Retained source-derived camera family at this source exposure; registration/calibration or holding does not claim an independent per-exposure fit. Original CPU FIT/CHECK diagnostics remain source evidence, not a stage pass."
         if self.analysis and family == "bar" and view.get("presentation") == "horizontal-mirror":
-            return common.compact_camera(self.candidate["nativeCameraRecord"]), "Latest four-seed source FIT camera with its genuine horizontal mirror; independent new native/GPU qualification unexecuted."
+            return common.compact_camera(self.candidate["nativeCameraRecord"]), "Single latest four-seed Analysis source FIT camera held/transferred across bank exposures with its genuine horizontal mirror; no per-exposure refit or new native/GPU qualification."
         same = [s for s in self.seeds if s[0] == shot]
         if same: return common.compact_camera(nearest(same,time,lambda x:x[1])[2]), "Nearest same-shot source camera, held over the unmeasured exposure; not independently fitted here."
         if family == "whole" and not ("spin" in shot or "inset" in shot or shot.startswith("endcard")):
@@ -172,7 +177,7 @@ class Generator:
                 return common.compact_camera(nearest(candidates,time,lambda x:x[1])[2]), "Related presenter/front composition source camera held as a coarse baseline, not a matched pose."
         if not self.analysis and family == "pen" and shot == "wheel-pen":
             camera = self.pinhole["actualFrozenFitterExperiments"][0]["actualFrozenFitterCameraRecord"]
-            return common.compact_camera(camera), "Exact Source6330 CPU pinhole FIT candidate; failed independent guide CHECK remains a diagnostic, not an exclusion."
+            return common.compact_camera(camera), "Single Exact Source6330 CPU pinhole FIT candidate held across the wheel-pen shot, not fitted at each exposure; failed independent guide CHECK remains a diagnostic, not an exclusion."
         rect = view["rectSourcePixels"]; aspect = rect[2]/rect[3]
         target, span = self.envelope(family,aspect)
         yaw, elevation = 0., 0.12
@@ -188,19 +193,103 @@ class Generator:
             yaw = 2*math.pi*(time-26.61)/(60.94-26.61)
         return look_camera(target,yaw,elevation,span,aspect), f"Chosen {family} crop: immutable native component bounds, source shot/view identity and front/rear/side/overhead description. Assumed30deg focal,25% framing margin, yaw/elevation and turntable cadence where no measured camera exists; no source-pixel fit claimed."
 
+    def continue_analysis_roots(self):
+        """Continue the latent cam branch, not the independently fitted rocker pose.
+
+        Both genuine inverse roots retain each recorded rocker endpoint. Choosing
+        the lowest rod-pixel cost independently can switch between those roots
+        and force an unobserved full rocker stroke between adjacent exposures.
+        Seed each channel from its first frozen choice, then take the genuine
+        root nearest its preceding cam angle. This is a chosen continuity rule,
+        not recovered crank direction; cumulative crank/setup inputs are retained.
+        """
+        path = f"{ANALYSIS}/{self.candidate['selectedDerivation']}"
+        fit = load(path)
+        manifest = load(f"{ANALYSIS}/frozen-census-search-manifest.json")
+        ceiling = manifest["unchangedHardConstraints"]["fullKnownAdditiveCeilingPx"]
+        snapshots = sorted(copy.deepcopy(self.candidate["frames"]),
+                           key=lambda row: row["sourceFrameIdentity"]["timeSeconds"])
+        previous, changes = None, []
+        first_index = snapshots[0]["frameIndex"]
+        for row in snapshots:
+            value, changed = row["chosenInput"], []
+            # The frozen roots are cam angles, equal to phase offsets in this
+            # zero-drive packet. Do not silently reinterpret another drive.
+            if value["crankTurns"] != 0 or value["setup"]["coneSwingRad"] != 0 or value["setup"]["driveCrankOffsetTurns"] != 0:
+                raise ValueError("Analysis inverse-root packet no longer has its frozen zero bank drive.")
+            selected = []
+            for j, roots in enumerate(row["allGenuineCamRootsRad"]):
+                original = row["chosenRootIndices"][j]
+                if value["phases"][j] != roots[original]:
+                    raise ValueError(f"Analysis frozen phase/root mismatch at {row['frameIndex']}, channel {j+1}.")
+                index = original if previous is None else min(
+                    range(len(roots)),
+                    key=lambda k: (abs(math.remainder(roots[k]-previous[j], 2*math.pi)),
+                                   k != original, k))
+                selected.append(index)
+                if index == original:
+                    continue
+                score = fit["groupScores"][(row["frameIndex"]-first_index)*20+j]
+                if score["camRoots"] != roots or score["chosenRootIndex"] != original:
+                    raise ValueError(f"Analysis frozen root-cost identity mismatch at {row['frameIndex']}, channel {j+1}.")
+                options = score.get("allFamilyRoots")
+                if options is None and row["bodyFITAvailable"]:
+                    raise ValueError(f"Analysis continuation lacks frozen rod source bounds at {row['frameIndex']}, channel {j+1}.")
+                rod = options[1] if options is not None else None
+                # A source-disambiguated orientation is not an interchangeable
+                # latent witness. Refuse rather than replace that observation.
+                if rod and (rod[index]["strictOutside"] != 0
+                            or rod[index]["maximumKnownPx"] > ceiling
+                            or not all(rod[index]["crossSectionValid"])
+                            or not (rod[index]["minimumInteriorPixelMargin"] >= 0)):
+                    raise ValueError(f"Analysis continuation conflicts with frozen rod source bounds at {row['frameIndex']}, channel {j+1}.")
+                def prediction(k):
+                    option = rod[k]
+                    return {**{key: copy.deepcopy(option[key]) for key in (
+                        "rootIndex", "camAngleRad", "maximumKnownPx", "strictOutside",
+                        "minimumInteriorPixelMargin")},
+                        "rawSourceCostSumSquares": sum(x*x for x in option["raw"]),
+                        "predictedRodAxisViewportPixels": copy.deepcopy(option["line"])}
+                changed.append({"channelIndex":j, "originalRootIndex":original,
+                                "continuedRootIndex":index,
+                                "originalPhaseRad":value["phases"][j],
+                                "continuedPhaseRad":roots[index],
+                                "rockerEndpointRad":row["rockerAnglesChosenWitnessRad"][j],
+                                "frozenRodPredictions": [prediction(original), prediction(index)] if rod else None,
+                                "bodyFITAvailable":row["bodyFITAvailable"]})
+                value["phases"][j] = roots[index]
+            previous = [roots[index] for roots,index in zip(row["allGenuineCamRootsRad"],selected)]
+            row["chosenRootIndices"] = selected
+            if changed:
+                changes.append({"frameIndex":row["frameIndex"],
+                                "sourceFrameIdentity":copy.deepcopy(row["sourceFrameIdentity"]),
+                                "channels":changed})
+        diagnostics = {
+            "kind":"chosen-inverse-root-continuation",
+            "rule":"First frozen root per channel, then nearest preceding genuine cam root modulo2pi; exact distance ties retain the frozen choice. No crank/setup/amplitude or source-pixel change.",
+            "frozenCandidate":f"{ANALYSIS}/candidate.json",
+            "frozenCandidateSha256":hashlib.sha256((ROOT / f"{ANALYSIS}/candidate.json").read_bytes()).hexdigest(),
+            "frozenRootCosts":path,
+            "frozenRootCostsSha256":hashlib.sha256((ROOT / path).read_bytes()).hexdigest(),
+            "frozenSourceFitCeilingPx":ceiling,
+            "interpretation":"Original independent root selection and costs remain frozen. Continued latent cam/rod orientations are chosen; recorded rocker endpoints are unchanged. Rod axes are inherited static predictions, NOT observations or current native/GPU qualification. All original connecting-rod source controls remain required.",
+            "sourceAcceptance":False, "historyRecovered":False,
+            "currentNativeQualification":"UNEXECUTED", "changedFrames":changes}
+        return snapshots, diagnostics
+
     def input(self, frame, family):
         time = frame["decodedTimeSeconds"]
         if self.analysis:
-            snapshots = self.candidate["frames"]
+            snapshots = self.analysis_snapshots
             first, last = snapshots[0]["sourceFrameIdentity"]["timeSeconds"], snapshots[-1]["sourceFrameIdentity"]["timeSeconds"]
             if family == "bar" and first <= time <= last:
                 row = nearest(snapshots,time,lambda x:x["sourceFrameIdentity"]["timeSeconds"])
-                return copy.deepcopy(row["chosenInput"]), "Latest frozen source FIT complete51 snapshot; amplitudes/phases are chosen inverse witnesses, not historical crank recovery."
+                return copy.deepcopy(row["chosenInput"]), "Frozen source FIT rocker/amplitude snapshot with nearest-previous genuine inverse cam-root continuation seeded from the first frozen branch. Latent phase/rod orientation is chosen, not historical crank recovery; original independent root choices, rod costs and alternative predictions remain in cpuDiagnostics.analysisRootContinuity. Source pixels and CHECKs are unchanged."
             # A source-window alone is not a measured crank trajectory. Hold the
             # nearest independently source-fitted complete input outside204 rather
             # than synthesizing a cadence, cosine sweep or coefficient history.
             row = snapshots[0] if time < first else snapshots[-1]
-            return copy.deepcopy(row["chosenInput"]), "Nearest endpoint complete51 source-FIT witness held outside measured204 bank exposures. Source-visible crank/coefficient trajectory in this different shot remains unmeasured; no generic cosine animation or historical input recovery claimed."
+            return copy.deepcopy(row["chosenInput"]), "Nearest endpoint complete51 source-FIT witness with the same chosen inverse cam-root continuation held outside measured204 bank exposures. Source-visible crank/coefficient trajectory in this different shot remains unmeasured; no generic cosine animation or historical input recovery claimed."
         if family in ("pen","wheel") and 264.01375 <= time <= 269.01875:
             row = nearest(self.motion["rows"],time,lambda x:x["nativePtsSeconds"])
             return copy.deepcopy(row["input"]), "Immutable Source6330..6450 conditional complete51 relative pen/wheel-motion input. Hidden collar is a chosen trajectory; absolute spoke/input history and full435 association remain unqualified."
@@ -293,6 +382,20 @@ class Generator:
                 view["imagePlaneWarp"] = {"kind":"homography","unwarpedViewportPixels":[1920,1080],
                     "renderToSourcePixels":[scale,0,960*(1-scale),0,1,0,0,0,1]}
                 view["provenance"]["evidence"] += " Source page-flip modeled as chosen center-hinged width compression with mirrored endpoint;2% width floor avoids a singular edge-on homography. Perspective fold/shadow details unmeasured; no real machine rotation invented."
+        if not self.analysis and frame["shotId"] == "presenter-to-spin" and {view["id"] for view in output} == {"outgoing", "incoming"}:
+            # The original source ledger names one full-canvas main composition;
+            # its source-backed two-image decomposition is not an extra body.
+            # This declares layout identity only, not landmark aliases or a fit.
+            for view in output:
+                if view["rectSourcePixels"] == [0, 0, 1920, 1080] and view["presentation"] == "native":
+                    view["sourceViewIds"] = ["main"]
+                    view["sourceViewMappingEvidence"] = (
+                        "8KmVDxkia_w.observations.json presenter-to-spin source main ROI is native full1920x1080; "
+                        "the retained track.json decomposes that same inspected presenter-disappearance/machine-resize "
+                        "composition into ordered outgoing and incoming full-canvas photographic layers. "
+                        "Both layers together cover the original main view; neither is a separately asserted additional body. "
+                        "Layout decomposition only: source landmark association and camera/opacity remain independently unmeasured."
+                    )
         return output
 
     def build(self):
@@ -314,6 +417,8 @@ class Generator:
             track["sourceMeasurements"]["analysisBankControls"] = copy.deepcopy(self.bank_controls["sourceMeasurementCounts"])
             track["sourceMeasurements"]["blockers"].append("Analysis bank CHECKs cover exact204 exposures112.3122..119.085633333s;2690 original corner nulls remain unavailable. Other moving mechanism/pen/crank controls outside that window are not inferred.")
             track["evidence"]["notes"].extend(self.bank_controls["evidence"]["notes"][1:])
+            track["cpuDiagnostics"]["analysisRootContinuity"] = self.analysis_continuity
+            track["evidence"]["notes"].append("Analysis independent source FIT roots can exchange indistinguishable rocker-pose branches. Playback chooses nearest-previous genuine inverse roots; observed rocker endpoints and all source controls stay unchanged. Original per-exposure rod-cost choices remain immutable; alternative cam/rod endpoint orientations and between-exposure continuity are chosen, not recovered or source-certified.")
         else:
             track["sourceMeasurements"]["blockers"].append("Synthesis conditional relative pen/wheel trajectory and source-displacement cosine witnesses do not metrically qualify full source-visible motion or unknown station/phase associations.")
         self.camera_metadata(track)
@@ -328,13 +433,15 @@ class Generator:
                 component = self.family(frame,view)
                 if evidence.startswith("Photographed branch donor"):
                     kind, branch = "source-transfer", evidence.split(" from ")[0]
-                elif evidence.startswith("Latest four-seed") or frame["shotId"] == "analysis-19":
-                    kind, branch = ("source-fit","analysis-four-seed-bank") if frame["shotId"] != "analysis-19" else ("source-transfer","analysis-page-flip-bank")
-                elif evidence.startswith("Original per-exposure") or evidence.startswith("Exact Source6330"):
-                    kind, branch = "source-fit", f"{frame['shotId']}:{view['id']}"
+                elif evidence.startswith("Single latest four-seed") or frame["shotId"] == "analysis-19":
+                    kind, branch = ("source-transfer","analysis-four-seed-bank") if frame["shotId"] != "analysis-19" else ("source-transfer","analysis-page-flip-bank")
+                elif evidence.startswith("Single Exact Source6330"):
+                    kind, branch = "source-transfer", f"{frame['shotId']}:{view['id']}:source6330-held"
+                elif evidence.startswith("Retained source-derived"):
+                    kind, branch = "source-transfer", f"{frame['shotId']}:{view['id']}"
                 elif evidence.startswith("Nearest same-shot") or evidence.startswith("Related presenter"):
-                    # Each held donor is a distinct branch; never interpolate two
-                    # unrelated solutions merely because source shot IDs agree.
+                    # Each held/calibrated donor is a distinct source-derived
+                    # branch, never described as an independent exposure fit.
                     fingerprint = json.dumps({k:camera[k] for k in ("positionMetres","quaternion","verticalFovDegrees")},sort_keys=True,separators=(",",":"))
                     fingerprint = hashlib.sha256(fingerprint.encode()).hexdigest()[:12]
                     kind, branch = "source-transfer", f"{frame['shotId']}:{view['id']}:held-{fingerprint}"

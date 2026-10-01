@@ -11,6 +11,8 @@ from __future__ import annotations
 import copy
 import json
 import math
+import re
+from functools import lru_cache
 from pathlib import Path
 
 WEB = Path(__file__).resolve().parents[1]
@@ -239,14 +241,78 @@ def compact_composite(view):
     return None
 
 
+# These identities are supported by the retained anchor correspondence evidence:
+# fixed castings/support fasteners, not every unbound part or assembly descendant.
+FIXED_ANCHOR_PARTS = {
+    f"harmonic-analyzer/{group}/{name}-{index}"
+    for group, name, indices in (
+        ("frame", "harmonic-base", (1,)), ("frame", "top-frame", (1,)),
+        ("frame", "tube-frame", range(1, 5)), ("frame", "tube-frame-cap", (4,)),
+        ("frame", "frame-cross-screw", range(1, 9)), ("frame", "fillister-screw", range(1, 5)),
+        ("frame", "nameplate", (1,)), ("frame", "rocker-arm-support", (1,)),
+        ("frame", "gooseneck-set-screw", (1,)),
+        ("channel", "pivot-shaft", (1,)), ("channel", "fulcrum-shaft", (1,)),
+        ("channel", "pivot-bracket", (1,)), ("channel", "pedestal-hold-down-screw", (2,)),
+        ("drive-train", "arbor-pedestal", (1, 2)),
+        ("drive-train", "pedestal-hold-down-screw", (1, 2)),
+        ("drive-train", "cone-lock-knob", (1,)), ("drive-train", "cone-pivot-screw", (1,)),
+        ("drive-train", "cylinder-gear-shaft", (1,)), ("drive-train", "cylinder-end-disc", (1,)),
+        ("drive-train", "pinion-pivot-shaft", (1,)),
+        ("magnifier", "wheel-bar", (1,)), ("magnifier", "wheel-axle-nut", (1,)),
+        ("magnifier", "clamp-screw", (1, 2)), ("magnifier", "column-clamp-front", (1,)),
+        ("paper-drive", "support-bar", (1,)), ("paper-drive", "clamp-screw", range(1, 5)),
+        ("paper-drive", "transgear-stub", (1,)), ("pen", "hanger-screw", (1,)),
+    )
+    for index in indices
+}
+FIXED_AXIS_ANCHORS = {
+    ("harmonic-analyzer/magnifier/magnifying-wheel-1", "wheel.center"),
+    ("harmonic-analyzer/paper-drive/transgear-knob-shaft-1", "feed-knob.center"),
+    ("harmonic-analyzer/paper-drive/transgear-knob-shaft-1", "transgear.knob.axis"),
+    ("harmonic-analyzer/paper-drive/transgear-knob-shaft-1", "paper-chain-axis"),
+    ("harmonic-analyzer/paper-drive/transgear-knob-shaft-1", "gta.paper.knob.axis"),
+    ("harmonic-analyzer/paper-drive/rack-pinion-1", "gta.paper.rack.axis"),
+    ("harmonic-analyzer/paper-drive/rack-pinion-1", "gta.paper.disc.axis"),
+    ("harmonic-analyzer/paper-drive/transgear-thumbnut-1", "gta.paper.upper.axis"),
+    ("harmonic-analyzer/paper-drive/transgear-removable-2", "gta.paper.lower.axis"),
+}
+
+
+@lru_cache(maxsize=1)
+def native_motion_bindings():
+    """Read the renderer's declarative bindings, without a second motion table."""
+    source = (WEB / "src/bindings.ts").read_text()
+    groups = dict(re.findall(r"^const (\w+) = '([^']+)'$", source, re.MULTILINE))
+    declarations = source.split("export const BINDINGS: readonly Binding[] = [", 1)[1].split("\n]", 1)[0]
+    bindings = []
+    for line in declarations.splitlines():
+        line = line.strip()
+        if not line or line.startswith("//"):
+            continue
+        match = re.fullmatch(r"(family|group)\('[^']+', (\w+), '([^']+)', '([^']+)'(?:, \d+)?\),", line)
+        if not match:
+            raise ValueError(f"Unrecognized native binding declaration: {line}")
+        kind, namespace, names, motion = match.groups()
+        pattern = f"{re.escape(groups[namespace])}{names}-[1-9][0-9]*" if kind == "family" else f"{re.escape(groups[namespace])}(?:{names})"
+        bindings.append((re.compile(pattern), motion))
+    return bindings
+
+
 def anchor_motion(anchor):
     if anchor.get("motion") in ("fixed", "moving"):
         return anchor["motion"]
-    description = anchor.get("description", "").lower()
-    path = anchor.get("partPath", "")
-    axis_feature = any(word in description for word in ("hub centre", "wheel hub", "shaft end centre", "shaft circular end centre", "shaft centre", "crankshaft axis"))
-    if axis_feature or any(word in description for word in ("fixed", "invariant", "stationary", "axis centre", "axis center")) or "/frame/" in path or "/pivot-shaft-" in path or "/stanchion-" in path:
+    path = anchor.get("partPath")
+    if not anchor.get("correspondenceEvidence"):
+        return None
+    if path in FIXED_ANCHOR_PARTS or (path, anchor["id"]) in FIXED_AXIS_ANCHORS:
         return "fixed"
+    motion = next((motion for pattern, motion in native_motion_bindings() if path and pattern.fullmatch(path)), None)
+    # A spin/swing binding alone does not prove that this point is off its axis.
+    # Crank/cone also have compound platform motion: their unidentified centres
+    # remain unknown, rather than being certified fixed or moving by prose.
+    if motion in (None, "crank", "cone-spin", "cylinder", "wheel", "paper-gear",
+                  "pinion-swing", "pinion-cam", "pinion-lever"):
+        return None
     return "moving"
 
 
@@ -272,7 +338,7 @@ def build_track(data, frame_views_callback, evidence_notes=None):
         for landmark in frame.get("landmarks", []):
             if landmark.get("status") != "observed" or landmark.get("pixel") is None:
                 continue
-            row["landmarks"].append({key: copy.deepcopy(landmark[key]) for key in ("anchorId", "viewId", "role", "pixel", "status", "method", "uncertaintyPx", "trackingEvidence") if key in landmark})
+            row["landmarks"].append({key: copy.deepcopy(landmark[key]) for key in ("anchorId", "viewId", "role", "pixel", "status", "method", "uncertaintyPx", "trackingEvidence", "measurementEvidence") if key in landmark})
         if frame.get("unavailable"):
             row["unavailable"] = [{key: copy.deepcopy(item[key]) for key in ("anchorId", "viewId", "reason") if key in item} if isinstance(item, dict) else item for item in frame["unavailable"]]
         row["views"] = views

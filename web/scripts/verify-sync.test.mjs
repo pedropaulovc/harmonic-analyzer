@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { parseOptions, sourceCensus, finishVideo, seekSettlement, sourcePtsInShot } from './verify-sync.mjs'
+import { parseOptions, sourceCensus, finishVideo, seekSettlement, sourcePtsInShot, requireSourceViews, measureView, playbackInterval } from './verify-sync.mjs'
 
 // These are decision-gate unit controls, NOT browser/source-fidelity evidence.
 const native = { durationSeconds: 2.1, fps: 30, pts: [0, 1, 2] }
@@ -24,7 +24,7 @@ test('incremental runs select one video without requiring the other five', () =>
   assert.equal(options.player, 'local')
   const census = sourceCensus(observations, { frames: observations.frames, coverage: { changeTimesSeconds: [] } }, native, options)
   assert.deepEqual(census.selected.map(row => row.timeSeconds), [1])
-  assert.deepEqual(census.rows.filter(row => row.reasons.includes('mid-interval')).map(row => row.timeSeconds), [0.5, 1.5])
+  assert.deepEqual(census.rows.filter(row => row.reasons.includes('mid-interval')).map(row => row.timeSeconds), [])
   assert.equal(options.scoped, true)
 })
 
@@ -152,4 +152,287 @@ test('mid-interval measurements use real independent source pixels, not interpol
   const missing = sourceCensus(observations, { frames: observations.frames }, native, parseOptions(['--times', '0.5'])).selected[0]
   assert.equal(missing.frame, null)
   assert.match(missing.unavailableReason, /oracle pixels are never interpolated/)
+})
+
+test('extra intermediate probes use exact observed exposures and stay diagnostic unless also mandatory', () => {
+  const observed = { ...frame(0.47), landmarks: [{ anchorId: 'actual-source', pixel: [31, 47], role: 'check', status: 'observed', method: 'manual' }] }
+  const source = { ...observations, frames: [frame(0), observed, frame(1), frame(2)] }
+  const census = sourceCensus(source, { frames: observations.frames }, native, parseOptions(['--stage', '50']))
+  const extra = census.rows.find(row => row.reasons.includes('mid-interval'))
+  assert.equal(extra.timeSeconds, 0.47)
+  assert.equal(extra.frame.decodedTimeSeconds, 0.47)
+  assert.deepEqual(extra.frame.landmarks[0].pixel, [31, 47])
+  assert.equal(extra.diagnosticOnly, true)
+  assert.deepEqual(census.rows.filter(row => row.reasons.includes('every-second')).map(row => row.timeSeconds), [0, 1, 2])
+  const mandatory = sourceCensus(source, { frames: observations.frames, coverage: { changeTimesSeconds: [0.47] } }, native, parseOptions(['--stage', '50'])).rows.find(row => row.timeSeconds === 0.47)
+  assert.equal(mandatory.diagnosticOnly, false)
+  assert.ok(mandatory.reasons.includes('authored-change-point'))
+})
+
+test('actual source membership changes remain mandatory even without an authored sample', () => {
+  const inset = { ...frame(0.4), views: [{ id: 'main' }, { id: 'inset' }] }
+  const source = { ...observations, frames: [frame(0), inset, { ...frame(1), views: inset.views }, { ...frame(2), views: inset.views }] }
+  const row = sourceCensus(source, { frames: observations.frames }, native, parseOptions(['--stage', '50'])).rows.find(row => row.timeSeconds === 0.4)
+  assert.equal(row.diagnosticOnly, false)
+  assert.ok(row.reasons.includes('retained-layout-change'))
+  assert.equal(row.frame, null)
+})
+
+test('optional probes without an admitted error cannot create an extra stage gate', () => {
+  const video = videoFixture(), extra = { timeSeconds: 0.5, required: true, diagnosticOnly: true, reasons: ['mid-interval'] }
+  video.samples.push({ ...extra, sampleTimeSeconds: 0.5, status: 'unavailable', unavailable: [{ reason: 'Diagnostic observation unavailable' }], measurements: [] })
+  finishVideo(video, { rows: [...censusFixture.rows, extra] }, parseOptions(['--stage', '50']))
+  assert.equal(video.coverage.complete, true)
+  assert.equal(video.status, 'passed')
+  assert.equal(video.coverage.diagnosticSamples.unavailable, 1)
+  assert.equal(video.maxErrorPx, 20)
+})
+
+test('diagnostic success cannot replace a missing integer second or required measurements', () => {
+  const video = videoFixture(), extra = { timeSeconds: 0.5, required: true, diagnosticOnly: true, reasons: ['mid-interval'] }
+  video.samples.push({ ...video.samples[0], ...extra, sampleTimeSeconds: 0.5 })
+  finishVideo(video, { rows: [...censusFixture.rows, extra, { timeSeconds: 1, required: true, reasons: ['every-second'] }] }, parseOptions(['--stage', '50']))
+  assert.equal(video.coverage.complete, false)
+  assert.equal(video.coverage.missingCensusSamples, 1)
+  assert.notEqual(video.status, 'passed')
+  const missing = videoFixture()
+  missing.samples[0].measurements = []
+  finishVideo(missing, censusFixture, parseOptions(['--stage', '50']))
+  assert.equal(missing.coverage.complete, false)
+  assert.notEqual(missing.stageMeasurement.status, 'passed')
+})
+
+test('diagnostic moving CHECKs cannot certify mandatory static-only measurements', () => {
+  const video = videoFixture(), extra = { timeSeconds: 0.5, required: true, diagnosticOnly: true, reasons: ['mid-interval'] }
+  video.samples[0].measurements = [measurement('fixed', 'fixed')]
+  video.samples.push({ ...video.samples[0], ...extra, sampleTimeSeconds: 0.5, measurements: [measurement('moving-extra', 'moving')] })
+  finishVideo(video, { rows: [...censusFixture.rows, extra] }, parseOptions(['--stage', '50']))
+  assert.notEqual(video.status, 'passed')
+  assert.equal(video.landmarks.movingChecks, 0)
+  assert.ok(video.failures.some(failure => failure.code === 'hard-moving-landmark-coverage'))
+})
+
+const sourceView = (id, rectSourcePixels = [0, 0, 1920, 1080]) => ({
+  id, rectSourcePixels, presentation: 'native',
+  camera: { positionMetres: [1, 1, 1], quaternion: [0, 0, 0, 1], verticalFovDegrees: 30 },
+  input: { crankTurns: 0 },
+})
+const implicitFrame = time => { const result = frame(time); delete result.views; return result }
+
+test('implicit legacy main is not an extra body on decomposed source panels', () => {
+  const source = { ...observations, frames: [implicitFrame(0), implicitFrame(1), implicitFrame(2)] }
+  const views = ['large-small', 'medium-medium', 'small-large'].map((id, index) => sourceView(id, [0, index * 360, 1920, 360]))
+  const authored = source.frames.map(frame => ({ ...frame, views }))
+  const row = sourceCensus(source, { frames: authored }, native, parseOptions(['--times', '1'])).selected[0]
+  assert.deepEqual(row.expectedViewIds, views.map(view => view.id))
+  requireSourceViews(row)
+})
+
+test('explicit source endcard views and newly visible dynamic insets cannot be omitted', () => {
+  const views = Array.from({ length: 8 }, (_, index) => sourceView(`endcard-${index}`, [index % 4 * 480, Math.floor(index / 4) * 540, 480, 540]))
+  const source = { ...observations, frames: observations.frames.map(frame => ({ ...frame, views })) }
+  const authored = source.frames.map(frame => ({ ...frame, views: views.slice(0, 7) }))
+  const row = sourceCensus(source, { frames: authored }, native, parseOptions(['--times', '1'])).selected[0]
+  assert.deepEqual(row.expectedViewIds, views.map(view => view.id))
+  assert.throws(() => requireSourceViews(row), /endcard-7/)
+  const main = sourceView('main'), inset = sourceView('dynamic-inset', [1400, 0, 520, 400])
+  const dynamic = { ...observations, frames: [{ ...frame(0), views: [main] }, { ...frame(1), views: [main, inset] }, { ...frame(2), views: [main, inset] }] }
+  const dynamicRow = sourceCensus(dynamic, { frames: observations.frames.map(frame => ({ ...frame, views: [main] })) }, native, parseOptions(['--times', '1'])).selected[0]
+  assert.throws(() => requireSourceViews(dynamicRow), /dynamic-inset/)
+})
+
+test('explicit full-view decomposition requires retained mapping evidence for every layer', () => {
+  const main = sourceView('main')
+  const source = { ...observations, frames: observations.frames.map(frame => ({ ...frame, views: [main] })) }
+  const layers = ['outgoing', 'incoming'].map(id => ({ ...sourceView(id), composite: { mode: 'crossfade', groupId: 'fade', imageLayerId: id, opacity: 0.5 }, sourceViewIds: ['main'], sourceViewMappingEvidence: 'Retained original full-canvas main and independently inspected ordered dissolve layout' }))
+  const rowAt = views => sourceCensus(source, { frames: source.frames.map(frame => ({ ...frame, views })) }, native, parseOptions(['--times', '1'])).selected[0]
+  const declared = rowAt(layers)
+  assert.deepEqual(declared.expectedViewIds, ['outgoing', 'incoming'])
+  requireSourceViews(declared)
+  const missing = rowAt(layers.map(({ sourceViewMappingEvidence, ...view }) => view))
+  assert.ok(missing.expectedViewIds.includes('main'))
+  assert.throws(() => requireSourceViews(missing), /main/)
+  assert.throws(() => requireSourceViews(rowAt(layers.slice(1))), /main/)
+})
+
+test('intermediate source landmark view renames need unique source-layout identity', () => {
+  const original = { ...frame(0.5), views: [sourceView('presenter-whole')], landmarks: [{ anchorId: 'actual-source', viewId: 'presenter-whole', pixel: [31, 47], role: 'check', status: 'observed', method: 'manual' }] }
+  const source = { ...observations, frames: [{ ...frame(0), views: original.views }, original, { ...frame(1), views: original.views }, { ...frame(2), views: original.views }] }
+  const rowAt = views => sourceCensus(source, { frames: observations.frames.map(frame => ({ ...frame, views })) }, native, parseOptions(['--times', '0.5'])).selected[0]
+  const renamed = rowAt([sourceView('main')])
+  assert.equal(renamed.frame.landmarks[0].viewId, 'main')
+  assert.equal(renamed.frame.landmarks[0].originalViewId, 'presenter-whole')
+  assert.deepEqual(renamed.frame.landmarks[0].pixel, [31, 47])
+  const ambiguous = rowAt([sourceView('outgoing'), sourceView('incoming')])
+  assert.deepEqual(ambiguous.frame.landmarks, [])
+  assert.match(ambiguous.frame.viewMappingUnavailable[0].reason, /Ambiguous/)
+  assert.throws(() => requireSourceViews(ambiguous), /presenter-whole/)
+})
+
+function measuredViewFixture() {
+  const view = sourceView('main'), frame = { timeSeconds: 1, decodedTimeSeconds: 1, views: [view], sourceImage: { sha256Bgr8: 'actual-target' } }
+  const positions = [[100, 100], [900, 100], [100, 800], [900, 800]]
+  const observations = positions.map((pixel, index) => ({ anchorId: `anchor-${index}`, role: index < 2 ? 'fit' : 'check', pixel, status: 'observed', method: 'manual', uncertaintyPx: 1 }))
+  const anchors = new Map(observations.map((observed, index) => [observed.anchorId, { kind: 'physical-feature', partPath: `native/part-${index}`, partLocalMetres: [0, 0, 0], correspondenceEvidence: 'Independently identified physical feature', motion: index === 2 ? 'moving' : 'fixed' }]))
+  const layout = [{ viewId: 'main', rectSourcePixels: view.rectSourcePixels, presentation: 'native', composite: { mode: 'opaque' } }]
+  const capture = { method: 'gpu-readback', status: 'captured', visibilityMode: 'depth-off-landmark-projection', viewId: 'main', timeSeconds: 1, sourceLayout: layout, resolvedImagePlaneWarp: null, landmarks: observations.map(observed => ({ id: observed.anchorId, state: 'rendered', sourcePixels: observed.pixel, canvasPixels: observed.pixel, uncertaintySourcePixels: 0.5 })) }
+  const mechanism = { method: 'actual-native-mechanism-solve', status: 'rendered', viewId: 'main', timeSeconds: 1, sourceDrawRevision: 1, channelAnglesRad: Array(20).fill(0), input: view.input, sourceLayout: layout, resolvedImagePlaneWarp: null }
+  const response = { captures: [{ viewId: 'main', capture, mechanism }], actual: { views: [{ ...view, sourceLayout: layout, resolvedImagePlaneWarp: null }] }, native: { mediaTime: 1 }, canvas: { tag: 'CANVAS', width: 1920, height: 1080, clientWidth: 1920, clientHeight: 1080, devicePixelRatio: 1 } }
+  return { view, frame, observations, anchors, response, capture, seeds: new Map() }
+}
+const measureFixture = fixture => measureView(fixture.view, fixture.response, fixture.frame, fixture.observations, 96, fixture.anchors, fixture.seeds)
+
+test('schema template matching admits only independent seed and actual correlation provenance', () => {
+  const fixture = measuredViewFixture(), observed = fixture.observations[3]
+  observed.method = 'template-match'
+  observed.trackingEvidence = { seedTimeSeconds: 0, reacquiredFromActualPixels: true, wholeSourceViewCorrelation: 0.998, sourcePatchCorrelation: 0.97, sourceSha256Bgr8: 'actual-target' }
+  fixture.seeds.set('0/main/anchor-3', { role: 'check' })
+  const admitted = measureFixture(fixture)
+  assert.equal(admitted.measured.length, 4)
+  assert.deepEqual(admitted.excluded, [])
+  for (const mutate of [
+    evidence => { delete evidence.reacquiredFromActualPixels },
+    evidence => { evidence.wholeSourceViewCorrelation = 0.9979 },
+    evidence => { evidence.sourcePatchCorrelation = 0.9699 },
+  ]) {
+    const copy = structuredClone(fixture)
+    mutate(copy.observations[3].trackingEvidence)
+    const result = measureFixture(copy)
+    assert.equal(result.measured.length, 3)
+    assert.equal(result.excluded[0].reasonCode, 'template-provenance')
+  }
+  fixture.seeds.clear()
+  assert.equal(measureFixture(fixture).excluded[0].reasonCode, 'template-provenance')
+})
+
+test('source method exclusions stay separate and require distributed admitted CHECK coverage', () => {
+  const fixture = measuredViewFixture()
+  fixture.observations[3].method = 'unsupported-source-technique'
+  const result = measureFixture(fixture)
+  assert.equal(result.measured.length, 3)
+  assert.equal(result.excluded[0].status, 'source-inadmissible')
+  assert.deepEqual(result.unavailable, [])
+  const insufficient = structuredClone(fixture)
+  insufficient.observations[2].method = 'unsupported-source-technique'
+  assert.match(measureFixture(insufficient).unavailable[0].reason, /three distributed/)
+  const collinear = structuredClone(fixture)
+  collinear.observations[2].pixel = [500, 100]
+  collinear.capture.landmarks[2].sourcePixels = [500, 100]
+  collinear.capture.landmarks[2].canvasPixels = [500, 100]
+  assert.match(measureFixture(collinear).unavailable[0].reason, /three distributed/)
+})
+
+test('missing actual pixels or native bodies and unrendered or masked GPU points remain blocking', () => {
+  for (const mutate of [
+    fixture => { fixture.observations[3].pixel = null },
+    fixture => { fixture.anchors.get('anchor-3').partPath = null },
+    fixture => { fixture.capture.landmarks[3].state = 'unavailable' },
+    fixture => { fixture.capture.landmarks[3].sourcePixels = [1921, 800] },
+    fixture => { fixture.capture.sourceLayout.push({ viewId: 'inset', rectSourcePixels: [850, 750, 200, 200], composite: { mode: 'opaque' } }) },
+  ]) {
+    const fixture = measuredViewFixture()
+    fixture.observations[3].method = 'unsupported-source-technique'
+    mutate(fixture)
+    const result = measureFixture(fixture)
+    assert.deepEqual(result.excluded, [])
+    assert.equal(result.unavailable.length, 1)
+    assert.ok(['source-unavailable', 'unmeasured-native'].includes(result.unavailable[0].status))
+  }
+  const noOracle = measuredViewFixture()
+  assert.throws(() => measureView(noOracle.view, noOracle.response, noOracle.frame, [], 96, noOracle.anchors), /no independently observed landmarks/)
+})
+
+test('stale source evidence is excluded but measured pixel errors still fail', () => {
+  const fixture = measuredViewFixture()
+  fixture.observations[3].method = 'image-edge'
+  fixture.observations[3].measurementEvidence = { sourceImage: { sha256Bgr8: 'different-exposure' } }
+  fixture.capture.landmarks[2].sourcePixels = [1200, 800]
+  fixture.capture.landmarks[2].canvasPixels = [1200, 800]
+  const result = measureFixture(fixture)
+  assert.equal(result.excluded[0].reasonCode, 'measurement-image-binding')
+  assert.equal(result.measured.find(item => item.anchorId === 'anchor-2').status, 'failed')
+  const video = videoFixture()
+  Object.assign(video.samples[0], { measurements: result.measured, excluded: result.excluded, unavailable: result.unavailable, status: 'failed' })
+  finishVideo(video, censusFixture, parseOptions(['--stage', '50']))
+  assert.equal(video.stageMeasurement.status, 'failed')
+  assert.equal(video.landmarks.measured, 3)
+  assert.equal(video.sourceLandmarkExclusions.mandatory, 1)
+})
+
+test('playback chooses a complete required same-shot window instead of crossing legitimate no-machine cuts', () => {
+  const shots = [
+    { id: 'short', startSeconds: 0, endSeconds: 1, classification: 'machine' },
+    { id: 'hold', startSeconds: 1, endSeconds: 5, classification: 'non-machine', hasCorrespondingMachine: false },
+    { id: 'long', startSeconds: 5, endSeconds: 15, classification: 'machine' },
+  ]
+  const sample = (time, shotId, complete = true) => ({ ...frame(time), shotId, classification: shotId === 'hold' ? 'non-machine' : 'machine', views: complete ? [sourceView('main')] : [] })
+  const frames = [sample(0, 'short'), sample(1, 'hold', false), sample(5, 'long'), sample(8, 'long', false), sample(9, 'long'), sample(12, 'long')]
+  const interval = playbackInterval({ track: { shots, frames }, native: { durationSeconds: 15 } })
+  assert.equal(interval.frame.timeSeconds, 9)
+  assert.equal(interval.endSeconds, 15)
+  assert.equal(interval.availableSeconds, 6)
+  assert.equal(playbackInterval({ track: { shots: shots.slice(0, 2), frames: frames.slice(0, 2) }, native: { durationSeconds: 15 } }), null)
+})
+
+test('a passed summary cannot hide failed pixels or an unmeasured mandatory clock', () => {
+  for (const mutate of [
+    video => { video.samples[0].measurements[1].status = 'failed' },
+    video => { video.samples[0].maxClockSkewSeconds = null },
+  ]) {
+    const video = videoFixture()
+    mutate(video)
+    finishVideo(video, censusFixture, parseOptions(['--stage', '50']))
+    assert.equal(video.coverage.complete, false)
+    assert.notEqual(video.status, 'passed')
+    assert.notEqual(video.stageMeasurement.status, 'passed')
+  }
+})
+
+test('an admitted diagnostic pixel counterexample still fails the stage without supplying mandatory coverage', () => {
+  const video = videoFixture(), extra = { timeSeconds: 0.5, required: true, diagnosticOnly: true, reasons: ['mid-interval'] }
+  video.samples.push({ ...extra, sampleTimeSeconds: 0.5, status: 'failed', unavailable: [], measurements: [measurement('diagnostic-moving', 'moving', 'failed')], maxClockSkewSeconds: 0.1 })
+  finishVideo(video, { rows: [...censusFixture.rows, extra] }, parseOptions(['--stage', '50']))
+  assert.equal(video.coverage.complete, true)
+  assert.equal(video.landmarks.movingChecks, 1)
+  assert.equal(video.diagnosticLandmarks.failed, 1)
+  assert.equal(video.maxErrorPx, 1000)
+  assert.equal(video.status, 'failed')
+  assert.equal(video.stageMeasurement.status, 'failed')
+  assert.ok(video.failures.some(failure => failure.code === 'diagnostic-pixel-counterexample'))
+})
+
+test('template seed identity remains the original source view after an evidenced compact rename', () => {
+  const fixture = measuredViewFixture(), observed = fixture.observations[3]
+  observed.method = 'template-match'
+  observed.originalViewId = 'presenter-whole'
+  observed.trackingEvidence = { seedTimeSeconds: 0, reacquiredFromActualPixels: true, wholeSourceViewCorrelation: 1, sourcePatchCorrelation: 1 }
+  fixture.seeds.set('0/presenter-whole/anchor-3', { role: 'check' })
+  assert.equal(measureFixture(fixture).measured.length, 4)
+  fixture.seeds.get('0/presenter-whole/anchor-3').role = 'fit'
+  assert.equal(measureFixture(fixture).excluded[0].reasonCode, 'template-provenance')
+  fixture.seeds.clear()
+  fixture.seeds.set('0/main/anchor-3', { role: 'check' })
+  assert.equal(measureFixture(fixture).excluded[0].reasonCode, 'template-provenance')
+})
+
+test('a missing selected mandatory sample cannot be called a successful scoped measurement', () => {
+  const video = videoFixture(), required = { timeSeconds: 1, required: true, reasons: ['requested-sample'] }
+  const rows = [...censusFixture.rows, required]
+  finishVideo(video, { rows, selected: rows }, parseOptions(['--stage', '50', '--times', '0,1']))
+  assert.equal(video.coverage.missingCensusSamples, 1)
+  assert.equal(video.stageMeasurement.scopedSamples.status, 'unavailable')
+  assert.equal(video.stageMeasurement.status, 'unmeasured')
+})
+
+test('authored source landmark aliases also require same-exposure layout evidence', () => {
+  const source = { ...observations, frames: observations.frames.map(frame => ({ ...frame, views: [sourceView('presenter-whole')] })) }
+  const authored = source.frames.map(frame => ({ ...frame, views: [sourceView('main')], landmarks: [{ anchorId: 'actual-source', viewId: 'presenter-whole', pixel: [31, 47], role: 'check', status: 'observed', method: 'manual' }] }))
+  const row = sourceCensus(source, { frames: authored }, native, parseOptions(['--times', '1'])).selected[0]
+  assert.equal(row.frame.landmarks[0].viewId, 'main')
+  assert.equal(row.frame.landmarks[0].originalViewId, 'presenter-whole')
+  assert.deepEqual(row.frame.landmarks[0].pixel, [31, 47])
+  requireSourceViews(row)
+  const unknown = structuredClone(row)
+  unknown.frame.landmarks[0].viewId = 'undeclared-dynamic-view'
+  assert.throws(() => requireSourceViews(unknown), /undeclared-dynamic-view/)
 })

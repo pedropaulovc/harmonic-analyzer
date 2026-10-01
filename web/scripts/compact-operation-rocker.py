@@ -2,7 +2,7 @@
 """Regenerate Operation/Rocker playback candidates from retained private evidence.
 
 Run: python3 web/scripts/compact-operation-rocker.py
-This reads JSON only: no model, solver, optimizer, browser, or acceptance run.
+This reads retained JSON/source metadata only: no model, solver, optimizer, browser, or acceptance run.
 The ignored evidence is deliberately an input, never overwritten. Source camera
 failures remain diagnostics; none of these choices claim a measured error stage.
 """
@@ -151,8 +151,8 @@ def operation():
                 if view and fit.get("camera"):
                     view["camera"] = fit["camera"]
                     view["cameraContinuityFamily"] = f"{frame['shotId']}:{family}:{ident}"
-                    view["cameraProvenance"] = {"kind": "source-fit", "family": view["cameraContinuityFamily"],
-                                                "evidence": f"operation-numeric-cache/{family}.json frame{number}, original source FIT"}
+                    view["cameraProvenance"] = {"kind": "source-transfer", "family": view["cameraContinuityFamily"],
+                                                "evidence": f"operation-numeric-cache/{family}.json frame{number}, retained source FIT/registered camera family. Original target residuals are diagnostics; a reused/derived camera is not asserted to be independently fitted at each exposure."}
         if "main" in by_id and "presenter-whole" in by_id and by_id["main"]["rectSourcePixels"] == by_id["presenter-whole"]["rectSourcePixels"]:
             by_id.pop("presenter-whole")
         observed = {(p.get("viewId") or "main", p["anchorId"], tuple(p.get("pixel") or [])) for p in frame.get("landmarks", [])}
@@ -162,7 +162,7 @@ def operation():
                 ident = "main"
             if ident not in by_id:
                 continue
-            point = {k: copy.deepcopy(declaration[k]) for k in ("anchorId", "role", "pixel", "status", "method", "uncertaintyPx") if k in declaration}
+            point = {k: copy.deepcopy(declaration[k]) for k in ("anchorId", "role", "pixel", "status", "method", "uncertaintyPx", "measurementEvidence", "trackingEvidence") if k in declaration}
             point["viewId"] = ident
             key = (ident, point["anchorId"], tuple(point["pixel"]))
             if key not in observed:
@@ -203,37 +203,48 @@ def operation():
                 rel, request = matching[-1]
                 camera, state = request["camera"], copy.deepcopy(request.get("input", state))
                 family = f"{frame['shotId']}:{rel}:{ident}"
-                camera_provenance = {"kind": "source-fit", "family": family, "evidence": f"{rel} exact source frame{number}/{ident}"}
+                camera_provenance = {"kind": "source-transfer", "family": family, "evidence": f"{rel} chosen capture camera used for exact source frame{number}/{ident}; retained source-fit donor, not a new per-exposure camera fit"}
             if number == 8002 and ident in corrected:
                 camera, state = corrected[ident]["view"]["camera"], copy.deepcopy(corrected[ident]["chosenInput"])
                 family = f"{frame['shotId']}:corrected-native8002:{ident}"
-                camera_provenance = {"kind": "source-fit", "family": family, "evidence": "Corrected joint8002 authority; numeric counter1.1863569024618958m"}
+                camera_provenance = {"kind": "source-transfer", "family": family, "evidence": "Corrected joint8002 retained source-camera authority transferred to this capture; numeric counter1.1863569024618958m, not a newly fitted camera"}
             if camera is None:
                 cache_key = (frame["shotId"], ident)
                 if cache_key not in held_cameras:
-                    own_families = {name for f in data["frames"] if f["shotId"] == frame["shotId"] for name, _ in source_by_frame.get(f.get("sourceFrameIndex"), [])}
-                    start = shots[frame["shotId"]]["startSeconds"]
-                    pool = [c for c in cameras if c["family"] in own_families and c["id"] in (ident, alias)]
+                    shot = shots[frame["shotId"]]
+                    start, end = shot["startSeconds"], shot["endSeconds"]
+                    # Fragment stems span multiple cuts. Only an actual fit time
+                    # inside this shot can supply an own-shot camera donor.
+                    own_shot = [c for c in cameras if start <= c["time"] < end]
+                    pool = [c for c in own_shot if c["id"] in (ident, alias)]
+                    kind = "source-transfer"
+                    basis = "Same-shot matching-view source FIT donor held; target exposure has not been independently camera-fitted"
                     if not pool:
-                        pool = [c for c in cameras if c["family"] in own_families]
+                        pool = own_shot
+                        kind = "source-informed-framing"
+                        basis = "Same-shot different-view source camera used as neutral framing, not an own-view fit"
                     if not pool:
-                        # A single stable physical whole-camera baseline, never
-                        # a changing unrelated nearest-camera whip inside a shot.
+                        # Retain a stable, honestly named neutral baseline where
+                        # no own-shot source fit exists; never call it an own-fit.
                         pool = [c for c in cameras if c["family"] == "CodexPresenter" and c["id"] in ("main", "presenter-whole")]
-                    candidate = min(pool, key=lambda c: abs(c["time"] - start))
-                    held = copy.deepcopy(candidate["camera"])
-                    if held.get("principalPointViewportPixels"):
-                        p = held["principalPointViewportPixels"]
-                        held["principalPointViewportPixels"] = [p[0] * original["rectSourcePixels"][2] / 1920, p[1] * original["rectSourcePixels"][3] / 1080]
-                    for key in ("status", "fitRmsPx", "fitMaxPx", "heldOutMaxPx"):
-                        held.pop(key, None)
-                    held_cameras[cache_key] = (held, candidate["reference"])
-                camera, reference = held_cameras[cache_key]
-                family = f"{frame['shotId']}:{ident}:fixed-source-baseline"
-                camera_provenance = {"kind": "source-informed-framing", "family": family, "evidence": f"Held chosen camera from {reference}; this exposure is not camera-matched"}
+                        basis = "Neutral presenter whole-camera source-informed framing baseline borrowed across a cut; no own-shot camera fit is available"
+                    if not pool:
+                        held_cameras[cache_key] = (None, "No retained source camera donor or neutral presenter baseline is available", "source-informed-framing")
+                    else:
+                        candidate = min(pool, key=lambda c: abs(c["time"] - start))
+                        held = copy.deepcopy(candidate["camera"])
+                        if held.get("principalPointViewportPixels"):
+                            p = held["principalPointViewportPixels"]
+                            held["principalPointViewportPixels"] = [p[0] * original["rectSourcePixels"][2] / 1920, p[1] * original["rectSourcePixels"][3] / 1080]
+                        for key in ("status", "fitRmsPx", "fitMaxPx", "heldOutMaxPx"):
+                            held.pop(key, None)
+                        held_cameras[cache_key] = (held, f"{basis}; donor {candidate['reference']} at {candidate['time']:.6f}s. Viewport resizing is chosen, not refitted.", kind)
+                camera, reference, kind = held_cameras[cache_key]
+                family = f"{frame['shotId']}:{ident}:held-source-camera"
+                camera_provenance = {"kind": kind, "family": family, "evidence": reference}
                 assumed[frame["shotId"]].add(ident)
             if not camera_provenance:
-                camera_provenance = {"kind": "source-fit", "family": family, "evidence": f"Retained source camera at frame{number}/{ident}; CPU diagnostic only"}
+                camera_provenance = {"kind": "source-transfer", "family": family, "evidence": f"Retained source-derived camera used at frame{number}/{ident}; source registration/held calibration is not an independent target-exposure camera fit. Original CPU diagnostics remain source evidence only."}
             if state and frame["shotId"] == "operation-024":
                 # Actual source111 and114 expose the same downwards handle;114
                 # overlays count1, and112 shows the arm up/right. Absolute phase
@@ -292,8 +303,8 @@ def rocker():
             notes = ("Saved CPU-feasible continuous independently actuated held-bank branch; actual source phases/station order, not ideal cosine or historical recovery.")
             view = view_record(original, body_candidate["camera"], row["completeInput"], notes)
             view["cameraContinuityFamily"] = "rocker-centered-body-profile"
-            view["cameraProvenance"] = {"kind": "source-fit", "family": "rocker-centered-body-profile",
-                                        "evidence": "recovered-runnable/full-profile-fit.json results2, centered body-aware candidate; old CPU strict2% failures retained"}
+            view["cameraProvenance"] = {"kind": "source-transfer", "family": "rocker-centered-body-profile",
+                                        "evidence": "Single recovered-runnable/full-profile-fit.json results2 centered body-aware source camera held across all Rocker exposures/overlays; no per-exposure fit. Original cap/rim CPU strict2% failures retained, current stages unmeasured."}
             result.append(view)
         return result
 

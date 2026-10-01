@@ -129,7 +129,6 @@ function configureLandmarkProbe(): void {
   if (enabled ? diagnosticReference === reference && diagnosticMachine === machine : diagnosticReference === null && diagnosticMachine === null) return
   viewer.setLandmarkProbe(null)
   viewer.setPartVisibilityProbe(null)
-  viewer.setNativeLineProbe(null)
   diagnosticReference = null
   diagnosticMachine = null
   if (!enabled || !reference || machine?.availability !== 'available') return
@@ -701,7 +700,6 @@ if (verificationEnabled) {
         views: activeViews.map((view) => ({ id: view.id, rectSourcePixels: view.rectSourcePixels, presentation: view.presentation, composite: view.composite, imagePlaneWarp: view.authoredImagePlaneWarp, resolvedImagePlaneWarp: view.imagePlaneWarp ?? null, sourceLayout: view.sourceLayout, camera: view.camera, input: serializeInput(view.input), mechanicalProvenance: view.mechanicalProvenance, unobservedInputFields: view.unobservedInputFields, sourceSampling: view.sourceSampling, nativeGeometryAssumptions: view.nativeGeometryAssumptions, renderedMechanism: renderedMechanism(view.id) })),
       }
     },
-    referenceData() { return reference?.data ?? null },
     compactData() { return reference?.data ?? null },
     pauseVideo() { player?.pause(); return this.snapshot() },
     playVideo() { player?.play(); return this.snapshot() },
