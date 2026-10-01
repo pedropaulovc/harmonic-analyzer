@@ -517,6 +517,53 @@ def test_dimension_text_lands_clear_of_the_views_and_the_title_block() -> None:
     assert cap_top - _CAPTION_HEIGHT > _TITLE_BLOCK_TOP + 0.003
 
 
+# The gear-data block at its 2.5 mm note height, measured on farm run
+# 20261001T110844152Z: rows 3.50 mm apart from a cap top 0.3 mm under the
+# anchor, the last row's descenders 0.6 mm under top - rows * pitch, and the
+# 95-character tooth-thickness row 165 mm wide (1.74 mm a character). The tip
+# diameter's "Ø65.21 ±0.1" printed 26.2 mm wide and 3.9 mm tall.
+_NOTE_LINE_PITCH = 0.0035
+_NOTE_DESCENDER = 0.0006
+_NOTE_CHAR_WIDTH = 0.00174
+_TIP_DIA_TEXT = "Ø65.21 ±0.1"
+_TIP_DIA_TEXT_HEIGHT = 0.0039
+
+
+def _gear_data_box() -> tuple[float, ...]:
+    rows = notes.GEAR_DATA.splitlines()
+    left, top = drawing.GEAR_DATA_POS
+    width = _NOTE_CHAR_WIDTH * max(len(row) for row in rows)
+    bottom = top - len(rows) * _NOTE_LINE_PITCH - _NOTE_DESCENDER
+    return (left, bottom, left + width, top)
+
+
+def _tip_dia_text_box(centre: tuple[float, float]) -> tuple[float, ...]:
+    half_w = _CHAR_WIDTH * len(_TIP_DIA_TEXT) / 2.0
+    half_h = _TIP_DIA_TEXT_HEIGHT / 2.0
+    x, y = centre
+    return (x - half_w, y - half_h, x + half_w, y + half_h)
+
+
+def test_tip_diameter_text_hangs_under_every_gear_data_row_and_over_the_teeth() -> None:
+    # R9-56's contact-ratio row grew the block down through "Ø65.21 ±0.1",
+    # which sat a fixed 16 mm over the tooth tips (machinist review, farm run
+    # 20261001T110844152Z). The text now hangs under the block's last row, so
+    # a further row moves it down -- until it would land on the teeth.
+    block = _gear_data_box()
+    assert "CONTACT RATIO WITH MHA-025" in notes.GEAR_DATA.splitlines()[-1]
+    tip = _tip_dia_text_box(drawing.FRONT_KEEP["OutsideDia"])
+    # The text sits under the block's columns, so its clearance is vertical.
+    assert block[0] < tip[0] < block[2]
+    assert block[1] - tip[3] >= 0.003
+    # ... and over the tooth-tip circle, with room for the leader's shoulder.
+    assert _box_distance(tip, drawing.FRONT_CENTER) > drawing.HALF_OD + 0.005
+    # The fixed placement, 16 mm over the tips, that the contact-ratio row
+    # printed through.
+    cx, cy = drawing.FRONT_CENTER
+    old = _tip_dia_text_box((cx - 0.035, cy + drawing.HALF_OD + 0.016))
+    assert old[3] > block[1]
+
+
 def test_part_stamps_make_critical_properties() -> None:
     build = _build_source()
     assert "apply_drawing_properties" in build
