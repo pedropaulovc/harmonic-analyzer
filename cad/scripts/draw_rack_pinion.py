@@ -2,7 +2,8 @@ r"""Create the curated manufacturing drawing for the rack-pinion reduction disc 
 
 Follows the batch gear-drawing pattern (see ``draw_cylinder_gear``). Drawn 1:1;
 the 120T disc is large and thin.  The face view (``*Front``, the rear face)
-prints the bore and the native #0-80 tap callout with its countersink and
+prints the bore with its reamed limits and the fit note naming the MHA-110
+spigot, and the native #0-80 tap callout with its countersink and
 assembly-transfer lines (no bolt-circle position: the taps are spotted
 through the MHA-159 flange at assembly); the edge view prints the disc
 thickness and the face squareness to datum A.
@@ -11,6 +12,7 @@ thickness and the face squareness to datum A.
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
@@ -19,6 +21,7 @@ from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_feature_control_frame,
+    add_leader_note,
     add_native_hole_callout,
     add_property_linked_note,
     assert_imported_precision,
@@ -36,6 +39,7 @@ from _native_axis_datum import add_native_axis_datum
 from _rack_bore_finish import add_rack_bore_finish
 from rack_pinion_spec import (
     BORE_CALLOUT,
+    BORE_FIT_CALLOUT,
     BORE_DIA,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -82,6 +86,15 @@ RIGHT_KEEP = {
     "FaceWidth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - HALF_OD - 0.012),
 }
 DIMENSION_CALLOUTS = {"BoreDia": BORE_CALLOUT}
+# The bore's fit note stands at the left margin under the gear data block;
+# its leader lands on the bore's 180° point, between the bore dimension's
+# upper-left leader and datum A below-left.
+_BORE_SHEET_RADIUS = BORE_DIA * VIEW_SCALE[0] / 2000.0
+BORE_FIT_NOTE = (0.018, 0.200)
+BORE_FIT_ATTACH = (
+    FRONT_CENTER[0] + _BORE_SHEET_RADIUS * math.cos(math.radians(180.0)),
+    FRONT_CENTER[1] + _BORE_SHEET_RADIUS * math.sin(math.radians(180.0)),
+)
 # Lower-left of the face view, off the rim: the leader lands on the 240° tap
 # (visible_circle_edge breaks the three equal radii on the lowest centre).
 TAP_CALLOUT_XY = (FRONT_CENTER[0] - 0.060, FRONT_CENTER[1] - 0.058)
@@ -191,6 +204,15 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, [*front_annotations, *right_annotations], DRAWING_PRECISION_BY_NAME
     )
     set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
+    add_leader_note(
+        adapter,
+        BORE_FIT_CALLOUT,
+        text_xy=BORE_FIT_NOTE,
+        attach_xy=BORE_FIT_ATTACH,
+        label="disc bore fit",
+        view=front,
+        height=0.0022,
+    )
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to disc bore")
     bore_edge = visible_circle_edge(adapter, front, BORE_DIA)

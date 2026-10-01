@@ -25,6 +25,7 @@ SKU = "91790A194"
 THREAD = "#8-32"
 THREAD_CLASS = "2A"
 THREAD_MAJOR = 0.164 * IN
+THREAD_MAJOR_MIN = 0.1571 * IN  # UNC-2A minimum major (ASME B1.1)
 LENGTH = 0.5 * IN  # from the top of the bevel
 PITCH = IN / 32.0
 HEAD_DIA = 0.312 * IN  # at the top of the bevel

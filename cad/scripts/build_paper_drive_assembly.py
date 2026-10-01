@@ -2522,14 +2522,18 @@ async def build(adapter) -> dict[str, str]:
     # platen-axis-referenced default fed the paper backward vs the tooth
     # contact; the pitch-axis re-reference still solved reversed at flip=False
     # -- the live gate measured +0.133 mm for feed Z -1.50 deg). flip=True
-    # lands the physical sense; recalibrate HERE (never the probe's FEED_SIGN)
+    # landed the physical sense while the feed pinion was inserted identity.
+    # The round-10 sleeve is inserted Ry180, which reverses Axis1@feed (its
+    # Top x Right axis, local +Z), so the same flag fed the paper backward
+    # again (run 20261001T062924323Z: +0.133 mm for feed Z -1.50 deg);
+    # flip=False restores it. Recalibrate HERE (never the probe's FEED_SIGN)
     # if the gate ever fails on sign again.
     await rack_pinion_mate(
         adapter,
         named_ref(f"Axis1@{rack}", "AXIS"),
         named_ref(f"Axis1@{feed}", "AXIS"),
         rack_travel_per_revolution=math.pi * FEED_PD,
-        flip=True,
+        flip=False,
         label="platen feed (feed pinion on the rack)",
     )
     # (4) The crank spin is a FREED operational DOF: its drive spec is

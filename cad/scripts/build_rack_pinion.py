@@ -56,6 +56,7 @@ from _drawing_marks import (
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
 )
 from _drawing_simplified import save_simplified_part
 from _gear import build_fixed_gear, volume_check
@@ -63,6 +64,7 @@ from _holes import wizard_holes
 from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry
 from rack_pinion_spec import (
+    BORE_DEVIATIONS,
     BORE_DIA,
     CSK_LEG,
     DIAMETRAL_PITCH,
@@ -235,8 +237,12 @@ async def build(adapter) -> dict[str, str]:
         f" tap to bore wall {TAP_TO_BORE_WALL_WORST:.2f} worst"
     )
 
-    # Printed places (and so the general-tolerance row each dimension claims)
-    # are authored on the model; no model band.
+    # The bore's reamed slip band on the sleeve spigot is the one model band;
+    # the other printed places (and so the general-tolerance row each
+    # dimension claims) are authored on the model.
+    set_dimension_bilateral_tolerance(
+        adapter, "BoreProfile", "BoreDia", *BORE_DEVIATIONS
+    )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():

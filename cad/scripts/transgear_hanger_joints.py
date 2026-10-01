@@ -153,6 +153,55 @@ PLATE_SCREW_TIP_PROUD_MAX = (
     - (PLATE.THICKNESS_OVER_ARM - PLATE.BAND_XX)
     - (ARM.THICKNESS - ARM.THICKNESS_BAND)
 )
+# Both screws enter their taps only if the plate's hole pitch and the arm's
+# tap pitch disagree by no more than the shanks' float in the two holes.  Each
+# part's pitch moves by both its holes' printed position bands (the arm's
+# tap stations and the plate's hole stations, ±HOLE_POSITION_BAND each, the
+# bands both builds apply); the smallest drilled hole floats on the largest
+# (basic) #8-32 major.  The 82° heads then seat off their countersinks' axes
+# by up to half the mismatch, opposite ways.
+PLATE_SCREW_PITCH_MISMATCH_MAX = 2.0 * ARM.HOLE_POSITION_BAND + 2.0 * (
+    PLATE.HOLE_POSITION_BAND
+)
+# Two holes, each letting its shank stand (hole - shank) / 2 off centre.
+PLATE_SCREW_PITCH_FLOAT = PLATE.SCREW_HOLE_DIA - PLATE_SCREW.THREAD_MAJOR
+PLATE_SCREW_PITCH_MARGIN = PLATE_SCREW_PITCH_FLOAT - PLATE_SCREW_PITCH_MISMATCH_MAX
+if PLATE_SCREW_PITCH_MARGIN <= 0.0:
+    raise AssertionError(
+        "MHA-166 screws cannot enter both arm taps: plate-to-arm pitch mismatch "
+        f"{PLATE_SCREW_PITCH_MISMATCH_MAX:.3f} > shank float "
+        f"{PLATE_SCREW_PITCH_FLOAT:.3f}"
+    )
+
+# The plate's notch face clears the arm's lower edge (the screws locate the
+# plate).  Closing it, in plate-frame y: the face's .XX corner heights, the
+# holes' Y station, and the screws' float in the largest drilled holes on the
+# thinnest 2A major -- each hole shifting c either way, a rigid plate moves a
+# notch corner by up to (|1 - t| + |t|) c, t the corner's x along the screw
+# pitch.  Across the edge (the face is parallel to it) the arm's .X outline
+# then stands out toward the face.
+_NOTCH_FLOAT = (
+    PLATE.SCREW_HOLE_DIA + PLATE.DRILL_GROWTH - PLATE_SCREW.THREAD_MAJOR_MIN
+) / 2.0
+_HOLE_X = sorted(x for x, _y in PLATE.SCREW_HOLES)
+_NOTCH_LEVER = max(
+    abs(1.0 - t) + abs(t)
+    for t in (
+        (corner[0] - _HOLE_X[0]) / (_HOLE_X[1] - _HOLE_X[0])
+        for corner in (PLATE.NOTCH_LEFT, PLATE.NOTCH_RIGHT)
+    )
+)
+NOTCH_AIR_WORST = (
+    PLATE.NOTCH_RELIEF
+    - PLATE.BAND_XX
+    - PLATE.HOLE_POSITION_BAND
+    - _NOTCH_LEVER * _NOTCH_FLOAT
+) * math.cos(ARM.EDGE_LEAN) - ARM.BAND_X
+if NOTCH_AIR_WORST <= 0.0:
+    raise AssertionError(
+        f"MHA-165 notch face meets the arm's lower edge: worst air "
+        f"{NOTCH_AIR_WORST:.3f}"
+    )
 
 # --- MHA-169 latch pin pressed to the floor of the arm's end-face hole ---------
 if abs(LATCH_PIN.DIA - ARM.PIN_HOLE_DIA) > 1e-9:

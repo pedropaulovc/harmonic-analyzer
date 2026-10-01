@@ -6,8 +6,8 @@ across the MHA-164 arm by two 8-32 oval-head screws.  It carries the knob
 shaft's running bore on axis K, a front hub (the thrust ring's seat) and a
 rear boss (the cup runs behind it).  Its rear portion is 5 thick where it
 lies over the arm; below the arm's lower edge it drops the arm's thickness
-(7.9375) more to the arm's front face, so the step (the "notch") sits on that
-edge.
+(7.9375) more to the arm's front face, so the step (the "notch") wraps that
+edge, NOTCH_RELIEF clear of it (the screws locate the plate).
 
 Local frame (same axes as the arm, so the assembly places both with one
 rotation about Z):
@@ -66,8 +66,21 @@ def arm_upper_edge_y(x: float) -> float:
 
 
 def arm_lower_edge_y(x: float) -> float:
-    """Plate-frame y of the arm's lower tangent edge (the notch face)."""
+    """Plate-frame y of the arm's lower tangent edge."""
     return -ARM.edge_half_width(x + BORE_STATION) - BORE_OFFSET
+
+
+# The screws locate the plate (its holes and countersinks on the arm's taps);
+# the notch face only clears the arm's lower edge.  It stands NOTCH_RELIEF (in
+# y) below that edge, parallel to it, so the arm's .X outline, the face's .XX
+# corner heights, the holes' position and the screws' float in them never
+# close it (transgear_hanger_joints.NOTCH_AIR_WORST).
+NOTCH_RELIEF = 2.5
+
+
+def notch_face_y(x: float) -> float:
+    """Plate-frame y of the notch face, NOTCH_RELIEF clear of the arm edge."""
+    return arm_lower_edge_y(x) - NOTCH_RELIEF
 
 
 TOP_LEFT = (EDGE_MINUS_X, arm_upper_edge_y(EDGE_MINUS_X))
@@ -76,8 +89,10 @@ KINK = (EDGE_MINUS_X, KINK_Y)
 _KINK_DIST = math.hypot(*KINK)
 _TANGENT_ANGLE = math.atan2(KINK[1], KINK[0]) + math.acos(END_R / _KINK_DIST)
 KINK_TANGENT = (END_R * math.cos(_TANGENT_ANGLE), END_R * math.sin(_TANGENT_ANGLE))
-NOTCH_LEFT = (EDGE_MINUS_X, arm_lower_edge_y(EDGE_MINUS_X))
-NOTCH_RIGHT = (EDGE_PLUS_X, arm_lower_edge_y(EDGE_PLUS_X))
+NOTCH_LEFT = (EDGE_MINUS_X, notch_face_y(EDGE_MINUS_X))
+NOTCH_RIGHT = (EDGE_PLUS_X, notch_face_y(EDGE_PLUS_X))
+if NOTCH_LEFT[1] <= KINK[1]:
+    raise AssertionError("the relieved notch face drops below the -X edge's kink")
 
 # --- Knob-shaft bearing: bore, front hub, rear boss (contract 1.10) ---------
 BORE_DIA = 8.5
@@ -99,7 +114,10 @@ BOSS_FACE_Z = REAR_FACE_Z + BOSS_HEIGHT
 FRONT_FACE_Z = -NOTCH_DEPTH
 
 # --- Screw holes: 2 x 82° countersinks for the #8 oval heads ----------------
-SCREW_HOLE_DIA = 4.4  # clearance, drilled +0.10/0
+# Clearance, drilled +0.10/0.  Ø4.5 (not 4.4): the two shanks must float over
+# the plate-to-arm pitch mismatch both parts' hole-position bands allow
+# (transgear_hanger_joints.PLATE_SCREW_PITCH_MARGIN).
+SCREW_HOLE_DIA = 4.5
 CSK_DIA = 7.9248  # 0.312 in, the head's Ø at the top of the bevel
 CSK_ANGLE_DEG = 82.0
 CSK_DEPTH = (
@@ -131,6 +149,7 @@ _NOTCH_DISTANCE = (
     BORE_STATION * math.sin(ARM.EDGE_LEAN)
     - BORE_OFFSET * math.cos(ARM.EDGE_LEAN)
     - ARM.PIVOT_END_R
+    - NOTCH_RELIEF * math.cos(ARM.EDGE_LEAN)
 )
 _NEAR_HOLE = min(SCREW_HOLES, key=lambda xy: math.hypot(*xy))
 WALLS: dict[str, tuple[float, float]] = {

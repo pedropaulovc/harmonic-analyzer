@@ -37,8 +37,10 @@ def test_every_marked_dimension_is_kept_once_with_part_authored_places() -> None
     # R9-5: the thickness is functional and prints .XXX; the bore .XXX.
     assert spec.DRAWING_PRECISION_BY_NAME == {"FaceWidth": 3, "BoreDia": 3}
     assert "draw_rack_pinion.py" in PRECISION_MIGRATED_DRAWINGS
-    # General bands only: no model-authored bilateral band on this part.
-    assert model_toleranced_dimensions(part) == {}
+    # The bore's reamed slip band is the one model-authored band.
+    assert model_toleranced_dimensions(part) == {
+        ("BoreProfile", "BoreDia"): "*BORE_DEVIATIONS",
+    }
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert not drawing_specification_violations(source, filename=drawing.__file__)
 
@@ -89,6 +91,34 @@ def test_tap_to_bore_wall_meets_the_target_worst_case() -> None:
     assert spec.TAP_TO_BORE_WALL_WORST >= 2.0
     assert spec.TAP_TO_BORE_WALL_WORST < spec.TAP_TO_BORE_WALL
     assert spec.CSK_TO_BORE_WORST >= 1.5
+
+
+def test_the_bore_slips_on_the_sleeve_spigot_at_every_limit() -> None:
+    """The bands the two builds apply (the disc's bore, the MHA-110 sleeve's
+    spigot) leave clearance at the tightest corner: the smallest bore over
+    the largest spigot, and the fit note quotes the same clearance."""
+    import build_transgear_feed_pinion as sleeve_part
+    import transgear_feed_pinion_spec as sleeve
+
+    assert (
+        model_toleranced_dimensions(sleeve_part)[("SleeveProfile", "SpigotDia")]
+        == "*SPIGOT_DIA_DEVIATIONS"
+    )
+    bore_lower, bore_upper = spec.BORE_DEVIATIONS
+    spigot_lower, spigot_upper = sleeve.SPIGOT_DIA_DEVIATIONS
+    least = (spec.BORE_DIA + bore_lower) - (sleeve.SPIGOT_DIA + spigot_upper)
+    greatest = (spec.BORE_DIA + bore_upper) - (sleeve.SPIGOT_DIA + spigot_lower)
+    assert least > 0.0
+    assert (least, greatest) == pytest.approx(spec.SPIGOT_DIAMETRAL_CLEARANCE)
+    # The disc's float on the spigot feeds the transferred taps' wall.
+    assert spec.DISC_OFFSET_MAX == pytest.approx(greatest / 2.0)
+    note = spec.BORE_FIT_CALLOUT
+    assert f"MATE SLEEVE {sleeve.SLEEVE_NUMBER}" in note
+    assert f"(DIA CLR {least:.3f}-{greatest:.3f} mm)" in note
+    assert f"\N{DIAMETER SIGN}{sleeve.SPIGOT_DIA:.3f} +{spigot_upper:.3f}/" in note
+    assert all(len(line) <= 70 for line in note.splitlines())
+    for banned in ("EXCEPTION", "ACCEPTED", "RULING", "POLICY", "BOOK FIDELITY"):
+        assert banned not in note.upper()
 
 
 def test_thickness_band_is_the_printed_xxx_band() -> None:

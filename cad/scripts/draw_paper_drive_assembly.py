@@ -43,9 +43,11 @@ import transgear_removable_spec as sprocket
 import transgear_stub_spec as stub
 from _common import _early_bound, check, run_build
 from _drawing_common import (
+    SIMPLIFIED_VIEW_CONFIGURATION,
     BalloonAnchor,
     DrawingOutputs,
     ViewRole,
+    _SW_SHADED_EDGES,
     add_component_bom_balloons,
     apply_view_configuration,
     assert_balloon_landings,
@@ -57,6 +59,7 @@ from _drawing_common import (
     read_required_properties,
     rebuild_drawing,
     set_high_quality_shaded_with_edges,
+    view_configuration,
 )
 from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
 from solidworks_mcp.adapters.com_variant import double_array
@@ -98,21 +101,33 @@ BOM_COLUMN_WIDTHS = {
 BOM_DESCRIPTION_MAX_CHARS = 41
 BOM_ROW_HEIGHT = 0.006
 BOM_ANCHOR = (0.018, 0.262)
-# The transgear alone (about 67 x 88 mm on the sheet at 2:3, from the Ø81.5
-# disc to the 105 mm hook), right of the inner view's ring and above the title
-# block. Its ring then spans x 306-407 mm, y 127-249 mm (inner_view_shift).
+# The transgear alone at 2:3, right of the inner view's ring and above the
+# title block. Native run 20261001T062924323Z read its outline at x 295.3 to
+# 404.8 mm centred at x 355; here it spans 286.3 to 395.8, its ring 269.3 to
+# 412.8, 2.2 mm inside the 415 limit (inner_view_shift).
 TRANSGEAR_VIEW_SCALE = (2.0, 3.0)
-TRANSGEAR_VIEW_CENTER = (0.355, 0.170)
+TRANSGEAR_VIEW_CENTER = (0.346, 0.170)
 BALLOON_MARGIN = 0.012
 TRANSGEAR_CAPTION_XY = (0.222, 0.082)
 # The parts the isometric hides, seen from the machine's right (camera at -X:
 # sheet x is machine +Z, sheet y is +Y) with every other part hidden in that
-# view only, at the isometric's scale (2:3 keeps the full-detail Default; a
-# 1:2 view of edges would switch to the simplified configuration).
+# view only. The largest ladder scale whose ring fits beside the isometric's
+# (inner_view_scale): the same run read the view 57.3 mm wide at 2:3, a 91.3
+# mm ring in the 76.3 mm left of the isometric's ring at x 355; at 1:2 it is
+# about 43.0 wide, a 77.0 ring in the 80.3 left here. Every ladder scale is
+# at most 1:2, so the view references the simplified configuration whichever
+# it takes (apply_view_configuration), and no rescale switches it.
 INNER_VIEW_ORIENTATION = "*Right"
-INNER_VIEW_SCALE = TRANSGEAR_VIEW_SCALE
+INNER_SCALE_LADDER = ((1.0, 2.0), (1.0, 3.0))
+if any(
+    view_configuration(scale, _SW_SHADED_EDGES) != SIMPLIFIED_VIEW_CONFIGURATION
+    for scale in INNER_SCALE_LADDER
+):
+    raise AssertionError(
+        "a rescale on the inner-view ladder would switch configuration"
+    )
 # Where the inner view lands before inner_view_shift centres it.
-INNER_VIEW_START = (0.240, 0.190)
+INNER_VIEW_START = (0.230, 0.190)
 # Sheet-2 balloon rings: left of them the BOM's right edge plus the clearance
 # the drive-train BOM keeps (MHA-A03), right the drive-train ring region's
 # right edge on the same template, top the BOM's top, bottom over the
@@ -442,6 +457,34 @@ def inner_view_shift(iso_outline: Box, inner_outline: Box) -> tuple[float, float
     return shift
 
 
+def _scale_text(scale: tuple[float, float]) -> str:
+    return f"{scale[0]:g}:{scale[1]:g}"
+
+
+def inner_view_scale(
+    iso_outline: Box, inner_outline: Box, placed: tuple[float, float]
+) -> tuple[float, float]:
+    """The largest INNER_SCALE_LADDER scale whose ring inner_view_shift fits.
+
+    ``inner_outline`` is the inner view's outline at ``placed``; a view's
+    outline scales with its scale about its centre, and the fit reads only
+    its size. Raises naming every scale's finding when none fits.
+    """
+    x0, y0, x1, y1 = inner_outline
+    cx, cy = (x0 + x1) / 2.0, (y0 + y1) / 2.0
+    findings = []
+    for scale in INNER_SCALE_LADDER:
+        k = (scale[0] / scale[1]) / (placed[0] / placed[1])
+        hw, hh = (x1 - x0) / 2.0 * k, (y1 - y0) / 2.0 * k
+        try:
+            inner_view_shift(iso_outline, (cx - hw, cy - hh, cx + hw, cy + hh))
+        except ValueError as error:
+            findings.append(f"{_scale_text(scale)}: {error}")
+            continue
+        return scale
+    raise ValueError(f"no inner-view scale fits sheet 2 ({' | '.join(findings)})")
+
+
 # --- sheet wording ---------------------------------------------------------------
 _N = BOM_PART_NUMBERS
 KNOB_TEETH = knob_shaft.TEETH
@@ -632,9 +675,11 @@ TRANSGEAR_CAPTION = (
     f"TRANSGEAR {TRANSGEAR_VIEW_SCALE[0]:g}:{TRANSGEAR_VIEW_SCALE[1]:g}; "
     f"ASSEMBLY AND FIT-UP: SHEET {SHEET_NAMES.index('ASSEMBLY AND FIT-UP') + 1}"
 )
-INNER_CAPTION = (
-    f"INNER PARTS, RIGHT SIDE {INNER_VIEW_SCALE[0]:g}:{INNER_VIEW_SCALE[1]:g}"
-)
+# The inner view's caption at each scale it may take.
+INNER_CAPTIONS = {
+    scale: f"INNER PARTS, RIGHT SIDE {_scale_text(scale)}"
+    for scale in INNER_SCALE_LADDER
+}
 FITUP_REFERENCE_CAPTION = (
     f"REFERENCE {FITUP_SCALE[0]:g}:{FITUP_SCALE[1]:g}; ITEMS: SHEET "
     f"{SHEET_NAMES.index('BILL OF MATERIALS') + 1}"
@@ -643,7 +688,7 @@ FITUP_REFERENCE_CAPTION = (
 SHEET_TEXTS = (
     *FITUP_NOTES,
     TRANSGEAR_CAPTION,
-    INNER_CAPTION,
+    *INNER_CAPTIONS.values(),
     FITUP_REFERENCE_CAPTION,
 )
 
@@ -868,6 +913,18 @@ def _shift_view(
         raise RuntimeError(f"{label}: view moved to {after!r}, expected {target!r}")
 
 
+def _set_view_scale(
+    adapter: Any, view: Any, scale: tuple[float, float], *, label: str
+) -> None:
+    """Re-scale a placed drawing view and read the scale back."""
+    view = _early_bound(view, "IView")
+    view.ScaleRatio = double_array([float(scale[0]), float(scale[1])])
+    adapter.currentModel.EditRebuild3()
+    ratio = tuple(float(value) for value in view.ScaleRatio)
+    if len(ratio) != 2 or abs(ratio[0] / ratio[1] - scale[0] / scale[1]) > 1e-9:
+        raise RuntimeError(f"{label}: view scale reads {ratio!r}, expected {scale!r}")
+
+
 def _link_view_to_bom(view: Any, table: Any, *, label: str) -> None:
     """Number ``view``'s balloons from the BOM table inserted on another view."""
     bom = _early_bound(table, "IBomTableAnnotation")
@@ -914,12 +971,13 @@ def _place_bom_sheet(adapter: Any, counts: Counter[str]) -> list[Any]:
     items = dict(_validate_bom(adapter, table, counts))
     _isolate_instances(adapter, view, TRANSGEAR_INSTANCES, label=label)
     inner_label = "transgear inner view"
+    placed = INNER_SCALE_LADDER[0]
     inner = place_view(
         adapter,
         str(SOURCE),
         INNER_VIEW_ORIENTATION,
         *INNER_VIEW_START,
-        scale=INNER_VIEW_SCALE,
+        scale=placed,
     )
     set_high_quality_shaded_with_edges(adapter, inner, label=inner_label)
     apply_view_configuration(adapter, inner, label=inner_label)
@@ -930,8 +988,14 @@ def _place_bom_sheet(adapter: Any, counts: Counter[str]) -> list[Any]:
             "paper-drive BOM items moved when the transgear views were isolated"
         )
     # Both rings fit before any balloon exists; only the inner view moves,
-    # the BOM's own view stays where the table was inserted.
-    shift = inner_view_shift(_view_outline(view), _view_outline(inner))
+    # the BOM's own view stays where the table was inserted. Every ladder
+    # scale keeps the configuration just applied (INNER_SCALE_LADDER).
+    iso_outline = _view_outline(view)
+    scale = inner_view_scale(iso_outline, _view_outline(inner), placed)
+    if scale != placed:
+        _set_view_scale(adapter, inner, scale, label=inner_label)
+    # The ladder predicted the fit; the re-read outline is the proof.
+    shift = inner_view_shift(iso_outline, _view_outline(inner))
     _shift_view(adapter, inner, shift, label=f"{inner_label} ring fit")
     iso_items, inner_items = transgear_balloon_items(items)
     landings = add_component_bom_balloons(
@@ -961,7 +1025,7 @@ def _place_bom_sheet(adapter: Any, counts: Counter[str]) -> list[Any]:
     _place_sheet_note(
         adapter,
         SHEET_NAMES[1],
-        INNER_CAPTION,
+        INNER_CAPTIONS[scale],
         (
             inner_outline[0] - BALLOON_RING_REACH,
             inner_outline[1] - BALLOON_RING_REACH - INNER_CAPTION_GAP,

@@ -3,7 +3,7 @@ r"""Purchased transgear arm-plate screws: McMaster 91790A194, 18-8 stainless.
 8-32 x 1/2 slotted 82 deg oval head, fully threaded, the length measured from
 the top of the bevel (contract §3.3).  Two of them hold the arm plate
 (MHA-165) on the arm (MHA-164): each head sits flush in one of the plate's
-82 deg countersinks and the shank runs through the plate's Ø4.4 clearance
+82 deg countersinks and the shank runs through the plate's Ø4.5 clearance
 hole into the arm's #8-32 through tap.
 
 Geometry source: the live McMaster pages, not a vendor model

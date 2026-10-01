@@ -408,7 +408,7 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
     ),
     # MHA-166 #8-32 x 1/2 (transgear_arm_plate_screw_spec; 12.7 from the top
     # of the flat head, flush in the plate's countersink) through the 5.0
-    # plate's Ø4.4 clearance: 12.7 - 5.0 = 7.7 in the arm's #29 through tap.
+    # plate's Ø4.5 clearance: 12.7 - 5.0 = 7.7 in the arm's #29 through tap.
     **_numbered_pairs(
         "transgear-arm-plate-screw",
         range(1, 3),

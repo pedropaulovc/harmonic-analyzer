@@ -98,12 +98,16 @@ SLEEVE_LENGTH = OVERALL_LENGTH
 SLEEVE_LENGTH_TOL = STATION_TOL
 
 # --- diameters -----------------------------------------------------------------
-# Printed .XXX (the title block's ±0.13): the spigot is the disc's slip-locating
-# fit (its bore Ø10.000 .XXX) and the shank the hub's press seat (its bore
-# Ø8.200 .XXX), the contract's §12 band reasons.
-SPIGOT_DIA = 10.0
+# The spigot is the disc's slip fit: turned to the SHAFT_H band under the
+# disc's REAM_SLIDE bore (rack_pinion_spec owns the pair, so the disc sheet's
+# fit note and this model band are one constant).  The shank is the hub's
+# press seat (its bore Ø8.200 .XXX) at the title block's .XXX row.
+SPIGOT_DIA = rack_pinion_spec.SPIGOT_DIA
+SPIGOT_DIA_BAND = rack_pinion_spec.SPIGOT_DIA_BAND  # (upper, lower) deviations
 SHANK_DIA = 8.2
 DIA_PLACES = 3
+if rack_pinion_spec.SLEEVE_NUMBER != SLEEVE_NUMBER:
+    raise AssertionError("the disc's fit note names another part than this sleeve")
 
 # The bore runs on the stud journal.  A running fit exists only if both size
 # bands are narrower than the clearance they claim (tolerance-policy step 6b):
@@ -188,9 +192,9 @@ ROOT_WALL_WORST = (ROOT_DIA_MIN - _BORE_MAX) / 2.0
 # Shank: (8.2 − 3.9)/2 = 2.15; (8.07 − 3.93)/2 = 2.07.
 SHANK_WALL = (SHANK_DIA - BORE_DIA) / 2.0
 SHANK_WALL_WORST = (SHANK_DIA - _BAND[DIA_PLACES] - _BORE_MAX) / 2.0
-# Spigot: (10 − 3.9)/2 = 3.05; (9.87 − 3.93)/2 = 2.97.
+# Spigot: (10 − 3.9)/2 = 3.05; (9.98 − 3.93)/2 = 3.025.
 SPIGOT_WALL = (SPIGOT_DIA - BORE_DIA) / 2.0
-SPIGOT_WALL_WORST = (SPIGOT_DIA - _BAND[DIA_PLACES] - _BORE_MAX) / 2.0
+SPIGOT_WALL_WORST = (SPIGOT_DIA + SPIGOT_DIA_BAND[1] - _BORE_MAX) / 2.0
 
 # --- oil hole (R9-8) -----------------------------------------------------------
 # Ø1.2 drilled (+0.10/0) on +Y, 3.5 (.X) behind the hub front face, through hub
@@ -310,6 +314,7 @@ for _feature, _dimensions in DRAWING_PRECISION.items():
 # The bands the build applies, by dimension (``(lower, upper)`` deviations).
 STATION_DEVIATIONS = (-STATION_TOL, STATION_TOL)
 BORE_DEVIATIONS = deviations(BORE_DIA_BAND)
+SPIGOT_DIA_DEVIATIONS = deviations(SPIGOT_DIA_BAND)
 OUTSIDE_DIA_DEVIATIONS = deviations(OUTSIDE_DIA_BAND)
 # swTolMIN records the floor as its lower deviation from the model nominal.
 ROOT_DIA_DEVIATIONS = (ROOT_DIA_MIN - ROOT_DIA, 0.0)

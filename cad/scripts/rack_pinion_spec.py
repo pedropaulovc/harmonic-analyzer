@@ -21,6 +21,7 @@ bolt-circle position.
 
 from __future__ import annotations
 
+from _fit_limits import REAM_SLIDE, SHAFT_H, deviations
 from _gtol_spec import CylinderFace
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
 from _printed_tolerance import printed_band_mm
@@ -67,21 +68,38 @@ FACE_WIDTH = 3.0
 # sleeve nose, and that stack reads the disc thickness.
 FACE_WIDTH_PLACES = 3
 BORE_DIA = 10.0
-# Printed .XXX: slips on the pinion sleeve's Ø10.000 .XXX spigot (0 modelled).
+# Slips on the pinion sleeve's Ø10 spigot (MHA-110).  The .XXX rows would let
+# a Ø9.870 bore meet a Ø10.130 spigot, so the bore is reamed to the fleet's
+# REAM_SLIDE band over the spigot's SHAFT_H band: guaranteed slip clearance.
+BORE_BAND = REAM_SLIDE  # (upper, lower) deviations
+BORE_DEVIATIONS = deviations(BORE_BAND)
 BORE_PLACES = 3
 
 _BAND = {places: printed_band_mm(places) for places in (1, 2, 3)}
 FACE_WIDTH_MIN = FACE_WIDTH - _BAND[FACE_WIDTH_PLACES]
 FACE_WIDTH_MAX = FACE_WIDTH + _BAND[FACE_WIDTH_PLACES]
-BORE_DIA_MAX = BORE_DIA + _BAND[BORE_PLACES]
+BORE_DIA_MIN = BORE_DIA + BORE_BAND[1]
+BORE_DIA_MAX = BORE_DIA + BORE_BAND[0]
 
-# The sleeve's spigot (contract §12: Ø10.000 .XXX).  Its smallest size and the
-# disc's largest bore bound how far the disc can sit off the sleeve axis while
-# the taps are spotted through the flange.
+# The sleeve's spigot (MHA-110), turned to the SHAFT_H band the sleeve's model
+# carries (transgear_feed_pinion_spec reads it here).  Its limits and the
+# bore's give the slip clearance and bound how far the disc can sit off the
+# sleeve axis while the taps are spotted through the flange.
+SLEEVE_NUMBER = "MHA-110"
 SPIGOT_DIA = 10.0
-SPIGOT_PLACES = 3
-SPIGOT_DIA_MIN = SPIGOT_DIA - _BAND[SPIGOT_PLACES]
-DISC_OFFSET_MAX = (BORE_DIA_MAX - SPIGOT_DIA_MIN) / 2.0
+SPIGOT_DIA_BAND = SHAFT_H  # (upper, lower) deviations
+SPIGOT_DIA_MIN = SPIGOT_DIA + SPIGOT_DIA_BAND[1]
+SPIGOT_DIA_MAX = SPIGOT_DIA + SPIGOT_DIA_BAND[0]
+# (least, greatest) diametral clearance: 0.010 .. 0.045.
+SPIGOT_DIAMETRAL_CLEARANCE = (
+    round(BORE_DIA_MIN - SPIGOT_DIA_MAX, 3),
+    round(BORE_DIA_MAX - SPIGOT_DIA_MIN, 3),
+)
+if SPIGOT_DIAMETRAL_CLEARANCE[0] <= 0.0:
+    raise AssertionError(
+        f"MHA-070 bore binds on the MHA-110 spigot: {SPIGOT_DIAMETRAL_CLEARANCE}"
+    )
+DISC_OFFSET_MAX = SPIGOT_DIAMETRAL_CLEARANCE[1] / 2.0
 
 # --- screw (MHA-161) -------------------------------------------------------------
 SCREW_MAJOR_DIA, SCREW_LENGTH, _HEAD_H, _HEAD_DIA, SCREW_PITCH = FILLISTER_SIZES[
@@ -186,8 +204,19 @@ TAP_CALLOUT_LINES = (
     "THEN DRILL AND TAP; MATCH-MARK DISC AND FLANGE",
 )
 TAP_CALLOUT_QUALIFIER = "\n".join(TAP_CALLOUT_LINES)
-# Reamed: the bore carries the Ra 1.6 finish and slips on the spigot.
+# Reamed: the bore carries the Ra 1.6 finish and slips on the spigot.  The
+# bore's native limits print with the dimension; the fit note names the mate.
 BORE_CALLOUT = "THRU - REAM"
+BORE_FIT_CALLOUT = "\n".join(
+    (
+        "BORE LIMITS GOVERN",
+        f"MATE SLEEVE {SLEEVE_NUMBER} SPIGOT",
+        f"(\N{DIAMETER SIGN}{SPIGOT_DIA:.3f} +{SPIGOT_DIA_BAND[0]:.3f}/"
+        f"{SPIGOT_DIA_BAND[1]:.3f})",
+        f"(DIA CLR {SPIGOT_DIAMETRAL_CLEARANCE[0]:.3f}-"
+        f"{SPIGOT_DIAMETRAL_CLEARANCE[1]:.3f} mm)",
+    )
+)
 
 SURFACE_FINISHES = (SurfaceFinishControl("bore", MACHINED_UM, CylinderFace(BORE_DIA)),)
 

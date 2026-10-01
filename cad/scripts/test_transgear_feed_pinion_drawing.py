@@ -50,6 +50,7 @@ def test_bands_come_from_named_spec_constants() -> None:
         ("SleeveProfile", "SpigotFront"): "STATION_TOL",
         ("SleeveProfile", "OverallLength"): "STATION_TOL",
         ("SleeveProfile", "BoreDia"): "*BORE_DEVIATIONS",
+        ("SleeveProfile", "SpigotDia"): "*SPIGOT_DIA_DEVIATIONS",
         ("SleeveProfile", "OutsideDia"): "*OUTSIDE_DIA_DEVIATIONS",
     }
     # A band tighter than its printed row needs a functional reason (rule 12):

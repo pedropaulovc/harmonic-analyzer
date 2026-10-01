@@ -262,49 +262,76 @@ def test_each_transgear_family_balloons_once_on_the_view_that_shows_it() -> None
     assert drawing.INNER_INSTANCES <= drawing.TRANSGEAR_INSTANCES
 
 
-# The isolated transgear's outline on sheet 2 at 2:3 with the view centred at
-# x 315 mm: the farm run's sleeve extreme points (20261001T051043622Z) fix the
-# projection, the builder's stations the extent. The inner view's from the
-# same stations: machine z -172.0 to -102.7 by y 225.8 to 293.2 at 2:3.
-ISO_OUTLINE_AT_315 = (0.2832, 0.1438, 0.3503, 0.2319)
-INNER_OUTLINE = (0.2171, 0.1676, 0.2633, 0.2125)
+# Native run 20261001T062924323Z (024e240b3) read sheet 2's outlines in x: the
+# isolated transgear at 2:3 centred at x 355 mm spans 295.3 to 404.8, the
+# inner *Right view at 2:3 placed at x 240 spans 201.0 to 258.3. Their y
+# extents are estimates from the builder's stations (the run reported no y).
+ISO_OUTLINE_AT_355 = (0.2953, 0.1438, 0.4048, 0.2319)
+INNER_OUTLINE_AT_2_3 = (0.2010, 0.1622, 0.2583, 0.2179)
 
 
 def _iso_outline(center_x: float) -> tuple[float, float, float, float]:
-    dx = center_x - 0.315
-    x0, y0, x1, y1 = ISO_OUTLINE_AT_315
+    dx = center_x - 0.355
+    x0, y0, x1, y1 = ISO_OUTLINE_AT_355
     return (x0 + dx, y0, x1 + dx, y1)
 
 
-def test_the_inner_ring_sits_between_the_bom_and_the_isometric_ring() -> None:
-    iso = _iso_outline(drawing.TRANSGEAR_VIEW_CENTER[0])
-    dx, dy = drawing.inner_view_shift(iso, INNER_OUTLINE)
-    reach = drawing.BALLOON_RING_REACH
-    left = INNER_OUTLINE[0] + dx - reach
-    right = INNER_OUTLINE[2] + dx + reach
-    assert left >= drawing.BOM_RIGHT + 0.003
-    assert drawing.BOM_RIGHT == pytest.approx(0.182)
-    assert right <= iso[0] - reach - drawing.SHEET_TWO_RING_GAP
-    # Level with the isometric.
-    assert (INNER_OUTLINE[1] + INNER_OUTLINE[3]) / 2.0 + dy == pytest.approx(
-        (iso[1] + iso[3]) / 2.0
+def _scaled(
+    outline: tuple[float, float, float, float], scale: tuple[float, float]
+) -> tuple[float, float, float, float]:
+    """``outline`` (read at 2:3) at ``scale``, about its centre."""
+    k = (scale[0] / scale[1]) / (2.0 / 3.0)
+    x0, y0, x1, y1 = outline
+    cx, cy, hw, hh = (x0 + x1) / 2, (y0 + y1) / 2, (x1 - x0) / 2 * k, (y1 - y0) / 2 * k
+    return (cx - hw, cy - hh, cx + hw, cy + hh)
+
+
+def test_the_024e240b3_layout_is_refused_naming_each_overflow() -> None:
+    """The native failure: both views at 2:3, the isometric centred at 355."""
+    with pytest.raises(ValueError) as refused:
+        drawing.inner_view_shift(_iso_outline(0.355), INNER_OUTLINE_AT_2_3)
+    message = str(refused.value)
+    assert "isometric ring right 421.8 mm past 415.0 mm" in message
+    assert "inner view ring left 184.0 mm past 185.0 mm" in message
+    assert (
+        "inner view ring right 275.3 mm within 4 mm of the isometric ring (278.3 mm)"
+        in message
     )
-    # Its caption stands under the ring, over the title block.
+    with pytest.raises(ValueError, match="no inner-view scale fits.*1:2.*1:3"):
+        drawing.inner_view_scale(_iso_outline(0.355), INNER_OUTLINE_AT_2_3, (2.0, 3.0))
+
+
+def test_both_rings_fit_between_the_bom_and_the_sheet_edge_with_margin() -> None:
+    iso = _iso_outline(drawing.TRANSGEAR_VIEW_CENTER[0])
+    scale = drawing.inner_view_scale(iso, INNER_OUTLINE_AT_2_3, (2.0, 3.0))
+    assert scale == (1.0, 2.0)
+    inner = _scaled(INNER_OUTLINE_AT_2_3, scale)
+    dx, dy = drawing.inner_view_shift(iso, inner)
+    reach = drawing.BALLOON_RING_REACH
+    iso_left, iso_right = iso[0] - reach, iso[2] + reach
+    left, right = inner[0] + dx - reach, inner[2] + dx + reach
+    assert drawing.BOM_RIGHT == pytest.approx(0.182)
+    assert iso_right <= 0.415 - 0.002
+    assert left >= drawing.BOM_RIGHT + 0.003 + 0.0015
+    assert right <= iso_left - drawing.SHEET_TWO_RING_GAP - 0.0015
+    # Level with the isometric.
+    assert (inner[1] + inner[3]) / 2.0 + dy == pytest.approx((iso[1] + iso[3]) / 2.0)
+    # Its caption stands under the ring, over the title block, left of the
+    # isometric's ring.
     template = DRAWING_TEMPLATES[drawing.SPEC.layout]
-    caption_top = INNER_OUTLINE[1] + dy - reach - drawing.INNER_CAPTION_GAP
+    caption_top = inner[1] + dy - reach - drawing.INNER_CAPTION_GAP
     assert caption_top - NOTE_LINE_PITCH > template.title_block_top_m
-    assert left + len(drawing.INNER_CAPTION) * NOTE_CHAR_WIDTH < iso[0] - reach
+    assert left + len(drawing.INNER_CAPTIONS[scale]) * NOTE_CHAR_WIDTH < iso_left
 
 
-def test_the_inner_ring_has_no_room_beside_an_isometric_left_at_315() -> None:
-    """Where the isometric stood alone, its ring left 77 mm for an 80 mm one."""
+def test_an_inner_view_wider_than_measured_steps_down_to_1_3() -> None:
+    """Ten per cent wider at 2:3 overflows at 1:2; 1:3 then fits."""
+    x0, y0, x1, y1 = INNER_OUTLINE_AT_2_3
+    wider = (x0 - (x1 - x0) * 0.05, y0, x1 + (x1 - x0) * 0.05, y1)
+    iso = _iso_outline(drawing.TRANSGEAR_VIEW_CENTER[0])
     with pytest.raises(ValueError, match="inner view ring"):
-        drawing.inner_view_shift(_iso_outline(0.315), INNER_OUTLINE)
-
-
-def test_an_isometric_ring_past_the_sheet_edge_is_refused() -> None:
-    with pytest.raises(ValueError, match="isometric ring right"):
-        drawing.inner_view_shift(_iso_outline(0.365), INNER_OUTLINE)
+        drawing.inner_view_shift(iso, _scaled(wider, (1.0, 2.0)))
+    assert drawing.inner_view_scale(iso, wider, (2.0, 3.0)) == (1.0, 3.0)
 
 
 def test_no_sheet_prints_a_forbidden_word() -> None:
@@ -363,8 +390,11 @@ def test_the_fitup_acceptance_prints_the_contract_bands() -> None:
 
 
 def test_the_collar_gap_stop_is_the_seat_limit_less_the_collar() -> None:
-    """§13.2 (4): g > 9.40 - L stops the fit-up; L = 4.000."""
-    assert drawing.COLLAR_GAP_MAX == pytest.approx(9.40 - 4.0, abs=1e-9)
+    """§13.2 (4): g past the collar's seat limit from the 12T front face less
+    its length L stops the fit-up."""
+    assert drawing.COLLAR_GAP_MAX == pytest.approx(
+        collar.SEAT_MAX_FROM_F - collar.LENGTH, abs=1e-9
+    )
     body = _step_body("collar-gap-measured")
     assert f"{drawing.COLLAR_GAP_MAX:.2f}" in body
     assert f"g = d + {collar.FIT_UP_OFFSET_TARGET:.2f}" in body

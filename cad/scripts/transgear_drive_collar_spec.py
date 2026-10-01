@@ -228,23 +228,25 @@ PIN_REAR_INSET_WORST = pin_rear_inset(
 
 # --- The fit-up setting (contract §13, (C)) --------------------------------------
 # The T24 seat (this front face) stands SET_NOMINAL in front of the 12T front
-# face F; forward travel is capped by the thumbnut's engagement floor, the
-# rearward travel by the collar's rear face meeting F.
+# face F; the rearward travel ends where the collar's rear face meets F, the
+# forward travel where the core's cross-pin hole, drilled at the setting,
+# would reach the die run-out (below).
 SET_NOMINAL = 6.2
-FORWARD_TRAVEL_MAX = 3.2
-SEAT_MAX_FROM_F = 9.40
+FORWARD_TRAVEL_MAX = 0.7
+SEAT_MAX_FROM_F = 6.90
 REARWARD_TRAVEL_NOMINAL = SET_NOMINAL - LENGTH  # 2.2
 REARWARD_TRAVEL_RANGE = (SET_NOMINAL - LENGTH_MAX, SET_NOMINAL - LENGTH_MIN)
 
 # --- The core's cross-pin hole against the die run-out (R9-18, R9-22) ------------
-# Collar frame at the nominal setting: F at z 6.2, so the full thread ends at
-# 6.2 - 6.5 = -0.3, -0.17 on the shortest printed plain core.  The hole is
-# drilled along the slot, its axis one hole radius above the slot floor
-# (2.2 + 0.8 = 3.0, machine z -151.3); its front edge comes forward by the
-# hole's upper limit, the slot's +0.10, the centring 0.065 and the collar's
-# .XXX length: 3.0 - 0.825 - 0.10 - 0.065 - 0.13 = 1.88.
+# Collar frame: the seat at z 0 and F at z = the seat's setting in front of F,
+# so the full thread ends PLAIN_CORE in front of F, 0.13 nearer on the
+# shortest printed plain core.  The hole is drilled along the slot at that
+# setting, its axis one hole radius above the slot floor (2.2 + 0.8 = 3.0);
+# its front edge comes forward by the hole's upper limit, the slot's +0.10,
+# the centring 0.065 and the collar's .XXX length:
+# 3.0 - 0.825 - 0.10 - 0.065 - 0.13 = 1.88.  The fitter may set the seat
+# anywhere up to SEAT_MAX_FROM_F, so the hole must clear the run-out there.
 CROSS_HOLE_Z = SLOT_FLOOR_Z + CROSS_HOLE_DIA / 2.0
-THREAD_END_Z_WORST = SET_NOMINAL - PLAIN_CORE + printed_band_mm(PLAIN_CORE_PLACES)
 CROSS_HOLE_FRONT_Z_WORST = (
     CROSS_HOLE_Z
     - (CROSS_HOLE_DIA + max(CROSS_HOLE_BAND)) / 2.0
@@ -254,14 +256,17 @@ CROSS_HOLE_FRONT_Z_WORST = (
 )
 
 
-def core_hole_runout_margin(runout: float) -> float:
+def core_hole_runout_margin(runout: float, seat_from_f: float) -> float:
     """Solid core between a die run-out ``runout`` long and the cross hole's
-    front edge at the nominal setting (negative: the hole meets the run-out)."""
-    return CROSS_HOLE_FRONT_Z_WORST - (THREAD_END_Z_WORST + runout)
+    front edge, the hole drilled with the seat ``seat_from_f`` in front of F
+    (negative: the hole meets the run-out)."""
+    thread_end_z = seat_from_f - PLAIN_CORE + printed_band_mm(PLAIN_CORE_PLACES)
+    return CROSS_HOLE_FRONT_Z_WORST - (thread_end_z + runout)
 
 
-# 1.88 - (-0.17 + 1.27) = 0.78.
-CORE_HOLE_RUNOUT_MARGIN = core_hole_runout_margin(DIE_RUNOUT_MAX)
+# At the furthest setting the sheet accepts:
+# 1.88 - (6.90 - 6.5 + 0.13 + 1.27) = 0.08 (0.78 at the nominal 6.2).
+CORE_HOLE_RUNOUT_MARGIN = core_hole_runout_margin(DIE_RUNOUT_MAX, SEAT_MAX_FROM_F)
 
 for _ok, _what in (
     (
@@ -292,7 +297,7 @@ for _ok, _what in (
     (min(REARWARD_TRAVEL_RANGE) > 0.0, "the collar cannot move rearward of its set"),
     (
         CORE_HOLE_RUNOUT_MARGIN > 0.0,
-        "the core's cross-pin hole meets the die run-out at the nominal setting",
+        "the core's cross-pin hole meets the die run-out at the furthest setting",
     ),
 ):
     if not _ok:

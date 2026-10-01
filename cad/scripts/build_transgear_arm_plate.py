@@ -14,14 +14,14 @@ arm's axes; +Z to the rear):
   tangent to it, the -X edge down to the kink [INFERENCE] and straight on to
   tangency with the round, the top edge on the arm's upper edge; extruded
   ``THICKNESS_OVER_ARM`` toward +Z as ``Plate``.
-* ``LowerOutline``: the same outline below the notch line (the arm's lower
-  edge), extruded ``NOTCH_DEPTH`` toward -Z as ``LowerSection``; its top edge
-  is the notch face.
+* ``LowerOutline``: the same outline below the notch line (``NOTCH_RELIEF``
+  clear of the arm's lower edge), extruded ``NOTCH_DEPTH`` toward -Z as
+  ``LowerSection``; its top edge is the notch face.
 * ``BearingProfile`` (Right plane, the section plane through K): the front
   hub and the rear boss [INFERENCE], revolved as ``Bearing``.  The hub face's
   station is dimensioned from the notch's inner corner on the mounting face.
 * ``Bore``: the Ø8.5 running bore through on K.
-* ``ScrewHoles``: two Ø4.4 clearance holes through, over the arm's taps.
+* ``ScrewHoles``: two Ø4.5 clearance holes through, over the arm's taps.
 * ``Countersink1`` / ``Countersink2``: the 82-degree seats of the oval heads,
   revolved cuts sketched on ``ScrewHolePlane`` (y through both hole axes).
 * ``CountersinkReference`` (blanked, on ``RearFace``): the printed
@@ -108,7 +108,7 @@ from transgear_arm_plate_geometry import (
     TOP_LEFT,
     TOP_RIGHT,
     WIDTH,
-    arm_lower_edge_y,
+    notch_face_y,
 )
 from transgear_arm_plate_spec import (
     BORE_BAND,
@@ -147,7 +147,7 @@ _CSK_HALF_ANGLE = CSK_ANGLE_DEG / 2.0
 _CSK_APEX_Z = REAR_FACE_Z - _R_CSK / math.tan(math.radians(_CSK_HALF_ANGLE))
 # The notch's inner corner in the section plane (x = 0): the mounting-face
 # point the hub station is measured from.
-_NOTCH_CORNER_Y = arm_lower_edge_y(0.0)
+_NOTCH_CORNER_Y = notch_face_y(0.0)
 _RIGHT_EDGE_FOOT = (TOP_RIGHT[0], 0.0)  # where the +X edge meets the round
 
 
@@ -166,7 +166,7 @@ def _outline_area(upper_left: tuple[float, float], upper_right: tuple[float, flo
 
 
 def _csk_removed() -> float:
-    """One countersink cone past its Ø4.4 hole: frustum less the hole."""
+    """One countersink cone past its clearance hole: frustum less the hole."""
     r, big, h = _R_HOLE, _R_CSK, CSK_DEPTH
     return math.pi * h / 3.0 * (big**2 + big * r + r**2) - math.pi * r**2 * h
 
