@@ -46,8 +46,8 @@ flowchart TD
     REL --> PRE{"Preflight:<br/>tag free · tree clean ·<br/>CAD Revision matches tag ·<br/>TOP .SLDASM built · boxes fresh + unit=mm"}
     PRE -->|fail| FAILR["✗ SystemExit"]
 
-    PRE -->|pass| PNG["⑩a Pack-and-Go +<br/>re-export STEP/STL/PNG<br/>into stage/"]
-    PNG -.->|ASSETS| APNG[("stage/solidworks/ (flattened P&amp;G)<br/>stage/step/ · stage/stl/ · stage/gltf/<br/>stage/png/ · stage/boxes/")]
+    PRE -->|pass| PNG["⑩a Pack-and-Go +<br/>re-export STEP/STL/PDF/PNG<br/>into stage/"]
+    PNG -.->|ASSETS| APNG[("stage/solidworks/ (flattened P&amp;G)<br/>stage/step/ · stage/stl/ · stage/pdf/<br/>stage/gltf/ · stage/png/ · stage/boxes/")]
 
     PNG --> DIFF["⑩b render_diff.py (uv run)<br/>download prev release →<br/>offscreen render changed parts<br/>(Hausdorff, noise-filtered)"]
     DIFF -->|no prior / render fails| SKIP["⚠ non-fatal: skip<br/>release continues"]
@@ -56,12 +56,15 @@ flowchart TD
     ADIFF --> BUNDLE
 
     BUNDLE["⑩c make_archive"]
-    BUNDLE -.->|ASSET| ABUN[("cad/out/release/<br/>harmonic-analyzer-&lt;ver&gt;.zip<br/>= solidworks + step + stl +<br/>boxes + png + diff")]
+    BUNDLE -.->|ASSET| ABUN[("cad/out/release/<br/>harmonic-analyzer-&lt;ver&gt;.zip<br/>= solidworks + step + stl + pdf +<br/>boxes + png + diff")]
 
-    ABUN --> TAG["⑩d git tag -a vNN<br/>git push origin vNN"]
-    TAG --> GH["🚀 ⑩e gh release create vNN"]
+    BUNDLE --> IMAGES["⑩d precompute README images<br/>from cad/out/release/harmonic-analyzer-vNN to temp;<br/>missing inputs/tools fail before tag"]
+    IMAGES -->|ok| TAG["⑩e git tag -a vNN<br/>git push origin vNN"]
+    IMAGES -->|fail| FAILR
+    TAG --> GH["🚀 ⑩f gh release create vNN"]
     GH -.->|ASSETS| AGH[("GitHub Release vNN<br/>bundle.zip + diff PNGs<br/>notes: commit SHA · SW rev ·<br/>inventory · changed-parts gallery")]
-    GH --> BUMP["⑩f advance release.yaml<br/>to next vNN<br/>commit + merge required"]
+    GH --> POST["⑩g after successful publish<br/>install prepared README images<br/>advance release.yaml next_revision"]
+    POST --> FOLLOWUP["⑩h follow-up PR: ONLY<br/>release.yaml next_revision + generated README images<br/>exempt from normal gates; may merge immediately"]
 
     classDef gate fill:#fff3cd,stroke:#d39e00,color:#000;
     classDef fail fill:#f8d7da,stroke:#c00,color:#000;
@@ -72,4 +75,4 @@ flowchart TD
     class FAIL1,FAIL2,FAILV,FAILR fail;
     class SKIP gate;
     class APART,AASM,AEXP,APNG,ADIFF,ABUN,AGH asset;
-    class REL,TAG,GH,BUNDLE,PNG,DIFF,BUMP rel;
+    class REL,TAG,GH,BUNDLE,IMAGES,POST,FOLLOWUP,PNG,DIFF rel;
