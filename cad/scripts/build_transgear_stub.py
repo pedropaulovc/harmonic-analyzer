@@ -10,7 +10,10 @@ the Ø9 thrust step, the Ø3.9 journal, the Ø2.4 MAX thread relief at the
 journal shoulder and the #6-32 front thread.  Two spherical ends are separate
 revolves on the same plane.  Named planes ``SleeveThrust`` (the Ø9 step face)
 and ``CapShoulder`` (the journal shoulder) and ``Axis1`` serve the assembly
-mates; the arm seat is the Front Plane.
+mates; the arm seat is the Front Plane.  The arm seat is faced to fit (R9-47):
+``ThrustStation`` carries the as-fitted station and the rear stations (the
+step, the face relief's floor, the rear thread's end) dimension from the
+thrust face, so the facing moves none of them.
 
 Run (SolidWorks already open)::
 
@@ -67,6 +70,7 @@ from transgear_stub_spec import (
     DRAWING_PRECISION,
     FACE_RELIEF_DEPTH,
     FACE_RELIEF_DIA,
+    FACE_RELIEF_FLOOR_FROM_THRUST,
     FRONT_DOME_R,
     FRONT_DOME_SAG,
     FRONT_THREAD_END,
@@ -79,6 +83,7 @@ from transgear_stub_spec import (
     JOURNAL_LENGTH_TOL,
     REAR_DOME_R,
     REAR_DOME_SAG,
+    REAR_THREAD_END_FROM_THRUST,
     REAR_THREAD_LENGTH,
     REAR_THREAD_MAJOR,
     RELIEF_DIA,
@@ -89,6 +94,7 @@ from transgear_stub_spec import (
     RELIEF_WIDTH_TOL,
     SLEEVE_THRUST_STATION,
     STEP_DIA,
+    STEP_LENGTH,
     SURFACE_FINISHES,
 )
 
@@ -246,11 +252,11 @@ async def build(adapter) -> dict[str, str]:
     # document units (see build_crankshaft).
     for name, value in (
         ("RearThreadDia", REAR_THREAD_MAJOR),
-        ("RearThreadLength", REAR_THREAD_LENGTH),
+        ("RearThreadEnd", REAR_THREAD_END_FROM_THRUST),
         ("FaceReliefDia", FACE_RELIEF_DIA),
-        ("FaceReliefDepth", FACE_RELIEF_DEPTH),
+        ("FaceReliefFloor", FACE_RELIEF_FLOOR_FROM_THRUST),
         ("CollarDia", COLLAR_DIA),
-        ("CollarLength", COLLAR_LENGTH),
+        ("StepLength", STEP_LENGTH),
         ("StepDia", STEP_DIA),
         ("ThrustStation", SLEEVE_THRUST_STATION),
         ("JournalDia", JOURNAL_DIA),
@@ -271,7 +277,8 @@ async def build(adapter) -> dict[str, str]:
     # seat (origin) toward the front thread; the rear thread lies at u > 0.
     # The face relief is a notch in the collar's rear face: the #10-32
     # cylinder runs FACE_RELIEF_DEPTH into the collar before the floor steps
-    # out to the relief Ø and back to the seat face.
+    # out to the relief Ø and back to the seat face.  The rear stations
+    # dimension from the thrust face (R9-47: the seat is faced to fit).
     u_rear = REAR_THREAD_LENGTH
     u_front = -FRONT_THREAD_END_STATION
     profile = SketchDims()
@@ -310,13 +317,13 @@ async def build(adapter) -> dict[str, str]:
     (
         rear_end,
         rear_thread,
-        _face_relief_floor,
+        face_relief_floor,
         face_relief_wall,
         seat_face,
         collar,
         _collar_front,
         step,
-        _thrust_face,
+        thrust_face,
         journal,
         shoulder,
         relief_floor,
@@ -337,49 +344,39 @@ async def build(adapter) -> dict[str, str]:
             f"{seat_face}.start", "origin", "vertical_points"
         ),
     )
-    for name, start, end, value, drive in (
+    for name, start, end, value in (
         (
-            "RearThreadLength",
+            "RearThreadEnd",
             f"{rear_end}.end",
-            f"{seat_face}.start",
-            REAR_THREAD_LENGTH,
-            '"RearThreadLength"',
+            f"{thrust_face}.start",
+            REAR_THREAD_END_FROM_THRUST,
         ),
         (
-            "FaceReliefDepth",
-            f"{face_relief_wall}.start",
-            f"{face_relief_wall}.end",
-            FACE_RELIEF_DEPTH,
-            '"FaceReliefDepth"',
+            "FaceReliefFloor",
+            f"{face_relief_floor}.end",
+            f"{thrust_face}.start",
+            FACE_RELIEF_FLOOR_FROM_THRUST,
         ),
-        ("CollarLength", f"{collar}.start", f"{collar}.end", COLLAR_LENGTH, None),
+        ("StepLength", f"{step}.start", f"{step}.end", STEP_LENGTH),
         (
             "ThrustStation",
             f"{seat_face}.end",
             f"{journal}.start",
             SLEEVE_THRUST_STATION,
-            None,
         ),
-        ("JournalLength", f"{journal}.start", f"{journal}.end", JOURNAL_LENGTH, None),
-        (
-            "ReliefWidth",
-            f"{relief_floor}.start",
-            f"{relief_floor}.end",
-            RELIEF_WIDTH,
-            None,
-        ),
+        ("JournalLength", f"{journal}.start", f"{journal}.end", JOURNAL_LENGTH),
+        ("ReliefWidth", f"{relief_floor}.start", f"{relief_floor}.end", RELIEF_WIDTH),
         (
             "FrontThreadEnd",
             f"{shoulder}.start",
             f"{front_thread}.end",
             FRONT_THREAD_END,
-            None,
         ),
     ):
         await dimension_between(
             adapter, start, end, "horizontal_distance", value, f"stud {name}"
         )
-        profile.record(name, drive or f'"{name}"')
+        profile.record(name, f'"{name}"')
     for name, line, u_mid, radius in (
         ("RearThreadDia", rear_thread, u_rear / 2.0, R_REAR),
         ("FaceReliefDia", face_relief_wall, -FACE_RELIEF_DEPTH / 2.0, R_FACE_RELIEF),
@@ -438,7 +435,7 @@ async def build(adapter) -> dict[str, str]:
             REAR_DOME_SAG,
             R_REAR,
             '"RearThreadDia" / 2',
-            '"RearThreadLength"',
+            '"RearThreadEnd" - "ThrustStation"',
             V_REAR_DOME,
         ),
         (

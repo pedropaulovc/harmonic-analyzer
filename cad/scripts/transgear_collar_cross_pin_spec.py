@@ -47,3 +47,13 @@ if not (HOLE_WINDOW[0] <= HOLE_DIA and HOLE_MAX <= HOLE_WINDOW[1]):
     raise AssertionError("the cross hole's band leaves B18.8.2's recommended hole")
 if not HOLE_WINDOW[0] <= PIN_DIA <= HOLE_WINDOW[1]:
     raise AssertionError("the pin's nominal diameter leaves its own hole window")
+
+# B18.8.2's uncompressed (free) diameter of a 1/16 slotted pin, 0.066-0.069 in
+# (Fuller Fasteners' B18.8.2 table, read October 1, 2026:
+# https://fullerfasteners.com/tech/ansi-b18-8-2-specifications-slotted-type-spring-pins/).
+# Each end outside the core springs back toward it, so the MHA-177 rear slot
+# the ends lie in is judged against FREE_DIA_MAX (R9-52).
+FREE_DIA_MIN = 0.066 * INCH  # 1.676
+FREE_DIA_MAX = 0.069 * INCH  # 1.753
+if not HOLE_MAX < FREE_DIA_MIN:
+    raise AssertionError("the cross hole no longer compresses the spring pin")

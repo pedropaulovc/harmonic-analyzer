@@ -113,10 +113,12 @@ def test_disc_cluster_rows_follow_the_stud_cap_and_disc() -> None:
             cap.CAP_LENGTH - stub.RELIEF_WIDTH,
         )
     )
-    # Each #0-80 fills the disc's tap over the whole face width.
+    # Each #0-80 is cut to fit (R9-47): it fills the disc's tap from the
+    # flange's front face to its cut end, inside the disc's rear face.
     assert disc_screw.SHANK_DIA == pytest.approx(disc.SCREW_MAJOR_DIA)
-    assert disc_screw.SHANK_LEN > hub.FLANGE_THICK + disc.FACE_WIDTH
-    limit = _annulus(disc.SCREW_MAJOR_DIA, disc.TAP_DRILL_DIA, disc.FACE_WIDTH)
+    engaged = disc_screw.CUT_LENGTH - hub.FLANGE_THICK
+    assert 0.0 < disc.FACE_WIDTH - engaged <= disc_screw.TIP_BELOW_REAR_FACE[1]
+    limit = _annulus(disc.SCREW_MAJOR_DIA, disc.TAP_DRILL_DIA, engaged)
     for n in (1, 2, 3):
         pair = _pair(f"transgear-disc-screw-{n}", "rack-pinion-1")
         assert allowed[pair] == pytest.approx(limit)
@@ -133,10 +135,14 @@ def test_knob_stack_rows_follow_the_shaft_cup_collar_and_nut() -> None:
         )
     )
 
-    # Stud tip less the nut's seat (collar set + T24 plate), at the nominal.
+    # Stud tip less the nut's seat (collar set + T24 plate), at the nominal,
+    # all on the thread blank (its full-thread end lies behind the seat).
     nut_engaged = shaft.TIP_STATION - _collar().SET_NOMINAL - removable.PLATE
+    assert shaft.TIP_STATION - nut_engaged > shaft.PLAIN_CORE
     assert allowed[_pair("transgear-thumbnut-1", "transgear-knob-shaft-1")] == (
-        pytest.approx(_annulus(shaft.THREAD_MAJOR, thumbnut.TAP_DRILL_DIA, nut_engaged))
+        pytest.approx(
+            _annulus(shaft.THREAD_BLANK_DIA, thumbnut.TAP_DRILL_DIA, nut_engaged)
+        )
     )
 
     tube = _holes.cross_hole_volume_mm3(

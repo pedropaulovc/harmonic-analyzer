@@ -438,7 +438,7 @@ def test_the_collar_is_pinned_before_the_stud_is_cut_and_the_stack_accepted() ->
 def test_the_cluster_float_and_pin_bands_print_their_spec_ranges() -> None:
     assert "0.20 TO 0.40" in _step_body("disc-cluster-hung")
     assert "2.30 TO 2.50 PROUD" in _step_body("collar-pins-pressed")
-    assert "12.49 TO 13.51 PROUD" in _step_body("latch-pin-pressed")
+    assert "12.96 TO 14.49 PROUD" in _step_body("latch-pin-pressed")
 
 
 def test_the_plate_screws_are_cut_to_the_limit_the_lock_sweep_clears() -> None:

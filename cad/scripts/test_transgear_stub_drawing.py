@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import ast
-import importlib.util
-import re
 from pathlib import Path
 
 import pytest
@@ -12,13 +10,10 @@ import pytest
 import _config
 import build_transgear_stub as part
 import draw_transgear_stub as drawing
-import transgear_arm_geometry as arm
 import transgear_stub_spec as spec
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
 from _fit_limits import SHAFT_H
-from _hole_spec import THREAD_MAJOR_MM
-from _printed_tolerance import drilled_oversize_mm, printed_band_mm
 from _surface_finish import MACHINED_UM
 
 SW_TOL_MAX = 6  # swTolType_e.swTolMAX
@@ -77,9 +72,9 @@ def test_thread_relief_prints_a_max_under_the_thread_root() -> None:
     ("station", "machine_z"),
     [
         (0.0, -124.4),
-        (spec.SLEEVE_THRUST_STATION, -134.9),
-        (spec.CAP_SHOULDER_STATION, -157.8),
-        (spec.TIP_STATION, -166.1),
+        (spec.SLEEVE_THRUST_STATION, -135.15),
+        (spec.CAP_SHOULDER_STATION, -158.05),
+        (spec.TIP_STATION, -166.35),
     ],
 )
 def test_cluster_interfaces_sit_at_their_machine_stations(
@@ -97,69 +92,11 @@ def test_journal_length_is_the_step_to_shoulder_span() -> None:
     )
 
 
-def test_rear_thread_engages_the_arm_at_least_one_and_a_half_diameters() -> None:
-    assert spec.REAR_ENGAGEMENT_WORST_D >= spec.ENGAGEMENT_RULE_D
-    assert spec.REAR_ENGAGEMENT_WORST <= spec.REAR_ENGAGEMENT_NOMINAL
+def test_face_relief_clears_the_thread_and_the_collar_keeps_its_wall() -> None:
     # The face relief lets the thread run to the collar face without cutting
     # through the collar wall.
     assert spec.FACE_RELIEF_DIA_MIN > spec.REAR_THREAD_MAJOR
     assert spec.COLLAR_WALL_WORST >= 2.0
-
-
-# R9-5: the screw-cutting run-out at 32 tpi.
-_RUNOUT = 1.0
-
-
-def _rear_engagement_corner(relief_depth: float) -> tuple[float, float]:
-    """(relief depth minimum, worst #10-32 engagement) from the printed rows:
-    the relief depth and thread length at their sheet places, the arm's
-    5/16 stock band, and its Ø5.0 countersinks at the drilled-hole plus."""
-    places = spec.DRAWING_PRECISION["StudProfile"]
-    depth_min = relief_depth - printed_band_mm(places["FaceReliefDepth"])
-    thread_min = spec.REAR_THREAD_LENGTH - printed_band_mm(places["RearThreadLength"])
-    major = THREAD_MAJOR_MM["#10-32"]
-    csk = (arm.STUD_TAP_CSK_DIA + drilled_oversize_mm() - major) / 2.0
-    run_out_in_arm = max(0.0, _RUNOUT - depth_min)
-    arm_min = arm.THICKNESS - arm.THICKNESS_BAND
-    return depth_min, min(thread_min, arm_min - csk) - max(csk, run_out_in_arm)
-
-
-def test_face_relief_holds_the_run_out_and_full_thread_keeps_one_and_a_half_d() -> None:
-    major = THREAD_MAJOR_MM["#10-32"]
-    depth_min, worst = _rear_engagement_corner(spec.FACE_RELIEF_DEPTH)
-    assert depth_min >= _RUNOUT
-    assert worst >= 1.5 * major
-    assert worst == pytest.approx(spec.REAR_ENGAGEMENT_WORST, abs=1e-6)
-    # The 1.00 relief left 0.51 of run-out in the arm's tap at its 0.49
-    # minimum: 6.98 = 1.45D of full thread.
-    old_min, old_worst = _rear_engagement_corner(1.00)
-    assert old_min < _RUNOUT
-    assert old_worst < 1.5 * major
-
-
-@pytest.mark.parametrize(
-    ("depth", "refusal"),
-    [
-        # The old relief: its run-out overflow outgrows the countersink.
-        ("1.00", r"engagement in the arm 6\.980 = 1\.446D"),
-        # Engagement survives (0.11 overflow < 0.137 csk) but the run-out
-        # still stands proud of the seat face.
-        ("1.40", r"0\.89 minimum does not hold the 1\.0 run-out"),
-    ],
-)
-def test_spec_refuses_a_relief_too_shallow_for_the_run_out(
-    depth: str, refusal: str
-) -> None:
-    source = Path(spec.__file__).read_text(encoding="utf-8")
-    shallow, count = re.subn(
-        r"^FACE_RELIEF_DEPTH = .*$", f"FACE_RELIEF_DEPTH = {depth}", source, flags=re.M
-    )
-    assert count == 1
-    module = importlib.util.module_from_spec(
-        importlib.util.spec_from_loader("_stub_spec_shallow", loader=None)
-    )
-    with pytest.raises(AssertionError, match=refusal):
-        exec(compile(shallow, spec.__file__, "exec"), module.__dict__)
 
 
 def test_the_journal_carries_the_one_machined_finish() -> None:

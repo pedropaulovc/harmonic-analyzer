@@ -22,7 +22,7 @@ Bands (title block unless stated):
   (R9-15), so the set takes up the run's band.  The pin crosses the strip
   obliquely and sweeps a 4.16 long footprint along it, which leaves 0.62
   each side at that pose (R9-24);
-* the rivet pair's run and pitch at .XXX: two Ø1.6 holes across a 10 strip
+* the rivet pair's run and pitch at .XXX: two Ø1.65 holes across a 10 strip
   hold the 2.0 web and edge walls only at that band.  The MHA-170 flap's
   holes are drilled through these at assembly, so nothing else registers on
   them;
@@ -166,7 +166,7 @@ DRAWING_NOTES = "\n".join(
         f"   WITHIN {CENTRING_BAND:.2f}. RUNS ARE MEASURED FROM THE TOP END.",
         "5. AT ASSEMBLY SET THE HOOK WITH THE MHA-169 PIN ENTERING THE PIN HOLE",
         "   WITHOUT TOUCHING, THEN DRILL THE MHA-170 FLAP THROUGH THE 2X RIVET",
-        "   HOLES; RIVET WITH 1/16 SOLID RIVETS (MCMASTER 97482A010).",
+        "   HOLES; RIVET WITH 1/16 SOLID RIVETS (MCMASTER 97482A015).",
         "6. BREAK SHARP EDGES.",
     )
 )

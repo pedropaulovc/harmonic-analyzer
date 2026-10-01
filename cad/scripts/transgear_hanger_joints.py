@@ -21,14 +21,20 @@ may import it; no part build does.
 * The pivot head's end play in the arm's spot face: shoulder - spacer -
   spot-face floor (from the arm's front face).
 * The MHA-169 latch pin pressed to the floor of the arm's blind end-face
-  hole (R9-12): the hole's reamed band keeps the press, its depth band sets
-  the proud range, and the shallowest hole still grips the pin 1.5 D.
+  hole (R9-12): the hole's reamed band keeps the press, its depth band and
+  the dowel's length grade set the proud range, the shallowest hole still
+  grips the pin 1.5 D, and the pin's full diameter passes the MHA-127
+  strip's far face at every corner of the latch stack (R9-23, R9-50).
 """
 
 from __future__ import annotations
 
+import itertools
 import math
 
+import latch_hook_bracket_geometry as BRACKET
+import latch_hook_bracket_spec as BRACKET_SPEC
+import latch_hook_geometry as HOOK
 import support_bar_spec as BAR
 import transgear_arm_geometry as ARM
 import transgear_arm_plate_geometry as PLATE
@@ -259,13 +265,17 @@ if min(LATCH_PIN_PRESS_INTERFERENCE) <= 0.0:
     raise AssertionError("the arm's pin-hole band loses the latch pin's press")
 if abs(LATCH_PIN.proud_length(ARM.PIN_HOLE_DEPTH) - LATCH_PIN.PROUD) > 1e-9:
     raise AssertionError("the arm's hole depth does not leave the latch pin PROUD")
-# The depth's .XX band moves the pressed pin's tip by as much: 12.49 .. 13.51.
-# The integrator judges the latch hook's grip on the pin over this range.
+# The depth's .XX band and the dowel's length grade move the pressed pin's
+# tip by as much: 22.225 -/+ 0.254 - (8.50 +/- 0.51) = 12.961 .. 14.489.
 LATCH_PIN_PROUD_RANGE = (
-    LATCH_PIN.proud_length(ARM.PIN_HOLE_DEPTH + ARM.PIN_HOLE_DEPTH_BAND),
-    LATCH_PIN.proud_length(ARM.PIN_HOLE_DEPTH - ARM.PIN_HOLE_DEPTH_BAND),
+    LATCH_PIN.proud_length(
+        ARM.PIN_HOLE_DEPTH + ARM.PIN_HOLE_DEPTH_BAND, -LATCH_PIN.LENGTH_GRADE
+    ),
+    LATCH_PIN.proud_length(
+        ARM.PIN_HOLE_DEPTH - ARM.PIN_HOLE_DEPTH_BAND, LATCH_PIN.LENGTH_GRADE
+    ),
 )
-# The shallowest hole: (6.05 - 0.51) - 0.443 = 5.10 of full diameter, 1.61 D.
+# The shallowest hole: (8.50 - 0.51) - 0.443 = 7.55 of full diameter, 2.38 D.
 LATCH_PIN_ENGAGEMENT_WORST_D = LATCH_PIN.press_engagement_d(
     ARM.PIN_HOLE_DEPTH - ARM.PIN_HOLE_DEPTH_BAND
 )
@@ -274,6 +284,82 @@ if LATCH_PIN_ENGAGEMENT_WORST_D < LATCH_PIN.PRESS_ENGAGEMENT_MIN_D:
         f"the shallowest arm hole grips the latch pin"
         f" {LATCH_PIN_ENGAGEMENT_WORST_D:.2f} D, under"
         f" {LATCH_PIN.PRESS_ENGAGEMENT_MIN_D} D"
+    )
+
+# --- MHA-169 pin through the MHA-127 strip's far face (R9-23, R9-50) ----------
+# The hook is set at fit-up in y and z only (R9-15), so nothing absorbs the
+# pin's reach along its own axis: its crowned end's full-diameter circle must
+# pass the strip's far (+X) face at every corner of the latch stack.  The
+# stack: the arm's tip station (.XX) and pin position (.XXX), the proud range
+# above, the dowel's diameter band, the arm's angular play about the pivot
+# (IntegratorE's coupled stack), the pivot tap's position and the shoulder's
+# float in the arm bore, the bracket's screw holes in the bar and in the
+# sheet with the screw head's float, the sheet's thickness band, and the
+# flap's 90 deg bend at the title block's angular row.
+LATCH_ARM_ANGLE_PLAY = 0.00305  # rad
+# The title block's ANGULAR row (+/-1 deg), which the MHA-170 sheet's BEND 90
+# DEG note takes.
+FLAP_BEND_TOL_DEG = 1.0
+# The flap's screw-hole X is taken from its outer face at the base, so a bent
+# flap leans its inside face, where the strip lies, by the pin axis's height
+# above the base's underside times tan(bend error).  The bend centre sits
+# 2.25..2.6 above the underside, so the underside is the longer, conservative
+# lever.
+FLAP_BEND_LEVER = ARM.PIN_MACHINE_Z - BRACKET.BAR_BACK_FACE_Z  # 9.469
+_LATCH_PIVOT = (BAR.PIVOT_TAP_X, BRACKET.BAR_CENTRE_Y + BAR.HANGER_TAP_Y)
+_LATCH_HOLE = (sum(HOOK.PLANE_X) / 2.0, HOOK.PIN_HOLE_YZ[0])
+_LATCH_THETA = math.atan2(
+    _LATCH_HOLE[1] - _LATCH_PIVOT[1], _LATCH_HOLE[0] - _LATCH_PIVOT[0]
+)  # -32.56 deg
+_FLAP_SHIFT = (
+    BAR.HOLE_POSITION_BAND + BRACKET_SPEC.POSITION_TOL + BRACKET_SPEC.HEAD_FLOAT_MAX
+)
+_BORE_FLOAT = (
+    ARM.PIVOT_BORE_DIA
+    + ARM.PIVOT_BORE_DIA_BAND
+    - PIVOT.SHOULDER_DIA
+    - min(PIVOT.SHOULDER_DIA_LIMITS)
+) / 2.0
+
+
+def latch_pin_far_face_margin(
+    tip_band: float = ARM.TIP_STATION_BAND,
+    proud_range: tuple[float, float] = LATCH_PIN_PROUD_RANGE,
+    bend_deg: float = FLAP_BEND_TOL_DEG,
+) -> float:
+    """Least distance, along the pin, by which the crowned end's full
+    diameter passes the strip's far face over every corner of the stack."""
+    signs = (-1.0, 1.0)
+    radii = [(LATCH_PIN.DIA + band) / 2.0 for band in LATCH_PIN.DIA_BAND]
+    sheet = (-BRACKET.SHEET_T_MINUS, BRACKET.SHEET_T_PLUS)
+    bends = [math.radians(s * bend_deg) for s in signs]
+    worst = math.inf
+    for tip, proud, r, flap, dt, tap, float_, side, play, bend in itertools.product(
+        signs, proud_range, radii, signs, sheet, signs, signs, signs, signs, bends
+    ):
+        theta = _LATCH_THETA + play * LATCH_ARM_ANGLE_PLAY
+        ux, uy = math.cos(theta), math.sin(theta)
+        px = _LATCH_PIVOT[0] + tap * BAR.HOLE_POSITION_BAND + float_ * _BORE_FLOAT
+        full = ARM.TIP_STATION + tip * tip_band + proud - LATCH_PIN.CROWN_R
+        centre_x = px + full * ux - uy * side * ARM.HOLE_POSITION_BAND
+        far_face = (
+            HOOK.PLANE_X[1] + flap * _FLAP_SHIFT + dt + FLAP_BEND_LEVER * math.tan(bend)
+        )
+        # The leaning face's normal is (cos, 0, sin) of the bend error; the
+        # end circle spans the pin's horizontal normal and machine Z.
+        reach = r * math.hypot(uy * math.cos(bend), math.sin(bend))
+        margin = ((centre_x - far_face) * math.cos(bend) - reach) / (
+            ux * math.cos(bend)
+        )
+        worst = min(worst, margin)
+    return worst
+
+
+LATCH_PIN_FAR_FACE_MARGIN_WORST = latch_pin_far_face_margin()
+if LATCH_PIN_FAR_FACE_MARGIN_WORST <= 0.0:
+    raise AssertionError(
+        "MHA-169 pin / MHA-127 strip far face: the pin's full diameter stops"
+        f" {-LATCH_PIN_FAR_FACE_MARGIN_WORST:.3f} short at the printed worst case"
     )
 
 # --- The MHA-168 sheet's installation line ------------------------------------

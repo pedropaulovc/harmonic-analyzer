@@ -13,6 +13,7 @@ import build_rack_pinion as part
 import draw_rack_pinion as drawing
 import rack_pinion_spec as spec
 import transgear_disc_hub_geometry as hub_geometry
+import transgear_disc_screw_spec as disc_screw
 from _drawing_contract import (
     PRECISION_MIGRATED_DRAWINGS,
     drawing_specification_violations,
@@ -63,13 +64,15 @@ def test_taps_sit_on_the_flange_bolt_circle() -> None:
 
 
 def test_disc_screw_engages_at_least_one_and_a_half_diameters_worst_case() -> None:
+    """R9-47: the MHA-161 tips are cut to fit inside the rear face, so the
+    joint (judged in transgear_disc_screw_spec) spends the tap's losses here."""
     assert spec.TAP_SPEC.size == hub_geometry.SCREW_THREAD == "#0-80"
-    assert spec.ENGAGEMENT_WORST_D >= 1.5
-    assert spec.ENGAGEMENT_WORST < spec.ENGAGEMENT_NOMINAL < spec.FACE_WIDTH
-    # The screw's tip always leaves the rear face, so no incomplete end
-    # thread sits in the disc; 0.95 past it at nominal.
-    assert spec.SCREW_TIP_PAST_REAR == pytest.approx(0.95)
-    assert spec.SCREW_TIP_PAST_REAR_MIN >= spec.SCREW_PITCH
+    assert disc_screw.ENGAGEMENT_WORST_D >= spec.ENGAGEMENT_FLOOR_D == 1.5
+    assert (
+        disc_screw.ENGAGEMENT_WORST
+        < disc_screw.ENGAGEMENT_NOMINAL
+        < spec.FACE_WIDTH - spec.CSK_THREAD_LOSS
+    )
 
 
 def test_disc_tap_drill_cuts_a_2b_minor_at_about_80_percent_thread() -> None:

@@ -1,4 +1,4 @@
-r"""McMaster 97482A010 -- 1100 aluminum domed head solid rivet, 1/16" x 1/8".
+r"""McMaster 97482A015 -- 1100 aluminum domed head solid rivet, 1/16" x 3/16".
 
 Used as latch-hook-rivet (MHA-175).  The catalogue facts and the part frame
 are ``latch_hook_rivet_spec``'s.  One Front-plane half-section revolved 360
@@ -12,7 +12,7 @@ saving it under cad/out/reference.
 
 Run standalone (SolidWorks open)::
 
-    uv run python cad\scripts\diagnostics\diag_build_97482A010.py
+    uv run python cad\scripts\diagnostics\diag_build_97482A015.py
 """
 
 from __future__ import annotations
@@ -51,7 +51,7 @@ def rivet_section() -> list[tuple[float, float]]:
     ]
 
 
-async def build_97482A010(adapter, truth=None):
+async def build_97482A015(adapter, truth=None):
     from solidworks_mcp.adapters.base import RevolveParameters
 
     check("create_sketch rivet section", await adapter.create_sketch("Front"))
@@ -110,7 +110,7 @@ async def build_catalog(adapter) -> dict[str, str]:
     with _telemetry.span("catalog.build", label=PART_NO):
         check(f"create_part {PART_NO}", await adapter.create_part())
         assert_seat_sketch_baseline(adapter, PART_NO)
-        await build_97482A010(adapter)
+        await build_97482A015(adapter)
         props = mass_properties(adapter)
         if not props["volume_mm3"] > 0.0:
             raise RuntimeError(f"{PART_NO} catalog build has no solid volume")

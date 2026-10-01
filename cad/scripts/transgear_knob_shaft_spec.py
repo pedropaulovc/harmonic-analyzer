@@ -7,16 +7,17 @@ closure.  ``build_transgear_knob_shaft`` marks and tolerances exactly
 
 Contract §1.1 (round 10): one turned steel shaft, front to rear --
 
-* a 1/4-20 stud end, full thread from the tip to ``PLAIN_CORE`` in front of
-  F, its tip chamfered 45 degrees to the thread's basic minor, the die's
-  run-out held to one pitch (R9-18).  The thumbnut (MHA-126) runs on it and
-  clamps the T24 on the drive collar's front face; the stud end is cut to
-  fit at rearward collar settings (§13.2) and is modelled uncut at the
-  nominal setting;
-* a plain Ø6.35 core, the sliding seat of the brass drive collar (MHA-177),
-  which is set on it at assembly; the Ø1.6 hole for the MHA-154 spring pin
-  is drilled through the core AT ASSEMBLY along the collar's rear slot and
-  is not on this sheet (R9-6);
+* a 1/4-20 stud end, die-cut on a Ø6.22 blank inside the 2A major limits
+  (R9-54), full thread from the tip to ``PLAIN_CORE`` in front of F, its
+  tip chamfered 45 degrees to the thread's basic minor; the die runs out
+  into a Ø4.0 thread relief between ``PLAIN_CORE`` and ``CORE_LENGTH``
+  (R9-53).  The thumbnut (MHA-126) runs on it and clamps the T24 on the
+  drive collar's front face; the stud end is cut to fit at rearward collar
+  settings (§13.2) and is modelled uncut at the nominal setting;
+* a plain Ø6.35 core from F to ``CORE_LENGTH``, the sliding seat of the
+  brass drive collar (MHA-177), which is set on it at assembly; the Ø1.6
+  hole for the MHA-154 spring pin is drilled through the core AT ASSEMBLY
+  along the collar's rear slot and is not on this sheet (R9-6);
 * the integral 12T DP38 pinion, meshing the 120T disc (MHA-070).  Its front
   face F is the datum of the tip, plain-core and cutter stations and the
   collar's rearward stop.  The form cutter cuts full depth from F to
@@ -31,7 +32,8 @@ Part frame: the axis is local +Z through the origin (``Axis1``); +Z is
 machine +Z (rearward), so the assembly places the part without rotation.  The
 origin is F, the 12T's front face (machine z -148.1 at the stack pose, R9-17):
 the teeth run z = 0..FACE_WIDTH, the journal FACE_WIDTH..REAR_END_Z, the
-plain core -PLAIN_CORE..0 and the thread -TIP_STATION..-PLAIN_CORE.  The
+plain core -CORE_LENGTH..0, the relief -PLAIN_CORE..-CORE_LENGTH and the
+thread -TIP_STATION..-PLAIN_CORE.  The
 seed tooth gap and the seed run-out slot are centred on ``GAP_AZIMUTH_DEG``
 (from local +X, CCW about +Z).
 
@@ -80,15 +82,43 @@ ROOT_DIA = (TEETH - 2.0 * 1.157) / DIAMETRAL_PITCH * MM_PER_IN  # 6.474
 # +X (tooth 0 is centred on +X); the pattern repeats it every 30 degrees.
 GAP_AZIMUTH_DEG = 180.0 / TEETH
 
-# --- Stud end: 1/4-20, full thread from the tip to the plain core ------------
+# --- Stud end: 1/4-20, full thread from the tip to the thread relief --------
 THREAD = "1/4-20"
-THREAD_MAJOR = THREAD_MAJOR_MM[THREAD]  # 6.35
+THREAD_MAJOR = THREAD_MAJOR_MM[THREAD]  # 6.35 basic
 THREADS_PER_IN = 20
 THREAD_PITCH = MM_PER_IN / THREADS_PER_IN
 # ASME B1.1 basic minor diameter (D1 = D - 1.082532 P): the tip chamfer runs
 # 45 degrees down to it, so the first full thread starts at the chamfer.
 THREAD_BASIC_MINOR = THREAD_MAJOR - 1.082532 * THREAD_PITCH  # 4.975
-TIP_CHAMFER = (THREAD_MAJOR - THREAD_BASIC_MINOR) / 2.0  # 0.687, 45 degrees
+# 1/4-20 UNC-2A limits, ASME B1.1 as tabled by Engineers Edge (read
+# 2026-10-01, https://www.engineersedge.com/screw_threads_chart.htm): major
+# 0.2408..0.2489 in, pitch diameter min 0.2127 in.
+THREAD_MAJOR_2A_IN = (0.2408, 0.2489)
+THREAD_MAJOR_2A = tuple(v * MM_PER_IN for v in THREAD_MAJOR_2A_IN)  # 6.116..6.322
+THREAD_PD_2A_MIN_IN = 0.2127
+# The deepest root a die cuts.  ASSUMPTION, as in crank_handle_pivot_screw_spec:
+# a root a full basic half-depth (0.649519 P) under the smallest 2A pitch
+# diameter, 4.578, below the table's 2A minor maximum 0.1876 in (4.765).
+THREAD_ROOT_2A_MIN = (THREAD_PD_2A_MIN_IN - 0.649519 / THREADS_PER_IN) * MM_PER_IN
+# R9-54: the die cuts on a blank turned inside the 2A major limits, a step
+# under the Ø6.35 core.  The model owns the ±0.10 band (rule 2).
+THREAD_BLANK_DIA = 6.22
+THREAD_BLANK_DIA_BAND = (0.10, -0.10)  # (upper, lower)
+THREAD_BLANK_DIA_PLACES = 2
+THREAD_BLANK_LIMITS = (
+    THREAD_BLANK_DIA + min(THREAD_BLANK_DIA_BAND),
+    THREAD_BLANK_DIA + max(THREAD_BLANK_DIA_BAND),
+)  # 6.12..6.32
+if not (
+    THREAD_MAJOR_2A[0] <= THREAD_BLANK_LIMITS[0]
+    and THREAD_BLANK_LIMITS[1] <= THREAD_MAJOR_2A[1]
+):
+    raise AssertionError(
+        f"MHA-078 thread blank / 1/4-20 UNC-2A major: the blank "
+        f"{THREAD_BLANK_LIMITS[0]:.3f}..{THREAD_BLANK_LIMITS[1]:.3f} leaves the "
+        f"2A major {THREAD_MAJOR_2A[0]:.3f}..{THREAD_MAJOR_2A[1]:.3f}"
+    )
+TIP_CHAMFER = (THREAD_BLANK_DIA - THREAD_BASIC_MINOR) / 2.0  # 0.622, 45 degrees
 TIP_CHAMFER_PLACES = 2
 # The title block states the UN thread class, so the callout names no class.
 THREAD_CALLOUT = f"{THREAD} UNC"
@@ -96,23 +126,58 @@ CHAMFER_CALLOUT = "X 45 DEG"
 # The tip prints as its station from F (.XX, R9-17), not as a thread length.
 TIP_STATION = 23.9
 TIP_STATION_PLACES = 2
-# Full thread ends PLAIN_CORE in front of F (.XXX, R9-17: the thumbnut's
-# rearmost thread seats with 0.14 to spare at the collar's rearward stop,
-# which .XX would erase).
-PLAIN_CORE = 6.5
-PLAIN_CORE_PLACES = 3
-THREAD_LENGTH_REF = TIP_STATION - PLAIN_CORE  # 17.4 REF
-# R9-18: the die's incomplete threads may run out at most one pitch into the
-# plain core (a die run flat face last, or single-pointed), so at the nominal
-# setting the run-out stops in front of the core's cross-pin hole.
-DIE_RUNOUT_PITCHES = 1
-DIE_RUNOUT_MAX = DIE_RUNOUT_PITCHES * THREAD_PITCH  # 1.27
-RUNOUT_NOTE = f"THREAD RUN-OUT {DIE_RUNOUT_PITCHES}P MAX."
 
 # --- Plain core: the drive collar's sliding seat -----------------------------
-CORE_DIA = THREAD_MAJOR  # one turned Ø6.35: the core and the thread blank
+CORE_DIA = THREAD_MAJOR  # 6.35, the reamed collar's size
 CORE_DIA_BAND = (-0.005, -0.015)  # (upper, lower): sliding under the reamed collar
 CORE_DIA_PLACES = 3
+# The core ends CORE_LENGTH in front of F (.XXX): the cross-pin hole, drilled
+# at assembly, must stay in the full core at the furthest collar setting
+# (MHA-177 asserts it).
+CORE_LENGTH = 5.25
+CORE_LENGTH_PLACES = 3
+
+# --- Thread relief: the die's run-out lies in it (R9-53) -----------------------
+# Full thread ends PLAIN_CORE in front of F, on the relief's front shoulder
+# (.XXX).  The die runs rearward until its leading face meets the core's
+# step, so it cuts full thread to the step plus its chamfered lead; the
+# narrowest printed relief holds a lead of DIE_RUNOUT_PITCHES (a die run
+# with its chamfer leading [INFERENCE: 1.5 P is the shorter of the common
+# die leads]).  The relief's floor stands under the deepest die-cut root,
+# so the lead's incomplete threads lie in air, and the thumbnut at the
+# collar's rearward stop runs only on full thread or over the relief.
+PLAIN_CORE = 7.5
+PLAIN_CORE_PLACES = 3
+THREAD_LENGTH_REF = TIP_STATION - PLAIN_CORE  # 16.4 REF
+DIE_RUNOUT_PITCHES = 1.5
+DIE_RUNOUT_MAX = DIE_RUNOUT_PITCHES * THREAD_PITCH  # 1.905
+RELIEF_DIA = 4.0
+RELIEF_DIA_PLACES = 2
+_CORE_LENGTH_TOL = printed_band_mm(CORE_LENGTH_PLACES)
+_PLAIN_CORE_TOL = printed_band_mm(PLAIN_CORE_PLACES)
+RELIEF_DIA_MAX = RELIEF_DIA + printed_band_mm(RELIEF_DIA_PLACES)  # 4.51
+RELIEF_DIA_MIN = RELIEF_DIA - printed_band_mm(RELIEF_DIA_PLACES)  # 3.49
+RELIEF_WIDTH_MIN = (PLAIN_CORE - _PLAIN_CORE_TOL) - (
+    CORE_LENGTH + _CORE_LENGTH_TOL
+)  # 7.37 - 5.38 = 1.99
+if RELIEF_WIDTH_MIN < DIE_RUNOUT_MAX - 1e-9:
+    raise AssertionError(
+        f"MHA-078 thread relief / die run-out: the narrowest relief "
+        f"{RELIEF_WIDTH_MIN:.3f} is under the {DIE_RUNOUT_MAX:.3f} "
+        f"({DIE_RUNOUT_PITCHES}P) a die's lead runs out over"
+    )
+if RELIEF_DIA_MAX > THREAD_ROOT_2A_MIN + 1e-9:
+    raise AssertionError(
+        f"MHA-078 thread relief / die root: the largest relief "
+        f"Ø{RELIEF_DIA_MAX:.3f} stands above the deepest die-cut root "
+        f"Ø{THREAD_ROOT_2A_MIN:.3f}"
+    )
+# The relief carries only the thumbnut's clamp (the drive enters the core
+# behind it, at the cross pin): its smallest section against the thread's
+# tensile-stress area, ASME B1.1 As = 0.7854 (D - 0.9743 / n)^2 (20.5 mm^2).
+THREAD_STRESS_AREA = math.pi / 4.0 * (THREAD_MAJOR - 0.9743 * THREAD_PITCH) ** 2
+RELIEF_AREA_MIN = math.pi / 4.0 * RELIEF_DIA_MIN**2  # 9.57
+RELIEF_AREA_RATIO_MIN = RELIEF_AREA_MIN / THREAD_STRESS_AREA  # 0.47
 
 # --- Journal: runs in the arm plate's Ø8.5 bore (K5, no bushing) -------------
 JOURNAL_DIA = 8.5
@@ -133,6 +198,7 @@ if abs(JOURNAL_LENGTH - 34.4375) > 1e-9:
 
 # --- Local stations along +Z, from F ------------------------------------------
 TIP_Z = -TIP_STATION
+CORE_END_Z = -CORE_LENGTH
 THREAD_END_Z = -PLAIN_CORE
 PINION_REAR_Z = FACE_WIDTH
 REAR_END_Z = FACE_WIDTH + JOURNAL_LENGTH
@@ -358,7 +424,7 @@ GEAR_DATA = gear_data_note(
 # The title block's 0.25 edge break is a sixth of this fine tooth's whole
 # depth, so the sheet carries the one part-specific exception it needs.
 TOOTH_EDGE_NOTE = "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS."
-DRAWING_NOTES = "\n".join((TOOTH_EDGE_NOTE, RUNOUT_NOTE, F_NOTE, CUTTER_NOTE))
+DRAWING_NOTES = "\n".join((TOOTH_EDGE_NOTE, F_NOTE, CUTTER_NOTE))
 
 # Two running surfaces: the journal in the plate bore and the core under the
 # sliding collar.  Nothing else runs; the rest is the title block's process.
@@ -367,27 +433,39 @@ SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = (
     SurfaceFinishControl(
         "core",
         MACHINED_UM,
-        CylinderFace(CORE_DIA, contains_z_mm=-PLAIN_CORE / 2.0),
+        CylinderFace(CORE_DIA, contains_z_mm=CORE_END_Z / 2.0),
     ),
 )
 
 # --- Marked-dimension contract ------------------------------------------------
 # ``StudProfile`` is the Right-plane revolve in front of F (the core, the
-# thread blank and the tip chamfer); it also carries two construction-only
-# witnesses: the full-thread end (PlainCore) and the tooth-tip blank across
-# the face (OutsideDia, rule 2's reference-sketch allowance), so every turned
-# size imports natively beside its axial extent.  ``JournalProfile`` is the
-# revolve behind the teeth.  ``GearBlank`` owns the face width.
+# thread relief, the thread blank and the tip chamfer); it also carries one
+# construction-only witness, the tooth-tip blank across the face (OutsideDia,
+# rule 2's reference-sketch allowance), so every turned size imports natively
+# beside its axial extent.  ``JournalProfile`` is the revolve behind the
+# teeth.  ``GearBlank`` owns the face width.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "GearBlank": {"FaceWidth"},
-    "StudProfile": {"CoreDia", "PlainCore", "TipStation", "TipChamfer", "OutsideDia"},
+    "StudProfile": {
+        "CoreDia",
+        "CoreLength",
+        "ReliefDia",
+        "PlainCore",
+        "ThreadBlankDia",
+        "TipStation",
+        "TipChamfer",
+        "OutsideDia",
+    },
     "JournalProfile": {"JournalDia", "JournalLength"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "GearBlank": {"FaceWidth": FACE_WIDTH_PLACES},
     "StudProfile": {
         "CoreDia": CORE_DIA_PLACES,
+        "CoreLength": CORE_LENGTH_PLACES,
+        "ReliefDia": RELIEF_DIA_PLACES,
         "PlainCore": PLAIN_CORE_PLACES,
+        "ThreadBlankDia": THREAD_BLANK_DIA_PLACES,
         "TipStation": TIP_STATION_PLACES,
         "TipChamfer": TIP_CHAMFER_PLACES,
         "OutsideDia": OUTSIDE_DIA_PLACES,

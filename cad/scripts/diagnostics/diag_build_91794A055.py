@@ -36,6 +36,16 @@ Frame: axis +Y, head up, the under-head face at y = 0 (Top Plane).  The
 vendor origin sits mid-overall (axis z, head +z) and its profile lies on
 the Right Plane, so vendor +y is replica +x.
 
+Cut to fit (optional, ``cut_length`` with ``cut_end_break``; R9-47): a
+screw cut at assembly, as MHA-161's are, is drawn as installed, in the
+``diag_mcmaster_oval`` idiom.  Revolve1 ends the shank at y = -cut_length
+with a 45 deg break of radial leg ``cut_end_break`` in place of the factory
+0.75 P tip chamfer, and ``revolved_volume`` follows the cut.  Everything
+else is the supplied screw's: the helix stays seeded on the factory tip
+plane and the cutter in air past it, so the groove is the vendor thread and
+its first turns sweep air beyond the cut.  Without them the build is the
+supplied screw, which the replica gate runs.
+
 Run standalone (SolidWorks open, vendor file and dump local); it is the
 replica gate::
 
@@ -107,27 +117,58 @@ RUNOUT_TAPER_H = (RUNOUT_R - ROOT_R) / math.tan(math.radians(RUNOUT_DRAFT_DEG))
 VENDOR_UNDERHEAD_Z = (HEAD_H + SHANK_LEN) / 2.0 - HEAD_H
 
 
-def revolved_volume() -> float:
-    """Revolve1's solid: cap + drafted band + neck + shank + tip frustum."""
+def shank_end(
+    cut_length: float | None = None, cut_end_break: float | None = None
+) -> tuple[float, float]:
+    """(length under the head, 45 deg end chamfer leg): the supplied screw's
+    factory tip, or the cut end of a screw cut to fit."""
+    if cut_length is None and cut_end_break is None:
+        return SHANK_LEN, TIP_CHAMFER
+    if cut_length is None or cut_end_break is None:
+        raise ValueError(f"{PART_NO}: a cut needs both its length and its end break")
+    if not cut_length < SHANK_LEN - TIP_CHAMFER:
+        raise ValueError(
+            f"{PART_NO}: a {cut_length} mm cut does not clear the supplied "
+            f"{SHANK_LEN} mm screw's factory tip"
+        )
+    if not 0.0 < cut_end_break < MAJOR_R:
+        raise ValueError(f"{PART_NO}: cut end break {cut_end_break} mm")
+    if not NECK_LEN + RUNOUT_TAPER_H < cut_length - cut_end_break:
+        raise ValueError(f"{PART_NO}: the {cut_length} mm cut leaves no shank")
+    return cut_length, cut_end_break
+
+
+def revolved_volume(
+    cut_length: float | None = None, cut_end_break: float | None = None
+) -> float:
+    """Revolve1's solid: cap + drafted band + neck + shank + end frustum."""
+    length, end_ch = shank_end(cut_length, cut_end_break)
     return (
         _spherical_cap_volume(HEAD_R, DOME_H)
         + _rev_frustum(HEAD_BAND, UNDER_HEAD_R, HEAD_R)
         + math.pi * NECK_R**2 * NECK_LEN
-        + math.pi * MAJOR_R**2 * (SHANK_LEN - NECK_LEN - TIP_CHAMFER)
-        + _rev_frustum(TIP_CHAMFER, MAJOR_R, MAJOR_R - TIP_CHAMFER)
+        + math.pi * MAJOR_R**2 * (length - NECK_LEN - end_ch)
+        + _rev_frustum(end_ch, MAJOR_R, MAJOR_R - end_ch)
     )
 
 
-async def build_91794A055(adapter, truth=None):
+async def build_91794A055(
+    adapter,
+    truth=None,
+    *,
+    cut_length: float | None = None,
+    cut_end_break: float | None = None,
+):
     from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
 
+    length, end_ch = shank_end(cut_length, cut_end_break)
     # --- Revolve1 --------------------------------------------------------------
     check("create_sketch profile", await adapter.create_sketch("Front"))
     sk_mgr = adapter.currentSketchManager
     with no_sketch_inference(adapter):
         if (
             sk_mgr.CreateCenterLine(
-                0.0, HEAD_H / 1000.0, 0.0, 0.0, -SHANK_LEN / 1000.0, 0.0
+                0.0, HEAD_H / 1000.0, 0.0, 0.0, -length / 1000.0, 0.0
             )
             is None
         ):
@@ -157,9 +198,9 @@ async def build_91794A055(adapter, truth=None):
                 (NECK_R, 0.0),
                 (NECK_R, -NECK_LEN),
                 (MAJOR_R, -NECK_LEN),
-                (MAJOR_R, -(SHANK_LEN - TIP_CHAMFER)),
-                (MAJOR_R - TIP_CHAMFER, -SHANK_LEN),
-                (0.0, -SHANK_LEN),
+                (MAJOR_R, -(length - end_ch)),  # factory tip or cut-end break
+                (MAJOR_R - end_ch, -length),
+                (0.0, -length),
                 (0.0, HEAD_H),
             ],
             close=False,
@@ -171,7 +212,7 @@ async def build_91794A055(adapter, truth=None):
         await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=False)),
     )
     name_last_feature(adapter, "Body")
-    v = revolved_volume()
+    v = revolved_volume(cut_length, cut_end_break)
     await volume_check(adapter, "revolved body", v, 0.005 * v)
 
     # --- Cut-Extrude1: driver slot ---------------------------------------------

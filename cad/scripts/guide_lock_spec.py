@@ -29,8 +29,11 @@ LOCK_THICK = 2.0  # extruded +Z
 
 # Screw-hole layout on the guide-side band (matches the guide's hole pitch:
 # the two stations sit x +-7 about the plate centre, 2.5 above the y=0 edge).
+# R9-49: 1/8 DRILL (Ø3.175) over the #4-40 majors carries this plate's Ø0.10
+# and the rail taps' Ø0.20 position (guide_lock_screw_spec.LOCK_SET_OFFSET);
+# the #4 close Ø3.048 left 0.20 of the 0.30 needed.
 HOLE_XY = ((4.0, 2.5), (18.0, 2.5))
-HOLE_SPEC = HoleSpec("clearance", "#4", fit="close")
+HOLE_SPEC = HoleSpec("drilled_fractional", "1/8")
 
 # --- Marked-dimension contract: feature -> the parametric dimension NAMES the
 # print shows. ``build_guide_lock`` marks exactly these; ``draw_guide_lock``
@@ -72,8 +75,7 @@ LOCK_HEIGHT_BAND = (0.0, -0.25)  # (upper, lower), native on Height
 DRAWING_NOTES = "\n".join(
     (
         "HOLE POSITION PER FCF.",
-        "SCREW HOLES: #4 CLEARANCE DRILL THRU, CLOSE FIT,",
-        "FOR #4-40 BUTTON-HEAD SOCKET CAP SCREWS.",
+        "SCREW HOLES PASS #4-40 BUTTON-HEAD SOCKET CAP SCREWS.",
         "MAKE FROM 2.0 COLD-ROLLED STRIP; 4 REQUIRED (2 PER GUIDE RAIL).",
         "BLACK OXIDE AFTER MACHINING.",
     )

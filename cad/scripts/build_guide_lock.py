@@ -77,10 +77,10 @@ MATERIAL = "Plain Carbon Steel"
 # sits ON the bar, so the same plate overlaps the bar by 10 there. (2026-07-07
 # field report: a 12-tall plate topped out AT the bar's bottom edge and
 # retained nothing at the bottom stations -- 15 keeps a 3 overlap.)
-# Stock 91255A106 button head shanks (MHA-176, ruling R9-31) pass through the
-# lock plates before threading into the guide's rear-face #4-40 receivers. The
-# part-owned #4 CLOSE clearance is the existing placement interface and still
-# leaves positive diametral clearance.
+# Stock 91255A108 button head shanks (MHA-176, rulings R9-31, R9-48) pass
+# through the lock plates before threading into the guide's rear-face #4-40
+# through taps. The part-owned 1/8 drill (R9-49) carries both printed hole
+# positions over the screw majors (guide_lock_screw_spec.LOCK_SET_OFFSET).
 HOLE_DIA = blind_cut_dia_mm(HOLE_SPEC)
 if HOLE_DIA < LOCK_SCREW_SHANK_DIA:
     raise AssertionError("stock guide-lock screw shank does not clear the guide lock")
@@ -93,7 +93,7 @@ async def build(adapter) -> dict[str, str]:
     # Editable knobs (Tools > Equations). mm suffix load-bearing (INCH document;
     # the equation manager reads bare numbers in document units). (The old
     # HoleDia knob is gone: the screw holes are now a native Hole Wizard feature
-    # whose diameter comes from the #4 clearance table, not a driven dim.)
+    # whose diameter comes from the fractional drill table, not a driven dim.)
     await set_global(adapter, "LockWidth", f"{LOCK_WIDTH}mm")
     await set_global(adapter, "LockHeight", f"{LOCK_HEIGHT}mm")
     await set_global(adapter, "LockThick", f"{LOCK_THICK}mm")
@@ -128,7 +128,7 @@ async def build(adapter) -> dict[str, str]:
     v_plate = LOCK_WIDTH * LOCK_HEIGHT * LOCK_THICK
     await volume_check(adapter, "lock plate", v_plate, 0.005 * v_plate)
 
-    # Screw holes on the guide-side band: ONE native Hole Wizard #4 clearance
+    # Screw holes on the guide-side band: ONE native Hole Wizard 1/8 drill
     # feature (2 through-all instances) drilled from the front face (z=0), while
     # the plate is still a plain prismatic slab. Positions are the guide layout.
     hole_dia = HOLE_DIA
@@ -137,7 +137,7 @@ async def build(adapter) -> dict[str, str]:
         HOLE_SPEC,
         [[x, y, 0.0] for x, y in HOLE_XY],
         (0.0, 0.0, -1.0),
-        "guide-lock screw holes (#4 clearance)",
+        "guide-lock screw holes (1/8 drill)",
         name="ScrewHoles",
     )
     v_holes = len(HOLE_XY) * math.pi * (hole_dia / 2.0) ** 2 * LOCK_THICK

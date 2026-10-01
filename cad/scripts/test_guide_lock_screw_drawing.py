@@ -1,10 +1,11 @@
-"""Offline contracts for the MHA-176 guide-lock screw (McMaster 91255A106)."""
+"""Offline contracts for the MHA-176 guide-lock screw (McMaster 91255A108)."""
 
 from __future__ import annotations
 
 import asyncio
 import contextlib
 import math
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -22,6 +23,7 @@ from _fastener_catalog import FASTENERS
 from _hole_spec import blind_cut_dia_mm
 from _stock_fastener import STOCK_RECIPES
 from diagnostics import diag_build_91255A106 as recipe
+from diagnostics import diag_build_91255A108 as sku_recipe
 from diagnostics import diag_mcmaster_lib
 
 STEM = "guide-lock-screw"
@@ -31,13 +33,15 @@ HEAD_ENVELOPE = (5.5, 2.0)
 
 
 def test_recipe_is_the_catalogue_screw() -> None:
-    """91255A106 per mcmaster.com (2026-09-30): #4-40 x 1/4, button head
-    0.213 x 0.059, 1/16 hex drive, fully threaded."""
-    dims = recipe.DIMS
-    assert dims.part_no == screw.SKU == "91255A106"
+    """The 91255A106 page per mcmaster.com (2026-09-30): #4-40, button head
+    0.213 x 0.059, 1/16 hex drive, fully threaded; R9-48 takes the series'
+    3/8 in length, 91255A108 ([INFERENCE], not yet read live)."""
+    dims = sku_recipe.DIMS
+    assert dims.part_no == screw.SKU == "91255A108"
     assert dims.major_dia == pytest.approx(0.112 * IN)
     assert dims.pitch == pytest.approx(IN / 40.0)
-    assert dims.length == pytest.approx(0.25 * IN)
+    assert dims.length == pytest.approx(0.375 * IN)
+    assert replace(dims, part_no=recipe.PART_NO, length=0.25 * IN) == recipe.DIMS
     assert dims.head_dia == pytest.approx(0.213 * IN)
     assert dims.head_h == pytest.approx(0.059 * IN)
     assert dims.hex_af == pytest.approx(IN / 16.0)
@@ -50,16 +54,17 @@ def test_head_fits_the_contract_envelope() -> None:
 
 
 def test_shank_is_the_lock_stack() -> None:
-    """Same 1/4 under-head length as the fillister it replaces: the shank
-    passes the lock plate and fills the guide's rear tap exactly."""
+    """The shank passes the lock plate into the guide's through tap (R9-48)
+    and stops inside the rail."""
     assert screw.THREAD == "#4-40"
     assert guide.LOCK_SCREW_PASSAGE == lock.LOCK_THICK
     assert screw.SHANK_LEN == pytest.approx(
         guide.LOCK_SCREW_PASSAGE + guide.LOCK_SCREW_THREAD_ENGAGEMENT
     )
     assert guide.LOCK_SCREW_THREAD_ENGAGEMENT >= screw.SHANK_DIA
-    assert guide.LOCK_SCREW_HOLE_DEPTH > guide.LOCK_SCREW_THREAD_ENGAGEMENT
-    # The #4 CLOSE clearance in the lock plate still passes the shank.
+    assert guide.LOCK_TAP_SPEC.end == "through_all"
+    assert guide.LOCK_SCREW_TIP_INSIDE_MIN > 0.0
+    # The 1/8 drill in the lock plate passes the shank.
     assert blind_cut_dia_mm(lock.HOLE_SPEC) > screw.SHANK_DIA
 
 
@@ -170,12 +175,12 @@ def _record(monkeypatch) -> list[tuple]:
         )[1],
     )
     monkeypatch.setattr(_telemetry, "info", lambda *a, **k: None)
-    asyncio.run(recipe.build_91255A106(adapter))
+    asyncio.run(sku_recipe.build_91255A108(adapter))
     return adapter.events
 
 
 def test_recipe_profile_is_the_catalogue_head_and_shank(monkeypatch) -> None:
-    d = recipe.DIMS
+    d = sku_recipe.DIMS
     calls = _record(monkeypatch)
     (arc,) = [c for c in calls if c[0] == "sketch.Create3PointArc"]
     start, end = arc[1][0:2], arc[1][3:5]
@@ -186,18 +191,18 @@ def test_recipe_profile_is_the_catalogue_head_and_shank(monkeypatch) -> None:
     assert max(x for x, _y in profile) == pytest.approx(d.head_dia / 2.0)
     assert min(y for _x, y in profile) == pytest.approx(-d.length)
     (revolved,) = [c for c in calls if c[0] == "volume_check" and c[1][0] == "revolved body"]
-    assert revolved[1][1] == pytest.approx(recipe.revolved_volume())
+    assert revolved[1][1] == pytest.approx(recipe.revolved_volume(d))
 
 
 def test_recipe_cuts_the_socket_fillets_and_thread(monkeypatch) -> None:
-    d = recipe.DIMS
+    d = sku_recipe.DIMS
     calls = _record(monkeypatch)
     (cut,) = [c for c in calls if c[0] == "fm.FeatureCut4"]
     assert cut[1][5] == pytest.approx(d.socket_depth / 1000.0)
     (fillet,) = [c for c in calls if c[0] == "add_fillet"]
     assert fillet[1][0] == pytest.approx(d.edge_fillet_r)
     (helix,) = [c for c in calls if c[0] == "insert_helix"]
-    assert helix[1][1:3] == pytest.approx((IN / 40.0, 0.25 * IN / (IN / 40.0) + 1.0))
+    assert helix[1][1:3] == pytest.approx((IN / 40.0, 0.375 * IN / (IN / 40.0) + 1.0))
     sweeps = [c for c in calls if c[0] == "thread_sweep_cut"]
     assert [c[1][-1] for c in sweeps] == ["ThreadGroove"]
     assert ("split_at_plane", ("Top Plane", "HeadSplit"), {}) in calls
@@ -213,8 +218,8 @@ def test_catalogue_row_is_the_registered_mcmaster_screw() -> None:
     assert stock.material == row["material"] == part.MATERIAL == "Alloy Steel"
     assert row["number"] == "MHA-176"
     metadata = STOCK_RECIPES[screw.SKU]
-    assert metadata.module == recipe.__name__
-    assert getattr(recipe, metadata.callable_name) is recipe.build_91255A106
+    assert metadata.module == sku_recipe.__name__
+    assert getattr(sku_recipe, metadata.callable_name) is sku_recipe.build_91255A108
     assert metadata.threaded
 
 
@@ -247,7 +252,7 @@ def test_stock_build_takes_the_fillister_frame(monkeypatch) -> None:
     (component,) = seen["components"]
     (reference,) = fillister_seen["components"]
     assert component.sku == screw.SKU
-    assert component.author is recipe.build_91255A106
+    assert component.author is sku_recipe.build_91255A108
     assert component.transform == reference.transform
     assert "screw_axis_planes" not in seen
 
@@ -277,14 +282,14 @@ def test_standalone_recipe_run_is_catalog_only(monkeypatch, tmp_path) -> None:
         return None
 
     monkeypatch.setattr(recipe, "check", lambda *a, **k: True)
-    monkeypatch.setattr(recipe, "build_91255A106", fake_recipe)
+    monkeypatch.setattr(sku_recipe, "build_91255A108", fake_recipe)
     monkeypatch.setattr(diag_mcmaster_lib, "OUT_DIR", tmp_path)
     monkeypatch.setattr(diag_mcmaster_lib, "assert_seat_sketch_baseline", lambda *a: None)
     monkeypatch.setattr(diag_mcmaster_lib, "mass_properties", lambda _a: {"volume_mm3": 40.0})
     monkeypatch.setattr(diag_mcmaster_lib, "export_views", no_views)
     monkeypatch.setattr(diag_mcmaster_lib, "close_all", no_close)
     adapter = _Adapter()
-    artefacts = asyncio.run(recipe.build_catalog(adapter))
+    artefacts = asyncio.run(sku_recipe.build_catalog(adapter))
     assert built == [adapter]
     assert saved == [str((tmp_path / f"{screw.SKU}-catalog.SLDPRT").resolve())]
     assert artefacts["sldprt"] == str(tmp_path / f"{screw.SKU}-catalog.SLDPRT")

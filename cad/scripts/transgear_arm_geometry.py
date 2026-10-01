@@ -50,8 +50,8 @@ TIP_END_R = 7.0
 # from it.  The sheet prints it .XX (R9-23, TIP_STATION_BAND): the latch
 # pin's full diameter must pass the hook's far face, and the hook's fit-up
 # set moves the hook in y/z only, so nothing absorbs the station along the
-# pin axis.  At .X, 44 of 3072 coupled corners leave the crowned end inside
-# the strip (worst -0.258); at .XX the worst is +0.032.
+# pin axis.  With the 7/8 pin, the flap's bend and the pin's length grade
+# (R9-50, transgear_hanger_joints) the worst is +0.306 at .XX, +0.016 at .X.
 TIP_STATION = 128.9
 # The straight edges are tangent to both rounds; each leans in toward the
 # square end by EDGE_LEAN, its outward normal (sin, cos) of that angle.
@@ -100,16 +100,18 @@ TAP_CSK_ANGLE_DEG = 90.0
 
 # --- Latch pin: reamed press hole along -X into the square end, flat floor --
 PIN_HOLE_DIA = 3.175
-# REAM 0/-0.010: the press fit for the 98381A473 dowel (+0.0025/+0.0076 over
+# REAM 0/-0.010: the press fit for the 98381A474 dowel (+0.0025/+0.0076 over
 # nominal) holds at both limits; .XXX (±0.13) could not hold a press.  The
 # band follows the crank seat drive-pin holes' convention (R9-12).
 PIN_HOLE_DIA_BAND = (0.0, -0.010)
 # The dowel is pressed to the hole's flat floor (R9-12, the MHA-026 / MHA-173
-# precedent), so the depth sets the pin's proud length: 19.05 - 6.05 = 13.0.
-PIN_HOLE_DEPTH = 6.05
+# precedent), so the depth sets the pin's proud length: 22.225 - 8.50 = 13.725.
+# R9-50: 8.50 (was 6.05 for the 3/4 pin) keeps the full diameter past the
+# latch hook's far face with the flap's bend and the pin's length grade.
+PIN_HOLE_DEPTH = 8.50
 # The depth prints .XX: the hanger joints judge the pin's full-diameter grip
-# at the shallowest hole, and the integrator the latch hook's grip on the pin
-# over the proud range, both at this band.
+# at the shallowest hole, and the latch hook's grip on the pin over the proud
+# range, both at this band.
 PIN_HOLE_DEPTH_BAND = 0.51
 PIN_HOLE_Z = THICKNESS / 2.0  # mid-thickness, on y = 0
 # The latch pin's axis in the machine frame; the hook's hole is drilled on it.

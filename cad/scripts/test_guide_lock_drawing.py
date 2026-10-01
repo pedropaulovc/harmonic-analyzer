@@ -38,9 +38,10 @@ def test_hole_contract_is_part_owned_and_resolved() -> None:
     spec = guide_lock_spec.HOLE_SPEC
     assert lock.HOLE_SPEC is spec
     assert drawing.HOLE_SPEC is spec
-    assert spec.kind == "clearance"
-    assert spec.size == "#4"
-    assert spec.fit == "close"
+    # R9-49: the fractional 1/8 drill carries both printed hole positions over
+    # the screw majors (guide_lock_screw_spec.LOCK_SET_OFFSET).
+    assert spec.kind == "drilled_fractional"
+    assert spec.size == "1/8"
     assert lock.HOLE_DIA == blind_cut_dia_mm(spec)
     assert drawing.HOLE_R_SHEET == (
         blind_cut_dia_mm(spec) * drawing.SHEET_SCALE[0] / 2000.0
@@ -58,7 +59,7 @@ def test_sheet_runs_at_4_to_1_with_2_to_1_isometric() -> None:
 
 def test_linked_notes_use_us_customary_fasteners_and_functional_tolerances() -> None:
     notes = guide_lock_spec.DRAWING_NOTES
-    assert "#4 CLEARANCE DRILL THRU" in notes
+    assert "#4-40 BUTTON-HEAD SOCKET CAP SCREWS" in notes
     assert "HOLE POSITION PER FCF" in notes
     # General tolerances live in the title block ONLY -- a second general
     # tolerance in the notes would conflict with it.

@@ -71,7 +71,6 @@ from rack_pinion_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
-    ENGAGEMENT_WORST_D,
     FACE_WIDTH,
     GEAR_DATA,
     SURFACE_FINISHES,
@@ -86,6 +85,7 @@ from transgear_disc_hub_geometry import (
     BOLT_CIRCLE_X_FACTOR,
     BOLT_CIRCLE_Y_FACTOR,
 )
+from transgear_disc_screw_spec import ENGAGEMENT_WORST_D
 
 PART_NAME = "rack-pinion"
 MATERIAL = "Brass"  # ch. 23 photos: brass

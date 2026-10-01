@@ -1,13 +1,13 @@
 r"""Pure-data contract for MHA-160, the transgear hub cap (contract §2.2, R9-5).
 
 A brass cap nut on the stud MHA-082's #6-32 front thread.  Its plain rear face
-seats on the stud's journal shoulder (machine z -157.8), so the cap is torqued
-against the stud and never against the disc cluster; the cluster floats
-between the stud's Ø9 thrust step and that shoulder.  Two drilled spanner
-holes in the front face take a pin spanner.
+seats on the stud's journal shoulder (machine z -158.05 as fitted), so the
+cap is torqued against the stud and never against the disc cluster; the
+cluster floats between the stud's Ø9 thrust step and that shoulder.  Two
+drilled spanner holes in the front face take a pin spanner.
 
 Frame: axis local +Z toward the machine front, origin on the rear face (the
-Front Plane, z 0), so machine z = -157.8 - local z.  ``FrontFace`` is the
+Front Plane, z 0), so machine z = -158.05 - local z.  ``FrontFace`` is the
 plane at z 5.80; ``Axis1`` the cap axis.  The spanner holes lie on local Y,
 in the Right plane of the turned profile, so one axial section shows the
 profile, the thread and both holes.
@@ -33,7 +33,7 @@ from transgear_stub_spec import (
     RELIEF_WIDTH_MAX,
 )
 
-REAR_FACE_MACHINE_Z = ARM_SEAT_MACHINE_Z - CAP_SHOULDER_STATION  # -157.8
+REAR_FACE_MACHINE_Z = ARM_SEAT_MACHINE_Z - CAP_SHOULDER_STATION  # -158.05
 
 CAP_DIA = 10.50
 CAP_LENGTH = 5.80
@@ -176,8 +176,8 @@ for _ok, _what in (
     (TAP_WEB_WORST > 0.0 and OD_WEB_WORST > 0.0, "a spanner-hole web is open"),
     (HOLE_FLOOR_WALL_WORST >= 2.0, "spanner-hole floor to the seat face under 2.0"),
     (
-        math.isclose(REAR_FACE_MACHINE_Z, -157.8, abs_tol=1e-6),
-        "cap rear face is not at machine z -157.8 (R9-5)",
+        math.isclose(REAR_FACE_MACHINE_Z, -158.05, abs_tol=1e-6),
+        "cap rear face is not at machine z -158.05 as fitted (R9-47)",
     ),
     (CSK_DIA > FRONT_THREAD_MAJOR, "the countersink ends inside the thread major"),
 ):

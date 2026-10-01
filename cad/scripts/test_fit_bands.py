@@ -124,9 +124,17 @@ NOT_FIT_BANDS: dict[tuple[str, str], str] = {
         "the oval-head screw's B18.6.3 length tolerance (plus, minus): indexed "
         "for the shortest stock left proud of the arm before its cut"
     ),
+    ("transgear_disc_screw_spec", "STOCK_LENGTH_BAND"): (
+        "the fillister screw's B18.6.3 length tolerance (plus, minus): indexed "
+        "for the stock's reach past the disc's rear face before its cut"
+    ),
     ("transgear_knob_retaining_screw_spec", "SHANK_LEN_BAND"): (
         "the pan-head screw's B18.6.3 length tolerance (plus, minus): indexed "
         "for the shortest reach into the knob shaft's tap"
+    ),
+    ("guide_lock_screw_spec", "SHANK_LEN_BAND"): (
+        "the button-head screw's B18.6.3 length tolerance (plus, minus): "
+        "indexed for the shortest reach into the platen guide's through tap"
     ),
 }
 

@@ -149,7 +149,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Guide Lock Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "guide lock; manufacturing drawing; #4 clearance",
+            3: "guide lock; manufacturing drawing; 1/8 drill screw holes",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
@@ -255,10 +255,10 @@ async def build(adapter: Any) -> dict[str, str]:
         edge_xy=(HOLE_2_X_SHEET + HOLE_R_SHEET, HOLE_Y_SHEET),
         frame_xy=(0.176, 0.134),
         characteristic="position",
-        # Fixed-fastener stack (codex machinist review): close-fit Ø3.048 over
-        # the #4 screws' Ø2.845 majors leaves ~Ø0.20 of position TOTAL across
-        # the plate + rail pair, so this plate's share is Ø0.10 -- Ø0.20 here
-        # would consume the whole stack alone.
+        # Fixed-fastener stack (R9-49): the 1/8 drill Ø3.175 over the #4
+        # screws' Ø2.845 majors leaves Ø0.33 of position TOTAL across the
+        # plate + rail pair, so this plate's Ø0.10 and the rail's Ø0.20 both
+        # fit (guide_lock_screw_spec.LOCK_SET_OFFSET asserts it).
         tolerance=GEOMETRIC_TOLERANCES_MM["screw-hole position"],
         datums=("A", "B", "C"),
         diameter=True,
@@ -269,8 +269,8 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         right,
         # Pick on datum face A CLEAR of the screw-hole band.  Seen edge-on in
-        # the right view the Ø3.048 holes read as hidden edges at y = 0.122 +-
-        # 0.0061 (0.1159..0.1281 sheet); a pick at the old -0.022 (=0.128)
+        # the right view the Ø3.175 holes read as hidden edges at y = 0.122 +-
+        # 0.0064 (0.1156..0.1284 sheet); a pick at the old -0.022 (=0.128)
         # landed on the hole-edge/datum-face intersection, so the FCF could
         # attach to the hole edge instead.  -0.006 sits above the band (like
         # the +0.006/+0.030 datum and finish picks), on a clean face point.

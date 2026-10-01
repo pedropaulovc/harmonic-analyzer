@@ -39,6 +39,8 @@ from crankshaft_spec import (
     DRIVE_PIN_OFFSET_TOL,
     SPIGOT_DIA_BAND,
 )
+from transgear_collar_cross_pin_spec import FREE_DIA_MAX as CROSS_PIN_FREE_DIA_MAX
+from transgear_collar_cross_pin_spec import FREE_DIA_MIN as CROSS_PIN_FREE_DIA_MIN
 from transgear_collar_cross_pin_spec import HOLE_BAND as CROSS_HOLE_BAND
 from transgear_collar_cross_pin_spec import HOLE_DIA as CROSS_HOLE_DIA
 from transgear_knob_drive_pin_spec import LENGTH as PIN_LENGTH
@@ -46,19 +48,31 @@ from transgear_knob_drive_pin_spec import PROUD_RANGE, THINNEST_PLATE
 from transgear_knob_shaft_spec import (
     CORE_DIA,
     CORE_DIA_BAND,
-    DIE_RUNOUT_MAX,
+    CORE_LENGTH,
+    CORE_LENGTH_PLACES,
+    ENGAGEMENT_FLOOR_D,
     PLAIN_CORE,
     PLAIN_CORE_PLACES,
+    RELIEF_DIA_MAX,
+    THREAD_MAJOR,
+    THREAD_PITCH,
+    TIP_STATION,
+    TIP_STATION_PLACES,
 )
 from transgear_removable_spec import BORE_DIA as WHEEL_BORE_DIA
 from transgear_removable_spec import (
     DRIVE_PIN_HOLE_DIA,
     DRIVE_PIN_PROUD,
     PLATE,
+    PLATE_BAND,
     SEAT_SPIGOT_DIA,
     SEAT_SPIGOT_RIM,
 )
 from transgear_removable_spec import PIN_CIRCLE_RADIUS as _WHEEL_PIN_CIRCLE_RADIUS
+from transgear_thumbnut_spec import OVERALL_LENGTH as NUT_LENGTH
+from transgear_thumbnut_spec import OVERALL_LENGTH_LO as NUT_LENGTH_LO
+from transgear_thumbnut_spec import REAR_THREAD_LOSS as NUT_CSK_DEPTH
+from transgear_thumbnut_spec import TAP_MINOR_2B_MIN as NUT_MINOR_MIN
 
 # The policy's wall floor for a named shortfall (the 2.0 target's floor).
 WALL_FLOOR = 1.5
@@ -84,12 +98,27 @@ BORE_DIA_BAND = (0.010, 0.0)
 BORE_DIA_PLACES = 3
 
 # --- Diametral rear slot along local X for the MHA-154 spring pin (R9-6) ------
-SLOT_WIDTH = 1.7
+# The pin's ends, outside the core's hole, spring back toward their free
+# diameter and lie in the slot, whose walls carry the drive.  R9-52: the slot
+# clears the largest free pin at its narrowest, so the pin drops in at fit-up
+# and the walls bear only under torque: 1.80 - 1.753 = 0.047 .. 1.90 - 1.676
+# = 0.224 (B18.8.2 free diameter, MHA-154's spec).
+SLOT_WIDTH = 1.8
 SLOT_WIDTH_BAND = (0.10, 0.0)
 SLOT_DEPTH = 1.8
 SLOT_DEPTH_BAND = (0.10, 0.0)
 SLOT_PLACES = 1
 SLOT_FLOOR_Z = LENGTH - SLOT_DEPTH  # 2.2
+SLOT_PIN_CLEARANCE = (
+    SLOT_WIDTH + min(SLOT_WIDTH_BAND) - CROSS_PIN_FREE_DIA_MAX,
+    SLOT_WIDTH + max(SLOT_WIDTH_BAND) - CROSS_PIN_FREE_DIA_MIN,
+)
+if SLOT_PIN_CLEARANCE[0] <= 0.0:
+    raise AssertionError(
+        f"MHA-177 slot / MHA-154 pin: the narrowest slot "
+        f"{SLOT_WIDTH + min(SLOT_WIDTH_BAND):.3f} grips the pin's free "
+        f"Ø{CROSS_PIN_FREE_DIA_MAX:.3f} ({SLOT_PIN_CLEARANCE[0]:+.3f})"
+    )
 
 # --- Drive-pin holes: reamed THROUGH for the MHA-155 press (the crank's twin) -
 PIN_CIRCLE_RADIUS = _WHEEL_PIN_CIRCLE_RADIUS  # 7.0, ±Y
@@ -167,8 +196,8 @@ PILOT_WALL_WORST = floor_2(
 SLOT_FLOOR_WALL = SLOT_FLOOR_Z
 SLOT_FLOOR_WALL_WORST = floor_2(LENGTH_MIN - (SLOT_DEPTH + max(SLOT_DEPTH_BAND)))
 # Slot side to the drive-pin holes (slot along X, pins on ±Y):
-# 7.0 - 1.19 - 0.85 = 4.96; less the offset 0.025, the slot's +0.10 half
-# 0.05 and its centring 0.065: 4.82.
+# 7.0 - 1.19 - 0.90 = 4.91; less the offset 0.025, the slot's +0.10 half
+# 0.05 and its centring 0.065: 4.77.
 SLOT_PIN_WALL = PIN_CIRCLE_RADIUS - PIN_HOLE_DIA / 2.0 - SLOT_WIDTH / 2.0
 SLOT_PIN_WALL_WORST = (
     PIN_CIRCLE_RADIUS
@@ -230,22 +259,23 @@ PIN_REAR_INSET_WORST = pin_rear_inset(
 # The T24 seat (this front face) stands SET_NOMINAL in front of the 12T front
 # face F; the rearward travel ends where the collar's rear face meets F, the
 # forward travel where the core's cross-pin hole, drilled at the setting,
-# would reach the die run-out (below).
+# would reach the shaft's thread relief (below).
 SET_NOMINAL = 6.2
 FORWARD_TRAVEL_MAX = 0.7
 SEAT_MAX_FROM_F = 6.90
 REARWARD_TRAVEL_NOMINAL = SET_NOMINAL - LENGTH  # 2.2
 REARWARD_TRAVEL_RANGE = (SET_NOMINAL - LENGTH_MAX, SET_NOMINAL - LENGTH_MIN)
 
-# --- The core's cross-pin hole against the die run-out (R9-18, R9-22) ------------
-# Collar frame: the seat at z 0 and F at z = the seat's setting in front of F,
-# so the full thread ends PLAIN_CORE in front of F, 0.13 nearer on the
-# shortest printed plain core.  The hole is drilled along the slot at that
-# setting, its axis one hole radius above the slot floor (2.2 + 0.8 = 3.0);
-# its front edge comes forward by the hole's upper limit, the slot's +0.10,
-# the centring 0.065 and the collar's .XXX length:
-# 3.0 - 0.825 - 0.10 - 0.065 - 0.13 = 1.88.  The fitter may set the seat
-# anywhere up to SEAT_MAX_FROM_F, so the hole must clear the run-out there.
+# --- The core's cross-pin hole against the thread relief (R9-18, R9-53) ---------
+# Collar frame: the seat at z 0 and F at z = the seat's setting in front of F.
+# The hole is drilled along the slot at that setting, its axis one hole
+# radius above the slot floor (2.2 + 0.8 = 3.0); its front edge comes forward
+# by the hole's upper limit, the slot's +0.10, the centring 0.065 and the
+# collar's .XXX length: 3.0 - 0.825 - 0.10 - 0.065 - 0.13 = 1.88, so it lies
+# seat - 1.88 in front of F.  The full Ø6.35 core ends CORE_LENGTH in front
+# of F, 0.13 nearer on the shortest printed core, where the thread relief
+# (holding the die's run-out) begins.  The fitter may set the seat anywhere
+# up to SEAT_MAX_FROM_F, so the hole must stay in the full core there.
 CROSS_HOLE_Z = SLOT_FLOOR_Z + CROSS_HOLE_DIA / 2.0
 CROSS_HOLE_FRONT_Z_WORST = (
     CROSS_HOLE_Z
@@ -254,19 +284,26 @@ CROSS_HOLE_FRONT_Z_WORST = (
     - POSITION_TOL
     - LENGTH_TOL
 )
+CORE_LENGTH_MIN = CORE_LENGTH - printed_band_mm(CORE_LENGTH_PLACES)  # 5.12
 
 
-def core_hole_runout_margin(runout: float, seat_from_f: float) -> float:
-    """Solid core between a die run-out ``runout`` long and the cross hole's
-    front edge, the hole drilled with the seat ``seat_from_f`` in front of F
-    (negative: the hole meets the run-out)."""
-    thread_end_z = seat_from_f - PLAIN_CORE + printed_band_mm(PLAIN_CORE_PLACES)
-    return CROSS_HOLE_FRONT_Z_WORST - (thread_end_z + runout)
+def core_hole_relief_margin(seat_from_f: float, core_length: float) -> float:
+    """Full core between the cross hole's front edge, the hole drilled with
+    the seat ``seat_from_f`` in front of F, and a core ``core_length`` long
+    (negative: the hole breaks into the thread relief)."""
+    return core_length - (seat_from_f - CROSS_HOLE_FRONT_Z_WORST)
 
 
 # At the furthest setting the sheet accepts:
-# 1.88 - (6.90 - 6.5 + 0.13 + 1.27) = 0.08 (0.78 at the nominal 6.2).
-CORE_HOLE_RUNOUT_MARGIN = core_hole_runout_margin(DIE_RUNOUT_MAX, SEAT_MAX_FROM_F)
+# 5.12 - (6.90 - 1.88) = 0.10 (0.80 at the nominal 6.2).
+CORE_HOLE_RELIEF_MARGIN = core_hole_relief_margin(SEAT_MAX_FROM_F, CORE_LENGTH_MIN)
+if CORE_HOLE_RELIEF_MARGIN <= 0.0:
+    raise AssertionError(
+        f"MHA-154 cross hole / MHA-078 thread relief: at the T24 seat "
+        f"{SEAT_MAX_FROM_F:.2f} the hole's front edge reaches "
+        f"{SEAT_MAX_FROM_F - CROSS_HOLE_FRONT_Z_WORST:.3f} in front of F, past "
+        f"the shortest core {CORE_LENGTH_MIN:.3f} ({CORE_HOLE_RELIEF_MARGIN:+.3f})"
+    )
 
 for _ok, _what in (
     (
@@ -295,10 +332,6 @@ for _ok, _what in (
         "the printed seat maximum is not the nominal set plus the forward travel",
     ),
     (min(REARWARD_TRAVEL_RANGE) > 0.0, "the collar cannot move rearward of its set"),
-    (
-        CORE_HOLE_RUNOUT_MARGIN > 0.0,
-        "the core's cross-pin hole meets the die run-out at the furthest setting",
-    ),
 ):
     if not _ok:
         raise AssertionError(f"MHA-177: {_what}")
@@ -332,6 +365,61 @@ STUD_CUT_PHRASE = (
     f"CUT {STUD_CUT_BELOW_RIM[0]:.1f} TO {STUD_CUT_BELOW_RIM[1]:.1f} BELOW THE "
     f"RIM, RE-CHAMFER {STUD_RECHAMFER_DEG}\u00b0 TO THE MINOR"
 )
+
+# --- The thumbnut on the stud over the whole setting (R9-53, contract §7) ------
+# The fitter may leave the T24 seat anywhere from the rearward stop (the
+# collar's rear face on F, seat = the collar length) to SEAT_MAX_FROM_F.
+_TIP_STATION_MIN = TIP_STATION - printed_band_mm(TIP_STATION_PLACES)  # 23.39
+_PLAIN_CORE_MAX = PLAIN_CORE + printed_band_mm(PLAIN_CORE_PLACES)  # 7.63
+_CORE_LENGTH_MAX = CORE_LENGTH + printed_band_mm(CORE_LENGTH_PLACES)  # 5.38
+_PLATE_MAX = PLATE + max(PLATE_BAND)  # 2.8
+NUT_LENGTH_MIN = NUT_LENGTH + NUT_LENGTH_LO  # 15.59
+
+
+def thumbnut_engagement(seat_from_f: float) -> float:
+    """Full stud thread inside the nut's full thread, the T24 seat
+    ``seat_from_f`` in front of F, at the printed worst case: forward, the
+    shortest stud tip (or the deepest cut below the shortest nut's rim) less
+    one pitch for its chamfer, inside the rim's countersink; rearward, the
+    nut's seat countersink on the thickest plate or the stud's full-thread
+    end, whichever lies further forward."""
+    rim = seat_from_f + THINNEST_PLATE + NUT_LENGTH_MIN
+    tip = min(_TIP_STATION_MIN, rim - STUD_CUT_BELOW_RIM[1])
+    front = min(tip - THREAD_PITCH, rim - NUT_CSK_DEPTH)
+    rear = max(seat_from_f + _PLATE_MAX + NUT_CSK_DEPTH, _PLAIN_CORE_MAX)
+    return front - rear
+
+
+# Each term is a min or max of lines in the seat, so the engagement is concave
+# over the travel and least at one of its ends: 21.16 - 1.27 - 7.63 = 12.26 at
+# the rearward stop, 23.39 - 1.27 - 9.90 = 12.22 at the seat maximum.
+THUMBNUT_ENGAGEMENT_WORST = min(
+    thumbnut_engagement(seat) for seat in (LENGTH_MIN, LENGTH_MAX, SEAT_MAX_FROM_F)
+)
+if THUMBNUT_ENGAGEMENT_WORST < ENGAGEMENT_FLOOR_D * THREAD_MAJOR - 1e-9:
+    raise AssertionError(
+        f"MHA-126 thumbnut / MHA-078 stud: {THUMBNUT_ENGAGEMENT_WORST:.3f} of full "
+        f"thread ({THUMBNUT_ENGAGEMENT_WORST / THREAD_MAJOR:.2f} D) at the worst "
+        f"setting, under {ENGAGEMENT_FLOOR_D} D"
+    )
+# At the rearward stop the nut's seat stands in front of the core's step, so
+# its thread runs only on full thread or over the relief, never onto the core
+# or a die run-out: 3.87 + 2.70 - 5.38 = 1.19.
+NUT_CORE_STEP_AIR = LENGTH_MIN + THINNEST_PLATE - _CORE_LENGTH_MAX
+if NUT_CORE_STEP_AIR <= 0.0:
+    raise AssertionError(
+        f"MHA-126 thumbnut / MHA-078 core step: at the rearward stop the nut "
+        f"seat {LENGTH_MIN + THINNEST_PLATE:.3f} reaches the core step "
+        f"{_CORE_LENGTH_MAX:.3f} ({NUT_CORE_STEP_AIR:+.3f})"
+    )
+# Over the relief the nut's smallest minor clears the largest relief:
+# (4.978 - 4.51) / 2 = 0.234 radial.
+NUT_RELIEF_RADIAL_AIR = (NUT_MINOR_MIN - RELIEF_DIA_MAX) / 2.0
+if NUT_RELIEF_RADIAL_AIR <= 0.0:
+    raise AssertionError(
+        f"MHA-126 thumbnut / MHA-078 thread relief: the nut's 2B minor "
+        f"Ø{NUT_MINOR_MIN:.3f} reaches the relief Ø{RELIEF_DIA_MAX:.3f}"
+    )
 # The widest line the sheet's notes block holds (its layout test).
 FIT_UP_NOTE_WIDTH = 66
 FIT_UP_NOTE = "\n".join(

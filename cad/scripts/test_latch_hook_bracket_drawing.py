@@ -161,6 +161,42 @@ def test_every_wall_holds_2_at_the_worst_case() -> None:
     assert min(worst for _, worst in spec.WALLS.values()) >= spec.WALL_TARGET
 
 
+def _flap_top_wall(flap_height: float, hole_dia: float) -> float:
+    """The upper rivet hole to the flap's top edge at the printed worst case:
+    the flap at the bottom of its .X row, the hook set its full range up, the
+    pitch at the top of its .XXX row, the hole drilled at the top of its
+    +0.10/0 band."""
+    top_z = geometry.RIVET_YZ[1][1]
+    return (
+        flap_height
+        - _row_mm(spec.FLAP_HEIGHT_PLACES)
+        - (
+            top_z
+            + spec.HOOK_SET_RANGE
+            + _row_mm(spec.HOOK_PITCH_PLACES)
+            + (hole_dia + max(spec.HOLE_BAND)) / 2.0
+        )
+    )
+
+
+def test_the_flap_top_holds_2_over_the_wider_rivet_holes(monkeypatch) -> None:
+    """R9-51: the Ø1.65 holes (the largest 1/16 shank's clearance) cost the
+    flap top 0.025; one .X step on the flap height (19.5 -> 19.6) restores the
+    2.0 wall at the worst case: 19.6 - 0.8 - (15.204 + 0.51 + 0.13 + 0.875)."""
+    wall = _flap_top_wall(geometry.FLAP_HEIGHT, geometry.RIVET_HOLE_DIA)
+    assert wall >= spec.WALL_TARGET
+    assert wall == pytest.approx(2.0805, abs=1e-4)
+    assert spec.WALLS["upper rivet hole to the flap's top edge"][1] == pytest.approx(
+        wall, abs=1e-3
+    )
+    # Negative control: the Ø1.65 holes in the 19.5 flap leave 1.98, and the
+    # gate refuses it.
+    assert _flap_top_wall(19.5, geometry.RIVET_HOLE_DIA) < spec.WALL_TARGET
+    monkeypatch.setattr(geometry, "FLAP_HEIGHT", 19.5)
+    with pytest.raises(AssertionError, match="flap's top edge wall 1.98"):
+        _spec_fresh()
+
+
 def _worst_rivet_walls(set_range: float) -> dict[str, float]:
     """Every flap wall around the match-drilled rivet holes, least over the
     corners: the hook set anywhere within ``set_range`` in y and z, either
@@ -218,10 +254,13 @@ def test_the_flap_walls_hold_2_over_the_hook_set_range_at_every_corner() -> None
     for name, wall in worst.items():
         # The spec's stack, judged at the printed hole band, is looser than
         # the corners by no more than the #51 drill's recorded excess over it.
-        assert spec.WALLS[name][1] <= wall + rivet.VENDOR_HOLE_OVER_BAND + 1e-6, name
-    # Negative control: a set range 0.01 past the thinnest wall's margin
+        over = max(rivet.VENDOR_HOLE_OVER_BAND, 0.0)
+        assert spec.WALLS[name][1] <= wall + over + 1e-6, name
+    # Negative control: a set range 0.01 past the thinnest margin of the
+    # walls the set moves (the web between the holes moves with neither)
     # breaks 2.0.
-    breaking = spec.HOOK_SET_RANGE + min(worst.values()) - spec.WALL_TARGET + 0.01
+    moved = {n: w for n, w in worst.items() if n != "web between the rivet holes"}
+    breaking = spec.HOOK_SET_RANGE + min(moved.values()) - spec.WALL_TARGET + 0.01
     assert min(_worst_rivet_walls(breaking).values()) < spec.WALL_TARGET
 
 

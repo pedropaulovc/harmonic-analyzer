@@ -8,8 +8,8 @@ that locates the 120T disc (MHA-070), and the Ø8.2 shank the brass hub
 cluster's front thrust face; its rear end runs on the stud's Ø9 step.
 
 Local frame: origin on the axis at the sleeve's REAR end (the face that runs
-on the stud's Ø9 step, machine z −134.9), +Z toward the machine FRONT.  The
-teeth occupy z 0..GEAR_FACE_STATION, the spigot GEAR_FACE_STATION..
+on the stud's Ø9 step, machine z −135.15 as fitted), +Z toward the machine
+FRONT.  The teeth occupy z 0..GEAR_FACE_STATION, the spigot GEAR_FACE_STATION..
 SPIGOT_FRONT_STATION, the shank SPIGOT_FRONT_STATION..OVERALL_LENGTH.  Datums:
 ``RearFace`` is the Front Plane (z 0), ``GearFace`` and ``SpigotFront`` are
 offset planes, ``Axis1`` is the tooth pattern's Top × Right axis.

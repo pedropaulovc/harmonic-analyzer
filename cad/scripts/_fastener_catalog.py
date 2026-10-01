@@ -94,11 +94,12 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "90280A108",
     ),
     # R9-31: the eight platen-riding guide-lock screws; a button head clears
-    # the hanger arm where the MHA-030 fillister head would not.
+    # the hanger arm where the MHA-030 fillister head would not. R9-48: 3/8
+    # long, so the guide's through tap holds 1.5D at the worst case.
     "guide-lock-screw": _stock(
         "guide-lock-screw",
         "Black-Oxide Alloy Steel Button Head Hex Drive Screw",
-        "91255A106",
+        "91255A108",
         material="Alloy Steel",
     ),
     "latch-hook-bracket-screw": _stock(
@@ -109,7 +110,7 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
     "latch-hook-rivet": _stock(
         "latch-hook-rivet",
         "Aluminum Domed Head Solid Rivet",
-        "97482A010",
+        "97482A015",
         material="1100-O Rod (SS)",
     ),
     "frame-side-screw": _stock(
@@ -242,7 +243,7 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
     "transgear-latch-pin": _stock(
         "transgear-latch-pin",
         "Alloy Steel Dowel Pin",
-        "98381A473",
+        "98381A474",
         material="Alloy Steel",
     ),
     "tube-frame-cap": _stock(

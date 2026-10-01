@@ -3,9 +3,9 @@ guide-lock-screw:
   number: MHA-176
   stock_name: Black-Oxide Alloy Steel Button Head Hex Drive Screw
   supplier: McMaster-Carr
-  supplier_skus: [91255A106]
+  supplier_skus: [91255A108]
   material: Alloy Steel
-  material_specification: "Alloy steel, black oxide, ASTM F835, Rockwell C39; McMaster-Carr 91255A106"
+  material_specification: "Alloy steel, black oxide, ASTM F835, Rockwell C39; McMaster-Carr 91255A108"
   finish: black oxide
   quantity: 8
   tolerance_class: machined_block

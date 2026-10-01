@@ -28,7 +28,8 @@ recipes:
 | 90283A193 | `transgear-knob-retaining-screw` (catalogue-only; no vendor model) | Zinc-Plated Steel Pan Head Slotted Screw |
 | 91247A720 | `knife-hanger-stud` | Medium-Strength Grade 5 Steel Hex Head Screw |
 | 91251A108 | `cone-tip-block-screw` (catalogue-only; no vendor model) | Black-Oxide Alloy Steel Socket Head Screw |
-| 91255A106 | `guide-lock-screw` (catalogue-only; no vendor model) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
+| 91255A106 | — (diagnostic recipe; a former `guide-lock-screw`) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
+| 91255A108 | `guide-lock-screw` (catalogue-only; no vendor model; SKU not yet read live) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91255A148 | — (diagnostic recipe; a former `cone-tip-block-screw`) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91375A106 | `arbor-set-screw` | Alloy Steel Cup-Tip Set Screw |
 | 91410A538 | `gooseneck-set-screw` | Steel Square-Head Cup-Point Set Screw |
@@ -47,12 +48,13 @@ recipes:
 | 93585A190 | `cone-lock-knob` | Stainless Steel High-Profile Knurled-Head Thumb Screw |
 | 94025A150 | — (diagnostic recipe; `cone-tip-adjuster` until rule-12 E11) | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
 | 94025A164 | `cone-tip-adjuster` | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
-| 97482A010 | `latch-hook-rivet` (catalogue-only; no vendor model) | Aluminum Domed Head Solid Rivet |
+| 97482A015 | `latch-hook-rivet` (catalogue-only; no vendor model) | Aluminum Domed Head Solid Rivet |
 | 98296A026 | `transgear-collar-cross-pin` | 1050-1095 Spring Steel Slotted Spring Pin |
 | 98296A027 | `pinion-strap-pin` | 1050-1095 Spring Steel Slotted Spring Pin |
 | 98381A433 | `transgear-knob-drive-pin` (catalogue-only; no vendor model) | Alloy Steel Dowel Pin |
 | 98381A434 | `crank-seat-drive-pin` (crank only; catalogue-only; no vendor model) | Alloy Steel Dowel Pin |
-| 98381A473 | `transgear-latch-pin` | Alloy Steel Dowel Pin |
+| 98381A473 | — (replica gate for the 1/8 series' end forms) | Alloy Steel Dowel Pin |
+| 98381A474 | `transgear-latch-pin` (catalogue-only; no vendor model; SKU not yet read live) | Alloy Steel Dowel Pin |
 | 99607A213 | `pen-set-screw` | Stainless Steel Flared-Collar Knurled-Head Thumb Screw |
 
 The cone-lock and swing-stop selections follow `cad/scripts/build_cone_lock_knob.py`
@@ -212,6 +214,13 @@ Catalog specifications checked on September 10, 2026:
   catalog-only run. Lost: 91255A105 (3/16 in; shortens the lock stack) and
   18-8 stainless 92949A106 (same head and length, 70 ksi, Rockwell B55;
   the alloy screw matches the 91255A148 family whose laws the recipe uses).
+- [91255A108](https://www.mcmaster.com/91255A108/) (`guide-lock-screw`)
+  replaces 91255A106 per ruling R9-48: the 1/4 in screw engaged only 1.26D
+  of the guide's blind tap at the worst case, so the guide's lock receivers
+  became through taps and the screw 3/8 in under the head (2.02D at the
+  worst case). [INFERENCE] 91255A108 is the 3/8 in length of the same
+  91255A series; its page has not been read live. `diag_build_91255A108.py`
+  builds it with the 91255A106 recipe at that length; it is catalogue-only.
 - [98296A027](https://www.mcmaster.com/98296A027/) was read live on
   September 25, 2026: 1050-1095 spring steel slotted spring pin, 1/16 in
   diameter, 1/2 in long, 0.012 in wall, for a 0.062-0.065 in hole,
@@ -240,8 +249,9 @@ Catalog specifications checked on September 10, 2026:
   long, end shape "Round x Chamfer". As for 98381A434, `diag_build_98381A433.py`
   models the plain nominal cylinder; catalogue-only, no vendor model, no
   replica gate.
-- [98381A473](https://www.mcmaster.com/98381A473/) (`transgear-latch-pin`,
-  MHA-169, the paper drive's latch pin) was read live on September 30, 2026:
+- [98381A473](https://www.mcmaster.com/98381A473/) (formerly
+  `transgear-latch-pin`; since R9-50 the 1/8 series' end-form gate) was read
+  live on September 30, 2026:
   alloy steel dowel pin, 1/8 in diameter, 3/4 in long, end shape "Round x
   Chamfer". The page states no end radius or chamfer; the vendor model does.
   The user supplied it (as `98381A473_Dowel Pin.SLDPRT`, kept here as
@@ -255,6 +265,15 @@ Catalog specifications checked on September 10, 2026:
   models those end forms, chamfered end at y = 0 (the end pressed into the
   arm), and its standalone run is the replica gate against that harvest. The
   diameter band is the family's, read on the 98381A433/434/489 pages.
+- 98381A474 (`transgear-latch-pin`, MHA-169, since R9-50) is the 7/8 in
+  length of the same 1/8 series (98381A467 1/8 in through 98381A479 1-3/4 in,
+  dt-logs `transgear-evidence/mcmaster-skus.md`, "Round 6 — additions"); a
+  reseller lists it as 1/8 x 7/8
+  (https://www.kvmtools.com/products/mcmaster-98381a474-dowel-pin-pack-of-50-alloy-steel-1-8-diameter-7-8-long).
+  [INFERENCE] Its own page is not yet read live. `diag_build_98381A474.py`
+  carries the 98381A473 harvest's end forms at the longer length; it is
+  catalogue-only: no vendor model, no replica gate, and its standalone
+  diagnostic is a catalog-only run.
 - [90283A193](https://www.mcmaster.com/90283A193/) (`transgear-knob-retaining-screw`,
   MHA-158) clamps the knob cup on the knob shaft's rear end face. The 90283A
   series was read live on September 30, 2026: 90283A191 (5/16 in) and
@@ -332,24 +351,27 @@ Catalog specifications checked on September 10, 2026:
   place of the factory tip. It is catalogue-only: no vendor model is
   downloaded or kept here, so it has no replica gate, and its standalone
   diagnostic is a catalog-only run.
-- [97482A010](https://www.mcmaster.com/97482A010/) (`latch-hook-rivet`,
+- [97482A015](https://www.mcmaster.com/97482A015/) (`latch-hook-rivet`,
   MHA-175, two) joins the latch hook's strip to the latch-hook bracket's
   flap; the flap's holes are drilled at assembly through the hook's. The
-  product page was read live on September 30, 2026 (dt-logs
+  family page was read live on September 30, 2026 (dt-logs
   `transgear-evidence/mcmaster-skus.md`, "Round 10 — hook rivets"): 1100
-  aluminum domed head solid rivet, 1/16 in diameter, 0.125 in long under the
-  head, round domed head Ø0.13 in x 0.051 in high, for material up to
-  0.094 in thick and a 0.067 in (#51 drill) hole, pack of 500. The contract
-  row asked for steel, but McMaster lists no steel 1/16 in solid rivet (all
-  16 in the family filter are aluminum), so the part is aluminum; SolidWorks
-  has no plain 1100 wire, and the page states no temper, so the part carries
-  the library's `1100-O Rod (SS)`. The page gives no head radius, so
-  `diag_build_97482A010.py` models the dome as the spherical cap through the
-  head rim and apex (R = 1.6998 mm) [INFERENCE]. The joint grips at most
-  2.2 mm (0.6 strip on a 1.5 +0.1 flap) against the 2.3876 mm maximum, and
-  the Ø1.5875 shank enters the smallest printed Ø1.6 +0.10/0 hole; the
-  vendor's #51 hole (Ø1.7018) sits 0.0018 mm over the top of that band. It is
-  catalogue-only: the page offers a 3-D download, but no vendor model was
+  aluminum domed head solid rivets, 1/16 in diameter; 97482A015 is the
+  0.188 in (3/16) length, for material up to 0.157 in thick. The 97482A010
+  row (1/8 long) read live gives the round domed head Ø0.13 in x 0.051 in
+  high and a 0.067 in (#51 drill) hole; 97482A015 is taken to share them
+  [INFERENCE]. The contract row asked for steel, but McMaster lists no steel
+  1/16 in solid rivet (all 16 in the family filter are aluminum), so the part
+  is aluminum; SolidWorks has no plain 1100 wire, and the page states no
+  temper, so the part carries the library's `1100-O Rod (SS)`. The page gives
+  no head radius, so `diag_build_97482A015.py` models the dome as the
+  spherical cap through the head rim and apex (R = 1.6998 mm) [INFERENCE].
+  R9-51 moved the joint from the 1/8 length in Ø1.6 holes: the ASME B18.1.1
+  shank (Ø0.064 in max) enters the least printed Ø1.65 +0.10/0 hole with
+  0.024 mm to spare, and the shortest rivet (-0.016 in) on the thickest
+  2.2 mm grip in the largest hole leaves 2.39 mm³ for the shop head against
+  MIL-R-47196A's 2.11 mm³ (Ø0.081 x 0.025 in). The vendor's #51 hole
+  (Ø1.7018) lies inside the band. It is catalogue-only: no vendor model was
   supplied or kept here, so it has no replica gate, and its standalone
   diagnostic is a catalog-only run.
 

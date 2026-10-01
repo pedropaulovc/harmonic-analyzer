@@ -155,6 +155,7 @@ import transgear_arm_spec as ARM_SPEC  # noqa: E402
 from build_support_bar import (  # noqa: E402
     BAR_DEPTH,
     BAR_HEIGHT,
+    BAR_LENGTH,
     CLAMP_CBORE_DEPTH,
     CLAMP_CBORE_DIA,
     CLAMP_HEAD_RECESS,
@@ -198,9 +199,9 @@ from build_platen_guide import (  # noqa: E402
     GUIDE_SCREW_PASSAGE,
     GUIDE_SCREW_THREAD_ENGAGEMENT,
     HOLE_X as GUIDE_LOCK_HOLE_X,
-    LOCK_SCREW_BOTTOM_CLEARANCE,
     LOCK_SCREW_PASSAGE,
     LOCK_SCREW_THREAD_ENGAGEMENT,
+    LOCK_SCREW_TIP_INSIDE_MIN,
     LOCK_STATION_X,
     SCREW_STATION_X as GUIDE_SCREW_STATION_X,
 )
@@ -215,12 +216,16 @@ from build_guide_lock import (  # noqa: E402
 # the same spec constants the guide and lock builds author on their model
 # dimensions, so the sheets and the sweep read one source.
 from _fit_limits import deviations  # noqa: E402
-from _printed_tolerance import printed_deviations  # noqa: E402
+from _printed_tolerance import printed_band_mm, printed_deviations  # noqa: E402
 from guide_lock_spec import (  # noqa: E402
     DRAWING_PRECISION_BY_NAME as LOCK_PRECISION,
     LOCK_HEIGHT_BAND,
 )
-from platen_guide_spec import GUIDE_DEPTH_BAND, GUIDE_DEPTH_PLACES  # noqa: E402
+from platen_guide_spec import (  # noqa: E402
+    GUIDE_DEPTH_BAND,
+    GUIDE_DEPTH_PLACES,
+    LOCK_GAP_FIT,
+)
 from build_platen_clip import (  # noqa: E402
     CLIP_LENGTH,
     CLIP_THICKNESS,
@@ -250,6 +255,7 @@ from fillister_screw_spec import (  # noqa: E402
 from guide_lock_screw_spec import (  # noqa: E402
     HEAD_DIA as LOCK_SCREW_HEAD_DIA,
     HEAD_H as LOCK_SCREW_HEAD_H,
+    LOCK_SET_OFFSET,
     SHANK_DIA as LOCK_SCREW_SHANK_DIA,
     SHANK_LEN as LOCK_SCREW_SHANK_LEN,
 )
@@ -319,6 +325,7 @@ import transgear_latch_pin_spec as LATCH_PIN  # noqa: E402
 import transgear_pivot_screw_spec as PIVOT_SCREW  # noqa: E402
 import transgear_pivot_spacer_spec as SPACER  # noqa: E402
 import transgear_stub_spec as STUB  # noqa: E402
+import transgear_stud_fit as STUD_FIT  # noqa: E402
 import latch_hook_bracket_screw_spec as HOOK_BRACKET_SCREW  # noqa: E402
 import latch_hook_bracket_spec as HOOK_BRACKET_SPEC  # noqa: E402
 import latch_hook_rivet_spec as HOOK_RIVET  # noqa: E402
@@ -414,8 +421,11 @@ if _pin_hole_offset + LATCH_PIN.DIA / 2.0 >= HOOK.PIN_HOLE_DIA / 2.0:
 STUB_Z0 = STUB.ARM_SEAT_MACHINE_Z  # -124.4
 if abs(STUB_Z0 - ARM_Z0) > 1e-9:
     raise AssertionError("the stud's seat is off the arm's front face")
-FEED_Z0 = STUB_Z0 - STUB.SLEEVE_THRUST_STATION  # -134.9 (Ry180, teeth to -144.4)
-DISC_Z0 = FEED_Z0 - FEED.GEAR_FACE_STATION - FEED.DISC_THICKNESS  # -147.4
+# The thrust station is faced to fit (R9-47, transgear_stud_fit); the model
+# carries the as-fitted nominal, so the cluster sits 0.25 forward of the
+# contract §2 stations.
+FEED_Z0 = STUB_Z0 - STUB.SLEEVE_THRUST_STATION  # -135.15 (Ry180, teeth to -144.65)
+DISC_Z0 = FEED_Z0 - FEED.GEAR_FACE_STATION - FEED.DISC_THICKNESS  # -147.65
 if abs(FEED.DISC_THICKNESS - DISC_FACE) > 1e-9:
     raise AssertionError("the feed sleeve's disc seat is not the disc's thickness")
 _DISC_SCREW_R = DISC_HUB_GEOM.BOLT_CIRCLE_DIA / 2.0
@@ -426,8 +436,8 @@ DISC_SCREW_XY = tuple(
     )
     for angle in DISC_HUB_GEOM.SCREW_ANGLES_DEG
 )
-DISC_SCREW_Z0 = DISC_Z0 - DISC_HUB.FLANGE_THICK  # -149.8: heads on the flange
-CAP_Z0 = CAP.REAR_FACE_MACHINE_Z  # -157.8 (Ry180: the cap runs to -163.6)
+DISC_SCREW_Z0 = DISC_Z0 - DISC_HUB.FLANGE_THICK  # -150.05: heads on the flange
+CAP_Z0 = CAP.REAR_FACE_MACHINE_Z  # -158.05 (Ry180: the cap runs to -163.85)
 
 import transgear_knob_drive_pin_spec as KNOB_PIN  # noqa: E402
 import transgear_removable_spec as REMOVABLE  # noqa: E402
@@ -495,13 +505,89 @@ if abs(KNOB_RING_Z0 + RING.LENGTH - (PLATE_Z0 + ARM_PLATE.HUB_FACE_Z)) > 1e-9:
 KNOB_CUP_Z0 = KNOB_SHAFT_Z0 + KNOB_SPEC.REAR_END_Z  # -107.7625
 KNOB_SCREW_Z0 = KNOB_CUP_Z0 + CUP.FLOOR  # -105.1625
 
+# R9-47, the stud faced to fit.  F carries the disc: with the knob shaft
+# rearward and the cluster forward, the fit-up sets the disc's front face
+# STUD_FIT_WINDOW behind F, so the stud's own stations drop out of every
+# chain from F.  The model sits at the window's centre on the nominal chain.
+_F_FROM_ARM_Z = (
+    ARM_Z0 + ARM.THICKNESS + ARM_PLATE.HUB_FACE_Z - RING.LENGTH - KNOB_SPEC.FACE_WIDTH
+)
+if abs(_F_FROM_ARM_Z - KNOB_SHAFT_Z0) > 1e-9:
+    raise AssertionError("F is off the arm, plate hub and thrust ring chain")
+if abs(DISC_Z0 - FEED.CLUSTER_FLOAT - KNOB_SHAFT_Z0 - STUD_FIT.MODEL_WINDOW_AIR) > 1e-9:
+    raise AssertionError("the model's disc is off the knob chain's fitted station")
+# The 120T disc's rear face (the MHA-161 tips sit inside it) to the platen's
+# front face at the printed worst case: the platen forward by its fitted
+# float, magnified by its yaw about the bar's end at the near lock; F
+# rearward by the arm (its head play less the spacer band), the arm, hub
+# face, ring and 12T bands; the platen forward by the bar and its own bands;
+# then the window's max, the cluster's rearward float, its tilt on the bore
+# clearance (pivot on the Ø9 step edge, over the shortest sleeve) at the
+# disc rim, and the disc face's squareness to its bore.
+# 2.2 - 1.0262 - 0.25 * 1.5575 - 0.20 - 0.40 - 0.0813 - 0.05 = +0.053.
+PLATEN_YAW_LEVER = (BAR_LENGTH / 2.0) / (BAR_LENGTH / 2.0 - LOCK_STATION_X[0])
+# The platen (4.0) and rack bar (6.0) carry no drawing band: .XXX assumed.
+_PLATEN_THICKNESS_BAND = printed_band_mm(3)
+_RACK_THICKNESS_BAND = printed_band_mm(3)
+DISC_PLATEN_NOMINAL = PLATE_FRONT_Z - KNOB_SHAFT_Z0 - DISC_SPEC.FACE_WIDTH  # 2.2
+DISC_PLATEN_BAND = (
+    HANGER.HEAD_PLAY_MAX
+    - SPACER.LENGTH_BAND
+    + ARM.THICKNESS_BAND
+    + printed_band_mm(ARM_PLATE_SPEC.HUB_STATION_PLACES)
+    + RING.LENGTH_TOL
+    + printed_band_mm(KNOB_SPEC.FACE_WIDTH_PLACES)
+    + (DISC_SPEC.FACE_WIDTH_MAX - DISC_SPEC.FACE_WIDTH)
+    + BAR.BAR_DEPTH_BAND
+    + _PLATEN_THICKNESS_BAND
+)  # 1.0262
+CLUSTER_TILT_AT_DISC_RIM = (
+    (DISC_SPEC.OUTSIDE_DIA - (STUB.STEP_DIA - printed_band_mm(1)))
+    / 2.0
+    * FEED.BORE_DIAMETRAL_CLEARANCE[1]
+    / (FEED.SLEEVE_LENGTH - FEED.SLEEVE_LENGTH_TOL)
+)  # 0.0813
+DISC_FACE_SQUARENESS = float(
+    DISC_SPEC.GEOMETRIC_TOLERANCES_MM["disc face squareness to bore"]
+)
+DISC_PLATEN_AIR_WORST = (
+    DISC_PLATEN_NOMINAL
+    - DISC_PLATEN_BAND
+    - LOCK_GAP_FIT[1] * PLATEN_YAW_LEVER
+    - STUB.STUD_FIT_WINDOW[1]
+    - FEED.CLUSTER_FLOAT_RANGE[1]
+    - CLUSTER_TILT_AT_DISC_RIM
+    - DISC_FACE_SQUARENESS
+)
+if DISC_PLATEN_AIR_WORST < 0.0:
+    raise AssertionError(
+        "MHA-070 disc rear face strikes the platen front face at the printed "
+        f"worst case: air {DISC_PLATEN_AIR_WORST:.4f} (R9-47)"
+    )
+# The stud's Ø12 collar front face to the MHA-069 rack's back face: the arm
+# forward on the shortest spacer, the bar thinnest, the rack thickest, the
+# collar longest the fit-up can leave it.  1.95 - 0.05 - 0.13 - 0.13 - 1.4654.
+COLLAR_RACK_AIR_NOMINAL = STUB_Z0 - STUB.COLLAR_LENGTH - RACK_BACK_Z  # 1.95
+COLLAR_RACK_AIR_WORST = (
+    COLLAR_RACK_AIR_NOMINAL
+    - SPACER.LENGTH_BAND
+    - BAR.BAR_DEPTH_BAND
+    - _RACK_THICKNESS_BAND
+    - (STUD_FIT.COLLAR_LENGTH_FITTED_MAX - STUB.COLLAR_LENGTH)
+)  # 0.1746
+if COLLAR_RACK_AIR_WORST < 0.0:
+    raise AssertionError(
+        "MHA-082 collar enters the MHA-069 rack at the printed worst case: "
+        f"air {COLLAR_RACK_AIR_WORST:.4f} (R9-47)"
+    )
+
 # Stack D: a bought #25 chain floated REARMOST on the thinnest T24 plate
 # reaches chain_reach_rear() behind the seat face; it must keep air to the
 # 120T disc's front face.
 CHAIN_REACH_REAR_WORST = REMOVABLE.CHAIN_REACH_REAR_WORST  # 3.587
 CHAIN_DISC_AXIAL_AIR_WORST = DISC_Z0 - (
     REMOVABLE.SEAT_FACE_Z + CHAIN_REACH_REAR_WORST
-)  # 3.3135 = 6.9 - 3.5865
+)  # 3.0635 = 6.65 - 3.5865
 if CHAIN_DISC_AXIAL_AIR_WORST <= 0.0:
     raise AssertionError(
         f"bought #25 chain reaches the 120T disc: air {CHAIN_DISC_AXIAL_AIR_WORST:.4f}"
@@ -850,8 +936,9 @@ def _assert_fastener_stacks() -> None:
     )
     nonnegative("guide screw blind-bottom clearance", GUIDE_SCREW_BOTTOM_CLEARANCE)
 
-    # The low button-head guide-lock screws (R9-31) take the real 2-mm plate
-    # and 6.35-mm under-head length; the guide receives the remaining 4.35 mm.
+    # The low button-head guide-lock screws (R9-31, R9-48) take the real 2-mm
+    # plate and 9.525-mm under-head length; the guide's through tap receives
+    # the remaining 7.525 mm and the tip stops inside the rail.
     nonnegative(
         "lock shank radial clearance", (LOCK_HOLE_DIA - LOCK_SCREW_SHANK_DIA) / 2.0
     )
@@ -867,7 +954,7 @@ def _assert_fastener_stacks() -> None:
     valid_engagement(
         "lock #4-40 engagement", LOCK_SCREW_THREAD_ENGAGEMENT, LOCK_SCREW_SHANK_DIA
     )
-    nonnegative("lock screw blind-bottom clearance", LOCK_SCREW_BOTTOM_CLEARANCE)
+    nonnegative("lock screw tip inside the guide", LOCK_SCREW_TIP_INSIDE_MIN)
 
     # Clip bosses use exactly the non-threaded remainder of the shank; the
     # platen is through-tapped, gives 4.0 mm engagement, and the tip is flush.
@@ -949,15 +1036,26 @@ def _assert_fastener_stacks() -> None:
             z - HOOK_BRACKET_SCREW.LENGTH - BAR_FRONT_Z,
         )
 
-    # Disc screws: through the hub flange and the disc's through taps, tips
-    # short of the platen that slides behind the disc.
-    disc_screw_tip = DISC_SCREW_Z0 + DISC_SCREW.SHANK_LEN
+    # Disc screws: through the hub flange and the disc's through taps, cut at
+    # assembly (R9-47) to TIP_BELOW_REAR_FACE inside the disc's rear face, so
+    # no tip stands into the platen's path behind the disc; the model carries
+    # the cut.  The worst-case engagement is the spec's (import-time).
+    disc_screw_tip = DISC_SCREW_Z0 + DISC_SCREW.LENGTH
+    tip_below_rear = DISC_Z0 + DISC_FACE - disc_screw_tip
+    if abs(tip_below_rear - DISC_SCREW.TIP_BELOW_REAR_FACE_MODEL) > 1e-9 or not (
+        DISC_SCREW.TIP_BELOW_REAR_FACE[0]
+        <= tip_below_rear
+        <= DISC_SCREW.TIP_BELOW_REAR_FACE[1]
+    ):
+        raise AssertionError(
+            "MHA-161 disc-screw tip to the MHA-070 disc rear face: "
+            f"{tip_below_rear:.3f} inside, off the cut window"
+        )
     valid_engagement(
         "disc #0-80 engagement",
-        min(DISC_FACE, disc_screw_tip - DISC_Z0),
+        disc_screw_tip - DISC_Z0,
         DISC_SCREW.SHANK_DIA,
     )
-    nonnegative("disc-screw tip to platen air", PLATE_FRONT_Z - disc_screw_tip)
 
     # Knob stack: the thumbnut on the shaft's front thread, the retaining
     # screw through the cup's floor into the shaft's rear tap.
@@ -966,6 +1064,11 @@ def _assert_fastener_stacks() -> None:
         raise AssertionError("thumbnut engagement is off the collar/T24 stack")
     valid_engagement(
         "thumbnut 1/4-20 engagement", THUMBNUT_ENGAGEMENT, KNOB_SPEC.THREAD_MAJOR
+    )
+    # The nut's seat stands on full thread, in front of the stud's relief.
+    nonnegative(
+        "thumbnut seat to the stud's full-thread end",
+        KNOB_SHAFT_Z0 - KNOB_SPEC.PLAIN_CORE - THUMBNUT_Z0,
     )
     knob_screw_reach = KNOB_SCREW.SHANK_LEN - CUP.FLOOR
     if abs(knob_screw_reach - CUP.REACH) > 1e-9:
@@ -1067,15 +1170,28 @@ def _assert_lock_station_sweep() -> None:
     back_rear = front_rear + _LOCK_THICK_DEV[1]
     lock_back = LOCK_Z0 + LOCK_THICK
     head_r = LOCK_SCREW_HEAD_DIA / 2.0  # the catalogue head, Ø and height
-    plate_grow = max(_LOCK_HEIGHT_DEV[1], 0.0)
+    # R9-49: each lock is pushed away from the bar onto its screws before they
+    # are tightened (the "guide-locks-set" step), so its guide-side edge stands
+    # up to LOCK_SET_OFFSET[1] beyond the model and its far edge recedes by at
+    # least LOCK_SET_OFFSET[0], less the height band's growth.
+    plate_outward = LOCK_SET_OFFSET[1]
+    plate_inward = max(_LOCK_HEIGHT_DEV[1], 0.0) - LOCK_SET_OFFSET[0]
     moving = []
     for gy, (y0, y1) in zip(GUIDE_Y, LOCK_PLATE_Y, strict=True):
         yc = gy + GUIDE_HEIGHT / 2.0
+        # The bottom rail's lock sits flush with the rail's underside and is
+        # pushed down; the top rail's flush with its top and pushed up.
+        grow_down, grow_up = (
+            (plate_outward, plate_inward) if y0 == gy else (plate_inward, plate_outward)
+        )
         moving += [
             (
                 f"lock plates y{y0:.1f}",
                 _grown(
-                    (y0, y1, LOCK_Z0, lock_back), plate_grow, front_forward, back_rear
+                    (y0 - grow_down, y1 + grow_up, LOCK_Z0, lock_back),
+                    0.0,
+                    front_forward,
+                    back_rear,
                 ),
             ),
             (
@@ -1211,16 +1327,17 @@ def _assert_lock_station_sweep() -> None:
             ),
         ),
         # The hook is set at fit-up up to HOOK_SET_RANGE either way in y and z
-        # before its rivet holes are match-drilled.
+        # before its rivet holes are match-drilled.  Either end of the rivet:
+        # the dome, the tail past the flap, or the widest shop head.
         *(
             (
-                "latch-hook rivet head",
+                "latch-hook rivet",
                 _grown(
                     (
-                        y - HOOK_RIVET.HEAD_DIA / 2.0,
-                        y + HOOK_RIVET.HEAD_DIA / 2.0,
-                        z - HOOK_RIVET.HEAD_DIA / 2.0,
-                        z + HOOK_RIVET.HEAD_DIA / 2.0,
+                        y - HOOK_RIVET.ENVELOPE_DIA / 2.0,
+                        y + HOOK_RIVET.ENVELOPE_DIA / 2.0,
+                        z - HOOK_RIVET.ENVELOPE_DIA / 2.0,
+                        z + HOOK_RIVET.ENVELOPE_DIA / 2.0,
                     ),
                     hook_set,
                     hook_set,
@@ -1254,6 +1371,21 @@ def _assert_lock_station_sweep() -> None:
             f" (worst-case gap {bar_gap:.3f} < {LOCK_SWEEP_FLOOR})"
         )
     minima["bar back face"] = bar_gap
+    # Pushed away from the bar (R9-49), a lock plate's guide-side edge moves
+    # over the platen's own back. Behind the platen back only the rails and
+    # the rack stand; paper and clips are on its front face.
+    rack = (RACK_TIP_Y, RACK_Y0, BAR_FRONT_Z, RACK_BACK_Z)
+    rack_gap = min(
+        _section_gap(section, rack)
+        for label, section in moving
+        if label.startswith("lock plates")
+    )
+    if rack_gap < LOCK_SWEEP_FLOOR:
+        raise AssertionError(
+            "a set guide-lock plate would foul the platen rack"
+            f" (worst-case gap {rack_gap:.3f} < {LOCK_SWEEP_FLOOR})"
+        )
+    minima["platen rack"] = rack_gap
     log(
         "guide-lock station sweep clears the hanger at the printed worst case: "
         + ", ".join(f"{label} {gap:.3f}" for label, gap in minima.items())
@@ -1342,14 +1474,16 @@ def _assert_gear_mesh() -> None:
 def _assert_knob_shaft_clearance() -> None:
     """The knob cluster must ride the disc's exact centre distance with its
     air gaps and floats."""
-    # R9-16: 0.1 is the fit-up acceptance for the collar's rearmost stop on
-    # the 12T's front face F (0.295 the no-bind minimum at F -148.1).
-    collar_disc_air_min = 0.1
-    air = DISC_Z0 - KNOB_SHAFT_Z0
+    # R9-47: the collar's rearmost stop is the 12T's front face F, and the
+    # stud is faced until F to the disc's front face reads STUD_FIT_WINDOW
+    # with the cluster forward, so the window's minimum is the collar's
+    # worst air to the disc.  The model sits at the window's centre.
+    collar_disc_air_min = STUB.STUD_FIT_WINDOW[0]
+    air = DISC_Z0 - FEED.CLUSTER_FLOAT - KNOB_SHAFT_Z0
     if air < collar_disc_air_min:
         raise AssertionError(
             f"knob drive collar to disc air {air:.2f} < {collar_disc_air_min}"
-            " -- the collar must stand clear of the disc"
+            " with the cluster forward -- the collar must stand clear of the disc"
         )
     reach = math.dist(KNOB_SHAFT_XY, STUD_XY)
     if abs(reach - DISC_SPEC.CENTRE_DISTANCE) > 1e-6:

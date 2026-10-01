@@ -1,9 +1,10 @@
-"""Offline contracts for the MHA-175 latch-hook rivet (McMaster 97482A010)."""
+"""Offline contracts for the MHA-175 latch-hook rivet (McMaster 97482A015)."""
 
 from __future__ import annotations
 
 import asyncio
 import contextlib
+import importlib.util
 import math
 import re
 from fractions import Fraction
@@ -21,7 +22,7 @@ import latch_hook_spec as hook_spec
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS
 from _stock_fastener import STOCK_RECIPES
-from diagnostics import diag_build_97482A010 as recipe
+from diagnostics import diag_build_97482A015 as recipe
 
 STEM = "latch-hook-rivet"
 IN = 25.4
@@ -39,7 +40,7 @@ def test_catalogue_row_is_the_registered_mcmaster_rivet() -> None:
     assert int(row["quantity"]) == 2
     metadata = STOCK_RECIPES[spec.SKU]
     assert metadata.module == recipe.__name__
-    assert getattr(recipe, metadata.callable_name) is recipe.build_97482A010
+    assert getattr(recipe, metadata.callable_name) is recipe.build_97482A015
     assert metadata.threaded is False
 
 
@@ -54,18 +55,138 @@ def test_recipe_is_the_size_the_registry_names() -> None:
 
 def test_the_joint_is_within_the_vendor_grip_and_the_shank_enters_every_hole() -> None:
     worst_grip = hook.STRIP_T + bracket.SHEET_T + bracket.SHEET_T_PLUS
-    assert worst_grip <= 0.094 * IN == pytest.approx(spec.MAX_GRIP)
+    assert worst_grip <= 0.157 * IN == pytest.approx(spec.MAX_GRIP)
     # One match-drilled hole: the smallest either sheet may print.
     assert hook.RIVET_HOLE_DIA == bracket.RIVET_HOLE_DIA
     smallest = hook.RIVET_HOLE_DIA + max(
         min(hook_spec.HOLE_BAND), min(bracket_spec.HOLE_BAND)
     )
     assert spec.DIA < smallest
-    # The vendor's #51 hole is looser than the printed band's top.
+    # The vendor's #51 hole now lies inside the printed band.
     largest = hook.RIVET_HOLE_DIA + min(
         max(hook_spec.HOLE_BAND), max(bracket_spec.HOLE_BAND)
     )
-    assert spec.VENDOR_HOLE_DIA > largest
+    assert smallest < spec.VENDOR_HOLE_DIA < largest
+
+
+# ASME B18.1.1, 1/16 solid rivet: shank Ø0.064 max / 0.059 min, length
+# +/-0.016 in; MIL-R-47196A Table III, 1/16 driven head Ø0.081 min x 0.025
+# min thick.
+_SHANK_MAX, _SHANK_MIN, _LENGTH_TOL = 0.064 * IN, 0.059 * IN, 0.016 * IN
+_HEAD_DIA_MIN, _HEAD_T_MIN = 0.081 * IN, 0.025 * IN
+
+
+def _worst_rivet_corners(hole_dia: float, length: float) -> tuple[float, float]:
+    """(least shank clearance, least shop-head volume) of a 1/16 rivet of
+    ``length`` in a hole ``hole_dia`` drilled to the printed +0.10/0 band in
+    the strip and the flap (or to the vendor's #51 drill), over a 0.6 strip on
+    the 1.5 sheet at its thickest stock."""
+    drilled = (hole_dia, hole_dia + 0.10, 0.067 * IN)
+    grip = hook.STRIP_T + bracket.SHEET_T + bracket.SHEET_T_PLUS
+    clearance = min(drilled) - _SHANK_MAX
+    area = math.pi / 4.0
+    head = min(
+        area * shank**2 * (rivet - grip) - area * (hole**2 - shank**2) * grip
+        for hole in drilled
+        for shank in (_SHANK_MIN, _SHANK_MAX)
+        for rivet in (length - _LENGTH_TOL, length + _LENGTH_TOL)
+    )
+    return clearance, head
+
+
+def test_every_rivet_corner_clears_the_shank_and_forms_the_shop_head() -> None:
+    """R9-51: the largest B18.1.1 shank enters the least printed hole, and
+    the shortest, thinnest rivet in the largest hole over the thickest grip
+    leaves the MIL-R-47196A shop head."""
+    need = math.pi / 4.0 * _HEAD_DIA_MIN**2 * _HEAD_T_MIN  # 2.111 mm^3
+    clearance, head = _worst_rivet_corners(hook.RIVET_HOLE_DIA, spec.LENGTH)
+    assert clearance == pytest.approx(0.0244, abs=1e-4)
+    assert head == pytest.approx(2.392, abs=1e-3) and head >= need
+    assert spec.SHANK_CLEARANCE_MIN == pytest.approx(clearance)
+    assert spec.SHOP_HEAD_VOLUME_WORST == pytest.approx(head)
+    # Negative controls: the old Ø1.6 hole binds the largest shank, and the
+    # 1/8 rivet in the Ø1.65 hole leaves too little for the head.
+    assert _worst_rivet_corners(1.6, spec.LENGTH)[0] < 0.0
+    assert _worst_rivet_corners(1.65, IN / 8.0)[1] < need
+
+
+def _reload_rivet_spec():
+    fresh_spec = importlib.util.spec_from_file_location(
+        "_rivet_perturbed", spec.__file__
+    )
+    fresh = importlib.util.module_from_spec(fresh_spec)
+    fresh_spec.loader.exec_module(fresh)
+    return fresh
+
+
+def test_the_rivet_gate_refuses_the_old_hole_and_the_short_rivet(monkeypatch) -> None:
+    assert _reload_rivet_spec().SHOP_HEAD_VOLUME_WORST == spec.SHOP_HEAD_VOLUME_WORST
+    with monkeypatch.context() as m:
+        m.setattr(hook, "RIVET_HOLE_DIA", 1.6)
+        m.setattr(bracket, "RIVET_HOLE_DIA", 1.6)
+        with pytest.raises(AssertionError, match=r"MHA-175 rivet .* binds"):
+            _reload_rivet_spec()
+    # The 1/8 rivet: the spec's own source with the old length.
+    source = (
+        Path(spec.__file__)
+        .read_text(encoding="utf-8")
+        .replace("LENGTH = 3.0 * MM_PER_IN / 16.0", "LENGTH = 0.125 * MM_PER_IN")
+    )
+    assert "LENGTH = 0.125 * MM_PER_IN" in source
+    with pytest.raises(AssertionError, match=r"MHA-175 rivet .* shop head"):
+        exec(compile(source, spec.__file__, "exec"), {"__name__": "_rivet_short"})
+
+
+def test_the_lock_sweep_clears_either_end_of_the_rivet(monkeypatch) -> None:
+    """The model shows the rivet undriven: its tail stands 2.66 past the
+    flap's outer face (3.17 at the longest rivet in the thinnest grip).  The
+    guide-lock stations sweep past it unbounded in x, so the sweep's rivet
+    section must hold the widest end: the 0.130-in dome, or the shop head the
+    most shank the joint leaves makes at MIL-R-47196A's least thickness."""
+    import build_paper_drive_assembly as assembly
+
+    holes = (hook.RIVET_HOLE_DIA, hook.RIVET_HOLE_DIA + 0.10, 0.067 * IN)
+    grips = (
+        hook.STRIP_T + bracket.SHEET_T - bracket.SHEET_T_MINUS,
+        hook.STRIP_T + bracket.SHEET_T + bracket.SHEET_T_PLUS,
+    )
+    area = math.pi / 4.0
+    most = max(
+        area * shank**2 * (rivet - grip) - area * (hole**2 - shank**2) * grip
+        for hole in holes
+        for shank in (_SHANK_MIN, _SHANK_MAX)
+        for rivet in (3.0 * IN / 16.0 - _LENGTH_TOL, 3.0 * IN / 16.0 + _LENGTH_TOL)
+        for grip in grips
+    )
+    shop_head = math.sqrt(most / (area * _HEAD_T_MIN))
+    assert shop_head == pytest.approx(3.597, abs=1e-3)
+    assert 3.0 * IN / 16.0 + _LENGTH_TOL - grips[0] == pytest.approx(
+        spec.TAIL_PROUD_MAX
+    )
+    dome = 0.130 * IN
+    envelope = max(dome, shop_head)
+    assert spec.ENVELOPE_DIA == pytest.approx(envelope)
+
+    def rivet_gap() -> float:
+        lines: list[str] = []
+        monkeypatch.setattr(assembly, "log", lines.append)
+        assembly._assert_lock_station_sweep()
+        (line,) = lines
+        return float(re.search(r"latch-hook rivet (-?\d+\.\d+)", line).group(1))
+
+    gap = rivet_gap()
+    assert gap >= assembly.LOCK_SWEEP_FLOOR
+    monkeypatch.setattr(spec, "ENVELOPE_DIA", dome)
+    # Each side grows by half the excess; across a corner the gap is the
+    # hypotenuse, so it shrinks by between that and sqrt(2) times it.
+    grow = (envelope - dome) / 2.0
+    dome_gap = rivet_gap()
+    assert dome_gap - math.sqrt(2.0) * grow - 1e-3 <= gap <= dome_gap - grow + 1e-3
+    # Negative control: an end 0.02 wider than the sweep's margin fouls it.
+    breaking = envelope + 2.0 * (gap - assembly.LOCK_SWEEP_FLOOR) + 0.02
+    monkeypatch.setattr(spec, "ENVELOPE_DIA", breaking)
+    with pytest.raises(AssertionError, match="latch-hook rivet"):
+        assembly._assert_lock_station_sweep()
 
 
 def test_the_dome_is_a_cap_through_the_rim_and_apex() -> None:
@@ -147,7 +268,7 @@ def _record(monkeypatch) -> list[tuple]:
     monkeypatch.setattr(recipe, "volume_check", volume_check)
     monkeypatch.setattr(recipe, "add_line_chain", add_line_chain)
     monkeypatch.setattr(recipe, "no_sketch_inference", no_inference)
-    asyncio.run(recipe.build_97482A010(adapter))
+    asyncio.run(recipe.build_97482A015(adapter))
     return adapter.events
 
 
@@ -186,7 +307,7 @@ def test_stock_build_uses_its_registered_recipe_on_the_origin(monkeypatch) -> No
     asyncio.run(part.build(None))
     (component,) = seen["components"]
     assert component.sku == spec.SKU
-    assert component.author is recipe.build_97482A010
+    assert component.author is recipe.build_97482A015
     assert component.transform.translation_mm == (0.0, 0.0, 0.0)
     assert component.transform.rotation_radians == (0.0, 0.0, 0.0)
     assert seen["screw_axis_planes"] == ("Front Plane", "Right Plane")
@@ -219,7 +340,7 @@ def test_standalone_recipe_run_is_catalog_only(monkeypatch, tmp_path) -> None:
         return None
 
     monkeypatch.setattr(recipe, "check", lambda *a, **k: True)
-    monkeypatch.setattr(recipe, "build_97482A010", fake_recipe)
+    monkeypatch.setattr(recipe, "build_97482A015", fake_recipe)
     monkeypatch.setattr(lib, "OUT_DIR", tmp_path)
     monkeypatch.setattr(lib, "assert_seat_sketch_baseline", lambda *a: None)
     monkeypatch.setattr(lib, "mass_properties", lambda _a: {"volume_mm3": 13.0})

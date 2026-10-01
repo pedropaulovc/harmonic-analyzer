@@ -58,8 +58,10 @@ TIP_RUN = 99.9
 END_YZ = (TOP_Y - TIP_RUN, C2[1] + math.sqrt(R2**2 - (TOP_Y - TIP_RUN - C2[0]) ** 2))
 CONTRACT_END_Y = 206.25
 
-PIN_HOLE_DIA = 5.4  # over the 1/8 latch pin (98381A473)
-RIVET_HOLE_DIA = 1.6  # 1/16 solid rivets
+PIN_HOLE_DIA = 5.4  # over the 1/8 latch pin (98381A474)
+# R9-51: a metric Ø1.65 drill clears the largest 1/16 shank (B18.1.1, 0.064
+# in) at the hole's least size; latch_hook_rivet_spec holds the joint.
+RIVET_HOLE_DIA = 1.65
 # Two rivets across the strip at y 303, 3.9 apart and symmetric about the
 # centreline (the 3.2 contract pitch left a 1.37 worst web between them).
 RIVET_Y = 303.0

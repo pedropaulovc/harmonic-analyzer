@@ -48,10 +48,11 @@ MACHINE_ORIGIN = (60.0, 299.2, BAR_BACK_FACE_Z)
 # --- Formed outline (part frame) ---------------------------------------------
 BASE_LENGTH = 17.0  # x -17.0..0: machine 43.0..60.0
 WIDTH = 8.0  # y 0..8: machine 299.2..307.2
-# z 0..19.5: machine -129.9..-110.4.  0.5 over the contract's 19.0 so the
+# z 0..19.6: machine -129.9..-110.3.  0.6 over the contract's 19.0 so the
 # upper rivet hole, match-drilled wherever the hook sets (R9-15), keeps a 2.0
-# wall to the top edge at the .X row (latch_hook_bracket_spec.WALLS).
-FLAP_HEIGHT = 19.5
+# wall to the top edge at the .X row (latch_hook_bracket_spec.WALLS); R9-51
+# added the 0.1 for the Ø1.65 rivet holes.
+FLAP_HEIGHT = 19.6
 
 # Bend (R9-10): modelled at inside R0.75 (outside R2.25, concentric); the
 # sheet accepts any inside radius up to INSIDE_BEND_R_MAX.
@@ -65,10 +66,11 @@ SCREW_HOLE_DIA = 3.2
 SCREW_HOLE_X = tuple(round(x - MACHINE_ORIGIN[0], 6) for x in BRACKET_TAP_X)
 SCREW_HOLE_Y = round(BAR_CENTRE_Y + HANGER_TAP_Y - MACHINE_ORIGIN[1], 6)
 
-# Two Ø1.6 holes for the 1/16 solid rivets through the flap and the hook
+# Two Ø1.65 holes for the 1/16 solid rivets through the flap and the hook
 # strip, on one line along Z (the hook's centreline at the rivets), lower
-# first.  The hook owns the positions; the flap takes them.
-RIVET_HOLE_DIA = 1.6
+# first.  The hook owns the positions and the size (R9-51); the flap takes
+# them.
+RIVET_HOLE_DIA = 1.65
 RIVET_YZ = tuple(
     sorted(
         (

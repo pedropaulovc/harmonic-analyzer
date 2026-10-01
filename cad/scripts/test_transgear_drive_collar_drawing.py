@@ -97,11 +97,11 @@ def test_slot_floor_to_front_face_worst_and_the_one_decimal_control() -> None:
 
 
 def test_slot_runs_between_the_drive_pins_not_through_them() -> None:
-    # Slot along X, pins on ±Y: 7.0 - 0.025 - 1.19 - 0.90 - 0.065 = 4.82.
-    assert spec.SLOT_PIN_WALL_WORST == pytest.approx(4.82)
+    # Slot along X, pins on ±Y: 7.0 - 0.025 - 1.19 - 0.95 - 0.065 = 4.77.
+    assert spec.SLOT_PIN_WALL_WORST == pytest.approx(4.77)
     assert spec.SLOT_PIN_WALL_WORST >= spec.WALL_FLOOR
     # Negative control: a slot cut along the pins' line puts them in it.
-    along_pins = 0.0 - 0.025 - 1.19 - 0.90 - 0.065
+    along_pins = 0.0 - 0.025 - 1.19 - 0.95 - 0.065
     assert along_pins < 0.0
 
 
@@ -140,7 +140,7 @@ def test_pilot_stays_behind_the_wheel_front_face() -> None:
 
 
 def test_setting_and_rearward_travel() -> None:
-    # The forward travel stops where the cross hole would meet the run-out.
+    # The forward travel stops where the cross hole would meet the relief.
     assert spec.SEAT_MAX_FROM_F == pytest.approx(6.90)
     assert spec.SEAT_MAX_FROM_F == pytest.approx(
         spec.SET_NOMINAL + spec.FORWARD_TRAVEL_MAX
@@ -151,37 +151,6 @@ def test_setting_and_rearward_travel() -> None:
     assert min(spec.REARWARD_TRAVEL_RANGE) > 0.0
     # Negative control: a collar as long as the plain core cannot move back.
     assert spec.SET_NOMINAL - shaft.PLAIN_CORE < 0.0
-
-
-def test_cross_hole_clears_the_die_runout_over_the_whole_accepted_travel() -> None:
-    # The hole's front edge, collar frame (seat z 0):
-    # 3.0 - (1.6 + upper) / 2 - 0.10 - 0.065 - 0.13 = 1.88.  With the seat s
-    # in front of F the shortest plain core's run-out reaches
-    # s - 6.5 + 0.13 + 1.27.  The fitter may set the seat anywhere from the
-    # rearward stop (rear face on F) to the printed seat maximum.
-    front = 3.0 - (1.6 + max(cross_pin.HOLE_BAND)) / 2.0 - 0.10 - 0.065 - 0.13
-    rear_stop = spec.LENGTH - spec.LENGTH_TOL
-    settings = [
-        rear_stop + (spec.SEAT_MAX_FROM_F - rear_stop) * i / 20.0 for i in range(21)
-    ]
-    for seat in settings:
-        reach = seat - shaft.PLAIN_CORE + 0.13 + shaft.THREAD_PITCH
-        assert front - reach > 0.0, seat
-    # The furthest setting is the worst, and the margin the spec reports.
-    reach_max = spec.SEAT_MAX_FROM_F - 6.5 + 0.13 + 1.27
-    assert spec.CORE_HOLE_RUNOUT_MARGIN == pytest.approx(front - reach_max)
-    assert spec.CORE_HOLE_RUNOUT_MARGIN > 0.0
-    # Negative controls: a two-pitch run-out meets the hole even at the
-    # nominal setting, and so does one pitch a pitch past the seat maximum.
-    assert (
-        spec.core_hole_runout_margin(2.0 * shaft.THREAD_PITCH, spec.SET_NOMINAL) < 0.0
-    )
-    assert (
-        spec.core_hole_runout_margin(
-            shaft.THREAD_PITCH, spec.SEAT_MAX_FROM_F + shaft.THREAD_PITCH
-        )
-        < 0.0
-    )
 
 
 def test_sheet_notes_print_the_floored_worst_walls_then_the_fit_up() -> None:

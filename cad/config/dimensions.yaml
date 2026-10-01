@@ -1502,7 +1502,7 @@ sections:
         - scaled + derived
         - med
       - - Platen guides + locks (rework E3, NEW)
-        - 'two black rails 269.64 × 5 × 10 screwed across the FULL platen back (bottom y 283.734..288.734, top 317.734..322.734 — the platen HANGS by the top rail''s underside on the bar''s top edge 317.734), each by 5 fillister screws whose heads show on the platen front (rows y 286.234/320.234, x −6.249..+209.463 step 53.928), seated in Ø6.5 × 2.4 counterbores (crowns 0.2 sub-flush so the paper lies flat) with shanks threading 2.4 into blind Ø3 holes on the rail fronts; 4 black lock plates 22 × 19 × 2 (2 per rail, inboard 30/70% stations x 47.679/155.535, 2 #4-40 × 1/4 button-head socket cap screws `guide-lock-screw` each — MHA-176, McMaster 91255A106, whose low head clears the transgear hanger arm, R9-31) on the rail backs (z −128.9..−126.9), bridging 1.0 behind the bar — the bottom pair spans the 7 open channel below the bar and overlaps its band by 7, the top pair hangs 14 over it — so the platen cannot fall off without colliding with the east column clamp'
+        - 'two black rails 269.64 × 5 × 10 screwed across the FULL platen back (bottom y 283.734..288.734, top 317.734..322.734 — the platen HANGS by the top rail''s underside on the bar''s top edge 317.734), each by 5 fillister screws whose heads show on the platen front (rows y 286.234/320.234, x −6.249..+209.463 step 53.928), seated in Ø6.5 × 2.4 counterbores (crowns 0.2 sub-flush so the paper lies flat) with shanks threading 2.4 into blind Ø3 holes on the rail fronts; 4 black lock plates 22 × 19 × 2 (2 per rail, inboard 30/70% stations x 47.679/155.535, 2 #4-40 × 3/8 button-head socket cap screws `guide-lock-screw` each — MHA-176, McMaster 91255A108 into through taps (R9-48), whose low head clears the transgear hanger arm, R9-31) on the rail backs (z −128.9..−126.9), bridging 1.0 behind the bar — the bottom pair spans the 7 open channel below the bar and overlaps its band by 7, the top pair hangs 14 over it — so the platen cannot fall off without colliding with the east column clamp'
         - —
         - 'ch22 p.54-55 back photo (rails + bright wear band + lock plates) + front photo (two rows of 5 screw heads)'
         - scaled + derived
@@ -1664,7 +1664,7 @@ sections:
         - derived
         - low
       - - Transgear latch (round 10, rulings 2 / 7 / R9-10 / R9-15)
-        - 'a 1/8 × 3/4 dowel `transgear-latch-pin` (MHA-169) pressed 6.05 into the arm''s square end face at T (50.642, 233.865) along the arm (z −120.43) stands 13 proud and engages the Ø5.4 hole of the latch hook MHA-127; the hook is riveted by two 1/16 aluminium rivets `latch-hook-rivet` (MHA-175, flap holes match-drilled through the hook at assembly) to the flap (x 58.5..60) of the 1.5 steel sheet bracket `latch-hook-bracket` (MHA-170), whose base (x 43..60, on the bar''s back face) is screwed by two #4-40 × 3/8 fillisters `latch-hook-bracket-screw` (MHA-171) into through taps at x 47.5 / 54.5, y 303.234. Flexing the strip +X releases the pin'
+        - 'a 1/8 × 7/8 dowel `transgear-latch-pin` (MHA-169) pressed 8.50 into the arm''s square end face at T (50.642, 233.865) along the arm (z −120.43) stands 13.725 proud and engages the Ø5.4 hole of the latch hook MHA-127; the hook is riveted by two 1/16 × 3/16 aluminium rivets `latch-hook-rivet` (MHA-175, flap holes match-drilled through the hook at assembly) to the flap (x 58.5..60) of the 1.5 steel sheet bracket `latch-hook-bracket` (MHA-170), whose base (x 43..60, on the bar''s back face) is screwed by two #4-40 × 3/8 fillisters `latch-hook-bracket-screw` (MHA-171) into through taps at x 47.5 / 54.5, y 303.234. Flexing the strip +X releases the pin'
         - —
         - 'engineerguy 4/4 keyframes v4_transgear_001 (latched) / 011 (released); CONTRACT-paper-drive §4 (round 10); `latch_hook_bracket_geometry`, `latch_hook_geometry`'
         - scaled + derived
@@ -1676,7 +1676,7 @@ sections:
         - scaled + derived
         - low/med
       - - Latch hook (MHA-127, round 10, R9-10)
-        - '10 × 0.6 dead-soft bright low-carbon strip, flat in the machine plane x 57.9..58.5 (face toward +X, riveted to the bracket flap''s −X face), curved EDGEWISE to a template: two tangent arcs R850 / R490 from the square top cut at y 306.2, z −116.64 (the part origin) down to a R5 free end 99.9 below the cut (y 206.3); Ø5.4 hole over the latch pin at (y, z) (229.04, −120.4); two Ø1.6 rivet holes at y 303, 3.9 apart'
+        - '10 × 0.6 dead-soft bright low-carbon strip, flat in the machine plane x 57.9..58.5 (face toward +X, riveted to the bracket flap''s −X face), curved EDGEWISE to a template: two tangent arcs R850 / R490 from the square top cut at y 306.2, z −116.64 (the part origin) down to a R5 free end 99.9 below the cut (y 206.3); Ø5.4 hole over the latch pin at (y, z) (229.04, −120.4); two Ø1.65 rivet holes at y 303, 3.9 apart'
         - —
         - 'engineerguy 4/4 keyframes v4_transgear_001 (latched) / 011 (released): a small curved leaf hanging from the bar at x ~ +52 in the video; CONTRACT-paper-drive §4.4 (`latch_hook_geometry`, PART_ORIGIN_MACHINE on the x 57.9 plane)'
         - scaled

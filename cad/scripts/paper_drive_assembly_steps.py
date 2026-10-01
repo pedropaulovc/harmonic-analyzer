@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import drive_train_steps
 import transgear_drive_collar_spec as collar
+import transgear_stub_spec as stub
 
 DRAWING_NUMBER = "MHA-A06"
 
@@ -26,6 +27,10 @@ CRANK_SIDE_KEYS = ("crank-mesh-checked", "paper-drive-wheel")
 CRANK_SIDE_REFS = tuple(drive_train_steps.step_ref(key) for key in CRANK_SIDE_KEYS)
 
 SEQUENCE: tuple[str, ...] = (
+    # Platen on the bar (R9-49: the locks set clear of the hanger; R9-47: the
+    # seats faced to the platen's float, platen_guide_spec.LOCK_GAP_FIT).
+    "guide-locks-set",
+    "lock-seats-faced",
     # Hanger, on the bench, then hung (R9-6: the spacer is fitted as made).
     "latch-pin-pressed",
     "stud-fitted",
@@ -35,6 +40,8 @@ SEQUENCE: tuple[str, ...] = (
     # Disc cluster (R9-5, R9-8, R9-9).
     "disc-cluster-pressed",
     "disc-taps-transferred",
+    # R9-47: tips cut inside the disc's rear face (transgear_disc_screw_spec).
+    "disc-screws-cut",
     "oil-hole-drilled",
     "disc-cluster-hung",
     # Knob stack, front to rear (contract §1).
@@ -45,6 +52,9 @@ SEQUENCE: tuple[str, ...] = (
     "hook-set-and-riveted",
     # Chain fit-up (contract §13.2 procedure (2)-(8)).
     "fitup-pose-set",
+    # R9-47: the stud's arm seat faced to the F-to-disc window in that pose
+    # (transgear_stub_spec.STUD_FIT_WINDOW).
+    "stud-faced-to-fit",
     "collar-gap-measured",
     "collar-pinned",
     "stud-end-cut",
@@ -76,9 +86,10 @@ OFFSET_ACCEPT_TOL = 0.10
 # not a released part.
 CLAMP_SLEEVE_OD = 10.4
 CLAMP_SLEEVE_ID = 6.5
-# Procedure (8): collar to 120T disc face air, accepted at this minimum
-# (R9-16; 0.55 at the worst printed corner, the collar cannot pass the 12T).
-COLLAR_DISC_AIR_MIN = 0.1
+# Procedure (8): collar to 120T disc face air, accepted at this minimum.  The
+# collar's rearmost stop is the 12T's front face F, so the worst air is the
+# stud fit window's minimum (R9-47, "stud-faced-to-fit").
+COLLAR_DISC_AIR_MIN = stub.STUD_FIT_WINDOW[0]
 
 # The printed forms of those bands: a drawing script only places them.
 OFFSET_ACCEPT_TEXT = f"{collar.FIT_UP_OFFSET_TARGET:.2f} \u00b1{OFFSET_ACCEPT_TOL:.2f}"

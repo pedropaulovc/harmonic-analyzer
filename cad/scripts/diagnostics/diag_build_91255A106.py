@@ -28,6 +28,10 @@ replica gate of its own; the native build is checked by the farm leaf.  Its
 standalone run is catalog-only: it builds the recipe, checks the solid is sane
 and saves it under cad/out/reference for inspection.
 
+``build_button_head`` and ``catalog_run`` take the ``ButtonHeadScrew``
+dimensions, so another length of the series reuses this recipe unchanged
+(``diag_build_91255A108.py``, the 3/8 in screw MHA-176 takes since R9-48).
+
 Frame: axis +Y, head up, bearing face (head underside) at y = 0.
 
 Run standalone (SolidWorks open)::
@@ -223,12 +227,13 @@ def edge_fillet_volume(d: ButtonHeadScrew = DIMS) -> float:
     )
 
 
-async def build_91255A106(adapter, truth=None):
+async def build_button_head(adapter, d: ButtonHeadScrew = DIMS) -> None:
+    """Build one button head screw of ``d``'s dimensions (the 91255A106 laws)."""
     from _common import _early_bound, _feature_by_name, _read_member, add_line_chain
     from solidworks_mcp.adapters.base import RevolveParameters
     from diagnostics.diag_mcmaster_lib import no_sketch_inference, split_at_plane
 
-    d = DIMS
+    part_no = d.part_no
     major_r = d.major_dia / 2.0
     head_r = d.head_dia / 2.0
     top_r = d.flat_top_dia / 2.0
@@ -244,7 +249,7 @@ async def build_91255A106(adapter, truth=None):
     sk_mgr = adapter.currentSketchManager
     with no_sketch_inference(adapter):
         if sk_mgr.CreateCenterLine(0.0, head_h / 1000.0, 0.0, 0.0, tip / 1000.0, 0.0) is None:
-            raise RuntimeError(f"{PART_NO} profile: CreateCenterLine failed")
+            raise RuntimeError(f"{part_no} profile: CreateCenterLine failed")
     ang_top = math.atan2(head_h - yc, top_r)
     ang_rim = math.atan2(band_h - yc, head_r)
     ang_mid = (ang_top + ang_rim) / 2.0
@@ -261,7 +266,7 @@ async def build_91255A106(adapter, truth=None):
             0.0,
         )
         if arc is None:
-            raise RuntimeError(f"{PART_NO} profile: dome arc failed")
+            raise RuntimeError(f"{part_no} profile: dome arc failed")
         await add_line_chain(
             adapter,
             [
@@ -283,7 +288,7 @@ async def build_91255A106(adapter, truth=None):
         await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=False)),
     )
     name_last_feature(adapter, "Body")
-    v = revolved_volume()
+    v = revolved_volume(d)
     v = await volume_check(adapter, "revolved body", v, 0.005 * v)
 
     # --- hex socket: blind cut down from the flat top -----------------------
@@ -318,10 +323,10 @@ async def build_91255A106(adapter, truth=None):
         0, 0.0, False, False,
     )
     if feat is None:
-        raise RuntimeError(f"{PART_NO} hex socket cut failed")
+        raise RuntimeError(f"{part_no} hex socket cut failed")
     name_last_feature(adapter, "HexSocket")
     v = await volume_check(
-        adapter, "hex socket", v - socket_volume(), 0.01 * socket_volume()
+        adapter, "hex socket", v - socket_volume(d), 0.01 * socket_volume(d)
     )
 
     # --- 60 deg countersink from the hex's corner circle (revolved cut) -----
@@ -337,7 +342,7 @@ async def build_91255A106(adapter, truth=None):
             )
             is None
         ):
-            raise RuntimeError(f"{PART_NO} countersink: CreateCenterLine failed")
+            raise RuntimeError(f"{part_no} countersink: CreateCenterLine failed")
         await add_line_chain(
             adapter,
             [
@@ -354,7 +359,7 @@ async def build_91255A106(adapter, truth=None):
     )
     name_last_feature(adapter, "SocketCountersink")
     v = await volume_check(
-        adapter, "socket countersink", v - countersink_volume(), 0.02
+        adapter, "socket countersink", v - countersink_volume(d), 0.02
     )
 
     # --- fillets on both band edges -----------------------------------------
@@ -366,7 +371,7 @@ async def build_91255A106(adapter, truth=None):
         ),
     )
     name_last_feature(adapter, "BandFillets")
-    await volume_check(adapter, "band fillets", v - edge_fillet_volume(), 0.02)
+    await volume_check(adapter, "band fillets", v - edge_fillet_volume(d), 0.02)
 
     # --- split at the bearing face (scopes the sweep) -----------------------
     body_boxes = split_at_plane(adapter, "Top Plane", "HeadSplit")
@@ -376,7 +381,7 @@ async def build_91255A106(adapter, truth=None):
         if box and box[1] < -1.0:  # extends below the bearing face
             shank_name = b["name"]
     if not shank_name:
-        raise RuntimeError(f"{PART_NO} split produced no shank body")
+        raise RuntimeError(f"{part_no} split produced no shank body")
     _telemetry.info(f"shank body: {shank_name}")
 
     # --- helix: tip-seeded, L + P up, right hand ----------------------------
@@ -389,7 +394,7 @@ async def build_91255A106(adapter, truth=None):
             )
             is None
         ):
-            raise RuntimeError(f"{PART_NO} helix seed circle failed")
+            raise RuntimeError(f"{part_no} helix seed circle failed")
     insert_helix(
         adapter,
         d.pitch,
@@ -426,7 +431,7 @@ async def build_91255A106(adapter, truth=None):
     sk2 = adapter.currentSketchManager
     with no_sketch_inference(adapter):
         if sk2.CreateCenterLine(0.0, 0.0, 0.0, 0.0, -neck_h / 1000.0, 0.0) is None:
-            raise RuntimeError(f"{PART_NO} neck: CreateCenterLine failed")
+            raise RuntimeError(f"{part_no} neck: CreateCenterLine failed")
         await add_line_chain(
             adapter,
             [
@@ -445,8 +450,13 @@ async def build_91255A106(adapter, truth=None):
     name_last_feature(adapter, "ThreadNeck")
 
 
-async def build_catalog(adapter) -> dict[str, str]:
-    """Catalog-only run: build the recipe and save it, no vendor truth."""
+async def build_91255A106(adapter, truth=None):
+    await build_button_head(adapter, DIMS)
+
+
+async def catalog_run(adapter, d: ButtonHeadScrew, author) -> dict[str, str]:
+    """Catalog-only run of ``author`` (the recipe for ``d``): build it and
+    save it, no vendor truth."""
     from diagnostics.diag_mcmaster_lib import (
         OUT_DIR,
         assert_seat_sketch_baseline,
@@ -455,23 +465,29 @@ async def build_catalog(adapter) -> dict[str, str]:
         mass_properties,
     )
 
-    with _telemetry.span("catalog.build", label=PART_NO):
-        check(f"create_part {PART_NO}", await adapter.create_part())
-        assert_seat_sketch_baseline(adapter, PART_NO)
-        await build_91255A106(adapter)
+    part_no = d.part_no
+    with _telemetry.span("catalog.build", label=part_no):
+        check(f"create_part {part_no}", await adapter.create_part())
+        assert_seat_sketch_baseline(adapter, part_no)
+        await author(adapter)
         props = mass_properties(adapter)
         if not props["volume_mm3"] > 0.0:
-            raise RuntimeError(f"{PART_NO} catalog build has no solid volume")
+            raise RuntimeError(f"{part_no} catalog build has no solid volume")
         OUT_DIR.mkdir(parents=True, exist_ok=True)
-        path = OUT_DIR / f"{PART_NO}-catalog.SLDPRT"
+        path = OUT_DIR / f"{part_no}-catalog.SLDPRT"
         check(f"save -> {path}", await adapter.save_file(str(path.resolve())))
         artefacts = {"sldprt": str(path)}
-        artefacts.update(await export_views(adapter, f"{PART_NO}-catalog"))
+        artefacts.update(await export_views(adapter, f"{part_no}-catalog"))
         _telemetry.success(
-            f"{PART_NO} catalog build saved: volume {props['volume_mm3']:.4f} mm^3"
+            f"{part_no} catalog build saved: volume {props['volume_mm3']:.4f} mm^3"
         )
         await close_all(adapter)
     return artefacts
+
+
+async def build_catalog(adapter) -> dict[str, str]:
+    """Catalog-only run: build the recipe and save it, no vendor truth."""
+    return await catalog_run(adapter, DIMS, build_91255A106)
 
 
 if __name__ == "__main__":

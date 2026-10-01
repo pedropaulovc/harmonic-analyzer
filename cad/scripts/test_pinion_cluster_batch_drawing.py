@@ -296,13 +296,14 @@ def test_cross_numbered_fit_pairs_use_fixed_runtime_oracles() -> None:
             (f"fillister-screw-{screw_number}", f"platen-guide-{guide_number}")
         )
         assert paper_drive[pair] == pytest.approx(limit)
-    # R9-31: the lock-plate screws are MHA-176 button heads, not fillisters.
+    # R9-31: the lock-plate screws are MHA-176 button heads, not fillisters;
+    # R9-48: 3/8 long, 7.525 of each in the guide's through tap.
     lock_receivers = {1: 1, 2: 1, 3: 2, 4: 1, 5: 2, 6: 2, 7: 1, 8: 2}
     for screw_number, guide_number in lock_receivers.items():
         pair = frozenset(
             (f"guide-lock-screw-{screw_number}", f"platen-guide-{guide_number}")
         )
-        assert paper_drive[pair] == pytest.approx(11.20210690940073)
+        assert paper_drive[pair] == pytest.approx(19.378357354767928)
 
     summing = _interference_contracts.allowed_interference_pairs("summing")
     assert summing == pytest.approx(
@@ -497,7 +498,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 "platen-guide",
                 2.8448,
                 2.261,
-                4.35,
+                7.525,
             ),
             **_expected_numbered_pairs(
                 "guide-lock-screw",
@@ -505,7 +506,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 "platen-guide",
                 2.8448,
                 2.261,
-                4.35,
+                7.525,
                 second_number=2,
             ),
             # Round 10 transgear: stock #8-32 / #4-40 / #0-80 screws, the
@@ -541,7 +542,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 "rack-pinion",
                 1.524,
                 1.191,
-                3.0,
+                2.9,
             ),
             frozenset(
                 ("transgear-knob-retaining-screw-1", "transgear-knob-shaft-1")
@@ -558,7 +559,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             ),
             frozenset(
                 ("transgear-thumbnut-1", "transgear-knob-shaft-1")
-            ): _annulus_limit(6.35, 5.105, 14.9),
+            ): _annulus_limit(6.22, 5.105, 14.9),
             # MHA-155 3/32 x 3/16 dowels pressed 2.3625 into MHA-177's 2.38 reams.
             **_expected_numbered_pairs(
                 "transgear-knob-drive-pin",

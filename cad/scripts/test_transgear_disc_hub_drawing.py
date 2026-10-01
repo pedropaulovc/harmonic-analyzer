@@ -100,9 +100,9 @@ def test_the_bore_keeps_its_press_on_the_sleeve_shank_at_every_printed_limit() -
     # Both at .XXX ±0.13 ran from 0.26 clearance to 0.26 interference.
     assert least >= 0.010 - 1e-9
     assert (least, greatest) == pytest.approx(spec.PRESS_INTERFERENCE)
-    callout = drawing.DIMENSION_CALLOUTS_BELOW["BoreDia"]
+    callout = " ".join(drawing.DIMENSION_CALLOUTS_BELOW["BoreDia"].split())
     assert f"{least:.3f}-{greatest:.3f} DIAMETRAL INTERFERENCE" in callout
-    assert f"PRESS ON {sleeve.SLEEVE_NUMBER} SHANK" in callout
+    assert f"INTERFERENCE ON {sleeve.SLEEVE_NUMBER}" in callout
 
 
 def test_walls_hold_at_the_worst_case_the_sheet_prints() -> None:

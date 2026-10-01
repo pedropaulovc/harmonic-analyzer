@@ -213,9 +213,32 @@ def test_pivot_engagement_starts_below_the_vendor_thread_neck(monkeypatch) -> No
 
 def test_the_shallowest_printed_hole_still_grips_the_pressed_pin(monkeypatch) -> None:
     assert joints.LATCH_PIN_ENGAGEMENT_WORST_D >= latch_pin.PRESS_ENGAGEMENT_MIN_D
-    # A depth band of 1.0 leaves (6.05 - 1.0 - 0.443) / 3.175 = 1.45 D.
-    monkeypatch.setattr(arm, "PIN_HOLE_DEPTH_BAND", 1.0)
+    # A depth band of 3.6 leaves (8.50 - 3.6 - 0.443) / 3.175 = 1.40 D.
+    monkeypatch.setattr(arm, "PIN_HOLE_DEPTH_BAND", 3.6)
     with pytest.raises(AssertionError, match="grips the latch pin"):
+        _reload_joints()
+
+
+def test_the_proud_range_counts_the_depth_row_and_the_pin_length_grade() -> None:
+    """R9-50: 22.225 -/+ 0.010 in - (8.50 +/- 0.51), printed 12.96 TO 14.49."""
+    grade = 0.010 * 25.4
+    low = 7 / 8 * 25.4 - grade - (8.50 + 0.51)
+    high = 7 / 8 * 25.4 + grade - (8.50 - 0.51)
+    assert joints.LATCH_PIN_PROUD_RANGE == pytest.approx((low, high), abs=1e-9)
+    assert f"{low:.2f} TO {high:.2f}" == "12.96 TO 14.49"
+
+
+def test_the_far_face_gate_refuses_the_three_quarter_pin(monkeypatch) -> None:
+    """R9-50: the 3/4 dowel in the 6.05 hole stopped 0.42 short of the strip's
+    far face with the flap's 1 deg bend and the length grade; the gate refuses
+    it and accepts the 7/8 pin in the 8.50 hole."""
+    assert joints.LATCH_PIN_FAR_FACE_MARGIN_WORST > 0.3
+    monkeypatch.setattr(latch_pin, "LENGTH", 0.75 * 25.4)
+    monkeypatch.setattr(latch_pin, "PROUD", 0.75 * 25.4 - 6.05)
+    monkeypatch.setattr(arm, "PIN_HOLE_DEPTH", 6.05)
+    with pytest.raises(
+        AssertionError, match=r"MHA-169 pin / MHA-127 strip far face.* 0\.419 short"
+    ):
         _reload_joints()
 
 

@@ -20,7 +20,7 @@ rear face, the face that seats on the disc's front face; the flange runs
 z = -2.4..0 and the hub body z = -9.4..-2.4, so local -Z is the machine's
 -Z (toward the operator).  Screw 0° is local +X, angles counter-clockwise
 seen from +Z; the oil hole is on local +Y at z = -5.9, 3.5 behind the hub's
-front face.  The part sits in the machine unrotated at z0 = -147.4.
+front face.  The part sits in the machine unrotated at z0 = -147.65.
 
 Pure data; no SolidWorks calls.
 """
@@ -199,11 +199,15 @@ OIL_HOLE_CALLOUT_BELOW = "\n".join(
     )
 )
 # The bore's native limits print with the dimension; the callout adds the
-# process, names the mate and states the interference the pair gives.
+# process, names the mate and states the interference the pair gives, in the
+# crank hub's three short lines: a wider block hangs its leader off the
+# block's far corner, across the hub diameter's shoulder (native leaf
+# fc9c2d700, shoulder-crosses-line).
 BORE_CALLOUT = "\n".join(
     (
-        f"REAM THRU, PRESS ON {SLEEVE_NUMBER} SHANK",
-        f"{PRESS_INTERFERENCE[0]:.3f}-{PRESS_INTERFERENCE[1]:.3f} DIAMETRAL INTERFERENCE",
+        "REAM THRU",
+        f"({PRESS_INTERFERENCE[0]:.3f}-{PRESS_INTERFERENCE[1]:.3f} DIAMETRAL",
+        f"INTERFERENCE ON {SLEEVE_NUMBER})",
     )
 )
 

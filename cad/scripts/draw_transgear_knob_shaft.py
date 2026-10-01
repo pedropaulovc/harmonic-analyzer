@@ -2,11 +2,12 @@ r"""Create the manufacturing drawing for the transgear knob shaft (MHA-078).
 
 A side view, the rear end view and an isometric.  The side view (``*Right``,
 model +Z running left) carries every turned size beside its axial extent
-(rule 7): the tooth-tip, core and journal diameters above the shaft, and the
-lengths below it baselined from F, the 12T's front face (the stud stations)
-and from the 12T's rear face (the journal).  The 1/4-20 thread is a callout on
-the plain Ø6.35 blank; its full-thread end is the PlainCore station and the
-die's run-out rides in the manufacturing notes, with the form cutter's
+(rule 7): the tooth-tip, core, relief, thread-blank and journal diameters
+above the shaft, and the lengths below it baselined from F, the 12T's front
+face (the stud stations) and from the 12T's rear face (the journal).  The
+1/4-20 thread is a callout on the Ø6.22 blank; its full-thread end is the
+PlainCore station, on the thread relief's front shoulder, and the core ends
+at the CoreLength station.  The manufacturing notes carry the form cutter's
 full-depth station and run-out limit.  The rear end view (``*Front``, looking
 at the rear face) carries the native #8-32 blind-tap callout with its entry
 countersink named under the thread line.  All dimensions import natively
@@ -45,6 +46,7 @@ from _surface_finish import surface_finish_by_key
 from transgear_knob_shaft_spec import (
     CHAMFER_CALLOUT,
     CORE_DIA,
+    CORE_LENGTH,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FACE_WIDTH,
@@ -104,27 +106,36 @@ def _sheet_y(radius_mm: float) -> float:
 REAR_X = _sheet_x(REAR_END_Z)
 PINION_REAR_X = _sheet_x(FACE_WIDTH)
 F_X = _sheet_x(0.0)
+CORE_END_X = _sheet_x(-CORE_LENGTH)
 THREAD_END_X = _sheet_x(-PLAIN_CORE)
 TIP_X = _sheet_x(TIP_Z)
 # Where the thread blank meets the tip chamfer.
 CHAMFER_START_X = _sheet_x(-(TIP_STATION - TIP_CHAMFER))
 HALF_OD = OUTSIDE_DIA * _S / 2000.0
 
-# Diameters stand above the shaft over their own spans; the lengths stack
-# below it, 15 mm apart: row 0 carries the face width, the full-thread end
-# from F and the journal length from the 12T's rear face; row 1 the stud tip
-# from F.  The tip chamfer's leg reads under the tip with its 45-degree
-# callout.
+# Diameters stand above the shaft over their own spans (the narrow relief's
+# one step higher, clear of the core's); the lengths stack below it, 15 mm
+# apart: row 0 carries the face width, the core length from F and the
+# journal length from the 12T's rear face; row 1 the full-thread end from F;
+# row 2 the stud tip from F.  The tip chamfer's leg reads under the tip with
+# its 45-degree callout.
 _ABOVE_Y = SIDE_CENTER[1] + HALF_OD + 0.016
-_ROW_Y = (SIDE_CENTER[1] - HALF_OD - 0.016, SIDE_CENTER[1] - HALF_OD - 0.031)
+_ROW_Y = (
+    SIDE_CENTER[1] - HALF_OD - 0.016,
+    SIDE_CENTER[1] - HALF_OD - 0.031,
+    SIDE_CENTER[1] - HALF_OD - 0.046,
+)
 SIDE_KEEP: dict[str, tuple[float, float]] = {
     "OutsideDia": ((F_X + PINION_REAR_X) / 2.0, _ABOVE_Y),
-    "CoreDia": ((F_X + THREAD_END_X) / 2.0, _ABOVE_Y),
+    "CoreDia": ((F_X + CORE_END_X) / 2.0, _ABOVE_Y),
+    "ReliefDia": ((CORE_END_X + THREAD_END_X) / 2.0, _ABOVE_Y + 0.010),
+    "ThreadBlankDia": ((THREAD_END_X + CHAMFER_START_X) / 2.0, _ABOVE_Y),
     "JournalDia": ((PINION_REAR_X + REAR_X) / 2.0, _ABOVE_Y),
     "FaceWidth": ((F_X + PINION_REAR_X) / 2.0, _ROW_Y[0]),
-    "PlainCore": ((F_X + THREAD_END_X) / 2.0, _ROW_Y[0]),
+    "CoreLength": ((F_X + CORE_END_X) / 2.0, _ROW_Y[0]),
+    "PlainCore": ((F_X + THREAD_END_X) / 2.0, _ROW_Y[1]),
     "JournalLength": ((PINION_REAR_X + REAR_X) / 2.0, _ROW_Y[0]),
-    "TipStation": ((F_X + TIP_X) / 2.0, _ROW_Y[1]),
+    "TipStation": ((F_X + TIP_X) / 2.0, _ROW_Y[2]),
     "TipChamfer": (TIP_X + 0.012, SIDE_CENTER[1] - HALF_OD),
 }
 END_KEEP: dict[str, tuple[float, float]] = {}

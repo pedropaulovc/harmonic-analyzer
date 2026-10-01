@@ -165,9 +165,9 @@ def test_platen_guide_hole_stations_match_native_wizard_features() -> None:
         tuple(guide.GUIDE_LENGTH * fraction for fraction in (0.1, 0.3, 0.5, 0.7, 0.9))
     )
     source = Path(guide.__file__).read_text(encoding="utf-8")
-    assert source.count("replace(") == 1
     assert source.count("TAPPED_HOLE_SPEC,") == 1
     assert "screw_spec = TAPPED_HOLE_SPEC" in source
+    assert "lock_spec = LOCK_TAP_SPEC" in source
     assert '"tapped_bottoming", "#4-40"' not in source
 
 
@@ -181,22 +181,46 @@ def test_drawing_splits_front_and_rear_blind_tap_tables() -> None:
     assert "for station in THROUGH_X" in source
 
 
-def test_platen_guide_blind_taps_keep_drill_depth_and_engagement_distinct() -> None:
-    assert guide.LOCK_SCREW_HOLE_DEPTH == pytest.approx(
-        guide.LOCK_SCREW_THREAD_ENGAGEMENT + guide.LOCK_SCREW_BOTTOM_CLEARANCE
-    )
+def test_platen_guide_front_taps_keep_drill_depth_and_engagement_distinct() -> None:
     assert guide.SCREW_HOLE_DEPTH == pytest.approx(
         guide.GUIDE_SCREW_THREAD_ENGAGEMENT + guide.GUIDE_SCREW_BOTTOM_CLEARANCE
     )
-    assert guide.LOCK_SCREW_BOTTOM_CLEARANCE > 0.0
     assert guide.GUIDE_SCREW_BOTTOM_CLEARANCE > 0.0
-    assert guide.LOCK_TAPPED_HOLE_SPEC.end == "blind"
-    assert guide.LOCK_TAPPED_HOLE_SPEC.depth_mm == pytest.approx(
-        guide.LOCK_SCREW_HOLE_DEPTH
+
+
+# R9-48: the lock receivers are #4-40 taps THROUGH the rail, so no depth band
+# can starve the 3/8 lock screws. Recomputed here from the catalogue and the
+# printed bands, not from the build's derived constants.
+_IN = 25.4
+_LOCK_SCREW_LEN_MAX = 0.375 * _IN  # 91255A108; B18.6.3 band +0/-0.03 in
+_LOCK_THICK_MIN = 2.0 - 0.13  # 2.000 at 3 places: title block +/-0.13
+_GUIDE_DEPTH_MIN = 10.0 - 0.50  # 10.00 +0/-0.50 on the guide sheet
+_BAR_DEPTH_MIN = 9.0 - 0.13  # MHA-074 9.00 +/-0.13
+_LOCK_GAP_FIT_MIN = 0.05  # the faced lock seats (R9-47)
+
+
+def test_lock_receivers_are_through_taps_that_hold_the_screw_tip() -> None:
+    spec = guide.LOCK_TAP_SPEC
+    assert (spec.kind, spec.size, spec.end) == ("tapped", "#4-40", "through_all")
+    assert spec.depth_mm == 0.0 and not spec.overrides_mm
+    seat_min = min(_GUIDE_DEPTH_MIN, _BAR_DEPTH_MIN + _LOCK_GAP_FIT_MIN)
+    tip_reach_max = _LOCK_SCREW_LEN_MAX - _LOCK_THICK_MIN
+    assert seat_min - tip_reach_max == pytest.approx(1.265, abs=1e-9)
+    assert guide.LOCK_SCREW_TIP_INSIDE_MIN == pytest.approx(seat_min - tip_reach_max)
+
+
+def test_lock_through_tap_exits_clear_the_front_taps() -> None:
+    # Each through tap exits the platen-mating face 7.0 from a front tap:
+    # both majors at the 9X Ø0.20 position, both mouths broken 0.25.
+    c2c = min(
+        abs(lock - front)
+        for lock in (80.892 - 7.0, 80.892 + 7.0, 188.748 - 7.0, 188.748 + 7.0)
+        for front in (26.964, 80.892, 134.82, 188.748, 242.676)
     )
-    assert guide.LOCK_TAPPED_HOLE_SPEC.overrides_mm["ThreadDepth"] == pytest.approx(
-        guide.LOCK_SCREW_THREAD_ENGAGEMENT
-    )
+    wall = c2c - 0.20 - THREAD_MAJOR_MM["#4-40"] - 2.0 * 0.25
+    assert wall == pytest.approx(3.455, abs=1e-3)
+    assert wall >= 1.5
+    assert guide.LOCK_TAP_EXIT_WALL_MIN == pytest.approx(wall)
 
 
 def test_drawing_contract_imports_without_pywin32() -> None:

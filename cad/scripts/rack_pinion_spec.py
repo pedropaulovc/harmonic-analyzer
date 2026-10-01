@@ -34,12 +34,7 @@ from transgear_disc_hub_geometry import (
     SCREW_THREAD,
     screw_centres,
 )
-from transgear_disc_hub_spec import (
-    FLANGE_THICK,
-    FLANGE_THICK_PLACES,
-    SCREW_HOLE_DIA,
-    SCREW_SKU,
-)
+from transgear_disc_hub_spec import SCREW_HOLE_DIA, SCREW_SKU
 
 MM_PER_IN = 25.4
 
@@ -131,39 +126,13 @@ if CSK_DIA <= TAP_MAJOR:
 CSK_LEG = (CSK_DIA - TAP_DRILL_DIA) / 2.0
 REAR_BREAK_MAX = 0.05
 
-# --- engagement of MHA-161 in the disc (contract §7) ---------------------------
-# The screw runs through the whole disc (its tip stands past the rear face),
-# so the full thread is the disc less the countersink's thread loss and the
-# rear burr break.
+# --- the tap's thread losses (contract §7) -------------------------------------
+# The MHA-161 screws are cut to fit at assembly (R9-47): their tips stop
+# inside the rear face, so the joint's engagement, the cut window and the
+# stock's reach are judged in transgear_disc_screw_spec from these losses.
 ENGAGEMENT_FLOOR_D = 1.5
 CSK_THREAD_LOSS = (CSK_DIA - TAP_MAJOR) / 2.0
 CSK_THREAD_LOSS_WORST = (CSK_DIA_MAX - TAP_MAJOR) / 2.0
-ENGAGEMENT_NOMINAL = FACE_WIDTH - CSK_THREAD_LOSS - REAR_BREAK_MAX
-ENGAGEMENT_WORST = FACE_WIDTH_MIN - CSK_THREAD_LOSS_WORST - REAR_BREAK_MAX
-ENGAGEMENT_NOMINAL_D = ENGAGEMENT_NOMINAL / SCREW_MAJOR_DIA
-ENGAGEMENT_WORST_D = ENGAGEMENT_WORST / SCREW_MAJOR_DIA
-if ENGAGEMENT_WORST_D < ENGAGEMENT_FLOOR_D - 1e-9:
-    raise AssertionError(
-        f"MHA-161 engages MHA-070 {ENGAGEMENT_WORST_D:.3f} D worst, under "
-        f"{ENGAGEMENT_FLOOR_D} D"
-    )
-
-# Screw tip past the disc's rear face: 6.35 under the head, less the flange
-# and the disc.  At the shortest reach the tip still clears the rear face by
-# more than one pitch, so the screw's incomplete end thread never sits in the
-# disc.  The platen air behind it is the assembly's.
-_FLANGE_BAND = _BAND[FLANGE_THICK_PLACES]
-SCREW_TIP_PAST_REAR = SCREW_LENGTH - FLANGE_THICK - FACE_WIDTH
-SCREW_TIP_PAST_REAR_MIN = SCREW_LENGTH - (FLANGE_THICK + _FLANGE_BAND) - FACE_WIDTH_MAX
-SCREW_TIP_PAST_REAR_MAX = SCREW_LENGTH - (FLANGE_THICK - _FLANGE_BAND) - FACE_WIDTH_MIN
-if abs(SCREW_TIP_PAST_REAR - 0.95) > 1e-9:
-    raise AssertionError(
-        f"disc-screw tip moved: {SCREW_TIP_PAST_REAR:.3f} past the rear face"
-    )
-if SCREW_TIP_PAST_REAR_MIN < SCREW_PITCH:
-    raise AssertionError(
-        "the disc screw's incomplete end thread can sit inside the disc"
-    )
 
 # --- tap to bore wall (contract §8) ---------------------------------------------
 # The disc prints no tap position, so its worst case is the transfer chain:

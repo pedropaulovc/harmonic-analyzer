@@ -1500,7 +1500,7 @@ _GRANDFATHERED_BUILDER_EDGES = {
         "dtrefactor: reads CLIP_LENGTH, CLIP_THICKNESS, HOLE_DIA, HOLE_INSET, HOLE_Y, SCREW_SEAT_BOSS_H, SCREW_SEAT_DIA, SCREW_SEAT_STACK"
     ),
     ("build_paper_drive_assembly.py", "build_platen_guide"): (
-        "dtrefactor: reads GUIDE_DEPTH, GUIDE_HEIGHT, GUIDE_LENGTH, GUIDE_SCREW_BOTTOM_CLEARANCE, GUIDE_SCREW_PASSAGE, GUIDE_SCREW_THREAD_ENGAGEMENT, HOLE_X, LOCK_SCREW_BOTTOM_CLEARANCE, LOCK_SCREW_PASSAGE, LOCK_SCREW_THREAD_ENGAGEMENT, LOCK_STATION_X, SCREW_STATION_X"
+        "dtrefactor: reads GUIDE_DEPTH, GUIDE_HEIGHT, GUIDE_LENGTH, GUIDE_SCREW_BOTTOM_CLEARANCE, GUIDE_SCREW_PASSAGE, GUIDE_SCREW_THREAD_ENGAGEMENT, HOLE_X, LOCK_SCREW_PASSAGE, LOCK_SCREW_THREAD_ENGAGEMENT, LOCK_SCREW_TIP_INSIDE_MIN, LOCK_STATION_X, SCREW_STATION_X"
     ),
     ("build_paper_drive_assembly.py", "build_platen_paper"): (
         "dtrefactor: reads PAPER_HEIGHT, PAPER_WIDTH"
@@ -2652,7 +2652,8 @@ def test_interference_contracts_do_not_depend_on_the_crankshaft_spec() -> None:
         # Reads through an imported listed module.
         ("build_boss_hook.py", True),
         ("build_spring_hook.py", True),
-        ("build_platen_guide.py", False),
+        # R9-48: judges its lock taps at the printed worst case.
+        ("build_platen_guide.py", True),
     ],
 )
 def test_reads_title_block_geometry_covers_root_and_closure(script, expected):

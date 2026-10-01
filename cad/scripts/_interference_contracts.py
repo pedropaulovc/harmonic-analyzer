@@ -355,8 +355,8 @@ _CROSS_PIN_CORE_MM3 = _cross_pin_overlap_mm3(
 # the MHA-169 dowel in the arm's Ø3.175 ream, the stud journal in the sleeve
 # bore (Ø3.9), the disc bore on the spigot (Ø10), the knob journal in the
 # plate bore (Ø8.5), the collar bore on the core (Ø6.35), the MHA-175 rivets
-# (Ø1.5875) in the Ø1.6 hook and flap holes, the MHA-154 pin in the collar's
-# 1.7 slot, the MHA-155 dowels in the T24's Ø2.5 holes, and every screw in
+# (Ø1.5875) in the Ø1.65 hook and flap holes, the MHA-154 pin in the collar's
+# 1.8 slot, the MHA-155 dowels in the T24's Ø2.5 holes, and every screw in
 # its clearance hole.
 _PAPER_DRIVE_ALLOWED_PAIRS = {
     **_numbered_pairs(
@@ -391,19 +391,20 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
         _smooth_annulus_limit_mm3(2.8448, 2.261, 5.2678),
         second_number=2,
     ),
-    # MHA-176 guide-lock screws (R9-31): seeds -1/-2, then the grid -3..-8;
-    # each 6.35 shank passes the 2.0 lock plate into the guide's rear tap.
+    # MHA-176 guide-lock screws (R9-31, R9-48): seeds -1/-2, then the grid
+    # -3..-8; each 9.525 shank passes the 2.0 lock plate into the guide's
+    # rear through tap.
     **_numbered_pairs(
         "guide-lock-screw",
         (1, 2, 4, 7),
         "platen-guide",
-        _smooth_annulus_limit_mm3(2.8448, 2.261, 4.35),
+        _smooth_annulus_limit_mm3(2.8448, 2.261, 7.525),
     ),
     **_numbered_pairs(
         "guide-lock-screw",
         (3, 5, 6, 8),
         "platen-guide",
-        _smooth_annulus_limit_mm3(2.8448, 2.261, 4.35),
+        _smooth_annulus_limit_mm3(2.8448, 2.261, 7.525),
         second_number=2,
     ),
     # MHA-166 #8-32 x 5/8 (transgear_arm_plate_screw_spec; from the top of the
@@ -435,9 +436,10 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
         "support-bar",
         _smooth_annulus_limit_mm3(2.8448, 2.261, 9.525 - 1.5),
     ),
-    # MHA-082's rear #10-32 (transgear_stub_spec), a plain 4.826 cylinder 8.0
-    # long from the collar face, fills the arm's #21 through tap over the
-    # whole 7.9375 stock (the taps' countersinks only shrink it).
+    # MHA-082's rear #10-32 (transgear_stub_spec), a plain 4.826 cylinder
+    # 9.25 long from the collar face as fitted (R9-47), fills the arm's #21
+    # through tap over the whole 7.9375 stock (the taps' countersinks only
+    # shrink it).
     frozenset(("transgear-stub-1", "transgear-arm-1")): _smooth_annulus_limit_mm3(
         4.826, 4.0386, 7.9375
     ),
@@ -448,13 +450,14 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
         3.505, 2.705, 5.8 - 1.1
     ),
     # MHA-161 #0-80 x 1/4 (transgear_disc_screw_spec) through the hub
-    # flange's Ø1.7 clearance, then the whole 3.0 face of the disc's 3/64 taps
-    # (rack_pinion_spec).
+    # flange's Ø1.7 clearance into the disc's 3/64 taps (rack_pinion_spec),
+    # cut at assembly (R9-47) to 5.3 under the head: 5.3 - 2.4 = 2.9 of the
+    # 3.0 face.
     **_numbered_pairs(
         "transgear-disc-screw",
         range(1, 4),
         "rack-pinion",
-        _smooth_annulus_limit_mm3(1.524, 1.191, 3.0),
+        _smooth_annulus_limit_mm3(1.524, 1.191, 5.3 - 2.4),
     ),
     # MHA-158 #8-32 x 7/16 (transgear_knob_retaining_screw_spec, 11.1125
     # under the head) on the MHA-157 cup's 2.6 floor: 11.1125 - 2.6 = 8.5125
@@ -478,13 +481,14 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
         1.10 * 5.26003719e-05
     ),
     # MHA-126's 1/4-20 tap drill 5.105 (transgear_thumbnut_spec) on MHA-078's
-    # plain Ø6.35 stud at the nominal collar setting: the tip 23.9 in front
+    # Ø6.22 thread blank at the nominal collar setting: the tip 23.9 in front
     # of F, the nut seated on the T24's front face 6.2 (collar set,
     # transgear_drive_collar_spec) + 2.8 (plate, transgear_removable_spec)
-    # in front of F, so 23.9 - 6.2 - 2.8 = 14.9.
+    # in front of F, so 23.9 - 6.2 - 2.8 = 14.9, all on the blank (it starts
+    # 7.5 in front of F, behind the nut's seat at 9.0).
     frozenset(
         ("transgear-thumbnut-1", "transgear-knob-shaft-1")
-    ): _smooth_annulus_limit_mm3(6.35, 5.105, 23.9 - 6.2 - 2.8),
+    ): _smooth_annulus_limit_mm3(6.22, 5.105, 23.9 - 6.2 - 2.8),
     # The cross pin's whole tube chord through the core (above).
     frozenset(("transgear-collar-cross-pin-1", "transgear-knob-shaft-1")): 1.10
     * _CROSS_PIN_CORE_MM3,

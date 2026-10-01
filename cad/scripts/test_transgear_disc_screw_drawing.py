@@ -172,7 +172,7 @@ class _Recorder:
         return await self._async("add_fillet", *args)
 
 
-def _record(monkeypatch) -> tuple[_Recorder, list[tuple]]:
+def _record(monkeypatch, **cut) -> tuple[_Recorder, list[tuple]]:
     adapter = _Recorder()
 
     def logger(name, result=None):
@@ -202,7 +202,7 @@ def _record(monkeypatch) -> tuple[_Recorder, list[tuple]]:
     monkeypatch.setattr(entry, "add_line_chain", add_line_chain)
     monkeypatch.setattr(entry, "no_sketch_inference", no_inference)
     monkeypatch.setattr(_telemetry, "info", lambda *a, **k: None)
-    asyncio.run(entry.build_91794A055(adapter))
+    asyncio.run(entry.build_91794A055(adapter, **cut))
     return adapter, adapter.events
 
 
@@ -280,6 +280,38 @@ def test_runout_swallows_the_neck_under_the_bearing_face(monkeypatch) -> None:
     assert x1 == pytest.approx(screw.ROOT_DIA / 2.0)
 
 
+def test_recipe_draws_the_screw_cut_to_fit_as_installed(monkeypatch) -> None:
+    """R9-47: the part is modelled cut, its end broken in place of the factory
+    tip chamfer; the thread stays the vendor's, seeded on the factory tip."""
+    cut = {"cut_length": screw.CUT_LENGTH, "cut_end_break": screw.CUT_END_BREAK_MAX}
+    _adapter, calls = _record(monkeypatch, **cut)
+    profile, *_rest = _chains(calls)
+    length, brk = screw.CUT_LENGTH, screw.CUT_END_BREAK_MAX
+    major_r = screw.SHANK_DIA / 2.0
+    assert [v for point in profile[5:8] for v in point] == pytest.approx(
+        [major_r, -(length - brk), major_r - brk, -length, 0.0, -length]
+    )
+    (revolve_check,) = [c for c in calls if c[0] == "volume_check"]
+    assert revolve_check[1][1] == pytest.approx(entry.revolved_volume(**cut))
+    assert entry.revolved_volume(**cut) < entry.revolved_volume()
+    assert ("offset_plane", (_adapter, "TipPlane", -screw.SHANK_LEN), {}) in calls
+
+
+@pytest.mark.parametrize(
+    ("cut_length", "cut_end_break"),
+    [
+        (screw.CUT_LENGTH, None),  # half a cut
+        (None, screw.CUT_END_BREAK_MAX),
+        (screw.SHANK_LEN, screw.CUT_END_BREAK_MAX),  # not short of the stock tip
+        (screw.CUT_LENGTH, 0.0),  # an unbroken end
+        (screw.NECK_LEN, screw.CUT_END_BREAK_MAX),  # no shank left
+    ],
+)
+def test_recipe_refuses_a_cut_it_cannot_draw(cut_length, cut_end_break) -> None:
+    with pytest.raises(ValueError):
+        entry.revolved_volume(cut_length, cut_end_break)
+
+
 def test_stock_build_uses_its_registered_recipe_head_up_on_the_origin(
     monkeypatch,
 ) -> None:
@@ -307,6 +339,10 @@ def test_stock_build_uses_its_registered_recipe_head_up_on_the_origin(
     (component,) = seen["components"]
     assert component.sku == screw.SKU
     assert component.author is entry.build_91794A055
+    assert component.parameters == {
+        "cut_length": screw.CUT_LENGTH,
+        "cut_end_break": screw.CUT_END_BREAK_MAX,
+    }
     assert component.transform.translation_mm == (0.0, 0.0, 0.0)
     assert component.transform.rotation_radians == (0.0, 0.0, 0.0)
     assert seen["material"] == part.SPEC.material
@@ -316,14 +352,23 @@ def test_stock_build_uses_its_registered_recipe_head_up_on_the_origin(
 _DIMENSION = re.compile(r"\d")
 
 
-def test_sheet_carries_no_installation_note_and_no_dimension_in_a_note() -> None:
-    """The purchased sheet prints only the registry's stock name, supplier and
-    SKU besides its fixed footer, so none of those may carry a size (Rule 6);
-    the 1.54 D worst engagement passes rule 12, so no installation line."""
+def test_sheet_states_the_cut_and_no_dimension_in_the_registry_names() -> None:
+    """The purchased sheet prints the registry's stock name, supplier and SKU
+    besides its fixed footer, so none of those may carry a size (Rule 6); the
+    installation note states the cut to fit (R9-47, as the paper-drive
+    assembly step prints it) and the cut end's break."""
     row = _config.parts(part.PART_NAME)
-    assert "installation_notes" not in row
     for field in ("title", "supplier", "finish"):
         assert not _DIMENSION.search(str(row[field])), (field, row[field])
+    lines = row["installation_notes"].splitlines()
+    assert len(lines) <= 4
+    assert all(len(line) <= 70 for line in lines), lines
+    flat = " ".join(lines)
+    assert (
+        f"CUT EACH TIP {screw.TIP_BELOW_REAR_FACE_TEXT} BELOW THE MHA-070 DISC "
+        "REAR FACE AT ASSEMBLY;"
+    ) in flat
+    assert f"BREAK THE CUT END {screw.CUT_END_BREAK_TEXT}." in flat
 
 
 def test_drawing_is_the_purchased_reference_sheet() -> None:

@@ -70,7 +70,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# A 17 x 8 x 19 bracket: 4:1 keeps the Ø1.6 rivet holes and their .XXX
+# A 17 x 8 x 19 bracket: 4:1 keeps the Ø1.65 rivet holes and their .XXX
 # positions legible; the three orthographic views fit the landscape sheet.
 SHEET_SCALE = (4.0, 1.0)
 VIEW_SCALE = (4, 1)

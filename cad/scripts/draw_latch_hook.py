@@ -53,7 +53,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# A 105 x 17 strip with Ø1.6 holes 3.9 apart: 3:1 keeps the rivet pair's
+# A 105 x 17 strip with Ø1.65 holes 3.9 apart: 3:1 keeps the rivet pair's
 # two .XXX dimensions legible and the whole strip on the landscape sheet.
 SHEET_SCALE = (3.0, 1.0)
 VIEW_SCALE = (3, 1)

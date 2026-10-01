@@ -66,6 +66,11 @@ THREAD = "1/4-20"
 TAP_SPEC = HoleSpec("tapped", THREAD)  # UNC-2B, through all
 TAP_DRILL_DIA = blind_cut_dia_mm(TAP_SPEC)
 THREAD_MAJOR = THREAD_MAJOR_MM[THREAD]
+# The smallest 1/4-20 UNC-2B minor diameter, 0.1960 in, ASME B1.1 as tabled
+# by Engineers Edge (read 2026-10-01,
+# https://www.engineersedge.com/thread_strength/internal_screw_threads_chart.htm):
+# where the nut stands over MHA-078's thread relief its crests clear it.
+TAP_MINOR_2B_MIN = 0.1960 * 25.4  # 4.978
 # 90° entry countersink at each end, 0.2 deep at the thread major: the first
 # full thread starts 0.2 in from the seat face.  The sheet prints the
 # countersink as a MAX so the thread it removes never exceeds the 0.2 the

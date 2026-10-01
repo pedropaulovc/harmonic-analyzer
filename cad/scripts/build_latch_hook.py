@@ -13,7 +13,7 @@ the strip runs toward local -X.  The profile is one closed sketch -- the top
 cut line, the outer edge (R855 then R495), the R5 full round, the inner edge
 (R485 then R845) -- with the template's inner radii, the tangency run and the
 tip run as its printed dimensions.  Extruded 0.6 along +Z (local +Z = machine
-+X, the face on the flap).  The Ø5.4 pin hole and the two Ø1.6 rivet holes
++X, the face on the flap).  The Ø5.4 pin hole and the two Ø1.65 rivet holes
 are cut from their own sketches, their runs measured from the top cut.
 
 Run (SolidWorks already open)::

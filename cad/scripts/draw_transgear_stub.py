@@ -10,8 +10,11 @@ The stud axis is model +Z, so the ``*Right`` view lays it horizontal as it
 sits in the lathe: model +Z runs to paper-LEFT, putting the #6-32 front end on
 the left and the #10-32 rear end on the right.  The side view shows hidden
 lines for the one hidden feature, the Ø5.40 face relief in the collar's rear
-face.  Axial stations baseline from the collar's rear face (the arm seat) and
-chain forward from the Ø9 step face.
+face.  The arm seat is faced to fit at assembly (R9-47), so the rear stations
+(the step, the face relief's floor, the rear thread's end) baseline from the
+Ø9 step face and the seat-to-step station prints as a REFERENCE under its
+turn-and-face callout; the journal and front thread chain forward from the
+step face.
 
 Run with SolidWorks open::
 
@@ -33,17 +36,21 @@ from _drawing_common import (
     add_surface_finish,
     add_view_centerline,
     assert_imported_precision,
+    dimension_name,
     finalize_drawing,
     new_project_drawing,
     offset_dimension_text,
     read_required_properties,
+    set_dimension_callouts,
     set_hidden_lines_removed,
     set_hidden_lines_visible,
+    set_reference_dimension,
     stamp_drawing_summary,
 )
 from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
+from paper_drive_assembly_steps import step_ref
 from transgear_stub_spec import (
     CAP_SHOULDER_STATION,
     COLLAR_DIA,
@@ -59,9 +66,11 @@ from transgear_stub_spec import (
     REAR_THREAD_LENGTH,
     REAR_THREAD_MAJOR,
     REAR_TIP_STATION,
+    REFERENCE_DIMENSIONS,
     RELIEF_END_STATION,
     SLEEVE_THRUST_STATION,
     SURFACE_FINISHES,
+    THRUST_STATION_CALLOUT,
     TIP_STATION,
 )
 from solidworks_mcp.adapters.solidworks.drawing import place_view
@@ -102,6 +111,7 @@ def _sheet_y(radius_mm: float) -> float:
 REAR_END_X = _sheet_x(-REAR_THREAD_LENGTH)
 SEAT_X = _sheet_x(0.0)
 COLLAR_FRONT_X = _sheet_x(COLLAR_LENGTH)
+FACE_RELIEF_FLOOR_X = _sheet_x(FACE_RELIEF_DEPTH)
 THRUST_X = _sheet_x(SLEEVE_THRUST_STATION)
 SHOULDER_X = _sheet_x(CAP_SHOULDER_STATION)
 RELIEF_END_X = _sheet_x(RELIEF_END_STATION)
@@ -112,25 +122,27 @@ COLLAR_TOP_Y = _sheet_y(COLLAR_DIA / 2.0)
 JOURNAL_TOP_Y = _sheet_y(JOURNAL_DIA / 2.0)
 RELIEF_MID_X = (SHOULDER_X + RELIEF_END_X) / 2.0
 
-# Axial rows below the profile, 15 mm apart: row 0 chains the rear thread
-# and the collar from the seat face and the journal from the step face; row 1
-# the step station from the seat face and the front thread from the shoulder.
-# Each row-1 extension line lands on a row-0 junction, so none crosses a
-# dimension line.
-_ROW_Y = (SIDE_CENTER[1] - 0.034, SIDE_CENTER[1] - 0.049)
+# Axial rows below the profile, 15 mm apart, nested on the step face: row 0
+# the step and the journal; row 1 the seat-to-step station (reference) and
+# the front thread from the shoulder; row 2 the rear thread's end.  Each
+# extension line lands on a junction of the rows above it, so none crosses
+# a dimension line.  Row 2's text stands over the rear thread, clear of the
+# reference station's two-line callout under row 1.
+_ROW_Y = (SIDE_CENTER[1] - 0.034, SIDE_CENTER[1] - 0.049, SIDE_CENTER[1] - 0.064)
 SIDE_KEEP = {
-    "RearThreadLength": ((REAR_END_X + SEAT_X) / 2.0, _ROW_Y[0]),
-    "CollarLength": ((SEAT_X + COLLAR_FRONT_X) / 2.0, _ROW_Y[0]),
+    "StepLength": ((COLLAR_FRONT_X + THRUST_X) / 2.0, _ROW_Y[0]),
     "JournalLength": ((THRUST_X + SHOULDER_X) / 2.0, _ROW_Y[0]),
     "ThrustStation": ((SEAT_X + THRUST_X) / 2.0, _ROW_Y[1]),
     "FrontThreadEnd": ((SHOULDER_X + FRONT_END_X) / 2.0, _ROW_Y[1]),
+    "RearThreadEnd": ((REAR_END_X + SEAT_X) / 2.0, _ROW_Y[2]),
     # The face relief (hidden) and the collar Ø stand right of the rear tip,
     # their extension lines clearing the #10-32 silhouette.
     "FaceReliefDia": (REAR_TIP_X + 0.012, SIDE_CENTER[1]),
     "CollarDia": (REAR_TIP_X + 0.026, SIDE_CENTER[1]),
-    "FaceReliefDepth": (
-        SEAT_X - FACE_RELIEF_DEPTH * _S / 2000.0,
-        COLLAR_TOP_Y + 0.012,
+    # Above the step Ø's row, from the hidden floor to the step face.
+    "FaceReliefFloor": (
+        (FACE_RELIEF_FLOOR_X + THRUST_X) / 2.0,
+        COLLAR_TOP_Y + 0.026,
     ),
     # The step and journal Ø read above the profile on their own sections.
     "StepDia": ((COLLAR_FRONT_X + THRUST_X) / 2.0, COLLAR_TOP_Y + 0.012),
@@ -164,6 +176,11 @@ FINISH_SYMBOL = ((THRUST_X + SHOULDER_X) / 2.0 - 0.010, COLLAR_TOP_Y + 0.008)
 CENTERLINE_PICK = ((THRUST_X + SHOULDER_X) / 2.0 + 0.010, SIDE_CENTER[1] + 0.001)
 ISO_NOTE_XY = (0.320, 0.185)
 NOTES_XY = (0.016, 0.070)
+# Faced to fit at MHA-A06's stud step; the pointer comes from the registry.
+FIT_STEP_KEY = "stud-faced-to-fit"
+DIMENSION_CALLOUTS = {
+    "ThrustStation": f"{THRUST_STATION_CALLOUT},\nPER {step_ref(FIT_STEP_KEY)}"
+}
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -221,6 +238,18 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     offset_dimension_text(adapter, annotations, {"ReliefDia": RELIEF_DIA_TEXT_XY})
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    # Faced to fit at assembly: the as-fitted station prints as a REFERENCE
+    # and the callout under it is the requirement.
+    for name in sorted(REFERENCE_DIMENSIONS):
+        matches = [
+            annotation
+            for annotation in annotations
+            if dimension_name(adapter, annotation) == name
+        ]
+        if len(matches) != 1:
+            raise RuntimeError(f"expected one MHA-082 {name} reference dimension")
+        set_reference_dimension(adapter, matches[0], label=f"MHA-082 {name}")
+    set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS, location="below")
 
     add_view_centerline(
         adapter,

@@ -154,12 +154,12 @@ def test_registry_row_is_the_turned_brass_mha_126() -> None:
 
 def _nut_fits_stud(nut, stud) -> bool:
     """The nut's tapped thread is the stud's: same size, same major, and the
-    stud's turned blank is that major."""
+    stud's thread blank is turned under that major."""
     return (
         nut.THREAD == stud.THREAD
         and nut.TAP_SPEC.size == stud.THREAD
         and nut.THREAD_MAJOR == pytest.approx(stud.THREAD_MAJOR)
-        and stud.CORE_DIA == pytest.approx(nut.THREAD_MAJOR)
+        and stud.THREAD_BLANK_DIA <= nut.THREAD_MAJOR
     )
 
 
@@ -172,7 +172,7 @@ def test_the_nut_thread_is_the_knob_shaft_stud_thread() -> None:
     other = SimpleNamespace(
         THREAD="#10-32",
         THREAD_MAJOR=_hole_spec.THREAD_MAJOR_MM["#10-32"],
-        CORE_DIA=_hole_spec.THREAD_MAJOR_MM["#10-32"],
+        THREAD_BLANK_DIA=_hole_spec.THREAD_MAJOR_MM["#10-32"],
     )
     assert not _nut_fits_stud(spec, other)
 

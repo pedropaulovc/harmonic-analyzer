@@ -84,9 +84,33 @@ def test_the_thickness_prints_as_the_ground_stock_reference() -> None:
 _ARM_ANGLE_PLAY = 0.00305
 
 
-def _worst_far_face_margin(tip_band: float) -> float:
+# The dowel family's length grade, +/-0.010 in (the 98381A catalogue rows).
+_PIN_LENGTH_GRADE = 0.010 * 25.4
+
+
+def _printed_proud_range(pin_length: float, hole_depth: float) -> tuple[float, float]:
+    """The pin pressed to the hole floor: its length at either end of the
+    family's grade less the depth at either end of its printed row."""
+    depth_band = _band(spec.DRAWING_PRECISION_BY_NAME["PinHoleDepth"])
+    return (
+        pin_length - _PIN_LENGTH_GRADE - (hole_depth + depth_band),
+        pin_length + _PIN_LENGTH_GRADE - (hole_depth - depth_band),
+    )
+
+
+def _worst_far_face_margin(
+    tip_band: float,
+    proud_range: tuple[float, float] | None = None,
+    bend_deg: float | None = None,
+) -> float:
     """Least axial distance by which the latch pin's full diameter passes
-    the hook strip's far face, over every corner of the coupled stack."""
+    the hook strip's far face, over every corner of the coupled stack: the
+    MHA-170 flap bent to either end of the title block's angular row (its
+    BEND 90 DEG note), leaning the strip's far face about the base."""
+    if proud_range is None:
+        proud_range = _printed_proud_range(pin.LENGTH, geometry.PIN_HOLE_DEPTH)
+    if bend_deg is None:
+        bend_deg = _config.title_block("angular")["value_deg"]
     pivot = (bar.PIVOT_TAP_X, bracket.BAR_CENTRE_Y + bar.HANGER_TAP_Y)
     hole = (sum(hook.PLANE_X) / 2.0, hook.PIN_HOLE_YZ[0])
     theta0 = math.atan2(hole[1] - pivot[1], hole[0] - pivot[0])
@@ -99,12 +123,15 @@ def _worst_far_face_margin(tip_band: float) -> float:
         - pivot_screw.SHOULDER_DIA
         - min(pivot_screw.SHOULDER_DIA_LIMITS)
     ) / 2.0
+    # The flap's X is held at the base; the strip's face at the pin's height
+    # above the base's underside leans by that height times tan(bend error).
+    lever = geometry.PIN_MACHINE_Z - bracket.BAR_BACK_FACE_Z
     radii = [(pin.DIA + band) / 2.0 for band in pin.DIA_BAND]
     signs = (-1.0, 1.0)
     margins = []
-    for tip, proud, r, flap, sheet, tap, float_, lateral, angle in itertools.product(
+    corners = itertools.product(
         signs,
-        joints.LATCH_PIN_PROUD_RANGE,
+        proud_range,
         radii,
         signs,
         (-bracket.SHEET_T_MINUS, bracket.SHEET_T_PLUS),
@@ -112,7 +139,9 @@ def _worst_far_face_margin(tip_band: float) -> float:
         signs,
         signs,
         signs,
-    ):
+        (-math.radians(bend_deg), math.radians(bend_deg)),
+    )
+    for tip, proud, r, flap, sheet, tap, float_, lateral, angle, bend in corners:
         theta = theta0 + angle * _ARM_ANGLE_PLAY
         ux, uy = math.cos(theta), math.sin(theta)
         px = pivot[0] + tap * bar.HOLE_POSITION_BAND + float_ * bore_float
@@ -120,19 +149,34 @@ def _worst_far_face_margin(tip_band: float) -> float:
         # centreline by its position band.
         full = geometry.TIP_STATION + tip * tip_band + proud - pin.CROWN_R
         centre_x = px + full * ux - uy * lateral * geometry.HOLE_POSITION_BAND
-        far_face = hook.PLANE_X[1] + flap * flap_shift + sheet
-        margins.append((centre_x - r * abs(uy) - far_face) / ux)
+        far_face = hook.PLANE_X[1] + flap * flap_shift + sheet + lever * math.tan(bend)
+        # Distance along the pin until the end circle (spanning the pin's
+        # horizontal normal and machine Z) clears the leaning plane.
+        c, s = math.cos(bend), math.sin(bend)
+        reach = r * math.hypot(uy * c, s)
+        margins.append(((centre_x - far_face) * c - reach) / (ux * c))
     return min(margins)
 
 
 def test_the_latch_pin_full_diameter_passes_the_hook_at_the_printed_tip_band() -> None:
-    """R9-23: the hook is set in y/z only, so the tip station's band reaches
-    the pin's grip; its printed band keeps the full diameter through the
-    strip at every corner, which the routine .X row would not."""
-    printed = _band(spec.DRAWING_PRECISION_BY_NAME["TipStation"])
-    assert _worst_far_face_margin(printed) >= 0.0
-    assert _worst_far_face_margin(geometry.TIP_STATION_BAND) >= 0.0
-    assert _worst_far_face_margin(_band(1)) < 0.0
+    """R9-23 / R9-50: the hook is set in y/z only, so the tip station's band,
+    the pin's length grade, the hole depth's row and the flap's bend all
+    reach the pin's grip on the strip; the 7/8 pin in the 8.50 hole keeps the
+    full diameter through the strip at every corner of the printed rows."""
+    printed = _band(spec.DRAWING_PRECISION_BY_NAME["TipStation"])  # 0.508
+    margin = _worst_far_face_margin(printed)
+    assert margin == pytest.approx(0.310, abs=1e-3)
+    # The spec judges the rounder 0.51 rows, so its worst is a hair smaller.
+    assert 0.0 < joints.LATCH_PIN_FAR_FACE_MARGIN_WORST <= margin
+    assert joints.LATCH_PIN_FAR_FACE_MARGIN_WORST == pytest.approx(margin, abs=0.01)
+    # The spec judges the bend at the title block's angular row or wider.
+    assert joints.FLAP_BEND_TOL_DEG >= _config.title_block("angular")["value_deg"]
+    # Negative control: the 3/4 pin in the 6.05 hole stops 0.42 short of the
+    # far face with the bend and the grade; without either it cleared.
+    old = _printed_proud_range(0.75 * 25.4, 6.05)
+    assert _worst_far_face_margin(printed, old) < -0.4
+    depth_only = (old[0] + _PIN_LENGTH_GRADE, old[1] - _PIN_LENGTH_GRADE)
+    assert _worst_far_face_margin(printed, depth_only, bend_deg=0.0) > 0.0
 
 
 def test_the_explicit_bands_are_the_spot_face_pin_ream_and_hole_positions() -> None:

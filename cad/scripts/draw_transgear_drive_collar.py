@@ -60,7 +60,7 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 # A Ø17.5 × 5.9 collar: 4:1 draws the Ø2.38 pin holes 9.5 mm across and the
-# 1.7 slot 6.8 mm wide, and leaves room round both views for their callouts.
+# 1.8 slot 7.2 mm wide, and leaves room round both views for their callouts.
 SHEET_SCALE = (4.0, 1.0)
 VIEW_SCALE = (4, 1)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1]

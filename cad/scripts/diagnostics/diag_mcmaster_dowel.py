@@ -21,6 +21,15 @@ harvest is one Revolve1 of five faces: a flat Ø0.115 end face and a cone at
 other (the round end).  Its diameter band is the family's, read on the
 98381A433/434/489 pages; the model is drawn at nominal.
 
+98381A474 (1/8 x 7/8, the MHA-169 latch pin since R9-50) is [INFERENCE]: the
+7/8 in length of the 1/8 series (98381A467 1/8 in through 98381A479
+1-3/4 in, dt-logs mcmaster-skus.md "Round 6 - additions"; a reseller lists
+98381A474 as 1/8 x 7/8,
+https://www.kvmtools.com/products/mcmaster-98381a474-dowel-pin-pack-of-50-alloy-steel-1-8-diameter-7-8-long),
+not yet read live and with no vendor model.  It carries the 98381A473
+harvest's end forms [INFERENCE: same diameter and end shape in the series],
+and its standalone run is catalog-only until a vendor check replaces both.
+
 Frame: the pin section revolved about model Y, the pressed (chamfered) end
 face at y = 0 and the rounded lead end at y = length.  The vendor revolves
 about its X axis centred on the origin, chamfer at -x.
@@ -45,6 +54,7 @@ DOWEL_SIZES = {
     "98381A433": (3.0 / 32.0 * MM_PER_IN, 3.0 / 16.0 * MM_PER_IN),  # 3/32 x 3/16
     "98381A434": (3.0 / 32.0 * MM_PER_IN, 0.25 * MM_PER_IN),  # 3/32 x 1/4
     "98381A473": (0.125 * MM_PER_IN, 0.75 * MM_PER_IN),  # 1/8 x 3/4
+    "98381A474": (0.125 * MM_PER_IN, 0.875 * MM_PER_IN),  # 1/8 x 7/8 [INFERENCE]
 }
 # Catalogue diameter tolerance over nominal, in inches (every size above).
 DIA_BAND_IN = (0.0001, 0.0003)
@@ -66,10 +76,13 @@ class DowelEnds:
 # Read off the 98381A473 harvest (Sketch2 "Point Diameter" 2.921, D3 16 deg,
 # "Crown Radius" 0.4064; Revolve1 faces: cone x -9.525..-9.0821, torus
 # x 9.1186..9.525, end faces Ø2.921 and Ø2.3622).
+_ROUND_X_CHAMFER_1_8 = DowelEnds(
+    point_dia=0.115 * MM_PER_IN, chamfer_deg=16.0, crown_r=0.016 * MM_PER_IN
+)
 DOWEL_ENDS = {
-    "98381A473": DowelEnds(
-        point_dia=0.115 * MM_PER_IN, chamfer_deg=16.0, crown_r=0.016 * MM_PER_IN
-    ),
+    "98381A473": _ROUND_X_CHAMFER_1_8,
+    # [INFERENCE] the 1/8 series' end forms, read off the 98381A473 harvest.
+    "98381A474": _ROUND_X_CHAMFER_1_8,
 }
 
 

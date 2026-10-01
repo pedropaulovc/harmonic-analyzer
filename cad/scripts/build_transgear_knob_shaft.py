@@ -1,20 +1,20 @@
 r"""Reproduction script: transgear knob shaft MHA-078 (book ch. 23, pp. 56-59).
 
 One turned steel shaft on the knob axis K, front to rear: the 1/4-20 stud end
-the thumbnut runs on, the plain Ø6.35 core the brass drive collar (MHA-177)
-slides on, the integral 12T DP38 pinion meshing the 120T disc, and the Ø8.5
-journal running in the arm plate's bore, with the #8-32 rear tap for the cup's
-retaining screw.  Every number and the part frame live in
-``transgear_knob_shaft_spec`` (contract §1.1, round 10).
+the thumbnut runs on and its thread relief, the plain Ø6.35 core the brass
+drive collar (MHA-177) slides on, the integral 12T DP38 pinion meshing the
+120T disc, and the Ø8.5 journal running in the arm plate's bore, with the
+#8-32 rear tap for the cup's retaining screw.  Every number and the part
+frame live in ``transgear_knob_shaft_spec`` (contract §1.1, round 10).
 
 Layout: axis local +Z (machine +Z, rearward), origin on the 12T's front face
 F (the Front Plane).
 
 * ``GearBlank`` + the seed gap and its pattern: the 12T, z 0..FACE_WIDTH,
   root-relieved to the 1.157/P gap floor (``_gear.build_fixed_gear``).
-* ``StudProfile``: the revolve in front of F -- the Ø6.35 core and thread
-  blank with the 45-degree tip chamfer; construction witnesses carry the
-  full-thread end (PlainCore) and the tooth-tip blank (OutsideDia).
+* ``StudProfile``: the revolve in front of F -- the Ø6.35 core, the thread
+  relief, the Ø6.22 thread blank and the 45-degree tip chamfer; a
+  construction witness carries the tooth-tip blank (OutsideDia).
 * ``JournalProfile``: the Ø8.5 journal revolve behind the teeth.
 * ``RunoutSlot`` + its pattern: the form cutter's run-out behind the
   full-depth station (R9-21), twelve hidden slots in the journal's front end
@@ -80,6 +80,7 @@ from _visibility import blank_reference_geometry
 from transgear_knob_shaft_spec import (
     CORE_DIA,
     CORE_DIA_BAND,
+    CORE_LENGTH,
     CUTTER_AXIS_R,
     CUTTER_AXIS_Z,
     CUTTER_DIA_MAX,
@@ -102,6 +103,7 @@ from transgear_knob_shaft_spec import (
     PLAIN_CORE,
     PRESSURE_ANGLE_DEG,
     REAR_END_Z,
+    RELIEF_DIA,
     ROOT_DIA,
     RUNOUT_SLOT_END_Z,
     RUNOUT_SLOT_WIDTH,
@@ -111,6 +113,8 @@ from transgear_knob_shaft_spec import (
     TAP_SPEC,
     TAP_TO_PINION_WORST,
     TEETH,
+    THREAD_BLANK_DIA,
+    THREAD_BLANK_DIA_BAND,
     THREAD_END_Z,
     TIP_CHAMFER,
     TIP_STATION,
@@ -121,6 +125,8 @@ PART_NAME = "transgear-knob-shaft"
 MATERIAL = "Plain Carbon Steel"  # contract §1.1: steel, made
 
 _R_CORE = CORE_DIA / 2.0
+_R_RELIEF = RELIEF_DIA / 2.0
+_R_BLANK = THREAD_BLANK_DIA / 2.0
 _R_JOURNAL = JOURNAL_DIA / 2.0
 _R_CUTTER = CUTTER_DIA_MAX / 2.0
 _CSK_R = TAP_CSK_DIA / 2.0
@@ -128,8 +134,11 @@ _CSK_R = TAP_CSK_DIA / 2.0
 _CSK_OVERRUN = 1.0
 
 # Solid volumes the gates expect (mm^3).
-V_STUD = math.pi * _R_CORE**2 * TIP_STATION - math.pi * TIP_CHAMFER**2 * (
-    _R_CORE - TIP_CHAMFER / 3.0
+V_STUD = (
+    math.pi * _R_CORE**2 * CORE_LENGTH
+    + math.pi * _R_RELIEF**2 * (PLAIN_CORE - CORE_LENGTH)
+    + math.pi * _R_BLANK**2 * (TIP_STATION - PLAIN_CORE)
+    - math.pi * TIP_CHAMFER**2 * (_R_BLANK - TIP_CHAMFER / 3.0)
 )
 V_JOURNAL = math.pi * _R_JOURNAL**2 * JOURNAL_LENGTH
 
@@ -308,49 +317,58 @@ async def _stud_profile(adapter: Any) -> list[tuple[str, str]]:
     axis = check(
         "stud axis centerline", await adapter.add_centerline(0.0, 0.0, TIP_STATION, 0.0)
     )
+    # The core steps down to the thread relief, which steps up at the
+    # full-thread end to the thread blank; the blank runs to the tip chamfer.
     points = [
         (0.0, 0.0),
         (0.0, _R_CORE),
-        (TIP_STATION - TIP_CHAMFER, _R_CORE),
-        (TIP_STATION, _R_CORE - TIP_CHAMFER),
+        (CORE_LENGTH, _R_CORE),
+        (CORE_LENGTH, _R_RELIEF),
+        (PLAIN_CORE, _R_RELIEF),
+        (PLAIN_CORE, _R_BLANK),
+        (TIP_STATION - TIP_CHAMFER, _R_BLANK),
+        (TIP_STATION, _R_BLANK - TIP_CHAMFER),
         (TIP_STATION, 0.0),
     ]
     lines = await add_line_chain(adapter, points)
-    thread_end = check(
-        "full-thread end witness",
-        await adapter.add_line(PLAIN_CORE, 0.0, PLAIN_CORE, _R_CORE),
-    )
     outside = check(
         "tooth-tip blank witness",
         await adapter.add_line(0.0, OUTSIDE_DIA / 2.0, -FACE_WIDTH, OUTSIDE_DIA / 2.0),
     )
     set_sketch_direct_db(adapter, False)
-    for line in (thread_end, outside):
-        _as_construction(adapter, line)
-    front_face, outline, chamfer, tip_face, axis_edge = lines
+    _as_construction(adapter, outside)
+    (
+        front_face,
+        core,
+        core_step,
+        relief,
+        thread_end,
+        blank,
+        chamfer,
+        tip_face,
+        axis_edge,
+    ) = lines
     for line, relation in (
         (front_face, "vertical"),
-        (outline, "horizontal"),
+        (core, "horizontal"),
+        (core_step, "vertical"),
+        (relief, "horizontal"),
+        (thread_end, "vertical"),
+        (blank, "horizontal"),
         (tip_face, "vertical"),
         (axis_edge, "horizontal"),
-        (thread_end, "vertical"),
         (outside, "horizontal"),
     ):
         check(
             f"stud profile {relation} {line}",
             await adapter.add_sketch_constraint(line, None, relation),
         )
-    for label, first, second, relation in (
-        (
-            "thread-end witness on the axis",
-            f"{thread_end}.start",
-            axis_edge,
-            "coincident",
+    check(
+        "tip witness starts at F",
+        await adapter.add_sketch_constraint(
+            f"{outside}.start", "origin", "vertical_points"
         ),
-        ("thread-end witness on the core", f"{thread_end}.end", outline, "coincident"),
-        ("tip witness starts at F", f"{outside}.start", "origin", "vertical_points"),
-    ):
-        check(label, await adapter.add_sketch_constraint(first, second, relation))
+    )
     await anchor_point_to_origin(
         adapter, f"{front_face}.start", 0.0, 0.0, "stud profile at F"
     )
@@ -381,15 +399,19 @@ async def _stud_profile(adapter: Any) -> list[tuple[str, str]]:
         "stud tip chamfer rise",
     )
     profile.record("TipChamferRise", '"TipChamfer"')
-    await dimension_between(
-        adapter,
-        f"{thread_end}.start",
-        "origin",
-        "horizontal_distance",
-        PLAIN_CORE,
-        "stud PlainCore",
-    )
-    profile.record("PlainCore", '"PlainCore"')
+    for name, line, value in (
+        ("CoreLength", core_step, CORE_LENGTH),
+        ("PlainCore", thread_end, PLAIN_CORE),
+    ):
+        await dimension_between(
+            adapter,
+            f"{line}.start",
+            "origin",
+            "horizontal_distance",
+            value,
+            f"stud {name}",
+        )
+        profile.record(name, f'"{name}"')
     await dimension_between(
         adapter,
         f"{outside}.start",
@@ -400,7 +422,13 @@ async def _stud_profile(adapter: Any) -> list[tuple[str, str]]:
     )
     profile.record("BlankSpan", '"FaceWidth"')
     for name, target, xy in (
-        ("CoreDia", outline, (PLAIN_CORE / 2.0, _R_CORE + 5.0)),
+        ("CoreDia", core, (CORE_LENGTH / 2.0, _R_CORE + 5.0)),
+        ("ReliefDia", relief, ((CORE_LENGTH + PLAIN_CORE) / 2.0, _R_RELIEF + 5.0)),
+        (
+            "ThreadBlankDia",
+            blank,
+            ((PLAIN_CORE + TIP_STATION) / 2.0, _R_BLANK + 5.0),
+        ),
         (
             "OutsideDia",
             f"{outside}.start",
@@ -539,7 +567,10 @@ async def build(adapter) -> dict[str, str]:
         ("OutsideDia", OUTSIDE_DIA),
         ("RootDia", ROOT_DIA),
         ("CoreDia", CORE_DIA),
+        ("CoreLength", CORE_LENGTH),
+        ("ReliefDia", RELIEF_DIA),
         ("PlainCore", PLAIN_CORE),
+        ("ThreadBlankDia", THREAD_BLANK_DIA),
         ("TipStation", TIP_STATION),
         ("TipChamfer", TIP_CHAMFER),
         ("JournalDia", JOURNAL_DIA),
@@ -736,10 +767,14 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # Bands (transgear_knob_shaft_spec): the sliding core and the running
-    # journal carry their fits, the journal length its own ±; the rest print
-    # at the title block's rows for the places they are authored at.
+    # journal carry their fits, the thread blank its 2A-major band, the
+    # journal length its own ±; the rest print at the title block's rows for
+    # the places they are authored at.
     set_dimension_bilateral_tolerance(
         adapter, "StudProfile", "CoreDia", *deviations(CORE_DIA_BAND)
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "StudProfile", "ThreadBlankDia", *deviations(THREAD_BLANK_DIA_BAND)
     )
     set_dimension_bilateral_tolerance(
         adapter, "JournalProfile", "JournalDia", *deviations(JOURNAL_DIA_BAND)

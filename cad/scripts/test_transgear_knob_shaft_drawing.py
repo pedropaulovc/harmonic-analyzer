@@ -54,6 +54,7 @@ def test_sheet_authors_no_manufacturing_value() -> None:
 def test_bands_come_from_named_spec_constants() -> None:
     assert model_toleranced_dimensions(part) == {
         ("StudProfile", "CoreDia"): "*deviations(CORE_DIA_BAND)",
+        ("StudProfile", "ThreadBlankDia"): "*deviations(THREAD_BLANK_DIA_BAND)",
         ("JournalProfile", "JournalDia"): "*deviations(JOURNAL_DIA_BAND)",
         ("JournalProfile", "JournalLength"): "JOURNAL_LENGTH_TOL",
     }
@@ -64,14 +65,14 @@ def test_bands_come_from_named_spec_constants() -> None:
 def test_stations_land_on_the_contract_machine_stations() -> None:
     stations = {
         "stud tip": (spec.TIP_Z, -172.0),
-        "full-thread end": (spec.THREAD_END_Z, -154.6),
+        "full-thread end": (spec.THREAD_END_Z, -155.6),
         "12T rear tooth ends": (spec.PINION_REAR_Z, -142.2),
         "journal rear face": (spec.REAR_END_Z, -107.76),
     }
     for name, (local, machine) in stations.items():
         assert F_MACHINE_Z + local == pytest.approx(machine, abs=0.005), name
     assert spec.OVERALL_LENGTH == pytest.approx(64.24, abs=0.005)
-    assert spec.THREAD_LENGTH_REF == pytest.approx(17.4)
+    assert spec.THREAD_LENGTH_REF == pytest.approx(16.4)
 
 
 def test_journal_spans_the_ring_the_plate_hub_and_the_float() -> None:
@@ -85,13 +86,6 @@ def test_journal_spans_the_ring_the_plate_hub_and_the_float() -> None:
         ring.LENGTH + ring.LENGTH_TOL + plate.HUB_TO_BOSS + plate.HUB_TO_BOSS_BAND
     )
     assert shortest_float > 0.0
-
-
-def test_thread_run_out_is_one_pitch_behind_the_full_thread() -> None:
-    assert spec.DIE_RUNOUT_MAX == pytest.approx(spec.THREAD_PITCH)
-    # The run-out's worst end stays in front of F: the core is plain from
-    # there to the 12T.
-    assert spec.THREAD_END_Z + spec.DIE_RUNOUT_MAX < 0.0
 
 
 def _shaft_spec_with(monkeypatch, module, name: str, value):
@@ -203,7 +197,7 @@ def test_part_record_and_finishes() -> None:
     faces = {control.key: control.face for control in spec.SURFACE_FINISHES}
     assert faces["journal"].diameter_mm == spec.JOURNAL_DIA
     assert faces["core"].diameter_mm == spec.CORE_DIA
-    assert spec.THREAD_END_Z < faces["core"].contains_z_mm < 0.0
+    assert spec.CORE_END_Z < faces["core"].contains_z_mm < 0.0
     assert drawing.DIMENSION_CALLOUTS_BELOW == {"TipChamfer": spec.CHAMFER_CALLOUT}
 
 

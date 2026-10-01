@@ -1,9 +1,11 @@
-"""Offline contracts for the MHA-169 transgear latch pin (McMaster 98381A473)."""
+"""Offline contracts for the MHA-169 transgear latch pin (McMaster 98381A474)."""
 
 from __future__ import annotations
 
+import asyncio
 import re
 from fractions import Fraction
+from pathlib import Path
 
 import pytest
 
@@ -13,7 +15,7 @@ import transgear_latch_pin_spec as spec
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 from _fastener_catalog import FASTENERS
 from _stock_fastener import STOCK_RECIPES
-from diagnostics import diag_build_98381A473 as recipe
+from diagnostics import diag_build_98381A474 as recipe
 from diagnostics.diag_mcmaster_dowel import MM_PER_IN
 
 STEM = "transgear-latch-pin"
@@ -29,14 +31,32 @@ def test_catalogue_row_is_the_registered_mcmaster_dowel() -> None:
     assert row["number"] == "MHA-169"
     metadata = STOCK_RECIPES[spec.SKU]
     assert metadata.module == recipe.__name__
-    assert getattr(recipe, metadata.callable_name) is recipe.build_98381A473
+    assert getattr(recipe, metadata.callable_name) is recipe.build_98381A474
     assert metadata.threaded is False
 
 
-def test_fleet_diagnostic_driver_builds_the_new_sku() -> None:
+def test_standalone_recipe_run_is_catalog_only(monkeypatch) -> None:
+    """R9-50: the 7/8 length has no vendor model yet, so the standalone run
+    builds and saves the catalog recipe and never enters the replica path,
+    which demands a vendor SLDPRT and its harvest."""
     from diagnostics.diag_build_mcmaster import REGISTRY
 
-    assert REGISTRY[spec.SKU] is recipe.build_98381A473
+    assert spec.SKU not in REGISTRY
+    assert not hasattr(recipe, "replica_main")
+    seen: list = []
+
+    async def fake_catalog(adapter, part_no):
+        seen.append(part_no)
+        return {}
+
+    monkeypatch.setattr(recipe, "build_catalog", fake_catalog)
+    asyncio.run(recipe._catalog(None))
+    assert seen == [spec.SKU]
+
+
+def test_no_vendor_model_of_the_new_pin_is_tracked() -> None:
+    root = Path(__file__).resolve().parents[2]
+    assert not list(root.glob(f"cad/references/**/{spec.SKU}*.SLDPRT"))
 
 
 def test_recipe_is_the_size_the_registry_names() -> None:

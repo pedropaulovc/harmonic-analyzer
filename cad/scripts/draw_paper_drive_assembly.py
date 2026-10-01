@@ -25,6 +25,7 @@ import _telemetry
 import latch_hook_bracket_geometry as bracket_geometry
 import latch_hook_geometry as hook_geometry
 import paper_drive_assembly_steps as steps
+import platen_guide_spec as platen_guide
 import transgear_arm_geometry as arm_geometry
 import transgear_arm_plate_geometry as plate_geometry
 import transgear_arm_plate_screw_spec as plate_screw
@@ -351,8 +352,8 @@ TRANSGEAR_BALLOON_ANCHORS = {
 # its 268 gear edges are past the edge fallback's 128), ballooned on the inner
 # view instead. Viewed along (-1, +1, -1), the camera at the machine's
 # front-left-top:
-# * the feed-pinion sleeve: its 12T (z -144.4 to -134.9) is behind the Ø81.5
-#   disc, its spigot (to -157.5) inside the hub shank and under the hub cap;
+# * the feed-pinion sleeve: its 12T (z -144.65 to -135.15) is behind the Ø81.5
+#   disc, its spigot (to -157.75) inside the hub shank and under the hub cap;
 # * the drive collar (Ø17.5, z -154.3 to -150.3) behind the Ø51.2 T24 (2.8
 #   thick): its deepest rim point's ray leaves the T24 at radius
 #   8.75 + (4.0 + 2.8) * sqrt(2) = 18.4 < 25.6; its spring pin lies in its
@@ -530,6 +531,14 @@ def _step_text() -> dict[str, str]:
     knob_lo, knob_hi = KNOB_END_FLOAT_RANGE
     teeth = f"{KNOB_TEETH}T"
     return {
+        "guide-locks-set": (
+            f"SNUG EACH {_N['guide-lock']} LOCK'S {_N['guide-lock-screw']} SCREWS, "
+            "PUSH THE LOCK AWAY FROM THE BAR TILL ITS HOLES BEAR ON THEM; TIGHTEN."
+        ),
+        "lock-seats-faced": (
+            f"FACE LOCK SEATS TO {platen_guide.LOCK_GAP_FIT_TEXT} PLATEN FLOAT; "
+            "ELSE STOP AND REPORT."
+        ),
         "latch-pin-pressed": (
             f"PRESS THE {_N['transgear-latch-pin']} DOWEL INTO THE "
             f"{_N['transgear-arm']} ARM'S REAMED HOLE TO THE HOLE FLOOR, "
@@ -569,6 +578,11 @@ def _step_text() -> dict[str, str]:
             f"FLANGE. FIX WITH {hub_geometry.SCREW_COUNT} "
             f"{_N['transgear-disc-screw']} SCREWS."
         ),
+        "disc-screws-cut": (
+            f"CUT {_N['transgear-disc-screw']} TIPS "
+            f"{disc_screw.TIP_BELOW_REAR_FACE_TEXT} BELOW DISC REAR FACE; "
+            f"BREAK {disc_screw.CUT_END_BREAK_TEXT}."
+        ),
         "oil-hole-drilled": (
             f"DRILL THE \u00d8{hub.OIL_HOLE_DIA:.1f} OIL HOLE THROUGH HUB AND "
             f"SLEEVE IN ONE OPERATION AS {_N['transgear-disc-hub']} SHOWS; "
@@ -593,7 +607,7 @@ def _step_text() -> dict[str, str]:
             "ON THE CORE UNPINNED, PINS FORWARD."
         ),
         "latch-bracket-fitted": (
-            f"SCREW THE {_N['latch-hook-bracket']} BRACKET TO THE BAR'S TAPS WITH "
+            f"SCREW THE {_N['latch-hook-bracket']} BRACKET TO THE BAR WITH "
             f"{TRANSGEAR_QUANTITIES['latch-hook-bracket-screw']} "
             f"{_N['latch-hook-bracket-screw']} SCREWS."
         ),
@@ -611,6 +625,11 @@ def _step_text() -> dict[str, str]:
             f"AGAINST THE SPACER; PUSH THE KNOB SHAFT REARWARD ({teeth} ON THE "
             f"RING, RING ON THE HUB). SLIDE THE COLLAR BACK AGAINST THE {teeth}; "
             "T24 AND THUMBNUT ON FINGER-TIGHT."
+        ),
+        "stud-faced-to-fit": (
+            "CLUSTER FORWARD, FEEL THE COLLAR TO DISC AIR. FACE THE "
+            f"{_N['transgear-stub']} STUD'S ARM SEAT TILL IT IS "
+            f"{stub.STUD_FIT_WINDOW_TEXT}; ELSE STOP AND REPORT."
         ),
         "collar-gap-measured": (
             "MEASURE d, THE T24 FRONT FACE BEHIND THE T12 FRONT FACE (STRAIGHT "
@@ -653,7 +672,7 @@ def _fitup_columns() -> tuple[str, str]:
     split = steps.step_number(FITUP_SECOND_COLUMN_KEY) - 1
     headings = (
         "TRANSGEAR ASSEMBLY",
-        "CHAIN FIT-UP, CRANK SIDE COMPLETE PER " + " AND ".join(steps.CRANK_SIDE_REFS),
+        "CHAIN FIT-UP, CRANK SIDE DONE PER " + " AND ".join(steps.CRANK_SIDE_REFS),
     )
     columns = []
     for heading, keys in zip(

@@ -11,3 +11,7 @@ transgear-disc-screw:
   tolerance_class: machined_block
   fit_class: fastener_clearance
   process: purchased
+  installation_notes: |-
+    INSTALLATION - THROUGH MHA-159 INTO THE MHA-070 DISC THROUGH TAP.
+    CUT EACH TIP 0.00-0.20 BELOW THE MHA-070 DISC REAR FACE AT ASSEMBLY;
+    BREAK THE CUT END 0.1 MAX.
