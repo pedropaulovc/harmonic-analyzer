@@ -81,6 +81,107 @@ export function claimedSourceImages(data) {
 const evidenceText = value => text(value) || (value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length > 0)
 const inRect = (pixel, rect) => vector(pixel, 2) && vector(rect, 4) && pixel[0] >= rect[0] && pixel[1] >= rect[1] && pixel[0] < rect[0] + rect[2] && pixel[1] < rect[1] + rect[3]
 const distance = (a, b) => Math.hypot(...a.map((value, index) => value - b[index]))
+
+/** Independent closed-form four-corner solve. Runtime matrices are never authority. */
+export function recomputeImagePlaneWarp(warp) {
+  if (!warp || warp.kind !== 'homography' || !vector(warp.unwarpedViewportPixels, 2) || warp.unwarpedViewportPixels.some(value => value <= 0)
+    || !Array.isArray(warp.cornersSourcePixels) || warp.cornersSourcePixels.length !== 4 || !warp.cornersSourcePixels.every(point => vector(point, 2))) throw new Error('Homography needs a finite positive native viewport and four ordered measured corners')
+  const p = warp.cornersSourcePixels, cross = (a, b, c) => (b[0]-a[0])*(c[1]-b[1])-(b[1]-a[1])*(c[0]-b[0])
+  const turns = p.map((point, index) => cross(point, p[(index+1)%4], p[(index+2)%4]))
+  if (turns.some(value => Math.abs(value) <= 1e-8) || !turns.every(value => Math.sign(value) === Math.sign(turns[0]))) throw new Error('Homography corners are duplicate, degenerate, concave or self-intersecting')
+  // Solve the unit-square map, then scale its input to native image boundaries.
+  const dx1=p[1][0]-p[2][0], dx2=p[3][0]-p[2][0], dx3=p[0][0]-p[1][0]+p[2][0]-p[3][0]
+  const dy1=p[1][1]-p[2][1], dy2=p[3][1]-p[2][1], dy3=p[0][1]-p[1][1]+p[2][1]-p[3][1]
+  const determinant=dx1*dy2-dx2*dy1
+  if (Math.abs(determinant) <= 1e-10) throw new Error('Singular measured homography')
+  const g=(dx3*dy2-dx2*dy3)/determinant, h=(dx1*dy3-dx3*dy1)/determinant, [width,height]=warp.unwarpedViewportPixels
+  const matrix=[(p[1][0]-p[0][0]+g*p[1][0])/width,(p[3][0]-p[0][0]+h*p[3][0])/height,p[0][0],
+    (p[1][1]-p[0][1]+g*p[1][1])/width,(p[3][1]-p[0][1]+h*p[3][1])/height,p[0][1],g/width,h/height,1]
+  const denominators=[1,1+g,1+g+h,1+h]
+  if (!matrix.every(finite) || denominators.some(value => value <= 1e-10)) throw new Error('Projective denominator vanishes or changes sign over native viewport')
+  invertHomography(matrix)
+  return {kind:'homography',unwarpedViewportPixels:[width,height],renderToSourcePixels:matrix}
+}
+export function projectHomography(matrix, point) {
+  const denominator=matrix[6]*point[0]+matrix[7]*point[1]+matrix[8]
+  if (!vector(matrix,9) || !vector(point,2) || !finite(denominator) || Math.abs(denominator)<1e-12) throw new Error('Invalid projective point or denominator')
+  return [(matrix[0]*point[0]+matrix[1]*point[1]+matrix[2])/denominator,(matrix[3]*point[0]+matrix[4]*point[1]+matrix[5])/denominator]
+}
+export function invertHomography(m) {
+  if (!vector(m,9)) throw new Error('Invalid homography matrix')
+  const result=[m[4]*m[8]-m[5]*m[7],m[2]*m[7]-m[1]*m[8],m[1]*m[5]-m[2]*m[4],
+    m[5]*m[6]-m[3]*m[8],m[0]*m[8]-m[2]*m[6],m[2]*m[3]-m[0]*m[5],
+    m[3]*m[7]-m[4]*m[6],m[1]*m[6]-m[0]*m[7],m[0]*m[4]-m[1]*m[3]]
+  const determinant=m[0]*result[0]+m[1]*result[3]+m[2]*result[6]
+  if (!finite(determinant) || Math.abs(determinant)<1e-12) throw new Error('Singular homography matrix')
+  return result.map(value=>value/determinant)
+}
+/** Frobenius Jacobian upper bound over the whole rectangle, not centre-only optimism. */
+export function homographyMagnificationBound(warp, region = [0,0,...warp.unwarpedViewportPixels]) {
+  const m=warp.renderToSourcePixels,[x,y,width,height]=region
+  const points=[[x,y],[x+width,y],[x+width,y+height],[x,y+height]]
+  const d=points.map(p=>m[6]*p[0]+m[7]*p[1]+m[8])
+  if (!vector(m,9) || d.some(value=>!finite(value)||value<=1e-10)) throw new Error('Unbounded projective uncertainty region')
+  const denominator=Math.min(...d)**2
+  const entries=[
+    p=>(m[0]*m[7]-m[1]*m[6])*p[1]+m[0]*m[8]-m[2]*m[6],
+    p=>(m[1]*m[6]-m[0]*m[7])*p[0]+m[1]*m[8]-m[2]*m[7],
+    p=>(m[3]*m[7]-m[4]*m[6])*p[1]+m[3]*m[8]-m[5]*m[6],
+    p=>(m[4]*m[6]-m[3]*m[7])*p[0]+m[4]*m[8]-m[5]*m[7]]
+  return Math.hypot(...entries.map(fn=>Math.max(...points.map(p=>Math.abs(fn(p))))/denominator))
+}
+export function independentlyResolvedWarp(view) { return view.imagePlaneWarp == null ? null : recomputeImagePlaneWarp(view.imagePlaneWarp) }
+export function sourceLayoutForViews(views) {
+  return views.map(view=>({viewId:view.id,rectSourcePixels:view.rectSourcePixels,presentation:view.presentation,composite:view.composite??{mode:'opaque'},resolvedImagePlaneWarp:independentlyResolvedWarp(view)}))
+}
+export function sameResolvedImagePlaneWarp(a,b) {
+  if (a===null||b===null) return a===b
+  if (!exactKeys(a,['kind','unwarpedViewportPixels','renderToSourcePixels'])||!exactKeys(b,['kind','unwarpedViewportPixels','renderToSourcePixels'])
+    ||a.kind!=='homography'||b.kind!=='homography'||canonicalJson(a.unwarpedViewportPixels)!==canonicalJson(b.unwarpedViewportPixels)||!vector(a.renderToSourcePixels,9)||!vector(b.renderToSourcePixels,9)) return false
+  const scale=a.renderToSourcePixels[8]/b.renderToSourcePixels[8]
+  return finite(scale)&&scale!==0&&a.renderToSourcePixels.every((value,i)=>Math.abs(value-scale*b.renderToSourcePixels[i])<=1e-8*Math.max(1,Math.abs(value)))
+}
+export function sameSourceLayout(a,b) {
+  return Array.isArray(a)&&Array.isArray(b)&&a.length===b.length&&a.every((view,i)=>exactKeys(view,['viewId','rectSourcePixels','presentation','composite','resolvedImagePlaneWarp'])
+    &&view.viewId===b[i].viewId&&canonicalJson(view.rectSourcePixels)===canonicalJson(b[i].rectSourcePixels)&&view.presentation===b[i].presentation
+    &&canonicalJson(view.composite)===canonicalJson(b[i].composite)&&sameResolvedImagePlaneWarp(view.resolvedImagePlaneWarp,b[i].resolvedImagePlaneWarp))
+}
+/** Actual convex support, intersected with the clipping ROI (quad may extend it). */
+export function sourceSupportPolygon(view) {
+  const rect=view.rectSourcePixels
+  if (!vector(rect,4)||rect[2]<=0||rect[3]<=0) throw new Error('Invalid source support ROI')
+  const warp=view.resolvedImagePlaneWarp ?? (view.imagePlaneWarp ? recomputeImagePlaneWarp(view.imagePlaneWarp) : null)
+  let polygon=warp ? [[0,0],[warp.unwarpedViewportPixels[0],0],warp.unwarpedViewportPixels,[0,warp.unwarpedViewportPixels[1]]].map(point=>projectHomography(warp.renderToSourcePixels,point))
+    : [[rect[0],rect[1]],[rect[0]+rect[2],rect[1]],[rect[0]+rect[2],rect[1]+rect[3]],[rect[0],rect[1]+rect[3]]]
+  for (const [axis,bound,direction] of [[0,rect[0],1],[0,rect[0]+rect[2],-1],[1,rect[1],1],[1,rect[1]+rect[3],-1]]) {
+    const output=[]
+    for (let i=0;i<polygon.length;i++) {
+      const a=polygon[i],b=polygon[(i+1)%polygon.length],insideA=direction*(a[axis]-bound)>=0,insideB=direction*(b[axis]-bound)>=0
+      if (insideA) output.push(a)
+      if (insideA!==insideB) { const mix=(bound-a[axis])/(b[axis]-a[axis]); output.push(a.map((value,j)=>value+mix*(b[j]-value))) }
+    }
+    polygon=output
+  }
+  return polygon
+}
+export function sourcePointSupported(view, point) {
+  if (!inRect(point,view.rectSourcePixels)) return false
+  const warp=view.resolvedImagePlaneWarp ?? (view.imagePlaneWarp ? recomputeImagePlaneWarp(view.imagePlaneWarp) : null)
+  if (!warp) return true
+  const p=projectHomography(invertHomography(warp.renderToSourcePixels),point)
+  return p[0]>=0 && p[1]>=0 && p[0]<warp.unwarpedViewportPixels[0] && p[1]<warp.unwarpedViewportPixels[1]
+}
+export function sourcePointUnmasked(layout, index, point) {
+  const own=layout[index],a=own?.composite??{mode:'opaque'}
+  if (!own||!sourcePointSupported(own,point)) return false
+  for (const later of layout.slice(index+1)) {
+    const b=later.composite??{mode:'opaque'}
+    const sameImage=a.mode==='crossfade'&&b.mode==='crossfade'&&a.groupId===b.groupId&&a.imageLayerId===b.imageLayerId
+    const independentFade=a.mode==='crossfade'&&b.mode==='crossfade'&&a.groupId===b.groupId&&!sameImage
+    if (!independentFade&&(sameImage||b.mode==='opaque'||b.opacity===1)&&sourcePointSupported(later,point)) return false
+  }
+  return true
+}
 export const INPUT_FIELDS = Object.freeze(['crankTurns', 'gearing', 'magnification', ...Array.from({ length: 20 }, (_, i) => `amplitudes[${i}]`), ...Array.from({ length: 20 }, (_, i) => `phases[${i}]`), ...['counterHeightM', 'meanLineAngleRad', 'platenOffsetM', 'wireFixtureOffsetM', 'coneSwingRad', 'pinionCamRad', 'heldChannelTurns', 'driveCrankOffsetTurns'].map(key => `setup.${key}`)])
 function exactKeys(value, keys) { return !!value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === keys.length && keys.every(key => Object.hasOwn(value, key)) }
 export function completeInput(input) {
@@ -137,7 +238,10 @@ export function visibilityProofErrors(proof, expected, anchors, landmarks, view 
   const binding = proof?.binding
   if (!exactKeys(proof, ['binding', 'sourceVisibleParts', 'excludedParts', 'sourceNonIdentifiableFixedParts', 'unresolvedParts', 'evidence']) || !text(proof.evidence)
     || !exactKeys(binding, [...Object.keys(expected), 'intervalSeconds'])) return [...errors, 'Missing complete, explicitly bound visibility proof']
-  for (const key of Object.keys(expected)) if (canonicalJson(binding[key]) !== canonicalJson(expected[key])) reject(`Visibility proof binding mismatch: ${key}`)
+  for (const key of Object.keys(expected)) {
+    const equal=key==='resolvedImagePlaneWarp'?sameResolvedImagePlaneWarp(binding[key],expected[key]):key==='sourceLayout'?sameSourceLayout(binding[key],expected[key]):canonicalJson(binding[key])===canonicalJson(expected[key])
+    if (!equal) reject(`Visibility proof binding mismatch: ${key}`)
+  }
   if (!vector(binding.intervalSeconds, 2) || binding.intervalSeconds[0] > expected.timeSeconds || binding.intervalSeconds[1] < expected.timeSeconds || binding.intervalSeconds[0] > binding.intervalSeconds[1]) reject('Visibility proof interval does not cover this sample')
   if (!Array.isArray(proof.sourceVisibleParts) || !Array.isArray(proof.excludedParts) || !Array.isArray(proof.sourceNonIdentifiableFixedParts) || !Array.isArray(proof.unresolvedParts)) return [...errors, 'Missing full native part census arrays, including explicit sourceNonIdentifiableFixedParts']
   if (proof.unresolvedParts.length) reject(`Unresolved native parts: ${proof.unresolvedParts.length}`)
@@ -241,7 +345,7 @@ export function requiredRuns(data) {
   return runs
 }
 export function frameViews(frame) {
-  return frame.views ?? [{ id: 'main', rectSourcePixels: [0, 0, 1920, 1080], presentation: 'native', camera: frame.camera, mechanicalState: frame.mechanicalState, cameraEvidence: frame.cameraEvidence, nativeLineChecks: frame.nativeLineChecks, sourceContourChecks: frame.sourceContourChecks, composite: frame.composite, compositeEvidence: frame.compositeEvidence, partOverrides: frame.partOverrides }]
+  return frame.views ?? [{ id: 'main', rectSourcePixels: [0, 0, 1920, 1080], presentation: 'native', camera: frame.camera, mechanicalState: frame.mechanicalState, cameraEvidence: frame.cameraEvidence, imagePlaneWarp: frame.imagePlaneWarp, nativeLineChecks: frame.nativeLineChecks, sourceContourChecks: frame.sourceContourChecks, composite: frame.composite, compositeEvidence: frame.compositeEvidence, partOverrides: frame.partOverrides }]
 }
 export function nearestPtsIndex(pts, time) {
   let lo = 0, hi = pts.length
@@ -305,6 +409,41 @@ function rigParameters(rig, phase) {
   return { rotation, translation: rig.worldToReferenceCameraCV.translationMetres.map((value, i) => value - axis[i]), focal: rig.worldToReferenceCameraCV.focalPixels, principal: [960, 540] }
 }
 /** Derived camera identities are recomputed, never inferred from fit status/error summaries. */
+/** Exact source/reference exposure bindings and genuinely disjoint interior checks. */
+export function homographyEvidenceErrors(warp, sourceImage, referenceSourceImage, referenceRect) {
+  const errors=[], reject=message=>errors.push(message)
+  if (!vector(referenceRect,4)||referenceRect[2]<=0||referenceRect[3]<=0) return ['Homography reference must have an independently established finite positive viewport']
+  if (!exactKeys(warp,['kind','unwarpedViewportPixels','cornersSourcePixels','sourceImage','referenceSourceImage','cornerMeasurementEvidence','correspondences'])) return ['Authored homography must have only measured corners, viewport, exact images and independent measurement evidence; no authored matrix']
+  if (sourceImageError(warp.sourceImage)||sourceImageError(warp.referenceSourceImage)||canonicalJson(warp.sourceImage)!==canonicalJson(sourceImage)||canonicalJson(warp.referenceSourceImage)!==canonicalJson(referenceSourceImage)) reject('Stale homography target/reference original source image identity')
+  const bound=e=>e&&typeof e==='object'&&!Array.isArray(e)&&text(e.evidence)&&canonicalJson(e.sourceImage)===canonicalJson(sourceImage)&&canonicalJson(e.referenceSourceImage)===canonicalJson(referenceSourceImage)
+  if (!bound(warp.cornerMeasurementEvidence)) reject('Four ordered image-boundary corners require actual exact target/reference exposure measurement evidence')
+  let resolved
+  try { resolved=recomputeImagePlaneWarp(warp) } catch(error) { reject(error.message); return errors }
+  const [width,height]=resolved.unwarpedViewportPixels,scale=width/referenceRect[2]
+  if (!finite(scale)||scale<=0||Math.abs(height/referenceRect[3]-scale)>1e-9*Math.max(1,scale)) reject('Unwarped native viewport must be a common uniform scale of independently established reference aspect, not target ROI')
+  const ids=new Set(),sourcePixels=new Set(),targetPixels=new Set(),checks=[]
+  if (!Array.isArray(warp.correspondences)) return [...errors,'Homography needs actual independently measured interior heldouts']
+  for (const item of warp.correspondences) {
+    if (!exactKeys(item,['id','role','referencePixelSource','pixelSource','method','uncertaintyPx','measurementEvidence'])
+      ||!text(item.id)||ids.has(item.id)||!['fit','check'].includes(item.role)||!['manual','optical-flow','image-edge','template-match'].includes(item.method)
+      ||!inRect(item.referencePixelSource,referenceRect)||!inRect(item.pixelSource,[0,0,1920,1080])||!finite(item.uncertaintyPx)||item.uncertaintyPx<0||item.uncertaintyPx>PIXEL_LIMIT||!bound(item.measurementEvidence)) { reject('Invalid independent exact-exposure homography correspondence');continue }
+    const a=canonicalJson(item.referencePixelSource),b=canonicalJson(item.pixelSource)
+    if (sourcePixels.has(a)||targetPixels.has(b)) reject('Homography fit/check pixels must be disjoint actual features')
+    ids.add(item.id);sourcePixels.add(a);targetPixels.add(b)
+    const native=item.referencePixelSource.map((value,i)=>(value-referenceRect[i])*scale),prediction=projectHomography(resolved.renderToSourcePixels,native)
+    if (distance(prediction,item.pixelSource)+item.uncertaintyPx>PIXEL_LIMIT) reject(`Independent ${item.role} homography error plus source uncertainty exceeds ${PIXEL_LIMIT}px`)
+    if (item.role==='check') {
+      const inverse=projectHomography(invertHomography(resolved.renderToSourcePixels),item.pixelSource)
+      if (native[0]<=0||native[1]<=0||native[0]>=width||native[1]>=height||inverse[0]<=0||inverse[1]<=0||inverse[0]>=width||inverse[1]>=height
+        ||warp.cornersSourcePixels.some(corner=>distance(corner,item.pixelSource)<=EPSILON)) reject('Boundary/corner constraints are fits, not actual interior heldouts')
+      checks.push(native)
+    }
+  }
+  let spread=0
+  for (const a of checks) for (const b of checks) spread=Math.max(spread,distance(a,b))
+  if (checks.length<2||spread<0.1*Math.hypot(width,height)) reject('Homography requires >=2 disjoint actual interior heldouts spread across reference content')
+  return errors
+}
 export function cameraEvidenceErrors(data) {
   const errors = [], rigs = new Map((data.sourceCameraRigs ?? []).map(rig => [rig.id, rig])), contexts = new Map(), resolved = new Map(), active = new Set()
   for (const frame of data.frames ?? []) for (const view of frameViews(frame)) contexts.set(`${frame.timeSeconds}/${view.id}`, { frame, view })
@@ -315,11 +454,15 @@ export function cameraEvidenceErrors(data) {
     if (!context?.view.camera) throw new Error(`Missing independently calibrated camera ${key}`)
     active.add(key)
     const { frame, view } = context, evidence = view.cameraEvidence ?? frame.cameraEvidence ?? { kind: 'direct-fit' }
+    if (view.camera.status!=='passed'||!vector(view.camera.positionMetres,3)||!vector(view.camera.quaternion,4)||Math.abs(Math.hypot(...view.camera.quaternion)-1)>0.002||!finite(view.camera.verticalFovDegrees)||view.camera.verticalFovDegrees<=0||view.camera.verticalFovDegrees>=179||sourceImageError(frame.sourceImage,data.source)) throw new Error('Reference/target camera lacks a passed finite physical camera and exact original exposure identity')
     let expected, parentImage, parentRect
+    if (view.imagePlaneWarp != null && evidence.kind !== 'source-image-plane-registered') throw new Error('Authored image-plane warp requires the explicit source-image-plane-registered camera branch')
     if (evidence.kind === 'direct-fit') {
       if (!exactKeys(evidence, ['kind'])) throw new Error('Unknown direct camera evidence fields')
       const landmarks = frame.landmarks?.filter(item => (item.viewId ?? 'main') === view.id) ?? []
       if (landmarks.filter(item => item.role === 'fit').length < 6 || landmarks.filter(item => item.role === 'check').length < 2) throw new Error('Direct camera retains >=6 fit/>=2 held-out guard')
+      if (new Set(landmarks.map(item=>item.anchorId)).size!==landmarks.length||new Set(landmarks.map(item=>canonicalJson(item.pixel))).size!==landmarks.length
+        ||landmarks.some(item=>item.status!=='observed'||!text(item.anchorId)||!inRect(item.pixel,view.rectSourcePixels)||!finite(item.uncertaintyPx)||item.uncertaintyPx<0||item.uncertaintyPx>PIXEL_LIMIT)) throw new Error('Reference direct camera needs distinct actual measured fit/check anchors/pixels')
       expected = cameraParameters(view.camera, view.rectSourcePixels)
     } else {
       if (Object.keys(view.cameraFit ?? {}).length || Object.keys(frame.cameraFit ?? {}).length) throw new Error('Derived camera cannot specify a new camera fit')
@@ -332,9 +475,9 @@ export function cameraEvidenceErrors(data) {
           const registration = rig.independentLoopEvidence?.sourceFrameMap?.find(item => canonicalJson(item.sourceImage) === canonicalJson(frame.sourceImage))
           if (!exactKeys(evidence, ['kind', 'rigId', 'phaseIndex']) || canonicalJson(view.rectSourcePixels) !== canonicalJson(parentRect) || view.presentation !== 'native' || !registration?.phaseAccepted || registration.referencePhaseIndex !== reference.phaseIndex) throw new Error('Current actual source exposure does not establish claimed native whole-source rig phase')
         } else if (!exactKeys(reference, ['rigId', 'phaseIndex'])) throw new Error('Mixed camera reference kinds')
-      } else if (evidence.kind === 'source-registered' && exactKeys(reference, ['timeSeconds', 'viewId'])) {
+      } else if (['source-registered','source-image-plane-registered'].includes(evidence.kind) && exactKeys(reference, ['timeSeconds', 'viewId'])) {
         const parentKey = `${reference.timeSeconds}/${reference.viewId ?? 'main'}`, parent = contexts.get(parentKey)
-        if (!parent || parent.view.presentation !== 'native') throw new Error('Missing or mirrored registration parent')
+        if (!parent || parent.view.presentation !== 'native' || parent.view.imagePlaneWarp != null) throw new Error('Missing, mirrored or already image-warped registration parent')
         expected = resolveCamera(parentKey); parentImage = parent.frame.sourceImage; parentRect = parent.view.rectSourcePixels
       } else throw new Error('Unknown camera evidence kind/reference')
       if (evidence.kind === 'source-registered') {
@@ -351,7 +494,15 @@ export function cameraEvidenceErrors(data) {
         if (roles.fit < 2 || roles.check < 2) throw new Error('Affine needs >=2 fitting and >=2 separately measured held-out correspondences')
         expected = { ...expected, focal: expected.focal * affine[0], principal: expected.principal.map((value, i) => affine[0] * (value + parentRect[i]) + affine[i === 0 ? 2 : 5]) }
       }
-      const actual = cameraParameters(view.camera, view.rectSourcePixels)
+      if (evidence.kind === 'source-image-plane-registered') {
+        if (!exactKeys(evidence,['kind','reference'])) throw new Error('Image-plane camera authority must be the explicit independent reference; H consumes presentation orientation once')
+        const failures=homographyEvidenceErrors(view.imagePlaneWarp,frame.sourceImage,parentImage,parentRect)
+        if (failures.length) throw new Error(failures.join('; '))
+        const scale=view.imagePlaneWarp.unwarpedViewportPixels[0]/parentRect[2]
+        expected={...expected,focal:expected.focal*scale,principal:expected.principal.map(value=>value*scale)}
+      }
+      const nativeRect=view.imagePlaneWarp ? [0,0,...view.imagePlaneWarp.unwarpedViewportPixels] : view.rectSourcePixels
+      const actual = cameraParameters(view.camera, nativeRect)
       if (distance(actual.rotation.flat(), expected.rotation.flat()) > 1e-6 || distance(actual.translation, expected.translation) > 1e-6 || Math.abs(actual.focal - expected.focal) > 1e-4 || distance(actual.principal, expected.principal) > 1e-4) throw new Error('Resolved camera does not equal independent rig/crop pose/intrinsics')
     }
     active.delete(key); resolved.set(key, expected); return expected
@@ -461,7 +612,9 @@ export function inspectReference(data, expectedId, native = null) {
         || (state.status === 'observed' && input?.setup?.counterHeightM === null) || (state.status === 'constrained' && state.input !== null)) fail('mechanical-state', 'Need a closed exclusive observed input/proof with measured numeric counter, or raw input:null with an explicit feasible constrained witness/proof', t, viewId)
       if (state?.status === 'constrained' || state?.status === 'observed') {
         const proof = state.status === 'constrained' ? state.runtimeWitness?.visibilityProof : state.visibilityProof
-        const expected = { sourceVideoId: source.videoId, sourceSha256: source.sha256, sourceImage: frame.sourceImage, modelSha256: data.model.sha256, modelSourceCommit: data.model.sourceCommit, shotId: frame.shotId, viewId, timeSeconds: t, decodedTimeSeconds: frame.decodedTimeSeconds, input, camera, rectSourcePixels: rect, presentation: view.presentation, composite: view.composite ?? { mode: 'opaque' }, partOverrides: view.partOverrides ?? [], constraints: state.runtimeWitness?.constraints ?? [], continuity: state.runtimeWitness?.continuity ?? null, nativeGeometryAssumptions: data.nativeGeometryAssumptions ?? [], sourceNonIdentifiableFixedParts: proof?.sourceNonIdentifiableFixedParts }
+        let resolvedImagePlaneWarp=null,sourceLayout=[]
+        try { resolvedImagePlaneWarp=independentlyResolvedWarp(view);sourceLayout=sourceLayoutForViews(views) } catch(error) { fail('image-plane-warp',error.message,t,viewId) }
+        const expected = { sourceVideoId: source.videoId, sourceSha256: source.sha256, sourceImage: frame.sourceImage, modelSha256: data.model.sha256, modelSourceCommit: data.model.sourceCommit, shotId: frame.shotId, viewId, timeSeconds: t, decodedTimeSeconds: frame.decodedTimeSeconds, input, camera, rectSourcePixels: rect, presentation: view.presentation, imagePlaneWarp:view.imagePlaneWarp??null, resolvedImagePlaneWarp, sourceLayout, composite: view.composite ?? { mode: 'opaque' }, partOverrides: view.partOverrides ?? [], constraints: state.runtimeWitness?.constraints ?? [], continuity: state.runtimeWitness?.continuity ?? null, nativeGeometryAssumptions: data.nativeGeometryAssumptions ?? [], sourceNonIdentifiableFixedParts: proof?.sourceNonIdentifiableFixedParts }
         const landmarks = frame.landmarks.filter(item => (item.viewId ?? 'main') === viewId)
         const errors = state.status === 'constrained' ? witnessErrors(state.runtimeWitness, expected, data.anchors ?? [], landmarks, view) : visibilityProofErrors(state.visibilityProof, expected, data.anchors ?? [], landmarks, view)
         for (const error of errors) fail(state.status === 'constrained' ? 'witness-proof' : 'observed-native-proof', error, t, viewId)
@@ -498,16 +651,21 @@ export function inspectReference(data, expectedId, native = null) {
       const cameraKind = (view.cameraEvidence ?? frame.cameraEvidence ?? { kind: 'direct-fit' }).kind
       if (cameraKind === 'direct-fit') {
         if (fitIds.size < 6 || checkIds.size < 2) fail('independent-check-count', `Direct camera needs >=6 fit and >=2 separately measured held-out anchors; observed ${fitIds.size}/${checkIds.size}`, t, viewId)
-      } else if (!['shared-rigid-sequence', 'source-registered'].includes(cameraKind) || (!checkIds.size && !(view.nativeLineChecks?.length))) fail('derived-native-check', 'Derived camera needs an independently identifiable calibration and actual target native held-out point or native line evidence', t, viewId)
+      } else if (!['shared-rigid-sequence', 'source-registered','source-image-plane-registered'].includes(cameraKind) || (!checkIds.size && !(view.nativeLineChecks?.length))) fail('derived-native-check', 'Derived camera needs an independently identifiable calibration and actual target native held-out point or native line evidence', t, viewId)
       for (const item of landmarks) if (item.measurementEvidence || item.trackingEvidence) for (const error of measuredImageErrors(item, frame.sourceImage)) fail('measurement-image-binding', `${item.anchorId}: ${error}`, t, viewId)
       for (const error of nativeLineErrors(view.nativeLineChecks ?? [], frame.sourceImage, rect, view.partOverrides ?? [])) fail('native-line-evidence', error, t, viewId)
+      if (view.imagePlaneWarp) for (const line of view.nativeLineChecks??[]) {
+        const e=line.measurementEvidence,region=e?.axisPerspectiveBiasRegionViewportPixels,[w,h]=view.imagePlaneWarp.unwarpedViewportPixels
+        if (!['source-global','unwarped-viewport'].includes(e?.axisPerspectiveBiasSpace)
+          ||(e.axisPerspectiveBiasSpace==='unwarped-viewport'&&(!vector(region,4)||region[0]<0||region[1]<0||region[2]<=0||region[3]<=0||region[0]+region[2]>w||region[1]+region[3]>h))) fail('native-line-warp-uncertainty','Warped line must explicitly bind final-source bias or a bounded unwarped viewport bias region for Jacobian propagation',t,viewId)
+      }
       const contourIds = new Set()
       for (const contour of view.sourceContourChecks ?? []) {
         if (!text(contour.id) || contourIds.has(contour.id) || !text(contour.partPath) || !contour.partPath.startsWith('harmonic-analyzer/') || !Array.isArray(contour.sourceContourPixels) || contour.sourceContourPixels.length < 2 || !contour.sourceContourPixels.every(point => inRect(point, rect)) || contour.sourceContourPixels.every(point => canonicalJson(point) === canonicalJson(contour.sourceContourPixels[0])) || !finite(contour.uncertaintyPx) || contour.uncertaintyPx < 0 || contour.uncertaintyPx > PIXEL_LIMIT || canonicalJson(contour.measurementEvidence?.sourceImage) !== canonicalJson(frame.sourceImage) || !text(contour.measurementEvidence?.evidence)) fail('source-contour-evidence', 'Need a distinct nondegenerate actually measured current-source native contour inside ROI with bounded uncertainty', t, viewId)
         contourIds.add(contour.id)
       }
       const composite = view.composite ?? { mode: 'opaque' }
-      if (composite.mode === 'opaque' ? !exactKeys(composite, ['mode']) : composite.mode !== 'crossfade' || !exactKeys(composite, ['mode', 'groupId', 'opacity']) || !text(composite.groupId) || !finite(composite.opacity) || composite.opacity < 0 || composite.opacity > 1 || !text(view.compositeEvidence)) fail('source-composite', 'Need explicit opaque mode or source-measured crossfade group/weight evidence', t, viewId)
+      if (composite.mode === 'opaque' ? !exactKeys(composite, ['mode']) : composite.mode !== 'crossfade' || !exactKeys(composite, ['mode', 'groupId', 'imageLayerId', 'opacity']) || !text(composite.groupId) || !text(composite.imageLayerId) || !finite(composite.opacity) || composite.opacity < 0 || composite.opacity > 1 || !text(view.compositeEvidence)) fail('source-composite', 'Need explicit opaque mode or source-measured crossfade group/image identity/common weight evidence', t, viewId)
       if (composite.mode === 'crossfade' && composite.opacity <= 0 && (landmarks.length || view.nativeLineChecks?.length)) fail('dropped-source-layer', 'Source-discernible corresponding points/lines cannot have zero rendered image contribution', t, viewId)
       if ([...checkIds].some(id => fitIds.has(id)) || checkPixels.some(pixel => fitPixels.some(fit => vector(pixel, 2) && vector(fit, 2) && Math.hypot(pixel[0] - fit[0], pixel[1] - fit[1]) < EPSILON))) fail('fit-check-leakage', 'A held-out anchor/pixel cannot also be a camera-fitting observation', t, viewId)
     }
@@ -583,35 +741,55 @@ export function errorStats(values) {
   return { count: values.length, maxPx: maximum, rmsPx: Math.sqrt(sumSquares / values.length) }
 }
 
-/** Half-open ROI edge partition: disjoint source tiles do not share an opacity budget. */
+/** Independent convex-edge arrangement; an image's supported union spends its weight once. */
 export function sourceCompositeErrors(views) {
-  const failures = [], completedGroups = new Set()
-  for (let index = 0; index < views.length;) {
-    const first = views[index], composite = first.composite ?? { mode: 'opaque' }
-    if (composite.mode !== 'crossfade') { index++; continue }
-    const groupId = composite.groupId, stack = []
-    const reject = (code, detail) => failures.push({ code, detail, viewId: first.id })
-    if (completedGroups.has(groupId)) reject('composite-layer-order', 'Crossfade group must be one contiguous actual source layer stack')
+  const failures=[],completedGroups=new Set()
+  for (let index=0;index<views.length;) {
+    const first=views[index],composite=first.composite??{mode:'opaque'}
+    if (composite.mode!=='crossfade') { index++;continue }
+    const groupId=composite.groupId,stack=[],reject=(code,detail)=>failures.push({code,detail,viewId:first.id})
+    if (!text(groupId)||completedGroups.has(groupId)) reject('composite-layer-order','Crossfade group must have an explicit identity and be contiguous')
     completedGroups.add(groupId)
-    while (index < views.length && views[index].composite?.mode === 'crossfade' && views[index].composite.groupId === groupId) stack.push(views[index++])
-    if (stack.length < 2 || stack.some(view => !vector(view.rectSourcePixels, 4) || view.rectSourcePixels[2] <= 0 || view.rectSourcePixels[3] <= 0 || !finite(view.composite.opacity) || view.composite.opacity < 0 || view.composite.opacity > 1)) {
-      reject('composite-layer-weights', 'Need >=2 measured layers with finite source ROIs and individual contribution in [0,1]')
-      continue
-    }
-    const xs = [...new Set(stack.flatMap(view => [view.rectSourcePixels[0], view.rectSourcePixels[0] + view.rectSourcePixels[2]]))].sort((a, b) => a - b)
-    const ys = [...new Set(stack.flatMap(view => [view.rectSourcePixels[1], view.rectSourcePixels[1] + view.rectSourcePixels[3]]))].sort((a, b) => a - b)
-    let positive = false
-    for (let y = 0; y < ys.length - 1; y++) for (let x = 0; x < xs.length - 1; x++) {
-      let weight = 0, active = 0
-      for (const view of stack) {
-        const [left, top, width, height] = view.rectSourcePixels
-        if (xs[x] >= left && xs[x] < left + width && ys[y] >= top && ys[y] < top + height) { weight += view.composite.opacity; active++ }
+    while(index<views.length&&views[index].composite?.mode==='crossfade'&&views[index].composite.groupId===groupId) stack.push(views[index++])
+    const images=new Map(),completedImages=new Set();let previous=null,invalid=false
+    for (const view of stack) {
+      const c=view.composite
+      if (!exactKeys(c,['mode','groupId','imageLayerId','opacity'])||!text(c.imageLayerId)||!finite(c.opacity)||c.opacity<0||c.opacity>1) { reject('composite-layer-weights','Explicit imageLayerId and common image opacity in [0,1] are required');invalid=true;continue }
+      if (c.imageLayerId!==previous) {
+        if(completedImages.has(c.imageLayerId)) reject('composite-image-order','Views within one crossfade image must be contiguous')
+        completedImages.add(c.imageLayerId);previous=c.imageLayerId
       }
-      if (!active) continue
-      positive ||= weight > 0
-      if (weight > 1 + EPSILON) reject('composite-layer-weights', `Measured source group ${groupId} has active weight ${weight}>1 in half-open source cell [${xs[x]},${ys[y]},${xs[x + 1] - xs[x]},${ys[y + 1] - ys[y]}]; no normalization or alpha-over rescue`)
+      if(images.has(c.imageLayerId)&&images.get(c.imageLayerId)!==c.opacity) reject('composite-image-weights','Every view of one image must have exactly the same common weight')
+      images.set(c.imageLayerId,c.opacity)
     }
-    if (!positive) reject('composite-layer-weights', 'Measured source group has no positive image contribution anywhere in its ROI union')
+    if(images.size<2) reject('composite-layer-weights','A crossfade needs at least two explicitly distinct actual images')
+    if(invalid) continue
+    let polygons
+    try { polygons=stack.map(sourceSupportPolygon) } catch(error) { reject('composite-support',error.message);continue }
+    const edges=polygons.flatMap(p=>p.map((a,i)=>[a,p[(i+1)%p.length]])),xs=polygons.flatMap(p=>p.map(point=>point[0]))
+    // Add every segment-crossing x: vertical support order is fixed inside each slab.
+    for(let a=0;a<edges.length;a++) for(let b=a+1;b<edges.length;b++) {
+      const [p,q]=edges[a],[r,s]=edges[b],u=q.map((v,i)=>v-p[i]),v=s.map((x,i)=>x-r[i]),d=u[0]*v[1]-u[1]*v[0]
+      if(Math.abs(d)<1e-12) continue
+      const z=r.map((x,i)=>x-p[i]),t=(z[0]*v[1]-z[1]*v[0])/d,k=(z[0]*u[1]-z[1]*u[0])/d
+      if(t>0&&t<1&&k>0&&k<1) xs.push(p[0]+t*u[0])
+    }
+    const cuts=[...new Set(xs)].sort((a,b)=>a-b);let positive=false
+    for(let x=0;x+1<cuts.length;x++) {
+      if(cuts[x+1]-cuts[x]<=1e-10) continue
+      const midpoint=(cuts[x]+cuts[x+1])/2,ys=[]
+      for(const [a,b] of edges) if(midpoint>Math.min(a[0],b[0])&&midpoint<Math.max(a[0],b[0])) ys.push(a[1]+(midpoint-a[0])*(b[1]-a[1])/(b[0]-a[0]))
+      const ycuts=[...new Set(ys)].sort((a,b)=>a-b)
+      for(let y=0;y+1<ycuts.length;y++) {
+        if(ycuts[y+1]-ycuts[y]<=1e-10) continue
+        const point=[midpoint,(ycuts[y]+ycuts[y+1])/2],active=new Set()
+        for(const view of stack) if(sourcePointSupported(view,point)) active.add(view.composite.imageLayerId)
+        let weight=0;for(const image of active) weight+=images.get(image)
+        positive||=weight>0
+        if(weight>1+EPSILON) reject('composite-layer-weights',`Measured image-union group ${groupId} has positive-area weight ${weight}>1 near source ${JSON.stringify(point)}; no normalization/double camera-view weighting rescue`)
+      }
+    }
+    if(!positive) reject('composite-layer-weights','Crossfade image support has no positive-area contribution')
   }
   return failures
 }

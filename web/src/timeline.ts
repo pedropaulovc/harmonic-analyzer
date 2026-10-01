@@ -292,11 +292,12 @@ function compileImagePlaneWarps(data: ReferenceFile, observations: readonly Obse
     if (active.has(key)) throw new Error('Camera registration dependency cycle.')
     const context = contexts.get(key)
     if (!context?.view.camera) throw new Error(`Missing independently calibrated camera ${key}.`)
+    const observedCamera = context.view.camera
     active.add(key)
     const { frame, view } = context, label = `Source camera ${key}`, evidence = view.cameraEvidence ?? frame.cameraEvidence ?? { kind: 'direct-fit' as const }
     requireImage(frame.sourceImage, data.source.sha256, label)
-    requireCamera(view.camera, label)
-    if (view.camera.status !== 'passed' || view.camera.heldOutMaxPx > LANDMARK_LIMIT_PX) throw new Error(`${label}: reference camera is not independently qualified.`)
+    requireCamera(observedCamera, label)
+    if (observedCamera.status !== 'passed' || observedCamera.heldOutMaxPx > LANDMARK_LIMIT_PX) throw new Error(`${label}: reference camera is not independently qualified.`)
     let result: ResolvedReferenceCamera
     if (evidence.kind === 'direct-fit') {
       exactFields(evidence, ['kind'], label)
@@ -305,7 +306,7 @@ function compileImagePlaneWarps(data: ReferenceFile, observations: readonly Obse
       const fits = landmarks.filter((landmark) => landmark.role === 'fit'), checks = landmarks.filter((landmark) => landmark.role === 'check')
       const fitIds = new Set(fits.map((landmark) => landmark.anchorId)), checkIds = new Set(checks.map((landmark) => landmark.anchorId))
       if (fitIds.size < 6 || checkIds.size < 2 || checks.some((check) => fitIds.has(check.anchorId))) throw new Error(`${label}: direct parent needs six fits and two disjoint independent held-outs.`)
-      result = { camera: { positionMetres: [...view.camera.positionMetres], quaternion: [...view.camera.quaternion], verticalFovDegrees: view.camera.verticalFovDegrees, principalPointViewportPixels: view.camera.principalPointViewportPixels ? [...view.camera.principalPointViewportPixels] : [view.rectSourcePixels[2] / 2, view.rectSourcePixels[3] / 2] }, viewport: [view.rectSourcePixels[2], view.rectSourcePixels[3]], rect: view.rectSourcePixels, sourceImage: frame.sourceImage }
+      result = { camera: { positionMetres: [...observedCamera.positionMetres], quaternion: [...observedCamera.quaternion], verticalFovDegrees: observedCamera.verticalFovDegrees, principalPointViewportPixels: observedCamera.principalPointViewportPixels ? [...observedCamera.principalPointViewportPixels] : [view.rectSourcePixels[2] / 2, view.rectSourcePixels[3] / 2] }, viewport: [view.rectSourcePixels[2], view.rectSourcePixels[3]], rect: view.rectSourcePixels, sourceImage: frame.sourceImage }
     } else {
       if (Object.keys(view.cameraFit ?? {}).length || Object.keys(frame.cameraFit ?? {}).length) throw new Error(`${label}: derived camera cannot specify a new fit.`)
       const reference = evidence.kind === 'shared-rigid-sequence' ? { rigId: evidence.rigId, phaseIndex: evidence.phaseIndex } : evidence.reference
@@ -381,7 +382,7 @@ function compileImagePlaneWarps(data: ReferenceFile, observations: readonly Obse
         if (checks.length < 2 || !checks.some((point, i) => checks.slice(i + 1).some((other) => Math.hypot(point[0] - other[0], point[1] - other[1]) >= 0.1 * Math.hypot(...viewport)))) throw new Error(`${label}: two spread independently measured interior checks required.`)
         warps.set(view, warp)
       } else throw new Error(`${label}: unknown camera evidence branch.`)
-      matchingCamera(view.camera, camera, viewport, label)
+      matchingCamera(observedCamera, camera, viewport, label)
       result = { camera, viewport, rect: view.rectSourcePixels, sourceImage: frame.sourceImage }
     }
     active.delete(key); resolved.set(key, result)

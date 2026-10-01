@@ -99,6 +99,25 @@
       ],
       "properties": {"fitPrincipalPoint": {"type": "boolean"}, "principalPointViewportPixels": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "number"}, "description": "Fixed independently evidenced principal point, viewport-local and unmirrored; may lie outside the viewport."}, "verticalFovDegrees": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 180}, "evidence": {"type": "string", "minLength": 1, "pattern": "\\S"}}
     },
+    "cameraReference": {"oneOf": [{"type": "object", "required": ["timeSeconds", "viewId"], "additionalProperties": false, "properties": {"timeSeconds": {"type": "number", "minimum": 0}, "viewId": {"type": ["string", "null"]}}}, {"type": "object", "required": ["rigId", "phaseIndex"], "additionalProperties": false, "properties": {"rigId": {"$ref": "#/$defs/sourceEvidence"}, "phaseIndex": {"type": "integer", "minimum": 0, "maximum": 70}}}]},
+    "warpViewport": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "number", "exclusiveMinimum": 0}},
+    "warpMeasurementEvidence": {"type": "object", "required": ["sourceImage", "referenceSourceImage", "evidence"], "properties": {"sourceImage": {"$ref": "#/$defs/sourceImage"}, "referenceSourceImage": {"$ref": "#/$defs/sourceImage"}, "evidence": {"$ref": "#/$defs/sourceEvidence"}}, "description": "Exact independently decoded original target and reference exposures plus the actual measurement recipe. Projected/inverse-warped native points are not source observations."},
+    "imagePlaneWarp": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "unwarpedViewportPixels", "cornersSourcePixels", "sourceImage", "referenceSourceImage", "cornerMeasurementEvidence", "correspondences"],
+      "properties": {
+        "kind": {"const": "homography"}, "unwarpedViewportPixels": {"$ref": "#/$defs/warpViewport"},
+        "cornersSourcePixels": {"type": "array", "minItems": 4, "maxItems": 4, "items": {"$ref": "#/$defs/pixelPair"}, "description": "Measured image boundaries in reference TL,TR,BR,BL identity order; sole H authority, all four are fitting constraints."},
+        "sourceImage": {"$ref": "#/$defs/sourceImage"}, "referenceSourceImage": {"$ref": "#/$defs/sourceImage"},
+        "cornerMeasurementEvidence": {"$ref": "#/$defs/warpMeasurementEvidence"},
+        "correspondences": {"type": "array", "minItems": 2, "contains": {"required": ["role"], "properties": {"role": {"const": "check"}}}, "minContains": 2, "items": {
+          "type": "object", "additionalProperties": false, "required": ["id", "role", "referencePixelSource", "pixelSource", "method", "uncertaintyPx", "measurementEvidence"],
+          "properties": {"id": {"$ref": "#/$defs/sourceEvidence"}, "role": {"enum": ["fit", "check"]}, "referencePixelSource": {"$ref": "#/$defs/pixelPair"}, "pixelSource": {"$ref": "#/$defs/pixelPair"}, "method": {"enum": ["manual", "optical-flow", "image-edge", "template-match"]}, "uncertaintyPx": {"type": "number", "minimum": 0, "maximum": 38.4}, "measurementEvidence": {"$ref": "#/$defs/warpMeasurementEvidence"}}
+        }, "description": "At least two disjoint genuinely measured interior image-feature checks spread across reference content; corners and fit rows do not count."}
+      }
+    },
+    "resolvedImagePlaneWarp": {"type": "object", "additionalProperties": false, "required": ["kind", "unwarpedViewportPixels", "renderToSourcePixels"], "properties": {"kind": {"const": "homography"}, "unwarpedViewportPixels": {"$ref": "#/$defs/warpViewport"}, "renderToSourcePixels": {"type": "array", "minItems": 9, "maxItems": 9, "items": {"type": "number"}}}, "description": "Derived row-major native-unmirrored-viewport to original source-global pixel H. Independently recomputed from four measured corners; never an authored second authority."},
+    "sourceLayout": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["viewId", "rectSourcePixels", "presentation", "composite", "resolvedImagePlaneWarp"], "properties": {"viewId": {"$ref": "#/$defs/sourceEvidence"}, "rectSourcePixels": {"$ref": "#/$defs/xyzw"}, "presentation": {"enum": ["native", "horizontal-mirror"]}, "composite": {"$ref": "#/$defs/sourceComposite"}, "resolvedImagePlaneWarp": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/resolvedImagePlaneWarp"}]}}}, "description": "Complete ordered simultaneous view support. Later views in one image mask earlier supported pixels; distinct fading images contribute their common image weight once."},
     "pixelPair": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "number"}},
     "cameraMeasurement": {
       "type": "object",
@@ -121,11 +140,14 @@
             "detector": {"type": "string", "minLength": 1, "pattern": "\\S"},
             "edgeRows": {"type": "array", "minItems": 2, "items": {"type": "object", "required": ["y", "left", "right", "contrast"], "properties": {"y": {"type": "number"}, "left": {"type": "number"}, "right": {"type": "number"}, "contrast": {"type": "number", "exclusiveMinimum": 0}}}},
             "axisPerspectiveBiasBoundPx": {"type": "number", "minimum": 0},
+            "axisPerspectiveBiasSpace": {"enum": ["source-global", "unwarped-viewport"], "description": "Mandatory for homography views; unwarped bounds are propagated by an independently recomputed H Jacobian, never reused as final-source pixels."},
+            "axisPerspectiveBiasRegionViewportPixels": {"$ref": "#/$defs/xyzw"},
             "axisPerspectiveEvidence": {"type": "string", "minLength": 1, "pattern": "\\S", "description": "Physical justification and independent bound for silhouette midpoint versus projected cylinder-axis perspective asymmetry; source-image edge pairs remain the observations."}
           }
         }
       }
     },
+    "warpedNativeLineCheck": {"allOf": [{"$ref": "#/$defs/nativeLineCheck"}, {"properties": {"measurementEvidence": {"required": ["axisPerspectiveBiasSpace"], "allOf": [{"if": {"properties": {"axisPerspectiveBiasSpace": {"const": "unwarped-viewport"}}}, "then": {"required": ["axisPerspectiveBiasRegionViewportPixels"]}}]}}}]},
     "sourceContourCheck": {
       "type": "object",
       "required": ["id", "partPath", "sourceContourPixels", "uncertaintyPx", "measurementEvidence"],
@@ -163,6 +185,7 @@
       "oneOf": [
         {"type": "object", "required": ["kind"], "additionalProperties": false, "properties": {"kind": {"const": "direct-fit"}}},
         {"type": "object", "required": ["kind", "rigId", "phaseIndex"], "additionalProperties": false, "properties": {"kind": {"const": "shared-rigid-sequence"}, "rigId": {"type": "string", "minLength": 1}, "phaseIndex": {"type": "integer", "minimum": 0, "maximum": 70}}},
+        {"type": "object", "required": ["kind", "reference"], "additionalProperties": false, "properties": {"kind": {"const": "source-image-plane-registered"}, "reference": {"$ref": "#/$defs/cameraReference"}}},
         {
           "type": "object",
           "required": ["kind", "reference", "sourceToViewportPixels", "sourceImage", "referenceSourceImage", "correspondences"],
@@ -186,7 +209,7 @@
     "landmark": {
       "type": "object",
       "required": ["anchorId", "role", "pixel", "status", "method", "uncertaintyPx"],
-      "properties": {"anchorId": {"type": "string"}, "viewId": {"type": "string"}, "role": {"enum": ["fit", "check"]}, "pixel": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "number"}}, "status": {"const": "observed"}, "method": {"enum": ["manual", "optical-flow", "image-edge", "template-match"]}, "uncertaintyPx": {"type": "number", "minimum": 0}}
+      "properties": {"anchorId": {"type": "string"}, "viewId": {"type": "string"}, "role": {"enum": ["fit", "check"]}, "pixel": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "number"}}, "status": {"const": "observed"}, "method": {"enum": ["manual", "optical-flow", "image-edge", "template-match"]}, "uncertaintyPx": {"type": "number", "minimum": 0, "description": "Qualified conservative Euclidean source-pixel measurement bound including source localization/raster quantization. Native GPU raster uncertainty is independently propagated and added once; unknown/null source uncertainty cannot become zero."}}
     },
     "mechanismInput": {
       "type": "object",
@@ -242,7 +265,7 @@
     "sourceComposite": {
       "oneOf": [
         {"type": "object", "required": ["mode"], "additionalProperties": false, "properties": {"mode": {"const": "opaque"}}},
-        {"type": "object", "required": ["mode", "groupId", "opacity"], "additionalProperties": false, "properties": {"mode": {"const": "crossfade"}, "groupId": {"$ref": "#/$defs/sourceEvidence"}, "opacity": {"type": "number", "minimum": 0, "maximum": 1}}}
+        {"type": "object", "required": ["mode", "groupId", "imageLayerId", "opacity"], "additionalProperties": false, "properties": {"mode": {"const": "crossfade"}, "groupId": {"$ref": "#/$defs/sourceEvidence"}, "imageLayerId": {"$ref": "#/$defs/sourceEvidence"}, "opacity": {"type": "number", "minimum": 0, "maximum": 1}}}
       ]
     },
     "sourcePartOverride": {
@@ -253,7 +276,7 @@
     },
     "witnessBinding": {
       "type": "object",
-      "required": ["sourceVideoId", "sourceSha256", "sourceImage", "modelSha256", "modelSourceCommit", "nativeGeometryAssumptions", "sourceNonIdentifiableFixedParts", "shotId", "viewId", "timeSeconds", "decodedTimeSeconds", "intervalSeconds", "input", "camera", "rectSourcePixels", "presentation", "composite", "partOverrides", "constraints", "continuity"],
+      "required": ["sourceVideoId", "sourceSha256", "sourceImage", "modelSha256", "modelSourceCommit", "nativeGeometryAssumptions", "sourceNonIdentifiableFixedParts", "shotId", "viewId", "timeSeconds", "decodedTimeSeconds", "intervalSeconds", "input", "camera", "rectSourcePixels", "presentation", "imagePlaneWarp", "resolvedImagePlaneWarp", "sourceLayout", "composite", "partOverrides", "constraints", "continuity"],
       "additionalProperties": false,
       "description": "Runtime verification requires exact equality with the enclosing source/model/frame/view identity, complete witness input, camera, ROI, presentation, composite, overrides, constraints, continuity, declared geometry assumptions and the proof's exact source-non-identifiable fixed-part records including their literal authority; this record is not an independent or status-only assertion.",
       "properties": {
@@ -265,6 +288,9 @@
         "timeSeconds": {"type": "number", "minimum": 0}, "decodedTimeSeconds": {"type": "number", "minimum": 0}, "intervalSeconds": {"$ref": "#/$defs/timeInterval"},
         "input": {"$ref": "#/$defs/mechanismInput"}, "camera": {"allOf": [{"$ref": "#/$defs/camera"}, {"type": "object"}]},
         "rectSourcePixels": {"$ref": "#/$defs/xyzw"}, "presentation": {"enum": ["native", "horizontal-mirror"]},
+        "imagePlaneWarp": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/imagePlaneWarp"}]},
+        "resolvedImagePlaneWarp": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/resolvedImagePlaneWarp"}]},
+        "sourceLayout": {"$ref": "#/$defs/sourceLayout"},
         "composite": {"$ref": "#/$defs/sourceComposite"}, "partOverrides": {"type": "array", "items": {"$ref": "#/$defs/sourcePartOverride"}},
         "constraints": {"type": "array", "items": {"$ref": "#/$defs/sourceConstraint"}}, "continuity": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/continuity"}]}
       }
@@ -320,7 +346,7 @@
     "view": {
       "type": "object",
       "required": ["id", "rectSourcePixels", "presentation", "camera", "mechanicalState"],
-      "allOf": [{"if": {"required": ["mechanicalState"], "properties": {"mechanicalState": {"required": ["status"], "properties": {"status": {"enum": ["observed", "constrained"]}}}}}, "then": {"properties": {"camera": {"type": "object"}}}}, {"if": {"required": ["composite"], "properties": {"composite": {"required": ["mode"], "properties": {"mode": {"const": "crossfade"}}}}}, "then": {"required": ["compositeEvidence"]}}],
+      "allOf": [{"if": {"required": ["mechanicalState"], "properties": {"mechanicalState": {"required": ["status"], "properties": {"status": {"enum": ["observed", "constrained"]}}}}}, "then": {"properties": {"camera": {"type": "object"}}}}, {"if": {"required": ["composite"], "properties": {"composite": {"required": ["mode"], "properties": {"mode": {"const": "crossfade"}}}}}, "then": {"required": ["compositeEvidence"]}}, {"if": {"required": ["imagePlaneWarp"]}, "then": {"required": ["cameraEvidence"], "properties": {"cameraEvidence": {"properties": {"kind": {"const": "source-image-plane-registered"}}}, "nativeLineChecks": {"items": {"$ref": "#/$defs/warpedNativeLineCheck"}}}}}, {"if": {"required": ["cameraEvidence"], "properties": {"cameraEvidence": {"required": ["kind"], "properties": {"kind": {"const": "source-image-plane-registered"}}}}}, "then": {"required": ["imagePlaneWarp"]}}],
       "properties": {
         "id": {"type": "string"},
         "rectSourcePixels": {"$ref": "#/$defs/xyzw"},
@@ -328,6 +354,7 @@
         "camera": {"$ref": "#/$defs/camera"},
         "cameraFit": {"$ref": "#/$defs/cameraFit"},
         "cameraEvidence": {"$ref": "#/$defs/cameraEvidence"},
+        "imagePlaneWarp": {"$ref": "#/$defs/imagePlaneWarp"},
         "nativeLineChecks": {"type": "array", "items": {"$ref": "#/$defs/nativeLineCheck"}},
         "sourceContourChecks": {"type": "array", "items": {"$ref": "#/$defs/sourceContourCheck"}},
         "composite": {"$ref": "#/$defs/sourceComposite"},
@@ -344,6 +371,8 @@
         {"if": {"required": ["mechanicalState"], "properties": {"mechanicalState": {"required": ["status"], "properties": {"status": {"enum": ["observed", "constrained"]}}}}}, "then": {"required": ["sourceImage"]}},
         {"if": {"required": ["views"], "properties": {"views": {"contains": {"required": ["mechanicalState"], "properties": {"mechanicalState": {"required": ["status"], "properties": {"status": {"enum": ["observed", "constrained"]}}}}}}}}, "then": {"required": ["sourceImage"]}},
         {"if": {"not": {"required": ["views"]}, "properties": {"mechanicalState": {"required": ["status"], "properties": {"status": {"enum": ["observed", "constrained"]}}}}}, "then": {"properties": {"camera": {"type": "object"}}}},
+        {"if": {"required": ["imagePlaneWarp"]}, "then": {"required": ["cameraEvidence"], "properties": {"cameraEvidence": {"properties": {"kind": {"const": "source-image-plane-registered"}}}, "nativeLineChecks": {"items": {"$ref": "#/$defs/warpedNativeLineCheck"}}}}},
+        {"if": {"required": ["cameraEvidence"], "properties": {"cameraEvidence": {"required": ["kind"], "properties": {"kind": {"const": "source-image-plane-registered"}}}}}, "then": {"required": ["imagePlaneWarp"]}},
         {"if": {"required": ["composite"], "properties": {"composite": {"required": ["mode"], "properties": {"mode": {"const": "crossfade"}}}}}, "then": {"required": ["compositeEvidence"]}}
       ],
       "properties": {
@@ -357,6 +386,7 @@
         "composite": {"$ref": "#/$defs/sourceComposite"},
         "compositeEvidence": {"$ref": "#/$defs/sourceEvidence"},
         "cameraEvidence": {"$ref": "#/$defs/cameraEvidence"},
+        "imagePlaneWarp": {"$ref": "#/$defs/imagePlaneWarp"},
         "sourceImage": {"$ref": "#/$defs/sourceImage"}, "cameraFit": {"$ref": "#/$defs/cameraFit"}, "anchorPoseMissing": {"type": "array", "items": {"type": "string"}}
       }
     }

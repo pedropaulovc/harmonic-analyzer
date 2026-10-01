@@ -110,8 +110,8 @@ unmeasured poses are not a complete physical match. The PDF page-by-page guide
 video (`rMHw9GCAtE8`) is excluded by user scope; its footage is not part of the
 catalog, observations or acceptance.
 
-Measured photo/page transforms use `cameraEvidence.kind:
-source-image-plane-registered` and an authored `imagePlaneWarp`. Ordered physical
+Measured photo/page transforms use the `source-image-plane-registered` camera
+evidence kind and an authored `imagePlaneWarp`. Ordered physical
 corner identities and the unwarped viewport determine the sole homography;
 independent interior checks cannot be reused fitting corners. The reference
 camera must be qualified independently. Native pose, field of view and reference

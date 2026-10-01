@@ -3,7 +3,7 @@ import { mkdir, writeFile, stat } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { VIDEO_IDS, MODEL_SHA256, MODEL_COMMIT, PIXEL_LIMIT, CLOCK_LIMIT, loadReferences, frameViews, sourceNeedsMachine, sourceCompositeErrors, nonIdentifiableFixedPartErrors, requiredRuns, frameIndexAt, errorStats, jsonDigest } from './verify-reference.mjs'
+import { VIDEO_IDS, MODEL_SHA256, MODEL_COMMIT, PIXEL_LIMIT, CLOCK_LIMIT, loadReferences, frameViews, sourceNeedsMachine, sourceCompositeErrors, sourceLayoutForViews, independentlyResolvedWarp, sameResolvedImagePlaneWarp, sameSourceLayout, sourcePointUnmasked, homographyMagnificationBound, projectHomography, invertHomography, nonIdentifiableFixedPartErrors, requiredRuns, frameIndexAt, errorStats, jsonDigest } from './verify-reference.mjs'
 import { distManifest, serveDist } from './verify-server.mjs'
 
 const WEB_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -40,6 +40,101 @@ function nearlyEqual(a, b, tolerance) {
   return a === b
 }
 const sameCamera = (a, b, rect = null) => !!a && !!b && nearlyEqual(a.positionMetres, b.positionMetres, CAMERA_TOLERANCE) && (nearlyEqual(a.quaternion, b.quaternion, CAMERA_TOLERANCE) || nearlyEqual(a.quaternion, b.quaternion?.map(value => -value), CAMERA_TOLERANCE)) && nearlyEqual(a.verticalFovDegrees, b.verticalFovDegrees, CAMERA_TOLERANCE) && nearlyEqual(a.principalPointViewportPixels ?? (rect ? [rect[2] / 2, rect[3] / 2] : null), b.principalPointViewportPixels ?? (rect ? [rect[2] / 2, rect[3] / 2] : null), CAMERA_TOLERANCE)
+const nativeCameraRect = view => view.imagePlaneWarp ? [0,0,...view.imagePlaneWarp.unwarpedViewportPixels] : view.rectSourcePixels
+const expectedLayout = view => view.sourceLayout ?? (view.mechanicalState?.runtimeWitness?.visibilityProof ?? view.mechanicalState?.visibilityProof)?.binding?.sourceLayout
+/** Explicit derived H/support binding is mandatory even for ordinary null-warp captures. */
+export function sourceCaptureBindingErrors(view,capture) {
+  const errors=[],warp=independentlyResolvedWarp(view),layout=expectedLayout(view)
+  if(!capture||!Object.hasOwn(capture,'resolvedImagePlaneWarp')||!sameResolvedImagePlaneWarp(capture.resolvedImagePlaneWarp,warp)||!sameSourceLayout(capture.sourceLayout,layout)) errors.push('Actual native capture has stale/missing resolved homography or ordered source support layout')
+  if(capture?.method==='actual-native-mechanism-solve') {
+    if(!Object.hasOwn(capture,'imagePlaneWarp')||jsonDigest(capture.imagePlaneWarp)!==jsonDigest(view.imagePlaneWarp??null)) errors.push('Actual mechanism authored warp is stale/missing')
+  } else if(capture?.presentation!==view.presentation) errors.push('Actual native capture presentation metadata is stale/mismatched; H already consumes its orientation')
+  return errors
+}
+/** A matched draw cannot bridge point certificates or an unqualified interval. */
+export function renderedCertificateErrors(rendered,timeSeconds) {
+  const errors=[],covers=proof=>{
+    const interval=proof?.binding?.intervalSeconds
+    return Array.isArray(interval)&&interval.length===2&&interval.every(finite)&&interval[0]<=timeSeconds&&interval[1]>=timeSeconds
+  }
+  if(!finite(timeSeconds)||!covers(rendered?.visibilityProof)) errors.push('Matched native draw is outside the current independently bound visibility certificate interval')
+  const sampling=rendered?.sourceSampling
+  if(!sampling||!['continuous','decoded-exposure'].includes(sampling.selection)||!finite(sampling.mix)||sampling.mix<0||sampling.mix>1||!finite(sampling.fromTimeSeconds)||!finite(sampling.toTimeSeconds)||sampling.fromTimeSeconds>sampling.toTimeSeconds) errors.push('Matched native draw lacks explicit continuous/decoded-exposure source sampling')
+  else if(sampling.selection==='decoded-exposure') {
+    if(sampling.mix!==0||sampling.fromTimeSeconds!==sampling.toTimeSeconds||rendered.visibilityProofEnd!==null) errors.push('Certified decoded-exposure hold cannot interpolate endpoints or an H trajectory')
+  } else if(sampling.mix>0&&!covers(rendered.visibilityProofEnd)) errors.push('Continuous native draw is outside its separately bound endpoint certificate interval')
+  return errors
+}
+/** Independently inspect actual sparse readback support; no CPU visibility surrogate. */
+export function nativeRasterSupportErrors(view,capture) {
+  const errors=sourceCaptureBindingErrors(view,capture)
+  if(capture?.method!=='gpu-readback'||capture.status!=='captured'||!['depth-off-landmark-projection','depth-off-native-line-projection','depth-tested-native-surfaces'].includes(capture.visibilityMode)) return [...errors,'Native support requires a fresh actual GPU diagnostic raster, not CPU visibility/projection']
+  const layout=expectedLayout(view),index=layout?.findIndex(item=>item.viewId===view.id)
+  if(index===undefined||index<0) return [...errors,'Native support layout omits the actual view identity']
+  const points=[]
+  if(capture.visibilityMode==='depth-tested-native-surfaces') {
+    if(!Array.isArray(capture.parts)||capture.parts.length<435||new Set(capture.parts.map(part=>part.partPath)).size!==capture.parts.length) errors.push('Native support requires the complete unique all435 depth-ID census')
+    for(const part of capture.parts??[]) if(part.pixelCount>0) {
+      if(!Array.isArray(part.contourSourcePixels)||!part.contourSourcePixels.length||!part.contourSourcePixels.every(vec2)) errors.push(`Actual visible native part lacks depth-ID boundary pixels: ${part.partPath}`)
+      else points.push(...part.contourSourcePixels)
+    }
+  } else if(capture.visibilityMode==='depth-off-native-line-projection') {
+    for(const line of capture.lines??[]) if(line.state==='rendered') points.push(...(line.sourceSamples??[]))
+  } else if(capture.visibilityMode==='depth-off-landmark-projection') {
+    for(const landmark of capture.landmarks??[]) if(landmark.state==='rendered') points.push(landmark.sourcePixels)
+  }
+  if(points.some(point=>!vec2(point)||!sourcePointUnmasked(layout,index,point))) errors.push('Actual GPU pixel-centre readback lies outside measured quad/ROI support or behind later same-image masking')
+  if(view.imagePlaneWarp) {
+    let minimum
+    try { minimum=warpedRasterUncertaintyBound(view,capture) } catch(error) { errors.push(error.message);return errors }
+    const entries=capture.visibilityMode==='depth-tested-native-surfaces'?(capture.parts??[]).filter(part=>part.pixelCount>0):capture.visibilityMode==='depth-off-native-line-projection'?(capture.lines??[]).filter(line=>line.state==='rendered'):(capture.landmarks??[]).filter(landmark=>landmark.state==='rendered')
+    if(entries.some(entry=>!finite(entry.uncertaintySourcePixels)||entry.uncertaintySourcePixels+1e-6<minimum)) errors.push('Actual GPU uncertainty omits independently bounded transformed native/destination raster quantization')
+  }
+  return errors
+}
+/** Independent conservative half-cell propagation and final destination readback bound. */
+export function warpedRasterUncertaintyBound(view,capture) {
+  const warp=independentlyResolvedWarp(view)
+  if(!warp) return null
+  const native=capture.nativeViewportBackingPixels,destination=capture.destinationCellSourcePixels
+  requireCondition(vec2(native)&&native.every(value=>Number.isInteger(value)&&value>0)&&vec2(destination)&&destination.every(value=>value>0),'Warp raster needs actual native backing dimensions and final destination source-cell dimensions')
+  const [w,h]=warp.unwarpedViewportPixels,m=warp.renderToSourcePixels,points=[[0,0],[w,0],[w,h],[0,h]]
+  const denominator=Math.min(...points.map(p=>m[6]*p[0]+m[7]*p[1]+m[8]))**2
+  const derivative=[
+    p=>(m[0]*m[7]-m[1]*m[6])*p[1]+m[0]*m[8]-m[2]*m[6],
+    p=>(m[1]*m[6]-m[0]*m[7])*p[0]+m[1]*m[8]-m[2]*m[7],
+    p=>(m[3]*m[7]-m[4]*m[6])*p[1]+m[3]*m[8]-m[5]*m[6],
+    p=>(m[4]*m[6]-m[3]*m[7])*p[0]+m[4]*m[8]-m[5]*m[7]]
+  const maxima=derivative.map(fn=>Math.max(...points.map(p=>Math.abs(fn(p))))/denominator),dx=w/native[0]/2,dy=h/native[1]/2
+  return Math.hypot(maxima[0]*dx+maxima[1]*dy,maxima[2]*dx+maxima[3]*dy)+Math.hypot(...destination)/2
+}
+
+/** The declared source bound includes source localization/quantization; never add it twice. */
+export function landmarkRasterErrorLedger(view,observation,marker,capture) {
+  requireCondition(capture?.method==='gpu-readback'&&capture.status==='captured'&&capture.visibilityMode==='depth-off-landmark-projection','Landmark ledger requires the actual GPU marker capture')
+  requireCondition(vec2(observation?.pixel)&&finite(observation.uncertaintyPx)&&observation.uncertaintyPx>=0,'Landmark source localization/raster uncertainty is unknown; null cannot become zero')
+  requireCondition(marker?.state==='rendered'&&vec2(marker.sourcePixels)&&finite(marker.uncertaintySourcePixels)&&marker.uncertaintySourcePixels>=0,'Actual native marker source-pixel raster uncertainty is unavailable')
+  let minimumNativeRasterUncertaintySourcePixels=warpedRasterUncertaintyBound(view,capture)
+  if(minimumNativeRasterUncertaintySourcePixels===null) {
+    requireCondition(vec2(capture.destinationCellSourcePixels)&&capture.destinationCellSourcePixels.every(value=>value>0),'Ordinary native marker needs actual destination source-cell dimensions')
+    minimumNativeRasterUncertaintySourcePixels=Math.hypot(...capture.destinationCellSourcePixels)/2
+  }
+  requireCondition(marker.uncertaintySourcePixels+1e-6>=minimumNativeRasterUncertaintySourcePixels,'Actual native marker uncertainty omits independently bounded raster quantization')
+  const rawResidualPx=Math.hypot(marker.sourcePixels[0]-observation.pixel[0],marker.sourcePixels[1]-observation.pixel[1])
+  return {rawResidualPx,sourceMeasurementUncertaintyPx:observation.uncertaintyPx,nativeRasterUncertaintySourcePixels:marker.uncertaintySourcePixels,minimumNativeRasterUncertaintySourcePixels,errorPx:rawResidualPx+observation.uncertaintyPx+marker.uncertaintySourcePixels}
+}
+export function finalSourceAxisBiasBound(view,check) {
+  const e=check.measurementEvidence,warp=independentlyResolvedWarp(view)
+  requireCondition(finite(e?.axisPerspectiveBiasBoundPx)&&e.axisPerspectiveBiasBoundPx>=0,'Native line perspective bias needs a finite nonnegative independently justified bound')
+  if(!warp) return e.axisPerspectiveBiasBoundPx
+  requireCondition(['source-global','unwarped-viewport'].includes(e.axisPerspectiveBiasSpace),'Warped native line bias has no explicit coordinate space; untransformed uncertainty is forbidden')
+  if(e.axisPerspectiveBiasSpace==='source-global') return e.axisPerspectiveBiasBoundPx
+  const region=e.axisPerspectiveBiasRegionViewportPixels
+  requireCondition(Array.isArray(region)&&region.length===4&&region.every(finite)&&region[0]>=0&&region[1]>=0&&region[2]>0&&region[3]>0&&region[0]+region[2]<=warp.unwarpedViewportPixels[0]&&region[1]+region[3]<=warp.unwarpedViewportPixels[1],'Warped axis bias needs a bounded unwarped viewport region')
+  const inverse=invertHomography(warp.renderToSourcePixels)
+  requireCondition(check.sourceLinePixels.every(point=>{const p=projectHomography(inverse,point);return p[0]>=region[0]&&p[1]>=region[1]&&p[0]<=region[0]+region[2]&&p[1]<=region[1]+region[3]}),'Unwarped bias region does not cover the independently observed line')
+  return e.axisPerspectiveBiasBoundPx*homographyMagnificationBound(warp,region)
+}
 
 async function apiSnapshot(page) { return page.evaluate(() => window.harmonicAnalyzer.snapshot()) }
 async function waitState(page, state, timeout = 20_000) {
@@ -280,6 +375,8 @@ export function freshCapture(entry, timeSeconds, nativeTimes, label) {
   requireCondition(skewSeconds <= CLOCK_LIMIT, `${label}: native media ${nativeTimes.join('/')}s vs captured draw ${capture.timeSeconds}s exceeds ${CLOCK_LIMIT}s`)
   requireCondition(visibility?.method === 'gpu-readback' && visibility.status === 'captured' && visibility.visibilityMode === 'depth-tested-native-surfaces' && visibility.viewId === entry.viewId && visibility.timeSeconds === capture.timeSeconds && Array.isArray(visibility.parts) && visibility.parts.length >= 435 && new Set(visibility.parts.map(part => part.partPath)).size === visibility.parts.length, `${label}: native-depth-census-stale-or-incomplete (all 435 genuine geometry paths required)`)
   requireCondition(mechanism?.method === 'actual-native-mechanism-solve' && mechanism.status === 'rendered' && mechanism.viewId === entry.viewId && mechanism.timeSeconds === capture.timeSeconds && Number.isInteger(mechanism.sourceDrawRevision) && mechanism.sourceDrawRevision > 0 && Array.isArray(mechanism.channelAnglesRad) && mechanism.channelAnglesRad.length === 20 && mechanism.channelAnglesRad.every(finite) && finite(mechanism.platenTravelM) && finite(mechanism.effectiveBankDriveTurns), `${label}: rendered-physical-state-stale-or-unavailable`)
+  requireCondition(Object.hasOwn(capture,'resolvedImagePlaneWarp')&&Array.isArray(capture.sourceLayout)&&capture.sourceLayout.length>0&&sameSourceLayout(capture.sourceLayout,visibility.sourceLayout)&&sameSourceLayout(capture.sourceLayout,mechanism.sourceLayout)&&sameResolvedImagePlaneWarp(capture.resolvedImagePlaneWarp,visibility.resolvedImagePlaneWarp)&&sameResolvedImagePlaneWarp(capture.resolvedImagePlaneWarp,mechanism.resolvedImagePlaneWarp),`${label}: stale/missing native capture homography or ordered masking layout`)
+  if(entry.nativeLines) requireCondition(sameSourceLayout(capture.sourceLayout,entry.nativeLines.sourceLayout)&&sameResolvedImagePlaneWarp(capture.resolvedImagePlaneWarp,entry.nativeLines.resolvedImagePlaneWarp),`${label}: finite-line capture belongs to a stale/different support layout or homography`)
   return { capture, visibility, mechanism, nativeLines: entry.nativeLines ?? null, skewSeconds }
 }
 
@@ -343,7 +440,11 @@ export function nativeLineRasterProof(view, captured, visibility, timeSeconds) {
     reject('native-line-gpu-unavailable', 'Need a fresh genuine finite native clipped-segment GPU raster; offscreen endpoint markers and CPU candidate errors are not acceptance')
     return { failures, measurements }
   }
-  if (visibility?.method !== 'gpu-readback' || visibility.status !== 'captured' || visibility.visibilityMode !== 'depth-tested-native-surfaces' || visibility.viewId !== view.id || visibility.timeSeconds !== timeSeconds || visibility.presentation !== view.presentation || jsonDigest(visibility.rectSourcePixels) !== jsonDigest(view.rectSourcePixels) || !sameCamera(visibility.camera, view.camera, view.rectSourcePixels)) {
+  for(const detail of [...sourceCaptureBindingErrors(view,captured),...sourceCaptureBindingErrors(view,visibility)]) reject('native-line-warp-layout-binding',detail)
+  if(failures.length) return {failures,measurements}
+  let minimumUncertainty
+  try { minimumUncertainty=warpedRasterUncertaintyBound(view,captured) } catch(error) { reject('native-line-warp-quantization',error.message);return {failures,measurements} }
+  if (visibility?.method !== 'gpu-readback' || visibility.status !== 'captured' || visibility.visibilityMode !== 'depth-tested-native-surfaces' || visibility.viewId !== view.id || visibility.timeSeconds !== timeSeconds || visibility.presentation !== view.presentation || jsonDigest(visibility.rectSourcePixels) !== jsonDigest(view.rectSourcePixels) || !sameCamera(visibility.camera, view.camera, nativeCameraRect(view))) {
     reject('native-line-depth-gpu-unavailable', 'The independent native surface visibility draw must match the line raster camera/ROI/presentation/time')
     return { failures, measurements }
   }
@@ -367,9 +468,14 @@ export function nativeLineRasterProof(view, captured, visibility, timeSeconds) {
     for (const sample of line.sourceSamples) { const value = along(sample); minimum = Math.min(minimum, value); maximum = Math.max(maximum, value) }
     const observed = [...check.sourceLinePixels, ...check.measurementEvidence.edgeRows.map(row => [(row.left + row.right) / 2, row.y])]
     const rasterFitDeviationPx = Math.max(...line.sourceSamples.map(perpendicular))
-    const conservativeErrorPx = Math.max(...observed.map(perpendicular)) + check.measurementEvidence.axisPerspectiveBiasBoundPx + line.uncertaintySourcePixels + rasterFitDeviationPx
+    let axisPerspectiveBiasSourcePixels
+    try { axisPerspectiveBiasSourcePixels=finalSourceAxisBiasBound(view,check) } catch(error) { reject('native-line-warp-uncertainty',error.message,{lineId:check.id});continue }
+    if(minimumUncertainty!==null&&line.uncertaintySourcePixels+1e-6<minimumUncertainty) reject('native-line-warp-quantization','Native line uncertainty is smaller than independently propagated native/final raster half-cell bounds',{lineId:check.id,minimumUncertainty,actual:line.uncertaintySourcePixels})
+    const layout=expectedLayout(view),layoutIndex=layout.findIndex(item=>item.viewId===view.id)
+    if(line.sourceSamples.some(point=>!sourcePointUnmasked(layout,layoutIndex,point))) reject('native-line-support-mask','Actual line readback includes pixels outside its quad or behind a later same-image subview',{lineId:check.id})
+    const conservativeErrorPx = Math.max(...observed.map(perpendicular)) + axisPerspectiveBiasSourcePixels + line.uncertaintySourcePixels + rasterFitDeviationPx
     const covered = observed.every(point => along(point) >= minimum - line.uncertaintySourcePixels && along(point) <= maximum + line.uncertaintySourcePixels)
-    const measurement = { type: 'native-line-gpu', lineId: check.id, partPath: check.partPath, timeSeconds, viewId: view.id, nativeRasterPixelCount: line.pixelCount, sampledRasterPixelCount: line.sourceSamples.length, observedSourceSegment: check.sourceLinePixels, axisPerspectiveBiasBoundPx: check.measurementEvidence.axisPerspectiveBiasBoundPx, uncertaintySourcePixels: line.uncertaintySourcePixels, samplingGapSourcePixels: line.samplingGapSourcePixels, rasterFitDeviationPx, conservativeErrorPx, nativeClippedRasterCoversObservation: covered }
+    const measurement = { type: 'native-line-gpu', lineId: check.id, partPath: check.partPath, timeSeconds, viewId: view.id, nativeRasterPixelCount: line.pixelCount, sampledRasterPixelCount: line.sourceSamples.length, observedSourceSegment: check.sourceLinePixels, axisPerspectiveBiasBoundPx: check.measurementEvidence.axisPerspectiveBiasBoundPx, axisPerspectiveBiasSourcePixels, uncertaintySourcePixels: line.uncertaintySourcePixels, minimumWarpedRasterUncertaintySourcePixels:minimumUncertainty, samplingGapSourcePixels: line.samplingGapSourcePixels, rasterFitDeviationPx, conservativeErrorPx, nativeClippedRasterCoversObservation: covered }
     measurements.push(measurement)
     if (!covered) reject('native-line-finite-coverage', 'Actual finite clipped native raster does not bracket independently measured source rows; no infinite-line extension is allowed', measurement)
     if (!finite(conservativeErrorPx) || conservativeErrorPx > PIXEL_LIMIT) reject('native-line-gpu-error', `Actual native raster perpendicular error plus independent axis bias/quantization exceeds ${PIXEL_LIMIT}px`, measurement)
@@ -379,13 +485,25 @@ export function nativeLineRasterProof(view, captured, visibility, timeSeconds) {
 /** Nearest captured boundary sample is a conservative (never optimistic) contour distance. */
 export function nativeContourRasterProof(view, visibility, timeSeconds) {
   const failures = [], measurements = []
-  if ((view.sourceContourChecks?.length ?? 0) && (visibility?.method !== 'gpu-readback' || visibility.status !== 'captured' || visibility.visibilityMode !== 'depth-tested-native-surfaces' || visibility.viewId !== view.id || visibility.timeSeconds !== timeSeconds || visibility.presentation !== view.presentation || jsonDigest(visibility.rectSourcePixels) !== jsonDigest(view.rectSourcePixels) || !sameCamera(visibility.camera, view.camera, view.rectSourcePixels) || visibility.sourceOpacity !== (view.composite?.mode === 'crossfade' ? view.composite.opacity : 1))) return { failures: [{ code: 'source-contour-gpu-unavailable', detail: 'Need the fresh actual native depth-boundary capture at this source camera/ROI/presentation/time/layer' }], measurements }
+  if ((view.sourceContourChecks?.length ?? 0) && (visibility?.method !== 'gpu-readback' || visibility.status !== 'captured' || visibility.visibilityMode !== 'depth-tested-native-surfaces' || visibility.viewId !== view.id || visibility.timeSeconds !== timeSeconds || visibility.presentation !== view.presentation || jsonDigest(visibility.rectSourcePixels) !== jsonDigest(view.rectSourcePixels) || !sameCamera(visibility.camera, view.camera, nativeCameraRect(view)) || visibility.sourceOpacity !== (view.composite?.mode === 'crossfade' ? view.composite.opacity : 1))) return { failures: [{ code: 'source-contour-gpu-unavailable', detail: 'Need the fresh actual native depth-boundary capture at this source camera/ROI/presentation/time/layer' }], measurements }
+  if(view.sourceContourChecks?.length) {
+    for(const detail of sourceCaptureBindingErrors(view,visibility)) failures.push({code:'source-contour-warp-layout-binding',detail})
+    if(failures.length) return {failures,measurements}
+  }
   for (const check of view.sourceContourChecks ?? []) {
     const part = visibility.parts.find(part => part.partPath === check.partPath), samples = part?.contourSourcePixels
     if (!part || part.pixelCount <= 0 || !Array.isArray(samples) || !samples.length || !samples.every(vec2) || !Number.isInteger(part.contourPixelCount) || part.contourPixelCount < samples.length || !finite(part.uncertaintySourcePixels) || part.uncertaintySourcePixels < 0) {
       failures.push({ code: 'source-contour-gpu-unavailable', detail: 'Need genuine depth-tested native part-ID boundary readback; a bounding extent or depth-off marker is not a contour', contourId: check.id, partPath: check.partPath })
       continue
     }
+    if(view.imagePlaneWarp) {
+      try {
+        const bound=warpedRasterUncertaintyBound(view,visibility)
+        if(part.uncertaintySourcePixels+1e-6<bound) failures.push({code:'source-contour-warp-quantization',detail:'Actual contour uncertainty omits transformed native/destination raster quantization',contourId:check.id,minimumUncertainty:bound,actual:part.uncertaintySourcePixels})
+      } catch(error) { failures.push({code:'source-contour-warp-quantization',detail:error.message,contourId:check.id});continue }
+    }
+    const layout=expectedLayout(view),layoutIndex=layout.findIndex(item=>item.viewId===view.id)
+    if(samples.some(point=>!sourcePointUnmasked(layout,layoutIndex,point))) failures.push({code:'source-contour-support-mask',detail:'Actual native contour lies outside its quad or behind same-image masking',contourId:check.id})
     let maximum = 0
     for (const point of check.sourceContourPixels) {
       let nearest = Infinity
@@ -402,8 +520,13 @@ export function nativeContourRasterProof(view, visibility, timeSeconds) {
 /** Metadata is checked against the real readback; depth-off markers are not occlusion proof. */
 export function renderedViewProof(view, rendered, entry, timeSeconds, report, assumptions = []) {
   const context = { timeSeconds, viewId: view.id }, composite = view.composite ?? { mode: 'opaque' }, opacity = composite.mode === 'opaque' ? 1 : composite.opacity
-  if (!rendered || !sameCamera(rendered.camera, view.camera, view.rectSourcePixels) || jsonDigest(rendered.rectSourcePixels) !== jsonDigest(view.rectSourcePixels) || rendered.presentation !== view.presentation || jsonDigest(rendered.composite) !== jsonDigest(composite) || rendered.compositeEvidence !== (view.compositeEvidence ?? null)) fail(report, 'rendered-view-binding', 'Actual camera/ROI/presentation/composite differs from independently measured view', context)
-  if (!sameCamera(entry.visibility.camera, view.camera, view.rectSourcePixels) || jsonDigest(entry.visibility.rectSourcePixels) !== jsonDigest(view.rectSourcePixels) || entry.visibility.presentation !== view.presentation || entry.visibility.sourceOpacity !== opacity || entry.capture.sourceOpacity !== opacity) fail(report, 'gpu-view-binding', 'Actual native GPU capture has different camera/ROI/mirror/layer contribution', context)
+  if (!rendered || !sameCamera(rendered.camera, view.camera, nativeCameraRect(view)) || jsonDigest(rendered.rectSourcePixels) !== jsonDigest(view.rectSourcePixels) || rendered.presentation !== view.presentation || jsonDigest(rendered.composite) !== jsonDigest(composite) || rendered.compositeEvidence !== (view.compositeEvidence ?? null)) fail(report, 'rendered-view-binding', 'Actual camera/ROI/presentation/composite differs from independently measured view', context)
+  if (!sameCamera(entry.visibility.camera, view.camera, nativeCameraRect(view)) || jsonDigest(entry.visibility.rectSourcePixels) !== jsonDigest(view.rectSourcePixels) || entry.visibility.presentation !== view.presentation || entry.visibility.sourceOpacity !== opacity || entry.capture.sourceOpacity !== opacity) fail(report, 'gpu-view-binding', 'Actual native GPU capture has different camera/ROI/mirror/layer contribution', context)
+  const warp=independentlyResolvedWarp(view),layout=expectedLayout(view)
+  if(!rendered||!Object.hasOwn(rendered,'imagePlaneWarp')||jsonDigest(rendered.imagePlaneWarp)!==jsonDigest(view.imagePlaneWarp??null)||!sameResolvedImagePlaneWarp(rendered.resolvedImagePlaneWarp,warp)||!sameSourceLayout(rendered.sourceLayout,layout)) fail(report,'rendered-warp-layout-binding','Actual snapshot authored/derived warp or ordered support differs from independent source layout',context)
+  for(const capture of [entry.capture,entry.visibility,entry.mechanism,...(entry.nativeLines?[entry.nativeLines]:[])]) for(const detail of sourceCaptureBindingErrors(view,capture)) fail(report,'gpu-warp-layout-binding',detail,context)
+  for(const capture of [entry.capture,entry.visibility,...(entry.nativeLines?[entry.nativeLines]:[])]) for(const detail of nativeRasterSupportErrors(view,capture)) fail(report,'native-raster-support',detail,context)
+  for(const detail of renderedCertificateErrors(rendered,timeSeconds)) fail(report,'rendered-certificate-interval',detail,context)
   const state = view.mechanicalState, witness = state.runtimeWitness, expectedInput = state.status === 'constrained' ? witness.input : state.input
   if (jsonDigest(rendered.input) !== jsonDigest(expectedInput) || jsonDigest(entry.mechanism.input) !== jsonDigest(expectedInput) || rendered.mechanicalProvenance !== state.status || entry.mechanism.mechanicalProvenance !== state.status || jsonDigest(rendered.partOverrides) !== jsonDigest(view.partOverrides ?? []) || jsonDigest(rendered.unobservedInputFields) !== jsonDigest(witness?.unobservedInputFields ?? []) || jsonDigest(entry.mechanism.unobservedInputFields) !== jsonDigest(witness?.unobservedInputFields ?? [])) fail(report, 'rendered-mechanical-provenance', 'Rendered native input/provenance/overrides differs from exclusive source observation or feasible witness', context)
   if (jsonDigest(rendered.nativeGeometryAssumptions ?? []) !== jsonDigest(assumptions) || jsonDigest(entry.mechanism.nativeGeometryAssumptions ?? []) !== jsonDigest(assumptions)) fail(report, 'rendered-native-geometry-assumption', 'Actual source draw omitted/changed the scoped user-approved pending-CAD assumption; no shape fidelity pass is inferred', context)
@@ -462,6 +585,7 @@ async function clockSample(page, embed, record, run) {
   requireCondition(app.snapshot.referenceState === 'matched' && app.snapshot.views?.length > 0, `Required source not matched/drawn during actual playback at native ${before.mediaTime}s: ${app.snapshot.referenceState}`)
   const measured = app.captures.map(entry => freshCapture(entry, null, [before.mediaTime, after.mediaTime], `Playback at native ${before.mediaTime}s`))
   requireCondition(measured.every(item => item.capture.timeSeconds === measured[0].capture.timeSeconds), 'Views of one required-source draw carry different capture times')
+  for(const view of app.snapshot.views) requireCondition(renderedCertificateErrors(view,measured[0].capture.timeSeconds).length===0,`Actual matched playback draw lies in an uncertified visibility gap for ${view.id}`)
   sample.captureTimeSeconds = measured[0].capture.timeSeconds
   sample.skewSeconds = Math.max(...measured.map(item => item.skewSeconds))
   return sample
@@ -571,7 +695,7 @@ export async function referenceProof(page, embed, record, report, outputDirector
     const proof = view.mechanicalState?.status === 'constrained' ? view.mechanicalState.runtimeWitness?.visibilityProof : view.mechanicalState?.visibilityProof
     return proof?.sourceNonIdentifiableFixedParts ?? []
   }))
-  const simultaneousBundles = record.data.frames.map(frame => frameViews(frame).map(view => ({ rectSourcePixels: view.rectSourcePixels, composite: view.composite ?? { mode: 'opaque' } })))
+  const simultaneousBundles = record.data.frames.map(frame => frameViews(frame).map(view => ({ rectSourcePixels: view.rectSourcePixels, composite: view.composite ?? { mode: 'opaque' }, imagePlaneWarp:independentlyResolvedWarp(view)??undefined })))
   await page.evaluate(({ bundles, paths, overrides }) => {
     const api = window.harmonicAnalyzer
     if (typeof api.assertSourceCompositeWeights !== 'function') throw new Error('Actual shared per-pixel source composite weight assertion is unavailable')
@@ -610,9 +734,13 @@ export async function referenceProof(page, embed, record, report, outputDirector
           requireCondition(lastRequired >= 0 && lastMatched === lastRequired, `held at ${t}s without an actual preceding calibrated matched pose`)
           requireCondition(Array.isArray(snapshot.views) && snapshot.views.length === expectedViews.length && expectedViews.every(view => {
             const rendered = snapshot.views.find(candidate => candidate.id === view.id)
-            return rendered && jsonDigest(rendered.rectSourcePixels) === jsonDigest(view.rectSourcePixels) && rendered.presentation === view.presentation && sameCamera(rendered.camera, view.camera, view.rectSourcePixels) && jsonDigest(rendered.composite) === jsonDigest(view.composite ?? { mode: 'opaque' })
+            return rendered && jsonDigest(rendered.rectSourcePixels) === jsonDigest(view.rectSourcePixels) && rendered.presentation === view.presentation && sameCamera(rendered.camera, view.camera, nativeCameraRect(view)) && jsonDigest(rendered.composite) === jsonDigest(view.composite ?? { mode: 'opaque' }) && sameResolvedImagePlaneWarp(rendered.resolvedImagePlaneWarp,independentlyResolvedWarp(view)) && sameSourceLayout(rendered.sourceLayout,sourceLayoutForViews(expectedViews))
           }), `held at ${t}s does not draw the exact views of the preceding matched frame ${frames[lastRequired].timeSeconds}s`)
-          for (const view of expectedViews) clockSkews.push(freshCapture(response.captures.find(entry => entry.viewId === view.id), t, [native.mediaTime], `Held ${t}s`).skewSeconds)
+          for (const view of expectedViews) {
+            const capture=freshCapture(response.captures.find(entry => entry.viewId === view.id), t, [native.mediaTime], `Held ${t}s`)
+            requireCondition(sourceCaptureBindingErrors({...view,sourceLayout:sourceLayoutForViews(expectedViews)},capture.capture).length===0,`Held ${t}s capture changed measured warp/support`)
+            clockSkews.push(capture.skewSeconds)
+          }
           heldFrames++
         }
         continue
@@ -629,11 +757,16 @@ export async function referenceProof(page, embed, record, report, outputDirector
       for (const view of expectedViews) {
         const entry = response.captures.find(entry => entry.viewId === view.id), measured = freshCapture(entry, t, [native.mediaTime], `Required ${t}s`)
         clockSkews.push(measured.skewSeconds)
-        const nativeCorrespondence = renderedViewProof(view, snapshot.views.find(candidate => candidate.id === view.id), measured, t, report, record.data.nativeGeometryAssumptions ?? [])
+        const sourceLayout=sourceLayoutForViews(expectedViews),qualifiedView={...view,sourceLayout}
+        const nativeCorrespondence = renderedViewProof(qualifiedView, snapshot.views.find(candidate => candidate.id === view.id), measured, t, report, record.data.nativeGeometryAssumptions ?? [])
+        if(view.imagePlaneWarp) {
+          const expectedCell=[1920/gate.width/response.canvas.devicePixelRatio,1080/gate.height/response.canvas.devicePixelRatio]
+          for(const capture of [measured.capture,measured.visibility,measured.nativeLines].filter(Boolean)) requireCondition(nearlyEqual(capture.destinationCellSourcePixels,expectedCell,1e-6),`Warp capture final raster cell dimensions do not match the actual #stage backing store at ${t}s/${view.id}`)
+        }
         measurements.push(...nativeCorrespondence.nativeLines, ...nativeCorrespondence.contours)
         lineErrors.push(...nativeCorrespondence.nativeLines.map(item => item.conservativeErrorPx))
         contourErrors.push(...nativeCorrespondence.contours.map(item => item.conservativeErrorPx))
-        captured.set(view.id, { ...measured, rect: view.rectSourcePixels, byId: new Map(measured.capture.landmarks.map(item => [item.id, item])) })
+        captured.set(view.id, { ...measured, view:{...view,sourceLayout:sourceLayoutForViews(expectedViews)}, rect: view.rectSourcePixels, byId: new Map(measured.capture.landmarks.map(item => [item.id, item])) })
         const evidence = view.cameraEvidence ?? frame.cameraEvidence
         if (evidence?.kind === 'shared-rigid-sequence') {
           const rig = record.data.sourceCameraRigs.find(rig => rig.id === evidence.rigId)
@@ -642,10 +775,17 @@ export async function referenceProof(page, embed, record, report, outputDirector
             if (rigGpuMeasured.has(key)) continue
             const marker = measured.capture.landmarks.find(marker => marker.id === item.anchorId)
             if (marker?.state !== 'rendered' || !vec2(marker.sourcePixels)) { fail(report, 'rig-gpu-landmark-unavailable', 'Global shared calibration anchor is not actually projected by the native GPU', { timeSeconds: t, viewId: view.id, rigId: rig.id, phaseIndex: item.phaseIndex, anchorId: item.anchorId }); continue }
-            const errorPx = Math.hypot(marker.sourcePixels[0] - item.pixel[0], marker.sourcePixels[1] - item.pixel[1])
-            rigGpuMeasured.add(key); rigGpuErrors.push(errorPx)
-            measurements.push({ type: 'rig-global-gpu', rigId: rig.id, phaseIndex: item.phaseIndex, anchorId: item.anchorId, role: item.role, timeSeconds: t, observedSourcePixels: item.pixel, renderedSourcePixels: marker.sourcePixels, errorPx })
-            if (errorPx > PIXEL_LIMIT) fail(report, 'rig-gpu-projection-error', 'Global actual native GPU projection exceeds fixed source-frame pixel bound', { timeSeconds: t, viewId: view.id, rigId: rig.id, phaseIndex: item.phaseIndex, anchorId: item.anchorId, errorPx })
+            let ledger
+            try { ledger=landmarkRasterErrorLedger(view,item,marker,measured.capture) }
+            catch(error) {
+              fail(report,'rig-gpu-uncertainty-unknown',error.message,{timeSeconds:t,viewId:view.id,rigId:rig.id,phaseIndex:item.phaseIndex,anchorId:item.anchorId})
+              measurements.push({type:'rig-global-gpu',rigId:rig.id,phaseIndex:item.phaseIndex,anchorId:item.anchorId,role:item.role,timeSeconds:t,sourceMeasurementUncertaintyPx:item.uncertaintyPx??null,nativeRasterUncertaintySourcePixels:marker.uncertaintySourcePixels??null,errorPx:null})
+              continue
+            }
+            rigGpuMeasured.add(key); rigGpuErrors.push(ledger.errorPx)
+            const measurement={type:'rig-global-gpu',rigId:rig.id,phaseIndex:item.phaseIndex,anchorId:item.anchorId,role:item.role,timeSeconds:t,observedSourcePixels:item.pixel,renderedSourcePixels:marker.sourcePixels,...ledger}
+            measurements.push(measurement)
+            if (ledger.errorPx > PIXEL_LIMIT) fail(report, 'rig-gpu-projection-error', 'Global actual native GPU residual plus source/native uncertainty exceeds fixed source-frame pixel bound', measurement)
           }
         }
       }
@@ -656,22 +796,25 @@ export async function referenceProof(page, embed, record, report, outputDirector
         const landmark = view?.byId.get(item.anchorId) ?? null
         const context = { timeSeconds: t, viewId, anchorId: item.anchorId, role: item.role, captureTimeSeconds: view?.capture.timeSeconds ?? null, nativeMediaTime: native.mediaTime, landmark }
         const sourceLayerIndex = expectedViews.findIndex(view => view.id === viewId)
-        for (const later of expectedViews.slice(sourceLayerIndex + 1)) {
-          const composite = later.composite ?? { mode: 'opaque' }, rect = later.rectSourcePixels
-          const sameFade = composite.mode === 'crossfade' && expectedViews[sourceLayerIndex]?.composite?.mode === 'crossfade' && composite.groupId === expectedViews[sourceLayerIndex].composite.groupId
-          if (!sameFade && (composite.mode === 'opaque' || composite.opacity === 1) && item.pixel[0] >= rect[0] && item.pixel[1] >= rect[1] && item.pixel[0] < rect[0] + rect[2] && item.pixel[1] < rect[1] + rect[3]) fail(report, 'covered-source-layer-landmark', 'Later opaque rendered layer drops an independently source-visible correspondence', context)
-        }
+        const sourceLayout=sourceLayoutForViews(expectedViews)
+        if(!sourcePointUnmasked(sourceLayout,sourceLayerIndex,item.pixel)) fail(report,'covered-source-layer-landmark','Independently source-visible correspondence lies outside its quad or behind a later same-image/opaque supported subview',context)
         if (!landmark || landmark.state !== 'rendered' || !vec2(landmark.sourcePixels) || !vec2(landmark.canvasPixels)) {
           fail(report, 'unrendered-gpu-landmark', 'Required landmark has no actual GPU-rendered marker pixel in this view', context)
           continue
         }
-        const [rx, ry, rw, rh] = view.rect
-        if (landmark.sourcePixels[0] < rx || landmark.sourcePixels[1] < ry || landmark.sourcePixels[0] > rx + rw || landmark.sourcePixels[1] > ry + rh) fail(report, 'rendered-outside-view', 'GPU marker lies outside its source view rectangle', context)
+        if(!sourcePointUnmasked(sourceLayout,sourceLayerIndex,landmark.sourcePixels)) fail(report,'rendered-outside-support','Actual GPU marker lies outside source quad/ROI support or behind same-image masking',context)
+        let ledger
+        try { ledger=landmarkRasterErrorLedger(view.view,item,landmark,view.capture) }
+        catch(error) {
+          fail(report,'rendered-landmark-uncertainty-unknown',error.message,context)
+          measurements.push({timeSeconds:t,viewId,anchorId:item.anchorId,role:item.role,sourceMeasurementUncertaintyPx:item.uncertaintyPx??null,nativeRasterUncertaintySourcePixels:landmark.uncertaintySourcePixels??null,errorPx:null})
+          continue
+        }
         const expectedCanvas = [gate.x + landmark.sourcePixels[0] / 1920 * gate.width, gate.y + landmark.sourcePixels[1] / 1080 * gate.height]
         const viewportMappingErrorPx = Math.hypot(landmark.canvasPixels[0] - expectedCanvas[0], landmark.canvasPixels[1] - expectedCanvas[1])
         if (viewportMappingErrorPx > VIEWPORT_MAPPING_LIMIT_PX) fail(report, 'actual-viewport-mapping', 'GPU marker canvas position is not on the source-letterboxed #stage gate', { ...context, viewportMappingErrorPx })
-        const errorPx = Math.hypot(landmark.sourcePixels[0] - item.pixel[0], landmark.sourcePixels[1] - item.pixel[1])
-        const measured = { timeSeconds: t, decodedTimeSeconds: frame.decodedTimeSeconds, nativeMediaTime: native.mediaTime, captureTimeSeconds: view.capture.timeSeconds, method: view.capture.method, viewId, anchorId: item.anchorId, role: item.role, observedSourcePixels: item.pixel, renderedSourcePixels: landmark.sourcePixels, renderedCanvasPixels: landmark.canvasPixels, uncertaintyCanvasPixels: landmark.uncertaintyCanvasPixels, viewportMappingErrorPx, errorPx }
+        const errorPx=ledger.errorPx
+        const measured = { timeSeconds: t, decodedTimeSeconds: frame.decodedTimeSeconds, nativeMediaTime: native.mediaTime, captureTimeSeconds: view.capture.timeSeconds, method: view.capture.method, viewId, anchorId: item.anchorId, role: item.role, observedSourcePixels: item.pixel, renderedSourcePixels: landmark.sourcePixels, renderedCanvasPixels: landmark.canvasPixels, uncertaintyCanvasPixels: landmark.uncertaintyCanvasPixels, viewportMappingErrorPx, ...ledger }
         measurements.push(measured)
         if (item.role === 'check') errors.push(errorPx); else fitErrors.push(errorPx)
         if (errorPx > PIXEL_LIMIT) fail(report, 'rendered-landmark-error', `Actual GPU-rendered ${item.role} error ${errorPx.toFixed(3)}px exceeds ${PIXEL_LIMIT}px`, measured)
@@ -692,7 +835,9 @@ export async function referenceProof(page, embed, record, report, outputDirector
       const from = frames[index], to = frames[index + 1]
       if (!required[index] || !required[index + 1] || from.shotId !== to.shotId) continue
       const fromViews = frameViews(from), toViews = frameViews(to)
-      if (!fromViews.some(view => view.mechanicalState.status === 'constrained') && jsonDigest(fromViews.map(view => [view.camera, view.mechanicalState.input, view.partOverrides, view.composite])) === jsonDigest(toViews.map(view => [view.camera, view.mechanicalState.input, view.partOverrides, view.composite]))) continue
+      const staticObserved=!fromViews.some(view=>view.mechanicalState.status==='constrained'||view.imagePlaneWarp)&&jsonDigest(fromViews.map(view=>[view.camera,view.mechanicalState.input,view.partOverrides,view.composite]))===jsonDigest(toViews.map(view=>[view.camera,view.mechanicalState.input,view.partOverrides,view.composite]))
+      const certifiedThroughout=fromViews.every(view=>{const interval=view.mechanicalState.visibilityProof?.binding?.intervalSeconds;return Array.isArray(interval)&&interval[0]<=from.timeSeconds&&interval[1]>=to.timeSeconds})
+      if(staticObserved&&certifiedThroughout) continue
       const times = record.native.pts.filter(time => time > from.timeSeconds + 1e-6 && time < to.timeSeconds - 1e-6)
       interpolation.requiredNativeExposures += times.length
       for (const time of times) {
@@ -704,15 +849,27 @@ export async function referenceProof(page, embed, record, report, outputDirector
         for (const rendered of response.snapshot.views) {
           const entry = freshCapture(response.captures.find(entry => entry.viewId === rendered.id), time, [response.native.mediaTime], `Native interpolated ${time}s`)
           const a = fromViews.find(view => view.id === rendered.id), b = toViews.find(view => view.id === rendered.id)
-          requireCondition(a && b && rendered.sourceSampling?.fromTimeSeconds === from.timeSeconds && rendered.sourceSampling.toTimeSeconds === to.timeSeconds && Math.abs(rendered.sourceSampling.mix - (time - from.timeSeconds) / (to.timeSeconds - from.timeSeconds)) <= 1e-9, `interpolation-source-binding: ${time}s/${rendered.id}`)
-          requireCondition(jsonDigest(entry.mechanism.input) === jsonDigest(rendered.input) && entry.mechanism.mechanicalProvenance === rendered.mechanicalProvenance && sameCamera(entry.visibility.camera, rendered.camera, rendered.rectSourcePixels) && jsonDigest(entry.visibility.rectSourcePixels) === jsonDigest(rendered.rectSourcePixels) && entry.visibility.sourceOpacity === (rendered.composite.mode === 'opaque' ? 1 : rendered.composite.opacity), `interpolation-render-binding: ${time}s/${rendered.id}`)
-          requireCondition(jsonDigest(a.partOverrides ?? []) === jsonDigest(b.partOverrides ?? []) && jsonDigest(rendered.partOverrides) === jsonDigest(a.partOverrides ?? []) && jsonDigest(a.composite ?? { mode: 'opaque' }) === jsonDigest(b.composite ?? { mode: 'opaque' }), `interpolation-discrete-regime: override/composite discontinuity at ${time}s/${rendered.id}`)
+          const decoded=rendered.sourceSampling?.selection==='decoded-exposure'
+          requireCondition(renderedCertificateErrors(rendered,time).length===0,`Matched native sample lies in an uncertified source interval at ${time}s/${rendered.id}`)
+          if(decoded) {
+            requireCondition(a&&rendered.sourceSampling.fromTimeSeconds===from.timeSeconds&&rendered.sourceSampling.toTimeSeconds===from.timeSeconds&&rendered.sourceSampling.mix===0,`Decoded-exposure hold must select the independently certified governing source image at ${time}s/${rendered.id}`)
+            requireCondition(sameResolvedImagePlaneWarp(rendered.resolvedImagePlaneWarp,independentlyResolvedWarp(a))&&sameSourceLayout(rendered.sourceLayout,sourceLayoutForViews(fromViews)),`Certified source hold changed its measured image-plane support at ${time}s/${rendered.id}`)
+            const input=a.mechanicalState.status==='constrained'?a.mechanicalState.runtimeWitness.input:a.mechanicalState.input
+            requireCondition(sameCamera(rendered.camera,a.camera,nativeCameraRect(a))&&jsonDigest(rendered.input)===jsonDigest(input),`Certified photograph/exposure hold cannot invent native physical camera/mechanism motion at ${time}s/${rendered.id}`)
+          } else {
+            requireCondition(!a?.imagePlaneWarp&&!b?.imagePlaneWarp,'Changing corners need actual decoded-exposure sampling; invented H coefficients/timing interpolation forbidden')
+            requireCondition(a && b && rendered.sourceSampling?.fromTimeSeconds === from.timeSeconds && rendered.sourceSampling.toTimeSeconds === to.timeSeconds && Math.abs(rendered.sourceSampling.mix - (time - from.timeSeconds) / (to.timeSeconds - from.timeSeconds)) <= 1e-9, `interpolation-source-binding: ${time}s/${rendered.id}`)
+          }
+          requireCondition(jsonDigest(entry.mechanism.input) === jsonDigest(rendered.input) && entry.mechanism.mechanicalProvenance === rendered.mechanicalProvenance && sameCamera(entry.visibility.camera, rendered.camera, nativeCameraRect(rendered)) && jsonDigest(entry.visibility.rectSourcePixels) === jsonDigest(rendered.rectSourcePixels) && entry.visibility.sourceOpacity === (rendered.composite.mode === 'opaque' ? 1 : rendered.composite.opacity), `interpolation-render-binding: ${time}s/${rendered.id}`)
+          for(const capture of [entry.capture,entry.visibility,entry.mechanism,...(entry.nativeLines?[entry.nativeLines]:[])]) requireCondition(sourceCaptureBindingErrors({...rendered,sourceLayout:rendered.sourceLayout},capture).length===0,`interpolation-warp-layout-binding: ${time}s/${rendered.id}`)
+          for(const capture of [entry.capture,entry.visibility,...(entry.nativeLines?[entry.nativeLines]:[])]) for(const detail of nativeRasterSupportErrors({...rendered,sourceLayout:rendered.sourceLayout},capture)) fail(report,'interpolated-native-raster-support',detail,{timeSeconds:time,viewId:rendered.id})
+          requireCondition(jsonDigest(rendered.partOverrides)===jsonDigest(a.partOverrides??[])&&jsonDigest(rendered.composite)===jsonDigest(a.composite??{mode:'opaque'})&&(decoded||(jsonDigest(a.partOverrides??[])===jsonDigest(b.partOverrides??[])&&jsonDigest(a.composite??{mode:'opaque'})===jsonDigest(b.composite??{mode:'opaque'}))),`interpolation-discrete-regime: override/composite discontinuity at ${time}s/${rendered.id}`)
           for (const error of physicalConstraintErrors(entry.mechanism, rendered.constraintSummary)) fail(report, 'interpolated-physical-constraint', 'Actual in-between native solution violates source constraints', { timeSeconds: time, viewId: rendered.id, ...error })
-          if (rendered.mechanicalProvenance === 'constrained') requireCondition(a.mechanicalState.runtimeWitness?.continuity && jsonDigest(a.mechanicalState.runtimeWitness.continuity) === jsonDigest(b.mechanicalState.runtimeWitness?.continuity) && jsonDigest(rendered.continuity) === jsonDigest(a.mechanicalState.runtimeWitness.continuity), `interpolation-witness-regime: source-evidenced continuity missing at ${time}s/${rendered.id}`)
+          if (!decoded&&rendered.mechanicalProvenance === 'constrained') requireCondition(a.mechanicalState.runtimeWitness?.continuity && jsonDigest(a.mechanicalState.runtimeWitness.continuity) === jsonDigest(b.mechanicalState.runtimeWitness?.continuity) && jsonDigest(rendered.continuity) === jsonDigest(a.mechanicalState.runtimeWitness.continuity), `interpolation-witness-regime: source-evidenced continuity missing at ${time}s/${rendered.id}`)
           const startProof = a.mechanicalState.status === 'constrained' ? a.mechanicalState.runtimeWitness.visibilityProof : a.mechanicalState.visibilityProof
           const endProof = b.mechanicalState.status === 'constrained' ? b.mechanicalState.runtimeWitness.visibilityProof : b.mechanicalState.visibilityProof
-          requireCondition(startProof && endProof && jsonDigest(rendered.visibilityProof) === jsonDigest(startProof) && jsonDigest(rendered.visibilityProofEnd) === jsonDigest(endProof), `interpolation-proof-binding: stale/missing observed or constrained endpoint certificate at ${time}s/${rendered.id}`)
-          for (const proof of [rendered.visibilityProof, rendered.visibilityProofEnd]) for (const error of nativeVisibilityErrors(entry.visibility, proof)) fail(report, `interpolated-${error.code}`, error.detail, { timeSeconds: time, viewId: rendered.id })
+          requireCondition(startProof && endProof && jsonDigest(rendered.visibilityProof) === jsonDigest(startProof) && (decoded?rendered.visibilityProofEnd===null:jsonDigest(rendered.visibilityProofEnd) === jsonDigest(endProof)), `interpolation-proof-binding: stale/missing observed or constrained endpoint certificate at ${time}s/${rendered.id}`)
+          for (const proof of (decoded?[rendered.visibilityProof]:[rendered.visibilityProof, rendered.visibilityProofEnd])) for (const error of nativeVisibilityErrors(entry.visibility, proof)) fail(report, `interpolated-${error.code}`, error.detail, { timeSeconds: time, viewId: rendered.id })
           requireCondition(jsonDigest(rendered.nativeGeometryAssumptions ?? []) === jsonDigest(record.data.nativeGeometryAssumptions ?? []) && jsonDigest(entry.mechanism.nativeGeometryAssumptions ?? []) === jsonDigest(record.data.nativeGeometryAssumptions ?? []), `interpolation-native-assumption-binding: ${time}s/${rendered.id}`)
           requireCondition(Array.isArray(rendered.sourceNonIdentifiableFixedParts) && Array.isArray(entry.mechanism.sourceNonIdentifiableFixedParts) && jsonDigest(rendered.sourceNonIdentifiableFixedParts) === jsonDigest(entry.mechanism.sourceNonIdentifiableFixedParts) && jsonDigest(rendered.sourceNonIdentifiableFixedParts) === jsonDigest(startProof.sourceNonIdentifiableFixedParts), `interpolation-uncertified-fixed-binding: ${time}s/${rendered.id}`)
           revisions.add(entry.mechanism.sourceDrawRevision); clockSkews.push(entry.skewSeconds); interpolation.verifiedViews++
@@ -904,6 +1061,6 @@ export async function verifySync() {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  if (process.argv.includes('--help')) console.log(`Usage: npm run verify:sync\nRequires an existing production dist, all ${VIDEO_IDS.length} private original source MP4s/complete independent observations (${VIDEO_IDS.join(', ')}), playwright and native /usr/bin/google-chrome.\nSource image formats: exclusive actual bgr8/sha256Bgr8 or gray8/sha256Gray8, with original sourceSha256/native exposure index/dimensions; every claimed image is selectively re-decoded. Pixel bound remains 1920*0.02=38.4px and clock bound 0.5s.\nEvery declared native line receives pure actual drawable REST-bounding-box endpoint qualification; passing that bound is not an axis/surface correspondence certificate. Crossfade source opacity is checked per half-open ROI pixel; disjoint incoming montage tiles can share one outgoing layer, but nested image composition is unsupported in this phase.\nUser-approved source-non-identifiable structural fixed parts require explicit proof/binding records, actual native identity/structural/deformation/override qualification before any side effect, and all depth-tested ID pixel extents inside an independently source-audited region. They remain rendered and explicitly NOT geometric-fidelity passed; moving/unbound parts and source-overridden parts are ineligible. Every native path belongs to exactly one of visible, excluded, unidentified-fixed or unresolved; unresolved must be empty.\nEnvironment: HARMONIC_REFERENCE_ROOT (default /tmp/harmonic-web-reference), HARMONIC_MODEL_INVENTORY (default /tmp/harmonic-web-model/model-inventory.json; required for global rig geometry), SIMULATOR_BASE (must match build), HARMONIC_CHROME, HARMONIC_HEADLESS=1 (default headed).\nOutput: web/.vite/verification-output/<timestamp>/report.json and actual native screenshots/measurements. Partial source census, unavailable native line/contour GPU proof and external YouTube restrictions FAIL; nothing is mocked, suppressed or skipped.`)
+  if (process.argv.includes('--help')) console.log(`Usage: npm run verify:sync\nRequires an existing production dist, all ${VIDEO_IDS.length} private original source MP4s/complete independent observations (${VIDEO_IDS.join(', ')}), playwright and native /usr/bin/google-chrome.\nSource image formats: exclusive actual bgr8/sha256Bgr8 or gray8/sha256Gray8, with original sourceSha256/native exposure index/dimensions; every claimed image is independently re-decoded. Pixel bound remains 1920*0.02=38.4px and clock bound 0.5s.\nImage-plane evidence requires four ordered measured corners, exact source/reference exposure identities, disjoint actual interior heldouts and an independently verified ordinary reference camera/aspect. H is recomputed independently; physical camera motion, authored second matrices, interpolated H coefficients, stale support layouts and untransformed raster/axis uncertainty cannot pass.\nCrossfade images require explicit imageLayerId/common weights. Each image's ordered ROI/quad union spends its weight once; later same-image views mask earlier supported pixels. Different fading images retain weighted contributions. Native colour/line/landmark/depth-ID support and half-open pixel-centre sampling must match the actual ordered layout.\nEvery declared native line receives pure actual drawable REST-bounding-box endpoint qualification; passing that bound is not an axis/surface correspondence certificate. Full all435 native depth-ID census, finite clipped native GPU lines and actual depth contours remain required.\nUser-approved source-non-identifiable structural fixed parts require explicit proof/binding records, actual native identity/structural/deformation/override qualification before any side effect, and all depth-tested ID pixel extents inside an independently source-audited region. They remain rendered and explicitly NOT geometric-fidelity passed; moving/unbound parts and source-overridden parts are ineligible. Every native path belongs to exactly one of visible, excluded, unidentified-fixed or unresolved; unresolved must be empty.\nEnvironment: HARMONIC_REFERENCE_ROOT (default /tmp/harmonic-web-reference; set to the durable private original-video/evidence root when recovered originals live elsewhere), HARMONIC_MODEL_INVENTORY (default /tmp/harmonic-web-model/model-inventory.json; required for global rig geometry), SIMULATOR_BASE (must match build), HARMONIC_CHROME, HARMONIC_HEADLESS=1 (default headed).\nOutput: web/.vite/verification-output/<timestamp>/report.json and actual native screenshots/measurements. Partial source census, unavailable native line/contour GPU proof and external YouTube restrictions FAIL; nothing is mocked, suppressed or skipped.`)
   else process.exitCode = await verifySync()
 }
