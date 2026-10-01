@@ -101,13 +101,21 @@ def _side_x(z_mm: float) -> float:
 # above-left of the rear face, which holds its two-row band and process
 # callout clear of its own extension lines.  Run 20261001T110844152Z put the
 # tip, spigot and shank on one shelf, where their bands printed over each
-# other (machinist review blocker).  The three lengths stay baseline-stacked
-# below from the rear face, shortest innermost.
+# other (machinist review blocker).  The lengths stay baseline-stacked below
+# from the rear face, shortest innermost, so no extension line crosses an
+# inner row.  The cutter's full-depth station and run-out limit (R9-67) carry
+# their names as model prefixes, too wide for their spans, so their text
+# stands left of the rear face, clear of every station's extension line; the
+# rows' 8 mm pitch keeps the section caption over the title block.
 FRONT_KEEP: dict[str, tuple[float, float]] = {}
 _SIDE_TOP = RIGHT_CENTER[1] + HALF_OD
 _SIDE_BOTTOM = RIGHT_CENTER[1] - HALF_OD
 _REAR_X = _side_x(0.0)
 _NOSE_X = _side_x(OVERALL_LENGTH)
+_ROW_PITCH = 0.008
+# The prefixed texts' centre left of the rear face: half the wider text's
+# printed width (test_transgear_feed_pinion_drawing) and an arrow's air.
+_CUTTER_TEXT_INSET = 0.040
 RIGHT_KEEP: dict[str, tuple[float, float]] = {
     "RootDia": (_REAR_X - 0.030, RIGHT_CENTER[1]),
     "OutsideDia": (_REAR_X - 0.066, RIGHT_CENTER[1]),
@@ -117,12 +125,21 @@ RIGHT_KEEP: dict[str, tuple[float, float]] = {
         (_side_x(FACE_WIDTH) + _side_x(SPIGOT_FRONT_STATION)) / 2.0,
         _SIDE_TOP + 0.012,
     ),
-    "FaceWidth": ((_REAR_X + _side_x(FACE_WIDTH)) / 2.0, _SIDE_BOTTOM - 0.012),
+    "FullDepth": (_REAR_X - _CUTTER_TEXT_INSET, _SIDE_BOTTOM - _ROW_PITCH - 0.002),
+    # Nudged left of its span's centre, clear of the run-out's extension line.
+    "FaceWidth": (
+        (_REAR_X + _side_x(FACE_WIDTH)) / 2.0 - 0.0015,
+        _SIDE_BOTTOM - 2 * _ROW_PITCH - 0.002,
+    ),
+    "CutterRunout": (
+        _REAR_X - _CUTTER_TEXT_INSET,
+        _SIDE_BOTTOM - 3 * _ROW_PITCH - 0.002,
+    ),
     "SpigotFront": (
         (_REAR_X + _side_x(SPIGOT_FRONT_STATION)) / 2.0,
-        _SIDE_BOTTOM - 0.024,
+        _SIDE_BOTTOM - 4 * _ROW_PITCH - 0.002,
     ),
-    "OverallLength": (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.036),
+    "OverallLength": (RIGHT_CENTER[0], _SIDE_BOTTOM - 5 * _ROW_PITCH - 0.002),
 }
 DIMENSION_CALLOUTS = {
     # The native value/limits define the bore; the callout adds the process.
@@ -147,8 +164,9 @@ BORE_FIT_ATTACH = (
     FRONT_CENTER[0] + _BORE_SHEET_RADIUS * math.cos(math.radians(135.0)),
     FRONT_CENTER[1] + _BORE_SHEET_RADIUS * math.sin(math.radians(135.0)),
 )
-# The section's native caption sits below the stacked lengths.
-SECTION_CAPTION = (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.050)
+# The section's native caption, placed by its top centre, sits below the
+# stacked lengths.
+SECTION_CAPTION = (RIGHT_CENTER[0], _SIDE_BOTTOM - 6 * _ROW_PITCH)
 # The finish stands lower LEFT of the end view: the section line's arrows and
 # their "A" labels point right, toward the section, and a lower-right leader
 # ran through the lower label (run 20261001T035353825Z layout audit).  It

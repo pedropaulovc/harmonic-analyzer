@@ -63,6 +63,7 @@ from guide_lock_screw_spec import TAP_MOUTH_BREAK, TIP_REACH_MAX
 from platen_spec import CBORE_DEPTH as PLATEN_CBORE_DEPTH, PLATE_THICKNESS
 from guide_lock_spec import LOCK_THICK
 from platen_guide_spec import (
+    DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     GEOMETRIC_TOLERANCES_MM,
     GUIDE_DEPTH_BAND,
@@ -281,8 +282,8 @@ async def build(adapter) -> dict[str, str]:
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
-    for feature_name, dimensions in DRAWING_PRECISION.items():
-        mark_dimensions_for_drawing(adapter, feature_name, set(dimensions))
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
 
     await apply_material(adapter, MATERIAL)

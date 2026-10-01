@@ -292,21 +292,31 @@ def test_bar_slide_face_carries_the_only_roughness_symbol() -> None:
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert source.count("add_surface_finish(") == 1
     assert 'surface_finish_by_key(SURFACE_FINISHES, "bar_slide")' in source
-    # Its leader lands between the A1 and B1 axes, clear of both.
+    # Its leader lands between the A1 and B1 axes, clear of both, at a point
+    # projected from the controlled face's front edge (model y 0, z 0). The
+    # 234a39c87 farm sheet drew that edge 1.1 mm under the hard-coded sheet y
+    # the leader once asked for, past the 1 mm attachment readback limit.
+    assert guide.SCREW_STATION_X[0] < drawing.BAR_SLIDE_STATION_MM < guide.HOLE_X[0]
     assert (
-        drawing.FRONT_LEFT_X_M + guide.SCREW_STATION_X[0] / 1000.0
-        < drawing.BAR_SLIDE_LANDING_X_M
-        < drawing.FRONT_LEFT_X_M + guide.HOLE_X[0] / 1000.0
-    )
+        "leader_attach_xy=model_point_in_view(\n"
+        "            adapter,\n"
+        "            front,\n"
+        "            (BAR_SLIDE_STATION_MM / 1000.0, 0.0, 0.0),"
+    ) in source
 
 
-def test_part_authors_the_printed_places() -> None:
+def test_part_authors_the_printed_dimensions_and_places() -> None:
     from platen_guide_spec import (
+        DRAWING_DIMENSIONS,
         DRAWING_PRECISION,
         DRAWING_PRECISION_BY_NAME,
         GUIDE_DEPTH_PLACES,
     )
 
+    assert DRAWING_DIMENSIONS == {
+        "GuideProfile": {"Length", "Height"},
+        "Guide": {"Depth"},
+    }
     # The length only meets the platen's edges and the holes locate from the
     # left end at basic stations: .X. The height prints at the places the
     # paper-drive lock-station sweep judges it at.
@@ -319,13 +329,18 @@ def test_part_authors_the_printed_places() -> None:
         "Height": GUIDE_DEPTH_PLACES,
         "Depth": GUIDE_DEPTH_PLACES,
     }
-    assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in (
-        Path(guide.__file__).read_text(encoding="utf-8")
-    )
+    build_source = Path(guide.__file__).read_text(encoding="utf-8")
+    assert "apply_drawing_precision(adapter, DRAWING_PRECISION)" in build_source
+    assert "in DRAWING_DIMENSIONS.items()" in build_source
+    source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert (
         "assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)"
-        in Path(drawing.__file__).read_text(encoding="utf-8")
+        in source
     )
+    # Both views import only their own features' marked dimensions, never the
+    # whole model's (which the farm log warns about and then deletes again).
+    assert source.count("curate_view_dimensions(") == 2
+    assert source.count("dimensions_by_feature=DRAWING_DIMENSIONS") == 2
 
 
 # The rear view's auto-placed hole-table origin, measured on the v38 sheet:

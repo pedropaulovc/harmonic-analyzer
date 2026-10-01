@@ -58,6 +58,7 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
+    set_dimension_prefix,
     set_dimension_symmetric_tolerance,
 )
 from _drawing_simplified import save_simplified_part
@@ -71,12 +72,19 @@ from transgear_feed_pinion_spec import (
     CUTTER_AXIS_R,
     CUTTER_AXIS_Z,
     CUTTER_DIA_MAX,
+    CUTTER_RUNOUT_DEVIATIONS,
+    CUTTER_RUNOUT_MAX,
+    CUTTER_RUNOUT_PLACES,
+    CUTTER_RUNOUT_PREFIX,
+    CUTTER_RUNOUT_TOL_TYPE,
     DEDENDUM_FACTOR,
     DIAMETRAL_PITCH,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
     FULL_DEPTH,
+    FULL_DEPTH_BAND,
+    FULL_DEPTH_PREFIX,
     GAP_AZIMUTH_DEG,
     GEAR_DATA,
     GEAR_FACE_STATION,
@@ -343,25 +351,35 @@ def _as_construction(adapter, line: str) -> None:
         raise RuntimeError(f"{line}: failed to become construction geometry")
 
 
-def _root_min_limit(adapter) -> None:
-    """RootDia as a single MIN limit: the cutter-depth floor the wall reads."""
-    lower, upper = ROOT_DIA_DEVIATIONS
-    _, dimension = _named_dimension(adapter, "SleeveProfile", "RootDia")
-    label = "RootDia@SleeveProfile"
-    # RootDia is driven by its global, which the build writes in inches to 8
-    # decimals (8.0433334 mm against the spec's 8.0433333), so a 1e-12 m match
-    # never holds; 1e-9 m is the convention every other readback here uses.
-    if not math.isclose(float(dimension.SystemValue), ROOT_DIA / 1000.0, abs_tol=1e-9):
+def _single_limit(
+    adapter,
+    name: str,
+    nominal: float,
+    limit_deviations: tuple[float, float],
+    tol_type: int,
+    printed: str,
+) -> None:
+    """A SleeveProfile dimension as a single MIN or MAX limit: SolidWorks
+    prints its nominal then the limit word, so the nominal is the limit's
+    value at the sheet's places; the deviations stay on the native tolerance
+    as the model's record of the band."""
+    lower, upper = limit_deviations
+    _, dimension = _named_dimension(adapter, "SleeveProfile", name)
+    label = f"{name}@SleeveProfile"
+    # A global-driven dimension reads back to the inch-rounded global (RootDia
+    # 8.0433334 mm against the spec's 8.0433333), so a 1e-12 m match never
+    # holds; 1e-9 m is the convention every other readback here uses.
+    if not math.isclose(float(dimension.SystemValue), nominal / 1000.0, abs_tol=1e-9):
         raise RuntimeError(
             f"{label}: nominal {float(dimension.SystemValue) * 1000.0:.7f} is not "
-            f"the modelled root {ROOT_DIA:.7f}"
+            f"the modelled {nominal:.7f}"
         )
     tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    tolerance.Type = ROOT_DIA_TOL_TYPE
+    tolerance.Type = tol_type
     if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
         raise RuntimeError(f"{label}: SetValues rejected {lower:+g}/{upper:+g} mm")
     if (
-        int(tolerance.Type) != ROOT_DIA_TOL_TYPE
+        int(tolerance.Type) != tol_type
         or not math.isclose(
             float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12
         )
@@ -369,8 +387,8 @@ def _root_min_limit(adapter) -> None:
             float(tolerance.GetMaxValue()), upper / 1000.0, abs_tol=1e-12
         )
     ):
-        raise RuntimeError(f"{label}: MIN-limit tolerance readback changed")
-    _telemetry.success(f"{label}: single limit {ROOT_DIA_MIN:.2f} MIN")
+        raise RuntimeError(f"{label}: single-limit tolerance readback changed")
+    _telemetry.success(f"{label}: single limit {printed}")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -399,6 +417,7 @@ async def build(adapter) -> dict[str, str]:
         ("OilHoleDia", OIL_HOLE_DIA),
         ("OilHoleZ", OIL_HOLE_Z),
         ("FullDepth", FULL_DEPTH),
+        ("CutterRunoutMax", CUTTER_RUNOUT_MAX),
         ("CutterDia", CUTTER_DIA_MAX),
         ("RunoutSlotWidth", RUNOUT_SLOT_WIDTH),
     ):
@@ -473,8 +492,19 @@ async def build(adapter) -> dict[str, str]:
         "bore-diameter witness",
         await adapter.add_line(0.0, BORE_DIA / 2.0, -OVERALL_LENGTH, BORE_DIA / 2.0),
     )
+    # R9-67: the cutter's full-depth station and run-out limit, from the rear
+    # face along the tooth tips' lower line, so each baseline dimension below
+    # the section rises from the part's edge.
+    tip_v = -OUTSIDE_DIA / 2.0
+    runout_ref = check(
+        "run-out-limit witness",
+        await adapter.add_line(0.0, tip_v, -CUTTER_RUNOUT_MAX, tip_v),
+    )
+    full_depth_ref = check(
+        "full-depth witness", await adapter.add_line(0.0, tip_v, -FULL_DEPTH, tip_v)
+    )
     set_sketch_direct_db(adapter, False)
-    for line in (outside_ref, root_ref, bore_ref):
+    for line in (outside_ref, root_ref, bore_ref, runout_ref, full_depth_ref):
         _as_construction(adapter, line)
     for i, line in enumerate(lines):
         (_, y1), (_, y2) = points[i], points[(i + 1) % len(lines)]
@@ -547,6 +577,42 @@ async def build(adapter) -> dict[str, str]:
     ):
         await add_diametric_linear_dimension(adapter, axis, target, xy, name)
         profile.record(name, f'"{name}"')
+    for label, line in (
+        ("run-out-limit witness", runout_ref),
+        ("full-depth witness", full_depth_ref),
+    ):
+        check(
+            f"{label} horizontal",
+            await adapter.add_sketch_constraint(line, None, "horizontal"),
+        )
+    check(
+        "full-depth witness starts on the run-out witness",
+        await adapter.add_sketch_constraint(
+            f"{full_depth_ref}.start", f"{runout_ref}.start", "coincident"
+        ),
+    )
+    await anchor_point_to_origin(
+        adapter, f"{runout_ref}.start", 0.0, tip_v, "witnesses on the tip line"
+    )
+    profile.record("WitnessDrop", '"OutsideDia" / 2')
+    await dimension_between(
+        adapter,
+        f"{full_depth_ref}.end",
+        "origin",
+        "horizontal_distance",
+        FULL_DEPTH,
+        "FullDepth",
+    )
+    profile.record("FullDepth", '"FullDepth"')
+    await dimension_between(
+        adapter,
+        f"{runout_ref}.end",
+        "origin",
+        "horizontal_distance",
+        CUTTER_RUNOUT_MAX,
+        "CutterRunout",
+    )
+    profile.record("CutterRunout", '"CutterRunoutMax"')
     await ensure_fully_defined(adapter, "sleeve sketch")
     check("exit_sketch sleeve", await adapter.exit_sketch())
     name_last_feature(adapter, "SleeveProfile")
@@ -704,13 +770,17 @@ async def build(adapter) -> dict[str, str]:
     # Bands (transgear_feed_pinion_spec): the three stations ±0.05 (R9-5), the
     # reamed bore, the spigot's slip band under the disc's reamed bore, the
     # shank's press band under the hub's reamed bore (R9-45), the tip's
-    # +0/-0.10, the root as a MIN floor.
+    # +0/-0.10, the root as a MIN floor; the cutter's full-depth station at
+    # its .XXX band and its run-out as a MAX limit (R9-67).
     set_dimension_symmetric_tolerance(adapter, "GearBlank", "FaceWidth", STATION_TOL)
     set_dimension_symmetric_tolerance(
         adapter, "SleeveProfile", "SpigotFront", STATION_TOL
     )
     set_dimension_symmetric_tolerance(
         adapter, "SleeveProfile", "OverallLength", STATION_TOL
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "SleeveProfile", "FullDepth", FULL_DEPTH_BAND
     )
     set_dimension_bilateral_tolerance(
         adapter, "SleeveProfile", "BoreDia", *BORE_DEVIATIONS
@@ -724,7 +794,25 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "SleeveProfile", "OutsideDia", *OUTSIDE_DIA_DEVIATIONS
     )
-    _root_min_limit(adapter)
+    _single_limit(
+        adapter,
+        "RootDia",
+        ROOT_DIA,
+        ROOT_DIA_DEVIATIONS,
+        ROOT_DIA_TOL_TYPE,
+        f"{ROOT_DIA_MIN:.2f} MIN",
+    )
+    _single_limit(
+        adapter,
+        "CutterRunout",
+        CUTTER_RUNOUT_MAX,
+        CUTTER_RUNOUT_DEVIATIONS,
+        CUTTER_RUNOUT_TOL_TYPE,
+        f"{CUTTER_RUNOUT_MAX:.{CUTTER_RUNOUT_PLACES}f} MAX",
+    )
+    # Each cutter station names itself: neither ends at a drawn edge.
+    set_dimension_prefix(adapter, "SleeveProfile", "FullDepth", FULL_DEPTH_PREFIX)
+    set_dimension_prefix(adapter, "SleeveProfile", "CutterRunout", CUTTER_RUNOUT_PREFIX)
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

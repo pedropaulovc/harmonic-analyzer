@@ -28,10 +28,16 @@ LOCK_TAP_SPEC = HoleSpec("tapped", "#4-40")
 GUIDE_DEPTH_BAND = (0.0, -0.50)  # (upper, lower)
 GUIDE_DEPTH_PLACES = 2
 
-# Places the print carries, authored on the model (policy rule 2). The height
-# prints at the depth's places (the lock-station sweep reads it so). The
-# length prints .X: the rail ends only meet the platen's edges, and the holes
-# locate from the left end at basic stations, so no stack reads its band.
+# The print's dimensions, by owning feature (the build marks exactly these and
+# the sheet imports only these), and the places each carries, authored on the
+# model (policy rule 2). The height prints at the depth's places (the
+# lock-station sweep reads it so). The length prints .X: the rail ends only
+# meet the platen's edges, and the holes locate from the left end at basic
+# stations, so no stack reads its band.
+DRAWING_DIMENSIONS: dict[str, set[str]] = {
+    "GuideProfile": {"Length", "Height"},
+    "Guide": {"Depth"},
+}
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "GuideProfile": {"Length": 1, "Height": GUIDE_DEPTH_PLACES},
     "Guide": {"Depth": GUIDE_DEPTH_PLACES},
@@ -41,6 +47,8 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     for dimensions in DRAWING_PRECISION.values()
     for name, places in dimensions.items()
 }
+if {f: set(d) for f, d in DRAWING_PRECISION.items()} != DRAWING_DIMENSIONS:
+    raise AssertionError("every marked platen-guide dimension needs native precision")
 
 # R9-47 (Main-approved fit-up): the lock gap, lock-plate front face to the
 # bar's back face, as fitted by facing the rail backs under the lock plates

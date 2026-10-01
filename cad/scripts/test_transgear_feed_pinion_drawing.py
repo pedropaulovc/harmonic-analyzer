@@ -52,6 +52,7 @@ def test_bands_come_from_named_spec_constants() -> None:
         ("GearBlank", "FaceWidth"): "STATION_TOL",
         ("SleeveProfile", "SpigotFront"): "STATION_TOL",
         ("SleeveProfile", "OverallLength"): "STATION_TOL",
+        ("SleeveProfile", "FullDepth"): "FULL_DEPTH_BAND",
         ("SleeveProfile", "BoreDia"): "*BORE_DEVIATIONS",
         ("SleeveProfile", "SpigotDia"): "*SPIGOT_DIA_DEVIATIONS",
         ("SleeveProfile", "ShankDia"): "*SHANK_DIA_DEVIATIONS",
@@ -120,15 +121,31 @@ def test_cutter_run_out_ends_inside_its_limit_and_leaves_the_spigot_round() -> N
     )
 
 
-def test_sheet_prints_the_full_depth_window_and_the_cutter_limit() -> None:
+def test_cutter_stations_are_native_banded_model_dimensions() -> None:
+    """Codex P2 on R9-67: the full-depth window and the run-out limit print as
+    the model's own dimensions, band and places on the part, not as numbers
+    frozen into note text (policy rules 2 and 7)."""
+    assert {"FullDepth", "CutterRunout"} <= spec.DRAWING_DIMENSIONS["SleeveProfile"]
+    places = spec.DRAWING_PRECISION_BY_NAME
+    assert places["FullDepth"] == spec.FULL_DEPTH_PLACES == 3
+    assert places["CutterRunout"] == spec.CUTTER_RUNOUT_PLACES == 2
+    # The window is the .XXX row's band; the run-out a MAX limit
+    # (swTolType_e.swTolMAX) whose nominal is the limit it prints.
+    assert spec.FULL_DEPTH_BAND == printed_band_mm(spec.FULL_DEPTH_PLACES)
+    assert spec.CUTTER_RUNOUT_TOL_TYPE == 6
+    lower, upper = spec.CUTTER_RUNOUT_DEVIATIONS
+    assert upper == 0.0
+    assert spec.CUTTER_RUNOUT_MAX + lower == pytest.approx(spec.FULL_DEPTH_MIN)
+    # No number the model owns is retyped into the notes.
     lines = spec.DRAWING_NOTES.splitlines()
-    assert spec.FULL_DEPTH_NOTE in lines and spec.CUTTER_NOTE in lines
+    for value in (f"{spec.FULL_DEPTH:.3f}", f"{spec.CUTTER_RUNOUT_MAX:.2f}"):
+        assert value not in spec.DRAWING_NOTES, value
+    assert spec.CUTTER_NOTE in lines
     assert len(lines) <= 4 and max(len(line) for line in lines) <= 70
-    assert f"{spec.FULL_DEPTH:.3f} \u00b1{printed_band_mm(3):.2f}" in (
-        spec.FULL_DEPTH_NOTE
-    )
-    assert f"{spec.CUTTER_RUNOUT_MAX:.2f} MAX" in spec.CUTTER_NOTE
     assert f"\u00d8{spec.CUTTER_DIA_MAX_IN:.2f} in MAX" in spec.CUTTER_NOTE
+    # One-line names, printed before the value on its own row.
+    for prefix in (spec.FULL_DEPTH_PREFIX, spec.CUTTER_RUNOUT_PREFIX):
+        assert "\n" not in prefix and prefix.endswith(" ")
 
 
 def test_modelled_run_out_slots_stay_in_the_spigots_rear_end() -> None:
@@ -220,6 +237,8 @@ _NOMINAL = {
     "FaceWidth": spec.FACE_WIDTH,
     "SpigotFront": spec.SPIGOT_FRONT_STATION,
     "OverallLength": spec.OVERALL_LENGTH,
+    "FullDepth": spec.FULL_DEPTH,
+    "CutterRunout": spec.CUTTER_RUNOUT_MAX,
 }
 _DEVIATIONS = {
     "BoreDia": spec.BORE_DEVIATIONS,
@@ -241,6 +260,10 @@ def _printed_text(name: str) -> str:
         value = f"\u00d8{value}"
     if name == "RootDia":
         rows = [f"{value} min."]
+    elif name == "CutterRunout":
+        rows = [f"{spec.CUTTER_RUNOUT_PREFIX}{value} max."]
+    elif name == "FullDepth":
+        rows = [f"{spec.FULL_DEPTH_PREFIX}{value} \u00b1{spec.FULL_DEPTH_BAND:.2f}"]
     elif name in _DEVIATIONS:
         lower, upper = _DEVIATIONS[name]
         places = _DEVIATION_PLACES[name]
@@ -338,9 +361,53 @@ def test_section_values_and_bands_print_clear_of_each_other() -> None:
     left = sorted(
         (n for n in inline if inline[n][0] < rear_x), key=lambda n: -inline[n][0]
     )
-    assert left == ["RootDia", "OutsideDia"]
     assert [_NOMINAL[n] for n in left] == sorted(_NOMINAL[n] for n in left)
     assert inline["ShankDia"][0] > nose_x
+
+
+# The native section caption, "SECTION A-A" over its scale, stands 16.5 mm
+# tall and is placed by its top centre; the B sheet's title block stands up
+# to 64.9 mm (test_crank_drive_gear_drawing, test_rocker_arm_support_drawing).
+_CAPTION_HEIGHT = 0.0165
+_TITLE_BLOCK_TOP = 0.0649
+
+
+def test_baseline_lengths_stack_without_crossing_extension_lines() -> None:
+    """Each length's row stands farther out than every shorter one, and its
+    text crosses no outer row's extension line (the prefixed cutter texts
+    stand left of the rear face); the caption hangs below them, clear of the
+    title block."""
+    rear_x = drawing._side_x(0.0)
+    bottom = drawing.RIGHT_CENTER[1] - drawing.HALF_OD
+    rows = {
+        name: xy
+        for name, xy in drawing.RIGHT_KEEP.items()
+        if xy[1] < bottom and not name.endswith("Dia")
+    }
+    assert set(rows) == {
+        "FullDepth",
+        "FaceWidth",
+        "CutterRunout",
+        "SpigotFront",
+        "OverallLength",
+    }
+    by_row = sorted(rows, key=lambda n: -rows[n][1])
+    assert [_NOMINAL[n] for n in by_row] == sorted(_NOMINAL[n] for n in by_row)
+    for i, name in enumerate(by_row):
+        box = _printed_box(name, rows[name])
+        for outer in by_row[i + 1 :]:
+            x = drawing._side_x(_NOMINAL[outer])
+            clear = (
+                x <= box.xmin - ARROW_TEXT_CLEARANCE_M
+                or x >= box.xmax + ARROW_TEXT_CLEARANCE_M
+            )
+            assert clear, (name, outer)
+    for name in ("FullDepth", "CutterRunout"):
+        assert _printed_box(name, rows[name]).xmax + ARROW_TEXT_CLEARANCE_M < rear_x
+    _, cap_top = drawing.SECTION_CAPTION
+    lowest = _printed_box(by_row[-1], rows[by_row[-1]])
+    assert cap_top < lowest.ymin - TEXT_CLEARANCE_HEIGHTS * _CAP_M
+    assert cap_top - _CAPTION_HEIGHT > _TITLE_BLOCK_TOP + 0.002
 
 
 # The finish symbol's ink from its insertion point, measured on run

@@ -857,3 +857,30 @@ def test_the_feed_mesh_sits_mid_reach_with_a_working_contact_ratio() -> None:
         patch.setattr(assembly, "RACK_PITCH_Y", assembly.RACK_PITCH_Y + 0.25)
         with pytest.raises(RuntimeError, match="contact ratio 0.86 < 1.2"):
             assembly._assert_rack_mesh()
+
+
+def test_the_mesh_band_ends_both_mesh_on_the_form_cut_pinion() -> None:
+    """Codex P2 (234a39c87) / R9-62a: the (0.20, 0.35) shake band put the rack
+    into the 12T's radial flank at its tight end (e 0.39) and under the 1.1
+    contact-ratio rule at its loose end (e 0.68, smallest printed tip)."""
+    with pytest.raises(ValueError, match="leaves the working window"):
+        steps.check_mesh_band((0.20, 0.35))
+    low, high = steps.MESH_BACKLASH_RANGE
+    with pytest.raises(ValueError, match="leaves the working window"):
+        steps.check_mesh_band((0.20, high))
+    with pytest.raises(ValueError, match="leaves the working window"):
+        steps.check_mesh_band((low, 0.35))
+    steps.check_mesh_band(steps.MESH_BACKLASH_RANGE)
+    # The window's ends are where the two criteria change sign.
+    e_min, e_max = steps.MESH_EXTENSION_MIN, steps.MESH_EXTENSION_MAX
+    assert steps.feed_mesh_penetration(e_min) <= 1e-5
+    assert steps.feed_mesh_penetration(e_min - 0.03) > 1e-4
+    assert steps.feed_mesh_contact_ratio(e_max, steps.TIP_DIA_MIN) == pytest.approx(
+        steps.MESH_CONTACT_RATIO_FLOOR
+    )
+    # The old tight end's reach into the flank, the old loose end's ratio.
+    assert steps.feed_mesh_penetration(steps.mesh_extension(0.20)) > 0.003
+    assert (
+        steps.feed_mesh_contact_ratio(steps.mesh_extension(0.35), steps.TIP_DIA_MIN)
+        < 1.1
+    )

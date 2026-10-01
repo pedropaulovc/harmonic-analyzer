@@ -142,6 +142,64 @@ def test_no_diameter_text_overlaps_another_or_its_line() -> None:
             assert not (bx0 <= line_x <= bx1 and by0 <= ay0), (a, b)
 
 
+# Leaders farm run 20261001T163633352Z (234a39c87) measured on the end view:
+# the journal finish's from its symbol, and the tap callout's from its drill
+# circle down towards its text.  SolidWorks landed the finish's at the
+# journal circle's bottom, (0.0415, 0.1477).
+_FINISH_LEADER_START = (0.0466, 0.1860)
+_TAP_LEADER = ((0.0427, 0.1647), (0.0473, 0.1553))
+
+
+def _segment_gap(
+    p: tuple[tuple[float, float], tuple[float, float]],
+    q: tuple[tuple[float, float], tuple[float, float]],
+) -> float:
+    """Least distance between two segments, 0.0 when they cross."""
+
+    def cross(o, a, b) -> float:
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+
+    (a, b), (c, d) = p, q
+    if (cross(a, b, c) > 0) != (cross(a, b, d) > 0) and (cross(c, d, a) > 0) != (
+        cross(c, d, b) > 0
+    ):
+        return 0.0
+
+    def to_segment(pt, s0, s1) -> float:
+        dx, dy = s1[0] - s0[0], s1[1] - s0[1]
+        t = ((pt[0] - s0[0]) * dx + (pt[1] - s0[1]) * dy) / (dx * dx + dy * dy)
+        t = min(1.0, max(0.0, t))
+        return math.hypot(pt[0] - s0[0] - t * dx, pt[1] - s0[1] - t * dy)
+
+    return min(
+        to_segment(a, c, d),
+        to_segment(b, c, d),
+        to_segment(c, a, b),
+        to_segment(d, a, b),
+    )
+
+
+def test_the_journal_finish_leader_routes_clear_of_the_tap_leader() -> None:
+    """234a39c87: the journal finish's leader, landed by SolidWorks at the
+    circle's bottom, crossed the tap callout's leader at (43.6, 162.9) mm.
+    It now lands on the journal circle under its symbol and keeps 2 mm off
+    the tap leader."""
+    attach = drawing.JOURNAL_FINISH_ATTACH
+    radius = spec.JOURNAL_DIA * drawing._S / 2000.0
+    centre = drawing.END_CENTER
+    assert math.hypot(attach[0] - centre[0], attach[1] - centre[1]) == pytest.approx(
+        radius, abs=1e-9
+    )
+    # The measured bottom landing lies on the same circle, so the centre holds.
+    assert math.hypot(0.0415 - centre[0], 0.1477 - centre[1]) == pytest.approx(
+        radius, abs=2e-4
+    )
+    assert _segment_gap((_FINISH_LEADER_START, attach), _TAP_LEADER) >= 0.002
+    # The old landing crosses it, and the landing stays on the sheet.
+    assert _segment_gap((_FINISH_LEADER_START, (0.0415, 0.1477)), _TAP_LEADER) == 0.0
+    assert attach[0] > 0.010
+
+
 def test_sheet_authors_no_manufacturing_value() -> None:
     # Rule 2: places and bands come from the part; the sheet reads them back.
     assert Path(drawing.__file__).name in PRECISION_MIGRATED_DRAWINGS
@@ -155,6 +213,7 @@ def test_bands_come_from_named_spec_constants() -> None:
         ("StudProfile", "ThreadBlankDia"): "*deviations(THREAD_BLANK_DIA_BAND)",
         ("JournalProfile", "JournalDia"): "*deviations(JOURNAL_DIA_BAND)",
         ("JournalProfile", "JournalLength"): "JOURNAL_LENGTH_TOL",
+        ("StudProfile", "FullDepth"): "FULL_DEPTH_BAND",
     }
     # The journal's ±0.05 holds the knob float inside its .XXX row.
     assert spec.JOURNAL_LENGTH_TOL < printed_band_mm(spec.JOURNAL_LENGTH_PLACES)
@@ -221,6 +280,112 @@ def test_run_out_limit_refuses_a_ring_that_brings_the_hub_bore_in(
     # inside the printed run-out limit.
     with pytest.raises(AssertionError, match="hub bore"):
         _shaft_spec_with(monkeypatch, ring, "LENGTH_TOL", 0.5)
+
+
+def test_cutter_stations_are_native_banded_model_dimensions() -> None:
+    """Codex P2 on R9-21/R9-67: the full-depth window and the run-out limit
+    print as the model's own dimensions, band and places on the part, not as
+    numbers frozen into note text (policy rules 2 and 7)."""
+    assert {"FullDepth", "CutterRunout"} <= spec.DRAWING_DIMENSIONS["StudProfile"]
+    places = spec.DRAWING_PRECISION_BY_NAME
+    assert places["FullDepth"] == spec.FULL_DEPTH_PLACES == 3
+    assert places["CutterRunout"] == spec.CUTTER_RUNOUT_PLACES == 2
+    # The window is the .XXX row's band; the run-out a MAX limit
+    # (swTolType_e.swTolMAX) whose nominal is the limit it prints.
+    assert spec.FULL_DEPTH_BAND == printed_band_mm(spec.FULL_DEPTH_PLACES)
+    assert spec.CUTTER_RUNOUT_TOL_TYPE == 6
+    lower, upper = spec.CUTTER_RUNOUT_DEVIATIONS
+    assert upper == 0.0
+    assert spec.CUTTER_RUNOUT_MAX + lower == pytest.approx(spec.FULL_DEPTH_MIN)
+    # No number the model owns is retyped into the notes.
+    lines = spec.DRAWING_NOTES.split("\n")
+    for value in (f"{spec.FULL_DEPTH:.3f}", f"{spec.CUTTER_RUNOUT_MAX:.2f}"):
+        assert value not in spec.DRAWING_NOTES, value
+    assert spec.CUTTER_NOTE in lines
+    assert f"\u00d8{spec.CUTTER_DIA_MAX_IN:.2f} in MAX" in spec.CUTTER_NOTE
+    # One-line names, printed before the value on its own row.
+    for prefix in (spec.FULL_DEPTH_PREFIX, spec.CUTTER_RUNOUT_PREFIX):
+        assert "\n" not in prefix and prefix.endswith(" ")
+
+
+# Each length below the side view: its two stations (model z) and its whole
+# text, the cutter stations' with their prefixes.  Text centres on its keep
+# point, _CHAR_WIDTH a character (8b5e1f354), the plain box's height.
+_LENGTHS = {
+    "CoreLength": ((0.0, -spec.CORE_LENGTH), f"{spec.CORE_LENGTH:.3f}"),
+    "PlainCore": ((0.0, spec.THREAD_END_Z), f"{spec.PLAIN_CORE:.3f}"),
+    "TipStation": ((0.0, spec.TIP_Z), f"{spec.TIP_STATION:.2f}"),
+    "FaceWidth": ((0.0, spec.FACE_WIDTH), f"{spec.FACE_WIDTH:.3f}"),
+    "JournalLength": (
+        (spec.PINION_REAR_Z, spec.REAR_END_Z),
+        f"{spec.JOURNAL_LENGTH:.3f} \u00b1{spec.JOURNAL_LENGTH_TOL:.2f}",
+    ),
+    "FullDepth": (
+        (0.0, spec.FULL_DEPTH),
+        f"{spec.FULL_DEPTH_PREFIX}{spec.FULL_DEPTH:.3f} "
+        f"\u00b1{spec.FULL_DEPTH_BAND:.2f}",
+    ),
+    "CutterRunout": (
+        (0.0, spec.CUTTER_RUNOUT_MAX),
+        f"{spec.CUTTER_RUNOUT_PREFIX}{spec.CUTTER_RUNOUT_MAX:.2f} max.",
+    ),
+}
+_TITLE_BLOCK_TOP, _TITLE_BLOCK_LEFT = 0.0649, 0.2183  # B sheet
+
+
+def _length_text_box(name: str) -> tuple[float, float, float, float]:
+    x, y = drawing.SIDE_KEEP[name]
+    half = len(_LENGTHS[name][1]) * _CHAR_WIDTH / 2.0
+    return (x - half, y + _PLAIN_BOX[1], x + half, y + _PLAIN_BOX[3])
+
+
+def test_lengths_stack_without_text_on_a_foreign_extension_line() -> None:
+    """Each side of F the lengths nest shortest innermost; no text stands on
+    an extension line running to a deeper row; the cutter stations' prefixed
+    text clears the border and the title block; and the only extension line
+    crossing another length's dimension line is the run-out's over the
+    journal length (two datums, F and the 12T's rear face)."""
+    below = drawing.SIDE_CENTER[1] - drawing.HALF_OD
+    rows = {n: xy for n, xy in drawing.SIDE_KEEP.items() if xy[1] < below - 0.005}
+    assert set(rows) == set(_LENGTHS)
+    for side in (1.0, -1.0):
+        from_f = [
+            n for n, ((z0, z1), _) in _LENGTHS.items() if z0 == 0.0 and side * z1 > 0.0
+        ]
+        by_row = sorted(from_f, key=lambda n: -rows[n][1])
+        reach = [abs(_LENGTHS[n][0][1]) for n in by_row]
+        assert reach == sorted(reach), by_row
+    boxes = {n: _length_text_box(n) for n in rows}
+    # A dimension line runs between its stations and on to text set outside.
+    spans = {}
+    for n, ((z0, z1), _) in _LENGTHS.items():
+        xs = (drawing._sheet_x(z0), drawing._sheet_x(z1), *boxes[n][::2])
+        spans[n] = (min(xs), max(xs))
+    crossings = set()
+    for deep, ((z0, z1), _) in _LENGTHS.items():
+        for x in (drawing._sheet_x(z0), drawing._sheet_x(z1)):
+            for inner, ((w0, w1), _) in _LENGTHS.items():
+                if rows[inner][1] <= rows[deep][1]:
+                    continue
+                x0, _, x1, _ = boxes[inner]
+                assert not x0 - 0.0005 < x < x1 + 0.0005, (inner, deep)
+                # A shared station is one extension line, not a crossing.
+                own = (drawing._sheet_x(w0), drawing._sheet_x(w1))
+                lo, hi = spans[inner]
+                if lo < x < hi and min(abs(x - o) for o in own) > 1e-9:
+                    crossings.add((deep, inner))
+    assert crossings == {("CutterRunout", "JournalLength")}
+    names = sorted(boxes)
+    for i, a in enumerate(names):
+        for b in names[i + 1 :]:
+            ax0, ay0, ax1, ay1 = boxes[a]
+            bx0, by0, bx1, by1 = boxes[b]
+            air = max(bx0 - ax1, ax0 - bx1, by0 - ay1, ay0 - by1)
+            assert air >= 0.001, (a, b, air)
+    for name in ("FullDepth", "CutterRunout"):
+        x0, y0, x1, _ = boxes[name]
+        assert x0 > drawing.F_X + 0.002 and x1 < 0.4191 - 0.003, name
+        assert x1 < _TITLE_BLOCK_LEFT or y0 > _TITLE_BLOCK_TOP + 0.002, name
 
 
 def test_modelled_run_out_slots_stay_under_the_thrust_ring() -> None:

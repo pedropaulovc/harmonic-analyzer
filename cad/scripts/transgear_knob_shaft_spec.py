@@ -215,26 +215,30 @@ if not CORE_DIA < JOURNAL_DIA < OUTSIDE_DIA:
 # The 12T is cut with a form cutter on a dividing head: full depth from F to
 # FULL_DEPTH, then the cutter's arc runs out behind that station, leaving
 # partial-depth gaps over the rest of the face and slotting the Ø8.5 journal
-# (proud of the gap floor) under the loose thrust ring.  The sheet prints the
-# full-depth length as a window from F, the run-out's end as a limit and the
+# (proud of the gap floor) under the loose thrust ring.  The side view prints
+# the full-depth station as a native baseline dimension from F with its .XXX
+# band and the run-out's end as a native MAX limit (construction witnesses in
+# ``StudProfile``, each named by its model prefix); the note gives the
 # largest cutter that keeps a window.
 FULL_DEPTH = 4.65
 FULL_DEPTH_PLACES = 3
 CUTTER_RUNOUT_MAX = 10.5  # from F, a limit
+CUTTER_RUNOUT_PLACES = 2
 CUTTER_DIA_MAX_IN = 1.25
 CUTTER_DIA_MAX = CUTTER_DIA_MAX_IN * MM_PER_IN  # 31.75
-_FULL_DEPTH_BAND = printed_band_mm(FULL_DEPTH_PLACES)
-FULL_DEPTH_MIN = FULL_DEPTH - _FULL_DEPTH_BAND  # 4.52
-FULL_DEPTH_MAX = FULL_DEPTH + _FULL_DEPTH_BAND  # 4.78
-# Two sheet lines, each inside the 70-character note limit.
-F_NOTE = (
-    f"F = 12T FRONT FACE. FULL DEPTH FROM F TO {FULL_DEPTH:.3f} "
-    f"\u00b1{_FULL_DEPTH_BAND:.2f}."
-)
-CUTTER_NOTE = (
-    f"CUTTER RUN-OUT {CUTTER_RUNOUT_MAX:.2f} MAX FROM F; "
-    f"CUTTER \u00d8{CUTTER_DIA_MAX_IN:.2f} in MAX."
-)
+FULL_DEPTH_BAND = printed_band_mm(FULL_DEPTH_PLACES)
+FULL_DEPTH_MIN = FULL_DEPTH - FULL_DEPTH_BAND  # 4.52
+FULL_DEPTH_MAX = FULL_DEPTH + FULL_DEPTH_BAND  # 4.78
+# swTolMAX prints the dimension's NOMINAL followed by "MAX", so the witness
+# sits at the limit; its deviations record "anywhere behind the shortest full
+# depth, up to the limit".
+CUTTER_RUNOUT_TOL_TYPE = 6  # swTolType_e.swTolMAX
+CUTTER_RUNOUT_DEVIATIONS = (FULL_DEPTH_MIN - CUTTER_RUNOUT_MAX, 0.0)
+if round(CUTTER_RUNOUT_MAX, CUTTER_RUNOUT_PLACES) != CUTTER_RUNOUT_MAX:
+    raise AssertionError("the run-out limit does not print at its places")
+FULL_DEPTH_PREFIX = "12T FULL DEPTH "
+CUTTER_RUNOUT_PREFIX = "CUTTER RUN-OUT "
+CUTTER_NOTE = f"12T FORM CUTTER \u00d8{CUTTER_DIA_MAX_IN:.2f} in MAX."
 
 
 def cutter_runout(cutter_dia: float, rise: float) -> float:
@@ -424,7 +428,7 @@ GEAR_DATA = gear_data_note(
 # The title block's 0.25 edge break is a sixth of this fine tooth's whole
 # depth, so the sheet carries the one part-specific exception it needs.
 TOOTH_EDGE_NOTE = "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS."
-DRAWING_NOTES = "\n".join((TOOTH_EDGE_NOTE, F_NOTE, CUTTER_NOTE))
+DRAWING_NOTES = "\n".join((TOOTH_EDGE_NOTE, CUTTER_NOTE))
 
 # Two running surfaces: the journal in the plate bore and the core under the
 # sliding collar.  Nothing else runs; the rest is the title block's process.
@@ -439,11 +443,12 @@ SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = (
 
 # --- Marked-dimension contract ------------------------------------------------
 # ``StudProfile`` is the Right-plane revolve in front of F (the core, the
-# thread relief, the thread blank and the tip chamfer); it also carries one
-# construction-only witness, the tooth-tip blank across the face (OutsideDia,
-# rule 2's reference-sketch allowance), so every turned size imports natively
-# beside its axial extent.  ``JournalProfile`` is the revolve behind the
-# teeth.  ``GearBlank`` owns the face width.
+# thread relief, the thread blank and the tip chamfer); it also carries
+# construction-only witnesses, the tooth-tip blank across the face (OutsideDia,
+# rule 2's reference-sketch allowance) and the cutter's full-depth station and
+# run-out limit from F (R9-21), so every turned size imports natively beside
+# its axial extent.  ``JournalProfile`` is the revolve behind the teeth.
+# ``GearBlank`` owns the face width.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "GearBlank": {"FaceWidth"},
     "StudProfile": {
@@ -455,6 +460,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "TipStation",
         "TipChamfer",
         "OutsideDia",
+        "FullDepth",
+        "CutterRunout",
     },
     "JournalProfile": {"JournalDia", "JournalLength"},
 }
@@ -469,6 +476,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "TipStation": TIP_STATION_PLACES,
         "TipChamfer": TIP_CHAMFER_PLACES,
         "OutsideDia": OUTSIDE_DIA_PLACES,
+        "FullDepth": FULL_DEPTH_PLACES,
+        "CutterRunout": CUTTER_RUNOUT_PLACES,
     },
     "JournalProfile": {
         "JournalDia": JOURNAL_DIA_PLACES,

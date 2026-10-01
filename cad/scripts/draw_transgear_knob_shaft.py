@@ -7,10 +7,11 @@ above the shaft, and the lengths below it baselined from F, the 12T's front
 face (the stud stations) and from the 12T's rear face (the journal).  The
 1/4-20 thread is a callout on the Ø6.22 blank; its full-thread end is the
 PlainCore station, on the thread relief's front shoulder, and the core ends
-at the CoreLength station.  The manufacturing notes carry the form cutter's
-full-depth station and run-out limit.  The rear end view (``*Front``, looking
-at the rear face) carries the native #8-32 blind-tap callout with its entry
-countersink named under the thread line.  All dimensions import natively
+at the CoreLength station.  The form cutter's full-depth station and run-out
+limit print as native lengths from F; the notes give the largest cutter.  The
+rear end view (``*Front``, looking at the rear face) carries the native #8-32
+blind-tap callout with its entry countersink named under the thread line.
+All dimensions import natively
 from the part with the places and bands ``transgear_knob_shaft_spec``
 authored.
 """
@@ -114,20 +115,26 @@ CHAMFER_START_X = _sheet_x(-(TIP_STATION - TIP_CHAMFER))
 HALF_OD = OUTSIDE_DIA * _S / 2000.0
 
 # Diameters stand above the shaft over their own spans; the lengths stack
-# below it, 15 mm apart: row 0 carries the face width, the core length from F
-# and the journal length from the 12T's rear face; row 1 the full-thread end
-# from F; row 2 the stud tip from F.  The tip chamfer's leg reads under the
+# below it, 10 mm apart, each side of F shortest innermost so no extension
+# line crosses an inner row's text.  Right of F: row 0 the core length, row 1
+# the full-thread end, row 2 the stud tip.  Left of F: row 0 the journal
+# length from the 12T's rear face; rows 3..5 the cutter's full-depth station
+# (R9-21), the face width and the run-out limit.  The two cutter stations
+# carry their names as model prefixes, too wide for their spans, so their
+# text stands right of F, below the stud's rows; the run-out's extension line
+# crosses the journal length's dimension line, the one crossing two datums
+# (F and the 12T's rear face) leave.  The tip chamfer's leg reads under the
 # tip with its 45-degree callout.  Right of the view's centre a Ø's text hangs
 # LEFT of its line, so the core's banded text (181..211 at 8b5e1f354) ran
 # over the 12T's Ø9.36 (181.5..194.5): the core reads one step up, and the
 # narrow relief's Ø, whose text the core's line would otherwise cross, two
 # and a half steps up.
 _ABOVE_Y = SIDE_CENTER[1] + HALF_OD + 0.016
-_ROW_Y = (
-    SIDE_CENTER[1] - HALF_OD - 0.016,
-    SIDE_CENTER[1] - HALF_OD - 0.031,
-    SIDE_CENTER[1] - HALF_OD - 0.046,
-)
+_ROW_PITCH = 0.010
+_ROW_Y = tuple(SIDE_CENTER[1] - HALF_OD - 0.016 - i * _ROW_PITCH for i in range(6))
+# The prefixed texts' centre right of F: half the wider text's printed width
+# (test_transgear_knob_shaft_drawing) and an arrow's air.
+_CUTTER_TEXT_INSET = 0.040
 SIDE_KEEP: dict[str, tuple[float, float]] = {
     "OutsideDia": ((F_X + PINION_REAR_X) / 2.0, _ABOVE_Y),
     "CoreDia": ((F_X + CORE_END_X) / 2.0, _ABOVE_Y + 0.010),
@@ -140,11 +147,13 @@ SIDE_KEEP: dict[str, tuple[float, float]] = {
     # the line stays 12.5 mm off the thread callout's leader to the chamfer.
     "ThreadBlankDia": (CHAMFER_START_X - 0.0125, _ABOVE_Y),
     "JournalDia": ((PINION_REAR_X + REAR_X) / 2.0, _ABOVE_Y),
-    "FaceWidth": ((F_X + PINION_REAR_X) / 2.0, _ROW_Y[0]),
+    "FaceWidth": ((F_X + PINION_REAR_X) / 2.0, _ROW_Y[4]),
     "CoreLength": ((F_X + CORE_END_X) / 2.0, _ROW_Y[0]),
     "PlainCore": ((F_X + THREAD_END_X) / 2.0, _ROW_Y[1]),
     "JournalLength": ((PINION_REAR_X + REAR_X) / 2.0, _ROW_Y[0]),
     "TipStation": ((F_X + TIP_X) / 2.0, _ROW_Y[2]),
+    "FullDepth": (F_X + _CUTTER_TEXT_INSET, _ROW_Y[3]),
+    "CutterRunout": (F_X + _CUTTER_TEXT_INSET, _ROW_Y[5]),
     "TipChamfer": (TIP_X + 0.012, SIDE_CENTER[1] - HALF_OD),
 }
 END_KEEP: dict[str, tuple[float, float]] = {}
@@ -160,8 +169,16 @@ THREAD_NOTE_XY = ((THREAD_END_X + CHAMFER_START_X) / 2.0, _ABOVE_Y + 0.020)
 # countersink's 90 degrees.
 TAP_CALLOUT_XY = (END_CENTER[0], END_CENTER[1] - HALF_OD - 0.030)
 # Finishes: the journal on its rear-face circle in the end view, the core on
-# its upper silhouette just in front of F.
+# its upper silhouette just in front of F.  The journal's leader lands on the
+# circle at 60 degrees, under its symbol: left to SolidWorks it landed at the
+# circle's bottom and crossed the whole view and the tap callout's leader
+# (234a39c87).
 JOURNAL_FINISH_SYMBOL = (END_CENTER[0] + 0.008, END_CENTER[1] + HALF_OD + 0.012)
+_JOURNAL_R = JOURNAL_DIA * _S / 2000.0
+JOURNAL_FINISH_ATTACH = (
+    END_CENTER[0] + _JOURNAL_R * 0.5,
+    END_CENTER[1] + _JOURNAL_R * 3.0**0.5 / 2.0,
+)
 CORE_FINISH_PICK = (F_X + 0.004, _sheet_y(CORE_DIA / 2.0))
 CORE_FINISH_SYMBOL = (F_X + 0.010, SIDE_CENTER[1] + HALF_OD + 0.004)
 # A point on the journal's face for the turning axis.
@@ -310,6 +327,7 @@ async def build(adapter: Any) -> dict[str, str]:
         control=surface_finish_by_key(SURFACE_FINISHES, "journal"),
         label="journal finish",
         entity=visible_circle_edge(adapter, end, JOURNAL_DIA),
+        leader_attach_xy=JOURNAL_FINISH_ATTACH,
         char_height=0.0025,
     )
     add_surface_finish(

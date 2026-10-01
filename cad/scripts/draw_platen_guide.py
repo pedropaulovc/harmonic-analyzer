@@ -16,6 +16,7 @@ import sys
 from typing import Any
 
 from platen_guide_spec import (
+    DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     GEOMETRIC_TOLERANCES_MM,
     SURFACE_FINISHES,
@@ -35,6 +36,7 @@ from _drawing_common import (
     finalize_drawing,
     import_cosmetic_threads,
     insert_hole_table,
+    model_point_in_view,
     new_project_drawing,
     read_required_properties,
     set_hidden_lines_removed,
@@ -83,12 +85,15 @@ BACK_HOLE_Y_M = BACK_VIEW_Y_M + (FRONT_HOLE_Y_M - FRONT_VIEW_Y_M)
 BACK_BOTTOM_Y_M = BACK_HOLE_Y_M - 0.0025
 # Put datum B's symbol midway between the A3/A4 hole axes, clear of both.
 DATUM_B_SYMBOL_X_M = FRONT_LEFT_X_M + (FRONT_X[2] + FRONT_X[3]) / 2000.0
-# The bar-slide finish lands on the bottom edge midway between the A1 and B1
-# axes, clear of both centre marks; the symbol (anchored at its lower-left,
-# boxed ~39 mm wide by the audit) sits below the view, right of the hole-table
-# origin's "0 -> X" row (ends ~0.078) and left of datum B's tag.
-BAR_SLIDE_LANDING_X_M = FRONT_LEFT_X_M + (FRONT_X[0] + REAR_X[0]) / 2000.0
-BAR_SLIDE_FINISH_XY = (BAR_SLIDE_LANDING_X_M - 0.006, 0.086)
+# The bar-slide finish lands on the bottom edge (model y 0, front face z 0)
+# midway between the A1 and B1 axes, clear of both centre marks. The landing
+# is projected from the model at draw time: the drawn edge sits ~1.1 mm under
+# FRONT_BOTTOM_Y_M, past add_surface_finish's 1 mm readback limit. The symbol
+# (anchored at its lower-left, boxed ~39 mm wide by the audit) sits below the
+# view, right of the hole-table origin's "0 -> X" row (ends ~0.078) and left
+# of datum B's tag.
+BAR_SLIDE_STATION_MM = (FRONT_X[0] + REAR_X[0]) / 2.0
+BAR_SLIDE_FINISH_XY = (FRONT_LEFT_X_M + BAR_SLIDE_STATION_MM / 1000.0 - 0.006, 0.086)
 # The separate front and rear tables fit above their matching face views.
 # 0.020 also clears the 12.7 mm zone margin enforced by the sheet audit.
 HOLE_TABLE_X_M = 0.020
@@ -244,12 +249,14 @@ async def build(adapter: Any) -> dict[str, str]:
             front,
             keep={"Length": (FRONT_VIEW_X_M, 0.135), "Height": (0.338, 0.110)},
             view_label="front",
+            dimensions_by_feature=DRAWING_DIMENSIONS,
         ),
         *curate_view_dimensions(
             adapter,
             right,
             keep={"Depth": (0.370, 0.095)},
             view_label="right",
+            dimensions_by_feature=DRAWING_DIMENSIONS,
         ),
     ]
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
@@ -431,7 +438,12 @@ async def build(adapter: Any) -> dict[str, str]:
         control=surface_finish_by_key(SURFACE_FINISHES, "bar_slide"),
         label="bar-slide face finish",
         entity=datum_b_entity,
-        leader_attach_xy=(BAR_SLIDE_LANDING_X_M, FRONT_BOTTOM_Y_M),
+        leader_attach_xy=model_point_in_view(
+            adapter,
+            front,
+            (BAR_SLIDE_STATION_MM / 1000.0, 0.0, 0.0),
+            label="bar-slide face finish landing",
+        ),
     )
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 

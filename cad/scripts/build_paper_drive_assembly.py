@@ -341,8 +341,8 @@ FEED_PD = FEED_TEETH / FEED_DP * IN  # 10.16 -- meshes the DP30 rack
 # Centre extension of the feed-pinion/rack mesh (R9-62): 0.55, contact ratio
 # 1.25, the hook's +/-0.25 set reach centred on it. The sleeve's teeth are cut
 # to the 1.25/P root (root relief), so the rack crests clear the gap floors;
-# the bound is involute interference, the crests' reach into the pinion no
-# deeper than r*sin^2(PA) (e 0.528 at 12T DP30 14.5 deg).
+# the bound is the rack's tip corners on the form-cut flank, clear from e 0.52
+# (paper_drive_assembly_steps.feed_mesh_penetration, R9-62a).
 RACK_MESH_EXT = 0.55
 # The stud S sits on machine x 0; its y is the feed pinion's mesh line under
 # the rack. The arm's printed stud station is |S - P| from the MHA-168 pivot
@@ -1494,32 +1494,30 @@ def _assert_rack_mesh() -> None:
         raise RuntimeError(
             f"feed pinion reaches only {z_overlap:.2f} into the rack band"
         )
-    # Radial safety: the rack crests stay above the interference point (the
-    # line of action's tangency with the base circle) and clear the 1.25/P
-    # root; the contact ratio stays at or over 1.2.
-    phi = math.radians(14.5)
-    r = FEED_PD / 2.0
-    crest_depth = RACK_ADDENDUM - RACK_MESH_EXT  # crests past the pitch circle
-    interference_margin = r * math.sin(phi) ** 2 - crest_depth
-    if interference_margin < 0.0:
+    # Radial safety (R9-62a): the rack clear of the form-cut 12T's flank (the
+    # same sweep that bounds the fit-up band), its crests clear of the 1.25/P
+    # root, and the contact ratio at or over 1.2 at the nominal mesh.
+    import paper_drive_assembly_steps as steps
+
+    if abs(RACK_ADDENDUM - FEED.MODULE_MM) > 1e-9:
+        raise RuntimeError("the mesh sweep assumes the rack's 1/P addendum")
+    penetration = steps.feed_mesh_penetration(RACK_MESH_EXT)
+    if penetration > 1e-5:
         raise RuntimeError(
-            f"rack crests {crest_depth:.3f} past the pinion's pitch circle,"
-            f" {-interference_margin:.3f} beyond the involute interference point"
+            f"rack reaches {penetration:.4f} into the feed pinion's flank"
+            f" at extension {RACK_MESH_EXT:.3f}"
         )
-    root_clearance = r - crest_depth - FEED.ROOT_DIA_MIN / 2.0
+    crest_depth = RACK_ADDENDUM - RACK_MESH_EXT  # crests past the pitch circle
+    root_clearance = FEED_PD / 2.0 - crest_depth - FEED.ROOT_DIA_MIN / 2.0
     if root_clearance < 0.25:
         raise RuntimeError(f"rack crests {root_clearance:.3f} off the pinion root")
-    rb = r * math.cos(phi)
-    ra = FEED.OUTSIDE_DIA / 2.0
-    contact_ratio = (
-        math.sqrt(ra * ra - rb * rb) - r * math.sin(phi) + crest_depth / math.sin(phi)
-    ) / (math.pi * FEED_PD / FEED_TEETH * math.cos(phi))
+    contact_ratio = steps.feed_mesh_contact_ratio(RACK_MESH_EXT)
     if contact_ratio < 1.2:
         raise RuntimeError(f"feed mesh contact ratio {contact_ratio:.2f} < 1.2")
     log(
         f"rack mesh: pitch line y {RACK_PITCH_Y:.2f}, extension {ext:.2f},"
-        f" rack gap centred over the stud, interference margin"
-        f" {interference_margin:.3f}, root clearance {root_clearance:.3f},"
+        f" rack gap centred over the stud, flank clear from extension"
+        f" {steps.MESH_EXTENSION_MIN:.3f}, root clearance {root_clearance:.3f},"
         f" contact ratio {contact_ratio:.2f}"
     )
 

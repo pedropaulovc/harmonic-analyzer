@@ -190,23 +190,29 @@ if SPIGOT_RECESS_WORST <= 0.0:
 # face: full depth from the rear face to FULL_DEPTH, then the cutter's arc runs
 # out behind that station, leaving partial-depth gaps over the rest of the
 # face and slotting the Ø10 spigot (proud of the gap floor) at its rear end.
-# The sheet prints the full-depth length as a window from the rear face, the
-# run-out's end as a limit and the largest cutter that keeps a window.
+# The section prints the full-depth station as a native baseline dimension
+# from the rear face with its .XXX band, and the run-out's end as a native
+# MAX limit (construction witnesses in ``SleeveProfile``, each named by its
+# model prefix); the note gives the largest cutter that keeps a window.
 FULL_DEPTH = 5.45
 FULL_DEPTH_PLACES = 3
 CUTTER_RUNOUT_MAX = 10.50  # from the rear face, a limit
+CUTTER_RUNOUT_PLACES = 2
 CUTTER_DIA_MAX_IN = 1.00
 CUTTER_DIA_MAX = CUTTER_DIA_MAX_IN * MM_PER_IN  # 25.4
-_FULL_DEPTH_BAND = printed_band_mm(FULL_DEPTH_PLACES)
-FULL_DEPTH_MIN = FULL_DEPTH - _FULL_DEPTH_BAND  # 5.32
-FULL_DEPTH_MAX = FULL_DEPTH + _FULL_DEPTH_BAND  # 5.58
-FULL_DEPTH_NOTE = (
-    f"12T FULL DEPTH FROM REAR FACE TO {FULL_DEPTH:.3f} \u00b1{_FULL_DEPTH_BAND:.2f}."
-)
-CUTTER_NOTE = (
-    f"CUTTER RUN-OUT {CUTTER_RUNOUT_MAX:.2f} MAX FROM REAR FACE; "
-    f"CUTTER \u00d8{CUTTER_DIA_MAX_IN:.2f} in MAX."
-)
+FULL_DEPTH_BAND = printed_band_mm(FULL_DEPTH_PLACES)
+FULL_DEPTH_MIN = FULL_DEPTH - FULL_DEPTH_BAND  # 5.32
+FULL_DEPTH_MAX = FULL_DEPTH + FULL_DEPTH_BAND  # 5.58
+# swTolMAX prints the dimension's NOMINAL followed by "MAX", so the witness
+# sits at the limit; its deviations record "anywhere behind the shortest full
+# depth, up to the limit".
+CUTTER_RUNOUT_TOL_TYPE = 6  # swTolType_e.swTolMAX
+CUTTER_RUNOUT_DEVIATIONS = (FULL_DEPTH_MIN - CUTTER_RUNOUT_MAX, 0.0)
+if round(CUTTER_RUNOUT_MAX, CUTTER_RUNOUT_PLACES) != CUTTER_RUNOUT_MAX:
+    raise AssertionError("the run-out limit does not print at its places")
+FULL_DEPTH_PREFIX = "12T FULL DEPTH "
+CUTTER_RUNOUT_PREFIX = "CUTTER RUN-OUT "
+CUTTER_NOTE = f"12T FORM CUTTER \u00d8{CUTTER_DIA_MAX_IN:.2f} in MAX."
 
 
 def cutter_runout(cutter_dia: float, rise: float) -> float:
@@ -365,7 +371,8 @@ SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = (
 # station).  ``SleeveProfile`` is the Right-plane revolve of the spigot and
 # shank, with construction-only witnesses for the tooth tip, the root and the
 # bore, so every turned diameter prints beside its axial extent on the
-# longitudinal section (rules 2 and 7).  Lengths are baselined from the rear
+# longitudinal section (rules 2 and 7), and for the cutter's full-depth
+# station and run-out limit (R9-67).  Lengths are baselined from the rear
 # face.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "GearBlank": {"FaceWidth"},
@@ -377,6 +384,8 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
         "ShankDia",
         "SpigotFront",
         "OverallLength",
+        "FullDepth",
+        "CutterRunout",
     },
 }
 
@@ -390,6 +399,8 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "ShankDia": DIA_PLACES,
         "SpigotFront": STATION_PLACES,
         "OverallLength": STATION_PLACES,
+        "FullDepth": FULL_DEPTH_PLACES,
+        "CutterRunout": CUTTER_RUNOUT_PLACES,
     },
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
@@ -435,4 +446,4 @@ GEAR_DATA = gear_data_note(
 
 # The title block's 0.25 edge break is 14% of this fine tooth's whole depth.
 TOOTH_EDGE_NOTE = "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS."
-DRAWING_NOTES = "\n".join((TOOTH_EDGE_NOTE, FULL_DEPTH_NOTE, CUTTER_NOTE))
+DRAWING_NOTES = "\n".join((TOOTH_EDGE_NOTE, CUTTER_NOTE))

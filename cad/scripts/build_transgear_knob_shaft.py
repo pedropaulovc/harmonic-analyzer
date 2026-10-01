@@ -63,12 +63,14 @@ from _common import (
     set_sketch_direct_db,
 )
 from _drawing_marks import (
+    _named_dimension,
     add_diametric_linear_dimension,
     apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
+    set_dimension_prefix,
     set_dimension_symmetric_tolerance,
 )
 from _drawing_simplified import save_simplified_part
@@ -84,12 +86,19 @@ from transgear_knob_shaft_spec import (
     CUTTER_AXIS_R,
     CUTTER_AXIS_Z,
     CUTTER_DIA_MAX,
+    CUTTER_RUNOUT_DEVIATIONS,
+    CUTTER_RUNOUT_MAX,
+    CUTTER_RUNOUT_PLACES,
+    CUTTER_RUNOUT_PREFIX,
+    CUTTER_RUNOUT_TOL_TYPE,
     DIAMETRAL_PITCH,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
     DRAWING_PRECISION,
     FACE_WIDTH,
     FULL_DEPTH,
+    FULL_DEPTH_BAND,
+    FULL_DEPTH_PREFIX,
     GAP_AZIMUTH_DEG,
     GEAR_DATA,
     JOURNAL_CSK_WALL_WORST,
@@ -335,8 +344,20 @@ async def _stud_profile(adapter: Any) -> list[tuple[str, str]]:
         "tooth-tip blank witness",
         await adapter.add_line(0.0, OUTSIDE_DIA / 2.0, -FACE_WIDTH, OUTSIDE_DIA / 2.0),
     )
+    # R9-21: the cutter's full-depth station and run-out limit, from F along
+    # the tooth tips' lower line, so each baseline dimension below the side
+    # view rises from the part's edge.
+    tip_v = -OUTSIDE_DIA / 2.0
+    runout_ref = check(
+        "run-out-limit witness",
+        await adapter.add_line(0.0, tip_v, -CUTTER_RUNOUT_MAX, tip_v),
+    )
+    full_depth_ref = check(
+        "full-depth witness", await adapter.add_line(0.0, tip_v, -FULL_DEPTH, tip_v)
+    )
     set_sketch_direct_db(adapter, False)
-    _as_construction(adapter, outside)
+    for line in (outside, runout_ref, full_depth_ref):
+        _as_construction(adapter, line)
     (
         front_face,
         core,
@@ -358,6 +379,8 @@ async def _stud_profile(adapter: Any) -> list[tuple[str, str]]:
         (tip_face, "vertical"),
         (axis_edge, "horizontal"),
         (outside, "horizontal"),
+        (runout_ref, "horizontal"),
+        (full_depth_ref, "horizontal"),
     ):
         check(
             f"stud profile {relation} {line}",
@@ -437,10 +460,59 @@ async def _stud_profile(adapter: Any) -> list[tuple[str, str]]:
     ):
         await add_diametric_linear_dimension(adapter, axis, target, xy, name)
         profile.record(name, f'"{name}"')
+    check(
+        "full-depth witness starts on the run-out witness",
+        await adapter.add_sketch_constraint(
+            f"{full_depth_ref}.start", f"{runout_ref}.start", "coincident"
+        ),
+    )
+    await anchor_point_to_origin(
+        adapter, f"{runout_ref}.start", 0.0, tip_v, "witnesses on the tip line"
+    )
+    profile.record("WitnessDrop", '"OutsideDia" / 2')
+    for name, line, value, drive in (
+        ("FullDepth", full_depth_ref, FULL_DEPTH, '"FullDepth"'),
+        ("CutterRunout", runout_ref, CUTTER_RUNOUT_MAX, '"CutterRunoutMax"'),
+    ):
+        await dimension_between(
+            adapter, f"{line}.end", "origin", "horizontal_distance", value, name
+        )
+        profile.record(name, drive)
     await ensure_fully_defined(adapter, "stud sketch")
     check("exit_sketch stud", await adapter.exit_sketch())
     name_last_feature(adapter, "StudProfile")
     return profile.apply(adapter, "StudProfile")
+
+
+def _runout_max_limit(adapter: Any) -> None:
+    """CutterRunout as the single limit "10.50 MAX" (swTolMAX): SolidWorks
+    prints the nominal then the limit word, so the nominal is the limit; the
+    deviations stay on the native tolerance as the model's record of the
+    band."""
+    lower, upper = CUTTER_RUNOUT_DEVIATIONS
+    _, dimension = _named_dimension(adapter, "StudProfile", "CutterRunout")
+    label = "CutterRunout@StudProfile"
+    if not math.isclose(
+        float(dimension.SystemValue), CUTTER_RUNOUT_MAX / 1000.0, abs_tol=1e-9
+    ):
+        raise RuntimeError(f"{label}: nominal is not the run-out limit")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = CUTTER_RUNOUT_TOL_TYPE
+    if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
+        raise RuntimeError(f"{label}: SetValues rejected {lower:+g}/{upper:+g} mm")
+    if (
+        int(tolerance.Type) != CUTTER_RUNOUT_TOL_TYPE
+        or not math.isclose(
+            float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12
+        )
+        or not math.isclose(
+            float(tolerance.GetMaxValue()), upper / 1000.0, abs_tol=1e-12
+        )
+    ):
+        raise RuntimeError(f"{label}: MAX-limit tolerance readback changed")
+    _telemetry.success(
+        f"{label}: single limit {CUTTER_RUNOUT_MAX:.{CUTTER_RUNOUT_PLACES}f} MAX"
+    )
 
 
 async def _journal_profile(adapter: Any) -> list[tuple[str, str]]:
@@ -576,6 +648,7 @@ async def build(adapter) -> dict[str, str]:
         ("JournalDia", JOURNAL_DIA),
         ("JournalLength", JOURNAL_LENGTH),
         ("FullDepth", FULL_DEPTH),
+        ("CutterRunoutMax", CUTTER_RUNOUT_MAX),
         ("CutterDia", CUTTER_DIA_MAX),
         ("RunoutSlotWidth", RUNOUT_SLOT_WIDTH),
     ):
@@ -768,8 +841,9 @@ async def build(adapter) -> dict[str, str]:
 
     # Bands (transgear_knob_shaft_spec): the sliding core and the running
     # journal carry their fits, the thread blank its 2A-major band, the
-    # journal length its own ±; the rest print at the title block's rows for
-    # the places they are authored at.
+    # journal length its own ±, the cutter's full-depth station its .XXX band
+    # and its run-out a MAX limit (R9-21); the rest print at the title block's
+    # rows for the places they are authored at.
     set_dimension_bilateral_tolerance(
         adapter, "StudProfile", "CoreDia", *deviations(CORE_DIA_BAND)
     )
@@ -782,6 +856,13 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_symmetric_tolerance(
         adapter, "JournalProfile", "JournalLength", JOURNAL_LENGTH_TOL
     )
+    set_dimension_symmetric_tolerance(
+        adapter, "StudProfile", "FullDepth", FULL_DEPTH_BAND
+    )
+    _runout_max_limit(adapter)
+    # Each cutter station names itself: neither ends at a drawn edge.
+    set_dimension_prefix(adapter, "StudProfile", "FullDepth", FULL_DEPTH_PREFIX)
+    set_dimension_prefix(adapter, "StudProfile", "CutterRunout", CUTTER_RUNOUT_PREFIX)
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)

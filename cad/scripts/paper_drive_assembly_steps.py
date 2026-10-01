@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import math
 
+import numpy as np
+
 import drive_train_steps
 import latch_hook_bracket_spec as hook_bracket
 import transgear_drive_collar_spec as collar
@@ -110,18 +112,123 @@ BAR_TOP_ABOVE_DECK = 266.934
 # the feed mesh at its 0.55 centre extension (contact ratio 1.25).
 RACK_CREST_DROP = 2.25
 RACK_CREST_TOL = 0.05
-# R9-62: the feed pinion's mesh in the rack, set before the hook is
+# R9-62a: the feed pinion's mesh in the rack, set before the hook is
 # match-drilled: the platen's shake along the rack with the knob held, i.e. the
 # backlash at the pitch line, 2 * e * tan(pressure angle) for a centre
-# extension e over the standard centres (0.20..0.35: e 0.39..0.68, contact
-# ratio about 1.5..1.05). A mesh the hook's set range cannot hold is reported.
-MESH_BACKLASH_RANGE = (0.20, 0.35)
+# extension e over the standard centres. The band's ends are checked below
+# against the form-cut 12T's interference (feed_mesh_penetration) and the 1.1
+# contact-ratio rule at the printed smallest tip (feed_mesh_contact_ratio).
+MESH_BACKLASH_RANGE = (0.28, 0.32)
+MESH_CONTACT_RATIO_FLOOR = 1.1
+# The rack's addendum and the pinion's flank, in the pinion's frame.
+_PHI = math.radians(feed_pinion.PRESSURE_ANGLE_DEG)
+_RACK_ADDENDUM = feed_pinion.MODULE_MM
+_PITCH_R = feed_pinion.PITCH_DIA / 2.0
+_BASE_R = _PITCH_R * math.cos(_PHI)
+_BASE_PITCH = math.pi * feed_pinion.MODULE_MM * math.cos(_PHI)
+_TOOTH_ANGLE = 2.0 * math.pi / feed_pinion.TEETH
+_INTERFERENCE_TOL = 1e-5  # mm: the sweep's sampling floor
 
 
 def mesh_extension(backlash: float) -> float:
     """The feed pinion's centre extension that gives ``backlash``."""
-    return backlash / (2.0 * math.tan(math.radians(feed_pinion.PRESSURE_ANGLE_DEG)))
+    return backlash / (2.0 * math.tan(_PHI))
 
+
+def feed_mesh_contact_ratio(
+    extension: float, outside_dia: float = feed_pinion.OUTSIDE_DIA
+) -> float:
+    """The 12T-on-rack contact ratio at centre ``extension``."""
+    tip_r = outside_dia / 2.0
+    approach = math.sqrt(tip_r**2 - _BASE_R**2) - _PITCH_R * math.sin(_PHI)
+    recess = (_RACK_ADDENDUM - extension) / math.sin(_PHI)
+    return (approach + recess) / _BASE_PITCH
+
+
+def feed_mesh_penetration(extension: float, samples: int = 20001) -> float:
+    """Deepest reach (mm, > 0 interferes) of the rack into the MHA-110 12T at
+    centre ``extension``, the rack pushed to flank contact.  The 12T is form
+    cut (R9-67): involute above the base circle, radial below it to the 1.25/P
+    root (the model's flank).  The rack's tip corners are what reach the
+    radial flank, so they are rolled through three pitches of mesh."""
+    roll = np.linspace(-1.5, 1.5, samples) * _TOOTH_ANGLE / 2.0
+    cos, sin = np.cos(roll), np.sin(roll)
+    tip_r = feed_pinion.OUTSIDE_DIA / 2.0
+    root_r = feed_pinion.ROOT_DIA / 2.0
+    corner_half = math.pi * feed_pinion.MODULE_MM / 4.0 - _RACK_ADDENDUM * math.tan(
+        _PHI
+    )
+    pitch = math.pi * feed_pinion.MODULE_MM
+    worst = -math.inf
+    for tooth in (-1, 0, 1):
+        for side in (-1.0, 1.0):
+            # Half the backlash, extension * tan(PA), takes the rack to contact.
+            x = -_PITCH_R * roll + extension * math.tan(_PHI)
+            x = x + tooth * pitch + side * corner_half
+            y = _PITCH_R + extension - _RACK_ADDENDUM
+            px, py = cos * x + sin * y, -sin * x + cos * y
+            radius = np.hypot(px, py)
+            pressure = np.arccos(_BASE_R / np.maximum(radius, _BASE_R))
+            half = (
+                _TOOTH_ANGLE / 4.0
+                + math.tan(_PHI)
+                - _PHI
+                - (np.tan(pressure) - pressure)
+            )
+            off_centre = np.abs(
+                np.remainder(np.arctan2(px, py), _TOOTH_ANGLE) - _TOOTH_ANGLE / 2.0
+            )
+            reach = np.where(
+                (radius <= tip_r) & (radius >= root_r),
+                (half - off_centre) * radius,
+                -math.inf,
+            )
+            worst = max(worst, float(reach.max()))
+    return worst
+
+
+def _least_clear_extension() -> float:
+    low, high = 0.0, _RACK_ADDENDUM
+    if feed_mesh_penetration(high) > _INTERFERENCE_TOL:
+        raise AssertionError("the rack reaches into the 12T at every mesh depth")
+    for _ in range(30):
+        mid = (low + high) / 2.0
+        if feed_mesh_penetration(mid) > _INTERFERENCE_TOL:
+            low = mid
+        else:
+            high = mid
+    return high
+
+
+# The mesh's working window in centre extension: the rack clear of the form
+# cut flank from MESH_EXTENSION_MIN (0.521), the contact ratio at the printed
+# smallest tip down to the 1.1 rule at MESH_EXTENSION_MAX (0.624).
+MESH_EXTENSION_MIN = _least_clear_extension()
+TIP_DIA_MIN = feed_pinion.OUTSIDE_DIA + feed_pinion.OUTSIDE_DIA_BAND[1]
+MESH_EXTENSION_MAX = _RACK_ADDENDUM - (
+    MESH_CONTACT_RATIO_FLOOR * _BASE_PITCH
+    - math.sqrt((TIP_DIA_MIN / 2.0) ** 2 - _BASE_R**2)
+    + _PITCH_R * math.sin(_PHI)
+) * math.sin(_PHI)
+
+
+def check_mesh_band(band: tuple[float, float]) -> None:
+    """Raise unless both ends of a platen-shake ``band`` mesh: the rack clear
+    of the 12T's flank at the tight end, the contact ratio at the printed
+    smallest tip within the 1.1 rule at the loose end."""
+    low, high = (mesh_extension(b) for b in band)
+    if not MESH_EXTENSION_MIN <= low < high <= MESH_EXTENSION_MAX:
+        raise ValueError(
+            f"mesh band e {low:.3f}..{high:.3f} leaves the working window "
+            f"{MESH_EXTENSION_MIN:.3f}..{MESH_EXTENSION_MAX:.3f}"
+        )
+    if feed_mesh_penetration(low) > _INTERFERENCE_TOL:
+        raise ValueError(f"the rack reaches into the 12T at e {low:.3f}")
+    if feed_mesh_contact_ratio(high, TIP_DIA_MIN) < MESH_CONTACT_RATIO_FLOOR:
+        raise ValueError(f"contact ratio under the 1.1 rule at e {high:.3f}")
+
+
+check_mesh_band(MESH_BACKLASH_RANGE)
 
 # The collar is set to transgear_drive_collar_spec.FIT_UP_OFFSET_SET_TEXT and
 # accepted within OFFSET_ACCEPT_TOL of the same target at the re-check
