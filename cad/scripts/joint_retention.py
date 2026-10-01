@@ -603,6 +603,8 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "crank_hub_pin",  # 4 m6 dowel, ISO 2338
         "crank_pin",  # 1:48 taper pin, light drive
         "crank_pin_eye",  # formed brass eye, clamped under fillister_screw (no thread of its own)
+        "crank_seat_drive_pin",  # MHA-173 dowel pressed into match-drilled holes, no thread
+        "crank_seat_washer",  # MHA-172 turned steel washer, plain bore, no thread
         "crank_pin_ring",  # brass wire keeper ring
         "crank_pinion",  # pinned by crank_pinion_pin
         "crank_pinion_pin",  # plain 1/8 drill-rod drive pin
@@ -652,6 +654,7 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "transgear_latch",  # plain O9.6 hub bores (build_transgear_latch.BORE_DIA), no thread
         "transgear_pinion",  # 12T third gear, plain bore on knob-shaft seat, no set screw
         "transgear_removable",  # O12 plain bore + 2 drive-pin holes, no thread (build_transgear_removable)
+        "transgear_knob_drive_pin",  # MHA-155 dowel pressed into plain holes, no thread
         "tube_frame",  # columns: socket slip fit; cross holes enlarged so the MHA-132 shank passes "WITHOUT THREAD CONTACT" (MHA-A04 STEP 2/5)
         "tube_frame_cap",  # McMaster 9275K141 push-on cap (MHA-A04 STEP 7)
         "wheel_bar",  # #8 clearance holes (clamp screws) + #8 close clearance (pen-hanger screw, which threads into pen_hanger in pen.SLDASM)
@@ -663,9 +666,11 @@ UNTHREADED_STOCK: dict[str, str] = {
     "channel_spring_installed": "extension spring; its hook ends hang in plain holes and eyes",
     "counter_spring": "extension spring; its hook ends hang in plain holes and eyes",
     "keeper_chain": "chain; its end links hang on screws and eyes, carrying no thread",
+    "crank_seat_drive_pin": "dowel pin pressed into a plain hole",
     "keeper_chain_link": "plain chain link",
     "knife_hanger_washer": "plain flat washer",
     "pinion_strap_pin": "slotted spring pin pressed into a plain hole",
+    "transgear_knob_drive_pin": "dowel pin pressed into a plain hole",
     "tube_frame_cap": "push-on round cap over the column end",
 }
 
