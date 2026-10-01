@@ -956,8 +956,14 @@ export async function verifyFrameImages(sourcePath, data, { signal, timeoutMs = 
       else { spans.push(start === last ? `eq(n,${start})` : `between(n,${start},${last})`); start = last = index }
     }
     spans.push(start === last ? `eq(n,${start})` : `between(n,${start},${last})`)
-    // Shell-free argv: any subset of the six-source declared exposures needs at most 23,768 ASCII filter characters.
-    const filter = `select='${spans.join('+')}'`
+    // A flat sum builds a left-deep FFmpeg AST; balance it to keep addition depth logarithmic.
+    function sumSpans(start, end) {
+      if (end - start === 1) return spans[start]
+      const middle = start + Math.floor((end - start) / 2)
+      return `(${sumSpans(start, middle)}+${sumSpans(middle, end)})`
+    }
+    // Shell-free argv: any declared six-source subset needs at most 26,128 ASCII filter characters.
+    const filter = `select='${sumSpans(0, spans.length)}'`
     const { stdout } = await runTool('ffmpeg', ['-v', 'error', '-threads', '2', '-copyts', '-i', sourcePath, '-an', '-vf', filter, '-frames:v', String(indices.length), '-fps_mode', 'passthrough', '-pix_fmt', pixelFormat === 'bgr8' ? 'bgr24' : 'gray', '-f', 'framehash', '-hash', 'sha256', 'pipe:1'], { signal, timeoutMs })
     const output = stdout.toString(), timeBase = output.match(/^#tb 0:\s*(\d+)\/(\d+)/m)
     const tick = timeBase ? Number(timeBase[1]) / Number(timeBase[2]) : NaN

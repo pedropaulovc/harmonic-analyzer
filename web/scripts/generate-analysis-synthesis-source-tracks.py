@@ -136,8 +136,14 @@ class Generator:
                     frame["views"] = [{"id":"main", "rectSourcePixels":[0,0,self.data["source"]["width"],self.data["source"]["height"]],
                                        "presentation":"native", "camera":frame.get("camera"),
                                        "mechanicalState":copy.deepcopy(frame.get("mechanicalState", {}))}]
-            retained_changes = [t for t in self.data.get("coverage", {}).get("changeTimesSeconds", [])
-                                if transition["startSeconds"] <= t < transition["endSeconds"]]
+            fps = self.data["source"]["fps"]["numerator"] / self.data["source"]["fps"]["denominator"]
+            # Coverage labels are rounded decimals. Use the cut-clock cadence and
+            # integer-frame tolerance from common, not a near-duplicate event key.
+            # Off-cadence events and distinct native exposures remain separate.
+            retained_changes = [
+                round(t * fps) / fps if abs(t * fps - round(t * fps)) < 1e-6 else t
+                for t in self.data.get("coverage", {}).get("changeTimesSeconds", [])
+                if transition["startSeconds"] <= t < transition["endSeconds"]]
             self.data.setdefault("compactChangeTimesSeconds", []).extend(
                 retained_changes + [key["decodedTimeSeconds"] for key in self.presenter_reframing["keys"]])
 

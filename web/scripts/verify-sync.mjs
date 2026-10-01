@@ -395,6 +395,19 @@ async function observedSeek(embed, target, command, fps) {
 }
 
 
+/** Preserve observed timing counterexamples even when the native model state is stale. */
+export function requirePausedReview(actual, native, frame, required = true) {
+  assert(actual.mode === 'reference-review' && actual.playerState === 'paused' && native.paused && !native.seeking, 'Source review did not hold a decoded paused original frame')
+  const clockSkewSeconds = Math.abs(actual.modelTime - native.mediaTime)
+  try {
+    assert(!finite(clockSkewSeconds) || clockSkewSeconds <= CLOCK_LIMIT, 'Actual original media/model clock exceeds the0.5s timing bound')
+    assert((required ? ['approximate'] : ['no-machine', 'approximate']).includes(actual.referenceState) && Math.abs(actual.modelTime - frame.timeSeconds) <= 1e-6, 'Source sample has no current native draw or legitimate no-machine hold')
+  } catch (error) {
+    if (finite(clockSkewSeconds)) Object.assign(error, { clockSkewSeconds, nativeMediaTime: native.mediaTime })
+    throw error
+  }
+}
+
 /** Capture actual framebuffer-marker readback; no CPU projection or old source certificates. */
 async function review(page, embed, record, frame, required = true) {
   const shot = record.track.shots.find(shot => shot.id === frame.shotId)
@@ -403,14 +416,7 @@ async function review(page, embed, record, frame, required = true) {
   const seek = await observedSeek(embed, frame.decodedTimeSeconds, () => page.evaluate(async sample => window.harmonicAnalyzer.reviewReferenceFrame(sample.timeSeconds, sample.decodedTimeSeconds), { timeSeconds: frame.timeSeconds, decodedTimeSeconds: frame.decodedTimeSeconds }), record.native.fps)
   const actual = await snapshot(page), native = await media(embed)
   requireModel(actual, record.id); requireMedia(native, record)
-  assert(actual.mode === 'reference-review' && actual.playerState === 'paused' && native.paused && !native.seeking, 'Source review did not hold a decoded paused original frame')
-  assert((required ? ['approximate'] : ['no-machine', 'approximate']).includes(actual.referenceState) && Math.abs(actual.modelTime - frame.timeSeconds) <= 1e-6, 'Source sample has no current native draw or legitimate no-machine hold')
-  const clockSkewSeconds = Math.abs(actual.modelTime - native.mediaTime)
-  if (finite(clockSkewSeconds) && clockSkewSeconds > CLOCK_LIMIT) {
-    const error = new Error('Actual original media/model clock exceeds the0.5s timing bound')
-    Object.assign(error, { clockSkewSeconds, nativeMediaTime: native.mediaTime })
-    throw error
-  }
+  requirePausedReview(actual, native, frame, required)
   assert(Math.abs(native.mediaTime - frame.decodedTimeSeconds) <= 0.5 / record.native.fps + 0.005 && Math.abs(native.mediaTime - frame.timeSeconds) <= CLOCK_LIMIT + 1e-6, 'Actual original media is not on the observed source exposure within the0.5s timing bound')
   const expectedIndex = nearestPtsIndex(record.native.pts, frame.decodedTimeSeconds)
   assert(Math.abs(record.native.pts[expectedIndex] - frame.decodedTimeSeconds) <= 0.001 && Math.abs(frame.decodedTimeSeconds - frame.timeSeconds) <= CLOCK_LIMIT + 1e-6, 'Authored sample is not a retained native source PTS within0.5s')
@@ -427,13 +433,16 @@ export function sourceSeedIndex(frames) {
     if (!finite(frame.decodedTimeSeconds) || !Number.isInteger(frame.sourceImage?.frameIndex) || frame.sourceImage.frameIndex < 0 || !frame.sourceImage?.sourceSha256) continue
     for (const item of frame.landmarks ?? []) {
       if (item.method !== 'manual' || item.status !== 'observed' || !point(item.pixel) || !['fit', 'check'].includes(item.role)) continue
-      const key = `${frame.decodedTimeSeconds}/${item.originalViewId ?? item.viewId ?? 'main'}/${item.anchorId}`, prior = seeds.get(key)
       const seed = { ...item, sourceImage: frame.sourceImage, decodedTimeSeconds: frame.decodedTimeSeconds }
-      // Exact exposure and original view, never the requested nominal second or
-      // a nearest-time alias. Contradictory declarations do not pick a winner.
-      if (seeds.has(key) && (!prior || jsonDigest(prior.sourceImage) !== jsonDigest(seed.sourceImage)
-        || prior.role !== seed.role || jsonDigest(prior.pixel) !== jsonDigest(seed.pixel))) seeds.set(key, null)
-      else seeds.set(key, seed)
+      // The producer records nominal seed time; both declared times identify the
+      // same exact image and original view, never a nearest-time/tolerance alias.
+      for (const time of new Set([frame.timeSeconds, frame.decodedTimeSeconds].filter(finite))) {
+        const key = `${time}/${item.originalViewId ?? item.viewId ?? 'main'}/${item.anchorId}`, prior = seeds.get(key)
+        // Contradictory declarations do not pick a winner, even on later repeats.
+        if (seeds.has(key) && (!prior || jsonDigest(prior.sourceImage) !== jsonDigest(seed.sourceImage)
+          || prior.role !== seed.role || jsonDigest(prior.pixel) !== jsonDigest(seed.pixel))) seeds.set(key, null)
+        else seeds.set(key, seed)
+      }
     }
   }
   return seeds
@@ -444,7 +453,6 @@ function sourceMethodIssue(observed, anchor, frame, seeds, viewId) {
   if (!['manual', 'optical-flow', 'image-edge', 'template-match'].includes(observed.method)) return { code: 'source-method', reason: 'Source measurement method is not an admitted independent pixel technique' }
   const evidence = observed.trackingEvidence, seed = seeds.get(`${evidence?.seedTimeSeconds}/${observed.originalViewId ?? viewId}/${observed.anchorId}`)
   const seedBound = seed && seed.sourceImage?.sourceSha256 && seed.sourceImage.sourceSha256 === frame.sourceImage?.sourceSha256
-    && seed.decodedTimeSeconds === evidence?.seedTimeSeconds
     && (!Object.hasOwn(evidence, 'seedDecodedFrameIndex') || evidence.seedDecodedFrameIndex === seed.sourceImage.frameIndex)
     && (!evidence.seedSourceImage || jsonDigest(evidence.seedSourceImage) === jsonDigest(seed.sourceImage))
   if (observed.method === 'template-match' && (!seedBound || seed.role !== observed.role || evidence?.reacquiredFromActualPixels !== true
@@ -850,11 +858,13 @@ export function finishVideo(video, census, options) {
   const diagnosticMeasurements = diagnostic.flatMap(sample => sample.measurements)
   const diagnosticFailures = diagnosticMeasurements.filter(item => item.status === 'failed')
   const diagnosticClockFailures = diagnostic.filter(sample => finite(sample.maxClockSkewSeconds) && sample.maxClockSkewSeconds > CLOCK_LIMIT)
+  const mandatoryClockFailures = mandatory.filter(sample => finite(sample.maxClockSkewSeconds) && sample.maxClockSkewSeconds > CLOCK_LIMIT)
   video.diagnosticLandmarks = { measured: diagnosticMeasurements.length, failed: diagnosticFailures.length, maxErrorPx: maximumField(diagnosticMeasurements, 'errorPx'), maxClockSkewSeconds: maximumField(diagnostic, 'maxClockSkewSeconds') }
   video.maxErrorPx = maximumField([...measurements, ...diagnosticMeasurements], 'errorPx')
   video.maxClockSkewSeconds = maximumField(video.samples, 'maxClockSkewSeconds')
   if (diagnosticFailures.length) video.failures.push({ code: 'diagnostic-pixel-counterexample', measuredLandmarks: diagnosticFailures.length, maxErrorPx: video.diagnosticLandmarks.maxErrorPx, reason: 'An independently admitted diagnostic source observation exceeds the stage pixel limit; optional missing or inadmissible oracles do not gate completeness, but actual measured counterexamples cannot be ignored.' })
   if (diagnosticClockFailures.length) video.failures.push({ code: 'diagnostic-clock-counterexample', measuredSamples: diagnosticClockFailures.length, maxClockSkewSeconds: maximumField(diagnosticClockFailures, 'maxClockSkewSeconds'), timeSeconds: diagnosticClockFailures.map(sample => sample.timeSeconds), reason: 'An independently observed diagnostic media/model clock exceeds0.5s; unknown timing remains unavailable, but a finite measured timing counterexample cannot be ignored.' })
+  if (mandatoryClockFailures.length) video.failures.push({ code: 'mandatory-clock-counterexample', measuredSamples: mandatoryClockFailures.length, maxClockSkewSeconds: maximumField(mandatoryClockFailures, 'maxClockSkewSeconds'), timeSeconds: mandatoryClockFailures.map(sample => sample.timeSeconds), reason: 'An independently observed mandatory media/model clock exceeds0.5s; legitimate no-machine holds still gate timing, and a finite measured timing counterexample cannot be ignored.' })
   video.unavailableReasons = video.samples.flatMap(sample => sample.unavailable.map(item => ({ timeSeconds: sample.timeSeconds, diagnosticOnly: sample.diagnosticOnly === true, ...item })))
   const exclusionReasons = {}
   let excludedMandatory = 0, excludedDiagnostic = 0
@@ -880,7 +890,7 @@ export function finishVideo(video, census, options) {
   if (!video.interaction || !Object.values(video.playback).some(result => result.status === 'passed')) video.failures.push({ code: 'interaction-unmeasured', reason: 'Actual original playback/audio/compact and paused manual native operation/orbit checks are required' })
   if (options.scoped) video.status = 'partial'
   else video.status = video.coverage.complete && !video.failures.length ? 'passed' : video.coverage.unavailableCensusSamples || !measurements.length ? 'unavailable' : 'failed'
-  const measuredFailure = required.some(sample => sample.status === 'failed' || sample.measurements.some(item => item.status === 'failed')) || diagnosticFailures.length > 0 || diagnosticClockFailures.length > 0
+  const measuredFailure = required.some(sample => sample.status === 'failed' || sample.measurements.some(item => item.status === 'failed')) || mandatoryClockFailures.length > 0 || diagnosticFailures.length > 0 || diagnosticClockFailures.length > 0
   video.stageMeasurement = { stage: options.stage, tolerancePx: 1920 * options.stage / 100, status: options.scoped ? 'unmeasured' : video.status === 'passed' ? 'passed' : measuredFailure || video.status === 'failed' ? 'failed' : 'unmeasured', scopedSamples: options.scoped ? { status: required.length && passed.length === required.length && missingCensusSamples === 0 && mandatory.length === selectedRows.length && !video.failures.length ? 'passed' : measuredFailure ? 'failed' : 'unavailable' } : null }
 }
 

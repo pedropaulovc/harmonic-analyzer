@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { parseOptions, sourceCensus, finishVideo, seekSettlement, sourcePtsInShot, requireSourceViews, measureView, playbackInterval, sourceSeedIndex, diagnosticReplayOutcome } from './verify-sync.mjs'
+import { parseOptions, sourceCensus, finishVideo, seekSettlement, sourcePtsInShot, requireSourceViews, measureView, playbackInterval, sourceSeedIndex, diagnosticReplayOutcome, requirePausedReview } from './verify-sync.mjs'
 import { jsonDigest } from './verify-reference.mjs'
 
 // These are decision-gate unit controls, NOT browser/source-fidelity evidence.
@@ -444,20 +444,23 @@ test('authored source landmark aliases also require same-exposure layout evidenc
   assert.throws(() => requireSourceViews(unknown), /undeclared-dynamic-view/)
 })
 
-test('tracked seeds bind the exact decoded exposure, original view and source image rather than nominal-time aliases', () => {
-  for (const method of ['optical-flow', 'template-match']) {
+test('tracked seeds admit declared nominal and decoded aliases of the exact original exposure and view', () => {
+  for (const method of ['optical-flow', 'template-match']) for (const [nominal, decoded] of [[3, 3.003], [20, 19.9866], [95, 94.9949]]) {
     const fixture = measuredViewFixture(), observed = fixture.observations[3]
     observed.method = method
     observed.originalViewId = 'presenter-whole'
-    observed.trackingEvidence = { seedTimeSeconds: 10.01, forwardBackwardErrorPx: 0.1, seedPatchCorrelation: 0.99, adjacentPatchCorrelation: 0.99, reacquiredFromActualPixels: true, wholeSourceViewCorrelation: 1, sourcePatchCorrelation: 1 }
-    const seedFrame = manualSeedFrame(fixture, 10, 10.01, 'presenter-whole')
+    observed.trackingEvidence = { seedTimeSeconds: nominal, forwardBackwardErrorPx: 0.1, seedPatchCorrelation: 0.99, adjacentPatchCorrelation: 0.99, reacquiredFromActualPixels: true, wholeSourceViewCorrelation: 1, sourcePatchCorrelation: 1 }
+    const seedFrame = manualSeedFrame(fixture, nominal, decoded, 'presenter-whole')
     fixture.seeds = sourceSeedIndex([seedFrame])
-    assert.equal(measureFixture(fixture).measured.length, 4)
-    assert.deepEqual(measureFixture(fixture).excluded, [])
+    for (const seedTimeSeconds of [nominal, decoded]) {
+      observed.trackingEvidence = { ...observed.trackingEvidence, seedTimeSeconds, seedDecodedFrameIndex: seedFrame.sourceImage.frameIndex, seedSourceImage: seedFrame.sourceImage }
+      assert.equal(measureFixture(fixture).measured.length, 4)
+      assert.deepEqual(measureFixture(fixture).excluded, [])
+    }
     for (const mutate of [
-      copy => { copy.observations[3].trackingEvidence.seedTimeSeconds = 10 },
-      copy => { copy.observations[3].trackingEvidence.seedTimeSeconds = 10.5 },
-      copy => { copy.observations[3].trackingEvidence.seedDecodedFrameIndex = 301 },
+      copy => { copy.observations[3].trackingEvidence.seedTimeSeconds = decoded + 0.000001 },
+      copy => { copy.observations[3].trackingEvidence.seedTimeSeconds = nominal + 0.5 },
+      copy => { copy.observations[3].trackingEvidence.seedDecodedFrameIndex = seedFrame.sourceImage.frameIndex + 1 },
       copy => { copy.observations[3].trackingEvidence.seedSourceImage = { ...seedFrame.sourceImage, sha256Bgr8: 'different-seed-image' } },
       copy => { copy.frame.sourceImage.sourceSha256 = '2'.repeat(64) },
       copy => { delete copy.observations[3].originalViewId },
@@ -468,9 +471,37 @@ test('tracked seeds bind the exact decoded exposure, original view and source im
       assert.equal(result.measured.length, 3)
       assert.equal(result.excluded[0].reasonCode, method === 'optical-flow' ? 'flow-provenance' : 'template-provenance')
     }
-    const contradictory = { ...seedFrame, sourceImage: { ...seedFrame.sourceImage, sha256Bgr8: 'contradictory-seed-image' } }
-    fixture.seeds = sourceSeedIndex([seedFrame, contradictory])
-    assert.equal(measureFixture(fixture).measured.length, 3)
+    for (const mutate of [
+      copy => { copy.sourceImage.sha256Bgr8 = 'contradictory-seed-image' },
+      copy => { copy.sourceImage.frameIndex++ },
+      copy => { copy.landmarks[0].pixel[0]++ },
+      copy => { copy.landmarks[0].role = 'fit' },
+    ]) {
+      const contradictory = structuredClone(seedFrame)
+      mutate(contradictory)
+      // A later repeat must not resurrect either contradictory alias.
+      fixture.seeds = sourceSeedIndex([seedFrame, contradictory, seedFrame])
+      for (const seedTimeSeconds of [nominal, decoded]) {
+        observed.trackingEvidence.seedTimeSeconds = seedTimeSeconds
+        const result = measureFixture(fixture)
+        assert.equal(result.measured.length, 3)
+        assert.equal(result.excluded[0].reasonCode, method === 'optical-flow' ? 'flow-provenance' : 'template-provenance')
+      }
+    }
+  }
+})
+
+test('a nominal/decoded alias collision fails closed only for its contradictory identity', () => {
+  const fixture = measuredViewFixture(), observed = fixture.observations[3]
+  observed.method = 'optical-flow'
+  observed.trackingEvidence = { seedTimeSeconds: 3.003, forwardBackwardErrorPx: 0.1, seedPatchCorrelation: 0.99, adjacentPatchCorrelation: 0.99 }
+  const first = manualSeedFrame(fixture, 3, 3.003), second = manualSeedFrame(fixture, 3.003, 3.04)
+  fixture.seeds = sourceSeedIndex([first, second, first])
+  assert.equal(measureFixture(fixture).excluded[0].reasonCode, 'flow-provenance')
+  for (const [seedTimeSeconds, seedSourceImage] of [[3, first.sourceImage], [3.04, second.sourceImage]]) {
+    observed.trackingEvidence = { ...observed.trackingEvidence, seedTimeSeconds, seedSourceImage, seedDecodedFrameIndex: seedSourceImage.frameIndex }
+    assert.equal(measureFixture(fixture).measured.length, 4)
+    assert.deepEqual(measureFixture(fixture).excluded, [])
   }
 })
 
@@ -495,6 +526,64 @@ test('missing, non-finite and within-bound diagnostic timing do not become fabri
     assert.equal(video.status, 'passed')
     assert.equal(video.stageMeasurement.status, 'passed')
     assert.ok(!video.failures.some(failure => failure.code === 'diagnostic-clock-counterexample'))
+  }
+})
+
+test('stale paused model clocks are retained before reference-state and nominal-time rejection', () => {
+  for (const required of [true, false]) for (const diagnosticOnly of [true, false]) {
+    const actual = { mode: 'reference-review', playerState: 'paused', modelTime: 1, referenceState: 'unavailable' }
+    const native = { paused: true, seeking: false, mediaTime: 2 }
+    let failure
+    try { requirePausedReview(actual, native, { timeSeconds: 2 }, required) }
+    catch (error) { failure = error }
+    assert.match(failure.message, /clock exceeds/)
+    assert.equal(failure.clockSkewSeconds, 1)
+    assert.equal(failure.nativeMediaTime, 2)
+    const video = videoFixture(), extra = { timeSeconds: 2, required, diagnosticOnly, reasons: ['mid-interval'] }
+    video.samples.push({ ...extra, sampleTimeSeconds: 2, status: 'failed', unavailable: [{ reason: failure.message }], measurements: [], maxClockSkewSeconds: failure.clockSkewSeconds })
+    finishVideo(video, { rows: [...censusFixture.rows, extra] }, parseOptions(['--stage', '50']))
+    assert.equal(video.stageMeasurement.status, 'failed')
+    const named = video.failures.find(item => item.code === `${diagnosticOnly ? 'diagnostic' : 'mandatory'}-clock-counterexample`)
+    assert.equal(named.measuredSamples, 1)
+    assert.equal(named.maxClockSkewSeconds, 1)
+    assert.deepEqual(named.timeSeconds, [2])
+  }
+})
+
+test('finite mandatory clocks gate exempt samples despite other unavailable census rows', () => {
+  for (const scoped of [false, true]) {
+    const video = videoFixture(), extra = { timeSeconds: 1, required: false, reasons: ['every-second'] }
+    const missing = { timeSeconds: 2, required: false, reasons: ['every-second'] }
+    video.samples.push({ ...extra, sampleTimeSeconds: 1, status: 'failed', unavailable: [{ reason: 'Clock exceeded' }], measurements: [], maxClockSkewSeconds: 0.5001 })
+    video.samples.push({ ...missing, sampleTimeSeconds: null, status: 'unavailable', unavailable: [{ reason: 'Missing source frame' }], measurements: [] })
+    const rows = [...censusFixture.rows, extra, missing]
+    finishVideo(video, { rows, selected: rows }, parseOptions(['--stage', '50', ...(scoped ? ['--times', '0,1,2'] : [])]))
+    assert.equal(video.coverage.unavailableCensusSamples, 1)
+    assert.equal(video.coverage.complete, false)
+    assert.equal(scoped ? video.stageMeasurement.scopedSamples.status : video.stageMeasurement.status, 'failed')
+    assert.ok(video.failures.some(item => item.code === 'mandatory-clock-counterexample'))
+  }
+})
+
+test('unknown and within-bound mandatory clocks do not fabricate timing counterexamples', () => {
+  for (const maxClockSkewSeconds of [null, undefined, NaN, Infinity, 0.5]) {
+    const video = videoFixture(), extra = { timeSeconds: 1, required: false, reasons: ['every-second'] }
+    video.samples.push({ ...extra, sampleTimeSeconds: 1, status: 'unavailable', unavailable: [{ reason: 'Missing source oracle' }], measurements: [], maxClockSkewSeconds })
+    finishVideo(video, { rows: [...censusFixture.rows, extra] }, parseOptions(['--stage', '50']))
+    assert.equal(video.stageMeasurement.status, 'unmeasured')
+    assert.ok(!video.failures.some(item => item.code === 'mandatory-clock-counterexample'))
+  }
+})
+
+test('paused review retains within-bound skew on stale-state errors without inventing unknown clocks', () => {
+  for (const modelTime of [1.5, 2, undefined, NaN, Infinity]) {
+    const actual = { mode: 'reference-review', playerState: 'paused', modelTime, referenceState: 'unavailable' }
+    assert.throws(() => requirePausedReview(actual, { paused: true, seeking: false, mediaTime: 2 }, { timeSeconds: 2 }), error => {
+      assert.match(error.message, /no current native draw/)
+      assert.equal(Object.hasOwn(error, 'clockSkewSeconds'), Number.isFinite(modelTime))
+      if (Number.isFinite(modelTime)) assert.equal(error.clockSkewSeconds, Math.abs(modelTime - 2))
+      return true
+    })
   }
 })
 

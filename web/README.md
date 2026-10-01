@@ -123,6 +123,11 @@ source frame's width, with clock skew no greater than 0.5 seconds.
 `?verify=1` enables native WebGL landmark readback. Mathematical camera fitting
 alone does not count as rendered-pixel evidence.
 
+Declared reference images are replayed from the original MP4 and checked against
+their native frame indices and pixel hashes. Frame selection uses a balanced
+expression so long collections stay within FFmpeg's expression-depth limit;
+this does not change the selected frames or split the decoder into retries.
+
 Legacy full-part visibility, finite-line, contour and raster-bound diagnostics
 remain historical evidence, not an exhaustive queue that must finish before
 source-following animation can be demonstrated. Preserve their real bug fixes
