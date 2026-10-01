@@ -1,12 +1,50 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { parseOptions, sourceCensus, finishVideo, seekSettlement, sourcePtsInShot, requireSourceViews, measureView, playbackInterval, sourceSeedIndex, diagnosticReplayOutcome, requirePausedReview } from './verify-sync.mjs'
+import { parseOptions, sourceCensus, finishVideo, seekSettlement, sourcePtsInShot, requireSourceViews, measureView, playbackInterval, sourceSeedIndex, diagnosticReplayOutcome, requirePausedReview, compareCameraPose } from './verify-sync.mjs'
 import { jsonDigest } from './verify-reference.mjs'
 
 // These are decision-gate unit controls, NOT browser/source-fidelity evidence.
 const native = { durationSeconds: 2.1, fps: 30, pts: [0, 1, 2] }
 const frame = (time, classification = 'machine') => ({ timeSeconds: time, decodedTimeSeconds: time, shotId: 'shot', classification, views: [{ id: 'main' }] })
 const observations = { shots: [{ id: 'shot', startSeconds: 0, endSeconds: 2.1, classification: 'machine', hasCorrespondingMachine: true }], frames: [frame(0), frame(1), frame(2)], coverage: { changeTimesSeconds: [0.1, 0.2] } }
+
+test('paused camera pose ignores normalization jitter but rejects actual translation, rotation and zoom', () => {
+  const camera = { positionMetres: [1.4665951818671157, 1.0722987956210683, 2.0027832566537382], quaternion: [0, 0, 0, 1], verticalFovDegrees: 35 }
+  const jitter = { ...camera, positionMetres: [camera.positionMetres[0], 1.07229879562107, camera.positionMetres[2]] }
+  const comparison = compareCameraPose(camera, jitter)
+  assert.equal(comparison.status, 'equivalent')
+  assert.ok(comparison.positionMetres > 0 && comparison.positionMetres < 1e-9)
+  assert.equal(compareCameraPose(camera, { ...jitter, quaternion: [0, 0, 0, -2], verticalFovDegrees: 35 + 1e-12 }).status, 'equivalent')
+  assert.equal(compareCameraPose(camera, { ...camera, quaternion: [0, Math.sin(1e-12 / 2), 0, Math.cos(1e-12 / 2)] }).status, 'equivalent')
+  const translated = compareCameraPose(camera, { ...camera, positionMetres: [camera.positionMetres[0] + 1e-6, ...camera.positionMetres.slice(1)] })
+  assert.equal(translated.status, 'changed')
+  assert.ok(translated.positionMetres > 1e-9)
+  const angle = 1e-6
+  const rotated = compareCameraPose(camera, { ...camera, quaternion: [0, Math.sin(angle / 2), 0, Math.cos(angle / 2)] })
+  assert.equal(rotated.status, 'changed')
+  assert.ok(Math.abs(rotated.rotationRadians - angle) < 1e-12)
+  const zoomed = compareCameraPose(camera, { ...camera, verticalFovDegrees: 35.001 })
+  assert.equal(zoomed.status, 'changed')
+  assert.ok(zoomed.verticalFovDegrees > 1e-9)
+})
+
+test('invalid camera poses fail closed for both unchanged and orbit-changed gates', () => {
+  const camera = { positionMetres: [0, 0, 1], quaternion: [0, 0, 0, 1], verticalFovDegrees: 35 }
+  for (const invalid of [
+    null,
+    { ...camera, positionMetres: [0, 1] },
+    { ...camera, positionMetres: [0, NaN, 1] },
+    { ...camera, quaternion: [0, 0, 0, 0] },
+    { ...camera, quaternion: [0, 0, 0, Infinity] },
+    { ...camera, quaternion: [0, 0, 1] },
+    { ...camera, verticalFovDegrees: NaN },
+    { ...camera, verticalFovDegrees: 0 },
+    { ...camera, verticalFovDegrees: 180 },
+  ]) {
+    assert.equal(compareCameraPose(camera, invalid).status, 'invalid')
+    assert.equal(compareCameraPose(invalid, camera).status, 'invalid')
+  }
+})
 
 test('stage percentages never reduce retained video or every-second coverage', () => {
   for (const stage of [50, 20, 10, 5]) {

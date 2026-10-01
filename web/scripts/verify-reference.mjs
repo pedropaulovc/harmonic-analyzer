@@ -962,9 +962,18 @@ export async function verifyFrameImages(sourcePath, data, { signal, timeoutMs = 
       const middle = start + Math.floor((end - start) / 2)
       return `(${sumSpans(start, middle)}+${sumSpans(middle, end)})`
     }
-    // Shell-free argv: any declared six-source subset needs at most 26,128 ASCII filter characters.
-    const filter = `select='${sumSpans(0, spans.length)}'`
-    const { stdout } = await runTool('ffmpeg', ['-v', 'error', '-threads', '2', '-copyts', '-i', sourcePath, '-an', '-vf', filter, '-frames:v', String(indices.length), '-fps_mode', 'passthrough', '-pix_fmt', pixelFormat === 'bgr8' ? 'bgr24' : 'gray', '-f', 'framehash', '-hash', 'sha256', 'pipe:1'], { signal, timeoutMs })
+    // Shell-free argv: six-source frame selection is at most 26,128 ASCII characters.
+    let conversion = ''
+    if (pixelFormat === 'gray8') {
+      const { stdout } = await runTool('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=pix_fmt,color_range', '-of', 'json', sourcePath], { signal, timeoutMs })
+      const stream = JSON.parse(stdout.toString()).streams?.[0]
+      if (stream?.pix_fmt !== 'yuv420p' || stream.color_range !== 'tv') throw new Error('Canonical gray8 replay requires original limited-range 8-bit yuv420p luma')
+      // Explicit round-to-nearest limited-to-full luma preserves the authored
+      // gray bytes; implicit swscale conversion differs between FFmpeg 6 and 9.
+      conversion = ",extractplanes=y,lut=c0='clip(floor((val-16)*255/219+0.5),0,255)',setparams=range=full"
+    }
+    const filter = `select='${sumSpans(0, spans.length)}'${conversion}`
+    const { stdout } = await runTool('ffmpeg', ['-v', 'error', '-threads', '2', '-copyts', '-i', sourcePath, '-map', '0:v:0', '-an', '-vf', filter, '-frames:v', String(indices.length), '-fps_mode', 'passthrough', '-pix_fmt', pixelFormat === 'bgr8' ? 'bgr24' : 'gray', '-f', 'framehash', '-hash', 'sha256', 'pipe:1'], { signal, timeoutMs })
     const output = stdout.toString(), timeBase = output.match(/^#tb 0:\s*(\d+)\/(\d+)/m)
     const tick = timeBase ? Number(timeBase[1]) / Number(timeBase[2]) : NaN
     const decoded = output.split('\n').filter(line => line.trim() && !line.startsWith('#')).map(line => line.split(',').map(value => value.trim()))

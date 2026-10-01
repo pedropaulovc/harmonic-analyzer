@@ -114,7 +114,7 @@
       "additionalProperties": false,
       "oneOf": [
         {"properties": {"pixelFormat": {"const": "bgr8"}}, "required": ["sha256Bgr8"], "not": {"required": ["sha256Gray8"]}},
-        {"properties": {"pixelFormat": {"const": "gray8"}}, "required": ["sha256Gray8"], "not": {"required": ["sha256Bgr8"]}}
+        {"properties": {"pixelFormat": {"const": "gray8", "description": "Full-range 8-bit gray from original limited-range 8-bit yuv420p luma: clip(floor((Y-16)*255/219+0.5),0,255). Hash raster bytes only, without an image header."}}, "required": ["sha256Gray8"], "not": {"required": ["sha256Bgr8"]}}
       ],
       "properties": {"frameIndex": {"type": "integer", "minimum": 0}, "sha256Bgr8": {"$ref": "#/$defs/hash"}, "sha256Gray8": {"$ref": "#/$defs/hash"}, "pixelFormat": {"enum": ["bgr8", "gray8"]}, "width": {"type": "integer", "minimum": 1}, "height": {"type": "integer", "minimum": 1}, "sourceSha256": {"$ref": "#/$defs/hash"}}
     },

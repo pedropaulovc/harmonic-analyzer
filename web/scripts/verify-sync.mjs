@@ -25,6 +25,28 @@ const delay = ms => new Promise(done => setTimeout(done, ms))
 const maximumField = (rows, field) => rows.reduce((maximum, row) => finite(row[field]) ? Math.max(maximum ?? 0, row[field]) : maximum, null)
 const HELP = `Usage: npm --prefix web run verify:sync -- [--stage 50|20|10|5] [--video <id|slug>] [--from seconds --to seconds | --times t,t,...] [--player local|youtube|both] [--headless|--headed] [--output directory]\nDefault: ALL SIX videos, final 5% of the 1920px frame width = 96px, timing <=0.5s, headless Chromium.\nStages 50/20/10/5 are ERROR tolerances (960/384/192/96px), never coverage fractions.\nPer-video and time-scoped runs measure available samples without an all-six preflight. A time-scoped report is partial, NEVER a whole-video stage pass. Stage 5 requires actual official YouTube playback/audio/compact checks; coarse stages default to byte-identical local original playback.\nRequires built dist, original MP4s in HARMONIC_REFERENCE_ROOT/videos (default web/.vite/reference-root), ffprobe/ffmpeg and Playwright Chromium. No attempt cap. Old certification code remains in git history; retained private diagnostic evidence is unchanged.\nExamples:\n  npm --prefix web run verify:sync -- --stage 50 --video analysis --times 117,118,119\n  npm --prefix web run verify:sync -- --stage 20 --video machine-spin\n  npm --prefix web run verify:sync\n`
 
+// Native orbit normalization can perturb stored floats without moving the camera.
+// Compare physical pose, not JSON bytes; invalid poses must never pass either gate.
+export function compareCameraPose(before, after) {
+  const tolerances = { positionMetres: 1e-9, rotationRadians: 1e-9, verticalFovDegrees: 1e-9 }
+  const vector = (value, size) => Array.isArray(value) && value.length === size && value.every(finite)
+  const valid = camera => camera && vector(camera.positionMetres, 3) && vector(camera.quaternion, 4)
+    && finite(camera.verticalFovDegrees) && camera.verticalFovDegrees > 0 && camera.verticalFovDegrees < 180
+  const invalid = { status: 'invalid', positionMetres: null, quaternionChord: null, rotationRadians: null, verticalFovDegrees: null, tolerances }
+  if (!valid(before) || !valid(after)) return invalid
+  const beforeNorm = Math.hypot(...before.quaternion), afterNorm = Math.hypot(...after.quaternion)
+  if (!finite(beforeNorm) || !finite(afterNorm) || beforeNorm === 0 || afterNorm === 0) return invalid
+  const a = before.quaternion.map(value => value / beforeNorm), b = after.quaternion.map(value => value / afterNorm)
+  // q and -q represent the same rotation. Chord avoids acos(dot)'s loss of
+  // precision for the near-identical rotations this verifier must distinguish.
+  const quaternionChord = Math.min(Math.hypot(...a.map((value, index) => value - b[index])), Math.hypot(...a.map((value, index) => value + b[index])))
+  const positionMetres = Math.hypot(...before.positionMetres.map((value, index) => value - after.positionMetres[index]))
+  const rotationRadians = 4 * Math.asin(Math.min(1, quaternionChord / 2))
+  const verticalFovDegrees = Math.abs(before.verticalFovDegrees - after.verticalFovDegrees)
+  if (![positionMetres, quaternionChord, rotationRadians, verticalFovDegrees].every(finite)) return invalid
+  const equivalent = positionMetres <= tolerances.positionMetres && rotationRadians <= tolerances.rotationRadians && verticalFovDegrees <= tolerances.verticalFovDegrees
+  return { status: equivalent ? 'equivalent' : 'changed', positionMetres, quaternionChord, rotationRadians, verticalFovDegrees, tolerances }
+}
 export function parseOptions(args) {
   const options = { stage: 5, videos: [], from: null, to: null, times: null, player: null, headed: process.env.HARMONIC_HEADLESS === '0', output: null }
   for (let index = 0; index < args.length; index++) {
@@ -745,42 +767,124 @@ async function playbackChecks(page, embed, record, report, outputDirectory) {
 }
 
 async function interactionChecks(page, embed, id, outputDirectory) {
-  await pause(page, embed); await page.evaluate(() => window.harmonicAnalyzer.endReferenceReview())
-  await page.locator('#fit-view').click()
-  if (!await page.locator('#manual-controls').evaluate(details => details.open)) await page.locator('#manual-controls > summary').click()
+  const evidence = { status: 'unavailable', before: null, after: null, orbit: null, range: null, exercise: null, mediaBefore: null, mediaAfterCrank: null, mediaAfter: null, predicates: Object.fromEntries(['keyboardFocus', 'rangeInputChanged', 'boundedExerciseCompleted', 'modelInputUpdated', 'nativeGeometryChanged', 'pixelHashChanged', 'exploringMode', 'playerPaused', 'cameraUnchanged', 'sourcePaused', 'sourceMediaFrozen', 'modelClockFrozen', 'orbitCameraChanged', 'orbitPixelsChanged', 'orbitSourcePaused', 'orbitMediaFrozen'].map(name => [name, 'unavailable'])), screenshots: {}, pixelHashes: {} }
   const crank = page.locator('#crank'), stage = page.locator('#stage')
-  assert(await crank.isVisible() && await crank.isEnabled(), 'Paused native mechanism manual crank is hidden or disabled')
-  const before = await snapshot(page), mediaBefore = await media(embed)
   const take = () => stage.screenshot({ mask: [page.locator('#video-dock'), page.locator('#loading')], animations: 'disabled' })
-  const beforePixels = await take()
-  const range = await crank.evaluate(control => ({ value: Number(control.value), min: Number(control.min), max: Number(control.max), step: Number(control.step) }))
-  assert([range.value, range.min, range.max, range.step].every(finite) && range.step > 0 && range.max > range.min, 'Manual crank has invalid physical input bounds')
-  const key = range.max - range.value >= range.value - range.min ? 'ArrowRight' : 'ArrowLeft'
-  await crank.focus()
-  assert(await crank.evaluate(control => document.activeElement === control), 'Manual crank did not receive actual keyboard focus')
-  await crank.press(key); await crank.press(key); await crank.press(key)
-  const changedValue = await crank.evaluate(control => Number(control.value))
-  assert(Math.abs(changedValue - range.value) > 1e-6, 'Actual keyboard interaction did not move the bounded crank range')
-  await page.waitForFunction(turns => Math.abs(window.harmonicAnalyzer.snapshot().input.crankTurns - turns) <= 1e-6, changedValue)
-  await page.evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))))
-  const after = await snapshot(page), crankPixels = await take()
-  assert(Math.abs(after.input.crankTurns - before.input.crankTurns) > 1e-6 && after.mode === 'exploring' && after.playerState === 'paused' && digest(beforePixels) !== digest(crankPixels) && jsonDigest(before.camera) === jsonDigest(after.camera), 'Manual crank must change actual native rendered geometry without moving camera or replaying media')
-  const target = await stage.evaluate(canvas => {
-    const rect = canvas.getBoundingClientRect()
-    for (const [x, y] of [[0.3, 0.3], [0.6, 0.45], [0.5, 0.6], [0.7, 0.25]]) {
-      const left = rect.left + rect.width * x, top = rect.top + rect.height * y, dx = Math.min(100, rect.width * 0.12)
-      if (document.elementFromPoint(left, top) === canvas && document.elementFromPoint(left + dx, top + 35) === canvas) return { left, top, dx }
+  let beforePixels, crankPixels
+  let exerciseState = 'not-started'
+  const captureManual = async () => {
+    evidence.after = await snapshot(page)
+    evidence.mediaAfterCrank = await media(embed)
+    evidence.changedValue = await crank.evaluate(control => Number(control.value))
+    evidence.predicates.keyboardFocus = await crank.evaluate(control => document.activeElement === control) ? 'passed' : 'failed'
+    crankPixels = await take()
+    const screenshot = `${id}-manual-crank-after.png`
+    await writeFile(resolve(outputDirectory, screenshot), crankPixels)
+    evidence.screenshots.after = screenshot
+    evidence.pixelHashes.after = digest(crankPixels)
+    if (!evidence.before || !evidence.range || !evidence.mediaBefore || !beforePixels) return
+    const { before, after, range, changedValue, mediaBefore, mediaAfterCrank } = evidence
+    evidence.deltas = {
+      rangeTurns: changedValue - range.value,
+      modelCrankTurns: after.input.crankTurns - before.input.crankTurns,
+      modelTimeSeconds: after.modelTime - before.modelTime,
+      sourceMediaSeconds: mediaAfterCrank.mediaTime - mediaBefore.mediaTime,
     }
-    return null
-  })
-  assert(target, 'No usable native model orbit surface')
-  await page.mouse.move(target.left, target.top); await page.mouse.down(); await page.mouse.move(target.left + target.dx, target.top + 35, { steps: 8 }); await page.mouse.up()
-  await page.evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))))
-  const orbit = await snapshot(page), orbitPixels = await take(), mediaAfter = await media(embed)
-  assert(jsonDigest(orbit.camera) !== jsonDigest(after.camera) && digest(orbitPixels) !== digest(crankPixels), 'Manual orbit must change actual rendered camera/pixels')
-  assert(mediaAfter.paused && Math.abs(mediaAfter.mediaTime - mediaBefore.mediaTime) <= 0.1, 'Manual operation/orbit restarted the source video')
-  const screenshot = `${id}-manual-orbit.png`; await writeFile(resolve(outputDirectory, screenshot), orbitPixels)
-  return { status: 'passed', crankTurnsBefore: before.input.crankTurns, crankTurnsAfter: after.input.crankTurns, orbitCameraBefore: after.camera, orbitCameraAfter: orbit.camera, pausedDriftSeconds: Math.abs(mediaAfter.mediaTime - mediaBefore.mediaTime), screenshot }
+    evidence.cameraComparison = compareCameraPose(before.camera, after.camera)
+    const predicates = {
+      rangeInputChanged: Math.abs(evidence.deltas.rangeTurns) > 1e-6,
+      boundedExerciseCompleted: !!evidence.exercise && changedValue >= range.min && changedValue <= range.max && Math.abs(evidence.deltas.rangeTurns - (evidence.exercise.key === 'ArrowRight' ? 1 : -1) * evidence.exercise.plannedTurns) <= 1e-6,
+      modelInputUpdated: Math.abs(after.input.crankTurns - changedValue) <= 1e-6,
+      nativeGeometryChanged: Math.abs(evidence.deltas.modelCrankTurns) > 1e-6 && digest(beforePixels) !== digest(crankPixels),
+      pixelHashChanged: digest(beforePixels) !== digest(crankPixels),
+      exploringMode: after.mode === 'exploring',
+      playerPaused: after.playerState === 'paused',
+      cameraUnchanged: evidence.cameraComparison.status === 'equivalent',
+      sourcePaused: mediaAfterCrank.paused,
+      sourceMediaFrozen: Math.abs(evidence.deltas.sourceMediaSeconds) <= 0.1,
+      modelClockFrozen: Math.abs(evidence.deltas.modelTimeSeconds) <= 1e-6,
+    }
+    Object.assign(evidence.predicates, Object.fromEntries(Object.entries(predicates).map(([name, passed]) => [name, passed ? 'passed' : 'failed'])))
+  }
+  try {
+    await pause(page, embed); await page.evaluate(() => window.harmonicAnalyzer.endReferenceReview())
+    await page.locator('#fit-view').click()
+    if (!await page.locator('#manual-controls').evaluate(details => details.open)) await page.locator('#manual-controls > summary').click()
+    assert(await crank.isVisible() && await crank.isEnabled(), 'Paused native mechanism manual crank is hidden or disabled')
+    evidence.before = await snapshot(page); evidence.mediaBefore = await media(embed)
+    beforePixels = await take()
+    const beforeScreenshot = `${id}-manual-crank-before.png`
+    await writeFile(resolve(outputDirectory, beforeScreenshot), beforePixels)
+    evidence.screenshots.before = beforeScreenshot; evidence.pixelHashes.before = digest(beforePixels)
+    const range = evidence.range = await crank.evaluate(control => ({ value: Number(control.value), min: Number(control.min), max: Number(control.max), step: Number(control.step) }))
+    assert([range.value, range.min, range.max, range.step].every(finite) && range.step > 0 && range.max > range.min && range.value >= range.min && range.value <= range.max, 'Manual crank has invalid physical input bounds')
+    const key = range.max - range.value >= range.value - range.min ? 'ArrowRight' : 'ArrowLeft'
+    const availableTurns = key === 'ArrowRight' ? range.max - range.value : range.value - range.min
+    // Arrow events honor the actual range step; PageUp uses a fraction of the
+    // entire range and can unintentionally exercise many revolutions.
+    const steps = Math.min(Math.max(1, Math.round(0.125 / range.step)), Math.floor(availableTurns / range.step + 1e-6))
+    const keyEventLimit = 1000
+    evidence.exercise = { key, steps, requestedTurns: 0.125, availableTurns, plannedTurns: steps * range.step, keyEventLimit }
+    assert(steps > 0, 'Manual crank has no available bounded keyboard step')
+    assert(Number.isInteger(steps) && steps <= keyEventLimit, `Manual crank exercise exceeds the ${keyEventLimit}-event keyboard limit`)
+    await crank.focus()
+    evidence.predicates.keyboardFocus = await crank.evaluate(control => document.activeElement === control) ? 'passed' : 'failed'
+    assert(evidence.predicates.keyboardFocus === 'passed', 'Manual crank did not receive actual keyboard focus')
+    exerciseState = 'started'
+    for (let step = 0; step < steps; step++) await crank.press(key)
+    const changedValue = await crank.evaluate(control => Number(control.value))
+    evidence.changedValue = changedValue
+    assert(Math.abs(changedValue - range.value) > 1e-6, 'Actual keyboard interaction did not move the bounded crank range')
+    await page.waitForFunction(turns => Math.abs(window.harmonicAnalyzer.snapshot().input.crankTurns - turns) <= 1e-6, changedValue)
+    await page.evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))))
+    await captureManual()
+    assert(Object.entries(evidence.predicates).filter(([name]) => !name.startsWith('orbit')).every(([, status]) => status === 'passed'), `Manual crank must change actual native rendered geometry without moving camera or replaying media: ${JSON.stringify(evidence.predicates)}`)
+    const after = evidence.after
+    const target = await stage.evaluate(canvas => {
+      const rect = canvas.getBoundingClientRect()
+      for (const [x, y] of [[0.3, 0.3], [0.6, 0.45], [0.5, 0.6], [0.7, 0.25]]) {
+        const left = rect.left + rect.width * x, top = rect.top + rect.height * y, dx = Math.min(100, rect.width * 0.12)
+        if (document.elementFromPoint(left, top) === canvas && document.elementFromPoint(left + dx, top + 35) === canvas) return { left, top, dx }
+      }
+      return null
+    })
+    assert(target, 'No usable native model orbit surface')
+    await page.mouse.move(target.left, target.top); await page.mouse.down(); await page.mouse.move(target.left + target.dx, target.top + 35, { steps: 8 }); await page.mouse.up()
+    await page.evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))))
+    const orbit = evidence.orbit = await snapshot(page), orbitPixels = await take(), mediaAfter = evidence.mediaAfter = await media(embed)
+    const screenshot = `${id}-manual-orbit.png`; await writeFile(resolve(outputDirectory, screenshot), orbitPixels)
+    evidence.screenshots.orbit = screenshot; evidence.pixelHashes.orbit = digest(orbitPixels)
+    evidence.orbitCameraComparison = compareCameraPose(after.camera, orbit.camera)
+    evidence.predicates.orbitCameraChanged = evidence.orbitCameraComparison.status === 'changed' ? 'passed' : 'failed'
+    evidence.predicates.orbitPixelsChanged = digest(orbitPixels) !== digest(crankPixels) ? 'passed' : 'failed'
+    evidence.predicates.orbitSourcePaused = mediaAfter.paused ? 'passed' : 'failed'
+    evidence.pausedDriftSeconds = Math.abs(mediaAfter.mediaTime - evidence.mediaBefore.mediaTime)
+    evidence.predicates.orbitMediaFrozen = evidence.pausedDriftSeconds <= 0.1 ? 'passed' : 'failed'
+    assert(evidence.predicates.orbitCameraChanged === 'passed' && evidence.predicates.orbitPixelsChanged === 'passed', 'Manual orbit must change actual rendered camera/pixels')
+    assert(evidence.predicates.orbitSourcePaused === 'passed' && evidence.predicates.orbitMediaFrozen === 'passed', 'Manual operation/orbit restarted the source video')
+    return { ...evidence, status: 'passed', crankTurnsBefore: evidence.before.input.crankTurns, crankTurnsAfter: after.input.crankTurns, orbitCameraBefore: after.camera, orbitCameraAfter: orbit.camera, screenshot }
+  } catch (error) {
+    evidence.status = 'failed'; evidence.reason = error.message
+    evidence.exerciseState = exerciseState
+    // Unattempted setup failures have a failure state, not an after-crank result.
+    // Once keyboard exercise starts, preserve its actual outcome and predicates.
+    if (!evidence.after) {
+      try {
+        if (exerciseState === 'started') await captureManual()
+        else {
+          evidence.failureState = { actual: await snapshot(page), media: await media(embed) }
+        }
+      } catch (captureError) { evidence.captureError = captureError.message }
+    }
+    const failureScreenshot = `${id}-manual-interaction-failed.png`
+    try { await page.screenshot({ path: resolve(outputDirectory, failureScreenshot) }); evidence.screenshots.failure = failureScreenshot }
+    catch (captureError) { evidence.failureScreenshotError = captureError.message }
+    evidence.report = `${id}-manual-interaction-failed.json`
+    try { await writeFile(resolve(outputDirectory, evidence.report), `${JSON.stringify(evidence, null, 2)}\n`) }
+    catch (captureError) { evidence.reportWriteError = captureError.message }
+    error.interaction = evidence
+    throw error
+  }
 }
 
 export function requireSourceViews(row) {
@@ -949,7 +1053,7 @@ export async function verifySync(options = parseOptions(process.argv.slice(2))) 
         try { await pause(page, embed); await measureSamples(page, embed, record, census, video, report.limits.sourceLandmarkPx, outputDirectory) }
         catch (error) { video.failures.push({ code: 'source-measurement', reason: error.message }) }
         try { video.interaction = await interactionChecks(page, embed, id, outputDirectory) }
-        catch (error) { video.failures.push({ code: 'manual-interaction', reason: error.message }) }
+        catch (error) { video.interaction = error.interaction ?? { status: 'failed', reason: error.message }; video.failures.push({ code: 'manual-interaction', reason: error.message, report: video.interaction.report ?? null }) }
         if (options.player === 'both') {
           try { const official = await openRoute(page, server.url, record, 'youtube'); await playbackChecks(page, official, record, video, outputDirectory) }
           catch (error) { if (video.playback.youtube) Object.assign(video.playback.youtube, { status: 'failed', reason: error.message }); video.failures.push({ code: 'youtube-playback', reason: error.message }) }

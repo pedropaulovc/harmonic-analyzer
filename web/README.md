@@ -123,10 +123,20 @@ source frame's width, with clock skew no greater than 0.5 seconds.
 `?verify=1` enables native WebGL landmark readback. Mathematical camera fitting
 alone does not count as rendered-pixel evidence.
 
+Paused interaction verification exercises a bounded crank turn and an actual
+camera orbit, preserving before/after native pixels, camera poses and media
+clocks. Camera equality permits only numerical noise (1e-9 metres, radians and
+FOV degrees); a real orbit must exceed that bound and change rendered pixels.
+Failed interactions retain their measured predicates and screenshots.
+
 Declared reference images are replayed from the original MP4 and checked against
 their native frame indices and pixel hashes. Frame selection uses a balanced
 expression so long collections stay within FFmpeg's expression-depth limit;
 this does not change the selected frames or split the decoder into retries.
+Gray references use explicit round-to-nearest limited-to-full 8-bit luma,
+not FFmpeg's version-dependent implicit gray conversion. The schema defines the
+byte profile; unsupported source formats are refused and existing hashes stay
+unchanged.
 
 Legacy full-part visibility, finite-line, contour and raster-bound diagnostics
 remain historical evidence, not an exhaustive queue that must finish before
