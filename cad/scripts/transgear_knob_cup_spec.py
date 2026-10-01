@@ -39,10 +39,11 @@ BORE_DIA = 4.3
 BORE_BAND = (0.10, 0.0)  # (upper, lower) deviations
 
 # Places each printed dimension carries (policy rule 12, contract §12): the
-# diameters and the floor at .XX (wall, head clearance, engagement), the
-# bore at .XX under its own band, the length routine at .X.
-OD_PLACES = 2
-COUNTERBORE_PLACES = 2
+# floor at .XX (the screw's engagement band), the bore at .XX under its own
+# band; the O.D., the counterbore and the length are routine at .X -- the
+# walls, the floor ligament and the pan head's entry all hold at that row.
+OD_PLACES = 1
+COUNTERBORE_PLACES = 1
 FLOOR_PLACES = 2
 BORE_PLACES = 2
 LENGTH_PLACES = 1

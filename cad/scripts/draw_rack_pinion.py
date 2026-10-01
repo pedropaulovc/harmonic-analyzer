@@ -47,6 +47,7 @@ from rack_pinion_spec import (
     GEOMETRIC_TOLERANCES_MM,
     OUTSIDE_DIA,
     TAP_CALLOUT_QUALIFIER,
+    TAP_CENTRES,
     TAP_DRILL_DIA,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -72,7 +73,10 @@ VIEW_SCALE = (1, 1)
 FRONT_CENTER = (0.220, 0.175)
 RIGHT_CENTER = (0.320, 0.175)
 ISO_CENTER = (0.383, 0.210)  # 0.388 clipped the zone border right by 1.4 mm
-BORE_FINISH_POSITION = (FRONT_CENTER[0] + 0.058, FRONT_CENTER[1] - 0.070)
+# Below the face view, left of the edge view's 3.000 (19e33c6c2 printed the
+# Ra 1.6 into it): the leader rises to the bore's 0° rim point under the
+# 0° tap, right of the tap callout's leader.
+BORE_FINISH_POSITION = (FRONT_CENTER[0] + 0.030, FRONT_CENTER[1] - 0.082)
 
 HALF_OD = OUTSIDE_DIA * VIEW_SCALE[0] / 2000.0
 FRONT_FACE_X = RIGHT_CENTER[0] - FACE_WIDTH * VIEW_SCALE[0] / 2000.0
@@ -95,9 +99,24 @@ BORE_FIT_ATTACH = (
     FRONT_CENTER[0] + _BORE_SHEET_RADIUS * math.cos(math.radians(180.0)),
     FRONT_CENTER[1] + _BORE_SHEET_RADIUS * math.sin(math.radians(180.0)),
 )
-# Lower-left of the face view, off the rim: the leader lands on the 240° tap
-# (visible_circle_edge breaks the three equal radii on the lowest centre).
+# Lower-left of the face view, off the rim: the leader rises to the lower-left
+# tap, below datum A and clear of the bore.  The pick is on that tap's drill
+# circle at 225° about its centre, off the centre-mark lines.  The face view is
+# symmetric about its horizontal axis, so the sheet's lower-left tap is the
+# model's x < 0 centre drawn under the axis whichever way the view mirrors.
+# (19e33c6c2 let visible_circle_edge break the tie between the two x < 0
+# taps on float noise: it took the upper one and the leader crossed the bore.)
 TAP_CALLOUT_XY = (FRONT_CENTER[0] - 0.060, FRONT_CENTER[1] - 0.058)
+_TAP_X, _TAP_Y = min(TAP_CENTRES)  # either x < 0 centre: only |y| is drawn
+TAP_SHEET_CENTER = (
+    FRONT_CENTER[0] + _TAP_X * VIEW_SCALE[0] / 1000.0,
+    FRONT_CENTER[1] - abs(_TAP_Y) * VIEW_SCALE[0] / 1000.0,
+)
+_TAP_SHEET_RADIUS = TAP_DRILL_DIA * VIEW_SCALE[0] / 2000.0
+TAP_PICK = (
+    TAP_SHEET_CENTER[0] + _TAP_SHEET_RADIUS * math.cos(math.radians(225.0)),
+    TAP_SHEET_CENTER[1] + _TAP_SHEET_RADIUS * math.sin(math.radians(225.0)),
+)
 
 
 def tap_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
@@ -247,7 +266,7 @@ async def build(adapter: Any) -> dict[str, str]:
     tap_callout = add_native_hole_callout(
         adapter,
         front,
-        edge=visible_circle_edge(adapter, front, TAP_DRILL_DIA),
+        edge_xy=TAP_PICK,
         callout_xy=TAP_CALLOUT_XY,
         label="#0-80 transferred disc taps",
     )

@@ -1,7 +1,7 @@
 r"""Reproduction script: platen plate (book ch. 22, pp. 54-55).
 
 The heavy darkened-brass plate that carries the recording paper. The
-toothed rack bar screwed to its back bottom edge, the two paper-clip
+toothed rack bar soft-soldered to its back bottom edge, the two paper-clip
 strips, and the two back-side guide rails the platen hangs on are
 separate parts (build_platen_rack.py / build_platen_clip.py /
 build_platen_guide.py). Fastener holes:

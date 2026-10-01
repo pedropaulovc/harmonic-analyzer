@@ -62,24 +62,34 @@ def test_the_quarter_inch_screw_is_refused(monkeypatch) -> None:
 
 
 def test_lock_and_guide_hole_positions_fit_the_fixed_fastener_stack() -> None:
-    """R9-49: H - F >= the lock's 2X Ø0.10 plus the guide's Ø0.20, with the
+    """R9-49: the hole-over-screw radial clearance covers the radial reach of
+    the lock's ±0.035 hole coordinates plus half the guide's Ø0.20, with the
     1/8 drill at its smallest and the screw major at its largest."""
     hole_min = 0.125 * IN
-    positions = float(lock.GEOMETRIC_TOLERANCES_MM["screw-hole position"]) + float(
-        guide.GEOMETRIC_TOLERANCES_MM["guide hole-pattern position"]
-    )
+    radial = (0.035**2 + 0.035**2) ** 0.5 + 0.20 / 2.0
     # The printed bands, untightened.
-    assert positions == pytest.approx(0.30)
+    assert lock.HOLE_LOCATION_BAND == pytest.approx(0.035)
+    assert float(
+        guide.GEOMETRIC_TOLERANCES_MM["guide hole-pattern position"]
+    ) == pytest.approx(0.20)
     assert blind_cut_dia_mm(lock.HOLE_SPEC) == pytest.approx(hole_min)
-    assert hole_min - MAJOR_MAX >= positions
+    assert (hole_min - MAJOR_MAX) / 2.0 >= radial
     # Pushed off the bar onto the screws, the lock gains at least the radial
     # clearance less the position error, and at most the loosest clearance
     # plus it.
-    set_min = (hole_min - MAJOR_MAX) / 2.0 - positions / 2.0
-    set_max = (hole_min + DRILLED_PLUS - MAJOR_MIN) / 2.0 + positions / 2.0
-    assert set_min == pytest.approx(0.0151, abs=1e-4)
-    assert set_max == pytest.approx(0.4400, abs=1e-4)
+    set_min = (hole_min - MAJOR_MAX) / 2.0 - radial
+    set_max = (hole_min + DRILLED_PLUS - MAJOR_MIN) / 2.0 + radial
+    assert set_min == pytest.approx(0.0156, abs=1e-4)
+    assert set_max == pytest.approx(0.4395, abs=1e-4)
     assert screw.LOCK_SET_OFFSET == pytest.approx((set_min, set_max))
+
+
+def test_the_hole_coordinates_at_the_arm_tap_band_are_refused(monkeypatch) -> None:
+    """±0.065 (the hanger arm's tap band) reaches 0.092 radially: the lock's
+    holes could then bear on their screws toward the bar."""
+    monkeypatch.setattr(lock, "HOLE_LOCATION_BAND", 0.065)
+    with pytest.raises(AssertionError, match="MHA-112 guide lock"):
+        _reload_screw_spec()
 
 
 def test_the_close_number_4_clearance_is_refused(monkeypatch) -> None:
@@ -94,7 +104,7 @@ def test_set_locks_clear_the_pivot_spacer_in_the_sweep(monkeypatch) -> None:
     import build_paper_drive_assembly as assembly
 
     hole_min = 0.125 * IN
-    set_min = (hole_min - MAJOR_MAX) / 2.0 - (0.10 + 0.20) / 2.0
+    set_min = (hole_min - MAJOR_MAX) / 2.0 - ((2 * 0.035**2) ** 0.5 + 0.20 / 2.0)
     spacer_r = (spacer.OD + spacer.OD_BAND) / 2.0
     pivot_y = assembly.PIVOT_XY[1]
     (_, bottom_top), (top_bottom, _) = assembly.LOCK_PLATE_Y

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import itertools
 import math
 from pathlib import Path
 
@@ -17,6 +18,8 @@ from _drawing_contract import (
     model_toleranced_dimensions,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _layout_audit import TEXT_CLEARANCE_HEIGHTS
+from _layout_geometry import ARROW_TEXT_CLEARANCE_M, Box, estimate_text_box
 from _printed_tolerance import printed_band_mm
 
 
@@ -146,3 +149,167 @@ def test_part_record_and_finish() -> None:
     (control,) = spec.SURFACE_FINISHES
     assert control.key == "bore"
     assert control.face.diameter_mm == spec.BORE_DIA
+
+
+# Dimension text as the fleet's sheets print it: 3.5 mm caps, the advance and
+# line pitch measured on the arbor-pedestal sheet (test_arbor_pedestal_drawing).
+_CAP_M = 0.0035
+_ADVANCE = 109.7 / (42 * 3.5)
+_LINE_SPACING = 16.8 * 25.4 / 72.0 / 3.5
+_NOMINAL = {
+    "OutsideDia": spec.OUTSIDE_DIA,
+    "RootDia": spec.ROOT_DIA_MIN,
+    "BoreDia": spec.BORE_DIA,
+    "SpigotDia": spec.SPIGOT_DIA,
+    "ShankDia": spec.SHANK_DIA,
+    "FaceWidth": spec.FACE_WIDTH,
+    "SpigotFront": spec.SPIGOT_FRONT_STATION,
+    "OverallLength": spec.OVERALL_LENGTH,
+}
+_DEVIATIONS = {
+    "BoreDia": spec.BORE_DEVIATIONS,
+    "SpigotDia": spec.SPIGOT_DIA_DEVIATIONS,
+    "ShankDia": spec.SHANK_DIA_DEVIATIONS,
+    "OutsideDia": spec.OUTSIDE_DIA_DEVIATIONS,
+}
+# The places SolidWorks printed each stacked band's deviations in (run
+# 20261001T110844152Z): the upper above the lower, the lower beside the value.
+_DEVIATION_PLACES = {"BoreDia": 3, "SpigotDia": 2, "ShankDia": 3, "OutsideDia": 1}
+
+
+def _printed_text(name: str) -> str:
+    """A kept dimension's whole text as the section prints it, padded with
+    the space SolidWorks prints either side: its value, then the root's MIN,
+    a station's band, or a stacked band, then any callout below."""
+    value = f"{_NOMINAL[name]:.{spec.DRAWING_PRECISION_BY_NAME[name]}f}"
+    if name.endswith("Dia"):
+        value = f"\u00d8{value}"
+    if name == "RootDia":
+        rows = [f"{value} min."]
+    elif name in _DEVIATIONS:
+        lower, upper = _DEVIATIONS[name]
+        places = _DEVIATION_PLACES[name]
+        rows = [f"{upper:+.{places}f}", f"{value} {lower:+.{places}f}"]
+    else:
+        rows = [f"{value} \u00b1{spec.STATION_TOL:.{spec.STATION_PLACES}f}"]
+    if name in drawing.DIMENSION_CALLOUTS:
+        rows.append(drawing.DIMENSION_CALLOUTS[name])
+    return "\n".join(f" {row} " for row in rows)
+
+
+def _inline(anchor: tuple[float, float]) -> bool:
+    return anchor[1] == drawing.RIGHT_CENTER[1]
+
+
+def _printed_box(name: str, anchor: tuple[float, float]) -> Box:
+    """The estimated box of a kept dimension's whole text.
+
+    Text placed on the axis prints centred on its point, the dimension line
+    breaking round it (the crank hub's sheet).  A shelf diameter's text hangs
+    off one side of its dimension line, and SolidWorks picks the side (the
+    20261001T110844152Z shelf printed both), so its box covers both."""
+    box = estimate_text_box(
+        _printed_text(name),
+        anchor=anchor,
+        height=_CAP_M,
+        reference=2,
+        advance_ratio=_ADVANCE,
+        line_spacing=_LINE_SPACING,
+    )
+    assert box is not None
+    if name.endswith("Dia") and not _inline(anchor):
+        width = box.xmax - box.xmin
+        return Box(anchor[0] - width, box.ymin, anchor[0] + width, box.ymax)
+    return box
+
+
+def _note_box(text: str, anchor: tuple[float, float]) -> Box:
+    """A note's estimated box: SolidWorks places a note by its upper left."""
+    box = estimate_text_box(
+        text,
+        anchor=anchor,
+        height=_CAP_M,
+        advance_ratio=_ADVANCE,
+        line_spacing=_LINE_SPACING,
+    )
+    assert box is not None
+    return box
+
+
+def test_section_values_and_bands_print_clear_of_each_other() -> None:
+    """Machinist review of run 20261001T110844152Z: the tip, spigot and shank
+    stood on one shelf above the section and their stacked bands printed over
+    each other.  Every value with its band and callout keeps the layout
+    audit's text air from every other text, clears both views, and stays
+    inside the border; the inline diameters print between their own
+    extension lines and off the part."""
+    s = drawing.VIEW_SCALE[0] / 1000.0
+    axis_y = drawing.RIGHT_CENTER[1]
+    rear_x = drawing._side_x(0.0)
+    nose_x = drawing._side_x(spec.OVERALL_LENGTH)
+    section = Box(rear_x, axis_y - drawing.HALF_OD, nose_x, axis_y + drawing.HALF_OD)
+    end_view = Box(
+        drawing.FRONT_CENTER[0] - drawing.HALF_OD,
+        drawing.FRONT_CENTER[1] - drawing.HALF_OD,
+        drawing.FRONT_CENTER[0] + drawing.HALF_OD,
+        drawing.FRONT_CENTER[1] + drawing.HALF_OD,
+    )
+    boxes = {name: _printed_box(name, xy) for name, xy in drawing.RIGHT_KEEP.items()}
+    boxes["oil hole note"] = _note_box(spec.OIL_HOLE_NOTE, drawing.OIL_HOLE_CALLOUT)
+    boxes["bore fit note"] = _note_box(spec.BORE_FIT_CALLOUT, drawing.BORE_FIT_NOTE)
+    air = TEXT_CLEARANCE_HEIGHTS * _CAP_M
+    clashes = [
+        (a, b, round(boxes[a].gap(boxes[b]) * 1000.0, 2))
+        for a, b in itertools.combinations(sorted(boxes), 2)
+        if boxes[a].gap(boxes[b]) < air
+    ]
+    assert clashes == []
+    x0, y0, x1, y1 = drawing.SHEET_INNER_BORDER
+    for name, box in boxes.items():
+        assert x0 <= box.xmin and box.xmax <= x1, name
+        assert y0 <= box.ymin and box.ymax <= y1, name
+        assert box.gap(end_view) >= ARROW_TEXT_CLEARANCE_M, name
+    inline = {
+        name: anchor for name, anchor in drawing.RIGHT_KEEP.items() if _inline(anchor)
+    }
+    assert set(inline) == {"OutsideDia", "RootDia", "ShankDia"}
+    for name in inline:
+        half = _NOMINAL[name] / 2.0 * s
+        assert axis_y - half < boxes[name].ymin, name
+        assert boxes[name].ymax < axis_y + half, name
+        assert boxes[name].gap(section) >= ARROW_TEXT_CLEARANCE_M, name
+    # Beside one face the larger diameter stands farther out, so neither's
+    # extension lines cross the other's dimension line.
+    left = sorted(
+        (n for n in inline if inline[n][0] < rear_x), key=lambda n: -inline[n][0]
+    )
+    assert left == ["RootDia", "OutsideDia"]
+    assert [_NOMINAL[n] for n in left] == sorted(_NOMINAL[n] for n in left)
+    assert inline["ShankDia"][0] > nose_x
+
+
+# The finish symbol's ink from its insertion point, measured on run
+# 20261001T110844152Z: the leader leaves the shoulder's right end, the "Ra"
+# text's lower right corner stands up and right of the root, and the V's
+# left arm reaches left of it.
+_FINISH_SHOULDER_DX = 0.0064
+_FINISH_TEXT_CORNER = (0.0147, 0.0042)
+_FINISH_LEFT_DX = -0.0021
+
+
+def test_finish_leader_climbs_clear_of_its_own_text() -> None:
+    """Run 20261001T110844152Z's finish leader climbed through its own "Ra
+    1.6" (leader-through-own-text); it now passes right of the text, and the
+    symbol stands clear of the end view and inside the border."""
+    sx, sy = drawing.FINISH_SYMBOL
+    start = (sx + _FINISH_SHOULDER_DX, sy)
+    end = drawing.FINISH_ATTACH
+    text_right = sx + _FINISH_TEXT_CORNER[0]
+    text_bottom = sy + _FINISH_TEXT_CORNER[1]
+    assert end[0] > start[0] and end[1] > text_bottom
+    rise = (text_bottom - start[1]) / (end[1] - start[1])
+    leader_x = start[0] + (end[0] - start[0]) * rise
+    assert leader_x - text_right >= ARROW_TEXT_CLEARANCE_M
+    end_view_left = drawing.FRONT_CENTER[0] - drawing.HALF_OD
+    assert end_view_left - text_right >= ARROW_TEXT_CLEARANCE_M
+    assert sx + _FINISH_LEFT_DX > drawing.SHEET_INNER_BORDER[0]

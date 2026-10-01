@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 import _assembly
+import _chain as chain
 import _config
 import build_paper_drive_assembly as assembly
 import draw_paper_drive_assembly as drawing
@@ -16,6 +17,7 @@ import drive_train_steps
 import harmonic_base_spec as base
 import nameplate_spec as nameplate
 import paper_drive_assembly_steps as steps
+import paper_drive_explode_spec as explode
 import transgear_drive_collar_spec as collar
 import transgear_removable_spec as sprocket
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
@@ -141,35 +143,52 @@ def test_the_printed_step_heads_are_the_registry_in_order() -> None:
     assert second[0] == steps.step_number(drawing.FITUP_SECOND_COLUMN_KEY)
 
 
-def test_the_crank_side_pointers_land_on_the_crank_fitup_steps() -> None:
-    """§13.2 (1): the chain fit-up starts from the crank side's own fit-up."""
-    pointers = STEP_POINTER.findall(drawing.FITUP_COLUMNS[1])
+def test_the_crank_side_pointer_names_the_sheet_that_prints_those_steps() -> None:
+    """§13.2 (1): the chain fit-up starts from the crank side's own fit-up,
+    and the pointer names the MHA-A03 sheet whose note prints both steps."""
+    import draw_drive_train_assembly as drive_train
+
+    pointers = re.findall(
+        r"(MHA-A\d{2}) SHEET (\d+), STEPS (\d+) AND (\d+)",
+        drawing.FITUP_COLUMNS[1].replace("\n", " "),
+    )
+    wanted = [str(drive_train_steps.step_number(key)) for key in steps.CRANK_SIDE_KEYS]
     assert pointers == [
-        (drive_train_steps.DRAWING_NUMBER, str(drive_train_steps.step_number(key)))
-        for key in ("crank-mesh-checked", "paper-drive-wheel")
+        (drive_train_steps.DRAWING_NUMBER, str(drive_train.SEQUENCE_SHEET), *wanted)
     ]
+    assert steps.CRANK_SIDE_KEYS == ("crank-mesh-checked", "paper-drive-wheel")
+    # The cone-and-crank steps are the note package_note_fields stacks on
+    # SEQUENCE_SHEET.
+    printed = set(STEP_HEAD.findall(drive_train.CONE_CRANK_STEPS))
+    assert set(wanted) <= printed
     fitup_ref = STEP_HEAD.findall(drawing.FITUP_COLUMNS[1])[0]
     assert f"STEP {fitup_ref}" in _step_body("fitup-accepted")
 
 
 def test_the_steps_fit_their_fields() -> None:
     template = DRAWING_TEMPLATES[drawing.SPEC.layout]
-    for text, (left, top), (right_limit, bottom_limit) in zip(
-        drawing.FITUP_NOTES,
-        drawing.FITUP_NOTE_XY,
-        drawing.FITUP_NOTE_LIMITS,
-        strict=True,
-    ):
+    fields = (
+        *zip(drawing.FITUP_NOTES, drawing.FITUP_NOTE_XY, drawing.FITUP_NOTE_LIMITS),
+        (
+            drawing.PLATEN_STEPS,
+            drawing.PLATEN_NOTE_XY,
+            (drawing.PLATEN_NOTE_RIGHT, template.title_block_top_m),
+        ),
+    )
+    for text, (left, top), (right_limit, bottom_limit) in fields:
         lines = text.splitlines()
         assert left + max(map(len, lines)) * NOTE_CHAR_WIDTH < right_limit
         assert top - len(lines) * NOTE_LINE_PITCH > bottom_limit
-    (first_left, _), (second_left, _), (collar_left, collar_top) = drawing.FITUP_NOTE_XY
-    first_limit, second_limit, collar_limit = drawing.FITUP_NOTE_LIMITS
-    assert first_limit[0] < min(second_left, collar_left)
-    # The collar note sits below the chain fit-up and above the title block.
-    assert second_limit[1] > collar_top
-    assert collar_limit[1] > template.title_block_top_m
-    assert first_left > 0.0 and max(second_limit[0], collar_limit[0]) < template.width_m
+    (first_left, _), (second_left, _) = drawing.FITUP_NOTE_XY
+    first_limit, second_limit = drawing.FITUP_NOTE_LIMITS
+    assert first_limit[0] < second_left
+    assert second_limit[1] > template.title_block_top_m
+    assert first_left > 0.0 and second_limit[0] < template.width_m
+    # Sheet 3's caption sits under its steps, sheet 1's under the front view.
+    assert drawing.EXPLODED_CAPTION_XY[1] < drawing.PLATEN_NOTE_XY[1] - (
+        len(drawing.PLATEN_STEPS.splitlines()) * NOTE_LINE_PITCH
+    )
+    assert drawing.EXPLODED_CAPTION_XY[1] - NOTE_LINE_PITCH > template.title_block_top_m
 
 
 def test_the_bom_fits_left_of_the_title_block_and_on_the_sheet() -> None:
@@ -401,9 +420,10 @@ def test_the_collar_gap_stop_is_the_seat_limit_less_the_collar() -> None:
 
 
 def test_the_fitup_steps_and_the_collar_note_print_one_setting_drill_and_cut() -> None:
-    """R9-30: the collar steps and the MHA-177 fit-up note (which this sheet
-    also prints) state the collar setting, the core drill and the stud cut in
-    the same words, so the two instructions cannot drift apart."""
+    """R9-30: the collar steps and the MHA-177 fit-up note (which the collar's
+    own sheet prints) state the collar setting, the core drill and the stud
+    cut in the same words, so the two instructions cannot drift apart; the
+    steps also carry the note's two seat limits, so A06 need not repeat it."""
     note = " ".join(collar.FIT_UP_NOTE.split())
     for key, phrase in (
         ("collar-gap-measured", collar.FIT_UP_OFFSET_SET_TEXT),
@@ -412,6 +432,10 @@ def test_the_fitup_steps_and_the_collar_note_print_one_setting_drill_and_cut() -
     ):
         assert phrase in _step_body(key), key
         assert phrase in note, key
+    gap_step = _step_body("collar-gap-measured")
+    assert f"T24 SEAT {collar.SEAT_MAX_FROM_F:.2f} MAX IN FRONT OF THE 12T" in gap_step
+    assert "COLLAR-TO-12T GAP 0 MIN" in gap_step
+    assert not any("COLLAR SUPPLIED UNPINNED" in text for text in drawing.SHEET_TEXTS)
     # The drill phrase carries the cross pin's functional hole band (R9-11).
     assert "\u00d81.6 +0.05/0 THROUGH THE CORE" in collar.CROSS_PIN_DRILL_PHRASE
     assert "0.3 TO 1.0 BELOW THE RIM" in collar.STUD_CUT_PHRASE
@@ -428,7 +452,8 @@ def test_the_collar_is_pinned_before_the_stud_is_cut_and_the_stack_accepted() ->
     ]
     numbers = [steps.step_number(key) for key in order]
     assert numbers == sorted(numbers)
-    assert steps.SEQUENCE[-1] == "fitup-accepted"
+    # Only the chain's closure and run follow the transgear's acceptance.
+    assert steps.SEQUENCE.index("fitup-accepted") == len(steps.SEQUENCE) - 3
     # The drive pins are in the collar before the stack is built.
     assert steps.step_number("collar-pins-pressed") < steps.step_number(
         "knob-stack-fitted"
@@ -551,3 +576,163 @@ def test_spare_remains_fixed_t18_sibling_with_original_rotation():
         is True
     )
     assert assembly.ROT_X_NEG90 == [[1.0, 0.0, 0.0], [0.0, 0.0, -1.0], [0.0, 1.0, 0.0]]
+
+
+def _numbered_items() -> dict[str, str]:
+    """Item numbers against the dict order, so plans must sort by them."""
+    return {
+        stem: str(len(drawing.BOM_PART_NUMBERS) - index)
+        for index, stem in enumerate(drawing.BOM_PART_NUMBERS)
+    }
+
+
+def test_every_bom_item_is_ballooned_on_some_sheet() -> None:
+    """Codex B1 (19e33c6c2): items 1-12 and the chain had no balloon."""
+    items = _numbered_items()
+    iso, inner = drawing.transgear_balloon_items(items)
+    plans = (
+        drawing.assembled_balloon_items(items),
+        drawing.platen_balloon_items(items),
+        iso,
+        inner,
+    )
+    ballooned = [stem for plan in plans for stem, _item in plan]
+    assert set(ballooned) == set(drawing.BOM_PART_NUMBERS)
+    for plan in plans:
+        assert [int(item) for _stem, item in plan] == sorted(
+            int(item) for _stem, item in plan
+        )
+    # Only the removable is ballooned twice: on the knob's T24 (sheet 2) and
+    # on the spare T18 on the deck (sheet 1), which the caption names.
+    repeated = {stem for stem in ballooned if ballooned.count(stem) > 1}
+    assert repeated == {"transgear-removable"}
+    spare = drawing.ASSEMBLED_BALLOON_ANCHORS["transgear-removable"].instance
+    assert spare == "transgear-removable-3"
+    assert "T18 SPARE, STORED LOOSE" in " ".join(drawing.ASSEMBLED_CAPTION.split())
+
+
+def test_the_exploded_sheet_balloons_exactly_the_platen_group() -> None:
+    platen_group = {
+        "support-bar",
+        "column-clamp-front",
+        "column-clamp-back",
+        "clamp-screw",
+        "platen",
+        "platen-rack",
+        "platen-guide",
+        "guide-lock",
+        "platen-clip",
+        "platen-paper",
+        "fillister-screw",
+        "guide-lock-screw",
+    }
+    assert set(drawing.PLATEN_BALLOON_ANCHORS) == platen_group
+    assert explode.SHOWN_STEMS == platen_group
+    assert drawing.SHEET_NAMES[2] == "PLATEN AND SUPPORT"
+
+
+def _platen_instances(**overrides) -> list[explode.Instance]:
+    instances = [
+        explode.Instance(f"{stem}-1", stem)
+        for stem in explode.SHOWN_STEMS - explode.ROLE_STEMS
+    ]
+    instances += [
+        explode.Instance(f"fillister-screw-{n}", "fillister-screw", role)
+        for n, role in (
+            (1, explode.GUIDE_SCREW_ROLE),
+            (2, explode.CLIP_SCREW_ROLE),
+        )
+    ]
+    instances.append(explode.Instance("rack-pinion-1", "rack-pinion"))
+    for name, instance in overrides.items():
+        instances = [i for i in instances if i.name != name] + [instance]
+    return instances
+
+
+def test_the_explode_moves_only_the_platen_group_and_keeps_the_platen() -> None:
+    plan = explode.plan_explode(_platen_instances())
+    moved = {name for _step, names in plan for name in names}
+    assert "rack-pinion-1" not in moved
+    assert "platen-1" not in moved
+    assert {name.rsplit("-", 1)[0] for name in moved} == (
+        explode.SHOWN_STEMS - explode.STATIONARY_STEMS
+    )
+    # The guide screws leave with the guides' step, the clip screws with the
+    # clips': a role mix-up would move a screw with the wrong part.
+    by_label = {step.label: names for step, names in plan}
+    assert any("fillister-screw-1" in names for names in by_label.values())
+    assert any("fillister-screw-2" in names for names in by_label.values())
+    for names in by_label.values():
+        assert not {"fillister-screw-1", "fillister-screw-2"} <= set(names)
+
+
+def test_the_explode_refuses_an_untagged_fillister_screw() -> None:
+    untagged = explode.Instance("fillister-screw-1", "fillister-screw")
+    with pytest.raises(ValueError, match="role tags"):
+        explode.plan_explode(_platen_instances(**{"fillister-screw-1": untagged}))
+
+
+def test_the_platen_group_is_built_and_hung_before_its_locks_are_set() -> None:
+    """Codex B2: the steps started with the locks already on."""
+    order = ["bar-clamped", "rack-soldered", "guides-screwed", "clips-fitted"]
+    order += ["platen-hung", "guide-locks-set", "lock-seats-faced"]
+    assert list(steps.SEQUENCE[: len(order)]) == order
+    assert f"{steps.BAR_TOP_ABOVE_DECK:.1f} ABOVE THE BASE DECK" in _step_body(
+        "bar-clamped"
+    )
+    # The latched hook cannot take up a rack set off its band (rack-crest
+    # ruling): the step prints the crest band itself.
+    assert "CRESTS 2.00 \u00b10.05 BELOW ITS BOTTOM EDGE" in _step_body("rack-soldered")
+    assert steps.BAR_TOP_ABOVE_DECK == pytest.approx(
+        assembly.BAR_TOP_Y - assembly.BASE_DECK_Y, abs=5e-4
+    )
+    assert steps.RACK_CREST_DROP == pytest.approx(
+        assembly.PLATE_Y0 - assembly.RACK_TIP_Y, abs=1e-9
+    )
+    # Every platen-group screw count the steps print is the model's.
+    assert f"{drawing.GUIDE_SCREWS} " in _step_body("guides-screwed")
+    assert drawing.GUIDE_SCREWS + drawing.CLIP_SCREWS == len(
+        assembly.GUIDE_SCREW_XY
+    ) + len(assembly.CLIP_SCREW_XY)
+
+
+def test_the_chain_is_closed_and_run_after_the_collar_is_accepted() -> None:
+    """Codex B3: routing, closure, adjustment and a functional run."""
+    assert steps.SEQUENCE[-3:] == (
+        "fitup-accepted",
+        "chain-closed",
+        "chain-run-accepted",
+    )
+    closed = _step_body("chain-closed")
+    assert f"LOOP {chain.LINK_COUNT} PITCHES" in closed
+    assert "CONNECTING LINK" in closed and "CLOSED END LEADING" in closed
+    assert "NO TENSIONING" in closed
+    run = _step_body("chain-run-accepted")
+    assert "EVERY TOOTH" in run and "TOUCHES NOTHING" in run
+    assert "LOOPED" not in _step_body("collar-pinned")
+
+
+def test_the_setting_and_the_acceptance_offsets_are_told_apart() -> None:
+    """Codex clarity: 0.05 ±0.05 sets, 0.05 ±0.10 accepts; a T24 behind
+    the T12 within the acceptance passes."""
+    setting = _step_body("collar-gap-measured")
+    accepted = _step_body("fitup-accepted")
+    assert f"STEP {steps.step_number('fitup-accepted')} RE-CHECKS" in setting
+    assert f"STEP {steps.step_number('collar-gap-measured')}'S SETTING" in accepted
+    behind = steps.OFFSET_ACCEPT_TOL - collar.FIT_UP_OFFSET_TARGET
+    assert behind > 0.0
+    assert f"UP TO {behind:.2f} BEHIND PASSES" in accepted
+
+
+def test_a_balloon_ring_is_centred_in_its_room_or_refused() -> None:
+    limits = (0.2, 0.1, 0.4, 0.3)
+    outline = (0.0, 0.0, 0.1, 0.1)
+    dx, dy = drawing.ring_fit_shift(outline, limits, name="t")
+    ring = drawing._grown(
+        (outline[0] + dx, outline[1] + dy, outline[2] + dx, outline[3] + dy),
+        drawing.BALLOON_RING_REACH,
+    )
+    assert ring[0] - limits[0] == pytest.approx(limits[2] - ring[2])
+    assert ring[1] - limits[1] == pytest.approx(limits[3] - ring[3])
+    with pytest.raises(ValueError, match="width"):
+        drawing.ring_fit_shift((0.0, 0.0, 0.19, 0.1), limits, name="t")

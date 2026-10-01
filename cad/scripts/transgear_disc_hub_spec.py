@@ -6,21 +6,22 @@ Contract §2.4 (round 10): a Ø12.9 turned hub pressed on the pinion sleeve's
 flange's Ø1.7 holes into the disc's taps (``transgear_disc_hub_geometry``;
 the taps are spotted through these holes at assembly, R9-9).  A Ø1.2 radial
 oil hole on +Y reaches the bore; it is drilled through the hub wall and the
-sleeve in one operation after pressing (R9-8), so the sheet carries a
-match-drill note, not a free drilled hole.
+sleeve in one operation after pressing (R9-8), centred on the hub body
+(R9-60), so the sheet carries a match-drill note, not a free drilled hole.
 
-Printed lengths (R9-5): the overall, flange rear face to hub front face,
-9.400 .XXX (it keeps the hub behind the sleeve nose), and the flange 2.400
-.XXX (the screw-tip-to-platen stack reads it).  The hub body's own length is
-their remainder and is not printed.
+Printed lengths (R9-5), both from the flange's rear face: the overall, to
+the hub front face, 9.400 .XXX (it keeps the hub behind the sleeve nose), and
+the flange 2.400 .XXX (the screw-tip-to-platen stack reads it).  The hub
+body's own length is their remainder and is not printed.
 
 Local frame (the build's, and the one the assembly mates): the gear axis is
 Z through the origin (``Axis1``).  ``Front Plane`` (z = 0) is the flange's
 rear face, the face that seats on the disc's front face; the flange runs
 z = -2.4..0 and the hub body z = -9.4..-2.4, so local -Z is the machine's
 -Z (toward the operator).  Screw 0° is local +X, angles counter-clockwise
-seen from +Z; the oil hole is on local +Y at z = -5.9, 3.5 behind the hub's
-front face.  The part sits in the machine unrotated at z0 = -147.65.
+seen from +Z; the oil hole is on local +Y at z = -5.9, centred on the hub
+body (3.5 behind its front face).  The part sits in the machine unrotated at
+z0 = -147.65.
 
 Pure data; no SolidWorks calls.
 """
@@ -39,9 +40,12 @@ from transgear_disc_hub_geometry import (
     SCREW_COUNT,
 )
 
-# The mating parts the sheet names.
-SLEEVE_NUMBER = "MHA-110"  # transgear pinion sleeve: the Ø8.2 front shank
-DISC_NUMBER = "MHA-070"
+# The mating parts the sheet names, by name and number (policy rule 2): the
+# feed pinion whose Ø8.2 front shank the hub presses on, and the disc screws.
+SLEEVE_NUMBER = "MHA-110"
+SLEEVE_NAME = "FEED PINION"
+SCREW_NUMBER = "MHA-161"
+SCREW_NAME = "DISC SCREW"
 
 # --- screw (MHA-161, McMaster 91794A055) ------------------------------------
 SCREW_SKU = "91794A055"
@@ -98,9 +102,12 @@ SCREW_HOLE_DIA = 1.7
 SCREW_HOLE_PLACES = 1
 OIL_HOLE_DIA = 1.2
 OIL_HOLE_PLACES = 1
-# Oil-hole station from the hub's FRONT face, at the .X default (R9-8).
-OIL_HOLE_STATION = 3.5
-OIL_HOLE_STATION_PLACES = 1
+# The oil hole is centred on the hub body (R9-60): it is match-drilled at
+# assembly, so the drill finds the body's centre at fit-up instead of a
+# printed station; nominal 3.5 behind the hub front face.
+OIL_HOLE_STATION = HUB_BODY_LENGTH / 2.0
+# Marking the body's centre with a rule at fit-up.
+OIL_HOLE_CENTRING_TOL = 0.25
 OIL_HOLE_Z = -(HUB_LENGTH - OIL_HOLE_STATION)  # -5.9 in the local frame
 
 _BAND = {places: printed_band_mm(places) for places in (1, 2, 3)}
@@ -134,19 +141,21 @@ HOLE_TO_RIM_WORST = _floor2(
     _smallest_dia(FLANGE_DIA, FLANGE_DIA_PLACES) / 2.0 - _BC_R_MAX - _SCREW_HOLE_MAX_R
 )
 HOLE_TO_BORE_WORST = _BC_R_MIN - _SCREW_HOLE_MAX_R - _BORE_MAX / 2.0
-# The station is dimensioned from the hub front face itself: no length stack.
-OIL_HOLE_TO_FRONT_NOMINAL = OIL_HOLE_STATION - OIL_HOLE_DIA / 2.0
-OIL_HOLE_TO_FRONT_WORST = (
-    OIL_HOLE_STATION - _BAND[OIL_HOLE_STATION_PLACES] - _OIL_HOLE_MAX_R
-)
-# Toward the flange the hole edge meets the flange's front face, which is
-# backed by the whole flange: an edge distance, not a web.
-OIL_HOLE_TO_FLANGE_WORST = (
+# The hole is centred on the body the printed lengths leave, so its edge sits
+# the same distance from the hub front face and from the flange face.
+HUB_BODY_LENGTH_RANGE = (
     _smallest_dia(HUB_LENGTH, HUB_LENGTH_PLACES)
-    - (FLANGE_THICK + _BAND[FLANGE_THICK_PLACES])
-    - (OIL_HOLE_STATION + _BAND[OIL_HOLE_STATION_PLACES])
-    - _OIL_HOLE_MAX_R
+    - (FLANGE_THICK + _BAND[FLANGE_THICK_PLACES]),
+    _largest_dia(HUB_LENGTH, HUB_LENGTH_PLACES)
+    - (FLANGE_THICK - _BAND[FLANGE_THICK_PLACES]),
 )
+# (least, greatest) station of the hole centre behind the hub front face.
+OIL_HOLE_STATION_RANGE = (
+    HUB_BODY_LENGTH_RANGE[0] / 2.0 - OIL_HOLE_CENTRING_TOL,
+    HUB_BODY_LENGTH_RANGE[1] / 2.0 + OIL_HOLE_CENTRING_TOL,
+)
+OIL_HOLE_LIGAMENT_NOMINAL = OIL_HOLE_STATION - OIL_HOLE_DIA / 2.0
+OIL_HOLE_LIGAMENT_WORST = OIL_HOLE_STATION_RANGE[0] - _OIL_HOLE_MAX_R
 
 # Heads beside the hub body: a clearance (contract §2.4, default 4), not a web.
 HEAD_TO_HUB_NOMINAL = BOLT_CIRCLE_DIA / 2.0 - SCREW_HEAD_DIA / 2.0 - HUB_DIA / 2.0
@@ -160,16 +169,12 @@ WALL_FLOOR = 2.0
 for _label, _wall in (
     ("hub wall over the bore", HUB_WALL_WORST),
     ("screw hole to bore", HOLE_TO_BORE_WORST),
-    ("oil hole to hub front face", OIL_HOLE_TO_FRONT_WORST),
+    ("oil hole to either end of the hub body", OIL_HOLE_LIGAMENT_WORST),
 ):
     if _wall < WALL_FLOOR - 1e-9:
         raise AssertionError(
             f"MHA-159 {_label}: {_wall:.3f} worst < floor {WALL_FLOOR}"
         )
-if OIL_HOLE_TO_FLANGE_WORST <= 0.0:
-    raise AssertionError(
-        f"MHA-159 oil hole breaks into the flange: {OIL_HOLE_TO_FLANGE_WORST:.3f}"
-    )
 if HEAD_TO_HUB_WORST <= 0.0:
     raise AssertionError(
         f"MHA-159 screw heads can touch the hub body: {HEAD_TO_HUB_WORST:.3f}"
@@ -183,60 +188,67 @@ if not 0.0 < HOLE_TO_RIM_WORST < WALL_FLOOR:
 # Named exception: MHA-159 hole to rim (drawing-simplicity-policy.md, "Named exceptions").
 HOLE_TO_RIM_NOTE = f"SCREW HOLE TO RIM {HOLE_TO_RIM_WORST:.2f} MIN."
 CORNER_NOTE = f"HUB-TO-FLANGE CORNER SHARP, R{CORNER_RADIUS_MAX:.1f} MAX."
-DRAWING_NOTES = "\n".join((HOLE_TO_RIM_NOTE, CORNER_NOTE))
+# What each .XXX length holds (R9-5): why neither prints at the .X default.
+HUB_LENGTH_NOTE = (
+    f"OVERALL {HUB_LENGTH:.3f} KEEPS HUB FRONT BEHIND"
+    f" {SLEEVE_NAME} {SLEEVE_NUMBER} NOSE."
+)
+FLANGE_THICK_NOTE = f"FLANGE {FLANGE_THICK:.3f} SETS {SCREW_NAME} {SCREW_NUMBER} REACH."
+DRAWING_NOTES = "\n".join(
+    (HOLE_TO_RIM_NOTE, CORNER_NOTE, HUB_LENGTH_NOTE, FLANGE_THICK_NOTE)
+)
 
 # Callouts the sheet hangs on the native dimensions.  The holes are drilled
 # (the title block's DRILLED HOLES row governs their sizes); the three screw
 # holes are one patterned feature, equally spaced on the printed circle.  The
-# oil hole is drilled with the hub pressed on the sleeve, through both: the
-# crank pinion's pin-hole wording (crank_pinion_spec.pin_hole_note).
+# oil hole is drilled with the hub pressed on the sleeve, through both and
+# centred on the hub body (R9-60): the crank pinion's pin-hole wording
+# (crank_pinion_spec.pin_hole_note).
 SCREW_HOLE_CALLOUT_ABOVE = f"{SCREW_COUNT}X"
 SCREW_HOLE_CALLOUT_BELOW = "DRILL THRU FLANGE, EQ SP"
 OIL_HOLE_CALLOUT_BELOW = "\n".join(
     (
-        f"MATCH DRILL AT ASSY WITH {SLEEVE_NUMBER}",
-        "THRU HUB WALL AND SLEEVE AFTER PRESSING",
+        "CENTRED ON HUB BODY",
+        "MATCH DRILL AT ASSY THRU HUB WALL AND",
+        f"{SLEEVE_NAME} {SLEEVE_NUMBER} AFTER PRESSING",
     )
 )
 # The bore's native limits print with the dimension; the callout adds the
-# process, names the mate and states the interference the pair gives, in the
-# crank hub's three short lines: a wider block hangs its leader off the
-# block's far corner, across the hub diameter's shoulder (native leaf
-# fc9c2d700, shoulder-crosses-line).
+# process, names the mate and states the interference the pair gives, in
+# short lines no wider than the crank hub's: a wider block hangs its leader
+# off the block's far corner (native leaf fc9c2d700, shoulder-crosses-line).
 BORE_CALLOUT = "\n".join(
     (
         "REAM THRU",
         f"({PRESS_INTERFERENCE[0]:.3f}-{PRESS_INTERFERENCE[1]:.3f} DIAMETRAL",
-        f"INTERFERENCE ON {SLEEVE_NUMBER})",
+        "INTERFERENCE ON",
+        f"{SLEEVE_NAME} {SLEEVE_NUMBER})",
     )
 )
 
 # Marked model dimensions and the places the model authors on them (policy
-# rule 2).  Face view: the four diameters and the bolt circle; edge view: the
-# flange, the overall length, the oil-hole station and its size.
+# rule 2).  Edge view: the turned profile's two diameters and its two lengths
+# from the flange's rear face, and the oil hole's size (rule 7); face view:
+# the bore, which only shows there, and the screw holes on their bolt circle.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "FlangeProfile": {"FlangeDia"},
-    "Flange": {"FlangeThick"},
-    "HubBodyProfile": {"HubDia"},
-    "HubBody": {"HubLength"},
+    "HubProfile": {"FlangeDia", "FlangeThick", "HubDia", "HubLength"},
     "BoreProfile": {"BoreDia"},
     "ScrewHoleProfile": {"BoltCircleDia", "ScrewHoleDia"},
-    "OilHoleProfile": {"OilHoleStation", "OilHoleDia"},
+    "OilHoleProfile": {"OilHoleDia"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "FlangeProfile": {"FlangeDia": FLANGE_DIA_PLACES},
-    "Flange": {"FlangeThick": FLANGE_THICK_PLACES},
-    "HubBodyProfile": {"HubDia": HUB_DIA_PLACES},
-    "HubBody": {"HubLength": HUB_LENGTH_PLACES},
+    "HubProfile": {
+        "FlangeDia": FLANGE_DIA_PLACES,
+        "FlangeThick": FLANGE_THICK_PLACES,
+        "HubDia": HUB_DIA_PLACES,
+        "HubLength": HUB_LENGTH_PLACES,
+    },
     "BoreProfile": {"BoreDia": BORE_PLACES},
     "ScrewHoleProfile": {
         "BoltCircleDia": BOLT_CIRCLE_PLACES,
         "ScrewHoleDia": SCREW_HOLE_PLACES,
     },
-    "OilHoleProfile": {
-        "OilHoleStation": OIL_HOLE_STATION_PLACES,
-        "OilHoleDia": OIL_HOLE_PLACES,
-    },
+    "OilHoleProfile": {"OilHoleDia": OIL_HOLE_PLACES},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places

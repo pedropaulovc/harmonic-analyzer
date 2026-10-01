@@ -19,6 +19,9 @@ import transgear_thumbnut_spec as spec
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
+# The B landscape template's inner border, left edge (sheet metres).
+SHEET_INNER_LEFT = 0.0127
+
 
 def test_required_drawing_paths() -> None:
     assert drawing.SLDDRW.as_posix().endswith("/slddrw/transgear-thumbnut.SLDDRW")
@@ -211,3 +214,88 @@ def test_the_part_carries_every_property_its_drawing_requires(monkeypatch) -> No
     _drawing_marks.apply_drawing_properties(None, part.PART_NAME)
     carried.update(stamped)
     assert [name for name in required if not str(carried.get(name) or "").strip()] == []
+
+
+def test_the_knurl_is_the_designated_din_82_raa_1_0() -> None:
+    """R9-57: the modelled teeth are the 1.0-pitch 90° straight knurl the
+    callout names, so the shop's wheel forms what the model shows."""
+    assert spec.KNURL_CREST_PITCH == pytest.approx(1.0, abs=0.01)
+    assert spec.KNURL_TOOTH_ANGLE_DEG == pytest.approx(90.0, abs=2.0)
+    assert spec.KNURL_DESIGNATION in spec.KNURL_CALLOUT
+    # Negative control: the 19e33c6c2 model (60 teeth over a Ø19.7 root)
+    # was a 1.07-pitch, 108.5° V no standard wheel forms.
+    old_angle = spec.knurl_tooth_angle_deg(spec.HEAD_DIA, 19.7, 60)
+    assert old_angle == pytest.approx(108.5, abs=0.1)
+    assert math.pi * spec.HEAD_DIA / 60 - spec.KNURL_PITCH > 0.01
+
+
+def test_the_shortest_nut_keeps_full_thread_for_the_stud() -> None:
+    """The overall length prints at .X; the shortest nut it admits still
+    gives the stud 1.5D of the nut's full thread."""
+    import transgear_drive_collar_spec as collar
+    import transgear_knob_shaft_spec as stud
+
+    assert spec.OVERALL_LENGTH_LO == pytest.approx(-0.8)
+    assert collar.NUT_LENGTH_MIN == pytest.approx(15.3)
+    assert collar.THUMBNUT_ENGAGEMENT_WORST >= 1.5 * stud.THREAD_MAJOR
+    # The nut's own full thread over its shortest length.
+    full = spec.FRONT_FULL_THREAD_Y + spec.OVERALL_LENGTH_LO - spec.REAR_FULL_THREAD_Y
+    assert full >= 1.5 * spec.THREAD_MAJOR
+
+
+def _section_station(y: float) -> float:
+    """Model station (from the seat face) of sheet height ``y`` on A-A."""
+    return (y - drawing.SECTION_CENTER[1]) * 1000.0 / drawing._S + (
+        spec.OVERALL_LENGTH / 2.0
+    )
+
+
+def test_the_stem_diameters_print_across_their_own_cut() -> None:
+    """Codex on 19e33c6c2: the Ø12.40 and Ø11.00 extension lines ran through
+    the head's hatching to a stack below the seat face, on the SECTION A-A
+    caption.  Each now prints at its own feature's height, text right of
+    the knurl, so no extension line crosses another feature's cut."""
+    head_right = drawing._section_x(spec.HEAD_DIA / 2.0)
+    for name, (lo, hi) in {
+        "FlangeDia": (0.0, spec.FLANGE_LENGTH),
+        "WaistDia": (spec.FLANGE_LENGTH, spec.FLANGE_LENGTH + spec.WAIST_LENGTH),
+    }.items():
+        x, y = drawing.SECTION_KEEP[name]
+        assert lo < _section_station(y) < hi, name
+        assert x > head_right, name
+    # The text clears the overall length's dimension line beyond it.
+    assert drawing.SECTION_KEEP["OverallLength"][0] - drawing._STEM_TEXT_X > 0.004
+    # Nothing prints below the seat face, where the caption hangs.
+    seat_y = drawing._section_y(0.0)
+    assert all(y >= seat_y for _x, y in drawing.SECTION_KEEP.values())
+    # The rim's diameters print above the rim, the knurl outermost.
+    rim_y = drawing._section_y(spec.OVERALL_LENGTH)
+    assert drawing.SECTION_KEEP["HeadDia"][1] > drawing.SECTION_KEEP["DishDia"][1]
+    assert drawing.SECTION_KEEP["DishDia"][1] > rim_y
+    # Negative control: the 19e33c6c2 stack sat under the seat face.
+    assert _section_station(seat_y - 0.014) < 0.0
+
+
+def test_the_section_stands_rim_up_or_is_refused() -> None:
+    assert drawing._rim_is_up((0.2, 0.15), (0.2, 0.198))
+    assert not drawing._rim_is_up((0.2, 0.198), (0.2, 0.15))
+    with pytest.raises(RuntimeError, match="not vertical"):
+        drawing._rim_is_up((0.2, 0.15), (0.248, 0.15))
+
+
+def test_the_thread_callout_stays_inside_the_left_border() -> None:
+    """Codex on 19e33c6c2: centred 0.050 left of the face view, the
+    countersink line ran off the sheet's left edge."""
+    from _layout_geometry import estimate_text_box
+
+    text = f"1/4-20 UNC - 2B THRU ALL\n{spec.CSK_QUALIFIER}"
+
+    def left_edge(anchor: tuple[float, float]) -> float:
+        box = estimate_text_box(text, anchor=anchor, height=0.0035, reference=5)
+        assert box is not None
+        return box.xmin
+
+    assert left_edge(drawing.THREAD_CALLOUT_XY) > SHEET_INNER_LEFT + 0.003
+    # Negative control: the 19e33c6c2 anchor.
+    old = (drawing.FACE_CENTER[0] - 0.050, drawing.THREAD_CALLOUT_XY[1])
+    assert left_edge(old) < SHEET_INNER_LEFT

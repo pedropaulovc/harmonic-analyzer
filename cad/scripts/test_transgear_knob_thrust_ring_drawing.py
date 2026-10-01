@@ -63,7 +63,7 @@ def test_the_bore_and_the_float_stop_carry_their_bands_on_the_model() -> None:
 def test_wall_holds_at_the_worst_case_the_sheet_prints() -> None:
     """Policy rule 12: the smallest O.D. its printed row accepts over the
     largest bore its band accepts."""
-    od_band = _config.title_block(f"linear_{spec.OD_PLACES}pl")["value_in"] * 25.4
+    od_band = _printed_tolerance.printed_band_mm(spec.OD_PLACES)
     worst = ((spec.OD - od_band) - (spec.ID + max(spec.ID_BAND))) / 2.0
     assert worst >= spec.WALL_FLOOR
     assert spec.WALL_WORST == pytest.approx(worst, abs=0.01)
@@ -85,6 +85,36 @@ def test_the_wall_gate_refuses_a_coarser_printed_row(monkeypatch) -> None:
     monkeypatch.setattr(_printed_tolerance, "printed_band_mm", lambda _places: 1.0)
     with pytest.raises(AssertionError, match="floor"):
         _ring_spec_fresh()
+
+
+def test_the_od_prints_at_the_coarsest_row_its_wall_allows() -> None:
+    """Policy rule 12: nothing fits on the O.D., so it prints at the title
+    block's .X row once the wall holds there."""
+    assert spec.worst_wall(1) >= spec.WALL_FLOOR
+    assert spec.OD_PLACES == 1
+
+
+def test_the_od_is_dimensioned_on_the_side_view_beside_the_rear_face() -> None:
+    """Policy rule 7, turned parts: the O.D. sits on the side view, so the
+    end view carries one diameter (the bore's callout) and no two diameter
+    lines cross its centre."""
+    assert set(drawing.END_KEEP) - drawing.MOVED_TO_SIDE == set(
+        drawing.DIMENSION_CALLOUTS
+    )
+    assert drawing.MOVED_TO_SIDE == {"RingOd"}
+    assert not drawing.MOVED_TO_SIDE & set(drawing.SIDE_KEEP)
+    half_od = spec.OD * drawing._S / 2000.0
+    rear_x = drawing._sheet_x(spec.LENGTH)
+    od_x, od_y = drawing.OD_ON_SIDE
+    assert abs(od_y - drawing.SIDE_CENTER[1]) < half_od
+    # The rear face's finish symbol stands between the part and the O.D.'s
+    # dimension line, inside its extension-line band.
+    (pick_x, _pick_y), (symbol_x, symbol_y) = drawing.FACE_FINISHES["rear_face"]
+    assert pick_x == pytest.approx(rear_x)
+    assert rear_x < symbol_x < od_x - 0.025
+    assert abs(symbol_y - drawing.SIDE_CENTER[1]) < half_od
+    # The length dimension stays above the part, clear of the O.D.
+    assert drawing.SIDE_KEEP["RingLength"][1] > drawing.SIDE_CENTER[1] + half_od
 
 
 def test_registry_row_is_the_turned_brass_mha_156() -> None:

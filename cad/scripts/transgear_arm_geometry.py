@@ -75,7 +75,7 @@ END_HALF_WIDTH = edge_half_width(TIP_STATION)
 # --- Pivot at P: Ø4.900 running bore + rear spot face for the head ---------
 PIVOT_BORE_DIA = 4.9  # on the Ø4.7625 (-0.0254/0) shoulder, 0.069 radial
 PIVOT_BORE_DIA_BAND = 0.13  # .XXX
-SPOT_FACE_DIA = 9.525  # 3/8 piloted counterbore; head Ø7.9375 clears it
+SPOT_FACE_DIA = 9.525  # 3/8 counterbore; head Ø7.9375 clears it
 SPOT_FACE_DIA_GROWTH = 0.10  # +0.10/0 (drilled row)
 # The floor is dimensioned from the FRONT face so the pivot end play never
 # sees the arm's stock thickness.

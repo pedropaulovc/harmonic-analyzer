@@ -132,10 +132,10 @@ def test_every_stock_plate_screw_stands_past_the_cut_on_an_eccentric_seat(
     assert proud >= joints.PLATE_SCREW_CUT_PROUD_MAX + screw.PITCH
     assert joints.PLATE_SCREW_STOCK_PROUD_MIN == pytest.approx(proud)
     # The uncut 1/2 in screw this replaced stopped inside the arm, where its
-    # own corner (lead and entry countersink lost) held only 1.28 D.
+    # own corner (lead and entry countersink lost) held under 1.5 D.
     uncut = 0.5 * 25.4 - 0.03 * 25.4 - thick_plate - shift - lift
     uncut -= screw.PITCH + entry
-    assert uncut / screw.THREAD_MAJOR == pytest.approx(1.2826, abs=5e-4)
+    assert uncut / screw.THREAD_MAJOR < joints.ENGAGEMENT_TARGET_D
     monkeypatch.setattr(screw, "STOCK_LENGTH", 0.5 * 25.4)
     with pytest.raises(AssertionError, match="too short to cut its lead off"):
         _reload_joints()
@@ -166,6 +166,7 @@ def test_plate_notch_face_clears_the_arm_edge_at_every_limit(monkeypatch) -> Non
     """The face is not a locating surface: worst air stays positive with the
     plate floated to its extremes on the two screws."""
     import transgear_arm_plate_screw_spec as screw
+    import transgear_arm_plate_spec as plate_spec
 
     c = (plate.SCREW_HOLE_DIA + plate.DRILL_GROWTH - screw.THREAD_MAJOR_MIN) / 2.0
     (x1, _), (x2, _) = sorted(plate.SCREW_HOLES)
@@ -173,7 +174,8 @@ def test_plate_notch_face_clears_the_arm_edge_at_every_limit(monkeypatch) -> Non
     for u1, u2 in itertools.product((-c, c), repeat=2):
         for xc, _yc in (plate.NOTCH_LEFT, plate.NOTCH_RIGHT):
             shift = max(shift, u1 + (u2 - u1) * (xc - x1) / (x2 - x1))
-    closing = plate.BAND_XX + plate.HOLE_POSITION_BAND + shift
+    corner_band = plate_spec.BAND_BY_PLACES[plate_spec.NOTCH_PLACES]
+    closing = corner_band + plate.HOLE_POSITION_BAND + shift
     lean = math.cos(arm.EDGE_LEAN)
     worst = (plate.NOTCH_RELIEF - closing) * lean - arm.BAND_X
     assert worst > 0.0

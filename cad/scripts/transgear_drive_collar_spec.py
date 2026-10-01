@@ -133,19 +133,18 @@ PIN_HOLE_DEPTH = LENGTH  # through the body
 # .XXX: the length (the rearward travel) and the pin-centre offsets (±0.025);
 # the fits carry their own bands; the pilot length reads .XX.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "CollarProfile": {"CollarDia"},
-    "Collar": {"CollarLength"},
-    "PilotProfile": {"PilotDia"},
-    "Pilot": {"PilotLength"},
+    "BodyProfile": {"CollarDia", "CollarLength", "PilotDia", "PilotLength"},
     "BoreProfile": {"BoreDia"},
     "SlotProfile": {"SlotWidth", "SlotDepth"},
     "PinHoleProfile": {"PinPosDia", "PinPosY", "PinNegY"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "CollarProfile": {"CollarDia": OD_PLACES},
-    "Collar": {"CollarLength": LENGTH_PLACES},
-    "PilotProfile": {"PilotDia": PILOT_DIA_PLACES},
-    "Pilot": {"PilotLength": PILOT_LENGTH_PLACES},
+    "BodyProfile": {
+        "CollarDia": OD_PLACES,
+        "CollarLength": LENGTH_PLACES,
+        "PilotDia": PILOT_DIA_PLACES,
+        "PilotLength": PILOT_LENGTH_PLACES,
+    },
     "BoreProfile": {"BoreDia": BORE_DIA_PLACES},
     "SlotProfile": {"SlotWidth": SLOT_PLACES, "SlotDepth": SLOT_PLACES},
     "PinHoleProfile": {
@@ -338,6 +337,15 @@ for _ok, _what in (
 
 BORE_CALLOUT = "REAM THROUGH"
 PIN_HOLE_CALLOUT = "2X REAM THROUGH"
+# The slot is cut symmetric about the bore axis (the model's SlotHalfWidth is
+# half the width from the axis) and runs along X, square to the ±Y pin line:
+# its centre plane carries the fleet's unlocated-feature centring term.
+SLOT_CALLOUT = (
+    f"CENTRED ON BORE AXIS \u00b1{POSITION_TOL:.3f}\n90\u00b0 TO DRIVE-PIN HOLE LINE"
+)
+# The overall, pilot front face to rear face, prints as a .X reference.
+OVERALL_LENGTH = LENGTH + PILOT_LENGTH  # 5.9
+DRAWING_REFERENCE_PRECISION = 1
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW\nSCALE 2:1"
 
 # The fit-up instruction (contract §13.2).  The paper-drive assembly prints
@@ -373,7 +381,7 @@ _TIP_STATION_MIN = TIP_STATION - printed_band_mm(TIP_STATION_PLACES)  # 23.39
 _PLAIN_CORE_MAX = PLAIN_CORE + printed_band_mm(PLAIN_CORE_PLACES)  # 7.63
 _CORE_LENGTH_MAX = CORE_LENGTH + printed_band_mm(CORE_LENGTH_PLACES)  # 5.38
 _PLATE_MAX = PLATE + max(PLATE_BAND)  # 2.8
-NUT_LENGTH_MIN = NUT_LENGTH + NUT_LENGTH_LO  # 15.59
+NUT_LENGTH_MIN = NUT_LENGTH + NUT_LENGTH_LO  # 15.3
 
 
 def thumbnut_engagement(seat_from_f: float) -> float:
@@ -391,7 +399,7 @@ def thumbnut_engagement(seat_from_f: float) -> float:
 
 
 # Each term is a min or max of lines in the seat, so the engagement is concave
-# over the travel and least at one of its ends: 21.16 - 1.27 - 7.63 = 12.26 at
+# over the travel and least at one of its ends: 20.87 - 1.27 - 7.63 = 11.97 at
 # the rearward stop, 23.39 - 1.27 - 9.90 = 12.22 at the seat maximum.
 THUMBNUT_ENGAGEMENT_WORST = min(
     thumbnut_engagement(seat) for seat in (LENGTH_MIN, LENGTH_MAX, SEAT_MAX_FROM_F)

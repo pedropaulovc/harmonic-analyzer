@@ -13,23 +13,21 @@ tangent edge; +Z through the thickness to the REAR face (z = THICKNESS).
 
 from __future__ import annotations
 
-from fractions import Fraction
-
 from transgear_arm_geometry import (
     BAND_X,
     BAND_XX,
     BAND_XXX,
     HOLE_POSITION_BAND,
-    MM_PER_IN,
     PIN_HOLE_DEPTH_BAND,
     PIVOT_BORE_DIA_BAND,
+    PIVOT_END_R,
     PLATE_TAP_CSK_DIA,
-    SPOT_FACE_DIA,
     SPOT_FACE_DIA_GROWTH,
     SPOT_FACE_FLOOR_BAND,
     STOCK_THICKNESS_IN,
     STUD_TAP_CSK_DIA,
     TAP_CSK_ANGLE_DEG,
+    TIP_STATION,
     TIP_STATION_BAND,
 )
 
@@ -72,7 +70,7 @@ for _label, _places, _band in (
         )
 
 # Explicit model bands, (upper, lower) deviations where one-sided.
-# The piloted counterbore only cuts oversize (drilled-hole row).
+# The counterbore only cuts oversize (drilled-hole row).
 SPOT_FACE_DIA_BAND = (SPOT_FACE_DIA_GROWTH, 0.0)
 # Floor from the FRONT face: the pivot head's end play (contract §13).
 SPOT_FACE_FLOOR_TOLERANCE = SPOT_FACE_FLOOR_BAND
@@ -88,10 +86,28 @@ STOCK_TEXT_SUFFIX = ") GROUND STOCK"
 _CSK = f"{TAP_CSK_ANGLE_DEG:.0f}\u00b0 CSK \u00d8"
 STUD_TAP_CSK_CALLOUT = f"{_CSK}{STUD_TAP_CSK_DIA:.1f} MAX BOTH SIDES"
 PLATE_TAP_CSK_CALLOUT = f"{_CSK}{PLATE_TAP_CSK_DIA:.1f} MAX BOTH SIDES"
-_SPOT_FACE_INCH = Fraction(SPOT_FACE_DIA / MM_PER_IN).limit_denominator(64)
-SPOT_FACE_CALLOUT = f"{_SPOT_FACE_INCH} PILOTED COUNTERBORE, REAR FACE"
-FLOOR_DEPTH_CALLOUT = "FLOOR FROM FRONT FACE"
-PIVOT_BORE_CALLOUT = "THRU"
+SPOT_FACE_CALLOUT = "COUNTERBORE, REAR FACE"
+# Two short lines: the text stands under the section's pivot end, inside the
+# left border.
+FLOOR_DEPTH_CALLOUT = "FLOOR FROM\nFRONT FACE"
+# The bore runs on the MHA-168 shoulder: a fit bore, so it is reamed.
+PIVOT_BORE_CALLOUT = "REAM THRU"
+
+
+def engagement_line(worst_mm: float, worst_d: float) -> str:
+    """The installed full-thread engagement a tap callout states: the
+    worst-case length and its multiple of the major diameter, each floored
+    (a MIN never rounds up)."""
+    mm = int(worst_mm * 100.0 + 1e-9) / 100.0
+    d = int(worst_d * 10.0 + 1e-9) / 10.0
+    return f"ENGAGEMENT {mm:.2f} MIN ({d:.1f}D)"
+
+
+# The true overall, pivot-end extreme to the square end, prints as a
+# reference; a derived reference has no part-side places, so the spec owns
+# its digit.
+OVERALL_LENGTH = PIVOT_END_R + TIP_STATION
+DRAWING_REFERENCE_PRECISION = 1
 # The pin goes in to the hole's flat floor, which sets its proud length.
 PIN_HOLE_CALLOUT = "\n".join(
     ("BLIND FLAT-BOTTOM REAM", "PRESS FIT LATCH PIN MHA-169", "TO HOLE FLOOR")

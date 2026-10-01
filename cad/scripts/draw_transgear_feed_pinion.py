@@ -73,8 +73,8 @@ PNG = OUTPUTS.png
 SHEET_SCALE = (3.0, 1.0)
 VIEW_SCALE = (3, 1)
 FRONT_CENTER = (0.100, 0.150)
-RIGHT_CENTER = (0.235, 0.150)
-ISO_CENTER = (0.365, 0.150)
+RIGHT_CENTER = (0.245, 0.150)
+ISO_CENTER = (0.370, 0.150)
 SHEET_INNER_BORDER = (0.0127, 0.0127, 0.4191, 0.2667)
 
 # Half the printed tooth-tip circle in sheet metres: the section's half-height,
@@ -92,28 +92,34 @@ def _side_x(z_mm: float) -> float:
 
 
 # The end view is pictorial and carries its center mark, the bore fit note and
-# the bore finish.  On the section, the diameters stand above the view over
-# their own axial spans (tip and root over the teeth, spigot and shank over
-# theirs, the bore left of the rear face); the three lengths stay
-# baseline-stacked below it from the rear face, shortest innermost.
+# the bore finish.  On the section, the tip, root and shank diameters print
+# inline on the axis, between their own extension lines and off the part (the
+# crank hub's and the disc hub's layout): the tip and root left of the rear
+# face, where their witnesses start, the larger farther out so neither
+# extension line crosses the other's dimension line; the shank right of the
+# nose.  The spigot keeps its shelf above its own span, and the bore its shelf
+# above-left of the rear face, which holds its two-row band and process
+# callout clear of its own extension lines.  Run 20261001T110844152Z put the
+# tip, spigot and shank on one shelf, where their bands printed over each
+# other (machinist review blocker).  The three lengths stay baseline-stacked
+# below from the rear face, shortest innermost.
 FRONT_KEEP: dict[str, tuple[float, float]] = {}
 _SIDE_TOP = RIGHT_CENTER[1] + HALF_OD
 _SIDE_BOTTOM = RIGHT_CENTER[1] - HALF_OD
+_REAR_X = _side_x(0.0)
+_NOSE_X = _side_x(OVERALL_LENGTH)
 RIGHT_KEEP: dict[str, tuple[float, float]] = {
-    "OutsideDia": ((_side_x(0.0) + _side_x(FACE_WIDTH)) / 2.0, _SIDE_TOP + 0.012),
-    "RootDia": ((_side_x(0.0) + _side_x(FACE_WIDTH)) / 2.0, _SIDE_TOP + 0.026),
-    "BoreDia": (_side_x(0.0) - 0.010, _SIDE_TOP + 0.040),
+    "RootDia": (_REAR_X - 0.030, RIGHT_CENTER[1]),
+    "OutsideDia": (_REAR_X - 0.066, RIGHT_CENTER[1]),
+    "ShankDia": (_NOSE_X + 0.022, RIGHT_CENTER[1]),
+    "BoreDia": (_REAR_X - 0.010, _SIDE_TOP + 0.040),
     "SpigotDia": (
         (_side_x(FACE_WIDTH) + _side_x(SPIGOT_FRONT_STATION)) / 2.0,
         _SIDE_TOP + 0.012,
     ),
-    "ShankDia": (
-        (_side_x(SPIGOT_FRONT_STATION) + _side_x(OVERALL_LENGTH)) / 2.0,
-        _SIDE_TOP + 0.012,
-    ),
-    "FaceWidth": ((_side_x(0.0) + _side_x(FACE_WIDTH)) / 2.0, _SIDE_BOTTOM - 0.012),
+    "FaceWidth": ((_REAR_X + _side_x(FACE_WIDTH)) / 2.0, _SIDE_BOTTOM - 0.012),
     "SpigotFront": (
-        (_side_x(0.0) + _side_x(SPIGOT_FRONT_STATION)) / 2.0,
+        (_REAR_X + _side_x(SPIGOT_FRONT_STATION)) / 2.0,
         _SIDE_BOTTOM - 0.024,
     ),
     "OverallLength": (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.036),
@@ -125,11 +131,14 @@ DIMENSION_CALLOUTS = {
 
 # The oil hole lies in the section plane (+Y), so the cut shows it as a gap in
 # the upper shank wall; the note's leader lands mid-wall on its front edge.
+# The note stands far enough right that its leader passes right of the
+# spigot's shelf text whichever side of its dimension line that prints, and
+# left of where the shank's extension lines start.
 OIL_HOLE_EDGE = (
     _side_x(OIL_HOLE_Z + OIL_HOLE_DIA / 2.0),
     RIGHT_CENTER[1] + (BORE_DIA + SHANK_DIA) / 4.0 * VIEW_SCALE[0] / 1000.0,
 )
-OIL_HOLE_CALLOUT = (_side_x(OVERALL_LENGTH) + 0.010, _SIDE_TOP + 0.050)
+OIL_HOLE_CALLOUT = (_NOSE_X + 0.030, _SIDE_TOP + 0.050)
 NOTE_HEIGHT = 0.0025
 
 _BORE_SHEET_RADIUS = BORE_DIA * VIEW_SCALE[0] / 2000.0
@@ -142,12 +151,15 @@ BORE_FIT_ATTACH = (
 SECTION_CAPTION = (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.050)
 # The finish stands lower LEFT of the end view: the section line's arrows and
 # their "A" labels point right, toward the section, and a lower-right leader
-# ran through the lower label (run 20261001T035353825Z layout audit).
+# ran through the lower label (run 20261001T035353825Z layout audit).  It
+# stands farther out and nearer level with the bore, so its leader climbs
+# shallowly and passes right of the symbol's own "Ra" text rather than through
+# it (run 20261001T110844152Z layout audit).
 FINISH_ATTACH = (
     FRONT_CENTER[0] + _BORE_SHEET_RADIUS * math.cos(math.radians(-135.0)),
     FRONT_CENTER[1] + _BORE_SHEET_RADIUS * math.sin(math.radians(-135.0)),
 )
-FINISH_SYMBOL = (FRONT_CENTER[0] - HALF_OD - 0.010, FRONT_CENTER[1] - 0.030)
+FINISH_SYMBOL = (FRONT_CENTER[0] - HALF_OD - 0.022, FRONT_CENTER[1] - 0.012)
 
 
 @_telemetry.traced("drawing.planar_centerline", label_param="label")

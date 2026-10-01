@@ -42,6 +42,7 @@ from _common import (
     check,
     define_circle,
     define_rectilinear_chain,
+    dimension_between,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
@@ -56,6 +57,7 @@ from _common import (
     volume_check,
 )
 from _drawing_marks import (
+    add_diametric_linear_dimension,
     apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -153,6 +155,7 @@ async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
         CreatePlaneParameters,
         ExtrusionParameters,
+        RevolveParameters,
     )
 
     check("create_part", await adapter.create_part())
@@ -180,31 +183,75 @@ async def build(adapter) -> dict[str, str]:
 
     drive_jobs: list[tuple[str, str]] = []
 
-    # --- Body: Ø17.5 rearward from the seat face (Front Plane, +Z) ------------
-    drive_jobs += await _front_circle(adapter, OD_R, "CollarDia", "collar")
-    check(
-        "extrude collar",
-        await adapter.create_extrusion(ExtrusionParameters(depth=LENGTH)),
+    # --- Body and pilot: one stepped profile revolved about the axis -----------
+    # Right sketch (u, v) maps to model (-Z, Y), the plane the *Right side view
+    # looks at, so the turned diameters and both lengths print there (policy
+    # rule 7).  The seat face is u = 0; the body runs to the rear face at
+    # u = -LENGTH, the pilot to its front face at u = +PILOT_LENGTH.  Both
+    # lengths run from the seat face, the datum the T24 seats on.  A profile
+    # turned the wrong way fails the volume gate and the planes' rebuild.
+    body = SketchDims()
+    check("create_sketch body profile", await adapter.create_sketch("Right"))
+    set_sketch_direct_db(adapter, True)
+    axis = check(
+        "body axis centerline",
+        await adapter.add_centerline(-LENGTH, 0.0, PILOT_LENGTH, 0.0),
     )
-    name_last_feature(adapter, "Collar")
-    length_dim = name_dimensions(adapter, "Collar", ["CollarLength"])
-    drive_jobs.append((length_dim[0], '"CollarLength"'))
-    volume = await volume_check(adapter, "collar body", V_COLLAR, 0.005 * V_COLLAR)
-
-    # --- Pilot: Ø10.00 forward of the seat face (-Z) --------------------------
-    # A pilot extruded the wrong way lands inside the body and adds nothing;
-    # the volume gate fails loud on it.
-    drive_jobs += await _front_circle(adapter, PILOT_R, "PilotDia", "pilot")
+    points = [
+        (-LENGTH, 0.0),
+        (-LENGTH, OD_R),
+        (0.0, OD_R),
+        (0.0, PILOT_R),
+        (PILOT_LENGTH, PILOT_R),
+        (PILOT_LENGTH, 0.0),
+    ]
+    lines = await add_line_chain(adapter, points)
+    set_sketch_direct_db(adapter, False)
+    for index, line in enumerate(lines):
+        (_, v0), (_, v1) = points[index], points[(index + 1) % len(lines)]
+        relation = "horizontal" if v0 == v1 else "vertical"
+        check(
+            f"body profile {relation} {line}",
+            await adapter.add_sketch_constraint(line, None, relation),
+        )
+    rear_face, collar, seat_face, pilot, pilot_front, axis_edge = lines
     check(
-        "extrude pilot",
-        await adapter.create_extrusion(
-            ExtrusionParameters(depth=PILOT_LENGTH, reverse_direction=True)
+        "body axis on the origin",
+        await adapter.add_sketch_constraint(
+            f"{axis_edge}.end", "origin", "horizontal_points"
         ),
     )
-    name_last_feature(adapter, "Pilot")
-    pilot_dim = name_dimensions(adapter, "Pilot", ["PilotLength"])
-    drive_jobs.append((pilot_dim[0], '"PilotLength"'))
-    volume = await volume_check(adapter, "pilot", volume + V_PILOT, 0.01 * V_PILOT)
+    check(
+        "seat face on the origin",
+        await adapter.add_sketch_constraint(
+            f"{seat_face}.start", "origin", "vertical_points"
+        ),
+    )
+    for name, line, u_mid, radius in (
+        ("CollarDia", collar, -LENGTH / 2.0, OD_R),
+        ("PilotDia", pilot, PILOT_LENGTH / 2.0, PILOT_R),
+    ):
+        await add_diametric_linear_dimension(
+            adapter, axis, line, (u_mid, radius + 4.0), name
+        )
+        body.record(name, f'"{name}"')
+    for name, start, end, value in (
+        ("CollarLength", f"{seat_face}.start", f"{rear_face}.end", LENGTH),
+        ("PilotLength", f"{seat_face}.end", f"{pilot_front}.start", PILOT_LENGTH),
+    ):
+        await dimension_between(
+            adapter, start, end, "horizontal_distance", value, f"body {name}"
+        )
+        body.record(name, f'"{name}"')
+    await ensure_fully_defined(adapter, "body profile sketch")
+    check("exit_sketch body profile", await adapter.exit_sketch())
+    name_last_feature(adapter, "BodyProfile")
+    drive_jobs += body.apply(adapter, "BodyProfile")
+    check("revolve body", await adapter.create_revolve(RevolveParameters(angle=360.0)))
+    name_last_feature(adapter, "Body")
+    volume = await volume_check(
+        adapter, "collar body and pilot", V_COLLAR + V_PILOT, 0.005 * V_COLLAR
+    )
 
     # --- Reamed bore through pilot and body ------------------------------------
     drive_jobs += await _front_circle(adapter, BORE_R, "BoreDia", "bore")
@@ -350,10 +397,10 @@ async def build(adapter) -> dict[str, str]:
     # reamed bore, the slot and the drive-pin press carry their own; the
     # length and the pilot length print at the title block's rows.
     set_dimension_bilateral_tolerance(
-        adapter, "CollarProfile", "CollarDia", *deviations(OD_BAND)
+        adapter, "BodyProfile", "CollarDia", *deviations(OD_BAND)
     )
     set_dimension_bilateral_tolerance(
-        adapter, "PilotProfile", "PilotDia", *deviations(PILOT_DIA_BAND)
+        adapter, "BodyProfile", "PilotDia", *deviations(PILOT_DIA_BAND)
     )
     set_dimension_bilateral_tolerance(
         adapter, "BoreProfile", "BoreDia", *deviations(BORE_DIA_BAND)

@@ -35,6 +35,7 @@ from _drawing_common import (
     new_project_drawing,
     read_required_properties,
     rebuild_drawing,
+    set_dimension_callouts,
     set_hidden_lines_removed,
     stamp_drawing_summary,
     view_name,
@@ -49,6 +50,7 @@ from solidworks_mcp.adapters.solidworks.drawing import (
     place_view,
 )
 from transgear_pivot_spacer_spec import (
+    BORE_CALLOUT,
     BORE_DIA,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
@@ -89,13 +91,15 @@ _PROFILE_REAR_X = PROFILE_CENTER[0] - LENGTH * _S / 2.0  # z LENGTH, left end
 _PROFILE_TOP = PROFILE_CENTER[1] + OD * _S / 2.0
 _PROFILE_BOTTOM = PROFILE_CENTER[1] - OD * _S / 2.0
 
-# The bore stays on the end view (the profile is hidden-lines-removed, and a
-# dimension never lands on a hidden line); the O.D. arrives there too and is
-# moved onto the profile below.
+# The bore stays on the end view, where it is a circle: a reamed through
+# hole, fully defined by its callout (rule 7), it needs no section, and the
+# profile is hidden-lines-removed (a dimension never lands on a hidden line).
+# The O.D. arrives there too and is moved onto the profile below.
 END_KEEP = {
     "BoreDia": (0.045, 0.205),
     "RingOd": (0.045, 0.120),  # donor: moved onto the profile
 }
+DIMENSION_CALLOUTS = {"BoreDia": BORE_CALLOUT}
 # The length under the profile; the O.D. right of the part, its dimension line
 # far enough out that the front face's finish symbol sits between them.
 PROFILE_KEEP = {
@@ -282,6 +286,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # and the length's band are authored on the part; the sheet only proves
     # the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    set_dimension_callouts(adapter, end_annotations, DIMENSION_CALLOUTS)
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add center marks to the spacer end view")
     # The turning axis, picked on the O.D. face above it.

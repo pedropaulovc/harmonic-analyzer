@@ -199,27 +199,24 @@ SPIGOT_WALL = (SPIGOT_DIA - BORE_DIA) / 2.0
 SPIGOT_WALL_WORST = (SPIGOT_DIA + SPIGOT_DIA_BAND[1] - _BORE_MAX) / 2.0
 
 # --- oil hole (R9-8) -----------------------------------------------------------
-# Ø1.2 drilled (+0.10/0) on +Y, 3.5 (.X) behind the hub front face, through hub
-# and shank wall in one operation after pressing.  The hub sheet owns its size
-# and station; this sheet carries the match-drill note (the crank pinion's
-# pin-hole wording, crank_pinion_spec.pin_hole_note).  Sleeve-local
-# z = 21.9 − 3.5 = 18.4.
+# Ø1.2 drilled (+0.10/0) on +Y, centred on the hub body (R9-60: 3.5 nominal
+# behind the hub front face), through hub and shank wall in one operation
+# after pressing.  The hub sheet owns its size and location; this sheet carries
+# the match-drill note (the crank pinion's pin-hole wording,
+# crank_pinion_spec.pin_hole_note).  Sleeve-local z = 21.9 − 3.5 = 18.4.
 OIL_HOLE_DIA = transgear_disc_hub_spec.OIL_HOLE_DIA
 OIL_HOLE_Z = HUB_FRONT_STATION - transgear_disc_hub_spec.OIL_HOLE_STATION
 OIL_HOLE_AZIMUTH_DEG = 90.0  # local +Y
-_OIL_STATION_BAND = _BAND[transgear_disc_hub_spec.OIL_HOLE_STATION_PLACES]
+# (least, greatest) station behind the hub front face: half the hub body the
+# hub's printed lengths leave, plus the centring at fit-up (3.12..3.88).
+_OIL_STATION_RANGE = transgear_disc_hub_spec.OIL_HOLE_STATION_RANGE
 _OIL_HOLE_MAX_R = (OIL_HOLE_DIA + _DRILL_OVERSIZE) / 2.0
 # Ligament from the hole to the sleeve nose: 22.6 − 18.4 − 0.6 = 3.6 nominal;
-# worst 0.34 (nose) + (3.5 − 0.8) − 0.65 = 2.39.
+# worst 0.34 (nose) + 3.12 − 0.65 = 2.81.
 OIL_HOLE_TO_NOSE = OVERALL_LENGTH - OIL_HOLE_Z - OIL_HOLE_DIA / 2.0
-OIL_HOLE_TO_NOSE_WORST = (
-    NOSE_PROUD_WORST
-    + transgear_disc_hub_spec.OIL_HOLE_STATION
-    - _OIL_STATION_BAND
-    - _OIL_HOLE_MAX_R
-)
+OIL_HOLE_TO_NOSE_WORST = NOSE_PROUD_WORST + _OIL_STATION_RANGE[0] - _OIL_HOLE_MAX_R
 # The hole stays on the shank, clear of the spigot step: its rear edge lies at
-# least (9.45 + 2.87 + 9.27) − (3.5 + 0.8) − 0.65 = 16.64 from the rear face.
+# least (9.45 + 2.87 + 9.27) − 3.88 − 0.65 = 17.06 from the rear face.
 OIL_HOLE_REAR_EDGE_WORST = (
     GEAR_FACE_STATION
     - STATION_TOL
@@ -227,7 +224,7 @@ OIL_HOLE_REAR_EDGE_WORST = (
     - _DISC_BAND
     + HUB_LENGTH
     - _HUB_BAND
-    - (transgear_disc_hub_spec.OIL_HOLE_STATION + _OIL_STATION_BAND)
+    - _OIL_STATION_RANGE[1]
     - _OIL_HOLE_MAX_R
 )
 if OIL_HOLE_REAR_EDGE_WORST <= SPIGOT_FRONT_STATION + STATION_TOL:

@@ -5,6 +5,7 @@ from __future__ import annotations
 import ast
 import itertools
 import math
+import re
 from fractions import Fraction
 from pathlib import Path
 
@@ -22,6 +23,8 @@ import transgear_arm_spec as spec
 import transgear_hanger_joints as joints
 import transgear_latch_pin_spec as pin
 import transgear_pivot_screw_spec as pivot_screw
+import transgear_stud_fit as stud_fit
+from _drawing_common import DRAWING_TEMPLATES
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 
@@ -215,6 +218,109 @@ def test_the_countersink_lines_ride_the_tap_thread_compartment() -> None:
     assert {part: updated[part] for part in (5, 7, 8)} == {5: "", 7: "", 8: ""}
     with pytest.raises(RuntimeError):
         drawing.tap_callout_definitions({5: "", 6: "", 7: "", 8: ""}, "X")
+
+
+_ENGAGEMENT_LINE = re.compile(r"ENGAGEMENT (\d+\.\d{2}) MIN \((\d\.\d)D\)")
+
+
+def test_each_tap_callout_states_its_worst_case_full_thread_engagement() -> None:
+    """Review of 19e33c6c2 (blocker): the sheet gave no engagement, so a blind
+    reviewer charged 1.5 incomplete pitches at each end of the 5/16 stock.
+    Each callout states the build's worst case, floored, at 1.5D or more."""
+    worst = {
+        "stud tap": (stud_fit.REAR_ENGAGEMENT_WORST, stud_fit.STUB.REAR_THREAD_MAJOR),
+        "plate taps": (
+            joints.PLATE_SCREW_ENGAGEMENT_WORST,
+            joints.PLATE_SCREW.THREAD_MAJOR,
+        ),
+    }
+    assert {row[0] for row in drawing.TAP_CALLOUTS} == set(worst)
+    for label, *_, qualifier in drawing.TAP_CALLOUTS:
+        match = _ENGAGEMENT_LINE.fullmatch(qualifier.splitlines()[-1])
+        assert match, label
+        printed_mm, printed_d = float(match[1]), float(match[2])
+        worst_mm, major = worst[label]
+        assert worst_mm - 0.01 < printed_mm <= worst_mm, label
+        assert joints.ENGAGEMENT_TARGET_D <= printed_d <= worst_mm / major, label
+    # A MIN never rounds up.
+    assert spec.engagement_line(7.749, 1.59) == "ENGAGEMENT 7.74 MIN (1.5D)"
+
+
+def test_the_pivot_bore_is_reamed_as_the_shoulder_running_fit() -> None:
+    """Review of 19e33c6c2: the Ø4.900 named no operation.  At the smallest
+    bore its band accepts, the MHA-168 shoulder keeps less radial air than a
+    drill's oversize, so the bore is a fit bore and the callout names REAM."""
+    drilled_growth = _config.title_block("drilled_hole")["plus_mm"]
+    assert 0.0 < joints.SHOULDER_RADIAL_CLEARANCE < drilled_growth / 2.0
+    assert spec.PIVOT_BORE_CALLOUT.split()[0] == "REAM"
+
+
+# Default-format text, measured on r743-rocker-fix3's render (as
+# test_transgear_drive_collar_drawing uses them); the landscape border.
+_CHAR_WIDTH = 0.00276
+_LINE_PITCH = 0.0045
+_BORDER = 0.0127
+
+
+def _centred_box(lines: list[str], xy: tuple[float, float]) -> tuple[float, ...]:
+    half_width = max(map(len, lines)) * _CHAR_WIDTH / 2.0
+    half_height = len(lines) * _LINE_PITCH / 2.0
+    return (
+        xy[0] - half_width,
+        xy[1] - half_height,
+        xy[0] + half_width,
+        xy[1] + half_height,
+    )
+
+
+def test_the_section_texts_stand_inside_the_left_border_and_off_the_section() -> None:
+    """Review of 19e33c6c2: the counterbore text crossed the left border and
+    the floor-depth text ran off the sheet over the section's pivot end."""
+    floor = _centred_box(
+        ["7.00 \u00b10.05", *spec.FLOOR_DEPTH_CALLOUT.splitlines()],
+        drawing.SECTION_KEEP["FloorDepth"],
+    )
+    section_bottom = (
+        drawing.SECTION_CENTER[1] - geometry.THICKNESS * drawing._S / 2000.0
+    )
+    assert floor[0] > _BORDER + 0.003
+    assert floor[3] < section_bottom - 0.002
+    counterbore = _centred_box(
+        ["\u00d89.525 +0.1", *spec.SPOT_FACE_CALLOUT.splitlines()],
+        drawing.SECTION_KEEP["SpotFaceDia"],
+    )
+    assert counterbore[0] > _BORDER + 0.003
+
+
+def test_the_tap_callouts_stand_inside_the_upper_border() -> None:
+    """Review of 19e33c6c2: both tap callouts touched the upper border."""
+    sheet_top = DRAWING_TEMPLATES[drawing.SPEC.layout].height_m - _BORDER
+    for label, _station, _radius, xy, qualifier in drawing.TAP_CALLOUTS:
+        # Drill and thread lines, then the qualifier's.
+        lines = ["\u00d83.45 THRU ALL", "8-32 UNC THRU ALL", *qualifier.splitlines()]
+        assert _centred_box(lines, xy)[3] + 0.001 < sheet_top - 0.003, label
+
+
+def test_the_overall_reference_spans_the_pivot_round_to_the_square_end() -> None:
+    """Review of 19e33c6c2: the 128.90 from the bore axis read as the overall
+    length.  The reference runs from the pivot round's far extreme to the
+    square end, under the station stack and over the section's callouts."""
+    assert spec.OVERALL_LENGTH == pytest.approx(
+        geometry.PIVOT_END_R + geometry.TIP_STATION
+    )
+    arc_pick, end_pick = drawing.OVERALL_PICKS
+    pivot = (drawing._front_x(0.0), drawing._front_y(0.0))
+    assert math.dist(arc_pick, pivot) == pytest.approx(
+        geometry.PIVOT_END_R * drawing._S / 1000.0
+    )
+    assert arc_pick[0] < pivot[0]
+    assert end_pick[0] == pytest.approx(drawing._front_x(geometry.TIP_STATION))
+    end_half = geometry.TIP_END_R * drawing._S / 1000.0
+    assert abs(end_pick[1] - drawing.FRONT_CENTER[1]) < end_half
+    lowest_station = min(xy[1] for xy in drawing.FRONT_KEEP.values())
+    assert drawing.OVERALL_TEXT_XY[1] <= lowest_station - drawing.STATION_PITCH + 1e-9
+    counterbore_top = drawing.SECTION_KEEP["SpotFaceDia"][1] + 0.006
+    assert drawing.OVERALL_TEXT_XY[1] - _LINE_PITCH > counterbore_top
 
 
 def test_registry_row_is_the_made_steel_mha_164() -> None:

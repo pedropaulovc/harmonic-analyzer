@@ -168,7 +168,7 @@ def test_thumbnut_engages_one_and_a_half_diameters_over_the_travel(
     the forward end is the shortest tip (or the deepest cut below the shortest
     nut's rim) less a pitch, inside the rim's countersink; the rear end the
     nut's seat countersink on the thickest plate, or the shortest stud's
-    full-thread end.  Least 12.22 (1.92 D) at the seat maximum."""
+    full-thread end.  Least 11.97 (1.89 D) on the shortest .X nut."""
     tip_min = _limits(shaft.TIP_STATION, shaft.TIP_STATION_PLACES)[0]
     thread_end_max = _limits(shaft.PLAIN_CORE, _stud_places("PlainCore"))[1]
     nut_min = _limits(nut.OVERALL_LENGTH, nut.OVERALL_LENGTH_PLACES)[0]
@@ -191,7 +191,7 @@ def test_thumbnut_engages_one_and_a_half_diameters_over_the_travel(
         for i in range(101)
     ]
     worst = min(engagement(seat) for seat in [*settings, rear_stops[1]])
-    assert worst == pytest.approx(12.22)
+    assert worst == pytest.approx(11.97)
     assert worst >= ENGAGEMENT_FLOOR
     assert collar.THUMBNUT_ENGAGEMENT_WORST == pytest.approx(worst)
     # Negative control: a stud tip 4 shorter leaves 8.22, under 1.5 D.

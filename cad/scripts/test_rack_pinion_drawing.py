@@ -164,10 +164,85 @@ def test_gear_data_block_specifies_the_tooth_system() -> None:
     assert "X.XX" not in data
 
 
-def test_manufacturing_notes_present() -> None:
-    assert "CUT TEETH PER GEAR DATA" in spec.DRAWING_NOTES
-    assert "DEBUR" not in spec.DRAWING_NOTES
-    assert "X.XX" not in spec.DRAWING_NOTES
+def test_manufacturing_notes_fit_the_limits_and_state_the_screw_engagement() -> None:
+    notes = part.MANUFACTURING_NOTES.splitlines()
+    assert len(notes) <= 4
+    assert all(len(line) <= 70 for line in notes)
+    # 19e33c6c2's blind review subtracted a blind tap's incomplete lead from
+    # the through tap; the sheet states the worst engagement, which the
+    # printed MIN never rounds up past and which meets the 1.5D floor.
+    printed = part.ENGAGEMENT_WORST_D_PRINTED
+    assert f"ENGAGEMENT {printed:.2f}D MIN" in part.MANUFACTURING_NOTES
+    assert spec.ENGAGEMENT_FLOOR_D <= printed <= disc_screw.ENGAGEMENT_WORST_D
+
+
+def _segments_cross(
+    a: tuple[float, float],
+    b: tuple[float, float],
+    c: tuple[float, float],
+    d: tuple[float, float],
+) -> bool:
+    def side(p, q, r) -> float:
+        return (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0])
+
+    return side(a, b, c) * side(a, b, d) < 0 and side(c, d, a) * side(c, d, b) < 0
+
+
+def _distance_to_segment(
+    point: tuple[float, float], a: tuple[float, float], b: tuple[float, float]
+) -> float:
+    ab = (b[0] - a[0], b[1] - a[1])
+    t = ((point[0] - a[0]) * ab[0] + (point[1] - a[1]) * ab[1]) / (
+        ab[0] ** 2 + ab[1] ** 2
+    )
+    t = min(1.0, max(0.0, t))
+    return math.dist(point, (a[0] + t * ab[0], a[1] + t * ab[1]))
+
+
+def test_tap_leader_lands_on_the_lower_left_tap_and_crosses_no_bore_leader() -> None:
+    """19e33c6c2: the tap leader rose across the bore to the upper tap."""
+    centre = drawing.FRONT_CENTER
+    bolt_r = hub_geometry.BOLT_CIRCLE_DIA / 2000.0
+    tap = drawing.TAP_SHEET_CENTER
+    assert math.dist(tap, centre) == pytest.approx(bolt_r)
+    assert tap[0] < centre[0] and tap[1] < centre[1]
+    # The pick lies on the drill circle, off both centre-mark lines.
+    pick = drawing.TAP_PICK
+    assert math.dist(pick, tap) == pytest.approx(spec.TAP_DRILL_DIA / 2000.0)
+    assert min(abs(pick[0] - tap[0]), abs(pick[1] - tap[1])) > 0.0003
+    leader = (drawing.TAP_CALLOUT_XY, pick)
+    bore_r = spec.BORE_DIA / 2000.0
+    assert _distance_to_segment(centre, *leader) > bore_r + 0.002
+    # The bore's diameter line runs through the centre to the far rim.
+    dim_xy = drawing.FRONT_KEEP["BoreDia"]
+    far = (
+        centre[0] + (centre[0] - dim_xy[0]) * bore_r / math.dist(dim_xy, centre),
+        centre[1] + (centre[1] - dim_xy[1]) * bore_r / math.dist(dim_xy, centre),
+    )
+    finish_attach = (centre[0] + bore_r, centre[1])
+    for other in (
+        (dim_xy, far),
+        (drawing.BORE_FIT_NOTE, drawing.BORE_FIT_ATTACH),
+        (drawing.BORE_FINISH_POSITION, finish_attach),
+    ):
+        assert not _segments_cross(*leader, *other)
+    # The finish leader passes under the 0° tap, not through it.
+    right_tap = (centre[0] + bolt_r, centre[1])
+    finish_leader = (drawing.BORE_FINISH_POSITION, finish_attach)
+    clearance = _distance_to_segment(right_tap, *finish_leader)
+    assert clearance > spec.TAP_DRILL_DIA / 2000.0 + 0.001
+
+
+def test_bore_finish_symbol_stands_clear_of_the_edge_view_thickness() -> None:
+    """19e33c6c2 printed Ra 1.6 into the 3.000."""
+    x, y = drawing.BORE_FINISH_POSITION
+    # The symbol and its "Ra 1.6" run about 45 mm right of and 16 mm above
+    # the insertion point (the farm run's print).
+    symbol_right, symbol_top = x + 0.045, y + 0.016
+    thickness_x, thickness_y = drawing.RIGHT_KEEP["FaceWidth"]
+    # The 3.000 text and its extension lines start at the disc's front face.
+    assert symbol_right < min(drawing.FRONT_FACE_X, thickness_x - 0.006) - 0.010
+    assert symbol_top < drawing.FRONT_CENTER[1] - drawing.HALF_OD
 
 
 def test_mesh_geometry_is_unchanged() -> None:

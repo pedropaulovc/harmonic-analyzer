@@ -3,10 +3,10 @@ r"""Create the manufacturing drawing for the transgear knob thrust ring (MHA-156
 The edge view is the ``*Right`` orientation rotated a quarter turn in the
 sheet so the ring's axis lies horizontal, as it sits in the lathe: the front
 face (on the 12T) on the left, the rear face (on the plate hub) on the
-right, each with its running finish, and the length between them under its
-explicit band.  The face view is the ``*Bottom`` orientation -- exactly the
-third-angle LEFT view of that rotated profile -- so it sits on the profile's
-axis to its left and carries both diameters.
+right, each with its running finish, the length between them under its
+explicit band and the O.D. beside it.  The face view is the ``*Bottom``
+orientation -- exactly the third-angle LEFT view of that rotated profile --
+so it sits on the profile's axis to its left and carries the bore's callout.
 """
 
 from __future__ import annotations
@@ -21,14 +21,17 @@ from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_surface_finish,
+    add_view_centerline,
     assert_imported_precision,
     curate_view_dimensions,
+    dimension_name,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
     set_hidden_lines_removed,
     stamp_drawing_summary,
+    view_name,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
@@ -41,6 +44,7 @@ from transgear_knob_thrust_ring_spec import (
     OD,
     SURFACE_FINISHES,
 )
+from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -73,10 +77,15 @@ ISO_CENTER = (0.300, SIDE_CENTER[1])
 
 DIMENSION_CALLOUTS = {"BoreDia": BORE_CALLOUT}
 
+# The bore's callout stays on the end view (a drilled hole is defined by its
+# callout, and the side view is hidden-lines-removed); the O.D. arrives there
+# too and is moved onto the side view, so no two diameter lines cross the
+# end view's centre.
 END_KEEP = {
-    "RingOd": (0.040, 0.225),
+    "RingOd": (0.040, 0.120),  # donor: moved onto the side view
     "BoreDia": (0.130, 0.225),
 }
+MOVED_TO_SIDE = frozenset({"RingOd"})
 SIDE_KEEP = {
     "RingLength": (0.180, 0.215),
 }
@@ -87,15 +96,69 @@ def _sheet_x(model_y_mm: float) -> float:
     return SIDE_CENTER[0] + (model_y_mm - LENGTH / 2.0) * _S / 1000.0
 
 
-# Each face's pick lies on its O.D. edge line, between the bore and the O.D.
+# The O.D. right of the rear face, its dimension line far enough out that the
+# rear face's finish symbol sits between the part and it.
+OD_ON_SIDE = (_sheet_x(LENGTH) + 0.045, SIDE_CENTER[1])
+
+# Each face's pick lies on its edge line, between the bore and the O.D.
 # radii, below the axis and clear of the length dimension above.  The front
-# face's symbol stands above the pick and outboard, its leader running down
-# to it; the rear face's stands below and outboard.
+# face's symbol stands left of the part, its leader running down to it; the
+# rear face's stands right of the part inside the O.D.'s extension-line band,
+# below the axis, short of the O.D. dimension line.
 _FACE_PICK_Y = SIDE_CENTER[1] - (ID + OD) / 4.0 * _S / 1000.0
 FACE_FINISHES = {
     "front_face": ((_sheet_x(0.0), _FACE_PICK_Y), (_sheet_x(0.0) - 0.025, 0.155)),
-    "rear_face": ((_sheet_x(LENGTH), _FACE_PICK_Y), (_sheet_x(LENGTH) + 0.025, 0.120)),
+    "rear_face": (
+        (_sheet_x(LENGTH), _FACE_PICK_Y),
+        (_sheet_x(LENGTH) + 0.014, SIDE_CENTER[1] - 0.008),
+    ),
 }
+
+
+def _move_dimension(
+    adapter: Any,
+    annotation: Any,
+    target: Any,
+    text_xy: tuple[float, float],
+    *,
+    source_view: Any,
+) -> Any:
+    """Move a model dimension to the projection that shows its extension lines."""
+    name = dimension_name(adapter, annotation)
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    if not drawing.ActivateView(view_name(adapter, source_view)):
+        raise RuntimeError(f"{name}: failed to activate source dimension view")
+    draw.ClearSelection2(True)
+    display = _early_bound(annotation.GetSpecificAnnotation(), "IDisplayDimension")
+    selection_name = str(display.GetNameForSelection() or "")
+    if not selection_name or not draw.Extension.SelectByID2(
+        selection_name,
+        "DIMENSION",
+        0.0,
+        0.0,
+        0.0,
+        False,
+        0,
+        null_callout(),
+        0,
+    ):
+        raise RuntimeError(
+            f"failed to select model dimension {name}: {selection_name!r}"
+        )
+    drawing.DragModelDimension(
+        view_name(adapter, target), 2, text_xy[0], text_xy[1], 0.0
+    )
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    matches = [
+        _early_bound(item, "IAnnotation")
+        for item in (_early_bound(target, "IView").GetAnnotations() or ())
+        if dimension_name(adapter, _early_bound(item, "IAnnotation")) == name
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(f"{name}: native dimension did not move into target view")
+    return matches[0]
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -163,7 +226,23 @@ async def build(adapter: Any) -> dict[str, str]:
         view_label="edge",
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    annotations = [*end_annotations, *side_annotations]
+    donors = [
+        annotation
+        for annotation in end_annotations
+        if dimension_name(adapter, annotation) in MOVED_TO_SIDE
+    ]
+    if len(donors) != len(MOVED_TO_SIDE):
+        raise RuntimeError("expected one ring O.D. donor dimension on the end view")
+    moved = [
+        _move_dimension(adapter, donor, side, OD_ON_SIDE, source_view=end)
+        for donor in donors
+    ]
+    end_annotations = [
+        annotation
+        for annotation in end_annotations
+        if dimension_name(adapter, annotation) not in MOVED_TO_SIDE
+    ]
+    annotations = [*end_annotations, *side_annotations, *moved]
     # Decimal places (and so the general-tolerance row each dimension claims)
     # and the bore's and length's bands are authored on the part; the sheet
     # only proves the import kept them.
@@ -171,6 +250,13 @@ async def build(adapter: Any) -> dict[str, str]:
     set_dimension_callouts(adapter, end_annotations, DIMENSION_CALLOUTS)
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to the ring face view")
+    # The turning axis, picked on the O.D. face above it.
+    add_view_centerline(
+        adapter,
+        side,
+        face_xy=(SIDE_CENTER[0], SIDE_CENTER[1] + OD * _S / 4000.0),
+        label="knob thrust ring axis centerline",
+    )
     for key, label in (
         ("front_face", "ring front (12T) face finish"),
         ("rear_face", "ring rear (plate hub) face finish"),

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import importlib.util
+import itertools
 import math
 from pathlib import Path
 
@@ -19,7 +20,7 @@ import support_bar_spec as bar
 import transgear_arm_geometry as arm
 import transgear_latch_pin_spec as pin
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
-from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 
 
 def _band(places: int) -> float:
@@ -171,7 +172,12 @@ def test_registry_row_is_the_dead_soft_strip_mha_127() -> None:
     assert int(row["quantity"]) == 1
     assert "dead soft" in row["material_specification"]
     assert "spring" not in row["finish"] + row["material_specification"]
-    assert row["material"] == part.MATERIAL
+    # Review of 19e33c6c2: the stock is the title block's MATERIAL cell, so no
+    # note restates it; the cell holds 30 characters.
+    assert row["material"] == spec.MATERIAL_TITLE
+    assert len(spec.MATERIAL_TITLE) <= 30
+    stock = f"{geom.STRIP_W:g} x {geom.STRIP_T:g}"
+    assert stock in row["material"] and stock in row["material_specification"]
 
 
 def _calls(path: str) -> dict[str, ast.Call]:
@@ -214,5 +220,299 @@ def test_the_part_carries_every_property_its_drawing_requires(monkeypatch) -> No
     assert [name for name in required if not str(carried.get(name) or "").strip()] == []
 
 
-def test_every_note_line_fits_the_note_field() -> None:
-    assert [line for line in spec.DRAWING_NOTES.split("\n") if len(line) > 70] == []
+_TITLE_BLOCK_TEXT = ("BREAK SHARP EDGES", "DEBURR", "REMOVE BURRS")
+
+
+def test_the_notes_fit_the_note_field_and_leave_the_title_block_its_own() -> None:
+    """Review of 19e33c6c2: BREAK SHARP EDGES restated the title block and
+    the stock line the MATERIAL cell.  At most 4 lines of at most 70."""
+    lines = spec.DRAWING_NOTES.split("\n")
+    assert len(lines) <= 4
+    assert [line for line in lines if len(line) > 70] == []
+    assert [t for t in _TITLE_BLOCK_TEXT if t in spec.DRAWING_NOTES] == []
+    assert "STRIP" not in spec.DRAWING_NOTES.replace("STRIP TO LIE FLAT", "")
+
+
+def test_the_centring_note_states_what_the_rivet_pair_holds() -> None:
+    """Review of 19e33c6c2 (blocker): "ALL HOLES ... CENTRED ON THE STRIP
+    WIDTH" contradicted the rivet pair 3.900 apart.  The note centres the
+    pin hole and the pair's midpoint -- which is what the model holds -- and
+    no single rivet hole, which sits half a pitch off the centreline."""
+    notes = spec.DRAWING_NOTES
+    assert "ALL HOLES" not in notes
+    (centring,) = [line for line in notes.split("\n") if "CENTRE" in line]
+    assert "PIN HOLE" in centring and "RIVET HOLES' MIDPOINT" in centring
+    assert f"WITHIN {spec.CENTRING_BAND:.2f}" in centring
+    # The pair's midpoint is on the centreline; a single hole is far outside
+    # the band, so a note centring each hole would be false.
+    (ya, za), (_, zb) = geom.RIVET_YZ
+    centre_z = geom.centreline_z(ya)
+    assert abs((za + zb) / 2.0 - centre_z) <= 1e-6
+    assert min(abs(za - centre_z), abs(zb - centre_z)) > spec.CENTRING_BAND
+    assert _on_centreline(*geom.PIN_HOLE_YZ) <= spec.CENTRING_BAND
+
+
+def test_the_template_callouts_state_the_constructions_the_model_holds() -> None:
+    """Review of 19e33c6c2 (blocker): R845.0, R485.0 and 52.9 did not fix
+    the arcs' centres or their tangency.  R845's centre is on the top cut's
+    line extended, R485 is internally tangent to it, and the 52.9 run ends at
+    that tangent point on the inner edge."""
+    top_cut_x = geom.TOP_LOWER[0]
+    assert geom.TOP_UPPER[0] == top_cut_x
+    assert geom.C1_L[0] == pytest.approx(top_cut_x, abs=1e-9)
+    assert "TOP CUT" in spec.INNER_R1_CALLOUT
+    # Internal tangency: the centres are R1 - R2 apart, both on the inner side.
+    gap = math.dist(geom.C1_L, geom.C2_L)
+    assert gap == pytest.approx(geom.INNER_R1 - geom.INNER_R2, abs=1e-3)
+    assert geom.C1_L[1] < geom.TOP_LOWER[1] and geom.C2_L[1] < geom.TOP_LOWER[1]
+    assert "TANGENT" in spec.INNER_R2_CALLOUT
+    # The 52.9 run lands on the inner edge's tangent point.
+    tangent = geom.JUNCTION_LOWER
+    assert math.dist(tangent, geom.C1_L) == pytest.approx(geom.INNER_R1, abs=2e-3)
+    assert math.dist(tangent, geom.C2_L) == pytest.approx(geom.INNER_R2, abs=2e-3)
+    assert -tangent[0] == pytest.approx(geom.JUNCTION_RUN, abs=1e-9)
+    assert "TANGENT POINT" in spec.JUNCTION_RUN_CALLOUT
+    assert "CENTRE" in spec.TIP_RUN_CALLOUT
+    for name in ("InnerR1", "InnerR2"):
+        assert name in drawing.DIMENSION_CALLOUTS
+    assert {"JunctionRun", "TipRun"} <= set(drawing.CALLOUTS_ABOVE)
+
+
+# Sheet text: 3.5 dimension characters, the notes' 3.0 (top-left anchored).
+_CHAR_WIDTH = 0.00276
+_LINE_PITCH = 0.0045
+_NOTE_CHAR_WIDTH = 0.0024
+_NOTE_LINE_PITCH = 0.0042
+_BORDER = 0.0127
+_S = drawing._S / 1000.0
+
+
+def _box(
+    lines: list[str], xy: tuple[float, float], above: int = 0
+) -> tuple[float, ...]:
+    """A text box centred on ``xy``, ``above`` callout lines stacked over it."""
+    half_width = max(map(len, lines)) * _CHAR_WIDTH / 2.0
+    body = len(lines) - above
+    return (
+        xy[0] - half_width,
+        xy[1] - body * _LINE_PITCH / 2.0,
+        xy[0] + half_width,
+        xy[1] + body * _LINE_PITCH / 2.0 + above * _LINE_PITCH,
+    )
+
+
+def _overlap(a: tuple[float, ...], b: tuple[float, ...]) -> bool:
+    return a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]
+
+
+def _crosses(p, q, r, s) -> bool:
+    """Whether segments pq and rs properly intersect."""
+
+    def side(a, b, c) -> float:
+        return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+
+    return side(p, q, r) * side(p, q, s) < 0 and side(r, s, p) * side(r, s, q) < 0
+
+
+def _box_edges(box):
+    x0, y0, x1, y1 = box
+    corners = [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
+    return list(zip(corners, corners[1:] + corners[:1]))
+
+
+def _layout():
+    """Every text box, dimension line and leader of the face view, in sheet
+    metres, from the drawing's own placements and the model's geometry."""
+    keep = drawing.FRONT_KEEP
+    notes_lines = spec.DRAWING_NOTES.split("\n")
+    nx, ny = drawing.NOTES_XY
+    notes = (
+        nx,
+        ny - len(notes_lines) * _NOTE_LINE_PITCH,
+        nx + max(map(len, notes_lines)) * _NOTE_CHAR_WIDTH,
+        ny,
+    )
+    top_cut_x = drawing._sheet(0.0, 0.0)[0]
+    runs = {
+        "JunctionRun": -geom.JUNCTION_RUN,
+        "PinHoleRun": geom.PIN_HOLE_L[0],
+        "TipRun": geom.END_L[0],
+        "RivetRun": geom.RIVET_L[0][0],
+    }
+    overall_xy = drawing._sheet(-spec.OVERALL_LENGTH / 2.0, drawing.OVERALL_TEXT_Y)
+    dim_lines = {
+        name: ((drawing._sheet(x, 0.0)[0], keep[name][1]), (top_cut_x, keep[name][1]))
+        for name, x in runs.items()
+    }
+    dim_lines["overall"] = (
+        (drawing._sheet(-spec.OVERALL_LENGTH, 0.0)[0], overall_xy[1]),
+        (top_cut_x, overall_xy[1]),
+    )
+    # The pitch's extension lines run from each rivet centre to its text.
+    for i, (x, y) in enumerate(geom.RIVET_L):
+        start = drawing._sheet(x, y)
+        dim_lines[f"RivetPitch ext {i}"] = (start, (keep["RivetPitch"][0], start[1]))
+    texts = {
+        "JunctionRun": _box(
+            ["52.9", spec.JUNCTION_RUN_CALLOUT], keep["JunctionRun"], 1
+        ),
+        "PinHoleRun": _box(["77.16"], keep["PinHoleRun"]),
+        "TipRun": _box(["99.9", spec.TIP_RUN_CALLOUT], keep["TipRun"], 1),
+        "overall": _box(["(104.9)"], overall_xy),
+        "InnerR1": _box(
+            ["R845.0", *spec.INNER_R1_CALLOUT.splitlines()], keep["InnerR1"]
+        ),
+        "InnerR2": _box(
+            ["R485.0", *spec.INNER_R2_CALLOUT.splitlines()], keep["InnerR2"]
+        ),
+        "PinHoleDia": _box(
+            ["\u00d85.40 +0.10", "0.00", spec.PIN_HOLE_CALLOUT], keep["PinHoleDia"]
+        ),
+        "RivetRun": _box(["3.200"], keep["RivetRun"]),
+        "RivetPitch": _box(["3.900"], keep["RivetPitch"]),
+        "RivetHoleDia": _box(
+            ["\u00d81.65 +0.10", "0.00", spec.RIVET_HOLE_CALLOUT], keep["RivetHoleDia"]
+        ),
+    }
+
+    def rim(centre_l, radius, text):
+        centre = drawing._sheet(*centre_l)
+        d = math.dist(centre, text)
+        r = radius * _S
+        return (
+            centre[0] + (text[0] - centre[0]) * r / d,
+            centre[1] + (text[1] - centre[1]) * r / d,
+        )
+
+    leaders = {
+        "PinHoleDia": rim(geom.PIN_HOLE_L, geom.PIN_HOLE_DIA / 2.0, keep["PinHoleDia"]),
+        "RivetHoleDia": rim(
+            geom.RIVET_L[0], geom.RIVET_HOLE_DIA / 2.0, keep["RivetHoleDia"]
+        ),
+        "InnerR1": rim(geom.C1_L, geom.INNER_R1, keep["InnerR1"]),
+        "InnerR2": rim(geom.C2_L, geom.INNER_R2, keep["InnerR2"]),
+    }
+    leaders = {name: (keep[name], end) for name, end in leaders.items()}
+    return texts, dim_lines, leaders, notes
+
+
+def test_every_text_stands_inside_the_border_off_the_title_block_and_notes() -> None:
+    """Review of 19e33c6c2: the template radii ran through the bottom border
+    and the title block, the Ø5.40 into the notes."""
+    template = DRAWING_TEMPLATES[drawing.SPEC.layout]
+    title_block = (
+        template.title_block_left_m,
+        0.0,
+        template.width_m,
+        template.title_block_top_m,
+    )
+    texts, _lines, _leaders, notes = _layout()
+    iso_half = _iso_half_extents()
+    iso = (
+        drawing.ISO_CENTER[0] - iso_half[0],
+        drawing.ISO_CENTER[1] - iso_half[1],
+        drawing.ISO_CENTER[0] + iso_half[0],
+        drawing.ISO_CENTER[1] + iso_half[1],
+    )
+    for box, name in [
+        *((b, n) for n, b in texts.items()),
+        (notes, "notes"),
+        (iso, "iso"),
+    ]:
+        assert box[0] > _BORDER + 0.002 and box[1] > _BORDER + 0.002, name
+        assert box[2] < template.width_m - _BORDER - 0.002, name
+        assert box[3] < template.height_m - _BORDER - 0.002, name
+        assert not _overlap(box, title_block), name
+    boxes = {**texts, "notes": notes, "iso": iso}
+    for (a, box_a), (b, box_b) in itertools.combinations(boxes.items(), 2):
+        assert not _overlap(box_a, box_b), (a, b)
+    # The strip itself stays clear of the notes and the isometric view.
+    outline = [drawing._sheet(x, y) for x, y in geom._OUTLINE]
+    strip = (
+        min(p[0] for p in outline),
+        min(p[1] for p in outline),
+        max(p[0] for p in outline),
+        max(p[1] for p in outline),
+    )
+    assert not _overlap(strip, notes) and not _overlap(strip, iso)
+
+
+def test_no_leader_crosses_a_dimension_line_a_text_or_the_notes() -> None:
+    """Review of 19e33c6c2: the Ø1.65 leader crossed the 52.9 and 3.200
+    dimensions and the Ø5.40 leader crossed the notes."""
+    texts, dim_lines, leaders, notes = _layout()
+    for name, (start, end) in leaders.items():
+        for line_name, (p, q) in dim_lines.items():
+            assert not _crosses(start, end, p, q), (name, line_name)
+        for other, box in {**texts, "notes": notes}.items():
+            if other == name:
+                continue
+            for p, q in _box_edges(box):
+                assert not _crosses(start, end, p, q), (name, other)
+    for (a, (pa, qa)), (b, (pb, qb)) in itertools.combinations(leaders.items(), 2):
+        assert not _crosses(pa, qa, pb, qb), (a, b)
+
+
+def test_the_template_radii_are_shortened_where_their_centres_leave_the_sheet() -> None:
+    """Review of 19e33c6c2: full-length R485/R845 lines ran to centres 1.4 m
+    and 2.5 m off the sheet, through the border and the title block."""
+    template = DRAWING_TEMPLATES[drawing.SPEC.layout]
+    off_sheet = {
+        name
+        for name, centre in (("InnerR1", geom.C1_L), ("InnerR2", geom.C2_L))
+        if not (
+            _BORDER < drawing._sheet(*centre)[0] < template.width_m - _BORDER
+            and _BORDER < drawing._sheet(*centre)[1] < template.height_m - _BORDER
+        )
+    }
+    assert off_sheet == {"InnerR1", "InnerR2"}
+    assert off_sheet <= set(drawing.SHORTENED_RADII)
+    # Each radius text sits between its arc and its centre: the shortened
+    # line points at the centre from the concave side.
+    _texts, _lines, leaders, _notes = _layout()
+    for name, centre in (("InnerR1", geom.C1_L), ("InnerR2", geom.C2_L)):
+        text, rim = leaders[name]
+        centre_sheet = drawing._sheet(*centre)
+        assert math.dist(text, centre_sheet) < math.dist(rim, centre_sheet), name
+
+
+def test_the_overall_reference_runs_to_the_full_round_extreme() -> None:
+    """Review of 19e33c6c2: 99.9 runs to the end round's centre; the strip's
+    true overall prints as a reference, outermost over the run stack."""
+    # LOCAL_X_MIN is the sampled outline's extreme.
+    assert spec.OVERALL_LENGTH == pytest.approx(-geom.LOCAL_X_MIN, abs=1e-4)
+    assert spec.OVERALL_LENGTH == pytest.approx(geom.TIP_RUN + geom.TIP_R)
+    assert spec.DRAWING_REFERENCE_PRECISION == {
+        "overall length reference": spec.TEMPLATE_PLACES
+    }
+    # The round pick is on the full round's flank, on the far side of its
+    # centre, so re-anchoring to the arc's extreme takes the free end.
+    pick = drawing._ROUND_PICK
+    assert math.dist(pick, geom.END_L) == pytest.approx(geom.TIP_R)
+    assert pick[0] < geom.END_L[0]
+    top_pick = drawing._TOP_CUT_PICK
+    assert top_pick[0] == geom.TOP_UPPER[0]
+    assert geom.TOP_LOWER[1] < top_pick[1] < geom.TOP_UPPER[1]
+    for x, y in geom.RIVET_L:
+        assert math.dist(top_pick, (x, y)) > geom.RIVET_HOLE_DIA
+    runs_y = [drawing.FRONT_KEEP[n][1] for n in ("JunctionRun", "PinHoleRun", "TipRun")]
+    overall_y = drawing._sheet(0.0, drawing.OVERALL_TEXT_Y)[1]
+    assert overall_y > max(runs_y)
+
+
+def _iso_half_extents() -> tuple[float, float]:
+    """Half the isometric view's sheet extents: the strip's outline at either
+    face, projected on the standard isometric's screen axes."""
+    scale = drawing.ISO_SCALE[0] / drawing.ISO_SCALE[1] / 1000.0
+    points = [
+        ((x - z) / math.sqrt(2.0), (-x + 2.0 * y - z) / math.sqrt(6.0))
+        for x, y in geom._OUTLINE
+        for z in (0.0, geom.STRIP_T)
+    ]
+    xs = [p[0] for p in points]
+    ys = [p[1] for p in points]
+    # Line weight and silhouette rounding.
+    return (
+        (max(xs) - min(xs)) * scale / 2.0 + 0.002,
+        (max(ys) - min(ys)) * scale / 2.0 + 0.002,
+    )

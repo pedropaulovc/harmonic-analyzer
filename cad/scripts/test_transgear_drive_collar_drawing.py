@@ -42,12 +42,72 @@ def test_every_marked_dimension_prints_in_exactly_one_view() -> None:
     assert set(drawing.END_KEEP) | set(drawing.SIDE_KEEP) == marked
     assert not set(drawing.END_KEEP) & set(drawing.SIDE_KEEP)
     assert set(drawing.DIMENSION_CALLOUTS_BELOW) <= set(drawing.END_KEEP)
+    assert set(drawing.DIMENSION_CALLOUTS_ABOVE) <= set(drawing.SIDE_KEEP)
+
+
+def test_turned_diameters_and_lengths_print_on_the_side_view() -> None:
+    # Rule 7: the turned O.D. and pilot sit on the profile the side view
+    # looks at, beside both lengths; the end view keeps only the holes.
+    body = spec.DRAWING_DIMENSIONS["BodyProfile"]
+    assert body == {"CollarDia", "CollarLength", "PilotDia", "PilotLength"}
+    assert body <= set(drawing.SIDE_KEEP)
+    assert spec.OVERALL_LENGTH == pytest.approx(spec.LENGTH + spec.PILOT_LENGTH)
+    # The overall reads outside both lengths, below them.
+    lowest_length = min(
+        drawing.SIDE_KEEP[n][1] for n in ("CollarLength", "PilotLength")
+    )
+    assert drawing.OVERALL_TEXT_XY[1] < lowest_length - 0.008
+    assert drawing.OVERALL_TEXT_XY[1] > BORDER + 0.010
+    # The O.D. reads outside the slot width, both left of the rear face.
+    assert (
+        drawing.SIDE_KEEP["CollarDia"][0]
+        < drawing.SIDE_KEEP["SlotWidth"][0]
+        < drawing._REAR_X
+    )
+    assert drawing.SIDE_KEEP["PilotDia"][0] > drawing._PILOT_X
+
+
+def _segments_cross(a, b, c, d) -> bool:
+    def side(p, q, r):
+        return (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0])
+
+    return side(a, b, c) * side(a, b, d) < 0 and side(c, d, a) * side(c, d, b) < 0
+
+
+def test_end_view_leaders_run_straight_in_without_crossing() -> None:
+    cx, cy = drawing.END_CENTER
+    bore_r = spec.BORE_DIA * drawing._S / 2000.0
+    bore_text = drawing.END_KEEP["BoreDia"]
+    angle = math.atan2(bore_text[1] - cy, bore_text[0] - cx)
+    bore_tip = (cx + bore_r * math.cos(angle), cy + bore_r * math.sin(angle))
+    pin_text = drawing.END_KEEP["PinPosDia"]
+    pin_tip = (cx, cy - drawing.PIN_R)  # the lower hole's centre
+    assert not _segments_cross(bore_text, bore_tip, pin_text, pin_tip)
+    # Neither diameter leader passes through the other pin hole.
+    hole_r = spec.PIN_HOLE_DIA * drawing._S / 2000.0
+    upper = (cx, cy + drawing.PIN_R)
+    (x0, y0), (x1, y1) = bore_text, bore_tip
+    t = ((upper[0] - x0) * (x1 - x0) + (upper[1] - y0) * (y1 - y0)) / (
+        (x1 - x0) ** 2 + (y1 - y0) ** 2
+    )
+    t = min(1.0, max(0.0, t))
+    nearest = (x0 + t * (x1 - x0), y0 + t * (y1 - y0))
+    assert math.dist(nearest, upper) > hole_r
+
+
+def test_slot_placement_prints_the_stacks_centring_term() -> None:
+    # The slot-to-pin wall stack spends POSITION_TOL on the slot's centring;
+    # the sheet must hold the slot to that, not leave it to appearance.
+    assert f"{spec.POSITION_TOL:.3f}" in spec.SLOT_CALLOUT
+    assert spec.POSITION_TOL == pytest.approx(0.065)
+    for line in spec.SLOT_CALLOUT.splitlines():
+        assert len(line) <= 70
 
 
 def test_fits_carry_named_bands_and_the_lengths_print_their_places() -> None:
     assert model_toleranced_dimensions(part) == {
-        ("CollarProfile", "CollarDia"): "*deviations(OD_BAND)",
-        ("PilotProfile", "PilotDia"): "*deviations(PILOT_DIA_BAND)",
+        ("BodyProfile", "CollarDia"): "*deviations(OD_BAND)",
+        ("BodyProfile", "PilotDia"): "*deviations(PILOT_DIA_BAND)",
         ("BoreProfile", "BoreDia"): "*deviations(BORE_DIA_BAND)",
         ("SlotProfile", "SlotWidth"): "*deviations(SLOT_WIDTH_BAND)",
         ("SlotProfile", "SlotDepth"): "*deviations(SLOT_DEPTH_BAND)",

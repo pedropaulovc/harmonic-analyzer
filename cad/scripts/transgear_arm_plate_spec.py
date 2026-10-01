@@ -36,6 +36,7 @@ from transgear_arm_plate_geometry import (
     HOLE_POSITION_BAND,
     HUB_FACE_TO_MOUNTING,
     HUB_TO_BOSS_BAND,
+    NOTCH_BAND,
     SCREW_HOLES,
 )
 
@@ -44,35 +45,40 @@ from transgear_arm_plate_geometry import (
 BAND_BY_PLACES: dict[int, float] = {1: BAND_X, 2: BAND_XX, 3: BAND_XXX}
 
 # Places each printed dimension carries (contract §12):
-# the outline (end radius, bar width, top corners, kink) and the boss Ø are
-# routine .X; the thickness over the arm is .XX (the MHA-166 engagement is
-# judged at it), as are the hub Ø and the notch face (walls) and the notch's
-# depth, the arm's stock thickness it takes (7.94; R9-26); the hub face's
-# station from the mounting face is .XXX (the chain plane, contract §13); the
-# hub-to-boss length prints .XXX under its explicit knob-float band; the bore
-# is a .XXX running fit under its explicit band; the screw-hole positions are
-# .XXX under the explicit ±HOLE_POSITION_BAND the arm's taps share; the
-# countersink Ø is .XXX (the oval head's seat, CSK_DIA_BAND); the drilled
-# clearance holes print .X under the title block's drilled-hole row (R9-13).
+# the outline (end radius, bar width, top corners, kink), the boss Ø, the
+# notch face's corner heights (it only clears the arm's edge) and the
+# countersink Ø (the cut-to-fit screw's seat, CSK_DIA_BAND) are routine .X;
+# the thickness over the arm is .XX (at .X the shortest stock MHA-166 no
+# longer stands past its cut and the land under the cone thins below the
+# wall target), as is the hub Ø (wall) and the notch's depth, the arm's stock
+# thickness it takes (7.94; R9-26; at .X the lower section's front face
+# enters the guide-lock screw heads' sweep); the hub face's station from the
+# mounting face is .XXX (the chain plane, contract §13: the disc-to-platen air
+# closes at .XX); the hub-to-boss length prints .XXX under its explicit
+# knob-float band; the bore is a .XXX running fit under its explicit band;
+# the screw-hole positions are .XXX under the explicit ±HOLE_POSITION_BAND the
+# arm's taps share (the two shanks' float over the plate-to-arm pitch); the
+# drilled clearance holes print .X under the title block's drilled-hole row
+# (R9-13).
 OUTLINE_PLACES = 1
 BOSS_DIA_PLACES = 1
 NOTCH_DEPTH_PLACES = 2
 THICKNESS_PLACES = 2
 HUB_DIA_PLACES = 2
-NOTCH_PLACES = 2
+NOTCH_PLACES = 1
 SCREW_HOLE_PLACES = 1
 HUB_STATION_PLACES = 3
 HUB_TO_BOSS_PLACES = 3
 BORE_PLACES = 3
 HOLE_POSITION_PLACES = 3
-CSK_DIA_PLACES = 3
+CSK_DIA_PLACES = 1
 
 # The places must claim the bands the geometry module's walls and the hanger
 # joints were judged at.
 for _label, _places, _band in (
     ("thickness over the arm", THICKNESS_PLACES, BAND_XX),
     ("hub", HUB_DIA_PLACES, BAND_XX),
-    ("notch face", NOTCH_PLACES, BAND_XX),
+    ("notch face", NOTCH_PLACES, NOTCH_BAND),
     ("boss", BOSS_DIA_PLACES, BAND_X),
     ("outline", OUTLINE_PLACES, BAND_X),
     ("countersink", CSK_DIA_PLACES, CSK_DIA_BAND),

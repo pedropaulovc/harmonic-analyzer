@@ -16,9 +16,9 @@ is the 3/8 in length of the same series, so the worst case holds 2.02D
 (``ENGAGEMENT_WORST``) and the tip stays inside the guide
 (``build_platen_guide`` asserts the tip against the guide's shallowest seat).
 
-Ruling R9-49: the lock's Ø0.10 hole position and the guide's Ø0.20 tap
-position need 0.30 of hole-over-screw clearance; the #4 close Ø3.048 left
-0.20.  The lock holes are 1/8 DRILL (Ø3.175), and at assembly each lock is
+Ruling R9-49: the lock's hole positions and the guide's Ø0.20 tap
+position need hole-over-screw clearance; the #4 close Ø3.048 left too
+little.  The lock holes are 1/8 DRILL (Ø3.175), and at assembly each lock is
 pushed away from the bar until its holes bear on the screws before they are
 tightened (``paper_drive_assembly_steps`` "guide-locks-set").  Pushed so, a
 lock stands between ``LOCK_SET_OFFSET`` beyond its model position, away from
@@ -26,6 +26,8 @@ the bar; the lock-station sweep reads that window.
 """
 
 from __future__ import annotations
+
+import math
 
 import _config
 import guide_lock_spec as lock
@@ -88,12 +90,13 @@ SCREW_MAJOR_MAX = DIMS.major_dia
 SCREW_MAJOR_MIN = 0.1061 * IN
 LOCK_HOLE_DIA_MIN = blind_cut_dia_mm(lock.HOLE_SPEC)
 LOCK_HOLE_DIA_MAX = LOCK_HOLE_DIA_MIN + drilled_oversize_mm()
-# Radial position error of one screw axis relative to its lock hole: half of
-# each printed position diameter.
+# Radial position error of one screw axis relative to its lock hole: the
+# radial reach of the lock's ± coordinate band plus half the guide's printed
+# position diameter.
 POSITION_RADIAL = (
-    float(lock.GEOMETRIC_TOLERANCES_MM["screw-hole position"])
-    + float(guide.GEOMETRIC_TOLERANCES_MM["guide hole-pattern position"])
-) / 2.0
+    math.hypot(lock.HOLE_LOCATION_BAND, lock.HOLE_LOCATION_BAND)
+    + float(guide.GEOMETRIC_TOLERANCES_MM["guide hole-pattern position"]) / 2.0
+)
 CLEARANCE_RADIAL_MIN = (LOCK_HOLE_DIA_MIN - SCREW_MAJOR_MAX) / 2.0
 CLEARANCE_RADIAL_MAX = (LOCK_HOLE_DIA_MAX - SCREW_MAJOR_MIN) / 2.0
 # (min, max) as set, away from the bar from the model position. Pushed until

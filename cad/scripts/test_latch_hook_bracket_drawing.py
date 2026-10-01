@@ -5,6 +5,7 @@ from __future__ import annotations
 import ast
 import importlib.util
 import itertools
+import math
 import re
 from pathlib import Path
 
@@ -26,7 +27,7 @@ from _drawing_contract import (
     drawing_specification_violations,
     model_toleranced_dimensions,
 )
-from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 
 
 def _row_mm(places: int) -> float:
@@ -339,8 +340,164 @@ def test_registry_row_is_the_steel_sheet_mha_170() -> None:
     row = _config.parts(part.PART_NAME)
     assert row["number"] == "MHA-170"
     assert int(row["quantity"]) == 1
-    assert row["material"] == part.MATERIAL
     assert "sheet" in row["material_specification"].lower()
+    # Review of 19e33c6c2: the stock is the title block's MATERIAL cell (30
+    # characters), so no note restates it.
+    assert row["material"] == spec.MATERIAL_TITLE
+    assert len(spec.MATERIAL_TITLE) <= 30
+    assert f"{geometry.SHEET_T:.1f}" in row["material"]
+    assert "16 GA" in row["material"] and "16 GA" in row["material_specification"]
+
+
+def test_the_notes_leave_the_stock_and_edge_break_to_the_title_block() -> None:
+    """Review of 19e33c6c2: MAKE FROM ... SHEET restated the material and
+    BREAK SHARP EDGES; DEBURR HOLES the title block's general note."""
+    lines = spec.DRAWING_NOTES.split("\n")
+    assert len(lines) <= 4
+    assert [line for line in lines if len(line) > 70] == []
+    for restated in ("SHEET", "STEEL", "BREAK SHARP", "DEBURR", "BURRS"):
+        assert restated not in spec.DRAWING_NOTES, restated
+
+
+def test_the_explicit_bands_are_the_ones_the_walls_need() -> None:
+    """Review of 19e33c6c2 asked for the title block's rows on the hole
+    positions (.XXX) and the base length (.X).  Either breaks a target: the
+    y-edge ligament and the screw head's bend clearance at ±0.13, the screw
+    hole's -X edge wall at the base length's ±0.8."""
+    grow = max(spec.HOLE_BAND) / 2.0
+    ligament = geometry.WIDTH - geometry.SCREW_HOLE_Y - geometry.SCREW_HOLE_DIA / 2.0
+    loose = _row_mm(spec.POSITION_PLACES)
+    assert spec.POSITION_TOL < loose
+    assert ligament - spec.WIDTH_TOL - spec.POSITION_TOL - grow >= spec.WALL_TARGET
+    assert ligament - spec.WIDTH_TOL - loose - grow < spec.WALL_TARGET
+    head_loss = loose - spec.POSITION_TOL
+    assert spec.HEAD_CLEARANCE_WORST - head_loss < spec.HEAD_CLEARANCE_FLOOR
+    # The base length: .XX holds, .X does not.
+    x_edge = (
+        geometry.BASE_LENGTH + geometry.SCREW_HOLE_X[0] - geometry.SCREW_HOLE_DIA / 2.0
+    )
+    for places, holds in ((spec.BASE_LENGTH_PLACES, True), (1, False)):
+        wall = x_edge - _row_mm(places) - spec.POSITION_TOL - grow
+        assert (wall >= spec.WALL_TARGET) is holds, places
+
+
+# Sheet text at 3.5 (dimensions) and the notes' default height; notes are
+# anchored top-left.
+_CHAR_WIDTH = 0.00276
+_LINE_PITCH = 0.0045
+_BORDER = 0.0127
+
+
+def _overlap(a: tuple[float, ...], b: tuple[float, ...]) -> bool:
+    return a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]
+
+
+def _crosses(p, q, r, s) -> bool:
+    """Whether segments pq and rs properly intersect."""
+
+    def side(a, b, c) -> float:
+        return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+
+    return side(p, q, r) * side(p, q, s) < 0 and side(r, s, p) * side(r, s, q) < 0
+
+
+def _rect(p, q) -> tuple[float, float, float, float]:
+    return (min(p[0], q[0]), min(p[1], q[1]), max(p[0], q[0]), max(p[1], q[1]))
+
+
+def _views() -> dict[str, tuple[float, float, float, float]]:
+    """The orthographic views' outlines and the isometric's bounding disc's
+    square (any projection of the part's box lies within half its diagonal
+    of the view centre), in sheet metres."""
+    iso_r = (
+        math.dist(
+            (0.0, 0.0, 0.0),
+            (geometry.BASE_LENGTH, geometry.WIDTH, geometry.FLAP_HEIGHT),
+        )
+        / 2.0
+        * drawing.ISO_SCALE[0]
+        / drawing.ISO_SCALE[1]
+        / 1000.0
+    )
+    ix, iy = drawing.ISO_CENTER
+    return {
+        "elevation": _rect(
+            drawing._elevation(-geometry.BASE_LENGTH, 0.0),
+            drawing._elevation(0.0, geometry.FLAP_HEIGHT),
+        ),
+        "plan": _rect(
+            drawing._plan(-geometry.BASE_LENGTH, 0.0),
+            drawing._plan(0.0, geometry.WIDTH),
+        ),
+        "side": _rect(
+            drawing._side(0.0, 0.0), drawing._side(geometry.WIDTH, geometry.FLAP_HEIGHT)
+        ),
+        "iso": (ix - iso_r, iy - iso_r, ix + iso_r, iy + iso_r),
+    }
+
+
+def _rivet_callout_box() -> tuple[float, float, float, float]:
+    x, y = drawing.SIDE_KEEP["RivetDia"]
+    lines = [spec.PAIR_CALLOUT, "\u00d81.65 +0.10", "0.00", spec.RIVET_HOLE_CALLOUT]
+    half_width = max(map(len, lines)) * _CHAR_WIDTH / 2.0
+    # The pair count stacks above the size, the process below it.
+    return (
+        x - half_width,
+        y - 2.5 * _LINE_PITCH,
+        x + half_width,
+        y + 1.5 * _LINE_PITCH,
+    )
+
+
+def test_every_view_and_caption_stands_inside_the_border_off_the_title_block() -> None:
+    """Review of 19e33c6c2: the side view ran into the title block and the
+    isometric caption touched the right border."""
+    template = DRAWING_TEMPLATES[drawing.SPEC.layout]
+    title_block = (
+        template.title_block_left_m,
+        0.0,
+        template.width_m,
+        template.title_block_top_m,
+    )
+    caption = spec.ISOMETRIC_VIEW_NOTE
+    cx, cy = drawing.ISO_NOTE_XY
+    caption_box = (cx, cy - _LINE_PITCH, cx + len(caption) * _CHAR_WIDTH, cy)
+    views = _views()
+    boxes = {**views, "caption": caption_box, "RivetDia": _rivet_callout_box()}
+    for name, box in boxes.items():
+        assert box[0] > _BORDER + 0.003 and box[1] > _BORDER + 0.003, name
+        assert box[2] < template.width_m - _BORDER - 0.003, name
+        assert box[3] < template.height_m - _BORDER - 0.003, name
+        assert not _overlap(box, title_block), name
+    for (a, box_a), (b, box_b) in itertools.combinations(boxes.items(), 2):
+        assert not _overlap(box_a, box_b), (a, b)
+    # The caption is centred under the isometric view.
+    assert abs(cx + len(caption) * _CHAR_WIDTH / 2.0 - drawing.ISO_CENTER[0]) < 0.01
+    assert cy < views["iso"][1]
+
+
+def test_the_rivet_callout_stands_off_the_side_view_and_its_leader_is_clear() -> None:
+    """Review of 19e33c6c2: DRILL AT ASSEMBLY THROUGH MHA-127 sat on the
+    side view's top edge.  The callout stands right of the flap; its leader
+    meets the lower hole without crossing the view's top edge or either
+    hole's horizontal centre line."""
+    side = _views()["side"]
+    box = _rivet_callout_box()
+    assert box[0] > side[2] + 0.003
+    text = drawing.SIDE_KEEP["RivetDia"]
+    centres = [drawing._side(y, z) for y, z in geometry.RIVET_YZ]
+    lower = min(centres, key=lambda c: c[1])
+    r = geometry.RIVET_HOLE_DIA / 2.0 * drawing._S
+    d = math.dist(lower, text)
+    rim = (
+        lower[0] + (text[0] - lower[0]) * r / d,
+        lower[1] + (text[1] - lower[1]) * r / d,
+    )
+    top_edge = ((side[0], side[3]), (side[2], side[3]))
+    assert not _crosses(text, rim, *top_edge)
+    for cx, cy in centres:
+        centre_line = ((side[0] - 0.003, cy), (side[2] + 0.003, cy))
+        assert not _crosses(text, rim, *centre_line)
 
 
 def _calls(path: str) -> dict[str, ast.Call]:

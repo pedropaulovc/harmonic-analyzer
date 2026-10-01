@@ -5,14 +5,16 @@ front shank; the flange's rear face seats the 120T disc (MHA-070) and three
 #0-80 fillister screws (MHA-161) clamp them (``transgear_disc_hub_spec``,
 ``transgear_disc_hub_geometry``).
 
-Layout (the spec's frame): Front-plane circles extruded toward -Z.  The
-flange runs z = -FLANGE_THICK..0 and the hub body z = -HUB_LENGTH..0 over it,
+Layout (the spec's frame): the flange and hub body are one turned profile on
+the Top plane, (u, v) = model (X, -Z), revolved about the gear axis, so the
+sheet's edge view carries both turned diameters (policy rule 7).  The flange
+runs z = -FLANGE_THICK..0 and the hub body z = -HUB_LENGTH..-FLANGE_THICK,
 so ``Front Plane`` (z = 0) is the flange's rear face, the one that seats on
-the disc, and the hub body's extrusion depth IS the printed overall length.
-The bore and the three screw holes are Front-plane cuts; the screw holes lie
-on a construction bolt circle whose driving diameter is the printed Ø16.4.
-The radial oil hole is a Top-plane cut toward +Y through one wall, located
-by a construction station line from the hub front face.  ``Axis1`` is the
+the disc, and both printed lengths run from it.  The bore and the three
+screw holes are Front-plane cuts; the screw holes lie on a construction bolt
+circle whose driving diameter is the printed Ø16.4.  The radial oil hole is
+a Top-plane cut toward +Y through one wall, centred on the hub body by a
+construction station line from the hub front face (R9-60).  ``Axis1`` is the
 gear axis (Top Plane ∩ Right Plane); the paper-drive assembly mates it to
 the sleeve's axis and the Front Plane to the disc's front face, unrotated.
 
@@ -29,6 +31,7 @@ import sys
 from _common import (
     SketchDims,
     _early_bound,
+    add_line_chain,
     anchor_point_to_origin,
     apply_material,
     bbox_extent_check,
@@ -49,6 +52,7 @@ from _common import (
     volume_check,
 )
 from _drawing_marks import (
+    add_diametric_linear_dimension,
     apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
@@ -176,7 +180,7 @@ async def _front_circle(
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import ExtrusionParameters
+    from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
 
     check("create_part", await adapter.create_part())
 
@@ -191,45 +195,79 @@ async def build(adapter) -> dict[str, str]:
         ("BoreDia", BORE_DIA),
         ("BoltCircleDia", BOLT_CIRCLE_DIA),
         ("ScrewHoleDia", SCREW_HOLE_DIA),
-        ("OilHoleStation", OIL_HOLE_STATION),
         ("OilHoleDia", OIL_HOLE_DIA),
     ):
         await set_global(adapter, name, f"{value}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
-    # Flange: a Front-plane disc extruded toward -Z (a boss's reverse), so
-    # its rear face is the Front Plane.
-    drive_jobs += await _front_circle(
-        adapter, FLANGE_R, "flange", "FlangeProfile", "FlangeDia"
-    )
+    # Turned profile about the gear axis, Top-plane (u, v) = model (X, -Z):
+    # flange rear face on the Front Plane, flange O.D., flange front face, hub
+    # O.D., hub front face.  Both lengths run from the flange's rear face: the
+    # overall the sheet prints (R9-5) and the flange; the hub body's own
+    # length is their remainder, never printed.
+    profile = SketchDims()
+    check("create_sketch hub profile", await adapter.create_sketch("Top"))
+    set_sketch_direct_db(adapter, True)
+    axis = check("hub axis", await adapter.add_centerline(0.0, 0.0, 0.0, HUB_LENGTH))
+    points = [
+        (0.0, 0.0),
+        (FLANGE_R, 0.0),
+        (FLANGE_R, FLANGE_THICK),
+        (HUB_R, FLANGE_THICK),
+        (HUB_R, HUB_LENGTH),
+        (0.0, HUB_LENGTH),
+    ]
+    lines = await add_line_chain(adapter, points)
+    set_sketch_direct_db(adapter, False)
+    for index, line in enumerate(lines):
+        p0 = points[index]
+        p1 = points[(index + 1) % len(points)]
+        relation = "horizontal" if p0[1] == p1[1] else "vertical"
+        check(
+            f"hub profile {relation} {line}",
+            await adapter.add_sketch_constraint(line, None, relation),
+        )
     check(
-        "extrude flange",
-        await adapter.create_extrusion(
-            ExtrusionParameters(depth=FLANGE_THICK, reverse_direction=True)
-        ),
+        "hub axis vertical", await adapter.add_sketch_constraint(axis, None, "vertical")
     )
-    name_last_feature(adapter, "Flange")
-    drive_jobs.append(
-        (name_dimensions(adapter, "Flange", ["FlangeThick"])[0], '"FlangeThick"')
+    await anchor_point_to_origin(
+        adapter, f"{lines[0]}.start", 0.0, 0.0, "flange rear face on the axis"
     )
-    await volume_check(adapter, "flange", V_FLANGE, 0.005 * V_FLANGE)
-
-    # Hub body from the same plane: its depth is the overall length the sheet
-    # prints (R9-5); the body's own length is the remainder, never printed.
-    drive_jobs += await _front_circle(
-        adapter, HUB_R, "hub body", "HubBodyProfile", "HubDia"
+    await add_diametric_linear_dimension(
+        adapter, axis, lines[1], (FLANGE_R + 4.0, FLANGE_THICK / 2.0), "FlangeDia"
     )
+    profile.record("FlangeDia", '"FlangeDia"')
+    await add_diametric_linear_dimension(
+        adapter,
+        axis,
+        lines[3],
+        (HUB_R + 4.0, (FLANGE_THICK + HUB_LENGTH) / 2.0),
+        "HubDia",
+    )
+    profile.record("HubDia", '"HubDia"')
     check(
-        "extrude hub body",
-        await adapter.create_extrusion(
-            ExtrusionParameters(depth=HUB_LENGTH, reverse_direction=True)
-        ),
+        "flange thickness",
+        await adapter.add_sketch_dimension(lines[1], None, "linear", FLANGE_THICK),
     )
+    profile.record("FlangeThick", '"FlangeThick"')
+    # The overall, flange rear face to hub front face (outer corners, where
+    # the drawing's extension lines rise).
+    await dimension_between(
+        adapter,
+        f"{lines[1]}.start",
+        f"{lines[4]}.start",
+        "vertical_distance",
+        HUB_LENGTH,
+        "hub overall length",
+    )
+    profile.record("HubLength", '"HubLength"')
+    await ensure_fully_defined(adapter, "hub profile")
+    check("exit_sketch hub profile", await adapter.exit_sketch())
+    name_last_feature(adapter, "HubProfile")
+    drive_jobs += profile.apply(adapter, "HubProfile")
+    check("revolve hub", await adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "HubBody")
-    drive_jobs.append(
-        (name_dimensions(adapter, "HubBody", ["HubLength"])[0], '"HubLength"')
-    )
     await volume_check(
         adapter, "flange + hub body", V_FLANGE + V_HUB_BODY, 0.005 * V_HUB_BODY
     )
@@ -303,8 +341,9 @@ async def build(adapter) -> dict[str, str]:
 
     # Radial oil hole on +Y, one wall to the bore.  Top-plane sketch (u, v) =
     # model (X, -Z): a construction line on the axis from the hub front face
-    # to the hole centre carries the printed station; the circle's centre
-    # sits on its end.
+    # to the hole centre carries the station, half the hub body (R9-60: the
+    # sheet prints no station; the hole is centred at fit-up); the circle's
+    # centre sits on its end.
     oil = SketchDims()
     check("create_sketch oil hole", await adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
@@ -330,7 +369,7 @@ async def build(adapter) -> dict[str, str]:
         OIL_HOLE_STATION,
         "oil hole station from the hub front face",
     )
-    oil.record("OilHoleStation", '"OilHoleStation"')
+    oil.record("OilHoleStation", '("HubLength" - "FlangeThick") / 2')
     sketch_mgr = adapter.currentSketchManager
     prev_add_to_db = bool(sketch_mgr.AddToDB)
     sketch_mgr.AddToDB = True

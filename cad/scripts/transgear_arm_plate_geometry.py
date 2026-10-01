@@ -72,7 +72,7 @@ def arm_lower_edge_y(x: float) -> float:
 
 # The screws locate the plate (its holes and countersinks on the arm's taps);
 # the notch face only clears the arm's lower edge.  It stands NOTCH_RELIEF (in
-# y) below that edge, parallel to it, so the arm's .X outline, the face's .XX
+# y) below that edge, parallel to it, so the arm's .X outline, the face's .X
 # corner heights, the holes' position and the screws' float in them never
 # close it (transgear_hanger_joints.NOTCH_AIR_WORST).
 NOTCH_RELIEF = 2.5
@@ -134,10 +134,14 @@ BAND_XXX = ARM.BAND_XXX
 HOLE_POSITION_BAND = ARM.HOLE_POSITION_BAND
 DRILL_GROWTH = 0.10
 WALL_TARGET = ARM.WALL_TARGET
-# The countersink Ø prints .XXX: at .X/.XX the oval head's seat moves far
-# enough to starve MHA-166's engagement (head proud) or to carry its tip
-# into the lock-station sweep (head sunk).
-CSK_DIA_BAND = BAND_XXX
+# The countersink Ø prints .X: the screws are cut flush at assembly, so the
+# seat only moves the oval head proud (the shortest stock screw must still
+# stand past the cut, transgear_hanger_joints.PLATE_SCREW_STOCK_PROUD_MIN) or
+# sunk (the land left under the cone, WALLS), and both hold at the .X row.
+CSK_DIA_BAND = BAND_X
+# The notch face's corner heights print .X: the face only clears the arm's
+# lower edge (transgear_hanger_joints.NOTCH_AIR_WORST).
+NOTCH_BAND = BAND_X
 _CSK_DEPTH_MAX = (
     (CSK_DIA + CSK_DIA_BAND - SCREW_HOLE_DIA)
     / 2.0
@@ -164,7 +168,7 @@ WALLS: dict[str, tuple[float, float]] = {
     "bore to end round": (END_R - BORE_DIA / 2.0, END_R - BAND_X - _BORE_R_MAX),
     "bore to notch": (
         _NOTCH_DISTANCE - BORE_DIA / 2.0,
-        _NOTCH_DISTANCE - BAND_XX - _BORE_R_MAX,
+        _NOTCH_DISTANCE - NOTCH_BAND - _BORE_R_MAX,
     ),
     "bore to screw holes": (
         math.hypot(*_NEAR_HOLE) - BORE_DIA / 2.0 - SCREW_HOLE_DIA / 2.0,

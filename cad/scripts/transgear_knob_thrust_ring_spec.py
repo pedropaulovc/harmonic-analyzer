@@ -30,10 +30,11 @@ LENGTH = 5.2
 # The forward stop of the knob's end float (contract §12): explicit ± band.
 LENGTH_TOL = 0.05
 
-# Places each printed dimension carries (policy rule 12): the O.D. at .XX
-# holds the wall below; the bore prints at .XX under its own band; the length
-# at .XXX under its explicit band.
-OD_PLACES = 2
+# Places each printed dimension carries (policy rule 12): the O.D. is routine
+# at .X (the wall below holds at that row, and nothing fits on the O.D.); the
+# bore prints at .XX under its own band; the length at .XXX under its
+# explicit band.
+OD_PLACES = 1
 ID_PLACES = 2
 LENGTH_PLACES = 3
 

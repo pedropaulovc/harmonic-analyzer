@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import math
 from pathlib import Path
 
 import pytest
@@ -10,10 +11,14 @@ import pytest
 import _config
 import build_transgear_hub_cap as part
 import draw_transgear_hub_cap as drawing
+import transgear_disc_hub_spec as disc_hub
 import transgear_hub_cap_spec as spec
 import transgear_stub_spec as stud
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
+from _gtol_spec import PlanarFace
+from _printed_tolerance import printed_band_mm
+from _surface_finish import SEAT_UM
 
 SW_TOL_MAX = 6  # swTolType_e.swTolMAX
 
@@ -49,11 +54,95 @@ def test_no_size_restates_a_title_block_band_on_the_model() -> None:
     assert model_toleranced_dimensions(part) == {}
 
 
-def test_front_chamfer_prints_a_max_that_clears_the_spanner_holes() -> None:
+def test_front_chamfer_prints_a_max_that_the_flats_run_out_through() -> None:
     assert spec.FRONT_CHAMFER_TOL_TYPE == SW_TOL_MAX
     assert spec.FRONT_CHAMFER == spec.FRONT_CHAMFER_MAX
-    assert spec.CHAMFER_INNER_EDGE_R_MIN > spec.SPANNER_HOLE_OUTER_EDGE_R_MAX
-    assert spec.SPANNER_HOLE_INNER_EDGE_R_MIN > spec.CSK_DIA_MAX / 2.0
+    # Smallest O.D. less the largest chamfer stays outside the widest flats.
+    od_min = spec.CAP_DIA - printed_band_mm(spec.DRAWING_PRECISION_BY_NAME["CapDia"])
+    widest = spec.FLATS_ACROSS + printed_band_mm(
+        spec.DRAWING_PRECISION_BY_NAME["FlatsAcross"]
+    )
+    assert od_min / 2.0 - spec.FRONT_CHAMFER > widest / 2.0
+
+
+def test_the_drive_flats_leave_no_wall_under_the_target_at_the_printed_worst() -> None:
+    """R9-58: the pin-spanner holes left a 0.685 countersink ligament (19e33c6c2
+    review); the flats' only wall is flat to thread, 2.0 or more at the worst."""
+    band = printed_band_mm(spec.DRAWING_PRECISION_BY_NAME["FlatsAcross"])
+    narrowest = spec.FLATS_ACROSS - band
+    widest = spec.FLATS_ACROSS + band
+    thread_major_max = stud.FRONT_THREAD_MAJOR + 0.05
+    assert (narrowest - thread_major_max) / 2.0 >= 2.0
+    assert spec.FLAT_WALL_WORST == pytest.approx((narrowest - thread_major_max) / 2.0)
+    # An 11/32 open-end spanner (basic 0.34375 in) takes the widest flats.
+    assert widest <= 0.34375 * 25.4
+    # The sleeve nose (the hub's press-seat shank at its largest) thrusts on
+    # the rear face inside the narrowest flats.
+    nose_max = disc_hub.SHANK_DIA + disc_hub.SHANK_DIA_BAND[0]
+    assert narrowest > nose_max
+    # Each flat keeps a real bearing chord at the smallest O.D.
+    od_min = spec.CAP_DIA - printed_band_mm(spec.DRAWING_PRECISION_BY_NAME["CapDia"])
+    assert 2.0 * math.sqrt((od_min / 2.0) ** 2 - (widest / 2.0) ** 2) > 4.0
+    # The build's volume gate charges both flats: an independent midpoint
+    # sum of the segments over the length, the chamfer's radius included.
+    steps = 2000
+    removed = 0.0
+    for i in range(steps):
+        z = (i + 0.5) * spec.CAP_LENGTH / steps
+        r = spec.CAP_DIA / 2.0 - max(0.0, z - (spec.CAP_LENGTH - spec.FRONT_CHAMFER))
+        h = spec.FLATS_ACROSS / 2.0
+        segment = r * r * math.acos(h / r) - h * math.sqrt(r * r - h * h)
+        removed += 2.0 * segment * spec.CAP_LENGTH / steps
+    assert part.V_FLATS == pytest.approx(removed, rel=1e-4)
+
+
+def test_the_rear_seat_carries_the_seat_finish_on_its_section_edge() -> None:
+    (finish,) = spec.SURFACE_FINISHES
+    assert finish.key == "rear_face"
+    assert finish.roughness_um == SEAT_UM
+    assert finish.face == PlanarFace((0.0, 0.0, -1.0), 0.0)
+    # The section lays the front (chamfered) end right: the pick is on the
+    # left edge, in the cut wall between the tap drill and the O.D.
+    pick_x, pick_y = drawing.REAR_FACE_PICK
+    assert pick_x == pytest.approx(
+        drawing.SECTION_CENTER[0] - spec.CAP_LENGTH * drawing._S / 2000.0
+    )
+    radius = (pick_y - drawing.SECTION_CENTER[1]) * 1000.0 / drawing._S
+    assert spec.TAP_DRILL_DIA / 2.0 + 0.5 < radius < spec.CAP_DIA / 2.0 - 0.5
+    symbol_x, symbol_y = drawing.REAR_FACE_SYMBOL_XY
+    assert symbol_x < pick_x and symbol_y > drawing.SECTION_CENTER[1] + drawing.HALF_OD
+
+
+# Text heights on the sheet: 3.5 mm dimensions, the A-A caption's large
+# 7 mm "SECTION" (farm run 20261001T110844152Z).
+DIM_TEXT_H = 0.0035
+CAPTION_H = 0.007
+
+
+def test_section_caption_clears_the_length_dimension() -> None:
+    """19e33c6c2 printed SECTION A-A through the 5.80."""
+    length_text_bottom = drawing.SECTION_KEEP["CapLength"][1] - DIM_TEXT_H
+    # Whether the caption hangs from its anchor or stands on it, it stays
+    # under the length text and over the notes.
+    assert drawing.CAPTION_XY[1] + CAPTION_H < length_text_bottom
+    assert drawing.CAPTION_XY[1] - CAPTION_H > drawing.NOTES_XY[1]
+
+
+def test_face_view_callouts_stand_clear_of_the_cutting_line() -> None:
+    """19e33c6c2: the upper A sat on the drill callout and the hole leaders
+    crowded the cutting line."""
+    line_x = drawing.SECTION_LINE[0][0]
+    line_top = drawing.SECTION_LINE[1][1]
+    flat_x = spec.FLATS_ACROSS * drawing._S / 2000.0
+    # The thread callout's text block (about 52 x 16 mm about its anchor)
+    # lies right of the flats and left of the section's seat symbol.
+    callout_x, callout_y = drawing.THREAD_CALLOUT_XY
+    assert callout_x - 0.026 > line_x + flat_x + 0.008
+    assert callout_x + 0.026 < drawing.REAR_FACE_SYMBOL_XY[0] - 0.005
+    assert callout_y + 0.008 < drawing.FACE_CENTER[1]
+    # The across-flats text stands above the cutting line's end and its A.
+    flats_y = drawing.FACE_KEEP["FlatsAcross"][1]
+    assert flats_y - DIM_TEXT_H / 2.0 > line_top + 0.008
 
 
 def test_cap_threads_onto_the_stud_and_seats_on_its_shoulder() -> None:
@@ -89,16 +178,14 @@ def test_engagement_stack_charges_the_relief_and_the_countersink() -> None:
     )
 
 
-def test_sheet_notes_state_the_spec_engagement_and_webs() -> None:
+def test_sheet_notes_state_the_spec_engagement() -> None:
     notes = spec.DRAWING_NOTES
     assert f"{spec.ENGAGEMENT_NOMINAL_D_PRINTED:.2f}D NOMINAL" in notes
     assert f"{spec.ENGAGEMENT_WORST_D_PRINTED:.2f}D MIN" in notes
-    assert f"THREAD {spec.TAP_WEB_WORST_PRINTED:.2f} MIN" in notes
-    assert f"O.D. {spec.OD_WEB_WORST_PRINTED:.2f} MIN" in notes
     # A MIN never rounds up past the arithmetic.
     assert spec.ENGAGEMENT_WORST_D_PRINTED <= spec.ENGAGEMENT_WORST_D
-    assert spec.TAP_WEB_WORST_PRINTED <= spec.TAP_WEB_WORST + 1e-9
-    assert spec.OD_WEB_WORST_PRINTED <= spec.OD_WEB_WORST + 1e-9
+    assert all(len(line) <= 70 for line in notes.splitlines())
+    assert len(notes.splitlines()) <= 4
 
 
 def test_registry_row_is_the_turned_brass_mha_160() -> None:

@@ -46,14 +46,16 @@ from _drawing_marks import (
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
 )
 from _fit_limits import deviations
 from _hole_spec import blind_cut_dia_mm
 from _holes import wizard_holes
 from guide_lock_spec import (
     DRAWING_DIMENSIONS,
-    DRAWING_NOTES,
     DRAWING_PRECISION,
+    HOLE_LOCATION_BAND,
+    HOLE_LOCATION_DIMENSIONS,
     HOLE_SPEC,
     HOLE_XY,
     ISOMETRIC_VIEW_NOTE,
@@ -72,11 +74,12 @@ MATERIAL = "Plain Carbon Steel"
 # build_paper_drive_assembly). LOCK_HEIGHT is sized by the BOTTOM station: its
 # rail sits 7 below the bar (open channel), so reaching the bar band takes
 # 5 (rail) + 7 (channel) + the overlap behind the bar. The 2026-09-02 user
-# re-read of ch22 p.54 shows a LOW lock and caps it at 15: 5 rail + 7 channel
-# + 3 bar overlap (the 2026-07 plate reached a 7 overlap = 19). The top rail
-# sits ON the bar, so the same plate overlaps the bar by 10 there. (2026-07-07
-# field report: a 12-tall plate topped out AT the bar's bottom edge and
-# retained nothing at the bottom stations -- 15 keeps a 3 overlap.)
+# re-read of ch22 p.54 shows a LOW lock: 5 rail + 7 channel + 3 bar overlap
+# (the 2026-07 plate reached a 7 overlap = 19), plus R9-59's 1.0 lip past the
+# rail's outer edge that gives the screw holes their edge ligament. The top
+# rail sits ON the bar, so the same plate overlaps the bar by 10 there.
+# (2026-07-07 field report: a 12-tall plate topped out AT the bar's bottom
+# edge and retained nothing at the bottom stations -- 3 is kept.)
 # Stock 91255A108 button head shanks (MHA-176, rulings R9-31, R9-48) pass
 # through the lock plates before threading into the guide's rear-face #4-40
 # through taps. The part-owned 1/8 drill (R9-49) carries both printed hole
@@ -84,6 +87,7 @@ MATERIAL = "Plain Carbon Steel"
 HOLE_DIA = blind_cut_dia_mm(HOLE_SPEC)
 if HOLE_DIA < LOCK_SCREW_SHANK_DIA:
     raise AssertionError("stock guide-lock screw shank does not clear the guide lock")
+
 
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters
@@ -97,6 +101,9 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "LockWidth", f"{LOCK_WIDTH}mm")
     await set_global(adapter, "LockHeight", f"{LOCK_HEIGHT}mm")
     await set_global(adapter, "LockThick", f"{LOCK_THICK}mm")
+    await set_global(adapter, "LockHoleX1", f"{HOLE_XY[0][0]}mm")
+    await set_global(adapter, "LockHoleX2", f"{HOLE_XY[1][0]}mm")
+    await set_global(adapter, "LockHoleY", f"{HOLE_XY[0][1]}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
@@ -110,7 +117,11 @@ async def build(adapter) -> dict[str, str]:
     ]
     lines = await add_line_chain(adapter, rect)
     await define_rectilinear_chain(
-        adapter, lines, rect, label="lock outline", dims=outline,
+        adapter,
+        lines,
+        rect,
+        label="lock outline",
+        dims=outline,
         names=["Width", "Height"],
         drives=['"LockWidth"', '"LockHeight"'],
     )
@@ -130,16 +141,25 @@ async def build(adapter) -> dict[str, str]:
 
     # Screw holes on the guide-side band: ONE native Hole Wizard 1/8 drill
     # feature (2 through-all instances) drilled from the front face (z=0), while
-    # the plate is still a plain prismatic slab. Positions are the guide layout.
+    # the plate is still a plain prismatic slab. Positions are the guide layout,
+    # dimensioned from the plate's corner (the outline's origin); the second
+    # hole's Y repeats the first's and stays off the print.
     hole_dia = HOLE_DIA
-    wizard_holes(
+    if HOLE_XY[0][1] != HOLE_XY[1][1]:
+        raise AssertionError("the guide-lock screw holes must share one Y station")
+    holes = wizard_holes(
         adapter,
         HOLE_SPEC,
         [[x, y, 0.0] for x, y in HOLE_XY],
         (0.0, 0.0, -1.0),
         "guide-lock screw holes (1/8 drill)",
         name="ScrewHoles",
+        placement_dims=[
+            (("Hole1X", '"LockHoleX1"'), ("Hole1Y", '"LockHoleY"')),
+            (("Hole2X", '"LockHoleX2"'), ("Hole2Y", '"LockHoleY"')),
+        ],
     )
+    drive_jobs += holes.placement_drive_jobs
     v_holes = len(HOLE_XY) * math.pi * (hole_dia / 2.0) ** 2 * LOCK_THICK
     v_final = v_plate - v_holes
     await volume_check(adapter, "lock with holes", v_final, 0.005 * v_plate)
@@ -154,15 +174,19 @@ async def build(adapter) -> dict[str, str]:
         adapter, "driven lock (equations neutral)", v_final, 0.005 * v_plate
     )
 
-    # Manufacturing drawing support: the height's explicit band and every
-    # printed dimension's places live on the model (policy rule 2; the
-    # paper-drive lock-station sweep reads the same constants), then mark
-    # exactly the print's dimensions (the drawing recipe imports the marked set
-    # and must find every one of these), and stamp the make-critical
-    # title-block properties.
+    # Manufacturing drawing support: the height's and the hole coordinates'
+    # explicit bands and every printed dimension's places live on the model
+    # (policy rule 2; the paper-drive lock-station sweep and the screw set
+    # window read the same constants), then mark exactly the print's
+    # dimensions (the drawing recipe imports the marked set and must find
+    # every one of these), and stamp the make-critical title-block properties.
     set_dimension_bilateral_tolerance(
         adapter, "LockProfile", "Height", *deviations(LOCK_HEIGHT_BAND)
     )
+    for dimension_name in sorted(HOLE_LOCATION_DIMENSIONS):
+        set_dimension_symmetric_tolerance(
+            adapter, "ScrewHoles", dimension_name, HOLE_LOCATION_BAND
+        )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
@@ -172,12 +196,7 @@ async def build(adapter) -> dict[str, str]:
     await apply_color(adapter, PANEL_BLACK)
     await report_mass_properties(adapter)
     apply_drawing_properties(
-        adapter,
-        PART_NAME,
-        {
-            "Manufacturing Notes": DRAWING_NOTES,
-            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
-        },
+        adapter, PART_NAME, {"Isometric View Note": ISOMETRIC_VIEW_NOTE}
     )
     return await save_part_and_images(adapter, PART_NAME)
 

@@ -219,7 +219,7 @@ if abs(PLATE_SCREW_TIP_INSIDE_NOMINAL) > 1e-9:
 PLATE_SCREW_TIP_PROUD_MAX = PLATE_SCREW_CUT_PROUD_MAX
 
 # The plate's notch face clears the arm's lower edge (the screws locate the
-# plate).  Closing it, in plate-frame y: the face's .XX corner heights, the
+# plate).  Closing it, in plate-frame y: the face's .X corner heights, the
 # holes' Y station, and the screws' float in the largest drilled holes on the
 # thinnest 2A major -- each hole shifting c either way, a rigid plate moves a
 # notch corner by up to (|1 - t| + |t|) c, t the corner's x along the screw
@@ -238,7 +238,7 @@ _NOTCH_LEVER = max(
 )
 NOTCH_AIR_WORST = (
     PLATE.NOTCH_RELIEF
-    - PLATE.BAND_XX
+    - PLATE.NOTCH_BAND
     - PLATE.HOLE_POSITION_BAND
     - _NOTCH_LEVER * _NOTCH_FLOAT
 ) * math.cos(ARM.EDGE_LEAN) - ARM.BAND_X

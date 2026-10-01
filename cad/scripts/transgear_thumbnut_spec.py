@@ -6,7 +6,7 @@ clamps the removable chain wheel (MHA-081, T24) against the drive collar
 (MHA-177): its rear face bears on the wheel's front face only, round the
 wheel's Ø10.3 bore.  Contract §1.6 (round 10): knurled head Ø20.5 × 8.7 with a
 dished front face (chord 15, sagitta 1.2), a Ø11 waist × 2.4 (ruling 5), a
-Ø12.4 flange to the seat face, 16.10 long, 1/4-20 UNC-2B through with an
+Ø12.4 flange to the seat face, 16.1 long, 1/4-20 UNC-2B through with an
 entry countersink at each end.  The stud's side of the engagement (tip
 station, tip chamfer, cut-to-fit) is MHA-078's; this module owns only the
 nut's side of it.
@@ -31,12 +31,16 @@ from _printed_tolerance import drilled_oversize_mm, printed_deviations
 from transgear_removable_spec import BORE_DIA as T24_BORE_DIA
 
 # --- Turned outline (contract §1.6) -------------------------------------------
-HEAD_DIA = 20.5  # knurl crests
+HEAD_DIA = 20.5  # knurl crests: the diameter over the knurl
 HEAD_LENGTH = 8.7
-# Straight knurl: the sketch's 120-point star, crests on HEAD_DIA and roots
-# on KNURL_ROOT_DIA.
-KNURL_TEETH = 60
-KNURL_ROOT_DIA = 19.7
+# Straight knurl DIN 82 RAA 1.0 (R9-57): a 90° V at 1.0 pitch, so 64 teeth
+# round the Ø20.5 (pitch 1.006 at the crest) and a 0.5 deep tooth; the
+# sketch's 128-point star puts crests on HEAD_DIA, roots on KNURL_ROOT_DIA.
+KNURL_TEETH = 64
+KNURL_ROOT_DIA = 19.5
+KNURL_DESIGNATION = "DIN 82-RAA 1.0"
+KNURL_PITCH = 1.0
+KNURL_FLANK_ANGLE_DEG = 90.0
 WAIST_DIA = 11.0
 WAIST_LENGTH = 2.4
 FLANGE_DIA = 12.4
@@ -46,6 +50,41 @@ FLANGE_LENGTH = OVERALL_LENGTH - HEAD_LENGTH - WAIST_LENGTH  # 5.0, not printed
 DISH_DIA = 15.0  # chord at the rim
 DISH_DEPTH = 1.2  # sagitta, rim to the floor on the axis
 DISH_RADIUS = ((DISH_DIA / 2.0) ** 2 + DISH_DEPTH**2) / (2.0 * DISH_DEPTH)
+
+
+def knurl_tooth_angle_deg(crest_dia: float, root_dia: float, teeth: int) -> float:
+    """Included angle of one modelled tooth space: the V from a root to the
+    two crests either side of it."""
+    half = math.pi / teeth
+    root = (root_dia / 2.0 * math.cos(half), root_dia / 2.0 * math.sin(half))
+    flanks = [
+        (
+            crest_dia / 2.0 * math.cos(angle) - root[0],
+            crest_dia / 2.0 * math.sin(angle) - root[1],
+        )
+        for angle in (0.0, 2.0 * half)
+    ]
+    (ax, ay), (bx, by) = flanks
+    return math.degrees(
+        math.acos((ax * bx + ay * by) / (math.hypot(ax, ay) * math.hypot(bx, by)))
+    )
+
+
+# The modelled knurl is the designated one: its crest pitch within 1 % of
+# the wheel's (the wheel tracks the circumference), its V within 2° of 90°,
+# and an even tooth count so the section plane cuts a crest on both sides.
+KNURL_CREST_PITCH = math.pi * HEAD_DIA / KNURL_TEETH  # 1.006
+KNURL_TOOTH_ANGLE_DEG = knurl_tooth_angle_deg(HEAD_DIA, KNURL_ROOT_DIA, KNURL_TEETH)
+if (
+    abs(KNURL_CREST_PITCH - KNURL_PITCH) > 0.01 * KNURL_PITCH
+    or abs(KNURL_TOOTH_ANGLE_DEG - KNURL_FLANK_ANGLE_DEG) > 2.0
+    or KNURL_TEETH % 2
+):
+    raise AssertionError(
+        f"MHA-126 knurl {KNURL_TEETH}T Ø{HEAD_DIA}/Ø{KNURL_ROOT_DIA} (pitch "
+        f"{KNURL_CREST_PITCH:.3f}, {KNURL_TOOTH_ANGLE_DEG:.1f}° V) is not "
+        f"{KNURL_DESIGNATION}"
+    )
 
 # --- Stations along the axis (local y) ----------------------------------------
 SEAT_FACE_Y = 0.0
@@ -91,12 +130,13 @@ REAR_FULL_THREAD_Y = REAR_CSK_APEX_Y - THREAD_MAJOR / 2.0
 FRONT_FULL_THREAD_Y = FRONT_CSK_APEX_Y + THREAD_MAJOR / 2.0
 
 # --- Places each printed dimension carries (policy rule 12, contract §12) ----
-# The diameters over the thread and the length at .XX (walls, the stud's
-# cut-to-fit engagement); the knurl, the head length, the waist length and
-# the dish at .X (outline, non-mating).
+# The diameters over the thread at .XX (walls); the overall length, the
+# knurl, the head length, the waist length and the dish at .X.  The stud is
+# cut to fit the nut's rim at assembly, so the engagement stack takes the
+# shortest .X nut (transgear_drive_collar_spec.thumbnut_engagement).
 HEAD_DIA_PLACES = 1
 HEAD_LENGTH_PLACES = 1
-OVERALL_LENGTH_PLACES = 2
+OVERALL_LENGTH_PLACES = 1
 FLANGE_DIA_PLACES = 2
 WAIST_DIA_PLACES = 2
 WAIST_LENGTH_PLACES = 1
@@ -165,7 +205,9 @@ if CSK_DIA >= T24_BORE_DIA:
 # stud's tip station and chamfer are MHA-078's.
 REAR_THREAD_LOSS = CSK_DEPTH
 
-KNURL_CALLOUT = f"STRAIGHT KNURL, {KNURL_TEETH} TEETH"
+# The Ø20.5 dimension is the diameter over the knurl; the designation gives
+# the pitch and the 90° tooth, so no tooth count prints (R9-57).
+KNURL_CALLOUT = f"STRAIGHT KNURL {KNURL_DESIGNATION}\nDIA OVER KNURL"
 
 # No roughness symbol: the seat face clamps the wheel (a clamp face, not a
 # running, sliding or locating surface; policy rule 5).

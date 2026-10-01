@@ -23,6 +23,10 @@ OD = 8.6
 OD_BAND = 0.13  # ±0.13: 0.07 worst to the lock stations
 BORE_DIA = 4.9  # .XXX, runs on the Ø4.7625 shoulder
 BORE_DIA_BAND = 0.13
+# The bore runs on the MHA-168 shoulder, as the arm's does: a fit bore, so it
+# is reamed (policy rule 7: the callout states the process).  A standard hole,
+# it is fully defined by its callout on the end view, where it is a circle.
+BORE_CALLOUT = "REAM THRU"
 LENGTH = 5.5
 LENGTH_BAND = 0.05  # pivot head play 0.10..0.35 with the floor and shoulder
 

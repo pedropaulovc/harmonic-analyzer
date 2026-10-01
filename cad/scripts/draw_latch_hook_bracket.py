@@ -76,11 +76,15 @@ SHEET_SCALE = (4.0, 1.0)
 VIEW_SCALE = (4, 1)
 ISO_SCALE = (2, 1)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1] / 1000.0  # sheet metres per model mm
-ELEVATION_CENTER = (0.170, 0.100)
-PLAN_CENTER = (ELEVATION_CENTER[0], 0.200)
+# The elevation and side view stand clear above the title block (its top is
+# 0.066), the note under the elevation's base-length dimension.
+ELEVATION_CENTER = (0.170, 0.118)
+PLAN_CENTER = (ELEVATION_CENTER[0], 0.215)
 SIDE_CENTER = (0.275, ELEVATION_CENTER[1])
 ISO_CENTER = (0.360, 0.205)
-NOTES_XY = (0.020, 0.060)
+NOTES_XY = (0.020, 0.050)
+# The caption centred under the isometric view, clear of the right border.
+ISO_NOTE_XY = (ISO_CENTER[0] - 0.025, ISO_CENTER[1] - 0.028)
 # The *Right view turned so model +Z runs up the sheet (and +Y to the right).
 SIDE_VIEW_ANGLE = -math.pi / 2.0
 
@@ -113,8 +117,9 @@ def _side(y_mm: float, z_mm: float) -> tuple[float, float]:
 # position.  The elevation's base length runs under it and the flap height
 # to its right.  On the plan the two screw-hole X chains stack above the
 # view, the hole Y and the width stand to its left, and the hole size sits
-# below the near hole.  On the side view the rivet-hole size leads to the
-# upper modelled hole from above-left.
+# below the near hole.  On the side view the rivet-hole size stands right of
+# the flap, below the lower hole, its leader rising to that hole clear of the
+# view's outline and centre lines.
 ELEVATION_KEEP = {
     "BaseLength": (
         _elevation(-BASE_LENGTH / 2.0, 0.0)[0],
@@ -130,7 +135,7 @@ PLAN_KEEP = {
     "ScrewDia": (_plan(SCREW_HOLE_X[1], 0.0)[0] + 0.012, _plan(0.0, 0.0)[1] - 0.012),
 }
 SIDE_KEEP = {
-    "RivetDia": (_side(0.0, 0.0)[0] - 0.014, _side(0.0, FLAP_HEIGHT)[1] + 0.008),
+    "RivetDia": (_side(WIDTH, 0.0)[0] + 0.054, _side(0.0, 8.0)[1]),
 }
 CALLOUTS_ABOVE = {"ScrewDia": PAIR_CALLOUT, "RivetDia": PAIR_CALLOUT}
 CALLOUTS_BELOW = {"ScrewDia": HOLE_CALLOUT, "RivetDia": RIVET_HOLE_CALLOUT}
@@ -227,7 +232,7 @@ async def build(adapter: Any) -> dict[str, str]:
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME center marks to the {label}")
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
-    add_property_linked_note(adapter, "Isometric View Note", ISO_CENTER[0], 0.160)
+    add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     return await finalize_drawing(
         adapter,

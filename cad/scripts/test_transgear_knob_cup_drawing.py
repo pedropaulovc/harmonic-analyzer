@@ -16,10 +16,12 @@ import transgear_knob_retaining_screw_spec as screw
 import transgear_knob_shaft_spec as knob_shaft
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+from _printed_tolerance import printed_band_mm
 
 
 def _band(places: int) -> float:
-    return _config.title_block(f"linear_{places}pl")["value_in"] * 25.4
+    """The +/- the title block prints for ``places`` (what the shop reads)."""
+    return printed_band_mm(places)
 
 
 def test_required_drawing_paths() -> None:
@@ -88,6 +90,22 @@ def test_the_pan_head_enters_the_smallest_counterbore() -> None:
     assert smallest > screw.HEAD_DIA
     # Seated at the nominal floor, the head stands below the rear face.
     assert spec.FLOOR + screw.HEAD_H < spec.LENGTH
+
+
+def test_the_diameters_print_at_the_coarsest_row_their_walls_allow() -> None:
+    """Policy rule 12: nothing fits on the O.D. or in the counterbore beyond
+    the pan head's entry, so both print at the title block's .X row once the
+    wall, the floor ligament the head bears on and the head's entry all hold
+    there."""
+    coarse = _band(1)
+    wall = ((spec.OD - coarse) - (spec.COUNTERBORE_DIA + coarse)) / 2.0
+    ligament = (
+        (spec.COUNTERBORE_DIA - coarse) - (spec.BORE_DIA + max(spec.BORE_BAND))
+    ) / 2.0
+    assert min(wall, ligament) >= spec.WALL_FLOOR
+    assert spec.COUNTERBORE_DIA - coarse > screw.HEAD_DIA
+    assert spec.OD_PLACES == spec.COUNTERBORE_PLACES == 1
+    assert spec.FLOOR_LIGAMENT_WORST == pytest.approx(ligament, abs=0.01)
 
 
 def test_the_screw_engages_1_5_d_at_the_thickest_printed_floor() -> None:

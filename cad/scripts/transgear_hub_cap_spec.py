@@ -4,13 +4,13 @@ A brass cap nut on the stud MHA-082's #6-32 front thread.  Its plain rear face
 seats on the stud's journal shoulder (machine z -158.05 as fitted), so the
 cap is torqued against the stud and never against the disc cluster; the
 cluster floats between the stud's Ø9 thrust step and that shoulder.  Two
-drilled spanner holes in the front face take a pin spanner.
+wrench flats over the whole length take an 11/32 open-end spanner (R9-58).
 
 Frame: axis local +Z toward the machine front, origin on the rear face (the
 Front Plane, z 0), so machine z = -158.05 - local z.  ``FrontFace`` is the
-plane at z 5.80; ``Axis1`` the cap axis.  The spanner holes lie on local Y,
-in the Right plane of the turned profile, so one axial section shows the
-profile, the thread and both holes.
+plane at z 5.80; ``Axis1`` the cap axis.  The flats stand square to local X,
+so the axial section in the Right plane cuts the full turned profile clear
+of both.
 
 PURE DATA: the build and the drawing both import it.
 """
@@ -19,8 +19,11 @@ from __future__ import annotations
 
 import math
 
+from _gtol_spec import PlanarFace
 from _hole_spec import HoleSpec, blind_cut_dia_mm
 from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from _surface_finish import SEAT_UM, SurfaceFinishControl
+from transgear_disc_hub_spec import SHANK_DIA, SHANK_DIA_BAND
 from transgear_stub_spec import (
     ARM_SEAT_MACHINE_Z,
     CAP_SHOULDER_STATION,
@@ -38,8 +41,8 @@ REAR_FACE_MACHINE_Z = ARM_SEAT_MACHINE_Z - CAP_SHOULDER_STATION  # -158.05
 CAP_DIA = 10.50
 CAP_LENGTH = 5.80
 # 45-degree break on the front O.D. edge, printed as a single MAX limit so
-# its inner edge never reaches the spanner holes (R9-5): swTolMAX prints the
-# NOMINAL then "MAX", so the nominal sits at the band's top.
+# its inner edge stays outside the flats and they run out the front face:
+# swTolMAX prints the NOMINAL then "MAX", so the nominal sits at the band's top.
 FRONT_CHAMFER = 0.5
 FRONT_CHAMFER_BAND = (0.0, -0.3)  # (upper, lower)
 FRONT_CHAMFER_TOL_TYPE = 6  # swTolType_e.swTolMAX (offline API docs, enums/swTolType_e)
@@ -50,31 +53,30 @@ TAP_SPEC = HoleSpec("tapped", FRONT_THREAD)
 TAP_DRILL_DIA = blind_cut_dia_mm(TAP_SPEC)
 # 90-degree entry countersink at the FRONT only; the rear face stays plain
 # (it is the seat).  The title block's drilled row (+0.10/0) governs its Ø.
-CSK_DIA = 3.9
+# R9-58 took it from 3.9 to 3.6: nothing else on the face competes for room,
+# and the smaller loss lengthens the engagement.
+CSK_DIA = 3.6
 CSK_DIA_MAX = round(CSK_DIA + drilled_oversize_mm(), 6)
 CSK_QUALIFIER = f"90\u00b0 CSK \u00d8{CSK_DIA:.1f} FRONT"
 
-# Two drilled spanner holes on local ±Y, 2.0 deep from the front face.
-SPANNER_HOLE_DIA = 1.2
-SPANNER_HOLE_DEPTH = 2.0
-SPANNER_HOLE_SPACING = 6.800  # centre to centre, r 3.4 about the axis
-SPANNER_HOLE_R = SPANNER_HOLE_SPACING / 2.0
-SPANNER_HOLE_CALLOUT = "2X DRILL"
+# Two wrench flats square to local X over the whole length (R9-58), for an
+# 11/32 open-end spanner: ASME B18.2.2 opens that spanner at least
+# 1.005 W + 0.001 in over the 11/32 basic, so a flat pair no wider than the
+# basic enters it.
+FLATS_ACROSS = 8.600
+SPANNER_BASIC_ACROSS = 11.0 / 32.0 * 25.4  # 8.731
 
 # --- Decimal places ARE the tolerance (policy rule 2) --------------------------
-# .XX: the O.D. (the spanner-hole web to the O.D. below) and the length (the
-# thread engagement below).  .XXX: the spanner-hole spacing (±0.065 position
-# in both webs).  The chamfer prints its MAX; the drilled holes read the title
-# block's drilled row.
+# .XX: the O.D. and the length (the thread engagement below).  .XXX: the
+# across-flats (the spanner's opening above, the sleeve nose's thrust annulus
+# and the flat-to-thread wall below).  The chamfer prints its MAX.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "CapProfile": {"CapDia", "CapLength", "FrontChamfer"},
-    "SpannerHoleProfile": {"SpannerHoleDia", "SpannerHoleSpacing"},
-    "SpannerHoles": {"SpannerHoleDepth"},
+    "FlatsProfile": {"FlatsAcross"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "CapProfile": {"CapDia": 2, "CapLength": 2, "FrontChamfer": 1},
-    "SpannerHoleProfile": {"SpannerHoleDia": 1, "SpannerHoleSpacing": 3},
-    "SpannerHoles": {"SpannerHoleDepth": 1},
+    "FlatsProfile": {"FlatsAcross": 3},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
     name: places
@@ -93,8 +95,8 @@ CAP_LENGTH_MIN = round(CAP_LENGTH - _band("CapLength"), 6)
 CAP_LENGTH_MAX = round(CAP_LENGTH + _band("CapLength"), 6)
 CAP_DIA_MIN = round(CAP_DIA - _band("CapDia"), 6)
 FRONT_CHAMFER_MAX = round(FRONT_CHAMFER + FRONT_CHAMFER_BAND[0], 6)
-POSITION_TOL = _band("SpannerHoleSpacing") / 2.0  # each hole about the axis
-HOLE_RADIAL_OVERSIZE = drilled_oversize_mm() / 2.0
+FLATS_ACROSS_MIN = round(FLATS_ACROSS - _band("FlatsAcross"), 6)
+FLATS_ACROSS_MAX = round(FLATS_ACROSS + _band("FlatsAcross"), 6)
 # The tapped hole's major may run up to 0.05 over basic on diameter
 # (contract §8's "tap major 0.025" radial term).
 TAP_MAJOR_RADIAL_ALLOWANCE = 0.025
@@ -104,8 +106,8 @@ TAP_MAJOR_RADIAL_ALLOWANCE = 0.025
 # RELIEF_WIDTH of the cap, the front countersink (csk - major)/2 at the other
 # end.  No first-thread deduction: the relief takes the stud's run-out and the
 # countersink the tap entry.
-#   nominal 5.80 - 1.1 - (3.9 - 3.505)/2 = 4.5025 = 1.28D
-#   worst   5.29 - 1.2 - (4.0 - 3.505)/2 = 3.8425 = 1.09D (floored)
+#   nominal 5.80 - 1.1 - (3.6 - 3.505)/2 = 4.6525 = 1.33D
+#   worst   5.29 - 1.2 - (3.7 - 3.505)/2 = 3.9925 = 1.13D (floored)
 CSK_LOSS_NOMINAL = (CSK_DIA - FRONT_THREAD_MAJOR) / 2.0
 CSK_LOSS_MAX = (CSK_DIA_MAX - FRONT_THREAD_MAJOR) / 2.0
 ENGAGEMENT_NOMINAL = round(
@@ -123,35 +125,23 @@ APPROVED_ENGAGEMENT_FLOOR_D = 1.08
 ENGAGEMENT_NOMINAL_D_PRINTED = round(ENGAGEMENT_NOMINAL_D, 2)
 ENGAGEMENT_WORST_D_PRINTED = math.floor(ENGAGEMENT_WORST_D * 100.0) / 100.0
 
-# --- Webs (contract §8) ---------------------------------------------------------
-# Spanner hole to the tap major: 3.4 - 0.6 - 1.7526 = 1.047; worst less the
-# hole position 0.065, its drilled oversize 0.05 and the tap major 0.025.
-TAP_WEB_NOMINAL = SPANNER_HOLE_R - SPANNER_HOLE_DIA / 2.0 - FRONT_THREAD_MAJOR / 2.0
-TAP_WEB_WORST = (
-    TAP_WEB_NOMINAL - POSITION_TOL - HOLE_RADIAL_OVERSIZE - TAP_MAJOR_RADIAL_ALLOWANCE
+# --- Flats (R9-58) ----------------------------------------------------------------
+# Flat to the tap major: 4.3 - 1.7526 = 2.547 nominal; worst at the narrowest
+# flats less the tap major's 0.025.
+FLAT_WALL_NOMINAL = FLATS_ACROSS / 2.0 - FRONT_THREAD_MAJOR / 2.0
+FLAT_WALL_WORST = (
+    FLATS_ACROSS_MIN / 2.0 - FRONT_THREAD_MAJOR / 2.0 - TAP_MAJOR_RADIAL_ALLOWANCE
 )
-# Spanner hole to the O.D.: 5.25 - 4.0 = 1.25; worst less the O.D.'s .XX
-# 0.255, the position 0.065 and the oversize 0.05.
-OD_WEB_NOMINAL = CAP_DIA / 2.0 - (SPANNER_HOLE_R + SPANNER_HOLE_DIA / 2.0)
-OD_WEB_WORST = (
-    OD_WEB_NOMINAL - _band("CapDia") / 2.0 - POSITION_TOL - HOLE_RADIAL_OVERSIZE
-)
-TAP_WEB_WORST_PRINTED = math.floor(round(TAP_WEB_WORST, 6) * 100.0) / 100.0
-OD_WEB_WORST_PRINTED = math.floor(round(OD_WEB_WORST, 6) * 100.0) / 100.0
+# The feed sleeve's nose (the hub's press-seat shank) thrusts on the rear face
+# when the cluster floats forward: the flats stand outside its largest O.D.
+SLEEVE_NOSE_R_MAX = (SHANK_DIA + SHANK_DIA_BAND[0]) / 2.0
 # The chamfer's inner edge on the front face at the smallest O.D. and the
-# largest chamfer (4.995 - 0.5 = 4.495) against the holes' outer edge at the
-# worst position and oversize (3.4 + 0.065 + 0.6 + 0.05 = 4.115).
+# largest chamfer (4.995 - 0.5 = 4.495) against the widest flats (4.365).
 CHAMFER_INNER_EDGE_R_MIN = CAP_DIA_MIN / 2.0 - FRONT_CHAMFER_MAX
-SPANNER_HOLE_OUTER_EDGE_R_MAX = (
-    SPANNER_HOLE_R + POSITION_TOL + SPANNER_HOLE_DIA / 2.0 + HOLE_RADIAL_OVERSIZE
-)
-# Countersink edge to the holes' inner edge: 2.685 - 2.0 at the worst case.
-SPANNER_HOLE_INNER_EDGE_R_MIN = (
-    SPANNER_HOLE_R - POSITION_TOL - SPANNER_HOLE_DIA / 2.0 - HOLE_RADIAL_OVERSIZE
-)
-# Hole floor to the rear (seat) face: 5.80 - 2.0 = 3.8 nominal, informational.
-HOLE_FLOOR_WALL_WORST = CAP_LENGTH_MIN - (
-    SPANNER_HOLE_DEPTH + _band("SpannerHoleDepth")
+# The spanner's bearing: each flat's chord at the smallest O.D. and the widest
+# flats, 2 x sqrt(4.995^2 - 4.365^2) = 4.86.
+FLAT_CHORD_WORST = 2.0 * math.sqrt(
+    (CAP_DIA_MIN / 2.0) ** 2 - (FLATS_ACROSS_MAX / 2.0) ** 2
 )
 
 for _ok, _what in (
@@ -165,16 +155,22 @@ for _ok, _what in (
         "swTolMAX prints the nominal: the chamfer nominal must be its max",
     ),
     (
-        CHAMFER_INNER_EDGE_R_MIN > SPANNER_HOLE_OUTER_EDGE_R_MAX,
-        f"front chamfer edge r {CHAMFER_INNER_EDGE_R_MIN:.3f} breaks into the "
-        f"spanner holes (outer edge r {SPANNER_HOLE_OUTER_EDGE_R_MAX:.3f})",
+        FLAT_WALL_WORST >= 2.0,
+        f"flat to the #6-32 major {FLAT_WALL_WORST:.3f} worst under the 2.0 target",
     ),
     (
-        SPANNER_HOLE_INNER_EDGE_R_MIN > CSK_DIA_MAX / 2.0,
-        "spanner holes break into the front countersink",
+        FLATS_ACROSS_MAX <= SPANNER_BASIC_ACROSS,
+        f"widest flats {FLATS_ACROSS_MAX:.3f} do not enter an 11/32 spanner",
     ),
-    (TAP_WEB_WORST > 0.0 and OD_WEB_WORST > 0.0, "a spanner-hole web is open"),
-    (HOLE_FLOOR_WALL_WORST >= 2.0, "spanner-hole floor to the seat face under 2.0"),
+    (
+        FLATS_ACROSS_MIN / 2.0 > SLEEVE_NOSE_R_MAX,
+        "the flats cut into the sleeve nose's thrust annulus on the rear face",
+    ),
+    (
+        CHAMFER_INNER_EDGE_R_MIN > FLATS_ACROSS_MAX / 2.0,
+        f"front chamfer edge r {CHAMFER_INNER_EDGE_R_MIN:.3f} runs inside the "
+        f"flats (r {FLATS_ACROSS_MAX / 2.0:.3f})",
+    ),
     (
         math.isclose(REAR_FACE_MACHINE_Z, -158.05, abs_tol=1e-6),
         "cap rear face is not at machine z -158.05 as fitted (R9-47)",
@@ -184,17 +180,20 @@ for _ok, _what in (
     if not _ok:
         raise AssertionError(f"MHA-160: {_what}")
 
-# The sheet states the approved shortfalls (contract §10.1); the ruling IDs
+# The rear face seats on the stud shoulder and takes the sleeve nose: a static
+# locating seat (policy rule 5), on the exact face the part build resolves.
+SURFACE_FINISHES = (
+    SurfaceFinishControl("rear_face", SEAT_UM, PlanarFace((0.0, 0.0, -1.0), 0.0)),
+)
+
+# The sheet states the approved shortfall (contract §10.1); the ruling IDs
 # stay here.
 # Named exception: MHA-160 engagement (drawing-simplicity-policy.md, "Named exceptions").
-# Named exception: MHA-160 web (drawing-simplicity-policy.md, "Named exceptions").
 DRAWING_NOTES = "\n".join(
     (
         f"THREAD ENGAGEMENT ON THE STUD {ENGAGEMENT_NOMINAL_D_PRINTED:.2f}D NOMINAL, "
         f"{ENGAGEMENT_WORST_D_PRINTED:.2f}D MIN.",
-        f"SPANNER HOLE WEB TO THE THREAD {TAP_WEB_WORST_PRINTED:.2f} MIN, "
-        f"TO THE O.D. {OD_WEB_WORST_PRINTED:.2f} MIN.",
-        "REAR FACE SEATS ON THE STUD SHOULDER: FACE IT FLAT AND SQUARE.",
+        "REAR FACE SEATS ON THE STUD SHOULDER.",
     )
 )
 THREAD_CALLOUT = FRONT_THREAD_CALLOUT

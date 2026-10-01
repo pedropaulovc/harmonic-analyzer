@@ -99,6 +99,7 @@ from _drawing_marks import DRAWN_BY
 from _assembly import (
     activate_assembly_contract,
     angle_driver,
+    author_in_drawing_configurations,
     assembly_title_properties,
     assert_component_placed,
     assert_free_dof_necessity,
@@ -140,6 +141,8 @@ from _transforms import (  # noqa: E402
 )
 from cone_pivot_post_installation import FRAME_FRONT_COLUMN_Z
 from harmonic_base_spec import STACK_HEIGHT as BASE_DECK_Y
+from _paper_drive_explode import create_paper_drive_explode
+from paper_drive_explode_spec import CLIP_SCREW_ROLE, GUIDE_SCREW_ROLE
 
 ASM_NAME = "paper-drive"
 
@@ -219,7 +222,9 @@ from _fit_limits import deviations  # noqa: E402
 from _printed_tolerance import printed_band_mm, printed_deviations  # noqa: E402
 from guide_lock_spec import (  # noqa: E402
     DRAWING_PRECISION_BY_NAME as LOCK_PRECISION,
+    HOLE_XY as LOCK_HOLE_XY,
     LOCK_HEIGHT_BAND,
+    RAIL_EDGE_LIP as LOCK_RAIL_LIP,
 )
 from platen_guide_spec import (  # noqa: E402
     GUIDE_DEPTH_BAND,
@@ -868,10 +873,16 @@ CHAIN_PLANE_ENVELOPES = (
 
 # The guide-lock stations ride the platen: each lock plate bridges the bar
 # behind one guide rail (bottom plate up from the lower rail's seat, top plate
-# down from the upper rail's top edge), its two screws on the rail's mid-line.
+# down from the upper rail's top edge), lapping LOCK_RAIL_LIP past the rail's
+# outer edge (R9-59), its two screws on the rail's mid-line.
+if any(abs(y - LOCK_RAIL_LIP - GUIDE_HEIGHT / 2.0) > 1e-9 for _, y in LOCK_HOLE_XY):
+    raise AssertionError("guide-lock screw holes are off the guide rail's mid-line")
 LOCK_PLATE_Y = (
-    (GUIDE_Y[0], GUIDE_Y[0] + LOCK_HEIGHT),
-    (GUIDE_Y[1] + GUIDE_HEIGHT - LOCK_HEIGHT, GUIDE_Y[1] + GUIDE_HEIGHT),
+    (GUIDE_Y[0] - LOCK_RAIL_LIP, GUIDE_Y[0] - LOCK_RAIL_LIP + LOCK_HEIGHT),
+    (
+        GUIDE_Y[1] + GUIDE_HEIGHT + LOCK_RAIL_LIP - LOCK_HEIGHT,
+        GUIDE_Y[1] + GUIDE_HEIGHT + LOCK_RAIL_LIP,
+    ),
 )
 
 
@@ -1177,12 +1188,14 @@ def _assert_lock_station_sweep() -> None:
     plate_outward = LOCK_SET_OFFSET[1]
     plate_inward = max(_LOCK_HEIGHT_DEV[1], 0.0) - LOCK_SET_OFFSET[0]
     moving = []
-    for gy, (y0, y1) in zip(GUIDE_Y, LOCK_PLATE_Y, strict=True):
+    for index, (gy, (y0, y1)) in enumerate(zip(GUIDE_Y, LOCK_PLATE_Y, strict=True)):
         yc = gy + GUIDE_HEIGHT / 2.0
-        # The bottom rail's lock sits flush with the rail's underside and is
-        # pushed down; the top rail's flush with its top and pushed up.
+        # The bottom rail's lock laps the rail's underside and is pushed down;
+        # the top rail's laps its top and is pushed up.
         grow_down, grow_up = (
-            (plate_outward, plate_inward) if y0 == gy else (plate_inward, plate_outward)
+            (plate_outward, plate_inward)
+            if index == 0
+            else (plate_inward, plate_outward)
         )
         moving += [
             (
@@ -2033,10 +2046,10 @@ async def build(adapter) -> dict[str, str]:
         await _lock_to_platen(guide, f"platen-guide y{gy:.1f}")
         guides.append(guide)
     # Lock plates on the guide backs, bridging BEHIND the bar (1.0 clear of its
-    # back face): top-rail locks hang DOWN over the bar (Rz180, 14 overlap),
-    # bottom-rail locks bridge UP across the 7 open channel onto the bar band
-    # (identity, 7 overlap -- the 19-tall plate is sized by this station); the
-    # two rows clear each other by 1.0 in y.
+    # back face) and lapping LOCK_RAIL_LIP past each rail's outer edge: top-rail
+    # locks hang DOWN over the bar (Rz180), bottom-rail locks bridge UP across
+    # the 7 open channel onto the bar band (identity, 3 overlap -- the plate's
+    # height is sized by this station).
     for x_c in LOCK_STATION_X:
         # Machine: the station is measured from the platen's +X edge (the mirror
         # of the pre-mirror left-edge station PLATE_X0 + x_c).
@@ -2044,7 +2057,7 @@ async def build(adapter) -> dict[str, str]:
         top = await place_component(
             adapter,
             "guide-lock",
-            [station + LOCK_WIDTH / 2.0, GUIDE_Y[1] + GUIDE_HEIGHT, LOCK_Z0],
+            [station + LOCK_WIDTH / 2.0, LOCK_PLATE_Y[1][1], LOCK_Z0],
             [0.0, 0.0, 180.0],
             rot_z_rows(180.0),
             ground=False,
@@ -2054,7 +2067,7 @@ async def build(adapter) -> dict[str, str]:
         bot = await place_component(
             adapter,
             "guide-lock",
-            [station - LOCK_WIDTH / 2.0, GUIDE_Y[0], LOCK_Z0],
+            [station - LOCK_WIDTH / 2.0, LOCK_PLATE_Y[0][0], LOCK_Z0],
             [0.0, 0.0, 0.0],
             IDENTITY,
             ground=False,
@@ -2191,6 +2204,12 @@ async def build(adapter) -> dict[str, str]:
         IDENTITY,
         "platen guide-screw grid",
     )
+    # The exploded sheet moves the guide and clip screws apart: tag each
+    # fillister screw with the joint it makes.
+    fillister_roles = {
+        **{name: CLIP_SCREW_ROLE for name in (clip_seed, *clip_instances)},
+        **{name: GUIDE_SCREW_ROLE for name in (guide_seed, *guide_instances)},
+    }
 
     # Two seeds at the right-hand station reproduce at the left-hand station;
     # under-head planes sit on the real 2-mm lock back faces.
@@ -2740,6 +2759,15 @@ async def build(adapter) -> dict[str, str]:
             "Quantity": "1",
             "Drawn By": DRAWN_BY,
         },
+    )
+    # Both drawing configurations own the explode: the exploded sheet's view
+    # at 1:3 references Default Simplified.
+    author_in_drawing_configurations(
+        adapter,
+        ASM_NAME,
+        lambda configuration: create_paper_drive_explode(
+            adapter, fillister_roles, configuration
+        ),
     )
     return await save_assembly_and_images(adapter, ASM_NAME)
 

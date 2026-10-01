@@ -12,7 +12,8 @@ square, the free end rounded, then the three holes drilled.  The width and
 thickness are the stock's and print as a reference.
 
 Datums the sheet uses: the square top cut (every run along the strip is taken
-from it) and the strip's own width (every hole is centred across it).
+from it) and the strip's own width (the pin hole, and the rivet pair's
+midpoint, are centred across it).
 
 Bands (title block unless stated):
 
@@ -21,14 +22,20 @@ Bands (title block unless stated):
   entering the Ø5.4 without touching, and the flap drilled through it after
   (R9-15), so the set takes up the run's band.  The pin crosses the strip
   obliquely and sweeps a 4.16 long footprint along it, which leaves 0.62
-  each side at that pose (R9-24);
+  each side at that pose (R9-24).  The MHA-170 flap's walls hold 2.0 over
+  that set range only (``latch_hook_bracket_spec.HOOK_SET_RANGE``): the .X
+  row's 0.8 would leave its upper rivet hole 1.79 from the flap's top;
 * the rivet pair's run and pitch at .XXX: two Ø1.65 holes across a 10 strip
   hold the 2.0 web and edge walls only at that band.  The MHA-170 flap's
   holes are drilled through these at assembly, so nothing else registers on
   them;
-* the holes' centring across the width within ``CENTRING_BAND`` (a note):
-  the Ø5.4 pin hole (sized over the pin) leaves 2.3 each side in the 10
-  strip, so centring is the whole margin.
+* the pin hole's and the rivet pair's midpoint's centring across the width
+  within ``CENTRING_BAND`` (a note): the Ø5.4 pin hole (sized over the pin)
+  leaves 2.3 each side in the 10 strip, so centring is the whole margin.
+
+The inner edge the template carries is fully defined by the sheet: R845.0
+centred on the top cut's line (it leaves the cut square), R485.0 tangent to
+it at the 52.9 run, both centres on the inner side.
 """
 
 from __future__ import annotations
@@ -51,6 +58,7 @@ from latch_hook_geometry import (
     RIVET_RUN,
     STRIP_T,
     STRIP_W,
+    TIP_R,
     TIP_RUN,
 )
 from support_bar_spec import HANGER_TAP_Y, PIVOT_TAP_X
@@ -154,20 +162,30 @@ if PIN_CLEARANCE_ALONG < PIN_CLEARANCE_MIN - 1e-9:
 # --- Sheet ---------------------------------------------------------------------
 PIN_HOLE_CALLOUT = "DRILL THRU"
 RIVET_HOLE_CALLOUT = "2X DRILL THRU"
+# The template's construction, under its imported dimensions: R845.0 leaves
+# the square top cut with its centre on the cut's line (the model's "arc 1
+# centre under the top cut"), R485.0 is tangent to it at the 52.9 run.
+INNER_R1_CALLOUT = "CENTRE ON TOP CUT\nLINE EXTENDED"
+INNER_R2_CALLOUT = "TANGENT TO\nADJOINING ARC"
+JUNCTION_RUN_CALLOUT = "TO TANGENT POINT"
+# TipRun ends at the full round's centre; the overall to its extreme prints
+# as a reference beside it.
+TIP_RUN_CALLOUT = "TO FULL-ROUND CENTRE"
+OVERALL_LENGTH = TIP_RUN + TIP_R
+DRAWING_REFERENCE_PRECISION: dict[str, int] = {
+    "overall length reference": TEMPLATE_PLACES
+}
+# The title block's MATERIAL cell prints the registry row's ``material`` (the
+# stock, so no note restates it; width and thickness are the strip's).
+MATERIAL_TITLE = f"Dead-soft steel strip {STRIP_W:g} x {STRIP_T:g}"
 
 DRAWING_NOTES = "\n".join(
     (
-        f"1. STOCK: BRIGHT LOW-CARBON STEEL STRIP {STRIP_W:g} x {STRIP_T:g},",
-        "   DEAD SOFT; WIDTH AND THICKNESS AS SUPPLIED (REF). DO NOT HARDEN.",
-        "2. BEND EDGEWISE, IN THE PLANE OF THE STRIP, OVER A TEMPLATE CUT TO",
-        "   THE INNER EDGE SHOWN; STRIP TO LIE FLAT AFTER BENDING.",
-        "3. CUT THE TOP END SQUARE TO THE STRIP; FULL-ROUND THE FREE END.",
-        "4. DRILL ALL HOLES AFTER BENDING, CENTRED ON THE STRIP WIDTH",
-        f"   WITHIN {CENTRING_BAND:.2f}. RUNS ARE MEASURED FROM THE TOP END.",
-        "5. AT ASSEMBLY SET THE HOOK WITH THE MHA-169 PIN ENTERING THE PIN HOLE",
-        "   WITHOUT TOUCHING, THEN DRILL THE MHA-170 FLAP THROUGH THE 2X RIVET",
-        "   HOLES; RIVET WITH 1/16 SOLID RIVETS (MCMASTER 97482A015).",
-        "6. BREAK SHARP EDGES.",
+        "1. BEND EDGEWISE OVER A TEMPLATE OF THE INNER EDGE; STRIP TO LIE FLAT.",
+        "2. CUT TOP END SQUARE; FULL-ROUND FREE END; DRILL HOLES AFTER BENDING.",
+        "3. CENTRE PIN HOLE AND 2X RIVET HOLES' MIDPOINT ON WIDTH WITHIN "
+        f"{CENTRING_BAND:.2f}.",
+        "4. AT ASSEMBLY: SET ON MHA-169 PIN CLEAR; DRILL MHA-170 FLAP THRU 2X.",
     )
 )
 

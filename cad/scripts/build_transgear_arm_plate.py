@@ -24,8 +24,8 @@ arm's axes; +Z to the rear):
 * ``ScrewHoles``: two Ø4.5 clearance holes through, over the arm's taps.
 * ``Countersink1`` / ``Countersink2``: the 82-degree seats of the oval heads,
   revolved cuts sketched on ``ScrewHolePlane`` (y through both hole axes).
-* ``CountersinkReference`` (blanked, on ``RearFace``): the printed
-  countersink Ø; the revolved cuts' own profiles lie edge-on to the plan.
+* ``CountersinkReference`` (blanked, on ``RearFace``, round the +X hole): the
+  printed countersink Ø; the revolved cuts' own profiles lie edge-on to the plan.
 
 Datums (all blanked): ``Axis1`` bore, ``Axis2``/``Axis3`` screw holes (-X,
 +X); planes ``RearFace`` (z = 5), ``HubFace`` (z = -20.5375), ``BossFace``
@@ -137,6 +137,10 @@ CSK_OVERRUN = 1.0
 SCREW_HOLE_Y = SCREW_HOLES[0][1]
 if any(abs(y - SCREW_HOLE_Y) > 1e-9 for _, y in SCREW_HOLES):
     raise AssertionError("the screw holes no longer share one ScrewHolePlane")
+# The printed hole Ø (``ScrewHoleDia``) is the first (-X) hole's circle; the
+# printed countersink Ø's reference circle goes round the other (+X) hole, so
+# the sheet leads the two callouts to different holes and they never cross.
+CSK_REFERENCE_HOLE = 1
 
 _R_BORE = BORE_DIA / 2.0
 _R_HUB = HUB_DIA / 2.0
@@ -801,12 +805,12 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     await define_circle(
         adapter,
-        *SCREW_HOLES[0],
+        *SCREW_HOLES[CSK_REFERENCE_HOLE],
         _R_CSK,
         "countersink reference",
         dims=csk_ref,
         names=("CskRefX", "CskRefY", "CskDia"),
-        drives=('"ScrewHoleX1"', '"ScrewHoleY"', '"CskDia"'),
+        drives=(f'"ScrewHoleX{CSK_REFERENCE_HOLE + 1}"', '"ScrewHoleY"', '"CskDia"'),
     )
     await ensure_fully_defined(adapter, "countersink reference sketch")
     check("exit_sketch countersink reference", await adapter.exit_sketch())

@@ -126,6 +126,19 @@ def test_turned_part_diameters_follow_the_machinist() -> None:
     )
 
 
+def test_the_bore_callout_names_ream_for_the_shoulder_running_fit() -> None:
+    """Review of 19e33c6c2 (blocker): the Ø4.900 named no operation.  At the
+    smallest bore its row accepts, the MHA-168 shoulder keeps less radial air
+    than a drill's oversize, so the bore is a fit bore and is reamed; its
+    callout rides the end-view diameter, the hole's defining view."""
+    import transgear_hanger_joints as joints
+
+    drilled_growth = _config.title_block("drilled_hole")["plus_mm"]
+    assert 0.0 < joints.SHOULDER_RADIAL_CLEARANCE < drilled_growth / 2.0
+    assert set(drawing.DIMENSION_CALLOUTS) == {"BoreDia"} <= set(drawing.END_KEEP)
+    assert drawing.DIMENSION_CALLOUTS["BoreDia"].split()[0] == "REAM"
+
+
 def test_registry_row_is_the_turned_brass_mha_167() -> None:
     row = _config.parts(part.PART_NAME)
     assert row["number"] == "MHA-167"

@@ -5,6 +5,7 @@ from __future__ import annotations
 import ast
 import asyncio
 import importlib.util
+import itertools
 import math
 import re
 from pathlib import Path
@@ -20,6 +21,7 @@ import transgear_disc_hub_geometry as joint
 import transgear_disc_hub_spec as spec
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
+from _layout_geometry import Box, estimate_text_box
 
 WALL_FLOOR = 2.0
 DRILL_PLUS = _config.title_block("drilled_hole")["plus_mm"]
@@ -57,10 +59,11 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
 def test_the_sheet_prints_the_overall_and_the_flange_never_the_hub_body() -> None:
     """R9-5: the overall (flange rear to hub front) 9.400 and the flange
     2.400 are functional .XXX lengths; the hub body is their remainder and is
-    not printed.  The only other axial size is the oil-hole station."""
+    not printed.  No oil-hole station prints either: the hole is centred on
+    the hub body when it is match-drilled (R9-60)."""
     diameters = {"FlangeDia", "HubDia", "BoreDia", "BoltCircleDia", "ScrewHoleDia"}
     lengths = set(spec.DRAWING_PRECISION_BY_NAME) - diameters - {"OilHoleDia"}
-    assert lengths == {"HubLength", "FlangeThick", "OilHoleStation"}
+    assert lengths == {"HubLength", "FlangeThick"}
     assert spec.HUB_LENGTH == pytest.approx(9.4) and _places("HubLength") == 3
     assert spec.FLANGE_THICK == pytest.approx(2.4) and _places("FlangeThick") == 3
     assert spec.BORE_DIA == pytest.approx(8.2) and _places("BoreDia") == 3
@@ -102,7 +105,33 @@ def test_the_bore_keeps_its_press_on_the_sleeve_shank_at_every_printed_limit() -
     assert (least, greatest) == pytest.approx(spec.PRESS_INTERFERENCE)
     callout = " ".join(drawing.DIMENSION_CALLOUTS_BELOW["BoreDia"].split())
     assert f"{least:.3f}-{greatest:.3f} DIAMETRAL INTERFERENCE" in callout
-    assert f"INTERFERENCE ON {sleeve.SLEEVE_NUMBER}" in callout
+
+
+def _sheet_text() -> str:
+    return "\n".join(
+        (
+            spec.DRAWING_NOTES,
+            *drawing.DIMENSION_CALLOUTS_BELOW.values(),
+            *drawing.DIMENSION_CALLOUTS_ABOVE.values(),
+        )
+    )
+
+
+def test_every_mate_the_sheet_cites_is_named_with_its_own_number() -> None:
+    """Policy rule 2: every part number the sheet cites is a mate's, printed
+    after that mate's name, and is the number the mate's own sheet carries."""
+    name_by_number: dict[str, str] = {}
+    for stem, name, number in (
+        ("transgear-feed-pinion", spec.SLEEVE_NAME, spec.SLEEVE_NUMBER),
+        ("transgear-disc-screw", spec.SCREW_NAME, spec.SCREW_NUMBER),
+    ):
+        assert _config.parts(stem)["number"] == number
+        name_by_number[number] = name
+    printed = " ".join(_sheet_text().split())
+    cited = re.findall(r"MHA-\d+", printed)
+    assert set(cited) == set(name_by_number)
+    for number, name in name_by_number.items():
+        assert printed.count(f"{name} {number}") == printed.count(number), number
 
 
 def test_walls_hold_at_the_worst_case_the_sheet_prints() -> None:
@@ -111,27 +140,25 @@ def test_walls_hold_at_the_worst_case_the_sheet_prints() -> None:
         (spec.HUB_DIA - _row(_places("HubDia"))) - (spec.BORE_DIA + spec.BORE_BAND[0])
     ) / 2.0
     oil_r = (spec.OIL_HOLE_DIA + DRILL_PLUS) / 2.0
-    station_band = _row(_places("OilHoleStation"))
-    oil_to_front = spec.OIL_HOLE_STATION - station_band - oil_r
-    oil_to_flange = (
-        (spec.HUB_LENGTH - _row(_places("HubLength")))
-        - (spec.FLANGE_THICK + _row(_places("FlangeThick")))
-        - (spec.OIL_HOLE_STATION + station_band)
-        - oil_r
+    # The oil hole is centred on the shortest hub body the printed lengths
+    # leave, give or take the centring at fit-up: the same ligament to the hub
+    # front face and to the flange face.
+    body_min = (spec.HUB_LENGTH - _row(_places("HubLength"))) - (
+        spec.FLANGE_THICK + _row(_places("FlangeThick"))
     )
+    oil_ligament = body_min / 2.0 - spec.OIL_HOLE_CENTRING_TOL - oil_r
     screw_r = (spec.SCREW_HOLE_DIA + DRILL_PLUS) / 2.0
     bc_r_min = joint.BOLT_CIRCLE_DIA / 2.0 - joint.BOLT_CIRCLE_POSITION_TOL
     hole_to_bore = bc_r_min - screw_r - (spec.BORE_DIA + spec.BORE_BAND[0]) / 2.0
 
     assert hub_wall == pytest.approx(2.0875, abs=0.005) and hub_wall >= WALL_FLOOR
-    assert oil_to_front == pytest.approx(2.05, abs=0.005) and oil_to_front >= WALL_FLOOR
+    # Printed at .X from the front face it was 2.05 there but 1.79 to the
+    # flange; centred, both sides keep 2.47.
+    assert oil_ligament == pytest.approx(2.47, abs=0.005)
+    assert oil_ligament >= WALL_FLOOR
     assert hole_to_bore >= WALL_FLOOR
-    # Toward the flange the hole edge meets the flange face: an edge
-    # distance, but the hole must never break into the flange.
-    assert oil_to_flange > 0.0
     assert spec.HUB_WALL_WORST == pytest.approx(hub_wall, abs=1e-9)
-    assert spec.OIL_HOLE_TO_FRONT_WORST == pytest.approx(oil_to_front, abs=1e-9)
-    assert spec.OIL_HOLE_TO_FLANGE_WORST == pytest.approx(oil_to_flange, abs=1e-9)
+    assert spec.OIL_HOLE_LIGAMENT_WORST == pytest.approx(oil_ligament, abs=1e-9)
 
 
 def test_the_thin_rim_is_stated_on_the_sheet_at_its_worst_case() -> None:
@@ -163,8 +190,8 @@ def _spec_fresh():
 
 def test_the_wall_gate_refuses_a_coarser_printed_row(monkeypatch) -> None:
     # Positive control: the title block as it is.
-    assert _spec_fresh().OIL_HOLE_TO_FRONT_WORST == pytest.approx(
-        spec.OIL_HOLE_TO_FRONT_WORST
+    assert _spec_fresh().OIL_HOLE_LIGAMENT_WORST == pytest.approx(
+        spec.OIL_HOLE_LIGAMENT_WORST
     )
     # Negative control: rows loose enough to thin a wall under 2.0.
     monkeypatch.setattr(_printed_tolerance, "printed_band_mm", lambda _places: 1.0)
@@ -172,29 +199,121 @@ def test_the_wall_gate_refuses_a_coarser_printed_row(monkeypatch) -> None:
         _spec_fresh()
 
 
-def test_oil_hole_is_match_drilled_through_the_pressed_sleeve() -> None:
-    """R9-8: Ø1.2 on the drilled row, 3.5 at .X from the hub front face,
-    drilled through hub and sleeve together after pressing."""
+def test_the_oil_hole_is_centred_on_the_hub_body_the_lengths_leave() -> None:
+    """R9-8 / R9-60: Ø1.2 on the drilled row, match-drilled through hub and
+    sleeve after pressing and centred on the hub body, so its station behind
+    the hub front face follows the printed lengths, not a band of its own."""
     assert spec.OIL_HOLE_DIA == pytest.approx(1.2)
     assert spec.OIL_HOLE_STATION == pytest.approx(3.5)
-    assert _places("OilHoleStation") == 1
-    lines = spec.OIL_HOLE_CALLOUT_BELOW.splitlines()
-    assert lines[0] == f"MATCH DRILL AT ASSY WITH {spec.SLEEVE_NUMBER}"
-    assert spec.SLEEVE_NUMBER == "MHA-110"
-    assert "SLEEVE" in lines[1] and "AFTER PRESSING" in lines[1]
-    assert drawing.DIMENSION_CALLOUTS_BELOW["OilHoleDia"] == spec.OIL_HOLE_CALLOUT_BELOW
+    body = (
+        (spec.HUB_LENGTH - _row(_places("HubLength")))
+        - (spec.FLANGE_THICK + _row(_places("FlangeThick"))),
+        (spec.HUB_LENGTH + _row(_places("HubLength")))
+        - (spec.FLANGE_THICK - _row(_places("FlangeThick"))),
+    )
+    assert spec.OIL_HOLE_STATION == pytest.approx(sum(body) / 4.0)
+    assert spec.OIL_HOLE_STATION_RANGE == pytest.approx(
+        (
+            body[0] / 2.0 - spec.OIL_HOLE_CENTRING_TOL,
+            body[1] / 2.0 + spec.OIL_HOLE_CENTRING_TOL,
+        )
+    )
 
 
 def test_sheet_text_states_facts_not_governance() -> None:
-    printed = "\n".join(
-        (
-            spec.DRAWING_NOTES,
-            *drawing.DIMENSION_CALLOUTS_BELOW.values(),
-            *drawing.DIMENSION_CALLOUTS_ABOVE.values(),
-        )
-    )
     for word in ("EXCEPTION", "ACCEPTED", "RULING", "POLICY", "BOOK FIDELITY"):
-        assert word not in printed.upper()
+        assert word not in _sheet_text().upper()
+    notes = spec.DRAWING_NOTES.splitlines()
+    assert len(notes) <= 4
+    assert [line for line in notes if len(line) > 70] == []
+
+
+# Dimension text as the fleet's sheets print it: 3.5 mm caps, the advance and
+# line pitch measured on the arbor-pedestal sheet (test_arbor_pedestal_drawing).
+_CAP_M = 0.0035
+_ADVANCE = 109.7 / (42 * 3.5)
+_LINE_SPACING = 16.8 * 25.4 / 72.0 / 3.5
+_NOMINAL = {
+    "FlangeDia": spec.FLANGE_DIA,
+    "HubDia": spec.HUB_DIA,
+    "HubLength": spec.HUB_LENGTH,
+    "FlangeThick": spec.FLANGE_THICK,
+    "BoreDia": spec.BORE_DIA,
+    "BoltCircleDia": joint.BOLT_CIRCLE_DIA,
+    "ScrewHoleDia": spec.SCREW_HOLE_DIA,
+    "OilHoleDia": spec.OIL_HOLE_DIA,
+}
+
+
+def _printed_box(name: str, anchor: tuple[float, float]) -> Box:
+    """The estimated box of a kept dimension's whole text, centred on its
+    text point: value (the bore's with its upper limit) and callouts."""
+    value = f"{_NOMINAL[name]:.{_places(name)}f}"
+    if name.endswith("Dia"):
+        value = f"\u00d8{value}"
+    if name == "BoreDia":
+        value += f" +{spec.BORE_BAND[0]:.3f}"
+    lines = [
+        drawing.DIMENSION_CALLOUTS_ABOVE.get(name),
+        value,
+        drawing.DIMENSION_CALLOUTS_BELOW.get(name),
+    ]
+    box = estimate_text_box(
+        "\n".join(line for line in lines if line),
+        anchor=anchor,
+        height=_CAP_M,
+        reference=2,
+        advance_ratio=_ADVANCE,
+        line_spacing=_LINE_SPACING,
+    )
+    assert box is not None
+    return box
+
+
+def test_turned_diameters_print_inline_beside_their_own_step_on_the_edge_view() -> None:
+    """Policy rule 7: the turned diameters sit on the edge view, not leader-
+    piled through the face view's centre, each inline between its own
+    extension lines and off the part; the face view keeps the bore and the
+    holes; no two texts on the sheet print over each other."""
+    s = drawing._S
+    axis_y = drawing.SIDE_CENTER[1]
+    edge = Box(
+        drawing.HUB_FRONT_X,
+        axis_y - spec.FLANGE_DIA / 2.0 * s,
+        drawing.FLANGE_REAR_X,
+        axis_y + spec.FLANGE_DIA / 2.0 * s,
+    )
+    flange_r = spec.FLANGE_DIA / 2.0 * s
+
+    def face_gap(box: Box) -> float:
+        """Clearance from ``box`` to the face view's flange circle."""
+        cx, cy = drawing.END_CENTER
+        nearest_x = min(max(cx, box.xmin), box.xmax)
+        nearest_y = min(max(cy, box.ymin), box.ymax)
+        return math.hypot(nearest_x - cx, nearest_y - cy) - flange_r
+
+    assert set(drawing.END_KEEP) == {"BoreDia", "BoltCircleDia", "ScrewHoleDia"}
+    boxes = {
+        name: _printed_box(name, anchor)
+        for keep in (drawing.END_KEEP, drawing.SIDE_KEEP)
+        for name, anchor in keep.items()
+    }
+    for name, diameter in (("HubDia", spec.HUB_DIA), ("FlangeDia", spec.FLANGE_DIA)):
+        half = diameter / 2.0 * s
+        assert axis_y - half < boxes[name].ymin, name
+        assert boxes[name].ymax < axis_y + half, name
+    for name in drawing.SIDE_KEEP:
+        assert boxes[name].gap(edge) >= 0.004, name
+    for name in drawing.END_KEEP:
+        assert face_gap(boxes[name]) >= 0.004, name
+    # The oil hole's callout stays under the flange's O.D. extension line.
+    assert boxes["OilHoleDia"].ymax < edge.ymin
+    clashes = [
+        (a, b)
+        for a, b in itertools.combinations(sorted(boxes), 2)
+        if boxes[a].overlaps(boxes[b], tol=0.0)
+    ]
+    assert clashes == []
 
 
 class _FakeSketchManager:
@@ -202,19 +321,31 @@ class _FakeSketchManager:
 
 
 class _FakeSolidWorks:
-    """Just enough of the adapter for the recipe's own calls."""
+    """Just enough of the adapter for the recipe's own calls; it keeps the
+    lines and circles the recipe draws."""
 
     def __init__(self) -> None:
         self.currentSketchManager = _FakeSketchManager()
         self._n = 0
+        self.lines: dict[str, tuple[float, ...]] = {}
+        self.circles: list[tuple[float, ...]] = []
 
     async def _entity(self, *_args, **_kwargs) -> str:
         self._n += 1
         return f"Entity{self._n}"
 
+    async def add_line(self, *args) -> str:
+        line = await self._entity()
+        self.lines[line] = args
+        return line
+
+    async def add_circle(self, *args) -> str:
+        self.circles.append(args)
+        return await self._entity()
+
     create_part = create_sketch = exit_sketch = _entity
-    create_extrusion = create_cut_extrude = _entity
-    add_line = add_circle = add_sketch_constraint = add_sketch_dimension = _entity
+    create_extrusion = create_cut_extrude = create_revolve = _entity
+    add_centerline = add_sketch_constraint = add_sketch_dimension = _entity
 
 
 def _drive_value(expr: str, globals_mm: dict[str, float]) -> float:
@@ -222,14 +353,17 @@ def _drive_value(expr: str, globals_mm: dict[str, float]) -> float:
     return float(eval(text, {"__builtins__": {}}, {}))  # noqa: S307 -- test-local arithmetic
 
 
-def test_hole_and_diameter_equations_reproduce_the_modelled_geometry(
-    monkeypatch,
-) -> None:
-    """Every circle's drive equation (bolt-circle factors included) evaluates
-    to the size and centre the recipe draws, so a rebuild after the drives
-    moves nothing -- the screw holes stay on the joint's shared pattern."""
+def test_every_drive_equation_reproduces_the_modelled_geometry(monkeypatch) -> None:
+    """Every drive equation (bolt-circle factors included) evaluates to the
+    size, centre or length the recipe draws, so a rebuild after the drives
+    moves nothing: the screw holes stay on the joint's shared pattern, the
+    turned profile on its printed sizes, the oil hole centred on the body."""
     globals_mm: dict[str, float] = {}
     circles: list[tuple] = []
+    chains: list[list[str]] = []
+    diametric: dict[str, str] = {}
+    rows: dict[int, list[tuple[str | None, str | None]]] = {}
+    drives: dict[str, dict[str | None, str | None]] = {}
 
     async def set_global(_adapter, name, value):
         globals_mm[name] = float(value.removesuffix("mm"))
@@ -237,6 +371,22 @@ def test_hole_and_diameter_equations_reproduce_the_modelled_geometry(
     async def define_circle(_adapter, x, y, radius, label, *, dims, names, drives):
         circles.append((label, x, y, radius, names, drives))
         return label
+
+    real_chain = part.add_line_chain
+
+    async def add_line_chain(adapter, points, close=True):
+        chains.append(await real_chain(adapter, points, close))
+        return chains[-1]
+
+    async def add_diametric(_adapter, _axis, line, _text_xy, label):
+        diametric[label] = line
+
+    def record(self, name, drive=None):
+        rows.setdefault(id(self), []).append((name, drive))
+
+    def apply(self, _adapter, feature):
+        drives[feature] = dict(rows.get(id(self), []))
+        return []
 
     async def quiet(*_args, **_kwargs):
         return None
@@ -246,7 +396,11 @@ def test_hole_and_diameter_equations_reproduce_the_modelled_geometry(
 
     monkeypatch.setattr(part, "set_global", set_global)
     monkeypatch.setattr(part, "define_circle", define_circle)
-    monkeypatch.setattr(_common.SketchDims, "apply", lambda self, _a, _f: [])
+    monkeypatch.setattr(part, "add_line_chain", add_line_chain)
+    monkeypatch.setattr(part, "add_diametric_linear_dimension", add_diametric)
+    monkeypatch.setattr(_common.SketchDims, "record", record)
+    monkeypatch.setattr(_common.SketchDims, "apply", apply)
+    monkeypatch.setattr(_common, "check", lambda _label, result: result)
     monkeypatch.setattr(part, "check", lambda _label, result: result)
     monkeypatch.setattr(part, "name_dimensions", names)
     monkeypatch.setattr(part, "name_bore_axis", lambda *a, **k: _async("Axis1"))
@@ -276,11 +430,45 @@ def test_hole_and_diameter_equations_reproduce_the_modelled_geometry(
     ):
         monkeypatch.setattr(part, helper, lambda *a, **k: None)
 
-    asyncio.run(part.build(_FakeSolidWorks()))
+    fake = _FakeSolidWorks()
+    asyncio.run(part.build(fake))
+
+    def value(feature: str, name: str) -> float:
+        return _drive_value(drives[feature][name], globals_mm)
+
+    # Turned profile: each diameter twice its step's radius, the flange's
+    # thickness the run of its O.D., the overall the profile's reach.
+    (profile,) = chains
+    flange_u, flange_v0, _u, flange_v1 = fake.lines[diametric["FlangeDia"]]
+    hub_u, *_hub = fake.lines[diametric["HubDia"]]
+    drawn = {
+        "FlangeDia": 2.0 * flange_u,
+        "HubDia": 2.0 * hub_u,
+        "FlangeThick": abs(flange_v1 - flange_v0),
+        "HubLength": max(max(fake.lines[line][1::2]) for line in profile),
+    }
+    assert set(drives["HubProfile"]) == set(drawn)
+    for name, size in drawn.items():
+        assert value("HubProfile", name) == pytest.approx(size, abs=1e-9), name
+    assert drawn["FlangeDia"] == pytest.approx(spec.FLANGE_DIA)
+    assert drawn["HubLength"] == pytest.approx(spec.HUB_LENGTH)
+
+    # Oil hole: the station line runs from the hub front face to the hole's
+    # centre, half the hub body behind it.
+    (station,) = set(fake.lines) - set(profile)
+    _u0, front_v, _u1, hole_v = fake.lines[station]
+    ((_cu, centre_v, oil_r),) = fake.circles
+    assert centre_v == pytest.approx(hole_v)
+    assert value("OilHoleProfile", "OilHoleDatum") == pytest.approx(front_v)
+    assert value("OilHoleProfile", "OilHoleStation") == pytest.approx(front_v - hole_v)
+    assert value("OilHoleProfile", "OilHoleStation") == pytest.approx(
+        (spec.HUB_LENGTH - spec.FLANGE_THICK) / 2.0
+    )
+    assert value("OilHoleProfile", "OilHoleDia") == pytest.approx(2.0 * oil_r)
 
     holes = [c for c in circles if c[0].startswith("screw hole")]
-    drawn = [v for _label, x, y, *_rest in holes for v in (x, y)]
-    assert drawn == pytest.approx([v for xy in joint.screw_centres() for v in xy])
+    drawn_holes = [v for _label, x, y, *_rest in holes for v in (x, y)]
+    assert drawn_holes == pytest.approx([v for xy in joint.screw_centres() for v in xy])
     checked = 0
     for label, x, y, radius, _names, (d_x, d_y, d_size) in circles:
         for emitted, drive in ((abs(x), d_x), (abs(y), d_y), (2.0 * radius, d_size)):
@@ -294,8 +482,9 @@ def test_hole_and_diameter_equations_reproduce_the_modelled_geometry(
                 drive,
             )
             checked += 1
-    # Four on-axis diameters, three hole sizes, five non-zero hole centres.
-    assert checked == 4 + 3 + 5
+    # Two on-axis diameters (bore, bolt circle), three hole sizes, five
+    # non-zero hole centres.
+    assert checked == 2 + 3 + 5
 
 
 async def _async(value):

@@ -1,13 +1,15 @@
-r"""Create the three-sheet paper-drive assembly drawing (MHA-A06).
+r"""Create the four-sheet paper-drive assembly drawing (MHA-A06).
 
-Sheet 1 keeps the Front/Right/Isometric views of the whole paper drive.
-Sheet 2 carries the bill of materials, a ballooned isometric of the
-transgear (the hanger, the latch, the disc cluster and the knob stack) and a
-ballooned right view of the parts that isometric hides. Sheet 3 prints the
-transgear's assembly steps and the chain fit-up (CONTRACT-paper-drive.md
-§13.2), numbered by ``paper_drive_assembly_steps``; every value comes from
-the spec that owns it, or from that module for the values only the procedure
-owns.
+Sheet 1 keeps the Front/Right/Isometric views of the whole paper drive and
+balloons the chain and the spare sprocket on the isometric. Sheet 2 carries
+the bill of materials, a ballooned isometric of the transgear (the hanger,
+the latch, the disc cluster and the knob stack) and a ballooned right view of
+the parts that isometric hides. Sheet 3 balloons the bar, its clamps and the
+platen group on the builder's exploded isometric (PAPER_DRIVE_EXPLODED) and
+prints their steps. Sheet 4 prints the transgear's assembly steps and the
+chain fit-up (CONTRACT-paper-drive.md §13.2). Every step is numbered by
+``paper_drive_assembly_steps``; every value comes from the spec that owns it,
+or from that module for the values only the procedure owns.
 """
 
 from __future__ import annotations
@@ -18,14 +20,17 @@ import sys
 import textwrap
 from collections import Counter
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Iterable
 
+import _chain as chain
 import _config
 import _telemetry
 import latch_hook_bracket_geometry as bracket_geometry
 import latch_hook_geometry as hook_geometry
 import paper_drive_assembly_steps as steps
+import paper_drive_explode_spec as explode
 import platen_guide_spec as platen_guide
+import platen_spec as platen
 import transgear_arm_geometry as arm_geometry
 import transgear_arm_plate_geometry as plate_geometry
 import transgear_arm_plate_screw_spec as plate_screw
@@ -43,8 +48,11 @@ import transgear_pivot_screw_spec as pivot_screw
 import transgear_removable_spec as sprocket
 import transgear_stub_spec as stub
 from _common import _early_bound, check, run_build
+from _paper_drive_explode import exploded_view_name
 from _drawing_common import (
     SIMPLIFIED_VIEW_CONFIGURATION,
+    isolate_drawing_view_components,
+    set_view_exploded_state,
     BalloonAnchor,
     DrawingOutputs,
     ViewRole,
@@ -79,16 +87,30 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-SHEET_NAMES = ("ASSEMBLED VIEWS", "BILL OF MATERIALS", "ASSEMBLY AND FIT-UP")
+SHEET_NAMES = (
+    "ASSEMBLED VIEWS",
+    "BILL OF MATERIALS",
+    "PLATEN AND SUPPORT",
+    "ASSEMBLY AND FIT-UP",
+)
 if SPEC.layout is not DrawingLayout.LANDSCAPE:
     raise AssertionError("the paper-drive sheet coordinates are landscape")
 SHEET_LAYOUTS = {name: DrawingLayout.LANDSCAPE for name in SHEET_NAMES}
 
-# --- sheet 1: the whole paper drive (the pre-round-10 three-view layout) -----
-ASSEMBLED_SCALE = (1.0, 5.0)
-FRONT_CENTER = (0.080, 0.150)
-RIGHT_CENTER = (0.200, 0.150)
-ISO_CENTER = (0.320, 0.145)
+# --- sheet 1: the whole paper drive, front, right and isometric -------------
+# At 1:3 the 1:5 layout's views (farm run 20261001T110844152Z: front 94 x 59,
+# right 14 x 58, isometric 72 x 80 mm) grow to 157 x 99, 23 x 97 and
+# 120 x 133: the front and right views above the free lower-left field, the
+# isometric right of them over the title block, its balloon ring inside the
+# sheet (_assert_ring_inside reads the placed outline).
+ASSEMBLED_SCALE = (1.0, 3.0)
+FRONT_CENTER = (0.100, 0.190)
+RIGHT_CENTER = (0.215, 0.190)
+ISO_CENTER = (0.330, 0.170)
+# The isometric's balloon ring: left of it the right view, below it the
+# title block (top 0.066), the sheet's drawing border round the rest.
+ISO_RING_LIMITS = (0.235, 0.069, 0.418, 0.267)
+ASSEMBLED_CAPTION_XY = (0.018, 0.120)
 
 # --- sheet 2: BOM left, ballooned transgear isometric right ------------------
 # The drive-train BOM's column widths and row height (MHA-A03), on the same
@@ -140,23 +162,36 @@ BALLOON_RING_REACH = BALLOON_MARGIN + 0.005
 SHEET_TWO_RING_GAP = 0.004
 INNER_CAPTION_GAP = 0.002
 
-# --- sheet 3: the steps in two columns, a small reference view ---------------
+# --- sheet 3: the platen-and-support steps, the ballooned exploded view -----
+# The builder's PAPER_DRIVE_EXPLODED shows only these families here; its
+# estimated isometric spans 445 x 371 mm (paper_drive_explode_spec), 148 x
+# 124 at 1:3, right of the steps and over the title block.
+EXPLODED_SCALE = (1.0, 3.0)
+EXPLODED_CENTER = (0.318, 0.168)
+PLATEN_NOTE_XY = (0.018, 0.262)
+# The steps' right limit, left of the exploded view's balloon ring.
+PLATEN_NOTE_RIGHT = 0.222
+EXPLODED_RING_LIMITS = (PLATEN_NOTE_RIGHT + 0.003, 0.069, 0.418, 0.267)
+
+# --- sheet 4: the steps in two columns, a small reference view ---------------
 FITUP_SCALE = (1.0, 10.0)
 FITUP_REFERENCE_CENTER = (0.100, 0.045)
 FITUP_LINE_WIDTH = 68  # characters; default-format note text
-# Each note's top-left corner, then its right limit and lowest y: the left
+# Each column's top-left corner, then its right limit and lowest y: the left
 # column stops above the reference view; the right column stops above the
-# MHA-177 collar's own fit-up note, which stops above the title block (top
-# 0.066).
-FITUP_NOTE_XY = ((0.018, 0.262), (0.215, 0.262), (0.215, 0.150))
-FITUP_NOTE_LIMITS = ((0.210, 0.075), (0.418, 0.152), (0.418, 0.072))
-# The chain fit-up (§13.2) opens the second column.
+# title block (top 0.066).
+FITUP_NOTE_XY = ((0.018, 0.262), (0.215, 0.262))
+FITUP_NOTE_LIMITS = ((0.210, 0.075), (0.418, 0.072))
+# The platen's locks open sheet 4; the chain fit-up (§13.2) opens its second
+# column.
+FITUP_FIRST_COLUMN_KEY = "guide-locks-set"
 FITUP_SECOND_COLUMN_KEY = "fitup-pose-set"
 
 SHEET_SCALES = {
     SHEET_NAMES[0]: ASSEMBLED_SCALE,
     SHEET_NAMES[1]: TRANSGEAR_VIEW_SCALE,
-    SHEET_NAMES[2]: FITUP_SCALE,
+    SHEET_NAMES[2]: EXPLODED_SCALE,
+    SHEET_NAMES[3]: FITUP_SCALE,
 }
 
 # --- BOM identities ------------------------------------------------------------
@@ -403,11 +438,63 @@ def transgear_balloon_items(
     )
 
 
+# Sheet 1's isometric balloons what sheets 2 and 3 do not show: the chain,
+# and the spare T18 on the base deck (the third removable inserted), whose
+# item sheet 2 balloons on the knob's T24.
+ASSEMBLED_BALLOON_ANCHORS = {
+    "chain-inner-link": BalloonAnchor(),
+    "chain-outer-link": BalloonAnchor(),
+    "transgear-removable": BalloonAnchor(instance="transgear-removable-3"),
+}
+# Sheet 3's exploded view balloons every family it shows.
+PLATEN_BALLOON_ANCHORS = {stem: BalloonAnchor() for stem in explode.SHOWN_STEMS}
+
+
+def _in_item_order(
+    items: dict[str, str], stems: Iterable[str]
+) -> tuple[tuple[str, str], ...]:
+    return tuple(
+        sorted(((stem, items[stem]) for stem in stems), key=lambda p: int(p[1]))
+    )
+
+
+def assembled_balloon_items(items: dict[str, str]) -> tuple[tuple[str, str], ...]:
+    """Sheet 1's isometric balloons, in item order."""
+    return _in_item_order(items, ASSEMBLED_BALLOON_ANCHORS)
+
+
+def platen_balloon_items(items: dict[str, str]) -> tuple[tuple[str, str], ...]:
+    """Sheet 3's exploded-view balloons, in item order."""
+    return _in_item_order(items, PLATEN_BALLOON_ANCHORS)
+
+
 Box = tuple[float, float, float, float]
 
 
 def _grown(box: Box, by: float) -> Box:
     return (box[0] - by, box[1] - by, box[2] + by, box[3] + by)
+
+
+def ring_fit_shift(outline: Box, limits: Box, *, name: str) -> tuple[float, float]:
+    """Shift that centres a view's balloon ring inside ``limits``.
+
+    Outlines and limits are sheet metres (left, bottom, right, top); the ring
+    is the outline grown by BALLOON_RING_REACH. Raises naming each axis on
+    which the ring is larger than the room.
+    """
+    ring = _grown(outline, BALLOON_RING_REACH)
+    findings = [
+        f"{name} ring {axis} {(ring[hi] - ring[lo]) * 1000:.1f} mm > room "
+        f"{(limits[hi] - limits[lo]) * 1000:.1f} mm"
+        for axis, lo, hi in (("width", 0, 2), ("height", 1, 3))
+        if ring[hi] - ring[lo] > limits[hi] - limits[lo]
+    ]
+    if findings:
+        raise ValueError(f"balloon ring does not fit: {'; '.join(findings)}")
+    return (
+        (limits[0] + limits[2] - ring[0] - ring[2]) / 2.0,
+        (limits[1] + limits[3] - ring[1] - ring[3]) / 2.0,
+    )
 
 
 def inner_view_shift(iso_outline: Box, inner_outline: Box) -> tuple[float, float]:
@@ -516,6 +603,10 @@ KNOB_END_FLOAT_RANGE = (
 # §13.2 procedure (4): past this gap the T24 seat would pass the collar's
 # SEAT_MAX_FROM_F in front of the 12T front face.
 COLLAR_GAP_MAX = collar.SEAT_MAX_FROM_F - collar.LENGTH
+# The platen's screw stations (platen_spec): its front counterbores take the
+# guide screws, its through-taps the clip screws.
+GUIDE_SCREWS = len(platen.GUIDE_HOLE_X) * len(platen.GUIDE_HOLE_Y)
+CLIP_SCREWS = len(platen.SOCKET_XY)
 
 
 def _stack_text() -> str:
@@ -531,6 +622,34 @@ def _step_text() -> dict[str, str]:
     knob_lo, knob_hi = KNOB_END_FLOAT_RANGE
     teeth = f"{KNOB_TEETH}T"
     return {
+        "bar-clamped": (
+            f"CLAMP THE {_N['support-bar']} BAR TO BOTH COLUMNS, EACH BETWEEN A "
+            f"{_N['column-clamp-front']} FRONT AND A {_N['column-clamp-back']} BACK "
+            f"ARC, WITH THE {_N['clamp-screw']} SCREWS FROM THE BAR FRONT. SET "
+            f"THE BAR TOP {steps.BAR_TOP_ABOVE_DECK:.1f} ABOVE THE BASE DECK AT "
+            "BOTH COLUMNS; TIGHTEN."
+        ),
+        "rack-soldered": (
+            f"SOFT-SOLDER THE {_N['platen-rack']} RACK TO THE {_N['platen']} "
+            "PLATEN'S BACK, TEETH DOWN, ENDS FLUSH WITH THE PLATEN'S, CRESTS "
+            f"{steps.RACK_CREST_TEXT} BELOW "
+            "ITS BOTTOM EDGE."
+        ),
+        "guides-screwed": (
+            f"SCREW THE {len(platen.GUIDE_HOLE_Y)} {_N['platen-guide']} GUIDES TO "
+            f"THE PLATEN BACK WITH {GUIDE_SCREWS} {_N['fillister-screw']} SCREWS "
+            "FROM THE FRONT, HEADS IN THE COUNTERBORES."
+        ),
+        "clips-fitted": (
+            f"SCREW THE {_N['platen-clip']} CLIPS TO THE PLATEN FRONT WITH "
+            f"{CLIP_SCREWS} {_N['fillister-screw']} SCREWS; SLIP THE "
+            f"{_N['platen-paper']} PAPER UNDER THEIR SPRING RAILS."
+        ),
+        "platen-hung": (
+            "HANG THE PLATEN ON THE BAR, THE TOP GUIDE ON THE BAR TOP. FIT THE "
+            f"{_N['guide-lock']} LOCKS TO THE GUIDE BACKS BEHIND THE BAR WITH "
+            f"THEIR {_N['guide-lock-screw']} SCREWS, LOOSE."
+        ),
         "guide-locks-set": (
             f"SNUG EACH {_N['guide-lock']} LOCK'S {_N['guide-lock-screw']} SCREWS, "
             "PUSH THE LOCK AWAY FROM THE BAR TILL ITS HOLES BEAR ON THEM; TIGHTEN."
@@ -584,7 +703,8 @@ def _step_text() -> dict[str, str]:
             f"BREAK {disc_screw.CUT_END_BREAK_TEXT}."
         ),
         "oil-hole-drilled": (
-            f"DRILL THE \u00d8{hub.OIL_HOLE_DIA:.1f} OIL HOLE THROUGH HUB AND "
+            f"DRILL THE \u00d8{hub.OIL_HOLE_DIA:.1f} OIL HOLE CENTRED ON THE HUB BODY, "
+            "THROUGH HUB AND "
             f"SLEEVE IN ONE OPERATION AS {_N['transgear-disc-hub']} SHOWS; "
             "DEBURR THE BORE."
         ),
@@ -636,9 +756,11 @@ def _step_text() -> dict[str, str]:
             "EDGE, OR DEPTH GAUGE THROUGH THE CHAIN WINDOW). COLLAR GAP "
             f"g = d + {collar.FIT_UP_OFFSET_TARGET:.2f} SETS THE T24 "
             f"{collar.FIT_UP_OFFSET_SET_TEXT} FORWARD "
-            f"OF THE T12. IF g EXCEEDS {COLLAR_GAP_MAX:.2f}, STOP AND REPORT. IF "
-            f"g IS 0 OR LESS, LEAVE THE COLLAR ON THE {teeth} (g = 0) AND "
-            "RECORD d."
+            f"OF THE T12, THE SETTING STEP {steps.step_number('fitup-accepted')} "
+            f"RE-CHECKS. IF g EXCEEDS {COLLAR_GAP_MAX:.2f} (T24 SEAT "
+            f"{steps.T24_SEAT_MAX_TEXT} IN FRONT OF THE {teeth} FRONT FACE), "
+            f"STOP AND REPORT. IF g IS 0 OR LESS, LEAVE THE COLLAR ON THE {teeth} "
+            f"(COLLAR-TO-{teeth} GAP {steps.COLLAR_GAP_MIN_TEXT}) AND RECORD d."
         ),
         "collar-pinned": (
             f"THUMBNUT AND T24 OFF. SLOTTED SHIM g BETWEEN COLLAR AND {teeth}; "
@@ -647,8 +769,7 @@ def _step_text() -> dict[str, str]:
             f"FACE, TIGHTENED BY THE THUMBNUT. {collar.CROSS_PIN_DRILL_PHRASE}; "
             "FIT THE "
             f"{_N['transgear-collar-cross-pin']} SPRING PIN IN THE SLOT. SLEEVE "
-            "AND SHIM OUT; T24 ON WITH THE CHAIN LOOPED OVER IT AND THE T12; "
-            "THUMBNUT TIGHT."
+            "AND SHIM OUT; T24 ON, THUMBNUT TIGHT."
         ),
         "stud-end-cut": (
             f"IF THE {_N['transgear-knob-shaft']} STUD END STANDS PROUD OF THE "
@@ -656,46 +777,93 @@ def _step_text() -> dict[str, str]:
         ),
         "fitup-accepted": (
             f"ACCEPT, IN THE POSE OF STEP {steps.step_number('fitup-pose-set')}: "
-            f"T24 FRONT FACE {steps.OFFSET_ACCEPT_TEXT} FORWARD OF THE T12 FRONT FACE; "
-            f"KNOB END FLOAT {knob_lo:.2f} TO {knob_hi:.2f}; PIVOT HEAD PLAY "
+            f"T24 FRONT FACE {steps.OFFSET_ACCEPT_TEXT} FORWARD OF THE T12 FRONT FACE "
+            f"(STEP {steps.step_number('collar-gap-measured')}'S SETTING, WIDENED "
+            "FOR PINNING AND GAUGE SPREAD: THE T24 UP TO "
+            f"{steps.OFFSET_ACCEPT_TOL - collar.FIT_UP_OFFSET_TARGET:.2f} BEHIND "
+            f"PASSES); KNOB END FLOAT {knob_lo:.2f} TO {knob_hi:.2f}; PIVOT HEAD PLAY "
             f"{joints.HEAD_PLAY_MIN:.2f} TO {joints.HEAD_PLAY_MAX:.2f}, THE "
             "HANGER SWINGING FREELY; COLLAR TO DISC AIR "
             f"{steps.COLLAR_DISC_AIR_TEXT}. OTHERWISE REPORT."
         ),
+        "chain-closed": (
+            f"LOOP {chain.LINK_COUNT} PITCHES OF #25 CHAIN, "
+            f"{_N['chain-inner-link']} INNER AND {_N['chain-outer-link']} OUTER "
+            "LINKS, OVER THE T24 AND THE T12; JOIN THE ENDS WITH A #25 "
+            "CONNECTING LINK AS ONE OUTER LINK, ITS CLIP'S CLOSED END LEADING "
+            "IN THE DIRECTION OF TRAVEL. THE CENTRES ARE FIXED: NO TENSIONING, "
+            "THE SLACK RUN HANGS FREE."
+        ),
+        "chain-run-accepted": (
+            "TURN THE CRANK 2 TURNS EACH WAY: THE CHAIN SEATS ON EVERY TOOTH OF "
+            "BOTH WHEELS WITHOUT CLIMBING OR A TIGHT SPOT, AND THE SLACK RUN "
+            "TOUCHES NOTHING. OTHERWISE REPORT."
+        ),
     }
 
 
-def _fitup_columns() -> tuple[str, str]:
+def _step_column(heading: str, keys: tuple[str, ...], text: dict[str, str]) -> str:
+    lines = textwrap.wrap(heading, width=FITUP_LINE_WIDTH)
+    for key in keys:
+        lines += textwrap.wrap(
+            text[key],
+            width=FITUP_LINE_WIDTH,
+            initial_indent=f"{steps.step_number(key)}. ",
+            subsequent_indent="   ",
+        )
+    return "\n".join(lines)
+
+
+def _step_columns() -> tuple[str, str, str]:
+    """Sheet 3's platen-and-support steps, then sheet 4's two columns."""
     text = _step_text()
     if set(text) != set(steps.SEQUENCE):
         raise AssertionError("paper-drive step text must cover exactly the sequence")
-    split = steps.step_number(FITUP_SECOND_COLUMN_KEY) - 1
-    headings = (
-        "TRANSGEAR ASSEMBLY",
-        "CHAIN FIT-UP, CRANK SIDE DONE PER " + " AND ".join(steps.CRANK_SIDE_REFS),
+    first = steps.step_number(FITUP_FIRST_COLUMN_KEY) - 1
+    second = steps.step_number(FITUP_SECOND_COLUMN_KEY) - 1
+    return (
+        _step_column(
+            f"PLATEN AND SUPPORT; STEP {steps.step_number(FITUP_FIRST_COLUMN_KEY)} "
+            f"ON: SHEET {SHEET_NAMES.index('ASSEMBLY AND FIT-UP') + 1}",
+            steps.SEQUENCE[:first],
+            text,
+        ),
+        _step_column(
+            "PLATEN LOCKS, THEN THE TRANSGEAR", steps.SEQUENCE[first:second], text
+        ),
+        _step_column(
+            f"CHAIN FIT-UP, CRANK SIDE DONE PER {steps.CRANK_SIDE_REF}",
+            steps.SEQUENCE[second:],
+            text,
+        ),
     )
-    columns = []
-    for heading, keys in zip(
-        headings, (steps.SEQUENCE[:split], steps.SEQUENCE[split:]), strict=True
-    ):
-        lines = textwrap.wrap(heading, width=FITUP_LINE_WIDTH)
-        for key in keys:
-            lines += textwrap.wrap(
-                text[key],
-                width=FITUP_LINE_WIDTH,
-                initial_indent=f"{steps.step_number(key)}. ",
-                subsequent_indent="   ",
-            )
-        columns.append("\n".join(lines))
-    return columns[0], columns[1]
 
 
-FITUP_COLUMNS = _fitup_columns()
-FITUP_STEPS = "\n".join(FITUP_COLUMNS)
-# The collar sheet leaves its fit-up instruction to this assembly (policy
-# rule 6); it prints verbatim under the chain fit-up.
-FITUP_COLLAR_NOTE = f"{_N['transgear-drive-collar']} COLLAR\n{collar.FIT_UP_NOTE}"
-FITUP_NOTES = (*FITUP_COLUMNS, FITUP_COLLAR_NOTE)
+PLATEN_STEPS, *_FITUP = _step_columns()
+# Sheet 4's two columns, left to right.
+FITUP_COLUMNS: tuple[str, str] = (_FITUP[0], _FITUP[1])
+FITUP_STEPS = "\n".join((PLATEN_STEPS, *FITUP_COLUMNS))
+FITUP_NOTES = FITUP_COLUMNS
+EXPLODED_CAPTION = (
+    f"PLATEN AND SUPPORT EXPLODED {EXPLODED_SCALE[0]:g}:{EXPLODED_SCALE[1]:g}; "
+    f"BOM: SHEET {SHEET_NAMES.index('BILL OF MATERIALS') + 1}"
+)
+# One blank line under the steps (default note text, 4.5 mm line pitch).
+EXPLODED_CAPTION_XY = (
+    PLATEN_NOTE_XY[0],
+    PLATEN_NOTE_XY[1] - (len(PLATEN_STEPS.splitlines()) + 1) * 0.0045,
+)
+# Sheet 1: which removable is which, and where every other item balloons.
+ASSEMBLED_CAPTION = "\n".join(
+    textwrap.wrap(
+        f"ISOMETRIC: THE {_N['transgear-removable']} ON THE BASE DECK IS THE T18 "
+        "SPARE, STORED LOOSE; THE T24 IS ON THE KNOB, THE T12 ON THE CRANK. "
+        "PLATEN AND SUPPORT ITEMS: SHEET "
+        f"{SHEET_NAMES.index('PLATEN AND SUPPORT') + 1}; TRANSGEAR ITEMS: SHEET "
+        f"{SHEET_NAMES.index('BILL OF MATERIALS') + 1}.",
+        width=FITUP_LINE_WIDTH,
+    )
+)
 TRANSGEAR_CAPTION = (
     f"TRANSGEAR {TRANSGEAR_VIEW_SCALE[0]:g}:{TRANSGEAR_VIEW_SCALE[1]:g}; "
     f"ASSEMBLY AND FIT-UP: SHEET {SHEET_NAMES.index('ASSEMBLY AND FIT-UP') + 1}"
@@ -706,12 +874,15 @@ INNER_CAPTIONS = {
     for scale in INNER_SCALE_LADDER
 }
 FITUP_REFERENCE_CAPTION = (
-    f"REFERENCE {FITUP_SCALE[0]:g}:{FITUP_SCALE[1]:g}; ITEMS: SHEET "
-    f"{SHEET_NAMES.index('BILL OF MATERIALS') + 1}"
+    f"REFERENCE {FITUP_SCALE[0]:g}:{FITUP_SCALE[1]:g}; ITEMS: SHEETS 1 TO "
+    f"{SHEET_NAMES.index('PLATEN AND SUPPORT') + 1}"
 )
 # Every text the package prints besides the BOM's own cells.
 SHEET_TEXTS = (
+    PLATEN_STEPS,
     *FITUP_NOTES,
+    EXPLODED_CAPTION,
+    ASSEMBLED_CAPTION,
     TRANSGEAR_CAPTION,
     *INNER_CAPTIONS.values(),
     FITUP_REFERENCE_CAPTION,
@@ -765,6 +936,19 @@ def _source_family_counts(model: Any) -> Counter[str]:
     if wrong:
         raise RuntimeError(f"paper-drive transgear counts off the contract: {wrong!r}")
     return counts
+
+
+def _validate_persisted_explode(model: Any) -> None:
+    """The builder authored PAPER_DRIVE_EXPLODED in both drawing configurations."""
+    assembly = _early_bound(model, "IAssemblyDoc")
+    for configuration in (explode.SOURCE_CONFIGURATION, SIMPLIFIED_VIEW_CONFIGURATION):
+        wanted = (exploded_view_name(configuration),)
+        names = tuple(assembly.GetExplodedViewNames2(configuration) or ())
+        if names != wanted:
+            raise RuntimeError(
+                f"paper-drive source {configuration} exploded views {names!r} "
+                f"!= {wanted!r}"
+            )
 
 
 def _create_sheets(adapter: Any) -> None:
@@ -899,7 +1083,9 @@ def _isolate_instances(
         raise RuntimeError(f"{label}: instances not in the view: {missing!r}")
 
 
-def _place_assembled_sheet(adapter: Any) -> None:
+def _place_assembled_sheet(adapter: Any) -> Any:
+    """Front, right and isometric of the whole drive; returns the isometric,
+    centred so its balloon ring keeps inside ISO_RING_LIMITS."""
     _activate_sheet(adapter, SHEET_NAMES[0])
     for view_name, center in (
         ("*Front", FRONT_CENTER),
@@ -914,6 +1100,19 @@ def _place_assembled_sheet(adapter: Any) -> None:
         apply_view_configuration(
             adapter, view, role=role, label=f"paper drive {view_name}"
         )
+    label = "paper drive *Isometric"
+    shift = ring_fit_shift(
+        _view_outline(view), ISO_RING_LIMITS, name="sheet 1 isometric"
+    )
+    _shift_view(adapter, view, shift, label=f"{label} ring fit")
+    _place_sheet_note(
+        adapter,
+        SHEET_NAMES[0],
+        ASSEMBLED_CAPTION,
+        ASSEMBLED_CAPTION_XY,
+        label="assembled-views caption",
+    )
+    return view
 
 
 def _view_outline(view: Any) -> Box:
@@ -967,9 +1166,12 @@ def _link_view_to_bom(view: Any, table: Any, *, label: str) -> None:
         raise RuntimeError(f"{label}: view is not linked to BOM {name!r}")
 
 
-def _place_bom_sheet(adapter: Any, counts: Counter[str]) -> list[Any]:
+def _place_bom_sheet(
+    adapter: Any, counts: Counter[str]
+) -> tuple[list[Any], Any, dict[str, str]]:
     """BOM of the whole drive; the transgear isometric and the inner view
-    between them balloon every transgear family once."""
+    between them balloon every transgear family once. Returns the landings,
+    the BOM table and its (stem: item) numbers."""
     _activate_sheet(adapter, SHEET_NAMES[1])
     label = "transgear isometric"
     view = place_view(
@@ -1057,22 +1259,78 @@ def _place_bom_sheet(adapter: Any, counts: Counter[str]) -> list[Any]:
         ),
         label="inner-parts caption",
     )
+    return landings, table, items
+
+
+def _balloon_assembled_sheet(
+    adapter: Any, iso: Any, table: Any, items: dict[str, str]
+) -> list[Any]:
+    """The chain and the spare T18 on sheet 1's isometric."""
+    _activate_sheet(adapter, SHEET_NAMES[0])
+    _link_view_to_bom(iso, table, label="sheet 1 isometric")
+    return add_component_bom_balloons(
+        adapter,
+        iso,
+        items=assembled_balloon_items(items),
+        anchors=ASSEMBLED_BALLOON_ANCHORS,
+        label="paper-drive sheet 1 BOM coverage",
+        margin=BALLOON_MARGIN,
+    )
+
+
+def _place_exploded_sheet(adapter: Any, table: Any, items: dict[str, str]) -> list[Any]:
+    """The builder's PAPER_DRIVE_EXPLODED, only the platen-and-support
+    families shown, each ballooned once; their steps left of it."""
+    _activate_sheet(adapter, SHEET_NAMES[2])
+    label = "platen and support exploded"
+    view = place_view(
+        adapter, str(SOURCE), "*Isometric", *EXPLODED_CENTER, scale=EXPLODED_SCALE
+    )
+    set_high_quality_shaded_with_edges(adapter, view, label=label)
+    configuration = apply_view_configuration(adapter, view, label=label)
+    set_view_exploded_state(
+        adapter, view, True, configuration=configuration, label=label
+    )
+    isolate_drawing_view_components(
+        adapter, view, visible_stems=explode.SHOWN_STEMS, label=label
+    )
+    shift = ring_fit_shift(_view_outline(view), EXPLODED_RING_LIMITS, name=label)
+    _shift_view(adapter, view, shift, label=f"{label} ring fit")
+    _link_view_to_bom(view, table, label=label)
+    landings = add_component_bom_balloons(
+        adapter,
+        view,
+        items=platen_balloon_items(items),
+        anchors=PLATEN_BALLOON_ANCHORS,
+        label="paper-drive platen BOM coverage",
+        margin=BALLOON_MARGIN,
+    )
+    _place_sheet_note(
+        adapter, SHEET_NAMES[2], PLATEN_STEPS, PLATEN_NOTE_XY, label="platen steps"
+    )
+    _place_sheet_note(
+        adapter,
+        SHEET_NAMES[2],
+        EXPLODED_CAPTION,
+        EXPLODED_CAPTION_XY,
+        label="exploded-view caption",
+    )
     return landings
 
 
 def _place_fitup_sheet(adapter: Any) -> None:
-    _activate_sheet(adapter, SHEET_NAMES[2])
+    _activate_sheet(adapter, SHEET_NAMES[3])
     view = place_view(
         adapter, str(SOURCE), "*Isometric", *FITUP_REFERENCE_CENTER, scale=FITUP_SCALE
     )
     apply_view_configuration(adapter, view, label="fit-up reference isometric")
     for index, (text, xy) in enumerate(zip(FITUP_NOTES, FITUP_NOTE_XY, strict=True)):
         _place_sheet_note(
-            adapter, SHEET_NAMES[2], text, xy, label=f"fit-up note {index + 1}"
+            adapter, SHEET_NAMES[3], text, xy, label=f"fit-up note {index + 1}"
         )
     _place_sheet_note(
         adapter,
-        SHEET_NAMES[2],
+        SHEET_NAMES[3],
         FITUP_REFERENCE_CAPTION,
         (FITUP_REFERENCE_CENTER[0] - 0.040, FITUP_NOTE_LIMITS[0][1] - 0.002),
         label="fit-up reference caption",
@@ -1109,9 +1367,12 @@ async def build(adapter: Any) -> dict[str, str]:
             f"{steps.DRAWING_NUMBER!r}"
         )
     counts = _source_family_counts(adapter.currentModel)
+    _validate_persisted_explode(adapter.currentModel)
     _create_sheets(adapter)
-    _place_assembled_sheet(adapter)
-    landings = _place_bom_sheet(adapter, counts)
+    iso = _place_assembled_sheet(adapter)
+    landings, table, items = _place_bom_sheet(adapter, counts)
+    landings += _balloon_assembled_sheet(adapter, iso, table, items)
+    landings += _place_exploded_sheet(adapter, table, items)
     _place_fitup_sheet(adapter)
     assert_full_detail_view(adapter, label="paper-drive assembly")
 

@@ -7,14 +7,19 @@ closure.  Geometry and frame: ``latch_hook_bracket_geometry``.
 How the sheet locates things (holes drilled after bending, R9-10):
 
 * screw-hole X from the flap's outer face (x = 0), hole Y from the base's
-  low-Y edge (y = 0), both ±POSITION_TOL;
+  low-Y edge (y = 0), both ±POSITION_TOL: the pair lands on the MHA-074
+  bar's #4-40 taps (themselves ±0.065) with ~0.18 radial float, and the
+  title block's .XXX ±0.13 would leave the y-edge ligament 1.94 and the
+  head 0.14 off the bend fillet;
 * rivet holes: not located on the sheet.  They are match-drilled through
   the MHA-127 hook at assembly, after the hook is set to latch the MHA-169
   pin (R9-15); the model keeps them at the hook's nominal ``RIVET_YZ``;
 * the width at ±WIDTH_TOL: the base must stay inside the bar's lock-free
   band (0.5 each side of the 8.0 base), and the y-edge ligament of the screw
   holes is 2.00 at that band; the title block's .XX row would thin it to 1.74;
-* the base length at .XX and the flap height at .X (title block);
+* the base length at .XX (title block): at .X the screw hole's -X edge
+  wall would be 2.900 - 0.8 - 0.065 - 0.05 = 1.985, under the 2.0 target;
+  the flap height at .X (title block);
 * both hole sizes drilled, +0.10 / 0.
 
 Walls (policy rule 12) are judged at the worst case of those bands, with the
@@ -206,13 +211,10 @@ if HEAD_CLEARANCE_WORST < HEAD_CLEARANCE_FLOOR - 1e-9:
 
 # --- Sheet text --------------------------------------------------------------
 BEND_NOTE = f"INSIDE BEND R{INSIDE_BEND_R_MAX:.1f} MAX; DRILL HOLES AFTER BENDING."
-DRAWING_NOTES = "\n".join(
-    (
-        f"1. MAKE FROM {SHEET_T:.1f} LOW-CARBON STEEL SHEET (16 GA).",
-        "2. BEND 90 DEG. " + BEND_NOTE,
-        "3. BREAK SHARP EDGES; DEBURR HOLES.",
-    )
-)
+# The stock is the title block's MATERIAL cell (the registry row's
+# ``material``) and its general note breaks edges, so the one note is the bend.
+MATERIAL_TITLE = f"{SHEET_T:.1f} (16 GA) CR sheet, A1008 CS"
+DRAWING_NOTES = "1. BEND 90 DEG. " + BEND_NOTE
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 2:1"
 HOLE_CALLOUT = "DRILL THRU"
 RIVET_HOLE_CALLOUT = "DRILL AT ASSEMBLY THROUGH MHA-127"

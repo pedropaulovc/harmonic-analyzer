@@ -87,6 +87,18 @@ from transgear_disc_hub_geometry import (
 )
 from transgear_disc_screw_spec import ENGAGEMENT_WORST_D
 
+# The MHA-161 screw's worst full-thread engagement in the through taps (the
+# tap's lead runs out of the rear face; the losses are the far-side
+# countersink and the cut tip), floored so the MIN never rounds up.
+ENGAGEMENT_WORST_D_PRINTED = math.floor(ENGAGEMENT_WORST_D * 100.0) / 100.0
+MANUFACTURING_NOTES = "\n".join(
+    (
+        DRAWING_NOTES,
+        "#0-80 TAPS FULL THREAD THRU; MHA-161 SCREW ENGAGEMENT "
+        f"{ENGAGEMENT_WORST_D_PRINTED:.2f}D MIN.",
+    )
+)
+
 PART_NAME = "rack-pinion"
 MATERIAL = "Brass"  # ch. 23 photos: brass
 
@@ -251,7 +263,7 @@ async def build(adapter) -> dict[str, str]:
     apply_drawing_properties(
         adapter,
         PART_NAME,
-        {"Gear Data": GEAR_DATA, "Manufacturing Notes": DRAWING_NOTES},
+        {"Gear Data": GEAR_DATA, "Manufacturing Notes": MANUFACTURING_NOTES},
     )
     return await save_simplified_part(adapter, PART_NAME, disc.tooth_features)
 

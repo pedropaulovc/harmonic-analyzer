@@ -2,13 +2,14 @@ r"""Create the manufacturing drawing for the transgear disc hub (MHA-159).
 
 The edge view is the ``*Top`` orientation turned a quarter turn so the hub's
 axis lies horizontal, as it sits in the lathe (policy rule 7): the hub front
-face on the left, the flange on the right.  Looking down on +Y it sees the
-radial oil hole end-on, so it carries the overall length, the flange, the
-oil-hole station from the hub front face and the hole's match-drill callout.
-The face view is the ``*Back`` orientation (looking at the hub front) turned
-to match -- exactly the third-angle LEFT view of that profile -- so it sits
-on the profile's axis to its left and carries the four diameters and the
-screw holes on their printed bolt circle.
+face on the left, the flange on the right.  It carries the turned profile:
+both diameters beside their steps and both lengths from the flange's rear
+face.  Looking down on +Y it sees the radial oil hole end-on, so it also
+carries the hole's size and its match-drill callout.  The face view is the
+``*Back`` orientation (looking at the hub front) turned to match -- exactly
+the third-angle LEFT view of that profile -- so it sits on the profile's axis
+to its left and carries the bore and the screw holes on their printed bolt
+circle.
 """
 
 from __future__ import annotations
@@ -39,7 +40,6 @@ from transgear_disc_hub_spec import (
     DRAWING_PRECISION_BY_NAME,
     HUB_LENGTH,
     OIL_HOLE_CALLOUT_BELOW,
-    OIL_HOLE_Z,
     SCREW_HOLE_CALLOUT_ABOVE,
     SCREW_HOLE_CALLOUT_BELOW,
 )
@@ -85,27 +85,27 @@ def _side_x(z_mm: float) -> float:
 
 HUB_FRONT_X = _side_x(-HUB_LENGTH)
 FLANGE_REAR_X = _side_x(0.0)
-OIL_HOLE_X = _side_x(OIL_HOLE_Z)
 
 # Every size and callout sits outside the silhouettes.
-# - Face view: the flange and bolt circle diameters above it, the hub and
-#   bore diameters below; the screw-hole size (3X, drilled through the
-#   flange) right of it, the bore's press callout under the bore's value.
-# - Edge view: the overall length on the row above, the flange's thickness
-#   right of the flange, the oil-hole station from the hub front face on the
-#   row below and the hole's size with its match-drill note below-right.
+# - Face view: the bolt circle diameter above-left, the screw-hole size (3X,
+#   drilled through the flange) right of it, the bore below with its press
+#   callout under the bore's value.
+# - Edge view: each turned diameter inline beside its own step (the hub's
+#   left of the hub front face, the flange's right of the flange rear face);
+#   the overall length on the row above, the flange's thickness right of the
+#   flange, and the oil hole's size with its match-drill callout below-right,
+#   under the flange.
 END_KEEP = {
-    "FlangeDia": (END_CENTER[0], 0.232),
     "BoltCircleDia": (END_CENTER[0] - 0.030, 0.222),
-    "HubDia": (END_CENTER[0] - 0.030, 0.112),
     "BoreDia": (END_CENTER[0] + 0.020, 0.102),
     "ScrewHoleDia": (END_CENTER[0] + 0.062, 0.215),
 }
 SIDE_KEEP = {
+    "HubDia": (HUB_FRONT_X - 0.016, SIDE_CENTER[1]),
+    "FlangeDia": (FLANGE_REAR_X + 0.016, SIDE_CENTER[1]),
     "HubLength": ((HUB_FRONT_X + FLANGE_REAR_X) / 2.0, 0.232),
     "FlangeThick": (FLANGE_REAR_X + 0.018, 0.222),
-    "OilHoleStation": ((HUB_FRONT_X + OIL_HOLE_X) / 2.0, 0.108),
-    "OilHoleDia": (FLANGE_REAR_X + 0.030, 0.120),
+    "OilHoleDia": (FLANGE_REAR_X + 0.030, 0.105),
 }
 DIMENSION_CALLOUTS_BELOW = {
     "BoreDia": BORE_CALLOUT,

@@ -2,12 +2,11 @@ r"""Create the manufacturing drawing for the transgear hub cap (MHA-160).
 
 The face view is the ``*Front`` orientation, looking at the front face: it
 carries the native #6-32 through-thread callout with the front countersink
-named under its thread line, and the two drilled spanner holes' Ø and
-spacing.  Section A-A cuts it on the cap axis through the Right plane, the
-plane of the turned profile and of both spanner holes, so the O.D., the
-length, the front chamfer and the holes' depth print on solid cut edges.  No
-roughness symbol: the plain rear face seats on the stud shoulder, a clamp
-face (policy rule 5); its flatness is a note.
+named under its thread line, and the wrench flats' across-flats size.
+Section A-A cuts it on the cap axis through the Right plane, clear of both
+flats, so the O.D., the length and the front chamfer print on solid cut
+edges.  The rear face seats on the stud shoulder: its seat roughness symbol
+stands on its edge in the section (policy rule 5).
 """
 
 from __future__ import annotations
@@ -22,6 +21,7 @@ from _drawing_common import (
     DrawingOutputs,
     add_native_hole_callout,
     add_property_linked_note,
+    add_surface_finish,
     assert_imported_precision,
     create_section_view,
     curate_view_dimensions,
@@ -34,6 +34,8 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
+from _section_axis import position_section_caption
+from _surface_finish import surface_finish_by_key
 from transgear_hub_cap_spec import (
     CAP_DIA,
     CAP_LENGTH,
@@ -41,8 +43,7 @@ from transgear_hub_cap_spec import (
     CSK_QUALIFIER,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
-    SPANNER_HOLE_CALLOUT,
-    SPANNER_HOLE_R,
+    SURFACE_FINISHES,
     TAP_DRILL_DIA,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -62,8 +63,8 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# A Ø10.5 × 5.8 cap: 5:1 draws the Ø1.2 spanner holes 6 mm across and leaves
-# room round the section for its four dimensions.
+# A Ø10.5 × 5.8 cap: 5:1 leaves room round the section for its three
+# dimensions and the seat's finish symbol.
 SHEET_SCALE = (5.0, 1.0)
 VIEW_SCALE = (5, 1)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1]
@@ -76,35 +77,37 @@ HALF_OD = CAP_DIA * _S / 2000.0
 HALF_LENGTH = CAP_LENGTH * _S / 2000.0
 SECTION_LINE_OVERRUN = 0.005
 # Up the face view on the cap axis: sheet Y is model Y in *Front, so the cut
-# is the Right plane, the plane of the turned profile and the spanner holes.
+# is the Right plane, the plane of the turned profile, square to the flats.
 SECTION_LINE = (
     (FACE_CENTER[0], FACE_CENTER[1] - HALF_OD - SECTION_LINE_OVERRUN),
     (FACE_CENTER[0], FACE_CENTER[1] + HALF_OD + SECTION_LINE_OVERRUN),
 )
-# The section lays the axis horizontal with the O.D. up and down: the O.D.
-# stands off one end, the length and the hole depth below and above, the
-# chamfer's leg above at the top corner.  Every axial dimension's text sits
-# on the section's centre line so either end-for-end projection reads.
+# The section lays the axis horizontal with the O.D. up and down, the front
+# (chamfered) end right (farm run 20261001T110844152Z): the O.D. stands off
+# the front end, the length below, the chamfer's leg above at the top corner.
 SECTION_KEEP = {
     "CapDia": (SECTION_CENTER[0] + HALF_LENGTH + 0.016, SECTION_CENTER[1]),
     "CapLength": (SECTION_CENTER[0], SECTION_CENTER[1] - HALF_OD - 0.014),
-    "SpannerHoleDepth": (SECTION_CENTER[0], SECTION_CENTER[1] + HALF_OD + 0.014),
     "FrontChamfer": (SECTION_CENTER[0], SECTION_CENTER[1] + HALF_OD + 0.030),
 }
-# The face view: the holes' Ø off the upper hole, their spacing left of the
-# face.
+# The native A-A caption under the length dimension, not on it (the same run
+# printed it through the 5.80).
+CAPTION_XY = (SECTION_CENTER[0] - 0.020, SECTION_CENTER[1] - HALF_OD - 0.028)
+# The rear (seat) face is the section's left edge; the pick lies on it in the
+# cut wall between the tap drill and the O.D., the symbol above-left of it.
+REAR_FACE_X = SECTION_CENTER[0] - HALF_LENGTH
+REAR_FACE_PICK = (REAR_FACE_X, SECTION_CENTER[1] + 0.6 * HALF_OD)
+REAR_FACE_SYMBOL_XY = (REAR_FACE_X - 0.016, SECTION_CENTER[1] + HALF_OD + 0.010)
+# The face view: the across-flats above the face, its text over the cutting
+# line's top end.
 FACE_KEEP = {
-    "SpannerHoleDia": (
-        FACE_CENTER[0] + 0.024,
-        FACE_CENTER[1] + SPANNER_HOLE_R * _S / 1000.0 + 0.020,
-    ),
-    "SpannerHoleSpacing": (FACE_CENTER[0] - HALF_OD - 0.012, FACE_CENTER[1]),
+    "FlatsAcross": (FACE_CENTER[0], FACE_CENTER[1] + HALF_OD + 0.016),
 }
-DIMENSION_CALLOUTS_BELOW = {
-    "SpannerHoleDia": SPANNER_HOLE_CALLOUT,
-    "FrontChamfer": CHAMFER_CALLOUT,
-}
-THREAD_CALLOUT_XY = (FACE_CENTER[0] + 0.030, FACE_CENTER[1] - HALF_OD - 0.020)
+DIMENSION_CALLOUTS_BELOW = {"FrontChamfer": CHAMFER_CALLOUT}
+# Right of the face view, below the axis: its leader reaches the tap drill's
+# right side, clear of the cutting line, the across-flats extension lines and
+# the lower A.
+THREAD_CALLOUT_XY = (FACE_CENTER[0] + HALF_OD + 0.034, FACE_CENTER[1] - 0.020)
 ISO_NOTE_XY = (ISO_CENTER[0] - 0.030, ISO_CENTER[1] - 0.040)
 NOTES_XY = (0.016, 0.070)
 
@@ -234,6 +237,16 @@ async def build(adapter: Any) -> dict[str, str]:
         label="#6-32 through thread",
     )
     _set_thread_callout_text(thread_callout)
+    position_section_caption(adapter, section, CAPTION_XY, label="hub cap")
+    add_surface_finish(
+        adapter,
+        section,
+        edge_xy=REAR_FACE_PICK,
+        symbol_xy=REAR_FACE_SYMBOL_XY,
+        control=surface_finish_by_key(SURFACE_FINISHES, "rear_face"),
+        label="cap rear (seat) face finish",
+        char_height=0.0025,
+    )
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
@@ -243,6 +256,10 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Transgear Hub Cap Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        # The Hole Wizard thread's own "#6-32 Tapped Hole" note restates the
+        # hole callout.
+        redundant_note_substrings=("Tapped Hole",),
+        expected_redundant_notes=1,
     )
 
 

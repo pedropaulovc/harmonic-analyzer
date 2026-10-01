@@ -16,15 +16,19 @@ hole floor.
 from __future__ import annotations
 
 import argparse
+import math
 import re
 import sys
 from typing import Any
 
 import _drawing_hidden_sketches as hidden_sketches
 import _telemetry
+import transgear_hanger_joints as joints
+import transgear_stud_fit as stud_fit
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_edge_dimension,
     add_native_hole_callout,
     add_property_linked_note,
     assert_imported_precision,
@@ -33,8 +37,10 @@ from _drawing_common import (
     new_project_drawing,
     read_required_properties,
     rebuild_drawing,
+    set_arc_endpoints_to_max,
     set_dimension_callouts,
     set_hidden_lines_removed,
+    set_reference_dimension,
     stamp_drawing_summary,
     visible_view_entities,
 )
@@ -54,8 +60,10 @@ from transgear_arm_geometry import (
 from transgear_arm_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
+    DRAWING_REFERENCE_PRECISION,
     FLOOR_DEPTH_CALLOUT,
     ISO_VIEW_SCALE,
+    OVERALL_LENGTH,
     PIN_HOLE_CALLOUT,
     PIVOT_BORE_CALLOUT,
     PLATE_TAP_CSK_CALLOUT,
@@ -63,6 +71,7 @@ from transgear_arm_spec import (
     STOCK_TEXT_PREFIX,
     STOCK_TEXT_SUFFIX,
     STUD_TAP_CSK_CALLOUT,
+    engagement_line,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -85,12 +94,17 @@ PNG = OUTPUTS.png
 
 # The arm is 141 mm long: 2:1 spans 0.283 m of the landscape sheet, with the
 # section A-A under it and the end view and isometric to its right, clear of
-# the title block (x > 0.216 below y 0.066).
+# the title block (x > 0.216 below y 0.066).  The front view stands 10 mm
+# right of centre so the section's floor-depth text, under its pivot end,
+# keeps clear of the left border (machinist review of 19e33c6c2: centred,
+# the counterbore text crossed it).
 SHEET_SCALE = (2.0, 1.0)
 VIEW_SCALE = (2, 1)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1]
-FRONT_CENTER = (0.168, 0.205)
-SECTION_CENTER = (FRONT_CENTER[0], 0.100)
+FRONT_CENTER = (0.178, 0.205)
+# Low enough that the counterbore callout above the section clears the
+# overall-length reference under the station stack.
+SECTION_CENTER = (FRONT_CENTER[0], 0.094)
 END_CENTER = (0.355, FRONT_CENTER[1])
 ISO_CENTER = (0.370, 0.115)
 ISO_NOTE_XY = (0.335, 0.080)
@@ -126,20 +140,39 @@ SECTION_LINE = (
 )
 
 # Per-view survivors of the marked-dimension import.  The stations stack
-# under the front view, nearest first; the callouts stand above it.
+# under the front view, nearest first, the overall reference under them;
+# the callouts stand above it.
 _UNDER_FRONT = _front_y(-PIVOT_END_R)
+STATION_PITCH = 0.010
 FRONT_KEEP = {
-    "PivotEndR": (0.022, _front_y(PIVOT_END_R) + 0.012),
-    "PivotBoreDia": (0.050, _front_y(PIVOT_END_R) + 0.030),
+    "PivotEndR": (_front_x(-PIVOT_END_R) - 0.005, _front_y(PIVOT_END_R) + 0.012),
+    "PivotBoreDia": (_front_x(0.0) - 0.002, _front_y(PIVOT_END_R) + 0.026),
     "EndWidth": (_front_x(TIP_STATION) + 0.012, FRONT_CENTER[1]),
-    "PlateTapStation1": (_front_x(PLATE_TAP_STATIONS[0] / 2.0), _UNDER_FRONT - 0.010),
-    "PlateTapStation2": (_front_x(PLATE_TAP_STATIONS[1] / 2.0), _UNDER_FRONT - 0.020),
-    "StudStation": (_front_x(STUD_STATION / 2.0), _UNDER_FRONT - 0.030),
-    "TipStation": (_front_x(TIP_STATION / 2.0), _UNDER_FRONT - 0.040),
+    "PlateTapStation1": (
+        _front_x(PLATE_TAP_STATIONS[0] / 2.0),
+        _UNDER_FRONT - STATION_PITCH,
+    ),
+    "PlateTapStation2": (
+        _front_x(PLATE_TAP_STATIONS[1] / 2.0),
+        _UNDER_FRONT - 2 * STATION_PITCH,
+    ),
+    "StudStation": (_front_x(STUD_STATION / 2.0), _UNDER_FRONT - 3 * STATION_PITCH),
+    "TipStation": (_front_x(TIP_STATION / 2.0), _UNDER_FRONT - 4 * STATION_PITCH),
 }
+# The true overall (review of 19e33c6c2: the 128.90 from the bore axis read
+# as one), a reference under the stations: picked on the pivot round's upper
+# flank and re-anchored to its far extreme, and on the square end.
+OVERALL_TEXT_XY = (FRONT_CENTER[0], _UNDER_FRONT - 5 * STATION_PITCH)
+_FLANK = PIVOT_END_R * math.sqrt(0.5)
+OVERALL_PICKS = (
+    (_front_x(-_FLANK), _front_y(_FLANK)),
+    (_front_x(TIP_STATION), _front_y(3.0)),
+)
+# The floor depth's text stands BELOW the section's pivot end, outside its
+# witness lines: beside the view it crossed the left border.
 SECTION_KEEP = {
     "SpotFaceDia": (_front_x(0.0), SECTION_CENTER[1] + 0.022),
-    "FloorDepth": (_front_x(-PIVOT_END_R) - 0.008, SECTION_CENTER[1]),
+    "FloorDepth": (_front_x(-PIVOT_END_R) - 0.005, SECTION_CENTER[1] - 0.020),
     "PinHoleDepth": (
         _front_x(TIP_STATION - PIN_HOLE_DEPTH / 2.0),
         SECTION_CENTER[1] - 0.020,
@@ -159,21 +192,70 @@ DIMENSION_CALLOUTS = {
 
 # Native tap callouts: arrow on the tap-drill rim under the rear countersink
 # (the Hole Wizard's own edge; the countersink mouth is the chamfer's), text
-# above the view; each carries its countersink line.
+# above the view, its top inside the upper border (review of 19e33c6c2: at
+# 30 mm over the pivot round it touched the border).  Each carries its
+# countersink line and the mating thread's installed full-thread engagement
+# at the worst case (the screws are cut flush, the stud's run-out sits in its
+# relief, and both taps go through), the hanger joints' and stud fit's
+# figures.
 _STUD_DRILL_R = blind_cut_dia_mm(STUD_TAP_SPEC) / 2.0
 _PLATE_DRILL_R = blind_cut_dia_mm(PLATE_TAP_SPEC) / 2.0
-STUD_CALLOUT_XY = (0.225, _front_y(PIVOT_END_R) + 0.030)
-PLATE_CALLOUT_XY = (0.120, _front_y(PIVOT_END_R) + 0.030)
+_CALLOUT_Y = _front_y(PIVOT_END_R) + 0.022
+STUD_CALLOUT_XY = (_front_x(STUD_STATION) + 0.036, _CALLOUT_Y)
+PLATE_CALLOUT_XY = (_front_x(PLATE_TAP_STATIONS[0]) + 0.016, _CALLOUT_Y)
+STUD_TAP_QUALIFIER = "\n".join(
+    (
+        STUD_TAP_CSK_CALLOUT,
+        engagement_line(
+            stud_fit.REAR_ENGAGEMENT_WORST, stud_fit.REAR_ENGAGEMENT_WORST_D
+        ),
+    )
+)
+PLATE_TAP_QUALIFIER = "\n".join(
+    (
+        PLATE_TAP_CSK_CALLOUT,
+        engagement_line(
+            joints.PLATE_SCREW_ENGAGEMENT_WORST, joints.PLATE_SCREW_ENGAGEMENT_WORST_D
+        ),
+    )
+)
 TAP_CALLOUTS = (
-    ("stud tap", STUD_STATION, _STUD_DRILL_R, STUD_CALLOUT_XY, STUD_TAP_CSK_CALLOUT),
+    ("stud tap", STUD_STATION, _STUD_DRILL_R, STUD_CALLOUT_XY, STUD_TAP_QUALIFIER),
     (
         "plate taps",
         PLATE_TAP_STATIONS[0],
         _PLATE_DRILL_R,
         PLATE_CALLOUT_XY,
-        PLATE_TAP_CSK_CALLOUT,
+        PLATE_TAP_QUALIFIER,
     ),
 )
+
+
+def _overall_reference(adapter: Any, front: Any) -> None:
+    overall = add_edge_dimension(
+        adapter,
+        front,
+        p0=OVERALL_PICKS[0],
+        p1=OVERALL_PICKS[1],
+        text_xy=OVERALL_TEXT_XY,
+        label="overall length reference",
+        orientation="horizontal",
+    )
+    set_arc_endpoints_to_max(adapter, overall, label="overall length reference")
+    display = _early_bound(overall, "IDisplayDimension")
+    dimension = _early_bound(display.GetDimension2(0), "IDimension")
+    measured_mm = abs(float(dimension.SystemValue) * 1000.0)
+    if abs(measured_mm - OVERALL_LENGTH) > 1e-5:
+        raise RuntimeError(
+            f"overall length reference measured {measured_mm:g}, "
+            f"expected {OVERALL_LENGTH:g} mm"
+        )
+    set_reference_dimension(
+        adapter, display.GetAnnotation(), label="overall length reference"
+    )
+    display.SetPrecision3(DRAWING_REFERENCE_PRECISION, -1, -1, -1)
+    if int(display.GetPrimaryPrecision2()) != DRAWING_REFERENCE_PRECISION:
+        raise RuntimeError("overall length reference precision did not persist")
 
 
 def _rear_rim(view: Any, *, radius_mm: float, station_mm: float, label: str) -> Any:
@@ -365,12 +447,13 @@ async def build(adapter: Any) -> dict[str, str]:
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
     set_dimension_callouts(adapter, annotations, DIMENSION_CALLOUTS)
     _set_stock_text(adapter, annotations)
+    _overall_reference(adapter, front)
     for view, label in ((front, "front"), (end, "end")):
         if not auto_center_marks(adapter, view, holes=True, size=0.0025):
             raise RuntimeError(f"failed to add ASME centre marks to the {label} view")
 
     # Thread and tap drill ride the native callouts; the class is the title
-    # block's; the countersink line is the spec's.
+    # block's; the countersink and engagement lines are the qualifier's.
     for label, station, radius, callout_xy, qualifier in TAP_CALLOUTS:
         callout = add_native_hole_callout(
             adapter,

@@ -226,12 +226,9 @@ GEAR_DATA = gear_data_note(
     ]
 )
 
-DRAWING_NOTES = "\n".join(
-    (
-        "CUT TEETH PER GEAR DATA.",
-        "THIN DISC GEAR; GEAR TEETH: CIRCULAR RUNOUT 0.05 MAX ABOUT DATUM A, MEASURED AT THE TOOTH TIPS.",
-    )
-)
+# The teeth are stated by the gear data block; the build appends the disc
+# screw's engagement line (transgear_disc_screw_spec imports this module).
+DRAWING_NOTES = "GEAR TEETH: CIRCULAR RUNOUT 0.05 MAX TO DATUM A AT THE TOOTH TIPS."
 
 
 # Manufacturing GD&T limits consumed by the part's drawing projection.
