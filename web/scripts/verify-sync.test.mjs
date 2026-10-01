@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { parseOptions, sourceCensus, finishVideo, seekSettlement, sourcePtsInShot, requireSourceViews, measureView, playbackInterval } from './verify-sync.mjs'
+import { parseOptions, sourceCensus, finishVideo, seekSettlement, sourcePtsInShot, requireSourceViews, measureView, playbackInterval, sourceSeedIndex, diagnosticReplayOutcome } from './verify-sync.mjs'
+import { jsonDigest } from './verify-reference.mjs'
 
 // These are decision-gate unit controls, NOT browser/source-fidelity evidence.
 const native = { durationSeconds: 2.1, fps: 30, pts: [0, 1, 2] }
@@ -269,8 +270,14 @@ test('intermediate source landmark view renames need unique source-layout identi
   assert.throws(() => requireSourceViews(ambiguous), /presenter-whole/)
 })
 
+const sourceImage = (frameIndex, hash) => ({ frameIndex, sha256Bgr8: hash, pixelFormat: 'bgr8', width: 1920, height: 1080, sourceSha256: '1'.repeat(64) })
+const manualSeedFrame = (fixture, timeSeconds = 0, decodedTimeSeconds = 0, viewId = 'main') => ({
+  timeSeconds, decodedTimeSeconds, sourceImage: sourceImage(Math.round(decodedTimeSeconds * 30), 'manual-seed'),
+  landmarks: [{ ...fixture.observations[3], method: 'manual', viewId, originalViewId: viewId }],
+})
+
 function measuredViewFixture() {
-  const view = sourceView('main'), frame = { timeSeconds: 1, decodedTimeSeconds: 1, views: [view], sourceImage: { sha256Bgr8: 'actual-target' } }
+  const view = sourceView('main'), frame = { timeSeconds: 1, decodedTimeSeconds: 1, views: [view], sourceImage: sourceImage(30, 'actual-target') }
   const positions = [[100, 100], [900, 100], [100, 800], [900, 800]]
   const observations = positions.map((pixel, index) => ({ anchorId: `anchor-${index}`, role: index < 2 ? 'fit' : 'check', pixel, status: 'observed', method: 'manual', uncertaintyPx: 1 }))
   const anchors = new Map(observations.map((observed, index) => [observed.anchorId, { kind: 'physical-feature', partPath: `native/part-${index}`, partLocalMetres: [0, 0, 0], correspondenceEvidence: 'Independently identified physical feature', motion: index === 2 ? 'moving' : 'fixed' }]))
@@ -286,7 +293,7 @@ test('schema template matching admits only independent seed and actual correlati
   const fixture = measuredViewFixture(), observed = fixture.observations[3]
   observed.method = 'template-match'
   observed.trackingEvidence = { seedTimeSeconds: 0, reacquiredFromActualPixels: true, wholeSourceViewCorrelation: 0.998, sourcePatchCorrelation: 0.97, sourceSha256Bgr8: 'actual-target' }
-  fixture.seeds.set('0/main/anchor-3', { role: 'check' })
+  fixture.seeds = sourceSeedIndex([manualSeedFrame(fixture)])
   const admitted = measureFixture(fixture)
   assert.equal(admitted.measured.length, 4)
   assert.deepEqual(admitted.excluded, [])
@@ -406,12 +413,12 @@ test('template seed identity remains the original source view after an evidenced
   observed.method = 'template-match'
   observed.originalViewId = 'presenter-whole'
   observed.trackingEvidence = { seedTimeSeconds: 0, reacquiredFromActualPixels: true, wholeSourceViewCorrelation: 1, sourcePatchCorrelation: 1 }
-  fixture.seeds.set('0/presenter-whole/anchor-3', { role: 'check' })
+  fixture.seeds = sourceSeedIndex([manualSeedFrame(fixture, 0, 0, 'presenter-whole')])
   assert.equal(measureFixture(fixture).measured.length, 4)
   fixture.seeds.get('0/presenter-whole/anchor-3').role = 'fit'
   assert.equal(measureFixture(fixture).excluded[0].reasonCode, 'template-provenance')
   fixture.seeds.clear()
-  fixture.seeds.set('0/main/anchor-3', { role: 'check' })
+  fixture.seeds = sourceSeedIndex([manualSeedFrame(fixture)])
   assert.equal(measureFixture(fixture).excluded[0].reasonCode, 'template-provenance')
 })
 
@@ -435,4 +442,129 @@ test('authored source landmark aliases also require same-exposure layout evidenc
   const unknown = structuredClone(row)
   unknown.frame.landmarks[0].viewId = 'undeclared-dynamic-view'
   assert.throws(() => requireSourceViews(unknown), /undeclared-dynamic-view/)
+})
+
+test('tracked seeds bind the exact decoded exposure, original view and source image rather than nominal-time aliases', () => {
+  for (const method of ['optical-flow', 'template-match']) {
+    const fixture = measuredViewFixture(), observed = fixture.observations[3]
+    observed.method = method
+    observed.originalViewId = 'presenter-whole'
+    observed.trackingEvidence = { seedTimeSeconds: 10.01, forwardBackwardErrorPx: 0.1, seedPatchCorrelation: 0.99, adjacentPatchCorrelation: 0.99, reacquiredFromActualPixels: true, wholeSourceViewCorrelation: 1, sourcePatchCorrelation: 1 }
+    const seedFrame = manualSeedFrame(fixture, 10, 10.01, 'presenter-whole')
+    fixture.seeds = sourceSeedIndex([seedFrame])
+    assert.equal(measureFixture(fixture).measured.length, 4)
+    assert.deepEqual(measureFixture(fixture).excluded, [])
+    for (const mutate of [
+      copy => { copy.observations[3].trackingEvidence.seedTimeSeconds = 10 },
+      copy => { copy.observations[3].trackingEvidence.seedTimeSeconds = 10.5 },
+      copy => { copy.observations[3].trackingEvidence.seedDecodedFrameIndex = 301 },
+      copy => { copy.observations[3].trackingEvidence.seedSourceImage = { ...seedFrame.sourceImage, sha256Bgr8: 'different-seed-image' } },
+      copy => { copy.frame.sourceImage.sourceSha256 = '2'.repeat(64) },
+      copy => { delete copy.observations[3].originalViewId },
+    ]) {
+      const copy = structuredClone(fixture)
+      mutate(copy)
+      const result = measureFixture(copy)
+      assert.equal(result.measured.length, 3)
+      assert.equal(result.excluded[0].reasonCode, method === 'optical-flow' ? 'flow-provenance' : 'template-provenance')
+    }
+    const contradictory = { ...seedFrame, sourceImage: { ...seedFrame.sourceImage, sha256Bgr8: 'contradictory-seed-image' } }
+    fixture.seeds = sourceSeedIndex([seedFrame, contradictory])
+    assert.equal(measureFixture(fixture).measured.length, 3)
+  }
+})
+
+test('finite diagnostic timing counterexamples fail even when pixels pass or no machine measurement is required', () => {
+  for (const required of [true, false]) {
+    const video = videoFixture(), extra = { timeSeconds: 0.5, required, diagnosticOnly: true, reasons: ['mid-interval'] }
+    video.samples.push({ ...extra, sampleTimeSeconds: 0.5, status: required ? 'failed' : 'unavailable', unavailable: [], measurements: required ? [measurement('diagnostic-moving', 'moving')] : [], maxClockSkewSeconds: 0.5001 })
+    finishVideo(video, { rows: [...censusFixture.rows, extra] }, parseOptions(['--stage', '50']))
+    assert.equal(video.coverage.complete, true)
+    assert.equal(video.diagnosticLandmarks.failed, 0)
+    assert.equal(video.maxClockSkewSeconds, 0.5001)
+    assert.equal(video.stageMeasurement.status, 'failed')
+    assert.ok(video.failures.some(failure => failure.code === 'diagnostic-clock-counterexample'))
+  }
+})
+
+test('missing, non-finite and within-bound diagnostic timing do not become fabricated counterexamples', () => {
+  for (const maxClockSkewSeconds of [null, undefined, NaN, Infinity, 0.5]) {
+    const video = videoFixture(), extra = { timeSeconds: 0.5, required: false, diagnosticOnly: true, reasons: ['mid-interval'] }
+    video.samples.push({ ...extra, sampleTimeSeconds: 0.5, status: 'unavailable', unavailable: [{ reason: 'No independent diagnostic oracle' }], measurements: [], maxClockSkewSeconds })
+    finishVideo(video, { rows: [...censusFixture.rows, extra] }, parseOptions(['--stage', '50']))
+    assert.equal(video.status, 'passed')
+    assert.equal(video.stageMeasurement.status, 'passed')
+    assert.ok(!video.failures.some(failure => failure.code === 'diagnostic-clock-counterexample'))
+  }
+})
+
+test('a bad diagnostic image does not erase an unrelated admitted pixel counterexample in the same decode batch', () => {
+  const good = jsonDigest(sourceImage(15, '3'.repeat(64))), bad = jsonDigest(sourceImage(15, '4'.repeat(64)))
+  const result = { verifiedImageDigests: [good], imageFailures: [{ imageDigest: bad, reason: 'Decoded source-image hash mismatch' }] }
+  const goodOutcome = diagnosticReplayOutcome([good], result), badOutcome = diagnosticReplayOutcome([bad], result)
+  assert.equal(goodOutcome.status, 'passed')
+  assert.equal(badOutcome.status, 'unavailable')
+  assert.match(badOutcome.reason, /hash mismatch/)
+  assert.equal(diagnosticReplayOutcome([good, bad], result).status, 'unavailable')
+  assert.equal(diagnosticReplayOutcome(['unverified-identity'], result).status, 'unavailable')
+  assert.equal(diagnosticReplayOutcome([good], { verifiedImageDigests: [good], imageFailures: [{ imageDigest: good, reason: 'Conflicting verification result' }] }).status, 'unavailable')
+  const video = videoFixture(), extra = { timeSeconds: 0.5, required: true, diagnosticOnly: true, reasons: ['mid-interval'] }
+  video.samples.push({ ...extra, sampleTimeSeconds: 0.5, sourceImageReplay: goodOutcome, status: 'failed', unavailable: [], measurements: [measurement('diagnostic-moving', 'moving', 'failed')], maxClockSkewSeconds: 0.1 })
+  video.samples.push({ ...extra, timeSeconds: 0.7, sampleTimeSeconds: null, sourceImageReplay: badOutcome, status: 'unavailable', unavailable: [{ reason: badOutcome.reason }], measurements: [] })
+  finishVideo(video, { rows: [...censusFixture.rows, extra, { ...extra, timeSeconds: 0.7 }] }, parseOptions(['--stage', '50']))
+  assert.equal(video.coverage.complete, true)
+  assert.equal(video.diagnosticLandmarks.failed, 1)
+  assert.equal(video.stageMeasurement.status, 'failed')
+})
+
+function playbackMotionFixture() {
+  const bankFrame = (time, x) => ({
+    ...frame(time), shotId: 'bank', views: [{ ...sourceView('main'), cameraProvenance: { kind: 'source-transfer', family: 'bank' } }],
+    sourceImage: sourceImage(time * 30, `bank-${time}`),
+    landmarks: [{ anchorId: 'cap', viewId: 'main', role: 'check', status: 'observed', pixel: [x, 100], method: 'manual', uncertaintyPx: 2 }],
+  })
+  const montageFrame = time => ({
+    ...frame(time, 'non-machine'), shotId: 'montage', views: [{ ...sourceView('main'), cameraProvenance: { kind: 'source-transfer', family: 'bank' }, input: { crankTurns: time } }],
+    sourceImage: sourceImage(time * 30, `montage-${time}`), landmarks: [],
+  })
+  return {
+    track: {
+      shots: [{ id: 'bank', startSeconds: 0, endSeconds: 5, classification: 'machine' }, { id: 'montage', startSeconds: 5, endSeconds: 25, classification: 'non-machine', hasCorrespondingMachine: true }],
+      frames: [bankFrame(0, 100), bankFrame(1, 180), bankFrame(4, 180), montageFrame(5), montageFrame(10), montageFrame(20)],
+      anchors: [{ id: 'cap', kind: 'physical-feature', partPath: 'native/cap', partLocalMetres: [0, 0, 0], correspondenceEvidence: 'Independent visible cap feature' }],
+    },
+    observations: { frames: [] }, native: { durationSeconds: 25 },
+  }
+}
+
+test('playback prefers observed visible source motion over a longer montage with only transferred hidden-input changes', () => {
+  const interval = playbackInterval(playbackMotionFixture())
+  assert.equal(interval.frame.shotId, 'bank')
+  assert.equal(interval.frame.timeSeconds, 0)
+  assert.equal(interval.availableSeconds, 5)
+  assert.equal(interval.motionEvidence.kind, 'independently-observed-source-landmark-motion')
+  assert.deepEqual(interval.motionEvidence.sourcePixelsBefore, [100, 100])
+  assert.deepEqual(interval.motionEvidence.sourcePixelsAfter, [180, 100])
+})
+
+test('inadmissible, reused-exposure or sub-uncertainty points cannot fabricate a visible playback-motion preference', () => {
+  for (const mutate of [
+    record => { for (const frame of record.track.frames.slice(0, 3)) frame.landmarks[0].method = 'unsupported-method' },
+    record => { for (const frame of record.track.frames.slice(0, 3)) frame.sourceImage = record.track.frames[0].sourceImage },
+    record => { record.track.frames[1].landmarks[0].pixel = [103, 100] },
+  ]) {
+    const record = playbackMotionFixture()
+    mutate(record)
+    const interval = playbackInterval(record)
+    assert.equal(interval.frame.shotId, 'montage')
+    assert.equal(interval.motionEvidence, null)
+  }
+})
+
+test('visible source motion cannot override the complete same-shot minimum playback duration', () => {
+  const record = playbackMotionFixture()
+  record.track.shots[0].endSeconds = 2.5
+  const interval = playbackInterval(record)
+  assert.equal(interval.frame.shotId, 'montage')
+  assert.ok(interval.availableSeconds >= 3)
 })

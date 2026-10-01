@@ -3,7 +3,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { VIDEO_IDS, MODEL_SHA256, MODEL_COMMIT, CLOCK_LIMIT, probeSource, verifyFrameImages, claimedSourceImages, nearestPtsIndex, sourceNeedsMachine, frameViews, sourcePointUnmasked, jsonDigest } from './verify-reference.mjs'
+import { VIDEO_IDS, MODEL_SHA256, MODEL_COMMIT, CLOCK_LIMIT, probeSource, verifyFrameImages, claimedSourceImages, nearestPtsIndex, sourceNeedsMachine, frameViews, sourceLayoutForViews, sourcePointUnmasked, jsonDigest } from './verify-reference.mjs'
 import { distManifest, serveDist } from './verify-server.mjs'
 
 const WEB_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -211,6 +211,15 @@ async function loadRecord(id, referenceRoot, signal) {
   return { id, track, observations, sourcePath, native, digest: jsonDigest(track) }
 }
 
+/** A bad diagnostic identity cannot erase independent successful exposures in the same decode batch. */
+export function diagnosticReplayOutcome(imageDigests, result) {
+  const verified = new Set(result.verifiedImageDigests ?? []), failures = new Map((result.imageFailures ?? []).map(item => [item.imageDigest, item.reason]))
+  const unavailable = imageDigests.filter(identity => failures.has(identity) || !verified.has(identity))
+  return unavailable.length
+    ? { status: 'unavailable', reason: unavailable.map(identity => `${identity}: ${failures.get(identity) ?? 'Declared diagnostic source-image identity was not independently verified'}`).join('; ') }
+    : { status: 'passed', proof: 'Additional declared diagnostic source-image identities independently replayed' }
+}
+
 async function replayCensusImages(record, census, staticControls, video, signal) {
   const source = record.track.source, replayOptions = { signal, native: record.native, source }
   const mandatoryData = { frames: census.selected.filter(row => !row.diagnosticOnly).map(row => row.frame).filter(Boolean), staticPhaseImages: staticControls.phaseImages, source }
@@ -239,7 +248,7 @@ async function replayCensusImages(record, census, staticControls, video, signal)
       diagnostics.reusedSamples++
     } else {
       for (const { image } of extra) additionalImages.set(jsonDigest(image), image)
-      additionalRows.push(row)
+      additionalRows.push({ row, imageDigests: extra.map(({ image }) => jsonDigest(image)) })
     }
   }
   diagnostics.additionalDeclaredIdentities = additionalImages.size
@@ -247,10 +256,14 @@ async function replayCensusImages(record, census, staticControls, video, signal)
     try {
       // Replay only new declared identities, with the existing decoder. Review
       // separately checks each diagnostic sample's exact source PTS/image index.
-      diagnostics.result = await verifyFrameImages(record.sourcePath, { frames: [], diagnosticImages: [...additionalImages.values()], source }, replayOptions)
-      for (const row of additionalRows) row.sourceImageReplay = { status: 'passed', proof: 'Additional declared diagnostic source-image identities independently replayed' }
+      diagnostics.result = await verifyFrameImages(record.sourcePath, { frames: [], diagnosticImages: [...additionalImages.values()], source }, { ...replayOptions, failureMode: 'attribute' })
+      for (const { row, imageDigests } of additionalRows) {
+        const outcome = diagnosticReplayOutcome(imageDigests, diagnostics.result)
+        if (outcome.status === 'passed') row.sourceImageReplay = outcome
+        else unavailable(row, `Diagnostic source image replay unavailable: ${outcome.reason}`)
+      }
     } catch (error) {
-      for (const row of additionalRows) unavailable(row, `Diagnostic source image replay unavailable: ${error.message}`)
+      for (const { row } of additionalRows) unavailable(row, `Diagnostic source image replay unavailable: ${error.message}`)
     }
   }
   diagnostics.unavailableSamples = rows.filter(row => !row.frame).length
@@ -392,6 +405,12 @@ async function review(page, embed, record, frame, required = true) {
   requireModel(actual, record.id); requireMedia(native, record)
   assert(actual.mode === 'reference-review' && actual.playerState === 'paused' && native.paused && !native.seeking, 'Source review did not hold a decoded paused original frame')
   assert((required ? ['approximate'] : ['no-machine', 'approximate']).includes(actual.referenceState) && Math.abs(actual.modelTime - frame.timeSeconds) <= 1e-6, 'Source sample has no current native draw or legitimate no-machine hold')
+  const clockSkewSeconds = Math.abs(actual.modelTime - native.mediaTime)
+  if (finite(clockSkewSeconds) && clockSkewSeconds > CLOCK_LIMIT) {
+    const error = new Error('Actual original media/model clock exceeds the0.5s timing bound')
+    Object.assign(error, { clockSkewSeconds, nativeMediaTime: native.mediaTime })
+    throw error
+  }
   assert(Math.abs(native.mediaTime - frame.decodedTimeSeconds) <= 0.5 / record.native.fps + 0.005 && Math.abs(native.mediaTime - frame.timeSeconds) <= CLOCK_LIMIT + 1e-6, 'Actual original media is not on the observed source exposure within the0.5s timing bound')
   const expectedIndex = nearestPtsIndex(record.native.pts, frame.decodedTimeSeconds)
   assert(Math.abs(record.native.pts[expectedIndex] - frame.decodedTimeSeconds) <= 0.001 && Math.abs(frame.decodedTimeSeconds - frame.timeSeconds) <= CLOCK_LIMIT + 1e-6, 'Authored sample is not a retained native source PTS within0.5s')
@@ -402,11 +421,19 @@ async function review(page, embed, record, frame, required = true) {
   }, (frame.views ?? []).map(view => view.id))
   return { actual, native, seek, beforeMediaTime: before.mediaTime, ...rendered }
 }
-function sourceSeedIndex(frames) {
+export function sourceSeedIndex(frames) {
   const seeds = new Map()
-  for (const frame of frames) for (const item of frame.landmarks ?? []) {
-    if (item.method === 'manual' && item.status === 'observed' && point(item.pixel) && ['fit', 'check'].includes(item.role)) {
-      seeds.set(`${frame.timeSeconds}/${item.originalViewId ?? item.viewId ?? 'main'}/${item.anchorId}`, item)
+  for (const frame of frames) {
+    if (!finite(frame.decodedTimeSeconds) || !Number.isInteger(frame.sourceImage?.frameIndex) || frame.sourceImage.frameIndex < 0 || !frame.sourceImage?.sourceSha256) continue
+    for (const item of frame.landmarks ?? []) {
+      if (item.method !== 'manual' || item.status !== 'observed' || !point(item.pixel) || !['fit', 'check'].includes(item.role)) continue
+      const key = `${frame.decodedTimeSeconds}/${item.originalViewId ?? item.viewId ?? 'main'}/${item.anchorId}`, prior = seeds.get(key)
+      const seed = { ...item, sourceImage: frame.sourceImage, decodedTimeSeconds: frame.decodedTimeSeconds }
+      // Exact exposure and original view, never the requested nominal second or
+      // a nearest-time alias. Contradictory declarations do not pick a winner.
+      if (seeds.has(key) && (!prior || jsonDigest(prior.sourceImage) !== jsonDigest(seed.sourceImage)
+        || prior.role !== seed.role || jsonDigest(prior.pixel) !== jsonDigest(seed.pixel))) seeds.set(key, null)
+      else seeds.set(key, seed)
     }
   }
   return seeds
@@ -416,12 +443,16 @@ function sourceSeedIndex(frames) {
 function sourceMethodIssue(observed, anchor, frame, seeds, viewId) {
   if (!['manual', 'optical-flow', 'image-edge', 'template-match'].includes(observed.method)) return { code: 'source-method', reason: 'Source measurement method is not an admitted independent pixel technique' }
   const evidence = observed.trackingEvidence, seed = seeds.get(`${evidence?.seedTimeSeconds}/${observed.originalViewId ?? viewId}/${observed.anchorId}`)
-  if (observed.method === 'template-match' && (!seed || seed.role !== observed.role || evidence?.reacquiredFromActualPixels !== true
+  const seedBound = seed && seed.sourceImage?.sourceSha256 && seed.sourceImage.sourceSha256 === frame.sourceImage?.sourceSha256
+    && seed.decodedTimeSeconds === evidence?.seedTimeSeconds
+    && (!Object.hasOwn(evidence, 'seedDecodedFrameIndex') || evidence.seedDecodedFrameIndex === seed.sourceImage.frameIndex)
+    && (!evidence.seedSourceImage || jsonDigest(evidence.seedSourceImage) === jsonDigest(seed.sourceImage))
+  if (observed.method === 'template-match' && (!seedBound || seed.role !== observed.role || evidence?.reacquiredFromActualPixels !== true
     || !finite(evidence.wholeSourceViewCorrelation) || evidence.wholeSourceViewCorrelation < 0.998
     || !finite(evidence.sourcePatchCorrelation) || evidence.sourcePatchCorrelation < 0.97)) {
     return { code: 'template-provenance', reason: 'Independent manual seed and actual source-view/source-feature reacquisition correlations must be retained' }
   }
-  if (observed.method === 'optical-flow' && (anchor?.kind !== 'physical-feature' || !seed || seed.role !== observed.role
+  if (observed.method === 'optical-flow' && (anchor?.kind !== 'physical-feature' || !seedBound || seed.role !== observed.role
     || !finite(evidence?.forwardBackwardErrorPx) || evidence.forwardBackwardErrorPx > 1
     || !finite(evidence?.seedPatchCorrelation) || evidence.seedPatchCorrelation < 0.80
     || !finite(evidence?.adjacentPatchCorrelation) || evidence.adjacentPatchCorrelation < 0.90)) {
@@ -498,10 +529,69 @@ export function measureView(view, response, frame, observations, tolerancePx, an
   return { measured, unavailable, excluded, clockSkewSeconds: Math.abs(capture.timeSeconds - response.native.mediaTime) }
 }
 
-/** Longest complete required same-shot run; a legitimate cut is never our clock probe. */
+function playbackSourceObservations(record) {
+  const frames = record.track.frames, anchors = new Map((record.track.anchors ?? []).map(anchor => [anchor.id, anchor]))
+  const shots = new Map(record.track.shots.map(shot => [shot.id, shot])), seeds = sourceSeedIndex([...(record.observations?.frames ?? []), ...frames])
+  return frames.map(frame => {
+    const points = new Map()
+    if (!frame.sourceImage || !sourcePtsInShot(frame, shots.get(frame.shotId))) return points
+    let layout
+    try { layout = sourceLayoutForViews(frame.views ?? []) } catch { return points }
+    for (const observed of frame.landmarks ?? []) {
+      const viewId = observed.viewId ?? 'main', index = layout.findIndex(view => view.viewId === viewId), anchor = anchors.get(observed.anchorId)
+      if (index < 0 || !anchor?.partPath || (!anchor.partLocalMetres && !anchor.worldMetres) || !anchor.correspondenceEvidence
+        || observed.status !== 'observed' || !['fit', 'check'].includes(observed.role) || !point(observed.pixel)
+        || !finite(observed.uncertaintyPx) || observed.uncertaintyPx < 0 || !sourcePointUnmasked(layout, index, observed.pixel)
+        || sourceMethodIssue(observed, anchor, frame, seeds, viewId)) continue
+      points.set(`${viewId}/${observed.anchorId}`, { ...observed, viewId })
+    }
+    return points
+  })
+}
+
+function sourceCameraChanged(from, to) {
+  const a = from.camera, b = to.camera
+  if (!a || !b) return false
+  const distance = Math.hypot(...a.positionMetres.map((value, index) => value - b.positionMetres[index]))
+  const dot = Math.abs(a.quaternion.reduce((sum, value, index) => sum + value * b.quaternion[index], 0))
+  return distance > 1e-6 || dot < 1 - 1e-10 || Math.abs(a.verticalFovDegrees - b.verticalFovDegrees) > 1e-5
+}
+
+function playbackMotionEvidence(record, index, points, endSeconds) {
+  const from = record.track.frames[index], frames = record.track.frames, shot = record.track.shots.find(shot => shot.id === from.shotId)
+  const horizon = Math.min(endSeconds, from.timeSeconds + 1.5)
+  let evidence = null
+  for (let next = index + 1; next < frames.length && frames[next].timeSeconds <= horizon; next++) {
+    const to = frames[next]
+    if (to.shotId !== from.shotId) break
+    if (!from.sourceImage || !to.sourceImage || to.sourceImage.frameIndex === from.sourceImage.frameIndex
+      || !sourcePtsInShot(to, shot) || to.decodedTimeSeconds <= from.decodedTimeSeconds) continue
+    for (const [key, observed] of points[index]) {
+      const target = points[next].get(key)
+      if (!target || observed.role !== target.role) continue
+      const displacementPx = Math.hypot(target.pixel[0] - observed.pixel[0], target.pixel[1] - observed.pixel[1])
+      const uncertaintyPx = observed.uncertaintyPx + target.uncertaintyPx, signalPx = displacementPx - uncertaintyPx
+      if (signalPx <= 1 || evidence?.priority === 2 && signalPx <= evidence.signalPx) continue
+      evidence = { kind: 'independently-observed-source-landmark-motion', priority: 2, signalPx, viewId: observed.viewId, anchorId: observed.anchorId, role: observed.role, fromTimeSeconds: from.timeSeconds, toTimeSeconds: to.timeSeconds, fromDecodedTimeSeconds: from.decodedTimeSeconds, toDecodedTimeSeconds: to.decodedTimeSeconds, sourceImageBefore: from.sourceImage, sourceImageAfter: to.sourceImage, sourcePixelsBefore: observed.pixel, sourcePixelsAfter: target.pixel, displacementPx, uncertaintyPx, methods: [observed.method, target.method] }
+    }
+    if (evidence?.priority === 2) continue
+    for (const view of from.views) {
+      const target = to.views?.find(item => item.id === view.id)
+      if (!target || view.cameraProvenance?.kind !== 'source-fit' || target.cameraProvenance?.kind !== 'source-fit'
+        || !view.cameraProvenance.family || view.cameraProvenance.family !== target.cameraProvenance.family
+        || !sourceCameraChanged(view, target)) continue
+      evidence = { kind: 'declared-source-fit-camera-change', priority: 1, signalPx: 0, viewId: view.id, cameraFamily: view.cameraProvenance.family, fromTimeSeconds: from.timeSeconds, toTimeSeconds: to.timeSeconds, sourceImageBefore: from.sourceImage, sourceImageAfter: to.sourceImage, cameraBefore: view.camera, cameraAfter: target.camera }
+      break
+    }
+  }
+  return evidence
+}
+
+/** Prefer observed visible motion; duration alone can select a static blurred montage with hidden-input changes. */
 export function playbackInterval(record, minimumSeconds = 3) {
   const shots = new Map(record.track.shots.map(shot => [shot.id, shot])), frames = record.track.frames
   const ends = new Float64Array(frames.length)
+  const points = playbackSourceObservations(record)
   let candidate = null
   for (let index = frames.length - 1; index >= 0; index--) {
     const frame = frames[index], shot = shots.get(frame.shotId)
@@ -512,34 +602,50 @@ export function playbackInterval(record, minimumSeconds = 3) {
     if (next && next.timeSeconds < endSeconds) endSeconds = next.shotId === frame.shotId && ends[index + 1] > next.timeSeconds ? ends[index + 1] : next.timeSeconds
     ends[index] = endSeconds
     const availableSeconds = endSeconds - Math.max(frame.timeSeconds, frame.decodedTimeSeconds)
-    if (availableSeconds >= minimumSeconds && (!candidate || availableSeconds > candidate.availableSeconds)) candidate = { frame, endSeconds, availableSeconds }
+    if (availableSeconds < minimumSeconds) continue
+    const motionEvidence = playbackMotionEvidence(record, index, points, endSeconds)
+    const priority = motionEvidence?.priority ?? 0, signalPx = motionEvidence?.signalPx ?? 0
+    if (!candidate || priority > (candidate.motionEvidence?.priority ?? 0)
+      || priority === (candidate.motionEvidence?.priority ?? 0) && (signalPx > (candidate.motionEvidence?.signalPx ?? 0)
+        || signalPx === (candidate.motionEvidence?.signalPx ?? 0) && availableSeconds > candidate.availableSeconds)) {
+      candidate = { frame, endSeconds, availableSeconds, motionEvidence }
+    }
   }
   return candidate
 }
 
 async function playbackChecks(page, embed, record, report, outputDirectory) {
+  const playback = { status: 'unavailable', selectedInterval: null, clocks: [] }
+  report.playback[embed.player] = playback
   await pause(page, embed)
   await page.evaluate(() => window.harmonicAnalyzer.endReferenceReview())
   const interval = playbackInterval(record)
   assert(interval, 'No complete required same-shot source interval with playback-duration margin is available')
   const candidate = interval.frame
+  playback.selectedInterval = { shotId: candidate.shotId, startTimeSeconds: candidate.timeSeconds, startDecodedTimeSeconds: candidate.decodedTimeSeconds, endSeconds: interval.endSeconds, availableSeconds: interval.availableSeconds, minimumRequiredSeconds: 3, selection: interval.motionEvidence?.kind ?? 'complete-required-same-shot-fallback', sourceMotionEvidence: interval.motionEvidence }
+  const readRenderState = () => page.evaluate(() => {
+    const api = window.harmonicAnalyzer, actual = api.snapshot()
+    return { actual, receipts: actual.views.map(view => ({ viewId: view.id, mechanism: api.renderedMechanism(view.id) })) }
+  })
   await page.evaluate(async sample => window.harmonicAnalyzer.reviewReferenceFrame(sample.timeSeconds, sample.decodedTimeSeconds), { timeSeconds: candidate.timeSeconds, decodedTimeSeconds: candidate.decodedTimeSeconds })
   const stage = page.locator('#stage')
   const canvasShot = () => stage.screenshot({ mask: [page.locator('#video-dock'), page.locator('#loading')], animations: 'disabled' })
   const beforePixels = await canvasShot()
-  const beforeSource = await snapshot(page)
+  const beforeRender = await readRenderState(), beforeSource = beforeRender.actual
+  playback.beforeState = { ...beforeRender, media: await media(embed) }
+  const beforeScreenshot = `${record.id}-${embed.player}-playing-before.png`, afterScreenshot = `${record.id}-${embed.player}-playing-after.png`
+  await writeFile(resolve(outputDirectory, beforeScreenshot), beforePixels)
+  playback.canvas = { beforeSha256: digest(beforePixels), beforeScreenshot }
   await page.locator('#pause-video').click()
   await page.waitForFunction(() => window.harmonicAnalyzer.snapshot().playerState === 'playing', undefined, { timeout: 25_000 })
   const started = await media(embed); requireMedia(started, record)
+  playback.startedMedia = started
   assert(!started.paused && !started.muted && started.volume > 0, 'Original video must actually play with unmuted nonzero audio')
-  const clocks = []
+  const clocks = playback.clocks
   for (let index = 0; index < 6; index++) {
     await delay(250)
     const before = await media(embed)
-    const rendered = await page.evaluate(() => {
-      const api = window.harmonicAnalyzer, actual = api.snapshot()
-      return { actual, receipts: actual.views.map(view => ({ viewId: view.id, mechanism: api.renderedMechanism(view.id) })) }
-    })
+    const rendered = await readRenderState()
     const actual = rendered.actual, after = await media(embed)
     requireMedia(after, record)
     assert(after.mediaTime >= before.mediaTime && !after.paused && actual.mode === 'following-video', 'Actual media/source-following playback stopped')
@@ -557,16 +663,17 @@ async function playbackChecks(page, embed, record, report, outputDirectory) {
     clocks.push({ mediaTimeBefore: before.mediaTime, modelTime: actual.modelTime, mediaTimeAfter: after.mediaTime, clockSkewSeconds: skew, referenceState: actual.referenceState, sourceDrawRevision: [...revisions][0], renderedViews: rendered.receipts.map(entry => ({ viewId: entry.viewId, method: entry.mechanism.method, status: entry.mechanism.status, timeSeconds: entry.mechanism.timeSeconds, inputDigest: jsonDigest(entry.mechanism.input) })) })
   }
   const ended = await media(embed)
+  playback.endedMedia = ended
   assert(ended.mediaTime - started.mediaTime >= 1, 'Actual source video did not advance through playback')
   assert(clocks.at(-1).sourceDrawRevision > clocks[0].sourceDrawRevision, 'Actual native completed draw revision never advanced while the original video played')
-  const afterPixels = await canvasShot(), afterSource = await snapshot(page)
+  const afterPixels = await canvasShot(), afterRender = await readRenderState(), afterSource = afterRender.actual
+  playback.afterState = { ...afterRender, media: await media(embed) }
+  await writeFile(resolve(outputDirectory, afterScreenshot), afterPixels)
   const visualState = actual => actual.views.map(view => ({ id: view.id, camera: view.camera, input: view.input, rectSourcePixels: view.rectSourcePixels, composite: view.composite, resolvedImagePlaneWarp: view.resolvedImagePlaneWarp }))
   const sourceStateChanged = jsonDigest(visualState(beforeSource)) !== jsonDigest(visualState(afterSource))
   const canvasChanged = digest(beforePixels) !== digest(afterPixels)
+  Object.assign(playback.canvas, { sourceStateChanged, canvasChanged, afterSha256: digest(afterPixels), afterScreenshot })
   assert(!sourceStateChanged || canvasChanged, 'Changing source camera/mechanism receipts did not change actual rendered canvas pixels')
-  const beforeScreenshot = `${record.id}-${embed.player}-playing-before.png`, afterScreenshot = `${record.id}-${embed.player}-playing-after.png`
-  await writeFile(resolve(outputDirectory, beforeScreenshot), beforePixels)
-  await writeFile(resolve(outputDirectory, afterScreenshot), afterPixels)
   await pause(page, embed)
   await page.locator('#minimize-player').click()
   const rect = await page.locator('#video-player').boundingBox()
@@ -626,7 +733,7 @@ async function playbackChecks(page, embed, record, report, outputDirectory) {
   const compactScreenshot = `${record.id}-${embed.player}-compact.png`
   await page.screenshot({ path: resolve(outputDirectory, compactScreenshot) })
   await page.locator('#minimize-player').click()
-  report.playback[embed.player] = { status: 'passed', clockProof: 'Completed actual-native-geometry-render receipts, actual original media before/after brackets, and actual canvas screenshots; expensive landmark probes remain paused-review-only.', audio: { muted: started.muted, volume: started.volume, proof: 'Actual decoded original HTMLMediaElement playback; audio track retained in unchanged source bytes, not acoustic loopback' }, advancedSeconds: ended.mediaTime - started.mediaTime, clocks, maxClockSkewSeconds: Math.max(...clocks.map(item => item.clockSkewSeconds)), canvas: { sourceStateChanged, canvasChanged, beforeSha256: digest(beforePixels), afterSha256: digest(afterPixels), beforeScreenshot, afterScreenshot }, compact: { width: rect.width, height: rect.height, controls: activeControls.controls, screenshot: compactScreenshot } }
+  Object.assign(playback, { status: 'passed', clockProof: 'Completed actual-native-geometry-render receipts, actual original media before/after brackets, and actual canvas screenshots; expensive landmark probes remain paused-review-only.', audio: { muted: started.muted, volume: started.volume, proof: 'Actual decoded original HTMLMediaElement playback; audio track retained in unchanged source bytes, not acoustic loopback' }, advancedSeconds: ended.mediaTime - started.mediaTime, clocks, maxClockSkewSeconds: Math.max(...clocks.map(item => item.clockSkewSeconds)), compact: { width: rect.width, height: rect.height, controls: activeControls.controls, screenshot: compactScreenshot } })
 }
 
 async function interactionChecks(page, embed, id, outputDirectory) {
@@ -716,7 +823,11 @@ async function measureSamples(page, embed, record, census, video, tolerancePx, o
         video.comparisonScreenshot = `${record.id}-source-comparison.png`
         await page.screenshot({ path: resolve(outputDirectory, video.comparisonScreenshot) })
       }
-    } catch (error) { sample.unavailable.push({ reason: error.message }) }
+    } catch (error) {
+      if (finite(error.clockSkewSeconds)) Object.assign(sample, { maxClockSkewSeconds: error.clockSkewSeconds, nativeMediaTime: error.nativeMediaTime })
+      if (finite(sample.maxClockSkewSeconds) && sample.maxClockSkewSeconds > CLOCK_LIMIT) sample.status = 'failed'
+      sample.unavailable.push({ reason: error.message })
+    }
   }
 }
 export function finishVideo(video, census, options) {
@@ -738,10 +849,12 @@ export function finishVideo(video, census, options) {
   video.landmarks = { measured: measurements.length, checks: checks.length, fitting: measurements.length - checks.length, fixedChecks: checks.filter(item => item.motion === 'fixed').length, movingChecks: checks.filter(item => item.motion === 'moving').length, maxErrorPx: maximumField(measurements, 'errorPx'), maxRawErrorPx: maximumField(measurements, 'rawErrorPx'), maxErrorFrameWidthPercent: maximumField(measurements, 'errorFrameWidthPercent') }
   const diagnosticMeasurements = diagnostic.flatMap(sample => sample.measurements)
   const diagnosticFailures = diagnosticMeasurements.filter(item => item.status === 'failed')
+  const diagnosticClockFailures = diagnostic.filter(sample => finite(sample.maxClockSkewSeconds) && sample.maxClockSkewSeconds > CLOCK_LIMIT)
   video.diagnosticLandmarks = { measured: diagnosticMeasurements.length, failed: diagnosticFailures.length, maxErrorPx: maximumField(diagnosticMeasurements, 'errorPx'), maxClockSkewSeconds: maximumField(diagnostic, 'maxClockSkewSeconds') }
   video.maxErrorPx = maximumField([...measurements, ...diagnosticMeasurements], 'errorPx')
   video.maxClockSkewSeconds = maximumField(video.samples, 'maxClockSkewSeconds')
   if (diagnosticFailures.length) video.failures.push({ code: 'diagnostic-pixel-counterexample', measuredLandmarks: diagnosticFailures.length, maxErrorPx: video.diagnosticLandmarks.maxErrorPx, reason: 'An independently admitted diagnostic source observation exceeds the stage pixel limit; optional missing or inadmissible oracles do not gate completeness, but actual measured counterexamples cannot be ignored.' })
+  if (diagnosticClockFailures.length) video.failures.push({ code: 'diagnostic-clock-counterexample', measuredSamples: diagnosticClockFailures.length, maxClockSkewSeconds: maximumField(diagnosticClockFailures, 'maxClockSkewSeconds'), timeSeconds: diagnosticClockFailures.map(sample => sample.timeSeconds), reason: 'An independently observed diagnostic media/model clock exceeds0.5s; unknown timing remains unavailable, but a finite measured timing counterexample cannot be ignored.' })
   video.unavailableReasons = video.samples.flatMap(sample => sample.unavailable.map(item => ({ timeSeconds: sample.timeSeconds, diagnosticOnly: sample.diagnosticOnly === true, ...item })))
   const exclusionReasons = {}
   let excludedMandatory = 0, excludedDiagnostic = 0
@@ -767,7 +880,7 @@ export function finishVideo(video, census, options) {
   if (!video.interaction || !Object.values(video.playback).some(result => result.status === 'passed')) video.failures.push({ code: 'interaction-unmeasured', reason: 'Actual original playback/audio/compact and paused manual native operation/orbit checks are required' })
   if (options.scoped) video.status = 'partial'
   else video.status = video.coverage.complete && !video.failures.length ? 'passed' : video.coverage.unavailableCensusSamples || !measurements.length ? 'unavailable' : 'failed'
-  const measuredFailure = required.some(sample => sample.status === 'failed' || sample.measurements.some(item => item.status === 'failed')) || diagnosticFailures.length > 0
+  const measuredFailure = required.some(sample => sample.status === 'failed' || sample.measurements.some(item => item.status === 'failed')) || diagnosticFailures.length > 0 || diagnosticClockFailures.length > 0
   video.stageMeasurement = { stage: options.stage, tolerancePx: 1920 * options.stage / 100, status: options.scoped ? 'unmeasured' : video.status === 'passed' ? 'passed' : measuredFailure || video.status === 'failed' ? 'failed' : 'unmeasured', scopedSamples: options.scoped ? { status: required.length && passed.length === required.length && missingCensusSamples === 0 && mandatory.length === selectedRows.length && !video.failures.length ? 'passed' : measuredFailure ? 'failed' : 'unavailable' } : null }
 }
 
@@ -822,14 +935,14 @@ export async function verifySync(options = parseOptions(process.argv.slice(2))) 
         })
         // Playback checks are independent of landmark availability: useful measurement must still run after a UI failure.
         try { await playbackChecks(page, embed, record, video, outputDirectory) }
-        catch (error) { video.failures.push({ code: `${measurementPlayer}-playback`, reason: error.message }) }
+        catch (error) { if (video.playback[measurementPlayer]) Object.assign(video.playback[measurementPlayer], { status: 'failed', reason: error.message }); video.failures.push({ code: `${measurementPlayer}-playback`, reason: error.message }) }
         try { await pause(page, embed); await measureSamples(page, embed, record, census, video, report.limits.sourceLandmarkPx, outputDirectory) }
         catch (error) { video.failures.push({ code: 'source-measurement', reason: error.message }) }
         try { video.interaction = await interactionChecks(page, embed, id, outputDirectory) }
         catch (error) { video.failures.push({ code: 'manual-interaction', reason: error.message }) }
         if (options.player === 'both') {
           try { const official = await openRoute(page, server.url, record, 'youtube'); await playbackChecks(page, official, record, video, outputDirectory) }
-          catch (error) { video.failures.push({ code: 'youtube-playback', reason: error.message }) }
+          catch (error) { if (video.playback.youtube) Object.assign(video.playback.youtube, { status: 'failed', reason: error.message }); video.failures.push({ code: 'youtube-playback', reason: error.message }) }
         }
         finishVideo(video, census, options)
       } catch (error) { video.failures.push({ code: 'video-prerequisite', reason: error.message }); video.unavailableReasons.push({ reason: error.message }) }

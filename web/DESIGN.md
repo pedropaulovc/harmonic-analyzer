@@ -132,6 +132,11 @@ A difficult view does not become exempt because it cannot yet be matched.
 Intervals without a corresponding machine may retain the preceding pose.
 Unsupported required intervals remain explicit in the UI and reports.
 
+Count the machine views actually visible in the footage. Synthesis's
+presenter-to-spin edit moves one machine image; it uses one native view with
+source-informed principal-point/FOV keys. Its coarse framing remains unmeasured.
+Actors and formula graphics stay in the original player.
+
 ### Measurement and refinement
 
 Use original hashed footage and timestamped source observations. Evaluate every

@@ -912,23 +912,41 @@ export function sourceCompositeErrors(views) {
   return failures
 }
 
-/** Re-decode only claimed actual exposures, in each explicitly declared reversible format. */
-export async function verifyFrameImages(sourcePath, data, { signal, timeoutMs = 180_000, native = null, source = data?.source } = {}) {
+/**
+ * Re-decode only claimed actual exposures, in each explicitly declared reversible format.
+ * Diagnostic attribution keeps per-identity failures separate within one native batch;
+ * strict replay remains the default, and source/decode/coverage failures always throw.
+ */
+export async function verifyFrameImages(sourcePath, data, { signal, timeoutMs = 180_000, native = null, source = data?.source, failureMode = 'strict' } = {}) {
+  const attributeFailures = failureMode === 'attribute'
   const observedSha256 = await sha256File(sourcePath)
   if (source && observedSha256 !== source.sha256) throw new Error('Independent original MP4 SHA256 mismatch before image replay')
   const identitySource = source ?? { sha256: observedSha256 }, formats = new Map()
+  const imageClaims = new Map(), imageFailures = new Map(), verifiedImageDigests = new Set()
+  const rejectImage = (image, reason) => {
+    if (!attributeFailures) throw new Error(reason)
+    imageFailures.set(jsonDigest(image), reason)
+  }
+  const attribution = () => attributeFailures ? {
+    verifiedImageDigests: [...verifiedImageDigests].filter(digest => !imageFailures.has(digest)),
+    imageFailures: [...imageFailures].map(([imageDigest, reason]) => ({ imageDigest, reason })),
+  } : {}
   for (const { image, path } of claimedSourceImages(data)) {
     const error = sourceImageError(image, identitySource, native)
-    if (error) throw new Error(`${path}: ${error}`)
+    if (error) { rejectImage(image, `${path}: ${error}`); continue }
     let images = formats.get(image.pixelFormat)
     if (!images) { images = new Map(); formats.set(image.pixelFormat, images) }
     const value = image.sha256Bgr8 ?? image.sha256Gray8
-    if (images.has(image.frameIndex) && images.get(image.frameIndex) !== value) throw new Error(`Conflicting ${image.pixelFormat} hashes at actual native frame ${image.frameIndex}`)
+    if (!attributeFailures && images.has(image.frameIndex) && images.get(image.frameIndex) !== value) throw new Error(`Conflicting ${image.pixelFormat} hashes at actual native frame ${image.frameIndex}`)
     images.set(image.frameIndex, value)
+    if (attributeFailures) {
+      const key = `${image.pixelFormat}/${image.frameIndex}`, claims = imageClaims.get(key) ?? new Map()
+      claims.set(jsonDigest(image), value); imageClaims.set(key, claims)
+    }
   }
   const frames = Array.isArray(data) ? data : data?.frames ?? []
-  for (const frame of frames) if (frame.sourceImage && native && (!finite(frame.decodedTimeSeconds) || Math.abs(native.pts[frame.sourceImage.frameIndex] - frame.decodedTimeSeconds) > 0.001 || (frame.decodedFrameIndex !== undefined && frame.decodedFrameIndex !== frame.sourceImage.frameIndex))) throw new Error(`Stale native PTS/index at ${frame.timeSeconds}s`)
-  if (!formats.size) return { count: 0, formats: [], frameHashDigest: null, reason: 'No source-image pixels claimed' }
+  for (const frame of frames) if (frame.sourceImage && native && (!finite(frame.decodedTimeSeconds) || Math.abs(native.pts[frame.sourceImage.frameIndex] - frame.decodedTimeSeconds) > 0.001 || (frame.decodedFrameIndex !== undefined && frame.decodedFrameIndex !== frame.sourceImage.frameIndex))) rejectImage(frame.sourceImage, `Stale native PTS/index at ${frame.timeSeconds}s`)
+  if (!formats.size) return { count: 0, formats: [], frameHashDigest: null, reason: 'No source-image pixels claimed', ...attribution() }
   const reports = [], allDigest = createHash('sha256')
   for (const [pixelFormat, images] of [...formats].sort(([a], [b]) => a.localeCompare(b))) {
     const indices = [...images.keys()].sort((a, b) => a - b), spans = []
@@ -946,16 +964,28 @@ export async function verifyFrameImages(sourcePath, data, { signal, timeoutMs = 
     const decoded = output.split('\n').filter(line => line.trim() && !line.startsWith('#')).map(line => line.split(',').map(value => value.trim()))
     if (decoded.length !== indices.length || !finite(tick) || tick <= 0) throw new Error(`Actual ${pixelFormat} framehash/PTS coverage ${decoded.length}/${indices.length}`)
     const digest = createHash('sha256'), bytesPerFrame = 1920 * 1080 * (pixelFormat === 'bgr8' ? 3 : 1)
+    let verifiedCount = 0
     for (let i = 0; i < indices.length; i++) {
       const row = decoded[i], index = indices[i], actual = row[5], actualPts = Number(row[2]) * tick
-      if (row.length !== 6 || Number(row[4]) !== bytesPerFrame || actual !== images.get(index)) throw new Error(`Actual source ${pixelFormat} bytes/hash mismatch at native frame ${index}: ${actual}/${images.get(index)}`)
+      if (!attributeFailures && (row.length !== 6 || Number(row[4]) !== bytesPerFrame || actual !== images.get(index))) throw new Error(`Actual source ${pixelFormat} bytes/hash mismatch at native frame ${index}: ${actual}/${images.get(index)}`)
       const expectedPts = native?.pts[index] ?? frames.find(frame => frame.sourceImage?.frameIndex === index)?.decodedTimeSeconds
-      if (expectedPts !== undefined && (!finite(actualPts) || Math.abs(actualPts - expectedPts) > tick / 2 + 0.001)) throw new Error(`Stale actual decoded ${pixelFormat} PTS at frame ${index}: ${actualPts}/${expectedPts}`)
+      const ptsError = expectedPts !== undefined && (!finite(actualPts) || Math.abs(actualPts - expectedPts) > tick / 2 + 0.001)
+      if (!attributeFailures && ptsError) throw new Error(`Stale actual decoded ${pixelFormat} PTS at frame ${index}: ${actualPts}/${expectedPts}`)
+      if (attributeFailures) {
+        let verified = false
+        for (const [imageDigest, expectedHash] of imageClaims.get(`${pixelFormat}/${index}`)) {
+          if (row.length !== 6 || Number(row[4]) !== bytesPerFrame || actual !== expectedHash) imageFailures.set(imageDigest, `Actual source ${pixelFormat} bytes/hash mismatch at native frame ${index}: ${actual}/${expectedHash}`)
+          else if (ptsError) imageFailures.set(imageDigest, `Stale actual decoded ${pixelFormat} PTS at frame ${index}: ${actualPts}/${expectedPts}`)
+          else if (!imageFailures.has(imageDigest)) { verifiedImageDigests.add(imageDigest); verified = true }
+        }
+        if (!verified) continue
+      }
+      verifiedCount++
       digest.update(`${index}:${actual}\n`); allDigest.update(`${pixelFormat}:${index}:${actual}\n`)
     }
-    reports.push({ pixelFormat, count: indices.length, bytesPerFrame, frameHashDigest: digest.digest('hex'), decoder: `ffmpeg native select; passthrough original PTS; SHA256 over actual ${pixelFormat} bytes` })
+    reports.push({ pixelFormat, count: verifiedCount, bytesPerFrame, frameHashDigest: digest.digest('hex'), decoder: `ffmpeg native select; passthrough original PTS; SHA256 over actual ${pixelFormat} bytes` })
   }
-  return { count: reports.reduce((sum, item) => sum + item.count, 0), formats: reports, frameHashDigest: allDigest.digest('hex'), originalSourceSha256: observedSha256 }
+  return { count: reports.reduce((sum, item) => sum + item.count, 0), formats: reports, frameHashDigest: allDigest.digest('hex'), originalSourceSha256: observedSha256, ...attribution() }
 }
 
 /** Reproject native geometry and independently replay actual phase/period source pixels. */

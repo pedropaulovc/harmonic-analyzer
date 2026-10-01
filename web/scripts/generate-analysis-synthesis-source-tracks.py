@@ -7,6 +7,8 @@ This retains numeric evidence and chooses continuous Analysis inverse cam roots.
 It loads no CAD/model/browser and does not qualify cameras, recover historical
 settings, or measure any matching stage. Original frozen root choices/costs remain
 immutable; alternative rod projections are predictions, never source observations.
+Synthesis presenter-to-spin retains one actual machine image with openly chosen
+principal-point/focal framing keys, not a second body or a measured camera fit.
 """
 from __future__ import annotations
 import copy
@@ -123,6 +125,94 @@ class Generator:
             "knife": ("/summing/",), "clamp": ("/magnifier/clamp-",),
         }
         self.parts = self.native["mechanical"][0]["all435"]
+        self.presenter_reframing = None
+        if not self.analysis:
+            self.presenter_reframing = self.presenter_reframing_keys()
+            transition = self.shots["presenter-to-spin"]
+            for frame in self.data["frames"]:
+                if frame["shotId"] == transition["id"]:
+                    # The original sparse observations and actual source-image
+                    # inspection show one body, not the legacy two-layer guess.
+                    frame["views"] = [{"id":"main", "rectSourcePixels":[0,0,self.data["source"]["width"],self.data["source"]["height"]],
+                                       "presentation":"native", "camera":frame.get("camera"),
+                                       "mechanicalState":copy.deepcopy(frame.get("mechanicalState", {}))}]
+            retained_changes = [t for t in self.data.get("coverage", {}).get("changeTimesSeconds", [])
+                                if transition["startSeconds"] <= t < transition["endSeconds"]]
+            self.data.setdefault("compactChangeTimesSeconds", []).extend(
+                retained_changes + [key["decodedTimeSeconds"] for key in self.presenter_reframing["keys"]])
+
+    def presenter_reframing_keys(self):
+        """Associate coarse inspection hints with immutable original native PTS.
+
+        Bounds are authoring hints from the single visible front-facing body.
+        They are not landmark measurements, independent pixel oracles or FITs.
+        """
+        transition = self.shots["presenter-to-spin"]
+        donor = max((frame for frame in self.data["frames"]
+                     if frame["shotId"] == "intro-machine"
+                     and frame["decodedTimeSeconds"] < transition["startSeconds"]
+                     and common.compact_camera(frame.get("camera"))),
+                    key=lambda frame:frame["decodedTimeSeconds"])
+        camera = donor["camera"]
+        baseline = {name:copy.deepcopy(camera[name]) for name in
+                    ("positionMetres","quaternion","verticalFovDegrees","principalPointViewportPixels")
+                    if name in camera}
+        hints = [(25.95,570.,930.), (26.03,467.,805.), (26.07,401.,752.),
+                 (26.14,330.,678.), (26.56,65.,392.)]
+        keys = []
+        for nominal,left,right in hints:
+            source = nearest(self.data["frames"],nominal,lambda frame:frame["decodedTimeSeconds"])
+            keys.append({"nominalInspectionTimeSeconds":nominal,
+                         "decodedTimeSeconds":source["decodedTimeSeconds"],
+                         "sourceFrameIndex":source["sourceFrameIndex"],
+                         "sourceImage":copy.deepcopy(source.get("sourceImage")),
+                         "coarseDisplayBodyXBoundsPixels":[left,right]})
+        return {"kind":"chosen-single-body-source-informed-framing",
+                "sourceViews":["main"], "measurementStatus":"unmeasured",
+                "sourceLineage":"web/content/8KmVDxkia_w.track.json",
+                "sourceSha256":self.data["source"]["sha256"],
+                "displayViewportPixels":[1568,882],
+                "keys":keys, "baselineCamera":baseline,
+                "baselineDecodedTimeSeconds":donor["decodedTimeSeconds"],
+                "baselineSourceImage":copy.deepcopy(donor.get("sourceImage")),
+                "coarseDisplayBodyHeightsPixels":[800.,746.],
+                "chosenDisplayVerticalCentrePixels":445.,
+                "chosenDisplayVerticalShiftPixels":20.,
+                "interpretation":"Actual inspected source has one front-facing machine moving middle-to-left while an opaque black image boundary covers the presenter. Nominal inspection hints are attached to nearest existing original native PTS, not declared exact independent image measurements. Horizontal hints are coarse; linear height/vertical-centre interpolation and held front-camera orientation are chosen. Missing per-key original image hashes remain null. Source pixels, uncertainties and source-time tolerance are unchanged; no alpha, warp, camera yaw or geometry change."}
+
+    def presenter_reframing_camera(self, frame):
+        packet = self.presenter_reframing
+        keys = packet["keys"]
+        time = frame["decodedTimeSeconds"]
+        first,last = keys[0],keys[-1]
+        time = max(first["decodedTimeSeconds"],min(last["decodedTimeSeconds"],time))
+        lower,upper = first,first
+        for key in keys:
+            if key["decodedTimeSeconds"] <= time:
+                lower = upper = key
+            else:
+                upper = key
+                break
+        interval = upper["decodedTimeSeconds"]-lower["decodedTimeSeconds"]
+        fraction = (time-lower["decodedTimeSeconds"])/interval if interval else 0.
+        centre = lambda key:sum(key["coarseDisplayBodyXBoundsPixels"])/2
+        x = centre(lower)+(centre(upper)-centre(lower))*fraction
+        progress = (time-first["decodedTimeSeconds"])/(last["decodedTimeSeconds"]-first["decodedTimeSeconds"])
+        height_start,height_end = packet["coarseDisplayBodyHeightsPixels"]
+        scale = (height_start+(height_end-height_start)*progress)/height_start
+        width,height = self.data["source"]["width"],self.data["source"]["height"]
+        display_width,display_height = packet["displayViewportPixels"]
+        origin = [centre(first)*width/display_width,
+                  packet["chosenDisplayVerticalCentrePixels"]*height/display_height]
+        target = [x*width/display_width,
+                  origin[1]+packet["chosenDisplayVerticalShiftPixels"]*progress*height/display_height]
+        camera = copy.deepcopy(packet["baselineCamera"])
+        principal = camera.get("principalPointViewportPixels", [width/2,height/2])
+        camera["principalPointViewportPixels"] = [target[i]+scale*(principal[i]-origin[i]) for i in range(2)]
+        camera["verticalFovDegrees"] = math.degrees(2*math.atan(
+            math.tan(math.radians(camera["verticalFovDegrees"]/2))/scale))
+        note = "Chosen single-body presenter reframe: retained pre-transition front-camera position/quaternion, coarse actual source-body horizontal framing hints at original native PTS, and chosen height/vertical-centre interpolation. Principal-point/FOV changes are source-informed, not source FIT/CHECK residuals, independent pixel oracles, recovered camera history or stage qualification. One original main view, no outgoing/incoming duplicate bodies or invented crossfade."
+        return camera,note
 
     def envelope(self, family, aspect):
         parts = [p for p in self.parts if any(name in p["partPath"] for name in self.groups[family])]
@@ -167,6 +257,8 @@ class Generator:
         time, shot = frame["timeSeconds"], frame["shotId"]
         direct = common.compact_camera(view.get("camera") or (frame.get("camera") if view["id"] == "main" else None))
         if direct: return direct, "Retained source-derived camera family at this source exposure; registration/calibration or holding does not claim an independent per-exposure fit. Original CPU FIT/CHECK diagnostics remain source evidence, not a stage pass."
+        if not self.analysis and shot == "presenter-to-spin":
+            return self.presenter_reframing_camera(frame)
         if self.analysis and family == "bar" and view.get("presentation") == "horizontal-mirror":
             return common.compact_camera(self.candidate["nativeCameraRecord"]), "Single latest four-seed Analysis source FIT camera held/transferred across bank exposures with its genuine horizontal mirror; no per-exposure refit or new native/GPU qualification."
         same = [s for s in self.seeds if s[0] == shot]
@@ -382,20 +474,6 @@ class Generator:
                 view["imagePlaneWarp"] = {"kind":"homography","unwarpedViewportPixels":[1920,1080],
                     "renderToSourcePixels":[scale,0,960*(1-scale),0,1,0,0,0,1]}
                 view["provenance"]["evidence"] += " Source page-flip modeled as chosen center-hinged width compression with mirrored endpoint;2% width floor avoids a singular edge-on homography. Perspective fold/shadow details unmeasured; no real machine rotation invented."
-        if not self.analysis and frame["shotId"] == "presenter-to-spin" and {view["id"] for view in output} == {"outgoing", "incoming"}:
-            # The original source ledger names one full-canvas main composition;
-            # its source-backed two-image decomposition is not an extra body.
-            # This declares layout identity only, not landmark aliases or a fit.
-            for view in output:
-                if view["rectSourcePixels"] == [0, 0, 1920, 1080] and view["presentation"] == "native":
-                    view["sourceViewIds"] = ["main"]
-                    view["sourceViewMappingEvidence"] = (
-                        "8KmVDxkia_w.observations.json presenter-to-spin source main ROI is native full1920x1080; "
-                        "the retained track.json decomposes that same inspected presenter-disappearance/machine-resize "
-                        "composition into ordered outgoing and incoming full-canvas photographic layers. "
-                        "Both layers together cover the original main view; neither is a separately asserted additional body. "
-                        "Layout decomposition only: source landmark association and camera/opacity remain independently unmeasured."
-                    )
         return output
 
     def build(self):
@@ -421,6 +499,8 @@ class Generator:
             track["evidence"]["notes"].append("Analysis independent source FIT roots can exchange indistinguishable rocker-pose branches. Playback chooses nearest-previous genuine inverse roots; observed rocker endpoints and all source controls stay unchanged. Original per-exposure rod-cost choices remain immutable; alternative cam/rod endpoint orientations and between-exposure continuity are chosen, not recovered or source-certified.")
         else:
             track["sourceMeasurements"]["blockers"].append("Synthesis conditional relative pen/wheel trajectory and source-displacement cosine witnesses do not metrically qualify full source-visible motion or unknown station/phase associations.")
+            track["evidence"]["synthesisPresenterFraming"] = copy.deepcopy(self.presenter_reframing)
+            track["sourceMeasurements"]["blockers"].append("Synthesis presenter-to-spin has one original main machine view with chosen coarse principal-point/FOV reframing. No independently measured transition FIT/CHECK landmarks or per-exposure camera fits are introduced; presenter/black graphic/formula are not native geometry.")
         self.camera_metadata(track)
         return track
 
