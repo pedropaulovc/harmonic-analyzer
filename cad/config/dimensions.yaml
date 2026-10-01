@@ -585,7 +585,7 @@ sections:
         - mesh plane alignment
         - high
       - - Crankshaft
-        - 'Along Z on the restored fixed crank axis (x, y) = (−129.336, 129.850). The frame-reference c2c is 39.735, with 0.423 slack for the single-cutter pair. User ruling 2026-09-28 requires positive worst-case tight backlash without a prescribed window. The 137.2-mm shaft spans z −183..−45.8 with its integral dome outboard. Its integral seat collar spans z −154.3..−144.5 (the removable T12 seats on its front face, sprocket −157.1..−154.3); the MHA-172 washer, faced at assembly to 0.50–4.00 from a 4.30 MIN blank, closes it to the post boss. The restored boss runs z −142.245..−70.210; the pinion south face is feeler-set 0.25 north of it, at z −69.960 (local 113.039505572). The 16T teeth grew 1.8 north, 9.5 → 11.3 mm (user ruling 2026-09-30): full OD over the 8.5 shoulder, the north 2.8 turned to Ø16.21. Its 14.0-mm boss length past the south-to-north gear face is unchanged, yielding 25.3 mm overall. Its Ø3.175 pin station, 18.3, follows the grown face parametrically. The integral Ø11.388 journal runs directly in the post; the Ø9.0 pinion seat step starts at local 111.3.'
+        - 'Along Z on the restored fixed crank axis (x, y) = (−129.336, 129.850). The frame-reference c2c is 39.735, with 0.423 slack for the single-cutter pair. User ruling 2026-09-28 requires positive worst-case tight backlash without a prescribed window. The 137.3-mm shaft spans z −183..−45.7 with its integral dome outboard. Its integral seat collar spans z −154.3..−144.5 (the removable T12 seats on its front face, sprocket −157.1..−154.3); the MHA-172 washer, faced at assembly to 0.50–4.00 from a 4.30 MIN blank, closes it to the post boss. The restored boss runs z −142.245..−70.210; the pinion south face is feeler-set 0.25 north of it, at z −69.960 (local 113.039505572). The 16T teeth grew 1.9 north, 9.5 → 11.4 mm (user ruling 2026-09-30, then R9-55): full OD over the 8.5 shoulder, the north 2.9 turned to Ø16.21. Its 14.0-mm boss length past the south-to-north gear face is unchanged, yielding 25.4 mm overall. Its Ø3.175 pin station, 18.4, follows the grown face parametrically. The integral Ø11.388 journal runs directly in the post; the Ø9.0 pinion seat step starts at local 111.3.'
         - 'cone-pivot-post-v2 is the physical authority for x/y. The ch30 GT crank_sprocket result (−122.84, 144.78) remains independent image evidence, while the primary crank construction photo governs the separate through hub and flush outboard face. The crossed-helical accommodation and historical 0.25 mm transverse-DP centre reference remain; neither is a backlash target.'
         - high (GT + mesh)
       - - Chain run
@@ -2132,8 +2132,8 @@ sections:
          restores that fixed crank axis and the unrelieved v36 post boss.
          The 64T keeps its south face on the unchanged 3.181 thrust collar
          and grows north to 7.2113 so it bears on T120 in the solid cone
-         stack (user ruling 2026-09-28). The 16T teeth (grown to 11.3 north,
-         user ruling 2026-09-30) sit 0.25 off the restored boss at z −70.210,
+         stack (user ruling 2026-09-28). The 16T teeth (grown to 11.4 north,
+         user ruling 2026-09-30, then R9-55) sit 0.25 off the restored boss at z −70.210,
          so its south face is z −69.960. They run at full OD for the 8.5
          shoulder and are turned to Ø16.21 north of it: with every printed
          band, fit offset and axis pose at its worst the shoulder's axial air
@@ -2145,7 +2145,7 @@ sections:
          is turned down to Ø15.78 MIN (still in 16T:64T contact wherever its
          reading can fail) only if the band stops the feeler, the shoulder
          faced back to 8.2 MIN only if the shoulder does; the teeth cover
-         0.862 of the grown 64T tooth row
+         0.857 of the grown 64T tooth row, each 64T slice at its own contact azimuth,
          with the cone stack floated 0.80 north (>=85% required; stub teeth
          counted).
          Positive worst-case tight backlash, not a backlash window, is the
