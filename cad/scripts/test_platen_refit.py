@@ -8,7 +8,7 @@ import pytest
 
 import _chain as chain
 import build_paper_drive_assembly as assembly
-import build_transgear_knob_shaft as knob_shaft
+import transgear_drive_collar_spec as collar
 import transgear_removable_spec as band
 import platen_spec as platen
 import build_platen_clip as clip
@@ -16,6 +16,7 @@ import build_platen_guide as guide
 import build_platen_paper as paper
 import build_platen_rack as rack
 import build_support_bar as support
+import fillister_screw_spec as fillister
 
 
 def test_platen_envelope_preserves_fitted_top_left_and_ratio() -> None:
@@ -129,13 +130,61 @@ def test_cascaded_drive_geometry_closes() -> None:
     assembly._assert_chain_layout()
 
 
+def test_chain_slack_run_clears_the_chain_plane_parts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # R9-30: the sag the 68-link loop forces must clear every placed part in
+    # the chain plane -- in plane, or axially by the band the chain sweeps.
+    assembly._assert_chain_slack_clearance()
+    run = assembly._slack_run_points()
+    assert math.isclose(
+        math.dist(run[0], assembly.KNOB_SHAFT_XY), chain.PITCH_R_T24, abs_tol=1e-3
+    )
+    crank_xy = (-assembly.CHAIN_CRANK_CENTRE[0], assembly.CHAIN_CRANK_CENTRE[1])
+    assert math.isclose(math.dist(run[-1], crank_xy), chain.PITCH_R_T12, abs_tol=1e-3)
+    # A part sitting on the sag's midpoint in the chain plane is refused...
+    probe_xy = run[len(run) // 2]
+    envelopes = assembly.CHAIN_PLANE_ENVELOPES
+    on_path = (
+        "probe",
+        probe_xy,
+        1.0,
+        assembly.CHAIN_MID_Z - 1.0,
+        assembly.CHAIN_MID_Z + 1.0,
+    )
+    monkeypatch.setattr(assembly, "CHAIN_PLANE_ENVELOPES", (*envelopes, on_path))
+    with pytest.raises(AssertionError, match="slack run"):
+        assembly._assert_chain_slack_clearance()
+    # ...but the same footprint just behind the band the chain sweeps passes.
+    chain_back = band.SEAT_FACE_Z + assembly.CHAIN_REACH_REAR_WORST
+    behind = ("probe", probe_xy, 1.0, chain_back + 0.01, chain_back + 2.0)
+    monkeypatch.setattr(assembly, "CHAIN_PLANE_ENVELOPES", (*envelopes, behind))
+    assembly._assert_chain_slack_clearance()
+
+
+def test_guide_lock_stations_sweep_clear_of_the_hanger(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The lock stations ride the platen across its whole feed; R9-31's low
+    # button heads pass under the hanger arm's front face.
+    assembly._assert_lock_station_sweep()
+    monkeypatch.setattr(assembly, "LOCK_SCREW_HEAD_H", 2.0)
+    assembly._assert_lock_station_sweep()
+    # Negative control: the stock fillister head stands into the arm.
+    monkeypatch.setattr(assembly, "LOCK_SCREW_HEAD_H", fillister.HEAD_H)
+    with pytest.raises(AssertionError, match="sweep into the arm"):
+        assembly._assert_lock_station_sweep()
+
+
 def test_chain_wheels_share_the_spec_band_and_the_chain_straddles_it() -> None:
     # One chain plane, the spec's, for the links and both wheels.
     assert assembly.CHAIN_MID_Z == band.CHAIN_MID_Z
     # Both wheels (crank T12, knob T24) sit on the one band: front face at
-    # the band front, rear face on the knob shaft's seat collar.
-    knob_seat_z = assembly.KNOB_SHAFT_Z0 + knob_shaft.SEAT_COLLAR
+    # the band front, rear face on the seat face (the knob side's is the
+    # MHA-152 drive collar's front face, set in front of the 12T's face F).
+    knob_seat_z = assembly.KNOB_COLLAR_Z0
     assert math.isclose(knob_seat_z, band.SEAT_FACE_Z)
+    assert math.isclose(assembly.KNOB_SHAFT_Z0 - collar.SET_NOMINAL, knob_seat_z)
     assert math.isclose(assembly.REMOVABLE_Z0 + band.PLATE, knob_seat_z)
     assert math.isclose(
         (assembly.REMOVABLE_Z0 + knob_seat_z) / 2.0, assembly.CHAIN_MID_Z
@@ -153,35 +202,33 @@ def test_chain_wheels_share_the_spec_band_and_the_chain_straddles_it() -> None:
     assert 2.0 * chain.BUSH_HALF_LEN >= band.PLATE
 
 
-def test_knob_collar_clears_the_disc_at_its_long_limit(monkeypatch) -> None:
-    # Codex P2 on efa719176: MHA-078's collar length prints .X (+/-0.8), and
-    # the 120T disc pair floats forward on the stud seat to the stud collar.
-    import importlib.util
-
-    assert knob_shaft.COLLAR_LEN == 4.6
-    assert math.isclose(assembly.KNOB_COLLAR_REAR_Z, assembly.DISC_Z0 - 1.3)
-    assert math.isclose(assembly.KNOB_SHAFT_Z0, -167.9)
-    assert math.isclose(assembly.DISC_FRONT_STOP_Z, assembly.DISC_Z0 - 0.4)
-    assert math.isclose(assembly.KNOB_DISC_AIR_WORST, 0.1)
-    # Negative control: the 5.4 collar's nominal 0.5 air passes, but at the
-    # long limit its rear face stands 0.7 past the disc's front stop.
-    monkeypatch.setattr(knob_shaft, "COLLAR_REAR", knob_shaft.SEAT_COLLAR + 5.4)
-    monkeypatch.setattr(knob_shaft, "DISC_AIR", 0.5)
-    spec = importlib.util.spec_from_file_location(
-        "_paper_drive_perturbed", assembly.__file__
+def test_knob_drive_collar_sits_between_the_seat_and_the_12t(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Round 10: the seat collar is no longer turned on the knob shaft; it is
+    # the separate 4.0-long MHA-152, set at fit-up SET_NOMINAL in front of the
+    # 12T's front face F.  Pushed fully rearward its rear face meets F, and
+    # the disc's front face still stands behind F.
+    assert collar.LENGTH == 4.0
+    assert math.isclose(assembly.KNOB_SHAFT_Z0, -148.1)
+    assert math.isclose(
+        assembly.KNOB_COLLAR_REAR_Z, assembly.KNOB_COLLAR_Z0 + collar.LENGTH
     )
-    fresh = importlib.util.module_from_spec(spec)
-    with pytest.raises(AssertionError, match=r"long \.X limit .* air -0\.70"):
-        spec.loader.exec_module(fresh)
+    travel = assembly.KNOB_SHAFT_Z0 - assembly.KNOB_COLLAR_REAR_Z
+    assert math.isclose(travel, collar.REARWARD_TRAVEL_NOMINAL)
+    assert min(collar.REARWARD_TRAVEL_RANGE) > 0.0
+    assert assembly.DISC_Z0 - assembly.KNOB_SHAFT_Z0 > 0.0
+    assembly._assert_knob_shaft_clearance()
+    # Negative control: a disc 0.05 behind F binds on the collar pushed
+    # fully rearward.
+    monkeypatch.setattr(assembly, "DISC_Z0", assembly.KNOB_SHAFT_Z0 + 0.05)
+    with pytest.raises(AssertionError, match="clear of the disc"):
+        assembly._assert_knob_shaft_clearance()
 
 
 def test_refitted_platen_clears_fixed_support_hardware() -> None:
     assert support.CLAMP_CBORE_DEPTH > 2.5
     assert support.CLAMP_CBORE_DIA > support.CLAMP_HOLE_DIA
-    assert math.isclose(assembly.STUD_XY[0], support.BRACKET_STUD_X)
-    assert support.BRACKET_HOLE_X == tuple(
-        support.BRACKET_STUD_X + dx for dx in (-10.0, 10.0)
-    )
     assert guide.LOCK_STATION_X == tuple(
         guide.GUIDE_LENGTH * fraction for fraction in (0.3, 0.7)
     )

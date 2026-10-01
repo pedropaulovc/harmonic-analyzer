@@ -1,47 +1,61 @@
-r"""Create the curated manufacturing drawing for the transgear feed pinion (12T).
+r"""Create the curated manufacturing drawing for the feed-pinion sleeve (MHA-110).
 
-Follows the batch gear-drawing pattern (see ``draw_cylinder_gear``). Drawn 3:1
-so the small long-faced pinion reads clearly.
+An end view, a longitudinal section A-A and an isometric at 3:1.  The end view
+carries the bore's fit note and finish; the section carries every turned
+diameter beside its axial extent and the three lengths baselined from the
+rear face (rule 7), all imported natively from the part with the places and
+bands the part authored (``transgear_feed_pinion_spec``).  The oil hole is
+match-drilled through the pressed hub, so the section carries only its
+match-drill note; its size and station belong to the hub's sheet.
 """
 
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 from typing import Any
 
-from transgear_feed_pinion_spec import GEOMETRIC_TOLERANCES_MM
-
 import _telemetry
-from _common import CAD_ROOT, check, run_build
+from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_feature_control_frame,
+    add_leader_note,
     add_property_linked_note,
     add_surface_finish,
+    assert_imported_precision,
+    check_drawing_layout,
+    create_section_view,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
+    rebuild_drawing,
     set_dimension_callouts,
-    set_dimension_precision,
     set_hidden_lines_removed,
     stamp_drawing_summary,
+    view_name,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
 from _surface_finish import surface_finish_by_key
 from transgear_feed_pinion_spec import (
     BORE_DIA,
+    BORE_FIT_CALLOUT,
+    BORE_PROCESS_CALLOUT,
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION_BY_NAME,
     FACE_WIDTH,
+    OIL_HOLE_DIA,
+    OIL_HOLE_NOTE,
+    OIL_HOLE_Z,
     OUTSIDE_DIA,
+    OVERALL_LENGTH,
+    SHANK_DIA,
+    SPIGOT_FRONT_STATION,
     SURFACE_FINISHES,
 )
-from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
-    place_view,
-)
+from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
 
 
 SPEC = DRAWINGS_BY_NAME["transgear_feed_pinion"]
@@ -58,26 +72,148 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (3.0, 1.0)
 VIEW_SCALE = (3, 1)
-FRONT_CENTER = (0.190, 0.175)
-RIGHT_CENTER = (0.295, 0.175)
-ISO_CENTER = (0.385, 0.210)
+FRONT_CENTER = (0.100, 0.150)
+RIGHT_CENTER = (0.235, 0.150)
+ISO_CENTER = (0.365, 0.150)
+SHEET_INNER_BORDER = (0.0127, 0.0127, 0.4191, 0.2667)
 
-BORE_R = BORE_DIA * VIEW_SCALE[0] / 2000.0
+# Half the printed tooth-tip circle in sheet metres: the section's half-height,
+# which every dimension is placed clear of.
 HALF_OD = OUTSIDE_DIA * VIEW_SCALE[0] / 2000.0
-FRONT_FACE_X = RIGHT_CENTER[0] - FACE_WIDTH * VIEW_SCALE[0] / 2000.0
 
-FRONT_KEEP = {
-    "BoreDia": (FRONT_CENTER[0] - 0.055, FRONT_CENTER[1] - 0.030),
+
+def _side_x(z_mm: float) -> float:
+    """Sheet x of a model-z station in the longitudinal section.
+
+    The section lays model +Z to the RIGHT (the crank pinion's read-back): the
+    rear face (z = 0) is the left edge and the nose the right edge.
+    """
+    return RIGHT_CENTER[0] + (z_mm - OVERALL_LENGTH / 2.0) * VIEW_SCALE[0] / 1000.0
+
+
+# The end view is pictorial and carries its center mark, the bore fit note and
+# the bore finish.  On the section, the diameters stand above the view over
+# their own axial spans (tip and root over the teeth, spigot and shank over
+# theirs, the bore left of the rear face); the three lengths stay
+# baseline-stacked below it from the rear face, shortest innermost.
+FRONT_KEEP: dict[str, tuple[float, float]] = {}
+_SIDE_TOP = RIGHT_CENTER[1] + HALF_OD
+_SIDE_BOTTOM = RIGHT_CENTER[1] - HALF_OD
+RIGHT_KEEP: dict[str, tuple[float, float]] = {
+    "OutsideDia": ((_side_x(0.0) + _side_x(FACE_WIDTH)) / 2.0, _SIDE_TOP + 0.012),
+    "RootDia": ((_side_x(0.0) + _side_x(FACE_WIDTH)) / 2.0, _SIDE_TOP + 0.026),
+    "BoreDia": (_side_x(0.0) - 0.010, _SIDE_TOP + 0.040),
+    "SpigotDia": (
+        (_side_x(FACE_WIDTH) + _side_x(SPIGOT_FRONT_STATION)) / 2.0,
+        _SIDE_TOP + 0.012,
+    ),
+    "ShankDia": (
+        (_side_x(SPIGOT_FRONT_STATION) + _side_x(OVERALL_LENGTH)) / 2.0,
+        _SIDE_TOP + 0.012,
+    ),
+    "FaceWidth": ((_side_x(0.0) + _side_x(FACE_WIDTH)) / 2.0, _SIDE_BOTTOM - 0.012),
+    "SpigotFront": (
+        (_side_x(0.0) + _side_x(SPIGOT_FRONT_STATION)) / 2.0,
+        _SIDE_BOTTOM - 0.024,
+    ),
+    "OverallLength": (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.036),
 }
 DIMENSION_CALLOUTS = {
-    # Reamed slip fit on the stud's turned Ø5 front seat (nominal-or-under, like
-    # the arbor journals): min 0.03 diametral clearance, inside the project's
-    # 0.025..0.075 shaft-in-bushing policy. Also settles which tolerance-block
-    # row governs the bore (neither .XX +/-0.51 nor DRILLED +0.10/0 -- the
-    # callout's own limits do).
-    "BoreDia": "THRU - REAM",
+    # The native value/limits define the bore; the callout adds the process.
+    "BoreDia": BORE_PROCESS_CALLOUT,
 }
-DIMENSION_PRECISION = {"BoreDia": 2}
+
+# The oil hole lies in the section plane (+Y), so the cut shows it as a gap in
+# the upper shank wall; the note's leader lands mid-wall on its front edge.
+OIL_HOLE_EDGE = (
+    _side_x(OIL_HOLE_Z + OIL_HOLE_DIA / 2.0),
+    RIGHT_CENTER[1] + (BORE_DIA + SHANK_DIA) / 4.0 * VIEW_SCALE[0] / 1000.0,
+)
+OIL_HOLE_CALLOUT = (_side_x(OVERALL_LENGTH) + 0.010, _SIDE_TOP + 0.050)
+NOTE_HEIGHT = 0.0025
+
+_BORE_SHEET_RADIUS = BORE_DIA * VIEW_SCALE[0] / 2000.0
+BORE_FIT_NOTE = (0.016, 0.215)
+BORE_FIT_ATTACH = (
+    FRONT_CENTER[0] + _BORE_SHEET_RADIUS * math.cos(math.radians(135.0)),
+    FRONT_CENTER[1] + _BORE_SHEET_RADIUS * math.sin(math.radians(135.0)),
+)
+# The section's native caption sits below the stacked lengths.
+SECTION_CAPTION = (RIGHT_CENTER[0], _SIDE_BOTTOM - 0.050)
+FINISH_ATTACH = (
+    FRONT_CENTER[0] + _BORE_SHEET_RADIUS * math.cos(math.radians(-45.0)),
+    FRONT_CENTER[1] + _BORE_SHEET_RADIUS * math.sin(math.radians(-45.0)),
+)
+FINISH_SYMBOL = (FRONT_CENTER[0] + HALF_OD + 0.010, FRONT_CENTER[1] - 0.030)
+
+
+@_telemetry.traced("drawing.planar_centerline", label_param="label")
+def _create_section_axis_centerline(adapter: Any, view: Any, *, label: str) -> Any:
+    """Create the turning axis in the longitudinal-section sketch."""
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    name = view_name(adapter, view)
+    if not drawing.ActivateView(name):
+        raise RuntimeError(f"failed to activate section view {name!r} ({label})")
+    sketch_manager = _early_bound(draw.SketchManager, "ISketchManager")
+    previous_add_to_db = bool(sketch_manager.AddToDB)
+    previous_display = bool(sketch_manager.DisplayWhenAdded)
+    sketch_manager.AddToDB = True
+    sketch_manager.DisplayWhenAdded = True
+    half_length = OVERALL_LENGTH / 2000.0
+    try:
+        centerline = sketch_manager.CreateCenterLine(
+            -half_length - 0.001, 0.0, 0.0, half_length + 0.001, 0.0, 0.0
+        )
+    finally:
+        sketch_manager.AddToDB = previous_add_to_db
+        sketch_manager.DisplayWhenAdded = previous_display
+    draw.ClearSelection2(True)
+    draw.EditRebuild3()
+    if centerline is None:
+        raise RuntimeError(f"failed to create section-axis centerline ({label})")
+    return centerline
+
+
+def _position_section_caption(
+    adapter: Any, view: Any, target: tuple[float, float]
+) -> None:
+    """Move the native linked section caption clear of the length dimensions."""
+    bound_view = _early_bound(view, "IView")
+    candidates = []
+    for raw_note in bound_view.GetNotes() or ():
+        note = _early_bound(raw_note, "INote")
+        linked_text = str(note.PropertyLinkedText or "")
+        if all(
+            token in linked_text for token in ("<VLNAME>", "<VLLABEL>", "<VLSCALEV>")
+        ):
+            candidates.append((note, linked_text))
+    if len(candidates) != 1:
+        raise RuntimeError(
+            f"expected one native linked section caption, found {len(candidates)}"
+        )
+    note, linked_text = candidates[0]
+    annotation = _early_bound(note.GetAnnotation(), "IAnnotation")
+    if not annotation.SetPosition2(*target, 0.0):
+        raise RuntimeError("failed to position the pinion-sleeve section caption")
+    rebuild_drawing(adapter, label="position pinion-sleeve section caption")
+    position = tuple(float(value) for value in annotation.GetPosition())
+    if math.dist(position[:2], target) > 1e-6:
+        raise RuntimeError("pinion-sleeve section caption position did not persist")
+    if str(note.PropertyLinkedText or "") != linked_text:
+        raise RuntimeError("pinion-sleeve section caption lost its native fields")
+
+
+def _assert_note_inside_border(note: Any, label: str) -> None:
+    extent = tuple(float(v) for v in (_early_bound(note, "INote").GetExtent() or ()))
+    _telemetry.info(f"{label} extent {extent}")
+    x0, y0, x1, y1 = SHEET_INNER_BORDER
+    if len(extent) < 5 or not (
+        x0 <= extent[0] and y0 <= extent[1] and extent[3] <= x1 and extent[4] <= y1
+    ):
+        raise RuntimeError(
+            f"{label} extent {extent} left the inner border {SHEET_INNER_BORDER}"
+        )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -113,64 +249,98 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter,
         drawing_model,
         {
-            0: "Transgear Feed Pinion Manufacturing Drawing",
+            0: "Transgear Pinion Sleeve Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "transgear feed pinion; brass; 12T; meshes the rack",
+            3: "transgear pinion sleeve; steel; 12T DP30 feed pinion, spigot, shank",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
 
     front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=VIEW_SCALE)
-    right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=VIEW_SCALE)
+    right = create_section_view(
+        adapter,
+        front,
+        line_start=(FRONT_CENTER[0], FRONT_CENTER[1] - HALF_OD - 0.005),
+        line_end=(FRONT_CENTER[0], FRONT_CENTER[1] + HALF_OD + 0.005),
+        view_xy=RIGHT_CENTER,
+        section_label="A",
+        scale=VIEW_SCALE,
+        label="pinion sleeve longitudinal centre section",
+    )
+    _position_section_caption(adapter, right, SECTION_CAPTION)
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=VIEW_SCALE)
     for view in (front, right, iso):
         set_hidden_lines_removed(adapter, view)
 
     front_annotations = curate_view_dimensions(
-        adapter, front, keep=FRONT_KEEP, view_label="front"
-    )
-    set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
-    set_dimension_precision(adapter, front_annotations, DIMENSION_PRECISION)
-    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center mark to pinion bore")
-    bore_edge = visible_circle_edge(adapter, front, BORE_DIA)
-
-    bore_top = (FRONT_CENTER[0], FRONT_CENTER[1] + BORE_R)
-    add_datum_feature(
         adapter,
         front,
-        edge_xy=bore_top,
-        symbol_xy=(FRONT_CENTER[0], FRONT_CENTER[1] + 0.030),
-        datum="A",
-        label="feed pinion bore axis",
-        shoulder=True,
+        keep=FRONT_KEEP,
+        view_label="front",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
-    add_feature_control_frame(
+    right_annotations = curate_view_dimensions(
         adapter,
         right,
-        edge_xy=(FRONT_FACE_X, RIGHT_CENTER[1] + HALF_OD * 0.55),
-        frame_xy=(FRONT_FACE_X - 0.034, RIGHT_CENTER[1] + HALF_OD + 0.010),
-        characteristic="perpendicularity",
-        tolerance=GEOMETRIC_TOLERANCES_MM["pinion face squareness to bore"],
-        datums=("A",),
-        label="pinion face squareness to bore",
+        keep=RIGHT_KEEP,
+        view_label="longitudinal section",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
     )
+    set_dimension_callouts(
+        adapter, [*front_annotations, *right_annotations], DIMENSION_CALLOUTS
+    )
+    assert_imported_precision(
+        adapter, front_annotations + right_annotations, DRAWING_PRECISION_BY_NAME
+    )
+    if not auto_center_marks(adapter, front, holes=True, size=0.0025):
+        raise RuntimeError("failed to add ASME center mark to the sleeve bore")
+    _create_section_axis_centerline(adapter, right, label="pinion sleeve axis")
+
+    oil_note = add_leader_note(
+        adapter,
+        OIL_HOLE_NOTE,
+        text_xy=OIL_HOLE_CALLOUT,
+        attach_xy=OIL_HOLE_EDGE,
+        label="oil hole match-drill note",
+        view=right,
+        height=NOTE_HEIGHT,
+    )
+    bore_fit = add_leader_note(
+        adapter,
+        BORE_FIT_CALLOUT,
+        text_xy=BORE_FIT_NOTE,
+        attach_xy=BORE_FIT_ATTACH,
+        label="sleeve bore fit",
+        view=front,
+        height=0.0022,
+    )
+    adapter.currentModel.GraphicsRedraw2()
+    _assert_note_inside_border(oil_note, "oil hole note")
+    _assert_note_inside_border(bore_fit, "bore fit note")
+    # The bore is the part's one running surface: its finish is authored on
+    # the part and read back here (rule 5).
     add_surface_finish(
         adapter,
         front,
-        symbol_xy=(FRONT_CENTER[0] + 0.016, FRONT_CENTER[1] - 0.058),
+        symbol_xy=FINISH_SYMBOL,
         control=surface_finish_by_key(SURFACE_FINISHES, "bore"),
-        label="feed pinion bore finish",
-        entity=bore_edge,
+        label="sleeve bore finish",
+        entity=visible_circle_edge(adapter, front, BORE_DIA),
+        leader_attach_xy=FINISH_ATTACH,
+        char_height=0.0025,
     )
 
-    add_property_linked_note(adapter, "Gear Data", 0.018, 0.262)
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.018, 0.092)
+    add_property_linked_note(adapter, "Gear Data", 0.016, 0.262, char_height=0.0025)
+    add_property_linked_note(
+        adapter, "Manufacturing Notes", 0.016, 0.070, char_height=0.0025
+    )
+    rebuild_drawing(adapter, label="pinion sleeve layout audit")
+    check_drawing_layout(adapter, layout=SPEC.layout, stem=PART_STEM)
     return await finalize_drawing(
         adapter,
         OUTPUTS,
-        pdf_title="Transgear Feed Pinion Manufacturing Drawing",
+        pdf_title="Transgear Pinion Sleeve Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
     )

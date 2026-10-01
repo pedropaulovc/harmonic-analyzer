@@ -30,7 +30,7 @@ from transgear_stub_spec import SURFACE_FINISHES  # noqa: E402
 SOURCE = CAD_ROOT / "out" / "sldprt" / "transgear-stub.SLDPRT"
 SCRATCH_PRT = CAD_ROOT / "out" / "sldprt" / "transgear-stub-surface-pmi.SLDPRT"
 SCRATCH_DRW = CAD_ROOT / "out" / "slddrw" / "transgear-stub-surface-pmi.SLDDRW"
-CONTROL = surface_finish_by_key(SURFACE_FINISHES, "gear_seat")
+CONTROL = surface_finish_by_key(SURFACE_FINISHES, "journal")
 ANNOTATION_NAME = CONTROL.annotation_name
 ROUGHNESS = f"Ra {CONTROL.roughness_um:g}"
 SHEET_TARGET = (0.19, 0.19)

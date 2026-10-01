@@ -16,13 +16,22 @@ The screws, and the small parts that do not belong anywhere else.
 | part | qty | material | stock |
 |---|---|---|---|
 | `fillister-screw` | TODO | TODO | TODO |
+| `guide-lock-screw` | TODO | TODO | TODO |
 | `slotted-screw` | TODO | TODO | TODO |
 | `thumb-screw` | TODO | TODO | TODO |
 | `hex-bolt` | TODO | TODO | TODO |
 | `lag-screw` | TODO | TODO | TODO |
 | `hanger-screw` | TODO | TODO | TODO |
 | `clamp-screw` | TODO | TODO | TODO |
-| `bracket-screw` | TODO | TODO | TODO |
+| `transgear-arm-plate-screw` | TODO | TODO | TODO |
+| `transgear-pivot-screw` | TODO | TODO | TODO |
+| `transgear-latch-pin` | TODO | TODO | TODO |
+| `latch-hook-bracket-screw` | TODO | TODO | TODO |
+| `latch-hook-rivet` | TODO | TODO | TODO |
+| `transgear-disc-screw` | TODO | TODO | TODO |
+| `transgear-collar-cross-pin` | TODO | TODO | TODO |
+| `transgear-knob-drive-pin` | TODO | TODO | TODO |
+| `transgear-knob-retaining-screw` | TODO | TODO | TODO |
 | `gooseneck-set-screw` | TODO | TODO | TODO |
 | `guide-lock` | TODO | TODO | TODO |
 | `column-clamp-front` | TODO | TODO | TODO |

@@ -1,0 +1,186 @@
+"""The paper-drive transgear interference rows follow their owner specs.
+
+``_interference_contracts`` writes every transgear size as a literal so no
+assembly re-keys on a transgear spec edit; these tests re-derive each row from
+the owners, so a spec change that moves a fit fails here instead of passing
+a stale bound (the MHA-139 precedent in test_crank_handle_pivot_screw_drawing).
+"""
+
+from __future__ import annotations
+
+import importlib
+import math
+
+import pytest
+
+import _holes
+import _interference_contracts
+import latch_hook_bracket_screw_spec as bracket_screw
+import latch_hook_bracket_spec as hook_bracket
+import latch_hook_rivet_spec as rivet
+import latch_hook_spec as hook
+import rack_pinion_spec as disc
+import support_bar_spec as bar
+import transgear_arm_geometry as arm
+import transgear_arm_plate_geometry as plate
+import transgear_arm_plate_screw_spec as plate_screw
+import transgear_collar_cross_pin_spec as cross_pin
+import transgear_disc_hub_spec as hub
+import transgear_disc_screw_spec as disc_screw
+import transgear_feed_pinion_spec as sleeve
+import transgear_hanger_joints as joints
+import transgear_hub_cap_spec as cap
+import transgear_knob_cup_spec as cup
+import transgear_knob_drive_pin_spec as drive_pin
+import transgear_knob_retaining_screw_spec as retaining_screw
+import transgear_knob_shaft_spec as shaft
+import transgear_latch_pin_spec as latch_pin
+import transgear_pivot_screw_spec as pivot_screw
+import transgear_removable_spec as removable
+import transgear_stub_spec as stub
+import transgear_thumbnut_spec as thumbnut
+from _hole_spec import TAP_DRILL_MM
+
+
+def _allowed() -> dict[frozenset[str], float]:
+    return _interference_contracts.allowed_interference_pairs("paper-drive")
+
+
+def _annulus(major_d: float, tap_d: float, length: float) -> float:
+    return 1.10 * math.pi * (major_d**2 - tap_d**2) * length / 4.0
+
+
+def _pair(first: str, second: str) -> frozenset[str]:
+    return frozenset((first, second))
+
+
+def _collar():
+    # MHA-152's spec (KnobShaftRound10); imported here so a missing or
+    # renamed collar fails this test rather than the whole module.
+    return importlib.import_module("transgear_drive_collar_spec")
+
+
+def test_hanger_screw_rows_follow_the_arm_plate_and_bar() -> None:
+    allowed = _allowed()
+    engaged = plate_screw.LENGTH - plate.THICKNESS_OVER_ARM
+    assert engaged == pytest.approx(joints.PLATE_SCREW_ENGAGEMENT_NOMINAL)
+    plate_limit = _annulus(
+        plate_screw.THREAD_MAJOR, TAP_DRILL_MM[arm.PLATE_TAP_SPEC.size], engaged
+    )
+    for n in (1, 2):
+        pair = _pair(f"transgear-arm-plate-screw-{n}", "transgear-arm-1")
+        assert allowed[pair] == pytest.approx(plate_limit)
+
+    # The shoulder screw's thread past its neck flat, in the bar's blind tap.
+    assert allowed[_pair("transgear-pivot-screw-1", "support-bar-1")] == pytest.approx(
+        _annulus(
+            pivot_screw.THREAD_MAJOR,
+            bar.PIVOT_TAP_DRILL_DIA,
+            pivot_screw.THREAD_LEN - pivot_screw.NECK_FLAT_END,
+        )
+    )
+
+
+def test_latch_bracket_screw_rows_follow_the_screw_and_bar_taps() -> None:
+    allowed = _allowed()
+    limit = _annulus(
+        bracket_screw.MAJOR_DIA,
+        TAP_DRILL_MM[bar.BRACKET_TAP_SPEC.size],
+        bracket_screw.ENGAGEMENT_NOMINAL,
+    )
+    for n in (1, 2):
+        pair = _pair(f"latch-hook-bracket-screw-{n}", "support-bar-1")
+        assert allowed[pair] == pytest.approx(limit)
+
+
+def test_disc_cluster_rows_follow_the_stud_cap_and_disc() -> None:
+    allowed = _allowed()
+    # The stud's rear thread runs past the arm, so the arm stock bounds it.
+    assert allowed[_pair("transgear-stub-1", "transgear-arm-1")] == pytest.approx(
+        _annulus(
+            stub.REAR_THREAD_MAJOR,
+            TAP_DRILL_MM[arm.STUD_TAP_SPEC.size],
+            min(stub.REAR_THREAD_LENGTH, arm.THICKNESS),
+        )
+    )
+    # The stud's relief stays inside the cap's tap drill; the rest of the cap
+    # rides the front thread's major.
+    assert stub.RELIEF_DIA < cap.TAP_DRILL_DIA
+    assert allowed[_pair("transgear-hub-cap-1", "transgear-stub-1")] == pytest.approx(
+        _annulus(
+            stub.FRONT_THREAD_MAJOR,
+            cap.TAP_DRILL_DIA,
+            cap.CAP_LENGTH - stub.RELIEF_WIDTH,
+        )
+    )
+    # Each #0-80 fills the disc's tap over the whole face width.
+    assert disc_screw.SHANK_DIA == pytest.approx(disc.SCREW_MAJOR_DIA)
+    assert disc_screw.SHANK_LEN > hub.FLANGE_THICK + disc.FACE_WIDTH
+    limit = _annulus(disc.SCREW_MAJOR_DIA, disc.TAP_DRILL_DIA, disc.FACE_WIDTH)
+    for n in (1, 2, 3):
+        pair = _pair(f"transgear-disc-screw-{n}", "rack-pinion-1")
+        assert allowed[pair] == pytest.approx(limit)
+
+
+def test_knob_stack_rows_follow_the_shaft_cup_collar_and_nut() -> None:
+    allowed = _allowed()
+    retaining = _pair("transgear-knob-retaining-screw-1", "transgear-knob-shaft-1")
+    assert allowed[retaining] == pytest.approx(
+        _annulus(
+            retaining_screw.SHANK_DIA,
+            shaft.TAP_DRILL_DIA,
+            retaining_screw.SHANK_LEN - cup.FLOOR,
+        )
+    )
+
+    # Stud tip less the nut's seat (collar set + T24 plate), at the nominal.
+    nut_engaged = shaft.TIP_STATION - _collar().SET_NOMINAL - removable.PLATE
+    assert allowed[_pair("transgear-thumbnut-1", "transgear-knob-shaft-1")] == (
+        pytest.approx(_annulus(shaft.THREAD_MAJOR, thumbnut.TAP_DRILL_DIA, nut_engaged))
+    )
+
+    tube = _holes.cross_hole_volume_mm3(
+        cross_pin.PIN_DIA, shaft.CORE_DIA
+    ) - _holes.cross_hole_volume_mm3(
+        cross_pin.PIN_DIA - 2.0 * cross_pin.WALL_T, shaft.CORE_DIA
+    )
+    # The pin spans the core, so the bound is its whole diametral chord.
+    assert cross_pin.PIN_LEN > shaft.CORE_DIA
+    pair = _pair("transgear-collar-cross-pin-1", "transgear-knob-shaft-1")
+    assert allowed[pair] == pytest.approx(1.10 * tube)
+
+
+def test_drive_pins_press_into_the_collar_not_the_shaft() -> None:
+    """MHA-155's reams moved from the shaft's integral collar to MHA-152; the
+    pins press over their length behind the seat face, inside the collar."""
+    collar = _collar()
+    allowed = _allowed()
+    assert drive_pin.DIA > collar.PIN_HOLE_DIA
+    assert drive_pin.PRESS_DEPTH <= collar.LENGTH
+    limit = _annulus(drive_pin.DIA, collar.PIN_HOLE_DIA, drive_pin.PRESS_DEPTH)
+    for n in (1, 2):
+        pin = f"transgear-knob-drive-pin-{n}"
+        assert allowed[_pair(pin, "transgear-drive-collar-1")] == pytest.approx(limit)
+        assert _pair(pin, "transgear-knob-shaft-1") not in allowed
+
+
+def test_pressed_and_slip_joints_without_a_row_do_not_overlap() -> None:
+    """A row-less joint is modelled line to line or clear; a spec that turns
+    one into a press needs a row here."""
+    assert shaft.CORE_DIA <= _collar().BORE_DIA
+    assert latch_pin.DIA <= arm.PIN_HOLE_DIA
+    assert rivet.DIA <= hook.RIVET_HOLE_DIA
+    assert rivet.DIA <= hook_bracket.RIVET_HOLE_DIA
+    assert sleeve.SHANK_DIA <= hub.BORE_DIA
+    assert drive_pin.DIA <= removable.PIN_HOLE_DIA
+
+
+def test_retired_parts_have_no_rows() -> None:
+    retired = (
+        "transgear-latch",
+        "transgear-pinion",
+        "transgear-bracket",
+        "bracket-screw",
+    )
+    named = {name.rsplit("-", 1)[0] for pair in _allowed() for name in pair}
+    assert not named & set(retired)

@@ -3,25 +3,24 @@ r"""Reproduction script: platen support bar (book ch. 21/22, pp. 50-55, 62-63).
 THE bar the platen rides on (book p.62 caption, singular): one rectangular
 steel bar clamped across the two front columns by the two-piece column
 clamps (build_column_clamp_front/back.py), carrying the hanging platen
-(guides + locks on the platen back) and, on its own back face, the
-transgear bracket (build_transgear_bracket.py). Cross-section 22 tall x
-9 deep (ch22 back-side wear band + ch30 front view); 452 long so the ends
-run ~29 past each column (ch30 p002).
+(guides + locks on the platen back) and, on its own back face, the ch. 23
+transgear hanger (pivot screw MHA-168) and the latch-hook bracket.
+Cross-section 22 tall x 9 deep (ch22 back-side wear band + ch30 front
+view); 452 long so the ends run ~29 past each column (ch30 p002).
 
 Holes (all along local Z, the machine front-back axis):
 * 4x clamp-screw counterbores flanking each column (x +-197 -+ 17.5):
   the screw heads sit sub-flush in the BAR's front face so the refitted platen
   can slide across the east clamp, and thread into the back clamp arc.
-* 2x O4.0 bracket-screw holes at MACHINE x -10 / +10 (the two large slotted
-  screws of the p.62/63 top/back views, flanking the stud at machine x 0).
+* the hanger's #8-32 blind pivot tap and the latch-hook bracket's two #4-40
+  through taps, all entering the back face (``support_bar_spec``).
 
-The bracket holes make the bar x-ASYMMETRIC, so it is authored MACHINE-
-handed and placed on its exact machine transform (an x-mirrored insert
-would flip the holes to +2/+22, off the stud line).
+The hanger holes make the bar x-ASYMMETRIC, so it is authored MACHINE-
+handed and placed on its exact machine transform.
 
 Layout: bar axis along X, origin at the bar centre; height along Y,
-depth along Z (front face local z -4.5). Dimensions: memory/
-paper-drive-rework.md E1/E2.
+depth along Z (front face local z -4.5, back face +4.5; named plane
+``BackFace``). Dimensions: memory/paper-drive-rework.md E1/E2.
 
 Run (SolidWorks already open)::
 
@@ -38,6 +37,7 @@ from _common import (
     apply_material,
     check,
     define_centered_rectangle,
+    define_circle,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
@@ -50,13 +50,25 @@ from _common import (
 )
 from _hole_spec import HoleSpec, blind_cut_dia_mm
 from _holes import wizard_holes
+from _visibility import blank_reference_geometry
 from clamp_screw_spec import HEAD_H as CLAMP_HEAD_H
+from support_bar_spec import (
+    BACK_FACE_Z,
+    BAR_DEPTH,
+    BAR_HEIGHT,
+    BRACKET_TAP_CSK_DIA,
+    BRACKET_TAP_SPEC,
+    BRACKET_TAP_X,
+    HANGER_TAP_Y,
+    PIVOT_TAP_CSK_DIA,
+    PIVOT_TAP_DRILL_DEPTH,
+    PIVOT_TAP_DRILL_DIA,
+    PIVOT_TAP_X,
+)
 
 PART_NAME = "support-bar"
 MATERIAL = "Plain Carbon Steel"
 
-BAR_HEIGHT = 22.0  # tall (Y) -- ch22 back-side wear band (low)
-BAR_DEPTH = 9.0  # deep (Z) -- front face rubs the platen back (low)
 BAR_LENGTH = 452.0  # ends at x +-226, ~29 past each Ø25.4 column (ch30 p002)
 
 COLUMN_X = 197.0  # frame column line (frame assembly)
@@ -79,16 +91,6 @@ CLAMP_HOLE_SPEC = HoleSpec(
         "CounterBoreDepth": CLAMP_CBORE_DEPTH,
     },
 )
-BRACKET_STUD_X = 0.0
-BRACKET_HOLE_X = tuple(BRACKET_STUD_X + dx for dx in (-10.0, 10.0))
-# The ~Ø4 bracket screws THREAD IN: tapped #8-32 (nearest UNC coarse).
-BRACKET_HOLE_SPEC = HoleSpec("tapped", "#8-32")
-# Latch-hook screw (2026-09-02, ch23 p.58 / video 4/4): the same #8-32 tap on
-# the FRONT face line, at the paper-drive LATCH_HOOK_X (asserted there
-# against this constant). The video pose (between the rocker pivot ball and
-# the disc, x ~ +52) is covered by the platen in this model, so the hook
-# hangs where the bar front IS exposed: just west of the platen's -X edge.
-LATCH_HOLE_X = -50.0
 
 CLAMP_HOLE_X = tuple(
     s * (COLUMN_X + d) for s in (-1.0, 1.0) for d in (-CLAMP_SCREW_DX, CLAMP_SCREW_DX)
@@ -96,7 +98,7 @@ CLAMP_HOLE_X = tuple(
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import ExtrusionParameters
+    from solidworks_mcp.adapters.base import CreatePlaneParameters, ExtrusionParameters
 
     check("create_part", await adapter.create_part())
 
@@ -135,41 +137,113 @@ async def build(adapter) -> dict[str, str]:
     expected = BAR_HEIGHT * BAR_DEPTH * BAR_LENGTH
     await volume_check(adapter, "bar", expected, 0.005 * expected)
 
-    # Screw holes, all through along Z at the bar's mid-height, drilled from the
-    # bar FRONT face (local z = -BAR_DEPTH/2, where the clamp-screw heads sit --
-    # ch30 p002), while the bar is still a plain prism: TWO native Hole Wizard
-    # features -- 4 clamp-screw #8 COUNTERBORES flanking the columns, and 2
-    # #8-32 TAPPED bracket-screw holes at the stud line (the bracket screws
-    # thread into the bar; covered by the platen, so a through cut reads clean).
-    # Positions are the photo layout.
+    # Clamp-screw holes, through along Z at the bar's mid-height, drilled from
+    # the bar FRONT face (local z = -BAR_DEPTH/2, where the clamp-screw heads
+    # sit -- ch30 p002), while the bar is still a plain prism: one native Hole
+    # Wizard feature, 4 clamp-screw #8 COUNTERBORES flanking the columns.
     front_z = -BAR_DEPTH / 2.0
     clamp_dia = CLAMP_HOLE_DIA
-    bracket_dia = blind_cut_dia_mm(BRACKET_HOLE_SPEC)
     wizard_holes(
         adapter, CLAMP_HOLE_SPEC,
         [[x, 0.0, front_z] for x in CLAMP_HOLE_X],
         (0.0, 0.0, -1.0), "clamp-screw counterbores (#8)", name="ClampHoles",
     )
-    wizard_holes(
-        adapter, BRACKET_HOLE_SPEC,
-        [[x, 0.0, front_z] for x in (*BRACKET_HOLE_X, LATCH_HOLE_X)],
-        (0.0, 0.0, -1.0), "bracket + latch-hook tapped holes (#8-32)", name="BracketHoles",
-    )
-    v_holes = (
-        len(CLAMP_HOLE_X)
-        * (
-            math.pi * (clamp_dia / 2.0) ** 2 * BAR_DEPTH
-            + math.pi
-            * ((CLAMP_CBORE_DIA / 2.0) ** 2 - (clamp_dia / 2.0) ** 2)
-            * CLAMP_CBORE_DEPTH
-        )
-        + (len(BRACKET_HOLE_X) + 1)
-        * math.pi
-        * (bracket_dia / 2.0) ** 2
-        * BAR_DEPTH
+    v_holes = len(CLAMP_HOLE_X) * (
+        math.pi * (clamp_dia / 2.0) ** 2 * BAR_DEPTH
+        + math.pi
+        * ((CLAMP_CBORE_DIA / 2.0) ** 2 - (clamp_dia / 2.0) ** 2)
+        * CLAMP_CBORE_DEPTH
     )
     expected -= v_holes
-    await volume_check(adapter, "bar with holes", expected, 0.02 * v_holes)
+    await volume_check(adapter, "bar with clamp holes", expected, 0.02 * v_holes)
+
+    # Latch-hook bracket: two #4-40 taps THROUGH from the back face (their
+    # exits on the front face lie under the platen footprint), then a
+    # 90-degree countersink on both mouths of each.
+    bracket_dia = blind_cut_dia_mm(BRACKET_TAP_SPEC)
+    wizard_holes(
+        adapter, BRACKET_TAP_SPEC,
+        [[x, HANGER_TAP_Y, BACK_FACE_Z] for x in BRACKET_TAP_X],
+        (0.0, 0.0, 1.0),
+        f"latch-hook bracket taps ({BRACKET_TAP_SPEC.size} through)",
+        name="BracketTaps",
+    )
+    r_bracket = bracket_dia / 2.0
+    v_bracket = len(BRACKET_TAP_X) * math.pi * r_bracket**2 * BAR_DEPTH
+    expected -= v_bracket
+    await volume_check(adapter, "bar with bracket taps", expected, 0.03 * v_bracket)
+    bracket_csk = (BRACKET_TAP_CSK_DIA - bracket_dia) / 2.0
+    check(
+        "countersink bracket-tap mouths",
+        await adapter.add_chamfer(
+            bracket_csk,
+            [
+                [x + r_bracket, HANGER_TAP_Y, z_face]
+                for x in BRACKET_TAP_X
+                for z_face in (-BACK_FACE_Z, BACK_FACE_Z)
+            ],
+        ),
+    )
+    name_last_feature(adapter, "BracketTapCountersinks")
+    v_bracket_csk = (
+        2 * len(BRACKET_TAP_X) * math.pi * bracket_csk**2 * (r_bracket + bracket_csk / 3.0)
+    )
+    expected -= v_bracket_csk
+    await volume_check(
+        adapter, "bracket-tap countersinks", expected, 0.03 * v_bracket_csk + 0.05
+    )
+
+    # Hanger pivot: the #8-32 tap drill is FLAT-bottomed (drill + end mill), so
+    # it is a plain blind cut from the back face rather than a wizard tap,
+    # whose 118-degree point would eat the floor under it.
+    check(
+        f"create_plane BackFace (Front Plane, +{BACK_FACE_Z})",
+        await adapter.create_plane(
+            CreatePlaneParameters(mode="offset", base_plane="Front Plane", offset=BACK_FACE_Z)
+        ),
+    )
+    name_last_feature(adapter, "BackFace")
+    pivot = SketchDims()
+    check("create_sketch pivot tap drill", await adapter.create_sketch("BackFace"))
+    await define_circle(
+        adapter,
+        PIVOT_TAP_X,
+        HANGER_TAP_Y,
+        PIVOT_TAP_DRILL_DIA / 2.0,
+        "pivot tap drill",
+        dims=pivot,
+        names=("PivotTapX", "PivotTapY", "PivotTapDrillDia"),
+        drives=(None, None, None),
+    )
+    await ensure_fully_defined(adapter, "pivot tap drill sketch")
+    check("exit_sketch pivot tap drill", await adapter.exit_sketch())
+    name_last_feature(adapter, "PivotTapProfile")
+    drive_jobs += pivot.apply(adapter, "PivotTapProfile")
+    check(
+        "cut pivot tap drill (flat, blind)",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=PIVOT_TAP_DRILL_DEPTH, reverse_direction=True)
+        ),
+    )
+    name_last_feature(adapter, "PivotTap")
+    r_pivot = PIVOT_TAP_DRILL_DIA / 2.0
+    v_pivot = math.pi * r_pivot**2 * PIVOT_TAP_DRILL_DEPTH
+    expected -= v_pivot
+    await volume_check(adapter, "bar with pivot tap drill", expected, 0.03 * v_pivot)
+    pivot_csk = (PIVOT_TAP_CSK_DIA - PIVOT_TAP_DRILL_DIA) / 2.0
+    check(
+        "countersink pivot-tap mouth",
+        await adapter.add_chamfer(
+            pivot_csk, [[PIVOT_TAP_X + r_pivot, HANGER_TAP_Y, BACK_FACE_Z]]
+        ),
+    )
+    name_last_feature(adapter, "PivotTapCountersink")
+    v_pivot_csk = math.pi * pivot_csk**2 * (r_pivot + pivot_csk / 3.0)
+    expected -= v_pivot_csk
+    await volume_check(
+        adapter, "pivot-tap countersink", expected, 0.03 * v_pivot_csk + 0.05
+    )
+    blank_reference_geometry(adapter, (("BackFace", "PLANE"),))
 
     # Apply the deferred drive equations after the model exists, then re-check:
     # every equation evaluates to the value just built, so geometry must not move.

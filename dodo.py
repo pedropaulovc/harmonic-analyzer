@@ -2979,6 +2979,12 @@ def task_check():
         # The removable sprocket's seat interface: its recorded web/rim
         # shortfalls and the #25 plates' clearance over the shared seat.
         SCRIPTS_DIR / "test_transgear_removable_seat.py",
+        # The transgear hanger's screwed joints, pivot head play and the latch
+        # pin's press, judged at the printed bands (transgear_hanger_joints).
+        SCRIPTS_DIR / "test_transgear_hanger_joints.py",
+        # The paper-drive interference rows re-derived from their owner specs
+        # (_interference_contracts writes them as literals).
+        SCRIPTS_DIR / "test_paper_drive_interference_contracts.py",
         # The kinematic probe's chain-ratio band separates the 12:24 tooth
         # ratio from the OD and pitch-circle couplings (verify:kinematics).
         SCRIPTS_DIR / "test_kinematic_probe_ratio.py",

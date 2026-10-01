@@ -1,22 +1,117 @@
-"""Offline contracts for the paper-drive assembly and its drawing."""
+"""Offline contracts for the paper-drive assembly and its drawing (MHA-A06)."""
 
 import ast
 import inspect
+import re
 from itertools import product
 from pathlib import Path
 
 import pytest
 
 import _assembly
+import _config
 import build_paper_drive_assembly as assembly
 import draw_paper_drive_assembly as drawing
+import drive_train_steps
 import harmonic_base_spec as base
 import nameplate_spec as nameplate
+import paper_drive_assembly_steps as steps
+import transgear_drive_collar_spec as collar
 import transgear_removable_spec as sprocket
-from _drawing_registry import DRAWINGS_BY_NAME
+from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
+
+STEP_HEAD = re.compile(r"^(\d+)\. ", re.MULTILINE)
+STEP_POINTER = re.compile(r"(MHA-A\d{2})\s+STEP\s+(\d+)")
+# Default-format note text, measured on r743-rocker-fix3's render (leaf
+# 20260926T112244Z-1-a884759d), as test_channel_assembly_drawing uses them;
+# #945 moves these into _drawing_common.
+NOTE_CHAR_WIDTH = 0.00276
+NOTE_LINE_PITCH = 0.0045
+# Words no sheet of the package may print (drawing-simplicity policy).
+FORBIDDEN_SHEET_WORDS = ("EXCEPTION", "ACCEPTED", "RULING", "POLICY", "BOOK FIDELITY")
+
+# CONTRACT-paper-drive.md, the round-10 component set.
+UNCHANGED_FAMILIES = {
+    "support-bar",
+    "column-clamp-front",
+    "column-clamp-back",
+    "clamp-screw",
+    "platen",
+    "platen-rack",
+    "platen-guide",
+    "guide-lock",
+    "platen-clip",
+    "platen-paper",
+    "fillister-screw",
+    "guide-lock-screw",  # R9-31: the eight lock screws leave MHA-030
+    "chain-inner-link",
+    "chain-outer-link",
+    "transgear-removable",
+}
+CONTRACT_TRANSGEAR_QUANTITIES = {
+    "transgear-arm": 1,
+    "transgear-arm-plate": 1,
+    "transgear-arm-plate-screw": 2,
+    "transgear-pivot-spacer": 1,
+    "transgear-pivot-screw": 1,
+    "transgear-latch-pin": 1,
+    "latch-hook-bracket": 1,
+    "latch-hook-bracket-screw": 2,
+    "latch-hook": 1,
+    "latch-hook-rivet": 2,
+    "transgear-stub": 1,
+    "transgear-feed-pinion": 1,
+    "transgear-disc-hub": 1,
+    "transgear-hub-cap": 1,
+    "rack-pinion": 1,
+    "transgear-disc-screw": 3,
+    "transgear-knob-shaft": 1,
+    "transgear-drive-collar": 1,
+    "transgear-collar-cross-pin": 1,
+    "transgear-knob-drive-pin": 2,
+    "transgear-removable": 3,
+    "transgear-thumbnut": 1,
+    "transgear-knob-thrust-ring": 1,
+    "transgear-knob-cup": 1,
+    "transgear-knob-retaining-screw": 1,
+}
+RETIRED_FAMILIES = {
+    "transgear-latch",
+    "transgear-pinion",
+    "transgear-bracket",
+    "bracket-screw",
+}
 
 
-def test_paper_drive_keeps_registry_outputs_and_precomputed_placement() -> None:
+def _step_body(key: str) -> str:
+    """The printed text of one step, from its head to the next head."""
+    text = drawing.FITUP_STEPS
+    heads = list(STEP_HEAD.finditer(text))
+    index = steps.step_number(key) - 1
+    end = heads[index + 1].start() if index + 1 < len(heads) else len(text)
+    return " ".join(text[heads[index].end() : end].split())
+
+
+def _number(stem: str) -> str:
+    return _config.parts(stem)["number"]
+
+
+def _literal_number(script: str, key: str) -> str:
+    """The drawing number a build script stamps into its Number property."""
+    path = Path(drawing.__file__).with_name(script)
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    values = {
+        node.values[index].value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Dict)
+        for index, item in enumerate(node.keys)
+        if isinstance(item, ast.Constant) and item.value == key
+    }
+    (value,) = values
+    return value
+
+
+def test_paper_drive_keeps_registry_outputs_and_names_its_sheets() -> None:
     spec = DRAWINGS_BY_NAME["paper_drive_assembly"]
     assert spec.source_kind == "assembly"
     assert spec.part == "paper_drive"
@@ -24,12 +119,212 @@ def test_paper_drive_keeps_registry_outputs_and_precomputed_placement() -> None:
     assert drawing.OUTPUTS == drawing.OUTPUTS.__class__(
         spec.outputs["slddrw"], spec.outputs["pdf"], spec.outputs["png"]
     )
-    assert drawing.SHEET_SCALE == (1.0, 5.0)
-    assert drawing.FRONT_CENTER == (0.080, 0.150)
-    assert drawing.RIGHT_CENTER == (0.200, 0.150)
-    assert drawing.ISO_CENTER == (0.320, 0.145)
-    source = Path(drawing.__file__).read_text(encoding="utf-8")
-    assert "return await build_simple_three_view_drawing(" in source
+    assert set(drawing.SHEET_SCALES) == set(drawing.SHEET_NAMES)
+    assert set(drawing.SHEET_LAYOUTS) == set(drawing.SHEET_NAMES)
+    assert len(set(drawing.SHEET_NAMES)) == len(drawing.SHEET_NAMES)
+
+
+def test_the_step_registry_names_this_sheet() -> None:
+    assert steps.DRAWING_NUMBER == _literal_number(
+        "build_paper_drive_assembly.py", "Number"
+    )
+    assert steps.step_ref(steps.SEQUENCE[3]) == f"{steps.DRAWING_NUMBER} STEP 4"
+    with pytest.raises(KeyError):
+        steps.step_number("no-such-step")
+
+
+def test_the_printed_step_heads_are_the_registry_in_order() -> None:
+    printed = [int(n) for n in STEP_HEAD.findall(drawing.FITUP_STEPS)]
+    assert printed == list(range(1, len(steps.SEQUENCE) + 1))
+    # The chain fit-up opens the second column.
+    second = [int(n) for n in STEP_HEAD.findall(drawing.FITUP_COLUMNS[1])]
+    assert second[0] == steps.step_number(drawing.FITUP_SECOND_COLUMN_KEY)
+
+
+def test_the_crank_side_pointers_land_on_the_crank_fitup_steps() -> None:
+    """§13.2 (1): the chain fit-up starts from the crank side's own fit-up."""
+    pointers = STEP_POINTER.findall(drawing.FITUP_COLUMNS[1])
+    assert pointers == [
+        (drive_train_steps.DRAWING_NUMBER, str(drive_train_steps.step_number(key)))
+        for key in ("crank-mesh-checked", "paper-drive-wheel")
+    ]
+    fitup_ref = STEP_HEAD.findall(drawing.FITUP_COLUMNS[1])[0]
+    assert f"STEP {fitup_ref}" in _step_body("fitup-accepted")
+
+
+def test_the_steps_fit_their_fields() -> None:
+    template = DRAWING_TEMPLATES[drawing.SPEC.layout]
+    for text, (left, top), (right_limit, bottom_limit) in zip(
+        drawing.FITUP_NOTES,
+        drawing.FITUP_NOTE_XY,
+        drawing.FITUP_NOTE_LIMITS,
+        strict=True,
+    ):
+        lines = text.splitlines()
+        assert left + max(map(len, lines)) * NOTE_CHAR_WIDTH < right_limit
+        assert top - len(lines) * NOTE_LINE_PITCH > bottom_limit
+    (first_left, _), (second_left, _), (collar_left, collar_top) = drawing.FITUP_NOTE_XY
+    first_limit, second_limit, collar_limit = drawing.FITUP_NOTE_LIMITS
+    assert first_limit[0] < min(second_left, collar_left)
+    # The collar note sits below the chain fit-up and above the title block.
+    assert second_limit[1] > collar_top
+    assert collar_limit[1] > template.title_block_top_m
+    assert first_left > 0.0 and max(second_limit[0], collar_limit[0]) < template.width_m
+
+
+def test_the_bom_fits_left_of_the_title_block_and_on_the_sheet() -> None:
+    template = DRAWING_TEMPLATES[drawing.SPEC.layout]
+    left, top = drawing.BOM_ANCHOR
+    width = sum(drawing.BOM_COLUMN_WIDTHS.values())
+    # A description past the measured one-line length wraps to a second line.
+    wrapped = sum(
+        len(text) > drawing.BOM_DESCRIPTION_MAX_CHARS
+        for text in drawing.BOM_DESCRIPTIONS.values()
+    )
+    assert wrapped <= len(drawing.GROUPED_DESCRIPTION_STEMS)
+    height = (len(drawing.BOM_PART_NUMBERS) + 1 + wrapped) * drawing.BOM_ROW_HEIGHT
+    assert left + width < template.title_block_left_m
+    assert top - height > 0.003
+    assert top < template.height_m - 0.003
+
+
+def test_bom_rows_are_exactly_the_round10_families() -> None:
+    families = set(drawing.BOM_PART_NUMBERS)
+    assert families == UNCHANGED_FAMILIES | set(CONTRACT_TRANSGEAR_QUANTITIES)
+    assert not families & RETIRED_FAMILIES
+    assert drawing.TRANSGEAR_QUANTITIES == CONTRACT_TRANSGEAR_QUANTITIES
+
+
+def test_bom_numbers_and_purchased_skus_come_from_the_registry() -> None:
+    for stem, number in drawing.BOM_PART_NUMBERS.items():
+        assert number == _number(stem), stem
+    for stem, description in drawing.BOM_DESCRIPTIONS.items():
+        skus = _config.parts(stem).get("supplier_skus") or ()
+        if skus:
+            assert description.endswith(f"MCMASTER {skus[0]}"), stem
+        else:
+            assert "MCMASTER" not in description, stem
+    # A number never repeats, so the alias map is total.
+    assert len(drawing.BOM_NORMALIZED_ALIASES) == len(drawing.BOM_PART_NUMBERS)
+
+
+def test_sheet_two_shows_and_balloons_exactly_the_transgear() -> None:
+    expected = {
+        f"{stem}-{index}"
+        for stem, count in CONTRACT_TRANSGEAR_QUANTITIES.items()
+        for index in range(1, count + 1)
+        if stem != "transgear-removable"
+    } | {"transgear-removable-1"}
+    assert drawing.TRANSGEAR_INSTANCES == expected
+    assert set(drawing.TRANSGEAR_BALLOON_ANCHORS) == set(CONTRACT_TRANSGEAR_QUANTITIES)
+    # The knob's T24 is instance 1; the crank T12 and the spare T18 stay off.
+    assert drawing.TRANSGEAR_BALLOON_ANCHORS["transgear-removable"].instance == (
+        "transgear-removable-1"
+    )
+
+
+def test_no_sheet_prints_a_forbidden_word() -> None:
+    texts = (*drawing.SHEET_TEXTS, *drawing.BOM_DESCRIPTIONS.values())
+    for text in texts:
+        for word in FORBIDDEN_SHEET_WORDS:
+            assert word not in text.upper(), (word, text)
+
+
+def test_no_retired_part_is_named_on_the_sheet() -> None:
+    retired = {"MHA-079", "MHA-080", "MHA-108", "MHA-109"}
+    printed = set(re.findall(r"MHA-\d{3}", drawing.FITUP_STEPS))
+    assert not printed & retired
+    assert printed <= set(drawing.BOM_PART_NUMBERS.values())
+
+
+def test_the_knob_stack_prints_front_to_rear() -> None:
+    """Contract §1: thumbnut | T24 | collar | 12T | ring | plate hub | plate |
+    rear boss | cup | screw."""
+    body = _step_body("knob-stack-fitted")
+    order = [
+        "transgear-thumbnut",
+        "transgear-removable",
+        "transgear-drive-collar",
+        "transgear-knob-shaft",
+        "transgear-knob-thrust-ring",
+        "transgear-arm-plate",
+        "transgear-knob-cup",
+        "transgear-knob-retaining-screw",
+    ]
+    assert [stem for stem, _label in drawing.KNOB_STACK if stem] == order
+    positions = [body.index(_number(stem)) for stem in order]
+    assert positions == sorted(positions)
+    assert body.index("PLATE HUB") < body.index(_number("transgear-arm-plate"))
+    assert body.index("REAR BOSS") < body.index(_number("transgear-knob-cup"))
+
+
+def test_the_pivot_screw_is_threadlocked_and_the_spacer_fitted_as_made() -> None:
+    """R9-7 adds threadlocker to MHA-168; R9-6 never faces MHA-167."""
+    body = _step_body("hanger-pivoted")
+    assert "LOW-STRENGTH THREADLOCKER" in body
+    assert _number("transgear-pivot-screw") in body
+    assert _number("transgear-pivot-spacer") in body
+    assert "AS MADE" in body
+    # No step shortens the spacer.
+    assert not re.search(r"\bFACE (IT|THE SPACER|TO)\b", drawing.FITUP_STEPS)
+
+
+def test_the_fitup_acceptance_prints_the_contract_bands() -> None:
+    """§13.2 (8): offset 0.05 ±0.10, knob float 0.05..0.35, head play
+    0.10..0.35, collar-disc air 0.10 min."""
+    assert drawing.KNOB_END_FLOAT_RANGE == pytest.approx((0.05, 0.35), abs=1e-9)
+    body = _step_body("fitup-accepted")
+    for text in ("0.05 \u00b10.10 FORWARD", "0.05 TO 0.35", "0.10 TO 0.35", "0.10 MIN"):
+        assert text in body, text
+
+
+def test_the_collar_gap_stop_is_the_seat_limit_less_the_collar() -> None:
+    """§13.2 (4): g > 9.40 - L stops the fit-up; L = 4.000."""
+    assert drawing.COLLAR_GAP_MAX == pytest.approx(9.40 - 4.0, abs=1e-9)
+    body = _step_body("collar-gap-measured")
+    assert f"{drawing.COLLAR_GAP_MAX:.2f}" in body
+    assert f"g = d + {collar.FIT_UP_OFFSET_TARGET:.2f}" in body
+
+
+def test_the_fitup_steps_and_the_collar_note_print_one_setting_drill_and_cut() -> None:
+    """R9-30: steps 14-16 and the MHA-152 fit-up note (which this sheet also
+    prints) state the collar setting, the core drill and the stud cut in the
+    same words, so the two instructions cannot drift apart."""
+    note = " ".join(collar.FIT_UP_NOTE.split())
+    for key, phrase in (
+        ("collar-gap-measured", collar.FIT_UP_OFFSET_SET_TEXT),
+        ("collar-pinned", collar.CROSS_PIN_DRILL_PHRASE),
+        ("stud-end-cut", collar.STUD_CUT_PHRASE),
+    ):
+        assert phrase in _step_body(key), key
+        assert phrase in note, key
+    # The drill phrase carries the cross pin's functional hole band (R9-11).
+    assert "\u00d81.6 +0.05/0 THROUGH THE CORE" in collar.CROSS_PIN_DRILL_PHRASE
+    assert "0.3 TO 1.0 BELOW THE RIM" in collar.STUD_CUT_PHRASE
+
+
+def test_the_collar_is_pinned_before_the_stud_is_cut_and_the_stack_accepted() -> None:
+    order = [
+        "hook-set-and-riveted",
+        "fitup-pose-set",
+        "collar-gap-measured",
+        "collar-pinned",
+        "stud-end-cut",
+        "fitup-accepted",
+    ]
+    numbers = [steps.step_number(key) for key in order]
+    assert numbers == sorted(numbers)
+    assert steps.SEQUENCE[-1] == "fitup-accepted"
+    # The drive pins are in the collar before the stack is built.
+    assert steps.step_number("collar-pins-pressed") < steps.step_number(
+        "knob-stack-fitted"
+    )
+
+
+def test_the_cluster_float_and_pin_bands_print_their_spec_ranges() -> None:
+    assert "0.20 TO 0.40" in _step_body("disc-cluster-hung")
+    assert "2.30 TO 2.50 PROUD" in _step_body("collar-pins-pressed")
+    assert "12.49 TO 13.51 PROUD" in _step_body("latch-pin-pressed")
 
 
 def _spare_world_point(monkeypatch, local):

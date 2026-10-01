@@ -309,8 +309,55 @@ _PEN_ALLOWED_PAIRS = {
     ),
 }
 
+
+def _cross_pin_overlap_mm3(pin_od: float, pin_id: float, shaft_d: float) -> float:
+    """Volume a tube pin lying diametrally across a solid shaft shares with it:
+    the perpendicular-cylinder intersection at its OD less that at its ID.
+    _holes.cross_hole_volume_mm3's trapezoid integral, restated so every
+    assembly's recipe stays clear of the Hole Wizard helpers."""
+
+    def solid(pin_d: float, n: int = 20001) -> float:
+        r, big_r = pin_d / 2.0, shaft_d / 2.0
+        dx = 2.0 * r / (n - 1)
+        total = 0.0
+        for i in range(n):
+            x = -r + i * dx
+            weight = 0.5 if i in (0, n - 1) else 1.0
+            total += (
+                weight
+                * 4.0
+                * math.sqrt(max(big_r**2 - x * x, 0.0))
+                * math.sqrt(max(r**2 - x * x, 0.0))
+            )
+        return total * dx
+
+    return solid(pin_od) - solid(pin_id)
+
+
+# MHA-154, a 1/16-in tube with a 0.012-in wall, lies diametrally across
+# MHA-078's Ø6.35 core, whose hole is drilled at assembly and not modelled.
+_CROSS_PIN_CORE_MM3 = _cross_pin_overlap_mm3(
+    25.4 / 16.0, 25.4 / 16.0 - 2.0 * 0.012 * 25.4, 6.35
+)
+
+
 # Pattern instances are numbered by seed creation while the two backs and
 # guides are numbered by insertion order, so their suffixes cross or interleave.
+#
+# The transgear rows (CONTRACT-paper-drive round 10): every stock screw and
+# the MHA-082 stud carry their thread at the basic major, and every receiving
+# tap is cut at its tap drill, so each bound is the smooth annulus over the
+# span where the major body lies inside the receiver.  Sizes and spans are
+# literals, as the MHA-139 row above, so no assembly re-keys on a transgear
+# spec; test_paper_drive_interference_contracts pins each to its owner.
+# Pairs with NO row, modelled line to line or with clearance, which the gate
+# reads as contact: the MHA-159 hub's Ø8.2 bore on the sleeve's Ø8.2 shank,
+# the MHA-169 dowel in the arm's Ø3.175 ream, the stud journal in the sleeve
+# bore (Ø3.9), the disc bore on the spigot (Ø10), the knob journal in the
+# plate bore (Ø8.5), the collar bore on the core (Ø6.35), the MHA-175 rivets
+# (Ø1.5875) in the Ø1.6 hook and flap holes, the MHA-154 pin in the collar's
+# 1.7 slot, the MHA-155 dowels in the T24's Ø2.5 holes, and every screw in
+# its clearance hole.
 _PAPER_DRIVE_ALLOWED_PAIRS = {
     **_numbered_pairs(
         "clamp-screw",
@@ -344,36 +391,94 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
         _smooth_annulus_limit_mm3(2.8448, 2.261, 5.2678),
         second_number=2,
     ),
+    # MHA-176 guide-lock screws (R9-31): seeds -1/-2, then the grid -3..-8;
+    # each 6.35 shank passes the 2.0 lock plate into the guide's rear tap.
     **_numbered_pairs(
-        "fillister-screw",
-        (15, 16, 18, 21),
+        "guide-lock-screw",
+        (1, 2, 4, 7),
         "platen-guide",
         _smooth_annulus_limit_mm3(2.8448, 2.261, 4.35),
     ),
     **_numbered_pairs(
-        "fillister-screw",
-        (17, 19, 20, 22),
+        "guide-lock-screw",
+        (3, 5, 6, 8),
         "platen-guide",
         _smooth_annulus_limit_mm3(2.8448, 2.261, 4.35),
         second_number=2,
     ),
+    # MHA-166 #8-32 x 1/2 (transgear_arm_plate_screw_spec; 12.7 from the top
+    # of the flat head, flush in the plate's countersink) through the 5.0
+    # plate's Ø4.4 clearance: 12.7 - 5.0 = 7.7 in the arm's #29 through tap.
     **_numbered_pairs(
-        "bracket-screw",
+        "transgear-arm-plate-screw",
+        range(1, 3),
+        "transgear-arm",
+        _smooth_annulus_limit_mm3(4.1656, 3.454, 12.7 - 5.0),
+    ),
+    # MHA-168 (transgear_pivot_screw_spec) in the support bar's blind #8-32
+    # tap: its 4.7625 thread less the 1.1938 neck flat under the shoulder,
+    # whose Ø3.02 stays inside the #29 drill -- the full thread plus the 45°
+    # ramp back to the major (the MHA-139 row's relief-and-lead-cone reading),
+    # 3.5687 of overlap. The contract's engagement (R9-7, vendor neck) counts
+    # full thread only: 4.7625 - 1.7653 = 2.9972 (0.72 D); the ramp adds
+    # solid overlap with the tap but carries no thread.
+    frozenset(("transgear-pivot-screw-1", "support-bar-1")): _smooth_annulus_limit_mm3(
+        4.1656, 3.454, 4.7625 - 1.1938
+    ),
+    # MHA-171 #4-40 x 3/8 (latch_hook_bracket_screw_spec) through the
+    # bracket's 1.5 sheet (Ø3.2 clearance): 9.525 - 1.5 = 8.025 in the
+    # support bar's #43 taps.
+    **_numbered_pairs(
+        "latch-hook-bracket-screw",
         range(1, 3),
         "support-bar",
-        _smooth_annulus_limit_mm3(4.1656, 3.454, 8.7),
+        _smooth_annulus_limit_mm3(2.8448, 2.261, 9.525 - 1.5),
     ),
-    # The front latch uses the third stock screw through the support bar's 9-mm tap.
-    frozenset(("bracket-screw-3", "support-bar-1")): _smooth_annulus_limit_mm3(
-        4.1656, 3.454, 9.0
+    # MHA-082's rear #10-32 (transgear_stub_spec), a plain 4.826 cylinder 8.0
+    # long from the collar face, fills the arm's #21 through tap over the
+    # whole 7.9375 stock (the taps' countersinks only shrink it).
+    frozenset(("transgear-stub-1", "transgear-arm-1")): _smooth_annulus_limit_mm3(
+        4.826, 4.0386, 7.9375
     ),
-    # The two MHA-155 dowels pressed into MHA-078's seat-collar holes, reamed
-    # through (ø2.38125 pin in a ø2.38 ream over the press depth, the pin's
-    # length inside the collar): the press fit.
+    # MHA-160 (transgear_hub_cap_spec: 5.8 long, #36 tapped through) seated
+    # on the stud's journal shoulder: the stud's 3.505 #6-32 cylinder starts
+    # past the Ø2.4 x 1.1 relief, so 5.8 - 1.1 = 4.7 of the cap.
+    frozenset(("transgear-hub-cap-1", "transgear-stub-1")): _smooth_annulus_limit_mm3(
+        3.505, 2.705, 5.8 - 1.1
+    ),
+    # MHA-161 #0-80 x 1/4 (transgear_disc_screw_spec) through the hub
+    # flange's Ø1.7 clearance, then the whole 3.0 face of the disc's 3/64 taps
+    # (rack_pinion_spec).
+    **_numbered_pairs(
+        "transgear-disc-screw",
+        range(1, 4),
+        "rack-pinion",
+        _smooth_annulus_limit_mm3(1.524, 1.191, 3.0),
+    ),
+    # MHA-158 #8-32 x 7/16 (transgear_knob_retaining_screw_spec, 11.1125
+    # under the head) on the MHA-157 cup's 2.6 floor: 11.1125 - 2.6 = 8.5125
+    # in the shaft's blind #29 rear tap (transgear_knob_shaft_spec).
+    frozenset(
+        ("transgear-knob-retaining-screw-1", "transgear-knob-shaft-1")
+    ): _smooth_annulus_limit_mm3(4.1656, 3.454, 11.1125 - 2.6),
+    # MHA-126's 1/4-20 tap drill 5.105 (transgear_thumbnut_spec) on MHA-078's
+    # plain Ø6.35 stud at the nominal collar setting: the tip 23.9 in front
+    # of F, the nut seated on the T24's front face 6.2 (collar set,
+    # transgear_drive_collar_spec) + 2.8 (plate, transgear_removable_spec)
+    # in front of F, so 23.9 - 6.2 - 2.8 = 14.9.
+    frozenset(
+        ("transgear-thumbnut-1", "transgear-knob-shaft-1")
+    ): _smooth_annulus_limit_mm3(6.35, 5.105, 23.9 - 6.2 - 2.8),
+    # The cross pin's whole tube chord through the core (above).
+    frozenset(("transgear-collar-cross-pin-1", "transgear-knob-shaft-1")): 1.10
+    * _CROSS_PIN_CORE_MM3,
+    # The two MHA-155 dowels pressed into the MHA-152 collar's through reams,
+    # the crank-seat twin (the collar's PIN_HOLE_DIA is the seat interface's
+    # DRIVE_PIN_HOLE_DIA): the pin's length behind the seat face.
     **_numbered_pairs(
         "transgear-knob-drive-pin",
         range(1, 3),
-        "transgear-knob-shaft",
+        "transgear-drive-collar",
         _smooth_annulus_limit_mm3(
             _SEAT_PIN_DIA, _SEAT_PIN_HOLE_DIA, _KNOB_SEAT_PIN_DEPTH
         ),

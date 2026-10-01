@@ -593,15 +593,18 @@ def test_chain_shift_moves_the_crank_seat_hub_and_knob_seat_together(
     """Ruling 2026-09-30: the chain plane came 1.8 forward on both shafts; the
     crank's spigot grew into the gap and its hub shortened to keep 0.7 air."""
     import build_paper_drive_assembly as paper
-    import build_transgear_knob_shaft as knob
     import crank_hub_geometry as hub
     import crankshaft_spec as cs
+    import transgear_drive_collar_spec as collar
     import transgear_removable_spec as removable
 
     crank_seat = drive.CRANKSHAFT_Z0 + cs.SEAT_COLLAR
-    knob_seat = paper.KNOB_SHAFT_Z0 + knob.SEAT_COLLAR
+    # The knob side's seat is the MHA-152 drive collar's front face, set
+    # SET_NOMINAL in front of the knob shaft's 12T front face.
+    knob_seat = paper.KNOB_COLLAR_Z0
     assert crank_seat == pytest.approx(-154.3)
     assert knob_seat == pytest.approx(crank_seat)
+    assert paper.KNOB_SHAFT_Z0 - collar.SET_NOMINAL == pytest.approx(knob_seat)
     assert paper.CHAIN_MID_Z == pytest.approx(crank_seat - removable.PLATE / 2.0)
     # The spigot stays put (-154.3..-148.5); the body ends at -144.5 (MHA-172
     # floor 0.5 took 0.5 off its rear).

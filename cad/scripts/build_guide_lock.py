@@ -57,7 +57,7 @@ from guide_lock_spec import (
     LOCK_THICK,
     LOCK_WIDTH,
 )
-from fillister_screw_spec import SHANK_DIA as FILLISTER_SHANK_DIA
+from guide_lock_screw_spec import SHANK_DIA as LOCK_SCREW_SHANK_DIA
 
 PART_NAME = "guide-lock"
 MATERIAL = "Plain Carbon Steel"
@@ -72,12 +72,13 @@ MATERIAL = "Plain Carbon Steel"
 # sits ON the bar, so the same plate overlaps the bar by 10 there. (2026-07-07
 # field report: a 12-tall plate topped out AT the bar's bottom edge and
 # retained nothing at the bottom stations -- 15 keeps a 3 overlap.)
-# Stock 90114A511 shanks pass through the lock plates before threading into the
-# guide's rear-face #4-40 receivers. The part-owned #4 CLOSE clearance is the
-# existing placement interface and still leaves positive diametral clearance.
+# Stock 91255A106 button head shanks (MHA-176, ruling R9-31) pass through the
+# lock plates before threading into the guide's rear-face #4-40 receivers. The
+# part-owned #4 CLOSE clearance is the existing placement interface and still
+# leaves positive diametral clearance.
 HOLE_DIA = blind_cut_dia_mm(HOLE_SPEC)
-if HOLE_DIA < FILLISTER_SHANK_DIA:
-    raise AssertionError("stock fillister shank does not clear the guide lock")
+if HOLE_DIA < LOCK_SCREW_SHANK_DIA:
+    raise AssertionError("stock guide-lock screw shank does not clear the guide lock")
 
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters

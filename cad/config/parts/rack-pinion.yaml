@@ -6,4 +6,4 @@ rack-pinion:
   quantity: 1
   tolerance_class: machined_block
   fit_class: gear_mesh
-  process: "gear cutting (hob/shaper)"
+  process: "gear cutting (hob/shaper); #0-80 taps drilled and tapped at assembly"

@@ -267,6 +267,24 @@ def test_notes_stay_within_four_lines_and_never_restate_the_title_block() -> Non
     assert "DEBUR" not in str(_config.parts("transgear-removable")["finish"]).upper()
 
 
+def test_the_notes_name_exactly_the_parts_the_drive_pins_press_into() -> None:
+    """The holes slip over pins pressed into a host part; the sheet names
+    each host by number.  Hosts are the assemblies' press-fit pairs: MHA-173
+    in the crankshaft, MHA-155 in the knob's drive collar (not the shaft)."""
+    from _interference_contracts import allowed_interference_pairs
+
+    pins = {"crank-seat-drive-pin", "transgear-knob-drive-pin"}
+    hosts: set[str] = set()
+    for assembly in ("drive-train", "paper-drive"):
+        for pair in allowed_interference_pairs(assembly):
+            stems = {name.rsplit("-", 1)[0] for name in pair}
+            if stems & pins:
+                hosts |= stems - pins
+    assert hosts == {"crankshaft", "transgear-drive-collar"}
+    numbers = {_config.parts(host)["number"] for host in hosts}
+    assert set(re.findall(r"MHA-\d+", notes.DRAWING_NOTES)) == numbers
+
+
 def test_gears_carry_no_frames_or_datums() -> None:
     tree = ast.parse(Path(drawing.__file__).read_text(encoding="utf-8"))
     called = {

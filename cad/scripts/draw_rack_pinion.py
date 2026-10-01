@@ -1,7 +1,11 @@
-r"""Create the curated manufacturing drawing for the rack-pinion reduction disc.
+r"""Create the curated manufacturing drawing for the rack-pinion reduction disc (MHA-070).
 
 Follows the batch gear-drawing pattern (see ``draw_cylinder_gear``). Drawn 1:1;
-the 120T disc is large and thin.
+the 120T disc is large and thin.  The face view (``*Front``, the rear face)
+prints the bore and the native #0-80 tap callout with its countersink and
+assembly-transfer lines (no bolt-circle position: the taps are spotted
+through the MHA-159 flange at assembly); the edge view prints the disc
+thickness and the face squareness to datum A.
 """
 
 from __future__ import annotations
@@ -10,20 +14,19 @@ import argparse
 import sys
 from typing import Any
 
-from rack_pinion_spec import GEOMETRIC_TOLERANCES_MM
-
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_feature_control_frame,
+    add_native_hole_callout,
     add_property_linked_note,
+    assert_imported_precision,
     curate_view_dimensions,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
     set_dimension_callouts,
-    set_dimension_precision,
     set_hidden_lines_removed,
     stamp_drawing_summary,
 )
@@ -31,7 +34,17 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
 from _native_axis_datum import add_native_axis_datum
 from _rack_bore_finish import add_rack_bore_finish
-from rack_pinion_spec import BORE_DIA, FACE_WIDTH, OUTSIDE_DIA
+from rack_pinion_spec import (
+    BORE_CALLOUT,
+    BORE_DIA,
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION_BY_NAME,
+    FACE_WIDTH,
+    GEOMETRIC_TOLERANCES_MM,
+    OUTSIDE_DIA,
+    TAP_CALLOUT_QUALIFIER,
+    TAP_DRILL_DIA,
+)
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
     place_view,
@@ -64,15 +77,51 @@ FRONT_KEEP = {
     # Approach from upper-left, clear of native datum A below-left.
     "BoreDia": (FRONT_CENTER[0] - 0.062, FRONT_CENTER[1] + 0.038),
 }
-DIMENSION_CALLOUTS = {
-    # Reamed slip fit on the stud's turned Ø5 front seat (nominal-or-under, like
-    # the arbor journals): min 0.03 diametral clearance, inside the project's
-    # 0.025..0.075 shaft-in-bushing policy. Also settles which tolerance-block
-    # row governs the bore (neither .XX +/-0.51 nor DRILLED +0.10/0 -- the
-    # callout's own limits do).
-    "BoreDia": "THRU - REAM",
+# Below the edge-on disc: the squareness frame stands above it.
+RIGHT_KEEP = {
+    "FaceWidth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - HALF_OD - 0.012),
 }
-DIMENSION_PRECISION = {"BoreDia": 2}
+DIMENSION_CALLOUTS = {"BoreDia": BORE_CALLOUT}
+# Lower-left of the face view, off the rim: the leader lands on the 240° tap
+# (visible_circle_edge breaks the three equal radii on the lowest centre).
+TAP_CALLOUT_XY = (FRONT_CENTER[0] - 0.060, FRONT_CENTER[1] - 0.058)
+
+
+def tap_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
+    """Append the countersink and transfer lines to the one thread compartment."""
+    if set(definitions) != {5, 6, 7, 8}:
+        raise RuntimeError(f"unexpected tap callout parts: {definitions!r}")
+    thread_parts = [
+        part for part, text in definitions.items() if "<hw-threadclass>" in text.lower()
+    ]
+    if len(thread_parts) != 1:
+        raise RuntimeError(
+            f"tap thread line is not in one callout part: {definitions!r}"
+        )
+    updated = dict(definitions)
+    part = thread_parts[0]
+    updated[part] = f"{updated[part].rstrip()}\n{TAP_CALLOUT_QUALIFIER}"
+    return updated
+
+
+def _set_tap_callout_text(display: Any) -> None:
+    definitions = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
+    updated = tap_callout_definitions(definitions)
+    for definition_part, writable_part in ((5, 1), (6, 2), (7, 3), (8, 4)):
+        if updated[definition_part] != definitions[definition_part]:
+            display.SetText(writable_part, updated[definition_part])
+    persisted = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
+    resolved = {part: str(display.GetText(part) or "") for part in (1, 2, 3, 4)}
+    thread = [text for text in resolved.values() if "UNF" in text]
+    if (
+        persisted != updated
+        or len(thread) != 1
+        or not thread[0].rstrip().endswith(TAP_CALLOUT_QUALIFIER)
+    ):
+        raise RuntimeError(
+            "rack-pinion tap callout lines did not persist: "
+            f"definitions={persisted!r}, resolved={resolved!r}"
+        )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -123,10 +172,25 @@ async def build(adapter: Any) -> dict[str, str]:
         set_hidden_lines_removed(adapter, view)
 
     front_annotations = curate_view_dimensions(
-        adapter, front, keep=FRONT_KEEP, view_label="front"
+        adapter,
+        front,
+        keep=FRONT_KEEP,
+        view_label="front",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    right_annotations = curate_view_dimensions(
+        adapter,
+        right,
+        keep=RIGHT_KEEP,
+        view_label="edge",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    # Decimal places (and so the general-tolerance row each dimension claims)
+    # are authored on the part; the sheet only proves the import kept them.
+    assert_imported_precision(
+        adapter, [*front_annotations, *right_annotations], DRAWING_PRECISION_BY_NAME
     )
     set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
-    set_dimension_precision(adapter, front_annotations, DIMENSION_PRECISION)
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to disc bore")
     bore_edge = visible_circle_edge(adapter, front, BORE_DIA)
@@ -156,6 +220,17 @@ async def build(adapter: Any) -> dict[str, str]:
     # endpoint setter: that setter drops the semantic association on this symbol.
     add_rack_bore_finish(adapter, front, bore_edge, symbol_xy=BORE_FINISH_POSITION)
 
+    # The native thread and drill ride the callout; the countersink, the burr
+    # break and the assembly transfer are the spec's lines under it.
+    tap_callout = add_native_hole_callout(
+        adapter,
+        front,
+        edge=visible_circle_edge(adapter, front, TAP_DRILL_DIA),
+        callout_xy=TAP_CALLOUT_XY,
+        label="#0-80 transferred disc taps",
+    )
+    _set_tap_callout_text(tap_callout)
+
     add_property_linked_note(adapter, "Gear Data", 0.018, 0.262)
     add_property_linked_note(adapter, "Manufacturing Notes", 0.018, 0.095)
     return await finalize_drawing(
@@ -164,6 +239,10 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Rack-Pinion Disc Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
+        # SolidWorks pins its own "... Tapped Hole" note to the face view once
+        # the tap carries a hole callout; the callout already states it.
+        redundant_note_substrings=("Tapped Hole",),
+        expected_redundant_notes=1,
     )
 
 

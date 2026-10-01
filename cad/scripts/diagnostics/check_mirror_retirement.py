@@ -903,98 +903,168 @@ for x, y in p.GUIDE_SCREW_XY:
         f"guide screw {_fs}",
         **_SOLV,
     )
-for x, y in p.LOCK_SCREW_XY:
-    _fs += 1
+# R9-31: the guide-lock screws are their own button-head stem (MHA-176).
+for i, (x, y) in enumerate(p.LOCK_SCREW_XY):
     expect(
         PD,
-        f"fillister-screw-{_fs}",
-        [x, y, p.LOCK_Z0 + 2.0],
+        f"guide-lock-screw-{i + 1}",
+        [x, y, p.LOCK_Z0 + p.LOCK_THICK],
         p.ROT_Y_180,
-        f"lock screw {_fs}",
+        f"lock screw {i + 1}",
         **_SOLV,
     )
+# Hanger: the arm swings on the pivot P at theta; the plate carries the knob K.
+_P = [p.PIVOT_XY[0], p.PIVOT_XY[1]]
+_arm_rows = p.rot_z_rows(p.ARM_ANGLE_DEG)
+expect(PD, "transgear-pivot-spacer-1", [*_P, p.SPACER_Z0], IDENTITY, "pivot spacer")
+expect(PD, "transgear-arm-1", [*_P, p.ARM_Z0], _arm_rows, "transgear-arm")
 expect(
     PD,
-    "transgear-bracket-1",
-    [p.STUD_XY[0], p.STUD_XY[1], p.BRACKET_Z0],
-    IDENTITY,
-    "transgear-bracket",
+    "transgear-pivot-screw-1",
+    [*_P, p.PIVOT_SCREW_Z0],
+    p.ROT_X_POS90,
+    "pivot screw",
 )
-for i, dx in enumerate((p.BRACKET_SCREW_DX, -p.BRACKET_SCREW_DX)):
+_K = [p.KNOB_SHAFT_XY[0], p.KNOB_SHAFT_XY[1]]
+expect(PD, "transgear-arm-plate-1", [*_K, p.PLATE_Z0], _arm_rows, "arm plate")
+for i, (x, y) in enumerate(p.PLATE_SCREW_XY):
     expect(
         PD,
-        f"bracket-screw-{i + 1}",
-        [p.STUD_XY[0] + dx, p.BAR_CY, p.STUB_Z0],
-        p.ROT_Y_180,
-        f"bracket-screw x{p.STUD_XY[0] + dx:+.0f}",
+        f"transgear-arm-plate-screw-{i + 1}",
+        [x, y, p.PLATE_SCREW_Z0],
+        p.ROT_X_POS90,
+        f"arm plate screw {i + 1}",
     )
 expect(
     PD,
-    "transgear-stub-1",
-    [p.STUD_XY[0], p.STUD_XY[1], p.STUB_Z0],
-    p.ROT_X_NEG90,
-    "transgear-stub",
+    "transgear-latch-pin-1",
+    list(p.LATCH_PIN_POS),
+    p.rot_z_rows(p.ARM_ANGLE_DEG - 90.0),
+    "latch pin",
 )
+# Latch hook on its bracket.
 expect(
     PD,
-    "transgear-latch-1",
-    [p.STUD_XY[0], p.STUD_XY[1], p.ARM_Z],
-    rows_from_euler([180.0, 0.0, p.LATCH_ANGLE_DEG]),
-    "transgear-latch",
-)
-expect(
-    PD,
-    "rack-pinion-1",
-    [p.STUD_XY[0], p.STUD_XY[1], p.DISC_Z0],
+    "latch-hook-bracket-1",
+    list(p.HOOK_BRACKET.MACHINE_ORIGIN),
     IDENTITY,
-    "rack-pinion disc",
+    "latch-hook bracket",
+)
+for i, pos in enumerate(p.HOOK_BRACKET_SCREW_POS):
+    expect(
+        PD,
+        f"latch-hook-bracket-screw-{i + 1}",
+        list(pos),
+        p.ROT_X_POS90,
+        f"latch-hook bracket screw {i + 1}",
+    )
+expect(PD, "latch-hook-1", list(p.LATCH_HOOK_POS), p.LATCH_HOOK_ROWS, "latch hook")
+for i, pos in enumerate(p.HOOK_RIVET_POS):
+    expect(
+        PD,
+        f"latch-hook-rivet-{i + 1}",
+        list(pos),
+        p.rot_z_rows(90.0),
+        f"latch-hook rivet {i + 1}",
+    )
+# Disc cluster on the stub at S.
+_S = [p.STUD_XY[0], p.STUD_XY[1]]
+expect(PD, "transgear-stub-1", [*_S, p.STUB_Z0], p.ROT_Y_180, "transgear-stub")
+expect(
+    PD,
+    "transgear-feed-pinion-1",
+    [*_S, p.FEED_Z0],
+    p.ROT_Y_180,
+    "feed pinion",
+    **_SOLV,
+)
+expect(PD, "rack-pinion-1", [*_S, p.DISC_Z0], IDENTITY, "rack-pinion disc", **_SOLV)
+expect(PD, "transgear-disc-hub-1", [*_S, p.DISC_Z0], IDENTITY, "disc hub", **_SOLV)
+for i, (x, y) in enumerate(p.DISC_SCREW_XY):
+    expect(
+        PD,
+        f"transgear-disc-screw-{i + 1}",
+        [x, y, p.DISC_SCREW_Z0],
+        p.ROT_X_NEG90,
+        f"disc screw {i + 1}",
+        **_SOLV,
+    )
+expect(PD, "transgear-hub-cap-1", [*_S, p.CAP_Z0], p.ROT_Y_180, "hub cap")
+# Knob stack at K: the T24 is inserted first (-1), then the crank T12 and the
+# T18 spare.
+expect(
+    PD,
+    "transgear-removable-1",
+    [*_K, p.REMOVABLE_Z0],
+    IDENTITY,
+    "removable T24",
     **_SOLV,
 )
 expect(
     PD,
-    "transgear-feed-pinion-1",
-    [p.STUD_XY[0], p.STUD_XY[1], p.FEED_Z0],
+    "transgear-drive-collar-1",
+    [*_K, p.KNOB_COLLAR_Z0],
     IDENTITY,
-    "feed pinion",
+    "drive collar",
+    **_SOLV,
+)
+for i, (x, y) in enumerate(p.KNOB_DRIVE_PIN_XY):
+    expect(
+        PD,
+        f"transgear-knob-drive-pin-{i + 1}",
+        [x, y, p.KNOB_DRIVE_PIN_Z0],
+        p.ROT_X_NEG90,
+        f"knob drive pin {i + 1}",
+        **_SOLV,
+    )
+expect(
+    PD,
+    "transgear-collar-cross-pin-1",
+    [*_K, p.CROSS_PIN_Z0],
+    IDENTITY,
+    "collar cross pin",
     **_SOLV,
 )
 expect(
     PD,
     "transgear-knob-shaft-1",
-    [p.KNOB_SHAFT_XY[0], p.KNOB_SHAFT_XY[1], p.KNOB_SHAFT_Z0],
-    p.ROT_X_POS90,
+    [*_K, p.KNOB_SHAFT_Z0],
+    p.rot_z_rows(p.THIRD_PHASE_DEG),
     "knob shaft",
     **_SOLV,
 )
 expect(
     PD,
-    "transgear-pinion-1",
-    [p.KNOB_SHAFT_XY[0], p.KNOB_SHAFT_XY[1], p.THIRD_Z0],
-    _rz(p.THIRD_PHASE_DEG),
-    "third gear",
+    "transgear-thumbnut-1",
+    [*_K, p.THUMBNUT_Z0],
+    p.ROT_X_NEG90,
+    "thumbnut",
     **_SOLV,
 )
 expect(
     PD,
-    "transgear-removable-1",
-    [p.KNOB_SHAFT_XY[0], p.KNOB_SHAFT_XY[1], p.REMOVABLE_Z0],
-    IDENTITY,
-    "removable T24",
+    "transgear-knob-thrust-ring-1",
+    [*_K, p.KNOB_RING_Z0],
+    p.ROT_X_POS90,
+    "knob thrust ring",
     **_SOLV,
 )
-for _k, _side in ((1, -1.0), (2, 1.0)):
-    expect(
-        PD,
-        f"transgear-knob-drive-pin-{_k}",
-        [
-            p.KNOB_SHAFT_XY[0],
-            p.KNOB_SHAFT_XY[1] + _side * p.REMOVABLE.PIN_CIRCLE_RADIUS,
-            p.KNOB_DRIVE_PIN_Z0,
-        ],
-        p.ROT_X_NEG90,
-        f"knob drive pin {_k}",
-        **_SOLV,
-    )
+expect(
+    PD,
+    "transgear-knob-cup-1",
+    [*_K, p.KNOB_CUP_Z0],
+    p.ROT_X_POS90,
+    "knob cup",
+    **_SOLV,
+)
+expect(
+    PD,
+    "transgear-knob-retaining-screw-1",
+    [*_K, p.KNOB_SCREW_Z0],
+    p.ROT_X_POS90,
+    "knob retaining screw",
+    **_SOLV,
+)
 expect(
     PD,
     "transgear-removable-2",
@@ -1048,7 +1118,7 @@ except Exception as e:
     fails.append(("chain seed lookup", repr(e)))
     _link_ok = False
 if _link_ok and not fails:
-    for k in range(1, 34):
+    for k in range(1, p.LINK_COUNT // 2):
         _link_expect(f"chain-inner-link-{k + 1}", 2 * k, f"chain inner @{2 * k}")
         _link_expect(
             f"chain-outer-link-{k + 1}", 2 * k + 1, f"chain outer @{2 * k + 1}"

@@ -1352,9 +1352,10 @@ async def _verify_paper_feed_one(adapter: Any, report: Report) -> None:
     The belt/chain (T12->T24) and rack-pinion ratios are otherwise exercised only by
     the hand-run ``build_kinematic_probe.py``, so a paper-feed regression could ship
     with the standard gates green. This wires that proof into ``verify:kinematics``:
-    open paper-drive, drive the crank, and assert T24 / knob shaft / third gear /
-    the 120T disc / the feed pinion all turn and the platen feeds (the probe's own
-    assertions). The driven (dirty) model is discarded without saving. The belt
+    open paper-drive, drive the crank, and assert T24 / drive collar / knob
+    shaft (integral 12T) / the 120T disc / the feed pinion all turn and the
+    platen feeds (the probe's own assertions). The driven (dirty) model is
+    discarded without saving. The belt
     mate ratio is build-time-checked but the rack coefficient and the
     end-to-end train are only proven by driving (codex #189)."""
     name = "paper-drive"

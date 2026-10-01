@@ -1,4 +1,22 @@
-r"""Create the curated machinist drawing for the transgear stud."""
+r"""Create the MHA-082 transgear stud manufacturing drawing.
+
+The SLDPRT remains authoritative.  A turned stud carries no datum and no
+geometric-control frame (policy rule 3): the running journal keeps its native
+fit band and one bearing-surface finish, the journal length its ±0.05 (the
+cluster float), the thread relief its Ø MAX and width band, and every other
+size is an ordinary model dimension at its part-authored places.
+
+The stud axis is model +Z, so the ``*Right`` view lays it horizontal as it
+sits in the lathe: model +Z runs to paper-LEFT, putting the #6-32 front end on
+the left and the #10-32 rear end on the right.  The side view shows hidden
+lines for the one hidden feature, the Ø5.40 face relief in the collar's rear
+face.  Axial stations baseline from the collar's rear face (the arm seat) and
+chain forward from the Ø9 step face.
+
+Run with SolidWorks open::
+
+    uv run python cad\scripts\draw_transgear_stub.py transgear-stub
+"""
 
 from __future__ import annotations
 
@@ -10,37 +28,43 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    PmiDrawingPlacement,
+    add_attached_note,
     add_property_linked_note,
     add_surface_finish,
-    curate_view_dimensions,
+    add_view_centerline,
+    assert_imported_precision,
     finalize_drawing,
-    project_part_pmi,
     new_project_drawing,
+    offset_dimension_text,
     read_required_properties,
-    set_dimension_callouts,
-    set_dimension_precision,
     set_hidden_lines_removed,
+    set_hidden_lines_visible,
     stamp_drawing_summary,
 )
+from _drawing_hidden_sketches import curate_view_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _surface_finish import surface_finish_by_key
 from transgear_stub_spec import (
-    BASE_DIA,
-    BASE_LEN,
-    COLLAR_DIA as COLLAR_DIA,
-    COLLAR_LEN,
-    GEOMETRIC_CONTROLS,
-    PART_DATUMS,
-    SEAT_DIA,
-    SEAT_LEN,
+    CAP_SHOULDER_STATION,
+    COLLAR_DIA,
+    COLLAR_LENGTH,
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION_BY_NAME,
+    FACE_RELIEF_DEPTH,
+    FRONT_THREAD_CALLOUT,
+    FRONT_THREAD_END_STATION,
+    FRONT_THREAD_MAJOR,
+    JOURNAL_DIA,
+    REAR_THREAD_CALLOUT,
+    REAR_THREAD_LENGTH,
+    REAR_THREAD_MAJOR,
+    REAR_TIP_STATION,
+    RELIEF_END_STATION,
+    SLEEVE_THRUST_STATION,
     SURFACE_FINISHES,
+    TIP_STATION,
 )
-from solidworks_mcp.adapters.solidworks.drawing import (
-    auto_center_marks,
-    place_view,
-)
-
+from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 SPEC = DRAWINGS_BY_NAME["transgear_stub"]
 PART_STEM = SPEC.artifact_stem
@@ -54,60 +78,90 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# A 26.9 mm stud reads at 4:1 everywhere, so the sheet scale IS the view
-# scale -- no per-view blow-up note needed.
-SHEET_SCALE = (4.0, 1.0)
-VIEW_MM = SHEET_SCALE[0] / 1000.0  # sheet meters per model mm in the views
-TOTAL_LEN = BASE_LEN + SEAT_LEN + COLLAR_LEN
-
-FRONT_CENTER = (0.115, 0.185)
-END_CENTER = (0.115, 0.068)  # base-end view, third-angle: below the front
-ISO_CENTER = (0.320, 0.190)
-
-
-def _fx(x_mm: float) -> float:
-    """Front-view sheet x for a model radial offset (mm from the axis)."""
-    return FRONT_CENTER[0] + x_mm * VIEW_MM
+# The side view prints at the sheet scale, so it needs no caption.  3:1 lays
+# the 50.7 stud 152 mm long and the 1.1 thread relief 3.3 mm wide.
+SHEET_SCALE = (3.0, 1.0)
+VIEW_SCALE = (3, 1)
+_S = SHEET_SCALE[0] / SHEET_SCALE[1]
+SIDE_CENTER = (0.160, 0.165)
+ISO_CENTER = (0.350, 0.230)
+ISO_SCALE = (2, 1)
+_MID_Z = (REAR_TIP_STATION + TIP_STATION) / 2.0
 
 
-def _fy(y_mm: float) -> float:
-    """Front-view sheet y for a model axial station (mm from the base end)."""
-    return FRONT_CENTER[1] + (y_mm - TOTAL_LEN / 2.0) * VIEW_MM
+def _sheet_x(model_z_mm: float) -> float:
+    """Sheet X of a model-Z station on the side view (model +Z runs left)."""
+    return SIDE_CENTER[0] + (_MID_Z - model_z_mm) * _S / 1000.0
 
 
-# Diameters stack on the left, land lengths chain on the right; the callout
-# texts sit clear of each other's extension lines (steps at different y).
-#
-# The chain runs at x=0.176 rather than 0.162: the Ra symbol beside the gear
-# seat throws its text out to x~0.171 (the text starts ~13 mm right of the
-# anchor and runs ~26 mm), and at 0.162 the chain's dimension line printed
-# straight through "Ra 1.6". The seat silhouette at x=0.125 leaves too little
-# room to walk the symbol left instead, so the chain moves right; ~7 mm of gap.
-#
-# CAVEAT (measured 2026-07-16): that "~7 mm of gap" is TEXT-only, and the text is
-# not the symbol's rightmost ink. Verified against the render: the text does end
-# at x=0.1703 (so 5.6 mm to the chain line, which sits at x=0.1759..0.1760), but
-# the Ra symbol's horizontal ARM extends 6.1 mm PAST its own text, to x=0.1764 --
-# it crosses the chain line by ~0.5 mm. Left as-is: a 0.5 mm hairline does not
-# justify a rebuild. Recorded so the next reader does not "confirm" this clearance
-# by measuring the text and miss the arm. Do not treat text extent as symbol
-# extent for ANY Ra placement -- and note text is not a COM primitive, so
-# GetLineAtIndex will not show it to you either; only the render will.
-_LENGTH_CHAIN_X = 0.176
-FRONT_KEEP = {
-    "BaseDia": (0.052, _fy(BASE_LEN / 2.0)),
-    "SeatDia": (0.052, _fy(BASE_LEN + 3.0)),
-    "CollarDia": (0.052, _fy(TOTAL_LEN - COLLAR_LEN / 2.0)),
-    "BaseLength": (_LENGTH_CHAIN_X, _fy(BASE_LEN / 2.0)),
-    "SeatLength": (_LENGTH_CHAIN_X, _fy(BASE_LEN + SEAT_LEN / 2.0)),
-    "CollarLength": (_LENGTH_CHAIN_X, _fy(TOTAL_LEN - COLLAR_LEN / 2.0)),
+def _sheet_y(radius_mm: float) -> float:
+    """Sheet Y of a point ``radius_mm`` above the stud axis (model +Y up)."""
+    return SIDE_CENTER[1] + radius_mm * _S / 1000.0
+
+
+REAR_END_X = _sheet_x(-REAR_THREAD_LENGTH)
+SEAT_X = _sheet_x(0.0)
+COLLAR_FRONT_X = _sheet_x(COLLAR_LENGTH)
+THRUST_X = _sheet_x(SLEEVE_THRUST_STATION)
+SHOULDER_X = _sheet_x(CAP_SHOULDER_STATION)
+RELIEF_END_X = _sheet_x(RELIEF_END_STATION)
+FRONT_END_X = _sheet_x(FRONT_THREAD_END_STATION)
+TIP_X = _sheet_x(TIP_STATION)
+REAR_TIP_X = _sheet_x(REAR_TIP_STATION)
+COLLAR_TOP_Y = _sheet_y(COLLAR_DIA / 2.0)
+JOURNAL_TOP_Y = _sheet_y(JOURNAL_DIA / 2.0)
+RELIEF_MID_X = (SHOULDER_X + RELIEF_END_X) / 2.0
+
+# Axial rows below the profile, 15 mm apart: row 0 chains the rear thread
+# and the collar from the seat face and the journal from the step face; row 1
+# the step station from the seat face and the front thread from the shoulder.
+# Each row-1 extension line lands on a row-0 junction, so none crosses a
+# dimension line.
+_ROW_Y = (SIDE_CENTER[1] - 0.034, SIDE_CENTER[1] - 0.049)
+SIDE_KEEP = {
+    "RearThreadLength": ((REAR_END_X + SEAT_X) / 2.0, _ROW_Y[0]),
+    "CollarLength": ((SEAT_X + COLLAR_FRONT_X) / 2.0, _ROW_Y[0]),
+    "JournalLength": ((THRUST_X + SHOULDER_X) / 2.0, _ROW_Y[0]),
+    "ThrustStation": ((SEAT_X + THRUST_X) / 2.0, _ROW_Y[1]),
+    "FrontThreadEnd": ((SHOULDER_X + FRONT_END_X) / 2.0, _ROW_Y[1]),
+    # The face relief (hidden) and the collar Ø stand right of the rear tip,
+    # their extension lines clearing the #10-32 silhouette.
+    "FaceReliefDia": (REAR_TIP_X + 0.012, SIDE_CENTER[1]),
+    "CollarDia": (REAR_TIP_X + 0.026, SIDE_CENTER[1]),
+    "FaceReliefDepth": (
+        SEAT_X - FACE_RELIEF_DEPTH * _S / 2000.0,
+        COLLAR_TOP_Y + 0.012,
+    ),
+    # The step and journal Ø read above the profile on their own sections.
+    "StepDia": ((COLLAR_FRONT_X + THRUST_X) / 2.0, COLLAR_TOP_Y + 0.012),
+    "JournalDia": (THRUST_X - 0.020, COLLAR_TOP_Y + 0.004),
+    # The relief: width above, Ø below with its text offset clear of the
+    # journal length's extension line at the shoulder.
+    "ReliefWidth": (RELIEF_MID_X, COLLAR_TOP_Y + 0.004),
+    "ReliefDia": (RELIEF_MID_X, SIDE_CENTER[1] - 0.012),
+    "FrontDomeR": (TIP_X - 0.012, SIDE_CENTER[1] - 0.016),
+    "RearDomeR": (REAR_TIP_X + 0.004, SIDE_CENTER[1] - 0.030),
 }
-# No callout overrides: both diameter bands are toleranced on the MODEL
-# dimension by build_transgear_stub (transgear_stub_spec.BASE_DIA_BAND /
-# SEAT_DIA_BAND), so SolidWorks renders the limits natively.
-DIMENSION_CALLOUTS: dict[str, str] = {}
-# The base is a 3/8" conversion: display 9.525, not a false-precision 9.53.
-DIMENSION_PRECISION = {"BaseDia": 3}
+RELIEF_DIA_TEXT_XY = ((RELIEF_END_X + FRONT_END_X) / 2.0, SIDE_CENTER[1] - 0.020)
+# Each thread callout lands on its own full-thread silhouette and stands out
+# past the rows, the front one up-left, the rear one up-right.
+FRONT_THREAD_PICK = (
+    (RELIEF_END_X + FRONT_END_X) / 2.0,
+    _sheet_y(FRONT_THREAD_MAJOR / 2.0),
+)
+FRONT_THREAD_NOTE_XY = (TIP_X - 0.030, COLLAR_TOP_Y + 0.020)
+REAR_THREAD_PICK = (
+    (REAR_END_X + SEAT_X) / 2.0 + 0.004,
+    _sheet_y(REAR_THREAD_MAJOR / 2.0),
+)
+REAR_THREAD_NOTE_XY = (REAR_TIP_X + 0.010, COLLAR_TOP_Y + 0.024)
+# The journal's upper silhouette, left of its Ø dimension line.
+FINISH_PICK = ((THRUST_X + SHOULDER_X) / 2.0 - 0.010, JOURNAL_TOP_Y)
+FINISH_SYMBOL = ((THRUST_X + SHOULDER_X) / 2.0 - 0.010, COLLAR_TOP_Y + 0.008)
+# A point on the journal face, clear of the Ø dimension line.
+CENTERLINE_PICK = ((THRUST_X + SHOULDER_X) / 2.0 + 0.010, SIDE_CENTER[1] + 0.001)
+ISO_NOTE_XY = (0.320, 0.185)
+NOTES_XY = (0.016, 0.070)
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -125,6 +179,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
+            "Isometric View Note",
         ),
         required=(
             "Number",
@@ -132,6 +187,7 @@ async def build(adapter: Any) -> dict[str, str]:
             "Finish",
             "Quantity",
             "Manufacturing Notes",
+            "Isometric View Note",
         ),
     )
     drawing_model, _sheet = new_project_drawing(
@@ -144,75 +200,60 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Transgear Stud Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "transgear stud; stepped gear stud; turned steel",
+            3: "transgear stud; turned steel; #10-32 and #6-32",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
 
-    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(4, 1))
-    end = place_view(adapter, str(SOURCE), "*Bottom", *END_CENTER, scale=(4, 1))
-    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(4, 1))
-    for view in (front, end, iso):
-        set_hidden_lines_removed(adapter, view)
+    side = place_view(adapter, str(SOURCE), "*Right", *SIDE_CENTER, scale=VIEW_SCALE)
+    iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=ISO_SCALE)
+    set_hidden_lines_visible(adapter, side)
+    set_hidden_lines_removed(adapter, iso)
 
-    front_annotations = curate_view_dimensions(
-        adapter, front, keep=FRONT_KEEP, view_label="front"
-    )
-    set_dimension_callouts(adapter, front_annotations, DIMENSION_CALLOUTS)
-    set_dimension_precision(adapter, front_annotations, DIMENSION_PRECISION)
-    # SolidWorks classifies the solid circular end silhouettes under the same
-    # AutoInsertCenterMarks2 "hole" bit as a bored circle; disabling that bit
-    # makes the API a guaranteed no-op even though the end view is circular.
-    if not auto_center_marks(adapter, end, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center mark to stud end view")
-
-    base_circle = (END_CENTER[0] + BASE_DIA / 2.0 * VIEW_MM, END_CENTER[1])
-    seat_left = _fx(-SEAT_DIA / 2.0)
-
-    # GD&T is model PMI (transgear_stub_spec.PART_DATUMS/GEOMETRIC_CONTROLS,
-    # authored by build_transgear_stub) — project it and place it where the
-    # hand-authored symbols used to sit. Which VIEW receives each annotation
-    # depends on its attachment (a datum tag only lands in a view aligned
-    # with its face), and the projection fails loud on any mismatch.
-    project_part_pmi(
+    annotations = curate_view_dimensions(
         adapter,
-        placements={
-            "datum:A": PmiDrawingPlacement(
-                view=end,
-                position=(END_CENTER[0] + 0.040, END_CENTER[1] - 0.018),
-                attachment_xy=base_circle,
-            ),
-            "seat_cylindricity": PmiDrawingPlacement(
-                view=front,
-                position=(0.038, _fy(BASE_LEN + 9.0)),
-                attachment_xy=(seat_left, _fy(BASE_LEN + 9.0)),
-                attachment_type="SILHOUETTE",
-            ),
-            "seat_runout": PmiDrawingPlacement(
-                view=front,
-                position=(0.038, _fy(BASE_LEN + 12.0)),
-                attachment_xy=(seat_left, _fy(BASE_LEN + 12.0)),
-                attachment_type="SILHOUETTE",
-            ),
-        },
-        datums=PART_DATUMS,
-        controls=GEOMETRIC_CONTROLS,
-        label="transgear stud PMI",
+        side,
+        keep=SIDE_KEEP,
+        view_label="side",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    offset_dimension_text(adapter, annotations, {"ReliefDia": RELIEF_DIA_TEXT_XY})
+    assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+
+    add_view_centerline(
+        adapter,
+        side,
+        face_xy=CENTERLINE_PICK,
+        label="MHA-082 turning axis",
+    )
+    add_attached_note(
+        adapter,
+        side,
+        text=FRONT_THREAD_CALLOUT,
+        entity_xy=FRONT_THREAD_PICK,
+        note_xy=FRONT_THREAD_NOTE_XY,
+        label="MHA-082 front thread callout",
+    )
+    add_attached_note(
+        adapter,
+        side,
+        text=REAR_THREAD_CALLOUT,
+        entity_xy=REAR_THREAD_PICK,
+        note_xy=REAR_THREAD_NOTE_XY,
+        label="MHA-082 rear thread callout",
     )
     add_surface_finish(
         adapter,
-        front,
-        edge_xy=(_fx(SEAT_DIA / 2.0), _fy(BASE_LEN + SEAT_LEN / 2.0)),
-        symbol_xy=(_fx(SEAT_DIA / 2.0) + 0.008, _fy(BASE_LEN + SEAT_LEN / 2.0) + 0.004),
-        control=surface_finish_by_key(SURFACE_FINISHES, "gear_seat"),
-        label="gear seat finish",
+        side,
+        edge_xy=FINISH_PICK,
+        symbol_xy=FINISH_SYMBOL,
+        control=surface_finish_by_key(SURFACE_FINISHES, "journal"),
+        label="MHA-082 journal finish",
         entity_type="SILHOUETTE",
+        char_height=0.0025,
     )
-
-    # x=0.020: a note is left-aligned on its anchor, so the ink starts here. The
-    # bound is the 12.7 mm zone margin (~0.0127), which the re-centred frame rule
-    # now matches (~0.0126); 0.020 clears both, and the audit enforces it.
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.112)
+    add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
+    add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)
 
     return await finalize_drawing(
         adapter,

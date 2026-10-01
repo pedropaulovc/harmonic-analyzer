@@ -19,6 +19,11 @@ def printed_band_mm(places: int) -> float:
     return float(str(_config.title_block(f"linear_{places}pl")["display"]).lstrip("±"))
 
 
+def drilled_oversize_mm() -> float:
+    """The title block's DRILLED HOLES plus allowance (its minus is 0)."""
+    return float(_config.title_block("drilled_hole")["plus_mm"])
+
+
 def printed_deviations(
     model: float, places: int, limits: tuple[float, float] | None = None
 ) -> tuple[float, float]:

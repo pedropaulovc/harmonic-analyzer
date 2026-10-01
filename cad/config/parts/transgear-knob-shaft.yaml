@@ -1,6 +1,10 @@
 transgear-knob-shaft:
+  title: Transgear Knob Shaft
   number: MHA-078
-  material: Brass
+  material: SAE 1018 CF bar, ASTM A108-24
+  material_specification: SAE 1018 CF bar, ASTM A108-24
+  finish: oiled
+  quantity: 1
   tolerance_class: machined_block
   fit_class: shaft_in_bushing
-  process: "machined (brass)"
+  process: "turned; 12T cut with a form cutter; 1/4-20 die-cut; #8-32 tapped"

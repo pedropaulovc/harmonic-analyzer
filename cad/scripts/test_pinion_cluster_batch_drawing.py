@@ -21,7 +21,6 @@ import pinion_lever_spec
 import pinion_pivot_shaft_spec
 import pinion_spring_spec
 import post_mount_screw_spec
-import transgear_knob_drive_pin_spec
 from _buildgraph import module_deps_of
 
 
@@ -291,20 +290,19 @@ def test_cross_numbered_fit_pairs_use_fixed_runtime_oracles() -> None:
         12: (2, 13.56562270743475),
         13: (1, 13.56562270743475),
         14: (2, 13.56562270743475),
-        15: (1, 11.20210690940073),
-        16: (1, 11.20210690940073),
-        17: (2, 11.20210690940073),
-        18: (1, 11.20210690940073),
-        19: (2, 11.20210690940073),
-        20: (2, 11.20210690940073),
-        21: (1, 11.20210690940073),
-        22: (2, 11.20210690940073),
     }
     for screw_number, (guide_number, limit) in guide_receivers_and_limits.items():
         pair = frozenset(
             (f"fillister-screw-{screw_number}", f"platen-guide-{guide_number}")
         )
         assert paper_drive[pair] == pytest.approx(limit)
+    # R9-31: the lock-plate screws are MHA-176 button heads, not fillisters.
+    lock_receivers = {1: 1, 2: 1, 3: 2, 4: 1, 5: 2, 6: 2, 7: 1, 8: 2}
+    for screw_number, guide_number in lock_receivers.items():
+        pair = frozenset(
+            (f"guide-lock-screw-{screw_number}", f"platen-guide-{guide_number}")
+        )
+        assert paper_drive[pair] == pytest.approx(11.20210690940073)
 
     summing = _interference_contracts.allowed_interference_pairs("summing")
     assert summing == pytest.approx(
@@ -494,41 +492,71 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 second_number=2,
             ),
             **_expected_numbered_pairs(
-                "fillister-screw",
-                (15, 16, 18, 21),
+                "guide-lock-screw",
+                (1, 2, 4, 7),
                 "platen-guide",
                 2.8448,
                 2.261,
                 4.35,
             ),
             **_expected_numbered_pairs(
-                "fillister-screw",
-                (17, 19, 20, 22),
+                "guide-lock-screw",
+                (3, 5, 6, 8),
                 "platen-guide",
                 2.8448,
                 2.261,
                 4.35,
                 second_number=2,
             ),
+            # Round 10 transgear: stock #8-32 / #4-40 / #0-80 screws, the
+            # MHA-082 stud's #10-32 and #6-32, and the MHA-126 1/4-20 nut.
             **_expected_numbered_pairs(
-                "bracket-screw",
+                "transgear-arm-plate-screw",
                 range(1, 3),
-                "support-bar",
+                "transgear-arm",
                 4.1656,
                 3.454,
-                8.7,
+                7.7,
             ),
-            frozenset(("bracket-screw-3", "support-bar-1")): _annulus_limit(
-                4.1656, 3.454, 9.0
+            frozenset(("transgear-pivot-screw-1", "support-bar-1")): _annulus_limit(
+                4.1656, 3.454, 3.5687
             ),
-            # MHA-155 3/32 x 3/16 dowels pressed into MHA-078's through 2.38 reams.
+            **_expected_numbered_pairs(
+                "latch-hook-bracket-screw",
+                range(1, 3),
+                "support-bar",
+                2.8448,
+                2.261,
+                8.025,
+            ),
+            frozenset(("transgear-stub-1", "transgear-arm-1")): _annulus_limit(
+                4.826, 4.0386, 7.9375
+            ),
+            frozenset(("transgear-hub-cap-1", "transgear-stub-1")): _annulus_limit(
+                3.505, 2.705, 4.7
+            ),
+            **_expected_numbered_pairs(
+                "transgear-disc-screw",
+                range(1, 4),
+                "rack-pinion",
+                1.524,
+                1.191,
+                3.0,
+            ),
+            frozenset(
+                ("transgear-knob-retaining-screw-1", "transgear-knob-shaft-1")
+            ): _annulus_limit(4.1656, 3.454, 8.5125),
+            frozenset(
+                ("transgear-thumbnut-1", "transgear-knob-shaft-1")
+            ): _annulus_limit(6.35, 5.105, 14.9),
+            # MHA-155 3/32 x 3/16 dowels pressed 2.3625 into MHA-152's 2.38 reams.
             **_expected_numbered_pairs(
                 "transgear-knob-drive-pin",
                 range(1, 3),
-                "transgear-knob-shaft",
+                "transgear-drive-collar",
                 2.38125,
                 2.38,
-                transgear_knob_drive_pin_spec.PRESS_DEPTH,
+                2.3625,
             ),
         },
         "harmonic-analyzer": {
@@ -619,8 +647,13 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
         frozenset(("crank-pin-1", "crank-hub-1")),
         frozenset(("crank-pin-1", "crankshaft-1")),
     }
+    # MHA-154's tube pin across MHA-078's unmodelled cross hole.
+    cross_pin_pair = frozenset(
+        ("transgear-collar-cross-pin-1", "transgear-knob-shaft-1")
+    )
     special_pairs = {
         "drive-train": crank_pairs,
+        "paper-drive": {cross_pin_pair},
     }
     for name, expected_threaded in threaded_by_assembly.items():
         allowed = _interference_contracts.allowed_interference_pairs(name)
@@ -644,5 +677,8 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
     # both receivers.
     assert 111.2 < crank_allowed[hub_pair] < 111.8
     assert 55.1 < crank_allowed[shaft_pair] < 55.6
+    # 1.10 x (12.470 - 4.755): the Ø1.5875 and Ø0.978 chords through Ø6.35.
+    paper_allowed = _interference_contracts.allowed_interference_pairs("paper-drive")
+    assert 8.4 < paper_allowed[cross_pin_pair] < 8.6
     assert _interference_contracts.allowed_interference_pairs("channel") == {}
     assert _interference_contracts.allowed_interference_pairs("unknown") == {}

@@ -52,6 +52,7 @@ from _drawing_marks import (
 from _hole_spec import DRILL_POINT_H, blind_cut_dia_mm
 from _holes import blind_hole_volume_mm3, wizard_holes
 from fillister_screw_spec import SHANK_LEN as FILLISTER_SHANK_LEN
+from guide_lock_screw_spec import SHANK_LEN as LOCK_SCREW_SHANK_LEN
 from platen_spec import CBORE_DEPTH as PLATEN_CBORE_DEPTH, PLATE_THICKNESS
 from guide_lock_spec import LOCK_THICK
 from platen_guide_spec import TAPPED_HOLE_SPEC
@@ -67,11 +68,12 @@ LOCK_SCREW_DX = 7.0  # 2 screws per lock flank its centre
 
 HOLE_X = tuple(s + d for s in LOCK_STATION_X for d in (-LOCK_SCREW_DX, LOCK_SCREW_DX))
 
-# The front row receives the ten guide screws after each shank passes through
-# the platen material left below its stock-head counterbore. The rear row
-# receives the eight lock screws after each shank passes through a 2-mm lock
-# plate. Both are #4-40 bottoming taps with positive clearance between the
-# screw tip and cylindrical blind-hole bottom.
+# The front row receives the ten guide screws (MHA-030 fillisters) after each
+# shank passes through the platen material left below its stock-head
+# counterbore. The rear row receives the eight lock screws (MHA-176 button
+# heads, ruling R9-31) after each shank passes through a 2-mm lock plate. Both
+# are #4-40 bottoming taps with positive clearance between the screw tip and
+# cylindrical blind-hole bottom.
 SCREW_STATION_X = (26.964, 80.892, 134.82, 188.748, 242.676)
 GUIDE_SCREW_PASSAGE = PLATE_THICKNESS - PLATEN_CBORE_DEPTH
 GUIDE_SCREW_THREAD_ENGAGEMENT = FILLISTER_SHANK_LEN - GUIDE_SCREW_PASSAGE
@@ -79,7 +81,7 @@ SCREW_HOLE_DEPTH = 5.52
 GUIDE_SCREW_BOTTOM_CLEARANCE = SCREW_HOLE_DEPTH - GUIDE_SCREW_THREAD_ENGAGEMENT
 
 LOCK_SCREW_PASSAGE = LOCK_THICK
-LOCK_SCREW_THREAD_ENGAGEMENT = FILLISTER_SHANK_LEN - LOCK_SCREW_PASSAGE
+LOCK_SCREW_THREAD_ENGAGEMENT = LOCK_SCREW_SHANK_LEN - LOCK_SCREW_PASSAGE
 LOCK_SCREW_BOTTOM_CLEARANCE = 0.25
 LOCK_SCREW_HOLE_DEPTH = LOCK_SCREW_THREAD_ENGAGEMENT + LOCK_SCREW_BOTTOM_CLEARANCE
 LOCK_TAPPED_HOLE_SPEC = replace(
@@ -101,10 +103,10 @@ _MIN_OPPOSED_RECEIVER_C2C = min(
 )
 
 if min(GUIDE_SCREW_THREAD_ENGAGEMENT, LOCK_SCREW_THREAD_ENGAGEMENT) <= 0.0:
-    raise AssertionError("fillister screw stack has no #4-40 thread engagement")
+    raise AssertionError("platen-guide screw stack has no #4-40 thread engagement")
 if max(SCREW_HOLE_DEPTH, LOCK_SCREW_HOLE_DEPTH) + _DRILL_POINT_REACH >= GUIDE_DEPTH:
     raise AssertionError(
-        "fillister receiver drill point breaks through the platen guide"
+        "platen-guide receiver drill point breaks through the platen guide"
     )
 if _MIN_OPPOSED_RECEIVER_C2C < _TAP_DRILL_DIA + 0.2:
     raise AssertionError("front and rear #4-40 guide receivers intersect")

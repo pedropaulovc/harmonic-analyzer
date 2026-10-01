@@ -1,0 +1,13 @@
+transgear-knob-retaining-screw:
+  title: Transgear Knob Retaining Screw
+  number: MHA-158
+  stock_name: Zinc-Plated Steel Pan Head Slotted Screw
+  supplier: McMaster-Carr
+  supplier_skus: [90283A193]
+  material: Plain Carbon Steel
+  material_specification: "Zinc-plated steel, slotted pan head, fully threaded; McMaster-Carr 90283A193"
+  finish: zinc plated
+  quantity: 1
+  tolerance_class: machined_block
+  fit_class: fastener_clearance
+  process: purchased

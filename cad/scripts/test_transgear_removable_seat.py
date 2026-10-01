@@ -1,4 +1,4 @@
-"""The removable #25 sprocket's seat interface (MHA-081 on MHA-026 / MHA-078)."""
+"""The removable #25 sprocket's seat interface (MHA-081 on MHA-026 / MHA-152)."""
 
 from __future__ import annotations
 
@@ -8,11 +8,11 @@ import pytest
 
 import _config
 import build_drive_train_assembly as bdt
-import build_transgear_knob_shaft as knob
 import crank_hub_geometry as hub
 import crank_hub_spec
 import crank_seat_drive_pin_spec as crank_pin
 import crankshaft_spec as crank
+import transgear_drive_collar_spec as collar
 import transgear_knob_drive_pin_spec as knob_pin
 import transgear_removable_spec as spec
 
@@ -138,19 +138,21 @@ def test_bought_chain_reach_about_the_seat_face() -> None:
 
 def test_knob_pin_holes_obey_the_wall_floor_or_run_through() -> None:
     # The shipped holes run the whole collar.
-    assert knob.PIN_HOLE_DEPTH == knob.COLLAR_LEN
-    assert knob.pin_hole_meets_wall_floor(knob.COLLAR_LEN, knob.PIN_HOLE_DEPTH)
+    assert collar.PIN_HOLE_DEPTH == collar.LENGTH
+    assert collar.pin_hole_meets_wall_floor(collar.LENGTH, collar.PIN_HOLE_DEPTH)
     # Negative control: the old blind hole, reamed to the pin's press depth
     # (4.7625 - 2.4 = 2.3625) in the first 3.6 collar, left a 1.2375 floor.
     # The old guard only refused a breakthrough (floor > 0) and passed it.
     old_depth = knob_pin.LENGTH - spec.DRIVE_PIN_PROUD
     assert old_depth == pytest.approx(2.3625)
     first_collar = 3.6
-    assert 0.0 < first_collar - old_depth < knob.WALL_FLOOR
-    assert not knob.pin_hole_meets_wall_floor(first_collar, old_depth)
+    assert 0.0 < first_collar - old_depth < collar.WALL_FLOOR
+    assert not collar.pin_hole_meets_wall_floor(first_collar, old_depth)
+    # Blind in the 4.000 collar it would leave 1.6375, over the floor.
+    assert collar.pin_hole_meets_wall_floor(collar.LENGTH, old_depth)
     # A blind hole is fine exactly at the floor, and not a hair under it.
-    assert knob.pin_hole_meets_wall_floor(3.6, 3.6 - 1.5)
-    assert not knob.pin_hole_meets_wall_floor(3.6, 3.6 - 1.49)
+    assert collar.pin_hole_meets_wall_floor(3.6, 3.6 - 1.5)
+    assert not collar.pin_hole_meets_wall_floor(3.6, 3.6 - 1.49)
 
 
 def test_knob_pin_tip_stays_inside_the_thinnest_wheel_under_the_thumbnut() -> None:
@@ -177,19 +179,17 @@ def test_knob_pin_tip_stays_inside_the_thinnest_wheel_under_the_thumbnut() -> No
 
 
 def test_knob_pin_pressed_end_stays_inside_the_collar() -> None:
-    # Longest 3/16 dowel set lowest, collar at the loosest .X row:
-    # 4.6 - 0.8 - (4.7625 + 0.254 - 2.30).
-    assert knob.PIN_REAR_INSET_WORST == pytest.approx(1.0835)
+    # Nominal: 4.0 - (4.7625 - 2.4).  Worst: the longest 3/16 dowel set
+    # lowest in the shortest .XXX collar: 3.87 - (4.7625 + 0.254 - 2.30).
+    assert collar.PIN_REAR_INSET == pytest.approx(1.6375)
+    assert collar.PIN_REAR_INSET_WORST == pytest.approx(1.1535)
     # Negative control: the crank's 1/4 dowel set to the same stop in the
-    # first 3.6 collar would stand out of its rear face toward the 120T disc.
-    assert (
-        knob.pin_rear_inset(
-            3.6 - crank.STATION_ROW,
-            crank_pin.LENGTH + crank.DRIVE_PIN_LENGTH_GRADE,
-            min(knob_pin.PROUD_RANGE),
-        )
-        < 0.0
-    )
+    # same shortest collar would stand out of its rear face toward the 12T.
+    assert collar.pin_rear_inset(
+        collar.LENGTH_MIN,
+        crank_pin.LENGTH + crank.DRIVE_PIN_LENGTH_GRADE,
+        min(knob_pin.PROUD_RANGE),
+    ) == pytest.approx(-0.434)
 
 
 def test_knob_pin_sheet_prints_the_press_stop_range() -> None:

@@ -41,11 +41,6 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "91375A106",
         material="Alloy Steel",
     ),
-    "bracket-screw": _stock(
-        "bracket-screw",
-        "Steel Narrow Fillister Head Slotted Screw",
-        "90280A194",
-    ),
     "clamp-screw": _stock(
         "clamp-screw",
         "Steel Narrow Fillister Head Slotted Screw",
@@ -97,6 +92,25 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "foot-screw",
         "Steel Narrow Fillister Head Slotted Screw",
         "90280A108",
+    ),
+    # R9-31: the eight platen-riding guide-lock screws; a button head clears
+    # the hanger arm where the MHA-030 fillister head would not.
+    "guide-lock-screw": _stock(
+        "guide-lock-screw",
+        "Black-Oxide Alloy Steel Button Head Hex Drive Screw",
+        "91255A106",
+        material="Alloy Steel",
+    ),
+    "latch-hook-bracket-screw": _stock(
+        "latch-hook-bracket-screw",
+        "Steel Narrow Fillister Head Slotted Screw",
+        "90280A108",
+    ),
+    "latch-hook-rivet": _stock(
+        "latch-hook-rivet",
+        "Aluminum Domed Head Solid Rivet",
+        "97482A010",
+        material="1100-O Rod (SS)",
     ),
     "frame-side-screw": _stock(
         "frame-side-screw",
@@ -195,6 +209,40 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "transgear-knob-drive-pin",
         "Alloy Steel Dowel Pin",
         "98381A433",
+        material="Alloy Steel",
+    ),
+    "transgear-knob-retaining-screw": _stock(
+        "transgear-knob-retaining-screw",
+        "Zinc-Plated Steel Pan Head Slotted Screw",
+        "90283A193",
+    ),
+    "transgear-disc-screw": _stock(
+        "transgear-disc-screw",
+        "18-8 Stainless Steel Fillister Head Slotted Screw",
+        "91794A055",
+        material="AISI 304",
+    ),
+    "transgear-arm-plate-screw": _stock(
+        "transgear-arm-plate-screw",
+        "18-8 Stainless Steel Oval Head Slotted Screw",
+        "91790A194",
+        material="AISI 304",
+    ),
+    "transgear-pivot-screw": _stock(
+        "transgear-pivot-screw",
+        "Slotted 18-8 Stainless Steel Precision Shoulder Screw",
+        "91829A205",
+        material="AISI 304",
+    ),
+    "transgear-collar-cross-pin": _stock(
+        "transgear-collar-cross-pin",
+        "1050-1095 Spring Steel Slotted Spring Pin",
+        "98296A026",
+    ),
+    "transgear-latch-pin": _stock(
+        "transgear-latch-pin",
+        "Alloy Steel Dowel Pin",
+        "98381A473",
         material="Alloy Steel",
     ),
     "tube-frame-cap": _stock(

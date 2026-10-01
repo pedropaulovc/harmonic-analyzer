@@ -1,23 +1,16 @@
-r"""Reproduction script: transgear stud (book ch. 23, pp. 56-59, 62-63).
+r"""Build MHA-082, the transgear stud (contract §2.1, ruling R9-5).
 
-The stepped steel stud that plugs into the transgear bracket's bore
-(build_transgear_bracket.py, on the support bar's back) and carries the
-whole fixed-reduction stack: a 3/8" base section through the bracket and
-the latch arm's big hub, then a turned-down O5 front seat for the 12T DP30
-feed pinion + 120T disc (their bores cannot take 3/8" -- the 12T base
-circle r 4.92 sits under the wall), ending in a retaining collar (the
-photo's end hardware collapsed to a collar -- simplification).
+The fixed steel stud the disc cluster runs on.  Dimensions and the derived
+fit facts live in ``transgear_stub_spec``.
 
-Layout: axis +Y from the bracket-back end at the origin; the assembly
-rotates +Y to -Z (machine front). Base y 0..9.1 (bracket + arm hub), seat
-y 9.1..22.9 (feed pinion + disc), collar 22.9..26.9.
-Dimensions: memory/paper-drive-rework.md E7/E8.
-
-Dimension scheme: the three lands carry true DIAMETRIC dims (doubled
-centerline-to-outline dims, ``swDiametricLinearDimension``) plus a
-per-land length dim -- the machinist-facing set the manufacturing drawing
-inserts as marked model items (a plain chain dim would print the radius
-and the step drops, not the diameters a lathe operator works to).
+Layout: one stepped revolve about local +Z on the Right plane, origin at the
+collar's rear face (the arm seat).  From the rear: the #10-32 thread (through
+the arm) with a Ø5.40 face relief in the collar's rear face, the Ø12 collar,
+the Ø9 thrust step, the Ø3.9 journal, the Ø2.4 MAX thread relief at the
+journal shoulder and the #6-32 front thread.  Two spherical ends are separate
+revolves on the same plane.  Named planes ``SleeveThrust`` (the Ø9 step face)
+and ``CapShoulder`` (the journal shoulder) and ``Axis1`` serve the assembly
+mates; the arm seat is the Front Plane.
 
 Run (SolidWorks already open)::
 
@@ -29,20 +22,21 @@ from __future__ import annotations
 import math
 import sys
 
-import _config
 import _telemetry
 from _common import (
+    POLISHED_STEEL,
     SketchDims,
+    _early_bound,
     add_line_chain,
-    anchor_point_to_origin,
+    apply_color,
     apply_material,
     check,
     dimension_between,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
-    define_circle,
-    _early_bound,
+    name_bore_axis,
+    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -52,389 +46,492 @@ from _common import (
     volume_check,
 )
 from _drawing_marks import (
+    _named_dimension,
     add_diametric_linear_dimension,
+    apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
     set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
 )
 from _fit_limits import deviations
 from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry
 from transgear_stub_spec import (
-    BASE_DIA,
-    BASE_DIA_BAND,
-    BASE_LEN,
-    CAP_DIA,
-    CAP_LEN,
-    CAP_SLOT_D,
-    CAP_SLOT_W,
+    CAP_SHOULDER_STATION,
     COLLAR_DIA,
-    COLLAR_LEN,
+    COLLAR_LENGTH,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
-    GEOMETRIC_CONTROLS,
-    PART_DATUMS,
-    SEAT_DIA,
-    SEAT_DIA_BAND,
-    SEAT_LEN,
+    DRAWING_PRECISION,
+    FACE_RELIEF_DEPTH,
+    FACE_RELIEF_DIA,
+    FRONT_DOME_R,
+    FRONT_DOME_SAG,
+    FRONT_THREAD_END,
+    FRONT_THREAD_END_STATION,
+    FRONT_THREAD_MAJOR,
+    ISOMETRIC_VIEW_NOTE,
+    JOURNAL_DIA,
+    JOURNAL_DIA_BAND,
+    JOURNAL_LENGTH,
+    JOURNAL_LENGTH_TOL,
+    REAR_DOME_R,
+    REAR_DOME_SAG,
+    REAR_THREAD_LENGTH,
+    REAR_THREAD_MAJOR,
+    RELIEF_DIA,
+    RELIEF_DIA_BAND,
+    RELIEF_DIA_TOL_TYPE,
+    RELIEF_END_STATION,
+    RELIEF_WIDTH,
+    RELIEF_WIDTH_TOL,
+    SLEEVE_THRUST_STATION,
+    STEP_DIA,
     SURFACE_FINISHES,
 )
 
 PART_NAME = "transgear-stub"
-MATERIAL = "Plain Carbon Steel"
+MATERIAL = "Plain Carbon Steel"  # 12L14/1215 (the registry row names it)
+
+R_REAR = REAR_THREAD_MAJOR / 2.0
+R_FACE_RELIEF = FACE_RELIEF_DIA / 2.0
+R_COLLAR = COLLAR_DIA / 2.0
+R_STEP = STEP_DIA / 2.0
+R_JOURNAL = JOURNAL_DIA / 2.0
+R_RELIEF = RELIEF_DIA / 2.0
+R_FRONT = FRONT_THREAD_MAJOR / 2.0
+
+V_PROFILE = math.pi * (
+    R_REAR**2 * REAR_THREAD_LENGTH
+    + R_COLLAR**2 * COLLAR_LENGTH
+    - (R_FACE_RELIEF**2 - R_REAR**2) * FACE_RELIEF_DEPTH
+    + R_STEP**2 * (SLEEVE_THRUST_STATION - COLLAR_LENGTH)
+    + R_JOURNAL**2 * JOURNAL_LENGTH
+    + R_RELIEF**2 * RELIEF_WIDTH
+    + R_FRONT**2 * (FRONT_THREAD_END - RELIEF_WIDTH)
+)
 
 
-
-def _com_get(obj, name: str):
-    """Zero-argument COM member that late-bound dispatch may expose as a
-    method or a value (the ``'tuple' object is not callable`` trap)."""
-    value = getattr(obj, name)
-    return value() if callable(value) else value
+def _cap_volume(sag: float, sphere_r: float) -> float:
+    """Spherical cap of height ``sag`` on a sphere of radius ``sphere_r``."""
+    return math.pi * sag**2 * (3.0 * sphere_r - sag) / 3.0
 
 
-def _circular_strip_area_mm2(diameter_mm: float, width_mm: float) -> float:
-    """Area of a diameter-spanning strip clipped by a circular profile."""
-    if not 0.0 < width_mm <= diameter_mm:
-        raise ValueError("strip width must be positive and no greater than diameter")
-    radius = diameter_mm / 2.0
-    half_width = width_mm / 2.0
-    return (
-        width_mm * math.sqrt(radius**2 - half_width**2)
-        + 2.0 * radius**2 * math.asin(half_width / radius)
-    )
+V_REAR_DOME = _cap_volume(REAR_DOME_SAG, REAR_DOME_R)
+V_FRONT_DOME = _cap_volume(FRONT_DOME_SAG, FRONT_DOME_R)
+V_TOTAL = V_PROFILE + V_REAR_DOME + V_FRONT_DOME
 
 
-def _brass_region_from_stations(
-    stations_mm: tuple[float, ...],
-    collar_start_mm: float,
-    cap_start_mm: float,
-    *,
-    tolerance_mm: float = 1e-3,
-) -> str | None:
-    """Classify a face from exact B-rep axial stations, never an approximate box."""
-    if not stations_mm:
-        return None
-    first = min(stations_mm)
-    if first < collar_start_mm - tolerance_mm:
-        return None
-    if first >= cap_start_mm - tolerance_mm:
-        return "cap"
-    return "collar"
-
-
-def _brass_span_evidence_region(
-    stations_mm: tuple[float, ...],
-    collar_start_mm: float,
-    cap_start_mm: float,
-    cap_end_mm: float,
-    *,
-    tolerance_mm: float = 1e-3,
-) -> str | None:
-    """Return the region proved by a nonzero axial span wholly inside it."""
-    if not stations_mm:
-        return None
-    first, last = min(stations_mm), max(stations_mm)
-    if last - first <= tolerance_mm:
-        return None
-    if (
-        first >= collar_start_mm - tolerance_mm
-        and last <= cap_start_mm + tolerance_mm
+def _single_limit_relief(adapter) -> None:
+    """ReliefDia as a MAX single limit carrying the band's deviations."""
+    lower, upper = deviations(RELIEF_DIA_BAND)
+    _, dimension = _named_dimension(adapter, "StudProfile", "ReliefDia")
+    label = "ReliefDia@StudProfile"
+    if not math.isclose(
+        float(dimension.SystemValue), RELIEF_DIA / 1000.0, abs_tol=1e-12
     ):
-        return "collar"
-    if first >= cap_start_mm - tolerance_mm and last <= cap_end_mm + tolerance_mm:
-        return "cap"
-    return None
+        raise RuntimeError(f"{label}: nominal is not the band's max")
+    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
+    tolerance.Type = RELIEF_DIA_TOL_TYPE
+    if not tolerance.SetValues(lower / 1000.0, upper / 1000.0):
+        raise RuntimeError(f"{label}: SetValues rejected {lower:+g}/{upper:+g} mm")
+    if (
+        int(tolerance.Type) != RELIEF_DIA_TOL_TYPE
+        or not math.isclose(
+            float(tolerance.GetMinValue()), lower / 1000.0, abs_tol=1e-12
+        )
+        or not math.isclose(
+            float(tolerance.GetMaxValue()), upper / 1000.0, abs_tol=1e-12
+        )
+    ):
+        raise RuntimeError(f"{label}: MAX-limit tolerance readback changed")
+    _telemetry.success(f"{label}: single limit {RELIEF_DIA:g} MAX")
 
 
-def _face_y_stations_mm(face) -> tuple[float, ...]:
-    """Return exact Y stations from a face's analytic surface and edge topology."""
-    stations: list[float] = []
-
-    surface = face.GetSurface()
-    if surface is not None:
-        surface = _early_bound(surface, "ISurface")
-        if surface.IsPlane():
-            params = tuple(
-                float(value) for value in _com_get(surface, "PlaneParams")
-            )
-            normal_length = math.sqrt(
-                sum(component * component for component in params[:3])
-            )
-            if normal_length and abs(params[1] / normal_length) > 1.0 - 1e-9:
-                stations.append(params[4] * 1000.0)
-
-    for raw_edge in _com_get(face, "GetEdges") or []:
-        edge = _early_bound(raw_edge, "IEdge")
-        for member in ("GetStartVertex", "GetEndVertex"):
-            vertex = _com_get(edge, member)
-            if vertex is None:
-                continue
-            point = _com_get(_early_bound(vertex, "IVertex"), "GetPoint")
-            stations.append(float(point[1]) * 1000.0)
-        curve = edge.GetCurve()
-        if curve is None:
-            continue
-        curve = _early_bound(curve, "ICurve")
-        if curve.IsCircle():
-            params = _com_get(curve, "CircleParams")
-            stations.append(float(params[1]) * 1000.0)
-
-    return tuple(stations)
-
-
-async def _paint_collar_brass(adapter, y_from: float) -> None:
-    """Apply bright brass to every collar and cap face using exact topology.
-
-    ``IFace2.GetBox`` is deliberately unsuitable here: SolidWorks documents it
-    as approximate, so its lower Y can leak below a true collar boundary and
-    silently leave a face steel. Analytic plane stations plus B-rep vertices
-    and circular-edge centres identify the actual axial extent instead.
-    """
-    from solidworks_mcp.adapters.com_variant import double_array
-
-    rgb = _config.palette("brass_bright")
-    brass = double_array([*rgb, 1.0, 1.0, 0.5, 0.31, 0.0, 0.0])
-    part_h = _early_bound(adapter.currentModel, "IPartDoc")
-    cap_from = y_from + COLLAR_LEN
-    cap_end = cap_from + CAP_LEN
-    matched = {"collar": 0, "cap": 0}
-    span_evidence = {"collar": 0, "cap": 0}
-    for body in part_h.GetBodies2(0, True) or []:
-        for raw_face in _com_get(body, "GetFaces") or []:
-            face = _early_bound(raw_face, "IFace2")
-            stations = _face_y_stations_mm(face)
-            if not stations:
-                raise RuntimeError("face has no exact axial topology stations")
-            region = _brass_region_from_stations(stations, y_from, cap_from)
-            if region is None:
-                continue
-            face.MaterialPropertyValues = brass
-            matched[region] += 1
-            proof = _brass_span_evidence_region(
-                stations, y_from, cap_from, cap_end
-            )
-            if proof is not None:
-                span_evidence[proof] += 1
-    for region, count in matched.items():
-        if count == 0:
-            raise RuntimeError(f"{region} faces not found for bright-brass finish")
-        if span_evidence[region] == 0:
-            raise RuntimeError(
-                f"{region} has no nonzero axial-span face proving its finish region"
-            )
-    _telemetry.info(
-        f"transgear-stub: {matched['collar']} collar + "
-        f"{matched['cap']} cap faces bright brass "
-        f"({span_evidence['collar']} + {span_evidence['cap']} span proofs)"
+async def _dome(
+    adapter,
+    *,
+    prefix: str,
+    u_base: float,
+    u_apex: float,
+    sphere_r: float,
+    sag: float,
+    rim_r: float,
+    rim_drive: str,
+    station_drive: str,
+) -> SketchDims:
+    """A spherical end on the Right plane (the MHA-060 cap idiom, as in
+    ``build_pinion_cam_pin``): base on the thread end at ``u_base``, apex on
+    the axis at ``u_apex``, closed down the axis.  The arc runs CCW over its
+    minor lobe, so it starts at the rim for a +Z end (apex at smaller u) and at
+    the apex for a -Z end.  Its radius prints as ``<prefix>DomeR``."""
+    toward_minus_z = u_apex > u_base
+    u_centre = u_apex - sphere_r if toward_minus_z else u_apex + sphere_r
+    dims = SketchDims()
+    check(f"create_sketch {prefix} dome", await adapter.create_sketch("Right"))
+    set_sketch_direct_db(adapter, True)
+    check(
+        f"{prefix} dome centerline",
+        await adapter.add_centerline(u_base, 0.0, u_apex, 0.0),
     )
+    base = check(
+        f"{prefix} dome base", await adapter.add_line(u_base, 0.0, u_base, rim_r)
+    )
+    if toward_minus_z:
+        arc_points = (u_apex, 0.0, u_base, rim_r)
+    else:
+        arc_points = (u_base, rim_r, u_apex, 0.0)
+    arc = check(f"{prefix} dome arc", await adapter.add_arc(u_centre, 0.0, *arc_points))
+    close = check(
+        f"{prefix} dome close", await adapter.add_line(u_apex, 0.0, u_base, 0.0)
+    )
+    set_sketch_direct_db(adapter, False)
+    check(
+        f"{prefix} dome base vertical",
+        await adapter.add_sketch_constraint(base, None, "vertical"),
+    )
+    check(
+        f"{prefix} dome close horizontal",
+        await adapter.add_sketch_constraint(close, None, "horizontal"),
+    )
+    check(
+        f"{prefix} dome rim reach",
+        await adapter.add_sketch_dimension(
+            f"{base}.end", "origin", "vertical_distance", rim_r
+        ),
+    )
+    dims.record(f"{prefix}DomeRim", rim_drive)
+    check(
+        f"{prefix} dome sagitta",
+        await adapter.add_sketch_dimension(
+            f"{close}.start", f"{close}.end", "horizontal_distance", sag
+        ),
+    )
+    dims.record(f"{prefix}DomeSagDim", f'"{prefix}DomeSag"')
+    check(
+        f"{prefix} dome on axis",
+        await adapter.add_sketch_constraint(
+            f"{base}.start", "origin", "horizontal_points"
+        ),
+    )
+    check(
+        f"{prefix} dome station",
+        await adapter.add_sketch_dimension(
+            f"{base}.start", "origin", "horizontal_distance", abs(u_base)
+        ),
+    )
+    dims.record(f"{prefix}DomeZ", station_drive)
+    check(
+        f"{prefix} dome radius",
+        await adapter.add_sketch_dimension(arc, None, "radial", sphere_r),
+    )
+    sag_name = f'"{prefix}DomeSag"'
+    dims.record(
+        f"{prefix}DomeR",
+        f"(({rim_drive}) * ({rim_drive}) + {sag_name} * {sag_name}) / (2 * {sag_name})",
+    )
+    return dims
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import (
-        CreatePlaneParameters,
-        ExtrusionParameters,
-        RevolveParameters,
-    )
+    from solidworks_mcp.adapters.base import CreatePlaneParameters, RevolveParameters
 
     check("create_part", await adapter.create_part())
+    # The mm suffix is load-bearing: the equation manager reads bare numbers in
+    # document units (see build_crankshaft).
+    for name, value in (
+        ("RearThreadDia", REAR_THREAD_MAJOR),
+        ("RearThreadLength", REAR_THREAD_LENGTH),
+        ("FaceReliefDia", FACE_RELIEF_DIA),
+        ("FaceReliefDepth", FACE_RELIEF_DEPTH),
+        ("CollarDia", COLLAR_DIA),
+        ("CollarLength", COLLAR_LENGTH),
+        ("StepDia", STEP_DIA),
+        ("ThrustStation", SLEEVE_THRUST_STATION),
+        ("JournalDia", JOURNAL_DIA),
+        ("JournalLength", JOURNAL_LENGTH),
+        ("ReliefDia", RELIEF_DIA),
+        ("ReliefWidth", RELIEF_WIDTH),
+        ("ThreadDia", FRONT_THREAD_MAJOR),
+        ("FrontThreadEnd", FRONT_THREAD_END),
+        ("RearDomeSag", REAR_DOME_SAG),
+        ("FrontDomeSag", FRONT_DOME_SAG),
+    ):
+        await set_global(adapter, name, f"{value}mm")
 
-    # Editable knobs (Tools > Equations): the section diameters and lengths.
-    # The mm suffix is load-bearing -- this is an INCH document and the
-    # equation manager reads BARE numbers in document units (so the 3/8" base
-    # is carried as its 9.525 mm value, not an unsuffixed 9.525 read as inches).
-    await set_global(adapter, "BaseDia", f"{BASE_DIA}mm")
-    await set_global(adapter, "BaseLen", f"{BASE_LEN}mm")
-    await set_global(adapter, "SeatDia", f"{SEAT_DIA}mm")
-    await set_global(adapter, "SeatLen", f"{SEAT_LEN}mm")
-    await set_global(adapter, "CollarDia", f"{COLLAR_DIA}mm")
-    await set_global(adapter, "CollarLen", f"{COLLAR_LEN}mm")
-    await set_global(adapter, "CapDia", f"{CAP_DIA}mm")
-    await set_global(adapter, "CapLen", f"{CAP_LEN}mm")
-    await set_global(adapter, "CapSlotD", f"{CAP_SLOT_D}mm")
+    drive_jobs: list[tuple[str, str]] = []
 
-    y_seat = BASE_LEN + SEAT_LEN
-    y_tip = y_seat + COLLAR_LEN
+    # --- Stepped profile ------------------------------------------------------
+    # Right sketch (u, v) maps to model (-Z, Y): negative u runs from the arm
+    # seat (origin) toward the front thread; the rear thread lies at u > 0.
+    # The face relief is a notch in the collar's rear face: the #10-32
+    # cylinder runs FACE_RELIEF_DEPTH into the collar before the floor steps
+    # out to the relief Ø and back to the seat face.
+    u_rear = REAR_THREAD_LENGTH
+    u_front = -FRONT_THREAD_END_STATION
     profile = SketchDims()
-    check("create_sketch profile", await adapter.create_sketch("Front"))
+    check("create_sketch stud profile", await adapter.create_sketch("Right"))
     set_sketch_direct_db(adapter, True)
     axis = check(
-        "axis centerline",
-        await adapter.add_centerline(0.0, 0.0, 0.0, y_tip),
+        "stud axis centerline", await adapter.add_centerline(u_rear, 0.0, u_front, 0.0)
     )
-    profile_pts = [
-        (0.0, 0.0),
-        (BASE_DIA / 2.0, 0.0),
-        (BASE_DIA / 2.0, BASE_LEN),
-        (SEAT_DIA / 2.0, BASE_LEN),
-        (SEAT_DIA / 2.0, y_seat),
-        (COLLAR_DIA / 2.0, y_seat),
-        (COLLAR_DIA / 2.0, y_tip),
-        (0.0, y_tip),
+    points = [
+        (u_rear, 0.0),
+        (u_rear, R_REAR),
+        (-FACE_RELIEF_DEPTH, R_REAR),
+        (-FACE_RELIEF_DEPTH, R_FACE_RELIEF),
+        (0.0, R_FACE_RELIEF),
+        (0.0, R_COLLAR),
+        (-COLLAR_LENGTH, R_COLLAR),
+        (-COLLAR_LENGTH, R_STEP),
+        (-SLEEVE_THRUST_STATION, R_STEP),
+        (-SLEEVE_THRUST_STATION, R_JOURNAL),
+        (-CAP_SHOULDER_STATION, R_JOURNAL),
+        (-CAP_SHOULDER_STATION, R_RELIEF),
+        (-RELIEF_END_STATION, R_RELIEF),
+        (-RELIEF_END_STATION, R_FRONT),
+        (u_front, R_FRONT),
+        (u_front, 0.0),
     ]
-    profile_lines = await add_line_chain(adapter, profile_pts)
+    lines = await add_line_chain(adapter, points)
     set_sketch_direct_db(adapter, False)
-    # The centerline merged into the (0, 0)/(0, y_tip) profile corners at
-    # creation, so the closed chain's own constraints define it too. Unlike
-    # define_rectilinear_chain, the horizontal spans carry NO chain dims --
-    # each land's outline line is pinned by its diametric dim instead, and
-    # the on-axis closing segment plus closure supply the rest.
-    n = len(profile_lines)
-    for i, line in enumerate(profile_lines):
-        (_, y1), (_, y2) = profile_pts[i], profile_pts[(i + 1) % n]
-        direction = "horizontal" if y1 == y2 else "vertical"
+    for index, line in enumerate(lines):
+        (_, v0), (_, v1) = points[index], points[(index + 1) % len(lines)]
+        relation = "horizontal" if v0 == v1 else "vertical"
         check(
-            f"stub {direction} {line}",
-            await adapter.add_sketch_constraint(line, None, direction),
+            f"stud profile {relation} {line}",
+            await adapter.add_sketch_constraint(line, None, relation),
         )
-    # Land lengths (the closing on-axis segment's span is closure-supplied).
-    for line, span, name, drive in (
-        (profile_lines[1], BASE_LEN, "BaseLength", '"BaseLen"'),
-        (profile_lines[3], SEAT_LEN, "SeatLength", '"SeatLen"'),
-        (profile_lines[5], COLLAR_LEN, "CollarLength", '"CollarLen"'),
+    (
+        rear_end,
+        rear_thread,
+        _face_relief_floor,
+        face_relief_wall,
+        seat_face,
+        collar,
+        _collar_front,
+        step,
+        _thrust_face,
+        journal,
+        shoulder,
+        relief_floor,
+        _relief_flank,
+        front_thread,
+        _front_end,
+        axis_edge,
+    ) = lines
+    check(
+        "stud axis on the origin",
+        await adapter.add_sketch_constraint(
+            f"{axis_edge}.end", "origin", "horizontal_points"
+        ),
+    )
+    check(
+        "arm seat on the origin",
+        await adapter.add_sketch_constraint(
+            f"{seat_face}.start", "origin", "vertical_points"
+        ),
+    )
+    for name, start, end, value, drive in (
+        (
+            "RearThreadLength",
+            f"{rear_end}.end",
+            f"{seat_face}.start",
+            REAR_THREAD_LENGTH,
+            '"RearThreadLength"',
+        ),
+        (
+            "FaceReliefDepth",
+            f"{face_relief_wall}.start",
+            f"{face_relief_wall}.end",
+            FACE_RELIEF_DEPTH,
+            '"FaceReliefDepth"',
+        ),
+        ("CollarLength", f"{collar}.start", f"{collar}.end", COLLAR_LENGTH, None),
+        (
+            "ThrustStation",
+            f"{seat_face}.end",
+            f"{journal}.start",
+            SLEEVE_THRUST_STATION,
+            None,
+        ),
+        ("JournalLength", f"{journal}.start", f"{journal}.end", JOURNAL_LENGTH, None),
+        (
+            "ReliefWidth",
+            f"{relief_floor}.start",
+            f"{relief_floor}.end",
+            RELIEF_WIDTH,
+            None,
+        ),
+        (
+            "FrontThreadEnd",
+            f"{shoulder}.start",
+            f"{front_thread}.end",
+            FRONT_THREAD_END,
+            None,
+        ),
     ):
         await dimension_between(
-            adapter, f"{line}.start", f"{line}.end", "vertical_distance", span,
-            f"stub {name}",
+            adapter, start, end, "horizontal_distance", value, f"stud {name}"
         )
-        profile.record(name, drive)
-    # Land diameters: doubled centerline dims (value = the full diameter).
-    for line, name, drive, text_y in (
-        (profile_lines[1], "BaseDia", '"BaseDia"', BASE_LEN / 2.0),
-        (profile_lines[3], "SeatDia", '"SeatDia"', BASE_LEN + SEAT_LEN / 2.0),
-        (profile_lines[5], "CollarDia", '"CollarDia"', y_seat + COLLAR_LEN / 2.0),
+        profile.record(name, drive or f'"{name}"')
+    for name, line, u_mid, radius in (
+        ("RearThreadDia", rear_thread, u_rear / 2.0, R_REAR),
+        ("FaceReliefDia", face_relief_wall, -FACE_RELIEF_DEPTH / 2.0, R_FACE_RELIEF),
+        ("CollarDia", collar, -COLLAR_LENGTH / 2.0, R_COLLAR),
+        (
+            "StepDia",
+            step,
+            -(COLLAR_LENGTH + SLEEVE_THRUST_STATION) / 2.0,
+            R_STEP,
+        ),
+        (
+            "JournalDia",
+            journal,
+            -(SLEEVE_THRUST_STATION + CAP_SHOULDER_STATION) / 2.0,
+            R_JOURNAL,
+        ),
+        (
+            "ReliefDia",
+            relief_floor,
+            -(CAP_SHOULDER_STATION + RELIEF_END_STATION) / 2.0,
+            R_RELIEF,
+        ),
+        ("ThreadDia", front_thread, (u_front - RELIEF_END_STATION) / 2.0, R_FRONT),
     ):
         await add_diametric_linear_dimension(
-            adapter, axis, line, (-8.0, text_y), name
+            adapter, axis, line, (u_mid, radius + 4.0), name
         )
-        profile.record(name, drive)
-    await anchor_point_to_origin(
-        adapter, f"{profile_lines[0]}.start", 0.0, 0.0, "stub anchor"
+        profile.record(name, f'"{name}"')
+    await ensure_fully_defined(adapter, "stud profile sketch")
+    check("exit_sketch stud profile", await adapter.exit_sketch())
+    name_last_feature(adapter, "StudProfile")
+    drive_jobs += profile.apply(adapter, "StudProfile")
+    check("revolve stud", await adapter.create_revolve(RevolveParameters(angle=360.0)))
+    name_last_feature(adapter, "Stud")
+    volume = await volume_check(
+        adapter, "stepped stud with both reliefs", V_PROFILE, 0.005 * V_PROFILE
     )
-    await ensure_fully_defined(adapter, "stub profile")
-    check("exit_sketch profile", await adapter.exit_sketch())
-    name_last_feature(adapter, "StubProfile")
-    drive_jobs = profile.apply(adapter, "StubProfile")
-    check("revolve stub", await adapter.create_revolve(RevolveParameters(angle=360.0)))
-    name_last_feature(adapter, "Stub")
 
-    expected = math.pi * (
-        (BASE_DIA / 2.0) ** 2 * BASE_LEN
-        + (SEAT_DIA / 2.0) ** 2 * SEAT_LEN
-        + (COLLAR_DIA / 2.0) ** 2 * COLLAR_LEN
-    )
-    await volume_check(adapter, "stub", expected, 0.005 * expected)
-
-    # Slotted cap screw on the collar face (ch23 p.59): a CAP_DIA x CAP_LEN boss
-    # on a plane at the collar's end, then a CAP_SLOT_W x CAP_SLOT_D slot cut
-    # across its face (Front-plane rectangle, mid-plane cut along Z).
-    end_y = BASE_LEN + SEAT_LEN + COLLAR_LEN
-    check(
-        "create_plane collar end",
-        await adapter.create_plane(CreatePlaneParameters(mode="offset", base_plane="Top Plane", offset=end_y)),
-    )
-    name_last_feature(adapter, "CapPlane")
-    drive_jobs.append(("D1@CapPlane", '"BaseLen" + "SeatLen" + "CollarLen"'))
-    cap = SketchDims()
-    check("create_sketch cap", await adapter.create_sketch("CapPlane"))
-    await define_circle(
-        adapter, 0.0, 0.0, CAP_DIA / 2.0, "cap", dims=cap,
-        names=("CapCx", "CapCz", "CapDia"), drives=(None, None, '"CapDia"'),
-    )
-    await ensure_fully_defined(adapter, "cap sketch")
-    check("exit_sketch cap", await adapter.exit_sketch())
-    name_last_feature(adapter, "CapProfile")
-    drive_jobs += cap.apply(adapter, "CapProfile")
-    check("extrude cap", await adapter.create_extrusion(ExtrusionParameters(depth=CAP_LEN)))
-    name_last_feature(adapter, "Cap")
-    drive_jobs.append(("D1@Cap", '"CapLen"'))
-    v_cap = math.pi * (CAP_DIA / 2.0) ** 2 * CAP_LEN
-    got = await volume_check(adapter, "stub + cap", expected + v_cap, 0.02 * v_cap + 0.005 * expected)
-    if got < expected + 0.5 * v_cap:
-        raise RuntimeError("cap extruded the wrong way (into the collar) -- flip the extrude")
-    blank_reference_geometry(adapter, (("CapPlane", "PLANE"),))
-    slot = SketchDims()
-    check("create_sketch cap slot", await adapter.create_sketch("Front"))
-    slot_rect = [
-        (-CAP_DIA / 2.0, end_y + CAP_LEN - CAP_SLOT_D),
-        (CAP_DIA / 2.0, end_y + CAP_LEN - CAP_SLOT_D),
-        (CAP_DIA / 2.0, end_y + CAP_LEN),
-        (-CAP_DIA / 2.0, end_y + CAP_LEN),
-    ]
-    slot_lines = await add_line_chain(adapter, slot_rect)
-    bottom, right, top, left = slot_lines
-    for label, ent, relation in (
-        ("slot bottom", bottom, "horizontal"), ("slot right", right, "vertical"),
-        ("slot top", top, "horizontal"), ("slot left", left, "vertical"),
+    # --- Spherical ends ----------------------------------------------------------
+    for (
+        prefix,
+        u_base,
+        u_apex,
+        sphere_r,
+        sag,
+        rim_r,
+        rim_drive,
+        station_drive,
+        v_dome,
+    ) in (
+        (
+            "Rear",
+            u_rear,
+            u_rear + REAR_DOME_SAG,
+            REAR_DOME_R,
+            REAR_DOME_SAG,
+            R_REAR,
+            '"RearThreadDia" / 2',
+            '"RearThreadLength"',
+            V_REAR_DOME,
+        ),
+        (
+            "Front",
+            u_front,
+            u_front - FRONT_DOME_SAG,
+            FRONT_DOME_R,
+            FRONT_DOME_SAG,
+            R_FRONT,
+            '"ThreadDia" / 2',
+            '"ThrustStation" + "JournalLength" + "FrontThreadEnd"',
+            V_FRONT_DOME,
+        ),
     ):
-        check(f"{label} {relation}", await adapter.add_sketch_constraint(ent, None, relation))
-    check("slot span", await adapter.add_sketch_dimension(bottom, None, "linear", CAP_DIA))
-    slot.record("SlotSpan", '"CapDia"')
-    check("slot depth", await adapter.add_sketch_dimension(right, None, "linear", CAP_SLOT_D))
-    slot.record("SlotDepth", '"CapSlotD"')
-    check("slot x0", await adapter.add_sketch_dimension(f"{bottom}.start", "origin", "horizontal_distance", CAP_DIA / 2.0))
-    slot.record("SlotX0", '"CapDia" / 2')
-    check("slot y0", await adapter.add_sketch_dimension(f"{bottom}.start", "origin", "vertical_distance", end_y + CAP_LEN - CAP_SLOT_D))
-    slot.record("SlotY0", '"BaseLen" + "SeatLen" + "CollarLen" + "CapLen" - "CapSlotD"')
-    await ensure_fully_defined(adapter, "cap slot sketch")
-    check("exit_sketch cap slot", await adapter.exit_sketch())
-    name_last_feature(adapter, "CapSlotProfile")
-    drive_jobs += slot.apply(adapter, "CapSlotProfile")
-    before_slot = check(
-        "measure volume before cap slot", await adapter.get_mass_properties()
-    ).volume
-    check("cut cap slot", await adapter.create_cut_extrude(ExtrusionParameters(depth=CAP_SLOT_W, both_directions=True)))
-    after_slot = check(
-        "measure volume after cap slot", await adapter.get_mass_properties()
-    ).volume
-    name_last_feature(adapter, "CapSlot")
-    v_slot = _circular_strip_area_mm2(CAP_DIA, CAP_SLOT_W) * CAP_SLOT_D
-    removed_slot = before_slot - after_slot
-    if abs(removed_slot - v_slot) > 0.02 * v_slot:
-        raise RuntimeError(
-            f"cap slot removed {removed_slot:.3f} mm^3, expected {v_slot:.3f} mm^3"
+        dims = await _dome(
+            adapter,
+            prefix=prefix,
+            u_base=u_base,
+            u_apex=u_apex,
+            sphere_r=sphere_r,
+            sag=sag,
+            rim_r=rim_r,
+            rim_drive=rim_drive,
+            station_drive=station_drive,
         )
-    _telemetry.success(
-        f"cap slot removed {removed_slot:.3f} mm^3 (analytic {v_slot:.3f})"
-    )
-    expected = expected + v_cap - v_slot
-    await volume_check(adapter, "stub + slotted cap", expected, 0.02 * v_cap + 0.005 * expected)
+        feature = f"{prefix}DomeProfile"
+        await ensure_fully_defined(adapter, f"{prefix.lower()} dome sketch")
+        check(f"exit_sketch {prefix} dome", await adapter.exit_sketch())
+        name_last_feature(adapter, feature)
+        drive_jobs += dims.apply(adapter, feature)
+        check(
+            f"revolve {prefix} dome",
+            await adapter.create_revolve(RevolveParameters(angle=360.0)),
+        )
+        name_last_feature(adapter, f"{prefix}Dome")
+        volume = await volume_check(
+            adapter, f"{prefix.lower()} dome", volume + v_dome, 0.03 * v_dome
+        )
 
-    # Deferred drive equations, then re-check neutrality (each evaluates to the
-    # as-built value, so the geometry must not move).
+    # --- Named stations for the assembly mates ----------------------------------
+    for plane, offset, drive in (
+        ("SleeveThrust", SLEEVE_THRUST_STATION, '"ThrustStation"'),
+        ("CapShoulder", CAP_SHOULDER_STATION, '"ThrustStation" + "JournalLength"'),
+    ):
+        check(
+            f"create_plane {plane}",
+            await adapter.create_plane(
+                CreatePlaneParameters(
+                    mode="offset", base_plane="Front Plane", offset=offset
+                )
+            ),
+        )
+        name_last_feature(adapter, plane)
+        plane_offset = name_dimensions(adapter, plane, [f"{plane}Offset"])
+        drive_jobs.append((plane_offset[0], drive))
+        blank_reference_geometry(adapter, ((plane, "PLANE"),))
+    await name_bore_axis(adapter, "Right Plane", 0.0, "Top Plane", 0.0, "stud axis")
+
+    # Deferred drive equations, then re-check neutrality.
     await force_rebuild(adapter)
-    for dim_name, expr in drive_jobs:
-        await drive_dimension(adapter, dim_name, expr)
+    for dimension, expression in drive_jobs:
+        await drive_dimension(adapter, dimension, expression)
     await force_rebuild(adapter)
-    await volume_check(adapter, "driven stub (equations neutral)", expected, 0.005 * expected)
+    await volume_check(
+        adapter, "driven stud (equations neutral)", V_TOTAL, 0.005 * V_TOTAL
+    )
+
+    # Model-owned bands (policy rule 2): the running-fit journal and its
+    # length (cluster float), the relief width (R9-5's window) and the relief
+    # Ø's single MAX limit.
+    set_dimension_bilateral_tolerance(
+        adapter, "StudProfile", "JournalDia", *deviations(JOURNAL_DIA_BAND)
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "StudProfile", "JournalLength", JOURNAL_LENGTH_TOL
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "StudProfile", "ReliefWidth", RELIEF_WIDTH_TOL
+    )
+    _single_limit_relief(adapter)
 
     await apply_material(adapter, MATERIAL)
-    await _paint_collar_brass(adapter, BASE_LEN + SEAT_LEN)
+    await apply_color(adapter, POLISHED_STEEL)
     await report_mass_properties(adapter)
-    # Tolerance the MODEL dimensions, not the sheet text. SolidWorks renders
-    # and re-renders these; a callout override on the drawing would be a frozen
-    # string beside a live numeral. `deviations` fixes the (upper, lower) ->
-    # (lower, upper) transposition at one chokepoint.
-    set_dimension_bilateral_tolerance(
-        adapter, "StubProfile", "BaseDia", *deviations(BASE_DIA_BAND)
-    )
-    set_dimension_bilateral_tolerance(
-        adapter, "StubProfile", "SeatDia", *deviations(SEAT_DIA_BAND)
-    )
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
-    # GD&T lives on the MODEL as plain annotations; the drawing imports it.
-    author_part_pmi(
-        adapter,
-        datums=PART_DATUMS,
-        controls=GEOMETRIC_CONTROLS,
-        surface_finishes=SURFACE_FINISHES,
-    )
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
     apply_drawing_properties(
         adapter,
         PART_NAME,
-        {"Manufacturing Notes": DRAWING_NOTES},
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+        },
     )
     return await save_part_and_images(adapter, PART_NAME)
 

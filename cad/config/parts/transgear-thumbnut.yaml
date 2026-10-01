@@ -1,7 +1,9 @@
 transgear-thumbnut:
+  title: Transgear Thumbnut
   number: MHA-126
   material: Brass
-  finish: "knurled thumb disc (knurl not modelled); bright"
+  material_specification: C36000 free-machining brass
+  finish: bright machined, oiled
+  quantity: 1
   tolerance_class: machined_block
-  fit_class: shaft_in_bushing
-  process: "turned (brass); tapped bore modelled as a plain slip bore"
+  process: "turned from bar (brass): straight-knurl the head, turn the waist and flange, dish the front face, tap 1/4-20 through, countersink both ends"

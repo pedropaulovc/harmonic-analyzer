@@ -1,0 +1,9 @@
+transgear-disc-hub:
+  title: Transgear Disc Hub
+  number: MHA-159
+  material: Brass
+  material_specification: C36000 free-machining brass
+  finish: bright machined, oiled
+  quantity: 1
+  tolerance_class: machined_block
+  process: "turned from bar (brass): face, turn hub and flange, bore; drill the flange screw holes; press on the sleeve, then match-drill the oil hole"

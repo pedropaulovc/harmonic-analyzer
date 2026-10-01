@@ -19,19 +19,24 @@ recipes:
 | 3606T811 | `keeper-chain-link` (catalogue-only; no vendor model) | Loop Link for Brass Trade Size 3 Bead Chain |
 | 90114A511 | `fillister-screw` | Brass Fillister Head Slotted Screw |
 | 90126A211 | `knife-hanger-washer` | Zinc-Plated Steel SAE Washer |
-| 90280A108 | `foot-screw` | Steel Narrow Fillister Head Slotted Screw |
-| 90280A194 | `bracket-screw`, `frame-side-screw` | Steel Narrow Fillister Head Slotted Screw |
+| 90280A108 | `foot-screw`, `latch-hook-bracket-screw` | Steel Narrow Fillister Head Slotted Screw |
+| 90280A194 | `frame-side-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A197 | `pedestal-hold-down-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A199 | `swing-stop-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A201 | `clamp-screw`, `slotted-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A837 | `frame-cross-screw` | Steel Narrow Fillister Head Slotted Screw |
+| 90283A193 | `transgear-knob-retaining-screw` (catalogue-only; no vendor model) | Zinc-Plated Steel Pan Head Slotted Screw |
 | 91247A720 | `knife-hanger-stud` | Medium-Strength Grade 5 Steel Hex Head Screw |
 | 91251A108 | `cone-tip-block-screw` (catalogue-only; no vendor model) | Black-Oxide Alloy Steel Socket Head Screw |
+| 91255A106 | `guide-lock-screw` (catalogue-only; no vendor model) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91255A148 | — (diagnostic recipe; a former `cone-tip-block-screw`) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
 | 91375A106 | `arbor-set-screw` | Alloy Steel Cup-Tip Set Screw |
 | 91410A538 | `gooseneck-set-screw` | Steel Square-Head Cup-Point Set Screw |
+| 91790A194 | `transgear-arm-plate-screw` (catalogue-only; no vendor model) | 18-8 Stainless Steel Oval Head Slotted Screw |
 | 91794A112 | `cone-tip-pinch-screw` | 18-8 Stainless Steel Fillister Head Slotted Screw |
+| 91794A055 | `transgear-disc-screw` | 18-8 Stainless Steel Fillister Head Slotted Screw |
 | 92240A540 | `lag-screw` | 18-8 Stainless Steel Hex Head Screw |
+| 91829A205 | `transgear-pivot-screw` | Slotted 18-8 Stainless Steel Precision Shoulder Screw |
 | 91829A560 | `cone-pivot-screw` | Slotted 18-8 Stainless Steel Precision Shoulder Screw |
 | 91882A221 | `thumb-screw` | Steel Raised Knurled-Head Thumb Screw |
 | 91882A425 | — (diagnostic recipe; `cone-lock-knob` until 2026-09-29) | Steel Raised Knurled-Head Thumb Screw |
@@ -42,9 +47,12 @@ recipes:
 | 93585A190 | `cone-lock-knob` | Stainless Steel High-Profile Knurled-Head Thumb Screw |
 | 94025A150 | — (diagnostic recipe; `cone-tip-adjuster` until rule-12 E11) | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
 | 94025A164 | `cone-tip-adjuster` | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
+| 97482A010 | `latch-hook-rivet` (catalogue-only; no vendor model) | Aluminum Domed Head Solid Rivet |
+| 98296A026 | `transgear-collar-cross-pin` | 1050-1095 Spring Steel Slotted Spring Pin |
 | 98296A027 | `pinion-strap-pin` | 1050-1095 Spring Steel Slotted Spring Pin |
 | 98381A433 | `transgear-knob-drive-pin` (catalogue-only; no vendor model) | Alloy Steel Dowel Pin |
 | 98381A434 | `crank-seat-drive-pin` (crank only; catalogue-only; no vendor model) | Alloy Steel Dowel Pin |
+| 98381A473 | `transgear-latch-pin` | Alloy Steel Dowel Pin |
 | 99607A213 | `pen-set-screw` | Stainless Steel Flared-Collar Knurled-Head Thumb Screw |
 
 The cone-lock and swing-stop selections follow `cad/scripts/build_cone_lock_knob.py`
@@ -187,14 +195,38 @@ Catalog specifications checked on September 10, 2026:
   minimum key engagement, 0.055 in, and a plain cylindrical head. It is
   catalogue-only: no vendor model is downloaded or kept here, so it has no
   replica gate, and its standalone diagnostic is a catalog-only run.
+- [91255A106](https://www.mcmaster.com/91255A106/) (`guide-lock-screw`,
+  MHA-176, eight) holds the four guide locks to the platen guides per ruling
+  R9-31 (September 30, 2026): these screws ride the platen, and the MHA-030
+  fillister head there sweeps into the transgear hanger arm, so they alone
+  take a button head with the same 1/4 in shank. The product page was read
+  in a headless browser on September 30, 2026: black-oxide alloy steel button
+  head hex drive screw, #4-40 UNC class 3A, right hand, 1/4 in under the
+  head, fully threaded, flat tip, standard-profile head Ø0.213 in x 0.059 in,
+  1/16 in hex drive, 140 ksi, Rockwell C39, ASME B18.3 / ASTM F835. The page
+  gives nothing else, so `diag_build_91255A106.py` carries the 91255A148
+  vendor-measured laws over in proportion: flat top 7/5 of the hex, band
+  0.15 of the head height at 10 deg, fillets 0.05, socket floor 0.55, the
+  60 deg countersink. It is catalogue-only: no vendor model is downloaded or
+  kept here, so it has no replica gate, and its standalone diagnostic is a
+  catalog-only run. Lost: 91255A105 (3/16 in; shortens the lock stack) and
+  18-8 stainless 92949A106 (same head and length, 70 ksi, Rockwell B55;
+  the alloy screw matches the 91255A148 family whose laws the recipe uses).
 - [98296A027](https://www.mcmaster.com/98296A027/) was read live on
   September 25, 2026: 1050-1095 spring steel slotted spring pin, 1/16 in
   diameter, 1/2 in long, 0.012 in wall, for a 0.062-0.065 in hole,
   ASME B18.8.2, chamfered ends, no finish listed; 430 lbf double shear,
-  Rockwell C43 minimum. `diag_build_98296A027.py` models the pin as
-  installed, a 1/16 in tube with the catalog wall. The page gives no slot
-  or chamfer size, so the recipe models neither. No vendor SLDPRT has been
-  harvested for it yet.
+  Rockwell C43 minimum. The page gives no slot or chamfer size. No vendor
+  SLDPRT has been harvested for it yet.
+- [98296A026](https://www.mcmaster.com/98296A026/) (`transgear-collar-cross-pin`,
+  MHA-154) was read live on September 30, 2026: the same 1050-1095 spring
+  steel slotted spring pin, unplated, 1/16 in diameter, 9/16 in long,
+  0.012 in wall, for a 0.062-0.065 in hole, chamfered ends, no diameter
+  tolerance stated. No vendor SLDPRT has been harvested for it yet.
+- Both spring pins are rows of `diagnostics/diag_mcmaster_spring_pin.py`,
+  which models each as installed, a 1/16 in tube with the catalog wall,
+  without slot or chamfer; `diag_build_98296A026.py` and
+  `diag_build_98296A027.py` are its per-size runs.
 - [98381A434](https://www.mcmaster.com/98381A434/) (`crank-seat-drive-pin`,
   MHA-173, crank only) was read live on September 30, 2026: alloy steel dowel pin,
   unplated, 3/32 in diameter (+0.0001 to +0.0003 in), 1/4 in long, end shape
@@ -208,6 +240,110 @@ Catalog specifications checked on September 10, 2026:
   long, end shape "Round x Chamfer". As for 98381A434, `diag_build_98381A433.py`
   models the plain nominal cylinder; catalogue-only, no vendor model, no
   replica gate.
+- [98381A473](https://www.mcmaster.com/98381A473/) (`transgear-latch-pin`,
+  MHA-169, the paper drive's latch pin) was read live on September 30, 2026:
+  alloy steel dowel pin, 1/8 in diameter, 3/4 in long, end shape "Round x
+  Chamfer". The page states no end radius or chamfer; the vendor model does.
+  The user supplied it (as `98381A473_Dowel Pin.SLDPRT`, kept here as
+  `98381A473.SLDPRT`), SHA-256
+  `71a73f654a95bb8a38c99fea9380a19148f15cf357711faa193f0e867a143685`, and it
+  was harvested on September 30, 2026 on amet into
+  `cad/out/reports/mcmaster-98381A473-dump.json`: one revolve of five faces,
+  a flat Ø0.115 in end face and a cone 16° to the axis at the chamfered end,
+  the Ø0.125 in cylinder, and a 0.016 in radius tangent to it down to a flat
+  Ø0.093 in face at the round end (150.2183 mm³). `diag_build_98381A473.py`
+  models those end forms, chamfered end at y = 0 (the end pressed into the
+  arm), and its standalone run is the replica gate against that harvest. The
+  diameter band is the family's, read on the 98381A433/434/489 pages.
+- [90283A193](https://www.mcmaster.com/90283A193/) (`transgear-knob-retaining-screw`,
+  MHA-158) clamps the knob cup on the knob shaft's rear end face. The 90283A
+  series was read live on September 30, 2026: 90283A191 (5/16 in) and
+  90283A192 (3/8 in) are zinc-plated steel slotted pan head screws, 8-32 UNC
+  class 2A, fully threaded, flat tip, pan head Ø0.322 in x 0.096 in high,
+  length under the head; the 90283A193 page resolves in the same series at
+  7/16 in, and its head and thread are taken from those rows. The page gives
+  no crown or slot shape, so `diag_mcmaster_pan.py` reuses the 90280A
+  fillister family's head laws (band 0.8 of the height under a spherical
+  crown, slot 0.135 of the head Ø wide and 1.5 widths deep). It is
+  catalogue-only: no vendor model is downloaded or kept here, so it has no
+  replica gate, and its standalone diagnostic is a catalog-only run.
+- [91829A205](https://www.mcmaster.com/91829A205/) (`transgear-pivot-screw`,
+  MHA-168) is the hanger arm's pivot: its shoulder runs through the arm and
+  the pivot spacer, and its thread enters the support bar's blind tap. The
+  product page was read live on September 30, 2026: slotted 18-8 stainless
+  steel precision shoulder screw, passivated, MS51575-11; shoulder Ø3/16 in
+  (-0.001/0) x 1/2 in (0/+0.002), 8-32 UNC class 2A thread 3/16 in long,
+  head Ø5/16 in x 5/32 in. The geometry is the vendor model's own:
+  `diag_build_91829A205.py` replays the dimensions and solved sketch geometry
+  read from `91829A205.SLDPRT` (harvested on amet on September 30, 2026; the
+  read-only dump `cad/out/reports/mcmaster-91829A205-dump.json`), the
+  91829A560 feature tree at this size: slot 1.27 wide x 1.5875 deep,
+  head-rim chamfer 0.257969 and tip chamfer 0.374904 (both 45°), and the
+  thread neck under the shoulder's end face. The neck is a R0.5715 fillet
+  into a Ø3.0226 land, flat to 1.1938 below the end face, then a 45° flank
+  back to the thread major, so full thread starts 1.7653 below the end face
+  and the joint counts engagement from there. `diag_build_mcmaster.py
+  91829A205` runs the replica gate against the vendor's volume
+  451.9447 mm³, surface 485.1899 mm² and 20-face area multiset. Evidence
+  SHA-256: native SLDPRT
+  `bb7a805e75e4e656242ff71cc97cf7e34a7f97c4a90fd66f4b05cb3ebe24601c`.
+- [91794A055](https://www.mcmaster.com/91794A055/) (`transgear-disc-screw`,
+  MHA-161, three) joins the brass disc hub's flange to the 120T disc: each
+  head sits on the flange and the thread enters one of the disc's through
+  taps. The product page was read on September 30, 2026: 18-8 stainless
+  steel slotted fillister head, #0-80 UNF class 2A, 1/4 in under the head,
+  fully threaded, high narrow head Ø0.096 in x 0.055 in. The user supplied
+  the vendor model `91794A055.SLDPRT`, harvested on amet on September 30,
+  2026 into the read-only dump `cad/out/reports/mcmaster-91794A055-dump.json`.
+  It is not the 90280A narrow-fillister tree, so `diag_build_91794A055.py`
+  replays its own laws (in `transgear_disc_screw_spec.py`) instead of
+  `diag_mcmaster_fillister.py`: a spherical dome over a side 0.7 of the head
+  height tall, drafted 5° narrower toward the bearing face; a neck
+  Ø1.02 x the size, 0.05 x the length long; a slot 0.1 of the head Ø wide
+  whose floor sits 1.5 dome heights under the apex; slot-floor fillets
+  0.033 and head-rim fillets 0.125 of the head height; a 45° x 0.75 P tip
+  chamfer; a thread seeded at the tip, running L + P up (its last turn is a
+  closed void inside the head, as in the vendor model), with a P/8 root flat
+  at major - 0.75 H; and a runout Ø(major + 0.1016) from the neck's step up
+  to the bearing face, drafted 60° toward the tip. `diag_build_mcmaster.py
+  91794A055` runs the replica gate against the vendor's volume 13.8241 mm³,
+  surface 64.5474 mm² and 26-face area multiset. Evidence SHA-256: native
+  SLDPRT `3b7b3ee38a51864b0c9d495e44ade30c80816d4b5498b8801211b8edb82676dc`.
+- [91790A194](https://www.mcmaster.com/91790A194/) (`transgear-arm-plate-screw`,
+  MHA-166, two) holds the transgear arm plate on the arm: each head sits flush
+  in a plate countersink and the thread enters the arm's through tap. The
+  91790A series was read live on September 30, 2026 (91790A192 at 3/8 in and
+  91790A194 at 1/2 in): 18-8 stainless steel, bright, slotted 82° oval head,
+  8-32 UNC class 2A, fully threaded, ASME B18.6.3; head Ø0.312 in, 0.152 in
+  total height of which the oval top is 0.052 in; the length is measured
+  from the top of the bevel. The page gives no slot, tip or crown radius, so
+  `diag_mcmaster_oval.py` models the crown as a spherical cap through the
+  head rim, runs the 82° bevel down to the thread major (the catalog's
+  0.100 in bevel reaches the cone's theoretical sharp, inside the shank), and
+  takes the slot, tip and thread-runout laws of the 90280A fillister family
+  (slot 0.135 of the head Ø wide and 1.5 widths deep). It is catalogue-only:
+  no vendor model is downloaded or kept here, so it has no replica gate, and
+  its standalone diagnostic is a catalog-only run.
+- [97482A010](https://www.mcmaster.com/97482A010/) (`latch-hook-rivet`,
+  MHA-175, two) joins the latch hook's strip to the latch-hook bracket's
+  flap; the flap's holes are drilled at assembly through the hook's. The
+  product page was read live on September 30, 2026 (dt-logs
+  `transgear-evidence/mcmaster-skus.md`, "Round 10 — hook rivets"): 1100
+  aluminum domed head solid rivet, 1/16 in diameter, 0.125 in long under the
+  head, round domed head Ø0.13 in x 0.051 in high, for material up to
+  0.094 in thick and a 0.067 in (#51 drill) hole, pack of 500. The contract
+  row asked for steel, but McMaster lists no steel 1/16 in solid rivet (all
+  16 in the family filter are aluminum), so the part is aluminum; SolidWorks
+  has no plain 1100 wire, and the page states no temper, so the part carries
+  the library's `1100-O Rod (SS)`. The page gives no head radius, so
+  `diag_build_97482A010.py` models the dome as the spherical cap through the
+  head rim and apex (R = 1.6998 mm) [INFERENCE]. The joint grips at most
+  2.2 mm (0.6 strip on a 1.5 +0.1 flap) against the 2.3876 mm maximum, and
+  the Ø1.5875 shank enters the smallest printed Ø1.6 +0.10/0 hole; the
+  vendor's #51 hole (Ø1.7018) sits 0.0018 mm over the top of that band. It is
+  catalogue-only: the page offers a 3-D download, but no vendor model was
+  supplied or kept here, so it has no replica gate, and its standalone
+  diagnostic is a catalog-only run.
 
 - [3606T118](https://www.mcmaster.com/3606T118/) (`keeper-chain`, MHA-149)
   and [3606T811](https://www.mcmaster.com/3606T811/) (`keeper-chain-link`,

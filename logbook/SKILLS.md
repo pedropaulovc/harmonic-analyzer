@@ -16,7 +16,7 @@ failure mode that would make the book worthless.
 | Drilling, boring, reaming to a fit | M03 | `pivot-bushing`, `lever-bushing`, `cylinder-gear` bore, `knife-mount` bore, `magnifying-wheel` | ch. 10 Drilling, boring, reaming |
 | Parting to a length, batch repeatability | M04 | 19× `pivot-bushing`, 19× `lever-bushing`, spacers | ch. 11 Parting to a length tolerance |
 | Slender turning, steadies, followers | M05 | `pivot-shaft`, `fulcrum-shaft`, `cone-gear-shaft`, `cylinder-gear-shaft`, `pinion-arbor`, `amplitude-bar` | ch. 12 Slender work |
-| Tramming, squaring, edge finding | M06 | `knife-mount` ×2, `pinion-pivot-block`, `transgear-bracket`, `arbor-pedestal` | ch. 13 Milling |
+| Tramming, squaring, edge finding | M06 | `knife-mount` ×2, `pinion-pivot-block`, `transgear-arm`, `arbor-pedestal` | ch. 13 Milling |
 | Profile milling, slots, batch fixturing | M07 | `rocker-arm` ×20, `connecting-rod` ×20, `channel-lever` ×20, `platen-guide`, `wheel-bar` | ch. 13 Milling |
 | Hole patterns, reaming, tapping | M08 | `rocker-arm-support` (4× 1/2-13 UNC-2B, `cad/scripts/build_rocker_arm_support.py`), `summing-lever` 20× Ø2.0 pattern, `harmonic-base` | ch. 14 Hole patterns and tapping |
 | Dividing head, indexing, co-phasing | M09 | `cylinder-gear` notches ×20, every gear blank | ch. 15 Indexing |

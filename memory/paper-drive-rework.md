@@ -131,6 +131,15 @@ park unchanged). Net feed: 1 crank rev (T12/T24 mounted) = 0.5 knob rev →
 (`NET_RACK_TRAVEL_PER_CRANK_REV`; verified by the kinematics probe).
 
 ## Part changes
+
+Superseded (2026-09, ch. 23 translational-gearing re-derivation, rulings
+R9-5..R9-25): `transgear-bracket`, `bracket-screw`, `transgear-latch` and
+`transgear-pinion` below are RETIRED. The cluster now hangs from the
+`transgear-arm` (MHA-164) on the `transgear-pivot-screw` (MHA-168), the latch
+is `latch-hook-bracket` + `latch-hook` + `latch-hook-rivet`, and the 12T DP38
+is integral to `transgear-knob-shaft` (MHA-078). The table records the
+2026-07-07 state.
+
 | part | change (as implemented) |
 |---|---|
 | support-bar | 10×10×384 → 22 tall × 9 deep × 452 (ends x ±226); 4 Ø4.4 clamp thru-holes + 2 Ø4.0 bracket holes (MACHINE-handed, placed mirror=False) |
