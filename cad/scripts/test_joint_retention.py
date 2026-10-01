@@ -361,9 +361,10 @@ def test_every_registered_joint_cites_a_live_source_occurrence() -> None:
 def test_deleting_a_row_whose_parts_other_rows_name_is_omitted(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # The latch-hook screw shares bracket_screw and support_bar with the
-    # bracket-screw row, so only the registry notices it is gone.
-    gone = "paper-drive/latch-hook-screw-in-bar"
+    # The stud's stems stay named without its row: transgear_stub as the hub
+    # cap's receiver, transgear_arm as the plate screws'. Only the registry
+    # notices the stud joint is gone.
+    gone = "paper-drive/stud-in-arm"
     table = tuple(j for j in jr.JOINTS if j.id != gone)
     findings = jr.audit(
         table,

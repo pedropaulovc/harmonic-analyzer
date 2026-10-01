@@ -38,6 +38,7 @@ import _buildgraph
 import _config
 import channel_assembly_steps
 import drive_train_steps
+import paper_drive_assembly_steps
 
 
 class Enforcement(StrEnum):
@@ -219,6 +220,7 @@ class Occurrence:
 STEP_LISTS: dict[str, tuple[str, ...]] = {
     "drive_train": drive_train_steps.SEQUENCE,
     "channel": channel_assembly_steps.SEQUENCE,
+    "paper_drive": paper_drive_assembly_steps.SEQUENCE,
 }
 
 
@@ -528,7 +530,6 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "arbor_pedestal",  # #4-40 UNC-2B apex tap through the crown (receiver of MHA-147); its #8 ledge hole is clearance only
         "arbor_set_screw",  # #4-40 UNC-2A x 1/4 cup-point set screw (McMaster 91375A106), member into arbor_pedestal
         "boss_hook",  # #10-24 UNC (McMaster 9490T1 open-eye eyebolt), member into the summing-lever boss tap
-        "bracket_screw",  # #8-32 UNC (McMaster 90280A194), member: 2 bracket screws + 1 latch-hook screw into support_bar
         "clamp_screw",  # #8-32 UNC (McMaster 90280A201), member into column_clamp_back: 2 in magnifier, 4 in paper_drive
         "column_clamp_back",  # #8-32 UNC tapped ear holes, receiver of clamp_screw (magnifier and paper_drive)
         "cone_gear_shaft",  # receiver: Sec4 D-flat gripped by cone_tip_collar's #2-56 set screw
@@ -542,17 +543,19 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "cone_tip_pinch_screw",  # #4-40 fillister (91794A112), member into cone_tip_block far jaw; lock of cone_tip_adjuster
         "crank_arm",  # #4-40 through-taps, receiver of crank_handle_pivot_screw and fillister_screw (MHA-030)
         "crank_handle_pivot_screw",  # #4-40 made shoulder screw (MHA-139), member into crank_arm
-        "fillister_screw",  # #4-40 brass fillister (90114A511): nameplate into harmonic_base, keeper eye into crank_arm, paper-drive clip/guide/lock screws
+        "fillister_screw",  # #4-40 brass fillister (90114A511): nameplate into harmonic_base, keeper eye into crank_arm, paper-drive clip and guide screws
         "foot_screw",  # #4-40 fillister (90280A108), member into harmonic_base via pinion_spring foot (top level)
         "frame_cross_screw",  # #10-32 UNF-2A x 1-3/4 (McMaster 90280A837), member: 4 into harmonic_base, 4 into top_frame
         "frame_side_screw",  # #8-32 narrow fillister (McMaster 90280A194, MHA-117); member, x2 into top_frame KeeperTaps (top-level row)
         "gooseneck",  # #6-32 UNC integral slotted spring screw in the brazed end-plug tap (member AND receiver, one component); also the post the frame's 1/4-20 set screw bears on
         "gooseneck_set_screw",  # 1/4-20 UNC square-head cup point (91410A538), member: into top_frame hub tap, grips summing gooseneck
+        "guide_lock_screw",  # #4-40 button head (McMaster 91255A108, MHA-176, R9-31), member: 8 into the platen_guide rear through taps
         "hanger_screw",  # #8-32 UNC x 1/2 hex head (McMaster 93075A194), member into the pen-hanger strap tap
         "harmonic_base",  # receiver: #10-32 cross taps, 1/4-20 hold-down seats, #4-40 nameplate seats, and the drive_train screws' seats (top-level rows)
         "knife_hanger_stud",  # 1/2-13 UNC (McMaster 91247A720 hex head x 2), member into the knife-mount top tap
         "knife_mount",  # 1/2-13 UNC-2B x 12.0 blind tap in the top seat, receiver of the knife-hanger stud
         "lag_screw",  # 1/4-20 UNC-2A x 3/4 hex head (92240A540), member: through rocker_arm_support foot into harmonic_base
+        "latch_hook_bracket_screw",  # #4-40 narrow fillister (McMaster 90280A108, MHA-171), member: 2 into the support_bar's #4-40 through taps
         "magnifying_clamp",  # #4-40 UNC-2B tapped ScrewHole (Hole Wizard), receiver of thumb_screw
         "measuring_stick_stop",  # knurled thumbscrew (size not stated) threading up through the block floor, modelled integral (member AND receiver, one component)
         "output_fixture",  # #4-40 UNC tapped cross hole (entry wall), receiver of the 2nd thumb_screw
@@ -563,19 +566,26 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "pen_v_block",  # receiver: Ø2.5 rod set-screw hole drilled thru, "THREAD/FIT TO SUIT SET SCREW AT ASSEMBLY"; the screw is not modelled
         "pinion_cam",  # M2.5 x 0.45 6H tap + supplied ISO 4026 M2.5 x 5 flat-point set screw, member (collar) gripping pinion_lift_rod
         "platen",  # #4-40 tapped through (platen_spec.SOCKET_SPEC), receiver of the 4 clip screws
-        "platen_guide",  # #4-40 bottoming-tapped blind, front (guide screws) + rear (lock screws), receiver
+        "platen_guide",  # #4-40 front bottoming taps (guide screws) + rear through taps (guide-lock screws, R9-48), receiver
         "post_mount_screw",  # 1/4-20 (MSC 40923898 fillister, cut to fit), member into cone_swing_platform
+        "rack_pinion",  # 120T disc (MHA-070): 3x #0-80 through taps drilled and tapped at assembly (A06 disc-taps-transferred), receiver of the disc screws
         "rocker_arm_support",  # receiver only of channel screws: 4x #8-32 BracketSeats (top-level rows); its own foot holes are 5/16 clearance
         "slotted_screw",  # #8-32 x 1-1/4 fillister (90280A201, MHA-101), member into harmonic_base tapped seat
         "spring_hook",  # #6-32 eyebolt (McMaster 9489T111, MHA-090); member, x20 into summing_lever tapped plate (top-level row); no channel-internal joint
         "summing_lever",  # #10-24 counter-anchor through tap (receiver of boss_hook) + 20x #6-32 plate taps (receiver of channel spring_hook, top-level row)
-        "support_bar",  # #8-32 tapped through (build_support_bar.BRACKET_HOLE_SPEC), receiver of bracket + latch-hook screws
+        "support_bar",  # #8-32 blind pivot tap + 2x #4-40 through bracket taps (support_bar_spec), receiver of the pivot screw and the latch-hook bracket screws
         "swing_stop_screw",  # #4-40 fillister (90280A108), member into harmonic_base (top level)
         "thumb_screw",  # #4-40 UNC (McMaster 91882A221), member: into magnifying_clamp ScrewHole; 2nd instance into output_fixture cross hole (config qty 2, not placed in the SLDASM)
         "top_frame",  # receiver: #10-32 cross taps, 1/4-20 gooseneck set tap, #8-32 fulcrum-keeper taps (top-level row)
-        "transgear_knob_shaft",  # front stub thread (size unstated, modelled plain O9.525), receiver/stud of the thumbnut
-        "transgear_stub",  # slotted cap screw in the collar face, thread unstated, modelled integral (transgear_stub_spec): member AND receiver
-        "transgear_thumbnut",  # internal thread (size unstated, "tapped bore modelled as a plain slip bore"), member (nut)
+        "transgear_arm",  # MHA-164: #10-32 stud tap + 2x #8-32 plate taps through (transgear_arm_spec), receiver
+        "transgear_arm_plate_screw",  # #8-32 slotted oval head (McMaster 91790A196, MHA-166), cut to fit; member: 2 into transgear_arm
+        "transgear_disc_screw",  # #0-80 slotted fillister (McMaster 91794A055, MHA-161), cut to fit; member: 3 through the hub flange into rack_pinion
+        "transgear_hub_cap",  # MHA-160 brass cap nut, #6-32 tapped through; member on the stud's front thread
+        "transgear_knob_retaining_screw",  # #8-32 pan head (McMaster 90283A193, MHA-158), member into the knob shaft's rear tap
+        "transgear_knob_shaft",  # MHA-078: 1/4-20 UNC die-cut front thread (thumbnut) + #8-32 rear tap (retaining screw), receiver
+        "transgear_pivot_screw",  # #8-32 shoulder screw (McMaster 91829A205, MHA-168), member into the support_bar's blind pivot tap
+        "transgear_stub",  # MHA-082 stud: #10-32 UNF rear thread (member, into transgear_arm) + #6-32 UNC front thread (receiver of the hub cap)
+        "transgear_thumbnut",  # MHA-126 knurled nut, 1/4-20 UNC-2B through; member on the knob shaft's front thread
         "wheel_axle",  # stud tip carries the hex nut (thread not modelled / not specified on the axle drawing), receiver of wheel_axle_nut
         "wheel_axle_nut",  # hex nut AF8 x 3 on the O5 stud ("commercial hex nut (thread not modelled)"), member
     }
@@ -614,11 +624,13 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "cylinder_gear_shaft",  # plain 3/8 arbor; MHA-147 cups bear in drilled spots, no thread ("NO FLATS; SET-SCREW SPOTS ARE DRILLED AT ASSEMBLY")
         "fulcrum_keeper",  # #8 close-clearance + fillister c'bore (clearance only); Ø6.50 reamed ball bore
         "fulcrum_shaft",  # plain Ø6.35 shaft, no threads
-        "guide_lock",  # #4 close clearance holes only (guide_lock_spec.HOLE_SPEC); clamped by fillister_screw
+        "guide_lock",  # 1/8 drill holes (R9-49) only; clamped by guide_lock_screw
         "keeper_chain",  # bead chain
         "keeper_chain_link",  # snap loop link
         "knife_hanger_washer",  # 90126A211 SAE washer, clearance ID
-        "latch_hook",  # O4.4 clearance eye (build_latch_hook.HOLE_DIA); clamped by bracket_screw
+        "latch_hook",  # MHA-127 spring-steel strip: drilled latch-pin and rivet holes, riveted to the bracket flap; no thread
+        "latch_hook_bracket",  # MHA-170 bent sheet: screw holes DRILL THRU, rivet holes drilled at assembly; no thread
+        "latch_hook_rivet",  # MHA-175 1/16 aluminium solid rivet
         "lever_wire",  # wire, tied through the fixture cross hole; no thread
         "magnifying_bracket",  # UNDRILLED blank; mounting-screw description retired (build_magnifying_bracket docstring)
         "magnifying_lever",  # plain Ø6 domed rod
@@ -645,15 +657,20 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "pivot_shaft",  # plain Ø10 shaft, integral shoulder, domed plain end; "NO FLATS"
         "platen_clip",  # #4 clearance holes only (build_platen_clip); clamped by fillister_screw
         "platen_paper",  # paper sheet, no thread
-        "platen_rack",  # no holes at all; lock-mated to the platen (see Notes: docstring says "screwed")
-        "rack_pinion",  # 120T disc, plain bore on stub seat, no set screw
+        "platen_rack",  # soft-soldered to the platen back (A06 rack-soldered); no holes, no thread
         "rocker_arm",  # reamed pivot hub bore + #47 rod-pin hole
         "rocker_thrust_washer",  # 1/16 sheet washer, plain bore
-        "transgear_bracket",  # #8 clearance screw holes + letter-V drilled stud bore (build_transgear_bracket); clamped by bracket_screw
-        "transgear_feed_pinion",  # 12T pinion, plain bore, lock-mated to disc, no set screw
-        "transgear_latch",  # plain O9.6 hub bores (build_transgear_latch.BORE_DIA), no thread
-        "transgear_pinion",  # 12T third gear, plain bore on knob-shaft seat, no set screw
+        "transgear_arm_plate",  # MHA-165: reamed knob-shaft bore + 2 countersunk clearance screw holes; no thread
+        "transgear_collar_cross_pin",  # MHA-154 1/16 slotted spring pin through the drive collar slot and shaft core
+        "transgear_disc_hub",  # MHA-159 brass hub: bore pressed on the feed sleeve, flange clearance holes for the disc screws; no thread
+        "transgear_drive_collar",  # MHA-177: reamed bore, reamed drive-pin holes, rear slot; no thread
+        "transgear_feed_pinion",  # MHA-110 12T DP30 feed sleeve: plain bore on the stud journal, the hub pressed on its shank; no thread
+        "transgear_knob_cup",  # MHA-157: drilled bore + counterbore for the retaining screw head; no thread
+        "transgear_knob_thrust_ring",  # MHA-156 loose brass ring, drilled bore; no thread
+        "transgear_latch_pin",  # MHA-169 1/8 dowel pressed into the arm's reamed end-face hole
+        "transgear_pivot_spacer",  # MHA-167 brass spacer, reamed bore on the pivot shoulder; no thread
         "transgear_removable",  # O12 plain bore + 2 drive-pin holes, no thread (build_transgear_removable)
+        "transgear_stud_shim",  # MHA-178 turned shim, bore drilled to pass the #10-32 major; no thread
         "transgear_knob_drive_pin",  # MHA-155 dowel pressed into plain holes, no thread
         "tube_frame",  # columns: socket slip fit; cross holes enlarged so the MHA-132 shank passes "WITHOUT THREAD CONTACT" (MHA-A04 STEP 2/5)
         "tube_frame_cap",  # McMaster 9275K141 push-on cap (MHA-A04 STEP 7)
@@ -670,7 +687,10 @@ UNTHREADED_STOCK: dict[str, str] = {
     "keeper_chain_link": "plain chain link",
     "knife_hanger_washer": "plain flat washer",
     "pinion_strap_pin": "slotted spring pin pressed into a plain hole",
+    "latch_hook_rivet": "solid rivet set through drilled holes",
     "transgear_knob_drive_pin": "dowel pin pressed into a plain hole",
+    "transgear_collar_cross_pin": "slotted spring pin in a drilled hole",
+    "transgear_latch_pin": "dowel pin pressed into a reamed hole",
     "tube_frame_cap": "push-on round cap over the column end",
 }
 
@@ -1604,7 +1624,7 @@ JOINTS: tuple[Joint, ...] = (
             "column_clamp_front_spec.py DRAWING_NOTES; wheel_bar_geom.py CLAMP_HOLE_SPEC; diag_mcmaster_fillister.py 90280A201"
         ),
     ),
-    # --- paper_drive as on main ---
+    # --- paper_drive (MHA-A06, paper_drive_assembly_steps) ---
     Joint(
         id="paper-drive/clamp-screw-in-back-arc",
         assembly="paper_drive",
@@ -1612,7 +1632,7 @@ JOINTS: tuple[Joint, ...] = (
         receiver="column_clamp_back",
         thread="#8-32 UNC",
         quantity=4,
-        installed_at="",
+        installed_at="bar-clamped",
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason="clamps support bar + front arc + back arc around a stationary frame column; none of these parts moves in operation, the head sits 0.2 sub-flush in a bar counterbore so the sliding platen never touches it, and the platen's X-wise slide drag reaches the pair of screws per column only as shear across their Z axes, never as torque about them",
         axial_capture="fillister head seated in the support_bar front counterbore (CLAMP_CBORE_DEPTH, 0.2 recess); shank through bar + column_clamp_front #8 clearance; threads into column_clamp_back's through #8-32 tap",
@@ -1620,41 +1640,7 @@ JOINTS: tuple[Joint, ...] = (
         lock_part="",
         lock_binds=(),
         lock_step="",
-        evidence="build_paper_drive_assembly.py:build (clamp-screw seeds + 'support clamp-screw pattern') and _assert_fastener_stacks (90280A201 clamps); build_column_clamp_back.HOLE_SPEC tapped #8-32; build_support_bar.CLAMP_HOLE_SPEC/CLAMP_HOLE_X; column_clamp_front_geom.EAR_HOLE_SPEC",
-    ),
-    Joint(
-        id="paper-drive/bracket-screw-in-bar",
-        assembly="paper_drive",
-        member="bracket_screw",
-        receiver="support_bar",
-        thread="#8-32 UNC",
-        quantity=2,
-        installed_at="",
-        exposure=Exposure.STATIC_CLAMP,
-        exposure_reason="clamps the transgear bracket plate to the fixed support bar's back face, and neither part moves in operation. The disc/feed-pinion drag and the latch-arm swing act about the stud axis 40.5 mm below the screws, and the two-screw pattern at x +-10 reacts that couple as in-plane shear across both screw axes, not as torque about either screw axis (judgement call, see Notes)",
-        axial_capture="fillister head bears on the transgear_bracket back face (Ry180 seed at STUB_Z0); shank through bracket #8 clearance; 8.7 mm engagement in the bar's through #8-32 tap, tip 0.3 short of the bar front",
-        lock=Lock.NONE,
-        lock_part="",
-        lock_binds=(),
-        lock_step="",
-        evidence="build_paper_drive_assembly.py:build ('transgear bracket-screw pattern') and _assert_fastener_stacks (90280A194 bracket screws); build_support_bar.BRACKET_HOLE_SPEC tapped #8-32; build_transgear_bracket.SCREW_HOLE_SPEC #8 clearance",
-    ),
-    Joint(
-        id="paper-drive/latch-hook-screw-in-bar",
-        assembly="paper_drive",
-        member="bracket_screw",
-        receiver="support_bar",
-        thread="#8-32 UNC",
-        quantity=1,
-        installed_at="",
-        exposure=Exposure.OSCILLATING,
-        exposure_reason="a single screw through the round eye of the spring-steel latch hook. The hook's latching load on the swing cluster acts at its free tip about 25 mm below the screw, so it is a moment about the screw's own axis, and it reverses as the cluster is latched and released for gear changes. Nothing but head friction stops the hook rotating on the screw",
-        axial_capture="fillister head bears on the latch_hook front face; shank through the O4.4 eye (0.25 air to the bar) into the bar's through #8-32 tap; tip exits the bar back face",
-        lock=Lock.NONE,
-        lock_part="",
-        lock_binds=(),
-        lock_step="",
-        evidence="build_paper_drive_assembly.py:build ('latch-hook screw' place_component) and LATCH_SCREW_TIP_Z assert; build_support_bar.LATCH_HOLE_X + 'bracket + latch-hook tapped holes (#8-32)'; build_latch_hook.HOLE_DIA/EYE_DIA docstring 'screwed at its top ... free at the bottom'",
+        evidence="build_paper_drive_assembly.py:build (clamp-screw seeds + 'support clamp-screw pattern') and _assert_fastener_stacks (90280A201 clamps); draw_paper_drive_assembly._step_text 'bar-clamped'; build_column_clamp_back.HOLE_SPEC tapped #8-32; build_support_bar.CLAMP_HOLE_SPEC/CLAMP_HOLE_X; column_clamp_front_geom.EAR_HOLE_SPEC",
     ),
     Joint(
         id="paper-drive/clip-screw-in-platen",
@@ -1663,15 +1649,12 @@ JOINTS: tuple[Joint, ...] = (
         receiver="platen",
         thread="#4-40 UNC",
         quantity=4,
-        installed_at="",
+        installed_at="clips-fitted",
         exposure=Exposure.STATIC_CLAMP,
-        exposure_reason="clamps each brass paper clip to the platen, and both travel together as one lock-mated body. The clip's spring-rail reaction acts along the screw axis (preload only), and two screws per clip stop the clip turning, so no operating torque acts about either screw axis",
+        exposure_reason="clamps each brass paper clip to the platen, and both travel together as one body. The clip's spring-rail reaction acts along the screw axis (preload only), and two screws per clip stop the clip turning, so no operating torque acts about either screw axis",
         axial_capture="fillister head on the clip's integral seat boss (SCREW_SEAT_STACK); shank through the clip #4 clearance into the platen's through #4-40 tap, 4.0 mm engagement, tip flush with the platen back",
         lock=Lock.NONE,
-        lock_part="",
-        lock_binds=(),
-        lock_step="",
-        evidence="build_paper_drive_assembly.py:build ('platen clip-screw grid') and _assert_fastener_stacks (clip bosses); platen_spec.SOCKET_SPEC tapped #4-40 through; build_platen_clip.SCREW_SEAT_STACK/HoleSpec('clearance','#4')",
+        evidence="build_paper_drive_assembly.py:build ('platen clip-screw grid') and _assert_fastener_stacks (clip #4-40 engagement, tip flush); draw_paper_drive_assembly._step_text 'clips-fitted'; platen_spec.SOCKET_SPEC tapped #4-40 through; build_platen_clip.SCREW_SEAT_STACK",
     ),
     Joint(
         id="paper-drive/guide-screw-in-guide",
@@ -1680,82 +1663,250 @@ JOINTS: tuple[Joint, ...] = (
         receiver="platen_guide",
         thread="#4-40 UNC",
         quantity=10,
-        installed_at="",
+        installed_at="guides-screwed",
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason="clamps the platen to its two guide rails, which move together as one body. The rails slide on the support bar's top edge, and that drag runs along X, transverse to the screw axes (Z), shared in shear by 5 screws per rail. No operating torque acts about any screw axis",
-        axial_capture="fillister head 0.2 sub-flush in the platen front counterbore; shank through the platen #4 hole into the guide's blind bottoming #4-40 tap, 5.2678 mm engagement with bottom clearance",
+        axial_capture="fillister head 0.2 sub-flush in the platen front counterbore; shank through the platen #4 hole into the guide's front #4-40 tap (through, R9-64), 5.27 mm engagement, tip stopping inside the rail",
         lock=Lock.NONE,
-        lock_part="",
-        lock_binds=(),
-        lock_step="",
-        evidence="build_paper_drive_assembly.py:build ('platen guide-screw grid') and _assert_fastener_stacks (90114A511 guide screws); platen_guide_spec.TAPPED_HOLE_SPEC; build_platen_guide 'Fastening-screw receivers'; build_platen GuideHoles counterbore",
+        evidence="build_paper_drive_assembly.py:build ('platen guide-screw grid') and _assert_fastener_stacks (90114A511 guide screws); draw_paper_drive_assembly._step_text 'guides-screwed'; platen_guide_spec.TAPPED_HOLE_SPEC; build_platen_guide.GUIDE_SCREW_THREAD_ENGAGEMENT/GUIDE_SCREW_TIP_INSIDE_MIN",
     ),
     Joint(
         id="paper-drive/lock-screw-in-guide",
         assembly="paper_drive",
-        member="fillister_screw",
+        member="guide_lock_screw",
         receiver="platen_guide",
         thread="#4-40 UNC",
         quantity=8,
-        installed_at="",
+        installed_at="platen-hung",
         exposure=Exposure.STATIC_CLAMP,
-        exposure_reason="clamps each guide-lock plate to the back of its guide rail, and both travel with the platen as one body. The plate sits 1.0 clear of the bar's back face and only touches if the platen is pulled forward, a load along the screw axis. Two screws per plate stop it turning, so no operating torque acts about either screw axis",
-        axial_capture="fillister head on the 2-mm guide_lock back face; shank through the lock's #4 close clearance into the guide's rear blind bottoming #4-40 tap, 4.35 mm engagement, 0.25 bottom clearance",
+        exposure_reason="clamps each guide-lock plate to the back of its guide rail, and both travel with the platen as one body. The plate stands the fitted lock gap (0.05-0.25, R9-47) off the bar's back face and only touches if the platen is pulled forward, a load along the screw axis. Two screws per plate stop it turning, so no operating torque acts about either screw axis",
+        axial_capture="button head on the 2-mm guide_lock back face; shank through the lock's 1/8 drilled hole into the guide's rear #4-40 tap (through, R9-48), tip stopping inside the rail",
         lock=Lock.NONE,
-        lock_part="",
-        lock_binds=(),
-        lock_step="",
-        evidence="build_paper_drive_assembly.py:build ('platen lock-screw grid', LOCK_SCREW_XY) and _assert_fastener_stacks (lock screws); build_platen_guide.LOCK_TAPPED_HOLE_SPEC/HOLE_X (4 per rail x 2 rails); guide_lock_spec.HOLE_SPEC",
+        evidence="build_paper_drive_assembly.py:build ('platen lock-screw grid', LOCK_SCREW_XY); draw_paper_drive_assembly._step_text 'platen-hung' (fitted loose) and 'guide-locks-set' (snug, push, tighten); guide_lock_screw_spec.ENGAGEMENT_WORST; build_platen_guide.HOLE_X/LOCK_SCREW_THREAD_ENGAGEMENT (4 per rail x 2 rails); guide_lock_spec.HOLE_SPEC; platen_guide_spec.LOCK_GAP_FIT",
+    ),
+    Joint(
+        id="paper-drive/stud-in-arm",
+        assembly="paper_drive",
+        member="transgear_stub",
+        receiver="transgear_arm",
+        thread="#10-32 UNF",
+        installed_at="stud-fitted",
+        exposure=Exposure.ROTATING_DRAG,
+        exposure_reason=(
+            "the stud is the journal of the disc cluster (120T disc + MHA-159 hub + 12T feed sleeve), "
+            "which spins on it whenever the crank turns and reverses when the paper is wound back. The "
+            "journal drag, and the cluster's end-float rubs on the stud's thrust step and on the hub cap "
+            "seated on the stud, all act about the stud axis, which is the thread axis. Only the seated "
+            "thread holds the stud in the arm"
+        ),
+        axial_capture=(
+            "the stud's #10-32 rear end runs through the MHA-178 shim into the arm's through stud tap "
+            "until the shim seats on the arm (worst-case engagement ~1.5 D, transgear_stud_fit."
+            "REAR_ENGAGEMENT_WORST_D); the shim is faced to the fitted window at stud-faced-to-fit"
+        ),
+        lock=Lock.NONE,
+        evidence=(
+            "draw_paper_drive_assembly._step_text 'stud-fitted' ('SCREW THE STUD'S #10-32 UNF END "
+            "THROUGH THE SHIM INTO THE ARM'S STUD TAP TILL THE SHIM SEATS ON THE ARM') and "
+            "'stud-faced-to-fit'; build_paper_drive_assembly.py 'transgear-stub' placement (Ry180 seat "
+            "on the shim); transgear_stub_spec.REAR_THREAD/FRONT_THREAD; transgear_arm_spec stud tap; "
+            "transgear_stud_fit.REAR_ENGAGEMENT_WORST_D. A redesign to a threadless pin is in progress "
+            "(review-gap-stud-retention); this row records the thread as built today"
+        ),
+    ),
+    Joint(
+        id="paper-drive/hub-cap-on-stud",
+        assembly="paper_drive",
+        member="transgear_hub_cap",
+        receiver="transgear_stub",
+        thread="#6-32 UNC",
+        installed_at="disc-cluster-hung",
+        exposure=Exposure.ROTATING_DRAG,
+        exposure_reason=(
+            "the cap is the front stop of the disc cluster, which spins on the stud journal with the "
+            "crank and floats 0.2-0.4 between the stud's thrust step and the cap. Whenever the cluster "
+            "runs forward the feed sleeve's nose rubs the cap's rear face about the stud axis, which is "
+            "the cap's thread axis; the drag reverses when the paper is wound back"
+        ),
+        axial_capture=(
+            "the brass cap nut runs on the stud's #6-32 front thread until it seats on the journal "
+            "shoulder (worst-case engagement ~1.15 D, transgear_hub_cap_spec.ENGAGEMENT_WORST_D); "
+            "that seat is the only preload"
+        ),
+        lock=Lock.NONE,
+        evidence=(
+            "draw_paper_drive_assembly._step_text 'disc-cluster-hung' ('RUN THE ... CAP ON THE #6-32 "
+            "UNC THREAD UNTIL IT SEATS ON THE JOURNAL SHOULDER ... THE CLUSTER SPINS FREELY'); "
+            "build_paper_drive_assembly.py 'The hub cap seats on the stud's journal shoulder' and "
+            "'transgear-hub-cap' placement; transgear_hub_cap_spec.TAP_SPEC; transgear_feed_pinion_spec."
+            "CLUSTER_FLOAT_RANGE"
+        ),
+    ),
+    Joint(
+        id="paper-drive/arm-plate-screws",
+        assembly="paper_drive",
+        member="transgear_arm_plate_screw",
+        receiver="transgear_arm",
+        thread="#8-32 UNC",
+        quantity=2,
+        installed_at="arm-plate-fitted",
+        exposure=Exposure.STATIC_CLAMP,
+        exposure_reason=(
+            "clamps the arm plate to the arm; the two never move relative to each other. The knob "
+            "shaft's journal drag in the plate bore acts about the knob axis, offset from both screws, "
+            "and the two-screw pattern reacts it as in-plane shear across both screw axes, not as "
+            "torque about either one (judgement call)"
+        ),
+        axial_capture=(
+            "82-degree oval head seated in the plate's countersink; thread through the arm's #8-32 "
+            "through tap (worst-case engagement ~1.7 D), tip cut flush at arm-plate-screws-cut"
+        ),
+        lock=Lock.NONE,
+        evidence=(
+            "draw_paper_drive_assembly._step_text 'arm-plate-fitted' (snug, then tighten in turn) and "
+            "'arm-plate-screws-cut'; build_paper_drive_assembly.py 'transgear-arm-plate-screw #' "
+            "placements (PLATE_SCREW_XY); transgear_hanger_joints.PLATE_SCREW_ENGAGEMENT_WORST_D; "
+            "transgear_arm_spec plate taps"
+        ),
+    ),
+    Joint(
+        id="paper-drive/pivot-screw-in-bar",
+        assembly="paper_drive",
+        member="transgear_pivot_screw",
+        receiver="support_bar",
+        thread="#8-32 UNC",
+        installed_at="hanger-pivoted",
+        exposure=Exposure.OSCILLATING,
+        exposure_reason=(
+            "the transgear arm swings on this shoulder screw: down to unlatch for a gear change, up to "
+            "re-mesh, and it rocks within the latch play when the feed drive reverses. The arm's "
+            "friction on the shoulder and under the head acts about the screw axis, in both senses"
+        ),
+        axial_capture=(
+            "shoulder bottomed on the bar's back face; the arm and pivot spacer ride the shoulder under "
+            "the head with 0.10-0.35 head play; thread in the bar's blind #8-32 tap (worst-case "
+            "engagement ~0.53 D, transgear_hanger_joints.PIVOT_ENGAGEMENT_WORST_D)"
+        ),
+        lock=Lock.THREADLOCKER_ONLY,
+        lock_step="hanger-pivoted",
+        evidence=(
+            "draw_paper_drive_assembly._step_text 'hanger-pivoted' ('SHOULDER SCREW FROM THE REAR "
+            "THROUGH ARM AND SPACER INTO THE BAR'S BLIND TAP WITH LOW-STRENGTH THREADLOCKER. SEAT IT; "
+            "THE ARM SWINGS FREELY'); build_paper_drive_assembly.py 'transgear-pivot-screw' placement; "
+            "support_bar_spec.PIVOT_TAP_THREAD; transgear_hanger_joints.HEAD_PLAY_MIN/MAX, "
+            "LATCH_ARM_ANGLE_PLAY and PIVOT_ENGAGEMENT_WORST_D"
+        ),
+    ),
+    Joint(
+        id="paper-drive/disc-screws",
+        assembly="paper_drive",
+        member="transgear_disc_screw",
+        receiver="rack_pinion",
+        thread="#0-80 UNF",
+        quantity=3,
+        installed_at="disc-taps-transferred",
+        exposure=Exposure.STATIC_CLAMP,
+        exposure_reason=(
+            "fix the 120T disc to the hub flange, which is pressed on the feed sleeve; disc, hub and "
+            "sleeve turn as one body. The drive torque acts about the stud axis, and the three screws "
+            "on the flange's bolt circle carry it as shear across their own axes, never as torque "
+            "about them"
+        ),
+        axial_capture=(
+            "fillister head on the hub flange; shank through the flange clearance into the disc's "
+            "#0-80 through tap transferred at assembly (worst-case engagement ~1.56 D), tip cut below "
+            "the disc rear face at disc-screws-cut"
+        ),
+        lock=Lock.NONE,
+        evidence=(
+            "draw_paper_drive_assembly._step_text 'disc-cluster-pressed', 'disc-taps-transferred' and "
+            "'disc-screws-cut'; build_paper_drive_assembly.py 'transgear-disc-screw (' placements and "
+            "lock mates; rack_pinion_spec.TAP_SPEC; transgear_disc_screw_spec.ENGAGEMENT_WORST_D; "
+            "transgear_disc_hub_geometry.SCREW_COUNT"
+        ),
+    ),
+    Joint(
+        id="paper-drive/knob-retaining-screw",
+        assembly="paper_drive",
+        member="transgear_knob_retaining_screw",
+        receiver="transgear_knob_shaft",
+        thread="#8-32 UNC",
+        installed_at="knob-stack-fitted",
+        exposure=Exposure.ROTATING_DRAG,
+        exposure_reason=(
+            "the screw clamps the knob cup on the rear end of the knob shaft, which spins in the arm "
+            "plate bore with the chain-driven T24 and reverses when the paper is wound back. The cup's "
+            "front ring runs 0.2 behind the plate's rear boss and is the rear stop of the knob's end "
+            "float, so whenever the knob is drawn forward the cup rubs the stationary boss about the "
+            "shaft axis, which is the screw axis"
+        ),
+        axial_capture=(
+            "pan head on the cup's counterbore floor; shank through the cup into the shaft's rear #8-32 "
+            "tap (worst-case engagement ~6.3 mm, transgear_knob_shaft_spec.ENGAGEMENT_WORST), clamping "
+            "the cup's front face on the shaft end face"
+        ),
+        lock=Lock.NONE,
+        evidence=(
+            "draw_paper_drive_assembly._step_text 'knob-stack-fitted' ('CLAMP THE CUP ON THE SHAFT'S "
+            "END FACE WITH THE SCREW'); build_paper_drive_assembly.py 'knob stack: retaining screw "
+            "locked to the knob cup' (a CAD mate, not hardware); transgear_knob_cup_spec docstring "
+            "(rear stop of the knob's end float); transgear_knob_shaft_spec.TAP_SPEC/ENGAGEMENT_WORST"
+        ),
+    ),
+    Joint(
+        id="paper-drive/latch-hook-bracket-screws-in-bar",
+        assembly="paper_drive",
+        member="latch_hook_bracket_screw",
+        receiver="support_bar",
+        thread="#4-40 UNC",
+        quantity=2,
+        installed_at="latch-bracket-fitted",
+        exposure=Exposure.STATIC_CLAMP,
+        exposure_reason=(
+            "clamp the latch-hook bracket to the fixed support bar; the hook is riveted to the "
+            "bracket's flap, so neither part moves in operation. The latch load on the hook reaches "
+            "the screw pair, 7 mm apart, as in-plane shear plus a couple the pair reacts in shear, not "
+            "as torque about either screw axis (judgement call)"
+        ),
+        axial_capture=(
+            "narrow fillister head on the bracket's 1.5 sheet; shank through the bracket's drilled "
+            "hole into the bar's #4-40 through tap, 8.0 mm nominal engagement"
+        ),
+        lock=Lock.NONE,
+        evidence=(
+            "draw_paper_drive_assembly._step_text 'latch-bracket-fitted' and 'hook-set-and-riveted'; "
+            "build_paper_drive_assembly.py 'latch-hook-bracket-screw (x' placements; "
+            "support_bar_spec.BRACKET_TAP_X/BRACKET_TAP_SPEC; latch_hook_bracket_screw_spec."
+            "ENGAGEMENT_NOMINAL"
+        ),
     ),
     Joint(
         id="paper-drive/thumbnut-on-knob-shaft",
         assembly="paper_drive",
         member="transgear_thumbnut",
         receiver="transgear_knob_shaft",
-        thread="unstated (O3/8 in knob-shaft front stub; thread modelled plain both sides)",
-        quantity=1,
-        installed_at="",
-        exposure=Exposure.ROTATING_DRAG,
-        exposure_reason="the nut rides the knob shaft, which spins in the latch arm's small hub with the chain-driven T24 and third gear, and retains the rotating T24 axially. Its neck bears on the T24 face, so any T24-to-shaft slip and the hub drag act about the thread axis, and the crank turns the cluster continuously (and reverses when the paper is wound back)",
-        axial_capture="O14 neck shoulders on the mounted T24 removable's front face (0.25 air in the model), covering its O12 bore; the nut runs on the shaft's 9.5-mm front stub, which ends inside the knurled disc",
-        lock=Lock.NONE,
-        lock_part="",
-        lock_binds=(),
-        lock_step="",
-        evidence="build_paper_drive_assembly.py:build ('knob cluster: thumbnut locked to the knob shaft' lock_mate) and the THUMBNUT_* asserts; build_transgear_thumbnut docstring/BORE_DIA; build_transgear_knob_shaft.FRONT_STUB ('thread the thumbnut runs onto, modelled plain'); config/parts/transgear-thumbnut.yaml process; config/assemblies/paper-drive.yaml allowed_free_stems comment",
-    ),
-    Joint(
-        id="paper-drive/transgear-stub-cap-screw",
-        assembly="paper_drive",
-        member="transgear_stub",
-        receiver="transgear_stub",
-        thread="unstated (slotted cap screw in the collar face, modelled integral; no thread, size or engagement recorded)",
-        quantity=1,
-        installed_at="",
+        thread="1/4-20 UNC",
+        installed_at="fitup-pose-set",
         exposure=Exposure.ROTATING_DRAG,
         exposure_reason=(
-            "the collar the cap screw holds is the front axial stop for the 120T disc, which is a free "
-            "revolute on the stud's O5 seat with the 12T feed pinion locked to it. The disc's front face "
-            "runs 0.4 clear of the collar (disc -148.4, collar -148.8), so any disc end float rubs the "
-            "collar about the stud axis, which is the screw axis. The crank turns the cluster continuously "
-            "and reverses it when the paper is wound back"
+            "the nut clamps the chain-driven T24 against the drive collar on the knob shaft, which "
+            "spins whenever the crank turns and reverses when the paper is wound back. The T24 drives "
+            "through two pins in O2.5 slip holes (0.06 radial), so the chain torque is shared with the "
+            "friction under the nut's seat face, and every take-up of that slip works the T24 face "
+            "under the nut about the thread axis"
         ),
         axial_capture=(
-            "CAP_DIA 5.0 slotted round head standing 1.5 proud of the 14.0 brass collar face (ch23 p.59 "
-            "photo); the collar is modelled integral with the stud (build_transgear_stub 'end hardware "
-            "collapsed to a collar -- simplification'), so neither the screw's thread nor the collar's seat "
-            "on the stud is modelled"
+            "the nut's flange seat face bears on the T24 front face round its bore and clamps it on "
+            "the drive collar; 1/4-20 UNC-2B through on the shaft's die-cut front thread, finger-tight "
+            "at fitup-pose-set and tightened at collar-pinned; removed by hand for gear swaps"
         ),
         lock=Lock.NONE,
-        lock_part="",
-        lock_binds=(),
-        lock_step="",
         evidence=(
-            "transgear_stub_spec.py CAP_DIA/CAP_LEN/CAP_SLOT_W/CAP_SLOT_D ('Slotted cap screw in the "
-            "collar's face ... modelled integral') and DRAWING_NOTES ('CAP DIA ... WITH A ... SLOT "
-            "(MODELLED INTEGRAL)'); build_transgear_stub.py docstring + 'Cap'/'CapSlot' features; "
-            "build_paper_drive_assembly.py transgear-stub placement, DISC_Z0, 'rack-pinion (120T reducer "
-            "disc)' revolute and 'feed pinion locked to the disc'"
+            "draw_paper_drive_assembly._step_text 'fitup-pose-set' ('T24 AND THUMBNUT ON "
+            "FINGER-TIGHT') and 'collar-pinned' ('THUMBNUT TIGHT'); build_paper_drive_assembly.py "
+            "'transgear-thumbnut (retains the mounted T24)' placement and _lock_to_shaft (a CAD mate, "
+            "not hardware); transgear_thumbnut_spec docstring; transgear_removable_spec.PIN_HOLE_DIA "
+            "and DRIVE_PIN_DIA"
         ),
     ),
 )
@@ -1766,8 +1917,8 @@ JOINTS: tuple[Joint, ...] = (
 # automatically: the build's placements cannot be enumerated offline without
 # running SolidWorks, and its threaded interference contracts list only
 # joints whose modelled threads overlap (no integral, unmodelled, or
-# mate-only joint, and not the latch-hook screw). test_joint_retention checks
-# every anchor still occurs in its source.
+# mate-only joint). test_joint_retention checks every anchor still occurs in
+# its source.
 REQUIRED_JOINTS: dict[str, Occurrence] = {
     "frame/cross-screw-in-base": Occurrence(
         "frame", "build_frame_assembly.py", "BASE_SCREW_SEAT_Z"
@@ -1885,14 +2036,6 @@ REQUIRED_JOINTS: dict[str, Occurrence] = {
     "paper-drive/clamp-screw-in-back-arc": Occurrence(
         "paper_drive", "build_paper_drive_assembly.py", "support clamp-screw pattern"
     ),
-    "paper-drive/bracket-screw-in-bar": Occurrence(
-        "paper_drive",
-        "build_paper_drive_assembly.py",
-        "transgear bracket-screw pattern",
-    ),
-    "paper-drive/latch-hook-screw-in-bar": Occurrence(
-        "paper_drive", "build_paper_drive_assembly.py", "LATCH_SCREW_TIP_Z"
-    ),
     "paper-drive/clip-screw-in-platen": Occurrence(
         "paper_drive", "build_paper_drive_assembly.py", "platen clip-screw grid"
     ),
@@ -1902,15 +2045,35 @@ REQUIRED_JOINTS: dict[str, Occurrence] = {
     "paper-drive/lock-screw-in-guide": Occurrence(
         "paper_drive", "build_paper_drive_assembly.py", "platen lock-screw grid"
     ),
+    "paper-drive/stud-in-arm": Occurrence(
+        "paper_drive", "build_paper_drive_assembly.py", '"transgear-stub",'
+    ),
+    "paper-drive/hub-cap-on-stud": Occurrence(
+        "paper_drive",
+        "build_paper_drive_assembly.py",
+        "The hub cap seats on the stud's journal shoulder",
+    ),
+    "paper-drive/arm-plate-screws": Occurrence(
+        "paper_drive", "build_paper_drive_assembly.py", "transgear-arm-plate-screw #"
+    ),
+    "paper-drive/pivot-screw-in-bar": Occurrence(
+        "paper_drive", "build_paper_drive_assembly.py", '"transgear-pivot-screw",'
+    ),
+    "paper-drive/disc-screws": Occurrence(
+        "paper_drive", "build_paper_drive_assembly.py", "transgear-disc-screw ("
+    ),
+    "paper-drive/knob-retaining-screw": Occurrence(
+        "paper_drive",
+        "build_paper_drive_assembly.py",
+        "knob stack: retaining screw locked to the knob cup",
+    ),
+    "paper-drive/latch-hook-bracket-screws-in-bar": Occurrence(
+        "paper_drive", "build_paper_drive_assembly.py", "latch-hook-bracket-screw (x"
+    ),
     "paper-drive/thumbnut-on-knob-shaft": Occurrence(
         "paper_drive",
         "build_paper_drive_assembly.py",
-        "knob cluster: thumbnut locked to the knob shaft",
-    ),
-    "paper-drive/transgear-stub-cap-screw": Occurrence(
-        "paper_drive",
-        "transgear_stub_spec.py",
-        "Slotted cap screw in the collar's face",
+        "transgear-thumbnut (retains the mounted T24)",
     ),
 }
 
