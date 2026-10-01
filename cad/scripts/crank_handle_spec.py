@@ -46,8 +46,8 @@ from crank_handle_ferrule_spec import (
     BORE_DIA as FERRULE_BORE_DIA,
     BORE_DIA_TOL as FERRULE_BORE_DIA_TOL,
     LENGTH as FERRULE_LENGTH,
-    OUTER_DIA as FERRULE_OUTER_DIA,
-    OUTER_DIA_TOL as FERRULE_OUTER_DIA_TOL,
+    INSTALLED_OUTER_DIA as FERRULE_OUTER_DIA,
+    STOCK_DIA_MIN as FERRULE_STOCK_DIA_MIN,
     TENON_GLUE_LINE as FERRULE_TENON_GLUE_LINE,
 )
 
@@ -122,10 +122,11 @@ COUNTERBORE_DIA_MAX = round(
 # option taken when the question timed out).  Crossing the cup, the crest
 # had to clear the pocket by the cup's whole possible offset and could skim
 # only ~0.001 off the steel.  The crest clears the largest counterbore turned
-# its whole contour allowance small and off the mandrel axis by the bore's
-# eccentricity, so turning never touches the cup.  Between the crest and the
+# its whole contour allowance small, with the outside and the counterbore each
+# off the bore by the printed run-out in opposite directions (local review of
+# 47cb8a46b), so turning never touches the cup.  Between the crest and the
 # counterbore mouth the oak ends in a flat face on that plane.
-END_ROUND_CY = COUNTERBORE_DIA_MAX / 2.0 + CONTOUR_ALLOWANCE_DIA / 2.0 + BORE_ECCENTRICITY
+END_ROUND_CY = COUNTERBORE_DIA_MAX / 2.0 + CONTOUR_ALLOWANCE_DIA / 2.0 + 2.0 * BORE_ECCENTRICITY
 
 # Flare: concave, centre above the waist, through the shoulder point.
 FLARE_R = ((WAIST_X - SHOULDER_X) ** 2 + (SHOULDER_R - WAIST_R) ** 2) / (
@@ -223,6 +224,18 @@ FERRULE_SEAT_RADIAL_MIN = (
 # title-block edge break on the tenon end and on the ferrule's bore mouth
 # (local review of 21bb244c5): 3.7, half the ferrule's length and more.
 TENON_GLUE_LENGTH_MIN = round(TENON_LENGTH - _GENERAL_1PL - 2.0 * EDGE_BREAK_MAX_MM, 6)
+# The ferrule rides the tenon (true to the bore within the eccentricity) on
+# its glue line, so it can sit this far off the bore; the skim, true to the
+# bore, takes it down to the contour (local review of 47cb8a46b, user ruling
+# 2026-10-01).
+FERRULE_OFFSET_MAX = BORE_ECCENTRICITY + TENON_GLUE_LINE[1] / 2.0
+# Brass left at the thin side: the smallest skimmed OD, off the bore by the
+# skim's own run-out, over the largest bore on the ferrule's offset.
+FERRULE_SKIMMED_WALL_MIN = (
+    (2.0 * SHOULDER_R - CONTOUR_ALLOWANCE_DIA) / 2.0
+    - BORE_ECCENTRICITY
+    - ((FERRULE_BORE_DIA + FERRULE_BORE_DIA_TOL) / 2.0 + FERRULE_OFFSET_MAX)
+)
 # The printed minimum oak wall over the bore (checked at the tenon end face).
 TENON_WALL_FLOOR_MM = 1.5
 # Arm face to the shortest tenon's end: the shortest .X ferrule less the
@@ -257,8 +270,13 @@ for _ok, _what in (
         "the smallest fitted tenon leaves under 1.5 over the bore",
     ),
     (
-        2.0 * FERRULE_OUTER_DIA_TOL <= CONTOUR_ALLOWANCE_DIA,
-        "turning the shoulder flush with the ferrule leaves the contour allowance",
+        FERRULE_STOCK_DIA_MIN / 2.0
+        >= (2.0 * SHOULDER_R + CONTOUR_ALLOWANCE_DIA) / 2.0 + FERRULE_OFFSET_MAX + BORE_ECCENTRICITY,
+        "the smallest ferrule stock, off-centre, does not clean up in the skim",
+    ),
+    (
+        FERRULE_SKIMMED_WALL_MIN >= 1.5,
+        "the skimmed ferrule, off-centre, leaves under 1.5 of brass",
     ),
     (WAIST_WALL_MIN >= 1.5, "the waist leaves under 1.5 over the bore"),
     (
@@ -275,7 +293,7 @@ for _ok, _what in (
         "the end round does not crest on the cup-face plane",
     ),
     (
-        END_ROUND_CY - CONTOUR_ALLOWANCE_DIA / 2.0 - BORE_ECCENTRICITY
+        END_ROUND_CY - CONTOUR_ALLOWANCE_DIA / 2.0 - 2.0 * BORE_ECCENTRICITY
         >= COUNTERBORE_DIA_MAX / 2.0 - 1e-9,
         "turning the end round can reach the cup",
     ),
@@ -343,7 +361,7 @@ DRAWING_NOTES = "\n".join(
         f"{TENON_GLUE_LINE[0]:.2f}-{TENON_GLUE_LINE[1]:.2f} DIAMETRAL",
         f"  CLEARANCE, COUNTERBORE <MOD-DIAM>{COUNTERBORE_DIA_MAX:.1f} MAX, DEPTH TO SEAT THE CUP",
         f"  FACE FLUSH; EPOXY BOTH IN, THE CUP CENTRED ON THE WAXED {SCREW_NUMBER} SCREW.",
-        f"AFTER CURE, TURN THE SHOULDER FLUSH WITH {FERRULE_NUMBER} AND THE END ROUND ON",
+        f"AFTER CURE, TURN THE SHOULDER AND {FERRULE_NUMBER} TOGETHER, AND THE END ROUND ON",
         f"  THE OAK ONLY, CLEAR OF {CUP_NUMBER}; AT WORST THE OAK FEATHERS AT THE CUP.",
         f"THE REAMED BORE RUNS ON THE {SCREW_NUMBER} SHOULDER; ITS LIMITS APPLY FULL LENGTH.",
         f"MIN OAK WALL {TENON_WALL_FLOOR_MM:.1f} OVER THE BORE, CORNERS EXCEPTED; THE OUTSIDE AND",

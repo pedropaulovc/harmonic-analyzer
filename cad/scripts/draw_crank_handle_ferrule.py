@@ -27,11 +27,13 @@ from _drawing_common import (
     check_drawing_layout,
     create_section_view,
     curate_view_dimensions,
+    dimension_name,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
     rebuild_drawing,
     set_hidden_lines_removed,
+    set_reference_dimension,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -41,6 +43,7 @@ from crank_handle_ferrule_spec import (
     DRAWING_PRECISION_BY_NAME,
     LENGTH,
     OUTER_DIA,
+    REFERENCE_DIMENSIONS,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -151,6 +154,12 @@ async def build(adapter: Any) -> dict[str, str]:
         dimensions_by_feature=DRAWING_DIMENSIONS,
     )
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
+    # The OD is the 9/16-in rod as supplied, skimmed at assembly: a reference.
+    by_name = {dimension_name(adapter, a): a for a in annotations}
+    for name in sorted(REFERENCE_DIMENSIONS):
+        set_reference_dimension(
+            adapter, by_name[name], label=f"MHA-152 {name}", diameter=name.endswith("Dia")
+        )
     if not auto_center_marks(adapter, end, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to the ferrule end view")
     create_section_axis_centerline(

@@ -23,25 +23,32 @@ PURE DATA, no SolidWorks/COM imports.
 
 from __future__ import annotations
 
-# Ø12.5 x 7 (user ruling 2026-09-30, ch30 eight-views-4 side view: the ring
-# reads ~Ø11-12, not the Ø15 first derived).  The bore follows the smaller
-# MHA-139 shoulder: the tenon over the Ø4.1 pivot bore keeps its 1.5 wall.
-OUTER_DIA = 12.5
-# Banded (local review of 1f3067ef2): the oak shoulder is turned flush with
-# this OD after cure, so the OD's spread must sit inside the grip's 0.5
-# contour allowance; at .X it spanned 1.6.
-OUTER_DIA_TOL = 0.20
+# The ring leaves the bench at the 9/16-in rod's own OD and is skimmed to the
+# Ø12.5 grip contour with the MHA-022 shoulder after the epoxy cures (user
+# ruling 2026-10-01, local review of 47cb8a46b: glued on, the ring can sit
+# 0.175 off the reamed bore, so an oak shoulder turned true to the bore could
+# not finish flush with a pre-turned OD).  The default configuration is the
+# ring as made; INSTALLED is it skimmed, and the drive train places that.
+STOCK_DIA = 0.5625 * 25.4
+# Cold-drawn brass rod, 9/16 in, -0.002 in (ASSUMPTION, the supplier's
+# commercial tolerance; not sourced in this repo).
+STOCK_DIA_MIN = round(STOCK_DIA - 0.002 * 25.4, 6)
+OUTER_DIA = STOCK_DIA
+# Ø12.5 x 7 as installed (user ruling 2026-09-30, ch30 eight-views-4: the
+# ring reads ~Ø11-12, not the Ø15 first derived).
+INSTALLED_OUTER_DIA = 12.5
+INSTALLED_CONFIG = "INSTALLED"
 # 7.7 (local review of 1f3067ef2): the fitted tenon keeps 1.5 of oak over the
 # reamed pivot bore with 0.10 of eccentricity between them.
 BORE_DIA = 7.7
 BORE_DIA_TOL = 0.10
 LENGTH = 7.0
 
-# Brass wall, on radius, at the worst case: the banded outside over the
-# banded bore.
-WALL_WORST = ((OUTER_DIA - OUTER_DIA_TOL) - (BORE_DIA + BORE_DIA_TOL)) / 2.0
+# Brass wall, on radius, as made: the smallest stock over the largest bore.
+# The skimmed wall, with the ring off-centre, is MHA-022's check.
+WALL_WORST = (STOCK_DIA_MIN - (BORE_DIA + BORE_DIA_TOL)) / 2.0
 if WALL_WORST < 1.5:
-    raise AssertionError("MHA-152 ferrule wall is under 1.5 at the .X worst case")
+    raise AssertionError("MHA-152 ferrule wall is under 1.5 at the worst case")
 
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "FerruleProfile": {"OuterDia", "BoreDia", "Length"},
@@ -56,6 +63,8 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 }
 if set(DRAWING_PRECISION_BY_NAME) != set().union(*DRAWING_DIMENSIONS.values()):
     raise AssertionError("every marked MHA-152 dimension needs authored places")
+# The OD is the rod as supplied: a reference, not a turned size.
+REFERENCE_DIMENSIONS = frozenset({"OuterDia"})
 
 # The mating part, quoted only to identify it (rule 6).  Written here rather
 # than read from _config.parts so crank-handle.yaml is not a rebuild input; the
@@ -68,8 +77,8 @@ HANDLE_NAME = "CRANK HANDLE"
 TENON_GLUE_LINE = (0.05, 0.15)
 DRAWING_NOTES = "\n".join(
     (
-        "BORE ON THE LATHE.  THE BORE BAND BOUNDS THE FITTED TENON'S WALL; THE OD",
-        "  BAND KEEPS THE OAK, TURNED FLUSH WITH IT, WITHIN ITS CONTOUR ALLOWANCE.",
+        "BORE ON THE LATHE; THE BORE BAND BOUNDS THE FITTED TENON'S WALL.",
+        f"OD AS SUPPLIED (9/16 IN ROD); SKIMMED TO <MOD-DIAM>{INSTALLED_OUTER_DIA:.1f} WITH {HANDLE_NUMBER} AFTER CURE.",
         f"THE {HANDLE_NUMBER} {HANDLE_NAME} TENON IS TURNED TO SUIT THIS BORE FOR",
         f"  {TENON_GLUE_LINE[0]:.2f}-{TENON_GLUE_LINE[1]:.2f} DIAMETRAL CLEARANCE; "
         "EPOXY THE RING ON, SEATED ON ITS SHOULDER.",

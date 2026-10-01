@@ -520,6 +520,9 @@ from crankshaft_spec import (  # noqa: E402
     SHAFT_LENGTH_BAND as CRANKSHAFT_LENGTH_BAND,
 )
 from crank_handle_spec import HANDLE_LENGTH as HANDLE_BASIC_LENGTH  # noqa: E402
+from crank_handle_ferrule_spec import (  # noqa: E402
+    INSTALLED_CONFIG as HANDLE_FERRULE_INSTALLED_CONFIG,
+)
 from crank_handle_pivot_screw_spec import (  # noqa: E402
     INSTALLED_CONFIG as HANDLE_SCREW_INSTALLED_CONFIG,
     INSTALLED_THREAD_LENGTH as HANDLE_SCREW_INSTALLED_THREAD,
@@ -4471,6 +4474,9 @@ async def build(adapter) -> dict[str, str]:
         ROT_Y_POS90,
         ground=False,
         label="crank-handle-ferrule (MHA-152, on the handle tenon)",
+        # As assembly leaves it: skimmed to the grip contour with the oak
+        # shoulder (user ruling 2026-10-01).
+        configuration=HANDLE_FERRULE_INSTALLED_CONFIG,
     )
     handle_cup = await place_component(
         adapter,

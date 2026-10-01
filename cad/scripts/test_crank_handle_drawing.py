@@ -51,11 +51,12 @@ def test_oak_ends_in_a_ferrule_tenon_and_a_cup_counterbore() -> None:
     assert spec.SHOULDER_X == ferrule.LENGTH
     # The end round crests on the cup-face plane at the basic length, on the
     # oak only, outside the largest counterbore turned its allowance small
-    # and off the mandrel by the bore's eccentricity: 4.25 + 0.25 + 0.10
-    # (local review of fbf82ad96).  A flat oak end runs from the crest to the
+    # with the outside and the counterbore each off the bore by the 0.10
+    # run-out in opposite directions: 4.25 + 0.25 + 0.20 (local reviews of
+    # fbf82ad96 and 47cb8a46b).  A flat oak end runs from the crest to the
     # counterbore mouth; the cup bottoms with its face on the basic length.
     assert spec.END_ROUND_CX + spec.END_ROUND_R == pytest.approx(spec.HANDLE_LENGTH)
-    assert spec.END_ROUND_CY == pytest.approx(8.5 / 2.0 + 0.25 + 0.10)
+    assert spec.END_ROUND_CY == pytest.approx(8.5 / 2.0 + 0.25 + 0.20)
     assert spec.OAK_END_X == spec.HANDLE_LENGTH
     assert spec.COUNTERBORE_DEPTH == pytest.approx(cup.OVERALL_LENGTH)
     assert spec.OVERALL_LENGTH == pytest.approx(56.0)
@@ -71,7 +72,7 @@ def test_oak_ends_in_a_ferrule_tenon_and_a_cup_counterbore() -> None:
     # 1.5 again at the contour allowance and the bore's eccentricity over the
     # largest counterbore.
     assert spec.FEATHER_DEPTH == 1.0
-    assert spec.OAK_WALL_BEHIND_FEATHER == pytest.approx(1.96, abs=0.01)
+    assert spec.OAK_WALL_BEHIND_FEATHER == pytest.approx(1.98, abs=0.01)
 
 
 def test_tenon_and_counterbore_are_fitted_to_the_parts_they_take() -> None:
@@ -85,24 +86,24 @@ def test_tenon_and_counterbore_are_fitted_to_the_parts_they_take() -> None:
     assert "TURN THE TENON TO SUIT THE MHA-152 FERRULE BORE" in spec.DRAWING_NOTES
     assert "COUNTERBORE TO SUIT THE MHA-153 CUP BODY" in spec.DRAWING_NOTES
     assert "DEPTH TO SEAT THE CUP\n  FACE FLUSH" in spec.DRAWING_NOTES
-    # User ruling 2026-09-30 (concept v4): after the cure the oak is turned
-    # flush with the ferrule; the end round is turned on the oak only, clear
+    # After the cure the oak shoulder and the ferrule are turned together
+    # (user ruling 2026-10-01); the end round is turned on the oak only, clear
     # of the cup (local review of fbf82ad96).
-    assert "AFTER CURE, TURN THE SHOULDER FLUSH WITH MHA-152 AND THE END ROUND ON" in spec.DRAWING_NOTES
+    assert "AFTER CURE, TURN THE SHOULDER AND MHA-152 TOGETHER, AND THE END ROUND ON" in spec.DRAWING_NOTES
     assert "THE OAK ONLY, CLEAR OF MHA-153; AT WORST THE OAK FEATHERS AT THE CUP." in spec.DRAWING_NOTES
-    assert "R2.4 END ROUND TO A FLAT OAK END, CREST <MOD-DIAM>9.2." in spec.DRAWING_NOTES
+    assert "R2.3 END ROUND TO A FLAT OAK END, CREST <MOD-DIAM>9.4." in spec.DRAWING_NOTES
     # crank-v4-16's sheet: two more lines ran the block into the border.
     assert len(spec.DRAWING_NOTES.splitlines()) <= 15
     # The fitted tenon keeps its ferrule seat and 1.5 over the bore, with
     # 0.10 of bore eccentricity budgeted (local review of 1f3067ef2).
-    assert spec.SHOULDER_R == pytest.approx(ferrule.OUTER_DIA / 2.0)
+    assert spec.SHOULDER_R == pytest.approx(ferrule.INSTALLED_OUTER_DIA / 2.0)
     assert spec.BORE_ECCENTRICITY == pytest.approx(0.10)
     assert spec.FERRULE_SEAT_RADIAL_MIN == pytest.approx(2.125)
     assert spec.TENON_WALL_MIN == pytest.approx(1.55)
     assert spec.WAIST_WALL_MIN == pytest.approx(2.325)
-    # Turning the shoulder flush with the banded ferrule OD stays inside the
-    # grip's contour allowance.
-    assert 2.0 * ferrule.OUTER_DIA_TOL <= spec.CONTOUR_ALLOWANCE_DIA
+    # The ring is skimmed with the shoulder, so its stock OD carries no band
+    # (user ruling 2026-10-01).
+    assert not hasattr(ferrule, "OUTER_DIA_TOL")
     source = Path(handle.__file__).read_text(encoding="utf-8")
     assert source.count("set_dimension_bilateral_tolerance(") == 1  # the reamed bore
     # The tenon length is routine: with no collar on the screw (local review
@@ -158,7 +159,7 @@ def test_grip_contour_is_a_note_with_a_loose_allowance() -> None:
     assert (spec.FLARE_R, spec.S_CONCAVE_R, spec.S_CONVEX_R, spec.DOME_R) == pytest.approx(
         (9.083, 21.636, 59.500, 30.694), abs=0.001
     )
-    assert spec.END_ROUND_R == pytest.approx(2.429, abs=0.001)
+    assert spec.END_ROUND_R == pytest.approx(2.260, abs=0.001)
     assert "TURN WITHIN 0.5 ON DIAMETER; CHECK WITH A TEMPLATE." in notes
     assert "BASIC" not in notes
     assert not hasattr(crank_handle_spec, "BASIC_DIMENSIONS")
