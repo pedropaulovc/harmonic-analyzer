@@ -247,17 +247,20 @@ BOM_SECOND_COLUMN_X = BOM_ANCHOR[0] + BOM_COLUMN_WIDTH + 0.008
 BOM_ROW_HEIGHT = 0.006
 BOM_HEIGHT_TOLERANCE = 1e-6
 BOM_SHEET_CLEARANCE = 0.003
-# Under the first BOM column, where sheet 6 already proved the same 1:8 view
-# and caption clear the sheet number; beside the BOM its centred caption ran
-# into the second column and past the right border.
-BOM_REFERENCE_ISO_CENTER = (0.110, 0.068)
+# The second column's right edge; the strip between it and the right note
+# field's edge is empty from the column tops down to the title block.
+BOM_RIGHT_EDGE = BOM_SECOND_COLUMN_X + BOM_COLUMN_WIDTH
 # The MHA-013 station pointer lives here, not in its BOM cell: on the grouped
 # 20-configuration row SolidWorks kept a written description only up to its
-# second comma (farm leaf 20260923T040258Z-1-0726d474, swmaker000005).
+# second comma (farm leaf 20260923T040258Z-1-0726d474, swmaker000005). Four
+# short lines, so the centred caption fits the strip right of the BOM: its
+# widest, "BALLOONS ON SHEETS 3-5", is ~54 mm at the 2.47 mm a character the
+# two-line caption printed (st19 dt-02).
 BOM_REFERENCE_CAPTION = (
-    f"REFERENCE 1:8 - BALLOONS ON SHEETS {min(CLUSTER_SHEETS.values())}-"
-    f"{max(CLUSTER_SHEETS.values())}\n"
-    f"MHA-013 CONE GEAR STATIONS: SHEET {FIT_SHEET}"
+    "REFERENCE 1:8\n"
+    f"BALLOONS ON SHEETS {min(CLUSTER_SHEETS.values())}-{max(CLUSTER_SHEETS.values())}\n"
+    "MHA-013 CONE GEAR\n"
+    f"STATIONS: SHEET {FIT_SHEET}"
 )
 
 # --- sheets 3-5: exploded cluster views --------------------------------------
@@ -311,6 +314,28 @@ NOTE_LINE_PITCH = 0.004525
 # package_note_fields lists every field and its blocks.
 ISO_RIGHT_FIELD = (NOTE_FIELD_RIGHT[0], NOTE_FIELD_RIGHT[1], NOTE_FIELD_RIGHT[2], 0.140)
 REFERENCE_ISO_CAPTION_XY = (0.330, 0.082)
+# A 1:8 reference view's outline is ~49 mm tall (its ink ~31 mm square inside
+# it, st19 dt-02); this half-extent budgets it both ways.
+REFERENCE_ISO_HALF_OUTLINE = 0.0247
+# The BOM sheet's reference view stands in the empty strip right of the
+# second column, its caption seated over the title block. Under the first
+# column it was placed for 20 rows; at 27 (MHA-172/MHA-173 added) the
+# column's bottom row ran through it (st19 dt-02), and that field has no
+# room left for the view and its caption under a taller column. The strip is
+# empty up to the column tops, so the view rides BOM_REFERENCE_ISO_SLACK
+# higher than the caption needs: dt-02's caption put the outline 25.2 mm under
+# its centre, past the budget, and bom_reference_iso_violations refuses a
+# caption that would reach the title block.
+BOM_REFERENCE_ISO_SLACK = 0.008
+BOM_REFERENCE_ISO_CENTER = (
+    (BOM_RIGHT_EDGE + NOTE_FIELD_RIGHT[2]) / 2.0,
+    DRAWING_TEMPLATES[SPEC.layout].title_block_top_m
+    + BOM_SHEET_CLEARANCE
+    + len(BOM_REFERENCE_CAPTION.splitlines()) * NOTE_LINE_PITCH
+    + VIEW_CAPTION_GAP
+    + BOM_REFERENCE_ISO_SLACK
+    + REFERENCE_ISO_HALF_OUTLINE,
+)
 
 # --- sheet 10: the whole drive train, full detail ----------------------------
 # The view (outline only) must fit between the one-line heading and the title
@@ -1165,6 +1190,35 @@ def bom_extent_violations(
         )
     if bottom < clearance:
         violations.append(f"bottom edge {bottom * 1000:.3f} mm is off the sheet")
+    return violations
+
+
+def bom_reference_iso_violations(outline: tuple[float, ...]) -> list[str]:
+    """Name every way the BOM sheet's reference view, with its caption under
+    it, leaves the strip right of the BOM's second column."""
+    left, bottom, right, _top = outline
+    clearance = BOM_SHEET_CLEARANCE
+    violations = []
+    # The outline already pads the ink (~8 mm on dt-02), so meeting the column
+    # is the limit.
+    if left < BOM_RIGHT_EDGE:
+        violations.append(
+            f"left edge {left * 1000:.3f} mm enters the BOM's second column "
+            f"({BOM_RIGHT_EDGE * 1000:.3f} mm)"
+        )
+    field_right = NOTE_FIELD_RIGHT[2]
+    if right > field_right:
+        violations.append(
+            f"right edge {right * 1000:.3f} mm passes {field_right * 1000:.3f} mm"
+        )
+    caption_lines = len(BOM_REFERENCE_CAPTION.splitlines())
+    caption_bottom = bottom - VIEW_CAPTION_GAP - caption_lines * NOTE_LINE_PITCH
+    floor = DRAWING_TEMPLATES[SPEC.layout].title_block_top_m + clearance
+    if caption_bottom < floor - BOM_HEIGHT_TOLERANCE:
+        violations.append(
+            f"caption bottom {caption_bottom * 1000:.3f} mm enters the title block "
+            f"(floor {floor * 1000:.3f} mm)"
+        )
     return violations
 
 
@@ -2377,6 +2431,9 @@ def _place_bom_view(adapter: Any) -> Any:
     )
     set_high_quality_shaded_with_edges(adapter, view, label="BOM reference isometric")
     _configure_view(adapter, view, exploded=False, label="BOM reference isometric")
+    violations = bom_reference_iso_violations(_view_outline(view))
+    if violations:
+        raise RuntimeError("BOM reference isometric: " + "; ".join(violations))
     return view
 
 
