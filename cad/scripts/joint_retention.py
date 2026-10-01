@@ -14,6 +14,9 @@ threaded or not (``THREADED_PARTS`` / ``UNTHREADED_PARTS``), so the joint list
 is checked against the build's own component enumeration
 (``_buildgraph.references_of``): a part added to an assembly fails coverage
 until it is classified, and a threaded part fails until a row names it.
+``REQUIRED_JOINTS`` registers every joint with its source occurrence, and the
+table must match it exactly, so a row deleted while other rows still name its
+parts is still caught.
 
 ``audit`` is pure. ``main`` writes ``cad/out/reports/joint-retention.json``
 and a readable summary beside it; under ``ENFORCEMENT = Enforcement.AUDIT`` it
@@ -150,6 +153,7 @@ class Kind(StrEnum):
     INSTALL_STEP_ABSENT = "install_step_absent"
     UNKNOWN_EXCEPTION = "unknown_exception"
     EXCEPTION_MISMATCH = "exception_mismatch"
+    UNREGISTERED = "unregistered"
 
 
 @dataclass(frozen=True, order=True)
@@ -201,6 +205,16 @@ class Ruling:
 # rule 9); none exists.
 RULINGS: dict[str, Ruling] = {}
 
+
+@dataclass(frozen=True)
+class Occurrence:
+    """Where the source places or specifies one required joint."""
+
+    assembly: str
+    source: str  # file under cad/scripts
+    anchor: str  # literal text in ``source`` at the joint's placement or spec
+
+
 # Assemblies whose steps are keyed in a step registry.
 STEP_LISTS: dict[str, tuple[str, ...]] = {
     "drive_train": drive_train_steps.SEQUENCE,
@@ -218,12 +232,17 @@ def audit(
     *,
     threaded: frozenset[str],
     unthreaded: frozenset[str],
+    required: Mapping[str, Occurrence],
     purchased: frozenset[str] = frozenset(),
     unthreaded_stock: Mapping[str, str] | None = None,
     rulings: Mapping[str, Ruling] = RULINGS,
 ) -> list[Finding]:
     """Every retention and coverage finding, sorted. Empty means clean.
 
+    ``required`` is the joint registry the table must match exactly: a
+    registered joint with no row is OMITTED, and a row the registry does not
+    list is UNREGISTERED. Stem coverage alone cannot see a missing row when
+    another row names the same parts (several screws of one stock).
     ``purchased`` names the bought-in parts; one counts as unthreaded only
     with a reason in ``unthreaded_stock`` (a pin, washer, spring or push-on
     cap), so purchased hardware cannot silently drop out of coverage."""
@@ -234,8 +253,34 @@ def audit(
     def flag(assembly: str, subject: str, kind: Kind, detail: str) -> None:
         findings.append(Finding(assembly, subject, kind, detail))
 
-    # Coverage: every referenced part is classified, and every threaded part
-    # appears in a row of its assembly or of an assembly containing it.
+    # Coverage: every registered joint has its row, every row is registered,
+    # every referenced part is classified, and every threaded part appears in
+    # a row of its assembly or of an assembly containing it.
+    rows_by_id = {j.id: j for j in joints}
+    for joint_id, occurrence in sorted(required.items()):
+        row = rows_by_id.get(joint_id)
+        if row is None:
+            flag(
+                occurrence.assembly,
+                joint_id,
+                Kind.OMITTED,
+                f"required joint has no row ({occurrence.source}: {occurrence.anchor!r})",
+            )
+        elif row.assembly != occurrence.assembly:
+            flag(
+                row.assembly,
+                joint_id,
+                Kind.UNREGISTERED,
+                f"registered under {occurrence.assembly}, not {row.assembly}",
+            )
+    for joint in joints:
+        if joint.id not in required:
+            flag(
+                joint.assembly,
+                joint.id,
+                Kind.UNREGISTERED,
+                "row has no entry in REQUIRED_JOINTS",
+            )
     named: dict[str, set[str]] = {}
     for joint in joints:
         named.setdefault(joint.assembly, set()).update({joint.member, joint.receiver})
@@ -386,6 +431,7 @@ def audit_table() -> list[Finding]:
         unthreaded=UNTHREADED_PARTS,
         purchased=purchased_parts(),
         unthreaded_stock=UNTHREADED_STOCK,
+        required=REQUIRED_JOINTS,
     )
 
 
@@ -527,6 +573,7 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "thumb_screw",  # #4-40 UNC (McMaster 91882A221), member: into magnifying_clamp ScrewHole; 2nd instance into output_fixture cross hole (config qty 2, not placed in the SLDASM)
         "top_frame",  # receiver: #10-32 cross taps, 1/4-20 gooseneck set tap, #8-32 fulcrum-keeper taps (top-level row)
         "transgear_knob_shaft",  # front stub thread (size unstated, modelled plain O9.525), receiver/stud of the thumbnut
+        "transgear_stub",  # slotted cap screw in the collar face, thread unstated, modelled integral (transgear_stub_spec): member AND receiver
         "transgear_thumbnut",  # internal thread (size unstated, "tapped bore modelled as a plain slip bore"), member (nut)
         "wheel_axle",  # stud tip carries the hex nut (thread not modelled / not specified on the axle drawing), receiver of wheel_axle_nut
         "wheel_axle_nut",  # hex nut AF8 x 3 on the O5 stud ("commercial hex nut (thread not modelled)"), member
@@ -604,7 +651,6 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "transgear_latch",  # plain O9.6 hub bores (build_transgear_latch.BORE_DIA), no thread
         "transgear_pinion",  # 12T third gear, plain bore on knob-shaft seat, no set screw
         "transgear_removable",  # O12 plain bore + 2 drive-pin holes, no thread (build_transgear_removable)
-        "transgear_stub",  # ON MAIN: plain slip plug in the bracket's letter-V bore; "cap screw" modelled integral (transgear_stub_spec)
         "tube_frame",  # columns: socket slip fit; cross holes enlarged so the MHA-132 shank passes "WITHOUT THREAD CONTACT" (MHA-A04 STEP 2/5)
         "tube_frame_cap",  # McMaster 9275K141 push-on cap (MHA-A04 STEP 7)
         "wheel_bar",  # #8 clearance holes (clamp screws) + #8 close clearance (pen-hanger screw, which threads into pen_hanger in pen.SLDASM)
@@ -1672,7 +1718,195 @@ JOINTS: tuple[Joint, ...] = (
         lock_step="",
         evidence="build_paper_drive_assembly.py:build ('knob cluster: thumbnut locked to the knob shaft' lock_mate) and the THUMBNUT_* asserts; build_transgear_thumbnut docstring/BORE_DIA; build_transgear_knob_shaft.FRONT_STUB ('thread the thumbnut runs onto, modelled plain'); config/parts/transgear-thumbnut.yaml process; config/assemblies/paper-drive.yaml allowed_free_stems comment",
     ),
+    Joint(
+        id="paper-drive/transgear-stub-cap-screw",
+        assembly="paper_drive",
+        member="transgear_stub",
+        receiver="transgear_stub",
+        thread="unstated (slotted cap screw in the collar face, modelled integral; no thread, size or engagement recorded)",
+        quantity=1,
+        installed_at="",
+        exposure=Exposure.ROTATING_DRAG,
+        exposure_reason=(
+            "the collar the cap screw holds is the front axial stop for the 120T disc, which is a free "
+            "revolute on the stud's O5 seat with the 12T feed pinion locked to it. The disc's front face "
+            "runs 0.4 clear of the collar (disc -148.4, collar -148.8), so any disc end float rubs the "
+            "collar about the stud axis, which is the screw axis. The crank turns the cluster continuously "
+            "and reverses it when the paper is wound back"
+        ),
+        axial_capture=(
+            "CAP_DIA 5.0 slotted round head standing 1.5 proud of the 14.0 brass collar face (ch23 p.59 "
+            "photo); the collar is modelled integral with the stud (build_transgear_stub 'end hardware "
+            "collapsed to a collar -- simplification'), so neither the screw's thread nor the collar's seat "
+            "on the stud is modelled"
+        ),
+        lock=Lock.NONE,
+        lock_part="",
+        lock_binds=(),
+        lock_step="",
+        evidence=(
+            "transgear_stub_spec.py CAP_DIA/CAP_LEN/CAP_SLOT_W/CAP_SLOT_D ('Slotted cap screw in the "
+            "collar's face ... modelled integral') and DRAWING_NOTES ('CAP DIA ... WITH A ... SLOT "
+            "(MODELLED INTEGRAL)'); build_transgear_stub.py docstring + 'Cap'/'CapSlot' features; "
+            "build_paper_drive_assembly.py transgear-stub placement, DISC_Z0, 'rack-pinion (120T reducer "
+            "disc)' revolute and 'feed pinion locked to the disc'"
+        ),
+    ),
 )
+
+# Every threaded joint the build calls for, with the source occurrence that
+# places or specifies it. Kept apart from JOINTS so that deleting a row is an
+# OMITTED finding even where another row names the same stems. Not derived
+# automatically: the build's placements cannot be enumerated offline without
+# running SolidWorks, and its threaded interference contracts list only
+# joints whose modelled threads overlap (no integral, unmodelled, or
+# mate-only joint, and not the latch-hook screw). test_joint_retention checks
+# every anchor still occurs in its source.
+REQUIRED_JOINTS: dict[str, Occurrence] = {
+    "frame/cross-screw-in-base": Occurrence(
+        "frame", "build_frame_assembly.py", "BASE_SCREW_SEAT_Z"
+    ),
+    "frame/cross-screw-in-top-frame": Occurrence(
+        "frame", "build_frame_assembly.py", "TOP_SCREW_SEAT_Z"
+    ),
+    "frame/support-hold-down-in-base": Occurrence(
+        "frame", "build_frame_assembly.py", '"lag-screw"'
+    ),
+    "frame/nameplate-screw-in-base": Occurrence(
+        "frame", "build_frame_assembly.py", "NAMEPLATE_SCREW_"
+    ),
+    "harmonic-analyzer/gooseneck-set-screw-in-top-frame": Occurrence(
+        "harmonic_analyzer", "build_frame_assembly.py", '"gooseneck-set-screw"'
+    ),
+    "drive-train/post-mount-screws": Occurrence(
+        "drive_train",
+        "build_drive_train_assembly.py",
+        "clamped in the post counterbore",
+    ),
+    "drive-train/tip-block-hold-down": Occurrence(
+        "drive_train",
+        "build_drive_train_assembly.py",
+        "clamped in the platform hold-down counterbore",
+    ),
+    "drive-train/tip-adjuster": Occurrence(
+        "drive_train", "build_drive_train_assembly.py", '"cone-tip-adjuster"'
+    ),
+    "drive-train/tip-pinch-screw": Occurrence(
+        "drive_train", "build_drive_train_assembly.py", "pinch screw in the cross-bore"
+    ),
+    "drive-train/tip-collar-set-screw": Occurrence(
+        "drive_train",
+        "build_drive_train_assembly.py",
+        "tip collar set screw on the D-flat",
+    ),
+    "drive-train/handle-pivot-screw": Occurrence(
+        "drive_train", "build_drive_train_assembly.py", '"crank-handle-pivot-screw"'
+    ),
+    "drive-train/arbor-apex-set-screw": Occurrence(
+        "drive_train", "build_drive_train_assembly.py", '"arbor-set-screw"'
+    ),
+    "drive-train/pinion-cam-set-screw": Occurrence(
+        "drive_train", "draw_drive_train_assembly.py", "cam-collars-set"
+    ),
+    "drive-train/keeper-eye-anchor-screw": Occurrence(
+        "drive_train", "build_drive_train_assembly.py", "ANCHOR_THREAD_ENGAGEMENT"
+    ),
+    "harmonic-analyzer/cone-pivot-screw-in-base": Occurrence(
+        "harmonic_analyzer", "build_drive_train_assembly.py", "PSCREW_"
+    ),
+    "harmonic-analyzer/cone-lock-knob-in-base": Occurrence(
+        "harmonic_analyzer", "build_drive_train_assembly.py", "require_lock_seat_fit"
+    ),
+    "harmonic-analyzer/swing-stop-screw-in-base": Occurrence(
+        "harmonic_analyzer", "build_drive_train_assembly.py", "require_stop_seat_fit"
+    ),
+    "harmonic-analyzer/spring-foot-screw-in-base": Occurrence(
+        "harmonic_analyzer", "build_drive_train_assembly.py", "_FOOT_SCREW_XZ"
+    ),
+    "harmonic-analyzer/arbor-pedestal-hold-down": Occurrence(
+        "harmonic_analyzer",
+        "build_drive_train_assembly.py",
+        '"pedestal-hold-down-screw"',
+    ),
+    "harmonic-analyzer/pinion-block-hold-down": Occurrence(
+        "harmonic_analyzer", "build_drive_train_assembly.py", '"slotted-screw"'
+    ),
+    "harmonic-analyzer/north-pivot-bracket-hold-down": Occurrence(
+        "harmonic_analyzer", "channel_assembly_steps.py", "north-pivot-bracket-set"
+    ),
+    "harmonic-analyzer/south-pivot-bracket-hold-down": Occurrence(
+        "harmonic_analyzer", "channel_assembly_steps.py", "south-bracket-feeler-set"
+    ),
+    "harmonic-analyzer/fulcrum-keeper-screw-in-top-frame": Occurrence(
+        "harmonic_analyzer", "build_channel_assembly.py", '"frame-side-screw"'
+    ),
+    "harmonic-analyzer/channel-anchor-in-summing-plate": Occurrence(
+        "harmonic_analyzer", "build_channel_assembly.py", "direct threaded seat"
+    ),
+    "harmonic-analyzer/stick-stop-thumbscrew": Occurrence(
+        "harmonic_analyzer", "build_measuring_stick_stop.py", "thumbscrew"
+    ),
+    "summing/knife-hanger-in-mount": Occurrence(
+        "summing", "build_summing_assembly.py", "HANGER_STUD_Y"
+    ),
+    "summing/boss-hook-in-lever": Occurrence(
+        "summing", "build_summing_assembly.py", "boss-hook keyed"
+    ),
+    "summing/gooseneck-spring-screw": Occurrence(
+        "summing", "gooseneck_spec.py", "SPRING SCREW"
+    ),
+    "pen/hanger-screw-in-hanger": Occurrence(
+        "pen", "build_pen_assembly.py", "HANGER_SCREW_POS"
+    ),
+    "pen/thumb-screw-in-stirrup": Occurrence(
+        "pen", "build_pen_assembly.py", "SET_SCREW_POS"
+    ),
+    "pen/v-block-set-screw-on-rod": Occurrence(
+        "pen", "pen_v_block_spec.py", "SCREW_HOLE_DIA"
+    ),
+    "magnifier/wheel-axle-nut": Occurrence(
+        "magnifier", "build_magnifier_assembly.py", "wheel-axle nut locked to the axle"
+    ),
+    "magnifier/clamp-thumb-screw": Occurrence(
+        "magnifier", "build_magnifier_assembly.py", "thumb-screw locked to clamp"
+    ),
+    "magnifier/fixture-thumb-screw": Occurrence(
+        "magnifier", "output_fixture_spec.py", "CROSS_HOLE_SPEC"
+    ),
+    "magnifier/wheel-bar-clamp-screws": Occurrence(
+        "magnifier", "build_magnifier_assembly.py", "CLAMP_SCREW_X"
+    ),
+    "paper-drive/clamp-screw-in-back-arc": Occurrence(
+        "paper_drive", "build_paper_drive_assembly.py", "support clamp-screw pattern"
+    ),
+    "paper-drive/bracket-screw-in-bar": Occurrence(
+        "paper_drive",
+        "build_paper_drive_assembly.py",
+        "transgear bracket-screw pattern",
+    ),
+    "paper-drive/latch-hook-screw-in-bar": Occurrence(
+        "paper_drive", "build_paper_drive_assembly.py", "LATCH_SCREW_TIP_Z"
+    ),
+    "paper-drive/clip-screw-in-platen": Occurrence(
+        "paper_drive", "build_paper_drive_assembly.py", "platen clip-screw grid"
+    ),
+    "paper-drive/guide-screw-in-guide": Occurrence(
+        "paper_drive", "build_paper_drive_assembly.py", "platen guide-screw grid"
+    ),
+    "paper-drive/lock-screw-in-guide": Occurrence(
+        "paper_drive", "build_paper_drive_assembly.py", "platen lock-screw grid"
+    ),
+    "paper-drive/thumbnut-on-knob-shaft": Occurrence(
+        "paper_drive",
+        "build_paper_drive_assembly.py",
+        "knob cluster: thumbnut locked to the knob shaft",
+    ),
+    "paper-drive/transgear-stub-cap-screw": Occurrence(
+        "paper_drive",
+        "transgear_stub_spec.py",
+        "Slotted cap screw in the collar's face",
+    ),
+}
 
 if __name__ == "__main__":
     sys.exit(main())

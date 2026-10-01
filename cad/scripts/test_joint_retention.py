@@ -8,10 +8,11 @@ cap retains axially (MHA-082 in MHA-164, paper drive). SolidWorks-free.
 from __future__ import annotations
 
 import dataclasses
+from pathlib import Path
 
 import joint_retention as jr
 import pytest
-from joint_retention import Exposure, Inventory, Joint, Kind, Lock, Ruling
+from joint_retention import Exposure, Inventory, Joint, Kind, Lock, Occurrence, Ruling
 
 PARTS = frozenset({"stud", "arm", "shim", "disc", "cap", "jam_nut", "base", "screw"})
 THREADED = frozenset({"stud", "arm", "cap", "jam_nut", "base", "screw"})
@@ -77,11 +78,13 @@ NUT = Joint(
     evidence="fixture",
 )
 VALID = (STUD, CAP, SCREW, NUT)
+REQUIRED = {j.id: Occurrence(j.assembly, "fixture", j.id) for j in VALID}
 
 
 def _audit(joints, inventory=INVENTORY, **kwargs):
     kwargs.setdefault("threaded", THREADED)
     kwargs.setdefault("unthreaded", UNTHREADED)
+    kwargs.setdefault("required", REQUIRED)
     return jr.audit(joints, inventory, **kwargs)
 
 
@@ -97,16 +100,38 @@ def test_a_mechanically_locked_stud_and_reasoned_static_clamps_pass() -> None:
     assert _audit(VALID) == []
 
 
-def test_a_missing_joint_row_is_an_omitted_threaded_part() -> None:
+def test_a_missing_joint_row_is_omitted() -> None:
     findings = _audit((STUD, CAP, NUT))
-    # The screw and the base it threads into are named by no other row.
-    assert _kinds(findings) == {("screw", Kind.OMITTED), ("base", Kind.OMITTED)}
+    # The registered screw joint has no row, and the screw and the base it
+    # threads into are named by no other row.
+    assert _kinds(findings) == {
+        (SCREW.id, Kind.OMITTED),
+        ("screw", Kind.OMITTED),
+        ("base", Kind.OMITTED),
+    }
+
+
+def test_a_missing_row_is_omitted_when_another_row_names_its_parts() -> None:
+    # A second screw of the same stock into the same base: stem coverage is
+    # satisfied by the first screw's row, so only the registry sees the gap.
+    second = dataclasses.replace(SCREW, id="paper-drive/second-screw-in-base")
+    required = {**REQUIRED, second.id: Occurrence("paper_drive", "fixture", "")}
+    assert _audit((*VALID, second), required=required) == []
+    assert _kinds(_audit(VALID, required=required)) == {(second.id, Kind.OMITTED)}
+
+
+def test_a_row_the_registry_does_not_list_is_unregistered() -> None:
+    extra = dataclasses.replace(SCREW, id="paper-drive/second-screw-in-base")
+    assert _kinds(_audit((*VALID, extra))) == {(extra.id, Kind.UNREGISTERED)}
+    # Registered under another assembly is not a match either.
+    required = {**REQUIRED, SCREW.id: Occurrence("frame", "fixture", "")}
+    assert _kinds(_audit(VALID, required=required)) == {(SCREW.id, Kind.UNREGISTERED)}
 
 
 def test_threaded_lock_hardware_needs_its_own_row() -> None:
     # The stud row names the jam nut as its lock; that does not cover the nut.
     findings = _audit((STUD, CAP, SCREW))
-    assert _kinds(findings) == {("jam_nut", Kind.OMITTED)}
+    assert _kinds(findings) == {(NUT.id, Kind.OMITTED), ("jam_nut", Kind.OMITTED)}
 
 
 def test_a_part_the_assembly_references_must_be_classified() -> None:
@@ -244,7 +269,8 @@ def test_hardware_the_drawings_call_for_but_no_assembly_places_is_reported() -> 
         lock=Lock.NONE,
         evidence="fixture",
     )
-    findings = _audit((set_screw, CAP, SCREW, NUT, STUD))
+    required = {**REQUIRED, set_screw.id: Occurrence("paper_drive", "fixture", "")}
+    findings = _audit((set_screw, CAP, SCREW, NUT, STUD), required=required)
     assert _kinds(findings) == {
         (set_screw.id, Kind.HARDWARE_UNMODELLED),
         (set_screw.id, Kind.UNLOCKED),
@@ -282,12 +308,19 @@ def test_a_cross_assembly_joint_covers_the_parts_of_both_subassemblies() -> None
         evidence="fixture",
     )
     threaded = frozenset({"hook", "plate"})
-    findings = jr.audit([hook], inventory, threaded=threaded, unthreaded=frozenset())
+    required = {hook.id: Occurrence("top", "fixture", "")}
+    findings = jr.audit(
+        [hook], inventory, threaded=threaded, unthreaded=frozenset(), required=required
+    )
     assert _kinds(findings) == {(hook.id, Kind.UNLOCKED)}
     # The same row filed under one sub-assembly cannot name the other's part.
     misfiled = dataclasses.replace(hook, assembly="channel")
     findings = jr.audit(
-        [misfiled], inventory, threaded=threaded, unthreaded=frozenset()
+        [misfiled],
+        inventory,
+        threaded=threaded,
+        unthreaded=frozenset(),
+        required=required,
     )
     assert (hook.id, Kind.UNKNOWN_PART) in _kinds(findings)
     assert ("plate", Kind.OMITTED) in _kinds(findings)
@@ -303,6 +336,7 @@ COVERAGE = frozenset(
         Kind.UNKNOWN_PART,
         Kind.INSTALL_STEP_ABSENT,
         Kind.UNKNOWN_EXCEPTION,
+        Kind.UNREGISTERED,
     }
 )
 
@@ -312,6 +346,33 @@ def test_the_table_covers_every_threaded_part_the_build_assembles() -> None:
     assert findings == [], "\n".join(
         f"{f.assembly} {f.subject}: {f.kind}: {f.detail}" for f in findings
     )
+
+
+def test_every_registered_joint_cites_a_live_source_occurrence() -> None:
+    scripts = Path(jr.__file__).parent
+    stale = [
+        f"{joint_id}: {o.anchor!r} not in {o.source}"
+        for joint_id, o in jr.REQUIRED_JOINTS.items()
+        if o.anchor not in (scripts / o.source).read_text(encoding="utf-8")
+    ]
+    assert stale == []
+
+
+def test_deleting_a_row_whose_parts_other_rows_name_is_omitted() -> None:
+    # The latch-hook screw shares bracket_screw and support_bar with the
+    # bracket-screw row, so only the registry notices it is gone.
+    gone = "paper-drive/latch-hook-screw-in-bar"
+    table = tuple(j for j in jr.JOINTS if j.id != gone)
+    findings = jr.audit(
+        table,
+        jr.build_inventory(),
+        threaded=jr.THREADED_PARTS,
+        unthreaded=jr.UNTHREADED_PARTS,
+        purchased=jr.purchased_parts(),
+        unthreaded_stock=jr.UNTHREADED_STOCK,
+        required=jr.REQUIRED_JOINTS,
+    )
+    assert {f.subject for f in findings if f.kind is Kind.OMITTED} == {gone}
 
 
 # Joints whose hardware the drawings call for but no builder places. A row
