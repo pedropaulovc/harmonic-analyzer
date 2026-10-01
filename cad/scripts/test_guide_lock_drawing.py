@@ -66,7 +66,7 @@ def _ligaments(hole_y: float) -> dict[str, float]:
     xs = [x for x, _ in guide_lock_spec.HOLE_XY]
     return {
         "guide-side edge": hole_y - band - r_max,
-        "far edge": (16.0 - 0.50) - hole_y - band - r_max,
+        "far edge": (15.65 - 0.50) - hole_y - band - r_max,
         "left edge": min(xs) - band - r_max,
         "right edge": (22.0 - _ONE_PLACE) - max(xs) - band - r_max,
     }

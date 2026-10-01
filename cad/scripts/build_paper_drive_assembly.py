@@ -260,7 +260,7 @@ from fillister_screw_spec import (  # noqa: E402
 from guide_lock_screw_spec import (  # noqa: E402
     HEAD_DIA as LOCK_SCREW_HEAD_DIA,
     HEAD_H as LOCK_SCREW_HEAD_H,
-    LOCK_SET_OFFSET,
+    LOCK_SET_EDGE_REACH,
     SHANK_DIA as LOCK_SCREW_SHANK_DIA,
     SHANK_LEN as LOCK_SCREW_SHANK_LEN,
 )
@@ -1130,6 +1130,10 @@ def _latch_hook_sections(step: float = 0.05) -> list[tuple[float, float, float, 
 # spacer, its plate's lower section on the thinnest arm stock and the deepest
 # notch. Deviations are (lower, upper) from the model, read from the specs the
 # parts author on their model dimensions, so the sheets and the sweep agree.
+# Unmodelled contributor (R9-61): the bottom rail's y on the platen, set
+# against the top rail (which hangs on the bar's top edge) by the platen's
+# guide-screw rows and the #4 screws' float in its Ø3.0 holes. The platen has
+# no sheet and so no printed bands, so the sweep holds both rails at GUIDE_Y.
 LOCK_SWEEP_FLOOR = 0.10
 _BAR_DEPTH_DEV = (-BAR.BAR_DEPTH_BAND, BAR.BAR_DEPTH_BAND)
 _GUIDE_DEPTH_DEV = printed_deviations(
@@ -1182,11 +1186,12 @@ def _assert_lock_station_sweep() -> None:
     lock_back = LOCK_Z0 + LOCK_THICK
     head_r = LOCK_SCREW_HEAD_DIA / 2.0  # the catalogue head, Ø and height
     # R9-49: each lock is pushed away from the bar onto its screws before they
-    # are tightened (the "guide-locks-set" step), so its guide-side edge stands
-    # up to LOCK_SET_OFFSET[1] beyond the model and its far edge recedes by at
-    # least LOCK_SET_OFFSET[0], less the height band's growth.
-    plate_outward = LOCK_SET_OFFSET[1]
-    plate_inward = max(_LOCK_HEIGHT_DEV[1], 0.0) - LOCK_SET_OFFSET[0]
+    # are tightened (the "guide-locks-set" step). Set so, and skewed by holes
+    # bearing at opposite ends of the set window, its guide-side edge stands
+    # up to LOCK_SET_EDGE_REACH[1] beyond the model and its far edge up to
+    # LOCK_SET_EDGE_REACH[0] toward the bar, plus the height band's growth.
+    plate_outward = LOCK_SET_EDGE_REACH[1]
+    plate_inward = max(_LOCK_HEIGHT_DEV[1], 0.0) + LOCK_SET_EDGE_REACH[0]
     moving = []
     for index, (gy, (y0, y1)) in enumerate(zip(GUIDE_Y, LOCK_PLATE_Y, strict=True)):
         yc = gy + GUIDE_HEIGHT / 2.0
@@ -1238,7 +1243,19 @@ def _assert_lock_station_sweep() -> None:
     )
     py = PIVOT_XY[1]
     ky = KNOB_SHAFT_XY[1]
-    spacer_r = (SPACER.OD + SPACER.OD_BAND) / 2.0
+    # R9-61: the hanger hangs on the pivot screw, whose #8-32 tap the bar
+    # prints at its ±HOLE_POSITION_BAND, so every hung section stands off its
+    # model by that band in y. The spacer is loose on the shoulder (it only
+    # spaces the arm off the bar), so its largest O.D. also stands off the
+    # screw axis by the largest bore on the thinnest shoulder.
+    pivot_tap = BAR.HOLE_POSITION_BAND
+    spacer_float = (
+        SPACER.BORE_DIA
+        + SPACER.BORE_DIA_BAND
+        - PIVOT_SCREW.SHOULDER_DIA
+        - PIVOT_SCREW.SHOULDER_DIA_LIMITS[0]
+    ) / 2.0
+    spacer_r = (SPACER.OD + SPACER.OD_BAND) / 2.0 + spacer_float
     bracket_y = HOOK_BRACKET.MACHINE_ORIGIN[1]
     bracket_screw_z = BAR_BACK_Z + HOOK_BRACKET.SHEET_T + HOOK_BRACKET.SHEET_T_PLUS
     # The arm's front face on the shortest spacer; its plate's lower section
@@ -1251,7 +1268,7 @@ def _assert_lock_station_sweep() -> None:
             "arm",
             _grown(
                 (tip_y - ARM.TIP_END_R, py + ARM.PIVOT_END_R, ARM_Z0, PLATE_Z0),
-                ARM.BAND_X + ARM.TIP_STATION_BAND,
+                ARM.BAND_X + ARM.TIP_STATION_BAND + pivot_tap,
                 arm_forward,
                 0.0,
             ),
@@ -1265,7 +1282,7 @@ def _assert_lock_station_sweep() -> None:
                     PLATE_Z0 + ARM_PLATE.FRONT_FACE_Z,
                     PLATE_Z0 + ARM_PLATE.BOSS_FACE_Z,
                 ),
-                _PLATE_OUTLINE_BAND,
+                _PLATE_OUTLINE_BAND + pivot_tap,
                 plate_forward,
                 0.0,
             ),
@@ -1279,7 +1296,7 @@ def _assert_lock_station_sweep() -> None:
                     PLATE_Z0 + ARM_PLATE.HUB_FACE_Z,
                     ARM_Z0,
                 ),
-                _HUB_DIA_DEV[1] / 2.0,
+                _HUB_DIA_DEV[1] / 2.0 + pivot_tap,
                 arm_forward,
                 0.0,
             ),
@@ -1294,30 +1311,45 @@ def _assert_lock_station_sweep() -> None:
                         ARM_Z0 - HANGER.PLATE_SCREW_TIP_PROUD_MAX,
                         PLATE_SCREW_Z0,
                     ),
-                    ARM.HOLE_POSITION_BAND,
+                    ARM.HOLE_POSITION_BAND + pivot_tap,
                     arm_forward,
                     0.0,
                 ),
             )
             for _, y in PLATE_SCREW_XY
         ),
-        ("pivot spacer", (py - spacer_r, py + spacer_r, SPACER_Z0, ARM_Z0)),
+        (
+            "pivot spacer",
+            _grown(
+                (py - spacer_r, py + spacer_r, SPACER_Z0, ARM_Z0), pivot_tap, 0.0, 0.0
+            ),
+        ),
         (
             "pivot screw shoulder",
-            (
-                py - PIVOT_SCREW.SHOULDER_DIA / 2.0,
-                py + PIVOT_SCREW.SHOULDER_DIA / 2.0,
-                SPACER_Z0,
-                PIVOT_SCREW_Z0,
+            _grown(
+                (
+                    py - PIVOT_SCREW.SHOULDER_DIA / 2.0,
+                    py + PIVOT_SCREW.SHOULDER_DIA / 2.0,
+                    SPACER_Z0,
+                    PIVOT_SCREW_Z0,
+                ),
+                pivot_tap,
+                0.0,
+                0.0,
             ),
         ),
         (
             "pivot screw head",
-            (
-                py - PIVOT_SCREW.HEAD_DIA / 2.0,
-                py + PIVOT_SCREW.HEAD_DIA / 2.0,
-                PIVOT_SCREW_Z0,
-                PIVOT_SCREW_Z0 + PIVOT_SCREW.HEAD_H,
+            _grown(
+                (
+                    py - PIVOT_SCREW.HEAD_DIA / 2.0,
+                    py + PIVOT_SCREW.HEAD_DIA / 2.0,
+                    PIVOT_SCREW_Z0,
+                    PIVOT_SCREW_Z0 + PIVOT_SCREW.HEAD_H,
+                ),
+                pivot_tap,
+                0.0,
+                0.0,
             ),
         ),
         (
@@ -2048,8 +2080,8 @@ async def build(adapter) -> dict[str, str]:
     # Lock plates on the guide backs, bridging BEHIND the bar (1.0 clear of its
     # back face) and lapping LOCK_RAIL_LIP past each rail's outer edge: top-rail
     # locks hang DOWN over the bar (Rz180), bottom-rail locks bridge UP across
-    # the 7 open channel onto the bar band (identity, 3 overlap -- the plate's
-    # height is sized by this station).
+    # the 7 open channel onto the bar band (identity, 2.65 overlap, R9-61 --
+    # the plate's height is sized by this station).
     for x_c in LOCK_STATION_X:
         # Machine: the station is measured from the platen's +X edge (the mirror
         # of the pre-mirror left-edge station PLATE_X0 + x_c).

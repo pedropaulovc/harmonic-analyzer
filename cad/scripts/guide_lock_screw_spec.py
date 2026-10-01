@@ -21,8 +21,12 @@ position need hole-over-screw clearance; the #4 close Ø3.048 left too
 little.  The lock holes are 1/8 DRILL (Ø3.175), and at assembly each lock is
 pushed away from the bar until its holes bear on the screws before they are
 tightened (``paper_drive_assembly_steps`` "guide-locks-set").  Pushed so, a
-lock stands between ``LOCK_SET_OFFSET`` beyond its model position, away from
-the bar; the lock-station sweep reads that window.
+lock stands between ``LOCK_SET_OFFSET`` beyond its model position at each
+hole, away from the bar.
+
+Ruling R9-61: the two holes need not bear alike, so a set plate can skew
+(``LOCK_SET_SKEW``); the step pushes it at its middle, and the lock-station
+sweep reads the skewed plate's edges (``LOCK_SET_EDGE_REACH``).
 """
 
 from __future__ import annotations
@@ -114,3 +118,35 @@ if LOCK_SET_OFFSET[0] < 0.0:
         f"{POSITION_RADIAL:.3f} (hole-over-screw "
         f"{LOCK_HOLE_DIA_MIN - SCREW_MAJOR_MAX:.3f} < {2.0 * POSITION_RADIAL:.2f})"
     )
+
+# --- The set plate's skew -----------------------------------------------------
+# The window holds at each hole on its own, so a set plate need not translate:
+# one hole can bear at the least gain (the smallest drill on the fattest
+# screw, its position errors toward the bar) while the other bears at the
+# most (the largest drill on the thinnest screw, its errors away from it).
+# The rigid plate then turns through the gain difference over the shortest
+# hole pitch the coordinates print, and its corner outboard of the
+# less-gained hole swings toward the bar by that skew times the longest
+# overhang the outline and coordinate bands allow. This bounds the plate
+# pushed at its middle, as the "guide-locks-set" step does: there the
+# frictionless contact (both holes bearing, any x pitch error) stays inside
+# it (test_guide_lock_fit_drawing).
+_HOLE_X = sorted(x for x, _ in lock.HOLE_XY)
+_HOLE_PITCH_MIN = _HOLE_X[-1] - _HOLE_X[0] - 2.0 * lock.HOLE_LOCATION_BAND
+_WIDTH_DEV = printed_deviations(
+    lock.LOCK_WIDTH, lock.DRAWING_PRECISION["LockProfile"]["Width"]
+)
+CORNER_OVERHANG_MAX = (
+    max(_HOLE_X[0], lock.LOCK_WIDTH + _WIDTH_DEV[1] - _HOLE_X[-1])
+    + lock.HOLE_LOCATION_BAND
+)
+# The sine of the largest skew.
+LOCK_SET_SKEW = (LOCK_SET_OFFSET[1] - LOCK_SET_OFFSET[0]) / _HOLE_PITCH_MIN
+# (far, guide side): the most a set plate's long edges stand beyond their
+# model positions anywhere along them, the far (spacer-side) edge toward the
+# bar and the guide-side edge away from it. The skew's cosine only draws both
+# edges in, so it is left out.
+LOCK_SET_EDGE_REACH = (
+    CORNER_OVERHANG_MAX * LOCK_SET_SKEW - LOCK_SET_OFFSET[0],
+    LOCK_SET_OFFSET[1] + CORNER_OVERHANG_MAX * LOCK_SET_SKEW,
+)

@@ -76,10 +76,13 @@ MATERIAL = "Plain Carbon Steel"
 # 5 (rail) + 7 (channel) + the overlap behind the bar. The 2026-09-02 user
 # re-read of ch22 p.54 shows a LOW lock: 5 rail + 7 channel + 3 bar overlap
 # (the 2026-07 plate reached a 7 overlap = 19), plus R9-59's 1.0 lip past the
-# rail's outer edge that gives the screw holes their edge ligament. The top
-# rail sits ON the bar, so the same plate overlaps the bar by 10 there.
-# (2026-07-07 field report: a 12-tall plate topped out AT the bar's bottom
-# edge and retained nothing at the bottom stations -- 3 is kept.)
+# rail's outer edge that gives the screw holes their edge ligament. R9-61
+# brought the spacer-side edge in by 0.35 so the set, skewed plate clears the
+# floating pivot spacer: the bottom station overlaps the bar 2.65 (2.15 at
+# the -0.50 height band). The top rail sits ON the bar, so the same plate
+# overlaps the bar by 9.65 there. (2026-07-07 field report: a 12-tall plate
+# topped out AT the bar's bottom edge and retained nothing at the bottom
+# stations.)
 # Stock 91255A108 button head shanks (MHA-176, rulings R9-31, R9-48) pass
 # through the lock plates before threading into the guide's rear-face #4-40
 # through taps. The part-owned 1/8 drill (R9-49) carries both printed hole

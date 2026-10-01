@@ -28,9 +28,12 @@ LOCK_WIDTH = 22.0  # along +X
 # holes, on the rail's mid-line, stand 3.5 from the guide-side edge and keep
 # the 1.5 ligament at the printed worst case (2.5 left 0.81).
 RAIL_EDGE_LIP = 1.0
-LOCK_HEIGHT = 16.0  # along +Y; y = 0 is the guide-side edge (2026-09-02
-# user re-read of ch22 p.54: a LOW lock -- 1 lip + 5 rail + 7 channel + 3 bar
-# overlap)
+# R9-61: 15.65 along +Y; y = 0 is the guide-side edge. The 2026-09-02 user
+# re-read of ch22 p.54 gives a LOW lock (1 lip + 5 rail + 7 channel + 3 bar
+# overlap = 16); only the spacer-side edge came in, by 0.35, so the set and
+# skewed plate clears the floating pivot spacer, and the bottom station
+# overlaps the bar 2.65 (2.15 at the -0.50 band).
+LOCK_HEIGHT = 15.65
 LOCK_THICK = 2.0  # extruded +Z
 
 # Screw-hole layout on the guide-side band (matches the guide's hole pitch:
@@ -58,12 +61,13 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 HOLE_LOCATION_DIMENSIONS = DRAWING_DIMENSIONS["ScrewHoles"]
 
 # Places and explicit bands the print carries on those dimensions, the ones the
-# paper-drive lock-station sweep judges the plate at (policy rule 12). The
-# bottom-station plate's far edge passes 0.150 from the pivot spacer and its
-# back face carries the button heads past the hanger arm and arm plate. So
-# the height never runs over 16 (+0/-0.50), and the strip thickness prints
-# .XXX (±0.13; at .XX the heads reach the arm plate). The width is free in the
-# unbounded sweep and prints .X.
+# paper-drive lock-station sweep judges the plate at (policy rule 12). Each
+# plate's far edge passes 0.142 from the floating pivot spacer, set and skewed
+# on its screws (R9-61), and its back face carries the button heads past the
+# hanger arm and arm plate. So the height never runs over 15.65 (+0/-0.50),
+# and the strip thickness prints .XXX (±0.13; at .XX the heads reach the arm
+# plate). The width prints .X: its +0.8 lengthens the overhang the skew swings
+# (guide_lock_screw_spec.CORNER_OVERHANG_MAX).
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "LockProfile": {"Width": 1, "Height": 2},
     "Lock": {"Depth": 3},

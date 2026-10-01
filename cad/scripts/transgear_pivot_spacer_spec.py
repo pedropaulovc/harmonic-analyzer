@@ -20,7 +20,7 @@ from _gtol_spec import PlanarFace
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 OD = 8.6
-OD_BAND = 0.13  # ±0.13: 0.07 worst to the lock stations
+OD_BAND = 0.13  # ±0.13: 0.142 worst to the lock stations, floating (R9-61)
 BORE_DIA = 4.9  # .XXX, runs on the Ø4.7625 shoulder
 BORE_DIA_BAND = 0.13
 # The bore runs on the MHA-168 shoulder, as the arm's does: a fit bore, so it

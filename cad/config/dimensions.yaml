@@ -1502,13 +1502,13 @@ sections:
         - scaled + derived
         - med
       - - Platen guides + locks (rework E3, NEW)
-        - 'two black rails 269.64 × 5 × 10 screwed across the FULL platen back (bottom y 283.734..288.734, top 317.734..322.734 — the platen HANGS by the top rail''s underside on the bar''s top edge 317.734), each by 5 fillister screws whose heads show on the platen front (rows y 286.234/320.234, x −6.249..+209.463 step 53.928), seated in Ø6.5 × 2.4 counterbores (crowns 0.2 sub-flush so the paper lies flat) with shanks threading 2.4 into blind Ø3 holes on the rail fronts; 4 black lock plates 22 × 16 × 2 (2 per rail, inboard 30/70% stations x 47.679/155.535, 2 #4-40 × 3/8 button-head socket cap screws `guide-lock-screw` each — MHA-176, McMaster 91255A108 into through taps (R9-48), whose low head clears the transgear hanger arm, R9-31) on the rail backs (z −128.9..−126.9), lapping 1.0 past each rail''s outer edge (R9-59), bridging 1.0 behind the bar — the bottom pair spans the 7 open channel below the bar and overlaps its band by 3, the top pair hangs 10 over it — so the platen cannot fall off without colliding with the east column clamp'
+        - 'two black rails 269.64 × 5 × 10 screwed across the FULL platen back (bottom y 283.734..288.734, top 317.734..322.734 — the platen HANGS by the top rail''s underside on the bar''s top edge 317.734), each by 5 fillister screws whose heads show on the platen front (rows y 286.234/320.234, x −6.249..+209.463 step 53.928), seated in Ø6.5 × 2.4 counterbores (crowns 0.2 sub-flush so the paper lies flat) with shanks threading 2.4 into blind Ø3 holes on the rail fronts; 4 black lock plates 22 × 15.65 × 2 (2 per rail, inboard 30/70% stations x 47.679/155.535, 2 #4-40 × 3/8 button-head socket cap screws `guide-lock-screw` each — MHA-176, McMaster 91255A108 into through taps (R9-48), whose low head clears the transgear hanger arm, R9-31) on the rail backs (z −128.9..−126.9), lapping 1.0 past each rail''s outer edge (R9-59), bridging 1.0 behind the bar — the bottom pair spans the 7 open channel below the bar and overlaps its band by 2.65 (R9-61), the top pair hangs 9.65 over it — so the platen cannot fall off without colliding with the east column clamp'
         - —
         - 'ch22 p.54-55 back photo (rails + bright wear band + lock plates) + front photo (two rows of 5 screw heads)'
         - scaled + derived
         - med
       - - Guide lock plates (2026-09-02)
-        - '22 × 16 × 2 (was 19 tall): 1.0 lip (R9-59) + 5 rail + 7 channel + 3 bar overlap'
+        - '22 × 15.65 × 2 (was 19 tall): 1.0 lip (R9-59) + 5 rail + 7 channel + 2.65 bar overlap (R9-61: the book read''s 3 less 0.35 so the set plate clears the pivot spacer)'
         - —
         - 'ch22 p.54: the locks read low against the rail (`guide_lock_spec.py`)'
         - scaled

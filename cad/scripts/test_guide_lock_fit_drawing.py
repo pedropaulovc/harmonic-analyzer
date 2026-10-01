@@ -9,6 +9,8 @@ its import-time assert refuses it.
 from __future__ import annotations
 
 import importlib.util
+import itertools
+import math
 import re
 from dataclasses import replace
 
@@ -98,37 +100,192 @@ def test_the_close_number_4_clearance_is_refused(monkeypatch) -> None:
         _reload_screw_spec()
 
 
-def test_set_locks_clear_the_pivot_spacer_in_the_sweep(monkeypatch) -> None:
-    """The lock-station sweep reads the as-set window: each lock's spacer-side
-    edge recedes by the least set offset, so the spacer gap grows by it."""
-    import build_paper_drive_assembly as assembly
+# R9-61 corners, recomputed from the catalogue and the printed bands.
+_HOLE_MIN = 0.125 * IN
+_CLEARANCE_MIN = (_HOLE_MIN - MAJOR_MAX) / 2.0
+_CLEARANCE_MAX = (_HOLE_MIN + DRILLED_PLUS - MAJOR_MIN) / 2.0
+_POSITION = (2 * 0.035**2) ** 0.5 + 0.20 / 2.0
+_SET_MIN = _CLEARANCE_MIN - _POSITION
+_SET_MAX = _CLEARANCE_MAX + _POSITION
+# Holes at x 4 and 18 (±0.035) from the left edge of the 22 (.X ±0.8) plate,
+# y 3.5 from its guide-side edge; R9-61's 15.65 height, +0/-0.50.
+_HOLE_X = (4.0, 18.0)
+_HOLE_Y = 3.5
+_HEIGHT = 15.65
+# Old (R9-59) model: a set plate only translates, so its far edge recedes.
+_OLD_FAR_REACH = -_SET_MIN
 
-    hole_min = 0.125 * IN
-    set_min = (hole_min - MAJOR_MAX) / 2.0 - ((2 * 0.035**2) ** 0.5 + 0.20 / 2.0)
-    spacer_r = (spacer.OD + spacer.OD_BAND) / 2.0
-    pivot_y = assembly.PIVOT_XY[1]
-    (_, bottom_top), (top_bottom, _) = assembly.LOCK_PLATE_Y
-    gap = min(
-        pivot_y - spacer_r - (bottom_top - set_min),
-        (top_bottom + set_min) - (pivot_y + spacer_r),
+
+def _set_plate_reach(e1, e2, w1, w2, c1, c2, width):
+    """(far, guide side): how far a set plate's far edge stands toward the
+    bar, and its guide-side edge away from it, beyond the model. Frictionless
+    contact: each hole (lock-frame error ``e``) bears on its screw (tap error
+    ``w``, radial clearance ``c``) on the bar side, and the push at the
+    plate's middle settles it where the two holes' gains sum largest."""
+    a1, a2 = e1[0] - w1[0], e2[0] - w2[0]
+    lo, hi = max(-c1 - a1, -c2 - a2), min(c1 - a1, c2 - a2)
+
+    def gain(c: float, h: float) -> float:
+        return math.sqrt(max(c * c - h * h, 0.0))
+
+    def bearing(t: float) -> float:
+        return gain(c1, t + a1) + gain(c2, t + a2)
+
+    for _ in range(80):
+        m1, m2 = lo + (hi - lo) / 3.0, hi - (hi - lo) / 3.0
+        if bearing(m1) < bearing(m2):
+            lo = m1
+        else:
+            hi = m2
+    t = (lo + hi) / 2.0
+    world = [
+        (x + w[0] + t + a, _HOLE_Y + w[1] - gain(c, t + a))
+        for x, w, c, a in ((_HOLE_X[0], w1, c1, a1), (_HOLE_X[1], w2, c2, a2))
+    ]
+    local = [
+        (_HOLE_X[0] + e1[0], _HOLE_Y + e1[1]),
+        (_HOLE_X[1] + e2[0], _HOLE_Y + e2[1]),
+    ]
+    turn = math.atan2(world[1][1] - world[0][1], world[1][0] - world[0][0])
+    turn -= math.atan2(local[1][1] - local[0][1], local[1][0] - local[0][0])
+
+    def y_of(x: float, y: float) -> float:
+        dx, dy = x - local[0][0], y - local[0][1]
+        return world[0][1] + math.sin(turn) * dx + math.cos(turn) * dy
+
+    corners = (0.0, width)
+    return (
+        max(y_of(x, _HEIGHT) for x in corners) - _HEIGHT,
+        -min(y_of(x, 0.0) for x in corners),
     )
-    assert gap >= assembly.LOCK_SWEEP_FLOOR
+
+
+def test_a_set_plate_skews_at_the_reviewed_hole_errors() -> None:
+    """Review of 8689c2a0d: opposite hole-position errors (lock ±0.035, guide
+    tap ±0.0999) on the tightest holes skew the set plate about 1.104°, and
+    its far corner comes 0.04458 toward the spacer instead of receding."""
+    reach = _set_plate_reach(
+        (0.0, 0.035), (0.0, -0.035), (0.0, -0.0999), (0.0, 0.0999),
+        _CLEARANCE_MIN, _CLEARANCE_MIN, 22.0,
+    )  # fmt: skip
+    assert reach[0] == pytest.approx(0.04458, abs=3e-4)
+    assert reach[0] > _OLD_FAR_REACH
+    assert screw.LOCK_SET_EDGE_REACH[0] >= reach[0]
+
+
+def test_a_set_plate_skews_further_on_unequal_hole_clearances() -> None:
+    """R9-61: each hole's clearance is its own drill and screw, so one hole
+    can bear at the least set gain and the other at the most. The skew then
+    swings the far corner over the longest overhang (22.8 wide) further toward
+    the spacer than position errors alone do."""
+    reach = _set_plate_reach(
+        (0.035, 0.035), (-0.035, -0.035), (0.0, -0.1), (0.0, 0.1),
+        _CLEARANCE_MAX, _CLEARANCE_MIN, 22.8,
+    )  # fmt: skip
+    assert reach[0] == pytest.approx(0.1034, abs=5e-4)
+    # The spec's closed form: the gain window over the shortest pitch, times
+    # the longest overhang, less the least gain.
+    overhang = 22.8 - _HOLE_X[1] + 0.035
+    skew = (_SET_MAX - _SET_MIN) / (_HOLE_X[1] - _HOLE_X[0] - 0.07)
+    assert screw.LOCK_SET_EDGE_REACH == pytest.approx(
+        (overhang * skew - _SET_MIN, _SET_MAX + overhang * skew)
+    )
+    assert reach[0] <= screw.LOCK_SET_EDGE_REACH[0]
+
+
+def test_the_set_plate_envelope_bounds_every_corner_of_the_bands() -> None:
+    """Every combination of hole-coordinate extremes, tap errors on the
+    Ø0.20 circle, clearance extremes and plate width stays inside the
+    envelope the sweep reads, on both long edges."""
+    taps = [
+        (0.1 * math.cos(k * math.pi / 4.0), 0.1 * math.sin(k * math.pi / 4.0))
+        for k in range(8)
+    ]
+    clearances = (_CLEARANCE_MIN, _CLEARANCE_MAX)
+    far = guide_side = -math.inf
+    for e in itertools.product((-0.035, 0.035), repeat=4):
+        for w1, w2, c1, c2, width in itertools.product(
+            taps, taps, clearances, clearances, (22.0 - 0.8, 22.0 + 0.8)
+        ):
+            reach = _set_plate_reach(e[:2], e[2:], w1, w2, c1, c2, width)
+            far, guide_side = max(far, reach[0]), max(guide_side, reach[1])
+    assert far <= screw.LOCK_SET_EDGE_REACH[0]
+    assert guide_side <= screw.LOCK_SET_EDGE_REACH[1]
+    # The old translation-only window misses both.
+    assert far > _OLD_FAR_REACH and guide_side > _SET_MAX
+
+
+def _spacer_gap(monkeypatch, assembly) -> float:
     lines: list[str] = []
     monkeypatch.setattr(assembly, "log", lines.append)
     assembly._assert_lock_station_sweep()
     (line,) = lines
-    reported = float(re.search(r"pivot spacer (-?\d+\.\d+)", line).group(1))
-    assert reported == pytest.approx(gap, abs=1e-3)
+    return float(re.search(r"pivot spacer (-?\d+\.\d+)", line).group(1))
+
+
+def test_set_locks_clear_the_floating_pivot_spacer_in_the_sweep(monkeypatch) -> None:
+    """R9-61: the spacer floats on the pivot shoulder (Ø5.030 bore on the
+    Ø4.7371 shoulder: 0.14645), the bar prints the pivot tap ±0.065, and each
+    set plate's far edge stands its skewed reach toward the bar; the 15.65
+    plate keeps the floor through all three."""
+    import build_paper_drive_assembly as assembly
+
+    # The largest bore on the thinnest 3/16 shoulder (+0/-0.001 in).
+    bore_max = spacer.BORE_DIA + spacer.BORE_DIA_BAND
+    spacer_float = (bore_max - (0.1875 - 0.001) * IN) / 2.0
+    assert spacer_float == pytest.approx(0.14645, abs=1e-5)
+    spacer_r = (spacer.OD + spacer.OD_BAND) / 2.0 + spacer_float + 0.065
+    far_reach = (22.8 - _HOLE_X[1] + 0.035) * (_SET_MAX - _SET_MIN) / 13.93 - _SET_MIN
+    pivot_y = assembly.PIVOT_XY[1]
+    bottom_rail, top_rail = assembly.GUIDE_Y
+    bottom_far = bottom_rail - 1.0 + _HEIGHT
+    top_far = top_rail + 5.0 + 1.0 - _HEIGHT
+    gap = min(
+        pivot_y - spacer_r - (bottom_far + far_reach),
+        (top_far - far_reach) - (pivot_y + spacer_r),
+    )
+    assert gap == pytest.approx(0.142, abs=1e-3)
+    assert gap >= assembly.LOCK_SWEEP_FLOOR
+    assert _spacer_gap(monkeypatch, assembly) == pytest.approx(gap, abs=1e-3)
+    # The 16-high plate the old model passed runs into the floating spacer.
+    monkeypatch.setattr(
+        assembly,
+        "LOCK_PLATE_Y",
+        (
+            (bottom_rail - 1.0, bottom_rail - 1.0 + 16.0),
+            (top_rail + 6.0 - 16.0, top_rail + 6.0),
+        ),
+    )
+    with pytest.raises(AssertionError, match="pivot spacer"):
+        assembly._assert_lock_station_sweep()
+
+
+def test_the_bar_pivot_tap_band_moves_the_spacer_in_the_sweep(monkeypatch) -> None:
+    """R9-61: the spacer hangs on the bar's pivot tap, so each 0.01 of the
+    tap's printed position band costs 0.01 of the spacer gap, and a band
+    wider than the gap's margin is refused."""
+    import build_paper_drive_assembly as assembly
+    import support_bar_spec as bar
+
+    gap = _spacer_gap(monkeypatch, assembly)
+    monkeypatch.setattr(bar, "HOLE_POSITION_BAND", bar.HOLE_POSITION_BAND + 0.01)
+    assert _spacer_gap(monkeypatch, assembly) == pytest.approx(gap - 0.01, abs=2e-3)
+    monkeypatch.setattr(
+        bar,
+        "HOLE_POSITION_BAND",
+        bar.HOLE_POSITION_BAND + (gap - assembly.LOCK_SWEEP_FLOOR) + 0.01,
+    )
+    with pytest.raises(AssertionError, match="pivot spacer"):
+        assembly._assert_lock_station_sweep()
 
 
 def test_sweep_refuses_a_lock_set_toward_the_spacer(monkeypatch) -> None:
     import build_paper_drive_assembly as assembly
 
-    lo, hi = assembly.LOCK_SET_OFFSET
-    # A lock left 0.10 nearer the spacer than the model (the screw float the
-    # bias-set step removes) runs under the sweep floor.
-    monkeypatch.setattr(assembly, "LOCK_SET_OFFSET", (-0.10, hi))
+    far, guide_side = assembly.LOCK_SET_EDGE_REACH
+    # A far edge 0.10 nearer the spacer than the set and skewed plate can
+    # reach runs under the sweep floor.
+    monkeypatch.setattr(assembly, "LOCK_SET_EDGE_REACH", (far + 0.10, guide_side))
     monkeypatch.setattr(assembly, "log", lambda *_a: None)
     with pytest.raises(AssertionError, match="pivot spacer"):
         assembly._assert_lock_station_sweep()
-    assert lo >= 0.0
