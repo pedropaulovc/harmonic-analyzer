@@ -195,22 +195,23 @@ def test_thread_relief_sits_below_the_minor_with_a_45_degree_lead() -> None:
     assert spec.SEAT_FLAT_INNER_DIA == pytest.approx(2.45)
     assert spec.SEAT_FLAT_INNER_DIA_MAX == pytest.approx(2.7)
     assert spec.RELIEF_DIA + 2.0 * spec.RELIEF_LEAD_LIMITS[1] < spec.THREAD_MODEL_DIA
-    # The seat on the arm face, from the limits (local reviews of 1f3067ef2,
-    # fbf82ad96 and 21bb244c5): the arm's largest tapped major, 0.1150 in =
-    # 2.921, broken 0.1 max, Ø3.121, out to the smallest shoulder broken 0.1
-    # max, 3.92 - 0.2 = Ø3.72, less the 2A/2B fit's 0.0368 float off axis:
-    # 0.263 radial.  Under the title block's 0.25 on both there would be none.
+    # The seat on the arm face, from printed limits (local reviews of
+    # 1f3067ef2, fbf82ad96, 21bb244c5 and aed772158): MHA-020's tapped mouth
+    # Ø3.1 max, out to the smallest shoulder broken 0.1 max, 3.92 - 0.2 =
+    # Ø3.72, less the screw's float off axis in the 2A/2B fit, (0.0991 -
+    # 0.0925) / 2 in = 0.0838: 0.226 radial.  Under the title block's 0.25 on
+    # both edges there would be none.
     assert spec.SEAT_EDGE_BREAK_MAX == pytest.approx(0.1)
-    assert spec.TAPPED_MOUTH_DIA_MAX == pytest.approx(0.1150 * 25.4 + 0.2)
-    assert spec.SEAT_CONTACT_INNER_DIA == pytest.approx(3.121)
+    assert spec.TAPPED_MOUTH_DIA_MAX == pytest.approx(3.1)
+    assert spec.SEAT_CONTACT_INNER_DIA == pytest.approx(3.1)
     assert spec.SEAT_CONTACT_OUTER_DIA_MIN == pytest.approx(3.72)
-    assert spec.THREAD_FIT_OFFSET_MAX == pytest.approx((0.0954 - 0.0925) / 2.0 * 25.4)
-    assert spec.SEAT_RADIAL_MIN == pytest.approx((3.72 - 3.121) / 2.0 - 0.03683, abs=1e-4)
-    assert spec.SEAT_RADIAL_MIN >= 0.25
+    assert spec.THREAD_FIT_OFFSET_MAX == pytest.approx((0.0991 - 0.0925) / 2.0 * 25.4)
+    assert spec.SEAT_RADIAL_MIN == pytest.approx((3.72 - 3.1) / 2.0 - 0.08382, abs=1e-4)
+    assert spec.SEAT_RADIAL_MIN >= 0.2
     assert (3.92 - 0.5) - (2.845 + 0.5) < 0.1
-    assert spec.SEAT_FLAT_ANNULUS_AREA == pytest.approx(math.pi / 4.0 * (16.0 - 3.121**2))
+    assert spec.SEAT_FLAT_ANNULUS_AREA == pytest.approx(math.pi / 4.0 * (16.0 - 3.1**2))
     assert spec.SEAT_FLAT_ANNULUS_AREA_MIN == pytest.approx(
-        math.pi / 4.0 * (3.72**2 - 3.121**2)
+        math.pi / 4.0 * (3.72**2 - 3.1**2)
     )
     # The one-piece screw goes in from the butt: nothing on the arm end of it
     # is larger than the bore it passes (local review of fbf82ad96).

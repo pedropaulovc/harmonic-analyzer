@@ -145,13 +145,14 @@ THREAD_PD_2A_MIN_IN = 0.0925
 THREAD_MINOR_2A_MIN_EST = (
     THREAD_PD_2A_MIN_IN - 0.649519 / THREADS_PER_IN
 ) * MM_PER_IN
-# The arm's tapped mouth and the screw's float in it (local review of
-# 21bb244c5).  ASSUMPTION, not sourced in this repo: a ground #4-40 tap cuts
-# the internal major to at most 0.1150 in = 2.921 (its H-limit over the 0.112
-# basic), and the 2A/2B pitch-diameter fit (2B max 0.0954 in, 2A min 0.0925
-# in) lets the screw sit 0.0368 off the hole's axis.
-TAP_MAJOR_MAX_IN = 0.1150
-THREAD_PD_2B_MAX_IN = 0.0954
+# The arm's tapped mouth is printed on MHA-020 as an inspectable maximum
+# (local review of aed772158: an assumed tap major was load-bearing and
+# printed nowhere), and the screw floats off the hole's axis by the 2A/2B
+# pitch-diameter fit.  #4-40 UNC class 2B pitch diameter 0.0958-0.0991 in
+# (ITP class-2B table, Machinery's Handbook; not sourced in this repo): with
+# the 2A minimum 0.0925 in the screw can sit 0.084 off axis.
+TAPPED_MOUTH_DIA_MAX = 3.1
+THREAD_PD_2B_MAX_IN = 0.0991
 THREAD_FIT_OFFSET_MAX = round(
     (THREAD_PD_2B_MAX_IN - THREAD_PD_2A_MIN_IN) / 2.0 * MM_PER_IN, 6
 )
@@ -345,12 +346,10 @@ DRAWING_NOTES = "\n".join(
     )
 )
 
-# The shoulder's seat on the arm face: from the arm's tapped mouth (the
-# largest tapped major plus MHA-020's 0.1-max mouth break, the larger of it
-# and the relief lead's envelope) out to the smallest shoulder less its
-# 0.1-max seat break, less the screw's float off the hole's axis on the
-# narrow side.
-TAPPED_MOUTH_DIA_MAX = round(TAP_MAJOR_MAX_IN * MM_PER_IN + 2.0 * SEAT_EDGE_BREAK_MAX, 6)
+# The shoulder's seat on the arm face: from the arm's printed maximum mouth
+# (the larger of it and the relief lead's envelope) out to the smallest
+# shoulder less its 0.1-max seat break, less the screw's float off the
+# hole's axis on the narrow side.
 SEAT_CONTACT_INNER_DIA = max(TAPPED_MOUTH_DIA_MAX, SEAT_FLAT_INNER_DIA_MAX)
 SEAT_CONTACT_OUTER_DIA_MIN = round(SHOULDER_DIA_MIN - 2.0 * SEAT_EDGE_BREAK_MAX, 6)
 SEAT_RADIAL_MIN = round(
@@ -385,7 +384,11 @@ for _ok, _what in (
         "relief lead reaches past the thread major into the seat annulus",
     ),
     (SEAT_FLAT_ANNULUS_AREA_MIN > 0.0, "no flat seat annulus is left"),
-    (SEAT_RADIAL_MIN >= 0.25, "the shoulder's seat on the arm face is under 0.25 radial"),
+    (SEAT_RADIAL_MIN >= 0.2, "the shoulder's seat on the arm face is under 0.2 radial"),
+    (
+        TAPPED_MOUTH_DIA_MAX > THREAD_MODEL_DIA + 2.0 * 0.05,
+        "the printed tapped mouth leaves no room to deburr the thread's start",
+    ),
     (
         RELIEF_DIA_MAX <= THREAD_MINOR_2A_MIN_EST,
         "the largest relief stands above the deepest die-cut root",

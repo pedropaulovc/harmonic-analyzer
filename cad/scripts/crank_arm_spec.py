@@ -29,7 +29,7 @@ import math
 
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec
 from _surface_finish import SurfaceFinishControl
-from crank_handle_pivot_screw_spec import SEAT_EDGE_BREAK_MAX as _PIVOT_SEAT_EDGE_BREAK_MAX
+from crank_handle_pivot_screw_spec import TAPPED_MOUTH_DIA_MAX as _PIVOT_TAPPED_MOUTH_DIA_MAX
 from crank_handle_pivot_screw_spec import THREAD_SIZE as PIVOT_SCREW_THREAD_SIZE
 from crank_hub_geometry import (
     ARM_FIDUCIAL_RADIUS,
@@ -173,7 +173,8 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {"overall length reference": 1}
 # the mill's width tolerance, not at the .X band.  The #4-40 handle pivot
 # (user ruling 2026-09-30) clears the 1.5D engagement rule, so the sheet no
 # longer states the #8-32's named exception.  Its tapped mouth on the handle
-# face is broken 0.1 max, so the MHA-139 shoulder keeps a seat around it.
+# face is held to an inspectable maximum, so the MHA-139 shoulder keeps a seat
+# around it.
 STOCK_NOTE = (
     f"{ARM_WIDTH:.1f} x {ARM_THICKNESS:.1f} SECTION: "
     f"{ARM_WIDTH / MM_PER_IN:g} x {ARM_STOCK_THICKNESS_IN} IN CF FLAT BAR AS SUPPLIED."
@@ -182,7 +183,7 @@ DRAWING_NOTES = "\n".join(
     (
         "PUNCH FIDUCIAL MARK WHERE SHOWN; LOCATE BY EYE.",
         STOCK_NOTE,
-        f"BREAK THE HANDLE PIVOT TAP'S MOUTH {_PIVOT_SEAT_EDGE_BREAK_MAX:.1f} MAX ON THE HANDLE FACE.",
+        f"HANDLE PIVOT TAP'S MOUTH <MOD-DIAM>{_PIVOT_TAPPED_MOUTH_DIA_MAX:.1f} MAX ON THE HANDLE FACE.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

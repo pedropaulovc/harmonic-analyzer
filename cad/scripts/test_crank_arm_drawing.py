@@ -311,7 +311,7 @@ def test_arm_states_no_engagement_exception_for_the_4_40_pivot() -> None:
     assert lines[1] == spec.STOCK_NOTE
     # The tapped mouth's break is held to 0.1 so the MHA-139 shoulder keeps a
     # seat round it (local review of fbf82ad96).
-    assert lines[2] == "BREAK THE HANDLE PIVOT TAP'S MOUTH 0.1 MAX ON THE HANDLE FACE."
+    assert lines[2] == "HANDLE PIVOT TAP'S MOUTH <MOD-DIAM>3.1 MAX ON THE HANDLE FACE."
     # The stock line comes from the one stock constant.
     assert spec.ARM_STOCK_THICKNESS == pytest.approx(7.9375)
     assert spec.STOCK_NOTE == "25.4 x 8.0 SECTION: 1 x 5/16 IN CF FLAT BAR AS SUPPLIED."
