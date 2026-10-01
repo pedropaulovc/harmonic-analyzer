@@ -3,7 +3,7 @@ import { mkdir, writeFile, stat } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { VIDEO_IDS, MODEL_SHA256, MODEL_COMMIT, PIXEL_LIMIT, CLOCK_LIMIT, loadReferences, frameViews, sourceNeedsMachine, sourceCompositeErrors, sourceLayoutForViews, independentlyResolvedWarp, sameResolvedImagePlaneWarp, sameSourceLayout, sourcePointSupported, sourcePointUnmasked, homographyMagnificationBound, projectHomography, invertHomography, nativeLineAxisBiasComponents, nonIdentifiableFixedPartErrors, requiredRuns, frameIndexAt, errorStats, jsonDigest } from './verify-reference.mjs'
+import { VIDEO_IDS, MODEL_SHA256, MODEL_COMMIT, PIXEL_LIMIT, CLOCK_LIMIT, loadReferences, frameViews, sourceNeedsMachine, sourceCompositeErrors, sourceLayoutForViews, independentlyResolvedWarp, sameResolvedImagePlaneWarp, sameSourceLayout, sourcePointUnmasked, sourceLocalizationFootprintBounds, nativeLineAxisGeometryBound, nonIdentifiableFixedPartErrors, sourceOcclusionErrors, sourceImageError, canonicalJson, requiredRuns, frameIndexAt, errorStats, jsonDigest } from './verify-reference.mjs'
 import { distManifest, serveDist } from './verify-server.mjs'
 
 const WEB_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -111,17 +111,9 @@ export function warpedRasterUncertaintyBound(view,capture) {
 
 /** All qualified observation uncertaintyPx values are already final source-global pixels. */
 export function sourceMeasurementUncertaintyLedger(view,observation,points) {
-  requireCondition(finite(observation?.uncertaintyPx)&&observation.uncertaintyPx>=0,'Source localization/raster uncertainty is unknown; null cannot become zero')
-  requireCondition(Array.isArray(points)&&points.length>0&&points.every(vec2),'Source localization needs actual finite observed source-global pixels')
-  const warp=independentlyResolvedWarp(view),bound=observation.uncertaintyPx
-  if(warp) {
-    const inverse=invertHomography(warp.renderToSourcePixels),support={rectSourcePixels:view.rectSourcePixels,resolvedImagePlaneWarp:warp}
-    for(const point of points) {
-      const footprint=[[-bound,-bound],[bound,-bound],[bound,bound],[-bound,bound]].map(offset=>point.map((value,i)=>value+offset[i]))
-      requireCondition(footprint.every(pixel=>inverse[6]*pixel[0]+inverse[7]*pixel[1]+inverse[8]>1e-10&&sourcePointSupported(support,pixel)),'Source localization footprint crosses the projective horizon or leaves measured source quad/ROI support')
-    }
-  }
-  return {type:'source-localization-raster-bound',coordinateSpace:'source-global',boundPx:bound,warpedFootprintValidated:warp!==null}
+  const footprint=sourceLocalizationFootprintBounds(view,observation,points)
+  const bound=observation.uncertaintyPx
+  return {type:'source-localization-raster-bound',coordinateSpace:'source-global',boundPx:bound,warpedFootprintValidated:footprint!==null}
 }
 /** Shared point/line/contour sum; each independent contribution occurs exactly once. */
 export function sourceRasterErrorLedger(view,observation,points,native,capture,rawResidualPx,geometryBiasSourcePixels=0,rasterFitDeviationSourcePixels=0) {
@@ -146,19 +138,8 @@ export function landmarkRasterErrorLedger(view,observation,marker,capture) {
 }
 /** An inclusive source allowance is certified, not subtracted heuristically. */
 export function finalSourceAxisBiasLedger(view,check,observed) {
-  const e=check.measurementEvidence,components=nativeLineAxisBiasComponents(check),warp=independentlyResolvedWarp(view)
-  let magnification=1
-  if(warp) {
-    requireCondition(['source-global','unwarped-viewport'].includes(e.axisPerspectiveBiasSpace),'Warped native line bias has no explicit coordinate space; untransformed uncertainty is forbidden')
-    if(e.axisPerspectiveBiasSpace==='unwarped-viewport') {
-      const region=e.axisPerspectiveBiasRegionViewportPixels
-      requireCondition(Array.isArray(region)&&region.length===4&&region.every(finite)&&region[0]>=0&&region[1]>=0&&region[2]>0&&region[3]>0&&region[0]+region[2]<=warp.unwarpedViewportPixels[0]&&region[1]+region[3]<=warp.unwarpedViewportPixels[1],'Warped axis bias needs a bounded unwarped viewport region')
-      const inverse=invertHomography(warp.renderToSourcePixels),radius=components.geometryBoundPx
-      requireCondition(observed.every(point=>{const p=projectHomography(inverse,point);return p[0]-radius>=region[0]&&p[1]-radius>=region[1]&&p[0]+radius<=region[0]+region[2]&&p[1]+radius<=region[1]+region[3]}),'Unwarped bias region does not cover every observed endpoint/edge-row geometry uncertainty footprint')
-      magnification=homographyMagnificationBound(warp,region)
-    }
-  } else requireCondition(e.axisPerspectiveBiasSpace===undefined||e.axisPerspectiveBiasSpace==='source-global','Ordinary axis bias must use source-global pixels')
-  return {type:'independent-axis-geometry-bound',declaredCoordinateSpace:e.axisPerspectiveBiasSpace??'source-global',declaredAxisPerspectiveBiasBoundPx:e.axisPerspectiveBiasBoundPx,components,magnificationBound:magnification,geometryBiasSourcePixels:components.geometryBoundPx*magnification}
+  const e=check.measurementEvidence,geometry=nativeLineAxisGeometryBound(view,check,observed)
+  return {type:'independent-axis-geometry-bound',declaredCoordinateSpace:e.axisPerspectiveBiasSpace??'source-global',declaredAxisPerspectiveBiasBoundPx:e.axisPerspectiveBiasBoundPx,...geometry}
 }
 
 async function apiSnapshot(page) { return page.evaluate(() => window.harmonicAnalyzer.snapshot()) }
@@ -435,10 +416,67 @@ export function physicalConstraintErrors(mechanism, constraints) {
   return errors
 }
 
-export function nativeVisibilityErrors(visibility, proof) {
+function sourceOccludedCaptureErrors(visibility, binding, currentSourceFrame) {
+  const errors = []
+  if (!binding || !currentSourceFrame || sourceImageError(currentSourceFrame.sourceImage, null)
+    || canonicalJson(currentSourceFrame.sourceImage) !== canonicalJson(binding.sourceImage)
+    || !finite(currentSourceFrame.timeSeconds) || currentSourceFrame.timeSeconds !== binding.timeSeconds
+    || binding.timeSeconds !== binding.decodedTimeSeconds || binding.intervalSeconds?.[0] !== binding.decodedTimeSeconds
+    || binding.intervalSeconds?.[1] !== binding.decodedTimeSeconds) errors.push('Source hand mask requires independently supplied exact current original image and native decoded exposure point certificate; other images, held and interpolated times are not certified')
+  if (!visibility || visibility.method !== 'gpu-readback' || visibility.status !== 'captured' || visibility.visibilityMode !== 'depth-tested-native-surfaces'
+    || !Array.isArray(visibility.parts) || visibility.parts.length < 435 || visibility.parts.some(part => !part || typeof part.partPath !== 'string')
+    || new Set(visibility.parts.map(part => part.partPath)).size !== visibility.parts.length) errors.push('Source hand exclusion requires a fresh genuine all435-path depth-native GPU capture, not CPU visibility or unavailable readback')
+  if (!binding || !visibility || visibility.viewId !== binding.viewId || !finite(visibility.timeSeconds) || visibility.timeSeconds !== binding.timeSeconds
+    || !sameCamera(visibility.camera, binding.camera, nativeCameraRect(binding))
+    || canonicalJson(visibility.rectSourcePixels) !== canonicalJson(binding.rectSourcePixels) || visibility.presentation !== binding.presentation
+    || !Object.hasOwn(visibility, 'resolvedImagePlaneWarp') || !sameResolvedImagePlaneWarp(visibility.resolvedImagePlaneWarp, binding.resolvedImagePlaneWarp)
+    || !Array.isArray(binding.sourceLayout) || !binding.sourceLayout.length || binding.sourceLayout.some(entry => !entry)
+    || !sameSourceLayout(visibility.sourceLayout, binding.sourceLayout)
+    || visibility.sourceOpacity !== (binding.composite?.mode === 'opaque' ? 1 : binding.composite?.opacity)) errors.push('Actual native source hand capture does not bind the exact witness view/time/camera/ROI/presentation/opacity/homography/layout')
+  return errors
+}
+function sourceHandExtentInside(part, mask) {
+  const extent = part.sourceExtentPixels
+  if (!Array.isArray(extent) || extent.length !== 4 || !extent.every(finite) || extent[0] >= extent[2] || extent[1] >= extent[3]
+    || extent[0] < 0 || extent[1] < 0 || extent[2] > mask.sourceImage.width || extent[3] > mask.sourceImage.height
+    || !finite(part.uncertaintySourcePixels) || part.uncertaintySourcePixels < 0) return false
+  const polygon = mask.polygonSourcePixels, uncertainty = mask.uncertaintyPx + part.uncertaintySourcePixels
+  if (!finite(uncertainty)) return false
+  let area2 = 0
+  for (let i = 0; i < polygon.length; i++) {
+    const a = polygon[i], b = polygon[(i + 1) % polygon.length]
+    area2 += a[0] * b[1] - a[1] * b[0]
+  }
+  const orientation = Math.sign(area2)
+  for (let i = 0; i < polygon.length; i++) {
+    const a = polygon[i], b = polygon[(i + 1) % polygon.length], dx = b[0] - a[0], dy = b[1] - a[1], length = Math.hypot(dx, dy)
+    for (const x of [extent[0], extent[2]]) for (const y of [extent[1], extent[3]]) {
+      const margin = orientation * (dx * (y - a[1]) - dy * (x - a[0])) / length
+      if (!finite(margin) || margin <= 0 || margin < uncertainty) return false
+    }
+  }
+  return true
+}
+export function nativeVisibilityErrors(visibility, proof, currentSourceFrame) {
   if (!proof || !Array.isArray(proof.sourceVisibleParts) || !Array.isArray(proof.excludedParts) || !Array.isArray(proof.sourceNonIdentifiableFixedParts) || !Array.isArray(proof.unresolvedParts) || proof.unresolvedParts.length) return [{ code: 'unresolved-source-census', detail: 'Require the explicit complete four-bucket native census; unidentified fixed parts are not source-corresponded or excluded' }]
+  if (!visibility || !Array.isArray(visibility.parts) || visibility.parts.some(part => !part || typeof part.partPath !== 'string')) return [{ code: 'native-depth-census-unavailable', detail: 'Actual native depth-ID census is unavailable or malformed' }]
   const errors = [], visible = new Map(proof.sourceVisibleParts.map(part => [part?.partPath, part])), excluded = new Map(proof.excludedParts.map(part => [part?.partPath, part])), uncertified = new Map(proof.sourceNonIdentifiableFixedParts.map(part => [part?.nativePartPath, part]))
   for (const detail of nonIdentifiableFixedPartErrors(proof.sourceNonIdentifiableFixedParts)) errors.push({ code: 'invalid-source-non-identifiable-fixed-part', detail })
+  const sourceHandPaths = new Set()
+  for (const part of proof.excludedParts) {
+    const hand = part?.reason === 'source-occluded', fields = ['partPath', 'reason', 'evidence', ...(hand ? ['sourceOcclusion'] : [])]
+    if (!part || Object.keys(part).length !== fields.length || fields.some(field => !Object.hasOwn(part, field))
+      || !['outside', 'occluded', 'absent', 'source-occluded'].includes(part.reason) || typeof part.evidence !== 'string' || !part.evidence.trim()) {
+      errors.push({ code: 'invalid-source-exclusion', detail: part?.partPath ?? 'Malformed exclusion' })
+      continue
+    }
+    if (hand) {
+      const maskErrors = sourceOcclusionErrors(part.sourceOcclusion, proof.binding?.sourceImage)
+      for (const detail of maskErrors) errors.push({ code: 'invalid-source-occlusion', detail: `${part.partPath}: ${detail}` })
+      if (!maskErrors.length) sourceHandPaths.add(part.partPath)
+    }
+  }
+  if (proof.excludedParts.some(part => part?.reason === 'source-occluded')) for (const detail of sourceOccludedCaptureErrors(visibility, proof.binding, currentSourceFrame)) errors.push({ code: 'source-occlusion-capture-binding', detail })
   const declaredPaths = [...proof.sourceVisibleParts.map(part => part?.partPath), ...proof.excludedParts.map(part => part?.partPath), ...proof.sourceNonIdentifiableFixedParts.map(part => part?.nativePartPath)]
   if (new Set(declaredPaths).size !== declaredPaths.length) errors.push({ code: 'overlapping-source-native-census', detail: 'Duplicate or cross-bucket native paths cannot masquerade as unknown fixed geometry' })
   const nativePaths = new Set(visibility.parts.map(part => part.partPath))
@@ -447,7 +485,11 @@ export function nativeVisibilityErrors(visibility, proof) {
     if (!visible.has(part.partPath) && !excluded.has(part.partPath) && !uncertified.has(part.partPath)) errors.push({ code: 'omitted-source-native-part', detail: part.partPath })
     if (!Number.isInteger(part.pixelCount) || part.pixelCount < 0 || (part.status === 'visible') !== (part.pixelCount > 0)) errors.push({ code: 'invalid-native-depth-result', detail: part.partPath })
     if (visible.has(part.partPath) && part.pixelCount === 0) errors.push({ code: 'source-visible-native-not-rendered', detail: part.partPath })
-    if (excluded.has(part.partPath) && part.pixelCount > 0) errors.push({ code: 'unsupported-extra-visible-native-part', detail: `${part.partPath}: source ${excluded.get(part.partPath).reason}, actual depth-visible ${part.pixelCount} pixels` })
+    if (excluded.has(part.partPath) && part.pixelCount > 0) {
+      const exclusion = excluded.get(part.partPath)
+      if (exclusion.reason !== 'source-occluded') errors.push({ code: 'unsupported-extra-visible-native-part', detail: `${part.partPath}: source ${exclusion.reason}, actual depth-visible ${part.pixelCount} pixels` })
+      else if (!sourceHandPaths.has(part.partPath) || !sourceHandExtentInside(part, exclusion.sourceOcclusion)) errors.push({ code: 'source-occlusion-native-extent', detail: `${part.partPath}: all positive actual native ID pixel cells must lie strictly inside the independently measured source hand polygon with combined source-mask/native uncertainty margin; sparse contours or an extent centre cannot certify coverage` })
+    }
     if (uncertified.has(part.partPath) && part.pixelCount > 0) {
       const region = uncertified.get(part.partPath).rectSourcePixels, extent = part.sourceExtentPixels
       if (!Array.isArray(region) || region.length !== 4 || !region.every(finite) || !Array.isArray(extent) || extent.length !== 4 || !extent.every(finite) || extent[0] >= extent[2] || extent[1] >= extent[3] || extent[0] < region[0] - 1e-6 || extent[1] < region[1] - 1e-6 || extent[2] > region[0] + region[2] + 1e-6 || extent[3] > region[1] + region[3] + 1e-6) errors.push({ code: 'source-non-identifiable-fixed-region', detail: `${part.partPath}: all actual native ID pixels must lie inside the independently source-audited region; sparse contours and native-derived ROIs are not authority` })
@@ -546,7 +588,7 @@ export function nativeContourRasterProof(view, visibility, timeSeconds) {
 }
 
 /** Metadata is checked against the real readback; depth-off markers are not occlusion proof. */
-export function renderedViewProof(view, rendered, entry, timeSeconds, report, assumptions = []) {
+export function renderedViewProof(view, rendered, entry, timeSeconds, report, assumptions = [], currentSourceFrame) {
   const context = { timeSeconds, viewId: view.id }, composite = view.composite ?? { mode: 'opaque' }, opacity = composite.mode === 'opaque' ? 1 : composite.opacity
   if (!rendered || !sameCamera(rendered.camera, view.camera, nativeCameraRect(view)) || jsonDigest(rendered.rectSourcePixels) !== jsonDigest(view.rectSourcePixels) || rendered.presentation !== view.presentation || jsonDigest(rendered.composite) !== jsonDigest(composite) || rendered.compositeEvidence !== (view.compositeEvidence ?? null)) fail(report, 'rendered-view-binding', 'Actual camera/ROI/presentation/composite differs from independently measured view', context)
   if (!sameCamera(entry.visibility.camera, view.camera, nativeCameraRect(view)) || jsonDigest(entry.visibility.rectSourcePixels) !== jsonDigest(view.rectSourcePixels) || entry.visibility.presentation !== view.presentation || entry.visibility.sourceOpacity !== opacity || entry.capture.sourceOpacity !== opacity) fail(report, 'gpu-view-binding', 'Actual native GPU capture has different camera/ROI/mirror/layer contribution', context)
@@ -557,18 +599,18 @@ export function renderedViewProof(view, rendered, entry, timeSeconds, report, as
   for(const detail of renderedCertificateErrors(rendered,timeSeconds)) fail(report,'rendered-certificate-interval',detail,context)
   const state = view.mechanicalState, witness = state.runtimeWitness, expectedInput = state.status === 'constrained' ? witness.input : state.input
   if (jsonDigest(rendered.input) !== jsonDigest(expectedInput) || jsonDigest(entry.mechanism.input) !== jsonDigest(expectedInput) || rendered.mechanicalProvenance !== state.status || entry.mechanism.mechanicalProvenance !== state.status || jsonDigest(rendered.partOverrides) !== jsonDigest(view.partOverrides ?? []) || jsonDigest(rendered.unobservedInputFields) !== jsonDigest(witness?.unobservedInputFields ?? []) || jsonDigest(entry.mechanism.unobservedInputFields) !== jsonDigest(witness?.unobservedInputFields ?? [])) fail(report, 'rendered-mechanical-provenance', 'Rendered native input/provenance/overrides differs from exclusive source observation or feasible witness', context)
-  if (jsonDigest(rendered.nativeGeometryAssumptions ?? []) !== jsonDigest(assumptions) || jsonDigest(entry.mechanism.nativeGeometryAssumptions ?? []) !== jsonDigest(assumptions)) fail(report, 'rendered-native-geometry-assumption', 'Actual source draw omitted/changed the scoped user-approved pending-CAD assumption; no shape fidelity pass is inferred', context)
+  if (jsonDigest(rendered.nativeGeometryAssumptions ?? []) !== jsonDigest(assumptions) || jsonDigest(entry.mechanism.nativeGeometryAssumptions ?? []) !== jsonDigest(assumptions)) fail(report, 'rendered-native-geometry-assumption', 'Actual source draw omitted/changed the exact scoped rod-head or lower-rocker side-face declaration; no shape fidelity pass is inferred', context)
   const proof = state.status === 'constrained' ? witness.visibilityProof : state.visibilityProof, fixed = proof?.sourceNonIdentifiableFixedParts
   if (!Array.isArray(fixed) || !Array.isArray(rendered.sourceNonIdentifiableFixedParts) || !Array.isArray(entry.mechanism.sourceNonIdentifiableFixedParts) || jsonDigest(rendered.sourceNonIdentifiableFixedParts) !== jsonDigest(fixed) || jsonDigest(entry.mechanism.sourceNonIdentifiableFixedParts) !== jsonDigest(fixed)) fail(report, 'rendered-source-non-identifiable-fixed-binding', 'Actual native draw must retain the exact explicitly approved uncertified fixed-part list; these are not geometric-fidelity passed', context)
   if (state.status === 'constrained') {
     if (state.input !== null || jsonDigest(rendered.visibilityProof) !== jsonDigest(witness.visibilityProof) || jsonDigest(rendered.constraintSummary) !== jsonDigest(witness.constraints) || jsonDigest(rendered.continuity) !== jsonDigest(witness.continuity ?? null)) fail(report, 'rendered-witness-binding', 'Actual witness constraints/proof/continuity are stale or misbound', context)
     for (const error of physicalConstraintErrors(entry.mechanism, witness.constraints)) fail(report, 'rendered-physical-constraint', 'Actual compiled native physical solution violates source observation', { ...context, ...error })
-    for (const error of nativeVisibilityErrors(entry.visibility, witness.visibilityProof)) fail(report, error.code, error.detail, context)
+    for (const error of nativeVisibilityErrors(entry.visibility, witness.visibilityProof, currentSourceFrame)) fail(report, error.code, error.detail, context)
   } else {
     if (!state.visibilityProof) fail(report, 'observed-native-census-unavailable', 'Complete observed input does not replace an independent all435-path source/native visibility proof', context)
     else {
       if (jsonDigest(rendered.visibilityProof) !== jsonDigest(state.visibilityProof) || jsonDigest(rendered.constraintSummary) !== jsonDigest([]) || rendered.continuity !== null) fail(report, 'rendered-observed-proof-binding', 'Observed native source proof is stale or masquerading as a witness', context)
-      for (const error of nativeVisibilityErrors(entry.visibility, state.visibilityProof)) fail(report, error.code, error.detail, context)
+      for (const error of nativeVisibilityErrors(entry.visibility, state.visibilityProof, currentSourceFrame)) fail(report, error.code, error.detail, context)
     }
   }
   const nativeLines = nativeLineRasterProof(view, entry.nativeLines, entry.visibility, timeSeconds), contours = nativeContourRasterProof(view, entry.visibility, timeSeconds)
@@ -711,6 +753,8 @@ export async function referenceProof(page, embed, record, report, outputDirector
   report.nativeGeometryAssumptions = record.data.nativeGeometryAssumptions ?? []
   report.sourceNonIdentifiableFixedParts = record.report.sourceNonIdentifiableFixedParts ?? []
   report.fixedPartFidelityBoundary = 'User-approved source-non-identifiable fixed parts remain rendered and uncertified; only independently identifiable source features can be geometric-fidelity passed.'
+  report.sourceOccludedParts = record.report.sourceOccludedParts ?? []
+  report.sourceOcclusionFidelityBoundary = 'Exact decoded-exposure human-hand interiors remain SOURCE-OCCLUDED, not source-corresponded or geometry-passed; all native paths and chosen feasible pose requirements remain accounted.'
   const sourceLines = record.data.frames.flatMap(frame => frameViews(frame).flatMap(view => (view.nativeLineChecks ?? []).map(line => ({ id: JSON.stringify([frame.timeSeconds, view.id, line.id, line.partPath, line.partLocalLineMetres]), partPath: line.partPath, partLocalLineMetres: line.partLocalLineMetres }))))
   if (sourceLines.length) await page.evaluate(lines => {
     const api = window.harmonicAnalyzer
@@ -786,7 +830,7 @@ export async function referenceProof(page, embed, record, report, outputDirector
         const entry = response.captures.find(entry => entry.viewId === view.id), measured = freshCapture(entry, t, [native.mediaTime], `Required ${t}s`)
         clockSkews.push(measured.skewSeconds)
         const sourceLayout=sourceLayoutForViews(expectedViews),qualifiedView={...view,sourceLayout}
-        const nativeCorrespondence = renderedViewProof(qualifiedView, snapshot.views.find(candidate => candidate.id === view.id), measured, t, report, record.data.nativeGeometryAssumptions ?? [])
+        const nativeCorrespondence = renderedViewProof(qualifiedView, snapshot.views.find(candidate => candidate.id === view.id), measured, t, report, record.data.nativeGeometryAssumptions ?? [], { sourceImage: frame.sourceImage, timeSeconds: t })
         if(view.imagePlaneWarp) {
           const expectedCell=[1920/gate.width/response.canvas.devicePixelRatio,1080/gate.height/response.canvas.devicePixelRatio]
           for(const capture of [measured.capture,measured.visibility,measured.nativeLines].filter(Boolean)) requireCondition(nearlyEqual(capture.destinationCellSourcePixels,expectedCell,1e-6),`Warp capture final raster cell dimensions do not match the actual #stage backing store at ${t}s/${view.id}`)
@@ -897,7 +941,8 @@ export async function referenceProof(page, embed, record, report, outputDirector
           const startProof = a.mechanicalState.status === 'constrained' ? a.mechanicalState.runtimeWitness.visibilityProof : a.mechanicalState.visibilityProof
           const endProof = b.mechanicalState.status === 'constrained' ? b.mechanicalState.runtimeWitness.visibilityProof : b.mechanicalState.visibilityProof
           requireCondition(startProof && endProof && jsonDigest(rendered.visibilityProof) === jsonDigest(startProof) && (decoded?rendered.visibilityProofEnd===null:jsonDigest(rendered.visibilityProofEnd) === jsonDigest(endProof)), `interpolation-proof-binding: stale/missing observed or constrained endpoint certificate at ${time}s/${rendered.id}`)
-          for (const proof of (decoded?[rendered.visibilityProof]:[rendered.visibilityProof, rendered.visibilityProofEnd])) for (const error of nativeVisibilityErrors(entry.visibility, proof)) fail(report, `interpolated-${error.code}`, error.detail, { timeSeconds: time, viewId: rendered.id })
+          const currentSourceFrame = { sourceImage: frames.find(frame => frame.timeSeconds === time)?.sourceImage, timeSeconds: time }
+          for (const proof of (decoded?[rendered.visibilityProof]:[rendered.visibilityProof, rendered.visibilityProofEnd])) for (const error of nativeVisibilityErrors(entry.visibility, proof, currentSourceFrame)) fail(report, `interpolated-${error.code}`, error.detail, { timeSeconds: time, viewId: rendered.id })
           requireCondition(jsonDigest(rendered.nativeGeometryAssumptions ?? []) === jsonDigest(record.data.nativeGeometryAssumptions ?? []) && jsonDigest(entry.mechanism.nativeGeometryAssumptions ?? []) === jsonDigest(record.data.nativeGeometryAssumptions ?? []), `interpolation-native-assumption-binding: ${time}s/${rendered.id}`)
           requireCondition(Array.isArray(rendered.sourceNonIdentifiableFixedParts) && Array.isArray(entry.mechanism.sourceNonIdentifiableFixedParts) && jsonDigest(rendered.sourceNonIdentifiableFixedParts) === jsonDigest(entry.mechanism.sourceNonIdentifiableFixedParts) && jsonDigest(rendered.sourceNonIdentifiableFixedParts) === jsonDigest(startProof.sourceNonIdentifiableFixedParts), `interpolation-uncertified-fixed-binding: ${time}s/${rendered.id}`)
           revisions.add(entry.mechanism.sourceDrawRevision); clockSkews.push(entry.skewSeconds); interpolation.verifiedViews++

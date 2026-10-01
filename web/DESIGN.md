@@ -65,6 +65,22 @@ approval. Animation uses the existing linkage; the head-shape difference remains
 an assumption in the HUD and reports. It does not authorize geometry edits,
 unrelated omissions or a measured head-topology fidelity claim.
 
+Separately, the user permits only the two small rimmed/recessed lower-rocker
+side-face features either side of the fulcrum to remain absent and uncertified.
+The closed declaration names `lower-rocker-nearest-left-face-bore` and
+`lower-rocker-nearest-right-face-bore`, and permits only qualified
+`harmonic-analyzer/channel/rocker-arm-1..20` paths. All twenty native rockers lack
+these features. This approval is not a promise of a future CAD match.
+
+`nativeGeometryAssumptions` permits at most one of each exact declaration and
+rejects duplicate identities, additional features and other native families.
+The HUD distinguishes the rod-head assumption from the lower-rocker exception;
+reports and visibility bindings retain the exact records. Neither declaration
+establishes whole-part correspondence or makes unavailable source data matched.
+Original hole contours remain diagnostics, not fabricated source pixels, native
+holes or textures. The full 435-part census, all other features, pose, camera,
+motion, 38.4-source-pixel and 0.5-second requirements remain unchanged.
+
 ## Source coverage
 
 Each observation identifies the original MP4 hash, source dimensions, decoded
@@ -86,6 +102,33 @@ with their actual dark/cropped source region and fixed-motion evidence recorded.
 The HUD and reports list them as not geometric-fidelity passed. Moving, deforming
 or source-overridden parts cannot use this category; identified-feature error
 and timing limits do not change.
+
+An independently measured opaque human hand may exclude a native part from
+source correspondence only with the distinct `source-occluded` reason. Its
+closed `sourceOcclusion` record binds the exact original decoded image, a
+convex nondegenerate in-image hand-interior polygon, source-mask uncertainty
+and measurement evidence. It is not a shadow/darkness heuristic, a general
+object waiver or permission to hide/fabricate native geometry.
+
+Ordinary rounded requested-time rows and held/interpolated samples cannot use
+this point-only certificate. They remain **UNAVAILABLE** unless independently
+source-qualified. Actual per-exposure hand masks and any separately qualified
+temporal closure remain source prerequisites; neither is inferred from an
+earlier mask or native capture time. Other reasons retain the 0.5-second timing
+limit unchanged.
+
+This certificate is one point at the original native decoded time, not a held
+or interpolated interval. The native consumer independently receives the current
+source-frame identity, and requires a fresh full-435 depth-tested GPU capture
+with the exact witness view, time, camera, ROI, presentation and ordered support
+layout. Every positive native ID pixel cell's conservative extent must lie
+strictly inside the polygon with margin at least source-mask uncertainty plus
+actual native source-pixel uncertainty. A centre or sparse contour is insufficient.
+Legacy `outside`, `occluded` and `absent` exclusions still require zero actual
+native ID pixels. The new bucket remains **SOURCE-OCCLUDED**, not source-corresponded
+or geometry-passed; a feasible whole pose is still chosen, not historically
+recovered. A source/CPU proposal cannot certify GPU/source coverage or promote
+canonical source availability.
 
 Runtime states:
 
@@ -156,6 +199,10 @@ raw reprojection error below 38.4 pixels alone is not acceptance.
 Ordinary landmark coordinates use exact destination pixel-cell mapping.
 Rasterized reference markers independently verify that mapping rather than
 calibrating it. Marker, blit and warped-cell errors remain explicit native terms.
+Clipping an enlarged mirrored or warped marker adds a conservative footprint
+term for higher same-image insets and outer raster/source boundaries. The
+centroid remains the actual readback value; a larger bound can reject the
+38.4-pixel limit even when the surviving marker is visible.
 CPU camera projection and two aliases of the player's clock are insufficient
 evidence. Native WebGL readback may use a software renderer; it does not imply
 hardware acceleration.

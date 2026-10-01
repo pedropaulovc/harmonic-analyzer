@@ -604,7 +604,7 @@ export class VideoReference {
         composite: observation.composite ?? { mode: 'opaque' }, resolvedImagePlaneWarp: imagePlaneWarps.get(observation) ?? null,
       }))
       assertSourceCompositeWeights(sourceLayout.map((entry) => ({ rectSourcePixels: entry.rectSourcePixels, presentation: entry.presentation, composite: entry.composite ?? undefined, imagePlaneWarp: entry.resolvedImagePlaneWarp ?? undefined })))
-      const views = observations.map((observation) => {
+      const views = observations.map((observation, observationIndex) => {
         if (observation.camera) requireCamera(observation.camera, `${video.id}@${t}s/${observation.id}`)
         if (observation.rectSourcePixels?.length !== 4) throw new Error(`Invalid source viewport at ${t}s.`)
         observation.rectSourcePixels.forEach((value) => finite(value, 'Source viewport'))
@@ -621,7 +621,7 @@ export class VideoReference {
           if (new Set(checks.map((check) => check.id)).size !== checks.length) throw new Error(`${label}: duplicate source geometry check ID.`)
         }
         for (const line of observation.nativeLineChecks ?? []) {
-          validateNativeLineAxisBiasComponents(line, observation.imagePlaneWarp != null, `${label}/${line.id}`)
+          validateNativeLineAxisBiasComponents(line, sourceLayout[observationIndex]!, `${label}/${line.id}`)
         }
         for (const override of observation.partOverrides ?? noOverrides) {
           const sourced = override as SourcePartOverride

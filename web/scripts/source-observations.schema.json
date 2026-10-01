@@ -22,7 +22,7 @@
       "required": ["sha256", "sourceCommit", "units", "axes"],
       "properties": {"sha256": {"$ref": "#/$defs/hash"}, "sourceCommit": {"type": "string"}, "units": {"const": "metres"}, "axes": {"const": "X-width/Y-height/Z-depth"}}
     },
-    "nativeGeometryAssumptions": {"type": "array", "minItems": 1, "maxItems": 1, "items": {"$ref": "#/$defs/nativeGeometryAssumption"}, "description": "The sole user-approved rod-head topology mapping, pending a later CAD correction. This is not a measured geometric-fidelity pass and does not exempt source pose, visibility, camera or timing checks."},
+    "nativeGeometryAssumptions": {"$ref": "#/$defs/nativeGeometryAssumptions"},
     "anchors": {"type": "array", "items": {"$ref": "#/$defs/anchor"}},
     "shots": {
       "type": "array",
@@ -49,7 +49,20 @@
     "sourceEvidence": {"type": "string", "minLength": 1, "pattern": "\\S"},
     "nativePartPath": {"type": "string", "pattern": "^harmonic-analyzer/[^/*?]+(?:/[^/*?]+)*$"},
     "timeInterval": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "number", "minimum": 0}},
+    "nativeGeometryAssumptions": {
+      "type": "array",
+      "maxItems": 2,
+      "items": {"$ref": "#/$defs/nativeGeometryAssumption"},
+      "allOf": [
+        {"contains": {"type": "object", "required": ["id"], "properties": {"id": {"const": "rod-head-functional-equivalence"}}}, "minContains": 0, "maxContains": 1},
+        {"contains": {"type": "object", "required": ["id"], "properties": {"id": {"const": "lower-rocker-side-face-functional-exception"}}}, "minContains": 0, "maxContains": 1}
+      ],
+      "description": "At most one of each closed user-approved declaration: rod-head functional mapping pending CAD match, and only the exact two lower-rocker side-face features permitted absent and uncertified. Neither establishes whole-part correspondence, a measured/topology fidelity pass or source availability, nor exempts the native census, pose, camera, motion, other features, 38.4-source-pixel or 0.5-second requirements. Original hole contours remain source diagnostics; no native holes, textures or source pixels may be fabricated."
+    },
     "nativeGeometryAssumption": {
+      "oneOf": [{"$ref": "#/$defs/rodHeadFunctionalEquivalence"}, {"$ref": "#/$defs/lowerRockerSideFaceFunctionalException"}]
+    },
+    "rodHeadFunctionalEquivalence": {
       "type": "object",
       "required": ["id", "status", "scope", "nativePartPaths", "authority", "sourceCounterpart", "interpretation"],
       "additionalProperties": false,
@@ -61,6 +74,21 @@
         "authority": {"const": "the one plate-like head vs u crosspiece is a discrepancy but both serve the same purpose; the 3d model will be fixed later to match device; animate assuming they will match later"},
         "sourceCounterpart": {"const": "Filmed U-shaped connecting-rod junction/crosspiece"},
         "interpretation": {"const": "Functional linkage mapping for animation only; not a current geometric-fidelity pass."}
+      }
+    },
+    "lowerRockerSideFaceFunctionalException": {
+      "type": "object",
+      "required": ["id", "status", "scope", "nativePartPaths", "authority", "sourceCounterpart", "sourceFeatureIds", "interpretation"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"const": "lower-rocker-side-face-functional-exception"},
+        "status": {"const": "user-approved-absent-uncertified"},
+        "scope": {"const": "two-lower-rocker-side-face-features-only"},
+        "nativePartPaths": {"type": "array", "minItems": 1, "maxItems": 20, "uniqueItems": true, "items": {"type": "string", "pattern": "^harmonic-analyzer/channel/rocker-arm-(?:[1-9]|1[0-9]|20)$"}},
+        "authority": {"const": "Allow a narrow functional exception"},
+        "sourceCounterpart": {"const": "Two small rimmed/recessed lower-rocker side-face features either side of the fulcrum"},
+        "sourceFeatureIds": {"const": ["lower-rocker-nearest-left-face-bore", "lower-rocker-nearest-right-face-bore"]},
+        "interpretation": {"const": "Only the two declared side-face features may remain absent from the native rockers and uncertified; animation-only exception, not whole-part correspondence or a measured/topology fidelity pass."}
       }
     },
     "sourceNonIdentifiableFixedPart": {
@@ -135,12 +163,12 @@
         "measurementEvidence": {
           "type": "object",
           "required": ["sourceImage", "detector", "edgeRows", "axisPerspectiveBiasBoundPx", "axisPerspectiveBiasComponents", "axisPerspectiveEvidence"],
-          "allOf": [{"if": {"properties": {"axisPerspectiveBiasComponents": {"properties": {"kind": {"const": "includes-source-localization"}}}}}, "then": {"properties": {"axisPerspectiveBiasSpace": {"const": "source-global"}}}}],
+          "allOf": [{"if": {"properties": {"axisPerspectiveBiasComponents": {"properties": {"kind": {"const": "includes-source-localization"}}}}}, "then": {"properties": {"axisPerspectiveBiasSpace": {"const": "source-global"}}}}, {"if": {"required": ["axisPerspectiveBiasSpace"], "properties": {"axisPerspectiveBiasSpace": {"const": "unwarped-viewport"}}}, "then": {"required": ["axisPerspectiveBiasRegionViewportPixels"]}}],
           "properties": {
             "sourceImage": {"$ref": "#/$defs/sourceImage"},
             "detector": {"type": "string", "minLength": 1, "pattern": "\\S"},
             "edgeRows": {"type": "array", "minItems": 2, "items": {"type": "object", "required": ["y", "left", "right", "contrast"], "properties": {"y": {"type": "number"}, "left": {"type": "number"}, "right": {"type": "number"}, "contrast": {"type": "number", "exclusiveMinimum": 0}}}},
-            "axisPerspectiveBiasBoundPx": {"type": "number", "minimum": 0},
+            "axisPerspectiveBiasBoundPx": {"type": "number", "minimum": 0, "description": "Unchanged authored axis bound in the declared coordinate space, not necessarily final-source pixels. Native viewport bounds may exceed 38.4; acceptance compares the propagated geometry plus independent source/native/residual/fit terms in final source-global pixels."},
             "axisPerspectiveBiasComponents": {
               "type": "object", "additionalProperties": false,
               "required": ["kind", "geometryBoundPx", "sourceLocalizationBoundPx", "evidence"],
@@ -153,14 +181,14 @@
               "allOf": [{"if": {"properties": {"kind": {"const": "independent-geometry"}}}, "then": {"properties": {"sourceLocalizationBoundPx": {"const": 0}}}}],
               "description": "Independently evidenced additive decomposition in axisPerspectiveBiasSpace (ordinary default source-global). Components must sum to the unchanged authored axis bound. Inclusive certificates are source-global only and sourceLocalizationBoundPx must equal the check's unchanged uncertaintyPx; only the geometry component is added alongside that localization term. No subtraction inferred from magnitude or prose."
             },
-            "axisPerspectiveBiasSpace": {"enum": ["source-global", "unwarped-viewport"], "description": "Mandatory for homography views; unwarped bounds are propagated by an independently recomputed H Jacobian, never reused as final-source pixels."},
-            "axisPerspectiveBiasRegionViewportPixels": {"$ref": "#/$defs/xyzw"},
+            "axisPerspectiveBiasSpace": {"enum": ["source-global", "unwarped-viewport"], "description": "Mandatory for homography views; unwarped geometry bounds are propagated by an independently recomputed H Jacobian over a region containing the entire inverse source-localization footprint plus native geometry radius. The already-source-global uncertaintyPx is never H-scaled."},
+            "axisPerspectiveBiasRegionViewportPixels": {"type": "array", "minItems": 4, "maxItems": 4, "prefixItems": [{"type": "number", "minimum": 0}, {"type": "number", "minimum": 0}, {"type": "number", "exclusiveMinimum": 0}, {"type": "number", "exclusiveMinimum": 0}], "items": false, "description": "Finite [x,y,width,height] within the unwarped viewport. For every endpoint and every paired-edge midpoint, inverse-map its supported source-global uncertaintyPx square on the positive projective branch, then expand the whole inverse footprint by geometryBoundPx; this entire expansion must lie in the region. Runtime/static/GPU validators enforce the cross-field containment before using the region's Jacobian bound."},
             "axisPerspectiveEvidence": {"type": "string", "minLength": 1, "pattern": "\\S", "description": "Physical justification and independent bound for silhouette midpoint versus projected cylinder-axis perspective asymmetry; source-image edge pairs remain the observations."}
           }
         }
       }
     },
-    "warpedNativeLineCheck": {"allOf": [{"$ref": "#/$defs/nativeLineCheck"}, {"properties": {"measurementEvidence": {"required": ["axisPerspectiveBiasSpace"], "allOf": [{"if": {"properties": {"axisPerspectiveBiasSpace": {"const": "unwarped-viewport"}}}, "then": {"required": ["axisPerspectiveBiasRegionViewportPixels"]}}]}}}]},
+    "warpedNativeLineCheck": {"allOf": [{"$ref": "#/$defs/nativeLineCheck"}, {"properties": {"measurementEvidence": {"required": ["axisPerspectiveBiasSpace"]}}}]},
     "sourceContourCheck": {
       "type": "object",
       "required": ["id", "partPath", "sourceContourPixels", "uncertaintyPx", "measurementEvidence"],
@@ -295,7 +323,7 @@
       "properties": {
         "sourceVideoId": {"$ref": "#/$defs/sourceEvidence"}, "sourceSha256": {"$ref": "#/$defs/hash"}, "sourceImage": {"$ref": "#/$defs/sourceImage"},
         "modelSha256": {"$ref": "#/$defs/hash"}, "modelSourceCommit": {"$ref": "#/$defs/sourceEvidence"},
-        "nativeGeometryAssumptions": {"type": "array", "maxItems": 1, "items": {"$ref": "#/$defs/nativeGeometryAssumption"}},
+        "nativeGeometryAssumptions": {"$ref": "#/$defs/nativeGeometryAssumptions"},
         "sourceNonIdentifiableFixedParts": {"$ref": "#/$defs/sourceNonIdentifiableFixedParts"},
         "shotId": {"$ref": "#/$defs/sourceEvidence"}, "viewId": {"$ref": "#/$defs/sourceEvidence"},
         "timeSeconds": {"type": "number", "minimum": 0}, "decodedTimeSeconds": {"type": "number", "minimum": 0}, "intervalSeconds": {"$ref": "#/$defs/timeInterval"},
@@ -308,16 +336,35 @@
         "constraints": {"type": "array", "items": {"$ref": "#/$defs/sourceConstraint"}}, "continuity": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/continuity"}]}
       }
     },
+    "sourceOcclusion": {
+      "type": "object",
+      "required": ["kind", "sourceImage", "polygonSourcePixels", "uncertaintyPx", "evidence"],
+      "additionalProperties": false,
+      "description": "An independently measured opaque human-hand interior in this exact original decoded image, not a darkness heuristic, native-derived mask or general object waiver. Runtime/static checks require a convex nondegenerate non-self-intersecting in-image polygon, exact proof image equality and a point certificate [decodedTimeSeconds, decodedTimeSeconds] at that exact time. Native qualification additionally requires fresh depth GPU readback, independently supplied exact current source image/time/view/camera/layout binding and the whole positive native ID-cell extent strictly inside with source-mask plus actual-native uncertainty margin. A single exposure cannot certify other images or interpolated/held times.",
+      "properties": {
+        "kind": {"const": "measured-opaque-human-hand-interior"},
+        "sourceImage": {"allOf": [{"$ref": "#/$defs/sourceImage"}, {"properties": {"width": {"const": 1920}, "height": {"const": 1080}}}]},
+        "polygonSourcePixels": {"type": "array", "minItems": 3, "uniqueItems": true, "items": {"type": "array", "minItems": 2, "maxItems": 2, "prefixItems": [{"type": "number", "minimum": 0, "maximum": 1920}, {"type": "number", "minimum": 0, "maximum": 1080}], "items": false}},
+        "uncertaintyPx": {"type": "number", "minimum": 0},
+        "evidence": {"$ref": "#/$defs/sourceEvidence"}
+      }
+    },
+    "sourceExclusion": {
+      "oneOf": [
+        {"type": "object", "required": ["partPath", "reason", "evidence"], "additionalProperties": false, "properties": {"partPath": {"$ref": "#/$defs/nativePartPath"}, "reason": {"enum": ["outside", "occluded", "absent"]}, "evidence": {"$ref": "#/$defs/sourceEvidence"}}},
+        {"type": "object", "required": ["partPath", "reason", "sourceOcclusion", "evidence"], "additionalProperties": false, "properties": {"partPath": {"$ref": "#/$defs/nativePartPath"}, "reason": {"const": "source-occluded"}, "sourceOcclusion": {"$ref": "#/$defs/sourceOcclusion"}, "evidence": {"$ref": "#/$defs/sourceEvidence"}}}
+      ]
+    },
     "visibilityProof": {
       "type": "object",
       "required": ["binding", "sourceVisibleParts", "excludedParts", "sourceNonIdentifiableFixedParts", "unresolvedParts", "evidence"],
       "additionalProperties": false,
-      "description": "Every native inventory path must appear exactly once as independently source-corresponded, evidentially excluded or explicitly user-approved source-non-identifiable structural fixed. Approved fixed parts remain rendered and are not measured/geometric-fidelity passed; moving, deforming or source-overridden parts cannot use that bucket. No unresolved part or rod-head geometry assumption establishes coverage. Full inventory membership, cross-bucket uniqueness, fixed-motion qualification, actual source-region/native ID pixels, references and exact binding records are runtime-verified without relaxing pixel or timing limits.",
+      "description": "Every native inventory path must appear exactly once as independently source-corresponded, evidentially excluded or explicitly user-approved source-non-identifiable structural fixed. A measured per-original-exposure opaque human-hand source-occluded exclusion remains SOURCE-OCCLUDED, not source-corresponded or geometry-passed; all legacy exclusions require zero actual native IDs. Approved fixed parts remain rendered and are not measured/geometric-fidelity passed; moving, deforming or source-overridden parts cannot use that bucket. No unresolved part or native geometry assumption establishes coverage. Full inventory membership, cross-bucket uniqueness, fixed-motion qualification, actual source-region/native ID pixels, references and exact binding records are runtime-verified without relaxing pixel or timing limits.",
       "anyOf": [{"properties": {"sourceVisibleParts": {"minItems": 1}}}, {"properties": {"excludedParts": {"minItems": 1}}}, {"properties": {"sourceNonIdentifiableFixedParts": {"minItems": 1}}}],
       "properties": {
         "binding": {"$ref": "#/$defs/witnessBinding"},
         "sourceVisibleParts": {"type": "array", "items": {"type": "object", "required": ["partPath", "sourceFeatures", "sourceCoverage", "evidence"], "additionalProperties": false, "properties": {"partPath": {"$ref": "#/$defs/nativePartPath"}, "sourceFeatures": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/sourceEvidence"}}, "sourceCoverage": {"$ref": "#/$defs/sourceCoverage"}, "evidence": {"$ref": "#/$defs/sourceEvidence"}}}},
-        "excludedParts": {"type": "array", "items": {"type": "object", "required": ["partPath", "reason", "evidence"], "additionalProperties": false, "properties": {"partPath": {"$ref": "#/$defs/nativePartPath"}, "reason": {"enum": ["outside", "occluded", "absent"]}, "evidence": {"$ref": "#/$defs/sourceEvidence"}}}},
+        "excludedParts": {"type": "array", "items": {"$ref": "#/$defs/sourceExclusion"}},
         "sourceNonIdentifiableFixedParts": {"$ref": "#/$defs/sourceNonIdentifiableFixedParts"},
         "unresolvedParts": {"type": "array", "maxItems": 0, "items": {"type": "object", "required": ["partPath", "reason"], "additionalProperties": false, "properties": {"partPath": {"$ref": "#/$defs/nativePartPath"}, "reason": {"$ref": "#/$defs/sourceEvidence"}}}},
         "evidence": {"$ref": "#/$defs/sourceEvidence"}

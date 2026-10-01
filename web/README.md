@@ -61,10 +61,41 @@ treated as functionally equivalent for animation, with the user's approval
 pending a later CAD correction. The HUD and verification reports retain this
 head-shape assumption. Other motion, camera and geometry checks still apply.
 
+The user separately allows a narrow exception for only the two small
+rimmed/recessed lower-rocker side-face features either side of the fulcrum.
+They are absent from all twenty native rockers and remain explicitly
+**uncertified**, not pending a promised CAD correction. The closed declaration
+names both exact source features and only `harmonic-analyzer/channel/rocker-arm-1..20`
+paths. The HUD identifies this exception separately from the rod-head mapping;
+reports and proof bindings retain both exact records when declared.
+
+Neither exception establishes correspondence for an entire moving part or
+makes incomplete source data matched. Original hole contours remain diagnostics;
+no source pixels, native holes or textures are fabricated. The full 435-part
+census, all other features, pose, camera, motion, 38.4-pixel and 0.5-second
+requirements remain unchanged.
+
 Structural fixed parts that the source cannot identify may remain rendered in
 a complete feasible reconstruction, with the user's approval. They are listed
 as source-non-identifiable, not geometric-fidelity passed. Moving parts and all
 identifiable-feature and timing checks retain their requirements.
+
+Source occlusion by an independently measured opaque human hand is separate from
+those geometry exceptions. A `source-occluded` record must bind the exact original
+image and decoded-time point certificate. A fresh all-435 depth GPU capture must
+put every positive native ID pixel cell strictly inside its convex source hand
+polygon, including the combined source-mask/native uncertainty margin. Source
+identity is supplied independently, never inferred from native capture time.
+Other exclusions still require zero native ID pixels. These parts remain
+**SOURCE-OCCLUDED**, not source-corresponded or geometry-passed; a single-image
+mask cannot certify held/interpolated images or times, and a CPU proposal cannot
+make unavailable canonical source data matched.
+
+Ordinary rounded requested-time rows and held/interpolated samples remain
+**UNAVAILABLE** unless separately source-qualified; the point-only hand mask
+cannot supply that qualification. Actual per-exposure masks or separately
+qualified temporal closure are source prerequisites, never inferred from an
+earlier mask. The 0.5-second timing limit for other reasons is unchanged.
 
 All six observation files currently have incomplete camera/mechanism coverage.
 Full footage fidelity is **not verified**.

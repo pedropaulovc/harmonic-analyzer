@@ -17,16 +17,34 @@ const text = value => typeof value === 'string' && value.trim().length > 0
 const hash = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value)
 
 const ROD_HEAD_AUTHORITY = 'the one plate-like head vs u crosspiece is a discrepancy but both serve the same purpose; the 3d model will be fixed later to match device; animate assuming they will match later'
+const LOWER_ROCKER_SIDE_FACE_POLICY = {
+  id: 'lower-rocker-side-face-functional-exception',
+  status: 'user-approved-absent-uncertified',
+  scope: 'two-lower-rocker-side-face-features-only',
+  authority: 'Allow a narrow functional exception',
+  sourceCounterpart: 'Two small rimmed/recessed lower-rocker side-face features either side of the fulcrum',
+  sourceFeatureIds: ['lower-rocker-nearest-left-face-bore', 'lower-rocker-nearest-right-face-bore'],
+  interpretation: 'Only the two declared side-face features may remain absent from the native rockers and uncertified; animation-only exception, not whole-part correspondence or a measured/topology fidelity pass.',
+}
 export function nativeGeometryAssumptionErrors(assumptions) {
   if (assumptions === undefined) return []
-  if (!Array.isArray(assumptions) || assumptions.length !== 1) return ['Only the explicitly approved single rod-head functional-equivalence record may be declared']
-  const value = assumptions[0]
-  if (!exactKeys(value, ['id', 'status', 'scope', 'nativePartPaths', 'authority', 'sourceCounterpart', 'interpretation'])
-    || value.id !== 'rod-head-functional-equivalence' || value.status !== 'user-approved-pending-cad-match' || value.scope !== 'rod-head-topology-only'
-    || value.authority !== ROD_HEAD_AUTHORITY || value.sourceCounterpart !== 'Filmed U-shaped connecting-rod junction/crosspiece'
-    || value.interpretation !== 'Functional linkage mapping for animation only; not a current geometric-fidelity pass.'
-    || !Array.isArray(value.nativePartPaths) || !value.nativePartPaths.length || new Set(value.nativePartPaths).size !== value.nativePartPaths.length
-    || value.nativePartPaths.some(path => typeof path !== 'string' || !/^harmonic-analyzer\/channel\/connecting-rod-([1-9]|1[0-9]|20)$/.test(path))) return ['Unapproved native geometry assumption, path, topology scope, authority or fidelity claim']
+  if (!Array.isArray(assumptions) || assumptions.length > 2) return ['Only up to one of each closed user-approved native geometry assumption may be declared']
+  const ids = new Set()
+  for (const value of assumptions) {
+    if (ids.has(value?.id)) return ['Duplicate native geometry assumption identity']
+    ids.add(value?.id)
+    if (value?.id === LOWER_ROCKER_SIDE_FACE_POLICY.id) {
+      if (!exactKeys(value, [...Object.keys(LOWER_ROCKER_SIDE_FACE_POLICY), 'nativePartPaths'])
+        || Object.keys(LOWER_ROCKER_SIDE_FACE_POLICY).some(key => canonicalJson(value[key]) !== canonicalJson(LOWER_ROCKER_SIDE_FACE_POLICY[key]))
+        || !Array.isArray(value.nativePartPaths) || !value.nativePartPaths.length || value.nativePartPaths.length > 20 || new Set(value.nativePartPaths).size !== value.nativePartPaths.length
+        || value.nativePartPaths.some(path => typeof path !== 'string' || !/^harmonic-analyzer\/channel\/rocker-arm-(?:[1-9]|1[0-9]|20)$/.test(path))) return ['Unapproved lower-rocker side-face feature scope, native path, authority or certification claim']
+    } else if (!exactKeys(value, ['id', 'status', 'scope', 'nativePartPaths', 'authority', 'sourceCounterpart', 'interpretation'])
+      || value.id !== 'rod-head-functional-equivalence' || value.status !== 'user-approved-pending-cad-match' || value.scope !== 'rod-head-topology-only'
+      || value.authority !== ROD_HEAD_AUTHORITY || value.sourceCounterpart !== 'Filmed U-shaped connecting-rod junction/crosspiece'
+      || value.interpretation !== 'Functional linkage mapping for animation only; not a current geometric-fidelity pass.'
+      || !Array.isArray(value.nativePartPaths) || !value.nativePartPaths.length || value.nativePartPaths.length > 20 || new Set(value.nativePartPaths).size !== value.nativePartPaths.length
+      || value.nativePartPaths.some(path => typeof path !== 'string' || !/^harmonic-analyzer\/channel\/connecting-rod-(?:[1-9]|1[0-9]|20)$/.test(path))) return ['Unapproved native geometry assumption, path, topology scope, authority or fidelity claim']
+  }
   return []
 }
 
@@ -131,6 +149,32 @@ export function homographyMagnificationBound(warp, region = [0,0,...warp.unwarpe
   return Math.hypot(...entries.map(fn=>Math.max(...points.map(p=>Math.abs(fn(p))))/denominator))
 }
 export function independentlyResolvedWarp(view) { return view.imagePlaneWarp == null ? null : recomputeImagePlaneWarp(view.imagePlaneWarp) }
+/** A positive-branch homography maps a supported source square to a convex quad.
+ * Its inverse-coordinate extrema occur at its corners; compute the inverse once
+ * for the whole certificate, then expand the whole footprint by native geometry.
+ * Source localization itself remains a source-global bound, never H-scaled.
+ */
+export function sourceLocalizationFootprintBounds(view, observation, points, geometryRadius = 0) {
+  if (!finite(observation?.uncertaintyPx) || observation.uncertaintyPx < 0) throw new Error('Source localization/raster uncertainty is unknown; null cannot become zero')
+  if (!Array.isArray(points) || !points.length || !points.every(point => vector(point,2))
+    || !finite(geometryRadius) || geometryRadius < 0) throw new Error('Source localization needs finite actual source points and a nonnegative geometry radius')
+  const warp = independentlyResolvedWarp(view)
+  if (!warp) return null
+  const rect = view.rectSourcePixels
+  if (!vector(rect,4) || rect[2] <= 0 || rect[3] <= 0) throw new Error('Invalid source localization support ROI')
+  const inverse = invertHomography(warp.renderToSourcePixels), bound = observation.uncertaintyPx
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (const point of points) for (const [dx,dy] of [[-1,-1],[1,-1],[1,1],[-1,1]]) {
+    const pixel = [point[0]+dx*bound,point[1]+dy*bound]
+    const denominator = inverse[6]*pixel[0]+inverse[7]*pixel[1]+inverse[8]
+    if (!finite(denominator) || denominator <= 1e-10 || !inRect(pixel,rect)) throw new Error('Source localization footprint crosses the projective horizon or leaves measured source quad/ROI support')
+    const native = projectHomography(inverse,pixel)
+    if (!native.every(finite) || native[0] < 0 || native[1] < 0 || native[0] >= warp.unwarpedViewportPixels[0] || native[1] >= warp.unwarpedViewportPixels[1]) throw new Error('Source localization footprint crosses the projective horizon or leaves measured source quad/ROI support')
+    minX = Math.min(minX,native[0]); minY = Math.min(minY,native[1])
+    maxX = Math.max(maxX,native[0]); maxY = Math.max(maxY,native[1])
+  }
+  return {warp,boundsViewportPixels:[minX-geometryRadius,minY-geometryRadius,maxX+geometryRadius,maxY+geometryRadius]}
+}
 export function sourceLayoutForViews(views) {
   return views.map(view=>({viewId:view.id,rectSourcePixels:view.rectSourcePixels,presentation:view.presentation,composite:view.composite??{mode:'opaque'},resolvedImagePlaneWarp:independentlyResolvedWarp(view)}))
 }
@@ -232,9 +276,32 @@ export function witnessErrors(witness, expected, anchors, landmarks, view = {}) 
   if (witness.continuity && (!exactKeys(witness.continuity, ['intervalId', 'evidence']) || !text(witness.continuity.intervalId) || !text(witness.continuity.evidence))) reject('Continuity requires a source-evidenced interval')
   return [...errors, ...visibilityProofErrors(witness.visibilityProof, expected, anchors, landmarks, view)]
 }
+export function sourceOcclusionErrors(mask, expectedSourceImage) {
+  if (!exactKeys(mask, ['kind', 'sourceImage', 'polygonSourcePixels', 'uncertaintyPx', 'evidence'])
+    || mask.kind !== 'measured-opaque-human-hand-interior' || sourceImageError(mask.sourceImage, null)
+    || canonicalJson(mask.sourceImage) !== canonicalJson(expectedSourceImage)
+    || !finite(mask.uncertaintyPx) || mask.uncertaintyPx < 0 || !text(mask.evidence)) return ['Source occlusion needs the exact original image, closed opaque-human-hand kind, nonnegative uncertainty and source evidence']
+  const polygon = mask.polygonSourcePixels
+  if (!Array.isArray(polygon) || polygon.length < 3 || !polygon.every(point => vector(point, 2) && point[0] >= 0 && point[1] >= 0 && point[0] <= mask.sourceImage.width && point[1] <= mask.sourceImage.height)) return ['Source hand interior requires a finite in-image convex nondegenerate polygon']
+  let area2 = 0
+  for (let i = 0; i < polygon.length; i++) {
+    const a = polygon[i], b = polygon[(i + 1) % polygon.length]
+    for (let j = 0; j < i; j++) if (a[0] === polygon[j][0] && a[1] === polygon[j][1]) return ['Duplicate source hand polygon vertex']
+    area2 += a[0] * b[1] - a[1] * b[0]
+  }
+  if (!finite(area2) || area2 === 0) return ['Degenerate source hand polygon']
+  const orientation = Math.sign(area2)
+  for (let i = 0; i < polygon.length; i++) {
+    const a = polygon[i], b = polygon[(i + 1) % polygon.length]
+    for (const point of polygon) if (orientation * ((b[0] - a[0]) * (point[1] - a[1]) - (b[1] - a[1]) * (point[0] - a[0])) < 0) return ['Source hand polygon must be convex and non-self-intersecting']
+  }
+  return []
+}
+
 export function visibilityProofErrors(proof, expected, anchors, landmarks, view = {}) {
   const errors = []
   const reject = detail => errors.push(detail)
+  errors.push(...nativeGeometryAssumptionErrors(expected.nativeGeometryAssumptions))
   const binding = proof?.binding
   if (!exactKeys(proof, ['binding', 'sourceVisibleParts', 'excludedParts', 'sourceNonIdentifiableFixedParts', 'unresolvedParts', 'evidence']) || !text(proof.evidence)
     || !exactKeys(binding, [...Object.keys(expected), 'intervalSeconds'])) return [...errors, 'Missing complete, explicitly bound visibility proof']
@@ -272,7 +339,14 @@ export function visibilityProofErrors(proof, expected, anchors, landmarks, view 
       if (!matched) reject(`Unknown/current-frame missing ${key}: ${id} for ${part.partPath}`)
     }
   }
-  for (const part of proof.excludedParts) if (!exactKeys(part, ['partPath', 'reason', 'evidence']) || !['outside', 'occluded', 'absent'].includes(part.reason)) reject(`Invalid source exclusion ${part.partPath}`)
+  for (const part of proof.excludedParts) {
+    if (!exactKeys(part, ['partPath', 'reason', 'evidence', ...(part.reason === 'source-occluded' ? ['sourceOcclusion'] : [])])
+      || !['outside', 'occluded', 'absent', 'source-occluded'].includes(part.reason)) reject(`Invalid source exclusion ${part.partPath}`)
+    else if (part.reason === 'source-occluded') {
+      errors.push(...sourceOcclusionErrors(part.sourceOcclusion, expected.sourceImage))
+      if (expected.timeSeconds !== expected.decodedTimeSeconds || binding.intervalSeconds?.[0] !== expected.decodedTimeSeconds || binding.intervalSeconds?.[1] !== expected.decodedTimeSeconds) reject('Source hand mask requires one exact decoded-exposure point certificate, not a held/interpolated interval')
+    }
+  }
   return errors
 }
 
@@ -384,15 +458,37 @@ export function nativeLineAxisBiasComponents(line) {
     ||components.sourceLocalizationBoundPx!==line.uncertaintyPx) throw new Error('Inclusive axis certificate must identify the same final-source localization bound exactly once')
   return components
 }
-export function nativeLineErrors(lines, image, rect, overrides = []) {
-  const errors = [], ids = new Set()
+/** Shared static/GPU geometry propagation; the certified region includes source
+ * localization in inverse viewport coordinates before the geometry expansion.
+ */
+export function nativeLineAxisGeometryBound(view, check, observed) {
+  const evidence = check.measurementEvidence, components = nativeLineAxisBiasComponents(check)
+  const footprint = sourceLocalizationFootprintBounds(view,check,observed,evidence.axisPerspectiveBiasSpace === 'unwarped-viewport' ? components.geometryBoundPx : 0)
+  let magnificationBound = 1
+  if (footprint) {
+    if (!['source-global','unwarped-viewport'].includes(evidence.axisPerspectiveBiasSpace)) throw new Error('Warped native line bias has no explicit coordinate space; untransformed uncertainty is forbidden')
+    if (evidence.axisPerspectiveBiasSpace === 'unwarped-viewport') {
+      const region = evidence.axisPerspectiveBiasRegionViewportPixels, warp = footprint.warp
+      if (!vector(region,4) || region[0] < 0 || region[1] < 0 || region[2] <= 0 || region[3] <= 0
+        || region[0]+region[2] > warp.unwarpedViewportPixels[0] || region[1]+region[3] > warp.unwarpedViewportPixels[1]) throw new Error('Warped axis bias needs a bounded unwarped viewport region')
+      const [minX,minY,maxX,maxY] = footprint.boundsViewportPixels
+      if (minX < region[0] || minY < region[1] || maxX > region[0]+region[2] || maxY > region[1]+region[3]) throw new Error('Unwarped bias region does not cover every endpoint/edge-row full source-localization footprint plus geometry uncertainty')
+      magnificationBound = homographyMagnificationBound(warp,region)
+    }
+  } else if (evidence.axisPerspectiveBiasSpace !== undefined && evidence.axisPerspectiveBiasSpace !== 'source-global') throw new Error('Ordinary axis bias must use source-global pixels')
+  const geometryBiasSourcePixels = components.geometryBoundPx*magnificationBound
+  if (!finite(geometryBiasSourcePixels)) throw new Error('Unbounded final-source geometry bias')
+  return {components,magnificationBound,geometryBiasSourcePixels}
+}
+export function nativeLineErrors(lines, image, view, overrides = []) {
+  const errors = [], ids = new Set(), rect = view?.rectSourcePixels
   for (const line of lines) {
     const evidence = line?.measurementEvidence, local = line?.partLocalLineMetres, source = line?.sourceLinePixels
     const reject = detail => errors.push(`${line?.id ?? 'unknown'}: ${detail}`)
     if (!text(line?.id) || ids.has(line.id) || !text(line.partPath) || !line.partPath.startsWith('harmonic-analyzer/') || !Array.isArray(local) || local.length !== 2 || !local.every(point => vector(point, 3)) || distance(local[0], local[1]) <= 1e-9
       || !Array.isArray(source) || source.length !== 2 || !source.every(point => inRect(point, rect)) || distance(source[0], source[1]) <= 1e-6 || !finite(line.uncertaintyPx) || line.uncertaintyPx < 0 || line.uncertaintyPx > PIXEL_LIMIT) { reject('Invalid/degenerate native geometry or actual source segment'); continue }
     ids.add(line.id)
-    if (canonicalJson(evidence?.sourceImage) !== canonicalJson(image) || !text(evidence?.detector) || !text(evidence?.axisPerspectiveEvidence) || !finite(evidence?.axisPerspectiveBiasBoundPx) || evidence.axisPerspectiveBiasBoundPx < 0 || evidence.axisPerspectiveBiasBoundPx > PIXEL_LIMIT) { reject('Need current exposure, actual edge detector and conservative independently justified axis perspective bias'); continue }
+    if (canonicalJson(evidence?.sourceImage) !== canonicalJson(image) || !text(evidence?.detector) || !text(evidence?.axisPerspectiveEvidence) || !finite(evidence?.axisPerspectiveBiasBoundPx) || evidence.axisPerspectiveBiasBoundPx < 0) { reject('Need current exposure, actual edge detector and conservative independently justified axis perspective bias'); continue }
     try { nativeLineAxisBiasComponents(line) } catch(error) { reject(error.message); continue }
     const rows = evidence.edgeRows
     if (!Array.isArray(rows) || rows.length < 2 || new Set(rows.map(row => row?.y)).size < 2) { reject('Need distinct actually observed paired-edge rows'); continue }
@@ -403,6 +499,11 @@ export function nativeLineErrors(lines, image, rect, overrides = []) {
       if (distance(point, source[0].map((value, i) => value + fraction * delta[i])) > line.uncertaintyPx) reject('Source line is unsupported by actual paired edges')
     }
     if (Math.min(...source.map(point => point[1])) < Math.min(...rows.map(row => row.y)) - line.uncertaintyPx || Math.max(...source.map(point => point[1])) > Math.max(...rows.map(row => row.y)) + line.uncertaintyPx) reject('Source line extends beyond observed edge support')
+    try {
+      const observed = [...source,...rows.map(row => [(row.left+row.right)/2,row.y])]
+      const geometry = nativeLineAxisGeometryBound(view,line,observed)
+      if (line.uncertaintyPx+geometry.geometryBiasSourcePixels > PIXEL_LIMIT) reject(`Source localization plus propagated geometry bias already exceeds ${PIXEL_LIMIT}px before native raster/residual/fit bounds`)
+    } catch(error) { reject(error.message) }
     if (overrides.some(override => override.visibility === 'hidden' && (line.partPath === override.partPath || line.partPath.startsWith(`${override.partPath}/`)))) reject('Source line belongs to hidden native geometry')
   }
   return errors
@@ -640,6 +741,7 @@ export function inspectReference(data, expectedId, native = null) {
         const errors = state.status === 'constrained' ? witnessErrors(state.runtimeWitness, expected, data.anchors ?? [], landmarks, view) : visibilityProofErrors(state.visibilityProof, expected, data.anchors ?? [], landmarks, view)
         for (const error of errors) fail(state.status === 'constrained' ? 'witness-proof' : 'observed-native-proof', error, t, viewId)
         if (Array.isArray(proof?.sourceNonIdentifiableFixedParts)) (summary.sourceNonIdentifiableFixedParts ??= []).push(...proof.sourceNonIdentifiableFixedParts.map(part => ({ ...part, timeSeconds: t, viewId })))
+        for (const exclusion of proof?.excludedParts ?? []) if (exclusion.reason === 'source-occluded') (summary.sourceOccludedParts ??= []).push({ timeSeconds: t, viewId, exclusion })
       }
       for (const override of view.partOverrides ?? []) {
         if (!text(override.partPath) || (override.visibility !== undefined && !['visible', 'hidden'].includes(override.visibility)) || (override.worldPositionMetres !== undefined && !vector(override.worldPositionMetres, 3)) || (override.worldQuaternion !== undefined && (!vector(override.worldQuaternion, 4) || Math.abs(Math.hypot(...override.worldQuaternion) - 1) > 0.002))) fail('part-override', 'Disassembly/setup must use qualified native part paths and finite observed poses', t, viewId)
@@ -674,12 +776,7 @@ export function inspectReference(data, expectedId, native = null) {
         if (fitIds.size < 6 || checkIds.size < 2) fail('independent-check-count', `Direct camera needs >=6 fit and >=2 separately measured held-out anchors; observed ${fitIds.size}/${checkIds.size}`, t, viewId)
       } else if (!['shared-rigid-sequence', 'source-registered','source-image-plane-registered'].includes(cameraKind) || (!checkIds.size && !(view.nativeLineChecks?.length))) fail('derived-native-check', 'Derived camera needs an independently identifiable calibration and actual target native held-out point or native line evidence', t, viewId)
       for (const item of landmarks) if (item.measurementEvidence || item.trackingEvidence) for (const error of measuredImageErrors(item, frame.sourceImage)) fail('measurement-image-binding', `${item.anchorId}: ${error}`, t, viewId)
-      for (const error of nativeLineErrors(view.nativeLineChecks ?? [], frame.sourceImage, rect, view.partOverrides ?? [])) fail('native-line-evidence', error, t, viewId)
-      if (view.imagePlaneWarp) for (const line of view.nativeLineChecks??[]) {
-        const e=line.measurementEvidence,region=e?.axisPerspectiveBiasRegionViewportPixels,[w,h]=view.imagePlaneWarp.unwarpedViewportPixels
-        if (!['source-global','unwarped-viewport'].includes(e?.axisPerspectiveBiasSpace)
-          ||(e.axisPerspectiveBiasSpace==='unwarped-viewport'&&(!vector(region,4)||region[0]<0||region[1]<0||region[2]<=0||region[3]<=0||region[0]+region[2]>w||region[1]+region[3]>h))) fail('native-line-warp-uncertainty','Warped line must explicitly bind final-source bias or a bounded unwarped viewport bias region for Jacobian propagation',t,viewId)
-      }
+      for (const error of nativeLineErrors(view.nativeLineChecks ?? [], frame.sourceImage, view, view.partOverrides ?? [])) fail('native-line-evidence', error, t, viewId)
       const contourIds = new Set()
       for (const contour of view.sourceContourChecks ?? []) {
         if (!text(contour.id) || contourIds.has(contour.id) || !text(contour.partPath) || !contour.partPath.startsWith('harmonic-analyzer/') || !Array.isArray(contour.sourceContourPixels) || contour.sourceContourPixels.length < 2 || !contour.sourceContourPixels.every(point => inRect(point, rect)) || contour.sourceContourPixels.every(point => canonicalJson(point) === canonicalJson(contour.sourceContourPixels[0])) || !finite(contour.uncertaintyPx) || contour.uncertaintyPx < 0 || contour.uncertaintyPx > PIXEL_LIMIT || canonicalJson(contour.measurementEvidence?.sourceImage) !== canonicalJson(frame.sourceImage) || !text(contour.measurementEvidence?.evidence)) fail('source-contour-evidence', 'Need a distinct nondegenerate actually measured current-source native contour inside ROI with bounded uncertainty', t, viewId)

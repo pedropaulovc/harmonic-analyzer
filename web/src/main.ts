@@ -424,7 +424,12 @@ function updateHud(): void {
   markControl(cone, 'setup.coneSwingRad')
   markControl(pinion, 'setup.pinionCamRad')
   markControl(platen, 'setup.platenOffsetM')
-  const geometryAssumption = reference?.data.nativeGeometryAssumptions?.length ? ' · Rod-head topology assumed pending CAD match; not geometric-fidelity passed' : ''
+  let geometryAssumption = ''
+  if (reference?.data.nativeGeometryAssumptions) for (const assumption of reference.data.nativeGeometryAssumptions) {
+    geometryAssumption += assumption.id === 'rod-head-functional-equivalence'
+      ? ' · Rod-head topology assumed pending CAD match; not geometric-fidelity passed'
+      : ' · Two lower-rocker side-face features absent and uncertified; narrow functional exception, not geometric-fidelity passed'
+  }
   const fixedParts = mode === 'exploring' ? explorationSourceNonIdentifiableFixedParts : activeViews.flatMap((view) => view.sourceNonIdentifiableFixedParts)
   const uncertifiedFixed = fixedParts.length ? ` · Source-non-identifiable fixed parts: ${[...new Set(fixedParts.map((part) => part.nativePartPath))].join(', ')}; not geometric-fidelity passed` : ''
   status.textContent = `${stateLabels[playbackState]} · ${time.toFixed(1)} s · ${context}${geometryAssumption}${uncertifiedFixed}`

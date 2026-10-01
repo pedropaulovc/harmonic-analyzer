@@ -1,6 +1,7 @@
 import { createMechanismPose, solveMechanism, type MechanismInput, type MechanismPose } from './mechanics'
 import { physicalChannelAngle } from './kinematics'
 import type { CameraRecord, ImagePlaneWarp, PartOverride, SourceComposite, SourceLayoutEntry } from './scene'
+import { prepareImagePlaneFootprintContext, imagePlaneSourceFootprintBounds } from './image-plane-homography'
 
 export const ROD_HEAD_FUNCTIONAL_EQUIVALENCE = {
   id: 'rod-head-functional-equivalence',
@@ -10,19 +11,37 @@ export const ROD_HEAD_FUNCTIONAL_EQUIVALENCE = {
   sourceCounterpart: 'Filmed U-shaped connecting-rod junction/crosspiece',
   interpretation: 'Functional linkage mapping for animation only; not a current geometric-fidelity pass.',
 } as const
-export type NativeGeometryAssumption = typeof ROD_HEAD_FUNCTIONAL_EQUIVALENCE & { nativePartPaths: string[] }
+export const LOWER_ROCKER_SIDE_FACE_FUNCTIONAL_EXCEPTION = {
+  id: 'lower-rocker-side-face-functional-exception',
+  status: 'user-approved-absent-uncertified',
+  scope: 'two-lower-rocker-side-face-features-only',
+  authority: 'Allow a narrow functional exception',
+  sourceCounterpart: 'Two small rimmed/recessed lower-rocker side-face features either side of the fulcrum',
+  sourceFeatureIds: ['lower-rocker-nearest-left-face-bore', 'lower-rocker-nearest-right-face-bore'],
+  interpretation: 'Only the two declared side-face features may remain absent from the native rockers and uncertified; animation-only exception, not whole-part correspondence or a measured/topology fidelity pass.',
+} as const
+export type NativeGeometryAssumption = (typeof ROD_HEAD_FUNCTIONAL_EQUIVALENCE | typeof LOWER_ROCKER_SIDE_FACE_FUNCTIONAL_EXCEPTION) & { nativePartPaths: string[] }
 
 export function validateNativeGeometryAssumptions(assumptions: readonly NativeGeometryAssumption[] | undefined): void {
   if (assumptions === undefined) return
-  if (!Array.isArray(assumptions) || assumptions.length !== 1) throw new Error('Native geometry assumptions require exactly the one approved rod-head declaration.')
-  const assumption = assumptions[0]!
-  keys(assumption, [...Object.keys(ROD_HEAD_FUNCTIONAL_EQUIVALENCE), 'nativePartPaths'], 'Native geometry assumption')
-  for (const key of Object.keys(ROD_HEAD_FUNCTIONAL_EQUIVALENCE) as (keyof typeof ROD_HEAD_FUNCTIONAL_EQUIVALENCE)[]) {
-    if (assumption[key] !== ROD_HEAD_FUNCTIONAL_EQUIVALENCE[key]) throw new Error(`Native geometry assumption has unapproved ${key}.`)
+  if (!Array.isArray(assumptions) || assumptions.length > 2) throw new Error('Native geometry assumptions permit at most one of each closed user-approved declaration.')
+  const ids = new Set<NativeGeometryAssumption['id']>()
+  for (const assumption of assumptions) {
+    const policy = assumption?.id === ROD_HEAD_FUNCTIONAL_EQUIVALENCE.id ? ROD_HEAD_FUNCTIONAL_EQUIVALENCE
+      : assumption?.id === LOWER_ROCKER_SIDE_FACE_FUNCTIONAL_EXCEPTION.id ? LOWER_ROCKER_SIDE_FACE_FUNCTIONAL_EXCEPTION : null
+    if (!policy || ids.has(assumption.id)) throw new Error('Unknown or duplicate native geometry assumption identity.')
+    ids.add(assumption.id)
+    keys(assumption, [...Object.keys(policy), 'nativePartPaths'], 'Native geometry assumption')
+    for (const key of Object.keys(policy) as (keyof typeof policy)[]) {
+      if (!equalRecord(assumption[key], policy[key])) throw new Error(`Native geometry assumption has unapproved ${key}.`)
+    }
+    const pathPattern = policy.id === ROD_HEAD_FUNCTIONAL_EQUIVALENCE.id
+      ? /^harmonic-analyzer\/channel\/connecting-rod-(?:[1-9]|1[0-9]|20)$/
+      : /^harmonic-analyzer\/channel\/rocker-arm-(?:[1-9]|1[0-9]|20)$/
+    if (!Array.isArray(assumption.nativePartPaths) || !assumption.nativePartPaths.length || assumption.nativePartPaths.length > 20
+      || new Set(assumption.nativePartPaths).size !== assumption.nativePartPaths.length
+      || assumption.nativePartPaths.some((path: unknown) => typeof path !== 'string' || !pathPattern.test(path))) throw new Error(`Approved ${policy.id} permits only unique qualified paths in its declared native family, numbered 1..20.`)
   }
-  if (!Array.isArray(assumption.nativePartPaths) || !assumption.nativePartPaths.length || assumption.nativePartPaths.length > 20
-    || new Set(assumption.nativePartPaths).size !== assumption.nativePartPaths.length
-    || assumption.nativePartPaths.some((path: unknown) => typeof path !== 'string' || !/^harmonic-analyzer\/channel\/connecting-rod-(?:[1-9]|1[0-9]|20)$/.test(path))) throw new Error('Approved topology assumption permits only unique qualified connecting-rod-1..20 paths.')
 }
 
 export interface SerializedInput extends Omit<MechanismInput, 'amplitudes' | 'phases'> {
@@ -117,7 +136,8 @@ export interface SourceContourCheck {
   measurementEvidence: { sourceImage: SourceImageIdentity; evidence: string }
 }
 /** Closed budget semantics match the independent static/GPU acceptance certificate. */
-export function validateNativeLineAxisBiasComponents(line: NativeLineCheck, warped: boolean, label: string): void {
+export function validateNativeLineAxisBiasComponents(line: NativeLineCheck, context: Pick<SourceLayoutEntry, 'rectSourcePixels' | 'resolvedImagePlaneWarp'>, label: string): void {
+  const footprintContext = prepareImagePlaneFootprintContext(context, label)
   const sourceUncertainty = finite(line.uncertaintyPx, `${label}.uncertaintyPx`)
   if (sourceUncertainty < 0) throw new Error(`${label}: source localization uncertainty must be nonnegative.`)
   const measured = line.measurementEvidence, components = measured?.axisPerspectiveBiasComponents
@@ -130,12 +150,32 @@ export function validateNativeLineAxisBiasComponents(line: NativeLineCheck, warp
   if (total < 0 || geometry < 0 || source < 0
     || Math.abs(geometry + source - total) > 1e-9 * Math.max(1, total)) throw new Error(`${label}: axis components do not close the unchanged authored bound.`)
   const space = measured.axisPerspectiveBiasSpace
-  if (warped ? !['source-global', 'unwarped-viewport'].includes(space ?? '') : space !== undefined && space !== 'source-global') throw new Error(`${label}: axis-bias coordinate space is missing or unsupported.`)
+  if (footprintContext ? !['source-global', 'unwarped-viewport'].includes(space ?? '') : space !== undefined && space !== 'source-global') throw new Error(`${label}: axis-bias coordinate space is missing or unsupported.`)
   if (components.kind === 'independent-geometry') {
     if (source !== 0) throw new Error(`${label}: independent geometry cannot contain source localization.`)
   } else if (components.kind === 'includes-source-localization') {
     if ((space ?? 'source-global') !== 'source-global' || source !== sourceUncertainty) throw new Error(`${label}: inclusive axis must certify the same final-source localization exactly once.`)
   } else throw new Error(`${label}: unknown axis-bias decomposition kind.`)
+  if (footprintContext) {
+    const localGeometry = space === 'unwarped-viewport'
+    const region = measured.axisPerspectiveBiasRegionViewportPixels
+    if (localGeometry) {
+      const [width, height] = footprintContext.unwarpedViewportPixels
+      if (!Array.isArray(region) || region.length !== 4) throw new Error(`${label}: a bounded unwarped geometry-bias region is required.`)
+      region.forEach((value) => finite(value, label))
+      if (region[0] < 0 || region[1] < 0 || region[2] <= 0 || region[3] <= 0 || region[0] + region[2] > width || region[1] + region[3] > height) throw new Error(`${label}: geometry-bias region must be positive and inside the native viewport.`)
+    }
+    const validateFootprint = (point: readonly [number, number]) => {
+      const bounds = imagePlaneSourceFootprintBounds(footprintContext, point, sourceUncertainty, localGeometry ? geometry : 0, label)
+      if (localGeometry && (!region || bounds[0] < region[0] || bounds[1] < region[1] || bounds[2] > region[0] + region[2] || bounds[3] > region[1] + region[3])) throw new Error(`${label}: geometry-bias region must contain the entire inverse source-localization footprint plus independent geometry.`)
+    }
+    if (!Array.isArray(line.sourceLinePixels) || line.sourceLinePixels.length !== 2 || !Array.isArray(measured.edgeRows)) throw new Error(`${label}: source endpoints and measured edge rows are required.`)
+    for (const point of line.sourceLinePixels) validateFootprint(point)
+    for (const row of measured.edgeRows) {
+      const left = finite(row?.left, label), right = finite(row?.right, label), y = finite(row?.y, label)
+      validateFootprint([left / 2 + right / 2, y])
+    }
+  }
 }
 export const SOURCE_NON_IDENTIFIABLE_FIXED_POLICY = {
   status: 'user-approved-source-non-identifiable',
@@ -174,10 +214,21 @@ export interface WitnessBinding {
   nativeGeometryAssumptions: readonly NativeGeometryAssumption[]
   sourceNonIdentifiableFixedParts: readonly SourceNonIdentifiableFixedPart[]
 }
+export interface SourceOcclusion {
+  kind: 'measured-opaque-human-hand-interior'
+  sourceImage: SourceImageIdentity
+  polygonSourcePixels: [number, number][]
+  uncertaintyPx: number
+  evidence: string
+}
+type SourceExclusion = { partPath: string; evidence: string } & (
+  | { reason: 'outside' | 'occluded' | 'absent'; sourceOcclusion?: never }
+  | { reason: 'source-occluded'; sourceOcclusion: SourceOcclusion }
+)
 export interface VisibilityProof {
   binding: WitnessBinding
   sourceVisibleParts: { partPath: string; sourceFeatures: string[]; sourceCoverage: SourceCoverage; evidence: string }[]
-  excludedParts: { partPath: string; reason: 'outside' | 'occluded' | 'absent'; evidence: string }[]
+  excludedParts: SourceExclusion[]
   unresolvedParts: { partPath: string; reason: string }[]
   sourceNonIdentifiableFixedParts: SourceNonIdentifiableFixedPart[]
   evidence: string
@@ -378,10 +429,36 @@ function validateSourceLayout(expected: Omit<WitnessBinding, 'intervalSeconds'>,
   }
   if (!viewIds.has(expected.viewId)) throw new Error(`${label}: source layout omits the bound view.`)
 }
+function validateSourceOcclusion(mask: SourceOcclusion, image: SourceImageIdentity, label: string): void {
+  keys(mask, ['kind', 'sourceImage', 'polygonSourcePixels', 'uncertaintyPx', 'evidence'], label)
+  if (mask.kind !== 'measured-opaque-human-hand-interior' || !equalRecord(mask.sourceImage, image)) throw new Error(`${label}: source occlusion needs the exact original image and closed opaque-human-hand kind.`)
+  evidence(mask.evidence, label)
+  if (finite(mask.uncertaintyPx, label) < 0) throw new Error(`${label}: source mask uncertainty must be nonnegative.`)
+  const polygon = mask.polygonSourcePixels
+  if (!Array.isArray(polygon) || polygon.length < 3) throw new Error(`${label}: source hand interior needs a convex nondegenerate polygon.`)
+  let area2 = 0
+  for (let i = 0; i < polygon.length; i++) {
+    const point = polygon[i]!
+    if (!Array.isArray(point) || point.length !== 2 || point.some((value) => typeof value !== 'number' || !Number.isFinite(value))
+      || point[0] < 0 || point[1] < 0 || point[0] > image.width || point[1] > image.height) throw new Error(`${label}: source hand polygon exceeds the original image.`)
+    for (let j = 0; j < i; j++) if (point[0] === polygon[j]![0] && point[1] === polygon[j]![1]) throw new Error(`${label}: duplicate source hand polygon vertex.`)
+  }
+  for (let i = 0; i < polygon.length; i++) {
+    const a = polygon[i]!, b = polygon[(i + 1) % polygon.length]!
+    area2 += a[0] * b[1] - a[1] * b[0]
+  }
+  if (!Number.isFinite(area2) || area2 === 0) throw new Error(`${label}: degenerate source hand polygon.`)
+  const orientation = Math.sign(area2)
+  for (let i = 0; i < polygon.length; i++) {
+    const a = polygon[i]!, b = polygon[(i + 1) % polygon.length]!
+    for (const point of polygon) if (orientation * ((b[0] - a[0]) * (point[1] - a[1]) - (b[1] - a[1]) * (point[0] - a[0])) < 0) throw new Error(`${label}: source hand polygon must be convex and non-self-intersecting.`)
+  }
+}
 export function validateVisibilityProof(proof: VisibilityProof, expected: Omit<WitnessBinding, 'intervalSeconds'>, anchors: readonly { id: string; partPath?: string }[], label: string): void {
   keys(proof, ['binding', 'sourceVisibleParts', 'excludedParts', 'unresolvedParts', 'sourceNonIdentifiableFixedParts', 'evidence'], label)
   evidence(proof.evidence, label)
   keys(expected, ['sourceVideoId', 'sourceSha256', 'sourceImage', 'modelSha256', 'modelSourceCommit', 'shotId', 'viewId', 'timeSeconds', 'decodedTimeSeconds', 'input', 'camera', 'rectSourcePixels', 'presentation', 'composite', 'imagePlaneWarp', 'resolvedImagePlaneWarp', 'sourceLayout', 'partOverrides', 'constraints', 'continuity', 'nativeGeometryAssumptions', 'sourceNonIdentifiableFixedParts'], `${label}.expected`)
+  validateNativeGeometryAssumptions(expected.nativeGeometryAssumptions)
   keys(proof.binding, [...Object.keys(expected), 'intervalSeconds'], `${label}.binding`)
   for (const key of Object.keys(expected) as (keyof typeof expected)[]) {
     if (!equalRecord(proof.binding[key], expected[key])) throw new Error(`${label}: visibility proof does not bind ${key}.`)
@@ -442,8 +519,11 @@ export function validateVisibilityProof(proof: VisibilityProof, expected: Omit<W
     }
   }
   for (const part of proof.excludedParts) {
-    keys(part, ['partPath', 'reason', 'evidence'], label)
-    if (!['outside', 'occluded', 'absent'].includes(part.reason)) throw new Error(`${label}: unknown native exclusion reason.`)
+    keys(part, ['partPath', 'reason', 'evidence', ...(part.reason === 'source-occluded' ? ['sourceOcclusion'] : [])], label)
+    if (part.reason === 'source-occluded') {
+      validateSourceOcclusion(part.sourceOcclusion, image, label)
+      if (expected.timeSeconds !== expected.decodedTimeSeconds || bounds[0] !== expected.decodedTimeSeconds || bounds[1] !== expected.decodedTimeSeconds) throw new Error(`${label}: source hand mask requires one exact decoded-exposure point certificate, not a held/interpolated interval.`)
+    } else if (!['outside', 'occluded', 'absent'].includes(part.reason)) throw new Error(`${label}: unknown native exclusion reason.`)
   }
 }
 function inInterval(value: number, minimum: number, maximum: number, period: number, label: string): void {

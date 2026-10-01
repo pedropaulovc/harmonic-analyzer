@@ -890,6 +890,45 @@ void main() {
     viewport(rect[0], rect[1], rect[2], rect[3])
   }
 
+  function higherMaskIntersects(left: number, top: number, right: number, bottom: number) {
+    const composite = activeView?.composite
+    if (!renderedViews || composite?.mode !== 'crossfade') return false
+    for (let i = activeViewIndex + 1; i < renderedViews.length; i++) {
+      const view = renderedViews[i]!, member = view.composite
+      if (member?.mode !== 'crossfade' || member.groupId !== composite.groupId || member.imageLayerId !== composite.imageLayerId) break
+      const polygon = sourceSupport(view).polygon
+      if (polygon.length < 6) continue
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+      for (let j = 0; j < polygon.length; j += 2) {
+        minX = Math.min(minX, polygon[j]!)
+        minY = Math.min(minY, polygon[j + 1]!)
+        maxX = Math.max(maxX, polygon[j]!)
+        maxY = Math.max(maxY, polygon[j + 1]!)
+      }
+      if (right < minX || left > maxX || bottom < minY || top > maxY) continue
+      // Separating axes of the actual convex source mask, not its camera ROI.
+      let separated = false
+      for (let j = 0; j < polygon.length; j += 2) {
+        const next = (j + 2) % polygon.length
+        const nx = polygon[next + 1]! - polygon[j + 1]!, ny = polygon[j]! - polygon[next]!
+        let minProjection = Infinity, maxProjection = -Infinity
+        for (let k = 0; k < polygon.length; k += 2) {
+          const projection = nx * polygon[k]! + ny * polygon[k + 1]!
+          minProjection = Math.min(minProjection, projection)
+          maxProjection = Math.max(maxProjection, projection)
+        }
+        const rectangleMin = nx * (nx < 0 ? right : left) + ny * (ny < 0 ? bottom : top)
+        const rectangleMax = nx * (nx < 0 ? left : right) + ny * (ny < 0 ? top : bottom)
+        if (rectangleMax < minProjection || rectangleMin > maxProjection) {
+          separated = true
+          break
+        }
+      }
+      if (!separated) return true
+    }
+    return false
+  }
+
   function warpQuantization() {
     return activeView?.imagePlaneWarp ? sourceSupport(activeView).quantization : 0
   }
@@ -1325,6 +1364,12 @@ void main() {
       // Nearest-sampled through the real blit, a marker must span at least one
       // destination sample; an odd square keeps its centre on the anchor.
       const pointSize = mirror ? 2 * Math.ceil(Math.max(ratioX, ratioY, 1) / 2) + 1 : 1
+      const warped = !!activeView?.imagePlaneWarp
+      const nativeCellUncertainty = warpQuantization()
+      // Two samples in one native texel differ by at most twice its
+      // half-cell Jacobian bound; a mirrored square has the given full span.
+      const footprintWidth = mirror ? pointSize / ratioX * sourcePerPixelX : 2 * nativeCellUncertainty
+      const footprintHeight = mirror ? pointSize / ratioY * sourcePerPixelY : 2 * nativeCellUncertainty
       if (pointSize > maxPointSize) {
         markAll(capture, markers, `mirror downscale needs ${pointSize}px GPU points; device maximum is ${maxPointSize}px`)
         return
@@ -1350,12 +1395,29 @@ void main() {
           const py = accumulators[o + 2]! / count
           let uncertaintyX = 0.5 + viewportQuantizationX
           let uncertaintyY = 0.5 + viewportQuantizationY
-          if (mirror) {
-            uncertaintyX += 0.5 / ratioX
-            uncertaintyY += 0.5 / ratioY
-            // A marker cut by the view edge loses part of its square.
-            if (accumulators[o + 3]! - 0.5 <= x0 || accumulators[o + 4]! + 0.5 >= x1) uncertaintyX += pointSize / (2 * ratioX)
-            if (accumulators[o + 5]! - 0.5 <= y0 || accumulators[o + 6]! + 0.5 >= y1) uncertaintyY += pointSize / (2 * ratioY)
+          let warpUncertainty = nativeCellUncertainty
+          if (mirror || warped) {
+            const clippedX = accumulators[o + 3]! - 0.5 <= x0 || accumulators[o + 4]! + 0.5 >= x1
+            const clippedY = accumulators[o + 5]! - 0.5 <= y0 || accumulators[o + 6]! + 0.5 >= y1
+            // Surviving GPU cells plus a full footprint span enclose every
+            // possibly omitted sample. Test the real later same-image masks;
+            // no CPU-projected landmark is used to infer the missing pixels.
+            const masked = activeView?.composite?.mode === 'crossfade' && higherMaskIntersects(
+              ((accumulators[o + 3]! - 0.5) * cssX - gate.x) * SOURCE_WIDTH / gate.width - footprintWidth,
+              ((gl.drawingBufferHeight - accumulators[o + 6]! - 0.5) * cssY - gate.y) * SOURCE_HEIGHT / gate.height - footprintHeight,
+              ((accumulators[o + 4]! + 0.5) * cssX - gate.x) * SOURCE_WIDTH / gate.width + footprintWidth,
+              ((gl.drawingBufferHeight - accumulators[o + 5]! + 0.5) * cssY - gate.y) * SOURCE_HEIGHT / gate.height + footprintHeight,
+            )
+            if (mirror) {
+              uncertaintyX += 0.5 / ratioX
+              uncertaintyY += 0.5 / ratioY
+              if (clippedX || masked) uncertaintyX += pointSize / (2 * ratioX)
+              if (clippedY || masked) uncertaintyY += pointSize / (2 * ratioY)
+            } else if (clippedX || clippedY || masked) {
+              // A truncated nearest-sampled texel can move the final mean to
+              // either edge, so the native cell's full diameter is required.
+              warpUncertainty += nativeCellUncertainty
+            }
           }
           const v = i * 5
           capture.states[i] = 0
@@ -1364,8 +1426,8 @@ void main() {
           capture.values[v + 1] = (gl.drawingBufferHeight - py) * cssY
           capture.values[v + 2] = (px * cssX - gate.x) * SOURCE_WIDTH / gate.width
           capture.values[v + 3] = ((gl.drawingBufferHeight - py) * cssY - gate.y) * SOURCE_HEIGHT / gate.height
-          capture.sourceUncertainties[i] = Math.hypot(uncertaintyX * sourcePerPixelX, uncertaintyY * sourcePerPixelY) + warpQuantization()
-          capture.values[v + 4] = Math.max(uncertaintyX * cssX, uncertaintyY * cssY) + warpQuantization() * Math.max(gate.width / SOURCE_WIDTH, gate.height / SOURCE_HEIGHT)
+          capture.sourceUncertainties[i] = Math.hypot(uncertaintyX * sourcePerPixelX, uncertaintyY * sourcePerPixelY) + warpUncertainty
+          capture.values[v + 4] = Math.max(uncertaintyX * cssX, uncertaintyY * cssY) + warpUncertainty * Math.max(gate.width / SOURCE_WIDTH, gate.height / SOURCE_HEIGHT)
         }
       }
     } finally {
