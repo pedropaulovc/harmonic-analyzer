@@ -122,6 +122,10 @@ there is no acceptance-attempt quota. The default final target is 5% of each
 source frame's width, with clock skew no greater than 0.5 seconds.
 `?verify=1` enables native WebGL landmark readback. Mathematical camera fitting
 alone does not count as rendered-pixel evidence.
+Diagnostic landmark receipts also retain the actual native marker's world
+coordinates from the same completed view draw. Stale, unresolved or
+GPU-deformed coordinates remain unavailable; world coordinates are not
+source-pixel measurements or camera qualification.
 
 Paused interaction verification exercises a bounded crank turn and an actual
 camera orbit, preserving before/after native pixels, camera poses and media
@@ -137,6 +141,10 @@ Gray references use explicit round-to-nearest limited-to-full 8-bit luma,
 not FFmpeg's version-dependent implicit gray conversion. The schema defines the
 byte profile; unsupported source formats are refused and existing hashes stay
 unchanged.
+
+Compact selection preserves original landmark observations across nominal and
+decoded-time aliases only when source frame, hashes, PTS and view layout match.
+It does not interpolate source pixels or change the selected camera and input.
 
 Legacy full-part visibility, finite-line, contour and raster-bound diagnostics
 remain historical evidence, not an exhaustive queue that must finish before

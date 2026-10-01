@@ -77,6 +77,10 @@ export type RenderedLandmarkState = 'rendered' | 'unresolved' | 'not-visible'
 export interface RenderedLandmark {
   id: string
   state: RenderedLandmarkState
+  /** Actual marker vertex in native world metres at this view's draw, independent of pixel eligibility. */
+  worldMetres: [number, number, number] | null
+  /** Null when worldMetres is available; otherwise why no draw-bound world coordinate is known. */
+  worldReason: string | null
   /** CSS pixels from the canvas top-left, y down; continuous (pixel centres at +0.5). */
   canvasPixels: [number, number] | null
   /** 1920 × 1080 source-frame pixels, top-left origin, y down; continuous. */
@@ -296,6 +300,9 @@ interface ViewCapture {
   values: Float64Array
   sourceUncertainties: Float64Array
   reasons: (string | null)[]
+  /** Rigid marker vertex transformed by matrixWorld immediately after this view's native draw. */
+  worldValues: Float64Array
+  worldReasons: (string | null)[]
   sourceOpacity: number
 }
 const CAPTURE_STATES: readonly RenderedLandmarkState[] = ['rendered', 'unresolved', 'not-visible']
@@ -1254,13 +1261,47 @@ void main() {
     const markers = internals.markers
     let capture = captures.get(viewId)
     if (!capture) {
-      capture = { epoch: -1, presentation, timeSeconds, sourceOpacity, states: new Uint8Array(markers.length), values: new Float64Array(markers.length * 5), sourceUncertainties: new Float64Array(markers.length), reasons: new Array<string | null>(markers.length).fill(null) }
+      capture = { epoch: -1, presentation, timeSeconds, sourceOpacity, states: new Uint8Array(markers.length), values: new Float64Array(markers.length * 5), sourceUncertainties: new Float64Array(markers.length), reasons: new Array<string | null>(markers.length).fill(null), worldValues: new Float64Array(markers.length * 3), worldReasons: new Array<string | null>(markers.length).fill(null) }
       captures.set(viewId, capture)
     }
     capture.epoch = drawEpoch
     capture.presentation = presentation
     capture.timeSeconds = timeSeconds
     capture.sourceOpacity = sourceOpacity
+    // This follows the existing native draw, before any diagnostic pass or next
+    // view's pose update. Snapshot the actual float32 vertex, not the anchor
+    // catalogue/rest pose or a CPU inverse projection of raster coordinates.
+    for (let i = 0; i < markers.length; i++) {
+      const marker = markers[i]!
+      const object = marker.object
+      let reason = marker.reason
+      if (object) {
+        if (sourceOpacity === 0) reason = 'view has zero measured source opacity; no native draw to bind world coordinates'
+        else if (object.geometry.hasAttribute('springCoordinate')) reason = 'marker uses GPU spring deformation; matrixWorld alone does not locate its vertex'
+        else {
+          for (let node: THREE.Object3D | null = object; node; node = node.parent) {
+            if (node.matrixWorldNeedsUpdate) {
+              reason = 'marker or ancestor world matrix is not current at the native draw'
+              break
+            }
+          }
+          if (reason === null) {
+            const position = object.geometry.getAttribute('position')
+            const x = position.getX(0), y = position.getY(0), z = position.getZ(0)
+            const e = object.matrixWorld.elements
+            const w = e[3]! * x + e[7]! * y + e[11]! * z + e[15]!
+            const o = i * 3
+            capture.worldValues[o] = (e[0]! * x + e[4]! * y + e[8]! * z + e[12]!) / w
+            capture.worldValues[o + 1] = (e[1]! * x + e[5]! * y + e[9]! * z + e[13]!) / w
+            capture.worldValues[o + 2] = (e[2]! * x + e[6]! * y + e[10]! * z + e[14]!) / w
+            if (!Number.isFinite(capture.worldValues[o]) || !Number.isFinite(capture.worldValues[o + 1]) || !Number.isFinite(capture.worldValues[o + 2])) {
+              reason = 'marker world transform did not yield three finite metres'
+            }
+          }
+        }
+      }
+      capture.worldReasons[i] = reason ?? (object ? null : 'native marker is unresolved')
+    }
     if (sourceOpacity === 0) {
       for (let i = 0; i < markers.length; i++) {
         capture.states[i] = markers[i]!.slot < 0 ? 1 : 2
@@ -1456,6 +1497,8 @@ void main() {
         return {
           id: marker.id,
           state: CAPTURE_STATES[capture.states[i]!]!,
+          worldMetres: capture.worldReasons[i] === null ? [capture.worldValues[i * 3]!, capture.worldValues[i * 3 + 1]!, capture.worldValues[i * 3 + 2]!] : null,
+          worldReason: capture.worldReasons[i]!,
           canvasPixels: rendered ? [capture.values[v]!, capture.values[v + 1]!] : null,
           sourcePixels: rendered ? [capture.values[v + 2]!, capture.values[v + 3]!] : null,
           uncertaintyCanvasPixels: rendered ? capture.values[v + 4]! : null,

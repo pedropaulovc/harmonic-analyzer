@@ -9,10 +9,12 @@ settings, or measure any matching stage. Original frozen root choices/costs rema
 immutable; alternative rod projections are predictions, never source observations.
 Synthesis presenter-to-spin retains one actual machine image with openly chosen
 principal-point/focal framing keys, not a second body or a measured camera fit.
-Two Synthesis cone shots may use a two-FIT chosen roll/FOV/principal-point
-reframe of the identical GPU-exercised fallback; cam-rod then balances all three
-original FITs exposed by its actual intermediate GPU probe. Independent
-qualification remains missing; no CHECK or image warp enters either objective.
+Synthesis cone-overview retains a two-FIT chosen perspective-camera similarity.
+Cam-rod uses a root-selected upright three-original-FIT fixed-intrinsics SQPNP
+physical pose; former similarities are historical/unaccepted evidence only.
+Independent qualification remains missing; CHECKs never enter camera objectives.
+Synthesis wheel-macro uses only its original wheel-centre FIT and actual GPU
+centre for a chosen principal-point translation; its hanger CHECK stays held out.
 Analysis's stationary full-front shot holds its original frame428 CPU FIT camera
 as a declared same-shot transfer. Independent focal/distance fit gauges are not
 a physical trajectory; seed CPU diagnostics do not qualify held exposures/GPU.
@@ -135,9 +137,11 @@ class Generator:
         self.parts = self.native["mechanical"][0]["all435"]
         self.presenter_reframing = None
         self.synthesis_coarse_framing = None
+        self.synthesis_wheel_framing = None
         if not self.analysis:
             self.presenter_reframing = self.presenter_reframing_keys()
             self.synthesis_coarse_framing = self.synthesis_coarse_framing_packet()
+            self.synthesis_wheel_framing = self.synthesis_wheel_framing_packet()
             transition = self.shots["presenter-to-spin"]
             for frame in self.data["frames"]:
                 if frame["shotId"] == transition["id"]:
@@ -351,7 +355,7 @@ class Generator:
         return row, hashlib.sha256(raw).hexdigest()
 
     def synthesis_coarse_framing_packet(self):
-        """Bound two own-shot similarities to the GPU-exercised cone fallback."""
+        """Bound own-shot approximate cameras to retained exact native evidence."""
         observations_path = "web/content/8KmVDxkia_w.observations.json"
         observations = load(observations_path)
         report_path = "web/.vite/verification-output/stage50-seed-clock-repaired-native-2026-10-01/8KmVDxkia_w.json"
@@ -364,10 +368,7 @@ class Generator:
         definitions = [
             ("cone-overview", 62, 1487,
              "aa922fb2440eb43a0011f320de755b0f284a51d9c8af9368bea5809d469c976d",
-             [[469, 329], [1430, 704]], 62.020291, 304),
-            ("cam-rod", 100, 2398,
-             "12932c5a2a5ae8649357d7865da6fde3064d01757bba1bd231b4f4ce845f7686",
-             [[435, 654], [706, 859]], 100.016583, 378)]
+             [[469, 329], [1430, 704]], 62.020291, 304)]
         keys = {}
         for shot, time, index, image_hash, source, media_time, revision in definitions:
             original = next(frame for frame in observations["frames"]
@@ -388,25 +389,6 @@ class Generator:
                 fits.append({"anchorId":anchor, "role":"fit", "sourcePixels":pixel,
                              "sourceUncertaintyPx":5, "nativePixels":copy.deepcopy(centre),
                              "method":"gpu-readback"})
-            baseline_exclusions = []
-            if shot == "cam-rod":
-                for anchor, role, pixel in (("rocker-shaft-back","fit",[1243,237]),
-                                            ("pinion-pivot-back","check",[876,1028])):
-                    point = next(p for p in original["landmarks"] if p["anchorId"] == anchor)
-                    if (point["role"] != role or point["status"] != "observed"
-                            or point["pixel"] != pixel or point["uncertaintyPx"] != 5):
-                        raise ValueError(f"Original cam-rod {role} declaration changed: {anchor}")
-                clipped = [p for p in gpu_row["unavailable"]
-                           if p.get("anchorId") == "rocker-shaft-back" and p.get("viewId") == "main"]
-                if (len(clipped) != 1 or clipped[0].get("role") != "fit"
-                        or clipped[0].get("sourcePixels") != [1243,237]
-                        or clipped[0].get("status") != "unmeasured-native"
-                        or clipped[0].get("reason") != "no marker pixels: clipped by camera frustum, near/far planes or view scissor"):
-                    raise ValueError("Baseline GPU rocker FIT clipping evidence changed")
-                baseline_exclusions = copy.deepcopy(clipped)
-                checks = [p for p in gpu_row["measurements"] if p.get("anchorId") == "pinion-pivot-back"]
-                if len(checks) != 1 or checks[0].get("role") != "check":
-                    raise ValueError("Baseline independent pinion CHECK role changed")
             dn = [native[1][i]-native[0][i] for i in range(2)]
             ds = [source[1][i]-source[0][i] for i in range(2)]
             native_length, source_length = math.hypot(*dn), math.hypot(*ds)
@@ -443,106 +425,21 @@ class Generator:
                                "sourceDrawRevision":revision, "method":"gpu-readback"},
                 "positiveFocalScale":scale, "screenRotationRadians":angle,
                 "chosenCamera":camera,
-                "unusableFITs":["rocker-shaft-back"] if shot == "cam-rod" else [],
-                "baselineNativeExclusions":baseline_exclusions,
-                "appliedViewCount":0, "appliedSeedExposureCount":0,
-                "excludedCHECKs":["pinion-pivot-back"] if shot == "cam-rod" else [],
+                "unusableFITs":[],
+                "eligibleViewCount":0, "appliedViewCount":0, "appliedSeedExposureCount":0,
+                "excludedCHECKs":[],
                 "qualification":"missing: qualified fitter requires 6 FIT / 2 CHECK; two-pair framing is not a source-fit camera"}
-        # The first actual GPU probe exposes the previously clipped third
-        # ORIGINAL cam-rod FIT. Balance all three with one additional physical
-        # similarity; the independent CHECK is deliberately absent.
-        key = keys["cam-rod"]
-        intermediate = copy.deepcopy(key["chosenCamera"])
-        probe_path = "web/.vite/verification-output/synthesis-fit-framing-native-2026-10-01/8KmVDxkia_w.json"
-        probe_native = [[435.,653.4], [706.2,859.8], [784.2,472.2]]
-        fit_ids = ids + ["rocker-shaft-back"]
-        fit_source = [point["pixel"] for anchor in fit_ids
-                      for point in key["originalLandmarks"] if point["anchorId"] == anchor]
-        if fit_source != [[435,654], [706,859], [1243,237]]:
-            raise ValueError("Original three-FIT cam-rod declarations changed")
-        probe_row, probe_hash = self.framing_gpu_sample(
-            probe_path,"cam-rod",100,fit_ids,probe_native,fit_source,100.016583,161,
-            ["passed","passed","failed"])
-        probe_checks = [p for p in probe_row["measurements"]
-                        if p.get("anchorId") == "pinion-pivot-back" and p.get("viewId") == "main"]
-        if len(probe_checks) != 1 or probe_checks[0].get("role") != "check":
-            raise ValueError("Intermediate independent pinion CHECK role changed")
-        if any(math.dist(native, source) > 1.
-               for native,source in zip(probe_native[:2],fit_source[:2])):
-            raise ValueError("Intermediate two-FIT GPU centres do not match stage-one targets within 1px")
-        native_mean = [sum(point[i] for point in probe_native)/3 for i in range(2)]
-        source_mean = [sum(point[i] for point in fit_source)/3 for i in range(2)]
-        dn = [[point[i]-native_mean[i] for i in range(2)] for point in probe_native]
-        ds = [[point[i]-source_mean[i] for i in range(2)] for point in fit_source]
-        denominator = sum(x*x+y*y for x,y in dn)
-        if not math.isfinite(denominator) or denominator <= 0:
-            raise ValueError("Degenerate three-FIT cam-rod native spread")
-        a = sum(n[0]*s[0]+n[1]*s[1] for n,s in zip(dn,ds))/denominator
-        b = sum(n[0]*s[1]-n[1]*s[0] for n,s in zip(dn,ds))/denominator
-        scale, angle = math.hypot(a,b), math.atan2(b,a)
-        if not (math.isfinite(scale) and scale > 0 and math.isfinite(angle)):
-            raise ValueError("Nonfinite or nonpositive three-FIT cam-rod scale")
-        predicted_pixels = [[source_mean[0]+a*n[0]-b*n[1],
-                             source_mean[1]+b*n[0]+a*n[1]] for n in dn]
-        predicted_residuals = [math.dist(pixel,source)
-                               for pixel,source in zip(predicted_pixels,fit_source)]
-        predicted_rms = math.sqrt(sum(value*value for value in predicted_residuals)/3)
-        prior_errors = [next(point["errorPx"] for point in probe_row["measurements"]
-                             if point["anchorId"] == anchor and point["viewId"] == "main")
-                        for anchor in fit_ids]
-        camera = copy.deepcopy(intermediate)
-        principal = intermediate["principalPointViewportPixels"]
-        p = [native_mean[i]-principal[i] for i in range(2)]
-        camera["principalPointViewportPixels"] = [source_mean[0]-a*p[0]+b*p[1],
-                                                 source_mean[1]-b*p[0]-a*p[1]]
-        x,y,z,w = intermediate["quaternion"]
-        sh,ch = math.sin(angle/2),math.cos(angle/2)
-        camera["quaternion"] = [x*ch+y*sh,y*ch-x*sh,z*ch+w*sh,w*ch-z*sh]
-        camera["verticalFovDegrees"] = math.degrees(2*math.atan(
-            math.tan(math.radians(intermediate["verticalFovDegrees"]/2))/scale))
-        key["stages"] = [{
-            "kind":"two-original-FIT-baseline-framing",
-            **{name:copy.deepcopy(key[name]) for name in (
-                "objectiveFITs","gpuEvidence","positiveFocalScale","screenRotationRadians",
-                "chosenCamera","unusableFITs")}},
-            {"kind":"three-original-FIT-least-squares-perspective-refinement",
-             "baselineCamera":intermediate,
-             "objectiveFITs":[{"anchorId":anchor,"role":"fit","sourcePixels":source,
-                              "sourceUncertaintyPx":5,"nativePixels":native,
-                              "method":"gpu-readback"}
-                             for anchor,source,native in zip(fit_ids,fit_source,probe_native)],
-             "gpuEvidence":{"report":probe_path,
-                            "reportSha256":probe_hash,
-                            "sampleSelector":{"sourceShotId":"cam-rod","timeSeconds":100,"viewId":"main"},
-                            "captureTimeSeconds":100,"nativeMediaTime":100.016583,"sourceDrawRevision":161,
-                            "method":"gpu-readback"},
-             "cameraBinding":"inferred-from-root-probe-lineage-and-original-two-FIT-centres-within-1px; report contains no camera pose",
-             "FITPrediction":{"status":"predicted-not-GPU-measured",
-                              "rows":[{"anchorId":anchor,"predictedPixels":pixel,
-                                       "predictedRawResidualPx":residual,
-                                       "predictedFrameWidthPercent":100*residual/width,
-                                       "intermediateMeasuredConservativeErrorPx":prior}
-                                      for anchor,pixel,residual,prior in zip(
-                                          fit_ids,predicted_pixels,predicted_residuals,prior_errors)],
-                              "predictedRawRmsPx":predicted_rms,
-                              "interpretation":"Three-FIT least-squares trades roughly 25x larger crank/cylinder raw residuals against their intermediate conservative GPU errors (~6.4/6.7px) to reduce the rocker's ~521px conservative error. Predicted remaining errors are roughly 7-8.5% of source width and far above original 5px source uncertainty. This roll/focal/principal-point compromise does not solve the underlying mismatch; viewpoint/parallax/geometry/pose are possible causes, not diagnosed here. Predictions are not fresh GPU proof or acceptance."},
-             "nativeCentroidPixels":native_mean,"sourceCentroidPixels":source_mean,
-             "leastSquaresCoefficients":[a,b],"positiveFocalScale":scale,
-             "screenRotationRadians":angle,"chosenCamera":camera,
-             "equations":"D=sum|native-nativeMean|^2; a=sum(dNative dot dSource)/D; b=sum(cross(dNative,dSource))/D; s=hypot(a,b); theta=atan2(b,a); PP'=sourceMean-s*R(theta)*(nativeMean-PP); FOV'=2*atan(tan(currentFOV/2)/s); q'=currentQ*qLocalZ(theta).",
-             "nativeQualification":"deferred",
-             "interpretation":"All three original FITs now have actual intermediate-camera GPU centres. Baseline rocker clipping remains historical evidence, not a current unavailable FIT. One positive-scale least-squares similarity balances all three; no CHECK input, source-pixel changes, historical camera recovery or current GPU/stage acceptance claim."}]
-        key["stages"][0]["baselineNativeExclusions"] = copy.deepcopy(key["baselineNativeExclusions"])
-        key["objectiveFITs"] = copy.deepcopy(key["stages"][1]["objectiveFITs"])
-        key["gpuEvidence"] = copy.deepcopy(key["stages"][1]["gpuEvidence"])
-        key["baselineCamera"] = intermediate
-        key["positiveFocalScale"] = scale
-        key["screenRotationRadians"] = angle
-        key["chosenCamera"] = camera
-        key["unusableFITs"] = []
-        key["qualification"] = "missing: only 3 original FIT / 1 independent CHECK; qualified fitter requires 6 FIT / 2 CHECK"
+        original = next(frame for frame in observations["frames"]
+                        if frame["shotId"] == "cam-rod" and frame["timeSeconds"] == 100)
+        keys["cam-rod"] = self.synthesis_camrod_physical_pose({
+            "timeSeconds":100,"decodedTimeSeconds":original["decodedTimeSeconds"],
+            "sourceImage":copy.deepcopy(original["sourceImage"]),"viewId":"main",
+            "originalLandmarks":copy.deepcopy(original["landmarks"]),
+            "originalUnavailable":copy.deepcopy(original.get("unavailable", [])),
+            "excludedCHECKs":["pinion-pivot-back"],
+            "eligibleViewCount":0,"appliedViewCount":0,"appliedSeedExposureCount":0},observations)
         return {
-            "kind":"chosen-own-shot-staged-FIT-perspective-framing",
+            "kind":"chosen-own-shot-source-informed-camera-framing",
             "status":"source-informed-chosen-approximate",
             "sourceAcceptance":"unavailable", "historicalPose":"unobserved",
             "nativeQualification":"deferred",
@@ -550,16 +447,131 @@ class Generator:
             "baselineGpuReport":report_path,
             "baselineGpuReportSha256":keys["cone-overview"]["gpuEvidence"]["reportSha256"],
             "viewportPixels":[width,height], "baselineCamera":baseline,
-            "scope":"Only full-frame native main views of exact cone-overview and cam-rod shots, requiring an identical base fallback, the exact GPU-exercised intermediate cam-rod camera, or the already-chosen result for idempotence. Chosen camera held within its own shot, never transferred to other cone families.",
-            "baselineFramingEquations":"Two-FIT baseline stage only: s=|source1-source0|/|native1-native0|; theta=atan2(cross(dNative,dSource),dot(dNative,dSource)); p'=source0-s*R(theta)*(native0-p); FOV'=2*atan(tan(FOV/2)/s); q'=q*qLocalZ(theta). Base FOV=30deg, p=(960,540); y-down +theta uses camera-local +Z roll. Final cam-rod equations/evidence/predictions are in shots.cam-rod.stages[1].",
+            "scope":"Only full-frame native main views of exact cone-overview and cam-rod shots, requiring the identical base fallback generated from authoritative *.track.json camera nulls. Generated *.source-track.json is not an input; former intermediate/similarity or already-chosen camera matches are unreachable and removed. Cameras are held only within their own shots, never transferred to other families.",
+            "baselineFramingEquations":"Active cone-overview two-FIT stage only: s=|source1-source0|/|native1-native0|; theta=atan2(cross(dNative,dSource),dot(dNative,dSource)); p'=source0-s*R(theta)*(native0-p); FOV'=2*atan(tan(FOV/2)/s); q'=q*qLocalZ(theta). Base FOV=30deg, p=(960,540). Cam-rod now uses shots.cam-rod.physicalPoseSelection: fixed-intrinsics SQPNP proper-pose conversion, not these similarity equations; former cam-rod stages are historical/unaccepted.",
             "baselineCameraLineage":{"track":"web/content/8KmVDxkia_w.source-track.json",
                                      "revision":"f02c25713","seedTimesSeconds":[62,100],
                                      "cameraStatus":"source-informed-chosen",
                                      "verification":"external-review-claim-not-generator-asserted",
                                      "interpretation":"Reviewer verified both original main cameras equal this fallback at the cited revision; reports contain marker readbacks, not camera records."},
-            "interpretation":"Original FIT pixels and actual same-exposure GPU marker centres choose physical perspective framing only: two FITs establish the baseline stage, then cam-rod alone balances all three original FITs exposed by an actual intermediate-camera GPU probe. Camera position/forward direction, positive perspective depths, geometry, poses, native/source bounds and clocks remain unchanged; no homography or render warp. Original declarations remain intact; baseline cam-rod rocker clipping stays historical evidence while its intermediate GPU centre is available. Independent pinion CHECK never enters either objective. Neither unique historical camera recovery nor 50/20/10/5% acceptance is claimed.",
-            "limitations":"Roll/focal-scale/principal-point changes produce an image-plane similarity of the perspective projection and cannot correct parallax. Two-pair FIT residuals are zero by construction before rasterization; the cam-rod second stage is a three-FIT least-squares compromise. Preceding zoom-shot continuity requires actual visual inspection; no unobserved transition is invented.",
+            "interpretation":"Cone-overview retains two original FIT/GPU pairs for chosen similarity framing. Cam-rod instead uses all three original source FITs and actual same-draw native world coordinates for a chosen fixed-intrinsics physical pose; its previous roll/focal/principal-point similarities are retained only as historical unaccepted evidence. All source pixels/declarations, native geometry/poses/bounds, inputs and clocks remain unchanged. Independent CHECKs never enter either objective or pose selection. Neither unique historical camera recovery nor GPU/50/20/10/5% acceptance is claimed.",
+            "limitations":"Cone-overview similarity cannot correct parallax. Cam-rod's three-point pose has ambiguous physical branches and depends on chosen intrinsics/qualitative upright prior; sparse zero FIT residual is not qualification. Only three FIT depths are proven; complete visible geometry and source-shot continuity require root GPU/visual inspection.",
             "shots":keys}
+
+    def synthesis_camrod_physical_pose(self, previous, observations):
+        """Publish root's FIT-only upright choice from a pinned sparse probe."""
+        path = "web/.vite/verification-output/synthesis-camrod-sqpnp-probe-2026-10-01.json"
+        raw = (ROOT / path).read_bytes()
+        digest = hashlib.sha256(raw).hexdigest()
+        if digest != "5a9f17e64671f84478fbdbc6de8cc620ae88932cfae78c3551dd029bc5cc1321":
+            raise ValueError("Chosen cam-rod physical probe artifact changed")
+        probe = json.loads(raw)
+        lineage = probe["lineage"]
+        receipt_record = lineage["actualWorldReceipt"]
+        receipt_raw = (ROOT / receipt_record["path"]).read_bytes()
+        receipt_hash = hashlib.sha256(receipt_raw).hexdigest()
+        if receipt_hash != receipt_record["sha256"] or receipt_hash != "222d69eb315c39366e93cdcaacadd19a9074b153fa6f0db42d3ff5f9d2af8dbc":
+            raise ValueError("Chosen cam-rod actual world receipt changed")
+        receipt = json.loads(receipt_raw)
+        if (probe["status"] != "candidate-enumeration-only"
+                or probe["selection"] != "none; retain every returned pose; CHECK not evaluated"
+                or probe["chosenIntrinsics"]["verticalFovDegrees"] != 30
+                or probe["chosenIntrinsics"]["principalPointViewportPixels"] != [960,540]
+                or lineage["sourceImage"] != previous["sourceImage"]
+                or lineage["sourceSha256"] != self.data["source"]["sha256"]
+                or lineage["nativeModelSha256"] != self.native["modelSha256"]
+                or lineage["nativeDenominator"] != 435
+                or lineage["originalLandmarks"] != previous["originalLandmarks"]
+                or lineage["sceneCurrentSourceSha256"] != hashlib.sha256((WEB / "src/scene.ts").read_bytes()).hexdigest()):
+            raise ValueError("Chosen cam-rod source/native/code/intrinsics lineage differs")
+        frame = next(frame for frame in self.data["frames"]
+                     if frame["shotId"] == "cam-rod" and frame["timeSeconds"] == 100)
+        value, _ = self.input(frame,"cone")
+        if common.compact_input(value) != lineage["completeInput"]:
+            raise ValueError("Chosen cam-rod world capture complete input differs from current seed")
+        snapshot, capture = receipt["snapshot"], receipt["renderedLandmarks"]
+        rendered = next(view for view in snapshot["views"] if view["id"] == "main")["renderedMechanism"]
+        identity = receipt["frameIdentity"]
+        if (identity["sourceImage"] != previous["sourceImage"] or identity["shotId"] != "cam-rod"
+                or identity["viewId"] != "main" or identity["timeSeconds"] != 100
+                or identity["decodedTimeSeconds"] != previous["decodedTimeSeconds"]
+                or snapshot["modelProvenance"]["identity"] != "matched"
+                or snapshot["modelProvenance"]["observedSha256"] != lineage["nativeModelSha256"]
+                or rendered["input"] != lineage["completeInput"] or rendered["timeSeconds"] != 100
+                or rendered["sourceDrawRevision"] != lineage["sourceDrawRevision"]
+                or capture["status"] != "captured" or capture["timeSeconds"] != 100 or capture["viewId"] != "main"):
+            raise ValueError("Chosen cam-rod same-draw world/input receipt binding differs")
+        fit_ids = ["crank-axis-back","cylinder-axis-back","rocker-shaft-back"]
+        for anchor, row in zip(fit_ids,probe["exactInputs"]):
+            original = next(point for point in previous["originalLandmarks"] if point["anchorId"] == anchor)
+            semantic = next(point for point in observations["anchors"] if point["id"] == anchor)
+            marker = next(point for point in capture["landmarks"] if point["id"] == anchor)
+            if (row["anchorId"] != anchor or row["sourceDeclaration"] != original
+                    or original["role"] != "fit" or original["status"] != "observed"
+                    or row["semanticNativeAnchor"] != semantic
+                    or row["actualRenderedWorldMetres"] != marker["worldMetres"]
+                    or marker["worldReason"] is not None
+                    or not all(math.isfinite(v) for v in row["actualRenderedWorldMetres"])):
+                raise ValueError(f"Chosen cam-rod original FIT/actual world binding differs: {anchor}")
+        if len(probe["exactInputs"]) != 3 or len(probe["candidates"]) != probe["returnedPoseCount"] or probe["returnedPoseCount"] != 2:
+            raise ValueError("Chosen cam-rod sparse enumeration changed")
+        candidates = copy.deepcopy(probe["candidates"])
+        fit_centroid = [sum(row["actualRenderedWorldMetres"][i] for row in probe["exactInputs"])/3 for i in range(3)]
+        eligible = []
+        for candidate in candidates:
+            fits = candidate["FITs"]
+            physical = (candidate["poseValidity"] == "physical-sparse-candidate"
+                        and abs(candidate["properRotationDeterminant"]-1) < 1e-8
+                        and abs(candidate["quaternionNorm"]-1) < 1e-8
+                        and [point["anchorId"] for point in fits] == fit_ids
+                        and all(math.isfinite(point["positiveDepthMetres"]) and point["positiveDepthMetres"] > 0.001 for point in fits))
+            upright = abs(candidate["angularRollDegreesRelativeWorldY"]) <= 15 and candidate["upWorldYAlignment"] > 0
+            back_side = candidate["camera"]["positionMetres"][2] > fit_centroid[2] and candidate["forwardWorld"][2] < 0
+            if physical and upright and back_side:
+                eligible.append(candidate)
+            candidate["chosenPolicyDecision"] = "eligible" if physical and upright and back_side else "rejected-qualitative-upright-or-CAD-positiveZ-side-prior"
+        if len(eligible) != 1 or eligible[0]["candidateId"] != "sqpnp-001":
+            raise ValueError("Root-selected cam-rod upright sparse pose is no longer uniquely eligible")
+        chosen = eligible[0]
+        expected = {"positionMetres":[-0.119936139775151,0.1739581164103444,0.5790659466866046],
+                    "quaternion":[-0.005039273586140318,-0.11877097134333389,0.021688863426512862,0.9926719776900882],
+                    "verticalFovDegrees":30.,"principalPointViewportPixels":[960.,540.]}
+        if chosen["camera"] != expected:
+            raise ValueError("Root-selected cam-rod camera differs from pinned chosen pose")
+        historical = {
+            "status":"retired-unaccepted",
+            "immutablePacket":{"gitRevision":"33197abb1","path":"web/content/8KmVDxkia_w.source-track.json",
+                               "jsonPointer":"/evidence/synthesisCoarseFraming/shots/cam-rod"},
+            "reports":[
+                {"path":"web/.vite/verification-output/stage50-seed-clock-repaired-native-2026-10-01/8KmVDxkia_w.json","stage":"original-side-fallback"},
+                {"path":"web/.vite/verification-output/synthesis-fit-framing-native-2026-10-01/8KmVDxkia_w.json","stage":"two-FIT-similarity"},
+                {"path":"web/.vite/verification-output/synthesis-three-fit-framing-native-2026-10-01/8KmVDxkia_w.json","stage":"three-FIT-similarity",
+                 "sha256":"666d3b3b388d3636b8699070ac9cf39c046f72df0106200ebbf0746fca375c02"}],
+            "reportHashAuthority":"Original/two-FIT report hashes and complete old derivation are retained in immutable revision33197abb1; the three-FIT report digest was computed by root during final review. Retired reports are provenance links, not active generation dependencies or recomputed hashes.",
+            "rootReportedThreeFITMaximumConservativeErrorPx":168.49,
+            "rootReportedThreeFITConservativeCHECKErrorPx":118.846,
+            "interpretation":"Retired two/three-FIT image-plane similarities were never qualified. Root actual source/native inspection found side-looking direction/large roll inconsistent with photographed upright composition despite smaller sparse errors. CHECK baseline/old GPU errors were inspected historically, but CHECK was excluded from all objectives and from the subsequent SQPNP enumeration/branch selection. Historical calculations are neither recomputed nor active camera guards."}
+        key = {name:copy.deepcopy(previous[name]) for name in (
+            "timeSeconds","decodedTimeSeconds","sourceImage","viewId","originalLandmarks",
+            "originalUnavailable","excludedCHECKs","eligibleViewCount","appliedViewCount","appliedSeedExposureCount")}
+        key.update({"kind":"chosen-three-original-FIT-fixed-intrinsics-physical-pose",
+                    "status":"source-informed-chosen-approximate","nativeQualification":"deferred",
+                    "sourceAcceptance":"unavailable","historicalPose":"unobserved",
+                    "chosenCamera":copy.deepcopy(chosen["camera"]),
+                    "objectiveFITs":copy.deepcopy(probe["exactInputs"]),
+                    "historicalSimilarityFraming":historical,
+                    "qualification":"Only3FIT/1CHECK, not qualified6FIT/2CHECK; complete-geometry depths and GPU source matching remain unverified",
+                    "physicalPoseSelection":{"probe":path,"probeSha256":digest,
+                        "worldReceipt":receipt_record["path"],"worldReceiptSha256":receipt_hash,
+                        "lineage":copy.deepcopy(lineage),"candidates":candidates,"chosenCandidateId":"sqpnp-001",
+                        "chosenQualitativeMaximumAbsoluteRollDegrees":15.,
+                        "chosenCADPositiveZSidePrior":{"FITCentroidWorldMetres":fit_centroid,
+                            "rule":"Camera worldZ > original-three-FIT centroid worldZ and forwardWorldZ < 0, matching original back=CAD+Z/source-right=CAD+X semantics; not an arbitrary CAD-front yaw0."},
+                        "generationDependencies":"Active physical choice requires only pinned SQPNP probe/world receipt, original source semantic/FIT identity, matched native hash and unchanged complete seed input. Strict current scene.ts SHA byte gate remains: any byte change requires recapture/rebinding, including otherwise cosmetic edits; it is intentionally not waived. Retired similarity reports/committed packet are references only. Authoritative inputs come from *.track.json, never generated *.source-track.json.",
+                        "reason":"Root selected only on original qualitative upright columns/no observed large roll and original back=CAD+Z semantic mapping. Both physical sparse branches fit the same three FITs; sqpnp-000's64.65deg roll conflicts with the declared chosen15deg upright/CAD-positiveZ-side prior. This prior is not measured historical roll. CHECK baseline and prior GPU errors were historically inspected, but CHECK was excluded from SQPNP enumeration objective and branch selection; candidate CHECKs were not projected/ranked before root selected001. Post-selection held-out measurements are separate evidence, not retroactive selection inputs.",
+                        "depthScope":"Only three actual original FIT points; no whole-native-geometry positive-depth or GPU acceptance claim",
+                        "poseConversion":"OpenCV world-to-camera R,t: position=-R^T*t; cameraToWorld=R^T*diag(1,-1,-1); quaternion xyzw. Fixed chosen FOV30, PP(960,540); native XYZ comes from the actual completed-draw Float32 marker vertex, not raster pixels or catalogue assumptions."}})
+        return key
 
     def synthesis_coarse_camera(self, frame, view, camera, note):
         packet = self.synthesis_coarse_framing
@@ -569,30 +581,103 @@ class Generator:
                 or view.get("presentation", "native") != "native"
                 or common.resolve_warp(view)):
             return camera, note
-        bases = [packet["baselineCamera"], key["chosenCamera"]]
-        if frame["shotId"] == "cam-rod":
-            bases.append(key["stages"][1]["baselineCamera"])
-        matched = False
-        for base in bases:
-            if not math.isclose(camera.get("verticalFovDegrees", 0), base["verticalFovDegrees"],
-                                rel_tol=0., abs_tol=1e-9):
-                continue
-            for name in ("positionMetres", "quaternion", "principalPointViewportPixels"):
-                values = camera.get(name, [960.,540.]) if name == "principalPointViewportPixels" else camera.get(name, [])
-                if (len(values) != len(base[name])
-                        or any(not math.isclose(a, b, rel_tol=0., abs_tol=1e-9)
-                               for a, b in zip(values, base[name]))):
-                    break
-            else:
-                matched = True
+        key["eligibleViewCount"] += 1
+        base = packet["baselineCamera"]
+        matched = math.isclose(camera.get("verticalFovDegrees",0),base["verticalFovDegrees"],rel_tol=0.,abs_tol=1e-9)
+        for name in ("positionMetres","quaternion","principalPointViewportPixels"):
+            values = camera.get(name,[960.,540.]) if name == "principalPointViewportPixels" else camera.get(name,[])
+            if (len(values) != len(base[name])
+                    or any(not math.isclose(a,b,rel_tol=0.,abs_tol=1e-9) for a,b in zip(values,base[name]))):
+                matched = False
                 break
         if not matched:
             return camera, note
         key["appliedViewCount"] += 1
         if frame.get("sourceImage") == key["sourceImage"]:
             key["appliedSeedExposureCount"] += 1
+        if frame["shotId"] == "cam-rod":
+            return copy.deepcopy(key["chosenCamera"]), (
+                "Chosen cam-rod own-shot physical SQPNP pose: three original FIT source pixels and actual same-input native world markers constrain a fixed chosen FOV30/centred-PP camera. Root selected the upright CAD+Z-facing branch using a declared15deg roll prior, never the held-out pinion CHECK. Position/forward direction now replace the visually mismatched former similarity camera; native geometry/poses/inputs/source declarations are unchanged. Only3FIT depths are proven, not complete geometry, historical camera, qualified6FIT/2CHECK or GPU/stage acceptance. Previous similarity evidence is historical/unaccepted. See evidence.synthesisCoarseFraming.shots.cam-rod.physicalPoseSelection.")
         return copy.deepcopy(key["chosenCamera"]), (
-            "Chosen own-shot staged-FIT perspective framing: original source images and actual GPU marker centres choose local-Z roll, positive focal scale and principal point only; baseline position/forward direction and perspective depth are unchanged. Two original FITs establish the fallback stage; cam-rod alone then balances all three original FITs exposed by the actual intermediate GPU probe. Held within this shot, not a unique historical camera, qualified source fit or stage acceptance. Independent 6FIT/2CHECK qualification is missing; CHECKs never enter framing. See evidence.synthesisCoarseFraming. "+note)
+            "Chosen cone-overview two-FIT perspective framing: original source pixels and actual GPU marker centres choose local-Z roll, positive focal scale and principal point only; baseline position/forward direction and perspective depth remain unchanged. Held within this shot, not a unique historical camera, qualified source fit or GPU/stage acceptance. Independent 6FIT/2CHECK qualification is missing; no CHECK enters framing. Cam-rod's former similarities are historical/unaccepted and replaced separately by its chosen upright physical pose. See evidence.synthesisCoarseFraming. "+note)
+
+    def synthesis_wheel_framing_packet(self):
+        """Choose wheel-macro translation from its single original FIT only."""
+        path = "web/content/8KmVDxkia_w.observations.json"
+        observations = load(path)
+        original = next(frame for frame in observations["frames"]
+                        if frame["shotId"] == "wheel-macro" and frame["timeSeconds"] == 252.00175)
+        image = original["sourceImage"]
+        if (image["frameIndex"] != 6042
+                or image["sha256Bgr8"] != "fc827f2d41c467a3a8bdfa73379f0e65e8a9988b1e47198c06a34624f97a5f91"
+                or image["sourceSha256"] != self.data["source"]["sha256"]
+                or image["width"] != 1920 or image["height"] != 1080):
+            raise ValueError("Original wheel-macro manual seed identity changed")
+        fit = next(point for point in original["landmarks"] if point["anchorId"] == "wheel-centre")
+        if (fit["role"] != "fit" or fit["status"] != "observed" or fit["method"] != "manual"
+                or fit["pixel"] != [1145,555] or fit["uncertaintyPx"] != 5):
+            raise ValueError("Original wheel-centre manual FIT declaration changed")
+        check = next(point for point in original["landmarks"] if point["anchorId"] == "wheel-hanger-screw")
+        if check["role"] != "check" or check["status"] != "observed":
+            raise ValueError("Original wheel hanger independent CHECK declaration changed")
+        report = "web/.vite/verification-output/stage50-seed-clock-repaired-native-2026-10-01/8KmVDxkia_w.json"
+        row, report_hash = self.framing_gpu_sample(
+            report,"wheel-macro",252.00175,["wheel-centre"],[[959.4,547.8]],
+            [[1145,555]],252.00175,689,["passed"])
+        if not any(point["anchorId"] == "wheel-hanger-screw" and point["role"] == "check"
+                   for point in row["measurements"]):
+            raise ValueError("Original wheel GPU independent CHECK role changed")
+        target, span = self.envelope("wheel",1920/1080)
+        baseline = look_camera(target,0.,0.12,span,1920/1080)
+        baseline["principalPointViewportPixels"] = [960.,540.]
+        native = next(point["nativePixels"] for point in row["measurements"]
+                      if point["anchorId"] == "wheel-centre" and point["viewId"] == "main")
+        offset = [fit["pixel"][i]-native[i] for i in range(2)]
+        if not all(math.isfinite(value) for value in offset):
+            raise ValueError("Nonfinite chosen wheel principal-point translation")
+        camera = copy.deepcopy(baseline)
+        camera["principalPointViewportPixels"] = [baseline["principalPointViewportPixels"][i]+offset[i] for i in range(2)]
+        return {"kind":"chosen-wheel-macro-single-FIT-principal-point-translation",
+                "status":"source-informed-chosen-approximate",
+                "sourceAcceptance":"unavailable","historicalPose":"unobserved","nativeQualification":"deferred",
+                "shotId":"wheel-macro","viewId":"main","timeSeconds":252.00175,
+                "decodedTimeSeconds":original["decodedTimeSeconds"],"sourceImage":copy.deepcopy(image),
+                "sourceObservations":path,"baselineCamera":baseline,"chosenCamera":camera,
+                "objectiveFIT":{"anchorId":"wheel-centre","role":"fit","sourcePixels":copy.deepcopy(fit["pixel"]),
+                                "sourceUncertaintyPx":5,"nativePixels":copy.deepcopy(native),"method":"gpu-readback"},
+                "principalPointTranslationPixels":offset,
+                "gpuEvidence":{"report":report,"reportSha256":report_hash,
+                               "sampleSelector":{"sourceShotId":"wheel-macro","timeSeconds":252.00175,"viewId":"main"},
+                               "captureTimeSeconds":252.00175,"nativeMediaTime":252.00175,"sourceDrawRevision":689},
+                "cameraBinding":"Root-confirmed existing frontal wheel fallback; report has marker readbacks, not camera pose.",
+                "originalLandmarks":copy.deepcopy(original["landmarks"]),
+                "originalUnavailable":copy.deepcopy(original.get("unavailable", [])),
+                "excludedCHECKs":["wheel-hanger-screw"],"eligibleViewCount":0,"appliedViewCount":0,"appliedSeedExposureCount":0,
+                "equations":"PP'=PP+(originalFIT-nativeGPUFIT); position, quaternion, FOV and perspective depth unchanged.",
+                "interpretation":"Only the original manual seed frame6042 wheel-centre FIT selects translation. The later original-frame6169 source inspection supports qualitative frontal composition, not new seed pixels. Original independent hanger CHECK is never an objective/ranking/selection input and no CHECK prediction is computed. Hold this chosen translation only in wheel-macro main; no spoke phase, source-visible motion, historical camera, parallax correction or qualified6FIT/2CHECK claim. One-pair translation residual is zero by construction before rasterization."}
+
+    def synthesis_wheel_camera(self, frame, view, camera, note):
+        packet = self.synthesis_wheel_framing
+        if (packet is None or frame["shotId"] != "wheel-macro" or view["id"] != "main"
+                or view["rectSourcePixels"] != [0,0,1920,1080]
+                or view.get("presentation","native") != "native" or common.resolve_warp(view)):
+            return camera,note
+        packet["eligibleViewCount"] += 1
+        base = packet["baselineCamera"]
+        matched = math.isclose(camera.get("verticalFovDegrees",0),base["verticalFovDegrees"],rel_tol=0.,abs_tol=1e-9)
+        for name in ("positionMetres","quaternion","principalPointViewportPixels"):
+            values = camera.get(name,[960.,540.]) if name == "principalPointViewportPixels" else camera.get(name,[])
+            if (len(values) != len(base[name])
+                    or any(not math.isclose(a,b,rel_tol=0.,abs_tol=1e-9) for a,b in zip(values,base[name]))):
+                matched = False
+                break
+        if not matched:
+            return camera,note
+        packet["appliedViewCount"] += 1
+        if frame.get("sourceImage") == packet["sourceImage"]:
+            packet["appliedSeedExposureCount"] += 1
+        return copy.deepcopy(packet["chosenCamera"]), (
+            "Chosen wheel-macro single-FIT principal-point translation: original manual wheel-centre seed and actual same-exposure GPU centre choose only screen offset. Position/orientation/FOV, source inputs/pixels and geometry are unchanged; independent hanger CHECK and moving spokes are not fit inputs. Unqualified1FIT/1CHECK, source-informed/chosen only, not historical camera or rendered acceptance. See evidence.synthesisWheelFraming. "+note)
 
     def envelope(self, family, aspect):
         parts = [p for p in self.parts if any(name in p["partPath"] for name in self.groups[family])]
@@ -819,6 +904,7 @@ class Generator:
             camera, camera_note = self.camera(frame,original,family)
             value, input_note = self.input(frame,family)
             camera, camera_note = self.synthesis_coarse_camera(frame,original,camera,camera_note)
+            camera, camera_note = self.synthesis_wheel_camera(frame,original,camera,camera_note)
             view = {"id":original["id"], "rectSourcePixels":original["rectSourcePixels"],
                     "presentation":original.get("presentation","native"), "camera":camera,
                     "input":common.compact_input(value),
@@ -902,12 +988,19 @@ class Generator:
             track["evidence"]["notes"].append("Analysis independent source FIT roots can exchange indistinguishable rocker-pose branches. Playback chooses nearest-previous genuine inverse roots; observed rocker endpoints and all source controls stay unchanged. Original per-exposure rod-cost choices remain immutable; alternative cam/rod endpoint orientations and between-exposure continuity are chosen, not recovered or source-certified.")
         else:
             for shot, key in self.synthesis_coarse_framing["shots"].items():
-                if key["appliedViewCount"] == 0 or key["appliedSeedExposureCount"] == 0:
-                    raise ValueError(f"Chosen framing did not apply to original seed main view: {shot}")
+                if (key["eligibleViewCount"] == 0 or key["appliedViewCount"] != key["eligibleViewCount"]
+                        or key["appliedSeedExposureCount"] == 0):
+                    raise ValueError(f"Chosen framing missed an eligible or original seed main view: {shot}")
+            if (self.synthesis_wheel_framing["eligibleViewCount"] == 0
+                    or self.synthesis_wheel_framing["appliedViewCount"] != self.synthesis_wheel_framing["eligibleViewCount"]
+                    or self.synthesis_wheel_framing["appliedSeedExposureCount"] == 0):
+                raise ValueError("Chosen wheel framing missed an eligible or original seed main view")
             track["sourceMeasurements"]["blockers"].append("Synthesis conditional relative pen/wheel trajectory and source-displacement cosine witnesses do not metrically qualify full source-visible motion or unknown station/phase associations.")
             track["evidence"]["synthesisPresenterFraming"] = copy.deepcopy(self.presenter_reframing)
             track["evidence"]["synthesisCoarseFraming"] = copy.deepcopy(self.synthesis_coarse_framing)
-            track["sourceMeasurements"]["blockers"].append("Synthesis cone-overview/cam-rod own-shot physical roll/FOV/principal-point framing starts from two original FIT pairs and actual fallback GPU centres. Cam-rod alone then balances all three original FITs using actual intermediate-camera GPU centres; original rocker clipping stays historical baseline evidence. Independent qualified fitting still lacks 6FIT/2CHECK; pinion CHECK never enters either objective. The latest chosen refinement has no current rendered acceptance.")
+            track["evidence"]["synthesisWheelFraming"] = copy.deepcopy(self.synthesis_wheel_framing)
+            track["sourceMeasurements"]["blockers"].append("Wheel-macro single original FIT chooses principal-point translation only; independent wheel-hanger CHECK stays held out and moving-spoke/input controls remain unresolved. OneFIT/oneCHECK is not qualified6FIT/2CHECK camera evidence; fresh GPU qualification is deferred.")
+            track["sourceMeasurements"]["blockers"].append("Cone-overview's two-FIT similarity remains chosen/unqualified. Cam-rod now uses three original FIT pixels and same-input actual native world markers for a root-selected upright fixedFOV30/centredPP SQPNP physical pose; previous camera similarities are historical/unaccepted. Its declared15deg upright branch prior is not a measured historical camera. Only3FIT depths are established, not whole geometry or GPU/stage acceptance;3FIT/1CHECK still lacks qualified6FIT/2CHECK. Pinion CHECK was never used for objective/ranking/selection and remains held out for root measurement.")
             track["sourceMeasurements"]["blockers"].append("Synthesis presenter-to-spin has one original main machine view with chosen coarse principal-point/FOV reframing. No independently measured transition FIT/CHECK landmarks or per-exposure camera fits are introduced; presenter/black graphic/formula are not native geometry.")
         self.camera_metadata(track)
         return track

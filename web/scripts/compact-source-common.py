@@ -5,6 +5,9 @@ Video-specific authors provide physically feasible inputs and candidate cameras.
 module only selects existing decoded-source observations and copies numeric evidence.
 Coverage means playback data coverage; stage matching remains unmeasured until the
 real renderer is compared with the retained source landmarks.
+Exact-image aliases may contribute original observed landmarks to a selected row,
+but never change its camera/input/timing. Identity/layout ambiguity is reported;
+conflicting corresponding source points fail closed rather than choosing a donor.
 """
 from __future__ import annotations
 
@@ -77,6 +80,106 @@ def compact_change_times(data):
             result.add(original)
     data.setdefault("samplingDiagnostics", {})["roundedEventSnaps"] = snaps
     return result
+
+def retain_exact_exposure_landmarks(selected, data):
+    """Union original pixels only across identical native exposures and layouts."""
+    identity_fields = ("frameIndex", "sourceSha256", "sha256Bgr8", "pixelFormat", "width", "height")
+
+    def identity(frame):
+        image = frame.get("sourceImage")
+        pts = frame.get("decodedTimeSeconds")
+        if (not isinstance(image, dict) or any(key not in image for key in identity_fields)
+                or not isinstance(pts, (int, float)) or not math.isfinite(pts)
+                or not isinstance(image["frameIndex"], int) or image["frameIndex"] < 0
+                or frame.get("decodedFrameIndex", image["frameIndex"]) != image["frameIndex"]
+                or image["sourceSha256"] != data["source"].get("sha256")
+                or image["width"] != data["source"]["width"] or image["height"] != data["source"]["height"]
+                or image["pixelFormat"] != "bgr8"
+                or any(not isinstance(image[key], str) or not re.fullmatch(r"[0-9a-f]{64}", image[key])
+                       for key in ("sourceSha256", "sha256Bgr8"))):
+            return None
+        return (frame["shotId"], pts, *(image[key] for key in identity_fields))
+
+    def layout(frame):
+        views = source_views(frame, data)
+        if not views or len({view["id"] for view in views}) != len(views):
+            return None
+        if any(((view.get("resolvedImagePlaneWarp") or view.get("imagePlaneWarp")) and not resolve_warp(view))
+               or (view.get("composite") and not compact_composite(view)) for view in views):
+            return None
+        return {view["id"]: {"rectSourcePixels":view["rectSourcePixels"],
+                            "presentation":view.get("presentation", "native"),
+                            "imagePlaneWarp":resolve_warp(view), "composite":compact_composite(view)}
+                for view in views}
+
+    def point_key(point, views):
+        view_id = point.get("viewId")
+        if view_id is None:
+            # Legacy unscoped points mean the single full-frame native main,
+            # not an arbitrary inset/transition layer.
+            if (set(views) != {"main"} or views["main"] != {
+                    "rectSourcePixels":[0,0,data["source"]["width"],data["source"]["height"]],
+                    "presentation":"native", "imagePlaneWarp":None, "composite":None}):
+                return None
+            view_id = "main"
+        if view_id not in views:
+            return None
+        return view_id, point["anchorId"]
+
+    groups = {}
+    for frame in data["frames"]:
+        key = identity(frame)
+        if key is not None:
+            groups.setdefault(key, []).append(frame)
+    diagnostics = {"status":"exact-exposure-only", "originalAliasGroupCount":sum(len(rows) > 1 for rows in groups.values()),
+                   "selectedRowsAugmented":0, "originalLandmarksRetained":0, "unavailable":[]}
+    output = []
+    for frame in selected:
+        aliases = groups.get(identity(frame), [])
+        views = layout(frame)
+        if len(aliases) > 1 and views is None:
+            diagnostics["unavailable"].append({"shotId":frame["shotId"],"timeSeconds":frame["timeSeconds"],
+                "reason":"Exact-image aliases have no unambiguous selected view layout; landmarks not copied."})
+        if len(aliases) < 2 or views is None:
+            output.append(frame)
+            continue
+        points = copy.deepcopy(frame.get("landmarks", []))
+        known = {}
+        added = 0
+        for alias in [frame, *aliases]:
+            if layout(alias) != views:
+                diagnostics["unavailable"].append({"shotId":frame["shotId"],"timeSeconds":frame["timeSeconds"],
+                    "aliasTimeSeconds":alias["timeSeconds"],"reason":"Identical source image has ambiguous/different view layout; landmarks not copied."})
+                continue
+            for point in alias.get("landmarks", []):
+                key = point_key(point, views)
+                if key is None:
+                    diagnostics["unavailable"].append({"shotId":frame["shotId"],"timeSeconds":frame["timeSeconds"],
+                        "aliasTimeSeconds":alias["timeSeconds"],"anchorId":point["anchorId"],
+                        "reason":"Original landmark view correspondence is ambiguous; landmark not copied."})
+                    continue
+                comparable = {**point, "viewId":key[0]}
+                old = known.get(key)
+                if old is not None:
+                    if old != comparable:
+                        raise ValueError(f"Conflicting original exact-exposure landmark for {frame['shotId']} native {frame['sourceImage']['frameIndex']} view {key[0]} anchor {key[1]}.")
+                    continue
+                known[key] = comparable
+                if alias is frame:
+                    continue
+                pixel = point.get("pixel")
+                if (point.get("status") != "observed" or not isinstance(pixel, list) or len(pixel) != 2
+                        or not all(isinstance(value, (int, float)) and math.isfinite(value) for value in pixel)):
+                    continue
+                points.append(copy.deepcopy(point))
+                added += 1
+        if added:
+            frame = {**frame, "landmarks":points}
+            diagnostics["selectedRowsAugmented"] += 1
+            diagnostics["originalLandmarksRetained"] += added
+        output.append(frame)
+    data.setdefault("samplingDiagnostics", {})["exactExposureAliasLandmarks"] = diagnostics
+    return output
 
 
 def selected_frames(data):
@@ -173,7 +276,7 @@ def selected_frames(data):
                 if not any(abs(existing - time) < 1e-6 for existing in output):
                     output[time] = frame
                 previous = frame
-    return [output[t] for t in sorted(output)]
+    return retain_exact_exposure_landmarks([output[t] for t in sorted(output)], data)
 
 
 def compact_camera(camera):

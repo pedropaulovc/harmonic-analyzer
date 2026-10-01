@@ -3,6 +3,10 @@
 
 No source video/frames are redistributed, no historical hidden state is recovered,
 and no CPU camera diagnostic is promoted to a current native GPU measurement.
+
+Regenerate from the repository root with: python3 web/scripts/compact-spin.py
+Declared seed presentation overrides affect chosen native rendering only; original
+source pixels, source-view layouts and exact-exposure seed identities are retained.
 """
 import copy
 import hashlib
@@ -141,8 +145,12 @@ def main():
                 )
             elif seed.get("cameraEvidence"):
                 evidence += "Prior photographic/camera CHECK diagnostics are retained separately; no current GPU acceptance claimed."
+            if "presentation" in seed:
+                # A documented per-view seed declaration governs native rendering,
+                # not the original source layout used for exact-exposure identity.
+                evidence += " " + seed["presentationEvidence"]
             view = {"id": view_id, "rectSourcePixels": copy.deepcopy(original["rectSourcePixels"]),
-                    "presentation": original.get("presentation", "native"), "camera": camera,
+                    "presentation": seed.get("presentation", original.get("presentation", "native")), "camera": camera,
                     "input": common.compact_input(candidate["input"]),
                     "provenance": common.chosen_provenance(evidence, candidate["unobservedInputFields"])}
             camera_kind = "source-transfer"
