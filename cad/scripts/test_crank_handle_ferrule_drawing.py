@@ -122,11 +122,12 @@ def test_note_names_the_mating_tenon() -> None:
     assert spec.HANDLE_NUMBER == row["number"]
     assert f"{spec.HANDLE_NUMBER} {spec.HANDLE_NAME}" in spec.DRAWING_NOTES
     assert len(spec.DRAWING_NOTES.splitlines()) == 4
-    # Machinist review of crank-v4-16: name the bore operation and say why
-    # the bore carries a band; the OD is stock, skimmed at assembly.
+    # Machinist review of crank-v4-16: name the bore operation.  Rule 6
+    # (Codex P1 on #1139, c81d97280): no narration of why the band exists.
+    # The OD is stock, skimmed at assembly.
     flat = " ".join(spec.DRAWING_NOTES.split())
-    assert flat.startswith("BORE ON THE LATHE;")
-    assert "THE BORE BAND BOUNDS THE FITTED TENON'S WALL." in flat
+    assert flat.startswith("BORE ON THE LATHE.")
+    assert "BAND" not in flat
     assert "OD AS SUPPLIED (9/16 IN ROD); SKIMMED TO <MOD-DIAM>12.5 WITH MHA-022 AFTER CURE." in flat
     assert "TURNED TO SUIT THIS BORE" in spec.DRAWING_NOTES
 

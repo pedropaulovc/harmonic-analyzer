@@ -97,8 +97,10 @@ def test_notes_name_the_mates_and_the_band_reason() -> None:
     assert f"{spec.SCREW_NUMBER} {spec.SCREW_NAME}" in notes
     assert "TO SUIT" in notes
     assert "MIN POCKET WALL 0.8; MIN FLOOR 1.5; CORNERS EXCEPTED." in notes
-    # Machinist review of crank-v4-16: the depth band states its reason.
-    assert "DEPTH BAND KEEPS THE LONGEST MHA-139 HEAD BELOW THE FACE." in notes
+    # Codex P1 on #1139 (c81d97280): policy rule 6 forbids narrating why a
+    # band exists, so the depth band's reason stays in the spec, not on the
+    # sheet.
+    assert "DEPTH BAND" not in notes
     # crank-v4-17: a 78-character line pushed the block 4.8 mm into the title
     # block (2.55 mm a character from x=21.9, title block at x=216).
     assert max(len(line.replace("<MOD-DIAM>", "@")) for line in notes.splitlines()) <= 74
