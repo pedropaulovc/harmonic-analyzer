@@ -16,21 +16,10 @@ from __future__ import annotations
 from crank_hub_geometry import (
     AXIAL_PIN_DIA,
     AXIAL_PIN_LENGTH,
+    SEAT_PRESS_INTERFERENCE,
     SHAFT_CLEARANCE_MAX,
     SHAFT_CLEARANCE_MIN,
 )
-
-# Seat-in-arm press (B1, Main 2026-09-25): the seat is turned to suit the
-# MHA-020 bore as measured, for a light press.  A 1018 hub in a 1018 arm,
-# 8.0 long and keyed by MHA-138 on the seam, needs the press only to hold the
-# hub square and stop it turning while the seam is match-drilled.  The band
-# sits inside ISO 286 H7/p6 at 18-30 mm (0.001-0.035 diametral, the
-# locational-interference fit); its line-to-line end is raised to 0.010
-# because the hub is turned to a measured bore, not drawn from stock.  No
-# geometry reads it (the model seats line-to-line), so it lives here with the
-# sheet that prints it, not in crank_hub_spec, which every assembly imports
-# through _interference_contracts.
-SEAT_PRESS_INTERFERENCE = (0.010, 0.030)  # diametral, mm (min, max)
 
 
 def seat_callout(mate: str) -> str:

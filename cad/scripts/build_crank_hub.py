@@ -1,7 +1,7 @@
 r"""Build separate through hub MHA-137.
 
 The local +Y axis runs inboard from the arm's outboard face.  The O19.4 seat is
-flush through the 8-mm arm; the O20.6 rear barrel supplies the inboard shoulder
+flush through the 8-mm arm; the O22.25 rear barrel supplies the inboard shoulder
 and carries the removable MHA-024 hub-to-shaft cross-hole, located from that
 shoulder; behind it a O16.5 relief turned to the rear face lets the #25 chain
 plates wrapping the crank T12 pass.  MHA-138 is an axial

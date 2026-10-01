@@ -37,13 +37,42 @@ def test_u27_walls_hold_two_millimetres_at_the_printed_bands() -> None:
     assert geometry.ARM_CHEEK_WORST_MM == pytest.approx(2.049, abs=1e-3)
 
 
+def test_arm_shoulder_keeps_its_land_over_the_largest_matched_seat() -> None:
+    """Codex P2 on 16146c26f: the arm is pressed to the barrel's front face,
+    and the seat is turned to whatever MHA-020 bore it meets.  At the printed
+    limits the largest bore (.X) plus the tightest press stands inside the
+    smallest barrel the sheet allows; after the arm bore's and the barrel
+    corner's edge breaks a land at least one edge break wide must be left."""
+    one_place = round(float(_config.title_block("linear_1pl")["value_in"]) * 25.4, 1)
+    two_place = round(float(_config.title_block("linear_2pl")["value_in"]) * 25.4, 2)
+    edge_break = float(_config.title_block("edge_break")["chamfer_max_mm"])
+    band = {1: one_place, 2: two_place}
+    seat_max = (
+        geometry.HUB_SEAT_DIA
+        + band[crank_hub_spec.DRAWING_PRECISION_BY_NAME["SeatDia"]]
+        + 0.030
+    )
+    assert seat_max == pytest.approx(20.23)
+    barrel_places = crank_hub_spec.DRAWING_PRECISION_BY_NAME["BarrelDia"]
+    barrel_min = geometry.HUB_BARREL_DIA - band[barrel_places]
+    land = (barrel_min - seat_max) / 2.0 - 2.0 * edge_break
+    assert land >= edge_break
+    assert geometry.HUB_SHOULDER_LAND_WORST_MM == pytest.approx(land)
+    assert geometry.SHOULDER_LAND_WORST_MIN == edge_break
+    assert geometry.SEAT_PRESS_INTERFERENCE[1] == 0.030
+    # The same barrel at the title block's .X leaves a 0.11 sliver.
+    with pytest.raises(AssertionError, match="shoulder land 0.110"):
+        geometry.shoulder_land(geometry.HUB_BARREL_DIA - one_place, seat_max)
+
+
 def test_mha024_ream_ligaments_meet_rule_12_at_the_printed_bands() -> None:
     # CONTRACT-crank MHA-137: 8 seat + 17.2 of hub behind the shoulder (19
     # until the seat face moved 1.8 forward, ruling 2026-09-30), the ream
     # station unchanged 5.6 from the shoulder at .XX.  The rear 3.85 is the
     # chain-plate relief (Main, 2026-09-30; lengthened from 3.6 for the
-    # floated wheel, PR1 Codex review 2), so the Ø20.6 barrel is 13.35.
-    assert geometry.HUB_BARREL_DIA == 20.6
+    # floated wheel, PR1 Codex review 2), so the barrel is 13.35.  R9-38 took
+    # it Ø20.6 -> Ø22.25 at .XX for the arm shoulder's land.
+    assert geometry.HUB_BARREL_DIA == 22.25
     assert geometry.HUB_LENGTH == pytest.approx(25.2)
     assert geometry.HUB_BARREL_LENGTH == pytest.approx(13.35)
     assert geometry.SERVICE_PIN_FROM_SHOULDER == 5.6
@@ -57,7 +86,7 @@ def test_mha024_ream_ligaments_meet_rule_12_at_the_printed_bands() -> None:
     assert (geometry.HUB_SEAT_DIA - geometry.HUB_BORE_DIA) / 2 == pytest.approx(
         4.92, abs=0.01
     )
-    assert geometry.HUB_BARREL_DIA / 2 - ream_r == pytest.approx(7.33, abs=0.01)
+    assert geometry.HUB_BARREL_DIA / 2 - ream_r == pytest.approx(8.155, abs=0.01)
     assert geometry.SERVICE_PIN_FROM_SHOULDER - ream_r == pytest.approx(2.63, abs=0.01)
     # The ream ends at the relief shoulder, not the rear face.
     assert rear_from_shoulder - ream_r == pytest.approx(4.78, abs=0.01)
@@ -69,7 +98,7 @@ def test_mha024_ream_ligaments_meet_rule_12_at_the_printed_bands() -> None:
         2.121, abs=1e-3
     )
     assert geometry.SERVICE_PIN_REAR_LIGAMENT_WORST_MM == pytest.approx(3.371, abs=1e-3)
-    assert geometry.SERVICE_PIN_BARREL_WALL_WORST_MM == pytest.approx(6.931, abs=1e-3)
+    assert geometry.SERVICE_PIN_BARREL_WALL_WORST_MM == pytest.approx(7.901, abs=1e-3)
 
 
 def test_rear_relief_clears_the_t12_chain_plates_and_keeps_its_wall() -> None:
@@ -349,7 +378,8 @@ def test_callouts_stand_clear_of_views_and_each_other() -> None:
     barrel_x = drawing.SIDE_KEEP["BarrelDia"][0]
     assert barrel_x < relief_x < drawing.INBOARD_X
     relief_half = len("Ø16.50") * char_w / 2.0
-    assert barrel_x + len("Ø20.6") * char_w / 2.0 < relief_x - relief_half
+    barrel_label = f"Ø{geometry.HUB_BARREL_DIA:.2f}"
+    assert barrel_x + len(barrel_label) * char_w / 2.0 < relief_x - relief_half
     assert relief_x + relief_half < drawing.INBOARD_X
 
 

@@ -66,13 +66,25 @@ ARM_STOCK_THICKNESS_MIN = float(ARM_STOCK_THICKNESS_IN - ARM_STOCK_MILL_MINUS_IN
 PHOTO_HUB_SEAT_DIA = round(PHOTO_HUB * PHOTO_MM_PER_UNIT * OUTBOARD_SCALE, 1)
 HUB_SEAT_DIA = round(PHOTO_HUB_SEAT_DIA - 0.1, 1)
 HUB_SEAT_LENGTH = ARM_THICKNESS
-# CONTRACT-crank MHA-137: the barrel behind the arm is Ø20.6 (observed Ø≈20,
-# review Q4) -- turned to its own size, narrower than the 1-in arm -- and the
-# hub runs 17.2 from the arm shoulder to a flat rear face 0.7 clear of the
+# Seat-in-arm press (B1, Main 2026-09-25): the seat is turned to suit the
+# MHA-020 bore as measured, for a light press.  A 1018 hub in a 1018 arm,
+# 8.0 long and keyed by MHA-138 on the seam, needs the press only to hold the
+# hub square and stop it turning while the seam is match-drilled.  The band
+# sits inside ISO 286 H7/p6 at 18-30 mm (0.001-0.035 diametral, the
+# locational-interference fit); its line-to-line end is raised to 0.010
+# because the hub is turned to a measured bore, not drawn from stock.  The
+# model seats line-to-line; the shoulder land below reads the largest seat.
+SEAT_PRESS_INTERFERENCE = (0.010, 0.030)  # diametral, mm (min, max)
+# CONTRACT-crank MHA-137: the barrel behind the arm (observed Ø≈20, review
+# Q4) is turned to its own size, narrower than the 1-in arm, and the hub
+# runs 17.2 from the arm shoulder to a flat rear face 0.7 clear of the
 # MHA-081 removable, which it keeps from walking forward (the drive train
 # asserts the air against transgear_removable_spec).  It followed the seat
-# face 1.8 forward (user ruling 2026-09-30): 19 -> 17.2.
-HUB_BARREL_DIA = 20.6
+# face 1.8 forward (user ruling 2026-09-30): 19 -> 17.2.  Its front face is
+# the shoulder the arm is pressed to: R9-38 took it Ø20.6 -> Ø22.25 at .XX so
+# the shoulder keeps its land (SHOULDER_LAND_WORST_MIN) over the largest
+# seat the press can turn, after both edge breaks.
+HUB_BARREL_DIA = 22.25
 HUB_SHOULDER_TO_REAR = 17.2
 # The #25 plates wrapping the crank T12 overhang the removable's front face
 # toward the hub, so the rear end is turned down to a Ø16.5 relief the plates
@@ -241,10 +253,13 @@ RELIEF_DIA_MAX = RELIEF_DIA + GENERAL_2PL_TOL_MM
 # The hub rides the shaft in its clearance bore, pinned wherever the
 # match-ream found it, so its relief can stand this far off the shaft axis.
 HUB_SHAFT_FLOAT = (HUB_BORE_DIA_MAX - (SHAFT_DIA + SHAFT_DIA_BAND[1])) / 2.0  # 0.0375
+# The barrel is printed at the title block's .XX: its smallest is what the
+# arm shoulder and the MHA-024 ream's wall read.
+HUB_BARREL_DIA_MIN = HUB_BARREL_DIA - GENERAL_2PL_TOL_MM
 # The barrel wall standing beside the big end of the ream, across the axis.
 SERVICE_PIN_BARREL_WALL_WORST_MM = (
-    HUB_BARREL_DIA - GENERAL_1PL_TOL_MM
-) / 2.0 - SERVICE_PIN_REAM_RADIUS_MAX
+    HUB_BARREL_DIA_MIN / 2.0 - SERVICE_PIN_REAM_RADIUS_MAX
+)
 
 
 def wall_after_edge_break(outer_dia: float, inner_dia: float) -> float:
@@ -276,8 +291,31 @@ for _wall, _label in (
 ):
     if _wall < WALL_TARGET_MM:
         raise AssertionError(f"{_label} is only {_wall:.3f} mm at worst case")
-if HUB_BARREL_DIA <= HUB_SEAT_DIA:
-    raise AssertionError("MHA-137 barrel leaves no shoulder against the arm")
+# The arm is pressed to the barrel's front face (FACES FLUSH), which carries
+# the press and then holds the arm square.  The face it bears on runs from
+# the arm bore's broken edge to the barrel's broken corner, and the seat is
+# turned to the bore it meets, so at worst the largest bore (.X) plus the
+# tightest press stands inside the smallest barrel.  The land must stay one
+# title-block edge break wide: a flat a fitter can see and gauge the press
+# against, not a knife edge left between two chamfers.
+SHOULDER_LAND_WORST_MIN = EDGE_BREAK_MAX_MM
+HUB_SEAT_DIA_MAX_MATCHED = HUB_SEAT_DIA_MAX_GENERAL + SEAT_PRESS_INTERFERENCE[1]
+
+
+def shoulder_land(barrel_dia_min: float, seat_dia_max: float) -> float:
+    """Radial land the arm bears on, the barrel's smallest against the largest
+    matched seat, both edges broken.  Raises below SHOULDER_LAND_WORST_MIN."""
+    land = wall_after_edge_break(barrel_dia_min, seat_dia_max)
+    if land < SHOULDER_LAND_WORST_MIN - 1e-9:
+        raise AssertionError(
+            f"MHA-137 shoulder land {land:.3f} < {SHOULDER_LAND_WORST_MIN}"
+        )
+    return land
+
+
+HUB_SHOULDER_LAND_WORST_MM = shoulder_land(
+    HUB_BARREL_DIA_MIN, HUB_SEAT_DIA_MAX_MATCHED
+)  # 0.255
 if not HUB_BORE_DIA < RELIEF_DIA < HUB_BARREL_DIA:
     raise AssertionError("MHA-137 relief is not a step between the bore and barrel")
 if SERVICE_PIN_STATION >= RELIEF_STATION:

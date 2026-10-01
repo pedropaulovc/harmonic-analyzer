@@ -67,7 +67,9 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         # length that keeps the #25 plates clear of the barrel's rear shoulder.
         "ReliefLength": 2,
         "SeatDia": 1,
-        "BarrelDia": 1,
+        # The arm's shoulder at the title block's .XX: HUB_BARREL_DIA_MIN, what
+        # the shoulder land over the largest matched seat reads.
+        "BarrelDia": 2,
         # A clearance diameter at the title block's .XX: RELIEF_DIA_MAX, what
         # the drive train's chain-plate air reads (0.23 to a real #25 plate
         # on the floated T12; 0.08 at .X).

@@ -637,11 +637,12 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
     crank_allowed = _interference_contracts.allowed_interference_pairs("drive-train")
     hub_pair = frozenset(("crank-pin-1", "crank-hub-1"))
     shaft_pair = frozenset(("crank-pin-1", "crankshaft-1"))
-    # The CONTRACT-crank hub barrel (Ø20.6) sets the MHA-024 pilot spans: a
-    # shorter hub chord, and the shaft crossing further up the taper. #1140
-    # stood the pin 0.6 further proud (PIN_PROUD 4.45, keeper-ring hole at
-    # 3.7), so a thinner stretch of the taper sits in both receivers.
-    assert 98.5 < crank_allowed[hub_pair] < 99.2
-    assert 56.7 < crank_allowed[shaft_pair] < 57.2
+    # The CONTRACT-crank hub barrel (Ø22.25 since R9-38) sets the MHA-024
+    # pilot spans: a longer hub chord, and the shaft crossing further down
+    # the taper. #1140 stood the pin 0.6 further proud (PIN_PROUD 4.45,
+    # keeper-ring hole at 3.7), so a thinner stretch of the taper sits in
+    # both receivers.
+    assert 111.2 < crank_allowed[hub_pair] < 111.8
+    assert 55.1 < crank_allowed[shaft_pair] < 55.6
     assert _interference_contracts.allowed_interference_pairs("channel") == {}
     assert _interference_contracts.allowed_interference_pairs("unknown") == {}
