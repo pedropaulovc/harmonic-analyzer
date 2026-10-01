@@ -57,14 +57,18 @@ def seat_bore_callout(mate: str) -> str:
     )
 
 
-def seam_callout(mate: str) -> str:
-    """MHA-138 seam, match-drilled with ``mate``: size first, then the process."""
+def seam_callout(mate: str, pin: str = "MHA-138") -> str:
+    """MHA-138 seam, match-drilled with ``mate``: size first, then the process.
+
+    ``pin`` names the pin as the sheet identifies it; the arm's print adds its
+    part name (MHA-020 machinist review, 2026-09-29).
+    """
     return "\n".join(
         (
             f"(<MOD-DIAM>{AXIAL_PIN_DIA:.1f}) <HOLE-DEPTH> {AXIAL_PIN_LENGTH:.1f}",
             f"MATCH-DRILL/REAM WITH {mate}",
             "AT ASSEMBLY, CENTRED ON THE SEAM",
-            "FOR MHA-138: LIGHT DRIVE FIT",
+            f"FOR {pin}: LIGHT DRIVE FIT",
         )
     )
 

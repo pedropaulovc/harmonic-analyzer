@@ -474,6 +474,20 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
+        name="crank_handle_ferrule",
+        part="crank_handle_ferrule",
+        artifact_stem="crank-handle-ferrule",
+        script_name="draw_crank_handle_ferrule.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="crank_handle_butt_cup",
+        part="crank_handle_butt_cup",
+        artifact_stem="crank-handle-butt-cup",
+        script_name="draw_crank_handle_butt_cup.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
         name="boss_hook",
         part="boss_hook",
         artifact_stem="boss-hook",

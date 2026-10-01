@@ -1,0 +1,10 @@
+crank-handle-ferrule:
+  title: Crank Handle Ferrule
+  number: MHA-152
+  description: "CRANK HANDLE FERRULE"
+  material: C36000 brass rod, 9/16 in
+  material_specification: C36000 free-machining brass rod, 9/16 in
+  finish: bright turned, clear lacquer
+  quantity: 1
+  tolerance_class: machined_block
+  process: "bored and parted from 9/16 in rod (brass), OD as supplied; epoxied on the MHA-022 tenon and skimmed to the grip contour with it"

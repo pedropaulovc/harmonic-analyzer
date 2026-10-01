@@ -1,13 +1,21 @@
 r"""Create the curated machinist drawing for the crank handle.
 
-A turned stained-oak pear grip (book ch. 11): an integral collar profile at the crank end,
-a waisted neck, a smooth twin-arc swell to the Ø22 max, and a blunt domed butt
-with a flat cap.  The pear silhouette is two internally-tangent arcs, so the
-swell/neck/butt diameters derive from the profile and cannot be marked without
-over-defining; the print dimensions the clean AXIAL stations (overall length,
-collar length, peak station) in the front profile view and gives the diameters
-as a turning-schedule note.  The profile sketches on the Front plane, so every
-marked dimension imports into the front view (handle axis horizontal).
+A turned, ebonized oak pear grip (book ch. 11).  User ruling 2026-09-29: the
+brass ferrule MHA-152 and the steel butt cup MHA-153 are separate parts, so
+this sheet prints only the oak -- a tenon for the ferrule at the crank end, a
+flared waist, an S-curve swell to the Ø21 max, and a domed butt whose end
+round crests on a flat oak end flush with the cup bonded into its
+counterbore (user rulings 2026-09-30, concept v4; turned clear of the cup
+after the local review of fbf82ad96).
+
+After the MHA-022 machinist review (user ruling 2026-09-29) the sheet is plain:
+no datums, feature-control frames or basic dimensions -- the grip is turned to
+its arcs within a contour allowance stated in the note.  The longitudinal
+section A-A, taken on the end view's vertical centre line, is the handle's
+length view (policy rule 7): it shows the counterbore step on cut edges and
+carries every profile dimension, since the profile sketches on the Front plane
+the section lies in.  The end view stands on the section's axis and carries the
+reamed bore.
 
 Run with SolidWorks open::
 
@@ -20,34 +28,34 @@ import argparse
 import sys
 from typing import Any
 
-from crank_handle_spec import GEOMETRIC_TOLERANCES_MM
-
 import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_datum_feature,
-    add_feature_control_frame,
     add_property_linked_note,
-    add_view_centerline,
+    assert_imported_precision,
+    create_section_view,
     curate_view_dimensions,
     dimension_name,
     finalize_drawing,
     new_project_drawing,
     read_required_properties,
-    set_basic_dimension,
     set_dimension_callouts,
     set_hidden_lines_removed,
-    set_hidden_lines_visible,
+    set_reference_dimension,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _section_axis import create_section_axis_centerline, position_section_caption
 from crank_handle_spec import (
-    COLLAR_DIA,
-    HANDLE_LENGTH,
+    DRAWING_DIMENSIONS,
+    DRAWING_PRECISION_BY_NAME,
     HANDLE_MAX_DIA,
-    PEAK_X,
-    PIVOT_BORE_DIA,
+    REFERENCE_DIMENSIONS,
+    SHOULDER_X,
+    TENON_DIA,
+    OAK_END_X,
+    TENON_X0,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
     auto_center_marks,
@@ -69,14 +77,17 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (2.0, 1.0)
 
-# Front view (XY): the pear lies horizontal, axis along +X, collar at the left
-# (x=0) and butt at the right (x=HANDLE_LENGTH).  Centre on the axial midspan.
-FRONT_BBOX_CX = HANDLE_LENGTH / 2.0
+# The section lays the handle axis horizontal, tenon at the left and butt at
+# the right (the part's +X to the right, as MHA-153's section showed), centred
+# on the oak's extent.  The end view stands on the same axis height.
+FRONT_BBOX_CX = (TENON_X0 + OAK_END_X) / 2.0
 FRONT_CENTER = (0.150, 0.178)
-RIGHT_CENTER = (0.285, 0.205)
-ISO_CENTER = (0.350, 0.150)
+RIGHT_CENTER = (0.300, FRONT_CENTER[1])
+ISO_CENTER = (0.365, 0.240)
+CAPTION_XY = (0.215, 0.114)
 
-COLLAR_R = COLLAR_DIA / 2.0
+TENON_R = TENON_DIA / 2.0
+END_R = HANDLE_MAX_DIA * SHEET_SCALE[0] / 2000.0
 
 
 def _front_x(model_x_mm: float) -> float:
@@ -87,24 +98,25 @@ def _front_y(model_y_mm: float) -> float:
     return FRONT_CENTER[1] + model_y_mm * SHEET_SCALE[0] / 1000.0
 
 
-COLLAR_R_SHEET = COLLAR_R * SHEET_SCALE[0] / 1000.0
-
 FRONT_KEEP = {
-    "HandleLength": (0.150, 0.128),
-    "CollarLength": (0.070, 0.222),
+    # The oak overall from the tenon end face, the one faced end.
+    "OverallLength": (0.150, 0.128),
+    "TenonLength": (_front_x((TENON_X0 + SHOULDER_X) / 2.0), 0.212),
+    "TenonDia": (0.068, 0.178),
     "PeakStation": (0.150, 0.242),
+    "CounterboreDepth": (0.202, 0.222),
+    "CounterboreDia": (0.232, 0.178),
 }
 RIGHT_KEEP = {
-    "PivotBoreDia": (0.360, 0.220),
+    "PivotBoreDia": (0.362, 0.165),
 }
-# The HandleLength band moved onto the model dimension in build_crank_handle
-# (crank_handle_spec.HANDLE_LENGTH_BAND). The pivot-bore tolerance now also
-# renders from its model dimension; the callout retains only process intent.
+# Every band renders from its model dimension; the callout retains only
+# process intent.
 DIMENSION_CALLOUTS = {
     "PivotBoreDia": "THRU - REAM",
 }
-
-
+CUT_START = (RIGHT_CENTER[0], RIGHT_CENTER[1] - END_R - 0.006)
+CUT_END = (RIGHT_CENTER[0], RIGHT_CENTER[1] + END_R + 0.006)
 async def build(adapter: Any) -> dict[str, str]:
     if not SOURCE.is_file():
         raise FileNotFoundError(f"source part is missing: {SOURCE}")
@@ -141,109 +153,65 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Crank Handle Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "crank handle; turned oak pear grip; integral collar profile",
+            3: "crank handle; turned oak pear grip; ferrule tenon and cup counterbore",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
-    front = place_view(adapter, str(SOURCE), "*Front", *FRONT_CENTER, scale=(2, 1))
     right = place_view(adapter, str(SOURCE), "*Right", *RIGHT_CENTER, scale=(2, 1))
+    front = create_section_view(
+        adapter,
+        right,
+        line_start=CUT_START,
+        line_end=CUT_END,
+        view_xy=FRONT_CENTER,
+        section_label="A",
+        scale=(2, 1),
+        label="crank handle longitudinal section",
+    )
+    position_section_caption(adapter, front, CAPTION_XY, label="crank handle")
     iso = place_view(adapter, str(SOURCE), "*Isometric", *ISO_CENTER, scale=(1, 1))
-    set_hidden_lines_removed(adapter, iso)
-    for view in (front, right):
-        set_hidden_lines_visible(adapter, view)
+    for view in (front, right, iso):
+        set_hidden_lines_removed(adapter, view)
     front.SetDisplayTangentEdges2(0)
     if int(front.GetDisplayTangentEdges2()) != 0:
         raise RuntimeError("failed to hide crank-handle tangent edges")
     front.UpdateViewDisplayGeometry()
 
     front_annotations = curate_view_dimensions(
-        adapter, front, keep=FRONT_KEEP, view_label="front"
-    )
-    right_annotations = curate_view_dimensions(
-        adapter, right, keep=RIGHT_KEEP, view_label="right"
-    )
-    set_dimension_callouts(
-        adapter, [*front_annotations, *right_annotations], DIMENSION_CALLOUTS
-    )
-    front_by_name = {dimension_name(adapter, a): a for a in front_annotations}
-    for station in ("CollarLength", "PeakStation"):
-        annotation = front_by_name[station]
-        display = adapter._attempt(lambda a=annotation: a.GetSpecificAnnotation())
-        if display is None:
-            raise RuntimeError(f"{station} has no display dimension to box")
-        set_basic_dimension(adapter, display, label=f"{station} profile station")
-    add_view_centerline(
         adapter,
         front,
-        face_xy=(_front_x(35.0), _front_y(0.0)),
-        label="crank handle turning axis",
+        keep=FRONT_KEEP,
+        view_label="longitudinal section",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    right_annotations = curate_view_dimensions(
+        adapter,
+        right,
+        keep=RIGHT_KEEP,
+        view_label="right",
+        dimensions_by_feature=DRAWING_DIMENSIONS,
+    )
+    imported = [*front_annotations, *right_annotations]
+    set_dimension_callouts(adapter, imported, DIMENSION_CALLOUTS)
+    assert_imported_precision(adapter, imported, DRAWING_PRECISION_BY_NAME)
+    front_by_name = {dimension_name(adapter, a): a for a in front_annotations}
+    # The tenon and the counterbore are fitted to the ferrule and cup (the
+    # to-suit note), so their sizes print as references.
+    for name in sorted(REFERENCE_DIMENSIONS):
+        set_reference_dimension(
+            adapter,
+            front_by_name[name],
+            label=f"MHA-022 {name}",
+            diameter=name.endswith("Dia"),
+        )
+    create_section_axis_centerline(
+        adapter, front, length_mm=OAK_END_X - TENON_X0, label="crank handle axis"
     )
     if not auto_center_marks(adapter, right, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center mark to crank-handle end view")
 
-    collar_od_top = (RIGHT_CENTER[0], RIGHT_CENTER[1] + COLLAR_R_SHEET)
-    bore_top = (
-        RIGHT_CENTER[0],
-        RIGHT_CENTER[1] + PIVOT_BORE_DIA * SHEET_SCALE[0] / 2000.0,
-    )
-    collar_face = (_front_x(0.0), _front_y(COLLAR_R * 0.55))
-    profile_peak = (
-        _front_x(PEAK_X),
-        _front_y(HANDLE_MAX_DIA / 2.0),
-    )
-    add_datum_feature(
-        adapter,
-        right,
-        edge_xy=collar_od_top,
-        symbol_xy=(RIGHT_CENTER[0], 0.245),
-        datum="A",
-        label="collar OD datum axis",
-    )
-    add_datum_feature(
-        adapter,
-        front,
-        edge_xy=collar_face,
-        symbol_xy=(0.040, 0.198),
-        datum="B",
-        label="flat collar face",
-    )
-    add_feature_control_frame(
-        adapter,
-        front,
-        edge_xy=collar_face,
-        frame_xy=(0.020, 0.155),
-        characteristic="perpendicularity",
-        tolerance=GEOMETRIC_TOLERANCES_MM["flat collar end perpendicularity"],
-        datums=("A",),
-        quantity="DATUM B FACE",
-        label="flat collar end perpendicularity",
-    )
-    add_feature_control_frame(
-        adapter,
-        right,
-        edge_xy=bore_top,
-        frame_xy=(0.350, 0.263),
-        characteristic="total_runout",
-        tolerance=GEOMETRIC_TOLERANCES_MM["full-length bore total runout"],
-        datums=("A",),
-        quantity="FULL BORE LENGTH",
-        label="full-length bore total runout",
-    )
-    add_feature_control_frame(
-        adapter,
-        front,
-        edge_xy=profile_peak,
-        frame_xy=(0.180, 0.263),
-        characteristic="profile_surface",
-        tolerance=GEOMETRIC_TOLERANCES_MM["turned handle profile"],
-        datums=("A", "B"),
-        quantity="TURNED GRIP PROFILE - SEE NOTE",
-        label="turned handle profile",
-        entity_type="SILHOUETTE",
-    )
-
-    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.080)
-    add_property_linked_note(adapter, "Isometric View Note", 0.325, 0.116)
+    add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.086)
+    add_property_linked_note(adapter, "Isometric View Note", 0.330, 0.205)
 
     return await finalize_drawing(
         adapter,

@@ -14,4 +14,4 @@ from crank_hub_notes import seam_callout, seat_bore_callout
 HUB_SEAT_CALLOUT = seat_bore_callout("MHA-137 HUB")
 # The MHA-138 seam is match-drilled with the hub at assembly; its callout sits
 # on the seam itself (policy rule 6) with the pin's nominal size and depth.
-SEAM_CALLOUT = seam_callout("MHA-137")
+SEAM_CALLOUT = seam_callout("MHA-137", pin="MHA-138 AXIAL PIN")

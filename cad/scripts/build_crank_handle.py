@@ -2,28 +2,23 @@ r"""Reproduction script: crank handle (book ch. 11, pp. 12-15).
 
 The pear-shaped wooden handle (stained black) that rotates on the crank-arm
 pivot -- the book calls it "a smooth piece of wood ... well-suited for a firm
-grip" (p.12). The current source part is one oak body: the collar-shaped
-cylindrical section at the crank end is integral with the revolve profile.
-Do not claim a separate brass collar on its manufacturing drawing unless the
-source model is split and assigned accordingly.
+grip" (p.12).  User ruling 2026-09-29 (the ch11 p.14/p.15 photographs): the
+bright ring at the crank end is a separate brass ferrule MHA-152 and the
+bright disc at the butt a steel cup MHA-153, so this oak body ends in a turned
+tenon (the ferrule's seat) and a counterbore (the cup's seat).
 
-The silhouette is now genuinely SMOOTH (the earlier revision approximated it
-with straight, axially-faceted segments). Two internally-tangent circular
-arcs span the wood body: a long, gentle front arc swells from the neck to the
-maximum diameter, and a tighter rear arc rounds off into the blunt domed butt
-(truncated by a small flat where the end-cap/screw seats -- see the p.15
-photo). The arcs share a horizontal tangent at the swell, so the wood reads as
-one continuous curve; the only edges are the deliberate ones in the photo (the
-brass-collar shoulder and the butt cap rim). Circumferentially smooth after
-the revolve, as before.
+User rulings 2026-09-30 (ch30 eight-views-4 side view, approved CadQuery
+concept v4): five tangent arcs span the wood -- a concave flare from the
+ferrule's OD down to a slim waist, an S-curve (concave then convex) up to the
+Ø21 swell, a dome, and an end round that runs out on the counterbore mouth,
+turned across the bonded cup at assembly.  Circumferentially smooth after the
+revolve.
 
-Dimensions: crank_handle_spec (2026-09-02 user re-read of ch11 p.14 + the
-ch30 p002 front view) -- 58 long from the collar face x Ø21 max at the swell,
-a longer/slimmer grip than the 44 mm egg of the first photo re-derive;
-photo-scaled (low).
-
-Layout: handle axis along +X from the origin (collar face at x=0), profile
-revolved 360 deg about a centerline on the axis.
+Layout: handle axis along +X; x=0 is the ferrule's arm face (the handle's
+seat on the arm), so the oak starts at the tenon end, short of it.  One
+revolve carries the tenon, the grip and the counterbore.  Every arc centre is
+anchored, each tangency fixes the next radius, and the oak's overall from the
+tenon end fixes where the end round meets the counterbore.
 
 Run (SolidWorks already open)::
 
@@ -32,23 +27,24 @@ Run (SolidWorks already open)::
 
 from __future__ import annotations
 
+import math
 import sys
 
-import _telemetry
 from _common import (
-    _early_bound,
+    PANEL_BLACK,
     SketchDims,
     add_line_chain,
     anchor_point_to_origin,
-    apply_material,
-    name_bore_axis,
+    anchor_point_to_point,
     apply_color,
-    PANEL_BLACK,
+    apply_material,
     check,
     define_circle,
+    dimension_between,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
+    name_bore_axis,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -58,6 +54,8 @@ from _common import (
     volume_check,
 )
 from _drawing_marks import (
+    add_diametric_linear_dimension,
+    apply_drawing_precision,
     apply_drawing_properties,
     clear_dimensions_for_drawing,
     mark_dimensions_for_drawing,
@@ -72,25 +70,63 @@ MATERIAL = "Oak"  # see _common.apply_material docstring
 # Primitive nominals come from the drawing spec (single source of truth shared
 # with the manufacturing print).
 from crank_handle_spec import (  # noqa: E402
-    CAP_R,
-    COLLAR_DIA,
-    COLLAR_LENGTH,
+    COUNTERBORE_DEPTH,
+    COUNTERBORE_DIA,
+    COUNTERBORE_FLOOR_X,
+    COUNTERBORE_R,
+    DOME_CENTER,
+    DOME_END,
     DRAWING_DIMENSIONS,
     DRAWING_NOTES,
-    FRONT_PROFILE_R,
-    HANDLE_LENGTH,
-    HANDLE_LENGTH_BAND,
-    HANDLE_MAX_DIA,
+    DRAWING_PRECISION,
+    END_ROUND_CENTER,
+    FERRULE_LENGTH,
+    FLARE_CENTER,
+    INFLECTION,
     ISOMETRIC_VIEW_NOTE,
-    NECK_R,
+    OAK_END_X,
+    PEAK_R,
     PEAK_X,
     PIVOT_BORE_BAND,
     PIVOT_BORE_DIA,
-    REAR_PROFILE_R,
+    S_CONCAVE_CENTER,
+    S_CONVEX_CENTER,
+    SHOULDER_R,
+    SHOULDER_X,
+    TENON_DIA,
+    TENON_LENGTH,
+    TENON_R,
+    TENON_X0,
+    WAIST_R,
+    WAIST_X,
+    WOOD_LENGTH,
+    profile_radius,
 )
 
-COLLAR_R = COLLAR_DIA / 2.0
-PEAK_R = HANDLE_MAX_DIA / 2.0
+# The peak-station witness stands inside the swell, clear of the profile.
+_WITNESS_Y0, _WITNESS_Y1 = 2.5, 3.5
+
+
+def _nominal_volume() -> float:
+    """Revolved volume of the nominal profile, less the bore: the check that
+    every arc was swept on the side the spec means (Simpson's rule)."""
+
+    def solid(x0: float, x1: float, radius) -> float:
+        n = 2000
+        h = (x1 - x0) / n
+        total = radius(x0) ** 2 + radius(x1) ** 2
+        for i in range(1, n):
+            total += (4 if i % 2 else 2) * radius(x0 + i * h) ** 2
+        return math.pi * total * h / 3.0
+
+    grip = solid(SHOULDER_X, OAK_END_X, profile_radius)
+    tenon = math.pi * TENON_R**2 * TENON_LENGTH
+    counterbore = math.pi * COUNTERBORE_R**2 * COUNTERBORE_DEPTH
+    bore = math.pi * (PIVOT_BORE_DIA / 2.0) ** 2 * (COUNTERBORE_FLOOR_X - TENON_X0)
+    return grip + tenon - counterbore - bore
+
+
+V_HANDLE = _nominal_volume()
 
 _SAVED_DRAWING_PROPERTIES = (
     "Number",
@@ -101,224 +137,208 @@ _SAVED_DRAWING_PROPERTIES = (
     "Isometric View Note",
 )
 
-# Smooth pear silhouette = two circular arcs that meet at the swell (PEAK_X,
-# PEAK_R) with a common horizontal tangent (both centres sit directly below
-# the swell on x = PEAK_X), so the join is curvature-side-consistent and the
-# wood is tangent-continuous from neck to butt.
-#   front arc: through the neck (COLLAR_LENGTH, NECK_R) and the swell.
-#   rear arc : through the swell and the butt cap rim (HANDLE_LENGTH, CAP_R).
-# For a chord that rises dh over run dx to a horizontal-tangent apex, the
-# radius is R = (dx^2 + dh^2) / (2 dh) and the centre is PEAK_R - R below.
-_dx_f, _dh_f = PEAK_X - COLLAR_LENGTH, PEAK_R - NECK_R
-FRONT_R = FRONT_PROFILE_R
-FRONT_CY = PEAK_R - FRONT_R
-_dx_r, _dh_r = HANDLE_LENGTH - PEAK_X, PEAK_R - CAP_R
-REAR_R = REAR_PROFILE_R
-REAR_CY = PEAK_R - REAR_R
-# Both circles pass through the swell apex (their common top point) and share
-# x = PEAK_X centres -> they are internally tangent there (|ΔCY| == ΔR):
-assert abs(abs(FRONT_CY - REAR_CY) - abs(FRONT_R - REAR_R)) < 1e-6
-
-
-def _com_get(obj, name: str):
-    """Read a zero-argument COM member that pywin32's late-bound dispatch may
-    expose either as a method (``GetBox()``) or as a property value (the
-    ``'tuple' object is not callable`` trap seen on IFace2.GetBox)."""
-    value = getattr(obj, name)
-    return value() if callable(value) else value
-
-
-COLLAR_BRASS = (0.72, 0.56, 0.24)  # ch11 pp.20-21: the bright brass collar
-
-
-async def _paint_collar_brass(adapter) -> None:
-    """Face-level brass on the collar over the ebonized body: the collar's
-    cylinder (non-planar, O COLLAR_DIA across Y/Z, COLLAR_LENGTH along the +X
-    turning axis) and its outer end face (planar, O COLLAR_DIA). The pear
-    grip's swell is far wider, the neck narrower, so the bounding box picks
-    the collar alone. Fails loud if nothing matches."""
-    from solidworks_mcp.adapters.com_variant import double_array
-
-    brass = double_array([*COLLAR_BRASS, 1.0, 1.0, 0.3, 0.31, 0.0, 0.0])
-    part_h = _early_bound(adapter.currentModel, "IPartDoc")
-    n = 0
-    for body in part_h.GetBodies2(0, True) or []:
-        for face in _com_get(body, "GetFaces") or []:
-            box = _com_get(face, "GetBox")
-            if not box:
-                continue
-            ys = (float(box[4]) - float(box[1])) * 1000.0
-            zs = (float(box[5]) - float(box[2])) * 1000.0
-            xmax = float(box[3]) * 1000.0
-            if abs(ys - COLLAR_DIA) < 0.3 and abs(zs - COLLAR_DIA) < 0.3 and xmax <= COLLAR_LENGTH + 0.3:
-                face.MaterialPropertyValues = brass
-                n += 1
-    if n < 1:
-        raise RuntimeError("crank-handle collar faces not found for the brass finish")
-    _telemetry.info(f"crank-handle collar: {n} faces brass")
-
 
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
 
     check("create_part", await adapter.create_part())
 
-    # Editable knobs (Tools > Equations): the handle silhouette's design
-    # constants as named globals driving the dimensions below. The mm suffix is
-    # load-bearing -- this is an INCH document and the equation manager reads BARE
-    # numbers in document units, so an unsuffixed 90 would be read as 90 inches
-    # and blow the part up 25.4x. The two arc radii/centres are a non-trivial
-    # closed form of these knobs (R = (dx^2 + dh^2) / 2dh); only the clean knobs
-    # (length, collar, peak station) drive dims -- the derived arc-centre depths
-    # stay auto-named/static (no single-global expression, see drives below).
-    await set_global(adapter, "HandleLength", f"{HANDLE_LENGTH}mm")
-    await set_global(adapter, "HandleMaxDia", f"{HANDLE_MAX_DIA}mm")
-    await set_global(adapter, "CollarLength", f"{COLLAR_LENGTH}mm")
-    await set_global(adapter, "CollarDia", f"{COLLAR_DIA}mm")
-    await set_global(adapter, "NeckR", f"{NECK_R}mm")
-    await set_global(adapter, "PeakX", f"{PEAK_X}mm")
-    await set_global(adapter, "CapR", f"{CAP_R}mm")
-    await set_global(adapter, "PivotBoreDia", f"{PIVOT_BORE_DIA}mm")
+    # Editable knobs (Tools > Equations). The mm suffix is load-bearing -- this
+    # is an INCH document and the equation manager reads BARE numbers in
+    # document units.  The arc centres are closed forms of several knobs, so
+    # their coordinates stay static.
+    for name, value in (
+        ("FerruleLength", FERRULE_LENGTH),
+        ("TenonLength", TENON_LENGTH),
+        ("TenonDia", TENON_DIA),
+        ("ShoulderR", SHOULDER_R),
+        ("PeakX", PEAK_X),
+        ("WoodLength", WOOD_LENGTH),
+        ("CounterboreDia", COUNTERBORE_DIA),
+        ("CounterboreDepth", COUNTERBORE_DEPTH),
+        ("PivotBoreDia", PIVOT_BORE_DIA),
+    ):
+        await set_global(adapter, name, f"{value}mm")
 
-    # Per-sketch SketchDims records each dim in emission order; apply() renames
-    # them and collects the drive jobs run in one deferred batch at the end (every
-    # equation target must resolve against the finished model).
     drive_jobs: list[tuple[str, str]] = []
+
+    shoulder_pt = (SHOULDER_X, SHOULDER_R)
+    waist_pt = (WAIST_X, WAIST_R)
+    peak_pt = (PEAK_X, PEAK_R)
+    oak_end_pt = (OAK_END_X, COUNTERBORE_R)
+    crest_pt = (OAK_END_X, END_ROUND_CENTER[1])
 
     profile = SketchDims()
     check("create_sketch profile", await adapter.create_sketch("Front"))
-    # Direct-to-DB: inferencing would snap the shallow front arc / collar
-    # shoulder to auto relations (see crank pin lesson).
+    # Direct-to-DB: inferencing would snap the shallow arcs to auto relations.
     set_sketch_direct_db(adapter, True)
     centerline = check(
         "add_centerline axis",
-        await adapter.add_centerline(0.0, 0.0, HANDLE_LENGTH, 0.0),
+        await adapter.add_centerline(TENON_X0, 0.0, COUNTERBORE_FLOOR_X, 0.0),
     )
-    # Brass collar as three lines: face -> outer cylinder -> shoulder step.
-    collar = await add_line_chain(
+    # Tenon: end face -> OD -> shoulder step up to the ferrule's OD.
+    tenon_end, tenon_top, shoulder = await add_line_chain(
+        adapter,
+        [(TENON_X0, 0.0), (TENON_X0, TENON_R), (SHOULDER_X, TENON_R), shoulder_pt],
+        close=False,
+    )
+    # add_arc sweeps CCW from start to end; each is ordered so the sweep is the
+    # minor arc on the silhouette side.  Concave arcs (centre above) run left
+    # to right under their centre; convex ones (centre below) right to left.
+    flare = check(
+        "flare arc", await adapter.add_arc(*FLARE_CENTER, *shoulder_pt, *waist_pt)
+    )
+    s_concave = check(
+        "S-curve concave arc",
+        await adapter.add_arc(*S_CONCAVE_CENTER, *waist_pt, *INFLECTION),
+    )
+    s_convex = check(
+        "S-curve convex arc",
+        await adapter.add_arc(*S_CONVEX_CENTER, *peak_pt, *INFLECTION),
+    )
+    dome = check("dome arc", await adapter.add_arc(*DOME_CENTER, *DOME_END, *peak_pt))
+    end_round = check(
+        "end round arc", await adapter.add_arc(*END_ROUND_CENTER, *crest_pt, *DOME_END)
+    )
+    # Crest -> flat oak end face -> counterbore wall -> counterbore floor ->
+    # axis closure.
+    oak_end_face, counterbore_wall, counterbore_floor, _closure = await add_line_chain(
         adapter,
         [
-            (0.0, 0.0),
-            (0.0, COLLAR_R),
-            (COLLAR_LENGTH, COLLAR_R),
-            (COLLAR_LENGTH, NECK_R),
+            crest_pt,
+            oak_end_pt,
+            (COUNTERBORE_FLOOR_X, COUNTERBORE_R),
+            (COUNTERBORE_FLOOR_X, 0.0),
+            (TENON_X0, 0.0),
         ],
         close=False,
     )
-    collar_face, collar_top, collar_step = collar
-    # add_arc draws CCW from start to end; order each so the CCW sweep is the
-    # minor (silhouette) arc over the top of its big circle.
-    front_arc = check(
-        "front swell arc",
-        await adapter.add_arc(
-            PEAK_X, FRONT_CY, PEAK_X, PEAK_R, COLLAR_LENGTH, NECK_R
-        ),
-    )
-    rear_arc = check(
-        "rear butt arc",
-        await adapter.add_arc(
-            PEAK_X, REAR_CY, HANDLE_LENGTH, CAP_R, PEAK_X, PEAK_R
-        ),
-    )
-    # Construction-only witness line inside the visible swell.  Keep both ends
-    # clear of the profile and axis: a line that touches the already-constrained
-    # arc join or axis inherits coincident relations and makes its peak-station
-    # dimension redundant/over-defining in SolidWorks.
+    # Construction-only witness line inside the swell, clear of the profile
+    # and the axis so it inherits no relations.
     peak_station = check(
         "peak station construction line",
-        await adapter.add_centerline(PEAK_X, 2.0, PEAK_X, 3.0),
-    )
-    cap_face = check(
-        "butt cap face",
-        await adapter.add_line(HANDLE_LENGTH, CAP_R, HANDLE_LENGTH, 0.0),
-    )
-    check(
-        "axis closure",
-        await adapter.add_line(HANDLE_LENGTH, 0.0, 0.0, 0.0),
+        await adapter.add_centerline(PEAK_X, _WITNESS_Y0, PEAK_X, _WITNESS_Y1),
     )
     set_sketch_direct_db(adapter, False)
 
-    # The profile centerline merged into the (0, 0) / (HANDLE_LENGTH,
-    # 0) chain ends, so horizontal + a length dim on it pin the axis (as in
-    # crank-pin). The collar face/top/step get h/v + linear dims; each arc
-    # centre is anchored (radius then derives from a pinned point -- the neck
-    # for the front arc, the tangency for the rear), and a single tangent
-    # relation locks the swell join and sizes the rear arc. Dimensioning a
-    # radius on top of that would over-define, so neither arc carries one.
-    check(
-        "anchor collar face",
-        await adapter.add_sketch_constraint(
-            f"{collar_face}.start", "origin", "coincident"
-        ),
-    )
     check(
         "axis horizontal",
         await adapter.add_sketch_constraint(centerline, None, "horizontal"),
     )
-    # Record each manual dim into SketchDims as it is created (creation order).
-    check(
-        "handle length",
-        await adapter.add_sketch_dimension(centerline, None, "linear", HANDLE_LENGTH),
-    )
-    profile.record("HandleLength", '"HandleLength"')
-    # collar face -> CollarR (= CollarDia/2); collar top -> CollarLength;
-    # collar step -> CollarR - NeckR (shoulder, derived); cap face has no dim.
-    for label, ent, relation, value, name, drive in (
-        ("collar face", collar_face, "vertical", COLLAR_R,
-         "CollarR", '"CollarDia" / 2'),
-        ("collar top", collar_top, "horizontal", COLLAR_LENGTH,
-         "CollarLength", '"CollarLength"'),
-        ("collar step", collar_step, "vertical", COLLAR_R - NECK_R,
-         "CollarStep", '"CollarDia" / 2 - "NeckR"'),
-        ("cap face", cap_face, "vertical", None, None, None),
+    for label, entity, relation in (
+        ("tenon end", tenon_end, "vertical"),
+        ("tenon OD", tenon_top, "horizontal"),
+        ("tenon shoulder", shoulder, "vertical"),
+        ("oak end face", oak_end_face, "vertical"),
+        ("counterbore wall", counterbore_wall, "horizontal"),
+        ("counterbore floor", counterbore_floor, "vertical"),
+        ("peak station", peak_station, "vertical"),
     ):
         check(
             f"{label} {relation}",
-            await adapter.add_sketch_constraint(ent, None, relation),
+            await adapter.add_sketch_constraint(entity, None, relation),
         )
-        if value is not None:
-            check(
-                f"{label} dim",
-                await adapter.add_sketch_dimension(ent, None, "linear", value),
-            )
-            profile.record(name, drive)
-    check(
-        "peak station vertical",
-        await adapter.add_sketch_constraint(peak_station, None, "vertical"),
-    )
+    # Dimensions in creation order; SketchDims renames them by that order.
     await anchor_point_to_origin(
-        adapter, f"{peak_station}.start", PEAK_X, 2.0, "peak station"
+        adapter, f"{tenon_end}.start", TENON_X0, 0.0, "tenon end on the axis"
     )
-    profile.record("PeakStation", '"PeakX"')
+    profile.record("TenonStart", '"FerruleLength" - "TenonLength"')
+    check(
+        "tenon length",
+        await adapter.add_sketch_dimension(tenon_top, None, "linear", TENON_LENGTH),
+    )
+    profile.record("TenonLength", '"TenonLength"')
+    await add_diametric_linear_dimension(
+        adapter,
+        centerline,
+        tenon_top,
+        ((TENON_X0 + SHOULDER_X) / 2.0, TENON_R + 4.0),
+        "TenonDia",
+    )
+    profile.record("TenonDia", '"TenonDia"')
+    check(
+        "shoulder step",
+        await adapter.add_sketch_dimension(shoulder, None, "linear", SHOULDER_R - TENON_R),
+    )
+    profile.record("ShoulderStep", '"ShoulderR" - "TenonDia" / 2')
+    # The oak overall, tenon end face to the oak's end at the counterbore
+    # mouth: every axial station reads from the tenon end, the one faced end.
+    await dimension_between(
+        adapter,
+        f"{tenon_end}.end",
+        f"{counterbore_wall}.start",
+        "horizontal_distance",
+        OAK_END_X - TENON_X0,
+        "oak overall from the tenon end",
+    )
+    profile.record("OverallLength", '"TenonLength" + "WoodLength"')
+    check(
+        "counterbore depth",
+        await adapter.add_sketch_dimension(
+            counterbore_wall, None, "linear", COUNTERBORE_DEPTH
+        ),
+    )
+    profile.record("CounterboreDepth", '"CounterboreDepth"')
+    await add_diametric_linear_dimension(
+        adapter,
+        centerline,
+        counterbore_wall,
+        (COUNTERBORE_FLOOR_X + COUNTERBORE_DEPTH / 2.0, COUNTERBORE_R + 4.0),
+        "CounterboreDia",
+    )
+    profile.record("CounterboreDia", '"CounterboreDia"')
+    # The peak station prints from the tenon end face too.
+    await anchor_point_to_point(
+        adapter,
+        f"{tenon_end}.end",
+        f"{peak_station}.start",
+        PEAK_X - TENON_X0,
+        _WITNESS_Y0 - TENON_R,
+        "peak station from the tenon end",
+    )
+    profile.record("PeakStation", '"PeakX" - "FerruleLength" + "TenonLength"')
     profile.record(None, None)
     check(
         "peak witness construction length",
         await adapter.add_sketch_dimension(
-            peak_station, None, "linear", 1.0
+            peak_station, None, "linear", _WITNESS_Y1 - _WITNESS_Y0
         ),
     )
     profile.record(None, None)
-    # Each arc centre is off-axis (PEAK_X != 0, *_CY < 0): anchor_point_to_origin
-    # emits a horizontal then a vertical distance dim. The horizontal span is
-    # PEAK_X (clean knob -> "PeakX"); the vertical span is the arc-centre depth
-    # |*_CY|, a non-trivial closed form of several knobs with no single-global
-    # expression, so it stays auto-named/static (None). The depth is a NEGATIVE
-    # coordinate displayed as its magnitude -- recorded with no drive, so the
-    # unsigned-distance trap (a negative drive failing at equation-add) can't bite.
-    await anchor_point_to_origin(
-        adapter, f"{front_arc}.center", PEAK_X, FRONT_CY, "front arc centre"
+    # Arc centres: each anchored by a horizontal and a vertical distance from
+    # the origin.  The two swell centres sit on the peak station ("PeakX"); the
+    # rest are closed forms of several knobs and stay static.  The end round's
+    # centre is anchored in height only: its tangency to the dome and the oak's
+    # end point fix the rest.
+    for arc, center, label, x_drive in (
+        (flare, FLARE_CENTER, "flare centre", None),
+        (s_concave, S_CONCAVE_CENTER, "S concave centre", None),
+        (s_convex, S_CONVEX_CENTER, "S convex centre", '"PeakX"'),
+        (dome, DOME_CENTER, "dome centre", '"PeakX"'),
+    ):
+        await anchor_point_to_origin(adapter, f"{arc}.center", *center, label)
+        profile.record(None if x_drive is None else f"{label.title().replace(' ', '')}X", x_drive)
+        profile.record(None, None)
+    await dimension_between(
+        adapter,
+        f"{tenon_end}.start",
+        f"{end_round}.center",
+        "vertical_distance",
+        END_ROUND_CENTER[1],
+        "end round centre height",
     )
-    profile.record("FrontArcCx", '"PeakX"')
     profile.record(None, None)
-    await anchor_point_to_origin(
-        adapter, f"{rear_arc}.center", PEAK_X, REAR_CY, "rear arc centre"
-    )
-    profile.record("RearArcCx", '"PeakX"')
-    profile.record(None, None)
-    check(
-        "swell tangent",
-        await adapter.add_sketch_constraint(front_arc, rear_arc, "tangent"),
-    )
+    for first, second, label in (
+        (flare, s_concave, "waist"),
+        (s_concave, s_convex, "inflection"),
+        (s_convex, dome, "swell"),
+        (dome, end_round, "end round"),
+        (end_round, oak_end_face, "end round crest"),
+    ):
+        check(
+            f"{label} tangent",
+            await adapter.add_sketch_constraint(first, second, "tangent"),
+        )
     await ensure_fully_defined(adapter, "handle profile")
     check("exit_sketch profile", await adapter.exit_sketch())
     name_last_feature(adapter, "HandleProfile")
@@ -352,36 +372,30 @@ async def build(adapter) -> dict[str, str]:
     check(
         "cut pivot bore",
         await adapter.create_cut_extrude(
-            ExtrusionParameters(depth=2.5 * HANDLE_LENGTH, both_directions=True)
+            ExtrusionParameters(depth=2.5 * OAK_END_X, both_directions=True)
         ),
     )
     name_last_feature(adapter, "PivotBore")
+    await volume_check(adapter, "crank handle", V_HANDLE, 0.002 * V_HANDLE)
 
-    # Capture the as-built volume as the neutrality reference (the bored,
-    # revolved twin-arc silhouette has no tidy closed form), then apply the deferred drive
-    # equations after the model + a rebuild exists so every target resolves. Each
-    # equation evaluates to the value just built, so the geometry must not move.
-    mass = await adapter.get_mass_properties()
-    v_handle = float(mass.data.volume)
+    # Deferred drive equations after the model + a rebuild exist, so every
+    # target resolves.  Each equation evaluates to the value just built, so
+    # the geometry must not move.
     await force_rebuild(adapter)
     for dim_name, expr in drive_jobs:
         await drive_dimension(adapter, dim_name, expr)
     await force_rebuild(adapter)
     await volume_check(
-        adapter, "driven crank handle (equations neutral)", v_handle, 0.001 * v_handle
+        adapter, "driven crank handle (equations neutral)", V_HANDLE, 0.002 * V_HANDLE
     )
 
     # Named bore/central axis for view-independent assembly mate
     # selection (M6 mated-DOF drive train).
     await name_bore_axis(adapter, "Front Plane", 0.0, "Top Plane", 0.0, "handle axis")
 
-    # Manufacturing drawing support: mark exactly the print's axial dimensions
-    # and stamp the make-critical title-block properties.
-    # Wood-overall band on the MODEL dimension; the sheet used to append
-    # "+0.00/-0.25 OVERALL" as frozen callout text beside a live numeral.
-    set_dimension_bilateral_tolerance(
-        adapter, "HandleProfile", "HandleLength", *deviations(HANDLE_LENGTH_BAND)
-    )
+    # Manufacturing drawing support: the model owns the one printed band
+    # (policy rule 2), the reamed bore, and the places every mark prints with.
+    # The tenon and the counterbore are fitted to the parts they take.
     set_dimension_bilateral_tolerance(
         adapter,
         "PivotBoreProfile",
@@ -391,12 +405,12 @@ async def build(adapter) -> dict[str, str]:
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
 
     await apply_material(adapter, MATERIAL)
     # ch11 pp.20-21 + ch30 plates: the pear grip is EBONIZED (painted/stained
-    # black, satin), not a brown oak tone -- only the collar reads brass.
+    # black, satin); the bright ferrule and cup are their own parts.
     await apply_color(adapter, PANEL_BLACK)
-    await _paint_collar_brass(adapter)
     await report_mass_properties(adapter)
     apply_drawing_properties(
         adapter,

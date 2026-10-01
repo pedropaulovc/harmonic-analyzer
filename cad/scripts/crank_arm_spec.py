@@ -29,7 +29,7 @@ import math
 
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec
 from _surface_finish import SurfaceFinishControl
-from crank_handle_pivot_screw_spec import FULL_THREAD_WORST_DIAMETERS_PRINTED
+from crank_handle_pivot_screw_spec import TAPPED_MOUTH_DIA_MAX as _PIVOT_TAPPED_MOUTH_DIA_MAX
 from crank_handle_pivot_screw_spec import THREAD_SIZE as PIVOT_SCREW_THREAD_SIZE
 from crank_hub_geometry import (
     ARM_FIDUCIAL_RADIUS,
@@ -170,24 +170,20 @@ DRAWING_REFERENCE_PRECISION: dict[str, int] = {"overall length reference": 1}
 # Policy rule 6: at most four short lines, each under ~75 characters so the
 # block stays left of the title block.  The section line is a requirement,
 # not a convenience: the U29 cheek around the hub seat reaches 2 mm only at
-# the mill's width tolerance, not at the .X band.  The third line states the
-# MHA-139 named exception on the sheet that is tapped for it (user ruling
-# 2026-09-25, MHA-020 review B2), with the worst case the screw spec derives
-# from the stock thickness -- the same line and number MHA-139 prints.
+# the mill's width tolerance, not at the .X band.  The #4-40 handle pivot
+# (user ruling 2026-09-30) clears the 1.5D engagement rule, so the sheet no
+# longer states the #8-32's named exception.  Its tapped mouth on the handle
+# face is held to an inspectable maximum, so the MHA-139 shoulder keeps a seat
+# around it.
 STOCK_NOTE = (
     f"{ARM_WIDTH:.1f} x {ARM_THICKNESS:.1f} SECTION: "
     f"{ARM_WIDTH / MM_PER_IN:g} x {ARM_STOCK_THICKNESS_IN} IN CF FLAT BAR AS SUPPLIED."
-)
-# Named exception: MHA-139 engagement (drawing-simplicity-policy.md, "Named exceptions").
-PIVOT_ENGAGEMENT_NOTE = (
-    f"{HANDLE_PIVOT_HOLE_SPEC.size} THREAD ENGAGEMENT "
-    f"{FULL_THREAD_WORST_DIAMETERS_PRINTED:.2f}D MIN."
 )
 DRAWING_NOTES = "\n".join(
     (
         "PUNCH FIDUCIAL MARK WHERE SHOWN; LOCATE BY EYE.",
         STOCK_NOTE,
-        PIVOT_ENGAGEMENT_NOTE,
+        f"HANDLE PIVOT TAP'S MOUTH <MOD-DIAM>{_PIVOT_TAPPED_MOUTH_DIA_MAX:.1f} MAX ON THE HANDLE FACE.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW SCALE 1:1"

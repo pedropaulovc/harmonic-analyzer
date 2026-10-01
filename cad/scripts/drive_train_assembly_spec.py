@@ -60,6 +60,8 @@ CLUSTERS: dict[Cluster, tuple[str, ...]] = {
         "keeper-chain-link",
         "fillister-screw",
         "crank-handle",
+        "crank-handle-ferrule",
+        "crank-handle-butt-cup",
         "crank-handle-pivot-screw",
         "crank-hub",
         "crank-hub-pin",
@@ -182,6 +184,8 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
             "keeper-chain-link",
             "fillister-screw",
             "crank-handle",
+            "crank-handle-ferrule",
+            "crank-handle-butt-cup",
             "crank-handle-pivot-screw",
             "crank-hub",
             "crank-hub-pin",
@@ -189,10 +193,18 @@ EXPLODE_STEPS: tuple[ExplodeStep, ...] = (
         "z",
         -30.0,
     ),
-    # MHA-139 rides out with the handle, then backs out of its bore: the tip
-    # starts 9.0 past the handle's inboard end and the handle is ~58 long.
+    # MHA-139 rides out with the handle and its bonded ferrule and cup, then
+    # backs out of its bore: the handle is ~58 long.
     ExplodeStep(
-        "crank handle", ("crank-handle", "crank-handle-pivot-screw"), "z", -35.0
+        "crank handle",
+        (
+            "crank-handle",
+            "crank-handle-ferrule",
+            "crank-handle-butt-cup",
+            "crank-handle-pivot-screw",
+        ),
+        "z",
+        -35.0,
     ),
     ExplodeStep("handle screw backs out", ("crank-handle-pivot-screw",), "z", -80.0),
     # The keeper chain stays tied to the pin: pin, ring, chain and links come

@@ -72,28 +72,33 @@ from crank_handle_pivot_screw_spec import (
     DRAWING_NOTES,
     DRAWING_PRECISION,
     HEAD_DIA,
+    HEAD_DIA_TOL,
     HEAD_LENGTH,
+    HEAD_LENGTH_TOL,
     INSTALLED_CONFIG,
     INSTALLED_THREAD_LENGTH,
     INSTALLED_TIP_CHAMFER,
     ISOMETRIC_VIEW_NOTE,
     OVERALL_LENGTH,
     RELIEF_DIA,
+    RELIEF_DIA_TOL,
     RELIEF_END_STATION,
     RELIEF_LEAD,
+    RELIEF_LEAD_TOL,
     RELIEF_WIDTH,
     SEAT_STATION,
     SHOULDER_DIA,
     SHOULDER_DIA_BAND,
     SHOULDER_LENGTH,
-    SHOULDER_LENGTH_TOL,
     SLOT_DEPTH,
+    SLOT_DEPTH_TOL,
     SLOT_WIDTH,
     SURFACE_FINISHES,
     THREAD_LENGTH,
     THREAD_LENGTH_BAND,
     THREAD_MODEL_DIA,
     TIP_CHAMFER,
+    TIP_CHAMFER_BAND,
 )
 
 
@@ -359,6 +364,47 @@ async def build(adapter) -> dict[str, str]:
         "overall length reference",
     )
     stations.record("OverallLength", '"HeadLength" + "ShoulderLength" + "ThreadLength"')
+    # The under-head face located from the TIP, the one faced end every axial
+    # location reads from (MHA-139 re-reviews): the seat is the thread length
+    # from the tip, the under-head face this reference -- the shoulder is
+    # turned to suit the bonded handle -- and the head face the overall.  It
+    # runs at mid-height of the under-head annulus so its head end sits on
+    # that face.
+    under_head_v = -(SHOULDER_R + HEAD_R) / 2.0
+    set_sketch_direct_db(adapter, True)
+    under_head_line = check(
+        "under-head location reference line",
+        await adapter.add_line(-OVERALL_LENGTH, under_head_v, -HEAD_LENGTH, under_head_v),
+    )
+    set_sketch_direct_db(adapter, False)
+    segment = _early_bound(adapter._sketch_entities[under_head_line], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError("under-head location reference line did not take construction flag")
+    check(
+        "under-head location reference horizontal",
+        await adapter.add_sketch_constraint(under_head_line, None, "horizontal"),
+    )
+    await anchor_point_to_origin(
+        adapter,
+        f"{under_head_line}.start",
+        -OVERALL_LENGTH,
+        under_head_v,
+        "under-head location from the tip",
+    )
+    stations.record(
+        "UnderHeadTipX", '"HeadLength" + "ShoulderLength" + "ThreadLength"'
+    )
+    stations.record("UnderHeadY", '( "ShoulderDia" + "HeadDia" ) / 4')
+    await dimension_between(
+        adapter,
+        f"{under_head_line}.start",
+        f"{under_head_line}.end",
+        "horizontal_distance",
+        OVERALL_LENGTH - HEAD_LENGTH,
+        "under-head location reference",
+    )
+    stations.record("UnderHeadLocation", '"ShoulderLength" + "ThreadLength"')
     await ensure_fully_defined(adapter, "station reference sketch")
     check("exit_sketch station reference", await adapter.exit_sketch())
     name_last_feature(adapter, "StationReference")
@@ -396,8 +442,26 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "ScrewProfile", "ShoulderDia", *deviations(SHOULDER_DIA_BAND)
     )
+    set_dimension_symmetric_tolerance(adapter, "ScrewProfile", "HeadDia", HEAD_DIA_TOL)
+    # The head length keeps the head below the MHA-153 face at the widest
+    # end play (Codex P2 on #1139).
     set_dimension_symmetric_tolerance(
-        adapter, "ScrewProfile", "ShoulderLength", SHOULDER_LENGTH_TOL
+        adapter, "ScrewProfile", "HeadLength", HEAD_LENGTH_TOL
+    )
+    # The two small features the MHA-139 re-review found could print as
+    # nothing at .X: the tip chamfer and the slot depth.
+    set_dimension_bilateral_tolerance(
+        adapter, "ScrewProfile", "TipChamfer", *deviations(TIP_CHAMFER_BAND)
+    )
+    set_dimension_symmetric_tolerance(adapter, "DriverSlot", "SlotDepth", SLOT_DEPTH_TOL)
+    # The relief diameter keeps the die's run-out under the thread root and a
+    # flat seat (Codex P1 on #1139); the relief lead prints as limits in the
+    # relief callout, the model owning its band all the same (Codex P2).
+    set_dimension_symmetric_tolerance(
+        adapter, "ScrewProfile", "ReliefDia", RELIEF_DIA_TOL
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "ScrewProfile", "ReliefLead", RELIEF_LEAD_TOL
     )
     set_dimension_bilateral_tolerance(
         adapter, "ScrewProfile", "ThreadLength", *deviations(THREAD_LENGTH_BAND)
