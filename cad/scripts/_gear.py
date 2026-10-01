@@ -456,6 +456,7 @@ async def build_fixed_gear(
     backlash_mm: float = 0.0,
     root_relief: bool = False,
     depth_dp: float | None = None,
+    long_addendum_mm: float = 0.0,
     dedendum: float = 1.157,
 ) -> ToothedDisc:
     """Build a toothed disc on the active new part.
@@ -484,6 +485,8 @@ async def build_fixed_gear(
     gear cut by a normal-plane cutter passes its TRANSVERSE ``dp`` and
     ``pa_deg`` (they place the involute) and the cutter's DP here: the cutter
     cuts its own depth whichever plane the profile is read in.
+    ``long_addendum_mm`` turns the blank's tip that much over the standard
+    addendum and leaves the root where the cutter's depth puts it.
     ``dedendum`` is the root-relief depth below the pitch circle in units of
     1/depth_dp: the standard 1.157, or 1.25 for a pinion whose drawing
     floors its root at the 1.25/P full-depth form (the feed-pinion sleeve).
