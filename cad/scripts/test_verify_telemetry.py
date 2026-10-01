@@ -40,7 +40,9 @@ from typing import Any
 import pytest
 
 # Export nowhere (no Aspire probe / OTLP retries) BEFORE the spine configures.
-os.environ.setdefault("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] = ""
+os.environ["OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"] = ""
+os.environ["OTEL_EXPORTER_OTLP_LOGS_ENDPOINT"] = ""
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -351,6 +353,9 @@ def _attach_capture():
     )
     from typing import cast
 
+    os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] = ""
+    os.environ["OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"] = ""
+    os.environ["OTEL_EXPORTER_OTLP_LOGS_ENDPOINT"] = ""
     _telemetry.configure()
     spans = InMemorySpanExporter()
     cast(SdkTracerProvider, _telemetry.trace.get_tracer_provider()).add_span_processor(

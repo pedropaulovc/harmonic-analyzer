@@ -517,13 +517,18 @@ def _compact_span(span: ReadableSpan) -> str:
 
 
 def _telemetry_dir() -> Path | None:
-    """``cad/out/reports/telemetry`` if it can be created, else ``None``.
+    """``HARMONIC_TELEMETRY_DIR`` or the default reports directory, else ``None``.
 
     Best-effort, exactly like the cache ``.jsonl`` log: telemetry capture must
     never be the reason a build fails.
     """
     try:
-        out = Path(__file__).resolve().parents[1] / "out" / "reports" / "telemetry"
+        configured = os.environ.get("HARMONIC_TELEMETRY_DIR")
+        out = (
+            Path(configured)
+            if configured
+            else Path(__file__).resolve().parents[1] / "out" / "reports" / "telemetry"
+        )
         out.mkdir(parents=True, exist_ok=True)
         return out
     except Exception:  # noqa: BLE001 - capture is best-effort, never fatal

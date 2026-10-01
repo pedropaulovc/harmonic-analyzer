@@ -3119,20 +3119,37 @@ def task_check():
         # removed row must rerun its tagged-emitter check.
         SCRIPTS_DIR.parent / "docs" / "drawing-simplicity-policy.md",
     ]
-    # The enrollment contract scans the configured root pytest populations.
-    # Path manifests also invalidate the stamp on addition/removal, which
-    # file_dep alone cannot detect.
-    import tomllib
-
-    pytest_scope = REPO_ROOT / "pyproject.toml"
-    pytest_testpaths = tomllib.loads(pytest_scope.read_text(encoding="utf-8"))[
-        "tool"
-    ]["pytest"]["ini_options"]["testpaths"]
-    root_test_modules = sorted(
-        path.relative_to(REPO_ROOT).as_posix()
-        for testpath in pytest_testpaths
-        for path in (REPO_ROOT / testpath).rglob("test_*.py")
+    # These tests load probe modules by filename, not by a syntactic import.
+    # Follow their helper closures explicitly as well as tracking the probe.
+    diagnostic_contract_sources = [
+        SCRIPTS_DIR / "diagnostics" / name
+        for name in (
+            "probe_vm2_rack_finish_attachment.py",
+            "probe_vm2_datum_ownership.py",
+            "probe_vm2_datum_attachment.py",
+            "probe_vm2_datum_lifecycle.py",
+            "analyze_vm2_datum_clearance.py",
+        )
+    ]
+    evidence_probes = (
+        REPO_ROOT / "cad" / "docs" / "pipeline" / "evidence"
+        / "vm2-datum-placement" / "probes"
     )
+    recorded_contract_deps = [
+        REPO_ROOT / "cad" / "references" / "base-serial.dxf",
+        *(
+            evidence_probes / name / "receipt.json"
+            for name in (
+                "rack-source-save-full",
+                "rack-source-save-precision",
+                "rack-source-save-callout",
+                "rack-native-lifecycle-original",
+                "rack-native-lifecycle-above",
+                "rack-production-lifecycle-33696944",
+                "rod-production-lifecycle-33696944",
+            )
+        ),
+    ]
     # test_adapter_feature_resolution exercises the vendored adapter, which
     # module_deps_of never walks (an installed package, see SUBMODULE_SRC). Its
     # real import closure (package __init__s, transitive helpers) is wider than
@@ -3140,7 +3157,11 @@ def task_check():
     # tiers hash: any submodule bump re-runs the gate (codex #1101). The files,
     # not a digest sidecar -- the sidecars are COM cache-key inputs, which no
     # check:* task may carry (test_com_deps_include_submodule_and_checks_do_not).
-    adapter_contract_deps = [str(path) for path in _submodule_src_files()]
+    # test_or_flag_fallback_names also scans the sibling src/utils files,
+    # so the scan boundary is the whole adapter src tree, not just its package.
+    adapter_contract_deps = sorted(
+        str(path.resolve()) for path in SUBMODULE_SRC.parent.rglob("*.py")
+    )
     # test_out_param_binding SCANS sources instead of importing them (it reads
     # every top-level build script and every diagnostics/*.py looking for
     # VT_BYREF), so module_deps_of cannot see them -- an import graph does not
@@ -3160,7 +3181,24 @@ def task_check():
             *(str(path.resolve()) for path in machinist_review_contract_deps),
             *adapter_contract_deps,
             *scanned_by_binding_gate,
-            str(pytest_scope.resolve()),
+            *(str(_resolved(path)) for path in SCRIPTS_DIR.rglob("*.py")),
+            *(
+                str(path.resolve())
+                for root in (REPO_ROOT / "tests", REPO_ROOT / "cad/comparisons/tools")
+                for pattern in ("test_*.py", "*_test.py")
+                for path in root.rglob(pattern)
+                if not any(
+                    part.startswith(".") or part == "references"
+                    for part in path.relative_to(REPO_ROOT).parts
+                )
+            ),
+            *(str(path.resolve()) for path in diagnostic_contract_sources),
+            *(
+                dep
+                for path in diagnostic_contract_sources
+                for dep in module_deps_of(path)
+            ),
+            *(str(path.resolve()) for path in recorded_contract_deps),
             str(
                 (REPO_ROOT / "cad" / "comparisons" / "tools" / "composite.py").resolve()
             ),
@@ -3301,8 +3339,7 @@ def task_check():
                     {
                         "submodule_sources": [
                             _rel_tag(path) for path in adapter_contract_deps
-                        ],
-                        "root_test_modules": root_test_modules,
+                        ]
                     }
                 )
             ],
@@ -3510,16 +3547,9 @@ def task_check():
                 *_config_deps(entry),
             )
         }
-        if (
-            "-m" in spec["cmd"]
-            and spec["cmd"][spec["cmd"].index("-m") + 1] == "pytest"
-        ):
-            # Pytest installs the containment boundary before test imports.
-            # A guard edit must not reuse a stamp produced by an older boundary.
-            executed.update(
-                str((REPO_ROOT / path).resolve())
-                for path in ("conftest.py", "_test_guard.py")
-            )
+        command = spec["cmd"]
+        if "-m" in command and command[command.index("-m") + 1] == "pytest":
+            executed.add(str((REPO_ROOT / "conftest.py").resolve()))
         yield {
             "name": name,
             "file_dep": sorted({*spec["file_dep"], *executed}),

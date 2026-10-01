@@ -8,10 +8,8 @@ test-runner-only reason; there is no grandfathered orphan allowance.
 
 from __future__ import annotations
 
-from fnmatch import fnmatch
 import importlib.util
 from pathlib import Path
-import tomllib
 
 SCRIPTS = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPTS.parents[1]
@@ -21,7 +19,7 @@ REPO_ROOT = SCRIPTS.parents[1]
 TEST_RUNNER_ONLY = {
     "tests/test_solidworks_launch_guard.py": (
         "Exercises the root conftest process/launch refusal boundary; run with "
-        "the contained root pytest runner, not a CAD recipe check."
+        "ordinary root pytest suite, not a CAD recipe check."
     ),
     "tests/test_pytest_scope.py": (
         "Validates root pytest discovery and vendored-suite exclusions, not CAD output."
@@ -31,7 +29,7 @@ TEST_RUNNER_ONLY = {
     ),
     "tests/test_farm_launcher.py": (
         "Farm launcher submission, retries and output-handling contracts belong "
-        "to the contained root launcher suite, not the offline CAD check."
+        "to the ordinary root launcher suite, not the offline CAD check."
     ),
     "tests/test_farm_checkout_drift.py": (
         "Worker checkout/identity drift contracts belong to the root launcher suite."
@@ -50,18 +48,16 @@ OPT_IN = {
 
 
 def _inventory(root: Path) -> set[str]:
-    options = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))[
-        "tool"
-    ]["pytest"]["ini_options"]
-    excluded = options["norecursedirs"]
+    """Maintained test trees; pytest scope itself is checked by test_pytest_scope."""
     return {
         path.relative_to(root).as_posix()
-        for testpath in options["testpaths"]
-        for path in (root / testpath).rglob("test_*.py")
+        for directory in ("cad/scripts", "cad/comparisons/tools", "tests")
+        for pattern in ("test_*.py", "*_test.py")
+        for path in (root / directory).rglob(pattern)
+        if path.is_file()
         if not any(
-            fnmatch(part, pattern)
+            part == "references" or part.startswith(".")
             for part in path.relative_to(root).parts[:-1]
-            for pattern in excluded
         )
     }
 
@@ -83,7 +79,7 @@ def _collected_by_check_gates(dodo) -> dict[str, set[str]]:
             continue
         for arg in cmd:
             path = Path(str(arg))
-            if path.suffix != ".py" or not path.name.startswith("test_"):
+            if path.suffix != ".py":
                 continue
             if not path.is_absolute():
                 path = REPO_ROOT / path
@@ -122,17 +118,12 @@ def test_every_root_pytest_module_has_a_gate_disposition() -> None:
     )
 
 
-def test_recursive_inventory_preserves_collisions_and_pytest_exclusions(tmp_path) -> None:
-    (tmp_path / "pyproject.toml").write_text(
-        '[tool.pytest.ini_options]\n'
-        'testpaths = ["cad/scripts", "tests"]\n'
-        'norecursedirs = [".*", "references"]\n',
-        encoding="utf-8",
-    )
+def test_recursive_inventory_preserves_distinct_module_paths(tmp_path) -> None:
     maintained = {
         "cad/scripts/test_contract.py",
         "cad/scripts/diagnostics/test_contract.py",
         "tests/test_contract.py",
+        "tests/contract_test.py",
     }
     excluded = {
         "cad/scripts/references/test_contract.py",

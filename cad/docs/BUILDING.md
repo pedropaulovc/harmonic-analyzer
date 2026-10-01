@@ -49,11 +49,20 @@ glance:
 | `verify_soundness:<stem>` / `verify:kinematics` | yes | local seat or farm leaf | DOF/interference/health gates per (sub)assembly · motion-study pen sweep |
 | `verify:soundness` | no (aggregator) | local | fans out to the `verify_soundness:<stem>` leaves; drives no COM itself |
 | `preflight` / `export` / `package:release` | yes | local seat or farm leaf | release preflight (gear ratios) · neutral STEP/STL/glTF + scene-graph export · Pack-and-Go |
-| `check:math` / `check:config` / `check:graph` / `check:undefined_names` / `check:nameplate` / `check:numerals` / `check:recipe` / `check:cache` / `check:partiso` / `check:inert` / `check:budget` | **no** | local only | Fourier math · config audit · undefined-name lint · pure-python unit tests |
+| `check:math` / `check:config` / `check:graph` / `check:undefined_names` / `check:nameplate` / `check:numerals` / `check:recipe` / `check:cache` / `check:telemetry` / `check:watchdog` / `check:freshness` / `check:flagonly` / `check:partiso` / `check:inert` / `check:budget` | **no** | local only | Fourier math · config audit · undefined-name lint · offline unit tests |
+| `check:verify_telemetry` | **no** | local only, opt-in | calibrated-latency telemetry span-shape audit; not required by build/release |
 | `gallery` | **no** (Blender + GPU) | local only | refresh the photo-vs-CAD comparison gallery; no farm worker has Blender |
 | `release` | meta | local (publishes) | stages, diffs, tags and publishes; its COM half is the separate `package:release` leaf |
 | **`build`** | yes | either executor | **every** part + assembly + **every** gate — the one fully-safe entry |
 | `build_bare` | yes | either executor | parts + assemblies only — a quick rebuild |
+
+`check:recipe` explicitly includes the formerly omitted offline contracts and
+five maintained diagnostic test modules. Runtime-loaded helpers and archived
+receipt/data inputs are dependencies. The recursive, path-keyed enrollment
+contract has no pending-triage bypass; `check:verify_telemetry` remains opt-in,
+and root launcher/discovery/safety tests plus comparison pose conversion keep
+concrete test-runner-only reasons. Root pytest discovery is not build-gate
+enrollment, and enrollment does not certify oracle quality.
 
 These examples run on a **local seat**. For the farm, replace
 `uv run python -m doit` with `build.py --executor farm` and follow

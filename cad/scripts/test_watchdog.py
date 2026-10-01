@@ -18,7 +18,9 @@ worker blocks the agent from removing the source root).
 
 from __future__ import annotations
 
+import importlib.util
 import sys
+from functools import partial
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
@@ -70,6 +72,71 @@ def _make(
         clock=lambda: now,
     )
     return dog, exits
+
+
+def test_default_exit_observes_later_transport_replacement(monkeypatch):
+    # Fake the actual transport BEFORE loading: even restoring the old captured
+    # os._exit default can only record a call, never terminate pytest.
+    unsafe_exits = []
+    monkeypatch.setattr(_watchdog.os, "_exit", unsafe_exits.append)
+    spec = importlib.util.spec_from_file_location(
+        "_offline_watchdog", _watchdog.__file__
+    )
+    module = importlib.util.module_from_spec(spec)
+    monkeypatch.setitem(sys.modules, spec.name, module)
+    spec.loader.exec_module(module)
+    crashes = set()
+    dog = module.Watchdog(
+        crash_pids=lambda: crashes,
+        hung_probe=lambda: False,
+        dialog_probe=lambda: None,
+        activity=lambda: 0.0,
+        clock=lambda: 0.0,
+    )
+    exits = []
+
+    def safe_exit(code):
+        exits.append(code)
+        raise _Exit(code)
+
+    monkeypatch.setattr(module, "_hard_exit", safe_exit)
+    crashes.add(4242)
+    with pytest.raises(_Exit):
+        dog.tick()
+    assert exits == [EXIT_CRASH]
+    assert unsafe_exits == []
+
+
+@pytest.fixture
+def offline_watchdog_thread(monkeypatch):
+    """Exercise the real thread, with no live seat probes or exit transport."""
+    threads = []
+    thread_type = _watchdog.threading.Thread
+
+    def track_thread(*args, **kwargs):
+        thread = thread_type(*args, **kwargs)
+        threads.append(thread)
+        return thread
+
+    monkeypatch.setattr(_watchdog.threading, "Thread", track_thread)
+    monkeypatch.setattr(
+        _watchdog,
+        "Watchdog",
+        partial(
+            Watchdog,
+            crash_pids=lambda: set(),
+            hung_probe=lambda: False,
+            dialog_probe=lambda: None,
+            activity=lambda: 0.0,
+            clock=lambda: 0.0,
+            exit_fn=lambda code: None,
+        ),
+    )
+    yield
+    _watchdog.stop()
+    for thread in threads:
+        thread.join(timeout=5)
+        assert not thread.is_alive()
 
 
 def test_new_crash_pid_is_fatal() -> None:
@@ -271,12 +338,12 @@ def test_env_kill_switch(monkeypatch: pytest.MonkeyPatch) -> None:
     assert _watchdog.start() is None
 
 
-def test_start_stop_idempotent(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_start_stop_idempotent(
+    monkeypatch: pytest.MonkeyPatch, offline_watchdog_thread
+) -> None:
     monkeypatch.delenv("HARMONIC_COM_WATCHDOG", raising=False)
     monkeypatch.setenv("HARMONIC_COM_OP_TIMEOUT", "900")
-    # The check:* gates are pure-python and must pass off-Windows too, where the
-    # real platform gate would return None (codex #344) -- force it open; the
-    # Win32 probes inside are themselves guarded no-ops off-Windows.
+    # Exercise start/stop off-Windows too, but never use live health probes.
     monkeypatch.setattr(_watchdog, "_WINDOWS", True)
     first = _watchdog.start()
     try:
@@ -287,7 +354,9 @@ def test_start_stop_idempotent(monkeypatch: pytest.MonkeyPatch) -> None:
     assert _watchdog._active is None
 
 
-def test_start_logs_the_armed_configuration(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_start_logs_the_armed_configuration(
+    monkeypatch: pytest.MonkeyPatch, offline_watchdog_thread
+) -> None:
     monkeypatch.delenv("HARMONIC_COM_WATCHDOG", raising=False)
     monkeypatch.setenv("HARMONIC_COM_OP_TIMEOUT", "900")
     monkeypatch.setattr(_watchdog, "_WINDOWS", True)

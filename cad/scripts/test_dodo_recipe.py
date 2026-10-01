@@ -2257,38 +2257,6 @@ def test_deleting_a_submodule_source_reruns_check_recipe(tmp_path):
     assert not recipe_is_current(saved)[0], "a deleted source must re-run the gate"
 
 
-def test_root_test_addition_and_removal_rerun_recipe_gate(tmp_path, monkeypatch):
-    """An unenrolled nested root test must not hide behind a green recipe stamp."""
-    dodo = _load_dodo()
-    dodo.subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
-    (tmp_path / "pyproject.toml").write_text(
-        '[tool.pytest.ini_options]\ntestpaths = ["tests"]\n',
-        encoding="utf-8",
-    )
-    monkeypatch.setattr(dodo, "REPO_ROOT", tmp_path)
-    test_dir = tmp_path / "tests" / "nested"
-    test_dir.mkdir(parents=True)
-    existing = test_dir / "test_existing.py"
-    existing.write_text("", encoding="utf-8")
-
-    def checker():
-        recipe = next(task for task in dodo.task_check() if task["name"] == "recipe")
-        (current,) = recipe["uptodate"]
-        return current
-
-    original = checker()
-    saved = {"_config_changed": original.config_digest}
-    assert checker()(None, saved), "an unchanged inventory must remain current"
-    added = test_dir / "test_unenrolled.py"
-    added.write_text("", encoding="utf-8")
-    expanded = checker()
-    assert not expanded(None, saved), "a new nested test must rerun gate enrollment"
-    expanded_saved = {"_config_changed": expanded.config_digest}
-    assert checker()(None, expanded_saved)
-    existing.unlink()
-    assert not checker()(None, expanded_saved), "a removed test must rerun enrollment"
-
-
 def test_part_relevant_submodule_change_flips_part_cache_key(tmp_path):
     """A PART-RELEVANT submodule source change -- a committed pin bump OR a dirty
     local edit -- flips every part's COM cache key; a no-op recompute leaves it stable
@@ -2496,6 +2464,57 @@ def test_recipe_gate_tracks_sources_imported_by_its_tests():
         REPO_ROOT / "cad" / "comparisons" / "tools" / "pose_manifest.py",
         REPO_ROOT / "cad" / "comparisons" / "tools" / "render_offline.py",
     } <= deps
+
+
+def test_recipe_gate_tracks_dynamic_diagnostics_and_recorded_inputs():
+    """Runtime loads/reads must invalidate recipe just like syntactic imports."""
+    dodo = _load_dodo()
+    recipe = next(task for task in dodo.task_check() if task["name"] == "recipe")
+    declared = {Path(path).resolve() for path in recipe["file_dep"]}
+    probes = (
+        REPO_ROOT / "cad" / "docs" / "pipeline" / "evidence"
+        / "vm2-datum-placement" / "probes"
+    )
+    recorded = {
+        REPO_ROOT / "cad" / "references" / "base-serial.dxf",
+        *(
+            probes / name / "receipt.json"
+            for name in (
+                "rack-source-save-full",
+                "rack-source-save-precision",
+                "rack-source-save-callout",
+                "rack-native-lifecycle-original",
+                "rack-native-lifecycle-above",
+                "rack-production-lifecycle-33696944",
+                "rod-production-lifecycle-33696944",
+            )
+        ),
+    }
+    dynamic_sources = {
+        dodo.SCRIPTS_DIR / "diagnostics" / name
+        for name in (
+            "probe_vm2_rack_finish_attachment.py",
+            "probe_vm2_datum_ownership.py",
+            "probe_vm2_datum_attachment.py",
+            "probe_vm2_datum_lifecycle.py",
+            "analyze_vm2_datum_clearance.py",
+        )
+    }
+    assert all(path.is_file() for path in recorded | dynamic_sources)
+    executed = {
+        Path(dep).resolve()
+        for path in dynamic_sources
+        for dep in (str(path), *dodo.module_deps_of(path))
+    }
+    assert executed | recorded <= declared
+    # The fallback-name contract recursively reads both trees, including
+    # adapter src/utils outside the solidworks_mcp package.
+    scripts = set(dodo.SCRIPTS_DIR.rglob("*.py"))
+    adapter = set(dodo.SUBMODULE_SRC.parent.rglob("*.py"))
+    assert scripts and adapter
+    assert dodo.SCRIPTS_DIR / "diagnostics" / "_owned_native_session.py" in scripts
+    assert dodo.SUBMODULE_SRC.parent / "utils" / "validate_coverage.py" in adapter
+    assert scripts | adapter <= declared
 
 
 def test_recipe_gate_tracks_machinist_prompt_and_schema_contract() -> None:
@@ -2845,9 +2864,7 @@ def test_check_gates_depend_on_everything_they_execute():
             )
         }
         if "-m" in command and command[command.index("-m") + 1] == "pytest":
-            containment = [REPO_ROOT / "conftest.py", REPO_ROOT / "_test_guard.py"]
-            assert all(path.is_file() for path in containment)
-            executed.update(str(path.resolve()) for path in containment)
+            executed.add(str((REPO_ROOT / "conftest.py").resolve()))
         missing = sorted(executed - declared)
         if missing:
             gaps[task["name"]] = [
