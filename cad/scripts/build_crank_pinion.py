@@ -12,7 +12,7 @@ carries the 1/8 in retention pin that keys the pinion to the crankshaft
 through a match-drilled radial cross-hole (crank_pinion_spec).
 
 Dimensions: cad/config/dimensions.yaml ch12 crank-drive gear row +
-Appendix C #9. The 11.3 tooth length runs past the drive gear's 7.2113
+Appendix C #9. The 11.4 tooth length runs past the drive gear's 7.2113
 face; the south face stays against its restored MHA-016 boss-side datum.
 The teeth run at full OD for the shoulder length and are turned down north of
 it, so the grown end passes under the inclined T120 (crank_pinion_spec).

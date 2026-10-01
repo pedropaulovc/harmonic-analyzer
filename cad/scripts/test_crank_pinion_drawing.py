@@ -133,9 +133,9 @@ def test_precision_is_authored_on_the_part_and_only_read_by_the_sheet() -> None:
 
 def test_grown_teeth_keep_the_south_seat_and_boss_length() -> None:
     # c'' variant B (user ruling 2026-09-30): the teeth grow 1.8 north of the
-    # 9.5 face; the boss keeps its 14.0 so the W15 pin wall is unchanged, and
-    # the south seat on MHA-016 does not move.
-    assert spec.FACE_WIDTH == pytest.approx(9.5 + 1.8)
+    # 9.5 face, and ruling R9-55 a further 0.1; the boss keeps its 14.0 so the
+    # W15 pin wall is unchanged, and the south seat on MHA-016 does not move.
+    assert spec.FACE_WIDTH == pytest.approx(9.5 + 1.8 + 0.1)
     assert spec.BOSS_LENGTH == pytest.approx(14.0)
     assert spec.OVERALL_LENGTH == pytest.approx(spec.FACE_WIDTH + spec.BOSS_LENGTH)
     assert spec.PIN_STATION == pytest.approx(spec.FACE_WIDTH + spec.BOSS_LENGTH / 2.0)
@@ -777,8 +777,8 @@ def test_turned_band_clears_t120_and_each_negative_control_flips() -> None:
     assert clear["shoulder air"] >= bdt.T120_PINION_AIR_FLOOR
     assert clear["turned band radial"] >= bdt.T120_TURNED_BAND_RADIAL_FLOOR
     # Each corner's own row width (Codex P2 on #1154).
-    assert bdt.CRANK_ROW_ENGAGEMENT_UNFLOATED == pytest.approx(0.9726, abs=2e-3)
-    assert bdt.CRANK_ROW_ENGAGEMENT_FRACTION == pytest.approx(0.8620, abs=2e-3)
+    assert bdt.CRANK_ROW_ENGAGEMENT_UNFLOATED == pytest.approx(0.9678, abs=2e-3)
+    assert bdt.CRANK_ROW_ENGAGEMENT_FRACTION == pytest.approx(0.8572, abs=2e-3)
     # Turned to the tip-circle row's +0.60, the band reaches T120.
     oversize = nominal_axes(turned_dia=spec.TURNED_DIA + 0.60)
     assert oversize["turned band radial"] < bdt.T120_TURNED_BAND_RADIAL_FLOOR
@@ -792,6 +792,56 @@ def test_turned_band_clears_t120_and_each_negative_control_flips() -> None:
         9.5 + 1.4, bdt._PINION_FACE_BAND, bdt.CONE_FLOAT_NORTH
     )
     assert short < bdt.CRANK_ROW_ENGAGEMENT_FLOOR
+
+
+def test_floated_64t_row_meshes_at_each_slice_own_azimuth() -> None:
+    # Codex P2 on #1154 (ruling R9-55): floated north along its inclined axis,
+    # each 64T slice sits farther +x, so it meshes at its own contact azimuth;
+    # translating the nominal row reported 86.20% where the slices give
+    # 84.36%. The row's ends are the contacts of the 64T's end slices, at
+    # every printed corner; the grown 16T keeps that row covered.
+    import itertools
+
+    import build_drive_train_assembly as bdt
+    from cone_line import COS_I, SIN_I, cone_station
+
+    def contact_z(station: float) -> float:
+        centre = cone_station(station)
+        leg = (centre[0] - bdt.X_CRANK) * COS_I
+        alpha = math.atan2(bdt.Y_CRANK - bdt.Y_DRIVE, leg)
+        return centre[2] + bdt.R64 * math.cos(alpha) * SIN_I
+
+    mid = bdt.GEAR64_CENTRE_STATION
+    half = bdt.GEAR64_FACE / 2.0
+    sliced = translated = math.inf
+    for b1, b2, b3, b4, d_length, play, f in itertools.product(
+        bdt._BOSS_NORTH_BAND,
+        bdt._CONE_BOSS_NORTH_BAND,
+        bdt._COLLAR_WIDTH_BAND,
+        bdt._GEAR64_FACE_LIMITS,
+        bdt._PINION_FACE_BAND,
+        bdt.PINION_END_PLAY,
+        (0.0, bdt.CONE_FLOAT_NORTH),
+    ):
+        south = bdt._POST_BOSS_NORTH + b1 + bdt.PINION_SEAT_FEELER + play
+        north = south + spec.FACE_WIDTH + d_length
+        rows = (
+            (
+                contact_z(mid - half + b2 + b3 + f),
+                contact_z(mid + half + b2 + b3 + b4 + f),
+            ),
+            (
+                contact_z(mid) - half * COS_I + (b2 + b3 + f) * COS_I,
+                contact_z(mid) + half * COS_I + (b2 + b3 + b4 + f) * COS_I,
+            ),
+        )
+        shares = [(min(north, rn) - max(south, rs)) / (rn - rs) for rs, rn in rows]
+        sliced = min(sliced, shares[0])
+        translated = min(translated, shares[1])
+    assert bdt.CRANK_ROW_ENGAGEMENT_FRACTION == pytest.approx(sliced, abs=1e-9)
+    assert sliced >= bdt.CRANK_ROW_ENGAGEMENT_FLOOR
+    # The translated row overstates the cover: it is not the conservative one.
+    assert translated > sliced
 
 
 def test_t120_radial_carries_every_fit_offset_and_axis_pose() -> None:
@@ -934,7 +984,7 @@ def test_t120_shoulder_air_is_no_higher_than_a_point_between_rim_samples() -> No
         + max(bdt._PINION_SHOULDER_BAND)
     )
     witness = z - bdt.T120_POSE_AXIAL - shoulder_top
-    assert witness == pytest.approx(-0.090422, abs=2e-6)
+    assert witness == pytest.approx(-0.090305, abs=2e-6)
     assert bdt.T120_SHOULDER_AIR <= witness
     assert bdt.T120_SHOULDER_AIR_STATED_WORST <= witness
 
@@ -960,8 +1010,8 @@ def test_t120_search_never_looks_outside_the_section() -> None:
     assert least[0] == pytest.approx(-3.0, abs=1e-9)
     nowhere = bdt._convex_min_where(objective, (lambda p: p + 1.0,), lo, hi)
     assert nowhere[0] == math.inf
-    assert bdt.T120_SHOULDER_AIR == pytest.approx(-0.090474, abs=2e-6)
-    assert bdt.T120_TURNED_BAND_RADIAL == pytest.approx(-0.115742, abs=2e-6)
+    assert bdt.T120_SHOULDER_AIR == pytest.approx(-0.090410, abs=2e-6)
+    assert bdt.T120_TURNED_BAND_RADIAL == pytest.approx(-0.115848, abs=2e-6)
 
 
 def test_t120_fit_up_closes_and_both_sheets_state_it() -> None:
@@ -1133,15 +1183,15 @@ def test_both_sheets_state_the_t120_shortfall_the_build_derives() -> None:
 
 
 def test_each_t120_cut_answers_only_its_own_failed_reading() -> None:
-    # Codex P1 on #1154 (review 3): at crank +0.300 the band reads 0.1817 and
+    # Codex P1 on #1154 (review 3): at crank +0.300 the band reads 0.1815 and
     # passes while the shoulder reads 0.0636 and fails.  A check that let
     # either failure turn the band down would cut it to Ø15.78 there, where
-    # its 16T:64T contact path is -0.0667: no contact, yet the row counted it.
+    # its 16T:64T contact path is -0.140: no contact, yet the row counted it.
     import build_drive_train_assembly as bdt
 
     witness = bdt.t120_fitup_reading(crank_heights=(0.300,))
-    assert witness["turned band radial"] == pytest.approx(0.181654, abs=2e-6)
-    assert witness["shoulder air"] == pytest.approx(0.063603, abs=2e-6)
+    assert witness["turned band radial"] == pytest.approx(0.181547, abs=2e-6)
+    assert witness["shoulder air"] == pytest.approx(0.063650, abs=2e-6)
     assert bdt.t120_fitup_cuts(witness) == {"shoulder air"}
     assert bdt.crank_band_contact_path(spec.TURNED_DIA_FITUP_MIN, 0.300) < 0.0
     # Facing the shoulder alone closes that check.

@@ -2337,10 +2337,19 @@ CRANK_BAND_CONTACT_PATHS = crank_band_contact_paths(PINION_TURNED_DIA_FITUP_MIN)
 # turned to a shorter addendum, and count only while that band keeps contact
 # (crank_band_contact_paths).  The full-depth share alone (reading (i)) is
 # reported, not gated.
-_G64_BAND = (
-    _GEAR64_CONTACT_Z - GEAR64_FACE / 2.0 * COS_I,
-    _GEAR64_CONTACT_Z + GEAR64_FACE / 2.0 * COS_I,
-)
+def gear64_contact_z(station_shift: float) -> float:
+    """Crank-axis z of the 64T's contact point in its slice ``station_shift``
+    north of the seat along the inclined cone axis. Each slice meshes at the
+    azimuth its OWN centre sees toward the crank: a slice farther north sits
+    farther +x, its in-plane leg grows and the contact swings off ALPHA64, so
+    floating the stack is not a plain translation of the nominal row."""
+    dx = (GEAR64_SEAT[0] + station_shift * SIN_I - X_CRANK) * COS_I
+    alpha = math.atan2(_DY16, dx)
+    return GEAR64_SEAT[2] + station_shift * COS_I + R64 * math.cos(alpha) * SIN_I
+
+
+if not math.isclose(gear64_contact_z(0.0), _GEAR64_CONTACT_Z, abs_tol=1e-9):
+    raise AssertionError("gear64_contact_z disagrees with the seated contact azimuth")
 CRANK_ROW_ENGAGEMENT_FLOOR = 0.85
 
 
@@ -2362,8 +2371,8 @@ def crank_row_engagement(
     ):
         south = _POST_BOSS_NORTH + b1 + PINION_SEAT_FEELER + play
         north = south + tooth_length + d_length
-        row_south = _G64_BAND[0] + (b2 + b3 + f) * COS_I
-        row_north = _G64_BAND[1] + (b2 + b3 + b4 + f) * COS_I
+        row_south = gear64_contact_z(-GEAR64_FACE / 2.0 + b2 + b3 + f)
+        row_north = gear64_contact_z(GEAR64_FACE / 2.0 + b2 + b3 + b4 + f)
         worst = min(
             worst,
             (min(north, row_north) - max(south, row_south)) / (row_north - row_south),

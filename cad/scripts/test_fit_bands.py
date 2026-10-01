@@ -66,9 +66,6 @@ NOT_FIT_BANDS: dict[tuple[str, str], str] = {
     ("build_drive_train_assembly", "ARBOR_PED_NORTH_Z_BAND"): (
         "plan z extent of the north pedestal foot (clearance geometry)"
     ),
-    ("build_drive_train_assembly", "_G64_BAND"): (
-        "64T gear z extent used for clearance checks"
-    ),
     # The 16T/T120 and row checks (c'' variant B): print-worst (lower, upper)
     # deviations already derived by printed_deviations/deviations from each
     # printed band, corners of the clearance scans rather than fits.
