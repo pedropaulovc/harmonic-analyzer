@@ -3459,6 +3459,11 @@ def task_check():
                 }
             ),
             "cmd": [sys.executable, str(SCRIPTS_DIR / "joint_retention.py")],
+            # The reports are outputs too: deleting one reruns the check.
+            "targets": [
+                str(REPORTS / "joint-retention.json"),
+                str(REPORTS / "joint-retention.md"),
+            ],
         },
     }
     # Tripwire: `build` and `release` depend on f"check:{c}" for c in _CHECK_NAMES, so a
@@ -3492,7 +3497,7 @@ def task_check():
             "name": name,
             "file_dep": sorted({*spec["file_dep"], *executed}),
             "uptodate": spec.get("uptodate", []),
-            "targets": [stamp],
+            "targets": [stamp, *spec.get("targets", [])],
             "actions": [
                 (_run_stamped, [spec["cmd"], f"check {name}", stamp, f"check:{name}"])
             ],

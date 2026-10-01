@@ -1473,7 +1473,9 @@ JOINTS: tuple[Joint, ...] = (
     Joint(
         id="magnifier/fixture-thumb-screw",
         assembly="magnifier",
-        member="thumb_screw",
+        # thumb_screw's one placed instance is the magnifying-clamp screw; the
+        # builder omits this second one, so the stem does not cover it.
+        member=UNMODELLED,
         receiver="output_fixture",
         thread="#4-40 UNC",
         quantity=1,

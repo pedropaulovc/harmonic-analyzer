@@ -292,3 +292,20 @@ def test_the_table_covers_every_threaded_part_the_build_assembles() -> None:
     assert findings == [], "\n".join(
         f"{f.assembly} {f.subject}: {f.kind}: {f.detail}" for f in findings
     )
+
+
+# Joints whose hardware the drawings call for but no builder places. A row
+# reusing the stem of a placed instance of the same part would hide them.
+UNPLACED = frozenset(
+    {
+        "magnifier/fixture-thumb-screw",  # build_magnifier_assembly omits it
+        "pen/v-block-set-screw-on-rod",  # no set-screw part exists
+    }
+)
+
+
+def test_hardware_no_builder_places_is_reported_as_unmodelled() -> None:
+    unmodelled = {
+        f.subject for f in jr.audit_table() if f.kind is Kind.HARDWARE_UNMODELLED
+    }
+    assert UNPLACED <= unmodelled
