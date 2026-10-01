@@ -11,7 +11,7 @@ import dataclasses
 
 import joint_retention as jr
 import pytest
-from joint_retention import Exposure, Inventory, Joint, Kind, Lock
+from joint_retention import Exposure, Inventory, Joint, Kind, Lock, Ruling
 
 PARTS = frozenset({"stud", "arm", "shim", "disc", "cap", "jam_nut", "base", "screw"})
 THREADED = frozenset({"stud", "arm", "cap", "jam_nut", "base", "screw"})
@@ -154,7 +154,27 @@ def test_a_user_ruling_is_the_only_waiver_for_an_unlocked_exposed_joint() -> Non
         (STUD.id, Kind.UNKNOWN_EXCEPTION),
         (STUD.id, Kind.UNLOCKED),
     }
-    assert _audit(joints, rulings={"U99": "user, 2026-10-01"}) == []
+    ruling = {"U99": Ruling(joint=STUD.id, granted="user, 2026-10-01")}
+    assert _audit(joints, rulings=ruling) == []
+
+
+def test_a_ruling_waives_only_the_joint_it_names() -> None:
+    # The screw cites the stud's ruling: it stays unlocked, and the reuse is
+    # itself a finding; the stud is still waived.
+    stud = dataclasses.replace(
+        STUD,
+        lock=Lock.THREADLOCKER_ONLY,
+        lock_part="",
+        lock_binds=(),
+        lock_step="",
+        exception="U99",
+    )
+    screw = dataclasses.replace(SCREW, exposure=Exposure.OSCILLATING, exception="U99")
+    ruling = {"U99": Ruling(joint=STUD.id, granted="user, 2026-10-01")}
+    assert _kinds(_audit((stud, CAP, screw, NUT), rulings=ruling)) == {
+        (SCREW.id, Kind.EXCEPTION_MISMATCH),
+        (SCREW.id, Kind.UNLOCKED),
+    }
 
 
 def test_a_static_clamp_must_say_why_no_operating_torque_reaches_it() -> None:
@@ -309,3 +329,21 @@ def test_hardware_no_builder_places_is_reported_as_unmodelled() -> None:
         f.subject for f in jr.audit_table() if f.kind is Kind.HARDWARE_UNMODELLED
     }
     assert UNPLACED <= unmodelled
+
+
+def test_per_channel_joints_follow_the_built_channel_count(monkeypatch) -> None:
+    # A reduced build (machine/channels.yaml active_count) places fewer
+    # channel anchors; the report must count what the build places.
+    built = jr._config.active_count()
+    before = jr.report([])["per_assembly"]["harmonic_analyzer"]["instances"]
+    monkeypatch.setattr(jr._config, "active_count", lambda: 5)
+    data = jr.report([])
+    assert data["per_assembly"]["harmonic_analyzer"]["instances"] == before - (
+        built - 5
+    )
+    anchors = next(
+        j
+        for j in data["joints"]
+        if j["id"] == "harmonic-analyzer/channel-anchor-in-summing-plate"
+    )
+    assert anchors["instances"] == 5

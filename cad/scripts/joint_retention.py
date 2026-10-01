@@ -103,8 +103,11 @@ class Joint:
     stops, which must be this joint's member and receiver. A locking part is
     not itself covered by naming it here: threaded lock hardware needs its own
     row. ``member`` or ``receiver`` is ``UNMODELLED`` where the hardware is
-    called for but not modelled. ``exception`` is a ``RULINGS`` key, and only
-    a user ruling creates one.
+    called for but not modelled. ``quantity`` counts instances per machine,
+    or per built channel where ``per_channel`` is set (the build places one
+    for each of ``_config.active_count()`` channels). ``exception`` is a
+    ``RULINGS`` key; only a user ruling creates one, and it waives only the
+    joint it names.
     """
 
     id: str
@@ -123,6 +126,13 @@ class Joint:
     lock_binds: tuple[str, ...] = ()
     lock_step: str = ""
     exception: str = ""
+    per_channel: bool = False
+
+    def instances(self) -> int:
+        """How many of this joint the build places."""
+        if self.per_channel:
+            return self.quantity * _config.active_count()
+        return self.quantity
 
 
 class Kind(StrEnum):
@@ -139,6 +149,7 @@ class Kind(StrEnum):
     LOCK_STEP_ABSENT = "lock_step_absent"
     INSTALL_STEP_ABSENT = "install_step_absent"
     UNKNOWN_EXCEPTION = "unknown_exception"
+    EXCEPTION_MISMATCH = "exception_mismatch"
 
 
 @dataclass(frozen=True, order=True)
@@ -178,9 +189,17 @@ class Inventory:
         return frozenset(found)
 
 
-# User rulings that accept a named joint without a mechanical lock. Only the
-# user grants one (policy rule 9); none exists.
-RULINGS: dict[str, str] = {}
+@dataclass(frozen=True)
+class Ruling:
+    """A user ruling accepting one named joint without a mechanical lock."""
+
+    joint: str  # the one joint id it waives
+    granted: str  # who ruled, when, and where it is recorded
+
+
+# Keyed by the ``exception`` a row cites. Only the user grants one (policy
+# rule 9); none exists.
+RULINGS: dict[str, Ruling] = {}
 
 # Assemblies whose steps are keyed in a step registry.
 STEP_LISTS: dict[str, tuple[str, ...]] = {
@@ -201,7 +220,7 @@ def audit(
     unthreaded: frozenset[str],
     purchased: frozenset[str] = frozenset(),
     unthreaded_stock: Mapping[str, str] | None = None,
-    rulings: Mapping[str, str] = RULINGS,
+    rulings: Mapping[str, Ruling] = RULINGS,
 ) -> list[Finding]:
     """Every retention and coverage finding, sorted. Empty means clean.
 
@@ -277,8 +296,14 @@ def audit(
                 f"step {joint.installed_at!r} is not in the step list",
             )
 
-        if joint.exception and joint.exception not in rulings:
+        ruling = rulings.get(joint.exception) if joint.exception else None
+        if joint.exception and ruling is None:
             bad(Kind.UNKNOWN_EXCEPTION, f"{joint.exception!r} is not a user ruling")
+        elif ruling is not None and ruling.joint != joint.id:
+            bad(
+                Kind.EXCEPTION_MISMATCH,
+                f"ruling {joint.exception!r} waives {ruling.joint}, not this joint",
+            )
 
         if joint.exposure is Exposure.UNCLASSIFIED:
             bad(Kind.UNCLASSIFIED_EXPOSURE, "load exposure not classified")
@@ -291,7 +316,7 @@ def audit(
                 "static_clamp without the reason no operating torque reaches it",
             )
 
-        excepted = bool(joint.exception) and joint.exception in rulings
+        excepted = ruling is not None and ruling.joint == joint.id
         if joint.lock in NOT_A_LOCK:
             if joint.exposure in EXPOSED and not excepted:
                 bad(
@@ -380,7 +405,7 @@ def report(findings: list[Finding]) -> dict[str, object]:
         rows = [j for j in JOINTS if j.assembly == assembly]
         per_assembly[assembly] = {
             "rows": len(rows),
-            "instances": sum(j.quantity for j in rows),
+            "instances": sum(j.instances() for j in rows),
             "findings": sum(1 for f in findings if f.assembly == assembly),
         }
     joint_ids = {j.id for j in JOINTS}
@@ -395,6 +420,7 @@ def report(findings: list[Finding]) -> dict[str, object]:
         "joints": [
             {
                 **asdict(j),
+                "instances": j.instances(),
                 "member_number": _part_number(j.member),
                 "receiver_number": _part_number(j.receiver),
             }
@@ -1361,7 +1387,8 @@ JOINTS: tuple[Joint, ...] = (
         member="spring_hook",
         receiver="summing_lever",
         thread="#6-32 UNC",
-        quantity=20,
+        quantity=1,
+        per_channel=True,  # build_channel_assembly places one per range(CHANNELS)
         installed_at="",
         exposure=Exposure.ADJUSTER,
         exposure_reason=(
