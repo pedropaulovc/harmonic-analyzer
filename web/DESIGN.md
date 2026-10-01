@@ -90,7 +90,7 @@ At 1920 pixels wide the limits are 960, 384, 192 and 96 pixels respectively.
 The final target is 5%; video/model timing stays within 0.5 seconds at every stage.
 
 Start with working approximate camera and mechanism tracking across **all six**
-videos, then present an actual headed-browser demo before refining to 20%, 10%
+videos, then present an actual browser demo before refining to 20%, 10%
 and 5%. Complete one coarse pass across the collection rather than perfecting
 one video while the others remain unavailable. Each stage reports its measured
 coverage, maximum errors and unresolved intervals; unmeasured is not passed.
@@ -149,7 +149,8 @@ pause/manual/resume transitions against the actual rendered scene.
 Paused exploration must permit orbit, pan, zoom and mechanism operation without
 advancing the source video. Compact mode retains the same visible usable player
 at least 200 by 200 pixels, with advancing audio and working pause/resume controls.
-Verify all six routes; present a headed demo of the working implementation.
+Verify all six routes; present a demo of the working implementation. This session
+uses headless Playwright with screenshots/recordings, as explicitly requested.
 
 Native WebGL landmark readback remains available for rendered-pixel measurements.
 CPU projection alone is not final rendered evidence. Existing raster, finite-line,

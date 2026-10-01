@@ -2,15 +2,15 @@ import { createServer } from 'node:http'
 import { createReadStream } from 'node:fs'
 import { readFile, readdir, stat } from 'node:fs/promises'
 import { extname, join, resolve, sep } from 'node:path'
-import { sha256File } from './verify-reference.mjs'
+import { sha256File, VIDEO_IDS } from './verify-reference.mjs'
 
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.glb': 'model/gltf-binary', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.woff2': 'font/woff2' }
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.glb': 'model/gltf-binary', '.mp4': 'video/mp4', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.woff2': 'font/woff2' }
 
 export async function distManifest(distRoot) {
   const files = []
   async function visit(directory, relative = '') {
     for (const entry of await readdir(directory, { withFileTypes: true })) {
-      const name = join(relative, entry.name), path = join(directory, entry.name)
+      const name = relative ? `${relative}/${entry.name}` : entry.name, path = join(directory, entry.name)
       if (entry.isDirectory()) await visit(path, name)
       else if (entry.isFile()) { const info = await stat(path); files.push({ path: name, bytes: info.size, sha256: await sha256File(path) }) }
       else throw new Error(`Built dist contains unsupported symbolic/special asset: ${name}`)
@@ -35,7 +35,7 @@ export function buildBase(indexHtml, requested = undefined) {
 }
 
 /** One owned ephemeral server. Never connects to, kills, or reuses a parent's dev service. */
-export async function serveDist(distRoot, { base, requests = [], signal } = {}) {
+export async function serveDist(distRoot, { base, requests = [], signal, referenceRoot, port = 0 } = {}) {
   const root = resolve(distRoot)
   const index = await readFile(join(root, 'index.html'), 'utf8')
   const basePath = buildBase(index, base)
@@ -47,8 +47,14 @@ export async function serveDist(distRoot, { base, requests = [], signal } = {}) 
       if (pathname !== basePath.slice(0, -1) && !pathname.startsWith(basePath)) { response.writeHead(404); response.end('Not under the built simulator base'); return }
       if (pathname === basePath.slice(0, -1)) { response.writeHead(308, { location: `${basePath}${new URL(request.url, 'http://localhost').search}` }); response.end(); return }
       const relative = pathname.slice(basePath.length) || 'index.html'
-      path = resolve(root, relative)
-      if (path !== root && !path.startsWith(`${root}${sep}`)) { response.writeHead(403); response.end(); return }
+      const media = /^reference-media\/([A-Za-z0-9_-]+)\.mp4$/.exec(relative)
+      if (media) {
+        if (!referenceRoot || !VIDEO_IDS.includes(media[1])) { response.writeHead(404); response.end('Original reference media unavailable'); return }
+        path = resolve(referenceRoot, 'videos', `${media[1]}.mp4`)
+      } else {
+        path = resolve(root, relative)
+        if (path !== root && !path.startsWith(`${root}${sep}`)) { response.writeHead(403); response.end(); return }
+      }
       const info = await stat(path)
       if (!info.isFile()) { response.writeHead(404); response.end(); return }
       const headers = { 'content-type': MIME[extname(path)] ?? 'application/octet-stream', 'cache-control': 'no-cache', 'accept-ranges': 'bytes', 'referrer-policy': 'strict-origin-when-cross-origin' }
@@ -77,7 +83,7 @@ export async function serveDist(distRoot, { base, requests = [], signal } = {}) 
     }
   })
   server.on('connection', socket => { sockets.add(socket); socket.on('close', () => sockets.delete(socket)) })
-  await new Promise((ready, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', ready) })
+  await new Promise((ready, reject) => { server.once('error', reject); server.listen(port, '127.0.0.1', ready) })
   const address = server.address()
   let closed = false
   const close = async () => {

@@ -1,16 +1,19 @@
-import { assertSourceCompositeWeights, createViewer, loadMachine, ViewCapacityError, type CameraRecord, type Machine, type NativeLineAnchor, type SourceView } from './scene'
+import { assertSourceCompositeWeights, createViewer, loadMachine, ViewCapacityError, type CameraRecord, type Machine, type SourceView } from './scene'
 import { createMechanismInput, MECHANISM_DATA, type MechanismInput } from './mechanics'
 import { MAGNIFIER_RATIO_MIN, MAGNIFIER_RATIO_MAX, physicalChannelAngle, squareWave } from './kinematics'
 import { VIDEOS, resolveVideo, type Video } from './video-catalog'
 import { createVideoPlayer, type PlaybackState, type VideoPlayer } from './youtube-player'
-import { loadReference, serializeInput, type PlaybackView, type ReferenceState, type VideoReference } from './timeline'
-import { INPUT_FIELDS, equalRecord, evaluateConstraints, type InputField, type SourceNonIdentifiableFixedPart } from './source-witness'
+import { loadReference, serializeInput, SOURCE_STAGE_PERCENTAGES, LANDMARK_LIMIT_PX, type PlaybackView, type ReferenceState } from './timeline'
+import type { CompactVideoReference } from './source-track'
+import { createSourceVideoPlayer } from './source-player'
+import { INPUT_FIELDS, equalRecord, type InputField } from './source-witness'
 
 function element<T extends HTMLElement>(selector: string): T {
   const found = document.querySelector<T>(selector)
   if (!found) throw new Error(`Missing page element: ${selector}`)
   return found
 }
+const verificationEnabled = new URLSearchParams(location.search).get('verify') === '1'
 
 const canvas = element<HTMLCanvasElement>('#stage')
 const loading = element('#loading')
@@ -22,6 +25,7 @@ const sourceError = element('#source-error')
 const modelError = element('#model-error')
 const physicsError = element('#physics-error')
 const videoError = element('#video-error')
+element('.interaction-hint').textContent = 'Pause to orbit, pan, zoom, and change the mechanism. Play resumes approximate source-following with chosen feasible inputs, not recovered history. Unavailable intervals and unmeasured stages remain explicit.'
 const videoContainer = element('#video-player')
 const videoDock = element('#video-dock')
 const workspace = element('#workspace')
@@ -53,7 +57,7 @@ const stateLabels: Record<PlaybackState, string> = {
 const input = createMechanismInput()
 const reviewRollbackInput = createMechanismInput()
 let machine: Machine | null = null
-let reference: VideoReference | null = null
+let reference: CompactVideoReference | null = null
 let player: VideoPlayer | null = null
 let video: Video | null = null
 let selectionAbort: AbortController | null = null
@@ -70,8 +74,7 @@ let physicsState: 'available' | 'unavailable' = 'unavailable'
 let playerSize: 'expanded' | 'compact' = 'expanded'
 let activeViews: readonly PlaybackView[] = []
 let initialCamera: CameraRecord | null = null
-let explorationOrigin: 'interactive-default' | 'observed-source' | 'chosen-feasible-reconstruction' = 'interactive-default'
-let explorationSourceNonIdentifiableFixedParts: readonly SourceNonIdentifiableFixedPart[] = []
+let explorationOrigin: 'interactive-default' | 'chosen-feasible-reconstruction' = 'interactive-default'
 interface MechanismDraw {
   status: 'solved-for-draw' | 'rendered'
   viewId: string
@@ -81,7 +84,6 @@ interface MechanismDraw {
   mechanicalProvenance: PlaybackView['mechanicalProvenance']
   unobservedInputFields: readonly InputField[]
   nativeGeometryAssumptions: PlaybackView['nativeGeometryAssumptions']
-  sourceNonIdentifiableFixedParts: PlaybackView['sourceNonIdentifiableFixedParts']
   imagePlaneWarp: PlaybackView['authoredImagePlaneWarp']
   resolvedImagePlaneWarp: NonNullable<PlaybackView['imagePlaneWarp']> | null
   sourceLayout: PlaybackView['sourceLayout']
@@ -91,9 +93,10 @@ interface MechanismDraw {
   effectiveBankDriveTurns: number
 }
 const mechanismDraws = new Map<string, MechanismDraw>()
-const nativeLineProbeIndices = new Map<string, number>()
 let sourceDrawTimeSeconds = 0
 let sourceDrawRevision = 0
+let diagnosticReference: CompactVideoReference | null = null
+let diagnosticMachine: Machine | null = null
 let lastTick = performance.now()
 let lastHud = 0
 const channelInputs: { amplitude: HTMLInputElement; phase: HTMLInputElement; value: HTMLOutputElement }[] = []
@@ -121,26 +124,18 @@ function cameraRecord(): CameraRecord {
 }
 
 function configureLandmarkProbe(): void {
+  const enabled = verificationEnabled && mode === 'reference-review' && referenceSeek === 'idle' && player?.getState() === 'paused'
+    && reference !== null && machine?.availability === 'available'
+  if (enabled ? diagnosticReference === reference && diagnosticMachine === machine : diagnosticReference === null && diagnosticMachine === null) return
   viewer.setLandmarkProbe(null)
   viewer.setPartVisibilityProbe(null)
   viewer.setNativeLineProbe(null)
-  nativeLineProbeIndices.clear()
-  if (new URLSearchParams(location.search).get('verify') !== '1') return
-  if (!reference || machine?.availability !== 'available') return
+  diagnosticReference = null
+  diagnosticMachine = null
+  if (!enabled || !reference || machine?.availability !== 'available') return
+  diagnosticReference = reference
+  diagnosticMachine = machine
   viewer.setLandmarkProbe(machine.createLandmarkProbe(reference.data.anchors))
-  viewer.setPartVisibilityProbe(machine.createPartVisibilityProbe())
-  const lines: NativeLineAnchor[] = []
-  for (const frame of reference.data.frames) {
-    for (const view of frame.views ?? [{ id: 'main', nativeLineChecks: frame.nativeLineChecks }]) {
-      for (const line of view.nativeLineChecks ?? []) {
-        const id = JSON.stringify([view.id, line.id, line.partPath, line.partLocalLineMetres])
-        if (nativeLineProbeIndices.has(id)) continue
-        nativeLineProbeIndices.set(id, lines.length)
-        lines.push({ id, partPath: line.partPath, partLocalLineMetres: line.partLocalLineMetres })
-      }
-    }
-  }
-  if (lines.length) viewer.setNativeLineProbe(machine.createNativeLineProbe(lines))
 }
 
 function renderPending(): void {
@@ -149,10 +144,10 @@ function renderPending(): void {
   viewer.render()
 }
 
-function updateMachine(source: MechanismInput, overrides?: PlaybackView['partOverrides']): void {
+function updateMachine(source: MechanismInput): void {
   if (machine?.availability !== 'available') return
   physicsState = 'unavailable'
-  machine.update(source, overrides)
+  machine.update(source)
   physicsState = 'available'
   paintRevision = 'pending'
 }
@@ -177,7 +172,7 @@ function updateControlState(): void {
   pauseButton.textContent = playbackState === 'playing' || playbackState === 'buffering' ? 'Pause & explore' : 'Play video'
 }
 
-function validateSourceViews(views: readonly PlaybackView[], sourceOverrides: readonly PlaybackView['partOverrides'][number][]): void {
+function validateSourceViews(views: readonly PlaybackView[]): void {
   if (machine?.availability !== 'available') throw new Error('A compatible native mechanism is required.')
   if (machine.missing.length) throw new Error(`Source reconstruction has unresolved native joints: ${machine.missing.join(', ')}.`)
   assertSourceCompositeWeights(views)
@@ -195,32 +190,6 @@ function validateSourceViews(views: readonly PlaybackView[], sourceOverrides: re
         || !Object.hasOwn(entry, 'resolvedImagePlaneWarp')
         || !equalRecord(entry.resolvedImagePlaneWarp, actual.imagePlaneWarp ?? null)) throw new Error(`Source view ${view.id} has stale or incomplete ordered source support.`)
     }
-    for (let endpoint = 0; endpoint < 2; endpoint++) {
-      const proof = endpoint === 0 ? view.visibilityProof : view.visibilityProofEnd
-      if (!proof) continue
-      const binding = proof.binding
-      if (!Object.hasOwn(binding, 'imagePlaneWarp') || !Object.hasOwn(binding, 'resolvedImagePlaneWarp')
-        || !Object.hasOwn(binding, 'sourceLayout')
-        || !equalRecord(binding.imagePlaneWarp, view.authoredImagePlaneWarp)
-        || !equalRecord(binding.resolvedImagePlaneWarp, view.imagePlaneWarp ?? null)
-        || !equalRecord(binding.sourceLayout, view.sourceLayout)) throw new Error(`Source view ${view.id} visibility proof does not bind its actual image-plane support.`)
-    }
-  }
-  for (const view of views) {
-    for (const override of view.partOverrides) if (!machine.partPaths.includes(override.partPath)) throw new Error(`Source override names unknown native part ${override.partPath}.`)
-    machine.assertNativeLinesWithinRestBounds(view.nativeLineChecks)
-    machine.assertNativeStructuralFixedParts(view.sourceNonIdentifiableFixedParts.map((part) => part.nativePartPath), sourceOverrides)
-    const proof = view.visibilityProof
-    if (!proof || proof.unresolvedParts.length) throw new Error('A complete source-visible native correspondence census is required.')
-    const nativeParts = machine.nativeDrawablePartPaths
-    for (const path of nativeParts) {
-      if (!proof.sourceVisibleParts.some((part) => path === part.partPath)
-        && !proof.excludedParts.some((part) => path === part.partPath)
-        && !proof.sourceNonIdentifiableFixedParts.some((part) => path === part.nativePartPath)) throw new Error(`Source visibility census omits native part ${path}.`)
-    }
-    for (const part of proof.sourceVisibleParts) if (!nativeParts.includes(part.partPath)) throw new Error(`Source visibility census names unknown native drawable ${part.partPath}.`)
-    for (const part of proof.excludedParts) if (!nativeParts.includes(part.partPath)) throw new Error(`Source visibility census names unknown native drawable ${part.partPath}.`)
-    for (const part of proof.sourceNonIdentifiableFixedParts) if (!nativeParts.includes(part.nativePartPath)) throw new Error(`Source visibility census names unknown fixed native drawable ${part.nativePartPath}.`)
   }
 }
 
@@ -228,13 +197,13 @@ function explore(): void {
   const chosen = primaryView()
   if (chosen && machine?.availability === 'available') {
     copyInput(chosen.input)
-    updateMachine(input, chosen.partOverrides)
+    updateMachine(input)
     viewer.applyCamera(chosen.camera)
-    explorationOrigin = chosen.mechanicalProvenance === 'constrained' ? 'chosen-feasible-reconstruction' : 'observed-source'
-    explorationSourceNonIdentifiableFixedParts = chosen.sourceNonIdentifiableFixedParts
+    explorationOrigin = 'chosen-feasible-reconstruction'
   }
   activeViews = []
   mode = 'exploring'
+  configureLandmarkProbe()
   manualMotion = 'idle'
   manualRunButton.textContent = 'Turn crank'
   viewer.setInteraction('exploring')
@@ -245,6 +214,7 @@ function explore(): void {
 
 function following(): void {
   mode = 'following-video'
+  configureLandmarkProbe()
   manualMotion = 'idle'
   manualRunButton.textContent = 'Turn crank'
   viewer.setInteraction('following-video')
@@ -253,12 +223,11 @@ function following(): void {
 
 function applyView(view: PlaybackView): void {
   if (!machine || machine.availability !== 'available') return
-  updateMachine(view.input, view.partOverrides)
-  evaluateConstraints(view.input, machine.pose, view.constraintSummary, 'Actual rendered source mechanism')
+  updateMachine(view.input)
   let draw = mechanismDraws.get(view.id)
   if (!draw) {
     draw = { status: 'solved-for-draw', viewId: view.id, timeSeconds: sourceDrawTimeSeconds, sourceDrawRevision,
-      input: createMechanismInput(), mechanicalProvenance: view.mechanicalProvenance, unobservedInputFields: view.unobservedInputFields, nativeGeometryAssumptions: view.nativeGeometryAssumptions, sourceNonIdentifiableFixedParts: view.sourceNonIdentifiableFixedParts,
+      input: createMechanismInput(), mechanicalProvenance: view.mechanicalProvenance, unobservedInputFields: view.unobservedInputFields, nativeGeometryAssumptions: view.nativeGeometryAssumptions,
       imagePlaneWarp: view.authoredImagePlaneWarp, resolvedImagePlaneWarp: view.imagePlaneWarp ?? null, sourceLayout: view.sourceLayout,
       channelAnglesRad: new Float64Array(20), platenTravelM: 0, penTravelM: 0, effectiveBankDriveTurns: 0 }
     mechanismDraws.set(view.id, draw)
@@ -270,7 +239,6 @@ function applyView(view: PlaybackView): void {
   draw.mechanicalProvenance = view.mechanicalProvenance
   draw.unobservedInputFields = view.unobservedInputFields
   draw.nativeGeometryAssumptions = view.nativeGeometryAssumptions
-  draw.sourceNonIdentifiableFixedParts = view.sourceNonIdentifiableFixedParts
   draw.imagePlaneWarp = view.authoredImagePlaneWarp
   draw.resolvedImagePlaneWarp = view.imagePlaneWarp ?? null
   draw.sourceLayout = view.sourceLayout
@@ -285,23 +253,6 @@ function drawSourceViews(views: readonly PlaybackView[], timeSeconds: number): v
   sourceDrawRevision++
   viewer.renderViews(views, beforeView, timeSeconds)
   for (const view of views) {
-    if (view.sourceNonIdentifiableFixedParts.length && new URLSearchParams(location.search).get('verify') === '1') {
-      const capture = viewer.readRenderedPartVisibility(view.id)
-      let failure = capture.status !== 'captured' || capture.timeSeconds !== timeSeconds ? 'Actual native ID pixels are unavailable for source-non-identifiable fixed parts.' : ''
-      for (const part of view.sourceNonIdentifiableFixedParts) {
-        const rendered = capture.parts.find((candidate) => candidate.partPath === part.nativePartPath)
-        const bounds = rendered?.sourceExtentPixels
-        const [x, y, w, h] = part.rectSourcePixels
-        if (!rendered || (rendered.status === 'visible' && (!bounds || bounds.some((value) => !Number.isFinite(value))
-          || bounds[0] < x || bounds[1] < y || bounds[2] > x + w || bounds[3] > y + h))) failure = `Source-non-identifiable fixed part ${part.nativePartPath} has native ID pixel cells outside its declared source region.`
-      }
-      if (failure) {
-        referenceState = 'unavailable'
-        activeViews = []
-        notice(sourceError, failure)
-        throw new Error(failure)
-      }
-    }
     const draw = mechanismDraws.get(view.id)
     if (draw?.sourceDrawRevision === sourceDrawRevision) draw.status = 'rendered'
   }
@@ -316,7 +267,6 @@ function renderedMechanism(viewId: string) {
     method: 'actual-native-mechanism-solve' as const, input: serializeInput(draw.input),
     mechanicalProvenance: draw.mechanicalProvenance, unobservedInputFields: draw.unobservedInputFields,
     nativeGeometryAssumptions: draw.nativeGeometryAssumptions,
-    sourceNonIdentifiableFixedParts: draw.sourceNonIdentifiableFixedParts,
     imagePlaneWarp: draw.imagePlaneWarp, resolvedImagePlaneWarp: draw.resolvedImagePlaneWarp, sourceLayout: draw.sourceLayout,
     channelAnglesRad: Array.from(draw.channelAnglesRad), platenTravelM: draw.platenTravelM, penTravelM: draw.penTravelM, effectiveBankDriveTurns: draw.effectiveBankDriveTurns,
   }
@@ -335,32 +285,15 @@ function sourceCapture<T extends {
     && equalRecord(draw.sourceLayout, capture.sourceLayout)
   return {
     ...capture,
-    status: capture.status === 'captured' && (!bound || mode === 'exploring' || referenceState === 'unavailable' || capture.timeSeconds !== modelTime) ? 'stale' as const : capture.status,
+    status: capture.status === 'captured' && (mode !== 'reference-review' || referenceSeek !== 'idle' || player?.getState() !== 'paused') ? 'unavailable' as const
+      : capture.status === 'captured' && (!bound || referenceState === 'unavailable' || capture.timeSeconds !== modelTime) ? 'stale' as const : capture.status,
     imagePlaneWarp: bound ? draw.imagePlaneWarp : null,
   }
 }
 
-function nativeLines(viewId: string) {
-  const capture = sourceCapture(viewer.readRenderedNativeLines(viewId))
-  const view = activeViews.find((candidate) => candidate.id === viewId)
-  if (!view || mode === 'exploring') return { ...capture, status: capture.status === 'captured' ? 'stale' as const : capture.status, lines: [] }
-  if (capture.status !== 'captured') return capture
-  return {
-    ...capture,
-    lines: view.nativeLineChecks.map((check) => {
-      const probeId = JSON.stringify([viewId, check.id, check.partPath, check.partLocalLineMetres])
-      const index = nativeLineProbeIndices.get(probeId)
-      const line = index === undefined ? undefined : capture.lines[index]
-      return line?.id === probeId ? { ...line, id: check.id, probeId } : {
-        id: check.id, probeId, state: 'unresolved' as const, pixelCount: 0, sourceSamples: [],
-        canvasExtentPixels: null, sourceExtentPixels: null, uncertaintySourcePixels: null,
-        samplingGapSourcePixels: null, reason: 'Current source line has no bound native GPU probe.',
-      }
-    }),
-  }
-}
 
 function renderSource(timeSeconds: number): void {
+  configureLandmarkProbe()
   if (!reference || !machine || machine.availability !== 'available') {
     referenceState = 'unavailable'
     renderPending()
@@ -368,7 +301,7 @@ function renderSource(timeSeconds: number): void {
   }
   const prepared = reference.prepareAt(timeSeconds)
   if (prepared.state !== 'unavailable') {
-    validateSourceViews(prepared.views, reference.sourcePartOverrides)
+    validateSourceViews(prepared.views)
     viewer.preflightViews(prepared.views)
   }
   const sample = reference.commitPrepared()
@@ -389,11 +322,7 @@ function renderSource(timeSeconds: number): void {
   }
   modelTime = timeSeconds
   notice(physicsError, '')
-  if (reference.data.coverage.status === 'blocked') {
-    notice(sourceError, `Source coverage is not complete: ${reference.coverageMessage}`)
-  } else {
-    notice(sourceError, '')
-  }
+  notice(sourceError, reference.approximationMessage)
 }
 
 function beforeView(_view: SourceView, index: number): void {
@@ -404,18 +333,16 @@ function beforeView(_view: SourceView, index: number): void {
 function updateHud(): void {
   const time = player?.getTime() ?? 0
   const chosen = mode === 'exploring' ? undefined : primaryView()
-  const constrained = chosen?.mechanicalProvenance === 'constrained'
   const context = mode === 'exploring'
     ? explorationOrigin === 'chosen-feasible-reconstruction' ? 'Manual exploration from chosen feasible reconstruction (not recovered history)' : 'Manual exploration'
-    : referenceState === 'held' ? constrained ? 'Holding source-visible reconstruction; hidden settings unobserved' : 'Holding last matched machine pose'
-      : referenceState === 'matched' ? !chosen ? 'No visible source-composite contribution; settings unobserved' : constrained ? 'Source-visible reconstruction; hidden settings unobserved' : 'Following measured source pose'
-        : referenceState === 'no-machine' ? 'No corresponding machine in this source interval' : 'Source pose not verified'
+    : referenceState === 'approximate' ? 'Approximate source-following; chosen inputs, not recovered history or a final matched result'
+      : referenceState === 'no-machine' ? 'No corresponding machine in this source interval' : 'Source pose unavailable'
   const hidden = chosen?.unobservedInputFields ?? []
   const valueLabel = (field: InputField, value: string): string => `${value}${hidden.includes(field) ? ' · chosen, not measured' : mode !== 'exploring' && !chosen ? ' · not source-measured' : ''}`
   const markControl = (control: HTMLInputElement | HTMLSelectElement, field: InputField): void => {
     const provenance = mode === 'exploring' ? 'manual' : !chosen ? 'unobserved' : hidden.includes(field) ? 'chosen' : 'measured'
     control.dataset.provenance = provenance
-    control.title = provenance === 'chosen' ? 'Witness choice; source setting unobserved, not measured.' : provenance === 'manual' ? 'Manual physical input; not a source measurement.' : provenance === 'unobserved' ? 'Source setting unobserved; retained physical input is not measured.' : 'Source-measured input.'
+    control.title = provenance === 'chosen' ? 'Chosen physically feasible input; source setting unobserved, not measured.' : provenance === 'manual' ? 'Manual physical input; not a source measurement.' : provenance === 'unobserved' ? 'Source setting unobserved; retained physical input is not measured.' : 'Source-measured input.'
   }
   markControl(crank, 'crankTurns')
   markControl(gearing, 'gearing')
@@ -430,9 +357,7 @@ function updateHud(): void {
       ? ' · Rod-head topology assumed pending CAD match; not geometric-fidelity passed'
       : ' · Two lower-rocker side-face features absent and uncertified; narrow functional exception, not geometric-fidelity passed'
   }
-  const fixedParts = mode === 'exploring' ? explorationSourceNonIdentifiableFixedParts : activeViews.flatMap((view) => view.sourceNonIdentifiableFixedParts)
-  const uncertifiedFixed = fixedParts.length ? ` · Source-non-identifiable fixed parts: ${[...new Set(fixedParts.map((part) => part.nativePartPath))].join(', ')}; not geometric-fidelity passed` : ''
-  status.textContent = `${stateLabels[playbackState]} · ${time.toFixed(1)} s · ${context}${geometryAssumption}${uncertifiedFixed}`
+  status.textContent = `${stateLabels[playbackState]} · ${time.toFixed(1)} s · ${context}${geometryAssumption}`
   crank.value = String(input.crankTurns)
   element<HTMLOutputElement>('#crank-value').value = valueLabel('crankTurns', `${input.crankTurns.toFixed(3)} turns`)
   gearing.value = input.gearing
@@ -465,7 +390,7 @@ function updateHud(): void {
     maximum = Math.max(maximum, force)
   }
   const forceView = mode === 'exploring' ? undefined : activeViews[activeViews.length - 1]
-  const forceProvenance = forceView?.mechanicalProvenance === 'constrained' ? 'Witness-only calculated loads/feed — not source measurements' : mode === 'exploring' ? 'Manual physical calculation — not source measurements' : forceView ? 'Calculated from observed source inputs' : 'Last physical calculation — source reconstruction unavailable, not source-measured'
+  const forceProvenance = mode === 'exploring' ? 'Manual physical calculation — not source measurements' : forceView ? 'Chosen-input physical calculation — not source measurements' : 'Last physical calculation — source reconstruction unavailable, not source-measured'
   const counterChoice = forceView?.unobservedInputFields.includes('setup.counterHeightM') ? `\nCounter ${forceView.input.setup.counterHeightM === null ? 'auto-level algorithm' : 'height'} chosen, not measured` : ''
   forceReadout.value = `${forceProvenance}${forceView ? ` · view ${forceView.id}` : ''}\n20 springs · ${minimum.toFixed(2)}–${maximum.toFixed(2)} N\nTorque residual ${machine.pose.equilibriumResidualNm.toExponential(1)} N·m\nPaper feed ${(machine.pose.platenTravelM * 1000).toFixed(2)} mm${counterChoice}`
 }
@@ -513,7 +438,9 @@ function buildVideoNavigation(): void {
   const navigation = element('#videos')
   for (const entry of VIDEOS) {
     const link = document.createElement('a')
-    link.href = `?video=${entry.slug}`
+    const route = new URL(location.href)
+    route.searchParams.set('video', entry.slug)
+    link.href = route.href
     link.dataset.videoId = entry.id
     link.textContent = videoLabels[entry.id]!
     link.title = entry.title
@@ -536,7 +463,7 @@ async function selectVideo(next: Video): Promise<void> {
   reference = null
   activeViews = []
   explorationOrigin = 'interactive-default'
-  viewer.setLandmarkProbe(null)
+  configureLandmarkProbe()
   referenceSeek = 'idle'
   video = next
   videoContainer.replaceChildren()
@@ -570,7 +497,8 @@ async function selectVideo(next: Video): Promise<void> {
     if (!selection.signal.aborted) notice(sourceError, error instanceof Error ? error.message : String(error))
   })
   try {
-    const created = await createVideoPlayer(videoContainer, next.id, (state) => {
+    const createPlayer = new URLSearchParams(location.search).get('referenceMedia') === '1' ? createSourceVideoPlayer : createVideoPlayer
+    const created = await createPlayer(videoContainer, next.id, (state) => {
       if (selection.signal.aborted) return
       playbackState = state
       if (state === 'playing') {
@@ -608,7 +536,7 @@ function selectRoute(): void {
     video = null
     reference = null
     activeViews = []
-    viewer.setLandmarkProbe(null)
+    configureLandmarkProbe()
     mode = 'exploring'
     viewer.setInteraction('exploring')
     title.textContent = 'Unknown video'
@@ -751,7 +679,7 @@ compactButton.addEventListener('click', () => {
 retryModel.addEventListener('click', () => { void fetchMachine() })
 window.addEventListener('popstate', selectRoute)
 
-if (new URLSearchParams(location.search).get('verify') === '1') {
+if (verificationEnabled) {
   const bridge = {
     snapshot() {
       const chosen = mode === 'exploring' ? undefined : primaryView()
@@ -759,29 +687,33 @@ if (new URLSearchParams(location.search).get('verify') === '1') {
         videoId: video?.id ?? null, playerVideoId: player?.getVideoId() ?? null, mode, playerState: player?.getState() ?? playbackState,
         videoTime: player?.getTime() ?? null, modelTime, referenceState, modelState, missingBindings: machine?.missing ?? [],
         modelProvenance: machine?.provenance ?? null, camera: cameraRecord(), input: serializeInput(input),
+        sourceDrawRevision, sourceDrawTimeSeconds, diagnosticCapture: diagnosticReference !== null && diagnosticReference === reference && diagnosticMachine === machine && mode === 'reference-review' && referenceSeek === 'idle' && player?.getState() === 'paused' ? 'paused-reference-review' : 'disabled',
+        sourceFollowing: reference ? { kind: reference.kind, stageLadder: SOURCE_STAGE_PERCENTAGES, finalTolerancePx: LANDMARK_LIMIT_PX, stages: reference.stageStatus, stageEvidence: 'unmeasured: no independently bound rendered report loaded', sourceMeasurements: reference.data.sourceMeasurements ?? null } : null,
         imagePlaneWarp: chosen ? chosen.authoredImagePlaneWarp : null,
         resolvedImagePlaneWarp: chosen?.imagePlaneWarp ?? null,
         sourceLayout: chosen?.sourceLayout ?? [],
         mechanicalProvenance: mode === 'exploring' ? null : primaryView()?.mechanicalProvenance ?? null,
         unobservedInputFields: mode === 'exploring' ? INPUT_FIELDS : primaryView()?.unobservedInputFields ?? INPUT_FIELDS,
-        constraintSummary: mode === 'exploring' ? [] : primaryView()?.constraintSummary ?? [],
-        explorationOrigin, inputMeaning: mode === 'exploring' ? 'manual-physical-input' : !primaryView() ? 'unverified-retained-physical-input' : primaryView()?.mechanicalProvenance === 'constrained' ? 'chosen-feasible-witness' : 'observed-source-input',
+        explorationOrigin, inputMeaning: mode === 'exploring' ? 'manual-physical-input' : !primaryView() ? 'unverified-retained-physical-input' : 'chosen-feasible-approximation',
         nativeGeometryAssumptions: reference?.data.nativeGeometryAssumptions ?? [],
-        sourceNonIdentifiableFixedParts: mode === 'exploring' ? explorationSourceNonIdentifiableFixedParts : activeViews.flatMap((view) => view.sourceNonIdentifiableFixedParts),
         physics: machine && physicsState === 'available' ? { renderedViewId: mode === 'exploring' ? 'exploring' : activeViews[activeViews.length - 1]?.id ?? null, mechanicalProvenance: mode === 'exploring' ? null : activeViews[activeViews.length - 1]?.mechanicalProvenance ?? null, springForcesN: Array.from(machine.pose.springForcesN), springLengthsM: Array.from(machine.pose.springLengthsM), equilibriumResidualNm: machine.pose.equilibriumResidualNm, platenTravelM: machine.pose.platenTravelM, summingAngleRad: machine.pose.summingAngleRad } : null,
         playerAudio: player?.getAudio() ?? null,
-        views: activeViews.map((view) => ({ id: view.id, rectSourcePixels: view.rectSourcePixels, presentation: view.presentation, composite: view.composite, compositeEvidence: view.compositeEvidence, imagePlaneWarp: view.authoredImagePlaneWarp, resolvedImagePlaneWarp: view.imagePlaneWarp ?? null, sourceLayout: view.sourceLayout, camera: view.camera, input: serializeInput(view.input), mechanicalProvenance: view.mechanicalProvenance, unobservedInputFields: view.unobservedInputFields, constraintSummary: view.constraintSummary, visibilityProof: view.visibilityProof, visibilityProofEnd: view.visibilityProofEnd, sourceSampling: view.sourceSampling, continuity: view.continuity, partOverrides: view.partOverrides, nativeGeometryAssumptions: view.nativeGeometryAssumptions, sourceNonIdentifiableFixedParts: view.sourceNonIdentifiableFixedParts, nativeLineChecks: view.nativeLineChecks, sourceContourChecks: view.sourceContourChecks, renderedMechanism: renderedMechanism(view.id) })),
+        views: activeViews.map((view) => ({ id: view.id, rectSourcePixels: view.rectSourcePixels, presentation: view.presentation, composite: view.composite, imagePlaneWarp: view.authoredImagePlaneWarp, resolvedImagePlaneWarp: view.imagePlaneWarp ?? null, sourceLayout: view.sourceLayout, camera: view.camera, input: serializeInput(view.input), mechanicalProvenance: view.mechanicalProvenance, unobservedInputFields: view.unobservedInputFields, sourceSampling: view.sourceSampling, nativeGeometryAssumptions: view.nativeGeometryAssumptions, renderedMechanism: renderedMechanism(view.id) })),
       }
     },
     referenceData() { return reference?.data ?? null },
-    async reviewReferenceFrame(timeSeconds: number) {
+    compactData() { return reference?.data ?? null },
+    pauseVideo() { player?.pause(); return this.snapshot() },
+    playVideo() { player?.play(); return this.snapshot() },
+    async reviewReferenceFrame(timeSeconds: number, sourceTimeSeconds = timeSeconds) {
       const nativePlayer = player
       if (nativePlayer?.getState() !== 'paused') throw new Error('Pause the actual source video before reviewing a reference frame.')
       if (!reference) throw new Error('Source observations are unavailable.')
       if (physicsState !== 'available') throw new Error('Restore a valid mechanical setup before reviewing a source frame.')
       if (referenceSeek === 'seeking') throw new Error('A native reference seek is already active.')
       if (!Number.isFinite(timeSeconds) || timeSeconds < 0) throw new Error('Reference time must be finite and nonnegative.')
-      if (reference.getState(timeSeconds) === 'unavailable') throw new Error('The requested source frame has no validated corresponding pose.')
+      if (!Number.isFinite(sourceTimeSeconds) || sourceTimeSeconds < 0 || Math.abs(sourceTimeSeconds - timeSeconds) > 0.5) throw new Error('Decoded source review time must be within 0.5s of its model sample.')
+      if (reference.getState(timeSeconds) === 'unavailable') throw new Error('The requested source frame has no available corresponding camera and feasible pose.')
       const previousView = mode === 'exploring' ? undefined : primaryView()
       const sourceCamera = previousView?.camera ?? cameraRecord()
       const previousCamera: CameraRecord = {
@@ -789,9 +721,8 @@ if (new URLSearchParams(location.search).get('verify') === '1') {
         quaternion: [...sourceCamera.quaternion],
         verticalFovDegrees: sourceCamera.verticalFovDegrees,
       }
-      const previousOverrides = previousView?.partOverrides
       const prepared = reference.prepareAt(timeSeconds)
-      validateSourceViews(prepared.views, reference.sourcePartOverrides)
+      validateSourceViews(prepared.views)
       viewer.preflightViews(prepared.views)
       copyInput(input, reviewRollbackInput)
       try {
@@ -799,10 +730,12 @@ if (new URLSearchParams(location.search).get('verify') === '1') {
         referenceSeek = 'seeking'
         viewer.setInteraction('following-video')
         updateControlState()
-        nativePlayer.seek(timeSeconds)
+        const sourceMedia = videoContainer.querySelector('video')
+        const seekTime = sourceMedia && sourceTimeSeconds >= sourceMedia.duration && sourceTimeSeconds - sourceMedia.duration <= 0.5 ? Math.max(0, sourceMedia.duration - 1e-6) : sourceTimeSeconds
+        nativePlayer.seek(seekTime)
         await new Promise<void>((resolve) => window.setTimeout(resolve, 40))
         const deadline = performance.now() + 20_000
-        while (nativePlayer.getState() !== 'paused' || Math.abs(nativePlayer.getTime() - timeSeconds) > 0.002) {
+        while (nativePlayer.getState() !== 'paused' || Math.abs(nativePlayer.getTime() - seekTime) > 0.002 || sourceMedia && (sourceMedia.seeking || sourceMedia.readyState < HTMLMediaElement.HAVE_CURRENT_DATA)) {
           if (nativePlayer !== player) throw new Error('The source video changed during reference review.')
           if (nativePlayer.getState() === 'error' || nativePlayer.getState() === 'ended') throw new Error('The actual source video cannot display the requested reference time.')
           if (performance.now() >= deadline) throw new Error('The actual source video did not settle at the requested paused reference time.')
@@ -811,16 +744,17 @@ if (new URLSearchParams(location.search).get('verify') === '1') {
         if (nativePlayer !== player) throw new Error('The source video changed during reference review.')
         referenceSeek = 'idle'
         renderSource(timeSeconds)
-        if (referenceState === 'unavailable') throw new Error('The requested source frame has no validated corresponding pose.')
+        if (referenceState === 'unavailable') throw new Error('The requested source frame has no available corresponding camera and feasible pose.')
         return this.snapshot()
       } catch (error) {
         if (nativePlayer === player) {
           referenceSeek = 'idle'
           mode = 'exploring'
+          configureLandmarkProbe()
           activeViews = []
           referenceState = 'unavailable'
           copyInput(reviewRollbackInput)
-          updateMachine(input, previousOverrides)
+          updateMachine(input)
           viewer.applyCamera(previousCamera)
           viewer.setInteraction('exploring')
           nativePlayer.pause()
@@ -837,21 +771,23 @@ if (new URLSearchParams(location.search).get('verify') === '1') {
       return this.snapshot()
     },
     renderedLandmarks(viewId: string) {
+      if (mode !== 'reference-review' || referenceSeek !== 'idle' || player?.getState() !== 'paused') return null
       const capture = viewer.readRenderedLandmarks(viewId)
       return capture ? sourceCapture(capture) : null
     },
-    renderedPartVisibility(viewId: string) { return sourceCapture(viewer.readRenderedPartVisibility(viewId)) },
+    renderedPartVisibility(viewId: string) {
+      const capture = sourceCapture(viewer.readRenderedPartVisibility(viewId))
+      return mode === 'reference-review' && referenceSeek === 'idle' && player?.getState() === 'paused' ? capture : { ...capture, status: 'unavailable' as const, parts: [] }
+    },
+    enablePartVisibility() {
+      if (mode !== 'reference-review' || referenceSeek !== 'idle' || player?.getState() !== 'paused') throw new Error('Pause and review an actual source frame before enabling native visibility capture.')
+      configureLandmarkProbe()
+      if (machine?.availability !== 'available') throw new Error('A compatible native mechanism is required.')
+      viewer.setPartVisibilityProbe(machine.createPartVisibilityProbe())
+      if (activeViews.length) drawSourceViews(activeViews, modelTime)
+    },
     renderedMechanism,
-    nativeLines,
-    assertNativeLinesWithinRestBounds(anchors: readonly NativeLineAnchor[]): void {
-      if (machine?.availability !== 'available') throw new Error('A compatible native mechanism is required.')
-      machine.assertNativeLinesWithinRestBounds(anchors)
-    },
     assertSourceCompositeWeights,
-    assertNativeStructuralFixedParts(paths: readonly string[], sourceOverrides: readonly PlaybackView['partOverrides'][number][]): void {
-      if (machine?.availability !== 'available') throw new Error('A compatible native mechanism is required.')
-      machine.assertNativeStructuralFixedParts(paths, sourceOverrides)
-    },
     followVideo() {
       if (player) renderSource(player.getTime())
       if (referenceState === 'unavailable') return

@@ -1,1209 +1,616 @@
 #!/usr/bin/env node
-import { mkdir, writeFile, stat } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { VIDEO_IDS, MODEL_SHA256, MODEL_COMMIT, PIXEL_LIMIT, CLOCK_LIMIT, loadReferences, frameViews, sourceNeedsMachine, sourceCompositeErrors, sourceLayoutForViews, independentlyResolvedWarp, sameResolvedImagePlaneWarp, sameSourceLayout, sourcePointUnmasked, sourceSupportPolygon, sourceLocalizationFootprintBounds, nativeLineAxisGeometryBound, nonIdentifiableFixedPartErrors, sourceOcclusionErrors, sourceImageError, canonicalJson, requiredRuns, frameIndexAt, errorStats, jsonDigest } from './verify-reference.mjs'
+import { VIDEO_IDS, MODEL_SHA256, MODEL_COMMIT, CLOCK_LIMIT, probeSource, verifyFrameImages, nearestPtsIndex, sourceNeedsMachine, frameViews, sourcePointUnmasked, jsonDigest } from './verify-reference.mjs'
 import { distManifest, serveDist } from './verify-server.mjs'
 
 const WEB_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-/** Independent DOM-letterbox cross-check of GPU marker canvas vs source coordinates, in CSS px. */
-const VIEWPORT_MAPPING_LIMIT_PX = 0.75
-/** Media identity only (rejects ads/wrong content); not a fidelity threshold. */
-const NATIVE_DURATION_TOLERANCE_SECONDS = 1
-/** A paused HTMLMediaElement may not advance more than this. */
-const PAUSED_DRIFT_SECONDS = 0.1
-/** Bounded wait for the official player's own seek/decode after reviewReferenceFrame resolves. */
-const NATIVE_SEEK_TIMEOUT_MS = 15_000
-const NATIVE_SEEK_POLL_MS = 50
-/** Frame-identity window: a requested source time must be the nearest native exposure (half a frame). */
-const seekToleranceSeconds = record => 0.5 / record.native.fps
-/** Held poses are exact copies of an earlier required frame's observed camera. */
-const CAMERA_TOLERANCE = 1e-7
-/** No-machine samples must leave exploratory geometry/camera untouched. */
-const UNCHANGED_TOLERANCE = 1e-9
-/** Clock proof needs >=1 s of draws inside a required run with a CLOCK_LIMIT guard band at each end. */
-const MIN_CLOCK_RUN_SECONDS = 1 + 2 * CLOCK_LIMIT + 0.5
+const STAGES = [50, 20, 10, 5]
+const VIDEO_SLUGS = ['intro-history', 'synthesis', 'analysis', 'operation', 'machine-spin', 'rocker-arms']
+const SOURCE_HASHES = [
+  '595b0ec7b1e1a0b3523d72d33f6e0950bd97dda5ab7032bf91c3e5b9fb7d225d',
+  'a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725',
+  '5fc75341c088475bdcbad1764a8d99269f51bc287495063072a760a935319a52',
+  'ec0dcdef13700bab2f318f74f9be5591c89b409ae5c5028be468b727284410e3',
+  '52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505',
+  '351bdf54ae64475645ee4904df43af979629c7dab62c47765276faea05adbf4a',
+]
+const finite = value => typeof value === 'number' && Number.isFinite(value)
+const point = value => Array.isArray(value) && value.length === 2 && value.every(finite)
+const assert = (condition, reason) => { if (!condition) throw new Error(reason) }
 const digest = bytes => createHash('sha256').update(bytes).digest('hex')
 const delay = ms => new Promise(done => setTimeout(done, ms))
-const finite = value => typeof value === 'number' && Number.isFinite(value)
-const vec2 = value => Array.isArray(value) && value.length === 2 && value.every(finite)
-function requireCondition(condition, message) { if (!condition) throw new Error(message) }
-function fail(report, code, detail, extra = {}) { report.failures.push({ code, detail, ...extra }) }
-function nearlyEqual(a, b, tolerance) {
-  if (finite(a) && finite(b)) return Math.abs(a - b) <= tolerance
-  if (Array.isArray(a) && Array.isArray(b)) return a.length === b.length && a.every((value, index) => nearlyEqual(value, b[index], tolerance))
-  if (a && b && typeof a === 'object' && typeof b === 'object') {
-    const keys = Object.keys(a)
-    return keys.length === Object.keys(b).length && keys.every(key => Object.hasOwn(b, key) && nearlyEqual(a[key], b[key], tolerance))
-  }
-  return a === b
-}
-const sameCamera = (a, b, rect = null) => !!a && !!b && nearlyEqual(a.positionMetres, b.positionMetres, CAMERA_TOLERANCE) && (nearlyEqual(a.quaternion, b.quaternion, CAMERA_TOLERANCE) || nearlyEqual(a.quaternion, b.quaternion?.map(value => -value), CAMERA_TOLERANCE)) && nearlyEqual(a.verticalFovDegrees, b.verticalFovDegrees, CAMERA_TOLERANCE) && nearlyEqual(a.principalPointViewportPixels ?? (rect ? [rect[2] / 2, rect[3] / 2] : null), b.principalPointViewportPixels ?? (rect ? [rect[2] / 2, rect[3] / 2] : null), CAMERA_TOLERANCE)
-const nativeCameraRect = view => view.imagePlaneWarp ? [0,0,...view.imagePlaneWarp.unwarpedViewportPixels] : view.rectSourcePixels
-const expectedLayout = view => view.sourceLayout ?? (view.mechanicalState?.runtimeWitness?.visibilityProof ?? view.mechanicalState?.visibilityProof)?.binding?.sourceLayout
-/** Explicit derived H/support binding is mandatory even for ordinary null-warp captures. */
-export function sourceCaptureBindingErrors(view,capture) {
-  const errors=[],warp=independentlyResolvedWarp(view),layout=expectedLayout(view)
-  if(!capture||!Object.hasOwn(capture,'resolvedImagePlaneWarp')||!sameResolvedImagePlaneWarp(capture.resolvedImagePlaneWarp,warp)||!sameSourceLayout(capture.sourceLayout,layout)) errors.push('Actual native capture has stale/missing resolved homography or ordered source support layout')
-  if(capture?.method==='actual-native-mechanism-solve') {
-    if(!Object.hasOwn(capture,'imagePlaneWarp')||jsonDigest(capture.imagePlaneWarp)!==jsonDigest(view.imagePlaneWarp??null)) errors.push('Actual mechanism authored warp is stale/missing')
-  } else if(capture?.presentation!==view.presentation) errors.push('Actual native capture presentation metadata is stale/mismatched; H already consumes its orientation')
-  return errors
-}
-/** A matched draw cannot bridge point certificates or an unqualified interval. */
-export function renderedCertificateErrors(rendered,timeSeconds) {
-  const errors=[],covers=proof=>{
-    const interval=proof?.binding?.intervalSeconds
-    return Array.isArray(interval)&&interval.length===2&&interval.every(finite)&&interval[0]<=timeSeconds&&interval[1]>=timeSeconds
-  }
-  if(!finite(timeSeconds)||!covers(rendered?.visibilityProof)) errors.push('Matched native draw is outside the current independently bound visibility certificate interval')
-  const sampling=rendered?.sourceSampling
-  if(!sampling||!['continuous','decoded-exposure'].includes(sampling.selection)||!finite(sampling.mix)||sampling.mix<0||sampling.mix>1||!finite(sampling.fromTimeSeconds)||!finite(sampling.toTimeSeconds)||sampling.fromTimeSeconds>sampling.toTimeSeconds) errors.push('Matched native draw lacks explicit continuous/decoded-exposure source sampling')
-  else if(sampling.selection==='decoded-exposure') {
-    if(sampling.mix!==0||sampling.fromTimeSeconds!==sampling.toTimeSeconds||rendered.visibilityProofEnd!==null) errors.push('Certified decoded-exposure hold cannot interpolate endpoints or an H trajectory')
-  } else if(sampling.mix>0&&!covers(rendered.visibilityProofEnd)) errors.push('Continuous native draw is outside its separately bound endpoint certificate interval')
-  return errors
-}
-/** Conservative closed SAT: touching a later blocking support is not unmasked. */
-function rectangleIntersectsSourcePolygon(rectangle,polygon) {
-  if(polygon.length<3) return false
-  const axes=[[1,0],[0,1]]
-  for(let i=0;i<polygon.length;i++) {
-    const a=polygon[i],b=polygon[(i+1)%polygon.length]
-    axes.push([a[1]-b[1],b[0]-a[0]])
-  }
-  for(const [x,y] of axes) {
-    const rectangleProjection=rectangle.map(point=>point[0]*x+point[1]*y),polygonProjection=polygon.map(point=>point[0]*x+point[1]*y)
-    if(Math.max(...rectangleProjection)<Math.min(...polygonProjection)||Math.max(...polygonProjection)<Math.min(...rectangleProjection)) return false
-  }
-  return true
-}
-/** The full possible continuous ID-boundary witness must remain unmasked. */
-function nativeContourSupportErrors(view,capture,part,minimum) {
-  const errors=[],layout=expectedLayout(view),index=layout?.findIndex(item=>item.viewId===view.id),cell=capture.destinationCellSourcePixels
-  if(!Array.isArray(part.contourSourcePixels)||!part.contourSourcePixels.every(vec2)||!Number.isInteger(part.contourPixelCount)||part.contourPixelCount<part.contourSourcePixels.length) return [`Actual visible native part lacks qualified depth-ID boundary pixels: ${part.partPath}`]
-  if(!finite(part.uncertaintySourcePixels)||part.uncertaintySourcePixels<0) return [`Actual native contour has unknown continuous-boundary support uncertainty: ${part.partPath}`]
-  // The independently required native Q cannot be understated. A producer's
-  // additional mirror-stage/rounded-camera term must also expand the witness.
-  const q=Math.max(0,minimum-Math.max(...cell),part.uncertaintySourcePixels-Math.max(...cell)),own=layout[index],a=own.composite??{mode:'opaque'},blocking=[]
-  for(const later of layout.slice(index+1)) {
-    const b=later.composite??{mode:'opaque'},sameImage=a.mode==='crossfade'&&b.mode==='crossfade'&&a.groupId===b.groupId&&a.imageLayerId===b.imageLayerId
-    const independentFade=a.mode==='crossfade'&&b.mode==='crossfade'&&a.groupId===b.groupId&&!sameImage
-    if(!independentFade&&(sameImage||b.mode==='opaque'||b.opacity===1)) blocking.push(sourceSupportPolygon(later))
-  }
-  if(part.contourSourcePixels.some(([x,y])=>{
-    const neighbours=[[x,y],[x-cell[0],y],[x+cell[0],y],[x,y-cell[1]],[x,y+cell[1]]]
-    const dx=cell[0]+q,dy=cell[1]+q,rectangle=[[x-dx,y-dy],[x+dx,y-dy],[x+dx,y+dy],[x-dx,y+dy]]
-    return neighbours.some(point=>!sourcePointUnmasked(layout,index,point))
-      ||rectangle.some(point=>!sourcePointUnmasked(layout,index,point))
-      ||blocking.some(polygon=>rectangleIntersectsSourcePolygon(rectangle,polygon))
-  })) errors.push(`Actual native contour lacks four supported neighbours and a fully unmasked continuous-boundary witness rectangle: ${part.partPath}`)
-  return errors
-}
-/** Independently inspect actual sparse readback support; no CPU visibility surrogate. */
-export function nativeRasterSupportErrors(view,capture) {
-  const errors=sourceCaptureBindingErrors(view,capture)
-  if(capture?.method!=='gpu-readback'||capture.status!=='captured'||!['depth-off-landmark-projection','depth-off-native-line-projection','depth-tested-native-surfaces'].includes(capture.visibilityMode)) return [...errors,'Native support requires a fresh actual GPU diagnostic raster, not CPU visibility/projection']
-  const layout=expectedLayout(view),index=layout?.findIndex(item=>item.viewId===view.id)
-  if(index===undefined||index<0) return [...errors,'Native support layout omits the actual view identity']
-  let minimum
-  try { minimum=minimumRasterUncertaintyBound(view,capture) } catch(error) { errors.push(error.message);return errors }
-  const points=[]
-  if(capture.visibilityMode==='depth-tested-native-surfaces') {
-    if(!Array.isArray(capture.parts)||capture.parts.length<435||new Set(capture.parts.map(part=>part.partPath)).size!==capture.parts.length) errors.push('Native support requires the complete unique all435 depth-ID census')
-    for(const part of capture.parts??[]) if(part.pixelCount>0) {
-      const contourErrors=nativeContourSupportErrors(view,capture,part,minimum)
-      errors.push(...contourErrors)
-      if(!contourErrors.length) points.push(...part.contourSourcePixels)
+const maximumField = (rows, field) => rows.reduce((maximum, row) => finite(row[field]) ? Math.max(maximum ?? 0, row[field]) : maximum, null)
+const HELP = `Usage: npm --prefix web run verify:sync -- [--stage 50|20|10|5] [--video <id|slug>] [--from seconds --to seconds | --times t,t,...] [--player local|youtube|both] [--headless|--headed] [--output directory]\nDefault: ALL SIX videos, final 5% of the 1920px frame width = 96px, timing <=0.5s, headless Chromium.\nStages 50/20/10/5 are ERROR tolerances (960/384/192/96px), never coverage fractions.\nPer-video and time-scoped runs measure available samples without an all-six preflight. A time-scoped report is partial, NEVER a whole-video stage pass. Stage 5 requires actual official YouTube playback/audio/compact checks; coarse stages default to byte-identical local original playback.\nRequires built dist, original MP4s in HARMONIC_REFERENCE_ROOT/videos (default web/.vite/reference-root), ffprobe/ffmpeg and Playwright Chromium. No attempt cap. Old certification code remains in git history; retained private diagnostic evidence is unchanged.\nExamples:\n  npm --prefix web run verify:sync -- --stage 50 --video analysis --times 117,118,119\n  npm --prefix web run verify:sync -- --stage 20 --video machine-spin\n  npm --prefix web run verify:sync\n`
+
+export function parseOptions(args) {
+  const options = { stage: 5, videos: [], from: null, to: null, times: null, player: null, headed: process.env.HARMONIC_HEADLESS === '0', output: null }
+  for (let index = 0; index < args.length; index++) {
+    const option = args[index]
+    if (option === '--help') return { help: true }
+    if (option === '--headed') { options.headed = true; continue }
+    if (option === '--headless') { options.headed = false; continue }
+    assert(['--stage', '--video', '--from', '--to', '--times', '--player', '--output'].includes(option), `Unknown option ${option}`)
+    const value = args[++index]
+    assert(value !== undefined && !value.startsWith('--'), `${option} requires a value`)
+    if (option === '--stage') options.stage = Number(value)
+    else if (option === '--video') {
+      const videoIndex = VIDEO_IDS.includes(value) ? VIDEO_IDS.indexOf(value) : VIDEO_SLUGS.indexOf(value)
+      assert(videoIndex >= 0, `Unknown retained video ${value}`)
+      if (!options.videos.includes(VIDEO_IDS[videoIndex])) options.videos.push(VIDEO_IDS[videoIndex])
+    } else if (option === '--times') {
+      assert(value.split(',').every(term => term.trim().length > 0), '--times cannot contain empty sample times')
+      options.times = value.split(',').map(Number)
     }
-  } else if(capture.visibilityMode==='depth-off-native-line-projection') {
-    for(const line of capture.lines??[]) if(line.state==='rendered') points.push(...(line.sourceSamples??[]))
-  } else if(capture.visibilityMode==='depth-off-landmark-projection') {
-    for(const landmark of capture.landmarks??[]) if(landmark.state==='rendered') points.push(landmark.sourcePixels)
+    else if (option === '--from') options.from = Number(value)
+    else if (option === '--to') options.to = Number(value)
+    else options[option.slice(2)] = value
   }
-  if(points.some(point=>!vec2(point)||!sourcePointUnmasked(layout,index,point))) errors.push('Actual GPU pixel-centre readback lies outside measured quad/ROI support or behind later same-image masking')
-  const entries=capture.visibilityMode==='depth-tested-native-surfaces'?(capture.parts??[]).filter(part=>part.pixelCount>0):capture.visibilityMode==='depth-off-native-line-projection'?(capture.lines??[]).filter(line=>line.state==='rendered'):(capture.landmarks??[]).filter(landmark=>landmark.state==='rendered')
-  if(entries.some(entry=>!finite(entry.uncertaintySourcePixels)||entry.uncertaintySourcePixels+1e-6<minimum)) errors.push('Actual GPU uncertainty omits independently bounded representation-specific native/destination raster quantization')
-  return errors
+  assert(STAGES.includes(options.stage), 'Stage must be one of 50,20,10,5')
+  for (const key of ['from', 'to']) assert(options[key] === null || (finite(options[key]) && options[key] >= 0), `${key} must be finite and nonnegative`)
+  assert(options.from === null || options.to === null || options.from <= options.to, '--from must not exceed --to')
+  assert(options.times === null || (options.times.length > 0 && options.times.every(time => finite(time) && time >= 0)), '--times needs finite nonnegative source times')
+  assert(options.times === null || (options.from === null && options.to === null), '--times cannot be combined with --from/--to')
+  options.player ??= options.stage === 5 ? 'both' : 'local'
+  assert(['local', 'youtube', 'both'].includes(options.player), '--player must be local, youtube or both')
+  if (!options.videos.length) options.videos = [...VIDEO_IDS]
+  options.scoped = options.times !== null || options.from !== null || options.to !== null
+  return options
 }
-/** Necessary mode-specific source-pixel floor; never certifies an uncut marker footprint. */
-export function warpedRasterUncertaintyBound(view,capture) {
-  requireCondition(capture?.method==='gpu-readback'&&capture.status==='captured'&&['depth-off-landmark-projection','depth-off-native-line-projection','depth-tested-native-surfaces'].includes(capture.visibilityMode),'Raster uncertainty needs a fresh actual GPU capture with a known sampling representation')
-  const entries=capture.visibilityMode==='depth-tested-native-surfaces'?capture.parts:capture.visibilityMode==='depth-off-native-line-projection'?capture.lines:capture.landmarks
-  requireCondition(Array.isArray(entries),'Raster uncertainty needs the actual representation-specific GPU readback entries')
-  requireCondition(typeof view.id==='string'&&view.id.length>0&&capture.viewId===view.id&&sourceCaptureBindingErrors(view,capture).length===0&&expectedLayout(view)?.some(member=>member.viewId===view.id),'Raster uncertainty needs the actual view, resolved homography, presentation and ordered support binding')
-  const native=capture.nativeViewportBackingPixels,destination=capture.destinationCellSourcePixels
-  requireCondition(vec2(destination)&&destination.every(value=>value>0),'Raster uncertainty needs actual final destination source-cell dimensions')
-  const warp=independentlyResolvedWarp(view)
-  if(!warp) {
-    requireCondition(native===null,'Ordinary raster capture must explicitly identify its inapplicable warped native backing dimensions')
-    return null
+
+function nearestFrame(frames, time, field = 'timeSeconds') {
+  let low = 0, high = frames.length
+  while (low < high) { const middle = (low + high) >>> 1; if (frames[middle][field] < time) low = middle + 1; else high = middle }
+  if (!low) return frames[0]
+  if (low === frames.length) return frames[low - 1]
+  return time - frames[low - 1][field] <= frames[low][field] - time ? frames[low - 1] : frames[low]
+}
+
+export function sourcePtsInShot(frame, shot) {
+  return Boolean(shot && finite(frame.decodedTimeSeconds) && shot.startSeconds <= frame.decodedTimeSeconds && frame.decodedTimeSeconds < shot.endSeconds)
+}
+
+/** Source census is retained separately from authored camera/input candidates. */
+export function sourceCensus(observations, track, native, options) {
+  const times = new Map(), sourceShots = track.shots ?? observations.shots
+  const originalShots = new Map(observations.shots.map(shot => [shot.id, shot]))
+  const compactShots = new Map(sourceShots.map(shot => [shot.id, shot]))
+  const add = (time, reason) => {
+    if (!finite(time) || time < 0 || time >= native.durationSeconds) return
+    const key = time.toFixed(6), row = times.get(key) ?? { timeSeconds: time, reasons: [] }
+    if (!row.reasons.includes(reason)) row.reasons.push(reason)
+    times.set(key, row)
   }
-  requireCondition(vec2(native)&&native.every(value=>Number.isInteger(value)&&value>0),'Warp raster needs actual native backing dimensions')
-  const [w,h]=warp.unwarpedViewportPixels,m=warp.renderToSourcePixels,points=[[0,0],[w,0],[w,h],[0,h]]
-  const denominators=points.map(p=>m[6]*p[0]+m[7]*p[1]+m[8])
-  requireCondition(denominators.every(value=>finite(value)&&value>1e-10),'Raster uncertainty crosses the positive projective branch')
-  const denominator=Math.min(...denominators)**2
-  const derivative=[
-    p=>(m[0]*m[7]-m[1]*m[6])*p[1]+m[0]*m[8]-m[2]*m[6],
-    p=>(m[1]*m[6]-m[0]*m[7])*p[0]+m[1]*m[8]-m[2]*m[7],
-    p=>(m[3]*m[7]-m[4]*m[6])*p[1]+m[3]*m[8]-m[5]*m[6],
-    p=>(m[4]*m[6]-m[3]*m[7])*p[0]+m[4]*m[8]-m[5]*m[7]]
-  const maxima=derivative.map(fn=>Math.max(...points.map(p=>Math.abs(fn(p))))/denominator),dx=w/native[0]/2,dy=h/native[1]/2
-  const q=Math.hypot(maxima[0]*dx+maxima[1]*dy,maxima[2]*dx+maxima[3]*dy)
-  let minimum
-  if(capture.visibilityMode==='depth-tested-native-surfaces') {
-    // A genuine supported four-neighbour ID transition crosses a rendered
-    // surface boundary: its final centre is within Q + one neighbour spacing.
-    // The producer must exclude readback cuts and non-surface primitives.
-    minimum=q+Math.max(...destination)
-  } else {
-    // A line sample can lie at the opposite native-cell edge from its true
-    // segment even for diagonal H. Only an exact separable affine marker
-    // centroid has the uncut-cell mean shortcut. Q is its necessary minimum;
-    // the producer still owes 2Q whenever ROI/scissor/later masks cut it.
-    const separableMarker=capture.visibilityMode==='depth-off-landmark-projection'&&m[6]===0&&m[7]===0&&((m[1]===0&&m[3]===0)||(m[0]===0&&m[4]===0))
-    minimum=(separableMarker?q:2*q)+Math.hypot(...destination)/2
+  for (let time = 0; time < native.durationSeconds; time++) add(time, 'every-second')
+  for (const time of track.coverage?.changeTimesSeconds ?? []) add(time, 'authored-change-point')
+  for (const shot of sourceShots) { add(shot.startSeconds, 'shot-start'); add(shot.endSeconds, 'shot-end') }
+  for (let index = 0; index < track.frames.length; index++) {
+    const frame = track.frames[index], next = track.frames[index + 1]
+    add(frame.timeSeconds, 'authored-sample')
+    if (next && next.shotId === frame.shotId && next.timeSeconds - frame.timeSeconds >= 0.125 && next.timeSeconds - frame.timeSeconds <= 2) add((frame.timeSeconds + next.timeSeconds) / 2, 'mid-interval')
   }
-  requireCondition(finite(minimum),'Raster uncertainty propagation is unbounded')
-  return minimum
-}
-
-function minimumRasterUncertaintyBound(view,capture) {
-  const warped=warpedRasterUncertaintyBound(view,capture)
-  return warped??(capture.visibilityMode==='depth-tested-native-surfaces'?Math.max(...capture.destinationCellSourcePixels):Math.hypot(...capture.destinationCellSourcePixels)/2)
-}
-
-/** All qualified observation uncertaintyPx values are already final source-global pixels. */
-export function sourceMeasurementUncertaintyLedger(view,observation,points) {
-  const footprint=sourceLocalizationFootprintBounds(view,observation,points)
-  const bound=observation.uncertaintyPx
-  return {type:'source-localization-raster-bound',coordinateSpace:'source-global',boundPx:bound,warpedFootprintValidated:footprint!==null}
-}
-/** Shared point/line/contour sum; each independent contribution occurs exactly once. */
-export function sourceRasterErrorLedger(view,observation,points,native,capture,rawResidualPx,geometryBiasSourcePixels=0,rasterFitDeviationSourcePixels=0) {
-  const sourceLocalization=sourceMeasurementUncertaintyLedger(view,observation,points)
-  requireCondition(finite(native?.uncertaintySourcePixels)&&native.uncertaintySourcePixels>=0,'Actual native source-pixel raster uncertainty is unavailable')
-  requireCondition([rawResidualPx,geometryBiasSourcePixels,rasterFitDeviationSourcePixels].every(value=>finite(value)&&value>=0),'Raster residual, geometry bias and fit deviation must be finite nonnegative source-pixel bounds')
-  const minimumNativeRasterUncertaintySourcePixels=minimumRasterUncertaintyBound(view,capture)
-  if(capture.visibilityMode==='depth-tested-native-surfaces') requireCondition(native.pixelCount>0&&native.contourSourcePixels?.length>0&&nativeContourSupportErrors(view,capture,native,minimumNativeRasterUncertaintySourcePixels).length===0,'Actual native contour lacks a supported four-neighbour and fully unmasked continuous-boundary witness')
-  requireCondition(native.uncertaintySourcePixels+1e-6>=minimumNativeRasterUncertaintySourcePixels,'Actual native uncertainty omits independently bounded native/destination raster quantization')
-  return {type:'source-global-raster-error-ledger',coordinateSpace:'source-global',rawResidualPx,sourceLocalization,sourceMeasurementUncertaintyPx:sourceLocalization.boundPx,nativeRasterUncertaintySourcePixels:native.uncertaintySourcePixels,minimumNativeRasterUncertaintySourcePixels,geometryBiasSourcePixels,rasterFitDeviationSourcePixels,errorPx:rawResidualPx+sourceLocalization.boundPx+native.uncertaintySourcePixels+geometryBiasSourcePixels+rasterFitDeviationSourcePixels}
-}
-/** Source localization/raster quantization is not a second native half-cell term. */
-export function landmarkRasterErrorLedger(view,observation,marker,capture) {
-  requireCondition(capture?.method==='gpu-readback'&&capture.status==='captured'&&capture.visibilityMode==='depth-off-landmark-projection','Landmark ledger requires the actual GPU marker capture')
-  requireCondition(vec2(observation?.pixel),'Landmark needs the actual independently observed source pixel')
-  requireCondition(marker?.state==='rendered'&&vec2(marker.sourcePixels),'Actual native marker source pixel is unavailable')
-  const rawResidualPx=Math.hypot(marker.sourcePixels[0]-observation.pixel[0],marker.sourcePixels[1]-observation.pixel[1])
-  return sourceRasterErrorLedger(view,observation,[observation.pixel],marker,capture,rawResidualPx)
-}
-/** An inclusive source allowance is certified, not subtracted heuristically. */
-export function finalSourceAxisBiasLedger(view,check,observed) {
-  const e=check.measurementEvidence,geometry=nativeLineAxisGeometryBound(view,check,observed)
-  return {type:'independent-axis-geometry-bound',declaredCoordinateSpace:e.axisPerspectiveBiasSpace??'source-global',declaredAxisPerspectiveBiasBoundPx:e.axisPerspectiveBiasBoundPx,...geometry}
-}
-
-async function apiSnapshot(page) { return page.evaluate(() => window.harmonicAnalyzer.snapshot()) }
-async function waitState(page, state, timeout = 20_000) {
-  await page.waitForFunction(expected => window.harmonicAnalyzer?.snapshot().playerState === expected, state, { timeout })
-}
-function checkSnapshot(snapshot, id) {
-  requireCondition(snapshot.videoId === id && snapshot.playerVideoId === id, `Actual YouTube/player route identity mismatch: ${snapshot.videoId}/${snapshot.playerVideoId}/${id}`)
-  requireCondition(snapshot.modelState === 'ready' && Array.isArray(snapshot.missingBindings) && !snapshot.missingBindings.length, `Authentic articulated model is not ready or has missing bindings: ${JSON.stringify(snapshot.missingBindings)}`)
-  const provenance = snapshot.modelProvenance
-  requireCondition(provenance?.identity === 'matched' && provenance.observedSha256 === MODEL_SHA256 && provenance.expectedSha256 === MODEL_SHA256 && provenance.sourceCommit === MODEL_COMMIT, 'Rendered model bytes/source revision do not match the released CAD export')
-  const physics = snapshot.physics
-  requireCondition(Array.isArray(physics?.springForcesN) && physics.springForcesN.length === 20 && physics.springForcesN.every(value => finite(value) && value >= 0), 'All twenty actual spring forces must be available')
-  requireCondition(Array.isArray(physics?.springLengthsM) && physics.springLengthsM.length === 20 && physics.springLengthsM.every(value => finite(value) && value > 0), 'All twenty actual spring lengths must be available')
-  requireCondition(['equilibriumResidualNm', 'platenTravelM', 'summingAngleRad'].every(key => finite(physics[key])), 'Physical equilibrium/output data is unavailable')
-}
-
-/**
- * Reads the renderer's last ACTUAL GPU marker capture per view (a pure read, not a
- * rerender or CPU projection) plus the real #stage canvas geometry. #stage is
- * itself the canvas element.
- */
-export function readRenderedState(viewIds) {
-  const api = window.harmonicAnalyzer
-  if (typeof api?.renderedLandmarks !== 'function' || typeof api?.renderedPartVisibility !== 'function' || typeof api?.renderedMechanism !== 'function') throw new Error('Verification bridge lacks genuine per-view GPU/physical capture APIs')
-  const captures = viewIds.map(viewId => ({
-    viewId,
-    capture: api.renderedLandmarks(viewId),
-    visibility: api.renderedPartVisibility(viewId),
-    mechanism: api.renderedMechanism(viewId),
-    nativeLines: typeof api.nativeLines === 'function' ? api.nativeLines(viewId) : null,
-  }))
-  const canvas = document.querySelector('#stage')
-  return { captures, canvas: { tag: canvas?.tagName ?? null, clientWidth: canvas?.clientWidth ?? 0, clientHeight: canvas?.clientHeight ?? 0, width: canvas?.width ?? 0, height: canvas?.height ?? 0, devicePixelRatio: window.devicePixelRatio } }
-}
-
-/** The real stage canvas must be visible and its backing store sized to its current layout. */
-function stageGate(canvas) {
-  requireCondition(canvas.tag === 'CANVAS', `#stage is not the rendered canvas element: ${canvas.tag}`)
-  requireCondition(canvas.clientWidth > 0 && canvas.clientHeight > 0, 'Actual source-render canvas viewport is hidden/empty')
-  requireCondition(Math.abs(canvas.width - canvas.clientWidth * canvas.devicePixelRatio) <= 1 && Math.abs(canvas.height - canvas.clientHeight * canvas.devicePixelRatio) <= 1, `Stale WebGL backing store ${canvas.width}×${canvas.height} for layout ${canvas.clientWidth}×${canvas.clientHeight}@${canvas.devicePixelRatio}`)
-  const width = Math.min(canvas.clientWidth, canvas.clientHeight * 1920 / 1080), height = width * 1080 / 1920
-  return { x: (canvas.clientWidth - width) / 2, y: (canvas.clientHeight - height) / 2, width, height }
-}
-
-async function nativeFrame(page, id) {
-  const iframe = page.locator('#video-player iframe')
-  requireCondition(await iframe.count() === 1, 'Exactly one visible native YouTube iframe is required')
-  const src = await iframe.getAttribute('src')
-  const url = new URL(src)
-  requireCondition(/(^|\.)youtube(?:-nocookie)?\.com$/.test(url.hostname) && url.pathname === `/embed/${id}`, `Wrong/non-native YouTube embed: ${src}`)
-  requireCondition(url.searchParams.get('controls') !== '0' && url.searchParams.get('mute') !== '1', 'Native controls/audio may not be disabled')
-  const handle = await iframe.elementHandle(), frame = await handle.contentFrame()
-  requireCondition(frame, 'Native YouTube frame did not load')
-  return { iframe, handle, frame, src }
-}
-
-/** Reads YouTube's own main HTMLMediaElement inside the official iframe, never an app alias. */
-async function nativeMedia(frame) {
-  return frame.evaluate(() => {
-    const player = document.querySelector('#movie_player')
-    const video = player?.querySelector('video.html5-main-video') ?? null
-    const control = document.querySelector('.ytp-play-button')
-    const controls = document.querySelector('.ytp-chrome-bottom')
-    const buttonRect = control?.getBoundingClientRect(), rect = controls?.getBoundingClientRect()
-    return {
-      mediaPresent: !!video, paused: video?.paused, seeking: video?.seeking, ended: video?.ended, muted: video?.muted, volume: video?.volume,
-      mediaTime: video?.currentTime, duration: video?.duration, readyState: video?.readyState ?? 0, videoWidth: video?.videoWidth ?? 0, videoHeight: video?.videoHeight ?? 0,
-      adShowing: !!player?.classList.contains('ad-showing'),
-      controls: !!controls && !!control, controlsHeight: rect?.height ?? 0, playButtonWidth: buttonRect?.width ?? 0, playButtonHeight: buttonRect?.height ?? 0,
-      error: document.querySelector('.ytp-error-content-wrap, .ytp-error')?.textContent?.trim() ?? '',
+  // Preserve real view membership/cut changes, not every exposure of continuous motion.
+  let precedingLayout = null
+  const framesByShot = new Map()
+  for (const frame of observations.frames) {
+    const layout = JSON.stringify([frame.shotId, frame.classification, frame.sourceMachineRequirement, frame.views?.map(view => [view.id, view.presentation])])
+    if (precedingLayout !== layout) add(frame.timeSeconds, 'retained-layout-change')
+    precedingLayout = layout
+    const shot = compactShots.get(frame.shotId) ?? originalShots.get(frame.shotId)
+    if (!shot || !finite(frame.decodedTimeSeconds) || frame.decodedTimeSeconds < shot.startSeconds || frame.decodedTimeSeconds >= shot.endSeconds) continue
+    if (!framesByShot.has(frame.shotId)) framesByShot.set(frame.shotId, [])
+    framesByShot.get(frame.shotId).push(frame)
+  }
+  for (const pool of framesByShot.values()) pool.sort((a, b) => a.decodedTimeSeconds - b.decodedTimeSeconds)
+  for (const time of options.times ?? []) add(time, 'requested-sample')
+  const rows = [...times.values()].sort((a, b) => a.timeSeconds - b.timeSeconds).map(row => {
+    const shot = sourceShots.find(shot => shot.startSeconds <= row.timeSeconds && row.timeSeconds < shot.endSeconds)
+    const original = nearestFrame(framesByShot.get(shot?.id) ?? [], row.timeSeconds, 'decodedTimeSeconds')
+    const authored = nearestFrame(track.frames, row.timeSeconds)
+    let left = -1, right = track.frames.length
+    while (left + 1 < right) { const middle = (left + right) >>> 1; if (track.frames[middle].timeSeconds <= row.timeSeconds) left = middle; else right = middle }
+    const from = track.frames[left], to = track.frames[left + 1]
+    const governing = from?.shotId === shot?.id ? from : authored?.shotId === shot?.id ? authored : null
+    const originalRequired = original ? sourceNeedsMachine(original, originalShots.get(original.shotId)) : !shot || shot.hasCorrespondingMachine !== false && shot.classification !== 'non-machine'
+    const compactRequired = governing ? sourceNeedsMachine(governing, shot) : originalRequired
+    const required = originalRequired || compactRequired
+    const expectedViewIds = [...new Set([...(originalRequired && original ? frameViews(original).map(view => view.id) : []), ...(compactRequired ? governing?.views?.map(view => view.id) ?? [] : [])])]
+    const tolerance = row.reasons.includes('every-second') ? 1e-5 : 1 / native.fps + 0.001
+    let frame = authored && Math.abs(authored.timeSeconds - row.timeSeconds) <= tolerance && authored.shotId === shot?.id ? authored : null
+    let unavailableReason = frame ? null : 'Missing authored sample at retained every-second/change-point source time'
+    const between = from && to && from.shotId === shot?.id && to.shotId === shot.id && row.timeSeconds > from.timeSeconds + 1e-6 && row.timeSeconds < to.timeSeconds - 1e-6
+    if (between && (row.reasons.includes('mid-interval') || row.reasons.includes('requested-sample'))) {
+      if (original && Math.abs(original.decodedTimeSeconds - row.timeSeconds) <= 1 / native.fps + 0.001) {
+        frame = { timeSeconds: row.timeSeconds, decodedTimeSeconds: original.decodedTimeSeconds, shotId: shot.id, classification: original.classification, landmarks: original.landmarks ?? [], views: from.views ?? [], measuredInterpolation: true, interpolationInterval: [from.timeSeconds, to.timeSeconds], ...(original.sourceImage ? { sourceImage: original.sourceImage } : {}) }
+        unavailableReason = null
+      } else { frame = null; unavailableReason = 'No independent same-shot source observation within one native frame of the interpolation sample; oracle pixels are never interpolated' }
     }
+    if (frame && finite(frame.decodedTimeSeconds) && !sourcePtsInShot(frame, shot)) { frame = null; unavailableReason = 'Observed source PTS lies outside its own half-open source shot' }
+    return { ...row, required, sourceShotId: shot?.id ?? original?.shotId ?? null, originalTimeSeconds: original?.timeSeconds ?? null, expectedViewIds, frame, unavailableReason }
   })
+  const selected = rows.filter(row => options.times ? options.times.some(time => Math.abs(time - row.timeSeconds) < 1e-5) : (options.from === null || row.timeSeconds >= options.from) && (options.to === null || row.timeSeconds <= options.to))
+  for (const time of options.times ?? []) if (time >= native.durationSeconds) selected.push({ timeSeconds: time, reasons: ['requested-sample'], required: true, expectedViewIds: [], frame: null, unavailableReason: 'Requested time is outside the original source duration' })
+  return { rows, selected }
 }
 
-/** Proves the official player holds a decoded frame of this actual source, not an ad or placeholder. */
-function requireNativeContent(actual, record, label) {
-  requireCondition(actual.mediaPresent, `${label}: no actual YouTube main HTMLMediaElement`)
-  requireCondition(!actual.error, `${label}: native YouTube error: ${actual.error}`)
-  requireCondition(!actual.adShowing, `${label}: YouTube is showing an ad, not the source content`)
-  requireCondition(actual.readyState >= 2 && actual.videoWidth > 0 && actual.videoHeight > 0, `${label}: native media has no decoded current frame (${JSON.stringify(actual)})`)
-  requireCondition(finite(actual.duration) && Math.abs(actual.duration - record.native.durationSeconds) <= NATIVE_DURATION_TOLERANCE_SECONDS, `${label}: native media duration ${actual.duration}s is not the ${record.native.durationSeconds}s source`)
-  requireCondition(finite(actual.mediaTime), `${label}: native media clock is not finite`)
+async function loadRecord(id, referenceRoot, signal) {
+  const track = JSON.parse(await readFile(resolve(WEB_ROOT, `content/${id}.source-track.json`), 'utf8'))
+  const observations = JSON.parse(await readFile(resolve(WEB_ROOT, `content/${id}.observations.json`), 'utf8'))
+  assert(track.kind === 'compact-source-track' && track.schemaVersion === 1, 'Expected the compact source-track contract')
+  const expectedHash = SOURCE_HASHES[VIDEO_IDS.indexOf(id)]
+  assert(track.source?.videoId === id && track.source.sha256 === expectedHash && observations.source?.sha256 === expectedHash, 'Compact/source census identity differs from retained original MP4 SHA256')
+  assert(track.model?.sha256 === MODEL_SHA256 && track.model.sourceCommit === MODEL_COMMIT && track.model.units === 'metres', 'Compact track must use the full unchanged native CAD model')
+  assert(Array.isArray(track.frames) && track.frames.length && track.frames.every((frame, index) => finite(frame.timeSeconds) && (finite(frame.decodedTimeSeconds) || (frame.decodedTimeSeconds === null && frame.sourceSampleUnavailable === true && !frame.views?.length && !frame.landmarks?.length && !frame.sourceImage)) && (!index || frame.timeSeconds > track.frames[index - 1].timeSeconds)), 'Compact samples must have finite increasing source times and native PTS, or explicit unavailable source-clock rows')
+  assert(Array.isArray(track.anchors) && new Set(track.anchors.map(anchor => anchor.id)).size === track.anchors.length, 'Compact native anchors must have unique identities')
+  const sourcePath = resolve(referenceRoot, 'videos', `${id}.mp4`)
+  const native = await probeSource(sourcePath, track.source, { signal })
+  return { id, track, observations, sourcePath, native, digest: jsonDigest(track) }
 }
 
-async function pauseActual(page, embed) {
-  const current = await apiSnapshot(page)
-  if (current.playerState === 'playing' || current.playerState === 'buffering') await page.locator('#pause-video').click()
-  await waitState(page, 'paused')
-  const before = await nativeMedia(embed.frame)
-  await delay(500)
-  const after = await nativeMedia(embed.frame)
-  requireCondition(before.paused === true && after.paused === true && finite(before.mediaTime) && finite(after.mediaTime) && Math.abs(after.mediaTime - before.mediaTime) <= PAUSED_DRIFT_SECONDS, 'Actual native HTMLMediaElement continues while paused')
-}
-
-/** Manual controls main.ts updateControlState enables only in ready exploration. */
-async function explorationControls(page) {
-  return page.evaluate(() => Object.fromEntries(['#drive-controls', '#channel-fieldset', '#fit-view'].map(selector => [selector, document.querySelector(selector)?.disabled === false])))
-}
-
-async function endReview(page) {
-  await page.evaluate(async () => {
-    const api = window.harmonicAnalyzer
-    if (typeof api?.endReferenceReview !== 'function') throw new Error('Verification bridge lacks endReferenceReview()')
-    await api.endReferenceReview()
-  })
-  const after = await apiSnapshot(page), controls = await explorationControls(page)
-  requireCondition(after.mode === 'exploring' && after.playerState === 'paused', `endReferenceReview did not restore paused exploration: ${after.mode}/${after.playerState}`)
-  requireCondition(Object.values(controls).every(Boolean), `endReferenceReview did not re-enable manual exploration controls: ${JSON.stringify(controls)}`)
-  return after
-}
-
-/** Leaves reference review with paused exploration and usable controls, whatever state a failed review left. */
-async function restoreExploration(page, embed) {
-  const current = await apiSnapshot(page), controls = await explorationControls(page)
-  if (current.mode === 'exploring' && current.playerState === 'paused' && Object.values(controls).every(Boolean)) return current
-  if (current.playerState !== 'paused') await pauseActual(page, embed)
-  return endReview(page)
-}
-
-const SEEK_OBSERVER_KEY = '__harmonicAnalyzerVerifySeekObserver'
-
-/**
- * Registers listeners on YouTube's own main HTMLMediaElement BEFORE the bridge
- * commands a seek, so every seeking/seeked event the command causes is observed
- * and ordered after the recorded pre-command state.
- */
-async function armSeekObserver(frame) {
-  return frame.evaluate(key => {
-    window[key]?.detach()
-    const video = document.querySelector('#movie_player video.html5-main-video')
-    if (!video) throw new Error('No actual YouTube main HTMLMediaElement to observe')
-    const events = []
-    const types = ['seeking', 'seeked', 'error', 'emptied', 'abort']
-    const record = event => events.push({ type: event.type, mediaTime: video.currentTime, paused: video.paused, seeking: video.seeking, readyState: video.readyState })
-    for (const type of types) video.addEventListener(type, record)
-    const pre = { mediaTime: video.currentTime, paused: video.paused, seeking: video.seeking, ended: video.ended, readyState: video.readyState }
-    const observer = {
-      video, events, pre,
-      detach() {
-        for (const type of types) video.removeEventListener(type, record)
-        if (window[key] === observer) delete window[key]
-      },
-    }
-    window[key] = observer
-    return pre
-  }, SEEK_OBSERVER_KEY)
-}
-
-async function readSeekObserver(frame) {
-  return frame.evaluate(key => {
-    const observer = window[key]
-    if (!observer) return null
-    const video = observer.video
-    return {
-      sameElement: video === document.querySelector('#movie_player video.html5-main-video') && video.isConnected,
-      pre: observer.pre, events: observer.events.slice(),
-      now: { mediaTime: video.currentTime, paused: video.paused, seeking: video.seeking, ended: video.ended, readyState: video.readyState, error: video.error ? (video.error.message || `code ${video.error.code}`) : null },
-    }
-  }, SEEK_OBSERVER_KEY)
-}
-
-async function disarmSeekObserver(frame) {
-  await frame.evaluate(key => window[key]?.detach(), SEEK_OBSERVER_KEY).catch(() => {})
-}
-
-/**
- * Post-command settlement of the ACTUAL media element: paused, not seeking, a
- * decoded current frame, currentTime on the requested exposure, and either a
- * seeking event raised after the command at the target followed by seeked, or
- * a legitimate no-op where the settled pre-command frame already was the target.
- * A pre-command frame at a different (even adjacent) time can never satisfy this.
- */
-function seekSettlement(observed, target, tolerance) {
-  if (!observed) return { fatal: 'Seek observer vanished from the official player frame' }
-  if (!observed.sameElement) return { fatal: 'YouTube replaced/detached the observed main media element during the seek' }
-  if (observed.now.error || observed.events.some(event => event.type === 'error')) return { fatal: `Native media error during seek: ${observed.now.error ?? 'error event'}` }
-  const { pre, events, now } = observed
-  const onTarget = time => finite(time) && Math.abs(time - target) <= tolerance
-  const settled = now.paused === true && !now.seeking && !now.ended && now.readyState >= 2 && onTarget(now.mediaTime)
-  let lastSeeking = -1
-  events.forEach((event, index) => { if (event.type === 'seeking') lastSeeking = index })
-  if (lastSeeking >= 0) {
-    const commanded = onTarget(events[lastSeeking].mediaTime) && events.slice(lastSeeking + 1).some(event => event.type === 'seeked')
-    return { done: settled && commanded, proof: 'seeking-then-seeked-after-command' }
-  }
-  const noOp = pre.paused === true && !pre.seeking && !pre.ended && pre.readyState >= 2 && onTarget(pre.mediaTime)
-  return { done: settled && noOp, proof: 'same-time-no-op' }
-}
-
-async function awaitNativeSeek(embed, target, tolerance) {
-  const deadline = Date.now() + NATIVE_SEEK_TIMEOUT_MS
-  for (;;) {
-    const observed = await readSeekObserver(embed.frame)
-    const verdict = seekSettlement(observed, target, tolerance)
-    requireCondition(!verdict.fatal, `Official player seek to ${target}s failed: ${verdict.fatal}`)
-    if (verdict.done) return { proof: verdict.proof, pre: observed.pre, events: observed.events, settled: observed.now }
-    requireCondition(Date.now() < deadline, `Official player did not settle a decoded paused frame at ${target}s (±${tolerance.toFixed(4)}s) within ${NATIVE_SEEK_TIMEOUT_MS}ms after the command: ${JSON.stringify(observed)}`)
-    await delay(NATIVE_SEEK_POLL_MS)
-  }
-}
-
-/**
- * The bridge commands the ACTUAL official YouTube player to seek to t and draws
- * the source sample at t. The YouTube IFrame API cannot acknowledge the decode,
- * so the verifier independently observes the official iframe's HTMLMediaElement
- * (listeners armed before the command) until it settles on t, then reads the
- * last actual GPU capture.
- */
-async function reviewAt(page, embed, record, timeSeconds, viewIds) {
-  const tolerance = seekToleranceSeconds(record)
-  await armSeekObserver(embed.frame)
-  let snapshot, seek
-  try {
-    snapshot = await page.evaluate(async timeSeconds => {
-      const api = window.harmonicAnalyzer
-      await api.reviewReferenceFrame(timeSeconds)
-      return api.snapshot()
-    }, timeSeconds)
-    seek = await awaitNativeSeek(embed, timeSeconds, tolerance)
-  } finally { await disarmSeekObserver(embed.frame) }
-  const ids = [...new Set([...viewIds, ...(snapshot.views ?? []).map(view => view.id)])]
-  const response = { snapshot, ...await page.evaluate(readRenderedState, ids) }
-  const native = await nativeMedia(embed.frame)
-  checkSnapshot(response.snapshot, record.id)
-  requireNativeContent(native, record, `Reviewed source ${timeSeconds}s`)
-  requireCondition(response.snapshot.mode === 'reference-review' && response.snapshot.playerState === 'paused', `Static reference review must hold actual paused playback at ${timeSeconds}s: ${response.snapshot.mode}/${response.snapshot.playerState}`)
-  requireCondition(native.paused === true && native.seeking === false && !native.ended, `Official player did not stay settled paused at ${timeSeconds}s: ${JSON.stringify(native)}`)
-  requireCondition(Math.abs(native.mediaTime - timeSeconds) <= tolerance, `Official player native media is at ${native.mediaTime}s, not the reviewed source exposure ${timeSeconds}s (±${tolerance}s)`)
-  return { ...response, native, seek: { proof: seek.proof, preMediaTime: seek.pre.mediaTime, settledMediaTime: seek.settled.mediaTime, events: seek.events.map(event => event.type) } }
-}
-
-/** Validates one view's last actual capture as a fresh GPU draw at the reviewed/played time. */
-export function freshCapture(entry, timeSeconds, nativeTimes, label) {
-  const capture = entry?.capture, visibility = entry?.visibility, mechanism = entry?.mechanism
-  requireCondition(capture?.method === 'gpu-readback' && capture.status === 'captured' && capture.visibilityMode === 'depth-off-landmark-projection' && capture.viewId === entry.viewId && Array.isArray(capture.landmarks) && finite(capture.timeSeconds), `${label}: gpu-landmark-stale-or-unavailable for ${entry?.viewId}`)
-  if (timeSeconds !== null) requireCondition(Math.abs(capture.timeSeconds - timeSeconds) <= 1e-6, `${label}: stale draw — captured ${capture.timeSeconds}s for ${timeSeconds}s`)
-  const skewSeconds = Math.max(...nativeTimes.map(time => Math.abs(capture.timeSeconds - time)))
-  requireCondition(skewSeconds <= CLOCK_LIMIT, `${label}: native media ${nativeTimes.join('/')}s vs captured draw ${capture.timeSeconds}s exceeds ${CLOCK_LIMIT}s`)
-  requireCondition(visibility?.method === 'gpu-readback' && visibility.status === 'captured' && visibility.visibilityMode === 'depth-tested-native-surfaces' && visibility.viewId === entry.viewId && visibility.timeSeconds === capture.timeSeconds && Array.isArray(visibility.parts) && visibility.parts.length >= 435 && new Set(visibility.parts.map(part => part.partPath)).size === visibility.parts.length, `${label}: native-depth-census-stale-or-incomplete (all 435 genuine geometry paths required)`)
-  requireCondition(mechanism?.method === 'actual-native-mechanism-solve' && mechanism.status === 'rendered' && mechanism.viewId === entry.viewId && mechanism.timeSeconds === capture.timeSeconds && Number.isInteger(mechanism.sourceDrawRevision) && mechanism.sourceDrawRevision > 0 && Array.isArray(mechanism.channelAnglesRad) && mechanism.channelAnglesRad.length === 20 && mechanism.channelAnglesRad.every(finite) && finite(mechanism.platenTravelM) && finite(mechanism.effectiveBankDriveTurns), `${label}: rendered-physical-state-stale-or-unavailable`)
-  requireCondition(Object.hasOwn(capture,'resolvedImagePlaneWarp')&&Array.isArray(capture.sourceLayout)&&capture.sourceLayout.length>0&&sameSourceLayout(capture.sourceLayout,visibility.sourceLayout)&&sameSourceLayout(capture.sourceLayout,mechanism.sourceLayout)&&sameResolvedImagePlaneWarp(capture.resolvedImagePlaneWarp,visibility.resolvedImagePlaneWarp)&&sameResolvedImagePlaneWarp(capture.resolvedImagePlaneWarp,mechanism.resolvedImagePlaneWarp),`${label}: stale/missing native capture homography or ordered masking layout`)
-  if(entry.nativeLines) requireCondition(sameSourceLayout(capture.sourceLayout,entry.nativeLines.sourceLayout)&&sameResolvedImagePlaneWarp(capture.resolvedImagePlaneWarp,entry.nativeLines.resolvedImagePlaneWarp),`${label}: finite-line capture belongs to a stale/different support layout or homography`)
-  return { capture, visibility, mechanism, nativeLines: entry.nativeLines ?? null, skewSeconds }
-}
-
-function fieldValue(input, field) {
-  if (field.startsWith('setup.')) return input.setup[field.slice(6)]
-  if (field.startsWith('amplitudes[') || field.startsWith('phases[')) return input[field.startsWith('amplitudes[') ? 'amplitudes' : 'phases'][Number(field.slice(field.indexOf('[') + 1, -1))]
-  return input[field]
-}
-/** Evaluate observations against the exact machine.input/pose captured by beforeView. */
-export function physicalConstraintErrors(mechanism, constraints) {
-  const errors = []
-  const bounded = (value, minimum, maximum, period) => {
-    const lifted = period === 0 ? value : value + Math.ceil((minimum - value) / period) * period
-    return finite(value) && lifted >= minimum - 1e-12 && lifted <= maximum + 1e-12
-  }
-  for (const constraint of constraints) {
-    let passed = false, actual
-    switch (constraint.kind) {
-      case 'input-value':
-        actual = fieldValue(mechanism.input, constraint.field)
-        passed = typeof actual === 'number' && typeof constraint.value === 'number' ? bounded(actual, constraint.value - constraint.tolerance, constraint.value + constraint.tolerance, 0) : actual === constraint.value
-        break
-      case 'input-interval': actual = fieldValue(mechanism.input, constraint.field); passed = bounded(actual, constraint.minimum, constraint.maximum, 0); break
-      case 'effective-bank-drive': actual = mechanism.effectiveBankDriveTurns; passed = bounded(actual, constraint.minimumTurns, constraint.maximumTurns, constraint.winding === 'modulo-one' ? 1 : 0); break
-      case 'channel-angle': actual = mechanism.channelAnglesRad[constraint.channelIndex]; passed = bounded(actual, constraint.minimumRadians, constraint.maximumRadians, constraint.winding === 'modulo-turn' ? 2 * Math.PI : 0); break
-      case 'paper-travel': actual = mechanism.platenTravelM; passed = bounded(actual, constraint.minimumMetres, constraint.maximumMetres, 0); break
-      case 'pen-travel': actual = mechanism.penTravelM; passed = bounded(actual, constraint.minimumMetres, constraint.maximumMetres, 0); break
-    }
-    if (!passed) errors.push({ kind: constraint.kind, field: constraint.field ?? null, channelIndex: constraint.channelIndex ?? null, actual: actual ?? null, ...(constraint.kind === 'pen-travel' && !finite(actual) ? { reason: 'rendered-pen-output-unavailable' } : {}), evidence: constraint.evidence })
-  }
-  return errors
-}
-
-function sourceOccludedCaptureErrors(visibility, binding, currentSourceFrame) {
-  const errors = []
-  if (!binding || !currentSourceFrame || sourceImageError(currentSourceFrame.sourceImage, null)
-    || canonicalJson(currentSourceFrame.sourceImage) !== canonicalJson(binding.sourceImage)
-    || !finite(currentSourceFrame.timeSeconds) || currentSourceFrame.timeSeconds !== binding.timeSeconds
-    || binding.timeSeconds !== binding.decodedTimeSeconds || binding.intervalSeconds?.[0] !== binding.decodedTimeSeconds
-    || binding.intervalSeconds?.[1] !== binding.decodedTimeSeconds) errors.push('Source hand mask requires independently supplied exact current original image and native decoded exposure point certificate; other images, held and interpolated times are not certified')
-  if (!visibility || visibility.method !== 'gpu-readback' || visibility.status !== 'captured' || visibility.visibilityMode !== 'depth-tested-native-surfaces'
-    || !Array.isArray(visibility.parts) || visibility.parts.length < 435 || visibility.parts.some(part => !part || typeof part.partPath !== 'string')
-    || new Set(visibility.parts.map(part => part.partPath)).size !== visibility.parts.length) errors.push('Source hand exclusion requires a fresh genuine all435-path depth-native GPU capture, not CPU visibility or unavailable readback')
-  if (!binding || !visibility || visibility.viewId !== binding.viewId || !finite(visibility.timeSeconds) || visibility.timeSeconds !== binding.timeSeconds
-    || !sameCamera(visibility.camera, binding.camera, nativeCameraRect(binding))
-    || canonicalJson(visibility.rectSourcePixels) !== canonicalJson(binding.rectSourcePixels) || visibility.presentation !== binding.presentation
-    || !Object.hasOwn(visibility, 'resolvedImagePlaneWarp') || !sameResolvedImagePlaneWarp(visibility.resolvedImagePlaneWarp, binding.resolvedImagePlaneWarp)
-    || !Array.isArray(binding.sourceLayout) || !binding.sourceLayout.length || binding.sourceLayout.some(entry => !entry)
-    || !sameSourceLayout(visibility.sourceLayout, binding.sourceLayout)
-    || visibility.sourceOpacity !== (binding.composite?.mode === 'opaque' ? 1 : binding.composite?.opacity)) errors.push('Actual native source hand capture does not bind the exact witness view/time/camera/ROI/presentation/opacity/homography/layout')
-  return errors
-}
-function sourceHandExtentInside(part, mask) {
-  const extent = part.sourceExtentPixels
-  if (!Array.isArray(extent) || extent.length !== 4 || !extent.every(finite) || extent[0] >= extent[2] || extent[1] >= extent[3]
-    || extent[0] < 0 || extent[1] < 0 || extent[2] > mask.sourceImage.width || extent[3] > mask.sourceImage.height
-    || !finite(part.uncertaintySourcePixels) || part.uncertaintySourcePixels < 0) return false
-  const polygon = mask.polygonSourcePixels, uncertainty = mask.uncertaintyPx + part.uncertaintySourcePixels
-  if (!finite(uncertainty)) return false
-  let area2 = 0
-  for (let i = 0; i < polygon.length; i++) {
-    const a = polygon[i], b = polygon[(i + 1) % polygon.length]
-    area2 += a[0] * b[1] - a[1] * b[0]
-  }
-  const orientation = Math.sign(area2)
-  for (let i = 0; i < polygon.length; i++) {
-    const a = polygon[i], b = polygon[(i + 1) % polygon.length], dx = b[0] - a[0], dy = b[1] - a[1], length = Math.hypot(dx, dy)
-    for (const x of [extent[0], extent[2]]) for (const y of [extent[1], extent[3]]) {
-      const margin = orientation * (dx * (y - a[1]) - dy * (x - a[0])) / length
-      if (!finite(margin) || margin <= 0 || margin < uncertainty) return false
-    }
-  }
-  return true
-}
-export function nativeVisibilityErrors(visibility, proof, currentSourceFrame) {
-  if (!proof || !Array.isArray(proof.sourceVisibleParts) || !Array.isArray(proof.excludedParts) || !Array.isArray(proof.sourceNonIdentifiableFixedParts) || !Array.isArray(proof.unresolvedParts) || proof.unresolvedParts.length) return [{ code: 'unresolved-source-census', detail: 'Require the explicit complete four-bucket native census; unidentified fixed parts are not source-corresponded or excluded' }]
-  if (!visibility || !Array.isArray(visibility.parts) || visibility.parts.some(part => !part || typeof part.partPath !== 'string')) return [{ code: 'native-depth-census-unavailable', detail: 'Actual native depth-ID census is unavailable or malformed' }]
-  const errors = [], visible = new Map(proof.sourceVisibleParts.map(part => [part?.partPath, part])), excluded = new Map(proof.excludedParts.map(part => [part?.partPath, part])), uncertified = new Map(proof.sourceNonIdentifiableFixedParts.map(part => [part?.nativePartPath, part]))
-  for (const detail of nonIdentifiableFixedPartErrors(proof.sourceNonIdentifiableFixedParts)) errors.push({ code: 'invalid-source-non-identifiable-fixed-part', detail })
-  const sourceHandPaths = new Set()
-  for (const part of proof.excludedParts) {
-    const hand = part?.reason === 'source-occluded', fields = ['partPath', 'reason', 'evidence', ...(hand ? ['sourceOcclusion'] : [])]
-    if (!part || Object.keys(part).length !== fields.length || fields.some(field => !Object.hasOwn(part, field))
-      || !['outside', 'occluded', 'absent', 'source-occluded'].includes(part.reason) || typeof part.evidence !== 'string' || !part.evidence.trim()) {
-      errors.push({ code: 'invalid-source-exclusion', detail: part?.partPath ?? 'Malformed exclusion' })
-      continue
-    }
-    if (hand) {
-      const maskErrors = sourceOcclusionErrors(part.sourceOcclusion, proof.binding?.sourceImage)
-      for (const detail of maskErrors) errors.push({ code: 'invalid-source-occlusion', detail: `${part.partPath}: ${detail}` })
-      if (!maskErrors.length) sourceHandPaths.add(part.partPath)
-    }
-  }
-  if (proof.excludedParts.some(part => part?.reason === 'source-occluded')) for (const detail of sourceOccludedCaptureErrors(visibility, proof.binding, currentSourceFrame)) errors.push({ code: 'source-occlusion-capture-binding', detail })
-  const declaredPaths = [...proof.sourceVisibleParts.map(part => part?.partPath), ...proof.excludedParts.map(part => part?.partPath), ...proof.sourceNonIdentifiableFixedParts.map(part => part?.nativePartPath)]
-  if (new Set(declaredPaths).size !== declaredPaths.length) errors.push({ code: 'overlapping-source-native-census', detail: 'Duplicate or cross-bucket native paths cannot masquerade as unknown fixed geometry' })
-  const nativePaths = new Set(visibility.parts.map(part => part.partPath))
-  for (const path of declaredPaths) if (!nativePaths.has(path)) errors.push({ code: 'unknown-source-native-part', detail: path })
-  for (const part of visibility.parts) {
-    if (!visible.has(part.partPath) && !excluded.has(part.partPath) && !uncertified.has(part.partPath)) errors.push({ code: 'omitted-source-native-part', detail: part.partPath })
-    if (!Number.isInteger(part.pixelCount) || part.pixelCount < 0 || (part.status === 'visible') !== (part.pixelCount > 0)) errors.push({ code: 'invalid-native-depth-result', detail: part.partPath })
-    if (visible.has(part.partPath) && part.pixelCount === 0) errors.push({ code: 'source-visible-native-not-rendered', detail: part.partPath })
-    if (excluded.has(part.partPath) && part.pixelCount > 0) {
-      const exclusion = excluded.get(part.partPath)
-      if (exclusion.reason !== 'source-occluded') errors.push({ code: 'unsupported-extra-visible-native-part', detail: `${part.partPath}: source ${exclusion.reason}, actual depth-visible ${part.pixelCount} pixels` })
-      else if (!sourceHandPaths.has(part.partPath) || !sourceHandExtentInside(part, exclusion.sourceOcclusion)) errors.push({ code: 'source-occlusion-native-extent', detail: `${part.partPath}: all positive actual native ID pixel cells must lie strictly inside the independently measured source hand polygon with combined source-mask/native uncertainty margin; sparse contours or an extent centre cannot certify coverage` })
-    }
-    if (uncertified.has(part.partPath) && part.pixelCount > 0) {
-      const region = uncertified.get(part.partPath).rectSourcePixels, extent = part.sourceExtentPixels
-      if (!Array.isArray(region) || region.length !== 4 || !region.every(finite) || !Array.isArray(extent) || extent.length !== 4 || !extent.every(finite) || extent[0] >= extent[2] || extent[1] >= extent[3] || extent[0] < region[0] - 1e-6 || extent[1] < region[1] - 1e-6 || extent[2] > region[0] + region[2] + 1e-6 || extent[3] > region[1] + region[3] + 1e-6) errors.push({ code: 'source-non-identifiable-fixed-region', detail: `${part.partPath}: all actual native ID pixels must lie inside the independently source-audited region; sparse contours and native-derived ROIs are not authority` })
-    }
-  }
-  return errors
-}
-
-/** Fit only the genuine raster samples, not CPU-projected/invented native endpoints. */
-export function nativeLineRasterProof(view, captured, visibility, timeSeconds) {
-  const failures = [], measurements = [], checks = view.nativeLineChecks ?? []
-  const reject = (code, detail, extra = {}) => failures.push({ code, detail, ...extra })
-  if (!checks.length) return { failures, measurements }
-  if (captured?.method !== 'gpu-readback' || captured.status !== 'captured' || captured.visibilityMode !== 'depth-off-native-line-projection' || captured.viewId !== view.id || captured.timeSeconds !== timeSeconds || captured.presentation !== view.presentation || jsonDigest(captured.rectSourcePixels) !== jsonDigest(view.rectSourcePixels) || !Array.isArray(captured.lines)) {
-    reject('native-line-gpu-unavailable', 'Need a fresh genuine finite native clipped-segment GPU raster; offscreen endpoint markers and CPU candidate errors are not acceptance')
-    return { failures, measurements }
-  }
-  for(const detail of [...sourceCaptureBindingErrors(view,captured),...sourceCaptureBindingErrors(view,visibility)]) reject('native-line-warp-layout-binding',detail)
-  if(failures.length) return {failures,measurements}
-  if (visibility?.method !== 'gpu-readback' || visibility.status !== 'captured' || visibility.visibilityMode !== 'depth-tested-native-surfaces' || visibility.viewId !== view.id || visibility.timeSeconds !== timeSeconds || visibility.presentation !== view.presentation || jsonDigest(visibility.rectSourcePixels) !== jsonDigest(view.rectSourcePixels) || !sameCamera(visibility.camera, view.camera, nativeCameraRect(view))) {
-    reject('native-line-depth-gpu-unavailable', 'The independent native surface visibility draw must match the line raster camera/ROI/presentation/time')
-    return { failures, measurements }
-  }
-  const expectedOpacity = view.composite?.mode === 'crossfade' ? view.composite.opacity : 1
-  if (captured.sourceOpacity !== expectedOpacity) reject('native-line-layer-binding', 'Native line raster belongs to a different actual source image contribution')
-  for (const check of checks) {
-    if(!Array.isArray(check.sourceLinePixels)||check.sourceLinePixels.length!==2||!check.sourceLinePixels.every(vec2)||!Array.isArray(check.measurementEvidence?.edgeRows)||check.measurementEvidence.edgeRows.length<2) { reject('native-line-source-unavailable','Need actual source endpoints and every measured paired-edge row',{lineId:check.id});continue }
-    const line = captured.lines.find(line => line.id === check.id), probeId = JSON.stringify([view.id, check.id, check.partPath, check.partLocalLineMetres])
-    if (!line || line.probeId !== probeId || line.state !== 'rendered' || !Number.isInteger(line.pixelCount) || line.pixelCount < 2 || !Array.isArray(line.sourceSamples) || line.sourceSamples.length < 2 || !line.sourceSamples.every(vec2) || !finite(line.uncertaintySourcePixels) || line.uncertaintySourcePixels < 0 || !finite(line.samplingGapSourcePixels) || line.samplingGapSourcePixels < 0) { reject('native-line-raster-unavailable', 'Qualified native finite line has no measurable actual clipped GPU raster', { lineId: check.id }); continue }
-    const part = visibility.parts.find(part => part.partPath === check.partPath)
-    if (!part || part.pixelCount <= 0) reject('native-line-depth-invisible', 'Depth-off line projection cannot establish a source-visible native part', { lineId: check.id, partPath: check.partPath })
-    const mean = [0, 0]
-    for (const sample of line.sourceSamples) { mean[0] += sample[0]; mean[1] += sample[1] }
-    mean[0] /= line.sourceSamples.length; mean[1] /= line.sourceSamples.length
-    let xx = 0, xy = 0, yy = 0
-    for (const sample of line.sourceSamples) { const x = sample[0] - mean[0], y = sample[1] - mean[1]; xx += x*x; xy += x*y; yy += y*y }
-    if (xx + yy <= 1e-9) { reject('native-line-raster-degenerate', 'Native line is degenerate in genuine GPU projection', { lineId: check.id }); continue }
-    const angle = 0.5 * Math.atan2(2 * xy, xx - yy), axis = [Math.cos(angle), Math.sin(angle)]
-    const along = point => (point[0] - mean[0]) * axis[0] + (point[1] - mean[1]) * axis[1]
-    const perpendicular = point => Math.abs((point[0] - mean[0]) * axis[1] - (point[1] - mean[1]) * axis[0])
-    let minimum = Infinity, maximum = -Infinity
-    for (const sample of line.sourceSamples) { const value = along(sample); minimum = Math.min(minimum, value); maximum = Math.max(maximum, value) }
-    // Distance to the finite fitted hull, not its infinite supporting axis.
-    // Fit deviation reaches actual extreme samples; native uncertainty reaches
-    // their true finite segment. Each bound enters the ledger exactly once.
-    const finiteSegmentDistance = point => {
-      const position=along(point)
-      return Math.hypot(perpendicular(point),Math.max(minimum-position,position-maximum,0))
-    }
-    const observed = [...check.sourceLinePixels, ...check.measurementEvidence.edgeRows.map(row => [(row.left + row.right) / 2, row.y])]
-    const rasterFitDeviationPx = Math.max(...line.sourceSamples.map(perpendicular))
-    let axisBias,errorLedger
+/** Admit only the retained Spin source family, never a free-form static assertion. */
+async function staticSourceControls(record) {
+  if (record.id !== 'XPQwKRt4Y2k') return { shots: new Map(), phaseImages: [], diagnostics: [] }
+  const shots = new Map(), diagnostics = [], phaseImages = []
+  const allowed = ['opening-fade', 'whole-machine', 'whole-machine-credit', 'whole-closeup-crossfade', 'closeup-sweep']
+  for (const family of record.track.sourceMotionFamilies ?? []) {
     try {
-      axisBias=finalSourceAxisBiasLedger(view,check,observed)
-      errorLedger=sourceRasterErrorLedger(view,check,observed,line,captured,Math.max(...observed.map(finiteSegmentDistance)),axisBias.geometryBiasSourcePixels,rasterFitDeviationPx)
-    } catch(error) { reject('native-line-uncertainty-unknown',error.message,{lineId:check.id,sourceMeasurementUncertaintyPx:check.uncertaintyPx??null});continue }
-    const layout=expectedLayout(view),layoutIndex=layout.findIndex(item=>item.viewId===view.id)
-    if(line.sourceSamples.some(point=>!sourcePointUnmasked(layout,layoutIndex,point))) reject('native-line-support-mask','Actual line readback includes pixels outside its quad or behind a later same-image subview',{lineId:check.id})
-    const sourceObservationsUnmasked=observed.every(point=>sourcePointUnmasked(layout,layoutIndex,point))
-    if(!sourceObservationsUnmasked) reject('native-line-source-support-mask','An actual observed endpoint/edge-row midpoint lies outside source quad/ROI support or behind a later same-image subview; surviving native fragments cannot certify a masked gap',{lineId:check.id})
-    const conservativeErrorPx=errorLedger.errorPx
-    const covered=sourceObservationsUnmasked&&observed.every(point=>along(point)>=minimum-line.uncertaintySourcePixels&&along(point)<=maximum+line.uncertaintySourcePixels)
-    const measurement={type:'native-line-gpu',lineId:check.id,partPath:check.partPath,timeSeconds,viewId:view.id,nativeRasterPixelCount:line.pixelCount,sampledRasterPixelCount:line.sourceSamples.length,observedSourceSegment:check.sourceLinePixels,observedSourcePointCount:observed.length,axisBias,errorLedger,samplingGapSourcePixels:line.samplingGapSourcePixels,conservativeErrorPx,sourceObservationsUnmasked,nativeClippedRasterCoversObservation:covered}
-    measurements.push(measurement)
-    if(!covered) reject('native-line-finite-coverage','Actual finite clipped native raster must bracket every unmasked independently measured source row; global fragment bounds cannot extend through masked gaps',measurement)
-    if(!finite(conservativeErrorPx)||conservativeErrorPx>PIXEL_LIMIT) reject('native-line-gpu-error',`Actual native raster residual plus independent source/native/geometry/raster-fit bounds exceeds ${PIXEL_LIMIT}px`,measurement)
+      const rig = record.observations.sourceCameraRigs?.find(rig => rig.id === family.id)
+      assert(family.kind === 'retained-source-photographic-rig' && family.id === 'spin-photographic-71-phase-loop' && family.videoId === record.id && family.sourceSha256 === record.native.observedSha256, 'Static source family is not the retained Spin photographic rig')
+      assert(rig && rig.phaseCount === 71 && jsonDigest(family.phaseImages) === jsonDigest(rig.phaseImages), 'Static family reference photos differ from the71 retained independent source-image identities')
+      const evidence = rig.independentLoopEvidence
+      assert(evidence?.sourceSha256 === family.sourceSha256 && evidence.uniqueImageCount === 71 && family.independentLoopEvidence?.sourceSha256 === evidence.sourceSha256 && jsonDigest(family.independentLoopEvidence.periodPixelComparison) === jsonDigest(evidence.periodPixelComparison), 'Static family lacks the retained source-only period/adjacent-phase controls')
+      assert(Array.isArray(family.shotIds) && family.shotIds.length === allowed.length && allowed.every(id => family.shotIds.includes(id)), 'Static source family cannot exempt montage/endcard or unrelated operation shots')
+      const mapPath = resolve(WEB_ROOT, '.vite/verification-output/spin-witness/rig-replay/actual-phase-map.json')
+      const bytes = await readFile(mapPath), map = JSON.parse(bytes)
+      assert(digest(bytes) === family.independentSourcePhaseMap?.sha256 && map.rigId === rig.id && map.sourceFrameMap?.length === family.independentSourcePhaseMap.sourceExposureIdentityCount, 'Independent actual-source phase-map identity differs from declared controls')
+      assert(jsonDigest(map.references) === jsonDigest(rig.phaseImages) && map.sourceFrameMap.every(row => row.independentPeriodIndexAgreement === true && row.sourceImage?.sourceSha256 === family.sourceSha256 && jsonDigest(row.referenceSourceImage) === jsonDigest(rig.phaseImages[row.referencePhaseIndex]?.sourceImage) && Math.abs(record.native.pts[row.frameIndex] - row.nativePtsSeconds) <= 0.001), 'Independent source-exposure/phase controls are unavailable or disagree')
+      const fixed = new Set(record.track.anchors.filter(anchor => anchor.motion === 'fixed').map(anchor => anchor.id))
+      assert(Array.isArray(family.fixedCheckAnchorIds) && new Set(family.fixedCheckAnchorIds).size >= 2 && family.fixedCheckAnchorIds.every(id => fixed.has(id)), 'Static source family has no distributed actual fixed CHECK correspondences')
+      phaseImages.push(...rig.phaseImages)
+      for (const shot of record.track.shots.filter(shot => allowed.includes(shot.id))) {
+        const original = record.observations.shots.find(original => original.id === shot.id), claim = shot.internalMotionSourceEvidence
+        assert(original && Math.abs(shot.startSeconds - original.startSeconds) <= 1e-6 && Math.abs(shot.endSeconds - original.endSeconds) <= 1e-6 && shot.internalMechanismMotion === 'static' && claim?.familyId === family.id && claim.kind === family.kind && claim.sourceSha256 === family.sourceSha256 && claim.independentSourcePhaseMapSha256 === family.independentSourcePhaseMap.sha256 && jsonDigest(claim.phaseImageFrameIndices) === jsonDigest(rig.phaseImages.map(phase => phase.sourceImage.frameIndex)), `Static source shot controls/interval differ for ${shot.id}`)
+        shots.set(shot.id, { status: 'source-controls-verified', familyId: family.id, sourceSha256: family.sourceSha256, independentSourcePhaseMapSha256: family.independentSourcePhaseMap.sha256, actualSourceExposures: map.sourceFrameMap.length, fixedCheckAnchorIds: family.fixedCheckAnchorIds })
+      }
+    } catch (error) { diagnostics.push({ familyId: family.id, reason: error.message }) }
   }
-  return { failures, measurements }
+  return { shots, phaseImages, diagnostics }
 }
-/** Nearest captured boundary sample is a conservative (never optimistic) contour distance. */
-export function nativeContourRasterProof(view, visibility, timeSeconds) {
-  const failures = [], measurements = []
-  if ((view.sourceContourChecks?.length ?? 0) && (visibility?.method !== 'gpu-readback' || visibility.status !== 'captured' || visibility.visibilityMode !== 'depth-tested-native-surfaces' || visibility.viewId !== view.id || visibility.timeSeconds !== timeSeconds || visibility.presentation !== view.presentation || jsonDigest(visibility.rectSourcePixels) !== jsonDigest(view.rectSourcePixels) || !sameCamera(visibility.camera, view.camera, nativeCameraRect(view)) || visibility.sourceOpacity !== (view.composite?.mode === 'crossfade' ? view.composite.opacity : 1))) return { failures: [{ code: 'source-contour-gpu-unavailable', detail: 'Need the fresh actual native depth-boundary capture at this source camera/ROI/presentation/time/layer' }], measurements }
-  if(view.sourceContourChecks?.length) {
-    for(const detail of sourceCaptureBindingErrors(view,visibility)) failures.push({code:'source-contour-warp-layout-binding',detail})
-    if(failures.length) return {failures,measurements}
+
+async function snapshot(page) { return page.evaluate(() => window.harmonicAnalyzer.snapshot()) }
+function requireModel(actual, id) {
+  assert(actual.videoId === id && actual.playerVideoId === id, 'Rendered route/player identity mismatch')
+  assert(actual.modelState === 'ready' && !actual.missingBindings?.length, 'Full native model is unavailable or has unresolved bindings')
+  const provenance = actual.modelProvenance
+  assert(provenance?.identity === 'matched' && provenance.observedSha256 === MODEL_SHA256 && provenance.expectedSha256 === MODEL_SHA256 && provenance.sourceCommit === MODEL_COMMIT, 'Actual model bytes/source commit mismatch')
+  assert(actual.physics?.springForcesN?.length === 20 && actual.physics.springForcesN.every(value => finite(value) && value >= 0) && actual.physics.springLengthsM?.length === 20 && actual.physics.springLengthsM.every(value => finite(value) && value > 0) && finite(actual.physics.equilibriumResidualNm), 'Actual native physical solve is unavailable')
+}
+async function openRoute(page, url, record, player) {
+  const route = new URL(url)
+  route.searchParams.set('video', record.id); route.searchParams.set('verify', '1')
+  if (player === 'local') route.searchParams.set('referenceMedia', '1')
+  const response = await page.goto(route.href, { waitUntil: 'domcontentloaded', timeout: 30_000 })
+  assert(response?.ok(), `Built route returned HTTP ${response?.status()}`)
+  await page.waitForFunction(id => window.harmonicAnalyzer?.snapshot().videoId === id && window.harmonicAnalyzer.snapshot().modelState !== 'loading', record.id, { timeout: 120_000 })
+  await page.waitForFunction(() => !document.querySelector('#pause-video')?.disabled, undefined, { timeout: 30_000 })
+  const actual = await snapshot(page)
+  requireModel(actual, record.id)
+  const data = await page.evaluate(() => window.harmonicAnalyzer.compactData?.() ?? window.harmonicAnalyzer.referenceData())
+  assert(jsonDigest(data) === record.digest, 'Built runtime compact track differs from the measured content file; rebuild first')
+  const selectors = await page.locator('#videos a').evaluateAll(links => links.map(link => new URL(link.href).searchParams.get('video')))
+  assert(selectors.length === 6 && new Set(selectors).size === 6, 'All six retained direct video routes must remain available')
+  if (player === 'local') {
+    await page.locator('#video-player video').waitFor({ state: 'visible', timeout: 30_000 })
+    const src = await page.locator('#video-player video').getAttribute('src')
+    assert(new URL(src, route).pathname === `${new URL(url).pathname}reference-media/${record.id}.mp4`, 'Local player is not using the retained original MP4 route')
+    return { route: route.href, frame: page, selector: '#video-player video', player }
   }
-  for (const check of view.sourceContourChecks ?? []) {
-    if(!Array.isArray(check.sourceContourPixels)||check.sourceContourPixels.length<2||!check.sourceContourPixels.every(vec2)) { failures.push({code:'source-contour-source-unavailable',detail:'Need the actual measured finite nondegenerate source contour pixels',contourId:check.id});continue }
-    const part = visibility.parts.find(part => part.partPath === check.partPath), samples = part?.contourSourcePixels
-    if (!part || part.pixelCount <= 0 || !Array.isArray(samples) || !samples.length || !samples.every(vec2) || !Number.isInteger(part.contourPixelCount) || part.contourPixelCount < samples.length || !finite(part.uncertaintySourcePixels) || part.uncertaintySourcePixels < 0) {
-      failures.push({ code: 'source-contour-gpu-unavailable', detail: 'Need genuine depth-tested native part-ID boundary readback; a bounding extent or depth-off marker is not a contour', contourId: check.id, partPath: check.partPath })
-      continue
-    }
-    const layout=expectedLayout(view),layoutIndex=layout.findIndex(item=>item.viewId===view.id)
-    if(samples.some(point=>!sourcePointUnmasked(layout,layoutIndex,point))) failures.push({code:'source-contour-support-mask',detail:'Actual native contour lies outside its quad or behind same-image masking',contourId:check.id})
-    const sourceObservationsUnmasked=check.sourceContourPixels.every(point=>sourcePointUnmasked(layout,layoutIndex,point))
-    if(!sourceObservationsUnmasked) failures.push({code:'source-contour-source-support-mask',detail:'An actual observed source contour pixel lies outside source quad/ROI support or behind a later same-image subview; nearby surviving native pixels cannot certify it',contourId:check.id})
-    let rawResidualPx=0
-    for(const point of check.sourceContourPixels) {
-      let nearest=Infinity
-      for(const sample of samples) nearest=Math.min(nearest,Math.hypot(point[0]-sample[0],point[1]-sample[1]))
-      rawResidualPx=Math.max(rawResidualPx,nearest)
-    }
-    let errorLedger
-    try { errorLedger=sourceRasterErrorLedger(view,check,check.sourceContourPixels,part,visibility,rawResidualPx) }
-    catch(error) { failures.push({code:'source-contour-uncertainty-unknown',detail:error.message,contourId:check.id,sourceMeasurementUncertaintyPx:check.uncertaintyPx??null});continue }
-    const measurement={type:'native-contour-gpu',contourId:check.id,partPath:check.partPath,timeSeconds,viewId:view.id,nativeBoundaryPixelCount:part.contourPixelCount,sampledBoundaryPixelCount:samples.length,observedSourcePointCount:check.sourceContourPixels.length,sourceObservationsUnmasked,errorLedger,conservativeErrorPx:errorLedger.errorPx}
-    measurements.push(measurement)
-    if(!finite(errorLedger.errorPx)||errorLedger.errorPx>PIXEL_LIMIT) failures.push({code:'source-contour-gpu-error',detail:`Actual native/source contour residual plus independent source/native raster bounds exceeds ${PIXEL_LIMIT}px`,...measurement})
-  }
-  return { failures, measurements }
+  const iframe = page.locator('#video-player iframe')
+  await iframe.waitFor({ state: 'visible', timeout: 30_000 })
+  const src = new URL(await iframe.getAttribute('src'))
+  assert(/(^|\.)youtube(?:-nocookie)?\.com$/.test(src.hostname) && src.pathname === `/embed/${record.id}` && src.searchParams.get('controls') !== '0' && src.searchParams.get('mute') !== '1', 'Official original YouTube embed/controls/audio are not intact')
+  const frame = await (await iframe.elementHandle()).contentFrame()
+  assert(frame, 'Official YouTube frame unavailable')
+  return { route: route.href, frame, selector: '#movie_player video.html5-main-video', player }
 }
-
-/** Metadata is checked against the real readback; depth-off markers are not occlusion proof. */
-export function renderedViewProof(view, rendered, entry, timeSeconds, report, assumptions = [], currentSourceFrame) {
-  const context = { timeSeconds, viewId: view.id }, composite = view.composite ?? { mode: 'opaque' }, opacity = composite.mode === 'opaque' ? 1 : composite.opacity
-  if (!rendered || !sameCamera(rendered.camera, view.camera, nativeCameraRect(view)) || jsonDigest(rendered.rectSourcePixels) !== jsonDigest(view.rectSourcePixels) || rendered.presentation !== view.presentation || jsonDigest(rendered.composite) !== jsonDigest(composite) || rendered.compositeEvidence !== (view.compositeEvidence ?? null)) fail(report, 'rendered-view-binding', 'Actual camera/ROI/presentation/composite differs from independently measured view', context)
-  if (!sameCamera(entry.visibility.camera, view.camera, nativeCameraRect(view)) || jsonDigest(entry.visibility.rectSourcePixels) !== jsonDigest(view.rectSourcePixels) || entry.visibility.presentation !== view.presentation || entry.visibility.sourceOpacity !== opacity || entry.capture.sourceOpacity !== opacity) fail(report, 'gpu-view-binding', 'Actual native GPU capture has different camera/ROI/mirror/layer contribution', context)
-  const warp=independentlyResolvedWarp(view),layout=expectedLayout(view)
-  if(!rendered||!Object.hasOwn(rendered,'imagePlaneWarp')||jsonDigest(rendered.imagePlaneWarp)!==jsonDigest(view.imagePlaneWarp??null)||!sameResolvedImagePlaneWarp(rendered.resolvedImagePlaneWarp,warp)||!sameSourceLayout(rendered.sourceLayout,layout)) fail(report,'rendered-warp-layout-binding','Actual snapshot authored/derived warp or ordered support differs from independent source layout',context)
-  for(const capture of [entry.capture,entry.visibility,entry.mechanism,...(entry.nativeLines?[entry.nativeLines]:[])]) for(const detail of sourceCaptureBindingErrors(view,capture)) fail(report,'gpu-warp-layout-binding',detail,context)
-  for(const capture of [entry.capture,entry.visibility,...(entry.nativeLines?[entry.nativeLines]:[])]) for(const detail of nativeRasterSupportErrors(view,capture)) fail(report,'native-raster-support',detail,context)
-  for(const detail of renderedCertificateErrors(rendered,timeSeconds)) fail(report,'rendered-certificate-interval',detail,context)
-  const state = view.mechanicalState, witness = state.runtimeWitness, expectedInput = state.status === 'constrained' ? witness.input : state.input
-  if (jsonDigest(rendered.input) !== jsonDigest(expectedInput) || jsonDigest(entry.mechanism.input) !== jsonDigest(expectedInput) || rendered.mechanicalProvenance !== state.status || entry.mechanism.mechanicalProvenance !== state.status || jsonDigest(rendered.partOverrides) !== jsonDigest(view.partOverrides ?? []) || jsonDigest(rendered.unobservedInputFields) !== jsonDigest(witness?.unobservedInputFields ?? []) || jsonDigest(entry.mechanism.unobservedInputFields) !== jsonDigest(witness?.unobservedInputFields ?? [])) fail(report, 'rendered-mechanical-provenance', 'Rendered native input/provenance/overrides differs from exclusive source observation or feasible witness', context)
-  if (jsonDigest(rendered.nativeGeometryAssumptions ?? []) !== jsonDigest(assumptions) || jsonDigest(entry.mechanism.nativeGeometryAssumptions ?? []) !== jsonDigest(assumptions)) fail(report, 'rendered-native-geometry-assumption', 'Actual source draw omitted/changed the exact scoped rod-head or lower-rocker side-face declaration; no shape fidelity pass is inferred', context)
-  const proof = state.status === 'constrained' ? witness.visibilityProof : state.visibilityProof, fixed = proof?.sourceNonIdentifiableFixedParts
-  if (!Array.isArray(fixed) || !Array.isArray(rendered.sourceNonIdentifiableFixedParts) || !Array.isArray(entry.mechanism.sourceNonIdentifiableFixedParts) || jsonDigest(rendered.sourceNonIdentifiableFixedParts) !== jsonDigest(fixed) || jsonDigest(entry.mechanism.sourceNonIdentifiableFixedParts) !== jsonDigest(fixed)) fail(report, 'rendered-source-non-identifiable-fixed-binding', 'Actual native draw must retain the exact explicitly approved uncertified fixed-part list; these are not geometric-fidelity passed', context)
-  if (state.status === 'constrained') {
-    if (state.input !== null || jsonDigest(rendered.visibilityProof) !== jsonDigest(witness.visibilityProof) || jsonDigest(rendered.constraintSummary) !== jsonDigest(witness.constraints) || jsonDigest(rendered.continuity) !== jsonDigest(witness.continuity ?? null)) fail(report, 'rendered-witness-binding', 'Actual witness constraints/proof/continuity are stale or misbound', context)
-    for (const error of physicalConstraintErrors(entry.mechanism, witness.constraints)) fail(report, 'rendered-physical-constraint', 'Actual compiled native physical solution violates source observation', { ...context, ...error })
-    for (const error of nativeVisibilityErrors(entry.visibility, witness.visibilityProof, currentSourceFrame)) fail(report, error.code, error.detail, context)
-  } else {
-    if (!state.visibilityProof) fail(report, 'observed-native-census-unavailable', 'Complete observed input does not replace an independent all435-path source/native visibility proof', context)
-    else {
-      if (jsonDigest(rendered.visibilityProof) !== jsonDigest(state.visibilityProof) || jsonDigest(rendered.constraintSummary) !== jsonDigest([]) || rendered.continuity !== null) fail(report, 'rendered-observed-proof-binding', 'Observed native source proof is stale or masquerading as a witness', context)
-      for (const error of nativeVisibilityErrors(entry.visibility, state.visibilityProof, currentSourceFrame)) fail(report, error.code, error.detail, context)
-    }
-  }
-  const nativeLines = nativeLineRasterProof(view, entry.nativeLines, entry.visibility, timeSeconds), contours = nativeContourRasterProof(view, entry.visibility, timeSeconds)
-  for (const error of [...nativeLines.failures, ...contours.failures]) fail(report, error.code, error.detail, { ...context, ...error })
-  return { nativeLines: nativeLines.measurements, contours: contours.measurements }
+async function media(embed) {
+  return embed.frame.evaluate(selector => {
+    const video = document.querySelector(selector), player = document.querySelector('#movie_player')
+    return { present: video instanceof HTMLVideoElement, paused: video?.paused, seeking: video?.seeking, ended: video?.ended, mediaTime: video?.currentTime, duration: video?.duration, muted: video?.muted, volume: video?.volume, readyState: video?.readyState, width: video?.videoWidth, height: video?.videoHeight, adShowing: !!player?.classList.contains('ad-showing'), error: video?.error?.message ?? document.querySelector('.ytp-error-content-wrap')?.textContent?.trim() ?? null }
+  }, embed.selector)
 }
-
-function longestRun(record) {
-  const runs = requiredRuns(record.data).filter(run => run.endSeconds - run.startSeconds >= MIN_CLOCK_RUN_SECONDS)
-  return runs.reduce((best, run) => !best || run.endSeconds - run.startSeconds > best.endSeconds - best.startSeconds ? run : best, null)
+function requireMedia(actual, record) {
+  assert(actual.present && !actual.error && !actual.adShowing && actual.readyState >= 2 && actual.width > 0 && actual.height > 0 && finite(actual.mediaTime), `Actual original media has no decoded source content: ${JSON.stringify(actual)}`)
+  assert(finite(actual.duration) && Math.abs(actual.duration - record.native.durationSeconds) <= 1, 'Actual player duration differs from retained source; ads/placeholders cannot pass')
 }
-
-/** Seek the official player into a required run through reference review, end review, then press Play. */
-async function playRequiredRun(page, embed, record, run) {
-  await pauseActual(page, embed)
-  const firstIndex = frameIndexAt(record.data.frames, run.startSeconds)
-  const views = frameViews(record.data.frames[firstIndex]).map(view => view.id)
-  const reviewed = await reviewAt(page, embed, record, run.startSeconds, views)
-  requireCondition(reviewed.snapshot.referenceState === 'matched', `Required run start ${run.startSeconds}s is not physically matched: ${reviewed.snapshot.referenceState}`)
-  await endReview(page)
-  await page.locator('#pause-video').click()
-  await waitState(page, 'playing')
-  await page.waitForFunction(() => window.harmonicAnalyzer.snapshot().mode === 'following-video', undefined, { timeout: 5000 })
+async function pause(page, embed) {
+  const actual = await snapshot(page)
+  if (['playing', 'buffering'].includes(actual.playerState)) await page.locator('#pause-video').click()
+  await page.waitForFunction(() => window.harmonicAnalyzer.snapshot().playerState === 'paused', undefined, { timeout: 20_000 })
+  const before = await media(embed); await delay(300); const after = await media(embed)
+  assert(before.paused && after.paused && finite(before.mediaTime) && Math.abs(after.mediaTime - before.mediaTime) <= 0.1, 'Pause must stop the actual original media clock')
 }
-
-/**
- * Brackets the app's last actual GPU capture between two reads of YouTube's own
- * HTMLMediaElement. Only samples well inside a required run are clock evidence.
- */
-async function clockSample(page, embed, record, run) {
-  const before = await nativeMedia(embed.frame)
-  const snapshot = await apiSnapshot(page)
-  const app = { snapshot, ...await page.evaluate(readRenderedState, (snapshot.views ?? []).map(view => view.id)) }
-  const after = await nativeMedia(embed.frame)
-  checkSnapshot(app.snapshot, record.id)
-  requireNativeContent(before, record, 'Playback'); requireNativeContent(after, record, 'Playback')
-  requireCondition(!before.paused && !after.paused && !after.muted && after.volume > 0, `Actual native playback paused/muted: ${JSON.stringify(after)}`)
-  requireCondition(app.snapshot.mode === 'following-video' && app.snapshot.playerState === 'playing', `Native playback left following mode: ${app.snapshot.playerState}/${app.snapshot.mode}`)
-  const inRun = before.mediaTime - CLOCK_LIMIT >= run.startSeconds && after.mediaTime + CLOCK_LIMIT <= run.endSeconds
-  const sample = { nativeBefore: before.mediaTime, nativeAfter: after.mediaTime, inRequiredRun: inRun, referenceState: app.snapshot.referenceState, captureTimeSeconds: null, skewSeconds: null }
-  if (!inRun) return sample
-  requireCondition(app.snapshot.referenceState === 'matched' && app.snapshot.views?.length > 0, `Required source not matched/drawn during actual playback at native ${before.mediaTime}s: ${app.snapshot.referenceState}`)
-  const measured = app.captures.map(entry => freshCapture(entry, null, [before.mediaTime, after.mediaTime], `Playback at native ${before.mediaTime}s`))
-  requireCondition(measured.every(item => item.capture.timeSeconds === measured[0].capture.timeSeconds), 'Views of one required-source draw carry different capture times')
-  for(const view of app.snapshot.views) requireCondition(renderedCertificateErrors(view,measured[0].capture.timeSeconds).length===0,`Actual matched playback draw lies in an uncertified visibility gap for ${view.id}`)
-  sample.captureTimeSeconds = measured[0].capture.timeSeconds
-  sample.skewSeconds = Math.max(...measured.map(item => item.skewSeconds))
-  return sample
+/** Independently observes native seeking/seeked AFTER the bridge commands a seek. */
+export function seekSettlement(observed, target, tolerance) {
+  if (!observed?.sameElement) return { fatal: 'Observed original media element was replaced/detached' }
+  if (observed.now.error || observed.events.some(event => event.type === 'error')) return { fatal: 'Actual original media failed during seek' }
+  const onTarget = time => finite(time) && Math.abs(time - target) <= tolerance
+  const settled = observed.now.paused && !observed.now.seeking && observed.now.readyState >= 2 && onTarget(observed.now.mediaTime)
+  const lastSeeking = observed.events.findLastIndex(event => event.type === 'seeking')
+  if (lastSeeking >= 0) return { done: settled && onTarget(observed.events[lastSeeking].mediaTime) && observed.events.slice(lastSeeking + 1).some(event => event.type === 'seeked'), proof: 'native-seeking-then-seeked-after-command' }
+  return { done: settled && observed.pre.paused && !observed.pre.seeking && observed.pre.readyState >= 2 && onTarget(observed.pre.mediaTime), proof: 'already-decoded-same-time-no-op' }
 }
-
-function requireAdvancingDraws(samples, minimumCount, minimumAdvance, label) {
-  const inRun = samples.filter(sample => sample.inRequiredRun)
-  requireCondition(inRun.length >= minimumCount, `${label}: only ${inRun.length}/${minimumCount} samples measured required-source draws`)
-  for (let index = 1; index < inRun.length; index++) requireCondition(inRun[index].captureTimeSeconds >= inRun[index - 1].captureTimeSeconds, `${label}: captured draw time went backwards`)
-  requireCondition(inRun.at(-1).captureTimeSeconds - inRun[0].captureTimeSeconds >= minimumAdvance, `${label}: required-source GPU capture time is stale (advanced ${inRun.at(-1).captureTimeSeconds - inRun[0].captureTimeSeconds}s)`)
-  requireCondition(inRun.at(-1).nativeAfter - inRun[0].nativeBefore >= minimumAdvance, `${label}: native HTMLMediaElement clock did not advance`)
-  return Math.max(...inRun.map(sample => sample.skewSeconds))
-}
-
-async function playbackProof(page, record, run, report) {
-  const embed = await nativeFrame(page, record.id)
-  const before = await apiSnapshot(page)
-  if (before.playerState === 'playing') { await page.locator('#pause-video').click(); await waitState(page, 'paused') }
-  await page.locator('#follow-video').click()
-  // Actual browser clicks on the public control, never evaluate(playVideo) or a fake clock.
-  await page.locator('#pause-video').click()
-  await waitState(page, 'playing')
-  const samples = []
-  report.playback = { samples, requiredRun: run, native: null, maxClockSkewSeconds: null, iframeSrc: embed.src, clockEvidence: null, userGesture: '#pause-video click; seeks only through the official player via reviewReferenceFrame' }
-  const started = await nativeMedia(embed.frame)
-  requireNativeContent(started, record, 'Initial playback')
-  if (!run) {
-    requireCondition(record.report.machineFrames === 0, `Required source frames exist but no contiguous required run >= ${MIN_CLOCK_RUN_SECONDS}s exists to measure the draw clock`)
-    await delay(1250)
-    const later = await nativeMedia(embed.frame)
-    requireCondition(!later.paused && later.mediaTime - started.mediaTime >= 1, 'Actual native HTMLMediaElement did not advance during user-gesture playback')
-    report.playback.clockEvidence = 'No required source frames in this video; no model draw clock is claimed'
-  } else {
-    await playRequiredRun(page, embed, record, run)
-    for (let index = 0; index < 12; index++) {
-      await delay(250)
-      samples.push(await clockSample(page, embed, record, run))
-    }
-    report.playback.maxClockSkewSeconds = requireAdvancingDraws(samples, 4, 1, 'Playback')
-    report.playback.clockEvidence = 'YouTube iframe HTMLMediaElement.currentTime bracketing renderedLandmarks(viewId).timeSeconds of required-source GPU captures'
-  }
-  const actual = await nativeMedia(embed.frame), snapshot = await apiSnapshot(page)
-  report.playback.native = actual
-  requireNativeContent(actual, record, 'Playback')
-  requireCondition(!actual.paused && !actual.muted && actual.volume > 0 && actual.controls && actual.controlsHeight > 0 && actual.playButtonWidth > 0, `Actual native media/audio/controls unavailable: ${JSON.stringify(actual)}`)
-  requireCondition(snapshot.playerAudio?.state === 'audible' && snapshot.playerAudio.volume > 0, 'YouTube API reports muted/inaudible playback')
-  return embed
-}
-
-async function compactProof(page, record, embed, run, report, outputDirectory) {
-  if (run) await playRequiredRun(page, embed, record, run)
-  const initial = await nativeMedia(embed.frame)
-  await page.locator('#minimize-player').click()
-  requireCondition(await page.locator('#video-dock').getAttribute('data-size') === 'compact', 'Player did not enter visible compact state')
-  requireCondition(await embed.handle.evaluate(element => element === document.querySelector('#video-player iframe') && element.isConnected), 'Minimization replaced/detached the native playing iframe')
-  const box = await embed.iframe.boundingBox()
-  requireCondition(box && box.width >= 200 && box.height >= 200, `Compact native YouTube viewport is below 200×200: ${JSON.stringify(box)}`)
-  requireCondition(await embed.iframe.isVisible(), 'Compact player is hidden')
-  const viewport = page.viewportSize()
-  requireCondition(box.x >= 0 && box.y >= 0 && box.x + box.width <= viewport.width + 1 && box.y + box.height <= viewport.height + 1, 'Compact player is clipped outside the visible browser viewport')
-  await embed.iframe.hover()
-  const actual = await nativeMedia(embed.frame)
-  requireNativeContent(actual, record, 'Compact playback')
-  requireCondition(actual.controls && actual.controlsHeight > 0 && actual.playButtonWidth >= 20 && actual.playButtonHeight >= 20 && !actual.paused && !actual.muted && actual.volume > 0, `Compact native controls/audio unusable: ${JSON.stringify(actual)}`)
-  const samples = []
-  if (run) {
-    for (let index = 0; index < 5; index++) { await delay(250); samples.push(await clockSample(page, embed, record, run)) }
-  } else await delay(1250)
-  const after = await nativeMedia(embed.frame), snapshot = await apiSnapshot(page)
-  checkSnapshot(snapshot, record.id)
-  requireCondition(snapshot.playerState === 'playing' && snapshot.playerAudio?.state === 'audible' && snapshot.playerAudio.volume > 0 && !after.paused && !after.muted && after.mediaTime - initial.mediaTime >= 0.5, 'Minimizing paused/muted/stalled actual native playback')
-  const maxClockSkewSeconds = run ? requireAdvancingDraws(samples, 2, 0.25, 'Compact playback') : null
-  const screenshot = `${record.id}-compact.png`
-  await page.screenshot({ path: resolve(outputDirectory, screenshot) })
-  report.compact = { sameIframe: true, bounds: box, native: actual, elapsedNativeSeconds: after.mediaTime - initial.mediaTime, audio: snapshot.playerAudio, samples, maxClockSkewSeconds, screenshot }
-  // Prove the shrunken native controls are hit-testable, not merely painted.
-  await embed.frame.locator('.ytp-play-button').click()
-  await waitState(page, 'paused')
-  const paused = await nativeMedia(embed.frame)
-  await delay(350)
-  const still = await nativeMedia(embed.frame)
-  requireCondition(paused.paused && still.paused && Math.abs(still.mediaTime - paused.mediaTime) <= PAUSED_DRIFT_SECONDS, 'Compact native pause control did not pause the actual HTMLMediaElement')
-  await embed.iframe.hover()
-  await embed.frame.locator('.ytp-play-button').click()
-  await waitState(page, 'playing')
-  report.compact.nativePauseResumeGestures = true
-  await page.locator('#minimize-player').click()
-  requireCondition(await page.locator('#video-dock').getAttribute('data-size') === 'expanded', 'Player did not restore expanded state')
-}
-
-export async function referenceProof(page, embed, record, report, outputDirectory) {
-  const builtReference = await page.evaluate(() => window.harmonicAnalyzer.referenceData())
-  requireCondition(jsonDigest(builtReference) === record.digest, 'Actually loaded built reference observations differ from the independently checked content file')
-  requireCondition(jsonDigest((await apiSnapshot(page)).nativeGeometryAssumptions ?? []) === jsonDigest(record.data.nativeGeometryAssumptions ?? []), 'Runtime native topology assumptions differ from the exact user-approved source declaration')
-  report.nativeGeometryAssumptions = record.data.nativeGeometryAssumptions ?? []
-  report.sourceNonIdentifiableFixedParts = record.report.sourceNonIdentifiableFixedParts ?? []
-  report.fixedPartFidelityBoundary = 'User-approved source-non-identifiable fixed parts remain rendered and uncertified; only independently identifiable source features can be geometric-fidelity passed.'
-  report.sourceOccludedParts = record.report.sourceOccludedParts ?? []
-  report.sourceOcclusionFidelityBoundary = 'Exact decoded-exposure human-hand interiors remain SOURCE-OCCLUDED, not source-corresponded or geometry-passed; all native paths and chosen feasible pose requirements remain accounted.'
-  const sourceLines = record.data.frames.flatMap(frame => frameViews(frame).flatMap(view => (view.nativeLineChecks ?? []).map(line => ({ id: JSON.stringify([frame.timeSeconds, view.id, line.id, line.partPath, line.partLocalLineMetres]), partPath: line.partPath, partLocalLineMetres: line.partLocalLineMetres }))))
-  if (sourceLines.length) await page.evaluate(lines => {
-    const api = window.harmonicAnalyzer
-    if (typeof api.assertNativeLinesWithinRestBounds !== 'function') throw new Error('Actual native drawable REST-bounds source-line qualification is unavailable')
-    api.assertNativeLinesWithinRestBounds(lines)
-  }, sourceLines)
-  report.nativeSourceLineRestBounds = { checkedDeclaredLines: sourceLines.length, includesNonselectedSourceChecks: true, qualification: 'Actual native drawable REST bounding box only; independent physical axis/surface/finite-extent evidence remains required' }
-  const sourceOverrides = record.data.frames.flatMap(frame => [...(frame.partOverrides ?? []), ...(frame.views ?? []).flatMap(view => view.partOverrides ?? [])])
-  const fixedDeclarations = record.data.frames.flatMap(frame => frameViews(frame).flatMap(view => {
-    const proof = view.mechanicalState?.status === 'constrained' ? view.mechanicalState.runtimeWitness?.visibilityProof : view.mechanicalState?.visibilityProof
-    return proof?.sourceNonIdentifiableFixedParts ?? []
-  }))
-  const simultaneousBundles = record.data.frames.map(frame => frameViews(frame).map(view => ({ rectSourcePixels: view.rectSourcePixels, composite: view.composite ?? { mode: 'opaque' }, imagePlaneWarp:independentlyResolvedWarp(view)??undefined })))
-  await page.evaluate(({ bundles, paths, overrides }) => {
-    const api = window.harmonicAnalyzer
-    if (typeof api.assertSourceCompositeWeights !== 'function') throw new Error('Actual shared per-pixel source composite weight assertion is unavailable')
-    for (const bundle of bundles) api.assertSourceCompositeWeights(bundle)
-    if (paths.length) {
-      if (typeof api.assertNativeStructuralFixedParts !== 'function') throw new Error('Actual structural identity/binding/deformation/source-override fixed-part qualification is unavailable')
-      api.assertNativeStructuralFixedParts(paths, overrides)
-    }
-  }, { bundles: simultaneousBundles, paths: [...new Set(fixedDeclarations.map(part => part.nativePartPath))], overrides: sourceOverrides })
-  report.nativeUncertifiedFixedQualification = { declaredRecords: fixedDeclarations.length, distinctNativeParts: new Set(fixedDeclarations.map(part => part.nativePartPath)).size, scope: 'Closed actual CAD structural catalogue and binding/deformation/entire-source-override graph; not current rest pose, unbound inference or a geometric-fidelity pass' }
-  await pauseActual(page, embed)
-  const errors = [], fitErrors = [], lineErrors = [], contourErrors = [], measurements = [], clockSkews = []
-  const shots = new Map(record.data.shots.map(shot => [shot.id, shot]))
-  const frames = record.data.frames
-  const required = frames.map(frame => sourceNeedsMachine(frame, shots.get(frame.shotId)))
-  // Exploratory state immediately before review; no-machine samples must leave it untouched.
-  const exploratory = await apiSnapshot(page)
-  let viewCount = 0, matchedFrames = 0, heldFrames = 0, noMachineFrames = 0, firstMachineScreenshot = null
-  let lastRequired = -1, lastMatched = -1
-  const rigGpuMeasured = new Set(), rigGpuErrors = [], interpolation = { requiredNativeExposures: 0, verifiedNativeExposures: 0, verifiedViews: 0 }
+async function observedSeek(embed, target, command, fps) {
+  assert(finite(target), 'Source sample PTS is unavailable')
+  await embed.frame.evaluate(selector => {
+    const video = document.querySelector(selector)
+    if (!(video instanceof HTMLVideoElement)) throw new Error('Actual original media element is unavailable')
+    window.__harmonicCompactSeek?.detach()
+    const read = () => ({ mediaTime: video.currentTime, paused: video.paused, seeking: video.seeking, readyState: video.readyState, error: video.error?.message ?? null })
+    const events = [], pre = read(), types = ['seeking', 'seeked', 'error']
+    const record = event => events.push({ type: event.type, ...read() })
+    for (const type of types) video.addEventListener(type, record)
+    window.__harmonicCompactSeek = { video, pre, events, read, detach() { for (const type of types) video.removeEventListener(type, record); delete window.__harmonicCompactSeek } }
+  }, embed.selector)
   try {
-    for (let index = 0; index < frames.length; index++) {
-      const frame = frames[index], t = frame.timeSeconds
-      const expectedViews = required[index] ? frameViews(frame) : lastRequired >= 0 ? frameViews(frames[lastRequired]) : []
-      const response = await reviewAt(page, embed, record, t, expectedViews.map(view => view.id))
-      const snapshot = response.snapshot, native = response.native
-      for (const error of sourceCompositeErrors(snapshot.views ?? [])) fail(report, error.code, error.detail, { timeSeconds: t, viewId: error.viewId })
-      if (!required[index]) {
-        if (snapshot.referenceState === 'no-machine') {
-          requireCondition(lastRequired < 0, `no-machine at ${t}s although required frame ${frames[lastRequired]?.timeSeconds}s precedes it; a calibrated hold is required`)
-          requireCondition(Array.isArray(snapshot.views) && snapshot.views.length === 0, `no-machine at ${t}s drew source views`)
-          requireCondition(nearlyEqual(snapshot.camera, exploratory.camera, UNCHANGED_TOLERANCE) && nearlyEqual(snapshot.input, exploratory.input, UNCHANGED_TOLERANCE), `no-machine at ${t}s replaced exploratory geometry/camera with an invented pose`)
-          noMachineFrames++
-        } else {
-          requireCondition(snapshot.referenceState === 'held', `Unsupported exempt-source state at ${t}s: ${snapshot.referenceState}`)
-          requireCondition(lastRequired >= 0 && lastMatched === lastRequired, `held at ${t}s without an actual preceding calibrated matched pose`)
-          requireCondition(Array.isArray(snapshot.views) && snapshot.views.length === expectedViews.length && expectedViews.every(view => {
-            const rendered = snapshot.views.find(candidate => candidate.id === view.id)
-            return rendered && jsonDigest(rendered.rectSourcePixels) === jsonDigest(view.rectSourcePixels) && rendered.presentation === view.presentation && sameCamera(rendered.camera, view.camera, nativeCameraRect(view)) && jsonDigest(rendered.composite) === jsonDigest(view.composite ?? { mode: 'opaque' }) && sameResolvedImagePlaneWarp(rendered.resolvedImagePlaneWarp,independentlyResolvedWarp(view)) && sameSourceLayout(rendered.sourceLayout,sourceLayoutForViews(expectedViews))
-          }), `held at ${t}s does not draw the exact views of the preceding matched frame ${frames[lastRequired].timeSeconds}s`)
-          for (const view of expectedViews) {
-            const capture=freshCapture(response.captures.find(entry => entry.viewId === view.id), t, [native.mediaTime], `Held ${t}s`)
-            requireCondition(sourceCaptureBindingErrors({...view,sourceLayout:sourceLayoutForViews(expectedViews)},capture.capture).length===0,`Held ${t}s capture changed measured warp/support`)
-            clockSkews.push(capture.skewSeconds)
-          }
-          heldFrames++
-        }
+    await command()
+    const deadline = Date.now() + 15_000
+    for (;;) {
+      const observed = await embed.frame.evaluate(selector => {
+        const observer = window.__harmonicCompactSeek
+        if (!observer) return null
+        return { sameElement: observer.video === document.querySelector(selector) && observer.video.isConnected, pre: observer.pre, events: observer.events.slice(), now: observer.read() }
+      }, embed.selector)
+      const verdict = seekSettlement(observed, target, 0.5 / fps + 0.005)
+      assert(!verdict.fatal, verdict.fatal)
+      if (verdict.done) return { proof: verdict.proof, targetSourcePtsSeconds: target, preMediaTime: observed.pre.mediaTime, settledMediaTime: observed.now.mediaTime, events: observed.events.map(event => event.type) }
+      assert(Date.now() < deadline, `Actual original video never decoded/settled the commanded source PTS ${target}s`)
+      await delay(50)
+    }
+  } finally { await embed.frame.evaluate(() => window.__harmonicCompactSeek?.detach()).catch(() => {}) }
+}
+
+
+/** Capture actual framebuffer-marker readback; no CPU projection or old source certificates. */
+async function review(page, embed, record, frame, required = true) {
+  const shot = record.track.shots.find(shot => shot.id === frame.shotId)
+  assert(sourcePtsInShot(frame, shot), 'Observed source PTS lies outside its own half-open source shot; adjacent-shot images/cameras cannot pass')
+  const before = await media(embed)
+  const seek = await observedSeek(embed, frame.decodedTimeSeconds, () => page.evaluate(async sample => window.harmonicAnalyzer.reviewReferenceFrame(sample.timeSeconds, sample.decodedTimeSeconds), { timeSeconds: frame.timeSeconds, decodedTimeSeconds: frame.decodedTimeSeconds }), record.native.fps)
+  const actual = await snapshot(page), native = await media(embed)
+  requireModel(actual, record.id); requireMedia(native, record)
+  assert(actual.mode === 'reference-review' && actual.playerState === 'paused' && native.paused && !native.seeking, 'Source review did not hold a decoded paused original frame')
+  assert((required ? ['approximate'] : ['no-machine', 'approximate']).includes(actual.referenceState) && Math.abs(actual.modelTime - frame.timeSeconds) <= 1e-6, 'Source sample has no current native draw or legitimate no-machine hold')
+  assert(Math.abs(native.mediaTime - frame.decodedTimeSeconds) <= 0.5 / record.native.fps + 0.005 && Math.abs(native.mediaTime - frame.timeSeconds) <= CLOCK_LIMIT + 1e-6, 'Actual original media is not on the observed source exposure within the0.5s timing bound')
+  const expectedIndex = nearestPtsIndex(record.native.pts, frame.decodedTimeSeconds)
+  assert(Math.abs(record.native.pts[expectedIndex] - frame.decodedTimeSeconds) <= 0.001 && Math.abs(frame.decodedTimeSeconds - frame.timeSeconds) <= CLOCK_LIMIT + 1e-6, 'Authored sample is not a retained native source PTS within0.5s')
+  if (frame.sourceImage) assert(frame.sourceImage.frameIndex === expectedIndex, 'Source image frame index differs from declared native PTS')
+  const rendered = await page.evaluate(ids => {
+    const canvas = document.querySelector('#stage')
+    return { captures: ids.map(viewId => ({ viewId, capture: window.harmonicAnalyzer.renderedLandmarks(viewId), mechanism: window.harmonicAnalyzer.renderedMechanism(viewId) })), canvas: { tag: canvas?.tagName, width: canvas?.width, height: canvas?.height, clientWidth: canvas?.clientWidth, clientHeight: canvas?.clientHeight, devicePixelRatio: window.devicePixelRatio } }
+  }, (frame.views ?? []).map(view => view.id))
+  return { actual, native, seek, beforeMediaTime: before.mediaTime, ...rendered }
+}
+function measureView(view, response, frame, observations, tolerancePx, anchors) {
+  const entry = response.captures.find(item => item.viewId === view.id), capture = entry?.capture, mechanism = entry?.mechanism
+  const rendered = response.actual.views?.find(item => item.id === view.id)
+  assert(capture?.method === 'gpu-readback' && capture.status === 'captured' && capture.visibilityMode === 'depth-off-landmark-projection' && capture.viewId === view.id && finite(capture.timeSeconds) && Math.abs(capture.timeSeconds - frame.timeSeconds) <= 1e-6, 'Missing/stale actual GPU landmark readback')
+  assert(mechanism?.method === 'actual-native-mechanism-solve' && mechanism.status === 'rendered' && mechanism.viewId === view.id && mechanism.timeSeconds === capture.timeSeconds && Number.isInteger(mechanism.sourceDrawRevision) && mechanism.sourceDrawRevision > 0 && mechanism.channelAnglesRad?.length === 20 && mechanism.channelAnglesRad.every(finite), 'Missing/stale native full physical solve')
+  assert(rendered && jsonDigest(mechanism.input) === jsonDigest(rendered.input) && jsonDigest(mechanism.sourceLayout) === jsonDigest(capture.sourceLayout) && jsonDigest(mechanism.resolvedImagePlaneWarp) === jsonDigest(capture.resolvedImagePlaneWarp), 'Readback and native input/layout/warp do not belong to the same rendered source view')
+  assert(jsonDigest(rendered.rectSourcePixels) === jsonDigest(view.rectSourcePixels) && rendered.presentation === view.presentation, 'Rendered source view ROI/orientation differs from sample')
+  const near = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((value, index) => finite(value) && Math.abs(value - b[index]) <= 1e-7)
+  if (frame.measuredInterpolation) {
+    const sampling = rendered.sourceSampling, [fromTime, toTime] = frame.interpolationInterval
+    assert(sampling && sampling.fromTimeSeconds === fromTime && (sampling.selection === 'continuous' ? sampling.toTimeSeconds === toTime && Math.abs(sampling.mix - (frame.timeSeconds - fromTime) / (toTime - fromTime)) <= 1e-7 : sampling.selection === 'decoded-exposure' && sampling.toTimeSeconds === fromTime && sampling.mix === 0), 'Intermediate source sample has no correctly bound actual interpolation/explicit held-pose receipt')
+  } else {
+    assert(near(rendered.camera?.positionMetres, view.camera.positionMetres) && (near(rendered.camera?.quaternion, view.camera.quaternion) || near(rendered.camera?.quaternion, view.camera.quaternion.map(value => -value))) && Math.abs(rendered.camera.verticalFovDegrees - view.camera.verticalFovDegrees) <= 1e-7 && jsonDigest(rendered.input) === jsonDigest(view.input), 'GPU sample did not draw the authored camera and complete chosen physical input')
+  }
+  const canvas = response.canvas
+  assert(canvas.tag === 'CANVAS' && canvas.clientWidth > 0 && canvas.clientHeight > 0 && Math.abs(canvas.width - canvas.clientWidth * canvas.devicePixelRatio) <= 1 && Math.abs(canvas.height - canvas.clientHeight * canvas.devicePixelRatio) <= 1, 'Actual WebGL canvas backing store is hidden/empty/stale')
+  const width = Math.min(canvas.clientWidth, canvas.clientHeight * 1920 / 1080), height = width * 1080 / 1920
+  const gate = { x: (canvas.clientWidth - width) / 2, y: (canvas.clientHeight - height) / 2, width, height }
+  const layoutIndex = capture.sourceLayout?.findIndex(item => item.viewId === view.id)
+  assert(layoutIndex >= 0, 'Actual GPU capture has no current ordered source support')
+  const required = observations.filter(item => (item.viewId ?? 'main') === view.id)
+  assert(required.length > 0, 'Required source view has no independently observed landmarks')
+  const measured = [], unavailable = []
+  if (!required.some(item => item.role === 'check')) unavailable.push({ viewId: view.id, reason: 'Required source view has no independent CHECK landmarks; FIT residuals are diagnostic only' })
+  for (const observed of required) {
+    const anchor = anchors.get(observed.anchorId), marker = capture.landmarks?.find(item => item.id === observed.anchorId)
+    const context = { viewId: view.id, anchorId: observed.anchorId, role: observed.role, motion: anchor?.motion ?? 'unknown', sourcePixels: observed.pixel }
+    if (!anchor?.partPath || (!anchor.partLocalMetres && !anchor.worldMetres) || !anchor.correspondenceEvidence) { unavailable.push({ ...context, reason: 'Source landmark lacks native physical-feature correspondence' }); continue }
+    if (observed.status !== 'observed' || !['manual', 'optical-flow', 'image-edge'].includes(observed.method) || !point(observed.pixel) || !finite(observed.uncertaintyPx) || observed.uncertaintyPx < 0) { unavailable.push({ ...context, reason: 'Independent source landmark pixel/measurement is unavailable' }); continue }
+    if (marker?.state !== 'rendered' || !point(marker.sourcePixels) || !point(marker.canvasPixels) || !finite(marker.uncertaintySourcePixels) || marker.uncertaintySourcePixels < 0) { unavailable.push({ ...context, reason: marker?.reason ?? 'Landmark has no actual GPU-rendered pixels' }); continue }
+    if (!sourcePointUnmasked(capture.sourceLayout, layoutIndex, observed.pixel) || !sourcePointUnmasked(capture.sourceLayout, layoutIndex, marker.sourcePixels)) { unavailable.push({ ...context, reason: 'Source/GPU landmark falls outside its view support or behind an opaque/inset layer' }); continue }
+    const canvasPoint = [gate.x + marker.sourcePixels[0] / 1920 * gate.width, gate.y + marker.sourcePixels[1] / 1080 * gate.height]
+    const mappingErrorPx = Math.hypot(marker.canvasPixels[0] - canvasPoint[0], marker.canvasPixels[1] - canvasPoint[1])
+    if (mappingErrorPx > 0.75) { unavailable.push({ ...context, reason: `Actual source-to-canvas mapping differs by ${mappingErrorPx}px` }); continue }
+    const rawErrorPx = Math.hypot(marker.sourcePixels[0] - observed.pixel[0], marker.sourcePixels[1] - observed.pixel[1])
+    const errorPx = rawErrorPx + observed.uncertaintyPx + marker.uncertaintySourcePixels
+    measured.push({ ...context, method: capture.method, nativePixels: marker.sourcePixels, canvasPixels: marker.canvasPixels, rawErrorPx, sourceUncertaintyPx: observed.uncertaintyPx, rasterUncertaintyPx: marker.uncertaintySourcePixels, errorPx, errorFrameWidthPercent: errorPx / 1920 * 100, status: errorPx <= tolerancePx ? 'passed' : 'failed', captureTimeSeconds: capture.timeSeconds, nativeMediaTime: response.native.mediaTime, sourceDrawRevision: mechanism.sourceDrawRevision, sourceSampling: rendered.sourceSampling, independentMidIntervalObservation: frame.measuredInterpolation === true })
+  }
+  return { measured, unavailable, clockSkewSeconds: Math.abs(capture.timeSeconds - response.native.mediaTime) }
+}
+
+async function playbackChecks(page, embed, record, report, outputDirectory) {
+  await pause(page, embed)
+  await page.evaluate(() => window.harmonicAnalyzer.endReferenceReview())
+  const complete = frame => frame.views?.length && record.native.durationSeconds - frame.timeSeconds > 3 && frame.views.every(view => view.camera && view.input)
+  const animatedCandidate = record.track.frames.find((frame, index) => {
+    const next = record.track.frames[index + 1]
+    return complete(frame) && next && complete(next) && frame.shotId === next.shotId && next.timeSeconds - frame.timeSeconds <= 2 && jsonDigest(frame.views) !== jsonDigest(next.views)
+  })
+  const candidate = animatedCandidate ?? record.track.frames.find(complete)
+  assert(candidate, 'No complete source interval available for actual playback timing')
+  await page.evaluate(async sample => window.harmonicAnalyzer.reviewReferenceFrame(sample.timeSeconds, sample.decodedTimeSeconds), { timeSeconds: candidate.timeSeconds, decodedTimeSeconds: candidate.decodedTimeSeconds })
+  const stage = page.locator('#stage')
+  const canvasShot = () => stage.screenshot({ mask: [page.locator('#video-dock'), page.locator('#loading')], animations: 'disabled' })
+  const beforePixels = await canvasShot()
+  const beforeSource = await snapshot(page)
+  await page.locator('#pause-video').click()
+  await page.waitForFunction(() => window.harmonicAnalyzer.snapshot().playerState === 'playing', undefined, { timeout: 25_000 })
+  const started = await media(embed); requireMedia(started, record)
+  assert(!started.paused && !started.muted && started.volume > 0, 'Original video must actually play with unmuted nonzero audio')
+  const clocks = []
+  for (let index = 0; index < 6; index++) {
+    await delay(250)
+    const before = await media(embed)
+    const rendered = await page.evaluate(() => {
+      const api = window.harmonicAnalyzer, actual = api.snapshot()
+      return { actual, receipts: actual.views.map(view => ({ viewId: view.id, mechanism: api.renderedMechanism(view.id) })) }
+    })
+    const actual = rendered.actual, after = await media(embed)
+    requireMedia(after, record)
+    assert(after.mediaTime >= before.mediaTime && !after.paused && actual.mode === 'following-video', 'Actual media/source-following playback stopped')
+    const skew = Math.max(0, before.mediaTime - actual.modelTime, actual.modelTime - after.mediaTime)
+    assert(finite(skew) && skew <= CLOCK_LIMIT, 'Playing video/native model timing exceeds0.5s')
+    assert(['approximate', 'matched', 'held', 'no-machine'].includes(actual.referenceState), 'Playing source-following draw became unavailable')
+    const revisions = new Set()
+    for (const entry of rendered.receipts) {
+      const native = entry.mechanism, view = actual.views.find(item => item.id === entry.viewId)
+      assert(native?.method === 'actual-native-mechanism-solve' && native.status === 'rendered' && native.timeSeconds === actual.modelTime && Number.isInteger(native.sourceDrawRevision) && native.sourceDrawRevision > 0 && native.channelAnglesRad?.length === 20 && native.channelAnglesRad.every(finite), 'Playback clock must be tied to a completed actual native geometry render, not a media/model-time alias')
+      assert(view && jsonDigest(native.input) === jsonDigest(view.input) && jsonDigest(native.sourceLayout) === jsonDigest(view.sourceLayout) && jsonDigest(native.resolvedImagePlaneWarp) === jsonDigest(view.resolvedImagePlaneWarp), 'Live native render receipt has a stale/different physical input or source view layout')
+      revisions.add(native.sourceDrawRevision)
+    }
+    assert(actual.views.length > 0 && revisions.size === 1, 'Playing clock proof needs one current completed native source draw shared by all physical views')
+    clocks.push({ mediaTimeBefore: before.mediaTime, modelTime: actual.modelTime, mediaTimeAfter: after.mediaTime, clockSkewSeconds: skew, referenceState: actual.referenceState, sourceDrawRevision: [...revisions][0], renderedViews: rendered.receipts.map(entry => ({ viewId: entry.viewId, method: entry.mechanism.method, status: entry.mechanism.status, timeSeconds: entry.mechanism.timeSeconds, inputDigest: jsonDigest(entry.mechanism.input) })) })
+  }
+  const ended = await media(embed)
+  assert(ended.mediaTime - started.mediaTime >= 1, 'Actual source video did not advance through playback')
+  assert(clocks.at(-1).sourceDrawRevision > clocks[0].sourceDrawRevision, 'Actual native completed draw revision never advanced while the original video played')
+  const afterPixels = await canvasShot(), afterSource = await snapshot(page)
+  const visualState = actual => actual.views.map(view => ({ id: view.id, camera: view.camera, input: view.input, rectSourcePixels: view.rectSourcePixels, composite: view.composite, resolvedImagePlaneWarp: view.resolvedImagePlaneWarp }))
+  const sourceStateChanged = jsonDigest(visualState(beforeSource)) !== jsonDigest(visualState(afterSource))
+  const canvasChanged = digest(beforePixels) !== digest(afterPixels)
+  assert(!sourceStateChanged || canvasChanged, 'Changing source camera/mechanism receipts did not change actual rendered canvas pixels')
+  const beforeScreenshot = `${record.id}-${embed.player}-playing-before.png`, afterScreenshot = `${record.id}-${embed.player}-playing-after.png`
+  await writeFile(resolve(outputDirectory, beforeScreenshot), beforePixels)
+  await writeFile(resolve(outputDirectory, afterScreenshot), afterPixels)
+  await pause(page, embed)
+  await page.locator('#minimize-player').click()
+  const rect = await page.locator('#video-player').boundingBox()
+  assert(rect && rect.width >= 200 && rect.height >= 200, 'Compact original player must remain at least200x200')
+  const activeControls = await embed.frame.evaluate(selector => {
+    const video = document.querySelector(selector)
+    if (selector.includes('html5-main-video')) {
+      const control = document.querySelector('.ytp-play-button'), bar = document.querySelector('.ytp-chrome-bottom'), bounds = control?.getBoundingClientRect()
+      return { controls: !!control && !!bar && bounds?.width > 0 && bounds?.height > 0 }
+    }
+    return { controls: video?.controls === true }
+  }, embed.selector)
+  assert(activeControls.controls, 'Compact original player has no usable native playback controls')
+  if (embed.player === 'youtube') await embed.frame.locator('.ytp-play-button').click()
+  else {
+    const nativeRect = await page.locator(embed.selector).boundingBox()
+    assert(nativeRect, 'Compact native media controls have no visible surface')
+    await page.mouse.click(nativeRect.x + 20, nativeRect.y + nativeRect.height - 20)
+  }
+  await page.waitForFunction(() => window.harmonicAnalyzer.snapshot().playerState === 'playing', undefined, { timeout: 20_000 })
+  const compactStarted = await media(embed); requireMedia(compactStarted, record)
+  await delay(600)
+  const compactPlayed = await media(embed)
+  const compactRender = await page.evaluate(() => {
+    const api = window.harmonicAnalyzer, actual = api.snapshot()
+    return { actual, receipts: actual.views.map(view => api.renderedMechanism(view.id)) }
+  })
+  const compactState = compactRender.actual
+  assert(!compactPlayed.paused && !compactPlayed.muted && compactPlayed.volume > 0 && compactPlayed.mediaTime - compactStarted.mediaTime >= 0.3 && compactState.mode === 'following-video' && Math.abs(compactState.modelTime - compactPlayed.mediaTime) <= CLOCK_LIMIT, 'Compact native controls did not actually play original audio/video with synchronized model')
+  assert(compactRender.receipts.length > 0 && compactRender.receipts.every(receipt => receipt.method === 'actual-native-mechanism-solve' && receipt.status === 'rendered' && receipt.timeSeconds === compactState.modelTime && receipt.sourceDrawRevision > clocks.at(-1).sourceDrawRevision), 'Compact playback has no new completed native geometry render receipt')
+  await pause(page, embed)
+  const compactScreenshot = `${record.id}-${embed.player}-compact.png`
+  await page.screenshot({ path: resolve(outputDirectory, compactScreenshot) })
+  await page.locator('#minimize-player').click()
+  report.playback[embed.player] = { status: 'passed', clockProof: 'Completed actual-native-geometry-render receipts, actual original media before/after brackets, and actual canvas screenshots; expensive landmark probes remain paused-review-only.', audio: { muted: started.muted, volume: started.volume, proof: 'Actual decoded original HTMLMediaElement playback; audio track retained in unchanged source bytes, not acoustic loopback' }, advancedSeconds: ended.mediaTime - started.mediaTime, clocks, maxClockSkewSeconds: Math.max(...clocks.map(item => item.clockSkewSeconds)), canvas: { sourceStateChanged, canvasChanged, beforeSha256: digest(beforePixels), afterSha256: digest(afterPixels), beforeScreenshot, afterScreenshot }, compact: { width: rect.width, height: rect.height, controls: activeControls.controls, screenshot: compactScreenshot } }
+}
+
+async function interactionChecks(page, embed, id, outputDirectory) {
+  await pause(page, embed); await page.evaluate(() => window.harmonicAnalyzer.endReferenceReview())
+  await page.locator('#fit-view').click()
+  const crank = page.locator('#crank'), stage = page.locator('#stage')
+  assert(await crank.isEnabled(), 'Paused native mechanism manual crank is disabled')
+  const before = await snapshot(page), mediaBefore = await media(embed)
+  const take = () => stage.screenshot({ mask: [page.locator('#video-dock'), page.locator('#loading')], animations: 'disabled' })
+  const beforePixels = await take()
+  await crank.focus(); await crank.press('ArrowRight'); await crank.press('ArrowRight'); await crank.press('ArrowRight')
+  await page.waitForFunction(turns => Math.abs(window.harmonicAnalyzer.snapshot().input.crankTurns - turns) > 1e-6, before.input.crankTurns)
+  await page.evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))))
+  const after = await snapshot(page), crankPixels = await take()
+  assert(after.mode === 'exploring' && after.playerState === 'paused' && digest(beforePixels) !== digest(crankPixels) && jsonDigest(before.camera) === jsonDigest(after.camera), 'Manual crank must change actual native rendered geometry without moving camera or replaying media')
+  const target = await stage.evaluate(canvas => {
+    const rect = canvas.getBoundingClientRect()
+    for (const [x, y] of [[0.3, 0.3], [0.6, 0.45], [0.5, 0.6], [0.7, 0.25]]) {
+      const left = rect.left + rect.width * x, top = rect.top + rect.height * y, dx = Math.min(100, rect.width * 0.12)
+      if (document.elementFromPoint(left, top) === canvas && document.elementFromPoint(left + dx, top + 35) === canvas) return { left, top, dx }
+    }
+    return null
+  })
+  assert(target, 'No usable native model orbit surface')
+  await page.mouse.move(target.left, target.top); await page.mouse.down(); await page.mouse.move(target.left + target.dx, target.top + 35, { steps: 8 }); await page.mouse.up()
+  await page.evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))))
+  const orbit = await snapshot(page), orbitPixels = await take(), mediaAfter = await media(embed)
+  assert(jsonDigest(orbit.camera) !== jsonDigest(after.camera) && digest(orbitPixels) !== digest(crankPixels), 'Manual orbit must change actual rendered camera/pixels')
+  assert(mediaAfter.paused && Math.abs(mediaAfter.mediaTime - mediaBefore.mediaTime) <= 0.1, 'Manual operation/orbit restarted the source video')
+  const screenshot = `${id}-manual-orbit.png`; await writeFile(resolve(outputDirectory, screenshot), orbitPixels)
+  return { status: 'passed', crankTurnsBefore: before.input.crankTurns, crankTurnsAfter: after.input.crankTurns, orbitCameraBefore: after.camera, orbitCameraAfter: orbit.camera, pausedDriftSeconds: Math.abs(mediaAfter.mediaTime - mediaBefore.mediaTime), screenshot }
+}
+
+async function measureSamples(page, embed, record, census, video, tolerancePx, outputDirectory) {
+  const anchors = new Map(record.track.anchors.map(anchor => [anchor.id, anchor]))
+  const measuredFrames = new Map()
+  for (const row of census.selected) {
+    const sample = { timeSeconds: row.timeSeconds, reasons: row.reasons, required: row.required, sourceShotId: row.sourceShotId, sampleTimeSeconds: row.frame?.timeSeconds ?? null, status: 'unavailable', measurements: [], unavailable: [] }
+    video.samples.push(sample)
+    if (!row.frame) { sample.unavailable.push({ reason: row.unavailableReason }); continue }
+    const frame = row.frame
+    try {
+      assert(frame.sourceSampleUnavailable !== true, frame.unavailableReason ?? 'No independently available original source PTS')
+      if (!row.required) {
+        const response = await review(page, embed, record, frame, false)
+        sample.nativeMediaTime = response.native.mediaTime
+        sample.maxClockSkewSeconds = Math.abs(response.actual.modelTime - response.native.mediaTime)
+        assert(sample.maxClockSkewSeconds <= CLOCK_LIMIT, 'No-machine/held sample timing exceeds0.5s')
+        sample.status = 'not-required'
         continue
       }
-      lastRequired = index
-      requireCondition(snapshot.referenceState === 'matched' && Math.abs(snapshot.modelTime - t) <= 1e-6, `Required physical-source sample unavailable/wrong at ${t}s: ${snapshot.referenceState}`)
-      requireCondition(Array.isArray(snapshot.views) && snapshot.views.length === expectedViews.length, `Rendered per-view scene missing at ${t}s`)
-      for (const view of expectedViews) {
-        const rendered = snapshot.views.find(candidate => candidate.id === view.id)
-        requireCondition(rendered && jsonDigest(rendered.rectSourcePixels) === jsonDigest(view.rectSourcePixels) && rendered.presentation === view.presentation, `Actual ROI/mirror view mismatch at ${t}s/${view.id}`)
-      }
-      const gate = stageGate(response.canvas)
-      const captured = new Map()
-      for (const view of expectedViews) {
-        const entry = response.captures.find(entry => entry.viewId === view.id), measured = freshCapture(entry, t, [native.mediaTime], `Required ${t}s`)
-        clockSkews.push(measured.skewSeconds)
-        const sourceLayout=sourceLayoutForViews(expectedViews),qualifiedView={...view,sourceLayout}
-        const nativeCorrespondence = renderedViewProof(qualifiedView, snapshot.views.find(candidate => candidate.id === view.id), measured, t, report, record.data.nativeGeometryAssumptions ?? [], { sourceImage: frame.sourceImage, timeSeconds: t })
-        if(view.imagePlaneWarp) {
-          const expectedCell=[1920/gate.width/response.canvas.devicePixelRatio,1080/gate.height/response.canvas.devicePixelRatio]
-          for(const capture of [measured.capture,measured.visibility,measured.nativeLines].filter(Boolean)) requireCondition(nearlyEqual(capture.destinationCellSourcePixels,expectedCell,1e-6),`Warp capture final raster cell dimensions do not match the actual #stage backing store at ${t}s/${view.id}`)
+      assert(frame.views?.length > 0, 'Required source interval has no authored native views (closeups/insets/montages remain required)')
+      const ids = new Set(frame.views.map(view => view.id))
+      assert(row.expectedViewIds.every(id => ids.has(id)), `Required source view(s) omitted: ${row.expectedViewIds.filter(id => !ids.has(id)).join(',')}`)
+      assert(frame.views.every(view => view.camera && view.input), 'Required source sample has a missing camera or complete physical input')
+      let result = measuredFrames.get(frame.timeSeconds)
+      if (!result) {
+        const response = await review(page, embed, record, frame)
+        const measurements = [], unavailable = [], clocks = []
+        for (const view of frame.views) {
+          try { const measured = measureView(view, response, frame, frame.landmarks ?? [], tolerancePx, anchors); measurements.push(...measured.measured); unavailable.push(...measured.unavailable); clocks.push(measured.clockSkewSeconds) }
+          catch (error) { unavailable.push({ viewId: view.id, reason: error.message }) }
         }
-        measurements.push(...nativeCorrespondence.nativeLines, ...nativeCorrespondence.contours)
-        lineErrors.push(...nativeCorrespondence.nativeLines.map(item => item.conservativeErrorPx))
-        contourErrors.push(...nativeCorrespondence.contours.map(item => item.conservativeErrorPx))
-        captured.set(view.id, { ...measured, view:{...view,sourceLayout:sourceLayoutForViews(expectedViews)}, rect: view.rectSourcePixels, byId: new Map(measured.capture.landmarks.map(item => [item.id, item])) })
-        const evidence = view.cameraEvidence ?? frame.cameraEvidence
-        if (evidence?.kind === 'shared-rigid-sequence') {
-          const rig = record.data.sourceCameraRigs.find(rig => rig.id === evidence.rigId)
-          for (const item of rig.measurements.filter(item => item.phaseIndex === evidence.phaseIndex)) {
-            const key = `${rig.id}/${item.phaseIndex}/${item.anchorId}`
-            if (rigGpuMeasured.has(key)) continue
-            const marker = measured.capture.landmarks.find(marker => marker.id === item.anchorId)
-            if (marker?.state !== 'rendered' || !vec2(marker.sourcePixels)) { fail(report, 'rig-gpu-landmark-unavailable', 'Global shared calibration anchor is not actually projected by the native GPU', { timeSeconds: t, viewId: view.id, rigId: rig.id, phaseIndex: item.phaseIndex, anchorId: item.anchorId }); continue }
-            let ledger
-            try { ledger=landmarkRasterErrorLedger(view,item,marker,measured.capture) }
-            catch(error) {
-              fail(report,'rig-gpu-uncertainty-unknown',error.message,{timeSeconds:t,viewId:view.id,rigId:rig.id,phaseIndex:item.phaseIndex,anchorId:item.anchorId})
-              measurements.push({type:'rig-global-gpu',rigId:rig.id,phaseIndex:item.phaseIndex,anchorId:item.anchorId,role:item.role,timeSeconds:t,sourceMeasurementUncertaintyPx:item.uncertaintyPx??null,nativeRasterUncertaintySourcePixels:marker.uncertaintySourcePixels??null,errorPx:null})
-              continue
-            }
-            rigGpuMeasured.add(key); rigGpuErrors.push(ledger.errorPx)
-            const measurement={type:'rig-global-gpu',rigId:rig.id,phaseIndex:item.phaseIndex,anchorId:item.anchorId,role:item.role,timeSeconds:t,observedSourcePixels:item.pixel,renderedSourcePixels:marker.sourcePixels,...ledger}
-            measurements.push(measurement)
-            if (ledger.errorPx > PIXEL_LIMIT) fail(report, 'rig-gpu-projection-error', 'Global actual native GPU residual plus source/native uncertainty exceeds fixed source-frame pixel bound', measurement)
-          }
-        }
+        const maxClockSkewSeconds = clocks.length ? Math.max(...clocks) : null
+        result = { measurements, unavailable, maxClockSkewSeconds, status: unavailable.length || !measurements.length || maxClockSkewSeconds === null ? 'unavailable' : measurements.some(item => item.status === 'failed') || maxClockSkewSeconds > CLOCK_LIMIT ? 'failed' : 'passed' }
+        measuredFrames.set(frame.timeSeconds, result)
       }
-      lastMatched = index
-      matchedFrames++; viewCount += expectedViews.length
-      for (const item of frame.landmarks) {
-        const viewId = item.viewId ?? 'main', view = captured.get(viewId)
-        const landmark = view?.byId.get(item.anchorId) ?? null
-        const context = { timeSeconds: t, viewId, anchorId: item.anchorId, role: item.role, captureTimeSeconds: view?.capture.timeSeconds ?? null, nativeMediaTime: native.mediaTime, landmark }
-        const sourceLayerIndex = expectedViews.findIndex(view => view.id === viewId)
-        const sourceLayout=sourceLayoutForViews(expectedViews)
-        if(!sourcePointUnmasked(sourceLayout,sourceLayerIndex,item.pixel)) fail(report,'covered-source-layer-landmark','Independently source-visible correspondence lies outside its quad or behind a later same-image/opaque supported subview',context)
-        if (!landmark || landmark.state !== 'rendered' || !vec2(landmark.sourcePixels) || !vec2(landmark.canvasPixels)) {
-          fail(report, 'unrendered-gpu-landmark', 'Required landmark has no actual GPU-rendered marker pixel in this view', context)
-          continue
-        }
-        if(!sourcePointUnmasked(sourceLayout,sourceLayerIndex,landmark.sourcePixels)) fail(report,'rendered-outside-support','Actual GPU marker lies outside source quad/ROI support or behind same-image masking',context)
-        let ledger
-        try { ledger=landmarkRasterErrorLedger(view.view,item,landmark,view.capture) }
-        catch(error) {
-          fail(report,'rendered-landmark-uncertainty-unknown',error.message,context)
-          measurements.push({timeSeconds:t,viewId,anchorId:item.anchorId,role:item.role,sourceMeasurementUncertaintyPx:item.uncertaintyPx??null,nativeRasterUncertaintySourcePixels:landmark.uncertaintySourcePixels??null,errorPx:null})
-          continue
-        }
-        const expectedCanvas = [gate.x + landmark.sourcePixels[0] / 1920 * gate.width, gate.y + landmark.sourcePixels[1] / 1080 * gate.height]
-        const viewportMappingErrorPx = Math.hypot(landmark.canvasPixels[0] - expectedCanvas[0], landmark.canvasPixels[1] - expectedCanvas[1])
-        if (viewportMappingErrorPx > VIEWPORT_MAPPING_LIMIT_PX) fail(report, 'actual-viewport-mapping', 'GPU marker canvas position is not on the source-letterboxed #stage gate', { ...context, viewportMappingErrorPx })
-        const errorPx=ledger.errorPx
-        const measured = { timeSeconds: t, decodedTimeSeconds: frame.decodedTimeSeconds, nativeMediaTime: native.mediaTime, captureTimeSeconds: view.capture.timeSeconds, method: view.capture.method, viewId, anchorId: item.anchorId, role: item.role, observedSourcePixels: item.pixel, renderedSourcePixels: landmark.sourcePixels, renderedCanvasPixels: landmark.canvasPixels, uncertaintyCanvasPixels: landmark.uncertaintyCanvasPixels, viewportMappingErrorPx, ...ledger }
-        measurements.push(measured)
-        if (item.role === 'check') errors.push(errorPx); else fitErrors.push(errorPx)
-        if (errorPx > PIXEL_LIMIT) fail(report, 'rendered-landmark-error', `Actual GPU-rendered ${item.role} error ${errorPx.toFixed(3)}px exceeds ${PIXEL_LIMIT}px`, measured)
+      Object.assign(sample, result)
+      if (!video.comparisonScreenshot && result.measurements.length) {
+        video.comparisonScreenshot = `${record.id}-source-comparison.png`
+        await page.screenshot({ path: resolve(outputDirectory, video.comparisonScreenshot) })
       }
-      if (!firstMachineScreenshot) {
-        firstMachineScreenshot = `${record.id}-matched.png`
-        await page.screenshot({ path: resolve(outputDirectory, firstMachineScreenshot) })
-      }
-    }
-    for (const rig of record.data.sourceCameraRigs ?? []) {
-      const missing = rig.measurements.filter(item => !rigGpuMeasured.has(`${rig.id}/${item.phaseIndex}/${item.anchorId}`))
-      if (missing.length) fail(report, 'rig-gpu-phase-coverage', 'All independent 71-phase global fit/held-out observations require actual native GPU projection; CPU candidate proof alone cannot pass', { rigId: rig.id, missingCount: missing.length, missing: missing.map(item => ({ phaseIndex: item.phaseIndex, anchorId: item.anchorId, role: item.role })) })
-    }
-    // Exercise every real native exposure inside interpolated mechanical intervals.
-    // This uses the same official-player review/render path, not an ideal solver or
-    // endpoint-only assertion. Unsupported continuity remains a failed prerequisite.
-    for (let index = 0; index + 1 < frames.length; index++) {
-      const from = frames[index], to = frames[index + 1]
-      if (!required[index] || !required[index + 1] || from.shotId !== to.shotId) continue
-      const fromViews = frameViews(from), toViews = frameViews(to)
-      const staticObserved=!fromViews.some(view=>view.mechanicalState.status==='constrained'||view.imagePlaneWarp)&&jsonDigest(fromViews.map(view=>[view.camera,view.mechanicalState.input,view.partOverrides,view.composite]))===jsonDigest(toViews.map(view=>[view.camera,view.mechanicalState.input,view.partOverrides,view.composite]))
-      const certifiedThroughout=fromViews.every(view=>{const interval=view.mechanicalState.visibilityProof?.binding?.intervalSeconds;return Array.isArray(interval)&&interval[0]<=from.timeSeconds&&interval[1]>=to.timeSeconds})
-      if(staticObserved&&certifiedThroughout) continue
-      const times = record.native.pts.filter(time => time > from.timeSeconds + 1e-6 && time < to.timeSeconds - 1e-6)
-      interpolation.requiredNativeExposures += times.length
-      for (const time of times) {
-        const response = await reviewAt(page, embed, record, time, fromViews.map(view => view.id))
-        requireCondition(response.snapshot.referenceState === 'matched' && response.snapshot.views.length === fromViews.length, `interpolation-unavailable: ${time}s has no compatible actual native reconstruction`)
-        for (const error of sourceCompositeErrors(response.snapshot.views)) fail(report, error.code, error.detail, { timeSeconds: time, viewId: error.viewId })
-        stageGate(response.canvas)
-        const revisions = new Set()
-        for (const rendered of response.snapshot.views) {
-          const entry = freshCapture(response.captures.find(entry => entry.viewId === rendered.id), time, [response.native.mediaTime], `Native interpolated ${time}s`)
-          const a = fromViews.find(view => view.id === rendered.id), b = toViews.find(view => view.id === rendered.id)
-          const decoded=rendered.sourceSampling?.selection==='decoded-exposure'
-          requireCondition(renderedCertificateErrors(rendered,time).length===0,`Matched native sample lies in an uncertified source interval at ${time}s/${rendered.id}`)
-          if(decoded) {
-            requireCondition(a&&rendered.sourceSampling.fromTimeSeconds===from.timeSeconds&&rendered.sourceSampling.toTimeSeconds===from.timeSeconds&&rendered.sourceSampling.mix===0,`Decoded-exposure hold must select the independently certified governing source image at ${time}s/${rendered.id}`)
-            requireCondition(sameResolvedImagePlaneWarp(rendered.resolvedImagePlaneWarp,independentlyResolvedWarp(a))&&sameSourceLayout(rendered.sourceLayout,sourceLayoutForViews(fromViews)),`Certified source hold changed its measured image-plane support at ${time}s/${rendered.id}`)
-            const input=a.mechanicalState.status==='constrained'?a.mechanicalState.runtimeWitness.input:a.mechanicalState.input
-            requireCondition(sameCamera(rendered.camera,a.camera,nativeCameraRect(a))&&jsonDigest(rendered.input)===jsonDigest(input),`Certified photograph/exposure hold cannot invent native physical camera/mechanism motion at ${time}s/${rendered.id}`)
-          } else {
-            requireCondition(!a?.imagePlaneWarp&&!b?.imagePlaneWarp,'Changing corners need actual decoded-exposure sampling; invented H coefficients/timing interpolation forbidden')
-            requireCondition(a && b && rendered.sourceSampling?.fromTimeSeconds === from.timeSeconds && rendered.sourceSampling.toTimeSeconds === to.timeSeconds && Math.abs(rendered.sourceSampling.mix - (time - from.timeSeconds) / (to.timeSeconds - from.timeSeconds)) <= 1e-9, `interpolation-source-binding: ${time}s/${rendered.id}`)
-          }
-          requireCondition(jsonDigest(entry.mechanism.input) === jsonDigest(rendered.input) && entry.mechanism.mechanicalProvenance === rendered.mechanicalProvenance && sameCamera(entry.visibility.camera, rendered.camera, nativeCameraRect(rendered)) && jsonDigest(entry.visibility.rectSourcePixels) === jsonDigest(rendered.rectSourcePixels) && entry.visibility.sourceOpacity === (rendered.composite.mode === 'opaque' ? 1 : rendered.composite.opacity), `interpolation-render-binding: ${time}s/${rendered.id}`)
-          for(const capture of [entry.capture,entry.visibility,entry.mechanism,...(entry.nativeLines?[entry.nativeLines]:[])]) requireCondition(sourceCaptureBindingErrors({...rendered,sourceLayout:rendered.sourceLayout},capture).length===0,`interpolation-warp-layout-binding: ${time}s/${rendered.id}`)
-          for(const capture of [entry.capture,entry.visibility,...(entry.nativeLines?[entry.nativeLines]:[])]) for(const detail of nativeRasterSupportErrors({...rendered,sourceLayout:rendered.sourceLayout},capture)) fail(report,'interpolated-native-raster-support',detail,{timeSeconds:time,viewId:rendered.id})
-          requireCondition(jsonDigest(rendered.partOverrides)===jsonDigest(a.partOverrides??[])&&jsonDigest(rendered.composite)===jsonDigest(a.composite??{mode:'opaque'})&&(decoded||(jsonDigest(a.partOverrides??[])===jsonDigest(b.partOverrides??[])&&jsonDigest(a.composite??{mode:'opaque'})===jsonDigest(b.composite??{mode:'opaque'}))),`interpolation-discrete-regime: override/composite discontinuity at ${time}s/${rendered.id}`)
-          for (const error of physicalConstraintErrors(entry.mechanism, rendered.constraintSummary)) fail(report, 'interpolated-physical-constraint', 'Actual in-between native solution violates source constraints', { timeSeconds: time, viewId: rendered.id, ...error })
-          if (!decoded&&rendered.mechanicalProvenance === 'constrained') requireCondition(a.mechanicalState.runtimeWitness?.continuity && jsonDigest(a.mechanicalState.runtimeWitness.continuity) === jsonDigest(b.mechanicalState.runtimeWitness?.continuity) && jsonDigest(rendered.continuity) === jsonDigest(a.mechanicalState.runtimeWitness.continuity), `interpolation-witness-regime: source-evidenced continuity missing at ${time}s/${rendered.id}`)
-          const startProof = a.mechanicalState.status === 'constrained' ? a.mechanicalState.runtimeWitness.visibilityProof : a.mechanicalState.visibilityProof
-          const endProof = b.mechanicalState.status === 'constrained' ? b.mechanicalState.runtimeWitness.visibilityProof : b.mechanicalState.visibilityProof
-          requireCondition(startProof && endProof && jsonDigest(rendered.visibilityProof) === jsonDigest(startProof) && (decoded?rendered.visibilityProofEnd===null:jsonDigest(rendered.visibilityProofEnd) === jsonDigest(endProof)), `interpolation-proof-binding: stale/missing observed or constrained endpoint certificate at ${time}s/${rendered.id}`)
-          const currentSourceFrame = { sourceImage: frames.find(frame => frame.timeSeconds === time)?.sourceImage, timeSeconds: time }
-          for (const proof of (decoded?[rendered.visibilityProof]:[rendered.visibilityProof, rendered.visibilityProofEnd])) for (const error of nativeVisibilityErrors(entry.visibility, proof, currentSourceFrame)) fail(report, `interpolated-${error.code}`, error.detail, { timeSeconds: time, viewId: rendered.id })
-          requireCondition(jsonDigest(rendered.nativeGeometryAssumptions ?? []) === jsonDigest(record.data.nativeGeometryAssumptions ?? []) && jsonDigest(entry.mechanism.nativeGeometryAssumptions ?? []) === jsonDigest(record.data.nativeGeometryAssumptions ?? []), `interpolation-native-assumption-binding: ${time}s/${rendered.id}`)
-          requireCondition(Array.isArray(rendered.sourceNonIdentifiableFixedParts) && Array.isArray(entry.mechanism.sourceNonIdentifiableFixedParts) && jsonDigest(rendered.sourceNonIdentifiableFixedParts) === jsonDigest(entry.mechanism.sourceNonIdentifiableFixedParts) && jsonDigest(rendered.sourceNonIdentifiableFixedParts) === jsonDigest(startProof.sourceNonIdentifiableFixedParts), `interpolation-uncertified-fixed-binding: ${time}s/${rendered.id}`)
-          revisions.add(entry.mechanism.sourceDrawRevision); clockSkews.push(entry.skewSeconds); interpolation.verifiedViews++
-        }
-        requireCondition(revisions.size === 1, `interpolation-stale-draw: per-layer physical revisions differ at ${time}s`)
-        interpolation.verifiedNativeExposures++
-      }
-    }
-  } finally {
-    report.reference = { matchedFrames, heldFrames, noMachineFrames, renderedViewCount: viewCount, expectedMachineFrames: record.report.machineFrames, expectedExemptFrames: record.report.exemptFrames, expectedViewCount: record.report.requiredViews, expectedFits: record.report.fitLandmarks, expectedChecks: record.report.checkLandmarks, expectedNativeLines: record.report.nativeLineChecks, expectedContours: record.report.sourceContourChecks, heldOut: errorStats([...errors, ...lineErrors, ...contourErrors]), heldOutPoints: errorStats(errors), nativeLines: errorStats(lineErrors), nativeContours: errorStats(contourErrors), fitting: errorStats(fitErrors), globalRigGpu: { measuredCount: rigGpuMeasured.size, errors: errorStats(rigGpuErrors) }, interpolation, maxDrawClockSkewSeconds: clockSkews.length ? Math.max(...clockSkews) : null, pixelSource: 'Actual GPU native landmark/finite-clipped-line projection and depth-tested all435-path surfaces/contours; exact compiled physical pose per source layer. Depth-off diagnostic projections alone are never occlusion proof.', firstMachineScreenshot, measurementsFile: `${record.id}-landmarks.json`, staticReviewIsPlaybackEvidence: false }
-    await writeFile(resolve(outputDirectory, report.reference.measurementsFile), `${JSON.stringify(measurements, null, 2)}\n`)
-    try { await restoreExploration(page, embed) } catch (error) { fail(report, 'end-reference-review', error.message) }
+    } catch (error) { sample.unavailable.push({ reason: error.message }) }
   }
-  requireCondition(matchedFrames === record.report.machineFrames && heldFrames + noMachineFrames === record.report.exemptFrames && viewCount === record.report.requiredViews && errors.length === record.report.checkLandmarks && fitErrors.length === record.report.fitLandmarks && lineErrors.length === record.report.nativeLineChecks && contourErrors.length === record.report.sourceContourChecks && interpolation.verifiedNativeExposures === interpolation.requiredNativeExposures, 'Actual GPU-rendered native/reference and non-endpoint temporal coverage is incomplete')
-  requireCondition(!record.report.machineFrames || errors.length >= 2 || (record.data.frames ?? []).some(frame => frameViews(frame).some(view => view.nativeLineChecks?.length)), 'No independent actual rendered native held-out measurements exist')
-  requireCondition(!report.failures.length, 'One or more actual source-to-render errors exceed the fidelity gate')
+}
+export function finishVideo(video, census, options) {
+  const required = video.samples.filter(sample => sample.required), measured = required.filter(sample => sample.measurements.length), passed = required.filter(sample => sample.status === 'passed')
+  const unique = new Map()
+  for (const sample of video.samples) for (const item of sample.measurements) unique.set(`${sample.sampleTimeSeconds}/${item.viewId}/${item.anchorId}`, item)
+  const measurements = [...unique.values()], checks = measurements.filter(item => item.role === 'check')
+  video.coverage = { allSourceCensusSamples: census.rows.length, allRequiredSourceSamples: census.rows.filter(row => row.required).length, selectedCensusSamples: video.samples.length, selectedRequiredSamples: required.length, measuredRequiredSamples: measured.length, passedRequiredSamples: passed.length, failedRequiredSamples: required.filter(sample => sample.status === 'failed').length, unavailableRequiredSamples: required.filter(sample => sample.status === 'unavailable').length, everySecond: { required: census.rows.filter(row => row.reasons.includes('every-second')).length, selected: video.samples.filter(row => row.reasons.includes('every-second')).length }, changePoints: { required: census.rows.filter(row => row.reasons.some(reason => reason !== 'every-second' && reason !== 'requested-sample')).length, selected: video.samples.filter(row => row.reasons.some(reason => reason !== 'every-second' && reason !== 'requested-sample')).length }, complete: !options.scoped && video.samples.length === census.rows.length && required.length > 0 && passed.length === required.length }
+  video.coverage.unavailableCensusSamples = video.samples.filter(sample => sample.status === 'unavailable').length
+  video.coverage.complete &&= video.coverage.unavailableCensusSamples === 0
+  video.landmarks = { measured: measurements.length, checks: checks.length, fitting: measurements.length - checks.length, fixedChecks: checks.filter(item => item.motion === 'fixed').length, movingChecks: checks.filter(item => item.motion === 'moving').length, maxErrorPx: maximumField(measurements, 'errorPx'), maxRawErrorPx: maximumField(measurements, 'rawErrorPx'), maxErrorFrameWidthPercent: maximumField(measurements, 'errorFrameWidthPercent') }
+  video.maxErrorPx = video.landmarks.maxErrorPx
+  video.maxClockSkewSeconds = maximumField(video.samples, 'maxClockSkewSeconds')
+  video.unavailableReasons = video.samples.flatMap(sample => sample.unavailable.map(item => ({ timeSeconds: sample.timeSeconds, ...item })))
+  if (!video.landmarks.fixedChecks) video.failures.push({ code: 'hard-fixed-landmark-coverage', reason: 'Hard fixed independent CHECK landmarks are required; easy camera-only FIT points cannot pass a video' })
+  const shotMap = new Map((video.shots ?? []).map(shot => [shot.id, shot]))
+  video.motionCoverage = []
+  for (const shotId of new Set(required.map(sample => sample.sourceShotId ?? 'undeclared-shot'))) {
+    const shot = shotMap.get(shotId), samples = required.filter(sample => (sample.sourceShotId ?? 'undeclared-shot') === shotId)
+    const staticRig = shot?.internalMechanismMotion === 'static' && shot.sourceStaticControls?.status === 'source-controls-verified'
+    const movingCheckSamples = samples.filter(sample => sample.measurements.some(item => item.role === 'check' && item.motion === 'moving')).length
+    const fixedCheckAnchors = new Set(samples.flatMap(sample => sample.measurements.filter(item => item.role === 'check' && item.motion === 'fixed').map(item => item.anchorId))).size
+    const complete = staticRig ? fixedCheckAnchors >= 2 : movingCheckSamples === samples.length
+    video.motionCoverage.push({ shotId, internalMechanismMotion: staticRig ? 'source-backed-static-rig' : shot?.internalMechanismMotion ?? 'unknown', evidence: shot?.internalMotionEvidence ?? null, sourceControls: shot?.sourceStaticControls ?? null, requiredSamples: samples.length, movingCheckSamples, fixedCheckAnchors, status: complete ? 'measured' : 'unavailable' })
+    if (!complete) video.failures.push({ code: 'hard-moving-landmark-coverage', shotId, reason: staticRig ? 'Source-backed static-rig shot needs distributed fixed CHECK landmarks; camera/error/timing/source views remain required' : 'Every required sample in a moving/unknown-mechanism shot needs an actual moving CHECK landmark; unknown/static hub axes cannot substitute' })
+  }
+  if (options.stage === 5 && video.playback.youtube?.status !== 'passed') video.failures.push({ code: 'official-player-unmeasured', reason: 'Final5% acceptance requires actual official YouTube playback/audio/compact checks' })
+  if (!video.interaction || !Object.values(video.playback).some(result => result.status === 'passed')) video.failures.push({ code: 'interaction-unmeasured', reason: 'Actual original playback/audio/compact and paused manual native operation/orbit checks are required' })
+  if (options.scoped) video.status = 'partial'
+  else video.status = video.coverage.complete && !video.failures.length ? 'passed' : video.coverage.unavailableCensusSamples || !measurements.length ? 'unavailable' : 'failed'
+  const measuredFailure = required.some(sample => sample.status === 'failed' || sample.measurements.some(item => item.status === 'failed'))
+  video.stageMeasurement = { stage: options.stage, tolerancePx: 1920 * options.stage / 100, status: options.scoped ? 'unmeasured' : video.status === 'passed' ? 'passed' : measuredFailure || video.status === 'failed' ? 'failed' : 'unmeasured', scopedSamples: options.scoped ? { status: required.length && passed.length === required.length && !video.failures.length ? 'passed' : measuredFailure ? 'failed' : 'unavailable' } : null }
 }
 
-async function interactionProof(page, embed, id, report, outputDirectory) {
-  await pauseActual(page, embed)
-  if ((await apiSnapshot(page)).mode === 'reference-review') await endReview(page)
-  const ready = await apiSnapshot(page)
-  requireCondition(ready.mode === 'exploring' && ready.playerState === 'paused', `Manual interaction requires paused exploration, found ${ready.mode}/${ready.playerState}`)
-  await page.locator('#fit-view').click()
-  const range = page.locator('#crank')
-  requireCondition(await range.isEnabled(), 'Paused crank exploration control is disabled')
-  // #stage IS the canvas element; there is no descendant canvas.
-  const stage = page.locator('#stage')
-  requireCondition(await stage.count() === 1 && await stage.evaluate(element => element instanceof HTMLCanvasElement), 'Exactly one real rendered #stage canvas is required')
-  // Mask the overlaid native player so only mechanism canvas pixels are compared.
-  const shot = () => stage.screenshot({ mask: [page.locator('#video-dock'), page.locator('#loading')], animations: 'disabled' })
-  const before = await apiSnapshot(page)
-  const nativeBefore = await nativeMedia(embed.frame)
-  const pixelsBefore = await shot()
-  const input = await range.evaluate(element => ({ value: Number(element.value), min: Number(element.min), max: Number(element.max), step: Number(element.step) || 0.01 }))
-  requireCondition(input.max > input.min, 'Manual crank has no actual travel')
-  const direction = input.value + 0.125 <= input.max ? 'ArrowRight' : 'ArrowLeft'
-  const presses = Math.max(1, Math.round(0.125 / input.step))
-  // Native range keyboard gestures; avoid whole-turn endpoints which can return to the same pose.
-  await range.focus()
-  for (let count = 0; count < presses; count++) await range.press(direction)
-  await page.waitForFunction(initial => Math.abs(window.harmonicAnalyzer.snapshot().input.crankTurns - initial) > 1e-6, before.input.crankTurns, { timeout: 5000 })
-  await page.evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))))
-  const after = await apiSnapshot(page)
-  const pixelsAfter = await shot()
-  const nativeAfter = await nativeMedia(embed.frame)
-  requireCondition(after.mode === 'exploring' && after.playerState === 'paused' && nativeAfter.paused && Math.abs(nativeAfter.mediaTime - nativeBefore.mediaTime) <= PAUSED_DRIFT_SECONDS, 'Manual crank must explore geometry with the actual native video paused')
-  requireCondition(jsonDigest(after.camera) === jsonDigest(before.camera), 'Manual crank proof moved camera instead of only articulating mechanism')
-  requireCondition(digest(pixelsBefore) !== digest(pixelsAfter), 'Manual crank did not change actual rendered canvas pixels')
-  const crankScreenshot = `${id}-manual-crank.png`
-  await writeFile(resolve(outputDirectory, crankScreenshot), pixelsAfter)
-  // Drag only where the canvas itself receives the pointer (not the overlaid player).
-  const point = await stage.evaluate(canvas => {
-    const rect = canvas.getBoundingClientRect()
-    for (const [fx, fy] of [[0.6, 0.45], [0.4, 0.45], [0.5, 0.3], [0.3, 0.3], [0.5, 0.6], [0.25, 0.6], [0.7, 0.25]]) {
-      const x = rect.left + rect.width * fx, y = rect.top + rect.height * fy, dx = Math.min(140, rect.width * 0.15)
-      if (document.elementFromPoint(x, y) === canvas && document.elementFromPoint(x + dx, y + 45) === canvas) return { x, y, dx }
-    }
-    return null
-  })
-  requireCondition(point, 'No unobstructed #stage canvas region receives pointer input')
-  await page.mouse.move(point.x, point.y); await page.mouse.down(); await page.mouse.move(point.x + point.dx, point.y + 45, { steps: 8 }); await page.mouse.up()
-  await page.evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))))
-  const orbit = await apiSnapshot(page), pixelsOrbit = await shot(), nativeOrbit = await nativeMedia(embed.frame)
-  requireCondition(jsonDigest(orbit.camera) !== jsonDigest(after.camera), 'Paused native canvas orbit did not change actual rendered camera')
-  requireCondition(digest(pixelsAfter) !== digest(pixelsOrbit), 'Paused orbit did not change actual rendered scene pixels')
-  requireCondition(orbit.playerState === 'paused' && nativeOrbit.paused && Math.abs(nativeOrbit.mediaTime - nativeBefore.mediaTime) <= PAUSED_DRIFT_SECONDS, 'Orbit restarted/faked video playback')
-  const orbitScreenshot = `${id}-manual-orbit.png`
-  await writeFile(resolve(outputDirectory, orbitScreenshot), pixelsOrbit)
-  report.interaction = { actualCrankTurns: [before.input.crankTurns, after.input.crankTurns], crankCanvasSha256: [digest(pixelsBefore), digest(pixelsAfter)], orbitCamera: [after.camera, orbit.camera], orbitCanvasSha256: digest(pixelsOrbit), nativeMediaTime: nativeBefore.mediaTime, screenshots: [crankScreenshot, orbitScreenshot], pixelEvidence: '#stage canvas screenshots with the native player overlay masked' }
-}
-
-export async function webglPositiveControl(page) {
-  return page.evaluate(() => {
-    const canvas = document.createElement('canvas')
-    canvas.width = 4; canvas.height = 4
-    const gl = canvas.getContext('webgl2') ?? canvas.getContext('webgl')
-    if (!gl) throw new Error('Native Chromium cannot create WebGL; SwiftShader prerequisite unavailable')
-    gl.clearColor(0.25, 0.5, 0.75, 1); gl.clear(gl.COLOR_BUFFER_BIT)
-    const pixel = new Uint8Array(4); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel)
-    if (Math.abs(pixel[0] - 64) > 1 || Math.abs(pixel[1] - 128) > 1 || Math.abs(pixel[2] - 191) > 1 || pixel[3] !== 255) throw new Error('Native WebGL framebuffer positive control did not render')
-    const info = gl.getExtension('WEBGL_debug_renderer_info')
-    const result = { pixel: Array.from(pixel), renderer: info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER), vendor: gl.getParameter(gl.VENDOR), version: gl.getParameter(gl.VERSION) }
-    gl.getExtension('WEBGL_lose_context')?.loseContext()
-    return result
-  })
-}
-
-export async function verifySync() {
-  const startedAt = new Date().toISOString()
-  const outputDirectory = resolve(WEB_ROOT, '.vite/verification-output', startedAt.replace(/[:.]/g, '-'))
+export async function verifySync(options = parseOptions(process.argv.slice(2))) {
+  if (options.help) { console.log(HELP); return 0 }
+  const startedAt = new Date().toISOString(), outputDirectory = resolve(options.output ?? resolve(WEB_ROOT, '.vite/verification-output', `stage-${options.stage}-${startedAt.replace(/[:.]/g, '-')}`))
   await mkdir(outputDirectory, { recursive: true })
-  const report = { startedAt, finishedAt: null, status: 'failed', limits: { sourceLandmarkPx: PIXEL_LIMIT, videoModelClockSeconds: CLOCK_LIMIT, viewportMappingPx: VIEWPORT_MAPPING_LIMIT_PX, compactViewportPixels: [200, 200] }, outputDirectory, failures: [], sources: [], videos: [], builtAssets: [], serverRequests: [], browserLog: [], verificationMode: 'Built app in native Chromium; independently decoded actual BGR8/gray8 image hashes and native PTS; native GPU landmark/clipped-line projection plus depth-tested complete435-path native visibility/contour readback; exact rendered compiled physical constraints/provenance/composite per source layer and all native exposures inside changing intervals; clock/seeks from official YouTube iframe HTMLMediaElement, never synthetic clocks. Native line endpoints must lie inside the actual drawable REST bounding box; this is not an axis/surface correspondence certificate. Crossfade opacity is bounded per source ROI pixel, not globally across disjoint tiles; nested image composition is unsupported in this phase. Explicit user-approved structurally fixed source-non-identifiable parts remain rendered, individually recorded and NOT geometric-fidelity passed; the full four-bucket census and independently audited full-ID-pixel region containment still apply. Approved rod-head topology is an explicit future-CAD-match assumption, not current shape fidelity. No partial-census or unavailable-evidence skip-green.' }
-  const abort = new AbortController()
-  const interrupt = () => abort.abort(new Error('Verification interrupted'))
+  const report = { schemaVersion: 1, startedAt, finishedAt: null, status: 'unavailable', stage: options.stage, stageLadder: STAGES, scope: options.scoped ? 'time-scoped-diagnostic' : options.videos.length === 6 ? 'all-six-videos' : 'selected-videos', options, limits: { frameWidthPixels: 1920, frameHeightPixels: 1080, errorFrameWidthPercent: options.stage, sourceLandmarkPx: 1920 * options.stage / 100, videoModelClockSeconds: CLOCK_LIMIT, compactViewportPixels: [200, 200] }, model: { sha256: MODEL_SHA256, sourceCommit: MODEL_COMMIT, integrity: 'unmeasured' }, interpretation: 'Chosen feasible hidden inputs are not historical recovery. Compact playback is approximate/unverified until this measured stage passes. Missing/failed samples never pass. GPU marker readback is actual render proof, not CPU projection; diagnostic markers alone do not certify every native surface. Narrow retained geometry exceptions remain uncertified.', videos: [], failures: [], builtAssets: [], browserLog: [], serverRequests: [] }
+  const abort = new AbortController(), interrupt = () => abort.abort(new Error('Verification interrupted'))
   process.once('SIGINT', interrupt); process.once('SIGTERM', interrupt)
   let server, browser, context, page
   try {
-    const referenceRoot = resolve(process.env.HARMONIC_REFERENCE_ROOT ?? '/tmp/harmonic-web-reference')
-    const references = await loadReferences(WEB_ROOT, referenceRoot, { signal: abort.signal })
-    report.sources = references.records.map(record => ({ ...record.report, observationDigest: record.digest, source: { sha256: record.native.observedSha256, width: record.native.width, height: record.native.height, durationSeconds: record.native.durationSeconds, fps: record.native.fps, nativeFrameCount: record.native.nativeFrameCount } }))
-    report.failures.push(...references.failures)
-    for (const source of report.sources) for (const failure of source.failures) report.failures.push({ videoId: source.videoId, ...failure })
-    requireCondition(references.records.length === VIDEO_IDS.length && !report.failures.length, `Independent all-${VIDEO_IDS.length} source prerequisites/coverage failed; see report.json. No camera/timeline self-grading or external-media skip is permitted.`)
-    const dist = resolve(WEB_ROOT, 'dist')
-    await stat(resolve(dist, 'index.html'))
-    report.builtAssets = await distManifest(dist)
-    requireCondition(report.builtAssets.find(asset => asset.path === 'models/harmonic-analyzer.glb')?.sha256 === MODEL_SHA256, 'Built authentic GLB is missing or does not match measured source/model identity')
-    server = await serveDist(dist, { base: process.env.SIMULATOR_BASE, requests: report.serverRequests, signal: abort.signal })
+    const referenceRoot = resolve(process.env.HARMONIC_REFERENCE_ROOT ?? resolve(WEB_ROOT, '.vite/reference-root'))
+    report.builtAssets = await distManifest(resolve(WEB_ROOT, 'dist'))
+    assert(report.builtAssets.find(asset => asset.path === 'models/harmonic-analyzer.glb')?.sha256 === MODEL_SHA256, 'Built model is missing or differs from the unchanged223MB native export')
+    report.model.integrity = 'passed'
+    server = await serveDist(resolve(WEB_ROOT, 'dist'), { referenceRoot, requests: report.serverRequests, signal: abort.signal, base: process.env.SIMULATOR_BASE })
     report.baseUrl = server.url
     const { chromium } = await import('playwright')
-    const executablePath = process.env.HARMONIC_CHROME ?? '/usr/bin/google-chrome'
-    browser = await chromium.launch({ executablePath, headless: process.env.HARMONIC_HEADLESS === '1', timeout: 30_000, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--no-sandbox', '--disable-dev-shm-usage'] })
+    const softwareGl = process.env.HARMONIC_SOFTWARE_GL === '1'
+    report.rendererChoice = softwareGl ? 'explicit-swiftshader' : 'native-browser-default'
+    browser = await chromium.launch({ executablePath: process.env.HARMONIC_CHROME ?? '/usr/bin/google-chrome', headless: !options.headed, args: [...(softwareGl ? ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] : []), '--no-sandbox', '--disable-dev-shm-usage'], timeout: 30_000 })
     abort.signal.addEventListener('abort', () => void browser.close(), { once: true })
-    context = await browser.newContext({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 })
-    context.setDefaultTimeout(20_000)
+    context = await browser.newContext({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 }); context.setDefaultTimeout(20_000)
     page = await context.newPage()
-    page.on('console', message => { if (message.type() === 'error' || message.type() === 'warning') report.browserLog.push({ type: message.type(), text: message.text(), location: message.location() }) })
-    page.on('pageerror', error => report.browserLog.push({ type: 'pageerror', text: error.message }))
-    page.on('requestfailed', request => report.browserLog.push({ type: 'requestfailed', url: request.url(), failure: request.failure() }))
+    page.on('pageerror', error => report.browserLog.push({ type: 'pageerror', reason: error.message }))
     report.browserVersion = browser.version()
-    report.webglPositiveControl = await webglPositiveControl(page)
-    for (const record of references.records) {
-      const video = { videoId: record.id, failures: [] }
+    for (const id of options.videos) {
+      const video = { videoId: id, status: 'unavailable', failures: [], samples: [], playback: {}, source: null, coverage: null, maxErrorPx: null, unavailableReasons: [] }
       report.videos.push(video)
+      let census
       try {
-        const route = new URL(server.url); route.searchParams.set('video', record.id); route.searchParams.set('verify', '1')
-        video.route = route.href
-        const response = await page.goto(route.href, { waitUntil: 'domcontentloaded', timeout: 30_000 })
-        requireCondition(response?.ok(), `Built direct route failed HTTP ${response?.status()}`)
-        await page.waitForFunction(id => window.harmonicAnalyzer?.snapshot().videoId === id && window.harmonicAnalyzer.snapshot().modelState !== 'loading', record.id, { timeout: 90_000 })
-        // YouTube may not publish getVideoData until the first gesture. Wait for
-        // the real resolved player's public control, then verify identity while
-        // actually playing rather than gating the very gesture that loads it.
-        await page.waitForFunction(() => { const button = document.querySelector('#pause-video'); return button && !button.disabled }, undefined, { timeout: 25_000 })
-        const snapshot = await apiSnapshot(page)
-        requireCondition(snapshot.modelState === 'ready', 'Actual articulated model is unavailable; no missing-GLB green path')
-        requireCondition(snapshot.playerState !== 'error', `Native YouTube external-media prerequisite failed for ${record.id}`)
-        const links = await page.locator('#videos a').evaluateAll(elements => elements.map(element => new URL(element.href).searchParams.get('video')))
-        requireCondition(links.length === VIDEO_IDS.length && new Set(links).size === VIDEO_IDS.length, `All ${VIDEO_IDS.length} direct video navigation links must be present and distinct`)
-        const run = longestRun(record)
-        video.requiredClockRun = run
-        const embed = await playbackProof(page, record, run, video)
-        await compactProof(page, record, embed, run, video, outputDirectory)
-        await referenceProof(page, embed, record, video, outputDirectory)
-        if (record.report.machineFrames && !report.videos.some(item => item.interaction)) await interactionProof(page, embed, record.id, video, outputDirectory)
-        video.status = 'passed'
-      } catch (error) {
-        video.status = 'failed'
-        fail(video, 'native-verification', error.message)
-        try {
-          video.failureDiagnostics = await page.evaluate(() => {
-            const visibleText = selector => document.querySelector(selector)?.textContent?.trim() ?? ''
-            let snapshot = null
-            try { snapshot = window.harmonicAnalyzer?.snapshot() ?? null } catch (error) { snapshot = { error: error.message } }
-            return { videoError: visibleText('#video-error'), sourceError: visibleText('#source-error'), modelStatus: visibleText('#model-status'), status: visibleText('#status'), snapshot }
-          })
-        } catch (diagnosticError) { video.diagnosticError = diagnosticError.message }
-        try { video.failureScreenshot = `${record.id}-failed.png`; await page.screenshot({ path: resolve(outputDirectory, video.failureScreenshot) }) } catch (screenshotError) { video.screenshotError = screenshotError.message }
-        report.failures.push(...video.failures.map(failure => ({ videoId: record.id, ...failure })))
-      }
+        if (abort.signal.aborted) throw abort.signal.reason
+        const record = await loadRecord(id, referenceRoot, abort.signal)
+        video.source = { sha256: record.native.observedSha256, width: record.native.width, height: record.native.height, fps: record.native.fps, durationSeconds: record.native.durationSeconds, nativeFrameCount: record.native.nativeFrameCount, trackDigest: record.digest, nativeGeometryAssumptions: record.track.nativeGeometryAssumptions ?? record.observations.nativeGeometryAssumptions ?? [], geometricExceptionsInterpretation: 'Narrow retained source/native exceptions remain uncertified, never whole-view or landmark waivers.' }
+        const staticControls = await staticSourceControls(record)
+        video.source.staticMotionDiagnostics = staticControls.diagnostics
+        video.shots = record.track.shots.map(shot => ({ id: shot.id, internalMechanismMotion: shot.internalMechanismMotion ?? 'unknown', internalMotionEvidence: shot.internalMotionEvidence ?? null, sourceStaticControls: staticControls.shots.get(shot.id) ?? null }))
+        census = sourceCensus(record.observations, record.track, record.native, options)
+        assert(census.selected.length > 0, 'Selected time window contains no source census samples')
+        // Only declared images in selected samples are decoded; old435 witnesses are never prerequisites.
+        try { video.source.imageReplay = await verifyFrameImages(record.sourcePath, { frames: census.selected.map(row => row.frame).filter(Boolean), staticPhaseImages: staticControls.phaseImages, source: record.track.source }, { signal: abort.signal, native: record.native, source: record.track.source }) }
+        catch (error) { video.failures.push({ code: 'source-image-replay', reason: error.message }) }
+        const measurementPlayer = options.player === 'youtube' ? 'youtube' : 'local'
+        const embed = await openRoute(page, server.url, record, measurementPlayer)
+        video.route = embed.route
+        video.webglRenderer = await page.evaluate(() => {
+          const canvas = document.querySelector('#stage'), gl = canvas?.getContext('webgl2') ?? canvas?.getContext('webgl')
+          if (!gl) throw new Error('Actual native model canvas has no WebGL context')
+          const extension = gl.getExtension('WEBGL_debug_renderer_info')
+          return { renderer: gl.getParameter(extension ? extension.UNMASKED_RENDERER_WEBGL : gl.RENDERER), vendor: gl.getParameter(extension ? extension.UNMASKED_VENDOR_WEBGL : gl.VENDOR), version: gl.getParameter(gl.VERSION), drawingBufferPixels: [gl.drawingBufferWidth, gl.drawingBufferHeight], canvasId: canvas.id }
+        })
+        // Playback checks are independent of landmark availability: useful measurement must still run after a UI failure.
+        try { await playbackChecks(page, embed, record, video, outputDirectory) }
+        catch (error) { video.failures.push({ code: `${measurementPlayer}-playback`, reason: error.message }) }
+        try { await pause(page, embed); await measureSamples(page, embed, record, census, video, report.limits.sourceLandmarkPx, outputDirectory) }
+        catch (error) { video.failures.push({ code: 'source-measurement', reason: error.message }) }
+        try { video.interaction = await interactionChecks(page, embed, id, outputDirectory) }
+        catch (error) { video.failures.push({ code: 'manual-interaction', reason: error.message }) }
+        if (options.player === 'both') {
+          try { const official = await openRoute(page, server.url, record, 'youtube'); await playbackChecks(page, official, record, video, outputDirectory) }
+          catch (error) { video.failures.push({ code: 'youtube-playback', reason: error.message }) }
+        }
+        finishVideo(video, census, options)
+      } catch (error) { video.failures.push({ code: 'video-prerequisite', reason: error.message }); video.unavailableReasons.push({ reason: error.message }) }
+      if (census && video.samples.length < census.selected.length) video.failures.push({ code: 'unmeasured-census', reason: `${census.selected.length - video.samples.length} selected samples were not measured` })
+      if (video.status !== 'passed') report.failures.push({ videoId: id, status: video.status, reasons: video.failures, unavailableSamples: video.coverage?.unavailableRequiredSamples ?? null })
+      await writeFile(resolve(outputDirectory, `${id}.json`), `${JSON.stringify(video, null, 2)}\n`)
+      console.log(JSON.stringify({ videoId: id, stage: options.stage, status: video.status, coverage: video.coverage, maxErrorPx: video.maxErrorPx, unavailableReasons: video.unavailableReasons.length }))
     }
-    requireCondition(report.videos.length === VIDEO_IDS.length && report.videos.every(video => video.status === 'passed') && report.videos.some(video => video.interaction), `Native all-${VIDEO_IDS.length} verification or actual paused interaction proof failed`)
-    requireCondition(!report.browserLog.some(item => item.type === 'pageerror'), 'Native browser has unhandled page errors')
-    report.status = 'passed'
-  } catch (error) { fail(report, 'verification-prerequisite', error.message) }
+    if (report.browserLog.some(item => item.type === 'pageerror')) report.failures.push({ code: 'unhandled-browser-error', reasons: report.browserLog })
+    report.status = options.scoped ? 'partial' : report.videos.length === options.videos.length && report.videos.every(video => video.status === 'passed') && !report.failures.length ? 'passed' : report.videos.some(video => video.status === 'failed' || video.stageMeasurement?.status === 'failed') ? 'failed' : 'unavailable'
+  } catch (error) { report.failures.push({ code: 'verification-prerequisite', reason: error.message }) }
   finally {
-    try { await page?.close() } catch (error) { fail(report, 'page-cleanup', error.message) }
-    try { await context?.close() } catch (error) { fail(report, 'context-cleanup', error.message) }
-    try { await browser?.close() } catch (error) { fail(report, 'browser-cleanup', error.message) }
-    try { await server?.close() } catch (error) { fail(report, 'server-cleanup', error.message) }
+    for (const [name, value] of [['page', page], ['context', context], ['browser', browser], ['server', server]]) try { await value?.close() } catch (error) { report.failures.push({ code: `${name}-cleanup`, reason: error.message }) }
     process.removeListener('SIGINT', interrupt); process.removeListener('SIGTERM', interrupt)
     report.finishedAt = new Date().toISOString()
-    if (report.failures.length) report.status = 'failed'
-    await writeFile(resolve(outputDirectory, 'report.json'), `${JSON.stringify(report, null, 2)}\n`)
-    const heldOut = { count: 0, maxPx: null, rmsPx: null }
-    let squared = 0
-    for (const video of report.videos) {
-      const stats = video.reference?.heldOut
-      if (!stats?.count) continue
-      heldOut.count += stats.count; heldOut.maxPx = Math.max(heldOut.maxPx ?? 0, stats.maxPx); squared += stats.count * stats.rmsPx * stats.rmsPx
-    }
-    if (heldOut.count) heldOut.rmsPx = Math.sqrt(squared / heldOut.count)
-    const clockMeasurements = report.videos.flatMap(video => [video.playback?.maxClockSkewSeconds, video.compact?.maxClockSkewSeconds, video.reference?.maxDrawClockSkewSeconds]).filter(finite)
-    const summary = { status: report.status, videoCount: report.videos.length, sourceCount: report.sources.length, failureCount: report.failures.length, report: resolve(outputDirectory, 'report.json'), maxClockSkewSeconds: clockMeasurements.length ? Math.max(...clockMeasurements) : null, heldOut, sourceNonIdentifiableFixedNativePartPaths: [...new Set(report.sources.flatMap(source => (source.sourceNonIdentifiableFixedParts ?? []).map(part => part.nativePartPath)))], fixedPartFidelityBoundary: 'Source-non-identifiable fixed parts are rendered but not geometric-fidelity passed.' }
-    console.log(JSON.stringify(summary, null, 2))
+    if (report.status === 'passed' && report.failures.length) report.status = 'failed'
+    const path = resolve(outputDirectory, 'report.json'); await writeFile(path, `${JSON.stringify(report, null, 2)}\n`)
+    console.log(JSON.stringify({ status: report.status, scope: report.scope, stage: report.stage, tolerancePx: report.limits.sourceLandmarkPx, videoCount: report.videos.length, report: path }, null, 2))
   }
   return report.status === 'passed' ? 0 : 1
 }
-
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  if (process.argv.includes('--help')) console.log(`Usage: npm run verify:sync\nRequires an existing production dist, all ${VIDEO_IDS.length} private original source MP4s/complete independent observations (${VIDEO_IDS.join(', ')}), playwright and native /usr/bin/google-chrome.\nSource image formats: exclusive actual bgr8/sha256Bgr8 or gray8/sha256Gray8, with original sourceSha256/native exposure index/dimensions; every claimed image is independently re-decoded. Pixel bound remains 1920*0.02=38.4px and clock bound 0.5s.\nImage-plane evidence requires four ordered measured corners, exact source/reference exposure identities, disjoint actual interior heldouts and an independently verified ordinary reference camera/aspect. H is recomputed independently; physical camera motion, authored second matrices, interpolated H coefficients, stale support layouts and untransformed raster/axis uncertainty cannot pass.\nCrossfade images require explicit imageLayerId/common weights. Each image's ordered ROI/quad union spends its weight once; later same-image views mask earlier supported pixels. Different fading images retain weighted contributions. Native colour/line/landmark/depth-ID support and half-open pixel-centre sampling must match the actual ordered layout.\nEvery declared native line receives pure actual drawable REST-bounding-box endpoint qualification; passing that bound is not an axis/surface correspondence certificate. Full all435 native depth-ID census, finite clipped native GPU lines and actual depth contours remain required.\nUser-approved source-non-identifiable structural fixed parts require explicit proof/binding records, actual native identity/structural/deformation/override qualification before any side effect, and all depth-tested ID pixel extents inside an independently source-audited region. They remain rendered and explicitly NOT geometric-fidelity passed; moving/unbound parts and source-overridden parts are ineligible. Every native path belongs to exactly one of visible, excluded, unidentified-fixed or unresolved; unresolved must be empty.\nEnvironment: HARMONIC_REFERENCE_ROOT (default /tmp/harmonic-web-reference; set to the durable private original-video/evidence root when recovered originals live elsewhere), HARMONIC_MODEL_INVENTORY (default /tmp/harmonic-web-model/model-inventory.json; required for global rig geometry), SIMULATOR_BASE (must match build), HARMONIC_CHROME, HARMONIC_HEADLESS=1 (default headed).\nOutput: web/.vite/verification-output/<timestamp>/report.json and actual native screenshots/measurements. Partial source census, unavailable native line/contour GPU proof and external YouTube restrictions FAIL; nothing is mocked, suppressed or skipped.`)
-  else process.exitCode = await verifySync()
+  try { process.exitCode = await verifySync() }
+  catch (error) { console.error(error.message); process.exitCode = 1 }
 }

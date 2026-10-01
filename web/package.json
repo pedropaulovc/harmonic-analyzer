@@ -10,6 +10,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "verify:sync": "node scripts/verify-sync.mjs",
+    "preview:reference": "node scripts/serve-verification.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit"
   },

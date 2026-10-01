@@ -85,7 +85,7 @@ of coverage. At 1920 pixels wide the limits are 960, 384, 192 and 96 pixels.
 The final tolerance is 5%; timing remains within 0.5 seconds throughout.
 
 First demonstrate working coarse camera/mechanism tracking across the collection
-in a headed browser, then refine the largest visible discrepancies. Verify every
+in the browser, then refine the largest visible discrepancies. Verify every
 integer second and visible change using distributed fixed and moving landmarks,
 actual rendered pixels and visual overlays. Close-ups, insets and montages remain
 required. Report uncertainty, exceptions and unavailable measurements explicitly.
@@ -95,15 +95,27 @@ Coarse playback is not final footage acceptance.
 npm --prefix web run build
 npm --prefix web run preview
 
-# Final all-video acceptance:
-export HARMONIC_REFERENCE_ROOT=/path/to/private-reference-root
-npm --prefix web run build && npm --prefix web run verify:sync
+# Incremental coarse collection, then refinements:
+export HARMONIC_REFERENCE_ROOT="$PWD/web/.vite/reference-root"
+HARMONIC_HEADLESS=1 npm --prefix web run verify:sync -- --stage 50
+HARMONIC_HEADLESS=1 npm --prefix web run verify:sync -- --stage 20
+HARMONIC_HEADLESS=1 npm --prefix web run verify:sync -- --stage 10
+
+# Scoped measurements do not claim a whole-video pass:
+HARMONIC_HEADLESS=1 npm --prefix web run verify:sync -- --stage 50 --video analysis --times 117,118,119
+
+# Final all-video acceptance, including the official player:
+HARMONIC_HEADLESS=1 npm --prefix web run build && HARMONIC_HEADLESS=1 npm --prefix web run verify:sync
+
+# Local demonstration of the unchanged private original footage:
+npm --prefix web run preview:reference -- --port 5967
+# http://127.0.0.1:5967/harmonic-analyzer/?video=machine-spin&referenceMedia=1
 ```
 
-`HARMONIC_REFERENCE_ROOT` defaults to `/tmp/harmonic-web-reference`; that location
-does not survive a host reboot. Prefer durable ignored storage such as
-`web/.vite/reference-root` and set the variable explicitly. The root must contain
-the six original MP4 files for the routes above under `videos/`.
+`HARMONIC_REFERENCE_ROOT` defaults to durable ignored `web/.vite/reference-root`.
+It must contain the six original MP4s under `videos/`. `preview:reference` serves
+them locally with range support without copying footage into publication assets.
+Default public playback remains the official YouTube embed.
 The verifier serves `dist/`, exercises the original media, and reports per-video
 coverage, rendered landmark errors and timing. Incremental runs are repeatable;
 there is no acceptance-attempt quota. The default final target is 5% of each
