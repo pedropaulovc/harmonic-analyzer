@@ -51,7 +51,11 @@ from crank_hub_geometry import (
 
 # --- Nominal geometry -------------------------------------------------------
 ARM_C2C = 75.0
-SQUARE_END_OVERHANG = 10.0
+# User ruling 2026-09-29 (ch11 p.14 photo re-check): the handle end is a full
+# semicircle concentric with the handle pivot, the same R12.7 as the hub end,
+# not the former square end 10.0 past the pivot.  The crank radius stays 75, so
+# the arm grows 2.7 to 87.7 from the hub axis.
+END_RADIUS = ARM_WIDTH / 2.0
 # The bar is left at its as-supplied thickness, so that stock must read as the
 # printed 8.0 inside the title block's .X band.
 if abs(ARM_STOCK_THICKNESS - ARM_THICKNESS) > GENERAL_1PL_TOL_MM:
@@ -59,12 +63,12 @@ if abs(ARM_STOCK_THICKNESS - ARM_THICKNESS) > GENERAL_1PL_TOL_MM:
         f"arm stock {ARM_STOCK_THICKNESS:.3f} is outside the printed {ARM_THICKNESS:.1f}'s .X band"
     )
 # U33: the MHA-139 slotted shoulder screw threads through the arm and carries
-# the handle.  Its tapped web to the square end is judged at the .X worst case
-# of both stations (U27).
+# the handle.  The end arc shares the pivot's centre, so its tapped web to the
+# end is judged at the .X worst case of the end radius alone (U27).
 HANDLE_PIVOT_HOLE_SPEC = HoleSpec("tapped", PIVOT_SCREW_THREAD_SIZE)
 _PIVOT_THREAD_R = THREAD_MAJOR_MM[HANDLE_PIVOT_HOLE_SPEC.size] / 2.0
-PIVOT_END_WEB_NOMINAL = SQUARE_END_OVERHANG - _PIVOT_THREAD_R
-PIVOT_END_WEB_WORST = PIVOT_END_WEB_NOMINAL - 2.0 * GENERAL_1PL_TOL_MM
+PIVOT_END_WEB_NOMINAL = END_RADIUS - _PIVOT_THREAD_R
+PIVOT_END_WEB_WORST = PIVOT_END_WEB_NOMINAL - GENERAL_1PL_TOL_MM
 if PIVOT_END_WEB_WORST < WALL_TARGET_MM:
     raise AssertionError(
         f"handle-pivot thread leaves {PIVOT_END_WEB_WORST:.2f} mm to the arm end"
@@ -96,7 +100,7 @@ ANCHOR_HOLE_SPEC = HoleSpec("tapped", "#4-40")
 SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = ()
 
 # Derived spans.
-ARM_END_X = ARM_C2C + SQUARE_END_OVERHANG
+ARM_END_X = ARM_C2C + END_RADIUS
 HALF_WIDTH = ARM_WIDTH / 2.0
 
 # The thickness prints as a reference, (8.0), under the stock line's "AS
@@ -108,15 +112,17 @@ REFERENCE_DIMENSIONS = {"Depth"}
 # Marked dimensions imported by the drawing.  The punch and axial seam groove
 # are assembly-match features, so their representation geometry carries no
 # independent size or location dimension.
+# The two end radii are concentric with the hub seat and the handle pivot, so
+# they locate both on the arm's mid-width axis; the former common-axis offset
+# restated that and is gone with the square end.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "ArmOutline": {"ArmEndX", "BossRadius"},
+    "ArmOutline": {"BossRadius", "EndRadius"},
     "Arm": {"Depth"},
     "HubSeatProfile": {"HubSeatDia"},
     "StationReference": {
         "PivotStation",
         "AnchorStation",
         "AnchorOffset",
-        "AxisOffset",
         "Width",
     },
 }
@@ -124,14 +130,13 @@ DRAWING_DIMENSIONS: dict[str, set[str]] = {
 # Decimal places are authored on the model.  The hub seat bore is a one-place
 # .X size: it is bored first, and MHA-137 is turned to suit it.
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "ArmOutline": {"ArmEndX": 1, "BossRadius": 1},
+    "ArmOutline": {"BossRadius": 1, "EndRadius": 1},
     "Arm": {"Depth": 1},
     "HubSeatProfile": {"HubSeatDia": 1},
     "StationReference": {
         "PivotStation": 1,
         "AnchorStation": 1,
         "AnchorOffset": 1,
-        "AxisOffset": 1,
         "Width": 1,
     },
 }
@@ -156,8 +161,8 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 if len(DRAWING_PRECISION_BY_NAME) != len(_PRECISION_NAMES):
     raise AssertionError("DRAWING_PRECISION repeats a dimension name across features")
 
-# The one sheet-derived dimension: the parenthesised boss-extreme-to-arm-end
-# overall, a read-only sum of the boss radius and ArmEndX with no model
+# The one sheet-derived dimension: the parenthesised extreme-to-extreme
+# overall, a read-only sum of the two end radii and the pivot station with no model
 # dimension to import. Its places are still specification, so the sheet
 # reads them here instead of typing a literal (policy rule 2).
 DRAWING_REFERENCE_PRECISION: dict[str, int] = {"overall length reference": 1}

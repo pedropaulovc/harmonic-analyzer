@@ -96,7 +96,7 @@ _ANCHOR_HOLE_DIA = blind_cut_dia_mm(ANCHOR_HOLE_SPEC)
 
 SHEET_SCALE = (2.0, 1.0)
 
-# Sheet layout (meters).  At 2:1 the 97.7-mm overall arm remains clear of the
+# Sheet layout (meters).  At 2:1 the 100.4-mm overall arm remains clear of the
 # title block, and the side view shows the 25.4 x 8 stock section.  The
 # principal view sits so its lower edge keeps the dimension rows' height below
 # it; the three callouts over the hub end (seat, seam, anchor tap) stand in a
@@ -187,13 +187,14 @@ def _omit_title_block_thread_class(display: Any) -> None:
 
 # Per-view survivors of the marked-dimension import.
 FRONT_KEEP = {
-    "ArmEndX": (0.190, 0.085),
     "PivotStation": (_sheet_x(ARM_C2C / 2.0), 0.095),
     "AnchorStation": (_sheet_x(ANCHOR_SCREW_X / 2.0), 0.104),
     "AnchorOffset": (0.108, FRONT_CENTER[1] + HALF_WIDTH * SHEET_SCALE[0] / 1000.0 + 0.008),
-    "AxisOffset": (0.252, FRONT_CENTER[1] + 0.013),
     "Width": (0.279, FRONT_CENTER[1]),
     "BossRadius": (0.030, FRONT_CENTER[1]),
+    # Below and right of the handle end, clear of the Width row and the
+    # 75.0 station row; its leader lands on the lower-right quarter of the arc.
+    "EndRadius": (0.268, 0.100),
     "HubSeatDia": (0.048, 0.225),
 }
 # The hub seat's leader lands on the near rim, upper left of the bore: at
@@ -224,6 +225,9 @@ SEAM_EDGE_PICK = (
     + AXIAL_PIN_DIA / 2.0 * math.sin(math.pi / 4.0) * SHEET_SCALE[0] / 1000.0,
 )
 SEAM_CALLOUT_XY = (0.104, 0.250)
+# The overall's pick on the handle-end arc: 2 mm below the axis, on the arc.
+_END_PICK_DY_SHEET = 0.004
+_END_PICK_DX = math.sqrt(HALF_WIDTH**2 - (_END_PICK_DY_SHEET * 1000.0 / SHEET_SCALE[0]) ** 2)
 ANCHOR_CALLOUT_XY = (0.195, 0.205)
 RIGHT_KEEP = {"Depth": (0.300, 0.108)}
 DIMENSION_CALLOUTS = {"HubSeatDia": HUB_SEAT_CALLOUT}
@@ -374,15 +378,15 @@ async def build(adapter: Any) -> dict[str, str]:
         label="anchor tap",
     )
     _omit_title_block_thread_class(anchor_callout)
-    # The true overall (boss extreme to arm end), as a reference below the
-    # 85.0 centre-to-end chain so nobody saws the stock 8 mm short
-    # (Harvey #25).  Picked at the boss arc's outer extreme so the default
-    # tangent arc condition measures the far side, not the centre.
+    # The true overall (boss extreme to handle-end extreme), as a reference
+    # below the 75.0 station so nobody saws the stock a radius short
+    # (Harvey #25).  Both ends are arcs, each picked on its outer flank and
+    # re-anchored to its far extreme below.
     overall = add_edge_dimension(
         adapter,
         front,
         p0=(_sheet_x(-HALF_WIDTH), FRONT_CENTER[1]),
-        p1=(_sheet_x(ARM_END_X), FRONT_CENTER[1] - 0.004),
+        p1=(_sheet_x(ARM_C2C + _END_PICK_DX), FRONT_CENTER[1] - _END_PICK_DY_SHEET),
         text_xy=(_sheet_x(ARM_C2C / 2.0), 0.073),
         label="overall length reference",
         orientation="horizontal",

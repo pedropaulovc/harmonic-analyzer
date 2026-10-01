@@ -22,7 +22,6 @@ import sys
 from _common import (
     SketchDims,
     _early_bound,
-    add_line_chain,
     anchor_point_to_origin,
     apply_material,
     blank_sketch,
@@ -60,7 +59,6 @@ from crank_arm_spec import (
     ANCHOR_SCREW_Y,
     ANCHOR_HOLE_SPEC,
     ARM_C2C,
-    ARM_END_X,
     ARM_THICKNESS,
     ARM_WIDTH,
     AXIAL_PIN_DIA,
@@ -78,7 +76,6 @@ from crank_arm_spec import (
     HANDLE_PIVOT_HOLE_SPEC,
     HUB_SEAT_DIA,
     ISOMETRIC_VIEW_NOTE,
-    SQUARE_END_OVERHANG,
     SURFACE_FINISHES,
 )
 from crank_native_acceptance import assert_signed_circle_center
@@ -116,12 +113,11 @@ async def build(adapter) -> dict[str, str]:
     # global that drives the dimensions below. The mm suffix is load-bearing --
     # this is an INCH document and the equation manager reads BARE numbers in
     # document units, so an unsuffixed 66 would be read as 66 inches and blow the
-    # part up 25.4x. ArmEndX is a derived span (equation of the primitives) so the
-    # square end stays SQUARE_END_OVERHANG past the pivot when either changes.
+    # part up 25.4x. Both end radii are half the width, so the handle end stays
+    # a semicircle about the pivot when either changes.
     await set_global(adapter, "ArmC2C", f"{ARM_C2C}mm")
     await set_global(adapter, "ArmWidth", f"{ARM_WIDTH}mm")
     await set_global(adapter, "ArmThickness", f"{ARM_THICKNESS}mm")
-    await set_global(adapter, "SquareEndOverhang", f"{SQUARE_END_OVERHANG}mm")
     await set_global(adapter, "HubSeatDia", f"{HUB_SEAT_DIA}mm")
     await set_global(adapter, "AxialPinDia", f"{AXIAL_PIN_DIA}mm")
     await set_global(adapter, "AxialPinLength", f"{AXIAL_PIN_LENGTH}mm")
@@ -133,7 +129,6 @@ async def build(adapter) -> dict[str, str]:
     await set_global(adapter, "FiducialY", f"{abs(FIDUCIAL_Y)}mm")
     await set_global(adapter, "AnchorScrewX", f"{ANCHOR_SCREW_X}mm")
     await set_global(adapter, "AnchorScrewY", f"{ANCHOR_SCREW_Y}mm")
-    await set_global(adapter, "ArmEndX", '"ArmC2C" + "SquareEndOverhang"')
 
     # Each sketch declares its dim names + drive equations as it is built; a
     # per-sketch SketchDims records each dim in emission order, then apply()
@@ -141,35 +136,41 @@ async def build(adapter) -> dict[str, str]:
     # end (every equation target must resolve against the finished model).
     drive_jobs: list[tuple[str, str]] = []
 
-    # Arm outline: full-radius boss cap (arc about the origin) + 3 lines.
+    # Arm outline: two full-radius end caps -- the boss about the origin, the
+    # handle end about the pivot (ch11 p.14) -- joined by the two long edges.
+    # Direct-to-DB so no inferred relation lands on the caps; the edges'
+    # endpoints merge with the cap endpoints at creation (build_pinion_bracket).
     outline = SketchDims()
     check("create_sketch outline", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
     arc = check(
         "add_arc boss cap",
         await adapter.add_arc(0.0, 0.0, 0.0, HALF_WIDTH, 0.0, -HALF_WIDTH),
     )
-    bottom, right, top = await add_line_chain(
-        adapter,
-        [
-            (0.0, -HALF_WIDTH),
-            (ARM_END_X, -HALF_WIDTH),
-            (ARM_END_X, HALF_WIDTH),
-            (0.0, HALF_WIDTH),
-        ],
-        close=False,
+    bottom = check(
+        "add bottom long edge",
+        await adapter.add_line(0.0, -HALF_WIDTH, ARM_C2C, -HALF_WIDTH),
     )
-    check("constraint horizontal bottom", await adapter.add_sketch_constraint(bottom, None, "horizontal"))
-    check("constraint vertical right", await adapter.add_sketch_constraint(right, None, "vertical"))
-    check("constraint horizontal top", await adapter.add_sketch_constraint(top, None, "horizontal"))
-    # Manual dims recorded into SketchDims as created (creation order): the arm
-    # length on the bottom line, then the boss-cap radius.
+    end_cap = check(
+        "add_arc handle-end cap",
+        await adapter.add_arc(ARM_C2C, 0.0, ARM_C2C, -HALF_WIDTH, ARM_C2C, HALF_WIDTH),
+    )
     check(
-        f"dimension arm length = {ARM_END_X:g}",
-        await adapter.add_sketch_dimension(bottom, None, "linear", ARM_END_X),
+        "add top long edge",
+        await adapter.add_line(ARM_C2C, HALF_WIDTH, 0.0, HALF_WIDTH),
     )
-    outline.record("ArmEndX", '"ArmEndX"')
+    set_sketch_direct_db(adapter, False)
+    check("constraint horizontal bottom", await adapter.add_sketch_constraint(bottom, None, "horizontal"))
+    # Manual dims recorded into SketchDims as created (creation order): the
+    # bottom edge's run to the pivot, the boss-cap radius, the end-cap radius.
+    # The run duplicates the printed PivotStation, so it is never marked.
+    check(
+        f"dimension long-edge run = {ARM_C2C:g}",
+        await adapter.add_sketch_dimension(bottom, None, "linear", ARM_C2C),
+    )
+    outline.record("EdgeRun", '"ArmC2C"')
     # Boss cap: centre at the origin + radius + both ends on the Y axis
-    # fully pin the semicircle; the merged chain follows.
+    # fully pin the semicircle.
     check(
         "boss centre -> origin",
         await adapter.add_sketch_constraint(f"{arc}.center", "origin", "coincident"),
@@ -180,6 +181,19 @@ async def build(adapter) -> dict[str, str]:
         check(
             f"{point} on Y axis",
             await adapter.add_sketch_constraint(point, "origin", "vertical_points"),
+        )
+    # Handle-end cap: its start rides the bottom edge's end, both ends stand
+    # plumb over its centre, and its radius closes it.  The top edge needs no
+    # relation of its own: both of its merged ends are already pinned, so a
+    # horizontal there would be redundant.
+    check("end cap radius", await adapter.add_sketch_dimension(end_cap, None, "radial", HALF_WIDTH))
+    outline.record("EndRadius", '"ArmWidth" / 2')
+    for end in ("start", "end"):
+        check(
+            f"end cap {end} plumb over its centre",
+            await adapter.add_sketch_constraint(
+                f"{end_cap}.{end}", f"{end_cap}.center", "vertical_points"
+            ),
         )
     await ensure_fully_defined(adapter, "arm outline")
     check("exit_sketch outline", await adapter.exit_sketch())
@@ -369,16 +383,14 @@ async def build(adapter) -> dict[str, str]:
             ANCHOR_SCREW_X, HALF_WIDTH, ANCHOR_SCREW_X, ANCHOR_SCREW_Y
         ),
     )
+    # The width reads across the pivot's vertical centre-mark line: the
+    # rounded end has no straight edge left to carry it.
     width_ref = check(
         "arm width reference line",
-        await adapter.add_line(ARM_END_X, -HALF_WIDTH, ARM_END_X, HALF_WIDTH),
-    )
-    axis_ref = check(
-        "common-axis offset reference line",
-        await adapter.add_line(ARM_END_X, 0.0, ARM_END_X, HALF_WIDTH),
+        await adapter.add_line(ARM_C2C, -HALF_WIDTH, ARM_C2C, HALF_WIDTH),
     )
     set_sketch_direct_db(adapter, False)
-    for line in (pivot_ref, anchor_ref, offset_ref, width_ref, axis_ref):
+    for line in (pivot_ref, anchor_ref, offset_ref, width_ref):
         _as_construction(adapter, line)
     for line, label in ((pivot_ref, "pivot"), (anchor_ref, "anchor")):
         check(
@@ -402,19 +414,9 @@ async def build(adapter) -> dict[str, str]:
             f"{offset_ref}.end", f"{anchor_ref}.end", "vertical_points"
         ),
     )
-    for line, label in (
-        (width_ref, "arm width"),
-        (axis_ref, "common-axis offset"),
-    ):
-        check(
-            f"{label} reference vertical",
-            await adapter.add_sketch_constraint(line, None, "vertical"),
-        )
     check(
-        "common-axis offset ends on the top long edge",
-        await adapter.add_sketch_constraint(
-            f"{axis_ref}.end", f"{width_ref}.end", "coincident"
-        ),
+        "arm width reference vertical",
+        await adapter.add_sketch_constraint(width_ref, None, "vertical"),
     )
     # Dimensions in creation order; SketchDims renames them by that order.
     await dimension_between(
@@ -462,19 +464,10 @@ async def build(adapter) -> dict[str, str]:
         "arm width reference",
     )
     stations.record("Width", '"ArmWidth"')
-    await dimension_between(
-        adapter,
-        f"{axis_ref}.start",
-        f"{axis_ref}.end",
-        "vertical_distance",
-        HALF_WIDTH,
-        "common-axis offset reference",
-    )
-    stations.record("AxisOffset", '"ArmWidth" / 2')
     await anchor_point_to_origin(
-        adapter, f"{width_ref}.start", ARM_END_X, -HALF_WIDTH, "arm width reference"
+        adapter, f"{width_ref}.start", ARM_C2C, -HALF_WIDTH, "arm width reference"
     )
-    stations.record("WidthX", '"ArmEndX"')
+    stations.record("WidthX", '"ArmC2C"')
     stations.record("WidthY", '"ArmWidth" / 2')
     await ensure_fully_defined(adapter, "station reference sketch")
     check("exit_sketch station reference", await adapter.exit_sketch())
