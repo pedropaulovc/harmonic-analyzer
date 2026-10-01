@@ -1384,6 +1384,9 @@ _CHECK_NAMES = (
     "partiso",
     "inert",
     "budget",
+    # Threaded-joint retention (drawing-simplicity-policy rule 9). Audit-only
+    # while joint_retention.ENFORCEMENT is AUDIT: it reports, never fails.
+    "joint_retention",
 )
 # Offline checks that are OPT-IN only (runnable via `doit check:<name>` but NOT
 # depended on by `build`/`release`). ``verify_telemetry`` drives the real gates
@@ -3079,6 +3082,9 @@ def task_check():
         # members, an incomplete before-walk refuses to diff, and the created
         # feature is picked by type, never an auxiliary one beside it.
         SCRIPTS_DIR / "test_adapter_feature_resolution.py",
+        # The threaded-joint retention audit's logic, and the joint table's
+        # coverage of every threaded part the assemblies reference.
+        SCRIPTS_DIR / "test_joint_retention.py",
     ]
     # These are runtime-read rather than imported, so module_deps_of cannot
     # discover them. A prompt/schema edit must invalidate check:recipe and rerun
@@ -3438,6 +3444,30 @@ def task_check():
             ),
             "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_error_budget.py")],
         },
+        "joint_retention": {
+            # Writes cad/out/reports/joint-retention.{json,md}. The joint table
+            # is checked against the parts each assembly script references
+            # (_buildgraph.references_of reads the scripts as TEXT, so the
+            # import graph cannot see them).
+            "file_dep": sorted(
+                {
+                    str((REPO_ROOT / "dodo.py").resolve()),
+                    # references_of runs here, but module_deps_of skips
+                    # _buildgraph itself, so name it.
+                    str((SCRIPTS_DIR / "_buildgraph.py").resolve()),
+                    *(
+                        str((SCRIPTS_DIR / f"build_{s}_assembly.py").resolve())
+                        for s in ASSEMBLY_ORDER
+                    ),
+                }
+            ),
+            "cmd": [sys.executable, str(SCRIPTS_DIR / "joint_retention.py")],
+            # The reports are outputs too: deleting one reruns the check.
+            "targets": [
+                str(REPORTS / "joint-retention.json"),
+                str(REPORTS / "joint-retention.md"),
+            ],
+        },
     }
     # Tripwire: `build` and `release` depend on f"check:{c}" for c in _CHECK_NAMES, so a
     # spec added here without the matching name (or vice versa) would silently never run
@@ -3470,7 +3500,7 @@ def task_check():
             "name": name,
             "file_dep": sorted({*spec["file_dep"], *executed}),
             "uptodate": spec.get("uptodate", []),
-            "targets": [stamp],
+            "targets": [stamp, *spec.get("targets", [])],
             "actions": [
                 (_run_stamped, [spec["cmd"], f"check {name}", stamp, f"check:{name}"])
             ],

@@ -83,8 +83,9 @@ WHAT A COMPLETE ASSEMBLY PACKAGE CONTAINS (the standard you hold it to)
   it here where the package gives the numbers (screw length, clearance
   stack, tapped depth, or a stated engagement). Where it does not, record
   "engagement not verifiable from the package" in minor; do not invent
-  values or ask the sheet to add them. Where the numbers are given, check
-  that:
+  values or ask the sheet to add them. That allowance covers numeric
+  engagement depth only; it never waives the retention requirement below.
+  Where the numbers are given, check that:
   - each screw engages at least 1.5 x its nominal diameter of FULL thread in
     its receiver, counting neither clearance holes nor the one to one and a
     half incomplete threads a tap or die leaves;
@@ -95,6 +96,19 @@ WHAT A COMPLETE ASSEMBLY PACKAGE CONTAINS (the standard you hold it to)
     a blocker; the fix is an adjustment at fit-up, not a tighter part band.
   A shortfall the package explicitly states as an accepted exception is
   recorded in minor, not flagged as a defect.
+- Retention under operating loads. For every threaded joint, identify what
+  is fixed and what turns, rocks or reverses, and whether that drag, torque
+  reversal or vibration can turn the threaded member or unload its seat. A
+  stud, pivot, axle or screw that carries a moving member, or that its drag
+  or operating torque can reach, shows its mechanical anti-loosening means
+  and the step that engages it: a jam nut, a nut locked by a pin or tab, a
+  cross-pin, a key or flat with axial capture, a pinch clamp across a slit
+  thread, or a staked or peened end. A plain seated thread, shoulder, shim,
+  unspecified tightening, lubricant, or thread locker alone does not lock
+  that class of joint. A cap or nut that retains a rotating cluster axially
+  is not credited as locking a different interface, such as the stud's own
+  thread in its frame. A static clamp that no operating torque reaches needs
+  no lock; do not ask for one.
 - Consumables and loose items: lubricant, thread locker, pins supplied loose,
   shims, all named.
 - Nothing more. Part tolerances, materials and finishes belong on the part
@@ -162,7 +176,10 @@ view or item for every finding, and say the fix):
   or verification capability conflict as defined above, full-thread
   engagement under 1.5D or an adjustment range that does not cover the
   worst-case stack (unless the package states it as an accepted
-  exception), an ambiguous
+  exception), missing or ineffective mechanical retention of a threaded
+  support or fastener exposed to operating drag, torque reversal or preload
+  loss, or such a joint whose locking step the package does not establish
+  (even where engagement is not verifiable), an ambiguous
   parked/engaged state, inconsistent BOM rows or balloon mappings
   across sheets, a setup sequence that conflicts across sheets, or any
   contradiction between sheets or between a view and a note.

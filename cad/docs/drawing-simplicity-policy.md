@@ -228,6 +228,23 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
    the parked/engaged setup. Legacy three-view sheets
    (`drawing_recipe_assembly.md`) are orientation placeholders and are
    EXPECTED to fail that review until they are built out.
+
+   **Operational retention is an assembly requirement, distinct from thread
+   engagement.** Every threaded support or fastener exposed to a rotating
+   member's drag, torque reversal or loss of preload has a mechanical
+   anti-loosening means (a jam nut, a nut locked by a pin or tab, a
+   cross-pin, a key or flat with axial capture, a pinch clamp across a slit
+   thread, a staked or peened end), shown in an assembly view or detail and
+   installed by a named assembly step. A plain seated thread, shoulder, shim
+   or threadlocker alone does not qualify, and a cap that retains a cluster
+   axially is not proof that the stud under it is locked to its frame. A
+   static clamp that no operating torque reaches needs no lock, and its row
+   in the joint table says why. Missing or unverifiable retention gates the
+   assembly review; the rule-12 allowance for engagement the package cannot
+   show does not waive it. `cad/scripts/joint_retention.py` lists every
+   threaded joint and audits this rule (`check:joint_retention`). A
+   departure needs an explicit joint-specific user ruling, never an inferred
+   exception.
 10. **Inspection assumes a hobby shop, not a CMM.** Surface plate, height
    gauge, indicators, V-blocks, sine bar and gauge blocks are fair game, so a
    geometric control is never rejected as uninspectable, only as
@@ -272,9 +289,10 @@ Secrets*, ch. 9 "Help for Engineers"; Lipton, *Metalworking Sink or Swim*, ch.
      owns installed engagement, and the build's seat-fit and stack asserts
      (e.g. `require_blind_seat_fit`) are where it is enforced. Today those
      asserts check only ≥ 1D; raising them to 1.5D at the worst case is
-     part of the rule-12 audit (#846). The assembly review checks it
-     only where the package gives the numbers, and otherwise records it as
-     not verifiable, without gating.
+   part of the rule-12 audit (#846). The assembly review checks it
+   only where the package gives the numbers, and otherwise records it as
+   not verifiable, without gating. Engagement is not retention: rule 9
+   still requires a mechanical lock on every exposed joint.
    - **Adjust at fit-up rather than stack.** Where loose bands cannot hold a
      worst-case stack, prefer a fit-up adjustment stated on the assembly
      steps (slot, shim, feeler-set, cut-to-fit, match-drill) over tightening
