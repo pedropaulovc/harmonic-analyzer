@@ -12,7 +12,6 @@ import crank_hub_notes
 import crank_hub_spec
 import crankshaft_spec
 import draw_crank_hub as drawing
-import transgear_removable_spec as removable
 from _drawing_registry import DRAWINGS_BY_NAME
 
 
@@ -83,21 +82,19 @@ def test_rear_relief_clears_the_t12_chain_plates_and_keeps_its_wall() -> None:
     assert geometry.RELIEF_STATION == pytest.approx(
         geometry.HUB_SEAT_LENGTH + geometry.HUB_BARREL_LENGTH
     )
-    # Title-block .X on the clearance diameter; the length carries the
-    # functional ±0.05 that holds the chain's axial air at print-worst, and so
-    # does the overall that places the rear face it is printed from.
-    assert geometry.RELIEF_DIA_MAX == pytest.approx(17.3)
+    # Title-block .XX on the clearance diameter (R9-37: 0.23 to a real #25
+    # plate on the floated T12, 0.08 at .X; test_transgear_removable_seat
+    # judges that corner); the length carries the functional ±0.05 that holds
+    # the chain's axial air at print-worst, and so does the overall that
+    # places the rear face it is printed from.
+    assert geometry.RELIEF_DIA_MAX == pytest.approx(17.01)
     assert geometry.RELIEF_LENGTH_TOL == 0.05
     assert geometry.HUB_LENGTH_TOL == 0.05
     assert crank_hub_spec.DRAWING_PRECISION["HubProfile"]["ReliefLength"] == 2
     assert crank_hub_spec.DRAWING_PRECISION["HubProfile"]["HubLength"] == 2
-    assert crank_hub_spec.DRAWING_PRECISION["HubProfile"]["ReliefDia"] == 1
-    # A real ANSI #25 plate wrapping the T12 clears the relief at its largest.
-    t12 = removable.TEETH["T12"]
-    plate_r = removable.chain_plate_inner_radius(t12, removable.ANSI_PLATE_HEIGHT)
-    assert plate_r - geometry.RELIEF_DIA_MAX / 2.0 == pytest.approx(0.278, abs=1e-3)
-    # Rule 12 wall over the bore: Ø15.7 against the Ø9.580 bore, edges broken.
-    assert geometry.RELIEF_WALL_WORST_MM == pytest.approx(2.56, abs=1e-3)
+    assert crank_hub_spec.DRAWING_PRECISION["HubProfile"]["ReliefDia"] == 2
+    # Rule 12 wall over the bore: Ø15.99 against the Ø9.580 bore, edges broken.
+    assert geometry.RELIEF_WALL_WORST_MM == pytest.approx(2.705, abs=1e-3)
     assert geometry.RELIEF_WALL_WORST_MM >= geometry.WALL_TARGET_MM
     # The MHA-024 ream stays on the full barrel.
     assert (
@@ -351,7 +348,7 @@ def test_callouts_stand_clear_of_views_and_each_other() -> None:
     relief_x = drawing.SIDE_KEEP["ReliefDia"][0]
     barrel_x = drawing.SIDE_KEEP["BarrelDia"][0]
     assert barrel_x < relief_x < drawing.INBOARD_X
-    relief_half = len("Ø16.5") * char_w / 2.0
+    relief_half = len("Ø16.50") * char_w / 2.0
     assert barrel_x + len("Ø20.6") * char_w / 2.0 < relief_x - relief_half
     assert relief_x + relief_half < drawing.INBOARD_X
 

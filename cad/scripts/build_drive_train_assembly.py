@@ -562,6 +562,7 @@ from crank_hub_geometry import (  # noqa: E402
     HUB_SEAT_LENGTH,
     RELIEF_DIA_MAX as HUB_RELIEF_DIA_MAX,
     HUB_LENGTH_TOL,
+    HUB_SHAFT_FLOAT,
     RELIEF_LENGTH as HUB_RELIEF_LENGTH,
     chain_shoulder_axial_air,
 )
@@ -592,6 +593,7 @@ from crankshaft_spec import (  # noqa: E402
     SPIGOT_END,
     SPIGOT_LENGTH,
     SPIGOT_LENGTH_TOL,
+    WHEEL_SEAT_FLOAT,
 )
 from crank_handle_spec import HANDLE_LENGTH as HANDLE_BASIC_LENGTH  # noqa: E402
 from crank_handle_ferrule_spec import (  # noqa: E402
@@ -655,24 +657,58 @@ CRANK_HUB_BARREL_REAR_Z = CRANK_HUB_REAR_Z - HUB_RELIEF_LENGTH  # -161.65
 # real ANSI #25 plate; axially, a bought chain's envelope (REMOVABLE.ANSI_*)
 # against the shoulders, every link at its printed worst (the CAD link sits
 # inside that envelope, so it needs no axial check of its own).
+# Radially the chain follows the T12, which floats WHEEL_SEAT_FLOAT off the
+# shaft axis on its pins; the hub's relief floats HUB_SHAFT_FLOAT in its bore.
+# The spigot, the hub, the T12 and the plates wrapping it all turn with the
+# shaft (the wheel pinned to the collar, the hub to the shaft): a plate only
+# articulates as it engages and leaves the wheel and never slides round the
+# spigot or the relief, so contact there is benign and no running clearance
+# is owed.  The floated stack is an all-limits coincidence; it must leave
+# positive air.
 _T12 = REMOVABLE.TEETH["T12"]
-_SPIGOT_R_WORST = (SPIGOT_DIA + max(SPIGOT_DIA_BAND)) / 2.0
-_HUB_RELIEF_R_WORST = HUB_RELIEF_DIA_MAX / 2.0
-_CHAIN_R_CAD = REMOVABLE.chain_plate_inner_radius(_T12, _chain.PLATE_HEIGHT)
-_CHAIN_R_ANSI = REMOVABLE.chain_plate_inner_radius(_T12, REMOVABLE.ANSI_PLATE_HEIGHT)
-CHAIN_SPIGOT_RADIAL_AIR_CAD = _CHAIN_R_CAD - _SPIGOT_R_WORST  # 0.699
-CHAIN_SPIGOT_RADIAL_AIR_ANSI = _CHAIN_R_ANSI - _SPIGOT_R_WORST  # 0.178
-CHAIN_RELIEF_RADIAL_AIR_CAD = _CHAIN_R_CAD - _HUB_RELIEF_R_WORST  # 0.799
-CHAIN_RELIEF_RADIAL_AIR_ANSI = _CHAIN_R_ANSI - _HUB_RELIEF_R_WORST  # 0.278
-CHAIN_RADIAL_AIR_MIN = 0.15
-for _what, _air in (
-    ("CAD link / seat spigot", CHAIN_SPIGOT_RADIAL_AIR_CAD),
-    ("ANSI #25 plate / seat spigot", CHAIN_SPIGOT_RADIAL_AIR_ANSI),
-    ("CAD link / hub relief", CHAIN_RELIEF_RADIAL_AIR_CAD),
-    ("ANSI #25 plate / hub relief", CHAIN_RELIEF_RADIAL_AIR_ANSI),
-):
-    if _air < CHAIN_RADIAL_AIR_MIN - 1e-9:
-        raise AssertionError(f"{_what} radial air {_air:.3f} < {CHAIN_RADIAL_AIR_MIN}")
+CHAIN_RADIAL_AIR_WORST_MIN = 0.01
+
+
+def chain_radial_air(
+    what: str, plate_height: float, feature_dia_max: float, offset: float
+) -> float:
+    """Worst radial air from a plate ``plate_height`` tall wrapping the T12 to
+    a crank feature of largest diameter ``feature_dia_max``, the wheel's axis
+    ``offset`` off the feature's: the plate's closest approach to the wheel's
+    axis, less the offset and the feature's radius.  Raises below
+    CHAIN_RADIAL_AIR_WORST_MIN."""
+    air = (
+        REMOVABLE.chain_plate_inner_radius(_T12, plate_height)
+        - offset
+        - feature_dia_max / 2.0
+    )
+    if air < CHAIN_RADIAL_AIR_WORST_MIN - 1e-9:
+        raise AssertionError(
+            f"{what} radial air {air:.3f} < {CHAIN_RADIAL_AIR_WORST_MIN}"
+        )
+    return air
+
+
+_SPIGOT_DIA_MAX = SPIGOT_DIA + max(SPIGOT_DIA_BAND)
+_RELIEF_OFFSET = WHEEL_SEAT_FLOAT + HUB_SHAFT_FLOAT
+CHAIN_SPIGOT_RADIAL_AIR_CAD = chain_radial_air(
+    "CAD link / seat spigot", _chain.PLATE_HEIGHT, _SPIGOT_DIA_MAX, WHEEL_SEAT_FLOAT
+)  # 0.541
+CHAIN_SPIGOT_RADIAL_AIR_ANSI = chain_radial_air(
+    "ANSI #25 plate / seat spigot",
+    REMOVABLE.ANSI_PLATE_HEIGHT,
+    _SPIGOT_DIA_MAX,
+    WHEEL_SEAT_FLOAT,
+)  # 0.020
+CHAIN_RELIEF_RADIAL_AIR_CAD = chain_radial_air(
+    "CAD link / hub relief", _chain.PLATE_HEIGHT, HUB_RELIEF_DIA_MAX, _RELIEF_OFFSET
+)  # 0.749
+CHAIN_RELIEF_RADIAL_AIR_ANSI = chain_radial_air(
+    "ANSI #25 plate / hub relief",
+    REMOVABLE.ANSI_PLATE_HEIGHT,
+    HUB_RELIEF_DIA_MAX,
+    _RELIEF_OFFSET,
+)  # 0.228
 # The fitter lines the hub's front face up flush with the shaft's dome root
 # (CRANK_FACE_Z) before the match-ream, so the hub rear face is CRANK_FACE_Z
 # + the printed hub length; the arm's stock thickness is out of the stack.

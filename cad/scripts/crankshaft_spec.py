@@ -260,8 +260,9 @@ if not _PIN_HOLE_OUTER_R < SPIGOT_DIA / 2.0 < COLLAR_DIA / 2.0:
 #   (crank_seat_washer_spec): its 0.8 would drive the washer under its 0.5
 #   floor.  +/-0.10 at .XX.
 # - The spigot diameter is held under nominal, (0, -0.10) at .XX: over it
-#   the ANSI #25 plates wrapping the T12 lose their 0.15 radial air, under
-#   it the rim to the pin holes thins (DRIVE_PIN_SPIGOT_RIM_WORST).
+#   the ANSI #25 plates wrapping the T12, floated off-centre by
+#   WHEEL_SEAT_FLOAT, lose their worst-case radial air; under it the rim to
+#   the pin holes thins (DRIVE_PIN_SPIGOT_RIM_WORST).
 # - The spigot's length prints from the seat face, not the far end, so the
 #   body's front face rides with the wheel and the chain: +/-0.05 at .XX
 #   keeps a bought chain's envelope clear of it.
@@ -326,6 +327,25 @@ if (
     >= transgear_removable_spec.PIN_HOLE_DIA - _DOWEL_OD[1]
 ):
     raise AssertionError("shaft + wheel pin spacing error exceeds the slip clearance")
+# The wheel rides its seat on the two pins alone; nothing else centres it.
+# At the printed limits it moves off the shaft axis by one hole's slip
+# clearance (the wheel's pin holes drilled to their largest over the
+# smallest stock dowel) plus a pin centre and its hole's centre each
+# DRIVE_PIN_OFFSET_TOL off nominal, the other way: along the pins' line
+# both pairs can lie so at once.  The Ø10.3 bore caps it only where its
+# own loosest clearance on the pilot is smaller, and it is not.  The chain
+# wrapping the wheel moves with it, so the drive train's radial chain air
+# takes this off.
+_DRILL_OVERSIZE = float(_config.title_block("drilled_hole")["plus_mm"])
+_WHEEL_PIN_FLOAT = (
+    transgear_removable_spec.PIN_HOLE_DIA + _DRILL_OVERSIZE - _DOWEL_OD[0]
+) / 2.0 + 2.0 * DRIVE_PIN_OFFSET_TOL
+_WHEEL_BORE_FLOAT = (
+    transgear_removable_spec.BORE_DIA
+    + _DRILL_OVERSIZE
+    - (SHAFT_DIA + SHAFT_DIA_BAND[1])
+) / 2.0
+WHEEL_SEAT_FLOAT = min(_WHEEL_PIN_FLOAT, _WHEEL_BORE_FLOAT)  # 0.158
 _PROUD = crank_seat_drive_pin_spec.LENGTH - DRIVE_PIN_DEPTH
 DRIVE_PIN_PROUD_RANGE = (
     _PROUD - DRIVE_PIN_DEPTH_TOL - DRIVE_PIN_LENGTH_GRADE,

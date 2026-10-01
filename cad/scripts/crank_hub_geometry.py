@@ -233,10 +233,14 @@ SERVICE_PIN_REAR_LIGAMENT_WORST_MM = (
     - (SERVICE_PIN_FROM_SHOULDER + GENERAL_2PL_TOL_MM)
     - SERVICE_PIN_REAM_RADIUS_MAX
 )
-# The relief is a clearance diameter at the title block's .X band: the
-# largest it can come out is what the #25 plates must clear, the smallest is
-# the relief's wall over the bore.
-RELIEF_DIA_MAX = RELIEF_DIA + GENERAL_1PL_TOL_MM
+# The relief is a clearance diameter at the title block's .XX band (R9-37:
+# a real #25 plate on the T12 floated on its pins keeps 0.23 off it, 0.08 at
+# .X): the largest it can come out is what the #25 plates must clear, the
+# smallest is the relief's wall over the bore.
+RELIEF_DIA_MAX = RELIEF_DIA + GENERAL_2PL_TOL_MM
+# The hub rides the shaft in its clearance bore, pinned wherever the
+# match-ream found it, so its relief can stand this far off the shaft axis.
+HUB_SHAFT_FLOAT = (HUB_BORE_DIA_MAX - (SHAFT_DIA + SHAFT_DIA_BAND[1])) / 2.0  # 0.0375
 # The barrel wall standing beside the big end of the ream, across the axis.
 SERVICE_PIN_BARREL_WALL_WORST_MM = (
     HUB_BARREL_DIA - GENERAL_1PL_TOL_MM
@@ -254,10 +258,10 @@ SEAM_WEB_WORST_MM = wall_after_edge_break(
 ARM_CHEEK_WORST_MM = wall_after_edge_break(
     ARM_WIDTH - ARM_WIDTH_STOCK_MINUS, HUB_SEAT_DIA_MAX_GENERAL
 )
-# The relief's wall over the bore: Ø16.5 at its .X lower limit against the
+# The relief's wall over the bore: Ø16.50 at its .XX lower limit against the
 # bore's upper limit, both edges broken.
 RELIEF_WALL_WORST_MM = wall_after_edge_break(
-    RELIEF_DIA - GENERAL_1PL_TOL_MM, HUB_BORE_DIA_MAX
+    RELIEF_DIA - GENERAL_2PL_TOL_MM, HUB_BORE_DIA_MAX
 )
 for _wall, _label in (
     (SEAM_WEB_WORST_MM, "MHA-137 seam-to-bore web"),

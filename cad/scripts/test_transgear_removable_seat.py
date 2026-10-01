@@ -7,7 +7,10 @@ import math
 import pytest
 
 import _config
+import build_drive_train_assembly as bdt
 import build_transgear_knob_shaft as knob
+import crank_hub_geometry as hub
+import crank_hub_spec
 import crank_seat_drive_pin_spec as crank_pin
 import crankshaft_spec as crank
 import transgear_knob_drive_pin_spec as knob_pin
@@ -36,8 +39,89 @@ def test_wrapped_t12_plate_inner_edge(plate_height: float, inner_r: float) -> No
     assert chord_mid == pytest.approx(11.849, abs=5e-4)
     got = spec.chain_plate_inner_radius(12, plate_height)
     assert got == pytest.approx(inner_r, abs=5e-4)
-    # The shared seat stays inside a real chain's plates with running air.
-    assert got - spec.SEAT_SPIGOT_DIA / 2.0 >= 0.15
+
+
+def _plate_edge_reach(teeth: int, plate_height: float, wheel_offset: float) -> float:
+    """Closest approach to the shaft axis of any wrapped plate's inner edge,
+    the wheel's centre ``wheel_offset`` off that axis along +Y, swept over the
+    chain's phase: rollers on the pitch circle, each plate's inner edge the
+    roller chord moved h/2 toward the wheel's centre."""
+    rp = spec.pitch_dia(teeth) / 2.0
+    step = 2.0 * math.pi / teeth
+    best = math.inf
+    for k in range(720):
+        for n in range(teeth):
+            t0 = n * step + step * k / 720.0
+            ends = []
+            for t in (t0, t0 + step):
+                x, y = rp * math.cos(t), rp * math.sin(t) + wheel_offset
+                ends.append((x, y))
+            mid = t0 + step / 2.0
+            nx, ny = (
+                -math.cos(mid) * plate_height / 2.0,
+                -math.sin(mid) * plate_height / 2.0,
+            )
+            (ax, ay), (bx, by) = ((x + nx, y + ny) for x, y in ends)
+            # Distance from the origin to segment AB.
+            dx, dy = bx - ax, by - ay
+            u = max(0.0, min(1.0, -(ax * dx + ay * dy) / (dx * dx + dy * dy)))
+            best = min(best, math.hypot(ax + u * dx, ay + u * dy))
+    return best
+
+
+def _printed_band(places: int) -> float:
+    row = {1: "linear_1pl", 2: "linear_2pl"}[places]
+    return round(float(_config.title_block(row)["value_in"]) * 25.4, places)
+
+
+def _wheel_float(hole_dia: float) -> float:
+    """The T12's worst offset from the shaft axis riding on its two pins:
+    the holes drilled to their largest over the smallest stock dowel, plus
+    a pin centre and its hole centre each at their location limit, opposite
+    ways along the pins' line."""
+    hole_max = hole_dia + float(_config.title_block("drilled_hole")["plus_mm"])
+    dowel_min = crank_pin.DIA + crank_pin.DIA_BAND_IN[0] * crank_pin.MM_PER_IN
+    return (hole_max - dowel_min) / 2.0 + 2.0 * spec.DRIVE_PIN_OFFSET_TOL
+
+
+def test_chain_on_the_floated_t12_keeps_its_radial_air() -> None:
+    """Codex P2 on a1ee741dc: the T12 rides its seat on two pins in drilled
+    slip holes, so a bought chain following it closes on the shaft-fixed
+    spigot and on the hub relief.  Judge the corner the prints allow, every
+    diameter at its largest printed size and the hub at the far side of its
+    bore clearance; the gate must report that corner's air, and it must stay
+    positive."""
+    wheel = _wheel_float(spec.PIN_HOLE_DIA)
+    assert wheel == pytest.approx(0.1581, abs=1e-4)
+    # The bore is no stop: its tightest clearance on the pilot is wider.
+    assert (spec.BORE_DIA - hub.SHAFT_DIA) / 2.0 > wheel
+    hub_float = (hub.HUB_BORE_DIA_MAX - (hub.SHAFT_DIA + hub.SHAFT_DIA_BAND[1])) / 2.0
+    spigot_max = crank.SPIGOT_DIA + max(crank.SPIGOT_DIA_BAND)
+    relief_places = crank_hub_spec.DRAWING_PRECISION_BY_NAME["ReliefDia"]
+    relief_max = hub.RELIEF_DIA + _printed_band(relief_places)
+    for height, spigot_air, relief_air in (
+        (
+            spec.ANSI_PLATE_HEIGHT,
+            bdt.CHAIN_SPIGOT_RADIAL_AIR_ANSI,
+            bdt.CHAIN_RELIEF_RADIAL_AIR_ANSI,
+        ),
+        (4.8, bdt.CHAIN_SPIGOT_RADIAL_AIR_CAD, bdt.CHAIN_RELIEF_RADIAL_AIR_CAD),
+    ):
+        # The gate's air is the floated corner's, not the centred wheel's.
+        corner = _plate_edge_reach(12, height, wheel) - spigot_max / 2.0
+        assert spigot_air == pytest.approx(corner, abs=1e-4)
+        assert corner >= bdt.CHAIN_RADIAL_AIR_WORST_MIN > 0.0
+        corner = _plate_edge_reach(12, height, wheel + hub_float) - relief_max / 2.0
+        assert relief_air == pytest.approx(corner, abs=1e-4)
+        assert corner >= bdt.CHAIN_RADIAL_AIR_WORST_MIN
+    assert bdt.CHAIN_SPIGOT_RADIAL_AIR_ANSI == pytest.approx(0.020, abs=1e-3)
+    # One drill size up (Ø2.6 holes) floats a real plate onto the spigot: the
+    # corner closes past contact and the gate refuses it.
+    loose = _wheel_float(2.6)
+    corner = _plate_edge_reach(12, spec.ANSI_PLATE_HEIGHT, loose) - spigot_max / 2.0
+    assert corner < 0.0
+    with pytest.raises(AssertionError, match="radial air -0.030"):
+        bdt.chain_radial_air("spigot", spec.ANSI_PLATE_HEIGHT, spigot_max, loose)
 
 
 def test_bought_chain_reach_about_the_seat_face() -> None:

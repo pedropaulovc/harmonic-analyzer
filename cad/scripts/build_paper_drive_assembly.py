@@ -389,7 +389,9 @@ if CHAIN_DISC_AXIAL_AIR_WORST <= 0.0:
     )
 # Radially, the only knob-shaft feature between the seat face and the disc is
 # the O17.5 seat collar (the pins sit inside it); at its print-worst (largest)
-# radius it must stand inside the T24 plates' inner edge, CAD link and ANSI.
+# radius it must stand inside the T24 plates' inner edge, CAD link and ANSI,
+# with the wheel floated off-centre on its pins (the crank's same pins, holes
+# and bands: crankshaft_spec.WHEEL_SEAT_FLOAT).
 T24_CHAIN_INNER_R = min(
     REMOVABLE.chain_plate_inner_radius(24, h)
     for h in (2.0 * CHAIN_PLATE_HALF_H, REMOVABLE.ANSI_PLATE_HEIGHT)
@@ -397,7 +399,7 @@ T24_CHAIN_INNER_R = min(
 KNOB_COLLAR_R_WORST = (
     REMOVABLE.SEAT_SPIGOT_DIA + max(crankshaft_spec.SPIGOT_DIA_BAND)
 ) / 2.0  # 8.75
-if KNOB_COLLAR_R_WORST >= T24_CHAIN_INNER_R:
+if KNOB_COLLAR_R_WORST + crankshaft_spec.WHEEL_SEAT_FLOAT >= T24_CHAIN_INNER_R:
     raise AssertionError("knob seat collar reaches the T24 chain plates' inner edge")
 
 # Thumbnut (2026-09-02, ch23 p.58/59 + video 4/4 "unscrew the nut that holds

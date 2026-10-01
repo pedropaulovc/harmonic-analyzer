@@ -68,9 +68,10 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "ReliefLength": 2,
         "SeatDia": 1,
         "BarrelDia": 1,
-        # A clearance diameter: the title block's .X (RELIEF_DIA_MAX is what
-        # the drive train's chain-plate air reads).
-        "ReliefDia": 1,
+        # A clearance diameter at the title block's .XX: RELIEF_DIA_MAX, what
+        # the drive train's chain-plate air reads (0.23 to a real #25 plate
+        # on the floated T12; 0.08 at .X).
+        "ReliefDia": 2,
     },
     "BoreProfile": {"BoreDia": 3},
     # Two places: the .XX band is what keeps the MHA-024 ream's ligament to
