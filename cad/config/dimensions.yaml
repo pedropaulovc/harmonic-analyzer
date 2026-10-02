@@ -1670,7 +1670,7 @@ sections:
         - scaled + derived
         - med
       - - Knob shaft (rework E8)
-        - 'stepped Ø9.525, through the latch small hub at pre-mirror (42.575, 252.367), spanning machine z −167.9 → −130: front pilot −167.9..−154.3 (thumbnut and the removable sprocket''s Ø10.3 bore), integral Ø17.5 × 5.4 seat collar −154.3..−148.9 (0.5 air to the third gear) carrying two 3/32 × 3/16 dowels (MHA-155) pressed from the seat face into Ø2.38 holes reamed through the collar, set 2.3..2.5 proud of the seat face on a press stop (T24 sprocket plate −157.1..−154.3, #25 chain plane −155.7), Ø5 third-gear seat −148.4..−142.9 (12T DP38 at −148.4..−144.4), hub ride to −130; Ø20 × 6.5 brass thumb knob ending at −123.5'
+        - 'stepped Ø9.525, through the latch small hub at pre-mirror (42.575, 252.367), spanning machine z −167.9 → −130: front pilot −167.9..−154.3 (thumbnut and the removable sprocket''s Ø10.3 bore), integral Ø17.5 × 4.6 seat collar −154.3..−149.7 (1.3 air to the third gear and 120T disc, 0.5 at the collar''s .X long limit) carrying two 3/32 × 3/16 dowels (MHA-155) pressed from the seat face into Ø2.38 holes reamed through the collar, set 2.3..2.5 proud of the seat face on a press stop (T24 sprocket plate −157.1..−154.3, #25 chain plane −155.7), Ø5 third-gear seat −149.7..−142.9 (12T DP38 at −148.4..−144.4), hub ride to −130; Ø20 × 6.5 brass thumb knob ending at −123.5'
         - —
         - '`v4_transgear_008/020` + ch. 23 topology; stack derived from the disc window −148.4..−145.4 (0.3 in front of the platen furniture''s deepest reach) and the −155.7 chain plane both shafts share (`transgear_removable_spec`)'
         - scaled + derived

@@ -178,8 +178,8 @@ def test_knob_pin_tip_stays_inside_the_thinnest_wheel_under_the_thumbnut() -> No
 
 def test_knob_pin_pressed_end_stays_inside_the_collar() -> None:
     # Longest 3/16 dowel set lowest, collar at the loosest .X row:
-    # 5.4 - 0.8 - (4.7625 + 0.254 - 2.30).
-    assert knob.PIN_REAR_INSET_WORST == pytest.approx(1.8835)
+    # 4.6 - 0.8 - (4.7625 + 0.254 - 2.30).
+    assert knob.PIN_REAR_INSET_WORST == pytest.approx(1.0835)
     # Negative control: the crank's 1/4 dowel set to the same stop in the
     # first 3.6 collar would stand out of its rear face toward the 120T disc.
     assert (

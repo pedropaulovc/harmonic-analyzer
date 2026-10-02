@@ -153,22 +153,25 @@ def test_chain_wheels_share_the_spec_band_and_the_chain_straddles_it() -> None:
     assert 2.0 * chain.BUSH_HALF_LEN >= band.PLATE
 
 
-def test_knob_collar_took_up_the_seat_shift_to_the_disc(monkeypatch) -> None:
-    # Ruling 2026-09-30: the seat face came 1.8 forward and the disc stayed,
-    # so the collar grew 3.6 -> 5.4 to keep its 0.5 air to the disc.
+def test_knob_collar_clears_the_disc_at_its_long_limit(monkeypatch) -> None:
+    # Codex P2 on efa719176: MHA-078's collar length prints .X (+/-0.8), and
+    # the 120T disc pair floats forward on the stud seat to the stud collar.
     import importlib.util
 
-    assert knob_shaft.COLLAR_LEN == 5.4
-    assert math.isclose(assembly.KNOB_COLLAR_REAR_Z, assembly.DISC_Z0 - 0.5)
+    assert knob_shaft.COLLAR_LEN == 4.6
+    assert math.isclose(assembly.KNOB_COLLAR_REAR_Z, assembly.DISC_Z0 - 1.3)
     assert math.isclose(assembly.KNOB_SHAFT_Z0, -167.9)
-    # Negative control: the first 3.6 collar under the moved seat stands
-    # 2.3 off the disc, and paper-drive refuses the placement.
-    monkeypatch.setattr(knob_shaft, "COLLAR_REAR", knob_shaft.SEAT_COLLAR + 3.6)
+    assert math.isclose(assembly.DISC_FRONT_STOP_Z, assembly.DISC_Z0 - 0.4)
+    assert math.isclose(assembly.KNOB_DISC_AIR_WORST, 0.1)
+    # Negative control: the 5.4 collar's nominal 0.5 air passes, but at the
+    # long limit its rear face stands 0.7 past the disc's front stop.
+    monkeypatch.setattr(knob_shaft, "COLLAR_REAR", knob_shaft.SEAT_COLLAR + 5.4)
+    monkeypatch.setattr(knob_shaft, "DISC_AIR", 0.5)
     spec = importlib.util.spec_from_file_location(
         "_paper_drive_perturbed", assembly.__file__
     )
     fresh = importlib.util.module_from_spec(spec)
-    with pytest.raises(AssertionError, match="clear of the disc"):
+    with pytest.raises(AssertionError, match=r"long \.X limit .* air -0\.70"):
         spec.loader.exec_module(fresh)
 
 

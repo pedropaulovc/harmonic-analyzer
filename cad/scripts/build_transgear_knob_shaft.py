@@ -11,15 +11,15 @@ reeding recipe needs an X-axis layout and this part's stack is sized along
 its axis).
 
 The seat is the one both removable shafts share (transgear_removable_spec):
-a O17.5 x 5.4 collar (the crank's seat-spigot diameter) whose FRONT face is
+a O17.5 x 4.6 collar (the crank's seat-spigot diameter) whose FRONT face is
 the seat face the wheel's rear face bears on, the wheel piloted on the plain
 O9.525 shaft in front of it, and two MHA-155 dowels pressed into holes reamed
 THROUGH the collar on the wheel's O14 pin circle. No floor stops the press:
 each pin is pressed in from the seat face onto a stop that leaves it
 DRIVE_PIN_PROUD out (knob_pin.PROUD_RANGE, printed on the MHA-155 sheet),
 its pressed end PIN_PRESS_DEPTH behind the seat face and inside the collar,
-whose rear face stands DISC_AIR clear of the 120T disc (paper-drive asserts
-it).
+whose rear face stays clear of the 120T disc even at the collar's long .X
+limit (paper-drive asserts it).
 
 Layout: axis +Y, origin at the FRONT tip of the pilot; the assembly rotates
 +Y to +Z (machine back) and places the seat face on the removable band's
@@ -84,12 +84,14 @@ SHAFT_DIA = 0.375 * IN  # 9.525 (low): pilot, thread stub and hub ride
 # (paper-drive's thumbnut-fit assert pins both).
 PILOT_LEN = 13.6
 COLLAR_DIA = removable.SEAT_SPIGOT_DIA  # 17.5, the crank's seat spigot
-# Seat face to the collar rear (machine -154.3..-148.9), DISC_AIR in front of
-# the 120T disc / third gear front face (-148.4): the collar took up the 1.8
-# the seat moved forward (user ruling 2026-09-30).  Paper-drive owns the disc
-# station and asserts this air from both sides.
-COLLAR_LEN = 5.4
-DISC_AIR = 0.5
+# Seat face to the collar rear (machine -154.3..-149.7), DISC_AIR in front of
+# the 120T disc / third gear front face (-148.4).  MHA-078 has no sheet, so
+# the collar length carries the title block's .X +/-0.8: the collar is that
+# much shorter than the 5.4 that took up the 2026-09-30 seat shift, so at its
+# long limit the rear face still stands 0.5 off the disc (paper-drive owns
+# the disc station and asserts the worst case).
+COLLAR_LEN = 4.6
+DISC_AIR = 1.3
 SEAT_DIA = 5.0  # turned-down third-gear seat (12T DP38 root < 3/8" surface)
 SEAT_LEN = DISC_AIR + 4.0 + 1.5  # air + third gear face 4 + 1.5 (to z -142.9)
 REAR_LEN = 12.9  # to the knob face; latch small hub rides z -132.75..-130.15
@@ -161,7 +163,7 @@ PIN_REAR_INSET_WORST = pin_rear_inset(
     COLLAR_LEN - crankshaft_spec.STATION_ROW,
     knob_pin.LENGTH + crankshaft_spec.DRIVE_PIN_LENGTH_GRADE,
     min(knob_pin.PROUD_RANGE),
-)  # 1.88
+)  # 1.08
 if PIN_REAR_INSET_WORST < 0.0:
     raise AssertionError(
         "a pressed knob drive pin stands out of the collar's rear face"

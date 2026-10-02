@@ -328,6 +328,7 @@ from build_transgear_knob_shaft import (  # noqa: E402
 import transgear_knob_drive_pin_spec as KNOB_PIN  # noqa: E402
 import crankshaft_spec  # noqa: E402
 import transgear_removable_spec as REMOVABLE  # noqa: E402
+import transgear_stub_spec as STUB  # noqa: E402
 from build_transgear_thumbnut import (  # noqa: E402
     BORE_DIA as THUMBNUT_BORE_DIA,
     DISC_DIA as THUMBNUT_DISC_DIA,
@@ -359,7 +360,7 @@ if REMOVABLE.PIN_HOLE_ANGLES_DEG != (90.0, 270.0):
 # the back): its SeatCollar station sits on the band's seat face, so its
 # origin (the pilot's front tip) is that far in front.
 KNOB_SHAFT_Z0 = REMOVABLE.SEAT_FACE_Z - KNOB_SEAT_COLLAR  # -167.9
-KNOB_COLLAR_REAR_Z = KNOB_SHAFT_Z0 + KNOB_COLLAR_REAR  # -148.9
+KNOB_COLLAR_REAR_Z = KNOB_SHAFT_Z0 + KNOB_COLLAR_REAR  # -149.7
 # The two MHA-155 dowels pressed through the collar's reamed holes (Rx-90: pin
 # +Y -> -Z), pressed end on DrivePinFloor (the press stop's station, inside
 # the collar), rounded end in the wheel's pin holes.
@@ -374,6 +375,20 @@ if abs(DISC_Z0 - KNOB_COLLAR_REAR_Z - KNOB_DISC_AIR) > 1e-9 or THIRD_Z0 != DISC_
     raise AssertionError(
         f"knob seat collar rear {KNOB_COLLAR_REAR_Z:.2f} is not {KNOB_DISC_AIR}"
         f" clear of the disc / third gear at {DISC_Z0}"
+    )
+# Worst case: the collar length (seat face to rear face, one .X dimension on
+# MHA-078) at its long limit puts the rear face STATION_ROW further back.  The
+# disc rim passes 3.99 off the knob axis, inside the collar's r 8.70 minimum,
+# so the faces overlap radially.  The disc + feed pinion pair floats on the
+# stud's O5 seat (13.8 for 9.5 + 3.0), so the disc front can ride up to the
+# stud collar's rear face, 0.4 in front of DISC_Z0.
+DISC_FRONT_STOP_Z = STUB_Z0 - (STUB.BASE_LEN + STUB.SEAT_LEN)  # -148.8
+KNOB_COLLAR_REAR_Z_WORST = KNOB_COLLAR_REAR_Z + crankshaft_spec.STATION_ROW  # -148.9
+KNOB_DISC_AIR_WORST = DISC_FRONT_STOP_Z - KNOB_COLLAR_REAR_Z_WORST  # 0.1
+if DISC_FRONT_STOP_Z > DISC_Z0 or KNOB_DISC_AIR_WORST <= 0.0:
+    raise AssertionError(
+        f"knob seat collar at its long .X limit reaches the 120T disc's front"
+        f" stop {DISC_FRONT_STOP_Z:.2f}: air {KNOB_DISC_AIR_WORST:.2f}"
     )
 
 # Stack D: a bought #25 chain floated REARMOST on the thinnest T24 plate
@@ -870,7 +885,7 @@ def _assert_knob_shaft_clearance() -> None:
         f"knob shaft at ({KNOB_SHAFT_XY[0]:.3f}, {KNOB_SHAFT_XY[1]:.3f}),"
         f" {PLATE_Y0 - shaft_top:.2f} under the platen edge; gaps:"
         f" T24/collar {t24_collar_gap:.1f}, T24/disc z {z_gap:.1f}, seat collar/disc"
-        f" z {collar_disc_z:.2f}"
+        f" z {collar_disc_z:.2f} ({KNOB_DISC_AIR_WORST:.2f} worst to the disc's stop)"
     )
 
 
