@@ -210,6 +210,14 @@ their declared SHA256 before `uv run --no-project --python
 web/.vite/calibration-venv/bin/python web/scripts/compact-spin.py`. CHECKs never fit
 the camera/input, and this does not qualify old template points or claim a stage pass.
 
+The current Intro and Machine-spin compact tracks predate their latest
+observation-lineage repair, physical-control additions and waiver changes. They
+are stale for source CHECK scoring: this checkpoint preserves them without
+regeneration or camera refitting. Regeneration alone is not a safe qualification
+step. First reconcile retained panel measurements and source-view requirements,
+then regenerate from reviewed observations and reconcile camera fits whose FIT
+pixels changed. Preserved playback does not verify the repaired controls.
+
 Competing off-track CHECK timestamps use the original video's integer
 `best_effort_timestamp` and rational `time_base`, not FFprobe's six-decimal time
 string. Both full-precision IEEE evaluations of that rational clock are accepted;
