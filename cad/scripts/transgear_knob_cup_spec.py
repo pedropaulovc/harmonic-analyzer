@@ -1,76 +1,107 @@
-r"""MHA-157 transgear-knob-cup: the brass cup clamped on the knob shaft's rear end.
+r"""MHA-157 transgear-knob-cup: the brass cup pinned on the knob shaft's rear end.
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
-closure.  The MHA-158 retaining screw (``transgear_knob_retaining_screw_spec``)
-seats its pan head on the counterbore floor and clamps the cup's front face
-on the knob shaft's (MHA-078) rear end face.  The outer ring of that same
-front face runs 0.2 behind the arm plate's rear boss: the cup is the REAR
-stop of the knob's end float (the MHA-156 thrust ring is the forward one).
-Contract §1.8, round 7 default c: the cup is 5.6 long so the floor is 2.6,
-printed as ONE dimension from the front face at .XX.  The floor band is also
-the screw's engagement band (contract §7).
+closure.  A plain turned ring, reamed to slide on the knob shaft's (MHA-078)
+Ø8.5 journal where it runs on behind the arm plate's rear boss.  Its front
+face runs END_FLOAT behind that boss: the cup is the REAR stop of the knob's
+end float (the MHA-156 thrust ring is the forward one).  K-1 (R9-70): at
+assembly the cup is slid on against a feeler at the boss, then a Ø1.6 hole
+is match-drilled through cup and journal PIN_HOLE_FROM_FRONT behind its
+front face and the MHA-183 spring pin pressed through both, so the cup is
+locked to the shaft in shear and carries no thread.  The hole is drilled at
+assembly and is not modelled on the part.
 
 Part frame: axis local +Y through the origin (``Axis1``); the front face
-(clamp and running face) is the Top Plane, y = 0; the counterbore opens at
-the rear face, y = LENGTH; its floor -- the screw's seat -- is the
-``ScrewSeat`` plane at y = FLOOR.
+(the running face) is the Top Plane, y = 0; the rear face is y = LENGTH.
 """
 
 from __future__ import annotations
 
+import math
+
 from _gtol_spec import PlanarFace
 from _printed_tolerance import printed_deviations
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
-from transgear_knob_retaining_screw_spec import (
-    FIRST_THREAD_LOSS,
-    HEAD_DIA,
-    HEAD_H,
-    SHANK_DIA,
-    SHANK_LEN,
-    SHANK_LEN_BAND,
+from transgear_arm_plate_geometry import BORE_DIA_LIMITS as PLATE_BORE_LIMITS
+from transgear_knob_cup_pin_spec import HOLE_MAX as PIN_HOLE_MAX
+from transgear_knob_cup_pin_spec import PIN_LEN, PIN_LEN_MAX
+from transgear_knob_shaft_spec import (
+    JOURNAL_DIA,
+    JOURNAL_DIA_BAND,
+    JOURNAL_DIA_MIN,
+    JOURNAL_REAR_EXTENSION,
+    JOURNAL_REAR_EXTENSION_MAX,
+    JOURNAL_REAR_EXTENSION_MIN,
 )
 
 OD = 19.0
-LENGTH = 5.6
-COUNTERBORE_DIA = 9.5
-FLOOR = 2.6  # front face to the counterbore floor
-BORE_DIA = 4.3
-# Clears the #8-32 shank; drilled, never under size (drilled-hole class).
-BORE_BAND = (0.10, 0.0)  # (upper, lower) deviations
+LENGTH = 8.0
+BORE_DIA = JOURNAL_DIA  # 8.5
+# Reamed to the arm plate bore's native band (the same journal runs in both):
+# a slide over the journal's running fit, 0.028 .. 0.075 diametral.
+BORE_BAND = (max(PLATE_BORE_LIMITS), min(PLATE_BORE_LIMITS))  # (+0.040, +0.015)
 
-# Places each printed dimension carries (policy rule 12, contract §12): the
-# floor at .XX (the screw's engagement band), the bore at .XX under its own
-# band; the O.D., the counterbore and the length are routine at .X -- the
-# walls, the floor ligament and the pan head's entry all hold at that row.
+# Places each printed dimension carries (policy rule 12): the O.D. and the
+# length are routine at .X -- the walls and the pin hold at that row; the bore
+# prints .XXX under its own band.
 OD_PLACES = 1
-COUNTERBORE_PLACES = 1
-FLOOR_PLACES = 2
-BORE_PLACES = 2
 LENGTH_PLACES = 1
+BORE_PLACES = 3
 
 WALL_FLOOR = 2.0
-ENGAGEMENT_FLOOR_D = 1.5
 
+_OD_LO, _ = printed_deviations(OD, OD_PLACES)
+_LENGTH_LO, _ = printed_deviations(LENGTH, LENGTH_PLACES)
+OD_MIN = OD + _OD_LO  # 18.2
+LENGTH_MIN = LENGTH + _LENGTH_LO  # 7.2
+BORE_MAX = BORE_DIA + max(BORE_BAND)  # 8.540
 
-def _band(model: float, places: int) -> tuple[float, float]:
-    return printed_deviations(model, places)
+BORE_JOURNAL_CLEARANCE = (
+    BORE_DIA + min(BORE_BAND) - (JOURNAL_DIA + max(JOURNAL_DIA_BAND)),
+    BORE_MAX - JOURNAL_DIA_MIN,
+)
+if min(BORE_JOURNAL_CLEARANCE) <= 0.0:
+    raise AssertionError("MHA-157's reamed bore binds on the journal")
 
+# --- The pin hole, match-drilled at assembly (R9-70, K-1) ---------------------
+# Its centre stands PIN_HOLE_FROM_FRONT behind the cup's front face, marked
+# out within PIN_HOLE_STATION_TOL; Ø1.6 +0.05/0 (MHA-183's hole band).
+PIN_HOLE_FROM_FRONT = 3.0
+PIN_HOLE_STATION_TOL = 0.10
+_PIN_HOLE_R_MAX = PIN_HOLE_MAX / 2.0  # 0.825
 
-_OD_LO, _ = _band(OD, OD_PLACES)
-_CB_LO, _CB_HI = _band(COUNTERBORE_DIA, COUNTERBORE_PLACES)
-_FLOOR_LO, _FLOOR_HI = _band(FLOOR, FLOOR_PLACES)
-_LENGTH_LO, _ = _band(LENGTH, LENGTH_PLACES)
-
-# --- Walls at the printed worst case (contract §8) ----------------------------
-FLOOR_WORST = FLOOR + _FLOOR_LO
-COUNTERBORE_WALL = (OD - COUNTERBORE_DIA) / 2.0
-COUNTERBORE_WALL_WORST = ((OD + _OD_LO) - (COUNTERBORE_DIA + _CB_HI)) / 2.0
-# The floor annulus the pan head bears on, bore to counterbore (informational).
-FLOOR_LIGAMENT = (COUNTERBORE_DIA - BORE_DIA) / 2.0
-FLOOR_LIGAMENT_WORST = ((COUNTERBORE_DIA + _CB_LO) - (BORE_DIA + max(BORE_BAND))) / 2.0
+# --- Walls at the printed worst case (contract §8, policy rule 12) -------------
+# Journal beside the hole: (8.465 - 1.65) / 2 = 3.41.
+JOURNAL_PIN_WALL = (JOURNAL_DIA - PIN_HOLE_MAX) / 2.0
+JOURNAL_PIN_WALL_WORST = (JOURNAL_DIA_MIN - PIN_HOLE_MAX) / 2.0
+# Cup front face to the hole's edge: 3.0 - 0.825 = 2.18 nominal; less the
+# marking-out 0.10, 2.08.
+FRONT_PIN_WALL = PIN_HOLE_FROM_FRONT - _PIN_HOLE_R_MAX
+FRONT_PIN_WALL_WORST = PIN_HOLE_FROM_FRONT - PIN_HOLE_STATION_TOL - _PIN_HOLE_R_MAX
+# Hole to the journal's rear end, the journal at its shortest behind the
+# cup's front face (MHA-078's .XXX length, the ring and hub-to-boss bands and
+# the feeler setting): 6.22 - 3.10 - 0.825 = 2.30 (6.5 - 3.0 - 0.825 = 2.68
+# nominal).
+END_PIN_WALL = JOURNAL_REAR_EXTENSION - PIN_HOLE_FROM_FRONT - _PIN_HOLE_R_MAX
+END_PIN_WALL_WORST = (
+    JOURNAL_REAR_EXTENSION_MIN
+    - PIN_HOLE_FROM_FRONT
+    - PIN_HOLE_STATION_TOL
+    - _PIN_HOLE_R_MAX
+)
+# Cup ring around the bore at the hole: (18.2 - 8.54) / 2 = 4.83.
+RADIAL_WALL = (OD - BORE_DIA) / 2.0
+RADIAL_WALL_WORST = (OD_MIN - BORE_MAX) / 2.0
+# Hole to the cup's rear face, the shortest cup: 7.2 - 3.10 - 0.825 = 3.28.
+REAR_PIN_WALL_WORST = (
+    LENGTH_MIN - PIN_HOLE_FROM_FRONT - PIN_HOLE_STATION_TOL - _PIN_HOLE_R_MAX
+)
 for _name, _wall in (
-    ("floor", FLOOR_WORST),
-    ("counterbore wall", COUNTERBORE_WALL_WORST),
+    ("journal beside the pin hole", JOURNAL_PIN_WALL_WORST),
+    ("front face to the pin hole", FRONT_PIN_WALL_WORST),
+    ("pin hole to the journal's rear end", END_PIN_WALL_WORST),
+    ("ring round the bore", RADIAL_WALL_WORST),
+    ("pin hole to the rear face", REAR_PIN_WALL_WORST),
 ):
     if _wall < WALL_FLOOR - 1e-9:
         raise AssertionError(
@@ -78,58 +109,44 @@ for _name, _wall in (
             f"the {WALL_FLOOR} floor"
         )
 
-# --- The screw's side of its engagement (contract §7) -------------------------
-# The shank reaches past the cup's front face -- into the shaft's tap -- by
-# its length under the head less the floor.  Worst case: the shortest screw
-# its B18.6.3 band allows in the thickest floor the sheet accepts, less the
-# incomplete first thread.  The shaft's side (its tap entry countersink, its
-# full-thread depth) is MHA-078's and is added by the assembly.
-REACH = SHANK_LEN - FLOOR
-REACH_MIN = SHANK_LEN - SHANK_LEN_BAND[1] - (FLOOR + _FLOOR_HI)
-REACH_MAX = SHANK_LEN + SHANK_LEN_BAND[0] - FLOOR_WORST
-ENGAGEMENT_OWN_WORST = REACH_MIN - FIRST_THREAD_LOSS
-if ENGAGEMENT_OWN_WORST < ENGAGEMENT_FLOOR_D * SHANK_DIA - 1e-9:
-    raise AssertionError(
-        f"MHA-158 engages {ENGAGEMENT_OWN_WORST:.3f} "
-        f"({ENGAGEMENT_OWN_WORST / SHANK_DIA:.2f} D) at the thickest printed "
-        f"MHA-157 floor, under {ENGAGEMENT_FLOOR_D} D before the shaft's own terms"
-    )
+# The pin's ends stay inside the cup's O.D.: (19.0 - 15.875) / 2 = 1.56 at
+# nominal, (18.2 - 16.256) / 2 = 0.97 for the longest pin in the smallest
+# cup, pressed centred.
+PIN_END_INSIDE_OD = (OD - PIN_LEN) / 2.0
+PIN_END_INSIDE_OD_WORST = (OD_MIN - PIN_LEN_MAX) / 2.0
+if PIN_END_INSIDE_OD_WORST <= 0.0:
+    raise AssertionError("MHA-183's ends stand out of MHA-157's O.D.")
+# The pin spans the journal and bites both cup walls.
+if not PIN_LEN > BORE_MAX:
+    raise AssertionError("MHA-183 does not reach through both cup walls")
 
-# --- The pan head in the counterbore ------------------------------------------
-HEAD_CLEARANCE = (COUNTERBORE_DIA - HEAD_DIA) / 2.0
-HEAD_CLEARANCE_WORST = ((COUNTERBORE_DIA + _CB_LO) - HEAD_DIA) / 2.0
-if HEAD_CLEARANCE_WORST <= 0.0:
-    raise AssertionError("MHA-158's pan head does not enter the smallest counterbore")
-# Head top below the rear face (positive = recessed); the length prints .X,
-# so at the worst case the head can stand proud of the rear face.
-HEAD_RECESS = LENGTH - (FLOOR + HEAD_H)
-HEAD_RECESS_WORST = (LENGTH + _LENGTH_LO) - (FLOOR + _FLOOR_HI + HEAD_H)
+# The journal's rear end stays inside the cup, behind its rear face:
+# 7.2 - 6.78 = 0.42 at the worst case, 1.5 at nominal.
+JOURNAL_END_INSET = LENGTH - JOURNAL_REAR_EXTENSION
+JOURNAL_END_INSET_WORST = LENGTH_MIN - JOURNAL_REAR_EXTENSION_MAX
+if JOURNAL_END_INSET_WORST <= 0.0:
+    raise AssertionError("the knob shaft's rear end stands out of MHA-157")
+if not math.isclose(JOURNAL_END_INSET, 1.5, abs_tol=1e-9):
+    raise AssertionError("MHA-157 no longer covers the journal's end by 1.5")
 
-# The sheet: the bore's process under its size.
-BORE_CALLOUT = "DRILL THRU"
+# The sheet: the bore's process, and the hole the assembly drills.
+BORE_CALLOUT = "REAM THRU\nPIN HOLE DRILLED AT ASSEMBLY"
 
-# The front face is the running face on the plate's rear boss (and the
-# clamp face on the shaft's end): MACHINED, on the exact native face the part
-# build resolves.
+# The front face is the running face on the plate's rear boss: MACHINED, on
+# the exact native face the part build resolves.
 SURFACE_FINISHES = (
     SurfaceFinishControl("front_face", MACHINED_UM, PlanarFace((0.0, -1.0, 0.0), 0.0)),
 )
 
 # Marked model dimensions and the places the model authors on them
-# (drawing-simplicity policy rule 2).  The turned profile carries both
-# diameters, the length and the floor from the front face; the bore is its
-# own feature.
+# (drawing-simplicity policy rule 2).  The turned profile carries the O.D.
+# and the length; the bore is its own feature.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
-    "CupProfile": {"CupDia", "CounterboreDia", "CupLength", "FloorDepth"},
+    "CupProfile": {"CupDia", "CupLength"},
     "BoreProfile": {"BoreDia"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "CupProfile": {
-        "CupDia": OD_PLACES,
-        "CounterboreDia": COUNTERBORE_PLACES,
-        "CupLength": LENGTH_PLACES,
-        "FloorDepth": FLOOR_PLACES,
-    },
+    "CupProfile": {"CupDia": OD_PLACES, "CupLength": LENGTH_PLACES},
     "BoreProfile": {"BoreDia": BORE_PLACES},
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {

@@ -212,11 +212,6 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "98381A433",
         material="Alloy Steel",
     ),
-    "transgear-knob-retaining-screw": _stock(
-        "transgear-knob-retaining-screw",
-        "Zinc-Plated Steel Pan Head Slotted Screw",
-        "90283A193",
-    ),
     "transgear-disc-screw": _stock(
         "transgear-disc-screw",
         "18-8 Stainless Steel Fillister Head Slotted Screw",
@@ -239,6 +234,11 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "transgear-collar-cross-pin",
         "1050-1095 Spring Steel Slotted Spring Pin",
         "98296A026",
+    ),
+    "transgear-knob-cup-pin": _stock(
+        "transgear-knob-cup-pin",
+        "1050-1095 Spring Steel Slotted Spring Pin",
+        "98296A031",
     ),
     "transgear-latch-pin": _stock(
         "transgear-latch-pin",

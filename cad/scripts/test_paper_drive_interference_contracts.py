@@ -28,9 +28,9 @@ import transgear_collar_cross_pin_spec as cross_pin
 import transgear_disc_hub_spec as hub
 import transgear_disc_screw_spec as disc_screw
 import transgear_hanger_joints as joints
+import transgear_knob_cup_pin_spec as cup_pin
 import transgear_knob_cup_spec as cup
 import transgear_knob_drive_pin_spec as drive_pin
-import transgear_knob_retaining_screw_spec as retaining_screw
 import transgear_knob_shaft_spec as shaft
 import transgear_latch_pin_spec as latch_pin
 import transgear_pivot_screw_spec as pivot_screw
@@ -138,18 +138,28 @@ def test_ring_row_is_the_free_state_grip_on_its_prong_arcs() -> None:
 
 def test_knob_stack_rows_follow_the_shaft_cup_collar_and_nut() -> None:
     allowed = _allowed()
-    retaining = _pair("transgear-knob-retaining-screw-1", "transgear-knob-shaft-1")
-    assert allowed[retaining] == pytest.approx(
-        _annulus(
-            retaining_screw.SHANK_DIA,
-            shaft.TAP_DRILL_DIA,
-            retaining_screw.SHANK_LEN - cup.FLOOR,
-        )
-    )
+    # R9-70 (K-1): MHA-183 across the journal and both walls of the cup ring,
+    # its ends inside the cup's O.D.: the journal takes the diametral chord,
+    # the cup the rest of the tube.
+    tube_d, tube_id = cup_pin.PIN_DIA, cup_pin.PIN_DIA - 2.0 * cup_pin.WALL_T
+    in_journal = _holes.cross_hole_volume_mm3(
+        tube_d, shaft.JOURNAL_DIA
+    ) - _holes.cross_hole_volume_mm3(tube_id, shaft.JOURNAL_DIA)
+    tube = math.pi * (tube_d**2 - tube_id**2) / 4.0 * cup_pin.PIN_LEN
+    assert shaft.JOURNAL_DIA < cup_pin.PIN_LEN < cup.OD
+    assert cup.BORE_DIA == shaft.JOURNAL_DIA
+    pair = _pair("transgear-knob-cup-pin-1", "transgear-knob-shaft-1")
+    assert allowed[pair] == pytest.approx(1.10 * in_journal, rel=1e-4)
+    pair = _pair("transgear-knob-cup-pin-1", "transgear-knob-cup-1")
+    assert allowed[pair] == pytest.approx(1.10 * (tube - in_journal), rel=1e-4)
+    assert not any("knob-retaining-screw" in name for p in allowed for name in p)
 
-    # Stud tip less the nut's seat (collar set + T24 plate), at the nominal,
-    # all on the thread blank (its full-thread end lies behind the seat).
-    nut_engaged = shaft.TIP_STATION - _collar().SET_NOMINAL - removable.PLATE
+    # Stud tip less the nut's seat (collar set + the fitted pilot, R9-70), at
+    # the nominal, all on the thread blank (its full-thread end lies behind
+    # the seat).
+    collar = _collar()
+    nut_engaged = shaft.TIP_STATION - collar.SET_NOMINAL - collar.PILOT_LENGTH
+    assert collar.PILOT_LENGTH == pytest.approx(removable.PLATE + collar.PILOT_PROUD)
     assert shaft.TIP_STATION - nut_engaged > shaft.PLAIN_CORE
     assert allowed[_pair("transgear-thumbnut-1", "transgear-knob-shaft-1")] == (
         pytest.approx(
@@ -180,10 +190,6 @@ def test_head_seat_rows_admit_less_than_a_micron_of_sink() -> None:
     for n in (1, 2):
         pair = _pair(f"transgear-arm-plate-screw-{n}", "transgear-arm-plate-1")
         assert 0.0 < allowed[pair] < cone_area * sink
-    # The pan head's bearing annulus on the cup's counterbore floor.
-    floor_area = math.pi * (retaining_screw.HEAD_DIA**2 - cup.BORE_DIA**2) / 4.0
-    pair = _pair("transgear-knob-retaining-screw-1", "transgear-knob-cup-1")
-    assert 0.0 < allowed[pair] < floor_area * sink
 
 
 def test_drive_pins_press_into_the_collar_not_the_shaft() -> None:

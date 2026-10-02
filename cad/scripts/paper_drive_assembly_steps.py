@@ -70,8 +70,13 @@ SEQUENCE: tuple[str, ...] = (
     "oil-hole-drilled",
     # R9-68: on the pin between the two bushing blanks, the ring last.
     "disc-cluster-hung",
-    # Knob stack, front to rear (contract §1).
+    # Knob stack, front to rear (contract §1). R9-70 (N-A): the collar's pilot
+    # faced on the bench to stand proud of every removable wheel, the
+    # thumbnut's seat (transgear_drive_collar_spec.PILOT_PROUD_RANGE); R9-70
+    # (K-1): the cup set on a feeler at the plate's rear boss and cross-pinned
+    # to the journal.
     "collar-pins-pressed",
+    "pilot-faced-to-fit",
     "knob-stack-fitted",
     # Latch (R9-15, R9-24). The hanger is meshed in the rack and run over the
     # platen's travel first; the hook is then set to hold that mesh.

@@ -1,4 +1,8 @@
-"""Create the purchased reference drawing for the transgear knob retaining screw."""
+"""Create the purchased reference drawing for the knob-cup pin.
+
+MHA-183 is pressed through the MHA-157 cup and the MHA-078 journal in a
+hole match-drilled through both at assembly.
+"""
 
 from __future__ import annotations
 
@@ -12,7 +16,7 @@ from _drawing_registry import DRAWINGS_BY_NAME
 from _purchased_fastener_drawing import build_purchased_fastener_drawing
 
 
-SPEC = DRAWINGS_BY_NAME["transgear_knob_retaining_screw"]
+SPEC = DRAWINGS_BY_NAME["transgear_knob_cup_pin"]
 
 
 async def build(adapter: Any) -> dict[str, str]:

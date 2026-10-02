@@ -34,6 +34,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from paper_drive_assembly_steps import step_ref
 from transgear_drive_collar_spec import (
     BORE_CALLOUT,
     DRAWING_DIMENSIONS,
@@ -44,6 +45,7 @@ from transgear_drive_collar_spec import (
     OVERALL_LENGTH,
     PILOT_DIA,
     PILOT_LENGTH,
+    PILOT_LENGTH_CALLOUT,
     PIN_CIRCLE_RADIUS,
     PIN_HOLE_CALLOUT,
     SLOT_CALLOUT,
@@ -65,7 +67,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# A Ø17.5 × 5.9 collar: 4:1 draws the Ø2.38 pin holes 9.5 mm across and the
+# A Ø17.5 × 6.9 collar: 4:1 draws the Ø2.38 pin holes 9.5 mm across and the
 # 1.8 slot 7.2 mm wide, and leaves room round both views for their callouts.
 SHEET_SCALE = (4.0, 1.0)
 VIEW_SCALE = (4, 1)
@@ -79,7 +81,7 @@ HALF_PILOT = PILOT_DIA * _S / 2000.0
 PIN_R = PIN_CIRCLE_RADIUS * _S / 1000.0
 # *Right looks along -X: sheet right is model -Z, so the pilot stands right
 # of the seat face and the body (with the rear slot) runs left.  The view is
-# centred on the part's box, z -1.9..4.0.
+# centred on the part's box, z -2.9..4.0.
 _SEAT_X = SIDE_CENTER[0] + (LENGTH - PILOT_LENGTH) * _S / 2000.0
 _REAR_X = _SEAT_X - LENGTH * _S / 1000.0
 _PILOT_X = _SEAT_X + PILOT_LENGTH * _S / 1000.0
@@ -93,17 +95,19 @@ END_KEEP = {
 }
 # The side view: both lengths from the seat face stacked below with the
 # overall under them, the O.D. left of the rear face outside the slot width,
-# the pilot right of its front face, the slot depth above its notch.
+# the pilot right of its front face, the slot depth above its notch.  The
+# pilot length reads innermost; its three-line fit callout hangs ~0.016
+# below it, so the collar length and the overall step out past it.
 SIDE_KEEP = {
     "PilotLength": ((_SEAT_X + _PILOT_X) / 2.0, SIDE_CENTER[1] - HALF_OD - 0.012),
-    "CollarLength": ((_REAR_X + _SEAT_X) / 2.0, SIDE_CENTER[1] - HALF_OD - 0.026),
+    "CollarLength": ((_REAR_X + _SEAT_X) / 2.0, SIDE_CENTER[1] - HALF_OD - 0.036),
     # 0.040 left: at 0.032 the O.D.'s band touched the slot width's value.
     "CollarDia": (_REAR_X - 0.040, SIDE_CENTER[1]),
     "PilotDia": (_PILOT_X + 0.014, SIDE_CENTER[1]),
     "SlotDepth": (_REAR_X + 0.004, SIDE_CENTER[1] + HALF_OD + 0.012),
     "SlotWidth": (_REAR_X - 0.014, SIDE_CENTER[1]),
 }
-OVERALL_TEXT_XY = ((_REAR_X + _PILOT_X) / 2.0, SIDE_CENTER[1] - HALF_OD - 0.040)
+OVERALL_TEXT_XY = ((_REAR_X + _PILOT_X) / 2.0, SIDE_CENTER[1] - HALF_OD - 0.050)
 # The overall's picks, pilot front face then rear face.  Each face's outer
 # circle stands edge-on here, so it is a model EDGE; only the turned flanks
 # are drawing silhouettes, and a SILHOUETTE pick on the rear face missed
@@ -111,14 +115,20 @@ OVERALL_TEXT_XY = ((_REAR_X + _PILOT_X) / 2.0, SIDE_CENTER[1] - HALF_OD - 0.040)
 # (half-width 0.9), inside the pilot (r 5.0), clear of the pin holes (r 5.81+).
 _OVERALL_PICK_Y = SIDE_CENTER[1] + PILOT_DIA * _S / 4000.0
 OVERALL_PICKS = ((_PILOT_X, _OVERALL_PICK_Y), (_REAR_X, _OVERALL_PICK_Y))
+# The pilot is supplied long and faced at assembly; the sheet prints the
+# fitted band and points at the assembly step that faces it.
+FIT_STEP_KEY = "pilot-faced-to-fit"
 DIMENSION_CALLOUTS_BELOW = {
     "BoreDia": BORE_CALLOUT,
     "PinPosDia": PIN_HOLE_CALLOUT,
+    "PilotLength": f"{PILOT_LENGTH_CALLOUT},\nPER {step_ref(FIT_STEP_KEY)}",
 }
 # The slot's centring reads above its depth, clear of the side view.
 DIMENSION_CALLOUTS_ABOVE = {"SlotDepth": SLOT_CALLOUT}
 ISO_NOTE_XY = (ISO_CENTER[0] - 0.030, ISO_CENTER[1] - 0.040)
-NOTES_XY = (0.016, 0.070)
+# Fifteen note lines from 0.085 end at 0.0175, above the border; the block's
+# right edge (66 chars, 0.198) stays left of the side view's callouts.
+NOTES_XY = (0.016, 0.085)
 
 
 def _printable_above_callouts(callouts: dict[str, str]) -> dict[str, str]:
@@ -132,7 +142,7 @@ def _printable_above_callouts(callouts: dict[str, str]) -> dict[str, str]:
 
 
 def _overall_reference(adapter: Any, side: Any) -> None:
-    """The (5.9) overall, pilot front face to rear face (rule 7)."""
+    """The (6.9) overall, pilot front face to rear face (rule 7)."""
     label = "drive-collar overall length reference"
     display = add_edge_dimension(
         adapter,

@@ -1,11 +1,11 @@
 r"""Shared recipe for the McMaster 98296A* slotted spring pins.
 
 Catalogue: each size's own McMaster product page, read live (98296A027 on
-2026-09-25, 98296A026 on 2026-09-30; dt-logs transgear-evidence
-mcmaster-skus.md): 1050-1095 spring steel, unplated, ASME B18.8.2, chamfered
-ends, 0.012 in wall, for a 0.062-0.065 in hole; no diameter tolerance
-stated.  No vendor SLDPRT has been harvested for either size, so there is no
-native tree to replay.
+2026-09-25, 98296A026 on 2026-09-30, 98296A031 on 2026-10-02; dt-logs
+transgear-evidence mcmaster-skus.md): 1050-1095 spring steel, unplated,
+ASME B18.8.2, chamfered ends, 0.012 in wall, for a 0.062-0.065 in hole; no
+diameter tolerance stated.  No vendor SLDPRT has been harvested for any
+size, so there is no native tree to replay.
 
 The recipe models the pin as installed in its hole: a tube of the nominal
 diameter and the catalogue wall, axis along model X, centred on the origin.
@@ -30,6 +30,7 @@ SPRING_PIN_SIZES = {
     # part:        (nominal dia, length), mm
     "98296A027": (MM_PER_IN / 16.0, MM_PER_IN / 2.0),  # 1/16 x 1/2
     "98296A026": (MM_PER_IN / 16.0, 9.0 * MM_PER_IN / 16.0),  # 1/16 x 9/16
+    "98296A031": (MM_PER_IN / 16.0, 5.0 * MM_PER_IN / 8.0),  # 1/16 x 5/8
 }
 # Catalogue wall (every size above).
 WALL_T = 0.012 * MM_PER_IN

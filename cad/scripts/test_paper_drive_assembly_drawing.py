@@ -22,6 +22,9 @@ import paper_drive_assembly_steps as steps
 import paper_drive_explode_spec as explode
 import transgear_drive_collar_spec as collar
 import transgear_cluster_fit as cluster_fit
+import transgear_knob_cup_pin_spec as cup_pin
+import transgear_knob_cup_spec as cup
+import transgear_knob_shaft_spec as knob_shaft
 import transgear_rear_bushing_spec as rear_bushing
 import transgear_removable_spec as sprocket
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
@@ -82,7 +85,7 @@ CONTRACT_TRANSGEAR_QUANTITIES = {
     "transgear-thumbnut": 1,
     "transgear-knob-thrust-ring": 1,
     "transgear-knob-cup": 1,
-    "transgear-knob-retaining-screw": 1,
+    "transgear-knob-cup-pin": 1,
 }
 RETIRED_FAMILIES = {
     "transgear-latch",
@@ -424,7 +427,7 @@ HIDDEN_BY_THE_ISOMETRIC = {
     "transgear-drive-collar",
     "transgear-collar-cross-pin",
     "transgear-knob-drive-pin",
-    "transgear-knob-retaining-screw",
+    "transgear-knob-cup-pin",
     "transgear-arm-plate-screw",
     "transgear-latch-pin",
     "transgear-rear-bushing",
@@ -554,7 +557,7 @@ def test_the_knob_stack_prints_front_to_rear() -> None:
         "transgear-knob-thrust-ring",
         "transgear-arm-plate",
         "transgear-knob-cup",
-        "transgear-knob-retaining-screw",
+        "transgear-knob-cup-pin",
     ]
     assert [stem for stem, _label in drawing.KNOB_STACK if stem] == order
     positions = [body.index(_number(stem)) for stem in order]
@@ -575,12 +578,37 @@ def test_the_pivot_screw_is_threadlocked_and_the_spacer_fitted_as_made() -> None
 
 
 def test_the_fitup_acceptance_prints_the_contract_bands() -> None:
-    """§13.2 (8): offset 0.05 ±0.10, knob float 0.05..0.35, head play
-    0.10..0.35, collar-disc air 0.10 min."""
-    assert drawing.KNOB_END_FLOAT_RANGE == pytest.approx((0.05, 0.35), abs=1e-9)
+    """§13.2 (8): offset 0.05 ±0.10, knob float at the cup's feeler band
+    (R9-70: 0.15..0.25), head play 0.10..0.35, collar-disc air 0.10 min, the
+    T24 free under the nut."""
+    assert drawing.KNOB_END_FLOAT_RANGE == pytest.approx((0.15, 0.25), abs=1e-9)
     body = _step_body("fitup-accepted")
-    for text in ("0.05 \u00b10.10 FORWARD", "0.05 TO 0.35", "0.10 TO 0.35", "0.10 MIN"):
+    for text in (
+        "0.05 \u00b10.10 FORWARD",
+        "0.15 TO 0.25",
+        "0.10 TO 0.35",
+        "0.10 MIN",
+        "T24 FREE UNDER THE NUT",
+    ):
         assert text in body, text
+
+
+def test_the_knob_stack_is_pinned_and_the_nut_seats_on_the_faced_pilot() -> None:
+    """R9-70: the cup set on the end-float feeler and cross-pinned to the
+    journal at the cup spec's station; the collar's pilot faced proud of the
+    wheels before the collar is pinned, and the nut tightened on it."""
+    knob = _step_body("knob-stack-fitted")
+    for text in (
+        f"{knob_shaft.END_FLOAT:.1f} FEELER AT THE BOSS",
+        cup_pin.HOLE_TEXT,
+        f"{cup.PIN_HOLE_FROM_FRONT:.1f} FROM THE CUP FRONT",
+    ):
+        assert text in knob, text
+    seq = steps.SEQUENCE
+    assert seq.index("pilot-faced-to-fit") < seq.index("knob-stack-fitted")
+    assert seq.index("pilot-faced-to-fit") < seq.index("collar-pinned")
+    assert f"{collar.PILOT_PROUD_TEXT} PROUD" in _step_body("pilot-faced-to-fit")
+    assert _step_body("collar-pinned").endswith("TIGHT ON THE PILOT.")
 
 
 def test_the_collar_gap_stop_is_the_seat_limit_less_the_collar() -> None:

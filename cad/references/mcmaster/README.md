@@ -25,7 +25,6 @@ recipes:
 | 90280A199 | `swing-stop-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A201 | `clamp-screw`, `slotted-screw` | Steel Narrow Fillister Head Slotted Screw |
 | 90280A837 | `frame-cross-screw` | Steel Narrow Fillister Head Slotted Screw |
-| 90283A193 | `transgear-knob-retaining-screw` (catalogue-only; no vendor model) | Zinc-Plated Steel Pan Head Slotted Screw |
 | 91247A720 | `knife-hanger-stud` | Medium-Strength Grade 5 Steel Hex Head Screw |
 | 91251A108 | `cone-tip-block-screw` (catalogue-only; no vendor model) | Black-Oxide Alloy Steel Socket Head Screw |
 | 91255A106 | — (diagnostic recipe; a former `guide-lock-screw`) | Black-Oxide Alloy Steel Button Head Hex Drive Screw |
@@ -52,6 +51,7 @@ recipes:
 | 97482A015 | `latch-hook-rivet` (catalogue-only; no vendor model) | Aluminum Domed Head Solid Rivet |
 | 98296A026 | `transgear-collar-cross-pin` | 1050-1095 Spring Steel Slotted Spring Pin |
 | 98296A027 | `pinion-strap-pin` | 1050-1095 Spring Steel Slotted Spring Pin |
+| 98296A031 | `transgear-knob-cup-pin` | 1050-1095 Spring Steel Slotted Spring Pin |
 | 98381A433 | `transgear-knob-drive-pin` (catalogue-only; no vendor model) | Alloy Steel Dowel Pin |
 | 98381A434 | `crank-seat-drive-pin` (crank only; catalogue-only; no vendor model) | Alloy Steel Dowel Pin |
 | 98381A473 | — (replica gate for the 1/8 series' end forms) | Alloy Steel Dowel Pin |
@@ -233,10 +233,17 @@ Catalog specifications checked on September 10, 2026:
   steel slotted spring pin, unplated, 1/16 in diameter, 9/16 in long,
   0.012 in wall, for a 0.062-0.065 in hole, chamfered ends, no diameter
   tolerance stated. No vendor SLDPRT has been harvested for it yet.
-- Both spring pins are rows of `diagnostics/diag_mcmaster_spring_pin.py`,
+- [98296A031](https://www.mcmaster.com/98296A031/) (`transgear-knob-cup-pin`,
+  MHA-183) was read live on October 2, 2026: the same 1050-1095 spring
+  steel slotted spring pin, 1/16 in diameter, 5/8 in long, for a
+  0.062-0.065 in hole. It is pressed through the knob cup and the knob
+  shaft's journal in a hole match-drilled at assembly. No vendor SLDPRT has
+  been harvested for it yet.
+- All three spring pins are rows of `diagnostics/diag_mcmaster_spring_pin.py`,
   which models each as installed, a 1/16 in tube with the catalog wall,
-  without slot or chamfer; `diag_build_98296A026.py` and
-  `diag_build_98296A027.py` are its per-size runs.
+  without slot or chamfer; `diag_build_98296A026.py`,
+  `diag_build_98296A027.py` and `diag_build_98296A031.py` are its per-size
+  runs.
 - [98381A434](https://www.mcmaster.com/98381A434/) (`crank-seat-drive-pin`,
   MHA-173, crank only) was read live on September 30, 2026: alloy steel dowel pin,
   unplated, 3/32 in diameter (+0.0001 to +0.0003 in), 1/4 in long, end shape
@@ -275,18 +282,6 @@ Catalog specifications checked on September 10, 2026:
   carries the 98381A473 harvest's end forms at the longer length; it is
   catalogue-only: no vendor model, no replica gate, and its standalone
   diagnostic is a catalog-only run.
-- [90283A193](https://www.mcmaster.com/90283A193/) (`transgear-knob-retaining-screw`,
-  MHA-158) clamps the knob cup on the knob shaft's rear end face. The 90283A
-  series was read live on September 30, 2026: 90283A191 (5/16 in) and
-  90283A192 (3/8 in) are zinc-plated steel slotted pan head screws, 8-32 UNC
-  class 2A, fully threaded, flat tip, pan head Ø0.322 in x 0.096 in high,
-  length under the head; the 90283A193 page resolves in the same series at
-  7/16 in, and its head and thread are taken from those rows. The page gives
-  no crown or slot shape, so `diag_mcmaster_pan.py` reuses the 90280A
-  fillister family's head laws (band 0.8 of the height under a spherical
-  crown, slot 0.135 of the head Ø wide and 1.5 widths deep). It is
-  catalogue-only: no vendor model is downloaded or kept here, so it has no
-  replica gate, and its standalone diagnostic is a catalog-only run.
 - [91829A205](https://www.mcmaster.com/91829A205/) (`transgear-pivot-screw`,
   MHA-168) is the hanger arm's pivot: its shoulder runs through the arm and
   the pivot spacer, and its thread enters the support bar's blind tap. The

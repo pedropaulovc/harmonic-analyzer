@@ -1,0 +1,12 @@
+transgear-knob-cup-pin:
+  title: Knob Cup Pin
+  number: MHA-183
+  stock_name: 1050-1095 Spring Steel Slotted Spring Pin
+  supplier: McMaster-Carr
+  supplier_skus: [98296A031]
+  material: Plain Carbon Steel
+  material_specification: "1050-1095 spring steel slotted spring pin, 1/16 x 5/8; McMaster-Carr 98296A031"
+  finish: plain; no coating
+  quantity: 1
+  tolerance_class: machined_block
+  process: purchased

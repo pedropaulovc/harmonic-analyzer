@@ -547,9 +547,6 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 1.191,
                 2.9,
             ),
-            frozenset(
-                ("transgear-knob-retaining-screw-1", "transgear-knob-shaft-1")
-            ): _annulus_limit(4.1656, 3.454, 8.5125),
             # R9-35: flush-head seat slivers, observed + 10 %.
             frozenset(("transgear-arm-plate-screw-1", "transgear-arm-plate-1")): (
                 1.10 * 0.00809042475
@@ -557,12 +554,11 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
             frozenset(("transgear-arm-plate-screw-2", "transgear-arm-plate-1")): (
                 1.10 * 0.00809042475
             ),
-            frozenset(("transgear-knob-retaining-screw-1", "transgear-knob-cup-1")): (
-                1.10 * 5.26003719e-05
-            ),
+            # R9-70: the nut on the collar's faced pilot, 2.9 in front of the
+            # seat face: 23.9 - 6.2 - 2.9 of the stud's thread blank.
             frozenset(
                 ("transgear-thumbnut-1", "transgear-knob-shaft-1")
-            ): _annulus_limit(6.22, 5.105, 14.9),
+            ): _annulus_limit(6.22, 5.105, 14.8),
             # MHA-155 3/32 x 3/16 dowels pressed 2.3625 into MHA-177's 2.38 reams.
             **_expected_numbered_pairs(
                 "transgear-knob-drive-pin",
@@ -661,13 +657,16 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
         frozenset(("crank-pin-1", "crank-hub-1")),
         frozenset(("crank-pin-1", "crankshaft-1")),
     }
-    # MHA-154's tube pin across MHA-078's unmodelled cross hole.
-    cross_pin_pair = frozenset(
-        ("transgear-collar-cross-pin-1", "transgear-knob-shaft-1")
-    )
+    # MHA-154's tube pin across MHA-078's unmodelled cross hole, and MHA-183's
+    # across the hole match-drilled through MHA-157 and the journal.
+    cross_pin_pairs = {
+        frozenset(("transgear-collar-cross-pin-1", "transgear-knob-shaft-1")),
+        frozenset(("transgear-knob-cup-pin-1", "transgear-knob-shaft-1")),
+        frozenset(("transgear-knob-cup-pin-1", "transgear-knob-cup-1")),
+    }
     special_pairs = {
         "drive-train": crank_pairs,
-        "paper-drive": {cross_pin_pair},
+        "paper-drive": cross_pin_pairs,
     }
     for name, expected_threaded in threaded_by_assembly.items():
         allowed = _interference_contracts.allowed_interference_pairs(name)
@@ -693,6 +692,9 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
     assert 55.1 < crank_allowed[shaft_pair] < 55.6
     # 1.10 x (12.470 - 4.755): the Ø1.5875 and Ø0.978 chords through Ø6.35.
     paper_allowed = _interference_contracts.allowed_interference_pairs("paper-drive")
+    cross_pin_pair = frozenset(
+        ("transgear-collar-cross-pin-1", "transgear-knob-shaft-1")
+    )
     assert 8.4 < paper_allowed[cross_pin_pair] < 8.6
     assert _interference_contracts.allowed_interference_pairs("channel") == {}
     assert _interference_contracts.allowed_interference_pairs("unknown") == {}

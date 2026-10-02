@@ -37,10 +37,11 @@ never authored.
   arm carries the feed sleeve (12T DP30), the 120T disc and its brass hub,
   closed by the hub cap. The arm plate, screwed to the arm, bores the knob
   shaft, whose integral 12T meshes the disc; the thrust ring and the knob cup
-  (retaining screw) set its end float. On the shaft's front core the drive
-  collar (pressed drive pins, cross pin) carries the mounted T24 removable
-  CHAIN-WRAPPED at the z -155.7 chain plane, and the knurled thumbnut on the
-  shaft's front thread retains it (ch23 p.58/59).
+  (set on a feeler, cross-pinned to the journal) set its end float. On the
+  shaft's front core the drive collar (pressed drive pins, cross pin) carries
+  the mounted T24 removable CHAIN-WRAPPED at the z -155.7 chain plane, and the
+  knurled thumbnut on the shaft's front thread, seated on the collar's pilot,
+  retains it free (ch23 p.58/59; R9-70).
 * Latch hook: the curved spring-steel strip riveted to the hook bracket's flap
   on the bar's back face; the arm's latch pin rides in its hole.
 * The ANSI #25 roller chain loops both removables (native connected-linkage
@@ -327,8 +328,8 @@ import transgear_drive_collar_spec as COLLAR  # noqa: E402
 import transgear_feed_pinion_spec as FEED  # noqa: E402
 import transgear_front_bushing_spec as FRONT_BUSHING  # noqa: E402
 import transgear_hanger_joints as HANGER  # noqa: E402
+import transgear_knob_cup_pin_spec as CUP_PIN  # noqa: E402
 import transgear_knob_cup_spec as CUP  # noqa: E402
-import transgear_knob_retaining_screw_spec as KNOB_SCREW  # noqa: E402
 import transgear_knob_thrust_ring_spec as RING  # noqa: E402
 import transgear_latch_pin_spec as LATCH_PIN  # noqa: E402
 import transgear_pin_spec as PIN  # noqa: E402
@@ -531,12 +532,20 @@ if COLLAR.PIN_CIRCLE_RADIUS != REMOVABLE.PIN_CIRCLE_RADIUS:
 # MHA-154 spring pin across the collar's rear slot (identity: along machine X).
 CROSS_PIN_Z0 = KNOB_COLLAR_Z0 + COLLAR.CROSS_HOLE_Z  # -151.3
 # Behind the 12T: the thrust ring to the plate hub's face, the knob cup on the
-# shaft's rear end, its retaining screw on the cup's floor (all Rx+90).
+# journal's rear end END_FLOAT behind the plate's boss (all Rx+90), and the
+# MHA-183 spring pin through cup and journal (identity: along machine X,
+# R9-70 K-1).
 KNOB_RING_Z0 = KNOB_SHAFT_Z0 + KNOB_SPEC.FACE_WIDTH  # -142.2
 if abs(KNOB_RING_Z0 + RING.LENGTH - (PLATE_Z0 + ARM_PLATE.HUB_FACE_Z)) > 1e-9:
     raise AssertionError("the thrust ring does not reach the arm plate's hub face")
-KNOB_CUP_Z0 = KNOB_SHAFT_Z0 + KNOB_SPEC.REAR_END_Z  # -107.7625
-KNOB_SCREW_Z0 = KNOB_CUP_Z0 + CUP.FLOOR  # -105.1625
+KNOB_CUP_Z0 = KNOB_SHAFT_Z0 + KNOB_SPEC.CUP_FACE_Z  # -107.7625
+KNOB_CUP_REAR_Z = KNOB_CUP_Z0 + CUP.LENGTH  # -99.7625
+KNOB_SHAFT_REAR_Z = KNOB_SHAFT_Z0 + KNOB_SPEC.REAR_END_Z  # -101.2625
+KNOB_CUP_PIN_Z0 = KNOB_CUP_Z0 + CUP.PIN_HOLE_FROM_FRONT  # -104.7625
+if not KNOB_CUP_Z0 < KNOB_SHAFT_REAR_Z < KNOB_CUP_REAR_Z:
+    raise AssertionError("the knob shaft's rear end is not inside the knob cup")
+if not KNOB_CUP_PIN_Z0 + CUP_PIN.HOLE_MAX / 2.0 < KNOB_SHAFT_REAR_Z:
+    raise AssertionError("the knob cup's pin hole runs off the journal's end")
 
 # R9-68, the bushings faced to fit.  F carries the disc: with the knob shaft
 # rearward and the cluster forward, the fit-up sets the disc's front face m
@@ -700,28 +709,31 @@ if KNOB_COLLAR_R_WORST + crankshaft_spec.WHEEL_SEAT_FLOAT >= T24_CHAIN_INNER_R:
 
 # Thumbnut MHA-126 (ch23 p.58/59 + video 4/4 "unscrew the nut that holds the
 # other gear in place"): the knurled brass nut OUTERMOST on the knob shaft,
-# tapped for the shaft's front thread, its flange's seat face ON the mounted
-# T24's front face. Rx(-90): local +Y -> -Z, so the nut spans
-# THUMBNUT_Z0 .. THUMBNUT_Z0 - THUMBNUT_LEN (the knurled head at the front).
-THUMBNUT_AIR = 0.0
-THUMBNUT_Z0 = REMOVABLE_Z0 - THUMBNUT_AIR  # -157.1 (the flange's seat face)
-THUMBNUT_FRONT_Z = THUMBNUT_Z0 - THUMBNUT_LEN  # -173.2 (the rim)
+# tapped for the shaft's front thread, its flange's seat face ON the drive
+# collar's pilot, faced to stand THUMBNUT_AIR proud of the mounted T24's front
+# face, so the T24 floats free under the flange (R9-70, N-A). Rx(-90): local
+# +Y -> -Z, so the nut spans THUMBNUT_Z0 .. THUMBNUT_Z0 - THUMBNUT_LEN (the
+# knurled head at the front).
+THUMBNUT_AIR = COLLAR.PILOT_PROUD  # 0.10, nominal
+THUMBNUT_Z0 = REMOVABLE_Z0 - THUMBNUT_AIR  # -157.2 (the flange's seat face)
+THUMBNUT_FRONT_Z = THUMBNUT_Z0 - THUMBNUT_LEN  # -173.3 (the rim)
 KNOB_SHAFT_FRONT_Z = KNOB_SHAFT_Z0 - KNOB_SPEC.TIP_STATION  # -172.0, the stud tip
-THUMBNUT_ENGAGEMENT = THUMBNUT_Z0 - KNOB_SHAFT_FRONT_Z  # 14.9
+THUMBNUT_ENGAGEMENT = THUMBNUT_Z0 - KNOB_SHAFT_FRONT_Z  # 14.8
 if THUMBNUT_THREAD != KNOB_SPEC.THREAD:
     raise AssertionError(
         f"thumbnut tap {THUMBNUT_THREAD} is not the knob shaft's {KNOB_SPEC.THREAD}"
     )
-if abs((REMOVABLE_Z0 - THUMBNUT_Z0) - THUMBNUT_AIR) > 1e-9:
-    raise AssertionError("thumbnut seat must sit THUMBNUT_AIR in front of the T24 face")
+if abs(THUMBNUT_Z0 - (KNOB_COLLAR_Z0 - COLLAR.PILOT_LENGTH)) > 1e-9:
+    raise AssertionError("thumbnut seat is not on the drive collar's pilot face")
+if not THUMBNUT_AIR > 0.0:
+    raise AssertionError("the thumbnut clamps the T24: the pilot is not proud of it")
 if not (THUMBNUT_FRONT_Z < KNOB_SHAFT_FRONT_Z < THUMBNUT_Z0):
     raise AssertionError(
         f"knob shaft front {KNOB_SHAFT_FRONT_Z} must end inside the thumbnut"
         f" ({THUMBNUT_FRONT_Z} .. {THUMBNUT_Z0})"
     )
-# The flange must actually RETAIN the wheel: cover its bore with a shoulder.
-# It bears across the pin circle, so the drive-pin tips must end inside the
-# wheel's plate, behind the flange's seat face.
+# The flange must still RETAIN the wheel: cover its bore with a shoulder.
+# The drive-pin tips end inside the wheel's plate, behind the flange's seat.
 if THUMBNUT_FLANGE_DIA < REMOVABLE.BORE_DIA + 1.0:
     raise AssertionError(
         "thumbnut flange slips into the removable's bore -- retains nothing"
@@ -732,14 +744,14 @@ if REMOVABLE.DRIVE_PIN_TIP_Z - THUMBNUT_Z0 <= 0.0:
 # chain, whose plates straddle the wheel (z CHAIN_MID_Z +- pin reach) and
 # wrap it at the pitch radius -- the nut's head must clear that wrap radially.
 _chain_inner_wrap_r = PITCH_R_T24 - CHAIN_PLATE_HALF_H  # 21.92
-if THUMBNUT_HEAD_DIA / 2.0 + THUMBNUT_AIR > _chain_inner_wrap_r:
+if THUMBNUT_HEAD_DIA / 2.0 > _chain_inner_wrap_r:
     raise AssertionError("thumbnut head reaches the chain's inner plate wrap")
 # The bought chain floated FRONTMOST reaches CHAIN_REACH_FRONT ahead of the
 # seat face (-160.59). The whole nut (and the shaft) lies radially inside the
 # ANSI plates' inner edge, so no axial stack exists there; assert the radial
 # one.
 CHAIN_FRONT_Z_WORST = REMOVABLE.SEAT_FACE_Z - REMOVABLE.CHAIN_REACH_FRONT  # -160.5865
-if max(THUMBNUT_HEAD_DIA, THUMBNUT_FLANGE_DIA) / 2.0 + THUMBNUT_AIR > T24_CHAIN_INNER_R:
+if max(THUMBNUT_HEAD_DIA, THUMBNUT_FLANGE_DIA) / 2.0 > T24_CHAIN_INNER_R:
     raise AssertionError("thumbnut reaches the bought chain's inner plate edge")
 
 # Latch hook MHA-127 (contract §4.4): the 10 x 0.6 strip curved edgewise in
@@ -972,7 +984,7 @@ CHAIN_PLANE_ENVELOPES = (
         KNOB_SHAFT_XY,
         KNOB_SPEC.OUTSIDE_DIA / 2.0,
         KNOB_SHAFT_FRONT_Z,
-        KNOB_CUP_Z0,
+        KNOB_SHAFT_REAR_Z,
     ),
     ("thumbnut", KNOB_SHAFT_XY, THUMBNUT_HEAD_DIA / 2.0, THUMBNUT_FRONT_Z, THUMBNUT_Z0),
     (
@@ -1182,11 +1194,11 @@ def _assert_fastener_stacks() -> None:
         DISC_SCREW.SHANK_DIA,
     )
 
-    # Knob stack: the thumbnut on the shaft's front thread, the retaining
-    # screw through the cup's floor into the shaft's rear tap.
-    raw_thumbnut = KNOB_SPEC.TIP_STATION - COLLAR.SET_NOMINAL - REMOVABLE.PLATE
+    # Knob stack: the thumbnut on the shaft's front thread, seated on the
+    # collar's pilot (R9-70); the cup is pinned, not screwed.
+    raw_thumbnut = KNOB_SPEC.TIP_STATION - COLLAR.SET_NOMINAL - COLLAR.PILOT_LENGTH
     if abs(THUMBNUT_ENGAGEMENT - raw_thumbnut) > 1e-9:
-        raise AssertionError("thumbnut engagement is off the collar/T24 stack")
+        raise AssertionError("thumbnut engagement is off the collar/pilot stack")
     valid_engagement(
         "thumbnut 1/4-20 engagement", THUMBNUT_ENGAGEMENT, KNOB_SPEC.THREAD_MAJOR
     )
@@ -1194,12 +1206,6 @@ def _assert_fastener_stacks() -> None:
     nonnegative(
         "thumbnut seat to the stud's full-thread end",
         KNOB_SHAFT_Z0 - KNOB_SPEC.PLAIN_CORE - THUMBNUT_Z0,
-    )
-    knob_screw_reach = KNOB_SCREW.SHANK_LEN - CUP.FLOOR
-    if abs(knob_screw_reach - CUP.REACH) > 1e-9:
-        raise AssertionError("knob retaining screw reach is off the cup's REACH")
-    valid_engagement(
-        "knob retaining screw engagement", knob_screw_reach, KNOB_SCREW.SHANK_DIA
     )
 
 
@@ -2734,8 +2740,8 @@ async def build(adapter) -> dict[str, str]:
         )
 
     # Knurled thumbnut OUTERMOST on the shaft's front thread, its flange's
-    # seat on the T24's front face, retaining it (ch23 p.58/59). Rx(-90):
-    # local +Y -> -Z, the knurled head at the machine front.
+    # seat on the collar's pilot, the T24 free under it (ch23 p.58/59; R9-70).
+    # Rx(-90): local +Y -> -Z, the knurled head at the machine front.
     thumbnut = await place_component(
         adapter,
         "transgear-thumbnut",
@@ -2743,12 +2749,13 @@ async def build(adapter) -> dict[str, str]:
         [-90.0, 0.0, 0.0],
         ROT_X_NEG90,
         ground=False,
-        label="transgear-thumbnut (retains the mounted T24)",
+        label="transgear-thumbnut (seated on the collar pilot, retains the T24)",
     )
     await _lock_to_shaft(thumbnut, "thumbnut")
     log(
-        f"thumbnut z {THUMBNUT_FRONT_Z:.2f}..{THUMBNUT_Z0:.2f} (seat on the T24"
-        f" face {REMOVABLE_Z0}); shaft front {KNOB_SHAFT_FRONT_Z:.2f}"
+        f"thumbnut z {THUMBNUT_FRONT_Z:.2f}..{THUMBNUT_Z0:.2f} (seat on the pilot,"
+        f" {THUMBNUT_AIR:.2f} proud of the T24 face {REMOVABLE_Z0});"
+        f" shaft front {KNOB_SHAFT_FRONT_Z:.2f}"
         f" ({KNOB_SHAFT_FRONT_Z - THUMBNUT_FRONT_Z:+.2f} inside the nut rim,"
         f" engagement {THUMBNUT_ENGAGEMENT:.2f}); tap {THUMBNUT_THREAD}; front-most"
         f" furniture near the knob axis: chain plates to z"
@@ -2756,7 +2763,7 @@ async def build(adapter) -> dict[str, str]:
         f" {_chain_inner_wrap_r - THUMBNUT_HEAD_DIA / 2.0:.1f})"
     )
     # Behind the 12T (Rx+90): the thrust ring to the plate hub, the knob cup on
-    # the shaft's rear end, and its retaining screw on the cup's floor.
+    # the journal's rear end, and the MHA-183 spring pin through both (R9-70).
     ring = await place_component(
         adapter,
         "transgear-knob-thrust-ring",
@@ -2775,19 +2782,19 @@ async def build(adapter) -> dict[str, str]:
         ground=False,
     )
     await _lock_to_shaft(cup, "knob cup")
-    knob_screw = await place_component(
+    cup_pin = await place_component(
         adapter,
-        "transgear-knob-retaining-screw",
-        [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], KNOB_SCREW_Z0],
-        [90.0, 0.0, 0.0],
-        ROT_X_POS90,
+        "transgear-knob-cup-pin",
+        [KNOB_SHAFT_XY[0], KNOB_SHAFT_XY[1], KNOB_CUP_PIN_Z0],
+        [0.0, 0.0, 0.0],
+        IDENTITY,
         ground=False,
     )
     await lock_mate(
         adapter,
-        named_ref(f"Front Plane@{knob_screw}", "PLANE"),
+        named_ref(f"Front Plane@{cup_pin}", "PLANE"),
         named_ref(f"Front Plane@{cup}", "PLANE"),
-        label="knob stack: retaining screw locked to the knob cup",
+        label="knob stack: cup pin locked to the knob cup",
     )
     # Crank-end T12 removable = the crank-shaft chain wheel, brought over from
     # drive-train so the chain seats on BOTH sprockets locally. Placed at the

@@ -3,9 +3,9 @@ r"""Reproduction script: transgear knob shaft MHA-078 (book ch. 23, pp. 56-59).
 One turned steel shaft on the knob axis K, front to rear: the 1/4-20 stud end
 the thumbnut runs on and its thread relief, the plain Ø6.35 core the brass
 drive collar (MHA-177) slides on, the integral 12T DP38 pinion meshing the
-120T disc, and the Ø8.5 journal running in the arm plate's bore, with the
-#8-32 rear tap for the cup's retaining screw.  Every number and the part
-frame live in ``transgear_knob_shaft_spec`` (contract §1.1, round 10).
+120T disc, and the Ø8.5 journal running in the arm plate's bore, carrying the
+MHA-157 cup on its rear extension.  Every number and the part frame live in
+``transgear_knob_shaft_spec`` (contract §1.1, round 10; R9-70 K-1).
 
 Layout: axis local +Z (machine +Z, rearward), origin on the 12T's front face
 F (the Front Plane).
@@ -21,13 +21,12 @@ F (the Front Plane).
   under the thrust ring, one per gap.  The seed is the Ø1.25 in cutter's
   circle at the nominal full-depth station, cut behind the rear tooth ends
   on the plane through the axis and the seed gap's centre line.
-* ``RearTap``: #8-32 blind from the rear end face (Hole Wizard); no
-  countersink, the mouth's 0.10 burr break is not modelled (R9-63).
 
 Datums: ``Axis1`` (the tooth pattern's axis, the shaft axis); ``Front
 Plane`` = F; planes ``PinionRear``, ``RearFace``, ``ThreadEnd`` and
-``StudTip``.  The Ø1.6 spring-pin hole is drilled through the core at
-assembly along the collar's rear slot and is not modelled (R9-6).
+``StudTip``.  The Ø1.6 spring-pin holes are drilled at assembly and are not
+modelled: through the core along the collar's rear slot (R9-6) and through
+the cup and journal for MHA-183 (R9-70, K-1).
 
 Run (SolidWorks already open)::
 
@@ -75,7 +74,6 @@ from _drawing_marks import (
 from _drawing_simplified import save_simplified_part
 from _fit_limits import deviations
 from _gear import build_fixed_gear, volume_check
-from _holes import blind_hole_volume_mm3, wizard_holes
 from _part_pmi import author_part_pmi
 from _visibility import blank_reference_geometry
 from transgear_knob_shaft_spec import (
@@ -103,8 +101,6 @@ from transgear_knob_shaft_spec import (
     JOURNAL_DIA,
     JOURNAL_DIA_BAND,
     JOURNAL_LENGTH,
-    JOURNAL_LENGTH_TOL,
-    JOURNAL_TAP_WALL_WORST,
     OUTSIDE_DIA,
     PINION_REAR_Z,
     PLAIN_CORE,
@@ -115,9 +111,6 @@ from transgear_knob_shaft_spec import (
     RUNOUT_SLOT_END_Z,
     RUNOUT_SLOT_WIDTH,
     SURFACE_FINISHES,
-    TAP_DRILL_DIA,
-    TAP_SPEC,
-    TAP_TO_PINION_WORST,
     TEETH,
     THREAD_BLANK_DIA,
     THREAD_BLANK_DIA_BAND,
@@ -750,21 +743,6 @@ async def build(adapter) -> dict[str, str]:
     )
     blank_reference_geometry(adapter, (("GapPlane", "PLANE"),))
 
-    # --- #8-32 rear tap ---------------------------------------------------------
-    tap = wizard_holes(
-        adapter,
-        TAP_SPEC,
-        [[0.0, 0.0, REAR_END_Z]],
-        (0.0, 0.0, 1.0),
-        f"rear tap ({TAP_SPEC.size} blind)",
-        name="RearTap",
-        expect_dia_mm=TAP_DRILL_DIA,
-        placement_dims=[((None, None), (None, None))],
-    )
-    drive_jobs += tap.placement_drive_jobs
-    v_tap = blind_hole_volume_mm3(tap.hole_dia_mm, tap.depth_mm)
-    volume = await volume_check(adapter, "rear tap", volume - v_tap, 0.02 * v_tap)
-
     # --- Mate datums along the axis, each driven by its station ---------------
     stations = (
         ("PinionRear", PINION_REAR_Z, '"FaceWidth"'),
@@ -795,17 +773,16 @@ async def build(adapter) -> dict[str, str]:
     await force_rebuild(adapter)
     await force_rebuild(adapter)
     await volume_check(
-        adapter, "driven knob shaft (equations neutral)", volume, 0.01 * v_tap
+        adapter, "driven knob shaft (equations neutral)", volume, 0.005 * V_JOURNAL
     )
     _telemetry.info(
-        f"knob shaft walls (floor 2.0, worst case): journal over the rear tap "
-        f"{JOURNAL_TAP_WALL_WORST:.3f}; tap drill to the 12T rear face "
-        f"{TAP_TO_PINION_WORST:.3f}; run-out slots end F + {RUNOUT_SLOT_END_Z:.2f}"
+        f"knob shaft: run-out slots end F + {RUNOUT_SLOT_END_Z:.2f}"
     )
 
     # Bands (transgear_knob_shaft_spec): the sliding core and the running
     # journal carry their fits, the thread blank its 2A-major band, the
-    # journal length its own ±, the cutter's full-depth station its .XXX band
+    # journal length its title-block .XXX row (the cup is set on a feeler at
+    # fit-up, R9-70 K-1), the cutter's full-depth station its .XXX band
     # and its run-out a MAX limit (R9-21); the rest print at the title block's
     # rows for the places they are authored at.
     set_dimension_bilateral_tolerance(
@@ -816,9 +793,6 @@ async def build(adapter) -> dict[str, str]:
     )
     set_dimension_bilateral_tolerance(
         adapter, "JournalProfile", "JournalDia", *deviations(JOURNAL_DIA_BAND)
-    )
-    set_dimension_symmetric_tolerance(
-        adapter, "JournalProfile", "JournalLength", JOURNAL_LENGTH_TOL
     )
     set_dimension_symmetric_tolerance(
         adapter, "StudProfile", "FullDepth", FULL_DEPTH_BAND

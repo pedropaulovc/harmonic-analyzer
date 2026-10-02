@@ -838,13 +838,6 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(
-        name="transgear_knob_retaining_screw",
-        part="transgear_knob_retaining_screw",
-        artifact_stem="transgear-knob-retaining-screw",
-        script_name="draw_transgear_knob_retaining_screw.py",
-        layout=DrawingLayout.LANDSCAPE,
-    ),
-    DrawingSpec(
         name="transgear_disc_screw",
         part="transgear_disc_screw",
         artifact_stem="transgear-disc-screw",
@@ -898,6 +891,13 @@ DRAWINGS: tuple[DrawingSpec, ...] = (
         part="transgear_collar_cross_pin",
         artifact_stem="transgear-collar-cross-pin",
         script_name="draw_transgear_collar_cross_pin.py",
+        layout=DrawingLayout.LANDSCAPE,
+    ),
+    DrawingSpec(
+        name="transgear_knob_cup_pin",
+        part="transgear_knob_cup_pin",
+        artifact_stem="transgear-knob-cup-pin",
+        script_name="draw_transgear_knob_cup_pin.py",
         layout=DrawingLayout.LANDSCAPE,
     ),
     DrawingSpec(

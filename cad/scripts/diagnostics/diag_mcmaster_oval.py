@@ -24,8 +24,8 @@ facts is [INFERENCE]:
 - slot laws from the 90280A narrow fillister family
   (``diag_mcmaster_fillister.py``): width = HeadDia*0.135, depth =
   width*1.5 from the crown apex;
-- thread and runout laws from the fillister/pan families
-  (``diag_mcmaster_pan.py``): tip chamfer 45 deg x 0.7P; helix seeded at the
+- thread and runout laws from the fillister family
+  (``diag_mcmaster_fillister.py``): tip chamfer 45 deg x 0.7P; helix seeded at the
   top of the bevel to P past the tip (revs = L/P + 1), the fillister's
   cutter (root flat at r = major - 0.75H) swept on the shank body only, after
   a split at the cone-to-shank junction, so the thread runs to under the

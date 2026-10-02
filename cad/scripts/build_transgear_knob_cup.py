@@ -1,18 +1,16 @@
 r"""Reproduction script: transgear knob cup (MHA-157; ch. 23; 1 used).
 
-The brass cup the MHA-158 retaining screw clamps on the knob shaft's rear end
-face; its front face runs behind the arm plate's rear boss, the rear stop of
-the knob's end float (``transgear_knob_cup_spec``).
+The brass ring pinned on the knob shaft's rear journal by the MHA-183 spring
+pin, pressed through a Ø1.6 hole match-drilled through cup and journal at
+assembly (not modelled); its front face runs behind the arm plate's rear
+boss, the rear stop of the knob's end float (``transgear_knob_cup_spec``).
 
 Layout: one turned half-profile on the Front plane, revolved about local +Y:
-the O.D., the counterbore opening at the rear face, the counterbore floor
-and the length are its driving dimensions, the floor measured from the
-front face (the one dimension the screw's engagement rides on).  The front
-face is the Top Plane (y = 0), the rear face y = LENGTH.  The Ø4.3 bore is
-cut through from a Top-plane circle.  ``Axis1`` is the cup axis (Front Plane
-∩ Right Plane); ``ScrewSeat`` is the counterbore floor (y = FLOOR).  The
-paper-drive assembly mates ``Axis1`` to the knob shaft's axis, the Top Plane
-to the shaft's rear end face, and the screw's Top Plane to ``ScrewSeat``.
+the O.D. and the length are its driving dimensions.  The front face is the
+Top Plane (y = 0), the rear face y = LENGTH.  The reamed Ø8.5 bore is cut
+through the full length from a Top-plane circle.  ``Axis1`` is the cup axis
+(Front Plane ∩ Right Plane).  The paper-drive assembly mates ``Axis1`` to the
+knob shaft's axis and the Top Plane to the shaft's cup-face station.
 
 Run (SolidWorks already open)::
 
@@ -32,12 +30,10 @@ from _common import (
     bbox_extent_check,
     check,
     define_circle,
-    dimension_between,
     drive_dimension,
     ensure_fully_defined,
     force_rebuild,
     name_bore_axis,
-    name_dimensions,
     name_last_feature,
     report_mass_properties,
     run_build,
@@ -56,14 +52,11 @@ from _drawing_marks import (
 )
 from _fit_limits import deviations
 from _part_pmi import author_part_pmi
-from _visibility import blank_reference_geometry
 from transgear_knob_cup_spec import (
     BORE_BAND,
     BORE_DIA,
-    COUNTERBORE_DIA,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
-    FLOOR,
     LENGTH,
     OD,
     SURFACE_FINISHES,
@@ -73,15 +66,13 @@ PART_NAME = "transgear-knob-cup"
 MATERIAL = "Brass"  # C36000 free-machining brass (the registry row names it)
 
 CUP_R = OD / 2.0
-CB_R = COUNTERBORE_DIA / 2.0
 BORE_R = BORE_DIA / 2.0
-V_BODY = math.pi * (CUP_R**2 * FLOOR + (CUP_R**2 - CB_R**2) * (LENGTH - FLOOR))
-V_BORE = math.pi * BORE_R**2 * FLOOR
+V_BODY = math.pi * CUP_R**2 * LENGTH
+V_BORE = math.pi * BORE_R**2 * LENGTH
 
 
 async def build(adapter) -> dict[str, str]:
     from solidworks_mcp.adapters.base import (
-        CreatePlaneParameters,
         ExtrusionParameters,
         RevolveParameters,
     )
@@ -94,27 +85,23 @@ async def build(adapter) -> dict[str, str]:
     for name, value in (
         ("CupDia", OD),
         ("CupLength", LENGTH),
-        ("CounterboreDia", COUNTERBORE_DIA),
-        ("FloorDepth", FLOOR),
         ("BoreDia", BORE_DIA),
     ):
         await set_global(adapter, name, f"{value}mm")
 
     drive_jobs: list[tuple[str, str]] = []
 
-    # Turned half-profile about local +Y: front face, O.D., rear face,
-    # counterbore wall, floor, back down the axis.
+    # Turned half-profile about local +Y: front face, O.D., rear face, back
+    # down the axis.
     profile = SketchDims()
     check("create_sketch cup profile", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
-    axis = check("cup axis", await adapter.add_centerline(0.0, 0.0, 0.0, FLOOR))
+    axis = check("cup axis", await adapter.add_centerline(0.0, 0.0, 0.0, LENGTH))
     points = [
         (0.0, 0.0),
         (CUP_R, 0.0),
         (CUP_R, LENGTH),
-        (CB_R, LENGTH),
-        (CB_R, FLOOR),
-        (0.0, FLOOR),
+        (0.0, LENGTH),
     ]
     lines = await add_line_chain(adapter, points)
     set_sketch_direct_db(adapter, False)
@@ -134,27 +121,11 @@ async def build(adapter) -> dict[str, str]:
         adapter, axis, lines[1], (CUP_R + 4.0, LENGTH / 2.0), "CupDia"
     )
     profile.record("CupDia", '"CupDia"')
-    await add_diametric_linear_dimension(
-        adapter, axis, lines[3], (CB_R, LENGTH + 4.0), "CounterboreDia"
-    )
-    profile.record("CounterboreDia", '"CounterboreDia"')
     check(
         "cup length",
         await adapter.add_sketch_dimension(lines[1], None, "linear", LENGTH),
     )
     profile.record("CupLength", '"CupLength"')
-    # The floor from the FRONT face (outer front corner to the floor's
-    # corner at the counterbore wall): one dimension, the screw's
-    # engagement band.
-    await dimension_between(
-        adapter,
-        f"{lines[1]}.start",
-        f"{lines[3]}.end",
-        "vertical_distance",
-        FLOOR,
-        "counterbore floor from the front face",
-    )
-    profile.record("FloorDepth", '"FloorDepth"')
     await ensure_fully_defined(adapter, "cup profile")
     check("exit_sketch cup profile", await adapter.exit_sketch())
     name_last_feature(adapter, "CupProfile")
@@ -165,7 +136,7 @@ async def build(adapter) -> dict[str, str]:
     await bbox_extent_check(adapter, "cup length", "y", LENGTH)
     await bbox_extent_check(adapter, "cup O.D.", "x", OD)
 
-    # Drilled through bore on the cup axis (the screw's clearance).
+    # Reamed through bore on the cup axis: the slide on the journal.
     bore = SketchDims()
     check("create_sketch cup bore", await adapter.create_sketch("Top"))
     await define_circle(
@@ -173,7 +144,7 @@ async def build(adapter) -> dict[str, str]:
         0.0,
         0.0,
         BORE_R,
-        "cup through bore",
+        "cup reamed bore",
         dims=bore,
         names=("BoreCx", "BoreCz", "BoreDia"),
         drives=(None, None, '"BoreDia"'),
@@ -190,19 +161,6 @@ async def build(adapter) -> dict[str, str]:
     )
     name_last_feature(adapter, "ThroughBore")
     await volume_check(adapter, "cup through bore", V_BODY - V_BORE, 0.01 * V_BORE)
-
-    # The screw's seat: the counterbore floor, driven from the same global as
-    # the printed floor dimension.
-    check(
-        "create_plane ScrewSeat",
-        await adapter.create_plane(
-            CreatePlaneParameters(mode="offset", base_plane="Top Plane", offset=FLOOR)
-        ),
-    )
-    name_last_feature(adapter, "ScrewSeat")
-    blank_reference_geometry(adapter, (("ScrewSeat", "PLANE"),))
-    seat_offset = name_dimensions(adapter, "ScrewSeat", ["ScrewSeatOffset"])
-    drive_jobs.append((seat_offset[0], '"FloorDepth"'))
 
     # The mate axis: the first reference axis, so it is Axis1.
     cup_axis = await name_bore_axis(

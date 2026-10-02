@@ -75,46 +75,8 @@ def test_the_thread_blank_shoulder_crosses_no_diameter_line() -> None:
 
 
 # Default-format text, measured on r743-rocker-fix3's render (as
-# test_transgear_arm_drawing uses them); the landscape border.  SolidWorks
-# centres a hole callout's lines on its point (8b5e1f354: the knob shaft's
-# three lines centred on x 15).
+# test_transgear_arm_drawing uses them).
 _CHAR_WIDTH = 0.00276
-_LINE_PITCH = 0.0045
-_BORDER = 0.0127
-
-
-def test_the_rear_tap_callout_stands_inside_the_left_border() -> None:
-    """Review of 8b5e1f354 (blocker): the callout, centred 30 mm left of the
-    end view, ran through the left border; the thread line and the
-    countersink's 90 degrees were cut off.  Every line stands inside the
-    border with air, short of the side view's rear end and its extension
-    lines, and under the end view's tooth tips."""
-    lines = [
-        f"\u00d8{spec.TAP_DRILL_DIA:.2f} \u21a7 {spec.TAP_DRILL_DEPTH:.1f}",
-        f"{spec.TAP_SIZE} UNC - 2B \u21a7 {spec.TAP_FULL_THREAD:.1f}",
-        *spec.TAP_MOUTH_QUALIFIER.splitlines(),
-    ]
-    x, y = drawing.TAP_CALLOUT_XY
-    half_width = max(map(len, lines)) * _CHAR_WIDTH / 2.0
-    half_height = len(lines) * _LINE_PITCH / 2.0
-    assert x - half_width >= _BORDER + 0.003
-    assert x + half_width <= drawing.REAR_X - 0.003
-    assert y + half_height <= drawing.END_CENTER[1] - drawing.HALF_OD - 0.003
-
-
-def test_the_rear_tap_mouth_loses_only_its_break_counted_from_the_drill() -> None:
-    """Codex P2 on #1166: full thread starts where the mouth's 45° leg meets
-    the tap drill (R9-63), so the Ø4.3 +0.10/0 countersink cost 0.473, not
-    the 0.117 counted to the major, and left 5.974 against the 6.248 of
-    1.5 D.  The mouth carries a 0.10 MAX break and keeps 1.5 D."""
-    floor = spec.ENGAGEMENT_FLOOR_D * spec.SHANK_DIA
-    assert spec.TAP_MOUTH_LOSS_WORST == spec.TAP_MOUTH_BREAK_MAX == 0.10
-    assert spec.ENGAGEMENT_WORST == pytest.approx(6.347, abs=1e-3)
-    assert spec.ENGAGEMENT_WORST >= floor
-    # The old countersink at its printed limit, charged to the drill, fell short.
-    old_loss = (4.3 + 0.10 - spec.TAP_DRILL_DIA) / 2.0
-    assert spec.ENGAGEMENT_OWN_WORST - old_loss == pytest.approx(5.974, abs=1e-3)
-    assert spec.ENGAGEMENT_OWN_WORST - old_loss < floor
 
 
 # Measured text boxes (8b5e1f354's PDF), relative to the keep point: a plain
@@ -156,62 +118,25 @@ def test_no_diameter_text_overlaps_another_or_its_line() -> None:
             assert not (bx0 <= line_x <= bx1 and by0 <= ay0), (a, b)
 
 
-# Leaders farm run 20261001T163633352Z (234a39c87) measured on the end view:
-# the journal finish's from its symbol, and the tap callout's from its drill
-# circle down towards its text.  SolidWorks landed the finish's at the
-# journal circle's bottom, (0.0415, 0.1477).
-_FINISH_LEADER_START = (0.0466, 0.1860)
-_TAP_LEADER = ((0.0427, 0.1647), (0.0473, 0.1553))
-
-
-def _segment_gap(
-    p: tuple[tuple[float, float], tuple[float, float]],
-    q: tuple[tuple[float, float], tuple[float, float]],
-) -> float:
-    """Least distance between two segments, 0.0 when they cross."""
-
-    def cross(o, a, b) -> float:
-        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
-
-    (a, b), (c, d) = p, q
-    if (cross(a, b, c) > 0) != (cross(a, b, d) > 0) and (cross(c, d, a) > 0) != (
-        cross(c, d, b) > 0
-    ):
-        return 0.0
-
-    def to_segment(pt, s0, s1) -> float:
-        dx, dy = s1[0] - s0[0], s1[1] - s0[1]
-        t = ((pt[0] - s0[0]) * dx + (pt[1] - s0[1]) * dy) / (dx * dx + dy * dy)
-        t = min(1.0, max(0.0, t))
-        return math.hypot(pt[0] - s0[0] - t * dx, pt[1] - s0[1] - t * dy)
-
-    return min(
-        to_segment(a, c, d),
-        to_segment(b, c, d),
-        to_segment(c, a, b),
-        to_segment(d, a, b),
-    )
-
-
-def test_the_journal_finish_leader_routes_clear_of_the_tap_leader() -> None:
-    """234a39c87: the journal finish's leader, landed by SolidWorks at the
-    circle's bottom, crossed the tap callout's leader at (43.6, 162.9) mm.
-    It now lands on the journal circle under its symbol and keeps 2 mm off
-    the tap leader."""
+def test_the_journal_finish_leader_lands_on_the_journal_circle() -> None:
+    """234a39c87: SolidWorks landed the finish's leader at the circle's
+    bottom and crossed the whole end view; it lands at 60 degrees, under its
+    symbol, on the journal circle and on the sheet."""
     attach = drawing.JOURNAL_FINISH_ATTACH
     radius = spec.JOURNAL_DIA * drawing._S / 2000.0
     centre = drawing.END_CENTER
     assert math.hypot(attach[0] - centre[0], attach[1] - centre[1]) == pytest.approx(
         radius, abs=1e-9
     )
-    # The measured bottom landing lies on the same circle, so the centre holds.
-    assert math.hypot(0.0415 - centre[0], 0.1477 - centre[1]) == pytest.approx(
-        radius, abs=2e-4
-    )
-    assert _segment_gap((_FINISH_LEADER_START, attach), _TAP_LEADER) >= 0.002
-    # The old landing crosses it, and the landing stays on the sheet.
-    assert _segment_gap((_FINISH_LEADER_START, (0.0415, 0.1477)), _TAP_LEADER) == 0.0
+    assert attach[1] > centre[1]
     assert attach[0] > 0.010
+
+
+def test_the_end_view_stands_clear_of_the_side_views_rear_end() -> None:
+    """The K-1 journal runs 6.5 further back; the side view's rear end must
+    still clear the end view's journal circle."""
+    assert drawing.END_CENTER[0] + drawing.HALF_OD + 0.005 < drawing.REAR_X
+
 
 
 def test_sheet_authors_no_manufacturing_value() -> None:
@@ -226,11 +151,11 @@ def test_bands_come_from_named_spec_constants() -> None:
         ("StudProfile", "CoreDia"): "*deviations(CORE_DIA_BAND)",
         ("StudProfile", "ThreadBlankDia"): "*deviations(THREAD_BLANK_DIA_BAND)",
         ("JournalProfile", "JournalDia"): "*deviations(JOURNAL_DIA_BAND)",
-        ("JournalProfile", "JournalLength"): "JOURNAL_LENGTH_TOL",
         ("StudProfile", "FullDepth"): "FULL_DEPTH_BAND",
     }
-    # The journal's ±0.05 holds the knob float inside its .XXX row.
-    assert spec.JOURNAL_LENGTH_TOL < printed_band_mm(spec.JOURNAL_LENGTH_PLACES)
+    # The journal length prints at the title block's .XXX: the knob float is
+    # set at fit-up, the cup pinned on a feeler (R9-70 K-1), not held by it.
+    assert spec.JOURNAL_LENGTH_PLACES == 3
 
 
 def test_stations_land_on_the_contract_machine_stations() -> None:
@@ -238,25 +163,36 @@ def test_stations_land_on_the_contract_machine_stations() -> None:
         "stud tip": (spec.TIP_Z, -172.0),
         "full-thread end": (spec.THREAD_END_Z, -155.6),
         "12T rear tooth ends": (spec.PINION_REAR_Z, -142.2),
-        "journal rear face": (spec.REAR_END_Z, -107.76),
+        "journal rear face": (spec.REAR_END_Z, -101.26),
     }
     for name, (local, machine) in stations.items():
         assert F_MACHINE_Z + local == pytest.approx(machine, abs=0.005), name
-    assert spec.OVERALL_LENGTH == pytest.approx(64.24, abs=0.005)
+    assert spec.OVERALL_LENGTH == pytest.approx(70.74, abs=0.005)
     assert spec.THREAD_LENGTH_REF == pytest.approx(16.4)
 
 
-def test_journal_spans_the_ring_the_plate_hub_and_the_float() -> None:
-    """R9-25: the rear face stands the thrust ring plus the plate's hub-to-boss
-    plus the end float behind the 12T's rear tooth ends, and the float stays
-    open with the journal short and the ring and the hub long."""
-    assert spec.JOURNAL_LENGTH == pytest.approx(
+def test_cup_face_station_spans_the_ring_the_plate_hub_and_the_float() -> None:
+    """R9-25 / K-1: the cup's front face stands the thrust ring plus the
+    plate's hub-to-boss plus the 0.2 end float behind the 12T's rear tooth
+    ends, set on a feeler within ±0.05, so the float stays open with the ring
+    and the hub at their long limits; the journal runs 6.5 on behind it."""
+    assert spec.CUP_FACE_STATION == pytest.approx(
         ring.LENGTH + plate.HUB_TO_BOSS + spec.END_FLOAT
     )
-    shortest_float = (spec.JOURNAL_LENGTH - spec.JOURNAL_LENGTH_TOL) - (
-        ring.LENGTH + ring.LENGTH_TOL + plate.HUB_TO_BOSS + plate.HUB_TO_BOSS_BAND
+    assert spec.END_FLOAT - spec.END_FLOAT_SET_TOL > 0.0
+    assert spec.CUP_FACE_STATION_BAND == pytest.approx(
+        ring.LENGTH_TOL + plate.HUB_TO_BOSS_BAND + spec.END_FLOAT_SET_TOL
     )
-    assert shortest_float > 0.0
+    assert spec.JOURNAL_LENGTH == pytest.approx(
+        spec.CUP_FACE_STATION + spec.JOURNAL_REAR_EXTENSION
+    )
+    assert spec.REAR_END_Z == pytest.approx(spec.PINION_REAR_Z + spec.JOURNAL_LENGTH)
+    # The journal behind the cup's front face at the printed worst case.
+    reach = printed_band_mm(spec.JOURNAL_LENGTH_PLACES) + spec.CUP_FACE_STATION_BAND
+    assert spec.JOURNAL_REAR_EXTENSION_MIN == pytest.approx(
+        spec.JOURNAL_REAR_EXTENSION - reach
+    )
+    assert spec.JOURNAL_REAR_EXTENSION_MIN > 0.0
 
 
 def _shaft_spec_with(monkeypatch, module, name: str, value):
@@ -332,7 +268,7 @@ _LENGTHS = {
     "FaceWidth": ((0.0, spec.FACE_WIDTH), f"{spec.FACE_WIDTH:.3f}"),
     "JournalLength": (
         (spec.PINION_REAR_Z, spec.REAR_END_Z),
-        f"{spec.JOURNAL_LENGTH:.3f} \u00b1{spec.JOURNAL_LENGTH_TOL:.2f}",
+        f"{spec.JOURNAL_LENGTH:.3f}",
     ),
     "FullDepth": (
         (0.0, spec.FULL_DEPTH),
@@ -455,14 +391,6 @@ def test_cutter_arc_runs_counter_clockwise_round_the_rear(
     )
     assert ccw(start, rear) < ccw(start, end)
     assert ccw(start, front) > ccw(start, end)
-
-
-def test_walls_meet_the_floor_at_the_worst_case() -> None:
-    for wall in (
-        spec.JOURNAL_TAP_WALL_WORST,
-        spec.TAP_TO_PINION_WORST,
-    ):
-        assert wall >= spec.WALL_FLOOR
 
 
 def test_part_record_and_finishes() -> None:

@@ -128,7 +128,7 @@ _INSERTED_SOURCES = {
     "platen platen_clip platen_guide platen_paper platen_rack rack_pinion support_bar "
     "transgear_arm transgear_arm_plate transgear_arm_plate_screw transgear_collar_cross_pin "
     "transgear_disc_hub transgear_disc_screw transgear_drive_collar transgear_feed_pinion "
-    "transgear_knob_cup transgear_knob_drive_pin transgear_knob_retaining_screw "
+    "transgear_knob_cup transgear_knob_cup_pin transgear_knob_drive_pin "
     "transgear_knob_shaft transgear_knob_thrust_ring transgear_latch_pin transgear_pivot_screw "
     "transgear_pin transgear_pivot_spacer transgear_rear_bushing transgear_front_bushing "
     "transgear_removable transgear_retaining_ring "

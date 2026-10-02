@@ -150,7 +150,7 @@ def test_both_fit_ups_are_one_line_a06_steps_in_order() -> None:
     assert "STOP AND REPORT" in text["lock-seats-faced"]
     cut = text["disc-screws-cut"]
     assert screw.TIP_BELOW_REAR_FACE_TEXT in cut and screw.CUT_END_BREAK_TEXT in cut
-    column = drawing.FITUP_COLUMNS[0].splitlines()
+    column = drawing.FITUP_STEPS.splitlines()
     for key in ("lock-seats-faced", "disc-screws-cut"):
         (line,) = [ln for ln in column if ln.startswith(f"{steps.step_number(key)}. ")]
         assert line.endswith(text[key]), line

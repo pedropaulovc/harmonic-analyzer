@@ -16,7 +16,8 @@ is checked against the build's own component enumeration
 until it is classified, and a threaded part fails until a row names it.
 ``REQUIRED_JOINTS`` registers every joint with its source occurrence, and the
 table must match it exactly, so a row deleted while other rows still name its
-parts is still caught.
+parts is still caught. A threaded joint replaced by a pinned one keeps a row,
+its lock the pin (paper-drive/knob-cup-on-journal, R9-70).
 
 ``audit`` is pure. ``main`` writes ``cad/out/reports/joint-retention.json``
 and a readable summary beside it; under ``ENFORCEMENT = Enforcement.AUDIT`` it
@@ -203,8 +204,19 @@ class Ruling:
 
 
 # Keyed by the ``exception`` a row cites. Only the user grants one (policy
-# rule 9); none exists.
-RULINGS: dict[str, Ruling] = {}
+# rule 9).
+RULINGS: dict[str, Ruling] = {
+    "U-MHA-168-threadlocker": Ruling(
+        joint="paper-drive/pivot-screw-in-bar",
+        granted=(
+            "user, 2026-10-02, joint-specific rule-9 ruling relayed with R9-70: keep the "
+            "low-strength threadlocker on the MHA-168 shoulder screw. The cross-pin ligament "
+            "would be 0.77, a jam nut cannot reach the bar's blind tap, and a pinch slit in "
+            "the bar misses the 2.0 wall target with no entry face, so no mechanical lock "
+            "fits without changing the photographed 91829A205 head"
+        ),
+    ),
+}
 
 
 @dataclass(frozen=True)
@@ -580,8 +592,7 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "transgear_arm",  # MHA-164: 2x #8-32 plate taps through (transgear_arm_spec), receiver; the pin MHA-179 is pressed in a reamed hole
         "transgear_arm_plate_screw",  # #8-32 slotted oval head (McMaster 91790A196, MHA-166), cut to fit; member: 2 into transgear_arm
         "transgear_disc_screw",  # #0-80 slotted fillister (McMaster 91794A055, MHA-161), cut to fit; member: 3 through the hub flange into rack_pinion
-        "transgear_knob_retaining_screw",  # #8-32 pan head (McMaster 90283A193, MHA-158), member into the knob shaft's rear tap
-        "transgear_knob_shaft",  # MHA-078: 1/4-20 UNC die-cut front thread (thumbnut) + #8-32 rear tap (retaining screw), receiver
+        "transgear_knob_shaft",  # MHA-078: 1/4-20 UNC die-cut front thread (thumbnut), receiver; the rear journal is cross-pinned to the cup (MHA-183)
         "transgear_pivot_screw",  # #8-32 shoulder screw (McMaster 91829A205, MHA-168), member into the support_bar's blind pivot tap
         "transgear_thumbnut",  # MHA-126 knurled nut, 1/4-20 UNC-2B through; member on the knob shaft's front thread
         "wheel_axle",  # stud tip carries the hex nut (thread not modelled / not specified on the axle drawing), receiver of wheel_axle_nut
@@ -660,11 +671,12 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "rocker_thrust_washer",  # 1/16 sheet washer, plain bore
         "transgear_arm_plate",  # MHA-165: reamed knob-shaft bore + 2 countersunk clearance screw holes; no thread
         "transgear_collar_cross_pin",  # MHA-154 1/16 slotted spring pin through the drive collar slot and shaft core
+        "transgear_knob_cup_pin",  # MHA-183 1/16 slotted spring pin through the knob cup and the shaft's journal
         "transgear_disc_hub",  # MHA-159 brass hub: D-bore on the sleeve's D-flat, plain flange clearance holes for the disc screws; trapped between the seat shoulder and the front bushing, no thread
         "transgear_drive_collar",  # MHA-177: reamed bore, reamed drive-pin holes, rear slot; no thread
         "transgear_feed_pinion",  # MHA-110 12T DP30 feed sleeve: plain bore on the pin, D-flat keying the hub's D-bore; no thread
         "transgear_front_bushing",  # MHA-181 brass bushing faced to fit, reamed bore on the pin; no thread
-        "transgear_knob_cup",  # MHA-157: drilled bore + counterbore for the retaining screw head; no thread
+        "transgear_knob_cup",  # MHA-157: reamed through bore, cross-pinned to the journal at assembly; no thread
         "transgear_knob_thrust_ring",  # MHA-156 loose brass ring, drilled bore; no thread
         "transgear_latch_pin",  # MHA-169 1/8 dowel pressed into the arm's reamed end-face hole
         "transgear_pivot_spacer",  # MHA-167 brass spacer, reamed bore on the pivot shoulder; no thread
@@ -691,6 +703,7 @@ UNTHREADED_STOCK: dict[str, str] = {
     "latch_hook_rivet": "solid rivet set through drilled holes",
     "transgear_knob_drive_pin": "dowel pin pressed into a plain hole",
     "transgear_collar_cross_pin": "slotted spring pin in a drilled hole",
+    "transgear_knob_cup_pin": "slotted spring pin in a hole match-drilled at assembly",
     "transgear_latch_pin": "dowel pin pressed into a reamed hole",
     "transgear_retaining_ring": "external retaining ring fitted sideways in a groove",
     "tube_frame_cap": "push-on round cap over the column end",
@@ -1733,6 +1746,7 @@ JOINTS: tuple[Joint, ...] = (
         ),
         lock=Lock.THREADLOCKER_ONLY,
         lock_step="hanger-pivoted",
+        exception="U-MHA-168-threadlocker",
         evidence=(
             "draw_paper_drive_assembly._step_text 'hanger-pivoted' ('SHOULDER SCREW FROM THE REAR "
             "THROUGH ARM AND SPACER INTO THE BAR'S BLIND TAP WITH LOW-STRENGTH THREADLOCKER. SEAT IT; "
@@ -1770,31 +1784,35 @@ JOINTS: tuple[Joint, ...] = (
         ),
     ),
     Joint(
-        id="paper-drive/knob-retaining-screw",
+        id="paper-drive/knob-cup-on-journal",
         assembly="paper_drive",
-        member="transgear_knob_retaining_screw",
+        member="transgear_knob_cup",
         receiver="transgear_knob_shaft",
-        thread="#8-32 UNC",
+        thread="none: Ø8.5 reamed slip fit, cross-pinned (R9-70 replaced the #8-32 screw)",
         installed_at="knob-stack-fitted",
         exposure=Exposure.ROTATING_DRAG,
         exposure_reason=(
-            "the screw clamps the knob cup on the rear end of the knob shaft, which spins in the arm "
-            "plate bore with the chain-driven T24 and reverses when the paper is wound back. The cup's "
-            "front ring runs 0.2 behind the plate's rear boss and is the rear stop of the knob's end "
+            "the cup rides the rear end of the knob shaft's journal, which spins in the arm plate "
+            "bore with the chain-driven T24 and reverses when the paper is wound back. The cup's "
+            "front face runs 0.2 behind the plate's rear boss and is the rear stop of the knob's end "
             "float, so whenever the knob is drawn forward the cup rubs the stationary boss about the "
-            "shaft axis, which is the screw axis"
+            "shaft axis"
         ),
         axial_capture=(
-            "pan head on the cup's counterbore floor; shank through the cup into the shaft's rear #8-32 "
-            "tap (worst-case engagement ~6.3 mm, transgear_knob_shaft_spec.ENGAGEMENT_WORST), clamping "
-            "the cup's front face on the shaft end face"
+            "the MHA-183 1/16 x 5/8 slotted spring pin pressed through the cup and the journal, "
+            "3.0 from the cup's front face, in a Ø1.6 +0.05/0 hole match-drilled with the cup set "
+            "on a 0.2 feeler at the boss; the pin carries the end-float thrust and the drag in "
+            "shear, its ends inside the cup's O.D."
         ),
-        lock=Lock.NONE,
+        lock=Lock.CROSS_PIN,
+        lock_part="transgear_knob_cup_pin",
+        lock_binds=("transgear_knob_cup", "transgear_knob_shaft"),
+        lock_step="knob-stack-fitted",
         evidence=(
-            "draw_paper_drive_assembly._step_text 'knob-stack-fitted' ('CLAMP THE CUP ON THE SHAFT'S "
-            "END FACE WITH THE SCREW'); build_paper_drive_assembly.py 'knob stack: retaining screw "
-            "locked to the knob cup' (a CAD mate, not hardware); transgear_knob_cup_spec docstring "
-            "(rear stop of the knob's end float); transgear_knob_shaft_spec.TAP_SPEC/ENGAGEMENT_WORST"
+            "draw_paper_drive_assembly._step_text 'knob-stack-fitted' (cup on the feeler, "
+            "match-drill, press the pin); build_paper_drive_assembly.py 'knob stack: cup pin "
+            "locked to the knob cup' and KNOB_CUP_PIN_Z0; transgear_knob_cup_spec "
+            "PIN_HOLE_FROM_FRONT and the pin-hole walls; transgear_knob_cup_pin_spec"
         ),
     ),
     Joint(
@@ -1831,26 +1849,27 @@ JOINTS: tuple[Joint, ...] = (
         receiver="transgear_knob_shaft",
         thread="1/4-20 UNC",
         installed_at="fitup-pose-set",
-        exposure=Exposure.ROTATING_DRAG,
+        exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
-            "the nut clamps the chain-driven T24 against the drive collar on the knob shaft, which "
-            "spins whenever the crank turns and reverses when the paper is wound back. The T24 drives "
-            "through two pins in O2.5 slip holes (0.06 radial), so the chain torque is shared with the "
-            "friction under the nut's seat face, and every take-up of that slip works the T24 face "
-            "under the nut about the thread axis"
+            "the nut seats on the drive collar's pilot, faced 0.05-0.15 proud of the T24's front "
+            "face, so it clamps only the collar to itself and the T24 floats free under its flange "
+            "(R9-70). The drive goes T24 -> the two pressed drive pins -> collar -> the MHA-154 "
+            "cross pin -> shaft; collar, nut and shaft turn as one body and the nut carries no "
+            "torque about its axis"
         ),
         axial_capture=(
-            "the nut's flange seat face bears on the T24 front face round its bore and clamps it on "
-            "the drive collar; 1/4-20 UNC-2B through on the shaft's die-cut front thread, finger-tight "
-            "at fitup-pose-set and tightened at collar-pinned; removed by hand for gear swaps"
+            "the nut's flange seat face bears on the collar pilot's faced front; 1/4-20 UNC-2B "
+            "through on the shaft's die-cut front thread, finger-tight at fitup-pose-set and "
+            "tightened on the pilot at collar-pinned; the flange spans the T24 bore and retains "
+            "the wheel on the drive pins; removed by hand for gear swaps"
         ),
         lock=Lock.NONE,
         evidence=(
-            "draw_paper_drive_assembly._step_text 'fitup-pose-set' ('T24 AND THUMBNUT ON "
-            "FINGER-TIGHT') and 'collar-pinned' ('THUMBNUT TIGHT'); build_paper_drive_assembly.py "
-            "'transgear-thumbnut (retains the mounted T24)' placement and _lock_to_shaft (a CAD mate, "
-            "not hardware); transgear_thumbnut_spec docstring; transgear_removable_spec.PIN_HOLE_DIA "
-            "and DRIVE_PIN_DIA"
+            "draw_paper_drive_assembly._step_text 'pilot-faced-to-fit', 'collar-pinned' ('THUMBNUT "
+            "TIGHT ON THE PILOT') and 'fitup-accepted' (T24 free under the nut); "
+            "build_paper_drive_assembly.py THUMBNUT_Z0 on the pilot and 'transgear-thumbnut "
+            "(seated on the collar pilot' placement; transgear_drive_collar_spec PILOT_PROUD_RANGE, "
+            "NUT_PILOT_BEARING_WORST and CHAIN_OFFSET_MARGIN"
         ),
     ),
 )
@@ -1998,10 +2017,10 @@ REQUIRED_JOINTS: dict[str, Occurrence] = {
     "paper-drive/disc-screws": Occurrence(
         "paper_drive", "build_paper_drive_assembly.py", "transgear-disc-screw ("
     ),
-    "paper-drive/knob-retaining-screw": Occurrence(
+    "paper-drive/knob-cup-on-journal": Occurrence(
         "paper_drive",
         "build_paper_drive_assembly.py",
-        "knob stack: retaining screw locked to the knob cup",
+        "knob stack: cup pin locked to the knob cup",
     ),
     "paper-drive/latch-hook-bracket-screws-in-bar": Occurrence(
         "paper_drive", "build_paper_drive_assembly.py", "latch-hook-bracket-screw (x"
@@ -2009,7 +2028,7 @@ REQUIRED_JOINTS: dict[str, Occurrence] = {
     "paper-drive/thumbnut-on-knob-shaft": Occurrence(
         "paper_drive",
         "build_paper_drive_assembly.py",
-        "transgear-thumbnut (retains the mounted T24)",
+        "transgear-thumbnut (seated on the collar pilot",
     ),
 }
 

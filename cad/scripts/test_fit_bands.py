@@ -120,10 +120,6 @@ NOT_FIT_BANDS: dict[tuple[str, str], str] = {
         "the fillister screw's B18.6.3 length tolerance (plus, minus): indexed "
         "for the stock's reach past the disc's rear face before its cut"
     ),
-    ("transgear_knob_retaining_screw_spec", "SHANK_LEN_BAND"): (
-        "the pan-head screw's B18.6.3 length tolerance (plus, minus): indexed "
-        "for the shortest reach into the knob shaft's tap"
-    ),
     ("guide_lock_screw_spec", "SHANK_LEN_BAND"): (
         "the button-head screw's B18.6.3 length tolerance (plus, minus): "
         "indexed for the shortest reach into the platen guide's through tap"
@@ -170,6 +166,10 @@ INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
     ("transgear_collar_cross_pin_spec", "HOLE_BAND"): (
         "the spring pin's drilled cross hole (functional, R9-11): indexed for "
         "HOLE_MAX against the B18.8.2 window and the fit-up step's limits"
+    ),
+    ("transgear_knob_cup_pin_spec", "HOLE_BAND"): (
+        "MHA-154's cross-hole band reused for the hole match-drilled through "
+        "cup and journal: indexed for HOLE_MAX against the B18.8.2 window"
     ),
     ("transgear_latch_pin_spec", "DIA_BAND"): (
         "the pressed dowel's catalogue diameter: read by min/max for the press "

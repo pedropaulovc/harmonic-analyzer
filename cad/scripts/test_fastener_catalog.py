@@ -40,7 +40,7 @@ _EXPECTED = {
     "transgear-arm-plate-screw": (("91790A196",), "MHA-166", 2),
     "transgear-collar-cross-pin": (("98296A026",), "MHA-154", 1),
     "transgear-knob-drive-pin": (("98381A433",), "MHA-155", 2),
-    "transgear-knob-retaining-screw": (("90283A193",), "MHA-158", 1),
+    "transgear-knob-cup-pin": (("98296A031",), "MHA-183", 1),
     "transgear-disc-screw": (("91794A055",), "MHA-161", 3),
     "transgear-latch-pin": (("98381A474",), "MHA-169", 1),
     "transgear-pivot-screw": (("91829A205",), "MHA-168", 1),

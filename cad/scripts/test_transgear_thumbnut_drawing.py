@@ -14,7 +14,6 @@ import _config
 import _hole_spec
 import build_transgear_thumbnut as part
 import draw_transgear_thumbnut as drawing
-import transgear_removable_spec
 import transgear_thumbnut_spec as spec
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
@@ -84,18 +83,26 @@ def test_walls_over_the_thread_refuse_a_larger_thread(monkeypatch) -> None:
         _thumbnut_spec_with(monkeypatch, _hole_spec, "THREAD_MAJOR_MM", majors)
 
 
-def test_the_seat_face_refuses_a_wheel_bore_it_cannot_cover(monkeypatch) -> None:
-    covered = _thumbnut_spec_with(
-        monkeypatch,
-        transgear_removable_spec,
-        "BORE_DIA",
-        transgear_removable_spec.BORE_DIA,
+def test_the_seat_face_bears_on_the_collar_pilot(monkeypatch) -> None:
+    """R9-70: the nut seats on MHA-177's faced pilot, not on the T24: its seat
+    bears on the pilot's annulus outside the rear countersink and its flange
+    covers the pilot all round, at the printed worst case."""
+    import transgear_drive_collar_spec as collar
+
+    pilot_min = collar.PILOT_DIA + min(collar.PILOT_DIA_BAND)
+    assert collar.NUT_PILOT_BEARING_WORST == pytest.approx(
+        (pilot_min - spec.CSK_DIA) / 2.0
     )
-    assert covered.SEAT_OVERLAP_WORST > 0.0
-    with pytest.raises(AssertionError, match="covers the T24"):
-        _thumbnut_spec_with(
-            monkeypatch, transgear_removable_spec, "BORE_DIA", spec.FLANGE_DIA - 0.4
-        )
+    assert collar.NUT_PILOT_BEARING_WORST > 1.5
+    assert collar.NUT_FLANGE_OVER_PILOT_WORST > 0.0
+    # A rear countersink as wide as the pilot leaves the nut nothing to bear on.
+    monkeypatch.setattr(spec, "CSK_DIA", collar.PILOT_DIA)
+    fresh_spec = importlib.util.spec_from_file_location(
+        "_collar_perturbed", collar.__file__
+    )
+    fresh = importlib.util.module_from_spec(fresh_spec)
+    with pytest.raises(AssertionError, match="countersink swallows the pilot"):
+        fresh_spec.loader.exec_module(fresh)
 
 
 def test_countersinks_take_no_more_thread_than_the_engagement_deducts() -> None:

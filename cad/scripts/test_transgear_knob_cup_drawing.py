@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import ast
-import importlib.util
 from pathlib import Path
 
 import pytest
@@ -12,7 +11,7 @@ import _config
 import build_transgear_knob_cup as part
 import draw_transgear_knob_cup as drawing
 import transgear_knob_cup_spec as spec
-import transgear_knob_retaining_screw_spec as screw
+import transgear_knob_cup_pin_spec as pin
 import transgear_knob_shaft_spec as knob_shaft
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -51,15 +50,7 @@ def test_every_marked_dimension_has_one_view_and_model_places() -> None:
     assert set(drawing.DIMENSION_CALLOUTS) <= set(drawing.FACE_KEEP)
 
 
-def test_the_floor_is_one_dimension_from_the_front_face_in_the_section() -> None:
-    """Contract §1.8 default c: the floor prints once, from the front face,
-    and on solid cut edges -- the section carries it with the length, both
-    from the same face, and no counterbore depth from the rear competes."""
-    profile = spec.DRAWING_DIMENSIONS["CupProfile"]
-    assert {"FloorDepth", "CupLength"} <= profile
-    assert "FloorDepth" in drawing.SECTION_KEEP
-    assert not any("Depth" in name for name in profile - {"FloorDepth"})
-    # The cut passes through the cup axis, across the whole face view.
+def test_the_section_cuts_the_cup_axis_across_the_face_view() -> None:
     (x0, y0), (x1, y1) = drawing.SECTION_LINE
     assert y0 == y1 == drawing.FACE_CENTER[1]
     assert x0 < drawing.FACE_CENTER[0] - drawing.HALF_OD
@@ -70,76 +61,56 @@ def test_only_the_bore_carries_a_model_band() -> None:
     assert model_toleranced_dimensions(part) == {
         ("BoreProfile", "BoreDia"): "*deviations(BORE_BAND)",
     }
-    assert min(spec.BORE_BAND) == 0.0 < max(spec.BORE_BAND)
+    assert min(spec.BORE_BAND) > 0.0
 
 
 def test_walls_hold_at_the_worst_case_the_sheet_prints() -> None:
-    floor = spec.FLOOR - _band(spec.FLOOR_PLACES)
-    wall = (
-        (spec.OD - _band(spec.OD_PLACES))
-        - (spec.COUNTERBORE_DIA + _band(spec.COUNTERBORE_PLACES))
-    ) / 2.0
-    for worst in (floor, wall):
-        assert worst >= spec.WALL_FLOOR
-    assert spec.FLOOR_WORST == pytest.approx(floor, abs=0.01)
-    assert spec.COUNTERBORE_WALL_WORST == pytest.approx(wall, abs=0.01)
+    """Every wall round the assembly-drilled pin hole, recomputed from the
+    printed bands, stays at or above the 2.0 mm floor."""
+    hole_r = (pin.HOLE_DIA + max(pin.HOLE_BAND)) / 2.0  # 0.825
+    station = spec.PIN_HOLE_FROM_FRONT + spec.PIN_HOLE_STATION_TOL
+    od_min = spec.OD - _band(spec.OD_PLACES)
+    length_min = spec.LENGTH - _band(spec.LENGTH_PLACES)
+    bore_max = spec.BORE_DIA + max(spec.BORE_BAND)
+    walls = {
+        "journal": (knob_shaft.JOURNAL_DIA_MIN - 2.0 * hole_r) / 2.0,
+        "front": spec.PIN_HOLE_FROM_FRONT - spec.PIN_HOLE_STATION_TOL - hole_r,
+        "end": knob_shaft.JOURNAL_REAR_EXTENSION_MIN - station - hole_r,
+        "ring": (od_min - bore_max) / 2.0,
+        "rear": length_min - station - hole_r,
+    }
+    assert walls["journal"] == pytest.approx((8.465 - 1.65) / 2.0, abs=0.01)
+    assert walls["front"] == pytest.approx(3.0 - 0.10 - 0.825, abs=1e-9)
+    assert walls["ring"] == pytest.approx((18.2 - 8.54) / 2.0, abs=1e-9)
+    assert {k: w for k, w in walls.items() if w < spec.WALL_FLOOR} == {}
+    assert spec.JOURNAL_PIN_WALL_WORST == pytest.approx(walls["journal"])
+    assert spec.FRONT_PIN_WALL_WORST == pytest.approx(walls["front"])
+    assert spec.END_PIN_WALL_WORST == pytest.approx(walls["end"])
+    assert spec.RADIAL_WALL_WORST == pytest.approx(walls["ring"])
+    assert spec.REAR_PIN_WALL_WORST == pytest.approx(walls["rear"])
 
 
-def test_the_pan_head_enters_the_smallest_counterbore() -> None:
-    smallest = spec.COUNTERBORE_DIA - _band(spec.COUNTERBORE_PLACES)
-    assert smallest > screw.HEAD_DIA
-    # Seated at the nominal floor, the head stands below the rear face.
-    assert spec.FLOOR + screw.HEAD_H < spec.LENGTH
+def test_the_longest_pin_stays_inside_the_smallest_od() -> None:
+    od_min = spec.OD - _band(spec.OD_PLACES)
+    longest = pin.PIN_LEN + pin.PIN_LEN_BAND
+    assert (od_min - longest) / 2.0 > 0.0
+    assert spec.PIN_END_INSIDE_OD_WORST == pytest.approx((od_min - longest) / 2.0)
+    # The shortest pin still reaches through both cup walls.
+    assert pin.PIN_LEN - pin.PIN_LEN_BAND > spec.BORE_DIA + max(spec.BORE_BAND)
 
 
-def test_the_diameters_print_at_the_coarsest_row_their_walls_allow() -> None:
-    """Policy rule 12: nothing fits on the O.D. or in the counterbore beyond
-    the pan head's entry, so both print at the title block's .X row once the
-    wall, the floor ligament the head bears on and the head's entry all hold
-    there."""
-    coarse = _band(1)
-    wall = ((spec.OD - coarse) - (spec.COUNTERBORE_DIA + coarse)) / 2.0
-    ligament = (
-        (spec.COUNTERBORE_DIA - coarse) - (spec.BORE_DIA + max(spec.BORE_BAND))
-    ) / 2.0
-    assert min(wall, ligament) >= spec.WALL_FLOOR
-    assert spec.COUNTERBORE_DIA - coarse > screw.HEAD_DIA
-    assert spec.OD_PLACES == spec.COUNTERBORE_PLACES == 1
-    assert spec.FLOOR_LIGAMENT_WORST == pytest.approx(ligament, abs=0.01)
+def test_the_reamed_bore_slides_on_the_journal_over_the_full_bands() -> None:
+    tightest = (spec.BORE_DIA + min(spec.BORE_BAND)) - (
+        knob_shaft.JOURNAL_DIA + max(knob_shaft.JOURNAL_DIA_BAND)
+    )
+    loosest = (spec.BORE_DIA + max(spec.BORE_BAND)) - knob_shaft.JOURNAL_DIA_MIN
+    assert 0.0 < tightest <= loosest
+    assert spec.BORE_JOURNAL_CLEARANCE == pytest.approx((tightest, loosest))
 
 
-def test_the_screw_engages_1_5_d_at_the_thickest_printed_floor() -> None:
-    """The shortest screw ASME B18.6.3 allows (+0/-0.03 in) reaches past the
-    front face by its length less the floor; the thickest floor the sheet
-    accepts, less the incomplete first thread, still leaves 1.5 D before the
-    shaft's own entry terms."""
-    thickest = spec.FLOOR + _band(spec.FLOOR_PLACES)
-    reach = screw.SHANK_LEN - 0.03 * 25.4 - thickest - screw.PITCH
-    assert reach >= 1.5 * screw.SHANK_DIA
-    assert spec.ENGAGEMENT_OWN_WORST == pytest.approx(reach, abs=0.01)
-    # With the shaft's mouth break, charged from its tap drill (R9-63), the
-    # joint still holds 1.5 D.
-    shaft_side = reach - knob_shaft.TAP_MOUTH_BREAK_MAX
-    assert shaft_side >= 1.5 * screw.SHANK_DIA
-    assert knob_shaft.ENGAGEMENT_WORST == pytest.approx(shaft_side, abs=0.01)
-
-
-def _cup_spec_with(monkeypatch, name: str, value):
-    monkeypatch.setattr(screw, name, value)
-    fresh_spec = importlib.util.spec_from_file_location("_cup_perturbed", spec.__file__)
-    fresh = importlib.util.module_from_spec(fresh_spec)
-    fresh_spec.loader.exec_module(fresh)
-    return fresh
-
-
-def test_the_engagement_gate_refuses_the_shorter_screw(monkeypatch) -> None:
-    """Contract Q-cup: 90283A192 (3/8) was replaced by 90283A193 (7/16)
-    because the shorter screw falls under 1.5 D at the .XX floor."""
-    # Positive control: the supplied length re-executes clean.
-    fresh = _cup_spec_with(monkeypatch, "SHANK_LEN", screw.SHANK_LEN)
-    assert fresh.ENGAGEMENT_OWN_WORST == pytest.approx(spec.ENGAGEMENT_OWN_WORST)
-    with pytest.raises(AssertionError, match="engages"):
-        _cup_spec_with(monkeypatch, "SHANK_LEN", 3.0 / 8.0 * 25.4)
+def test_the_journal_end_stays_inside_the_shortest_cup() -> None:
+    length_min = spec.LENGTH - _band(spec.LENGTH_PLACES)
+    assert length_min - knob_shaft.JOURNAL_REAR_EXTENSION_MAX > 0.0
 
 
 def test_registry_row_is_the_turned_brass_mha_157() -> None:

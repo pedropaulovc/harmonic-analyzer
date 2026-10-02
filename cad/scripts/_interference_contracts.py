@@ -340,6 +340,19 @@ _CROSS_PIN_CORE_MM3 = _cross_pin_overlap_mm3(
     25.4 / 16.0, 25.4 / 16.0 - 2.0 * 0.012 * 25.4, 6.35
 )
 
+# MHA-183 (98296A031), the same tube 5/8 long, lies diametrally across the
+# MHA-078 journal's rear end (Ø8.5) and both walls of the MHA-157 cup ring,
+# in a hole match-drilled through both at assembly and not modelled (R9-70,
+# K-1): its chord through the journal, and the rest of its length in the cup
+# (its ends stay inside the cup's O.D.).
+_CUP_PIN_OD = 25.4 / 16.0
+_CUP_PIN_ID = _CUP_PIN_OD - 2.0 * 0.012 * 25.4
+_CUP_PIN_JOURNAL_MM3 = _cross_pin_overlap_mm3(_CUP_PIN_OD, _CUP_PIN_ID, 8.5)
+_CUP_PIN_CUP_MM3 = (
+    math.pi / 4.0 * (_CUP_PIN_OD**2 - _CUP_PIN_ID**2) * (5.0 * 25.4 / 8.0)
+    - _CUP_PIN_JOURNAL_MM3
+)
+
 # MHA-182, McMaster 97431A260: the vendor replica's three prong arcs on its
 # free diameter, atan(3/4) of the turn each (diag_build_97431A260's outline:
 # the window prongs from 90 to 126.87 deg, the far one +/-atan(1/3)).
@@ -464,36 +477,31 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
         "rack-pinion",
         _smooth_annulus_limit_mm3(1.524, 1.191, 5.3 - 2.4),
     ),
-    # MHA-158 #8-32 x 7/16 (transgear_knob_retaining_screw_spec, 11.1125
-    # under the head) on the MHA-157 cup's 2.6 floor: 11.1125 - 2.6 = 8.5125
-    # in the shaft's blind #29 rear tap (transgear_knob_shaft_spec).
-    frozenset(
-        ("transgear-knob-retaining-screw-1", "transgear-knob-shaft-1")
-    ): _smooth_annulus_limit_mm3(4.1656, 3.454, 11.1125 - 2.6),
+    # MHA-183 through the knob shaft's journal and the cup (above).
+    frozenset(("transgear-knob-cup-pin-1", "transgear-knob-shaft-1")): 1.10
+    * _CUP_PIN_JOURNAL_MM3,
+    frozenset(("transgear-knob-cup-pin-1", "transgear-knob-cup-1")): 1.10
+    * _CUP_PIN_CUP_MM3,
     # Seats modelled line to line that the gate read as solid overlap on run
     # 20261001T035353825Z (assembly:paper_drive, R9-35): each MHA-166 oval
-    # head in its 82-degree countersink (0.00809 mm^3) and the MHA-158 pan
-    # head on the cup's counterbore floor (5.26e-5 mm^3).  Sub-micron slivers
+    # head in its 82-degree countersink (0.00809 mm^3).  Sub-micron slivers
     # of coincident faces; the observed reading plus ten percent, so a head
-    # sunk even 1 um into its seat (~0.05 / ~0.04 mm^3) still fails.
+    # sunk even 1 um into its seat (~0.05 mm^3) still fails.
     **_numbered_pairs(
         "transgear-arm-plate-screw",
         range(1, 3),
         "transgear-arm-plate",
         1.10 * 0.00809042475,
     ),
-    frozenset(("transgear-knob-retaining-screw-1", "transgear-knob-cup-1")): (
-        1.10 * 5.26003719e-05
-    ),
     # MHA-126's 1/4-20 tap drill 5.105 (transgear_thumbnut_spec) on MHA-078's
     # Ø6.22 thread blank at the nominal collar setting: the tip 23.9 in front
-    # of F, the nut seated on the T24's front face 6.2 (collar set,
-    # transgear_drive_collar_spec) + 2.8 (plate, transgear_removable_spec)
-    # in front of F, so 23.9 - 6.2 - 2.8 = 14.9, all on the blank (it starts
-    # 7.5 in front of F, behind the nut's seat at 9.0).
+    # of F, the nut seated on the collar's pilot (R9-70), 6.2 (collar set,
+    # transgear_drive_collar_spec) + 2.9 (the fitted pilot) in front of F, so
+    # 23.9 - 6.2 - 2.9 = 14.8, all on the blank (it starts 7.5 in front of F,
+    # behind the nut's seat at 9.1).
     frozenset(
         ("transgear-thumbnut-1", "transgear-knob-shaft-1")
-    ): _smooth_annulus_limit_mm3(6.22, 5.105, 23.9 - 6.2 - 2.8),
+    ): _smooth_annulus_limit_mm3(6.22, 5.105, 23.9 - 6.2 - 2.9),
     # The cross pin's whole tube chord through the core (above).
     frozenset(("transgear-collar-cross-pin-1", "transgear-knob-shaft-1")): 1.10
     * _CROSS_PIN_CORE_MM3,

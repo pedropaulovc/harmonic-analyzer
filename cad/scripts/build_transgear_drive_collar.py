@@ -3,8 +3,10 @@ r"""Build MHA-177, the transgear drive collar (contract §1.2, round 10).
 A brass collar reamed to slide on the knob shaft's plain Ø6.35 core, set and
 pinned at assembly; its front face seats the removable T24, whose bore takes
 the front pilot and whose holes drop over two dowels pressed through the
-collar.  Dimensions and the derived fit facts live in
-``transgear_drive_collar_spec``.
+collar.  The pilot runs through the T24 and is the thumbnut's seat: supplied
+long and faced at assembly to stand 0.05..0.15 proud of the T24's front face,
+so the nut bears on the pilot and the T24 floats under it.  Dimensions and
+the derived fit facts live in ``transgear_drive_collar_spec``.
 
 Layout: axis local +Z (machine +Z, rearward), origin on the front (seat)
 face, the Front Plane; the body runs z 0..LENGTH, the pilot in front of it.
@@ -12,7 +14,8 @@ face, the Front Plane; the body runs z 0..LENGTH, the pilot in front of it.
 * ``Axis1``: the bore axis (Top Plane x Right Plane), made first so the
   assembly mates always find it by that name.
 * ``Collar``: the Ø17.5 body, extruded rearward from the Front Plane.
-* ``Pilot``: the Ø10.00 pilot, extruded forward from the Front Plane.
+* ``Pilot``: the Ø10.00 pilot, extruded forward from the Front Plane to its
+  nominal fitted length (faced to fit at assembly).
 * ``Bore``: the Ø6.350 reamed bore, cut through both ways.
 * ``Slot``: the diametral rear slot, a Right-plane rectangle from the rear
   face to the slot floor, cut through both ways along X, so its width and
@@ -395,7 +398,8 @@ async def build(adapter) -> dict[str, str]:
 
     # Bands (transgear_drive_collar_spec): the seat O.D., the pilot, the
     # reamed bore, the slot and the drive-pin press carry their own; the
-    # length and the pilot length print at the title block's rows.
+    # length prints at the title block's row and the pilot length is set by
+    # facing at assembly (the sheet's fitted-band callout), so no model band.
     set_dimension_bilateral_tolerance(
         adapter, "BodyProfile", "CollarDia", *deviations(OD_BAND)
     )

@@ -9,11 +9,11 @@ face (the stud stations) and from the 12T's rear face (the journal).  The
 PlainCore station, on the thread relief's front shoulder, and the core ends
 at the CoreLength station.  The form cutter's full-depth station and run-out
 limit print as native lengths from F; the notes give the largest cutter.  The
-rear end view (``*Front``, looking at the rear face) carries the native #8-32
-blind-tap callout with its mouth's edge break named under the thread line.
-All dimensions import natively
-from the part with the places and bands ``transgear_knob_shaft_spec``
-authored.
+rear end view (``*Front``, looking at the rear face) carries the journal's
+running finish.  The journal's rear extension carries the MHA-157 cup, pinned
+through a hole drilled at assembly (R9-70 K-1), so it carries no feature on
+this sheet.  All dimensions import natively from the part with the places
+and bands ``transgear_knob_shaft_spec`` authored.
 """
 
 from __future__ import annotations
@@ -27,7 +27,6 @@ from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
     add_attached_note,
-    add_native_hole_callout,
     add_property_linked_note,
     add_surface_finish,
     add_view_centerline,
@@ -38,7 +37,6 @@ from _drawing_common import (
     read_required_properties,
     set_dimension_callouts,
     set_hidden_lines_removed,
-    set_hole_callout_precision,
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -56,15 +54,12 @@ from transgear_knob_shaft_spec import (
     PLAIN_CORE,
     REAR_END_Z,
     SURFACE_FINISHES,
-    TAP_DEPTH_PRECISION,
-    TAP_DRILL_DIA,
-    TAP_MOUTH_QUALIFIER,
     THREAD_CALLOUT,
     TIP_CHAMFER,
     TIP_STATION,
     TIP_Z,
 )
-from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
+from solidworks_mcp.adapters.solidworks.drawing import place_view
 
 SPEC = DRAWINGS_BY_NAME["transgear_knob_shaft"]
 PART_STEM = SPEC.artifact_stem
@@ -78,7 +73,8 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# 3:1 lays the 64.24 shaft 193 mm long and the 12T's Ø9.36 tips 28 mm tall.
+# 3:1 lays the 70.74 shaft 212 mm long (sheet x 0.074 .. 0.286, clear of the
+# end view's 0.059 and the isometric) and the 12T's Ø9.36 tips 28 mm tall.
 SHEET_SCALE = (3.0, 1.0)
 VIEW_SCALE = (3, 1)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1]
@@ -163,16 +159,10 @@ DIMENSION_CALLOUTS_BELOW = {"TipChamfer": CHAMFER_CALLOUT}
 # chamfer and stands up and left, clear of the tooth-tip Ø over the 12T.
 THREAD_PICK = (CHAMFER_START_X, SIDE_CENTER[1] + 0.002)
 THREAD_NOTE_XY = ((THREAD_END_X + CHAMFER_START_X) / 2.0, _ABOVE_Y + 0.020)
-# The rear tap's callout stands centred under the end view: SolidWorks centres
-# the callout's three lines on this point, and at 8b5e1f354 the 46 mm thread
-# line, centred 30 mm left of the view, ran off the sheet with the
-# countersink's 90 degrees.
-TAP_CALLOUT_XY = (END_CENTER[0], END_CENTER[1] - HALF_OD - 0.030)
 # Finishes: the journal on its rear-face circle in the end view, the core on
 # its upper silhouette just in front of F.  The journal's leader lands on the
 # circle at 60 degrees, under its symbol: left to SolidWorks it landed at the
-# circle's bottom and crossed the whole view and the tap callout's leader
-# (234a39c87).
+# circle's bottom and crossed the whole view (234a39c87).
 JOURNAL_FINISH_SYMBOL = (END_CENTER[0] + 0.008, END_CENTER[1] + HALF_OD + 0.012)
 _JOURNAL_R = JOURNAL_DIA * _S / 2000.0
 JOURNAL_FINISH_ATTACH = (
@@ -185,42 +175,6 @@ CORE_FINISH_SYMBOL = (F_X + 0.010, SIDE_CENTER[1] + HALF_OD + 0.004)
 CENTERLINE_PICK = ((PINION_REAR_X + REAR_X) / 2.0, SIDE_CENTER[1] + 0.003)
 GEAR_DATA_XY = (0.016, 0.262)
 NOTES_XY = (0.016, 0.070)
-
-
-def _thread_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
-    """Append the edge-break line to the one compartment holding the thread."""
-    if set(definitions) != {5, 6, 7, 8}:
-        raise RuntimeError(f"unexpected thread callout parts: {definitions!r}")
-    thread_parts = [
-        part for part, text in definitions.items() if "<hw-threadclass>" in text
-    ]
-    if len(thread_parts) != 1:
-        raise RuntimeError(f"thread line is not in one callout part: {definitions!r}")
-    updated = dict(definitions)
-    part = thread_parts[0]
-    updated[part] = f"{updated[part].rstrip()}\n{TAP_MOUTH_QUALIFIER}"
-    return updated
-
-
-def _set_thread_callout_text(display: Any) -> None:
-    """Name the mouth's edge break under the native blind-thread line."""
-    definitions = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
-    updated = _thread_callout_definitions(definitions)
-    for definition_part, writable_part in ((5, 1), (6, 2), (7, 3), (8, 4)):
-        if updated[definition_part] != definitions[definition_part]:
-            display.SetText(writable_part, updated[definition_part])
-    persisted = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
-    resolved = {part: str(display.GetText(part) or "") for part in (1, 2, 3, 4)}
-    thread = [text for text in resolved.values() if "UNC" in text]
-    if (
-        persisted != updated
-        or len(thread) != 1
-        or not thread[0].rstrip().endswith(TAP_MOUTH_QUALIFIER)
-    ):
-        raise RuntimeError(
-            "knob shaft edge-break line did not persist: "
-            f"definitions={persisted!r}, resolved={resolved!r}"
-        )
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -292,8 +246,6 @@ async def build(adapter: Any) -> dict[str, str]:
     # are authored on the part; the sheet only proves the import kept them.
     assert_imported_precision(adapter, annotations, DRAWING_PRECISION_BY_NAME)
 
-    if not auto_center_marks(adapter, end, holes=True, size=0.0025):
-        raise RuntimeError("failed to add ASME center mark to the rear tap")
     add_view_centerline(
         adapter, side, face_xy=CENTERLINE_PICK, label="MHA-078 turning axis"
     )
@@ -304,19 +256,6 @@ async def build(adapter: Any) -> dict[str, str]:
         entity_xy=THREAD_PICK,
         note_xy=THREAD_NOTE_XY,
         label="MHA-078 stud thread callout",
-    )
-    # The tap-drill edge: the Hole Wizard feature's visible circle from the
-    # rear.
-    tap_callout = add_native_hole_callout(
-        adapter,
-        end,
-        edge=visible_circle_edge(adapter, end, TAP_DRILL_DIA),
-        callout_xy=TAP_CALLOUT_XY,
-        label="#8-32 blind rear tap",
-    )
-    _set_thread_callout_text(tap_callout)
-    set_hole_callout_precision(
-        tap_callout, TAP_DEPTH_PRECISION, label="rear tap depths"
     )
 
     # The two running surfaces, authored on the part and read back (rule 5).
@@ -351,12 +290,6 @@ async def build(adapter: Any) -> dict[str, str]:
         pdf_title="Transgear Knob Shaft Manufacturing Drawing",
         scale=SHEET_SCALE,
         layout=SPEC.layout,
-        # SolidWorks pins its own "#8-32 Tapped Hole" note to the end view
-        # once the tap carries a hole callout (run 20261001T035353825Z: it
-        # sat across the side view); the callout already states the thread.
-        # finalize removes it before its own layout audit.
-        redundant_note_substrings=("Tapped Hole",),
-        expected_redundant_notes=1,
     )
 
 

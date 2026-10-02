@@ -17,7 +17,6 @@ import transgear_arm_plate_screw_spec as screw
 import transgear_arm_plate_spec as spec
 import transgear_hanger_joints as joints
 import transgear_knob_shaft_spec as knob_shaft
-import transgear_knob_thrust_ring_spec as ring
 from _buildgraph import module_deps_of
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
@@ -235,17 +234,13 @@ def test_the_hub_station_prints_the_loosest_row_the_disc_platen_air_holds() -> N
 
 
 def test_the_explicit_bands_are_tighter_only_where_the_title_block_row_fails() -> None:
-    """The hub-to-boss band keeps the knob's end float open; the hole
-    positions keep the two shanks inside their float over the arm's taps."""
+    """The hole positions keep the two shanks inside their float over the
+    arm's taps.  The knob's end float no longer rides on the hub-to-boss
+    band: the cup is pinned on a feeler at fit-up (R9-70 K-1), so the float
+    holds at its set tolerance whatever band the hub-to-boss prints at."""
     row = _band(3)
-
-    def end_float_min(band: float) -> float:
-        return knob_shaft.END_FLOAT - (
-            knob_shaft.JOURNAL_LENGTH_TOL + ring.LENGTH_TOL + band
-        )
-
-    assert end_float_min(spec.HUB_TO_BOSS_TOLERANCE) > 0.0
-    assert end_float_min(row) <= 0.0
+    float_min = knob_shaft.END_FLOAT - knob_shaft.END_FLOAT_SET_TOL
+    assert float_min > 0.0
 
     def pitch_margin(band: float) -> float:
         mismatch = 2.0 * arm.HOLE_POSITION_BAND + 2.0 * band

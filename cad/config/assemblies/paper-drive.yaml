@@ -40,8 +40,8 @@ allowed_free_stems:
   - transgear-drive-collar  # mated to the knob T24 (Axis1, RearFace, Right Plane)
   - transgear-feed-pinion
   - transgear-knob-cup  # knob stack: rides the knob shaft (lock-mated)
+  - transgear-knob-cup-pin  # pins the cup to the knob shaft's journal
   - transgear-knob-drive-pin  # pair pressed in the drive collar
-  - transgear-knob-retaining-screw
   - transgear-knob-shaft
   - transgear-knob-thrust-ring
   - transgear-removable

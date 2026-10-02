@@ -2,22 +2,23 @@ r"""MHA-126 transgear-thumbnut: the knurled brass nut on the knob shaft's stud.
 
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` module in its import
 closure.  The nut runs on the 1/4-20 stud of the knob shaft (MHA-078) and
-clamps the removable chain wheel (MHA-081, T24) against the drive collar
-(MHA-177): its rear face bears on the wheel's front face only, round the
-wheel's Ø10.3 bore.  Contract §1.6 (round 10): knurled head Ø20.5 × 8.7 with a
-dished front face (a cone from Ø15 at the rim to a flat Ø9 floor 1.0 deep),
-a Ø11 waist × 2.4 (ruling 5), a Ø12.4 flange to the seat face, 16.1 long,
-1/4-20 UNC-2B through with an entry countersink at each end.  The stud's
+seats on the drive collar's (MHA-177) pilot, faced at assembly to stand
+0.05-0.15 proud of the removable chain wheel's (MHA-081, T24) front face, so
+the wheel floats free under it (R9-70, N-A).  Contract §1.6 (round 10):
+knurled head Ø20.5 × 8.7 with a dished front face (a cone from Ø15 at the
+rim to a flat Ø9 floor 1.0 deep), a Ø11 waist × 2.4 (ruling 5), a Ø12.4
+flange to the seat face, 16.1 long, 1/4-20 UNC-2B through with an entry
+countersink at each end.  The stud's
 side of the engagement (tip station, tip chamfer, cut-to-fit) is MHA-078's;
 this module owns only the nut's side of it.
 
 Part frame: axis local +Y through the origin (``Axis1``, Front Plane ∩ Right
 Plane).  The seat face -- the flange's rear face, the one that bears on the
-T24 -- is the Top Plane, y = 0; the rim of the dished front face is the
-``RimFace`` plane, y = OVERALL_LENGTH; the dish's flat floor is the
+collar's pilot -- is the Top Plane, y = 0; the rim of the dished front face
+is the ``RimFace`` plane, y = OVERALL_LENGTH; the dish's flat floor is the
 ``DishFloor`` plane, y = OVERALL_LENGTH - DISH_DEPTH.  The paper-drive
 assembly maps local +Y to machine -Z (the nut's rim faces the machine
-front), mates ``Axis1`` to the knob axis and the Top Plane to the T24's
+front), mates ``Axis1`` to the knob axis and the Top Plane to the pilot's
 front face.  The knurl's crests lie on the Front Plane, so the axial section
 through it cuts two crests.
 """
@@ -27,8 +28,7 @@ from __future__ import annotations
 import math
 
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
-from _printed_tolerance import drilled_oversize_mm, printed_deviations
-from transgear_removable_spec import BORE_DIA as T24_BORE_DIA
+from _printed_tolerance import printed_deviations
 
 # --- Turned outline (contract §1.6) -------------------------------------------
 HEAD_DIA = 20.5  # knurl crests: the diameter over the knurl
@@ -148,7 +148,6 @@ DISH_DEPTH_PLACES = 1
 WALL_FLOOR = 2.0
 # A tap cuts up to 0.05 over the basic major: half of it on a wall.
 _TAP_OVERSIZE_R = 0.025
-_DRILL_OVERSIZE = drilled_oversize_mm()
 
 _HEAD_LO, _ = printed_deviations(HEAD_DIA, HEAD_DIA_PLACES)
 _HEAD_LEN_LO, _ = printed_deviations(HEAD_LENGTH, HEAD_LENGTH_PLACES)
@@ -220,18 +219,9 @@ for _name, _margin in DISH_FLOOR_MARGINS.items():
             f"MHA-126 dish: {_name} is {_margin:.3f} at the printed worst case"
         )
 
-# --- The seat on the T24 -------------------------------------------------------
-# The seat face covers the wheel's drilled bore all round (radial overlap),
-# so the nut clamps the wheel's front face and never enters its bore.
-SEAT_OVERLAP = (FLANGE_DIA - T24_BORE_DIA) / 2.0
-SEAT_OVERLAP_WORST = (
-    (FLANGE_DIA + _FLANGE_LO) - (T24_BORE_DIA + _DRILL_OVERSIZE)
-) / 2.0
-if SEAT_OVERLAP_WORST <= 0.0:
-    raise AssertionError("MHA-126 seat face no longer covers the T24's bore")
-# The rear countersink stays inside the seat annulus' inner edge.
-if CSK_DIA >= T24_BORE_DIA:
-    raise AssertionError("MHA-126 rear countersink reaches the T24's bore edge")
+# --- The seat on the collar's pilot (R9-70) -------------------------------------
+# The bearing annulus and the flange's cover over the pilot are MHA-177's
+# (``transgear_drive_collar_spec``), which reads this module.
 
 # --- The nut's side of the stud engagement (contract §7) ----------------------
 # The stack subtracts the thread each countersink takes (at its printed MAX,

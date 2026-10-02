@@ -11,9 +11,10 @@ Contract §1.1 (round 10): one turned steel shaft, front to rear --
   (R9-54), full thread from the tip to ``PLAIN_CORE`` in front of F, its
   tip chamfered 45 degrees to the thread's basic minor; the die runs out
   into a Ø4.0 thread relief between ``PLAIN_CORE`` and ``CORE_LENGTH``
-  (R9-53).  The thumbnut (MHA-126) runs on it and clamps the T24 on the
-  drive collar's front face; the stud end is cut to fit at rearward collar
-  settings (§13.2) and is modelled uncut at the nominal setting;
+  (R9-53).  The thumbnut (MHA-126) runs on it and seats on the drive
+  collar's pilot, the T24 free under it (R9-70, N-A); the stud end is cut to
+  fit at rearward collar settings (§13.2) and is modelled uncut at the
+  nominal setting;
 * a plain Ø6.35 core from F to ``CORE_LENGTH``, the sliding seat of the
   brass drive collar (MHA-177), which is set on it at assembly; the Ø1.6
   hole for the MHA-154 spring pin is drilled through the core AT ASSEMBLY
@@ -25,8 +26,11 @@ Contract §1.1 (round 10): one turned steel shaft, front to rear --
   the rest of the face and twelve run-out slots in the front of the journal,
   under the loose thrust ring (MHA-156), which bears on the rear tooth ends;
 * the Ø8.5 journal, running straight in the arm plate's bore, between that
-  ring and the cup (MHA-157) clamped to the rear end face by the retaining
-  screw (MHA-158) in the rear #8-32 tap.
+  ring and the cup (MHA-157) on its rear end.  The journal runs
+  ``JOURNAL_REAR_EXTENSION`` behind the cup's front face; the cup is set on
+  a feeler at the plate's rear boss and pinned to it at assembly by the
+  MHA-183 spring pin, in a hole match-drilled through cup and journal
+  (R9-70, K-1), which is not on this sheet.
 
 Part frame: the axis is local +Z through the origin (``Axis1``); +Z is
 machine +Z (rearward), so the assembly places the part without rotation.  The
@@ -39,7 +43,7 @@ seed tooth gap and the seed run-out slot are centred on ``GAP_AZIMUTH_DEG``
 
 Named datums: ``Axis1`` (the shaft axis); ``Front Plane`` (F); planes
 ``PinionRear`` (the 12T's rear face, the thrust ring's seat), ``RearFace``
-(the rear end face, the cup's seat), ``ThreadEnd`` (full thread ends) and
+(the journal's rear end face), ``ThreadEnd`` (full thread ends) and
 ``StudTip`` (the tip face).
 """
 
@@ -48,13 +52,11 @@ from __future__ import annotations
 import math
 
 from _gtol_spec import CylinderFace
-from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM, HoleSpec
+from _hole_spec import THREAD_MAJOR_MM
 from _printed_tolerance import printed_band_mm, printed_deviations
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 from transgear_arm_plate_geometry import HUB_TO_BOSS as PLATE_HUB_TO_BOSS
-from transgear_knob_cup_spec import ENGAGEMENT_OWN_WORST, REACH_MAX
-from transgear_knob_retaining_screw_spec import SHANK_DIA
-from transgear_knob_retaining_screw_spec import THREAD as SCREW_THREAD
+from transgear_arm_plate_geometry import HUB_TO_BOSS_BAND as PLATE_HUB_TO_BOSS_BAND
 from transgear_knob_thrust_ring_spec import LENGTH as RING_LENGTH
 from transgear_knob_thrust_ring_spec import LENGTH_TOL as RING_LENGTH_TOL
 
@@ -183,26 +185,47 @@ RELIEF_AREA_RATIO_MIN = RELIEF_AREA_MIN / THREAD_STRESS_AREA  # 0.47
 JOURNAL_DIA = 8.5
 JOURNAL_DIA_BAND = (-0.013, -0.035)  # (upper, lower): the running fit
 JOURNAL_DIA_PLACES = 3
-# 12T rear face to the rear end face (R9-25): the thrust ring + the plate's
-# hub-to-boss + the 0.2 end float, the cup's front face running that far
-# behind the rear boss at the stack pose.  Its own ±0.05 holds the knob float.
+# The cup's front face, from the 12T's rear face (R9-25): the thrust ring +
+# the plate's hub-to-boss + the 0.2 end float, the cup running that far
+# behind the rear boss at the stack pose.  K-1 (R9-70): the float is set at
+# assembly, the cup slid on the journal against a 0.2 feeler at the boss and
+# pinned there, and accepted within END_FLOAT_SET_TOL; the journal's length
+# no longer enters it.
 END_FLOAT = 0.2
-JOURNAL_LENGTH = RING_LENGTH + PLATE_HUB_TO_BOSS + END_FLOAT  # 34.4375
-JOURNAL_LENGTH_TOL = 0.05
-JOURNAL_LENGTH_PLACES = 3
-if abs(JOURNAL_LENGTH - 34.4375) > 1e-9:
+END_FLOAT_SET_TOL = 0.05
+CUP_FACE_STATION = RING_LENGTH + PLATE_HUB_TO_BOSS + END_FLOAT  # 34.4375
+if abs(CUP_FACE_STATION - 34.4375) > 1e-9:
     raise AssertionError(
-        f"journal {JOURNAL_LENGTH:.4f} is off the contract's 34.4375 "
+        f"cup face station {CUP_FACE_STATION:.4f} is off the contract's 34.4375 "
         "(ring 5.2 + hub-to-boss 29.0375 + 0.2 float, R9-25)"
     )
+# Where the fitter sets the cup on a real stack: the ring's and the hub-to-
+# boss's own bands, and the feeler setting.
+CUP_FACE_STATION_BAND = RING_LENGTH_TOL + PLATE_HUB_TO_BOSS_BAND + END_FLOAT_SET_TOL
+# The journal runs on behind the cup's front face to carry the cup's pin
+# (K-1); 12T rear face to the rear end face, at the title block's .XXX.
+JOURNAL_REAR_EXTENSION = 6.5
+JOURNAL_LENGTH = CUP_FACE_STATION + JOURNAL_REAR_EXTENSION  # 40.9375
+JOURNAL_LENGTH_PLACES = 3
+_JOURNAL_LENGTH_BAND = printed_band_mm(JOURNAL_LENGTH_PLACES)
+# The journal behind the cup's front face at the printed worst case:
+# 6.5 - 0.13 - 0.15 = 6.22 .. 6.78.
+JOURNAL_REAR_EXTENSION_MIN = JOURNAL_REAR_EXTENSION - (
+    _JOURNAL_LENGTH_BAND + CUP_FACE_STATION_BAND
+)
+JOURNAL_REAR_EXTENSION_MAX = JOURNAL_REAR_EXTENSION + (
+    _JOURNAL_LENGTH_BAND + CUP_FACE_STATION_BAND
+)
+JOURNAL_DIA_MIN = JOURNAL_DIA + min(JOURNAL_DIA_BAND)  # 8.465
 
 # --- Local stations along +Z, from F ------------------------------------------
 TIP_Z = -TIP_STATION
 CORE_END_Z = -CORE_LENGTH
 THREAD_END_Z = -PLAIN_CORE
 PINION_REAR_Z = FACE_WIDTH
+CUP_FACE_Z = PINION_REAR_Z + CUP_FACE_STATION  # 40.3375, at the stack pose
 REAR_END_Z = FACE_WIDTH + JOURNAL_LENGTH
-OVERALL_LENGTH = REAR_END_Z - TIP_Z  # 64.24 REF
+OVERALL_LENGTH = REAR_END_Z - TIP_Z  # 70.74 REF
 
 if not ROOT_DIA > CORE_DIA:
     raise AssertionError("the 12T's gap floors cut into the Ø6.35 core")
@@ -315,85 +338,6 @@ def gap_chord(radius: float) -> float:
 # follow the gap's involute, narrower below).  Hidden under the thrust ring.
 RUNOUT_SLOT_WIDTH = gap_chord(JOURNAL_DIA / 2.0)
 
-# --- Rear tap: #8-32 blind, for the MHA-158 retaining screw ------------------
-TAP_SIZE = SCREW_THREAD
-TAP_MAJOR = THREAD_MAJOR_MM[TAP_SIZE]
-TAP_DRILL_DIA = TAP_DRILL_MM[TAP_SIZE]
-TAP_PITCH = MM_PER_IN / 32.0
-# Depths print at .X (policy rule 12, the cone-tip-block foot-tap precedent).
-# The contract's nominal 9.2 full thread / 10.4 drill leaves the longest
-# screw reach 0.18 inside the full thread at nominal, but at .X the full
-# thread may stop 8.4 deep, and the screw would jam in the tap's lead: the
-# depths are deepened so the printed worst case keeps TAP_TIP_MARGIN.
-TAP_DEPTH_PLACES = 1
-TAP_TIP_MARGIN = 0.25
-TAP_FULL_THREAD = 10.1
-# The drill runs 1.5 P past the deepest full thread at both printed limits,
-# so a plug tap's lead never eats it.
-TAP_DRILL_DEPTH = 12.9
-TAP_SPEC = HoleSpec(
-    "tapped",
-    TAP_SIZE,
-    end="blind",
-    depth_mm=TAP_DRILL_DEPTH,
-    overrides_mm={"ThreadDepth": TAP_FULL_THREAD},
-)
-# No countersink (R9-63): a 90° countersink opening past the 4.166 major
-# costs at least (4.166 - 3.454) / 2 = 0.356 of full thread at the mouth,
-# and the Ø4.3 +0.10/0 it carried cost 0.473, leaving 5.974 against the
-# 6.248 of 1.5 D.  The mouth carries a burr break only (not modelled); full
-# thread starts where the break's 45° leg meets the tap drill.
-TAP_MOUTH_BREAK_MAX = 0.10
-TAP_MOUTH_QUALIFIER = f"BREAK EDGE {TAP_MOUTH_BREAK_MAX:.2f} MAX"
-
-_TAP_BAND = printed_band_mm(TAP_DEPTH_PLACES)
-TAP_FULL_THREAD_MIN = TAP_FULL_THREAD - _TAP_BAND
-TAP_TIP_CLEARANCE_WORST = TAP_FULL_THREAD_MIN - REACH_MAX
-if TAP_TIP_CLEARANCE_WORST < TAP_TIP_MARGIN - 1e-9:
-    raise AssertionError(
-        f"MHA-158 can reach {REACH_MAX:.3f} into the tap, within "
-        f"{TAP_TIP_MARGIN} of the shallowest printed full thread "
-        f"{TAP_FULL_THREAD_MIN:.2f}"
-    )
-if (TAP_DRILL_DEPTH - _TAP_BAND) - (
-    TAP_FULL_THREAD + _TAP_BAND
-) < 1.5 * TAP_PITCH - 1e-9:
-    raise AssertionError("the rear tap drill leaves no lead room past the full thread")
-
-# The screw's side (MHA-157 floor, first-thread loss) comes from the cup; the
-# shaft's own term is the thread its mouth break removes, counted from the
-# tap drill (R9-63).
-TAP_MOUTH_LOSS_WORST = TAP_MOUTH_BREAK_MAX
-ENGAGEMENT_WORST = ENGAGEMENT_OWN_WORST - TAP_MOUTH_LOSS_WORST
-if ENGAGEMENT_WORST < ENGAGEMENT_FLOOR_D * SHANK_DIA - 1e-9:
-    raise AssertionError(
-        f"MHA-158 engages {ENGAGEMENT_WORST:.3f} "
-        f"({ENGAGEMENT_WORST / SHANK_DIA:.2f} D) in the rear tap, under "
-        f"{ENGAGEMENT_FLOOR_D} D"
-    )
-
-# --- Walls at the printed worst case (contract §8) ---------------------------
-_JOURNAL_MIN = JOURNAL_DIA + min(JOURNAL_DIA_BAND)
-# Journal over the tap's thread major (the mouth break, inside the major,
-# leaves the wall whole).
-JOURNAL_TAP_WALL = (JOURNAL_DIA - TAP_MAJOR) / 2.0  # 2.167
-JOURNAL_TAP_WALL_WORST = (_JOURNAL_MIN - TAP_MAJOR) / 2.0
-if TAP_DRILL_DIA + 2.0 * TAP_MOUTH_BREAK_MAX >= TAP_MAJOR:
-    raise AssertionError("the rear tap's mouth break opens past the thread major")
-# Solid from the tap-drill point to the 12T's rear face (not a load wall).
-TAP_TO_PINION_WORST = (
-    JOURNAL_LENGTH - JOURNAL_LENGTH_TOL - (TAP_DRILL_DEPTH + _TAP_BAND)
-)
-for _name, _wall in (
-    ("journal over the rear tap", JOURNAL_TAP_WALL_WORST),
-    ("tap drill to the 12T rear face", TAP_TO_PINION_WORST),
-):
-    if _wall < WALL_FLOOR - 1e-9:
-        raise AssertionError(
-            f"MHA-078 {_name} {_wall:.3f} at the printed worst case is under "
-            f"the {WALL_FLOOR} floor"
-        )
-
 # The tip chamfer at its printed worst never grows past the one pitch the
 # thumbnut's engagement budget already takes off for it (contract §7).
 _CHAMFER_LOWER, _CHAMFER_UPPER = printed_deviations(TIP_CHAMFER, TIP_CHAMFER_PLACES)
@@ -497,10 +441,3 @@ if len(DRAWING_PRECISION_BY_NAME) != sum(map(len, DRAWING_PRECISION.values())):
 for _feature, _names in DRAWING_PRECISION.items():
     if set(_names) != DRAWING_DIMENSIONS[_feature]:
         raise AssertionError(f"{_feature}: marked dimensions without places")
-
-# The tap's callout prints its two depths at TAP_DEPTH_PLACES, the band the
-# reach stack above reads, not the native two places.
-TAP_DEPTH_PRECISION = {
-    "hw-threaddepth": TAP_DEPTH_PLACES,
-    "hw-tapdrldepth": TAP_DEPTH_PLACES,
-}

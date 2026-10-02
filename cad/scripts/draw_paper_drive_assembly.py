@@ -33,7 +33,6 @@ import paper_drive_explode_spec as explode
 import platen_guide_spec as platen_guide
 import platen_spec as platen
 import transgear_arm_geometry as arm_geometry
-import transgear_arm_plate_geometry as plate_geometry
 import transgear_arm_plate_screw_spec as plate_screw
 import transgear_cluster_fit as cluster_fit
 import transgear_disc_hub_geometry as hub_geometry
@@ -41,10 +40,10 @@ import transgear_disc_hub_spec as hub
 import transgear_disc_screw_spec as disc_screw
 import transgear_drive_collar_spec as collar
 import transgear_hanger_joints as joints
+import transgear_knob_cup_pin_spec as cup_pin
+import transgear_knob_cup_spec as knob_cup
 import transgear_knob_drive_pin_spec as drive_pin
-import transgear_knob_retaining_screw_spec as retaining_screw
 import transgear_knob_shaft_spec as knob_shaft
-import transgear_knob_thrust_ring_spec as thrust_ring
 import transgear_pivot_screw_spec as pivot_screw
 import transgear_removable_spec as sprocket
 from _common import _com_invoke, _early_bound, check, run_build
@@ -216,9 +215,10 @@ FITUP_LINE_WIDTH = 68  # characters; default-format note text
 # title block (top 0.066).
 FITUP_NOTE_XY = ((0.018, 0.262), (0.215, 0.262))
 FITUP_NOTE_LIMITS = ((0.210, 0.075), (0.418, 0.072))
-# The platen's locks open sheet 4; the hook step, then the chain fit-up (§13.2)
-# under its own heading, fill its second column.
-FITUP_FIRST_COLUMN_KEY = "guide-locks-set"
+# The platen's steps, its locks included, fill sheet 3; the transgear opens
+# sheet 4; the hook step, then the chain fit-up (§13.2) under its own
+# heading, fill its second column.
+FITUP_FIRST_COLUMN_KEY = "latch-pin-pressed"
 FITUP_SECOND_COLUMN_KEY = "hook-set-and-riveted"
 FITUP_CHAIN_KEY = "fitup-pose-set"
 
@@ -272,9 +272,7 @@ BOM_PART_NUMBERS = {
     "transgear-thumbnut": _config.parts("transgear-thumbnut")["number"],
     "transgear-knob-thrust-ring": _config.parts("transgear-knob-thrust-ring")["number"],
     "transgear-knob-cup": _config.parts("transgear-knob-cup")["number"],
-    "transgear-knob-retaining-screw": _config.parts("transgear-knob-retaining-screw")[
-        "number"
-    ],
+    "transgear-knob-cup-pin": _config.parts("transgear-knob-cup-pin")["number"],
 }
 # A purchased part's registry SKU, printed in its description.
 _SKU = {
@@ -300,9 +298,9 @@ _SKU = {
     "transgear-knob-drive-pin": _config.parts("transgear-knob-drive-pin")[
         "supplier_skus"
     ][0],
-    "transgear-knob-retaining-screw": _config.parts("transgear-knob-retaining-screw")[
-        "supplier_skus"
-    ][0],
+    "transgear-knob-cup-pin": _config.parts("transgear-knob-cup-pin")["supplier_skus"][
+        0
+    ],
 }
 # The description column is drawing wording; a purchased part names its SKU.
 BOM_DESCRIPTIONS = {
@@ -361,10 +359,7 @@ BOM_DESCRIPTIONS = {
     "transgear-thumbnut": "TRANSGEAR THUMBNUT",
     "transgear-knob-thrust-ring": "KNOB THRUST RING",
     "transgear-knob-cup": "KNOB CUP",
-    "transgear-knob-retaining-screw": (
-        f"{retaining_screw.THREAD} PAN HEAD SCREW, MCMASTER "
-        f"{_SKU['transgear-knob-retaining-screw']}"
-    ),
+    "transgear-knob-cup-pin": f"SPRING PIN, MCMASTER {_SKU['transgear-knob-cup-pin']}",
 }
 if set(BOM_DESCRIPTIONS) != set(BOM_PART_NUMBERS):
     raise AssertionError("paper-drive BOM description coverage is incomplete")
@@ -413,7 +408,7 @@ TRANSGEAR_QUANTITIES = {
     "transgear-thumbnut": 1,
     "transgear-knob-thrust-ring": 1,
     "transgear-knob-cup": 1,
-    "transgear-knob-retaining-screw": 1,
+    "transgear-knob-cup-pin": 1,
 }
 if not set(TRANSGEAR_QUANTITIES) <= set(BOM_PART_NUMBERS):
     raise AssertionError("every transgear family is a BOM row")
@@ -487,7 +482,8 @@ TRANSGEAR_BALLOON_ANCHORS = {
 #   rear slot and its drive pins in its and the T24's holes;
 # * the knob shaft: only its 0.7 mm stud tip stands past the thumbnut, and
 #   its 12T and threads are past the edge fallback too;
-# * the knob screw inside the knob cup, the arm-plate screws' heads on the
+# * the MHA-183 cup pin's end, across the journal inside the knob cup and
+#   nearer the eye than the journal, the arm-plate screws' heads on the
 #   plate's rear face, the latch pin in the arm behind the latch bracket;
 # * the rear bushing (Ø9, z -130.4 to -124.4) behind the Ø81.5 disc: its
 #   front rim's ray leaves the disc's rear face at radius
@@ -505,7 +501,7 @@ INNER_STEMS = frozenset(
         "transgear-drive-collar",
         "transgear-collar-cross-pin",
         "transgear-knob-drive-pin",
-        "transgear-knob-retaining-screw",
+        "transgear-knob-cup-pin",
         "transgear-arm-plate-screw",
         "transgear-latch-pin",
         "transgear-rear-bushing",
@@ -872,18 +868,13 @@ KNOB_STACK: tuple[tuple[str | None, str], ...] = (
     ("transgear-arm-plate", "PLATE"),
     (None, "REAR BOSS"),
     ("transgear-knob-cup", "CUP"),
-    ("transgear-knob-retaining-screw", "SCREW"),
+    ("transgear-knob-cup-pin", "PIN"),
 )
-# The knob's end float: the shaft journal against the ring and the plate's
-# hub-to-boss, each at its own printed band (R9-17: 0.2 nominal).
-_KNOB_FLOAT_BAND = (
-    knob_shaft.JOURNAL_LENGTH_TOL
-    + thrust_ring.LENGTH_TOL
-    + plate_geometry.HUB_TO_BOSS_BAND
-)
+# The knob's end float: the cup set on a feeler END_FLOAT behind the plate's
+# boss and pinned there (R9-70, K-1), accepted at the feeler's own band.
 KNOB_END_FLOAT_RANGE = (
-    knob_shaft.END_FLOAT - _KNOB_FLOAT_BAND,
-    knob_shaft.END_FLOAT + _KNOB_FLOAT_BAND,
+    knob_shaft.END_FLOAT - knob_shaft.END_FLOAT_SET_TOL,
+    knob_shaft.END_FLOAT + knob_shaft.END_FLOAT_SET_TOL,
 )
 # §13.2 procedure (4): past this gap the T24 seat would pass the collar's
 # SEAT_MAX_FROM_F in front of the 12T front face.
@@ -1009,11 +1000,18 @@ def _step_text() -> dict[str, str]:
             f"{_N['transgear-drive-collar']} COLLAR TO A STOP, {drive_lo:.2f} TO "
             f"{drive_hi:.2f} PROUD OF ITS FRONT FACE."
         ),
+        "pilot-faced-to-fit": (
+            f"FACE THE COLLAR'S PILOT {collar.PILOT_PROUD_TEXT} PROUD OF EACH "
+            f"{_N['transgear-removable']} WHEEL FLAT ON THE PINS; ELSE STOP AND "
+            "REPORT."
+        ),
         "knob-stack-fitted": (
-            f"KNOB STACK, FRONT TO REAR: {_stack_text()}. PASS THE SHAFT "
-            "THROUGH THE LOOSE RING INTO THE PLATE BORE FROM THE FRONT; CLAMP "
-            "THE CUP ON THE SHAFT'S END FACE WITH THE SCREW. SLIDE THE COLLAR "
-            "ON THE CORE UNPINNED, PINS FORWARD."
+            f"KNOB STACK, FRONT TO REAR: {_stack_text()}. SHAFT THROUGH THE LOOSE "
+            "RING INTO THE PLATE BORE FROM THE FRONT, PUSHED REARWARD. CUP ON THE "
+            f"JOURNAL ON A {knob_shaft.END_FLOAT:.1f} FEELER AT THE BOSS; "
+            f"MATCH-DRILL {cup_pin.HOLE_TEXT} THROUGH BOTH "
+            f"{knob_cup.PIN_HOLE_FROM_FRONT:.1f} FROM THE CUP FRONT; PRESS THE PIN "
+            "IN, CENTRED. COLLAR ON THE CORE UNPINNED, PINS FORWARD."
         ),
         "latch-bracket-fitted": (
             f"SCREW THE {_N['latch-hook-bracket']} BRACKET TO THE BAR WITH "
@@ -1075,22 +1073,23 @@ def _step_text() -> dict[str, str]:
             f"FACE, TIGHTENED BY THE THUMBNUT. {collar.CROSS_PIN_DRILL_PHRASE}; "
             "FIT THE "
             f"{_N['transgear-collar-cross-pin']} SPRING PIN IN THE SLOT. SLEEVE "
-            "AND SHIM OUT; T24 ON, THUMBNUT TIGHT."
+            "AND SHIM OUT; T24 ON, NUT TIGHT ON THE PILOT."
         ),
         "stud-end-cut": (
             f"IF THE {_N['transgear-knob-shaft']} STUD END STANDS PROUD OF THE "
             f"THUMBNUT RIM, {collar.STUD_CUT_PHRASE}."
         ),
         "fitup-accepted": (
-            f"ACCEPT, IN THE POSE OF STEP {steps.step_number('fitup-pose-set')}: "
+            f"ACCEPT, IN STEP {steps.step_number('fitup-pose-set')}'S POSE: "
             f"T24 FRONT FACE {steps.OFFSET_ACCEPT_TEXT} FORWARD OF THE T12 FRONT FACE "
             f"(STEP {steps.step_number('collar-gap-measured')}'S SETTING, WIDENED "
             "FOR PINNING AND GAUGE SPREAD: THE T24 UP TO "
             f"{steps.OFFSET_ACCEPT_TOL - collar.FIT_UP_OFFSET_TARGET:.2f} BEHIND "
-            f"PASSES); KNOB END FLOAT {knob_lo:.2f} TO {knob_hi:.2f}; PIVOT HEAD PLAY "
+            f"PASSES); KNOB END FLOAT {knob_lo:.2f} TO {knob_hi:.2f}; T24 FREE "
+            "UNDER THE NUT; PIVOT HEAD PLAY "
             f"{joints.HEAD_PLAY_MIN:.2f} TO {joints.HEAD_PLAY_MAX:.2f}, THE "
-            "HANGER SWINGING FREELY; COLLAR TO DISC AIR "
-            f"{steps.COLLAR_DISC_AIR_TEXT}. OTHERWISE REPORT."
+            "HANGER FREE; COLLAR TO DISC AIR "
+            f"{steps.COLLAR_DISC_AIR_TEXT}. ELSE REPORT."
         ),
         "chain-closed": (
             f"LOOP {chain.LINK_COUNT} PITCHES OF #25 CHAIN, "
@@ -1135,9 +1134,7 @@ def _step_columns() -> tuple[str, str, str]:
             steps.SEQUENCE[:first],
             text,
         ),
-        _step_column(
-            "PLATEN LOCKS, THEN THE TRANSGEAR", steps.SEQUENCE[first:second], text
-        ),
+        _step_column("THE TRANSGEAR", steps.SEQUENCE[first:second], text),
         "\n".join(
             (
                 _step_column("", steps.SEQUENCE[second:chain_start], text),

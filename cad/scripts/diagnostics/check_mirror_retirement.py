@@ -1080,10 +1080,10 @@ expect(
 )
 expect(
     PD,
-    "transgear-knob-retaining-screw-1",
-    [*_K, p.KNOB_SCREW_Z0],
-    p.ROT_X_POS90,
-    "knob retaining screw",
+    "transgear-knob-cup-pin-1",
+    [*_K, p.KNOB_CUP_PIN_Z0],
+    IDENTITY,
+    "knob cup pin",
     **_SOLV,
 )
 expect(

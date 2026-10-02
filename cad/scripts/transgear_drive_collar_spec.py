@@ -10,9 +10,14 @@ slide on the knob shaft's plain Ø6.35 core (MHA-078).  It is set on the core
 at assembly and pinned by the MHA-154 spring pin, drilled through the core
 along the collar's diametral rear slot and lying in it, so the slot walls
 carry the drive (R9-6).  The front face is the removable T24's (MHA-081)
-seat: the Ø10.00 × 1.90 pilot enters the wheel's Ø10.3 bore, two MHA-155
-dowels pressed through reamed holes on the Ø14 circle drive the wheel, and
-the thumbnut (MHA-126) clamps it on this face.
+seat: the Ø10.00 pilot enters the wheel's Ø10.3 bore and two MHA-155 dowels
+pressed through reamed holes on the Ø14 circle drive the wheel.  R9-70
+(N-A): the pilot is supplied long and faced at assembly to stand
+PILOT_PROUD_RANGE proud of the T24's front face, and the thumbnut (MHA-126)
+seats on the pilot's front face, so the nut clamps the collar to the shaft
+and the T24 floats that much between the collar and the nut.  The drive
+runs T24 -> drive pins -> collar -> MHA-154 -> shaft; the nut carries no
+torque.  The model carries the pilot at its nominal fitted length.
 
 Part frame: the axis is local +Z through the origin (``Axis1``, the bore
 axis); +Z is machine +Z (rearward), so the assembly places the part without
@@ -31,7 +36,7 @@ from __future__ import annotations
 import math
 import textwrap
 
-from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from _printed_tolerance import drilled_oversize_mm, printed_band_mm, printed_deviations
 from crankshaft_spec import (
     DRIVE_PIN_HOLE_BAND,
     DRIVE_PIN_LENGTH_GRADE,
@@ -50,6 +55,8 @@ from transgear_knob_shaft_spec import (
     CORE_DIA_BAND,
     CORE_LENGTH,
     CORE_LENGTH_PLACES,
+    END_FLOAT,
+    END_FLOAT_SET_TOL,
     ENGAGEMENT_FLOOR_D,
     PLAIN_CORE,
     PLAIN_CORE_PLACES,
@@ -69,6 +76,9 @@ from transgear_removable_spec import (
     SEAT_SPIGOT_RIM,
 )
 from transgear_removable_spec import PIN_CIRCLE_RADIUS as _WHEEL_PIN_CIRCLE_RADIUS
+from transgear_thumbnut_spec import CSK_DIA as NUT_CSK_DIA
+from transgear_thumbnut_spec import FLANGE_DIA as NUT_FLANGE_DIA
+from transgear_thumbnut_spec import FLANGE_DIA_PLACES as NUT_FLANGE_DIA_PLACES
 from transgear_thumbnut_spec import FRONT_THREAD_LOSS as NUT_FRONT_THREAD_LOSS
 from transgear_thumbnut_spec import OVERALL_LENGTH as NUT_LENGTH
 from transgear_thumbnut_spec import OVERALL_LENGTH_LO as NUT_LENGTH_LO
@@ -86,12 +96,32 @@ OD = SEAT_SPIGOT_DIA  # 17.5, the crank spigot's seat
 OD_BAND = SPIGOT_DIA_BAND  # (upper, lower) = (0, -0.10)
 OD_PLACES = 2
 
-# --- Pilot on the front face, inside the T24's Ø10.3 bore (ruling 5) ----------
+# --- Pilot on the front face, through the T24's Ø10.3 bore (ruling 5) ---------
 PILOT_DIA = 10.0
 PILOT_DIA_BAND = (0.0, -0.10)
 PILOT_DIA_PLACES = 2
-PILOT_LENGTH = 1.9
+# R9-70 (N-A): the thumbnut's seat.  The fitter faces the pilot so its front
+# face stands PILOT_PROUD_RANGE proud of the T24's front face (the plate
+# measured, the pilot faced to it plus 0.10 ±0.05), so the T24 is free under
+# the nut by the same amount.  The pilot's fitted length is the plate plus
+# that: 2.70 + 0.05 = 2.75 .. 2.80 + 0.15 = 2.95; it is supplied
+# PILOT_BLANK_LENGTH_MIN long and the model carries the nominal 2.8 + 0.10.
+PILOT_PROUD_RANGE = (0.05, 0.15)
+PILOT_PROUD = sum(PILOT_PROUD_RANGE) / 2.0  # 0.10
+PILOT_LENGTH = PLATE + PILOT_PROUD  # 2.90, nominal fitted
 PILOT_LENGTH_PLACES = 2
+PILOT_LENGTH_FITTED_MIN = THINNEST_PLATE + min(PILOT_PROUD_RANGE)  # 2.75
+PILOT_LENGTH_FITTED_MAX = PLATE + max(PLATE_BAND) + max(PILOT_PROUD_RANGE)  # 2.95
+FACING_ALLOWANCE = 0.10
+PILOT_BLANK_LENGTH_MIN = 3.40
+if PILOT_BLANK_LENGTH_MIN < PILOT_LENGTH_FITTED_MAX + FACING_ALLOWANCE - 1e-9:
+    raise AssertionError(
+        f"MHA-177 pilot blank {PILOT_BLANK_LENGTH_MIN:.2f} MIN leaves no "
+        f"{FACING_ALLOWANCE} facing allowance over the "
+        f"{PILOT_LENGTH_FITTED_MAX:.2f} longest fit"
+    )
+if not PILOT_LENGTH_FITTED_MIN <= PILOT_LENGTH <= PILOT_LENGTH_FITTED_MAX:
+    raise AssertionError("MHA-177's modelled pilot lies outside its fitted band")
 
 # --- Bore: reamed through, sliding on the plain core --------------------------
 BORE_DIA = CORE_DIA  # 6.35
@@ -167,7 +197,6 @@ DRAWING_PRECISION_BY_NAME: dict[str, int] = {
 LENGTH_TOL = printed_band_mm(LENGTH_PLACES)  # 0.13
 LENGTH_MIN = round(LENGTH - LENGTH_TOL, 6)  # 3.87
 LENGTH_MAX = round(LENGTH + LENGTH_TOL, 6)  # 4.13
-PILOT_LENGTH_MAX = round(PILOT_LENGTH + printed_band_mm(PILOT_LENGTH_PLACES), 6)  # 2.41
 # An unlocated feature's centring on the axis (the slot, the cross hole): the
 # fleet's position term, half the .XXX row (contract §8).
 POSITION_TOL = printed_band_mm(3) / 2.0  # 0.065
@@ -229,10 +258,17 @@ PILOT_BORE_CLEARANCE = (
     (WHEEL_BORE_DIA - (PILOT_DIA + max(PILOT_DIA_BAND))) / 2.0,
     (WHEEL_BORE_DIA + drilled_oversize_mm() - (PILOT_DIA + min(PILOT_DIA_BAND))) / 2.0,
 )
-# The pilot's front face stays behind the T24's front face, where the
-# thumbnut bears: 2.8 - 1.9 = 0.9 nominal, 2.7 - 2.41 = 0.29 worst.
-PILOT_FACE_INSET = PLATE - PILOT_LENGTH
-PILOT_FACE_INSET_WORST = THINNEST_PLATE - PILOT_LENGTH_MAX
+# R9-70 (N-A): the thumbnut seats on the pilot's front face, which stands
+# PILOT_PROUD_RANGE proud of the T24's front face: the nut's seat bears on the
+# pilot's annulus outside its rear countersink, (9.90 - 6.75) / 2 = 1.575 at
+# the worst case, its flange covers the pilot all round, and the T24 is free
+# under it by the proud.
+_NUT_FLANGE_LO, _ = printed_deviations(NUT_FLANGE_DIA, NUT_FLANGE_DIA_PLACES)
+NUT_PILOT_BEARING_WORST = (PILOT_DIA + min(PILOT_DIA_BAND) - NUT_CSK_DIA) / 2.0
+NUT_FLANGE_OVER_PILOT_WORST = (
+    NUT_FLANGE_DIA + _NUT_FLANGE_LO - (PILOT_DIA + max(PILOT_DIA_BAND))
+) / 2.0
+T24_FLOAT_RANGE = PILOT_PROUD_RANGE
 
 
 # --- Drive pins pressed through to a stop (MHA-155) ------------------------------
@@ -318,10 +354,12 @@ for _ok, _what in (
     (PIN_HOLE_INNER_R_MIN > PILOT_R_MAX, "the drive-pin holes break into the pilot"),
     (min(BORE_CORE_CLEARANCE) > 0.0, "the bore binds on the plain core"),
     (min(PILOT_BORE_CLEARANCE) > 0.0, "the pilot binds in the T24 bore"),
+    (NUT_PILOT_BEARING_WORST > 0.0, "the thumbnut's countersink swallows the pilot"),
     (
-        PILOT_FACE_INSET_WORST > 0.0,
-        "the pilot reaches the T24's front face (the thumbnut's seat)",
+        NUT_FLANGE_OVER_PILOT_WORST > 0.0,
+        "the thumbnut's flange no longer covers the pilot",
     ),
+    (min(T24_FLOAT_RANGE) > 0.0, "the pilot no longer stands proud of the T24"),
     (
         pin_hole_meets_wall_floor(LENGTH, PIN_HOLE_DEPTH),
         "a blind drive-pin hole leaves a floor under the wall floor",
@@ -347,7 +385,7 @@ SLOT_CALLOUT = f"CENTRED ON BORE AXIS \u00b1{POSITION_TOL:.3f}"
 SLOT_ORIENTATION = "REAR SLOT 90\u00b0 TO HOLE LINE"
 PIN_HOLE_CALLOUT = f"2X REAM THROUGH\n{SLOT_ORIENTATION}"
 # The overall, pilot front face to rear face, prints as a .X reference.
-OVERALL_LENGTH = LENGTH + PILOT_LENGTH  # 5.9
+OVERALL_LENGTH = LENGTH + PILOT_LENGTH  # 6.9
 DRAWING_REFERENCE_PRECISION = 1
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW\nSCALE 2:1"
 
@@ -379,11 +417,12 @@ STUD_CUT_PHRASE = (
 
 # --- The thumbnut on the stud over the whole setting (R9-53, contract §7) ------
 # The fitter may leave the T24 seat anywhere from the rearward stop (the
-# collar's rear face on F, seat = the collar length) to SEAT_MAX_FROM_F.
+# collar's rear face on F, seat = the collar length) to SEAT_MAX_FROM_F.  The
+# nut seats on the pilot's faced front face (R9-70), the fitted pilot length
+# in front of the seat.
 _TIP_STATION_MIN = TIP_STATION - printed_band_mm(TIP_STATION_PLACES)  # 23.39
 _PLAIN_CORE_MAX = PLAIN_CORE + printed_band_mm(PLAIN_CORE_PLACES)  # 7.63
 _CORE_LENGTH_MAX = CORE_LENGTH + printed_band_mm(CORE_LENGTH_PLACES)  # 5.38
-_PLATE_MAX = PLATE + max(PLATE_BAND)  # 2.8
 NUT_LENGTH_MIN = NUT_LENGTH + NUT_LENGTH_LO  # 15.3
 
 
@@ -391,20 +430,23 @@ def thumbnut_engagement(seat_from_f: float) -> float:
     """Full stud thread inside the nut's full thread, the T24 seat
     ``seat_from_f`` in front of F, at the printed worst case: forward, the
     shortest stud tip (or the deepest cut below the shortest nut's rim) less
-    one pitch for its chamfer, inside the rim's countersink; rearward, the
-    nut's seat countersink on the thickest plate or the stud's full-thread
-    end, whichever lies further forward.  Each countersink's loss is counted
-    from the tap drill (R9-63)."""
-    rim = seat_from_f + THINNEST_PLATE + NUT_LENGTH_MIN
+    one pitch for its chamfer, inside the rim's countersink, the nut on the
+    shortest fitted pilot; rearward, the nut's seat countersink on the longest
+    fitted pilot or the stud's full-thread end, whichever lies further
+    forward.  Each countersink's loss is counted from the tap drill (R9-63)."""
+    rim = seat_from_f + PILOT_LENGTH_FITTED_MIN + NUT_LENGTH_MIN
     tip = min(_TIP_STATION_MIN, rim - STUD_CUT_BELOW_RIM[1])
     front = min(tip - THREAD_PITCH, rim - NUT_FRONT_THREAD_LOSS)
-    rear = max(seat_from_f + _PLATE_MAX + NUT_REAR_THREAD_LOSS, _PLAIN_CORE_MAX)
+    rear = max(
+        seat_from_f + PILOT_LENGTH_FITTED_MAX + NUT_REAR_THREAD_LOSS, _PLAIN_CORE_MAX
+    )
     return front - rear
 
 
 # Each term is a min or max of lines in the seat, so the engagement is concave
-# over the travel and least at one of its ends: 20.87 - 1.27 - 7.63 = 11.97 at
-# the rearward stop, 23.39 - 1.27 - 10.52 = 11.60 at the seat maximum.
+# over the travel and least at one of its ends: 21.92 - 2.623 - 7.643 = 11.65
+# at the rearward stop, 23.39 - 1.27 - 10.673 = 11.447 (1.80 D) at the seat
+# maximum.
 THUMBNUT_ENGAGEMENT_WORST = min(
     thumbnut_engagement(seat) for seat in (LENGTH_MIN, LENGTH_MAX, SEAT_MAX_FROM_F)
 )
@@ -416,12 +458,12 @@ if THUMBNUT_ENGAGEMENT_WORST < ENGAGEMENT_FLOOR_D * THREAD_MAJOR - 1e-9:
     )
 # At the rearward stop the nut's seat stands in front of the core's step, so
 # its thread runs only on full thread or over the relief, never onto the core
-# or a die run-out: 3.87 + 2.70 - 5.38 = 1.19.
-NUT_CORE_STEP_AIR = LENGTH_MIN + THINNEST_PLATE - _CORE_LENGTH_MAX
+# or a die run-out: 3.87 + 2.75 - 5.38 = 1.24.
+NUT_CORE_STEP_AIR = LENGTH_MIN + PILOT_LENGTH_FITTED_MIN - _CORE_LENGTH_MAX
 if NUT_CORE_STEP_AIR <= 0.0:
     raise AssertionError(
         f"MHA-126 thumbnut / MHA-078 core step: at the rearward stop the nut "
-        f"seat {LENGTH_MIN + THINNEST_PLATE:.3f} reaches the core step "
+        f"seat {LENGTH_MIN + PILOT_LENGTH_FITTED_MIN:.3f} reaches the core step "
         f"{_CORE_LENGTH_MAX:.3f} ({NUT_CORE_STEP_AIR:+.3f})"
     )
 # Over the relief the nut's smallest minor clears the largest relief:
@@ -432,17 +474,54 @@ if NUT_RELIEF_RADIAL_AIR <= 0.0:
         f"MHA-126 thumbnut / MHA-078 thread relief: the nut's 2B minor "
         f"Ø{NUT_MINOR_MIN:.3f} reaches the relief Ø{RELIEF_DIA_MAX:.3f}"
     )
+
+# --- The chain plane in service (contract §13.2, R9-2 / R9-17) ----------------
+# Tsubaki's ±1 sprocket offset at every printed corner, floats included.  The
+# contract's enumeration sets the pair (T24 against T12, mid-planes) at
+# CHAIN_SET_RANGE; in service the crank shaft's end play and the knob's end
+# float move the T24 forward of it, the hanger's head play rearward.  R9-70
+# adds the T24's own float under the thumbnut, forward only (the collar body
+# is its rear stop), and K-1 sets the knob's end float on a feeler at fit-up,
+# so it no longer carries the journal, ring and hub-to-boss bands (contract:
+# 0..0.35): -0.3103 - 0.25 - 0.25 - 0.15 = -0.9603 .. +0.40.
+CHAIN_OFFSET_LIMIT = 1.0
+CHAIN_SET_RANGE = (-0.3103, 0.05)
+CRANK_END_PLAY_MAX = 0.25
+HANGER_HEAD_PLAY_MAX = 0.35
+KNOB_END_FLOAT_MAX = END_FLOAT + END_FLOAT_SET_TOL  # 0.25
+CHAIN_OFFSET_IN_SERVICE = (
+    CHAIN_SET_RANGE[0] - CRANK_END_PLAY_MAX - KNOB_END_FLOAT_MAX - max(T24_FLOAT_RANGE),
+    CHAIN_SET_RANGE[1] + HANGER_HEAD_PLAY_MAX,
+)
+CHAIN_OFFSET_MARGIN = CHAIN_OFFSET_LIMIT - max(map(abs, CHAIN_OFFSET_IN_SERVICE))
+if CHAIN_OFFSET_MARGIN < 0.0:
+    raise AssertionError(
+        f"chain plane in service {CHAIN_OFFSET_IN_SERVICE[0]:+.4f}.."
+        f"{CHAIN_OFFSET_IN_SERVICE[1]:+.4f} leaves Tsubaki's "
+        f"±{CHAIN_OFFSET_LIMIT} ({CHAIN_OFFSET_MARGIN:+.4f})"
+    )
+
+# The pilot's length: faced at assembly, its requirement printed with the
+# dimension; the sheet appends the step that sets it.
+PILOT_LENGTH_CALLOUT = (
+    f"SET AT ASSEMBLY {PILOT_LENGTH_FITTED_MIN:.2f}-{PILOT_LENGTH_FITTED_MAX:.2f}"
+    "\nFACED TO FIT"
+)
+PILOT_PROUD_TEXT = f"{PILOT_PROUD_RANGE[0]:.2f} TO {PILOT_PROUD_RANGE[1]:.2f}"
 # The widest line the sheet's notes block holds (its layout test).
 FIT_UP_NOTE_WIDTH = 66
 FIT_UP_NOTE = "\n".join(
     textwrap.wrap(
-        "COLLAR SUPPLIED UNPINNED. AT ASSEMBLY SET THE COLLAR ON THE SHAFT SO "
+        "COLLAR SUPPLIED UNPINNED, ITS PILOT LONG. AT ASSEMBLY FACE THE PILOT "
+        f"{PILOT_PROUD_TEXT} PROUD OF THE T24 FRONT FACE, THEN SET THE COLLAR "
+        "ON THE SHAFT SO "
         f"THAT THE T24 FRONT FACE LIES {FIT_UP_OFFSET_SET_TEXT} FORWARD OF THE "
         "T12 FRONT FACE WITH THE ARM AND THE CRANK SHAFT PULLED FORWARD AND THE "
         f"KNOB SHAFT PUSHED REARWARD; CLAMP, {CROSS_PIN_DRILL_PHRASE}, FIT "
         "1/16 \u00d7 9/16 SPRING PIN IN THE SLOT. COLLAR REAR FACE TO 12T FRONT "
         f"FACE 0 MIN. T24 SEAT {SEAT_MAX_FROM_F:.2f} MAX IN FRONT OF 12T FRONT "
-        f"FACE. STUD END PROUD OF THE THUMBNUT RIM: {STUD_CUT_PHRASE}.",
+        "FACE. THE THUMBNUT SEATS ON THE PILOT, THE T24 FREE UNDER IT. STUD END "
+        f"PROUD OF THE THUMBNUT RIM: {STUD_CUT_PHRASE}.",
         width=FIT_UP_NOTE_WIDTH,
         break_on_hyphens=False,
     )
@@ -458,6 +537,7 @@ DRAWING_NOTES = "\n".join(
         f"DRIVE-PIN HOLE TO COLLAR RIM {DRIVE_PIN_COLLAR_RIM_WORST:.2f} MIN.",
         f"PILOT WALL {PILOT_WALL_WORST:.2f} MIN.",
         f"SLOT FLOOR TO FRONT FACE {SLOT_FLOOR_WALL_WORST:.2f} MIN.",
+        f"SUPPLY THE PILOT {PILOT_BLANK_LENGTH_MIN:.2f} MIN LONG.",
         FIT_UP_NOTE,
     )
 )

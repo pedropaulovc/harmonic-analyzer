@@ -1,13 +1,12 @@
 r"""Create the manufacturing drawing for the transgear knob cup (MHA-157).
 
-The face view is the ``*Top`` orientation, looking into the counterbore from
-the rear: it carries the drilled bore with its process.  Section A-A cuts it
-on the cup axis through the Front plane, the plane of the turned profile, so
-the O.D., the counterbore, the length and the counterbore floor -- measured
-from the front face, the one dimension the retaining screw's engagement
-rides on -- print on solid cut edges (policy: a floor no hole callout states
-takes a section, never hidden lines).  The front face is the running face on
-the plate's rear boss and carries its finish.
+The face view is the ``*Top`` orientation, looking into the ring from the
+rear: it carries the reamed bore with its process and the note that the
+MHA-183 pin hole is drilled at assembly (through cup and journal together,
+so it is not dimensioned here).  Section A-A cuts it on the cup axis through
+the Front plane, the plane of the turned profile, so the O.D. and the length
+print on solid cut edges.  The front face is the running face on the plate's
+rear boss and carries its finish.
 """
 
 from __future__ import annotations
@@ -60,8 +59,8 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# A Ø19 cup: 4:1 keeps the section's four dimensions and the bore callout
-# legible without crowding the landscape sheet.
+# A Ø19 x 8 ring: 4:1 keeps the section (76 x 32 mm on the sheet) and the
+# two-line bore callout legible without crowding the landscape sheet.
 SHEET_SCALE = (4.0, 1.0)
 VIEW_SCALE = (4, 1)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1]
@@ -83,11 +82,11 @@ DIMENSION_CALLOUTS = {"BoreDia": BORE_CALLOUT}
 FACE_KEEP = {
     "BoreDia": (0.040, 0.225),
 }
+# The section spans sheet y 0.154 .. 0.186: the O.D. below it, the length
+# outboard on the right.
 SECTION_KEEP = {
-    "CounterboreDia": (0.200, 0.205),
     "CupDia": (0.200, 0.130),
     "CupLength": (0.255, SECTION_CENTER[1]),
-    "FloorDepth": (0.145, 0.160),
 }
 
 

@@ -12,6 +12,7 @@ import pytest
 import _config
 import build_transgear_drive_collar as part
 import draw_transgear_drive_collar as drawing
+import paper_drive_assembly_steps as steps
 import transgear_collar_cross_pin_spec as cross_pin
 import transgear_drive_collar_spec as spec
 import transgear_knob_shaft_spec as shaft
@@ -42,7 +43,9 @@ def test_every_marked_dimension_prints_in_exactly_one_view() -> None:
     marked = set().union(*spec.DRAWING_DIMENSIONS.values())
     assert set(drawing.END_KEEP) | set(drawing.SIDE_KEEP) == marked
     assert not set(drawing.END_KEEP) & set(drawing.SIDE_KEEP)
-    assert set(drawing.DIMENSION_CALLOUTS_BELOW) <= set(drawing.END_KEEP)
+    assert set(drawing.DIMENSION_CALLOUTS_BELOW) <= (
+        set(drawing.END_KEEP) | set(drawing.SIDE_KEEP)
+    )
     assert set(drawing.DIMENSION_CALLOUTS_ABOVE) <= set(drawing.SIDE_KEEP)
 
 
@@ -347,13 +350,55 @@ def test_bore_slides_on_the_core_and_the_pilot_in_the_wheel() -> None:
     assert (removable.BORE_DIA - removable.BORE_DIA) / 2.0 <= 0.0
 
 
-def test_pilot_stays_behind_the_wheel_front_face() -> None:
-    # 2.8 - 1.9 = 0.9; the thinnest plate 2.7 less the pilot at .XX 2.41.
-    assert spec.PILOT_FACE_INSET == pytest.approx(0.9)
-    assert spec.PILOT_FACE_INSET_WORST == pytest.approx(0.29)
-    assert spec.PILOT_FACE_INSET_WORST > 0.0
-    # Negative control: the pilot length at the .X row reaches the face.
-    assert 2.7 - (spec.PILOT_LENGTH + printed_band_mm(1)) <= 0.0
+def test_the_pilot_is_faced_to_stand_proud_of_the_t24_from_the_blank() -> None:
+    """R9-70: the fitted band is the T24 plate band plus the proud range, the
+    model's pilot lies inside it, and the blank faces to the longest fit with
+    one finishing cut left."""
+    plate_lo, plate_hi = 2.7, 2.8  # the T24 plate, 2.8 +0/-0.1
+    assert spec.PILOT_LENGTH_FITTED_MIN == pytest.approx(
+        plate_lo + min(spec.PILOT_PROUD_RANGE)
+    )
+    assert spec.PILOT_LENGTH_FITTED_MAX == pytest.approx(
+        plate_hi + max(spec.PILOT_PROUD_RANGE)
+    )
+    assert (spec.PILOT_LENGTH_FITTED_MIN, spec.PILOT_LENGTH_FITTED_MAX) == (
+        pytest.approx((2.75, 2.95))
+    )
+    assert (
+        spec.PILOT_LENGTH_FITTED_MIN
+        <= spec.PILOT_LENGTH
+        <= spec.PILOT_LENGTH_FITTED_MAX
+    )
+    assert spec.PILOT_LENGTH == pytest.approx(2.8 + 0.10)
+    assert (
+        spec.PILOT_BLANK_LENGTH_MIN
+        >= spec.PILOT_LENGTH_FITTED_MAX + spec.FACING_ALLOWANCE - 1e-9
+    )
+    assert f"{spec.PILOT_BLANK_LENGTH_MIN:.2f} MIN" in spec.DRAWING_NOTES
+    callout = drawing.DIMENSION_CALLOUTS_BELOW["PilotLength"]
+    fitted = f"{spec.PILOT_LENGTH_FITTED_MIN:.2f}-{spec.PILOT_LENGTH_FITTED_MAX:.2f}"
+    assert fitted in callout
+    assert "FACED TO FIT" in callout
+
+
+def test_the_pilot_length_callout_points_at_its_facing_step() -> None:
+    """The pilot is faced before the collar is pinned; the pointer follows
+    any renumbering."""
+    assert drawing.FIT_STEP_KEY == "pilot-faced-to-fit"
+    assert steps.step_number(drawing.FIT_STEP_KEY) < steps.step_number(
+        "collar-pinned"
+    )
+    callout = drawing.DIMENSION_CALLOUTS_BELOW["PilotLength"]
+    assert callout.endswith(f"PER {steps.step_ref(drawing.FIT_STEP_KEY)}")
+
+
+def test_the_thumbnut_bears_on_the_pilot_and_the_t24_floats() -> None:
+    # Pilot 9.90 min over the nut's countersink: an annulus of bearing.
+    assert spec.NUT_PILOT_BEARING_WORST == pytest.approx(1.575)
+    assert spec.NUT_PILOT_BEARING_WORST > 0.0
+    assert min(spec.T24_FLOAT_RANGE) > 0.0
+    # Negative control: a pilot faced flush with the T24 leaves no float.
+    assert spec.PILOT_LENGTH_FITTED_MIN - min(spec.PILOT_PROUD_RANGE) - 2.7 <= 0.0
 
 
 def test_setting_and_rearward_travel() -> None:
@@ -372,10 +417,11 @@ def test_setting_and_rearward_travel() -> None:
 
 def test_sheet_notes_print_the_floored_worst_walls_then_the_fit_up() -> None:
     notes = spec.DRAWING_NOTES.splitlines()
-    assert notes[:3] == [
+    assert notes[:4] == [
         f"DRIVE-PIN HOLE TO COLLAR RIM {spec.DRIVE_PIN_COLLAR_RIM_WORST:.2f} MIN.",
         f"PILOT WALL {spec.PILOT_WALL_WORST:.2f} MIN.",
         f"SLOT FLOOR TO FRONT FACE {spec.SLOT_FLOOR_WALL_WORST:.2f} MIN.",
+        f"SUPPLY THE PILOT {spec.PILOT_BLANK_LENGTH_MIN:.2f} MIN LONG.",
     ]
     # A MIN never rounds up past the arithmetic; control: rounding would.
     assert spec.floor_2(0.489) == pytest.approx(0.48)
@@ -383,7 +429,8 @@ def test_sheet_notes_print_the_floored_worst_walls_then_the_fit_up() -> None:
     assert spec.floor_2(1.97) == pytest.approx(1.97)
     # R9-29: the collar ships unpinned, so its sheet carries the whole fit-up
     # instruction the assembly prints, with the spec's seat maximum and drill.
-    assert notes[3:] == spec.FIT_UP_NOTE.splitlines()
+    assert notes[4:] == spec.FIT_UP_NOTE.splitlines()
+    assert "THE THUMBNUT SEATS ON THE PILOT" in " ".join(notes[4:])
     assert f"T24 SEAT {spec.SEAT_MAX_FROM_F:.2f}" in spec.DRAWING_NOTES
     assert (
         f"\u00d8{cross_pin.HOLE_DIA:.1f} +{cross_pin.HOLE_BAND[0]:.2f}/0 THROUGH"

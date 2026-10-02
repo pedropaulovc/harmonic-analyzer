@@ -31,7 +31,7 @@ The screws, and the small parts that do not belong anywhere else.
 | `transgear-disc-screw` | TODO | TODO | TODO |
 | `transgear-collar-cross-pin` | TODO | TODO | TODO |
 | `transgear-knob-drive-pin` | TODO | TODO | TODO |
-| `transgear-knob-retaining-screw` | TODO | TODO | TODO |
+| `transgear-knob-cup-pin` | TODO | TODO | TODO |
 | `gooseneck-set-screw` | TODO | TODO | TODO |
 | `guide-lock` | TODO | TODO | TODO |
 | `column-clamp-front` | TODO | TODO | TODO |
