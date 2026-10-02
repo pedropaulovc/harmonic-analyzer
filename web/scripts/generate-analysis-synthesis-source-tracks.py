@@ -3,6 +3,8 @@
 
 Run from any directory with the tracked web/content calibration evidence:
   python web/scripts/generate-analysis-synthesis-source-tracks.py
+Use --video 6dW6VYXp9HM or --video 8KmVDxkia_w to regenerate one selected
+output without validating unrelated video dependencies.
 This retains numeric evidence and chooses continuous Analysis inverse cam roots.
 It loads no CAD/model/browser and does not qualify cameras, recover historical
 settings, or measure any matching stage. Original frozen root choices/costs remain
@@ -41,8 +43,8 @@ CALIBRATION = "web/content/analysis-synthesis.frozen-generation-evidence.json"
 CALIBRATION_SHA256 = "425beca33506fcb307c3892808b7871a8ee2f06b7aa90f7103fc6993e6319267"
 FRAMING_GPU = "web/content/8KmVDxkia_w.framing-gpu-evidence-2026-10-01.json"
 FRAMING_GPU_SHA256 = "239cb59e799bbb42f6551b74c3b6cf1eccf66f9b0ec7c93518f743b37caf4173"
-CAMROD_BRIDGE_SHA256 = "521ed83d88ba163fd9623c5ed3229c0b16955825ba2031e045695cd00c486312"
-CAMROD_PROBE_SHA256 = "c1e698845d2f38e20df43f9bcf090cf7b43bed4de74eb6d776adbbbfcafee389"
+CAMROD_BRIDGE_SHA256 = "f1fa25d925592a51959b6908dac3651da4c8f6dc8a640be77e68f152620caade"
+CAMROD_PROBE_SHA256 = "c6dbce2f8391d938958d3798a6866092f9db4e1ad8be7a0626df6dfad46102a5"
 CAMROD_DEPENDENCY_FINGERPRINT = "sha256-canonical-json-repo-path-bytes-v1"
 
 
@@ -225,7 +227,6 @@ class Generator:
             for frame in self.data["frames"]:
                 if frame["shotId"] == "analysis-39":
                     frame["sourceMachineRequirement"] = "required"
-                    frame["views"] = self.analysis_endcard_layout()
             self.data["compactChangeTimesSeconds"] = [
                 self.shots[name]["startSeconds"] + f*(self.shots[name]["endSeconds"]-self.shots[name]["startSeconds"])
                 for name in ("analysis-03","analysis-05","analysis-07","analysis-13","analysis-15","analysis-17","analysis-19","analysis-28")
@@ -329,6 +330,7 @@ class Generator:
         # Validate the producer's existing source-inspected layout normalization,
         # not the legacy outgoing/incoming layer guess retained in track.json.
         self.chosen_camera_permissions = self.chosen_camera_continuity_packet(video_id, permission_packet)
+        self.chosen_camera_permission_packet = permission_packet
 
     def chosen_camera_continuity_packet(self, video_id, packet):
         """Optional authored permissions, bounded by unchanged native source rows."""
@@ -1092,29 +1094,28 @@ class Generator:
                 return value, f"Complete immutable numeric baseline plus source-observed {feature} vertical-displacement witness. Assumed harmonic1 branch/small coefficient; pixel range mapped to cosine phase, not metrically recovered source motion or station association. Other hidden settings held, no generic animation."
         return value, "Complete immutable physically exercised small-large input baseline; unmeasured source-visible motion/coefficients held rather than invented. This is a source-informed static candidate, not historical state recovery."
 
-    @staticmethod
-    def analysis_endcard_layout():
-        # Visually read from original AnalysisMP4 at220s: boundaries x640/1280,
-        # y540. These are this source's boxes, not copied Spin source pixels.
-        views = [{"id":"endcard-intro","rectSourcePixels":[0,0,640,540],"presentation":"native"},
-                 {"id":"endcard-synthesis","rectSourcePixels":[640,0,640,540],"presentation":"native"},
-                 {"id":"endcard-book","rectSourcePixels":[0,540,640,540],"presentation":"native"},
-                 {"id":"endcard-guide","rectSourcePixels":[640,540,640,540],"presentation":"native"},
-                 {"id":"endcard-rocker","rectSourcePixels":[1280,540,640,540],"presentation":"native"}]
-        views.extend({"id":f"endcard-operation-paper-{i}","rectSourcePixels":[1280,180*i,640,180],"presentation":"native"} for i in range(3))
-        return views
 
     def donor_view(self, original, donor_id):
         donor = self.donors["views"][donor_id]
-        return {"id":original["id"],"rectSourcePixels":original["rectSourcePixels"],
+        result = {"id":original["id"],"rectSourcePixels":original["rectSourcePixels"],
                 "presentation":original.get("presentation",donor.get("presentation","native")),
                 "camera":common.compact_camera(donor["camera"]),
                 "input":common.compact_input(self.donors["candidates"][donor["candidateId"]]["input"]),
                 "provenance":common.chosen_provenance(f"Photographed branch donor {donor_id}/{donor['candidateId']} from XPQwKRt4Y2k.source-seeds.json. Source boxes retained/independently inspected; camera/full input transferred as a coarse chosen candidate, NOT measured current-source pixels, history or GPU qualification. Blurred layer weights and source footage cadence unobserved.")}
+        composite = common.compact_composite(original)
+        warp = common.resolve_warp(original)
+        if composite:
+            result["composite"] = composite
+        if warp:
+            result["imagePlaneWarp"] = warp
+        return result
 
     def views(self, frame):
         output = []
         for original in common.source_views(frame,self.data):
+            if (self.analysis and frame["shotId"] != "analysis-39"
+                    and common.source_requirement(original) == "unreadable-navigation" and original.get("camera") is None):
+                continue
             donor_id = original["id"]
             if not self.analysis:
                 donor_id = {"endcard-plaque":"endcard-intro","endcard-bank":"endcard-analysis","endcard-pen-inset":"endcard-analysis-pen-inset"}.get(donor_id, donor_id)
@@ -1145,7 +1146,9 @@ class Generator:
             width = max(1.,1920*f)
             original = {"id":"bar-bank", "rectSourcePixels":[1920-width,0,width,1080], "presentation":"native"}
             family="bar";camera,note=self.camera(frame,original,family);value,why=self.input(frame,family)
-            output.append({**original,"camera":camera,"input":common.compact_input(value),"provenance":common.chosen_provenance(note+" "+why+" Expanding insert layout inferred linearly from the independently retained shot onset/settle; rectangle is chosen, not measured.")})
+            output.append({**original,"sourceViewIds":["main"],
+                "sourceViewMappingEvidence":"Authored bar-bank insert decomposition of the retained main source view. Its expanding rectangle is chosen from the shot onset/settle, not an independently measured view boundary.",
+                "camera":camera,"input":common.compact_input(value),"provenance":common.chosen_provenance(note+" "+why+" Expanding insert layout inferred linearly from the independently retained shot onset/settle; rectangle is chosen, not measured.")})
         fades = {"analysis-13":("spring","pen"), "analysis-15":("pen","cone"), "analysis-28":("spring","pen")}
         if self.analysis and frame["shotId"] in fades:
             shot = self.shots[frame["shotId"]]
@@ -1180,7 +1183,7 @@ class Generator:
         track = common.build_track(self.data,self.views,[
             "Regenerate with python web/scripts/generate-analysis-synthesis-source-tracks.py; all active inputs are pinned tracked web/content calibration evidence, renderer binding metadata and source declarations. Ignored paths are historical provenance only; source/model hashes remain unchanged.",
             "All50/20/10/5% width stages remain unmeasured. CPU camera rejection at2% is not a blanket removal of a coarser candidate. No GPU/model/browser execution or historical source recovery.",
-            "Camera/input/layout assumptions are declared per view. All retained source shots and integer/change/layout keys remain required, including nested endcards; source copyrighted artwork is not reconstructed."])
+            "Camera/input/layout assumptions are declared per view. Retained source shots and integer/change/layout keys remain unchanged; only evidenced unreadable-navigation backgrounds waive measurement, with original nested source archives retained."])
         track["source"] = copy.deepcopy(self.data["source"])
         if self.analysis_held_camera:
             application = self.analysis_held_camera["application"]
@@ -1196,7 +1199,7 @@ class Generator:
                 raise ValueError("Analysis held-camera application is empty or leaves retained stationary main exposures uncovered.")
             track["evidence"]["analysisStationaryFrontCamera"] = copy.deepcopy(self.analysis_held_camera)
             track["evidence"]["notes"].append(self.analysis_held_camera["interpretation"])
-        track["evidence"]["notes"].append("Analysis endcard boxes independently inspected from retained original MP4 at220s. Donor photographed camera branches are explicitly chosen, not copied source pixels. Page-flip uses a finite chosen projective-layout baseline, not recovered editing history.")
+        track["evidence"]["notes"].append("Authoritative terminal navigation boxes and waiver evidence come from retained original-source observations. Existing photographed camera branches remain chosen metadata, not copied source pixels. Newly archived unreadable backgrounds have no inferred camera/input. Page-flip uses a finite chosen projective-layout baseline, not recovered editing history.")
         track["cpuDiagnostics"] = {
             "analysisFourSeed": {"source":f"{ANALYSIS}/candidate.json", "qualification":self.candidate["qualification"], "distributions":self.candidate["fullSourceRawAndNormalizedDistributions"]},
             "synthesisPinhole": {"source":CALIBRATION, "jsonPointer":"/inputs/pinhole/data", "finiteAttempts":self.pinhole["finiteAttemptCount"], "positiveDepthCandidates":self.pinhole["physicalPositiveDepthEscapeCount"], "sourceAccepted":False},
@@ -1233,6 +1236,7 @@ class Generator:
             track["sourceMeasurements"]["blockers"].append("Cone-overview's two-FIT similarity remains chosen/unqualified. Cam-rod now uses three original FIT pixels and same-input actual native world markers for a root-selected upright fixedFOV30/centredPP SQPNP physical pose; previous camera similarities are historical/unaccepted. Its declared15deg upright branch prior is not a measured historical camera. Only3FIT depths are established, not whole geometry or GPU/stage acceptance;3FIT/1CHECK still lacks qualified6FIT/2CHECK. Pinion CHECK was never used for objective/ranking/selection and remains held out for root measurement.")
             track["sourceMeasurements"]["blockers"].append("Synthesis presenter-to-spin has one original main machine view with chosen coarse principal-point/FOV reframing. No independently measured transition FIT/CHECK landmarks or per-exposure camera fits are introduced; presenter/black graphic/formula are not native geometry.")
         self.camera_metadata(track)
+        track["evidence"]["chosenCameraInterpolation"] = copy.deepcopy(self.chosen_camera_permission_packet)
         return track
 
     def camera_metadata(self, track):
@@ -1240,6 +1244,8 @@ class Generator:
         applied_permissions = set()
         for frame in track["frames"]:
             for view in frame["views"]:
+                if view.get("camera") is None:
+                    continue
                 evidence = view["provenance"]["evidence"]
                 camera = view["camera"]
                 component = self.family(frame,view)

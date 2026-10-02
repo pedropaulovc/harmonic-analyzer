@@ -97,11 +97,46 @@ These are maximum admitted landmark/contour source-pixel errors, not percentages
 of videos covered. At 1920 pixels wide the limits are 960, 384, 192 and 96 pixels respectively.
 The final target is 5%; video/model timing stays within 0.5 seconds at every stage.
 
-Start with working approximate camera and mechanism tracking across **all six**
-videos, then present an actual browser demo before refining to 20%, 10%
-and 5%. Complete one coarse pass across the collection rather than perfecting
-one video while the others remain unavailable. Each stage reports its measured
-coverage, maximum errors and unresolved intervals; unmeasured is not passed.
+Active implementation now prioritizes **Synthesis and Analysis**. Preserve the
+other four routes and their existing data, but do not expand their calibration
+or evidence collection unless a shared playback dependency requires it.
+The six-video product scope remains; this changes the implementation order.
+
+The unit of progress is an **integrated playable interval**, not an observation
+row, private camera fit, source gallery or verification packet. For each active
+video, select a named source interval with visible mechanism or camera changes,
+integrate its compact track through the normal generator, then demonstrate it
+in the ordinary browser companion with original playback and audio.
+The demo must show continuous motion, a seek, pause/manual exploration and
+return to following playback. Record the interval, visible before/after change,
+measured error where available and remaining mismatches. Do not call an
+approximation a fidelity pass.
+
+Hold one camera and fixed-feature state throughout a verified stationary shot.
+Use sparse source-measured camera/input keys and the existing interpolation for
+continuous changing shots; add keys only when an actual rendered/source mismatch
+requires them. Fixed framing does not imply a stationary mechanism. Never
+interpolate through cuts, setup changes, occlusions or unavailable evidence,
+and never label interpolated source coordinates independent CHECK measurements.
+Keep required actual-footage verification timestamps even when runtime keys are
+sparse.
+
+Develop Synthesis and Analysis increments concurrently with separate video owners
+and one shared-code integration owner. Serialize expensive browser/GPU checks,
+not implementation. Demonstrate one useful increment per video before widening
+calibration; each ready increment publishes and merges independently. Iterate
+their observed discrepancies
+through 20%, 10% and 5%; prioritize the largest visible mismatch, not the largest
+evidence backlog. A prerequisite repair belongs in the increment only when it
+blocks loading, following the clock, coherent motion or measuring that interval.
+Each stage reports coverage, maximum errors and unresolved intervals;
+unmeasured is not passed.
+
+Publish each demonstrated increment as a small ready PR and merge it when its
+build and review gates pass, rather than holding progress for whole-video
+fidelity. Record publishing, review and merge as separate milestones.
+An incremental PR must state its implemented interval and remaining fidelity
+gaps; merging it does not certify a complete video or tolerance stage.
 
 ### Runtime tracks
 
@@ -166,6 +201,13 @@ close-ups, moving mechanisms, insets, mirrored views, photographs and montages.
 A difficult view does not become exempt because it cannot yet be matched.
 Intervals without a corresponding machine may retain the preceding pose.
 Unsupported required intervals remain explicit in the UI and reports.
+
+The user-approved navigation exception applies only to deliberately blurred,
+text-covered thumbnail backgrounds. Each waived source view retains its original
+records and an explicit reason; all timestamps, playback and audio remain in
+scope. Wholly unreadable navigation holds the last 3D pose with an unmeasured
+status. Mixed transitions still update and verify sharp outgoing or readable
+machine views. No other missing observation or difficult mechanism is exempt.
 
 Count the machine views actually visible in the footage. Synthesis's
 presenter-to-spin edit moves one machine image; it uses one native view with

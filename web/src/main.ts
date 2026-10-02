@@ -3,7 +3,7 @@ import { createMechanismInput, MECHANISM_DATA, type MechanismInput } from './mec
 import { MAGNIFIER_RATIO_MIN, MAGNIFIER_RATIO_MAX, physicalChannelAngle, squareWave } from './kinematics'
 import { VIDEOS, resolveVideo, type Video } from './video-catalog'
 import { createVideoPlayer, type PlaybackState, type VideoPlayer } from './youtube-player'
-import { loadReference, serializeInput, SOURCE_STAGE_PERCENTAGES, LANDMARK_LIMIT_PX, type PlaybackView, type ReferenceState } from './timeline'
+import { loadReference, serializeInput, SOURCE_STAGE_PERCENTAGES, LANDMARK_LIMIT_PX, type PlaybackView, type ReferenceState, type WaivedSourceView } from './timeline'
 import type { CompactVideoReference } from './source-track'
 import { createSourceVideoPlayer } from './source-player'
 import { INPUT_FIELDS, equalRecord, type InputField } from './source-witness'
@@ -68,12 +68,14 @@ let referenceSeek: 'idle' | 'seeking' = 'idle'
 let referenceState: ReferenceState = 'unavailable'
 let modelState: 'loading' | 'ready' | 'unavailable' = 'loading'
 let modelTime = 0
+let referenceTimeSeconds: number | null = null
 let manualMotion: 'idle' | 'turning' = 'idle'
 let manualRevision: 'pending' | 'clean' = 'pending'
 let paintRevision: 'pending' | 'clean' = 'pending'
 let physicsState: 'available' | 'unavailable' = 'unavailable'
 let playerSize: 'expanded' | 'compact' = 'expanded'
 let activeViews: readonly PlaybackView[] = []
+let activeWaivedViews: readonly WaivedSourceView[] = []
 let initialCamera: CameraRecord | null = null
 let explorationOrigin: 'interactive-default' | 'chosen-feasible-reconstruction' = 'interactive-default'
 interface MechanismDraw {
@@ -274,7 +276,7 @@ function renderedMechanism(viewId: string) {
   const draw = mechanismDraws.get(viewId)
   if (!draw) return { status: 'unavailable' as const, viewId, imagePlaneWarp: null, resolvedImagePlaneWarp: null, sourceLayout: [] }
   return {
-    status: mode === 'exploring' || referenceState === 'unavailable' || draw.timeSeconds !== modelTime ? 'stale' as const : draw.status,
+    status: mode === 'exploring' || referenceState !== 'approximate' || !activeViews.some((view) => view.id === viewId) || draw.sourceDrawRevision !== sourceDrawRevision || draw.timeSeconds !== modelTime ? 'stale' as const : draw.status,
     viewId, timeSeconds: draw.timeSeconds, sourceDrawRevision: draw.sourceDrawRevision,
     method: 'actual-native-mechanism-solve' as const, input: serializeInput(draw.input),
     mechanicalProvenance: draw.mechanicalProvenance, unobservedInputFields: draw.unobservedInputFields,
@@ -298,7 +300,7 @@ function sourceCapture<T extends {
     && draw.timeSeconds === capture.timeSeconds && equalRecord(draw.resolvedImagePlaneWarp, capture.resolvedImagePlaneWarp)
     && equalRecord(draw.sourceLayout, capture.sourceLayout)
   const status = capture.status === 'captured' && (mode !== 'reference-review' || referenceSeek !== 'idle' || player?.getState() !== 'paused') ? 'unavailable' as const
-    : capture.status === 'captured' && (!bound || referenceState === 'unavailable' || capture.timeSeconds !== modelTime) ? 'stale' as const : capture.status
+    : capture.status === 'captured' && (!bound || referenceState !== 'approximate' || capture.timeSeconds !== modelTime) ? 'stale' as const : capture.status
   return {
     ...capture,
     status,
@@ -316,13 +318,15 @@ function renderSource(timeSeconds: number): void {
     return
   }
   const prepared = reference.prepareAt(timeSeconds)
-  if (prepared.state !== 'unavailable') {
+  if (prepared.state !== 'unavailable' && prepared.state !== 'waived-navigation') {
     validateSourceViews(prepared.views)
     viewer.preflightViews(prepared.views)
   }
   const sample = reference.commitPrepared()
   referenceState = sample.state
   activeViews = sample.views
+  activeWaivedViews = sample.waivedViews
+  referenceTimeSeconds = sample.timeSeconds
   if (sample.state === 'unavailable') {
     notice(sourceError, sample.reason)
     renderPending()
@@ -336,9 +340,9 @@ function renderSource(timeSeconds: number): void {
     drawSourceViews(sample.views, timeSeconds)
     paintRevision = 'clean'
   }
-  modelTime = timeSeconds
+  if (sample.state !== 'waived-navigation') modelTime = timeSeconds
   notice(physicsError, '')
-  notice(sourceError, reference.approximationMessage)
+  notice(sourceError, sample.reason)
 }
 
 function beforeView(_view: SourceView, index: number): void {
@@ -349,10 +353,12 @@ function beforeView(_view: SourceView, index: number): void {
 function updateHud(): void {
   const time = player?.getTime() ?? 0
   const chosen = mode === 'exploring' ? undefined : primaryView()
+  const navigationContext = activeWaivedViews.length ? `${activeWaivedViews.length} unreadable navigation archival view ${activeWaivedViews.length === 1 ? 'record' : 'records'} measurement-waived` : ''
   const context = mode === 'exploring'
     ? explorationOrigin === 'chosen-feasible-reconstruction' ? 'Manual exploration from chosen feasible reconstruction (not recovered history)' : 'Manual exploration'
-    : referenceState === 'approximate' ? 'Approximate source-following; chosen inputs, not recovered history or a final matched result'
-      : referenceState === 'no-machine' ? 'No corresponding machine in this source interval' : 'Source pose unavailable'
+    : referenceState === 'approximate' ? `Approximate source-following; chosen inputs, not recovered history or a final matched result${activeWaivedViews.length ? ` · ${navigationContext}; required views retained` : ''}`
+      : referenceState === 'waived-navigation' ? `${navigationContext}; last physical pose held, not a current source reconstruction`
+        : referenceState === 'no-machine' ? 'No corresponding machine in this source interval' : 'Source pose unavailable'
   const hidden = chosen?.unobservedInputFields ?? []
   const valueLabel = (field: InputField, value: string): string => `${value}${hidden.includes(field) ? ' · chosen, not measured' : mode !== 'exploring' && !chosen ? ' · not source-measured' : ''}`
   const markControl = (control: HTMLInputElement | HTMLSelectElement, field: InputField): void => {
@@ -409,7 +415,7 @@ function updateHud(): void {
     maximum = Math.max(maximum, force)
   }
   const forceView = mode === 'exploring' ? undefined : activeViews[activeViews.length - 1]
-  const forceProvenance = mode === 'exploring' ? 'Manual physical calculation — not source measurements' : forceView ? 'Chosen-input physical calculation — not source measurements' : 'Last physical calculation — source reconstruction unavailable, not source-measured'
+  const forceProvenance = mode === 'exploring' ? 'Manual physical calculation — not source measurements' : forceView ? 'Chosen-input physical calculation — not source measurements' : referenceState === 'waived-navigation' ? 'Last physical calculation held during unreadable navigation — not source-measured' : 'Last physical calculation — source reconstruction unavailable, not source-measured'
   const counterChoice = forceView?.unobservedInputFields.includes('setup.counterHeightM') ? `\nCounter ${forceView.input.setup.counterHeightM === null ? 'auto-level algorithm' : 'height'} chosen, not measured` : ''
   forceReadout.value = `${forceProvenance}${forceView ? ` · view ${forceView.id}` : ''}\n20 springs · ${minimum.toFixed(2)}–${maximum.toFixed(2)} N\nTorque residual ${machine.pose.equilibriumResidualNm.toExponential(1)} N·m\nPaper feed ${(machine.pose.platenTravelM * 1000).toFixed(2)} mm${counterChoice}`
 }
@@ -481,6 +487,7 @@ async function selectVideo(next: Video): Promise<void> {
   player = null
   reference = null
   activeViews = []
+  activeWaivedViews = []
   explorationOrigin = 'interactive-default'
   configureLandmarkProbe()
   referenceSeek = 'idle'
@@ -489,6 +496,7 @@ async function selectVideo(next: Video): Promise<void> {
   playbackState = 'unstarted'
   referenceState = 'unavailable'
   modelTime = 0
+  referenceTimeSeconds = null
   copyInput(createMechanismInput())
   manualRevision = 'pending'
   mode = 'exploring'
@@ -705,7 +713,7 @@ if (verificationEnabled) {
       const chosen = mode === 'exploring' ? undefined : primaryView()
       return {
         videoId: video?.id ?? null, playerVideoId: player?.getVideoId() ?? null, mode, playerState: player?.getState() ?? playbackState,
-        videoTime: player?.getTime() ?? null, modelTime, referenceState, modelState, missingBindings: machine?.missing ?? [],
+        videoTime: player?.getTime() ?? null, modelTime, referenceTimeSeconds, referenceState, modelState, missingBindings: machine?.missing ?? [],
         modelProvenance: machine?.provenance ?? null, camera: cameraRecord(), input: serializeInput(input),
         sourceDrawRevision, sourceDrawTimeSeconds, diagnosticCapture: diagnosticReference !== null && diagnosticReference === reference && diagnosticMachine === machine && mode === 'reference-review' && referenceSeek === 'idle' && player?.getState() === 'paused' ? 'paused-reference-review' : 'disabled',
         sourceFollowing: reference ? { kind: reference.kind, stageLadder: SOURCE_STAGE_PERCENTAGES, finalTolerancePx: LANDMARK_LIMIT_PX, stages: reference.stageStatus, stageEvidence: 'unmeasured: no independently bound rendered report loaded', sourceMeasurements: reference.data.sourceMeasurements ?? null } : null,
@@ -718,6 +726,7 @@ if (verificationEnabled) {
         nativeGeometryAssumptions: reference?.data.nativeGeometryAssumptions ?? [],
         physics: machine && physicsState === 'available' ? { renderedViewId: mode === 'exploring' ? 'exploring' : activeViews[activeViews.length - 1]?.id ?? null, mechanicalProvenance: mode === 'exploring' ? null : activeViews[activeViews.length - 1]?.mechanicalProvenance ?? null, springForcesN: Array.from(machine.pose.springForcesN), springLengthsM: Array.from(machine.pose.springLengthsM), equilibriumResidualNm: machine.pose.equilibriumResidualNm, platenTravelM: machine.pose.platenTravelM, summingAngleRad: machine.pose.summingAngleRad } : null,
         playerAudio: player?.getAudio() ?? null,
+        waivedViews: activeWaivedViews,
         views: activeViews.map((view) => ({ id: view.id, rectSourcePixels: view.rectSourcePixels, presentation: view.presentation, composite: view.composite, imagePlaneWarp: view.authoredImagePlaneWarp, resolvedImagePlaneWarp: view.imagePlaneWarp ?? null, sourceLayout: view.sourceLayout, camera: view.camera, input: serializeInput(view.input), mechanicalProvenance: view.mechanicalProvenance, unobservedInputFields: view.unobservedInputFields, sourceSampling: view.sourceSampling, nativeGeometryAssumptions: view.nativeGeometryAssumptions, renderedMechanism: renderedMechanism(view.id) })),
       }
     },
@@ -741,8 +750,10 @@ if (verificationEnabled) {
         verticalFovDegrees: sourceCamera.verticalFovDegrees,
       }
       const prepared = reference.prepareAt(timeSeconds)
-      validateSourceViews(prepared.views)
-      viewer.preflightViews(prepared.views)
+      if (prepared.state !== 'waived-navigation') {
+        validateSourceViews(prepared.views)
+        viewer.preflightViews(prepared.views)
+      }
       copyInput(input, reviewRollbackInput)
       try {
         mode = 'reference-review'

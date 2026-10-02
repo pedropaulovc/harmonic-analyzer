@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 const { parseOptions, sourceCensus, finishVideo, seekSettlement, sourcePtsInShot, requireSourceViews, measureView, measureContours, sourceContourSidecar, playbackInterval, sourceSeedIndex, diagnosticReplayOutcome, requirePausedReview, compareCameraPose, normalizeVerificationReport, resolveVerificationReport, writeVerificationReport } = await import(process.env.HARMONIC_VERIFY_SYNC_MODULE ?? './verify-sync.mjs')
-import { jsonDigest, sourceLayoutForViews } from './verify-reference.mjs'
+import { jsonDigest, sourceLayoutForViews, sourceViewMeasurementRequirement } from './verify-reference.mjs'
 import { mkdtemp, readFile, writeFile, rm, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -173,6 +173,63 @@ test('compact-required endcards retain all source views despite a legacy non-mac
   const row = sourceCensus(legacy, { shots: legacy.shots, frames: authored }, native, parseOptions(['--times', '1'])).selected[0]
   assert.equal(row.required, true)
   assert.deepEqual(row.expectedViewIds, ['endcard-a', 'endcard-b'])
+})
+
+test('navigation waivers are explicit per-view declarations and malformed values cannot weaken coverage', () => {
+  assert.equal(sourceViewMeasurementRequirement({ id: 'clear' }), 'required')
+  for (const measurementRequirement of [null, '', 0, false, 'unreadable', 'waived']) {
+    const invalid = { ...frame(1), views: [{ id: 'main', measurementRequirement, measurementRequirementEvidence: 'Original source inspected' }] }
+    assert.throws(() => sourceCensus({ ...observations, frames: [invalid] }, { frames: [invalid] }, native, parseOptions(['--times', '1'])), /requirement/)
+  }
+  assert.throws(() => sourceViewMeasurementRequirement({ id: 'nav', measurementRequirement: 'unreadable-navigation', measurementRequirementEvidence: ' ' }), /evidence/)
+})
+
+test('a sharp outgoing view remains required across a mixed-to-wholly-unreadable navigation boundary', () => {
+  const nav = { id: 'navigation', measurementRequirement: 'unreadable-navigation', measurementRequirementEvidence: 'Original terminal thumbnail is severely blurred and text-covered', camera: null, input: null }
+  const clear = { id: 'main', camera: {}, input: {} }
+  const frames = [{ ...frame(0), views: [clear] }, { ...frame(1), views: [clear, nav] }, { ...frame(2), views: [nav] }]
+  const census = sourceCensus({ ...observations, frames }, { frames }, native, parseOptions(['--times', '1,2']))
+  const mixed = census.selected.find(row => row.timeSeconds === 1), held = census.selected.find(row => row.timeSeconds === 2)
+  assert.equal(mixed.required, true)
+  assert.deepEqual(mixed.expectedViewIds, ['main'])
+  requireSourceViews(mixed)
+  assert.throws(() => requireSourceViews({ ...mixed, frame: { ...mixed.frame, views: [nav] } }), /omitted/)
+  assert.equal(held.required, false)
+  assert.deepEqual(held.expectedViewIds, [])
+  assert.deepEqual(held.waivedViews.map(view => view.id), ['navigation'])
+  const weakened = { frames: frames.map(frame => ({ ...frame, views: frame.views.map(view => view.id === 'main' ? { ...view, ...nav, id: 'main' } : view) })) }
+  const originalRequired = sourceCensus({ ...observations, frames }, weakened, native, parseOptions(['--times', '1'])).selected[0]
+  assert.equal(originalRequired.required, true)
+  assert.throws(() => requireSourceViews(originalRequired), /incorrectly waived/)
+})
+
+test('wholly unreadable navigation holds stale 3D pose but still requires the current original-source clock', () => {
+  const view = { id: 'nav', measurementRequirement: 'unreadable-navigation', measurementRequirementEvidence: 'Original terminal background is severely blurred' }
+  const sample = { ...frame(1), views: [view] }
+  const actual = { mode: 'reference-review', playerState: 'paused', referenceState: 'waived-navigation', referenceTimeSeconds: 1, modelTime: 0, views: [], waivedViews: [view] }
+  const media = { mediaTime: 1, paused: true, seeking: false }
+  requirePausedReview(actual, media, sample, false)
+  assert.throws(() => requirePausedReview({ ...actual, referenceTimeSeconds: 0 }, media, sample, false), /0.5s/)
+  assert.throws(() => requirePausedReview({ ...actual, referenceState: 'approximate', views: [view] }, media, sample, false), /waived\/unmeasured/)
+  assert.throws(() => requirePausedReview({ ...actual, waivedViews: [] }, media, sample, false), /waived\/unmeasured/)
+  assert.throws(() => requirePausedReview(actual, media, sample, true), /waived\/unmeasured/)
+})
+
+test('navigation archives are counted separately and cannot erase a clear-view measured counterexample', () => {
+  const video = videoFixture()
+  video.samples[0].status = 'failed'
+  video.samples[0].measurements[0] = measurement('fixed', 'fixed', 'failed')
+  const waivedView = { id: 'nav', status: 'waived-unmeasured', measurementRequirement: 'unreadable-navigation', measurementRequirementEvidence: 'Original navigation background unreadable', retainedLandmarks: [{ anchorId: 'archived-check', role: 'check', status: 'observed', pixel: [100, 200] }] }
+  video.samples.push({ timeSeconds: 1, sampleTimeSeconds: 1, reasons: ['every-second'], required: false, status: 'waived-unmeasured', waivedViews: [waivedView], unavailable: [], measurements: [], maxClockSkewSeconds: 0.1 })
+  const census = { rows: [...censusFixture.rows, { timeSeconds: 1, required: false, reasons: ['every-second'], waivedViews: [waivedView] }] }
+  finishVideo(video, census, parseOptions(['--stage', '20']))
+  assert.equal(video.landmarks.measured, 2)
+  assert.equal(video.navigationWaivers.selectedWhollyWaivedSamples, 1)
+  assert.equal(video.navigationWaivers.selectedWaivedArchivalViewSamples, 1)
+  assert.equal(video.coverage.selectedRequiredSamples, 1)
+  assert.equal(video.coverage.failedRequiredSamples, 1)
+  assert.equal(video.status, 'failed')
+  assert.equal(video.stageMeasurement.status, 'failed')
 })
 
 test('source PTS is half-open in its own shot, never rescued by the0.5s clock bound', () => {

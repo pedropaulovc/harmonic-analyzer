@@ -402,6 +402,27 @@ export function sourceNeedsMachine(frame, shot) {
   if (frame.classification === 'non-machine' || shot?.hasCorrespondingMachine === false) return false
   return true
 }
+
+/** A waiver is an explicit source-view declaration, never inferred from a shot label. */
+export function sourceViewMeasurementRequirement(view) {
+  const requirement = Object.hasOwn(view, 'measurementRequirement') ? view.measurementRequirement : 'required'
+  if (!['required', 'unreadable-navigation'].includes(requirement)) throw new Error(`Unknown source-view measurement requirement: ${String(requirement)}`)
+  if (requirement === 'unreadable-navigation' && !text(view.measurementRequirementEvidence)) throw new Error(`Unreadable navigation view ${view.id ?? ''} needs original-source evidence`)
+  return requirement
+}
+
+export function frameRequiredViews(frame, shot) {
+  const views = frameViews(frame)
+  const required = views.filter(view => sourceViewMeasurementRequirement(view) === 'required')
+  return sourceNeedsMachine(frame, shot) ? required : []
+}
+
+/** Missing required layouts stay mandatory; wholly waived archives do not become measurements. */
+export function frameRequiresMeasurement(frame, shot) {
+  const views = frameViews(frame)
+  const requirements = views.map(sourceViewMeasurementRequirement)
+  return sourceNeedsMachine(frame, shot) && (!views.length || requirements.includes('required'))
+}
 /** Index of the source frame governing time t (last frame at or before t), or -1. */
 export function frameIndexAt(frames, time) {
   let lo = 0, hi = frames.length
@@ -414,7 +435,7 @@ export function requiredRuns(data) {
   const runs = []
   let current = null
   for (const frame of data.frames ?? []) {
-    const required = sourceNeedsMachine(frame, shots.get(frame.shotId))
+    const required = frameRequiresMeasurement(frame, shots.get(frame.shotId))
     if (required && !current) current = { startSeconds: frame.timeSeconds, endSeconds: null, frames: 0 }
     if (!required && current) { current.endSeconds = frame.timeSeconds; runs.push(current); current = null }
     if (current) current.frames++
@@ -641,7 +662,7 @@ export function cameraEvidenceErrors(data) {
     }
     active.delete(key); resolved.set(key, expected); return expected
   }
-  for (const [key, { frame, view }] of contexts) if (view.camera && sourceNeedsMachine(frame, data.shots?.find(shot => shot.id === frame.shotId))) {
+  for (const [key, { frame, view }] of contexts) if (view.camera && sourceViewMeasurementRequirement(view) === 'required' && sourceNeedsMachine(frame, data.shots?.find(shot => shot.id === frame.shotId))) {
     try { resolveCamera(key) } catch (error) { active.clear(); errors.push({ code: 'camera-evidence', detail: error.message, timeSeconds: frame.timeSeconds, viewId: view.id }) }
   }
   return errors
@@ -652,7 +673,7 @@ export function inspectReference(data, expectedId, native = null) {
   const failures = []
   const fail = (code, detail, timeSeconds, viewId) => failures.push({ code, detail, ...(timeSeconds === undefined ? {} : { timeSeconds }), ...(viewId === undefined ? {} : { viewId }) })
   const source = data?.source, coverage = data?.coverage
-  const summary = { videoId: expectedId, frameCount: 0, integerSecondsRequired: 0, integerSecondsPresent: 0, changeTimesRequired: 0, changeTimesPresent: 0, machineFrames: 0, exemptFrames: 0, requiredViews: 0, fitLandmarks: 0, checkLandmarks: 0, nativeLineChecks: 0, sourceContourChecks: 0, sourceContourFits: 0, sourcePtsChecked: 0, maxDecodeSkewSeconds: 0, intervals: [], failures }
+  const summary = { videoId: expectedId, frameCount: 0, integerSecondsRequired: 0, integerSecondsPresent: 0, changeTimesRequired: 0, changeTimesPresent: 0, machineFrames: 0, exemptFrames: 0, requiredViews: 0, waivedFrames: 0, waivedViews: [], fitLandmarks: 0, checkLandmarks: 0, nativeLineChecks: 0, sourceContourChecks: 0, sourceContourFits: 0, sourcePtsChecked: 0, maxDecodeSkewSeconds: 0, intervals: [], failures }
   if (data?.schemaVersion !== 1) fail('schema', 'schemaVersion must be 1')
   if (source?.videoId !== expectedId || !hash(source?.sha256) || source?.width !== 1920 || source?.height !== 1080 || !finite(source?.durationSeconds) || source.durationSeconds <= 0) {
     fail('source-identity', 'Expected this public video, its SHA256, 1920×1080 and a positive duration')
@@ -720,25 +741,36 @@ export function inspectReference(data, expectedId, native = null) {
       nativeIndices.add(index); summary.sourcePtsChecked++; summary.maxDecodeSkewSeconds = Math.max(summary.maxDecodeSkewSeconds, skew)
       if (frame.sourceImage && frame.sourceImage.frameIndex !== index) fail('source-image-index', `Actual decoded image hash belongs to a different exposure than native ${index}`, t)
     }
+    const views = frameViews(frame), viewIds = new Set(), waived = new Set()
+    for (const view of views) {
+      try { if (sourceViewMeasurementRequirement(view) === 'unreadable-navigation') waived.add(view.id) }
+      catch (error) { fail('view-measurement-requirement', error.message, t, view.id) }
+    }
     if (!sourceNeedsMachine(frame, shot)) {
       summary.exemptFrames++
-      if ((frame.landmarks?.length ?? 0) > 0 || frame.views?.some(view => view.camera)) fail('non-machine-evidence', 'A no-corresponding-machine hold cannot conceal measured physical views', t)
-      continue
+      if (frame.landmarks?.some(item => !waived.has(item.viewId ?? 'main')) || frame.views?.some(view => !waived.has(view.id) && view.camera)) fail('non-machine-evidence', 'A no-corresponding-machine hold cannot conceal measured physical views', t)
+      if (!waived.size) continue
+    } else {
+      summary.machineFrames++
+      if (!Array.isArray(frame.landmarks) || !Array.isArray(frame.unavailable)) { fail('missing-landmarks', 'Missing actual-source landmark/unavailability arrays', t); continue }
+      if (views.some(view => !waived.has(view.id)) && sourceImageError(frame.sourceImage, source, native)) fail('source-image-identity', 'Every required physical view needs an independently reproducible actual native BGR8 or gray8 exposure', t)
+      if (!views.length) fail('missing-views', 'Corresponding physical machine has no source view', t)
     }
-    summary.machineFrames++
-    if (!Array.isArray(frame.landmarks) || !Array.isArray(frame.unavailable)) { fail('missing-landmarks', 'Missing actual-source landmark/unavailability arrays', t); continue }
-    if (sourceImageError(frame.sourceImage, source, native)) fail('source-image-identity', 'Every required physical view needs an independently reproducible actual native BGR8 or gray8 exposure', t)
-    const views = frameViews(frame), viewIds = new Set()
-    if (!views.length) fail('missing-views', 'Corresponding physical machine has no source view', t)
+    if (waived.size === views.length && waived.size) summary.waivedFrames++
     for (const view of views) {
       const viewId = view.id
       if (!text(viewId) || viewIds.has(viewId)) fail('view-id', 'View IDs must be nonempty and distinct', t, viewId)
-      viewIds.add(viewId); summary.requiredViews++
+      viewIds.add(viewId)
+      const rect = view.rectSourcePixels
+      if (!vector(rect, 4) || rect[0] < 0 || rect[1] < 0 || rect[2] <= 0 || rect[3] <= 0 || rect[0] + rect[2] > 1920 || rect[1] + rect[3] > 1080 || !['native', 'horizontal-mirror'].includes(view.presentation)) fail('source-viewport', 'Invalid actual source ROI or mirror presentation', t, viewId)
+      if (waived.has(viewId)) {
+        summary.waivedViews.push({ timeSeconds: t, viewId, status: 'waived-unmeasured', measurementRequirement: 'unreadable-navigation', measurementRequirementEvidence: view.measurementRequirementEvidence, retainedLandmarks: frame.landmarks?.filter(item => (item.viewId ?? 'main') === viewId).length ?? 0 })
+        continue
+      }
+      summary.requiredViews++
       summary.nativeLineChecks += view.nativeLineChecks?.length ?? 0
       summary.sourceContourChecks += view.sourceContourChecks?.filter(contour => contour.role === 'check').length ?? 0
       summary.sourceContourFits += view.sourceContourChecks?.filter(contour => contour.role === 'fit').length ?? 0
-      const rect = view.rectSourcePixels
-      if (!vector(rect, 4) || rect[0] < 0 || rect[1] < 0 || rect[2] <= 0 || rect[3] <= 0 || rect[0] + rect[2] > 1920 || rect[1] + rect[3] > 1080 || !['native', 'horizontal-mirror'].includes(view.presentation)) fail('source-viewport', 'Invalid actual source ROI or mirror presentation', t, viewId)
       const camera = view.camera
       if (!camera || camera.status !== 'passed' || !vector(camera.positionMetres, 3) || !vector(camera.quaternion, 4) || Math.abs(Math.hypot(...camera.quaternion) - 1) > 0.002 || !finite(camera.verticalFovDegrees) || camera.verticalFovDegrees <= 0 || camera.verticalFovDegrees >= 179) fail('camera-state', 'Missing/failed/incomplete observed camera', t, viewId)
       const state = view.mechanicalState, input = state?.status === 'constrained' ? state.runtimeWitness?.input : state?.input

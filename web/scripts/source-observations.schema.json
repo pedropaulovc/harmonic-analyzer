@@ -407,11 +407,14 @@
     "view": {
       "type": "object",
       "required": ["id", "rectSourcePixels", "presentation", "camera", "mechanicalState"],
+      "dependentSchemas": {"measurementRequirement": {"if": {"properties": {"measurementRequirement": {"const": "unreadable-navigation"}}}, "then": {"required": ["measurementRequirementEvidence"]}}},
       "allOf": [{"if": {"required": ["mechanicalState"], "properties": {"mechanicalState": {"required": ["status"], "properties": {"status": {"enum": ["observed", "constrained"]}}}}}, "then": {"properties": {"camera": {"type": "object"}}}}, {"if": {"required": ["composite"], "properties": {"composite": {"required": ["mode"], "properties": {"mode": {"const": "crossfade"}}}}}, "then": {"required": ["compositeEvidence"]}}, {"if": {"required": ["imagePlaneWarp"]}, "then": {"required": ["cameraEvidence"], "properties": {"cameraEvidence": {"properties": {"kind": {"const": "source-image-plane-registered"}}}, "nativeLineChecks": {"items": {"$ref": "#/$defs/warpedNativeLineCheck"}}}}}, {"if": {"required": ["cameraEvidence"], "properties": {"cameraEvidence": {"required": ["kind"], "properties": {"kind": {"const": "source-image-plane-registered"}}}}}, "then": {"required": ["imagePlaneWarp"]}}],
       "properties": {
         "id": {"type": "string"},
         "rectSourcePixels": {"$ref": "#/$defs/xyzw"},
         "presentation": {"enum": ["native", "horizontal-mirror"]},
+        "measurementRequirement": {"enum": ["required", "unreadable-navigation"], "default": "required", "description": "Only source-proven severely blurred or opaque text-covered terminal navigation backgrounds may waive measurement. Physical source-machine presence and original archival observations remain unchanged."},
+        "measurementRequirementEvidence": {"$ref": "#/$defs/sourceEvidence"},
         "camera": {"$ref": "#/$defs/camera"},
         "cameraFit": {"$ref": "#/$defs/cameraFit"},
         "cameraEvidence": {"$ref": "#/$defs/cameraEvidence"},

@@ -132,6 +132,13 @@ actual rendered pixels and visual overlays. Close-ups, insets and montages remai
 required. Report uncertainty, exceptions and unavailable measurements explicitly.
 Coarse playback is not final footage acceptance.
 
+The approved exception is deliberately blurred, text-covered navigation/endcard
+thumbnail backgrounds. Those views stay in the timestamp census as waived,
+unmeasured source views; they are not successful measurements. The original
+player/audio continue, and wholly unreadable navigation holds the preceding 3D
+pose. Readable insets and sharp outgoing machine views during a crossfade remain
+required. Missing evidence elsewhere never creates this exception.
+
 ```sh
 npm --prefix web run build
 npm --prefix web run preview
@@ -193,6 +200,16 @@ Exact aliases use the declared `sha256Bgr8` or `sha256Gray8` hash for their
 pixel format. Formats never alias each other; sampling diagnostics list
 supported formats and any unsupported source declarations.
 
+Machine-spin physical CHECK controls retain independently identified manual seed
+pixels separately from historical tube-template observations. Regenerate source-only
+controls with `uv run --no-project --python web/.vite/calibration-venv/bin/python
+web/scripts/generate-spin-source-controls.py --scope physical --output <numeric-packet.json>`.
+The producer uses the unchanged source observer, verifies original BGR hashes and
+integer native PTS, and retains track losses. Publish reviewed numeric controls and
+their declared SHA256 before `uv run --no-project --python
+web/.vite/calibration-venv/bin/python web/scripts/compact-spin.py`. CHECKs never fit
+the camera/input, and this does not qualify old template points or claim a stage pass.
+
 Competing off-track CHECK timestamps use the original video's integer
 `best_effort_timestamp` and rational `time_base`, not FFprobe's six-decimal time
 string. Both full-precision IEEE evaluations of that rational clock are accepted;
@@ -217,6 +234,10 @@ CHECK-bearing decoded exposures also create required census rows when they are
 absent from compact exposure-index samples. Camera and input still come from the
 compact track; unbracketed exposures retain each CHECK as unavailable. Non-exact
 aliases supply no pixels, and alias-only CHECK IDs remain unavailable obligations.
+Original required CHECKs remain obligations even when a compact frame is missing
+or labels the exposure non-machine. Only an original source-view
+unreadable-navigation declaration can waive those checks; a compact-only label
+cannot erase them.
 
 After exact paused source review, a selected row with valid explicit CHECK contours
 enables depth-tested native part-ID capture. Repeated enablement reuses the probe

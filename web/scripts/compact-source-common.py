@@ -379,6 +379,89 @@ def source_views(frame, data):
              "mechanicalState": copy.deepcopy(frame.get("mechanicalState", {}))}]
 
 
+def source_requirement(view):
+    """Only an evidenced per-view navigation declaration may waive measurement."""
+    requirement = view.get("measurementRequirement", "required")
+    if requirement not in ("required", "unreadable-navigation"):
+        raise ValueError(f"Unknown source measurement requirement for view {view.get('id')!r}: {requirement!r}.")
+    if requirement == "unreadable-navigation":
+        evidence = view.get("measurementRequirementEvidence")
+        if not isinstance(evidence, str) or not evidence.strip():
+            raise ValueError(f"Navigation waiver for view {view.get('id')!r} requires nonempty string evidence.")
+    return requirement
+
+
+def archival_navigation_counts(frames):
+    """Describe retained archive records/panels, never physical coverage or gates."""
+    records = panel_samples = ungrouped = 0
+    all_panels = set()
+    for frame in frames:
+        frame_panels = set()
+        for view in frame.get("views", []):
+            if source_requirement(view) != "unreadable-navigation":
+                continue
+            records += 1
+            panels = set(re.findall(
+                r"Actual navigation panel: ([A-Za-z0-9][A-Za-z0-9_-]*)\.",
+                view["measurementRequirementEvidence"]))
+            if not panels:
+                ungrouped += 1
+            frame_panels.update(panels)
+        panel_samples += len(frame_panels)
+        all_panels.update(frame_panels)
+    return {"waivedArchivalViewSamples": records,
+            "representedArchivalPanelSamples": panel_samples,
+            "representedArchivalPanelIds": sorted(all_panels),
+            "ungroupedArchivalViewSamples": ungrouped}
+
+
+def retain_view_requirements(frame, data, views):
+    """Bind compact requirements to original IDs, retaining omitted waived archives."""
+    originals = source_views(frame, data)
+    by_id = {}
+    for original in originals:
+        ident = original["id"]
+        if not isinstance(ident, str) or not ident or ident in by_id:
+            raise ValueError(f"Ambiguous original source view ID in {frame['shotId']}: {ident!r}.")
+        source_requirement(original)
+        by_id[ident] = original
+    represented, compact_ids = set(), set()
+    for view in views:
+        ident = view["id"]
+        if not isinstance(ident, str) or not ident or ident in compact_ids:
+            raise ValueError(f"Ambiguous compact source view ID in {frame['shotId']}: {ident!r}.")
+        compact_ids.add(ident)
+        ids = view.get("sourceViewIds", [ident])
+        if (not isinstance(ids, list) or not ids
+                or any(not isinstance(value, str) or value not in by_id for value in ids)
+                or len(set(ids)) != len(ids)):
+            raise ValueError(f"Unknown or ambiguous original view mapping for {frame['shotId']}/{ident}.")
+        requirements = {source_requirement(by_id[value]) for value in ids}
+        if len(requirements) != 1:
+            raise ValueError(f"Mixed original measurement requirements for {frame['shotId']}/{ident}.")
+        requirement = next(iter(requirements))
+        declared = source_requirement(view)
+        if "measurementRequirement" in view and declared != requirement:
+            raise ValueError(f"Compact view cannot override original measurement requirement for {frame['shotId']}/{ident}.")
+        if requirement == "unreadable-navigation":
+            view["measurementRequirement"] = requirement
+            view["measurementRequirementEvidence"] = " | ".join(dict.fromkeys(
+                by_id[value]["measurementRequirementEvidence"] for value in ids))
+        elif any("measurementRequirement" in by_id[value] for value in ids):
+            view["measurementRequirement"] = requirement
+        represented.update(ids)
+    for ident, original in by_id.items():
+        if source_requirement(original) != "unreadable-navigation" or ident in represented:
+            continue
+        if ident in compact_ids:
+            raise ValueError(f"Omitted archive collides with compact view ID for {frame['shotId']}/{ident}.")
+        archive = copy.deepcopy(original)
+        archive["camera"] = compact_camera(original.get("camera"))
+        archive["input"] = None
+        views.append(archive)
+    return views
+
+
 def resolve_warp(view):
     warp = view.get("resolvedImagePlaneWarp") or view.get("imagePlaneWarp")
     if warp and all(key in warp for key in ("kind", "unwarpedViewportPixels", "renderToSourcePixels")):
@@ -473,6 +556,9 @@ def anchor_motion(anchor):
 
 
 def build_track(data, frame_views_callback, evidence_notes=None):
+    for frame in data["frames"]:
+        for view in frame.get("views", []):
+            source_requirement(view)
     canonicalize_cut_clock(data)
     shots = [{key: copy.deepcopy(shot[key]) for key in ("id", "startSeconds", "endSeconds", "classification", "hasCorrespondingMachine", "reason", "internalMechanismMotion", "internalMotionEvidence", "internalMotionSourceEvidence") if key in shot} for shot in data["shots"]]
     anchors = []
@@ -482,25 +568,23 @@ def build_track(data, frame_views_callback, evidence_notes=None):
         anchors.append(item)
     frames, blockers = [], []
     for frame in selected_frames(data):
-        views = [] if frame.get("sourceSampleUnavailable") else frame_views_callback(frame)
+        views = [] if frame.get("sourceSampleUnavailable") else retain_view_requirements(
+            frame, data, frame_views_callback(frame))
         for view in views:
-            if "cameraProvenance" not in view:
+            if view.get("camera") is not None and "cameraProvenance" not in view:
                 family = f'{data["source"]["videoId"]}:{frame["shotId"]}:{view["id"]}:unqualified-camera'
                 view["cameraProvenance"] = {"kind": "source-informed-framing", "family": family,
                                             "evidence": "Chosen playback camera; an independently source-fitted camera family has not been declared for this view."}
                 view["cameraContinuityFamily"] = family
         row = {key: copy.deepcopy(frame[key]) for key in ("timeSeconds", "decodedTimeSeconds", "sourceSampleUnavailable", "shotId", "classification", "sourceMachineRequirement", "sourceImage", "retainedObservationTimeSeconds") if key in frame}
-        row["landmarks"] = []
-        for landmark in frame.get("landmarks", []):
-            if landmark.get("status") != "observed" or landmark.get("pixel") is None:
-                continue
-            row["landmarks"].append({key: copy.deepcopy(landmark[key]) for key in ("anchorId", "viewId", "role", "pixel", "status", "method", "uncertaintyPx", "trackingEvidence", "measurementEvidence") if key in landmark})
+        row["landmarks"] = copy.deepcopy(frame.get("landmarks", []))
         if frame.get("unavailable"):
             row["unavailable"] = [{key: copy.deepcopy(item[key]) for key in ("anchorId", "viewId", "reason") if key in item} if isinstance(item, dict) else item for item in frame["unavailable"]]
         row["views"] = views
         if row["decodedTimeSeconds"] is None or abs(row["decodedTimeSeconds"] - row["timeSeconds"]) > 0.5:
             blockers.append(f'{frame["shotId"]} at {frame["timeSeconds"]:.6f}s: no retained observation within 0.5s.')
-        if needs_machine(frame, data) and (not views or any(view.get("camera") is None or view.get("input") is None for view in views)):
+        required = [view for view in views if source_requirement(view) == "required"]
+        if needs_machine(frame, data) and (not views or any(view.get("camera") is None or view.get("input") is None for view in required)):
             blockers.append(f'{frame["shotId"]} at {frame["timeSeconds"]:.6f}s: source-required camera/input remains unavailable.')
         frames.append(row)
     source_keys = ("videoId", "sha256", "width", "height", "durationSeconds", "videoDurationSeconds", "fps", "decodedFrameCount", "firstDecodedTimeSeconds", "lastDecodedTimeSeconds", "rights")
@@ -514,12 +598,18 @@ def build_track(data, frame_views_callback, evidence_notes=None):
               "stages": {str(stage): {"status": "unmeasured"} for stage in (50, 20, 10, 5)},
               "evidence": {"interpretation": "Chosen source-informed physically feasible playback candidates. Historical hidden inputs are not recovered. Retained camera FIT/CHECK residuals are CPU diagnostics, not current GPU measurements or stage passes.",
                            "notes": list(evidence_notes or [])}}
-    required_views = [(frame, view) for frame in frames if needs_machine(frame, data) for view in frame["views"]]
+    required_views = [(frame, view) for frame in frames if needs_machine(frame, data)
+                      for view in frame["views"] if source_requirement(view) == "required"]
+    waived_views = [(frame, view) for frame in frames for view in frame["views"]
+                    if source_requirement(view) == "unreadable-navigation"]
     checked_views = sum(any(point.get("role") == "check" and point.get("viewId", "main") == view["id"] for point in frame["landmarks"]) for frame, view in required_views)
-    assumed_cameras = sum(view["cameraProvenance"]["kind"] == "source-informed-framing" for _, view in required_views)
+    assumed_cameras = sum(view.get("cameraProvenance", {}).get("kind") == "source-informed-framing" for _, view in required_views)
     result["sourceMeasurements"] = {
         "status": "partial" if checked_views else "incomplete",
         "requiredViewSamples": len(required_views), "viewSamplesWithSourceChecks": checked_views,
+        **archival_navigation_counts(frames),
+        "waivedNavigationReasons": list(dict.fromkeys(
+            view["measurementRequirementEvidence"] for _, view in waived_views)),
         "assumedCameraViewSamples": assumed_cameras,
         "blockers": [
             f"Independent source CHECK pixels are missing in {len(required_views) - checked_views} required view samples.",

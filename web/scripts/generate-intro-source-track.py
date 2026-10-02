@@ -121,10 +121,10 @@ def main():
 
     track = common.build_track(data, views_for, [
         "All required shots, integer seconds, changes and layout/landmark keys retained; original observed landmarks and decoded PTS unchanged.",
-        "All montage views54..80, two-view68 composite, three gearing panels, five right-side photos, plaque and all eight endcard photographs remain required.",
+        "All montage views54..80, two-view68 composite, three gearing panels, five right-side photos and plaque remain required. All eight terminal navigation photographs are retained as source-proven unreadable-navigation archives; outgoing whole-machine stays required.",
         "Frozen feasible complete51 candidates are held by shot; no source historical input recovery or inferred crank speed. Unobserved moving-source motion is a staged-error measurement question, not an exemption.",
         "Source photo/camera/input family candidates can be used despite original strict2% failures. Coverage complete means rows have renderable approximations, not50/20/10/5% image error acceptance.",
-        "No null machine views or unsupported row intervals. Page-by-page photo, cone/phase reframing, inset zoom and photometric crossfade remain explicitly chosen baselines, not matched witnesses.",
+        "Required machine views retain renderable candidate cameras/inputs. Navigation waiver is measurement-only, not a source-machine absence assertion. Cone/phase reframing, clear inset zoom and photometric crossfade remain explicitly chosen baselines, not matched witnesses.",
     ])
     track["cpuDiagnostics"] = diagnostics
     track["source"] = copy.deepcopy(data["source"])

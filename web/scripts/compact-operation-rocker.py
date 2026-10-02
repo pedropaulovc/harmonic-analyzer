@@ -223,6 +223,8 @@ def operation():
             frame["sourceImage"] = rows[0]["sourceIdentity"].get("actualSourceImage")
         output = []
         for original in common.source_views(frame, data):
+            if common.source_requirement(original) == "unreadable-navigation" and original.get("camera") is None:
+                continue
             ident = original["id"]
             row = next((r for r in rows if (r.get("viewId") or "main") == ident), None)
             if row is None and rows:
@@ -325,7 +327,8 @@ def operation():
         if frame.get("sourceObservationAuthority") == "operation019-v3"
     }
     for frame in track["frames"]:
-        if frame["views"] and all(v["camera"] and v["input"] for v in frame["views"]):
+        required = [view for view in frame["views"] if common.source_requirement(view) == "required"]
+        if required and all(v["camera"] and v["input"] for v in required):
             frame.pop("unavailable", None)
         number = frame.get("sourceImage", {}).get("frameIndex")
         if frame["shotId"] == "operation-019" and number in refined_unavailable:
@@ -365,6 +368,8 @@ def rocker():
             row = min(states, key=lambda r: abs(r["timeSeconds"] - frame.get("retainedObservationTimeSeconds", frame["timeSeconds"])))
         result = []
         for original in common.source_views(frame, data):
+            if common.source_requirement(original) == "unreadable-navigation" and original.get("camera") is None:
+                continue
             notes = ("Saved CPU-feasible continuous independently actuated held-bank branch; actual source phases/station order, not ideal cosine or historical recovery.")
             view = view_record(original, body_candidate["camera"], row["completeInput"], notes)
             view["cameraContinuityFamily"] = "rocker-centered-body-profile"
@@ -383,7 +388,7 @@ def rocker():
         "0..1015.681333s: complete native exterior/shank/side-recess correspondence and independently actuated held-bank cone visibility remain unqualified; no whole-body exemption.",
         "Centered body-aware camera preserves actual source cap/rim constraints but has not passed current native whole-body source measurement."])
     for frame in track["frames"]:
-        if frame["views"]:
+        if any(common.source_requirement(view) == "required" for view in frame["views"]):
             frame.pop("unavailable", None)
     retain_generator_inputs(track, seeds, seed_input)
     return track
