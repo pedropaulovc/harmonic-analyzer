@@ -3,41 +3,98 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Michelson's Harmonic Analyzer — interactive</title>
+    <title>Harmonic Analyzer — video companion</title>
     <meta
       name="description"
-      content="Turn the crank of Albert Michelson's 1898 harmonic analyzer in your browser: twenty sine waves added by gears, cams, springs and levers."
+      content="Explore Michelson's harmonic analyzer alongside six engineerguy videos. Pause to turn the crank, adjust twenty channels, and inspect the spring-balanced mechanism."
     />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
-    <div id="app">
-      <canvas id="stage"></canvas>
+    <div id="app" class="companion">
+      <header class="site-header">
+        <a class="wordmark" href="?video=intro-history">Harmonic Analyzer</a>
+        <p class="site-subtitle">Twenty channels. One mechanical sum.</p>
+        <nav id="videos" aria-label="Companion videos"></nav>
+      </header>
 
-      <div id="loading" role="status">
-        <p>Loading the machine…</p>
-        <p class="hint">
-          No model? Run <code>npm run fetch-model</code> after
-          <code>doit export</code>.
-        </p>
-      </div>
-
-      <aside id="panel" hidden>
-        <h1>Harmonic Analyzer</h1>
-        <nav id="chapters" aria-label="Tour chapters"></nav>
-        <p id="chapter-title"></p>
-        <p id="chapter-body"></p>
-        <div id="controls">
-          <label>
-            Crank
-            <input id="crank" type="range" min="0" max="40" step="0.01" value="0" />
-          </label>
-          <output id="readout"></output>
-          <button id="play">Play</button>
+      <main id="workspace">
+        <div class="model-view">
+          <canvas id="stage" aria-label="Interactive CAD model of the harmonic analyzer" tabindex="0"></canvas>
+          <div id="loading" role="status">
+            <p id="model-status">Loading the released CAD model…</p>
+            <p class="hint">The complete assembly is 223 MB; the first load can take a moment.</p>
+            <button id="retry-model" type="button" hidden>Retry model</button>
+          </div>
+          <section id="video-dock" data-size="expanded" aria-label="Source video">
+            <div class="video-toolbar">
+              <span id="video-label">Source video</span>
+              <button id="minimize-player" type="button" aria-controls="video-player" aria-expanded="true">Compact player</button>
+            </div>
+            <div id="video-player"></div>
+            <p id="video-error" class="notice" role="alert" hidden></p>
+            <a id="watch-on-youtube" target="_blank" rel="noopener noreferrer">Watch on YouTube ↗</a>
+          </section>
         </div>
-      </aside>
 
-      <canvas id="trace" aria-label="Machine output trace"></canvas>
+        <aside id="panel">
+          <p class="eyebrow">Engineerguy video companion</p>
+          <h1 id="video-title"></h1>
+          <p id="status"><span id="playback-status" role="status">Loading video…</span><span id="playback-clock"> · 0.0 s</span></p>
+          <div class="playback-actions">
+            <button id="pause-video" type="button" disabled>Play video</button>
+            <button id="follow-video" type="button" disabled>Restore video pose</button>
+            <button id="fit-view" type="button" disabled>See whole machine</button>
+          </div>
+          <p class="interaction-hint">Pause to orbit, pan, zoom, and change the mechanism. Play follows approximate source tracks with chosen feasible inputs, not recovered history; unavailable intervals and unmeasured fidelity remain explicit.</p>
+          <p id="source-error" class="notice" role="status" hidden></p>
+          <p id="model-error" class="notice" role="alert" hidden></p>
+          <p id="physics-error" class="notice" role="alert" hidden></p>
+
+          <details id="manual-controls">
+            <summary>Mechanism controls</summary>
+            <fieldset id="drive-controls" disabled>
+              <legend>Drive and setup</legend>
+              <label for="crank">Crank position <output id="crank-value"></output></label>
+              <input id="crank" type="range" min="-5" max="160" step="0.001" value="0" />
+              <div class="crank-actions">
+                <button id="manual-run" type="button">Turn crank</button>
+                <label for="crank-speed">Turns / second</label>
+                <input id="crank-speed" type="number" min="0.05" max="2" step="0.05" value="0.25" />
+              </div>
+              <label for="gearing">Paper drive</label>
+              <select id="gearing">
+                <option value="small-large">T12 : T24 — fine feed</option>
+                <option value="medium-medium">T18 : T18 — twice the feed</option>
+                <option value="large-small">T24 : T12 — four times the feed</option>
+              </select>
+              <label for="magnification">Magnifier clamp <output id="magnification-value"></output></label>
+              <input id="magnification" type="range" step="0.001" />
+              <label for="fixture-offset">Wire fixture height <output id="fixture-value"></output></label>
+              <input id="fixture-offset" type="range" step="0.0001" />
+              <label for="cone-swing">Cone platform swing <output id="cone-value"></output></label>
+              <input id="cone-swing" type="range" step="0.0001" />
+              <label for="pinion-cam">Pinion engagement cam <output id="pinion-value"></output></label>
+              <input id="pinion-cam" type="range" step="0.0001" />
+              <label for="platen-offset">Platen datum <output id="platen-value"></output></label>
+              <input id="platen-offset" type="range" min="-0.1" max="0.1" step="0.0001" />
+            </fieldset>
+            <fieldset id="channel-fieldset" disabled>
+              <legend>Twenty physical channels</legend>
+              <p class="hint">Normalized slide position. The configured CAD station is shown in millimetres; engraved measuring-stick calibration is not established. Phase rotates that channel's cam.</p>
+              <div class="coefficient-presets">
+                <button id="zero-coefficients" type="button">Zero</button>
+                <button id="fundamental-coefficient" type="button">Fundamental</button>
+                <button id="odd-coefficients" type="button">Odd 1/n</button>
+              </div>
+              <div id="channel-controls"></div>
+            </fieldset>
+          </details>
+          <output id="force-readout" aria-label="Calculated spring force balance"></output>
+          <p class="physics-caption">Constraint-based motion with loaded extension springs and quasistatic torque balance. No tooth-collision, friction, or inertia simulation.</p>
+        </aside>
+
+      </main>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

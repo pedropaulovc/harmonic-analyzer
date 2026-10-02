@@ -1,10 +1,9 @@
 /**
- * The machine's kinematics, in one place, derived from the source and not from
- * the CAD model.
+ * Source-backed drive ratios and Fourier sampling utilities.
  *
- * The geometry comes from the GLB; the *motion* comes from here. Keeping them
- * separate means a re-export of the model can never silently change the maths,
- * and the maths can be unit-tested without a renderer.
+ * Physical joint closures and all twenty loaded springs live in mechanics.ts;
+ * the wire/wheel/pen closure lives in magnifier.ts. Released native geometry
+ * and these equations are validated together by the source-data exporter.
  *
  * Source of the ratios: Michelson & Stratton, "A New Harmonic Analyzer" (1898),
  * and the gear train as modelled in `cad/config/machine/gear_train.yaml`.
@@ -29,10 +28,18 @@ export const CHANNELS = 20
 export const TURNS_PER_X_UNIT = 80 / (2 * Math.PI)
 
 /**
- * Angle of cylinder gear `k` (1-based) after `turns` crank revolutions, radians.
+ * Angle of harmonic `k` (1-based), not GLB instance k, after crank turns.
  */
 export function channelAngle(turns: number, k: number): number {
   return (turns * k * Math.PI) / 40
+}
+
+/**
+ * Physical CAD station index j (0-based) runs harmonic 20..1, NOT 1..20.
+ * Source: cad/config/channels.yaml harmonic_n = cone_teeth/6 = 20-index.
+ */
+export function physicalChannelAngle(turns: number, index: number): number {
+  return channelAngle(turns, CHANNELS - index)
 }
 
 /**
@@ -44,64 +51,47 @@ export function fourierArgument(turns: number): number {
 }
 
 /**
- * Vertical displacement of rocker-arm k's tip, normalised to +/-1.
- *
- * The cam is a plain eccentric circle, so the rocker motion is *near*
- * sinusoidal, not exactly sinusoidal — the book is explicit about this and it
- * is a real error source in the machine. `camHarmonic` below models the first
- * correction; set it to 0 for the idealised cosine.
- */
-export function rockerDisplacement(turns: number, k: number, camHarmonic = 0): number {
-  const t = channelAngle(turns, k)
-  return Math.cos(t) + camHarmonic * Math.cos(2 * t)
-}
-
-/**
- * The summing lever's output: the weighted sum of all channels.
- *
- * `amplitudes[k-1]` is the coefficient a_k set by the position of amplitude bar
- * k on its rocker arm. The measuring stick divides each half of a rocker arm
- * into ten, so the usable range is [-10, +10]; the sign is which side of the
- * rocker pivot the bar sits on, and a bar at the pivot is exactly zero.
- */
-export function output(turns: number, amplitudes: readonly number[], camHarmonic = 0): number {
-  let sum = 0
-  for (let k = 1; k <= CHANNELS; k++) {
-    sum += (amplitudes[k - 1] ?? 0) * rockerDisplacement(turns, k, camHarmonic)
-  }
-  return sum
-}
-
-/** Magnification: x4 at the magnifying lever (settable), x5 at the wheel (fixed). */
-export const WHEEL_MAGNIFICATION = 5
-export const LEVER_MAGNIFICATION_MAX = 4
-
-/** Magnifying-wheel rotation, radians, for a given summing-lever travel in mm. */
-export function wheelAngle(leverTravelMm: number, leverMagnification = LEVER_MAGNIFICATION_MAX): number {
-  const HUB_RADIUS_MM = 10 // inner wheel: 20 mm diameter
-  return (leverTravelMm * leverMagnification) / HUB_RADIUS_MM
-}
-
-/**
  * The three translational-gearing options. The operator swaps two removable
  * gears (small/medium/large) to set how far the paper travels per crank turn,
  * which is the horizontal scale of the plot.
  */
 export type Gearing = 'small-large' | 'medium-medium' | 'large-small'
 
-/** Periods of the fundamental drawn across the full platen travel. */
-export const GEARING_PERIODS: Record<Gearing, number> = {
-  'small-large': 2,
-  'medium-medium': 1,
-  'large-small': 0.5,
+/**
+ * Actual translational drive. Source: cad/scripts/paper_drive_geom.py and
+ * build_kinematic_probe.py signed end-to-end gate.
+ * T12:T24 chain, T12:T120 disc reduction, DP30 T12 rack pinion (PD 10.16 mm).
+ * T18:T18 doubles the fine feed; reversing the T12:T24 pair quadruples it.
+ */
+export const PAPER_FEED_FINE_M_PER_TURN = (0.5 * (12 / 120) * Math.PI * 10.16) / 1000
+export const PAPER_FEED_MULTIPLIER: Readonly<Record<Gearing, number>> = {
+  'small-large': 1,
+  'medium-medium': 2,
+  'large-small': 4,
 }
 
-/** Platen position, normalised 0..1 across its travel. */
-export function platenPosition(turns: number, gearing: Gearing): number {
-  const turnsPerPeriod = 80
-  const full = turnsPerPeriod * GEARING_PERIODS[gearing]
-  return Math.min(1, turns / full)
+/**
+ * Signed global-X rack displacement. Crank angle is global +Z; the same-sense
+ * chain feeds an external 12:120 mesh, so +crank turns feed the platen toward -X.
+ * Source signed oracle: build_kinematic_probe.py FEED_SIGN=+1, GEAR_SENSE=-1.
+ */
+export function paperTravelM(turns: number, gearing: Gearing): number {
+  return -turns * PAPER_FEED_FINE_M_PER_TURN * PAPER_FEED_MULTIPLIER[gearing]
 }
+
+/** Source crossed external 16T:64T mesh: +crank Z drives -cone inclined axis. */
+export function coneShaftAngle(turns: number): number {
+  return -turns * 2 * Math.PI * (16 / 64)
+}
+
+/**
+ * The real magnifying clamp radius divided by the 39.85 mm spring-anchor arm.
+ * Source: magnifying_lever_geom.clamp_radius_band(12): 66/165/209 mm.
+ * These geometric limits supersede a nominal "up to four" animation scale.
+ */
+export const MAGNIFIER_RATIO_MIN = 66 / 39.85
+export const MAGNIFIER_RATIO_BUILT = 165 / 39.85
+export const MAGNIFIER_RATIO_MAX = 209 / 39.85
 
 /**
  * Sample a coefficient set from a function, the way an operator does it:

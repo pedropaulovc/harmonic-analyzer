@@ -1,121 +1,203 @@
-# Simulator design
+# Video companion design
 
-## Goal
+## Data flow
 
-A visitor should be able to answer, in five minutes and without reading
-anything: *how does turning a crank add twenty sine waves together?*
+The CAD export supplies native geometry and rest transforms. Generated
+`mechanics-data.ts` supplies the dimensions, linkage datums and spring catalog
+values used by `mechanics.ts`. `export-mechanics.py` and `export-magnifier.py`
+read CAD authority; the website does not infer dimensions from video pixels.
 
-Not a game, not a configurator, not a CAD viewer. A guided mechanism
-explanation you can interrupt and poke at.
+`video-catalog.ts` identifies the six original videos in scope and their local
+reference hashes. `youtube-player.ts` owns the visible official embed.
+`timeline.ts` selects compact source camera and physical-input tracks per view.
+`main.ts` follows the original playback clock or permits paused exploration;
+`scene.ts` applies the physical pose to the full native GLB.
 
-## Architecture
+The GLB hash and source revision must match the generated mechanical data.
+A rejected load never enters the visible scene. Bindings resolve genuine native
+component names; missing joints have a separate persistent warning and prevent
+complete synchronization acceptance. Original geometry is not decimated, resized
+or replaced with proxy parts.
 
-```
- cad/out/gltf/harmonic-analyzer.glb        (doit export, on the SolidWorks seat)
-            │  npm run fetch-model
-            ▼
- public/models/harmonic-analyzer.glb       (gitignored)
-            │  GLTFLoader
-            ▼
- scene.ts ──── resolves ────► bindings.ts   logical joint -> node-name regex
-     │                             ▲
-     │ drives                      │ (contract; a miss warns, never throws)
-     ▼                             │
- kinematics.ts  ◄──── ratios from cad/config/machine/gear_train.yaml
-     │                             + Michelson & Stratton 1898
-     ▼
- main.ts  ── animation loop, output trace, narration panel
-     ▲
- narration.ts ◄── content/script.md ◄── references/engineerguy-youtube/*.vtt
-```
+The viewer generates a PMREM room environment once for image-based lighting.
+The native steel and brass materials are fully metallic, so diffuse hemisphere
+lighting alone leaves their surfaces dark. The environment contributes reflected
+light only: its room geometry is not added to the machine scene or drawable
+inventory, and native GLB geometry and materials remain unchanged. Temporary room
+and PMREM resources are released after generation; the environment render target
+is released with the viewer.
 
-### Why geometry and motion are separate
+## Physical model
 
-The GLB carries shapes and rest transforms. It does **not** carry the
-kinematics — SolidWorks mates don't survive a glTF export, and even if they
-did, deriving a gear ratio by watching a mesh is worse than reading it from the
-config that cut the gear.
+All twenty stations contribute to the torque balance, in their CAD row order
+(harmonics 20 through 1). Each station uses the actual eccentric circle and rod
+closure, rocker contact arc and amplitude-bar geometry. Loaded extension-spring
+force is computed from hook separation, catalog rate and initial tension. The
+counter spring and lever weights participate in the nonlinear quasistatic
+summing equilibrium. The wire and magnifier then determine wheel rotation and
+pen travel. An ideal Fourier sum is not used to drive the physical output.
 
-So `kinematics.ts` is pure maths with no three.js import: `channelAngle`,
-`rockerDisplacement`, `output`, `platenPosition`. That makes it unit-testable
-and means a re-export can never silently change the physics.
+The released hub-wire route preserves its native rest contact and guided wrap.
+Positive global +Z wheel rotation pays out the left-rim hanging run, so signed
+pen travel is `-rimPitchRadius * wheelAngle`; `R/r` remains a gain magnitude.
+This taut, non-slip model is an internal mechanical contract, not evidence that
+the film uses the same routing or that a fixture adjustment held other inputs fixed.
 
-### The binding contract
+Pen travel moves the native rod, v-block, frame, marker and set-screw together.
+The hanger and its screw remain fixed. Source-evidenced setup lifts and yaw use
+qualified rigid-part overrides; the pen wire remains a separately solved run.
+The platen carries its rack, paper, two clips, all twenty-two fillister screws,
+two guides and four guide locks as one 33-part group. The crank arm carries its
+anchor screw. These attachments follow the released assembly mates pinned to
+the native export; frame-mounted hardware remains fixed.
 
-`doit export` names glTF nodes after SolidWorks component instances:
-`cone-gear-1`, `cylinder-gear-7`, `crank-arm-1`. `bindings.ts` matches those
-with regexes and records, per joint, the axis and whether it rotates or
-translates.
+Interactive amplitude is a normalized CAD slide station, bounded by the native
+mechanism. The displayed millimetres are not a calibration of the video's
+engraved scale. Per-channel phase rotates that channel's cam. Source states must
+supply all twenty amplitudes and phases explicitly.
 
-Two properties this buys:
+The engaged bank drive is `crankTurns - driveCrankOffsetTurns`; the disengaged
+bank retains `heldChannelTurns`. Returning the platform to the engaged state
+changes the coupling offset, preserving the stopped bank's pose while the crank
+has moved. This does not rewrite the physical cam phases or retune the counter.
+The crank, cone shaft and paper feed retain their own drive motion.
 
-- **Order-independence.** Indexed bindings sort on the trailing instance
-  number, so adding a component doesn't shuffle which gear is channel 7.
-- **Graceful degradation.** An unresolved binding logs which pattern missed and
-  leaves the joint static. A renamed component costs you one joint, not the
-  page.
+The model omits friction, inertia and tooth-contact dynamics. Quasistatic
+constraint rejection retains the last valid rendered geometry and shows an
+error. It does not substitute a nominal pose or suppress a failed solve.
 
-When the CAD renames a component, the fix is a one-line regex change here.
+The native connecting-rod plate eye is used as the functional counterpart of the
+filmed U-shaped junction, with the user's approval pending a later CAD correction.
+`nativeGeometryAssumptions` identifies the affected rod paths and records that
+approval. Animation uses the existing linkage; the head-shape difference remains
+an assumption in the HUD and reports. It does not authorize geometry edits,
+unrelated omissions or a measured head-topology fidelity claim.
 
-## The maths, stated once
+Separately, the user permits only the two small rimmed/recessed lower-rocker
+side-face features either side of the fulcrum to remain absent and uncertified.
+The closed declaration names `lower-rocker-nearest-left-face-bore` and
+`lower-rocker-nearest-right-face-bore`, and permits only qualified
+`harmonic-analyzer/channel/rocker-arm-1..20` paths. All twenty native rockers lack
+these features. This approval is not a promise of a future CAD match.
 
-From the 1898 paper: one crank turn advances cylinder gear *k* by *k*/80 of a
-revolution. So
+`nativeGeometryAssumptions` permits at most one of each exact declaration and
+rejects duplicate identities, additional features and other native families.
+The HUD distinguishes the rod-head assumption from the lower-rocker exception;
+reports and visibility bindings retain the exact records. Neither declaration
+establishes whole-part correspondence or makes unavailable source data matched.
+Original hole contours remain diagnostics, not fabricated source pixels, native
+holes or textures. Native inventory integrity, all other features, pose and
+motion remain required. The staged image tolerances below replace the former
+38.4-source-pixel limit; timing remains bounded by 0.5 seconds.
 
-```
-theta_k(turns) = turns * k * PI / 40
-output(turns)  = sum over k of a_k * cos(theta_k)
-```
+## Iterative synchronization plan
 
-Two crank turns advance gear *k* by *k*·π/20 — exactly the argument of the
-*k*-th cosine. That identity is the whole trick behind using the same machine
-for analysis: read the output every two turns and you're reading coefficients.
+The approved sequence is **50% → 20% → 10% → 5% of source frame width**.
+These are maximum landmark-position errors, not percentages of videos covered.
+At 1920 pixels wide the limits are 960, 384, 192 and 96 pixels respectively.
+The final target is 5%; video/model timing stays within 0.5 seconds at every stage.
 
-Magnification is ×4 at the magnifying lever (settable by sliding the vertical
-rod) and a fixed ×5 at the wheel (100 mm outer over a 20 mm hub).
+Start with working approximate camera and mechanism tracking across **all six**
+videos, then present an actual browser demo before refining to 20%, 10%
+and 5%. Complete one coarse pass across the collection rather than perfecting
+one video while the others remain unavailable. Each stage reports its measured
+coverage, maximum errors and unresolved intervals; unmeasured is not passed.
 
-The cams are **plain eccentric circles**, so the rocker motion is *near*
-sinusoidal, not exactly sinusoidal. `rockerDisplacement` takes a `camHarmonic`
-term for this; it defaults to 0 (ideal). Modelling it properly is a genuine
-fidelity improvement and a good "what the real machine actually does" beat.
+### Runtime tracks
 
-## Narration
+Reuse the existing official player, native scene, physical solver and camera/input
+interpolation. Author compact per-video shot tracks with camera keys, complete
+feasible physical inputs, discrete setup changes and source view layouts.
+Cuts switch atomically; interpolation is confined to compatible continuous shots.
+Unobserved inputs may be chosen feasibly and must remain labelled as chosen,
+not historically recovered. No second solver, proxy geometry, fake visibility
+certificates or arbitrary individual-part adjustments are permitted.
 
-Ten chapters (`narration.ts`), each with a crank range, an amplitude-bar
-setting, a camera hint and the video it derives from. Copy lives in
-[`content/script.md`](content/script.md) and is written against the transcripts
-in `references/engineerguy-youtube/` — paraphrased, never pasted.
+Phase offsets interpolate along the shortest angular arc; cumulative crank turns
+remain linear. The Analysis bank's independently fitted inverse cam roots are
+continued on the nearest genuine branch before interpolation. Both roots preserve
+the observed rocker angle, but may change an unobserved cam/rod orientation.
+Retain the original rod bounds, CHECK pixels and branch-choice audit; do not
+suppress an infeasible transition or claim recovered phase history.
 
-## Roadmap
+Production playback does not require semantic source certificates for every one
+of the 435 native drawables at every exposure. Native model identity, complete
+inventory and coherent attached-part motion still matter. Offline source evidence
+is separate from compact runtime tracks; full decoded-frame observation corpora
+are not a prerequisite for displaying an honestly labelled approximation.
 
-| # | feature | notes |
-|---|---|---|
-| 0 | **Write the narration copy** | the ten chapters currently ship placeholder text. This is the part every visitor actually reads, and it is not blocked on anything. Issue #481. |
-| 1 | Camera moves per chapter | hints exist in `narration.ts`; needs a tween and a framing helper. Reuse the azimuth/elevation convention from `cad/comparisons/manifest.json` so poses transfer. |
-| 2 | Draggable amplitude bars | the single most engaging interaction: set your own coefficients, watch the trace change |
-| 3 | Cam-driven rocker motion | replace the ideal cosine with the eccentric-cam profile from `build_cylinder_gear.py` |
-| 4 | Section/exploded views | isolate one channel; fade the other nineteen |
-| 5 | Analysis mode | draw a function, sample it at twenty points, watch the machine read the coefficients back |
-| 6 | Audio | the machine is famously near-silent apart from the amplitude bars' squeak |
-| 7 | Deep links | `?chapter=summing&turns=12` for the book and the campaign to link into |
+Required coverage includes every retained video's corresponding machine views:
+close-ups, moving mechanisms, insets, mirrored views, photographs and montages.
+A difficult view does not become exempt because it cannot yet be matched.
+Intervals without a corresponding machine may retain the preceding pose.
+Unsupported required intervals remain explicit in the UI and reports.
 
-## Asset budget {#asset-budget}
+Count the machine views actually visible in the footage. Synthesis's
+presenter-to-spin edit moves one machine image; it uses one native view with
+source-informed principal-point/FOV keys. Its coarse framing remains unmeasured.
+Actors and formula graphics stay in the original player.
 
-The raw assembly GLB is far too large for a landing page. Before publishing:
+### Measurement and refinement
 
-- `gltfpack -cc` or Draco compression
-- decimate the parts nobody looks closely at (fasteners, the frame interior)
-- consider a reduced model: 20 channels of full geometry is a lot of triangles
-  for a machine whose *point* reads fine with 5 channels visible
-- target < 15 MB over the wire, < 3 s to first interaction on a laptop
+Use original hashed footage and timestamped source observations. Evaluate every
+integer second and visible camera/mechanism change. Additional intermediate probes
+use real independently observed source exposures, never interpolated oracle pixels.
+Their unavailable measurements are diagnostic; an admitted over-limit error still
+fails the stage. Reference landmarks must include spatially distributed fixed
+features and visible moving features; a favorable camera fit alone cannot prove
+the mechanism state.
 
-Measure before optimising — the 600 kB JS bundle is three.js and is not the
-problem.
+Compare the actual rendered native model with source landmarks and inspect
+source/render overlays and silhouettes. Report source-localization uncertainty
+and known geometry exceptions separately; do not relabel unknown correspondences
+or uncertain measurements as precise passes. Existing hard foot/guide/pen failures
+remain useful regression diagnostics, not obligations to solve an exhaustive
+part-identification problem before showing any animation.
 
-## Non-goals
+GPU landmarks explicitly use `depth-off-landmark-projection`. Their errors measure
+projected feature positions, not visible native surfaces: an opaque part can cover
+an accurately projected marker. A favorable landmark result therefore cannot
+replace actual source/render inspection. Use the depth-tested native part-ID
+capture to distinguish genuinely occluding components from dark metallic surfaces;
+lighting changes must not change those surface owners or hide native geometry.
 
-- Physical accuracy of spring dynamics. This is a kinematic toy, and it should
-  say so.
-- Mobile-first. It should not break on a phone, but the target is a laptop.
-- A CAD viewer. Nobody needs a tree of 102 parts. The STEP files are one click
-  away for anyone who does.
+Per-video verification is incremental and repeatable, without an acceptance-run
+quota. The all-video final gate retains all six pages and the 5%/0.5-second limits.
+A coarse demo or a passing subset does not establish final acceptance.
+On a failed stage, refine the worst source-visible discrepancy, rerun the affected
+shot, then rerun the collection. Escalate actual missing geometry outside approved
+exceptions rather than hiding it with a camera warp or an occlusion claim.
+
+### Browser verification
+
+Exercise the original visible audible player and use its actual media time,
+not two aliases of an application clock. Seeking, buffering or unavailable media
+cannot provide timing evidence. Check deterministic seek/follow behavior and
+pause/manual/resume transitions against the actual rendered scene.
+
+Paused exploration must permit orbit, pan, zoom and mechanism operation without
+advancing the source video. Compact mode retains the same visible usable player
+at least 200 by 200 pixels, with advancing audio and working pause/resume controls.
+Verify all six routes. Present the working implementation in a headed browser;
+headless Playwright with screenshots or recordings is for automated checks.
+
+Native WebGL landmark readback remains available for rendered-pixel measurements.
+CPU projection alone is not final rendered evidence. Existing raster, finite-line,
+contour, masking and per-part certificate machinery is diagnostic legacy work:
+its historical results are preserved, but completing its entire pending queue is
+not a prerequisite for this iterative delivery plan. If a measurement uses a
+particular diagnostic path, that path's known correctness defects still matter.
+
+
+## Assets and rights
+
+The full native GLB is approximately 223 MB. The website loads one model and
+reuses geometry buffers during motion. Source observations load per video.
+Downloaded MP4s, decoded frames, screenshots and verification reports stay
+outside tracked publication assets. The site embeds the originals through
+YouTube rather than hosting their streams. The 2014 book's non-commercial
+material must not enter a commercial website or campaign product.
+
+The default static base path is `/harmonic-analyzer/`. `SIMULATOR_BASE` must be
+consistent between Vite build and production verifier. Portfolio sequencing is
+owned by the [project board](https://github.com/users/pedropaulovc/projects/1).

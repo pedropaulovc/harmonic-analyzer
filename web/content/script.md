@@ -1,8 +1,10 @@
 # Narration script
 
-The copy shown in the simulator's panel, chapter by chapter. `narration.ts`
-holds the structure (crank range, amplitude setting, camera); this file holds
-the words.
+Historical narration plan, not the current website implementation or schedule.
+Current workstream sequencing lives in the
+[Harmonic Analyzer project](https://github.com/users/pedropaulovc/projects/1).
+The companion now uses native video playback and measured source observations
+rather than scripted chapters.
 
 ## Sourcing
 
@@ -30,9 +32,9 @@ chapter.
 
 ## Chapters
 
-Placeholder copy is in `narration.ts` and is deliberately thin. Rewrite each
-against the transcript, then move the final text here and have `narration.ts`
-import it.
+This table records the proposed chapters and their copy maturity at the time of
+the plan. The retired chapter code is preserved in
+[Git history](https://github.com/pedropaulovc/harmonic-analyzer/blob/77c165b5d/web/src/narration.ts).
 
 | id | working title | source video | status |
 |---|---|---|---|

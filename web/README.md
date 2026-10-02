@@ -1,76 +1,184 @@
-# Interactive simulator
+# Harmonic analyzer video companion
 
-The harmonic analyzer running in a browser. Turn the crank, watch twenty sine
-waves get added by gears and springs, and see the pen draw the answer.
+Six engineerguy videos share an interactive view of the CAD-exported analyzer.
+The original YouTube player sits in the model area's lower-right corner. Pause
+for manual exploration, then orbit, pan, zoom, turn the crank or adjust the twenty
+channels. Compact mode keeps the same visible player and its audio.
 
-It runs on the same CAD model the physical machine is built from, which is the
-GLB that `doit export` writes. So what you see is the geometry that gets
-machined rather than an artist's impression. The narration follows the pacing of
-the [engineerguy video series](https://www.youtube.com/playlist?list=PL2FF649D0C4407B30),
-so anyone who watched those lands somewhere familiar.
-
-## Implementation coverage
-
-Current Website workstream status and sequencing live in the
+Website workstream status lives on the
 [Harmonic Analyzer project](https://github.com/users/pedropaulovc/projects/1).
-The implementation loads the model, resolves the joints, drives them from the
-real gear ratios and draws the output trace. Narration chapters exist as
-structured data with placeholder copy. Camera moves and the amplitude-bar UI are
-not built yet. See [`DESIGN.md`](DESIGN.md).
+Implementation and fidelity limits are described in [`DESIGN.md`](DESIGN.md).
 
-## Run it
+## Run locally
 
-```powershell
-cd web
-npm install
-npm run fetch-model     # copies cad/out/gltf/*.glb -> public/models/
-npm run dev
+```sh
+npm --prefix web ci
+npm --prefix web run fetch-model -- /path/to/harmonic-analyzer.glb
+npm --prefix web run dev
 ```
 
-No GLB is the normal state of a fresh checkout, since the model is a build
-artefact. Either run `uv run python -m doit export` on the SolidWorks seat, or
-download a release bundle and pass the file with
-`npm run fetch-model -- path/to.glb`. Without one the page still loads and tells
-you so instead of failing silently.
+The model is a generated artifact, absent from a fresh checkout. Use the exact
+CAD export identified by `src/mechanics-data.ts`; incompatible bytes are rejected.
+`fetch-model` can also copy the existing `cad/out/gltf/` export. Missing models
+and failed YouTube playback produce visible errors.
 
-```powershell
-npm run build       # typecheck + production bundle -> dist/
-npm run preview     # serve the bundle
+Playback can start while the model or source track loads. Source-following starts
+automatically when both are ready; pausing retains manual exploration. Status
+announcements exclude the running clock. Force readouts are physical calculations,
+not source measurements.
+
+Routes accept a slug or the corresponding YouTube ID:
+
+| Page | Query |
+|---|---|
+| Intro / History | `?video=intro-history` |
+| Synthesis | `?video=synthesis` |
+| Analysis | `?video=analysis` |
+| Operation | `?video=operation` |
+| Machine spin | `?video=machine-spin` |
+| Rocker arms | `?video=rocker-arms` |
+
+The PDF page-by-page guide video (`rMHw9GCAtE8`) is excluded by user scope. It
+has no route, observation file or verifier page; its MP4 and source intervals
+are not acceptance prerequisites.
+
+The video embeds use the official YouTube IFrame API. Downloaded source videos,
+reference screenshots and the GLB remain untracked; the site does not host or
+redistribute the footage.
+
+## Fidelity and verification
+
+The interactive mechanism uses CAD-derived eccentric cams, connecting rods,
+finite rocker arcs, amplitude bars, twenty loaded extension springs, the counter
+spring, wire and magnifier. It solves quasistatic torque balance. It does not
+simulate tooth collisions, friction or inertia. The amplitude controls show CAD
+station millimetres; calibration to the video's engraved measuring sticks is
+not established.
+
+Source-following tracks combine source cameras with complete feasible physical
+inputs. Hidden settings may be chosen and are labelled unobserved, not recovered
+historical settings. Playback distinguishes a working approximation from measured
+fidelity. Unsupported required intervals remain explicit; intervals without a
+corresponding machine may retain the preceding pose.
+
+The filmed U-shaped connecting-rod junction and the native plate-like head are
+treated as functionally equivalent for animation, with the user's approval
+pending a later CAD correction. The HUD and verification reports retain this
+head-shape assumption. Other motion, camera and geometry checks still apply.
+
+The user separately allows a narrow exception for only the two small
+rimmed/recessed lower-rocker side-face features either side of the fulcrum.
+They are absent from all twenty native rockers and remain explicitly
+**uncertified**, not pending a promised CAD correction. The closed declaration
+names both exact source features and only `harmonic-analyzer/channel/rocker-arm-1..20`
+paths. The HUD identifies this exception separately from the rod-head mapping;
+reports retain both exact records when declared.
+
+Neither exception establishes correspondence for an entire moving part. No source
+pixels, native holes or textures are fabricated. The native inventory and coherent
+mechanism motion remain required; per-part source certificates at every exposure
+are no longer prerequisites for approximate playback.
+
+Structural fixed parts that the source cannot identify may remain rendered in
+a complete feasible reconstruction, with the user's approval. They are listed
+as source-non-identifiable, not geometric-fidelity passed. Moving parts and all
+identifiable-feature and timing checks retain their requirements.
+
+The iterative plan is **50% → 20% → 10% → 5% of source frame width**, across
+all six videos at each stage. These are maximum landmark errors, not fractions
+of coverage. At 1920 pixels wide the limits are 960, 384, 192 and 96 pixels.
+The final tolerance is 5%; timing remains within 0.5 seconds throughout.
+
+First demonstrate working coarse camera/mechanism tracking across the collection
+in the browser, then refine the largest visible discrepancies. Verify every
+integer second and visible change using distributed fixed and moving landmarks,
+actual rendered pixels and visual overlays. Close-ups, insets and montages remain
+required. Report uncertainty, exceptions and unavailable measurements explicitly.
+Coarse playback is not final footage acceptance.
+
+```sh
+npm --prefix web run build
+npm --prefix web run preview
+
+# Incremental coarse collection, then refinements:
+export HARMONIC_REFERENCE_ROOT="$PWD/web/.vite/reference-root"
+HARMONIC_HEADLESS=1 npm --prefix web run verify:sync -- --stage 50
+HARMONIC_HEADLESS=1 npm --prefix web run verify:sync -- --stage 20
+HARMONIC_HEADLESS=1 npm --prefix web run verify:sync -- --stage 10
+
+# Scoped measurements do not claim a whole-video pass:
+HARMONIC_HEADLESS=1 npm --prefix web run verify:sync -- --stage 50 --video analysis --times 117,118,119
+
+# Final all-video acceptance, including the official player:
+HARMONIC_HEADLESS=1 npm --prefix web run build && HARMONIC_HEADLESS=1 npm --prefix web run verify:sync
+
+# Local demonstration of the unchanged private original footage:
+npm --prefix web run preview:reference -- --port 5967
+# http://127.0.0.1:5967/harmonic-analyzer/?video=machine-spin&referenceMedia=1
 ```
 
-## Layout
+`HARMONIC_REFERENCE_ROOT` defaults to durable ignored `web/.vite/reference-root`.
+It must contain the six original MP4s under `videos/`. `preview:reference` serves
+them locally with range support without copying footage into publication assets.
+Default public playback remains the official YouTube embed.
+The verifier serves `dist/`, exercises the original media, and reports per-video
+coverage, rendered landmark errors and timing. Incremental runs are repeatable;
+there is no acceptance-attempt quota. The default final target is 5% of each
+source frame's width, with clock skew no greater than 0.5 seconds.
+`?verify=1` enables native WebGL landmark readback. Mathematical camera fitting
+alone does not count as rendered-pixel evidence.
+Diagnostic landmark receipts also retain the actual native marker's world
+coordinates from the same completed view draw. Stale, unresolved or
+GPU-deformed coordinates remain unavailable; world coordinates are not
+source-pixel measurements or camera qualification.
 
-```
-web/
-  index.html            shell: canvas, narration panel, output trace
-  src/
-    main.ts             wiring, animation loop, the trace plot
-    scene.ts            three.js setup, GLB load, joint resolution
-    bindings.ts         THE CONTRACT: logical joint -> glTF node name pattern
-    kinematics.ts       the machine's maths, no three.js, unit-testable
-    narration.ts        the guided tour, chapter by chapter
-  content/script.md     narration copy, sourced from the video transcripts
-  scripts/fetch-model.mjs
-```
+Paused interaction verification exercises a bounded crank turn and an actual
+camera orbit, preserving before/after native pixels, camera poses and media
+clocks. Camera equality permits only numerical noise (1e-9 metres, radians and
+FOV degrees); a real orbit must exceed that bound and change rendered pixels.
+Failed interactions retain their measured predicates and screenshots.
 
-## The two ideas worth knowing
+Declared reference images are replayed from the original MP4 and checked against
+their native frame indices and pixel hashes. Frame selection uses a balanced
+expression so long collections stay within FFmpeg's expression-depth limit;
+this does not change the selected frames or split the decoder into retries.
+Gray references use explicit round-to-nearest limited-to-full 8-bit luma,
+not FFmpeg's version-dependent implicit gray conversion. The schema defines the
+byte profile; unsupported source formats are refused and existing hashes stay
+unchanged.
 
-Geometry and motion are separate. The GLB supplies shapes and rest positions,
-while `kinematics.ts` supplies the motion, derived from the 1898 paper and
-`cad/config/machine/gear_train.yaml`. A re-export therefore cannot silently
-change the physics, and the physics can be tested without a browser.
+Compact selection preserves original landmark observations across nominal and
+decoded-time aliases only when source frame, hashes, PTS and view layout match.
+It does not interpolate source pixels or change the selected camera and input.
+Exact aliases use the declared `sha256Bgr8` or `sha256Gray8` hash for their
+pixel format. Formats never alias each other; sampling diagnostics list
+supported formats and any unsupported source declarations.
 
-Joints bind by name, not by index. `bindings.ts` matches glTF node names
-(`cylinder-gear-7`, `crank-arm-1`, which are the SolidWorks component instances)
-with regexes, and the channel number comes from the node's own name. A binding
-that doesn't resolve logs a named warning and leaves that joint static, so a
-renamed component degrades gracefully instead of blanking the page or, worse,
-putting the wrong harmonic on the wrong gear.
+Source generators use committed observations, chosen seed states and immutable
+numeric calibration metadata under `content/`. Original private capture paths
+and hashes remain provenance links, not regeneration dependencies. No source
+video or screenshots are included in those inputs. Capture-bound renderer and
+model hashes remain strict; changing the renderer requires recapturing its
+bound evidence.
 
-## Deploying
+`npm --prefix web run test:source` runs the source-generation boundary tests
+through uv in an isolated Python environment. The suite covers exact-exposure
+identity, conflicting landmarks and invalid presentation declarations.
 
-Static files. `base` in `vite.config.ts` defaults to `/harmonic-analyzer/` for a
-GitHub Pages project site. Override it with `SIMULATOR_BASE` for anywhere else.
+Legacy full-part visibility, finite-line, contour and raster-bound diagnostics
+remain historical evidence, not an exhaustive queue that must finish before
+source-following animation can be demonstrated. Preserve their real bug fixes
+when using those measurement paths. See [`DESIGN.md`](DESIGN.md) for the current
+track, coverage and verification contract.
 
-The GLB is large. Before shipping publicly, run it through `gltfpack` or Draco.
-See [`DESIGN.md`](DESIGN.md#asset-budget).
+Reports and local screenshots go to `web/.vite/verification-output/` and are
+ignored. `HARMONIC_CHROME` selects the Chromium executable; `HARMONIC_HEADLESS=1`
+is available for automation. External-media restrictions are failures, not skips.
+
+## Deployment
+
+`npm --prefix web run build` produces static files under `web/dist/`. The default
+base path is `/harmonic-analyzer/`; set `SIMULATOR_BASE` consistently for both the
+build and verifier when deploying elsewhere. The authentic model is approximately
+223 MB, so its first load is substantial. Fidelity verification uses all twenty
+channels and the full export; it must not substitute reduced geometry.
