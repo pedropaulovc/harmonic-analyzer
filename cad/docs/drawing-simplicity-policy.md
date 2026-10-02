@@ -356,7 +356,11 @@ hand, citing the row in the PR, and the durable cure is stating the exception
 on the sheet so the reviewer files it under minor. Minor findings are recorded, not gating. Regression tests must defend
 observable manufacturing contracts and plausible failures, not fixed note wording,
 line counts, or mocked API-call sequences. Native drawing generation must verify
-persisted dimension values, tolerances, reference state, and required view modes;
-the exported sheet review checks clarity and unnecessary annotations. Add focused
+persisted dimension values, tolerances, reference state, and required view modes.
+Native finish attachment must identify the controlled model face and retain the
+physical leader landing, not merely a non-dangling transient silhouette. A
+sheet-derived linear reference must read back a linear native dimension type
+before interpreting its system value as a length.
+The exported sheet review checks clarity and unnecessary annotations. Add focused
 behavioral tests for uncertain boundaries, without duplicating native readback
 checks with mocks.

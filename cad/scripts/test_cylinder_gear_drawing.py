@@ -5,6 +5,7 @@ from __future__ import annotations
 import runpy
 from collections import Counter
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -124,3 +125,105 @@ def test_stacking_thickness_is_the_held_marked_dimension() -> None:
     assert spec.DRAWING_PRECISION_BY_NAME["OverallThickness"] == 4
     assert "OverallThickness" in drawing.RIGHT_KEEP
     assert f"{bank.RING_OVERHANG_MAX:.2f}" in notes.STACK_FIT_CALLOUT
+
+
+class _RimEdge:
+    def __init__(
+        self, station_mm: float, *, radius_mm=spec.CAM_DIA / 2.0,
+        center_y_mm=spec.ECCENTRICITY, axis=(0.0, 0.0, 1.0),
+    ) -> None:
+        self.curve = SimpleNamespace(
+            IsCircle=lambda: True,
+            CircleParams=(
+                0.0, center_y_mm / 1000.0, station_mm / 1000.0,
+                *axis, radius_mm / 1000.0,
+            ),
+        )
+
+    def GetCurve(self):  # noqa: N802
+        return self.curve
+
+
+class _CamFace:
+    def __init__(self, edges: list[_RimEdge], diameter_mm: float = spec.CAM_DIA) -> None:
+        self.edges = edges
+        self.surface = SimpleNamespace(
+            Identity=lambda: 4002,
+            CylinderParams=(
+                0.0, spec.ECCENTRICITY / 1000.0, 0.0,
+                0.0, 0.0, 1.0, diameter_mm / 2000.0,
+            ),
+        )
+
+    def GetSurface(self):  # noqa: N802
+        return self.surface
+
+    def GetBox(self):  # noqa: N802
+        return (
+            -0.0153, -0.00666, spec.FACE_WIDTH / 1000.0,
+            0.0153, 0.02394, spec.OVERALL_THICKNESS / 1000.0,
+        )
+
+    def GetEdges(self):  # noqa: N802
+        return self.edges
+
+
+class _CamView:
+    def __init__(self, faces: list[_CamFace]) -> None:
+        self.faces = faces
+
+    def GetVisibleComponents(self):  # noqa: N802
+        return ["cylinder-gear"]
+
+    def GetVisibleEntities2(self, component, kind):  # noqa: N802
+        return self.faces if kind == 3 else []
+
+
+def test_cam_thickness_uses_only_the_two_physical_cam_boundary_rims() -> None:
+    shoulder = _RimEdge(spec.FACE_WIDTH)
+    rear = _RimEdge(spec.OVERALL_THICKNESS, axis=(0.0, 0.0, -1.0))
+    bore = _RimEdge(
+        spec.OVERALL_THICKNESS, radius_mm=spec.BORE_DIA / 2.0, center_y_mm=0.0,
+    )
+    origin_plane = _RimEdge(0.0)
+    cam = _CamFace([rear, bore, shoulder, origin_plane])
+    gear = _CamFace([_RimEdge(spec.FACE_WIDTH)], spec.OUTSIDE_DIA)
+
+    rims = drawing._cam_thickness_rims(_CamView([gear, cam]))
+
+    assert rims == {spec.FACE_WIDTH: shoulder, spec.OVERALL_THICKNESS: rear}
+    axial_span_mm = (
+        rims[spec.OVERALL_THICKNESS].curve.CircleParams[2]
+        - rims[spec.FACE_WIDTH].curve.CircleParams[2]
+    ) * 1000.0
+    assert axial_span_mm == pytest.approx(spec.CAM_THICKNESS)
+
+
+@pytest.mark.parametrize(
+    "fault", ("missing", "radius", "center", "axis", "station", "ambiguous"),
+)
+def test_cam_thickness_rejects_a_wrong_or_ambiguous_axial_boundary(fault: str) -> None:
+    shoulder = _RimEdge(spec.FACE_WIDTH)
+    edges = [shoulder]
+    if fault == "radius":
+        edges.append(_RimEdge(spec.OVERALL_THICKNESS, radius_mm=spec.CAM_DIA / 2.0 + 1.0))
+    elif fault == "center":
+        edges.append(_RimEdge(spec.OVERALL_THICKNESS, center_y_mm=spec.ECCENTRICITY + 1.0))
+    elif fault == "axis":
+        edges.append(_RimEdge(spec.OVERALL_THICKNESS, axis=(1.0, 0.0, 0.0)))
+    elif fault == "station":
+        edges.append(_RimEdge(spec.OVERALL_THICKNESS + 1.0))
+    elif fault == "ambiguous":
+        edges.extend([_RimEdge(spec.OVERALL_THICKNESS), _RimEdge(spec.OVERALL_THICKNESS)])
+    with pytest.raises(RuntimeError, match="expected one circular cam rim"):
+        drawing._cam_thickness_rims(_CamView([_CamFace(edges)]))
+
+
+@pytest.mark.parametrize("count", (0, 2))
+def test_cam_thickness_refuses_missing_or_ambiguous_cam_faces(count: int) -> None:
+    faces = [
+        _CamFace([_RimEdge(spec.FACE_WIDTH), _RimEdge(spec.OVERALL_THICKNESS)])
+        for _ in range(count)
+    ]
+    with pytest.raises(RuntimeError, match=f"expected one cam face, got {count}"):
+        drawing._cam_thickness_rims(_CamView(faces))

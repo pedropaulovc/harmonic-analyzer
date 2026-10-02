@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -278,3 +279,47 @@ def test_crown_finish_leader_passes_under_its_own_text() -> None:
     assert drawing.CROWN_FINISH_SYMBOL_XY[1] < crown_y
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "_crown_point(CROWN_FINISH_FROM_ROOT_MM)" in source
+
+
+class _FinishFace:
+    """Surface geometry, not an annotation/selection API echo."""
+
+    def __init__(self, identity: int, parameters: tuple[float, ...]) -> None:
+        self.surface = SimpleNamespace(
+            Identity=lambda: identity, SphereParams=parameters, CylinderParams=parameters,
+        )
+
+    def GetSurface(self):  # noqa: N802
+        return self.surface
+
+    def GetBox(self):  # noqa: N802
+        return ()
+
+
+class _FinishView:
+    def __init__(self, faces: list[_FinishFace]) -> None:
+        self.faces = faces
+
+    def GetVisibleComponents(self):  # noqa: N802
+        return ["cam-pin"]
+
+    def GetVisibleEntities2(self, component, kind):  # noqa: N802
+        return self.faces if kind == 3 else []
+
+
+def test_crown_finish_selects_the_sphere_not_the_bonded_shank() -> None:
+    crown = _FinishFace(4004, (0.0, 0.0, 0.014, drawing.CAP_RADIUS / 1000.0))
+    shank = _FinishFace(4002, (0.0, 0.0, 0.0, 0.0, 0.0, 1.0, drawing.PIN_DIA / 2000.0))
+    wrong_radius = _FinishFace(4004, (0.0, 0.0, 0.014, drawing.CAP_RADIUS / 2000.0))
+
+    assert drawing._crown_face(_FinishView([shank, wrong_radius, crown])) is crown
+
+
+@pytest.mark.parametrize("count", (0, 2))
+def test_crown_finish_refuses_missing_or_ambiguous_spherical_faces(count: int) -> None:
+    faces = [
+        _FinishFace(4004, (0.0, 0.0, 0.014, drawing.CAP_RADIUS / 1000.0))
+        for _ in range(count)
+    ]
+    with pytest.raises(RuntimeError, match=f"expected one controlled face, got {count}"):
+        drawing._crown_face(_FinishView(faces))

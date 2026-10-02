@@ -16,7 +16,6 @@ from _drawing_common import (
     assert_imported_precision,
     curate_view_dimensions,
     dimension_name,
-    face_silhouettes_through,
     finalize_drawing,
     model_point_in_view,
     new_project_drawing,
@@ -27,12 +26,14 @@ from _drawing_common import (
     set_reference_dimension,
     stamp_drawing_summary,
     view_name,
+    visible_view_entities,
 )
 from _drawing_hidden_sketches import (
     curate_view_dimensions as curate_hidden_owner_dimensions,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _layout_geometry import audit_sheet, format_findings
+from _part_pmi import _face_geometry, _face_matches
 from _surface_finish import surface_finish_by_key
 from pinion_arbor_pin_spec import PIN_HOLE_CALLOUT
 from pinion_arbor_spec import (
@@ -405,35 +406,41 @@ JOURNAL_FINISHES = {
 def _journal_finish_picks(
     adapter: Any, view: Any
 ) -> dict[str, tuple[Any, tuple[float, float], tuple[float, float]]]:
-    """Each land's Ra target: ``(silhouette, landing, symbol_xy)``.
+    """Each land's Ra target: ``(controlled face, landing, symbol_xy)``.
 
-    The landing is the land's station on its flank; the silhouette is the one
-    its part-owned face (``SURFACE_FINISHES``) draws through that point, found
-    on the model (:func:`face_silhouettes_through`), not hit-tested there.
-    The hit test missed the front land at sheet (0.25355, 0.166), dead on the
-    flank, on swmaker00000a@10 twice while swmaker000004@4 hit it with the
-    same key; the land's face draws that flank as two coincident silhouettes.
+    The 1:1 *Top view is turned -90 degrees: model +X is its lower flank,
+    while model Y is view depth. Project the physical surface point, not an
+    axis point plus an assumed paper-space radius. A silhouette sweep can
+    return only the opposite flank (the failed leaf returned y=174 mm, not
+    y=166 mm); the visible model face is the stable attachment for either
+    flank, using the cone-gear-shaft FACE/selection-point pattern.
     """
+    controls = {
+        key: surface_finish_by_key(SURFACE_FINISHES, key)
+        for key in JOURNAL_FINISHES
+    }
+    matches: dict[str, list[Any]] = {key: [] for key in controls}
+    for face in visible_view_entities(view, 3, label="arbor journal finish faces"):
+        geometry = _face_geometry(face)
+        if geometry is None:
+            continue
+        for key, control in controls.items():
+            if _face_matches(geometry, control.face):
+                matches[key].append(face)
     picks = {}
     for key, (station_z, symbol_xy, flank) in JOURNAL_FINISHES.items():
-        land_x, axis_y = model_point_in_view(
+        if len(matches[key]) != 1:
+            raise RuntimeError(
+                f"arbor {key} finish: expected one controlled face, got {len(matches[key])}"
+            )
+        landing = model_point_in_view(
             adapter,
             view,
-            (0.0, 0.0, station_z / 1000.0),
-            label=f"arbor {key} finish station",
+            (-FLANK_SIGN[flank] * SHAFT_DIA / 2000.0, 0.0, station_z / 1000.0),
+            label=f"arbor {key} finish landing",
         )
-        landing = (land_x, axis_y + FLANK_SIGN[flank] * SHAFT_DIA / 2000.0)
-        picks[key] = (surface_finish_by_key(SURFACE_FINISHES, key).face, landing, symbol_xy)
-    silhouettes = face_silhouettes_through(
-        adapter,
-        view,
-        {key: (face, landing) for key, (face, landing, _xy) in picks.items()},
-        label="arbor journal finish flanks",
-    )
-    return {
-        key: (silhouettes[key], landing, symbol_xy)
-        for key, (_face, landing, symbol_xy) in picks.items()
-    }
+        picks[key] = (matches[key][0], landing, symbol_xy)
+    return picks
 
 
 def _move_dimension(
@@ -1174,16 +1181,16 @@ async def build(adapter: Any) -> dict[str, str]:
     _add_turning_axis(adapter, principal)
     witness_spans = _blacken_reference_witnesses(adapter, principal)
     finishes = _journal_finish_picks(adapter, principal)
-    for key, (silhouette, landing, symbol_xy) in finishes.items():
+    for key, (face, landing, symbol_xy) in finishes.items():
         add_surface_finish(
             adapter,
             principal,
-            entity=silhouette,
+            entity=face,
             leader_attach_xy=landing,
             symbol_xy=symbol_xy,
             control=surface_finish_by_key(SURFACE_FINISHES, key),
             label=f"arbor {key} finish",
-            entity_type="SILHOUETTE",
+            entity_type="FACE",
             char_height=0.0025,
         )
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)
