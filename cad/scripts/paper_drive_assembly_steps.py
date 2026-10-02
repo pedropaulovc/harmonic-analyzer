@@ -21,6 +21,8 @@ import latch_hook_bracket_spec as hook_bracket
 import transgear_drive_collar_spec as collar
 import transgear_cluster_fit as cluster_fit
 import transgear_feed_pinion_spec as feed_pinion
+import transgear_hanger_joints as joints
+import transgear_removable_spec as removable
 
 DRAWING_NUMBER = "MHA-A06"
 
@@ -227,11 +229,24 @@ MESH_EXTENSION_MAX = _RACK_ADDENDUM - (
 ) * math.sin(_PHI)
 
 
-def check_mesh_band(band: tuple[float, float]) -> None:
+# R9-62a's band is read with the arm resting on the hook, its MHA-169 pin on
+# the Ø5.4's lower edge ("hook-set-and-riveted"), so in service the pin has
+# no travel left along the strip to let the arm fall: LATCH_SLACK_ALONG.  Read
+# with the arm clamped and the pin clear in the hole (the step before Codex P1
+# on b2eb9a0e1), the unclamped arm fell through the hole's 0.620 along the
+# strip, the pinion 0.220, and the band's loose end ran at e 0.839.
+LATCH_SLACK_ALONG = 0.0
+
+
+def check_mesh_band(
+    band: tuple[float, float], latch_slack_along: float = LATCH_SLACK_ALONG
+) -> None:
     """Raise unless both ends of a platen-shake ``band`` mesh: the rack clear
     of the 12T's flank at the tight end, the contact ratio at the printed
-    smallest tip within the 1.1 rule at the loose end."""
+    smallest tip within the 1.1 rule at the loose end once the arm has
+    fallen through ``latch_slack_along`` of latch-pin travel on the hook."""
     low, high = (mesh_extension(b) for b in band)
+    high += joints.latch_pinion_drop(latch_slack_along)
     if not MESH_EXTENSION_MIN <= low < high <= MESH_EXTENSION_MAX:
         raise ValueError(
             f"mesh band e {low:.3f}..{high:.3f} leaves the working window "
@@ -244,11 +259,43 @@ def check_mesh_band(band: tuple[float, float]) -> None:
 
 
 check_mesh_band(MESH_BACKLASH_RANGE)
+# The feed mesh in service at its loosest: the band's loose end with the arm
+# resting on the hook.
+MESH_EXTENSION_LATCHED_MAX = mesh_extension(
+    MESH_BACKLASH_RANGE[1]
+) + joints.latch_pinion_drop(LATCH_SLACK_ALONG)
 
 # The collar is set to transgear_drive_collar_spec.FIT_UP_OFFSET_SET_TEXT and
 # accepted within OFFSET_ACCEPT_TOL of the same target at the re-check
-# (procedure (8): "-0.05 ±0.10" in machine z, forward is -z).
+# (procedure (8): "-0.05 ±0.10" in machine z, forward is -z).  Both readings
+# take the T24 held back on its collar seat ("fitup-pose-set"): it floats
+# T24_FLOAT_RANGE forward of it under the nut, so a T24 read floated forward
+# would set and accept the pair up to that float off.
 OFFSET_ACCEPT_TOL = 0.10
+# What the acceptance passes, in service: the seated front faces within the
+# accepted band, the mid-planes a half plate band either way (both chain
+# wheels are MHA-081 plates); then the crank's end play, the knob's end
+# float and the T24's own float under the nut forward, the hanger's head
+# play rearward (transgear_drive_collar_spec's in-service terms):
+# -0.15 - 0.05 - 0.25 - 0.25 - 0.15 = -0.85 .. +0.05 + 0.05 + 0.35 = +0.45.
+_HALF_PLATE_SPREAD = (max(removable.PLATE_BAND) - min(removable.PLATE_BAND)) / 2.0
+ACCEPTED_CHAIN_OFFSET_IN_SERVICE = (
+    -(collar.FIT_UP_OFFSET_TARGET + OFFSET_ACCEPT_TOL)
+    - _HALF_PLATE_SPREAD
+    - collar.CRANK_END_PLAY_MAX
+    - collar.KNOB_END_FLOAT_MAX
+    - max(collar.T24_FLOAT_RANGE),
+    OFFSET_ACCEPT_TOL
+    - collar.FIT_UP_OFFSET_TARGET
+    + _HALF_PLATE_SPREAD
+    + collar.HANGER_HEAD_PLAY_MAX,
+)
+if max(map(abs, ACCEPTED_CHAIN_OFFSET_IN_SERVICE)) > collar.CHAIN_OFFSET_LIMIT:
+    raise AssertionError(
+        f"an accepted chain pair runs {ACCEPTED_CHAIN_OFFSET_IN_SERVICE[0]:+.3f}.."
+        f"{ACCEPTED_CHAIN_OFFSET_IN_SERVICE[1]:+.3f} in service, past "
+        f"±{collar.CHAIN_OFFSET_LIMIT}"
+    )
 # Procedure (5): the clamp sleeve over the stud bears on the collar's pilot
 # face while the core is drilled, tightened by the thumbnut. A shop fixture,
 # not a released part.
@@ -261,6 +308,10 @@ COLLAR_DISC_AIR_MIN = cluster_fit.FIT_WINDOW[0]
 
 # The printed forms of those bands: a drawing script only places them.
 OFFSET_ACCEPT_TEXT = f"{collar.FIT_UP_OFFSET_TARGET:.2f} \u00b1{OFFSET_ACCEPT_TOL:.2f}"
+# The T24 floats collar.T24_FLOAT_RANGE forward of its seat (the collar's
+# front face) under the thumbnut; the setting and its acceptance read it
+# held back on that seat, the pose ACCEPTED_CHAIN_OFFSET_IN_SERVICE assumes.
+T24_HELD_BACK_TEXT = "T24 HELD BACK ON ITS SEAT"
 COLLAR_DISC_AIR_TEXT = f"{COLLAR_DISC_AIR_MIN:.2f} MIN"
 RACK_CREST_TEXT = f"{RACK_CREST_DROP:.2f} \u00b1{RACK_CREST_TOL:.2f}"
 MESH_BACKLASH_TEXT = f"{MESH_BACKLASH_RANGE[0]:.2f} TO {MESH_BACKLASH_RANGE[1]:.2f}"

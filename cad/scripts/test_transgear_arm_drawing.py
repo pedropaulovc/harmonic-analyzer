@@ -115,7 +115,7 @@ def _worst_far_face_margin(
     if bend_deg is None:
         bend_deg = _config.title_block("angular")["value_deg"]
     pivot = (bar.PIVOT_TAP_X, bracket.BAR_CENTRE_Y + bar.HANGER_TAP_Y)
-    hole = (sum(hook.PLANE_X) / 2.0, hook.PIN_HOLE_YZ[0])
+    hole = (sum(hook.PLANE_X) / 2.0, hook.PIN_AXIS_YZ[0])
     theta0 = math.atan2(hole[1] - pivot[1], hole[0] - pivot[0])
     flap_shift = (
         bar.HOLE_POSITION_BAND + bracket_spec.POSITION_TOL + bracket_spec.HEAD_FLOAT_MAX

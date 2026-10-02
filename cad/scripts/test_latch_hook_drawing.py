@@ -16,6 +16,7 @@ import draw_latch_hook as drawing
 import latch_hook_bracket_geometry as bracket
 import latch_hook_geometry as geom
 import latch_hook_spec as spec
+import paper_drive_assembly_steps as steps
 import support_bar_spec as bar
 import transgear_arm_geometry as arm
 import transgear_latch_pin_spec as pin
@@ -65,8 +66,9 @@ def _on_centreline(y: float, z: float) -> float:
 
 def test_the_centreline_is_two_tangent_arcs_from_a_square_top() -> None:
     """R9-10: the tangent two-arc chain replaces the traced spline; the top
-    cut is square to the strip.  R9-26: the pin hole is on the arm's pin axis
-    and within the sheet's centring band of the centreline."""
+    cut is square to the strip.  R9-26: the pin's axis crosses the strip at
+    the arm's pin height; the hole is within the sheet's centring band of the
+    centreline."""
     # Square top: arc 1's centre lies on the normal to the cut line (y const).
     assert geom.C1[0] == geom.TOP_Y
     # Tangent: both centres and the junction collinear.
@@ -76,7 +78,7 @@ def test_the_centreline_is_two_tangent_arcs_from_a_square_top() -> None:
     for station in (geom.JUNCTION, geom.END_YZ):
         assert _on_centreline(*station) < 2e-3
     arm_pin_z = arm.FRONT_FACE_MACHINE_Z + arm.THICKNESS / 2.0
-    assert geom.PIN_HOLE_YZ[1] == pytest.approx(arm_pin_z, abs=1e-9)
+    assert geom.PIN_AXIS_YZ[1] == pytest.approx(arm_pin_z, abs=1e-9)
     assert _on_centreline(*geom.PIN_HOLE_YZ) <= spec.CENTRING_BAND
     # The rivet pair straddles the centreline symmetrically.
     (ya, za), (yb, zb) = geom.RIVET_YZ
@@ -117,30 +119,73 @@ def test_walls_hold_the_target_at_the_worst_case_the_sheet_prints() -> None:
     )
 
 
-def test_the_latch_pin_enters_its_hole_at_the_fit_up_pose() -> None:
-    """The pin's full diameter, swept obliquely through the strip, clears
-    the 5.4 hole by the latch's minimum at the pose the hook is set in."""
+def _swept_pin(dia: float) -> list[tuple[float, float]]:
+    """Machine (y, z) of the pin's surface where it crosses the strip's two
+    faces, the arm at its drawn pose: its full ``dia`` swept obliquely."""
     pivot = (bar.PIVOT_TAP_X, bracket.BAR_CENTRE_Y + bar.HANGER_TAP_Y)
-    hole_y = geom.PIN_HOLE_YZ[0]
+    axis_y, axis_z = geom.PIN_AXIS_YZ
     mid_x = sum(geom.PLANE_X) / 2.0
-    run = (mid_x - pivot[0], hole_y - pivot[1])
+    run = (mid_x - pivot[0], axis_y - pivot[1])
     length = math.hypot(*run)
     ux, uy = run[0] / length, run[1] / length  # the pin axis, in a z plane
-    r = pin.DIA_MAX / 2.0
-    reach = 0.0
+    points = []
     for step in range(3600):
         phi = 2.0 * math.pi * step / 3600
         # A point on the pin's surface: across the axis in the xy plane by
         # r cos(phi) (normal (-uy, ux)), along z by r sin(phi).
-        across, off_z = r * math.cos(phi), r * math.sin(phi)
+        across, off_z = dia / 2.0 * math.cos(phi), dia / 2.0 * math.sin(phi)
         off_x, off_y = -uy * across, ux * across
         for face_x in geom.PLANE_X:
             s = (face_x - mid_x - off_x) / ux
-            y = hole_y + s * uy + off_y
-            reach = max(reach, math.hypot(y - hole_y, off_z))
+            points.append((axis_y + s * uy + off_y, axis_z + off_z))
+    return points
+
+
+def _room_below(points: list[tuple[float, float]], hole: tuple[float, float]) -> float:
+    """How far the swept pin can fall down the strip (-y) inside a Ø5.4 at
+    its least size centred on ``hole``: the arm's drop on the latch."""
+    r = geom.PIN_HOLE_DIA / 2.0
+    return min(
+        (y - hole[0]) + math.sqrt(max(r**2 - (z - hole[1]) ** 2, 0.0))
+        for y, z in points
+    )
+
+
+def test_the_latch_pin_enters_its_hole_at_the_fit_up_pose() -> None:
+    """The pin's full diameter, swept obliquely through the strip, leaves the
+    5.4 hole the latch's minimum room each side along the strip."""
+    reach = max(
+        math.hypot(y - geom.PIN_AXIS_YZ[0], z - geom.PIN_AXIS_YZ[1])
+        for y, z in _swept_pin(pin.DIA_MAX)
+    )
     clearance = geom.PIN_HOLE_DIA / 2.0 - reach
     assert clearance >= spec.PIN_CLEARANCE_MIN
     assert spec.PIN_CLEARANCE_ALONG == pytest.approx(clearance, abs=1e-3)
+
+
+def test_the_arm_rests_on_the_hook_and_keeps_its_feed_mesh() -> None:
+    """Codex P1 on b2eb9a0e1: the hook is set with its hole's lower edge on
+    the pin, and the drawn hole holds the largest pin there, so the unclamped
+    arm cannot fall through it to open the feed mesh past the 1.1 rule.  A
+    hole centred on the pin's axis let the arm fall 0.620 along the strip,
+    the pinion 0.220: the band's loose end ran at e 0.839, CR 0.77 at the
+    smallest tip (the nominal set's 0.55 at e 0.770, CR 0.88)."""
+    largest, least = _swept_pin(pin.DIA_MAX), _swept_pin(pin.DIA + min(pin.DIA_BAND))
+    # Bearing, not interfering: the largest pin touches the lower edge, the
+    # least one sits within a few hundredths of it.
+    assert _room_below(largest, geom.PIN_HOLE_YZ) == pytest.approx(0.0, abs=2e-3)
+    assert _room_below(least, geom.PIN_HOLE_YZ) < 0.01
+    assert steps.LATCH_SLACK_ALONG == pytest.approx(
+        _room_below(largest, geom.PIN_HOLE_YZ), abs=2e-3
+    )
+    steps.check_mesh_band(
+        steps.MESH_BACKLASH_RANGE, _room_below(least, geom.PIN_HOLE_YZ)
+    )
+    # The hole drawn on the pin's axis: the arm falls through its clearance.
+    centred = _room_below(largest, geom.PIN_AXIS_YZ)
+    assert centred == pytest.approx(spec.PIN_CLEARANCE_ALONG, abs=2e-3)
+    with pytest.raises(ValueError, match="working window"):
+        steps.check_mesh_band(steps.MESH_BACKLASH_RANGE, centred)
 
 
 def _spec_with(monkeypatch, name: str, value):

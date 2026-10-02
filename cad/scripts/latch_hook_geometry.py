@@ -18,9 +18,13 @@ of the contract's traced spline, 0.167 max deviation from it):
   to the end, TIP_RUN 99.9 from the top cut (y 206.3, z -123.49).  The
   model carries the printed .X value; the contract's 206.25 end sits 0.05
   further on;
-* the pin hole is on the pin's axis at the strip's mid-plane: y 229.0403,
-  z the arm's pin (-120.43125), 0.031 off arc 2 toward the inner edge,
-  inside the sheet's centring band and taken up by the fit-up set (R9-26);
+* the pin's axis crosses the strip's mid-plane at PIN_AXIS_YZ (y 229.0403,
+  z the arm's pin, -120.43125);
+* the pin hole is drawn where the arm RESTS on the hook: on the centreline,
+  0.617 up the strip from the pin axis, so the largest pin's swept
+  footprint bears on the hole's lower edge (Codex P1 on b2eb9a0e1: a hole
+  centred on the pin let the arm drop 0.62 along the strip, the feed
+  pinion 0.22 out of the rack); the fit-up set takes up its run band;
 * the free end is a full round, R5 about the end point;
 * the edges are the ±5 concentric offsets (R845 / R855, R485 / R495).
 
@@ -52,7 +56,12 @@ C1 = (306.2, -966.6395)
 JUNCTION = (253.0041, -118.3057)
 R2 = 490.0
 C2 = (283.6700, -607.3452)
-PIN_HOLE_YZ = (229.0403, PIN_MACHINE_Z)
+# The latch pin's axis on the strip's mid-plane, the arm at its drawn pose.
+PIN_AXIS_YZ = (229.0403, PIN_MACHINE_Z)
+# The pin hole, on the centreline where the largest pin (Ø3.18262) swept
+# through the strip at its 32.56 deg incidence bears on the hole's lower edge
+# (latch_hook_spec.PIN_BEARING_LIFT; the sweep is test_latch_hook_drawing's).
+PIN_HOLE_YZ = (229.6570, -120.3312)
 # The end's run from the top cut, as printed (.X), on arc 2.
 TIP_RUN = 99.9
 END_YZ = (TOP_Y - TIP_RUN, C2[1] + math.sqrt(R2**2 - (TOP_Y - TIP_RUN - C2[0]) ** 2))

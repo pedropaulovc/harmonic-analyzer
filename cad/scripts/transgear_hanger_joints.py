@@ -310,9 +310,9 @@ FLAP_BEND_TOL_DEG = 1.0
 # lever.
 FLAP_BEND_LEVER = ARM.PIN_MACHINE_Z - BRACKET.BAR_BACK_FACE_Z  # 9.469
 _LATCH_PIVOT = (BAR.PIVOT_TAP_X, BRACKET.BAR_CENTRE_Y + BAR.HANGER_TAP_Y)
-_LATCH_HOLE = (sum(HOOK.PLANE_X) / 2.0, HOOK.PIN_HOLE_YZ[0])
+_LATCH_PIN_AT_STRIP = (sum(HOOK.PLANE_X) / 2.0, HOOK.PIN_AXIS_YZ[0])
 _LATCH_THETA = math.atan2(
-    _LATCH_HOLE[1] - _LATCH_PIVOT[1], _LATCH_HOLE[0] - _LATCH_PIVOT[0]
+    _LATCH_PIN_AT_STRIP[1] - _LATCH_PIVOT[1], _LATCH_PIN_AT_STRIP[0] - _LATCH_PIVOT[0]
 )  # -32.56 deg
 _FLAP_SHIFT = (
     BAR.HOLE_POSITION_BAND + BRACKET_SPEC.POSITION_TOL + BRACKET_SPEC.HEAD_FLOAT_MAX
@@ -364,6 +364,20 @@ if LATCH_PIN_FAR_FACE_MARGIN_WORST <= 0.0:
         "MHA-169 pin / MHA-127 strip far face: the pin's full diameter stops"
         f" {-LATCH_PIN_FAR_FACE_MARGIN_WORST:.3f} short at the printed worst case"
     )
+
+
+# --- The feed mesh on the latch (Codex P1 on b2eb9a0e1) -----------------------
+def latch_pinion_drop(slack_along: float) -> float:
+    """How far the feed pinion's centre falls, opening its mesh in the rack,
+    when the free arm swings down till its latch pin's trace on the hook
+    strip has moved ``slack_along`` (machine y).  The pin's axis turns with
+    the arm about P; its trace on the strip's plane (x constant) moves
+    run / cos^2 per radian, and the stud, on the same line PIN_STATION from P,
+    falls PIN_STATION * cos per radian."""
+    run = _LATCH_PIN_AT_STRIP[0] - _LATCH_PIVOT[0]
+    turn = slack_along * math.cos(_LATCH_THETA) ** 2 / run
+    return turn * ARM.PIN_STATION * math.cos(_LATCH_THETA)
+
 
 # --- The MHA-168 sheet's installation line ------------------------------------
 # The purchased sheet prints the registry's ``installation_notes``; the

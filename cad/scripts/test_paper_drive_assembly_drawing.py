@@ -974,6 +974,31 @@ def test_the_setting_and_the_acceptance_offsets_are_told_apart() -> None:
     assert f"UP TO {behind:.2f} BEHIND PASSES" in accepted
 
 
+def test_the_t24_is_read_held_back_on_its_seat() -> None:
+    """Codex P2 on b2eb9a0e1: the T24 floats 0.05-0.15 forward of its seat
+    under the nut, so d and the acceptance read it held back on the seat, the
+    pose the chain-plane budget starts from; the float is then forward only.
+    Accepted at 0.05 ±0.10 seated, the pair runs -0.85..+0.45 in service."""
+    pose = _step_body("fitup-pose-set")
+    assert steps.T24_HELD_BACK_TEXT in pose
+    assert _step_body("collar-gap-measured").startswith(
+        f"{steps.T24_HELD_BACK_TEXT}, MEASURE d"
+    )
+    accepted = _step_body("fitup-accepted")
+    assert accepted.startswith(f"ACCEPT, IN STEP {steps.step_number('fitup-pose-set')}")
+    low, high = steps.ACCEPTED_CHAIN_OFFSET_IN_SERVICE
+    assert (low, high) == pytest.approx((-0.85, 0.45), abs=1e-9)
+    # The float is in the budget, forward: the contract's set range and the
+    # acceptance both lose it at their forward ends.
+    assert collar.CHAIN_OFFSET_IN_SERVICE[0] == pytest.approx(
+        collar.CHAIN_SET_RANGE[0]
+        - collar.CRANK_END_PLAY_MAX
+        - collar.KNOB_END_FLOAT_MAX
+        - max(collar.T24_FLOAT_RANGE)
+    )
+    assert max(abs(low), abs(high)) <= collar.CHAIN_OFFSET_LIMIT
+
+
 def test_a_balloon_ring_is_centred_in_its_room_or_refused() -> None:
     limits = (0.2, 0.1, 0.4, 0.3)
     outline = (0.0, 0.0, 0.1, 0.1)
@@ -1072,6 +1097,11 @@ def test_the_hook_is_set_on_a_meshed_and_run_hanger() -> None:
     assert "FULL TRAVEL: NO TIGHT SPOT, SHAKE AT EVERY TOOTH" in mesh
     hook = " ".join(text["hook-set-and-riveted"].split())
     assert hook.startswith("HOLDING THAT MESH")
+    # Codex P1 on b2eb9a0e1: set clear of the pin, the unclamped arm fell
+    # through the hole's clearance and opened the feed mesh.
+    pin = drawing._N["transgear-latch-pin"]
+    assert f"ITS HOLE'S LOWER EDGE ON THE {pin} PIN" in hook
+    assert "CLEAR" not in hook
     assert f"OVER {steps.HOOK_SET_TEXT} OFF ITS DRAWN PLACE: STOP AND REPORT" in hook
     assert hook.endswith("UNCLAMP, LATCH, RE-RUN THE TRAVEL.")
 

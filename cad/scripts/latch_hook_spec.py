@@ -18,13 +18,16 @@ midpoint, are centred across it).
 Bands (title block unless stated):
 
 * the template -- inner-edge radii, the tangency run, the tip run -- at .X;
-* the pin hole's run at .XX: the hook is set at assembly with the 1/8 pin
-  entering the Ø5.4 without touching, and the flap drilled through it after
-  (R9-15), so the set takes up the run's band.  The pin crosses the strip
-  obliquely and sweeps a 4.16 long footprint along it, which leaves 0.62
-  each side at that pose (R9-24).  The MHA-170 flap's walls hold 2.0 over
-  that set range only (``latch_hook_bracket_spec.HOOK_SET_RANGE``): the .X
-  row's 0.8 would leave its upper rivet hole 1.79 from the flap's top;
+* the pin hole's run at .XX: the hook is set at assembly with the Ø5.4's
+  lower edge on the 1/8 pin, the arm clamped at its feed mesh, and the flap
+  drilled through it after (R9-15), so the set takes up the run's band.  The
+  pin crosses the strip obliquely and sweeps a 4.16 long footprint along it,
+  which leaves the hole 0.62 of room each side of it (R9-24); the hole is
+  drawn 0.617 up the strip from the pin's axis, so all of it is above the
+  resting pin and the arm cannot drop through it (Codex P1 on b2eb9a0e1).
+  The MHA-170 flap's walls hold 2.0 over that set range only
+  (``latch_hook_bracket_spec.HOOK_SET_RANGE``): the .X row's 0.8 would leave
+  its upper rivet hole 1.79 from the flap's top;
 * the rivet pair's run and pitch at .XXX: two Ø1.65 holes across a 10 strip
   hold the 2.0 web and edge walls only at that band.  The MHA-170 flap's
   holes are drilled through these at assembly, so nothing else registers on
@@ -49,6 +52,7 @@ from latch_hook_geometry import (
     INNER_R1,
     INNER_R2,
     JUNCTION_RUN,
+    PIN_AXIS_YZ,
     PIN_HOLE_CENTRELINE_OFFSET,
     PIN_HOLE_DIA,
     PIN_HOLE_YZ,
@@ -71,8 +75,8 @@ WALL_FLOOR = 1.5
 # centred on); thickness as supplied.
 STOCK_WIDTH_TOL = 0.1
 CENTRING_BAND = 0.06  # hole centre to the strip's mid-width, each way
-# The pin hole is modelled on the pin's axis, off the centreline by the arm's
-# pin height (R9-26); the printed centring band must cover that.
+# The pin hole is drawn on the centreline, 0.100 off the pin's axis across
+# the strip (latch_hook_geometry); the printed centring band must cover it.
 if abs(PIN_HOLE_CENTRELINE_OFFSET) > CENTRING_BAND:
     raise AssertionError(
         f"MHA-127 pin hole sits {PIN_HOLE_CENTRELINE_OFFSET:.3f} off the strip"
@@ -88,19 +92,19 @@ RIVET_PLACES = 3
 HOLE_DIA_PLACES = 2
 
 # The 1/8 latch pin's footprint on the strip.  At the fit-up pose the pin's
-# axis runs on the arm's centreline from the pivot P through the hole's
-# centre on the strip's mid-plane, in a plane of constant z; the strip's
+# axis runs on the arm's centreline from the pivot P through PIN_AXIS_YZ on
+# the strip's mid-plane, in a plane of constant z; the strip's
 # faces are normal to machine X, so the pin crosses them at PIN_INCIDENCE
 # and its full diameter sweeps D / cos + T tan along the trace.
 _PIVOT_XY = (PIVOT_TAP_X, BAR_CENTRE_Y + HANGER_TAP_Y)
-_HOLE_XY = ((PLANE_X[0] + PLANE_X[1]) / 2.0, PIN_HOLE_YZ[0])
+_HOLE_XY = ((PLANE_X[0] + PLANE_X[1]) / 2.0, PIN_AXIS_YZ[0])
 PIN_INCIDENCE = math.atan2(
     abs(_HOLE_XY[1] - _PIVOT_XY[1]), _HOLE_XY[0] - _PIVOT_XY[0]
 )  # 32.56 deg
 PIN_FOOTPRINT_ALONG = PIN_DIA_MAX / math.cos(PIN_INCIDENCE) + STRIP_T * math.tan(
     PIN_INCIDENCE
 )  # 3.776 + 0.383 = 4.159
-# The least pin-to-hole clearance the latch keeps.
+# The least pin-to-hole room the latch keeps each side of the swept pin.
 PIN_CLEARANCE_MIN = 0.28
 
 
@@ -147,17 +151,22 @@ for _name, _wall in WALLS_WORST.items():
             f"the {WALL_TARGET} target"
         )
 
-# --- The latch pin enters the Ø5.4 at the fit-up pose --------------------------
-# The hook is set on the pin before the flap is drilled through its rivet
-# holes (R9-15), so the set takes up the run's band, as it does the rivet
-# holes' misalignment: the clearance is the hole's least size about the
-# swept footprint.
+# --- The latch pin rests on the Ø5.4's lower edge at the fit-up pose -----------
+# The hook is set with the hole's lower edge on the pin, the arm clamped at
+# its feed mesh, before the flap is drilled through its rivet holes (R9-15),
+# so the set takes up the run's band, as it does the rivet holes'
+# misalignment.  The hole's least size leaves PIN_CLEARANCE_ALONG each side
+# of the swept footprint along the strip.  Drawn PIN_BEARING_LIFT up the
+# strip from the pin's axis, it holds the largest pin on its lower edge, so
+# the unclamped arm keeps the feed mesh it was set at; the room, twice this,
+# is all above the pin.
 PIN_CLEARANCE_ALONG = (PIN_HOLE_DIA - PIN_FOOTPRINT_ALONG) / 2.0  # 0.620
 if PIN_CLEARANCE_ALONG < PIN_CLEARANCE_MIN - 1e-9:
     raise AssertionError(
-        f"MHA-127 pin hole leaves {PIN_CLEARANCE_ALONG:.3f} pin clearance at the"
-        f" fit-up pose, under {PIN_CLEARANCE_MIN}"
+        f"MHA-127 pin hole leaves {PIN_CLEARANCE_ALONG:.3f} pin room each side"
+        f" of the swept pin, under {PIN_CLEARANCE_MIN}"
     )
+PIN_BEARING_LIFT = PIN_HOLE_YZ[0] - PIN_AXIS_YZ[0]  # 0.617
 
 # --- Sheet ---------------------------------------------------------------------
 PIN_HOLE_CALLOUT = "DRILL THRU"
@@ -185,7 +194,7 @@ DRAWING_NOTES = "\n".join(
         "2. CUT TOP END SQUARE; FULL-ROUND FREE END; DRILL HOLES AFTER BENDING.",
         "3. CENTRE PIN HOLE AND 2X RIVET HOLES' MIDPOINT ON WIDTH WITHIN "
         f"{CENTRING_BAND:.2f}.",
-        "4. AT ASSEMBLY: SET ON MHA-169 PIN CLEAR; DRILL MHA-170 FLAP THRU 2X.",
+        "4. SET HOLE'S LOWER EDGE ON MHA-169 PIN; DRILL MHA-170 FLAP THRU 2X.",
     )
 )
 

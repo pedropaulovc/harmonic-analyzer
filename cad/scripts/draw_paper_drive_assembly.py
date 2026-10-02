@@ -1027,9 +1027,9 @@ def _step_text() -> dict[str, str]:
         ),
         "hook-set-and-riveted": (
             f"HOLDING THAT MESH, SET THE {_N['latch-hook']} HOOK ON THE BRACKET "
-            f"FLAP, THE {_N['transgear-latch-pin']} PIN CLEAR IN ITS HOLE (HOOK "
-            f"OVER {steps.HOOK_SET_TEXT} OFF ITS DRAWN PLACE: STOP AND REPORT); "
-            "CLAMP. DRILL THE FLAP THROUGH ITS "
+            f"FLAP, ITS HOLE'S LOWER EDGE ON THE {_N['transgear-latch-pin']} PIN "
+            f"(HOOK OVER {steps.HOOK_SET_TEXT} OFF ITS DRAWN PLACE: STOP AND "
+            "REPORT); CLAMP. DRILL THE FLAP THROUGH ITS "
             f"{TRANSGEAR_QUANTITIES['latch-hook-rivet']} RIVET HOLES (SEE "
             f"{_N['latch-hook-bracket']}); SET "
             f"{TRANSGEAR_QUANTITIES['latch-hook-rivet']} "
@@ -1039,7 +1039,7 @@ def _step_text() -> dict[str, str]:
             "HANGER LATCHED. PULL THE CRANK SHAFT FORWARD AND THE ARM FORWARD "
             f"AGAINST THE SPACER; PUSH THE KNOB SHAFT REARWARD ({teeth} ON THE "
             f"RING, RING ON THE HUB). SLIDE THE COLLAR BACK AGAINST THE {teeth}; "
-            "T24 AND THUMBNUT ON FINGER-TIGHT."
+            f"T24 AND THUMBNUT ON FINGER-TIGHT, {steps.T24_HELD_BACK_TEXT}."
         ),
         "front-bushing-faced-to-fit": (
             f"CLUSTER FORWARD, FEEL m, THE {teeth}-TO-DISC AIR. FACE THE "
@@ -1056,9 +1056,10 @@ def _step_text() -> dict[str, str]:
             "REPORT."
         ),
         "collar-gap-measured": (
-            "MEASURE d, THE T24 FRONT FACE BEHIND THE T12 FRONT FACE (STRAIGHT "
-            "EDGE, OR DEPTH GAUGE THROUGH THE CHAIN WINDOW). COLLAR GAP "
-            f"g = d + {collar.FIT_UP_OFFSET_TARGET:.2f} SETS THE T24 "
+            f"{steps.T24_HELD_BACK_TEXT}, MEASURE d, ITS FRONT FACE BEHIND THE "
+            "T12 FRONT FACE (STRAIGHT EDGE, OR DEPTH GAUGE THROUGH THE CHAIN "
+            "WINDOW). "
+            f"COLLAR GAP g = d + {collar.FIT_UP_OFFSET_TARGET:.2f} SETS THE T24 "
             f"{collar.FIT_UP_OFFSET_SET_TEXT} FORWARD "
             f"OF THE T12, THE SETTING STEP {steps.step_number('fitup-accepted')} "
             f"RE-CHECKS. IF g EXCEEDS {COLLAR_GAP_MAX:.2f} (T24 SEAT "
