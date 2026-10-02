@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -278,3 +279,54 @@ def test_crown_finish_leader_passes_under_its_own_text() -> None:
     assert drawing.CROWN_FINISH_SYMBOL_XY[1] < crown_y
     source = Path(drawing.__file__).read_text(encoding="utf-8")
     assert "_crown_point(CROWN_FINISH_FROM_ROOT_MM)" in source
+
+
+class _PinFace:
+    """IFace2 double: one surface identity, its parameters and the next face."""
+
+    def __init__(
+        self, identity: int, accessor: str, parameters: tuple[float, ...]
+    ) -> None:
+        self.surface = SimpleNamespace(Identity=identity, **{accessor: parameters})
+        self.next: _PinFace | None = None
+
+    def GetSurface(self):  # noqa: N802 - the COM member name
+        return self.surface
+
+    def GetBox(self):  # noqa: N802
+        return ()
+
+    def GetNextFace(self):  # noqa: N802
+        return self.next
+
+
+def test_crown_finish_attaches_the_controlled_crown_face() -> None:
+    """Farm run 20261002T180658288Z (@9, @15): the crown silhouette picked at
+    the crown point re-solved to another face's silhouette after insertion
+    (``same_entity=False``).  The finish attaches the one spherical face the
+    part-owned control names, on the part the view references -- not the
+    shank cylinder, and without hit-testing or sweeping the view."""
+    shank = _PinFace(
+        4002, "CylinderParams", (0, 0, 0, 0, 0, 1, pinion_cam_pin_spec.PIN_DIA / 2000)
+    )
+    crown = _PinFace(
+        4004, "SphereParams", (0.0, 0.0, 0.0, pinion_cam_pin_spec.CAP_RADIUS / 1000)
+    )
+    shank.next = crown
+    part = SimpleNamespace(
+        GetBodies2=lambda body_type, visible_only: [
+            SimpleNamespace(GetFirstFace=lambda: shank)
+        ]
+    )
+    view = SimpleNamespace(ReferencedDocument=part)
+
+    assert drawing._crown_face(view) is crown
+
+    crown.surface.SphereParams = (
+        0.0,
+        0.0,
+        0.0,
+        2.0 * pinion_cam_pin_spec.CAP_RADIUS / 1000,
+    )
+    with pytest.raises(RuntimeError, match=r"crown: face spec .* matched 0 faces"):
+        drawing._crown_face(view)
