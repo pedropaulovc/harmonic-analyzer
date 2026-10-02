@@ -1508,7 +1508,7 @@ _GRANDFATHERED_BUILDER_EDGES = {
         "dtrefactor: reads PAPER_HEIGHT, PAPER_WIDTH"
     ),
     ("build_paper_drive_assembly.py", "build_platen_rack"): (
-        "dtrefactor: reads ADDENDUM, BAR_HEIGHT, FIRST_GAP_X, PITCH"
+        "dtrefactor: reads ADDENDUM, BAR_HEIGHT, BAR_LENGTH, FIRST_GAP_X, PITCH"
     ),
     ("build_paper_drive_assembly.py", "build_rack_pinion"): (
         "dtrefactor: reads DP, FACE_WIDTH, TEETH"

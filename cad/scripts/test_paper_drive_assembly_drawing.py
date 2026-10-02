@@ -22,6 +22,7 @@ import paper_drive_assembly_steps as steps
 import paper_drive_explode_spec as explode
 import transgear_drive_collar_spec as collar
 import transgear_cluster_fit as cluster_fit
+import transgear_rear_bushing_spec as rear_bushing
 import transgear_removable_spec as sprocket
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 
@@ -529,10 +530,36 @@ def test_the_collar_is_pinned_before_the_stud_is_cut_and_the_stack_accepted() ->
 
 def test_the_cluster_float_and_pin_bands_print_their_spec_ranges() -> None:
     rear = _step_body("rear-bushing-faced-to-fit")
-    assert f"END FLOAT IS {cluster_fit.FLOAT_WINDOW_TEXT}" in rear
+    assert f"END FLOAT {cluster_fit.FLOAT_WINDOW_TEXT}" in rear
     assert cluster_fit.FIT_WINDOW_TEXT in _step_body("front-bushing-faced-to-fit")
     assert "2.30 TO 2.50 PROUD" in _step_body("collar-pins-pressed")
     assert "12.96 TO 14.49 PROUD" in _step_body("latch-pin-pressed")
+
+
+def test_the_rear_bushing_blank_is_faced_to_the_gauged_gap_before_it_goes_on() -> None:
+    """Codex P2 (724f78f26): the MHA-180 blank is longer than the gap it
+    fills (6.85 MIN against 6.30 nominal, cluster forward), so refitted
+    unfaced it keeps the ring out of its groove. The step gauges that gap,
+    sleeve rear face from the arm's front face, with the front bushing and
+    ring on, faces the blank to it less the float, and only then puts it on
+    the pin."""
+    gap_nominal = cluster_fit.REAR_CHAIN_NOMINAL - cluster_fit.FIT_WINDOW_CENTRE
+    assert rear_bushing.BLANK_LENGTH_MIN > gap_nominal
+    lo, hi = cluster_fit.SLEEVE_REAR_FORWARD_FROM_ARM
+    assert lo <= gap_nominal <= hi
+    # The gap less the float band is the length band the bushing's sheet sets.
+    assert lo - cluster_fit.FLOAT_WINDOW[1] == pytest.approx(rear_bushing.GAP_MIN)
+    assert hi - cluster_fit.FLOAT_WINDOW[0] == pytest.approx(rear_bushing.GAP_MAX)
+    rear = _step_body("rear-bushing-faced-to-fit")
+    gauged = rear.index("DEPTH-GAUGE THE SLEEVE REAR FACE FROM THE ARM")
+    faced = rear.index(f"BLANK TO THAT LESS {cluster_fit.FLOAT_WINDOW_TEXT}")
+    fitted = rear.index("BLANK ON")
+    assert gauged < faced < fitted
+    # The hung cluster carries no rear bushing until then.
+    assert "NO REAR BUSHING YET" in _step_body("disc-cluster-hung")
+    assert steps.step_number("disc-cluster-hung") < steps.step_number(
+        "rear-bushing-faced-to-fit"
+    )
 
 
 def test_the_hub_is_faced_to_the_nose_before_the_disc_is_tapped() -> None:
@@ -773,6 +800,10 @@ def test_the_platen_group_is_built_and_hung_before_its_locks_are_set() -> None:
     assert steps.RACK_CREST_DROP == pytest.approx(
         assembly.PLATE_Y0 - assembly.RACK_TIP_Y, abs=1e-9
     )
+    # Codex P2 (724f78f26): the step solders the rack flush; the model places
+    # it so (the platen pose, not the rack, takes the mesh phasing).
+    assert "ENDS FLUSH WITH THE PLATEN'S" in _step_body("rack-soldered")
+    assert assembly.RACK_X0 == assembly.PLATE_X0
     # Every platen-group screw count the steps print is the model's.
     assert f"{drawing.GUIDE_SCREWS} " in _step_body("guides-screwed")
     assert drawing.GUIDE_SCREWS + drawing.CLIP_SCREWS == len(

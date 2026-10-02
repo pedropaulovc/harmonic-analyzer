@@ -267,6 +267,7 @@ from guide_lock_screw_spec import (  # noqa: E402
 from build_platen_rack import (  # noqa: E402
     ADDENDUM as RACK_ADDENDUM,
     BAR_HEIGHT as RACK_BAR_HEIGHT,
+    BAR_LENGTH as RACK_BAR_LENGTH,
     BAR_THICKNESS as RACK_BAR_THICKNESS,
     FIRST_GAP_X as RACK_FIRST_GAP_X,
     PITCH as RACK_PITCH,
@@ -276,12 +277,13 @@ from build_platen_paper import (  # noqa: E402
     PAPER_WIDTH,
 )
 
-PLATE_X0 = -33.213
+PLATE_X0_PHOTO = -33.213
 # ch30-p002 Pose Studio refit (2026-07-23): the platen's top-left reference
 # corner was hand-aligned at (-33.213, 408.054) in the current assembly. The
 # width is 300 * 0.8988 and the user-confirmed H:W ratio is 1:2, so preserving
 # that top edge puts the resized plate bottom here. The fit's z delta remains
-# ignored: a near-front view does not constrain depth.
+# ignored: a near-front view does not constrain depth. The placed PLATE_X0 is
+# this photo x snapped to the rack's mesh phasing (below, after the stud).
 PLATE_Y0 = 273.234
 PLATE_FRONT_Z = BAR_FRONT_Z - PLATE_THICKNESS  # -142.75
 
@@ -787,13 +789,24 @@ _MESH_AZ = 180.0 + MESH_ANGLE_DEG  # 12: from the knob axis toward the stud
 THIRD_PHASE_DEG = (_MESH_AZ - KNOB_SPEC.GAP_AZIMUTH_DEG) % THIRD_GAMMA  # 27
 if THIRD_PHASE_DEG > THIRD_GAMMA / 2.0:
     THIRD_PHASE_DEG -= THIRD_GAMMA  # -3: nearest representative
-# The feed sleeve (Ry180) keeps a tooth on machine +90 deg (90 = 3 * 30), and
-# the rack is phased so a GAP centre sits exactly on the stud's x (RACK_X0).
-# Machine-handed: the rack is teeth-down (Rx180), its tooth pattern marching +X
-# from RACK_X0.
-_k = math.floor((STUD_XY[0] - RACK_FIRST_GAP_X - PLATE_X0) / RACK_PITCH)
-RACK_X0 = STUD_XY[0] - RACK_FIRST_GAP_X - _k * RACK_PITCH
-# The resized rack keeps a gap centred on the relocated stud.
+# The feed sleeve (Ry180) keeps a tooth on machine +90 deg (90 = 3 * 30), so a
+# rack GAP centre must sit exactly on the stud's x. The rack is soldered with
+# its ends flush with the platen's (MHA-A06 "rack-soldered"), so its gaps
+# march +X from FIRST_GAP_X in from the platen's -X end: the photo pose moves
+# by the smallest shift that lands a gap on the stud (no more than half a
+# pitch, far inside the photo fit). Machine-handed: the rack is teeth-down
+# (Rx180), its tooth pattern marching +X from RACK_X0.
+PLATE_X0_PHASING = math.remainder(
+    STUD_XY[0] - RACK_FIRST_GAP_X - PLATE_X0_PHOTO, RACK_PITCH
+)  # -0.0355
+if abs(PLATE_X0_PHASING) > RACK_PITCH / 2.0:
+    raise AssertionError(
+        f"platen phasing {PLATE_X0_PHASING:.4f} exceeds half the rack pitch"
+    )
+PLATE_X0 = PLATE_X0_PHOTO + PLATE_X0_PHASING  # -33.2485
+RACK_X0 = PLATE_X0  # ends flush
+if abs(RACK_BAR_LENGTH - PLATE_WIDTH) > 1e-9:
+    raise AssertionError("the rack's ends cannot both be flush with the platen's")
 
 # Net platen feed per CRANK revolution through the real train (T12/T24
 # mounted): 0.5 chain * (12/120) gear * pi*PD rack = 1.596 mm. Every stage is

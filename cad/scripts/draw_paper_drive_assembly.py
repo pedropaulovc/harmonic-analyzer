@@ -958,11 +958,13 @@ def _step_text() -> dict[str, str]:
             f"{_N['transgear-front-bushing']} BUSHING'S REAR TILL m IS "
             f"{cluster_fit.FIT_WINDOW_TEXT}; ELSE STOP AND REPORT."
         ),
+        # The blank (MHA-180 BLANK_LENGTH_MIN) is longer than the nominal gap
+        # it fills, so it is faced to the gap gauged before it goes on.
         "rear-bushing-faced-to-fit": (
-            "RING, BUSHING, CLUSTER OFF; "
-            f"{_N['transgear-rear-bushing']} BLANK ON THE PIN; REFIT, RING LAST, "
-            "SIDEWAYS. FACE THE REAR BUSHING TILL THE CLUSTER'S END FLOAT IS "
-            f"{cluster_fit.FLOAT_WINDOW_TEXT}, SPINNING FREELY; ELSE STOP AND "
+            "CLUSTER FORWARD, DEPTH-GAUGE THE SLEEVE REAR FACE FROM THE ARM; "
+            f"FACE THE {_N['transgear-rear-bushing']} BLANK TO THAT LESS "
+            f"{cluster_fit.FLOAT_WINDOW_TEXT}. STRIP TO THE PIN, BLANK ON, REFIT. "
+            f"END FLOAT {cluster_fit.FLOAT_WINDOW_TEXT}, SPINNING FREELY; ELSE "
             "REPORT."
         ),
         "collar-gap-measured": (

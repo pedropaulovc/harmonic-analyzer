@@ -1526,19 +1526,19 @@ sections:
         - stated
         - high
       - - Platen position (rework)
-        - plate x −33.213..+236.427, y 273.234..408.054, front face z −142.75 (back face on the bar front at −138.9; 3.85 thick, R9-68); top-left fixed by the ch30-p002 delta fit; hangs on the single y-306.734 support bar
+        - plate x −33.2485..+236.3915, y 273.234..408.054, front face z −142.75 (back face on the bar front at −138.9; 3.85 thick, R9-68); top-left fixed by the ch30-p002 delta fit at x −33.213, then moved −0.0355 (the least shift, under half the 2.660 rack pitch) so the flush-soldered rack has a gap centre over the feed stud; hangs on the single y-306.734 support bar
         - —
         - 'ch30-p002 Pose Studio delta fit: current-model origin translated (+116.787,+20.122), width scaled 0.8988, then height corrected to H:W = 1:2 while preserving the fitted top-left corner; z delta rejected as front-view depth leakage'
         - derived
         - med
       - - Paper holder positions (rework E4)
-        - 'two handed vertical holders from y 324.554..408.054: left origin (−29.8202, 408.054), Rz −90°, envelope x −29.8202..−20.8322; right origin (+233.0342, 324.554), Rz +90°, envelope x +224.0462..+233.0342. The flat rails seat at z −143.55..−142.75 against the platen; each local +Y spring rail points inward over the paper and bows to z −145.05 at peak'
+        - 'two handed vertical holders from y 324.554..408.054: left origin (−29.8557, 408.054), Rz −90°, envelope x −29.8557..−20.8677; right origin (+232.9987, 324.554), Rz +90°, envelope x +224.0107..+232.9987. The flat rails seat at z −143.55..−142.75 against the platen; each local +Y spring rail points inward over the paper and bows to z −145.05 at peak'
         - —
         - 'ch22 front photo: bright holders hug opposite platen edges with their spring lanes inward; #4 holes remain on the platen socket rows, while opposite handed rotations preserve the asymmetric one-sheet topology'
         - scaled + derived
         - med
       - - Clip screws ×4 + platen sockets
-        - stock 90114A511 brass fillister (Ø4.6482 × 2.7178 head, 6.35 shank) through each clip's #4 clearance end holes (machine x −27.820/+231.034, y 331.744/400.864) into #4-40 taps through the 3.85 platen and its Ø7 × 0.65 rear bosses (4.5 engaged, 1.58D; tips flush with the boss rear faces); under-head faces on the clip seats (z −144.6); ALL platen-riding screws lock-mated to the platen (rework E5 — grounded screws floated while the platen fed); slots below render resolution — omitted
+        - stock 90114A511 brass fillister (Ø4.6482 × 2.7178 head, 6.35 shank) through each clip's #4 clearance end holes (machine x −27.856/+230.999, y 331.744/400.864) into #4-40 taps through the 3.85 platen and its Ø7 × 0.65 rear bosses (4.5 engaged, 1.58D; tips flush with the boss rear faces); under-head faces on the clip seats (z −144.6); ALL platen-riding screws lock-mated to the platen (rework E5 — grounded screws floated while the platen fed); slots below render resolution — omitted
         - —
         - p.55 front photo (clip end screws)
         - scaled + derived

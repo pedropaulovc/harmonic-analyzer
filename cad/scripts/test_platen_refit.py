@@ -22,8 +22,25 @@ from _printed_tolerance import printed_deviations
 
 def test_platen_envelope_preserves_fitted_top_left_and_ratio() -> None:
     assert math.isclose(platen.PLATE_HEIGHT * 2.0, platen.PLATE_WIDTH)
-    assert math.isclose(assembly.PLATE_X0, -33.213)
+    assert math.isclose(assembly.PLATE_X0_PHOTO, -33.213)
     assert math.isclose(assembly.PLATE_Y0 + platen.PLATE_HEIGHT, 408.054)
+
+
+def test_the_rack_is_flush_with_the_platen_and_a_gap_sits_over_the_stud() -> None:
+    """Codex P2 (724f78f26): MHA-A06 solders the rack ends flush with the
+    platen's, so the model places it flush, and the mesh phasing (a rack gap
+    centre on the feed pinion's +90-deg tooth over the stud) moves the platen
+    off its photo x by the least shift instead of the rack along the platen."""
+    assert rack.BAR_LENGTH == platen.PLATE_WIDTH
+    assert assembly.RACK_X0 == assembly.PLATE_X0
+    # Rx180 keeps local +X along machine +X: both bodies run +X from origin.
+    assert assembly.RACK_X0 + rack.BAR_LENGTH == assembly.PLATE_X0 + platen.PLATE_WIDTH
+    gaps = (assembly.STUD_XY[0] - assembly.RACK_X0 - rack.FIRST_GAP_X) / rack.PITCH
+    assert gaps == pytest.approx(round(gaps), abs=1e-9)
+    shift = assembly.PLATE_X0 - assembly.PLATE_X0_PHOTO
+    assert abs(shift) <= rack.PITCH / 2.0
+    assert shift == pytest.approx(-0.0355, abs=5e-5)
+    assembly._assert_rack_mesh()
 
 
 def test_platen_furniture_cascades_with_resized_envelope() -> None:
