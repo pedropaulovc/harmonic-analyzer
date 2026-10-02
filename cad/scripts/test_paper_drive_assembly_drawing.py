@@ -12,6 +12,7 @@ import pytest
 import _assembly
 import _chain as chain
 import _config
+import _drawing_common
 import build_paper_drive_assembly as assembly
 import draw_paper_drive_assembly as drawing
 import drive_train_steps
@@ -248,15 +249,19 @@ def test_sheet_two_shows_and_balloons_exactly_the_transgear() -> None:
     )
 
 
-def test_collar_balloon_is_frozen_on_its_rear_rim_clear_of_the_pin_band() -> None:
-    # The inner view sees the collar edge-on from the right, so a rim point
-    # at the height of a drive-pin hole or of the bore draws on shared ink
-    # (farm run 20261002T160324403Z landed 0.288 mm off in the pin band).
+def test_collar_balloon_is_frozen_at_its_rear_rim_bottom_end() -> None:
+    # The inner view sees the collar's rims edge-on from the right; hit tests
+    # missed their middles on farm runs 20261002T160324403Z and
+    # 20261002T164049933Z. The anchor sits at the rear rim's bottom end, past
+    # the drive-pin hole, so a leader slid to the rim's end stays in limit.
     x, y, z = drawing.TRANSGEAR_BALLOON_ANCHORS["transgear-drive-collar"].point_mm
-    assert math.hypot(x, y) == pytest.approx(collar.OD / 2.0, abs=1e-3)
+    radius = collar.OD / 2.0
+    assert math.hypot(x, y) == pytest.approx(radius, abs=1e-3)
     assert z == pytest.approx(collar.LENGTH)
-    pin_band_inner = collar.PIN_CIRCLE_RADIUS - collar.PIN_HOLE_DIA / 2.0
-    assert collar.BORE_DIA / 2.0 < -y < pin_band_inner
+    assert -y > collar.PIN_CIRCLE_RADIUS + collar.PIN_HOLE_DIA / 2.0
+    largest_scale = max(num / den for num, den in drawing.INNER_SCALE_LADDER)
+    end_gap_m = (radius + y) * largest_scale / 1000.0
+    assert end_gap_m < _drawing_common._BALLOON_LANDING_TOLERANCE_M / 2.0
     # Below the axis is away from the feed sleeve: its stud stands above the knob.
     assert assembly.STUD_XY[1] > assembly.KNOB_SHAFT_XY[1]
 
