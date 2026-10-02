@@ -5,16 +5,16 @@ closure.  The nut runs on the 1/4-20 stud of the knob shaft (MHA-078) and
 clamps the removable chain wheel (MHA-081, T24) against the drive collar
 (MHA-177): its rear face bears on the wheel's front face only, round the
 wheel's Ø10.3 bore.  Contract §1.6 (round 10): knurled head Ø20.5 × 8.7 with a
-dished front face (chord 15, sagitta 1.2), a Ø11 waist × 2.4 (ruling 5), a
-Ø12.4 flange to the seat face, 16.1 long, 1/4-20 UNC-2B through with an
-entry countersink at each end.  The stud's side of the engagement (tip
-station, tip chamfer, cut-to-fit) is MHA-078's; this module owns only the
-nut's side of it.
+dished front face (a cone from Ø15 at the rim to a flat Ø9 floor 1.0 deep),
+a Ø11 waist × 2.4 (ruling 5), a Ø12.4 flange to the seat face, 16.1 long,
+1/4-20 UNC-2B through with an entry countersink at each end.  The stud's
+side of the engagement (tip station, tip chamfer, cut-to-fit) is MHA-078's;
+this module owns only the nut's side of it.
 
 Part frame: axis local +Y through the origin (``Axis1``, Front Plane ∩ Right
 Plane).  The seat face -- the flange's rear face, the one that bears on the
 T24 -- is the Top Plane, y = 0; the rim of the dished front face is the
-``RimFace`` plane, y = OVERALL_LENGTH; the dish floor on the axis is the
+``RimFace`` plane, y = OVERALL_LENGTH; the dish's flat floor is the
 ``DishFloor`` plane, y = OVERALL_LENGTH - DISH_DEPTH.  The paper-drive
 assembly maps local +Y to machine -Z (the nut's rim faces the machine
 front), mates ``Axis1`` to the knob axis and the Top Plane to the T24's
@@ -46,10 +46,15 @@ WAIST_LENGTH = 2.4
 FLANGE_DIA = 12.4
 OVERALL_LENGTH = 16.1
 FLANGE_LENGTH = OVERALL_LENGTH - HEAD_LENGTH - WAIST_LENGTH  # 5.0, not printed
-# Dished front face: a spherical cap cut into the head, centre on the axis.
-DISH_DIA = 15.0  # chord at the rim
-DISH_DEPTH = 1.2  # sagitta, rim to the floor on the axis
-DISH_RADIUS = ((DISH_DIA / 2.0) ** 2 + DISH_DEPTH**2) / (2.0 * DISH_DEPTH)
+# Dished front face: a conical recess from the rim's Ø down to a flat floor,
+# centred on the axis; the front countersink is cut in that floor.  The
+# machinist review of 6de7230aa found the earlier spherical cap (chord 15,
+# sagitta 1.2 to a point on the axis inside the tap drill) ended on the
+# countersink at no definite Ø: the floor gives the recess a definite inner
+# edge and its depth a real surface.
+DISH_DIA = 15.0  # at the rim
+DISH_FLOOR_DIA = 9.0  # the floor's outer edge, where the cone ends
+DISH_DEPTH = 1.0  # rim to the floor
 
 
 def knurl_tooth_angle_deg(crest_dia: float, root_dia: float, teeth: int) -> float:
@@ -91,13 +96,10 @@ SEAT_FACE_Y = 0.0
 HEAD_REAR_Y = OVERALL_LENGTH - HEAD_LENGTH
 RIM_Y = OVERALL_LENGTH
 DISH_FLOOR_Y = OVERALL_LENGTH - DISH_DEPTH
-
-
-def dish_surface_y(radius: float) -> float:
-    """Local y of the dished face at ``radius`` from the axis."""
-    if not 0.0 <= radius <= DISH_DIA / 2.0 + 1e-9:
-        raise ValueError(f"radius {radius} is off the dish")
-    return DISH_FLOOR_Y + DISH_RADIUS - math.sqrt(DISH_RADIUS**2 - radius**2)
+# The dish profile's two corners (radius from the axis, local y): the depth
+# runs between them, from the rim's edge down to the floor's.
+DISH_RIM_CORNER = (DISH_DIA / 2.0, RIM_Y)
+DISH_FLOOR_CORNER = (DISH_FLOOR_DIA / 2.0, DISH_FLOOR_Y)
 
 
 # --- Thread (contract §1.6, §7) -----------------------------------------------
@@ -118,11 +120,11 @@ if CSK_DIA <= THREAD_MAJOR:
     raise AssertionError("MHA-126 countersink ends inside the thread major")
 CSK_QUALIFIER = f"90\u00b0 CSK \u00d8{CSK_DIA:.2f} MAX BOTH ENDS"
 # Rear countersink: a 45° break on the tap-drill edge of the seat face, its
-# cone y = CSK_DIA / 2 - r.  Front: the same Ø at the dished face, its cone
-# y = FRONT_CSK_APEX_Y + r.
+# cone y = CSK_DIA / 2 - r.  Front: the same break on the dish floor, its
+# cone y = FRONT_CSK_APEX_Y + r.
 REAR_CSK_BREAK = (CSK_DIA - TAP_DRILL_DIA) / 2.0
 REAR_CSK_APEX_Y = CSK_DIA / 2.0
-FRONT_CSK_APEX_Y = dish_surface_y(CSK_DIA / 2.0) - CSK_DIA / 2.0
+FRONT_CSK_APEX_Y = DISH_FLOOR_Y - CSK_DIA / 2.0
 # First full thread from each end: where the cone meets the tap drill, not
 # the major (R9-63).
 REAR_FULL_THREAD_Y = REAR_CSK_APEX_Y - TAP_DRILL_DIA / 2.0
@@ -140,6 +142,7 @@ FLANGE_DIA_PLACES = 2
 WAIST_DIA_PLACES = 2
 WAIST_LENGTH_PLACES = 1
 DISH_DIA_PLACES = 1
+DISH_FLOOR_DIA_PLACES = 1
 DISH_DEPTH_PLACES = 1
 
 WALL_FLOOR = 2.0
@@ -151,6 +154,10 @@ _HEAD_LO, _ = printed_deviations(HEAD_DIA, HEAD_DIA_PLACES)
 _HEAD_LEN_LO, _ = printed_deviations(HEAD_LENGTH, HEAD_LENGTH_PLACES)
 _WAIST_LO, _ = printed_deviations(WAIST_DIA, WAIST_DIA_PLACES)
 _FLANGE_LO, _ = printed_deviations(FLANGE_DIA, FLANGE_DIA_PLACES)
+_DISH_LO, _ = printed_deviations(DISH_DIA, DISH_DIA_PLACES)
+_DISH_FLOOR_LO, _DISH_FLOOR_HI = printed_deviations(
+    DISH_FLOOR_DIA, DISH_FLOOR_DIA_PLACES
+)
 _DISH_DEPTH_LO, _DISH_DEPTH_HI = printed_deviations(DISH_DEPTH, DISH_DEPTH_PLACES)
 OVERALL_LENGTH_LO, OVERALL_LENGTH_HI = printed_deviations(
     OVERALL_LENGTH, OVERALL_LENGTH_PLACES
@@ -185,6 +192,34 @@ for _name, (_nominal, _worst) in WALLS.items():
             f"under the {WALL_FLOOR} floor"
         )
 
+
+def dish_floor_margins(
+    dish_dia: float, floor_dia: float, depth: float, csk_dia: float
+) -> dict[str, float]:
+    """Worst-case margins (mm, each > 0 when it holds) that keep the dish
+    ending on its own floor at every printed size: the floor's edge outside
+    the front countersink's MAX, the cone running inward from the rim, and
+    the floor below the rim."""
+    floor_land = floor_dia + _DISH_FLOOR_LO - csk_dia
+    cone_run = dish_dia + _DISH_LO - floor_dia - _DISH_FLOOR_HI
+    return {
+        "floor land outside the countersink": floor_land / 2.0,
+        "cone from the rim to the floor": cone_run / 2.0,
+        "floor below the rim": depth + _DISH_DEPTH_LO,
+    }
+
+
+# --- The dish ends on its floor ------------------------------------------------
+# So the depth and the floor's Ø stay the recess's inner edge whatever size
+# the countersink is cut, and the countersink sits on a flat face like the
+# rear one.
+DISH_FLOOR_MARGINS = dish_floor_margins(DISH_DIA, DISH_FLOOR_DIA, DISH_DEPTH, CSK_DIA)
+for _name, _margin in DISH_FLOOR_MARGINS.items():
+    if _margin <= 0.0:
+        raise AssertionError(
+            f"MHA-126 dish: {_name} is {_margin:.3f} at the printed worst case"
+        )
+
 # --- The seat on the T24 -------------------------------------------------------
 # The seat face covers the wheel's drilled bore all round (radial overlap),
 # so the nut clamps the wheel's front face and never enters its bore.
@@ -200,11 +235,11 @@ if CSK_DIA >= T24_BORE_DIA:
 
 # --- The nut's side of the stud engagement (contract §7) ----------------------
 # The stack subtracts the thread each countersink takes (at its printed MAX,
-# from the seat face and from the rim, the front one under the dish) and,
-# after cut-to-fit, the nut's shortest printed length.  The stud's tip
-# station and chamfer are MHA-078's.
+# from the seat face and from the rim, the front one on the dish floor at its
+# deepest printed depth) and, after cut-to-fit, the nut's shortest printed
+# length.  The stud's tip station and chamfer are MHA-078's.
 REAR_THREAD_LOSS = REAR_FULL_THREAD_Y - SEAT_FACE_Y  # 0.823
-FRONT_THREAD_LOSS = RIM_Y - FRONT_FULL_THREAD_Y  # 1.784
+FRONT_THREAD_LOSS = RIM_Y - FRONT_FULL_THREAD_Y + _DISH_DEPTH_HI  # 2.623
 
 # The Ø20.5 dimension is the diameter over the knurl; the designation gives
 # the pitch and the 90° tooth, so no tooth count prints (R9-57).  One line:
@@ -221,11 +256,12 @@ KNURL_CALLOUT = f"STRAIGHT KNURL {KNURL_DESIGNATION}; DIA OVER KNURL"
 # (drawing-simplicity policy rule 2).  The head profile carries the knurl
 # diameter, the head length and the overall length from the seat face; the
 # stem profile the flange and waist diameters and the waist length (the
-# flange length is the remainder); the dish its chord and depth.
+# flange length is the remainder); the dish its rim and floor diameters and
+# its depth from the rim's edge to the floor's.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "HeadProfile": {"HeadDia", "HeadLength", "OverallLength"},
     "StemProfile": {"FlangeDia", "WaistDia", "WaistLength"},
-    "DishProfile": {"DishDia", "DishDepth"},
+    "DishProfile": {"DishDia", "DishFloorDia", "DishDepth"},
 }
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "HeadProfile": {
@@ -240,6 +276,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     },
     "DishProfile": {
         "DishDia": DISH_DIA_PLACES,
+        "DishFloorDia": DISH_FLOOR_DIA_PLACES,
         "DishDepth": DISH_DEPTH_PLACES,
     },
 }

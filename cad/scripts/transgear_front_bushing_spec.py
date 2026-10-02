@@ -23,7 +23,7 @@ import transgear_cluster_fit as FIT
 import transgear_disc_hub_spec as HUB
 import transgear_pin_spec as PIN
 import transgear_retaining_ring_spec as RING
-from _gtol_spec import PlanarFace
+from _gtol_spec import CylinderFace, PlanarFace
 from _printed_tolerance import printed_band_mm
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
@@ -90,7 +90,10 @@ DRAWING_NOTES = "\n".join(
     )
 )
 
+# Rule 5: the bore runs on the pin and both faces bear, so all three carry
+# the machined grade, the bore as the sleeve's bore on the same pin does.
 SURFACE_FINISHES = (
+    SurfaceFinishControl("bore", MACHINED_UM, CylinderFace(BORE_DIA)),
     SurfaceFinishControl("nose_face", MACHINED_UM, PlanarFace((0.0, 0.0, -1.0), 0.0)),
     SurfaceFinishControl("ring_face", MACHINED_UM, PlanarFace((0.0, 0.0, 1.0), LENGTH)),
 )

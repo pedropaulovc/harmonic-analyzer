@@ -21,14 +21,15 @@ seat face on the Top Plane (y = 0), rim at y = OVERALL_LENGTH.
   length; the flange length is the remainder of the overall length.
 * ``ThreadBore``: one Hole Wizard 1/4-20 UNC-2B tapped hole, through all
   from the seat face.
-* ``DishProfile``: the spherical dish cut into the rim face, dimensioned by
-  its chord and depth (the sphere radius is driven from both).
-* ``Countersinks``: both 90° entry countersinks as one revolved cut.  The
-  rear one is a 45° break on the tap-drill edge of the seat face.  The front
-  one reaches the same Ø on the dished face.
+* ``DishProfile``: the dished front face, a cone cut from the rim's Ø down
+  to a flat floor, dimensioned by both diameters and the depth from the
+  rim's edge to the floor's edge (both edges stand on the finished nut).
+* ``Countersinks``: both 90° entry countersinks as one revolved cut, each a
+  45° break on the tap-drill edge of a flat face: the seat face at the rear,
+  the dish floor at the front.
 
-``RimFace`` (y = OVERALL_LENGTH) and ``DishFloor`` (the dish floor on the
-axis) are named offset planes for the stud's tip and cut-to-fit stations.
+``RimFace`` (y = OVERALL_LENGTH) and ``DishFloor`` (the dish's flat floor)
+are named offset planes for the stud's tip and cut-to-fit stations.
 
 Run (SolidWorks already open)::
 
@@ -75,8 +76,10 @@ from transgear_thumbnut_spec import (
     CSK_DIA,
     DISH_DEPTH,
     DISH_DIA,
+    DISH_FLOOR_CORNER,
+    DISH_FLOOR_DIA,
     DISH_FLOOR_Y,
-    DISH_RADIUS,
+    DISH_RIM_CORNER,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION,
     FLANGE_DIA,
@@ -107,7 +110,10 @@ WAIST_R = WAIST_DIA / 2.0
 DRILL_R = TAP_DRILL_DIA / 2.0
 CSK_R = CSK_DIA / 2.0
 # How far each countersink cutter runs past its cone into air (radially).
-_CSK_OVERRUN = 1.0
+# The front one stays inside the dish floor's edge, so it cuts no cone.
+_CSK_OVERRUN = 0.5
+if CSK_R + _CSK_OVERRUN >= DISH_FLOOR_CORNER[0]:
+    raise AssertionError("front countersink cutter reaches the dish's cone")
 # How far the flute seed's flanks run past the crests, as a multiple of the
 # root-to-crest flank, so the cutter closes outside the head.
 _FLUTE_FLANK_RUN = 1.6
@@ -150,25 +156,10 @@ def _flute_area() -> float:
 
 
 def _dish_volume() -> float:
-    """Solid the dish removes once the tap drill is through: the spherical
-    cap less the part of it inside the drill."""
-    r, h, rd = DISH_RADIUS, DISH_DEPTH, DRILL_R
-    cap = math.pi * h**2 * (3.0 * r - h) / 3.0
-    # Inside the drill: ∫ 2πρ (h - s(ρ)) dρ, s(ρ) = R - √(R² - ρ²).
-    sag = math.pi * r * rd**2 - 2.0 * math.pi / 3.0 * (r**3 - (r**2 - rd**2) ** 1.5)
-    return cap - (math.pi * h * rd**2 - sag)
-
-
-def _front_csk_volume() -> float:
-    """Solid between the drill wall, the front cone y = apex + ρ and the
-    dished face, ρ from the drill radius to CSK_R."""
-    r, rd, rc = DISH_RADIUS, DRILL_R, CSK_R
-    rim = DISH_FLOOR_Y + r - FRONT_CSK_APEX_Y
-    return (
-        math.pi * rim * (rc**2 - rd**2)
-        - 2.0 * math.pi / 3.0 * ((r**2 - rd**2) ** 1.5 - (r**2 - rc**2) ** 1.5)
-        - 2.0 * math.pi / 3.0 * (rc**3 - rd**3)
-    )
+    """Solid the dish removes once the tap drill is through: the frustum from
+    the rim's Ø to the floor's, less the drill inside it."""
+    r1, r2, h = DISH_RIM_CORNER[0], DISH_FLOOR_CORNER[0], DISH_DEPTH
+    return math.pi * h * ((r1**2 + r1 * r2 + r2**2) / 3.0 - DRILL_R**2)
 
 
 V_HEAD = math.pi * HEAD_R**2 * HEAD_LENGTH
@@ -178,7 +169,7 @@ V_STEM = math.pi * (FLANGE_R**2 * FLANGE_LENGTH + WAIST_R**2 * WAIST_LENGTH)
 V_THREAD = math.pi * DRILL_R**2 * OVERALL_LENGTH
 V_DISH = _dish_volume()
 V_REAR_CSK = math.pi * REAR_CSK_BREAK**2 * (DRILL_R + REAR_CSK_BREAK / 3.0)
-V_FRONT_CSK = _front_csk_volume()
+V_FRONT_CSK = V_REAR_CSK  # the same break, on the flat dish floor
 V_TOTAL = V_KNURLED + V_STEM - V_THREAD - V_DISH - V_REAR_CSK - V_FRONT_CSK
 
 
@@ -203,6 +194,7 @@ async def build(adapter) -> dict[str, str]:
         ("WaistDia", WAIST_DIA),
         ("WaistLength", WAIST_LENGTH),
         ("DishDia", DISH_DIA),
+        ("DishFloorDia", DISH_FLOOR_DIA),
         ("DishDepth", DISH_DEPTH),
     ):
         await set_global(adapter, name, f"{value}mm")
@@ -388,42 +380,39 @@ async def build(adapter) -> dict[str, str]:
     )
 
     # --- Dished front face ---------------------------------------------------
-    # The crankshaft-dome recipe inverted: base on the rim, arc from the
-    # floor on the axis out to the chord, closed down the axis.
+    # Base on the rim, the cone down to the floor's edge, the floor in to the
+    # axis, closed up the axis.  The depth runs between the two corners, the
+    # edges the finished nut keeps, not to the axis inside the tap drill.
     dish = SketchDims()
     check("create_sketch dish", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     dish_axis = check(
         "dish axis", await adapter.add_centerline(0.0, DISH_FLOOR_Y, 0.0, RIM_Y)
     )
-    dish_base = check(
-        "dish base", await adapter.add_line(0.0, RIM_Y, DISH_DIA / 2.0, RIM_Y)
+    dish_base = check("dish base", await adapter.add_line(0.0, RIM_Y, *DISH_RIM_CORNER))
+    dish_cone = check(
+        "dish cone", await adapter.add_line(*DISH_RIM_CORNER, *DISH_FLOOR_CORNER)
     )
-    dish_arc = check(
-        "dish arc",
-        await adapter.add_arc(
-            0.0,
-            DISH_FLOOR_Y + DISH_RADIUS,
-            0.0,
-            DISH_FLOOR_Y,
-            DISH_DIA / 2.0,
-            RIM_Y,
-        ),
+    dish_floor = check(
+        "dish floor",
+        await adapter.add_line(*DISH_FLOOR_CORNER, 0.0, DISH_FLOOR_Y),
     )
     dish_close = check(
         "dish closure", await adapter.add_line(0.0, DISH_FLOOR_Y, 0.0, RIM_Y)
     )
     set_sketch_direct_db(adapter, False)
     for label, first, second in (
-        ("base-arc", f"{dish_base}.end", f"{dish_arc}.end"),
-        ("arc-close", f"{dish_arc}.start", f"{dish_close}.start"),
+        ("base-cone", f"{dish_base}.end", f"{dish_cone}.start"),
+        ("cone-floor", f"{dish_cone}.end", f"{dish_floor}.start"),
+        ("floor-close", f"{dish_floor}.end", f"{dish_close}.start"),
         ("close-base", f"{dish_close}.end", f"{dish_base}.start"),
-        ("axis start", f"{dish_axis}.start", f"{dish_arc}.start"),
+        ("axis start", f"{dish_axis}.start", f"{dish_floor}.end"),
         ("axis end", f"{dish_axis}.end", f"{dish_base}.start"),
     ):
         check(label, await adapter.add_sketch_constraint(first, second, "coincident"))
     for label, entity, relation in (
         ("dish base", dish_base, "horizontal"),
+        ("dish floor", dish_floor, "horizontal"),
         ("dish closure", dish_close, "vertical"),
         ("dish axis", dish_axis, "vertical"),
     ):
@@ -436,24 +425,23 @@ async def build(adapter) -> dict[str, str]:
         adapter, dish_axis, f"{dish_base}.end", (DISH_DIA / 4.0, RIM_Y + 3.0), "DishDia"
     )
     dish.record("DishDia", '"DishDia"')
+    await add_diametric_linear_dimension(
+        adapter,
+        dish_axis,
+        f"{dish_floor}.start",
+        (DISH_FLOOR_DIA / 4.0, RIM_Y + 1.5),
+        "DishFloorDia",
+    )
+    dish.record("DishFloorDia", '"DishFloorDia"')
     await dimension_between(
         adapter,
-        f"{dish_arc}.start",
-        f"{dish_base}.start",
+        f"{dish_floor}.start",
+        f"{dish_base}.end",
         "vertical_distance",
         DISH_DEPTH,
-        "dish depth",
+        "dish depth, rim edge to floor edge",
     )
     dish.record("DishDepth", '"DishDepth"')
-    check(
-        "dish sphere radius",
-        await adapter.add_sketch_dimension(dish_arc, None, "radial", DISH_RADIUS),
-    )
-    dish.record(
-        "DishRadius",
-        '("DishDia" / 2 * "DishDia" / 2 + "DishDepth" * "DishDepth") '
-        '/ (2 * "DishDepth")',
-    )
     await ensure_fully_defined(adapter, "dish profile")
     check("exit_sketch dish", await adapter.exit_sketch())
     name_last_feature(adapter, "DishProfile")

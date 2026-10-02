@@ -13,15 +13,18 @@ tangent edge; +Z through the thickness to the REAR face (z = THICKNESS).
 
 from __future__ import annotations
 
+import math
+
+import transgear_latch_pin_spec as LATCH_PIN
 import transgear_pin_spec as PIN
 from transgear_arm_geometry import (
     BAND_X,
     BAND_XX,
     BAND_XXX,
     HOLE_POSITION_BAND,
-    PIN_BORE_DIA_MAX,
-    PIN_BORE_DIA_MIN,
     PIN_HOLE_DEPTH_BAND,
+    PIN_HOLE_DIA,
+    PIN_HOLE_DIA_BAND,
     PIVOT_BORE_DIA_BAND,
     PIVOT_END_R,
     PLATE_TAP_CSK_DIA,
@@ -96,12 +99,9 @@ FLOOR_DEPTH_CALLOUT = "FLOOR FROM\nFRONT FACE"
 PIVOT_BORE_CALLOUT = "REAM THRU"
 
 # --- The MHA-179 pin's press in the reamed bore at S (R9-68) -----------------
-# This module imports both the arm geometry and the pin spec (the pin spec
-# imports the geometry, so the geometry cannot import it back).
-PIN_PRESS_INTERFERENCE = (
-    round(PIN.DIA_MIN - PIN_BORE_DIA_MAX, 6),
-    round(PIN.DIA_MAX - PIN_BORE_DIA_MIN, 6),
-)
+# The pin spec owns the press (it imports the arm geometry, so the geometry
+# cannot import it back); the arm prints it under the bore.
+PIN_PRESS_INTERFERENCE = PIN.PRESS_INTERFERENCE
 if PIN_PRESS_INTERFERENCE != (0.010, 0.026):
     raise AssertionError(
         f"MHA-164 pin bore press on MHA-179 is {PIN_PRESS_INTERFERENCE}, "
@@ -131,9 +131,38 @@ def engagement_line(worst_mm: float, worst_d: float) -> str:
 # its digit.
 OVERALL_LENGTH = PIVOT_END_R + TIP_STATION
 DRAWING_REFERENCE_PRECISION = 1
+
+# --- The MHA-169 latch pin's press in the blind ream -------------------------
+# (loosest, tightest) from the printed ream band and the dowel's catalogue
+# band: 0.00254..0.01762.  The callout rounds both outward to four places,
+# so the range it names holds every pin and hole the two bands accept.
+LATCH_PIN_NUMBER = "MHA-169"
+LATCH_PIN_PRESS_INTERFERENCE = (
+    round(
+        LATCH_PIN.DIA + min(LATCH_PIN.DIA_BAND) - PIN_HOLE_DIA - max(PIN_HOLE_DIA_BAND),
+        6,
+    ),
+    round(
+        LATCH_PIN.DIA + max(LATCH_PIN.DIA_BAND) - PIN_HOLE_DIA - min(PIN_HOLE_DIA_BAND),
+        6,
+    ),
+)
+if LATCH_PIN_PRESS_INTERFERENCE[0] <= 0.0:
+    raise AssertionError("the MHA-164 latch-pin ream loses MHA-169's press")
+LATCH_PIN_PRESS_PRINTED = (
+    math.floor(LATCH_PIN_PRESS_INTERFERENCE[0] * 1e4 + 1e-6) / 1e4,
+    math.ceil(LATCH_PIN_PRESS_INTERFERENCE[1] * 1e4 - 1e-6) / 1e4,
+)  # 0.0025, 0.0177
 # The pin goes in to the hole's flat floor, which sets its proud length.
+# Three lines no wider than before: the callout's right edge sits inside the
+# border and its top under the stock thickness text.
 PIN_HOLE_CALLOUT = "\n".join(
-    ("BLIND FLAT-BOTTOM REAM", "PRESS FIT LATCH PIN MHA-169", "TO HOLE FLOOR")
+    (
+        "BLIND FLAT-BOTTOM REAM",
+        f"PRESS PIN {LATCH_PIN_NUMBER} TO FLOOR",
+        f"{LATCH_PIN_PRESS_PRINTED[0]:.4f}/{LATCH_PIN_PRESS_PRINTED[1]:.4f}"
+        " INTERFERENCE",
+    )
 )
 
 ISO_VIEW_SCALE = (1, 2)

@@ -125,13 +125,16 @@ def test_the_length_callout_points_at_the_front_bushing_step() -> None:
     assert callout.endswith(f"PER {steps.step_ref(drawing.FIT_STEP_KEY)}")
 
 
-def test_both_end_faces_run_machined() -> None:
+def test_the_bore_and_both_end_faces_run_machined() -> None:
+    """Rule 5: the bore runs on the pin, the faces bear (review of 6de7230aa:
+    the running bore had no Ra)."""
     faces = {
         control.key: (control.roughness_um, control.face)
         for control in spec.SURFACE_FINISHES
     }
-    assert set(faces) == {"nose_face", "ring_face"}
+    assert set(faces) == {"bore", "nose_face", "ring_face"}
     assert {ra for ra, _ in faces.values()} == {MACHINED_UM}
+    assert faces["bore"][1].diameter_mm == pin.DIA
     assert (tuple(faces["nose_face"][1].normal), faces["nose_face"][1].offset_mm) == (
         (0.0, 0.0, -1.0),
         0.0,
@@ -158,6 +161,24 @@ def test_face_symbols_attach_to_their_own_end_of_the_lathe_profile() -> None:
         assert pick[0] == pytest.approx(sheet_x(faces[key].offset_mm))
         radius = abs(pick[1] - drawing.PROFILE_CENTER[1]) / scale
         assert spec.BORE_DIA / 2.0 < radius < spec.OD / 2.0 - spec.FRONT_CHAMFER
+
+
+def test_the_bore_finish_lands_on_the_bore_circle_clear_of_the_od() -> None:
+    """The end view shows the bore round: the leader lands on its circle,
+    away from the Ø callout's upper-right landing, and the symbol (its ink
+    grows about 15 mm right and 7 mm up at 2.5 mm text) clears the O.D.
+    circle and the horizontal centre line."""
+    scale = drawing.SHEET_SCALE[0] / drawing.SHEET_SCALE[1] / 1000.0
+    cx, cy = drawing.END_CENTER
+    ax, ay = drawing.BORE_FINISH_ATTACH
+    assert ((ax - cx) ** 2 + (ay - cy) ** 2) ** 0.5 == pytest.approx(
+        spec.BORE_DIA * scale / 2.0
+    )
+    assert ax < cx and ay < cy
+    sx, sy = drawing.BORE_FINISH_SYMBOL
+    ink_right, ink_top = sx + 0.015, sy + 0.007
+    assert ink_right < cx - spec.OD * scale / 2.0
+    assert ink_top < cy
 
 
 def test_sheet_text_stays_short() -> None:

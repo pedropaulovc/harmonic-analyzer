@@ -45,6 +45,7 @@ from _drawing_common import (
     view_name,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _gear_drawing_entities import visible_circle_edge
 from _layout_geometry import audit_sheet, format_findings
 from _surface_finish import surface_finish_by_key
 from diagnostics.drawing_layout_audit import collect_document
@@ -78,7 +79,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# A Ø12 x 5 ring: 5:1 keeps the four sizes, the fit callout and both face
+# A Ø12 x 5 ring: 5:1 keeps the four sizes, the fit callout and the three
 # finishes legible on the landscape sheet.
 SHEET_SCALE = (5.0, 1.0)
 VIEW_SCALE = (5, 1)
@@ -145,6 +146,18 @@ FACE_FINISHES = {
         (_PROFILE_NOSE_X + 0.014, PROFILE_CENTER[1] - 0.008),
     ),
 }
+# The bore runs on the pin (rule 5): its finish sits on the end view, where
+# the bore is a circle.  The leader lands on the bore circle at -135 deg,
+# away from the Ø callout's landing upper right; the symbol stands left of
+# the O.D. below the horizontal centre line, its ink growing up and right
+# short of the line and of the O.D. circle.  Every symbol keeps one height.
+_BORE_SHEET_RADIUS = BORE_DIA * _S / 2.0
+BORE_FINISH_ATTACH = (
+    END_CENTER[0] + _BORE_SHEET_RADIUS * math.cos(math.radians(-135.0)),
+    END_CENTER[1] + _BORE_SHEET_RADIUS * math.sin(math.radians(-135.0)),
+)
+BORE_FINISH_SYMBOL = (END_CENTER[0] - OD * _S / 2.0 - 0.022, END_CENTER[1] - 0.012)
+FINISH_CHAR_HEIGHT = 0.0025
 NOTES_XY = (0.020, 0.075)
 ISO_NOTE_XY = (0.315, 0.145)
 # Text over ink, an extension line through its own text and a mark printed
@@ -378,8 +391,18 @@ async def build(adapter: Any) -> dict[str, str]:
             symbol_xy=symbol,
             control=surface_finish_by_key(SURFACE_FINISHES, key),
             label=label,
-            char_height=0.0025,
+            char_height=FINISH_CHAR_HEIGHT,
         )
+    add_surface_finish(
+        adapter,
+        end,
+        symbol_xy=BORE_FINISH_SYMBOL,
+        control=surface_finish_by_key(SURFACE_FINISHES, "bore"),
+        label="bushing bore finish",
+        entity=visible_circle_edge(adapter, end, BORE_DIA),
+        leader_attach_xy=BORE_FINISH_ATTACH,
+        char_height=FINISH_CHAR_HEIGHT,
+    )
 
     add_property_linked_note(adapter, "Manufacturing Notes", *NOTES_XY)
     add_property_linked_note(adapter, "Isometric View Note", *ISO_NOTE_XY)

@@ -5,8 +5,9 @@ it carries the native 1/4-20 through-thread callout with both countersinks
 named under its thread line.  Section A-A cuts it on the nut axis through the
 Front plane, the plane of the turned profiles and of two knurl crests, so the
 knurl diameter, the head, waist and flange, the overall length from the seat
-face and the dish's chord and depth print on solid cut edges.  No roughness
-symbol: the seat face clamps the wheel (policy rule 5).
+face and the dish's rim and floor diameters and its depth to the floor print
+on solid cut edges.  No roughness symbol: the seat face clamps the wheel
+(policy rule 5).
 """
 
 from __future__ import annotations
@@ -66,7 +67,7 @@ SLDDRW = OUTPUTS.slddrw
 PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
-# A Ø20.5 × 16.1 nut: 3:1 leaves room round the section for its eight
+# A Ø20.5 × 16.1 nut: 3:1 leaves room round the section for its nine
 # dimensions and the knurl callout on the landscape sheet.
 SHEET_SCALE = (3.0, 1.0)
 VIEW_SCALE = (3, 1)
@@ -95,19 +96,25 @@ def _section_y(model_y_mm: float) -> float:
     return SECTION_CENTER[1] + (model_y_mm - OVERALL_LENGTH / 2.0) * _S / 1000.0
 
 
-# The rim's diameters stack above it (knurl outermost) with only air below
-# their extension lines; the lengths stand off the right (head, overall) and
-# the left (waist, dish depth) of the silhouette.  The waist and the flange
-# are dimensioned across their own cut, each dimension line at its
-# feature's height and its text out to the right: an extension line from
-# either, run past the rim or the seat face, would cross the other's
-# hatching, and nothing prints below the seat face, where the native
-# SECTION A-A caption hangs.
+# The rim's diameters stack above it (knurl outermost, the dish floor
+# innermost, so each one's extension lines stay inside the next one's) with
+# only air below their extension lines; the lengths stand off the right
+# (head, overall) and the left (waist, dish depth) of the silhouette.  The
+# dish depth's text stands above its rim extension line: at 3:1 the depth is
+# shorter than the text is tall.  The waist and the flange are dimensioned
+# across their own cut, each dimension line at its feature's height and its
+# text out to the right: an extension line from either, run past the rim or
+# the seat face, would cross the other's hatching, and nothing prints below
+# the seat face, where the native SECTION A-A caption hangs.
 _STEM_TEXT_X = _section_x(HEAD_DIA / 2.0) + 0.021
 SECTION_KEEP = {
     "HeadDia": (SECTION_CENTER[0], _section_y(OVERALL_LENGTH) + 0.030),
     "DishDia": (SECTION_CENTER[0], _section_y(OVERALL_LENGTH) + 0.014),
-    "DishDepth": (_section_x(-HEAD_DIA / 2.0) - 0.016, _section_y(OVERALL_LENGTH)),
+    "DishFloorDia": (SECTION_CENTER[0], _section_y(OVERALL_LENGTH) + 0.006),
+    "DishDepth": (
+        _section_x(-HEAD_DIA / 2.0) - 0.016,
+        _section_y(OVERALL_LENGTH) + 0.004,
+    ),
     "HeadLength": (
         _section_x(HEAD_DIA / 2.0) + 0.014,
         _section_y(OVERALL_LENGTH - HEAD_LENGTH / 2.0),

@@ -9,12 +9,14 @@ import itertools
 import math
 import re
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 import _common
 import _config
 import _drawing_common
+import _part_pmi
 import _printed_tolerance
 import build_transgear_disc_hub as part
 import draw_transgear_disc_hub as drawing
@@ -259,53 +261,96 @@ def _side_view_model_point(sheet_xy: tuple[float, float]) -> tuple[float, float]
     return dx * x_dir[0] + dy * x_dir[1], z_mid + dx * z_dir[0] + dy * z_dir[1]
 
 
-def test_each_perpendicularity_frame_names_its_face_rim_and_a_clear_landing() -> None:
-    """Each frame attaches to its face's outer rim, the circle the edge view
-    draws as that face's line, and its leader lands on that line where only
-    the rim projects, half a sheet millimetre or more from any corner or
-    overlying edge and off every extension line (farm run
-    20261002T153039266Z missed a sheet pick over the 0-degree screw hole's
-    edge on the rear face), and each frame stands right of the spigot's end
-    on its landing's side of the axis."""
+# The frames as the farm drew them (run 20261002T180658288Z): the 0.005
+# frame's box 29.29 wide on the sheet, the 0.03 frame's 26.75, and a
+# leader's arrowhead 3.13 long.
+_FRAME_WIDTH = {
+    drawing.SPIGOT_END_FRAME.label: 0.02929,
+    drawing.FLANGE_FACE_FRAME.label: 0.02675,
+}
+_ARROWHEAD = 0.00313
+
+
+def _nominal_landing(frame) -> tuple[float, float]:
+    """Where ``frame``'s leader lands on the laid-out edge view: on its face's
+    line, at its model x (model +X up)."""
+    return (
+        drawing._side_x(frame.face_z_mm),
+        drawing.AXIS_Y + frame.landing_x_mm * drawing._S,
+    )
+
+
+def _frame_box(frame) -> Box:
+    x, top = drawing.frame_position(_nominal_landing(frame))
+    return Box(x, top - drawing.FRAME_HEIGHT, x + _FRAME_WIDTH[frame.label], top)
+
+
+def test_each_frame_lands_square_on_its_face_clear_of_corners_and_text() -> None:
+    """MR #1166: the spigot end's leader ran down at a slant onto the end's
+    line 3 sheet mm from its corner with the spigot's O.D., and read as
+    controlling the cylinder.  Each leader now runs level from its frame's
+    middle onto its face's line (square to the face, the way a leader to a
+    surface reads), lands on the face's annulus at the view's mid-depth, an
+    arrowhead and a millimetre or more from every corner the face shares with
+    a turned diameter, off the screw holes' edges (farm run
+    20261002T153039266Z missed a sheet pick over the 0-degree hole's edge on
+    the rear face) and on the side of the axis no extension line rises from.
+    Each frame and leader stays clear of every dimension's text; the spigot
+    end's frame inside the spigot's extension lines and left of its
+    diameter's dimension line, the flange's between the spigot's and the
+    flange's extension lines."""
+    s = drawing._S
     flange, spigot = drawing.FLANGE_FACE_FRAME, drawing.SPIGOT_END_FRAME
-    assert (flange.rim_z_mm, flange.rim_radius_mm) == (0.0, spec.FLANGE_DIA / 2.0)
-    assert (spigot.rim_z_mm, spigot.rim_radius_mm) == (
-        spec.SPIGOT_LENGTH,
-        spec.SPIGOT_DIA / 2.0,
-    )
-    clear = 0.0005 / drawing._S  # model mm
-    # Inside each face's radial extent: the flange's rear face from the
-    # spigot's O.D. out, the spigot's end from its round bore out.
-    assert (
-        spec.SPIGOT_DIA / 2.0 + clear
-        < abs(flange.landing_x_mm)
-        < spec.FLANGE_DIA / 2.0 - clear
-    )
-    assert (
-        spec.BORE_DIA / 2.0 + clear
-        < abs(spigot.landing_x_mm)
-        < spec.SPIGOT_DIA / 2.0 - clear
-    )
-    # The screw holes pierce the rear face: each one's edge there projects
-    # across its centre's x plus or minus its radius.
+    spigot_r, flange_r = spec.SPIGOT_DIA / 2.0, spec.FLANGE_DIA / 2.0
+    # Each face's annulus, and the radii where its line meets a turned
+    # diameter's on the sheet: the spigot's end from its round bore (hidden
+    # inside the spigot) out to the spigot's O.D.; the flange's rear face
+    # from the spigot's root out to the flange's O.D.
+    annulus = {
+        flange.label: (spigot_r, flange_r),
+        spigot.label: (spec.BORE_DIA / 2.0, spigot_r),
+    }
+    corners = {flange.label: (spigot_r, flange_r), spigot.label: (spigot_r,)}
+    boxes = {
+        name: _printed_box(name, anchor) for name, anchor in drawing.SIDE_KEEP.items()
+    }
+    for frame in (flange, spigot):
+        landing = _nominal_landing(frame)
+        assert _side_view_model_point(landing) == pytest.approx(
+            (frame.landing_x_mm, frame.face_z_mm)
+        )
+        r = abs(frame.landing_x_mm)
+        assert annulus[frame.label][0] < r < annulus[frame.label][1]
+        for corner in corners[frame.label]:
+            assert abs(corner - r) * s >= _ARROWHEAD + 0.001, (frame.label, corner)
+        x, top = drawing.frame_position(landing)
+        assert top - drawing.FRAME_HEIGHT / 2.0 == pytest.approx(landing[1], abs=1e-12)
+        assert x - landing[0] >= _ARROWHEAD + 0.003
+        frame_box = _frame_box(frame)
+        leader = Box(landing[0], landing[1], x, landing[1])
+        for name, text in boxes.items():
+            assert frame_box.gap(text) >= 0.002, (frame.label, name)
+            assert leader.gap(text) >= 0.002, (frame.label, name)
     for centre_x, _centre_y in joint.screw_centres():
-        assert abs(flange.landing_x_mm - centre_x) > joint.SCREW_HOLE_DIA / 2.0 + clear
+        gap = abs(flange.landing_x_mm - centre_x) - joint.SCREW_HOLE_DIA / 2.0
+        assert gap * s >= 0.001
     # The spigot's length and the overall end at the spigot end's +X corner
     # and print above the part, so their extension lines rise off the spigot
     # end's line; the spigot length's other one rises from the spigot's +X
     # corner at the flange, along the rear face's +X stretch.
     for name in ("SpigotLength", "HubLength"):
         text_x, _text_z = _side_view_model_point(drawing.SIDE_KEEP[name])
-        assert text_x > spec.FLANGE_DIA / 2.0, name
-    assert flange.landing_x_mm < 0.0
-    sides = set()
-    for frame in (flange, spigot):
-        frame_x, _frame_z = _side_view_model_point(frame.frame_xy)
-        assert frame.frame_xy[0] > drawing.SPIGOT_END_X
-        assert spec.SPIGOT_DIA / 2.0 < abs(frame_x) < spec.FLANGE_DIA / 2.0
-        assert (frame_x > 0.0) == (frame.landing_x_mm > 0.0)
-        sides.add(frame_x > 0.0)
-    assert sides == {True, False}
+        assert text_x > flange_r, name
+    assert flange.landing_x_mm < 0.0 < spigot.landing_x_mm
+    axis_y = drawing.AXIS_Y
+    spigot_box, flange_box = _frame_box(spigot), _frame_box(flange)
+    assert spigot_box.xmin > drawing.SPIGOT_END_X
+    assert spigot_box.ymin > axis_y
+    assert spigot_box.ymax <= axis_y + spigot_r * s - drawing.FRAME_AIR + 1e-12
+    assert spigot_box.xmax <= drawing.SIDE_KEEP["SpigotDia"][0] - 0.002
+    assert axis_y - flange_r * s + 0.002 <= flange_box.ymin
+    assert flange_box.ymax <= axis_y - spigot_r * s - 0.002
+    assert flange_box.xmin > drawing.SPIGOT_END_X
 
 
 def _circle(radius: float, z: float, *, x: float = 0.0, axis_z: float = 1.0):
@@ -342,8 +387,82 @@ def test_face_rim_resolves_exactly_one_circle_on_the_hub_axis() -> None:
         drawing.face_rim(_drawing_common.ViewEdges(label="edge", edges=()), frame)
 
 
+def _surface_face(
+    identity: int, parameters: tuple[float, ...], *, flipped: bool = False
+):
+    """A model face as ``_part_pmi._face_geometry`` reads it (metres)."""
+    surface = SimpleNamespace(
+        Identity=identity, PlaneParams=parameters, CylinderParams=parameters
+    )
+    return SimpleNamespace(
+        GetSurface=lambda: surface,
+        FaceInSurfaceSense=lambda: flipped,
+        GetBox=lambda: (),
+    )
+
+
+def _plane(z_mm: float, *, facing: float = 1.0):
+    """The plane square to the hub axis at ``z_mm``, its outward normal +Z
+    (or -Z)."""
+    return _surface_face(
+        _part_pmi._SURFACE_PLANE,
+        (0.0, 0.0, 1.0, 0.0, 0.0, z_mm / 1000.0),
+        flipped=facing < 0.0,
+    )
+
+
+def _cylinder(radius_mm: float):
+    return _surface_face(
+        _part_pmi._SURFACE_CYLINDER, (0.0, 0.0, 0.0, 0.0, 0.0, 1.0, radius_mm / 1000.0)
+    )
+
+
+def _rim_between(*faces):
+    edge = SimpleNamespace(GetTwoAdjacentFaces2=lambda: faces)
+    return _drawing_common.ViewEdge(edge=edge, line=None, circle=None, vertices=None)
+
+
+@pytest.mark.parametrize("plane_first", [False, True])
+def test_each_frame_attaches_to_the_plane_its_rim_bounds_never_the_cylinder(
+    plane_first: bool,
+) -> None:
+    """MR #1166: the spigot end's frame, left on the rim the end shares with
+    the spigot's O.D., read as controlling the cylinder.  Each frame takes,
+    of its rim's two faces, the one plane square to the hub axis at its
+    station facing +Z -- the spigot's end at z 3.65, the flange's rear face
+    at z 0 -- whichever face the rim reports first.  A plane at another
+    station or facing the other way never stands in for it, and two such
+    planes, or fewer than two faces, fail naming each face."""
+    spigot, flange = drawing.SPIGOT_END_FRAME, drawing.FLANGE_FACE_FRAME
+    assert spec.SPIGOT_LENGTH == pytest.approx(3.65)
+    for frame, z, radius in (
+        (spigot, spec.SPIGOT_LENGTH, spec.SPIGOT_DIA / 2.0),
+        (flange, 0.0, spec.FLANGE_DIA / 2.0),
+    ):
+        cylinder, plane = _cylinder(radius), _plane(z)
+        pair = (plane, cylinder) if plane_first else (cylinder, plane)
+        assert drawing.controlled_face(_rim_between(*pair), frame) is plane
+    cylinder = _cylinder(spec.SPIGOT_DIA / 2.0)
+    for wrong in (
+        _plane(0.0),  # the flange's rear face
+        _plane(spec.SPIGOT_LENGTH + 0.1),
+        _plane(spec.SPIGOT_LENGTH, facing=-1.0),
+    ):
+        with pytest.raises(
+            RuntimeError, match=r"matched 0 of 2 faces: surface 4002 .*; surface 4001 "
+        ):
+            drawing.controlled_face(_rim_between(cylinder, wrong), spigot)
+    end = _plane(spec.SPIGOT_LENGTH)
+    with pytest.raises(RuntimeError, match="matched 2 of 2 faces"):
+        drawing.controlled_face(_rim_between(end, _plane(spec.SPIGOT_LENGTH)), spigot)
+    with pytest.raises(RuntimeError, match="matched 1 of 1 faces"):
+        drawing.controlled_face(_rim_between(None, end), spigot)
+    with pytest.raises(RuntimeError, match="matched 0 of 0 faces: none"):
+        drawing.controlled_face(_rim_between(), spigot)
+
+
 @pytest.mark.parametrize("turn", [1.0, -1.0])
-def test_rim_landing_puts_the_leader_at_its_model_x_on_the_projected_line(
+def test_face_landing_puts_the_leader_at_its_model_x_on_the_projected_line(
     turn: float,
 ) -> None:
     """The landing sits at the frame's model x between the rim's projected
@@ -352,7 +471,7 @@ def test_rim_landing_puts_the_leader_at_its_model_x_on_the_projected_line(
         r = frame.rim_radius_mm * drawing._S
         minus_end = (0.2346, drawing.AXIS_Y - turn * r)
         plus_end = (0.2346, drawing.AXIS_Y + turn * r)
-        landing = drawing.rim_landing(frame, minus_end, plus_end)
+        landing = drawing.face_landing(frame, minus_end, plus_end)
         assert landing == pytest.approx(
             (0.2346, drawing.AXIS_Y + turn * frame.landing_x_mm * drawing._S)
         )

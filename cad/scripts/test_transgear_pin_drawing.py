@@ -10,6 +10,7 @@ import pytest
 import _config
 import build_transgear_pin as part
 import draw_transgear_pin as drawing
+import transgear_arm_geometry as arm
 import transgear_pin_spec as spec
 import transgear_retaining_ring_spec as ring
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
@@ -67,6 +68,23 @@ def test_the_front_land_holds_three_groove_depths_at_its_printed_lower_limit() -
     assert lower >= spec.EDGE_MARGIN_MIN
 
 
+def test_the_head_land_keeps_a_rim_at_its_printed_lower_limit() -> None:
+    """Review of 6de7230aa (blocker): a 0.5 land at .X went to -0.3 under
+    the title block's ±0.8, so a missing head passed.  The land prints .XX
+    and, at its lower limit, still leaves a cylindrical rim past the
+    largest edge break on both its edges; the apex stays 2.0 proud."""
+    places = spec.DRAWING_PRECISION_BY_NAME["HeadLand"]
+    assert places == 2
+    lower = round(spec.HEAD_LAND, places) - printed_band_mm(places)
+    assert spec.HEAD_LAND_MIN == pytest.approx(lower)
+    edge_break = max(
+        float(_config.title_block("edge_break")[key])
+        for key in ("radius_mm", "chamfer_max_mm")
+    )
+    assert lower >= 2.0 * edge_break > 0.0
+    assert spec.HEAD_LAND + spec.HEAD_DOME_SAG == pytest.approx(2.0)
+
+
 def test_the_groove_holds_the_ring_at_every_printed_limit() -> None:
     """The ring grips at the groove's largest Ø and still clears the shank;
     the ring's thickness never binds in the narrowest groove."""
@@ -121,6 +139,18 @@ def test_notes_fit_the_sheet_limits() -> None:
     lines = spec.DRAWING_NOTES.splitlines()
     assert len(lines) <= 4
     assert all(len(line) <= 70 for line in lines)
+
+
+def test_the_note_names_the_press_the_shank_band_sets() -> None:
+    """The 0/-0.008 shank against the arm's +0.008/0 ream: smallest pin in
+    the largest ream and the reverse.  The finish field says ground, so the
+    notes do not."""
+    loosest = spec.DIA_MIN - arm.PIN_BORE_DIA_MAX
+    tightest = spec.DIA_MAX - arm.PIN_BORE_DIA_MIN
+    assert spec.PRESS_INTERFERENCE == pytest.approx((loosest, tightest))
+    assert (loosest, tightest) == pytest.approx((0.010, 0.026))
+    assert f"{loosest:.3f}-{tightest:.3f} DIAMETRAL INTERFERENCE" in spec.DRAWING_NOTES
+    assert "GROUND" not in spec.DRAWING_NOTES
 
 
 def test_registry_row_is_the_turned_steel_mha_179() -> None:

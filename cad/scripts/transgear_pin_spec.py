@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import math
 
+import _config
 import transgear_arm_geometry as ARM
 import transgear_retaining_ring_spec as RING
 from _gtol_spec import CylinderFace
@@ -36,17 +37,36 @@ HEAD_SEAT_MACHINE_Z = round(ARM.FRONT_FACE_MACHINE_Z + ARM.THICKNESS, 6)  # -116
 # --- Shank: the running journal and the press in the arm -----------------------
 # The sleeve and both bushings run on it (their bores Ø3.900 +0.030/+0.012,
 # 0.012..0.038 diametral); the arm's REAM Ø3.874 +0.008/0 holds it by a
-# 0.010..0.026 press (``transgear_arm_geometry``).
+# 0.010..0.026 press (``transgear_arm_geometry``), named on this sheet.
 DIA = 3.900
 DIA_BAND = (0.0, -0.008)  # (upper, lower) deviations, ground
 DIA_MIN = round(DIA + DIA_BAND[1], 6)
 DIA_MAX = round(DIA + DIA_BAND[0], 6)
 DIA_PLACES = 3
+# (loosest, tightest): smallest shank in the largest ream, and the reverse.
+PRESS_INTERFERENCE = (
+    round(DIA_MIN - ARM.PIN_BORE_DIA_MAX, 6),
+    round(DIA_MAX - ARM.PIN_BORE_DIA_MIN, 6),
+)  # 0.010, 0.026
 
-# --- Head: Ø5.0, a 0.5 land then a spherical dome, 2.0 proud of the arm ------
+# --- Head: Ø5.0, a 1.20 land then a spherical dome, 2.0 proud of the arm ------
+# The head stops the press and, pulled forward by the ring's thrust on the
+# load wall, holds the pin in the arm; nothing bears on its dome.  Its land
+# prints .XX: at .X the title block's ±0.8 let a 0.5 land go to -0.3 (review
+# of 6de7230aa).  At its printed lower limit (0.69) the land still keeps a
+# cylindrical rim once the title block's largest edge break is taken off
+# each of its two edges (the seat and the dome's rim).  The dome is 0.8
+# high, so the apex stays 2.0 proud.
 HEAD_DIA = 5.0
-HEAD_LAND = 0.5
-HEAD_DOME_SAG = 1.5
+HEAD_LAND = 1.20
+HEAD_LAND_PLACES = 2
+HEAD_LAND_MIN = round(HEAD_LAND - printed_band_mm(HEAD_LAND_PLACES), 6)  # 0.69
+_EDGE_BREAK = _config.title_block("edge_break")
+EDGE_BREAK_MAX = max(
+    float(_EDGE_BREAK["radius_mm"]), float(_EDGE_BREAK["chamfer_max_mm"])
+)
+HEAD_LAND_FLOOR = 2.0 * EDGE_BREAK_MAX  # 0.50
+HEAD_DOME_SAG = 0.8
 HEAD_HEIGHT = HEAD_LAND + HEAD_DOME_SAG  # 2.0 proud of the arm's rear face
 HEAD_DOME_R = ((HEAD_DIA / 2.0) ** 2 + HEAD_DOME_SAG**2) / (2.0 * HEAD_DOME_SAG)
 
@@ -111,7 +131,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     "PinProfile": {
         "ShankDia": DIA_PLACES,
         "HeadDia": 1,
-        "HeadLand": 1,
+        "HeadLand": HEAD_LAND_PLACES,
         "GrooveStation": GROOVE_STATION_PLACES,
         "GrooveDia": 3,
         "GrooveWidth": 3,
@@ -142,6 +162,16 @@ for _ok, _what in (
         math.isclose(HEAD_APEX_MACHINE_Z, -114.4625, abs_tol=1e-6),
         "the head apex is not 2.0 proud of the arm's rear face",
     ),
+    (
+        HEAD_LAND_MIN >= HEAD_LAND_FLOOR,
+        f"the head land {HEAD_LAND} at {HEAD_LAND_PLACES} places has a printed "
+        f"lower limit {HEAD_LAND_MIN:.2f}, under {HEAD_LAND_FLOOR:.2f}, a "
+        "largest edge break on each of its edges",
+    ),
+    (
+        PRESS_INTERFERENCE[0] > 0.0,
+        f"the shank loses its press in the {ARM_NUMBER} ream: {PRESS_INTERFERENCE}",
+    ),
 ):
     if not _ok:
         raise AssertionError(f"MHA-179: {_what}")
@@ -149,10 +179,15 @@ for _ok, _what in (
 # The ring the groove takes, named once above the groove Ø (one line: an
 # above-callout holding a line break never prints).
 GROOVE_CALLOUT = f"FOR {RING_NUMBER} RING, McMASTER {RING.SKU}"
+# The shank's band sets the press in the arm's ream: the note names it, so
+# the 0.008 band reads as the fit it is (review of 6de7230aa).  The finish
+# field already says ground.
 DRAWING_NOTES = "\n".join(
     (
-        "1/4 IN BAR STOCK OK. SHANK GROUND.",
+        "1/4 IN BAR STOCK OK.",
         f"PRESSED INTO {ARM_NUMBER} FROM THE REAR UNTIL THE HEAD SEATS.",
+        f"SHANK TO {ARM_NUMBER} REAM: {PRESS_INTERFERENCE[0]:.3f}-"
+        f"{PRESS_INTERFERENCE[1]:.3f} DIAMETRAL INTERFERENCE.",
     )
 )
 ISOMETRIC_VIEW_NOTE = "ISOMETRIC VIEW\nSCALE 2:1"

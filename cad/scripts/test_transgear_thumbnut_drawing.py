@@ -19,6 +19,7 @@ import transgear_thumbnut_spec as spec
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
 from _drawing_registry import DRAWINGS_BY_NAME
+from _printed_tolerance import printed_band_mm
 
 # The B landscape template's inner border, left edge (sheet metres).
 SHEET_INNER_LEFT = 0.0127
@@ -100,17 +101,84 @@ def test_the_seat_face_refuses_a_wheel_bore_it_cannot_cover(monkeypatch) -> None
 def test_countersinks_take_no_more_thread_than_the_engagement_deducts() -> None:
     """Full thread starts where each countersink's 45° leg meets the tap
     drill (R9-63), not the major: the printed MAX takes 0.82 at the seat
-    face, not the 0.2 counted to the major, and the front one, cut on the
-    dish, 1.78 from the rim.  The engagement stack deducts both."""
+    face, not the 0.2 counted to the major, and the front one, cut in the
+    dish floor at its deepest printed depth, 2.62 from the rim.  The
+    engagement stack deducts both."""
     printed = float(spec.CSK_QUALIFIER.split("\u00d8")[1].split()[0])
     assert "MAX" in spec.CSK_QUALIFIER.split()
     rear = (printed - spec.TAP_DRILL_DIA) / 2.0
     assert rear == pytest.approx(0.8225, abs=1e-3)
     assert rear <= spec.REAR_THREAD_LOSS + 1e-9
-    front_cone_y = spec.dish_surface_y(printed / 2.0) - printed / 2.0
-    front = spec.RIM_Y - (front_cone_y + spec.TAP_DRILL_DIA / 2.0)
-    assert front == pytest.approx(1.784, abs=1e-3)
+    deepest_floor = spec.DISH_DEPTH + printed_band_mm(spec.DISH_DEPTH_PLACES)
+    front = deepest_floor + rear
+    assert front == pytest.approx(2.6225, abs=1e-3)
     assert front <= spec.FRONT_THREAD_LOSS + 1e-9
+
+
+def _outside_every_countersink(point: tuple[float, float]) -> bool:
+    """Whether a profile point (radius, y) survives the drill and both
+    countersinks: on neither cone's side of the printed MAX Ø."""
+    radius, _y = point
+    return radius > spec.CSK_DIA / 2.0 > spec.TAP_DRILL_DIA / 2.0
+
+
+def test_the_dish_ends_on_its_floor_at_every_printed_size() -> None:
+    """Machinist review of 6de7230aa (blocker): Ø15.0 and a 1.2 depth to a
+    point on the axis inside the tap drill left the sloping recess ending
+    wherever the Ø6.75 MAX countersink met it.  The recess now ends on a flat
+    floor whose edge Ø the model carries and the section prints; the
+    countersink is cut inside that floor at every printed size; and the
+    depth runs from the rim's edge to the floor's, both edges the finished
+    nut keeps."""
+    assert {"DishDia", "DishFloorDia", "DishDepth"} == spec.DRAWING_DIMENSIONS[
+        "DishProfile"
+    ]
+    assert {"DishDia", "DishFloorDia", "DishDepth"} <= set(drawing.SECTION_KEEP)
+    # Title-block .X: the band the margins below are judged at.
+    assert drawing.DRAWING_PRECISION_BY_NAME["DishFloorDia"] == 1
+    assert spec.dish_floor_margins(
+        spec.DISH_DIA, spec.DISH_FLOOR_DIA, spec.DISH_DEPTH, spec.CSK_DIA
+    ) == pytest.approx(
+        {
+            "floor land outside the countersink": 0.725,
+            "cone from the rim to the floor": 2.2,
+            "floor below the rim": 0.2,
+        }
+    )
+    rim, floor = spec.DISH_RIM_CORNER, spec.DISH_FLOOR_CORNER
+    assert rim == pytest.approx((spec.DISH_DIA / 2.0, spec.RIM_Y))
+    assert floor == pytest.approx((spec.DISH_FLOOR_DIA / 2.0, spec.DISH_FLOOR_Y))
+    assert rim[1] - floor[1] == pytest.approx(spec.DISH_DEPTH)
+    band = printed_band_mm(spec.DISH_FLOOR_DIA_PLACES)
+    assert _outside_every_countersink((floor[0] - band / 2.0, floor[1]))
+    assert _outside_every_countersink(rim)
+    # Negative controls: the 6de7230aa depth ran to the axis, inside the
+    # drill; a floor no wider than the countersink lets it cut the cone.
+    assert not _outside_every_countersink((0.0, spec.RIM_Y - 1.2))
+    narrow = spec.dish_floor_margins(
+        spec.DISH_DIA, spec.CSK_DIA, spec.DISH_DEPTH, spec.CSK_DIA
+    )
+    assert narrow["floor land outside the countersink"] < 0.0
+
+
+def test_the_dish_dimensions_stack_clear_of_each_other_and_the_rim() -> None:
+    """The rim's diameters nest (each one's extension lines inside the next
+    one's dimension line), and the dish depth's text stands above its rim
+    extension line rather than on it, as the 6de7230aa 1.2 did."""
+    from _layout_geometry import estimate_text_box
+
+    keep = drawing.SECTION_KEEP
+    rim_y = drawing._section_y(spec.OVERALL_LENGTH)
+    assert keep["HeadDia"][1] > keep["DishDia"][1] > keep["DishFloorDia"][1] > rim_y
+
+    def bottom(anchor: tuple[float, float]) -> float:
+        box = estimate_text_box("1.0", anchor=anchor, height=0.0035, reference=2)
+        assert box is not None
+        return box.ymin
+
+    assert bottom(keep["DishDepth"]) > rim_y
+    # Negative control: the 6de7230aa anchor at the rim's height.
+    assert bottom((keep["DishDepth"][0], rim_y)) < rim_y
 
 
 def test_countersink_line_joins_the_native_thread_line() -> None:
@@ -307,8 +375,10 @@ def test_the_shortest_nut_keeps_full_thread_for_the_stud() -> None:
     assert spec.OVERALL_LENGTH_LO == pytest.approx(-0.8)
     assert collar.NUT_LENGTH_MIN == pytest.approx(15.3)
     assert collar.THUMBNUT_ENGAGEMENT_WORST >= 1.5 * stud.THREAD_MAJOR
-    # The nut's own full thread over its shortest length.
-    full = spec.FRONT_FULL_THREAD_Y + spec.OVERALL_LENGTH_LO - spec.REAR_FULL_THREAD_Y
+    # The nut's own full thread over its shortest length, the front
+    # countersink on the deepest printed floor.
+    shortest_rim = spec.RIM_Y + spec.OVERALL_LENGTH_LO
+    full = shortest_rim - spec.FRONT_THREAD_LOSS - spec.REAR_FULL_THREAD_Y
     assert full >= 1.5 * spec.THREAD_MAJOR
 
 

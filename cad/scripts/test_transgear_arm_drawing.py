@@ -258,6 +258,34 @@ def test_the_pin_bore_presses_the_mha_179_pin_at_every_limit() -> None:
     assert min(geometry.PIN_BORE_DIA_BAND) == 0.0 < max(geometry.PIN_BORE_DIA_BAND)
 
 
+def test_the_latch_pin_hole_names_its_press_on_mha_169() -> None:
+    """Review of 6de7230aa (blocker): the blind ream said PRESS FIT with no
+    interference.  Smallest dowel in the largest hole and the reverse, both
+    from printed bands, the callout rounding outward so it holds them."""
+    loosest = (
+        pin.DIA
+        + min(pin.DIA_BAND)
+        - geometry.PIN_HOLE_DIA
+        - max(geometry.PIN_HOLE_DIA_BAND)
+    )
+    tightest = (
+        pin.DIA
+        + max(pin.DIA_BAND)
+        - geometry.PIN_HOLE_DIA
+        - min(geometry.PIN_HOLE_DIA_BAND)
+    )
+    assert (loosest, tightest) == pytest.approx((0.00254, 0.01762))
+    assert spec.LATCH_PIN_PRESS_INTERFERENCE == pytest.approx((loosest, tightest))
+    assert joints.LATCH_PIN_PRESS_INTERFERENCE == pytest.approx((loosest, tightest))
+    assert _config.parts("transgear-latch-pin")["number"] == spec.LATCH_PIN_NUMBER
+    low, high = spec.LATCH_PIN_PRESS_PRINTED
+    assert 0.0 < low <= loosest < tightest <= high < tightest + 1e-4
+    lines = spec.PIN_HOLE_CALLOUT.splitlines()
+    assert lines[1] == f"PRESS PIN {spec.LATCH_PIN_NUMBER} TO FLOOR"
+    assert lines[2] == f"{low:.4f}/{high:.4f} INTERFERENCE"
+    assert lines[2] == "0.0025/0.0177 INTERFERENCE"
+
+
 def test_the_pivot_bore_is_reamed_as_the_shoulder_running_fit() -> None:
     """Review of 19e33c6c2: the Ø4.900 named no operation.  At the smallest
     bore its band accepts, the MHA-168 shoulder keeps less radial air than a
