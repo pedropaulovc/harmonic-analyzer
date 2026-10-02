@@ -531,7 +531,13 @@ def build_track(data, frame_views_callback, evidence_notes=None):
     return result
 
 
-def write_track(track):
+def prepare_track(track):
+    """Serialize without publishing, so paired outputs can be prepared together."""
     path = WEB / "content" / f'{track["source"]["videoId"]}.source-track.json'
-    path.write_text(json.dumps(track, separators=(",", ":"), allow_nan=False) + "\n")
+    return path, json.dumps(track, separators=(",", ":"), allow_nan=False) + "\n"
+
+
+def write_track(track):
+    path, contents = prepare_track(track)
+    path.write_text(contents)
     return path

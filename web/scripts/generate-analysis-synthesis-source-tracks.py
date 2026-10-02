@@ -129,7 +129,6 @@ class Generator:
             controls_spec.loader.exec_module(controls_module)
             # Reuse the original source-control derivation and all of its
             # exposure/station/CHECK guards, but never read private evidence.
-            controls_module.BASE = WEB / "content/analysis-recovery-calibration-evidence"
             for name in ("centres","ledger","bankReport"):
                 self.calibration_input(name)
             self.bank_controls = controls_module.build_packet()
@@ -1085,9 +1084,7 @@ if __name__ == "__main__":
     # Build and serialize the complete pair before publishing either output.
     # A missing/malformed Synthesis input must not leave Analysis regenerated.
     tracks = [Generator(video_id).build() for video_id in ("6dW6VYXp9HM", "8KmVDxkia_w")]
-    outputs = [(track, WEB / "content" / f'{track["source"]["videoId"]}.source-track.json',
-                json.dumps(track, separators=(",", ":"), allow_nan=False) + "\n")
-               for track in tracks]
+    outputs = [(track, *common.prepare_track(track)) for track in tracks]
     for track, path, contents in outputs:
         path.write_text(contents)
         print(f"{path.relative_to(ROOT)}: {len(track['shots'])} shots, {len(track['frames'])} compact frames, {sum(len(f['views']) for f in track['frames'])} views; coverage={track['coverage']['status']}; stages unmeasured")
