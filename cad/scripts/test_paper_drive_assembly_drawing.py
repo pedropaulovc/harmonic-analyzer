@@ -242,28 +242,69 @@ def test_sheet_two_shows_and_balloons_exactly_the_transgear() -> None:
         if stem != "transgear-removable"
     } | {"transgear-removable-1"}
     assert drawing.TRANSGEAR_INSTANCES == expected
-    assert set(drawing.TRANSGEAR_BALLOON_ANCHORS) == set(CONTRACT_TRANSGEAR_QUANTITIES)
+    # The collar alone has no batch anchor: it balloons on its rear rim.
+    anchored = set(CONTRACT_TRANSGEAR_QUANTITIES) - {drawing.COLLAR_STEM}
+    assert set(drawing.TRANSGEAR_BALLOON_ANCHORS) == anchored
     # The knob's T24 is instance 1; the crank T12 and the spare T18 stay off.
     assert drawing.TRANSGEAR_BALLOON_ANCHORS["transgear-removable"].instance == (
         "transgear-removable-1"
     )
 
 
-def test_collar_balloon_is_frozen_at_its_rear_rim_bottom_end() -> None:
+def test_the_collar_leader_lands_on_its_rear_rim_beside_the_lower_end() -> None:
     # The inner view sees the collar's rims edge-on from the right; hit tests
-    # missed their middles on farm runs 20261002T160324403Z and
-    # 20261002T164049933Z. The anchor sits at the rear rim's bottom end, past
-    # the drive-pin hole, so a leader slid to the rim's end stays in limit.
-    x, y, z = drawing.TRANSGEAR_BALLOON_ANCHORS["transgear-drive-collar"].point_mm
+    # missed them on farm runs 20261002T160324403Z, 20261002T164049933Z and
+    # 20261002T171234232Z. The leader lands past the drive-pin hole, so one
+    # re-solved to the rim line's nearer end stays in limit.
+    x, y, z = drawing.COLLAR_LANDING_MM
     radius = collar.OD / 2.0
-    assert math.hypot(x, y) == pytest.approx(radius, abs=1e-3)
+    assert math.hypot(x, y) == pytest.approx(radius, abs=1e-9)
     assert z == pytest.approx(collar.LENGTH)
     assert -y > collar.PIN_CIRCLE_RADIUS + collar.PIN_HOLE_DIA / 2.0
+    # Green run 20261001T172013211Z's 1:2 rear-rim line, -Y end to +Y end.
+    minus_end, plus_end = (0.21852, 0.171822), (0.21852, 0.180572)
+    landing = drawing.collar_rim_landing(minus_end, plus_end)
+    assert landing[0] == pytest.approx(0.21852)
+    assert landing[1] - minus_end[1] == pytest.approx((radius + y) / 2.0 / 1000.0)
     largest_scale = max(num / den for num, den in drawing.INNER_SCALE_LADDER)
     end_gap_m = (radius + y) * largest_scale / 1000.0
     assert end_gap_m < _drawing_common._BALLOON_LANDING_TOLERANCE_M / 2.0
     # Below the axis is away from the feed sleeve: its stud stands above the knob.
     assert assembly.STUD_XY[1] > assembly.KNOB_SHAFT_XY[1]
+
+
+def _circle(
+    z: float, radius: float, closest: tuple[float, float, float], axis_z: float = 1.0
+) -> drawing.RimCandidate:
+    return drawing.RimCandidate(
+        edge=object(),
+        circle=(0.0, 0.0, z, 0.0, 0.0, axis_z, radius),
+        closest_mm=closest,
+    )
+
+
+def test_the_collar_rim_matcher_takes_the_one_arc_holding_the_landing() -> None:
+    radius, z = collar.OD / 2.0, collar.LENGTH
+    landing = drawing.COLLAR_LANDING_MM
+    # The rear slot splits the rear rim: the -Y arc holds the landing, the +Y
+    # arc's nearest point is its end at the slot's wall.
+    lower = _circle(z, radius, landing)
+    slot_y = collar.SLOT_WIDTH / 2.0
+    upper = _circle(z, radius, (-math.sqrt(radius**2 - slot_y**2), slot_y, z))
+    front = _circle(0.0, radius, (landing[0], landing[1], 0.0))
+    bore = _circle(z, collar.BORE_DIA / 2.0, (landing[0] / 2, landing[1] / 2, z))
+    assert drawing.collar_rear_rim([front, upper, lower, bore]) is lower
+    # Either axis sense is the collar's.
+    flipped = _circle(z, radius, landing, axis_z=-1.0)
+    assert drawing.collar_rear_rim([front, flipped, upper]) is flipped
+    # 2 micrometres off the landing is another arc.
+    near = _circle(z, radius, (landing[0], landing[1] - 0.002, z))
+    with pytest.raises(RuntimeError, match=r"matched 0 of 4 circles: r 8\.7500"):
+        drawing.collar_rear_rim([front, upper, bore, near])
+    with pytest.raises(RuntimeError, match="matched 0 of 0 circles: none"):
+        drawing.collar_rear_rim([])
+    with pytest.raises(RuntimeError, match="matched 2 of 3 circles"):
+        drawing.collar_rear_rim([lower, flipped, upper])
 
 
 # The transgear families the sheet-2 isometric draws no reachable ink of (farm

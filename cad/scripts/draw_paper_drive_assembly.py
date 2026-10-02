@@ -19,8 +19,9 @@ import math
 import sys
 import textwrap
 from collections import Counter
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Iterable
+from typing import Any, Callable, Iterable, Sequence
 
 import _chain as chain
 import _config
@@ -46,16 +47,25 @@ import transgear_knob_shaft_spec as knob_shaft
 import transgear_knob_thrust_ring_spec as thrust_ring
 import transgear_pivot_screw_spec as pivot_screw
 import transgear_removable_spec as sprocket
-from _common import _early_bound, check, run_build
+from _common import _com_invoke, _early_bound, check, run_build
 from _paper_drive_explode import exploded_view_name
 from _drawing_common import (
     SIMPLIFIED_VIEW_CONFIGURATION,
     isolate_drawing_view_components,
     set_view_exploded_state,
     BalloonAnchor,
+    BalloonLanding,
     DrawingOutputs,
     ViewRole,
     _SW_SHADED_EDGES,
+    _VIEW_ENTITY_EDGE,
+    _AnchorChoice,
+    _anchor_model_points,
+    _create_component_bom_balloon,
+    _shown_instances,
+    _spread_balloons,
+    _view_component_leaves,
+    _view_explode_offsets,
     add_component_bom_balloons,
     apply_view_configuration,
     assert_balloon_landings,
@@ -63,6 +73,7 @@ from _drawing_common import (
     create_blank_drawing_sheets,
     finalize_drawing,
     insert_bom_table,
+    model_points_in_view,
     new_project_drawing,
     read_required_properties,
     rebuild_drawing,
@@ -71,7 +82,12 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
 from solidworks_mcp.adapters.com_variant import double_array
-from solidworks_mcp.adapters.solidworks.drawing import add_note, place_view
+from solidworks_mcp.adapters.solidworks.drawing import (
+    add_note,
+    place_view,
+    raw_visible_entities,
+    view_name,
+)
 
 
 SPEC = DRAWINGS_BY_NAME["paper_drive_assembly"]
@@ -404,28 +420,57 @@ TRANSGEAR_INSTANCES = frozenset(
     for stem, count in TRANSGEAR_QUANTITIES.items()
     for index in range(1, (1 if stem == "transgear-removable" else count) + 1)
 )
-# The drive collar's balloon (on the inner view, INNER_STEMS) is frozen at the
-# bottom end of its rear-face rim; y here is the collar's own (machine Y -
-# 256.89). From the right (camera at -X, sheet x along +Z) the rims are
-# circles seen edge-on: lines at sheet x 216.52 (front) and 218.52 (rear),
-# 1:2, y 171.82 to 180.57. Their middles hit-test unreliably: farm run
-# 20261002T160324403Z (swmaker000005) missed walk tries 1 to 7 at y +/-4.601
-# and +/-8.174 on both rims; try 8 hit (3.122, 8.174, 0), which try 3 had
-# missed, and its leader landed at the rim's top end, 0.288 mm up. Run
-# 20261002T164049933Z froze the rear-rim middle (7.443, -4.601, 4.0), on
-# visible ink in green run 20261001T172013211Z's sheet, and selected no edge.
-# Hits near a rim's end did hold: (-2.704, 8.322, 0) on runs
-# 20261001T075433Z and 20261001T092343Z. This point is 0.05 mm up from the
-# rear rim's bottom end (218.52, 171.82), where a leader slid to the end still
-# lands in limit. It is 0.23 mm below the pin hole's edge on the same line and
+# The drive collar's balloon (on the inner view, INNER_STEMS) attaches by
+# entity to its rear-face rim, never by a sheet hit test. From the right
+# (camera at -X, sheet x along +Z) the collar's rims are circles seen
+# edge-on: lines at sheet x 216.52 (front) and 218.52 (rear), 1:2, y 171.82
+# to 180.57. Hit tests on those lines are unreliable. On farm run
+# 20261002T160324403Z (swmaker000005) walk tries 1 to 7 at y +/-4.601 and
+# +/-8.174 missed both rims; try 8 hit (3.122, 8.174, 0), which try 3 had
+# missed, and its leader landed at the rim's top end, 0.288 mm up. A frozen
+# point then selected no edge on the rear rim's middle (7.443, -4.601, 4.0),
+# run 20261002T164049933Z (swmaker000005), nor 0.05 mm from its bottom end
+# (-1.319, -8.65, 4.0), run 20261002T171234232Z (swmaker00000a). So the rim
+# is named by its model geometry, as the disc hub's perpendicularity frames
+# name theirs: the circle on the collar's axis at z LENGTH, r OD/2, from the
+# edges the view lists for the collar. The rear slot (along local X) splits
+# it into a +Y and a -Y arc; the -Y arc holds the landing. That arc's middle,
+# (0, -r), projects onto the line's bottom end, and the leader lands
+# COLLAR_RIM_END_INSET up from it: a leader re-solved to the line's nearer
+# end, as run 20261002T160324403Z's was, stays 0.05 mm away at 1:2. The
+# landing is 0.23 mm below the drive-pin hole's edge on the same line and
 # 2.0 mm from the lower drive pin, which stands proud of the front face only.
 # The knob shaft's 12T is 2.2 mm away. The feed sleeve is all above the axis.
+COLLAR_STEM = "transgear-drive-collar"
+COLLAR_INSTANCE = f"{COLLAR_STEM}-1"
+COLLAR_RIM_RADIUS = collar.OD / 2.0
+COLLAR_RIM_Z = collar.LENGTH
+COLLAR_RIM_END_INSET = 0.1
+COLLAR_LANDING_Y = COLLAR_RIM_END_INSET - COLLAR_RIM_RADIUS
+# Collar-local mm: (-1.319, -8.650, 4.000).
+COLLAR_LANDING_MM = (
+    -math.sqrt(COLLAR_RIM_RADIUS**2 - COLLAR_LANDING_Y**2),
+    COLLAR_LANDING_Y,
+    COLLAR_RIM_Z,
+)
+# A listed circle is the rim within these of its modelled centre and radius,
+# its axis along the collar's (both senses), and the arc holding the landing
+# when its closest point to it is within 1e-6 m (draw_transgear_disc_hub's).
+_RIM_CENTER_TOL_MM = 1e-4
+_RIM_RADIUS_TOL_MM = 1e-4
+_RIM_AXIS_TOL = 1e-6
+_RIM_LANDING_TOL_MM = 1e-3
+# Seen edge-on, a rim's +/-X points project onto its line's midpoint; the
+# projection is exact to ~1e-9 m.
+_EDGE_ON_TOL_M = 1e-6
+# The collar has no anchor here: _balloon_collar_on_its_rear_rim places it.
 TRANSGEAR_BALLOON_ANCHORS = {
     stem: BalloonAnchor(instance="transgear-removable-1")
     if stem == "transgear-removable"
     else BalloonAnchor()
     for stem in TRANSGEAR_QUANTITIES
-} | {"transgear-drive-collar": BalloonAnchor((-1.319, -8.650, 4.000))}
+    if stem != COLLAR_STEM
+}
 # The families the isometric draws no reachable ink of (farm run
 # 20261001T051043622Z: none of the sleeve's 12 extreme points hit its ink, and
 # its 268 gear edges are past the edge fallback's 128), ballooned on the inner
@@ -486,6 +531,63 @@ def transgear_balloon_items(
     return (
         tuple(pair for pair in ordered if pair[0] not in INNER_STEMS),
         tuple(pair for pair in ordered if pair[0] in INNER_STEMS),
+    )
+
+
+@dataclass(frozen=True)
+class RimCandidate:
+    """One circular edge the inner view lists for the collar: its
+    ``ICurve.CircleParams`` (centre and radius in collar-local mm, the axis a
+    unit vector) and its ``IEdge.GetClosestPointOn`` the landing (mm)."""
+
+    edge: Any
+    circle: tuple[float, float, float, float, float, float, float]
+    closest_mm: tuple[float, float, float]
+
+
+def collar_rear_rim(candidates: Sequence[RimCandidate]) -> RimCandidate:
+    """The one listed arc of the collar's rear-face rim that holds the
+    landing; none or several raise, listing every circle the view lists."""
+    centre = (0.0, 0.0, COLLAR_RIM_Z)
+
+    def is_rim(candidate: RimCandidate) -> bool:
+        circle = candidate.circle
+        offset = sum(abs(a - b) for a, b in zip(circle[:3], centre))
+        return (
+            offset <= _RIM_CENTER_TOL_MM
+            and abs(circle[6] - COLLAR_RIM_RADIUS) <= _RIM_RADIUS_TOL_MM
+            and 1.0 - abs(circle[5]) <= _RIM_AXIS_TOL
+            and math.dist(candidate.closest_mm, COLLAR_LANDING_MM)
+            <= _RIM_LANDING_TOL_MM
+        )
+
+    matches = [candidate for candidate in candidates if is_rim(candidate)]
+    if len(matches) != 1:
+        listed = "; ".join(
+            "r {6:.4f} at ({0:.4f}, {1:.4f}, {2:.4f}) axis ({3:.3f}, {4:.3f}, {5:.3f})".format(
+                *candidate.circle
+            )
+            + f", {math.dist(candidate.closest_mm, COLLAR_LANDING_MM):.4f} from the landing"
+            for candidate in candidates
+        )
+        landing = ", ".join(f"{value:.3f}" for value in COLLAR_LANDING_MM)
+        raise RuntimeError(
+            f"{COLLAR_INSTANCE}: expected one listed rear-rim arc r "
+            f"{COLLAR_RIM_RADIUS:g} mm at z {COLLAR_RIM_Z:g} mm through ({landing}), "
+            f"matched {len(matches)} of {len(candidates)} circles: {listed or 'none'}"
+        )
+    return matches[0]
+
+
+def collar_rim_landing(
+    minus_end: tuple[float, float], plus_end: tuple[float, float]
+) -> tuple[float, float]:
+    """Where the collar's leader lands: the landing's y along the rear rim's
+    projected line, from its -Y end to its +Y end (sheet metres)."""
+    t = (COLLAR_LANDING_Y + COLLAR_RIM_RADIUS) / (2.0 * COLLAR_RIM_RADIUS)
+    return (
+        minus_end[0] + t * (plus_end[0] - minus_end[0]),
+        minus_end[1] + t * (plus_end[1] - minus_end[1]),
     )
 
 
@@ -1294,6 +1396,102 @@ def _link_view_to_bom(view: Any, table: Any, *, label: str) -> None:
         raise RuntimeError(f"{label}: view is not linked to BOM {name!r}")
 
 
+def _collar_rim_candidates(view: Any, leaf: Any) -> list[RimCandidate]:
+    """Every circular edge the view lists as drawn for the collar ``leaf``,
+    read in collar-local mm (the listed-edge fallback's part space)."""
+    landing_m = tuple(value / 1000.0 for value in COLLAR_LANDING_MM)
+    candidates = []
+    for edge in raw_visible_entities(view, leaf.component, _VIEW_ENTITY_EDGE):
+        curve = _com_invoke(edge, "IEdge", "GetCurve")
+        if curve is None or not _com_invoke(curve, "ICurve", "IsCircle"):
+            continue
+        params = tuple(
+            float(v) for v in (_com_invoke(curve, "ICurve", "CircleParams") or ())
+        )
+        closest = tuple(
+            float(v)
+            for v in (_com_invoke(edge, "IEdge", "GetClosestPointOn", *landing_m) or ())
+        )
+        if len(params) < 7 or len(closest) < 3:
+            raise RuntimeError(
+                f"{leaf.path}: a listed circle read params {params}, closest point {closest}"
+            )
+        cx, cy, cz, nx, ny, nz, radius = params[:7]
+        candidates.append(
+            RimCandidate(
+                edge=edge,
+                circle=(cx * 1e3, cy * 1e3, cz * 1e3, nx, ny, nz, radius * 1e3),
+                closest_mm=(closest[0] * 1e3, closest[1] * 1e3, closest[2] * 1e3),
+            )
+        )
+    return candidates
+
+
+@_telemetry.traced("drawing.collar_rim_balloon", label_param="label")
+def _balloon_collar_on_its_rear_rim(
+    adapter: Any, view: Any, *, item: str, label: str
+) -> BalloonLanding:
+    """The drive collar's balloon on its rear-face rim, selected by entity.
+
+    The rim is checked edge-on, then its leader lands at the landing's y
+    along the rim's projected line, and is proven there. The rim is a listed
+    edge selected through the view with its landing set: the ``shared-edge``
+    path of :func:`_create_component_bom_balloon`.
+    """
+    leaves = _view_component_leaves(adapter, view, label=label)
+    leaf = _shown_instances(
+        leaves, COLLAR_STEM, BalloonAnchor(instance=COLLAR_INSTANCE), label=label
+    )[0]
+    offsets = _view_explode_offsets(adapter, view, label=label)
+    r_m, z_m = COLLAR_RIM_RADIUS / 1000.0, COLLAR_RIM_Z / 1000.0
+    minus_end, plus_end, plus_x, minus_x = model_points_in_view(
+        adapter,
+        view,
+        _anchor_model_points(
+            adapter,
+            leaf,
+            ((0.0, -r_m, z_m), (0.0, r_m, z_m), (r_m, 0.0, z_m), (-r_m, 0.0, z_m)),
+            offsets,
+            stem=COLLAR_STEM,
+            label=label,
+        ),
+        label=f"{label} {COLLAR_STEM} rear rim",
+        names=("-Y end", "+Y end", "+X point", "-X point"),
+    )
+    middle = ((minus_end[0] + plus_end[0]) / 2.0, (minus_end[1] + plus_end[1]) / 2.0)
+    for side, point in (("+X", plus_x), ("-X", minus_x)):
+        if math.dist(point, middle) > _EDGE_ON_TOL_M:
+            raise RuntimeError(
+                f"{label}: {leaf.path}'s rear rim is not edge-on in the inner view: "
+                f"its {side} point projects to {point}, its line's midpoint is {middle}"
+            )
+    rim = collar_rear_rim(_collar_rim_candidates(view, leaf))
+    landing = collar_rim_landing(minus_end, plus_end)
+    _telemetry.info(
+        f"{label}: {leaf.path} rear rim projects from ({minus_end[0]:.5f}, "
+        f"{minus_end[1]:.5f}) at -Y to ({plus_end[0]:.5f}, {plus_end[1]:.5f}) at +Y; "
+        f"leader lands at ({landing[0]:.5f}, {landing[1]:.5f}); matched arc "
+        "r {6:.4f} at ({0:.4f}, {1:.4f}, {2:.4f}) axis ({3:.3f}, {4:.3f}, {5:.3f})".format(
+            *rim.circle
+        )
+        + ", closest point ({:.4f}, {:.4f}, {:.4f}) mm".format(*rim.closest_mm)
+    )
+    if not _early_bound(adapter.currentModel, "IDrawingDoc").ActivateView(
+        view_name(adapter, view)
+    ):
+        raise RuntimeError(f"{label}: failed to activate the collar's balloon view")
+    return _create_component_bom_balloon(
+        adapter,
+        view,
+        stem=COLLAR_STEM,
+        choice=_AnchorChoice(
+            instance=leaf.path, edge=rim.edge, method="shared-edge", sheet_xy=landing
+        ),
+        expected_item=item,
+        label=label,
+    )
+
+
 def _place_bom_sheet(
     adapter: Any, counts: Counter[str]
 ) -> tuple[list[Any], Any, dict[str, str]]:
@@ -1361,14 +1559,30 @@ def _place_bom_sheet(
         label="paper-drive transgear BOM coverage",
         margin=BALLOON_MARGIN,
     )
-    landings += add_component_bom_balloons(
+    # The collar balloons after the batch, so its balloon cannot cover a
+    # point the batch hit-tests; then all of the view's balloons re-ring.
+    balloons_label = "paper-drive transgear inner BOM coverage"
+    inner_landings = add_component_bom_balloons(
         adapter,
         inner,
-        items=inner_items,
+        items=tuple(pair for pair in inner_items if pair[0] != COLLAR_STEM),
         anchors=TRANSGEAR_BALLOON_ANCHORS,
-        label="paper-drive transgear inner BOM coverage",
+        label=balloons_label,
         margin=BALLOON_MARGIN,
     )
+    inner_landings.append(
+        _balloon_collar_on_its_rear_rim(
+            adapter, inner, item=dict(inner_items)[COLLAR_STEM], label=balloons_label
+        )
+    )
+    _spread_balloons(
+        adapter,
+        inner,
+        [landing.note for landing in inner_landings],
+        margin=BALLOON_MARGIN,
+    )
+    rebuild_drawing(adapter, label=f"{balloons_label} ring")
+    landings += inner_landings
     _place_sheet_note(
         adapter,
         SHEET_NAMES[1],
