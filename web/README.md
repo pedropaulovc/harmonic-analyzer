@@ -91,6 +91,20 @@ or replace the video ID with `8KmVDxkia_w` for Synthesis.
 Omitting `--video` still validates and prepares both Analysis/Synthesis outputs
 before publishing either.
 
+Analysis has bounded cumulative source-drive authority for the visible crank
+(79.8130667..86.6866 seconds) and mirrored bank (112.3122..119.0856333 seconds).
+The authoritative packets are
+[`6dW6VYXp9HM.visible-crank-motion.json`](content/6dW6VYXp9HM.visible-crank-motion.json),
+[`6dW6VYXp9HM.visible-crank-gauge.json`](content/6dW6VYXp9HM.visible-crank-gauge.json),
+[`6dW6VYXp9HM.automatic-motion.json`](content/6dW6VYXp9HM.automatic-motion.json)
+and [`6dW6VYXp9HM.motion-controls.json`](content/6dW6VYXp9HM.motion-controls.json).
+They separate observed relative motion from chosen native sign/home and hidden
+setup. Same-shot margins hold the nearest new input through the real cut;
+other shots, views and presentations retain their existing paths.
+[`DESIGN.md`](DESIGN.md#bounded-analysis-motion-authority) describes the gauges,
+source-specific producers and limits. These drives remain chosen approximations;
+source camera and geometry fidelity are unaccepted.
+
 `npm --prefix web run test:playback` exercises eight synthetic runtime decisions
 through Vite SSR, without a browser or GLB. `SOURCE_TRACK_MODULE` may point to
 a historical source-track module for a failing-before control; these tests

@@ -3,10 +3,18 @@
 
 Run from any directory with the tracked web/content calibration evidence:
   python web/scripts/generate-analysis-synthesis-source-tracks.py
-This retains numeric evidence and chooses continuous Analysis inverse cam roots.
-It loads no CAD/model/browser and does not qualify cameras, recover historical
-settings, or measure any matching stage. Original frozen root choices/costs remain
-immutable; alternative rod projections are predictions, never source observations.
+This retains numeric evidence and applies one conditional source-FIT cumulative
+bank drive only to Analysis analysis-22/bar-bank/horizontal-mirror. Its twenty
+phases/amplitudes/setup stay fixed; its endpoint is chosen-held to the same shot's
+end, not extrapolated or re-zeroed. Analysis analysis-16/main/native separately
+uses observed visible-crank relative cycles, approximate within-cycle phase and
+an explicitly chosen native sign/home under its unchanged existing camera.
+Its fixed chosen setup and first/last inputs hold over same-shot margins.
+Other Analysis inputs retain inverse-root continuation. It loads no CAD/model/
+browser and does not qualify cameras, recover physical shaft sign/home or
+historical settings, or measure any matching stage.
+Original frozen root choices/costs remain immutable historical diagnostics;
+alternative rod projections are predictions, never source observations.
 Synthesis presenter-to-spin retains one actual machine image with openly chosen
 principal-point/focal framing keys, not a second body or a measured camera fit.
 Synthesis cone-overview retains a two-FIT chosen perspective-camera similarity.
@@ -21,6 +29,7 @@ a physical trajectory; seed CPU diagnostics do not qualify held exposures/GPU.
 """
 from __future__ import annotations
 import argparse
+from bisect import bisect_left
 import copy
 import hashlib
 import importlib.util
@@ -38,6 +47,18 @@ CALIBRATION = "web/content/analysis-synthesis.frozen-generation-evidence.json"
 CALIBRATION_SHA256 = "425beca33506fcb307c3892808b7871a8ee2f06b7aa90f7103fc6993e6319267"
 FRAMING_GPU = "web/content/8KmVDxkia_w.framing-gpu-evidence-2026-10-01.json"
 FRAMING_GPU_SHA256 = "239cb59e799bbb42f6551b74c3b6cf1eccf66f9b0ec7c93518f743b37caf4173"
+AUTOMATIC_MOTION = "web/content/6dW6VYXp9HM.automatic-motion.json"
+AUTOMATIC_MOTION_SHA256 = "37e00fb2569363dedf22d99cdc54229138990934497239d8b7201b97da2f0cc8"
+MOTION_CONTROLS = "web/content/6dW6VYXp9HM.motion-controls.json"
+MOTION_CONTROLS_SHA256 = "208d4a18a5c152805015e48b8be227a1825c1c03497c0e9370be109d6ca4daab"
+VISIBLE_CRANK_MOTION = "web/content/6dW6VYXp9HM.visible-crank-motion.json"
+VISIBLE_CRANK_MOTION_SHA256 = "0433129092cb167a69d29b3a9712b81f5cb70701d173c97323c6045e33b827ba"
+VISIBLE_CRANK_GAUGE = "web/content/6dW6VYXp9HM.visible-crank-gauge.json"
+VISIBLE_CRANK_GAUGE_SHA256 = "6e58a2b704f81c211c31eb45a0c429521de114338e5e4c349ef74f9b509a973e"
+ANALYSIS_SOURCE_SHA256 = "5fc75341c088475bdcbad1764a8d99269f51bc287495063072a760a935319a52"
+ANALYSIS_MODEL_SHA256 = "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d"
+AUTOMATIC_NATIVE_MATH = ("web/src/mechanics.ts", "web/src/mechanics-data.ts",
+                         "web/src/kinematics.ts", "web/src/magnifier.ts")
 
 
 def load(path):
@@ -61,6 +82,13 @@ def same_camera(camera, baseline):
                 or any(not math.isclose(a,b,rel_tol=0.,abs_tol=1e-9) for a,b in zip(values,baseline[name]))):
             return False
     return True
+
+
+def visible_crank_source_image(row):
+    """Serialize the actual decoded identity without changing producer facts."""
+    image = row["sourceImage"]
+    return {"frameIndex":row["frameIndex"],"pixelFormat":"bgr8",
+            **{key:image[key] for key in ("sourceSha256","sha256Bgr8","width","height")}}
 
 
 def nearest(rows, time, key):
@@ -145,6 +173,13 @@ class Generator:
                 frame["landmarks"].extend(copy.deepcopy(control["landmarks"]))
                 frame.setdefault("unavailable", []).extend(copy.deepcopy(control["unavailable"]))
             self.data["compactChangeTimesSeconds"].extend(row["timeSeconds"] for row in controls.values())
+        self.automatic_motion = self.analysis_automatic_motion_packet() if self.analysis else None
+        if self.automatic_motion:
+            self.automatic_motion_frames = {row["frameIndex"]: row for row in self.automatic_motion["frames"]}
+            self.automatic_motion_times = [row["timeSeconds"] for row in self.automatic_motion["frames"]]
+            # Preserve the authority's exact native keys, not integer labels or
+            # rounded event seconds. Original decoded PTS/images stay untouched.
+            self.data["compactChangeTimesSeconds"].extend(self.automatic_motion_times)
         self.motion = self.calibration_input("motion")
         self.pinhole = self.calibration_input("pinhole")
         self.donors = load("web/content/XPQwKRt4Y2k.source-seeds.json")
@@ -210,6 +245,20 @@ class Generator:
         # Validate the producer's existing source-inspected layout normalization,
         # not the legacy outgoing/incoming layer guess retained in track.json.
         self.chosen_camera_permissions = self.chosen_camera_continuity_packet(video_id, permission_packet)
+        self.visible_crank_motion, self.visible_crank_gauge = None, None
+        if self.analysis:
+            self.visible_crank_motion, self.visible_crank_gauge = self.analysis_visible_crank_packet()
+            self.visible_crank_frames = {row["frameIndex"]:row for row in self.visible_crank_motion["frames"]}
+            self.visible_crank_times = [row["timeSeconds"] for row in self.visible_crank_motion["frames"]]
+            self.visible_crank_fixed_input = copy.deepcopy(self.visible_crank_gauge["baseChosenInput"])
+            self.visible_crank_fixed_input["setup"]["driveCrankOffsetTurns"] = self.visible_crank_gauge["chosenGauge"]["driveCrankOffsetTurns"]
+            for frame in self.data["frames"]:
+                row = self.visible_crank_frames.get(frame.get("decodedFrameIndex"))
+                if row and frame.get("sourceImage") is None:
+                    # Real decoded identities fill legacy omissions only after
+                    # every original identity conflict has been refused.
+                    frame["sourceImage"] = visible_crank_source_image(row)
+            self.data["compactChangeTimesSeconds"].extend(self.visible_crank_times)
 
     def chosen_camera_continuity_packet(self, video_id, packet):
         """Optional authored permissions, bounded by unchanged native source rows."""
@@ -271,6 +320,252 @@ class Generator:
             return record["data"]
         return load_pinned(record["retainedPath"], record["retainedSha256"],
                            f"Retained {name} calibration")[0]
+
+    def analysis_automatic_motion_packet(self):
+        """Load only pinned stdlib data; never import the extraction producer."""
+        try:
+            packet, _ = load_pinned(AUTOMATIC_MOTION, AUTOMATIC_MOTION_SHA256,
+                                    "Analysis automatic motion")
+            controls, _ = load_pinned(MOTION_CONTROLS, MOTION_CONTROLS_SHA256,
+                                      "Analysis automatic motion controls")
+            self.validate_analysis_automatic_motion(packet, controls)
+        except (OSError, KeyError, TypeError, AttributeError) as error:
+            raise ValueError("Analysis automatic motion authority is missing or malformed.") from error
+        return packet
+
+    def validate_analysis_automatic_motion(self, packet, controls):
+        """Refuse unsupported authority without changing FIT/CHECK or source rows."""
+        interval = packet["interval"]
+        expected_interval = {
+            "startSeconds":112.3122, "endSeconds":119.08563333333333,
+            "firstNativeFrameIndex":3366, "lastNativeFrameIndex":3569,
+            "nativeFrameCount":204, "shotId":"analysis-22", "viewId":"bar-bank",
+            "presentation":"horizontal-mirror"}
+        authority, source = packet["authority"], self.data["source"]
+        if (packet["schemaVersion"] != 1 or packet["kind"] != "source-fit-coherent-bank-drive"
+                or packet["videoId"] != "6dW6VYXp9HM" or interval != expected_interval
+                or controls["schemaVersion"] != 1
+                or controls["kind"] != "analysis-coherent-motion-immutable-source-controls"
+                or controls["videoId"] != packet["videoId"]
+                or source["videoId"] != packet["videoId"]
+                or source["sha256"] != ANALYSIS_SOURCE_SHA256
+                or authority["videoSha256"] != source["sha256"]
+                or source["fps"] != {"numerator":30000,"denominator":1001}
+                or [source["width"],source["height"]] != [1920,1080]
+                or authority["nativeModelSha256"] != ANALYSIS_MODEL_SHA256
+                or self.data["model"]["sha256"] != ANALYSIS_MODEL_SHA256
+                or self.native["modelSha256"] != ANALYSIS_MODEL_SHA256
+                or authority["controls"] != {"path":MOTION_CONTROLS,"sha256":MOTION_CONTROLS_SHA256}
+                or authority["physicalCrankDirection"] != "unobservable"
+                or authority["absolutePhysicalCrankPhase"] != "unobservable"
+                or packet["integration"]["stageAcceptance"] is not False
+                or packet["diagnostics"]["positiveGaugeChosenNotSourceSign"] is not True):
+            raise ValueError("Analysis automatic motion source/model/scope authority is unsupported.")
+        shot = self.shots[interval["shotId"]]
+        if (shot["startDecodedFrameIndex"] != 3366
+                or not math.isclose(shot["startSeconds"],interval["startSeconds"],abs_tol=1e-9,rel_tol=0.)
+                or not math.isclose(shot["endSeconds"],124.49103333333333,abs_tol=1e-9,rel_tol=0.)):
+            raise ValueError("Analysis automatic motion must end inside the unchanged analysis-22 shot.")
+        smoke = packet["diagnostics"]["nativeForwardSmoke"]
+        hashes = smoke["nativeMathSha256"]
+        if (set(hashes) != set(AUTOMATIC_NATIVE_MATH)
+                or smoke["status"] != "all-native-inputs-solved" or smoke["sourceExposures"] != 204
+                or any(hashlib.sha256((ROOT / path).read_bytes()).hexdigest() != hashes[path]
+                       for path in AUTOMATIC_NATIVE_MATH)):
+            raise ValueError("Analysis automatic motion native math authority changed.")
+        frozen = controls["frozenCandidate"]
+        if (any(frozen[key] != self.candidate[key] for key in (
+                "geometryAuthority","nativeCameraRecord","analyticMirroredCameraParameters"))
+                or frozen["geometryAuthority"]["originalGlbSha256"] != ANALYSIS_MODEL_SHA256
+                or controls["nativeLandmarkAnchors"] != self.request["nativeLandmarkAnchors"]
+                or controls["nativeRest"]["authority"]["model"]["expectedSha256"] != ANALYSIS_MODEL_SHA256
+                or controls["nativeRest"]["authority"]["model"]["observedSha256"] != ANALYSIS_MODEL_SHA256):
+            raise ValueError("Analysis automatic motion frozen native camera/geometry association changed.")
+        if controls["sourceFits"]["frames"] != self.calibration_input("centres")["frames"]:
+            raise ValueError("Analysis automatic motion raw source FIT controls changed.")
+        rest = controls["nativeRest"]["rest"]
+        if (controls["nativeRest"]["channel"]["count"] != 20 or len(rest) != 20
+                or {row["partPath"] for row in rest} != {
+                    f"harmonic-analyzer/channel/rocker-arm-{station}" for station in range(1,21)}
+                or any(len(row["restWorldMatrix"]) != 16
+                       or any(type(value) not in (int,float) or not math.isfinite(value)
+                              for value in row["restWorldMatrix"]) for row in rest)):
+            raise ValueError("Analysis automatic motion needs the complete static twenty-station native rest.")
+        fixed = packet["fixedInput"]
+        compact = common.compact_input(fixed)
+        numbers = [compact["crankTurns"],compact["magnification"]] + compact["phases"] + compact["amplitudes"] + list(compact["setup"].values())
+        if (fixed != compact or any(type(value) not in (int,float) or not math.isfinite(value) for value in numbers)
+                or fixed["crankTurns"] != 0 or fixed["setup"]["coneSwingRad"] != 0
+                or any(fixed[key] != self.candidate["frames"][0]["chosenInput"][key]
+                       for key in ("amplitudes","gearing","magnification","setup"))):
+            raise ValueError("Analysis automatic motion needs one finite complete fixed native input.")
+        correspondence = [
+            {"sourceStation":station,"harmonic":station,"nativeStationIndex":20-station,
+             "nativePartPath":f"harmonic-analyzer/channel/rocker-arm-{21-station}"}
+            for station in range(1,21)]
+        if packet["stationCorrespondence"] != correspondence:
+            raise ValueError("Analysis automatic motion source/native station association changed.")
+        rows, fits, frozen_rows = packet["frames"], controls["sourceFits"]["frames"], frozen["frames"]
+        if (len(rows) != 204 or len(fits) != 204 or len(frozen_rows) != 204
+                or len(self.candidate["frames"]) != 204):
+            raise ValueError("Analysis automatic motion requires every original native exposure.")
+        original_rows = {}
+        for frame in self.data["frames"]:
+            index = frame.get("decodedFrameIndex")
+            if index is not None and 3366 <= index <= 3569:
+                original_rows.setdefault(index,[]).append(frame)
+        anchors = {anchor["id"]:anchor for anchor in self.request["nativeLandmarkAnchors"]}
+        for offset, (row,fit,old,current) in enumerate(zip(rows,fits,frozen_rows,self.candidate["frames"])):
+            index, time = 3366+offset, row["timeSeconds"]
+            image = row["sourceImage"]
+            if (type(row["frameIndex"]) is not int or row["frameIndex"] != index
+                    or fit["frameIndex"] != index or old["frameIndex"] != index or current["frameIndex"] != index
+                    or type(time) not in (int,float) or not math.isfinite(time)
+                    or not math.isclose(time,index/(30000/1001),rel_tol=0.,abs_tol=1e-9)
+                    or fit["timeSeconds"] != time or fit["sourceImage"] != image
+                    or current["sourceFrameIdentity"] != {"frameIndex":index,"timeSeconds":time,"sourceImage":image}
+                    or any(old[key] != current[key] for key in old)
+                    or image["frameIndex"] != index or image["sourceSha256"] != ANALYSIS_SOURCE_SHA256
+                    or [image["width"],image["height"]] != [1920,1080] or image["pixelFormat"] != "bgr8"
+                    or not isinstance(image["sha256Bgr8"],str) or len(image["sha256Bgr8"]) != 64
+                    or any(char not in "0123456789abcdef" for char in image["sha256Bgr8"])
+                    or type(row["crankTurns"]) not in (int,float) or not math.isfinite(row["crankTurns"])
+                    or len(row["rockerAnglesRad"]) != 20
+                    or any(type(angle) not in (int,float) or not math.isfinite(angle) for angle in row["rockerAnglesRad"])):
+                raise ValueError(f"Analysis automatic motion native exposure authority changed at {index}.")
+            originals = original_rows.get(index,[])
+            if (not originals or not any(math.isclose(frame["timeSeconds"],time,rel_tol=0.,abs_tol=1e-9) for frame in originals)
+                    or any(frame["shotId"] != interval["shotId"] or frame.get("sourceImage") != image
+                           or not math.isclose(frame["decodedTimeSeconds"],time,rel_tol=0.,abs_tol=1e-9)
+                           for frame in originals)):
+                raise ValueError(f"Analysis automatic motion original source identity is missing or changed at {index}.")
+            stations = fit["physicalFaceCentroids"]
+            if (len(stations) != 20
+                    or any(point["sourceStation"] != station["sourceStation"]
+                           or point["nativePartPath"] != station["nativePartPath"]
+                           or anchors[f"station-{station['sourceStation']}-cap-centre"]["partPath"] != station["nativePartPath"]
+                           for point,station in zip(stations,correspondence))):
+                raise ValueError(f"Analysis automatic motion FIT/native association changed at {index}.")
+        if (rows[0]["timeSeconds"] != interval["startSeconds"] or rows[-1]["timeSeconds"] != interval["endSeconds"]
+                or rows[0]["crankTurns"] != 0
+                or any(b["crankTurns"] < a["crankTurns"]-1e-12 for a,b in zip(rows,rows[1:]))):
+            raise ValueError("Analysis automatic motion cumulative positive gauge is invalid.")
+
+    def analysis_visible_crank_packet(self):
+        try:
+            packet, _ = load_pinned(VISIBLE_CRANK_MOTION,VISIBLE_CRANK_MOTION_SHA256,
+                                    "Analysis visible crank motion")
+            gauge, _ = load_pinned(VISIBLE_CRANK_GAUGE,VISIBLE_CRANK_GAUGE_SHA256,
+                                   "Analysis chosen visible crank projection gauge")
+            self.validate_analysis_visible_crank(packet)
+            self.validate_analysis_visible_crank_gauge(packet,gauge)
+        except (OSError, KeyError, TypeError, AttributeError) as error:
+            raise ValueError("Analysis visible crank authority is missing or malformed.") from error
+        return packet, gauge
+
+    def validate_analysis_visible_crank_gauge(self, packet, gauge):
+        chosen, association, qualification = gauge["chosenGauge"], gauge["cameraAssociation"], gauge["qualification"]
+        if (gauge["schemaVersion"] != 1 or gauge["kind"] != "chosen-visible-crank-projection-gauge"
+                or gauge["videoId"] != packet["source"]["videoId"] or gauge["interval"] != packet["interval"]
+                or gauge["sourceMotion"] != {"path":VISIBLE_CRANK_MOTION,"sha256":VISIBLE_CRANK_MOTION_SHA256}
+                or gauge["chosenInputSource"] != {
+                    "path":MOTION_CONTROLS,"sha256":MOTION_CONTROLS_SHA256,
+                    "jsonPointer":"/frozenCandidate/frames/0/chosenInput","historicalSetupRecovered":False}
+                or chosen != {"nativeSign":-1,"shotLocalOffsetTurns":0.7118017231396382,
+                    "driveCrankOffsetTurns":0.7118017231396382,"kind":"chosen-under-existing-camera",
+                    "historicalNativeSignIdentified":False,"historicalNativeHomeIdentified":False,
+                    "initialBankPoseRetainedByChosenLag":True}
+                or gauge["modelSha256"] != ANALYSIS_MODEL_SHA256
+                or gauge["baseChosenInput"] != self.analysis_snapshots[0]["chosenInput"]
+                or common.compact_input(gauge["baseChosenInput"]) != gauge["baseChosenInput"]
+                or association["shotId"] != "analysis-16" or association["viewId"] != "main"
+                or association["presentation"] != "native" or association["referenceSourceTimeSeconds"] != 80
+                or association["kind"] != "existing-chosen-component-framing"
+                or association["sourceNativeCameraQualified"] is not False
+                or qualification["stageAcceptance"] is not False or qualification["GPUQualification"] != "UNEXECUTED"
+                or qualification["sourceAuthorityUnchanged"] is not True
+                or qualification["sourceSelectedNativeSign"] is not None
+                or qualification["sourceAbsoluteNativeHomeTurns"] is not None):
+            raise ValueError("Analysis visible crank gauge must remain a chosen, shot-local native association.")
+        hashes = gauge["nativeMathSha256"]
+        if (set(hashes) != set(AUTOMATIC_NATIVE_MATH)
+                or any(hashlib.sha256((ROOT / path).read_bytes()).hexdigest() != hashes[path]
+                       for path in AUTOMATIC_NATIVE_MATH)):
+            raise ValueError("Analysis visible crank native math proof authority changed.")
+        frame = next(frame for frame in self.data["frames"]
+                     if frame["shotId"] == "analysis-16" and frame["timeSeconds"] == 80)
+        view = next(view for view in common.source_views(frame,self.data) if view["id"] == "main")
+        camera, _ = self.camera(frame,view,self.family(frame,view))
+        if association["camera"] != camera:
+            raise ValueError("Analysis visible crank chosen gauge no longer has its unchanged existing camera.")
+        controls = {row["nativeSign"]:row for row in gauge["positiveControls"]}
+        if (set(controls) != {-1,1} or len(gauge["positiveControls"]) != 2
+                or any(row["actualNativeInputsSolved"] != 207 for row in controls.values())
+                or controls[-1]["projectedDirection"] != "clockwise"
+                or controls[-1]["originalPixelSignedOrbitAreaPx2"] <= 0
+                or controls[1]["projectedDirection"] != "counterclockwise"
+                or controls[1]["originalPixelSignedOrbitAreaPx2"] >= 0):
+            raise ValueError("Analysis visible crank chosen gauge lacks its actual native winding positive control.")
+
+    def validate_analysis_visible_crank(self, packet):
+        source, interval, authority = packet["source"], packet["interval"], packet["authority"]
+        if (packet["schemaVersion"] != 1 or packet["kind"] != "shot-local-visible-main-crank-relative-motion"
+                or source["videoId"] != "6dW6VYXp9HM" or source["sha256"] != ANALYSIS_SOURCE_SHA256
+                or source["fps"] != {"numerator":30000,"denominator":1001}
+                or [source["width"],source["height"]] != [1920,1080] or source["ptsTimeBase"] != "1/30000"
+                or any(source[key] != self.data["source"][key] for key in ("videoId","sha256","fps","width","height"))
+                or interval["shotId"] != "analysis-16" or interval["shotBoundsSeconds"] != [79.44603333333333,87.02026666666667]
+                or interval["firstFrameIndex"] != 2392 or interval["lastFrameIndex"] != 2598
+                or interval["startSeconds"] != 79.81306666666667 or interval["endSeconds"] != 86.6866
+                or interval["continuousNativeFrames"] is not True
+                or authority["nativeSignCandidates"] != [-1,1] or authority["selectedNativeSign"] is not None
+                or authority["absoluteNativeHomeTurns"] is not None or authority["phaseTransferToOtherShots"] is not False):
+            raise ValueError("Analysis visible crank source/scope authority is unsupported.")
+        shot = self.shots["analysis-16"]
+        if (shot["startDecodedFrameIndex"] != 2381
+                or any(not math.isclose(shot[key],value,rel_tol=0.,abs_tol=1e-9)
+                       for key,value in zip(("startSeconds","endSeconds"),interval["shotBoundsSeconds"]))):
+            raise ValueError("Analysis visible crank authority requires the unchanged original shot.")
+        lineage = packet["lineage"]
+        for prefix in ("nativeGeometry","kinematics"):
+            path = lineage[f"{prefix}Path"]
+            expected = "web/src/mechanics-data.ts" if prefix == "nativeGeometry" else "web/src/kinematics.ts"
+            if path != expected or hashlib.sha256((ROOT / path).read_bytes()).hexdigest() != lineage[f"{prefix}Sha256"]:
+                raise ValueError("Analysis visible crank native geometry authority changed.")
+        rows = packet["frames"]
+        if len(rows) != 207:
+            raise ValueError("Analysis visible crank requires all207 native source exposures.")
+        originals = {}
+        for frame in self.data["frames"]:
+            index = frame.get("decodedFrameIndex")
+            if index is not None and 2392 <= index <= 2598:
+                originals.setdefault(index,[]).append(frame)
+        for offset,row in enumerate(rows):
+            index, time, image = 2392+offset, row["timeSeconds"], row["sourceImage"]
+            if (type(row["frameIndex"]) is not int or row["frameIndex"] != index
+                    or type(time) not in (int,float) or not math.isfinite(time)
+                    or not math.isclose(time,index/(30000/1001),rel_tol=0.,abs_tol=1e-9)
+                    or image["format"] != "bgr8" or image["pts"] != index*1001
+                    or image["sourceSha256"] != ANALYSIS_SOURCE_SHA256
+                    or [image["width"],image["height"]] != [1920,1080]
+                    or not isinstance(image["sha256Bgr8"],str) or len(image["sha256Bgr8"]) != 64
+                    or any(char not in "0123456789abcdef" for char in image["sha256Bgr8"])
+                    or type(row["relativeCrankTurns"]) not in (int,float) or not math.isfinite(row["relativeCrankTurns"])):
+                raise ValueError(f"Analysis visible crank source native authority changed at {index}.")
+            identity = visible_crank_source_image(row)
+            exposures = originals.get(index,[])
+            if (not exposures or not any(math.isclose(frame["timeSeconds"],time,rel_tol=0.,abs_tol=1e-9) for frame in exposures)
+                    or any(frame["shotId"] != "analysis-16"
+                           or not math.isclose(frame["decodedTimeSeconds"],time,rel_tol=0.,abs_tol=1e-9)
+                           or frame.get("sourceImage") is not None and frame["sourceImage"] != identity
+                           for frame in exposures)):
+                raise ValueError(f"Analysis visible crank original source identity conflicts at {index}.")
+        if (rows[0]["timeSeconds"] != interval["startSeconds"] or rows[-1]["timeSeconds"] != interval["endSeconds"]
+                or rows[0]["relativeCrankTurns"] != 0
+                or packet["integration"]["relativeZero"] != {
+                    "frameIndex":2392,"timeSeconds":79.81306666666667,"turns":0,
+                    "meaning":"first observed exposure, not shaft home"}):
+            raise ValueError("Analysis visible crank source-relative zero/domain changed.")
 
     def analysis_held_camera_packet(self):
         """Pin original own-shot evidence before any generated controls mutate it."""
@@ -597,7 +892,8 @@ class Generator:
             raise ValueError("Chosen cam-rod source/native/code/intrinsics lineage differs")
         frame = next(frame for frame in self.data["frames"]
                      if frame["shotId"] == "cam-rod" and frame["timeSeconds"] == 100)
-        value, _ = self.input(frame,"cone")
+        original = next(view for view in common.source_views(frame,self.data) if view["id"] == "main")
+        value, _ = self.input(frame,"cone",original)
         if common.compact_input(value) != lineage["completeInput"]:
             raise ValueError("Chosen cam-rod world capture complete input differs from current seed")
         snapshot, capture = receipt["snapshot"], receipt["renderedLandmarks"]
@@ -857,7 +1153,7 @@ class Generator:
         return look_camera(target,yaw,elevation,span,aspect), f"Chosen {family} crop: immutable native component bounds, source shot/view identity and front/rear/side/overhead description. Assumed30deg focal,25% framing margin, yaw/elevation and turntable cadence where no measured camera exists; no source-pixel fit claimed."
 
     def continue_analysis_roots(self):
-        """Continue the latent cam branch, not the independently fitted rocker pose.
+        """Retain historical inverse-root continuity for fallback inputs only.
 
         Both genuine inverse roots retain each recorded rocker endpoint. Choosing
         the lowest rod-pixel cost independently can switch between those roots
@@ -865,6 +1161,8 @@ class Generator:
         Seed each channel from its first frozen choice, then take the genuine
         root nearest its preceding cam angle. This is a chosen continuity rule,
         not recovered crank direction; cumulative crank/setup inputs are retained.
+        The automatic bank/visible-crank scopes supersede independent posing;
+        this retained diagnostic is not their drive or a new runtime proof.
         """
         root_record = self.calibration["inputs"]["roots"]
         fit = self.calibration_input("roots")
@@ -938,13 +1236,88 @@ class Generator:
                                              "originalArtifact":"historical-reference-only"},
             "frozenSourceFitCeilingPx":ceiling,
             "interpretation":"Original independent root selection and costs remain frozen. Continued latent cam/rod orientations are chosen; recorded rocker endpoints are unchanged. Rod axes are inherited static predictions, NOT observations or current native/GPU qualification. All original connecting-rod source controls remain required.",
+            "application":"Historical inverse-pose diagnostic and unchanged fallback outside the automatic bank/visible-crank scopes; not the current drive inside either scope.",
             "sourceAcceptance":False, "historyRecovered":False,
             "currentNativeQualification":"UNEXECUTED", "changedFrames":changes}
         return snapshots, diagnostics
 
-    def input(self, frame, family):
+    def analysis_automatic_motion_input(self, frame, family, view):
+        if (not self.automatic_motion or family != "bar"
+                or frame["shotId"] != "analysis-22" or view["id"] != "bar-bank"
+                or view.get("presentation","native") != "horizontal-mirror"):
+            return None
+        packet, time = self.automatic_motion, frame["decodedTimeSeconds"]
+        rows = packet["frames"]
+        if time < rows[0]["timeSeconds"] or time >= self.shots["analysis-22"]["endSeconds"]:
+            return None
+        direct = view.get("camera")
+        if direct and common.compact_camera(direct) != common.compact_camera(self.candidate["nativeCameraRecord"]):
+            raise ValueError("Analysis automatic motion cannot replace its frozen camera association.")
+        value = copy.deepcopy(packet["fixedInput"])
+        native = self.automatic_motion_frames.get(frame.get("decodedFrameIndex"))
+        if native:
+            if (frame.get("sourceImage") != native["sourceImage"]
+                    or not math.isclose(time,native["timeSeconds"],rel_tol=0.,abs_tol=1e-9)):
+                raise ValueError("Analysis automatic motion input requires its exact native source identity.")
+            value["crankTurns"] = native["crankTurns"]
+            note = "Exact native exposure conditional source-FIT cumulative bank drive."
+        elif time > rows[-1]["timeSeconds"]:
+            value["crankTurns"] = rows[-1]["crankTurns"]
+            note = "CHOSEN unmeasured same-shot endpoint hold after the last source-FIT native exposure through analysis-22's actual end. This packet endpoint is NOT a cut; no cadence extrapolation or blend back to zero/inverse phases."
+        else:
+            upper = bisect_left(self.automatic_motion_times,time)
+            if self.automatic_motion_times[upper] == time:
+                value["crankTurns"] = rows[upper]["crankTurns"]
+            else:
+                left, right = rows[upper-1], rows[upper]
+                fraction = (time-left["timeSeconds"])/(right["timeSeconds"]-left["timeSeconds"])
+                value["crankTurns"] = left["crankTurns"] + fraction*(right["crankTurns"]-left["crankTurns"])
+            note = "Linear cumulative conditional source-FIT bank drive in actual source seconds between the two surrounding native authority exposures; no interpolated source image or CHECK."
+        return value, note+" Twenty phases/amplitudes and complete setup are fixed, with the original mirrored FIT camera and source/native station association unchanged. Positive effective-bank gauge is chosen; physical shaft sign/home and historical settings remain unobservable. No camera, GPU or stage qualification."
+
+    def analysis_visible_crank_input(self, frame, family, view):
+        if (not self.visible_crank_motion or family != "cone"
+                or frame["shotId"] != "analysis-16" or view["id"] != "main"
+                or view.get("presentation","native") != "native"):
+            return None
+        time, rows = frame["decodedTimeSeconds"], self.visible_crank_motion["frames"]
+        shot = self.shots["analysis-16"]
+        if not shot["startSeconds"] <= time < shot["endSeconds"]:
+            return None
+        camera, _ = self.camera(frame,view,family)
+        if camera != self.visible_crank_gauge["cameraAssociation"]["camera"]:
+            raise ValueError("Analysis visible crank cannot change its chosen existing camera association.")
+        native = self.visible_crank_frames.get(frame.get("decodedFrameIndex"))
+        if native:
+            if (frame.get("sourceImage") != visible_crank_source_image(native)
+                    or not math.isclose(time,native["timeSeconds"],rel_tol=0.,abs_tol=1e-9)):
+                raise ValueError("Analysis visible crank input requires its exact decoded source identity.")
+            relative, note = native["relativeCrankTurns"], "Exact observed source-native visible-crank relative-motion key; within-cycle phase remains an affine-ellipse approximation."
+        elif time < rows[0]["timeSeconds"] or time > rows[-1]["timeSeconds"]:
+            relative = rows[0]["relativeCrankTurns"] if time < rows[0]["timeSeconds"] else rows[-1]["relativeCrankTurns"]
+            note = "CHOSEN unmeasured first/last visible-crank input held over this same shot's unmeasured margin; no cadence extrapolation, artificial cut or blend to the old zero drive."
+        else:
+            upper = bisect_left(self.visible_crank_times,time)
+            if self.visible_crank_times[upper] == time:
+                relative = rows[upper]["relativeCrankTurns"]
+            else:
+                left, right = rows[upper-1], rows[upper]
+                fraction = (time-left["timeSeconds"])/(right["timeSeconds"]-left["timeSeconds"])
+                relative = left["relativeCrankTurns"] + fraction*(right["relativeCrankTurns"]-left["relativeCrankTurns"])
+            note = "Linear relative-crank interpolation in actual source seconds between adjacent native observations; approximate within-cycle phase, never interpolated source controls."
+        value, chosen = copy.deepcopy(self.visible_crank_fixed_input), self.visible_crank_gauge["chosenGauge"]
+        value["crankTurns"] = chosen["nativeSign"]*relative + chosen["shotLocalOffsetTurns"]
+        return value, note+" Image-plane clockwise winding and cycle periods are observed, but native -1 sign and shot-local offset are CHOSEN under the unchanged existing unqualified camera. Source sign/home remain null. One existing chosen-feasible twenty-phase/amplitude/setup witness and constant chosen drive lag are held, explicitly unobserved; no phase transfer to other shots or camera/GPU/stage claim. Bottom-hold localization noise is not physical instantaneous shaft speed."
+
+    def input(self, frame, family, view):
         time = frame["decodedTimeSeconds"]
         if self.analysis:
+            visible = self.analysis_visible_crank_input(frame,family,view)
+            if visible is not None:
+                return visible
+            automatic = self.analysis_automatic_motion_input(frame,family,view)
+            if automatic is not None:
+                return automatic
             snapshots = self.analysis_snapshots
             first, last = snapshots[0]["sourceFrameIdentity"]["timeSeconds"], snapshots[-1]["sourceFrameIdentity"]["timeSeconds"]
             if family == "bar" and first <= time <= last:
@@ -954,7 +1327,7 @@ class Generator:
             # nearest independently source-fitted complete input outside204 rather
             # than synthesizing a cadence, cosine sweep or coefficient history.
             row = snapshots[0] if time < first else snapshots[-1]
-            return copy.deepcopy(row["chosenInput"]), "Nearest endpoint complete51 source-FIT witness with the same chosen inverse cam-root continuation held outside measured204 bank exposures. Source-visible crank/coefficient trajectory in this different shot remains unmeasured; no generic cosine animation or historical input recovery claimed."
+            return copy.deepcopy(row["chosenInput"]), "Nearest endpoint complete51 source-FIT witness with the same chosen inverse cam-root continuation held outside the eligible automatic bank/visible-crank domains and views. Source-visible crank/coefficient trajectory remains unmeasured; no generic cosine animation or historical input recovery claimed."
         if family in ("pen","wheel") and 264.01375 <= time <= 269.01875:
             row = nearest(self.motion["rows"],time,lambda x:x["nativePtsSeconds"])
             return copy.deepcopy(row["input"]), "Immutable Source6330..6450 conditional complete51 relative pen/wheel-motion input. Hidden collar is a chosen trajectory; absolute spoke/input history and full435 association remain unqualified."
@@ -1005,7 +1378,7 @@ class Generator:
                 continue
             family = self.family(frame,original)
             camera, camera_note = self.camera(frame,original,family)
-            value, input_note = self.input(frame,family)
+            value, input_note = self.input(frame,family,original)
             camera, camera_note = self.synthesis_coarse_camera(frame,original,camera,camera_note)
             camera, camera_note = self.synthesis_wheel_camera(frame,original,camera,camera_note)
             view = {"id":original["id"], "rectSourcePixels":original["rectSourcePixels"],
@@ -1024,7 +1397,7 @@ class Generator:
             f = max(0.,min(1.,(frame["timeSeconds"]-s["startSeconds"])/(s["endSeconds"]-s["startSeconds"])))
             width = max(1.,1920*f)
             original = {"id":"bar-bank", "rectSourcePixels":[1920-width,0,width,1080], "presentation":"native"}
-            family="bar";camera,note=self.camera(frame,original,family);value,why=self.input(frame,family)
+            family="bar";camera,note=self.camera(frame,original,family);value,why=self.input(frame,family,original)
             output.append({**original,"camera":camera,"input":common.compact_input(value),"provenance":common.chosen_provenance(note+" "+why+" Expanding insert layout inferred linearly from the independently retained shot onset/settle; rectangle is chosen, not measured.")})
         fades = {"analysis-13":("spring","pen"), "analysis-15":("pen","cone"), "analysis-28":("spring","pen")}
         if self.analysis and frame["shotId"] in fades:
@@ -1035,7 +1408,7 @@ class Generator:
                 original = {"id":("outgoing","incoming")[index], "rectSourcePixels":[0,0,1920,1080], "presentation":"native"}
                 target,span = self.envelope(family,1920/1080)
                 camera = look_camera(target,-math.pi/2 if family != "pen" else 0.,0.16,span,1920/1080)
-                value,note = self.input(frame,family)
+                value,note = self.input(frame,family,original)
                 output.append({**original,"camera":camera,"input":common.compact_input(value),
                     "sourceViewIds":["main"],
                     "sourceViewMappingEvidence":f"Retained observations for {frame['shotId']} describe one full-canvas main source image during the dissolve. The outgoing/incoming layers are this producer's authored decomposition of that same image into the ordered {fades[frame['shotId']][0]}/{fades[frame['shotId']][1]} perspectives, not independent measured source-view identities; source boundaries choose linear opacity, not recovered edit weights.",
@@ -1095,7 +1468,60 @@ class Generator:
             track["sourceMeasurements"]["blockers"].append("Analysis bank CHECKs cover exact204 exposures112.3122..119.085633333s;2690 original corner nulls remain unavailable. Other moving mechanism/pen/crank controls outside that window are not inferred.")
             track["evidence"]["notes"].extend(self.bank_controls["evidence"]["notes"][1:])
             track["cpuDiagnostics"]["analysisRootContinuity"] = self.analysis_continuity
-            track["evidence"]["notes"].append("Analysis independent source FIT roots can exchange indistinguishable rocker-pose branches. Playback chooses nearest-previous genuine inverse roots; observed rocker endpoints and all source controls stay unchanged. Original per-exposure rod-cost choices remain immutable; alternative cam/rod endpoint orientations and between-exposure continuity are chosen, not recovered or source-certified.")
+            track["evidence"]["notes"].append("Original Analysis independent FIT inverse roots and nearest-previous continuation remain immutable historical diagnostics and the fallback for other views/shots. The eligible analysis-22/bar-bank/horizontal-mirror interval instead uses one source-FIT cumulative bank drive with twenty fixed phases/amplitudes/setup. Original source controls, CHECK roles and camera/layout stay unchanged; neither drive nor root ambiguity recovers physical shaft sign/home.")
+            motion = self.automatic_motion
+            domain = {**copy.deepcopy(motion["interval"]),
+                      "measurementStatus":"conditional-source-fit",
+                      "interpolation":"linear-cumulative-in-actual-source-seconds"}
+            hold = {"startSeconds":motion["interval"]["endSeconds"],
+                    "endSeconds":self.shots["analysis-22"]["endSeconds"],
+                    "startExclusive":True,"endExclusive":True,
+                    "measurementStatus":"unmeasured","kind":"chosen-endpoint-hold",
+                    "crankTurns":motion["frames"][-1]["crankTurns"],
+                    "interpretation":"Last fitted exposure is inside the same shot, not a cut. Hold its complete new input without cadence extrapolation or return to independent inverse posing; no source-image/control authority extends past the measured domain."}
+            diagnostics = {"kind":motion["kind"],
+                "authority":{"path":AUTOMATIC_MOTION,"sha256":AUTOMATIC_MOTION_SHA256,
+                             "controls":{"path":MOTION_CONTROLS,"sha256":MOTION_CONTROLS_SHA256}},
+                "domain":domain,"endpointHold":hold,
+                "physicalCrankDirection":motion["authority"]["physicalCrankDirection"],
+                "absolutePhysicalCrankPhase":motion["authority"]["absolutePhysicalCrankPhase"],
+                "effectiveBankGauge":motion["authority"]["effectiveBankGauge"],
+                "stageAcceptance":False,"cameraQualificationChanged":False,
+                "packetDiagnostics":copy.deepcopy(motion["diagnostics"])}
+            track["cpuDiagnostics"]["analysisAutomaticMotion"] = diagnostics
+            track["evidence"]["analysisAutomaticMotion"] = {
+                key:copy.deepcopy(diagnostics[key]) for key in (
+                    "authority","domain","endpointHold","physicalCrankDirection",
+                    "absolutePhysicalCrankPhase","effectiveBankGauge","stageAcceptance","cameraQualificationChanged")}
+            track["sourceMeasurements"]["analysisAutomaticMotion"] = {
+                "domain":copy.deepcopy(domain),"endpointHold":copy.deepcopy(hold),"stageAcceptance":False}
+            track["evidence"]["notes"].append(hold["interpretation"])
+            track["sourceMeasurements"]["blockers"].append("Analysis cumulative bank drive is conditional source-relative FIT authority only at native3366..3569. Physical shaft sign/home, absolute hidden state and camera/native geometry/GPU/stage qualification remain unresolved. The remaining same-shot endpoint hold is chosen and unmeasured, not extended source-motion evidence.")
+            visible, gauge = self.visible_crank_motion, self.visible_crank_gauge
+            visible_domain = {**copy.deepcopy(visible["interval"]),"viewId":"main","presentation":"native",
+                              "measurementStatus":"observed-cycles-approximate-within-cycle-phase"}
+            visible_holds = [
+                {"startSeconds":self.shots["analysis-16"]["startSeconds"],"endSeconds":visible["interval"]["startSeconds"],
+                 "kind":"chosen-first-input-hold","measurementStatus":"unmeasured","endExclusive":True},
+                {"startSeconds":visible["interval"]["endSeconds"],"endSeconds":self.shots["analysis-16"]["endSeconds"],
+                 "kind":"chosen-last-input-hold","measurementStatus":"unmeasured","startExclusive":True,"endExclusive":True}]
+            visible_diagnostics = {
+                "authority":{"path":VISIBLE_CRANK_MOTION,"sha256":VISIBLE_CRANK_MOTION_SHA256,
+                             "gauge":{"path":VISIBLE_CRANK_GAUGE,"sha256":VISIBLE_CRANK_GAUGE_SHA256}},
+                "domain":visible_domain,"sameShotMarginHolds":visible_holds,
+                "sourceAuthority":copy.deepcopy(visible["authority"]),"sourceMeasurements":copy.deepcopy(visible["measurement"]),
+                "chosenGauge":copy.deepcopy(gauge["chosenGauge"]),"cameraAssociation":copy.deepcopy(gauge["cameraAssociation"]),
+                "nativeMathSha256":copy.deepcopy(gauge["nativeMathSha256"]),
+                "retainedNativeProjectionProof":copy.deepcopy(gauge["positiveControls"]),
+                "qualification":copy.deepcopy(gauge["qualification"])}
+            track["cpuDiagnostics"]["analysisVisibleCrankMotion"] = visible_diagnostics
+            track["evidence"]["analysisVisibleCrankMotion"] = {
+                key:copy.deepcopy(visible_diagnostics[key]) for key in (
+                    "authority","domain","sameShotMarginHolds","sourceAuthority","chosenGauge","cameraAssociation","qualification")}
+            track["sourceMeasurements"]["analysisVisibleCrankMotion"] = {
+                "domain":copy.deepcopy(visible_domain),"sameShotMarginHolds":copy.deepcopy(visible_holds),
+                "sourceSelectedNativeSign":None,"sourceAbsoluteNativeHomeTurns":None,"stageAcceptance":False}
+            track["sourceMeasurements"]["blockers"].append("Visible-crank native2392..2598 supplies observed source image winding/cycle periods and approximate within-cycle phase only. Native sign/home mapping and one complete fixed setup/drive lag are chosen under the unchanged unqualified camera. Same-shot first/last margin holds are unmeasured; source bottom-hold noise is not exact physical speed. No cross-shot phase transfer or camera/GPU/stage acceptance.")
         else:
             for shot, key in self.synthesis_coarse_framing["shots"].items():
                 if (key["eligibleViewCount"] == 0 or key["appliedViewCount"] != key["eligibleViewCount"]
