@@ -20,6 +20,7 @@ def load_script(filename, name):
 
 common = load_script('compact-source-common.py', 'source_generation_common')
 spin = load_script('compact-spin.py', 'source_generation_spin')
+rocker = load_script('compact-operation-rocker.py', 'source_generation_rocker')
 
 
 def exact_exposure():
@@ -98,6 +99,137 @@ class ExactExposureLandmarkTests(unittest.TestCase):
                              if row.get('anchorId') == 'ambiguous']
                 self.assertEqual(len(ambiguity), 1)
                 self.assertEqual(result['landmarks'], [ambiguous, *data['frames'][1]['landmarks']])
+
+
+def rocker_exposure():
+    data = exact_exposure()
+    image = copy.deepcopy(data['frames'][0]['sourceImage'])
+    frame = copy.deepcopy(data['frames'][0])
+    frame.update(timeSeconds=1.01, nativeFrame=30)
+    frame.pop('sourceImage')
+    data['frames'] = [frame]
+    data['source'].update(videoId='4mBuyixt22U', durationSeconds=3,
+                          fps={'numerator': 30, 'denominator': 1})
+    data['shots'] = [{'id': 'machine', 'classification': 'machine',
+                     'startSeconds': 0, 'endSeconds': 3,
+                     'hasCorrespondingMachine': True}]
+    data.update(model={}, anchors=[])
+    state = {
+        'nativeFrame': 30, 'timeSeconds': 1.01, 'sourceImage': image,
+        'completeInput': {
+            'crankTurns': 0, 'amplitudes': [0] * 20, 'phases': [0] * 20,
+            'gearing': 'medium-medium', 'magnification': 1,
+            'setup': {key: 0 for key in common.SETUP_FIELDS},
+        },
+    }
+    seeds = {
+        'states': [state],
+        'bodyCandidate': {'camera': {'positionMetres': [0, 0, 1],
+                                    'quaternion': [0, 0, 0, 1],
+                                    'verticalFovDegrees': 45}},
+    }
+    return data, seeds
+
+
+class RockerSourceImageTests(unittest.TestCase):
+    def generate(self, data, seeds):
+        with patch.object(rocker.common, 'load_observations',
+                          return_value=copy.deepcopy(data)), patch.object(
+                rocker, 'load_seeds', return_value=(copy.deepcopy(seeds), {})), patch.object(
+                rocker, 'retain_generator_inputs'):
+            return rocker.rocker()
+
+    def test_exact_seed_image_follows_retained_exposure_not_playback_label(self):
+        data, seeds = rocker_exposure()
+        track = self.generate(data, seeds)
+        alias = next(frame for frame in track['frames'] if frame['timeSeconds'] == 1)
+        original = next(frame for frame in track['frames'] if frame['timeSeconds'] == 1.01)
+        self.assertEqual(alias['retainedObservationTimeSeconds'], 1.01)
+        for frame in (alias, original):
+            self.assertEqual(frame['decodedTimeSeconds'], 1.0)
+            self.assertEqual(frame['sourceImage'], seeds['states'][0]['sourceImage'])
+            self.assertEqual(frame['views'][0]['input'], seeds['states'][0]['completeInput'])
+
+    def test_nearest_input_uses_retained_time_without_borrowing_source_image(self):
+        data, seeds = rocker_exposure()
+        data['frames'][0].update(timeSeconds=1.49, decodedTimeSeconds=1.2,
+                                 decodedFrameIndex=36, nativeFrame=36)
+        early = seeds['states'][0]
+        early.update(nativeFrame=33, timeSeconds=1.1)
+        early['sourceImage']['frameIndex'] = 33
+        late = copy.deepcopy(early)
+        late.update(nativeFrame=45, timeSeconds=1.5)
+        late['sourceImage']['frameIndex'] = 45
+        late['completeInput']['crankTurns'] = 0.75
+        seeds['states'].append(late)
+        track = self.generate(data, seeds)
+        alias = next(frame for frame in track['frames'] if frame['timeSeconds'] == 1)
+        self.assertEqual(alias['retainedObservationTimeSeconds'], 1.49)
+        self.assertEqual(alias['decodedTimeSeconds'], 1.2)
+        self.assertNotIn('sourceImage', alias)
+        self.assertEqual(alias['views'][0]['input'], late['completeInput'])
+        self.assertEqual(alias['views'][0]['provenance']['kind'], 'chosen-feasible')
+        self.assertEqual(alias['views'][0]['provenance']['unobservedInputFields'],
+                         common.INPUT_FIELDS)
+
+    def test_conflicting_source_or_decoded_identity_cannot_supply_seed_image(self):
+        for mismatch in ('seed-image-frame', 'seed-source', 'decoded-pts', 'decoded-frame'):
+            with self.subTest(mismatch=mismatch):
+                data, seeds = rocker_exposure()
+                if mismatch == 'seed-image-frame':
+                    seeds['states'][0]['sourceImage']['frameIndex'] = 31
+                elif mismatch == 'seed-source':
+                    seeds['states'][0]['sourceImage']['sourceSha256'] = 'c' * 64
+                elif mismatch == 'decoded-pts':
+                    data['frames'][0]['decodedTimeSeconds'] = 31 / 30
+                else:
+                    data['frames'][0]['decodedFrameIndex'] = 31
+                track = self.generate(data, seeds)
+                frame = next(frame for frame in track['frames'] if frame['timeSeconds'] == 1)
+                self.assertNotIn('sourceImage', frame)
+                self.assertEqual(frame['views'][0]['input'], seeds['states'][0]['completeInput'])
+
+    def test_existing_source_image_is_preserved_for_exact_and_nearest_inputs(self):
+        for exact in (True, False):
+            with self.subTest(exact=exact):
+                data, seeds = rocker_exposure()
+                image = copy.deepcopy(seeds['states'][0]['sourceImage'])
+                data['frames'][0]['sourceImage'] = image
+                seeds['states'][0]['sourceImage']['sha256Gray8'] = 'c' * 64
+                if not exact:
+                    seeds['states'][0]['nativeFrame'] = 31
+                    seeds['states'][0]['sourceImage']['frameIndex'] = 31
+                track = self.generate(data, seeds)
+                alias = next(frame for frame in track['frames'] if frame['timeSeconds'] == 1)
+                self.assertEqual(alias['sourceImage'], image)
+                self.assertEqual(alias['views'][0]['input'], seeds['states'][0]['completeInput'])
+
+    def test_1016_nearest_state_is_not_required_exposure_identity(self):
+        for required in (True, False):
+            with self.subTest(required=required):
+                data, seeds = rocker_exposure()
+                classification = 'machine' if required else 'non-machine'
+                data['source'].update(durationSeconds=1016.1,
+                                      fps={'numerator': 24000, 'denominator': 1001})
+                data['shots'][0].update(endSeconds=1016.1,
+                                        classification=classification,
+                                        hasCorrespondingMachine=required)
+                data['frames'][0].update(timeSeconds=1016,
+                                         decodedTimeSeconds=1016.0149999999999,
+                                         decodedFrameIndex=24360, nativeFrame=24360,
+                                         classification=classification)
+                seeds['states'][0].update(nativeFrame=24352,
+                                          timeSeconds=1015.6813333333332)
+                seeds['states'][0]['sourceImage']['frameIndex'] = 24352
+                track = self.generate(data, seeds)
+                frame = next(frame for frame in track['frames'] if frame['timeSeconds'] == 1016)
+                self.assertEqual(frame['decodedTimeSeconds'], 1016.0149999999999)
+                self.assertNotIn('sourceImage', frame)
+                if required:
+                    self.assertEqual(frame['views'][0]['input'], seeds['states'][0]['completeInput'])
+                    self.assertEqual(frame['views'][0]['provenance']['kind'], 'chosen-feasible')
+                else:
+                    self.assertEqual(frame['views'], [])
 
 
 class SpinPresentationTests(unittest.TestCase):

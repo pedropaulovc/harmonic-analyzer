@@ -40,7 +40,7 @@
         <aside id="panel">
           <p class="eyebrow">Engineerguy video companion</p>
           <h1 id="video-title"></h1>
-          <p id="status" role="status">Loading video…</p>
+          <p id="status"><span id="playback-status" role="status">Loading video…</span><span id="playback-clock"> · 0.0 s</span></p>
           <div class="playback-actions">
             <button id="pause-video" type="button" disabled>Play video</button>
             <button id="follow-video" type="button" disabled>Restore video pose</button>
@@ -90,7 +90,7 @@
               <div id="channel-controls"></div>
             </fieldset>
           </details>
-          <output id="force-readout" aria-label="Source-backed spring force balance"></output>
+          <output id="force-readout" aria-label="Calculated spring force balance"></output>
           <p class="physics-caption">Constraint-based motion with loaded extension springs and quasistatic torque balance. No tooth-collision, friction, or inertia simulation.</p>
         </aside>
 

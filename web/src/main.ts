@@ -20,7 +20,8 @@ const loading = element('#loading')
 const modelStatus = element('#model-status')
 const retryModel = element<HTMLButtonElement>('#retry-model')
 const title = element('#video-title')
-const status = element('#status')
+const playbackStatus = element('#playback-status')
+const playbackClock = element('#playback-clock')
 const sourceError = element('#source-error')
 const modelError = element('#model-error')
 const physicsError = element('#physics-error')
@@ -102,7 +103,7 @@ let lastHud = 0
 const channelInputs: { amplitude: HTMLInputElement; phase: HTMLInputElement; value: HTMLOutputElement }[] = []
 
 function notice(target: HTMLElement, message: string): void {
-  target.textContent = message
+  if (target.textContent !== message) target.textContent = message
   target.hidden = message.length === 0
 }
 
@@ -218,6 +219,16 @@ function following(): void {
   manualRunButton.textContent = 'Turn crank'
   viewer.setInteraction('following-video')
   updateControlState()
+}
+
+function retryFollowing(): void {
+  if (!player || mode !== 'exploring') return
+  const state = player.getState()
+  if (state !== 'playing' && state !== 'buffering') return
+  try {
+    renderSource(player.getTime())
+    if (referenceState !== 'unavailable') following()
+  } catch (error) { notice(physicsError, error instanceof Error ? error.message : String(error)) }
 }
 
 function applyView(view: PlaybackView): void {
@@ -356,7 +367,10 @@ function updateHud(): void {
       ? ' · Rod-head topology assumed pending CAD match; not geometric-fidelity passed'
       : ' · Two lower-rocker side-face features absent and uncertified; narrow functional exception, not geometric-fidelity passed'
   }
-  status.textContent = `${stateLabels[playbackState]} · ${time.toFixed(1)} s · ${context}${geometryAssumption}`
+  const announcedStatus = `${stateLabels[playbackState]} · ${context}${geometryAssumption}`
+  if (playbackStatus.textContent !== announcedStatus) playbackStatus.textContent = announcedStatus
+  const clock = ` · ${time.toFixed(1)} s`
+  if (playbackClock.textContent !== clock) playbackClock.textContent = clock
   crank.value = String(input.crankTurns)
   element<HTMLOutputElement>('#crank-value').value = valueLabel('crankTurns', `${input.crankTurns.toFixed(3)} turns`)
   gearing.value = input.gearing
@@ -523,7 +537,7 @@ async function selectVideo(next: Video): Promise<void> {
     if (!selection.signal.aborted) notice(videoError, error instanceof Error ? error.message : String(error))
   }
   await sourcePromise
-  if (!selection.signal.aborted) { updateControlState(); updateHud() }
+  if (!selection.signal.aborted) { retryFollowing(); updateControlState(); updateHud() }
 }
 
 function selectRoute(): void {
@@ -561,6 +575,7 @@ async function fetchMachine(): Promise<void> {
     notice(modelError, machine.missing.length ? `Unresolved native joints: ${machine.missing.join(', ')}. This model cannot establish complete footage fidelity.` : '')
     configureLandmarkProbe()
     manualRevision = 'clean'
+    retryFollowing()
   } catch (error) {
     modelState = 'unavailable'
     modelStatus.textContent = `No compatible model loaded. Run npm run fetch-model -- path/to/released.glb. ${error instanceof Error ? error.message : String(error)}`

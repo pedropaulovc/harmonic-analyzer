@@ -178,8 +178,8 @@ pause/manual/resume transitions against the actual rendered scene.
 Paused exploration must permit orbit, pan, zoom and mechanism operation without
 advancing the source video. Compact mode retains the same visible usable player
 at least 200 by 200 pixels, with advancing audio and working pause/resume controls.
-Verify all six routes; present a demo of the working implementation. This session
-uses headless Playwright with screenshots/recordings, as explicitly requested.
+Verify all six routes. Present the working implementation in a headed browser;
+headless Playwright with screenshots or recordings is for automated checks.
 
 Native WebGL landmark readback remains available for rendered-pixel measurements.
 CPU projection alone is not final rendered evidence. Existing raster, finite-line,

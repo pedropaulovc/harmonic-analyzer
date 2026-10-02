@@ -40,13 +40,11 @@ const CY = M.wheelCentreMm[1] / 1000
 const CZ = M.wheelCentreMm[2] / 1000
 const CONTACT_Z = M.hubTangentMm[2] / 1000
 
-// Source lever_wire_geom.YOKE_PITCH_R and magnifying_wheel_geom diameters.
+// Exported pitch radii already include the source wire radius.
 // Keep physical pitch and the CAD's artificial visual separation distinct.
-export const MAGNIFIER_WIRE_DIAMETER_M = 0.0008
-const WIRE_RADIUS = MAGNIFIER_WIRE_DIAMETER_M / 2
-const HUB_RADIUS = 0.020 / 2 + WIRE_RADIUS
-const RIM_RADIUS = 0.100 / 2 + WIRE_RADIUS
-const VISUAL_CLEARANCE = 0.00025
+const HUB_RADIUS = M.hubPitchRadiusMm / 1000
+const RIM_RADIUS = M.rimPitchRadiusMm / 1000
+const VISUAL_CLEARANCE = M.visualClearanceMm / 1000
 const VISUAL_HUB_RADIUS = HUB_RADIUS + VISUAL_CLEARANCE
 const REST_HOOK_X = M.hookMm[0] / 1000
 const REST_HOOK_Y = M.hookMm[1] / 1000

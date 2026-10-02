@@ -5,7 +5,8 @@ Run: python3 web/scripts/compact-operation-rocker.py
 This reads authored numeric seeds/source metadata only: no model, solver,
 optimizer, browser, private evidence directory, or acceptance run. Historical
 report paths/digests remain provenance; source camera failures remain diagnostics.
-None of these choices claim a measured error stage.
+Only exact decoded exposures supply source images; nearest states supply chosen
+inputs, not source pixels. None of these choices claim a measured error stage.
 """
 from __future__ import annotations
 
@@ -295,6 +296,7 @@ def rocker():
     data = common.load_observations("4mBuyixt22U")
     seeds, seed_input = load_seeds("4mBuyixt22U")
     states = seeds["states"]
+    fps = data["source"]["fps"]["numerator"] / data["source"]["fps"]["denominator"]
     by_frame = {row["nativeFrame"]: row for row in states}
     body_candidate = seeds["bodyCandidate"]
     # The1078 states supply the complete source-informed bank. Shared selection
@@ -306,9 +308,17 @@ def rocker():
             return []
         number = frame.get("nativeFrame", frame.get("sourceImage", {}).get("frameIndex"))
         row = by_frame.get(number)
+        # Seed timeSeconds is an authored observation label, not decoded PTS.
+        # Selector aliases retain the decoded exposure even when their playback
+        # time changes; only that exact frame may supply missing source pixels.
+        if ("sourceImage" not in frame and row is not None
+                and row["sourceImage"]["frameIndex"] == number
+                and row["sourceImage"]["sourceSha256"] == data["source"]["sha256"]
+                and frame.get("decodedFrameIndex", number) == number
+                and round(frame["decodedTimeSeconds"] * fps) == number):
+            frame["sourceImage"] = copy.deepcopy(row["sourceImage"])
         if row is None:
             row = min(states, key=lambda r: abs(r["timeSeconds"] - frame.get("retainedObservationTimeSeconds", frame["timeSeconds"])))
-        frame.setdefault("sourceImage", copy.deepcopy(row["sourceImage"]))
         result = []
         for original in common.source_views(frame, data):
             notes = ("Saved CPU-feasible continuous independently actuated held-bank branch; actual source phases/station order, not ideal cosine or historical recovery.")

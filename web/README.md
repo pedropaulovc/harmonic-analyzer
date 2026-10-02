@@ -22,6 +22,11 @@ CAD export identified by `src/mechanics-data.ts`; incompatible bytes are rejecte
 `fetch-model` can also copy the existing `cad/out/gltf/` export. Missing models
 and failed YouTube playback produce visible errors.
 
+Playback can start while the model or source track loads. Source-following starts
+automatically when both are ready; pausing retains manual exploration. Status
+announcements exclude the running clock. Force readouts are physical calculations,
+not source measurements.
+
 Routes accept a slug or the corresponding YouTube ID:
 
 | Page | Query |
