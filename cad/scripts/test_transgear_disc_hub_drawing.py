@@ -226,8 +226,6 @@ def test_the_spigot_seats_on_the_step_square_and_clear_of_the_disc() -> None:
         "flange rear face perpendicularity to bore": "0.03",
         "spigot end perpendicularity to bore": "0.005",
     }
-    assert drawing.FLANGE_FACE_FRAME[0][0] == drawing.FLANGE_REAR_X
-    assert drawing.SPIGOT_END_FRAME[0][0] == drawing.SPIGOT_END_X
     tilt = (
         sleeve.STEP_FACE_PERPENDICULARITY / sleeve.STEP_FACE_PERPENDICULARITY_ZONE_DIA
         + spec.SPIGOT_END_PERPENDICULARITY / spec.SPIGOT_END_PERPENDICULARITY_ZONE_DIA
@@ -245,6 +243,58 @@ def test_the_spigot_seats_on_the_step_square_and_clear_of_the_disc() -> None:
     assert spec.DISC_STEP_GAP_WORST > 0.0
     # The disc's bore chamfer clears the spigot's corner radius.
     assert spec.CORNER_RADIUS_MAX < disc.BORE_FRONT_CHAMFER_LIMITS[0]
+
+
+def _side_view_model_point(sheet_xy: tuple[float, float]) -> tuple[float, float]:
+    """Model (x, z) under a sheet point on the edge view: ``*Top`` shows model
+    +X right and -Z up, the view turns SIDE_VIEW_ANGLE counter-clockwise, and
+    it centres on the part's z span."""
+    angle = drawing.SIDE_VIEW_ANGLE
+    x_dir = (math.cos(angle), math.sin(angle))
+    z_dir = (math.sin(angle), -math.cos(angle))
+    z_mid = (spec.HUB_FRONT_Z + spec.SPIGOT_LENGTH) / 2.0
+    dx = (sheet_xy[0] - drawing.SIDE_CENTER[0]) / drawing._S
+    dy = (sheet_xy[1] - drawing.SIDE_CENTER[1]) / drawing._S
+    return dx * x_dir[0] + dy * x_dir[1], z_mid + dx * z_dir[0] + dy * z_dir[1]
+
+
+def test_each_perpendicularity_pick_lands_on_its_face_alone() -> None:
+    """Each frame's edge pick lands on its face's edge-on line where only the
+    face's outer circle projects, half a sheet millimetre or more from any
+    corner or overlying edge and off every extension line (farm run
+    20261002T153039266Z missed the flange's rear face over the 0-degree
+    screw hole's edge), and each frame stands right of the spigot's end on
+    its pick's side of the axis."""
+    clear = 0.0005 / drawing._S  # model mm
+    flange_x, flange_z = _side_view_model_point(drawing.FLANGE_FACE_FRAME[0])
+    spigot_x, spigot_z = _side_view_model_point(drawing.SPIGOT_END_FRAME[0])
+    assert flange_z == pytest.approx(0.0)
+    assert spigot_z == pytest.approx(spec.SPIGOT_LENGTH)
+    # Inside each face's radial extent: the flange's rear face from the
+    # spigot's O.D. out, the spigot's end from its round bore out.
+    assert spec.SPIGOT_DIA / 2.0 + clear < abs(flange_x) < spec.FLANGE_DIA / 2.0 - clear
+    assert spec.BORE_DIA / 2.0 + clear < abs(spigot_x) < spec.SPIGOT_DIA / 2.0 - clear
+    # The screw holes pierce the rear face: each one's edge there projects
+    # across its centre's x plus or minus its radius.
+    for centre_x, _centre_y in joint.screw_centres():
+        assert abs(flange_x - centre_x) > joint.SCREW_HOLE_DIA / 2.0 + clear
+    # The spigot's length and the overall end at the spigot end's +X corner
+    # and print above the part, so their extension lines rise off the spigot
+    # end's line; the spigot length's other one rises from the spigot's +X
+    # corner at the flange, along the rear face's +X stretch.
+    for name in ("SpigotLength", "HubLength"):
+        text_x, _text_z = _side_view_model_point(drawing.SIDE_KEEP[name])
+        assert text_x > spec.FLANGE_DIA / 2.0, name
+    assert flange_x < 0.0
+    sides = set()
+    for pick, frame in (drawing.FLANGE_FACE_FRAME, drawing.SPIGOT_END_FRAME):
+        frame_x, _frame_z = _side_view_model_point(frame)
+        assert frame[0] > drawing.SPIGOT_END_X
+        assert spec.SPIGOT_DIA / 2.0 < abs(frame_x) < spec.FLANGE_DIA / 2.0
+        pick_x, _pick_z = _side_view_model_point(pick)
+        assert (frame_x > 0.0) == (pick_x > 0.0)
+        sides.add(frame_x > 0.0)
+    assert sides == {True, False}
 
 
 def _sheet_text() -> str:
@@ -522,9 +572,13 @@ def test_turned_diameters_print_inline_beside_their_own_step_on_the_edge_view() 
     for name in drawing.END_KEEP:
         assert face_gap(boxes[name]) >= 0.004, name
     # The oil hole's callout stands above the flange's O.D. extension line,
-    # the faced overall's below it; the two lengths above share a row.
+    # its text ending left of the hub front, where the overall's extension
+    # line rises to its row; the overall stands a row above the two lengths,
+    # which share a row, its text right of the spigot's end.
     assert boxes["OilHoleDia"].ymin > edge.ymax
-    assert boxes["HubLength"].ymax < edge.ymin
+    assert boxes["OilHoleDia"].xmax < drawing.HUB_FRONT_X
+    assert boxes["HubLength"].ymin > boxes["SpigotLength"].ymax
+    assert boxes["HubLength"].xmin > drawing.SPIGOT_END_X
     assert drawing.SIDE_KEEP["FlangeThick"][1] == drawing.SIDE_KEEP["SpigotLength"][1]
     # The spigot's text and callout end clear of the flange's dimension line.
     assert boxes["SpigotDia"].xmax < drawing.SIDE_KEEP["FlangeDia"][0] - 0.004

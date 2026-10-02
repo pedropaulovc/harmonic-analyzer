@@ -36,6 +36,7 @@ import transgear_latch_pin_spec as latch_pin
 import transgear_pivot_screw_spec as pivot_screw
 import transgear_removable_spec as removable
 import transgear_pin_spec as pin
+import transgear_retaining_ring_spec as ring
 import transgear_thumbnut_spec as thumbnut
 from _hole_spec import TAP_DRILL_MM
 
@@ -106,6 +107,33 @@ def test_disc_cluster_rows_follow_the_pin_hub_and_disc() -> None:
     for n in (1, 2, 3):
         pair = _pair(f"transgear-disc-screw-{n}", "rack-pinion-1")
         assert allowed[pair] == pytest.approx(limit)
+
+
+def test_ring_row_is_the_free_state_grip_on_its_prong_arcs() -> None:
+    """MHA-182 is the replica-gated vendor body at its free diameter, so its
+    prongs grip inside the MHA-179 groove floor; the overlap is the prong
+    arcs' share of the groove-to-free annulus over the ring's thickness."""
+    from diagnostics import diag_build_97431A260 as recipe
+
+    assert pin.GROOVE_DIA == ring.GROOVE_DIA
+    assert ring.FREE_DIA < pin.GROOVE_DIA
+    # The ring sits wholly in the groove, off the Ø3.9 land.
+    assert ring.THICKNESS + ring.THICKNESS_TOL <= pin.GROOVE_WIDTH
+    sweeps = []
+    for segment in recipe.outline():
+        if isinstance(segment, recipe.Line):
+            continue
+        if math.hypot(*segment.start) != pytest.approx(ring.FREE_DIA / 2.0):
+            continue
+        start = math.atan2(segment.start[1], segment.start[0])
+        end = math.atan2(segment.end[1], segment.end[0])
+        sweeps.append((end - start) % (2.0 * math.pi))
+    assert len(sweeps) == 3
+    share = sum(sweeps) / (2.0 * math.pi)
+    pair = _pair("transgear-retaining-ring-1", "transgear-pin-1")
+    assert _allowed()[pair] == pytest.approx(
+        share * _annulus(pin.GROOVE_DIA, ring.FREE_DIA, ring.THICKNESS)
+    )
 
 
 def test_knob_stack_rows_follow_the_shaft_cup_collar_and_nut() -> None:

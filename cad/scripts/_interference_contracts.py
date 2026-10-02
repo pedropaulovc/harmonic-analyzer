@@ -340,6 +340,11 @@ _CROSS_PIN_CORE_MM3 = _cross_pin_overlap_mm3(
     25.4 / 16.0, 25.4 / 16.0 - 2.0 * 0.012 * 25.4, 6.35
 )
 
+# MHA-182, McMaster 97431A260: the vendor replica's three prong arcs on its
+# free diameter, atan(3/4) of the turn each (diag_build_97431A260's outline:
+# the window prongs from 90 to 126.87 deg, the far one +/-atan(1/3)).
+_RING_PRONG_SHARE = 3.0 * math.atan(0.75) / (2.0 * math.pi)
+
 
 # Pattern instances are numbered by seed creation while the two backs and
 # guides are numbered by insertion order, so their suffixes cross or interleave.
@@ -353,12 +358,11 @@ _CROSS_PIN_CORE_MM3 = _cross_pin_overlap_mm3(
 # Pairs with NO row, modelled line to line or with clearance, which the gate
 # reads as contact: the MHA-159 hub's D-bore on the sleeve's Ø9 boss and
 # D-flat, the MHA-169 dowel in the arm's Ø3.175 ream, the sleeve and both
-# bushings on the MHA-179 pin (Ø3.9), the MHA-182 ring in the pin's groove,
-# the disc bore on the boss (Ø9), the knob journal in the plate bore (Ø8.5),
-# the collar bore on the core (Ø6.35), the MHA-175 rivets (Ø1.5875) in the
-# Ø1.65 hook and flap holes, the MHA-154 pin in the collar's 1.8 slot, the
-# MHA-155 dowels in the T24's Ø2.5 holes, and every screw in its clearance
-# hole.
+# bushings on the MHA-179 pin (Ø3.9), the disc bore on the boss (Ø9), the
+# knob journal in the plate bore (Ø8.5), the collar bore on the core
+# (Ø6.35), the MHA-175 rivets (Ø1.5875) in the Ø1.65 hook and flap holes,
+# the MHA-154 pin in the collar's 1.8 slot, the MHA-155 dowels in the T24's
+# Ø2.5 holes, and every screw in its clearance hole.
 _PAPER_DRIVE_ALLOWED_PAIRS = {
     **_numbered_pairs(
         "clamp-screw",
@@ -442,6 +446,14 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
     frozenset(("transgear-pin-1", "transgear-arm-1")): _smooth_annulus_limit_mm3(
         3.9, 3.874, 7.9375
     ),
+    # MHA-182 (transgear_retaining_ring_spec) in the MHA-179 groove: the
+    # vendor replica is the ring as McMaster ships it, its prongs on the
+    # Ø2.8956 free diameter, 0.0254 inside the Ø2.9464 groove floor: the grip,
+    # over the prong arcs (above) and the 0.635 thickness.  The prong-corner
+    # fillets only shorten the arcs: run 20261002T153039266Z read 0.03591
+    # over the three prongs (assembly:paper_drive), 0.72 of this bound.
+    frozenset(("transgear-retaining-ring-1", "transgear-pin-1")): _RING_PRONG_SHARE
+    * _smooth_annulus_limit_mm3(2.9464, 2.8956, 0.635),
     # MHA-161 #0-80 x 1/4 (transgear_disc_screw_spec) through the hub
     # flange's Ø1.7 clearance into the disc's 3/64 taps (rack_pinion_spec),
     # cut at assembly (R9-47) to 5.3 under the head: 5.3 - 2.4 = 2.9 of the

@@ -178,12 +178,19 @@ SECTION_CAPTION = (RIGHT_CENTER[0], _SIDE_BOTTOM - 6 * _ROW_PITCH)
 # ran through the lower label (run 20261001T035353825Z layout audit).  It
 # stands farther out and nearer level with the bore, so its leader climbs
 # shallowly and passes right of the symbol's own "Ra" text rather than through
-# it (run 20261001T110844152Z layout audit).
+# it (run 20261001T110844152Z layout audit).  The symbol grows up and right
+# from its insertion point in proportion to its text, so its text keeps the
+# note height: at the document's 6.35 mm default (run 20261002T153039266Z)
+# "Ra 1.6" printed 13.5-37.4 mm right of and 10.8-17.2 mm above the point,
+# over the teeth and across the bore fit leader's landing at 135 degrees.  At
+# 2.5 mm the symbol's ink tops out 9 mm below that landing and its text ends
+# 7 mm left of the tip circle.
 FINISH_ATTACH = (
     FRONT_CENTER[0] + _BORE_SHEET_RADIUS * math.cos(math.radians(-135.0)),
     FRONT_CENTER[1] + _BORE_SHEET_RADIUS * math.sin(math.radians(-135.0)),
 )
 FINISH_SYMBOL = (FRONT_CENTER[0] - HALF_OD - 0.022, FRONT_CENTER[1] - 0.012)
+FINISH_CHAR_HEIGHT = 0.0025
 
 # The step face (the disc hub's seat) shows edge-on in the section where the
 # cut passes through the tooth on +Y: the pick lands mid-face between the
@@ -377,6 +384,7 @@ async def build(adapter: Any) -> dict[str, str]:
         label="sleeve bore finish",
         entity=visible_circle_edge(adapter, front, BORE_DIA),
         leader_attach_xy=FINISH_ATTACH,
+        char_height=FINISH_CHAR_HEIGHT,
     )
     # Datum A, the bore, where it shows round; the end view has no datum tag
     # yet, as the native placement requires.

@@ -152,13 +152,18 @@ FLAT_CALLOUT = "\n".join(
 #   spigot's callout under its text, clear of the part.  The two lengths
 #   from the flange's rear face on one row above: the flange's text left of
 #   the flange, the spigot's right of the spigot.  The overall, a reference
-#   faced at assembly, below, its text and fit-up callout right of the
-#   spigot end's extension line.  The oil hole's size with its match-drill
-#   callout above-left, over the gap between the two views.
+#   faced at assembly, on the next row up, outermost, its text and fit-up
+#   callout right of the spigot end's extension line.  Its ends are the
+#   spigot's and the hub's +X corners, so from a row above its extension
+#   lines rise off the part; from below they ran down across the hub front
+#   and the spigot end, over the spigot end frame's pick.  The oil hole's
+#   size with its match-drill callout above-left, over the gap between the
+#   two views, its text ending left of the overall's hub-front extension
+#   line.
 # - The two perpendicularity frames stand right of the spigot's end, inside
-#   the flange's extension lines: the flange's above the spigot's extension
-#   line, its leader on the rear face above the spigot; the spigot end's
-#   below the spigot, its leader on the end's lower half.
+#   the flange's extension lines: the flange's below the spigot, its leader
+#   level onto the rear face's lower half; the spigot end's above the
+#   spigot's extension line, its leader on the end's upper half.
 END_KEEP = {
     "BoltCircleDia": (END_CENTER[0] - 0.030, AXIS_Y + _FLANGE_R + 0.016),
     "ScrewHoleDia": (END_CENTER[0] + 0.036, AXIS_Y + _FLANGE_R + 0.016),
@@ -171,8 +176,8 @@ SIDE_KEEP = {
     "FlangeDia": (SPIGOT_END_X + 0.077, AXIS_Y),
     "FlangeThick": (_side_x(-FLANGE_THICK) - 0.014, AXIS_Y + _FLANGE_R + 0.008),
     "SpigotLength": (SPIGOT_END_X + 0.012, AXIS_Y + _FLANGE_R + 0.008),
-    "HubLength": (SPIGOT_END_X + 0.040, AXIS_Y - _FLANGE_R - 0.020),
-    "OilHoleDia": (HUB_FRONT_X - 0.035, AXIS_Y + _FLANGE_R + 0.040),
+    "HubLength": (SPIGOT_END_X + 0.040, AXIS_Y + _FLANGE_R + 0.024),
+    "OilHoleDia": (HUB_FRONT_X - 0.052, AXIS_Y + _FLANGE_R + 0.040),
 }
 DIMENSION_CALLOUTS_BELOW = {
     "BoreDia": BORE_CALLOUT,
@@ -185,18 +190,34 @@ DIMENSION_CALLOUTS_BELOW = {
 DIMENSION_CALLOUTS_ABOVE = {"ScrewHoleDia": SCREW_HOLE_CALLOUT_ABOVE}
 
 # (edge pick, frame position) in sheet metres for each perpendicularity
-# frame: each pick on its face's edge-on outline midway across the face,
-# each frame centred in the band between the spigot's and the flange's
-# extension lines.
+# frame.  The edge view shows model +X up (*Top's +X right, turned +90
+# degrees) and each face edge-on as a vertical line.  Each pick lands where
+# only that face's own outer circle projects, midway along that stretch,
+# and each frame stands on the pick's side of the axis, centred in the band
+# between the spigot's and the flange's extension lines.
+# - Flange rear face, z 0: its line spans r 6.55-12.55 each side of the
+#   axis.  Above (+X), the 0-degree screw hole's edge on the face projects
+#   across r 8.65-10.35 (BC 9.50 +/- 0.85), and the spigot length's
+#   extension line rises from the spigot's +X corner along the whole
+#   stretch; the first pick, r 9.55 above, missed there (farm run
+#   20261002T153039266Z).  Below (-X), the 120- and 240-degree holes project
+#   at r 3.90-5.60, behind the spigot, so the 6.00 stretch carries the
+#   flange's outer circle alone: the pick sits at its midpoint, r 9.55,
+#   3.00 (9.0 on the sheet) from either corner, level with its frame.
+# - Spigot end, z 3.65: its bore is round (the D-flat ends at z 0) and its
+#   edge overlays r < 4.50, so the pick sits midway along r 4.50-6.55 above
+#   the axis, r 5.525, 1.025 (3.1 on the sheet) from either end.  The
+#   spigot's length and the overall both end at its +X corner and print
+#   above, so their extension lines rise from the corner, off the line.
 _UPPER_BAND_Y = AXIS_Y + (_SPIGOT_R + _FLANGE_R) / 2.0
 _LOWER_BAND_Y = AXIS_Y - (_SPIGOT_R + _FLANGE_R) / 2.0
 FLANGE_FACE_FRAME = (
-    (FLANGE_REAR_X, _UPPER_BAND_Y),
-    (SPIGOT_END_X + 0.010, _UPPER_BAND_Y),
+    (FLANGE_REAR_X, AXIS_Y - (_SPIGOT_R + _FLANGE_R) / 2.0),
+    (SPIGOT_END_X + 0.010, _LOWER_BAND_Y),
 )
 SPIGOT_END_FRAME = (
-    (SPIGOT_END_X, AXIS_Y - (_BORE_R + _SPIGOT_R) / 2.0),
-    (SPIGOT_END_X + 0.010, _LOWER_BAND_Y),
+    (SPIGOT_END_X, AXIS_Y + (_BORE_R + _SPIGOT_R) / 2.0),
+    (SPIGOT_END_X + 0.010, _UPPER_BAND_Y),
 )
 
 

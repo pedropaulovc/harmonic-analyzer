@@ -508,13 +508,29 @@ def test_baseline_lengths_stack_without_crossing_extension_lines() -> None:
     assert cap_top - _CAPTION_HEIGHT > _TITLE_BLOCK_TOP + 0.002
 
 
-# The finish symbol's ink from its insertion point, measured on run
-# 20261001T110844152Z: the leader leaves the shoulder's right end, the "Ra"
-# text's lower right corner stands up and right of the root, and the V's
-# left arm reaches left of it.
+# The finish symbol's ink from its insertion point, measured with 2.5 mm text
+# on run 20261001T110844152Z: the leader leaves the shoulder's right end (the
+# bent leader's fixed 6.35 mm shelf), the "Ra" text's lower right corner
+# stands up and right of the root, the V's left arm reaches left of it and
+# the bar over the text tops the ink.  All but the shelf scale with the text:
+# run 20261002T153039266Z's 6.35 mm text printed 2.54 times as far out.
+_FINISH_MEASURED_HEIGHT = 0.0025
 _FINISH_SHOULDER_DX = 0.0064
 _FINISH_TEXT_CORNER = (0.0147, 0.0042)
 _FINISH_LEFT_DX = -0.0021
+_FINISH_TOP_DY = 0.0072
+
+
+def _finish_ink() -> tuple[float, float, float, float]:
+    """The finish's text right, text bottom, ink left and ink top."""
+    sx, sy = drawing.FINISH_SYMBOL
+    k = drawing.FINISH_CHAR_HEIGHT / _FINISH_MEASURED_HEIGHT
+    return (
+        sx + _FINISH_TEXT_CORNER[0] * k,
+        sy + _FINISH_TEXT_CORNER[1] * k,
+        sx + _FINISH_LEFT_DX * k,
+        sy + _FINISH_TOP_DY * k,
+    )
 
 
 def test_finish_leader_climbs_clear_of_its_own_text() -> None:
@@ -522,14 +538,25 @@ def test_finish_leader_climbs_clear_of_its_own_text() -> None:
     1.6" (leader-through-own-text); it now passes right of the text, and the
     symbol stands clear of the end view and inside the border."""
     sx, sy = drawing.FINISH_SYMBOL
+    text_right, text_bottom, ink_left, _ = _finish_ink()
     start = (sx + _FINISH_SHOULDER_DX, sy)
     end = drawing.FINISH_ATTACH
-    text_right = sx + _FINISH_TEXT_CORNER[0]
-    text_bottom = sy + _FINISH_TEXT_CORNER[1]
     assert end[0] > start[0] and end[1] > text_bottom
     rise = (text_bottom - start[1]) / (end[1] - start[1])
     leader_x = start[0] + (end[0] - start[0]) * rise
     assert leader_x - text_right >= ARROW_TEXT_CLEARANCE_M
     end_view_left = drawing.FRONT_CENTER[0] - drawing.HALF_OD
     assert end_view_left - text_right >= ARROW_TEXT_CLEARANCE_M
-    assert sx + _FINISH_LEFT_DX > drawing.SHEET_INNER_BORDER[0]
+    assert ink_left > drawing.SHEET_INNER_BORDER[0]
+
+
+def test_bore_fit_leader_passes_clear_of_the_finish() -> None:
+    """Run 20261002T153039266Z's bore fit leader ran through the finish's "Ra
+    1.6" (leader-through-text).  The note stands above its landing, so its
+    leader never dips below the landing, and the finish's whole ink stands
+    several millimetres below it."""
+    landing_y = drawing.BORE_FIT_ATTACH[1]
+    note = _note_box(spec.BORE_FIT_CALLOUT, drawing.BORE_FIT_NOTE)
+    assert note.ymin > landing_y
+    _, _, _, ink_top = _finish_ink()
+    assert landing_y - ink_top >= 0.005
