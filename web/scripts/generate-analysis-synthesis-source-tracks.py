@@ -100,7 +100,6 @@ class Generator:
         self.analysis = video_id == "6dW6VYXp9HM"
         self.data = common.load_observations(video_id, prefer_track=not self.analysis)
         self.shots = {s["id"]: s for s in self.data["shots"]}
-        self.chosen_camera_permissions = self.chosen_camera_continuity_packet(video_id)
         self.analysis_held_camera = self.analysis_held_camera_packet() if self.analysis else None
         if self.analysis:
             self.shots["analysis-39"]["hasCorrespondingMachine"] = True
@@ -168,6 +167,8 @@ class Generator:
         self.presenter_reframing = None
         self.synthesis_coarse_framing = None
         self.synthesis_wheel_framing = None
+        permission_path = WEB / "content" / f"{video_id}.chosen-camera-continuity.json"
+        permission_packet = json.loads(permission_path.read_text()) if permission_path.exists() else None
         if not self.analysis:
             self.presenter_reframing = self.presenter_reframing_keys()
             self.synthesis_coarse_framing = self.synthesis_coarse_framing_packet()
@@ -175,6 +176,22 @@ class Generator:
             transition = self.shots["presenter-to-spin"]
             for frame in self.data["frames"]:
                 if frame["shotId"] == transition["id"]:
+                    if permission_packet and any(
+                            permission.get("shotId") == transition["id"] and permission.get("viewId") == "main"
+                            for permission in permission_packet.get("permissions", [])):
+                        # Check original evidence before the single-body layout
+                        # discards legacy outgoing/incoming view identities.
+                        original_views = frame.get("views", [])
+                        view_ids = [view.get("id") for view in original_views]
+                        if (view_ids not in (["main"], ["outgoing", "incoming"], ["incoming", "outgoing"])
+                                or any(view.get("camera") is not None
+                                       or view["rectSourcePixels"] != [0,0,self.data["source"]["width"],self.data["source"]["height"]]
+                                       or view.get("presentation", "native") != "native"
+                                       or view.get("imagePlaneWarp") is not None
+                                       or view.get("resolvedImagePlaneWarp") is not None
+                                       or view.get("composite") is not None
+                                       for view in original_views)):
+                            raise ValueError("Chosen presenter continuity requires original unmeasured full-frame native views.")
                     # The original sparse observations and actual source-image
                     # inspection show one body, not the legacy two-layer guess.
                     frame["views"] = [{"id":"main", "rectSourcePixels":[0,0,self.data["source"]["width"],self.data["source"]["height"]],
@@ -190,13 +207,14 @@ class Generator:
                 if transition["startSeconds"] <= t < transition["endSeconds"]]
             self.data.setdefault("compactChangeTimesSeconds", []).extend(
                 retained_changes + [key["decodedTimeSeconds"] for key in self.presenter_reframing["keys"]])
+        # Validate the producer's existing source-inspected layout normalization,
+        # not the legacy outgoing/incoming layer guess retained in track.json.
+        self.chosen_camera_permissions = self.chosen_camera_continuity_packet(video_id, permission_packet)
 
-    def chosen_camera_continuity_packet(self, video_id):
+    def chosen_camera_continuity_packet(self, video_id, packet):
         """Optional authored permissions, bounded by unchanged native source rows."""
-        path = WEB / "content" / f"{video_id}.chosen-camera-continuity.json"
-        if not path.exists():
+        if packet is None:
             return {}
-        packet = json.loads(path.read_text())
         if (packet.get("schemaVersion") != 1 or packet.get("videoId") != video_id
                 or packet.get("sourceSha256") != self.data["source"]["sha256"]
                 or not isinstance(packet.get("permissions"), list)):
@@ -217,22 +235,32 @@ class Generator:
                     or permission.get("startSeconds") != shot["startSeconds"]
                     or permission.get("endSeconds") != shot["endSeconds"]):
                 raise ValueError("Chosen camera continuity permission needs bounded main/whole unmeasured framing evidence.")
+            def native_index(record, track_name, observation_name):
+                values = [record[name] for name in (track_name, observation_name) if name in record]
+                if (not values or any(type(value) is not int for value in values)
+                        or any(value != values[0] for value in values)):
+                    raise ValueError("Chosen camera permission native index is missing or contradictory.")
+                return values[0]
+
             first, last = permission.get("startDecodedFrameIndex"), permission.get("lastDecodedFrameIndex")
             fps = self.data["source"]["fps"]
             rate = fps["numerator"] / fps["denominator"]
-            if (type(first) is not int or type(last) is not int or first > last
-                    or first != shot.get("startDecodedFrameIndex")
+            if (type(first) is not int or type(last) is not int or first < 0 or first > last
+                    or first != native_index(shot, "nativeStartFrame", "startDecodedFrameIndex")
                     or abs(first / rate - shot["startSeconds"]) > 1e-9
                     or abs((last + 1) / rate - shot["endSeconds"]) > 1e-9):
                 raise ValueError("Chosen camera permission native interval differs from the complete source shot.")
             rows = [frame for frame in self.data["frames"] if frame["shotId"] == shot["id"]]
-            if (not rows or {frame.get("decodedFrameIndex") for frame in rows} != set(range(first, last + 1))
+            indices = [native_index(frame, "sourceFrameIndex", "decodedFrameIndex") for frame in rows]
+            if (not rows or set(indices) != set(range(first, last + 1))
                     or any(frame.get("camera") is not None
-                           or not shot["startSeconds"] <= frame["decodedTimeSeconds"] < shot["endSeconds"]
+                           or type(frame.get("decodedTimeSeconds")) not in (int, float)
+                           or not math.isfinite(frame["decodedTimeSeconds"])
+                           or abs(frame["decodedTimeSeconds"] - index / rate) > 1e-9
                            or any(view["id"] != "main" or view.get("camera") is not None
                                   or view["rectSourcePixels"] != [0, 0, self.data["source"]["width"], self.data["source"]["height"]]
                                   or view.get("presentation", "native") != "native"
-                                  for view in common.source_views(frame, self.data)) for frame in rows)):
+                                  for view in common.source_views(frame, self.data)) for frame, index in zip(rows, indices))):
                 raise ValueError("Chosen camera permission requires complete native coverage with unchanged unmeasured main layout.")
             permissions[key] = copy.deepcopy(permission)
         return permissions
@@ -1122,9 +1150,13 @@ class Generator:
                 family = f"{kind}:{branch}"
                 permission = self.chosen_camera_permissions.get((frame["shotId"], view["id"]))
                 if permission:
+                    fps = self.data["source"]["fps"]
+                    rate = fps["numerator"] / fps["denominator"]
+                    native_start = permission["startDecodedFrameIndex"] / rate
+                    native_end = (permission["lastDecodedFrameIndex"] + 1) / rate
                     if (kind != permission["cameraProvenanceKind"] or component != permission["componentFamily"]
                             or view["provenance"]["kind"] != "chosen-feasible"
-                            or not permission["startSeconds"] <= frame["decodedTimeSeconds"] < permission["endSeconds"]
+                            or not native_start - 1e-9 <= frame["decodedTimeSeconds"] < native_end
                             or view["rectSourcePixels"] != [0,0,self.data["source"]["width"],self.data["source"]["height"]]
                             or view["presentation"] != "native"):
                         raise ValueError("Chosen continuity permission cannot override a camera donor or layout change.")

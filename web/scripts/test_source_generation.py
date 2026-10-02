@@ -21,6 +21,7 @@ def load_script(filename, name):
 common = load_script('compact-source-common.py', 'source_generation_common')
 spin = load_script('compact-spin.py', 'source_generation_spin')
 rocker = load_script('compact-operation-rocker.py', 'source_generation_rocker')
+camera_tracks = load_script('generate-analysis-synthesis-source-tracks.py', 'source_generation_camera_tracks')
 
 
 def exact_exposure():
@@ -230,6 +231,172 @@ class RockerSourceImageTests(unittest.TestCase):
                     self.assertEqual(frame['views'][0]['provenance']['kind'], 'chosen-feasible')
                 else:
                     self.assertEqual(frame['views'], [])
+
+
+class ChosenCameraNativeClockTests(unittest.TestCase):
+    def fixture(self, track_schema):
+        first, last = 623, 637
+        rate = 24000 / 1001
+        shot = {'id': 'presenter-to-spin', 'startSeconds': 25.984291667,
+                'endSeconds': 26.609916667,
+                ('nativeStartFrame' if track_schema else 'startDecodedFrameIndex'): first}
+        rows = [{'shotId': shot['id'], 'decodedTimeSeconds': index / rate,
+                 ('sourceFrameIndex' if track_schema else 'decodedFrameIndex'): index,
+                 'camera': None, 'views': [{'id': 'main', 'camera': None,
+                    'rectSourcePixels': [0, 0, 1920, 1080], 'presentation': 'native'}]}
+                for index in range(first, last + 1)]
+        data = {'source': {'sha256': 'a' * 64, 'width': 1920, 'height': 1080,
+                          'fps': {'numerator': 24000, 'denominator': 1001}},
+                'shots': [shot], 'frames': rows}
+        permission = {'shotId': shot['id'], 'viewId': 'main', 'componentFamily': 'whole',
+                      'cameraProvenanceKind': 'source-informed-framing',
+                      'measurementStatus': 'unmeasured', 'cameraInterpolation': 'continuous-shot',
+                      'cameraInterpolationEvidence': 'Chosen single-body continuous reframing.',
+                      'cameraContinuityFamily': 'chosen:presenter-to-spin:main',
+                      'startSeconds': shot['startSeconds'], 'endSeconds': shot['endSeconds'],
+                      'startDecodedFrameIndex': first, 'lastDecodedFrameIndex': last}
+        packet = {'schemaVersion': 1, 'videoId': '8KmVDxkia_w',
+                  'sourceSha256': data['source']['sha256'], 'permissions': [permission]}
+        return data, packet
+
+    def load_permission(self, data, packet):
+        generator = camera_tracks.Generator.__new__(camera_tracks.Generator)
+        generator.data = data
+        generator.shots = {shot['id']: shot for shot in data['shots']}
+        return generator.chosen_camera_continuity_packet('8KmVDxkia_w', packet)
+
+    def test_both_native_schemas_accept_decimal_cut_rounding_without_mutation(self):
+        for track_schema in (False, True):
+            with self.subTest(track_schema=track_schema):
+                data, packet = self.fixture(track_schema)
+                original = copy.deepcopy(data)
+                permissions = self.load_permission(data, packet)
+                self.assertEqual(permissions[('presenter-to-spin', 'main')], packet['permissions'][0])
+                self.assertEqual(data, original)
+
+    def test_missing_conflicting_or_off_clock_native_evidence_is_refused(self):
+        for mismatch in ('missing-row', 'shot-index', 'row-index', 'nan-pts',
+                         'off-clock', 'frame-camera', 'view-camera', 'layout', 'presentation'):
+            with self.subTest(mismatch=mismatch):
+                data, packet = self.fixture(True)
+                row = data['frames'][0]
+                if mismatch == 'missing-row':
+                    data['frames'].pop(7)
+                elif mismatch == 'shot-index':
+                    data['shots'][0]['startDecodedFrameIndex'] = 624
+                elif mismatch == 'row-index':
+                    row['decodedFrameIndex'] = 624
+                elif mismatch == 'nan-pts':
+                    row['decodedTimeSeconds'] = float('nan')
+                elif mismatch == 'off-clock':
+                    data['frames'][7]['decodedTimeSeconds'] += 0.01
+                elif mismatch == 'frame-camera':
+                    row['camera'] = {'verticalFovDegrees': 30}
+                elif mismatch == 'view-camera':
+                    row['views'][0]['camera'] = {'verticalFovDegrees': 30}
+                elif mismatch == 'presentation':
+                    row['views'][0]['presentation'] = 'horizontal-mirror'
+                else:
+                    row['views'][0]['rectSourcePixels'] = [0, 0, 960, 1080]
+                with self.assertRaises(ValueError):
+                    self.load_permission(data, packet)
+
+
+class PresenterOriginalViewTests(unittest.TestCase):
+    def source(self, legacy_views=True):
+        # Exercise the real retained producer input and constructor, including
+        # the outgoing/incoming null-camera layout accepted before normalization.
+        data = camera_tracks.common.load_observations('8KmVDxkia_w', prefer_track=True)
+        if not legacy_views:
+            return data
+        for frame in data['frames']:
+            if frame['shotId'] == 'presenter-to-spin':
+                view = {'rectSourcePixels': [0, 0, data['source']['width'], data['source']['height']],
+                        'presentation': 'native', 'camera': None}
+                frame['views'] = [dict(view, id=name) for name in ('outgoing', 'incoming')]
+        return data
+
+    def construct(self, data):
+        with patch.object(camera_tracks.common, 'load_observations', return_value=data):
+            return camera_tracks.Generator('8KmVDxkia_w')
+
+    def test_existing_retained_source_accepts_permission(self):
+        generator = self.construct(self.source(legacy_views=False))
+        self.assertIn(('presenter-to-spin', 'main'), generator.chosen_camera_permissions)
+
+    def test_legacy_null_views_normalize_and_apply_permission_at_native_first_exposure(self):
+        generator = self.construct(self.source())
+        frame = next(frame for frame in generator.data['frames']
+                     if frame['shotId'] == 'presenter-to-spin' and frame['sourceFrameIndex'] == 623)
+        self.assertLess(frame['decodedTimeSeconds'], generator.shots[frame['shotId']]['startSeconds'])
+        self.assertEqual([view['id'] for view in frame['views']], ['main'])
+        track = {'frames': [{**frame, 'views': generator.views(frame)}]}
+        generator.camera_metadata(track)
+        permission = generator.chosen_camera_permissions[(frame['shotId'], 'main')]
+        view = track['frames'][0]['views'][0]
+        self.assertEqual(view['cameraInterpolation'], 'continuous-shot')
+        self.assertEqual(view['cameraContinuityFamily'], permission['cameraContinuityFamily'])
+        self.assertEqual(view['cameraProvenance']['kind'], 'source-informed-framing')
+
+    def test_unsupported_original_views_are_refused_before_normalization(self):
+        for mismatch in ('camera', 'rect', 'presentation', 'empty', 'missing', 'warp',
+                         'resolved-warp', 'crossfade', 'unexpected-id', 'duplicate-id'):
+            with self.subTest(mismatch=mismatch):
+                data = self.source()
+                frame = next(frame for frame in data['frames'] if frame['shotId'] == 'presenter-to-spin')
+                view = frame['views'][1]
+                if mismatch == 'camera':
+                    view['camera'] = {'verticalFovDegrees': 30}
+                elif mismatch == 'rect':
+                    view['rectSourcePixels'] = [960, 0, 960, 1080]
+                elif mismatch == 'presentation':
+                    view['presentation'] = 'horizontal-mirror'
+                elif mismatch == 'empty':
+                    frame['views'] = []
+                elif mismatch == 'missing':
+                    frame.pop('views')
+                elif mismatch in ('warp', 'resolved-warp'):
+                    view['resolvedImagePlaneWarp' if mismatch == 'resolved-warp' else 'imagePlaneWarp'] = {
+                        'kind': 'homography', 'unwarpedViewportPixels': [0, 0, 1920, 1080],
+                        'renderToSourcePixels': [1, 0, 0, 0, 1, 0, 0, 0, 1]}
+                elif mismatch == 'crossfade':
+                    view['composite'] = {'mode': 'crossfade', 'groupId': 'body',
+                                         'imageLayerId': 'incoming', 'opacity': 0.5}
+                elif mismatch == 'unexpected-id':
+                    view['id'] = 'unmapped-body'
+                else:
+                    frame['views'].append(copy.deepcopy(view))
+                original = copy.deepcopy(frame.get('views'))
+                with self.assertRaises(ValueError):
+                    self.construct(data)
+                self.assertEqual(frame.get('views'), original)
+
+    def test_unrelated_original_source_views_remain_outside_permission_guard(self):
+        data = self.source()
+        frame = next(frame for frame in data['frames']
+                     if frame['shotId'] != 'presenter-to-spin' and frame.get('views'))
+        frame['views'][0]['rectSourcePixels'] = [0, 0, 960, 1080]
+        original = copy.deepcopy(frame['views'])
+        generator = self.construct(data)
+        self.assertEqual(frame['views'], original)
+        self.assertIn(('presenter-to-spin', 'main'), generator.chosen_camera_permissions)
+
+    def test_presenter_without_selected_permission_keeps_existing_normalization(self):
+        data = self.source()
+        frame = next(frame for frame in data['frames'] if frame['shotId'] == 'presenter-to-spin')
+        frame['views'][1]['rectSourcePixels'] = [960, 0, 960, 1080]
+        packet = {'schemaVersion': 1, 'videoId': '8KmVDxkia_w',
+                  'sourceSha256': data['source']['sha256'], 'permissions': []}
+        permission_path = camera_tracks.WEB / 'content/8KmVDxkia_w.chosen-camera-continuity.json'
+        read_text = Path.read_text
+
+        def read_packet(path, *args, **kwargs):
+            return json.dumps(packet) if path == permission_path else read_text(path, *args, **kwargs)
+
+        with patch.object(Path, 'read_text', read_packet):
+            generator = self.construct(data)
+        self.assertEqual(generator.chosen_camera_permissions, {})
+        self.assertEqual([view['id'] for view in frame['views']], ['main'])
 
 
 class SpinPresentationTests(unittest.TestCase):

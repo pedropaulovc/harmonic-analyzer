@@ -61,21 +61,33 @@ historical settings. Playback distinguishes a working approximation from measure
 fidelity. Unsupported required intervals remain explicit; intervals without a
 corresponding machine may retain the preceding pose.
 
-Analysis03's bounded interval **4.4044..7.307300000000001 seconds** opts in
-to chosen continuous camera framing at both endpoints. Position, rotation, FOV
-and principal point blend only within compatible same-shot views; cuts, layout
-and discrete mechanical changes still hold the decoded exposure. This is
-unmeasured source-informed framing, not recovered camera history or a fidelity
-pass. The final **5% / 0.5-second** limits remain unchanged, as do other videos.
+Analysis03's bounded interval **4.4044..7.307300000000001 seconds** and
+Synthesis's presenter-to-spin interval **25.984291667..26.609916667 seconds**
+opt in to chosen continuous camera framing at both endpoints. Position,
+rotation, FOV and principal point blend only within compatible same-shot views;
+Synthesis's existing front-camera position/rotation stay fixed while its chosen
+principal-point/FOV keys reframe the single machine image. Cuts, layout and
+discrete mechanical changes still hold the decoded exposure. This is unmeasured
+source-informed framing, not recovered camera history or a fidelity pass.
+The final **5% / 0.5-second** limits and other videos' policies remain unchanged.
 
 The optional `content/<videoId>.chosen-camera-continuity.json` permission packet
 pins source SHA, shot bounds, native coverage and unmeasured main/whole framing
 evidence. No packet preserves the old policy. Analysis03 retains all 90 source
-observation rows covering the contiguous native exposures 132..218; all source
-cameras there remain null. Only the selected family bypasses the producer's
-generic 30-degree branch split; generated framing keys are not new measurements.
-Regenerate this video independently with
-`uv run --isolated --no-project python web/scripts/generate-analysis-synthesis-source-tracks.py --video 6dW6VYXp9HM`.
+observation rows covering the contiguous native exposures 132..218. Synthesis's
+presenter-to-spin retains 16 rows covering all 15 native exposures 623..637;
+source cameras in both intervals remain null. Only the selected families bypass
+the producer's generic 30-degree branch split; generated framing keys are not
+new measurements. The Synthesis **25.98..26.54-second** scoped headless
+demonstration does not qualify source matching or recover camera/mechanical pose.
+Before Synthesis's existing single-main normalization, selected permissions
+refuse original measured, partial-frame, mirrored, warped, composite, missing,
+empty or unmapped views. Valid null-camera full-frame main or outgoing/incoming views
+remain accepted; normalized main framing is checked afterward. Original retained
+source layouts are not edited.
+Regenerate either video independently with
+`uv run --isolated --no-project python web/scripts/generate-analysis-synthesis-source-tracks.py --video 6dW6VYXp9HM`
+or replace the video ID with `8KmVDxkia_w` for Synthesis.
 Omitting `--video` still validates and prepares both Analysis/Synthesis outputs
 before publishing either.
 
