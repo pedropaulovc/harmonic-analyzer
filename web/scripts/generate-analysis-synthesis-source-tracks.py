@@ -12,6 +12,9 @@ principal-point/focal framing keys, not a second body or a measured camera fit.
 Synthesis cone-overview retains a two-FIT chosen perspective-camera similarity.
 Cam-rod uses a root-selected upright three-original-FIT fixed-intrinsics SQPNP
 physical pose; former similarities are historical/unaccepted evidence only.
+Cam-rod's historical GPU world receipt is preserved verbatim; a pinned portable
+actual old/current native-CPU/Float32-marker/SQPNP equivalence bridge binds the
+unchanged physical authority to every current native source-code hash.
 Independent qualification remains missing; CHECKs never enter camera objectives.
 Synthesis wheel-macro uses only its original wheel-centre FIT and actual GPU
 centre for a chosen principal-point translation; its hanger CHECK stays held out.
@@ -61,6 +64,66 @@ def same_camera(camera, baseline):
                 or any(not math.isclose(a,b,rel_tol=0.,abs_tol=1e-9) for a,b in zip(values,baseline[name]))):
             return False
     return True
+
+
+def validate_camrod_current_native_rebinding(probe, receipt):
+    """Bind current native code without relabeling the original GPU capture."""
+    bridge = probe["currentNativeCPURebinding"]
+    encoded = json.dumps(bridge, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+    if hashlib.sha256(encoded).hexdigest() != "f9db0ea9b98937086c53a550061fb3ec8df45933d269e9041e6e22509e81dd8b":
+        raise ValueError("Chosen cam-rod current native equivalence artifact changed")
+    lineage = probe["lineage"]
+    historical = bridge["immutableHistoricalAuthority"]
+    original = bridge["originalAuthority"]
+    epoch = bridge["currentNativeEpoch"]
+    native = bridge["nativeCPUEquivalence"]
+    solver = bridge["fitOnlySQPNPEquivalence"]
+    if (bridge["status"] != "actual-old-current-native-and-SQPNP-equivalence-pass"
+            or historical["probe"]["sha256"] != "5a9f17e64671f84478fbdbc6de8cc620ae88932cfae78c3551dd029bc5cc1321"
+            or historical["worldReceipt"]["sha256"] != lineage["actualWorldReceipt"]["sha256"]
+            or historical["sceneSourceSha256"] != lineage["sceneCurrentSourceSha256"]
+            or original["completeInput"] != lineage["completeInput"]
+            or original["sourceImage"] != lineage["sourceImage"]
+            or original["sourceSha256"] != lineage["sourceSha256"]
+            or original["nativeModelSha256"] != lineage["nativeModelSha256"]
+            or original["nativeDenominator"] != 435 or native["nativeDenominator"] != 435
+            or original["originalLandmarks"] != lineage["originalLandmarks"]
+            or original["originalFITs"] != probe["exactInputs"]
+            or epoch["model"]["sha256"] != lineage["nativeModelSha256"]
+            or epoch["strictDependencyCount"] != 1134
+            or not all(epoch[name] and native[name] and solver[name] for name in ("guardBefore", "guardAfter"))
+            or not all(native[name] for name in ("all435MatricesExact", "allNativeGeometryExact", "oldCurrentMachineStateExact", "FITFloat32WorldMatchesHistorical"))
+            or native["oldHashes"] != native["currentHashes"]
+            or not all(row["equal"] and row["maxAbsoluteNumericDifference"] == 0 for row in native["equality"].values())
+            or not solver["allBranchesEquivalent"] or not solver["allCandidatesExactlyEqual"]
+            or solver["actualEnumeration"]["candidates"] != probe["candidates"]
+            or solver["chosenCandidateId"] != "sqpnp-001"
+            or solver["preservedAuthoritativeCamera"] != probe["candidates"][1]["camera"]
+            or solver["sourceCHECKUsedToFitRankSelect"] or bridge["scope"]["sourceCHECKUsedToFitRankSelect"]
+            or bridge["scope"]["newLeftInputCameraEdgeIntegration"]
+            or bridge["scope"]["currentGPUClaim"] or bridge["scope"]["currentGPUEpochInvented"]):
+        raise ValueError("Chosen cam-rod immutable legacy/current native equivalence binding differs")
+    paths = {
+        "web/src/mechanics.ts", "web/src/magnifier.ts", "web/src/kinematics.ts",
+        "web/src/mechanics-data.ts", "web/src/source-witness.ts", "web/src/scene.ts",
+        "web/src/bindings.ts", "web/src/source-track.ts", "web/src/image-plane-homography.ts",
+    }
+    if set(epoch["codeHashes"]) != paths:
+        raise ValueError("Chosen cam-rod current native code census differs")
+    for path, expected in epoch["codeHashes"].items():
+        if hashlib.sha256((ROOT / path).read_bytes()).hexdigest() != expected:
+            raise ValueError(f"Chosen cam-rod current native code epoch differs: {path}")
+    captured = {row["id"]: row for row in receipt["renderedLandmarks"]["landmarks"]}
+    if not (len(probe["exactInputs"]) == len(native["actualOldFITMarkers"]) == len(native["actualCurrentFITMarkers"]) == 3):
+        raise ValueError("Chosen cam-rod current native FIT marker census differs")
+    for row, old, current in zip(probe["exactInputs"], native["actualOldFITMarkers"], native["actualCurrentFITMarkers"]):
+        anchor = row["anchorId"]
+        if (old != current or old["anchorId"] != anchor
+                or old["semanticNativeAnchor"] != row["semanticNativeAnchor"]
+                or old["nativeWorldMetres"] != row["actualRenderedWorldMetres"]
+                or current["nativeWorldMetres"] != captured[anchor]["worldMetres"]):
+            raise ValueError(f"Chosen cam-rod current Float32 native FIT marker differs: {anchor}")
+    return bridge
 
 
 def nearest(rows, time, key):
@@ -573,7 +636,7 @@ class Generator:
         path = "web/content/8KmVDxkia_w.camrod-sqpnp-probe-2026-10-01.json"
         raw = (ROOT / path).read_bytes()
         digest = hashlib.sha256(raw).hexdigest()
-        if digest != "5a9f17e64671f84478fbdbc6de8cc620ae88932cfae78c3551dd029bc5cc1321":
+        if digest != "3ea09b8ce279b5ab10f7d6c7bd73d4cfe8046af3c6b831f398d308e4c7e6e0ba":
             raise ValueError("Chosen cam-rod physical probe artifact changed")
         probe = json.loads(raw)
         lineage = probe["lineage"]
@@ -584,6 +647,7 @@ class Generator:
         if receipt_hash != receipt_record["sha256"] or receipt_hash != "222d69eb315c39366e93cdcaacadd19a9074b153fa6f0db42d3ff5f9d2af8dbc":
             raise ValueError("Chosen cam-rod actual world receipt changed")
         receipt = json.loads(receipt_raw)
+        rebinding = validate_camrod_current_native_rebinding(probe, receipt)
         if (probe["status"] != "candidate-enumeration-only"
                 or probe["selection"] != "none; retain every returned pose; CHECK not evaluated"
                 or probe["chosenIntrinsics"]["verticalFovDegrees"] != 30
@@ -592,8 +656,7 @@ class Generator:
                 or lineage["sourceSha256"] != self.data["source"]["sha256"]
                 or lineage["nativeModelSha256"] != self.native["modelSha256"]
                 or lineage["nativeDenominator"] != 435
-                or lineage["originalLandmarks"] != previous["originalLandmarks"]
-                or lineage["sceneCurrentSourceSha256"] != hashlib.sha256((WEB / "src/scene.ts").read_bytes()).hexdigest()):
+                or lineage["originalLandmarks"] != previous["originalLandmarks"]):
             raise ValueError("Chosen cam-rod source/native/code/intrinsics lineage differs")
         frame = next(frame for frame in self.data["frames"]
                      if frame["shotId"] == "cam-rod" and frame["timeSeconds"] == 100)
@@ -677,10 +740,11 @@ class Generator:
                         "worldReceipt":receipt_path,"worldReceiptSha256":receipt_hash,
                         "worldReceiptOriginalPath":receipt_record["path"],
                         "lineage":copy.deepcopy(lineage),"candidates":candidates,"chosenCandidateId":"sqpnp-001",
+                        "currentNativeCPURebinding":copy.deepcopy(rebinding),
                         "chosenQualitativeMaximumAbsoluteRollDegrees":15.,
                         "chosenCADPositiveZSidePrior":{"FITCentroidWorldMetres":fit_centroid,
                             "rule":"Camera worldZ > original-three-FIT centroid worldZ and forwardWorldZ < 0, matching original back=CAD+Z/source-right=CAD+X semantics; not an arbitrary CAD-front yaw0."},
-                        "generationDependencies":"Active physical choice requires only tracked pinned SQPNP probe/world receipt, original source semantic/FIT identity, matched native hash and unchanged complete seed input. Exact original probe/receipt bytes and their old paths/hashes are retained; ignored paths within immutable lineage are historical references, never reads. Strict current scene.ts SHA byte gate remains: any byte change requires recapture/rebinding, including otherwise cosmetic edits; it is intentionally not waived. Retired similarity reports/committed packet are references only. Authoritative inputs come from *.track.json, never generated *.source-track.json.",
+                        "generationDependencies":"Active physical choice requires the tracked pinned original SQPNP physical authority, unchanged historical GPU world receipt, and mandatory portable actual old/current native-CPU/Float32-marker/SQPNP equivalence metadata; original source semantic/FIT identity, matched native hash and complete seed input remain exact. Original GPU scene-byte lineage is preserved as historical evidence, never relabeled current. Every current native source-code SHA is strictly bound by the equivalence bridge; any byte change requires fresh actual proof/rebinding, including cosmetic edits, with no waiver. Ignored proof paths are provenance references only, never generation-time reads. Retired similarity reports remain references. Authoritative source inputs come from *.track.json, never generated *.source-track.json. CPU equivalence is not current GPU coverage, historical-camera or source/stage acceptance.",
                         "reason":"Root selected only on original qualitative upright columns/no observed large roll and original back=CAD+Z semantic mapping. Both physical sparse branches fit the same three FITs; sqpnp-000's64.65deg roll conflicts with the declared chosen15deg upright/CAD-positiveZ-side prior. This prior is not measured historical roll. CHECK baseline and prior GPU errors were historically inspected, but CHECK was excluded from SQPNP enumeration objective and branch selection; candidate CHECKs were not projected/ranked before root selected001. Post-selection held-out measurements are separate evidence, not retroactive selection inputs.",
                         "depthScope":"Only three actual original FIT points; no whole-native-geometry positive-depth or GPU acceptance claim",
                         "poseConversion":"OpenCV world-to-camera R,t: position=-R^T*t; cameraToWorld=R^T*diag(1,-1,-1); quaternion xyzw. Fixed chosen FOV30, PP(960,540); native XYZ comes from the actual completed-draw Float32 marker vertex, not raster pixels or catalogue assumptions."}})

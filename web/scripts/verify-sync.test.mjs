@@ -1130,7 +1130,7 @@ test('view precondition failures account for actual required CHECK contours with
 test('failed explicitly held-out curves remain CHECK failures rather than converting to FIT', () => {
   const fixture = contourFixture()
   fixture.check.measurementEvidence.evidence = 'Failure does not authorize conversion of this original CHECK to FIT.'
-  fixture.part.contourSourcePixels = [[500, 500], [510, 500]]
+  fixture.part.contourSourcePixels = [[1800, 1000], [1810, 1000]]
   const result = measureContourFixture(fixture)
   assert.equal(result.measured[0].role, 'check')
   assert.equal(result.measured[0].status, 'failed')
@@ -1141,4 +1141,23 @@ test('failed explicitly held-out curves remain CHECK failures rather than conver
   finishVideo(video, censusFixture, parseOptions(['--stage', '50']))
   assert.equal(video.contourChecks.failed, 1)
   assert.equal(video.stageMeasurement.status, 'failed')
+})
+
+test('a conflicting FIT alias never erases the unavailable obligation of an original CHECK', () => {
+  for (const firstRole of ['check', 'fit']) {
+    const fixture = contourFixture(), first = { ...fixture.frame, views: [{ ...fixture.view, sourceContourChecks: [{ ...fixture.check, role: firstRole }] }] }
+    const second = structuredClone(first)
+    second.views[0].sourceContourChecks[0].role = firstRole === 'check' ? 'fit' : 'check'
+    const joined = sourceContourSidecar(fixture.frame, [first, second])
+    Object.assign(fixture.frame, joined)
+    const result = measureContourFixture(fixture)
+    assert.deepEqual(result.measured, [])
+    assert.ok(result.unavailable.some(item => item.contourId === fixture.check.id && item.role === 'check'))
+    const video = videoFixture()
+    Object.assign(video.samples[0], { status: 'unavailable', contourChecks: result.measured, contourFits: result.retainedFits, unavailable: result.unavailable })
+    finishVideo(video, censusFixture, parseOptions(['--stage', '50']))
+    assert.equal(video.contourChecks.unavailable, 1)
+    assert.equal(video.contourChecks.measured, 0)
+    assert.notEqual(video.stageMeasurement.status, 'passed')
+  }
 })

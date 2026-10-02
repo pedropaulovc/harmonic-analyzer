@@ -179,6 +179,7 @@ export function sourceContourSidecar(frame, originals) {
       if (identities.has(key)) {
         if (!prior || jsonDigest(prior.check) !== jsonDigest(check) || prior.originalViewId !== sourceView.id) {
           identities.set(key, null)
+          if (prior) contourJoinUnavailable.push({ viewId: prior.viewId, originalViewId: prior.originalViewId, contourId: prior.check.id, partPath: prior.check.partPath, role: prior.check.role, status: 'source-unavailable', reason: 'Conflicting exact-exposure source contour identities cannot choose or merge a curve' })
           contourJoinUnavailable.push({ ...context, status: 'source-unavailable', reason: 'Conflicting exact-exposure source contour identities cannot choose or merge a curve' })
         }
         continue
