@@ -129,6 +129,21 @@ def test_package_text_cites_only_bom_or_external_part_numbers() -> None:
     assert cited <= bom | EXTERNAL_NUMBERS
 
 
+def test_every_crank_mesh_check_spans_one_full_crank_gear_turn() -> None:
+    """#1144 blocker 3: sheet 8 checked the mesh over one crank turn, a
+    quarter of the MHA-021 revolution step 4 and check 2 require."""
+    import crank_drive_gear_spec as gear
+    import crank_pinion_spec as pinion
+
+    assert drawing.CRANK_TURNS_PER_GEAR_TURN == gear.TEETH / pinion.TEETH
+    full_gear_turn = re.compile(r"MHA-021.{0,30}\bFULL\b|\bFULL\b.{0,30}MHA-021")
+    fit = " ".join(drawing.FIT_PLACEHOLDER.split())
+    for text in (fit, drawing.CONE_CRANK_STEPS, drawing.CHECKS):
+        assert full_gear_turn.search(" ".join(text.split())), text
+    assert re.search(rf"\b{drawing.CRANK_TURNS_PER_GEAR_TURN} CRANK TURNS\b", fit)
+    assert "ONE CRANK TURN" not in fit
+
+
 def test_note_lines_fit_a_half_sheet_field() -> None:
     """3.5 mm text renders about 2.63 mm per character; a field is 194 mm wide."""
     for text in (
