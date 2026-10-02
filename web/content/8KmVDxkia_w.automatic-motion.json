@@ -35,7 +35,7 @@
       "sha256": "731ae554aee8b77b7643073d4107f59a04ea530ad41612ec8de00316aaec183c"
     },
     "web/scripts/generate-8KmVDxkia_w-automatic-motion.py": {
-      "sha256": "a2093720f2240b63915a3b95f8c5b4a68daaab571183f36b634b0e27d303a78b"
+      "sha256": "4a7467b622c6191ee0a2c0bf5c53ca2c721b86f1c831617bea433a0c803b46b8"
     }
   },
   "bankInterval": {
@@ -4355,9 +4355,12 @@
       }
     ],
     "annotationFITCount": 409,
-    "allPhysicalCHECKExposuresExcludedFromAnnotationFIT": true,
-    "cadenceRule": "Actually observed H20 upper/lower extrema establish cumulative half-sweep branch (2crank-equivalent turns each). Dense source annotation FIT Y chooses one bounded smooth within-sweep phase shape; positive angular derivative is declared single-sense continuation, not measured exact speed at unobservable extrema. Independent CHECK exposures never fit cadence. Final partial sweep is endpoint-limited. Linear interpolation of cumulative crankTurns between native-source keys; no modulo, wall-clock clock or manual control.",
-    "phaseAssociation": "All20stations use native upper-extreme phase at f2541 as explicitly source-informed/chosen initial alignment; measured H20 temporal drive then feeds exact physical harmonics20..1. H1 independent physical controls diagnose this choice."
+    "physicalCHECKHoldout": {
+      "far20Metal": "exposure-disjoint-from-annotation-FIT",
+      "nearest1PhysicalJoint": "feature-pixel-held-out-at-annotation-FIT-exposures"
+    },
+    "cadenceRule": "Actually observed H20 upper/lower extrema establish cumulative half-sweep branch (2crank-equivalent turns each). Dense source annotation FIT Y chooses one bounded smooth within-sweep phase shape; positive angular derivative is declared single-sense continuation, not measured exact speed at unobservable extrema. Far-H20 physical-metal CHECK exposures never fit cadence. H1 cross-feature CHECK pixels stay out of cadence and pixel-gauge objectives, but their exposure times overlap annotation FIT. Final partial sweep is endpoint-limited. Linear interpolation of cumulative crankTurns between native-source keys; no modulo, wall-clock clock or manual control.",
+    "phaseAssociation": "All20stations use native upper-extreme phase at f2541 as explicitly source-informed/chosen initial alignment; measured H20 temporal drive then feeds exact physical harmonics20..1. H1 feature-pixel-held-out physical controls diagnose this choice."
   },
   "lowerCrank": {
     "intervalSeconds": [

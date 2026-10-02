@@ -5,8 +5,9 @@ uv run --python web/.vite/calibration-venv/bin/python --no-project \
   web/scripts/generate-8KmVDxkia_w-automatic-motion.py
 
 The high20 explanatory tube is explicitly annotation evidence. Its extrema time
-an unsigned crank-equivalent advance; physical gray-metal and genuine nearest
-rod-joint exposures are independent controls. +/− bank sense stays unresolved.
+an unsigned crank-equivalent advance. Far-H20 gray-metal CHECK exposures are
+cadence-disjoint; nearest-H1 rod-joint CHECK pixels are feature-held-out at
+annotation FIT times. +/− bank sense stays unresolved.
 No images/video/model assets, historical seals or other corpora are changed.
 """
 from __future__ import annotations
@@ -54,6 +55,17 @@ def build_packet():
     fits = [row for row in evidence['annotations'] if row['role']=='fit']
     if any(row['sourceImage']['frameIndex'] in checks for row in fits):
         raise ValueError('Independent metal control exposure entered annotation objective')
+    fit_indices = {row['sourceImage']['frameIndex'] for row in fits}
+    nearest_rows = evidence['nearestJointSource']['rows']
+    nearest_fit_indices = {row['sourceImage']['frameIndex'] for row in nearest_rows
+                           if row['role']=='fit-pixel-gauge-only'}
+    nearest_check_indices = {row['sourceImage']['frameIndex'] for row in nearest_rows
+                             if row['role']=='check'}
+    if (not nearest_check_indices or not nearest_check_indices <= fit_indices
+            or nearest_check_indices & nearest_fit_indices):
+        raise ValueError('H1 CHECK pixels must stay gauge-held-out at annotation FIT exposures')
+    if any(row['sourceImage']['frameIndex'] in checks for row in evidence['physicalMetalFIT']):
+        raise ValueError('H20 CHECK exposure entered physical pixel-gauge FIT')
     times = np.array([source_time(row) for row in fits])
     pixels = np.array([row['pixel'][1] for row in fits])
     if not np.all(np.diff(times)>0):
@@ -206,9 +218,11 @@ def build_packet():
             'chosenWithinSweepCrankTurnsPerVideoSecondRange':[float(min(dense_speeds)),float(max(dense_speeds))],
             'withinSweepFits':leg_fits,
             'sourceHigh20Extrema':source_extrema,'annotationFITCount':len(fits),
-            'allPhysicalCHECKExposuresExcludedFromAnnotationFIT':True,
-            'cadenceRule':'Actually observed H20 upper/lower extrema establish cumulative half-sweep branch (2crank-equivalent turns each). Dense source annotation FIT Y chooses one bounded smooth within-sweep phase shape; positive angular derivative is declared single-sense continuation, not measured exact speed at unobservable extrema. Independent CHECK exposures never fit cadence. Final partial sweep is endpoint-limited. Linear interpolation of cumulative crankTurns between native-source keys; no modulo, wall-clock clock or manual control.',
-            'phaseAssociation':'All20stations use native upper-extreme phase at f2541 as explicitly source-informed/chosen initial alignment; measured H20 temporal drive then feeds exact physical harmonics20..1. H1 independent physical controls diagnose this choice.'},
+            'physicalCHECKHoldout':{
+                'far20Metal':'exposure-disjoint-from-annotation-FIT',
+                'nearest1PhysicalJoint':'feature-pixel-held-out-at-annotation-FIT-exposures'},
+            'cadenceRule':'Actually observed H20 upper/lower extrema establish cumulative half-sweep branch (2crank-equivalent turns each). Dense source annotation FIT Y chooses one bounded smooth within-sweep phase shape; positive angular derivative is declared single-sense continuation, not measured exact speed at unobservable extrema. Far-H20 physical-metal CHECK exposures never fit cadence. H1 cross-feature CHECK pixels stay out of cadence and pixel-gauge objectives, but their exposure times overlap annotation FIT. Final partial sweep is endpoint-limited. Linear interpolation of cumulative crankTurns between native-source keys; no modulo, wall-clock clock or manual control.',
+            'phaseAssociation':'All20stations use native upper-extreme phase at f2541 as explicitly source-informed/chosen initial alignment; measured H20 temporal drive then feeds exact physical harmonics20..1. H1 feature-pixel-held-out physical controls diagnose this choice.'},
         'lowerCrank':{'intervalSeconds':[source_time(crank_fit[0]),source_time(crank_check[-1])],
             'binding':crank['binding'],'direction':1,'directionAuthority':crank['sourceView'],
             'crankTurnsPerVideoSecond':float(slope/(2*math.pi)),

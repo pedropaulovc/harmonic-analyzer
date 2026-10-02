@@ -176,8 +176,13 @@ These are driving-shaft phases, not rocker deflection angles. The lower-crank
 **270.35..271.23-second** interval has `phaseMatchQualified: false` and supplies
 no runtime motion; neither cadence nor phase continues across a cut.
 
-Conditional independent actual-metal controls cover 18 harmonics over 20
-exposures (maximum 26.50 px) and 17 harmonics at one exposure (maximum 9.43 px).
+Conditional actual-metal controls cover **18 held-out exposures at H20**
+(maximum 26.50 px) and **17 pixel/feature-held-out exposures at H1**
+(maximum 9.43 px); H2–H19 remain unmeasured. The packet's typed
+`physicalCHECKHoldout` authority is checked against the actual exposure sets:
+H20 CHECK exposures are disjoint from annotation FIT, while all H1 CHECK
+times overlap annotation FIT. H1 cross-feature physical pixels stay out of
+cadence and H1 pixel-gauge objectives; they are not exposure-held-out controls.
 Their scope does not establish actual rocker-mesh GPU motion, full-scene
 correspondence or camera qualification. Continuous original-video/native
 playback over **105.96..124.45 seconds** recorded 444 media frames and 153

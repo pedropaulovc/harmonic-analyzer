@@ -1,6 +1,7 @@
 """Consumer-visible source identity and presentation refusal boundaries."""
 import copy
 import importlib.util
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -1036,6 +1037,66 @@ class SynthesisAutomaticSourceDriveCurrentOnlyTests(unittest.TestCase):
         boundary['decodedTimeSeconds'] = generator.shots['rocker-bank']['endSeconds']
         self.assertIsNone(generator.synthesis_automatic_input(
             boundary, 'bar', self.main_view(generator, end)))
+
+    def test_current_only_h1_pixel_holdout_accepts_fit_times_but_refuses_exposure_holdout(self):
+        generator = self.fixture()
+        packet = generator.synthesis_automatic_motion['packet']
+        evidence = json.loads((camera_tracks.ROOT / camera_tracks.SYNTHESIS_AUTOMATIC_EVIDENCE).read_text())
+        annotation_fits = {row['sourceImage']['frameIndex'] for row in evidence['annotations']
+                           if row['role'] == 'fit'}
+        h1_checks = [row for row in evidence['nearestJointSource']['rows'] if row['role'] == 'check']
+        self.assertEqual(len(h1_checks), 17)
+        self.assertTrue({row['sourceImage']['frameIndex'] for row in h1_checks} <= annotation_fits)
+        # A valid cross-feature CHECK exposure must retain its annotation cadence
+        # knot, not be dropped by an overbroad all-physical exposure holdout.
+        knots = {row['timeSeconds']: row['crankTurns']
+                 for row in generator.synthesis_automatic_motion['candidate']['knots']}
+        for row in h1_checks:
+            with self.subTest(accepted_h1_frame=row['sourceImage']['frameIndex']):
+                frame = self.source_frame(generator, row['sourceImage']['frameIndex'])
+                value, _ = generator.synthesis_automatic_input(
+                    frame, 'bar', self.main_view(generator, frame))
+                self.assertAlmostEqual(value['crankTurns'], knots[row['timeSeconds']], places=10)
+
+        paths = [camera_tracks.SYNTHESIS_AUTOMATIC_MOTION, *packet['generationDependencies']]
+        for mismatch in ('h1-exposure-authority', 'h1-disjoint-time', 'h20-fit-overlap'):
+            with self.subTest(mismatch=mismatch), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                for relative in paths:
+                    target = root / relative
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_bytes((camera_tracks.ROOT / relative).read_bytes())
+                changed_packet, changed_evidence = copy.deepcopy(packet), copy.deepcopy(evidence)
+                expected_error = 'H1 CHECK feature-pixel holdout'
+                if mismatch == 'h1-exposure-authority':
+                    changed_packet['bankMeasurement']['physicalCHECKHoldout']['nearest1PhysicalJoint'] = (
+                        'exposure-disjoint-from-annotation-FIT')
+                else:
+                    if mismatch == 'h1-disjoint-time':
+                        changed_row = next(row for row in changed_evidence['nearestJointSource']['rows']
+                                           if row['role'] == 'check')
+                        exposure = changed_evidence['physicalMetalCHECK'][0]
+                    else:
+                        changed_row = changed_evidence['physicalMetalCHECK'][0]
+                        exposure = next(row for row in changed_evidence['annotations'] if row['role'] == 'fit')
+                        expected_error = 'H20 CHECK exposure holdout'
+                    changed_row['sourceImage'] = copy.deepcopy(exposure['sourceImage'])
+                    changed_row['timeSeconds'] = exposure['timeSeconds']
+                evidence_path = root / camera_tracks.SYNTHESIS_AUTOMATIC_EVIDENCE
+                evidence_path.write_text(json.dumps(changed_evidence, indent=2) + '\n')
+                evidence_hash = hashlib.sha256(evidence_path.read_bytes()).hexdigest()
+                changed_packet['generationDependencies'][camera_tracks.SYNTHESIS_AUTOMATIC_EVIDENCE]['sha256'] = (
+                    evidence_hash)
+                packet_path = root / camera_tracks.SYNTHESIS_AUTOMATIC_MOTION
+                packet_path.write_text(json.dumps(changed_packet, indent=2) + '\n')
+                packet_hash = hashlib.sha256(packet_path.read_bytes()).hexdigest()
+                # Re-pin real fixture bytes so refusal must come from the typed
+                # holdout and actual exposure sets, not the outer digest gate.
+                with patch.object(camera_tracks, 'ROOT', root), \
+                        patch.object(camera_tracks, 'SYNTHESIS_AUTOMATIC_MOTION_SHA256', packet_hash), \
+                        patch.object(camera_tracks, 'SYNTHESIS_AUTOMATIC_EVIDENCE_SHA256', evidence_hash):
+                    with self.assertRaisesRegex(ValueError, expected_error):
+                        generator.synthesis_automatic_motion_packet()
 
     def test_current_only_source_model_and_exact_exposure_mismatches_are_refused(self):
         for mismatch in ('source', 'model', 'missing-knot-exposure', 'wrong-exposure-hash', 'off-native-clock'):

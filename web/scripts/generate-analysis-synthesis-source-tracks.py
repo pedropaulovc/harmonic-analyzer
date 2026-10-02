@@ -63,7 +63,7 @@ ANALYSIS_MODEL_SHA256 = "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a2
 AUTOMATIC_NATIVE_MATH = ("web/src/mechanics.ts", "web/src/mechanics-data.ts",
                          "web/src/kinematics.ts", "web/src/magnifier.ts")
 SYNTHESIS_AUTOMATIC_MOTION = "web/content/8KmVDxkia_w.automatic-motion.json"
-SYNTHESIS_AUTOMATIC_MOTION_SHA256 = "a11d9ecc5feb2dbb7950722b8934967d4b6764cc6d662a7d79674072e07a8188"
+SYNTHESIS_AUTOMATIC_MOTION_SHA256 = "68b33f73055a49bbdbfad4e86d4f59ccc45e39b93be0b5b7fa71f3ec490dae3b"
 SYNTHESIS_AUTOMATIC_EVIDENCE = "web/content/8KmVDxkia_w.automatic-motion-evidence.json"
 SYNTHESIS_AUTOMATIC_EVIDENCE_SHA256 = "7a193758b02166ad02604274cd08b89135b2941f54301312d242efcc508e8233"
 SYNTHESIS_AUTOMATIC_BRANCH = "bank-direction-+1"  # Explicit chosen sense, never source-identified.
@@ -651,9 +651,21 @@ class Generator:
                 raise ValueError("Synthesis automatic source-image/native exposure authority differs")
             images[index] = image
         fit_indices = {row["sourceImage"]["frameIndex"] for row in evidence["annotations"] if row["role"] == "fit"}
-        check_indices = {row["sourceImage"]["frameIndex"] for row in evidence["physicalMetalCHECK"]}
-        if fit_indices & check_indices or packet["bankMeasurement"]["allPhysicalCHECKExposuresExcludedFromAnnotationFIT"] is not True:
-            raise ValueError("Independent physical controls entered Synthesis automatic cadence FIT")
+        far_check_indices = {row["sourceImage"]["frameIndex"] for row in evidence["physicalMetalCHECK"]}
+        far_fit_indices = {row["sourceImage"]["frameIndex"] for row in evidence["physicalMetalFIT"]}
+        nearest_rows = evidence["nearestJointSource"]["rows"]
+        nearest_check_indices = {row["sourceImage"]["frameIndex"] for row in nearest_rows if row["role"] == "check"}
+        nearest_fit_indices = {row["sourceImage"]["frameIndex"] for row in nearest_rows
+                               if row["role"] == "fit-pixel-gauge-only"}
+        holdout = packet["bankMeasurement"].get("physicalCHECKHoldout")
+        if (not isinstance(holdout,dict) or set(holdout) != {"far20Metal","nearest1PhysicalJoint"}
+                or holdout["far20Metal"] != "exposure-disjoint-from-annotation-FIT"
+                or not far_check_indices or far_check_indices & (fit_indices | far_fit_indices)):
+            raise ValueError("H20 CHECK exposure holdout differs from actual annotation/pixel-gauge FIT")
+        if (holdout["nearest1PhysicalJoint"] != "feature-pixel-held-out-at-annotation-FIT-exposures"
+                or not nearest_check_indices or not nearest_check_indices <= fit_indices
+                or nearest_check_indices & nearest_fit_indices):
+            raise ValueError("H1 CHECK feature-pixel holdout must overlap annotation FIT exposures without entering pixel-gauge FIT")
         knots = candidate["knots"]
         times = []
         indices = []
@@ -712,8 +724,9 @@ class Generator:
                  "Unmeasured same-shot endpoint hold; no cadence extrapolation or return-to-zero blend.")
         return value, (scope+" Explicit chosen +native bank sense, NOT source-identified direction; "
             "constant20 upper-aligned phases are a source-informed prior, NOT twenty recovered historical phases. "
-            "409 explanatory-annotation FIT exposures time cumulative crank-equivalent drive; actual physical "
-            "metal/joint controls remain independent and are not camera/GPU qualification. All20stations use "
+            "409 explanatory-annotation FIT exposures time cumulative crank-equivalent drive. "
+            "H20 metal CHECK exposures stay outside annotation FIT; H1 cross-feature CHECK pixels remain held out "
+            "at annotation FIT times. Neither control is camera/GPU qualification. All20stations use "
             "unchanged released harmonic20..1 coupling. Other complete baseline settings remain unobserved/chosen.")
 
     def analysis_held_camera_packet(self):

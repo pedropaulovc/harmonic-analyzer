@@ -119,8 +119,11 @@ This drive applies only to the rocker-bank/main/native full-canvas unwarped view
 Unmeasured same-shot slivers hold the nearest new input until the real cut.
 The lower-crank interval **270.35..271.23 seconds** is excluded
 (`phaseMatchQualified: false`); cadence and phases do not transfer across cuts.
-Conditional independent actual-metal controls cover 18 harmonics over 20 exposures
-(maximum 26.50 px) and 17 harmonics at one exposure (maximum 9.43 px).
+Conditional actual-metal controls cover **18 held-out exposures at H20**
+(maximum 26.50 px) and **17 pixel/feature-held-out exposures at H1**
+(maximum 9.43 px). H20 CHECK exposures are disjoint from annotation FIT.
+H1 CHECK times overlap annotation FIT, but its cross-feature physical pixels
+never enter the cadence or H1 pixel-gauge fit. H2–H19 remain unmeasured.
 They do not qualify GPU motion, the full scene or the camera. Separate native
 GPU captures exercised all twenty visible rocker meshes, with changing raster
 extents and contours at a fixed camera. Uninterrupted original-video/native
