@@ -21,6 +21,7 @@ def load_script(filename, name):
 common = load_script('compact-source-common.py', 'source_generation_common')
 spin = load_script('compact-spin.py', 'source_generation_spin')
 rocker = load_script('compact-operation-rocker.py', 'source_generation_rocker')
+camera_tracks = load_script('generate-analysis-synthesis-source-tracks.py', 'source_generation_camera_tracks')
 
 
 def exact_exposure():
@@ -230,6 +231,80 @@ class RockerSourceImageTests(unittest.TestCase):
                     self.assertEqual(frame['views'][0]['provenance']['kind'], 'chosen-feasible')
                 else:
                     self.assertEqual(frame['views'], [])
+
+
+class ChosenCameraNativeClockTests(unittest.TestCase):
+    def fixture(self, legacy):
+        first, last = 623, 637
+        rate = 24000 / 1001
+        shot = {'id': 'presenter-to-spin', 'startSeconds': 25.984291667,
+                'endSeconds': 26.609916667,
+                ('nativeStartFrame' if legacy else 'startDecodedFrameIndex'): first}
+        rows = [{'shotId': shot['id'], 'decodedTimeSeconds': index / rate,
+                 ('sourceFrameIndex' if legacy else 'decodedFrameIndex'): index,
+                 'camera': None, 'views': [{'id': 'main', 'camera': None,
+                    'rectSourcePixels': [0, 0, 1920, 1080], 'presentation': 'native'}]}
+                for index in range(first, last + 1)]
+        data = {'source': {'sha256': 'a' * 64, 'width': 1920, 'height': 1080,
+                          'fps': {'numerator': 24000, 'denominator': 1001}},
+                'shots': [shot], 'frames': rows}
+        permission = {'shotId': shot['id'], 'viewId': 'main', 'componentFamily': 'whole',
+                      'cameraProvenanceKind': 'source-informed-framing',
+                      'measurementStatus': 'unmeasured', 'cameraInterpolation': 'continuous-shot',
+                      'cameraInterpolationEvidence': 'Chosen single-body continuous reframing.',
+                      'cameraContinuityFamily': 'chosen:presenter-to-spin:main',
+                      'startSeconds': shot['startSeconds'], 'endSeconds': shot['endSeconds'],
+                      'startDecodedFrameIndex': first, 'lastDecodedFrameIndex': last}
+        packet = {'schemaVersion': 1, 'videoId': '8KmVDxkia_w',
+                  'sourceSha256': data['source']['sha256'], 'permissions': [permission]}
+        return data, packet
+
+    def load_permission(self, data, packet):
+        generator = camera_tracks.Generator.__new__(camera_tracks.Generator)
+        generator.data = data
+        generator.shots = {shot['id']: shot for shot in data['shots']}
+        with tempfile.TemporaryDirectory() as directory:
+            web = Path(directory)
+            (web / 'content').mkdir()
+            (web / 'content/8KmVDxkia_w.chosen-camera-continuity.json').write_text(json.dumps(packet))
+            with patch.object(camera_tracks, 'WEB', web):
+                return generator.chosen_camera_continuity_packet('8KmVDxkia_w')
+
+    def test_both_native_schemas_accept_decimal_cut_rounding_without_mutation(self):
+        for legacy in (False, True):
+            with self.subTest(legacy=legacy):
+                data, packet = self.fixture(legacy)
+                original = copy.deepcopy(data)
+                permissions = self.load_permission(data, packet)
+                self.assertEqual(permissions[('presenter-to-spin', 'main')], packet['permissions'][0])
+                self.assertEqual(data, original)
+
+    def test_missing_conflicting_or_off_clock_native_evidence_is_refused(self):
+        for mismatch in ('missing-row', 'shot-index', 'row-index', 'nan-pts',
+                         'off-clock', 'before-cut', 'after-last', 'camera', 'layout'):
+            with self.subTest(mismatch=mismatch):
+                data, packet = self.fixture(True)
+                row = data['frames'][0]
+                if mismatch == 'missing-row':
+                    data['frames'].pop(7)
+                elif mismatch == 'shot-index':
+                    data['shots'][0]['startDecodedFrameIndex'] = 624
+                elif mismatch == 'row-index':
+                    row['decodedFrameIndex'] = 624
+                elif mismatch == 'nan-pts':
+                    row['decodedTimeSeconds'] = float('nan')
+                elif mismatch == 'off-clock':
+                    data['frames'][7]['decodedTimeSeconds'] += 0.01
+                elif mismatch == 'before-cut':
+                    row['decodedTimeSeconds'] -= 2e-9
+                elif mismatch == 'after-last':
+                    data['frames'][-1]['decodedTimeSeconds'] += 2e-9
+                elif mismatch == 'camera':
+                    row['views'][0]['camera'] = {'verticalFovDegrees': 30}
+                else:
+                    row['views'][0]['rectSourcePixels'] = [0, 0, 960, 1080]
+                with self.assertRaises(ValueError):
+                    self.load_permission(data, packet)
 
 
 class SpinPresentationTests(unittest.TestCase):

@@ -121,13 +121,24 @@ source-fit/source-transfer continuity. Unknown policies or missing continuous-sh
 evidence reject the track. Existing continuity/provenance families and
 cut, layout, gearing and counter-height-mode guards remain authoritative.
 
-Only Analysis03's bounded **4.4044..7.307300000000001-second** interval opts
-in to this chosen continuous framing. Position, quaternion rotation, FOV and
-principal point interpolate; mechanical provenance remains chosen and stages
-remain unmeasured. Neither this interpolation nor the scoped headless
-**5.9..7.1-second** demonstration establishes recovered camera history or a
-fidelity pass. All six videos retain the final **5% / 0.5-second** acceptance
-limits; other videos' framing policies are unchanged.
+Analysis03's bounded **4.4044..7.307300000000001-second** interval and
+Synthesis's presenter-to-spin **25.984291667..26.609916667-second** interval
+opt in to this chosen continuous framing through the same optional
+`content/<videoId>.chosen-camera-continuity.json` permission convention.
+Position, quaternion rotation, FOV and principal point interpolate; Synthesis
+holds its existing front-camera position/quaternion and blends its chosen
+principal-point/FOV reframing keys. Its 16 retained source rows cover native
+exposures 623..637. Permission validation follows the producer's existing
+source-inspected normalization of legacy outgoing/incoming guesses to one
+unmeasured full-frame native main/whole composition; retained source files stay
+unchanged. Both active observation and retained-track native-index schemas must
+agree when both fields are present. Native PTS must match index/FPS within
+1e-9 seconds; decimal cut rounding does not authorize a frame-sized expansion.
+Mechanical provenance remains chosen and stages remain unmeasured. Neither this
+interpolation nor the scoped headless Analysis **5.9..7.1-second** and Synthesis
+**25.98..26.54-second** demonstrations establish recovered camera/mechanical pose,
+historical camera motion or a fidelity pass. All six videos retain the final
+**5% / 0.5-second** acceptance limits; other videos' framing policies are unchanged.
 
 Eight focused `node:test` cases load the real modules through Vite SSR
 (`npm --prefix web run test:playback`). An optional `SOURCE_TRACK_MODULE`
