@@ -397,6 +397,91 @@ class PresenterOriginalViewTests(unittest.TestCase):
             generator = self.construct(data)
         self.assertEqual(generator.chosen_camera_permissions, {})
         self.assertEqual([view['id'] for view in frame['views']], ['main'])
+def operation_exposure():
+    data, rocker_seeds = rocker_exposure()
+    data['source']['videoId'] = 'jfH-NbsmvD4'
+    data['shots'][0]['id'] = 'operation-019'
+    frame = data['frames'][0]
+    frame.update(shotId='operation-019', sourceFrameIndex=30,
+                 sourceImage=copy.deepcopy(rocker_seeds['states'][0]['sourceImage']),
+                 sourceObservationAuthority='operation019-v3',
+                 unavailable=[{'anchorId': 'lost-feature', 'viewId': 'main',
+                               'reason': 'Inherited source loss remains unqualified.'}])
+    frame['camera'] = copy.deepcopy(rocker_seeds['bodyCandidate']['camera'])
+    frame['landmarks'] = [{'anchorId': 'support', 'role': 'check',
+                           'status': 'observed', 'method': 'manual',
+                           'pixel': [120.5, 340.25], 'uncertaintyPx': 3}]
+    data['anchors'] = [{'id': 'support', 'kind': 'physical-feature'}]
+    old_input = copy.deepcopy(rocker_seeds['states'][0]['completeInput'])
+    new_input = copy.deepcopy(old_input)
+    new_input['crankTurns'] = 0.75
+    camera = copy.deepcopy(frame['camera'])
+    camera['positionMetres'] = [0, 0, 3]
+    seeds = {
+        'sourceInputIndex': {'rows': [{
+            'recordId': 'canonical:0:main', 'kind': 'canonical',
+            'shotId': 'operation-019', 'timeSeconds': 1.01,
+            'sourceFrameIndex': 30, 'viewId': 'main',
+            'rectSourcePixels': [0, 0, 1920, 1080]}]},
+        'chosenStates': {'canonical:0:main': old_input},
+        'observedDegrees': {}, 'fragments': {}, 'gapExposures': [],
+        'correctedCaptures': {},
+        'sourceControls': [{
+            'sourceFrameIndex': 30, 'sourceImage': copy.deepcopy(frame['sourceImage']),
+            'declarations': [{
+                'fragment': 'historical', 'viewId': 'main',
+                'usage': 'provenance-only',
+                'declaration': {**copy.deepcopy(frame['landmarks'][0]),
+                                'pixel': [140, 360]}}]}],
+        'captureRequests': [{'path': 'tracked-numeric-seed', 'request': {
+            'sourceImage': copy.deepcopy(frame['sourceImage']),
+            'decodedTimeSeconds': 1.0, 'viewId': 'main', 'camera': camera,
+            'input': new_input, 'cameraContinuityFamily': 'conditional-family',
+            'cameraProvenance': {'kind': 'source-fit', 'family': 'conditional-family',
+                                 'evidence': 'CHECK-informed inherited family; not cold.'},
+            'inputEvidence': 'Chosen complete state; hidden input is unobserved.'}}],
+    }
+    return data, seeds
+
+
+class OperationCaptureAuthorityTests(unittest.TestCase):
+    def generate(self, data, seeds):
+        with patch.object(rocker.common, 'load_observations',
+                          return_value=copy.deepcopy(data)), patch.object(
+                rocker, 'load_seeds', return_value=(copy.deepcopy(seeds), {})), patch.object(
+                rocker, 'retain_generator_inputs'):
+            return rocker.operation()
+
+    def test_fresh_pixels_and_inherited_loss_survive_complete_playback(self):
+        data, seeds = operation_exposure()
+        track = self.generate(data, seeds)
+        for time in (1, 1.01):
+            frame = next(row for row in track['frames'] if row['timeSeconds'] == time)
+            self.assertEqual(frame['landmarks'], data['frames'][0]['landmarks'])
+            self.assertEqual(frame['unavailable'], data['frames'][0]['unavailable'])
+            self.assertEqual(frame['decodedTimeSeconds'], 1.0)
+            self.assertEqual(frame['sourceImage'], data['frames'][0]['sourceImage'])
+            self.assertEqual(frame['views'][0]['input']['crankTurns'], 0.75)
+            self.assertEqual(frame['views'][0]['camera']['positionMetres'], [0, 0, 3])
+
+    def test_different_source_hash_clock_or_view_cannot_replace_exact_camera_input(self):
+        for mismatch in ('hash', 'source', 'pts', 'view'):
+            with self.subTest(mismatch=mismatch):
+                data, seeds = operation_exposure()
+                request = seeds['captureRequests'][0]['request']
+                if mismatch == 'hash':
+                    request['sourceImage']['sha256Gray8'] = 'c' * 64
+                elif mismatch == 'source':
+                    request['sourceImage']['sourceSha256'] = 'c' * 64
+                elif mismatch == 'pts':
+                    request['decodedTimeSeconds'] = 1.00001
+                else:
+                    request['viewId'] = 'inset'
+                track = self.generate(data, seeds)
+                frame = next(row for row in track['frames'] if row['timeSeconds'] == 1)
+                self.assertEqual(frame['views'][0]['camera'], data['frames'][0]['camera'])
+                self.assertEqual(frame['views'][0]['input']['crankTurns'], 0)
+                self.assertEqual(frame['landmarks'], data['frames'][0]['landmarks'])
 
 
 class SpinPresentationTests(unittest.TestCase):
