@@ -149,17 +149,55 @@ reverting the implementation. Synthetic fixtures test runtime decisions, not
 source observations or rendered fidelity.
 
 Phase offsets interpolate along the shortest angular arc; cumulative crank turns
-remain linear. The Analysis bank's independently fitted inverse cam roots are
-continued on the nearest genuine branch before interpolation. Both roots preserve
-the observed rocker angle, but may change an unobserved cam/rod orientation.
-Retain the original rod bounds, CHECK pixels and branch-choice audit; do not
-suppress an infeasible transition or claim recovered phase history.
+remain linear. Outside the bounded Analysis motion scopes below, independently
+fitted bank inverse cam roots continue on the nearest genuine branch before
+interpolation. Both roots preserve the observed rocker angle but may change an
+unobserved cam/rod orientation. The original rod bounds, CHECK pixels and
+branch-choice audit remain required; phase history is not recovered.
 
 Production playback does not require semantic source certificates for every one
 of the 435 native drawables at every exposure. Native model identity, complete
 inventory and coherent attached-part motion still matter. Offline source evidence
 is separate from compact runtime tracks; full decoded-frame observation corpora
 are not a prerequisite for displaying an honestly labelled approximation.
+
+#### Bounded Analysis motion authority
+
+The source-specific producers
+[`6dW6VYXp9HM-visible-crank-extract.py`](scripts/6dW6VYXp9HM-visible-crank-extract.py),
+[`6dW6VYXp9HM-visible-crank-gauge.py`](scripts/6dW6VYXp9HM-visible-crank-gauge.py)
+and [`6dW6VYXp9HM-extract-automatic-motion.py`](scripts/6dW6VYXp9HM-extract-automatic-motion.py)
+produce the numerical authority consumed by
+[`generate-analysis-synthesis-source-tracks.py`](scripts/generate-analysis-synthesis-source-tracks.py).
+The crank's [motion packet](content/6dW6VYXp9HM.visible-crank-motion.json)
+records clockwise source motion at 0.90..0.98 turns/second over full cycles,
+then the actual bottom hold, within 79.8130667..86.6866 seconds.
+Source-native sign and absolute home remain `null`. The separate
+[chosen gauge](content/6dW6VYXp9HM.visible-crank-gauge.json) applies
+`nativeT = -relativeT + 0.711801723` while preserving the initial bank pose.
+Actual native crank projection under the existing camera gives normalized
+projection-angle RMS 9.19 degrees and maximum 11.34 degrees. This chooses an
+integration gauge without establishing historical physical home or qualifying
+the camera.
+
+The bank's [automatic-motion packet](content/6dW6VYXp9HM.automatic-motion.json)
+uses the frozen [motion controls](content/6dW6VYXp9HM.motion-controls.json) for
+112.3122..119.0856333 seconds. It advances effective cumulative `T` by
+3.890576427 turns with twenty constant driving-shaft phases and amplitudes,
+retaining the first chosen complete hidden setup. These phases are not rocker
+deflection angles. Both signed physical alternatives remain possible; neither
+phase nor cadence transfers across cuts.
+
+Authority is confined to `analysis-16/main/native` for the crank and
+`analysis-22/bar-bank/horizontal-mirror` for the bank. Unmeasured same-shot
+margins hold the nearest new input through the real cut: the crank shot spans
+79.4460333..87.0202667 seconds and the bank shot ends at 124.4910333 seconds.
+There is no cadence extrapolation or blend back to the old drive at the measured
+endpoint. Outside those exact shot/view/presentation scopes, existing input
+paths remain intact. Packet facts are authoritative; generated metadata labels
+the drive chosen/approximate. Cameras and CAD are unchanged, and source camera
+and geometry fidelity remain unaccepted. Native motion evidence does not
+establish source spatial alignment or acceptance of all twenty rendered rockers.
 
 Required coverage includes every retained video's corresponding machine views:
 close-ups, moving mechanisms, insets, mirrored views, photographs and montages.
