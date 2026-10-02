@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import math
 
-import _config
 import transgear_arm_geometry as ARM
 import transgear_retaining_ring_spec as RING
 from _gtol_spec import CylinderFace
@@ -49,25 +48,21 @@ PRESS_INTERFERENCE = (
     round(DIA_MAX - ARM.PIN_BORE_DIA_MIN, 6),
 )  # 0.010, 0.026
 
-# --- Head: Ø5.0, a 1.20 land then a spherical dome, 2.0 proud of the arm ------
+# --- Head: Ø5.0, a 2.10 land then a spherical dome, 2.9 proud of the arm ------
 # The head stops the press and, pulled forward by the ring's thrust on the
-# load wall, holds the pin in the arm; nothing bears on its dome.  Its land
-# prints .XX: at .X the title block's ±0.8 let a 0.5 land go to -0.3 (review
-# of 6de7230aa).  At its printed lower limit (0.69) the land still keeps a
-# cylindrical rim once the title block's largest edge break is taken off
-# each of its two edges (the seat and the dome's rim).  The dome is 0.8
-# high, so the apex stays 2.0 proud.
+# load wall, holds the pin in the arm; nothing bears on its dome.  The land
+# is a wall held to the policy's 1.5 hard floor at its printed lower limit:
+# it prints .XX, so 2.10 leaves 1.59 (1.20 left 0.69, review of e0ac6477e; a
+# 0.5 land at .X went to -0.3, review of 6de7230aa).  The dome stays 0.8
+# high on top, so the apex stands 2.9 proud, less than the MHA-168 head.
+WALL_FLOOR = 1.5
 HEAD_DIA = 5.0
-HEAD_LAND = 1.20
+HEAD_LAND = 2.10
 HEAD_LAND_PLACES = 2
-HEAD_LAND_MIN = round(HEAD_LAND - printed_band_mm(HEAD_LAND_PLACES), 6)  # 0.69
-_EDGE_BREAK = _config.title_block("edge_break")
-EDGE_BREAK_MAX = max(
-    float(_EDGE_BREAK["radius_mm"]), float(_EDGE_BREAK["chamfer_max_mm"])
-)
-HEAD_LAND_FLOOR = 2.0 * EDGE_BREAK_MAX  # 0.50
+HEAD_LAND_MIN = round(HEAD_LAND - printed_band_mm(HEAD_LAND_PLACES), 6)  # 1.59
+HEAD_LAND_FLOOR = WALL_FLOOR
 HEAD_DOME_SAG = 0.8
-HEAD_HEIGHT = HEAD_LAND + HEAD_DOME_SAG  # 2.0 proud of the arm's rear face
+HEAD_HEIGHT = HEAD_LAND + HEAD_DOME_SAG  # 2.9 proud of the arm's rear face
 HEAD_DOME_R = ((HEAD_DIA / 2.0) ** 2 + HEAD_DOME_SAG**2) / (2.0 * HEAD_DOME_SAG)
 
 # --- Ring groove -------------------------------------------------------------
@@ -85,25 +80,27 @@ GROOVE_WIDTH_BAND = RING.GROOVE_WIDTH_BAND
 GROOVE_REAR_STATION = round(GROOVE_STATION - GROOVE_WIDTH, 6)
 
 # --- Front end: a plain length in front of the groove, then a dome -----------
-# The land in front of the groove carries the ring's thrust: rule 12 target on
-# the shear land, at least the groove depth times 3 (ASSUMPTION from the ring
-# maker's edge-margin guidance: 0.4768 x 3 = 1.4304).  An accepted pin is
-# checked against the land's PRINTED lower limit: it prints .XXX (+/-0.13), so
-# 1.600 leaves 1.470 (at .X the title block's +/-0.8 left 0.7, Codex P2).
-FRONT_LAND = 1.600  # groove load wall to the dome's base
-FRONT_LAND_PLACES = 3
+# The land in front of the groove carries the ring's thrust, so it is a wall
+# held at its PRINTED lower limit to the larger of the policy's 1.5 hard
+# floor and three groove depths (ASSUMPTION from the ring maker's edge-margin
+# guidance: 0.4768 x 3 = 1.4304).  Nothing mates on it, so it prints .XX:
+# 2.10 leaves 1.59 (1.600 at .XXX left 1.470, review of e0ac6477e; at .X the
+# title block's +/-0.8 left 0.7, Codex P2).
+FRONT_LAND = 2.10  # groove load wall to the dome's base
+FRONT_LAND_PLACES = 2
 FRONT_LAND_BAND = printed_band_mm(FRONT_LAND_PLACES)
-FRONT_LAND_MIN = round(FRONT_LAND - FRONT_LAND_BAND, 6)
+FRONT_LAND_MIN = round(FRONT_LAND - FRONT_LAND_BAND, 6)  # 1.59
 TIP_DOME_SAG = 1.5
 TIP_DOME_R = ((DIA / 2.0) ** 2 + TIP_DOME_SAG**2) / (2.0 * TIP_DOME_SAG)
-LENGTH = round(GROOVE_STATION + FRONT_LAND + TIP_DOME_SAG, 6)  # 50.35
-OVERALL_LENGTH = round(LENGTH + HEAD_HEIGHT, 6)  # 52.35, apex to tip
-TIP_MACHINE_Z = round(HEAD_SEAT_MACHINE_Z - LENGTH, 6)  # -166.8125
-HEAD_APEX_MACHINE_Z = round(HEAD_SEAT_MACHINE_Z + HEAD_HEIGHT, 6)  # -114.4625
+LENGTH = round(GROOVE_STATION + FRONT_LAND + TIP_DOME_SAG, 6)  # 50.85
+OVERALL_LENGTH = round(LENGTH + HEAD_HEIGHT, 6)  # 53.75, apex to tip
+TIP_MACHINE_Z = round(HEAD_SEAT_MACHINE_Z - LENGTH, 6)  # -167.3125
+HEAD_APEX_MACHINE_Z = round(HEAD_SEAT_MACHINE_Z + HEAD_HEIGHT, 6)  # -113.5625
 GROOVE_LOAD_WALL_MACHINE_Z = round(HEAD_SEAT_MACHINE_Z - GROOVE_STATION, 6)
 
 GROOVE_DEPTH = (DIA - GROOVE_DIA) / 2.0
 EDGE_MARGIN_MIN = 3.0 * GROOVE_DEPTH
+FRONT_LAND_FLOOR = max(WALL_FLOOR, EDGE_MARGIN_MIN)  # 1.5
 
 SURFACE_FINISHES = (
     SurfaceFinishControl(
@@ -152,21 +149,21 @@ for _ok, _what in (
     (HEAD_DOME_SAG < HEAD_DOME_R, "the head is not a spherical cap"),
     (TIP_DOME_SAG < TIP_DOME_R, "the tip is not a spherical cap"),
     (
-        FRONT_LAND_MIN >= EDGE_MARGIN_MIN,
+        FRONT_LAND_MIN >= FRONT_LAND_FLOOR,
         f"the land in front of the groove {FRONT_LAND} at {FRONT_LAND_PLACES} "
         f"places has a printed lower limit {FRONT_LAND_MIN:.3f}, under "
-        f"{EDGE_MARGIN_MIN:.4f}, three groove depths",
+        f"{FRONT_LAND_FLOOR:.4f}, the wall floor or three groove depths",
     ),
     (GROOVE_DIA < DIA_MIN, "the groove does not cut below the shank"),
     (
-        math.isclose(HEAD_APEX_MACHINE_Z, -114.4625, abs_tol=1e-6),
-        "the head apex is not 2.0 proud of the arm's rear face",
+        math.isclose(HEAD_APEX_MACHINE_Z, -113.5625, abs_tol=1e-6),
+        "the head apex is not 2.9 proud of the arm's rear face",
     ),
     (
         HEAD_LAND_MIN >= HEAD_LAND_FLOOR,
         f"the head land {HEAD_LAND} at {HEAD_LAND_PLACES} places has a printed "
-        f"lower limit {HEAD_LAND_MIN:.2f}, under {HEAD_LAND_FLOOR:.2f}, a "
-        "largest edge break on each of its edges",
+        f"lower limit {HEAD_LAND_MIN:.2f}, under the {HEAD_LAND_FLOOR:.1f} "
+        "wall floor",
     ),
     (
         PRESS_INTERFERENCE[0] > 0.0,

@@ -45,8 +45,8 @@ def test_every_marked_dimension_prints_once_with_model_places() -> None:
 
 def test_only_the_shank_and_the_ring_groove_carry_model_bands() -> None:
     """The ground shank (running fit and arm press) and the groove's
-    catalogue Ø and width carry native bands; the groove station and the
-    front land print .XXX and every other size its places under the title
+    catalogue Ø and width carry native bands; the groove station prints .XXX,
+    the two lands .XX, and every other size its places under the title
     block."""
     assert model_toleranced_dimensions(part) == {
         ("PinProfile", "ShankDia"): "*deviations(DIA_BAND)",
@@ -55,34 +55,36 @@ def test_only_the_shank_and_the_ring_groove_carry_model_bands() -> None:
     }
     assert spec.DRAWING_PRECISION_BY_NAME["ShankDia"] == 3
     assert spec.DRAWING_PRECISION_BY_NAME["GrooveStation"] == 3
-    assert spec.DRAWING_PRECISION_BY_NAME["FrontLand"] == 3
+    assert spec.DRAWING_PRECISION_BY_NAME["FrontLand"] == 2
+    assert spec.DRAWING_PRECISION_BY_NAME["HeadLand"] == 2
 
 
-def test_the_front_land_holds_three_groove_depths_at_its_printed_lower_limit() -> None:
-    """Codex P2: at .X the title block's ±0.8 left a 1.5 land 0.7 at its
-    lower limit, under three groove depths (1.4304).  The check reads the
-    places the land actually prints at."""
+def test_the_front_land_holds_the_wall_floor_at_its_printed_lower_limit() -> None:
+    """Review of e0ac6477e (blocker): 1.600 at .XXX left 1.470 of land in
+    front of the groove, under the 1.5 wall floor (three groove depths,
+    1.4304, is the weaker bound).  The check reads the places the land
+    actually prints at."""
     places = spec.DRAWING_PRECISION_BY_NAME["FrontLand"]
     lower = round(spec.FRONT_LAND, places) - printed_band_mm(places)
     assert spec.FRONT_LAND_MIN == pytest.approx(lower)
+    assert lower >= spec.WALL_FLOOR == 1.5
     assert lower >= spec.EDGE_MARGIN_MIN
 
 
-def test_the_head_land_keeps_a_rim_at_its_printed_lower_limit() -> None:
-    """Review of 6de7230aa (blocker): a 0.5 land at .X went to -0.3 under
-    the title block's ±0.8, so a missing head passed.  The land prints .XX
-    and, at its lower limit, still leaves a cylindrical rim past the
-    largest edge break on both its edges; the apex stays 2.0 proud."""
+def test_the_head_land_holds_the_wall_floor_at_its_printed_lower_limit() -> None:
+    """Review of e0ac6477e (blocker): 1.20 at .XX let the retaining head go
+    to 0.69, under the 1.5 wall floor.  At its printed lower limit the land
+    still keeps a cylindrical rim past the largest edge break on both its
+    edges, under the dome on top."""
     places = spec.DRAWING_PRECISION_BY_NAME["HeadLand"]
-    assert places == 2
     lower = round(spec.HEAD_LAND, places) - printed_band_mm(places)
     assert spec.HEAD_LAND_MIN == pytest.approx(lower)
+    assert lower >= spec.WALL_FLOOR == 1.5
     edge_break = max(
         float(_config.title_block("edge_break")[key])
         for key in ("radius_mm", "chamfer_max_mm")
     )
-    assert lower >= 2.0 * edge_break > 0.0
-    assert spec.HEAD_LAND + spec.HEAD_DOME_SAG == pytest.approx(2.0)
+    assert lower - 2.0 * edge_break > 0.0
 
 
 def test_the_groove_holds_the_ring_at_every_printed_limit() -> None:
@@ -109,10 +111,10 @@ def test_the_groove_callout_names_the_ring_on_one_line() -> None:
 @pytest.mark.parametrize(
     ("station", "machine_z"),
     [
-        (-spec.HEAD_HEIGHT, -114.4625),
+        (-spec.HEAD_HEIGHT, -113.5625),
         (0.0, -116.4625),
         (spec.GROOVE_STATION, -163.7125),
-        (spec.LENGTH, -166.8125),
+        (spec.LENGTH, -167.3125),
     ],
 )
 def test_the_pin_sits_at_its_machine_stations(station: float, machine_z: float) -> None:
