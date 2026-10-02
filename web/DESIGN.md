@@ -93,8 +93,8 @@ motion remain required. The staged image tolerances below replace the former
 ## Iterative synchronization plan
 
 The approved sequence is **50% → 20% → 10% → 5% of source frame width**.
-These are maximum landmark-position errors, not percentages of videos covered.
-At 1920 pixels wide the limits are 960, 384, 192 and 96 pixels respectively.
+These are maximum admitted landmark/contour source-pixel errors, not percentages
+of videos covered. At 1920 pixels wide the limits are 960, 384, 192 and 96 pixels respectively.
 The final target is 5%; video/model timing stays within 0.5 seconds at every stage.
 
 Start with working approximate camera and mechanism tracking across **all six**
@@ -196,6 +196,71 @@ replace actual source/render inspection. Use the depth-tested native part-ID
 capture to distinguish genuinely occluding components from dark metallic surfaces;
 lighting changes must not change those surface owners or hide native geometry.
 
+`verify-sync.mjs` also measures retained raw `SourceContourCheck` curves through
+the existing depth-ID API, without copying contours into compact tracks or
+changing the selected source camera/input. A sidecar joins only the exact source
+video/frame/decoded-PTS and same-format image hash, with an unambiguous measured
+source-layout view mapping. Gray and BGR byte identities never compare across
+formats. Original endpoints, source-only evidence and partial-edge scope remain
+unchanged. Every contour stays CHECK-only, strictly downstream of fitting; a
+camera candidate fitted to these rows is not independent and cannot be promoted.
+
+After paused exact source review, a contour-bearing row enables part visibility
+and reads the snapshot, landmarks, native visibility and full mechanism solve
+from the same redraw. Captured status and camera/principal point, ordered support,
+warp, destination-cell/native-backing metadata, time, physical-input and positive
+layer contribution must agree. The selected native part must have nonempty actual
+depth-ID pixels and sampled boundary centers. Native support/scissor and later-mask
+filtering applies; missing, stale, wrong-part, hidden and zero-contribution receipts
+cannot become an empty-set success. The all-drawable ID inventory preserves real
+native occlusion, not a new per-435 source-certification gate.
+
+The native getters already enforce their private renderer capture epoch. The
+bridge exposes the existing source-draw revision only for captured getter output
+bound to the current completed source draw; stale/unknown output receives no
+revision. Contour, landmark and mechanism revisions must all equal the positive
+current snapshot `sourceDrawRevision`, and its `sourceDrawTimeSeconds` must match
+capture time. Thus retained same-time old pixel/mechanism records cannot qualify
+merely because time, camera, input and layout repeat. Missing old revisions fail
+closed; no epoch fallback is synthesized.
+
+For observed partial source points \(S\) and actual captured target-part boundary
+sample centers \(N\), the oracle is
+`max(s in S) min(n in N) distance(s,n) + source uncertainty + GPU raster bound`.
+Both uncertainty terms are source-global pixels, added once; no homography scales
+the already-global source term. Warped source localization requires supported
+projective footprints and matching resolved/backing receipts. There is no inferred
+curve extension, bounding-box/native-endpoint/CPU proxy, RMS smoothing or reverse
+distance against unobserved silhouette portions. The actual GPU sample subset can
+overstate nearest-boundary distance, never optimistically reduce it.
+
+This is binary ID/depth **layer geometry**, not literal final fractional-alpha
+color visibility: positive crossfade layers have their exact weight recorded but
+are not area-scaled, and diagnostic depth/material behavior can differ from color
+blending. Inherited Rod20 right-exterior evidence certifies only the observed
+partial edge if measured; it cannot establish the entire silhouette, opposite
+edge, junction topology or material-coordinate identity. Same-part nearest-edge
+correspondence and the coarse 384-pixel Stage20 tolerance remain geometric risks.
+
+Per-sample and summary `contourChecks` count each curve once, separately from FIT
+and CHECK point landmarks. A genuinely measured contour can supply a view's CHECK
+and required sample even without point CHECKs. It supplies moving coverage only
+through existing exact-part moving ancestry or the loaded native rig's resolved
+indexed `rod` binding. `Machine.readPartBinding(partPath)` and the verification
+bridge expose `{partPath,bindingId,kind,motion,stationIndex}` directly from
+`RestPart.binding`, never a guessed path-family set or another part's anchor.
+For Rod20, the genuine `connectingRods` binding resolves station index19 and the
+existing `rod` updater; the consumer records that read-only native metadata with
+the independent source contour association. This is kinematic moving eligibility,
+not observed source internal movement (`observedSourceInternalMotion` remains
+`unmeasured`). Missing/unbound metadata or an unknown classification remains
+unavailable for moving coverage. It cannot satisfy the fixed-point requirement or turn
+many curve samples into distinct features for the distributed-landmark exclusion
+floor. All original source views, selected physical inputs, clocks and coverage
+requirements remain mandatory. The canonical Rocker observations already retain
+all 48 late Rod20 curves; only Root's current native GPU run can establish their
+errors or close the reported gaps.
+
 Per-video verification is incremental and repeatable, without an acceptance-run
 quota. The all-video final gate retains all six pages and the 5%/0.5-second limits.
 A coarse demo or a passing subset does not establish final acceptance.
@@ -217,8 +282,9 @@ Verify all six routes. Present the working implementation in a headed browser;
 headless Playwright with screenshots or recordings is for automated checks.
 
 Native WebGL landmark readback remains available for rendered-pixel measurements.
-CPU projection alone is not final rendered evidence. Existing raster, finite-line,
-contour, masking and per-part certificate machinery is diagnostic legacy work:
+CPU projection alone is not final rendered evidence. Exhaustive raster, finite-line
+and per-part certificate machinery remains diagnostic legacy work, distinct from
+the scoped contour CHECK path above:
 its historical results are preserved, but completing its entire pending queue is
 not a prerequisite for this iterative delivery plan. If a measurement uses a
 particular diagnostic path, that path's known correctness defects still matter.

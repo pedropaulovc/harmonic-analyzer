@@ -290,14 +290,16 @@ function sourceCapture<T extends {
   sourceLayout: PlaybackView['sourceLayout']
 }>(capture: T) {
   const draw = mechanismDraws.get(capture.viewId)
-  const bound = draw?.status === 'rendered' && draw.timeSeconds === capture.timeSeconds
-    && equalRecord(draw.resolvedImagePlaneWarp, capture.resolvedImagePlaneWarp)
+  const bound = draw?.status === 'rendered' && draw.sourceDrawRevision === sourceDrawRevision && draw.timeSeconds === sourceDrawTimeSeconds
+    && draw.timeSeconds === capture.timeSeconds && equalRecord(draw.resolvedImagePlaneWarp, capture.resolvedImagePlaneWarp)
     && equalRecord(draw.sourceLayout, capture.sourceLayout)
+  const status = capture.status === 'captured' && (mode !== 'reference-review' || referenceSeek !== 'idle' || player?.getState() !== 'paused') ? 'unavailable' as const
+    : capture.status === 'captured' && (!bound || referenceState === 'unavailable' || capture.timeSeconds !== modelTime) ? 'stale' as const : capture.status
   return {
     ...capture,
-    status: capture.status === 'captured' && (mode !== 'reference-review' || referenceSeek !== 'idle' || player?.getState() !== 'paused') ? 'unavailable' as const
-      : capture.status === 'captured' && (!bound || referenceState === 'unavailable' || capture.timeSeconds !== modelTime) ? 'stale' as const : capture.status,
+    status,
     imagePlaneWarp: bound ? draw.imagePlaneWarp : null,
+    sourceDrawRevision: status === 'captured' && bound ? draw.sourceDrawRevision : null,
   }
 }
 
@@ -800,6 +802,7 @@ if (verificationEnabled) {
       if (activeViews.length) drawSourceViews(activeViews, modelTime)
     },
     renderedMechanism,
+    readPartBinding(partPath: string) { return machine?.readPartBinding(partPath) ?? null },
     assertSourceCompositeWeights,
     followVideo() {
       if (player) renderSource(player.getTime())

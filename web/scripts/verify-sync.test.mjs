@@ -696,9 +696,9 @@ test('visible source motion cannot override the complete same-shot minimum playb
   assert.ok(interval.availableSeconds >= 3)
 })
 
-function contourFixture() {
+function contourFixture(sourceDrawRevision = 1) {
   const fixture = measuredViewFixture(), { view, frame, response, capture, anchors } = fixture
-  frame.sourceImage = { ...sourceImage(30, 'a'.repeat(64)), ptsTicks: 30, ptsTimeBase: '1/30' }
+  frame.sourceImage = sourceImage(30, 'a'.repeat(64))
   const check = { id: 'right-exterior', partPath: 'harmonic-analyzer/channel/connecting-rod-20',
     sourceContourPixels: [[100.5, 100.5], [120.5, 100.5], [140.5, 100.5]], uncertaintyPx: 3,
     measurementEvidence: { sourceImage: frame.sourceImage, evidence: 'Source-only partial right exterior edge; original endpoints retained.' } }
@@ -706,13 +706,15 @@ function contourFixture() {
   const layout = sourceLayoutForViews([view]), mechanism = response.captures[0].mechanism
   capture.sourceLayout = layout; mechanism.sourceLayout = layout; response.actual.views[0].sourceLayout = layout
   capture.sourceOpacity = 1; capture.destinationCellSourcePixels = [1, 1]; capture.nativeViewportBackingPixels = null
-  Object.assign(response.actual, { mode: 'reference-review', playerState: 'paused', modelTime: 1 })
+  capture.sourceDrawRevision = sourceDrawRevision; mechanism.sourceDrawRevision = sourceDrawRevision
+  Object.assign(response.actual, { mode: 'reference-review', playerState: 'paused', modelTime: 1, sourceDrawRevision, sourceDrawTimeSeconds: 1 })
   const part = { partPath: check.partPath, status: 'visible', pixelCount: 1024, contourPixelCount: 40,
     contourSourcePixels: [[103.5, 104.5], [120.5, 100.5], [140.5, 100.5], [1800.5, 900.5]], uncertaintySourcePixels: 2 }
-  const visibility = { method: 'gpu-readback', visibilityMode: 'depth-tested-native-surfaces', status: 'captured', viewId: 'main', timeSeconds: 1,
+  const visibility = { method: 'gpu-readback', visibilityMode: 'depth-tested-native-surfaces', status: 'captured', viewId: 'main', timeSeconds: 1, sourceDrawRevision,
     rectSourcePixels: view.rectSourcePixels, presentation: view.presentation, sourceOpacity: 1, camera: { ...view.camera, principalPointViewportPixels: [960, 540] },
     sourceLayout: layout, resolvedImagePlaneWarp: null, nativeViewportBackingPixels: null, destinationCellSourcePixels: [1, 1], parts: [part] }
   response.captures[0].partVisibility = visibility
+  response.nativePartBindings = [{ partPath: check.partPath, binding: { partPath: check.partPath, bindingId: 'connectingRods', kind: 'indexed', motion: 'rod', stationIndex: 19 } }]
   anchors.set('rod-motion', { id: 'rod-motion', partPath: check.partPath, motion: 'moving', correspondenceEvidence: 'Existing identified Rod20 motion ancestry' })
   return { ...fixture, check, part, visibility }
 }
@@ -729,6 +731,28 @@ test('partial contour uses directed maximum actual sample distance and additive 
   assert.equal(measureContourFixture(fixture, 9.999).measured[0].status, 'failed')
   fixture.part.contourSourcePixels = fixture.part.contourSourcePixels.slice(1)
   assert.equal(measureContourFixture(fixture).measured[0].rawErrorPx, 20)
+})
+
+test('warped contour bounds stay source-global and unsupported localization footprints refuse measurement', () => {
+  const fixture = contourFixture()
+  const warp = { kind: 'homography', unwarpedViewportPixels: [960, 540], cornersSourcePixels: [[0, 0], [1920, 0], [1920, 1080], [0, 1080]] }
+  fixture.view.imagePlaneWarp = warp; fixture.response.actual.views[0].imagePlaneWarp = warp
+  const layout = sourceLayoutForViews([fixture.view]), resolved = layout[0].resolvedImagePlaneWarp
+  for (const receipt of [fixture.visibility, fixture.capture, fixture.response.captures[0].mechanism, fixture.response.actual.views[0]]) {
+    receipt.sourceLayout = layout; receipt.resolvedImagePlaneWarp = resolved
+  }
+  fixture.visibility.camera.principalPointViewportPixels = [480, 270]
+  fixture.visibility.nativeViewportBackingPixels = [960, 540]; fixture.capture.nativeViewportBackingPixels = [960, 540]
+  fixture.part.uncertaintySourcePixels = 6
+  const result = measureContourFixture(fixture, 14)
+  assert.deepEqual(result.unavailable, [])
+  assert.equal(result.measured[0].rawErrorPx, 5)
+  assert.equal(result.measured[0].sourceUncertaintyPx, 3)
+  assert.equal(result.measured[0].rasterUncertaintyPx, 6)
+  assert.equal(result.measured[0].errorPx, 14)
+  fixture.check.sourceContourPixels = [[1, 100], [2, 100]]
+  assert.equal(measureContourFixture(fixture).measured.length, 0)
+  assert.match(measureContourFixture(fixture).unavailable[0].reason, /localization footprint/)
 })
 
 test('contour native evidence refuses another part, stale receipts, zero contribution and empty geometry', () => {
@@ -810,7 +834,6 @@ test('exact sidecar joins retain original curve scope and reject frame, PTS, SHA
   for (const mutate of [
     original => { original.sourceImage = { ...original.sourceImage, frameIndex: 31 } },
     original => { original.decodedTimeSeconds = 1.000001 },
-    original => { original.sourceImage = { ...original.sourceImage, ptsTicks: 31 } },
     original => { original.sourceImage = { ...original.sourceImage, sha256Bgr8: 'b'.repeat(64) } },
     original => { original.sourceImage = { ...original.sourceImage, sourceSha256: '2'.repeat(64) } },
     original => { original.sourceImage = { ...original.sourceImage, pixelFormat: 'gray8', sha256Gray8: original.sourceImage.sha256Bgr8 }; delete original.sourceImage.sha256Bgr8 },
@@ -859,6 +882,7 @@ test('unknown contour motion ancestry and missing/failed contours never produce 
   for (const motion of ['unknown', 'fixed']) {
     const fixture = contourFixture()
     fixture.anchors.get('rod-motion').motion = motion
+    fixture.response.nativePartBindings[0].binding = null
     const contours = measureContourFixture(fixture).measured
     assert.equal(contours[0].motion, 'unknown')
     const video = videoFixture()
@@ -885,4 +909,137 @@ test('many samples on a single contour cannot rescue the distributed admitted la
   assert.equal(result.contourChecks.length, 1)
   assert.equal(result.measured.length, 2)
   assert.match(result.unavailable.find(item => /three distributed/.test(item.reason)).reason, /three distributed/)
+})
+
+test('conflicting exposure/view contour declarations refuse a winner while repeated identical rows count once', () => {
+  const fixture = contourFixture(), original = { ...fixture.frame, views: [{ ...fixture.view, sourceContourChecks: [fixture.check] }] }
+  assert.equal(sourceContourSidecar(fixture.frame, [original, structuredClone(original)]).contourChecks.length, 1)
+  const conflicting = structuredClone(original)
+  conflicting.views[0].sourceContourChecks[0].sourceContourPixels[0] = [500, 500]
+  const joined = sourceContourSidecar(fixture.frame, [original, conflicting])
+  assert.deepEqual(joined.contourChecks, [])
+  assert.match(joined.contourJoinUnavailable[0].reason, /Conflicting/)
+})
+
+test('census contour sidecars use the selected exact exposure without changing chosen cameras, inputs or landmark roles', () => {
+  const fixture = contourFixture()
+  const selected = { ...fixture.frame, shotId: 'shot', classification: 'machine', landmarks: fixture.observations.slice(0, 2) }
+  const original = { ...selected, views: [{ ...fixture.view, sourceContourChecks: [fixture.check] }] }
+  const compact = { frames: [{ ...frame(0), views: [fixture.view] }, selected, { ...frame(2), views: [fixture.view] }] }
+  const raw = { ...observations, frames: [compact.frames[0], original, compact.frames[2]] }
+  const row = sourceCensus(raw, compact, native, parseOptions(['--times', '1'])).selected[0]
+  assert.equal(row.frame.contourChecks.length, 1)
+  assert.deepEqual(row.frame.views, selected.views)
+  assert.deepEqual(row.frame.landmarks, selected.landmarks)
+  assert.equal(row.frame.landmarks.every(item => item.role === 'fit'), true)
+  original.sourceImage = { ...original.sourceImage, sha256Bgr8: 'b'.repeat(64) }
+  const stale = sourceCensus(raw, compact, native, parseOptions(['--times', '1'])).selected[0]
+  assert.deepEqual(stale.frame.contourChecks, [])
+  assert.match(stale.frame.contourJoinUnavailable[0].reason, /same-format image hash/)
+})
+
+test('diagnostic contour counterexamples fail stages without inflating diagnostic landmark counts', () => {
+  const fixture = contourFixture(), video = videoFixture()
+  video.samples.push({ ...video.samples[0], timeSeconds: 1, sampleTimeSeconds: 1, diagnosticOnly: true, reasons: ['mid-interval'], measurements: [],
+    contourChecks: measureContourFixture(fixture, 9).measured, status: 'failed' })
+  const census = { rows: [...censusFixture.rows, { timeSeconds: 1, diagnosticOnly: true, required: true, reasons: ['mid-interval'] }] }
+  finishVideo(video, census, parseOptions(['--stage', '50']))
+  assert.equal(video.coverage.passedRequiredSamples, 1)
+  assert.equal(video.diagnosticLandmarks.measured, 0)
+  assert.equal(video.diagnosticLandmarks.failed, 0)
+  assert.equal(video.diagnosticContourChecks.failed, 1)
+  assert.equal(video.stageMeasurement.status, 'failed')
+  assert.equal(video.failures.find(item => item.code === 'diagnostic-pixel-counterexample').measuredContours, 1)
+})
+
+test('an exact contour exposure survives unselected PTS aliases without borrowing their pixels', () => {
+  const fixture = contourFixture(), exact = { ...fixture.frame, views: [{ ...fixture.view, sourceContourChecks: [fixture.check] }] }
+  const unselected = structuredClone(exact)
+  unselected.decodedTimeSeconds = 1 + Number.EPSILON
+  unselected.views[0].sourceContourChecks[0].sourceContourPixels = [[1700, 700], [1700, 800]]
+  const joined = sourceContourSidecar(fixture.frame, [unselected, exact])
+  assert.deepEqual(joined.contourJoinUnavailable, [])
+  assert.deepEqual(joined.contourChecks[0].check.sourceContourPixels, fixture.check.sourceContourPixels)
+  assert.deepEqual(sourceContourSidecar(fixture.frame, [unselected]).contourChecks, [])
+  assert.match(sourceContourSidecar(fixture.frame, [unselected]).contourJoinUnavailable[0].reason, /PTS/)
+})
+
+test('resolved exact native rod binding supplies kinematic moving eligibility without claiming observed source motion', () => {
+  const fixture = contourFixture()
+  fixture.anchors.delete('rod-motion')
+  const measured = measureContourFixture(fixture).measured[0]
+  assert.equal(measured.motion, 'moving')
+  assert.equal(measured.motionBasis, 'resolved-native-rod-binding')
+  assert.equal(measured.observedSourceInternalMotion, 'unmeasured')
+  assert.deepEqual(measured.motionAnchorIds, [])
+  assert.deepEqual(measured.nativePartBinding, { partPath: fixture.check.partPath, bindingId: 'connectingRods', kind: 'indexed', motion: 'rod', stationIndex: 19 })
+  const video = videoFixture()
+  video.samples[0].measurements = [measurement('fixed', 'fixed')]
+  video.samples[0].contourChecks = [measured]
+  finishVideo(video, censusFixture, parseOptions(['--stage', '50']))
+  assert.equal(video.status, 'passed')
+  assert.equal(video.landmarks.movingChecks, 0)
+  assert.equal(video.motionCoverage[0].movingCheckSamples, 1)
+})
+
+test('missing, wrong-path, non-rod and unresolved station binding cannot manufacture contour moving coverage', () => {
+  for (const mutate of [
+    fixture => { fixture.response.nativePartBindings = [] },
+    fixture => { fixture.response.nativePartBindings[0].binding = null },
+    fixture => { fixture.response.nativePartBindings[0].binding.partPath = 'harmonic-analyzer/channel/rocker-arm-20' },
+    fixture => { fixture.response.nativePartBindings[0].binding.bindingId = '' },
+    fixture => { fixture.response.nativePartBindings[0].binding.motion = 'rocker' },
+    fixture => { fixture.response.nativePartBindings[0].binding.kind = 'group' },
+    fixture => { fixture.response.nativePartBindings[0].binding.stationIndex = -1 },
+    fixture => { fixture.response.nativePartBindings[0].binding.stationIndex = 20 },
+    fixture => { fixture.response.nativePartBindings.push(structuredClone(fixture.response.nativePartBindings[0])) },
+  ]) {
+    const fixture = contourFixture()
+    fixture.anchors.delete('rod-motion')
+    mutate(fixture)
+    const measured = measureContourFixture(fixture).measured[0]
+    assert.equal(measured.status, 'passed')
+    assert.equal(measured.motion, 'unknown')
+    const video = videoFixture()
+    video.samples[0].measurements = [measurement('fixed', 'fixed')]
+    video.samples[0].contourChecks = [measured]
+    finishVideo(video, censusFixture, parseOptions(['--stage', '50']))
+    assert.notEqual(video.status, 'passed')
+    assert.ok(video.failures.some(item => item.code === 'hard-moving-landmark-coverage'))
+  }
+})
+
+test('retained captured pixels from an older same-time redraw cannot satisfy current contour review', () => {
+  const older = contourFixture(1), current = contourFixture(2)
+  assert.equal(measureContourFixture(current).measured[0].status, 'passed')
+  for (const captures of [
+    [{ ...current.response.captures[0], partVisibility: older.visibility }],
+    [{ ...current.response.captures[0], capture: older.capture }],
+    older.response.captures,
+  ]) {
+    const response = { ...current.response, captures }
+    const result = measureContours(current.view, response, current.frame, 10, current.anchors)
+    assert.deepEqual(result.measured, [])
+    assert.match(result.unavailable[0].reason, /current completed source draw revision/)
+  }
+  assert.equal(older.visibility.status, 'captured')
+  assert.equal(older.capture.status, 'captured')
+  assert.equal(older.visibility.timeSeconds, current.visibility.timeSeconds)
+})
+
+test('missing draw receipts and a same-revision receipt for another source draw time fail closed', () => {
+  for (const mutate of [
+    fixture => { delete fixture.visibility.sourceDrawRevision },
+    fixture => { delete fixture.capture.sourceDrawRevision },
+    fixture => { delete fixture.response.actual.sourceDrawRevision },
+    fixture => { delete fixture.response.actual.sourceDrawTimeSeconds },
+    fixture => { fixture.response.actual.sourceDrawTimeSeconds = 0.99 },
+    fixture => { fixture.response.captures[0].mechanism.sourceDrawRevision = 2 },
+  ]) {
+    const fixture = contourFixture()
+    mutate(fixture)
+    const result = measureContourFixture(fixture)
+    assert.deepEqual(result.measured, [])
+    assert.match(result.unavailable[0].reason, /current completed source draw revision/)
+  }
 })
