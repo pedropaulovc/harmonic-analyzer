@@ -2212,9 +2212,10 @@ async def _export_assembly_images(
     ``{<view>: path}``; the caller adds the assembly path.
 
     Does NOT touch the committed ``cad/docs/images`` README renders -- those are
-    refreshed deliberately via ``python cad/scripts/trim_renders.py`` and
-    committed on purpose, so a model build never dirties a tracked file (which
-    would otherwise block ``doit release``'s clean-tree preflight).
+    refreshed from a pinned release via ``python cad/scripts/trim_renders.py
+    --release-root cad/out/release/harmonic-analyzer-vNN`` or installed by the
+    publisher only after publication. A model build never dirties tracked images
+    (which would otherwise block ``doit release``'s clean-tree preflight).
     """
     png_dir = OUT_PNG / asm_name
     png_dir.mkdir(parents=True, exist_ok=True)

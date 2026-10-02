@@ -121,8 +121,8 @@ git submodule update --init --recursive
 
 ## Minimum merge gate (every PR)
 
-A PR is not mergeable until ALL THREE hold — no exceptions, no partial
-credit:
+Except for the narrowly generated-only post-release PR defined below, a PR is
+not mergeable until ALL THREE hold — no partial credit:
 
 1. **Build green** — the full `uv run python -m doit -n 4` pipeline (every
    part, assembly and gate) passes on the PR's head. **One** successful build
@@ -281,12 +281,27 @@ such build:
 - `build_bare` = parts + assemblies only (fast, no gates, no export).
 - `release` is opt-in: `doit release` defaults to the next `vNN`; pass an
   explicit tag/options after `--` (for example, `doit release -- v22 --draft`).
-  Its COM half is the separate `package:release` leaf (Pack-and-Go), so `release`
-  itself only stages, diffs, tags and publishes — no seat, farm or local.
+  Its COM half is the separate `package:release` leaf. The release action and
+  publisher run on the submitter, precompute README images before the tag, and
+  install them with the `next_revision` bump only after publication succeeds.
+- The release follow-up PR is exempt from the three merge gates ONLY if its
+  entire diff is the `cad/config/release.yaml` `next_revision` bump plus the
+  generated README image files. It may merge immediately. Code, prose, docs,
+  README markup/layout or any other change stays in an ordinary PR and MUST pass
+  every gate.
+- For a supervised farm release, launch only
+  `-Targets "build,export,package:release,preflight"` through
+  `scripts/farm-run.ps1` (`build` supplies drawing and check gates). On recorded
+  success restore the complete `cad/out` from `.done`'s `outputs` path to the
+  owning worktree, then run `uv run --frozen python -m doit -s gallery` and
+  `uv run --frozen python -m doit -s release -- vNN` there. This avoids
+  postpublish changes being discarded with the snapshot and prevents local COM
+  redispatch. See
+  [`DEVELOPING.md`](DEVELOPING.md#supervised-farm-releases).
 - The tracked `cad/config/release.yaml` value is the Revision on every
-  `.SLDPRT`, `.SLDASM`, and linked drawing title block. `cut_release.py`
-  advances it after a successful publish and leaves a tracked merge bump;
-  the release agent MUST commit and merge that bump before the next release.
+  `.SLDPRT`, `.SLDASM`, and linked drawing title block. The publisher advances
+  `next_revision` after a successful publish; the release agent MUST merge that
+  generated-only follow-up before the next release.
 
 ## `.farm-sources.json` — submodules the farm does not acquire
 

@@ -4,12 +4,17 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import time
 from pathlib import Path
 
 import pytest
+from PIL import Image, ImageDraw
+from pypdf import PdfWriter
+from pypdf.generic import DecodedStreamObject
 
 import cut_release
+import trim_renders
 
 
 def test_release_refuses_an_incomplete_or_stale_comparison_gallery(
@@ -302,3 +307,182 @@ def test_release_notes_report_the_native_pack_and_go_count() -> None:
 
     assert "native Pack-and-Go (137 referenced documents" in notes
     assert "99 referenced documents" not in notes
+
+
+@pytest.fixture
+def prepared_readme_release(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> tuple[Path, Path, Path]:
+    """Real local picture staging; only CAD building and external publication are isolated."""
+    release_dir = tmp_path / "release"
+    release_root = release_dir / "harmonic-analyzer-v22"
+    png = release_root / "png"
+    for name in trim_renders.README_RENDERS:
+        source = png / name / f"{name}_isometric.png"
+        source.parent.mkdir(parents=True, exist_ok=True)
+        image = Image.new("RGB", (80, 80), "white")
+        ImageDraw.Draw(image).rectangle((30, 30, 49, 49), fill="black")
+        image.save(source)
+    for name in trim_renders.README_DRAWINGS:
+        Image.new("RGB", (72, 36), (12, 34, 56)).save(png / f"{name}_drawing.png")
+    pdf = release_root / "pdf"
+    pdf.mkdir()
+    for pdf_name, _ in trim_renders.README_PDF_SHEETS.values():
+        writer = PdfWriter()
+        for rgb in ((1, 0, 0), (0, 1, 0), (0, 0, 1), (1, 1, 0)):
+            page = writer.add_blank_page(width=72, height=36)
+            content = DecodedStreamObject()
+            content.set_data(f"{' '.join(map(str, rgb))} rg 0 0 72 36 re f".encode())
+            page.replace_contents(content)
+        with (pdf / pdf_name).open("wb") as target:
+            writer.write(target)
+    gltf = release_root / "gltf"
+    gltf.mkdir()
+    (gltf / "harmonic-analyzer.glb").write_bytes(b"external renderer input")
+
+    # The expensive graphics collaborator is isolated, but cropping, PDFium,
+    # byte-for-byte drawings, image installation, and YAML replacement are real.
+    def render_pose(_source: Path, target: Path, **_kwargs: object) -> None:
+        Image.new("RGB", (20, 30), "blue").save(target)
+
+    monkeypatch.setattr(trim_renders, "render_display_pose", render_pose)
+    images = tmp_path / "tracked-images"
+    images.mkdir()
+    for name in trim_renders.README_IMAGE_NAMES:
+        (images / name).write_bytes(b"previous release image")
+    revision = tmp_path / "release.yaml"
+    revision.write_text("next_revision: v22\n", encoding="utf-8")
+    native = tmp_path / "native"
+    native.mkdir()
+    (native / "harmonic-analyzer.SLDASM").write_bytes(b"preflight input")
+    scene = tmp_path / "scene.json"
+    scene.write_text('{"unit":"mm"}', encoding="utf-8")
+    zip_path = release_root.with_suffix(".zip")
+    zip_path.write_bytes(b"prepared bundle")
+    facts = {
+        "native_documents": 137,
+        "sw_revision": "35",
+        "parts": 99,
+        "assemblies": 8,
+        "config_meshes": 22,
+        "pngs": 107,
+        "comparisons": {"pairs": 3, "mean_score": None},
+        "size_mb": 42.0,
+    }
+    monkeypatch.setattr(cut_release, "RELEASE_DIR", release_dir)
+    monkeypatch.setattr(cut_release, "RELEASE_VERSION_FILE", revision)
+    monkeypatch.setattr(cut_release, "OUT_SLDASM", native)
+    monkeypatch.setattr(cut_release, "SCENE_JSON", scene)
+    monkeypatch.setattr(cut_release, "LOGS_DIR", tmp_path / "logs")
+    monkeypatch.setattr(cut_release._config, "release_revision", lambda: "v22")
+    monkeypatch.setattr(trim_renders, "DOCS_IMAGES", images)
+    monkeypatch.setattr(cut_release, "bundle", lambda *_args: (zip_path, facts))
+    monkeypatch.setattr(cut_release, "_git", lambda *_args, **_kwargs: "")
+    return release_root, images, revision
+
+
+@pytest.mark.parametrize("publication", ["dry-run", "failed", "successful"])
+def test_release_installs_images_and_revision_only_after_successful_publication(
+    prepared_readme_release: tuple[Path, Path, Path],
+    monkeypatch: pytest.MonkeyPatch,
+    publication: str,
+) -> None:
+    """Dry runs and gh failures cannot dirty the image/revision follow-up tree."""
+    release_root, images, revision = prepared_readme_release
+
+    def gh(*_args: str) -> str:
+        assert publication != "dry-run", "dry run reached external publication"
+        assert revision.read_text(encoding="utf-8") == "next_revision: v22\n"
+        for name in trim_renders.README_IMAGE_NAMES:
+            assert (images / name).read_bytes() == b"previous release image"
+        if publication == "failed":
+            raise RuntimeError("asset publication failed")
+        return "https://github.com/example/repo/releases/tag/v22"
+
+    monkeypatch.setattr(cut_release, "_gh", gh)
+    args = ["cut_release.py", "v22"]
+    if publication == "dry-run":
+        args.append("--no-publish")
+    monkeypatch.setattr(sys, "argv", args)
+    if publication == "failed":
+        with pytest.raises(RuntimeError, match="asset publication failed"):
+            cut_release.main()
+    else:
+        assert cut_release.main() == 0
+
+    if publication == "successful":
+        assert revision.read_text(encoding="utf-8") == "next_revision: v23\n"
+        assert (images / "pinion-arbor-drawing.png").read_bytes() == (
+            release_root / "png" / "pinion-arbor_drawing.png"
+        ).read_bytes()
+        with Image.open(images / "frame.png") as image:
+            assert image.size == (68, 68)
+        with Image.open(images / "drive-train-assembly-sheet-4.png") as image:
+            assert image.convert("RGB").getpixel((150, 75)) == (255, 255, 0)
+        with Image.open(images / "frame-assembly-sheet-3.png") as image:
+            assert image.convert("RGB").getpixel((150, 75)) == (0, 0, 255)
+    else:
+        assert revision.read_text(encoding="utf-8") == "next_revision: v22\n"
+        for name in trim_renders.README_IMAGE_NAMES:
+            assert (images / name).read_bytes() == b"previous release image"
+    assert not tuple(release_root.parent.glob(".v22-readme-images-*"))
+    assert not tuple(revision.parent.glob(".release.yaml.*.tmp"))
+
+
+def test_missing_readme_artifact_fails_before_tag_or_publish(
+    prepared_readme_release: tuple[Path, Path, Path],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    release_root, images, revision = prepared_readme_release
+    (release_root / "png" / "frame" / "frame_isometric.png").unlink()
+
+    def git(*args: str, **_kwargs: object) -> str:
+        if args[:2] == ("tag", "-a") or args[0] == "push":
+            pytest.fail("missing README artifact reached tag/push")
+        return ""
+
+    monkeypatch.setattr(cut_release, "_git", git)
+    monkeypatch.setattr(
+        cut_release, "_gh", lambda *_args: pytest.fail("missing artifact reached publication")
+    )
+    monkeypatch.setattr(sys, "argv", ["cut_release.py", "v22"])
+
+    with pytest.raises(FileNotFoundError, match="frame_isometric.png"):
+        cut_release.main()
+
+    assert revision.read_text(encoding="utf-8") == "next_revision: v22\n"
+    for name in trim_renders.README_IMAGE_NAMES:
+        assert (images / name).read_bytes() == b"previous release image"
+
+
+def test_postpublish_image_install_failure_preserves_revision_and_identifies_recovery(
+    prepared_readme_release: tuple[Path, Path, Path],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, images, revision = prepared_readme_release
+    url = "https://github.com/example/repo/releases/tag/v22"
+    monkeypatch.setattr(cut_release, "_gh", lambda *_args: url)
+    replace = os.replace
+
+    def refuse_image_install(source: Path, destination: Path) -> None:
+        if Path(destination).parent == images:
+            raise PermissionError("image destination is read-only")
+        replace(source, destination)
+
+    monkeypatch.setattr(os, "replace", refuse_image_install)
+    monkeypatch.setattr(sys, "argv", ["cut_release.py", "v22"])
+
+    with pytest.raises(RuntimeError) as failure:
+        cut_release.main()
+
+    message = str(failure.value)
+    assert url in message
+    assert (
+        "uv run python cad/scripts/trim_renders.py "
+        "--release-root cad/out/release/harmonic-analyzer-v22"
+    ) in message
+    assert "next_revision: v23" in message
+    assert revision.read_text(encoding="utf-8") == "next_revision: v22\n"
+    for name in trim_renders.README_IMAGE_NAMES:
+        assert (images / name).read_bytes() == b"previous release image"
+    assert not tuple(revision.parent.glob(".release.yaml.*.tmp"))

@@ -90,8 +90,28 @@ uv run python -m doit clean
 ```
 
 `cad/config/release.yaml` reserves the Revision stamped into every native CAD
-file and linked drawing title block. A successful publish advances it to the
-next `vNN`; commit and merge that tracked version bump before the next release.
+file and linked drawing title block. Before tagging or publishing, the
+publisher prepares all generated README images from the staged, versioned
+`cad/out/release/harmonic-analyzer-vNN` package without writing tracked files.
+Missing inputs or rendering tools fail before the tag; there is no fallback to
+stale images. Only after successful publication does it install those images
+under `cad/docs/images/` and advance `next_revision`.
+
+Submit that post-release refresh in a follow-up PR whose only changes are the
+`cad/config/release.yaml` `next_revision` bump and the regenerated README image
+files. This exact generated-only PR is exempt from the regular build and review
+gates and may merge immediately. Any code, prose, documentation, README markup
+or layout change remains an ordinary PR and must pass the normal gates.
+
+For a supervised farm release, never launch the `release` target in the
+disposable snapshot. Use `farm-run.ps1` with
+`-Targets "build,export,package:release,preflight"` (`build` supplies the
+drawing and check gates), then restore the successful run's complete `cad/out`
+from its recorded `.done` `outputs` path to the owning worktree. There, run
+`uv run --frozen python -m doit -s gallery` followed by
+`uv run --frozen python -m doit -s release -- vNN`. This keeps the gallery and
+publish in the owning checkout and avoids local COM redispatch; see
+[`DEVELOPING.md`](../../DEVELOPING.md#supervised-farm-releases).
 
 ## Parallelism
 

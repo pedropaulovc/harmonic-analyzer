@@ -165,6 +165,18 @@ leaf then reports `cache_missing`, or succeeds without its key, every tracked
 difference is reported the same way, since each is a lead; without any, the
 failure names its other likely causes instead.
 
+### Supervised farm releases
+
+Never launch the `release` target through `farm-run.ps1`: it runs in a
+disposable snapshot, and cleanup would discard the publisher's post-release
+tracked image and `release.yaml` updates. Launch with
+`-Targets "build,export,package:release,preflight"` (`build` supplies drawing
+and check gates). Once successful, restore the complete `cad/out` from the
+recorded `.done` `outputs` path (normally `<LogDirectory>\<run-id>.out`) into
+the owning worktree. Then run `uv run --frozen python -m doit -s gallery`
+followed by `uv run --frozen python -m doit -s release -- vNN` there. This keeps
+the gallery and publish in the owning worktree without local COM redispatch.
+
 ### Starting one under the supervisor
 
 Start it with `hub` `op: "start"`, never with Bash. `persist: true` is what lets
