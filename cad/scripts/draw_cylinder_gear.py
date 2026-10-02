@@ -17,9 +17,9 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
-    add_edge_dimension,
     add_property_linked_note,
     add_surface_finish,
+    assert_dimension_measures,
     assert_imported_precision,
     curate_view_dimensions,
     dimension_name,
@@ -33,9 +33,11 @@ from _drawing_common import (
     set_reference_dimensions,
     stamp_drawing_summary,
     view_name,
+    visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
+from _part_pmi import _face_geometry, _face_matches
 from _surface_finish import surface_finish_by_key
 from cylinder_gear_notes import BORE_FIT_CALLOUT, STACK_FIT_CALLOUT
 from cylinder_gear_spec import (
@@ -283,42 +285,111 @@ def _check_notch_dimensions(
     ]
 
 
-def _checked_edge_dimension(
-    adapter: Any,
-    view: Any,
-    *,
-    p0: tuple[float, float],
-    p1: tuple[float, float],
-    text_xy: tuple[float, float],
-    label: str,
-    expected_mm: float,
-    orientation: str,
-) -> Any:
-    """Add one SHEET-derived reference dimension and verify its value and places.
+def _cam_thickness_rims(view: Any) -> dict[float, Any]:
+    """The two circular boundaries of the exposed cam cylinder.
 
-    Every controlling dimension is a model dimension whose places the part
-    authored and ``assert_imported_precision`` reads back; the one dimension
-    built here is the parenthesised cam thickness (the stacking thickness less
-    the face width, #743), a read-only difference with no model dimension to
-    import, so its places come from the spec's
-    ``DRAWING_REFERENCE_PRECISION`` keyed by ``label`` -- never a literal.
+    CamBoss merges into the blank at z=FACE_WIDTH and ends at
+    OVERALL_THICKNESS. Its controlled cylindrical face, not a hit-tested
+    tooth edge projected across the rear face, owns both reference endpoints.
     """
-    display = add_edge_dimension(
-        adapter,
-        view,
-        p0=p0,
-        p1=p1,
-        text_xy=text_xy,
-        label=label,
-        orientation=orientation,
+    control = surface_finish_by_key(SURFACE_FINISHES, "cam_follower")
+    faces = []
+    for face in visible_view_entities(view, 3, label="cam thickness face"):
+        geometry = _face_geometry(face)
+        if geometry is not None and _face_matches(geometry, control.face):
+            faces.append(face)
+    if len(faces) != 1:
+        raise RuntimeError(f"cam thickness reference: expected one cam face, got {len(faces)}")
+    matches: dict[float, list[tuple[Any, tuple[float, ...]]]] = {
+        FACE_WIDTH: [], OVERALL_THICKNESS: [],
+    }
+    geometry_readback = []
+    for edge in _early_bound(faces[0], "IFace2").GetEdges() or ():
+        curve = _early_bound(edge, "IEdge").GetCurve()
+        if curve is None:
+            continue
+        curve = _early_bound(curve, "ICurve")
+        if not curve.IsCircle():
+            continue
+        params = tuple(float(value) for value in curve.CircleParams)
+        geometry_readback.append(params)
+        for station, edges in matches.items():
+            center = (0.0, ECCENTRICITY / 1000.0, station / 1000.0)
+            if (
+                math.dist(params[:3], center) <= 1e-7
+                and abs(params[6] - CAM_DIA / 2000.0) <= 1e-7
+                and abs(abs(params[5]) - 1.0) <= 1e-6
+                and math.hypot(params[3], params[4]) <= 1e-6
+            ):
+                edges.append((edge, params))
+    for station, edges in matches.items():
+        if len(edges) != 1:
+            raise RuntimeError(
+                f"cam thickness reference: expected one circular cam rim at z={station:g} mm, "
+                f"got {len(edges)}; circular boundaries={geometry_readback!r}"
+            )
+    _telemetry.info(
+        f"cam thickness reference: selected controlled cam circular boundaries "
+        f"(centre xyz, axis xyz, radius; metres) "
+        f"{[edges[0][1] for edges in matches.values()]!r}"
     )
-    display = _early_bound(display, "IDisplayDimension")
-    dimension = _early_bound(display.GetDimension2(0), "IDimension")
-    measured_mm = abs(float(dimension.SystemValue) * 1000.0)
-    if abs(measured_mm - expected_mm) > 1e-5:
-        raise RuntimeError(
-            f"{label}: measured {measured_mm:g}, expected {expected_mm:g} mm"
+    return {station: edges[0][0] for station, edges in matches.items()}
+
+
+def _cam_thickness_reference(adapter: Any, view: Any) -> Any:
+    """Dimension the cam's actual circular rims with an explicitly linear API.
+
+    This is the reference difference of the model-owned stacking thickness
+    and face width. The selected rims project as parallel lines in *Right,
+    but their native curves are circles; require a horizontal linear type
+    instead of trusting automatic inference from overlapping projected edges.
+    """
+    label = "cam thickness reference"
+    rims = _cam_thickness_rims(view)
+    draw = adapter.currentModel
+    drawing = _early_bound(draw, "IDrawingDoc")
+    if not drawing.ActivateView(view_name(adapter, view)):
+        raise RuntimeError(f"{label}: failed to activate the right view")
+    draw.ClearSelection2(True)
+    manager = _early_bound(draw.SelectionManager, "ISelectionMgr")
+    for index, (station, edge) in enumerate(rims.items(), 1):
+        data = manager.CreateSelectData()
+        data.View = view
+        if _early_bound(edge, "IEntity").Select4(index > 1, data) is not True:
+            raise RuntimeError(f"{label}: failed to select the cam rim at z={station:g} mm")
+        selected = manager.GetSelectedObject6(index, -1)
+        if (
+            int(manager.GetSelectedObjectCount2(-1)) != index
+            or int(manager.GetSelectedObjectType3(index, -1)) != 1  # swSelEDGES
+            or int(adapter.swApp.IsSame(selected, edge)) != 1
+        ):
+            raise RuntimeError(f"{label}: selected entity is not the cam rim at z={station:g} mm")
+        landing = _project_mm(
+            adapter, view, (0.0, ECCENTRICITY - CAM_DIA / 2.0, station),
+            label=f"{label} rim landing",
         )
+        if manager.SetSelectionPoint2(index, -1, landing[0], landing[1], 0.0) is not True:
+            raise RuntimeError(f"{label}: failed to set the cam rim selection point")
+    # swDimensionType_e.swHorLinearDimension; Error is in/out VT_I4 in the
+    # generated R2026 binding, so pywin32 returns (display dimension, status).
+    display, status = _early_bound(draw.Extension, "IModelDocExtension").AddSpecificDimension(
+        RIGHT_CENTER[0] + 0.020, 0.200, 0.0, 11, 0
+    )
+    draw.ClearSelection2(True)
+    if display is None or int(status) != 0:  # swAddSpecificDimension_Success
+        raise RuntimeError(f"{label}: explicit horizontal dimension failed, status={status}")
+    display = _early_bound(display, "IDisplayDimension")
+    dimension_type = int(display.Type2)
+    if dimension_type not in (2, 11):  # linear, horizontal linear; never angular
+        raise RuntimeError(f"{label}: expected horizontal linear dimension, got type {dimension_type}")
+    measured_mm = assert_dimension_measures(
+        adapter,
+        display,
+        expected_mm=CAM_THICKNESS,
+        label=label,
+        entities=(rims[FACE_WIDTH], rims[OVERALL_THICKNESS]),
+    )
+    _telemetry.info(f"{label}: native type {dimension_type}, measured {measured_mm:g} mm")
     places = DRAWING_REFERENCE_PRECISION[label]
     # -1: swDimensionPrecisionSettings_e do-not-change for the dual and both
     # tolerance places.  The subscript is written out again because
@@ -466,32 +537,10 @@ async def build(adapter: Any) -> dict[str, str]:
     if not auto_center_marks(adapter, front, holes=True, size=0.0025):
         raise RuntimeError("failed to add ASME center marks to cam-side front view")
 
-    # Face width and the overall (stacking) thickness are controlled; the cam
-    # thickness between them is their difference.  Show it as a checked
-    # REFERENCE from the gear's rear face (below the cam) to the cam's rear face.
-    cam_bore_wall = CAM_DIA / 2.0 - ECCENTRICITY - BORE_DIA / 2.0
-    cam_pick_y = -(BORE_DIA / 2.0 + cam_bore_wall / 2.0)
-    gear_rear_pick_y = -(CAM_DIA / 2.0 - ECCENTRICITY + 5.0)
-    cam_reference = _checked_edge_dimension(
-        adapter,
-        right,
-        p0=_project_mm(
-            adapter,
-            right,
-            (0.0, gear_rear_pick_y, FACE_WIDTH),
-            label="gear rear face below the cam",
-        ),
-        p1=_project_mm(
-            adapter,
-            right,
-            (0.0, cam_pick_y, OVERALL_THICKNESS),
-            label="cam rear edge",
-        ),
-        text_xy=(RIGHT_CENTER[0] + 0.020, 0.200),
-        label="cam thickness reference",
-        expected_mm=CAM_THICKNESS,
-        orientation="horizontal",
-    )
+    # The reference spans the two physical circular boundaries of the exposed
+    # cam cylinder; the face-width and stacking-thickness requirements stay on
+    # their imported model dimensions.
+    cam_reference = _cam_thickness_reference(adapter, right)
     cam_reference.ShowParenthesis = True
     if not cam_reference.ShowParenthesis:
         raise RuntimeError("cam thickness was not shown as reference")

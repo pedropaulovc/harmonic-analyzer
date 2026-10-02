@@ -38,8 +38,10 @@ from _drawing_common import (
     set_hidden_lines_removed,
     set_reference_dimension,
     stamp_drawing_summary,
+    visible_view_entities,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _part_pmi import _face_geometry, _face_matches
 from _surface_finish import surface_finish_by_key
 from pinion_cam_pin_spec import (
     CAP_RADIUS,
@@ -125,6 +127,24 @@ def _crown_point(axial_from_root_mm: float) -> tuple[float, float, float]:
     rise = CAP_RADIUS - CAP_SAG + axial_from_root_mm
     radial = math.sqrt(CAP_RADIUS**2 - rise**2)
     return (0.0, -radial / 1000.0, (PIN_LEN + axial_from_root_mm) / 1000.0)
+
+
+def _crown_face(view: Any) -> Any:
+    """The one visible spherical face controlled by the crown finish.
+
+    Select the controlled model face, not a hit-tested transient silhouette,
+    and retain the exact crown landing. The cone-gear shaft's journal finishes
+    use the same strictly checked native FACE attachment.
+    """
+    control = surface_finish_by_key(SURFACE_FINISHES, "crown")
+    matches = []
+    for face in visible_view_entities(view, 3, label="cam-pin crown finish face"):
+        geometry = _face_geometry(face)
+        if geometry is not None and _face_matches(geometry, control.face):
+            matches.append(face)
+    if len(matches) != 1:
+        raise RuntimeError(f"cam-pin crown finish: expected one controlled face, got {len(matches)}")
+    return matches[0]
 
 
 def _overall_reference(adapter: Any, right: Any) -> None:
@@ -243,11 +263,12 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         right,
-        edge_xy=crown_finish_point,
+        entity=_crown_face(right),
+        leader_attach_xy=crown_finish_point,
         symbol_xy=CROWN_FINISH_SYMBOL_XY,
         control=surface_finish_by_key(SURFACE_FINISHES, "crown"),
         label="cam-pin crown finish",
-        entity_type="SILHOUETTE",
+        entity_type="FACE",
         char_height=0.0025,  # the pivot-block size; the default read oversized at 8:1
     )
 

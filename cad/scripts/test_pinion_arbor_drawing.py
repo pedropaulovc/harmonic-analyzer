@@ -1883,13 +1883,14 @@ def test_sr_leader_aims_at_the_crown_arc_not_its_corner() -> None:
     assert x < drawing.DETAIL_KEEP["CrossHoleDia"][0] - 0.030
 
 
-# --- journal Ra flanks: resolved on the model, never hit-tested -------------
+# --- journal finishes: exact controlled faces and physical flank points ----
 
 
 class _Cylinder:
     """ISurface of an axial cylinder: identity, CylinderParams (metres)."""
 
-    Identity = 4002  # swSurfaceTypes_e.CYLINDER_TYPE
+    def Identity(self) -> int:  # noqa: N802 - native method, not a property
+        return 4002  # swSurfaceTypes_e.CYLINDER_TYPE
 
     def __init__(self, dia_mm: float) -> None:
         self.CylinderParams = (0.0, 0.0, 0.0, 0.0, 0.0, 1.0, dia_mm / 2000.0)
@@ -1910,48 +1911,26 @@ class _ShaftFace:
         return self.box
 
 
-class _Silhouette:
-    """ISilhouetteEdge: its face and its model-space ends (metres)."""
-
-    def __init__(self, face: _ShaftFace, side: float) -> None:
-        self.face = face
-        y = side * face.surface.CylinderParams[6]
-        self.ends = ((0.0, y, face.box[2]), (0.0, y, face.box[5]))
-
-    def GetFace(self):  # noqa: N802
-        return self.face
-
-    def GetStartPoint(self):  # noqa: N802
-        return SimpleNamespace(ArrayData=self.ends[0])
-
-    def GetEndPoint(self):  # noqa: N802
-        return SimpleNamespace(ArrayData=self.ends[1])
-
-
 class _ProfileView:
-    """The 1:1 profile: model z runs leftwards along sheet x, model y up."""
+    """The turned *Top profile: model Z runs left, model X runs down."""
 
-    def __init__(self, silhouettes: list[_Silhouette]) -> None:
-        self.silhouettes = silhouettes
-        self.sweeps: list[int] = []
+    def __init__(self, faces: list[_ShaftFace], scale: float = 1.0) -> None:
+        self.faces = faces
+        self.scale = scale
 
     def GetVisibleComponents(self):  # noqa: N802
         return ["pinion-arbor-1"]
 
     def GetVisibleEntities2(self, component, kind):  # noqa: N802
-        self.sweeps.append(kind)
-        return list(self.silhouettes) if kind == 4 else []
+        # No lower silhouette is supplied: the failed seat enumerated only
+        # the upper one, even though the controlled face is visible.
+        return list(self.faces) if kind == 3 else []
 
-    @staticmethod
-    def sheet(xyz) -> tuple[float, float]:
-        return (0.30 - xyz[2], 0.17 + xyz[1])
+    def sheet(self, xyz) -> tuple[float, float]:
+        return (0.30 - self.scale * xyz[2], 0.17 - self.scale * xyz[0])
 
 
-def _journal_profile(monkeypatch, *, drop=(), twins=()) -> tuple[_ProfileView, dict]:
-    """Both flanks of every Ø8 zone, collinear on the sheet, plus the Ø15 head;
-    ``twins`` flanks come back twice, as the seat returns the front land's."""
-    import _drawing_common
-
+def _journal_profile(monkeypatch, *, scale=1.0) -> tuple[_ProfileView, dict]:
     front, back = spec.FRONT_JOURNAL_Z, spec.BACK_JOURNAL_Z
     faces = {
         "front_journal": _ShaftFace(spec.SHAFT_DIA, front, front + spec.JOURNAL_LEN),
@@ -1959,92 +1938,62 @@ def _journal_profile(monkeypatch, *, drop=(), twins=()) -> tuple[_ProfileView, d
         "back_journal": _ShaftFace(spec.SHAFT_DIA, back, back + spec.JOURNAL_LEN),
         "head": _ShaftFace(spec.HEAD_DIA, spec.HEAD_REAR_Z - spec.HEAD_LEN, spec.HEAD_REAR_Z),
     }
-    silhouettes = {
-        (name, side): _Silhouette(face, sign)
-        for name, face in faces.items()
-        for side, sign in (("lower", -1.0), ("upper", 1.0))
-        if (name, side) not in drop
-    }
-    extra = [_Silhouette(faces[name], -1.0 if side == "lower" else 1.0) for name, side in twins]
-    view = _ProfileView([*silhouettes.values(), *extra])
+    view = _ProfileView(list(faces.values()), scale)
     monkeypatch.setattr(
         drawing,
         "model_point_in_view",
         lambda adapter, v, xyz, *, label: v.sheet(xyz),
     )
-    monkeypatch.setattr(
-        _drawing_common,
-        "model_points_in_view",
-        lambda adapter, v, points, *, label, names=None: [v.sheet(p) for p in points],
-    )
-    return view, silhouettes
+    return view, faces
 
 
-def test_each_journal_ra_lands_on_its_own_faces_silhouette_found_on_the_model(
-    monkeypatch,
+@pytest.mark.parametrize("scale", (1.0, 2.0))
+def test_journal_finishes_select_their_own_land_and_project_its_physical_flank(
+    monkeypatch, scale: float
 ) -> None:
-    """drawing:pinion_arbor key 870279bc: ``SelectByID2`` at the front land's
-    flank point (0.25355, 0.166), dead on the outline, missed on
-    swmaker00000a@10 and hit on swmaker000004@4; @10 missed it again at the
-    next commit.  A coordinate pick is the seat's graphics hit test.  Each Ra
-    now takes the silhouette its part-owned face draws through the landing --
-    the lower flank for the front land, the upper for the back, never the
-    collinear plain zone next to it -- from ONE silhouette sweep."""
-    view, silhouettes = _journal_profile(monkeypatch)
+    """Equal-diameter plain shaft zones must not acquire the journal finish.
+
+    Missing lower silhouette enumeration cannot move the front finish to the
+    upper flank. Its lower landing must also follow the view's actual scale.
+    """
+    view, faces = _journal_profile(monkeypatch, scale=scale)
 
     picks = drawing._journal_finish_picks(SimpleNamespace(), view)
 
-    assert view.sweeps == [4]
-    assert set(picks) == set(drawing.JOURNAL_FINISHES)
-    for key, (silhouette, landing, symbol_xy) in picks.items():
-        station_z, want_symbol, flank = drawing.JOURNAL_FINISHES[key]
-        assert silhouette is silhouettes[(key, flank)]
-        assert symbol_xy == want_symbol
-        # The leader lands at the station on that flank, as the pick did.
+    for key, (face, landing, _symbol_xy) in picks.items():
+        station_z, _symbol, flank = drawing.JOURNAL_FINISHES[key]
+        assert face is faces[key]
         assert landing == pytest.approx(
-            view.sheet((0.0, drawing.FLANK_SIGN[flank] * spec.SHAFT_DIA / 2000.0, station_z / 1000.0))
+            (
+                0.30 - scale * station_z / 1000.0,
+                0.17 + scale * drawing.FLANK_SIGN[flank] * spec.SHAFT_DIA / 2000.0,
+            )
         )
 
 
-def test_a_journal_flank_the_view_does_not_draw_fails_loud(monkeypatch) -> None:
-    """No fallback to a neighbour: without the front land's lower flank the
-    collinear plain zone and the land's own upper flank are both refused."""
-    view, _silhouettes = _journal_profile(monkeypatch, drop={("front_journal", "lower")})
+@pytest.mark.parametrize("fault", ("missing", "wrong_diameter", "wrong_station", "ambiguous"))
+def test_journal_finish_refuses_missing_wrong_or_ambiguous_controlled_faces(
+    monkeypatch, fault: str
+) -> None:
+    view, faces = _journal_profile(monkeypatch)
+    front = faces["front_journal"]
+    view.faces.remove(front)
+    expected = 0
+    if fault == "wrong_diameter":
+        view.faces.append(_ShaftFace(spec.HEAD_DIA, spec.FRONT_JOURNAL_Z,
+                                    spec.FRONT_JOURNAL_Z + spec.JOURNAL_LEN))
+    elif fault == "wrong_station":
+        view.faces.append(_ShaftFace(spec.SHAFT_DIA, spec.BACK_JOURNAL_Z,
+                                    spec.BACK_JOURNAL_Z + spec.JOURNAL_LEN))
+    elif fault == "ambiguous":
+        view.faces.extend([
+            front,
+            _ShaftFace(spec.SHAFT_DIA, spec.FRONT_JOURNAL_Z,
+                       spec.FRONT_JOURNAL_Z + spec.JOURNAL_LEN),
+        ])
+        expected = 2
 
-    with pytest.raises(RuntimeError, match=r"0 silhouettes of front_journal's face"):
+    with pytest.raises(
+        RuntimeError, match=f"front_journal finish: expected one controlled face, got {expected}"
+    ):
         drawing._journal_finish_picks(SimpleNamespace(), view)
-
-
-def test_a_flank_the_seat_returns_twice_is_one_line(monkeypatch) -> None:
-    """Farm run 20260929T224917539Z on swmaker000004@4: the front land's face
-    returned its lower flank as TWO silhouettes, both (240.55, 166)-(260.55,
-    166) mm -- the tie under the point the hit test had to break.  Coincident
-    twins are the one line they draw; the first is taken."""
-    view, silhouettes = _journal_profile(monkeypatch, twins={("front_journal", "lower")})
-
-    picks = drawing._journal_finish_picks(SimpleNamespace(), view)
-
-    assert picks["front_journal"][0] is silhouettes[("front_journal", "lower")]
-    assert picks["back_journal"][0] is silhouettes[("back_journal", "upper")]
-
-
-def test_two_different_lines_of_one_face_through_the_point_are_refused(monkeypatch) -> None:
-    import _drawing_common
-
-    face = _ShaftFace(spec.SHAFT_DIA, 0.0, 20.0)
-    lower = _Silhouette(face, -1.0)
-    # A shorter segment on the same line: not a twin, so not the same line.
-    stub = _Silhouette(face, -1.0)
-    stub.ends = (stub.ends[0], (0.0, stub.ends[1][1], 0.015))
-    view = _ProfileView([lower, stub])
-    monkeypatch.setattr(
-        _drawing_common,
-        "model_points_in_view",
-        lambda adapter, v, points, *, label, names=None: [v.sheet(p) for p in points],
-    )
-    spec_face = spec.SURFACE_FINISHES[0].face.__class__(spec.SHAFT_DIA, contains_z_mm=10.0)
-    with pytest.raises(RuntimeError, match=r"2 silhouettes of land's face"):
-        _drawing_common.face_silhouettes_through(
-            SimpleNamespace(), view, {"land": (spec_face, view.sheet((0.0, -0.004, 0.010)))},
-            label="land",
-        )
