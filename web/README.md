@@ -81,8 +81,8 @@ the producer's generic 30-degree branch split; generated framing keys are not
 new measurements. The Synthesis **25.98..26.54-second** scoped headless
 demonstration does not qualify source matching or recover camera/mechanical pose.
 Before Synthesis's existing single-main normalization, selected permissions
-refuse original measured, partial-frame, mirrored, warped, composite, empty or
-unmapped views. Valid null-camera full-frame main or outgoing/incoming views
+refuse original measured, partial-frame, mirrored, warped, composite, missing,
+empty or unmapped views. Valid null-camera full-frame main or outgoing/incoming views
 remain accepted; normalized main framing is checked afterward. Original retained
 source layouts are not edited.
 Regenerate either video independently with

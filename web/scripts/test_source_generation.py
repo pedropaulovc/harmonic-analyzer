@@ -339,7 +339,7 @@ class PresenterOriginalViewTests(unittest.TestCase):
         self.assertEqual(view['cameraProvenance']['kind'], 'source-informed-framing')
 
     def test_unsupported_original_views_are_refused_before_normalization(self):
-        for mismatch in ('camera', 'rect', 'presentation', 'empty', 'warp',
+        for mismatch in ('camera', 'rect', 'presentation', 'empty', 'missing', 'warp',
                          'resolved-warp', 'crossfade', 'unexpected-id', 'duplicate-id'):
             with self.subTest(mismatch=mismatch):
                 data = self.source()
@@ -353,6 +353,8 @@ class PresenterOriginalViewTests(unittest.TestCase):
                     view['presentation'] = 'horizontal-mirror'
                 elif mismatch == 'empty':
                     frame['views'] = []
+                elif mismatch == 'missing':
+                    frame.pop('views')
                 elif mismatch in ('warp', 'resolved-warp'):
                     view['resolvedImagePlaneWarp' if mismatch == 'resolved-warp' else 'imagePlaneWarp'] = {
                         'kind': 'homography', 'unwarpedViewportPixels': [0, 0, 1920, 1080],
@@ -364,10 +366,10 @@ class PresenterOriginalViewTests(unittest.TestCase):
                     view['id'] = 'unmapped-body'
                 else:
                     frame['views'].append(copy.deepcopy(view))
-                original = copy.deepcopy(frame['views'])
+                original = copy.deepcopy(frame.get('views'))
                 with self.assertRaises(ValueError):
                     self.construct(data)
-                self.assertEqual(frame['views'], original)
+                self.assertEqual(frame.get('views'), original)
 
     def test_unrelated_original_source_views_remain_outside_permission_guard(self):
         data = self.source()

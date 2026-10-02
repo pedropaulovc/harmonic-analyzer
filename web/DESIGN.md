@@ -130,7 +130,7 @@ holds its existing front-camera position/quaternion and blends its chosen
 principal-point/FOV reframing keys. Its 16 retained source rows cover native
 exposures 623..637. Before normalization, a selected permission requires either
 one main view or the retained outgoing/incoming pair: null cameras, full-frame
-native rectangles, and no warp or composite metadata. Empty, duplicated or
+native rectangles, and no warp or composite metadata. Missing, empty, duplicated or
 unmapped views are refused rather than replaced with a fabricated main view.
 Normalized main/whole framing is validated afterward; retained source files stay
 unchanged. Both active observation and retained-track native-index schemas must
