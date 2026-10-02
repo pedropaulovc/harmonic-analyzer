@@ -48,9 +48,10 @@ from _common import (
     set_sketch_direct_db,
     volume_check,
 )
+from _hole_spec import THREAD_MAJOR_MM
 from _holes import CLEARANCE_MM, HoleSpec, wizard_holes
 from fillister_screw_spec import HEAD_DIA, SHANK_DIA, SHANK_LEN
-from platen_spec import PLATE_THICKNESS, SOCKET_THREAD_ENGAGEMENT
+from platen_spec import PLATE_THICKNESS, SOCKET_BOSS_H, SOCKET_THREAD_ENGAGEMENT
 
 PART_NAME = "platen-clip"
 MATERIAL = "Brass"  # see _common.apply_material docstring
@@ -61,8 +62,9 @@ CLIP_LENGTH = (
 CLIP_WIDTH = 8.988  # ch30-p002 Pose Studio: 10 * 0.8988
 SHEET_T = 0.8  # photo-backed brass sheet thickness
 CLIP_THICKNESS = SHEET_T  # assembly stand-off: one sheet, not a face stack
-# Stock 90114A511 has a 6.35-mm shank; the full 4-mm platen receiver leaves
-# a 2.35-mm under-head stack. Raise only the two flat-rail screw stations.
+# Stock 90114A511 has a 6.35-mm shank; the 3.85 platen plus its 0.65 rear
+# boss take 4.5 of it as thread, leaving a 1.85-mm under-head stack. Raise only
+# the two flat-rail screw stations.
 SCREW_SEAT_STACK = SHANK_LEN - SOCKET_THREAD_ENGAGEMENT
 SCREW_SEAT_BOSS_H = SCREW_SEAT_STACK - CLIP_THICKNESS
 SCREW_SEAT_RADIAL_MARGIN = 0.2
@@ -181,8 +183,12 @@ if SCREW_SEAT_BOSS_H <= 0.0:
     raise AssertionError("stock fillister screw no longer requires a clip seat boss")
 if abs(SCREW_SEAT_STACK + SOCKET_THREAD_ENGAGEMENT - SHANK_LEN) > 1e-9:
     raise AssertionError("clip/platen stack no longer finishes at the screw tip")
-if abs(SOCKET_THREAD_ENGAGEMENT - PLATE_THICKNESS) > 1e-9:
-    raise AssertionError("clip screw receiver no longer uses full platen thickness")
+if abs(SOCKET_THREAD_ENGAGEMENT - (PLATE_THICKNESS + SOCKET_BOSS_H)) > 1e-9:
+    raise AssertionError("clip screw receiver no longer runs through plate and boss")
+if SOCKET_THREAD_ENGAGEMENT + 1e-9 < 1.5 * THREAD_MAJOR_MM["#4-40"]:
+    raise AssertionError(
+        f"clip #4-40 engagement {SOCKET_THREAD_ENGAGEMENT:.4f} < 1.5D (rule 12)"
+    )
 if HOLE_DIA < SHANK_DIA:
     raise AssertionError("stock fillister shank does not clear the clip")
 

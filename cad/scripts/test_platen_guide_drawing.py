@@ -182,7 +182,7 @@ def test_drawing_splits_front_and_rear_tap_tables() -> None:
 # breaking through a faced lock seat). Recomputed from the catalogue screw
 # and the platen's counterbore, not from the build's derived constants.
 _GUIDE_SCREW_LEN_MAX = 0.25 * 25.4  # 90114A511; B18.6.3 band +0/-0.03 in
-_PLATEN_PASSAGE = 4.0 - 2.9178  # plate less the stock-head counterbore
+_PLATEN_PASSAGE = 3.85 - 2.9178  # plate less the stock-head counterbore
 
 
 def test_front_receivers_are_through_taps_that_hold_the_screw_tip() -> None:
@@ -193,7 +193,7 @@ def test_front_receivers_are_through_taps_that_hold_the_screw_tip() -> None:
     assert guide.GUIDE_SCREW_THREAD_ENGAGEMENT == pytest.approx(reach)
     # The tip against the shallowest seat (the faced lock seats over A2/A4).
     seat_min = min(_GUIDE_DEPTH_MIN, _BAR_DEPTH_MIN + _LOCK_GAP_FIT_MIN)
-    assert seat_min - reach == pytest.approx(3.6522, abs=1e-9)
+    assert seat_min - reach == pytest.approx(3.5022, abs=1e-9)
     assert guide.GUIDE_SCREW_TIP_INSIDE_MIN == pytest.approx(seat_min - reach)
     # The assembly's blind-bottom check reads the same tip clearance.
     assert guide.GUIDE_SCREW_BOTTOM_CLEARANCE == guide.GUIDE_SCREW_TIP_INSIDE_MIN

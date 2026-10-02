@@ -2,7 +2,8 @@
 
 The fixture is the case that exposed the gap: a #10-32 stud screwed into an
 arm until its shim seats, carrying an oiled rotating gear cluster that a front
-cap retains axially (MHA-082 in MHA-164, paper drive). SolidWorks-free.
+cap retains axially (the paper drive's MHA-082 stud in MHA-164, retired by
+R9-68 for a pressed pin). SolidWorks-free.
 """
 
 from __future__ import annotations
@@ -361,10 +362,10 @@ def test_every_registered_joint_cites_a_live_source_occurrence() -> None:
 def test_deleting_a_row_whose_parts_other_rows_name_is_omitted(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # The stud's stems stay named without its row: transgear_stub as the hub
-    # cap's receiver, transgear_arm as the plate screws'. Only the registry
-    # notices the stud joint is gone.
-    gone = "paper-drive/stud-in-arm"
+    # The guide screws' stems stay named without their row: fillister_screw
+    # as the clip screws' member, platen_guide as the lock screws' receiver.
+    # Only the registry notices the guide-screw joint is gone.
+    gone = "paper-drive/guide-screw-in-guide"
     table = tuple(j for j in jr.JOINTS if j.id != gone)
     findings = jr.audit(
         table,

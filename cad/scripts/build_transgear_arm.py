@@ -1,9 +1,10 @@
 r"""Reproduction script: transgear arm (MHA-164; ch. 23; 1 used).
 
 The steel link of the paper-drive hanger: it swings on the MHA-168 shoulder
-screw at the pivot P, carries the disc cluster's stud at S, the MHA-165 plate
-on two #8-32 taps between them, and the MHA-169 latch pin in its square end
-(``transgear_arm_geometry``; the sheet's contract is ``transgear_arm_spec``).
+screw at the pivot P, carries the disc cluster's MHA-179 pin at S, the
+MHA-165 plate on two #8-32 taps between them, and the MHA-169 latch pin in
+its square end (``transgear_arm_geometry``; the sheet's contract is
+``transgear_arm_spec``).
 
 Layout (part frame of ``transgear_arm_geometry``: origin on P at the FRONT
 face, +X to the square end, +Z to the rear face):
@@ -12,18 +13,19 @@ face, +X to the square end, +Z to the rear face):
   tangent to it, cut square at the tip station by the 14-wide end face;
   extruded ``THICKNESS`` toward +Z as ``Arm``.
 * ``PivotBore``: the Ø4.9 running bore through at P.
-* ``StudTap`` / ``PlateTaps``: native Hole Wizard taps through from the rear
-  face.  The plate taps' mouths are countersunk (``PlateTapCountersinks``);
-  the stud tap's are not (R9-63), so the title-block edge break governs them.
+* ``PinBore``: the Ø3.874 reamed press bore through at S for the MHA-179
+  pin, cut normal to the faces (the pin's head seats on the rear face).
+* ``PlateTaps``: native Hole Wizard taps through from the rear face, their
+  mouths countersunk (``PlateTapCountersinks``).
 * ``SpotFace``: the rear spot face, a revolved cut whose profile (Top plane,
   the arm's centreline section) dimensions its floor from the FRONT face.
 * ``PinHole``: the blind, flat-floored latch-pin hole (reamed for the dowel's
   press, which bottoms on the floor), sketched on the square end face.
-* ``StationReference`` (blanked): the printed stations of the stud and plate
-  taps from P; the Hole Wizard placement sketches that drive them are not
-  importable.
+* ``StationReference`` (blanked): the printed stations of the pin bore and
+  the plate taps from P; the Hole Wizard placement sketches that drive the
+  taps are not importable.
 
-Datums (all blanked): ``Axis1`` pivot, ``Axis2`` stud, ``Axis3``/``Axis4``
+Datums (all blanked): ``Axis1`` pivot, ``Axis2`` pin, ``Axis3``/``Axis4``
 plate taps, ``Axis5`` latch pin; planes ``RearFace`` (z = THICKNESS),
 ``PivotHeadSeat`` (the spot-face floor, the pivot head's seat) and ``EndFace``
 (x = TIP_STATION).
@@ -82,10 +84,13 @@ from _visibility import blank_reference_geometry
 from transgear_arm_geometry import (
     EDGE_LEAN,
     END_HALF_WIDTH,
+    PIN_BORE_DIA,
+    PIN_BORE_DIA_BAND,
     PIN_HOLE_DEPTH,
     PIN_HOLE_DIA,
     PIN_HOLE_DIA_BAND,
     PIN_HOLE_Z,
+    PIN_STATION,
     PIVOT_BORE_DIA,
     PIVOT_END_R,
     PIVOT_TANGENT_X,
@@ -96,8 +101,6 @@ from transgear_arm_geometry import (
     SPOT_FACE_DEPTH,
     SPOT_FACE_DIA,
     SPOT_FACE_FLOOR_FROM_FRONT,
-    STUD_STATION,
-    STUD_TAP_SPEC,
     THICKNESS,
     TIP_STATION,
 )
@@ -128,7 +131,7 @@ SPOT_FACE_OVERRUN = SPOT_FACE_DEPTH
 _R_BORE = PIVOT_BORE_DIA / 2.0
 _R_SPOT = SPOT_FACE_DIA / 2.0
 _R_PIN = PIN_HOLE_DIA / 2.0
-_R_STUD = blind_cut_dia_mm(STUD_TAP_SPEC) / 2.0
+_R_PIN_BORE = PIN_BORE_DIA / 2.0
 _R_PLATE = blind_cut_dia_mm(PLATE_TAP_SPEC) / 2.0
 # 90-degree countersinks: one 45-degree chamfer leg on each plate-tap drill
 # mouth.
@@ -160,7 +163,7 @@ def _csk_volume(csk: float, r: float) -> float:
 
 V_ARM = _outline_area() * THICKNESS
 V_BORE = math.pi * _R_BORE**2 * THICKNESS
-V_STUD = math.pi * _R_STUD**2 * THICKNESS
+V_PIN_BORE = math.pi * _R_PIN_BORE**2 * THICKNESS
 V_PLATE = len(PLATE_TAP_STATIONS) * math.pi * _R_PLATE**2 * THICKNESS
 V_PLATE_CSK = 2.0 * len(PLATE_TAP_STATIONS) * _csk_volume(PLATE_CSK, _R_PLATE)
 V_SPOT = math.pi * (_R_SPOT**2 - _R_BORE**2) * SPOT_FACE_DEPTH
@@ -253,9 +256,10 @@ async def build(adapter: Any) -> dict[str, str]:
         ("TipStation", TIP_STATION),
         ("EndWidth", 2.0 * END_HALF_WIDTH),
         ("PivotBoreDia", PIVOT_BORE_DIA),
+        ("PinBoreDia", PIN_BORE_DIA),
         ("SpotFaceDia", SPOT_FACE_DIA),
         ("SpotFaceFloor", SPOT_FACE_FLOOR_FROM_FRONT),
-        ("StudStation", STUD_STATION),
+        ("PinStation", PIN_STATION),
         ("PlateTapStation1", PLATE_TAP_STATIONS[0]),
         ("PlateTapStation2", PLATE_TAP_STATIONS[1]),
         ("PinHoleDia", PIN_HOLE_DIA),
@@ -368,19 +372,34 @@ async def build(adapter: Any) -> dict[str, str]:
     expected -= V_BORE
     await volume_check(adapter, "arm with pivot bore", expected, 0.01 * V_BORE)
 
-    # --- Taps through from the rear face, then the plate taps' mouths
-    # countersunk ---------------------------------------------------------
-    stud = wizard_holes(
+    # --- Pin bore through at S: the MHA-179 press, reamed square to the faces
+    pin_bore = SketchDims()
+    check("create_sketch pin bore", await adapter.create_sketch("Front"))
+    await define_circle(
         adapter,
-        STUD_TAP_SPEC,
-        [[STUD_STATION, 0.0, THICKNESS]],
-        (0.0, 0.0, 1.0),
-        f"stud tap ({STUD_TAP_SPEC.size} through)",
-        name="StudTap",
-        expect_dia_mm=2.0 * _R_STUD,
-        placement_dims=[(("StudX", '"StudStation"'), (None, None))],
+        PIN_STATION,
+        0.0,
+        _R_PIN_BORE,
+        "pin bore",
+        dims=pin_bore,
+        names=("PinBoreX", None, "PinBoreDia"),
+        drives=('"PinStation"', None, '"PinBoreDia"'),
     )
-    drive_jobs += stud.placement_drive_jobs
+    await ensure_fully_defined(adapter, "pin bore sketch")
+    check("exit_sketch pin bore", await adapter.exit_sketch())
+    name_last_feature(adapter, "PinBoreProfile")
+    drive_jobs += pin_bore.apply(adapter, "PinBoreProfile")
+    check(
+        "cut pin bore",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=THROUGH_CUT_DEPTH, both_directions=True)
+        ),
+    )
+    name_last_feature(adapter, "PinBore")
+    expected -= V_PIN_BORE
+    await volume_check(adapter, "arm with pin bore", expected, 0.01 * V_PIN_BORE)
+
+    # --- Plate taps through from the rear face, their mouths countersunk ----
     plate = wizard_holes(
         adapter,
         PLATE_TAP_SPEC,
@@ -395,8 +414,8 @@ async def build(adapter: Any) -> dict[str, str]:
         ],
     )
     drive_jobs += plate.placement_drive_jobs
-    expected -= V_STUD + V_PLATE
-    await volume_check(adapter, "arm with taps", expected, 0.03 * (V_STUD + V_PLATE))
+    expected -= V_PLATE
+    await volume_check(adapter, "arm with plate taps", expected, 0.03 * V_PLATE)
     check(
         "countersink plate-tap mouths",
         await adapter.add_chamfer(
@@ -542,12 +561,12 @@ async def build(adapter: Any) -> dict[str, str]:
         f"{before - after:.2f} mm^3 (analytic {V_PIN:.2f})"
     )
 
-    # --- REFERENCE sketch: the printed tap stations from P -------------------
+    # --- REFERENCE sketch: the printed hole stations from P ------------------
     stations = SketchDims()
     check("create_sketch station reference", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)
     references = (
-        ("StudStation", STUD_STATION),
+        ("PinStation", PIN_STATION),
         ("PlateTapStation1", PLATE_TAP_STATIONS[0]),
         ("PlateTapStation2", PLATE_TAP_STATIONS[1]),
     )
@@ -587,7 +606,7 @@ async def build(adapter: Any) -> dict[str, str]:
     # --- Named datums for the assembly mates ---------------------------------
     for label, plane_b, offset_b, drive_b, want in (
         ("pivot axis", "Right Plane", 0.0, None, "Axis1"),
-        ("stud axis", "Right Plane", STUD_STATION, '"StudStation"', "Axis2"),
+        ("pin axis", "Right Plane", PIN_STATION, '"PinStation"', "Axis2"),
         (
             "plate tap 1 axis",
             "Right Plane",
@@ -657,7 +676,7 @@ async def build(adapter: Any) -> dict[str, str]:
         adapter, "SpotFaceProfile", "FloorDepth", SPOT_FACE_FLOOR_TOLERANCE
     )
     set_dimension_symmetric_tolerance(
-        adapter, "StationReference", "StudStation", HOLE_POSITION_TOLERANCE
+        adapter, "StationReference", "PinStation", HOLE_POSITION_TOLERANCE
     )
     set_dimension_symmetric_tolerance(
         adapter, "StationReference", "PlateTapStation1", HOLE_POSITION_TOLERANCE
@@ -670,6 +689,9 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     set_dimension_bilateral_tolerance(
         adapter, "PinHoleProfile", "PinHoleDia", *deviations(PIN_HOLE_DIA_BAND)
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "PinBoreProfile", "PinBoreDia", *deviations(PIN_BORE_DIA_BAND)
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)

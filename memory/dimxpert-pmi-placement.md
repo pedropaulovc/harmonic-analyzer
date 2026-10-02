@@ -6,9 +6,10 @@ metadata:
 ---
 
 The display/placement layer on top of [[dimxpert-authoring-probe]] (authoring
-itself). All facts probe-verified on transgear-stub, R2026x SP3.0 Makers seat;
-probes in `cad/scripts/diagnostics/probe_pmi_*.py` (worktree branch
-`dimxpert-pmi-migration`, PR #450).
+itself). All facts probe-verified on the MHA-082 stub, R2026x SP3.0 Makers
+seat; probes in `cad/scripts/diagnostics/probe_pmi_*.py` (worktree branch
+`dimxpert-pmi-migration`, PR #450). R9-68 retired the stub; the DimXpert
+probes now target `transgear-pin` (MHA-179).
 
 **The legality rule (user-discovered, explains every symptom).** An FCF on a
 cylindrical face is only legal in the annotation view PERPENDICULAR to the

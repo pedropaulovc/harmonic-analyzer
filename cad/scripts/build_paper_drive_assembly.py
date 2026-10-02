@@ -283,7 +283,7 @@ PLATE_X0 = -33.213
 # that top edge puts the resized plate bottom here. The fit's z delta remains
 # ignored: a near-front view does not constrain depth.
 PLATE_Y0 = 273.234
-PLATE_FRONT_Z = BAR_FRONT_Z - PLATE_THICKNESS  # -142.9
+PLATE_FRONT_Z = BAR_FRONT_Z - PLATE_THICKNESS  # -142.75
 
 # The platen hangs: the bar's top edge carries the top guide's underside.
 GUIDE_Y = (283.734, 317.734)  # bottom / top rail seats (machine y)
@@ -317,22 +317,23 @@ import transgear_arm_plate_geometry as ARM_PLATE  # noqa: E402
 import transgear_arm_plate_spec as ARM_PLATE_SPEC  # noqa: E402
 import transgear_arm_plate_screw_spec as PLATE_SCREW  # noqa: E402
 import transgear_collar_cross_pin_spec as CROSS_PIN  # noqa: E402
+import transgear_cluster_fit as CLUSTER  # noqa: E402
 import transgear_disc_hub_geometry as DISC_HUB_GEOM  # noqa: E402
 import transgear_disc_hub_spec as DISC_HUB  # noqa: E402
 import transgear_disc_screw_spec as DISC_SCREW  # noqa: E402
 import transgear_drive_collar_spec as COLLAR  # noqa: E402
 import transgear_feed_pinion_spec as FEED  # noqa: E402
+import transgear_front_bushing_spec as FRONT_BUSHING  # noqa: E402
 import transgear_hanger_joints as HANGER  # noqa: E402
-import transgear_hub_cap_spec as CAP  # noqa: E402
 import transgear_knob_cup_spec as CUP  # noqa: E402
 import transgear_knob_retaining_screw_spec as KNOB_SCREW  # noqa: E402
 import transgear_knob_thrust_ring_spec as RING  # noqa: E402
 import transgear_latch_pin_spec as LATCH_PIN  # noqa: E402
+import transgear_pin_spec as PIN  # noqa: E402
 import transgear_pivot_screw_spec as PIVOT_SCREW  # noqa: E402
 import transgear_pivot_spacer_spec as SPACER  # noqa: E402
-import transgear_stub_spec as STUB  # noqa: E402
-import transgear_stud_fit as STUD_FIT  # noqa: E402
-import transgear_stud_shim_spec as SHIM  # noqa: E402
+import transgear_rear_bushing_spec as REAR_BUSHING  # noqa: E402
+import transgear_retaining_ring_spec as E_RING  # noqa: E402
 import latch_hook_bracket_screw_spec as HOOK_BRACKET_SCREW  # noqa: E402
 import latch_hook_bracket_spec as HOOK_BRACKET_SPEC  # noqa: E402
 import latch_hook_rivet_spec as HOOK_RIVET  # noqa: E402
@@ -351,7 +352,7 @@ STUD_X = 0.0
 STUD_XY = (STUD_X, RACK_PITCH_Y - FEED_PD / 2.0 - RACK_MESH_EXT)
 PIVOT_XY = (BAR.PIVOT_TAP_X, BAR_CY + BAR.HANGER_TAP_Y)  # (-58, 303.234)
 if (
-    abs(math.dist(STUD_XY, PIVOT_XY) - ARM.STUD_STATION)
+    abs(math.dist(STUD_XY, PIVOT_XY) - ARM.PIN_STATION)
     > 0.5 * 10.0**-ARM_SPEC.STATION_PLACES
 ):
     raise AssertionError("the stud is off the arm's printed station from the pivot")
@@ -422,21 +423,25 @@ if _pin_hole_offset + LATCH_PIN.DIA / 2.0 >= HOOK.PIN_HOLE_DIA / 2.0:
         f"latch pin axis is {_pin_hole_offset:.3f} off the hook's pin hole centre"
     )
 
-# Stud / disc cluster on S. The MHA-178 shim sits on the arm's front face and
-# the stud MHA-082 seats on the shim (Ry180: its stations run to machine -Z);
-# the feed sleeve thrusts on its step, the disc sits on the sleeve's seat, the
-# brass hub presses on the sleeve in front of the disc, and the hub cap closes
-# the stack.  The shim is faced to fit (R9-47, R9-65, transgear_stud_fit); the
-# model carries it as fitted to nominal parts, so the cluster sits 0.25
-# forward of the contract §2 stations.
-SHIM_Z0 = ARM_Z0 - SHIM.THICKNESS  # -127.45: its collar face, +Z to the arm
-STUB_Z0 = STUB.SEAT_MACHINE_Z  # -127.45
-if abs(STUB_Z0 - SHIM_Z0) > 1e-9:
-    raise AssertionError("the stud's seat is off the shim's collar face")
-FEED_Z0 = STUB_Z0 - STUB.SLEEVE_THRUST_STATION  # -135.15 (Ry180, teeth to -144.65)
-DISC_Z0 = FEED_Z0 - FEED.GEAR_FACE_STATION - FEED.DISC_THICKNESS  # -147.65
-if abs(FEED.DISC_THICKNESS - DISC_FACE) > 1e-9:
-    raise AssertionError("the feed sleeve's disc seat is not the disc's thickness")
+# Disc cluster on the pin MHA-179 at S (R9-68).  The pin is pressed into the
+# arm, its head on the arm's rear face (Ry180: its stations run to machine
+# -Z).  On it, rear to front: the MHA-180 rear bushing on the arm's front
+# face, the MHA-110 feed sleeve (the disc on its round boss, its front face
+# at the D-flat's end wall where the hub's D-bore bears, screwed together),
+# the MHA-181 front bushing on the sleeve's nose and the MHA-182 ring in the
+# pin's groove.  Both bushings and the hub are
+# faced to fit (transgear_cluster_fit); the model carries them as fitted to
+# nominal parts, the cluster rearward with its float open at the ring.
+PIN_Z0 = PIN.HEAD_SEAT_MACHINE_Z  # -116.4625: the head's underside (Ry180)
+if abs(PIN_Z0 - (ARM_Z0 + ARM.THICKNESS)) > 1e-9:
+    raise AssertionError("the pin's head is off the arm's rear face")
+REAR_BUSHING_Z0 = CLUSTER.REAR_BUSHING_REAR_Z  # -124.4 (Ry180, to -130.4)
+if abs(REAR_BUSHING_Z0 - ARM_Z0) > 1e-9:
+    raise AssertionError("the rear bushing is off the arm's front face")
+FEED_Z0 = REAR_BUSHING_Z0 - REAR_BUSHING.LENGTH  # -130.4 (Ry180, teeth to -144.0)
+DISC_Z0 = FEED_Z0 - FEED.DISC_FRONT_STATION  # -147.65: on the hub spigot's flange
+if abs(DISC_Z0 - CLUSTER.DISC_FRONT_Z) > 1e-9:
+    raise AssertionError("the disc is off the cluster fit's station")
 _DISC_SCREW_R = DISC_HUB_GEOM.BOLT_CIRCLE_DIA / 2.0
 DISC_SCREW_XY = tuple(
     (
@@ -446,7 +451,24 @@ DISC_SCREW_XY = tuple(
     for angle in DISC_HUB_GEOM.SCREW_ANGLES_DEG
 )
 DISC_SCREW_Z0 = DISC_Z0 - DISC_HUB.FLANGE_THICK  # -150.05: heads on the flange
-CAP_Z0 = CAP.REAR_FACE_MACHINE_Z  # -158.05 (Ry180: the cap runs to -164.05)
+FRONT_BUSHING_Z0 = FEED_Z0 - FEED.OVERALL_LENGTH  # -157.75 (Ry180, to -162.78)
+if abs(FRONT_BUSHING_Z0 - CLUSTER.FRONT_BUSHING_REAR_Z) > 1e-9:
+    raise AssertionError("the front bushing is off the sleeve's nose")
+# The hub's front face, faced to fit HUB_NOSE_WINDOW behind the sleeve's
+# nose, so the front bushing bears on the steel nose and traps hub and disc.
+HUB_FRONT_Z = DISC_Z0 + DISC_HUB.HUB_FRONT_Z
+if abs(HUB_FRONT_Z - CLUSTER.HUB_FRONT_Z) > 1e-9:
+    raise AssertionError("the hub's front face is off the cluster fit's station")
+if abs(DISC_Z0 + DISC_HUB_GEOM.SPIGOT_LENGTH - CLUSTER.STEP_Z) > 1e-9:
+    raise AssertionError("the hub's spigot end is off the sleeve's step face")
+if not (
+    CLUSTER.HUB_NOSE_WINDOW[0]
+    <= HUB_FRONT_Z - FRONT_BUSHING_Z0
+    <= CLUSTER.HUB_NOSE_WINDOW[1]
+):
+    raise AssertionError("the hub's front face is off the sleeve nose's window")
+if abs(CLUSTER.RING_FRONT_Z - (PIN_Z0 - PIN.GROOVE_STATION)) > 1e-9:
+    raise AssertionError("the ring is off the pin groove's load wall")
 
 import transgear_knob_drive_pin_spec as KNOB_PIN  # noqa: E402
 import transgear_removable_spec as REMOVABLE  # noqa: E402
@@ -514,31 +536,31 @@ if abs(KNOB_RING_Z0 + RING.LENGTH - (PLATE_Z0 + ARM_PLATE.HUB_FACE_Z)) > 1e-9:
 KNOB_CUP_Z0 = KNOB_SHAFT_Z0 + KNOB_SPEC.REAR_END_Z  # -107.7625
 KNOB_SCREW_Z0 = KNOB_CUP_Z0 + CUP.FLOOR  # -105.1625
 
-# R9-47, the stud faced to fit.  F carries the disc: with the knob shaft
-# rearward and the cluster forward, the fit-up sets the disc's front face
-# STUD_FIT_WINDOW behind F, so the stud's own stations drop out of every
-# chain from F.  The model sits at the window's centre on the nominal chain.
+# R9-68, the bushings faced to fit.  F carries the disc: with the knob shaft
+# rearward and the cluster forward, the fit-up sets the disc's front face m
+# (transgear_cluster_fit.FIT_WINDOW) behind F by facing the front bushing,
+# so the pin's and sleeve's own stations drop out of every chain from F.
+# The model sits at the window's centre on the nominal chain.
 _F_FROM_ARM_Z = (
     ARM_Z0 + ARM.THICKNESS + ARM_PLATE.HUB_FACE_Z - RING.LENGTH - KNOB_SPEC.FACE_WIDTH
 )
-if abs(_F_FROM_ARM_Z - KNOB_SHAFT_Z0) > 1e-9:
+if abs(_F_FROM_ARM_Z - KNOB_SHAFT_Z0) > 1e-9 or abs(CLUSTER.F_Z - KNOB_SHAFT_Z0) > 1e-9:
     raise AssertionError("F is off the arm, plate hub and thrust ring chain")
-if abs(DISC_Z0 - FEED.CLUSTER_FLOAT - KNOB_SHAFT_Z0 - STUD_FIT.MODEL_WINDOW_AIR) > 1e-9:
+if abs(DISC_Z0 - CLUSTER.FLOAT_WINDOW_CENTRE - KNOB_SHAFT_Z0 - CLUSTER.MODEL_M) > 1e-9:
     raise AssertionError("the model's disc is off the knob chain's fitted station")
 # The 120T disc's rear face (the MHA-161 tips sit inside it) to the platen's
 # front face at the printed worst case: the platen forward by its fitted
 # float, magnified by its yaw about the bar's end at the near lock; F
 # rearward by the arm (its head play less the spacer band), the arm, hub
 # face, ring and 12T bands; the platen forward by the bar and its own bands;
-# then the window's max, the cluster's rearward float, its tilt on the bore
-# clearance (pivot on the Ø9 step edge, over the shortest sleeve) at the
-# disc rim, and the disc face's squareness to its bore.
-# 2.2 - 1.0262 - 0.25 * 1.5575 - 0.20 - 0.40 - 0.0813 - 0.05 = +0.053.
+# then m's max, the cluster's rearward float, its tilt on the bore clearance
+# (pivot on the rear bushing's smallest Ø9, over the shortest sleeve) at the
+# disc rim, and the disc's wobble on its mount (DISC_MOUNT_WOBBLE).
 PLATEN_YAW_LEVER = (BAR_LENGTH / 2.0) / (BAR_LENGTH / 2.0 - LOCK_STATION_X[0])
 # The platen (4.0) and rack bar (6.0) carry no drawing band: .XXX assumed.
 _PLATEN_THICKNESS_BAND = printed_band_mm(3)
 _RACK_THICKNESS_BAND = printed_band_mm(3)
-DISC_PLATEN_NOMINAL = PLATE_FRONT_Z - KNOB_SHAFT_Z0 - DISC_SPEC.FACE_WIDTH  # 2.2
+DISC_PLATEN_NOMINAL = PLATE_FRONT_Z - KNOB_SHAFT_Z0 - DISC_SPEC.FACE_WIDTH  # 2.35
 DISC_PLATEN_BAND = (
     HANGER.HEAD_PLAY_MAX
     - SPACER.LENGTH_BAND
@@ -551,75 +573,103 @@ DISC_PLATEN_BAND = (
     + _PLATEN_THICKNESS_BAND
 )  # 1.0262
 CLUSTER_TILT_AT_DISC_RIM = (
-    (DISC_SPEC.OUTSIDE_DIA - (STUB.STEP_DIA - printed_band_mm(1)))
+    (
+        DISC_SPEC.OUTSIDE_DIA
+        - (REAR_BUSHING.OD - printed_band_mm(REAR_BUSHING.OD_PLACES))
+    )
     / 2.0
-    * FEED.BORE_DIAMETRAL_CLEARANCE[1]
-    / (FEED.SLEEVE_LENGTH - FEED.SLEEVE_LENGTH_TOL)
-)  # 0.0813
-DISC_FACE_SQUARENESS = float(
-    DISC_SPEC.GEOMETRIC_TOLERANCES_MM["disc face squareness to bore"]
-)
+    * CLUSTER.BORE_DIAMETRAL_CLEARANCE[1]
+    / (FEED.OVERALL_LENGTH - FEED.STATION_TOL)
+)  # 0.0793
+# The disc's rear face at its rim against the sleeve's axis: the hub rocking
+# on the boss (it is trapped with float, never preloaded onto the step) over
+# its shortest round engagement, levered from its step contact; then, each
+# zone scaled from its diameter to the rim, the sleeve's step face square to
+# its bore, the hub's spigot end and flange rear face square to its bore,
+# and the disc's rear face parallel to its front (clamp) face.
+_DISC_RIM_R = DISC_SPEC.OUTSIDE_DIA / 2.0
+DISC_HUB_ROCK_AT_RIM = (
+    (_DISC_RIM_R - DISC_HUB.SEAT_CONTACT_R)
+    * DISC_HUB.BOSS_CLEARANCE
+    / DISC_HUB.ROUND_ENGAGEMENT_MIN
+)  # 0.0624
+DISC_MOUNT_WOBBLE = (
+    DISC_HUB_ROCK_AT_RIM
+    + _DISC_RIM_R
+    * FEED.STEP_FACE_PERPENDICULARITY
+    / FEED.STEP_FACE_PERPENDICULARITY_ZONE_DIA
+    + _DISC_RIM_R
+    * DISC_HUB.SPIGOT_END_PERPENDICULARITY
+    / DISC_HUB.SPIGOT_END_PERPENDICULARITY_ZONE_DIA
+    + _DISC_RIM_R
+    * DISC_HUB.FLANGE_FACE_PERPENDICULARITY
+    / DISC_HUB.FLANGE_FACE_PERPENDICULARITY_ZONE_DIA
+    + float(DISC_SPEC.GEOMETRIC_TOLERANCES_MM["disc rear face parallelism to front"])
+)  # 0.1956
+# The least air the disc's rear face keeps to the platen's front (R9-68).
+DISC_PLATEN_AIR_MIN = 0.03
 DISC_PLATEN_AIR_WORST = (
     DISC_PLATEN_NOMINAL
     - DISC_PLATEN_BAND
     - LOCK_GAP_FIT[1] * PLATEN_YAW_LEVER
-    - STUB.STUD_FIT_WINDOW[1]
-    - FEED.CLUSTER_FLOAT_RANGE[1]
+    - CLUSTER.FIT_WINDOW[1]
+    - CLUSTER.FLOAT_WINDOW[1]
     - CLUSTER_TILT_AT_DISC_RIM
-    - DISC_FACE_SQUARENESS
+    - DISC_MOUNT_WOBBLE
 )
-if DISC_PLATEN_AIR_WORST < 0.0:
+if DISC_PLATEN_AIR_WORST < DISC_PLATEN_AIR_MIN:
     raise AssertionError(
-        "MHA-070 disc rear face strikes the platen front face at the printed "
-        f"worst case: air {DISC_PLATEN_AIR_WORST:.4f} (R9-47)"
+        "MHA-070 disc rear face comes within the platen front face's "
+        f"{DISC_PLATEN_AIR_MIN} at the printed worst case: air "
+        f"{DISC_PLATEN_AIR_WORST:.4f} (R9-47, R9-68)"
     )
-# R9-67: the feed sleeve's 12T cuts full depth from its rear face over the
-# rack's whole width.  The rack's front face is the platen's back face, so
+# R9-67/R9-68: the feed sleeve's 12T cuts full depth from its rear face over
+# the rack's whole width.  The rack's front face is the platen's back face, so
 # the stack above sets how far forward of the sleeve's rear face it reaches,
 # less the terms that do not lie between the sleeve and the platen's back
-# (the platen's own band, the disc face's squareness, the rim's tilt, which
-# comes back as the tilt at the 12T tips):
-# 9.55 - (0.0531 + 0.13 + 0.05 + 0.0813 - 0.0041 + 4.0) = 5.24 < 5.32 MIN.
+# (the platen's own band, the disc's mount wobble, the rim's tilt, which
+# comes back as the tilt at the 12T tips).  The disc's front face is the hub
+# flange's rear face, a spigot length ahead of the sleeve's step; the stack's
+# thickest disc reaches rearward from it.
 CLUSTER_TILT_AT_FEED_TIPS = (
-    (FEED.OUTSIDE_DIA - (STUB.STEP_DIA - printed_band_mm(1)))
+    (FEED.OUTSIDE_DIA - (REAR_BUSHING.OD - printed_band_mm(REAR_BUSHING.OD_PLACES)))
     / 2.0
-    * FEED.BORE_DIAMETRAL_CLEARANCE[1]
-    / (FEED.SLEEVE_LENGTH - FEED.SLEEVE_LENGTH_TOL)
-)  # 0.0041
+    * CLUSTER.BORE_DIAMETRAL_CLEARANCE[1]
+    / (FEED.OVERALL_LENGTH - FEED.STATION_TOL)
+)  # 0.0034
 RACK_FRONT_FROM_SLEEVE_REAR_WORST = (
-    FEED.GEAR_FACE_STATION
-    + FEED.STATION_TOL
+    FEED.DISC_FRONT_STATION
+    - DISC_SPEC.FACE_WIDTH_MAX
+    + FEED.DISC_FRONT_STATION_BAND
     - DISC_PLATEN_AIR_WORST
     - _PLATEN_THICKNESS_BAND
-    - DISC_FACE_SQUARENESS
+    - DISC_MOUNT_WOBBLE
     - CLUSTER_TILT_AT_DISC_RIM
     + CLUSTER_TILT_AT_FEED_TIPS
     - PLATE_THICKNESS
-)  # 5.24
+)
 if FEED.FULL_DEPTH_MIN < RACK_FRONT_FROM_SLEEVE_REAR_WORST:
     raise AssertionError(
         f"MHA-110 12T full depth may stop {FEED.FULL_DEPTH_MIN:.3f} from the rear "
         f"face, inside the rack's worst reach {RACK_FRONT_FROM_SLEEVE_REAR_WORST:.3f}"
     )
-# The stud's Ø12 collar front face to the MHA-069 rack's back face: the arm
-# forward on the shortest spacer, the bar thinnest, the rack thickest, the
-# shim and collar longest the fit-up can leave them.
-# 1.95 - 0.05 - 0.13 - 0.13 - 1.4654.
-COLLAR_RACK_AIR_NOMINAL = STUB_Z0 - STUB.COLLAR_LENGTH - RACK_BACK_Z  # 1.95
-COLLAR_RACK_AIR_WORST = (
-    COLLAR_RACK_AIR_NOMINAL
+# The MHA-180 rear bushing's front face to the MHA-069 rack's back face (its
+# Ø9 .X can reach the rack's crests radially): the arm forward on the
+# shortest spacer, the bar thinnest, the rack thickest, and the bushing
+# following the sleeve forward to its fitted max.
+# 2.5 - 0.05 - 0.13 - 0.13 - 0.87 = 1.32.
+BUSHING_RACK_AIR_NOMINAL = REAR_BUSHING_Z0 - REAR_BUSHING.LENGTH - RACK_BACK_Z  # 2.5
+BUSHING_RACK_AIR_WORST = (
+    BUSHING_RACK_AIR_NOMINAL
     - SPACER.LENGTH_BAND
     - BAR.BAR_DEPTH_BAND
     - _RACK_THICKNESS_BAND
-    - (
-        STUD_FIT.COLLAR_FRONT_STATION_FITTED_MAX
-        - (STUB.FITTED_THRUST_STATION - STUB.STEP_LENGTH)
-    )
-)  # 0.1746
-if COLLAR_RACK_AIR_WORST < 0.0:
+    - (CLUSTER.SLEEVE_REAR_FORWARD_FROM_ARM[1] - REAR_BUSHING.LENGTH)
+)  # 1.32
+if BUSHING_RACK_AIR_WORST < 0.0:
     raise AssertionError(
-        "MHA-082 collar enters the MHA-069 rack at the printed worst case: "
-        f"air {COLLAR_RACK_AIR_WORST:.4f} (R9-47)"
+        "MHA-180 rear bushing enters the MHA-069 rack at the printed worst case: "
+        f"air {BUSHING_RACK_AIR_WORST:.4f} (R9-68)"
     )
 
 # Stack D: a bought #25 chain floated REARMOST on the thinnest T24 plate
@@ -838,14 +888,27 @@ LOCK_SCREW_XY = tuple(
 # own wheels are its intended contact. An axis of None stands for platen-
 # group furniture that rides the feed: only axial air can clear it.
 CHAIN_PLANE_ENVELOPES = (
-    ("hub cap", STUD_XY, CAP.CAP_DIA / 2.0, CAP_Z0 - CAP.CAP_LENGTH, CAP_Z0),
-    ("stud", STUD_XY, STUB.COLLAR_DIA / 2.0, STUB_Z0 - STUB.TIP_STATION, STUB_Z0),
-    ("stud shim", STUD_XY, SHIM.OD / 2.0, SHIM_Z0, ARM_Z0),
+    (
+        "retaining ring",
+        STUD_XY,
+        E_RING.OD / 2.0,
+        CLUSTER.RING_FRONT_Z,
+        CLUSTER.RING_REAR_Z,
+    ),
+    ("pin", STUD_XY, PIN.DIA / 2.0, PIN.TIP_MACHINE_Z, PIN_Z0),
+    (
+        "front bushing",
+        STUD_XY,
+        FRONT_BUSHING.OD / 2.0,
+        FRONT_BUSHING_Z0 - FRONT_BUSHING.LENGTH,
+        FRONT_BUSHING_Z0,
+    ),
+    ("rear bushing", STUD_XY, REAR_BUSHING.OD / 2.0, FEED_Z0, REAR_BUSHING_Z0),
     (
         "disc hub",
         STUD_XY,
         DISC_HUB.HUB_DIA / 2.0,
-        DISC_Z0 - DISC_HUB.HUB_LENGTH,
+        DISC_Z0 + DISC_HUB.HUB_FRONT_Z,
         DISC_Z0 - DISC_HUB.FLANGE_THICK,
     ),
     (
@@ -963,7 +1026,7 @@ def _assert_fastener_stacks() -> None:
         raise AssertionError("clamp head is not recessed by the specified 0.2 mm")
 
     # 90114A511 guide screws: exact head recess, positive shank clearance,
-    # 5.2678-mm engagement, and positive blind-bottom clearance.
+    # 5.4178-mm engagement, and positive blind-bottom clearance.
     nonnegative("guide head recess", PLATEN_CBORE_DEPTH - FILLISTER_HEAD_H)
     nonnegative(
         "guide head radial clearance", (PLATEN_CBORE_DIA - FILLISTER_HEAD_DIA) / 2.0
@@ -1005,7 +1068,8 @@ def _assert_fastener_stacks() -> None:
     nonnegative("lock screw tip inside the guide", LOCK_SCREW_TIP_INSIDE_MIN)
 
     # Clip bosses use exactly the non-threaded remainder of the shank; the
-    # platen is through-tapped, gives 4.0 mm engagement, and the tip is flush.
+    # platen and its rear socket bosses are through-tapped for 4.5 mm
+    # engagement, and the tip is flush with the boss.
     if (PLATEN_SOCKET_SPEC.kind, PLATEN_SOCKET_SPEC.size, PLATEN_SOCKET_SPEC.end) != (
         "tapped",
         "#4-40",
@@ -1030,7 +1094,7 @@ def _assert_fastener_stacks() -> None:
     )
     nonnegative("clip screw rear protrusion clearance", clip_tip_clearance)
     if abs(clip_tip_clearance) > 1e-9:
-        raise AssertionError("clip screw tip is not flush with the platen back")
+        raise AssertionError("clip screw tip is not flush with the socket boss")
 
     # The raised heads remain wholly outside the recording-paper side margins.
     paper_side_margin = (PLATE_WIDTH - PAPER_WIDTH) / 2.0
@@ -1568,12 +1632,12 @@ def _assert_gear_mesh() -> None:
 def _assert_knob_shaft_clearance() -> None:
     """The knob cluster must ride the disc's exact centre distance with its
     air gaps and floats."""
-    # R9-47: the collar's rearmost stop is the 12T's front face F, and the
-    # stud is faced until F to the disc's front face reads STUD_FIT_WINDOW
-    # with the cluster forward, so the window's minimum is the collar's
-    # worst air to the disc.  The model sits at the window's centre.
-    collar_disc_air_min = STUB.STUD_FIT_WINDOW[0]
-    air = DISC_Z0 - FEED.CLUSTER_FLOAT - KNOB_SHAFT_Z0
+    # R9-68: the collar's rearmost stop is the 12T's front face F, and the
+    # front bushing is faced until F to the disc's front face reads
+    # FIT_WINDOW with the cluster forward, so the window's minimum is the
+    # collar's worst air to the disc.  The model sits at the window's centre.
+    collar_disc_air_min = CLUSTER.FIT_WINDOW[0]
+    air = DISC_Z0 - CLUSTER.FLOAT_WINDOW_CENTRE - KNOB_SHAFT_Z0
     if air < collar_disc_air_min:
         raise AssertionError(
             f"knob drive collar to disc air {air:.2f} < {collar_disc_air_min}"
@@ -1597,6 +1661,21 @@ def _assert_knob_shaft_clearance() -> None:
     t24_hub_gap = reach - (REMOVABLE_TIP_R["T24"] + DISC_HUB.HUB_DIA / 2.0)
     if t24_hub_gap < 0.5:
         raise RuntimeError(f"mounted T24 to disc-hub gap {t24_hub_gap:.2f} < 0.5")
+    # The MHA-181 front bushing at its largest Ø against the knob stack's
+    # largest neighbours, whatever their z: the T24's tips, the thumbnut and
+    # the drive collar.
+    bushing_r = (FRONT_BUSHING.OD + printed_band_mm(FRONT_BUSHING.OD_PLACES)) / 2.0
+    bushing_air = (
+        reach
+        - bushing_r
+        - max(
+            REMOVABLE_TIP_R["T24"],
+            max(THUMBNUT_HEAD_DIA, THUMBNUT_FLANGE_DIA) / 2.0,
+            KNOB_COLLAR_R_WORST,
+        )
+    )
+    if bushing_air < 1.0:
+        raise RuntimeError(f"front bushing to knob stack air {bushing_air:.2f} < 1.0")
     # The T24 overlaps the disc rim in XY -- they must stay z-separated.
     z_gap = DISC_Z0 - REMOVABLE.SEAT_FACE_Z  # 6.9
     if z_gap < 2.0:
@@ -1607,16 +1686,17 @@ def _assert_knob_shaft_clearance() -> None:
         raise RuntimeError(
             f"knob end float {end_float:.4f} is not {KNOB_SPEC.END_FLOAT}"
         )
-    # Cluster float: the hub cap's rear face in front of the feed sleeve's nose.
-    cluster_float = (FEED_Z0 - FEED.OVERALL_LENGTH) - CAP_Z0
-    if abs(cluster_float - FEED.CLUSTER_FLOAT) > 1e-9:
+    # Cluster float: the ring's rear face in front of the front bushing.
+    cluster_float = (FRONT_BUSHING_Z0 - FRONT_BUSHING.LENGTH) - CLUSTER.RING_REAR_Z
+    if abs(cluster_float - CLUSTER.FLOAT_WINDOW_CENTRE) > 1e-9:
         raise RuntimeError(
-            f"disc cluster float {cluster_float:.4f} is not {FEED.CLUSTER_FLOAT}"
+            f"disc cluster float {cluster_float:.4f} is not {CLUSTER.FLOAT_WINDOW_CENTRE}"
         )
     log(
         f"knob shaft at ({KNOB_SHAFT_XY[0]:.3f}, {KNOB_SHAFT_XY[1]:.3f}); plate"
         f" hub {RACK_TIP_Y - hub_top:.2f} under the rack crests; gaps:"
-        f" T24/hub {t24_hub_gap:.1f}, T24/disc z {z_gap:.1f}, collar/disc z"
+        f" T24/hub {t24_hub_gap:.1f}, front bushing/knob stack {bushing_air:.1f},"
+        f" T24/disc z {z_gap:.1f}, collar/disc z"
         f" {air:.2f}; floats: knob {end_float:.2f}, cluster {cluster_float:.2f}"
     )
 
@@ -2431,20 +2511,22 @@ async def build(adapter) -> dict[str, str]:
         f" ({LATCH_HOOK_Z_SPAN[0] - BAR_BACK_Z:.2f} behind the bar's back face)"
     )
 
-    # --- disc cluster on the stud S -------------------------------------------
-    # The shim's collar face at SHIM_Z0, its arm face on the arm.
+    # --- disc cluster on the pin S ----------------------------------------------
+    # Ry(180): the pin's stations run from its head seat on the arm's rear face
+    # to -Z, its shank pressed through the arm's reamed bore.
     await place_component(
         adapter,
-        "transgear-stud-shim",
-        [STUD_XY[0], STUD_XY[1], SHIM_Z0],
-        [0.0, 0.0, 0.0],
-        IDENTITY,
+        "transgear-pin",
+        [STUD_XY[0], STUD_XY[1], PIN_Z0],
+        [0.0, 180.0, 0.0],
+        ROT_Y_180,
     )
-    # Ry(180): the stud's stations run from its seat on the shim to -Z.
+    # Ry(180): the rear bushing's arm face on the arm's front face, its sleeve
+    # face REAR_BUSHING.LENGTH forward (faced to fit, model at nominal).
     await place_component(
         adapter,
-        "transgear-stub",
-        [STUD_XY[0], STUD_XY[1], STUB_Z0],
+        "transgear-rear-bushing",
+        [STUD_XY[0], STUD_XY[1], REAR_BUSHING_Z0],
         [0.0, 180.0, 0.0],
         ROT_Y_180,
     )
@@ -2461,10 +2543,11 @@ async def build(adapter) -> dict[str, str]:
         label="rack-pinion (120T reducer disc)",
     )
     await _sprocket_revolute(adapter, disc, "reducer disc")
-    # The 12T DP30 feed sleeve thrusts on the stud's collar (Ry180, teeth
-    # forward to the disc seat) and meshes the teeth-down rack; the brass hub
-    # pressed on its shank and the three disc screws make one cluster with the
-    # disc, so each is LOCKED to it (net DOF unchanged).
+    # The 12T DP30 feed sleeve runs on the pin with its rear face on the rear
+    # bushing (Ry180, teeth forward to the disc seat) and meshes the teeth-down
+    # rack; the hub keyed on its D-flat and the three disc
+    # screws make one cluster with the disc, so each is LOCKED to it (net DOF
+    # unchanged).
     feed = await place_component(
         adapter,
         "transgear-feed-pinion",
@@ -2512,12 +2595,20 @@ async def build(adapter) -> dict[str, str]:
             named_ref(f"Front Plane@{disc}", "PLANE"),
             label=f"disc screw at {angle:.0f} deg locked to the disc",
         )
-    # The hub cap seats on the stud's journal shoulder (Ry180: forward to -Z),
-    # CLUSTER_FLOAT in front of the sleeve's nose.
+    # Ry(180): the front bushing's rear face on the sleeve's nose, faced to
+    # fit; the MHA-182 ring in the pin's groove FLOAT_WINDOW_CENTRE in front
+    # of it, its front face on the groove's load wall.
     await place_component(
         adapter,
-        "transgear-hub-cap",
-        [STUD_XY[0], STUD_XY[1], CAP_Z0],
+        "transgear-front-bushing",
+        [STUD_XY[0], STUD_XY[1], FRONT_BUSHING_Z0],
+        [0.0, 180.0, 0.0],
+        ROT_Y_180,
+    )
+    await place_component(
+        adapter,
+        "transgear-retaining-ring",
+        [STUD_XY[0], STUD_XY[1], CLUSTER.RING_REAR_Z],
         [0.0, 180.0, 0.0],
         ROT_Y_180,
     )

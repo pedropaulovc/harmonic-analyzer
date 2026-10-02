@@ -16,8 +16,9 @@ and [[drawing-spec-purity]].
 **AUTHORING WORKS — full chain proven on the Makers seat:**
 
 - Positive control: `AutoDimensionScheme` (default options) authors 3 features
-  + 3 annotations on transgear-stub. Its `False` retval is a SOFT signal
+  + 3 annotations on the MHA-082 stub. Its `False` retval is a SOFT signal
   (partial scheme), not failure — judge by created evidence. NOT licence-gated.
+  (R9-68 retired the stub; the probes now target `transgear-pin`, MHA-179.)
 - `InsertDatum` returns True in ~0.5 s (`Datum19@Plane1(A)`), with or without
   the official example's `DatumLength = 0.06`.
 - `InsertGtol` works, and needs NO preceding datum for form controls.

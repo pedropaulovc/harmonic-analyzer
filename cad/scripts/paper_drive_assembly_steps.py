@@ -19,8 +19,8 @@ import numpy as np
 import drive_train_steps
 import latch_hook_bracket_spec as hook_bracket
 import transgear_drive_collar_spec as collar
+import transgear_cluster_fit as cluster_fit
 import transgear_feed_pinion_spec as feed_pinion
-import transgear_stub_spec as stub
 
 DRAWING_NUMBER = "MHA-A06"
 
@@ -51,16 +51,24 @@ SEQUENCE: tuple[str, ...] = (
     "lock-seats-faced",
     # Hanger, on the bench, then hung (R9-6: the spacer is fitted as made).
     "latch-pin-pressed",
-    "stud-fitted",
+    # R9-68: the plain pin pressed into the arm's reamed hole, head on the
+    # arm's rear face (transgear_pin_spec).
+    "pin-pressed",
     "arm-plate-fitted",
     "arm-plate-screws-cut",
     "hanger-pivoted",
-    # Disc cluster (R9-5, R9-8, R9-9).
-    "disc-cluster-pressed",
+    # Disc cluster, on the bench (R9-68: the disc on the sleeve's seat
+    # shoulder, the hub's D-bore on its D-flat; R9-8, R9-9). The hub is then
+    # faced to stand inside transgear_cluster_fit.HUB_NOSE_WINDOW behind the
+    # sleeve nose, so the front bushing bears on the steel nose and traps the
+    # hub and disc against the shoulder.
+    "disc-cluster-assembled",
+    "hub-faced-to-nose",
     "disc-taps-transferred",
     # R9-47: tips cut inside the disc's rear face (transgear_disc_screw_spec).
     "disc-screws-cut",
     "oil-hole-drilled",
+    # R9-68: on the pin between the two bushing blanks, the ring last.
     "disc-cluster-hung",
     # Knob stack, front to rear (contract §1).
     "collar-pins-pressed",
@@ -72,9 +80,11 @@ SEQUENCE: tuple[str, ...] = (
     "hook-set-and-riveted",
     # Chain fit-up (contract §13.2 procedure (2)-(8)).
     "fitup-pose-set",
-    # R9-47, R9-65: the stud's MHA-178 shim faced to the F-to-disc window in
-    # that pose (transgear_stub_spec.STUD_FIT_WINDOW).
-    "stud-faced-to-fit",
+    # R9-68: in that pose, the MHA-181 front bushing faced to m (the F-to-disc
+    # window, cluster forward), then the MHA-180 rear bushing faced to the
+    # cluster's float (transgear_cluster_fit).
+    "front-bushing-faced-to-fit",
+    "rear-bushing-faced-to-fit",
     "collar-gap-measured",
     "collar-pinned",
     "stud-end-cut",
@@ -240,9 +250,9 @@ OFFSET_ACCEPT_TOL = 0.10
 CLAMP_SLEEVE_OD = 10.4
 CLAMP_SLEEVE_ID = 6.5
 # Procedure (8): collar to 120T disc face air, accepted at this minimum.  The
-# collar's rearmost stop is the 12T's front face F, so the worst air is the
-# stud fit window's minimum (R9-47, "stud-faced-to-fit").
-COLLAR_DISC_AIR_MIN = stub.STUD_FIT_WINDOW[0]
+# collar's rearmost stop is the 12T's front face F, so the worst air is m's
+# fitted minimum (R9-47, R9-68: "front-bushing-faced-to-fit").
+COLLAR_DISC_AIR_MIN = cluster_fit.FIT_WINDOW[0]
 
 # The printed forms of those bands: a drawing script only places them.
 OFFSET_ACCEPT_TEXT = f"{collar.FIT_UP_OFFSET_TARGET:.2f} \u00b1{OFFSET_ACCEPT_TOL:.2f}"

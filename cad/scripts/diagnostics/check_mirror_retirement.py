@@ -967,10 +967,17 @@ for i, pos in enumerate(p.HOOK_RIVET_POS):
         p.rot_z_rows(90.0),
         f"latch-hook rivet {i + 1}",
     )
-# Disc cluster on the stub at S, the stub seated on its shim.
+# Disc cluster on the MHA-179 pin at S: pin and both bushings Ry(180), the
+# MHA-182 ring in the pin's groove.
 _S = [p.STUD_XY[0], p.STUD_XY[1]]
-expect(PD, "transgear-stud-shim-1", [*_S, p.SHIM_Z0], IDENTITY, "stud shim")
-expect(PD, "transgear-stub-1", [*_S, p.STUB_Z0], p.ROT_Y_180, "transgear-stub")
+expect(PD, "transgear-pin-1", [*_S, p.PIN_Z0], p.ROT_Y_180, "transgear-pin")
+expect(
+    PD,
+    "transgear-rear-bushing-1",
+    [*_S, p.REAR_BUSHING_Z0],
+    p.ROT_Y_180,
+    "rear bushing",
+)
 expect(
     PD,
     "transgear-feed-pinion-1",
@@ -990,7 +997,20 @@ for i, (x, y) in enumerate(p.DISC_SCREW_XY):
         f"disc screw {i + 1}",
         **_SOLV,
     )
-expect(PD, "transgear-hub-cap-1", [*_S, p.CAP_Z0], p.ROT_Y_180, "hub cap")
+expect(
+    PD,
+    "transgear-front-bushing-1",
+    [*_S, p.FRONT_BUSHING_Z0],
+    p.ROT_Y_180,
+    "front bushing",
+)
+expect(
+    PD,
+    "transgear-retaining-ring-1",
+    [*_S, p.CLUSTER.RING_REAR_Z],
+    p.ROT_Y_180,
+    "retaining ring",
+)
 # Knob stack at K: the T24 is inserted first (-1), then the crank T12 and the
 # T18 spare.
 expect(

@@ -1,12 +1,14 @@
 r"""Create the curated manufacturing drawing for the feed-pinion sleeve (MHA-110).
 
-An end view, a longitudinal section A-A and an isometric at 3:1.  The end view
-carries the bore's fit note and finish; the section carries every turned
-diameter beside its axial extent and the three lengths baselined from the
-rear face (rule 7), all imported natively from the part with the places and
-bands the part authored (``transgear_feed_pinion_spec``).  The oil hole is
-match-drilled through the pressed hub, so the section carries only its
-match-drill note; its size and station belong to the hub's sheet.
+An end view, a longitudinal section B-B and an isometric at 3:1 (the section
+takes B: A names the bore datum).  The end view carries the bore's fit note,
+its finish and datum A; the section carries every turned diameter beside its
+axial extent, the D-flat from the axis, the lengths baselined from the rear
+face (rule 7) and the step face (the disc hub's seat) square to the bore, all
+imported natively from the part with the places and bands the part authored
+(``transgear_feed_pinion_spec``).  The oil hole is drilled through the seated
+hub at assembly, so the section carries only its one-line drill note; its
+station belongs to the hub's sheet.
 """
 
 from __future__ import annotations
@@ -20,6 +22,7 @@ import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_feature_control_frame,
     add_leader_note,
     add_property_linked_note,
     add_surface_finish,
@@ -38,23 +41,26 @@ from _drawing_common import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _gear_drawing_entities import visible_circle_edge
+from _native_axis_datum import add_native_axis_datum
 from _surface_finish import surface_finish_by_key
 from transgear_feed_pinion_spec import (
+    BORE_DATUM,
     BORE_DIA,
     BORE_FIT_CALLOUT,
     BORE_PROCESS_CALLOUT,
+    BOSS_DIA,
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FACE_WIDTH,
-    OIL_HOLE_DIA,
-    OIL_HOLE_NOTE,
-    OIL_HOLE_Z,
+    FLAT_END_STATION,
+    FLAT_TO_AXIS,
+    GEOMETRIC_TOLERANCES_MM,
+    HUB_NUMBER,
     OUTSIDE_DIA,
     OVERALL_LENGTH,
-    SHANK_DIA,
-    SPIGOT_FRONT_STATION,
     SURFACE_FINISHES,
 )
+from transgear_disc_hub_spec import OIL_HOLE_DIA, OIL_HOLE_SLEEVE_Z
 from solidworks_mcp.adapters.solidworks.drawing import auto_center_marks, place_view
 
 
@@ -72,9 +78,12 @@ PNG = OUTPUTS.png
 
 SHEET_SCALE = (3.0, 1.0)
 VIEW_SCALE = (3, 1)
-FRONT_CENTER = (0.100, 0.150)
-RIGHT_CENTER = (0.245, 0.150)
-ISO_CENTER = (0.370, 0.150)
+# The end view's section line stands right of the bore fit note's leader.
+FRONT_CENTER = (0.080, 0.160)
+RIGHT_CENTER = (0.230, 0.160)
+# The isometric (94 x 88 mm at 3:1) stands upper right, clear of the title
+# block and right of the oil-hole note.
+ISO_CENTER = (0.367, 0.214)
 SHEET_INNER_BORDER = (0.0127, 0.0127, 0.4191, 0.2667)
 
 # Half the printed tooth-tip circle in sheet metres: the section's half-height,
@@ -92,21 +101,22 @@ def _side_x(z_mm: float) -> float:
 
 
 # The end view is pictorial and carries its center mark, the bore fit note and
-# the bore finish.  On the section, the tip, root and shank diameters print
+# the bore finish.  On the section, the tip, root and boss diameters print
 # inline on the axis, between their own extension lines and off the part (the
 # crank hub's and the disc hub's layout): the tip and root left of the rear
 # face, where their witnesses start, the larger farther out so neither
-# extension line crosses the other's dimension line; the shank right of the
-# nose.  The spigot keeps its shelf above its own span, and the bore its shelf
+# extension line crosses the other's dimension line; the boss right of the
+# nose, beyond the flat.  The flat's distance from the axis prints between its
+# own extension lines just right of the nose, where its upper extension line
+# (the axis) stops short of the boss's text.  The bore keeps its shelf
 # above-left of the rear face, which holds its two-row band and process
-# callout clear of its own extension lines.  Run 20261001T110844152Z put the
-# tip, spigot and shank on one shelf, where their bands printed over each
-# other (machinist review blocker).  The lengths stay baseline-stacked below
-# from the rear face, shortest innermost, so no extension line crosses an
-# inner row.  The cutter's full-depth station and run-out limit (R9-67) carry
-# their names as model prefixes, too wide for their spans, so their text
-# stands left of the rear face, clear of every station's extension line; the
-# rows' 8 mm pitch keeps the section caption over the title block.
+# callout clear of its own extension lines.  The lengths stay
+# baseline-stacked below from the rear face, shortest innermost, so no
+# extension line crosses an inner row.  The cutter's full-depth station and
+# run-out limit (R9-67) carry their names as model prefixes, too wide for
+# their spans, so their text stands left of the rear face, clear of every
+# station's extension line; the rows' 8 mm pitch keeps the section caption
+# over the title block.
 FRONT_KEEP: dict[str, tuple[float, float]] = {}
 _SIDE_TOP = RIGHT_CENTER[1] + HALF_OD
 _SIDE_BOTTOM = RIGHT_CENTER[1] - HALF_OD
@@ -116,30 +126,26 @@ _ROW_PITCH = 0.008
 # The prefixed texts' centre left of the rear face: half the wider text's
 # printed width (test_transgear_feed_pinion_drawing) and an arrow's air.
 _CUTTER_TEXT_INSET = 0.040
+_FLAT_SHEET_DROP = FLAT_TO_AXIS * VIEW_SCALE[0] / 1000.0
+
+
+def _row(index: int) -> float:
+    """Sheet y of the ``index``-th baseline row below the section."""
+    return _SIDE_BOTTOM - index * _ROW_PITCH - 0.002
+
+
 RIGHT_KEEP: dict[str, tuple[float, float]] = {
     "RootDia": (_REAR_X - 0.030, RIGHT_CENTER[1]),
     "OutsideDia": (_REAR_X - 0.066, RIGHT_CENTER[1]),
-    "ShankDia": (_NOSE_X + 0.022, RIGHT_CENTER[1]),
+    "BossDia": (_NOSE_X + 0.064, RIGHT_CENTER[1]),
+    "FlatToAxis": (_NOSE_X + 0.024, RIGHT_CENTER[1] - _FLAT_SHEET_DROP / 2.0),
     "BoreDia": (_REAR_X - 0.010, _SIDE_TOP + 0.040),
-    "SpigotDia": (
-        (_side_x(FACE_WIDTH) + _side_x(SPIGOT_FRONT_STATION)) / 2.0,
-        _SIDE_TOP + 0.012,
-    ),
-    "FullDepth": (_REAR_X - _CUTTER_TEXT_INSET, _SIDE_BOTTOM - _ROW_PITCH - 0.002),
+    "FullDepth": (_REAR_X - _CUTTER_TEXT_INSET, _row(1)),
     # Nudged left of its span's centre, clear of the run-out's extension line.
-    "FaceWidth": (
-        (_REAR_X + _side_x(FACE_WIDTH)) / 2.0 - 0.0015,
-        _SIDE_BOTTOM - 2 * _ROW_PITCH - 0.002,
-    ),
-    "CutterRunout": (
-        _REAR_X - _CUTTER_TEXT_INSET,
-        _SIDE_BOTTOM - 3 * _ROW_PITCH - 0.002,
-    ),
-    "SpigotFront": (
-        (_REAR_X + _side_x(SPIGOT_FRONT_STATION)) / 2.0,
-        _SIDE_BOTTOM - 4 * _ROW_PITCH - 0.002,
-    ),
-    "OverallLength": (RIGHT_CENTER[0], _SIDE_BOTTOM - 5 * _ROW_PITCH - 0.002),
+    "FaceWidth": ((_REAR_X + _side_x(FACE_WIDTH)) / 2.0 - 0.0015, _row(2)),
+    "CutterRunout": (_REAR_X - _CUTTER_TEXT_INSET, _row(3)),
+    "FlatEnd": ((_REAR_X + _side_x(FLAT_END_STATION)) / 2.0, _row(4)),
+    "OverallLength": (RIGHT_CENTER[0], _row(5)),
 }
 DIMENSION_CALLOUTS = {
     # The native value/limits define the bore; the callout adds the process.
@@ -147,15 +153,15 @@ DIMENSION_CALLOUTS = {
 }
 
 # The oil hole lies in the section plane (+Y), so the cut shows it as a gap in
-# the upper shank wall; the note's leader lands mid-wall on its front edge.
-# The note stands far enough right that its leader passes right of the
-# spigot's shelf text whichever side of its dimension line that prints, and
-# left of where the shank's extension lines start.
+# the upper boss wall; the note's leader lands mid-wall on its front edge.
+# The note stands above the section, right of the bore's shelf text and left
+# of the isometric.
+OIL_HOLE_NOTE = f"\u00d8{OIL_HOLE_DIA:.1f} OIL HOLE: DRILL AT ASSY WITH {HUB_NUMBER} THRU HUB AND BOSS"
 OIL_HOLE_EDGE = (
-    _side_x(OIL_HOLE_Z + OIL_HOLE_DIA / 2.0),
-    RIGHT_CENTER[1] + (BORE_DIA + SHANK_DIA) / 4.0 * VIEW_SCALE[0] / 1000.0,
+    _side_x(OIL_HOLE_SLEEVE_Z + OIL_HOLE_DIA / 2.0),
+    RIGHT_CENTER[1] + (BORE_DIA + BOSS_DIA) / 4.0 * VIEW_SCALE[0] / 1000.0,
 )
-OIL_HOLE_CALLOUT = (_NOSE_X + 0.030, _SIDE_TOP + 0.050)
+OIL_HOLE_CALLOUT = (_REAR_X + 0.035, _SIDE_TOP + 0.077)
 NOTE_HEIGHT = 0.0025
 
 _BORE_SHEET_RADIUS = BORE_DIA * VIEW_SCALE[0] / 2000.0
@@ -168,7 +174,7 @@ BORE_FIT_ATTACH = (
 # stacked lengths.
 SECTION_CAPTION = (RIGHT_CENTER[0], _SIDE_BOTTOM - 6 * _ROW_PITCH)
 # The finish stands lower LEFT of the end view: the section line's arrows and
-# their "A" labels point right, toward the section, and a lower-right leader
+# their "B" labels point right, toward the section, and a lower-right leader
 # ran through the lower label (run 20261001T035353825Z layout audit).  It
 # stands farther out and nearer level with the bore, so its leader climbs
 # shallowly and passes right of the symbol's own "Ra" text rather than through
@@ -178,6 +184,16 @@ FINISH_ATTACH = (
     FRONT_CENTER[1] + _BORE_SHEET_RADIUS * math.sin(math.radians(-135.0)),
 )
 FINISH_SYMBOL = (FRONT_CENTER[0] - HALF_OD - 0.022, FRONT_CENTER[1] - 0.012)
+
+# The step face (the disc hub's seat) shows edge-on in the section where the
+# cut passes through the tooth on +Y: the pick lands mid-face between the
+# boss and the tip.  The frame stands above the section, left of the step
+# and of the oil-hole note's leader, clear of the bore's shelf.
+STEP_FACE_EDGE = (
+    _side_x(FACE_WIDTH),
+    RIGHT_CENTER[1] + (BOSS_DIA + OUTSIDE_DIA) / 4.0 * VIEW_SCALE[0] / 1000.0,
+)
+STEP_FRAME = (_side_x(FACE_WIDTH) - 0.020, _SIDE_TOP + 0.012)
 
 
 @_telemetry.traced("drawing.planar_centerline", label_param="label")
@@ -285,7 +301,7 @@ async def build(adapter: Any) -> dict[str, str]:
             0: "Transgear Pinion Sleeve Manufacturing Drawing",
             1: "Harmonic Analyzer hobby-machinist book drawing",
             2: "Harmonic Analyzer Project",
-            3: "transgear pinion sleeve; steel; 12T DP30 feed pinion, spigot, shank",
+            3: "transgear pinion sleeve; steel; 12T DP30 pinion, D-flat boss",
             4: "Generated from the project-owned ASME B drawing standard",
         },
     )
@@ -297,7 +313,7 @@ async def build(adapter: Any) -> dict[str, str]:
         line_start=(FRONT_CENTER[0], FRONT_CENTER[1] - HALF_OD - 0.005),
         line_end=(FRONT_CENTER[0], FRONT_CENTER[1] + HALF_OD + 0.005),
         view_xy=RIGHT_CENTER,
-        section_label="A",
+        section_label="B",
         scale=VIEW_SCALE,
         label="pinion sleeve longitudinal centre section",
     )
@@ -335,7 +351,7 @@ async def build(adapter: Any) -> dict[str, str]:
         OIL_HOLE_NOTE,
         text_xy=OIL_HOLE_CALLOUT,
         attach_xy=OIL_HOLE_EDGE,
-        label="oil hole match-drill note",
+        label="oil hole drill note",
         view=right,
         height=NOTE_HEIGHT,
     )
@@ -361,7 +377,29 @@ async def build(adapter: Any) -> dict[str, str]:
         label="sleeve bore finish",
         entity=visible_circle_edge(adapter, front, BORE_DIA),
         leader_attach_xy=FINISH_ATTACH,
-        char_height=0.0025,
+    )
+    # Datum A, the bore, where it shows round; the end view has no datum tag
+    # yet, as the native placement requires.
+    add_native_axis_datum(
+        adapter,
+        front,
+        entity=visible_circle_edge(adapter, front, BORE_DIA),
+        source_path=SOURCE,
+        radius_m=BORE_DIA / 2000.0,
+        datum=BORE_DATUM,
+        label="sleeve bore axis",
+        shoulder=True,
+        stability_tolerance_m=0.0001,
+    )
+    add_feature_control_frame(
+        adapter,
+        right,
+        edge_xy=STEP_FACE_EDGE,
+        frame_xy=STEP_FRAME,
+        characteristic="perpendicularity",
+        tolerance=GEOMETRIC_TOLERANCES_MM["step face perpendicularity to bore"],
+        datums=(BORE_DATUM,),
+        label="step face perpendicularity",
     )
 
     add_property_linked_note(adapter, "Gear Data", 0.016, 0.262, char_height=0.0025)

@@ -1,10 +1,11 @@
 r"""Create the manufacturing drawing for the transgear arm (MHA-164).
 
 The principal view is ``*Front``, looking at the REAR face: the outline (the
-pivot radius, the tip station and the end-face width), the pivot bore, both
-tap callouts with their qualifier lines, and the tap stations from the pivot
-(the blanked ``StationReference`` sketch, shown in this view only).  Section
-A-A cuts it on the centreline -- through the pivot, every tap and the
+pivot radius, the tip station and the end-face width), the pivot bore, the
+MHA-179 pin's reamed press bore, the plate-tap callout with its qualifier
+lines, and the hole stations from the pivot (the blanked
+``StationReference`` sketch, shown in this view only).  Section
+A-A cuts it on the centreline -- through the pivot, every hole and the
 latch-pin hole -- so the rear spot face's diameter, its floor from the FRONT
 face (the pivot head's end play) and the latch-pin hole's depth print on
 solid cut edges.  The end view (``*Right``, the square end) carries the
@@ -24,7 +25,6 @@ from typing import Any
 import _drawing_hidden_sketches as hidden_sketches
 import _telemetry
 import transgear_hanger_joints as joints
-import transgear_stud_fit as stud_fit
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
@@ -49,11 +49,10 @@ from _hole_spec import blind_cut_dia_mm
 from transgear_arm_geometry import (
     PIN_HOLE_DEPTH,
     PIN_HOLE_Z,
+    PIN_STATION,
     PIVOT_END_R,
     PLATE_TAP_SPEC,
     PLATE_TAP_STATIONS,
-    STUD_STATION,
-    STUD_TAP_SPEC,
     THICKNESS,
     TIP_STATION,
 )
@@ -64,6 +63,7 @@ from transgear_arm_spec import (
     FLOOR_DEPTH_CALLOUT,
     ISO_VIEW_SCALE,
     OVERALL_LENGTH,
+    PIN_BORE_CALLOUT,
     PIN_HOLE_CALLOUT,
     PIVOT_BORE_CALLOUT,
     PLATE_TAP_CSK_CALLOUT,
@@ -147,6 +147,10 @@ STATION_PITCH = 0.010
 FRONT_KEEP = {
     "PivotEndR": (_front_x(-PIVOT_END_R) - 0.005, _front_y(PIVOT_END_R) + 0.012),
     "PivotBoreDia": (_front_x(0.0) - 0.002, _front_y(PIVOT_END_R) + 0.026),
+    # The pin bore's Ø and its three callout lines stand above the arm, right
+    # of the plate-tap callout and left of the end view; lower than the pivot
+    # bore's, so its stacked +0.008 band keeps inside the upper border.
+    "PinBoreDia": (_front_x(PIN_STATION) + 0.036, _front_y(PIVOT_END_R) + 0.018),
     "EndWidth": (_front_x(TIP_STATION) + 0.012, FRONT_CENTER[1]),
     "PlateTapStation1": (
         _front_x(PLATE_TAP_STATIONS[0] / 2.0),
@@ -156,7 +160,7 @@ FRONT_KEEP = {
         _front_x(PLATE_TAP_STATIONS[1] / 2.0),
         _UNDER_FRONT - 2 * STATION_PITCH,
     ),
-    "StudStation": (_front_x(STUD_STATION / 2.0), _UNDER_FRONT - 3 * STATION_PITCH),
+    "PinStation": (_front_x(PIN_STATION / 2.0), _UNDER_FRONT - 3 * STATION_PITCH),
     "TipStation": (_front_x(TIP_STATION / 2.0), _UNDER_FRONT - 4 * STATION_PITCH),
 }
 # The true overall (review of 19e33c6c2: the 128.90 from the bore axis read
@@ -187,29 +191,22 @@ END_KEEP = {
 }
 DIMENSION_CALLOUTS = {
     "PivotBoreDia": PIVOT_BORE_CALLOUT,
+    "PinBoreDia": PIN_BORE_CALLOUT,
     "SpotFaceDia": SPOT_FACE_CALLOUT,
     "FloorDepth": FLOOR_DEPTH_CALLOUT,
     "PinHoleDia": PIN_HOLE_CALLOUT,
 }
 
-# Native tap callouts: arrow on the tap-drill rim nearest the rear face (the
-# Hole Wizard's own edge; on the plate taps the countersink mouth is the
-# chamfer's), text above the view, its top inside the upper border (review
-# of 19e33c6c2: at 30 mm over the pivot round it touched the border).  Each
-# carries the mating thread's installed full-thread engagement at the worst
-# case (the screws are cut flush, the stud's run-out sits in its relief, and
-# both taps go through), the hanger joints' and stud fit's figures, each
-# mouth's loss counted to the tap drill (R9-63); the plate taps add their
-# countersink line.  The stud tap has no countersink: the title-block edge
-# break governs its mouths.
-_STUD_DRILL_R = blind_cut_dia_mm(STUD_TAP_SPEC) / 2.0
+# Native tap callout: arrow on the plate-tap countersink mouth nearest the
+# rear face (the chamfer's own edge), text above the view, its top inside the
+# upper border (review of 19e33c6c2: at 30 mm over the pivot round it touched
+# the border).  It carries the countersink line and the mating screw's
+# installed full-thread engagement at the worst case (the screws are cut
+# flush and the taps go through), the hanger joints' figure, each mouth's
+# loss counted to the tap drill (R9-63).
 _PLATE_DRILL_R = blind_cut_dia_mm(PLATE_TAP_SPEC) / 2.0
 _CALLOUT_Y = _front_y(PIVOT_END_R) + 0.022
-STUD_CALLOUT_XY = (_front_x(STUD_STATION) + 0.036, _CALLOUT_Y)
 PLATE_CALLOUT_XY = (_front_x(PLATE_TAP_STATIONS[0]) + 0.016, _CALLOUT_Y)
-STUD_TAP_QUALIFIER = engagement_line(
-    stud_fit.REAR_ENGAGEMENT_WORST, stud_fit.REAR_ENGAGEMENT_WORST_D
-)
 PLATE_TAP_QUALIFIER = "\n".join(
     (
         PLATE_TAP_CSK_CALLOUT,
@@ -219,7 +216,6 @@ PLATE_TAP_QUALIFIER = "\n".join(
     )
 )
 TAP_CALLOUTS = (
-    ("stud tap", STUD_STATION, _STUD_DRILL_R, STUD_CALLOUT_XY, STUD_TAP_QUALIFIER),
     (
         "plate taps",
         PLATE_TAP_STATIONS[0],
@@ -471,8 +467,8 @@ async def build(adapter: Any) -> dict[str, str]:
         scale=SHEET_SCALE,
         layout=SPEC.layout,
         # SolidWorks pins its own "... Tapped Hole" note to the front view
-        # once a tap carries a hole callout; the two callouts already state
-        # each thread and drill.
+        # once a tap carries a hole callout; the plate-tap callout already
+        # states the thread and drill.
         redundant_note_substrings=("Tapped Hole",),
         expected_redundant_notes=len(TAP_CALLOUTS),
     )

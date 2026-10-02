@@ -370,8 +370,8 @@ async def build(adapter) -> dict[str, str]:
 
     # Straight grip rod LAST: rectangle profile on the Front plane revolved
     # about +Y (centerline on the axis; nothing later crosses it).  The
-    # centerline merges into the on-axis corners at creation (the MHA-082
-    # transgear-stub idiom), and the diameter is a doubled centerline dim.
+    # centerline merges into the on-axis corners at creation (the usual
+    # turned-part revolve idiom), and the diameter is a doubled centerline dim.
     rod = SketchDims()
     check("create_sketch rod", await adapter.create_sketch("Front"))
     set_sketch_direct_db(adapter, True)

@@ -153,7 +153,7 @@ is integral to `transgear-knob-shaft` (MHA-078). The table records the
 | transgear-pinion | 24T DP30 → 12T DP38, face 4, bore Ø5 (third gear) |
 | transgear-feed-pinion (NEW) | 12T DP30, face 9.5, bore Ø5 (fifth gear, meshes rack) |
 | transgear-latch | c2c 66.05 → 44.766; thickness 4.5 → 2.6 (rack-back/bar-front slot) |
-| transgear-stub | stepped: Ø9.525×9.1 + Ø5×13.8 seat + Ø14×4 collar |
+| MHA-082 stub (retired by R9-68; the MHA-179 pin replaces it) | stepped: Ø9.525×9.1 + Ø5×13.8 seat + Ø14×4 collar |
 | transgear-knob-shaft | stepped: Ø9.525×9.1 + Ø5×5.5 seat + Ø9.525×12.9 + knob (z −157.5..−123.5) |
 | transgear-removable | face width 5.0 → 2.4 |
 | chain links (_chain) | inner plates ±1.45..±2.25, bushings ±1.45, outer ±2.55..±3.35, pins ±3.35 |

@@ -2,9 +2,10 @@ r"""Pure transgear-arm (MHA-164) geometry shared by the arm, its plate, its
 pivot hardware and the paper-drive assembly.
 
 Book ch. 23 (t157 / t161 / t241): a steel link that swings on the MHA-168
-shoulder screw at the pivot P on the support bar, carries the fixed stud of
-the disc cluster at S, the MHA-165 plate (and through it the knob shaft) on
-two #8-32 taps between them, and the 1/8 latch pin in its square end.
+shoulder screw at the pivot P on the support bar, carries the MHA-179 pin of
+the disc cluster (pressed into a reamed hole) at S, the MHA-165 plate (and
+through it the knob shaft) on two #8-32 taps between them, and the 1/8 latch
+pin in its square end.
 
 Local frame (the part's origin and axes; the assembly places it by a pure
 rotation about Z and a translation):
@@ -83,20 +84,17 @@ SPOT_FACE_FLOOR_FROM_FRONT = 7.0
 SPOT_FACE_FLOOR_BAND = 0.05
 SPOT_FACE_DEPTH = THICKNESS - SPOT_FACE_FLOOR_FROM_FRONT
 
-# --- Stud at S: #10-32 THROUGH, mouths broken by the title block -----------
-# Full thread starts where a mouth's 45-degree leg meets the tap drill, so
-# a mouth takes (mouth - drill) / 2 of thread (R9-63).  A 5.0 countersink on
-# both faces left 6.95 (1.44D) of full thread in the thinnest stock, and any
-# countersink large enough to open past the major leaves under 1.5D.  So the
-# stud tap has none: the title block's R0.25 OR CHAMFER 0.25 MAX break
-# governs each mouth.
-STUD_STATION = 68.815  # |S - P|, printed .XXX (hole position)
-STUD_TAP_SPEC = HoleSpec("tapped", "#10-32")
-STUD_TAP_MOUTH_LOSS_MAX = 0.25  # title-block edge break, each face
-TAP_DRILL_GROWTH = 0.10  # +0.10/0 (drilled row)
-STUD_TAP_MOUTH_DIA_MAX = (
-    blind_cut_dia_mm(STUD_TAP_SPEC) + TAP_DRILL_GROWTH + 2.0 * STUD_TAP_MOUTH_LOSS_MAX
-)
+# --- Pin at S: REAM THROUGH, the press for the MHA-179 pin (R9-68) ---------
+# The pin (transgear_pin_spec: Ø3.900 0/-0.008, ground) is pressed in from
+# the rear until its head seats on the rear face, so the hole is reamed
+# square through the ground faces.  The interference (0.010..0.026) is
+# asserted in transgear_arm_spec, which imports both: the pin spec imports
+# this module.
+PIN_STATION = 68.815  # |S - P|, printed .XXX (hole position)
+PIN_BORE_DIA = 3.874
+PIN_BORE_DIA_BAND = (0.008, 0.0)  # (upper, lower) deviations, reamed
+PIN_BORE_DIA_MAX = round(PIN_BORE_DIA + PIN_BORE_DIA_BAND[0], 6)
+PIN_BORE_DIA_MIN = round(PIN_BORE_DIA + PIN_BORE_DIA_BAND[1], 6)
 # --- Plate taps: 2 x #8-32 THROUGH on the centreline, countersunk both ends -
 PLATE_SCREW_PITCH = 15.0
 PLATE_SCREW_MID_STATION = 33.542  # the plate's centreline (MHA-165)
@@ -165,13 +163,12 @@ WALLS: dict[str, tuple[float, float]] = {
         SPOT_FACE_FLOOR_FROM_FRONT,
         SPOT_FACE_FLOOR_FROM_FRONT - SPOT_FACE_FLOOR_BAND,
     ),
-    "stud tap to edges": (
-        edge_half_width(STUD_STATION) - _tap_major(STUD_TAP_SPEC) / 2.0,
-        edge_half_width(STUD_STATION)
+    "pin bore to edges": (
+        edge_half_width(PIN_STATION) - PIN_BORE_DIA / 2.0,
+        edge_half_width(PIN_STATION)
         - BAND_X
         - HOLE_POSITION_BAND
-        - _tap_major(STUD_TAP_SPEC) / 2.0
-        - _TAP_OVERSIZE_R,
+        - PIN_BORE_DIA_MAX / 2.0,
     ),
     "plate taps to edges": (
         edge_half_width(PLATE_TAP_STATIONS[1]) - _tap_major(PLATE_TAP_SPEC) / 2.0,
@@ -196,15 +193,19 @@ WALLS: dict[str, tuple[float, float]] = {
         - (PIN_HOLE_DIA + PIN_HOLE_DIA_BAND[0]) / 2.0
         - HOLE_POSITION_BAND,
     ),
+    # The latch pin's hole, at its deepest on the shortest tip station, to
+    # the pin bore's far side.
+    "latch-pin hole floor to pin bore": (
+        TIP_STATION - PIN_HOLE_DEPTH - PIN_STATION - PIN_BORE_DIA / 2.0,
+        TIP_STATION
+        - TIP_STATION_BAND
+        - PIN_HOLE_DEPTH
+        - PIN_HOLE_DEPTH_BAND
+        - PIN_STATION
+        - HOLE_POSITION_BAND
+        - PIN_BORE_DIA_MAX / 2.0,
+    ),
 }
 for _name, (_nominal, _worst) in WALLS.items():
     if _worst < WALL_TARGET:
         raise AssertionError(f"arm {_name} wall {_worst:.3f} < {WALL_TARGET}")
-
-# The latch pin's hole, at its deepest, must stop short of the stud tap's
-# broken mouth.
-if (
-    TIP_STATION - TIP_STATION_BAND - PIN_HOLE_DEPTH - PIN_HOLE_DEPTH_BAND
-    <= STUD_STATION + STUD_TAP_MOUTH_DIA_MAX
-):
-    raise AssertionError("latch-pin hole reaches the stud tap")

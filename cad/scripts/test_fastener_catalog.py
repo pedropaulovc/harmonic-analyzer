@@ -44,6 +44,7 @@ _EXPECTED = {
     "transgear-disc-screw": (("91794A055",), "MHA-161", 3),
     "transgear-latch-pin": (("98381A474",), "MHA-169", 1),
     "transgear-pivot-screw": (("91829A205",), "MHA-168", 1),
+    "transgear-retaining-ring": (("97431A260",), "MHA-182", 1),
     "knife-hanger-washer": (("90126A211",), "MHA-131", 2),
     "spring-hook": (("9489T111",), "MHA-090", 20),
     "tube-frame-cap": (("9275K141",), "MHA-133", 4),

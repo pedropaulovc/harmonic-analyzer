@@ -49,21 +49,25 @@ def test_sheet_authors_no_manufacturing_value() -> None:
 
 def test_bands_come_from_named_spec_constants() -> None:
     assert model_toleranced_dimensions(part) == {
-        ("GearBlank", "FaceWidth"): "STATION_TOL",
-        ("SleeveProfile", "SpigotFront"): "STATION_TOL",
+        ("FlatProfile", "FlatEnd"): "STATION_TOL",
         ("SleeveProfile", "OverallLength"): "STATION_TOL",
         ("SleeveProfile", "FullDepth"): "FULL_DEPTH_BAND",
         ("SleeveProfile", "BoreDia"): "*BORE_DEVIATIONS",
-        ("SleeveProfile", "SpigotDia"): "*SPIGOT_DIA_DEVIATIONS",
-        ("SleeveProfile", "ShankDia"): "*SHANK_DIA_DEVIATIONS",
+        ("SleeveProfile", "BossDia"): "*BOSS_DIA_DEVIATIONS",
+        ("FlatProfile", "FlatToAxis"): "*FLAT_TO_AXIS_DEVIATIONS",
         ("SleeveProfile", "OutsideDia"): "*OUTSIDE_DIA_DEVIATIONS",
     }
     # A band tighter than its printed row needs a functional reason (rule 12):
-    # the stations' ±0.05 sits inside their .XX row, the tip's +0/-0.10 inside .XXX.
+    # the stations' ±0.05 sits inside their .XX row, the tip's +0/-0.10, the
+    # boss's h6 and the flat's 0/-0.015 inside .XXX.
     assert spec.STATION_TOL < printed_band_mm(spec.STATION_PLACES)
-    assert -spec.OUTSIDE_DIA_BAND[1] < printed_band_mm(
-        spec.DRAWING_PRECISION_BY_NAME["OutsideDia"]
-    )
+    by_name = spec.DRAWING_PRECISION_BY_NAME
+    for name, band in (
+        ("OutsideDia", spec.OUTSIDE_DIA_BAND),
+        ("BossDia", spec.BOSS_DIA_BAND),
+        ("FlatToAxis", spec.FLAT_TO_AXIS_BAND),
+    ):
+        assert band[0] - band[1] < printed_band_mm(by_name[name]), name
 
 
 def test_root_prints_as_the_cutter_depth_floor() -> None:
@@ -82,35 +86,91 @@ def test_root_prints_as_the_cutter_depth_floor() -> None:
     assert upper == 0.0
 
 
-def test_cluster_float_and_nose_proud_hold_worst_case() -> None:
-    low, high = spec.CLUSTER_FLOAT_RANGE
-    assert low == pytest.approx(0.2) and high == pytest.approx(0.4)
-    assert spec.NOSE_PROUD == pytest.approx(0.70)
-    assert spec.NOSE_PROUD_WORST >= 0.34 - 1e-9
-    # The hub flange clamps the disc, never the spigot step.
-    assert spec.SPIGOT_RECESS_WORST > 0.0
-    assert spec.SPIGOT_LENGTH_MIN > 0.5 * spec.DISC_THICKNESS
+def test_disc_front_stands_a_spigot_length_ahead_of_the_step() -> None:
+    """The hub's spigot seats on the 12T's step and carries the disc on its
+    flange, so the disc's front face is the step plus the spigot; the disc's
+    bore stands radially outside the 12T's tips, so its rear face never
+    meets the teeth, and stands ahead of the step at every printed limit."""
+    import rack_pinion_spec as disc
+    import transgear_disc_hub_spec as hub
+
+    assert spec.DISC_FRONT_STATION == pytest.approx(spec.FACE_WIDTH + hub.SPIGOT_LENGTH)
+    assert spec.DISC_FRONT_STATION == pytest.approx(17.25)
+    assert spec.DISC_FRONT_STATION_BAND == pytest.approx(
+        printed_band_mm(spec.FACE_WIDTH_PLACES) + hub.SPIGOT_LENGTH_BAND
+    )
+    assert disc.BORE_DIA_MIN > spec.OUTSIDE_DIA + spec.OUTSIDE_DIA_BAND[0]
+    assert hub.DISC_STEP_GAP_WORST > 0.0
+
+
+def test_boss_and_flat_take_the_hub_bore() -> None:
+    """One round size for the hub's bore and one flat for its D: the boss
+    no longer carries the disc (the hub's spec checks the clearances at
+    every limit pair)."""
+    import transgear_disc_hub_spec as hub
+
+    assert spec.BOSS_DIA == hub.BORE_DIA
+    assert spec.FLAT_TO_AXIS == hub.FLAT_TO_AXIS
+    assert hub.BOSS_CLEARANCE_LIMITS[0] >= 0.0
+    assert hub.FLAT_CLEARANCE[0] > 0.0
+
+
+def test_step_face_is_square_to_the_bore() -> None:
+    """The hub's spigot seats on the step, so the step face is held square
+    to the bore (datum A) over the tip circle; the frame prints the spec's
+    value."""
+    assert spec.BORE_DATUM == "A"
+    assert spec.STEP_FACE_PERPENDICULARITY == 0.005
+    assert spec.STEP_FACE_PERPENDICULARITY_ZONE_DIA == spec.OUTSIDE_DIA
+    assert spec.GEOMETRIC_TOLERANCES_MM == {
+        "step face perpendicularity to bore": "0.005"
+    }
+    # The frame's leader lands on the step face's edge-on line in the
+    # section, between the boss and the tip on the +Y tooth.
+    s = drawing.VIEW_SCALE[0] / 1000.0
+    x, y = drawing.STEP_FACE_EDGE
+    assert x == pytest.approx(drawing._side_x(spec.FACE_WIDTH))
+    axis_y = drawing.RIGHT_CENTER[1]
+    assert axis_y + spec.BOSS_DIA / 2.0 * s < y < axis_y + spec.OUTSIDE_DIA / 2.0 * s
+    assert drawing.STEP_FRAME[1] > drawing._SIDE_TOP
 
 
 def test_full_depth_covers_the_racks_worst_reach() -> None:
     """R9-67: the 12T cuts full depth from the rear face over the rack's whole
     width at the printed worst case of the stack behind the platen."""
     import build_paper_drive_assembly as assembly
+    import rack_pinion_spec as disc
 
     reach = assembly.RACK_FRONT_FROM_SLEEVE_REAR_WORST
     assert spec.FULL_DEPTH_MIN >= reach
-    assert spec.FULL_DEPTH_MAX < spec.GEAR_FACE_STATION - spec.STATION_TOL
-    # The platen stands between the rack's front face and the disc seat, so
-    # the rack never reaches within the platen's thickness of the seat.
-    assert reach < spec.GEAR_FACE_STATION + spec.STATION_TOL - assembly.PLATE_THICKNESS
+    assert spec.FULL_DEPTH_MAX < spec.FACE_WIDTH - printed_band_mm(
+        spec.FACE_WIDTH_PLACES
+    )
+    # The platen stands between the rack's front face and the disc's rear
+    # face, so the rack never reaches within the platen's thickness of it in
+    # the limit that sets its reach: the disc at its furthest forward on the
+    # sleeve (the step and spigot at their longest, the disc thickest).
+    disc_rear = (
+        spec.DISC_FRONT_STATION + spec.DISC_FRONT_STATION_BAND - disc.FACE_WIDTH_MAX
+    )
+    assert reach + assembly.PLATE_THICKNESS < disc_rear
 
 
-def test_cutter_run_out_ends_inside_its_limit_and_leaves_the_spigot_round() -> None:
-    assert spec.CUTTER_RUNOUT_END_WORST <= spec.CUTTER_RUNOUT_MAX
-    assert spec.SPIGOT_FULL_ROUND_MIN >= 0.5 * spec.DISC_THICKNESS
-    # The run-out's rise is the spigot's top over the shallowest-printed root.
+def test_cutter_run_out_ends_inside_its_limit_clear_of_the_disc() -> None:
+    """The run-out at its worst, and the printed limit, stand at least
+    RUNOUT_DISC_CLEARANCE behind the disc's nearest rear face: the slots end
+    under the hub's spigot, which the disc stands outside radially."""
+    import rack_pinion_spec as disc
+
+    assert spec.DISC_REAR_MIN == pytest.approx(
+        spec.DISC_FRONT_STATION - spec.DISC_FRONT_STATION_BAND - disc.FACE_WIDTH_MAX
+    )
+    assert spec.RUNOUT_DISC_CLEARANCE == 0.05
+    limit = spec.DISC_REAR_MIN - spec.RUNOUT_DISC_CLEARANCE
+    assert spec.CUTTER_RUNOUT_END_WORST <= spec.CUTTER_RUNOUT_MAX <= limit
+    # The run-out's rise is the boss's top over the shallowest-printed root.
     assert spec.RUNOUT_RISE_WORST == pytest.approx(
-        (spec.SPIGOT_DIA + spec.SPIGOT_DIA_BAND[0] - spec.ROOT_DIA_MIN) / 2.0
+        (spec.BOSS_DIA + spec.BOSS_DIA_BAND[0] - spec.ROOT_DIA_MIN) / 2.0
     )
     # Negative control: a Ø1.25 in cutter at the deepest full-depth limit runs
     # past the printed limit.
@@ -148,44 +208,56 @@ def test_cutter_stations_are_native_banded_model_dimensions() -> None:
         assert "\n" not in prefix and prefix.endswith(" ")
 
 
-def test_modelled_run_out_slots_stay_in_the_spigots_rear_end() -> None:
-    assert spec.GEAR_FACE_STATION < spec.RUNOUT_SLOT_END_Z < spec.CUTTER_RUNOUT_MAX
-    # The slot's flat walls are the gap's width where the cutter leaves the
-    # spigot: wider than at the root, narrower than at the tips.
-    root = spec.gap_chord(spec.ROOT_DIA / 2.0)
-    tip = spec.gap_chord(spec.OUTSIDE_DIA / 2.0)
-    assert root < spec.RUNOUT_SLOT_WIDTH < tip
-    # At the pitch circle the gap is half the circular pitch.
-    pitch_r = spec.PITCH_DIA / 2.0
-    assert spec.gap_chord(pitch_r) == pytest.approx(
-        2.0 * pitch_r * math.sin(math.pi / (2.0 * spec.TEETH))
+def test_flat_end_mill_reaches_the_end_wall_clear_of_the_hub() -> None:
+    """The flat is cut by an end mill parallel to the sleeve axis, plunged
+    from the nose: its flutes cover the longest flat with 0.5 to spare.  The
+    wall stops nothing: the hub's flat starts a spigot length ahead of the
+    step, ahead of the wall at every printed limit."""
+    import transgear_disc_hub_spec as hub
+
+    assert spec.FLAT_LENGTH_MAX == pytest.approx(
+        spec.FLAT_LENGTH + 2.0 * spec.STATION_TOL
     )
-    assert 0.0 < part.V_RUNOUT_SLOT < part.V_SPIGOT / spec.TEETH
+    assert spec.FLAT_CUTTER_FLUTE_MIN >= spec.FLAT_LENGTH_MAX + 0.5
+    worst = (
+        spec.FACE_WIDTH
+        - printed_band_mm(spec.FACE_WIDTH_PLACES)
+        + hub.SPIGOT_LENGTH_MIN
+        - (spec.FLAT_END_STATION + spec.STATION_TOL)
+    )
+    assert hub.FLAT_END_CLEARANCE_WORST == pytest.approx(worst)
+    assert hub.FLAT_END_CLEARANCE_WORST > 0.0
 
 
-def test_bore_runs_on_the_stud_journal() -> None:
-    import transgear_stub_spec as stud
+def test_flat_volume_is_the_boss_segment() -> None:
+    radius = spec.BOSS_DIA / 2.0
+    half_angle = math.acos(spec.FLAT_TO_AXIS / radius)
+    segment = radius**2 * (half_angle - math.sin(half_angle) * math.cos(half_angle))
+    assert part.V_FLAT == pytest.approx(
+        segment * (spec.OVERALL_LENGTH - spec.FLAT_END_STATION)
+    )
+    # The bore stays under the flat: it never breaks through.
+    assert spec.BORE_DIA / 2.0 < spec.FLAT_TO_AXIS
 
-    assert spec.BORE_DIA == stud.JOURNAL_DIA
-    j_upper, j_lower = stud.JOURNAL_DIA_BAND
+
+def test_bore_runs_on_the_pin() -> None:
+    import transgear_pin_spec as pin
+
+    assert spec.BORE_DIA == pin.DIA
+    p_upper, p_lower = pin.DIA_BAND
     b_upper, b_lower = spec.BORE_DIA_BAND
-    clearance = (b_lower - j_upper, b_upper - j_lower)
+    clearance = (b_lower - p_upper, b_upper - p_lower)
     assert clearance == pytest.approx(spec.BORE_DIAMETRAL_CLEARANCE)
     assert clearance[0] > 0.0
     # A running fit exists only when both size bands are narrower than the
     # clearance range they claim (tolerance-policy step 6b).
     span = clearance[1] - clearance[0]
-    assert b_upper - b_lower < span and j_upper - j_lower < span
+    assert b_upper - b_lower < span and p_upper - p_lower < span
 
 
-def test_oil_hole_lands_on_the_hub_hole_and_a_tooth_centre() -> None:
-    import transgear_disc_hub_spec as hub
+def test_oil_hole_lands_on_a_tooth_centre() -> None:
     from involute_gear import gear_facts
 
-    hub_front = spec.GEAR_FACE_STATION + spec.DISC_THICKNESS + hub.HUB_LENGTH
-    assert spec.OIL_HOLE_Z == pytest.approx(hub_front - hub.OIL_HOLE_STATION)
-    assert spec.OIL_HOLE_DIA == hub.OIL_HOLE_DIA
-    assert spec.SPIGOT_FRONT_STATION < spec.OIL_HOLE_Z < spec.OVERALL_LENGTH
     facts = gear_facts(spec.TEETH, spec.DIAMETRAL_PITCH, spec.PRESSURE_ANGLE_DEG)
     gap_centre = math.degrees((facts["ThetaL"] + facts["ThetaU"]) / 2.0)
     pitch = 360.0 / spec.TEETH
@@ -197,20 +269,32 @@ def test_walls_meet_the_target_worst_case() -> None:
     for name, nominal, worst in spec.WALLS:
         assert worst >= spec.WALL_TARGET, name
         assert nominal >= worst, name
+    # The wall under the flat is the one held to the floor, not the target,
+    # and the sheet prints its worst case floored at two places.
+    assert spec.WALL_FLOOR <= spec.FLAT_WALL_WORST < spec.WALL_TARGET
+    assert spec.FLAT_WALL_WORST <= spec.FLAT_WALL
+    assert spec.FLAT_WALL_PRINTED <= spec.FLAT_WALL_WORST
+    assert f"{spec.FLAT_WALL_PRINTED:.2f} MIN" in spec.FLAT_WALL_NOTE
+    assert spec.FLAT_WALL_NOTE in spec.DRAWING_NOTES.splitlines()
 
 
 def test_sheet_text_names_the_right_parts() -> None:
+    import transgear_disc_hub_spec as hub
+
     numbers = {
         "transgear-feed-pinion": spec.SLEEVE_NUMBER,
-        "transgear-stub": spec.STUD_NUMBER,
+        "transgear-pin": spec.PIN_NUMBER,
         "transgear-disc-hub": spec.HUB_NUMBER,
         "rack-pinion": spec.DISC_NUMBER,
         "platen-rack": spec.RACK_NUMBER,
     }
     for stem, number in numbers.items():
         assert _config.parts(stem)["number"] == number, stem
-    assert spec.OIL_HOLE_NOTE.startswith(f"MATCH DRILL AT ASSY WITH {spec.HUB_NUMBER}")
-    assert f"MATE STUD {spec.STUD_NUMBER}" in spec.BORE_FIT_CALLOUT
+    note = drawing.OIL_HOLE_NOTE
+    assert "\n" not in note and len(note) <= 70
+    assert note.startswith(f"\u00d8{hub.OIL_HOLE_DIA:.1f} OIL HOLE")
+    assert f"WITH {spec.HUB_NUMBER}" in note
+    assert f"MATE PIN {spec.PIN_NUMBER}" in spec.BORE_FIT_CALLOUT
     assert drawing.DIMENSION_CALLOUTS == {"BoreDia": spec.BORE_PROCESS_CALLOUT}
 
 
@@ -232,23 +316,26 @@ _NOMINAL = {
     "OutsideDia": spec.OUTSIDE_DIA,
     "RootDia": spec.ROOT_DIA_MIN,
     "BoreDia": spec.BORE_DIA,
-    "SpigotDia": spec.SPIGOT_DIA,
-    "ShankDia": spec.SHANK_DIA,
+    "BossDia": spec.BOSS_DIA,
+    "FlatToAxis": spec.FLAT_TO_AXIS,
     "FaceWidth": spec.FACE_WIDTH,
-    "SpigotFront": spec.SPIGOT_FRONT_STATION,
+    "FlatEnd": spec.FLAT_END_STATION,
     "OverallLength": spec.OVERALL_LENGTH,
     "FullDepth": spec.FULL_DEPTH,
     "CutterRunout": spec.CUTTER_RUNOUT_MAX,
 }
 _DEVIATIONS = {
     "BoreDia": spec.BORE_DEVIATIONS,
-    "SpigotDia": spec.SPIGOT_DIA_DEVIATIONS,
-    "ShankDia": spec.SHANK_DIA_DEVIATIONS,
+    "BossDia": spec.BOSS_DIA_DEVIATIONS,
+    "FlatToAxis": spec.FLAT_TO_AXIS_DEVIATIONS,
     "OutsideDia": spec.OUTSIDE_DIA_DEVIATIONS,
 }
 # The places SolidWorks printed each stacked band's deviations in (run
 # 20261001T110844152Z): the upper above the lower, the lower beside the value.
-_DEVIATION_PLACES = {"BoreDia": 3, "SpigotDia": 2, "ShankDia": 3, "OutsideDia": 1}
+_DEVIATION_PLACES = {"BoreDia": 3, "BossDia": 3, "FlatToAxis": 3, "OutsideDia": 1}
+# The stations the R9-5 ±0.05 band governs; the other lengths print bare
+# under the title block's .XXX row.
+_STATIONS = {"FlatEnd", "OverallLength"}
 
 
 def _printed_text(name: str) -> str:
@@ -268,8 +355,10 @@ def _printed_text(name: str) -> str:
         lower, upper = _DEVIATIONS[name]
         places = _DEVIATION_PLACES[name]
         rows = [f"{upper:+.{places}f}", f"{value} {lower:+.{places}f}"]
-    else:
+    elif name in _STATIONS:
         rows = [f"{value} \u00b1{spec.STATION_TOL:.{spec.STATION_PLACES}f}"]
+    else:
+        rows = [value]
     if name in drawing.DIMENSION_CALLOUTS:
         rows.append(drawing.DIMENSION_CALLOUTS[name])
     return "\n".join(f" {row} " for row in rows)
@@ -320,7 +409,8 @@ def test_section_values_and_bands_print_clear_of_each_other() -> None:
     each other.  Every value with its band and callout keeps the layout
     audit's text air from every other text, clears both views, and stays
     inside the border; the inline diameters print between their own
-    extension lines and off the part."""
+    extension lines and off the part, and the flat's value between the axis
+    and the flat, right of the nose."""
     s = drawing.VIEW_SCALE[0] / 1000.0
     axis_y = drawing.RIGHT_CENTER[1]
     rear_x = drawing._side_x(0.0)
@@ -333,7 +423,7 @@ def test_section_values_and_bands_print_clear_of_each_other() -> None:
         drawing.FRONT_CENTER[1] + drawing.HALF_OD,
     )
     boxes = {name: _printed_box(name, xy) for name, xy in drawing.RIGHT_KEEP.items()}
-    boxes["oil hole note"] = _note_box(spec.OIL_HOLE_NOTE, drawing.OIL_HOLE_CALLOUT)
+    boxes["oil hole note"] = _note_box(drawing.OIL_HOLE_NOTE, drawing.OIL_HOLE_CALLOUT)
     boxes["bore fit note"] = _note_box(spec.BORE_FIT_CALLOUT, drawing.BORE_FIT_NOTE)
     air = TEXT_CLEARANCE_HEIGHTS * _CAP_M
     clashes = [
@@ -350,7 +440,7 @@ def test_section_values_and_bands_print_clear_of_each_other() -> None:
     inline = {
         name: anchor for name, anchor in drawing.RIGHT_KEEP.items() if _inline(anchor)
     }
-    assert set(inline) == {"OutsideDia", "RootDia", "ShankDia"}
+    assert set(inline) == {"OutsideDia", "RootDia", "BossDia"}
     for name in inline:
         half = _NOMINAL[name] / 2.0 * s
         assert axis_y - half < boxes[name].ymin, name
@@ -362,10 +452,18 @@ def test_section_values_and_bands_print_clear_of_each_other() -> None:
         (n for n in inline if inline[n][0] < rear_x), key=lambda n: -inline[n][0]
     )
     assert [_NOMINAL[n] for n in left] == sorted(_NOMINAL[n] for n in left)
-    assert inline["ShankDia"][0] > nose_x
+    assert inline["BossDia"][0] > nose_x
+    # The flat's value sits between its extension lines (the axis and the
+    # flat) right of the nose, and its axis extension line, which runs to its
+    # dimension line, stops short of the boss's inline text.
+    flat = boxes["FlatToAxis"]
+    flat_x = drawing.RIGHT_KEEP["FlatToAxis"][0]
+    assert axis_y - spec.FLAT_TO_AXIS * s < flat.ymin and flat.ymax < axis_y
+    assert flat.gap(section) >= ARROW_TEXT_CLEARANCE_M
+    assert flat_x + 2.0 * ARROW_TEXT_CLEARANCE_M < boxes["BossDia"].xmin
 
 
-# The native section caption, "SECTION A-A" over its scale, stands 16.5 mm
+# The native section caption, "SECTION B-B" over its scale, stands 16.5 mm
 # tall and is placed by its top centre; the B sheet's title block stands up
 # to 64.9 mm (test_crank_drive_gear_drawing, test_rocker_arm_support_drawing).
 _CAPTION_HEIGHT = 0.0165
@@ -388,7 +486,7 @@ def test_baseline_lengths_stack_without_crossing_extension_lines() -> None:
         "FullDepth",
         "FaceWidth",
         "CutterRunout",
-        "SpigotFront",
+        "FlatEnd",
         "OverallLength",
     }
     by_row = sorted(rows, key=lambda n: -rows[n][1])

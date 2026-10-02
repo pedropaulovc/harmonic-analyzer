@@ -1,26 +1,32 @@
 r"""Pure-data dimensional contract shared by the feed-pinion sleeve and its drawing.
 
-The transgear pinion sleeve (MHA-110, contract §2.3): one turned steel sleeve
-that runs on the fixed stud's Ø3.9 journal (MHA-082) and carries, rear to
-front, the 12T DP30 feed pinion that meshes the platen rack, the Ø10 spigot
-that locates the 120T disc (MHA-070), and the Ø8.2 shank the brass hub
-(MHA-159) is pressed on.  Its nose stands proud of the hub and is the
-cluster's front thrust face; its rear end runs on the stud's Ø9 step.
+The transgear pinion sleeve (MHA-110, R9-68): one turned steel sleeve that
+runs on the MHA-179 pin's Ø3.9 shank and carries, rear to front, the 12T
+DP30 feed pinion that meshes the platen rack and, past one step, the Ø9 h6
+boss.  The brass hub (MHA-159) slides on the boss: its rear spigot passes
+the 120T disc's (MHA-070) bore, which pilots on it, and seats its end on the
+step face, so the step is the rear stop of hub and disc; the hub drives
+through the boss's D-flat, which is drive only (its end wall stands behind
+the hub's own flat and never touches it).  The hub's front face is faced to
+stand just behind the nose, so the MHA-181 front bushing bears on the nose
+and traps hub and disc against the step.  The rear face runs on the MHA-180
+rear bushing; both bushings and the hub are faced to fit
+(``transgear_cluster_fit``, which reads this module).
 
-Local frame: origin on the axis at the sleeve's REAR end (the face that runs
-on the stud's Ø9 step, machine z −135.15 as fitted), +Z toward the machine
-FRONT.  The teeth occupy z 0..GEAR_FACE_STATION, the spigot GEAR_FACE_STATION..
-SPIGOT_FRONT_STATION, the shank SPIGOT_FRONT_STATION..OVERALL_LENGTH.  Datums:
-``RearFace`` is the Front Plane (z 0), ``GearFace`` and ``SpigotFront`` are
-offset planes, ``Axis1`` is the tooth pattern's Top × Right axis.
-
-Round-10 rulings R9-5 (cluster float, nose proud, functional stations) and
-R9-8 (the Ø1.2 oil hole, match-drilled through hub and sleeve after pressing)
-supersede the contract where they differ.
+Local frame: origin on the axis at the sleeve's REAR face, +Z toward the
+machine FRONT.  The teeth occupy z 0..FACE_WIDTH, the boss
+FACE_WIDTH..OVERALL_LENGTH; the D-flat (local -Y) runs from the nose back to
+its end wall at FLAT_END_STATION.  Datums: ``RearFace`` is the Front Plane
+(z 0), ``GearFace`` (the step face) an offset plane, ``Axis1`` the tooth
+pattern's Top × Right axis; the sheet's datum A is the bore.
 
 PURE DATA, no SolidWorks/COM imports: ``build_transgear_feed_pinion`` marks and
 tolerances exactly ``DRAWING_DIMENSIONS`` / ``DRAWING_PRECISION``;
-``draw_transgear_feed_pinion`` keeps exactly the same names.
+``draw_transgear_feed_pinion`` keeps exactly the same names.  Nothing here
+imports ``transgear_cluster_fit``, the hub's spec or a bushing spec (they
+import this; the hub's spec owns the hub-to-sleeve fits and the match-drilled
+oil hole's location); the hub's spigot comes from the joint's pure-data
+``transgear_disc_hub_geometry``.
 """
 
 from __future__ import annotations
@@ -28,12 +34,12 @@ from __future__ import annotations
 import math
 
 import rack_pinion_spec
-import transgear_disc_hub_spec
-import transgear_stub_spec
+import transgear_pin_spec
 from _fit_limits import deviations
 from _gtol_spec import CylinderFace
-from _printed_tolerance import drilled_oversize_mm, printed_band_mm
+from _printed_tolerance import printed_band_mm
 from _surface_finish import MACHINED_UM, SurfaceFinishControl
+from transgear_disc_hub_geometry import SPIGOT_LENGTH, SPIGOT_LENGTH_BAND
 
 MM_PER_IN = 25.4
 
@@ -42,10 +48,12 @@ MM_PER_IN = 25.4
 # rebuild inputs of every importer); test_transgear_feed_pinion_drawing checks
 # them against the registry offline.
 SLEEVE_NUMBER = "MHA-110"
-STUD_NUMBER = "MHA-082"
+PIN_NUMBER = transgear_pin_spec.PIN_NUMBER
 HUB_NUMBER = "MHA-159"
 DISC_NUMBER = "MHA-070"
 RACK_NUMBER = "MHA-069"
+if rack_pinion_spec.HUB_NUMBER != HUB_NUMBER:
+    raise AssertionError("the disc's fit note names another hub than this sheet")
 
 # --- 12T DP30 feed pinion ------------------------------------------------------
 TEETH = 12
@@ -77,132 +85,122 @@ if round(ROOT_DIA, ROOT_DIA_PLACES) != ROOT_DIA_MIN:
     )
 
 # --- axial stations from the rear face (z 0) -----------------------------------
-# All three print ±0.05 (R9-5).  Functional reasons:
-#   GEAR_FACE_STATION: the disc seat; it sets where the disc, hub flange and hub
-#     front face land, so it is a term of the nose-proud stack below.
-#   SPIGOT_FRONT_STATION: the spigot may never stand proud of the disc's front
-#     face, or the hub flange would seat on the spigot step instead of clamping
-#     the disc; that stack (SPIGOT_RECESS_WORST) cannot hold at the .X row.
-#   OVERALL_LENGTH: the cluster float against the stud journal and the nose
-#     proud of the hub.
+# OVERALL_LENGTH and FLAT_END_STATION print ±0.05 (R9-5; the knob chain and
+# the fitted bands read the overall: transgear_cluster_fit).  The tooth length
+# prints .XXX: its end is the step face the hub's spigot seats on, so it
+# places hub and disc with the spigot's own .XXX length (the bushings and the
+# hub are faced to fit over both bands).
 STATION_TOL = 0.05
 STATION_PLACES = 2
-GEAR_FACE_STATION = 9.5
-FACE_WIDTH = GEAR_FACE_STATION  # the tooth length: rear face to the disc seat
-# Rule-11 (FeedSleevePart): 12.2, not the contract's 12.5.  The disc is 3.00
-# .XXX (±0.13), so a spigot as long as the disc is thick stands proud of it at
-# the worst case; 12.2 ±0.05 keeps it 0.07 inside the disc's front face.
-SPIGOT_FRONT_STATION = 12.2
-OVERALL_LENGTH = 22.6
-SLEEVE_LENGTH = OVERALL_LENGTH
-SLEEVE_LENGTH_TOL = STATION_TOL
+FACE_WIDTH = 13.60  # the tooth length: rear face to the step onto the boss
+FACE_WIDTH_PLACES = 3
+FACE_WIDTH_BAND = printed_band_mm(FACE_WIDTH_PLACES)
+OVERALL_LENGTH = 27.35
 
 # --- diameters -----------------------------------------------------------------
-# The spigot is the disc's slip fit: turned to the SHAFT_H band under the
-# disc's REAM_SLIDE bore (rack_pinion_spec owns the pair, so the disc sheet's
-# fit note and this model band are one constant).  The shank is the hub's
-# press seat, turned to the band transgear_disc_hub_spec sets over the hub's
-# reamed bore (that module owns the pair and its interference, R9-45).
-SPIGOT_DIA = rack_pinion_spec.SPIGOT_DIA
-SPIGOT_DIA_BAND = rack_pinion_spec.SPIGOT_DIA_BAND  # (upper, lower) deviations
-SHANK_DIA = transgear_disc_hub_spec.SHANK_DIA
-SHANK_DIA_BAND = transgear_disc_hub_spec.SHANK_DIA_BAND  # (upper, lower) deviations
-DIA_PLACES = 3
-if rack_pinion_spec.SLEEVE_NUMBER != SLEEVE_NUMBER:
-    raise AssertionError("the disc's fit note names another part than this sleeve")
+# The boss is the hub's locating fit: turned h6 under the hub's Ø9 H7 bore
+# (transgear_disc_hub_spec checks the pair).
+BOSS_DIA = 9.0
+BOSS_DIA_BAND = (0.0, -0.009)  # (upper, lower) deviations, h6
+BOSS_DIA_PLACES = 3
 
-# The bore runs on the stud journal.  A running fit exists only if both size
-# bands are narrower than the clearance they claim (tolerance-policy step 6b):
-# +0.030/+0.012 over the journal's 0/−0.020 gives 0.012..0.050 diametral.
-BORE_DIA = transgear_stub_spec.JOURNAL_DIA  # 3.9
+# --- the step face: the hub's seat ----------------------------------------------
+# The hub's spigot bears on the step face's tooth ends, so the face is held
+# square to the bore (datum A), faced in the setup that reams the bore; the
+# zone is the face's extent, the 12T's tip circle.
+BORE_DATUM = "A"
+GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
+    "step face perpendicularity to bore": "0.005",
+}
+STEP_FACE_PERPENDICULARITY = float(
+    GEOMETRIC_TOLERANCES_MM["step face perpendicularity to bore"]
+)
+STEP_FACE_PERPENDICULARITY_ZONE_DIA = OUTSIDE_DIA
+
+# --- D-flat (local -Y): drive only ------------------------------------------------
+# The hub drives through it.  The flat plane prints from the boss axis with
+# its own (0, −0.015): the hub's flat sits 0.020..0.050 off it (the hub owns
+# its band and checks the pair).
+FLAT_TO_AXIS = 3.5
+FLAT_TO_AXIS_BAND = (0.0, -0.015)  # (upper, lower) deviations
+FLAT_TO_AXIS_PLACES = 3
+FLAT_DEPTH = BOSS_DIA / 2.0 - FLAT_TO_AXIS  # 1.0
+# The flat runs from the nose rearward to an end wall at FLAT_END_STATION,
+# cut by an end mill on an axis parallel to the sleeve's, plunged from the
+# nose.  The wall stops nothing: the hub's flat starts at its flange's rear
+# face, the spigot's length ahead of the step, so the wall stands clear
+# behind it (transgear_disc_hub_spec.FLAT_END_CLEARANCE_WORST).
+FLAT_END_STATION = 16.60
+FLAT_LENGTH = OVERALL_LENGTH - FLAT_END_STATION  # 10.75
+FLAT_LENGTH_MAX = FLAT_LENGTH + 2.0 * STATION_TOL  # 10.85
+FLAT_CUTTER_FLUTE_MIN = 12.0
+if FLAT_CUTTER_FLUTE_MIN < FLAT_LENGTH_MAX + 0.5:
+    raise AssertionError("the flat's end mill cannot reach the end wall on its flutes")
+
+# --- bore: a running fit on the MHA-179 pin ----------------------------------------
+# A running fit exists only if both size bands are narrower than the clearance
+# they claim (tolerance-policy step 6b): +0.030/+0.012 over the pin's
+# 0/−0.008 gives 0.012..0.038 diametral.
+BORE_DIA = transgear_pin_spec.DIA  # 3.9
 BORE_DIA_BAND = (0.030, 0.012)  # (upper, lower) deviations, reamed
 BORE_PLACES = 3
-_JOURNAL_UPPER, _JOURNAL_LOWER = transgear_stub_spec.JOURNAL_DIA_BAND
+_PIN_UPPER, _PIN_LOWER = transgear_pin_spec.DIA_BAND
 BORE_DIAMETRAL_CLEARANCE = (
-    round(BORE_DIA_BAND[1] - _JOURNAL_UPPER, 3),
-    round(BORE_DIA_BAND[0] - _JOURNAL_LOWER, 3),
-)
+    round(BORE_DIA_BAND[1] - _PIN_UPPER, 3),
+    round(BORE_DIA_BAND[0] - _PIN_LOWER, 3),
+)  # 0.012 .. 0.038
 if BORE_DIAMETRAL_CLEARANCE[0] <= 0.0:
-    raise AssertionError(
-        f"sleeve bore binds on the journal: {BORE_DIAMETRAL_CLEARANCE}"
-    )
+    raise AssertionError(f"sleeve bore binds on the pin: {BORE_DIAMETRAL_CLEARANCE}")
 BORE_PROCESS_CALLOUT = "REAM THRU"
 BORE_FIT_CALLOUT = "\n".join(
     (
         "BORE LIMITS GOVERN",
-        f"MATE STUD {STUD_NUMBER}",
-        f"(\N{DIAMETER SIGN}{BORE_DIA:.3f} +{_JOURNAL_UPPER:.3f}/{_JOURNAL_LOWER:.3f})",
+        f"MATE PIN {PIN_NUMBER}",
+        f"(\N{DIAMETER SIGN}{BORE_DIA:.3f} +{_PIN_UPPER:.3f}/{_PIN_LOWER:.3f})",
         f"(DIA CLR {BORE_DIAMETRAL_CLEARANCE[0]:.3f}-{BORE_DIAMETRAL_CLEARANCE[1]:.3f} mm)",
     )
 )
 
 _BAND = {places: printed_band_mm(places) for places in (1, 2, 3)}
-_DRILL_OVERSIZE = drilled_oversize_mm()
 
-# --- R9-5 checks (worst case at the printed bands) -----------------------------
-# Cluster float = stud journal (Ø9 step → shoulder, 22.9 ±0.05) − sleeve length
-# (22.6 ±0.05) = 0.3 nominal, 0.2..0.4.
-_JOURNAL_LENGTH = transgear_stub_spec.JOURNAL_LENGTH
-_JOURNAL_LENGTH_TOL = transgear_stub_spec.JOURNAL_LENGTH_TOL
-CLUSTER_FLOAT = _JOURNAL_LENGTH - SLEEVE_LENGTH
-CLUSTER_FLOAT_RANGE = (
-    (_JOURNAL_LENGTH - _JOURNAL_LENGTH_TOL) - (SLEEVE_LENGTH + SLEEVE_LENGTH_TOL),
-    (_JOURNAL_LENGTH + _JOURNAL_LENGTH_TOL) - (SLEEVE_LENGTH - SLEEVE_LENGTH_TOL),
-)
-if not (0.2 - 1e-9 <= CLUSTER_FLOAT_RANGE[0] and CLUSTER_FLOAT_RANGE[1] <= 0.4 + 1e-9):
-    raise AssertionError(f"cluster float {CLUSTER_FLOAT_RANGE} left the ruled 0.2..0.4")
-
-# Nose proud of the hub front face = 22.6 − (9.5 + disc 3.00 + hub 9.40) = 0.70;
-# worst 22.55 − (9.55 + 3.13 + 9.53) = 0.34 (disc and hub print .XXX).
+# --- the hub and disc on the step ------------------------------------------------
+# The hub's spigot seats on the step face and passes the disc's bore; the
+# hub's flange clamps the disc's front face, so that face stands the
+# spigot's length ahead of the step and the disc's rear face stands in air
+# ahead of it, the spigot's length less the disc's thickness (0.65 nominal;
+# the hub's spec takes the worst case with the tilts).  The disc's bore is
+# the spigot's, outside the 12T's tips, so the two never overlap radially.
 DISC_THICKNESS = rack_pinion_spec.FACE_WIDTH
-_DISC_BAND = _BAND[rack_pinion_spec.FACE_WIDTH_PLACES]
-HUB_LENGTH = transgear_disc_hub_spec.HUB_LENGTH
-_HUB_BAND = _BAND[transgear_disc_hub_spec.HUB_LENGTH_PLACES]
-HUB_FRONT_STATION = GEAR_FACE_STATION + DISC_THICKNESS + HUB_LENGTH  # 21.9
-NOSE_PROUD = OVERALL_LENGTH - HUB_FRONT_STATION
-NOSE_PROUD_WORST = (OVERALL_LENGTH - SLEEVE_LENGTH_TOL) - (
-    GEAR_FACE_STATION
-    + STATION_TOL
-    + DISC_THICKNESS
-    + _DISC_BAND
-    + HUB_LENGTH
-    + _HUB_BAND
-)
-if NOSE_PROUD_WORST < 0.34 - 1e-9:
-    raise AssertionError(
-        f"hub can stand proud of the sleeve nose: {NOSE_PROUD_WORST:.3f}"
-    )
-
-# The spigot stays inside the disc bore, so the flange clamps the disc:
-# (9.45 + 2.87) − 12.25 = 0.07 at the worst case.  The step is 12.15 − 9.55 =
-# 2.60 long at the worst case; the cutter's run-out slots its rear end (below).
-SPIGOT_RECESS_WORST = (
-    GEAR_FACE_STATION - STATION_TOL + DISC_THICKNESS - _DISC_BAND
-) - (SPIGOT_FRONT_STATION + STATION_TOL)
-SPIGOT_LENGTH_MIN = (
-    SPIGOT_FRONT_STATION - STATION_TOL - (GEAR_FACE_STATION + STATION_TOL)
-)
-if SPIGOT_RECESS_WORST <= 0.0:
-    raise AssertionError(f"spigot stands proud of the disc: {SPIGOT_RECESS_WORST:.3f}")
+DISC_FRONT_STATION = FACE_WIDTH + SPIGOT_LENGTH  # 17.25, the hub flange's seat
+DISC_FRONT_STATION_BAND = FACE_WIDTH_BAND + SPIGOT_LENGTH_BAND  # 0.26
+DISC_REAR_STATION = DISC_FRONT_STATION - DISC_THICKNESS  # 14.25
+DISC_REAR_MIN = (
+    DISC_FRONT_STATION - DISC_FRONT_STATION_BAND - rack_pinion_spec.FACE_WIDTH_MAX
+)  # 13.86
+if rack_pinion_spec.BORE_DIA_MIN <= OUTSIDE_DIA + OUTSIDE_DIA_BAND[0]:
+    raise AssertionError("the disc's bore overlaps the 12T's tips radially")
 
 # --- 12T form-cutter run-out (R9-67, on the knob shaft's R9-21) ---------------
 # The 12T is cut with a form cutter on a dividing head from the open rear
 # face: full depth from the rear face to FULL_DEPTH, then the cutter's arc runs
 # out behind that station, leaving partial-depth gaps over the rest of the
-# face and slotting the Ø10 spigot (proud of the gap floor) at its rear end.
-# The section prints the full-depth station as a native baseline dimension
-# from the rear face with its .XXX band, and the run-out's end as a native
-# MAX limit (construction witnesses in ``SleeveProfile``, each named by its
-# model prefix); the note gives the largest cutter that keeps a window.
-FULL_DEPTH = 5.45
+# teeth and, at its deepest, short slots in the boss ahead of the step,
+# under the hub spigot's bore.  The section prints the full-depth station as a
+# native baseline dimension from the rear face with its .XXX band, and the
+# run-out's end (where the cutter rises clear of the Ø9 boss) as a native MAX
+# limit (construction witnesses in ``SleeveProfile``, each named by its model
+# prefix); the note gives the largest cutter that keeps that window.  The
+# model cuts full depth over the whole tooth length and leaves the slots out
+# (0.05 long at the nominal cutter).
+FULL_DEPTH = 10.20
 FULL_DEPTH_PLACES = 3
-CUTTER_RUNOUT_MAX = 10.50  # from the rear face, a limit
+CUTTER_RUNOUT_MAX = 13.80  # from the rear face, a limit
 CUTTER_RUNOUT_PLACES = 2
 CUTTER_DIA_MAX_IN = 1.00
 CUTTER_DIA_MAX = CUTTER_DIA_MAX_IN * MM_PER_IN  # 25.4
 FULL_DEPTH_BAND = printed_band_mm(FULL_DEPTH_PLACES)
-FULL_DEPTH_MIN = FULL_DEPTH - FULL_DEPTH_BAND  # 5.32
-FULL_DEPTH_MAX = FULL_DEPTH + FULL_DEPTH_BAND  # 5.58
+FULL_DEPTH_MIN = FULL_DEPTH - FULL_DEPTH_BAND  # 10.07
+FULL_DEPTH_MAX = FULL_DEPTH + FULL_DEPTH_BAND  # 10.33
 # swTolMAX prints the dimension's NOMINAL followed by "MAX", so the witness
 # sits at the limit; its deviations record "anywhere behind the shortest full
 # depth, up to the limit".
@@ -226,114 +224,48 @@ def cutter_runout(cutter_dia: float, rise: float) -> float:
 
 
 # The rack's worst reach from the rear face is the assembly's stack
-# (build_paper_drive_assembly.RACK_FRONT_FROM_SLEEVE_REAR_WORST, 5.24), which
-# asserts FULL_DEPTH_MIN covers it.  The longest run-out: the spigot at its
-# largest radius over the shallowest-printed gap floor (the root's MIN),
-# 5.000 − 4.020 = 0.98 -> 4.89 behind the deepest full-depth station.
-RUNOUT_RISE_WORST = (SPIGOT_DIA + SPIGOT_DIA_BAND[0]) / 2.0 - ROOT_DIA_MIN / 2.0
+# (build_paper_drive_assembly.RACK_FRONT_FROM_SLEEVE_REAR_WORST), which
+# asserts FULL_DEPTH_MIN covers it.  The boss at its largest radius over the
+# shallowest-printed gap floor (the root's MIN), 4.500 − 4.020 = 0.48, runs
+# out 3.46 behind the deepest full-depth station, 13.79, inside the 13.80
+# limit.  The slots end under the hub's spigot (the hub's spec takes them off
+# its round engagement, ROUND_ENGAGEMENT_MIN) and stand behind the disc's
+# nearest rear face (13.86) by RUNOUT_DISC_CLEARANCE: the disc sits on the
+# spigot, radially outside the boss, so the margin only keeps the slots'
+# end behind the disc's plane.
+RUNOUT_RISE_WORST = (BOSS_DIA + BOSS_DIA_BAND[0]) / 2.0 - ROOT_DIA_MIN / 2.0
 CUTTER_RUNOUT_END_WORST = FULL_DEPTH_MAX + cutter_runout(
     CUTTER_DIA_MAX, RUNOUT_RISE_WORST
-)  # 10.47
-# The spigot's unslotted length at the worst case: the run-out limit to the
-# spigot front's nearest station, 12.15 − 10.50 = 1.65.
-SPIGOT_FULL_ROUND_MIN = SPIGOT_FRONT_STATION - STATION_TOL - CUTTER_RUNOUT_MAX
-if FULL_DEPTH_MAX >= GEAR_FACE_STATION - STATION_TOL:
-    raise AssertionError("the 12T full-depth window reaches the disc seat")
+)  # 13.79
+RUNOUT_DISC_CLEARANCE = 0.05
+if FULL_DEPTH_MAX >= FACE_WIDTH - _BAND[FACE_WIDTH_PLACES]:
+    raise AssertionError("the 12T full-depth window reaches the step")
 if CUTTER_RUNOUT_END_WORST > CUTTER_RUNOUT_MAX + 1e-9:
     raise AssertionError(
-        f"a Ø{CUTTER_DIA_MAX:.2f} cutter's run-out reaches "
-        f"{CUTTER_RUNOUT_END_WORST:.3f}, past the printed {CUTTER_RUNOUT_MAX:.2f}"
+        f"a Ø{CUTTER_DIA_MAX_IN:.2f} in cutter runs out to "
+        f"{CUTTER_RUNOUT_END_WORST:.3f}, past the {CUTTER_RUNOUT_MAX} limit"
     )
-if SPIGOT_FULL_ROUND_MIN < 0.5 * DISC_THICKNESS:
+if CUTTER_RUNOUT_END_WORST > DISC_REAR_MIN - RUNOUT_DISC_CLEARANCE + 1e-9:
     raise AssertionError(
-        f"the run-out leaves {SPIGOT_FULL_ROUND_MIN:.2f} of round spigot, under "
-        f"half the {DISC_THICKNESS:.2f} disc it locates"
+        f"the cutter runs out to {CUTTER_RUNOUT_END_WORST:.3f}, within "
+        f"{RUNOUT_DISC_CLEARANCE} of the disc's rear face {DISC_REAR_MIN:.3f}"
     )
-
-# The model cuts at the nominal full depth with the largest cutter: its axis
-# lies across the seed gap's centre line, CUTTER_AXIS_R from the sleeve axis
-# at z = FULL_DEPTH, and the slots end RUNOUT_SLOT_END_Z from the rear face.
-CUTTER_AXIS_R = ROOT_DIA / 2.0 + CUTTER_DIA_MAX / 2.0  # 16.72
-CUTTER_AXIS_Z = FULL_DEPTH
-RUNOUT_SLOT_END_Z = FULL_DEPTH + cutter_runout(
-    CUTTER_DIA_MAX, SPIGOT_DIA / 2.0 - ROOT_DIA / 2.0
-)  # 10.33
-if not GEAR_FACE_STATION < RUNOUT_SLOT_END_Z < CUTTER_RUNOUT_MAX:
-    raise AssertionError("the modelled run-out slots leave the spigot's rear end")
-
-
-def gap_chord(radius: float) -> float:
-    """Chordal width of a standard 12T tooth gap at ``radius`` (mm): the gap
-    angle is π/N − 2 inv φ at the pitch circle plus 2 inv φ at ``radius``
-    (radial flanks below the base circle)."""
-    phi = math.radians(PRESSURE_ANGLE_DEG)
-    base_r = PITCH_DIA / 2.0 * math.cos(phi)
-    inv_r = 0.0
-    if radius > base_r:
-        phi_r = math.acos(base_r / radius)
-        inv_r = math.tan(phi_r) - phi_r
-    angle = math.pi / TEETH - 2.0 * (math.tan(phi) - phi) + 2.0 * inv_r
-    return 2.0 * radius * math.sin(angle / 2.0)
-
-
-# The model's slots are flat-walled at the gap's width where the cutter
-# leaves the spigot surface (a simplification: the form cutter's walls follow
-# the gap's involute, narrower below).
-RUNOUT_SLOT_WIDTH = gap_chord(SPIGOT_DIA / 2.0)
-# The seed gap _gear.cut_tooth_gap cuts is centred half a pitch CCW of local
-# +X (tooth 0 is centred on +X); the pattern repeats it every 30 degrees.
-GAP_AZIMUTH_DEG = 180.0 / TEETH
-
-# --- walls (rule 12: target 2.0, floor 1.5, at the printed bands) --------------
-WALL_TARGET = 2.0
-_BORE_MAX = BORE_DIA + BORE_DIA_BAND[0]  # 3.930
-# Under the root: (8.0433 − 3.900)/2 = 2.072 nominal; (8.04 MIN − 3.930)/2 = 2.055.
-ROOT_WALL = (ROOT_DIA - BORE_DIA) / 2.0
-ROOT_WALL_WORST = (ROOT_DIA_MIN - _BORE_MAX) / 2.0
-# Shank: (8.2 − 3.9)/2 = 2.15; (8.225 − 3.93)/2 = 2.147 (its band lies above it).
-SHANK_WALL = (SHANK_DIA - BORE_DIA) / 2.0
-SHANK_WALL_WORST = (SHANK_DIA + SHANK_DIA_BAND[1] - _BORE_MAX) / 2.0
-# Spigot: (10 − 3.9)/2 = 3.05; (9.98 − 3.93)/2 = 3.025.
-SPIGOT_WALL = (SPIGOT_DIA - BORE_DIA) / 2.0
-SPIGOT_WALL_WORST = (SPIGOT_DIA + SPIGOT_DIA_BAND[1] - _BORE_MAX) / 2.0
+if CUTTER_RUNOUT_MAX > DISC_REAR_MIN - RUNOUT_DISC_CLEARANCE + 1e-9:
+    raise AssertionError("the run-out limit reaches the disc's rear face")
 
 # --- oil hole (R9-8) -----------------------------------------------------------
-# Ø1.2 drilled (+0.10/0) on +Y, centred on the hub body (R9-60: 3.5 nominal
-# behind the hub front face), through hub and shank wall in one operation
-# after pressing.  The hub sheet owns its size and location; this sheet carries
-# the match-drill note (the crank pinion's pin-hole wording,
-# crank_pinion_spec.pin_hole_note).  Sleeve-local z = 21.9 − 3.5 = 18.4.
-OIL_HOLE_DIA = transgear_disc_hub_spec.OIL_HOLE_DIA
-OIL_HOLE_Z = HUB_FRONT_STATION - transgear_disc_hub_spec.OIL_HOLE_STATION
-OIL_HOLE_AZIMUTH_DEG = 90.0  # local +Y
-# (least, greatest) station behind the hub front face: half the hub body the
-# hub's printed lengths leave, plus the centring at fit-up (3.12..3.88).
-_OIL_STATION_RANGE = transgear_disc_hub_spec.OIL_HOLE_STATION_RANGE
-_OIL_HOLE_MAX_R = (OIL_HOLE_DIA + _DRILL_OVERSIZE) / 2.0
-# Ligament from the hole to the sleeve nose: 22.6 − 18.4 − 0.6 = 3.6 nominal;
-# worst 0.34 (nose) + 3.12 − 0.65 = 2.81.
-OIL_HOLE_TO_NOSE = OVERALL_LENGTH - OIL_HOLE_Z - OIL_HOLE_DIA / 2.0
-OIL_HOLE_TO_NOSE_WORST = NOSE_PROUD_WORST + _OIL_STATION_RANGE[0] - _OIL_HOLE_MAX_R
-# The hole stays on the shank, clear of the spigot step: its rear edge lies at
-# least (9.45 + 2.87 + 9.27) − 3.88 − 0.65 = 17.06 from the rear face.
-OIL_HOLE_REAR_EDGE_WORST = (
-    GEAR_FACE_STATION
-    - STATION_TOL
-    + DISC_THICKNESS
-    - _DISC_BAND
-    + HUB_LENGTH
-    - _HUB_BAND
-    - _OIL_STATION_RANGE[1]
-    - _OIL_HOLE_MAX_R
-)
-if OIL_HOLE_REAR_EDGE_WORST <= SPIGOT_FRONT_STATION + STATION_TOL:
-    raise AssertionError("the oil hole can reach the spigot step")
+# Ø1.2 drilled (+0.10/0) on +Y, centred on the hub body (R9-60), through hub
+# and boss wall in one operation at assembly.  The hub's spec owns its size,
+# its sleeve-local station (transgear_disc_hub_spec.OIL_HOLE_SLEEVE_Z) and
+# the ligament to this nose; this sheet's drawing carries the drill note
+# (draw_transgear_feed_pinion.OIL_HOLE_NOTE, which reads the hub's size).
+OIL_HOLE_AZIMUTH_DEG = 90.0  # local +Y, opposite the flat
 
 # Tooth phase: the seed gap is centred half a pitch CCW of local +X
 # (involute_gear.gear_facts: (ThetaL + ThetaU) / 2 = Gamma / 2) and the pattern
 # steps a pitch, so gap centres sit at 15° + k·30°.  +Y (90°) is a TOOTH
-# centre; the oil hole is on the shank 8.9 in front of the teeth anyway, so no
-# clocking is needed.
+# centre; the oil hole is on the boss well in front of the teeth anyway, so
+# no clocking is needed.
 TOOTH_PITCH_DEG = 360.0 / TEETH
 GAP_CENTRE_PHASE_DEG = TOOTH_PITCH_DEG / 2.0
 OIL_HOLE_TOOTH_OFFSET_DEG = (
@@ -342,24 +274,31 @@ OIL_HOLE_TOOTH_OFFSET_DEG = (
 if abs(OIL_HOLE_TOOTH_OFFSET_DEG - GAP_CENTRE_PHASE_DEG) > 1e-9:
     raise AssertionError("the +Y oil hole is no longer on a tooth centre")
 
+# --- walls (rule 12: target 2.0, floor 1.5, at the printed bands) --------------
+WALL_TARGET = 2.0
+WALL_FLOOR = 1.5
+_BORE_MAX = BORE_DIA + BORE_DIA_BAND[0]  # 3.930
+# Under the root: (8.0433 − 3.900)/2 = 2.072 nominal; (8.04 MIN − 3.930)/2 = 2.055.
+ROOT_WALL = (ROOT_DIA - BORE_DIA) / 2.0
+ROOT_WALL_WORST = (ROOT_DIA_MIN - _BORE_MAX) / 2.0
+# Boss: (9 − 3.9)/2 = 2.55; (8.991 − 3.93)/2 = 2.53.
+BOSS_WALL = (BOSS_DIA - BORE_DIA) / 2.0
+BOSS_WALL_WORST = (BOSS_DIA + BOSS_DIA_BAND[1] - _BORE_MAX) / 2.0
 WALLS = (
     ("under the root", ROOT_WALL, ROOT_WALL_WORST),
-    ("shank", SHANK_WALL, SHANK_WALL_WORST),
-    ("spigot", SPIGOT_WALL, SPIGOT_WALL_WORST),
-    ("oil hole to nose", OIL_HOLE_TO_NOSE, OIL_HOLE_TO_NOSE_WORST),
+    ("boss", BOSS_WALL, BOSS_WALL_WORST),
 )
 for _name, _nominal, _worst in WALLS:
     if _worst < WALL_TARGET:
         raise AssertionError(f"sleeve wall {_name} {_worst:.3f} under {WALL_TARGET}")
-
-# --- sheet text ------------------------------------------------------------------
-OIL_HOLE_NOTE = "\n".join(
-    (
-        f"MATCH DRILL AT ASSY WITH {HUB_NUMBER}",
-        "THRU HUB AND SHANK WALL AFTER PRESSING",
-        f"HOLE SIZE AND LOCATION PER {HUB_NUMBER}",
-    )
-)
+# Under the flat: 3.5 − 1.95 = 1.55 nominal; 3.485 − 1.965 = 1.52 at the
+# worst case, under the 2.0 target (the Named exceptions row): it is judged
+# against the 1.5 floor and printed as a MIN, floored at two places.
+FLAT_WALL = FLAT_TO_AXIS - BORE_DIA / 2.0
+FLAT_WALL_WORST = round(FLAT_TO_AXIS + FLAT_TO_AXIS_BAND[1] - _BORE_MAX / 2.0, 6)
+FLAT_WALL_PRINTED = math.floor(FLAT_WALL_WORST * 100.0) / 100.0  # 1.52
+if FLAT_WALL_WORST < WALL_FLOOR:
+    raise AssertionError(f"the D-flat wall {FLAT_WALL_WORST:.3f} is under the floor")
 
 # One roughness, on the one running surface: the bore.
 SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = (
@@ -367,40 +306,43 @@ SURFACE_FINISHES: tuple[SurfaceFinishControl, ...] = (
 )
 
 # --- Marked-dimension contract -------------------------------------------------
-# ``GearBlank`` is the tooth blank's extrude (its depth is the gear-face
-# station).  ``SleeveProfile`` is the Right-plane revolve of the spigot and
-# shank, with construction-only witnesses for the tooth tip, the root and the
-# bore, so every turned diameter prints beside its axial extent on the
-# longitudinal section (rules 2 and 7), and for the cutter's full-depth
-# station and run-out limit (R9-67).  Lengths are baselined from the rear
-# face.
+# ``GearBlank`` is the tooth blank's extrude (its depth is the tooth length).
+# ``SleeveProfile`` is the Right-plane revolve of the boss, with
+# construction-only witnesses for the tooth tip, the root and the bore, so
+# every turned diameter prints beside its axial extent on the longitudinal
+# section (rules 2 and 7), and for the cutter's full-depth station, its
+# run-out limit (R9-67).  Lengths are baselined from the rear face.
+# ``FlatProfile`` is the flat's cut sketch on the Right plane (the section
+# plane): the flat from the axis and its end wall from the rear face print on
+# the section, where the flat shows edge-on.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "GearBlank": {"FaceWidth"},
     "SleeveProfile": {
         "OutsideDia",
         "RootDia",
         "BoreDia",
-        "SpigotDia",
-        "ShankDia",
-        "SpigotFront",
+        "BossDia",
         "OverallLength",
         "FullDepth",
         "CutterRunout",
     },
+    "FlatProfile": {"FlatToAxis", "FlatEnd"},
 }
 
 DRAWING_PRECISION: dict[str, dict[str, int]] = {
-    "GearBlank": {"FaceWidth": STATION_PLACES},
+    "GearBlank": {"FaceWidth": FACE_WIDTH_PLACES},
     "SleeveProfile": {
         "OutsideDia": 3,
         "RootDia": ROOT_DIA_PLACES,
         "BoreDia": BORE_PLACES,
-        "SpigotDia": DIA_PLACES,
-        "ShankDia": DIA_PLACES,
-        "SpigotFront": STATION_PLACES,
+        "BossDia": BOSS_DIA_PLACES,
         "OverallLength": STATION_PLACES,
         "FullDepth": FULL_DEPTH_PLACES,
         "CutterRunout": CUTTER_RUNOUT_PLACES,
+    },
+    "FlatProfile": {
+        "FlatToAxis": FLAT_TO_AXIS_PLACES,
+        "FlatEnd": STATION_PLACES,
     },
 }
 DRAWING_PRECISION_BY_NAME: dict[str, int] = {
@@ -417,8 +359,8 @@ for _feature, _dimensions in DRAWING_PRECISION.items():
 # The bands the build applies, by dimension (``(lower, upper)`` deviations).
 STATION_DEVIATIONS = (-STATION_TOL, STATION_TOL)
 BORE_DEVIATIONS = deviations(BORE_DIA_BAND)
-SPIGOT_DIA_DEVIATIONS = deviations(SPIGOT_DIA_BAND)
-SHANK_DIA_DEVIATIONS = deviations(SHANK_DIA_BAND)
+BOSS_DIA_DEVIATIONS = deviations(BOSS_DIA_BAND)
+FLAT_TO_AXIS_DEVIATIONS = deviations(FLAT_TO_AXIS_BAND)
 OUTSIDE_DIA_DEVIATIONS = deviations(OUTSIDE_DIA_BAND)
 # swTolMIN records the floor as its lower deviation from the model nominal.
 ROOT_DIA_DEVIATIONS = (ROOT_DIA_MIN - ROOT_DIA, 0.0)
@@ -444,6 +386,9 @@ GEAR_DATA = gear_data_note(
     ]
 )
 
-# The title block's 0.25 edge break is 14% of this fine tooth's whole depth.
+# The title block's 0.25 edge break is 14% of this fine tooth's whole depth,
+# and the tooth ends seat the hub's spigot.
 TOOTH_EDGE_NOTE = "DO NOT BREAK OR CHAMFER EDGES ON TOOTH FLANKS, TIPS OR ROOTS."
-DRAWING_NOTES = "\n".join((TOOTH_EDGE_NOTE, CUTTER_NOTE))
+# Named exception: MHA-110 flat wall (drawing-simplicity-policy.md, "Named exceptions").
+FLAT_WALL_NOTE = f"D-FLAT WALL TO BORE {FLAT_WALL_PRINTED:.2f} MIN."
+DRAWING_NOTES = "\n".join((TOOTH_EDGE_NOTE, CUTTER_NOTE, FLAT_WALL_NOTE))

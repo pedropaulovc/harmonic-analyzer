@@ -7,7 +7,7 @@ gives PD 80.21 / OD 81.55, and the measured rack/disc pitch ratio ~1.27
 matches 2.660/2.101). It does NOT touch the rack (the old 96T DP30
 "rack-pinion" role is REFUTED -- paper-drive rework E7/E8): it is the fixed
 reduction wheel, driven 12:120 by the knob shaft's 12T DP38, slipped on the
-pinion sleeve's Ø10 spigot and screwed to the brass hub's flange (MHA-159)
+pinion sleeve's Ø9 boss and screwed to the brass hub's flange (MHA-159)
 by three #0-80 fillister screws (MHA-161).
 
 Every size is ``rack_pinion_spec``'s; the screw pattern is
@@ -19,7 +19,7 @@ the disc's FRONT face (z = 0, the flange seat), the body runs z = 0..3 and
 
 Features: ``GearBlank`` / ``GearBlankProfile`` (the toothed disc's blank,
 renamed so its depth prints as ``FaceWidth``), the tooth gap + pattern,
-``BoreProfile`` / ``Bore`` (Ø10 through) and ``DiscTaps`` (native Hole
+``BoreProfile`` / ``Bore`` (Ø9 through) and ``DiscTaps`` (native Hole
 Wizard #0-80 taps through, placed from the rear face on the bolt circle; no
 countersink, each mouth's 0.10 burr break is not modelled, R9-63).
 
@@ -237,7 +237,7 @@ async def build(adapter) -> dict[str, str]:
         f" tap to bore wall {TAP_TO_BORE_WALL_WORST:.2f} worst"
     )
 
-    # The bore's reamed slip band on the sleeve spigot is the one model band;
+    # The bore's reamed slip band on the sleeve boss is the one model band;
     # the other printed places (and so the general-tolerance row each
     # dimension claims) are authored on the model.
     set_dimension_bilateral_tolerance(

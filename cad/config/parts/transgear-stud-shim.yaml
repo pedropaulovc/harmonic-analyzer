@@ -1,9 +1,0 @@
-transgear-stud-shim:
-  title: Transgear Stud Shim
-  number: MHA-178
-  material: 12L14 cold-finished steel bar
-  material_specification: 12L14 or 1215 cold-finished steel bar, 1/2 in
-  finish: bright turned, oiled
-  quantity: 1
-  tolerance_class: machined_block
-  process: "turned from bar (steel): drill the bore, face both faces; one face faced to fit at assembly"

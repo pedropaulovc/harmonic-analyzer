@@ -6,7 +6,7 @@ from _surface_finish import MACHINED_UM, SurfaceFinishControl
 
 # R9-64: the guide screws' front receivers are #4-40 tapped THROUGH the rail,
 # as R9-48 made the rear row. A blind tap cannot hold full thread to the
-# screw's 5.27 reach and keep a bottoming tap's lead above the drill bottom
+# screw's 5.42 reach and keep a bottoming tap's lead above the drill bottom
 # without the drill point breaking through a faced lock seat, so the hole has
 # no thread or drill depth to stack. The tips stop inside the rail
 # (build_platen_guide asserts the reach).

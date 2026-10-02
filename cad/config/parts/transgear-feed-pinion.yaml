@@ -6,4 +6,4 @@ transgear-feed-pinion:
   quantity: 1
   tolerance_class: machined_block
   fit_class: gear_mesh
-  process: "turned; gear cutting (hob/shaper)"
+  process: "turned; gear cutting (hob/shaper); flat milled"

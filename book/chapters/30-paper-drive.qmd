@@ -23,7 +23,8 @@ The crank also drives the paper sideways, through a reduction, a chain, and a ra
 | `rack-pinion` | TODO | TODO | TODO |
 | `transgear-feed-pinion` | TODO | TODO | TODO |
 | `transgear-disc-hub` | TODO | TODO | TODO |
-| `transgear-hub-cap` | TODO | TODO | TODO |
+| `transgear-rear-bushing` | TODO | TODO | TODO |
+| `transgear-front-bushing` | TODO | TODO | TODO |
 | `transgear-knob-shaft` | TODO | TODO | TODO |
 | `transgear-drive-collar` | TODO | TODO | TODO |
 | `transgear-thumbnut` | TODO | TODO | TODO |
@@ -35,7 +36,7 @@ The crank also drives the paper sideways, through a reduction, a chain, and a ra
 | `latch-hook-bracket` | TODO | TODO | TODO |
 | `latch-hook` | TODO | TODO | TODO |
 | `transgear-removable` | TODO | TODO | TODO |
-| `transgear-stub` | TODO | TODO | TODO |
+| `transgear-pin` | TODO | TODO | TODO |
 | `chain-sprocket` | TODO | TODO | TODO |
 | `chain-inner-link` | TODO | TODO | TODO |
 | `chain-outer-link` | TODO | TODO | TODO |

@@ -139,7 +139,9 @@ def test_both_fit_ups_are_one_line_a06_steps_in_order() -> None:
     seq = steps.SEQUENCE
     assert seq.index("lock-seats-faced") == seq.index("guide-locks-set") + 1
     assert (
-        seq.index("disc-taps-transferred")
+        seq.index("disc-cluster-assembled")
+        < seq.index("hub-faced-to-nose")
+        < seq.index("disc-taps-transferred")
         < seq.index("disc-screws-cut")
         < seq.index("disc-cluster-hung")
     )

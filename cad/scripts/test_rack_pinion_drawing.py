@@ -116,32 +116,43 @@ def test_tap_to_bore_wall_meets_the_target_worst_case() -> None:
     assert spec.TAP_TO_BORE_WALL_WORST < spec.TAP_TO_BORE_WALL
 
 
-def test_the_bore_slips_on_the_sleeve_spigot_at_every_limit() -> None:
-    """The bands the two builds apply (the disc's bore, the MHA-110 sleeve's
-    spigot) leave clearance at the tightest corner: the smallest bore over
-    the largest spigot, and the fit note quotes the same clearance."""
-    import build_transgear_feed_pinion as sleeve_part
-    import transgear_feed_pinion_spec as sleeve
+def test_the_bore_pilots_on_the_hub_spigot_at_every_limit() -> None:
+    """The bands the two builds apply (the disc's H7 bore, the MHA-159 hub's
+    h6 spigot) never bind: at the tightest corner, the smallest bore over the
+    largest spigot, they meet line on line, and the fit note quotes the
+    clearance the limits give."""
+    import build_transgear_disc_hub as hub_part
+    import transgear_disc_hub_spec as hub
 
     assert (
-        model_toleranced_dimensions(sleeve_part)[("SleeveProfile", "SpigotDia")]
+        model_toleranced_dimensions(hub_part)[("HubProfile", "SpigotDia")]
         == "*SPIGOT_DIA_DEVIATIONS"
     )
+    assert spec.BORE_DIA == hub.SPIGOT_DIA
     bore_lower, bore_upper = spec.BORE_DEVIATIONS
-    spigot_lower, spigot_upper = sleeve.SPIGOT_DIA_DEVIATIONS
-    least = (spec.BORE_DIA + bore_lower) - (sleeve.SPIGOT_DIA + spigot_upper)
-    greatest = (spec.BORE_DIA + bore_upper) - (sleeve.SPIGOT_DIA + spigot_lower)
-    assert least > 0.0
+    spigot_lower, spigot_upper = hub.SPIGOT_DIA_DEVIATIONS
+    least = (spec.BORE_DIA + bore_lower) - (hub.SPIGOT_DIA + spigot_upper)
+    greatest = (spec.BORE_DIA + bore_upper) - (hub.SPIGOT_DIA + spigot_lower)
+    assert least >= -1e-9
     assert (least, greatest) == pytest.approx(spec.SPIGOT_DIAMETRAL_CLEARANCE)
     # The disc's float on the spigot feeds the transferred taps' wall.
     assert spec.DISC_OFFSET_MAX == pytest.approx(greatest / 2.0)
     note = spec.BORE_FIT_CALLOUT
-    assert f"MATE SLEEVE {sleeve.SLEEVE_NUMBER}" in note
+    assert "MATE HUB MHA-159 SPIGOT" in note
     assert f"(DIA CLR {least:.3f}-{greatest:.3f} mm)" in note
-    assert f"\N{DIAMETER SIGN}{sleeve.SPIGOT_DIA:.3f} +{spigot_upper:.3f}/" in note
+    assert f"\N{DIAMETER SIGN}{hub.SPIGOT_DIA:.3f} +{spigot_upper:.3f}/" in note
     assert all(len(line) <= 70 for line in note.splitlines())
     for banned in ("EXCEPTION", "ACCEPTED", "RULING", "POLICY", "BOOK FIDELITY"):
         assert banned not in note.upper()
+
+
+def test_the_bore_front_chamfer_clears_the_spigot_corner() -> None:
+    """The flange clamps the front face only if the bore's front chamfer
+    reaches past the hub's spigot-to-flange corner radius."""
+    import transgear_disc_hub_spec as hub
+
+    assert spec.BORE_FRONT_CHAMFER_LIMITS[0] >= hub.CORNER_RADIUS_MAX
+    assert spec.BORE_FRONT_CHAMFER_NOTE in spec.DRAWING_NOTES.splitlines()
 
 
 def test_thickness_band_is_the_printed_xxx_band() -> None:
@@ -268,8 +279,8 @@ def test_bore_finish_symbol_stands_clear_of_the_edge_view_thickness() -> None:
 def test_mesh_geometry_is_unchanged() -> None:
     assert (part.TEETH, part.DP, part.FACE_WIDTH) == (120, 38.0, 3.0)
     assert spec.CENTRE_DISTANCE == 44.766
-    assert part.BORE_DIAMETER == spec.BORE_DIA == 10.0
-    assert drawing.DIMENSION_CALLOUTS == {"BoreDia": "THRU - REAM"}
+    assert part.BORE_DIAMETER == spec.BORE_DIA == 13.1
+    assert drawing.DIMENSION_CALLOUTS == {"BoreDia": spec.BORE_CALLOUT}
 
 
 def test_part_config_properties() -> None:

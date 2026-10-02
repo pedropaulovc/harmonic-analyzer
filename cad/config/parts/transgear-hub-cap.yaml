@@ -1,9 +1,0 @@
-transgear-hub-cap:
-  title: Transgear Hub Cap
-  number: MHA-160
-  material: Brass
-  material_specification: C36000 free-machining brass
-  finish: bright machined, oiled
-  quantity: 1
-  tolerance_class: machined_block
-  process: "turned from bar (brass): face both ends, chamfer the front edge, tap #6-32 through, countersink the front, mill two wrench flats"

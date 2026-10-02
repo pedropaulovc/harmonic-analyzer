@@ -125,7 +125,7 @@ from solidworks_mcp.adapters.pywin32_adapter import (  # noqa: E402
     null_callout,
 )
 
-SOURCE_PART = CAD_ROOT / "out" / "sldprt" / "transgear-stub.SLDPRT"
+SOURCE_PART = CAD_ROOT / "out" / "sldprt" / "transgear-pin.SLDPRT"
 
 # The official Get_and_Set_Datum examples (C#/VB.NET/VBA — all three) set this
 # before InsertDatum; the wedged probe_dimxpert_gtol run did not.  Meters.
@@ -401,7 +401,7 @@ async def main() -> int:
     if not SOURCE_PART.is_file():
         raise FileNotFoundError(
             f"build a part first -- {SOURCE_PART} is missing "
-            "(uv run python -m doit part:transgear_stub)"
+            "(uv run python -m doit part:transgear_pin)"
         )
 
     async with _telemetry.aspan(f"probe.dimxpert_authoring.{stage}"):

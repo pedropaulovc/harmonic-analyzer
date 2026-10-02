@@ -280,16 +280,16 @@ def test_cross_numbered_fit_pairs_use_fixed_runtime_oracles() -> None:
         assert paper_drive[pair] == pytest.approx(42.217366426182714)
 
     guide_receivers_and_limits = {
-        5: (1, 13.56562270743475),
-        6: (2, 13.56562270743475),
-        7: (1, 13.56562270743475),
-        8: (2, 13.56562270743475),
-        9: (1, 13.56562270743475),
-        10: (2, 13.56562270743475),
-        11: (1, 13.56562270743475),
-        12: (2, 13.56562270743475),
-        13: (1, 13.56562270743475),
-        14: (2, 13.56562270743475),
+        5: (1, 13.951902256034774),
+        6: (2, 13.951902256034774),
+        7: (1, 13.951902256034774),
+        8: (2, 13.951902256034774),
+        9: (1, 13.951902256034774),
+        10: (2, 13.951902256034774),
+        11: (1, 13.951902256034774),
+        12: (2, 13.951902256034774),
+        13: (1, 13.951902256034774),
+        14: (2, 13.951902256034774),
     }
     for screw_number, (guide_number, limit) in guide_receivers_and_limits.items():
         pair = frozenset(
@@ -473,7 +473,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 "platen",
                 2.8448,
                 2.261,
-                4.0,
+                4.5,
             ),
             **_expected_numbered_pairs(
                 "fillister-screw",
@@ -481,7 +481,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 "platen-guide",
                 2.8448,
                 2.261,
-                5.2678,
+                5.4178,
             ),
             **_expected_numbered_pairs(
                 "fillister-screw",
@@ -489,7 +489,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 "platen-guide",
                 2.8448,
                 2.261,
-                5.2678,
+                5.4178,
                 second_number=2,
             ),
             **_expected_numbered_pairs(
@@ -510,7 +510,7 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 second_number=2,
             ),
             # Round 10 transgear: stock #8-32 / #4-40 / #0-80 screws, the
-            # MHA-082 stud's #10-32 and #6-32, and the MHA-126 1/4-20 nut.
+            # MHA-179 pin's press in the arm, and the MHA-126 1/4-20 nut.
             **_expected_numbered_pairs(
                 "transgear-arm-plate-screw",
                 range(1, 3),
@@ -530,13 +530,8 @@ def test_drive_train_interference_contracts_use_fixed_runtime_oracles() -> None:
                 2.261,
                 8.025,
             ),
-            frozenset(("transgear-stub-1", "transgear-arm-1")): _annulus_limit(
-                4.826, 4.0386, 7.9375
-            ),
-            # R9-66: the 6.00 cap less the stud's 1.1 relief (a literal oracle,
-            # independent of the row under test).
-            frozenset(("transgear-hub-cap-1", "transgear-stub-1")): _annulus_limit(
-                3.505, 2.705, 4.9
+            frozenset(("transgear-pin-1", "transgear-arm-1")): _annulus_limit(
+                3.9, 3.874, 7.9375
             ),
             **_expected_numbered_pairs(
                 "transgear-disc-screw",

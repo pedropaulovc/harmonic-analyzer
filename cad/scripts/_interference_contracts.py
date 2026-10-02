@@ -51,11 +51,6 @@ from transgear_removable_spec import DRIVE_PIN_DIA as _SEAT_PIN_DIA
 from transgear_removable_spec import DRIVE_PIN_HOLE_DIA as _SEAT_PIN_HOLE_DIA
 from crank_seat_drive_pin_spec import PRESS_DEPTH as _CRANK_SEAT_PIN_DEPTH
 from transgear_knob_drive_pin_spec import PRESS_DEPTH as _KNOB_SEAT_PIN_DEPTH
-from transgear_hub_cap_spec import CAP_LENGTH as _HUB_CAP_LENGTH
-from transgear_hub_cap_spec import TAP_DRILL_DIA as _HUB_CAP_TAP_DRILL
-from transgear_stub_spec import FRONT_THREAD_END as _STUD_FRONT_THREAD_END
-from transgear_stub_spec import FRONT_THREAD_MAJOR as _STUD_FRONT_MAJOR
-from transgear_stub_spec import RELIEF_WIDTH as _STUD_RELIEF_WIDTH
 
 
 def _smooth_annulus_limit_mm3(
@@ -349,20 +344,21 @@ _CROSS_PIN_CORE_MM3 = _cross_pin_overlap_mm3(
 # Pattern instances are numbered by seed creation while the two backs and
 # guides are numbered by insertion order, so their suffixes cross or interleave.
 #
-# The transgear rows (CONTRACT-paper-drive round 10): every stock screw and
-# the MHA-082 stud carry their thread at the basic major, and every receiving
-# tap is cut at its tap drill, so each bound is the smooth annulus over the
-# span where the major body lies inside the receiver.  Sizes and spans are
+# The transgear rows (CONTRACT-paper-drive round 10, R9-68): every stock
+# screw carries its thread at the basic major, and every receiving tap is
+# cut at its tap drill, so each bound is the smooth annulus over the span
+# where the major body lies inside the receiver.  Sizes and spans are
 # literals, as the MHA-139 row above, so no assembly re-keys on a transgear
 # spec; test_paper_drive_interference_contracts pins each to its owner.
 # Pairs with NO row, modelled line to line or with clearance, which the gate
-# reads as contact: the MHA-159 hub's Ø8.2 bore on the sleeve's Ø8.2 shank,
-# the MHA-169 dowel in the arm's Ø3.175 ream, the stud journal in the sleeve
-# bore (Ø3.9), the disc bore on the spigot (Ø10), the knob journal in the
-# plate bore (Ø8.5), the collar bore on the core (Ø6.35), the MHA-175 rivets
-# (Ø1.5875) in the Ø1.65 hook and flap holes, the MHA-154 pin in the collar's
-# 1.8 slot, the MHA-155 dowels in the T24's Ø2.5 holes, and every screw in
-# its clearance hole.
+# reads as contact: the MHA-159 hub's D-bore on the sleeve's Ø9 boss and
+# D-flat, the MHA-169 dowel in the arm's Ø3.175 ream, the sleeve and both
+# bushings on the MHA-179 pin (Ø3.9), the MHA-182 ring in the pin's groove,
+# the disc bore on the boss (Ø9), the knob journal in the plate bore (Ø8.5),
+# the collar bore on the core (Ø6.35), the MHA-175 rivets (Ø1.5875) in the
+# Ø1.65 hook and flap holes, the MHA-154 pin in the collar's 1.8 slot, the
+# MHA-155 dowels in the T24's Ø2.5 holes, and every screw in its clearance
+# hole.
 _PAPER_DRIVE_ALLOWED_PAIRS = {
     **_numbered_pairs(
         "clamp-screw",
@@ -381,19 +377,19 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
         "fillister-screw",
         range(1, 5),
         "platen",
-        _smooth_annulus_limit_mm3(2.8448, 2.261, 4.0),
+        _smooth_annulus_limit_mm3(2.8448, 2.261, 4.5),
     ),
     **_numbered_pairs(
         "fillister-screw",
         range(5, 15, 2),
         "platen-guide",
-        _smooth_annulus_limit_mm3(2.8448, 2.261, 5.2678),
+        _smooth_annulus_limit_mm3(2.8448, 2.261, 5.4178),
     ),
     **_numbered_pairs(
         "fillister-screw",
         range(6, 15, 2),
         "platen-guide",
-        _smooth_annulus_limit_mm3(2.8448, 2.261, 5.2678),
+        _smooth_annulus_limit_mm3(2.8448, 2.261, 5.4178),
         second_number=2,
     ),
     # MHA-176 guide-lock screws (R9-31, R9-48): seeds -1/-2, then the grid
@@ -441,21 +437,10 @@ _PAPER_DRIVE_ALLOWED_PAIRS = {
         "support-bar",
         _smooth_annulus_limit_mm3(2.8448, 2.261, 9.525 - 1.5),
     ),
-    # MHA-082's rear #10-32 (transgear_stub_spec), a plain 4.826 cylinder
-    # 12.3 long from its seat on the MHA-178 shim (R9-65: the run-out groove
-    # stands inside the shim, whose Ø5.1 bore clears the thread), fills the
-    # arm's #21 through tap over the whole 7.9375 stock (the taps' mouth
-    # breaks only shrink it).
-    frozenset(("transgear-stub-1", "transgear-arm-1")): _smooth_annulus_limit_mm3(
-        4.826, 4.0386, 7.9375
-    ),
-    # MHA-160 (transgear_hub_cap_spec, #36 tapped through) seated on the
-    # stud's journal shoulder: the stud's #6-32 major cylinder starts past
-    # its relief and runs to the cap's front face (6.0 - 1.1 = 4.9).
-    frozenset(("transgear-hub-cap-1", "transgear-stub-1")): _smooth_annulus_limit_mm3(
-        _STUD_FRONT_MAJOR,
-        _HUB_CAP_TAP_DRILL,
-        min(_HUB_CAP_LENGTH, _STUD_FRONT_THREAD_END) - _STUD_RELIEF_WIDTH,
+    # MHA-179 (transgear_pin_spec, Ø3.900) pressed through the arm's Ø3.874
+    # ream (transgear_arm_geometry) over the whole 7.9375 stock: the press.
+    frozenset(("transgear-pin-1", "transgear-arm-1")): _smooth_annulus_limit_mm3(
+        3.9, 3.874, 7.9375
     ),
     # MHA-161 #0-80 x 1/4 (transgear_disc_screw_spec) through the hub
     # flange's Ø1.7 clearance into the disc's 3/64 taps (rack_pinion_spec),

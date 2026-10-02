@@ -13,11 +13,14 @@ tangent edge; +Z through the thickness to the REAR face (z = THICKNESS).
 
 from __future__ import annotations
 
+import transgear_pin_spec as PIN
 from transgear_arm_geometry import (
     BAND_X,
     BAND_XX,
     BAND_XXX,
     HOLE_POSITION_BAND,
+    PIN_BORE_DIA_MAX,
+    PIN_BORE_DIA_MIN,
     PIN_HOLE_DEPTH_BAND,
     PIVOT_BORE_DIA_BAND,
     PIVOT_END_R,
@@ -40,11 +43,11 @@ BAND_BY_PLACES: dict[int, float] = {1: BAND_X, 2: BAND_XX, 3: BAND_XXX}
 # strip, see ``transgear_arm_geometry.TIP_STATION``); the thickness is the
 # ground stock's, printed to two places as a reference (the stock band
 # governs it, ``STOCK_TEXT_PREFIX``); the pivot bore is a .XXX fit; the
-# latch-pin hole prints .XXX under its explicit ream band; the hole stations
-# and the pin height are .XXX positions under the explicit
-# ±HOLE_POSITION_BAND; the spot face prints its explicit bands; the pin-hole
-# depth is .XX, the band the pin's grip and proud range are judged at
-# (``PIN_HOLE_DEPTH_BAND``).
+# latch-pin hole and the pin bore print .XXX under their explicit ream
+# bands; the hole stations and the pin height are .XXX positions under the
+# explicit ±HOLE_POSITION_BAND; the spot face prints its explicit bands; the
+# pin-hole depth is .XX, the band the pin's grip and proud range are judged
+# at (``PIN_HOLE_DEPTH_BAND``).
 OUTLINE_PLACES = 1
 TIP_STATION_PLACES = 2
 THICKNESS_PLACES = 2
@@ -53,6 +56,7 @@ SPOT_FACE_DIA_PLACES = 3
 SPOT_FACE_FLOOR_PLACES = 2
 STATION_PLACES = 3
 PIN_HOLE_DIA_PLACES = 3
+PIN_BORE_DIA_PLACES = 3
 PIN_HOLE_DEPTH_PLACES = 2
 
 # The places must claim the bands the geometry module's walls and the
@@ -73,7 +77,7 @@ for _label, _places, _band in (
 SPOT_FACE_DIA_BAND = (SPOT_FACE_DIA_GROWTH, 0.0)
 # Floor from the FRONT face: the pivot head's end play (contract §13).
 SPOT_FACE_FLOOR_TOLERANCE = SPOT_FACE_FLOOR_BAND
-# Stud, plate-tap and latch-pin positions (contract §12 row 457).
+# Pin, plate-tap and latch-pin positions (contract §12 row 457).
 HOLE_POSITION_TOLERANCE = HOLE_POSITION_BAND
 
 # --- Printed text -------------------------------------------------------------
@@ -90,6 +94,27 @@ SPOT_FACE_CALLOUT = "COUNTERBORE, REAR FACE"
 FLOOR_DEPTH_CALLOUT = "FLOOR FROM\nFRONT FACE"
 # The bore runs on the MHA-168 shoulder: a fit bore, so it is reamed.
 PIVOT_BORE_CALLOUT = "REAM THRU"
+
+# --- The MHA-179 pin's press in the reamed bore at S (R9-68) -----------------
+# This module imports both the arm geometry and the pin spec (the pin spec
+# imports the geometry, so the geometry cannot import it back).
+PIN_PRESS_INTERFERENCE = (
+    round(PIN.DIA_MIN - PIN_BORE_DIA_MAX, 6),
+    round(PIN.DIA_MAX - PIN_BORE_DIA_MIN, 6),
+)
+if PIN_PRESS_INTERFERENCE != (0.010, 0.026):
+    raise AssertionError(
+        f"MHA-164 pin bore press on MHA-179 is {PIN_PRESS_INTERFERENCE}, "
+        "not 0.010..0.026"
+    )
+# Three short lines under the Ø: the operation, the mating pin, the press.
+PIN_BORE_CALLOUT = "\n".join(
+    (
+        "REAM THRU",
+        f"PRESS FIT PIN {PIN.PIN_NUMBER}",
+        f"{PIN_PRESS_INTERFERENCE[0]:.3f}/{PIN_PRESS_INTERFERENCE[1]:.3f} INTERFERENCE",
+    )
+)
 
 
 def engagement_line(worst_mm: float, worst_d: float) -> str:
@@ -117,13 +142,14 @@ ISOMETRIC_VIEW_NOTE = f"ISOMETRIC VIEW SCALE {ISO_VIEW_SCALE[0]}:{ISO_VIEW_SCALE
 # Marked model dimensions and the places the model authors on them
 # (drawing-simplicity policy rule 2).  The hole stations live in the blanked
 # ``StationReference`` sketch: the Hole Wizard placement sketches that drive
-# the taps are not importable.
+# the taps are not importable, and the pin bore's station prints with them.
 DRAWING_DIMENSIONS: dict[str, set[str]] = {
     "ArmOutline": {"PivotEndR", "TipStation", "EndWidth"},
     "Arm": {"Depth"},
     "PivotBoreProfile": {"PivotBoreDia"},
+    "PinBoreProfile": {"PinBoreDia"},
     "SpotFaceProfile": {"SpotFaceDia", "FloorDepth"},
-    "StationReference": {"StudStation", "PlateTapStation1", "PlateTapStation2"},
+    "StationReference": {"PinStation", "PlateTapStation1", "PlateTapStation2"},
     "PinHoleProfile": {"PinHoleDia", "PinHoleZ"},
     "PinHole": {"PinHoleDepth"},
 }
@@ -135,12 +161,13 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
     },
     "Arm": {"Depth": THICKNESS_PLACES},
     "PivotBoreProfile": {"PivotBoreDia": PIVOT_BORE_PLACES},
+    "PinBoreProfile": {"PinBoreDia": PIN_BORE_DIA_PLACES},
     "SpotFaceProfile": {
         "SpotFaceDia": SPOT_FACE_DIA_PLACES,
         "FloorDepth": SPOT_FACE_FLOOR_PLACES,
     },
     "StationReference": {
-        "StudStation": STATION_PLACES,
+        "PinStation": STATION_PLACES,
         "PlateTapStation1": STATION_PLACES,
         "PlateTapStation2": STATION_PLACES,
     },

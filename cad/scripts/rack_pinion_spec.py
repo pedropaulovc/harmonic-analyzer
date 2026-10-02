@@ -3,8 +3,12 @@ r"""MHA-070 rack-pinion: the 120T brass reducer disc of the translational gearin
 PURE DATA, no SolidWorks/COM calls and no ``build_*`` import.  The disc is
 driven 12:120 by the knob shaft's 12T DP38 and screwed to the brass hub's
 flange (MHA-159, ``transgear_disc_hub_spec``) by three #0-80 fillister
-screws (MHA-161, McMaster 91794A055).  Its Ø10 bore slips on the pinion
-sleeve's spigot (contract §2.3 / §2.5).
+screws (MHA-161, McMaster 91794A055; the joint is
+``transgear_disc_hub_geometry``'s).  Its Ø13.1 H7 bore pilots on the hub's
+Ø13.1 h6 spigot, which passes it and seats on the pinion sleeve's (MHA-110)
+step face; its front face, clamped by the hub's flange, stands the spigot's
+length ahead of that step, and its rear face stands in air ahead of the
+sleeve's 12T, radially clear of its tips (R9-68).
 
 Part frame: gear axis = Z through the origin; the Front plane (z = 0) is the
 disc's FRONT face, the one the hub flange's rear face seats on; the body runs
@@ -12,8 +16,9 @@ z = 0..FACE_WIDTH, so local +Z is machine rearward.  The screw pattern's 0°
 is local +X, counter-clockwise seen from +Z (``transgear_disc_hub_geometry``).
 
 The #0-80 taps are TRANSFERRED at assembly (ruling R9-9): with the disc on
-the spigot and the hub pressed on, each tap is spotted through its MHA-159
-flange hole, then drilled and tapped, and disc and flange are match-marked.
+the hub's spigot and the hub seated on the sleeve's step, each tap is spotted
+through its MHA-159 flange hole, then drilled and tapped, and disc and
+flange are match-marked.
 The model places the taps on the flange's bolt circle (the one authority);
 the sheet prints the tap, its mouth breaks and the transfer, never the
 bolt-circle position.
@@ -21,7 +26,7 @@ bolt-circle position.
 
 from __future__ import annotations
 
-from _fit_limits import REAM_SLIDE, SHAFT_H, deviations
+from _fit_limits import deviations
 from _gtol_spec import CylinderFace
 from _hole_spec import THREAD_MAJOR_MM, HoleSpec, blind_cut_dia_mm
 from _printed_tolerance import printed_band_mm
@@ -31,10 +36,13 @@ from transgear_disc_hub_geometry import (
     BOLT_CIRCLE_DIA,
     BOLT_CIRCLE_POSITION_TOL,
     SCREW_COUNT,
+    SCREW_HOLE_DIA,
+    SCREW_SKU,
     SCREW_THREAD,
+    SPIGOT_DIA,
+    SPIGOT_DIA_BAND,
     screw_centres,
 )
-from transgear_disc_hub_spec import SCREW_HOLE_DIA, SCREW_SKU
 
 MM_PER_IN = 25.4
 
@@ -62,11 +70,12 @@ FACE_WIDTH = 3.0
 # Printed .XXX, functional (R9-5): the hub may never stand proud of the
 # sleeve nose, and that stack reads the disc thickness.
 FACE_WIDTH_PLACES = 3
-BORE_DIA = 10.0
-# Slips on the pinion sleeve's Ø10 spigot (MHA-110).  The .XXX rows would let
-# a Ø9.870 bore meet a Ø10.130 spigot, so the bore is reamed to the fleet's
-# REAM_SLIDE band over the spigot's SHAFT_H band: guaranteed slip clearance.
-BORE_BAND = REAM_SLIDE  # (upper, lower) deviations
+BORE_DIA = SPIGOT_DIA  # 13.1
+# Pilots on the hub's spigot (MHA-159, transgear_disc_hub_geometry): one ISO
+# fit, the bore reamed H7 at 10-18 mm over the spigot's h6, a locational
+# clearance that assembles by hand, so the disc never binds and sits at most
+# 0.0145 off the hub's axis while its taps are spotted.
+BORE_BAND = (0.018, 0.0)  # (upper, lower) deviations, H7
 BORE_DEVIATIONS = deviations(BORE_BAND)
 BORE_PLACES = 3
 
@@ -76,25 +85,31 @@ FACE_WIDTH_MAX = FACE_WIDTH + _BAND[FACE_WIDTH_PLACES]
 BORE_DIA_MIN = BORE_DIA + BORE_BAND[1]
 BORE_DIA_MAX = BORE_DIA + BORE_BAND[0]
 
-# The sleeve's spigot (MHA-110), turned to the SHAFT_H band the sleeve's model
-# carries (transgear_feed_pinion_spec reads it here).  Its limits and the
-# bore's give the slip clearance and bound how far the disc can sit off the
-# sleeve axis while the taps are spotted through the flange.
-SLEEVE_NUMBER = "MHA-110"
-SPIGOT_DIA = 10.0
-SPIGOT_DIA_BAND = SHAFT_H  # (upper, lower) deviations
+# The hub's spigot, turned to the h6 band the hub's model carries.  Its
+# limits and the bore's give the locating clearance and bound how far the
+# disc can sit off the hub's axis while the taps are spotted through the
+# flange.
 SPIGOT_DIA_MIN = SPIGOT_DIA + SPIGOT_DIA_BAND[1]
 SPIGOT_DIA_MAX = SPIGOT_DIA + SPIGOT_DIA_BAND[0]
-# (least, greatest) diametral clearance: 0.010 .. 0.045.
+# (least, greatest) diametral clearance: 0.000 .. 0.029.
 SPIGOT_DIAMETRAL_CLEARANCE = (
     round(BORE_DIA_MIN - SPIGOT_DIA_MAX, 3),
     round(BORE_DIA_MAX - SPIGOT_DIA_MIN, 3),
 )
-if SPIGOT_DIAMETRAL_CLEARANCE[0] <= 0.0:
+if SPIGOT_DIAMETRAL_CLEARANCE[0] < 0.0:
     raise AssertionError(
-        f"MHA-070 bore binds on the MHA-110 spigot: {SPIGOT_DIAMETRAL_CLEARANCE}"
+        f"MHA-070 bore binds on the MHA-159 spigot: {SPIGOT_DIAMETRAL_CLEARANCE}"
     )
 DISC_OFFSET_MAX = SPIGOT_DIAMETRAL_CLEARANCE[1] / 2.0
+# The rear face stands in air (the hub's flange locates the front face), so
+# the bore's rear edge takes the title block's break.  The front edge is
+# chamfered past the spigot-to-flange corner's R0.1 so the front face seats
+# on the flange (transgear_disc_hub_spec checks the pair).
+BORE_FRONT_CHAMFER_LIMITS = (0.15, 0.25)  # 45 deg
+BORE_FRONT_CHAMFER_NOTE = (
+    f"BORE FRONT EDGE CHAMFER {BORE_FRONT_CHAMFER_LIMITS[0]:.2f}-"
+    f"{BORE_FRONT_CHAMFER_LIMITS[1]:.2f} X 45\u00b0."
+)
 
 # --- screw (MHA-161) -------------------------------------------------------------
 SCREW_MAJOR_DIA, SCREW_LENGTH, _HEAD_H, _HEAD_DIA, SCREW_PITCH = FILLISTER_SIZES[
@@ -149,6 +164,7 @@ if TAP_TO_BORE_WALL_WORST < WALL_FLOOR - 1e-9:
 
 # --- sheet -------------------------------------------------------------------------
 HUB_NUMBER = "MHA-159"
+HUB_NAME = "HUB"
 # Lines appended under the native "#0-80 UNF-2B THRU" hole callout.
 TAP_CALLOUT_LINES = (
     f"BREAK EDGE {MOUTH_BREAK_MAX:.2f} MAX BOTH SIDES",
@@ -156,13 +172,14 @@ TAP_CALLOUT_LINES = (
     "THEN DRILL AND TAP; MATCH-MARK DISC AND FLANGE",
 )
 TAP_CALLOUT_QUALIFIER = "\n".join(TAP_CALLOUT_LINES)
-# Reamed: the bore carries the Ra 1.6 finish and slips on the spigot.  The
-# bore's native limits print with the dimension; the fit note names the mate.
+# Reamed: the bore carries the Ra 1.6 finish and pilots on the hub's spigot.
+# The bore's native limits print with the dimension; the fit note names the
+# mate.
 BORE_CALLOUT = "THRU - REAM"
 BORE_FIT_CALLOUT = "\n".join(
     (
         "BORE LIMITS GOVERN",
-        f"MATE SLEEVE {SLEEVE_NUMBER} SPIGOT",
+        f"MATE {HUB_NAME} {HUB_NUMBER} SPIGOT",
         f"(\N{DIAMETER SIGN}{SPIGOT_DIA:.3f} +{SPIGOT_DIA_BAND[0]:.3f}/"
         f"{SPIGOT_DIA_BAND[1]:.3f})",
         f"(DIA CLR {SPIGOT_DIAMETRAL_CLEARANCE[0]:.3f}-"
@@ -211,10 +228,19 @@ GEAR_DATA = gear_data_note(
 
 # The teeth are stated by the gear data block; the build appends the disc
 # screw's engagement line (transgear_disc_screw_spec imports this module).
-DRAWING_NOTES = "GEAR TEETH: CIRCULAR RUNOUT 0.05 MAX TO DATUM A AT THE TOOTH TIPS."
+DRAWING_NOTES = "\n".join(
+    (
+        "GEAR TEETH: CIRCULAR RUNOUT 0.05 MAX TO DATUM A AT THE TOOTH TIPS.",
+        BORE_FRONT_CHAMFER_NOTE,
+    )
+)
 
 
-# Manufacturing GD&T limits consumed by the part's drawing projection.
+# Manufacturing GD&T limits consumed by the part's drawing projection.  The
+# hub's flange clamps the front face (datum B), so the rear face, toward the
+# platen, is held parallel to it (the paper-drive assembly's platen air reads
+# it); the bore (datum A) carries the tooth-tip runout note.
 GEOMETRIC_TOLERANCES_MM: dict[str, str] = {
-    "disc face squareness to bore": "0.05",
+    "disc rear face parallelism to front": "0.05",
 }
+FRONT_FACE_DATUM = "B"

@@ -2,8 +2,9 @@ r"""Positive control for part-owned surface-finish PMI.
 
 The production migration must not assume that a surface-finish symbol authored
 on a ``.SLDPRT`` survives save/reopen or imports into a drawing.  This probe
-copies the already-built transgear stud, verifies its production-authored named
-Ra 1.6 symbol, then proves both behaviors without modifying released artefacts.
+copies the already-built transgear pin (MHA-179), verifies its
+production-authored named Ra 1.6 journal symbol, then proves both behaviors
+without modifying released artefacts.
 
 Run with a 3DEXPERIENCE-launched SolidWorks session already open::
 
@@ -25,11 +26,11 @@ import _watchdog  # noqa: E402
 from _common import CAD_ROOT, _early_bound, _read_member  # noqa: E402
 from _surface_finish import surface_finish_by_key  # noqa: E402
 from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter  # noqa: E402
-from transgear_stub_spec import SURFACE_FINISHES  # noqa: E402
+from transgear_pin_spec import SURFACE_FINISHES  # noqa: E402
 
-SOURCE = CAD_ROOT / "out" / "sldprt" / "transgear-stub.SLDPRT"
-SCRATCH_PRT = CAD_ROOT / "out" / "sldprt" / "transgear-stub-surface-pmi.SLDPRT"
-SCRATCH_DRW = CAD_ROOT / "out" / "slddrw" / "transgear-stub-surface-pmi.SLDDRW"
+SOURCE = CAD_ROOT / "out" / "sldprt" / "transgear-pin.SLDPRT"
+SCRATCH_PRT = CAD_ROOT / "out" / "sldprt" / "transgear-pin-surface-pmi.SLDPRT"
+SCRATCH_DRW = CAD_ROOT / "out" / "slddrw" / "transgear-pin-surface-pmi.SLDDRW"
 CONTROL = surface_finish_by_key(SURFACE_FINISHES, "journal")
 ANNOTATION_NAME = CONTROL.annotation_name
 ROUGHNESS = f"Ra {CONTROL.roughness_um:g}"

@@ -2,11 +2,12 @@ r"""Create the curated manufacturing drawing for the rack-pinion reduction disc 
 
 Follows the batch gear-drawing pattern (see ``draw_cylinder_gear``). Drawn 1:1;
 the 120T disc is large and thin.  The face view (``*Front``, the rear face)
-prints the bore with its reamed limits and the fit note naming the MHA-110
-spigot, and the native #0-80 tap callout with its mouth-break and
+prints the bore with its reamed limits and the fit note naming the MHA-159
+hub's spigot, and the native #0-80 tap callout with its mouth-break and
 assembly-transfer lines (no bolt-circle position: the taps are spotted
 through the MHA-159 flange at assembly); the edge view prints the disc
-thickness and the face squareness to datum A.
+thickness, the front (clamped) face as datum B and the rear face's
+parallelism to it.
 """
 
 from __future__ import annotations
@@ -20,6 +21,7 @@ import _telemetry
 from _common import CAD_ROOT, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    add_datum_feature,
     add_feature_control_frame,
     add_leader_note,
     add_native_hole_callout,
@@ -44,6 +46,7 @@ from rack_pinion_spec import (
     DRAWING_DIMENSIONS,
     DRAWING_PRECISION_BY_NAME,
     FACE_WIDTH,
+    FRONT_FACE_DATUM,
     GEOMETRIC_TOLERANCES_MM,
     OUTSIDE_DIA,
     TAP_CALLOUT_QUALIFIER,
@@ -80,12 +83,20 @@ BORE_FINISH_POSITION = (FRONT_CENTER[0] + 0.030, FRONT_CENTER[1] - 0.082)
 
 HALF_OD = OUTSIDE_DIA * VIEW_SCALE[0] / 2000.0
 FRONT_FACE_X = RIGHT_CENTER[0] - FACE_WIDTH * VIEW_SCALE[0] / 2000.0
+REAR_FACE_X = RIGHT_CENTER[0] + FACE_WIDTH * VIEW_SCALE[0] / 2000.0
+# Datum B tags the front face upper left of the edge view, in the lane the
+# face view leaves; the parallelism frame hangs lower right of it, under the
+# isometric, its leader on the rear face, so neither crosses the disc.
+DATUM_B_EDGE = (FRONT_FACE_X, RIGHT_CENTER[1] + HALF_OD * 0.55)
+DATUM_B_SYMBOL = (FRONT_FACE_X - 0.016, RIGHT_CENTER[1] + HALF_OD * 0.55)
+PARALLELISM_EDGE = (REAR_FACE_X, RIGHT_CENTER[1] - HALF_OD * 0.45)
+PARALLELISM_FRAME = (REAR_FACE_X + 0.012, RIGHT_CENTER[1] - HALF_OD * 0.45 - 0.012)
 
 FRONT_KEEP = {
     # Approach from upper-left, clear of native datum A below-left.
     "BoreDia": (FRONT_CENTER[0] - 0.062, FRONT_CENTER[1] + 0.038),
 }
-# Below the edge-on disc: the squareness frame stands above it.
+# Below the edge-on disc, clear of datum B above and the frame to the right.
 RIGHT_KEEP = {
     "FaceWidth": (RIGHT_CENTER[0], RIGHT_CENTER[1] - HALF_OD - 0.012),
 }
@@ -247,15 +258,25 @@ async def build(adapter: Any) -> dict[str, str]:
         shoulder=True,
         stability_tolerance_m=0.0001,
     )
+    # Datum B: a vertical edge with no neighbour inside the pick radius at
+    # this height (the rear face stands 3 mm off), so the hit-test form.
+    add_datum_feature(
+        adapter,
+        right,
+        edge_xy=DATUM_B_EDGE,
+        symbol_xy=DATUM_B_SYMBOL,
+        datum=FRONT_FACE_DATUM,
+        label="disc front (clamped) face",
+    )
     add_feature_control_frame(
         adapter,
         right,
-        edge_xy=(FRONT_FACE_X, RIGHT_CENTER[1] + HALF_OD * 0.55),
-        frame_xy=(FRONT_FACE_X - 0.034, RIGHT_CENTER[1] + HALF_OD + 0.010),
-        characteristic="perpendicularity",
-        tolerance=GEOMETRIC_TOLERANCES_MM["disc face squareness to bore"],
-        datums=("A",),
-        label="disc face squareness to bore",
+        edge_xy=PARALLELISM_EDGE,
+        frame_xy=PARALLELISM_FRAME,
+        characteristic="parallelism",
+        tolerance=GEOMETRIC_TOLERANCES_MM["disc rear face parallelism to front"],
+        datums=(FRONT_FACE_DATUM,),
+        label="disc rear face parallelism to front",
     )
     # Explicit entity selection supplies the insertion point. No post-insertion
     # endpoint setter: that setter drops the semantic association on this symbol.

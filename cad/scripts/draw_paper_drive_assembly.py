@@ -34,11 +34,11 @@ import platen_spec as platen
 import transgear_arm_geometry as arm_geometry
 import transgear_arm_plate_geometry as plate_geometry
 import transgear_arm_plate_screw_spec as plate_screw
+import transgear_cluster_fit as cluster_fit
 import transgear_disc_hub_geometry as hub_geometry
 import transgear_disc_hub_spec as hub
 import transgear_disc_screw_spec as disc_screw
 import transgear_drive_collar_spec as collar
-import transgear_feed_pinion_spec as sleeve
 import transgear_hanger_joints as joints
 import transgear_knob_drive_pin_spec as drive_pin
 import transgear_knob_retaining_screw_spec as retaining_screw
@@ -46,7 +46,6 @@ import transgear_knob_shaft_spec as knob_shaft
 import transgear_knob_thrust_ring_spec as thrust_ring
 import transgear_pivot_screw_spec as pivot_screw
 import transgear_removable_spec as sprocket
-import transgear_stub_spec as stub
 from _common import _early_bound, check, run_build
 from _paper_drive_explode import exploded_view_name
 from _drawing_common import (
@@ -240,11 +239,12 @@ BOM_PART_NUMBERS = {
     "latch-hook-bracket-screw": _config.parts("latch-hook-bracket-screw")["number"],
     "latch-hook": _config.parts("latch-hook")["number"],
     "latch-hook-rivet": _config.parts("latch-hook-rivet")["number"],
-    "transgear-stub": _config.parts("transgear-stub")["number"],
-    "transgear-stud-shim": _config.parts("transgear-stud-shim")["number"],
+    "transgear-pin": _config.parts("transgear-pin")["number"],
+    "transgear-rear-bushing": _config.parts("transgear-rear-bushing")["number"],
     "transgear-feed-pinion": _config.parts("transgear-feed-pinion")["number"],
     "transgear-disc-hub": _config.parts("transgear-disc-hub")["number"],
-    "transgear-hub-cap": _config.parts("transgear-hub-cap")["number"],
+    "transgear-front-bushing": _config.parts("transgear-front-bushing")["number"],
+    "transgear-retaining-ring": _config.parts("transgear-retaining-ring")["number"],
     "rack-pinion": _config.parts("rack-pinion")["number"],
     "transgear-disc-screw": _config.parts("transgear-disc-screw")["number"],
     "transgear-knob-shaft": _config.parts("transgear-knob-shaft")["number"],
@@ -273,6 +273,9 @@ _SKU = {
     ][0],
     "latch-hook-rivet": _config.parts("latch-hook-rivet")["supplier_skus"][0],
     "transgear-disc-screw": _config.parts("transgear-disc-screw")["supplier_skus"][0],
+    "transgear-retaining-ring": _config.parts("transgear-retaining-ring")[
+        "supplier_skus"
+    ][0],
     "transgear-collar-cross-pin": _config.parts("transgear-collar-cross-pin")[
         "supplier_skus"
     ][0],
@@ -319,11 +322,14 @@ BOM_DESCRIPTIONS = {
     ),
     "latch-hook": "LATCH HOOK",
     "latch-hook-rivet": f"DOMED SOLID RIVET, MCMASTER {_SKU['latch-hook-rivet']}",
-    "transgear-stub": "TRANSGEAR STUD",
-    "transgear-stud-shim": "TRANSGEAR STUD SHIM",
+    "transgear-pin": "TRANSGEAR PIN",
+    "transgear-rear-bushing": "TRANSGEAR REAR BUSHING",
     "transgear-feed-pinion": "TRANSGEAR FEED PINION SLEEVE",
     "transgear-disc-hub": "TRANSGEAR DISC HUB",
-    "transgear-hub-cap": "TRANSGEAR HUB CAP NUT",
+    "transgear-front-bushing": "TRANSGEAR FRONT BUSHING",
+    "transgear-retaining-ring": (
+        f"RETAINING RING, MCMASTER {_SKU['transgear-retaining-ring']}"
+    ),
     "rack-pinion": "TRANSGEAR DISC, 120T",
     "transgear-disc-screw": (
         f"{disc_screw.THREAD} FILLISTER SCREW, MCMASTER {_SKU['transgear-disc-screw']}"
@@ -373,11 +379,12 @@ TRANSGEAR_QUANTITIES = {
     "latch-hook-bracket-screw": len(bracket_geometry.SCREW_HOLE_X),
     "latch-hook": 1,
     "latch-hook-rivet": len(hook_geometry.RIVET_YZ),
-    "transgear-stub": 1,
-    "transgear-stud-shim": 1,
+    "transgear-pin": 1,
+    "transgear-rear-bushing": 1,
     "transgear-feed-pinion": 1,
     "transgear-disc-hub": 1,
-    "transgear-hub-cap": 1,
+    "transgear-front-bushing": 1,
+    "transgear-retaining-ring": 1,
     "rack-pinion": 1,
     "transgear-disc-screw": hub_geometry.SCREW_COUNT,
     "transgear-knob-shaft": 1,
@@ -408,8 +415,9 @@ TRANSGEAR_BALLOON_ANCHORS = {
 # its 268 gear edges are past the edge fallback's 128), ballooned on the inner
 # view instead. Viewed along (-1, +1, -1), the camera at the machine's
 # front-left-top:
-# * the feed-pinion sleeve: its 12T (z -144.65 to -135.15) is behind the Ø81.5
-#   disc, its spigot (to -157.75) inside the hub shank and under the hub cap;
+# * the feed-pinion sleeve: its 12T (z -144.15 to -130.4) is behind the Ø81.5
+#   disc, its boss (to -157.75) inside the hub, faced to stand just behind the
+#   nose, and the front bushing that bears on the nose;
 # * the drive collar (Ø17.5, z -154.3 to -150.3) behind the Ø51.2 T24 (2.8
 #   thick): its deepest rim point's ray leaves the T24 at radius
 #   8.75 + (4.0 + 2.8) * sqrt(2) = 18.4 < 25.6; its spring pin lies in its
@@ -418,15 +426,15 @@ TRANSGEAR_BALLOON_ANCHORS = {
 #   its 12T and threads are past the edge fallback too;
 # * the knob screw inside the knob cup, the arm-plate screws' heads on the
 #   plate's rear face, the latch pin in the arm behind the latch bracket;
-# * the stud's shim (Ø12, z -127.45 to -124.4) behind the Ø81.5 disc: its
-#   rear rim's ray leaves the disc's rear face at radius
-#   6 + (144.65 - 124.4) * sqrt(2) = 34.6 < 40.75.
+# * the rear bushing (Ø9, z -130.4 to -124.4) behind the Ø81.5 disc: its
+#   front rim's ray leaves the disc's rear face at radius
+#   4.5 + (144.65 - 130.4) * sqrt(2) = 24.7 < 40.75.
 # From the right, with only these shown, each has at least half its surface
 # in view (the knob stack at x -43.8 overlaps the sleeve at x 0 only below
 # y 265.6, the sleeve reaching 272.1; the spring pin's end shows down its
 # slot; the drive pins stand 2.4 proud of the collar, above and below it; the
-# shim at x 0 shares no z with the sleeve, and the latch pin nearer the
-# eye at x 43.5 stands at y 238.4, under the shim's 260.2).
+# rear bushing at x 0 shares no z with the sleeve's teeth, and the latch pin
+# nearer the eye at x 43.5 stands at y 238.4, under the bushing's 261.7).
 INNER_STEMS = frozenset(
     {
         "transgear-feed-pinion",
@@ -437,7 +445,7 @@ INNER_STEMS = frozenset(
         "transgear-knob-retaining-screw",
         "transgear-arm-plate-screw",
         "transgear-latch-pin",
-        "transgear-stud-shim",
+        "transgear-rear-bushing",
     }
 )
 if not INNER_STEMS < set(TRANSGEAR_QUANTITIES):
@@ -686,7 +694,6 @@ def _stack_text() -> str:
 
 def _step_text() -> dict[str, str]:
     pin_lo, pin_hi = joints.LATCH_PIN_PROUD_RANGE
-    float_lo, float_hi = sleeve.CLUSTER_FLOAT_RANGE
     drive_lo, drive_hi = drive_pin.PROUD_RANGE
     knob_lo, knob_hi = KNOB_END_FLOAT_RANGE
     teeth = f"{KNOB_TEETH}T"
@@ -733,10 +740,9 @@ def _step_text() -> dict[str, str]:
             f"{_N['transgear-arm']} ARM'S REAMED HOLE TO THE HOLE FLOOR, "
             f"{pin_lo:.2f} TO {pin_hi:.2f} PROUD."
         ),
-        "stud-fitted": (
-            f"SCREW THE {_N['transgear-stub']} STUD'S {stub.REAR_THREAD_CALLOUT} END "
-            f"THROUGH THE {_N['transgear-stud-shim']} SHIM INTO THE ARM'S STUD TAP "
-            "TILL THE SHIM SEATS ON THE ARM."
+        "pin-pressed": (
+            f"PRESS THE {_N['transgear-pin']} PIN INTO THE {_N['transgear-arm']} "
+            "ARM'S REAMED HOLE FROM THE REAR TILL ITS HEAD SEATS ON THE ARM."
         ),
         "arm-plate-fitted": (
             f"FIT THE {_N['transgear-arm-plate']} PLATE TO THE ARM WITH "
@@ -756,15 +762,19 @@ def _step_text() -> dict[str, str]:
             "THROUGH ARM AND SPACER INTO THE BAR'S BLIND TAP WITH LOW-STRENGTH "
             "THREADLOCKER. SEAT IT; THE ARM SWINGS FREELY."
         ),
-        "disc-cluster-pressed": (
-            f"SLIDE THE {_N['rack-pinion']} DISC ON THE "
-            f"{_N['transgear-feed-pinion']} SLEEVE'S SPIGOT AGAINST ITS PINION; "
-            f"PRESS THE {_N['transgear-disc-hub']} HUB ON THE SHANK UNTIL ITS "
-            "FLANGE CLAMPS THE DISC."
+        "disc-cluster-assembled": (
+            f"FIT THE {_N['rack-pinion']} DISC ON THE {_N['transgear-disc-hub']} "
+            f"HUB'S SPIGOT, THEN THE HUB'S D-BORE ON THE {_N['transgear-feed-pinion']} "
+            "D-FLAT, SPIGOT TO THE STEP."
+        ),
+        "hub-faced-to-nose": (
+            "AS FITTED, MEASURE THE HUB FRONT FACE BEHIND THE SLEEVE NOSE. HUB "
+            f"OFF; FACE ITS FRONT TILL {cluster_fit.HUB_NOSE_WINDOW_TEXT} BEHIND; "
+            "REFIT."
         ),
         "disc-taps-transferred": (
             f"SPOT-DRILL THE DISC THROUGH THE {hub_geometry.SCREW_COUNT} FLANGE "
-            f"HOLES, THEN DRILL AND TAP {disc_screw.THREAD}; MATCH-MARK DISC AND "
+            f"HOLES; DRILL AND TAP {disc_screw.THREAD}; MATCH-MARK DISC AND "
             f"FLANGE. FIX WITH {hub_geometry.SCREW_COUNT} "
             f"{_N['transgear-disc-screw']} SCREWS."
         ),
@@ -780,10 +790,10 @@ def _step_text() -> dict[str, str]:
             "DEBURR THE BORE."
         ),
         "disc-cluster-hung": (
-            "OIL THE STUD JOURNAL; SLIDE THE CLUSTER ON, PINION REARWARD. RUN "
-            f"THE {_N['transgear-hub-cap']} CAP ON THE {stub.FRONT_THREAD_CALLOUT} "
-            "THREAD UNTIL IT SEATS ON THE JOURNAL SHOULDER. ACCEPT: CLUSTER END "
-            f"FLOAT {float_lo:.2f} TO {float_hi:.2f}; THE CLUSTER SPINS FREELY."
+            "OIL THE PIN; CLUSTER ON, PINION REARWARD; A "
+            f"{_N['transgear-front-bushing']} BUSHING BLANK ON THE NOSE TRAPS HUB "
+            f"AND DISC; {_N['transgear-retaining-ring']} RING SIDEWAYS IN THE PIN "
+            "GROOVE. NO REAR BUSHING YET: CLUSTER FORWARD ON THE RING."
         ),
         "collar-pins-pressed": (
             f"PRESS {TRANSGEAR_QUANTITIES['transgear-knob-drive-pin']} "
@@ -825,10 +835,17 @@ def _step_text() -> dict[str, str]:
             f"RING, RING ON THE HUB). SLIDE THE COLLAR BACK AGAINST THE {teeth}; "
             "T24 AND THUMBNUT ON FINGER-TIGHT."
         ),
-        "stud-faced-to-fit": (
-            "CLUSTER FORWARD, FEEL THE COLLAR TO DISC AIR. FACE THE "
-            f"{_N['transgear-stud-shim']} SHIM TILL IT IS "
-            f"{stub.STUD_FIT_WINDOW_TEXT}; ELSE STOP AND REPORT."
+        "front-bushing-faced-to-fit": (
+            f"CLUSTER FORWARD, FEEL m, THE {teeth}-TO-DISC AIR. FACE THE "
+            f"{_N['transgear-front-bushing']} BUSHING'S REAR TILL m IS "
+            f"{cluster_fit.FIT_WINDOW_TEXT}; ELSE STOP AND REPORT."
+        ),
+        "rear-bushing-faced-to-fit": (
+            "RING, BUSHING, CLUSTER OFF; "
+            f"{_N['transgear-rear-bushing']} BLANK ON THE PIN; REFIT, RING LAST, "
+            "SIDEWAYS. FACE THE REAR BUSHING TILL THE CLUSTER'S END FLOAT IS "
+            f"{cluster_fit.FLOAT_WINDOW_TEXT}, SPINNING FREELY; ELSE STOP AND "
+            "REPORT."
         ),
         "collar-gap-measured": (
             "MEASURE d, THE T24 FRONT FACE BEHIND THE T12 FRONT FACE (STRAIGHT "

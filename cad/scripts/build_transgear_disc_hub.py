@@ -1,22 +1,31 @@
 r"""Reproduction script: transgear disc hub (MHA-159; ch. 23; 1 used).
 
-The turned brass hub and flange pressed on the pinion sleeve's (MHA-110)
-front shank; the flange's rear face seats the 120T disc (MHA-070) and three
-#0-80 fillister screws (MHA-161) clamp them (``transgear_disc_hub_spec``,
+The turned brass hub and flange whose bore slides on the pinion sleeve's
+(MHA-110) Ø9 boss and drives through its D-flat.  Its rear spigot passes the
+120T disc's (MHA-070) bore, which pilots on it, and seats on the sleeve's
+step; the flange's rear face clamps the disc's front face and three #0-80
+fillister screws (MHA-161) hold them.  Nothing fastens the hub to the
+sleeve: the spigot bears on the step and the MHA-181 front bushing traps hub
+and disc forward; the D-flat drives (``transgear_disc_hub_spec``,
 ``transgear_disc_hub_geometry``).
 
-Layout (the spec's frame): the flange and hub body are one turned profile on
-the Top plane, (u, v) = model (X, -Z), revolved about the gear axis, so the
-sheet's edge view carries both turned diameters (policy rule 7).  The flange
-runs z = -FLANGE_THICK..0 and the hub body z = -HUB_LENGTH..-FLANGE_THICK,
-so ``Front Plane`` (z = 0) is the flange's rear face, the one that seats on
-the disc, and both printed lengths run from it.  The bore and the three
-screw holes are Front-plane cuts; the screw holes lie on a construction bolt
-circle whose driving diameter is the printed Ø16.4.  The radial oil hole is
-a Top-plane cut toward +Y through one wall, centred on the hub body by a
-construction station line from the hub front face (R9-60).  ``Axis1`` is the
-gear axis (Top Plane ∩ Right Plane); the paper-drive assembly mates it to
-the sleeve's axis and the Front Plane to the disc's front face, unrotated.
+Layout (the spec's frame): the spigot, flange and hub body are one turned
+profile on the Top plane, (u, v) = model (X, -Z), revolved about the gear
+axis, so the sheet's edge view carries all three turned diameters (policy
+rule 7).  The spigot runs z = 0..SPIGOT_LENGTH, the flange
+z = -FLANGE_THICK..0 and the hub body forward to the hub front face, so
+``Front Plane`` (z = 0) is the flange's rear face, the one that clamps the
+disc, and the spigot's and flange's printed lengths run from it.  The
+overall, spigot end to hub front face, is the cluster fit's model length
+(the hub front face is faced to the sleeve's nose at assembly).  The bore
+is two Front-plane cuts: the D-bore (its flat on local -Y) forward through
+flange and body, and the round bore back through the spigot.  The three
+screw holes lie on a construction bolt circle whose driving diameter is the
+printed Ø19.  The radial oil hole is a Top-plane cut toward +Y through one
+wall, centred on the hub body by a construction station line from the hub
+front face (R9-60).  ``Axis1`` is the gear axis (Top Plane ∩ Right Plane);
+the paper-drive assembly mates it to the sleeve's axis and the Front Plane
+to the disc's front face, unrotated.
 
 Run (SolidWorks already open)::
 
@@ -73,13 +82,18 @@ from transgear_disc_hub_spec import (
     DRAWING_PRECISION,
     FLANGE_DIA,
     FLANGE_THICK,
+    FLAT_TO_AXIS,
+    FLAT_TO_AXIS_DEVIATIONS,
     HUB_BODY_LENGTH,
     HUB_DIA,
+    HUB_FRONT_Z,
     HUB_LENGTH,
     OIL_HOLE_DIA,
     OIL_HOLE_STATION,
-    OIL_HOLE_Z,
     SCREW_HOLE_DIA,
+    SPIGOT_DIA,
+    SPIGOT_DIA_DEVIATIONS,
+    SPIGOT_LENGTH,
 )
 
 PART_NAME = "transgear-disc-hub"
@@ -88,6 +102,7 @@ MATERIAL = "Brass"  # C36000 free-machining brass (the registry row names it)
 FLANGE_R = FLANGE_DIA / 2.0
 HUB_R = HUB_DIA / 2.0
 BORE_R = BORE_DIA / 2.0
+SPIGOT_R = SPIGOT_DIA / 2.0
 SCREW_HOLE_R = SCREW_HOLE_DIA / 2.0
 OIL_HOLE_R = OIL_HOLE_DIA / 2.0
 
@@ -111,16 +126,38 @@ def radial_hole_volume(radius: float, inner: float, outer: float) -> float:
     return total
 
 
+def d_bore_area(radius: float, flat_to_axis: float) -> float:
+    """Area of a round bore trimmed by a flat ``flat_to_axis`` off its centre."""
+    half_chord = math.sqrt(radius * radius - flat_to_axis * flat_to_axis)
+    segment = (
+        radius * radius * math.acos(flat_to_axis / radius) - flat_to_axis * half_chord
+    )
+    return math.pi * radius * radius - segment
+
+
+V_SPIGOT = math.pi * SPIGOT_R**2 * SPIGOT_LENGTH
 V_FLANGE = math.pi * FLANGE_R**2 * FLANGE_THICK
 V_HUB_BODY = math.pi * HUB_R**2 * HUB_BODY_LENGTH
-V_BORE = math.pi * BORE_R**2 * HUB_LENGTH
+# The D-bore through flange and body, the round bore through the spigot.
+V_D_BORE = d_bore_area(BORE_R, FLAT_TO_AXIS) * -HUB_FRONT_Z
+V_SPIGOT_BORE = math.pi * BORE_R**2 * SPIGOT_LENGTH
 V_SCREW_HOLES = len(screw_centres()) * math.pi * SCREW_HOLE_R**2 * FLANGE_THICK
 V_OIL_HOLE = radial_hole_volume(OIL_HOLE_R, BORE_R, HUB_R)
-V_FINAL = V_FLANGE + V_HUB_BODY - V_BORE - V_SCREW_HOLES - V_OIL_HOLE
+V_FINAL = (
+    V_SPIGOT
+    + V_FLANGE
+    + V_HUB_BODY
+    - V_D_BORE
+    - V_SPIGOT_BORE
+    - V_SCREW_HOLES
+    - V_OIL_HOLE
+)
 
-# The hub front face in the Top-plane sketch, whose (u, v) is model (X, -Z).
-_HUB_FRONT_V = HUB_LENGTH
-_OIL_HOLE_V = -OIL_HOLE_Z
+# The Top-plane sketch's (u, v) is model (X, -Z): the spigot's end at
+# v = -SPIGOT_LENGTH, the hub front face at v = -HUB_FRONT_Z.
+_SPIGOT_END_V = -SPIGOT_LENGTH
+_HUB_FRONT_V = -HUB_FRONT_Z
+_OIL_HOLE_V = _HUB_FRONT_V - OIL_HOLE_STATION
 
 
 def _z_extreme_mm(adapter, sign: float) -> float:
@@ -141,11 +178,13 @@ def _z_extreme_mm(adapter, sign: float) -> float:
 
 
 def _check_z_span(adapter) -> None:
-    """The frame's promise: the flange's rear face on z = 0, the hub toward -Z."""
+    """The frame's promise: the flange's rear face on z = 0, the spigot toward
+    +Z, the hub toward -Z."""
     front, rear = _z_extreme_mm(adapter, -1.0), _z_extreme_mm(adapter, 1.0)
-    if abs(rear) > 1e-3 or abs(front + HUB_LENGTH) > 1e-3:
+    if abs(rear - SPIGOT_LENGTH) > 1e-3 or abs(front - HUB_FRONT_Z) > 1e-3:
         raise RuntimeError(
-            f"disc hub spans z {front:.4f}..{rear:.4f}, not {-HUB_LENGTH:g}..0"
+            f"disc hub spans z {front:.4f}..{rear:.4f}, "
+            f"not {HUB_FRONT_Z:g}..{SPIGOT_LENGTH:g}"
         )
 
 
@@ -157,30 +196,65 @@ def _as_construction(adapter, entity_id: str) -> None:
         raise RuntimeError(f"{entity_id} did not take the construction flag")
 
 
-async def _front_circle(
-    adapter, radius: float, label: str, feature: str, name: str
-) -> list[tuple[str, str]]:
-    """One on-axis Front-plane circle whose diameter is the ``name`` global."""
-    dims = SketchDims()
-    check(f"create_sketch {label}", await adapter.create_sketch("Front"))
-    await define_circle(
-        adapter,
-        0.0,
-        0.0,
-        radius,
-        label,
-        dims=dims,
-        names=(None, None, name),
-        drives=(None, None, f'"{name}"'),
+async def _d_bore(adapter) -> list[tuple[str, str]]:
+    """The Front-plane D-bore: a major arc through +Y closed by its flat on
+    -Y.  A construction witness from the bore's axis to the flat owns the
+    flat's printed distance (FlatToAxis), independent of BoreDia."""
+    bore = SketchDims()
+    check("create_sketch bore", await adapter.create_sketch("Front"))
+    half_chord = math.sqrt(BORE_R * BORE_R - FLAT_TO_AXIS * FLAT_TO_AXIS)
+    set_sketch_direct_db(adapter, True)
+    arc = check(
+        "D-bore major arc",
+        await adapter.add_arc(
+            0.0, 0.0, half_chord, -FLAT_TO_AXIS, -half_chord, -FLAT_TO_AXIS
+        ),
     )
-    await ensure_fully_defined(adapter, f"{label} sketch")
-    check(f"exit_sketch {label}", await adapter.exit_sketch())
-    name_last_feature(adapter, feature)
-    return dims.apply(adapter, feature)
+    flat = check(
+        "D-bore flat",
+        await adapter.add_line(-half_chord, -FLAT_TO_AXIS, half_chord, -FLAT_TO_AXIS),
+    )
+    witness = check(
+        "D-bore flat witness",
+        await adapter.add_line(0.0, 0.0, 0.0, -FLAT_TO_AXIS),
+    )
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, witness)
+    for label, first, second, relation in (
+        ("bore arc centre", f"{arc}.center", "origin", "coincident"),
+        ("bore left junction", f"{flat}.start", f"{arc}.end", "coincident"),
+        ("bore right junction", f"{flat}.end", f"{arc}.start", "coincident"),
+        ("horizontal bore flat", flat, None, "horizontal"),
+        ("vertical flat witness", witness, None, "vertical"),
+        ("witness on bore axis", f"{witness}.start", "origin", "coincident"),
+        ("witness on bore flat", f"{witness}.end", flat, "coincident"),
+    ):
+        check(label, await adapter.add_sketch_constraint(first, second, relation))
+    check(
+        "bore diameter",
+        await adapter.add_sketch_dimension(arc, None, "diameter", BORE_DIA),
+    )
+    bore.record("BoreDia", '"BoreDia"')
+    await dimension_between(
+        adapter,
+        f"{witness}.start",
+        f"{witness}.end",
+        "vertical_distance",
+        FLAT_TO_AXIS,
+        "bore flat from the axis",
+    )
+    bore.record("FlatToAxis", '"FlatToAxis"')
+    await ensure_fully_defined(adapter, "D-bore sketch")
+    check("exit_sketch bore", await adapter.exit_sketch())
+    name_last_feature(adapter, "BoreProfile")
+    return bore.apply(adapter, "BoreProfile")
 
 
 async def build(adapter) -> dict[str, str]:
-    from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
+    from solidworks_mcp.adapters.base import (
+        ExtrusionParameters,
+        RevolveParameters,
+    )
 
     check("create_part", await adapter.create_part())
 
@@ -192,7 +266,10 @@ async def build(adapter) -> dict[str, str]:
         ("FlangeThick", FLANGE_THICK),
         ("HubDia", HUB_DIA),
         ("HubLength", HUB_LENGTH),
+        ("SpigotDia", SPIGOT_DIA),
+        ("SpigotLength", SPIGOT_LENGTH),
         ("BoreDia", BORE_DIA),
+        ("FlatToAxis", FLAT_TO_AXIS),
         ("BoltCircleDia", BOLT_CIRCLE_DIA),
         ("ScrewHoleDia", SCREW_HOLE_DIA),
         ("OilHoleDia", OIL_HOLE_DIA),
@@ -202,21 +279,27 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs: list[tuple[str, str]] = []
 
     # Turned profile about the gear axis, Top-plane (u, v) = model (X, -Z):
-    # flange rear face on the Front Plane, flange O.D., flange front face, hub
-    # O.D., hub front face.  Both lengths run from the flange's rear face: the
-    # overall the sheet prints (R9-5) and the flange; the hub body's own
-    # length is their remainder, never printed.
+    # spigot end, spigot O.D., flange rear face (on the Front Plane), flange
+    # O.D., flange front face, hub O.D., hub front face.  The spigot's and
+    # flange's lengths run from the flange's rear face; the overall the sheet
+    # prints as a reference runs from the spigot's end (R9-68); the hub
+    # body's own length is the remainder, never printed.
     profile = SketchDims()
     check("create_sketch hub profile", await adapter.create_sketch("Top"))
     set_sketch_direct_db(adapter, True)
-    axis = check("hub axis", await adapter.add_centerline(0.0, 0.0, 0.0, HUB_LENGTH))
+    axis = check(
+        "hub axis",
+        await adapter.add_centerline(0.0, _SPIGOT_END_V, 0.0, _HUB_FRONT_V),
+    )
     points = [
-        (0.0, 0.0),
+        (0.0, _SPIGOT_END_V),
+        (SPIGOT_R, _SPIGOT_END_V),
+        (SPIGOT_R, 0.0),
         (FLANGE_R, 0.0),
         (FLANGE_R, FLANGE_THICK),
         (HUB_R, FLANGE_THICK),
-        (HUB_R, HUB_LENGTH),
-        (0.0, HUB_LENGTH),
+        (HUB_R, _HUB_FRONT_V),
+        (0.0, _HUB_FRONT_V),
     ]
     lines = await add_line_chain(adapter, points)
     set_sketch_direct_db(adapter, False)
@@ -231,32 +314,51 @@ async def build(adapter) -> dict[str, str]:
     check(
         "hub axis vertical", await adapter.add_sketch_constraint(axis, None, "vertical")
     )
-    await anchor_point_to_origin(
-        adapter, f"{lines[0]}.start", 0.0, 0.0, "flange rear face on the axis"
+    # The axis on u = 0, the flange's rear face on v = 0.
+    check(
+        "spigot end centre on the axis",
+        await adapter.add_sketch_constraint(
+            f"{lines[0]}.start", "origin", "vertical_points"
+        ),
+    )
+    check(
+        "flange rear face on the Front Plane",
+        await adapter.add_sketch_constraint(
+            f"{lines[2]}.start", "origin", "horizontal_points"
+        ),
     )
     await add_diametric_linear_dimension(
-        adapter, axis, lines[1], (FLANGE_R + 4.0, FLANGE_THICK / 2.0), "FlangeDia"
+        adapter, axis, lines[1], (SPIGOT_R + 4.0, _SPIGOT_END_V / 2.0), "SpigotDia"
+    )
+    profile.record("SpigotDia", '"SpigotDia"')
+    await add_diametric_linear_dimension(
+        adapter, axis, lines[3], (FLANGE_R + 4.0, FLANGE_THICK / 2.0), "FlangeDia"
     )
     profile.record("FlangeDia", '"FlangeDia"')
     await add_diametric_linear_dimension(
         adapter,
         axis,
-        lines[3],
-        (HUB_R + 4.0, (FLANGE_THICK + HUB_LENGTH) / 2.0),
+        lines[5],
+        (HUB_R + 4.0, (FLANGE_THICK + _HUB_FRONT_V) / 2.0),
         "HubDia",
     )
     profile.record("HubDia", '"HubDia"')
     check(
+        "spigot length",
+        await adapter.add_sketch_dimension(lines[1], None, "linear", SPIGOT_LENGTH),
+    )
+    profile.record("SpigotLength", '"SpigotLength"')
+    check(
         "flange thickness",
-        await adapter.add_sketch_dimension(lines[1], None, "linear", FLANGE_THICK),
+        await adapter.add_sketch_dimension(lines[3], None, "linear", FLANGE_THICK),
     )
     profile.record("FlangeThick", '"FlangeThick"')
-    # The overall, flange rear face to hub front face (outer corners, where
-    # the drawing's extension lines rise).
+    # The overall, spigot end to hub front face (outer corners, where the
+    # drawing's extension lines rise).
     await dimension_between(
         adapter,
         f"{lines[1]}.start",
-        f"{lines[4]}.start",
+        f"{lines[6]}.start",
         "vertical_distance",
         HUB_LENGTH,
         "hub overall length",
@@ -268,24 +370,58 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += profile.apply(adapter, "HubProfile")
     check("revolve hub", await adapter.create_revolve(RevolveParameters(angle=360.0)))
     name_last_feature(adapter, "HubBody")
-    await volume_check(
-        adapter, "flange + hub body", V_FLANGE + V_HUB_BODY, 0.005 * V_HUB_BODY
-    )
+    v_body = V_SPIGOT + V_FLANGE + V_HUB_BODY
+    await volume_check(adapter, "spigot + flange + hub body", v_body, 0.005 * v_body)
     await bbox_extent_check(adapter, "overall length", "z", HUB_LENGTH)
     await bbox_extent_check(adapter, "flange O.D.", "x", FLANGE_DIA)
     _check_z_span(adapter)
 
-    # Pressed bore, through (a cut runs against the sketch normal: -Z).
-    drive_jobs += await _front_circle(
-        adapter, BORE_R, "hub bore", "BoreProfile", "BoreDia"
-    )
+    # D-bore forward through flange and body (a cut runs against the sketch
+    # normal: -Z); the flat drives only, from the flange's rear face.
+    drive_jobs += await _d_bore(adapter)
     check(
-        "cut hub bore",
-        await adapter.create_cut_extrude(ExtrusionParameters(depth=HUB_LENGTH)),
+        "cut hub D-bore",
+        await adapter.create_cut_extrude(ExtrusionParameters(depth=-HUB_FRONT_Z)),
     )
     name_last_feature(adapter, "ThroughBore")
-    v_body = V_FLANGE + V_HUB_BODY
-    await volume_check(adapter, "hub bore", v_body - V_BORE, 0.01 * V_BORE)
+    await volume_check(adapter, "hub D-bore", v_body - V_D_BORE, 0.01 * V_D_BORE)
+    v_body -= V_D_BORE
+
+    # The spigot's bore: the same Ø9 H7, round, reversed (+Z) from the Front
+    # Plane to the spigot's end, driven by the D-bore's own BoreDia.
+    spigot_bore = SketchDims()
+    check("create_sketch spigot bore", await adapter.create_sketch("Front"))
+    await define_circle(
+        adapter,
+        0.0,
+        0.0,
+        BORE_R,
+        "spigot bore",
+        dims=spigot_bore,
+        names=(None, None, "SpigotBoreDia"),
+        drives=(None, None, '"BoreDia"'),
+    )
+    await ensure_fully_defined(adapter, "spigot bore sketch")
+    check("exit_sketch spigot bore", await adapter.exit_sketch())
+    name_last_feature(adapter, "SpigotBoreProfile")
+    drive_jobs += spigot_bore.apply(adapter, "SpigotBoreProfile")
+    check(
+        "cut spigot bore",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=SPIGOT_LENGTH, reverse_direction=True)
+        ),
+    )
+    name_last_feature(adapter, "SpigotBore")
+    drive_jobs.append(
+        (
+            name_dimensions(adapter, "SpigotBore", ["SpigotBoreDepth"])[0],
+            '"SpigotLength"',
+        )
+    )
+    await volume_check(
+        adapter, "spigot bore", v_body - V_SPIGOT_BORE, 0.01 * V_SPIGOT_BORE
+    )
+    v_body -= V_SPIGOT_BORE
 
     # Three screw holes through the flange on the shared bolt circle: a
     # construction circle carries the printed diameter; each hole centre is
@@ -334,7 +470,6 @@ async def build(adapter) -> dict[str, str]:
         await adapter.create_cut_extrude(ExtrusionParameters(depth=HUB_LENGTH)),
     )
     name_last_feature(adapter, "ScrewHoles")
-    v_body -= V_BORE
     await volume_check(
         adapter, "screw holes", v_body - V_SCREW_HOLES, 0.02 * V_SCREW_HOLES
     )
@@ -360,7 +495,7 @@ async def build(adapter) -> dict[str, str]:
     await anchor_point_to_origin(
         adapter, f"{station}.start", 0.0, _HUB_FRONT_V, "oil hole datum at hub front"
     )
-    oil.record("OilHoleDatum", '"HubLength"')
+    oil.record("OilHoleDatum", '"HubLength" - "SpigotLength"')
     await dimension_between(
         adapter,
         f"{station}.start",
@@ -369,7 +504,7 @@ async def build(adapter) -> dict[str, str]:
         OIL_HOLE_STATION,
         "oil hole station from the hub front face",
     )
-    oil.record("OilHoleStation", '("HubLength" - "FlangeThick") / 2')
+    oil.record("OilHoleStation", '("HubLength" - "SpigotLength" - "FlangeThick") / 2')
     sketch_mgr = adapter.currentSketchManager
     prev_add_to_db = bool(sketch_mgr.AddToDB)
     sketch_mgr.AddToDB = True
@@ -426,19 +561,25 @@ async def build(adapter) -> dict[str, str]:
 
     await apply_material(adapter, MATERIAL)
     await report_mass_properties(adapter)
-    # The reamed press bore carries its band on the model (R9-45); every other
-    # size is governed by its places, the holes by the title block's DRILLED
-    # HOLES row (the spec's DRAWING_PRECISION).
+    # The bore carries both its bands on the model: the round's H7 and the
+    # flat's band, which together set the fit on the sleeve's boss and flat;
+    # the spigot carries its h6, the disc's pilot.  Every other size is
+    # governed by its places, the holes by the title block's DRILLED HOLES
+    # row (the spec's DRAWING_PRECISION).
     set_dimension_bilateral_tolerance(
         adapter, "BoreProfile", "BoreDia", *BORE_DEVIATIONS
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "BoreProfile", "FlatToAxis", *FLAT_TO_AXIS_DEVIATIONS
+    )
+    set_dimension_bilateral_tolerance(
+        adapter, "HubProfile", "SpigotDia", *SPIGOT_DIA_DEVIATIONS
     )
     apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
     apply_drawing_properties(adapter, PART_NAME, {"Manufacturing Notes": DRAWING_NOTES})
-    # The cut sketches are absorbed (hidden) by their features; the drawing
-    # imports their dimensions through those features.
     return await save_part_and_images(adapter, PART_NAME)
 
 

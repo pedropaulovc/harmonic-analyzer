@@ -19,6 +19,7 @@ import nameplate_spec as nameplate
 import paper_drive_assembly_steps as steps
 import paper_drive_explode_spec as explode
 import transgear_drive_collar_spec as collar
+import transgear_cluster_fit as cluster_fit
 import transgear_removable_spec as sprocket
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 
@@ -61,11 +62,12 @@ CONTRACT_TRANSGEAR_QUANTITIES = {
     "latch-hook-bracket-screw": 2,
     "latch-hook": 1,
     "latch-hook-rivet": 2,
-    "transgear-stub": 1,
-    "transgear-stud-shim": 1,  # R9-65: the stud's faced-to-fit shim
+    "transgear-pin": 1,
+    "transgear-rear-bushing": 1,
     "transgear-feed-pinion": 1,
     "transgear-disc-hub": 1,
-    "transgear-hub-cap": 1,
+    "transgear-front-bushing": 1,
+    "transgear-retaining-ring": 1,
     "rack-pinion": 1,
     "transgear-disc-screw": 3,
     "transgear-knob-shaft": 1,
@@ -246,7 +248,7 @@ def test_sheet_two_shows_and_balloons_exactly_the_transgear() -> None:
 
 
 # The transgear families the sheet-2 isometric draws no reachable ink of (farm
-# run 20261001T051043622Z failed on the sleeve; the stud's shim stands behind
+# run 20261001T051043622Z failed on the sleeve; the rear bushing stands behind
 # the Ø81.5 disc): they balloon on the inner view.
 HIDDEN_BY_THE_ISOMETRIC = {
     "transgear-feed-pinion",
@@ -257,7 +259,7 @@ HIDDEN_BY_THE_ISOMETRIC = {
     "transgear-knob-retaining-screw",
     "transgear-arm-plate-screw",
     "transgear-latch-pin",
-    "transgear-stud-shim",
+    "transgear-rear-bushing",
 }
 
 
@@ -466,9 +468,23 @@ def test_the_collar_is_pinned_before_the_stud_is_cut_and_the_stack_accepted() ->
 
 
 def test_the_cluster_float_and_pin_bands_print_their_spec_ranges() -> None:
-    assert "0.20 TO 0.40" in _step_body("disc-cluster-hung")
+    rear = _step_body("rear-bushing-faced-to-fit")
+    assert f"END FLOAT IS {cluster_fit.FLOAT_WINDOW_TEXT}" in rear
+    assert cluster_fit.FIT_WINDOW_TEXT in _step_body("front-bushing-faced-to-fit")
     assert "2.30 TO 2.50 PROUD" in _step_body("collar-pins-pressed")
     assert "12.96 TO 14.49 PROUD" in _step_body("latch-pin-pressed")
+
+
+def test_the_hub_is_faced_to_the_nose_before_the_disc_is_tapped() -> None:
+    """R9-68: the hub's front face is faced to stand just behind the sleeve
+    nose on the bench, disc seated and hub on the flat, before the flange
+    holes are transferred; the front bushing then bears on the nose."""
+    order = ["disc-cluster-assembled", "hub-faced-to-nose", "disc-taps-transferred"]
+    numbers = [steps.step_number(key) for key in order]
+    assert numbers == list(range(numbers[0], numbers[0] + 3))
+    faced = _step_body("hub-faced-to-nose")
+    assert f"TILL {cluster_fit.HUB_NOSE_WINDOW_TEXT} BEHIND" in faced
+    assert "ON THE NOSE TRAPS HUB AND DISC" in _step_body("disc-cluster-hung")
 
 
 def test_the_plate_screws_are_cut_to_the_limit_the_lock_sweep_clears() -> None:
@@ -840,7 +856,7 @@ def test_the_feed_mesh_sits_mid_reach_with_a_working_contact_ratio() -> None:
     the fit-up accepts stays inside what the hook's set range can hold."""
     assert assembly.RACK_MESH_EXT == pytest.approx(0.55)
     assembly._assert_rack_mesh()
-    # The hook's set range moves the stud by the pivot-to-stud over the
+    # The hook's set range moves the pin by the pivot-to-pin over the
     # pivot-to-latch lever.
     lever = (assembly.STUD_X - assembly.BAR.PIVOT_TAP_X) / (
         sum(assembly.HOOK.PLANE_X) / 2.0 - assembly.BAR.PIVOT_TAP_X

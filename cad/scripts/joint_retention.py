@@ -577,14 +577,12 @@ THREADED_PARTS: frozenset[str] = frozenset(
         "swing_stop_screw",  # #4-40 fillister (90280A108), member into harmonic_base (top level)
         "thumb_screw",  # #4-40 UNC (McMaster 91882A221), member: into magnifying_clamp ScrewHole; 2nd instance into output_fixture cross hole (config qty 2, not placed in the SLDASM)
         "top_frame",  # receiver: #10-32 cross taps, 1/4-20 gooseneck set tap, #8-32 fulcrum-keeper taps (top-level row)
-        "transgear_arm",  # MHA-164: #10-32 stud tap + 2x #8-32 plate taps through (transgear_arm_spec), receiver
+        "transgear_arm",  # MHA-164: 2x #8-32 plate taps through (transgear_arm_spec), receiver; the pin MHA-179 is pressed in a reamed hole
         "transgear_arm_plate_screw",  # #8-32 slotted oval head (McMaster 91790A196, MHA-166), cut to fit; member: 2 into transgear_arm
         "transgear_disc_screw",  # #0-80 slotted fillister (McMaster 91794A055, MHA-161), cut to fit; member: 3 through the hub flange into rack_pinion
-        "transgear_hub_cap",  # MHA-160 brass cap nut, #6-32 tapped through; member on the stud's front thread
         "transgear_knob_retaining_screw",  # #8-32 pan head (McMaster 90283A193, MHA-158), member into the knob shaft's rear tap
         "transgear_knob_shaft",  # MHA-078: 1/4-20 UNC die-cut front thread (thumbnut) + #8-32 rear tap (retaining screw), receiver
         "transgear_pivot_screw",  # #8-32 shoulder screw (McMaster 91829A205, MHA-168), member into the support_bar's blind pivot tap
-        "transgear_stub",  # MHA-082 stud: #10-32 UNF rear thread (member, into transgear_arm) + #6-32 UNC front thread (receiver of the hub cap)
         "transgear_thumbnut",  # MHA-126 knurled nut, 1/4-20 UNC-2B through; member on the knob shaft's front thread
         "wheel_axle",  # stud tip carries the hex nut (thread not modelled / not specified on the axle drawing), receiver of wheel_axle_nut
         "wheel_axle_nut",  # hex nut AF8 x 3 on the O5 stud ("commercial hex nut (thread not modelled)"), member
@@ -662,15 +660,18 @@ UNTHREADED_PARTS: frozenset[str] = frozenset(
         "rocker_thrust_washer",  # 1/16 sheet washer, plain bore
         "transgear_arm_plate",  # MHA-165: reamed knob-shaft bore + 2 countersunk clearance screw holes; no thread
         "transgear_collar_cross_pin",  # MHA-154 1/16 slotted spring pin through the drive collar slot and shaft core
-        "transgear_disc_hub",  # MHA-159 brass hub: bore pressed on the feed sleeve, flange clearance holes for the disc screws; no thread
+        "transgear_disc_hub",  # MHA-159 brass hub: D-bore on the sleeve's D-flat, plain flange clearance holes for the disc screws; trapped between the seat shoulder and the front bushing, no thread
         "transgear_drive_collar",  # MHA-177: reamed bore, reamed drive-pin holes, rear slot; no thread
-        "transgear_feed_pinion",  # MHA-110 12T DP30 feed sleeve: plain bore on the stud journal, the hub pressed on its shank; no thread
+        "transgear_feed_pinion",  # MHA-110 12T DP30 feed sleeve: plain bore on the pin, D-flat keying the hub's D-bore; no thread
+        "transgear_front_bushing",  # MHA-181 brass bushing faced to fit, reamed bore on the pin; no thread
         "transgear_knob_cup",  # MHA-157: drilled bore + counterbore for the retaining screw head; no thread
         "transgear_knob_thrust_ring",  # MHA-156 loose brass ring, drilled bore; no thread
         "transgear_latch_pin",  # MHA-169 1/8 dowel pressed into the arm's reamed end-face hole
         "transgear_pivot_spacer",  # MHA-167 brass spacer, reamed bore on the pivot shoulder; no thread
+        "transgear_pin",  # MHA-179 plain steel pin pressed into the arm's reamed hole, ring groove at the front; no thread
+        "transgear_rear_bushing",  # MHA-180 brass bushing faced to fit, reamed bore on the pin; no thread
         "transgear_removable",  # O12 plain bore + 2 drive-pin holes, no thread (build_transgear_removable)
-        "transgear_stud_shim",  # MHA-178 turned shim, bore drilled to pass the #10-32 major; no thread
+        "transgear_retaining_ring",  # MHA-182 external retaining ring (McMaster 97431A260) in the pin's groove
         "transgear_knob_drive_pin",  # MHA-155 dowel pressed into plain holes, no thread
         "tube_frame",  # columns: socket slip fit; cross holes enlarged so the MHA-132 shank passes "WITHOUT THREAD CONTACT" (MHA-A04 STEP 2/5)
         "tube_frame_cap",  # McMaster 9275K141 push-on cap (MHA-A04 STEP 7)
@@ -691,6 +692,7 @@ UNTHREADED_STOCK: dict[str, str] = {
     "transgear_knob_drive_pin": "dowel pin pressed into a plain hole",
     "transgear_collar_cross_pin": "slotted spring pin in a drilled hole",
     "transgear_latch_pin": "dowel pin pressed into a reamed hole",
+    "transgear_retaining_ring": "external retaining ring fitted sideways in a groove",
     "tube_frame_cap": "push-on round cap over the column end",
 }
 
@@ -1685,64 +1687,6 @@ JOINTS: tuple[Joint, ...] = (
         evidence="build_paper_drive_assembly.py:build ('platen lock-screw grid', LOCK_SCREW_XY); draw_paper_drive_assembly._step_text 'platen-hung' (fitted loose) and 'guide-locks-set' (snug, push, tighten); guide_lock_screw_spec.ENGAGEMENT_WORST; build_platen_guide.HOLE_X/LOCK_SCREW_THREAD_ENGAGEMENT (4 per rail x 2 rails); guide_lock_spec.HOLE_SPEC; platen_guide_spec.LOCK_GAP_FIT",
     ),
     Joint(
-        id="paper-drive/stud-in-arm",
-        assembly="paper_drive",
-        member="transgear_stub",
-        receiver="transgear_arm",
-        thread="#10-32 UNF",
-        installed_at="stud-fitted",
-        exposure=Exposure.ROTATING_DRAG,
-        exposure_reason=(
-            "the stud is the journal of the disc cluster (120T disc + MHA-159 hub + 12T feed sleeve), "
-            "which spins on it whenever the crank turns and reverses when the paper is wound back. The "
-            "journal drag, and the cluster's end-float rubs on the stud's thrust step and on the hub cap "
-            "seated on the stud, all act about the stud axis, which is the thread axis. Only the seated "
-            "thread holds the stud in the arm"
-        ),
-        axial_capture=(
-            "the stud's #10-32 rear end runs through the MHA-178 shim into the arm's through stud tap "
-            "until the shim seats on the arm (worst-case engagement ~1.5 D, transgear_stud_fit."
-            "REAR_ENGAGEMENT_WORST_D); the shim is faced to the fitted window at stud-faced-to-fit"
-        ),
-        lock=Lock.NONE,
-        evidence=(
-            "draw_paper_drive_assembly._step_text 'stud-fitted' ('SCREW THE STUD'S #10-32 UNF END "
-            "THROUGH THE SHIM INTO THE ARM'S STUD TAP TILL THE SHIM SEATS ON THE ARM') and "
-            "'stud-faced-to-fit'; build_paper_drive_assembly.py 'transgear-stub' placement (Ry180 seat "
-            "on the shim); transgear_stub_spec.REAR_THREAD/FRONT_THREAD; transgear_arm_spec stud tap; "
-            "transgear_stud_fit.REAR_ENGAGEMENT_WORST_D. A redesign to a threadless pin is in progress "
-            "(review-gap-stud-retention); this row records the thread as built today"
-        ),
-    ),
-    Joint(
-        id="paper-drive/hub-cap-on-stud",
-        assembly="paper_drive",
-        member="transgear_hub_cap",
-        receiver="transgear_stub",
-        thread="#6-32 UNC",
-        installed_at="disc-cluster-hung",
-        exposure=Exposure.ROTATING_DRAG,
-        exposure_reason=(
-            "the cap is the front stop of the disc cluster, which spins on the stud journal with the "
-            "crank and floats 0.2-0.4 between the stud's thrust step and the cap. Whenever the cluster "
-            "runs forward the feed sleeve's nose rubs the cap's rear face about the stud axis, which is "
-            "the cap's thread axis; the drag reverses when the paper is wound back"
-        ),
-        axial_capture=(
-            "the brass cap nut runs on the stud's #6-32 front thread until it seats on the journal "
-            "shoulder (worst-case engagement ~1.15 D, transgear_hub_cap_spec.ENGAGEMENT_WORST_D); "
-            "that seat is the only preload"
-        ),
-        lock=Lock.NONE,
-        evidence=(
-            "draw_paper_drive_assembly._step_text 'disc-cluster-hung' ('RUN THE ... CAP ON THE #6-32 "
-            "UNC THREAD UNTIL IT SEATS ON THE JOURNAL SHOULDER ... THE CLUSTER SPINS FREELY'); "
-            "build_paper_drive_assembly.py 'The hub cap seats on the stud's journal shoulder' and "
-            "'transgear-hub-cap' placement; transgear_hub_cap_spec.TAP_SPEC; transgear_feed_pinion_spec."
-            "CLUSTER_FLOAT_RANGE"
-        ),
-    ),
-    Joint(
         id="paper-drive/arm-plate-screws",
         assembly="paper_drive",
         member="transgear_arm_plate_screw",
@@ -1807,8 +1751,8 @@ JOINTS: tuple[Joint, ...] = (
         installed_at="disc-taps-transferred",
         exposure=Exposure.STATIC_CLAMP,
         exposure_reason=(
-            "fix the 120T disc to the hub flange, which is pressed on the feed sleeve; disc, hub and "
-            "sleeve turn as one body. The drive torque acts about the stud axis, and the three screws "
+            "fix the 120T disc to the hub flange, whose D-bore is keyed on the feed sleeve's D-flat; "
+            "disc, hub and sleeve turn as one body. The drive torque acts about the pin axis, and the three screws "
             "on the flange's bolt circle carry it as shear across their own axes, never as torque "
             "about them"
         ),
@@ -1819,7 +1763,7 @@ JOINTS: tuple[Joint, ...] = (
         ),
         lock=Lock.NONE,
         evidence=(
-            "draw_paper_drive_assembly._step_text 'disc-cluster-pressed', 'disc-taps-transferred' and "
+            "draw_paper_drive_assembly._step_text 'disc-cluster-assembled', 'disc-taps-transferred' and "
             "'disc-screws-cut'; build_paper_drive_assembly.py 'transgear-disc-screw (' placements and "
             "lock mates; rack_pinion_spec.TAP_SPEC; transgear_disc_screw_spec.ENGAGEMENT_WORST_D; "
             "transgear_disc_hub_geometry.SCREW_COUNT"
@@ -2044,14 +1988,6 @@ REQUIRED_JOINTS: dict[str, Occurrence] = {
     ),
     "paper-drive/lock-screw-in-guide": Occurrence(
         "paper_drive", "build_paper_drive_assembly.py", "platen lock-screw grid"
-    ),
-    "paper-drive/stud-in-arm": Occurrence(
-        "paper_drive", "build_paper_drive_assembly.py", '"transgear-stub",'
-    ),
-    "paper-drive/hub-cap-on-stud": Occurrence(
-        "paper_drive",
-        "build_paper_drive_assembly.py",
-        "The hub cap seats on the stud's journal shoulder",
     ),
     "paper-drive/arm-plate-screws": Occurrence(
         "paper_drive", "build_paper_drive_assembly.py", "transgear-arm-plate-screw #"

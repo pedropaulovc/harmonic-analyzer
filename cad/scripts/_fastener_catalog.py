@@ -246,6 +246,12 @@ FASTENERS: dict[str, PurchasedFastenerSpec] = {
         "98381A474",
         material="Alloy Steel",
     ),
+    # R9-68: E-style ring closing the disc cluster's float on the MHA-179 pin.
+    "transgear-retaining-ring": _stock(
+        "transgear-retaining-ring",
+        "Side-Mount External Retaining Ring",
+        "97431A260",
+    ),
     "tube-frame-cap": _stock(
         "tube-frame-cap",
         "Metal Round Cap",

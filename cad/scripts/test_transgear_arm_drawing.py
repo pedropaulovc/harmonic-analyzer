@@ -22,12 +22,11 @@ import transgear_arm_geometry as geometry
 import transgear_arm_spec as spec
 import transgear_hanger_joints as joints
 import transgear_latch_pin_spec as pin
+import transgear_pin_spec as cluster_pin
 import transgear_pivot_screw_spec as pivot_screw
-import transgear_stud_fit as stud_fit
 from _drawing_common import DRAWING_TEMPLATES
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
-from _hole_spec import TAP_DRILL_MM, THREAD_MAJOR_MM
 
 
 def _band(places: int) -> float:
@@ -187,11 +186,12 @@ def test_the_explicit_bands_are_the_spot_face_pin_ream_and_hole_positions() -> N
     assert model_toleranced_dimensions(part) == {
         ("SpotFaceProfile", "SpotFaceDia"): "*deviations(SPOT_FACE_DIA_BAND)",
         ("SpotFaceProfile", "FloorDepth"): "SPOT_FACE_FLOOR_TOLERANCE",
-        ("StationReference", "StudStation"): "HOLE_POSITION_TOLERANCE",
+        ("StationReference", "PinStation"): "HOLE_POSITION_TOLERANCE",
         ("StationReference", "PlateTapStation1"): "HOLE_POSITION_TOLERANCE",
         ("StationReference", "PlateTapStation2"): "HOLE_POSITION_TOLERANCE",
         ("PinHoleProfile", "PinHoleZ"): "HOLE_POSITION_TOLERANCE",
         ("PinHoleProfile", "PinHoleDia"): "*deviations(PIN_HOLE_DIA_BAND)",
+        ("PinBoreProfile", "PinBoreDia"): "*deviations(PIN_BORE_DIA_BAND)",
     }
     # The piloted counterbore only cuts oversize; the pin's press hole must
     # never end up larger than nominal.
@@ -229,7 +229,6 @@ def test_each_tap_callout_states_its_worst_case_full_thread_engagement() -> None
     reviewer charged 1.5 incomplete pitches at each end of the 5/16 stock.
     Each callout states the build's worst case, floored, at 1.5D or more."""
     worst = {
-        "stud tap": (stud_fit.REAR_ENGAGEMENT_WORST, stud_fit.STUB.REAR_THREAD_MAJOR),
         "plate taps": (
             joints.PLATE_SCREW_ENGAGEMENT_WORST,
             joints.PLATE_SCREW.THREAD_MAJOR,
@@ -248,30 +247,15 @@ def test_each_tap_callout_states_its_worst_case_full_thread_engagement() -> None
     assert spec.engagement_line(7.749, 1.599) == "ENGAGEMENT 7.74 MIN (1.59D)"
 
 
-def test_the_stud_tap_mouths_take_only_the_title_block_break() -> None:
-    """Machinist review of 8b5e1f354 (blocker): full thread starts where a
-    mouth's 45° leg meets the tap drill, so Ø5.0 countersinks on both faces
-    left 6.95 (1.44D) and no countersink opening past the major reached
-    1.5D.  R9-63 drops them: the title block's edge break governs."""
-    stud_qualifier = drawing.STUD_TAP_QUALIFIER
-    assert "CSK" not in stud_qualifier and "\u00d8" not in stud_qualifier
-    assert "CSK" in drawing.PLATE_TAP_QUALIFIER
-    break_max = _config.title_block("edge_break")["chamfer_max_mm"]
-    assert geometry.STUD_TAP_MOUTH_LOSS_MAX == break_max
-    assert not hasattr(part, "STUD_CSK")
-    drill = TAP_DRILL_MM["#10-32"]
-    assert geometry.STUD_TAP_MOUTH_DIA_MAX == pytest.approx(
-        drill + 0.10 + 2.0 * break_max
-    )
-    # Any countersink that opens past the major takes more than 1.5D allows
-    # from the thinnest stock on two faces.
-    major = THREAD_MAJOR_MM["#10-32"]
-    thinnest = geometry.THICKNESS - geometry.THICKNESS_BAND
-    assert thinnest - 2.0 * (major - drill) / 2.0 < 1.5 * major
-    # The plate taps keep theirs, each charged to the tap drill.
-    assert geometry.PLATE_TAP_MOUTH_LOSS_MAX == pytest.approx(
-        (geometry.PLATE_TAP_CSK_DIA - TAP_DRILL_MM["#8-32"]) / 2.0
-    )
+def test_the_pin_bore_presses_the_mha_179_pin_at_every_limit() -> None:
+    """R9-68: the #10-32 stud tap at S became a reamed bore that holds the
+    MHA-179 pin by a press at both limit pairs, and its ream band only cuts
+    oversize."""
+    loosest = cluster_pin.DIA_MIN - geometry.PIN_BORE_DIA_MAX
+    tightest = cluster_pin.DIA_MAX - geometry.PIN_BORE_DIA_MIN
+    assert (loosest, tightest) == pytest.approx((0.010, 0.026))
+    assert spec.PIN_PRESS_INTERFERENCE == pytest.approx((loosest, tightest))
+    assert min(geometry.PIN_BORE_DIA_BAND) == 0.0 < max(geometry.PIN_BORE_DIA_BAND)
 
 
 def test_the_pivot_bore_is_reamed_as_the_shoulder_running_fit() -> None:

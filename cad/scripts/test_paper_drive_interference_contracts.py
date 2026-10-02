@@ -27,9 +27,7 @@ import transgear_arm_plate_screw_spec as plate_screw
 import transgear_collar_cross_pin_spec as cross_pin
 import transgear_disc_hub_spec as hub
 import transgear_disc_screw_spec as disc_screw
-import transgear_feed_pinion_spec as sleeve
 import transgear_hanger_joints as joints
-import transgear_hub_cap_spec as cap
 import transgear_knob_cup_spec as cup
 import transgear_knob_drive_pin_spec as drive_pin
 import transgear_knob_retaining_screw_spec as retaining_screw
@@ -37,7 +35,7 @@ import transgear_knob_shaft_spec as shaft
 import transgear_latch_pin_spec as latch_pin
 import transgear_pivot_screw_spec as pivot_screw
 import transgear_removable_spec as removable
-import transgear_stub_spec as stub
+import transgear_pin_spec as pin
 import transgear_thumbnut_spec as thumbnut
 from _hole_spec import TAP_DRILL_MM
 
@@ -93,25 +91,11 @@ def test_latch_bracket_screw_rows_follow_the_screw_and_bar_taps() -> None:
         assert allowed[pair] == pytest.approx(limit)
 
 
-def test_disc_cluster_rows_follow_the_stud_cap_and_disc() -> None:
+def test_disc_cluster_rows_follow_the_pin_hub_and_disc() -> None:
     allowed = _allowed()
-    # The stud's rear thread runs past the arm, so the arm stock bounds it.
-    assert allowed[_pair("transgear-stub-1", "transgear-arm-1")] == pytest.approx(
-        _annulus(
-            stub.REAR_THREAD_MAJOR,
-            TAP_DRILL_MM[arm.STUD_TAP_SPEC.size],
-            min(stub.REAR_THREAD_LENGTH, arm.THICKNESS),
-        )
-    )
-    # The stud's relief stays inside the cap's tap drill; the rest of the cap
-    # rides the front thread's major.
-    assert stub.RELIEF_DIA < cap.TAP_DRILL_DIA
-    assert allowed[_pair("transgear-hub-cap-1", "transgear-stub-1")] == pytest.approx(
-        _annulus(
-            stub.FRONT_THREAD_MAJOR,
-            cap.TAP_DRILL_DIA,
-            cap.CAP_LENGTH - stub.RELIEF_WIDTH,
-        )
+    # The pin presses through the arm's reamed bore over the whole stock.
+    assert allowed[_pair("transgear-pin-1", "transgear-arm-1")] == pytest.approx(
+        _annulus(pin.DIA, arm.PIN_BORE_DIA, arm.THICKNESS)
     )
     # Each #0-80 is cut to fit (R9-47): it fills the disc's tap from the
     # flange's front face to its cut end, inside the disc's rear face.
@@ -195,7 +179,6 @@ def test_pressed_and_slip_joints_without_a_row_do_not_overlap() -> None:
     assert latch_pin.DIA <= arm.PIN_HOLE_DIA
     assert rivet.DIA <= hook.RIVET_HOLE_DIA
     assert rivet.DIA <= hook_bracket.RIVET_HOLE_DIA
-    assert sleeve.SHANK_DIA <= hub.BORE_DIA
     assert drive_pin.DIA <= removable.PIN_HOLE_DIA
 
 

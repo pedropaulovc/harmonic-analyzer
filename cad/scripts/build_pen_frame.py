@@ -68,7 +68,7 @@ RAIL_SIDE = 4.0  # long-side rails (local X): read thinner in the photo; the
 RAIL_END = 5.0  # end rails (local Y); the screw rail keeps thread depth
 TRIM_NEAR = 0.75  # local x = 0 edge pulled back: that rail faces the platen
 # (machine z = -143 - local x) and must clear the recording paper's front
-# face at -143.4 by the 0.25+ margin (M6.8 platen-paper)
+# face at -143.25 by the 0.25+ margin (M6.8 platen-paper)
 FRAME_DEPTH = 10.0  # Z
 # The set screw threads INTO the bottom rail, so its hole is an exact #4-40
 # tapped Hole Wizard feature drilled up from the bottom face. THROUGH_NEXT

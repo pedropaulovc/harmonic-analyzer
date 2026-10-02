@@ -48,6 +48,7 @@ recipes:
 | 93585A190 | `cone-lock-knob` | Stainless Steel High-Profile Knurled-Head Thumb Screw |
 | 94025A150 | — (diagnostic recipe; `cone-tip-adjuster` until rule-12 E11) | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
 | 94025A164 | `cone-tip-adjuster` | 18-8 Stainless Steel Slotted Cup-Tip Set Screw |
+| 97431A260 | `transgear-retaining-ring` | Side-Mount External Retaining Ring |
 | 97482A015 | `latch-hook-rivet` (catalogue-only; no vendor model) | Aluminum Domed Head Solid Rivet |
 | 98296A026 | `transgear-collar-cross-pin` | 1050-1095 Spring Steel Slotted Spring Pin |
 | 98296A027 | `pinion-strap-pin` | 1050-1095 Spring Steel Slotted Spring Pin |
@@ -374,6 +375,24 @@ Catalog specifications checked on September 10, 2026:
   (Ø1.7018) lies inside the band. It is catalogue-only: no vendor model was
   supplied or kept here, so it has no replica gate, and its standalone
   diagnostic is a catalog-only run.
+
+- [97431A260](https://www.mcmaster.com/97431A260/) (`transgear-retaining-ring`,
+  MHA-182, R9-68) is pushed sideways into the MHA-179 pin's groove in front
+  of the MHA-181 front bushing and closes the disc cluster's float. Its page
+  was read live (user-pasted) on October 2, 2026: side-mount external ring
+  for a 5/32 in shaft, phosphate-coated carbon steel, Rockwell C47 min,
+  groove Ø0.116 in, ring O.D. 0.282 in, thickness 0.025 in ±0.002. The
+  user-supplied vendor model was harvested on amet on October 2, 2026
+  (`cad/out/reports/mcmaster-97431A260-dump.json`): one Right-plane outline
+  (outer arc, three prongs on the Ø2.8956 "Free Diameter" circle, two
+  relief arcs), one mid-plane extrude and two fillet sets (R0.4445 at the
+  gap, R0.22225 at the prongs). `diag_build_97431A260.py` replays it and
+  passed the replica gate on October 2, 2026: volume 13.3124 vs 13.3124 mm³,
+  area 64.1486 vs 64.1486 mm², 26 faces each with the same face-area
+  multiset (largest per-face delta 0.0000 mm²), centre of mass on the
+  vendor's (`cad/out/reference/97431A260-replica-report.json`).
+  Evidence SHA-256: native SLDPRT
+  `dc3d0f8549d8851713aa234e24f338e9f0d41dbc96550669c281c99c3d9f4cff`.
 
 - [3606T118](https://www.mcmaster.com/3606T118/) (`keeper-chain`, MHA-149)
   and [3606T811](https://www.mcmaster.com/3606T811/) (`keeper-chain-link`,

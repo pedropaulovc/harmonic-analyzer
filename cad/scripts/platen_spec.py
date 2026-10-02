@@ -15,14 +15,22 @@ from fillister_screw_spec import HEAD_H as FILLISTER_HEAD_H
 
 PLATE_WIDTH = 269.64  # ch30-p002 Pose Studio: 300 * 0.8988 (user fit)
 PLATE_HEIGHT = PLATE_WIDTH / 2.0  # user-confirmed front-face H:W = 1:2
-PLATE_THICKNESS = 4.0  # DIMENSIONS.md ch22: p.55 edge-on photo (low)
+# DIMENSIONS.md ch22: p.55 edge-on photo (low) read ~4; thinned to 3.85
+# (R9-68) with the back face, which carries the rack, held on the bar front:
+# the front face moves 0.15 rearward to open the disc-to-platen air.
+PLATE_THICKNESS = 3.85
 
 # Clip-screw receivers: the stock 90114A511 shank reaches through the clip's
-# integral seat and uses the platen's full 4-mm thickness as #4-40 engagement.
-# These must be through taps: no blind receiver in this plate can accept the
-# exact 6.35-mm under-head length without bottoming.
+# integral seat into a #4-40 tap through the plate and a Ø7 boss standing
+# SOCKET_BOSS_H proud of the back face at each station, so the thread engages
+# >= 1.5D (rule 12) and the screw tip finishes flush with the boss's rear face.
+# These must be through taps: no blind receiver here can accept the exact
+# 6.35-mm under-head length without bottoming. The bosses stand above the top
+# guide rail's band, where nothing but the clip-screw tips rides the back.
 SOCKET_SPEC = HoleSpec("tapped", "#4-40")
-SOCKET_THREAD_ENGAGEMENT = PLATE_THICKNESS
+SOCKET_BOSS_DIA = 7.0  # 2.08 wall around the #4-40 major (rule 12: 2.0)
+SOCKET_BOSS_H = 0.65
+SOCKET_THREAD_ENGAGEMENT = PLATE_THICKNESS + SOCKET_BOSS_H
 SOCKET_XY = (
     (5.3928, 58.5104), (5.3928, 127.6296),
     (264.2472, 58.5104), (264.2472, 127.6296),
