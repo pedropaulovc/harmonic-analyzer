@@ -258,6 +258,14 @@ interaction requirements remain unchanged. The retained Rocker contours include
 all 48 late contour-only obligations, but source acceptance and closure require
 Root's current native GPU measurements; retained coordinates alone are not a pass.
 
+Serialized verification reports use `reportSchemaVersion: 2`. Each video's
+`contourEvidence` dictionary stores exact JSON evidence values under SHA-256 keys;
+`<field>Ref` fields reference those values. `resolveVerificationReport` in
+`scripts/verify-sync.mjs` restores the detailed shape and rejects missing or corrupt
+references. Counts, statuses, error bounds and draw-revision scalars stay on their
+measurement rows. Publication uses bounded 64 KiB writes and an atomic rename.
+All source coordinates and captured boundary samples remain in the report.
+
 Decision controls: `node --test web/scripts/verify-sync.test.mjs`. They do not
 replace an actual native-GPU `verify:sync` run against the unchanged model/MP4s.
 
