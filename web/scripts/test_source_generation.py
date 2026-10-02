@@ -23,7 +23,6 @@ common = load_script('compact-source-common.py', 'source_generation_common')
 spin = load_script('compact-spin.py', 'source_generation_spin')
 rocker = load_script('compact-operation-rocker.py', 'source_generation_rocker')
 camera_tracks = load_script('generate-analysis-synthesis-source-tracks.py', 'source_generation_camera_tracks')
-synthesis = load_script('generate-analysis-synthesis-source-tracks.py', 'source_generation_synthesis')
 
 
 def exact_exposure():
@@ -610,12 +609,12 @@ class SynthesisDependencyEpochTests(unittest.TestCase):
                       'strictDependencyCount': len(records),
                       'dependencyEpoch': self.dependency}
         self.historical = {'oldStrictManifestSha256': 'a' * 64}
-        root_patch = patch.object(synthesis, 'ROOT', self.root)
+        root_patch = patch.object(camera_tracks, 'ROOT', self.root)
         root_patch.start()
         self.addCleanup(root_patch.stop)
 
     def validate(self):
-        return synthesis.validate_camrod_dependency_epoch(self.epoch, self.historical)
+        return camera_tracks.validate_camrod_dependency_epoch(self.epoch, self.historical)
 
     def test_unchanged_installed_bytes_match_both_portable_proofs(self):
         self.assertEqual(self.validate(), {
