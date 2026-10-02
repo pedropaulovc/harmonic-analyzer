@@ -3,6 +3,8 @@
 
 Run from any directory with the tracked web/content calibration evidence:
   python web/scripts/generate-analysis-synthesis-source-tracks.py
+Use --video 6dW6VYXp9HM or --video 8KmVDxkia_w to regenerate one selected
+output without validating unrelated video dependencies.
 This retains numeric evidence and chooses continuous Analysis inverse cam roots.
 It loads no CAD/model/browser and does not qualify cameras, recover historical
 settings, or measure any matching stage. Original frozen root choices/costs remain
@@ -12,6 +14,9 @@ principal-point/focal framing keys, not a second body or a measured camera fit.
 Synthesis cone-overview retains a two-FIT chosen perspective-camera similarity.
 Cam-rod uses a root-selected upright three-original-FIT fixed-intrinsics SQPNP
 physical pose; former similarities are historical/unaccepted evidence only.
+Cam-rod's historical GPU world receipt is preserved verbatim; a pinned portable
+actual old/current native-CPU/Float32-marker/SQPNP equivalence bridge binds the
+unchanged physical authority to current native code and installed Three bytes.
 Independent qualification remains missing; CHECKs never enter camera objectives.
 Synthesis wheel-macro uses only its original wheel-centre FIT and actual GPU
 centre for a chosen principal-point translation; its hanger CHECK stays held out.
@@ -38,6 +43,9 @@ CALIBRATION = "web/content/analysis-synthesis.frozen-generation-evidence.json"
 CALIBRATION_SHA256 = "425beca33506fcb307c3892808b7871a8ee2f06b7aa90f7103fc6993e6319267"
 FRAMING_GPU = "web/content/8KmVDxkia_w.framing-gpu-evidence-2026-10-01.json"
 FRAMING_GPU_SHA256 = "239cb59e799bbb42f6551b74c3b6cf1eccf66f9b0ec7c93518f743b37caf4173"
+CAMROD_BRIDGE_SHA256 = "f1fa25d925592a51959b6908dac3651da4c8f6dc8a640be77e68f152620caade"
+CAMROD_PROBE_SHA256 = "c6dbce2f8391d938958d3798a6866092f9db4e1ad8be7a0626df6dfad46102a5"
+CAMROD_DEPENDENCY_FINGERPRINT = "sha256-canonical-json-repo-path-bytes-v1"
 
 
 def load(path):
@@ -61,6 +69,119 @@ def same_camera(camera, baseline):
                 or any(not math.isclose(a,b,rel_tol=0.,abs_tol=1e-9) for a,b in zip(values,baseline[name]))):
             return False
     return True
+
+
+def dependency_file_record(path):
+    try:
+        raw = (ROOT / path).read_bytes()
+    except OSError as error:
+        raise ValueError(f"Chosen cam-rod dependency unavailable: {path}") from error
+    return {"sha256": hashlib.sha256(raw).hexdigest(), "bytes": len(raw)}
+
+
+def installed_three_epoch():
+    """Hash the proof's complete Three package, including GLTFLoader imports.
+
+    The bridge is checked once when the Synthesis generator is constructed, not
+    per frame. Deliberately do not retain a cross-call cache: direct callers must
+    detect a dependency mutation even after an earlier successful validation.
+    """
+    package = ROOT / "web/node_modules/three"
+    if not package.is_dir():
+        raise ValueError("Chosen cam-rod installed Three dependency unavailable: web/node_modules/three")
+    files = {path.relative_to(ROOT).as_posix(): dependency_file_record(path)
+             for path in package.rglob("*") if path.is_file()}
+    encoded = json.dumps(files, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+    return {"path": "web/node_modules/three", "fileCount": len(files),
+            "bytes": sum(record["bytes"] for record in files.values()),
+            "sha256": hashlib.sha256(encoded).hexdigest()}
+
+
+def validate_camrod_dependency_epoch(epoch, historical):
+    """Verify compact portable pins derived from the executed strict manifests."""
+    dependency = epoch["dependencyEpoch"]
+    installed = dependency["installedThree"]
+    manifests = dependency["strictProofManifests"]
+    if (dependency["fingerprint"] != CAMROD_DEPENDENCY_FINGERPRINT
+            or set(dependency["packageFiles"]) != {"web/package.json", "web/package-lock.json"}
+            or installed["path"] != "web/node_modules/three"
+            or set(manifests) != {"old", "current"}
+            or manifests["old"]["sha256"] != historical["oldStrictManifestSha256"]
+            or manifests["current"]["sha256"] != epoch["strictManifestSha256"]
+            or any(record["dependencyCount"] != epoch["strictDependencyCount"]
+                   or record["installedThreeSha256"] != installed["sha256"]
+                   for record in manifests.values())):
+        raise ValueError("Chosen cam-rod portable dependency proof binding differs")
+    package_files = {}
+    for path, expected in dependency["packageFiles"].items():
+        package_files[path] = dependency_file_record(path)
+        if package_files[path] != expected:
+            raise ValueError(f"Chosen cam-rod package dependency epoch differs: {path}")
+    actual = installed_three_epoch()
+    if actual != installed:
+        raise ValueError("Chosen cam-rod installed Three dependency epoch differs")
+    return {"packageFiles": package_files, "installedThree": actual}
+
+
+def validate_camrod_current_native_rebinding(probe, receipt):
+    """Bind current native code/dependencies without relabeling the original GPU capture."""
+    bridge = probe["currentNativeCPURebinding"]
+    encoded = json.dumps(bridge, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+    if hashlib.sha256(encoded).hexdigest() != CAMROD_BRIDGE_SHA256:
+        raise ValueError("Chosen cam-rod current native equivalence artifact changed")
+    lineage = probe["lineage"]
+    historical = bridge["immutableHistoricalAuthority"]
+    original = bridge["originalAuthority"]
+    epoch = bridge["currentNativeEpoch"]
+    native = bridge["nativeCPUEquivalence"]
+    solver = bridge["fitOnlySQPNPEquivalence"]
+    if (bridge["status"] != "actual-old-current-native-and-SQPNP-equivalence-pass"
+            or historical["probe"]["sha256"] != "5a9f17e64671f84478fbdbc6de8cc620ae88932cfae78c3551dd029bc5cc1321"
+            or historical["worldReceipt"]["sha256"] != lineage["actualWorldReceipt"]["sha256"]
+            or historical["sceneSourceSha256"] != lineage["sceneCurrentSourceSha256"]
+            or original["completeInput"] != lineage["completeInput"]
+            or original["sourceImage"] != lineage["sourceImage"]
+            or original["sourceSha256"] != lineage["sourceSha256"]
+            or original["nativeModelSha256"] != lineage["nativeModelSha256"]
+            or original["nativeDenominator"] != 435 or native["nativeDenominator"] != 435
+            or original["originalLandmarks"] != lineage["originalLandmarks"]
+            or original["originalFITs"] != probe["exactInputs"]
+            or epoch["model"]["sha256"] != lineage["nativeModelSha256"]
+            or epoch["strictDependencyCount"] != 1134
+            or not all(epoch[name] and native[name] and solver[name] for name in ("guardBefore", "guardAfter"))
+            or not all(native[name] for name in ("all435MatricesExact", "allNativeGeometryExact", "oldCurrentMachineStateExact", "FITFloat32WorldMatchesHistorical"))
+            or native["oldHashes"] != native["currentHashes"]
+            or not all(row["equal"] and row["maxAbsoluteNumericDifference"] == 0 for row in native["equality"].values())
+            or not solver["allBranchesEquivalent"] or not solver["allCandidatesExactlyEqual"]
+            or solver["actualEnumeration"]["candidates"] != probe["candidates"]
+            or solver["chosenCandidateId"] != "sqpnp-001"
+            or solver["preservedAuthoritativeCamera"] != probe["candidates"][1]["camera"]
+            or solver["sourceCHECKUsedToFitRankSelect"] or bridge["scope"]["sourceCHECKUsedToFitRankSelect"]
+            or bridge["scope"]["newLeftInputCameraEdgeIntegration"]
+            or bridge["scope"]["currentGPUClaim"] or bridge["scope"]["currentGPUEpochInvented"]):
+        raise ValueError("Chosen cam-rod immutable legacy/current native equivalence binding differs")
+    paths = {
+        "web/src/mechanics.ts", "web/src/magnifier.ts", "web/src/kinematics.ts",
+        "web/src/mechanics-data.ts", "web/src/source-witness.ts", "web/src/scene.ts",
+        "web/src/bindings.ts", "web/src/source-track.ts", "web/src/image-plane-homography.ts",
+    }
+    if set(epoch["codeHashes"]) != paths:
+        raise ValueError("Chosen cam-rod current native code census differs")
+    for path, expected in epoch["codeHashes"].items():
+        if hashlib.sha256((ROOT / path).read_bytes()).hexdigest() != expected:
+            raise ValueError(f"Chosen cam-rod current native code epoch differs: {path}")
+    validate_camrod_dependency_epoch(epoch, historical)
+    captured = {row["id"]: row for row in receipt["renderedLandmarks"]["landmarks"]}
+    if not (len(probe["exactInputs"]) == len(native["actualOldFITMarkers"]) == len(native["actualCurrentFITMarkers"]) == 3):
+        raise ValueError("Chosen cam-rod current native FIT marker census differs")
+    for row, old, current in zip(probe["exactInputs"], native["actualOldFITMarkers"], native["actualCurrentFITMarkers"]):
+        anchor = row["anchorId"]
+        if (old != current or old["anchorId"] != anchor
+                or old["semanticNativeAnchor"] != row["semanticNativeAnchor"]
+                or old["nativeWorldMetres"] != row["actualRenderedWorldMetres"]
+                or current["nativeWorldMetres"] != captured[anchor]["worldMetres"]):
+            raise ValueError(f"Chosen cam-rod current Float32 native FIT marker differs: {anchor}")
+    return bridge
 
 
 def nearest(rows, time, key):
@@ -106,7 +227,6 @@ class Generator:
             for frame in self.data["frames"]:
                 if frame["shotId"] == "analysis-39":
                     frame["sourceMachineRequirement"] = "required"
-                    frame["views"] = self.analysis_endcard_layout()
             self.data["compactChangeTimesSeconds"] = [
                 self.shots[name]["startSeconds"] + f*(self.shots[name]["endSeconds"]-self.shots[name]["startSeconds"])
                 for name in ("analysis-03","analysis-05","analysis-07","analysis-13","analysis-15","analysis-17","analysis-19","analysis-28")
@@ -210,6 +330,7 @@ class Generator:
         # Validate the producer's existing source-inspected layout normalization,
         # not the legacy outgoing/incoming layer guess retained in track.json.
         self.chosen_camera_permissions = self.chosen_camera_continuity_packet(video_id, permission_packet)
+        self.chosen_camera_permission_packet = permission_packet
 
     def chosen_camera_continuity_packet(self, video_id, packet):
         """Optional authored permissions, bounded by unchanged native source rows."""
@@ -573,7 +694,7 @@ class Generator:
         path = "web/content/8KmVDxkia_w.camrod-sqpnp-probe-2026-10-01.json"
         raw = (ROOT / path).read_bytes()
         digest = hashlib.sha256(raw).hexdigest()
-        if digest != "5a9f17e64671f84478fbdbc6de8cc620ae88932cfae78c3551dd029bc5cc1321":
+        if digest != CAMROD_PROBE_SHA256:
             raise ValueError("Chosen cam-rod physical probe artifact changed")
         probe = json.loads(raw)
         lineage = probe["lineage"]
@@ -584,6 +705,7 @@ class Generator:
         if receipt_hash != receipt_record["sha256"] or receipt_hash != "222d69eb315c39366e93cdcaacadd19a9074b153fa6f0db42d3ff5f9d2af8dbc":
             raise ValueError("Chosen cam-rod actual world receipt changed")
         receipt = json.loads(receipt_raw)
+        rebinding = validate_camrod_current_native_rebinding(probe, receipt)
         if (probe["status"] != "candidate-enumeration-only"
                 or probe["selection"] != "none; retain every returned pose; CHECK not evaluated"
                 or probe["chosenIntrinsics"]["verticalFovDegrees"] != 30
@@ -592,8 +714,7 @@ class Generator:
                 or lineage["sourceSha256"] != self.data["source"]["sha256"]
                 or lineage["nativeModelSha256"] != self.native["modelSha256"]
                 or lineage["nativeDenominator"] != 435
-                or lineage["originalLandmarks"] != previous["originalLandmarks"]
-                or lineage["sceneCurrentSourceSha256"] != hashlib.sha256((WEB / "src/scene.ts").read_bytes()).hexdigest()):
+                or lineage["originalLandmarks"] != previous["originalLandmarks"]):
             raise ValueError("Chosen cam-rod source/native/code/intrinsics lineage differs")
         frame = next(frame for frame in self.data["frames"]
                      if frame["shotId"] == "cam-rod" and frame["timeSeconds"] == 100)
@@ -677,10 +798,11 @@ class Generator:
                         "worldReceipt":receipt_path,"worldReceiptSha256":receipt_hash,
                         "worldReceiptOriginalPath":receipt_record["path"],
                         "lineage":copy.deepcopy(lineage),"candidates":candidates,"chosenCandidateId":"sqpnp-001",
+                        "currentNativeCPURebinding":copy.deepcopy(rebinding),
                         "chosenQualitativeMaximumAbsoluteRollDegrees":15.,
                         "chosenCADPositiveZSidePrior":{"FITCentroidWorldMetres":fit_centroid,
                             "rule":"Camera worldZ > original-three-FIT centroid worldZ and forwardWorldZ < 0, matching original back=CAD+Z/source-right=CAD+X semantics; not an arbitrary CAD-front yaw0."},
-                        "generationDependencies":"Active physical choice requires only tracked pinned SQPNP probe/world receipt, original source semantic/FIT identity, matched native hash and unchanged complete seed input. Exact original probe/receipt bytes and their old paths/hashes are retained; ignored paths within immutable lineage are historical references, never reads. Strict current scene.ts SHA byte gate remains: any byte change requires recapture/rebinding, including otherwise cosmetic edits; it is intentionally not waived. Retired similarity reports/committed packet are references only. Authoritative inputs come from *.track.json, never generated *.source-track.json.",
+                        "generationDependencies":"Active physical choice requires the tracked pinned original SQPNP physical authority, unchanged historical GPU world receipt, and mandatory portable actual old/current native-CPU/Float32-marker/SQPNP equivalence metadata; original source semantic/FIT identity, matched native hash and complete seed input remain exact. Original GPU scene-byte lineage is preserved as historical evidence, never relabeled current. Every current native source-code SHA and all1117 installed Three dependency bytes, including GLTFLoader/transitive imports, are strictly bound to the executed equivalence proof. Generation additionally pins web/package.json and web/package-lock.json; these two files were not in the original strict1134 CPU proof census. Any code, package/lockfile or installed Three byte/census change refuses generation and requires actual proof/rebinding, with no hash-only substitution or waiver. Dependency bytes are read once at Synthesis construction, not per frame, and no cross-call cache can conceal later mutation. Ignored proof paths are provenance references only, never generation-time reads. Retired similarity reports remain references. Authoritative source inputs come from *.track.json, never generated *.source-track.json. CPU equivalence is not current GPU coverage, historical-camera or source/stage acceptance.",
                         "reason":"Root selected only on original qualitative upright columns/no observed large roll and original back=CAD+Z semantic mapping. Both physical sparse branches fit the same three FITs; sqpnp-000's64.65deg roll conflicts with the declared chosen15deg upright/CAD-positiveZ-side prior. This prior is not measured historical roll. CHECK baseline and prior GPU errors were historically inspected, but CHECK was excluded from SQPNP enumeration objective and branch selection; candidate CHECKs were not projected/ranked before root selected001. Post-selection held-out measurements are separate evidence, not retroactive selection inputs.",
                         "depthScope":"Only three actual original FIT points; no whole-native-geometry positive-depth or GPU acceptance claim",
                         "poseConversion":"OpenCV world-to-camera R,t: position=-R^T*t; cameraToWorld=R^T*diag(1,-1,-1); quaternion xyzw. Fixed chosen FOV30, PP(960,540); native XYZ comes from the actual completed-draw Float32 marker vertex, not raster pixels or catalogue assumptions."}})
@@ -972,29 +1094,28 @@ class Generator:
                 return value, f"Complete immutable numeric baseline plus source-observed {feature} vertical-displacement witness. Assumed harmonic1 branch/small coefficient; pixel range mapped to cosine phase, not metrically recovered source motion or station association. Other hidden settings held, no generic animation."
         return value, "Complete immutable physically exercised small-large input baseline; unmeasured source-visible motion/coefficients held rather than invented. This is a source-informed static candidate, not historical state recovery."
 
-    @staticmethod
-    def analysis_endcard_layout():
-        # Visually read from original AnalysisMP4 at220s: boundaries x640/1280,
-        # y540. These are this source's boxes, not copied Spin source pixels.
-        views = [{"id":"endcard-intro","rectSourcePixels":[0,0,640,540],"presentation":"native"},
-                 {"id":"endcard-synthesis","rectSourcePixels":[640,0,640,540],"presentation":"native"},
-                 {"id":"endcard-book","rectSourcePixels":[0,540,640,540],"presentation":"native"},
-                 {"id":"endcard-guide","rectSourcePixels":[640,540,640,540],"presentation":"native"},
-                 {"id":"endcard-rocker","rectSourcePixels":[1280,540,640,540],"presentation":"native"}]
-        views.extend({"id":f"endcard-operation-paper-{i}","rectSourcePixels":[1280,180*i,640,180],"presentation":"native"} for i in range(3))
-        return views
 
     def donor_view(self, original, donor_id):
         donor = self.donors["views"][donor_id]
-        return {"id":original["id"],"rectSourcePixels":original["rectSourcePixels"],
+        result = {"id":original["id"],"rectSourcePixels":original["rectSourcePixels"],
                 "presentation":original.get("presentation",donor.get("presentation","native")),
                 "camera":common.compact_camera(donor["camera"]),
                 "input":common.compact_input(self.donors["candidates"][donor["candidateId"]]["input"]),
                 "provenance":common.chosen_provenance(f"Photographed branch donor {donor_id}/{donor['candidateId']} from XPQwKRt4Y2k.source-seeds.json. Source boxes retained/independently inspected; camera/full input transferred as a coarse chosen candidate, NOT measured current-source pixels, history or GPU qualification. Blurred layer weights and source footage cadence unobserved.")}
+        composite = common.compact_composite(original)
+        warp = common.resolve_warp(original)
+        if composite:
+            result["composite"] = composite
+        if warp:
+            result["imagePlaneWarp"] = warp
+        return result
 
     def views(self, frame):
         output = []
         for original in common.source_views(frame,self.data):
+            if (self.analysis and frame["shotId"] != "analysis-39"
+                    and common.source_requirement(original) == "unreadable-navigation" and original.get("camera") is None):
+                continue
             donor_id = original["id"]
             if not self.analysis:
                 donor_id = {"endcard-plaque":"endcard-intro","endcard-bank":"endcard-analysis","endcard-pen-inset":"endcard-analysis-pen-inset"}.get(donor_id, donor_id)
@@ -1025,7 +1146,9 @@ class Generator:
             width = max(1.,1920*f)
             original = {"id":"bar-bank", "rectSourcePixels":[1920-width,0,width,1080], "presentation":"native"}
             family="bar";camera,note=self.camera(frame,original,family);value,why=self.input(frame,family)
-            output.append({**original,"camera":camera,"input":common.compact_input(value),"provenance":common.chosen_provenance(note+" "+why+" Expanding insert layout inferred linearly from the independently retained shot onset/settle; rectangle is chosen, not measured.")})
+            output.append({**original,"sourceViewIds":["main"],
+                "sourceViewMappingEvidence":"Authored bar-bank insert decomposition of the retained main source view. Its expanding rectangle is chosen from the shot onset/settle, not an independently measured view boundary.",
+                "camera":camera,"input":common.compact_input(value),"provenance":common.chosen_provenance(note+" "+why+" Expanding insert layout inferred linearly from the independently retained shot onset/settle; rectangle is chosen, not measured.")})
         fades = {"analysis-13":("spring","pen"), "analysis-15":("pen","cone"), "analysis-28":("spring","pen")}
         if self.analysis and frame["shotId"] in fades:
             shot = self.shots[frame["shotId"]]
@@ -1060,7 +1183,7 @@ class Generator:
         track = common.build_track(self.data,self.views,[
             "Regenerate with python web/scripts/generate-analysis-synthesis-source-tracks.py; all active inputs are pinned tracked web/content calibration evidence, renderer binding metadata and source declarations. Ignored paths are historical provenance only; source/model hashes remain unchanged.",
             "All50/20/10/5% width stages remain unmeasured. CPU camera rejection at2% is not a blanket removal of a coarser candidate. No GPU/model/browser execution or historical source recovery.",
-            "Camera/input/layout assumptions are declared per view. All retained source shots and integer/change/layout keys remain required, including nested endcards; source copyrighted artwork is not reconstructed."])
+            "Camera/input/layout assumptions are declared per view. Retained source shots and integer/change/layout keys remain unchanged; only evidenced unreadable-navigation backgrounds waive measurement, with original nested source archives retained."])
         track["source"] = copy.deepcopy(self.data["source"])
         if self.analysis_held_camera:
             application = self.analysis_held_camera["application"]
@@ -1076,7 +1199,7 @@ class Generator:
                 raise ValueError("Analysis held-camera application is empty or leaves retained stationary main exposures uncovered.")
             track["evidence"]["analysisStationaryFrontCamera"] = copy.deepcopy(self.analysis_held_camera)
             track["evidence"]["notes"].append(self.analysis_held_camera["interpretation"])
-        track["evidence"]["notes"].append("Analysis endcard boxes independently inspected from retained original MP4 at220s. Donor photographed camera branches are explicitly chosen, not copied source pixels. Page-flip uses a finite chosen projective-layout baseline, not recovered editing history.")
+        track["evidence"]["notes"].append("Authoritative terminal navigation boxes and waiver evidence come from retained original-source observations. Existing photographed camera branches remain chosen metadata, not copied source pixels. Newly archived unreadable backgrounds have no inferred camera/input. Page-flip uses a finite chosen projective-layout baseline, not recovered editing history.")
         track["cpuDiagnostics"] = {
             "analysisFourSeed": {"source":f"{ANALYSIS}/candidate.json", "qualification":self.candidate["qualification"], "distributions":self.candidate["fullSourceRawAndNormalizedDistributions"]},
             "synthesisPinhole": {"source":CALIBRATION, "jsonPointer":"/inputs/pinhole/data", "finiteAttempts":self.pinhole["finiteAttemptCount"], "positiveDepthCandidates":self.pinhole["physicalPositiveDepthEscapeCount"], "sourceAccepted":False},
@@ -1113,6 +1236,7 @@ class Generator:
             track["sourceMeasurements"]["blockers"].append("Cone-overview's two-FIT similarity remains chosen/unqualified. Cam-rod now uses three original FIT pixels and same-input actual native world markers for a root-selected upright fixedFOV30/centredPP SQPNP physical pose; previous camera similarities are historical/unaccepted. Its declared15deg upright branch prior is not a measured historical camera. Only3FIT depths are established, not whole geometry or GPU/stage acceptance;3FIT/1CHECK still lacks qualified6FIT/2CHECK. Pinion CHECK was never used for objective/ranking/selection and remains held out for root measurement.")
             track["sourceMeasurements"]["blockers"].append("Synthesis presenter-to-spin has one original main machine view with chosen coarse principal-point/FOV reframing. No independently measured transition FIT/CHECK landmarks or per-exposure camera fits are introduced; presenter/black graphic/formula are not native geometry.")
         self.camera_metadata(track)
+        track["evidence"]["chosenCameraInterpolation"] = copy.deepcopy(self.chosen_camera_permission_packet)
         return track
 
     def camera_metadata(self, track):
@@ -1120,6 +1244,8 @@ class Generator:
         applied_permissions = set()
         for frame in track["frames"]:
             for view in frame["views"]:
+                if view.get("camera") is None:
+                    continue
                 evidence = view["provenance"]["evidence"]
                 camera = view["camera"]
                 component = self.family(frame,view)

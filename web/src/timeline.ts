@@ -5,9 +5,10 @@ import { CompactVideoReference, type CompactSourceTrack } from './source-track'
 import type { Video } from './video-catalog'
 
 export { SOURCE_WIDTH, SOURCE_HEIGHT, LANDMARK_LIMIT_PX, SOURCE_STAGE_PERCENTAGES } from './source-track'
+export type { SourceViewMeasurementRequirement } from './source-track'
 
 /** Approximation never asserts recovered history or a passed rendered tolerance stage. */
-export type ReferenceState = 'approximate' | 'no-machine' | 'unavailable'
+export type ReferenceState = 'approximate' | 'waived-navigation' | 'no-machine' | 'unavailable'
 export type Classification = 'machine' | 'non-machine' | 'transition' | 'unobservable'
 export interface SourceIdentity {
   videoId: string
@@ -74,11 +75,17 @@ export interface PlaybackView extends SourceView {
   sourceLayout: readonly SourceLayoutEntry[]
   nativeGeometryAssumptions: readonly NativeGeometryAssumption[]
 }
+export interface WaivedSourceView {
+  id: string
+  measurementRequirement: 'unreadable-navigation'
+  measurementRequirementEvidence: string
+}
 export interface SourceSample {
   state: ReferenceState
   timeSeconds: number
   reason: string
   views: PlaybackView[]
+  waivedViews: readonly WaivedSourceView[]
   mechanicalProvenance: 'chosen' | null
   unobservedInputFields: InputField[]
   nativeGeometryAssumptions: readonly NativeGeometryAssumption[]

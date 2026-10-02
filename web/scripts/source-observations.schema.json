@@ -191,10 +191,11 @@
     "warpedNativeLineCheck": {"allOf": [{"$ref": "#/$defs/nativeLineCheck"}, {"properties": {"measurementEvidence": {"required": ["axisPerspectiveBiasSpace"]}}}]},
     "sourceContourCheck": {
       "type": "object",
-      "required": ["id", "partPath", "sourceContourPixels", "uncertaintyPx", "measurementEvidence"],
+      "required": ["id", "role", "partPath", "sourceContourPixels", "uncertaintyPx", "measurementEvidence"],
       "additionalProperties": false,
       "properties": {
         "id": {"$ref": "#/$defs/sourceEvidence"},
+        "role": {"enum": ["fit", "check"], "description": "Authoritative producer-declared fitting versus independent held-out role. Never inferred from prose, part motion or a missing value; FIT curves cannot certify CHECK coverage."},
         "partPath": {"$ref": "#/$defs/nativePartPath"},
         "sourceContourPixels": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/pixelPair"}, "description": "Independently measured source-global contour samples, bound to the actual decoded exposure; never native projections used as source observations."},
         "uncertaintyPx": {"type": "number", "minimum": 0, "description": "Independent conservative Euclidean final source-global localization/raster-quantization bound, matching landmarks and native line checks. Added exactly once to nearest captured boundary distance and native raster uncertainty; unknown/null fails closed. H does not transform an already-source-global bound; warped localization footprints must remain bounded and supported."},
@@ -406,11 +407,14 @@
     "view": {
       "type": "object",
       "required": ["id", "rectSourcePixels", "presentation", "camera", "mechanicalState"],
+      "dependentSchemas": {"measurementRequirement": {"if": {"properties": {"measurementRequirement": {"const": "unreadable-navigation"}}}, "then": {"required": ["measurementRequirementEvidence"]}}},
       "allOf": [{"if": {"required": ["mechanicalState"], "properties": {"mechanicalState": {"required": ["status"], "properties": {"status": {"enum": ["observed", "constrained"]}}}}}, "then": {"properties": {"camera": {"type": "object"}}}}, {"if": {"required": ["composite"], "properties": {"composite": {"required": ["mode"], "properties": {"mode": {"const": "crossfade"}}}}}, "then": {"required": ["compositeEvidence"]}}, {"if": {"required": ["imagePlaneWarp"]}, "then": {"required": ["cameraEvidence"], "properties": {"cameraEvidence": {"properties": {"kind": {"const": "source-image-plane-registered"}}}, "nativeLineChecks": {"items": {"$ref": "#/$defs/warpedNativeLineCheck"}}}}}, {"if": {"required": ["cameraEvidence"], "properties": {"cameraEvidence": {"required": ["kind"], "properties": {"kind": {"const": "source-image-plane-registered"}}}}}, "then": {"required": ["imagePlaneWarp"]}}],
       "properties": {
         "id": {"type": "string"},
         "rectSourcePixels": {"$ref": "#/$defs/xyzw"},
         "presentation": {"enum": ["native", "horizontal-mirror"]},
+        "measurementRequirement": {"enum": ["required", "unreadable-navigation"], "default": "required", "description": "Only source-proven severely blurred or opaque text-covered terminal navigation backgrounds may waive measurement. Physical source-machine presence and original archival observations remain unchanged."},
+        "measurementRequirementEvidence": {"$ref": "#/$defs/sourceEvidence"},
         "camera": {"$ref": "#/$defs/camera"},
         "cameraFit": {"$ref": "#/$defs/cameraFit"},
         "cameraEvidence": {"$ref": "#/$defs/cameraEvidence"},

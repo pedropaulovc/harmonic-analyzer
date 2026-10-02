@@ -1,0 +1,824 @@
+{
+  "schemaVersion": 1,
+  "videoId": "XPQwKRt4Y2k",
+  "sourceSha256": "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505",
+  "qualification": "Original physical CHECK IDs/roles and source pixels approved after actual-source review. Historical wrong-feature rows preserved privately but excluded. Not camera fitting or native acceptance.",
+  "seeds": [
+    {
+      "timeSeconds": 30.03,
+      "decodedTimeSeconds": 30.03,
+      "requestedTimeSeconds": 30,
+      "shotId": "whole-machine",
+      "sourceImage": {
+        "frameIndex": 720,
+        "sha256Bgr8": "c65bf7db8015ef097eedee4c38dbe9b58390472fcb86c1197b274051d334c2cf",
+        "pixelFormat": "bgr8",
+        "width": 1920,
+        "height": 1080,
+        "sourceSha256": "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505"
+      },
+      "landmarks": [
+        {
+          "anchorId": "wheel.center",
+          "role": "check",
+          "pixel": [
+            957,
+            535
+          ],
+          "status": "observed",
+          "method": "manual",
+          "uncertaintyPx": 3,
+          "viewId": "whole",
+          "measurementEvidence": {
+            "sourceImage": {
+              "frameIndex": 720,
+              "sha256Bgr8": "c65bf7db8015ef097eedee4c38dbe9b58390472fcb86c1197b274051d334c2cf",
+              "pixelFormat": "bgr8",
+              "width": 1920,
+              "height": 1080,
+              "sourceSha256": "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505"
+            },
+            "independentManualSeedSourceImage": {
+              "frameIndex": 720,
+              "sha256Bgr8": "c65bf7db8015ef097eedee4c38dbe9b58390472fcb86c1197b274051d334c2cf",
+              "pixelFormat": "bgr8",
+              "width": 1920,
+              "height": 1080,
+              "sourceSha256": "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505"
+            },
+            "sourceOnlyProducer": "Existing unchanged observe-source.py APIs; no native images/cameras/errors consumed.",
+            "manualProvenance": {
+              "sourceImage": {
+                "frameIndex": 720,
+                "sha256Bgr8": "c65bf7db8015ef097eedee4c38dbe9b58390472fcb86c1197b274051d334c2cf",
+                "pixelFormat": "bgr8",
+                "width": 1920,
+                "height": 1080,
+                "sourceSha256": "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505"
+              },
+              "manualProvenance": {
+                "jsonlPath": "/home/pedro/.omp/agent/sessions/-src-wt-website-scaffolding/2026-09-30T14-29-10-666Z_01a0f2b8-298a-76eb-8119-8a8f2633cd1d/CodexCalSpin.jsonl",
+                "lineNumber": 85,
+                "eventId": "3bc39c8a",
+                "timestamp": "2026-09-30T22:18:43.734Z",
+                "qualification": "Exact prior manually measured table, not promotion of current template-match rows. Original rows/roles retained. Physical CHECKs may be independently source-tracked; section centres must not be LK tracked."
+              },
+              "qualification": "Recovered original authored manual physical CHECK, not current-template reclassification."
+            }
+          }
+        },
+        {
+          "anchorId": "frame-cross-screw-6",
+          "role": "check",
+          "pixel": [
+            816,
+            107
+          ],
+          "status": "observed",
+          "method": "manual",
+          "uncertaintyPx": 3,
+          "viewId": "whole",
+          "measurementEvidence": {
+            "sourceImage": {
+              "frameIndex": 720,
+              "sha256Bgr8": "c65bf7db8015ef097eedee4c38dbe9b58390472fcb86c1197b274051d334c2cf",
+              "pixelFormat": "bgr8",
+              "width": 1920,
+              "height": 1080,
+              "sourceSha256": "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505"
+            },
+            "independentManualSeedSourceImage": {
+              "frameIndex": 720,
+              "sha256Bgr8": "c65bf7db8015ef097eedee4c38dbe9b58390472fcb86c1197b274051d334c2cf",
+              "pixelFormat": "bgr8",
+              "width": 1920,
+              "height": 1080,
+              "sourceSha256": "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505"
+            },
+            "sourceOnlyProducer": "Existing unchanged observe-source.py APIs; no native images/cameras/errors consumed.",
+            "manualProvenance": {
+              "sourceImage": {
+                "frameIndex": 720,
+                "sha256Bgr8": "c65bf7db8015ef097eedee4c38dbe9b58390472fcb86c1197b274051d334c2cf",
+                "pixelFormat": "bgr8",
+                "width": 1920,
+                "height": 1080,
+                "sourceSha256": "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505"
+              },
+              "manualProvenance": {
+                "jsonlPath": "/home/pedro/.omp/agent/sessions/-src-wt-website-scaffolding/2026-09-30T14-29-10-666Z_01a0f2b8-298a-76eb-8119-8a8f2633cd1d/CodexCalSpin.jsonl",
+                "lineNumber": 85,
+                "eventId": "3bc39c8a",
+                "timestamp": "2026-09-30T22:18:43.734Z",
+                "qualification": "Exact prior manually measured table, not promotion of current template-match rows. Original rows/roles retained. Physical CHECKs may be independently source-tracked; section centres must not be LK tracked."
+              },
+              "qualification": "Recovered original authored manual physical CHECK, not current-template reclassification."
+            }
+          }
+        },
+        {
+          "anchorId": "frame-cross-screw-5",
+          "role": "check",
+          "pixel": [
+            1147,
+            123
+          ],
+          "status": "observed",
+          "method": "manual",
+          "uncertaintyPx": 3,
+          "viewId": "whole",
+          "measurementEvidence": {
+            "sourceImage": {
+              "frameIndex": 720,
+              "sha256Bgr8": "c65bf7db8015ef097eedee4c38dbe9b58390472fcb86c1197b274051d334c2cf",
+              "pixelFormat": "bgr8",
+              "width": 1920,
+              "height": 1080,
+              "sourceSha256": "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505"
+            },
+            "independentManualSeedSourceImage": {
+              "frameIndex": 720,
+              "sha256Bgr8": "c65bf7db8015ef097eedee4c38dbe9b58390472fcb86c1197b274051d334c2cf",
+              "pixelFormat": "bgr8",
+              "width": 1920,
+              "height": 1080,
+              "sourceSha256": "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505"
+            },
+            "sourceOnlyProducer": "Existing unchanged observe-source.py APIs; no native images/cameras/errors consumed.",
+            "manualProvenance": {
+              "sourceImage": {
+                "frameIndex": 720,
+                "sha256Bgr8": "c65bf7db8015ef097eedee4c38dbe9b58390472fcb86c1197b274051d334c2cf",
+                "pixelFormat": "bgr8",
+                "width": 1920,
+                "height": 1080,
+                "sourceSha256": "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505"
+              },
+              "manualProvenance": {
+                "jsonlPath": "/home/pedro/.omp/agent/sessions/-src-wt-website-scaffolding/2026-09-30T14-29-10-666Z_01a0f2b8-298a-76eb-8119-8a8f2633cd1d/CodexCalSpin.jsonl",
+                "lineNumber": 85,
+                "eventId": "3bc39c8a",
+                "timestamp": "2026-09-30T22:18:43.734Z",
+                "qualification": "Exact prior manually measured table, not promotion of current template-match rows. Original rows/roles retained. Physical CHECKs may be independently source-tracked; section centres must not be LK tracked."
+              },
+              "qualification": "Recovered original authored manual physical CHECK, not current-template reclassification."
+            }
+          }
+        },
+        {
+          "anchorId": "frame-cross-screw-2",
+          "role": "check",
+          "pixel": [
+            829,
+            1030
+          ],
+          "status": "observed",
+          "method": "manual",
+          "uncertaintyPx": 3,
+          "viewId": "whole",
+          "measurementEvidence": {
+            "sourceImage": {
+              "frameIndex": 720,
+              "sha256Bgr8": "c65bf7db8015ef097eedee4c38dbe9b58390472fcb86c1197b274051d334c2cf",
+              "pixelFormat": "bgr8",
+              "width": 1920,
+              "height": 1080,
+              "sourceSha256": "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505"
+            },
+            "independentManualSeedSourceImage": {
+              "frameIndex": 720,
+              "sha256Bgr8": "c65bf7db8015ef097eedee4c38dbe9b58390472fcb86c1197b274051d334c2cf",
+              "pixelFormat": "bgr8",
+              "width": 1920,
+              "height": 1080,
+              "sourceSha256": "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505"
+            },
+            "sourceOnlyProducer": "Existing unchanged observe-source.py APIs; no native images/cameras/errors consumed.",
+            "manualProvenance": {
+              "sourceImage": {
+                "frameIndex": 720,
+                "sha256Bgr8": "c65bf7db8015ef097eedee4c38dbe9b58390472fcb86c1197b274051d334c2cf",
+                "pixelFormat": "bgr8",
+                "width": 1920,
+                "height": 1080,
+                "sourceSha256": "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505"
+              },
+              "manualProvenance": {
+                "jsonlPath": "/home/pedro/.omp/agent/sessions/-src-wt-website-scaffolding/2026-09-30T14-29-10-666Z_01a0f2b8-298a-76eb-8119-8a8f2633cd1d/CodexCalSpin.jsonl",
+                "lineNumber": 85,
+                "eventId": "3bc39c8a",
+                "timestamp": "2026-09-30T22:18:43.734Z",
+                "qualification": "Exact prior manually measured table, not promotion of current template-match rows. Original rows/roles retained. Physical CHECKs may be independently source-tracked; section centres must not be LK tracked."
+              },
+              "qualification": "Recovered original authored manual physical CHECK, not current-template reclassification."
+            }
+          }
+        }
+      ],
+      "views": [
+        {
+          "id": "whole",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ]
+        }
+      ],
+      "decodedTimestampTicks": 720720,
+      "timeBase": "1/24000",
+      "sourceTimeEvidence": "Exact original native timestamp ticks and rational1/24000 clock; six-decimal ffprobe display is not source-image admission authority."
+    },
+    {
+      "timeSeconds": 32.99129166666667,
+      "decodedTimeSeconds": 32.99129166666667,
+      "requestedTimeSeconds": 33,
+      "shotId": "whole-machine",
+      "sourceImage": {
+        "frameIndex": 791,
+        "sha256Bgr8": "a8d64763dd6fd099bb8a2ef4ae3ed3e83741a39a6b78861e958ad5a3b48f9bc0",
+        "pixelFormat": "bgr8",
+        "width": 1920,
+        "height": 1080,
+        "sourceSha256": "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505"
+      },
+      "landmarks": [
+        {
+          "anchorId": "wheel.center",
+          "role": "check",
+          "pixel": [
+            938,
+            539
+          ],
+          "status": "observed",
+          "method": "manual",
+          "uncertaintyPx": 3,
+          "viewId": "whole",
+          "measurementEvidence": {
+            "sourceImage": {
+              "frameIndex": 791,
+              "sha256Bgr8": "a8d64763dd6fd099bb8a2ef4ae3ed3e83741a39a6b78861e958ad5a3b48f9bc0",
+              "pixelFormat": "bgr8",
+              "width": 1920,
+              "height": 1080,
+              "sourceSha256": "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505"
+            },
+            "independentManualSeedSourceImage": {
+              "frameIndex": 791,
+              "sha256Bgr8": "a8d64763dd6fd099bb8a2ef4ae3ed3e83741a39a6b78861e958ad5a3b48f9bc0",
+              "pixelFormat": "bgr8",
+              "width": 1920,
+              "height": 1080,
+              "sourceSha256": "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505"
+            },
+            "sourceOnlyProducer": "Existing unchanged observe-source.py APIs; no native images/cameras/errors consumed.",
+            "manualProvenance": {
+              "sourceImage": {
+                "frameIndex": 791,
+                "sha256Bgr8": "a8d64763dd6fd099bb8a2ef4ae3ed3e83741a39a6b78861e958ad5a3b48f9bc0",
+                "pixelFormat": "bgr8",
+                "width": 1920,
+                "height": 1080,
+                "sourceSha256": "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505"
+              },
+              "manualProvenance": {
+                "jsonlPath": "/home/pedro/.omp/agent/sessions/-src-wt-website-scaffolding/2026-09-30T14-29-10-666Z_01a0f2b8-298a-76eb-8119-8a8f2633cd1d/CodexCalSpin.jsonl",
+                "lineNumber": 85,
+                "eventId": "3bc39c8a",
+                "timestamp": "2026-09-30T22:18:43.734Z",
+                "qualification": "Exact prior manually measured table, not promotion of current template-match rows. Original rows/roles retained. Physical CHECKs may be independently source-tracked; section centres must not be LK tracked."
+              },
+              "qualification": "Recovered original authored manual physical CHECK, not current-template reclassification."
+            }
+          }
+        }
+      ],
+      "views": [
+        {
+          "id": "whole",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ]
+        }
+      ],
+      "decodedTimestampTicks": 791791,
+      "timeBase": "1/24000",
+      "sourceTimeEvidence": "Exact original native timestamp ticks and rational1/24000 clock; six-decimal ffprobe display is not source-image admission authority."
+    },
+    {
+      "timeSeconds": 4.75475,
+      "decodedTimeSeconds": 4.75475,
+      "decodedTimestampTicks": 114114,
+      "timeBase": "1/24000",
+      "shotId": "whole-machine",
+      "sourceImage": {
+        "frameIndex": 114,
+        "sha256Bgr8": "92cf99daf4cad9f5e7e4ed10044f4e67e2add92f251b9357e26029eaf491d34d",
+        "pixelFormat": "bgr8",
+        "width": 1920,
+        "height": 1080,
+        "sourceSha256": "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505"
+      },
+      "landmarks": [
+        {
+          "anchorId": "wheel.center",
+          "viewId": "whole",
+          "role": "check",
+          "pixel": [
+            789,
+            537
+          ],
+          "status": "observed",
+          "method": "manual",
+          "uncertaintyPx": 4,
+          "measurementEvidence": {
+            "sourceImage": {
+              "frameIndex": 114,
+              "sha256Bgr8": "92cf99daf4cad9f5e7e4ed10044f4e67e2add92f251b9357e26029eaf491d34d",
+              "pixelFormat": "bgr8",
+              "width": 1920,
+              "height": 1080,
+              "sourceSha256": "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505"
+            },
+            "independentManualSeedSourceImage": {
+              "frameIndex": 114,
+              "sha256Bgr8": "92cf99daf4cad9f5e7e4ed10044f4e67e2add92f251b9357e26029eaf491d34d",
+              "pixelFormat": "bgr8",
+              "width": 1920,
+              "height": 1080,
+              "sourceSha256": "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505"
+            },
+            "sourceOnlyProducer": "Existing unchanged observe-source.py APIs; no native images/cameras/errors consumed.",
+            "manualProvenance": {
+              "sourceImage": {
+                "frameIndex": 114,
+                "sha256Bgr8": "92cf99daf4cad9f5e7e4ed10044f4e67e2add92f251b9357e26029eaf491d34d",
+                "pixelFormat": "bgr8",
+                "width": 1920,
+                "height": 1080,
+                "sourceSha256": "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505"
+              },
+              "identity": "Brass hub visible in profile at convergence of photographed wheel spokes; no projected or template-reference point used.",
+              "authorship": "SpinSourceRefine independently inspected original source PNG/crop on 2026-10-02; numeric centre authored from actual photographed hub, no native residual or camera consumed.",
+              "qualification": "Manual source physical CHECK candidate; Root source-frame review required before publication."
+            }
+          }
+        }
+      ],
+      "views": [
+        {
+          "id": "whole",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ]
+        }
+      ],
+      "sourceTimeEvidence": "Exact original native timestamp ticks and rational1/24000 clock; six-decimal ffprobe display is not source-image admission authority."
+    },
+    {
+      "timeSeconds": 5.75575,
+      "decodedTimeSeconds": 5.75575,
+      "decodedTimestampTicks": 138138,
+      "timeBase": "1/24000",
+      "shotId": "whole-machine",
+      "sourceImage": {
+        "frameIndex": 138,
+        "sha256Bgr8": "096b0d55653f84a22049aadfe87176176fa26e8d23b5d637f142272e868039ef",
+        "pixelFormat": "bgr8",
+        "width": 1920,
+        "height": 1080,
+        "sourceSha256": "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505"
+      },
+      "landmarks": [
+        {
+          "anchorId": "wheel.center",
+          "viewId": "whole",
+          "role": "check",
+          "pixel": [
+            853,
+            534
+          ],
+          "status": "observed",
+          "method": "manual",
+          "uncertaintyPx": 4,
+          "measurementEvidence": {
+            "sourceImage": {
+              "frameIndex": 138,
+              "sha256Bgr8": "096b0d55653f84a22049aadfe87176176fa26e8d23b5d637f142272e868039ef",
+              "pixelFormat": "bgr8",
+              "width": 1920,
+              "height": 1080,
+              "sourceSha256": "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505"
+            },
+            "independentManualSeedSourceImage": {
+              "frameIndex": 138,
+              "sha256Bgr8": "096b0d55653f84a22049aadfe87176176fa26e8d23b5d637f142272e868039ef",
+              "pixelFormat": "bgr8",
+              "width": 1920,
+              "height": 1080,
+              "sourceSha256": "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505"
+            },
+            "sourceOnlyProducer": "Existing unchanged observe-source.py APIs; no native images/cameras/errors consumed.",
+            "manualProvenance": {
+              "sourceImage": {
+                "frameIndex": 138,
+                "sha256Bgr8": "096b0d55653f84a22049aadfe87176176fa26e8d23b5d637f142272e868039ef",
+                "pixelFormat": "bgr8",
+                "width": 1920,
+                "height": 1080,
+                "sourceSha256": "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505"
+              },
+              "identity": "Clearly visible brass central boss at convergence of radial spokes in original source hub-band crop.",
+              "authorship": "SpinSourceRefine independently inspected original source PNG/crop on 2026-10-02; numeric centre authored from actual photographed hub, no native residual or camera consumed.",
+              "qualification": "Manual source physical CHECK candidate; Root source-frame review required before publication."
+            }
+          }
+        }
+      ],
+      "views": [
+        {
+          "id": "whole",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ]
+        }
+      ],
+      "sourceTimeEvidence": "Exact original native timestamp ticks and rational1/24000 clock; six-decimal ffprobe display is not source-image admission authority."
+    },
+    {
+      "timeSeconds": 6.75675,
+      "decodedTimeSeconds": 6.75675,
+      "decodedTimestampTicks": 162162,
+      "timeBase": "1/24000",
+      "shotId": "whole-machine",
+      "sourceImage": {
+        "frameIndex": 162,
+        "sha256Bgr8": "64ae37f12c830014119a9fa312eaa9e455b4a31ddc500d4cce985895ddfec17e",
+        "pixelFormat": "bgr8",
+        "width": 1920,
+        "height": 1080,
+        "sourceSha256": "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505"
+      },
+      "landmarks": [
+        {
+          "anchorId": "wheel.center",
+          "viewId": "whole",
+          "role": "check",
+          "pixel": [
+            1026,
+            534
+          ],
+          "status": "observed",
+          "method": "manual",
+          "uncertaintyPx": 4,
+          "measurementEvidence": {
+            "sourceImage": {
+              "frameIndex": 162,
+              "sha256Bgr8": "64ae37f12c830014119a9fa312eaa9e455b4a31ddc500d4cce985895ddfec17e",
+              "pixelFormat": "bgr8",
+              "width": 1920,
+              "height": 1080,
+              "sourceSha256": "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505"
+            },
+            "independentManualSeedSourceImage": {
+              "frameIndex": 162,
+              "sha256Bgr8": "64ae37f12c830014119a9fa312eaa9e455b4a31ddc500d4cce985895ddfec17e",
+              "pixelFormat": "bgr8",
+              "width": 1920,
+              "height": 1080,
+              "sourceSha256": "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505"
+            },
+            "sourceOnlyProducer": "Existing unchanged observe-source.py APIs; no native images/cameras/errors consumed.",
+            "manualProvenance": {
+              "sourceImage": {
+                "frameIndex": 162,
+                "sha256Bgr8": "64ae37f12c830014119a9fa312eaa9e455b4a31ddc500d4cce985895ddfec17e",
+                "pixelFormat": "bgr8",
+                "width": 1920,
+                "height": 1080,
+                "sourceSha256": "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505"
+              },
+              "identity": "Visible hub/boss in front-quarter source wheel; centre selected at spoke convergence.",
+              "authorship": "SpinSourceRefine independently inspected original source PNG/crop on 2026-10-02; numeric centre authored from actual photographed hub, no native residual or camera consumed.",
+              "qualification": "Manual source physical CHECK candidate; Root source-frame review required before publication."
+            }
+          }
+        }
+      ],
+      "views": [
+        {
+          "id": "whole",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ]
+        }
+      ],
+      "sourceTimeEvidence": "Exact original native timestamp ticks and rational1/24000 clock; six-decimal ffprobe display is not source-image admission authority."
+    },
+    {
+      "timeSeconds": 7.25725,
+      "decodedTimeSeconds": 7.25725,
+      "decodedTimestampTicks": 174174,
+      "timeBase": "1/24000",
+      "shotId": "whole-machine",
+      "sourceImage": {
+        "frameIndex": 174,
+        "sha256Bgr8": "143a981cc535dc3be82a5d5b14c7ce7d5db156861763190e4ae5a3653f08f5e3",
+        "pixelFormat": "bgr8",
+        "width": 1920,
+        "height": 1080,
+        "sourceSha256": "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505"
+      },
+      "landmarks": [
+        {
+          "anchorId": "wheel.center",
+          "viewId": "whole",
+          "role": "check",
+          "pixel": [
+            1077,
+            534
+          ],
+          "status": "observed",
+          "method": "manual",
+          "uncertaintyPx": 4,
+          "measurementEvidence": {
+            "sourceImage": {
+              "frameIndex": 174,
+              "sha256Bgr8": "143a981cc535dc3be82a5d5b14c7ce7d5db156861763190e4ae5a3653f08f5e3",
+              "pixelFormat": "bgr8",
+              "width": 1920,
+              "height": 1080,
+              "sourceSha256": "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505"
+            },
+            "independentManualSeedSourceImage": {
+              "frameIndex": 174,
+              "sha256Bgr8": "143a981cc535dc3be82a5d5b14c7ce7d5db156861763190e4ae5a3653f08f5e3",
+              "pixelFormat": "bgr8",
+              "width": 1920,
+              "height": 1080,
+              "sourceSha256": "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505"
+            },
+            "sourceOnlyProducer": "Existing unchanged observe-source.py APIs; no native images/cameras/errors consumed.",
+            "manualProvenance": {
+              "sourceImage": {
+                "frameIndex": 174,
+                "sha256Bgr8": "143a981cc535dc3be82a5d5b14c7ce7d5db156861763190e4ae5a3653f08f5e3",
+                "pixelFormat": "bgr8",
+                "width": 1920,
+                "height": 1080,
+                "sourceSha256": "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505"
+              },
+              "identity": "Visible brass central boss in source wheel profile; original pixels inspected, not predicted centre.",
+              "authorship": "SpinSourceRefine independently inspected original source PNG/crop on 2026-10-02; numeric centre authored from actual photographed hub, no native residual or camera consumed.",
+              "qualification": "Manual source physical CHECK candidate; Root source-frame review required before publication."
+            }
+          }
+        }
+      ],
+      "views": [
+        {
+          "id": "whole",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ]
+        }
+      ],
+      "sourceTimeEvidence": "Exact original native timestamp ticks and rational1/24000 clock; six-decimal ffprobe display is not source-image admission authority."
+    },
+    {
+      "timeSeconds": 28.987291666666668,
+      "decodedTimeSeconds": 28.987291666666668,
+      "decodedTimestampTicks": 695695,
+      "timeBase": "1/24000",
+      "shotId": "whole-machine",
+      "sourceImage": {
+        "frameIndex": 695,
+        "sha256Bgr8": "168425e35b5f32502cb998d5dd8f67be782b2d263ade5b3b17c728d27c8e3b5b",
+        "pixelFormat": "bgr8",
+        "width": 1920,
+        "height": 1080,
+        "sourceSha256": "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505"
+      },
+      "landmarks": [
+        {
+          "anchorId": "wheel.center",
+          "viewId": "whole",
+          "role": "check",
+          "pixel": [
+            801,
+            538
+          ],
+          "status": "observed",
+          "method": "manual",
+          "uncertaintyPx": 4,
+          "measurementEvidence": {
+            "sourceImage": {
+              "frameIndex": 695,
+              "sha256Bgr8": "168425e35b5f32502cb998d5dd8f67be782b2d263ade5b3b17c728d27c8e3b5b",
+              "pixelFormat": "bgr8",
+              "width": 1920,
+              "height": 1080,
+              "sourceSha256": "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505"
+            },
+            "independentManualSeedSourceImage": {
+              "frameIndex": 695,
+              "sha256Bgr8": "168425e35b5f32502cb998d5dd8f67be782b2d263ade5b3b17c728d27c8e3b5b",
+              "pixelFormat": "bgr8",
+              "width": 1920,
+              "height": 1080,
+              "sourceSha256": "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505"
+            },
+            "sourceOnlyProducer": "Existing unchanged observe-source.py APIs; no native images/cameras/errors consumed.",
+            "manualProvenance": {
+              "sourceImage": {
+                "frameIndex": 695,
+                "sha256Bgr8": "168425e35b5f32502cb998d5dd8f67be782b2d263ade5b3b17c728d27c8e3b5b",
+                "pixelFormat": "bgr8",
+                "width": 1920,
+                "height": 1080,
+                "sourceSha256": "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505"
+              },
+              "identity": "New independent photographed brass hub-centre observation. Archived [835,535] row is wrong feature and remains excluded unchanged.",
+              "authorship": "SpinSourceRefine independently inspected original source PNG/crop on 2026-10-02; numeric centre authored from actual photographed hub, no native residual or camera consumed.",
+              "qualification": "Manual source physical CHECK candidate; Root source-frame review required before publication."
+            }
+          }
+        }
+      ],
+      "views": [
+        {
+          "id": "whole",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ]
+        }
+      ],
+      "sourceTimeEvidence": "Exact original native timestamp ticks and rational1/24000 clock; six-decimal ffprobe display is not source-image admission authority."
+    },
+    {
+      "timeSeconds": 128.002875,
+      "decodedTimeSeconds": 128.002875,
+      "decodedTimestampTicks": 3072069,
+      "timeBase": "1/24000",
+      "shotId": "closeup-sweep",
+      "sourceImage": {
+        "frameIndex": 3069,
+        "sha256Bgr8": "85dc0afda270368ff0aa2ba86d222214ebbde5bf66fe89f49689f29a505abb2e",
+        "pixelFormat": "bgr8",
+        "width": 1920,
+        "height": 1080,
+        "sourceSha256": "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505"
+      },
+      "landmarks": [
+        {
+          "anchorId": "wheel.center",
+          "viewId": "closeup",
+          "role": "check",
+          "pixel": [
+            776,
+            835
+          ],
+          "status": "observed",
+          "method": "manual",
+          "uncertaintyPx": 4,
+          "measurementEvidence": {
+            "sourceImage": {
+              "frameIndex": 3069,
+              "sha256Bgr8": "85dc0afda270368ff0aa2ba86d222214ebbde5bf66fe89f49689f29a505abb2e",
+              "pixelFormat": "bgr8",
+              "width": 1920,
+              "height": 1080,
+              "sourceSha256": "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505"
+            },
+            "independentManualSeedSourceImage": {
+              "frameIndex": 3069,
+              "sha256Bgr8": "85dc0afda270368ff0aa2ba86d222214ebbde5bf66fe89f49689f29a505abb2e",
+              "pixelFormat": "bgr8",
+              "width": 1920,
+              "height": 1080,
+              "sourceSha256": "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505"
+            },
+            "sourceOnlyProducer": "Existing unchanged observe-source.py APIs; no native images/cameras/errors consumed.",
+            "manualProvenance": {
+              "sourceImage": {
+                "frameIndex": 3069,
+                "sha256Bgr8": "85dc0afda270368ff0aa2ba86d222214ebbde5bf66fe89f49689f29a505abb2e",
+                "pixelFormat": "bgr8",
+                "width": 1920,
+                "height": 1080,
+                "sourceSha256": "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505"
+              },
+              "identity": "Clearly visible silver reverse-side wheel hub at radial spoke convergence in enlarged rotating closeup; same retained wheel.center physical anchor, original CHECK role.",
+              "authorship": "SpinSourceRefine independently inspected original source PNG/crop on 2026-10-02; numeric centre authored from actual photographed hub, no native residual or camera consumed.",
+              "qualification": "Manual source physical CHECK candidate; Root source-frame review required before publication."
+            }
+          }
+        }
+      ],
+      "views": [
+        {
+          "id": "closeup",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ]
+        }
+      ],
+      "sourceTimeEvidence": "Exact original native timestamp ticks and rational1/24000 clock; six-decimal ffprobe display is not source-image admission authority."
+    },
+    {
+      "timeSeconds": 129.29583333333332,
+      "decodedTimeSeconds": 129.29583333333332,
+      "decodedTimestampTicks": 3103100,
+      "timeBase": "1/24000",
+      "shotId": "closeup-sweep",
+      "sourceImage": {
+        "frameIndex": 3100,
+        "sha256Bgr8": "dfd33546c21cfd984f0bf39d43eb1eb294e618aff56e1af856992ebccc7ad9d1",
+        "pixelFormat": "bgr8",
+        "width": 1920,
+        "height": 1080,
+        "sourceSha256": "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505"
+      },
+      "landmarks": [
+        {
+          "anchorId": "wheel.center",
+          "viewId": "closeup",
+          "role": "check",
+          "pixel": [
+            379,
+            999
+          ],
+          "status": "observed",
+          "method": "manual",
+          "uncertaintyPx": 4,
+          "measurementEvidence": {
+            "sourceImage": {
+              "frameIndex": 3100,
+              "sha256Bgr8": "dfd33546c21cfd984f0bf39d43eb1eb294e618aff56e1af856992ebccc7ad9d1",
+              "pixelFormat": "bgr8",
+              "width": 1920,
+              "height": 1080,
+              "sourceSha256": "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505"
+            },
+            "independentManualSeedSourceImage": {
+              "frameIndex": 3100,
+              "sha256Bgr8": "dfd33546c21cfd984f0bf39d43eb1eb294e618aff56e1af856992ebccc7ad9d1",
+              "pixelFormat": "bgr8",
+              "width": 1920,
+              "height": 1080,
+              "sourceSha256": "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505"
+            },
+            "sourceOnlyProducer": "Existing unchanged observe-source.py APIs; no native images/cameras/errors consumed.",
+            "manualProvenance": {
+              "sourceImage": {
+                "frameIndex": 3100,
+                "sha256Bgr8": "dfd33546c21cfd984f0bf39d43eb1eb294e618aff56e1af856992ebccc7ad9d1",
+                "pixelFormat": "bgr8",
+                "width": 1920,
+                "height": 1080,
+                "sourceSha256": "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505"
+              },
+              "identity": "Visible brass wheel hub below the wire-bank in closeup source, before pan carries hub out of frame; original wheel CHECK role retained.",
+              "authorship": "SpinSourceRefine independently inspected original source PNG/crop on 2026-10-02; numeric centre authored from actual photographed hub, no native residual or camera consumed.",
+              "qualification": "Manual source physical CHECK candidate; Root source-frame review required before publication."
+            }
+          }
+        }
+      ],
+      "views": [
+        {
+          "id": "closeup",
+          "rectSourcePixels": [
+            0,
+            0,
+            1920,
+            1080
+          ]
+        }
+      ],
+      "sourceTimeEvidence": "Exact original native timestamp ticks and rational1/24000 clock; six-decimal ffprobe display is not source-image admission authority."
+    }
+  ]
+}

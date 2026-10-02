@@ -6,7 +6,12 @@ This reads authored numeric seeds/source metadata only: no model, solver,
 optimizer, browser, private evidence directory, or acceptance run. Historical
 report paths/digests remain provenance; source camera failures remain diagnostics.
 Only exact decoded exposures supply source images; nearest states supply chosen
-inputs, not source pixels. None of these choices claim a measured error stage.
+inputs, not source pixels. Exact captureRequests may freeze a camera/full input
+on the retained PTS plus complete sourceImage identity. Source controls marked
+provenance-only retain superseded measurements without mixing trajectories.
+Operation019 uses this authority with the unchanged shared compact selector;
+its original source failures and CHECK-informed ancestry remain explicit.
+None of these choices claim a measured error stage.
 """
 from __future__ import annotations
 
@@ -65,6 +70,19 @@ def view_record(original, camera, state, evidence):
     return result
 
 
+def capture_request(frame, ident, requests):
+    """Exact new authority may replace a historical exposure, never its pixels."""
+    number = frame.get("sourceFrameIndex", frame.get("sourceImage", {}).get("frameIndex"))
+    alias = "presenter-whole" if ident == "main" else ident
+    matching = [(rel, request) for rel, request in requests
+                if request["sourceImage"]["frameIndex"] == number
+                and (request.get("viewId") or request.get("recordId", "").split(":")[-1]) in (ident, alias)
+                and ("decodedTimeSeconds" not in request
+                     or (request["decodedTimeSeconds"] == frame.get("decodedTimeSeconds")
+                         and request["sourceImage"] == frame.get("sourceImage")))]
+    return matching[-1] if matching else None
+
+
 def operation():
     data = common.load_observations("jfH-NbsmvD4")
     seeds, seed_input = load_seeds("jfH-NbsmvD4")
@@ -106,6 +124,8 @@ def operation():
     controls = defaultdict(list)
     for exposure in seeds["sourceControls"]:
         for control in exposure["declarations"]:
+            if control.get("usage") == "provenance-only":
+                continue
             original = control["declaration"]
             controls[exposure["sourceFrameIndex"]].append(
                 ({**control, "sourceImage": exposure["sourceImage"]}, original))
@@ -182,6 +202,14 @@ def operation():
                 frame.setdefault("landmarks", []).append(point)
                 observed.add(key)
             frame["sourceImage"] = control["sourceImage"]
+        for ident, view in by_id.items():
+            selected_capture = capture_request(frame, ident, requests)
+            if selected_capture:
+                _, request = selected_capture
+                # New exact-exposure cameras participate in the existing shared
+                # motion/layout selector; old requests retain their old policy.
+                if "decodedTimeSeconds" in request:
+                    view["camera"] = request["camera"]
         frame["views"] = list(by_id.values())
     unsupported = defaultdict(set)
     assumed = defaultdict(set)
@@ -195,6 +223,8 @@ def operation():
             frame["sourceImage"] = rows[0]["sourceIdentity"].get("actualSourceImage")
         output = []
         for original in common.source_views(frame, data):
+            if common.source_requirement(original) == "unreadable-navigation" and original.get("camera") is None:
+                continue
             ident = original["id"]
             row = next((r for r in rows if (r.get("viewId") or "main") == ident), None)
             if row is None and rows:
@@ -210,13 +240,15 @@ def operation():
             camera_provenance = original.get("cameraProvenance")
             evidence = "Saved complete chosen51 physical candidate; hidden controls remain unobserved."
             alias = "presenter-whole" if ident == "main" else ident
-            matching = [(rel, r) for rel, r in requests if r["sourceImage"]["frameIndex"] == number and
-                        (r.get("viewId") or r.get("recordId", "").split(":")[-1]) in (ident, alias)]
-            if matching:
-                rel, request = matching[-1]
+            selected_capture = capture_request(frame, ident, requests)
+            if selected_capture:
+                rel, request = selected_capture
                 camera, state = request["camera"], copy.deepcopy(request.get("input", state))
-                family = f"{frame['shotId']}:{rel}:{ident}"
-                camera_provenance = {"kind": "source-transfer", "family": family, "evidence": f"{rel} chosen capture camera used for exact source frame{number}/{ident}; retained source-fit donor, not a new per-exposure camera fit"}
+                family = request.get("cameraContinuityFamily", f"{frame['shotId']}:{rel}:{ident}")
+                camera_provenance = copy.deepcopy(request.get("cameraProvenance")) or {
+                    "kind": "source-transfer", "family": family,
+                    "evidence": f"{rel} chosen capture camera used for exact source frame{number}/{ident}; retained source-fit donor, not a new per-exposure camera fit"}
+                evidence = request.get("inputEvidence", evidence)
             if number == 8002 and ident in corrected:
                 camera, state = corrected[ident]["view"]["camera"], copy.deepcopy(corrected[ident]["chosenInput"])
                 family = f"{frame['shotId']}:corrected-native8002:{ident}"
@@ -285,9 +317,24 @@ def operation():
     source_blockers.append("operation-024111..114s: source establishes one visible turn; absolute crank phase and intermediate speed are chosen. Other hand-driven phase/yaw/disassembly inputs remain partially measured, never static-exempt.")
     track["sourceMeasurements"]["status"] = "partial"
     track["sourceMeasurements"]["blockers"].extend(source_blockers)
+    refinement = seeds.get("operation019Refinement")
+    if refinement:
+        track["evidence"]["operation019Refinement"] = copy.deepcopy(refinement)
+        track["sourceMeasurements"]["blockers"].append(refinement["qualification"])
+    refined_unavailable = {
+        frame["sourceImage"]["frameIndex"]: frame["unavailable"]
+        for frame in data["frames"]
+        if frame.get("sourceObservationAuthority") == "operation019-v3"
+    }
     for frame in track["frames"]:
-        if frame["views"] and all(v["camera"] and v["input"] for v in frame["views"]):
+        required = [view for view in frame["views"] if common.source_requirement(view) == "required"]
+        if required and all(v["camera"] and v["input"] for v in required):
             frame.pop("unavailable", None)
+        number = frame.get("sourceImage", {}).get("frameIndex")
+        if frame["shotId"] == "operation-019" and number in refined_unavailable:
+            # Solved playback does not erase failed source stats, virtual flow
+            # features, or inherited source losses; they remain unavailable.
+            frame["unavailable"] = copy.deepcopy(refined_unavailable[number])
     retain_generator_inputs(track, seeds, seed_input)
     return track
 
@@ -321,6 +368,8 @@ def rocker():
             row = min(states, key=lambda r: abs(r["timeSeconds"] - frame.get("retainedObservationTimeSeconds", frame["timeSeconds"])))
         result = []
         for original in common.source_views(frame, data):
+            if common.source_requirement(original) == "unreadable-navigation" and original.get("camera") is None:
+                continue
             notes = ("Saved CPU-feasible continuous independently actuated held-bank branch; actual source phases/station order, not ideal cosine or historical recovery.")
             view = view_record(original, body_candidate["camera"], row["completeInput"], notes)
             view["cameraContinuityFamily"] = "rocker-centered-body-profile"
@@ -339,7 +388,7 @@ def rocker():
         "0..1015.681333s: complete native exterior/shank/side-recess correspondence and independently actuated held-bank cone visibility remain unqualified; no whole-body exemption.",
         "Centered body-aware camera preserves actual source cap/rim constraints but has not passed current native whole-body source measurement."])
     for frame in track["frames"]:
-        if frame["views"]:
+        if any(common.source_requirement(view) == "required" for view in frame["views"]):
             frame.pop("unavailable", None)
     retain_generator_inputs(track, seeds, seed_input)
     return track

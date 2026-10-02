@@ -2,7 +2,7 @@ import { Quaternion } from 'three'
 import { createMechanismInput, createMechanismPose, MECHANISM_DATA, type MechanismInput } from './mechanics'
 import { assertSourceCompositeWeights, type CameraRecord, type ImagePlaneWarp, type SourceComposite, type SourceLayoutEntry } from './scene'
 import { compileInput, equalRecord, INPUT_FIELDS, SETUP_KEYS, solveSourceInput, validateNativeGeometryAssumptions, type InputField, type NativeGeometryAssumption, type SerializedInput, type SourceConstraint, type SourceImageIdentity } from './source-witness'
-import type { Classification, Landmark, PlaybackView, ReferenceAnchor, SourceIdentity, NativeModelIdentity, SourceShot, ReferenceState, SourceSample } from './timeline'
+import type { Classification, Landmark, PlaybackView, ReferenceAnchor, SourceIdentity, NativeModelIdentity, SourceShot, ReferenceState, SourceSample, WaivedSourceView } from './timeline'
 import type { Video } from './video-catalog'
 
 export const SOURCE_WIDTH = 1920
@@ -16,6 +16,8 @@ const PHASE_PERIOD_RAD = 2 * Math.PI
 const UNMEASURED_STAGE = Object.freeze({ status: 'unmeasured' as const })
 const UNMEASURED_STAGES = Object.freeze({ 50: UNMEASURED_STAGE, 20: UNMEASURED_STAGE, 10: UNMEASURED_STAGE, 5: UNMEASURED_STAGE })
 export type SourceStagePercentage = typeof SOURCE_STAGE_PERCENTAGES[number]
+export type SourceViewMeasurementRequirement = 'required' | 'unreadable-navigation'
+const EMPTY_WAIVED_VIEWS: readonly WaivedSourceView[] = []
 export interface SourceStageMeasurement {
   status: 'unmeasured' | 'failed' | 'passed'
   /** Authored diagnostics only; runtime never treats a report string as verified evidence. */
@@ -26,6 +28,8 @@ export interface SourceStageMeasurement {
 }
 export interface CompactSourceView {
   id: string
+  measurementRequirement?: SourceViewMeasurementRequirement
+  measurementRequirementEvidence?: string
   /** Explicit source-view identities represented by this rendered layer; never inferred aliases. */
   sourceViewIds?: string[]
   /** Source/layout evidence for the declared mapping, including authored decomposition. */
@@ -34,16 +38,22 @@ export interface CompactSourceView {
   presentation: 'native' | 'horizontal-mirror'
   camera: CameraRecord | null
   input: SerializedInput | null
-  provenance: { kind: 'chosen-feasible'; evidence: string; unobservedInputFields: InputField[] }
-  cameraProvenance?: { kind: 'source-fit' | 'source-transfer' | 'source-informed-framing'; evidence: string; family: string }
+  provenance: { kind: 'chosen-feasible'; evidence: string; unobservedInputFields: InputField[] } | null
+  cameraProvenance?: { kind: 'source-fit' | 'source-transfer' | 'source-informed-framing'; evidence: string; family: string } | null
   cameraContinuityFamily?: string
-  /** Held vetoes blending; source-informed framing requires continuous-shot at both endpoints. */
+  /** Authored playback policy; continuous framing remains chosen, never a source-fit claim. */
   cameraInterpolation?: 'continuous-shot' | 'held'
-  /** Nonblank source evidence required for continuous-shot interpolation. */
   cameraInterpolationEvidence?: string
   composite?: SourceComposite
   imagePlaneWarp?: ImagePlaneWarp
 }
+export function sourceViewMeasurementRequirement(view: CompactSourceView): SourceViewMeasurementRequirement {
+  const requirement = Object.hasOwn(view, 'measurementRequirement') ? view.measurementRequirement : 'required'
+  if (requirement !== 'required' && requirement !== 'unreadable-navigation') throw new Error(`Source view ${view.id} has an unknown measurement requirement.`)
+  if (requirement === 'unreadable-navigation' && (typeof view.measurementRequirementEvidence !== 'string' || !view.measurementRequirementEvidence.trim())) throw new Error(`Source view ${view.id} needs explicit unreadable-navigation evidence.`)
+  return requirement
+}
+
 export interface CompactSourceFrame {
   timeSeconds: number
   decodedTimeSeconds: number | null
@@ -144,6 +154,8 @@ interface CompiledTrackFrame {
   continuousToNext: boolean
   layout: SourceLayoutEntry[]
   views: CompiledTrackView[]
+  waivedViews: WaivedSourceView[]
+  approximationReason: string
 }
 interface TrackBuffer {
   sample: SourceSample
@@ -152,7 +164,7 @@ interface TrackBuffer {
 
 function buffer(): TrackBuffer {
   return {
-    sample: { state: 'unavailable', timeSeconds: 0, reason: '', views: [], mechanicalProvenance: null, unobservedInputFields: [], nativeGeometryAssumptions: [] },
+    sample: { state: 'unavailable', timeSeconds: 0, reason: '', views: [], waivedViews: EMPTY_WAIVED_VIEWS, mechanicalProvenance: null, unobservedInputFields: [], nativeGeometryAssumptions: [] },
     views: new Map(),
   }
 }
@@ -215,13 +227,24 @@ export class CompactVideoReference {
       if (!Array.isArray(frame.views) || !Array.isArray(frame.landmarks)) throw new Error(`Missing source layout or landmarks at ${t}s.`)
       const required = frame.sourceMachineRequirement === 'required' || frame.classification === 'machine' || (frame.classification === 'non-machine' ? shot.hasCorrespondingMachine === true : shot.hasCorrespondingMachine !== false)
       if (new Set(frame.views.map((view) => view.id)).size !== frame.views.length) throw new Error(`Duplicate source view at ${t}s.`)
-      const layout: SourceLayoutEntry[] = frame.views.map((view) => {
+      const requiredViews: CompactSourceView[] = []
+      const waivedViews: WaivedSourceView[] = []
+      for (const view of frame.views) {
+        const requirement = sourceViewMeasurementRequirement(view)
+        if (requirement === 'required') requiredViews.push(view)
+        else waivedViews.push({ id: view.id, measurementRequirement: requirement, measurementRequirementEvidence: view.measurementRequirementEvidence! })
         if (view.rectSourcePixels?.length !== 4) throw new Error(`Invalid source viewport at ${t}s.`)
         view.rectSourcePixels.forEach((value) => finite(value, 'Source viewport'))
         const [x, y, w, h] = view.rectSourcePixels
         if (x < 0 || y < 0 || w <= 0 || h <= 0 || x + w > SOURCE_WIDTH || y + h > SOURCE_HEIGHT || !['native', 'horizontal-mirror'].includes(view.presentation)) throw new Error(`Source viewport exceeds the source frame at ${t}s.`)
-        return { viewId: view.id, rectSourcePixels: view.rectSourcePixels, presentation: view.presentation, composite: view.composite ?? OPAQUE_COMPOSITE, resolvedImagePlaneWarp: view.imagePlaneWarp ?? null }
-      })
+        if (view.sourceViewIds !== undefined || view.sourceViewMappingEvidence !== undefined) {
+          if (!Array.isArray(view.sourceViewIds) || !view.sourceViewIds.length
+            || view.sourceViewIds.some((id) => typeof id !== 'string' || !id.trim())
+            || new Set(view.sourceViewIds).size !== view.sourceViewIds.length
+            || typeof view.sourceViewMappingEvidence !== 'string' || !view.sourceViewMappingEvidence.trim()) throw new Error(`${video.id}@${t}s/${view.id}: source-view mapping needs nonempty unique identities and explicit evidence.`)
+        }
+      }
+      const layout: SourceLayoutEntry[] = requiredViews.map((view) => ({ viewId: view.id, rectSourcePixels: view.rectSourcePixels, presentation: view.presentation, composite: view.composite ?? OPAQUE_COMPOSITE, resolvedImagePlaneWarp: view.imagePlaneWarp ?? null }))
       try {
         assertSourceCompositeWeights(frame.views)
       } catch (error) {
@@ -232,32 +255,30 @@ export class CompactVideoReference {
         landmark.pixel.forEach((value) => finite(value, 'Source landmark pixel'))
         if (finite(landmark.uncertaintyPx, 'Source landmark uncertainty') < 0) throw new Error('Source landmark uncertainty cannot be negative.')
       }
-      const views = frame.views.map((view) => {
+      const views = requiredViews.map((view) => {
         const label = `${video.id}@${t}s/${view.id}`
-        if (view.sourceViewIds !== undefined || view.sourceViewMappingEvidence !== undefined) {
-          if (!Array.isArray(view.sourceViewIds) || !view.sourceViewIds.length
-            || view.sourceViewIds.some((id) => typeof id !== 'string' || !id.trim())
-            || new Set(view.sourceViewIds).size !== view.sourceViewIds.length
-            || typeof view.sourceViewMappingEvidence !== 'string' || !view.sourceViewMappingEvidence.trim()) throw new Error(`${label}: source-view mapping needs nonempty unique identities and explicit evidence.`)
+        if (view.camera !== null) requireCamera(view.camera, label)
+        const provenance = view.provenance
+        if (view.input !== null || provenance !== null) {
+          if (!provenance || provenance.kind !== 'chosen-feasible' || !provenance.evidence?.trim() || !Array.isArray(provenance.unobservedInputFields)
+            || new Set(provenance.unobservedInputFields).size !== provenance.unobservedInputFields.length || provenance.unobservedInputFields.some((field) => !INPUT_FIELDS.includes(field))) throw new Error(`${label}: chosen inputs need explicit unobserved provenance.`)
         }
-        if (view.camera) requireCamera(view.camera, label)
-        if (!view.provenance || view.provenance.kind !== 'chosen-feasible' || !view.provenance.evidence?.trim() || !Array.isArray(view.provenance.unobservedInputFields)
-          || new Set(view.provenance.unobservedInputFields).size !== view.provenance.unobservedInputFields.length || view.provenance.unobservedInputFields.some((field) => !INPUT_FIELDS.includes(field))) throw new Error(`${label}: chosen inputs need explicit unobserved provenance.`)
         const input = view.input === null ? null : compileInput(view.input, label)
-        const unobservedInputFields = [...view.provenance.unobservedInputFields]
+        const unobservedInputFields = provenance ? [...provenance.unobservedInputFields] : []
         if (input?.setup.counterHeightM === null && !unobservedInputFields.includes('setup.counterHeightM')) unobservedInputFields.push('setup.counterHeightM')
         if (view.cameraProvenance && (!['source-fit', 'source-transfer', 'source-informed-framing'].includes(view.cameraProvenance.kind) || !view.cameraProvenance.evidence?.trim() || !view.cameraProvenance.family?.trim())) throw new Error(`${label}: camera family provenance is incomplete.`)
         if (view.cameraContinuityFamily !== undefined && !view.cameraContinuityFamily.trim()) throw new Error(`${label}: camera continuity family is empty.`)
-        if (view.cameraInterpolation !== undefined && (typeof view.cameraInterpolation !== 'string' || !['continuous-shot', 'held'].includes(view.cameraInterpolation))) throw new Error(`${label}: unknown camera interpolation policy.`)
-        if (view.cameraInterpolation === 'continuous-shot' && (typeof view.cameraInterpolationEvidence !== 'string' || !view.cameraInterpolationEvidence.trim())) throw new Error(`${label}: continuous-shot camera interpolation needs explicit evidence.`)
+        if (view.cameraInterpolation !== undefined && !['continuous-shot', 'held'].includes(view.cameraInterpolation)) throw new Error(`${label}: camera interpolation policy is unknown.`)
+        if (view.cameraInterpolation === 'continuous-shot' && (typeof view.cameraInterpolationEvidence !== 'string' || !view.cameraInterpolationEvidence.trim())) throw new Error(`${label}: continuous camera interpolation needs source-shot evidence.`)
         return { observation: view, input, unobservedInputFields, inputChangesToNext: false, phaseDeltasToNext: null as Float64Array | null, cameraInterpolatesToNext: false, inputValidated: false }
       })
-      return { observation: frame, required, layout, views, shotStartSeconds: shot.startSeconds, shotEndSeconds: shot.endSeconds, continuousToNext: false, available: pts !== null && (!required || views.length > 0 && views.every((view) => view.input !== null && view.observation.camera !== null)) }
+      const approximationReason = waivedViews.length ? `${this.approximationMessage} ${waivedViews.length} unreadable navigation archival view ${waivedViews.length === 1 ? 'record is' : 'records are'} measurement-waived; archived source records retained and the other views remain measurement-required.` : this.approximationMessage
+      return { observation: frame, required, layout, views, waivedViews, approximationReason, shotStartSeconds: shot.startSeconds, shotEndSeconds: shot.endSeconds, continuousToNext: false, available: pts !== null && (!required || (views.length > 0 || waivedViews.length > 0) && views.every((view) => view.input !== null && view.observation.camera !== null)) }
     })
     for (let i = 0; i < this.frames.length - 1; i++) {
       const from = this.frames[i]!
       const next = this.frames[i + 1]!
-      from.continuousToNext = from.available && next.available && from.required && next.required && next.observation.shotId === from.observation.shotId
+      from.continuousToNext = from.available && next.available && from.required && next.required && from.views.length > 0 && next.observation.shotId === from.observation.shotId
         && next.views.length === from.views.length && equalRecord(from.layout, next.layout)
         && from.views.every((view, index) => view.observation.id === next.views[index]!.observation.id && view.input?.gearing === next.views[index]!.input?.gearing
           && (view.input?.setup.counterHeightM === null) === (next.views[index]!.input?.setup.counterHeightM === null))
@@ -269,10 +290,10 @@ export class CompactVideoReference {
           if (a.inputChangesToNext) a.phaseDeltasToNext = compilePhaseDeltas(a.input!, b.input!)
           const provenance = a.observation.cameraProvenance
           const nextProvenance = b.observation.cameraProvenance
-          a.cameraInterpolatesToNext = a.observation.cameraInterpolation !== 'held' && b.observation.cameraInterpolation !== 'held'
-            && typeof a.observation.cameraContinuityFamily === 'string'
+          a.cameraInterpolatesToNext = typeof a.observation.cameraContinuityFamily === 'string'
             && a.observation.cameraContinuityFamily === b.observation.cameraContinuityFamily
-            && provenance !== undefined && nextProvenance !== undefined
+            && provenance != null && nextProvenance != null
+            && a.observation.cameraInterpolation !== 'held' && b.observation.cameraInterpolation !== 'held'
             && (provenance.kind !== 'source-informed-framing' && nextProvenance.kind !== 'source-informed-framing'
               || a.observation.cameraInterpolation === 'continuous-shot' && b.observation.cameraInterpolation === 'continuous-shot')
             && provenance.family === nextProvenance.family
@@ -301,6 +322,7 @@ export class CompactVideoReference {
 
   private stateFor(t: number, frame: CompiledTrackFrame): ReferenceState {
     if (frame.observation.timeSeconds > t || t < frame.shotStartSeconds || t > frame.shotEndSeconds || t === frame.shotEndSeconds && t < this.data.source.durationSeconds || !frame.available) return 'unavailable'
+    if (frame.views.length === 0 && frame.waivedViews.length > 0) return 'waived-navigation'
     return frame.required ? 'approximate' : 'no-machine'
   }
 
@@ -315,11 +337,13 @@ export class CompactVideoReference {
     sample.timeSeconds = t
     sample.state = this.stateFor(t, from)
     sample.views.length = 0
+    sample.waivedViews = sample.state === 'unavailable' ? EMPTY_WAIVED_VIEWS : from.waivedViews
     sample.mechanicalProvenance = null
     sample.unobservedInputFields.length = 0
     sample.nativeGeometryAssumptions = this.data.nativeGeometryAssumptions ?? EMPTY_GEOMETRY_ASSUMPTIONS
-    sample.reason = sample.state === 'approximate' ? this.approximationMessage
-      : sample.state === 'no-machine' ? 'No corresponding machine in this source interval.' : from.observation.unavailableReason ?? 'This required source interval has no available camera and complete feasible input.'
+    sample.reason = sample.state === 'approximate' ? from.approximationReason
+      : sample.state === 'waived-navigation' ? 'Source-proven unreadable navigation archival view records are measurement-waived; archived source records retained. Last physical pose held, not a current source reconstruction.'
+        : sample.state === 'no-machine' ? 'No corresponding machine in this source interval.' : from.observation.unavailableReason ?? 'This required source interval has no available camera and complete feasible input.'
     if (sample.state === 'approximate') {
       const continuous = from.continuousToNext
       const mix = continuous ? (t - from.observation.timeSeconds) / (next!.observation.timeSeconds - from.observation.timeSeconds) : 0

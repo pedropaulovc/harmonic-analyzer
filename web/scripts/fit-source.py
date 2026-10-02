@@ -14,6 +14,7 @@ Image-plane homographies are unsupported here and fail closed without adapting o
 
 import argparse
 import copy
+import importlib.util
 import json
 import math
 from pathlib import Path
@@ -22,6 +23,12 @@ import cv2
 import numpy as np
 from scipy.optimize import least_squares
 from scipy.spatial.transform import Rotation
+
+COMMON_SPEC = importlib.util.spec_from_file_location(
+    "compact_source_common", Path(__file__).with_name("compact-source-common.py")
+)
+common = importlib.util.module_from_spec(COMMON_SPEC)
+COMMON_SPEC.loader.exec_module(common)
 
 
 def finite_vector(value, size, label):
@@ -158,6 +165,7 @@ def validate(observations):
             validate_input(frame["mechanicalState"]["input"], f"{t}/input")
         views = {}
         for view in frame.get("views", []):
+            common.source_requirement(view)
             view_id = view["id"]
             if view_id in views:
                 raise ValueError(f"{t}: duplicate source viewport {view_id}")
@@ -1437,10 +1445,11 @@ def run(observations, inventory):
     fitted = copy.deepcopy(observations)
     shots = {shot["id"]: shot for shot in observations["shots"]}
     required_frames = []
-    measured, failures, missing = [], [], []
+    measured, failures, missing, waived = [], [], [], []
     contexts = {}
     for frame in fitted["frames"]:
-        frame["camera"] = None
+        waived.extend(view for view in frame.get("views", [])
+                      if common.source_requirement(view) == "unreadable-navigation")
         shot = shots[frame["shotId"]]
         if not needs_machine(frame, shot):
             continue
@@ -1460,6 +1469,10 @@ def run(observations, inventory):
                 "mechanicalState": frame["mechanicalState"],
             }
         ]
+        targets = [view for view in targets if common.source_requirement(view) == "required"]
+        if not targets:
+            continue
+        frame["camera"] = None
         for view in targets:
             required_frames.append(view)
             x, y, width, height = view["rectSourcePixels"]
@@ -1616,7 +1629,7 @@ def run(observations, inventory):
         not needs_machine(frame, shots[frame["shotId"]]) for frame in fitted["frames"]
     )
     complete = (
-        (bool(measured) or no_machine_source)
+        (bool(measured) or no_machine_source or (not required_frames and bool(waived)))
         and not failures
         and not missing
         and not mechanism_missing
@@ -1631,6 +1644,9 @@ def run(observations, inventory):
         "measuredFitCount": len(measured),
         "failedFitTimes": failures,
         "requiredMachineSampleCount": len(required_frames),
+        **common.archival_navigation_counts(fitted["frames"]),
+        "waivedNavigationReasons": list(dict.fromkeys(
+            view["measurementRequirementEvidence"] for view in waived)),
         "noCorrespondingMachineSource": no_machine_source,
         "heldOutThresholdPx": observations["source"]["width"] * 0.02,
         "fits": measured,

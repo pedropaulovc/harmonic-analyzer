@@ -93,15 +93,50 @@ motion remain required. The staged image tolerances below replace the former
 ## Iterative synchronization plan
 
 The approved sequence is **50% → 20% → 10% → 5% of source frame width**.
-These are maximum landmark-position errors, not percentages of videos covered.
-At 1920 pixels wide the limits are 960, 384, 192 and 96 pixels respectively.
+These are maximum admitted landmark/contour source-pixel errors, not percentages
+of videos covered. At 1920 pixels wide the limits are 960, 384, 192 and 96 pixels respectively.
 The final target is 5%; video/model timing stays within 0.5 seconds at every stage.
 
-Start with working approximate camera and mechanism tracking across **all six**
-videos, then present an actual browser demo before refining to 20%, 10%
-and 5%. Complete one coarse pass across the collection rather than perfecting
-one video while the others remain unavailable. Each stage reports its measured
-coverage, maximum errors and unresolved intervals; unmeasured is not passed.
+Active implementation now prioritizes **Synthesis and Analysis**. Preserve the
+other four routes and their existing data, but do not expand their calibration
+or evidence collection unless a shared playback dependency requires it.
+The six-video product scope remains; this changes the implementation order.
+
+The unit of progress is an **integrated playable interval**, not an observation
+row, private camera fit, source gallery or verification packet. For each active
+video, select a named source interval with visible mechanism or camera changes,
+integrate its compact track through the normal generator, then demonstrate it
+in the ordinary browser companion with original playback and audio.
+The demo must show continuous motion, a seek, pause/manual exploration and
+return to following playback. Record the interval, visible before/after change,
+measured error where available and remaining mismatches. Do not call an
+approximation a fidelity pass.
+
+Hold one camera and fixed-feature state throughout a verified stationary shot.
+Use sparse source-measured camera/input keys and the existing interpolation for
+continuous changing shots; add keys only when an actual rendered/source mismatch
+requires them. Fixed framing does not imply a stationary mechanism. Never
+interpolate through cuts, setup changes, occlusions or unavailable evidence,
+and never label interpolated source coordinates independent CHECK measurements.
+Keep required actual-footage verification timestamps even when runtime keys are
+sparse.
+
+Develop Synthesis and Analysis increments concurrently with separate video owners
+and one shared-code integration owner. Serialize expensive browser/GPU checks,
+not implementation. Demonstrate one useful increment per video before widening
+calibration; each ready increment publishes and merges independently. Iterate
+their observed discrepancies
+through 20%, 10% and 5%; prioritize the largest visible mismatch, not the largest
+evidence backlog. A prerequisite repair belongs in the increment only when it
+blocks loading, following the clock, coherent motion or measuring that interval.
+Each stage reports coverage, maximum errors and unresolved intervals;
+unmeasured is not passed.
+
+Publish each demonstrated increment as a small ready PR and merge it when its
+build and review gates pass, rather than holding progress for whole-video
+fidelity. Record publishing, review and merge as separate milestones.
+An incremental PR must state its implemented interval and remaining fidelity
+gaps; merging it does not certify a complete video or tolerance stage.
 
 ### Runtime tracks
 
@@ -167,10 +202,25 @@ A difficult view does not become exempt because it cannot yet be matched.
 Intervals without a corresponding machine may retain the preceding pose.
 Unsupported required intervals remain explicit in the UI and reports.
 
+The user-approved navigation exception applies only to deliberately blurred,
+text-covered thumbnail backgrounds. Each waived source view retains its original
+records and an explicit reason; all timestamps, playback and audio remain in
+scope. Wholly unreadable navigation holds the last 3D pose with an unmeasured
+status. Mixed transitions still update and verify sharp outgoing or readable
+machine views. No other missing observation or difficult mechanism is exempt.
+
 Count the machine views actually visible in the footage. Synthesis's
 presenter-to-spin edit moves one machine image; it uses one native view with
 source-informed principal-point/FOV keys. Its coarse framing remains unmeasured.
 Actors and formula graphics stay in the original player.
+
+Synthesis generation validates its portable CPU-equivalence bridge against both
+executed dependency manifests. The installed Three tree, including GLTFLoader,
+must match their exact file paths and byte hashes. `web/package.json` and
+`web/package-lock.json` have separate generation-time byte pins; they were not
+included in the historical proof manifests. A missing Three installation reports
+dependency unavailability; changed dependency bytes refuse generation as drift.
+The bridge preserves historical GPU provenance and makes no current GPU claim.
 
 ### Measurement and refinement
 
@@ -196,6 +246,83 @@ replace actual source/render inspection. Use the depth-tested native part-ID
 capture to distinguish genuinely occluding components from dark metallic surfaces;
 lighting changes must not change those surface owners or hide native geometry.
 
+`verify-sync.mjs` also measures retained raw `SourceContourCheck` curves through
+the existing depth-ID API, without copying contours into compact tracks or
+changing the selected source camera/input. A sidecar joins only the exact source
+video/frame/decoded-PTS and same-format image hash, with an unambiguous measured
+source-layout view mapping. Gray and BGR byte identities never compare across
+formats. Original endpoints, source-only evidence and partial-edge scope remain
+unchanged. The existing type/schema now require explicit `role: 'fit' | 'check'`;
+missing/invalid roles fail closed and runtime never interprets prose as a role.
+Only authoritative CHECK contours are independent, strictly downstream of
+fitting. Existing Rocker upper-rim stations 1,5,9,13,17 remain CHECK and the other
+15 remain FIT. FIT records are retained unmeasured in `contourFits`, not independent
+CHECKs or moving/view/sample coverage, and do not gate held-out contour errors.
+Every original rod curve stays CHECK, including all 85 source0 Rod20 samples and
+failed Rod3 observations; a failed CHECK cannot become FIT or disappear. A camera
+candidate fitted to these CHECK rows is not independent and cannot be promoted.
+
+After paused exact source review, a valid explicit CHECK-contour row enables part visibility
+and reads the snapshot, landmarks, native visibility and full mechanism solve
+from the same redraw. Captured status and camera/principal point, ordered support,
+warp, destination-cell/native-backing metadata, time, physical-input and positive
+layer contribution must agree. The selected native part must have nonempty actual
+depth-ID pixels and sampled boundary centers. Native support/scissor and later-mask
+filtering applies; missing, stale, wrong-part, hidden and zero-contribution receipts
+cannot become an empty-set success. The all-drawable ID inventory preserves real
+native occlusion, not a new per-435 source-certification gate.
+
+The native getters already enforce their private renderer capture epoch. The
+bridge exposes the existing source-draw revision only for captured getter output
+bound to the current completed source draw; stale/unknown output receives no
+revision. Contour, landmark and mechanism revisions must all equal the positive
+current snapshot `sourceDrawRevision`, and its `sourceDrawTimeSeconds` must match
+capture time. Thus retained same-time old pixel/mechanism records cannot qualify
+merely because time, camera, input and layout repeat. Missing old revisions fail
+closed; no epoch fallback is synthesized.
+
+For observed partial source points \(S\) and actual captured target-part boundary
+sample centers \(N\), the oracle is
+`max(s in S) min(n in N) distance(s,n) + source uncertainty + GPU raster bound`.
+Both uncertainty terms are source-global pixels, added once; no homography scales
+the already-global source term. Warped source localization requires supported
+projective footprints and matching resolved/backing receipts. There is no inferred
+curve extension, bounding-box/native-endpoint/CPU proxy, RMS smoothing or reverse
+distance against unobserved silhouette portions. The actual GPU sample subset can
+overstate nearest-boundary distance, never optimistically reduce it.
+
+This is binary ID/depth **layer geometry**, not literal final fractional-alpha
+color visibility: positive crossfade layers have their exact weight recorded but
+are not area-scaled, and diagnostic depth/material behavior can differ from color
+blending. Inherited Rod20 right-exterior evidence certifies only the observed
+partial edge if measured; it cannot establish the entire silhouette, opposite
+edge, junction topology or material-coordinate identity. Same-part nearest-edge
+correspondence and the coarse 384-pixel Stage20 tolerance remain geometric risks.
+
+Per-sample and summary `contourChecks` count each curve once, separately from FIT
+and CHECK point landmarks. A genuinely measured contour can supply a view's CHECK
+and required sample even without point CHECKs. It supplies moving coverage only
+through existing exact-part moving ancestry or the loaded native rig's resolved
+indexed `rod` binding. `Machine.readPartBinding(partPath)` and the verification
+bridge expose `{partPath,bindingId,kind,motion,stationIndex}` directly from the
+resolved `RestPart.binding` with actual updater membership, never a guessed
+path-family set, inherited binding on an undriven clone or another part's anchor.
+For Rod20, the genuine `connectingRods` binding resolves station index19 and the
+existing `rod` updater; the consumer records that read-only native metadata with
+the independent source contour association. This is kinematic moving eligibility,
+not observed source internal movement (`observedSourceInternalMotion` remains
+`unmeasured`). Missing/unbound metadata or an unknown classification remains
+unavailable for moving coverage. It cannot satisfy the fixed-point requirement or turn
+many curve samples into distinct features for the distributed-landmark exclusion
+floor. All original source views, selected physical inputs, clocks and coverage
+requirements remain mandatory. The canonical Rocker observations already retain
+all 48 late Rod20 curves; only Root's current native GPU run can establish their
+errors or close the reported gaps.
+Source-review/view-precondition failures preserve the actual required CHECK
+contour IDs in unavailable accounting, while FIT records remain separate and
+never inflate CHECK unavailable counts. The custom source ledger validator also
+requires the closed role enum and reports source FIT/CHECK contour counts separately.
+
 Per-video verification is incremental and repeatable, without an acceptance-run
 quota. The all-video final gate retains all six pages and the 5%/0.5-second limits.
 A coarse demo or a passing subset does not establish final acceptance.
@@ -217,8 +344,9 @@ Verify all six routes. Present the working implementation in a headed browser;
 headless Playwright with screenshots or recordings is for automated checks.
 
 Native WebGL landmark readback remains available for rendered-pixel measurements.
-CPU projection alone is not final rendered evidence. Existing raster, finite-line,
-contour, masking and per-part certificate machinery is diagnostic legacy work:
+CPU projection alone is not final rendered evidence. Exhaustive raster, finite-line
+and per-part certificate machinery remains diagnostic legacy work, distinct from
+the scoped contour CHECK path above:
 its historical results are preserved, but completing its entire pending queue is
 not a prerequisite for this iterative delivery plan. If a measurement uses a
 particular diagnostic path, that path's known correctness defects still matter.

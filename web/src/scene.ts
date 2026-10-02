@@ -150,6 +150,15 @@ export interface ModelProvenance {
   identity: 'matched' | 'mismatched' | 'unavailable'
   url: string
 }
+/** Articulation metadata from an exact resolved part in the currently loaded native rig. */
+export interface NativePartBinding {
+  readonly partPath: string
+  readonly bindingId: string
+  readonly kind: Binding['kind']
+  readonly motion: Binding['motion']
+  /** Zero-based resolved physical station for indexed bindings, otherwise null. */
+  readonly stationIndex: number | null
+}
 export interface Machine {
   readonly input: MechanismInput
   readonly pose: MechanismPose
@@ -160,6 +169,8 @@ export interface Machine {
   readonly partPaths: readonly string[]
   /** Actual qualified native drawable paths; querying does not allocate GPU resources. */
   readonly nativeDrawablePartPaths: readonly string[]
+  /** Read-only metadata from this rig's resolved native articulation binding. */
+  readPartBinding(partPath: string): NativePartBinding | null
   update(input: MechanismInput, overrides?: readonly PartOverride[]): void
   /** Add another genuine native part instance, sharing its original geometry. */
   addPartInstance(sourcePartPath: string, instancePath: string): 'added' | 'already-present' | 'missing-source'
@@ -2496,9 +2507,16 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
     driven.length = 0
   }
 
+  function readPartBinding(partPath: string): NativePartBinding | null {
+    if (availability !== 'available' || !root) return null
+    const part = parts.get(partPath), binding = part?.binding
+    if (!part || !binding || !driven.includes(part)) return null
+    return { partPath: part.path, bindingId: binding.id, kind: binding.kind, motion: binding.motion, stationIndex: binding.kind === 'indexed' ? part.station : null }
+  }
+
   solveMechanism(input, pose)
   return {
-    input, pose, missing, loadError, provenance, partPaths: paths, update, addPartInstance, createLandmarkProbe, createPartVisibilityProbe, dispose,
+    input, pose, missing, loadError, provenance, partPaths: paths, update, addPartInstance, createLandmarkProbe, createPartVisibilityProbe, readPartBinding, dispose,
     get availability() { return availability },
     get nativeDrawablePartPaths() { synchronizeNativeInventory(); return nativeDrawablePaths },
   }

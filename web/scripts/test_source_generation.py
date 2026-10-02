@@ -1,5 +1,6 @@
 """Consumer-visible source identity and presentation refusal boundaries."""
 import copy
+import hashlib
 import importlib.util
 import json
 from pathlib import Path
@@ -57,6 +58,65 @@ class ExactExposureLandmarkTests(unittest.TestCase):
         result = retain(data)
         self.assertEqual(result['landmarks'], originals[1]['landmarks'])
         self.assertEqual(data['frames'], originals)
+
+    def test_opaque_main_retains_real_unscoped_alias_check(self):
+        data = exact_exposure()
+        for frame in data['frames']:
+            frame['views'] = [{'id': 'main', 'rectSourcePixels': [0, 0, 1920, 1080],
+                               'presentation': 'native', 'composite': {'mode': 'opaque'}}]
+        retained_point = {'anchorId': 'base', 'status': 'observed', 'role': 'fit',
+                          'pixel': [80, 420]}
+        data['frames'][0]['landmarks'] = [retained_point]
+        result = retain(data)
+        self.assertEqual({p['anchorId']: (p['role'], p['pixel']) for p in result['landmarks']},
+                         {'base': ('fit', [80, 420]), 'support': ('check', [120.5, 340.25])})
+        self.assertEqual(result['views'], data['frames'][0]['views'])
+        self.assertEqual(data['samplingDiagnostics']['exactExposureAliasLandmarks']['unavailable'], [])
+
+    def test_unscoped_opaque_check_cannot_cross_different_source_layout(self):
+        for mismatch in ('rect', 'presentation', 'warp', 'crossfade', 'inset'):
+            with self.subTest(mismatch=mismatch):
+                data = exact_exposure()
+                for frame in data['frames']:
+                    frame['views'] = [{'id': 'main', 'rectSourcePixels': [0, 0, 1920, 1080],
+                                       'presentation': 'native', 'composite': {'mode': 'opaque'}}]
+                donor = data['frames'][1]['views'][0]
+                if mismatch == 'rect':
+                    donor['rectSourcePixels'] = [0, 0, 960, 1080]
+                elif mismatch == 'presentation':
+                    donor['presentation'] = 'horizontal-mirror'
+                elif mismatch == 'warp':
+                    donor['imagePlaneWarp'] = {
+                        'kind': 'homography', 'unwarpedViewportPixels': [1920, 1080],
+                        'renderToSourcePixels': [1, 0, 10, 0, 1, 0, 0, 0, 1]}
+                elif mismatch == 'crossfade':
+                    donor['composite'] = {'mode': 'crossfade', 'groupId': 'fade',
+                                          'imageLayerId': 'incoming', 'opacity': 0.5}
+                else:
+                    data['frames'][1]['views'].append(
+                        {'id': 'inset', 'rectSourcePixels': [0, 0, 640, 360]})
+                self.assertEqual(retain(data)['landmarks'], [])
+
+    def test_equal_transition_or_warped_layout_cannot_scope_legacy_points(self):
+        for transformed in ('crossfade', 'warp', 'mirror', 'inset'):
+            with self.subTest(transformed=transformed):
+                data = exact_exposure()
+                view = {'id': 'main', 'rectSourcePixels': [0, 0, 1920, 1080],
+                        'presentation': 'native', 'composite': {'mode': 'opaque'}}
+                if transformed == 'crossfade':
+                    view['composite'] = {'mode': 'crossfade', 'groupId': 'fade',
+                                         'imageLayerId': 'incoming', 'opacity': 0.5}
+                elif transformed == 'warp':
+                    view['imagePlaneWarp'] = {
+                        'kind': 'homography', 'unwarpedViewportPixels': [1920, 1080],
+                        'renderToSourcePixels': [1, 0, 10, 0, 1, 0, 0, 0, 1]}
+                elif transformed == 'mirror':
+                    view['presentation'] = 'horizontal-mirror'
+                for frame in data['frames']:
+                    frame['views'] = [copy.deepcopy(view)]
+                    if transformed == 'inset':
+                        frame['views'].append({'id': 'inset', 'rectSourcePixels': [0, 0, 640, 360]})
+                self.assertEqual(retain(data)['landmarks'], [])
 
     def test_different_hash_pts_or_layout_cannot_supply_check(self):
         for mismatch in ('hash', 'pts', 'layout'):
@@ -397,6 +457,91 @@ class PresenterOriginalViewTests(unittest.TestCase):
             generator = self.construct(data)
         self.assertEqual(generator.chosen_camera_permissions, {})
         self.assertEqual([view['id'] for view in frame['views']], ['main'])
+def operation_exposure():
+    data, rocker_seeds = rocker_exposure()
+    data['source']['videoId'] = 'jfH-NbsmvD4'
+    data['shots'][0]['id'] = 'operation-019'
+    frame = data['frames'][0]
+    frame.update(shotId='operation-019', sourceFrameIndex=30,
+                 sourceImage=copy.deepcopy(rocker_seeds['states'][0]['sourceImage']),
+                 sourceObservationAuthority='operation019-v3',
+                 unavailable=[{'anchorId': 'lost-feature', 'viewId': 'main',
+                               'reason': 'Inherited source loss remains unqualified.'}])
+    frame['camera'] = copy.deepcopy(rocker_seeds['bodyCandidate']['camera'])
+    frame['landmarks'] = [{'anchorId': 'support', 'role': 'check',
+                           'status': 'observed', 'method': 'manual',
+                           'pixel': [120.5, 340.25], 'uncertaintyPx': 3}]
+    data['anchors'] = [{'id': 'support', 'kind': 'physical-feature'}]
+    old_input = copy.deepcopy(rocker_seeds['states'][0]['completeInput'])
+    new_input = copy.deepcopy(old_input)
+    new_input['crankTurns'] = 0.75
+    camera = copy.deepcopy(frame['camera'])
+    camera['positionMetres'] = [0, 0, 3]
+    seeds = {
+        'sourceInputIndex': {'rows': [{
+            'recordId': 'canonical:0:main', 'kind': 'canonical',
+            'shotId': 'operation-019', 'timeSeconds': 1.01,
+            'sourceFrameIndex': 30, 'viewId': 'main',
+            'rectSourcePixels': [0, 0, 1920, 1080]}]},
+        'chosenStates': {'canonical:0:main': old_input},
+        'observedDegrees': {}, 'fragments': {}, 'gapExposures': [],
+        'correctedCaptures': {},
+        'sourceControls': [{
+            'sourceFrameIndex': 30, 'sourceImage': copy.deepcopy(frame['sourceImage']),
+            'declarations': [{
+                'fragment': 'historical', 'viewId': 'main',
+                'usage': 'provenance-only',
+                'declaration': {**copy.deepcopy(frame['landmarks'][0]),
+                                'pixel': [140, 360]}}]}],
+        'captureRequests': [{'path': 'tracked-numeric-seed', 'request': {
+            'sourceImage': copy.deepcopy(frame['sourceImage']),
+            'decodedTimeSeconds': 1.0, 'viewId': 'main', 'camera': camera,
+            'input': new_input, 'cameraContinuityFamily': 'conditional-family',
+            'cameraProvenance': {'kind': 'source-fit', 'family': 'conditional-family',
+                                 'evidence': 'CHECK-informed inherited family; not cold.'},
+            'inputEvidence': 'Chosen complete state; hidden input is unobserved.'}}],
+    }
+    return data, seeds
+
+
+class OperationCaptureAuthorityTests(unittest.TestCase):
+    def generate(self, data, seeds):
+        with patch.object(rocker.common, 'load_observations',
+                          return_value=copy.deepcopy(data)), patch.object(
+                rocker, 'load_seeds', return_value=(copy.deepcopy(seeds), {})), patch.object(
+                rocker, 'retain_generator_inputs'):
+            return rocker.operation()
+
+    def test_fresh_pixels_and_inherited_loss_survive_complete_playback(self):
+        data, seeds = operation_exposure()
+        track = self.generate(data, seeds)
+        for time in (1, 1.01):
+            frame = next(row for row in track['frames'] if row['timeSeconds'] == time)
+            self.assertEqual(frame['landmarks'], data['frames'][0]['landmarks'])
+            self.assertEqual(frame['unavailable'], data['frames'][0]['unavailable'])
+            self.assertEqual(frame['decodedTimeSeconds'], 1.0)
+            self.assertEqual(frame['sourceImage'], data['frames'][0]['sourceImage'])
+            self.assertEqual(frame['views'][0]['input']['crankTurns'], 0.75)
+            self.assertEqual(frame['views'][0]['camera']['positionMetres'], [0, 0, 3])
+
+    def test_different_source_hash_clock_or_view_cannot_replace_exact_camera_input(self):
+        for mismatch in ('hash', 'source', 'pts', 'view'):
+            with self.subTest(mismatch=mismatch):
+                data, seeds = operation_exposure()
+                request = seeds['captureRequests'][0]['request']
+                if mismatch == 'hash':
+                    request['sourceImage']['sha256Gray8'] = 'c' * 64
+                elif mismatch == 'source':
+                    request['sourceImage']['sourceSha256'] = 'c' * 64
+                elif mismatch == 'pts':
+                    request['decodedTimeSeconds'] = 1.00001
+                else:
+                    request['viewId'] = 'inset'
+                track = self.generate(data, seeds)
+                frame = next(row for row in track['frames'] if row['timeSeconds'] == 1)
+                self.assertEqual(frame['views'][0]['camera'], data['frames'][0]['camera'])
+                self.assertEqual(frame['views'][0]['input']['crankTurns'], 0)
+                self.assertEqual(frame['landmarks'], data['frames'][0]['landmarks'])
 
 
 class SpinPresentationTests(unittest.TestCase):
@@ -423,6 +568,134 @@ class SpinPresentationTests(unittest.TestCase):
                 if evidence is not None:
                     seed['presentationEvidence'] = evidence
                 self.assert_seed_refused_before_observations(seed)
+
+
+class SynthesisDependencyEpochTests(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.root = Path(directory.name)
+        files = {
+            'web/package.json': b'{"dependencies":{"three":"0.180.0"}}\n',
+            'web/package-lock.json': b'{"lockfileVersion":3,"three":"0.180.0"}\n',
+            'web/node_modules/three/package.json': b'{"name":"three","version":"0.180.0"}\n',
+            'web/node_modules/three/build/three.core.js': b'export class Matrix4 {}\n',
+            'web/node_modules/three/build/three.module.js': b'export * from "./three.core.js";\n',
+            'web/node_modules/three/examples/jsm/loaders/GLTFLoader.js': b'import { Matrix4 } from "three";\n',
+        }
+        records = {}
+        for name, raw in files.items():
+            path = self.root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(raw)
+            records[name] = {'sha256': hashlib.sha256(raw).hexdigest(), 'bytes': len(raw)}
+        installed = {name: row for name, row in records.items()
+                     if name.startswith('web/node_modules/three/')}
+        encoded = json.dumps(installed, sort_keys=True, separators=(',', ':')).encode()
+        self.dependency = {
+            'fingerprint': 'sha256-canonical-json-repo-path-bytes-v1',
+            'packageFiles': {name: records[name] for name in
+                             ('web/package.json', 'web/package-lock.json')},
+            'installedThree': {
+                'path': 'web/node_modules/three', 'fileCount': len(installed),
+                'bytes': sum(row['bytes'] for row in installed.values()),
+                'sha256': hashlib.sha256(encoded).hexdigest()},
+            'strictProofManifests': {
+                kind: {'sha256': digest, 'dependencyCount': len(records),
+                       'installedThreeSha256': hashlib.sha256(encoded).hexdigest()}
+                for kind, digest in (('old', 'a' * 64), ('current', 'b' * 64))},
+        }
+        self.epoch = {'strictManifestSha256': 'b' * 64,
+                      'strictDependencyCount': len(records),
+                      'dependencyEpoch': self.dependency}
+        self.historical = {'oldStrictManifestSha256': 'a' * 64}
+        root_patch = patch.object(camera_tracks, 'ROOT', self.root)
+        root_patch.start()
+        self.addCleanup(root_patch.stop)
+
+    def validate(self):
+        return camera_tracks.validate_camrod_dependency_epoch(self.epoch, self.historical)
+
+    def test_unchanged_installed_bytes_match_both_portable_proofs(self):
+        self.assertEqual(self.validate(), {
+            'packageFiles': self.dependency['packageFiles'],
+            'installedThree': self.dependency['installedThree']})
+
+    def test_manifest_or_lockfile_drift_refuses_after_valid_bridge(self):
+        for name in ('web/package.json', 'web/package-lock.json'):
+            with self.subTest(name=name):
+                self.validate()
+                path = self.root / name
+                original = path.read_bytes()
+                path.write_bytes(original + b'\n')
+                with self.assertRaisesRegex(ValueError, 'package dependency epoch differs'):
+                    self.validate()
+                path.write_bytes(original)
+
+    def test_installed_loader_math_or_resolution_drift_refuses_without_lock_change(self):
+        for name in ('package.json', 'build/three.core.js', 'build/three.module.js',
+                     'examples/jsm/loaders/GLTFLoader.js'):
+            with self.subTest(name=name):
+                self.validate()
+                path = self.root / 'web/node_modules/three' / name
+                original = path.read_bytes()
+                path.write_bytes(original + b'// changed installed dependency\n')
+                with self.assertRaisesRegex(ValueError, 'installed Three dependency epoch differs'):
+                    self.validate()
+                path.write_bytes(original)
+
+    def test_same_size_installed_drift_cannot_reuse_earlier_success(self):
+        self.validate()
+        path = self.root / 'web/node_modules/three/build/three.core.js'
+        original = path.read_bytes()
+        path.write_bytes(original.replace(b'Matrix4', b'Matrix3'))
+        with self.assertRaisesRegex(ValueError, 'installed Three dependency epoch differs'):
+            self.validate()
+
+    def test_missing_installed_package_is_unavailable_not_version_drift(self):
+        self.validate()
+        package = self.root / 'web/node_modules/three'
+        package.rename(self.root / 'saved-three-package')
+        with self.assertRaisesRegex(ValueError, 'installed Three dependency unavailable'):
+            self.validate()
+
+    def test_non_directory_package_path_is_unavailable_not_version_drift(self):
+        self.validate()
+        package = self.root / 'web/node_modules/three'
+        package.rename(self.root / 'saved-three-package')
+        package.write_bytes(b'not an installed package directory\n')
+        with self.assertRaisesRegex(ValueError, 'installed Three dependency unavailable'):
+            self.validate()
+
+    def test_missing_dependency_cannot_disappear_from_census(self):
+        self.validate()
+        (self.root / 'web/node_modules/three/examples/jsm/loaders/GLTFLoader.js').unlink()
+        with self.assertRaisesRegex(ValueError, 'installed Three dependency epoch differs'):
+            self.validate()
+
+    def test_added_dependency_invalidates_proof_census(self):
+        self.validate()
+        (self.root / 'web/node_modules/three/build/new-helper.js').write_bytes(b'export const helper = 1;\n')
+        with self.assertRaisesRegex(ValueError, 'installed Three dependency epoch differs'):
+            self.validate()
+
+    def test_missing_lockfile_is_unavailable_not_accepted(self):
+        self.validate()
+        (self.root / 'web/package-lock.json').unlink()
+        with self.assertRaisesRegex(ValueError, 'dependency unavailable'):
+            self.validate()
+
+    def test_old_and_current_manifest_seals_must_bind_same_installed_bytes(self):
+        for kind in ('old', 'current'):
+            for field, replacement in (('sha256', 'c' * 64),
+                                       ('dependencyCount', 1),
+                                       ('installedThreeSha256', 'd' * 64)):
+                with self.subTest(kind=kind, field=field):
+                    original = self.dependency['strictProofManifests'][kind][field]
+                    self.dependency['strictProofManifests'][kind][field] = replacement
+                    with self.assertRaisesRegex(ValueError, 'portable dependency proof binding differs'):
+                        self.validate()
+                    self.dependency['strictProofManifests'][kind][field] = original
 
 
 if __name__ == '__main__':

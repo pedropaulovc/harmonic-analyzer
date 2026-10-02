@@ -99,6 +99,53 @@ def validate_seed_presentations(seeds):
             )
 
 
+def retain_physical_source_controls(data, seeds):
+    """Append actual physical CHECKs without rewriting legacy phase measurements."""
+    declaration = seeds["physicalSourceControls"]
+    raw = (common.WEB.parent / declaration["path"]).read_bytes()
+    if hashlib.sha256(raw).hexdigest() != declaration["sha256"]:
+        raise ValueError("Spin physical source-control bytes disagree with their declaration.")
+    controls = json.loads(raw)
+    if controls["sourceSha256"] != data["source"]["sha256"]:
+        raise ValueError("Spin physical source controls belong to a different original video.")
+    anchors = {anchor["id"]: anchor for anchor in data["anchors"]}
+    originals = {}
+    for frame in data["frames"]:
+        image = frame.get("sourceImage", {})
+        originals.setdefault((image.get("frameIndex"), image.get("sha256Bgr8")), []).append(frame)
+    existing_times = {frame["timeSeconds"] for frame in data["frames"]}
+    for entry in controls["frames"]:
+        identity = entry["sourceImage"]
+        donors = originals.get((identity["frameIndex"], identity["sha256Bgr8"]), [])
+        if not donors or any(frame["sourceImage"] != identity for frame in donors):
+            raise ValueError("A physical CHECK requires an exact retained original source exposure.")
+        for point in entry["landmarks"]:
+            anchor = anchors.get(point["anchorId"])
+            if not anchor or anchor.get("kind") != "physical-feature" or point["role"] != "check":
+                raise ValueError("Spin physical source controls must preserve existing physical CHECK identities.")
+        for frame in donors:
+            views = {view["id"]: view for view in common.source_views(frame, data)}
+            observed = {(point.get("viewId"), point["anchorId"]) for point in frame["landmarks"]}
+            for point in entry["landmarks"]:
+                view_id = point["viewId"]
+                if view_id not in views:
+                    raise ValueError("A physical CHECK has no matching original source view.")
+                if (view_id, point["anchorId"]) in observed:
+                    raise ValueError("Physical source controls must not replace an existing landmark.")
+            frame["landmarks"].extend(copy.deepcopy(entry["landmarks"]))
+            added_ids = {point["anchorId"] for point in entry["landmarks"]}
+            frame["unavailable"] = [item for item in frame.get("unavailable", []) if item.get("anchorId") not in added_ids]
+        pts = entry["timeSeconds"]
+        if pts not in existing_times:
+            # The donor is the same decoded image/layout, never a nearby camera.
+            frame = copy.deepcopy(donors[0])
+            frame.update({"timeSeconds": pts, "decodedTimeSeconds": entry["decodedTimeSeconds"]})
+            data["frames"].append(frame)
+            existing_times.add(pts)
+    data["compactChangeTimesSeconds"].extend(entry["timeSeconds"] for entry in controls["frames"])
+    return controls
+
+
 def main():
     seeds = json.loads((common.WEB / "content" / "XPQwKRt4Y2k.source-seeds.json").read_text())
     validate_seed_presentations(seeds)
@@ -127,6 +174,7 @@ def main():
         data["frames"].append(frame)
         existing_times.add(pts)
     data["compactChangeTimesSeconds"] = [entry["decodedTimeSeconds"] for entry in controls["frames"]]
+    physical_controls = retain_physical_source_controls(data, seeds)
     family = seeds["staticSourceFamily"]
     phase_tracking = retain_phase_point_provenance(data, family)
     for amendment in seeds["staticMotion"]["shotAmendments"]:
@@ -234,6 +282,11 @@ def main():
     track["sourceMeasurementTracking"] = {"method": controls["method"], "qualification": controls["qualification"],
                                          "summary": controls["summary"], "trackingFailures": controls["trackingFailures"]}
     track["sourceMeasurementTracking"]["phasePatchReacquisition"] = phase_tracking
+    track["sourceMeasurementTracking"]["physicalSourceChecks"] = {
+        "method": physical_controls["method"], "qualification": physical_controls["qualification"],
+        "summary": copy.deepcopy(physical_controls["summary"]),
+        "trackingFailures": copy.deepcopy(physical_controls["trackingFailures"]),
+    }
     track["sourceMeasurements"]["status"] = "partial"
     track["sourceMeasurements"]["blockers"].append(
         "Whole-view phase/patch reacquisitions retain actual ROI NCC, actual feature NCC and independent image-edge reference measurements. "

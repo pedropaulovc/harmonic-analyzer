@@ -120,8 +120,9 @@ as source-non-identifiable, not geometric-fidelity passed. Moving parts and all
 identifiable-feature and timing checks retain their requirements.
 
 The iterative plan is **50% → 20% → 10% → 5% of source frame width**, across
-all six videos at each stage. These are maximum landmark errors, not fractions
-of coverage. At 1920 pixels wide the limits are 960, 384, 192 and 96 pixels.
+all six videos at each stage. These are maximum source-pixel errors for admitted
+landmarks and independent contour CHECKs, not fractions of coverage. At 1920
+pixels wide the limits are 960, 384, 192 and 96 pixels.
 The final tolerance is 5%; timing remains within 0.5 seconds throughout.
 
 First demonstrate working coarse camera/mechanism tracking across the collection
@@ -130,6 +131,13 @@ integer second and visible change using distributed fixed and moving landmarks,
 actual rendered pixels and visual overlays. Close-ups, insets and montages remain
 required. Report uncertainty, exceptions and unavailable measurements explicitly.
 Coarse playback is not final footage acceptance.
+
+The approved exception is deliberately blurred, text-covered navigation/endcard
+thumbnail backgrounds. Those views stay in the timestamp census as waived,
+unmeasured source views; they are not successful measurements. The original
+player/audio continue, and wholly unreadable navigation holds the preceding 3D
+pose. Readable insets and sharp outgoing machine views during a crossfade remain
+required. Missing evidence elsewhere never creates this exception.
 
 ```sh
 npm --prefix web run build
@@ -160,7 +168,7 @@ It must contain the six original MP4s under `videos/`. `preview:reference` serve
 them locally with range support without copying footage into publication assets.
 Default public playback remains the official YouTube embed.
 The verifier serves `dist/`, exercises the original media, and reports per-video
-coverage, rendered landmark errors and timing. Incremental runs are repeatable;
+coverage, rendered landmark/contour errors and timing. Incremental runs are repeatable;
 there is no acceptance-attempt quota. The default final target is 5% of each
 source frame's width, with clock skew no greater than 0.5 seconds.
 `?verify=1` enables native WebGL landmark readback. Mathematical camera fitting
@@ -192,6 +200,134 @@ Exact aliases use the declared `sha256Bgr8` or `sha256Gray8` hash for their
 pixel format. Formats never alias each other; sampling diagnostics list
 supported formats and any unsupported source declarations.
 
+Machine-spin physical CHECK controls retain independently identified manual seed
+pixels separately from historical tube-template observations. Regenerate source-only
+controls with `uv run --no-project --python web/.vite/calibration-venv/bin/python
+web/scripts/generate-spin-source-controls.py --scope physical --output <numeric-packet.json>`.
+The producer uses the unchanged source observer, verifies original BGR hashes and
+integer native PTS, and retains track losses. Publish reviewed numeric controls and
+their declared SHA256 before `uv run --no-project --python
+web/.vite/calibration-venv/bin/python web/scripts/compact-spin.py`. CHECKs never fit
+the camera/input, and this does not qualify old template points or claim a stage pass.
+
+The current Intro and Machine-spin compact tracks predate their latest
+observation-lineage repair, physical-control additions and waiver changes. They
+are stale for source CHECK scoring: this checkpoint preserves them without
+regeneration or camera refitting. Regeneration alone is not a safe qualification
+step. First reconcile retained panel measurements and source-view requirements,
+then regenerate from reviewed observations and reconcile camera fits whose FIT
+pixels changed. Preserved playback does not verify the repaired controls.
+
+Competing off-track CHECK timestamps use the original video's integer
+`best_effort_timestamp` and rational `time_base`, not FFprobe's six-decimal time
+string. Both full-precision IEEE evaluations of that rational clock are accepted;
+no nearest-frame or timing tolerance selects source pixels. FIT-only timestamp
+aliases cannot block a sole CHECK exposure. Conflicting full CHECK declarations
+remain unavailable, and original declared timestamps are preserved.
+
+Retained `SourceContourCheck` records carry an authoritative explicit
+`role: 'fit' | 'check'`. Missing/invalid roles fail closed; neither prose, moving
+ancestry nor a failed residual can assign or change that role. `verify:sync` joins
+raw frame/view curves to the selected compact frame only by exact source video,
+frame index, decoded PTS, same-format gray/BGR image hash and actual source-layout
+view identity. It never uses a nearest exposure, cross-format hash, projected
+point alias or extrapolated endpoint. Only CHECK curves form the independent
+post-fit oracle; their pixels/residuals cannot choose camera, warp or physical
+input. FIT curves remain `contourFits` source records, unmeasured and non-gating,
+and never supply CHECK/moving/view/sample coverage. The existing Rocker upper-rim
+partition is CHECK stations 1,5,9,13,17 and FIT for the other 15; all original rod
+curves, including the complete 85-point source0 Rod20 edge, remain CHECK.
+
+CHECK-bearing decoded exposures also create required census rows when they are
+absent from compact exposure-index samples. Camera and input still come from the
+compact track; unbracketed exposures retain each CHECK as unavailable. Non-exact
+aliases supply no pixels, and alias-only CHECK IDs remain unavailable obligations.
+Original required CHECKs remain obligations even when a compact frame is missing
+or labels the exposure non-machine. Only an original source-view
+unreadable-navigation declaration can waive those checks; a compact-only label
+cannot erase them.
+
+After exact paused source review, a selected row with valid explicit CHECK contours
+enables depth-tested native part-ID capture. Repeated enablement reuses the probe
+and redraws only when its current-view capture is stale, including an input change.
+The snapshot, landmark, visibility and complete mechanism-solve receipts come from
+the same current draw. Target part paths, camera/principal point, ordered layout,
+resolved warp, raster backing,
+physical input, time and positive source contribution must agree. Landmark,
+visibility and mechanism `sourceDrawRevision` receipts must equal the positive
+current snapshot revision, with its `sourceDrawTimeSeconds` matching capture time.
+Retained same-time readbacks and missing revisions cannot substitute for that draw.
+The bridge stamps only genuine fresh getter output bound to the current source
+draw; stale/unavailable native output is not upgraded. Empty, hidden,
+stale, zero-contribution or masked boundaries remain unavailable. The complete
+native ID inventory preserves occlusion; it is not 435-part source certification.
+
+The contour error is the directed maximum from each observed source point to its
+nearest **actual sampled target-part ID boundary center**, plus source localization
+uncertainty and the GPU's source-global raster bound. No bounding box, CAD endpoint,
+CPU silhouette, RMS average or reverse distance to unobserved edges substitutes.
+Sampling a subset of the actual boundary can conservatively overstate the error.
+This measures positive-contribution layer geometry, not the final fractional-alpha
+color silhouette. A partial Rod20 right-exterior curve does not certify the whole
+rod, its other edges, head topology or material-point correspondence.
+
+Reports keep `contourChecks` separate from `landmarks`: one measured curve can
+supply a required view's independent CHECK, but its many samples cannot become
+distributed point features or rescue point-method exclusions. Moving coverage
+requires existing matching target-part moving ancestry; unknown ancestry remains
+unavailable. For rods, `readPartBinding(partPath)` reads the exact resolved binding
+of the currently loaded rig: `{partPath,bindingId,kind,motion,stationIndex}`.
+A valid indexed `motion: 'rod'` binding qualifies native kinematic moving
+eligibility, without borrowing a rocker anchor or guessing from path-name stems.
+The query requires membership in the actual rig updater; a cloned part cannot
+claim moving eligibility merely by inheriting its source's binding metadata.
+An exact or ancestor position/quaternion override in the selected view
+also prevents that part from supplying moving coverage.
+Reports retain this `nativePartBinding`, the source association in
+`measurementEvidence`, and `observedSourceInternalMotion: 'unmeasured'`:
+kinematic eligibility is not a claim of observed source movement. Missing,
+unbound, wrong-part or invalid-station metadata cannot manufacture eligibility.
+Failures before contour measurement still name every actual required CHECK curve
+as unavailable; FIT curves never inflate the CHECK unavailable count.
+Fixed-point, every-source-view, complete-input, clock, playback and
+interaction requirements remain unchanged. The retained Rocker contours include
+all 48 late contour-only obligations, but source acceptance and closure require
+Root's current native GPU measurements; retained coordinates alone are not a pass.
+
+Serialized verification reports use `reportSchemaVersion: 2`. Each video's
+`contourEvidence` dictionary stores exact JSON evidence values under SHA-256 keys;
+`<field>Ref` fields reference those values. `resolveVerificationReport` in
+`scripts/verify-sync.mjs` restores the detailed shape and rejects missing or corrupt
+references. Counts, statuses, error bounds and draw-revision scalars stay on their
+measurement rows. Publication uses bounded 64 KiB writes and an atomic rename.
+All source coordinates and captured boundary samples remain in the report.
+
+Decision controls: `node --test web/scripts/verify-sync.test.mjs`. They do not
+replace an actual native-GPU `verify:sync` run against the unchanged model/MP4s.
+
+After building, Root can exercise every one of the 48 retained late contour-only
+exposures against the **current native GPU** with the exact selected source times:
+
+```sh
+HARMONIC_SOFTWARE_GL=0 npm --prefix web run verify:sync -- --stage 20 --video rocker-arms --times 967.5916249999999,968,969,970,971,973,975,976,978,979,980,981,982,983,984,985,986,988,989,990,991,992,994,995,996,997,998,1000,1001,1002,1003,1004,1005,1006,1007,1008,1009,1011,1012,1013,1014,1014.2215416666666,1014.26325,1014.6281979166666,1014.9931458333333,1015,1015.35809375,1015.6813333333332 --output "$PWD/web/.vite/verification-output/rocker-contours48-stage20"
+```
+
+Resolve the version2 report with `resolveVerificationReport` before inspecting
+these fields. In the serialized file, `sourceImageRef`,
+`nativeBoundarySamplesRef` and `nativePartBindingRef` are keys into that video's
+`contourEvidence` dictionary, not missing evidence.
+
+Inspect the actual `webglRenderer` (native NVIDIA/RTX3090 for that acceptance run),
+each sample's `contourChecks` source image and fresh redraw receipts, nonzero target
+pixels/boundary samples, exact native `connectingRods`/indexed/`rod` binding with
+`stationIndex: 19` for `connecting-rod-20`, and additive errors against 384 pixels.
+Root can query `window.harmonicAnalyzer.readPartBinding(partPath)` read-only during
+the paused redraw. This scoped run is
+not a stage pass: fixed-point/other-source coverage still requires the full run.
+Root also exercises source0, positive-fade/zero-contribution, support/scissor,
+later-mask and native-occlusion controls; neither this command nor decision tests
+claim those GPU results in advance.
+
 Source generators use committed observations, chosen seed states and immutable
 numeric calibration metadata under `content/`. Original private capture paths
 and hashes remain provenance links, not regeneration dependencies. No source
@@ -203,7 +339,7 @@ bound evidence.
 through uv in an isolated Python environment. The suite covers exact-exposure
 identity, conflicting landmarks and invalid presentation declarations.
 
-Legacy full-part visibility, finite-line, contour and raster-bound diagnostics
+Legacy exhaustive per-part certificates, finite-line and raster-bound diagnostics
 remain historical evidence, not an exhaustive queue that must finish before
 source-following animation can be demonstrated. Preserve their real bug fixes
 when using those measurement paths. See [`DESIGN.md`](DESIGN.md) for the current
