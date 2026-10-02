@@ -105,6 +105,29 @@ other shots, views and presentations retain their existing paths.
 source-specific producers and limits. These drives remain chosen approximations;
 source camera and geometry fidelity are unaccepted.
 
+Synthesis's rocker-bank interval **105.980875..124.4159583 seconds** uses
+[automatic-motion inputs](content/8KmVDxkia_w.automatic-motion.json) and
+[source evidence](content/8KmVDxkia_w.automatic-motion-evidence.json), produced by
+[`generate-8KmVDxkia_w-automatic-motion.py`](scripts/generate-8KmVDxkia_w-automatic-motion.py).
+The source's 4× label describes published-video playback: mean cadence is
+1.559234652 turns/s, with unsigned cumulative drive of 28.744620749 turns across
+410 native knots. `bank-direction-+1` is an explicitly chosen physical direction,
+not a recovered historical sign. Twenty constant common upper phases remain a
+chosen prior; hidden amplitudes and setup remain chosen and unmeasured.
+
+This drive applies only to the rocker-bank/main/native full-canvas unwarped view.
+Unmeasured same-shot slivers hold the nearest new input until the real cut.
+The lower-crank interval **270.35..271.23 seconds** is excluded
+(`phaseMatchQualified: false`); cadence and phases do not transfer across cuts.
+Conditional independent actual-metal controls cover 18 harmonics over 20 exposures
+(maximum 26.50 px) and 17 harmonics at one exposure (maximum 9.43 px).
+They do not qualify GPU motion, the full scene or the camera. Separate native
+GPU captures exercised all twenty visible rocker meshes, with changing raster
+extents and contours at a fixed camera. Uninterrupted original-video/native
+playback had a maximum 52.690 ms media-to-completed-draw skew. The fixed far
+portrait camera still mismatches the filmed bank close-up; camera and geometric
+fidelity remain unqualified.
+
 `npm --prefix web run test:playback` exercises eight synthetic runtime decisions
 through Vite SSR, without a browser or GLB. `SOURCE_TRACK_MODULE` may point to
 a historical source-track module for a failing-before control; these tests
