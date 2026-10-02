@@ -20,6 +20,7 @@ as a declared same-shot transfer. Independent focal/distance fit gauges are not
 a physical trajectory; seed CPU diagnostics do not qualify held exposures/GPU.
 """
 from __future__ import annotations
+import argparse
 import copy
 import hashlib
 import importlib.util
@@ -99,6 +100,7 @@ class Generator:
         self.analysis = video_id == "6dW6VYXp9HM"
         self.data = common.load_observations(video_id, prefer_track=not self.analysis)
         self.shots = {s["id"]: s for s in self.data["shots"]}
+        self.chosen_camera_permissions = self.chosen_camera_continuity_packet(video_id)
         self.analysis_held_camera = self.analysis_held_camera_packet() if self.analysis else None
         if self.analysis:
             self.shots["analysis-39"]["hasCorrespondingMachine"] = True
@@ -188,6 +190,52 @@ class Generator:
                 if transition["startSeconds"] <= t < transition["endSeconds"]]
             self.data.setdefault("compactChangeTimesSeconds", []).extend(
                 retained_changes + [key["decodedTimeSeconds"] for key in self.presenter_reframing["keys"]])
+
+    def chosen_camera_continuity_packet(self, video_id):
+        """Optional authored permissions, bounded by unchanged native source rows."""
+        path = WEB / "content" / f"{video_id}.chosen-camera-continuity.json"
+        if not path.exists():
+            return {}
+        packet = json.loads(path.read_text())
+        if (packet.get("schemaVersion") != 1 or packet.get("videoId") != video_id
+                or packet.get("sourceSha256") != self.data["source"]["sha256"]
+                or not isinstance(packet.get("permissions"), list)):
+            raise ValueError("Chosen camera continuity packet source identity is invalid.")
+        permissions = {}
+        for permission in packet["permissions"]:
+            shot = self.shots.get(permission.get("shotId"))
+            key = (permission.get("shotId"), permission.get("viewId"))
+            if (shot is None or key in permissions or permission.get("viewId") != "main"
+                    or permission.get("componentFamily") != "whole"
+                    or permission.get("cameraProvenanceKind") != "source-informed-framing"
+                    or permission.get("measurementStatus") != "unmeasured"
+                    or permission.get("cameraInterpolation") != "continuous-shot"
+                    or not isinstance(permission.get("cameraInterpolationEvidence"), str)
+                    or not permission["cameraInterpolationEvidence"].strip()
+                    or not isinstance(permission.get("cameraContinuityFamily"), str)
+                    or not permission["cameraContinuityFamily"].strip()
+                    or permission.get("startSeconds") != shot["startSeconds"]
+                    or permission.get("endSeconds") != shot["endSeconds"]):
+                raise ValueError("Chosen camera continuity permission needs bounded main/whole unmeasured framing evidence.")
+            first, last = permission.get("startDecodedFrameIndex"), permission.get("lastDecodedFrameIndex")
+            fps = self.data["source"]["fps"]
+            rate = fps["numerator"] / fps["denominator"]
+            if (type(first) is not int or type(last) is not int or first > last
+                    or first != shot.get("startDecodedFrameIndex")
+                    or abs(first / rate - shot["startSeconds"]) > 1e-9
+                    or abs((last + 1) / rate - shot["endSeconds"]) > 1e-9):
+                raise ValueError("Chosen camera permission native interval differs from the complete source shot.")
+            rows = [frame for frame in self.data["frames"] if frame["shotId"] == shot["id"]]
+            if (not rows or {frame.get("decodedFrameIndex") for frame in rows} != set(range(first, last + 1))
+                    or any(frame.get("camera") is not None
+                           or not shot["startSeconds"] <= frame["decodedTimeSeconds"] < shot["endSeconds"]
+                           or any(view["id"] != "main" or view.get("camera") is not None
+                                  or view["rectSourcePixels"] != [0, 0, self.data["source"]["width"], self.data["source"]["height"]]
+                                  or view.get("presentation", "native") != "native"
+                                  for view in common.source_views(frame, self.data)) for frame in rows)):
+                raise ValueError("Chosen camera permission requires complete native coverage with unchanged unmeasured main layout.")
+            permissions[key] = copy.deepcopy(permission)
+        return permissions
 
     def calibration_input(self, name):
         record = self.calibration["inputs"][name]
@@ -961,6 +1009,8 @@ class Generator:
                 camera = look_camera(target,-math.pi/2 if family != "pen" else 0.,0.16,span,1920/1080)
                 value,note = self.input(frame,family)
                 output.append({**original,"camera":camera,"input":common.compact_input(value),
+                    "sourceViewIds":["main"],
+                    "sourceViewMappingEvidence":f"Retained observations for {frame['shotId']} describe one full-canvas main source image during the dissolve. The outgoing/incoming layers are this producer's authored decomposition of that same image into the ordered {fades[frame['shotId']][0]}/{fades[frame['shotId']][1]} perspectives, not independent measured source-view identities; source boundaries choose linear opacity, not recovered edit weights.",
                     "composite":{"mode":"crossfade","groupId":frame["shotId"],"imageLayerId":original["id"],"opacity":fraction if index else 1-fraction},
                     "provenance":common.chosen_provenance(note+" Both independently filmed source perspectives retained. Camera from component bounds; linear fade weights chosen from source shot boundaries, not measured opacity.")})
         if self.analysis and frame["shotId"] == "analysis-19":
@@ -1039,6 +1089,7 @@ class Generator:
 
     def camera_metadata(self, track):
         previous, epochs = {}, {}
+        applied_permissions = set()
         for frame in track["frames"]:
             for view in frame["views"]:
                 evidence = view["provenance"]["evidence"]
@@ -1069,6 +1120,22 @@ class Generator:
                 else:
                     kind, branch = "source-informed-framing", f"{frame['shotId']}:{view['id']}:{component}"
                 family = f"{kind}:{branch}"
+                permission = self.chosen_camera_permissions.get((frame["shotId"], view["id"]))
+                if permission:
+                    if (kind != permission["cameraProvenanceKind"] or component != permission["componentFamily"]
+                            or view["provenance"]["kind"] != "chosen-feasible"
+                            or not permission["startSeconds"] <= frame["decodedTimeSeconds"] < permission["endSeconds"]
+                            or view["rectSourcePixels"] != [0,0,self.data["source"]["width"],self.data["source"]["height"]]
+                            or view["presentation"] != "native"):
+                        raise ValueError("Chosen continuity permission cannot override a camera donor or layout change.")
+                    continuity = permission["cameraContinuityFamily"]
+                    view["cameraInterpolation"] = permission["cameraInterpolation"]
+                    view["cameraInterpolationEvidence"] = permission["cameraInterpolationEvidence"]
+                    view["cameraProvenance"] = {"kind":kind,"family":continuity,
+                                               "evidence":evidence+" Camera assumptions remain unmeasured; continuity does not certify a match."}
+                    view["cameraContinuityFamily"] = continuity
+                    applied_permissions.add((frame["shotId"], view["id"]))
+                    continue
                 old = previous.get(family)
                 if old:
                     dot = min(1.,abs(sum(a*b for a,b in zip(old["quaternion"],camera["quaternion"]))))
@@ -1078,12 +1145,18 @@ class Generator:
                 continuity = f"{family}:branch{epochs.get(family,0)}"
                 view["cameraProvenance"] = {"kind":kind,"family":continuity,"evidence":evidence+" Camera assumptions remain unmeasured; continuity does not certify a match."}
                 view["cameraContinuityFamily"] = continuity
+        if applied_permissions != self.chosen_camera_permissions.keys():
+            raise ValueError("Chosen camera permission has no eligible generated main/whole framing views.")
 
 
 if __name__ == "__main__":
-    # Build and serialize the complete pair before publishing either output.
-    # A missing/malformed Synthesis input must not leave Analysis regenerated.
-    tracks = [Generator(video_id).build() for video_id in ("6dW6VYXp9HM", "8KmVDxkia_w")]
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--video", choices=("6dW6VYXp9HM", "8KmVDxkia_w"),
+                        help="Regenerate only this video; default validates the complete pair before publishing.")
+    args = parser.parse_args()
+    # The default still prepares the complete pair before publishing either.
+    videos = (args.video,) if args.video else ("6dW6VYXp9HM", "8KmVDxkia_w")
+    tracks = [Generator(video_id).build() for video_id in videos]
     outputs = [(track, *common.prepare_track(track)) for track in tracks]
     for track, path, contents in outputs:
         path.write_text(contents)
