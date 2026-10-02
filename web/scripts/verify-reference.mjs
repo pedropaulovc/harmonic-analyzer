@@ -480,6 +480,18 @@ export function nativeLineAxisGeometryBound(view, check, observed) {
   if (!finite(geometryBiasSourcePixels)) throw new Error('Unbounded final-source geometry bias')
   return {components,magnificationBound,geometryBiasSourcePixels}
 }
+/** One authoritative source-contour predicate for static and actual-GPU review. */
+export function sourceContourErrors(contour, view, sourceImage) {
+  const errors = [], pixels = contour?.sourceContourPixels
+  if (!['fit', 'check'].includes(contour?.role)) errors.push('Contour has no authoritative explicit FIT/CHECK role')
+  if (!text(contour?.id) || !text(contour?.partPath) || !contour.partPath.startsWith('harmonic-analyzer/')) errors.push('Contour needs a nonempty identity and qualified native part path')
+  if (!Array.isArray(pixels) || pixels.length < 2 || !pixels.every(pixel => inRect(pixel, view?.rectSourcePixels))
+    || pixels.every(pixel => canonicalJson(pixel) === canonicalJson(pixels[0]))) errors.push('Contour needs distinct nondegenerate actual source pixels inside the declared source ROI')
+  if (!finite(contour?.uncertaintyPx) || contour.uncertaintyPx < 0 || contour.uncertaintyPx > PIXEL_LIMIT) errors.push(`Contour needs bounded source uncertainty between 0 and ${PIXEL_LIMIT}px`)
+  if (canonicalJson(contour?.measurementEvidence?.sourceImage) !== canonicalJson(sourceImage) || !text(contour?.measurementEvidence?.evidence)) errors.push('Contour needs canonical current-source image identity and actual measured edge evidence')
+  return errors
+}
+
 export function nativeLineErrors(lines, image, view, overrides = []) {
   const errors = [], ids = new Set(), rect = view?.rectSourcePixels
   for (const line of lines) {
@@ -780,7 +792,7 @@ export function inspectReference(data, expectedId, native = null) {
       for (const error of nativeLineErrors(view.nativeLineChecks ?? [], frame.sourceImage, view, view.partOverrides ?? [])) fail('native-line-evidence', error, t, viewId)
       const contourIds = new Set()
       for (const contour of view.sourceContourChecks ?? []) {
-        if (!text(contour.id) || contourIds.has(contour.id) || !['fit', 'check'].includes(contour.role) || !text(contour.partPath) || !contour.partPath.startsWith('harmonic-analyzer/') || !Array.isArray(contour.sourceContourPixels) || contour.sourceContourPixels.length < 2 || !contour.sourceContourPixels.every(point => inRect(point, rect)) || contour.sourceContourPixels.every(point => canonicalJson(point) === canonicalJson(contour.sourceContourPixels[0])) || !finite(contour.uncertaintyPx) || contour.uncertaintyPx < 0 || contour.uncertaintyPx > PIXEL_LIMIT || canonicalJson(contour.measurementEvidence?.sourceImage) !== canonicalJson(frame.sourceImage) || !text(contour.measurementEvidence?.evidence)) fail('source-contour-evidence', 'Need an explicit FIT/CHECK role and distinct nondegenerate actually measured current-source native contour inside ROI with bounded uncertainty', t, viewId)
+        if (contourIds.has(contour.id) || sourceContourErrors(contour, view, frame.sourceImage).length) fail('source-contour-evidence', 'Need an explicit FIT/CHECK role and distinct nondegenerate actually measured current-source native contour inside ROI with bounded uncertainty', t, viewId)
         contourIds.add(contour.id)
       }
       const composite = view.composite ?? { mode: 'opaque' }

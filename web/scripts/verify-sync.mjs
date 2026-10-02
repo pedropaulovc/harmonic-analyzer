@@ -3,7 +3,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { VIDEO_IDS, MODEL_SHA256, MODEL_COMMIT, CLOCK_LIMIT, probeSource, verifyFrameImages, claimedSourceImages, nearestPtsIndex, sourceNeedsMachine, frameViews, sourceLayoutForViews, sourcePointUnmasked, sourceLocalizationFootprintBounds, sameSourceLayout, sameResolvedImagePlaneWarp, jsonDigest } from './verify-reference.mjs'
+import { VIDEO_IDS, MODEL_SHA256, MODEL_COMMIT, CLOCK_LIMIT, probeSource, verifyFrameImages, claimedSourceImages, nearestPtsIndex, sourceNeedsMachine, frameViews, sourceLayoutForViews, sourcePointUnmasked, sourceLocalizationFootprintBounds, sameSourceLayout, sameResolvedImagePlaneWarp, jsonDigest, sourceContourErrors } from './verify-reference.mjs'
 import { distManifest, serveDist } from './verify-server.mjs'
 
 const WEB_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -151,16 +151,20 @@ function exactSourceExposure(original, selected) {
 
 /** Join raw contour roles downstream of compact camera/input selection, without changing their scope. */
 export function sourceContourSidecar(frame, originals) {
-  const contourChecks = [], contourJoinUnavailable = [], identities = new Map()
-  const exact = originals.filter(original => original.shotId === frame.shotId && exactSourceExposure(original, frame))
-  // Unselected nominal/decoded aliases are not join candidates. If the exact
-  // exposure exists, other rows cannot poison it or silently supply its pixels.
-  const candidates = exact.length ? exact : originals.filter(original => original.sourceImage?.frameIndex === frame.sourceImage?.frameIndex || original.decodedTimeSeconds === frame.decodedTimeSeconds)
+  const contourChecks = [], contourJoinUnavailable = [], identities = new Map(), declarations = new Set()
+  const aliases = originals.filter(original => original.sourceImage?.frameIndex === frame.sourceImage?.frameIndex || original.decodedTimeSeconds === frame.decodedTimeSeconds)
+  const exact = aliases.filter(original => original.shotId === frame.shotId && exactSourceExposure(original, frame))
+  // Exact source declarations alone may supply pixels. Alias-only CHECK IDs
+  // remain obligations below, never rounded-PTS pixel join candidates.
+  const candidates = exact.length ? exact : aliases
   for (const original of candidates) {
     for (const sourceView of frameViews(original)) for (const check of sourceView.sourceContourChecks ?? []) {
       const mapping = compactSourceViewId(original, sourceView.id, frame.views ?? [])
       const selected = frame.views?.find(view => view.id === mapping.viewId)
       const context = { viewId: mapping.viewId ?? sourceView.id, originalViewId: sourceView.id, contourId: check.id, partPath: check.partPath, role: check.role ?? 'unknown' }
+      const declaration = jsonDigest([original.shotId, original.decodedTimeSeconds, original.sourceImage, sourceView.id, sourceView.rectSourcePixels, sourceView.presentation, sourceView.composite ?? { mode: 'opaque' }, check])
+      if (declarations.has(declaration)) continue
+      declarations.add(declaration)
       if (!['fit', 'check'].includes(check.role)) {
         contourJoinUnavailable.push({ ...context, status: 'source-unavailable', reason: 'Contour has no authoritative explicit FIT/CHECK role' })
         continue
@@ -188,6 +192,21 @@ export function sourceContourSidecar(frame, originals) {
         ...(mapping.evidence ? { viewMappingEvidence: mapping.evidence } : {}) })
     }
   }
+  if (exact.length) {
+    const exactIds = new Set(exact.flatMap(original => frameViews(original).flatMap(view => (view.sourceContourChecks ?? []).map(check => `${view.id}/${check.id}/${check.role}`))))
+    const aliasIds = new Set()
+    for (const original of aliases) {
+      if (original.shotId === frame.shotId && exactSourceExposure(original, frame)) continue
+      for (const sourceView of frameViews(original)) for (const check of sourceView.sourceContourChecks ?? []) {
+        const key = `${sourceView.id}/${check.id}/${check.role}`
+        if (check.role !== 'check' || exactIds.has(key) || aliasIds.has(key)) continue
+        aliasIds.add(key)
+        const mapping = compactSourceViewId(original, sourceView.id, frame.views ?? [])
+        contourJoinUnavailable.push({ viewId: mapping.viewId ?? sourceView.id, originalViewId: sourceView.id, contourId: check.id, partPath: check.partPath, role: check.role,
+          status: 'source-unavailable', reason: 'Alias-only CHECK has no declaration on the selected exact source exposure; rounded-PTS pixels are never borrowed' })
+      }
+    }
+  }
   contourChecks.push(...[...identities.values()].filter(Boolean))
   return { contourChecks, contourJoinUnavailable }
 }
@@ -204,16 +223,25 @@ export function sourceCensus(observations, track, native, options) {
     if (!contourFrames.has(key)) contourFrames.set(key, [])
     contourFrames.get(key).push(frame)
   }
-  const add = (time, reason) => {
+  const add = (time, reason, contourSource = null) => {
     if (!finite(time) || time < 0 || time >= native.durationSeconds) return
     const key = time.toFixed(6), row = times.get(key) ?? { timeSeconds: time, reasons: [] }
     if (!row.reasons.includes(reason)) row.reasons.push(reason)
+    if (contourSource && !row.contourSource) row.contourSource = contourSource
     times.set(key, row)
   }
   for (let time = 0; time < native.durationSeconds; time++) add(time, 'every-second')
   for (const time of track.coverage?.changeTimesSeconds ?? []) add(time, 'authored-change-point')
   for (const shot of sourceShots) { add(shot.startSeconds, 'shot-start'); add(shot.endSeconds, 'shot-end') }
   for (const frame of track.frames) add(frame.timeSeconds, 'authored-sample')
+  // A compact sample already accounts for its frame-index aliases through the
+  // exact-exposure sidecar. Every other CHECK exposure is a mandatory oracle,
+  // even without point landmarks; FIT-only curves never add census obligations.
+  const authoredExposureIndices = new Set(track.frames.map(frame => frame.sourceImage?.frameIndex).filter(Number.isInteger))
+  for (const [frameIndex, originals] of contourFrames) {
+    if (authoredExposureIndices.has(frameIndex)) continue
+    for (const original of originals) if (frameViews(original).some(view => view.sourceContourChecks?.some(check => check.role === 'check'))) add(original.decodedTimeSeconds, 'source-contour-check', original)
+  }
   // Preserve real view membership/cut changes, not every exposure of continuous motion.
   let precedingLayout = null
   const framesByShot = new Map()
@@ -238,10 +266,10 @@ export function sourceCensus(observations, track, native, options) {
     if (original) add(original.decodedTimeSeconds, 'mid-interval')
   }
   for (const time of options.times ?? []) add(time, 'requested-sample')
-  const rows = [...times.values()].sort((a, b) => a.timeSeconds - b.timeSeconds).map(row => {
+  const rows = [...times.values()].sort((a, b) => a.timeSeconds - b.timeSeconds).map(({ contourSource, ...row }) => {
     const diagnosticOnly = row.reasons.every(reason => reason === 'mid-interval')
     const shot = sourceShots.find(shot => shot.startSeconds <= row.timeSeconds && row.timeSeconds < shot.endSeconds)
-    const original = nearestFrame(framesByShot.get(shot?.id) ?? [], row.timeSeconds, 'decodedTimeSeconds')
+    const original = contourSource ?? nearestFrame(framesByShot.get(shot?.id) ?? [], row.timeSeconds, 'decodedTimeSeconds')
     const authored = nearestFrame(track.frames, row.timeSeconds)
     let left = -1, right = track.frames.length
     while (left + 1 < right) { const middle = (left + right) >>> 1; if (track.frames[middle].timeSeconds <= row.timeSeconds) left = middle; else right = middle }
@@ -249,7 +277,7 @@ export function sourceCensus(observations, track, native, options) {
     const governing = from?.shotId === shot?.id ? from : authored?.shotId === shot?.id ? authored : null
     const originalRequired = original ? sourceNeedsMachine(original, originalShots.get(original.shotId)) : !shot || shot.hasCorrespondingMachine !== false && shot.classification !== 'non-machine'
     const compactRequired = governing ? sourceNeedsMachine(governing, shot) : originalRequired
-    const required = originalRequired || compactRequired
+    const required = originalRequired || compactRequired || Boolean(contourSource)
     // frameViews' implicit main is a legacy convenience, not an independently
     // declared source perspective. All explicit source views remain required.
     const sourceViewMappings = originalRequired && original?.views ? original.views.map(view => ({ originalViewId: view.id, ...compactSourceViewRequirement(original, view.id, governing?.views ?? []) })) : []
@@ -257,8 +285,9 @@ export function sourceCensus(observations, track, native, options) {
     const tolerance = row.reasons.includes('every-second') ? 1e-5 : 1 / native.fps + 0.001
     let frame = authored && Math.abs(authored.timeSeconds - row.timeSeconds) <= tolerance && authored.shotId === shot?.id ? authored : null
     let unavailableReason = frame ? null : 'Missing authored sample at retained every-second/change-point source time'
+    if (contourSource && (!frame || !exactSourceExposure(contourSource, frame))) { frame = null; unavailableReason = 'No compact camera/input selection at the exact CHECK source exposure' }
     const between = from && to && from.shotId === shot?.id && to.shotId === shot.id && row.timeSeconds > from.timeSeconds + 1e-6 && row.timeSeconds < to.timeSeconds - 1e-6
-    if (between && (row.reasons.includes('mid-interval') || row.reasons.includes('requested-sample'))) {
+    if (between && (contourSource || row.reasons.includes('mid-interval') || row.reasons.includes('requested-sample'))) {
       if (original && original.decodedTimeSeconds > from.timeSeconds && original.decodedTimeSeconds < to.timeSeconds
         && Math.abs(original.decodedTimeSeconds - row.timeSeconds) <= 1 / native.fps + 0.001) {
         const mapped = compactSourceLandmarks(original, from.views ?? [])
@@ -277,7 +306,13 @@ export function sourceCensus(observations, track, native, options) {
       }
     }
     if (frame) frame = { ...frame, ...sourceContourSidecar(frame, contourFrames.get(frame.sourceImage?.frameIndex) ?? []) }
-    return { ...row, diagnosticOnly, required, sourceShotId: shot?.id ?? original?.shotId ?? null, originalTimeSeconds: original?.timeSeconds ?? null, expectedViewIds, sourceViewMappings, frame, unavailableReason }
+    const unjoinedContours = !frame && contourSource ? sourceContourSidecar({ ...contourSource, views: governing?.views ?? [] }, contourFrames.get(contourSource.sourceImage?.frameIndex) ?? []) : null
+    const contourJoinUnavailable = unjoinedContours ? [
+      ...unjoinedContours.contourJoinUnavailable.filter(item => item.role === 'check'),
+      ...unjoinedContours.contourChecks.filter(item => item.check.role === 'check').map(item => ({ viewId: item.viewId, originalViewId: item.originalViewId, contourId: item.check.id, partPath: item.check.partPath, role: item.check.role,
+        status: 'unmeasured-native', reason: unavailableReason })),
+    ] : []
+    return { ...row, diagnosticOnly, required, sourceShotId: shot?.id ?? original?.shotId ?? null, originalTimeSeconds: original?.timeSeconds ?? null, expectedViewIds, sourceViewMappings, frame, unavailableReason, contourJoinUnavailable }
   })
   const selected = rows.filter(row => options.times ? options.times.some(time => Math.abs(time - row.timeSeconds) < 1e-5) : (options.from === null || row.timeSeconds >= options.from) && (options.to === null || row.timeSeconds <= options.to))
   for (const time of options.times ?? []) if (time >= native.durationSeconds) selected.push({ timeSeconds: time, reasons: ['requested-sample'], diagnosticOnly: false, required: true, expectedViewIds: [], frame: null, unavailableReason: 'Requested time is outside the original source duration' })
@@ -508,13 +543,14 @@ async function review(page, embed, record, frame, required = true) {
   const expectedIndex = nearestPtsIndex(record.native.pts, frame.decodedTimeSeconds)
   assert(Math.abs(record.native.pts[expectedIndex] - frame.decodedTimeSeconds) <= 0.001 && Math.abs(frame.decodedTimeSeconds - frame.timeSeconds) <= CLOCK_LIMIT + 1e-6, 'Authored sample is not a retained native source PTS within0.5s')
   if (frame.sourceImage) assert(frame.sourceImage.frameIndex === expectedIndex, 'Source image frame index differs from declared native PTS')
-  const withContours = required && (frame.contourChecks ?? []).some(item => item.check.role === 'check' && validSourceContour(item.check))
+  const drawableContours = required ? (frame.contourChecks ?? []).filter(item => item.check.role === 'check' && !sourceContourIssue(item, frame.views?.find(view => view.id === item.viewId), frame)) : []
+  const withContours = drawableContours.length > 0
   const rendered = await page.evaluate(({ ids, withContours, partPaths }) => {
     const bridge = window.harmonicAnalyzer
     if (withContours) bridge.enablePartVisibility()
     const canvas = document.querySelector('#stage')
     return { actual: bridge.snapshot(), ...(withContours ? { nativePartBindings: partPaths.map(partPath => ({ partPath, binding: bridge.readPartBinding(partPath) })) } : {}), captures: ids.map(viewId => ({ viewId, capture: bridge.renderedLandmarks(viewId), mechanism: bridge.renderedMechanism(viewId), ...(withContours ? { partVisibility: bridge.renderedPartVisibility(viewId) } : {}) })), canvas: { tag: canvas?.tagName, width: canvas?.width, height: canvas?.height, clientWidth: canvas?.clientWidth, clientHeight: canvas?.clientHeight, devicePixelRatio: window.devicePixelRatio } }
-  }, { ids: (frame.views ?? []).map(view => view.id), withContours, partPaths: [...new Set((frame.contourChecks ?? []).filter(item => item.check.role === 'check' && validSourceContour(item.check)).map(item => item.check.partPath))] })
+  }, { ids: (frame.views ?? []).map(view => view.id), withContours, partPaths: [...new Set(drawableContours.map(item => item.check.partPath))] })
   actual = rendered.actual; native = await media(embed)
   requireModel(actual, record.id); requireMedia(native, record); requirePausedReview(actual, native, frame, required)
   return { native, seek, beforeMediaTime: before.mediaTime, ...rendered }
@@ -585,11 +621,10 @@ function distributedLandmarkFloor(measured) {
   return false
 }
 
-function validSourceContour(check) {
-  return ['fit', 'check'].includes(check?.role) && typeof check.id === 'string' && check.id.trim() && typeof check.partPath === 'string' && check.partPath.startsWith('harmonic-analyzer/')
-    && Array.isArray(check.sourceContourPixels) && check.sourceContourPixels.length >= 2 && check.sourceContourPixels.every(point)
-    && check.sourceContourPixels.some(pixel => jsonDigest(pixel) !== jsonDigest(check.sourceContourPixels[0]))
-    && finite(check.uncertaintyPx) && check.uncertaintyPx >= 0 && typeof check.measurementEvidence?.evidence === 'string' && check.measurementEvidence.evidence.trim()
+function sourceContourIssue(item, view, frame) {
+  const errors = sourceContourErrors(item.check, view, frame.sourceImage)
+  if (!exactSourceExposure(item, frame) || jsonDigest(item.sourceImage) !== jsonDigest(frame.sourceImage)) errors.push('Contour source evidence belongs to a different exact exposure')
+  return errors.length ? errors.join('; ') : null
 }
 
 function retainedContourFits(frame, viewId) {
@@ -610,10 +645,15 @@ function sourceContourUnavailable(frame, reason, viewId) {
 /** Only explicitly held-out CHECK edges are an oracle; FIT curves stay retained and unmeasured. */
 export function measureContours(view, response, frame, tolerancePx, anchors) {
   const declared = (frame.contourChecks ?? []).filter(item => item.viewId === view.id)
-  const required = declared.filter(item => item.check.role === 'check')
+  const required = []
   const unavailable = (frame.contourJoinUnavailable ?? []).filter(item => item.viewId === view.id && item.role !== 'fit'), measured = []
   const retainedFits = retainedContourFits(frame, view.id)
   unavailable.push(...declared.filter(item => !['fit', 'check'].includes(item.check.role)).map(item => ({ viewId: view.id, contourId: item.check.id, partPath: item.check.partPath, role: item.check.role ?? 'unknown', status: 'source-unavailable', reason: 'Contour has no authoritative explicit FIT/CHECK role' })))
+  for (const item of declared.filter(item => item.check.role === 'check')) {
+    const reason = sourceContourIssue(item, view, frame)
+    if (reason) unavailable.push({ viewId: view.id, originalViewId: item.originalViewId, contourId: item.check.id, partPath: item.check.partPath, role: item.check.role, status: 'source-unavailable', reason })
+    else required.push(item)
+  }
   if (!required.length) return { measured, unavailable, retainedFits }
   const entry = response.captures.find(item => item.viewId === view.id), capture = entry?.capture, mechanism = entry?.mechanism, visibility = entry?.partVisibility
   const rendered = response.actual.views?.find(item => item.id === view.id)
@@ -675,7 +715,6 @@ export function measureContours(view, response, frame, tolerancePx, anchors) {
   for (const item of required) {
     const check = item.check, context = { viewId: view.id, originalViewId: item.originalViewId, contourId: check.id, partPath: check.partPath, role: check.role }
     try {
-      assert(validSourceContour(check) && exactSourceExposure(item, frame) && sameSourceImage(check.measurementEvidence.sourceImage, item.sourceImage), 'Contour source pixels/evidence are unavailable or belong to a different exact exposure')
       const matches = visibility.parts?.filter(part => part.partPath === check.partPath) ?? [], part = matches[0]
       assert(matches.length === 1 && part.status === 'visible' && Number.isInteger(part.pixelCount) && part.pixelCount > 0
         && Number.isInteger(part.contourPixelCount) && part.contourPixelCount > 0 && Array.isArray(part.contourSourcePixels) && part.contourSourcePixels.length > 0
@@ -700,9 +739,11 @@ export function measureContours(view, response, frame, tolerancePx, anchors) {
       const ancestry = [...anchors.values()].filter(anchor => anchor.partPath === check.partPath && anchor.correspondenceEvidence)
       const bindings = (response.nativePartBindings ?? []).filter(receipt => receipt.partPath === check.partPath)
       const nativePartBinding = bindings.length === 1 ? bindings[0].binding : null
-      const nativeRodMovingEligible = nativePartBinding?.partPath === check.partPath && typeof nativePartBinding.bindingId === 'string' && nativePartBinding.bindingId.trim()
+      const poseOverridden = [view, rendered].some(candidate => candidate.partOverrides?.some(override => override.partPath === check.partPath
+        && (override.worldPositionMetres !== undefined || override.worldQuaternion !== undefined)))
+      const nativeRodMovingEligible = !poseOverridden && nativePartBinding?.partPath === check.partPath && typeof nativePartBinding.bindingId === 'string' && nativePartBinding.bindingId.trim()
         && nativePartBinding.kind === 'indexed' && nativePartBinding.motion === 'rod' && Number.isInteger(nativePartBinding.stationIndex) && nativePartBinding.stationIndex >= 0 && nativePartBinding.stationIndex < 20
-      const anchorMovingEligible = ancestry.length > 0 && ancestry.every(anchor => anchor.motion === 'moving')
+      const anchorMovingEligible = !poseOverridden && ancestry.length > 0 && ancestry.every(anchor => anchor.motion === 'moving')
       const motion = nativeRodMovingEligible || anchorMovingEligible ? 'moving' : 'unknown'
       const errorPx = rawErrorPx + check.uncertaintyPx + part.uncertaintySourcePixels
       measured.push({ ...context, motion, motionAnchorIds: ancestry.map(anchor => anchor.id), nativePartBinding,
@@ -765,7 +806,7 @@ export function measureView(view, response, frame, observations, tolerancePx, an
       measured.push({ ...context, method: capture.method, nativePixels: marker.sourcePixels, canvasPixels: marker.canvasPixels, rawErrorPx, sourceUncertaintyPx: observed.uncertaintyPx, rasterUncertaintyPx: marker.uncertaintySourcePixels, errorPx, errorFrameWidthPercent: errorPx / 1920 * 100, status: errorPx <= tolerancePx ? 'passed' : 'failed', captureTimeSeconds: capture.timeSeconds, nativeMediaTime: response.native.mediaTime, sourceDrawRevision: mechanism.sourceDrawRevision, sourceSampling: rendered.sourceSampling, independentMidIntervalObservation: frame.measuredInterpolation === true })
     }
     if (excluded.length && !distributedLandmarkFloor(measured)) unavailable.push({ viewId: view.id, status: 'source-unavailable', reason: 'Source-inadmissible exclusions require at least three distributed admitted actual landmarks including an independent CHECK' })
-    return { measured, contourChecks: contours.measured, contourFits: contours.retainedFits, unavailable, excluded, clockSkewSeconds: Math.abs(capture.timeSeconds - response.native.mediaTime) }
+    return { measured, contourChecks: contours.measured, unavailable, excluded, clockSkewSeconds: Math.abs(capture.timeSeconds - response.native.mediaTime) }
   } catch (error) {
     error.contourUnavailable = sourceContourUnavailable(frame, error.message, view.id)
     throw error
@@ -1118,7 +1159,7 @@ async function measureSamples(page, embed, record, census, video, tolerancePx, o
   for (const row of census.selected) {
     const sample = { timeSeconds: row.timeSeconds, reasons: row.reasons, diagnosticOnly: row.diagnosticOnly === true, required: row.required, sourceShotId: row.sourceShotId, sampleTimeSeconds: row.frame?.timeSeconds ?? null, sourceImageReplay: row.sourceImageReplay ?? null, status: 'unavailable', measurements: [], contourChecks: [], contourFits: [], unavailable: [], excluded: [] }
     video.samples.push(sample)
-    if (!row.frame) { sample.unavailable.push({ reason: row.unavailableReason }); continue }
+    if (!row.frame) { sample.unavailable.push({ reason: row.unavailableReason }, ...(row.contourJoinUnavailable ?? [])); continue }
     const frame = row.frame
     sample.contourFits = retainedContourFits(frame)
     try {
@@ -1173,8 +1214,8 @@ export function finishVideo(video, census, options) {
   for (const sample of mandatory) for (const item of sample.contourChecks ?? []) if (item.role === 'check') uniqueContours.set(`${sample.sampleTimeSeconds}/${item.viewId}/${item.partPath}/${item.contourId}`, item)
   const contours = [...uniqueContours.values()]
   const unavailableContours = new Set()
-  for (const sample of mandatory) for (const item of sample.unavailable) if (item.contourId && item.role === 'check') unavailableContours.add(`${sample.sampleTimeSeconds}/${item.viewId}/${item.partPath}/${item.contourId}`)
-  const isChange = row => row.reasons.some(reason => !['every-second', 'requested-sample', 'mid-interval'].includes(reason))
+  for (const sample of mandatory) for (const item of sample.unavailable) if (item.contourId && item.role === 'check') unavailableContours.add(`${sample.sampleTimeSeconds ?? sample.timeSeconds}/${item.viewId}/${item.partPath}/${item.contourId}`)
+  const isChange = row => row.reasons.some(reason => !['every-second', 'requested-sample', 'mid-interval', 'source-contour-check'].includes(reason))
   video.coverage = { allSourceCensusSamples: census.rows.length, allMandatoryCensusSamples: mandatoryRows.length, allRequiredSourceSamples: mandatoryRows.filter(row => row.required).length, selectedCensusSamples: video.samples.length, selectedMandatoryCensusSamples: mandatory.length, selectedRequiredSamples: required.length, measuredRequiredSamples: measured.length, passedRequiredSamples: passed.length, failedRequiredSamples: required.filter(sample => sample.status === 'failed').length, unavailableRequiredSamples: required.filter(sample => sample.status === 'unavailable').length, missingCensusSamples, diagnosticSamples: { selected: diagnostic.length, measured: diagnostic.filter(sample => sampleChecks(sample).length).length, passed: diagnostic.filter(sample => sample.status === 'passed').length, failed: diagnostic.filter(sample => sample.status === 'failed').length, unavailable: diagnostic.filter(sample => sample.status === 'unavailable').length }, everySecond: { required: mandatoryRows.filter(row => row.reasons.includes('every-second')).length, selected: mandatory.filter(row => row.reasons.includes('every-second')).length }, changePoints: { required: mandatoryRows.filter(isChange).length, selected: mandatory.filter(isChange).length }, complete: !options.scoped && missingCensusSamples === 0 && mandatory.length === mandatoryRows.length && required.length > 0 && passed.length === required.length && mandatory.every(sample => sample.required || sample.status === 'not-required') }
   video.coverage.unavailableCensusSamples = mandatory.filter(sample => sample.status === 'unavailable').length + missingCensusSamples
   video.coverage.complete &&= video.coverage.unavailableCensusSamples === 0

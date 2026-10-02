@@ -1,5 +1,6 @@
 """Consumer-visible source identity and presentation refusal boundaries."""
 import copy
+import hashlib
 import importlib.util
 import json
 from pathlib import Path
@@ -22,6 +23,7 @@ common = load_script('compact-source-common.py', 'source_generation_common')
 spin = load_script('compact-spin.py', 'source_generation_spin')
 rocker = load_script('compact-operation-rocker.py', 'source_generation_rocker')
 camera_tracks = load_script('generate-analysis-synthesis-source-tracks.py', 'source_generation_camera_tracks')
+synthesis = load_script('generate-analysis-synthesis-source-tracks.py', 'source_generation_synthesis')
 
 
 def exact_exposure():
@@ -567,6 +569,119 @@ class SpinPresentationTests(unittest.TestCase):
                 if evidence is not None:
                     seed['presentationEvidence'] = evidence
                 self.assert_seed_refused_before_observations(seed)
+
+
+class SynthesisDependencyEpochTests(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.root = Path(directory.name)
+        files = {
+            'web/package.json': b'{"dependencies":{"three":"0.180.0"}}\n',
+            'web/package-lock.json': b'{"lockfileVersion":3,"three":"0.180.0"}\n',
+            'web/node_modules/three/package.json': b'{"name":"three","version":"0.180.0"}\n',
+            'web/node_modules/three/build/three.core.js': b'export class Matrix4 {}\n',
+            'web/node_modules/three/build/three.module.js': b'export * from "./three.core.js";\n',
+            'web/node_modules/three/examples/jsm/loaders/GLTFLoader.js': b'import { Matrix4 } from "three";\n',
+        }
+        records = {}
+        for name, raw in files.items():
+            path = self.root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(raw)
+            records[name] = {'sha256': hashlib.sha256(raw).hexdigest(), 'bytes': len(raw)}
+        installed = {name: row for name, row in records.items()
+                     if name.startswith('web/node_modules/three/')}
+        encoded = json.dumps(installed, sort_keys=True, separators=(',', ':')).encode()
+        self.dependency = {
+            'fingerprint': 'sha256-canonical-json-repo-path-bytes-v1',
+            'packageFiles': {name: records[name] for name in
+                             ('web/package.json', 'web/package-lock.json')},
+            'installedThree': {
+                'path': 'web/node_modules/three', 'fileCount': len(installed),
+                'bytes': sum(row['bytes'] for row in installed.values()),
+                'sha256': hashlib.sha256(encoded).hexdigest()},
+            'strictProofManifests': {
+                kind: {'sha256': digest, 'dependencyCount': len(records),
+                       'installedThreeSha256': hashlib.sha256(encoded).hexdigest()}
+                for kind, digest in (('old', 'a' * 64), ('current', 'b' * 64))},
+        }
+        self.epoch = {'strictManifestSha256': 'b' * 64,
+                      'strictDependencyCount': len(records),
+                      'dependencyEpoch': self.dependency}
+        self.historical = {'oldStrictManifestSha256': 'a' * 64}
+        root_patch = patch.object(synthesis, 'ROOT', self.root)
+        root_patch.start()
+        self.addCleanup(root_patch.stop)
+
+    def validate(self):
+        return synthesis.validate_camrod_dependency_epoch(self.epoch, self.historical)
+
+    def test_unchanged_installed_bytes_match_both_portable_proofs(self):
+        self.assertEqual(self.validate(), {
+            'packageFiles': self.dependency['packageFiles'],
+            'installedThree': self.dependency['installedThree']})
+
+    def test_manifest_or_lockfile_drift_refuses_after_valid_bridge(self):
+        for name in ('web/package.json', 'web/package-lock.json'):
+            with self.subTest(name=name):
+                self.validate()
+                path = self.root / name
+                original = path.read_bytes()
+                path.write_bytes(original + b'\n')
+                with self.assertRaisesRegex(ValueError, 'package dependency epoch differs'):
+                    self.validate()
+                path.write_bytes(original)
+
+    def test_installed_loader_math_or_resolution_drift_refuses_without_lock_change(self):
+        for name in ('package.json', 'build/three.core.js', 'build/three.module.js',
+                     'examples/jsm/loaders/GLTFLoader.js'):
+            with self.subTest(name=name):
+                self.validate()
+                path = self.root / 'web/node_modules/three' / name
+                original = path.read_bytes()
+                path.write_bytes(original + b'// changed installed dependency\n')
+                with self.assertRaisesRegex(ValueError, 'installed Three dependency epoch differs'):
+                    self.validate()
+                path.write_bytes(original)
+
+    def test_same_size_installed_drift_cannot_reuse_earlier_success(self):
+        self.validate()
+        path = self.root / 'web/node_modules/three/build/three.core.js'
+        original = path.read_bytes()
+        path.write_bytes(original.replace(b'Matrix4', b'Matrix3'))
+        with self.assertRaisesRegex(ValueError, 'installed Three dependency epoch differs'):
+            self.validate()
+
+    def test_missing_dependency_cannot_disappear_from_census(self):
+        self.validate()
+        (self.root / 'web/node_modules/three/examples/jsm/loaders/GLTFLoader.js').unlink()
+        with self.assertRaisesRegex(ValueError, 'installed Three dependency epoch differs'):
+            self.validate()
+
+    def test_added_dependency_invalidates_proof_census(self):
+        self.validate()
+        (self.root / 'web/node_modules/three/build/new-helper.js').write_bytes(b'export const helper = 1;\n')
+        with self.assertRaisesRegex(ValueError, 'installed Three dependency epoch differs'):
+            self.validate()
+
+    def test_missing_lockfile_is_unavailable_not_accepted(self):
+        self.validate()
+        (self.root / 'web/package-lock.json').unlink()
+        with self.assertRaisesRegex(ValueError, 'dependency unavailable'):
+            self.validate()
+
+    def test_old_and_current_manifest_seals_must_bind_same_installed_bytes(self):
+        for kind in ('old', 'current'):
+            for field, replacement in (('sha256', 'c' * 64),
+                                       ('dependencyCount', 1),
+                                       ('installedThreeSha256', 'd' * 64)):
+                with self.subTest(kind=kind, field=field):
+                    original = self.dependency['strictProofManifests'][kind][field]
+                    self.dependency['strictProofManifests'][kind][field] = replacement
+                    with self.assertRaisesRegex(ValueError, 'portable dependency proof binding differs'):
+                        self.validate()
+                    self.dependency['strictProofManifests'][kind][field] = original
 
 
 if __name__ == '__main__':

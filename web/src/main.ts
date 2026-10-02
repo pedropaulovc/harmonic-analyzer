@@ -1,4 +1,4 @@
-import { assertSourceCompositeWeights, createViewer, loadMachine, ViewCapacityError, type CameraRecord, type Machine, type SourceView } from './scene'
+import { assertSourceCompositeWeights, createViewer, loadMachine, ViewCapacityError, type CameraRecord, type Machine, type PartVisibilityProbe, type SourceView } from './scene'
 import { createMechanismInput, MECHANISM_DATA, type MechanismInput } from './mechanics'
 import { MAGNIFIER_RATIO_MIN, MAGNIFIER_RATIO_MAX, physicalChannelAngle, squareWave } from './kinematics'
 import { VIDEOS, resolveVideo, type Video } from './video-catalog'
@@ -98,6 +98,7 @@ let sourceDrawTimeSeconds = 0
 let sourceDrawRevision = 0
 let diagnosticReference: CompactVideoReference | null = null
 let diagnosticMachine: Machine | null = null
+let visibilityProbe: PartVisibilityProbe | null = null
 let lastTick = performance.now()
 let lastHud = 0
 const channelInputs: { amplitude: HTMLInputElement; phase: HTMLInputElement; value: HTMLOutputElement }[] = []
@@ -130,6 +131,7 @@ function configureLandmarkProbe(): void {
   if (enabled ? diagnosticReference === reference && diagnosticMachine === machine : diagnosticReference === null && diagnosticMachine === null) return
   viewer.setLandmarkProbe(null)
   viewer.setPartVisibilityProbe(null)
+  visibilityProbe = null
   diagnosticReference = null
   diagnosticMachine = null
   if (!enabled || !reference || machine?.availability !== 'available') return
@@ -290,7 +292,9 @@ function sourceCapture<T extends {
   sourceLayout: PlaybackView['sourceLayout']
 }>(capture: T) {
   const draw = mechanismDraws.get(capture.viewId)
-  const bound = draw?.status === 'rendered' && draw.sourceDrawRevision === sourceDrawRevision && draw.timeSeconds === sourceDrawTimeSeconds
+  const view = activeViews.find((view) => view.id === capture.viewId)
+  const bound = view !== undefined && draw?.status === 'rendered' && equalRecord(draw.input, view.input)
+    && draw.sourceDrawRevision === sourceDrawRevision && draw.timeSeconds === sourceDrawTimeSeconds
     && draw.timeSeconds === capture.timeSeconds && equalRecord(draw.resolvedImagePlaneWarp, capture.resolvedImagePlaneWarp)
     && equalRecord(draw.sourceLayout, capture.sourceLayout)
   const status = capture.status === 'captured' && (mode !== 'reference-review' || referenceSeek !== 'idle' || player?.getState() !== 'paused') ? 'unavailable' as const
@@ -798,7 +802,14 @@ if (verificationEnabled) {
       if (mode !== 'reference-review' || referenceSeek !== 'idle' || player?.getState() !== 'paused') throw new Error('Pause and review an actual source frame before enabling native visibility capture.')
       configureLandmarkProbe()
       if (machine?.availability !== 'available') throw new Error('A compatible native mechanism is required.')
-      viewer.setPartVisibilityProbe(machine.createPartVisibilityProbe())
+      if (visibilityProbe?.status !== 'active') {
+        visibilityProbe = machine.createPartVisibilityProbe()
+        viewer.setPartVisibilityProbe(visibilityProbe)
+      } else if (activeViews.every((view) => sourceCapture(viewer.readRenderedPartVisibility(view.id)).status === 'captured')) {
+        return
+      }
+      // Reuse the same machine's probe, but refresh missing or stale captures
+      // through a real source draw rather than manufacturing a new epoch.
       if (activeViews.length) drawSourceViews(activeViews, modelTime)
     },
     renderedMechanism,

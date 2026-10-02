@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { parseOptions, sourceCensus, finishVideo, seekSettlement, sourcePtsInShot, requireSourceViews, measureView, measureContours, sourceContourSidecar, playbackInterval, sourceSeedIndex, diagnosticReplayOutcome, requirePausedReview, compareCameraPose } from './verify-sync.mjs'
+const { parseOptions, sourceCensus, finishVideo, seekSettlement, sourcePtsInShot, requireSourceViews, measureView, measureContours, sourceContourSidecar, playbackInterval, sourceSeedIndex, diagnosticReplayOutcome, requirePausedReview, compareCameraPose } = await import(process.env.HARMONIC_VERIFY_SYNC_MODULE ?? './verify-sync.mjs')
 import { jsonDigest, sourceLayoutForViews } from './verify-reference.mjs'
 
 // These are decision-gate unit controls, NOT browser/source-fidelity evidence.
@@ -1105,8 +1105,9 @@ test('unavailable FIT source joins remain diagnostics instead of gating genuine 
   const result = measureView(fixture.view, fixture.response, fixture.frame, [], 10, fixture.anchors)
   assert.equal(result.contourChecks[0].status, 'passed')
   assert.deepEqual(result.unavailable, [])
-  assert.equal(result.contourFits[0].status, 'fit-source-unavailable')
-  assert.equal(result.contourFits[0].role, 'fit')
+  const retained = measureContourFixture(fixture).retainedFits
+  assert.equal(retained[0].status, 'fit-source-unavailable')
+  assert.equal(retained[0].role, 'fit')
 })
 
 test('view precondition failures account for actual required CHECK contours without FIT inflation', () => {
@@ -1160,4 +1161,169 @@ test('a conflicting FIT alias never erases the unavailable obligation of an orig
     assert.equal(video.contourChecks.measured, 0)
     assert.notEqual(video.stageMeasurement.status, 'passed')
   }
+})
+
+test('contour-only exact CHECK exposures are mandatory census oracles without creating landmark observations', () => {
+  const fixture = contourFixture(), image = sourceImage(15, 'b'.repeat(64))
+  const check = { ...fixture.check, measurementEvidence: { ...fixture.check.measurementEvidence, sourceImage: image } }
+  const original = { ...frame(0.5), sourceImage: image, landmarks: [], views: [{ ...fixture.view, sourceContourChecks: [check] }] }
+  const compact = { frames: observations.frames.map(item => ({ ...item, views: [fixture.view] })) }
+  const raw = { ...observations, frames: [compact.frames[0], original, compact.frames[1], compact.frames[2]] }
+  const census = sourceCensus(raw, compact, native, parseOptions(['--stage', '20']))
+  const row = census.rows.find(item => item.timeSeconds === 0.5)
+  assert.ok(row.reasons.includes('source-contour-check'))
+  assert.equal(row.diagnosticOnly, false)
+  assert.equal(row.required, true)
+  assert.equal(row.frame.decodedTimeSeconds, original.decodedTimeSeconds)
+  assert.deepEqual(row.frame.sourceImage, image)
+  assert.deepEqual(row.frame.landmarks, [])
+  assert.deepEqual(row.frame.views, compact.frames[0].views)
+  assert.deepEqual(row.frame.contourChecks.map(item => item.check), [check])
+  original.views[0].sourceContourChecks[0] = { ...check, role: 'fit' }
+  const fitCensus = sourceCensus(raw, compact, native, parseOptions(['--stage', '20']))
+  assert.equal(fitCensus.rows.some(item => item.reasons.includes('source-contour-check')), false)
+  assert.equal(fitCensus.rows.some(item => item.timeSeconds === 0.5), false)
+})
+
+test('CHECK exposures without a compact camera/input bracket retain every unavailable exposure obligation', () => {
+  const fixture = contourFixture()
+  const originals = [0.5, 0.6].map(timeSeconds => {
+    const image = sourceImage(Math.round(timeSeconds * 30), 'b'.repeat(64))
+    const check = { ...fixture.check, measurementEvidence: { ...fixture.check.measurementEvidence, sourceImage: image } }
+    return { ...frame(timeSeconds), sourceImage: image, landmarks: [], views: [{ ...fixture.view, sourceContourChecks: [check] }] }
+  })
+  const compact = { frames: [{ ...frame(0), views: [fixture.view] }] }
+  const raw = { ...observations, frames: [compact.frames[0], ...originals] }
+  const rows = sourceCensus(raw, compact, native, parseOptions(['--stage', '20'])).rows.filter(item => item.reasons.includes('source-contour-check'))
+  assert.deepEqual(rows.map(row => row.timeSeconds), [0.5, 0.6])
+  for (const row of rows) {
+    assert.equal(row.frame, null)
+    assert.equal(row.required, true)
+    assert.deepEqual(row.contourJoinUnavailable.map(item => [item.contourId, item.role, item.status]), [[fixture.check.id, 'check', 'unmeasured-native']])
+  }
+  const video = videoFixture()
+  video.samples = rows.map(row => ({ ...video.samples[0], timeSeconds: row.timeSeconds, sampleTimeSeconds: null, measurements: [], status: 'unavailable', unavailable: row.contourJoinUnavailable }))
+  finishVideo(video, { rows }, parseOptions(['--stage', '20']))
+  assert.equal(video.contourChecks.unavailable, 2)
+  assert.equal(video.contourChecks.measured, 0)
+  assert.equal(video.stageMeasurement.status, 'unmeasured')
+  assert.equal(video.coverage.complete, false)
+})
+
+test('selected exact source rows retain alias-only CHECK IDs as unavailable and count identical declarations once', () => {
+  const fixture = contourFixture(), exact = { ...fixture.frame, shotId: 'shot', views: [{ ...fixture.view, sourceContourChecks: [fixture.check] }] }
+  const alias = structuredClone(exact)
+  alias.decodedTimeSeconds = 1 + Number.EPSILON
+  const aliasOnly = { ...alias.views[0].sourceContourChecks[0], id: 'alias-only', sourceContourPixels: [[1700, 700], [1700, 800]] }
+  alias.views[0].sourceContourChecks.push(aliasOnly, { ...aliasOnly, id: 'alias-fit', role: 'fit' })
+  const selected = { ...fixture.frame, shotId: 'shot' }
+  const joined = sourceContourSidecar(selected, [alias, exact, structuredClone(alias), structuredClone(exact)])
+  assert.deepEqual(joined.contourChecks.map(item => item.check), [fixture.check])
+  assert.deepEqual(joined.contourJoinUnavailable.map(item => [item.contourId, item.role, item.status]), [['alias-only', 'check', 'source-unavailable']])
+  assert.match(joined.contourJoinUnavailable[0].reason, /exact source exposure/)
+  const compact = { frames: [{ ...frame(0), views: [fixture.view] }, selected, { ...frame(2), views: [fixture.view] }] }
+  const census = sourceCensus({ ...observations, frames: [compact.frames[0], exact, alias, compact.frames[2]] }, compact, native, parseOptions(['--times', '1']))
+  assert.equal(census.rows.some(item => item.reasons.includes('source-contour-check')), false)
+  assert.deepEqual(census.selected[0].frame.contourJoinUnavailable.map(item => item.contourId), ['alias-only'])
+})
+
+test('exact target world pose overrides cannot supply moving contour coverage from native or anchor ancestry', () => {
+  for (const source of ['selected', 'rendered']) for (const field of ['worldPositionMetres', 'worldQuaternion']) for (const withAncestry of [false, true]) {
+    const fixture = contourFixture()
+    if (!withAncestry) fixture.anchors.clear()
+    const view = source === 'selected' ? fixture.view : fixture.response.actual.views[0]
+    view.partOverrides = [{ partPath: fixture.check.partPath, [field]: field === 'worldPositionMetres' ? [0, 0, 0] : [0, 0, 0, 1] }]
+    const result = measureContourFixture(fixture)
+    assert.deepEqual(result.unavailable, [])
+    assert.equal(result.measured[0].status, 'passed')
+    assert.equal(result.measured[0].errorPx, 10)
+    assert.equal(result.measured[0].motion, 'unknown')
+    const video = videoFixture()
+    video.samples[0].measurements = [measurement('fixed', 'fixed')]
+    video.samples[0].contourChecks = result.measured
+    finishVideo(video, censusFixture, parseOptions(['--stage', '20']))
+    assert.equal(video.contourChecks.movingChecks, 0)
+    assert.ok(video.failures.some(item => item.code === 'hard-moving-landmark-coverage'))
+  }
+})
+
+test('visibility-only and different exact-part pose overrides retain genuinely visible native moving eligibility', () => {
+  for (const override of [
+    { visibility: 'visible' },
+    { partPath: 'harmonic-analyzer/channel/connecting-rod-19', worldPositionMetres: [0, 0, 0], worldQuaternion: [0, 0, 0, 1] },
+  ]) {
+    const fixture = contourFixture()
+    fixture.anchors.clear()
+    fixture.view.partOverrides = [{ partPath: fixture.check.partPath, ...override }]
+    fixture.response.actual.views[0].partOverrides = fixture.view.partOverrides
+    const result = measureContourFixture(fixture)
+    assert.deepEqual(result.unavailable, [])
+    assert.equal(result.measured[0].status, 'passed')
+    assert.equal(result.measured[0].motion, 'moving')
+    assert.equal(result.measured[0].motionBasis, 'resolved-native-rod-binding')
+  }
+})
+
+test('malformed-only CHECK rows diagnose source evidence before an absent GPU contour readback', () => {
+  for (const [mutate, reason] of [
+    [fixture => { delete fixture.check.uncertaintyPx }, /bounded source uncertainty/],
+    [fixture => { fixture.check.uncertaintyPx = 38.4001 }, /bounded source uncertainty/],
+    [fixture => { fixture.check.sourceContourPixels = [[1920, 100], [1920, 101]] }, /source ROI/],
+    [fixture => { fixture.check.sourceContourPixels = [[100, 100], [100, 100]] }, /nondegenerate/],
+    [fixture => { fixture.check.measurementEvidence.sourceImage = { ...fixture.frame.sourceImage, sha256Gray8: fixture.frame.sourceImage.sha256Bgr8 } }, /canonical current-source image/],
+    [fixture => { fixture.check.measurementEvidence.sourceImage = { ...fixture.frame.sourceImage, pixelFormat: 'gray8', sha256Gray8: fixture.frame.sourceImage.sha256Bgr8 }; delete fixture.check.measurementEvidence.sourceImage.sha256Bgr8 }, /canonical current-source image/],
+    [fixture => { fixture.frame.contourChecks[0].decodedTimeSeconds += Number.EPSILON }, /exact exposure/],
+  ]) {
+    const fixture = contourFixture()
+    mutate(fixture)
+    delete fixture.response.captures[0].partVisibility
+    const result = measureContourFixture(fixture)
+    assert.deepEqual(result.measured, [])
+    assert.equal(result.unavailable.length, 1)
+    assert.equal(result.unavailable[0].status, 'source-unavailable')
+    assert.match(result.unavailable[0].reason, reason)
+  }
+  const valid = contourFixture()
+  delete valid.response.captures[0].partVisibility
+  const result = measureContourFixture(valid)
+  assert.equal(result.unavailable[0].status, 'unmeasured-native')
+  assert.match(result.unavailable[0].reason, /depth-ID contour readback/)
+})
+
+test('mixed CHECK rows keep structural source faults separate from genuine native readback faults', () => {
+  const fixture = contourFixture(), invalid = structuredClone(fixture.frame.contourChecks[0])
+  invalid.check.id = 'missing-uncertainty'
+  delete invalid.check.uncertaintyPx
+  fixture.frame.contourChecks.push(invalid)
+  delete fixture.response.captures[0].partVisibility
+  const result = measureContourFixture(fixture)
+  assert.deepEqual(result.measured, [])
+  assert.deepEqual(result.unavailable.map(item => [item.contourId, item.status]), [['missing-uncertainty', 'source-unavailable'], ['right-exterior', 'unmeasured-native']])
+  assert.match(result.unavailable[0].reason, /bounded source uncertainty/)
+  assert.match(result.unavailable[1].reason, /depth-ID contour readback/)
+})
+
+test('canonical source uncertainty and image equality remain required even with complete native receipts', () => {
+  for (const mutate of [
+    fixture => { fixture.check.uncertaintyPx = 38.4001 },
+    fixture => { fixture.check.measurementEvidence.sourceImage = { ...fixture.frame.sourceImage, sha256Gray8: fixture.frame.sourceImage.sha256Bgr8 } },
+    fixture => { fixture.check.measurementEvidence.sourceImage = { ...fixture.frame.sourceImage, extraImageIdentity: 'not canonical' } },
+  ]) {
+    const fixture = contourFixture()
+    mutate(fixture)
+    const result = measureContourFixture(fixture, 100)
+    assert.deepEqual(result.measured, [])
+    assert.equal(result.unavailable[0].status, 'source-unavailable')
+  }
+  const bounded = contourFixture()
+  bounded.check.uncertaintyPx = 38.4
+  assert.equal(measureContourFixture(bounded, 100).measured[0].errorPx, 45.4)
+  const gray = contourFixture()
+  gray.frame.sourceImage = { frameIndex: 30, pixelFormat: 'gray8', sha256Gray8: 'a'.repeat(64), width: 1920, height: 1080, sourceSha256: '1'.repeat(64) }
+  gray.frame.contourChecks[0].sourceImage = gray.frame.sourceImage
+  gray.check.measurementEvidence.sourceImage = gray.frame.sourceImage
+  const result = measureContourFixture(gray)
+  assert.deepEqual(result.unavailable, [])
+  assert.equal(result.measured[0].status, 'passed')
+  assert.equal(result.measured[0].errorPx, 10)
 })

@@ -206,10 +206,17 @@ and never supply CHECK/moving/view/sample coverage. The existing Rocker upper-ri
 partition is CHECK stations 1,5,9,13,17 and FIT for the other 15; all original rod
 curves, including the complete 85-point source0 Rod20 edge, remain CHECK.
 
-Only a selected row with valid explicit CHECK contours enables the existing depth-tested native
-part-ID capture, after exact paused source review. The snapshot, landmark,
-visibility and complete mechanism-solve receipts come from that redraw. Target
-part paths, camera/principal point, ordered layout, resolved warp, raster backing,
+CHECK-bearing decoded exposures also create required census rows when they are
+absent from compact exposure-index samples. Camera and input still come from the
+compact track; unbracketed exposures retain each CHECK as unavailable. Non-exact
+aliases supply no pixels, and alias-only CHECK IDs remain unavailable obligations.
+
+After exact paused source review, a selected row with valid explicit CHECK contours
+enables depth-tested native part-ID capture. Repeated enablement reuses the probe
+and redraws only when its current-view capture is stale, including an input change.
+The snapshot, landmark, visibility and complete mechanism-solve receipts come from
+the same current draw. Target part paths, camera/principal point, ordered layout,
+resolved warp, raster backing,
 physical input, time and positive source contribution must agree. Landmark,
 visibility and mechanism `sourceDrawRevision` receipts must equal the positive
 current snapshot revision, with its `sourceDrawTimeSeconds` matching capture time.
@@ -238,6 +245,8 @@ A valid indexed `motion: 'rod'` binding qualifies native kinematic moving
 eligibility, without borrowing a rocker anchor or guessing from path-name stems.
 The query requires membership in the actual rig updater; a cloned part cannot
 claim moving eligibility merely by inheriting its source's binding metadata.
+An exact-target position or quaternion override in the selected or rendered view
+also prevents that part from supplying moving coverage.
 Reports retain this `nativePartBinding`, the source association in
 `measurementEvidence`, and `observedSourceInternalMotion: 'unmeasured'`:
 kinematic eligibility is not a claim of observed source movement. Missing,

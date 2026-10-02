@@ -172,6 +172,13 @@ presenter-to-spin edit moves one machine image; it uses one native view with
 source-informed principal-point/FOV keys. Its coarse framing remains unmeasured.
 Actors and formula graphics stay in the original player.
 
+Synthesis generation validates its portable CPU-equivalence bridge against both
+executed dependency manifests. The installed Three tree, including GLTFLoader,
+must match their exact file paths and byte hashes. `web/package.json` and
+`web/package-lock.json` have separate generation-time byte pins; they were not
+included in the historical proof manifests. Dependency drift refuses generation.
+The bridge preserves historical GPU provenance and makes no current GPU claim.
+
 ### Measurement and refinement
 
 Use original hashed footage and timestamped source observations. Evaluate every

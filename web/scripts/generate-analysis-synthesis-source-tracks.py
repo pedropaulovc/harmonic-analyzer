@@ -14,7 +14,7 @@ Cam-rod uses a root-selected upright three-original-FIT fixed-intrinsics SQPNP
 physical pose; former similarities are historical/unaccepted evidence only.
 Cam-rod's historical GPU world receipt is preserved verbatim; a pinned portable
 actual old/current native-CPU/Float32-marker/SQPNP equivalence bridge binds the
-unchanged physical authority to every current native source-code hash.
+unchanged physical authority to current native code and installed Three bytes.
 Independent qualification remains missing; CHECKs never enter camera objectives.
 Synthesis wheel-macro uses only its original wheel-centre FIT and actual GPU
 centre for a chosen principal-point translation; its hanger CHECK stays held out.
@@ -41,6 +41,9 @@ CALIBRATION = "web/content/analysis-synthesis.frozen-generation-evidence.json"
 CALIBRATION_SHA256 = "425beca33506fcb307c3892808b7871a8ee2f06b7aa90f7103fc6993e6319267"
 FRAMING_GPU = "web/content/8KmVDxkia_w.framing-gpu-evidence-2026-10-01.json"
 FRAMING_GPU_SHA256 = "239cb59e799bbb42f6551b74c3b6cf1eccf66f9b0ec7c93518f743b37caf4173"
+CAMROD_BRIDGE_SHA256 = "521ed83d88ba163fd9623c5ed3229c0b16955825ba2031e045695cd00c486312"
+CAMROD_PROBE_SHA256 = "c1e698845d2f38e20df43f9bcf090cf7b43bed4de74eb6d776adbbbfcafee389"
+CAMROD_DEPENDENCY_FINGERPRINT = "sha256-canonical-json-repo-path-bytes-v1"
 
 
 def load(path):
@@ -66,11 +69,64 @@ def same_camera(camera, baseline):
     return True
 
 
+def dependency_file_record(path):
+    try:
+        raw = (ROOT / path).read_bytes()
+    except OSError as error:
+        raise ValueError(f"Chosen cam-rod dependency unavailable: {path}") from error
+    return {"sha256": hashlib.sha256(raw).hexdigest(), "bytes": len(raw)}
+
+
+def installed_three_epoch():
+    """Hash the proof's complete Three package, including GLTFLoader imports.
+
+    The bridge is checked once when the Synthesis generator is constructed, not
+    per frame. Deliberately do not retain a cross-call cache: direct callers must
+    detect a dependency mutation even after an earlier successful validation.
+    """
+    package = ROOT / "web/node_modules/three"
+    try:
+        files = {path.relative_to(ROOT).as_posix(): dependency_file_record(path)
+                 for path in package.rglob("*") if path.is_file()}
+    except OSError as error:
+        raise ValueError("Chosen cam-rod installed Three dependency unavailable") from error
+    encoded = json.dumps(files, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+    return {"path": "web/node_modules/three", "fileCount": len(files),
+            "bytes": sum(record["bytes"] for record in files.values()),
+            "sha256": hashlib.sha256(encoded).hexdigest()}
+
+
+def validate_camrod_dependency_epoch(epoch, historical):
+    """Verify compact portable pins derived from the executed strict manifests."""
+    dependency = epoch["dependencyEpoch"]
+    installed = dependency["installedThree"]
+    manifests = dependency["strictProofManifests"]
+    if (dependency["fingerprint"] != CAMROD_DEPENDENCY_FINGERPRINT
+            or set(dependency["packageFiles"]) != {"web/package.json", "web/package-lock.json"}
+            or installed["path"] != "web/node_modules/three"
+            or set(manifests) != {"old", "current"}
+            or manifests["old"]["sha256"] != historical["oldStrictManifestSha256"]
+            or manifests["current"]["sha256"] != epoch["strictManifestSha256"]
+            or any(record["dependencyCount"] != epoch["strictDependencyCount"]
+                   or record["installedThreeSha256"] != installed["sha256"]
+                   for record in manifests.values())):
+        raise ValueError("Chosen cam-rod portable dependency proof binding differs")
+    package_files = {}
+    for path, expected in dependency["packageFiles"].items():
+        package_files[path] = dependency_file_record(path)
+        if package_files[path] != expected:
+            raise ValueError(f"Chosen cam-rod package dependency epoch differs: {path}")
+    actual = installed_three_epoch()
+    if actual != installed:
+        raise ValueError("Chosen cam-rod installed Three dependency epoch differs")
+    return {"packageFiles": package_files, "installedThree": actual}
+
+
 def validate_camrod_current_native_rebinding(probe, receipt):
-    """Bind current native code without relabeling the original GPU capture."""
+    """Bind current native code/dependencies without relabeling the original GPU capture."""
     bridge = probe["currentNativeCPURebinding"]
     encoded = json.dumps(bridge, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
-    if hashlib.sha256(encoded).hexdigest() != "f9db0ea9b98937086c53a550061fb3ec8df45933d269e9041e6e22509e81dd8b":
+    if hashlib.sha256(encoded).hexdigest() != CAMROD_BRIDGE_SHA256:
         raise ValueError("Chosen cam-rod current native equivalence artifact changed")
     lineage = probe["lineage"]
     historical = bridge["immutableHistoricalAuthority"]
@@ -113,6 +169,7 @@ def validate_camrod_current_native_rebinding(probe, receipt):
     for path, expected in epoch["codeHashes"].items():
         if hashlib.sha256((ROOT / path).read_bytes()).hexdigest() != expected:
             raise ValueError(f"Chosen cam-rod current native code epoch differs: {path}")
+    validate_camrod_dependency_epoch(epoch, historical)
     captured = {row["id"]: row for row in receipt["renderedLandmarks"]["landmarks"]}
     if not (len(probe["exactInputs"]) == len(native["actualOldFITMarkers"]) == len(native["actualCurrentFITMarkers"]) == 3):
         raise ValueError("Chosen cam-rod current native FIT marker census differs")
@@ -636,7 +693,7 @@ class Generator:
         path = "web/content/8KmVDxkia_w.camrod-sqpnp-probe-2026-10-01.json"
         raw = (ROOT / path).read_bytes()
         digest = hashlib.sha256(raw).hexdigest()
-        if digest != "3ea09b8ce279b5ab10f7d6c7bd73d4cfe8046af3c6b831f398d308e4c7e6e0ba":
+        if digest != CAMROD_PROBE_SHA256:
             raise ValueError("Chosen cam-rod physical probe artifact changed")
         probe = json.loads(raw)
         lineage = probe["lineage"]
@@ -744,7 +801,7 @@ class Generator:
                         "chosenQualitativeMaximumAbsoluteRollDegrees":15.,
                         "chosenCADPositiveZSidePrior":{"FITCentroidWorldMetres":fit_centroid,
                             "rule":"Camera worldZ > original-three-FIT centroid worldZ and forwardWorldZ < 0, matching original back=CAD+Z/source-right=CAD+X semantics; not an arbitrary CAD-front yaw0."},
-                        "generationDependencies":"Active physical choice requires the tracked pinned original SQPNP physical authority, unchanged historical GPU world receipt, and mandatory portable actual old/current native-CPU/Float32-marker/SQPNP equivalence metadata; original source semantic/FIT identity, matched native hash and complete seed input remain exact. Original GPU scene-byte lineage is preserved as historical evidence, never relabeled current. Every current native source-code SHA is strictly bound by the equivalence bridge; any byte change requires fresh actual proof/rebinding, including cosmetic edits, with no waiver. Ignored proof paths are provenance references only, never generation-time reads. Retired similarity reports remain references. Authoritative source inputs come from *.track.json, never generated *.source-track.json. CPU equivalence is not current GPU coverage, historical-camera or source/stage acceptance.",
+                        "generationDependencies":"Active physical choice requires the tracked pinned original SQPNP physical authority, unchanged historical GPU world receipt, and mandatory portable actual old/current native-CPU/Float32-marker/SQPNP equivalence metadata; original source semantic/FIT identity, matched native hash and complete seed input remain exact. Original GPU scene-byte lineage is preserved as historical evidence, never relabeled current. Every current native source-code SHA and all1117 installed Three dependency bytes, including GLTFLoader/transitive imports, are strictly bound to the executed equivalence proof. Generation additionally pins web/package.json and web/package-lock.json; these two files were not in the original strict1134 CPU proof census. Any code, package/lockfile or installed Three byte/census change refuses generation and requires actual proof/rebinding, with no hash-only substitution or waiver. Dependency bytes are read once at Synthesis construction, not per frame, and no cross-call cache can conceal later mutation. Ignored proof paths are provenance references only, never generation-time reads. Retired similarity reports remain references. Authoritative source inputs come from *.track.json, never generated *.source-track.json. CPU equivalence is not current GPU coverage, historical-camera or source/stage acceptance.",
                         "reason":"Root selected only on original qualitative upright columns/no observed large roll and original back=CAD+Z semantic mapping. Both physical sparse branches fit the same three FITs; sqpnp-000's64.65deg roll conflicts with the declared chosen15deg upright/CAD-positiveZ-side prior. This prior is not measured historical roll. CHECK baseline and prior GPU errors were historically inspected, but CHECK was excluded from SQPNP enumeration objective and branch selection; candidate CHECKs were not projected/ranked before root selected001. Post-selection held-out measurements are separate evidence, not retroactive selection inputs.",
                         "depthScope":"Only three actual original FIT points; no whole-native-geometry positive-depth or GPU acceptance claim",
                         "poseConversion":"OpenCV world-to-camera R,t: position=-R^T*t; cameraToWorld=R^T*diag(1,-1,-1); quaternion xyzw. Fixed chosen FOV30, PP(960,540); native XYZ comes from the actual completed-draw Float32 marker vertex, not raster pixels or catalogue assumptions."}})
