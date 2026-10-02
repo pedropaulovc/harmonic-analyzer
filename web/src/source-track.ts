@@ -37,6 +37,10 @@ export interface CompactSourceView {
   provenance: { kind: 'chosen-feasible'; evidence: string; unobservedInputFields: InputField[] }
   cameraProvenance?: { kind: 'source-fit' | 'source-transfer' | 'source-informed-framing'; evidence: string; family: string }
   cameraContinuityFamily?: string
+  /** Held vetoes blending; source-informed framing requires continuous-shot at both endpoints. */
+  cameraInterpolation?: 'continuous-shot' | 'held'
+  /** Nonblank source evidence required for continuous-shot interpolation. */
+  cameraInterpolationEvidence?: string
   composite?: SourceComposite
   imagePlaneWarp?: ImagePlaneWarp
 }
@@ -244,6 +248,8 @@ export class CompactVideoReference {
         if (input?.setup.counterHeightM === null && !unobservedInputFields.includes('setup.counterHeightM')) unobservedInputFields.push('setup.counterHeightM')
         if (view.cameraProvenance && (!['source-fit', 'source-transfer', 'source-informed-framing'].includes(view.cameraProvenance.kind) || !view.cameraProvenance.evidence?.trim() || !view.cameraProvenance.family?.trim())) throw new Error(`${label}: camera family provenance is incomplete.`)
         if (view.cameraContinuityFamily !== undefined && !view.cameraContinuityFamily.trim()) throw new Error(`${label}: camera continuity family is empty.`)
+        if (view.cameraInterpolation !== undefined && (typeof view.cameraInterpolation !== 'string' || !['continuous-shot', 'held'].includes(view.cameraInterpolation))) throw new Error(`${label}: unknown camera interpolation policy.`)
+        if (view.cameraInterpolation === 'continuous-shot' && (typeof view.cameraInterpolationEvidence !== 'string' || !view.cameraInterpolationEvidence.trim())) throw new Error(`${label}: continuous-shot camera interpolation needs explicit evidence.`)
         return { observation: view, input, unobservedInputFields, inputChangesToNext: false, phaseDeltasToNext: null as Float64Array | null, cameraInterpolatesToNext: false, inputValidated: false }
       })
       return { observation: frame, required, layout, views, shotStartSeconds: shot.startSeconds, shotEndSeconds: shot.endSeconds, continuousToNext: false, available: pts !== null && (!required || views.length > 0 && views.every((view) => view.input !== null && view.observation.camera !== null)) }
@@ -263,10 +269,12 @@ export class CompactVideoReference {
           if (a.inputChangesToNext) a.phaseDeltasToNext = compilePhaseDeltas(a.input!, b.input!)
           const provenance = a.observation.cameraProvenance
           const nextProvenance = b.observation.cameraProvenance
-          a.cameraInterpolatesToNext = typeof a.observation.cameraContinuityFamily === 'string'
+          a.cameraInterpolatesToNext = a.observation.cameraInterpolation !== 'held' && b.observation.cameraInterpolation !== 'held'
+            && typeof a.observation.cameraContinuityFamily === 'string'
             && a.observation.cameraContinuityFamily === b.observation.cameraContinuityFamily
             && provenance !== undefined && nextProvenance !== undefined
-            && provenance.kind !== 'source-informed-framing' && nextProvenance.kind !== 'source-informed-framing'
+            && (provenance.kind !== 'source-informed-framing' && nextProvenance.kind !== 'source-informed-framing'
+              || a.observation.cameraInterpolation === 'continuous-shot' && b.observation.cameraInterpolation === 'continuous-shot')
             && provenance.family === nextProvenance.family
         }
       }

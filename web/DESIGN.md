@@ -113,6 +113,28 @@ Unobserved inputs may be chosen feasibly and must remain labelled as chosen,
 not historically recovered. No second solver, proxy geometry, fake visibility
 certificates or arbitrary individual-part adjustments are permitted.
 
+Chosen source-informed camera framing is held unless both endpoints explicitly
+declare `cameraInterpolation: 'continuous-shot'` with nonblank
+`cameraInterpolationEvidence`. `held` at either endpoint vetoes blending,
+including for measured camera families; omitted policies preserve existing
+source-fit/source-transfer continuity. Unknown policies or missing continuous-shot
+evidence reject the track. Existing continuity/provenance families and
+cut, layout, gearing and counter-height-mode guards remain authoritative.
+
+Only Analysis03's bounded **4.4044..7.307300000000001-second** interval opts
+in to this chosen continuous framing. Position, quaternion rotation, FOV and
+principal point interpolate; mechanical provenance remains chosen and stages
+remain unmeasured. Neither this interpolation nor the scoped headless
+**5.9..7.1-second** demonstration establishes recovered camera history or a
+fidelity pass. All six videos retain the final **5% / 0.5-second** acceptance
+limits; other videos' framing policies are unchanged.
+
+Eight focused `node:test` cases load the real modules through Vite SSR
+(`npm --prefix web run test:playback`). An optional `SOURCE_TRACK_MODULE`
+selects a historical source-track module for failing-before controls without
+reverting the implementation. Synthetic fixtures test runtime decisions, not
+source observations or rendered fidelity.
+
 Phase offsets interpolate along the shortest angular arc; cumulative crank turns
 remain linear. The Analysis bank's independently fitted inverse cam roots are
 continued on the nearest genuine branch before interpolation. Both roots preserve

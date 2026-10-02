@@ -11,6 +11,7 @@
     "build": "tsc --noEmit && vite build",
     "verify:sync": "node scripts/verify-sync.mjs",
     "test:source": "uv run --isolated --no-project python -m unittest discover -s scripts -p test_source_generation.py",
+    "test:playback": "node --test scripts/source-track.test.mjs",
     "preview:reference": "node scripts/serve-verification.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit"

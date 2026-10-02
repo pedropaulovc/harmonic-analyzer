@@ -61,6 +61,29 @@ historical settings. Playback distinguishes a working approximation from measure
 fidelity. Unsupported required intervals remain explicit; intervals without a
 corresponding machine may retain the preceding pose.
 
+Analysis03's bounded interval **4.4044..7.307300000000001 seconds** opts in
+to chosen continuous camera framing at both endpoints. Position, rotation, FOV
+and principal point blend only within compatible same-shot views; cuts, layout
+and discrete mechanical changes still hold the decoded exposure. This is
+unmeasured source-informed framing, not recovered camera history or a fidelity
+pass. The final **5% / 0.5-second** limits remain unchanged, as do other videos.
+
+The optional `content/<videoId>.chosen-camera-continuity.json` permission packet
+pins source SHA, shot bounds, native coverage and unmeasured main/whole framing
+evidence. No packet preserves the old policy. Analysis03 retains all 90 source
+observation rows covering the contiguous native exposures 132..218; all source
+cameras there remain null. Only the selected family bypasses the producer's
+generic 30-degree branch split; generated framing keys are not new measurements.
+Regenerate this video independently with
+`uv run --isolated --no-project python web/scripts/generate-analysis-synthesis-source-tracks.py --video 6dW6VYXp9HM`.
+Omitting `--video` still validates and prepares both Analysis/Synthesis outputs
+before publishing either.
+
+`npm --prefix web run test:playback` exercises eight synthetic runtime decisions
+through Vite SSR, without a browser or GLB. `SOURCE_TRACK_MODULE` may point to
+a historical source-track module for a failing-before control; these tests
+do not measure source fidelity.
+
 The filmed U-shaped connecting-rod junction and the native plate-like head are
 treated as functionally equivalent for animation, with the user's approval
 pending a later CAD correction. The HUD and verification reports retain this
@@ -108,6 +131,9 @@ HARMONIC_HEADLESS=1 npm --prefix web run verify:sync -- --stage 10
 
 # Scoped measurements do not claim a whole-video pass:
 HARMONIC_HEADLESS=1 npm --prefix web run verify:sync -- --stage 50 --video analysis --times 117,118,119
+
+# Headless bounded Analysis03 demonstration; not a fidelity acceptance pass:
+HARMONIC_HEADLESS=1 npm --prefix web run verify:sync -- --stage 50 --video analysis --from 5.9 --to 7.1 --player local --headless
 
 # Final all-video acceptance, including the official player:
 HARMONIC_HEADLESS=1 npm --prefix web run build && HARMONIC_HEADLESS=1 npm --prefix web run verify:sync
