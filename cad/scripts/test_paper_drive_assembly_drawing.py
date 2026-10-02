@@ -2,6 +2,7 @@
 
 import ast
 import inspect
+import math
 import re
 from itertools import product
 from pathlib import Path
@@ -245,6 +246,19 @@ def test_sheet_two_shows_and_balloons_exactly_the_transgear() -> None:
     assert drawing.TRANSGEAR_BALLOON_ANCHORS["transgear-removable"].instance == (
         "transgear-removable-1"
     )
+
+
+def test_collar_balloon_is_frozen_on_its_rear_rim_clear_of_the_pin_band() -> None:
+    # The inner view sees the collar edge-on from the right, so a rim point
+    # at the height of a drive-pin hole or of the bore draws on shared ink
+    # (farm run 20261002T160324403Z landed 0.288 mm off in the pin band).
+    x, y, z = drawing.TRANSGEAR_BALLOON_ANCHORS["transgear-drive-collar"].point_mm
+    assert math.hypot(x, y) == pytest.approx(collar.OD / 2.0, abs=1e-3)
+    assert z == pytest.approx(collar.LENGTH)
+    pin_band_inner = collar.PIN_CIRCLE_RADIUS - collar.PIN_HOLE_DIA / 2.0
+    assert collar.BORE_DIA / 2.0 < -y < pin_band_inner
+    # Below the axis is away from the feed sleeve: its stud stands above the knob.
+    assert assembly.STUD_XY[1] > assembly.KNOB_SHAFT_XY[1]
 
 
 # The transgear families the sheet-2 isometric draws no reachable ink of (farm

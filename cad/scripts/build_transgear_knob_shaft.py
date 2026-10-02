@@ -21,8 +21,8 @@ F (the Front Plane).
   under the thrust ring, one per gap.  The seed is the Ø1.25 in cutter's
   circle at the nominal full-depth station, cut behind the rear tooth ends
   on the plane through the axis and the seed gap's centre line.
-* ``RearTap``: #8-32 blind from the rear end face (Hole Wizard), with the
-  90-degree entry countersink ``RearTapCountersink`` (a revolved cut).
+* ``RearTap``: #8-32 blind from the rear end face (Hole Wizard); no
+  countersink, the mouth's 0.10 burr break is not modelled (R9-63).
 
 Datums: ``Axis1`` (the tooth pattern's axis, the shaft axis); ``Front
 Plane`` = F; planes ``PinionRear``, ``RearFace``, ``ThreadEnd`` and
@@ -50,7 +50,6 @@ from _common import (
     anchor_point_to_origin,
     apply_material,
     check,
-    define_polygon_chain,
     dimension_between,
     drive_dimension,
     ensure_fully_defined,
@@ -101,7 +100,6 @@ from transgear_knob_shaft_spec import (
     FULL_DEPTH_PREFIX,
     GAP_AZIMUTH_DEG,
     GEAR_DATA,
-    JOURNAL_CSK_WALL_WORST,
     JOURNAL_DIA,
     JOURNAL_DIA_BAND,
     JOURNAL_LENGTH,
@@ -117,7 +115,6 @@ from transgear_knob_shaft_spec import (
     RUNOUT_SLOT_END_Z,
     RUNOUT_SLOT_WIDTH,
     SURFACE_FINISHES,
-    TAP_CSK_DIA,
     TAP_DRILL_DIA,
     TAP_SPEC,
     TAP_TO_PINION_WORST,
@@ -138,9 +135,6 @@ _R_RELIEF = RELIEF_DIA / 2.0
 _R_BLANK = THREAD_BLANK_DIA / 2.0
 _R_JOURNAL = JOURNAL_DIA / 2.0
 _R_CUTTER = CUTTER_DIA_MAX / 2.0
-_CSK_R = TAP_CSK_DIA / 2.0
-# How far the countersink cutter runs past the rear face into air.
-_CSK_OVERRUN = 1.0
 
 # Solid volumes the gates expect (mm^3).
 V_STUD = (
@@ -756,7 +750,7 @@ async def build(adapter) -> dict[str, str]:
     )
     blank_reference_geometry(adapter, (("GapPlane", "PLANE"),))
 
-    # --- #8-32 rear tap and its entry countersink ------------------------------
+    # --- #8-32 rear tap ---------------------------------------------------------
     tap = wizard_holes(
         adapter,
         TAP_SPEC,
@@ -770,35 +764,6 @@ async def build(adapter) -> dict[str, str]:
     drive_jobs += tap.placement_drive_jobs
     v_tap = blind_hole_volume_mm3(tap.hole_dia_mm, tap.depth_mm)
     volume = await volume_check(adapter, "rear tap", volume - v_tap, 0.02 * v_tap)
-
-    drill_r = tap.hole_dia_mm / 2.0
-    # The cone r = s (s from the apex, 0..CSK_R) less what the drill took.
-    v_csk = math.pi * (_CSK_R**3 - drill_r**3) / 3.0 - math.pi * drill_r**2 * (
-        _CSK_R - drill_r
-    )
-    reach = _CSK_R + _CSK_OVERRUN
-    apex_u = -(REAR_END_Z - _CSK_R)
-    csk = [(apex_u, 0.0), (apex_u - reach, reach), (apex_u - reach, 0.0)]
-    check("create_sketch countersink", await adapter.create_sketch("Right"))
-    set_sketch_direct_db(adapter, True)
-    check(
-        "countersink axis",
-        await adapter.add_centerline(apex_u, 0.0, apex_u - reach, 0.0),
-    )
-    csk_lines = await add_line_chain(adapter, csk)
-    set_sketch_direct_db(adapter, False)
-    await define_polygon_chain(adapter, csk_lines, csk, label="rear countersink")
-    await ensure_fully_defined(adapter, "countersink profile")
-    check("exit_sketch countersink", await adapter.exit_sketch())
-    name_last_feature(adapter, "RearTapCountersinkProfile")
-    check(
-        "revolve countersink",
-        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
-    )
-    name_last_feature(adapter, "RearTapCountersink")
-    volume = await volume_check(
-        adapter, "rear countersink", volume - v_csk, 0.03 * v_csk + 0.05
-    )
 
     # --- Mate datums along the axis, each driven by its station ---------------
     stations = (
@@ -834,8 +799,7 @@ async def build(adapter) -> dict[str, str]:
     )
     _telemetry.info(
         f"knob shaft walls (floor 2.0, worst case): journal over the rear tap "
-        f"{JOURNAL_TAP_WALL_WORST:.3f}, over its countersink "
-        f"{JOURNAL_CSK_WALL_WORST:.3f}; tap drill to the 12T rear face "
+        f"{JOURNAL_TAP_WALL_WORST:.3f}; tap drill to the 12T rear face "
         f"{TAP_TO_PINION_WORST:.3f}; run-out slots end F + {RUNOUT_SLOT_END_Z:.2f}"
     )
 

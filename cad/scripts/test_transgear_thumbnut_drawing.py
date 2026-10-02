@@ -98,11 +98,19 @@ def test_the_seat_face_refuses_a_wheel_bore_it_cannot_cover(monkeypatch) -> None
 
 
 def test_countersinks_take_no_more_thread_than_the_engagement_deducts() -> None:
-    """The contract's engagement stack deducts the rear countersink's 0.2;
-    the sheet's countersink limit may not remove more."""
+    """Full thread starts where each countersink's 45° leg meets the tap
+    drill (R9-63), not the major: the printed MAX takes 0.82 at the seat
+    face, not the 0.2 counted to the major, and the front one, cut on the
+    dish, 1.78 from the rim.  The engagement stack deducts both."""
     printed = float(spec.CSK_QUALIFIER.split("\u00d8")[1].split()[0])
     assert "MAX" in spec.CSK_QUALIFIER.split()
-    assert (printed - spec.THREAD_MAJOR) / 2.0 <= spec.REAR_THREAD_LOSS + 1e-9
+    rear = (printed - spec.TAP_DRILL_DIA) / 2.0
+    assert rear == pytest.approx(0.8225, abs=1e-3)
+    assert rear <= spec.REAR_THREAD_LOSS + 1e-9
+    front_cone_y = spec.dish_surface_y(printed / 2.0) - printed / 2.0
+    front = spec.RIM_Y - (front_cone_y + spec.TAP_DRILL_DIA / 2.0)
+    assert front == pytest.approx(1.784, abs=1e-3)
+    assert front <= spec.FRONT_THREAD_LOSS + 1e-9
 
 
 def test_countersink_line_joins_the_native_thread_line() -> None:

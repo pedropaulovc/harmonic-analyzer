@@ -404,12 +404,25 @@ TRANSGEAR_INSTANCES = frozenset(
     for stem, count in TRANSGEAR_QUANTITIES.items()
     for index in range(1, (1 if stem == "transgear-removable" else count) + 1)
 )
+# The drive collar's balloon (on the inner view, INNER_STEMS) is frozen on its
+# rear-face rim below its axis; y here is the collar's own (machine Y - 256.89).
+# From the right (camera at -X, sheet x along +Z) every walk point is on an
+# edge-on rim at y +/-4.601 or +/-8.174, and 8.174 lies inside the drive-pin
+# band 7.0 +/- 1.19, where the pins' ink and the holes' edges meet the rim.
+# Farm run 20261002T160324403Z: tries 1 to 7 missed; try 8, (3.122, 8.174,
+# 0), drew 0.008 mm from pin 1's silhouette end at sheet (216.52, 180.28).
+# That sheet point had missed on try 3. The leader then landed on the rim's
+# end, 0.288 mm up. Mirrored below the axis is the rear-rim point (7.443,
+# 4.601, 4.0), on which runs 20261001T165119Z and 20261001T173014Z landed.
+# At 1:2 it stands 0.6 mm clear of the pin band (5.81) and 0.7 mm clear of
+# the core's edge (3.175). It is away from the feed sleeve, whose R9-68
+# D-flat edges (y +5.81, machine 262.70) meet the rim above the axis.
 TRANSGEAR_BALLOON_ANCHORS = {
     stem: BalloonAnchor(instance="transgear-removable-1")
     if stem == "transgear-removable"
     else BalloonAnchor()
     for stem in TRANSGEAR_QUANTITIES
-}
+} | {"transgear-drive-collar": BalloonAnchor((7.443, -4.601, 4.000))}
 # The families the isometric draws no reachable ink of (farm run
 # 20261001T051043622Z: none of the sleeve's 12 extreme points hit its ink, and
 # its 268 gear edges are past the edge fallback's 128), ballooned on the inner

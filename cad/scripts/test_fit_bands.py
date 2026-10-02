@@ -112,10 +112,6 @@ NOT_FIT_BANDS: dict[tuple[str, str], str] = {
     ("pinion_spring_geometry", "FORMED_CONTACT_BANDS"): (
         "names of the formed dimensions the contact corners perturb, not a band"
     ),
-    ("transgear_knob_shaft_spec", "TAP_CSK_BAND"): (
-        "the rear tap's entry countersink diameter: nothing mates it; indexed "
-        "for the printed note and the engagement loss"
-    ),
     ("transgear_arm_plate_screw_spec", "STOCK_LENGTH_BAND"): (
         "the oval-head screw's B18.6.3 length tolerance (plus, minus): indexed "
         "for the shortest stock left proud of the arm before its cut"

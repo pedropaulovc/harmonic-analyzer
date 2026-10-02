@@ -10,7 +10,7 @@ PlainCore station, on the thread relief's front shoulder, and the core ends
 at the CoreLength station.  The form cutter's full-depth station and run-out
 limit print as native lengths from F; the notes give the largest cutter.  The
 rear end view (``*Front``, looking at the rear face) carries the native #8-32
-blind-tap callout with its entry countersink named under the thread line.
+blind-tap callout with its mouth's edge break named under the thread line.
 All dimensions import natively
 from the part with the places and bands ``transgear_knob_shaft_spec``
 authored.
@@ -56,9 +56,9 @@ from transgear_knob_shaft_spec import (
     PLAIN_CORE,
     REAR_END_Z,
     SURFACE_FINISHES,
-    TAP_CSK_QUALIFIER,
     TAP_DEPTH_PRECISION,
     TAP_DRILL_DIA,
+    TAP_MOUTH_QUALIFIER,
     THREAD_CALLOUT,
     TIP_CHAMFER,
     TIP_STATION,
@@ -188,7 +188,7 @@ NOTES_XY = (0.016, 0.070)
 
 
 def _thread_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
-    """Append the countersink line to the one compartment holding the thread."""
+    """Append the edge-break line to the one compartment holding the thread."""
     if set(definitions) != {5, 6, 7, 8}:
         raise RuntimeError(f"unexpected thread callout parts: {definitions!r}")
     thread_parts = [
@@ -198,12 +198,12 @@ def _thread_callout_definitions(definitions: dict[int, str]) -> dict[int, str]:
         raise RuntimeError(f"thread line is not in one callout part: {definitions!r}")
     updated = dict(definitions)
     part = thread_parts[0]
-    updated[part] = f"{updated[part].rstrip()}\n{TAP_CSK_QUALIFIER}"
+    updated[part] = f"{updated[part].rstrip()}\n{TAP_MOUTH_QUALIFIER}"
     return updated
 
 
 def _set_thread_callout_text(display: Any) -> None:
-    """Name the entry countersink under the native blind-thread line."""
+    """Name the mouth's edge break under the native blind-thread line."""
     definitions = {part: str(display.GetText(part) or "") for part in (5, 6, 7, 8)}
     updated = _thread_callout_definitions(definitions)
     for definition_part, writable_part in ((5, 1), (6, 2), (7, 3), (8, 4)):
@@ -215,10 +215,10 @@ def _set_thread_callout_text(display: Any) -> None:
     if (
         persisted != updated
         or len(thread) != 1
-        or not thread[0].rstrip().endswith(TAP_CSK_QUALIFIER)
+        or not thread[0].rstrip().endswith(TAP_MOUTH_QUALIFIER)
     ):
         raise RuntimeError(
-            "knob shaft countersink line did not persist: "
+            "knob shaft edge-break line did not persist: "
             f"definitions={persisted!r}, resolved={resolved!r}"
         )
 
@@ -305,8 +305,8 @@ async def build(adapter: Any) -> dict[str, str]:
         note_xy=THREAD_NOTE_XY,
         label="MHA-078 stud thread callout",
     )
-    # The tap-drill edge under the entry countersink: the Hole Wizard
-    # feature's inner visible circle from the rear.
+    # The tap-drill edge: the Hole Wizard feature's visible circle from the
+    # rear.
     tap_callout = add_native_hole_callout(
         adapter,
         end,

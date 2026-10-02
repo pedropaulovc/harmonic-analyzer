@@ -338,11 +338,13 @@ TAP_SPEC = HoleSpec(
     depth_mm=TAP_DRILL_DEPTH,
     overrides_mm={"ThreadDepth": TAP_FULL_THREAD},
 )
-# 90-degree entry countersink, one chamfer on the tap-drill edge.
-TAP_CSK_DIA = 4.3
-TAP_CSK_BAND = (0.10, 0.0)  # (upper, lower): drilled-hole class
-TAP_CSK = (TAP_CSK_DIA - TAP_DRILL_DIA) / 2.0  # 45-degree leg
-TAP_CSK_QUALIFIER = f"90\u00b0 CSK \u00d8{TAP_CSK_DIA:.1f} +{TAP_CSK_BAND[0]:.2f}/0"
+# No countersink (R9-63): a 90° countersink opening past the 4.166 major
+# costs at least (4.166 - 3.454) / 2 = 0.356 of full thread at the mouth,
+# and the Ø4.3 +0.10/0 it carried cost 0.473, leaving 5.974 against the
+# 6.248 of 1.5 D.  The mouth carries a burr break only (not modelled); full
+# thread starts where the break's 45° leg meets the tap drill.
+TAP_MOUTH_BREAK_MAX = 0.10
+TAP_MOUTH_QUALIFIER = f"BREAK EDGE {TAP_MOUTH_BREAK_MAX:.2f} MAX"
 
 _TAP_BAND = printed_band_mm(TAP_DEPTH_PLACES)
 TAP_FULL_THREAD_MIN = TAP_FULL_THREAD - _TAP_BAND
@@ -359,10 +361,10 @@ if (TAP_DRILL_DEPTH - _TAP_BAND) - (
     raise AssertionError("the rear tap drill leaves no lead room past the full thread")
 
 # The screw's side (MHA-157 floor, first-thread loss) comes from the cup; the
-# shaft's own term is the thread its entry countersink removes, at the
-# largest printed countersink.
-TAP_CSK_LOSS_WORST = (TAP_CSK_DIA + max(TAP_CSK_BAND) - TAP_MAJOR) / 2.0
-ENGAGEMENT_WORST = ENGAGEMENT_OWN_WORST - TAP_CSK_LOSS_WORST
+# shaft's own term is the thread its mouth break removes, counted from the
+# tap drill (R9-63).
+TAP_MOUTH_LOSS_WORST = TAP_MOUTH_BREAK_MAX
+ENGAGEMENT_WORST = ENGAGEMENT_OWN_WORST - TAP_MOUTH_LOSS_WORST
 if ENGAGEMENT_WORST < ENGAGEMENT_FLOOR_D * SHANK_DIA - 1e-9:
     raise AssertionError(
         f"MHA-158 engages {ENGAGEMENT_WORST:.3f} "
@@ -372,17 +374,18 @@ if ENGAGEMENT_WORST < ENGAGEMENT_FLOOR_D * SHANK_DIA - 1e-9:
 
 # --- Walls at the printed worst case (contract §8) ---------------------------
 _JOURNAL_MIN = JOURNAL_DIA + min(JOURNAL_DIA_BAND)
-# Journal over the tap's thread major, and over the countersink at the mouth.
+# Journal over the tap's thread major (the mouth break, inside the major,
+# leaves the wall whole).
 JOURNAL_TAP_WALL = (JOURNAL_DIA - TAP_MAJOR) / 2.0  # 2.167
 JOURNAL_TAP_WALL_WORST = (_JOURNAL_MIN - TAP_MAJOR) / 2.0
-JOURNAL_CSK_WALL_WORST = (_JOURNAL_MIN - (TAP_CSK_DIA + max(TAP_CSK_BAND))) / 2.0
+if TAP_DRILL_DIA + 2.0 * TAP_MOUTH_BREAK_MAX >= TAP_MAJOR:
+    raise AssertionError("the rear tap's mouth break opens past the thread major")
 # Solid from the tap-drill point to the 12T's rear face (not a load wall).
 TAP_TO_PINION_WORST = (
     JOURNAL_LENGTH - JOURNAL_LENGTH_TOL - (TAP_DRILL_DEPTH + _TAP_BAND)
 )
 for _name, _wall in (
     ("journal over the rear tap", JOURNAL_TAP_WALL_WORST),
-    ("journal over the tap countersink", JOURNAL_CSK_WALL_WORST),
     ("tap drill to the 12T rear face", TAP_TO_PINION_WORST),
 ):
     if _wall < WALL_FLOOR - 1e-9:

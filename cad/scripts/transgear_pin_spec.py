@@ -65,19 +65,23 @@ GROOVE_WIDTH_BAND = RING.GROOVE_WIDTH_BAND
 GROOVE_REAR_STATION = round(GROOVE_STATION - GROOVE_WIDTH, 6)
 
 # --- Front end: a plain length in front of the groove, then a dome -----------
-FRONT_LAND = 1.5  # groove load wall to the dome's base
+# The land in front of the groove carries the ring's thrust: rule 12 target on
+# the shear land, at least the groove depth times 3 (ASSUMPTION from the ring
+# maker's edge-margin guidance: 0.4768 x 3 = 1.4304).  An accepted pin is
+# checked against the land's PRINTED lower limit: it prints .XXX (+/-0.13), so
+# 1.600 leaves 1.470 (at .X the title block's +/-0.8 left 0.7, Codex P2).
+FRONT_LAND = 1.600  # groove load wall to the dome's base
+FRONT_LAND_PLACES = 3
+FRONT_LAND_BAND = printed_band_mm(FRONT_LAND_PLACES)
+FRONT_LAND_MIN = round(FRONT_LAND - FRONT_LAND_BAND, 6)
 TIP_DOME_SAG = 1.5
 TIP_DOME_R = ((DIA / 2.0) ** 2 + TIP_DOME_SAG**2) / (2.0 * TIP_DOME_SAG)
-LENGTH = round(GROOVE_STATION + FRONT_LAND + TIP_DOME_SAG, 6)  # 50.25
-OVERALL_LENGTH = round(LENGTH + HEAD_HEIGHT, 6)  # 52.25, apex to tip
-TIP_MACHINE_Z = round(HEAD_SEAT_MACHINE_Z - LENGTH, 6)
+LENGTH = round(GROOVE_STATION + FRONT_LAND + TIP_DOME_SAG, 6)  # 50.35
+OVERALL_LENGTH = round(LENGTH + HEAD_HEIGHT, 6)  # 52.35, apex to tip
+TIP_MACHINE_Z = round(HEAD_SEAT_MACHINE_Z - LENGTH, 6)  # -166.8125
 HEAD_APEX_MACHINE_Z = round(HEAD_SEAT_MACHINE_Z + HEAD_HEIGHT, 6)  # -114.4625
 GROOVE_LOAD_WALL_MACHINE_Z = round(HEAD_SEAT_MACHINE_Z - GROOVE_STATION, 6)
 
-# The groove's depth leaves the ring's catalogue seat; the land in front of
-# it carries the ring's thrust (rule 12 target on the shear land: the land
-# must be at least the groove depth times 3, ASSUMPTION from the ring maker's
-# edge-margin guidance, so 1.5 covers 0.48 x 3 = 1.43).
 GROOVE_DEPTH = (DIA - GROOVE_DIA) / 2.0
 EDGE_MARGIN_MIN = 3.0 * GROOVE_DEPTH
 
@@ -111,7 +115,7 @@ DRAWING_PRECISION: dict[str, dict[str, int]] = {
         "GrooveStation": GROOVE_STATION_PLACES,
         "GrooveDia": 3,
         "GrooveWidth": 3,
-        "FrontLand": 1,
+        "FrontLand": FRONT_LAND_PLACES,
     },
     "HeadDomeProfile": {"HeadDomeR": 1},
     "TipDomeProfile": {"TipDomeR": 1},
@@ -128,9 +132,10 @@ for _ok, _what in (
     (HEAD_DOME_SAG < HEAD_DOME_R, "the head is not a spherical cap"),
     (TIP_DOME_SAG < TIP_DOME_R, "the tip is not a spherical cap"),
     (
-        FRONT_LAND >= EDGE_MARGIN_MIN,
-        f"the land in front of the groove {FRONT_LAND} is under "
-        f"{EDGE_MARGIN_MIN:.2f}, three groove depths",
+        FRONT_LAND_MIN >= EDGE_MARGIN_MIN,
+        f"the land in front of the groove {FRONT_LAND} at {FRONT_LAND_PLACES} "
+        f"places has a printed lower limit {FRONT_LAND_MIN:.3f}, under "
+        f"{EDGE_MARGIN_MIN:.4f}, three groove depths",
     ),
     (GROOVE_DIA < DIA_MIN, "the groove does not cut below the shank"),
     (

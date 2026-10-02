@@ -117,8 +117,9 @@ def test_the_screw_engages_1_5_d_at_the_thickest_printed_floor() -> None:
     reach = screw.SHANK_LEN - 0.03 * 25.4 - thickest - screw.PITCH
     assert reach >= 1.5 * screw.SHANK_DIA
     assert spec.ENGAGEMENT_OWN_WORST == pytest.approx(reach, abs=0.01)
-    # With the shaft's largest tap countersink the joint still holds 1.5 D.
-    shaft_side = reach - (knob_shaft.TAP_CSK_DIA + 0.10 - knob_shaft.TAP_MAJOR) / 2.0
+    # With the shaft's mouth break, charged from its tap drill (R9-63), the
+    # joint still holds 1.5 D.
+    shaft_side = reach - knob_shaft.TAP_MOUTH_BREAK_MAX
     assert shaft_side >= 1.5 * screw.SHANK_DIA
     assert knob_shaft.ENGAGEMENT_WORST == pytest.approx(shaft_side, abs=0.01)
 

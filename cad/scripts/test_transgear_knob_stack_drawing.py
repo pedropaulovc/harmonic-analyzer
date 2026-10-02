@@ -126,7 +126,7 @@ def test_thumbnut_runs_clear_of_the_core_step_at_the_rearward_stop(
     assert nut_seat - core_max > 0.0
     # Negative control: at fc9c2d700 the full thread ended 6.5 (.XXX) in front
     # of F with a one-pitch die run-out behind it, so the run-out reached
-    # 6.37..7.90 and the nut's first full thread (0.2 in from its seat, 6.77)
+    # 6.37..7.90 and the nut's first full thread (0.82 from its seat, 7.39)
     # sat on it.
     head_runout_end = 6.5 + printed_band_mm(3) + PITCH
     assert nut_seat + nut.REAR_THREAD_LOSS < head_runout_end
@@ -168,7 +168,8 @@ def test_thumbnut_engages_one_and_a_half_diameters_over_the_travel(
     the forward end is the shortest tip (or the deepest cut below the shortest
     nut's rim) less a pitch, inside the rim's countersink; the rear end the
     nut's seat countersink on the thickest plate, or the shortest stud's
-    full-thread end.  Least 11.97 (1.89 D) on the shortest .X nut."""
+    full-thread end; each countersink's loss counted from the tap drill
+    (R9-63).  Least 11.60 (1.83 D) on the shortest .X nut."""
     tip_min = _limits(shaft.TIP_STATION, shaft.TIP_STATION_PLACES)[0]
     thread_end_max = _limits(shaft.PLAIN_CORE, _stud_places("PlainCore"))[1]
     nut_min = _limits(nut.OVERALL_LENGTH, nut.OVERALL_LENGTH_PLACES)[0]
@@ -181,8 +182,8 @@ def test_thumbnut_engages_one_and_a_half_diameters_over_the_travel(
     def engagement(seat: float) -> float:
         rim = seat + plate[0] + nut_min
         tip = min(tip_min, rim - cut_deepest)
-        front = min(tip - PITCH, rim - nut.CSK_DEPTH)
-        rear = max(seat + plate[1] + nut.CSK_DEPTH, thread_end_max)
+        front = min(tip - PITCH, rim - nut.FRONT_THREAD_LOSS)
+        rear = max(seat + plate[1] + nut.REAR_THREAD_LOSS, thread_end_max)
         return front - rear
 
     rear_stops = _limits(collar.LENGTH, collar.LENGTH_PLACES)
@@ -191,9 +192,9 @@ def test_thumbnut_engages_one_and_a_half_diameters_over_the_travel(
         for i in range(101)
     ]
     worst = min(engagement(seat) for seat in [*settings, rear_stops[1]])
-    assert worst == pytest.approx(11.97)
+    assert worst == pytest.approx(11.5975)
     assert worst >= ENGAGEMENT_FLOOR
     assert collar.THUMBNUT_ENGAGEMENT_WORST == pytest.approx(worst)
-    # Negative control: a stud tip 4 shorter leaves 8.22, under 1.5 D.
+    # Negative control: a stud tip 4 shorter leaves 7.60, under 1.5 D.
     with pytest.raises(AssertionError, match="MHA-126 thumbnut / MHA-078 stud"):
         _reloaded_collar(monkeypatch, shaft, "TIP_STATION", shaft.TIP_STATION - 4.0)

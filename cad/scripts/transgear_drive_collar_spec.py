@@ -69,9 +69,10 @@ from transgear_removable_spec import (
     SEAT_SPIGOT_RIM,
 )
 from transgear_removable_spec import PIN_CIRCLE_RADIUS as _WHEEL_PIN_CIRCLE_RADIUS
+from transgear_thumbnut_spec import FRONT_THREAD_LOSS as NUT_FRONT_THREAD_LOSS
 from transgear_thumbnut_spec import OVERALL_LENGTH as NUT_LENGTH
 from transgear_thumbnut_spec import OVERALL_LENGTH_LO as NUT_LENGTH_LO
-from transgear_thumbnut_spec import REAR_THREAD_LOSS as NUT_CSK_DEPTH
+from transgear_thumbnut_spec import REAR_THREAD_LOSS as NUT_REAR_THREAD_LOSS
 from transgear_thumbnut_spec import TAP_MINOR_2B_MIN as NUT_MINOR_MIN
 
 # The policy's wall floor for a named shortfall (the 2.0 target's floor).
@@ -392,17 +393,18 @@ def thumbnut_engagement(seat_from_f: float) -> float:
     shortest stud tip (or the deepest cut below the shortest nut's rim) less
     one pitch for its chamfer, inside the rim's countersink; rearward, the
     nut's seat countersink on the thickest plate or the stud's full-thread
-    end, whichever lies further forward."""
+    end, whichever lies further forward.  Each countersink's loss is counted
+    from the tap drill (R9-63)."""
     rim = seat_from_f + THINNEST_PLATE + NUT_LENGTH_MIN
     tip = min(_TIP_STATION_MIN, rim - STUD_CUT_BELOW_RIM[1])
-    front = min(tip - THREAD_PITCH, rim - NUT_CSK_DEPTH)
-    rear = max(seat_from_f + _PLATE_MAX + NUT_CSK_DEPTH, _PLAIN_CORE_MAX)
+    front = min(tip - THREAD_PITCH, rim - NUT_FRONT_THREAD_LOSS)
+    rear = max(seat_from_f + _PLATE_MAX + NUT_REAR_THREAD_LOSS, _PLAIN_CORE_MAX)
     return front - rear
 
 
 # Each term is a min or max of lines in the seat, so the engagement is concave
 # over the travel and least at one of its ends: 20.87 - 1.27 - 7.63 = 11.97 at
-# the rearward stop, 23.39 - 1.27 - 9.90 = 12.22 at the seat maximum.
+# the rearward stop, 23.39 - 1.27 - 10.52 = 11.60 at the seat maximum.
 THUMBNUT_ENGAGEMENT_WORST = min(
     thumbnut_engagement(seat) for seat in (LENGTH_MIN, LENGTH_MAX, SEAT_MAX_FROM_F)
 )

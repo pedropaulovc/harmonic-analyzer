@@ -92,15 +92,29 @@ def test_the_rear_tap_callout_stands_inside_the_left_border() -> None:
     lines = [
         f"\u00d8{spec.TAP_DRILL_DIA:.2f} \u21a7 {spec.TAP_DRILL_DEPTH:.1f}",
         f"{spec.TAP_SIZE} UNC - 2B \u21a7 {spec.TAP_FULL_THREAD:.1f}",
-        *spec.TAP_CSK_QUALIFIER.splitlines(),
+        *spec.TAP_MOUTH_QUALIFIER.splitlines(),
     ]
-    assert spec.TAP_CSK_QUALIFIER.startswith("90\u00b0 CSK")
     x, y = drawing.TAP_CALLOUT_XY
     half_width = max(map(len, lines)) * _CHAR_WIDTH / 2.0
     half_height = len(lines) * _LINE_PITCH / 2.0
     assert x - half_width >= _BORDER + 0.003
     assert x + half_width <= drawing.REAR_X - 0.003
     assert y + half_height <= drawing.END_CENTER[1] - drawing.HALF_OD - 0.003
+
+
+def test_the_rear_tap_mouth_loses_only_its_break_counted_from_the_drill() -> None:
+    """Codex P2 on #1166: full thread starts where the mouth's 45° leg meets
+    the tap drill (R9-63), so the Ø4.3 +0.10/0 countersink cost 0.473, not
+    the 0.117 counted to the major, and left 5.974 against the 6.248 of
+    1.5 D.  The mouth carries a 0.10 MAX break and keeps 1.5 D."""
+    floor = spec.ENGAGEMENT_FLOOR_D * spec.SHANK_DIA
+    assert spec.TAP_MOUTH_LOSS_WORST == spec.TAP_MOUTH_BREAK_MAX == 0.10
+    assert spec.ENGAGEMENT_WORST == pytest.approx(6.347, abs=1e-3)
+    assert spec.ENGAGEMENT_WORST >= floor
+    # The old countersink at its printed limit, charged to the drill, fell short.
+    old_loss = (4.3 + 0.10 - spec.TAP_DRILL_DIA) / 2.0
+    assert spec.ENGAGEMENT_OWN_WORST - old_loss == pytest.approx(5.974, abs=1e-3)
+    assert spec.ENGAGEMENT_OWN_WORST - old_loss < floor
 
 
 # Measured text boxes (8b5e1f354's PDF), relative to the keep point: a plain
@@ -446,7 +460,6 @@ def test_cutter_arc_runs_counter_clockwise_round_the_rear(
 def test_walls_meet_the_floor_at_the_worst_case() -> None:
     for wall in (
         spec.JOURNAL_TAP_WALL_WORST,
-        spec.JOURNAL_CSK_WALL_WORST,
         spec.TAP_TO_PINION_WORST,
     ):
         assert wall >= spec.WALL_FLOOR

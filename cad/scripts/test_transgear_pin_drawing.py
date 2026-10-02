@@ -14,6 +14,7 @@ import transgear_pin_spec as spec
 import transgear_retaining_ring_spec as ring
 from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
+from _printed_tolerance import printed_band_mm
 from _surface_finish import MACHINED_UM
 
 
@@ -43,8 +44,9 @@ def test_every_marked_dimension_prints_once_with_model_places() -> None:
 
 def test_only_the_shank_and_the_ring_groove_carry_model_bands() -> None:
     """The ground shank (running fit and arm press) and the groove's
-    catalogue Ø and width carry native bands; the groove station prints
-    .XXX and every other size its places under the title block."""
+    catalogue Ø and width carry native bands; the groove station and the
+    front land print .XXX and every other size its places under the title
+    block."""
     assert model_toleranced_dimensions(part) == {
         ("PinProfile", "ShankDia"): "*deviations(DIA_BAND)",
         ("PinProfile", "GrooveDia"): "*deviations(GROOVE_DIA_BAND)",
@@ -52,6 +54,17 @@ def test_only_the_shank_and_the_ring_groove_carry_model_bands() -> None:
     }
     assert spec.DRAWING_PRECISION_BY_NAME["ShankDia"] == 3
     assert spec.DRAWING_PRECISION_BY_NAME["GrooveStation"] == 3
+    assert spec.DRAWING_PRECISION_BY_NAME["FrontLand"] == 3
+
+
+def test_the_front_land_holds_three_groove_depths_at_its_printed_lower_limit() -> None:
+    """Codex P2: at .X the title block's ±0.8 left a 1.5 land 0.7 at its
+    lower limit, under three groove depths (1.4304).  The check reads the
+    places the land actually prints at."""
+    places = spec.DRAWING_PRECISION_BY_NAME["FrontLand"]
+    lower = round(spec.FRONT_LAND, places) - printed_band_mm(places)
+    assert spec.FRONT_LAND_MIN == pytest.approx(lower)
+    assert lower >= spec.EDGE_MARGIN_MIN
 
 
 def test_the_groove_holds_the_ring_at_every_printed_limit() -> None:
@@ -81,7 +94,7 @@ def test_the_groove_callout_names_the_ring_on_one_line() -> None:
         (-spec.HEAD_HEIGHT, -114.4625),
         (0.0, -116.4625),
         (spec.GROOVE_STATION, -163.7125),
-        (spec.LENGTH, -166.7125),
+        (spec.LENGTH, -166.8125),
     ],
 )
 def test_the_pin_sits_at_its_machine_stations(station: float, machine_z: float) -> None:

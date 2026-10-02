@@ -71,7 +71,7 @@ PDF = OUTPUTS.pdf
 PNG = OUTPUTS.png
 
 # The side view prints at the sheet scale, so it needs no caption.  3:1 lays
-# the 52.25 pin 157 mm long and the 0.737 groove 2.2 mm wide.
+# the 52.35 pin 157 mm long and the 0.737 groove 2.2 mm wide.
 SHEET_SCALE = (3.0, 1.0)
 VIEW_SCALE = (3, 1)
 _S = SHEET_SCALE[0] / SHEET_SCALE[1]

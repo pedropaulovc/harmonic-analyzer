@@ -110,12 +110,10 @@ THREAD_MAJOR = THREAD_MAJOR_MM[THREAD]
 # https://www.engineersedge.com/thread_strength/internal_screw_threads_chart.htm):
 # where the nut stands over MHA-078's thread relief its crests clear it.
 TAP_MINOR_2B_MIN = 0.1960 * 25.4  # 4.978
-# 90° entry countersink at each end, 0.2 deep at the thread major: the first
-# full thread starts 0.2 in from the seat face.  The sheet prints the
-# countersink as a MAX so the thread it removes never exceeds the 0.2 the
-# engagement stack (contract §7) deducts.
-CSK_DEPTH = 0.2
-CSK_DIA = THREAD_MAJOR + 2.0 * CSK_DEPTH
+# 90° entry countersink at each end, opened 0.2 past the thread major so the
+# first thread starts full rather than on a feather edge.  The sheet prints
+# it as a MAX, so the thread it removes never exceeds the losses below.
+CSK_DIA = THREAD_MAJOR + 2.0 * 0.2
 if CSK_DIA <= THREAD_MAJOR:
     raise AssertionError("MHA-126 countersink ends inside the thread major")
 CSK_QUALIFIER = f"90\u00b0 CSK \u00d8{CSK_DIA:.2f} MAX BOTH ENDS"
@@ -125,9 +123,10 @@ CSK_QUALIFIER = f"90\u00b0 CSK \u00d8{CSK_DIA:.2f} MAX BOTH ENDS"
 REAR_CSK_BREAK = (CSK_DIA - TAP_DRILL_DIA) / 2.0
 REAR_CSK_APEX_Y = CSK_DIA / 2.0
 FRONT_CSK_APEX_Y = dish_surface_y(CSK_DIA / 2.0) - CSK_DIA / 2.0
-# First full thread (at the major) from each end.
-REAR_FULL_THREAD_Y = REAR_CSK_APEX_Y - THREAD_MAJOR / 2.0
-FRONT_FULL_THREAD_Y = FRONT_CSK_APEX_Y + THREAD_MAJOR / 2.0
+# First full thread from each end: where the cone meets the tap drill, not
+# the major (R9-63).
+REAR_FULL_THREAD_Y = REAR_CSK_APEX_Y - TAP_DRILL_DIA / 2.0
+FRONT_FULL_THREAD_Y = FRONT_CSK_APEX_Y + TAP_DRILL_DIA / 2.0
 
 # --- Places each printed dimension carries (policy rule 12, contract §12) ----
 # The diameters over the thread at .XX (walls); the overall length, the
@@ -200,10 +199,12 @@ if CSK_DIA >= T24_BORE_DIA:
     raise AssertionError("MHA-126 rear countersink reaches the T24's bore edge")
 
 # --- The nut's side of the stud engagement (contract §7) ----------------------
-# The stack subtracts the rear countersink's thread loss (CSK_DEPTH, a MAX on
-# the sheet) and, after cut-to-fit, the nut's shortest printed length.  The
-# stud's tip station and chamfer are MHA-078's.
-REAR_THREAD_LOSS = CSK_DEPTH
+# The stack subtracts the thread each countersink takes (at its printed MAX,
+# from the seat face and from the rim, the front one under the dish) and,
+# after cut-to-fit, the nut's shortest printed length.  The stud's tip
+# station and chamfer are MHA-078's.
+REAR_THREAD_LOSS = REAR_FULL_THREAD_Y - SEAT_FACE_Y  # 0.823
+FRONT_THREAD_LOSS = RIM_Y - FRONT_FULL_THREAD_Y  # 1.784
 
 # The Ø20.5 dimension is the diameter over the knurl; the designation gives
 # the pitch and the 90° tooth, so no tooth count prints (R9-57).  One line:

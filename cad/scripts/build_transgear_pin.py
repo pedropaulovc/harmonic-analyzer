@@ -402,7 +402,8 @@ async def build(adapter) -> dict[str, str]:
 
     # Model-owned bands (policy rule 2): the ground shank (the running fit and
     # the press in the arm) and the ring groove's catalogue Ø and width.  The
-    # groove station prints .XXX and the title block governs it.
+    # groove station and the front land print .XXX and the title block governs
+    # them.
     set_dimension_bilateral_tolerance(
         adapter, "PinProfile", "ShankDia", *deviations(DIA_BAND)
     )
