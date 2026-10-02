@@ -145,6 +145,20 @@ unchanged.
 Compact selection preserves original landmark observations across nominal and
 decoded-time aliases only when source frame, hashes, PTS and view layout match.
 It does not interpolate source pixels or change the selected camera and input.
+Exact aliases use the declared `sha256Bgr8` or `sha256Gray8` hash for their
+pixel format. Formats never alias each other; sampling diagnostics list
+supported formats and any unsupported source declarations.
+
+Source generators use committed observations, chosen seed states and immutable
+numeric calibration metadata under `content/`. Original private capture paths
+and hashes remain provenance links, not regeneration dependencies. No source
+video or screenshots are included in those inputs. Capture-bound renderer and
+model hashes remain strict; changing the renderer requires recapturing its
+bound evidence.
+
+`npm --prefix web run test:source` runs the source-generation boundary tests
+through uv in an isolated Python environment. The suite covers exact-exposure
+identity, conflicting landmarks and invalid presentation declarations.
 
 Legacy full-part visibility, finite-line, contour and raster-bound diagnostics
 remain historical evidence, not an exhaustive queue that must finish before

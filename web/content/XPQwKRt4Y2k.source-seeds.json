@@ -1337,8 +1337,15 @@
       "cameraEvidence": {
         "measuredSourceFeatureCount": 5,
         "independentHeldOutMeasuredFeatureCount": 2,
-        "independentNativeCameraCheckCount": 2,
-        "maximumConditionalNativeCheckErrorPx": 4.263690799802585,
+        "independentHistoricalCpuCameraCheckCount": 2,
+        "maximumConditionalHistoricalCpuCheckErrorPx": 4.263690799802585,
+        "diagnosticKind": "historical-cpu-projection",
+        "presentationConvention": "horizontal-mirror",
+        "historicalFieldNames": {
+          "independentHistoricalCpuCameraCheckCount": "independentNativeCameraCheckCount",
+          "maximumConditionalHistoricalCpuCheckErrorPx": "maximumConditionalNativeCheckErrorPx"
+        },
+        "qualification": "Retained historical CPU catalog diagnostic in the horizontal-mirror projection convention, not an unmirrored result or current native GPU acceptance. The original catalog world points projected through this unchanged camera reproduce the approximately 4.26px CHECK maximum only after horizontal mirroring within rect[1280,0,640,540]; the historical Native field names and native layout label were inconsistent with that convention. Historical numeric values, source measurements and FIT/CHECK roles are preserved; these CHECK residuals are retrospective provenance, not presentation-selection evidence or a fresh GPU measurement.",
         "maximumMeasuredSourceUncertaintyPx": 20.762378636063566,
         "fullAcceptance": false
       },
@@ -16776,8 +16783,12 @@
       "evidence": "Every actual native whole-camera exposure1..2698 compared by all-pixel ROI NCC against all71 independently decoded source photos. Actual142-frame/71image repeated source period, not authored uniform-spin agreement. All2698 winners verified; minNCC0.83966374397, min distinct phase margin0.16358500719. Native photo fullgray = BGR2GRAY then INTER_AREA480x270. Physical source QA corrects phase46 tube1 lip to174; old160 feature is separate crossing wire."
     },
     "independentSourcePhaseMap": {
-      "path": "web/.vite/verification-output/spin-witness/rig-replay/actual-phase-map.json",
+      "path": "web/content/XPQwKRt4Y2k.source-phase-map.json",
       "sha256": "1726d46537adcb7437399192d5b8ba4f3ee0b1b67bb48a3c42b35759e5838cb1",
+      "originalArtifact": {
+        "path": "web/.vite/verification-output/spin-witness/rig-replay/actual-phase-map.json",
+        "sha256": "1726d46537adcb7437399192d5b8ba4f3ee0b1b67bb48a3c42b35759e5838cb1"
+      },
       "sourceExposureIdentityCount": 2698
     },
     "fixedCheckAnchorIds": [

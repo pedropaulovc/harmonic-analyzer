@@ -7,6 +7,8 @@ and no CPU camera diagnostic is promoted to a current native GPU measurement.
 Regenerate from the repository root with: python3 web/scripts/compact-spin.py
 Declared seed presentation overrides affect chosen native rendering only; original
 source pixels, source-view layouts and exact-exposure seed identities are retained.
+The immutable numeric phase/source-image map is committed in web/content; private
+capture paths retained in declarations are provenance only, never runtime inputs.
 """
 import copy
 import hashlib
@@ -76,9 +78,31 @@ def retain_phase_point_provenance(data, family):
             "qualification": "Source evidence retained, not blanket template admission. Other reacquisitions still need an independently admissible seed and adequate actual target source-view/feature correlations."}
 
 
+def validate_seed_presentations(seeds):
+    """Refuse undocumented or invalid rendering overrides before generation."""
+    for view_id, seed in seeds["views"].items():
+        if "presentation" not in seed:
+            if "presentationEvidence" in seed:
+                raise ValueError(f"Spin seed view {view_id!r}: presentationEvidence requires a presentation override.")
+            continue
+        presentation = seed["presentation"]
+        if presentation not in ("native", "horizontal-mirror"):
+            raise ValueError(
+                f"Spin seed view {view_id!r}: invalid presentation {presentation!r}; "
+                "expected 'native' or 'horizontal-mirror'."
+            )
+        evidence = seed.get("presentationEvidence")
+        if not isinstance(evidence, str) or not evidence.strip():
+            raise ValueError(
+                f"Spin seed view {view_id!r}: presentation {presentation!r} "
+                "requires nonempty string presentationEvidence."
+            )
+
+
 def main():
-    data = common.load_observations("XPQwKRt4Y2k")
     seeds = json.loads((common.WEB / "content" / "XPQwKRt4Y2k.source-seeds.json").read_text())
+    validate_seed_presentations(seeds)
+    data = common.load_observations("XPQwKRt4Y2k")
     controls = seeds["montageSourceControls"]
     data["anchors"].extend(copy.deepcopy(controls["anchors"]))
     source_controls = {(entry["sourceImage"]["frameIndex"], entry["sourceImage"]["sha256Bgr8"]): entry for entry in controls["frames"]}
@@ -144,7 +168,10 @@ def main():
                     "not a newly measured physical camera or passing source fit."
                 )
             elif seed.get("cameraEvidence"):
-                evidence += "Prior photographic/camera CHECK diagnostics are retained separately; no current GPU acceptance claimed."
+                evidence += seed["cameraEvidence"].get(
+                    "qualification",
+                    "Prior photographic/camera CHECK diagnostics are retained separately; no current GPU acceptance claimed.",
+                )
             if "presentation" in seed:
                 # A documented per-view seed declaration governs native rendering,
                 # not the original source layout used for exact-exposure identity.
@@ -198,7 +225,7 @@ def main():
     track = common.build_track(data, views, [
         "The source internally static photographed machine rotates on a turntable; source camera changes, not fictitious crank-driven animation, reproduce that motion.",
         "All closeup sweep/crossfade layers and nine nested endcard views are retained, including the guide/book photographed hardware.",
-        "Camera FIT/CHECK values are original CPU diagnostic residuals and unmeasured at the new50/20/10/5% stages.",
+        "Camera FIT/CHECK values are historical CPU diagnostic residuals, not current native GPU acceptance; endcard-analysis uses the horizontal-mirror projection convention despite the historical Native field labels.",
         "Endcard source controls use existing independently measured source pixels and source-only optical-flow/patch checks; failures and unmeasured guide/pen-inset controls remain explicit.",
     ])
     track["cpuDiagnostics"] = {view_id: copy.deepcopy(seed.get("cameraEvidence", {})) for view_id, seed in seeds["views"].items() if seed.get("cameraEvidence")}

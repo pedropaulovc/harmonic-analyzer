@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Regenerate compact Analysis/Synthesis playback candidates from retained evidence.
 
-Run from any directory with the preserved private evidence in this checkout:
+Run from any directory with the tracked web/content calibration evidence:
   python web/scripts/generate-analysis-synthesis-source-tracks.py
 This retains numeric evidence and chooses continuous Analysis inverse cam roots.
 It loads no CAD/model/browser and does not qualify cameras, recover historical
@@ -32,12 +32,34 @@ ROOT = WEB.parent
 spec = importlib.util.spec_from_file_location("compact_source_common", WEB / "scripts/compact-source-common.py")
 common = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(common)
-ANALYSIS = ".playwright-cli/analysis-recovery/four-seed-source-fit-census"
-SYNTHESIS = "web/.vite/verification-output/synthesis-full-source"
+ANALYSIS = "web/content/analysis-recovery-calibration-evidence/four-seed-source-fit-census"
+CALIBRATION = "web/content/analysis-synthesis.frozen-generation-evidence.json"
+CALIBRATION_SHA256 = "425beca33506fcb307c3892808b7871a8ee2f06b7aa90f7103fc6993e6319267"
+FRAMING_GPU = "web/content/8KmVDxkia_w.framing-gpu-evidence-2026-10-01.json"
+FRAMING_GPU_SHA256 = "239cb59e799bbb42f6551b74c3b6cf1eccf66f9b0ec7c93518f743b37caf4173"
 
 
 def load(path):
     return json.loads((ROOT / path).read_text())
+
+
+def load_pinned(path, expected_sha256, description):
+    raw = (ROOT / path).read_bytes()
+    digest = hashlib.sha256(raw).hexdigest()
+    if digest != expected_sha256:
+        raise ValueError(f"{description} artifact changed")
+    return json.loads(raw), digest
+
+
+def same_camera(camera, baseline):
+    if not math.isclose(camera.get("verticalFovDegrees",0), baseline["verticalFovDegrees"], rel_tol=0., abs_tol=1e-9):
+        return False
+    for name in ("positionMetres","quaternion","principalPointViewportPixels"):
+        values = camera.get(name,[960.,540.]) if name == "principalPointViewportPixels" else camera.get(name,[])
+        if (len(values) != len(baseline[name])
+                or any(not math.isclose(a,b,rel_tol=0.,abs_tol=1e-9) for a,b in zip(values,baseline[name]))):
+            return False
+    return True
 
 
 def nearest(rows, time, key):
@@ -88,10 +110,12 @@ class Generator:
                 self.shots[name]["startSeconds"] + f*(self.shots[name]["endSeconds"]-self.shots[name]["startSeconds"])
                 for name in ("analysis-03","analysis-05","analysis-07","analysis-13","analysis-15","analysis-17","analysis-19","analysis-28")
                 for f in (0.25,0.5,0.75)]
-        self.native = load(f"{SYNTHESIS}/source-pinhole-alternatives/actual-current-native.json")
+        self.calibration, self.calibration_hash = load_pinned(
+            CALIBRATION, CALIBRATION_SHA256, "Retained Analysis/Synthesis calibration")
+        self.native = self.calibration_input("native")
         self.base = self.native["mechanical"][0]["chosenInput"]
-        self.candidate = load(f"{ANALYSIS}/candidate.json")
-        self.request = load(f"{ANALYSIS}/all204-cpu-forward-request.json")
+        self.candidate = self.calibration_input("candidate")
+        self.request = self.calibration_input("request")
         requested = {row["frameIndex"]: row["chosenInput"] for row in self.request["requests"] if row["kind"] == "all204-chosen-native-forward-input"}
         if any(requested[row["frameIndex"]] != row["chosenInput"] for row in self.candidate["frames"]):
             raise ValueError("Frozen Analysis candidate and serialized complete input request differ.")
@@ -103,6 +127,11 @@ class Generator:
             controls_spec = importlib.util.spec_from_file_location("analysis_bank_controls", WEB / "scripts/generate-analysis-bank-source-controls.py")
             controls_module = importlib.util.module_from_spec(controls_spec)
             controls_spec.loader.exec_module(controls_module)
+            # Reuse the original source-control derivation and all of its
+            # exposure/station/CHECK guards, but never read private evidence.
+            controls_module.BASE = WEB / "content/analysis-recovery-calibration-evidence"
+            for name in ("centres","ledger","bankReport"):
+                self.calibration_input(name)
             self.bank_controls = controls_module.build_packet()
             self.data["anchors"].extend(copy.deepcopy(self.bank_controls["anchors"]))
             controls = {row["sourceImage"]["frameIndex"]: row for row in self.bank_controls["frames"]}
@@ -116,8 +145,8 @@ class Generator:
                 frame["landmarks"].extend(copy.deepcopy(control["landmarks"]))
                 frame.setdefault("unavailable", []).extend(copy.deepcopy(control["unavailable"]))
             self.data["compactChangeTimesSeconds"].extend(row["timeSeconds"] for row in controls.values())
-        self.motion = load(f"{SYNTHESIS}/native-cpu/conditional-source121-complete51-motion.json")
-        self.pinhole = load(f"{SYNTHESIS}/source-pinhole-alternatives/physical-pinhole-alternatives-packet.json")
+        self.motion = self.calibration_input("motion")
+        self.pinhole = self.calibration_input("pinhole")
         self.donors = load("web/content/XPQwKRt4Y2k.source-seeds.json")
         self.seeds = [(f["shotId"], f["timeSeconds"], f["camera"]) for f in self.data["frames"] if common.compact_camera(f.get("camera"))]
         self.features = {}
@@ -160,6 +189,13 @@ class Generator:
                 if transition["startSeconds"] <= t < transition["endSeconds"]]
             self.data.setdefault("compactChangeTimesSeconds", []).extend(
                 retained_changes + [key["decodedTimeSeconds"] for key in self.presenter_reframing["keys"]])
+
+    def calibration_input(self, name):
+        record = self.calibration["inputs"][name]
+        if "data" in record:
+            return record["data"]
+        return load_pinned(record["retainedPath"], record["retainedSha256"],
+                           f"Retained {name} calibration")[0]
 
     def analysis_held_camera_packet(self):
         """Pin original own-shot evidence before any generated controls mutate it."""
@@ -333,8 +369,7 @@ class Generator:
     @staticmethod
     def framing_gpu_sample(path, shot, time, ids, native, source, media_time, revision, statuses):
         """Read exact retained evidence; reject changed/mismatched GPU inputs."""
-        raw = (ROOT / path).read_bytes()
-        report = json.loads(raw)
+        report, digest = load_pinned(path, FRAMING_GPU_SHA256, "Retained GPU framing")
         rows = [row for row in report["samples"]
                 if row["sourceShotId"] == shot and row["timeSeconds"] == time]
         if report["videoId"] != "8KmVDxkia_w" or len(rows) != 1:
@@ -352,13 +387,13 @@ class Generator:
                         "sourceDrawRevision":revision}
             if any(point.get(name) != value for name,value in expected.items()):
                 raise ValueError(f"GPU framing FIT evidence changed: {path}/{anchor}")
-        return row, hashlib.sha256(raw).hexdigest()
+        return row, digest
 
     def synthesis_coarse_framing_packet(self):
         """Bound own-shot approximate cameras to retained exact native evidence."""
         observations_path = "web/content/8KmVDxkia_w.observations.json"
         observations = load(observations_path)
-        report_path = "web/.vite/verification-output/stage50-seed-clock-repaired-native-2026-10-01/8KmVDxkia_w.json"
+        report_path = FRAMING_GPU
         width, height = 1920, 1080
         target, span = self.envelope("cone", width/height)
         baseline = look_camera(target, -math.pi/2, 0.16, span, width/height)
@@ -460,7 +495,7 @@ class Generator:
 
     def synthesis_camrod_physical_pose(self, previous, observations):
         """Publish root's FIT-only upright choice from a pinned sparse probe."""
-        path = "web/.vite/verification-output/synthesis-camrod-sqpnp-probe-2026-10-01.json"
+        path = "web/content/8KmVDxkia_w.camrod-sqpnp-probe-2026-10-01.json"
         raw = (ROOT / path).read_bytes()
         digest = hashlib.sha256(raw).hexdigest()
         if digest != "5a9f17e64671f84478fbdbc6de8cc620ae88932cfae78c3551dd029bc5cc1321":
@@ -468,7 +503,8 @@ class Generator:
         probe = json.loads(raw)
         lineage = probe["lineage"]
         receipt_record = lineage["actualWorldReceipt"]
-        receipt_raw = (ROOT / receipt_record["path"]).read_bytes()
+        receipt_path = "web/content/8KmVDxkia_w.camrod-world-receipt-2026-10-01.json"
+        receipt_raw = (ROOT / receipt_path).read_bytes()
         receipt_hash = hashlib.sha256(receipt_raw).hexdigest()
         if receipt_hash != receipt_record["sha256"] or receipt_hash != "222d69eb315c39366e93cdcaacadd19a9074b153fa6f0db42d3ff5f9d2af8dbc":
             raise ValueError("Chosen cam-rod actual world receipt changed")
@@ -562,12 +598,14 @@ class Generator:
                     "historicalSimilarityFraming":historical,
                     "qualification":"Only3FIT/1CHECK, not qualified6FIT/2CHECK; complete-geometry depths and GPU source matching remain unverified",
                     "physicalPoseSelection":{"probe":path,"probeSha256":digest,
-                        "worldReceipt":receipt_record["path"],"worldReceiptSha256":receipt_hash,
+                        "probeOriginalPath":"web/.vite/verification-output/synthesis-camrod-sqpnp-probe-2026-10-01.json",
+                        "worldReceipt":receipt_path,"worldReceiptSha256":receipt_hash,
+                        "worldReceiptOriginalPath":receipt_record["path"],
                         "lineage":copy.deepcopy(lineage),"candidates":candidates,"chosenCandidateId":"sqpnp-001",
                         "chosenQualitativeMaximumAbsoluteRollDegrees":15.,
                         "chosenCADPositiveZSidePrior":{"FITCentroidWorldMetres":fit_centroid,
                             "rule":"Camera worldZ > original-three-FIT centroid worldZ and forwardWorldZ < 0, matching original back=CAD+Z/source-right=CAD+X semantics; not an arbitrary CAD-front yaw0."},
-                        "generationDependencies":"Active physical choice requires only pinned SQPNP probe/world receipt, original source semantic/FIT identity, matched native hash and unchanged complete seed input. Strict current scene.ts SHA byte gate remains: any byte change requires recapture/rebinding, including otherwise cosmetic edits; it is intentionally not waived. Retired similarity reports/committed packet are references only. Authoritative inputs come from *.track.json, never generated *.source-track.json.",
+                        "generationDependencies":"Active physical choice requires only tracked pinned SQPNP probe/world receipt, original source semantic/FIT identity, matched native hash and unchanged complete seed input. Exact original probe/receipt bytes and their old paths/hashes are retained; ignored paths within immutable lineage are historical references, never reads. Strict current scene.ts SHA byte gate remains: any byte change requires recapture/rebinding, including otherwise cosmetic edits; it is intentionally not waived. Retired similarity reports/committed packet are references only. Authoritative inputs come from *.track.json, never generated *.source-track.json.",
                         "reason":"Root selected only on original qualitative upright columns/no observed large roll and original back=CAD+Z semantic mapping. Both physical sparse branches fit the same three FITs; sqpnp-000's64.65deg roll conflicts with the declared chosen15deg upright/CAD-positiveZ-side prior. This prior is not measured historical roll. CHECK baseline and prior GPU errors were historically inspected, but CHECK was excluded from SQPNP enumeration objective and branch selection; candidate CHECKs were not projected/ranked before root selected001. Post-selection held-out measurements are separate evidence, not retroactive selection inputs.",
                         "depthScope":"Only three actual original FIT points; no whole-native-geometry positive-depth or GPU acceptance claim",
                         "poseConversion":"OpenCV world-to-camera R,t: position=-R^T*t; cameraToWorld=R^T*diag(1,-1,-1); quaternion xyzw. Fixed chosen FOV30, PP(960,540); native XYZ comes from the actual completed-draw Float32 marker vertex, not raster pixels or catalogue assumptions."}})
@@ -583,14 +621,7 @@ class Generator:
             return camera, note
         key["eligibleViewCount"] += 1
         base = packet["baselineCamera"]
-        matched = math.isclose(camera.get("verticalFovDegrees",0),base["verticalFovDegrees"],rel_tol=0.,abs_tol=1e-9)
-        for name in ("positionMetres","quaternion","principalPointViewportPixels"):
-            values = camera.get(name,[960.,540.]) if name == "principalPointViewportPixels" else camera.get(name,[])
-            if (len(values) != len(base[name])
-                    or any(not math.isclose(a,b,rel_tol=0.,abs_tol=1e-9) for a,b in zip(values,base[name]))):
-                matched = False
-                break
-        if not matched:
+        if not same_camera(camera, base):
             return camera, note
         key["appliedViewCount"] += 1
         if frame.get("sourceImage") == key["sourceImage"]:
@@ -620,16 +651,18 @@ class Generator:
         check = next(point for point in original["landmarks"] if point["anchorId"] == "wheel-hanger-screw")
         if check["role"] != "check" or check["status"] != "observed":
             raise ValueError("Original wheel hanger independent CHECK declaration changed")
-        report = "web/.vite/verification-output/stage50-seed-clock-repaired-native-2026-10-01/8KmVDxkia_w.json"
+        report = FRAMING_GPU
         row, report_hash = self.framing_gpu_sample(
             report,"wheel-macro",252.00175,["wheel-centre"],[[959.4,547.8]],
             [[1145,555]],252.00175,689,["passed"])
         if not any(point["anchorId"] == "wheel-hanger-screw" and point["role"] == "check"
                    for point in row["measurements"]):
             raise ValueError("Original wheel GPU independent CHECK role changed")
-        target, span = self.envelope("wheel",1920/1080)
-        baseline = look_camera(target,0.,0.12,span,1920/1080)
-        baseline["principalPointViewportPixels"] = [960.,540.]
+        frame = next(frame for frame in self.data["frames"]
+                     if frame["shotId"] == "wheel-macro" and frame["timeSeconds"] == original["timeSeconds"])
+        view = next(view for view in common.source_views(frame, self.data) if view["id"] == "main")
+        baseline, _ = self.camera(frame, view, "wheel")
+        baseline.setdefault("principalPointViewportPixels", [960.,540.])
         native = next(point["nativePixels"] for point in row["measurements"]
                       if point["anchorId"] == "wheel-centre" and point["viewId"] == "main")
         offset = [fit["pixel"][i]-native[i] for i in range(2)]
@@ -664,14 +697,7 @@ class Generator:
             return camera,note
         packet["eligibleViewCount"] += 1
         base = packet["baselineCamera"]
-        matched = math.isclose(camera.get("verticalFovDegrees",0),base["verticalFovDegrees"],rel_tol=0.,abs_tol=1e-9)
-        for name in ("positionMetres","quaternion","principalPointViewportPixels"):
-            values = camera.get(name,[960.,540.]) if name == "principalPointViewportPixels" else camera.get(name,[])
-            if (len(values) != len(base[name])
-                    or any(not math.isclose(a,b,rel_tol=0.,abs_tol=1e-9) for a,b in zip(values,base[name]))):
-                matched = False
-                break
-        if not matched:
+        if not same_camera(camera, base):
             return camera,note
         packet["appliedViewCount"] += 1
         if frame.get("sourceImage") == packet["sourceImage"]:
@@ -765,9 +791,9 @@ class Generator:
         root nearest its preceding cam angle. This is a chosen continuity rule,
         not recovered crank direction; cumulative crank/setup inputs are retained.
         """
-        path = f"{ANALYSIS}/{self.candidate['selectedDerivation']}"
-        fit = load(path)
-        manifest = load(f"{ANALYSIS}/frozen-census-search-manifest.json")
+        root_record = self.calibration["inputs"]["roots"]
+        fit = self.calibration_input("roots")
+        manifest = self.calibration_input("manifest")
         ceiling = manifest["unchangedHardConstraints"]["fullKnownAdditiveCeilingPx"]
         snapshots = sorted(copy.deepcopy(self.candidate["frames"]),
                            key=lambda row: row["sourceFrameIdentity"]["timeSeconds"])
@@ -794,10 +820,9 @@ class Generator:
                 score = fit["groupScores"][(row["frameIndex"]-first_index)*20+j]
                 if score["camRoots"] != roots or score["chosenRootIndex"] != original:
                     raise ValueError(f"Analysis frozen root-cost identity mismatch at {row['frameIndex']}, channel {j+1}.")
-                options = score.get("allFamilyRoots")
-                if options is None and row["bodyFITAvailable"]:
+                rod = score["rodRoots"]
+                if rod is None and row["bodyFITAvailable"]:
                     raise ValueError(f"Analysis continuation lacks frozen rod source bounds at {row['frameIndex']}, channel {j+1}.")
-                rod = options[1] if options is not None else None
                 # A source-disambiguated orientation is not an interchangeable
                 # latent witness. Refuse rather than replace that observation.
                 if rod and (rod[index]["strictOutside"] != 0
@@ -831,8 +856,11 @@ class Generator:
             "rule":"First frozen root per channel, then nearest preceding genuine cam root modulo2pi; exact distance ties retain the frozen choice. No crank/setup/amplitude or source-pixel change.",
             "frozenCandidate":f"{ANALYSIS}/candidate.json",
             "frozenCandidateSha256":hashlib.sha256((ROOT / f"{ANALYSIS}/candidate.json").read_bytes()).hexdigest(),
-            "frozenRootCosts":path,
-            "frozenRootCostsSha256":hashlib.sha256((ROOT / path).read_bytes()).hexdigest(),
+            "frozenRootCosts":root_record["originalPath"],
+            "frozenRootCostsSha256":root_record["originalSha256"],
+            "frozenRootCostsGenerationInput":{"path":CALIBRATION,"sha256":self.calibration_hash,
+                                             "jsonPointer":"/inputs/roots/data",
+                                             "originalArtifact":"historical-reference-only"},
             "frozenSourceFitCeilingPx":ceiling,
             "interpretation":"Original independent root selection and costs remain frozen. Continued latent cam/rod orientations are chosen; recorded rocker endpoints are unchanged. Rod axes are inherited static predictions, NOT observations or current native/GPU qualification. All original connecting-rod source controls remain required.",
             "sourceAcceptance":False, "historyRecovered":False,
@@ -953,7 +981,7 @@ class Generator:
             self.analysis_held_camera["application"]["appliedViewCount"] = 0
             self.analysis_held_camera["application"]["appliedExposures"] = []
         track = common.build_track(self.data,self.views,[
-            "Regenerate with python web/scripts/generate-analysis-synthesis-source-tracks.py; requires immutable ignored source evidence; source/model hashes remain unchanged.",
+            "Regenerate with python web/scripts/generate-analysis-synthesis-source-tracks.py; all active inputs are pinned tracked web/content calibration evidence, renderer binding metadata and source declarations. Ignored paths are historical provenance only; source/model hashes remain unchanged.",
             "All50/20/10/5% width stages remain unmeasured. CPU camera rejection at2% is not a blanket removal of a coarser candidate. No GPU/model/browser execution or historical source recovery.",
             "Camera/input/layout assumptions are declared per view. All retained source shots and integer/change/layout keys remain required, including nested endcards; source copyrighted artwork is not reconstructed."])
         track["source"] = copy.deepcopy(self.data["source"])
@@ -974,8 +1002,13 @@ class Generator:
         track["evidence"]["notes"].append("Analysis endcard boxes independently inspected from retained original MP4 at220s. Donor photographed camera branches are explicitly chosen, not copied source pixels. Page-flip uses a finite chosen projective-layout baseline, not recovered editing history.")
         track["cpuDiagnostics"] = {
             "analysisFourSeed": {"source":f"{ANALYSIS}/candidate.json", "qualification":self.candidate["qualification"], "distributions":self.candidate["fullSourceRawAndNormalizedDistributions"]},
-            "synthesisPinhole": {"source":f"{SYNTHESIS}/source-pinhole-alternatives/physical-pinhole-alternatives-packet.json", "finiteAttempts":self.pinhole["finiteAttemptCount"], "positiveDepthCandidates":self.pinhole["physicalPositiveDepthEscapeCount"], "sourceAccepted":False},
-            "synthesisRelativeMotion": {"source":f"{SYNTHESIS}/native-cpu/conditional-source121-complete51-motion.json", "maximumConditionalRelativePenResidualPx":self.motion["maximumConditionalRelativePenResidualPx"], "sourceAccepted":False}}
+            "synthesisPinhole": {"source":CALIBRATION, "jsonPointer":"/inputs/pinhole/data", "finiteAttempts":self.pinhole["finiteAttemptCount"], "positiveDepthCandidates":self.pinhole["physicalPositiveDepthEscapeCount"], "sourceAccepted":False},
+            "synthesisRelativeMotion": {"source":CALIBRATION, "jsonPointer":"/inputs/motion/data", "maximumConditionalRelativePenResidualPx":self.motion["maximumConditionalRelativePenResidualPx"], "sourceAccepted":False}}
+        track["evidence"]["generationCalibrationInputs"] = {
+            "path":CALIBRATION,"sha256":self.calibration_hash,
+            "originalSources":{name:{key:record[key] for key in ("originalPath","originalSha256","retention")}
+                               for name,record in self.calibration["inputs"].items()},
+            "interpretation":"Original paths/hashes identify immutable provenance, not active reads. Retained subsets copy only unchanged numeric/source-identity inputs used by this generator; omitted runtime reports and raw media are not required. Every selected source-control file and GPU sample packet is separately pinned. This retention does not qualify cameras or source fidelity."}
         track["sourceMeasurements"] = {"status":"partial","blockers":[
             "Stage50/20/10/5 source-width errors remain unmeasured by this generator; source camera/input assumptions are not rendered source-fidelity passes.",
             "Component-envelope closeup/turntable framing is chosen where a source-fit camera is unavailable; exact source camera/temporal history remains unmeasured.",
@@ -1049,7 +1082,12 @@ class Generator:
 
 
 if __name__ == "__main__":
-    for video_id in ("6dW6VYXp9HM", "8KmVDxkia_w"):
-        track = Generator(video_id).build()
-        path = common.write_track(track)
+    # Build and serialize the complete pair before publishing either output.
+    # A missing/malformed Synthesis input must not leave Analysis regenerated.
+    tracks = [Generator(video_id).build() for video_id in ("6dW6VYXp9HM", "8KmVDxkia_w")]
+    outputs = [(track, WEB / "content" / f'{track["source"]["videoId"]}.source-track.json',
+                json.dumps(track, separators=(",", ":"), allow_nan=False) + "\n")
+               for track in tracks]
+    for track, path, contents in outputs:
+        path.write_text(contents)
         print(f"{path.relative_to(ROOT)}: {len(track['shots'])} shots, {len(track['frames'])} compact frames, {sum(len(f['views']) for f in track['frames'])} views; coverage={track['coverage']['status']}; stages unmeasured")

@@ -83,34 +83,64 @@ def compact_change_times(data):
 
 def retain_exact_exposure_landmarks(selected, data):
     """Union original pixels only across identical native exposures and layouts."""
-    identity_fields = ("frameIndex", "sourceSha256", "sha256Bgr8", "pixelFormat", "width", "height")
+    pixel_hash_fields = {"bgr8": "sha256Bgr8", "gray8": "sha256Gray8"}
+    identity_fields = ("frameIndex", "sourceSha256", "pixelFormat", "width", "height")
 
     def identity(frame):
         image = frame.get("sourceImage")
         pts = frame.get("decodedTimeSeconds")
-        if (not isinstance(image, dict) or any(key not in image for key in identity_fields)
-                or not isinstance(pts, (int, float)) or not math.isfinite(pts)
-                or not isinstance(image["frameIndex"], int) or image["frameIndex"] < 0
+        pixel_format = image.get("pixelFormat") if isinstance(image, dict) else None
+        hash_field = pixel_hash_fields.get(pixel_format) if isinstance(pixel_format, str) else None
+        if (not isinstance(image, dict) or hash_field is None
+                or any(key not in image for key in (*identity_fields, hash_field))
+                or type(pts) not in (int, float) or not math.isfinite(pts)
+                or type(image["frameIndex"]) is not int or image["frameIndex"] < 0
+                or type(frame.get("decodedFrameIndex", image["frameIndex"])) is not int
                 or frame.get("decodedFrameIndex", image["frameIndex"]) != image["frameIndex"]
                 or image["sourceSha256"] != data["source"].get("sha256")
-                or image["width"] != data["source"]["width"] or image["height"] != data["source"]["height"]
-                or image["pixelFormat"] != "bgr8"
+                or any(type(image[key]) is not int or image[key] <= 0
+                       or image[key] != data["source"][key] for key in ("width", "height"))
                 or any(not isinstance(image[key], str) or not re.fullmatch(r"[0-9a-f]{64}", image[key])
-                       for key in ("sourceSha256", "sha256Bgr8"))):
+                       for key in ("sourceSha256", hash_field))):
             return None
-        return (frame["shotId"], pts, *(image[key] for key in identity_fields))
+        return (frame["shotId"], pts, *(image[key] for key in identity_fields), image[hash_field])
+
+    layout_cache = {}
 
     def layout(frame):
+        cache_key = id(frame)
+        if cache_key in layout_cache:
+            return layout_cache[cache_key]
         views = source_views(frame, data)
-        if not views or len({view["id"] for view in views}) != len(views):
+        if not isinstance(views, list) or any(not isinstance(view, dict) for view in views):
+            layout_cache[cache_key] = None
             return None
-        if any(((view.get("resolvedImagePlaneWarp") or view.get("imagePlaneWarp")) and not resolve_warp(view))
-               or (view.get("composite") and not compact_composite(view)) for view in views):
-            return None
-        return {view["id"]: {"rectSourcePixels":view["rectSourcePixels"],
-                            "presentation":view.get("presentation", "native"),
-                            "imagePlaneWarp":resolve_warp(view), "composite":compact_composite(view)}
-                for view in views}
+        result = {}
+        for view in views:
+            view_id = view.get("id")
+            rect = view.get("rectSourcePixels")
+            try:
+                warp = resolve_warp(view)
+                composite = compact_composite(view)
+            except (KeyError, TypeError, AttributeError):
+                layout_cache[cache_key] = None
+                return None
+            if (not isinstance(view_id, str) or not view_id or view_id in result
+                    or not isinstance(rect, list) or len(rect) != 4
+                    or any(type(value) not in (int, float) or not math.isfinite(value) for value in rect)
+                    or rect[0] < 0 or rect[1] < 0 or rect[2] <= 0 or rect[3] <= 0
+                    or rect[0] + rect[2] > data["source"]["width"]
+                    or rect[1] + rect[3] > data["source"]["height"]
+                    or view.get("presentation", "native") not in ("native", "horizontal-mirror")
+                    or ((view.get("resolvedImagePlaneWarp") or view.get("imagePlaneWarp")) and not warp)
+                    or (view.get("composite") and not composite)):
+                result = None
+                break
+            result[view_id] = {"rectSourcePixels":rect,
+                               "presentation":view.get("presentation", "native"),
+                               "imagePlaneWarp":warp, "composite":composite}
+        layout_cache[cache_key] = result or None
+        return layout_cache[cache_key]
 
     def point_key(point, views):
         view_id = point.get("viewId")
@@ -132,7 +162,20 @@ def retain_exact_exposure_landmarks(selected, data):
         if key is not None:
             groups.setdefault(key, []).append(frame)
     diagnostics = {"status":"exact-exposure-only", "originalAliasGroupCount":sum(len(rows) > 1 for rows in groups.values()),
-                   "selectedRowsAugmented":0, "originalLandmarksRetained":0, "unavailable":[]}
+                   "selectedRowsAugmented":0, "originalLandmarksRetained":0, "unavailable":[],
+                   "supportedPixelFormats":list(pixel_hash_fields), "unsupportedPixelFormats":[]}
+    reported_formats = set()
+    for frame in [*data["frames"], *selected]:
+        image = frame.get("sourceImage")
+        if isinstance(image, dict) and (not isinstance(image.get("pixelFormat"), str)
+                                        or image.get("pixelFormat") not in pixel_hash_fields):
+            pixel_format = image.get("pixelFormat")
+            format_key = json.dumps(pixel_format, sort_keys=True)
+            if format_key not in reported_formats:
+                reported_formats.add(format_key)
+                diagnostics["unsupportedPixelFormats"].append({
+                    "pixelFormat":pixel_format,
+                    "reason":"Unsupported source pixel format; exact-exposure landmark aliases not copied."})
     output = []
     for frame in selected:
         aliases = groups.get(identity(frame), [])
@@ -146,7 +189,15 @@ def retain_exact_exposure_landmarks(selected, data):
         points = copy.deepcopy(frame.get("landmarks", []))
         known = {}
         added = 0
+        # The selected row can be the original object or an equal copy. Visit
+        # that declaration once, but keep unequal rows so conflicts still fail.
+        seen = set()
         for alias in [frame, *aliases]:
+            if id(alias) in seen:
+                continue
+            seen.add(id(alias))
+            if alias is not frame and alias == frame:
+                continue
             if layout(alias) != views:
                 diagnostics["unavailable"].append({"shotId":frame["shotId"],"timeSeconds":frame["timeSeconds"],
                     "aliasTimeSeconds":alias["timeSeconds"],"reason":"Identical source image has ambiguous/different view layout; landmarks not copied."})

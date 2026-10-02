@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
-"""Regenerate Operation/Rocker playback candidates from retained private evidence.
+"""Regenerate Operation/Rocker playback candidates from tracked immutable inputs.
 
 Run: python3 web/scripts/compact-operation-rocker.py
-This reads retained JSON/source metadata only: no model, solver, optimizer, browser, or acceptance run.
-The ignored evidence is deliberately an input, never overwritten. Source camera
-failures remain diagnostics; none of these choices claim a measured error stage.
+This reads authored numeric seeds/source metadata only: no model, solver,
+optimizer, browser, private evidence directory, or acceptance run. Historical
+report paths/digests remain provenance; source camera failures remain diagnostics.
+None of these choices claim a measured error stage.
 """
 from __future__ import annotations
 
 import copy
+import hashlib
 import importlib.util
 import json
 from collections import defaultdict
@@ -18,16 +20,34 @@ SPEC = importlib.util.spec_from_file_location("compact_source_common", Path(__fi
 common = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(common)
 WEB = common.WEB
-EVIDENCE = WEB / ".vite/verification-output"
 
 
-def load(path):
-    return json.loads(path.read_text())
+def input_record(path, role, raw=None):
+    path = path.resolve()
+    return {"path": str(path.relative_to(WEB.parent)), "role": role,
+            "sha256": hashlib.sha256(path.read_bytes() if raw is None else raw).hexdigest(),
+            "requiredForRegeneration": True}
 
 
-def local_path(value):
-    # Historical producers used an absolute worktree path; regeneration is portable.
-    return WEB / value.split("/web/", 1)[-1] if "/web/" in value else WEB / value.removeprefix("web/")
+def load_seeds(video_id):
+    path = WEB / "content" / f"{video_id}.source-seeds.json"
+    raw = path.read_bytes()
+    return json.loads(raw), input_record(path, "immutable-authored-choices-and-source-evidence", raw)
+
+
+def retain_generator_inputs(track, seeds, seed_input):
+    track["evidence"]["generatorInputs"] = [
+        input_record(WEB / "content" / f'{track["source"]["videoId"]}.observations.json',
+                     "original-source-observations"),
+        seed_input,
+        input_record(Path(__file__), "generator"),
+        input_record(Path(__file__).with_name("compact-source-common.py"), "shared-source-selector"),
+        input_record(WEB / "src/bindings.ts", "native-anchor-motion-lineage"),
+    ]
+    track["evidence"]["historicalReportInputs"] = {
+        "usage": "provenance-only", "requiredForRegeneration": False,
+        "reports": copy.deepcopy(seeds["historicalReportInputs"]),
+    }
 
 
 def view_record(original, camera, state, evidence):
@@ -46,12 +66,11 @@ def view_record(original, camera, state, evidence):
 
 def operation():
     data = common.load_observations("jfH-NbsmvD4")
-    root = EVIDENCE / "operation-witness"
-    mechanics = root / "whole-state-closure/mechanics"
-    index = load(mechanics / "source-input-index.json")
-    latest = load(mechanics / "latest-run.json")
-    states = {row["recordId"]: row["chosenInput"] for row in load(local_path(latest["chosenResultsPath"]))["rows"]}
-    degrees = {row["recordId"]: row for row in load(mechanics / "observed-degree-source-joins.json")["rows"]}
+    seeds, seed_input = load_seeds("jfH-NbsmvD4")
+    index = seeds["sourceInputIndex"]
+    states = seeds["chosenStates"]
+    degrees = {record_id: {"unmappedObservedDegrees": items}
+               for record_id, items in seeds["observedDegrees"].items()}
     canonical = defaultdict(list)
     for row in index["rows"]:
         if row["kind"] == "canonical":
@@ -66,36 +85,32 @@ def operation():
         for name in ("targets", "sourceFeatureMeasurements", "pairedMeasurements"):
             changes.update(point["timeSeconds"] for point in event.get(name, []) if "timeSeconds" in point)
     data["compactChangeTimesSeconds"] = sorted(changes)
-    fragments = {}
     cameras = []
     source_by_frame = defaultdict(list)
     anchor_ids = {a["id"] for a in data["anchors"]}
-    for path in sorted((EVIDENCE / "operation-numeric-cache").glob("Codex*.json")):
-        fragment = fragments[path.stem] = load(path)
+    for family, fragment in seeds["fragments"].items():
         for anchor in fragment.get("anchors", []):
             if anchor["id"] not in anchor_ids:
                 data["anchors"].append(copy.deepcopy(anchor))
                 anchor_ids.add(anchor["id"])
         for frame in fragment.get("frames", []):
-            source_by_frame[frame["sourceFrameIndex"]].append((path.stem, frame))
+            source_by_frame[frame["sourceFrameIndex"]].append((family, frame))
             for fit in frame.get("fits", []) + frame.get("diagnosticFits", []):
                 if common.compact_camera(fit.get("camera")):
                     cameras.append({"frame": frame["sourceFrameIndex"], "time": frame["timeSeconds"],
                                     "id": fit.get("viewId") or "main", "camera": fit["camera"],
-                                    "family": path.stem, "reference": f"{path.relative_to(WEB)}/frame={frame['sourceFrameIndex']}"})
+                                    "family": family, "reference": f"{fragment['historicalPath']}/frame={frame['sourceFrameIndex']}"})
     # Source checks are authored image measurements, not camera.checkErrors
-    # projectedPixel predictions. Resolve the original declaration before copying.
+    # Frozen declarations preserve the original source reference before copying.
     controls = defaultdict(list)
-    for control in load(root / "whole-state-closure/source-control-index.json")["controls"]:
-        original = fragments[control["fragment"]]
-        for key in control["reference"].split("#/")[-1].split("/"):
-            original = original[int(key)] if isinstance(original, list) else original[key]
-        if original.get("status") == "observed" and original.get("pixel"):
-            controls[control["sourceFrameIndex"]].append((control, original))
-    gap_root = EVIDENCE / "operation-rocker-refinement"
-    actual_gaps = load(gap_root / "operation14-gap-exposures.json")["rows"] + load(gap_root / "operation25-own-shot-gap-exposures.json")["rows"]
-    # These actual local-MP4 decodes are retained numeric evidence, not new source
-    # observations. Rounded pre-cut events are snapped by the shared selector.
+    for exposure in seeds["sourceControls"]:
+        for control in exposure["declarations"]:
+            original = control["declaration"]
+            controls[exposure["sourceFrameIndex"]].append(
+                ({**control, "sourceImage": exposure["sourceImage"]}, original))
+    actual_gaps = seeds["gapExposures"]
+    # Original local-MP4 decode identities are frozen numeric inputs, not new
+    # source observations. Rounded pre-cut events use the shared selector.
     for gap in actual_gaps:
         time = gap["decodedTimeSeconds"]
         shot = next(s for s in data["shots"] if s["startSeconds"] <= time < s["endSeconds"])
@@ -110,14 +125,11 @@ def operation():
         frame.pop("sourceSampleUnavailable", None)
         data["frames"].append(frame)
     requests = []
-    for relative in ("whole-poses/novel-native-capture-requests.json",
-                     "amplitude-poses/novel-full435-capture-requests.json",
-                     "output-poses/novel-native-capture-requests.json",
-                     "cone-poses/per-view-capture-requests.json"):
-        for request in load(root / relative)["requests"]:
-            if common.compact_camera(request.get("camera")):
-                requests.append((relative, request))
-    corrected = {c["view"]["id"]: c for c in load(root / "capture-service-request8002.json")["captures"]}
+    for entry in seeds["captureRequests"]:
+        request = entry["request"]
+        if common.compact_camera(request.get("camera")):
+            requests.append((entry["path"], request))
+    corrected = seeds["correctedCaptures"]
     # Merge measurements and exact source cameras before sampling so useful
     # landmark/layout/camera keys are selected from actual source evidence.
     for frame in data["frames"]:
@@ -275,17 +287,16 @@ def operation():
     for frame in track["frames"]:
         if frame["views"] and all(v["camera"] and v["input"] for v in frame["views"]):
             frame.pop("unavailable", None)
+    retain_generator_inputs(track, seeds, seed_input)
     return track
 
 
 def rocker():
     data = common.load_observations("4mBuyixt22U")
-    root = EVIDENCE / "rocker-witness"
-    index = load(root / "constant-gearing-cpu-prerequisite-index.json")
-    request = load(root / index["launchRoot"] / index["complete51RequestData"]["path"])
-    states = request["compatibleDisengagedHeldBankAlternativeRows"]
+    seeds, seed_input = load_seeds("4mBuyixt22U")
+    states = seeds["states"]
     by_frame = {row["nativeFrame"]: row for row in states}
-    body_candidate = load(root / "recovered-runnable/full-profile-fit.json")["results"][2]
+    body_candidate = seeds["bodyCandidate"]
     # The1078 states supply the complete source-informed bank. Shared selection
     # condenses continuous exposures to seconds, cuts, fades and useful motion
     # keys; the original exposure census is diagnostic, not mandatory new cuts.
@@ -320,6 +331,7 @@ def rocker():
     for frame in track["frames"]:
         if frame["views"]:
             frame.pop("unavailable", None)
+    retain_generator_inputs(track, seeds, seed_input)
     return track
 
 
