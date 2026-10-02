@@ -40,6 +40,7 @@ from _drawing_common import (
     stamp_drawing_summary,
 )
 from _drawing_registry import DRAWINGS_BY_NAME
+from _part_pmi import _resolve_faces
 from _surface_finish import surface_finish_by_key
 from pinion_cam_pin_spec import (
     CAP_RADIUS,
@@ -125,6 +126,24 @@ def _crown_point(axial_from_root_mm: float) -> tuple[float, float, float]:
     rise = CAP_RADIUS - CAP_SAG + axial_from_root_mm
     radial = math.sqrt(CAP_RADIUS**2 - rise**2)
     return (0.0, -radial / 1000.0, (PIN_LEN + axial_from_root_mm) / 1000.0)
+
+
+def _crown_face(view: Any) -> Any:
+    """The crown's one controlled spherical model face, for a FACE finish.
+
+    Resolved on the part ``view`` references (exactly one match for the
+    part-owned control, as the part build's own PMI pass resolved it), not
+    hit-tested as a transient silhouette: on the first cold v39 build (farm
+    run 20261002T180658288Z, workers @9 and @15) the silhouette picked at the
+    crown point re-solved after insertion to a silhouette whose face was not
+    the selected one (``same_entity=False``).  A model face keeps its identity
+    through the rebuild, and the leader-landing readback keeps the crown point.
+    """
+    document = _early_bound(
+        _early_bound(view, "IView").ReferencedDocument, "IModelDoc2"
+    )
+    control = surface_finish_by_key(SURFACE_FINISHES, "crown")
+    return _resolve_faces(document, {control.key: control.face})[control.key]
 
 
 def _overall_reference(adapter: Any, right: Any) -> None:
@@ -243,11 +262,12 @@ async def build(adapter: Any) -> dict[str, str]:
     add_surface_finish(
         adapter,
         right,
-        edge_xy=crown_finish_point,
+        entity=_crown_face(right),
+        leader_attach_xy=crown_finish_point,
         symbol_xy=CROWN_FINISH_SYMBOL_XY,
         control=surface_finish_by_key(SURFACE_FINISHES, "crown"),
         label="cam-pin crown finish",
-        entity_type="SILHOUETTE",
+        entity_type="FACE",
         char_height=0.0025,  # the pivot-block size; the default read oversized at 8:1
     )
 

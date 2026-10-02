@@ -16,7 +16,6 @@ from _drawing_common import (
     assert_imported_precision,
     curate_view_dimensions,
     dimension_name,
-    face_silhouettes_through,
     finalize_drawing,
     model_point_in_view,
     new_project_drawing,
@@ -33,6 +32,7 @@ from _drawing_hidden_sketches import (
 )
 from _drawing_registry import DRAWINGS_BY_NAME
 from _layout_geometry import audit_sheet, format_findings
+from _part_pmi import _resolve_faces
 from _surface_finish import surface_finish_by_key
 from pinion_arbor_pin_spec import PIN_HOLE_CALLOUT
 from pinion_arbor_spec import (
@@ -405,15 +405,30 @@ JOURNAL_FINISHES = {
 def _journal_finish_picks(
     adapter: Any, view: Any
 ) -> dict[str, tuple[Any, tuple[float, float], tuple[float, float]]]:
-    """Each land's Ra target: ``(silhouette, landing, symbol_xy)``.
+    """Each land's Ra target: ``(controlled face, landing, symbol_xy)``.
 
-    The landing is the land's station on its flank; the silhouette is the one
-    its part-owned face (``SURFACE_FINISHES``) draws through that point, found
-    on the model (:func:`face_silhouettes_through`), not hit-tested there.
-    The hit test missed the front land at sheet (0.25355, 0.166), dead on the
-    flank, on swmaker00000a@10 twice while swmaker000004@4 hit it with the
-    same key; the land's face draws that flank as two coincident silhouettes.
+    The landing is the land's station on its flank; the face is the one model
+    face its part-owned control (``SURFACE_FINISHES``) names, resolved on the
+    part the view references (:func:`_part_pmi._resolve_faces`, exactly one
+    match per key, as the part build's own PMI pass resolved it) and attached
+    as a FACE at that landing.  Neither a hit test nor a silhouette sweep:
+    SelectByID2 at the front land's flank (0.25355, 0.166) missed on
+    swmaker00000a@10 and hit on swmaker000004@4 with the same key, and on the
+    first cold v39 build (farm run 20261002T180658288Z) the silhouette sweep
+    returned only the land's UPPER flank, y=174 mm, so the lower-flank
+    landing had no silhouette to take.  The face spans both flanks; the
+    leader-landing readback still pins the flank.
     """
+    document = _early_bound(
+        _early_bound(view, "IView").ReferencedDocument, "IModelDoc2"
+    )
+    faces = _resolve_faces(
+        document,
+        {
+            key: surface_finish_by_key(SURFACE_FINISHES, key).face
+            for key in JOURNAL_FINISHES
+        },
+    )
     picks = {}
     for key, (station_z, symbol_xy, flank) in JOURNAL_FINISHES.items():
         land_x, axis_y = model_point_in_view(
@@ -423,17 +438,8 @@ def _journal_finish_picks(
             label=f"arbor {key} finish station",
         )
         landing = (land_x, axis_y + FLANK_SIGN[flank] * SHAFT_DIA / 2000.0)
-        picks[key] = (surface_finish_by_key(SURFACE_FINISHES, key).face, landing, symbol_xy)
-    silhouettes = face_silhouettes_through(
-        adapter,
-        view,
-        {key: (face, landing) for key, (face, landing, _xy) in picks.items()},
-        label="arbor journal finish flanks",
-    )
-    return {
-        key: (silhouettes[key], landing, symbol_xy)
-        for key, (_face, landing, symbol_xy) in picks.items()
-    }
+        picks[key] = (faces[key], landing, symbol_xy)
+    return picks
 
 
 def _move_dimension(
@@ -1174,16 +1180,16 @@ async def build(adapter: Any) -> dict[str, str]:
     _add_turning_axis(adapter, principal)
     witness_spans = _blacken_reference_witnesses(adapter, principal)
     finishes = _journal_finish_picks(adapter, principal)
-    for key, (silhouette, landing, symbol_xy) in finishes.items():
+    for key, (face, landing, symbol_xy) in finishes.items():
         add_surface_finish(
             adapter,
             principal,
-            entity=silhouette,
+            entity=face,
             leader_attach_xy=landing,
             symbol_xy=symbol_xy,
             control=surface_finish_by_key(SURFACE_FINISHES, key),
             label=f"arbor {key} finish",
-            entity_type="SILHOUETTE",
+            entity_type="FACE",
             char_height=0.0025,
         )
     add_property_linked_note(adapter, "Manufacturing Notes", 0.020, 0.060)

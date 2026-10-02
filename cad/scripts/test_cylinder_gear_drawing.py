@@ -5,6 +5,7 @@ from __future__ import annotations
 import runpy
 from collections import Counter
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -124,3 +125,141 @@ def test_stacking_thickness_is_the_held_marked_dimension() -> None:
     assert spec.DRAWING_PRECISION_BY_NAME["OverallThickness"] == 4
     assert "OverallThickness" in drawing.RIGHT_KEEP
     assert f"{bank.RING_OVERHANG_MAX:.2f}" in notes.STACK_FIT_CALLOUT
+
+
+class _RimEdge:
+    """IEdge double of a circular boundary at ``station_mm`` along the axis."""
+
+    def __init__(
+        self,
+        station_mm: float,
+        *,
+        radius_mm: float = spec.CAM_DIA / 2.0,
+        center_y_mm: float = spec.ECCENTRICITY,
+        axis: tuple[float, float, float] = (0.0, 0.0, 1.0),
+    ) -> None:
+        self.curve = SimpleNamespace(
+            IsCircle=lambda: True,
+            CircleParams=(
+                0.0,
+                center_y_mm / 1000.0,
+                station_mm / 1000.0,
+                *axis,
+                radius_mm / 1000.0,
+            ),
+        )
+
+    def GetCurve(self):  # noqa: N802 - the COM member name
+        return self.curve
+
+
+class _CamFace:
+    """IFace2 double of a cylinder about the eccentric axis, cam-boss long."""
+
+    def __init__(
+        self, edges: list[_RimEdge], diameter_mm: float = spec.CAM_DIA
+    ) -> None:
+        self.edges = edges
+        self.surface = SimpleNamespace(
+            Identity=4002,  # swSurfaceTypes_e.CYLINDER_TYPE
+            CylinderParams=(
+                0.0,
+                spec.ECCENTRICITY / 1000.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+                diameter_mm / 2000.0,
+            ),
+        )
+
+    def GetSurface(self):  # noqa: N802
+        return self.surface
+
+    def GetBox(self):  # noqa: N802
+        r = spec.CAM_DIA / 2000.0
+        y = spec.ECCENTRICITY / 1000.0
+        return (
+            -r,
+            y - r,
+            spec.FACE_WIDTH / 1000.0,
+            r,
+            y + r,
+            spec.OVERALL_THICKNESS / 1000.0,
+        )
+
+    def GetEdges(self):  # noqa: N802
+        return self.edges
+
+
+class _CamView:
+    """The right view's visible faces (swViewEntityType_Face = 3)."""
+
+    def __init__(self, faces: list[_CamFace]) -> None:
+        self.faces = faces
+
+    def GetVisibleComponents(self):  # noqa: N802
+        return ["cylinder-gear"]
+
+    def GetVisibleEntities2(self, component, kind):  # noqa: N802
+        return self.faces if kind == 3 else []
+
+
+def test_cam_thickness_takes_only_the_cam_faces_two_rims() -> None:
+    """Farm run 20261002T180658288Z: coordinate picks for the cam thickness
+    produced a dimension reading 1570.8 -- pi/2, an angle.  The reference now
+    dimensions the controlled cam face's two circular rims, and nothing else on
+    it or on another cylinder: not the bore circle at the rear station, not a
+    rim at another station, not the gear blank's circle."""
+    shoulder = _RimEdge(spec.FACE_WIDTH)
+    rear = _RimEdge(spec.OVERALL_THICKNESS, axis=(0.0, 0.0, -1.0))
+    bore = _RimEdge(
+        spec.OVERALL_THICKNESS, radius_mm=spec.BORE_DIA / 2.0, center_y_mm=0.0
+    )
+    origin = _RimEdge(0.0)
+    cam = _CamFace([rear, bore, shoulder, origin])
+    gear = _CamFace([_RimEdge(spec.FACE_WIDTH)], spec.OUTSIDE_DIA)
+
+    rims = drawing._cam_thickness_rims(_CamView([gear, cam]))
+
+    assert rims == {spec.FACE_WIDTH: shoulder, spec.OVERALL_THICKNESS: rear}
+    span_mm = (
+        rims[spec.OVERALL_THICKNESS].curve.CircleParams[2]
+        - rims[spec.FACE_WIDTH].curve.CircleParams[2]
+    ) * 1000.0
+    assert span_mm == pytest.approx(spec.CAM_THICKNESS)
+
+
+@pytest.mark.parametrize(
+    "fault", ("missing", "radius", "center", "axis", "station", "ambiguous")
+)
+def test_cam_thickness_refuses_a_wrong_or_ambiguous_rim(fault: str) -> None:
+    edges = [_RimEdge(spec.FACE_WIDTH)]
+    if fault == "radius":
+        edges.append(
+            _RimEdge(spec.OVERALL_THICKNESS, radius_mm=spec.CAM_DIA / 2.0 + 1.0)
+        )
+    elif fault == "center":
+        edges.append(
+            _RimEdge(spec.OVERALL_THICKNESS, center_y_mm=spec.ECCENTRICITY + 1.0)
+        )
+    elif fault == "axis":
+        edges.append(_RimEdge(spec.OVERALL_THICKNESS, axis=(1.0, 0.0, 0.0)))
+    elif fault == "station":
+        edges.append(_RimEdge(spec.OVERALL_THICKNESS + 1.0))
+    elif fault == "ambiguous":
+        edges.extend(
+            [_RimEdge(spec.OVERALL_THICKNESS), _RimEdge(spec.OVERALL_THICKNESS)]
+        )
+    with pytest.raises(RuntimeError, match="expected one circular cam rim"):
+        drawing._cam_thickness_rims(_CamView([_CamFace(edges)]))
+
+
+@pytest.mark.parametrize("count", (0, 2))
+def test_cam_thickness_refuses_a_missing_or_ambiguous_cam_face(count: int) -> None:
+    faces = [
+        _CamFace([_RimEdge(spec.FACE_WIDTH), _RimEdge(spec.OVERALL_THICKNESS)])
+        for _ in range(count)
+    ]
+    with pytest.raises(RuntimeError, match=f"expected one cam face, got {count}"):
+        drawing._cam_thickness_rims(_CamView(faces))
