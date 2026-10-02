@@ -338,8 +338,9 @@ class PresenterOriginalViewTests(unittest.TestCase):
         self.assertEqual(view['cameraContinuityFamily'], permission['cameraContinuityFamily'])
         self.assertEqual(view['cameraProvenance']['kind'], 'source-informed-framing')
 
-    def test_original_measured_or_split_views_are_refused_before_normalization(self):
-        for mismatch in ('camera', 'rect', 'presentation'):
+    def test_unsupported_original_views_are_refused_before_normalization(self):
+        for mismatch in ('camera', 'rect', 'presentation', 'empty', 'warp',
+                         'resolved-warp', 'crossfade', 'unexpected-id', 'duplicate-id'):
             with self.subTest(mismatch=mismatch):
                 data = self.source()
                 frame = next(frame for frame in data['frames'] if frame['shotId'] == 'presenter-to-spin')
@@ -348,8 +349,21 @@ class PresenterOriginalViewTests(unittest.TestCase):
                     view['camera'] = {'verticalFovDegrees': 30}
                 elif mismatch == 'rect':
                     view['rectSourcePixels'] = [960, 0, 960, 1080]
-                else:
+                elif mismatch == 'presentation':
                     view['presentation'] = 'horizontal-mirror'
+                elif mismatch == 'empty':
+                    frame['views'] = []
+                elif mismatch in ('warp', 'resolved-warp'):
+                    view['resolvedImagePlaneWarp' if mismatch == 'resolved-warp' else 'imagePlaneWarp'] = {
+                        'kind': 'homography', 'unwarpedViewportPixels': [0, 0, 1920, 1080],
+                        'renderToSourcePixels': [1, 0, 0, 0, 1, 0, 0, 0, 1]}
+                elif mismatch == 'crossfade':
+                    view['composite'] = {'mode': 'crossfade', 'groupId': 'body',
+                                         'imageLayerId': 'incoming', 'opacity': 0.5}
+                elif mismatch == 'unexpected-id':
+                    view['id'] = 'unmapped-body'
+                else:
+                    frame['views'].append(copy.deepcopy(view))
                 original = copy.deepcopy(frame['views'])
                 with self.assertRaises(ValueError):
                     self.construct(data)

@@ -181,10 +181,16 @@ class Generator:
                             for permission in permission_packet.get("permissions", [])):
                         # Check original evidence before the single-body layout
                         # discards legacy outgoing/incoming view identities.
-                        if any(view.get("camera") is not None
-                               or view["rectSourcePixels"] != [0,0,self.data["source"]["width"],self.data["source"]["height"]]
-                               or view.get("presentation", "native") != "native"
-                               for view in common.source_views(frame, self.data)):
+                        original_views = common.source_views(frame, self.data)
+                        view_ids = [view.get("id") for view in original_views]
+                        if (view_ids not in (["main"], ["outgoing", "incoming"], ["incoming", "outgoing"])
+                                or any(view.get("camera") is not None
+                                       or view["rectSourcePixels"] != [0,0,self.data["source"]["width"],self.data["source"]["height"]]
+                                       or view.get("presentation", "native") != "native"
+                                       or view.get("imagePlaneWarp") is not None
+                                       or view.get("resolvedImagePlaneWarp") is not None
+                                       or view.get("composite") is not None
+                                       for view in original_views)):
                             raise ValueError("Chosen presenter continuity requires original unmeasured full-frame native views.")
                     # The original sparse observations and actual source-image
                     # inspection show one body, not the legacy two-layer guess.
