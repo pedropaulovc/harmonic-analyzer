@@ -26,10 +26,13 @@ centre for a chosen principal-point translation; its hanger CHECK stays held out
 Analysis's stationary full-front shot holds its original frame428 CPU FIT camera
 as a declared same-shot transfer. Independent focal/distance fit gauges are not
 a physical trajectory; seed CPU diagnostics do not qualify held exposures/GPU.
+Synthesis rocker-bank uses separately pinned source-timed cumulative drive for
+all20 stations, with explicit chosen +sense/common-upper phase and same-shot
+unmeasured endpoint holds. Other shots retain their previous candidate inputs.
 """
 from __future__ import annotations
 import argparse
-from bisect import bisect_left
+from bisect import bisect_left, bisect_right
 import copy
 import hashlib
 import importlib.util
@@ -59,6 +62,11 @@ ANALYSIS_SOURCE_SHA256 = "5fc75341c088475bdcbad1764a8d99269f51bc287495063072a760
 ANALYSIS_MODEL_SHA256 = "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d"
 AUTOMATIC_NATIVE_MATH = ("web/src/mechanics.ts", "web/src/mechanics-data.ts",
                          "web/src/kinematics.ts", "web/src/magnifier.ts")
+SYNTHESIS_AUTOMATIC_MOTION = "web/content/8KmVDxkia_w.automatic-motion.json"
+SYNTHESIS_AUTOMATIC_MOTION_SHA256 = "68b33f73055a49bbdbfad4e86d4f59ccc45e39b93be0b5b7fa71f3ec490dae3b"
+SYNTHESIS_AUTOMATIC_EVIDENCE = "web/content/8KmVDxkia_w.automatic-motion-evidence.json"
+SYNTHESIS_AUTOMATIC_EVIDENCE_SHA256 = "7a193758b02166ad02604274cd08b89135b2941f54301312d242efcc508e8233"
+SYNTHESIS_AUTOMATIC_BRANCH = "bank-direction-+1"  # Explicit chosen sense, never source-identified.
 
 
 def load(path):
@@ -143,6 +151,8 @@ class Generator:
             CALIBRATION, CALIBRATION_SHA256, "Retained Analysis/Synthesis calibration")
         self.native = self.calibration_input("native")
         self.base = self.native["mechanical"][0]["chosenInput"]
+        self.synthesis_automatic_motion = (
+            self.synthesis_automatic_motion_packet() if video_id == "8KmVDxkia_w" else None)
         self.candidate = self.calibration_input("candidate")
         self.request = self.calibration_input("request")
         requested = {row["frameIndex"]: row["chosenInput"] for row in self.request["requests"] if row["kind"] == "all204-chosen-native-forward-input"}
@@ -566,6 +576,158 @@ class Generator:
                     "frameIndex":2392,"timeSeconds":79.81306666666667,"turns":0,
                     "meaning":"first observed exposure, not shaft home"}):
             raise ValueError("Analysis visible crank source-relative zero/domain changed.")
+
+    def synthesis_automatic_motion_packet(self):
+        """Bind new motion authority without rewriting historical source/code seals."""
+        try:
+            packet, packet_hash = load_pinned(SYNTHESIS_AUTOMATIC_MOTION,
+                SYNTHESIS_AUTOMATIC_MOTION_SHA256, "Synthesis automatic motion")
+            evidence, evidence_hash = load_pinned(SYNTHESIS_AUTOMATIC_EVIDENCE,
+                SYNTHESIS_AUTOMATIC_EVIDENCE_SHA256, "Synthesis automatic source evidence")
+        except OSError as error:
+            raise ValueError("Required Synthesis automatic motion/evidence unavailable") from error
+        source = self.data["source"]
+        source_fields = ("videoId","sha256","width","height","fps","decodedFrameCount")
+        if (packet.get("schemaVersion") != 1 or evidence.get("schemaVersion") != 1
+                or packet.get("videoId") != "8KmVDxkia_w" or evidence.get("videoId") != "8KmVDxkia_w"
+                or any(packet["source"].get(key) != source.get(key)
+                       or evidence["source"].get(key) != source.get(key) for key in source_fields)
+                or source["fps"] != {"numerator":24000,"denominator":1001}
+                or packet.get("model") != self.data["model"] or evidence.get("model") != self.data["model"]):
+            raise ValueError("Synthesis automatic source/model identity differs")
+        dependencies = packet["generationDependencies"]
+        required_paths = {SYNTHESIS_AUTOMATIC_EVIDENCE, "web/src/mechanics-data.ts",
+            "web/src/kinematics.ts", "web/src/mechanics.ts",
+            "web/scripts/generate-8KmVDxkia_w-automatic-motion.py"}
+        if set(dependencies) != required_paths or dependencies[SYNTHESIS_AUTOMATIC_EVIDENCE]["sha256"] != evidence_hash:
+            raise ValueError("Synthesis automatic native-math/evidence dependency census differs")
+        for path, record in dependencies.items():
+            try:
+                actual = hashlib.sha256((ROOT/path).read_bytes()).hexdigest()
+            except OSError as error:
+                raise ValueError(f"Synthesis automatic dependency unavailable: {path}") from error
+            if actual != record["sha256"]:
+                raise ValueError(f"Synthesis automatic native-math dependency differs: {path}")
+        text = (ROOT/"web/src/mechanics-data.ts").read_text()
+        native = json.loads(text.split("export const MECHANISM_DATA = ",1)[1].rsplit(" as const",1)[0])
+        if (native["harmonicNumbers"] != list(range(20,0,-1))
+                or native["provenance"]["modelSha256"] != self.data["model"]["sha256"]
+                or native["provenance"]["sourceCommit"] != self.data["model"]["sourceCommit"]):
+            raise ValueError("Synthesis automatic released native station/model provenance differs")
+        interval = packet["bankInterval"]
+        shot = self.shots.get(interval.get("shotId"))
+        if (interval != evidence["interval"] or interval.get("shotId") != "rocker-bank"
+                or shot is None or shot["classification"] != "machine"
+                or shot.get("hasCorrespondingMachine") is not True
+                or interval.get("startFrame") != 2541 or interval.get("endFrame") != 2983
+                or abs(interval["startSeconds"]-2541*1001/24000)>1e-9
+                or abs(interval["endSeconds"]-2983*1001/24000)>1e-9
+                or not shot["startSeconds"] <= interval["startSeconds"] < interval["endSeconds"] < shot["endSeconds"]):
+            raise ValueError("Synthesis automatic native interval is outside its actual bank shot")
+        candidates = [row for row in packet["bankCandidates"] if row.get("id") == SYNTHESIS_AUTOMATIC_BRANCH]
+        if (len(candidates) != 1 or candidates[0]["directionBranch"] != 1
+                or candidates[0]["directionAuthority"] != "unresolved-source-equivalent-physical-sense-choice"
+                or packet["acceptance"]["signedBankDriveRecovered"] is not False
+                or packet["acceptance"]["twentyHistoricalPhasesRecovered"] is not False
+                or packet["acceptance"]["amplitudeSettingsRecovered"] is not False
+                or packet["acceptance"]["historicalWitnessesRewritten"] is not False):
+            raise ValueError("Synthesis automatic branch must remain an explicit unqualified physical-sense choice")
+        candidate = candidates[0]
+        if (candidate["staticPhasesRad"] != [0.024861791156517085]*20
+                or candidate["requiredSetup"] != {"coneSwingRad":0.,"driveCrankOffsetTurns":0.}):
+            raise ValueError("Synthesis automatic constant bank alignment/engaged setup differs")
+        rows = evidence["annotations"]+evidence["physicalMetalFIT"]+evidence["physicalMetalCHECK"]+evidence["nearestJointSource"]["rows"]
+        images = {}
+        for row in rows:
+            image = row["sourceImage"]
+            index = image.get("frameIndex")
+            digest = image.get("sha256Bgr8")
+            if (type(index) is not int or not 2541 <= index <= 2983
+                    or image.get("sourceSha256") != source["sha256"] or image.get("pixelFormat") != "bgr8"
+                    or image.get("width") != source["width"] or image.get("height") != source["height"]
+                    or not isinstance(digest,str) or len(digest)!=64 or any(c not in "0123456789abcdef" for c in digest)
+                    or abs(row["timeSeconds"]-index*1001/24000)>1e-9
+                    or index in images and images[index] != image):
+                raise ValueError("Synthesis automatic source-image/native exposure authority differs")
+            images[index] = image
+        fit_indices = {row["sourceImage"]["frameIndex"] for row in evidence["annotations"] if row["role"] == "fit"}
+        far_check_indices = {row["sourceImage"]["frameIndex"] for row in evidence["physicalMetalCHECK"]}
+        far_fit_indices = {row["sourceImage"]["frameIndex"] for row in evidence["physicalMetalFIT"]}
+        nearest_rows = evidence["nearestJointSource"]["rows"]
+        nearest_check_indices = {row["sourceImage"]["frameIndex"] for row in nearest_rows if row["role"] == "check"}
+        nearest_fit_indices = {row["sourceImage"]["frameIndex"] for row in nearest_rows
+                               if row["role"] == "fit-pixel-gauge-only"}
+        holdout = packet["bankMeasurement"].get("physicalCHECKHoldout")
+        if (not isinstance(holdout,dict) or set(holdout) != {"far20Metal","nearest1PhysicalJoint"}
+                or holdout["far20Metal"] != "exposure-disjoint-from-annotation-FIT"
+                or not far_check_indices or far_check_indices & (fit_indices | far_fit_indices)):
+            raise ValueError("H20 CHECK exposure holdout differs from actual annotation/pixel-gauge FIT")
+        if (holdout["nearest1PhysicalJoint"] != "feature-pixel-held-out-at-annotation-FIT-exposures"
+                or not nearest_check_indices or not nearest_check_indices <= fit_indices
+                or nearest_check_indices & nearest_fit_indices):
+            raise ValueError("H1 CHECK feature-pixel holdout must overlap annotation FIT exposures without entering pixel-gauge FIT")
+        knots = candidate["knots"]
+        times = []
+        indices = []
+        previous_turns = -math.inf
+        for knot in knots:
+            time, turns = knot["timeSeconds"], knot["crankTurns"]
+            if (type(time) not in (int,float) or type(turns) not in (int,float)
+                    or not math.isfinite(time) or not math.isfinite(turns)):
+                raise ValueError("Synthesis automatic knot needs finite cumulative source drive")
+            index = round(time*24000/1001)
+            if (abs(time-index*1001/24000)>1e-9 or index not in images
+                    or times and time <= times[-1] or turns <= previous_turns):
+                raise ValueError("Synthesis automatic knots must advance on unique source-native exposures")
+            retained = [frame for frame in self.data["frames"] if frame["shotId"] == shot["id"]
+                        and abs(frame.get("decodedTimeSeconds",-1)-time)<1e-9]
+            if (not retained or any(frame.get("sourceImage") != images[index] for frame in retained)
+                    or any(frame.get("sourceFrameIndex",frame.get("decodedFrameIndex",index)) != index for frame in retained)):
+                raise ValueError(f"Synthesis automatic retained source exposure differs: {index}")
+            times.append(time); indices.append(index); previous_turns = turns
+        if (len(knots) != 410 or set(indices) != fit_indices | {interval["startFrame"]}
+                or abs(times[0]-interval["startSeconds"])>1e-9
+                or abs(times[-1]-interval["endSeconds"])>1e-9 or knots[0]["crankTurns"] != 0):
+            raise ValueError("Synthesis automatic complete410-knot source cadence is required")
+        # Native source rows already exist. Requiring their exact identity above
+        # lets common retain keys without borrowing neighbouring source images,
+        # cameras, layouts or CHECK pixels. No annotation becomes a landmark.
+        self.data.setdefault("compactChangeTimesSeconds",[]).extend(times)
+        return {"packet":packet, "candidate":candidate, "times":times,
+                "packetSha256":packet_hash, "evidenceSha256":evidence_hash}
+
+    def synthesis_automatic_input(self, frame, family, source_view):
+        motion = self.synthesis_automatic_motion
+        if (motion is None or self.analysis or self.data["source"]["videoId"] != "8KmVDxkia_w"
+                or frame["shotId"] != "rocker-bank" or family != "bar" or source_view is None
+                or source_view["id"] != "main" or source_view["rectSourcePixels"] != [0,0,1920,1080]
+                or source_view.get("presentation","native") != "native"
+                or common.resolve_warp(source_view) or source_view.get("composite")):
+            return None
+        time = frame["decodedTimeSeconds"]
+        shot = self.shots["rocker-bank"]
+        if not shot["startSeconds"]-1e-9 <= time < shot["endSeconds"]:
+            return None
+        candidate = motion["candidate"]
+        times = motion["times"]
+        bounded = max(times[0],min(times[-1],time))
+        right = min(len(times)-1,bisect_right(times,bounded))
+        left = max(0,right-1)
+        a,b = candidate["knots"][left],candidate["knots"][right]
+        fraction = (bounded-a["timeSeconds"])/(b["timeSeconds"]-a["timeSeconds"]) if right != left else 0.
+        value = copy.deepcopy(self.base)
+        value["crankTurns"] = a["crankTurns"]+(b["crankTurns"]-a["crankTurns"])*fraction
+        value["phases"] = copy.deepcopy(candidate["staticPhasesRad"])
+        value["setup"].update(candidate["requiredSetup"])
+        scope = ("Measured-source-timed bank interval with chosen smooth within-sweep continuation."
+                 if times[0] <= time <= times[-1] else
+                 "Unmeasured same-shot endpoint hold; no cadence extrapolation or return-to-zero blend.")
+        return value, (scope+" Explicit chosen +native bank sense, NOT source-identified direction; "
+            "constant20 upper-aligned phases are a source-informed prior, NOT twenty recovered historical phases. "
+            "409 explanatory-annotation FIT exposures time cumulative crank-equivalent drive. "
+            "H20 metal CHECK exposures stay outside annotation FIT; H1 cross-feature CHECK pixels remain held out "
+            "at annotation FIT times. Neither control is camera/GPU qualification. All20stations use "
+            "unchanged released harmonic20..1 coupling. Other complete baseline settings remain unobserved/chosen.")
 
     def analysis_held_camera_packet(self):
         """Pin original own-shot evidence before any generated controls mutate it."""
@@ -1328,6 +1490,9 @@ class Generator:
             # than synthesizing a cadence, cosine sweep or coefficient history.
             row = snapshots[0] if time < first else snapshots[-1]
             return copy.deepcopy(row["chosenInput"]), "Nearest endpoint complete51 source-FIT witness with the same chosen inverse cam-root continuation held outside the eligible automatic bank/visible-crank domains and views. Source-visible crank/coefficient trajectory remains unmeasured; no generic cosine animation or historical input recovery claimed."
+        automatic = self.synthesis_automatic_input(frame,family,view)
+        if automatic is not None:
+            return automatic
         if family in ("pen","wheel") and 264.01375 <= time <= 269.01875:
             row = nearest(self.motion["rows"],time,lambda x:x["nativePtsSeconds"])
             return copy.deepcopy(row["input"]), "Immutable Source6330..6450 conditional complete51 relative pen/wheel-motion input. Hidden collar is a chosen trajectory; absolute spoke/input history and full435 association remain unqualified."
@@ -1535,6 +1700,28 @@ class Generator:
             track["evidence"]["synthesisPresenterFraming"] = copy.deepcopy(self.presenter_reframing)
             track["evidence"]["synthesisCoarseFraming"] = copy.deepcopy(self.synthesis_coarse_framing)
             track["evidence"]["synthesisWheelFraming"] = copy.deepcopy(self.synthesis_wheel_framing)
+            motion = self.synthesis_automatic_motion
+            packet = motion["packet"]
+            track["evidence"]["synthesisAutomaticMotion"] = {
+                "path":SYNTHESIS_AUTOMATIC_MOTION, "sha256":motion["packetSha256"],
+                "sourceEvidence":SYNTHESIS_AUTOMATIC_EVIDENCE,
+                "sourceEvidenceSha256":motion["evidenceSha256"],
+                "selectedBranch":SYNTHESIS_AUTOMATIC_BRANCH,
+                "selectionStatus":"explicit-chosen-positive-sense-not-source-identified",
+                "sourceMotionQuality":packet["sourceMotionQuality"],
+                "measurement":copy.deepcopy(packet["bankMeasurement"]),
+                "interval":copy.deepcopy(packet["bankInterval"]),
+                "generationDependencies":copy.deepcopy(packet["generationDependencies"]),
+                "independentControls":copy.deepcopy(motion["candidate"]["independentControls"]),
+                "acceptance":copy.deepcopy(packet["acceptance"]),
+                "sameShotOutsideInterval":"Unmeasured first/last input hold, not source cadence extrapolation.",
+                "lowerCrankIntegrated":False,
+                "lowerCrankBlocker":"Independent max angular residual0.437rad; phaseMatchQualified=false and actual3Dprojection/close-phase confidence unavailable. No sign/cadence/phase transfer into bank."}
+            track["sourceMeasurements"]["blockers"].extend(packet["limitations"])
+            track["evidence"]["notes"].append(
+                "Rocker-bank alone uses410 native cumulative crank keys driving all20 released harmonic stations. "
+                "Positive physical sense/common-upper phases are explicitly chosen; annotation and actual physical "
+                "control meanings remain separate. Native camera/geometry/GPU/source-pixel qualification remains incomplete.")
             track["sourceMeasurements"]["blockers"].append("Wheel-macro single original FIT chooses principal-point translation only; independent wheel-hanger CHECK stays held out and moving-spoke/input controls remain unresolved. OneFIT/oneCHECK is not qualified6FIT/2CHECK camera evidence; fresh GPU qualification is deferred.")
             track["sourceMeasurements"]["blockers"].append("Cone-overview's two-FIT similarity remains chosen/unqualified. Cam-rod now uses three original FIT pixels and same-input actual native world markers for a root-selected upright fixedFOV30/centredPP SQPNP physical pose; previous camera similarities are historical/unaccepted. Its declared15deg upright branch prior is not a measured historical camera. Only3FIT depths are established, not whole geometry or GPU/stage acceptance;3FIT/1CHECK still lacks qualified6FIT/2CHECK. Pinion CHECK was never used for objective/ranking/selection and remains held out for root measurement.")
             track["sourceMeasurements"]["blockers"].append("Synthesis presenter-to-spin has one original main machine view with chosen coarse principal-point/FOV reframing. No independently measured transition FIT/CHECK landmarks or per-exposure camera fits are introduced; presenter/black graphic/formula are not native geometry.")

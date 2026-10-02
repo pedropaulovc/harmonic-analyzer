@@ -1,6 +1,7 @@
 """Consumer-visible source identity and presentation refusal boundaries."""
 import copy
 import importlib.util
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -887,6 +888,254 @@ class SpinPresentationTests(unittest.TestCase):
                 if evidence is not None:
                     seed['presentationEvidence'] = evidence
                 self.assert_seed_refused_before_observations(seed)
+
+
+class SynthesisAutomaticSourceDriveTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        # Use the actual consumer constructor, including inline retained native
+        # calibration, rather than assuming every calibration record is a file.
+        cls.generator = camera_tracks.Generator('8KmVDxkia_w')
+        cls.track = cls.generator.build()
+        cls.baseline = common.compact_input(cls.generator.base)
+        cls.native_frames = {
+            frame.get('sourceFrameIndex', frame.get('decodedFrameIndex')): frame
+            for frame in cls.generator.data['frames']
+            if frame.get('decodedTimeSeconds') is not None
+            and abs(frame['timeSeconds'] - frame['decodedTimeSeconds']) < 1e-8
+        }
+        # These fixtures remain beside the tests when SOURCE_GENERATOR_PATH
+        # selects an exact historical producer copied to a sibling file.
+        content = HERE.parent / 'content'
+        cls.packet = json.loads((content / '8KmVDxkia_w.automatic-motion.json').read_text())
+        cls.candidate = next(row for row in cls.packet['bankCandidates']
+                             if row['id'] == 'bank-direction-+1')
+
+    def source_frame(self, index):
+        return self.native_frames[index]
+
+    def main_input(self, frame):
+        return next(view['input'] for view in self.generator.views(frame)
+                    if view['id'] == 'main')
+
+    def assert_complete_input(self, value, turns):
+        self.assertAlmostEqual(value['crankTurns'], turns, places=10)
+        expected = copy.deepcopy(self.baseline)
+        expected['phases'] = self.candidate['staticPhasesRad']
+        expected['setup'].update(self.candidate['requiredSetup'])
+        for field in ('amplitudes', 'phases', 'gearing', 'magnification', 'setup'):
+            self.assertEqual(value[field], expected[field], field)
+
+    def test_cumulative_source_drive_wins_over_old_single_rocker_fold(self):
+        first, last = self.source_frame(2541), self.source_frame(2973)
+        a, b = self.main_input(first), self.main_input(last)
+        # This assertion fails on original main's consumer-visible parked crank,
+        # before accessing any API or constant introduced by automatic motion.
+        self.assertGreater(b['crankTurns'] - a['crankTurns'], 27)
+        self.assertEqual(a['phases'], b['phases'])
+        self.assertEqual(len(set(a['phases'])), 1)
+        self.assertEqual(len(a['phases']), 20)
+        fps = self.packet['source']['fps']
+        rate = fps['numerator'] / fps['denominator']
+        for knot in self.candidate['knots']:
+            index = round(knot['timeSeconds'] * rate)
+            with self.subTest(index=index):
+                self.assert_complete_input(self.main_input(self.source_frame(index)),
+                                           knot['crankTurns'])
+        # Also exercise serialization and the real integer playback aliases;
+        # the drive belongs to the retained exposure, not its rounded label.
+        generated = {frame['timeSeconds']: frame for frame in self.track['frames']}
+        for label, original, value in ((106, first, a), (124, last, b)):
+            with self.subTest(label=label):
+                frame = generated[label]
+                self.assertEqual(frame['decodedTimeSeconds'], original['decodedTimeSeconds'])
+                self.assertEqual(frame['sourceImage'], original['sourceImage'])
+                bank = next(view for view in frame['views'] if view['id'] == 'main')
+                self.assertEqual(bank['input'], value)
+
+    def test_between_knots_interpolation_does_not_wrap_or_park_the_crank(self):
+        before, after = self.source_frame(2579), self.source_frame(2581)
+        middle = self.source_frame(2580)  # Independent CHECK, excluded from knot FIT.
+        a, b, m = (self.main_input(frame) for frame in (before, after, middle))
+        self.assertNotIn(middle['decodedTimeSeconds'],
+                         [knot['timeSeconds'] for knot in self.candidate['knots']])
+        self.assertGreater(a['crankTurns'], 1)
+        self.assertLess(a['crankTurns'], m['crankTurns'])
+        self.assertLess(m['crankTurns'], b['crankTurns'])
+        expected_turns = (a['crankTurns'] + b['crankTurns']) / 2
+        self.assert_complete_input(m, expected_turns)
+
+    def test_interval_edges_hold_in_same_shot_but_never_cross_the_cut(self):
+        first, end = self.source_frame(2541), self.source_frame(2983)
+        end_input = self.main_input(end)
+        # Comparing against source authority (not another parked output) catches
+        # missing cumulative drive as well as an endpoint return-to-zero blend.
+        self.assert_complete_input(end_input, self.candidate['knots'][-1]['crankTurns'])
+        before_input = self.main_input(self.source_frame(2540))
+        self.assert_complete_input(before_input, self.candidate['knots'][0]['crankTurns'])
+        self.assertEqual(before_input, self.main_input(first))
+        shot_end = self.generator.shots['rocker-bank']['endSeconds']
+        for time in ((end['decodedTimeSeconds'] + shot_end) / 2, shot_end - 1e-6):
+            with self.subTest(time=time):
+                boundary = copy.deepcopy(end)
+                # Mathematical instants, not extra observations/source identities.
+                for field in ('sourceImage', 'sourceFrameIndex', 'decodedFrameIndex'):
+                    boundary.pop(field, None)
+                boundary['timeSeconds'] = boundary['decodedTimeSeconds'] = time
+                self.assertEqual(self.main_input(boundary), end_input)
+        next_shot = self.source_frame(2984)
+        self.assertEqual(next_shot['shotId'], 'rocker-out')
+        self.assertEqual(self.main_input(next_shot)['crankTurns'], self.baseline['crankTurns'])
+
+
+class SynthesisAutomaticSourceDriveCurrentOnlyTests(unittest.TestCase):
+    def fixture(self, load_motion=True):
+        generator = camera_tracks.Generator('8KmVDxkia_w')
+        if not load_motion:
+            generator.synthesis_automatic_motion = None
+        return generator
+
+    def source_frame(self, generator, index):
+        return next(frame for frame in generator.data['frames']
+                    if frame['shotId'] == 'rocker-bank'
+                    and frame.get('sourceFrameIndex', frame.get('decodedFrameIndex')) == index)
+
+    def main_view(self, generator, frame):
+        return next(view for view in common.source_views(frame, generator.data)
+                    if view['id'] == 'main')
+
+    def test_current_only_no_bank_drive_leaks_to_other_shots_views_or_camera_layers(self):
+        generator = self.fixture()
+        frame = self.source_frame(generator, 2700)
+        view = self.main_view(generator, frame)
+        for scope in ('other-shot', 'wrong-family', 'inset', 'mirror', 'warp', 'composite', 'other-corpus'):
+            with self.subTest(scope=scope):
+                row, source_view, family = copy.deepcopy(frame), copy.deepcopy(view), 'bar'
+                if scope == 'other-shot':
+                    row['shotId'] = 'rocker-out'
+                elif scope == 'wrong-family':
+                    family = 'cone'
+                elif scope == 'inset':
+                    source_view['id'] = 'lower-inset'
+                    source_view['rectSourcePixels'] = [0, 0, 960, 1080]
+                elif scope == 'mirror':
+                    source_view['presentation'] = 'horizontal-mirror'
+                elif scope == 'warp':
+                    source_view['imagePlaneWarp'] = {'kind': 'homography',
+                        'unwarpedViewportPixels': [0, 0, 1920, 1080],
+                        'renderToSourcePixels': [1, 0, 0, 0, 1, 0, 0, 0, 1]}
+                elif scope == 'composite':
+                    source_view['composite'] = {'mode': 'crossfade'}
+                elif scope == 'other-corpus':
+                    generator.data['source']['videoId'] = '6dW6VYXp9HM'
+                self.assertIsNone(generator.synthesis_automatic_input(row, family, source_view))
+
+    def test_current_only_interval_refuses_exact_cut(self):
+        generator = self.fixture()
+        end = self.source_frame(generator, 2983)
+        boundary = copy.deepcopy(end)
+        boundary['decodedTimeSeconds'] = generator.shots['rocker-bank']['endSeconds']
+        self.assertIsNone(generator.synthesis_automatic_input(
+            boundary, 'bar', self.main_view(generator, end)))
+
+    def test_current_only_h1_pixel_holdout_accepts_fit_times_but_refuses_exposure_holdout(self):
+        generator = self.fixture()
+        packet = generator.synthesis_automatic_motion['packet']
+        evidence = json.loads((camera_tracks.ROOT / camera_tracks.SYNTHESIS_AUTOMATIC_EVIDENCE).read_text())
+        annotation_fits = {row['sourceImage']['frameIndex'] for row in evidence['annotations']
+                           if row['role'] == 'fit'}
+        h1_checks = [row for row in evidence['nearestJointSource']['rows'] if row['role'] == 'check']
+        self.assertEqual(len(h1_checks), 17)
+        self.assertTrue({row['sourceImage']['frameIndex'] for row in h1_checks} <= annotation_fits)
+        # A valid cross-feature CHECK exposure must retain its annotation cadence
+        # knot, not be dropped by an overbroad all-physical exposure holdout.
+        knots = {row['timeSeconds']: row['crankTurns']
+                 for row in generator.synthesis_automatic_motion['candidate']['knots']}
+        for row in h1_checks:
+            with self.subTest(accepted_h1_frame=row['sourceImage']['frameIndex']):
+                frame = self.source_frame(generator, row['sourceImage']['frameIndex'])
+                value, _ = generator.synthesis_automatic_input(
+                    frame, 'bar', self.main_view(generator, frame))
+                self.assertAlmostEqual(value['crankTurns'], knots[row['timeSeconds']], places=10)
+
+        paths = [camera_tracks.SYNTHESIS_AUTOMATIC_MOTION, *packet['generationDependencies']]
+        for mismatch in ('h1-exposure-authority', 'h1-disjoint-time', 'h20-fit-overlap'):
+            with self.subTest(mismatch=mismatch), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                for relative in paths:
+                    target = root / relative
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_bytes((camera_tracks.ROOT / relative).read_bytes())
+                changed_packet, changed_evidence = copy.deepcopy(packet), copy.deepcopy(evidence)
+                expected_error = 'H1 CHECK feature-pixel holdout'
+                if mismatch == 'h1-exposure-authority':
+                    changed_packet['bankMeasurement']['physicalCHECKHoldout']['nearest1PhysicalJoint'] = (
+                        'exposure-disjoint-from-annotation-FIT')
+                else:
+                    if mismatch == 'h1-disjoint-time':
+                        changed_row = next(row for row in changed_evidence['nearestJointSource']['rows']
+                                           if row['role'] == 'check')
+                        exposure = changed_evidence['physicalMetalCHECK'][0]
+                    else:
+                        changed_row = changed_evidence['physicalMetalCHECK'][0]
+                        exposure = next(row for row in changed_evidence['annotations'] if row['role'] == 'fit')
+                        expected_error = 'H20 CHECK exposure holdout'
+                    changed_row['sourceImage'] = copy.deepcopy(exposure['sourceImage'])
+                    changed_row['timeSeconds'] = exposure['timeSeconds']
+                evidence_path = root / camera_tracks.SYNTHESIS_AUTOMATIC_EVIDENCE
+                evidence_path.write_text(json.dumps(changed_evidence, indent=2) + '\n')
+                evidence_hash = hashlib.sha256(evidence_path.read_bytes()).hexdigest()
+                changed_packet['generationDependencies'][camera_tracks.SYNTHESIS_AUTOMATIC_EVIDENCE]['sha256'] = (
+                    evidence_hash)
+                packet_path = root / camera_tracks.SYNTHESIS_AUTOMATIC_MOTION
+                packet_path.write_text(json.dumps(changed_packet, indent=2) + '\n')
+                packet_hash = hashlib.sha256(packet_path.read_bytes()).hexdigest()
+                # Re-pin real fixture bytes so refusal must come from the typed
+                # holdout and actual exposure sets, not the outer digest gate.
+                with patch.object(camera_tracks, 'ROOT', root), \
+                        patch.object(camera_tracks, 'SYNTHESIS_AUTOMATIC_MOTION_SHA256', packet_hash), \
+                        patch.object(camera_tracks, 'SYNTHESIS_AUTOMATIC_EVIDENCE_SHA256', evidence_hash):
+                    with self.assertRaisesRegex(ValueError, expected_error):
+                        generator.synthesis_automatic_motion_packet()
+
+    def test_current_only_source_model_and_exact_exposure_mismatches_are_refused(self):
+        for mismatch in ('source', 'model', 'missing-knot-exposure', 'wrong-exposure-hash', 'off-native-clock'):
+            with self.subTest(mismatch=mismatch):
+                generator = self.fixture(load_motion=False)
+                if mismatch == 'source':
+                    generator.data['source']['sha256'] = '0' * 64
+                elif mismatch == 'model':
+                    generator.data['model']['sha256'] = '0' * 64
+                elif mismatch == 'missing-knot-exposure':
+                    generator.data['frames'] = [frame for frame in generator.data['frames']
+                        if frame.get('sourceFrameIndex', frame.get('decodedFrameIndex')) != 2557]
+                else:
+                    rows = [frame for frame in generator.data['frames'] if frame['shotId'] == 'rocker-bank'
+                        and frame.get('sourceFrameIndex', frame.get('decodedFrameIndex')) == 2557]
+                    for frame in rows:
+                        if mismatch == 'wrong-exposure-hash':
+                            frame['sourceImage']['sha256Bgr8'] = '0' * 64
+                        else:
+                            frame['decodedTimeSeconds'] += 0.001
+                with self.assertRaises(ValueError):
+                    generator.synthesis_automatic_motion_packet()
+
+    def test_current_only_missing_motion_and_changed_native_math_never_fall_back_to_old_fold(self):
+        generator = self.fixture(load_motion=False)
+        packet = json.loads((camera_tracks.ROOT / camera_tracks.SYNTHESIS_AUTOMATIC_MOTION).read_text())
+        paths = [camera_tracks.SYNTHESIS_AUTOMATIC_MOTION, *packet['generationDependencies']]
+        for mismatch in ('missing-motion', 'changed-native-math'):
+            with self.subTest(mismatch=mismatch), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                if mismatch == 'changed-native-math':
+                    for relative in paths:
+                        target = root / relative
+                        target.parent.mkdir(parents=True, exist_ok=True)
+                        target.write_bytes((camera_tracks.ROOT / relative).read_bytes())
+                    native_math = root / 'web/src/mechanics.ts'
+                    native_math.write_bytes(native_math.read_bytes() + b'\n')
+                with patch.object(camera_tracks, 'ROOT', root), self.assertRaises(ValueError):
+                    generator.synthesis_automatic_motion_packet()
 
 
 if __name__ == '__main__':

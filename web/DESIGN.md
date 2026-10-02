@@ -155,6 +155,49 @@ interpolation. Both roots preserve the observed rocker angle but may change an
 unobserved cam/rod orientation. The original rod bounds, CHECK pixels and
 branch-choice audit remain required; phase history is not recovered.
 
+Synthesis's [automatic-motion packet](content/8KmVDxkia_w.automatic-motion.json)
+and [evidence packet](content/8KmVDxkia_w.automatic-motion-evidence.json) are
+produced by
+[`generate-8KmVDxkia_w-automatic-motion.py`](scripts/generate-8KmVDxkia_w-automatic-motion.py).
+They bound the rocker bank to **105.980875..124.4159583 seconds**, with 410 native
+knots and unsigned cumulative drive of 28.744620749 turns. The mean
+1.559234652 turns/s cadence uses published-video time, including the source's
+4× playback; runtime must not divide it by four. The selected
+`bank-direction-+1` branch is explicitly chosen because historical physical
+direction remains unresolved.
+
+Apply this input only to rocker-bank/main/native full-canvas unwarped views.
+Hold the nearest new input through unmeasured same-shot slivers until the real
+cut. Preserve all twenty constant common upper phases as a chosen prior and
+retain the existing hidden amplitudes/setup as unmeasured feasible choices.
+The existing native constraints remain authoritative: shaft phase for channel
+`j` is `(T - driveCrankOffsetTurns) * (20 - j) * pi / 40 + phase[j]`.
+These are driving-shaft phases, not rocker deflection angles. The lower-crank
+**270.35..271.23-second** interval has `phaseMatchQualified: false` and supplies
+no runtime motion; neither cadence nor phase continues across a cut.
+
+Conditional actual-metal controls cover **18 held-out exposures at H20**
+(maximum 26.50 px) and **17 pixel/feature-held-out exposures at H1**
+(maximum 9.43 px); H2–H19 remain unmeasured. The packet's typed
+`physicalCHECKHoldout` authority is checked against the actual exposure sets:
+H20 CHECK exposures are disjoint from annotation FIT, while all H1 CHECK
+times overlap annotation FIT. H1 cross-feature physical pixels stay out of
+cadence and H1 pixel-gauge objectives; they are not exposure-held-out controls.
+Their scope does not establish actual rocker-mesh GPU motion, full-scene
+correspondence or camera qualification. Continuous original-video/native
+playback over **105.96..124.45 seconds** recorded 444 media frames and 153
+completed draws, with no waiting, stalled, pause, error or seeking events and
+maximum media-to-completed-draw skew of 52.690 ms. All twenty native shaft phases
+obeyed the formula with zero-radian error while phases and amplitudes stayed
+fixed. Separate time-bound native GPU captures at **106.5, 113.5 and 118.5
+seconds** retain all 435 drawables and show all twenty named rocker-arm meshes
+visible, with changing raster extents and contours at the same camera.
+The ordinary twenty landmark anchors are static structural points; their zero
+3D displacement is expected and does not test rocker movement. The camera and
+CAD remain unchanged: the fixed far portrait view still mismatches the filmed
+bank close-up. Neither timing nor rendered-motion proof qualifies source camera
+or geometric fidelity.
+
 Production playback does not require semantic source certificates for every one
 of the 435 native drawables at every exposure. Native model identity, complete
 inventory and coherent attached-part motion still matter. Offline source evidence
