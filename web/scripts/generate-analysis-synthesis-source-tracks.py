@@ -167,6 +167,8 @@ class Generator:
         self.presenter_reframing = None
         self.synthesis_coarse_framing = None
         self.synthesis_wheel_framing = None
+        permission_path = WEB / "content" / f"{video_id}.chosen-camera-continuity.json"
+        permission_packet = json.loads(permission_path.read_text()) if permission_path.exists() else None
         if not self.analysis:
             self.presenter_reframing = self.presenter_reframing_keys()
             self.synthesis_coarse_framing = self.synthesis_coarse_framing_packet()
@@ -174,6 +176,16 @@ class Generator:
             transition = self.shots["presenter-to-spin"]
             for frame in self.data["frames"]:
                 if frame["shotId"] == transition["id"]:
+                    if permission_packet and any(
+                            permission.get("shotId") == transition["id"] and permission.get("viewId") == "main"
+                            for permission in permission_packet.get("permissions", [])):
+                        # Check original evidence before the single-body layout
+                        # discards legacy outgoing/incoming view identities.
+                        if any(view.get("camera") is not None
+                               or view["rectSourcePixels"] != [0,0,self.data["source"]["width"],self.data["source"]["height"]]
+                               or view.get("presentation", "native") != "native"
+                               for view in common.source_views(frame, self.data)):
+                            raise ValueError("Chosen presenter continuity requires original unmeasured full-frame native views.")
                     # The original sparse observations and actual source-image
                     # inspection show one body, not the legacy two-layer guess.
                     frame["views"] = [{"id":"main", "rectSourcePixels":[0,0,self.data["source"]["width"],self.data["source"]["height"]],
@@ -191,14 +203,12 @@ class Generator:
                 retained_changes + [key["decodedTimeSeconds"] for key in self.presenter_reframing["keys"]])
         # Validate the producer's existing source-inspected layout normalization,
         # not the legacy outgoing/incoming layer guess retained in track.json.
-        self.chosen_camera_permissions = self.chosen_camera_continuity_packet(video_id)
+        self.chosen_camera_permissions = self.chosen_camera_continuity_packet(video_id, permission_packet)
 
-    def chosen_camera_continuity_packet(self, video_id):
+    def chosen_camera_continuity_packet(self, video_id, packet):
         """Optional authored permissions, bounded by unchanged native source rows."""
-        path = WEB / "content" / f"{video_id}.chosen-camera-continuity.json"
-        if not path.exists():
+        if packet is None:
             return {}
-        packet = json.loads(path.read_text())
         if (packet.get("schemaVersion") != 1 or packet.get("videoId") != video_id
                 or packet.get("sourceSha256") != self.data["source"]["sha256"]
                 or not isinstance(packet.get("permissions"), list)):
@@ -219,8 +229,8 @@ class Generator:
                     or permission.get("startSeconds") != shot["startSeconds"]
                     or permission.get("endSeconds") != shot["endSeconds"]):
                 raise ValueError("Chosen camera continuity permission needs bounded main/whole unmeasured framing evidence.")
-            def native_index(record, current, legacy):
-                values = [record[name] for name in (current, legacy) if name in record]
+            def native_index(record, track_name, observation_name):
+                values = [record[name] for name in (track_name, observation_name) if name in record]
                 if (not values or any(type(value) is not int for value in values)
                         or any(value != values[0] for value in values)):
                     raise ValueError("Chosen camera permission native index is missing or contradictory.")
@@ -241,7 +251,6 @@ class Generator:
                            or type(frame.get("decodedTimeSeconds")) not in (int, float)
                            or not math.isfinite(frame["decodedTimeSeconds"])
                            or abs(frame["decodedTimeSeconds"] - index / rate) > 1e-9
-                           or not first / rate - 1e-9 <= frame["decodedTimeSeconds"] <= last / rate + 1e-9
                            or any(view["id"] != "main" or view.get("camera") is not None
                                   or view["rectSourcePixels"] != [0, 0, self.data["source"]["width"], self.data["source"]["height"]]
                                   or view.get("presentation", "native") != "native"
