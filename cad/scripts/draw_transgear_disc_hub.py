@@ -21,20 +21,25 @@ from __future__ import annotations
 import argparse
 import math
 import sys
+from dataclasses import dataclass
 from typing import Any
 
 import _telemetry
 from _common import CAD_ROOT, _early_bound, check, run_build
 from _drawing_common import (
     DrawingOutputs,
+    ViewEdge,
+    ViewEdges,
     add_feature_control_frame,
     add_property_linked_note,
     assert_imported_precision,
     curate_view_dimensions,
     dimension_name,
     finalize_drawing,
+    model_points_in_view,
     new_project_drawing,
     read_required_properties,
+    scan_view_edges,
     set_dimension_callouts,
     set_hidden_lines_removed,
     set_reference_dimension,
@@ -109,11 +114,9 @@ def _side_x(z_mm: float) -> float:
 
 
 HUB_FRONT_X = _side_x(HUB_FRONT_Z)
-FLANGE_REAR_X = _side_x(0.0)
 SPIGOT_END_X = _side_x(SPIGOT_LENGTH)
 _FLANGE_R = FLANGE_DIA / 2.0 * _S
 _SPIGOT_R = SPIGOT_DIA / 2.0 * _S
-_BORE_R = BORE_DIA / 2.0 * _S
 
 # Faced to fit at MHA-A06's hub step; the pointer comes from the step
 # registry.
@@ -156,7 +159,7 @@ FLAT_CALLOUT = "\n".join(
 #   callout right of the spigot end's extension line.  Its ends are the
 #   spigot's and the hub's +X corners, so from a row above its extension
 #   lines rise off the part; from below they ran down across the hub front
-#   and the spigot end, over the spigot end frame's pick.  The oil hole's
+#   and the spigot end, under the spigot end frame's leader.  The oil hole's
 #   size with its match-drill callout above-left, over the gap between the
 #   two views, its text ending left of the overall's hub-front extension
 #   line.
@@ -189,36 +192,144 @@ DIMENSION_CALLOUTS_BELOW = {
 }
 DIMENSION_CALLOUTS_ABOVE = {"ScrewHoleDia": SCREW_HOLE_CALLOUT_ABOVE}
 
-# (edge pick, frame position) in sheet metres for each perpendicularity
-# frame.  The edge view shows model +X up (*Top's +X right, turned +90
-# degrees) and each face edge-on as a vertical line.  Each pick lands where
-# only that face's own outer circle projects, midway along that stretch,
-# and each frame stands on the pick's side of the axis, centred in the band
-# between the spigot's and the flange's extension lines.
-# - Flange rear face, z 0: its line spans r 6.55-12.55 each side of the
-#   axis.  Above (+X), the 0-degree screw hole's edge on the face projects
-#   across r 8.65-10.35 (BC 9.50 +/- 0.85), and the spigot length's
-#   extension line rises from the spigot's +X corner along the whole
-#   stretch; the first pick, r 9.55 above, missed there (farm run
-#   20261002T153039266Z).  Below (-X), the 120- and 240-degree holes project
-#   at r 3.90-5.60, behind the spigot, so the 6.00 stretch carries the
-#   flange's outer circle alone: the pick sits at its midpoint, r 9.55,
-#   3.00 (9.0 on the sheet) from either corner, level with its frame.
-# - Spigot end, z 3.65: its bore is round (the D-flat ends at z 0) and its
-#   edge overlays r < 4.50, so the pick sits midway along r 4.50-6.55 above
-#   the axis, r 5.525, 1.025 (3.1 on the sheet) from either end.  The
-#   spigot's length and the overall both end at its +X corner and print
-#   above, so their extension lines rise from the corner, off the line.
-_UPPER_BAND_Y = AXIS_Y + (_SPIGOT_R + _FLANGE_R) / 2.0
-_LOWER_BAND_Y = AXIS_Y - (_SPIGOT_R + _FLANGE_R) / 2.0
-FLANGE_FACE_FRAME = (
-    (FLANGE_REAR_X, AXIS_Y - (_SPIGOT_R + _FLANGE_R) / 2.0),
-    (SPIGOT_END_X + 0.010, _LOWER_BAND_Y),
+# The two perpendicularity frames attach by entity, not by a sheet pick.  A
+# face seen edge-on draws as its outer rim, a circle on the hub's axis (model
+# Z) whose projection is the face's line; SelectByID2 on such a line found no
+# edge here twice (runs 20261002T153039266Z and 20261002T160324403Z, sheet x
+# 0.2346 above and below the axis), as it once did on the crankshaft's
+# collar rim (run 20261001T035353825Z).  Each frame names its rim by model
+# geometry, which the scan must match exactly once, and its leader lands on
+# the rim's projected line at a model x, placed between the projected ends
+# at run time.
+# - Flange rear face, z 0, rim r 12.55: its line spans r 6.55-12.55 each side
+#   of the axis.  On +X the 0-degree screw hole's edge on the face projects
+#   across r 8.65-10.35 (BC 9.50 +/- 0.85) and the spigot length's extension
+#   line rises from the spigot's +X corner along the whole stretch; on -X the
+#   120- and 240-degree holes project at r 3.90-5.60, behind the spigot.  The
+#   leader lands at x -9.55, mid-stretch, 3.00 (9.0 on the sheet) from
+#   either corner.
+# - Spigot end, z 3.65, rim r 6.55: its bore is round (the D-flat ends at
+#   z 0) and its edge overlays r < 4.50; the leader lands at x +5.525, midway
+#   along r 4.50-6.55, 1.025 (3.1 on the sheet) from either end.  The
+#   spigot's length and the overall end at its +X corner and print above, so
+#   their extension lines rise off the line.
+# Each frame stands right of the spigot's end on its landing's side of the
+# axis (model +X up: *Top's +X right, turned +90 degrees), centred in the
+# band between the spigot's and the flange's extension lines.
+
+
+@dataclass(frozen=True)
+class RimFrame:
+    """A perpendicularity frame on a face the edge view shows edge-on: the
+    face's outer rim (model z and radius, mm, centred on the hub axis), the
+    model x its leader lands at on the rim's line, and the frame's sheet
+    position (metres)."""
+
+    label: str
+    rim_z_mm: float
+    rim_radius_mm: float
+    landing_x_mm: float
+    frame_xy: tuple[float, float]
+
+
+_BAND_DY = (_SPIGOT_R + _FLANGE_R) / 2.0
+FLANGE_FACE_FRAME = RimFrame(
+    label="flange rear face perpendicularity",
+    rim_z_mm=0.0,
+    rim_radius_mm=FLANGE_DIA / 2.0,
+    landing_x_mm=-(SPIGOT_DIA + FLANGE_DIA) / 4.0,
+    frame_xy=(SPIGOT_END_X + 0.010, AXIS_Y - _BAND_DY),
 )
-SPIGOT_END_FRAME = (
-    (SPIGOT_END_X, AXIS_Y + (_BORE_R + _SPIGOT_R) / 2.0),
-    (SPIGOT_END_X + 0.010, _UPPER_BAND_Y),
+SPIGOT_END_FRAME = RimFrame(
+    label="spigot end perpendicularity",
+    rim_z_mm=SPIGOT_LENGTH,
+    rim_radius_mm=SPIGOT_DIA / 2.0,
+    landing_x_mm=(BORE_DIA + SPIGOT_DIA) / 4.0,
+    frame_xy=(SPIGOT_END_X + 0.010, AXIS_Y + _BAND_DY),
 )
+# A rim matches within these of its modelled centre and radius (the part is
+# built to the spec's sizes), its axis along the hub's.
+_RIM_CENTER_TOL_MM = 1e-4
+_RIM_RADIUS_TOL_MM = 1e-4
+_HUB_AXIS = (0.0, 0.0, 1.0)
+# Seen edge-on, a rim's +Y point projects onto its line's midpoint; the
+# projection is exact to ~1e-9 m.
+_EDGE_ON_TOL_M = 1e-6
+
+
+def face_rim(edges: ViewEdges, frame: RimFrame) -> ViewEdge:
+    """The one visible circle on the hub axis at ``frame``'s rim station and
+    radius; none or several raise, listing every circle the scan holds."""
+    centre = (0.0, 0.0, frame.rim_z_mm)
+
+    def is_rim(circle: tuple[float, ...]) -> bool:
+        offset = sum(abs(a - b) for a, b in zip(circle[:3], centre))
+        tilt = 1.0 - abs(sum(a * b for a, b in zip(circle[3:6], _HUB_AXIS)))
+        return (
+            offset <= _RIM_CENTER_TOL_MM
+            and abs(circle[6] - frame.rim_radius_mm) <= _RIM_RADIUS_TOL_MM
+            and tilt <= 1e-6
+        )
+
+    matches = [item for item in edges.circles if is_rim(item.circle)]
+    if len(matches) != 1:
+        candidates = "; ".join(
+            "r {6:.4f} at ({0:.4f}, {1:.4f}, {2:.4f}) axis ({3:.3f}, {4:.3f}, {5:.3f})".format(
+                *item.circle
+            )
+            for item in edges.circles
+        )
+        raise RuntimeError(
+            f"{frame.label}: expected one visible rim r {frame.rim_radius_mm:g} mm "
+            f"at z {frame.rim_z_mm:g} mm on the hub axis in the {edges.label!r} "
+            f"scan, matched {len(matches)} of {len(edges.circles)} circles: "
+            f"{candidates or 'none'}"
+        )
+    return matches[0]
+
+
+def rim_landing(
+    frame: RimFrame,
+    minus_end: tuple[float, float],
+    plus_end: tuple[float, float],
+) -> tuple[float, float]:
+    """Where ``frame``'s leader lands: its model x along the rim's projected
+    line, from the rim's -X end to its +X end (sheet metres)."""
+    t = (frame.landing_x_mm + frame.rim_radius_mm) / (2.0 * frame.rim_radius_mm)
+    return (
+        minus_end[0] + t * (plus_end[0] - minus_end[0]),
+        minus_end[1] + t * (plus_end[1] - minus_end[1]),
+    )
+
+
+def _rim_attachment(
+    adapter: Any, view: Any, edges: ViewEdges, frame: RimFrame
+) -> tuple[Any, tuple[float, float]]:
+    """``frame``'s rim edge and its leader's landing, projected from the rim
+    at run time; logs where the rim's line lies on the sheet."""
+    rim = face_rim(edges, frame)
+    r_m, z_m = frame.rim_radius_mm / 1000.0, frame.rim_z_mm / 1000.0
+    minus_end, plus_end, side_point = model_points_in_view(
+        adapter,
+        view,
+        ((-r_m, 0.0, z_m), (r_m, 0.0, z_m), (0.0, r_m, z_m)),
+        label=f"{frame.label} rim",
+        names=("-X end", "+X end", "+Y point"),
+    )
+    middle = ((minus_end[0] + plus_end[0]) / 2.0, (minus_end[1] + plus_end[1]) / 2.0)
+    if math.dist(side_point, middle) > _EDGE_ON_TOL_M:
+        raise RuntimeError(
+            f"{frame.label}: the rim is not edge-on in the edge view: its +Y "
+            f"point projects to {side_point}, its line's midpoint is {middle}"
+        )
+    landing = rim_landing(frame, minus_end, plus_end)
+    _telemetry.info(
+        f"{frame.label} rim projects from ({minus_end[0]:.5f}, {minus_end[1]:.5f}) "
+        f"at -X to ({plus_end[0]:.5f}, {plus_end[1]:.5f}) at +X; leader lands at "
+        f"({landing[0]:.5f}, {landing[1]:.5f}); the layout puts the face at sheet "
+        f"x {_side_x(frame.rim_z_mm):.5f}"
+    )
+    return rim.edge, landing
 
 
 async def build(adapter: Any) -> dict[str, str]:
@@ -326,26 +437,23 @@ async def build(adapter: Any) -> dict[str, str]:
         shoulder=True,
         stability_tolerance_m=0.0001,
     )
-    add_feature_control_frame(
-        adapter,
-        side,
-        edge_xy=FLANGE_FACE_FRAME[0],
-        frame_xy=FLANGE_FACE_FRAME[1],
-        characteristic="perpendicularity",
-        tolerance=GEOMETRIC_TOLERANCES_MM["flange rear face perpendicularity to bore"],
-        datums=(BORE_DATUM,),
-        label="flange rear face perpendicularity",
-    )
-    add_feature_control_frame(
-        adapter,
-        side,
-        edge_xy=SPIGOT_END_FRAME[0],
-        frame_xy=SPIGOT_END_FRAME[1],
-        characteristic="perpendicularity",
-        tolerance=GEOMETRIC_TOLERANCES_MM["spigot end perpendicularity to bore"],
-        datums=(BORE_DATUM,),
-        label="spigot end perpendicularity",
-    )
+    side_edges = scan_view_edges(side, label="hub edge view rims")
+    for frame, key in (
+        (FLANGE_FACE_FRAME, "flange rear face perpendicularity to bore"),
+        (SPIGOT_END_FRAME, "spigot end perpendicularity to bore"),
+    ):
+        rim, landing = _rim_attachment(adapter, side, side_edges, frame)
+        add_feature_control_frame(
+            adapter,
+            side,
+            edge_entity=rim,
+            leader_attach_xy=landing,
+            frame_xy=frame.frame_xy,
+            characteristic="perpendicularity",
+            tolerance=GEOMETRIC_TOLERANCES_MM[key],
+            datums=(BORE_DATUM,),
+            label=frame.label,
+        )
     # Re-assert the display mode now the last annotation has landed: an
     # annotation attached after placement can leave a view's edge set
     # unregenerated, and only a real mode change rebuilds it.

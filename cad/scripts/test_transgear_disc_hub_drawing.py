@@ -14,6 +14,7 @@ import pytest
 
 import _common
 import _config
+import _drawing_common
 import _printed_tolerance
 import build_transgear_disc_hub as part
 import draw_transgear_disc_hub as drawing
@@ -258,26 +259,37 @@ def _side_view_model_point(sheet_xy: tuple[float, float]) -> tuple[float, float]
     return dx * x_dir[0] + dy * x_dir[1], z_mid + dx * z_dir[0] + dy * z_dir[1]
 
 
-def test_each_perpendicularity_pick_lands_on_its_face_alone() -> None:
-    """Each frame's edge pick lands on its face's edge-on line where only the
-    face's outer circle projects, half a sheet millimetre or more from any
-    corner or overlying edge and off every extension line (farm run
-    20261002T153039266Z missed the flange's rear face over the 0-degree
-    screw hole's edge), and each frame stands right of the spigot's end on
-    its pick's side of the axis."""
+def test_each_perpendicularity_frame_names_its_face_rim_and_a_clear_landing() -> None:
+    """Each frame attaches to its face's outer rim, the circle the edge view
+    draws as that face's line, and its leader lands on that line where only
+    the rim projects, half a sheet millimetre or more from any corner or
+    overlying edge and off every extension line (farm run
+    20261002T153039266Z missed a sheet pick over the 0-degree screw hole's
+    edge on the rear face), and each frame stands right of the spigot's end
+    on its landing's side of the axis."""
+    flange, spigot = drawing.FLANGE_FACE_FRAME, drawing.SPIGOT_END_FRAME
+    assert (flange.rim_z_mm, flange.rim_radius_mm) == (0.0, spec.FLANGE_DIA / 2.0)
+    assert (spigot.rim_z_mm, spigot.rim_radius_mm) == (
+        spec.SPIGOT_LENGTH,
+        spec.SPIGOT_DIA / 2.0,
+    )
     clear = 0.0005 / drawing._S  # model mm
-    flange_x, flange_z = _side_view_model_point(drawing.FLANGE_FACE_FRAME[0])
-    spigot_x, spigot_z = _side_view_model_point(drawing.SPIGOT_END_FRAME[0])
-    assert flange_z == pytest.approx(0.0)
-    assert spigot_z == pytest.approx(spec.SPIGOT_LENGTH)
     # Inside each face's radial extent: the flange's rear face from the
     # spigot's O.D. out, the spigot's end from its round bore out.
-    assert spec.SPIGOT_DIA / 2.0 + clear < abs(flange_x) < spec.FLANGE_DIA / 2.0 - clear
-    assert spec.BORE_DIA / 2.0 + clear < abs(spigot_x) < spec.SPIGOT_DIA / 2.0 - clear
+    assert (
+        spec.SPIGOT_DIA / 2.0 + clear
+        < abs(flange.landing_x_mm)
+        < spec.FLANGE_DIA / 2.0 - clear
+    )
+    assert (
+        spec.BORE_DIA / 2.0 + clear
+        < abs(spigot.landing_x_mm)
+        < spec.SPIGOT_DIA / 2.0 - clear
+    )
     # The screw holes pierce the rear face: each one's edge there projects
     # across its centre's x plus or minus its radius.
     for centre_x, _centre_y in joint.screw_centres():
-        assert abs(flange_x - centre_x) > joint.SCREW_HOLE_DIA / 2.0 + clear
+        assert abs(flange.landing_x_mm - centre_x) > joint.SCREW_HOLE_DIA / 2.0 + clear
     # The spigot's length and the overall end at the spigot end's +X corner
     # and print above the part, so their extension lines rise off the spigot
     # end's line; the spigot length's other one rises from the spigot's +X
@@ -285,16 +297,65 @@ def test_each_perpendicularity_pick_lands_on_its_face_alone() -> None:
     for name in ("SpigotLength", "HubLength"):
         text_x, _text_z = _side_view_model_point(drawing.SIDE_KEEP[name])
         assert text_x > spec.FLANGE_DIA / 2.0, name
-    assert flange_x < 0.0
+    assert flange.landing_x_mm < 0.0
     sides = set()
-    for pick, frame in (drawing.FLANGE_FACE_FRAME, drawing.SPIGOT_END_FRAME):
-        frame_x, _frame_z = _side_view_model_point(frame)
-        assert frame[0] > drawing.SPIGOT_END_X
+    for frame in (flange, spigot):
+        frame_x, _frame_z = _side_view_model_point(frame.frame_xy)
+        assert frame.frame_xy[0] > drawing.SPIGOT_END_X
         assert spec.SPIGOT_DIA / 2.0 < abs(frame_x) < spec.FLANGE_DIA / 2.0
-        pick_x, _pick_z = _side_view_model_point(pick)
-        assert (frame_x > 0.0) == (pick_x > 0.0)
+        assert (frame_x > 0.0) == (frame.landing_x_mm > 0.0)
         sides.add(frame_x > 0.0)
     assert sides == {True, False}
+
+
+def _circle(radius: float, z: float, *, x: float = 0.0, axis_z: float = 1.0):
+    return _drawing_common.ViewEdge(
+        edge=object(),
+        line=None,
+        circle=(x, 0.0, z, 0.0, 0.0, axis_z, radius),
+        vertices=None,
+    )
+
+
+def test_face_rim_resolves_exactly_one_circle_on_the_hub_axis() -> None:
+    """The rim is the one circle at its station and radius on the hub's axis,
+    either normal sign; a neighbour at another station, radius or centre
+    never stands in for it, and none or two fail listing every circle."""
+    frame = drawing.FLANGE_FACE_FRAME
+    radius = frame.rim_radius_mm
+    rim = _circle(radius, 0.0, axis_z=-1.0)
+    neighbours = (
+        _circle(radius, -spec.FLANGE_THICK),  # the flange's front rim
+        _circle(spec.SPIGOT_DIA / 2.0, 0.0),  # the spigot's root
+        _circle(spec.SCREW_HOLE_DIA / 2.0, 0.0, x=spec.BOLT_CIRCLE_DIA / 2.0),
+        _circle(radius + 0.001, 0.0),
+    )
+    edges = _drawing_common.ViewEdges(label="edge", edges=(*neighbours, rim))
+    assert drawing.face_rim(edges, frame) is rim
+    lone = _drawing_common.ViewEdges(label="edge", edges=neighbours)
+    with pytest.raises(RuntimeError, match=r"matched 0 of 4 circles: .*r 12\.5510 at"):
+        drawing.face_rim(lone, frame)
+    split = _drawing_common.ViewEdges(label="edge", edges=(rim, _circle(radius, 0.0)))
+    with pytest.raises(RuntimeError, match="matched 2 of 2"):
+        drawing.face_rim(split, frame)
+    with pytest.raises(RuntimeError, match="matched 0 of 0 circles: none"):
+        drawing.face_rim(_drawing_common.ViewEdges(label="edge", edges=()), frame)
+
+
+@pytest.mark.parametrize("turn", [1.0, -1.0])
+def test_rim_landing_puts_the_leader_at_its_model_x_on_the_projected_line(
+    turn: float,
+) -> None:
+    """The landing sits at the frame's model x between the rim's projected
+    -X and +X ends, whichever way the view turns them."""
+    for frame in (drawing.FLANGE_FACE_FRAME, drawing.SPIGOT_END_FRAME):
+        r = frame.rim_radius_mm * drawing._S
+        minus_end = (0.2346, drawing.AXIS_Y - turn * r)
+        plus_end = (0.2346, drawing.AXIS_Y + turn * r)
+        landing = drawing.rim_landing(frame, minus_end, plus_end)
+        assert landing == pytest.approx(
+            (0.2346, drawing.AXIS_Y + turn * frame.landing_x_mm * drawing._S)
+        )
 
 
 def _sheet_text() -> str:
