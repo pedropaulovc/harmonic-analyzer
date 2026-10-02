@@ -640,7 +640,7 @@ export function inspectReference(data, expectedId, native = null) {
   const failures = []
   const fail = (code, detail, timeSeconds, viewId) => failures.push({ code, detail, ...(timeSeconds === undefined ? {} : { timeSeconds }), ...(viewId === undefined ? {} : { viewId }) })
   const source = data?.source, coverage = data?.coverage
-  const summary = { videoId: expectedId, frameCount: 0, integerSecondsRequired: 0, integerSecondsPresent: 0, changeTimesRequired: 0, changeTimesPresent: 0, machineFrames: 0, exemptFrames: 0, requiredViews: 0, fitLandmarks: 0, checkLandmarks: 0, nativeLineChecks: 0, sourceContourChecks: 0, sourcePtsChecked: 0, maxDecodeSkewSeconds: 0, intervals: [], failures }
+  const summary = { videoId: expectedId, frameCount: 0, integerSecondsRequired: 0, integerSecondsPresent: 0, changeTimesRequired: 0, changeTimesPresent: 0, machineFrames: 0, exemptFrames: 0, requiredViews: 0, fitLandmarks: 0, checkLandmarks: 0, nativeLineChecks: 0, sourceContourChecks: 0, sourceContourFits: 0, sourcePtsChecked: 0, maxDecodeSkewSeconds: 0, intervals: [], failures }
   if (data?.schemaVersion !== 1) fail('schema', 'schemaVersion must be 1')
   if (source?.videoId !== expectedId || !hash(source?.sha256) || source?.width !== 1920 || source?.height !== 1080 || !finite(source?.durationSeconds) || source.durationSeconds <= 0) {
     fail('source-identity', 'Expected this public video, its SHA256, 1920×1080 and a positive duration')
@@ -723,7 +723,8 @@ export function inspectReference(data, expectedId, native = null) {
       if (!text(viewId) || viewIds.has(viewId)) fail('view-id', 'View IDs must be nonempty and distinct', t, viewId)
       viewIds.add(viewId); summary.requiredViews++
       summary.nativeLineChecks += view.nativeLineChecks?.length ?? 0
-      summary.sourceContourChecks += view.sourceContourChecks?.length ?? 0
+      summary.sourceContourChecks += view.sourceContourChecks?.filter(contour => contour.role === 'check').length ?? 0
+      summary.sourceContourFits += view.sourceContourChecks?.filter(contour => contour.role === 'fit').length ?? 0
       const rect = view.rectSourcePixels
       if (!vector(rect, 4) || rect[0] < 0 || rect[1] < 0 || rect[2] <= 0 || rect[3] <= 0 || rect[0] + rect[2] > 1920 || rect[1] + rect[3] > 1080 || !['native', 'horizontal-mirror'].includes(view.presentation)) fail('source-viewport', 'Invalid actual source ROI or mirror presentation', t, viewId)
       const camera = view.camera
@@ -779,7 +780,7 @@ export function inspectReference(data, expectedId, native = null) {
       for (const error of nativeLineErrors(view.nativeLineChecks ?? [], frame.sourceImage, view, view.partOverrides ?? [])) fail('native-line-evidence', error, t, viewId)
       const contourIds = new Set()
       for (const contour of view.sourceContourChecks ?? []) {
-        if (!text(contour.id) || contourIds.has(contour.id) || !text(contour.partPath) || !contour.partPath.startsWith('harmonic-analyzer/') || !Array.isArray(contour.sourceContourPixels) || contour.sourceContourPixels.length < 2 || !contour.sourceContourPixels.every(point => inRect(point, rect)) || contour.sourceContourPixels.every(point => canonicalJson(point) === canonicalJson(contour.sourceContourPixels[0])) || !finite(contour.uncertaintyPx) || contour.uncertaintyPx < 0 || contour.uncertaintyPx > PIXEL_LIMIT || canonicalJson(contour.measurementEvidence?.sourceImage) !== canonicalJson(frame.sourceImage) || !text(contour.measurementEvidence?.evidence)) fail('source-contour-evidence', 'Need a distinct nondegenerate actually measured current-source native contour inside ROI with bounded uncertainty', t, viewId)
+        if (!text(contour.id) || contourIds.has(contour.id) || !['fit', 'check'].includes(contour.role) || !text(contour.partPath) || !contour.partPath.startsWith('harmonic-analyzer/') || !Array.isArray(contour.sourceContourPixels) || contour.sourceContourPixels.length < 2 || !contour.sourceContourPixels.every(point => inRect(point, rect)) || contour.sourceContourPixels.every(point => canonicalJson(point) === canonicalJson(contour.sourceContourPixels[0])) || !finite(contour.uncertaintyPx) || contour.uncertaintyPx < 0 || contour.uncertaintyPx > PIXEL_LIMIT || canonicalJson(contour.measurementEvidence?.sourceImage) !== canonicalJson(frame.sourceImage) || !text(contour.measurementEvidence?.evidence)) fail('source-contour-evidence', 'Need an explicit FIT/CHECK role and distinct nondegenerate actually measured current-source native contour inside ROI with bounded uncertainty', t, viewId)
         contourIds.add(contour.id)
       }
       const composite = view.composite ?? { mode: 'opaque' }

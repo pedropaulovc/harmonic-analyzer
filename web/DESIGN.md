@@ -202,10 +202,17 @@ changing the selected source camera/input. A sidecar joins only the exact source
 video/frame/decoded-PTS and same-format image hash, with an unambiguous measured
 source-layout view mapping. Gray and BGR byte identities never compare across
 formats. Original endpoints, source-only evidence and partial-edge scope remain
-unchanged. Every contour stays CHECK-only, strictly downstream of fitting; a
-camera candidate fitted to these rows is not independent and cannot be promoted.
+unchanged. The existing type/schema now require explicit `role: 'fit' | 'check'`;
+missing/invalid roles fail closed and runtime never interprets prose as a role.
+Only authoritative CHECK contours are independent, strictly downstream of
+fitting. Existing Rocker upper-rim stations 1,5,9,13,17 remain CHECK and the other
+15 remain FIT. FIT records are retained unmeasured in `contourFits`, not independent
+CHECKs or moving/view/sample coverage, and do not gate held-out contour errors.
+Every original rod curve stays CHECK, including all 85 source0 Rod20 samples and
+failed Rod3 observations; a failed CHECK cannot become FIT or disappear. A camera
+candidate fitted to these CHECK rows is not independent and cannot be promoted.
 
-After paused exact source review, a contour-bearing row enables part visibility
+After paused exact source review, a valid explicit CHECK-contour row enables part visibility
 and reads the snapshot, landmarks, native visibility and full mechanism solve
 from the same redraw. Captured status and camera/principal point, ordered support,
 warp, destination-cell/native-backing metadata, time, physical-input and positive
@@ -247,8 +254,9 @@ and CHECK point landmarks. A genuinely measured contour can supply a view's CHEC
 and required sample even without point CHECKs. It supplies moving coverage only
 through existing exact-part moving ancestry or the loaded native rig's resolved
 indexed `rod` binding. `Machine.readPartBinding(partPath)` and the verification
-bridge expose `{partPath,bindingId,kind,motion,stationIndex}` directly from
-`RestPart.binding`, never a guessed path-family set or another part's anchor.
+bridge expose `{partPath,bindingId,kind,motion,stationIndex}` directly from the
+resolved `RestPart.binding` with actual updater membership, never a guessed
+path-family set, inherited binding on an undriven clone or another part's anchor.
 For Rod20, the genuine `connectingRods` binding resolves station index19 and the
 existing `rod` updater; the consumer records that read-only native metadata with
 the independent source contour association. This is kinematic moving eligibility,
@@ -260,6 +268,10 @@ floor. All original source views, selected physical inputs, clocks and coverage
 requirements remain mandatory. The canonical Rocker observations already retain
 all 48 late Rod20 curves; only Root's current native GPU run can establish their
 errors or close the reported gaps.
+Source-review/view-precondition failures preserve the actual required CHECK
+contour IDs in unavailable accounting, while FIT records remain separate and
+never inflate CHECK unavailable counts. The custom source ledger validator also
+requires the closed role enum and reports source FIT/CHECK contour counts separately.
 
 Per-video verification is incremental and repeatable, without an acceptance-run
 quota. The all-video final gate retains all six pages and the 5%/0.5-second limits.

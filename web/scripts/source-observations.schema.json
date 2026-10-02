@@ -191,10 +191,11 @@
     "warpedNativeLineCheck": {"allOf": [{"$ref": "#/$defs/nativeLineCheck"}, {"properties": {"measurementEvidence": {"required": ["axisPerspectiveBiasSpace"]}}}]},
     "sourceContourCheck": {
       "type": "object",
-      "required": ["id", "partPath", "sourceContourPixels", "uncertaintyPx", "measurementEvidence"],
+      "required": ["id", "role", "partPath", "sourceContourPixels", "uncertaintyPx", "measurementEvidence"],
       "additionalProperties": false,
       "properties": {
         "id": {"$ref": "#/$defs/sourceEvidence"},
+        "role": {"enum": ["fit", "check"], "description": "Authoritative producer-declared fitting versus independent held-out role. Never inferred from prose, part motion or a missing value; FIT curves cannot certify CHECK coverage."},
         "partPath": {"$ref": "#/$defs/nativePartPath"},
         "sourceContourPixels": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/pixelPair"}, "description": "Independently measured source-global contour samples, bound to the actual decoded exposure; never native projections used as source observations."},
         "uncertaintyPx": {"type": "number", "minimum": 0, "description": "Independent conservative Euclidean final source-global localization/raster-quantization bound, matching landmarks and native line checks. Added exactly once to nearest captured boundary distance and native raster uncertainty; unknown/null fails closed. H does not transform an already-source-global bound; warped localization footprints must remain bounded and supported."},

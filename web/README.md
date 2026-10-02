@@ -193,15 +193,20 @@ Exact aliases use the declared `sha256Bgr8` or `sha256Gray8` hash for their
 pixel format. Formats never alias each other; sampling diagnostics list
 supported formats and any unsupported source declarations.
 
-Retained `SourceContourCheck` curves are a separate, post-fit oracle. `verify:sync`
-joins raw observation frame/view CHECKs to the selected compact frame only by the
-exact source video, frame index, decoded PTS and same-format gray/BGR image hash,
-with the actual source-layout view identity. It never uses a nearest exposure,
-cross-format hash, projected point alias or extrapolated curve endpoint. Neither
-these pixels nor their residuals may be reused to choose the camera, warp or
-physical input.
+Retained `SourceContourCheck` records carry an authoritative explicit
+`role: 'fit' | 'check'`. Missing/invalid roles fail closed; neither prose, moving
+ancestry nor a failed residual can assign or change that role. `verify:sync` joins
+raw frame/view curves to the selected compact frame only by exact source video,
+frame index, decoded PTS, same-format gray/BGR image hash and actual source-layout
+view identity. It never uses a nearest exposure, cross-format hash, projected
+point alias or extrapolated endpoint. Only CHECK curves form the independent
+post-fit oracle; their pixels/residuals cannot choose camera, warp or physical
+input. FIT curves remain `contourFits` source records, unmeasured and non-gating,
+and never supply CHECK/moving/view/sample coverage. The existing Rocker upper-rim
+partition is CHECK stations 1,5,9,13,17 and FIT for the other 15; all original rod
+curves, including the complete 85-point source0 Rod20 edge, remain CHECK.
 
-Only a selected row with valid contours enables the existing depth-tested native
+Only a selected row with valid explicit CHECK contours enables the existing depth-tested native
 part-ID capture, after exact paused source review. The snapshot, landmark,
 visibility and complete mechanism-solve receipts come from that redraw. Target
 part paths, camera/principal point, ordered layout, resolved warp, raster backing,
@@ -231,10 +236,14 @@ unavailable. For rods, `readPartBinding(partPath)` reads the exact resolved bind
 of the currently loaded rig: `{partPath,bindingId,kind,motion,stationIndex}`.
 A valid indexed `motion: 'rod'` binding qualifies native kinematic moving
 eligibility, without borrowing a rocker anchor or guessing from path-name stems.
+The query requires membership in the actual rig updater; a cloned part cannot
+claim moving eligibility merely by inheriting its source's binding metadata.
 Reports retain this `nativePartBinding`, the source association in
 `measurementEvidence`, and `observedSourceInternalMotion: 'unmeasured'`:
 kinematic eligibility is not a claim of observed source movement. Missing,
 unbound, wrong-part or invalid-station metadata cannot manufacture eligibility.
+Failures before contour measurement still name every actual required CHECK curve
+as unavailable; FIT curves never inflate the CHECK unavailable count.
 Fixed-point, every-source-view, complete-input, clock, playback and
 interaction requirements remain unchanged. The retained Rocker contours include
 all 48 late contour-only obligations, but source acceptance and closure require

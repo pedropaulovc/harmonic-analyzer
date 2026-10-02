@@ -146,10 +146,12 @@ def retain_exact_exposure_landmarks(selected, data):
         view_id = point.get("viewId")
         if view_id is None:
             # Legacy unscoped points mean the single full-frame native main,
-            # not an arbitrary inset/transition layer.
-            if (set(views) != {"main"} or views["main"] != {
-                    "rectSourcePixels":[0,0,data["source"]["width"],data["source"]["height"]],
-                    "presentation":"native", "imagePlaneWarp":None, "composite":None}):
+            # including an explicitly opaque image, not an inset/transition.
+            if (set(views) != {"main"}
+                    or views["main"]["rectSourcePixels"] != [0,0,data["source"]["width"],data["source"]["height"]]
+                    or views["main"]["presentation"] != "native"
+                    or views["main"]["imagePlaneWarp"] is not None
+                    or views["main"]["composite"] not in (None, {"mode":"opaque"})):
                 return None
             view_id = "main"
         if view_id not in views:

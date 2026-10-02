@@ -2510,7 +2510,7 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
   function readPartBinding(partPath: string): NativePartBinding | null {
     if (availability !== 'available' || !root) return null
     const part = parts.get(partPath), binding = part?.binding
-    if (!part || !binding) return null
+    if (!part || !binding || !driven.includes(part)) return null
     return { partPath: part.path, bindingId: binding.id, kind: binding.kind, motion: binding.motion, stationIndex: binding.kind === 'indexed' ? part.station : null }
   }
 

@@ -58,6 +58,65 @@ class ExactExposureLandmarkTests(unittest.TestCase):
         self.assertEqual(result['landmarks'], originals[1]['landmarks'])
         self.assertEqual(data['frames'], originals)
 
+    def test_opaque_main_retains_real_unscoped_alias_check(self):
+        data = exact_exposure()
+        for frame in data['frames']:
+            frame['views'] = [{'id': 'main', 'rectSourcePixels': [0, 0, 1920, 1080],
+                               'presentation': 'native', 'composite': {'mode': 'opaque'}}]
+        retained_point = {'anchorId': 'base', 'status': 'observed', 'role': 'fit',
+                          'pixel': [80, 420]}
+        data['frames'][0]['landmarks'] = [retained_point]
+        result = retain(data)
+        self.assertEqual({p['anchorId']: (p['role'], p['pixel']) for p in result['landmarks']},
+                         {'base': ('fit', [80, 420]), 'support': ('check', [120.5, 340.25])})
+        self.assertEqual(result['views'], data['frames'][0]['views'])
+        self.assertEqual(data['samplingDiagnostics']['exactExposureAliasLandmarks']['unavailable'], [])
+
+    def test_unscoped_opaque_check_cannot_cross_different_source_layout(self):
+        for mismatch in ('rect', 'presentation', 'warp', 'crossfade', 'inset'):
+            with self.subTest(mismatch=mismatch):
+                data = exact_exposure()
+                for frame in data['frames']:
+                    frame['views'] = [{'id': 'main', 'rectSourcePixels': [0, 0, 1920, 1080],
+                                       'presentation': 'native', 'composite': {'mode': 'opaque'}}]
+                donor = data['frames'][1]['views'][0]
+                if mismatch == 'rect':
+                    donor['rectSourcePixels'] = [0, 0, 960, 1080]
+                elif mismatch == 'presentation':
+                    donor['presentation'] = 'horizontal-mirror'
+                elif mismatch == 'warp':
+                    donor['imagePlaneWarp'] = {
+                        'kind': 'homography', 'unwarpedViewportPixels': [1920, 1080],
+                        'renderToSourcePixels': [1, 0, 10, 0, 1, 0, 0, 0, 1]}
+                elif mismatch == 'crossfade':
+                    donor['composite'] = {'mode': 'crossfade', 'groupId': 'fade',
+                                          'imageLayerId': 'incoming', 'opacity': 0.5}
+                else:
+                    data['frames'][1]['views'].append(
+                        {'id': 'inset', 'rectSourcePixels': [0, 0, 640, 360]})
+                self.assertEqual(retain(data)['landmarks'], [])
+
+    def test_equal_transition_or_warped_layout_cannot_scope_legacy_points(self):
+        for transformed in ('crossfade', 'warp', 'mirror', 'inset'):
+            with self.subTest(transformed=transformed):
+                data = exact_exposure()
+                view = {'id': 'main', 'rectSourcePixels': [0, 0, 1920, 1080],
+                        'presentation': 'native', 'composite': {'mode': 'opaque'}}
+                if transformed == 'crossfade':
+                    view['composite'] = {'mode': 'crossfade', 'groupId': 'fade',
+                                         'imageLayerId': 'incoming', 'opacity': 0.5}
+                elif transformed == 'warp':
+                    view['imagePlaneWarp'] = {
+                        'kind': 'homography', 'unwarpedViewportPixels': [1920, 1080],
+                        'renderToSourcePixels': [1, 0, 10, 0, 1, 0, 0, 0, 1]}
+                elif transformed == 'mirror':
+                    view['presentation'] = 'horizontal-mirror'
+                for frame in data['frames']:
+                    frame['views'] = [copy.deepcopy(view)]
+                    if transformed == 'inset':
+                        frame['views'].append({'id': 'inset', 'rectSourcePixels': [0, 0, 640, 360]})
+                self.assertEqual(retain(data)['landmarks'], [])
+
     def test_different_hash_pts_or_layout_cannot_supply_check(self):
         for mismatch in ('hash', 'pts', 'layout'):
             with self.subTest(mismatch=mismatch):

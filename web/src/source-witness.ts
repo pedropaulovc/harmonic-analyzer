@@ -97,6 +97,7 @@ export interface NativeLineCheck {
 }
 export interface SourceContourCheck {
   id: string
+  role: 'fit' | 'check'
   partPath: string
   sourceContourPixels: [number, number][]
   uncertaintyPx: number

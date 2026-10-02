@@ -699,7 +699,7 @@ test('visible source motion cannot override the complete same-shot minimum playb
 function contourFixture(sourceDrawRevision = 1) {
   const fixture = measuredViewFixture(), { view, frame, response, capture, anchors } = fixture
   frame.sourceImage = sourceImage(30, 'a'.repeat(64))
-  const check = { id: 'right-exterior', partPath: 'harmonic-analyzer/channel/connecting-rod-20',
+  const check = { id: 'right-exterior', role: 'check', partPath: 'harmonic-analyzer/channel/connecting-rod-20',
     sourceContourPixels: [[100.5, 100.5], [120.5, 100.5], [140.5, 100.5]], uncertaintyPx: 3,
     measurementEvidence: { sourceImage: frame.sourceImage, evidence: 'Source-only partial right exterior edge; original endpoints retained.' } }
   frame.contourChecks = [{ viewId: 'main', originalViewId: 'main', decodedTimeSeconds: 1, sourceImage: frame.sourceImage, check }]
@@ -1042,4 +1042,103 @@ test('missing draw receipts and a same-revision receipt for another source draw 
     assert.deepEqual(result.measured, [])
     assert.match(result.unavailable[0].reason, /current completed source draw revision/)
   }
+})
+
+test('authoritative FIT contours stay retained without independent CHECK or moving coverage', () => {
+  const fixture = contourFixture()
+  fixture.check.role = 'fit'
+  fixture.check.measurementEvidence.evidence = 'Prose says CHECK, but the authoritative structured role is FIT.'
+  const result = measureContourFixture(fixture)
+  assert.deepEqual(result.measured, [])
+  assert.deepEqual(result.unavailable, [])
+  assert.equal(result.retainedFits[0].status, 'fit-retained-unmeasured')
+  assert.equal(result.retainedFits[0].check.role, 'fit')
+  const video = videoFixture()
+  video.samples[0].measurements = [measurement('fixed', 'fixed')]
+  video.samples[0].contourFits = result.retainedFits
+  finishVideo(video, censusFixture, parseOptions(['--stage', '50']))
+  assert.equal(video.contourChecks.measured, 0)
+  assert.equal(video.contourChecks.movingChecks, 0)
+  assert.equal(video.contourFits.retained, 1)
+  assert.equal(video.motionCoverage[0].movingCheckSamples, 0)
+  assert.ok(video.failures.some(item => item.code === 'hard-moving-landmark-coverage'))
+})
+
+test('missing or invalid contour roles fail closed despite CHECK prose and moving native binding', () => {
+  for (const role of [undefined, null, 'CHECK', 'held-out']) {
+    const fixture = contourFixture()
+    fixture.check.role = role
+    fixture.check.measurementEvidence.evidence = 'Independent held-out CHECK station.'
+    const direct = measureContourFixture(fixture)
+    assert.deepEqual(direct.measured, [])
+    assert.deepEqual(direct.retainedFits, [])
+    assert.match(direct.unavailable[0].reason, /authoritative explicit FIT\/CHECK role/)
+    const original = { ...fixture.frame, views: [{ ...fixture.view, sourceContourChecks: [fixture.check] }] }
+    const joined = sourceContourSidecar(fixture.frame, [original])
+    assert.deepEqual(joined.contourChecks, [])
+    assert.match(joined.contourJoinUnavailable[0].reason, /authoritative explicit FIT\/CHECK role/)
+  }
+})
+
+test('FIT-only curves cannot supply a required contour-only view or inflate CHECK summaries', () => {
+  const fixture = contourFixture()
+  fixture.check.role = 'fit'
+  assert.throws(() => measureView(fixture.view, fixture.response, fixture.frame, [], 10, fixture.anchors), /no independently observed landmarks or contour CHECK/)
+  const result = measureContourFixture(fixture), video = videoFixture()
+  video.samples[0].measurements = []
+  video.samples[0].contourChecks = result.retainedFits
+  video.samples[0].contourFits = result.retainedFits
+  finishVideo(video, censusFixture, parseOptions(['--stage', '50']))
+  assert.equal(video.coverage.measuredRequiredSamples, 0)
+  assert.equal(video.coverage.passedRequiredSamples, 0)
+  assert.equal(video.contourChecks.measured, 0)
+  assert.equal(video.motionCoverage[0].movingCheckSamples, 0)
+  assert.notEqual(video.stageMeasurement.status, 'passed')
+})
+
+test('unavailable FIT source joins remain diagnostics instead of gating genuine held-out CHECKs', () => {
+  const fixture = contourFixture(), fit = structuredClone(fixture.check)
+  fit.id = 'fit-edge'; fit.role = 'fit'
+  fit.measurementEvidence.sourceImage.sha256Bgr8 = 'b'.repeat(64)
+  const original = { ...fixture.frame, views: [{ ...fixture.view, sourceContourChecks: [fixture.check, fit] }] }
+  Object.assign(fixture.frame, sourceContourSidecar(fixture.frame, [original]))
+  const result = measureView(fixture.view, fixture.response, fixture.frame, [], 10, fixture.anchors)
+  assert.equal(result.contourChecks[0].status, 'passed')
+  assert.deepEqual(result.unavailable, [])
+  assert.equal(result.contourFits[0].status, 'fit-source-unavailable')
+  assert.equal(result.contourFits[0].role, 'fit')
+})
+
+test('view precondition failures account for actual required CHECK contours without FIT inflation', () => {
+  const fixture = contourFixture(), fit = structuredClone(fixture.frame.contourChecks[0])
+  fit.check.id = 'fit-edge'; fit.check.role = 'fit'
+  fixture.frame.contourChecks.push(fit)
+  fixture.capture.status = 'stale'
+  let failure
+  try { measureView(fixture.view, fixture.response, fixture.frame, [], 10, fixture.anchors) } catch (error) { failure = error }
+  assert.match(failure.message, /Missing\/stale actual GPU landmark/)
+  assert.deepEqual(failure.contourUnavailable.map(item => [item.contourId, item.role]), [['right-exterior', 'check']])
+  const video = videoFixture()
+  Object.assign(video.samples[0], { status: 'unavailable', measurements: [], contourChecks: [], contourFits: measureContourFixture(fixture).retainedFits, unavailable: failure.contourUnavailable })
+  finishVideo(video, censusFixture, parseOptions(['--stage', '50']))
+  assert.equal(video.contourChecks.unavailable, 1)
+  assert.equal(video.contourChecks.measured, 0)
+  assert.equal(video.contourFits.retained, 1)
+  assert.notEqual(video.stageMeasurement.status, 'passed')
+})
+
+test('failed explicitly held-out curves remain CHECK failures rather than converting to FIT', () => {
+  const fixture = contourFixture()
+  fixture.check.measurementEvidence.evidence = 'Failure does not authorize conversion of this original CHECK to FIT.'
+  fixture.part.contourSourcePixels = [[500, 500], [510, 500]]
+  const result = measureContourFixture(fixture)
+  assert.equal(result.measured[0].role, 'check')
+  assert.equal(result.measured[0].status, 'failed')
+  assert.deepEqual(result.retainedFits, [])
+  const video = videoFixture()
+  video.samples[0].measurements = [measurement('fixed', 'fixed')]
+  video.samples[0].contourChecks = result.measured
+  finishVideo(video, censusFixture, parseOptions(['--stage', '50']))
+  assert.equal(video.contourChecks.failed, 1)
+  assert.equal(video.stageMeasurement.status, 'failed')
 })
