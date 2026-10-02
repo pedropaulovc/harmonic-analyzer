@@ -177,7 +177,7 @@ function unavailableSourceContours(originals, views, reason) {
 
 /** Join raw contour roles downstream of compact camera/input selection, without changing their scope. */
 export function sourceContourSidecar(frame, originals) {
-  const contourChecks = [], contourJoinUnavailable = [], identities = new Map(), declarations = new Set(), contexts = new Map()
+  const contourChecks = [], contourJoinUnavailable = [], identities = new Map(), declarations = new Set(), contexts = new Map(), exactIds = new Set()
   const aliases = originals.filter(original => original.sourceImage?.frameIndex === frame.sourceImage?.frameIndex || original.decodedTimeSeconds === frame.decodedTimeSeconds)
   const exact = aliases.filter(original => original.shotId === frame.shotId && exactSourceExposure(original, frame))
   // Exact source declarations alone may supply pixels. Alias-only CHECK IDs
@@ -188,7 +188,8 @@ export function sourceContourSidecar(frame, originals) {
       const mapping = compactSourceViewId(original, sourceView.id, frame.views ?? [])
       const selected = frame.views?.find(view => view.id === mapping.viewId)
       const context = sourceContourDeclaration(original, sourceView, check, mapping)
-      const declaration = jsonDigest([original.shotId, original.decodedTimeSeconds, original.sourceImage, sourceView.id, sourceView.rectSourcePixels, sourceView.presentation, sourceView.composite ?? { mode: 'opaque' }, check])
+      const declaration = JSON.stringify([original.shotId, original.decodedTimeSeconds, sourceView.id, context.sourceDeclarationDigest])
+      if (exact.length) exactIds.add(context.sourceDeclarationDigest)
       if (declarations.has(declaration)) continue
       declarations.add(declaration)
       if (!['fit', 'check'].includes(check.role)) {
@@ -208,7 +209,7 @@ export function sourceContourSidecar(frame, originals) {
       }
       const key = `${mapping.viewId}/${check.id}`, prior = identities.get(key)
       if (identities.has(key)) {
-        if (!prior || jsonDigest(prior.check) !== jsonDigest(check) || prior.originalViewId !== sourceView.id) {
+        if (!prior || contexts.get(key).sourceDeclarationDigest !== context.sourceDeclarationDigest || prior.originalViewId !== sourceView.id) {
           identities.set(key, null)
           if (prior) contourJoinUnavailable.push({ ...contexts.get(key), status: 'source-unavailable', reason: 'Conflicting exact-exposure source contour identities cannot choose or merge a curve' })
           contourJoinUnavailable.push({ ...context, status: 'source-unavailable', reason: 'Conflicting exact-exposure source contour identities cannot choose or merge a curve' })
@@ -221,10 +222,6 @@ export function sourceContourSidecar(frame, originals) {
     }
   }
   if (exact.length) {
-    const exactIds = new Set(exact.flatMap(original => frameViews(original).flatMap(view => {
-      const mapping = compactSourceViewId(original, view.id, frame.views ?? [])
-      return (view.sourceContourChecks ?? []).map(check => sourceContourDeclaration(original, view, check, mapping).sourceDeclarationDigest)
-    })))
     const aliasIds = new Map()
     for (const original of aliases) {
       if (original.shotId === frame.shotId && exactSourceExposure(original, frame)) continue
@@ -282,20 +279,41 @@ export function sourceCensus(observations, track, native, options) {
     authoredExposures.get(index).push(frame)
   }
   for (const [frameIndex, originals] of contourFrames) {
-    if (!originals.some(original => frameViews(original).some(view => view.sourceContourChecks?.some(check => check.role === 'check')))) continue
+    const checked = originals.filter(original => frameViews(original).some(view => view.sourceContourChecks?.some(check => check.role === 'check')))
+    if (!checked.length) continue
     const authored = authoredExposures.get(frameIndex)
     if (authored) {
       for (const frame of authored) add(frame.timeSeconds, 'source-contour-check', frame)
       continue
     }
-    const first = originals[0]
-    const oneExposure = originals.length === 1 || originals.every(original => original.shotId === first.shotId && exactSourceExposure(original, first))
-    const nativePts = native.pts?.[frameIndex]
-    const exactNative = finite(nativePts) ? originals.filter(original => original.decodedTimeSeconds === nativePts) : []
-    const nativeAuthority = exactNative.length && exactNative.every(original => original.shotId === exactNative[0].shotId && exactSourceExposure(original, exactNative[0])) ? exactNative[0] : null
+    const first = checked[0]
+    const governingViews = track.frames.findLast(frame => frame.timeSeconds <= first.decodedTimeSeconds && frame.shotId === first.shotId)?.views ?? []
+    const declarationSets = new Map()
+    const declarationSet = original => {
+      if (!declarationSets.has(original)) {
+        const ids = new Set()
+        for (const view of frameViews(original)) {
+          const mapping = compactSourceViewId(original, view.id, governingViews)
+          for (const check of view.sourceContourChecks ?? []) if (check.role === 'check') ids.add(sourceContourDeclaration(original, view, check, mapping).sourceDeclarationDigest)
+        }
+        declarationSets.set(original, JSON.stringify([...ids].sort()))
+      }
+      return declarationSets.get(original)
+    }
+    const sameDeclarations = (a, b) => a.shotId === b.shotId && declarationSet(a) === declarationSet(b)
+    const oneExposure = checked.length === 1 || checked.every(original => exactSourceExposure(original, first) && sameDeclarations(original, first))
+    const clock = native.timeBase, timestamp = native.timestampTicks?.[frameIndex]
+    // These are the two full-precision IEEE evaluations of the same integer
+    // rational clock, not a timing tolerance or the rounded FFprobe decimal.
+    const nativeTimes = Number.isSafeInteger(timestamp) && Number.isSafeInteger(clock?.numerator) && clock.numerator > 0
+      && Number.isSafeInteger(clock?.denominator) && clock.denominator > 0 && Number.isSafeInteger(timestamp * clock.numerator)
+      ? new Set([timestamp * clock.numerator / clock.denominator, timestamp * (clock.numerator / clock.denominator)]) : new Set()
+    const nativePts = nativeTimes.values().next().value
+    const exactNative = checked.filter(original => nativeTimes.has(original.decodedTimeSeconds))
+    const nativeAuthority = exactNative.length && exactNative.every(original => sameDeclarations(original, exactNative[0])) ? exactNative[0] : null
     const authority = oneExposure ? first : nativeAuthority
     if (authority) add(authority.decodedTimeSeconds, 'source-contour-check', authority)
-    else add(finite(nativePts) ? nativePts : first.decodedTimeSeconds, 'source-contour-check', null,
+    else add(finite(nativePts) ? nativePts : native.pts?.[frameIndex] ?? first.decodedTimeSeconds, 'source-contour-check', null,
       { originals, reason: 'CHECK PTS aliases have no single exact source exposure authority; no alias pixels or camera are selected' })
   }
   // Preserve real view membership/cut changes, not every exposure of continuous motion.
@@ -697,7 +715,7 @@ function sourceContourUnavailable(frame, reason, viewId) {
   return [
     ...(frame.contourJoinUnavailable ?? []).filter(item => item.role !== 'fit' && (viewId === undefined || item.viewId === viewId)),
     ...(frame.contourChecks ?? []).filter(item => item.check.role === 'check' && (viewId === undefined || item.viewId === viewId))
-      .map(item => ({ viewId: item.viewId, originalViewId: item.originalViewId, contourId: item.check.id, partPath: item.check.partPath, role: item.check.role, status: 'unmeasured-native', reason })),
+      .map(item => ({ ...item, contourId: item.check.id, partPath: item.check.partPath, role: item.check.role, status: 'unmeasured-native', reason })),
   ]
 }
 
@@ -707,10 +725,10 @@ export function measureContours(view, response, frame, tolerancePx, anchors) {
   const required = []
   const unavailable = (frame.contourJoinUnavailable ?? []).filter(item => item.viewId === view.id && item.role !== 'fit'), measured = []
   const retainedFits = retainedContourFits(frame, view.id)
-  unavailable.push(...declared.filter(item => !['fit', 'check'].includes(item.check.role)).map(item => ({ viewId: view.id, contourId: item.check.id, partPath: item.check.partPath, role: item.check.role ?? 'unknown', status: 'source-unavailable', reason: 'Contour has no authoritative explicit FIT/CHECK role' })))
+  unavailable.push(...declared.filter(item => !['fit', 'check'].includes(item.check.role)).map(item => ({ ...item, viewId: view.id, contourId: item.check.id, partPath: item.check.partPath, role: item.check.role ?? 'unknown', status: 'source-unavailable', reason: 'Contour has no authoritative explicit FIT/CHECK role' })))
   for (const item of declared.filter(item => item.check.role === 'check')) {
     const reason = sourceContourIssue(item, view, frame)
-    if (reason) unavailable.push({ viewId: view.id, originalViewId: item.originalViewId, contourId: item.check.id, partPath: item.check.partPath, role: item.check.role, status: 'source-unavailable', reason })
+    if (reason) unavailable.push({ ...item, viewId: view.id, contourId: item.check.id, partPath: item.check.partPath, role: item.check.role, status: 'source-unavailable', reason })
     else required.push(item)
   }
   if (!required.length) return { measured, unavailable, retainedFits }
@@ -767,7 +785,7 @@ export function measureContours(view, response, frame, tolerancePx, anchors) {
     const cells = [1920 / gateWidth * canvas.clientWidth / canvas.width, 1080 / (gateWidth * 1080 / 1920) * canvas.clientHeight / canvas.height]
     assert(visibility.destinationCellSourcePixels.every((value, index) => Math.abs(value - cells[index]) <= 1e-7), 'Contour destination cells differ from the actual WebGL backing store')
   } catch (error) {
-    unavailable.push(...required.map(item => ({ viewId: view.id, contourId: item.check.id, partPath: item.check.partPath, role: item.check.role, status: 'unmeasured-native', reason: error.message })))
+    unavailable.push(...required.map(item => ({ ...item, viewId: view.id, contourId: item.check.id, partPath: item.check.partPath, role: item.check.role, status: 'unmeasured-native', reason: error.message })))
     return { measured, unavailable, retainedFits }
   }
   const layoutIndex = visibility.sourceLayout.findIndex(item => item.viewId === view.id)
@@ -817,7 +835,7 @@ export function measureContours(view, response, frame, tolerancePx, anchors) {
         camera: visibility.camera, rectSourcePixels: visibility.rectSourcePixels, presentation: visibility.presentation, sourceLayout: visibility.sourceLayout,
         resolvedImagePlaneWarp: visibility.resolvedImagePlaneWarp, destinationCellSourcePixels: visibility.destinationCellSourcePixels, nativeViewportBackingPixels: visibility.nativeViewportBackingPixels,
         input: mechanism.input, independentMidIntervalObservation: frame.measuredInterpolation === true })
-    } catch (error) { unavailable.push({ ...context, status: 'unmeasured-contour', reason: error.message }) }
+    } catch (error) { unavailable.push({ ...item, ...context, status: 'unmeasured-contour', reason: error.message }) }
   }
   return { measured, unavailable, retainedFits }
 }
@@ -1335,10 +1353,12 @@ const CONTOUR_EVIDENCE_FIELDS = new Set([
   'nativePartBinding', 'destinationCellSourcePixels', 'nativeViewportBackingPixels', 'check', 'sourceViewSupport',
 ])
 
-/** Report-only lossless factoring; measurement APIs and stage computation stay raw. */
-export function normalizeVerificationReport(report) {
+/** Report-only lossless factoring; an optional run-local cache holds finalized videos only. */
+export function normalizeVerificationReport(report, finalizedVideos = null) {
+  const cached = finalizedVideos?.get(report)
+  if (cached) return cached
   assert(!Object.hasOwn(report, 'reportSchemaVersion') && !Object.hasOwn(report, 'contourEvidence'), 'Expected an unencoded verification report')
-  if (Array.isArray(report.videos)) return { ...report, reportSchemaVersion: REPORT_SCHEMA_VERSION, videos: report.videos.map(normalizeVerificationReport) }
+  if (Array.isArray(report.videos)) return { ...report, reportSchemaVersion: REPORT_SCHEMA_VERSION, videos: report.videos.map(video => normalizeVerificationReport(video, finalizedVideos)) }
   const contourEvidence = Object.create(null), identities = new WeakMap()
   const intern = value => {
     if (identities.has(value)) return identities.get(value)
@@ -1453,8 +1473,9 @@ function* reportJsonChunks(value, statistics) {
 }
 
 /** Backpressured 64KiB writes and atomic publication, never a whole-report string. */
-export async function writeVerificationReport(path, report) {
-  const encoded = normalizeVerificationReport(report)
+export async function writeVerificationReport(path, report, finalizedVideos = null) {
+  const encoded = normalizeVerificationReport(report, finalizedVideos)
+  if (!Array.isArray(report.videos)) finalizedVideos?.set(report, encoded)
   const temporary = `${path}.${process.pid}-${randomUUID()}.tmp`
   const statistics = { bytesWritten: 0, chunksWritten: 0, maxChunkBytes: 0 }
   try {
@@ -1472,7 +1493,7 @@ export async function verifySync(options = parseOptions(process.argv.slice(2))) 
   const startedAt = new Date().toISOString(), outputDirectory = resolve(options.output ?? resolve(WEB_ROOT, '.vite/verification-output', `stage-${options.stage}-${startedAt.replace(/[:.]/g, '-')}`))
   await mkdir(outputDirectory, { recursive: true })
   const report = { schemaVersion: 1, startedAt, finishedAt: null, status: 'unavailable', stage: options.stage, stageLadder: STAGES, scope: options.scoped ? 'time-scoped-diagnostic' : options.videos.length === 6 ? 'all-six-videos' : 'selected-videos', options, limits: { frameWidthPixels: 1920, frameHeightPixels: 1080, errorFrameWidthPercent: options.stage, sourceLandmarkPx: 1920 * options.stage / 100, videoModelClockSeconds: CLOCK_LIMIT, compactViewportPixels: [200, 200] }, model: { sha256: MODEL_SHA256, sourceCommit: MODEL_COMMIT, integrity: 'unmeasured' }, interpretation: 'Chosen feasible hidden inputs are not historical recovery. Compact playback is approximate/unverified until this measured stage passes. Every integer second, authored/visible change and actual source view remains mandatory; missing/failed required measurements never pass. Extra interior observations are diagnostic: missing/inadmissible oracles do not add certification prerequisites, but independently admitted measured pixel counterexamples still fail the stage. GPU marker readback is actual render proof, not CPU projection; diagnostic markers alone do not certify every native surface. Narrow retained geometry exceptions remain uncertified.', videos: [], failures: [], builtAssets: [], browserLog: [], serverRequests: [] }
-  const abort = new AbortController(), interrupt = () => abort.abort(new Error('Verification interrupted'))
+  const finalizedVideos = new Map(), abort = new AbortController(), interrupt = () => abort.abort(new Error('Verification interrupted'))
   process.once('SIGINT', interrupt); process.once('SIGTERM', interrupt)
   let server, browser, context, page
   try {
@@ -1535,7 +1556,7 @@ export async function verifySync(options = parseOptions(process.argv.slice(2))) 
         if (unmeasured.length) video.failures.push({ code: 'unmeasured-census', reason: `${unmeasured.length} selected mandatory samples were not measured` })
       }
       if (video.status !== 'passed') report.failures.push({ videoId: id, status: video.status, reasons: video.failures, unavailableSamples: video.coverage?.unavailableRequiredSamples ?? null })
-      await writeVerificationReport(resolve(outputDirectory, `${id}.json`), video)
+      await writeVerificationReport(resolve(outputDirectory, `${id}.json`), video, finalizedVideos)
       console.log(JSON.stringify({ videoId: id, stage: options.stage, status: video.status, coverage: video.coverage, maxErrorPx: video.maxErrorPx, unavailableReasons: video.unavailableReasons.length }))
     }
     if (report.browserLog.some(item => item.type === 'pageerror')) report.failures.push({ code: 'unhandled-browser-error', reasons: report.browserLog })
@@ -1546,7 +1567,7 @@ export async function verifySync(options = parseOptions(process.argv.slice(2))) 
     process.removeListener('SIGINT', interrupt); process.removeListener('SIGTERM', interrupt)
     report.finishedAt = new Date().toISOString()
     if (report.status === 'passed' && report.failures.length) report.status = 'failed'
-    const path = resolve(outputDirectory, 'report.json'); await writeVerificationReport(path, report)
+    const path = resolve(outputDirectory, 'report.json'); await writeVerificationReport(path, report, finalizedVideos)
     console.log(JSON.stringify({ status: report.status, scope: report.scope, stage: report.stage, tolerancePx: report.limits.sourceLandmarkPx, videoCount: report.videos.length, report: path }, null, 2))
   }
   return report.status === 'passed' ? 0 : 1

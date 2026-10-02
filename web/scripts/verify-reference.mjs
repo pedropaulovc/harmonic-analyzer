@@ -824,7 +824,7 @@ export function inspectReference(data, expectedId, native = null) {
 export async function probeSource(path, expected, { signal } = {}) {
   const observedSha256 = await sha256File(path)
   if (observedSha256 !== expected.sha256) throw new Error(`Source SHA256 mismatch: ${path}`)
-  const { stdout } = await runTool('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_streams', '-show_format', '-show_frames', '-show_entries', 'stream=width,height,avg_frame_rate,duration:format=duration:frame=best_effort_timestamp_time', '-of', 'json', path], { signal })
+  const { stdout } = await runTool('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_streams', '-show_format', '-show_frames', '-show_entries', 'stream=width,height,avg_frame_rate,duration,time_base:format=duration:frame=best_effort_timestamp,best_effort_timestamp_time', '-of', 'json', path], { signal })
   const probe = JSON.parse(stdout), stream = probe.streams?.[0]
   const [numerator, denominator] = (stream?.avg_frame_rate ?? '').split('/').map(Number)
   const fps = numerator / denominator
@@ -836,7 +836,13 @@ export async function probeSource(path, expected, { signal } = {}) {
   if (stream?.width !== 1920 || stream?.height !== 1080 || !finite(fps) || fps <= 0 || !pts.length || pts.some((value, index) => !finite(value) || (index && value <= pts[index - 1]))) throw new Error(`Invalid actual decoded stream/PTS: ${path}`)
   const durationSeconds = Number(probe.format?.duration)
   if (Math.abs(durationSeconds - expected.durationSeconds) > 0.05) throw new Error(`Actual source duration differs from observations: ${durationSeconds}/${expected.durationSeconds}`)
-  return { observedSha256, width: stream.width, height: stream.height, fps, durationSeconds, nativeFrameCount: pts.length, pts }
+  // Exact integer clock evidence resolves competing declarations only. Missing
+  // evidence does not change unique authored selection or legacy replay gates.
+  const timeTerms = (stream.time_base ?? '').split('/').map(Number), [timeNumerator, timeDenominator] = timeTerms
+  const timeBase = timeTerms.length === 2 && Number.isSafeInteger(timeNumerator) && timeNumerator > 0 && Number.isSafeInteger(timeDenominator) && timeDenominator > 0
+    ? { numerator: timeNumerator, denominator: timeDenominator } : null
+  const timestampTicks = probe.frames.map(frame => Number.isSafeInteger(frame.best_effort_timestamp) ? frame.best_effort_timestamp : null)
+  return { observedSha256, width: stream.width, height: stream.height, fps, durationSeconds, nativeFrameCount: pts.length, pts, timestampTicks, timeBase }
 }
 
 export async function loadReferences(webRoot, referenceRoot, { signal } = {}) {

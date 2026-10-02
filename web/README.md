@@ -193,6 +193,13 @@ Exact aliases use the declared `sha256Bgr8` or `sha256Gray8` hash for their
 pixel format. Formats never alias each other; sampling diagnostics list
 supported formats and any unsupported source declarations.
 
+Competing off-track CHECK timestamps use the original video's integer
+`best_effort_timestamp` and rational `time_base`, not FFprobe's six-decimal time
+string. Both full-precision IEEE evaluations of that rational clock are accepted;
+no nearest-frame or timing tolerance selects source pixels. FIT-only timestamp
+aliases cannot block a sole CHECK exposure. Conflicting full CHECK declarations
+remain unavailable, and original declared timestamps are preserved.
+
 Retained `SourceContourCheck` records carry an authoritative explicit
 `role: 'fit' | 'check'`. Missing/invalid roles fail closed; neither prose, moving
 ancestry nor a failed residual can assign or change that role. `verify:sync` joins
@@ -245,7 +252,7 @@ A valid indexed `motion: 'rod'` binding qualifies native kinematic moving
 eligibility, without borrowing a rocker anchor or guessing from path-name stems.
 The query requires membership in the actual rig updater; a cloned part cannot
 claim moving eligibility merely by inheriting its source's binding metadata.
-An exact-target position or quaternion override in the selected or rendered view
+An exact or ancestor position/quaternion override in the selected view
 also prevents that part from supplying moving coverage.
 Reports retain this `nativePartBinding`, the source association in
 `measurementEvidence`, and `observedSourceInternalMotion: 'unmeasured'`:
@@ -275,6 +282,11 @@ exposures against the **current native GPU** with the exact selected source time
 ```sh
 HARMONIC_SOFTWARE_GL=0 npm --prefix web run verify:sync -- --stage 20 --video rocker-arms --times 967.5916249999999,968,969,970,971,973,975,976,978,979,980,981,982,983,984,985,986,988,989,990,991,992,994,995,996,997,998,1000,1001,1002,1003,1004,1005,1006,1007,1008,1009,1011,1012,1013,1014,1014.2215416666666,1014.26325,1014.6281979166666,1014.9931458333333,1015,1015.35809375,1015.6813333333332 --output "$PWD/web/.vite/verification-output/rocker-contours48-stage20"
 ```
+
+Resolve the version2 report with `resolveVerificationReport` before inspecting
+these fields. In the serialized file, `sourceImageRef`,
+`nativeBoundarySamplesRef` and `nativePartBindingRef` are keys into that video's
+`contourEvidence` dictionary, not missing evidence.
 
 Inspect the actual `webglRenderer` (native NVIDIA/RTX3090 for that acceptance run),
 each sample's `contourChecks` source image and fresh redraw receipts, nonzero target
