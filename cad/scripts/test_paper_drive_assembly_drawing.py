@@ -24,6 +24,7 @@ import transgear_drive_collar_spec as collar
 import transgear_cluster_fit as cluster_fit
 import transgear_rear_bushing_spec as rear_bushing
 import transgear_removable_spec as sprocket
+from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
 from _drawing_registry import DRAWING_TEMPLATES, DRAWINGS_BY_NAME
 
 STEP_HEAD = re.compile(r"^(\d+)\. ", re.MULTILINE)
@@ -306,6 +307,112 @@ def test_the_collar_rim_matcher_takes_the_one_arc_holding_the_landing() -> None:
         drawing.collar_rear_rim([])
     with pytest.raises(RuntimeError, match="matched 2 of 3 circles"):
         drawing.collar_rear_rim([lower, flipped, upper])
+
+
+# Farm run 20261002T180658288Z's inner-view ring (its drawing.balloon_ring
+# event): BOM item and attachment (sheet m), in ring order. 17 is the
+# arm-plate screw, 24 the rear bushing, 32 the collar.
+INNER_RING_180658 = (
+    ("34", (0.219889, 0.176708)),
+    ("32", (0.220362, 0.174046)),
+    ("18", (0.229903, 0.170997)),
+    ("35", (0.234541, 0.176240)),
+    ("39", (0.236058, 0.178096)),
+    ("26", (0.226995, 0.178996)),
+    ("24", (0.228995, 0.180840)),
+    ("17", (0.233308, 0.188817)),
+    ("33", (0.218228, 0.178923)),
+)
+# That run logged no outline: run 20261002T172458664Z's 1:2 inner outline,
+# scaled to 1:3 about the collar's landing (218.520, 171.821 there; 220.362,
+# 174.046 here). Its circles render r 5.232 mm.
+INNER_OUTLINE_180658 = (0.209403, 0.162653, 0.239943, 0.192772)
+BALLOON_RADIUS = 0.005232
+
+
+def _ring_centres(
+    outline: tuple[float, float, float, float],
+) -> list[tuple[float, float]]:
+    """_spread_balloons' circle centres for INNER_RING_180658, in its order."""
+    cx, cy = (outline[0] + outline[2]) / 2.0, (outline[1] + outline[3]) / 2.0
+    rx = (outline[2] - outline[0]) / 2.0 + drawing.BALLOON_MARGIN
+    ry = (outline[3] - outline[1]) / 2.0 + drawing.BALLOON_MARGIN
+    thetas = [math.atan2(y - cy, x - cx) for _item, (x, y) in INNER_RING_180658]
+    order = sorted(range(len(thetas)), key=thetas.__getitem__)
+    gap = _drawing_common._min_angular_gap(
+        min(rx, ry), BALLOON_RADIUS, clearance=_drawing_common._BALLOON_CLEARANCE_M
+    )
+    angles = _drawing_common._push_apart_on_ring(
+        [thetas[index] for index in order], min_gap=gap
+    )
+    centres = [(0.0, 0.0)] * len(thetas)
+    for index, angle in zip(order, angles):
+        centres[index] = (cx + rx * math.cos(angle), cy + ry * math.sin(angle))
+    return centres
+
+
+def _crossed_items(
+    centres: list[tuple[float, float]], slots: list[int]
+) -> set[frozenset[str]]:
+    """The item pairs whose printed leaders, circle edge to attachment, cross."""
+    segments = []
+    for (item, (x, y)), slot in zip(INNER_RING_180658, slots):
+        bx, by = centres[slot]
+        length = math.hypot(x - bx, y - by)
+        segments.append(
+            LeaderSegment(
+                label=item,
+                kind="balloon",
+                x0=bx + (x - bx) / length * BALLOON_RADIUS,
+                y0=by + (y - by) / length * BALLOON_RADIUS,
+                x1=x,
+                y1=y,
+            )
+        )
+    return {
+        frozenset((crossing.a.label, crossing.b.label))
+        for crossing in find_leader_leader_crossings(segments)
+    }
+
+
+def test_the_inner_ring_swaps_crossing_leaders_onto_each_others_slots() -> None:
+    attachments = [attach for _item, attach in INNER_RING_180658]
+    identity = list(range(len(INNER_RING_180658)))
+    centres = _ring_centres(INNER_OUTLINE_180658)
+    # The ring as run 20261002T180658288Z left it crosses 17 over 24.
+    assert _crossed_items(centres, identity) == {frozenset({"17", "24"})}
+    slots = drawing.uncrossed_ring_slots(centres, attachments)
+    moved = {INNER_RING_180658[index][0] for index in identity if slots[index] != index}
+    assert moved == {"17", "24"}
+    assert _crossed_items(centres, slots) == set()
+    # The outline is reconstructed: within 2 mm of it either way, whatever
+    # the ring crosses, the slots it takes cross nothing, and no leader runs
+    # through another balloon's circle.
+    for dx, dy in product((-0.002, 0.0, 0.002), repeat=2):
+        x0, y0, x1, y1 = INNER_OUTLINE_180658
+        shifted = _ring_centres((x0 + dx, y0 + dy, x1 + dx, y1 + dy))
+        slots = drawing.uncrossed_ring_slots(shifted, attachments)
+        assert sorted(slots) == identity
+        assert _crossed_items(shifted, slots) == set(), (dx, dy)
+        for index, (x, y) in enumerate(attachments):
+            bx, by = shifted[slots[index]]
+            for other, (ox, oy) in enumerate(shifted):
+                if other == slots[index]:
+                    continue
+                t = ((ox - bx) * (x - bx) + (oy - by) * (y - by)) / (
+                    (x - bx) ** 2 + (y - by) ** 2
+                )
+                t = min(1.0, max(0.0, t))
+                gap = math.hypot(bx + t * (x - bx) - ox, by + t * (y - by) - oy)
+                assert gap > BALLOON_RADIUS, (dx, dy, index, other)
+
+
+def test_an_uncrossed_ring_keeps_its_slots() -> None:
+    centres = [(0.0, 1.0), (1.0, 0.0), (0.0, -1.0)]
+    attachments = [(0.0, 0.1), (0.1, 0.0), (0.0, -0.1)]
+    assert drawing.uncrossed_ring_slots(centres, attachments) == [0, 1, 2]
+    # Two leaders swapped across each other go back.
+    assert drawing.uncrossed_ring_slots(centres[:2], attachments[1::-1]) == [1, 0]
 
 
 # The transgear families the sheet-2 isometric draws no reachable ink of (farm

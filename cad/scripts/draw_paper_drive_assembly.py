@@ -77,9 +77,11 @@ from _drawing_common import (
     new_project_drawing,
     read_required_properties,
     rebuild_drawing,
+    rendered_balloon_circle,
     set_high_quality_shaded_with_edges,
     view_configuration,
 )
+from _drawing_layout_check import LeaderSegment, find_leader_leader_crossings
 from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
 from solidworks_mcp.adapters.com_variant import double_array
 from solidworks_mcp.adapters.solidworks.drawing import (
@@ -589,6 +591,94 @@ def collar_rim_landing(
         minus_end[0] + t * (plus_end[0] - minus_end[0]),
         minus_end[1] + t * (plus_end[1] - minus_end[1]),
     )
+
+
+# _spread_balloons rings a view's balloons in its attachments' angular order
+# about the view's centre, then pushes crowded circles apart along the ring.
+# An attachment far from that centre can leave its leader across a pushed
+# neighbour's: on farm run 20261002T180658288Z (swmaker000009, inner view at
+# 1:3, its nine circles 0.60 rad apart on a 27 mm ring) the arm-plate screw's
+# (item 17) leader from its attachment (233.3, 188.8) mm crossed the rear
+# bushing's (item 24) from (229.0, 180.8) mm at (233.2, 189.0). Swapping two
+# crossing leaders' slots uncrosses them and strictly shortens their total
+# length (the triangle inequality), so repeated swaps end; the cap only
+# bounds a wrong input.
+_UNCROSS_SWAPS_MAX = 64
+
+
+def uncrossed_ring_slots(
+    centres: Sequence[tuple[float, float]],
+    attachments: Sequence[tuple[float, float]],
+) -> list[int]:
+    """Which ring slot (an index into ``centres``, the circle centres as
+    placed) each balloon takes so that no two leaders, each from its circle's
+    centre to its attachment, cross. Leaders that do not cross keep their
+    slots, so the slots, and the circles' clearances, are the ring's own."""
+    if len(centres) != len(attachments):
+        raise ValueError("one ring slot per balloon attachment")
+    slots = list(range(len(centres)))
+    for _swap in range(_UNCROSS_SWAPS_MAX + 1):
+        segments = [
+            LeaderSegment(
+                label=str(index),
+                kind="balloon",
+                x0=centres[slots[index]][0],
+                y0=centres[slots[index]][1],
+                x1=attach[0],
+                y1=attach[1],
+            )
+            for index, attach in enumerate(attachments)
+        ]
+        crossings = find_leader_leader_crossings(segments)
+        if not crossings:
+            return slots
+        first, second = int(crossings[0].a.label), int(crossings[0].b.label)
+        slots[first], slots[second] = slots[second], slots[first]
+    raise RuntimeError(
+        f"balloon ring: leaders still cross after {_UNCROSS_SWAPS_MAX} slot swaps"
+    )
+
+
+def _uncross_ring(
+    adapter: Any, landings: Sequence[BalloonLanding], *, label: str
+) -> None:
+    """Move ``landings``' ringed balloons between their own ring slots until
+    no two leaders cross (:func:`uncrossed_ring_slots`); attachments stay."""
+    annotations, centres, offsets, attachments = [], [], [], []
+    for landing in landings:
+        x, y, _radius = rendered_balloon_circle(landing.note, label=label)
+        annotation = _early_bound(
+            _early_bound(landing.note, "INote").GetAnnotation(), "IAnnotation"
+        )
+        anchor = tuple(float(value) for value in (annotation.GetPosition() or ()))
+        points = tuple(
+            float(value) for value in (annotation.GetLeaderPointsAtIndex(0) or ())
+        )
+        if len(anchor) < 2 or len(points) < 6:
+            raise RuntimeError(f"{label}: {landing.stem} balloon is unreadable")
+        annotations.append(annotation)
+        centres.append((x, y))
+        offsets.append((anchor[0] - x, anchor[1] - y))
+        attachments.append((points[-3], points[-2]))
+    slots = uncrossed_ring_slots(centres, attachments)
+    moved = [index for index, slot in enumerate(slots) if slot != index]
+    for index in moved:
+        x, y = centres[slots[index]]
+        if not annotations[index].SetPosition(
+            x + offsets[index][0], y + offsets[index][1], 0.0
+        ):
+            raise RuntimeError(
+                f"{label}: failed to move {landings[index].stem} balloon"
+            )
+    if moved:
+        _telemetry.info(
+            f"{label}: swapped ring slots to uncross leaders: "
+            + ", ".join(
+                f"{landings[index].stem} -> {landings[slots[index]].stem}'s"
+                for index in moved
+            )
+        )
+        rebuild_drawing(adapter, label=f"{label} uncrossed")
 
 
 # Sheet 1's isometric balloons what sheets 2 and 3 do not show: the chain,
@@ -1584,6 +1674,7 @@ def _place_bom_sheet(
         margin=BALLOON_MARGIN,
     )
     rebuild_drawing(adapter, label=f"{balloons_label} ring")
+    _uncross_ring(adapter, inner_landings, label=balloons_label)
     landings += inner_landings
     _place_sheet_note(
         adapter,
