@@ -653,6 +653,21 @@ class SynthesisDependencyEpochTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'installed Three dependency epoch differs'):
             self.validate()
 
+    def test_missing_installed_package_is_unavailable_not_version_drift(self):
+        self.validate()
+        package = self.root / 'web/node_modules/three'
+        package.rename(self.root / 'saved-three-package')
+        with self.assertRaisesRegex(ValueError, 'installed Three dependency unavailable'):
+            self.validate()
+
+    def test_non_directory_package_path_is_unavailable_not_version_drift(self):
+        self.validate()
+        package = self.root / 'web/node_modules/three'
+        package.rename(self.root / 'saved-three-package')
+        package.write_bytes(b'not an installed package directory\n')
+        with self.assertRaisesRegex(ValueError, 'installed Three dependency unavailable'):
+            self.validate()
+
     def test_missing_dependency_cannot_disappear_from_census(self):
         self.validate()
         (self.root / 'web/node_modules/three/examples/jsm/loaders/GLTFLoader.js').unlink()

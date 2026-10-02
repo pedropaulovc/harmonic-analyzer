@@ -176,7 +176,8 @@ Synthesis generation validates its portable CPU-equivalence bridge against both
 executed dependency manifests. The installed Three tree, including GLTFLoader,
 must match their exact file paths and byte hashes. `web/package.json` and
 `web/package-lock.json` have separate generation-time byte pins; they were not
-included in the historical proof manifests. Dependency drift refuses generation.
+included in the historical proof manifests. A missing Three installation reports
+dependency unavailability; changed dependency bytes refuse generation as drift.
 The bridge preserves historical GPU provenance and makes no current GPU claim.
 
 ### Measurement and refinement

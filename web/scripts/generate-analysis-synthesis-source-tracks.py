@@ -85,11 +85,10 @@ def installed_three_epoch():
     detect a dependency mutation even after an earlier successful validation.
     """
     package = ROOT / "web/node_modules/three"
-    try:
-        files = {path.relative_to(ROOT).as_posix(): dependency_file_record(path)
-                 for path in package.rglob("*") if path.is_file()}
-    except OSError as error:
-        raise ValueError("Chosen cam-rod installed Three dependency unavailable") from error
+    if not package.is_dir():
+        raise ValueError("Chosen cam-rod installed Three dependency unavailable: web/node_modules/three")
+    files = {path.relative_to(ROOT).as_posix(): dependency_file_record(path)
+             for path in package.rglob("*") if path.is_file()}
     encoded = json.dumps(files, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
     return {"path": "web/node_modules/three", "fileCount": len(files),
             "bytes": sum(record["bytes"] for record in files.values()),
