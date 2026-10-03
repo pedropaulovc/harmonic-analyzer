@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "kind": "lossless-web-model-representation",
+  "source": {
+    "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+    "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+  },
+  "representation": {
+    "path": "models/harmonic-analyzer.glb",
+    "sha256": "ad5c259265be354fb25d208281301356d7587c6a2e508fce1a6cd29014a74719",
+    "byteLength": 38975844,
+    "codec": "EXT_meshopt_compression"
+  },
+  "pipeline": {
+    "version": 1,
+    "steps": [
+      "exact-dedup",
+      "meshopt"
+    ],
+    "codecVersion": "meshoptimizer@0.22.0"
+  },
+  "equivalence": {
+    "method": "decoded-per-drawable-exact-v1",
+    "semanticSha256": "b60baed017b499c6d48e8b5aeab3c2c19f2ad256c26c0bd8e17cb094b3b4a093",
+    "drawableCount": 433
+  }
+}

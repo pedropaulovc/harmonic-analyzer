@@ -124,6 +124,9 @@ async function loadScene(bytes) {
 
 test('exact meshes/images deduplicate while all named independently transformed scene instances survive and share real Three geometry', async () => {
   const model = fixture(), sourceBytes = packGlb(model.json, model.binary)
+  // Compare against the serialized source document, not JavaScript-only -0
+  // transform values that JSON.stringify has already encoded as 0.
+  const sourceJson = unpackGlb(sourceBytes).json
   const { optimizedBytes, report } = await optimizeModel(sourceBytes)
   const optimized = unpackGlb(optimizedBytes)
   assert.equal(optimized.json.meshes.length, 1)
@@ -131,7 +134,7 @@ test('exact meshes/images deduplicate while all named independently transformed 
   assert.equal(optimized.json.bufferViews.length, 4)
   assert.equal(optimized.json.images.length, 1)
   assert.equal(optimized.json.textures[0].source, optimized.json.textures[1].source)
-  assert.deepEqual(optimized.json.nodes.map(node => ({ ...node, mesh: node.mesh === undefined ? undefined : 'same-geometry' })), model.json.nodes.map(node => ({ ...node, mesh: node.mesh === undefined ? undefined : 'same-geometry' })))
+  assert.deepEqual(optimized.json.nodes.map(node => ({ ...node, mesh: node.mesh === undefined ? undefined : 'same-geometry' })), sourceJson.nodes.map(node => ({ ...node, mesh: node.mesh === undefined ? undefined : 'same-geometry' })))
   assert.deepEqual(optimized.json.scenes, model.json.scenes)
   assert.deepEqual(optimized.json.materials, model.json.materials)
   assert.deepEqual(optimized.json.asset, model.json.asset)

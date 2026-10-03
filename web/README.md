@@ -18,9 +18,27 @@ npm --prefix web run dev
 ```
 
 The model is a generated artifact, absent from a fresh checkout. Use the exact
-CAD export identified by `src/mechanics-data.ts`; incompatible bytes are rejected.
-`fetch-model` can also copy the existing `cad/out/gltf/` export. Missing models
-and failed YouTube playback produce visible errors.
+raw CAD export identified by `src/mechanics-data.ts`; incompatible bytes are
+rejected. `fetch-model` validates the current raw pin, performs lossless exact
+deduplication and Meshopt compression, then publishes only the optimized GLB.
+It also accepts the existing `cad/out/gltf/` export when no path is supplied.
+The raw cache stays outside public assets under `web/.vite/model-source/`.
+Missing models and failed YouTube playback produce visible errors.
+
+To adopt a future approved CAD release, provide both its full commit and raw
+SHA-256 (not the optimized file's hash):
+
+```sh
+npm --prefix web run fetch-model -- /path/to/new.glb --source-commit <full40hexapprovedCADcommit> --source-sha256 <approvedraw64hexreleasehash>
+```
+
+The release command reads that exact CAD revision, checks the raw model against
+its native mechanics, and stages the new native metadata and optimized asset
+before publication. Missing revisions or incompatible mechanics leave the last
+working assets intact. A current source commit does not approve arbitrary bytes.
+Existing source tracks are stale for a new raw model and reject source-following;
+manual exploration is not recalibration. See [`DESIGN.md`](DESIGN.md) for the
+representation and provenance contract.
 
 Playback can start while the model or source track loads. Source-following starts
 automatically when both are ready; pausing retains manual exploration. Status
@@ -238,6 +256,8 @@ and hashes remain provenance links, not regeneration dependencies. No source
 video or screenshots are included in those inputs. Capture-bound renderer and
 model hashes remain strict; changing the renderer requires recapturing its
 bound evidence.
+Lossless delivery optimization keeps the native raw hash authoritative; it does
+not recalibrate observations or establish geometry/source fidelity acceptance.
 
 `npm --prefix web run test:source` runs the source-generation boundary tests
 through uv in an isolated Python environment. The suite covers exact-exposure
@@ -257,6 +277,22 @@ is available for automation. External-media restrictions are failures, not skips
 
 `npm --prefix web run build` produces static files under `web/dist/`. The default
 base path is `/harmonic-analyzer/`; set `SIMULATOR_BASE` consistently for both the
-build and verifier when deploying elsewhere. The authentic model is approximately
-223 MB, so its first load is substantial. Fidelity verification uses all twenty
-channels and the full export; it must not substitute reduced geometry.
+build and verifier when deploying elsewhere. Deployment publishes the optimized
+representation, not the 222,903,724-byte raw export or its private cache.
+Exact geometry sharing reduces duplicate buffers; Meshopt reduces transfer
+bytes, not the instance-expanded triangle count. No frame-rate improvement is
+established. Fidelity verification still uses all twenty channels and the full
+geometry; it must not substitute reduced geometry.
+
+The current source-v37 import produced the same result in two runs:
+
+| Representation | Bytes |
+|---|---:|
+| Raw native export | 222,903,724 |
+| Exact deduplication | 61,672,576 |
+| Meshopt delivery asset | 38,975,844 |
+
+This is an 82.5145% reduction in delivered model bytes. All 429 source nodes and
+433 drawable instances are preserved; triangle count is unchanged. Native
+mechanical metadata is unchanged. These measurements establish lossless asset
+delivery, not geometry/source fidelity acceptance or a frame-rate improvement.

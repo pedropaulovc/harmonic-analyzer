@@ -2,6 +2,9 @@ import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
+import { MeshoptDecoder } from 'meshoptimizer'
+import modelRepresentation from '../content/model-representation.json'
+import { assertModelRepresentationBytes, REPRESENTATION_KIND, REPRESENTATION_PATH } from '../model-representation.mjs'
 import { BINDINGS, instanceIndex, type Binding } from './bindings'
 import { createMechanismInput, createMechanismPose, solveMechanism, MECHANISM_DATA, type MechanismInput, type MechanismPose } from './mechanics'
 import { PAPER_FEED_MULTIPLIER } from './kinematics'
@@ -144,8 +147,13 @@ export interface PartOverride {
 }
 export interface ModelProvenance {
   sourceCommit: string
+  /** Pinned RAW native CAD identity, not an observation of downloaded bytes. */
+  sourceSha256: string
+  representationKind: typeof REPRESENTATION_KIND
   expectedSha256: string
   observedSha256: string | null
+  expectedByteLength: number
+  observedByteLength: number | null
   generator: string | null
   identity: 'matched' | 'mismatched' | 'unavailable'
   url: string
@@ -215,7 +223,7 @@ export const EXPLORING_VIEW_ID = 'exploring'
 const SOURCE_WIDTH = 1920
 const SOURCE_HEIGHT = 1080
 const FULL_FRAME: readonly [number, number, number, number] = [0, 0, SOURCE_WIDTH, SOURCE_HEIGHT]
-const MODEL_URL = `${import.meta.env.BASE_URL}models/harmonic-analyzer.glb`
+const MODEL_URL = `${import.meta.env.BASE_URL}${REPRESENTATION_PATH}`
 const Z = new THREE.Vector3(0, 0, 1)
 const Y = new THREE.Vector3(0, 1, 0)
 
@@ -1809,8 +1817,11 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
   const probes = new Set<LandmarkProbe>()
   const provenance: ModelProvenance = {
     sourceCommit: MECHANISM_DATA.provenance.sourceCommit,
-    expectedSha256: MECHANISM_DATA.provenance.modelSha256,
-    observedSha256: null, generator: null, identity: 'unavailable', url,
+    sourceSha256: MECHANISM_DATA.provenance.modelSha256,
+    representationKind: REPRESENTATION_KIND,
+    expectedSha256: modelRepresentation.representation.sha256,
+    expectedByteLength: modelRepresentation.representation.byteLength,
+    observedSha256: null, observedByteLength: null, generator: null, identity: 'unavailable', url,
   }
   let availability: Machine['availability'] = 'unavailable'
   let loadError: string | null = null
@@ -1822,12 +1833,20 @@ export async function loadMachine(scene: THREE.Scene, options: LoadMachineOption
     const buffer = await response.arrayBuffer()
     const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', buffer))
     provenance.observedSha256 = Array.from(digest, byte => byte.toString(16).padStart(2, '0')).join('')
-    provenance.identity = provenance.observedSha256 === provenance.expectedSha256 ? 'matched' : 'mismatched'
-    if (provenance.identity === 'mismatched') {
+    provenance.observedByteLength = buffer.byteLength
+    try {
+      assertModelRepresentationBytes(modelRepresentation, MECHANISM_DATA.provenance, { sha256: provenance.observedSha256, byteLength: buffer.byteLength })
+      provenance.identity = 'matched'
+    } catch (error) {
+      provenance.identity = 'mismatched'
       availability = 'incompatible'
-      missing.push(`Model identity mismatch: ${provenance.observedSha256}; model not parsed or added to the scene`)
-    } else {
-      const gltf = await new GLTFLoader().parseAsync(buffer, new URL('.', new URL(url, location.href)).href)
+      loadError = error instanceof Error ? error.message : String(error)
+      missing.push(loadError)
+    }
+    if (provenance.identity === 'matched') {
+      if (!MeshoptDecoder.supported) throw new Error('This browser does not support the lossless Meshopt model decoder')
+      await MeshoptDecoder.ready
+      const gltf = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).parseAsync(buffer, new URL('.', new URL(url, location.href)).href)
       provenance.generator = gltf.asset.generator ?? null
       const loaded = gltf.scene
       parsed = loaded

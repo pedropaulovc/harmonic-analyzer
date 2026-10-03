@@ -200,3 +200,12 @@ test('continuous-shot permission requires nonblank string evidence at either end
     }
   }
 })
+
+test('source-following rejects a different raw native source or release commit rather than adopting transport identity', () => {
+  const replacement = fixture()
+  replacement.model.sha256 = 'f'.repeat(64)
+  assert.throws(() => new CompactVideoReference(replacement, video), /different native CAD export/)
+  const otherCommit = fixture()
+  otherCommit.model.sourceCommit = 'b'.repeat(40)
+  assert.throws(() => new CompactVideoReference(otherCommit, video), /different native CAD export/)
+})

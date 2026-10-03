@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
-"""Export pure CAD mechanism data and verify it against the released GLB.
+"""Export pure CAD mechanism data and verify it against an explicitly pinned raw GLB.
 
-Run from the repository root:
-  python web/scripts/export-mechanics.py --model /path/to/harmonic-analyzer.glb
-Only web output is written. CAD sources and the model are read-only. The GLB is
-not redistributed. Analytic force seats and calibrated native render seats are
+Run from the repository root (use the approved release commit and raw digest):
+  uv run --isolated --no-project --python 3.13 \\
+    --with-requirements web/scripts/requirements-model-export.txt \\
+    python web/scripts/export-mechanics.py --model /path/to/raw-native.glb \\
+    --source-commit 1268c23d4a8fc741147c5e09d8d1e45247a71945 \\
+    --expected-model-sha256 2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d
+Only web output is written. CAD sources and the raw model are read-only. The GLB
+is not redistributed. CAD is archived from the exact supplied commit, never from
+the working tree. Analytic force seats and calibrated native render seats are
 kept separate; the latter are never interpolated into an invented force model.
 """
 
@@ -17,6 +22,7 @@ import importlib
 import io
 import json
 import math
+import re
 import struct
 import subprocess
 import sys
@@ -117,23 +123,68 @@ def main() -> None:
     )
     parser.add_argument("--model", type=Path, required=True)
     parser.add_argument(
+        "--source-commit",
+        required=True,
+        help="Approved CAD source commit: exactly 40 lowercase hexadecimal characters",
+    )
+    parser.add_argument(
+        "--expected-model-sha256",
+        required=True,
+        help="Approved raw GLB SHA256: exactly 64 lowercase hexadecimal characters",
+    )
+    parser.add_argument(
         "--output",
         type=Path,
         default=Path(__file__).resolve().parents[1] / "src/mechanics-data.ts",
     )
     args = parser.parse_args()
-    working_cad = args.cad_root.resolve()
-    repo = working_cad.parent
-    # Evaluate the exact model revision, not today's potentially different CAD.
+    if not re.fullmatch(r"[0-9a-f]{40}", args.source_commit):
+        parser.error("--source-commit must be exactly 40 lowercase hexadecimal characters")
+    if not re.fullmatch(r"[0-9a-f]{64}", args.expected_model_sha256):
+        parser.error("--expected-model-sha256 must be exactly 64 lowercase hexadecimal characters")
+    if args.source_commit == RELEASE_COMMIT and args.expected_model_sha256 != RELEASE_SHA256:
+        parser.error(
+            f"--source-commit {RELEASE_COMMIT} requires the existing raw model SHA256 "
+            f"{RELEASE_SHA256}; its native release pin cannot be replaced"
+        )
+    try:
+        nodes, model_hash = glb_nodes(args.model)
+    except (OSError, ValueError, struct.error) as error:
+        parser.error(f"Cannot read --model as a complete raw GLB: {error}")
+    if model_hash != args.expected_model_sha256:
+        parser.error(
+            f"Raw model SHA256 {model_hash} differs from --expected-model-sha256 "
+            f"{args.expected_model_sha256}; supply the approved original raw GLB"
+        )
+    repo = args.cad_root.resolve().parent
+    # Evaluate the exact supplied model revision, never working-tree CAD.
     # Only pure scripts/configuration enter the temporary snapshot.
+    try:
+        archive = subprocess.check_output(
+            ["git", "archive", args.source_commit, "cad/scripts", "cad/config"],
+            cwd=repo,
+            stderr=subprocess.PIPE,
+        )
+    except subprocess.CalledProcessError as error:
+        detail = error.stderr.decode("utf-8", errors="replace").strip()
+        parser.error(
+            f"Cannot archive CAD source commit {args.source_commit}: {detail}. "
+            "Fetch that exact commit with cad/scripts and cad/config; working-tree CAD is never used"
+        )
+    except OSError as error:
+        parser.error(f"Cannot archive CAD source commit {args.source_commit} from {repo}: {error}")
     snapshot = tempfile.TemporaryDirectory(prefix="harmonic-mechanics-source-")
     snapshot_root = Path(snapshot.name)
-    archive = subprocess.check_output(
-        ["git", "archive", RELEASE_COMMIT, "cad/scripts", "cad/config"], cwd=repo
-    )
-    with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
-        tar.extractall(snapshot_root, filter="data")
+    try:
+        with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
+            tar.extractall(snapshot_root, filter="data")
+    except (OSError, tarfile.TarError) as error:
+        snapshot.cleanup()
+        parser.error(f"Cannot read CAD source archive for {args.source_commit}: {error}")
     cad = snapshot_root / "cad"
+    if not (cad / "scripts").is_dir() or not (cad / "config").is_dir():
+        snapshot.cleanup()
+        parser.error(f"CAD source archive for {args.source_commit} lacks cad/scripts or cad/config")
     sys.path.insert(0, str(cad / "scripts"))
     # This released data table sits in a COM recipe whose unrelated imports
     # pull telemetry/Windows machinery. Evaluate its exact assignment AST only:
@@ -238,9 +289,6 @@ def main() -> None:
     paper = modules["paper_drive_geom"]
     chain = modules["_chain"]
     installation = modules["cone_pivot_post_installation"]
-    nodes, model_hash = glb_nodes(args.model)
-    if model_hash != RELEASE_SHA256:
-        raise ValueError(f"Model SHA256 {model_hash} is not the pinned v37 release")
     count = config.machine("channels", "count")
     if count != 20:
         raise ValueError("The web solver requires the complete twenty-channel machine")
@@ -565,7 +613,7 @@ def main() -> None:
     data = {
         "harmonicNumbers": [row["harmonic_n"] for row in config.channels()],
         "provenance": {
-            "sourceCommit": RELEASE_COMMIT,
+            "sourceCommit": args.source_commit,
             "modelSha256": model_hash,
             "units": "CAD mm; exported pose uses metres/radians/newtons",
             "sourceFiles": sources,

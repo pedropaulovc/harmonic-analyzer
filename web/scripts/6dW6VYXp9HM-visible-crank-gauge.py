@@ -4,6 +4,11 @@
 uv run --no-project --python web/.vite/calibration-venv/bin/python \
     web/scripts/6dW6VYXp9HM-visible-crank-gauge.py
 
+The default model is the immutable raw cache at
+web/.vite/model-source/<MECHANISM_DATA.provenance.modelSha256>.glb.
+For an original raw GLB elsewhere, append --model /path/to/raw-native.glb.
+The compressed public model is never an input to this gauge.
+
 Source winding/tempo remain measured in the separate visible-crank packet. Native
 sign and first-phase offset here are chosen under the EXISTING unqualified main
 analysis16 camera; they are not historical shaft sign/home or camera calibration.
@@ -13,6 +18,7 @@ receipts stay private. The generic generator reads only the numeric gauge JSON.
 """
 from __future__ import annotations
 
+import argparse
 import copy
 import hashlib
 import json
@@ -29,7 +35,7 @@ ROOT = WEB.parent
 VIDEO_ID = "6dW6VYXp9HM"
 SOURCE = WEB / f"content/{VIDEO_ID}.visible-crank-motion.json"
 CONTROLS = WEB / f"content/{VIDEO_ID}.motion-controls.json"
-MODEL = WEB / "public/models/harmonic-analyzer.glb"
+NATIVE_DATA = WEB / "src/mechanics-data.ts"
 OUTPUT = WEB / f"content/{VIDEO_ID}.visible-crank-gauge.json"
 PRIVATE = WEB / f".vite/verification-output/{VIDEO_ID}-visible-crank-gauge"
 CAMERA = {
@@ -101,22 +107,54 @@ def signed_area(points):
 
 
 def main():
-    PRIVATE.mkdir(parents=True, exist_ok=True)
-    dependencies = [Path(__file__), SOURCE, CONTROLS, MODEL]
-    dependencies.extend(WEB / path for path in (*MATH_PATHS, *PROJECTION_PATHS))
-    before = {str(path.relative_to(ROOT)): digest(path) for path in dependencies}
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--model",
+        type=Path,
+        help="Original raw native GLB; defaults to the SHA-addressed raw model cache",
+    )
+    args = parser.parse_args()
+    try:
+        text = NATIVE_DATA.read_text()
+        native = json.loads(text.split("export const MECHANISM_DATA = ", 1)[1].rsplit(" as const", 1)[0])
+        native_model_sha256 = native["provenance"]["modelSha256"]
+    except (OSError, ValueError, IndexError, KeyError) as error:
+        parser.error(f"Cannot read current native raw model pin from {NATIVE_DATA}: {error}")
+    model = args.model if args.model is not None else WEB / ".vite/model-source" / f"{native_model_sha256}.glb"
+    model_label = f"raw-model/{native_model_sha256}.glb"
+    try:
+        model_sha256 = digest(model)
+    except OSError as error:
+        description = "required raw model cache" if args.model is None else "--model raw native GLB"
+        parser.error(
+            f"Cannot read {description} at {model}: {error}. "
+            "From web/, run `npm run fetch-model -- /path/to/raw-native.glb` to cache the original "
+            "native bytes, or supply --model /path/to/raw-native.glb. The compressed public GLB "
+            "cannot replace the raw source"
+        )
+    if model_sha256 != native_model_sha256:
+        parser.error(
+            f"Raw model SHA256 {model_sha256} differs from the current native pin "
+            f"{native_model_sha256}; supply the original raw GLB, not the compressed public asset"
+        )
+    dependencies = {str(path.relative_to(ROOT)): path for path in (Path(__file__), SOURCE, CONTROLS)}
+    dependencies.update({f"web/{path}": WEB / path for path in (*MATH_PATHS, *PROJECTION_PATHS)})
+    before = {label: digest(path) for label, path in dependencies.items()}
+    dependencies[model_label] = model
+    before[model_label] = model_sha256
     source = json.loads(SOURCE.read_text())
     controls = json.loads(CONTROLS.read_text())
+    if model_sha256 != controls["frozenCandidate"]["geometryAuthority"]["originalGlbSha256"]:
+        parser.error("Source static/native association and actual raw model identity differ")
     if source["authority"]["selectedNativeSign"] is not None or source["authority"]["absoluteNativeHomeTurns"] is not None:
         raise ValueError("Source authority must not identify a native gauge")
     base_input = copy.deepcopy(controls["frozenCandidate"]["frames"][0]["chosenInput"])
     if base_input["crankTurns"] != 0 or base_input["setup"]["coneSwingRad"] != 0 or base_input["setup"]["driveCrankOffsetTurns"] != 0:
         raise ValueError("Original chosen-feasible fixture no longer has zero engaged drive")
+    PRIVATE.mkdir(parents=True, exist_ok=True)
     orbit = execute("orbit-positive-control", [i / 360 for i in range(361)], base_input, 0)
-    if orbit["modelSha256"] != before[str(MODEL.relative_to(ROOT))]:
-        raise ValueError("Released native data and actual model identity differ")
-    if orbit["modelSha256"] != controls["frozenCandidate"]["geometryAuthority"]["originalGlbSha256"]:
-        raise ValueError("Source static/native association and actual model identity differ")
+    if orbit["modelSha256"] != before[model_label]:
+        raise ValueError("Executed native data and actual raw model identity differ")
     points = np.array([row["pixel"] for row in orbit["rows"][:-1]])
     centre, radii, degrees, rotation = ellipse_axes(points)
     measurement = source["measurement"]
@@ -166,7 +204,7 @@ def main():
                              "maximumEquilibriumResidualNm": max(abs(row["equilibriumResidualNm"]) for row in actual["rows"])})
     if not alternatives[0]["originalPixelSignedOrbitAreaPx2"] < 0 < alternatives[1]["originalPixelSignedOrbitAreaPx2"]:
         raise ValueError("Actual native projection did not distinguish clockwise/counterclockwise choices")
-    after = {str(path.relative_to(ROOT)): digest(path) for path in dependencies}
+    after = {label: digest(path) for label, path in dependencies.items()}
     if before != after:
         raise ValueError("Actually executed native/projection/source/producer dependency changed")
     packet = {
