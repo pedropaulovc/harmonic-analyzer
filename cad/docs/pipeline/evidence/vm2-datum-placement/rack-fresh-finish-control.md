@@ -1,5 +1,7 @@
 # Fresh semantic finish insertion control
 
+> Historical evidence: identifiers, paths, URLs and checksums below are retained as recorded. See [current subsystem identities](../../../subsystem-identities.md) for the canonical migration map.
+
 The [native control receipt](probes/rack-fresh-finish-specific-null/receipt.json)
 records a fresh symbol inserted immediately after view-scoped selection of the
 exact bore edge at its right rim. No endpoint or symbol-position setter was used.

@@ -6,6 +6,10 @@ Current workstream sequencing lives in the
 The companion now uses native video playback and measured source observations
 rather than scripted chapters.
 
+Historical chapter IDs and the Git snapshot link below are preserved. For current
+CAD part and assembly identities, see the
+[subsystem identity guide](../../cad/docs/subsystem-identities.md).
+
 ## Sourcing
 
 The beat order and pacing follow the engineerguy series, whose transcripts are

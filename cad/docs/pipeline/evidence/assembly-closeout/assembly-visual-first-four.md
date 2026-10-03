@@ -1,5 +1,7 @@
 # Independent closeout: first four assembly renders
 
+> Historical evidence: identifiers, paths, URLs and checksums below are retained as recorded. See [current subsystem identities](../../../subsystem-identities.md) for the canonical migration map.
+
 Inspected at frozen head `64c3dab4875354a7d44d709539e001db920a0377` in
 `C:/src/ha-assembly-closeout-independent`. Codex opened and visually inspected
 each actual PNG below using the image viewer. All four previews are readable;

@@ -55,6 +55,6 @@ TODO
 
 **Sources for this chapter**
 
-- `cad/scripts/build_harmonic_analyzer_assembly.py` (mate order)
+- `cad/scripts/build_ha_harmonic_analyzer_assembly.py` (mate order)
 - `verify:soundness`
 

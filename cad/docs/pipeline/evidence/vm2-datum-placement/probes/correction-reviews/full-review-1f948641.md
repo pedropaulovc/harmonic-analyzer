@@ -1,5 +1,7 @@
 # Independent full committed-diff review: 1f948641
 
+> Historical evidence: identifiers, paths, URLs and checksums below are retained as recorded. See [current subsystem identities](../../../../../subsystem-identities.md) for the canonical migration map.
+
 Verdict: **one outstanding offline contract failure; not clean**. Evidence-byte checks found no mismatch. This is not native acceptance, a green full build, or an external CodeRabbit approval.
 
 Reviewed PR #702 base `55056d4990d38ebb461f343d3002fc90731b9e73` against frozen head `1f948641ddb9418a43351d6051424fc18e3191b7`. The reviewer authored none of the implementation. Review used pinned Git blobs, not the working-tree source or the concurrently running native session. No COM calls, production edits, Git head changes, or merges were performed.

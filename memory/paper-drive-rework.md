@@ -5,6 +5,9 @@ metadata:
   type: project
 ---
 
+> Identity migration: dated findings, release paths and recorded identifiers below retain their snapshot values. For current IDs and paths, see the [subsystem identity guide](../cad/docs/subsystem-identities.md).
+
+
 # Paper-drive rework — reference findings + design (2026-07-07)
 
 User-reported issues (8) audited against book ch22/ch23, videos 2/4 + 4/4, ch30

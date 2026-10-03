@@ -1,5 +1,7 @@
 # Partial drawing visual receipt: batch 7
 
+> Historical evidence: identifiers, paths, URLs and checksums below are retained as recorded. See [current subsystem identities](../../../subsystem-identities.md) for the canonical migration map.
+
 Frozen head: `64c3dab4875354a7d44d709539e001db920a0377`.
 Initial batch pinned: `2026-09-08T05:36:14.275836+00:00`. The 82 names in batch 1-6 manifests were excluded. Seven additional completed PNGs were captured, below the cap of 20; no later arrivals were added.
 

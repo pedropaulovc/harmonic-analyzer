@@ -5,6 +5,9 @@ metadata:
   type: reference
 ---
 
+> Identity migration: dated findings, release paths and recorded identifiers below retain their snapshot values. For current IDs and paths, see the [subsystem identity guide](../cad/docs/subsystem-identities.md).
+
+
 Everything needed to author native `HoleWzd` features from Python lives in
 `cad/scripts/_holes.py` (`wizard_holes` + `HoleSpec`), probe-verified on this
 seat by `diagnostics/diag_hole_wizard.py` (6/6 volume-exact, 2026-07-11).

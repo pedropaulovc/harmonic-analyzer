@@ -15,29 +15,29 @@ The screws, and the small parts that do not belong anywhere else.
 
 | part | qty | material | stock |
 |---|---|---|---|
-| `fillister-screw` | TODO | TODO | TODO |
-| `guide-lock-screw` | TODO | TODO | TODO |
-| `slotted-screw` | TODO | TODO | TODO |
-| `thumb-screw` | TODO | TODO | TODO |
-| `hex-bolt` | TODO | TODO | TODO |
-| `lag-screw` | TODO | TODO | TODO |
-| `hanger-screw` | TODO | TODO | TODO |
-| `clamp-screw` | TODO | TODO | TODO |
-| `transgear-arm-plate-screw` | TODO | TODO | TODO |
-| `transgear-pivot-screw` | TODO | TODO | TODO |
-| `transgear-pivot-spring` | TODO | TODO | TODO |
-| `transgear-latch-pin` | TODO | TODO | TODO |
-| `latch-hook-bracket-screw` | TODO | TODO | TODO |
-| `latch-hook-rivet` | TODO | TODO | TODO |
-| `transgear-disc-screw` | TODO | TODO | TODO |
-| `transgear-collar-cross-pin` | TODO | TODO | TODO |
-| `transgear-knob-drive-pin` | TODO | TODO | TODO |
-| `transgear-knob-cup-pin` | TODO | TODO | TODO |
-| `gooseneck-set-screw` | TODO | TODO | TODO |
-| `guide-lock` | TODO | TODO | TODO |
-| `column-clamp-front` | TODO | TODO | TODO |
-| `column-clamp-back` | TODO | TODO | TODO |
-| `nameplate` | TODO | TODO | TODO |
+| `vn-fillister-screw` | TODO | TODO | TODO |
+| `vn-guide-lock-screw` | TODO | TODO | TODO |
+| `vn-slotted-screw` | TODO | TODO | TODO |
+| `vn-thumb-screw` | TODO | TODO | TODO |
+| `vn-hex-bolt` | TODO | TODO | TODO |
+| `vn-lag-screw` | TODO | TODO | TODO |
+| `vn-hanger-screw` | TODO | TODO | TODO |
+| `vn-clamp-screw` | TODO | TODO | TODO |
+| `vn-transgear-arm-plate-screw` | TODO | TODO | TODO |
+| `vn-transgear-pivot-screw` | TODO | TODO | TODO |
+| `vn-transgear-pivot-spring` | TODO | TODO | TODO |
+| `vn-transgear-latch-pin` | TODO | TODO | TODO |
+| `vn-latch-hook-bracket-screw` | TODO | TODO | TODO |
+| `vn-latch-hook-rivet` | TODO | TODO | TODO |
+| `vn-transgear-disc-screw` | TODO | TODO | TODO |
+| `vn-transgear-collar-cross-pin` | TODO | TODO | TODO |
+| `vn-transgear-knob-drive-pin` | TODO | TODO | TODO |
+| `vn-transgear-knob-cup-pin` | TODO | TODO | TODO |
+| `vn-gooseneck-set-screw` | TODO | TODO | TODO |
+| `pd-guide-lock` | TODO | TODO | TODO |
+| `sh-column-clamp-front` | TODO | TODO | TODO |
+| `sh-column-clamp-back` | TODO | TODO | TODO |
+| `fr-nameplate` | TODO | TODO | TODO |
 
 : {tbl-colwidths="[40,10,25,25]"}
 

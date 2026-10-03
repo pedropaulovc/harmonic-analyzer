@@ -4,6 +4,8 @@
 > status or implementation guidance. Current status and sequencing live in the
 > [Harmonic Analyzer project](https://github.com/users/pedropaulovc/projects/1).
 
+> Identity migration: this archived proposal retains its original script names and component identifiers. Use the [subsystem identity guide](../../cad/docs/subsystem-identities.md) for current IDs and paths.
+
 Two changes to the assembly build scripts:
 
 1. Replace cloned grounded structure with SolidWorks linear component patterns.

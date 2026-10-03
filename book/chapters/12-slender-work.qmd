@@ -37,12 +37,12 @@ TODO
 
 ::: {.callout-tip}
 ## Now make
-`pivot-shaft` (Ø6.35 × 203.2, L/D 32:1), then the `cone-gear-shaft` — five steps ending in a Ø0.79 × 34 mm journal.
+`ch-pivot-shaft` (Ø6.35 × 203.2, L/D 32:1), then the `dt-cone-gear-shaft` — five steps ending in a Ø0.79 × 34 mm journal.
 :::
 
 ---
 
 **Sources for this chapter**
 
-- `cad/docs/machining-dfm.md` (`cone-gear-shaft`, `pivot-shaft`, `fulcrum-shaft`)
+- `cad/docs/machining-dfm.md` (`dt-cone-gear-shaft`, `ch-pivot-shaft`, `ch-fulcrum-shaft`)
 

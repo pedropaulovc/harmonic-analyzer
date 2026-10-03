@@ -1,5 +1,7 @@
 # Final drawing visual batch 8
 
+> Historical evidence: identifiers, paths, URLs and checksums below are retained as recorded. See [current subsystem identities](../../../subsystem-identities.md) for the canonical migration map.
+
 All three drawing-number/revision value pairs remain distinct and inside their cells. Each assembly sheet has a resolved title and three populated views. The harmonic-analyzer assembly title has a field-containment defect already within issue #709 scope; no additional body-layout observation for #712 was found in this batch.
 
 Frozen source head: `64c3dab4875354a7d44d709539e001db920a0377`. Initial filename list pinned at `2026-09-08T05:53:24.250788+00:00`; excludes the 89 names in batches 1-7. The three exact source PNG copies complete 92 pinned drawing PNGs across those manifests. Prior batches retain their recorded limitations; this count is inspection coverage, not a statement that every sheet is clean.

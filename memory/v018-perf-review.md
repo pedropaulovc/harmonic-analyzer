@@ -5,6 +5,9 @@ metadata:
   type: project
 ---
 
+> Identity migration: dated findings, release paths and recorded identifiers below retain their snapshot values. For current IDs and paths, see the [subsystem identity guide](../cad/docs/subsystem-identities.md).
+
+
 Profiled the v0.18.0 `-logs.zip` (126 task logs, ~14,367s serial COM seat) + 3-agent code inspection.
 Extends [[checks-perf-value-audit]] + [[release-perf-incremental]]. NONE of these are implemented yet
 (review only, SW seat was in use). Ranked by est. seconds saved per full release run:

@@ -1,5 +1,7 @@
 # Native datum helper: fail-first regression run
 
+> Historical evidence: identifiers, paths, URLs and checksums below are retained as recorded. See [current subsystem identities](../../../subsystem-identities.md) for the canonical migration map.
+
 Run against unchanged production `_drawing_common.py` at correction head
 `a371f49448b9c7fb300b77152c59cb2874889657`. The proposed native mode remains
 unapplied pending VM1 coordination. All native objects, COM bindings and

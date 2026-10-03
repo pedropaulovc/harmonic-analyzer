@@ -5,6 +5,9 @@ metadata:
   type: project
 ---
 
+> Identity migration: dated findings, release paths and recorded identifiers below retain their snapshot values. For current IDs and paths, see the [subsystem identity guide](../cad/docs/subsystem-identities.md).
+
+
 There is now a **library** for driving the Makers/3DEXPERIENCE SolidWorks lifecycle
 in code, replacing the manual SW Rx / Platform-shortcut dance:
 `solidworks_mcp.adapters.sw_recovery` (in the submodule, merged as fork PR #92) +

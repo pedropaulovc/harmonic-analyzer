@@ -1,5 +1,7 @@
 # VM2 datum placement investigation
 
+> Historical evidence: identifiers, paths, URLs and checksums below are retained as recorded. See [current subsystem identities](../../../subsystem-identities.md) for the canonical migration map.
+
 This independent correction starts from main
 `55056d4990d38ebb461f343d3002fc90731b9e73`, with adapter
 `2269009ed56712867826516f4406afc98a0c2814`, under the

@@ -5,6 +5,9 @@ metadata:
   type: project
 ---
 
+> Identity migration: dated findings, release paths and recorded identifiers below retain their snapshot values. For current IDs and paths, see the [subsystem identity guide](../cad/docs/subsystem-identities.md).
+
+
 **2026-07-02 (branch `ch14-rom-rederive`, same day as [[ch30-gt-reanchor]]):**
 the rocker range of motion was re-derived from the ch14 book photos and the
 whole cam→rocker→rod chain re-authored around it.

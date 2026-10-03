@@ -5,6 +5,9 @@ metadata:
   type: project
 ---
 
+> Identity migration: dated findings, release paths and recorded identifiers below retain their snapshot values. For current IDs and paths, see the [subsystem identity guide](../cad/docs/subsystem-identities.md).
+
+
 Measured 2026-07-28 on drive-train, same commit, same cached assembly, ~32
 balloons on one un-isolated full-assembly view:
 
@@ -27,7 +30,7 @@ density: 32 balloons do not fit on the ring at the minimum gap, so
 `_push_apart_on_ring` falls back to even spacing, which its own docstring
 records as the placement that hauls leaders across the model.
 
-`draw_channel_assembly.py` records a DIFFERENT native-layout defect
+`draw_ch_channel_assembly.py` records a DIFFERENT native-layout defect
 (that `f375557a` replaced hand-pinned balloons with `layout=2` on the premise
 that "their order follows the view ring", and it does not). This run does NOT
 reproduce that one: the observation above is that the crossed pairs WERE in the
@@ -45,7 +48,7 @@ Two related facts measured at the same time:
   concealed component; isolate it.
 - **`AutoBalloon5` is nondeterministic about WHICH view balloons a given item**
   (observed: an item moved between views across two runs of an identical
-  assembly; also recorded independently in `draw_channel_assembly.py`). So a
+  assembly; also recorded independently in `draw_ch_channel_assembly.py`). So a
   drawing built on un-isolated AutoBalloon views cannot be made fully
   deterministic from the recipe side.
 

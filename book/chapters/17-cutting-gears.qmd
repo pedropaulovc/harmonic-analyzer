@@ -45,14 +45,14 @@ TODO
 
 ::: {.callout-tip}
 ## Now make
-`cone-gear` T120 — the largest and most forgiving gear in the set.
+`dt-cone-gear` T120 — the largest and most forgiving gear in the set.
 :::
 
 ---
 
 **Sources for this chapter**
 
-- `cad/scripts/build_cone_gear.py`
-- `cad/scripts/build_cylinder_gear.py`
+- `cad/scripts/build_dt_cone_gear.py`
+- `cad/scripts/build_dt_cylinder_gear.py`
 - Appendix @sec-gear-tables
 

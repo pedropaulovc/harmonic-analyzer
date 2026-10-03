@@ -7,6 +7,9 @@ metadata:
   originSessionId: ba03bcc4-d81e-4e71-bbc7-7926c9a87d29
 ---
 
+> Identity migration: dated findings, release paths and recorded identifiers below retain their snapshot values. For current IDs and paths, see the [subsystem identity guide](../cad/docs/subsystem-identities.md).
+
+
 Phase F motion pipeline PROVEN end-to-end 2026-06-13 on drive-train.SLDASM
 alone (`cad/scripts/probe_motion.py`): a crank motor drove the gear train and
 cylinder-gear-1 (a cam) swept 270° across a 2 s run, sampled by transform.

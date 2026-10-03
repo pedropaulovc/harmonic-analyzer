@@ -7,6 +7,9 @@ metadata:
   originSessionId: 5e824fa0-7bda-4055-8655-aa59ed6f0ef9
 ---
 
+> Identity migration: dated findings, release paths and recorded identifiers below retain their snapshot values. For current IDs and paths, see the [subsystem identity guide](../cad/docs/subsystem-identities.md).
+
+
 M6.4 output.SLDASM FINAL placements (2026-06-10, after the 17→8→0
 interference campaign). Authoritative source (HISTORICAL): the then-`build_output_assembly.py`
 constants (SPLIT 2026-06-20 into summing/magnifier/pen/paper-drive builders — see

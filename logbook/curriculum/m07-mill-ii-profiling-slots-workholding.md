@@ -21,8 +21,8 @@ hours_actual: 0
 ## References
 
 - `references/machining-for-hobbyists-getting-started/09_chapter-7-milling-machines.pdf`
-- `cad/docs/machining-dfm.md` (`rocker-arm`, `connecting-rod` rows)
-- `cad/scripts/build_rocker_arm.py`
+- `cad/docs/machining-dfm.md` (`ch-rocker-arm`, `ch-connecting-rod` rows)
+- `cad/scripts/build_ch_rocker_arm.py`
 
 ## Practice
 
@@ -34,7 +34,7 @@ hours_actual: 0
 
 ## Now make — the real part this unlocks
 
-**`rocker-arm`** ×20 (2.5 mm steel, R800 concave top edge — the **outline** of the plate, not a pocket) and **`connecting-rod`** ×20 (flat 2D profile, book-accurate rough finish).
+**`ch-rocker-arm`** ×20 (2.5 mm steel, R800 concave top edge — the **outline** of the plate, not a pocket) and **`ch-connecting-rod`** ×20 (flat 2D profile, book-accurate rough finish).
 
 ## Competency check
 

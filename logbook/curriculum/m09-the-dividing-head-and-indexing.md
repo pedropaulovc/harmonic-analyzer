@@ -22,7 +22,7 @@ hours_actual: 0
 
 - `references/gears-and-gear-cutting/gears-and-gear-cutting.pdf`
 - `references/machinerys-handbook/` (indexing tables)
-- `cad/scripts/build_cylinder_gear.py` (the +Y notch datum)
+- `cad/scripts/build_dt_cylinder_gear.py` (the +Y notch datum)
 
 ## Practice
 
@@ -34,7 +34,7 @@ hours_actual: 0
 
 ## Now make — the real part this unlocks
 
-The **0.4 mm alignment notch** on the `cylinder-gear`s — then prove you can repeat the phase on a second part.
+The **0.4 mm alignment notch** on the `dt-cylinder-gear`s — then prove you can repeat the phase on a second part.
 
 ## Competency check
 

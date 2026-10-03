@@ -15,15 +15,15 @@ index does not repeat it.
 |---|---|---:|---|
 | M00 | [Safety and shop setup](m00-safety-and-shop-setup.md) | 8 | — |
 | M01 | [Measurement and layout](m01-measurement-and-layout.md) | 12 | — |
-| M02 | [Lathe I — facing, turning, shoulders](m02-lathe-i-facing-turning-shoulders.md) | 20 | `crank-pin`, `pivot-shaft` blank |
+| M02 | [Lathe I — facing, turning, shoulders](m02-lathe-i-facing-turning-shoulders.md) | 20 | `dt-crank-pin`, `ch-pivot-shaft` blank |
 | M03 | [Lathe II — drilling, boring, reaming](m03-lathe-ii-drilling-boring-reaming.md) | 16 | one `pivot-bushing` |
 | M04 | [Lathe III — parting to length, batch work](m04-lathe-iii-parting-to-length-and-batch-work.md) | 20 | 19× `pivot-bushing` + 19× `lever-bushing` |
-| M05 | [Lathe IV — slender work, steadies, tapers](m05-lathe-iv-slender-work-steadies-tapers.md) | 16 | `pivot-shaft`, `fulcrum-shaft`, `cone-gear-shaft` |
-| M06 | [Mill I — tramming, squaring, edge finding](m06-mill-i-tramming-squaring-edge-finding.md) | 16 | `knife-mount` ×2 |
-| M07 | [Mill II — profiling, slots, workholding](m07-mill-ii-profiling-slots-workholding.md) | 20 | `rocker-arm` ×20, `connecting-rod` ×20 |
-| M08 | [Hole patterns, reaming and tapping](m08-hole-patterns-reaming-and-tapping.md) | 12 | `rocker-arm-support` feet, spring-hole pattern |
-| M09 | [The dividing head and indexing](m09-the-dividing-head-and-indexing.md) | 20 | `cylinder-gear` alignment notches |
-| M10 | [Gear cutting](m10-gear-cutting-making-the-cutter-then-the-gear.md) | 60+ | form cutters, then `cone-gear` T120 → the whole train |
+| M05 | [Lathe IV — slender work, steadies, tapers](m05-lathe-iv-slender-work-steadies-tapers.md) | 16 | `ch-pivot-shaft`, `ch-fulcrum-shaft`, `dt-cone-gear-shaft` |
+| M06 | [Mill I — tramming, squaring, edge finding](m06-mill-i-tramming-squaring-edge-finding.md) | 16 | `sm-knife-mount` ×2 |
+| M07 | [Mill II — profiling, slots, workholding](m07-mill-ii-profiling-slots-workholding.md) | 20 | `ch-rocker-arm` ×20, `ch-connecting-rod` ×20 |
+| M08 | [Hole patterns, reaming and tapping](m08-hole-patterns-reaming-and-tapping.md) | 12 | `fr-rocker-arm-support` feet, spring-hole pattern |
+| M09 | [The dividing head and indexing](m09-the-dividing-head-and-indexing.md) | 20 | `dt-cylinder-gear` alignment notches |
+| M10 | [Gear cutting](m10-gear-cutting-making-the-cutter-then-the-gear.md) | 60+ | form cutters, then `dt-cone-gear` T120 → the whole train |
 | M11 | [Soldering, finishing, assembly craft](m11-soldering-finishing-and-assembly-craft.md) | 16 | cone gear stack on its D-flat shaft |
 
 Total `[EST]` ≈ **236 h**, and M10 is certainly underestimated.

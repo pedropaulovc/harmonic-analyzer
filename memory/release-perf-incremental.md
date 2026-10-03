@@ -1,3 +1,6 @@
+
+> Identity migration: dated findings, release paths and recorded identifiers below retain their snapshot values. For current IDs and paths, see the [subsystem identity guide](../cad/docs/subsystem-identities.md).
+
 # Release/build perf: kill the COM-spine duplication (2026-06-25)
 
 Profiled the **v0.9.1 release logs** (attached as `harmonic-analyzer-v0.9.1-logs.zip`

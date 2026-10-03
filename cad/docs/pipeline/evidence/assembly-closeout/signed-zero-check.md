@@ -1,5 +1,7 @@
 # Signed-zero hypothesis result at candidate64
 
+> Historical evidence: identifiers, paths, URLs and checksums below are retained as recorded. See [current subsystem identities](../../../subsystem-identities.md) for the canonical migration map.
+
 No tested zero-only representation reproduced any of the five differing baseline fingerprints. Paper-drive also did not reproduce its own stored fingerprint. Equivalence remains unproven for these comparisons; this result excludes only the bounded variants tried.
 
 | Assembly | Attempts | Baseline target | Own stored target |

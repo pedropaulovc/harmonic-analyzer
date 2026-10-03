@@ -35,7 +35,7 @@ hours_actual: 0
 
 ## Now make — the real part this unlocks
 
-**`crank-pin`** and a **`pivot-shaft`** blank — plain turned steel, no bore, no step. The first real parts of the analyzer.
+**`dt-crank-pin`** and a **`ch-pivot-shaft`** blank — plain turned steel, no bore, no step. The first real parts of the analyzer.
 
 ## Competency check
 

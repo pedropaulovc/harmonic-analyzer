@@ -1,5 +1,7 @@
 # Assembly recipe granularity: VM2 evidence
 
+> Historical evidence: identifiers, paths, URLs and checksums below are retained as recorded. See [current subsystem identities](../subsystem-identities.md) for the canonical migration map.
+
 > Historical #677 experiment on its drawing parent and adapter. These results
 > are not current integration acceptance or schedule. See the
 > [new integration evidence](assembly-granularity-integration-results.md) and

@@ -1,5 +1,7 @@
 # Rack finish attachment control
 
+> Historical evidence: identifiers, paths, URLs and checksums below are retained as recorded. See [current subsystem identities](../../../subsystem-identities.md) for the canonical migration map.
+
 Historical immediate-readback experiment, not a persistent-placement result.
 The later [rebuild and cold-reopen control](rack-finish-failure-372acd6e.md)
 returned the leader to the crowded datum location. The sequence recommended
