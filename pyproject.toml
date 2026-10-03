@@ -108,4 +108,4 @@ package = false
 # editable so local edits to the COM adapter are picked up live. Run
 # `git submodule update --init` after cloning so this path exists.
 solidworks-mcp-python = { path = "SolidworksMCP-python", editable = true }
-prechips = { git = "https://github.com/pedropaulovc/prechips", rev = "ba449ce1dc19080eae8f96b8e79a61d8044dfb5d" }
+prechips = { git = "https://github.com/pedropaulovc/prechips", rev = "d43cdf9c51213d9f7e9b0e2bb7801bd7b6afb893" }
