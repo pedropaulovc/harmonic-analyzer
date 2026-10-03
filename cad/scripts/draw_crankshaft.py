@@ -87,9 +87,12 @@ from crank_pinion_spec import CRANKSHAFT_PIN_HOLE_PROCESS
 from crankshaft_notes import (
     CROSS_HOLE_CALLOUT,
     DRIVE_PIN_CALLOUT,
+    DRIVE_PIN_DEPTH_BAND,
     DRIVE_PIN_LOCATION_CALLOUT,
 )
 from solidworks_mcp.adapters.solidworks.drawing import (
+    _SW_LENGTH_MM,
+    _SW_PREF_UNITS_LINEAR,
     auto_center_marks,
     place_view,
 )
@@ -276,7 +279,7 @@ COLLAR_REAR_FINISH = (
     (COLLAR_REAR_X + 0.0069, 0.195),
 )
 # The drive-pin holes' native REAM callout (size and depth from the cut, the
-# depth's model band put on it by _band_hole_depth)
+# depth's band appended by _band_hole_depth)
 # with the press prose under it on two long rows (four rows in all): its
 # leader picks the upper hole's rim and the text sits above the end view and
 # the dome, left of the cross-hole callout, inside the top border.
@@ -339,99 +342,81 @@ def _set_callout_below(display: Any, text: str, label: str) -> None:
         raise RuntimeError(f"{label}: callout-below text did not persist: {applied!r}")
 
 
-# The drive-pin holes' depth dimension in the part, the one their native
-# callout prints and build_crankshaft tolerances: (feature, dimension).
-DRIVE_PIN_DEPTH_DIMENSION = ("DrivePinHoles", "DrivePinDepth")
-# The callout's depth variable (``<hw-depth>`` in its format text) and the
-# swCalloutVariableType_e value of a length variable.
-_HOLE_DEPTH_VARIABLE = "hw-depth"
-_CALLOUT_LENGTH_VARIABLE = 1
-# swTolType_e values that state no band: swTolNONE, swTolBASIC.
-_NO_BAND_TOLERANCE_TYPES = frozenset({0, 1})
+# Format-definition parts of a display dimension and the writable part each
+# one is set through (swDimensionTextParts_e): prefix, suffix, callout above,
+# callout below.
+_DEFINITION_TO_WRITABLE = {5: 1, 6: 2, 7: 3, 8: 4}
 
 
-def _band_hole_depth(display: Any, source_model: Any, label: str) -> None:
-    """Print the model depth's band on the native callout's depth variable.
+def _depth_banded_definition(definitions: dict[int, str], band: str) -> tuple[int, str]:
+    """The one format part ending on the callout's depth, with ``band`` after it.
 
-    The cut's depth dimension carries the part's band, but a hole callout
-    keeps its own tolerance per callout variable (``ICalloutVariable``; the
-    model's ``IDimensionTolerance`` does not override it) and the drive-pin
-    callout printed the depth bare with the model already banded (machinist
-    review of f7c9771b3).  The type and limits are copied from the model
-    dimension onto ``<hw-depth>``, so the band renders natively, in the
-    sheet's units, beside the depth; text typed after the depth stays in mm
-    through a unit switch (Codex P2 on #1151).  The drawing owns no number:
-    the variable must hold the model's depth before the write, and the band
-    is read back after it.  Values are system units (metres), like
-    ``ICalloutLengthVariable.Length``.
+    A native hole callout splits its text across the prefix, suffix and
+    callout compartments; on the farm the drive-pin callout's prefix read
+    ``REAM <MOD-DIAM>`` and its depth sat in another part (run
+    20261001T011714683Z).  Exactly one part may carry ``<HOLE-DEPTH>``, once,
+    followed by the depth alone; anything else (no depth, two, text after it,
+    a band already there) fails loud.
     """
-    from win32com.client.dynamic import Dispatch as dynamic_dispatch  # noqa: PLC0415
+    if set(definitions) != set(_DEFINITION_TO_WRITABLE):
+        raise RuntimeError(f"unexpected hole callout parts: {definitions!r}")
+    holders = [part for part, text in definitions.items() if "<HOLE-DEPTH>" in text]
+    joined = "\n".join(definitions.values())
+    if len(holders) != 1 or band in joined:
+        raise RuntimeError(f"hole callout has no single closing depth: {definitions!r}")
+    part = holders[0]
+    definition = definitions[part]
+    head, _marker, tail = definition.rpartition("<HOLE-DEPTH>")
+    if "<HOLE-DEPTH>" in head or len(tail.split()) != 1:
+        raise RuntimeError(f"hole callout has no single closing depth: {definitions!r}")
+    return part, f"{definition.rstrip()} {band}"
 
-    feature, name = DRIVE_PIN_DEPTH_DIMENSION
-    raw_dimension = source_model.Parameter(f"{name}@{feature}")
-    if raw_dimension is None:
-        raise RuntimeError(f"{label}: source part has no {name}@{feature}")
-    dimension = _early_bound(raw_dimension, "IDimension")
-    tolerance = _early_bound(dimension.Tolerance, "IDimensionTolerance")
-    band = (
-        int(tolerance.Type),
-        float(tolerance.GetMinValue()),
-        float(tolerance.GetMaxValue()),
-    )
-    if band[0] in _NO_BAND_TOLERANCE_TYPES:
-        raise RuntimeError(f"{label}: {name}@{feature} carries no band: {band!r}")
+
+def _require_mm_sheet(draw: Any, label: str) -> None:
+    """Refuse unless the drawing's linear unit is the millimetre.
+
+    The depth band is typed text in mm: SolidWorks re-renders the callout's
+    native depth in the sheet's units but never the text after it, so the
+    band is only true on a mm sheet.  The callout has no native route for it:
+    ``GetHoleCalloutVariables`` raised DISP_E_BADVARTYPE on this cut-extrude
+    callout on the farm (run 20261003T001156794Z); every repo caller it works
+    for is a Hole Wizard feature.  Reads the document preference
+    ``set_units_mm`` writes (``IModelDoc2::GetUserPreferenceIntegerValue``).
+    """
+    doc = _early_bound(draw, "IModelDoc2")
+    unit = doc.GetUserPreferenceIntegerValue(_SW_PREF_UNITS_LINEAR)
+    if type(unit) is not int or unit != _SW_LENGTH_MM:
+        raise RuntimeError(
+            f"{label}: the typed depth band is mm, but the sheet's linear unit"
+            f" is {unit!r} (swLengthUnit_e; swMM = {_SW_LENGTH_MM})"
+        )
+
+
+def _band_hole_depth(display: Any, band: str, draw: Any, label: str) -> None:
+    """Print the part's depth band after the native callout's depth.
+
+    The cut's depth carries the band in the part, but the callout prints the
+    depth bare; the band joins the format text of the part holding the depth,
+    where the native size and depth stay associative.  Read back like the
+    prose.  The callout-below compartment is rewritten by the matched-fit
+    prose afterwards, so a depth there is refused rather than lost.  The band
+    is mm text, so the sheet must be mm (``_require_mm_sheet``).
+    """
+    _require_mm_sheet(draw, label)
     display = _early_bound(display, "IDisplayDimension")
-    # The generic early-bound interface aliases the concrete variables'
-    # DISPIDs: ICalloutVariable members go by name, the length by its own
-    # interface (diagnostics/diag_hole_callout_association.py).
-    depths = [
-        (raw, dynamic_dispatch(raw._oleobj_))
-        for raw in display.GetHoleCalloutVariables() or ()
-    ]
-    depths = [
-        (raw, late)
-        for raw, late in depths
-        if str(late.VariableName) == _HOLE_DEPTH_VARIABLE
-    ]
-    if len(depths) != 1:
+    definitions = {
+        part: str(display.GetText(part) or "") for part in _DEFINITION_TO_WRITABLE
+    }
+    part, updated = _depth_banded_definition(definitions, band)
+    if part == 8:
         raise RuntimeError(
-            f"{label}: expected one {_HOLE_DEPTH_VARIABLE} callout variable, "
-            f"found {len(depths)}"
+            f"{label}: depth is in the callout-below text: {definitions!r}"
         )
-    raw, variable = depths[0]
-    if int(variable.Type) != _CALLOUT_LENGTH_VARIABLE:
-        raise RuntimeError(f"{label}: {_HOLE_DEPTH_VARIABLE} is not a length variable")
-    length = _early_bound(raw, "ICalloutLengthVariable")
-    depth_m = float(dimension.SystemValue)
-    if abs(float(length.Length) - depth_m) > 1e-9:
-        raise RuntimeError(
-            f"{label}: {_HOLE_DEPTH_VARIABLE} {float(length.Length)!r} m is not "
-            f"{name}@{feature} {depth_m!r} m"
-        )
-    before = (
-        int(variable.ToleranceType),
-        float(variable.ToleranceMin),
-        float(variable.ToleranceMax),
-    )
-    variable.ToleranceType = band[0]
-    variable.ToleranceMin = band[1]
-    variable.ToleranceMax = band[2]
-    applied = (
-        int(variable.ToleranceType),
-        float(variable.ToleranceMin),
-        float(variable.ToleranceMax),
-    )
-    if applied[0] != band[0] or any(
-        abs(got - want) > 1e-12 for got, want in zip(applied[1:], band[1:])
-    ):
-        raise RuntimeError(
-            f"{label}: {_HOLE_DEPTH_VARIABLE} band {applied!r} != "
-            f"{name}@{feature} {band!r}"
-        )
-    _telemetry.info(
-        f"{label}: {_HOLE_DEPTH_VARIABLE} band {before!r} -> {applied!r} from "
-        f"{name}@{feature}, {int(length.TolerancePrecision)} tolerance places"
-    )
+    display.SetText(_DEFINITION_TO_WRITABLE[part], updated)
+    applied = str(display.GetText(part) or "")
+    if applied.replace("\r", "") != updated.replace("\r", ""):
+        raise RuntimeError(f"{label}: depth band did not persist: {applied!r}")
+    _telemetry.info(f"{label}: depth band joined format part {part}: {updated!r}")
 
 
 Box = tuple[float, float, float, float]
@@ -872,7 +857,8 @@ async def build(adapter: Any) -> dict[str, str]:
     )
     _band_hole_depth(
         drive_pins,
-        _early_bound(_early_bound(end, "IView").ReferencedDocument, "IModelDoc2"),
+        DRIVE_PIN_DEPTH_BAND,
+        drawing_model,
         "seat-collar drive-pin holes",
     )
     _set_callout_below(drive_pins, DRIVE_PIN_CALLOUT, "seat-collar drive-pin holes")

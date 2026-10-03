@@ -13,7 +13,7 @@ import crank_hub_geometry as geometry
 import crankshaft_notes as notes
 import crankshaft_spec as spec
 import draw_crankshaft as drawing
-from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
+from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import blind_cut_dia_mm
 from _surface_finish import MACHINED_UM
@@ -181,19 +181,70 @@ def test_spigot_rim_is_the_named_exception_the_sheet_states() -> None:
     assert float(recorded.group(1)) == _floor_2(nominal) == spec.DRIVE_PIN_SPIGOT_RIM
 
 
-def test_drive_pin_depth_band_is_the_models_own() -> None:
+def test_drive_pin_depth_prints_its_band_after_the_native_depth() -> None:
     # Machinist review of f7c9771b3: the bare 3.95 read under the title
     # block's .XX and left 5.75 - 4.46 = 1.29 of spigot under the holes.  The
-    # callout copies the band from the depth dimension it prints, so that
-    # dimension must be the one the part bands, with the band the proud stack
-    # reads; typed after the depth it stayed mm in inch (Codex P2 on #1151).
-    feature, name = drawing.DRIVE_PIN_DEPTH_DIMENSION
-    assert model_toleranced_dimensions(part)[(feature, name)] == "DRIVE_PIN_DEPTH_TOL"
-    assert name in spec.HOLE_CALLOUT_PRECISION[feature]
+    # callout carries the cut's own band, the one the proud stack reads.
+    assert notes.DRIVE_PIN_DEPTH_BAND == f"<MOD-PM>{spec.DRIVE_PIN_DEPTH_TOL:.2f}"
     floor = (spec.SPIGOT_LENGTH - spec.SPIGOT_LENGTH_TOL) - (
         spec.DRIVE_PIN_DEPTH + spec.DRIVE_PIN_DEPTH_TOL
     )
     assert floor >= 1.5
+    band = notes.DRIVE_PIN_DEPTH_BAND
+    # The farm's native split: the process and diameter modifier in the
+    # prefix, the depth in a later compartment.
+    depth = "<HOLE-DEPTH> <hw-depth>"
+
+    def parts(prefix: str = "REAM <MOD-DIAM>", suffix: str = depth) -> dict:
+        return {5: prefix, 6: suffix, 7: "", 8: ""}
+
+    assert drawing._depth_banded_definition(parts(), band) == (6, f"{depth} {band}")
+    whole = "REAM <MOD-DIAM><hw-diam> <HOLE-DEPTH> <hw-depth>"
+    assert drawing._depth_banded_definition(parts(prefix=whole, suffix=""), band) == (
+        5,
+        f"{whole} {band}",
+    )
+    for broken in (
+        parts(suffix="THRU ALL"),
+        parts(suffix=f"{depth} {band}"),
+        parts(suffix=f"{depth} PRESS FIT"),
+        parts(suffix=f"<HOLE-DEPTH> 1.0 {depth}"),
+        parts(prefix=f"REAM {depth}"),
+        {5: "REAM <MOD-DIAM>", 6: depth},
+    ):
+        with pytest.raises(RuntimeError):
+            drawing._depth_banded_definition(broken, band)
+
+
+class _Sheet:
+    """A drawing document reporting one linear unit (swLengthUnit_e)."""
+
+    def __init__(self, unit: object) -> None:
+        self.unit = unit
+
+    def GetUserPreferenceIntegerValue(self, pref: int) -> object:
+        assert pref == drawing._SW_PREF_UNITS_LINEAR
+        return self.unit
+
+
+def test_typed_depth_band_refuses_a_non_mm_sheet() -> None:
+    # Codex P2 on #1151: the band is mm text after a native depth, so it is
+    # only true on a mm sheet; the callout variables that would carry it
+    # natively are unreachable on this cut-extrude callout (farm run
+    # 20261003T001156794Z).  An inch sheet must stop before the band is typed.
+    drawing._require_mm_sheet(_Sheet(0), "mm")  # swMM
+    for unit in (3, 1, None):  # swINCHES, swCM, an unread preference
+        with pytest.raises(RuntimeError, match="typed depth band is mm"):
+            drawing._require_mm_sheet(_Sheet(unit), "not mm")
+
+    class _Callout:
+        def GetText(self, part: int) -> str:
+            raise AssertionError("read the callout before the unit check")
+
+    with pytest.raises(RuntimeError, match="typed depth band is mm"):
+        drawing._band_hole_depth(
+            _Callout(), notes.DRIVE_PIN_DEPTH_BAND, _Sheet(3), "inch sheet"
+        )
 
 
 def test_integral_dome_is_the_only_outboard_shaft_projection() -> None:
