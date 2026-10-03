@@ -2,7 +2,7 @@ r"""McMaster 98381A473 -- alloy steel dowel pin, 1/8" diameter, 3/4" long.
 
 One of the 98381A* sizes built by the shared recipe in
 ``diag_mcmaster_dowel.py`` (see its docstring for the catalogue facts).
-Used as transgear-latch-pin (MHA-169).  Unlike 98381A433/434 this size has a
+Used as transgear-latch-pin (MHA-VN-042).  Unlike 98381A433/434 this size has a
 user-supplied vendor model, so the recipe carries its end forms (chamfer and
 round, read off the harvest) and the standalone run is the replica gate
 against ``cad/out/reports/mcmaster-98381A473-dump.json``.

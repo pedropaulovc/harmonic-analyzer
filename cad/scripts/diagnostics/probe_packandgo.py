@@ -27,7 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # for _common
 
 from _common import OUT_SLDASM, OUT_SLDPRT, check, log, run_build  # noqa: E402
 
-ASSEMBLY = OUT_SLDASM / "harmonic-analyzer.SLDASM"
+ASSEMBLY = OUT_SLDASM / "ha-harmonic-analyzer.SLDASM"
 PART = OUT_SLDPRT / "a-frame.SLDPRT"
 
 

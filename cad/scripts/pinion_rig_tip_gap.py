@@ -23,9 +23,9 @@ import math
 
 import pinion_rig_park_geometry as park
 from cone_line import X_DRUM, Y_DRIVE
-from pinion_cam_geometry import CAM_OD
-from pinion_cam_geometry import ECC as CAM_ECC
-from pinion_cam_pin_geometry import PIN_DIA as FPIN_DIA
+from dt_pinion_cam_geometry import CAM_OD
+from dt_pinion_cam_geometry import ECC as CAM_ECC
+from dt_pinion_cam_pin_geometry import PIN_DIA as FPIN_DIA
 from pinion_rig_fitup import FEELER_GAGE_LEAVES_MM, FEELER_GAGE_NAME
 from pinion_rig_layout import FEELER_LEAF_STEP
 

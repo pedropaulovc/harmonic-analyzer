@@ -53,14 +53,14 @@ _DATA_LITERAL_RE = re.compile(r"""["']([^"']+\.(?:dxf|dwg))["']""", re.IGNORECAS
 # still enumerates the assembly tasks. The former monolithic ``output`` is split
 # by function into summing -> magnifier -> pen (the value chain) + paper-drive.
 ASSEMBLY_ORDER = (
-    "frame",
-    "drive_train",
-    "channel",
-    "summing",
-    "magnifier",
-    "pen",
-    "paper_drive",
-    "harmonic_analyzer",
+    "fr_frame",
+    "dt_drive_train",
+    "ch_channel",
+    "sm_summing",
+    "mg_magnifier",
+    "pn_pen",
+    "pd_paper_drive",
+    "ha_harmonic_analyzer",
 )
 
 # Scripts that match build_*.py but produce no .SLDPRT part in the SolidWorks
@@ -671,22 +671,44 @@ class _AssemblySources:
         if isinstance(node, ast.IfExp):
             return self.strings(node.body, trail) | self.strings(node.orelse, trail)
         if isinstance(node, ast.JoinedStr):
-            prefix = node.values[0] if node.values else None
-            if (
-                not isinstance(prefix, ast.Constant)
-                or not isinstance(prefix.value, str)
-                or not prefix.value
-            ):
+            values = {""}
+            for piece in node.values:
+                if isinstance(piece, ast.Constant) and isinstance(piece.value, str):
+                    fragments = {piece.value}
+                elif isinstance(piece, ast.FormattedValue):
+                    try:
+                        fragments = self.strings(piece.value, trail)
+                    except ValueError:
+                        if not all(values):
+                            return self.fail(node)
+                        fragments = {"*"}
+                else:
+                    return self.fail(node)
+                values = {prefix + suffix for prefix in values for suffix in fragments}
+            if not values or not all(values):
                 return self.fail(node)
-            return {prefix.value + ("*" if len(node.values) > 1 else "")}
+            return values
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Div):
+            return self.strings(node.right, trail)
+        if isinstance(node, ast.Call) and self.call_name(node) in {"str", "Path"}:
+            return self.strings(self.argument(node, 0, "path"), trail)
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr in {"resolve", "absolute"}
+            and not node.args
+            and not node.keywords
+        ):
+            return self.strings(node.func.value, trail)
         if isinstance(node, ast.Call) and self.call_name(node) in {
             "_part",
             "_subassembly",
         }:
             self.validate_path_wrapper(node)
-            return self.strings(self.argument(node, 0, "name"), trail)
+            extension = ".SLDPRT" if self.call_name(node) == "_part" else ".SLDASM"
+            return {name + extension for name in self.strings(self.argument(node, 0, "name"), trail)}
         if isinstance(node, ast.Call) and self.call_name(node) == "part_path":
-            return self.strings(self.argument(node, 0, "name"), trail)
+            return {name + ".SLDPRT" for name in self.strings(self.argument(node, 0, "part"), trail)}
         if (
             isinstance(node, ast.Call)
             and isinstance(node.func, ast.Attribute)
@@ -762,10 +784,12 @@ class _AssemblySources:
             if not isinstance(call, ast.Call):
                 continue
             name = self.call_name(call)
+            if name.startswith("AddComponent"):
+                self.fail(call)  # native insertion must use an enumerated source sink
             if name == "place_component":
-                expressions.append(self.argument(call, 1, "part"))
+                expressions.append((self.argument(call, 1, "part"), ".SLDPRT"))
             if name == "InsertComponentParameters":
-                expressions.append(self.argument(call, 0, "file_path"))
+                expressions.append((self.argument(call, 0, "file_path"), ""))
             if name == "insert_component":
                 parameters = self.argument(call, 0, "parameters")
                 if (
@@ -797,14 +821,46 @@ class _AssemblySources:
                 ]
                 if len(fields) != 1:
                     self.fail(item)
-                expressions.extend(fields)
+                expressions.extend((value, ".SLDPRT") for value in fields)
         names = set()
-        for expression in expressions:
-            resolved = self.strings(expression)
-            if not resolved:
+        for expression, extension in expressions:
+            resolved = {name + extension for name in self.strings(expression)}
+            if not resolved or any(
+                not re.search(r"\.(?:SLDPRT|SLDASM)$", name, re.IGNORECASE)
+                for name in resolved
+            ):
                 self.fail(expression)
             names.update(resolved)
         return frozenset(names)
+
+
+def generated_source_names(source: str) -> frozenset[str]:
+    """Names actually passed to the native spring producer in this builder.
+
+    An arbitrary suffix of a registered part is not a generated model. Only
+    calls to the imported production emitter establish these local outputs.
+    """
+    scan = _AssemblySources(source)
+    emitters = {
+        alias.asname or alias.name
+        for node in scan.tree.body
+        if isinstance(node, ast.ImportFrom) and node.module == "_spring"
+        for alias in node.names
+        if alias.name == "build_spring"
+    }
+    names = set()
+    for node in ast.walk(scan.tree):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in emitters:
+            names.update(scan.strings(scan.argument(node, 1, "part_name")))
+    return frozenset(names)
+
+
+def generated_source_owner(name: str, part_names) -> str:
+    """The registered base of a generated native model, never an assembly."""
+    parents = [stem for stem in part_names if name.startswith(stem + "-")]
+    if not parents:
+        raise ValueError(f"generated model {name!r} has no registered part producer")
+    return max(parents, key=len)
 
 
 def references_of(asm_stem: str) -> list[str]:
@@ -817,31 +873,44 @@ def references_of(asm_stem: str) -> list[str]:
     ``file_dep`` on the referenced ``.SLDPRT``/sub-``.SLDASM`` target, so order
     and the refresh/full decision fall out of the graph.
     """
-    candidates = part_stems() + [a for a in ASSEMBLY_ORDER if a != asm_stem]
+    from fnmatch import fnmatchcase
+
+    parts = part_stems()
+    candidates = parts + [a for a in ASSEMBLY_ORDER if a != asm_stem]
     by_name = {stem.replace("_", "-"): stem for stem in candidates}
+    part_names = {stem.replace("_", "-") for stem in parts}
     found = set()
     source = script_for(asm_stem).read_text(encoding="utf-8")
-    for name in _assembly_source_names(source):
-        name = name.replace("\\", "/").rsplit("/", 1)[-1]
-        name = re.sub(r"\.(?:SLDPRT|SLDASM)$", "", name, flags=re.IGNORECASE)
-        if name in by_name:
-            found.add(by_name[name])
+    generated = {
+        name: generated_source_owner(name, part_names)
+        for name in generated_source_names(source)
+    }
+    for raw_name in _assembly_source_names(source):
+        name = raw_name.replace("\\", "/").rsplit("/", 1)[-1]
+        extension = re.search(r"\.(SLDPRT|SLDASM)$", name, flags=re.IGNORECASE)
+        kind = extension[1].upper() if extension else None
+        if extension:
+            name = name[:extension.start()]
+        eligible = {
+            dashed: stem for dashed, stem in by_name.items()
+            if kind is None or (dashed in part_names) == (kind == "SLDPRT")
+        }
+        if name in eligible:
+            found.add(eligible[name])
             continue
-        if name.endswith("*"):
-            prefix = name[:-1]
-            matches = {
-                stem for dashed, stem in by_name.items() if dashed.startswith(prefix)
-            }
-            # In-script variants inherit the longest existing producer family,
-            # not the shorter 'channel' assembly prefix.
-            parents = [dashed for dashed in by_name if prefix.startswith(dashed + "-")]
-            if parents:
-                matches.add(by_name[max(parents, key=len)])
-            if matches:
-                found.update(matches)
-                continue
+        matches = {
+            stem for dashed, stem in eligible.items()
+            if "*" in name and fnmatchcase(dashed, name)
+        }
+        if kind != "SLDASM":
+            for variant, owner in generated.items():
+                if name == variant or ("*" not in name and fnmatchcase(name, variant)):
+                    matches.add(by_name[owner])
+        if matches:
+            found.update(matches)
+            continue
         raise ValueError(
-            f"Unresolved assembly source {name!r} in {script_for(asm_stem)}"
+            f"Unresolved assembly source {raw_name!r} in {script_for(asm_stem)}"
         )
     return [stem for stem in candidates if stem in found]
 
@@ -1780,7 +1849,7 @@ def data_deps_of(script: Path) -> list[str]:
     must treat as ``file_dep`` (and fold into the remote-cache key).
 
     ``module_deps_of`` only follows Python imports; a build that imports a data
-    file (``build_nameplate`` -> ``cad/references/nameplate-engraving.dxf`` via
+    file (``build_nameplate`` -> ``cad/references/fr-nameplate-engraving.dxf`` via
     ``adapter.import_dxf_dwg``) has no import edge to it, so an edit to the DXF
     would otherwise not rebuild the part. This scans the script's transitive
     module closure source for quoted ``*.dxf``/``*.dwg`` literals and resolves
@@ -2284,27 +2353,27 @@ def stamps_title_block_properties(script: Path) -> bool:
 TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
     {
         "_printed_tolerance",
-        "boss_hook_spec",
-        "build_drive_train_assembly",
-        "build_harmonic_base",
-        "build_wheel_bar",
-        "cone_pivot_post_spec",
-        "cone_swing_platform_geometry",
-        "cone_swing_platform_spec",
-        "cone_tip_block_spec",
+        "vn_boss_hook_spec",
+        "build_dt_drive_train_assembly",
+        "build_fr_harmonic_base",
+        "build_mg_wheel_bar",
+        "dt_cone_pivot_post_spec",
+        "dt_cone_swing_platform_geometry",
+        "dt_cone_swing_platform_spec",
+        "dt_cone_tip_block_spec",
         "crank_boss_rim",
-        "crank_hub_geometry",
-        "crank_pinion_spec",
-        "crankshaft_spec",
+        "dt_crank_hub_geometry",
+        "dt_crank_pinion_spec",
+        "dt_crankshaft_spec",
         "error_budget",
         "export_features",
-        "harmonic_base_fasteners",
-        "guide_lock_screw_spec",
-        "post_mount_screw_spec",
-        "spring_hook_spec",
-        "swing_stop_screw_spec",
-        "transgear_disc_hub_spec",
-        "transgear_removable_notes",
+        "fr_harmonic_base_fasteners",
+        "vn_guide_lock_screw_spec",
+        "vn_post_mount_screw_spec",
+        "vn_spring_hook_spec",
+        "vn_swing_stop_screw_spec",
+        "pd_transgear_disc_hub_spec",
+        "pd_transgear_removable_notes",
     }
 )
 
@@ -2331,6 +2400,6 @@ def dependents_of(stem: str) -> list[str]:
     .SLDASM`` -- so ``references_of`` is the DIRECT inverse only.
     """
     deps = [asm for asm in ASSEMBLY_ORDER if asm != stem and stem in references_of(asm)]
-    if deps and "harmonic_analyzer" not in deps:
-        deps.append("harmonic_analyzer")
+    if deps and "ha_harmonic_analyzer" not in deps:
+        deps.append("ha_harmonic_analyzer")
     return deps

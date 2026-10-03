@@ -79,7 +79,7 @@ _FITS = {"close": 0, "normal": 1, "loose": 2}  # swWzdHoleScrewClearanceTypes_e
 # that the caller then refuses to accept, and nothing can satisfy both.
 #
 # That band was real. The correction threshold was 0.05 while
-# `build_arbor_pedestal` asserted 0.005, so a #4 clearance initialized at
+# `build_dt_arbor_pedestal` asserted 0.005, so a #4 clearance initialized at
 # 3.2512 instead of 3.264 (drift 0.0128) was left alone by the wizard and then
 # rejected by the builder -- an unfixable failure whichever value the spec
 # pinned. It presented as the seat's table "moving" and cost three flip-flops of

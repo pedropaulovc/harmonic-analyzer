@@ -10,17 +10,17 @@ import numpy as np
 import pytest
 
 import _config
-import amplitude_bar_spec as bar
+import ch_amplitude_bar_spec as bar
 import channel_frame_geom as frame
 import channel_kinematics as ck
 import error_budget
-import rocker_arm_notes as arm_notes
+import ch_rocker_arm_notes as arm_notes
 import cylinder_bank_layout as drum_bank
-import pivot_bracket_spec as bracket
-import pivot_shaft_spec as shaft
-import rocker_arm_spec as arm
+import ch_pivot_bracket_spec as bracket
+import ch_pivot_shaft_spec as shaft
+import ch_rocker_arm_spec as arm
 import rocker_bank_layout as bank
-import rocker_thrust_washer_spec as washer
+import ch_rocker_thrust_washer_spec as washer
 from _buildgraph import config_files_of, module_deps_of
 
 SCRIPTS = Path(__file__).resolve().parent
@@ -138,7 +138,7 @@ def test_hub_and_washer_share_one_od_over_each_wall_floor() -> None:
 
 def test_shoulder_stays_on_its_bar_and_under_each_mating_od() -> None:
     """The shoulder is decoupled from the hub O.D.: it keeps the O10 bar's
-    size (MHA-065 prints STOCK 10 BAR) and stays no larger than the hub it
+    size (MHA-CH-005 prints STOCK 10 BAR) and stays no larger than the hub it
     bears on or the washer that closes the stack's other end, so it is never
     the widest thing under a bar foot."""
     assert shaft.SHOULDER_DIA == 10.0
@@ -239,7 +239,7 @@ def test_bar_foot_cheeks_clear_the_hub_at_the_worst_case(
     assert _cheek_cap(monkeypatch, 0.0, _BAND_2PL) - hub_top < 0.0
     for other_max_material_r in (
         (washer.OD + _BAND_2PL) / 2.0,
-        # MHA-065 prints the shoulder Ø10.00 at .XX, as supplied bar or not.
+        # MHA-CH-005 prints the shoulder Ø10.00 at .XX, as supplied bar or not.
         (shaft.SHOULDER_DIA + _BAND_2PL) / 2.0,
     ):
         assert other_max_material_r <= hub_max_material_r
@@ -291,24 +291,24 @@ def test_layout_reads_only_the_channel_stations() -> None:
     assert deps.isdisjoint(
         {
             "cylinder_bank_layout.py",
-            "build_pivot_bracket.py",
-            "build_pivot_shaft.py",
-            "rocker_arm_notes.py",
+            "build_ch_pivot_bracket.py",
+            "build_ch_pivot_shaft.py",
+            "ch_rocker_arm_notes.py",
         }
     )
 
 
 def test_pivot_parts_read_no_gear_train_config() -> None:
-    shaft_cfg = config_files_of(SCRIPTS / "build_pivot_shaft.py")
+    shaft_cfg = config_files_of(SCRIPTS / "build_ch_pivot_shaft.py")
     assert "machine/channels.yaml" in shaft_cfg
     assert {"machine/gear_train.yaml", "machine/cone_incline.yaml"}.isdisjoint(
         shaft_cfg
     )
     assert not any(
         t.startswith("machine/")
-        for t in config_files_of(SCRIPTS / "build_pivot_bracket.py")
+        for t in config_files_of(SCRIPTS / "build_ch_pivot_bracket.py")
     )
     assert not any(
         t.startswith("machine/")
-        for t in config_files_of(SCRIPTS / "build_rocker_thrust_washer.py")
+        for t in config_files_of(SCRIPTS / "build_ch_rocker_thrust_washer.py")
     )

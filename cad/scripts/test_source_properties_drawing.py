@@ -2,8 +2,8 @@
 
 A drawing reads its title block from the source part's custom properties and
 fails at build time when a required one is missing (``read_required_properties``).
-The warm build of integ 9a0f50b1c lost ``drawing:cylinder_end_disc`` that way:
-the #743 rebuild of MHA-121 never called ``apply_drawing_properties``, so
+The warm build of integ 9a0f50b1c lost ``drawing:dt_cylinder_end_disc`` that way:
+the #743 rebuild of MHA-DT-026 never called ``apply_drawing_properties``, so
 Material Specification / Finish / Quantity were never stamped.  This contract
 catches the same gap offline, across every registered part drawing.
 

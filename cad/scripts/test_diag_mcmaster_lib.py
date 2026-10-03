@@ -165,7 +165,7 @@ class _WeldedSeat:
     ``ISketchRelationManager.AddRelation`` has nothing to merge and returns
     ``None`` WITHOUT raising; the adapter has no COM error to quote and
     reports a bare rejection.  On 2026-09-18 that refusal failed
-    ``part:pen_set_screw`` and ``part:knife_hanger_stud`` on three different
+    ``part:vn_pen_set_screw`` and ``part:vn_knife_hanger_stud`` on three different
     workers, always on the first pair, because every pair is in this state.
 
     A profile must therefore author to completion against this seat.

@@ -104,8 +104,8 @@ def main():
     baseline = args.baseline.resolve(strict=True)
     output = args.output.resolve()
     reports = (ROOT / "cad/out/reports").resolve()
-    if not baseline.is_file() or baseline.name != "rack-pinion.SLDPRT":
-        raise ValueError("baseline must be an existing rack-pinion.SLDPRT")
+    if not baseline.is_file() or baseline.name != "pd-rack-pinion.SLDPRT":
+        raise ValueError("baseline must be an existing pd-rack-pinion.SLDPRT")
     if not baseline.is_relative_to(ROOT / "cad/out"):
         raise ValueError("baseline must belong to this checkout's cad/out")
     if not output.is_relative_to(reports) or output == reports or output.exists():
@@ -122,7 +122,7 @@ def main():
     from _common import _early_bound, _read_member
     import _drawing_common as common
     from _drawing_marks import _named_dimension
-    import draw_rack_pinion as recipe
+    import draw_pd_rack_pinion as recipe
     from diagnostics._owned_native_session import run_owned_diagnostic
 
     async def probe(adapter):
@@ -130,7 +130,7 @@ def main():
         if app.GetDocuments() or app.ActiveDoc is not None:
             raise RuntimeError("requires an empty seat; no documents closed")
         output.mkdir(parents=True)
-        source = output / "rack-pinion.SLDPRT"
+        source = output / "pd-rack-pinion.SLDPRT"
         baseline_hash = digest(baseline)
         shutil.copyfile(baseline, source)
         if digest(source) != baseline_hash or digest(baseline) != baseline_hash:

@@ -26,11 +26,11 @@ import _telemetry  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 PARTS = [
-    "amplitude-bar",
-    "channel-spring-installed",
+    "ch-amplitude-bar",
+    "vn-channel-spring-installed",
     "channel-spring",
-    "counter-spring",
-    "gooseneck",
+    "vn-counter-spring",
+    "sm-gooseneck",
 ]
 # Solid features legitimately report Visible == 2 (their bodies are shown);
 # only unabsorbed reference/sketch features leak into assembly renders.

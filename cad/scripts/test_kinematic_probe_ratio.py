@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-import transgear_removable_spec as removable
+import pd_transgear_removable_spec as removable
 from build_kinematic_probe import (
     CHAIN_RATIO,
     CRANK_TOL,

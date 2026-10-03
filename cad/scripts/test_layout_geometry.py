@@ -368,7 +368,7 @@ def test_leader_clipping_a_pictorial_view_is_not_a_crossing():
 
 def test_a_hole_callouts_attach_run_is_leader_even_where_it_misses_its_text():
     """swing, #902 case 2: collect_document promoted only the run touching the
-    text, so MHA-091 RD1's rim-to-shelf diagonal (S1 @ ac4fa6dd0 dump) stayed
+    text, so MHA-DT-020 RD1's rim-to-shelf diagonal (S1 @ ac4fa6dd0 dump) stayed
     "line" and a leader crossing it passed audit_sheet. A hole callout's
     display lines are all leader."""
     from diagnostics.drawing_layout_audit import _classify_segments
@@ -412,7 +412,7 @@ def test_a_hole_callouts_attach_run_is_leader_even_where_it_misses_its_text():
     assert not crossings(by_topology)  # the miss swing reported
 
 
-# MHA-091 RD1-RD3 as the S1 @ ac4fa6dd0 dump read them (swing, #902 case 2):
+# MHA-DT-020 RD1-RD3 as the S1 @ ac4fa6dd0 dump read them (swing, #902 case 2):
 # display lines, then the lower-left of each estimated text row, in mm.
 _S1_CALLOUTS = {
     "RD1": (

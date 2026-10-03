@@ -49,7 +49,7 @@ from _assembly import (  # noqa: E402
 
 # Distance drivers seed their side from paper-drive's flip seeds
 # (cad/config/assemblies/paper-drive.yaml), the assembly this probe mirrors.
-activate_assembly_contract("paper-drive")
+activate_assembly_contract("pd-paper-drive")
 from _transforms import IDENTITY, rot_z_rows  # noqa: E402
 from preflight_release import _discard_open_documents  # noqa: E402
 
@@ -182,11 +182,11 @@ async def build(adapter: Any) -> dict[str, str]:
         # temp driver authored FROM an exactly-parallel rest pose fails in place
         # with hard error 1, both flips -- seen live twice. 15 deg puts the rest
         # dihedral safely off the apex (a spur sprocket's spin pose is cosmetic).
-        t12 = await place_component(adapter, "transgear-removable", [T12_POS, 0.0, 0.0],
+        t12 = await place_component(adapter, "pd-transgear-removable", [T12_POS, 0.0, 0.0],
                                     [0.0, 0.0, 15.0], rot_z_rows(15.0),
                                     ground=False, configuration="T12",
                                     label="probe T12")
-        t24 = await place_component(adapter, "transgear-removable", [T24_POS, 0.0, 0.0],
+        t24 = await place_component(adapter, "pd-transgear-removable", [T24_POS, 0.0, 0.0],
                                     [0.0, 0.0, 0.0], IDENTITY,
                                     ground=False, configuration="T24",
                                     label="probe T24")

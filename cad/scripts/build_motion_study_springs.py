@@ -19,7 +19,7 @@ SPRINGS (add_springs):
   tension. Combined with the lumped-Z endpoint below, this is qualitative
   motion only, NOT proof of static balance or tolerance performance.
 
-  The summing lever arrives operationally free in summing.SLDASM; a legacy
+  The summing lever arrives operationally free in sm-summing.SLDASM; a legacy
   snapshot driver, if present in an older artefact, is suppressed here. The 20 bottom eyes share
   ONE summing-lever datum point at the stock anchor eye height and X offset.
   This retains the existing lumped motion model, not an exact per-station
@@ -67,9 +67,9 @@ from build_motion_study import (
     _sub_model,
     _suppress_named,
 )
-import channel_lever_spec as _CL
-import gooseneck_geom as _GN
-import summing_lever_spec as _SL
+import ch_channel_lever_spec as _CL
+import sm_gooseneck_geom as _GN
+import sm_summing_lever_spec as _SL
 from stock_anchor_geom import ANCHOR_9489T111, ANCHOR_9490T1
 
 # Part-local support centres (mm), not points to select on model edges.
@@ -102,7 +102,7 @@ CT_FREE_LEN = None
 async def _eye_point(adapter, comp_needle, local_point, label, comps=None):
     """Create a fixed support RefPoint on a shared part doc; never save it.
 
-    Use the direct sketch-point promotion recipe from build_magnifying_wheel.
+    Use the direct sketch-point promotion recipe from build_mg_magnifying_wheel.
     A 3D sketch uses part-local coordinates without a selected plane or edge.
     """
     import pythoncom
@@ -204,8 +204,8 @@ async def add_springs(adapter):
     # 1) free the summing-lever rock (the ANGLE snapshot dim) so springs move it.
     await _suppress_named(
         adapter,
-        "summing-1",
-        ("summing-lever",),
+        "sm-summing-1",
+        ("sm-summing-lever",),
         (ANGLE,),
         "summing-lever rock (free for springs)",
     )
@@ -213,24 +213,24 @@ async def add_springs(adapter):
     # 2) eye datum points on the shared part docs (inherited by all instances).
     comps = _components(adapter)
     lever_pt = await _eye_point(
-        adapter, "channel-lever-1", CH_LEVER_EYE, "channel-lever tab", comps=comps
+        adapter, "ch-channel-lever-1", CH_LEVER_EYE, "channel-lever tab", comps=comps
     )
     plate_pt = await _eye_point(
         adapter,
-        "summing-lever-1",
+        "sm-summing-lever-1",
         SUM_LEVER_EYE,
         "summing-lever stock anchor datum",
         comps=comps,
     )
     goose_pt = await _eye_point(
-        adapter, "gooseneck-1", GOOSENECK_EYE, "gooseneck counter-top", comps=comps
+        adapter, "sm-gooseneck-1", GOOSENECK_EYE, "gooseneck counter-top", comps=comps
     )
     hook_pt = await _eye_point(
-        adapter, "boss-hook-1", COUNTER_ANCHOR_EYE, "9490T1 counter-bottom", comps=comps
+        adapter, "vn-boss-hook-1", COUNTER_ANCHOR_EYE, "9490T1 counter-bottom", comps=comps
     )
 
-    sum_name = _find_one(adapter, "summing-lever-1", comps=comps)[1]
-    levers = _by_z_rank(adapter, "channel-lever", comps=comps)
+    sum_name = _find_one(adapter, "sm-summing-lever-1", comps=comps)[1]
+    levers = _by_z_rank(adapter, "ch-channel-lever", comps=comps)
     k_ch = SPRING_KCH if SPRING_KCH > 0 else STOCK_KCH
     log(
         f"  channel spring k = {k_ch:.1f} N/m (catalogue {STOCK_KCH:.3f} N/m, "
@@ -261,8 +261,8 @@ async def add_springs(adapter):
     log(f"  channel springs: {ok}/{len(levers)}")
 
     # 4) counter spring: gooseneck (structural) <-> boss-hook (on summing-lever).
-    goose_n = _find_one(adapter, "gooseneck-1", comps=comps)[1]
-    hook_n = _find_one(adapter, "boss-hook-1", comps=comps)[1]
+    goose_n = _find_one(adapter, "sm-gooseneck-1", comps=comps)[1]
+    hook_n = _find_one(adapter, "vn-boss-hook-1", comps=comps)[1]
     k_ct = SPRING_KCT if SPRING_KCT > 0 else STOCK_KCT
     log(
         f"  counter spring k = {k_ct:.1f} N/m (catalogue {STOCK_KCT:.3f} N/m, "
@@ -304,18 +304,18 @@ RIM_EDGE_CANDIDATES = [
 async def _suppress_pen_travel(adapter):
     """Suppress an explicitly authored transient pen-travel drive, if present.
 
-    Default-free ``pen.SLDASM`` has no Y-travel mate.  Its two remaining
+    Default-free ``pn-pen.SLDASM`` has no Y-travel mate.  Its two remaining
     pen-rod distance mates locate depth/across and must never be suppressed.
     """
     from solidworks_mcp.adapters.base import SuppressMateParameters
 
-    _, model = _sub_model(adapter, "pen-1")
+    _, model = _sub_model(adapter, "pn-pen-1")
     travel_name = None
     for _f, mate, name, mtype, parts, _v in _iter_mates(
         adapter, model, read_values=False
     ):
         lone = _lone_real(parts, "pen")
-        if mtype != DISTANCE or lone is None or _family(lone) != "pen-rod":
+        if mtype != DISTANCE or lone is None or _family(lone) != "pn-pen-rod":
             continue
         if name == "DRIVE_pen_travel":
             travel_name = name
@@ -327,7 +327,7 @@ async def _suppress_pen_travel(adapter):
     check(
         "suppress pen travel",
         await adapter.suppress_mate(
-            SuppressMateParameters(name=travel_name, suppress=True, component="pen-1")
+            SuppressMateParameters(name=travel_name, suppress=True, component="pn-pen-1")
         ),
     )
 
@@ -341,9 +341,9 @@ async def _rim_point(adapter, comps=None):
 
     top = adapter.currentModel
     top_title = str(_read_member(top, "GetTitle"))
-    wh, _ = _find_one(adapter, "magnifying-wheel-1", comps=comps)
+    wh, _ = _find_one(adapter, "mg-magnifying-wheel-1", comps=comps)
     if wh is None:
-        raise RuntimeError("magnifying-wheel-1 not found for rim point")
+        raise RuntimeError("mg-magnifying-wheel-1 not found for rim point")
     part = _read_member(wh, "GetModelDoc2")
     if part is None:
         raise RuntimeError("magnifying-wheel part doc unresolved")
@@ -391,8 +391,8 @@ async def _add_wire1_gear(adapter, summing_name=None, wheel_name=None):
     comps = None
     if summing_name is None or wheel_name is None:
         comps = _components(adapter)
-    summing_name = summing_name or _find_one(adapter, "summing-lever-1", comps=comps)[1]
-    wheel_name = wheel_name or _find_one(adapter, "magnifying-wheel-1", comps=comps)[1]
+    summing_name = summing_name or _find_one(adapter, "sm-summing-lever-1", comps=comps)[1]
+    wheel_name = wheel_name or _find_one(adapter, "mg-magnifying-wheel-1", comps=comps)[1]
     if summing_name is None or wheel_name is None:
         raise RuntimeError("WIRE1 split-sub component path unresolved")
     last = None
@@ -439,8 +439,8 @@ async def add_wires_gravity(adapter, with_gravity=False):
     #    + pen-rod Y travel (WIRE2 yoke drags it). The mag-lever rock stays pinned.
     await _suppress_named(
         adapter,
-        "magnifier-1",
-        ("magnifying-wheel",),
+        "mg-magnifier-1",
+        ("mg-magnifying-wheel",),
         (ANGLE,),
         "wheel rock (free for WIRE1)",
     )
@@ -450,9 +450,9 @@ async def add_wires_gravity(adapter, with_gravity=False):
     rim_pt = await _rim_point(adapter, comps=comps)
 
     # 3) both wires authored at top level between the split flexible subs.
-    summing_name = _find_one(adapter, "summing-lever-1", comps=comps)[1]
-    wheel_name = _find_one(adapter, "magnifying-wheel-1", comps=comps)[1]
-    pen_name = _find_one(adapter, "pen-rod-1", comps=comps)[1]
+    summing_name = _find_one(adapter, "sm-summing-lever-1", comps=comps)[1]
+    wheel_name = _find_one(adapter, "mg-magnifying-wheel-1", comps=comps)[1]
+    pen_name = _find_one(adapter, "pn-pen-rod-1", comps=comps)[1]
     if summing_name is None or wheel_name is None or pen_name is None:
         raise RuntimeError("split output-chain component path unresolved")
     w1 = await _add_wire1_gear(adapter, summing_name, wheel_name)

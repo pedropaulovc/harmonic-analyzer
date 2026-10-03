@@ -1,6 +1,6 @@
 r"""Localize the summing-lever <-> neutral-spring top-level clash.
 
-Inserts ONLY channel.SLDASM + output.SLDASM (the clashing pair) at identity,
+Inserts ONLY ch-channel.SLDASM + output.SLDASM (the clashing pair) at identity,
 runs interference detection, and for every interference dumps the two
 components' assembly-space bounding boxes (mm) plus their AABB overlap region
 -- the overlap box is where the 3.99 mm^3 sits, so it names the offending
@@ -32,7 +32,7 @@ async def build(adapter) -> dict[str, str]:
     )
 
     check("create_assembly", await adapter.create_assembly())
-    for name in ("channel", "output"):
+    for name in ("ch-channel", "output"):
         path = str((OUT_SLDASM / f"{name}.SLDASM").resolve())
         data = check(
             f"insert {name}",
@@ -82,7 +82,7 @@ async def build(adapter) -> dict[str, str]:
     adapter._attempt(lambda: mgr.Done(), default=None)
 
     # --- isolate summing-lever + the stretch00 springs, render the clash -----
-    keep = ("summing-lever", "channel-spring-installed-stretch00")
+    keep = ("sm-summing-lever", "vn-channel-spring-installed-stretch00")
     model = adapter.currentModel
 
     def _leaves(comp):

@@ -1,0 +1,10 @@
+dt-crank-seat-washer:
+  number: MHA-DT-036
+  category: dt
+  title: Crank Seat Thrust Washer
+  material: AISI 1018 cold-finished steel bar
+  material_specification: AISI 1018 cold-finished steel bar, ASTM A108
+  finish: oiled
+  quantity: 1
+  tolerance_class: machined_block
+  process: "turned from bar: bored to pass the crankshaft's journal land, both faces faced (steel)"

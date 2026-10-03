@@ -8,14 +8,14 @@ import _config
 
 
 MAGNIFIER_SPECS = {
-    "knife-mount": "knife_mount_spec",
-    "lever-wire": "lever_wire_spec",
-    "magnifying-bracket": "magnifying_bracket_spec",
-    "magnifying-clamp": "magnifying_clamp_spec",
-    "magnifying-lever": "magnifying_lever_spec",
-    "magnifying-vertical-rod": "magnifying_vertical_rod_spec",
-    "magnifying-wheel": "magnifying_wheel_spec",
-    "wheel-bar": "wheel_bar_spec",
+    "sm-knife-mount": "sm_knife_mount_spec",
+    "mg-lever-wire": "mg_lever_wire_spec",
+    "mg-magnifying-bracket": "mg_magnifying_bracket_spec",
+    "mg-magnifying-clamp": "mg_magnifying_clamp_spec",
+    "mg-magnifying-lever": "mg_magnifying_lever_spec",
+    "mg-magnifying-vertical-rod": "mg_magnifying_vertical_rod_spec",
+    "mg-magnifying-wheel": "mg_magnifying_wheel_spec",
+    "mg-wheel-bar": "mg_wheel_bar_spec",
 }
 
 

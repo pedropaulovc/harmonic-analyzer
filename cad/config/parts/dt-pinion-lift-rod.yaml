@@ -1,0 +1,11 @@
+dt-pinion-lift-rod:
+  title: Pinion Lift Rod
+  number: MHA-DT-017
+  category: dt
+  material: Plain Carbon Steel
+  material_specification: AISI 1018 cold-finished steel shafting
+  finish: bright machined; protect with ISO VG 32 machine-oil film
+  quantity: 1
+  tolerance_class: machined_block
+  fit_class: shaft_in_bushing
+  process: "machined (steel)"

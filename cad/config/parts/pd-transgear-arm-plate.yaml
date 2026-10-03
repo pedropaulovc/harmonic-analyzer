@@ -1,0 +1,13 @@
+pd-transgear-arm-plate:
+  title: Transgear Arm Plate
+  number: MHA-PD-019
+  category: pd
+  material: AISI 1018 cold-finished steel
+  material_specification: AISI 1018 cold-finished steel bar, ASTM A108, 1-1/4 in
+  finish: bright machined; protect with ISO VG 32 machine-oil film
+  quantity: 1
+  tolerance_class: machined_block
+  process: >-
+    Mill the outline from 1-1/4 in bar and step the notch; turn the front hub
+    and rear boss on the bore axis; ream the bore; drill and countersink the
+    two screw holes.

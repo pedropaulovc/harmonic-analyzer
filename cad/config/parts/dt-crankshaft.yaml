@@ -1,0 +1,10 @@
+dt-crankshaft:
+  number: MHA-DT-011
+  category: dt
+  material: AISI 1018 cold-finished steel bar
+  material_specification: AISI 1018 cold-finished steel bar, ASTM A108
+  finish: oiled
+  quantity: 1
+  tolerance_class: machined_block
+  fit_class: shaft_in_bushing
+  process: "turned from bar: 3/8 in core, integral Ø20.6 collar with a Ø17.5 sprocket seat spigot and 2 reamed drive-pin holes, Ø9.0 pinion seat step (steel)"

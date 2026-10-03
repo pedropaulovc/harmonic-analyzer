@@ -47,7 +47,7 @@ def _child_md5s() -> dict[str, str]:
 
 
 async def main() -> None:
-    arg = sys.argv[1] if len(sys.argv) > 1 else "frame"
+    arg = sys.argv[1] if len(sys.argv) > 1 else "fr-frame"
     path = Path(arg) if arg.lower().endswith(".sldasm") else OUT / f"{arg}.SLDASM"
     stem = path.stem
 

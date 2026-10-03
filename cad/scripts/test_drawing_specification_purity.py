@@ -142,8 +142,8 @@ add_surface_finish(
     imported_controls = """
 from _drawing_common import add_surface_finish
 from _surface_finish import surface_finish_by_key
-from connecting_rod_spec import SURFACE_FINISHES
-import connecting_rod_spec as rod_spec
+from ch_connecting_rod_spec import SURFACE_FINISHES
+import ch_connecting_rod_spec as rod_spec
 import _surface_finish as finish_catalog
 
 CONTROL = surface_finish_by_key(SURFACE_FINISHES, "strap_bore")
@@ -189,8 +189,8 @@ drawing.add_feature_control_frame(
 def test_detector_allows_feature_control_frame_values_from_part_contracts() -> None:
     source = """
 from _drawing_common import add_feature_control_frame
-from pinion_lever_spec import GEOMETRIC_CONTROLS, HUB_RUNOUT_TOLERANCE
-import pinion_lever_spec as lever_spec
+from dt_pinion_lever_spec import GEOMETRIC_CONTROLS, HUB_RUNOUT_TOLERANCE
+import dt_pinion_lever_spec as lever_spec
 
 FIRST_CONTROL = GEOMETRIC_CONTROLS[0]
 SELECTED_CONTROL = next(
@@ -215,7 +215,7 @@ add_feature_control_frame(
 def test_detector_does_not_let_spec_text_mask_a_local_fcf_number() -> None:
     source = """
 from _drawing_common import add_feature_control_frame
-from pinion_lever_spec import LABEL
+from dt_pinion_lever_spec import LABEL
 
 add_feature_control_frame(
     adapter, view, frame_xy=(0.1, 0.2), characteristic="flatness",
@@ -228,7 +228,7 @@ def test_detector_finds_bare_within_limits_only_in_attached_notes() -> None:
     source = """
 from _drawing_common import add_attached_note as attached
 import _drawing_common as drawing
-from pinion_lever_spec import LABEL
+from dt_pinion_lever_spec import LABEL
 
 NOTE = "TIP FACE FLAT WITHIN 0.05\\nPERPENDICULAR TO AXIS WITHIN 0.10"
 LOCAL_LIMIT = 0.20
@@ -264,12 +264,12 @@ unrelated(text="WITHIN 0.40")
 def test_detector_allows_attached_note_limits_from_part_contracts() -> None:
     source = """
 from _drawing_common import add_attached_note
-from pinion_lever_spec import (
+from dt_pinion_lever_spec import (
     GEOMETRIC_TOLERANCES_MM,
     GRIP_FLATNESS,
     GRIP_REQUIREMENT_NOTE,
 )
-import pinion_lever_spec as lever_spec
+import dt_pinion_lever_spec as lever_spec
 
 LOCAL_ALIAS = GRIP_FLATNESS
 add_attached_note(
@@ -371,9 +371,9 @@ def test_precision_exception_is_the_spec_reference_precision_only() -> None:
     item of it) may reach SetPrecision3; any other *_spec value is spec data,
     not a places statement, and still writes a drawing-owned precision."""
     source = """
-import top_frame_spec
-from harmonic_base_spec import DRAWING_REFERENCE_PRECISION as REF
-from tube_frame_spec import DRAWING_REFERENCE_PRECISION, SHANK_DIA
+import fr_top_frame_spec
+from fr_harmonic_base_spec import DRAWING_REFERENCE_PRECISION as REF
+from fr_tube_frame_spec import DRAWING_REFERENCE_PRECISION, SHANK_DIA
 
 display.SetPrecision3(DRAWING_REFERENCE_PRECISION, -1, -1, -1)
 display.SetPrecision3(DRAWING_REFERENCE_PRECISION["Height"], -1, -1, -1)
@@ -391,9 +391,9 @@ display.SetPrecision3(top_frame_spec.WEB_WIDTH, -1, -1, -1)
 
 def test_precision_rule_is_scoped_to_migrated_drawings(tmp_path: Path) -> None:
     legacy = tmp_path / "draw_legacy.py"
-    migrated = tmp_path / "draw_harmonic_base.py"
+    migrated = tmp_path / "draw_fr_harmonic_base.py"
     body = "display.SetPrecision3(1, -1, -1, -1)\n"
     legacy.write_text(body, encoding="utf-8")
     migrated.write_text(body, encoding="utf-8")
     violations = drawing_fleet_specification_violations([legacy, migrated])
-    assert [Path(item.filename).name for item in violations] == ["draw_harmonic_base.py"]
+    assert [Path(item.filename).name for item in violations] == ["draw_fr_harmonic_base.py"]

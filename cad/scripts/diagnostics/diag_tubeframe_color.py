@@ -1,7 +1,7 @@
 r"""Diagnostic: where does tube-frame's black come from?
 
-Opens tube-frame.SLDPRT, reports doc-level MPV + body/face appearance
-counts, exports an isolated image; then opens frame.SLDASM and reports the
+Opens fr-tube-frame.SLDPRT, reports doc-level MPV + body/face appearance
+counts, exports an isolated image; then opens fr-frame.SLDASM and reports the
 tube-frame components' material property overrides.
 
 Run: C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\diag_tubeframe_color.py
@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 async def build(adapter) -> dict[str, str]:
-    check("open part", await adapter.open_model(str(ROOT / "out" / "sldprt" / "tube-frame.SLDPRT")))
+    check("open part", await adapter.open_model(str(ROOT / "out" / "sldprt" / "fr-tube-frame.SLDPRT")))
     model = adapter.currentModel
     _flag(model, "IModelDoc2")
     mpv = model.MaterialPropertyValues
@@ -48,14 +48,14 @@ async def build(adapter) -> dict[str, str]:
                 n_face_appearance += 1
         _telemetry.info(f"faces: {len(faces)}, with face MPV: {n_face_appearance}")
 
-    check("open frame asm", await adapter.open_model(str(ROOT / "out" / "sldasm" / "frame.SLDASM")))
+    check("open frame asm", await adapter.open_model(str(ROOT / "out" / "sldasm" / "fr-frame.SLDASM")))
     asm = adapter.currentModel
     _flag(asm, "IModelDoc2")
     _flag(asm, "IAssemblyDoc")
     for comp in asm.GetComponents(True) or []:
         _flag(comp, "IComponent2")
         name = comp.Name2
-        if not name.startswith("tube-frame"):
+        if not name.startswith("fr-tube-frame"):
             continue
         cmpv = _read_member(comp, "MaterialPropertyValues")
         _telemetry.info(f"frame comp {name} MPV: {cmpv[:3] if cmpv else None}")

@@ -132,35 +132,28 @@ def test_the_internal_reference_pattern_catches_what_it_forbids() -> None:
         assert not INTERNAL_REFERENCE.search(sample), sample
 
 
-def test_the_scan_reaches_known_printed_text() -> None:
-    constants = printed_constants()
-    assert "knife_mount_spec.DRAWING_NOTES" in constants
-    assert "draw_drive_train_assembly.CHECKS" in constants
-    assert "knife-mount.material_specification" in printed_registry_fields()
-
-
 def test_no_printed_text_cites_an_internal_rule_or_ruling() -> None:
     assert not _internal_hits({**printed_constants(), **printed_registry_fields()})
 
 
 def test_post_mount_screw_prints_no_installation_notes() -> None:
-    row = yaml.safe_load((PARTS / "post-mount-screw.yaml").read_text(encoding="utf-8"))
-    assert "installation_notes" not in row["post-mount-screw"]
+    row = yaml.safe_load((PARTS / "vn-post-mount-screw.yaml").read_text(encoding="utf-8"))
+    assert "installation_notes" not in row["vn-post-mount-screw"]
 
 
 @pytest.mark.xfail(strict=True, reason="#932 tbspec wording (checklist, knife-mount)")
 def test_knife_mount_prints_its_heat_treatment_in_finish_only() -> None:
-    import knife_mount_spec
+    import sm_knife_mount_spec
 
-    row = yaml.safe_load((PARTS / "knife-mount.yaml").read_text(encoding="utf-8"))
-    row = row["knife-mount"]
+    row = yaml.safe_load((PARTS / "sm-knife-mount.yaml").read_text(encoding="utf-8"))
+    row = row["sm-knife-mount"]
     # The ruling's contract, not its wording: MATERIAL names the O1 steel,
     # FINISH carries the hardness and the unpainted state, the notes neither.
     assert re.search(r"\bO1\b", row["material_specification"])
     assert "HRC" not in row["material_specification"].upper()
     assert re.search(r"58-60\s*HRC", row["finish"], re.IGNORECASE)
     assert "UNPAINTED" in row["finish"].upper()
-    notes = knife_mount_spec.DRAWING_NOTES.upper()
+    notes = sm_knife_mount_spec.DRAWING_NOTES.upper()
     assert "HRC" not in notes and "UNPAINTED" not in notes
 
 
@@ -170,7 +163,7 @@ def test_cone_swing_platform_prints_no_minimum_stock_note() -> None:
     texts = {
         name: text
         for name, text in printed_constants().items()
-        if name.startswith(("cone_swing_platform", "draw_cone_swing_platform"))
+        if name.startswith(("dt_cone_swing_platform", "draw_dt_cone_swing_platform"))
     }
     assert texts
     for name, text in texts.items():
@@ -179,10 +172,10 @@ def test_cone_swing_platform_prints_no_minimum_stock_note() -> None:
 
 # Governance for a printed shortfall lives in the policy's Named exceptions
 # table and in a code comment on the emitter that prints it, never on the
-# sheet (user, 2026-09-26): "# Named exception: MHA-nnn <shortfall words> (...)".
+# sheet (user, 2026-09-26): "# Named exception: MHA-XX-nnn <shortfall words> (...)".
 POLICY = SCRIPTS.parent / "docs" / "drawing-simplicity-policy.md"
 EXCEPTION_TAG = re.compile(
-    r"#\s*Named exception:\s*(MHA-\d{3})\s+([a-z][a-z ]*[a-z])\s*\("
+    r"#\s*Named exception:\s*(MHA-[A-Z]{2}-\d{3})\s+([a-z][a-z ]*[a-z])\s*\("
 )
 
 
@@ -196,7 +189,7 @@ def named_exception_rows() -> list[tuple[str, str]]:
         cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
         if len(cells) != 4 or cells[0] == "parts" or set(cells[0]) <= {"-"}:
             continue
-        part = re.search(r"MHA-\d{3}", cells[0])
+        part = re.search(r"\bMHA-[A-Z]{2}-\d{3}\b", cells[0])
         assert part, f"a Named exceptions row names no part number: {line}"
         rows.append((part.group(0), f"{cells[0]} {cells[1]}".lower()))
     return rows

@@ -225,13 +225,15 @@ datum-origin case replay from the calibration run's dumps.
 1. **REPORT** (`LAYOUT_AUDIT_MODE`): writes the report and fails a leaf only
    on a finding of a kind in `ENFORCED_KINDS` (a fault still fails it).
    One fleet farm run produces each drawing's finding list for its owner.
-   A gating kind joins `ENFORCED_KINDS` once it reads zero on every drawing.
+   Collision kinds join `ENFORCED_KINDS` once they read zero on every drawing.
    The count takes each stem's latest `layout.audit` span on the branch's
-   lineage. The set now holds `com-read-errors`, `duplicate-thread-callout`,
+   lineage. `title-field-misfit` is enforced from the first build; it does not
+   wait for a zero-count rollout. The set now holds `com-read-errors`,
+   `duplicate-thread-callout`,
    `leader-crosses-leader`, `leader-crosses-section-line`,
    `leader-through-text`, `line-on-dimension-line`, `line-through-own-text`,
-   `merged-blocks` and `shoulder-crosses-line`. The leader kinds reached zero
-   when #1105 re-placed the callouts.
+   `merged-blocks`, `shoulder-crosses-line` and `title-field-misfit`. The leader
+   kinds reached zero when #1105 re-placed the callouts.
    The kinds that still fire are held out. `leader-crosses-line` is one:
    amplitude-bar's notch-floor Ra stands under ruling B, and arbor-pedestal's
    tap callout crosses Width, both accepted. `leader-through-own-text` is
@@ -253,6 +255,13 @@ datum-origin case replay from the calibration run's dumps.
    calls, the 3 `audit_sheet` calls, `diagnostics/drawing_layout_audit`'s own
    collector, and `draw_fr_harmonic_base`'s local checks. An allow-list entry
    needs a cited ruling.
+
+Every sheet's DWG. NO. and PART values must print in full on one line within
+their ruled `DrawingTemplateSpec.title_cells_m` cells, with 0.25 mm clearance.
+The native presave `_drawing_title_fields` check in `finalize_drawing` reads
+`PropertyLinkedText`, `GetText` and `GetExtent`, comparing the resolved values
+with the linked model's `Number` and `Title`. A misfit fails the drawing.
+Enlarge or reposition the cell; never shorten the canonical identity or title.
 
 Not checked:
 

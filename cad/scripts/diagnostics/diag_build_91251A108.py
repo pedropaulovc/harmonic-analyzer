@@ -1,7 +1,7 @@
 r"""McMaster 91251A108 -- black-oxide alloy steel socket head screw, #4-40 x 3/8".
 
 Catalogue: the McMaster product page https://www.mcmaster.com/91251A108/
-(read in a headless browser on 2026-09-29 for the MHA-140 hold-down): #4-40
+(read in a headless browser on 2026-09-29 for the MHA-VN-030 hold-down): #4-40
 UNC, class 3A, right hand, 3/8 in (9.525) under the head, fully threaded,
 flat tip; standard socket head Ø0.183 in (4.6482) x 0.112 in (2.8448) high,
 3/32 in hex drive; black-oxide alloy steel, 170 ksi, Rockwell C37, ASTM

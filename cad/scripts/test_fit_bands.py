@@ -3,7 +3,7 @@
 A band only reaches ``_fit_limits.deviations`` (or the bilateral setter) inside
 ``build()``, which needs a SolidWorks seat. So an inverted or zero-width band
 used to pass the whole offline suite and fail its farm leaf instead: warm-c486
-lost ``part:crank_drive_gear`` to "fit band is inverted: (0.025, 0.025)" at
+lost ``part:dt_crank_drive_gear`` to "fit band is inverted: (0.025, 0.025)" at
 ``build_crank_drive_gear.build()`` -> ``deviations(BORE_DIA_BAND)``.
 
 This file finds every band consumer by reading the scripts' source, resolves each
@@ -45,9 +45,9 @@ _SETTER = "set_dimension_bilateral_tolerance"
 # from. "each" means build() loops over the tuple of bands.
 LOCAL_BAND_SOURCES: dict[tuple[str, str], tuple[str, str]] = {
     # for section, band in enumerate(SECTION_DIA_BANDS): ... deviations(band)
-    ("build_cone_gear_shaft", "band"): ("SECTION_DIA_BANDS", "each"),
+    ("build_dt_cone_gear_shaft", "band"): ("SECTION_DIA_BANDS", "each"),
     # def _printed_limits(nominal, places): ... GENERAL_BAND_BY_PLACES[places]
-    ("cone_tip_block_spec", "GENERAL_BAND_BY_PLACES[places]"): (
+    ("dt_cone_tip_block_spec", "GENERAL_BAND_BY_PLACES[places]"): (
         "GENERAL_BAND_BY_PLACES",
         "values",
     ),
@@ -60,67 +60,67 @@ OFFLINE_IMPORT_EXCLUSIONS: dict[str, str] = {}
 # Module-level *_BAND tuples that are not fit bands, so no checked consumer
 # reads them. A new band tuple must be fed to a consumer above or listed here.
 NOT_FIT_BANDS: dict[tuple[str, str], str] = {
-    ("build_drive_train_assembly", "ARBOR_PED_SOUTH_Z_BAND"): (
+    ("build_dt_drive_train_assembly", "ARBOR_PED_SOUTH_Z_BAND"): (
         "plan z extent of the south pedestal foot (clearance geometry)"
     ),
-    ("build_drive_train_assembly", "ARBOR_PED_NORTH_Z_BAND"): (
+    ("build_dt_drive_train_assembly", "ARBOR_PED_NORTH_Z_BAND"): (
         "plan z extent of the north pedestal foot (clearance geometry)"
     ),
     # The 16T/T120 and row checks (c'' variant B): print-worst (lower, upper)
     # deviations already derived by printed_deviations/deviations from each
     # printed band, corners of the clearance scans rather than fits.
-    ("build_drive_train_assembly", "_PINION_FACE_BAND"): (
+    ("build_dt_drive_train_assembly", "_PINION_FACE_BAND"): (
         "16T face print-worst deviations (clearance/engagement corners)"
     ),
-    ("build_drive_train_assembly", "_PINION_SHOULDER_BAND"): (
+    ("build_dt_drive_train_assembly", "_PINION_SHOULDER_BAND"): (
         "16T shoulder print-worst deviations (T120 air corners)"
     ),
-    ("build_drive_train_assembly", "_PINION_TIP_RADIUS_BAND"): (
+    ("build_dt_drive_train_assembly", "_PINION_TIP_RADIUS_BAND"): (
         "16T tip-radius print-worst deviations (T120 air corners)"
     ),
-    ("build_drive_train_assembly", "_PINION_TURNED_DIA_BAND"): (
+    ("build_dt_drive_train_assembly", "_PINION_TURNED_DIA_BAND"): (
         "16T turned-band diameter print-worst deviations (T120 radial and band contact corners)"
     ),
-    ("build_drive_train_assembly", "_BOSS_NORTH_BAND"): (
+    ("build_dt_drive_train_assembly", "_BOSS_NORTH_BAND"): (
         "post crank-boss north face print-worst deviations (16T station corners)"
     ),
-    ("build_drive_train_assembly", "_CONE_BOSS_NORTH_BAND"): (
+    ("build_dt_drive_train_assembly", "_CONE_BOSS_NORTH_BAND"): (
         "post cone-boss north face print-worst deviations (cone stack corners)"
     ),
-    ("build_drive_train_assembly", "_COLLAR_WIDTH_BAND"): (
+    ("build_dt_drive_train_assembly", "_COLLAR_WIDTH_BAND"): (
         "cone-shaft collar print-worst deviations (cone stack corners)"
     ),
-    ("build_drive_train_assembly", "_CRANK_HEIGHT_BAND"): (
+    ("build_dt_drive_train_assembly", "_CRANK_HEIGHT_BAND"): (
         "crank-above-cone print-worst deviations (radial clearance corners)"
     ),
-    ("build_drive_train_assembly", "_T120_NORTH_BAND"): (
+    ("build_dt_drive_train_assembly", "_T120_NORTH_BAND"): (
         "T120 north-face (upper, lower) station band sampled by the T120 scan"
     ),
-    ("build_drive_train_assembly", "_ARB_Z_BANDS"): (
+    ("build_dt_drive_train_assembly", "_ARB_Z_BANDS"): (
         "(z extent, minimum gap) pairs for the swing-plate clearance sweep"
     ),
-    ("build_drive_train_assembly", "_SWING_RIG_BANDS"): (
+    ("build_dt_drive_train_assembly", "_SWING_RIG_BANDS"): (
         "(z low, z high, name) pinion-rig extents for the engage-swing sweep"
     ),
-    ("build_drive_train_assembly", "_SPRING_Z_BAND"): (
+    ("build_dt_drive_train_assembly", "_SPRING_Z_BAND"): (
         "plan z extent of the return spring for the engage-swing sweep"
     ),
-    ("build_drive_train_assembly", "CRANK_COLUMN_BANDS"): (
+    ("build_dt_drive_train_assembly", "CRANK_COLUMN_BANDS"): (
         "(z front, z rear, diameter, name) crank-seat column extents for the "
         "radial clearance sweep"
     ),
-    ("pinion_spring_geometry", "FORMED_CONTACT_BANDS"): (
+    ("dt_pinion_spring_geometry", "FORMED_CONTACT_BANDS"): (
         "names of the formed dimensions the contact corners perturb, not a band"
     ),
-    ("transgear_arm_plate_screw_spec", "STOCK_LENGTH_BAND"): (
+    ("vn_transgear_arm_plate_screw_spec", "STOCK_LENGTH_BAND"): (
         "the oval-head screw's B18.6.3 length tolerance (plus, minus): indexed "
         "for the shortest stock left proud of the arm before its cut"
     ),
-    ("transgear_disc_screw_spec", "STOCK_LENGTH_BAND"): (
+    ("vn_transgear_disc_screw_spec", "STOCK_LENGTH_BAND"): (
         "the fillister screw's B18.6.3 length tolerance (plus, minus): indexed "
         "for the stock's reach past the disc's rear face before its cut"
     ),
-    ("guide_lock_screw_spec", "SHANK_LEN_BAND"): (
+    ("vn_guide_lock_screw_spec", "SHANK_LEN_BAND"): (
         "the button-head screw's B18.6.3 length tolerance (plus, minus): "
         "indexed for the shortest reach into the platen guide's through tap"
     ),
@@ -130,48 +130,48 @@ NOT_FIT_BANDS: dict[tuple[str, str], str] = {
 # to print or derive limits. An inverted one prints wrong limits, so they get
 # the same check as a helper-fed band.
 INDEXED_FIT_BANDS: dict[tuple[str, str], str] = {
-    ("alignment_pinion_spec", "BASE_TANGENT_SPAN_BAND"): (
+    ("dt_alignment_pinion_spec", "BASE_TANGENT_SPAN_BAND"): (
         "indexed into the span-measurement note text"
     ),
-    ("cone_gear_shaft_spec", "STOCK_DIA_BAND"): (
+    ("dt_cone_gear_shaft_spec", "STOCK_DIA_BAND"): (
         "the 5/8 bar's supplied size band, indexed for the thrust ring's "
         "worst-case width (THRUST_RING_MIN)"
     ),
-    ("crankshaft_spec", "SEAT_COLLAR_BAND"): (
+    ("dt_crankshaft_spec", "SEAT_COLLAR_BAND"): (
         "the seat face's station deviations, indexed for the hub-to-sprocket air"
     ),
-    ("transgear_removable_spec", "PLATE_BAND"): (
+    ("pd_transgear_removable_spec", "PLATE_BAND"): (
         "the wheel plate's thickness deviations, indexed for the hub-to-sprocket "
         "air and the chain envelope's reach"
     ),
-    ("connecting_rod_spec", "RING_THICKNESS_BAND"): (
+    ("ch_connecting_rod_spec", "RING_THICKNESS_BAND"): (
         "indexed by cylinder_bank_layout for the thickest ring its cam slot holds"
     ),
-    ("cylinder_gear_spec", "OVERALL_THICKNESS_BAND"): (
+    ("dt_cylinder_gear_spec", "OVERALL_THICKNESS_BAND"): (
         "centred (cylinder_bank_layout asserts it): indexed as the symmetric "
         "tolerance and the fit-up mic limits"
     ),
-    ("pinion_arbor_collar_spec", "BORE_BAND"): (
+    ("dt_pinion_arbor_collar_spec", "BORE_BAND"): (
         "the title block's drilled-hole row, indexed for the slide-clearance, "
         "wall and pin-end-depth stacks (not printed on the bore)"
     ),
-    ("pinion_arbor_geometry", "DRUM_LEN_BAND"): "indexed into the drum-length limits",
-    ("pinion_handle_geometry", "ROD_DIA_BAND"): (
+    ("dt_pinion_arbor_geometry", "DRUM_LEN_BAND"): "indexed into the drum-length limits",
+    ("dt_pinion_handle_geometry", "ROD_DIA_BAND"): (
         "indexed by pinion_arbor_spec for the cross-rod fit limits"
     ),
-    ("rocker_arm_spec", "PIVOT_HOLE_BAND"): (
+    ("ch_rocker_arm_spec", "PIVOT_HOLE_BAND"): (
         "indexed into the hub's wall floor (HUB_DIA_MIN); the build also "
         "sets it natively on PivotDia"
     ),
-    ("transgear_collar_cross_pin_spec", "HOLE_BAND"): (
+    ("vn_transgear_collar_cross_pin_spec", "HOLE_BAND"): (
         "the spring pin's drilled cross hole (functional, R9-11): indexed for "
         "HOLE_MAX against the B18.8.2 window and the fit-up step's limits"
     ),
-    ("transgear_knob_cup_pin_spec", "HOLE_BAND"): (
-        "MHA-154's cross-hole band reused for the hole match-drilled through "
+    ("vn_transgear_knob_cup_pin_spec", "HOLE_BAND"): (
+        "MHA-VN-037's cross-hole band reused for the hole match-drilled through "
         "cup and journal: indexed for HOLE_MAX against the B18.8.2 window"
     ),
-    ("transgear_latch_pin_spec", "DIA_BAND"): (
+    ("vn_transgear_latch_pin_spec", "DIA_BAND"): (
         "the pressed dowel's catalogue diameter: read by min/max for the press "
         "interference against the arm's blind hole"
     ),

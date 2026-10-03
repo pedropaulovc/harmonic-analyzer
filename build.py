@@ -4,7 +4,7 @@ Examples:
     uv run python build.py --help
     uv run python build.py --verbosity warning -n 4
     uv run python build.py --verbosity debug check:math
-    uv run python build.py --executor farm --leaf-timeout 90 assembly:harmonic_analyzer
+    uv run python build.py --executor farm --leaf-timeout 90 assembly:ha_harmonic_analyzer
 
 The wrapper consumes ``--verbosity``, ``--executor`` and ``--leaf-timeout``; every
 other argument is passed to ``doit`` unchanged. A leading ``--help``/``-h`` (after
@@ -71,7 +71,7 @@ _USAGE = (
 )
 _DESCRIPTION = """\
 Run the doit graph (dodo.py). Only the options below belong to the wrapper; every
-other argument goes to doit unchanged, so `build.py part:cone_gear`, `build.py
+other argument goes to doit unchanged, so `build.py part:dt_cone_gear`, `build.py
 -n 4`, `build.py list` and `build.py help run` mean what they mean under `doit`."""
 _EPILOG = f"""\
 farm defaults (--executor farm; `build` / `build.cmd` pass it for you):

@@ -117,7 +117,7 @@ async def rack_pinion_mate(
     pinion_pitch_diameter: float = 0.0,
     rack_travel_per_revolution: float = 0.0,
     flip: bool = False,
-    label: str = "rack_pinion",
+    label: str = "pd_rack_pinion",
     verify: tuple[str, list[float]] | None = None,
 ) -> Any:
     """Rack-pinion mate coupling a linear rack to a rotating pinion.
@@ -134,7 +134,7 @@ async def rack_pinion_mate(
     return await _mate(
         adapter,
         label,
-        "rack_pinion",
+        "pd_rack_pinion",
         [rack_ref, pinion_ref],
         pinion_pitch_diameter=pinion_pitch_diameter,
         rack_travel_per_revolution=rack_travel_per_revolution,

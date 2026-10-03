@@ -190,7 +190,7 @@ console.log(JSON.stringify({{data:MECHANISM_DATA,pose,gauge}},(k,v)=>k==='_work'
             for row, point in zip(rows, world, strict=True)
         ]
 
-    paper = parts["harmonic-analyzer/paper-drive/platen-paper-1"]
+    paper = parts["ha-harmonic-analyzer/pd-paper-drive/pd-platen-paper-1"]
     paper_rows = [row for row in measurements if row["anchorId"].startswith("paper.")]
     paper_world = np.array(
         [
@@ -218,10 +218,10 @@ console.log(JSON.stringify({{data:MECHANISM_DATA,pose,gauge}},(k,v)=>k==='_work'
     paper_errors = errors(paper_rows, paper_world + [rack_fit.x[0], 0, 0])
 
     crank_axis = np.array(
-        parts["harmonic-analyzer/drive-train/crankshaft-1"]["world"][12:15]
+        parts["ha-harmonic-analyzer/dt-drive-train/dt-crankshaft-1"]["world"][12:15]
     )
     handle_origin = np.array(
-        parts["harmonic-analyzer/drive-train/crank-handle-1"]["world"][12:15]
+        parts["ha-harmonic-analyzer/dt-drive-train/dt-crank-handle-1"]["world"][12:15]
     )
     crank_rows = [
         row for row in measurements if row["anchorId"] == "crank.handle-pivot"
@@ -266,7 +266,7 @@ console.log(JSON.stringify({{data:MECHANISM_DATA,pose,gauge}},(k,v)=>k==='_work'
 
     # A cropped upper screw does not make the entire counter unobservable:
     # the genuine native rigid stem's lower free end survives five source views.
-    goose = parts["harmonic-analyzer/summing/gooseneck-1"]
+    goose = parts["ha-harmonic-analyzer/sm-summing/sm-gooseneck-1"]
     goose_tip = np.array(
         [goose["world"][12], goose["bounds"]["min"][1], goose["world"][14]]
     )
@@ -354,9 +354,9 @@ console.log(JSON.stringify({{data:MECHANISM_DATA,pose,gauge}},(k,v)=>k==='_work'
         max(interval[0] for interval in ratio_intervals),
         min(interval[1] for interval in ratio_intervals),
     ]
-    small = parts["harmonic-analyzer/paper-drive/transgear-removable-2"]
-    large = parts["harmonic-analyzer/paper-drive/transgear-removable-1"]
-    medium = parts["harmonic-analyzer/paper-drive/transgear-removable-3"]
+    small = parts["ha-harmonic-analyzer/pd-paper-drive/pd-transgear-removable-2"]
+    large = parts["ha-harmonic-analyzer/pd-paper-drive/pd-transgear-removable-1"]
+    medium = parts["ha-harmonic-analyzer/pd-paper-drive/pd-transgear-removable-3"]
     small_radius = (small["bounds"]["max"][1] - small["bounds"]["min"][1]) / 2
     large_radius = (large["bounds"]["max"][1] - large["bounds"]["min"][1]) / 2
     medium_radius = (medium["bounds"]["max"][0] - medium["bounds"]["min"][0]) / 2

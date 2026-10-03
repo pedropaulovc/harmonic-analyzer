@@ -87,7 +87,7 @@ async def main():
     await adapter.connect()
     check("create_assembly", await adapter.create_assembly())
 
-    shaft = await _insert(adapter, "pivot-shaft", [X, SHAFT_Y, 0.0], fixed=True)
+    shaft = await _insert(adapter, "ch-pivot-shaft", [X, SHAFT_Y, 0.0], fixed=True)
     bush = await _insert(adapter, "pivot-bushing", [X, BUSH_Y, 0.0], fixed=False)
 
     # vertical slider: bushing OD concentric with shaft OD (clear of the bushing).

@@ -1,0 +1,13 @@
+vn-transgear-collar-cross-pin:
+  title: Drive Collar Cross Pin
+  number: MHA-VN-037
+  category: vn
+  stock_name: 1050-1095 Spring Steel Slotted Spring Pin
+  supplier: McMaster-Carr
+  supplier_skus: [98296A026]
+  material: Plain Carbon Steel
+  material_specification: "1050-1095 spring steel slotted spring pin, 1/16 x 9/16; McMaster-Carr 98296A026"
+  finish: plain; no coating
+  quantity: 1
+  tolerance_class: machined_block
+  process: purchased

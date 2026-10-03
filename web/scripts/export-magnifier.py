@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Export magnifier source geometry and a nonzero coordinate-based control.
 
-Run from any directory: python web/scripts/export-magnifier.py
+Run from any directory: python web/scripts/export-magnifier.py --source-commit <approved-canonical-commit>
 Only numeric JSON is emitted. CAD stays read-only; no COM, native build, source
 images, or generated GLB modifications. This is not the website acceptance gate.
 The control constructs a circle tangent by bisection of the perpendicularity
@@ -11,6 +11,7 @@ constraint, independently of magnifier.ts's analytic acos tangent expression.
 from __future__ import annotations
 
 import hashlib
+import argparse
 import importlib
 import io
 import json
@@ -21,29 +22,32 @@ import tarfile
 import tempfile
 from pathlib import Path
 
-COMMIT = "1268c23d4a8fc741147c5e09d8d1e45247a71945"
 ROOT = Path(__file__).resolve().parents[2]
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--source-commit", required=True,
+                        help="Approved canonical CAD source commit")
+    args = parser.parse_args()
     archive = subprocess.check_output(
-        ["git", "archive", COMMIT, "cad/scripts", "cad/config"], cwd=ROOT
+        ["git", "archive", args.source_commit, "cad/scripts", "cad/config"], cwd=ROOT
     )
     with tempfile.TemporaryDirectory(prefix="magnifier-source-") as temp:
         with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
             tar.extractall(temp, filter="data")
         scripts = Path(temp) / "cad/scripts"
         sys.path.insert(0, str(scripts))
-        wire = importlib.import_module("lever_wire_geom")
-        wheel = importlib.import_module("magnifying_wheel_geom")
-        pen = importlib.import_module("pen_wire_geom")
-        lever = importlib.import_module("magnifying_lever_geom")
-        clamp = importlib.import_module("magnifying_clamp_geom")
+        wire = importlib.import_module("mg_lever_wire_geom")
+        wheel = importlib.import_module("mg_magnifying_wheel_geom")
+        pen = importlib.import_module("pn_pen_wire_geom")
+        lever = importlib.import_module("mg_magnifying_lever_geom")
+        clamp = importlib.import_module("mg_magnifying_clamp_geom")
         spring = importlib.import_module("spring_mount_geom")
         cx, cy = wire.WHEEL_X, wire.WHEEL_BAR_Y
         radius = wheel.HUB_DIA / 2 + wire.WIRE_DIA / 2
-        vertical = importlib.import_module("magnifying_vertical_rod_spec")
-        fixture = importlib.import_module("output_fixture_spec")
+        vertical = importlib.import_module("mg_magnifying_vertical_rod_spec")
+        fixture = importlib.import_module("mg_output_fixture_spec")
         rim = wheel.RIM_OUTER_DIA / 2 + pen.WIRE_DIA / 2
 
         def tangent(
@@ -95,22 +99,22 @@ def main() -> None:
                 }
             )
         names = (
-            "lever_wire_geom.py",
-            "magnifying_lever_geom.py",
-            "magnifying_wheel_geom.py",
-            "magnifying_wheel_spec.py",
-            "pen_wire_geom.py",
-            "build_magnifier_assembly.py",
-            "build_pen_assembly.py",
-            "magnifying_vertical_rod_spec.py",
-            "build_magnifying_vertical_rod.py",
-            "output_fixture_spec.py",
-            "magnifying_clamp_geom.py",
+            "mg_lever_wire_geom.py",
+            "mg_magnifying_lever_geom.py",
+            "mg_magnifying_wheel_geom.py",
+            "mg_magnifying_wheel_spec.py",
+            "pn_pen_wire_geom.py",
+            "build_mg_magnifier_assembly.py",
+            "build_pn_pen_assembly.py",
+            "mg_magnifying_vertical_rod_spec.py",
+            "build_mg_magnifying_vertical_rod.py",
+            "mg_output_fixture_spec.py",
+            "mg_magnifying_clamp_geom.py",
         )
         print(
             json.dumps(
                 {
-                    "sourceCommit": COMMIT,
+                    "sourceCommit": args.source_commit,
                     "sourceFiles": [
                         {
                             "path": "cad/scripts/" + name,

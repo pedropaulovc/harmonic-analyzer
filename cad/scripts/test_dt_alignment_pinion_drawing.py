@@ -1,0 +1,234 @@
+"""Offline contracts for retained alignment-pinion manufacturing data."""
+
+from __future__ import annotations
+
+import math
+import re
+
+import pytest
+
+import _config
+import dt_alignment_pinion_spec as spec
+import dt_pinion_arbor_geometry as arbor_geometry
+import dt_pinion_arbor_spec as arbor
+
+
+def test_gear_data_block_preserves_the_actual_base_chord_profile() -> None:
+    data = spec.GEAR_DATA
+    assert spec.TEETH == 32
+    assert spec.TEETH == int(_config.machine("alignment_pinion", "teeth"))
+    assert "NUMBER OF TEETH:  32" in data
+    for field in (
+        "DIAMETRAL PITCH",
+        "MODULE",
+        "PRESSURE ANGLE",
+        "PITCH DIAMETER",
+        "MIN CHORD-FLOOR DIAMETER (mm, REF):  15.780",
+        "AS-CUT RADIAL TOOTH DEPTH (mm, REF):  0.777",
+        f"TOOTH FORM:  {spec.BASE_CHORD_ROOT_FORM}",
+    ):
+        assert field in data, field
+    assert "FULL DEPTH" not in data
+    assert "WHOLE DEPTH" not in data
+    assert "X.XX" not in data
+
+
+def test_only_the_bore_carries_a_finish_symbol() -> None:
+    """Machinist review of the pc-r7 sheet: Ra 1.6 on both end faces was
+    over-specified.  The ends bear on the MHA-DT-014 straps at the float's two
+    stops, but no friction or end-play budget asks for a grade, so they take
+    the title-block finish.  "End faces polished" stays retired too."""
+    import draw_dt_alignment_pinion as drawing
+
+    (bore,) = spec.SURFACE_FINISHES
+    assert bore.key == "drum_bore"
+    assert bore.face.diameter_mm == spec.BORE_DIA
+    assert bore.roughness_um == 1.6
+    assert "polish" not in _config.parts("dt-alignment-pinion")["finish"].lower()
+    for retired in ("_end_face_tip_arc", "BACK_END_FACE_XY", "FRONT_END_FACE_XY"):
+        assert not hasattr(drawing, retired), retired
+
+
+def test_bonded_slip_fit_clears_the_mha102_journal_within_the_bond_gap() -> None:
+    shaft_limits = (
+        arbor_geometry.SHAFT_DIA + arbor.SHAFT_DIA_BAND[1],
+        arbor_geometry.SHAFT_DIA + arbor.SHAFT_DIA_BAND[0],
+    )
+    bore_limits = (
+        spec.BORE_DIA + spec.ARBOR_BORE_BAND[1],
+        spec.BORE_DIA + spec.ARBOR_BORE_BAND[0],
+    )
+    # The drum bonds onto MHA-DT-022's bond zone, not its journal lands (U39).
+    assert arbor.SHAFT_DIA_BAND != arbor.JOURNAL_DIA_BAND
+    assert bore_limits == pytest.approx((8.00, 8.10))
+    # A stock 8 mm H7 reamer (8.000-8.015) lands inside the band.
+    assert bore_limits[0] <= 8.000 and 8.015 <= bore_limits[1]
+    minimum_clearance = bore_limits[0] - shaft_limits[1]
+    maximum_clearance = bore_limits[1] - shaft_limits[0]
+    assert minimum_clearance == pytest.approx(
+        spec.ARBOR_BORE_BAND[1] - arbor.SHAFT_DIA_BAND[0]
+    )
+    # The drum slides on by hand: the arbor's bond zone sits 0.01 under 8.00.
+    assert minimum_clearance == pytest.approx(0.010)
+    assert minimum_clearance >= 0.010 - 1e-9
+    assert maximum_clearance == pytest.approx(
+        spec.ARBOR_BORE_BAND[0] - arbor.SHAFT_DIA_BAND[1]
+    )
+    assert maximum_clearance == pytest.approx(0.200)
+    assert maximum_clearance < spec.RETAINING_COMPOUND_MAX_GAP_MM
+    assert spec.BORE_DIA == arbor_geometry.SHAFT_DIA  # the CAD models line-to-line
+
+
+def test_the_drum_bond_is_the_fitup_step_not_a_note() -> None:
+    import dt_pinion_arbor_spec as arbor_spec
+
+    notes = spec.DRAWING_NOTES
+    # Rule 6 (R3): one note.  The drum is symmetric, so no orientation note;
+    # its axial station is stated once, on MHA-DT-022.  The MHA-DT-022 bond-zone
+    # band is MHA-DT-022's own native dimension (Codex P1 on #814), the hand
+    # slide rides the bore callout (Codex P2 on #832), and the bond itself is
+    # the pinion fit-up step MHA-DT-022's spec owns (Main's rule-6 sweep).
+    assert notes == "TOOTH FLANKS, TIPS, AND ROOTS: DO NOT CHAMFER OR BLEND."
+    assert "BOND ZONE" not in notes
+    assert "ARBOR JOURNAL" not in notes
+    assert "LOCTITE" not in notes and "ON ASSEMBLY" not in notes
+    assert "MHA-DT-001" in arbor_spec.ASSEMBLY_STEP
+    assert spec.RETAINING_COMPOUND in arbor_spec.ASSEMBLY_STEP
+    assert "j=19" not in notes and "LOCATED FROM" not in notes
+    assert "MATES WITH CYLINDER-GEAR BANK" not in notes
+    for retired in ("INTERFERENCE", "MATCHED FIT", "ENSURES FULL ENGAGEMENT", "+/-0.5"):
+        assert retired not in notes, retired
+
+
+def test_part_metadata_preserves_material_finish_quantity() -> None:
+    config = _config.parts("dt-alignment-pinion")
+    assert config["material_specification"] == "C36000 free-machining brass"
+    assert config["finish"] == "bore as reamed; teeth as cut"
+    assert int(config["quantity"]) == 1
+
+
+class _FakeNote:
+    def __init__(self, linked: str, resolved: str) -> None:
+        self.PropertyLinkedText = linked
+        self._resolved = resolved
+
+    def GetText(self) -> str:
+        return self._resolved
+
+
+class _FakeDrawing:
+    def __init__(self) -> None:
+        self.rebuilds = 0
+
+    def ForceRebuild3(self, top_only: bool) -> bool:
+        self.rebuilds += 1
+        return True
+
+
+def test_material_readback_rebuilds_before_comparing_resolved_text() -> None:
+    import draw_dt_alignment_pinion as draw
+
+    linked = 'MATERIAL: $PRPSHEET:"Material Specification"'
+    resolved = "MATERIAL: C36000 free-machining brass"
+    drawing = _FakeDrawing()
+    draw._verify_title_material_specification(
+        drawing, (_FakeNote(linked, resolved), linked, resolved)
+    )
+    assert drawing.rebuilds == 1
+
+
+def test_material_readback_names_the_unresolved_text() -> None:
+    import draw_dt_alignment_pinion as draw
+
+    linked = 'MATERIAL: $PRPSHEET:"Material Specification"'
+    with pytest.raises(RuntimeError, match="got 'MATERIAL: '"):
+        draw._verify_title_material_specification(
+            _FakeDrawing(),
+            (
+                _FakeNote(linked, "MATERIAL: "),
+                linked,
+                "MATERIAL: C36000 free-machining brass",
+            ),
+        )
+
+
+def test_tooth_thickness_is_controlled_by_the_model_base_tangent_span() -> None:
+    k = spec.BASE_TANGENT_SPAN_TEETH
+    # Unroll the model's own base-circle tooth: k tooth arcs plus k-1 pitches.
+    unrolled = spec._BASE_RADIUS * (
+        2.0 * spec._BASE_TOOTH_HALF_ANGLE + (k - 1) * 2.0 * math.pi / spec.TEETH
+    )
+    assert spec.BASE_TANGENT_SPAN == pytest.approx(unrolled, abs=1e-9)
+    contact_r = math.hypot(spec._BASE_RADIUS, spec.BASE_TANGENT_SPAN / 2.0)
+    assert spec._BASE_RADIUS < contact_r < spec.OUTSIDE_DIA / 2.0
+    assert abs(contact_r - spec.PITCH_DIA / 2.0) < 0.05
+    assert spec.BASE_TANGENT_SPAN_BAND == (0.0, -0.100)
+    assert "BASE-TANGENT SPAN, OVER 3 TEETH (mm):  3.964 +0.000/-0.100" in spec.GEAR_DATA
+
+
+def test_fit_bore_callout_names_its_process() -> None:
+    import draw_dt_alignment_pinion as draw
+
+    assert draw.DIMENSION_CALLOUTS["ArborBoreDia"].splitlines()[0] == "REAM THRU"
+
+
+def test_hand_slide_fit_rides_the_bore_callout_not_a_note() -> None:
+    """Rule 6: a matched-fit acceptance belongs on the feature callout or an
+    assembly step, never in a general note (Codex P2 on #832)."""
+    import draw_dt_alignment_pinion as draw
+
+    callout = draw.DIMENSION_CALLOUTS["ArborBoreDia"]
+    assert callout == spec.ARBOR_BORE_CALLOUT
+    arbor = _config.parts("dt-pinion-arbor")
+    assert callout.splitlines()[1:] == [
+        f"SLIDES BY HAND ON {arbor['number']}",
+        arbor["title"].upper(),
+    ]
+    assert arbor["number"] == "MHA-DT-022"
+    assert "PINION ARBOR" in callout
+    for line in spec.DRAWING_NOTES.splitlines():
+        assert "SLIDE" not in line and "BY HAND" not in line, line
+
+
+def test_od_at_the_general_band_keeps_tip_clearance_and_contact() -> None:
+    """The .XX (+/-0.51) OD band is functionally enough for the 120T mesh."""
+    import dt_cylinder_gear_spec as gear
+
+    general = 0.51
+    alpha = math.radians(spec.PRESSURE_ANGLE_DEG)
+    inv = math.tan(alpha) - alpha
+    engaged_c2c = float(_config.machine("alignment_pinion", "engaged_center_distance_mm"))
+    gear_base_r = gear.TEETH * spec.MODULE_MM * math.cos(alpha) / 2.0
+    gear_floor_r = gear_base_r * math.cos(
+        math.pi / gear.TEETH - (math.pi / (2.0 * gear.TEETH) + inv)
+    )
+    gear_tip_r = gear.OUTSIDE_DIA / 2.0
+    # The base-chord gap floor stops the 120T tips 0.24 short of standard depth;
+    # U28 (user, 2026-09-23) parks the drum 0.2425 further out so the swing
+    # lands exactly there -- the configured engaged centre distance IS the
+    # seated one.
+    seated_c2c = gear_tip_r + spec.MIN_CHORD_FLOOR_DIA / 2.0
+    assert seated_c2c - engaged_c2c == pytest.approx(0.0, abs=1e-5)
+
+    def contact_ratio(c2c: float, tip_r: float) -> float:
+        working = math.acos((spec._BASE_RADIUS + gear_base_r) / c2c)
+        path = (
+            math.sqrt(tip_r**2 - spec._BASE_RADIUS**2)
+            + math.sqrt(gear_tip_r**2 - gear_base_r**2)
+            - c2c * math.sin(working)
+        )
+        return path / (math.pi * spec.MODULE_MM * math.cos(alpha))
+
+    for c2c in (engaged_c2c, seated_c2c):
+        largest_tip_r = (spec.OUTSIDE_DIA + general) / 2.0
+        smallest_tip_r = (spec.OUTSIDE_DIA - general) / 2.0
+        assert c2c - largest_tip_r - gear_floor_r > 0.20
+        assert contact_ratio(c2c, smallest_tip_r) > 1.1
+
+
+def test_no_note_line_carries_a_dimension() -> None:
+    """Rule 6: once part numbers and the named retaining compound are set
+    aside, no note line carries a digit (Codex P1 on #814)."""
+    for line in spec.DRAWING_NOTES.splitlines():
+        text = re.sub(r"\bMHA-[A-Z]{2}-\d{3}\b", "", line).replace(spec.RETAINING_COMPOUND, "")
+        assert not re.search(r"\d", text), line

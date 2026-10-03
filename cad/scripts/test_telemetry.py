@@ -445,7 +445,7 @@ def test_build_session_continues_injected_parent_without_duplicate(
     if env.get("TRACESTATE"):
         monkeypatch.setenv("TRACESTATE", env["TRACESTATE"])
 
-    with _telemetry.build_session("build_cone_gear") as root:
+    with _telemetry.build_session("build_dt_cone_gear") as root:
         assert root is None  # no duplicate root layer
         with _telemetry.span("op"):
             pass

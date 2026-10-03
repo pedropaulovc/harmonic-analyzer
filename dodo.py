@@ -46,8 +46,8 @@ Run through uv (SolidWorks already open for the COM tasks)::
     uv run python build.py --verbosity warning -n 4  # concise console output
 
     uv run python -m doit build_bare            # quick: parts + assemblies only, no gates
-    uv run python -m doit assembly:paper_drive  # just that assembly + its stale prereqs
-    uv run python -m doit part:summing_lever    # just that part
+    uv run python -m doit assembly:pd_paper_drive  # just that assembly + its stale prereqs
+    uv run python -m doit part:sm_summing_lever    # just that part
     uv run python -m doit verify:soundness      # one SW gate; check:math one offline gate
     uv run python -m doit export                # neutral STEP/STL/glTF/scene export
     uv run python -m doit release               # cut the next vNN release (opt-in)
@@ -57,9 +57,9 @@ Run through uv (SolidWorks already open for the COM tasks)::
 Full-rebuild escape (idiomatic doit -- a missing target forces a run, and
 build_or_refresh takes the FULL branch when the target is absent)::
 
-    del cad\out\sldasm\paper-drive.SLDASM
-    %DOIT% forget assembly:paper_drive    # optional: also drop the cached hash
-    %DOIT% assembly:paper_drive
+    del cad\out\sldasm\pd-paper-drive.SLDASM
+    %DOIT% forget assembly:pd_paper_drive    # optional: also drop the cached hash
+    %DOIT% assembly:pd_paper_drive
 """
 
 from __future__ import annotations
@@ -1264,7 +1264,7 @@ def _fail_task(label: str, rc: int, *, started: float) -> None:
     retrievable one, which is the same lie as a field reported blank when no
     read could have answered it. ``_failure_artefact_hint`` sends the reader to
     THIS line, so it has to exist in both outcomes (measured on
-    ``part:pen_set_screw``, gate build 2026-09-18).
+    ``part:vn_pen_set_screw``, gate build 2026-09-18).
     """
     commit_gb = _sw_commit_gb()
     if commit_gb is not None:
@@ -1324,7 +1324,7 @@ def _failure_artefact_hint(log_blob: str | None) -> str:
     recipe called ``capture_com_failure`` leave artefacts, the worker's
     workspace is gone by now, and ``LeafResult`` carries no artefact count. An
     unconditional download instruction therefore sent operators to a prefix
-    with zero blobs (``part:pen_set_screw``, gate build 2026-09-18) -- worse
+    with zero blobs (``part:vn_pen_set_screw``, gate build 2026-09-18) -- worse
     than silence, because the pause before the failure implies something was
     captured. Probing the container from here is the wrong fix: it would put a
     network call on the path whose one job is to deliver the exit code.
@@ -1715,9 +1715,9 @@ def _channel_spring_variants() -> list[Path]:
     """Measured-length spring variants inserted by the channel assembly.
     Neutral also uses stretch00. These are assembly-owned outputs, not separate
     task targets; cleanup and cache packing share this inventory so a hit restores
-    every spring component referenced by channel.SLDASM.
+    every spring component referenced by ch-channel.SLDASM.
     """
-    return sorted((CAD_OUT / "sldprt").glob("channel-spring-installed-stretch*.SLDPRT"))
+    return sorted((CAD_OUT / "sldprt").glob("vn-channel-spring-installed-stretch*.SLDPRT"))
 
 
 def _part_cache_outputs(stem: str) -> list[Path]:
@@ -1746,9 +1746,9 @@ def _assembly_cache_outputs(stem: str) -> list[Path]:
     # would then find no drive specs to author transiently and fail loud.
     dof = sldasm.parent / f".{sldasm.stem}.dof.json"
     outs = [sldasm, _png_dir(stem), massprops, dof]
-    if stem == "channel":
+    if stem == "ch_channel":
         outs += _channel_spring_variants()
-    if stem == "harmonic_analyzer":
+    if stem == "ha_harmonic_analyzer":
         outs.append(CAD_OUT / "harmonic-analyzer-bom.csv")
     return outs
 
@@ -1939,7 +1939,7 @@ def _soundness_file_deps(stem: str) -> list[str]:
         _sldasm(stem),
         _assembly_execution_token(stem),
     ]
-    if stem == "paper_drive":
+    if stem == "pd_paper_drive":
         deps.append(_dof_json(stem))
     return deps
 
@@ -1958,8 +1958,8 @@ def _kinematics_file_deps() -> list[str]:
     .SLDPRT -> .SLDASM digest.
 
     The magnifier live-chain sweep (verify._verify_live_chain_one) opens
-    magnifier.SLDASM and authors its recorded lever drive spec transiently; the
-    paper-feed proof (verify._verify_paper_feed_one) opens paper-drive.SLDASM and
+    mg-magnifier.SLDASM and authors its recorded lever drive spec transiently; the
+    paper-feed proof (verify._verify_paper_feed_one) opens pd-paper-drive.SLDASM and
     drives the crank -- without those deps a rebuild of either would leave the
     stamp valid and SKIP the gates (codex #177/#189). The pen sweep + magnifier
     chain sweep read the .dof.json manifests directly (codex #221), and the
@@ -1972,14 +1972,14 @@ def _kinematics_file_deps() -> list[str]:
     return [
         str(VERIFY_PY),
         str(POSTBUILD_PY),
-        _sldasm("pen"),
-        _assembly_execution_token("pen"),
-        _sldasm("magnifier"),
-        _assembly_execution_token("magnifier"),
-        _sldasm("paper_drive"),
-        _assembly_execution_token("paper_drive"),
-        _dof_json("pen"),
-        _dof_json("magnifier"),
+        _sldasm("pn_pen"),
+        _assembly_execution_token("pn_pen"),
+        _sldasm("mg_magnifier"),
+        _assembly_execution_token("mg_magnifier"),
+        _sldasm("pd_paper_drive"),
+        _assembly_execution_token("pd_paper_drive"),
+        _dof_json("pn_pen"),
+        _dof_json("mg_magnifier"),
         str((SCRIPTS_DIR / "build_kinematic_probe.py").resolve()),
         str((SCRIPTS_DIR / "pen_driver.py").resolve()),
         str((SCRIPTS_DIR / "truth_model.py").resolve()),
@@ -1995,10 +1995,10 @@ def _preflight_file_deps() -> list[str]:
         str(VERIFY_PY),
         str((SCRIPTS_DIR / "_assembly.py").resolve()),
         str(POSTBUILD_PY),
-        _sldasm("drive_train"),
-        _assembly_execution_token("drive_train"),
-        _sldasm("channel"),
-        _assembly_execution_token("channel"),
+        _sldasm("dt_drive_train"),
+        _assembly_execution_token("dt_drive_train"),
+        _sldasm("ch_channel"),
+        _assembly_execution_token("ch_channel"),
     ]
 
 
@@ -2604,7 +2604,7 @@ def _assembly_run_mode(
         return "full", "target missing"
     if recipe_changed:
         return "full", "recipe changed"
-    if stem == "paper_drive":
+    if stem == "pd_paper_drive":
         return "full", "bounded thread-contact gate requires full rebuild"
     return "refresh", "referenced artefact changed"
 
@@ -2775,7 +2775,7 @@ def _clean_assembly(stem):
     _force_remove(Path(_assembly_execution_token(stem)))
     _force_remove(_recipe_sidecar(stem))
     _force_remove(CAD_OUT / "png" / stem.replace("_", "-"))
-    if stem == "channel":
+    if stem == "ch_channel":
         for variant in _channel_spring_variants():
             _force_remove(variant)
 
@@ -2932,6 +2932,46 @@ def task_verify():
         "verbosity": 2,
     }
 
+    # Temporary opt-in route-B probe; remove after native template evidence is captured.
+    probe = (SCRIPTS_DIR / "diagnostics" / "probe_title_field_fit.py").resolve()
+    probe_dir = CAD_OUT / "probe" / "title-field-fit"
+    probe_outputs = [
+        probe_dir / "title-field-fit.json",
+        *(
+            probe_dir / f"{case}-{layout.value}.pdf"
+            for case in ("control-v39", "number10-title29", "number15-title29")
+            for layout in DRAWING_TEMPLATES
+        ),
+    ]
+    probe_deps = sorted(
+        {
+            str(probe),
+            *_helper_deps(probe),
+            *(str(template.path.resolve()) for template in DRAWING_TEMPLATES.values()),
+            str(RELEASE_VERSION_FILE),
+            _submodule_dep(),
+        }
+    )
+    yield {
+        "name": "title_field_probe",
+        "file_dep": probe_deps,
+        "targets": [str(path) for path in probe_outputs],
+        "actions": [
+            (
+                _cached_com_action,
+                [
+                    "verify:title_field_probe",
+                    [sys.executable, str(probe)],
+                    probe_deps,
+                    probe_outputs,
+                    "title-field-probe",
+                ],
+            )
+        ],
+        "clean": True,
+        "verbosity": 2,
+    }
+
 
 def task_check():
     """SolidWorks-FREE checks -- no COM, so they run in parallel under ``-n N``.
@@ -3006,6 +3046,8 @@ def task_check():
         SCRIPTS_DIR / "test_stock_fastener.py",
         # The shared layout audit's own contract (_layout_audit.py finders + ink model).
         SCRIPTS_DIR / "test_layout_audit.py",
+        # Full native Number/Title readback and ruled-cell fit failures.
+        SCRIPTS_DIR / "test_drawing_title_fields.py",
         # Drawing infrastructure and cross-sheet contracts do not follow the
         # per-sheet test_*_drawing.py suffix, so enroll them explicitly.
         SCRIPTS_DIR / "test_drawing_marks.py",
@@ -3013,16 +3055,16 @@ def task_check():
         SCRIPTS_DIR / "test_fastener_catalog.py",
         # The keeper chain's rest-pose solve: whole pitches, clearances, and a
         # length that lets the taper pin come fully out.
-        SCRIPTS_DIR / "test_keeper_chain.py",
+        SCRIPTS_DIR / "test_vn_keeper_chain.py",
         # The removable sprocket's seat interface: its recorded web/rim
         # shortfalls and the #25 plates' clearance over the shared seat.
-        SCRIPTS_DIR / "test_transgear_removable_seat.py",
+        SCRIPTS_DIR / "test_pd_transgear_removable_seat.py",
         # The transgear hanger's screwed joints, pivot head play and the latch
         # pin's press, judged at the printed bands (transgear_hanger_joints).
         SCRIPTS_DIR / "test_transgear_hanger_joints.py",
         # The paper-drive interference rows re-derived from their owner specs
         # (_interference_contracts writes them as literals).
-        SCRIPTS_DIR / "test_paper_drive_interference_contracts.py",
+        SCRIPTS_DIR / "test_pd_paper_drive_interference_contracts.py",
         # The kinematic probe's chain-ratio band separates the 12:24 tooth
         # ratio from the OD and pitch-circle couplings (verify:kinematics).
         SCRIPTS_DIR / "test_kinematic_probe_ratio.py",
@@ -3055,7 +3097,7 @@ def task_check():
         SCRIPTS_DIR / "test_assembly_drawing_batch_contract.py",
         # Same failure shape: never enrolled, so the U28 re-lay (997f3534) left
         # its three drive-train support pins red with every gate green.
-        SCRIPTS_DIR / "test_drive_train_support_layout.py",
+        SCRIPTS_DIR / "test_dt_drive_train_support_layout.py",
         # The cone tip block's hold-down, embed-window and collar-air contracts
         # (I20/I22/I24/I31; prism ruling 2026-09-29) that
         # build_drive_train_assembly asserts at import.
@@ -3077,10 +3119,10 @@ def task_check():
         # (cascade -> integ merge, Main's restricted review).
         SCRIPTS_DIR / "test_module_constants_assigned_once.py",
         # Integ-branch tests that guard caught un-enrolled at #877 round 4.
-        SCRIPTS_DIR / "test_cone_gear_mesh_design.py",
-        SCRIPTS_DIR / "test_cone_gear_seat_fit.py",
+        SCRIPTS_DIR / "test_dt_cone_gear_mesh_design.py",
+        SCRIPTS_DIR / "test_dt_cone_gear_seat_fit.py",
         SCRIPTS_DIR / "test_drawing_hidden_sketches.py",
-        SCRIPTS_DIR / "test_drive_train_steps.py",
+        SCRIPTS_DIR / "test_dt_drive_train_steps.py",
         SCRIPTS_DIR / "test_drive_train_tip_adjuster_seat.py",
         SCRIPTS_DIR / "test_fit_bands.py",
         SCRIPTS_DIR / "test_printed_text_rulings.py",
@@ -3093,8 +3135,8 @@ def task_check():
         SCRIPTS_DIR / "test_crank_mesh_stack.py",
         SCRIPTS_DIR / "test_crank_mesh_studies_band.py",
         SCRIPTS_DIR / "test_crank_boss_rim.py",
-        # ... and #937: the cylinder-bank layout bands and MHA-147's set screw.
-        SCRIPTS_DIR / "test_arbor_set_screw.py",
+        # ... and #937: the cylinder-bank layout bands and MHA-VN-034's set screw.
+        SCRIPTS_DIR / "test_vn_arbor_set_screw.py",
         SCRIPTS_DIR / "test_cylinder_bank_layout.py",
         # ... and #936: the rocker-bank stack, the support's bracket seats, the
         # channel's cross-bank axial budget and the hole-callout process line.
@@ -3124,7 +3166,7 @@ def task_check():
         SCRIPTS_DIR / "test_sketch_preference_baseline.py",
         SCRIPTS_DIR / "test_diag_mcmaster_lib.py",
         # Every configuration of a saved part is rebuilt and read back clean
-        # (pc-p1r: MHA-135 INSTALLED saved stale failed saved-rebuild-clean).
+        # (pc-p1r: MHA-DT-030 INSTALLED saved stale failed saved-rebuild-clean).
         SCRIPTS_DIR / "test_part_save_rebuild.py",
         # Assembly mates select by name, never by a view-dependent point pick
         # (#916: the collar pick selected the shaft collar's OD on one seat).
@@ -3257,15 +3299,15 @@ def task_check():
             # DXF is now the source of truth (the re-traced coordinate loops are
             # retired), so the gate depends on the file + its integrity test.
             "file_dep": [
-                str((SCRIPTS_DIR / "test_nameplate_geometry.py").resolve()),
-                str((SCRIPTS_DIR / "nameplate_spec.py").resolve()),
+                str((SCRIPTS_DIR / "test_fr_nameplate_geometry.py").resolve()),
+                str((SCRIPTS_DIR / "fr_nameplate_spec.py").resolve()),
                 str(
                     (
-                        REPO_ROOT / "cad" / "references" / "nameplate-engraving.dxf"
+                        REPO_ROOT / "cad" / "references" / "fr-nameplate-engraving.dxf"
                     ).resolve()
                 ),
             ],
-            "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_nameplate_geometry.py")],
+            "cmd": [*pytest_cmd, str(SCRIPTS_DIR / "test_fr_nameplate_geometry.py")],
         },
         "numerals": {
             # Guards the GENERATED numerals DXF the measuring-stick build imports:
@@ -3285,7 +3327,7 @@ def task_check():
                         REPO_ROOT
                         / "cad"
                         / "references"
-                        / "measuring-stick-numerals.dxf"
+                        / "ha-measuring-stick-numerals.dxf"
                     ).resolve()
                 ),
             ],
@@ -3479,9 +3521,9 @@ def task_check():
                 {
                     str((SCRIPTS_DIR / "error_budget.py").resolve()),
                     str((SCRIPTS_DIR / "test_error_budget.py").resolve()),
-                    str((SCRIPTS_DIR / "build_channel_assembly.py").resolve()),
-                    str((SCRIPTS_DIR / "build_cylinder_gear.py").resolve()),
-                    str((SCRIPTS_DIR / "build_measuring_stick.py").resolve()),
+                    str((SCRIPTS_DIR / "build_ch_channel_assembly.py").resolve()),
+                    str((SCRIPTS_DIR / "build_dt_cylinder_gear.py").resolve()),
+                    str((SCRIPTS_DIR / "build_ha_measuring_stick.py").resolve()),
                     # config: derived from the accessor scan of the model's and
                     # the test's import closures (the same _config_deps every
                     # part uses), never hand-listed -- a hand list missed

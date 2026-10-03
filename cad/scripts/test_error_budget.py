@@ -136,8 +136,8 @@ def test_loaded_anchor_geometry_sets_pen_gain_and_hole_sensitivity(nom):
     """Independent force-distance finite differences include initial-tension
     stiffness and distinguish the manufactured hole X from the loaded arm."""
     import channel_kinematics
-    import channel_spring_stock_geom as channel_stock
-    import counter_spring_stock_geom as counter_stock
+    import vn_channel_spring_stock_geom as channel_stock
+    import vn_counter_spring_stock_geom as counter_stock
     import spring_mount_geom as mounts
 
     knife = (mounts.KNIFE[0], mounts.KNIFE_CONTACT_Y)
@@ -547,7 +547,7 @@ def test_counter_spring_catalog_range_gates_every_station_case(
     rejects the configured case instead of extrapolating a counter pose beyond
     the catalog range.
     """
-    import counter_spring_stock_geom as counter_stock
+    import vn_counter_spring_stock_geom as counter_stock
     import spring_mount_geom as mounts
 
     neutral_stations = np.zeros(eb.N_ELEMENTS)
@@ -700,7 +700,7 @@ def test_ungated_minimum_pose_fails_unless_waived(budget, report, nom):
     report names those inputs, the gate fails on it unless the yaml records
     the waiver (#748), and the offline wire estimate that rides the waiver
     reproduces lever_wire_geom's own numbers at the as-built pose."""
-    import lever_wire_geom
+    import mg_lever_wire_geom
 
     mag = report["closed_form"]["magnifier"]
     assert mag["minimum_pose_cad_gated"] is False
@@ -713,9 +713,9 @@ def test_ungated_minimum_pose_fails_unless_waived(budget, report, nom):
     built = eb._minimum_pose_wire_estimate(
         dataclasses.replace(nom, lever_r_min=nom.lever_r_built)
     )
-    assert built["hook_x_mm"] == pytest.approx(lever_wire_geom.CLAMP_X)
-    assert built["wire_length_mm"] == pytest.approx(lever_wire_geom.WIRE_LEN, abs=1e-3)
-    assert mag["minimum_pose_wire_estimate"]["hook_x_mm"] < lever_wire_geom.CLAMP_X
+    assert built["hook_x_mm"] == pytest.approx(mg_lever_wire_geom.CLAMP_X)
+    assert built["wire_length_mm"] == pytest.approx(mg_lever_wire_geom.WIRE_LEN, abs=1e-3)
+    assert mag["minimum_pose_wire_estimate"]["hook_x_mm"] < mg_lever_wire_geom.CLAMP_X
 
 
 def test_shipped_procedure_caps_the_clamp_radius_at_the_built_pose(report, nom):
@@ -1110,47 +1110,47 @@ def test_stick_division_is_the_configured_scale_the_builder_engraves():
     station -> stick-reading conversion, the drawing notes and the builder's
     ticks all reach it through the one read point (measuring_stick_geom); none
     may copy it."""
-    import measuring_stick_geom
-    import measuring_stick_spec
+    import ha_measuring_stick_geom
+    import ha_measuring_stick_spec
 
     configured = float(eb._config.machine("amplitude", "stick_division_spacing_mm"))
-    assert measuring_stick_geom.DIVISION_SPACING == configured
-    assert measuring_stick_geom.DIVISION_COUNT == int(
+    assert ha_measuring_stick_geom.DIVISION_SPACING == configured
+    assert ha_measuring_stick_geom.DIVISION_COUNT == int(
         eb._config.machine("amplitude", "stick_division_count")
     )
-    assert measuring_stick_geom.MINOR_SPACING == configured / int(
+    assert ha_measuring_stick_geom.MINOR_SPACING == configured / int(
         eb._config.machine("amplitude", "stick_minor_per_division")
     )
     assert eb.STICK_DIVISION_MM == configured
     # the engraved span follows the configured COUNT, so the last tick keeps
     # its end margin instead of running off a longer/shorter scale
-    import build_measuring_stick as stick
+    import build_ha_measuring_stick as stick
 
-    assert stick.SCALE_SPAN == (measuring_stick_geom.DIVISION_COUNT - 1) * configured
+    assert stick.SCALE_SPAN == (ha_measuring_stick_geom.DIVISION_COUNT - 1) * configured
     assert stick.SCALE_START_X == (
         stick.BODY_LENGTH - stick.SCALE_SPAN - stick.SCALE_END_MARGIN
     )
     # the NATIVE equation and the drawing NOTES carry the same counts, so a
     # config edit cannot leave the driven sketch or the sheet describing a
     # scale the part does not engrave
-    src = (pathlib.Path(eb.__file__).with_name("build_measuring_stick.py")).read_text(
+    src = (pathlib.Path(eb.__file__).with_name("build_ha_measuring_stick.py")).read_text(
         encoding="utf-8"
     )
     assert '{DIVISION_COUNT - 1} * "DivisionSpacing"' in src
-    notes = measuring_stick_spec.DRAWING_NOTES
-    top = measuring_stick_geom.DIVISION_COUNT - 1
+    notes = ha_measuring_stick_spec.DRAWING_NOTES
+    top = ha_measuring_stick_geom.DIVISION_COUNT - 1
     assert (
-        f"{measuring_stick_geom.DIVISION_COUNT} FULL TICKS (VALUES 0 THRU {top})"
+        f"{ha_measuring_stick_geom.DIVISION_COUNT} FULL TICKS (VALUES 0 THRU {top})"
         in notes
     )
     assert (
-        f"{measuring_stick_geom.MINOR_PER_DIVISION - 1} MINOR" in notes
+        f"{ha_measuring_stick_geom.MINOR_PER_DIVISION - 1} MINOR" in notes
     )  # tenths between two full ticks
     assert f"NUMERALS 0 THRU {top}" in notes
     assert f"TICK N AT {configured:.2f} X N" in notes
     assert f"SPAN {top * configured:.2f} REF" in notes
-    assert re.search(r"^from measuring_stick_geom import \($", src, re.M)
-    for module in ("measuring_stick_geom.py", "measuring_stick_spec.py"):
+    assert re.search(r"^from ha_measuring_stick_geom import \($", src, re.M)
+    for module in ("ha_measuring_stick_geom.py", "ha_measuring_stick_spec.py"):
         text = (pathlib.Path(eb.__file__).with_name(module)).read_text(encoding="utf-8")
         assert not re.search(r"^\s*\w*DIVISION\w*\s*[:=].*\d", text, re.M) or (
             "_config.machine" in text
@@ -1199,7 +1199,7 @@ def test_cone_flat_phase_follows_gear_ratio_and_print_worst_lever(budget):
     greatest AF, less the title block's edge break on the torque corner
     (Codex, #1128), unless the least bore flat is shorter still. The residual
     is booked against the longest unbroken Ø9.525 flat."""
-    import cone_gear_spec
+    import dt_cone_gear_spec
     import cone_shaft_land_bands
     import gear_seat_fit
 
@@ -1212,7 +1212,7 @@ def test_cone_flat_phase_follows_gear_ratio_and_print_worst_lever(budget):
     mean = (clearance_lo + clearance_hi) / 2.0
     clock = budget["critical_features"]["cone_flat_clock"]["tolerance"]
     play = budget["critical_features"]["cone_flat_play"]["tolerance"]
-    assert clock == cone_gear_spec.FLAT_CLOCK_TOLERANCE_DEG
+    assert clock == dt_cone_gear_spec.FLAT_CLOCK_TOLERANCE_DEG
     assert play == pytest.approx((clearance_hi - clearance_lo) / 2.0)
     assert gear_seat_fit.FLAT_AF_CLEARANCE == (0.010, 0.030)
     edge_break = _config.title_block("edge_break")
@@ -1224,7 +1224,7 @@ def test_cone_flat_phase_follows_gear_ratio_and_print_worst_lever(budget):
 
     reference_upper, _ = cone_shaft_land_bands.SECTION_DIA_BANDS[1]
     reference_chord = chord(
-        cone_gear_spec.bore_dia_mm(120) + reference_upper,
+        dt_cone_gear_spec.bore_dia_mm(120) + reference_upper,
         cone_shaft_land_bands.SECTION_FLAT_AF[1] + af_lower,
     )
     for section, (band, af, carried) in enumerate(
@@ -1239,7 +1239,7 @@ def test_cone_flat_phase_follows_gear_ratio_and_print_worst_lever(budget):
             assert section == 0 and af is None
             continue
         assert af is not None
-        diameter = cone_gear_spec.bore_dia_mm(carried[0])
+        diameter = dt_cone_gear_spec.bore_dia_mm(carried[0])
         _, lower = band
         _, bore_lower = gear_seat_fit.seat_bore_band(band)
         lever = min(
@@ -1249,7 +1249,7 @@ def test_cone_flat_phase_follows_gear_ratio_and_print_worst_lever(budget):
         for teeth in carried:
             index = teeth // 6 - 1
             ratio = teeth / 120.0
-            assert cone_gear_spec.bore_dia_mm(teeth) == pytest.approx(diameter)
+            assert dt_cone_gear_spec.bore_dia_mm(teeth) == pytest.approx(diameter)
             assert profiles["cone_flat_clock"][0][index] * clock == pytest.approx(
                 math.radians(clock) * ratio
             )
@@ -1268,16 +1268,16 @@ def test_cone_flat_phase_follows_gear_ratio_and_print_worst_lever(budget):
 
 
 def test_shaft_flat_clock_is_printed_and_booked_per_land(budget):
-    """MHA-014's four flats share one clock by note, at the title block's
+    """MHA-DT-004's four flats share one clock by note, at the title block's
     angle, and the budget draws that angle once per land: gears on one land
     turn together, and the Ø9.525 land (the 64T and T030..T120) is the
     reference its own clock cannot move."""
-    import cone_gear_shaft_spec
+    import dt_cone_gear_shaft_spec
     import cone_shaft_land_bands
 
     angle = float(_config.title_block("angular")["value_deg"])
     assert budget["critical_features"]["cone_land_clock"]["tolerance"] == angle
-    assert "ALL FLATS PARALLEL." in cone_gear_shaft_spec.DRAWING_NOTES.splitlines()
+    assert "ALL FLATS PARALLEL." in dt_cone_gear_shaft_spec.DRAWING_NOTES.splitlines()
 
     land = eb.draw_groups()["cone_land_clock"]
     for carried in cone_shaft_land_bands.SECTION_CONE_GEAR_TEETH:
@@ -1336,24 +1336,24 @@ def test_flat_phase_propagates_through_physical_readout(nom):
 
 def test_drawing_limits_agree_with_the_budget(budget):
     """Manufacturing tolerance values and derived fit limits agree with the budget."""
-    import channel_lever_spec
-    import cylinder_gear_spec
-    import rocker_arm_spec
-    import summing_lever_spec
+    import ch_channel_lever_spec
+    import dt_cylinder_gear_spec
+    import ch_rocker_arm_spec
+    import sm_summing_lever_spec
 
     feats = budget["critical_features"]
-    assert cylinder_gear_spec.ECCENTRICITY_TOLERANCE_MM == pytest.approx(
+    assert dt_cylinder_gear_spec.ECCENTRICITY_TOLERANCE_MM == pytest.approx(
         feats["cam_eccentricity"]["tolerance"]
     ), "cylinder-gear drawing carries a different eccentricity tolerance"
-    assert cylinder_gear_spec.CAM_PHASE_TOLERANCE_DEG == pytest.approx(
+    assert dt_cylinder_gear_spec.CAM_PHASE_TOLERANCE_DEG == pytest.approx(
         feats["cam_phase"]["tolerance"]
     ), "cylinder-gear drawing carries a different cam-phase tolerance"
     # every +/- arm tolerance is held by a diametral position zone of twice it
     for feature, spec_module, key in (
-        ("summing_hook_arm", summing_lever_spec, "spring-hole pattern position"),
-        ("rocker_rod_pin_radius", rocker_arm_spec, "rod-pin hole position"),
-        ("lever_bar_pin_arm", channel_lever_spec, "bar-pin hole position"),
-        ("lever_spring_hook_arm", channel_lever_spec, "spring-eye hole position"),
+        ("summing_hook_arm", sm_summing_lever_spec, "spring-hole pattern position"),
+        ("rocker_rod_pin_radius", ch_rocker_arm_spec, "rod-pin hole position"),
+        ("lever_bar_pin_arm", ch_channel_lever_spec, "bar-pin hole position"),
+        ("lever_spring_hook_arm", ch_channel_lever_spec, "spring-eye hole position"),
     ):
         zone = float(spec_module.GEOMETRIC_TOLERANCES_MM[key])
         assert zone == pytest.approx(2.0 * feats[feature]["tolerance"]), (
@@ -1362,8 +1362,8 @@ def test_drawing_limits_agree_with_the_budget(budget):
         )
     backlash_lo, backlash_hi = eb._config.fit("gear_mesh", "backlash_mm")
     pitch_r = (
-        eb.cylinder_gear_spec.TEETH
-        / (2.0 * eb.cylinder_gear_spec.DIAMETRAL_PITCH)
+        eb.dt_cylinder_gear_spec.TEETH
+        / (2.0 * eb.dt_cylinder_gear_spec.DIAMETRAL_PITCH)
         * 25.4
     )
     spread_deg = math.degrees((backlash_hi - backlash_lo) / 2.0 / pitch_r)

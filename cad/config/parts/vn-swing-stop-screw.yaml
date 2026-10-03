@@ -1,0 +1,14 @@
+vn-swing-stop-screw:
+  title: Steel Narrow Fillister Head Slotted Screw
+  number: MHA-VN-015
+  category: vn
+  stock_name: Steel Narrow Fillister Head Slotted Screw
+  supplier: McMaster-Carr
+  supplier_skus: [90280A108]
+  material: Plain Carbon Steel
+  material_specification: Steel, McMaster-Carr 90280A108
+  finish: zinc plated
+  quantity: 1
+  tolerance_class: machined_block
+  fit_class: fastener_clearance
+  process: purchased

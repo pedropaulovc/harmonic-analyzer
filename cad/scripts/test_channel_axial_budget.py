@@ -12,10 +12,10 @@ from __future__ import annotations
 import pytest
 
 import _config
-import connecting_rod_spec as rod
+import ch_connecting_rod_spec as rod
 import cylinder_bank_layout as bank
-import cylinder_gear_spec as gear
-import rocker_arm_spec as arm
+import dt_cylinder_gear_spec as gear
+import ch_rocker_arm_spec as arm
 import rocker_bank_layout as rocker
 
 

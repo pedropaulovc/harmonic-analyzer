@@ -16,7 +16,7 @@ What it does, in order:
      compact release tag (``v31`` -> ``v32``), and require
      ``cad/config/release.yaml`` to reserve that same CAD Revision.
   2. Pre-flight: tag must not already exist; the committed tree must be clean
-     (``--allow-dirty`` to override); harmonic-analyzer.SLDASM must be built.
+     (``--allow-dirty`` to override); ha-harmonic-analyzer.SLDASM must be built.
   3. Stage the bundle. This script opens NO SolidWorks document and needs NO
      seat: ``package_native.py`` (doit task ``package:release``, dispatchable to
      the farm) already ran every Pack-and-Go and left a PREPARED native tree
@@ -96,7 +96,7 @@ import _telemetry
 import trim_renders
 
 REPO_ROOT = CAD_ROOT.parent
-TOP_ASSEMBLY = "harmonic-analyzer"
+TOP_ASSEMBLY = "ha-harmonic-analyzer"
 RELEASE_DIR = CAD_ROOT / "out" / "release"
 # Per-task build/verify logs teed by dodo.py:_run (part-*, assembly-*, verify-*,
 # check-*). Shipped as a SEPARATE GitHub-release LOGS asset (zipped together with
@@ -302,7 +302,7 @@ def _repo_slug() -> str:
     """``owner/repo`` from the origin remote, for building asset URLs."""
     url = _git("config", "--get", "remote.origin.url", check_rc=False)
     m = re.search(r"github\.com[:/](.+?)(?:\.git)?$", url or "")
-    return m.group(1) if m else "pedropaulovc/harmonic-analyzer"
+    return m.group(1) if m else "pedropaulovc/ha-harmonic-analyzer"
 
 
 def render_diff(stage: Path, prev_tag: str) -> dict[str, Any]:
@@ -653,7 +653,7 @@ def write_provenance(
     """
     diff = facts.get("diff") or {}
     prov = {
-        "schema": "harmonic-analyzer/provenance@1",
+        "schema": "ha-harmonic-analyzer/provenance@1",
         "release": {
             "version": version,
             "previous": diff.get("prev"),

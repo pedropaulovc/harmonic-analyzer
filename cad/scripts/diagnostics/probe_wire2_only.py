@@ -59,7 +59,7 @@ async def _suppress_pen_travel(adapter):
     best = (None, -1.0)
     for _f, mate, name, mtype, parts, _v in _iter_mates(adapter, model, read_values=False):
         lone = _lone_real(parts, "output")
-        if mtype != DISTANCE or lone is None or _family(lone) != "pen-rod":
+        if mtype != DISTANCE or lone is None or _family(lone) != "pn-pen-rod":
             continue
         val = _mate_value(adapter, mate, mtype) or 0.0
         if val > best[1]:
@@ -84,19 +84,19 @@ async def main():
     log(f"opened {asm_path}")
 
     await _flex_output(adapter)
-    await _suppress_named(adapter, "output-1", ("magnifying-wheel",), (ANGLE,),
+    await _suppress_named(adapter, "output-1", ("mg-magnifying-wheel",), (ANGLE,),
                           "wheel rock")
     await _suppress_pen_travel(adapter)
 
     _, out_doc = _sub_model(adapter, "output-1")
     top = adapter.currentModel
     adapter.currentModel = out_doc
-    marker, _ = _find_one(adapter, "pen-marker")
+    marker, _ = _find_one(adapter, "pn-pen-marker")
     y0 = _world(_comp_xform(adapter, marker), [0, 0, 0])[1] if marker else None
     try:
-        rr = _entity_ref("pen-rod-1", "Axis1", "AXIS")
+        rr = _entity_ref("pn-pen-rod-1", "Axis1", "AXIS")
         rr.mark = 64
-        pr = _entity_ref("magnifying-wheel-1", "Axis1", "AXIS")
+        pr = _entity_ref("mg-magnifying-wheel-1", "Axis1", "AXIS")
         pr.mark = 128
         w2 = await rack_pinion_mate(adapter, rr, pr, pinion_pitch_diameter=100.0,
                                     label="WIRE2 wheel->pen")
@@ -105,13 +105,13 @@ async def main():
         log(f"  WIRE2 FAILED: {exc}")
 
     # rotate the wheel 30 deg about its own axis (Z) and rebuild; read pen delta.
-    wh, _ = _find_one(adapter, "magnifying-wheel-1")
+    wh, _ = _find_one(adapter, "mg-magnifying-wheel-1")
     a = _comp_xform(adapter, wh)
     await adapter.rotate_component(RotateComponentParameters(
-        name="magnifying-wheel-1", angle=30.0, axis_vector=[a[6], a[7], a[8]],
+        name="mg-magnifying-wheel-1", angle=30.0, axis_vector=[a[6], a[7], a[8]],
         axis_point=[a[9] * 1000.0, a[10] * 1000.0, a[11] * 1000.0], mode="exact"))
     adapter._attempt(lambda: out_doc.ForceRebuild3(False), default=None)
-    marker2, _ = _find_one(adapter, "pen-marker")
+    marker2, _ = _find_one(adapter, "pn-pen-marker")
     y1 = _world(_comp_xform(adapter, marker2), [0, 0, 0])[1] if marker2 else None
     if y0 is not None and y1 is not None:
         log(f"  pen-marker Y: {y0:.3f} -> {y1:.3f}  delta={y1 - y0:.3f} mm "

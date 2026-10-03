@@ -4,7 +4,7 @@ The longitudinal section is a turned part's length view (policy rule 7): its
 explicit centerline says which edges are the faced ends, and the cut exposes
 the bores so their diameters never land on hidden lines.  Lifted from
 ``draw_crank_pinion`` for the small turned parts that share the layout
-(MHA-152, MHA-153); only their drawings import it.
+(MHA-DT-034, MHA-DT-035); only their drawings import it.
 """
 
 from __future__ import annotations
@@ -56,7 +56,7 @@ def position_section_caption(
     """Move the native linked section caption to ``target`` and verify it.
 
     The caption carries its scale field only when the section's scale differs
-    from the sheet's (MHA-153's 5:1 section on a 5:1 sheet has none: farm leaf
+    from the sheet's (MHA-DT-035's 5:1 section on a 5:1 sheet has none: farm leaf
     20260929T222303Z found no ``<VLSCALEV>`` caption), so it is found by its
     label field alone.
     """

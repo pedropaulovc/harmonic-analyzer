@@ -69,15 +69,15 @@ async def main():
     # clear any leftover cam mates.
     for _s, _m, name, _t, parts, _v in _iter_mates(adapter, doc, read_values=False):
         j = " ".join(parts)
-        if "cylinder-gear" in j and "connecting-rod" in j:
+        if "dt-cylinder-gear" in j and "ch-connecting-rod" in j:
             await adapter.suppress_mate(SuppressMateParameters(name=name, suppress=False))
             await adapter.delete_mate(MateRefParameters(name=name))
 
     point_name = await _add_ring_centre_point(adapter)
 
     comps = _components(adapter)
-    gears = _by_z_rank(adapter, "cylinder-gear", comps=comps)
-    rods = _by_z_rank(adapter, "connecting-rod", comps=comps)
+    gears = _by_z_rank(adapter, "dt-cylinder-gear", comps=comps)
+    rods = _by_z_rank(adapter, "ch-connecting-rod", comps=comps)
     n = min(len(gears), len(rods))
     log(f"  {len(gears)} gears, {len(rods)} rods -> {n} channels")
 

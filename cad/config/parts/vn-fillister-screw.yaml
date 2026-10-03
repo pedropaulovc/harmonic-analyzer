@@ -1,0 +1,14 @@
+vn-fillister-screw:
+  title: Brass Fillister Head Slotted Screw
+  number: MHA-VN-006
+  category: vn
+  stock_name: Brass Fillister Head Slotted Screw
+  supplier: McMaster-Carr
+  supplier_skus: [90114A511]
+  material: Brass
+  material_specification: Brass, McMaster-Carr 90114A511
+  finish: plain
+  quantity: 19
+  tolerance_class: machined_block
+  fit_class: fastener_clearance
+  process: purchased

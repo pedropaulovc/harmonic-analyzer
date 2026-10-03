@@ -1,0 +1,9 @@
+mg-wheel-bar:
+  number: MHA-MG-008
+  category: mg
+  material: Plain Carbon Steel
+  material_specification: Plain Carbon Steel
+  finish: machined
+  quantity: 1
+  tolerance_class: machined_block
+  process: "machined (steel)"

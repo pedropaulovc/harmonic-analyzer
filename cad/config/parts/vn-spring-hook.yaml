@@ -1,0 +1,21 @@
+vn-spring-hook:
+  title: Channel Spring Anchor
+  number: MHA-VN-012
+  category: vn
+  stock_name: 'Black-Oxide Steel #6-32 Routing Eyebolt (Trimmed Shank, Supplied Nut Omitted)'
+  supplier: McMaster-Carr
+  supplier_skus: [9489T111]
+  material: Plain Carbon Steel
+  material_specification: Black-oxide steel, McMaster-Carr 9489T111
+  finish: SUPPLIED BLACK OXIDE; OIL BARE CUT END
+  installation_notes: |-
+    INSTALLATION - CHANNEL LOWER ANCHOR
+    DISCARD SUPPLIED HEX NUT; NO NUT INSTALLED.
+    THREAD DIRECTLY INTO SUMMING LEVER MHA-SM-003
+    TAPPED PLATE. RUN DOWN UNTIL NECK SEATS ON
+    PLATE TOP; BACK OUT 1 TURN MAX TO SET CHANNEL
+    PRELOAD. CLOCK EYE TO SPRING PULL PLANE.
+    USE REMOVABLE MEDIUM-STRENGTH THREADLOCKER.
+  quantity: 20
+  tolerance_class: machined_block
+  process: purchased

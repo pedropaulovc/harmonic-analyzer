@@ -4,8 +4,8 @@
 
 Six measured baseline interference-boundary witnesses are retained in the FREE
 catalogue end frame. They are test queries, NOT placement offsets or corrections.
-The replica queries translate with counter_spring_stock_geom.end_centers_mm at
-counter_spring_spec.INSTALLED_LENGTH_MM. Rebuilds are intentionally UNSAVED.
+The replica queries translate with vn_counter_spring_stock_geom.end_centers_mm at
+vn_counter_spring_spec.INSTALLED_LENGTH_MM. Rebuilds are intentionally UNSAVED.
 Native curve distance minus nominal wire radius is an envelope diagnostic, not
 an exact swept-surface or contact-interference calculation.
 """
@@ -25,8 +25,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 import dodo
 import _telemetry
-import counter_spring_spec
-import counter_spring_stock_geom as stock
+import vn_counter_spring_spec
+import vn_counter_spring_stock_geom as stock
 from _common import _early_bound, _read_member, check, run_build
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -182,7 +182,7 @@ def snapshot(doc, kind, phase, queries):
 
 
 async def probe(adapter, paths, output):
-    length = counter_spring_spec.INSTALLED_LENGTH_MM
+    length = vn_counter_spring_spec.INSTALLED_LENGTH_MM
     free_eye = stock.end_centers_mm(stock.FREE_LENGTH_MM)[1]
     installed_eye = stock.end_centers_mm(length)[1]
     translation = [installed - free for installed, free in zip(installed_eye, free_eye, strict=True)]
@@ -193,7 +193,7 @@ async def probe(adapter, paths, output):
         "free_frame_witnesses_mm": FREE_WITNESSES_MM,
         "translation": {"installed_length_mm": length, "free_length_mm": stock.FREE_LENGTH_MM,
                         "free_to_replica_positive_end_mm": translation,
-                        "authority": "counter_spring_stock_geom.end_centers_mm(counter_spring_spec.INSTALLED_LENGTH_MM)"},
+                        "authority": "vn_counter_spring_stock_geom.end_centers_mm(vn_counter_spring_spec.INSTALLED_LENGTH_MM)"},
         "input_sha256_before": {str(path): digest(path) for path in paths.values()},
         "input_sha256_after": {}, "rebuild_returns": {}, "comparisons": [],
     }
@@ -262,7 +262,7 @@ async def probe(adapter, paths, output):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--vendor", type=Path, default=ROOT / "cad/references/mcmaster/1330K524.SLDPRT")
-    parser.add_argument("--replica", type=Path, default=ROOT / "cad/out/sldprt/counter-spring.SLDPRT")
+    parser.add_argument("--replica", type=Path, default=ROOT / "cad/out/sldprt/vn-counter-spring.SLDPRT")
     parser.add_argument("--output", type=Path, default=ROOT / "cad/out/reports/stock-spring-surface.json")
     args = parser.parse_args()
     paths = {"replica": args.replica.resolve(strict=True), "vendor": args.vendor.resolve(strict=True)}

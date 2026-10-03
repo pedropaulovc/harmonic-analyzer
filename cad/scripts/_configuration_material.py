@@ -4,7 +4,7 @@
 (``IPartDoc::SetMaterialPropertyName2``), so a configuration split before it
 could carry no material, and an assembly placing that configuration would take
 the part's mass from the wrong density.  Shared by the parts that save an
-INSTALLED configuration beside their manufactured default (MHA-135, MHA-139).
+INSTALLED configuration beside their manufactured default (MHA-DT-030, MHA-DT-032).
 """
 
 from __future__ import annotations

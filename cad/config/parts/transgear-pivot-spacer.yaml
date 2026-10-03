@@ -1,9 +1,0 @@
-transgear-pivot-spacer:
-  title: Transgear Pivot Spacer
-  number: MHA-167
-  material: Brass
-  material_specification: C36000 free-machining brass
-  finish: bright machined, oiled
-  quantity: 1
-  tolerance_class: machined_block
-  process: "turned from bar (brass): drill and ream the bore, face both ends to length"

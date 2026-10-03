@@ -1,0 +1,10 @@
+pd-transgear-pin:
+  title: Transgear Pin
+  number: MHA-PD-023
+  category: pd
+  material: Plain Carbon Steel
+  material_specification: 12L14 or 1215 cold-finished steel bar, 1/4 in
+  finish: bright turned and ground, oiled
+  quantity: 1
+  tolerance_class: machined_block
+  process: "turned from bar (steel): turn the head and shank, cut the ring groove, dome both ends, grind the shank"

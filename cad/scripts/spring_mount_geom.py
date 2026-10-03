@@ -17,33 +17,33 @@ from typing import Literal
 
 import _config
 import channel_kinematics
-import channel_lever_spec
-import channel_spring_stock_geom as channel_stock
-import counter_spring_stock_geom as counter_stock
-import gooseneck_geom
-import summing_lever_spec
+import ch_channel_lever_spec
+import vn_channel_spring_stock_geom as channel_stock
+import vn_counter_spring_stock_geom as counter_stock
+import sm_gooseneck_geom
+import sm_summing_lever_spec
 from _hole_spec import blind_cut_dia_mm
 from stock_anchor_geom import ANCHOR_9489T111, ANCHOR_9490T1
 
 KNIFE = (-15.0, 979.7)
-KNIFE_CONTACT_Y = KNIFE[1] + summing_lever_spec.HEX_H / 2.0
+KNIFE_CONTACT_Y = KNIFE[1] + sm_summing_lever_spec.HEX_H / 2.0
 COLUMN_X = -197.0
 MIN_CLEARANCE_MM = 0.25
-PLATE_TOP_Y = KNIFE[1] + summing_lever_spec.PLATE_T / 2.0
+PLATE_TOP_Y = KNIFE[1] + sm_summing_lever_spec.PLATE_T / 2.0
 CHANNEL_ANCHOR_XY = (
-    KNIFE[0] + summing_lever_spec.HOLE_X,
+    KNIFE[0] + sm_summing_lever_spec.HOLE_X,
     PLATE_TOP_Y - ANCHOR_9489T111.thread_start_y_mm,
 )
-COUNTER_SHANK_LENGTH_MM = summing_lever_spec.ANCHOR_H
+COUNTER_SHANK_LENGTH_MM = sm_summing_lever_spec.ANCHOR_H
 COUNTER_ANCHOR_XY = (
-    KNIFE[0] + summing_lever_spec.TIP_X,
-    KNIFE[1] + summing_lever_spec.ANCHOR_H / 2.0 - ANCHOR_9490T1.thread_start_y_mm,
+    KNIFE[0] + sm_summing_lever_spec.TIP_X,
+    KNIFE[1] + sm_summing_lever_spec.ANCHOR_H / 2.0 - ANCHOR_9490T1.thread_start_y_mm,
 )
-GOOSENECK_END_X = COLUMN_X - gooseneck_geom.ARM_END_X
-COUNTER_UPPER_EYE_X = GOOSENECK_END_X + gooseneck_geom.SCREW_SHANK_LEN / 2.0
+GOOSENECK_END_X = COLUMN_X - sm_gooseneck_geom.ARM_END_X
+COUNTER_UPPER_EYE_X = GOOSENECK_END_X + sm_gooseneck_geom.SCREW_SHANK_LEN / 2.0
 
-_channel = _config.parts("channel-spring-installed")
-_counter = _config.parts("counter-spring")
+_channel = _config.parts("vn-channel-spring-installed")
+_counter = _config.parts("vn-counter-spring")
 CHANNEL_RATE_N_PER_MM = float(_channel["spring_rate_n_per_mm"])
 CHANNEL_INITIAL_TENSION_N = float(_channel["initial_tension_n"])
 COUNTER_RATE_N_PER_MM = float(_counter["spring_rate_n_per_mm"])
@@ -53,8 +53,8 @@ COUNTER_MAXIMUM_LOAD_N = float(_counter["maximum_load_n"])
 _CHANNEL_INNER_R = channel_stock.COIL_ID_MM / 2.0
 _CHANNEL_LOWER_OFFSET = ANCHOR_9489T111.eye_id_mm / 2.0 + _CHANNEL_INNER_R
 _CHANNEL_UPPER_DROP = (
-    math.sqrt(_CHANNEL_INNER_R**2 - (channel_lever_spec.LEVER_THICKNESS / 2.0) ** 2)
-    + blind_cut_dia_mm(channel_lever_spec.SPRING_EYE_HOLE_SPEC) / 2.0
+    math.sqrt(_CHANNEL_INNER_R**2 - (ch_channel_lever_spec.LEVER_THICKNESS / 2.0) ** 2)
+    + blind_cut_dia_mm(ch_channel_lever_spec.SPRING_EYE_HOLE_SPEC) / 2.0
 )
 
 
@@ -219,7 +219,7 @@ def counter_upper_support_offset(axis: tuple[float, float]) -> float:
     """Ideal circular-wire support seed for the counter's half-turn clocking."""
     ux, uy = axis
     radius = counter_stock.COIL_MEAN_RADIUS_MM
-    tube = counter_stock.WIRE_RADIUS_MM + gooseneck_geom.SCREW_SHANK_DIA / 2.0
+    tube = counter_stock.WIRE_RADIUS_MM + sm_gooseneck_geom.SCREW_SHANK_DIA / 2.0
     omega = 2.0 * math.pi * counter_stock.LOOP_TURNS
     half_interval = math.asin(tube / radius) / omega
 
@@ -389,7 +389,7 @@ def counter_half_turn_clearances(
     eye_x = counter_stock.end_centers_mm(pose.length_mm)[1][0]
     start_x = counter_stock.coil_end_x_mm(pose.length_mm) + wire
     rows = pose.rotation_rows
-    head_x = GOOSENECK_END_X + gooseneck_geom.SCREW_SHANK_LEN
+    head_x = GOOSENECK_END_X + sm_gooseneck_geom.SCREW_SHANK_LEN
     tube_gap = head_gap = math.inf
     steps = 1024
     for index in range(steps + 1):
@@ -407,15 +407,15 @@ def counter_half_turn_clearances(
             tube_gap,
             math.hypot(
                 max(x - GOOSENECK_END_X, 0.0),
-                max(radial - gooseneck_geom.TUBE_DIA / 2.0, 0.0),
+                max(radial - sm_gooseneck_geom.TUBE_DIA / 2.0, 0.0),
             )
             - wire,
         )
         head_gap = min(
             head_gap,
             math.hypot(
-                max(head_x - x, x - head_x - gooseneck_geom.SCREW_HEAD_T, 0.0),
-                max(radial - gooseneck_geom.SCREW_HEAD_DIA / 2.0, 0.0),
+                max(head_x - x, x - head_x - sm_gooseneck_geom.SCREW_HEAD_T, 0.0),
+                max(radial - sm_gooseneck_geom.SCREW_HEAD_DIA / 2.0, 0.0),
             )
             - wire,
         )
@@ -440,5 +440,5 @@ COUNTER_REFERENCE_POSE = _reference_counter_pose()
 GOOSENECK_ORIGIN_Y = (
     COUNTER_REFERENCE_POSE.upper_eye_xy[1]
     + counter_upper_support_offset(COUNTER_REFERENCE_POSE.axis_xy)
-    - gooseneck_geom.ARM_Y
+    - sm_gooseneck_geom.ARM_Y
 )

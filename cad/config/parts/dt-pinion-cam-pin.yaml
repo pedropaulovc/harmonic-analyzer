@@ -1,0 +1,10 @@
+dt-pinion-cam-pin:
+  title: Pinion Cam Follower Pin
+  number: MHA-DT-025
+  category: dt
+  material: AISI O1 drill rod
+  material_specification: AISI O1 drill rod
+  finish: as-received drill rod; protect with ISO VG 32 machine-oil film
+  quantity: 2
+  tolerance_class: machined_block
+  process: "cut from drill rod; crown turned"

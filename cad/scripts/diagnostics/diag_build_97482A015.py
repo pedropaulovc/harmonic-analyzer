@@ -1,6 +1,6 @@
 r"""McMaster 97482A015 -- 1100 aluminum domed head solid rivet, 1/16" x 3/16".
 
-Used as latch-hook-rivet (MHA-175).  The catalogue facts and the part frame
+Used as latch-hook-rivet (MHA-VN-045).  The catalogue facts and the part frame
 are ``latch_hook_rivet_spec``'s.  One Front-plane half-section revolved 360
 deg about the Y axis: the shank from y = -LENGTH to the head's flat bearing
 face at y = 0, and the dome, [INFERENCE] a spherical cap from the Ø HEAD_DIA
@@ -24,7 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from _common import add_line_chain, check, name_last_feature, volume_check  # noqa: E402
 from diagnostics.diag_mcmaster_lib import no_sketch_inference  # noqa: E402
-from latch_hook_rivet_spec import (  # noqa: E402
+from vn_latch_hook_rivet_spec import (  # noqa: E402
     DIA,
     DOME_CENTRE_Y,
     HEAD_DIA,

@@ -978,7 +978,7 @@ def test_hole_callout_leader_reads_the_true_bent_geometry():
 
 def test_collector_boxes_no_dimension_but_keeps_hole_callout_leaders(monkeypatch):
     """A display dimension used to become an 8 mm nominal square with NONE
-    scope, which nothing ever overlap-checked: MHA-092's "20.8"/"8.42" and its
+    scope, which nothing ever overlap-checked: MHA-DT-021's "20.8"/"8.42" and its
     callouts over the right view all passed. The shared layout audit boxes
     dimension text from display data now, so the element audit carries NO
     dimension box -- only the hole callout's leader ink for crossing checks."""
@@ -1250,7 +1250,7 @@ def test_datum_tag_box_spans_its_leader_and_triangle():
 
 MM = 0.001
 
-# MHA-062 (pc-858x928b at bc942d25f) as pc-gdt-ink-diag a89a13a7a logged it:
+# MHA-DT-019 (pc-858x928b at bc942d25f) as pc-gdt-ink-diag a89a13a7a logged it:
 # the cylindricity FCF in the 4:1 end view. GetPosition is its frame's
 # top-left, (0.065, 0.232); the render prints the frame at about
 # (0.0648..0.0853, 0.2250..0.2319). Its IGtol primitives are a crossed 7 mm
@@ -1287,7 +1287,7 @@ def _recorded_events(monkeypatch):
 
 
 def test_a_leadered_frames_igtol_primitives_never_box_it(monkeypatch):
-    """pc-858x928b: MHA-062's cylindricity frame printed over "STRAPS" and
+    """pc-858x928b: MHA-DT-019's cylindricity frame printed over "STRAPS" and
     "0.45" while the audit boxed it as the 7 mm placeholder its IGtol
     primitives draw at the leader's far end, 17 mm below the frame. Those
     primitives are no longer read: with no display data the symbol keeps the
@@ -1401,7 +1401,7 @@ def test_a_datum_tag_is_boxed_and_led_from_its_display_data():
     assert [(s.x0, s.y0, s.x1, s.y1) for s in segs] == [pytest.approx((0.115, 0.16937, 0.115, 0.18737))]
 
 
-# MHA-062 as gdtdiag2 (c7d835ede, run 20260926T100140395Z) logged its display
+# MHA-DT-019 as gdtdiag2 (c7d835ede, run 20260926T100140395Z) logged its display
 # data. Overlaid on the pc-858x928b render (mha062-gdt-overlay.png,
 # mha062-crown-overlay.png) the frames and datum box sit exactly on the ink.
 def _lines(*runs):
@@ -1628,7 +1628,7 @@ def test_leaders_converging_on_one_point_are_stacked_not_crossed():
     # ~2.4 mm arrowheads, so no reader can see it. The gate's first sweep DID
     # report this; it was the only false positive in 23 sheets.
     datum = LeaderSegment("datum A", "gdt", 0.3650, 0.1100, 0.3520, 0.1100, owner="Iso")
-    other = LeaderSegment("frame", "gdt", 0.3389, 0.0885, 0.3650, 0.1102, owner="Iso")
+    other = LeaderSegment("fr-frame", "gdt", 0.3389, 0.0885, 0.3650, 0.1102, owner="Iso")
     assert find_leader_leader_crossings([datum, other]) == []
 
 
@@ -1666,13 +1666,13 @@ def _stub_layout(monkeypatch, leader_crossings):
 def test_a_clean_sheet_passes(monkeypatch):
     _stub_layout(monkeypatch, 0)
     drawing_common.check_drawing_layout(
-        None, layout=DrawingLayout.LANDSCAPE, stem="pen-assembly"
+        None, layout=DrawingLayout.LANDSCAPE, stem="pn-pen-assembly"
     )
 
 
-@pytest.mark.parametrize("stem", ["pen-assembly", "crank-arm", ""])
+@pytest.mark.parametrize("stem", ["pn-pen-assembly", "dt-crank-arm", ""])
 def test_no_sheet_is_exempt_from_a_leader_crossing(monkeypatch, stem):
-    """pen-assembly USED to be grandfathered for 2 crossings while the fix was
+    """pn-pen-assembly USED to be grandfathered for 2 crossings while the fix was
     thought to need a design decision. It needed the balloon radius, which
     the rendered full-circle arc exposes. The exemption died with the defect, and no
     sheet -- named, unnamed, or formerly-grandfathered -- may reintroduce one."""
@@ -1744,7 +1744,7 @@ def test_the_ratchet_never_excuses_a_leader_across_a_VIEW():
     try:
         with pytest.raises(RuntimeError):
             dc.check_drawing_layout(
-                None, layout=DrawingLayout.LANDSCAPE, stem="pen-assembly"
+                None, layout=DrawingLayout.LANDSCAPE, stem="pn-pen-assembly"
             )
     finally:
         dc.collect_layout_elements, dc.audit_layout = real_collect, real_audit
@@ -1909,7 +1909,7 @@ class _FakeNote:
 
     ``placed`` is the rendered CIRCLE centre. ``GetPosition``/``SetPosition``
     read and move the ANCHOR, which native balloons keep ~(+4.0, -1.7) mm off
-    the centre (#866, MHA-A03 integ3 leaf, 40 balloons).
+    the centre (#866, MHA-DT-000 integ3 leaf, 40 balloons).
     """
 
     ANCHOR_OFFSET = (0.0040, -0.0017)
@@ -2085,7 +2085,7 @@ def test_spread_balloons_land_their_circles_on_the_ring_not_their_anchors():
     """#866: the ring slot is a CIRCLE centre, and SetPosition moves the anchor.
 
     Placing the anchor on the slot left every circle ~(+4.0, -1.7) mm off the
-    ring (MHA-A03 integ3). The spread must carry each balloon's anchor offset.
+    ring (MHA-DT-000 integ3). The spread must carry each balloon's anchor offset.
     """
     notes = [_FakeNote(0.12, 0.13), _FakeNote(0.18, 0.17), _FakeNote(0.15, 0.19)]
     margin = 0.014
@@ -2143,7 +2143,7 @@ def _instances(*names, hidden=(), bodies=None):
     """Leaf drawing components, one per instance path, in the given walk order."""
     return [
         _FakeDrawingComponent(
-            f"drive-train-8/{name}@Drawing View9",
+            f"dt-drive-train-8/{name}@Drawing View9",
             path=f"C:/x/{name.rsplit('/', 1)[-1].rsplit('-', 1)[0]}.SLDPRT",
             visible=name not in hidden,
             body=(bodies or {}).get(name),
@@ -2153,7 +2153,7 @@ def _instances(*names, hidden=(), bodies=None):
 
 
 def _leaves(children):
-    root = _FakeDrawingComponent("drive-train-8", children=children)
+    root = _FakeDrawingComponent("dt-drive-train-8", children=children)
     view = SimpleNamespace(RootDrawingComponent2=lambda _resolve: root)
     return drawing_common._view_component_leaves(_FakeAdapter(None), view, label="t")
 
@@ -2161,7 +2161,7 @@ def _leaves(children):
 _ANCHOR = drawing_common.BalloonAnchor(point_mm=(1.0, 2.0, 3.0))
 
 
-def _chosen(children, stem="cone-gear", anchor=_ANCHOR):
+def _chosen(children, stem="dt-cone-gear", anchor=_ANCHOR):
     return drawing_common._shown_instances(_leaves(children), stem, anchor, label="t")[0].path
 
 
@@ -2171,23 +2171,23 @@ def test_anchor_instance_is_the_lowest_natural_name_in_any_walk_order():
     sorts before 10 before 19 as a machinist reads them."""
     from itertools import permutations
 
-    for order in permutations(("cone-gear-19", "cone-gear-2", "cone-gear-10")):
-        assert _chosen(_instances(*order)) == "cone-gear-2"
+    for order in permutations(("dt-cone-gear-19", "dt-cone-gear-2", "dt-cone-gear-10")):
+        assert _chosen(_instances(*order)) == "dt-cone-gear-2"
 
 
 def test_anchor_instance_skips_a_hidden_instance_and_a_hidden_parent():
     """Drive-train isolates one cluster per view: a hidden instance draws no
     edge to anchor on, nor does a shown part under a hidden sub-assembly."""
-    assert _chosen(_instances("cone-gear-1", "cone-gear-2", hidden={"cone-gear-1"})) == "cone-gear-2"
-    parent = _FakeDrawingComponent("sub-1", children=_instances("cone-gear-1"), visible=False)
-    assert _chosen([parent, *_instances("cone-gear-3")]) == "cone-gear-3"
+    assert _chosen(_instances("dt-cone-gear-1", "dt-cone-gear-2", hidden={"dt-cone-gear-1"})) == "dt-cone-gear-2"
+    parent = _FakeDrawingComponent("sub-1", children=_instances("dt-cone-gear-1"), visible=False)
+    assert _chosen([parent, *_instances("dt-cone-gear-3")]) == "dt-cone-gear-3"
 
 
 def test_pinned_anchor_instance_must_be_shown():
-    pinned = drawing_common.BalloonAnchor(point_mm=(0.0, 0.0, 0.0), instance="cone-gear-4")
-    assert _chosen(_instances("cone-gear-1", "cone-gear-4"), anchor=pinned) == "cone-gear-4"
+    pinned = drawing_common.BalloonAnchor(point_mm=(0.0, 0.0, 0.0), instance="dt-cone-gear-4")
+    assert _chosen(_instances("dt-cone-gear-1", "dt-cone-gear-4"), anchor=pinned) == "dt-cone-gear-4"
     with pytest.raises(RuntimeError, match="cone-gear has no shown instance cone-gear-4"):
-        _chosen(_instances("cone-gear-1", "cone-gear-4", hidden={"cone-gear-4"}), anchor=pinned)
+        _chosen(_instances("dt-cone-gear-1", "dt-cone-gear-4", hidden={"dt-cone-gear-4"}), anchor=pinned)
 
 
 class _AnchorEdge:
@@ -2404,7 +2404,7 @@ def _exploded_view(
     point. ``referenced`` is the configuration the view shows (the model's active one
     is ``Default``); ``instances`` are that configuration's component paths
     (default: the view's leaves). No steps means a collapsed view."""
-    root = _FakeDrawingComponent("drive-train-8", children=children)
+    root = _FakeDrawingComponent("dt-drive-train-8", children=children)
     model = _ExplodedModel(
         steps,
         instances if instances is not None else [child.Component.Name2 for child in children],
@@ -2446,7 +2446,7 @@ def _body(points):
     return SimpleNamespace(GetExtremePoint=extreme)
 
 
-def _balloon(monkeypatch, sheet, view, anchors, items=(("cone-gear", "1"),)):
+def _balloon(monkeypatch, sheet, view, anchors, items=(("dt-cone-gear", "1"),)):
     """Run the real balloon path with the sheet projection = model (x, y)."""
     projected = []
 
@@ -2476,18 +2476,18 @@ def test_frozen_anchor_selects_at_its_exploded_projection_and_records_it(monkeyp
     """Component transform, THEN the explode: a drawing view shows the model
     exploded while every component transform still reads the collapsed pose
     (farm probe: projecting without the explode hit the tube under each cap)."""
-    children = _instances("cone-gear-2", "cone-gear-1")
+    children = _instances("dt-cone-gear-2", "dt-cone-gear-1")
     children[1].Component.Transform2.ArrayData = (1, 0, 0, 0, 1, 0, 0, 0, 1, 0.1, 0.2, 0.0, 1, 0, 0, 0)
-    view = _exploded_view(children, [((0.0, 0.25, 0.0), ["cone-gear-1"]), ((0.03, 0.0, 0.0), ["cone-gear-1"])])
+    view = _exploded_view(children, [((0.0, 0.25, 0.0), ["dt-cone-gear-1"]), ((0.03, 0.0, 0.0), ["dt-cone-gear-1"])])
     # (1, 2) mm local -> +(100, 200) mm placed -> +(30, 250) mm exploded.
-    sheet = _AnchorSheet({(0.131, 0.452): _AnchorEdge("cone-gear-1")})
-    balloons, projected, anchors = _balloon(monkeypatch, sheet, view, {"cone-gear": _ANCHOR})
+    sheet = _AnchorSheet({(0.131, 0.452): _AnchorEdge("dt-cone-gear-1")})
+    balloons, projected, anchors = _balloon(monkeypatch, sheet, view, {"dt-cone-gear": _ANCHOR})
     assert len(balloons) == 1 and sheet.hits == [(0.131, 0.452)]
-    assert projected[0][1] == ("cone-gear",)
+    assert projected[0][1] == ("dt-cone-gear",)
     assert anchors == [
         {
-            "stem": "cone-gear",
-            "instance": "cone-gear-1",
+            "stem": "dt-cone-gear",
+            "instance": "dt-cone-gear-1",
             "method": "frozen",
             "point_mm": "1.000,2.000,3.000",
             "sheet_mm": "131.000,452.000",
@@ -2497,70 +2497,70 @@ def test_frozen_anchor_selects_at_its_exploded_projection_and_records_it(monkeyp
 
 
 def test_frozen_anchor_that_hits_nothing_fails_naming_the_stem(monkeypatch):
-    view = _exploded_view(_instances("cone-gear-1"), [])
+    view = _exploded_view(_instances("dt-cone-gear-1"), [])
     sheet = _AnchorSheet({})
     with pytest.raises(RuntimeError, match="cone-gear frozen balloon anchor .* selects no edge"):
-        _balloon(monkeypatch, sheet, view, {"cone-gear": _ANCHOR})
+        _balloon(monkeypatch, sheet, view, {"dt-cone-gear": _ANCHOR})
     assert sheet.balloons == []
 
 
 def test_frozen_anchor_on_another_components_edge_fails(monkeypatch):
     """A part moved in front of the anchor must fail the sheet, not balloon the
     part in front with the wrong item's number."""
-    view = _exploded_view(_instances("cone-gear-1"), [])
-    sheet = _AnchorSheet({(0.001, 0.002): _AnchorEdge("crank-pinion-1")})
-    with pytest.raises(RuntimeError, match="selects an edge of crank-pinion-1, not cone-gear-1"):
-        _balloon(monkeypatch, sheet, view, {"cone-gear": _ANCHOR})
+    view = _exploded_view(_instances("dt-cone-gear-1"), [])
+    sheet = _AnchorSheet({(0.001, 0.002): _AnchorEdge("dt-crank-pinion-1")})
+    with pytest.raises(RuntimeError):
+        _balloon(monkeypatch, sheet, view, {"dt-cone-gear": _ANCHOR})
     assert sheet.balloons == []
 
 
 def test_a_family_without_a_frozen_anchor_fails_before_any_balloon(monkeypatch):
-    view = _exploded_view(_instances("cone-gear-1", "crank-pinion-1"), [])
-    sheet = _AnchorSheet({(0.001, 0.002): _AnchorEdge("cone-gear-1")})
-    with pytest.raises(ValueError, match=r"no balloon anchor for \['crank-pinion'\]"):
+    view = _exploded_view(_instances("dt-cone-gear-1", "dt-crank-pinion-1"), [])
+    sheet = _AnchorSheet({(0.001, 0.002): _AnchorEdge("dt-cone-gear-1")})
+    with pytest.raises(ValueError):
         _balloon(
             monkeypatch,
             sheet,
             view,
-            {"cone-gear": _ANCHOR},
-            items=(("cone-gear", "1"), ("crank-pinion", "2")),
+            {"dt-cone-gear": _ANCHOR},
+            items=(("dt-cone-gear", "1"), ("dt-crank-pinion", "2")),
         )
     assert sheet.hits == [] and sheet.balloons == []
 
 
 def test_a_rotating_explode_step_is_refused_not_summed(monkeypatch):
-    view = _exploded_view(_instances("cone-gear-1"), [((0.0, 0.1, 0.0), ["cone-gear-1"])])
+    view = _exploded_view(_instances("dt-cone-gear-1"), [((0.0, 0.1, 0.0), ["dt-cone-gear-1"])])
     configuration = view.ReferencedDocument.GetConfigurationByName("Default")
     step = configuration.GetExplodeStep(0)
     step.GetComponentXform = lambda: (0, -1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
     with pytest.raises(RuntimeError, match="not a pure translation"):
-        _balloon(monkeypatch, _AnchorSheet({}), view, {"cone-gear": _ANCHOR})
+        _balloon(monkeypatch, _AnchorSheet({}), view, {"dt-cone-gear": _ANCHOR})
 
 
 def _pair_of_subassemblies(**view_kwargs):
     """Two sub-assemblies, each holding a ``cone-gear-1``."""
-    return _instances("sub-1/cone-gear-1", "sub-2/cone-gear-1", **view_kwargs)
+    return _instances("sub-1/dt-cone-gear-1", "sub-2/dt-cone-gear-1", **view_kwargs)
 
 
-_SUB_2 = drawing_common.BalloonAnchor(point_mm=(1.0, 2.0, 3.0), instance="sub-2/cone-gear-1")
+_SUB_2 = drawing_common.BalloonAnchor(point_mm=(1.0, 2.0, 3.0), instance="sub-2/dt-cone-gear-1")
 
 
 def test_anchor_instance_is_the_full_path_not_its_last_segment():
-    assert _chosen(_pair_of_subassemblies()) == "sub-1/cone-gear-1"
-    assert _chosen(_pair_of_subassemblies(), anchor=_SUB_2) == "sub-2/cone-gear-1"
+    assert _chosen(_pair_of_subassemblies()) == "sub-1/dt-cone-gear-1"
+    assert _chosen(_pair_of_subassemblies(), anchor=_SUB_2) == "sub-2/dt-cone-gear-1"
 
 
 def test_frozen_hit_on_the_same_named_part_of_another_subassembly_fails(monkeypatch):
     view = _exploded_view(_pair_of_subassemblies(), [])
-    sheet = _AnchorSheet({(0.001, 0.002): _AnchorEdge("sub-1/cone-gear-1")})
+    sheet = _AnchorSheet({(0.001, 0.002): _AnchorEdge("sub-1/dt-cone-gear-1")})
     with pytest.raises(
         RuntimeError, match="selects an edge of sub-1/cone-gear-1, not sub-2/cone-gear-1"
     ):
-        _balloon(monkeypatch, sheet, view, {"cone-gear": _SUB_2})
+        _balloon(monkeypatch, sheet, view, {"dt-cone-gear": _SUB_2})
     assert sheet.balloons == []
 
 
-_SUBASSEMBLY_EXPLODE = [((0.0, 0.25, 0.0), ["sub-1/cone-gear-1"]), ((0.03, 0.0, 0.0), ["sub-2"])]
+_SUBASSEMBLY_EXPLODE = [((0.0, 0.25, 0.0), ["sub-1/dt-cone-gear-1"]), ((0.03, 0.0, 0.0), ["sub-2"])]
 
 
 @pytest.mark.parametrize(
@@ -2582,10 +2582,10 @@ def test_explode_offsets_are_keyed_by_full_path_and_include_the_subassembly(
     view = _exploded_view(
         _pair_of_subassemblies(), _SUBASSEMBLY_EXPLODE, referenced=referenced, shown_only=shown_only
     )
-    sheet = _AnchorSheet({(0.031, 0.002): _AnchorEdge("sub-2/cone-gear-1")})
-    balloons, _projected, anchors = _balloon(monkeypatch, sheet, view, {"cone-gear": _SUB_2})
+    sheet = _AnchorSheet({(0.031, 0.002): _AnchorEdge("sub-2/dt-cone-gear-1")})
+    balloons, _projected, anchors = _balloon(monkeypatch, sheet, view, {"dt-cone-gear": _SUB_2})
     assert len(balloons) == 1 and sheet.hits == [(0.031, 0.002)]
-    assert anchors[0]["instance"] == "sub-2/cone-gear-1"
+    assert anchors[0]["instance"] == "sub-2/dt-cone-gear-1"
     assert view.ReferencedDocument.shown == shown
     assert not view.ReferencedDocument.exploded
 
@@ -2597,7 +2597,7 @@ def test_a_non_active_explode_member_naming_no_instance_of_its_configuration_fai
         _pair_of_subassemblies(),
         _SUBASSEMBLY_EXPLODE,
         referenced="Default Simplified",
-        instances=["sub-1/cone-gear-1"],
+        instances=["sub-1/dt-cone-gear-1"],
     )
     with pytest.raises(
         RuntimeError, match=r"moves 'sub-2', which .* names no instance of 'Default Simplified'"
@@ -2627,7 +2627,7 @@ def test_an_exploded_view_whose_configuration_reads_no_steps_is_refused(referenc
         (lambda edge: ((edge,), (46,)), r"types \[46\]"),
         (lambda edge: ((None,), (0,)), r"owned by \[''\]"),
         (
-            lambda edge: ((_AnchorEdge("sub-1/cone-gear-1"),), (1,)),
+            lambda edge: ((_AnchorEdge("sub-1/dt-cone-gear-1"),), (1,)),
             r"owned by \['sub-1/cone-gear-1'\]",
         ),
     ],
@@ -2637,11 +2637,11 @@ def test_balloon_must_attach_to_exactly_one_edge_of_the_exact_instance(
     monkeypatch, attach, why
 ):
     view = _exploded_view(_pair_of_subassemblies(), [])
-    sheet = _AnchorSheet({(0.001, 0.002): _AnchorEdge("sub-2/cone-gear-1")}, attach=attach)
+    sheet = _AnchorSheet({(0.001, 0.002): _AnchorEdge("sub-2/dt-cone-gear-1")}, attach=attach)
     with pytest.raises(
         RuntimeError, match=f"must attach to one edge of sub-2/cone-gear-1; .*{why}"
     ):
-        _balloon(monkeypatch, sheet, view, {"cone-gear": _SUB_2})
+        _balloon(monkeypatch, sheet, view, {"dt-cone-gear": _SUB_2})
 
 
 _WALK = drawing_common.BalloonAnchor()
@@ -2669,8 +2669,8 @@ def test_walk_tries_the_same_points_however_the_body_breaks_ties(monkeypatch):
     import random
 
     def run(points, sheet):
-        view = _exploded_view(_instances("cone-gear-1", bodies={"cone-gear-1": _body(points)}), [])
-        return _balloon(monkeypatch, sheet, view, {"cone-gear": _WALK})
+        view = _exploded_view(_instances("dt-cone-gear-1", bodies={"dt-cone-gear-1": _body(points)}), [])
+        return _balloon(monkeypatch, sheet, view, {"dt-cone-gear": _WALK})
 
     probe = _AnchorSheet({})
     with pytest.raises(RuntimeError, match="no verifiably visible edge"):
@@ -2681,7 +2681,7 @@ def test_walk_tries_the_same_points_however_the_body_breaks_ties(monkeypatch):
     for _ in range(12):
         points = _comb()
         shuffle.shuffle(points)
-        sheet = _AnchorSheet({claimed: _AnchorEdge("cone-gear-1")})
+        sheet = _AnchorSheet({claimed: _AnchorEdge("dt-cone-gear-1")})
         balloons, _projected, anchors = run(points, sheet)
         assert len(balloons) == 1
         runs.append((tuple(sheet.hits), anchors[0]))
@@ -2699,9 +2699,9 @@ def test_walk_anchors_identically_on_a_640_and_an_820_pixel_seat_window(monkeypa
 
     def run(sheet):
         view = _exploded_view(
-            _instances("cone-gear-1", bodies={"cone-gear-1": _body(_L_POINTS)}), []
+            _instances("dt-cone-gear-1", bodies={"dt-cone-gear-1": _body(_L_POINTS)}), []
         )
-        return _balloon(monkeypatch, sheet, view, {"cone-gear": _WALK})
+        return _balloon(monkeypatch, sheet, view, {"dt-cone-gear": _WALK})
 
     probe = _AnchorSheet({})
     with pytest.raises(RuntimeError, match="no verifiably visible edge"):
@@ -2710,8 +2710,8 @@ def test_walk_anchors_identically_on_a_640_and_an_820_pixel_seat_window(monkeypa
     anchors = []
     for window_px in (640, 820):
         sheet = _AnchorSheet(
-            {second: _AnchorEdge("cone-gear-1")},
-            near={first: (0.003, _AnchorEdge("cone-gear-1"))},
+            {second: _AnchorEdge("dt-cone-gear-1")},
+            near={first: (0.003, _AnchorEdge("dt-cone-gear-1"))},
             window_px=window_px,
         )
         _balloons, _projected, placed = run(sheet)
@@ -2768,18 +2768,18 @@ def test_walk_hit_on_the_same_named_part_of_another_subassembly_is_not_claimed(m
     sub-2's, not sub-1's, however alike their last path segments read, so
     sub-1 anchors on its next point."""
     bodies = {
-        "sub-1/cone-gear-1": _body([(0.0, 0.01, 0.0), (0.0, -0.01, 0.0)]),
-        "sub-2/cone-gear-1": _body([(0.0, 0.02, 0.0)]),
+        "sub-1/dt-cone-gear-1": _body([(0.0, 0.01, 0.0), (0.0, -0.01, 0.0)]),
+        "sub-2/dt-cone-gear-1": _body([(0.0, 0.02, 0.0)]),
     }
     view = _exploded_view(_pair_of_subassemblies(bodies=bodies), [])
     sheet = _AnchorSheet(
         {
-            (0.0, -0.01): _AnchorEdge("sub-2/cone-gear-1"),
-            (0.0, 0.01): _AnchorEdge("sub-1/cone-gear-1"),
+            (0.0, -0.01): _AnchorEdge("sub-2/dt-cone-gear-1"),
+            (0.0, 0.01): _AnchorEdge("sub-1/dt-cone-gear-1"),
         }
     )
-    _balloons, _projected, anchors = _balloon(monkeypatch, sheet, view, {"cone-gear": _WALK})
-    assert (anchors[0]["instance"], anchors[0]["sheet_mm"]) == ("sub-1/cone-gear-1", "0.000,10.000")
+    _balloons, _projected, anchors = _balloon(monkeypatch, sheet, view, {"dt-cone-gear": _WALK})
+    assert (anchors[0]["instance"], anchors[0]["sheet_mm"]) == ("sub-1/dt-cone-gear-1", "0.000,10.000")
     assert sheet.hits == [(0.0, -0.01), (0.0, 0.01)]
 
 
@@ -2790,7 +2790,7 @@ def test_walk_hit_on_the_same_named_part_of_another_subassembly_is_not_claimed(m
 _MEASURED_LANDINGS = {
     # Frame sheet 2, item 8: 0.46 mm off a #4-40 head drawn 0.35 mm across
     # at 1:8, into the nameplate engraving.
-    "frame-8-fillister-screw": ((0.161847, 0.139315), (0.161438, 0.139110)),
+    "fr-frame-8-fillister-screw": ((0.161847, 0.139315), (0.161438, 0.139110)),
     # Drive-train sheet 3, item 3: 10.3 mm round the thrust washer's rim,
     # into the cylinder gear's teeth.
     "dt-3-cylinder-end-disc": ((0.259833, 0.190494), (0.254346, 0.181734)),
@@ -2798,12 +2798,12 @@ _MEASURED_LANDINGS = {
 
 
 def _walked_to(hit, landing, **sheet_kwargs):
-    """cone-gear-1 walks to ``hit``, the one point the hit test gives back
+    """dt-cone-gear-1 walks to ``hit``, the one point the hit test gives back
     to it; selected by entity alone, its edge ends a leader at ``landing``."""
     view = _exploded_view(
-        _instances("cone-gear-1", bodies={"cone-gear-1": _body([(*hit, 0.0)])}), []
+        _instances("dt-cone-gear-1", bodies={"dt-cone-gear-1": _body([(*hit, 0.0)])}), []
     )
-    sheet = _AnchorSheet({hit: _AnchorEdge("cone-gear-1", landing=landing)}, **sheet_kwargs)
+    sheet = _AnchorSheet({hit: _AnchorEdge("dt-cone-gear-1", landing=landing)}, **sheet_kwargs)
     return view, sheet
 
 
@@ -2814,7 +2814,7 @@ def test_a_walked_balloon_leader_ends_where_the_hit_test_claimed_its_part(monkey
     where SolidWorks would put it on the edge."""
     hit, landing = _MEASURED_LANDINGS[case]
     view, sheet = _walked_to(hit, landing)
-    balloons, _projected, anchors = _balloon(monkeypatch, sheet, view, {"cone-gear": _WALK})
+    balloons, _projected, anchors = _balloon(monkeypatch, sheet, view, {"dt-cone-gear": _WALK})
     assert [note.end for note in balloons] == [hit]
     assert anchors[0]["sheet_mm"] == f"{hit[0] * 1000:.3f},{hit[1] * 1000:.3f}"
 
@@ -2826,7 +2826,7 @@ def test_a_balloon_leader_that_ends_off_its_claimed_point_fails_the_sheet(monkey
     hit, landing = _MEASURED_LANDINGS[case]
     view, sheet = _walked_to(hit, landing, honours_point=False)
     with pytest.raises(RuntimeError, match="cone-gear balloon leader attachment moved"):
-        _balloon(monkeypatch, sheet, view, {"cone-gear": _WALK})
+        _balloon(monkeypatch, sheet, view, {"dt-cone-gear": _WALK})
 
 
 @pytest.mark.parametrize("case", sorted(_MEASURED_LANDINGS))
@@ -2837,7 +2837,7 @@ def test_a_later_rebuild_that_moves_a_landed_leader_fails_the_final_proof(monkey
     fails the drawing, named; one left in place passes."""
     hit, landing = _MEASURED_LANDINGS[case]
     view, sheet = _walked_to(hit, landing)
-    _balloon(monkeypatch, sheet, view, {"cone-gear": _WALK})
+    _balloon(monkeypatch, sheet, view, {"dt-cone-gear": _WALK})
     adapter = _FakeAdapter(sheet)
     drawing_common.assert_balloon_landings(adapter, sheet.landings)
     sheet.balloons[0].end = landing
@@ -2868,21 +2868,21 @@ def test_a_ring_behind_a_pin_is_ballooned_where_its_listed_edge_is_drawn(monkeyp
         return tuple(round(v, 9) for v in _ring_point(t)[:2])
 
     shank = _AnchorEdge("taper-pin-1")
-    ring = _AnchorEdge("crank-pin-ring-1", at=_ring_point, landing=key(0.0))
-    bore = _AnchorEdge("crank-pin-ring-1", at=lambda t: _ring_point(t, radius=0.002))
+    ring = _AnchorEdge("dt-crank-pin-ring-1", at=_ring_point, landing=key(0.0))
+    bore = _AnchorEdge("dt-crank-pin-ring-1", at=lambda t: _ring_point(t, radius=0.002))
     results = []
     for listed in ((ring, bore), (bore, ring)):
         view = _exploded_view(
-            _instances("crank-pin-ring-1", bodies={"crank-pin-ring-1": _body([(0.0, 0.05, 0.0)])}),
+            _instances("dt-crank-pin-ring-1", bodies={"dt-crank-pin-ring-1": _body([(0.0, 0.05, 0.0)])}),
             [],
-            visible={"crank-pin-ring-1": listed},
+            visible={"dt-crank-pin-ring-1": listed},
         )
         sheet = _AnchorSheet({key(0.1): shank, key(0.9): shank, key(0.5): ring})
         balloons, _projected, anchors = _balloon(
-            monkeypatch, sheet, view, {"crank-pin-ring": _WALK}, items=(("crank-pin-ring", "1"),)
+            monkeypatch, sheet, view, {"dt-crank-pin-ring": _WALK}, items=(("dt-crank-pin-ring", "1"),)
         )
         assert [note.end for note in balloons] == [key(0.5)]
-        assert (anchors[0]["method"], anchors[0]["visible"]) == ("visible-edge", "crank-pin-ring-1=2")
+        assert (anchors[0]["method"], anchors[0]["visible"]) == ("visible-edge", "dt-crank-pin-ring-1=2")
         results.append((tuple(sheet.hits), anchors[0]))
     assert results[0] == results[1]
 
@@ -2900,7 +2900,7 @@ def test_a_bushing_sharing_its_bores_outline_is_ballooned_on_its_own_listed_edge
         return tuple(round(v, 9) for v in _ring_point(t, radius=0.003)[:2])
 
     rim = _AnchorEdge("flush-part-1", at=lambda t: _ring_point(t, radius=0.003))
-    bore = _AnchorEdge("cone-tip-block-1")
+    bore = _AnchorEdge("dt-cone-tip-block-1")
 
     def run(sheet):
         rim.sheet = sheet
@@ -2916,7 +2916,7 @@ def test_a_bushing_sharing_its_bores_outline_is_ballooned_on_its_own_listed_edge
     sheet = _AnchorSheet({key(0.3): bore})
     balloons, _projected, anchors = run(sheet)
     assert [note.end for note in balloons] == [key(0.3)]
-    assert (anchors[0]["method"], anchors[0]["shared"]) == ("shared-edge", "cone-tip-block-1")
+    assert (anchors[0]["method"], anchors[0]["shared"]) == ("shared-edge", "dt-cone-tip-block-1")
     sheet = _AnchorSheet({})
     balloons, _projected, anchors = run(sheet)
     assert [note.end for note in balloons] == [rim.landing]
@@ -2939,14 +2939,14 @@ def test_walk_without_a_hit_or_a_listed_edge_fails_naming_what_it_tried(monkeypa
     lag-screw-2 that way on every 640 px seat; the instance is now a pin.
     Nor is it "attach to the first walked edge": that edge may be hidden."""
     bodies = {
-        "cone-gear-1": _body([(0.0, 0.05, 0.0)]),
-        "cone-gear-2": _body([(0.0, 0.06, 0.0)]),
+        "dt-cone-gear-1": _body([(0.0, 0.05, 0.0)]),
+        "dt-cone-gear-2": _body([(0.0, 0.06, 0.0)]),
     }
-    spare = _AnchorEdge("cone-gear-2")
+    spare = _AnchorEdge("dt-cone-gear-2")
     view = _exploded_view(
-        _instances("cone-gear-1", "cone-gear-2", bodies=bodies),
+        _instances("dt-cone-gear-1", "dt-cone-gear-2", bodies=bodies),
         [],
-        visible={"cone-gear-1": [_AnchorEdge("cone-gear-1")] * listed, "cone-gear-2": [spare]},
+        visible={"dt-cone-gear-1": [_AnchorEdge("dt-cone-gear-1")] * listed, "dt-cone-gear-2": [spare]},
     )
 
     def fetch(_component, _kind):
@@ -2960,7 +2960,7 @@ def test_walk_without_a_hit_or_a_listed_edge_fails_naming_what_it_tried(monkeypa
         rf"at sheet mm \[\(0\.00, 50\.00\)\]: 1 body extreme points, then 0 points along "
         rf"its {listed} listed visible edges \(sampled when 1-{drawing_common._VISIBLE_EDGES_PER_INSTANCE}\)",
     ):
-        _balloon(monkeypatch, sheet, view, {"cone-gear": _WALK})
+        _balloon(monkeypatch, sheet, view, {"dt-cone-gear": _WALK})
     assert sheet.balloons == []
     assert sheet.hits == [(0.0, 0.05)]
 

@@ -187,10 +187,10 @@ def test_pattern_helpers_do_not_reference_removed_flag_helpers() -> None:
 @pytest.mark.parametrize(
     "builder",
     [
-        "build_drive_train_assembly.py",
-        "build_frame_assembly.py",
-        "build_magnifier_assembly.py",
-        "build_paper_drive_assembly.py",
+        "build_dt_drive_train_assembly.py",
+        "build_fr_frame_assembly.py",
+        "build_mg_magnifier_assembly.py",
+        "build_pd_paper_drive_assembly.py",
     ],
 )
 def test_every_native_pattern_records_authored_targets(builder: str) -> None:

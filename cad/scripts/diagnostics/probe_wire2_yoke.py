@@ -76,7 +76,7 @@ async def _suppress_pen_travel(adapter):
     best = (None, -1.0)
     for _f, mate, name, mtype, parts, _v in _iter_mates(adapter, model, read_values=False):
         lone = _lone_real(parts, "output")
-        if mtype != DISTANCE or lone is None or _family(lone) != "pen-rod":
+        if mtype != DISTANCE or lone is None or _family(lone) != "pn-pen-rod":
             continue
         val = _mate_value(adapter, mate, mtype) or 0.0
         if val > best[1]:
@@ -92,7 +92,7 @@ async def _rim_point(adapter):
     from solidworks_mcp.adapters.base import CreateReferencePointParameters
     top = adapter.currentModel
     top_title = str(_read_member(top, "GetTitle"))
-    wh, _ = _find_one(adapter, "magnifying-wheel-1")
+    wh, _ = _find_one(adapter, "mg-magnifying-wheel-1")
     part = adapter._attempt(lambda: wh.GetModelDoc2(), default=None)
     part_title = str(_read_member(part, "GetTitle"))
     adapter._attempt(
@@ -131,7 +131,7 @@ async def main():
     log(f"opened {asm_path}")
 
     await _flex_output(adapter)
-    await _suppress_named(adapter, "output-1", ("summing-lever", "magnifying-wheel"),
+    await _suppress_named(adapter, "output-1", ("sm-summing-lever", "mg-magnifying-wheel"),
                           (ANGLE,), "summing+wheel rock")
     await _suppress_pen_travel(adapter)
 
@@ -147,8 +147,8 @@ async def main():
     top = adapter.currentModel
     adapter.currentModel = out_doc
     try:
-        w1 = await gear_mate(adapter, _entity_ref("summing-lever-1", "Axis1", "AXIS"),
-                             _entity_ref("magnifying-wheel-1", "Axis1", "AXIS"),
+        w1 = await gear_mate(adapter, _entity_ref("sm-summing-lever-1", "Axis1", "AXIS"),
+                             _entity_ref("mg-magnifying-wheel-1", "Axis1", "AXIS"),
                              RATIO_SUM_WHEEL, label="WIRE1 summing->wheel")
         log(f"  WIRE1: {w1.get('name')}")
     except Exception as exc:  # noqa: BLE001
@@ -158,8 +158,8 @@ async def main():
         # named_ref string is resolved against the ACTIVE doc (the top assembly)
         # and fails; _entity_ref maps the part feature through the component.
         w2 = await coincident_mate(
-            adapter, _entity_ref("magnifying-wheel-1", rim_pt, "POINT"),
-            _entity_ref("pen-rod-1", "Top Plane", "PLANE"), label="WIRE2 yoke rim->pen")
+            adapter, _entity_ref("mg-magnifying-wheel-1", rim_pt, "POINT"),
+            _entity_ref("pn-pen-rod-1", "Top Plane", "PLANE"), label="WIRE2 yoke rim->pen")
         log(f"  WIRE2 yoke: {w2.get('name')}")
     except Exception as exc:  # noqa: BLE001
         log(f"  WIRE2 FAILED: {exc}")
@@ -167,7 +167,7 @@ async def main():
     adapter.currentModel = top
 
     check("motor summing", await adapter.add_motor(MotionMotorParameters(
-        motor_type="rotary", entity=_entity_ref("summing-lever-1", "Axis1", "AXIS"),
+        motor_type="rotary", entity=_entity_ref("sm-summing-lever-1", "Axis1", "AXIS"),
         speed=SUM_RPM, study_name="")))
 
     await adapter.set_motion_time(MotionTimeParameters(time=0.0, study_name=""))
@@ -175,21 +175,21 @@ async def main():
     adapter._attempt(lambda: top.EditRebuild3(), default=None)
     check("calc", await adapter.calculate_motion(MotionStudyRefParameters(name="")))
 
-    marker, _ = _find_one(adapter, "pen-marker")
-    sl, _ = _find_one(adapter, "summing-lever-1")
-    wh, _ = _find_one(adapter, "magnifying-wheel-1")
+    marker, _ = _find_one(adapter, "pn-pen-marker")
+    sl, _ = _find_one(adapter, "sm-summing-lever-1")
+    wh, _ = _find_one(adapter, "mg-magnifying-wheel-1")
     base, spans, ys = {}, {}, []
     for t in TIMES:
         await adapter.set_motion_time(MotionTimeParameters(time=t, study_name=""))
         if marker is not None:
             ys.append(_world(_comp_xform(adapter, marker), [0, 0, 0])[1])
-        for key, comp in (("summing", sl), ("wheel", wh)):
+        for key, comp in (("sm-summing", sl), ("wheel", wh)):
             a = _comp_xform(adapter, comp)
             base.setdefault(key, a)
             spans[key] = max(spans.get(key, 0.0), _rot_angle(base[key], a))
     if ys:
         log(f"  pen-marker Y: min={min(ys):.2f} max={max(ys):.2f} span={max(ys) - min(ys):.3f} mm")
-    log(f"  ROCK summing={spans.get('summing', 0):.1f}  wheel={spans.get('wheel', 0):.1f}")
+    log(f"  ROCK summing={spans.get('sm-summing', 0):.1f}  wheel={spans.get('wheel', 0):.1f}")
     await adapter.disconnect()
     _telemetry.info("Disconnected (NOT saved).")
 

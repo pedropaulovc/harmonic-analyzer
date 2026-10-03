@@ -81,7 +81,7 @@ follow the length while wire diameter, turn count and both rigid end loops do
 not, and each end assembly translates by ``(L - 254)/2``.  The domain is the
 catalogue extension range 254 .. 421.6146 mm -- an extension spring has no
 compressed state -- enforced by
-:func:`counter_spring_stock_geom.validate_length_mm`.
+:func:`vn_counter_spring_stock_geom.validate_length_mm`.
 
 Run standalone (SolidWorks open)::
 
@@ -99,7 +99,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import _telemetry  # noqa: E402
-import counter_spring_stock_geom as geom  # noqa: E402
+import vn_counter_spring_stock_geom as geom  # noqa: E402
 from _common import (  # noqa: E402
     _early_bound,
     _feature_by_name,

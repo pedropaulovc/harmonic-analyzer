@@ -32,14 +32,14 @@ STUDY = "Motion Study 2"
 
 # (label, family, single?) -- chain order from motor to rocker
 CHAIN = [
-    ("crankshaft", "crankshaft", True),
-    ("16Tpinion", "crank-pinion", True),
-    ("64Tgear", "crank-drive-gear", True),
-    ("coneshaft", "cone-gear-shaft", True),
-    ("conegear", "cone-gear", False),
-    ("cylgear", "cylinder-gear", False),
-    ("rod", "connecting-rod", False),
-    ("rocker", "rocker-arm", False),
+    ("dt-crankshaft", "dt-crankshaft", True),
+    ("16Tpinion", "dt-crank-pinion", True),
+    ("64Tgear", "dt-crank-drive-gear", True),
+    ("coneshaft", "dt-cone-gear-shaft", True),
+    ("conegear", "dt-cone-gear", False),
+    ("cylgear", "dt-cylinder-gear", False),
+    ("rod", "ch-connecting-rod", False),
+    ("rocker", "ch-rocker-arm", False),
 ]
 
 

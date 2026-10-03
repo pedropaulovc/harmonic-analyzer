@@ -1,0 +1,10 @@
+pd-rack-pinion:
+  number: MHA-PD-006
+  category: pd
+  material: Brass
+  material_specification: C36000 free-machining brass
+  finish: gear teeth cut; polished brass
+  quantity: 1
+  tolerance_class: machined_block
+  fit_class: gear_mesh
+  process: "gear cutting (hob/shaper); #0-80 taps drilled and tapped at assembly"

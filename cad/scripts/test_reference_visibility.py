@@ -259,7 +259,7 @@ def test_a_shown_wizard_placement_sketch_under_its_hole_fails() -> None:
 
 def test_an_assembly_does_not_walk_into_its_components() -> None:
     component = _Feature(
-        "crank-arm-1",
+        "dt-crank-arm-1",
         "Reference",
         SHOWN,
         subs=[_Feature("Sk", "ProfileFeature", SHOWN)],
@@ -270,7 +270,7 @@ def test_an_assembly_does_not_walk_into_its_components() -> None:
 
 def test_an_assembly_level_shown_sketch_fails() -> None:
     model = _Model(
-        _Feature("crank-arm-1", "Reference", SHOWN),
+        _Feature("dt-crank-arm-1", "Reference", SHOWN),
         _Feature("LayoutSketch", "ProfileFeature", SHOWN),
     )
     with pytest.raises(RuntimeError, match="LayoutSketch"):
@@ -303,7 +303,7 @@ def test_part_save_checks_before_the_first_save() -> None:
         _part_tree(_Feature("StationReference", "ProfileFeature", SHOWN)), saves
     )
     with pytest.raises(RuntimeError, match="StationReference"):
-        asyncio.run(_common.save_part_and_images(adapter, "crank-arm"))
+        asyncio.run(_common.save_part_and_images(adapter, "dt-crank-arm"))
     assert saves == []
 
 
@@ -313,7 +313,7 @@ def test_a_shown_plane_reaching_the_save_fails_it() -> None:
     saves: list[str] = []
     model = _part_tree(_Feature("Axis1", "RefAxis", SHOWN))
     with pytest.raises(RuntimeError, match="axis 'Axis1'"):
-        asyncio.run(_common.save_part_and_images(_adapter(model, saves), "crank-arm"))
+        asyncio.run(_common.save_part_and_images(_adapter(model, saves), "dt-crank-arm"))
     assert model.by_name["Axis1"].Visible == SHOWN
     assert saves == []
 
@@ -348,7 +348,7 @@ def test_both_hole_wizard_helpers_hide_their_placement_sketch() -> None:
 
 def test_every_standalone_save_path_runs_the_check() -> None:
     """Part saves go through save_part_and_images; the exceptions check too."""
-    own_savers = {"build_cone_gear.py"}
+    own_savers = {"build_dt_cone_gear.py"}
     for path in sorted(SCRIPTS.glob("build_*.py")):
         text = path.read_text(encoding="utf-8")
         if "adapter.save_file(" not in text:
@@ -497,7 +497,7 @@ def _scan(model: _Model, monkeypatch, allowed=None) -> tuple[str, dict]:
         _visibility._telemetry, "info", lambda msg, **attrs: lines.append((msg, attrs))
     )
     _ROUND_TRIPS.clear()
-    _visibility.assert_reference_geometry_hidden(_adapter(model), "crank-arm", allowed)
+    _visibility.assert_reference_geometry_hidden(_adapter(model), "dt-crank-arm", allowed)
     scans = [
         (msg, attrs) for msg, attrs in lines if attrs.get("walk_purpose") == "check"
     ]
@@ -556,7 +556,7 @@ def test_an_empty_feature_tree_fails_the_check(monkeypatch, returned) -> None:
     model = _part_tree()
     monkeypatch.setattr(model.FeatureManager, "GetFeatures", lambda _top: returned)
     with pytest.raises(RuntimeError, match="crank-arm: GetFeatures.* no features"):
-        _visibility.assert_reference_geometry_hidden(_adapter(model), "crank-arm")
+        _visibility.assert_reference_geometry_hidden(_adapter(model), "dt-crank-arm")
 
 
 def test_shared_reference_creators_hide_what_they_create() -> None:
@@ -822,7 +822,7 @@ def test_the_blank_sweep_flags_a_name_nothing_authors() -> None:
 def test_every_blanked_name_is_one_its_builder_authors() -> None:
     """A blank of a feature the build no longer creates fails the build at
     selection (R1's crankshaft dropped its journal but still blanked
-    'JournalStartPlane': leaf 20260926T211617385Z-2783256a, part:crankshaft)."""
+    'JournalStartPlane': leaf 20260926T211617385Z-2783256a, part:dt_crankshaft)."""
     offenders = {
         path.name: missing
         for path in sorted(SCRIPTS.glob("build_*.py"))
@@ -833,7 +833,7 @@ def test_every_blanked_name_is_one_its_builder_authors() -> None:
 
 def test_the_shared_walk_counts_every_feature_but_skips_components() -> None:
     component = _Feature(
-        "crank-arm-1", "Reference", SHOWN, subs=[_Feature("Sk", "ProfileFeature")]
+        "dt-crank-arm-1", "Reference", SHOWN, subs=[_Feature("Sk", "ProfileFeature")]
     )
     hole = _Feature(
         "Hole", "HoleWzd", SHOWN, subs=[_Feature("3DSketch1", "3DProfileFeature")]
@@ -846,7 +846,7 @@ def test_the_shared_walk_counts_every_feature_but_skips_components() -> None:
         "Front Plane",
         "Hole",
         "3DSketch1",
-        "crank-arm-1",
+        "dt-crank-arm-1",
     ]
     assert walk.visited == 4
     # Only raw dispid calls: FirstFeature, then per feature its type, its first
@@ -885,7 +885,7 @@ class _PaperDriveAdapter:
 
 def _paper_drive_scans(monkeypatch, shown: list[set[str]], blanked: list[tuple]):
     """Each visibility scan reads the next set; the blank records its request."""
-    import build_paper_drive_assembly as paper_drive
+    import build_pd_paper_drive_assembly as paper_drive
 
     scans = iter(shown)
 
@@ -939,7 +939,7 @@ def test_paper_drive_plane_that_stays_shown_fails_loud(monkeypatch) -> None:
 
 
 def test_paper_drive_wraps_both_feature_steps() -> None:
-    source = (SCRIPTS / "build_paper_drive_assembly.py").read_text(encoding="utf-8")
+    source = (SCRIPTS / "build_pd_paper_drive_assembly.py").read_text(encoding="utf-8")
     assert 'hide_generated_planes(adapter, shown, "roller chain pattern")' in source
     assert 'hide_generated_planes(adapter, shown, "belt/chain coupling")' in source
     for step in ("await _insert_roller_chain(adapter)", "await adapter.insert_belt_chain("):

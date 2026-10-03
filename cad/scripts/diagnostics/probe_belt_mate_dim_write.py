@@ -11,7 +11,7 @@ This spike writes the PITCH diameters straight onto those mate dimensions
 (``IDimension.SystemValue``), rebuilds, and measures the true coupling ratio by
 driving the crank. Read-only otherwise; never saves.
 
-Run (SolidWorks already open, paper-drive.SLDASM built)::
+Run (SolidWorks already open, pd-paper-drive.SLDASM built)::
 
     uv run python cad/scripts/diagnostics/probe_belt_mate_dim_write.py
 """
@@ -72,7 +72,7 @@ def _write_mate_dims(adapter: Any) -> dict:
 
 
 async def build(adapter: Any) -> dict[str, str]:
-    asm = OUT_SLDASM / "paper-drive.SLDASM"
+    asm = OUT_SLDASM / "pd-paper-drive.SLDASM"
     check("open paper-drive", await adapter.open_model(str(asm)))
     try:
         roles = _removables_by_role(adapter)

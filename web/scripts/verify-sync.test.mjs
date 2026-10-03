@@ -700,7 +700,7 @@ test('render verification separates the real representation digest from pinned r
   const descriptor = {
     schemaVersion: 1, kind: 'lossless-web-model-representation',
     source: { sha256: MODEL_SHA256, sourceCommit: MODEL_COMMIT },
-    representation: { path: 'models/harmonic-analyzer.glb', sha256: 'a'.repeat(64), byteLength: 4096, codec: 'EXT_meshopt_compression' },
+    representation: { path: 'models/ha-harmonic-analyzer.glb', sha256: 'a'.repeat(64), byteLength: 4096, codec: 'EXT_meshopt_compression' },
     pipeline: { version: 1, steps: ['exact-dedup', 'meshopt'], codecVersion: 'meshoptimizer@0.22.0' },
     equivalence: { method: 'decoded-per-drawable-exact-v1', semanticSha256: 'b'.repeat(64), drawableCount: 435 },
   }

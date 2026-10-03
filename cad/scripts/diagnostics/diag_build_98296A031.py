@@ -2,7 +2,7 @@ r"""McMaster 98296A031 -- 1050-1095 spring steel slotted spring pin, 1/16 x 5/8.
 
 One of the 98296A* sizes built by the shared recipe in
 ``diag_mcmaster_spring_pin.py`` (see its docstring for the catalogue facts).
-Used as transgear-knob-cup-pin (MHA-183).
+Used as transgear-knob-cup-pin (MHA-VN-048).
 
 Run standalone (SolidWorks open)::
 

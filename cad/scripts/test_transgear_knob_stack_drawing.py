@@ -1,7 +1,7 @@
 """Worst-case contracts of the transgear knob stack (R9-52, R9-53, R9-54).
 
-The MHA-078 knob shaft's stud, the MHA-177 drive collar's rear slot, the
-MHA-154 spring pin across it and the MHA-126 thumbnut, each pair judged at the
+The MHA-PD-008 knob shaft's stud, the MHA-PD-022 drive collar's rear slot, the
+MHA-VN-037 spring pin across it and the MHA-PD-013 thumbnut, each pair judged at the
 printed worst case (policy rule 12).  Every corner is recomputed here from the
 printed values and places and from the catalogue limits, not read back from the
 specs' derived constants; the reloads prove each import-time assert fires.
@@ -13,11 +13,11 @@ import importlib.util
 
 import pytest
 
-import transgear_collar_cross_pin_spec as cross_pin
-import transgear_drive_collar_spec as collar
-import transgear_knob_shaft_spec as shaft
-import transgear_removable_spec as removable
-import transgear_thumbnut_spec as nut
+import vn_transgear_collar_cross_pin_spec as cross_pin
+import pd_transgear_drive_collar_spec as collar
+import pd_transgear_knob_shaft_spec as shaft
+import pd_transgear_removable_spec as removable
+import pd_transgear_thumbnut_spec as nut
 from _printed_tolerance import printed_band_mm
 
 INCH = 25.4
@@ -73,7 +73,7 @@ def test_slot_clears_the_free_spring_pin_at_both_limits(monkeypatch) -> None:
     # Negative control: the 1.7 slot of fc9c2d700 grips the largest free pin.
     assert 1.7 - PIN_FREE_DIA[1] < 0.0
     # The spec's assert fires on a pin whose free diameter fills the slot.
-    with pytest.raises(AssertionError, match="MHA-177 slot / MHA-154 pin"):
+    with pytest.raises(AssertionError, match="MHA-PD-022 slot / MHA-VN-037 pin"):
         _reloaded_collar(monkeypatch, cross_pin, "FREE_DIA_MAX", 1.81)
 
 
@@ -131,7 +131,7 @@ def test_thumbnut_runs_clear_of_the_core_step_at_the_rearward_stop(
     # sat on it.
     head_runout_end = 6.5 + printed_band_mm(3) + PITCH
     assert nut_seat + nut.REAR_THREAD_LOSS < head_runout_end
-    with pytest.raises(AssertionError, match="MHA-126 thumbnut / MHA-078 core step"):
+    with pytest.raises(AssertionError, match="MHA-PD-013 thumbnut / MHA-PD-008 core step"):
         _reloaded_collar(monkeypatch, shaft, "CORE_LENGTH", 6.5)
 
 
@@ -158,7 +158,7 @@ def test_cross_hole_stays_in_the_full_core_over_the_travel(monkeypatch) -> None:
     assert min(margins) == pytest.approx(0.10)
     assert min(margins) > 0.0
     # Negative control: a core 0.25 shorter puts the hole in the relief.
-    with pytest.raises(AssertionError, match="MHA-154 cross hole / MHA-078"):
+    with pytest.raises(AssertionError, match="MHA-VN-037 cross hole / MHA-PD-008"):
         _reloaded_collar(monkeypatch, shaft, "CORE_LENGTH", shaft.CORE_LENGTH - 0.25)
 
 
@@ -198,5 +198,5 @@ def test_thumbnut_engages_one_and_a_half_diameters_over_the_travel(
     assert worst >= ENGAGEMENT_FLOOR
     assert collar.THUMBNUT_ENGAGEMENT_WORST == pytest.approx(worst)
     # Negative control: a stud tip 4 shorter leaves 7.60, under 1.5 D.
-    with pytest.raises(AssertionError, match="MHA-126 thumbnut / MHA-078 stud"):
+    with pytest.raises(AssertionError, match="MHA-PD-013 thumbnut / MHA-PD-008 stud"):
         _reloaded_collar(monkeypatch, shaft, "TIP_STATION", shaft.TIP_STATION - 4.0)

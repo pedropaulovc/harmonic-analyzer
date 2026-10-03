@@ -47,11 +47,11 @@ async def main():
 
     log("  one-time walk to cache targets ...")
     comps = _components(adapter)
-    rocks = _by_z_rank(adapter, "rocker-arm", comps=comps)
+    rocks = _by_z_rank(adapter, "ch-rocker-arm", comps=comps)
     cached = {
-        "crank": _find_one(adapter, "crankshaft-1", comps=comps)[0],
-        "coneshaft": _find_one(adapter, "cone-gear-shaft-1", comps=comps)[0],
-        "cylgear0": _find_one(adapter, "cylinder-gear-1", comps=comps)[0],
+        "crank": _find_one(adapter, "dt-crankshaft-1", comps=comps)[0],
+        "coneshaft": _find_one(adapter, "dt-cone-gear-shaft-1", comps=comps)[0],
+        "cylgear0": _find_one(adapter, "dt-cylinder-gear-1", comps=comps)[0],
     }
     for i, (c, _n) in enumerate(rocks[:4]):
         cached[f"rock{i}"] = c

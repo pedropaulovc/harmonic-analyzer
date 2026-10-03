@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import win32com.client  # noqa: E402
 
-import draw_frame_assembly as frame  # noqa: E402
+import draw_fr_frame_assembly as frame  # noqa: E402
 from _common import _early_bound, check, run_build  # noqa: E402
 from _drawing_common import (  # noqa: E402
     _drawing_component_children,
@@ -33,7 +33,7 @@ from solidworks_mcp.adapters import sw_type_info  # noqa: E402
 from solidworks_mcp.adapters.solidworks.drawing import new_drawing, place_view  # noqa: E402
 
 OUT = Path(__file__).resolve().parents[2] / "out" / "reports" / "probe-balloon-anchor.json"
-STEM = "nameplate"
+STEM = "fr-nameplate"
 SAMPLE = 200
 
 

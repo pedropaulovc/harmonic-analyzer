@@ -33,7 +33,7 @@ import _telemetry
 # drive-train sub -- so its pass doubles as a cheap sanity read). The other
 # assemblies carry no gear mates; they were only opened here for the retired
 # DOF-closure proof.
-GEAR_ASSEMBLIES = ["drive-train", "channel"]
+GEAR_ASSEMBLIES = ["dt-drive-train", "ch-channel"]
 
 
 async def _preflight_one(adapter: Any, name: str) -> str:

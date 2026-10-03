@@ -1,9 +1,0 @@
-transgear-arm:
-  title: Transgear Arm
-  number: MHA-164
-  material: AISI 1018 cold-finished steel
-  material_specification: AISI 1018 cold-finished steel bar, ASTM A108
-  finish: bright machined; protect with ISO VG 32 machine-oil film
-  quantity: 1
-  tolerance_class: machined_block
-  process: "saw from 5/16 x 1 precision-ground flat stock (McMaster 9517K466), faces as supplied; mill the outline to the pivot radius and the square end; drill and ream the pivot bore and counterbore the rear spot face; drill and ream the pin bore through, square to the faces, for the MHA-179 press; drill, countersink both sides and tap the plate holes through; drill and ream the blind latch-pin hole flat-bottomed into the square end"

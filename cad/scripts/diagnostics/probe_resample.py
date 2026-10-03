@@ -52,10 +52,10 @@ async def main():
         check(f"set_time {t:.2f}", await adapter.set_motion_time(
             MotionTimeParameters(time=t, study_name=STUDY)))
         comps = _components(adapter)  # FRESH walk -> fresh dispatches each frame
-        crank = _find_one(adapter, "crankshaft-1", comps=comps)
-        gears = _by_z_rank(adapter, "cylinder-gear", comps=comps)
-        rocks = _by_z_rank(adapter, "rocker-arm", comps=comps)
-        rods = _by_z_rank(adapter, "connecting-rod", comps=comps)
+        crank = _find_one(adapter, "dt-crankshaft-1", comps=comps)
+        gears = _by_z_rank(adapter, "dt-cylinder-gear", comps=comps)
+        rocks = _by_z_rank(adapter, "ch-rocker-arm", comps=comps)
+        rods = _by_z_rank(adapter, "ch-connecting-rod", comps=comps)
         targets = {
             "crank": crank,
             "gear0": gears[0] if gears else (None, None),

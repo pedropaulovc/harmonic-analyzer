@@ -11,14 +11,14 @@ hypotheses.  This script measures them on the exact tooth solids that
   2048 x 512 (theta, r) grid the voxel study tests against, ~0.0015 mm
   circumferential), extruded along its own axis (the 64T with its helix
   twist) in 0.1 mm slices; the pinion's turned band (north of
-  ``crank_pinion_spec.SHOULDER_LENGTH``, cut to ``TURNED_DIA``) is honored in
+  ``dt_crank_pinion_spec.SHOULDER_LENGTH``, cut to ``TURNED_DIA``) is honored in
   both its boundary and its material, as ``crossed_mesh_study.pinion_material``
   reads it;
 * with the 64T held at a crank phase, the pinion is rotated (``seed_off``)
   and the pair collides when any boundary point of either gear lies inside
   the other's material;
 * the two first-contact rotations bracket the free window; its width at the
-  16T standard pitch radius is the circular backlash at the MHA-025 pitch
+  16T standard pitch radius is the circular backlash at the MHA-DT-010 pitch
   line -- the reading the drive-train sheet's check 2 takes;
 * each case is swept over one crank tooth pitch (22.5 deg) and reports the
   tight spot (min) and the loose spot (max).

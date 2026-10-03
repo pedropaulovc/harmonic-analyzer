@@ -1,5 +1,5 @@
 r"""McMaster 91794A055 -- 18-8 stainless slotted fillister screw, #0-80 x 1/4
-(MHA-161, the transgear disc screws).
+(MHA-VN-039, the transgear disc screws).
 
 Every number is imported from ``transgear_disc_screw_spec`` (catalogue and
 the laws read off the vendor model, each with its dump source); none is
@@ -37,7 +37,7 @@ vendor origin sits mid-overall (axis z, head +z) and its profile lies on
 the Right Plane, so vendor +y is replica +x.
 
 Cut to fit (optional, ``cut_length`` with ``cut_end_break``; R9-47): a
-screw cut at assembly, as MHA-161's are, is drawn as installed, in the
+screw cut at assembly, as MHA-VN-039's are, is drawn as installed, in the
 ``diag_mcmaster_oval`` idiom.  Revolve1 ends the shank at y = -cut_length
 with a 45 deg break of radial leg ``cut_end_break`` in place of the factory
 0.75 P tip chamfer, and ``revolved_volume`` follows the cut.  Everything
@@ -75,7 +75,7 @@ from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     replica_main,
     thread_sweep_cut,
 )
-from transgear_disc_screw_spec import (  # noqa: E402
+from vn_transgear_disc_screw_spec import (  # noqa: E402
     CUTTER_CENTRE_PAST_TIP,
     CUTTER_TOP_W,
     DOME_H,

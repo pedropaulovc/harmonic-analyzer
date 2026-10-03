@@ -1,6 +1,6 @@
 r"""Generate the measuring stick's engraved numerals DXF (tracked asset).
 
-Writes ``cad/references/measuring-stick-numerals.dxf``: the 0..10 scale
+Writes ``cad/references/ha-measuring-stick-numerals.dxf``: the 0..10 scale
 numerals of the ruled measuring stick as closed loops at their FINAL model
 millimetre coordinates, ready for ``build_measuring_stick`` to import onto the
 Front plane and cut ``TICK_DEPTH`` deep (the nameplate precedent: the Makers
@@ -53,7 +53,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import _dxf_text as dxf  # noqa: E402
-from build_measuring_stick import (  # noqa: E402
+from build_ha_measuring_stick import (  # noqa: E402
     BODY_WIDTH,
     DIVISION_COUNT,
     DIVISION_SPACING,

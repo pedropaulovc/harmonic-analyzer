@@ -1,4 +1,4 @@
-r"""Diagnostic: list sketch features in channel.SLDASM (assembly level) and in
+r"""Diagnostic: list sketch features in ch-channel.SLDASM (assembly level) and in
 each unique referenced part, with visibility. Read-only.
 
 Run: C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\diag_sketches.py
@@ -16,7 +16,7 @@ from _common import check, run_build  # noqa: E402
 from _common import _flag  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
-ASM = ROOT / "out" / "sldasm" / "channel.SLDASM"
+ASM = ROOT / "out" / "sldasm" / "ch-channel.SLDASM"
 
 
 def _get(obj, name):
@@ -45,7 +45,7 @@ async def build(adapter) -> dict[str, str]:
     model = adapter.currentModel
     _flag(model, "IModelDoc2")
     _flag(model, "IAssemblyDoc")
-    list_sketches(model, "channel.SLDASM")
+    list_sketches(model, "ch-channel.SLDASM")
 
     comps = model.GetComponents(True) or []
     seen = set()

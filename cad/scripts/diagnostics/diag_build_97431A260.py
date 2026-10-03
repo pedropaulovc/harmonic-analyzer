@@ -1,5 +1,5 @@
 r"""McMaster 97431A260 -- side-mount (E-style) external retaining ring for a
-5/32 in shaft, phosphate-coated carbon steel (MHA-182, R9-68).
+5/32 in shaft, phosphate-coated carbon steel (MHA-VN-047, R9-68).
 
 Laws: measured from the vendor model, read by the read-only dump
 ``cad/out/reports/mcmaster-97431A260-dump.json`` (amet, 2026-10-02) of
@@ -51,7 +51,7 @@ from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     replica_main,
 )
 from diagnostics.sketch_profile import Arc, Line, Segment  # noqa: E402
-from transgear_retaining_ring_spec import FREE_DIA, OD, THICKNESS  # noqa: E402
+from vn_transgear_retaining_ring_spec import FREE_DIA, OD, THICKNESS  # noqa: E402
 
 OUTER_R = OD / 2.0  # 3.5814, "Ring OD"
 PRONG_R = FREE_DIA / 2.0  # 1.4478, "Free Diameter"

@@ -1,7 +1,0 @@
-guide-lock:
-  number: MHA-112
-  material_family: ferrous_noncritical
-  finish: black oxide
-  quantity: 4
-  tolerance_class: machined_block
-  process: "machined from solid stock or casting"

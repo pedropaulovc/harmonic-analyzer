@@ -23,7 +23,7 @@ def test_farm_preflight_refuses_undefined_name_before_fleet_query(
     scripts = tmp_path / "cad" / "scripts"
     scripts.mkdir(parents=True)
     # A throwaway copy of a real builder; never mutate the tracked original.
-    source = REPO_ROOT / "cad" / "scripts" / "build_crank_drive_gear.py"
+    source = REPO_ROOT / "cad" / "scripts" / "build_dt_crank_drive_gear.py"
     (scripts / source.name).write_bytes(
         source.read_bytes() + b"\nundefined_names_gate_negative_control()\n"
     )

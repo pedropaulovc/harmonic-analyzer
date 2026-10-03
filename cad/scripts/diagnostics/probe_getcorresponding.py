@@ -79,13 +79,13 @@ async def main():
     log("created throwaway parent")
 
     # --- channel: rod Axis1, rigid then flexible ---
-    ch = (OUT_SLDASM / "channel.SLDASM").resolve()
+    ch = (OUT_SLDASM / "ch-channel.SLDASM").resolve()
     res = await adapter.insert_component(
         InsertComponentParameters(file_path=str(ch), position=[0, 0, 0], rotation=[0, 0, 0])
     )
     sub = res.data["name"]
     log(f"inserted channel as {sub!r}")
-    rod = _find_comp(adapter, doc, "connecting-rod-16")
+    rod = _find_comp(adapter, doc, "ch-connecting-rod-16")
     rname = str(_read_member(rod, "Name2"))
     rpart = adapter._attempt(lambda: rod.GetModelDoc2(), default=None)
     ax1 = _axis_feature(rpart, "Axis1") if rpart else None
@@ -99,7 +99,7 @@ async def main():
         _map_select(adapter, doc, rod, ax1, 1, "FLEXIBLE rod Axis1")
 
     # --- drive-train: gear Axis3 (cam lobe), flexible ---
-    dt = (OUT_SLDASM / "drive-train.SLDASM").resolve()
+    dt = (OUT_SLDASM / "dt-drive-train.SLDASM").resolve()
     res2 = await adapter.insert_component(
         InsertComponentParameters(file_path=str(dt), position=[0, 0, 0], rotation=[0, 0, 0])
     )
@@ -109,7 +109,7 @@ async def main():
             SetComponentSolvingParameters(name=dtsub, solving="flexible")
         )
         adapter._attempt(lambda: doc.EditRebuild3())
-        gear = _find_comp(adapter, doc, "cylinder-gear-1")
+        gear = _find_comp(adapter, doc, "dt-cylinder-gear-1")
         gname = str(_read_member(gear, "Name2")) if gear else "?"
         gpart = adapter._attempt(lambda: gear.GetModelDoc2(), default=None) if gear else None
         ax3 = _axis_feature(gpart, "Axis3") if gpart else None

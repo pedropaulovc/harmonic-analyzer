@@ -115,7 +115,7 @@ class Application:
 @pytest.fixture
 def harness(tmp_path, monkeypatch):
     root = tmp_path.resolve()
-    source = root / "cad/out/sldprt/pinion-lift-rod.SLDPRT"
+    source = root / "cad/out/sldprt/dt-pinion-lift-rod.SLDPRT"
     source.parent.mkdir(parents=True)
     source.write_bytes(b"fake unchanged source")
     reports = root / "cad/out/reports/datum-placement"
@@ -126,7 +126,7 @@ def harness(tmp_path, monkeypatch):
     monkeypatch.setenv("HARMONIC_DIAGNOSTIC_SW_PID", "123")
     monkeypatch.setenv("HARMONIC_REMOTE_CACHE_MODE", "off")
     app = Application()
-    part = Document(source, "pinion-lift-rod.SLDPRT", 1)
+    part = Document(source, "dt-pinion-lift-rod.SLDPRT", 1)
     drawing = Document("", "Diagnostic - Sheet1", 3)
     drawing.views = [View("Sheet1"), *(View(name, part) for name in ("Front", "Top", "Right"))]
     for current, following in zip(drawing.views, drawing.views[1:]):
@@ -169,7 +169,7 @@ def harness(tmp_path, monkeypatch):
             run_owned_diagnostic=lambda callback: asyncio.run(callback(adapter))
         ),
         "solidworks_mcp.adapters.com_variant": SimpleNamespace(null_callout=lambda: None),
-        "draw_pinion_lift_rod": recipe,
+        "draw_dt_pinion_lift_rod": recipe,
     }
     for name, value in modules.items():
         monkeypatch.setitem(sys.modules, name, value)
@@ -307,11 +307,11 @@ def attachment_run(h, selection="edge"):
     # below execute the real historical-version guard, before the fake runner.
     h.monkeypatch.setattr(module, "require_historical_recipe", lambda _part: None)
     output = h.reports / "attachment"
-    h.invoke(module, "pinion_lift_rod", selection, "requested", output)
+    h.invoke(module, "dt_pinion_lift_rod", selection, "requested", output)
     return json.loads((output / "receipt.json").read_text())
 
 
-@pytest.mark.parametrize("part", ["pinion_lift_rod", "rack_pinion"])
+@pytest.mark.parametrize("part", ["dt_pinion_lift_rod", "pd_rack_pinion"])
 def test_exact_historical_recipe_is_supported(harness, part):
     h = harness
     module = h.load("probe_vm2_datum_attachment")
@@ -338,7 +338,7 @@ def test_unsupported_recipe_rejects_before_runner_or_output(harness, old_helper)
                           lambda _callback: pytest.fail("historical guard attached to COM"))
     output = h.reports / "unsupported"
     with pytest.raises(RuntimeError, match="historical attachment probe does not support") as error:
-        h.invoke(module, "pinion_lift_rod", "edge", "requested", output)
+        h.invoke(module, "dt_pinion_lift_rod", "edge", "requested", output)
     assert module.HISTORICAL_REPLAY_COMMIT in str(error.value)
     assert "--production --ink-refresh cold" in str(error.value)
     assert not output.exists()
@@ -355,14 +355,14 @@ def test_git_recipe_hash_normalizes_crlf_without_ignoring_other_changes(tmp_path
     monkeypatch.setattr(module, "ROOT", tmp_path.resolve())
     subprocess.run(["git", "init", "--quiet", str(tmp_path)], check=True)
     subprocess.run(["git", "config", "--local", "core.autocrlf", "true"], cwd=tmp_path, check=True)
-    path = tmp_path / "cad/scripts/draw_pinion_lift_rod.py"
+    path = tmp_path / "cad/scripts/draw_dt_pinion_lift_rod.py"
     path.parent.mkdir(parents=True)
     path.write_bytes(b"def build():\n    return 1\n")
-    expected = module.historical_recipe_blob("pinion_lift_rod")
+    expected = module.historical_recipe_blob("dt_pinion_lift_rod")
     path.write_bytes(b"def build():\r\n    return 1\r\n")
-    assert module.historical_recipe_blob("pinion_lift_rod") == expected
+    assert module.historical_recipe_blob("dt_pinion_lift_rod") == expected
     path.write_bytes(b"def build():\r\n    return 2\r\n")
-    assert module.historical_recipe_blob("pinion_lift_rod") != expected
+    assert module.historical_recipe_blob("dt_pinion_lift_rod") != expected
 
 
 def test_attachment_closure_skips_stale_part_and_hashes_final_evidence(harness):

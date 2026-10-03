@@ -1671,7 +1671,7 @@ def _traced_adapter_method(name: str, method: Any) -> Any:
         async with aspan(span_name, arg=_adapter_arg(args)) as sp:
             result = await method(self, *args, **kwargs)
             # The adapter RETURNS its failures (``AdapterResult`` with an error
-            # status) and callers often probe with them -- ``build_cone_gear`` tries
+            # status) and callers often probe with them -- ``build_dt_cone_gear`` tries
             # several axis candidates for one pattern. The status is an attribute,
             # not an ERROR span: the caller's ``check`` raises inside its own span
             # when a failure matters.

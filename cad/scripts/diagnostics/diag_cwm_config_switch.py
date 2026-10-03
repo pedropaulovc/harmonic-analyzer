@@ -42,7 +42,7 @@ from _assembly import (  # noqa: E402
 
 # Distance drivers seed their side from drive-train's flip seeds
 # (cad/config/assemblies/drive-train.yaml), the assembly this probe mirrors.
-activate_assembly_contract("drive-train")
+activate_assembly_contract("dt-drive-train")
 from _assembly_postbuild import discard_open_documents  # noqa: E402
 from _common import _flag_only, check, log, run_build  # noqa: E402
 from _cwm import (  # noqa: E402
@@ -97,10 +97,10 @@ async def build(adapter) -> dict[str, str]:
     try:
         check("create_assembly", await adapter.create_assembly())
         shaft = await place_component(
-            adapter, "cone-gear-shaft", [0.0, 0.0, 0.0], [0.0, 0.0, 0.0],
+            adapter, "dt-cone-gear-shaft", [0.0, 0.0, 0.0], [0.0, 0.0, 0.0],
             IDENTITY, ground=False, label="cone-gear-shaft (seed, auto-fixed)")
         seed = await place_component(
-            adapter, "cone-gear", [0.0, 0.0, -Z0], [0.0, 0.0, 0.0], IDENTITY,
+            adapter, "dt-cone-gear", [0.0, 0.0, -Z0], [0.0, 0.0, 0.0], IDENTITY,
             ground=False, configuration=SEED_CFG,
             label=f"cone-gear {SEED_CFG} seed")
         tgt = [0.0, 0.0, -Z0]
@@ -118,7 +118,7 @@ async def build(adapter) -> dict[str, str]:
             label="seed anti-spin (keyed phase)", verify=(seed, tgt))
 
         rows = [r for r in mates_with_owners(
-            adapter, {"cone-gear", "cone-gear-shaft"}) if seed in r["instances"]]
+            adapter, {"dt-cone-gear", "dt-cone-gear-shaft"}) if seed in r["instances"]]
         ext = external_mate_rows(rows, {seed})
         dims = [i for i, r in enumerate(ext)
                 if r["type"] == "MateDistanceDim"]

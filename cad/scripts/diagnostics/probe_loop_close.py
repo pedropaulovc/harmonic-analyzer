@@ -48,7 +48,7 @@ async def _flex_channel(adapter):
     )
     from _assembly import coincident_mate, named_ref
     asm = adapter.currentModel
-    sub = "channel-1"
+    sub = "ch-channel-1"
     check(f"float {sub}", await adapter.float_component(ComponentRefParameters(name=sub)))
     for plane in ("Front Plane", "Top Plane", "Right Plane"):
         await coincident_mate(
@@ -122,16 +122,16 @@ async def main():
 
     # free the rod + rocker inside channel-1 (same suppress the build does)
     await _suppress_recurring(
-        adapter, "channel-1", ("rocker-arm",), "rocker spin drivers")
+        adapter, "ch-channel-1", ("ch-rocker-arm",), "rocker spin drivers")
     await _suppress_named(
-        adapter, "channel-1", ("connecting-rod",), (DISTANCE, ANGLE),
+        adapter, "ch-channel-1", ("ch-connecting-rod",), (DISTANCE, ANGLE),
         "rod drivers (free the rod fully)")
 
     # ch00 trio by Z-rank (same station)
     comps = _components(adapter)
-    gear, gear_n = _by_z_rank(adapter, "cylinder-gear", comps=comps)[0]
-    rod, rod_n = _by_z_rank(adapter, "connecting-rod", comps=comps)[0]
-    rk, rk_n = _by_z_rank(adapter, "rocker-arm", comps=comps)[0]
+    gear, gear_n = _by_z_rank(adapter, "dt-cylinder-gear", comps=comps)[0]
+    rod, rod_n = _by_z_rank(adapter, "ch-connecting-rod", comps=comps)[0]
+    rk, rk_n = _by_z_rank(adapter, "ch-rocker-arm", comps=comps)[0]
     log(f"  ch00: gear={gear_n!r} rod={rod_n!r} rocker={rk_n!r}")
     _positions(adapter, rod, rk, "start")
 

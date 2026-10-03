@@ -25,12 +25,12 @@ from win32com.client.dynamic import Dispatch as dynamic_dispatch
 from _common import _early_bound, check
 from _drawing_common import add_native_hole_callout, new_project_drawing, render_pdf_png
 from _drawing_registry import DRAWINGS_BY_NAME, DrawingLayout
-from draw_harmonic_base import _cross_tap_edge
+from draw_fr_harmonic_base import _cross_tap_edge
 from diagnostics._owned_native_session import run_owned_diagnostic
 from solidworks_mcp.adapters.pywin32_adapter import null_callout
 from solidworks_mcp.adapters.solidworks.drawing import place_view, save_drawing
 
-SOURCE = DRAWINGS_BY_NAME["harmonic_base"].source.resolve()
+SOURCE = DRAWINGS_BY_NAME["fr_harmonic_base"].source.resolve()
 OUTPUT = ROOT / "cad/out/reports/hole-callout-association"
 PROCESS = "FRONT AND REAR"
 SCALE = (1.0, 4.0)

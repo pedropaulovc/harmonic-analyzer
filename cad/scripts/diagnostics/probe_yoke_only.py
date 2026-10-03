@@ -58,7 +58,7 @@ async def _suppress_pen_travel(adapter):
     best = (None, -1.0)
     for _f, mate, name, mtype, parts, _v in _iter_mates(adapter, model, read_values=False):
         lone = _lone_real(parts, "output")
-        if mtype != DISTANCE or lone is None or _family(lone) != "pen-rod":
+        if mtype != DISTANCE or lone is None or _family(lone) != "pn-pen-rod":
             continue
         val = _mate_value(adapter, mate, mtype) or 0.0
         if val > best[1]:
@@ -72,7 +72,7 @@ async def _rim_point(adapter):
     from solidworks_mcp.adapters.base import CreateReferencePointParameters
     top = adapter.currentModel
     top_title = str(_read_member(top, "GetTitle"))
-    wh, _ = _find_one(adapter, "magnifying-wheel-1")
+    wh, _ = _find_one(adapter, "mg-magnifying-wheel-1")
     part = adapter._attempt(lambda: wh.GetModelDoc2(), default=None)
     part_title = str(_read_member(part, "GetTitle"))
     adapter._attempt(
@@ -110,7 +110,7 @@ async def main():
     log(f"opened {asm_path}")
 
     await _flex_output(adapter)
-    await _suppress_named(adapter, "output-1", ("magnifying-wheel",), (ANGLE,),
+    await _suppress_named(adapter, "output-1", ("mg-magnifying-wheel",), (ANGLE,),
                           "wheel rock")
     await _suppress_pen_travel(adapter)
     rim_pt = await _rim_point(adapter)
@@ -125,8 +125,8 @@ async def main():
     adapter.currentModel = out_doc
     try:
         w2 = await coincident_mate(
-            adapter, _entity_ref("magnifying-wheel-1", rim_pt, "POINT"),
-            _entity_ref("pen-rod-1", "Top Plane", "PLANE"), label="yoke rim->pen")
+            adapter, _entity_ref("mg-magnifying-wheel-1", rim_pt, "POINT"),
+            _entity_ref("pn-pen-rod-1", "Top Plane", "PLANE"), label="yoke rim->pen")
         log(f"  WIRE2 yoke: {w2.get('name')}")
     except Exception as exc:  # noqa: BLE001
         log(f"  WIRE2 FAILED: {exc}")
@@ -134,7 +134,7 @@ async def main():
     adapter.currentModel = top
 
     check("motor wheel", await adapter.add_motor(MotionMotorParameters(
-        motor_type="rotary", entity=_entity_ref("magnifying-wheel-1", "Axis1", "AXIS"),
+        motor_type="rotary", entity=_entity_ref("mg-magnifying-wheel-1", "Axis1", "AXIS"),
         speed=WHEEL_RPM, study_name="")))
 
     await adapter.set_motion_time(MotionTimeParameters(time=0.0, study_name=""))
@@ -142,8 +142,8 @@ async def main():
     adapter._attempt(lambda: top.EditRebuild3(), default=None)
     check("calc", await adapter.calculate_motion(MotionStudyRefParameters(name="")))
 
-    marker, _ = _find_one(adapter, "pen-marker")
-    wh, _ = _find_one(adapter, "magnifying-wheel-1")
+    marker, _ = _find_one(adapter, "pn-pen-marker")
+    wh, _ = _find_one(adapter, "mg-magnifying-wheel-1")
     base = None
     rows = []
     for t in TIMES:

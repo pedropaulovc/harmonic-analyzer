@@ -6,12 +6,12 @@ from pathlib import Path
 
 import pytest
 
-import arbor_pedestal_spec
+import dt_arbor_pedestal_spec
 
 import _config
-import connecting_rod_spec as rod
+import ch_connecting_rod_spec as rod
 import cylinder_bank_layout as bank
-import cylinder_gear_spec as gear
+import dt_cylinder_gear_spec as gear
 from _buildgraph import module_deps_of
 
 MM_PER_IN = 25.4
@@ -140,7 +140,7 @@ def test_stations_close_up_against_the_datum() -> None:
 def test_layout_stays_geometry_only() -> None:
     deps = {Path(p).name for p in module_deps_of(Path(bank.__file__))}
     assert deps.isdisjoint(
-        {"cylinder_gear_notes.py", "build_cylinder_gear.py", "draw_cylinder_gear.py"}
+        {"dt_cylinder_gear_notes.py", "build_dt_cylinder_gear.py", "draw_dt_cylinder_gear.py"}
     )
     source = Path(bank.__file__).read_text(encoding="utf-8")
     assert "title_block" not in source.split('"""', 2)[2]
@@ -150,7 +150,7 @@ def test_arbor_spans_both_straps_and_domes_proud_of_each() -> None:
     """#743 supersedes U34b's "span less 6.0": the arbor fills both strap
     bores, where the apex set screws bear on it, and each end is domed
     ARBOR_DOME_HEIGHT proud of its strap's outer face."""
-    import arbor_pedestal_spec as ped
+    import dt_arbor_pedestal_spec as ped
 
     assert bank.STRAP_OUTER_SPAN == pytest.approx(bank.STRAP_INNER_SPAN + 2 * ped.STRAP_T)
     assert bank.ARBOR_LENGTH == pytest.approx(bank.STRAP_OUTER_SPAN)
@@ -163,15 +163,15 @@ def test_arbor_spans_both_straps_and_domes_proud_of_each() -> None:
     )
     # A true dome over the whole end (SR about 8.3 on the 3/8 rod), never
     # more than a hemisphere.
-    import cylinder_gear_shaft_spec as arbor
+    import dt_cylinder_gear_shaft_spec as arbor
 
     assert 0.0 < bank.ARBOR_DOME_HEIGHT <= arbor.SHAFT_DIA / 2.0
 
 
 def test_pedestals_anchor_on_the_bank_strap_faces() -> None:
-    """The drive train stands each MHA-004 on its strap inner face (U34 row 5),
+    """The drive train stands each MHA-DT-002 on its strap inner face (U34 row 5),
     and the #743 stack is what fixes those faces."""
-    import arbor_pedestal_spec as ped
+    import dt_arbor_pedestal_spec as ped
 
     assert bank.FRONT_PEDESTAL_ORIGIN_Z == pytest.approx(
         bank.FRONT_STRAP_INNER_Z - ped.STRAP_INNER_Z
@@ -195,15 +195,15 @@ def test_apex_set_screw_socket_and_cup_point_are_named() -> None:
     named layout constant (the drive train places it exactly), and the cup
     point, not the thread, spans the running clearance with the arbor pushed
     to the bottom of a largest bore on a smallest arbor."""
-    import arbor_set_screw_spec as screw
-    import cylinder_gear_shaft_spec as shaft
+    import vn_arbor_set_screw_spec as screw
+    import dt_cylinder_gear_shaft_spec as shaft
 
     assert bank.SET_SCREW_SOCKET_PROUD == pytest.approx(
-        screw.LENGTH + shaft.SHAFT_DIA / 2.0 - arbor_pedestal_spec.TOP_RADIUS
+        screw.LENGTH + shaft.SHAFT_DIA / 2.0 - dt_arbor_pedestal_spec.TOP_RADIUS
     )
     assert 0.0 < bank.SET_SCREW_SOCKET_PROUD < 0.25
     bore_max_r = (
-        arbor_pedestal_spec.BORE_DIA + arbor_pedestal_spec.BORE_DIA_BAND[0]
+        dt_arbor_pedestal_spec.BORE_DIA + dt_arbor_pedestal_spec.BORE_DIA_BAND[0]
     ) / 2.0
     shaft_min_r = (shaft.SHAFT_DIA + shaft.SHAFT_DIA_BAND[1]) / 2.0
     lowest_tip_r = 2.0 * shaft_min_r - bore_max_r

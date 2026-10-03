@@ -2,7 +2,7 @@ r"""SEAT SPIKE: validate the SW Belt/Chain assembly feature on paper-drive.
 
 Two things in one seat run, so I do not burn multiple COM sessions:
 
-1. **Topology dump** -- open the built ``paper-drive.SLDASM`` and log every
+1. **Topology dump** -- open the built ``pd-paper-drive.SLDASM`` and log every
    top-level component (name + referenced configuration) and every mate. This
    is how the crank -> chain -> knob -> rack-pinion -> platen feed path is read
    (per [[verify-assumptions-live-sw]]: probe the live model, do not trust
@@ -58,7 +58,7 @@ def _bool_array(values: list[bool]):
 
 
 async def build(adapter) -> dict[str, str]:
-    asm = OUT_SLDASM / "paper-drive.SLDASM"
+    asm = OUT_SLDASM / "pd-paper-drive.SLDASM"
     if not asm.exists():
         error(f"not built: {asm}")
         return {}
@@ -94,7 +94,7 @@ async def _explore(adapter) -> dict[str, str]:
             name = adapter._attempt(lambda c=c: c.Name2, default="?")
             cfg = adapter._attempt(lambda c=c: c.ReferencedConfiguration, default="?")
             rows.append((str(name), str(cfg)))
-            if name and "transgear-removable" in str(name) and str(cfg) in ("T12", "T24"):
+            if name and "pd-transgear-removable" in str(name) and str(cfg) in ("T12", "T24"):
                 sprockets[str(cfg)] = c
         for name, cfg in rows:
             info(f"  comp {name!r:52}  cfg={cfg}")

@@ -1,0 +1,579 @@
+r"""Reproduction script: crank pinion (book ch. 11/12, pp. 16, 19, 20).
+
+The pinion on the crankshaft that meshes the dark steel crank-drive gear
+at the cone set's large end (`build_dt_crank_drive_gear.py`), implementing
+the book-stated 4:1 crank-to-cone reduction (p. 16). Tooth count/DP per
+the Appendix C #9 split, with DP 25.7311 fixed by the manually
+rederived v2 post's cast-in crank axis. A plain straight spur
+with a root-relieved floor; the crossed-mesh accommodation lives on the
+64T (see its docstring for the full rederivation). On its outboard face
+a plain hub boss at the tooth root (ch12 p.19 page002_img02 / img06)
+carries the 1/8 in retention pin that keys the pinion to the crankshaft
+through a match-drilled radial cross-hole (crank_pinion_spec).
+
+Dimensions: cad/config/dimensions.yaml ch12 crank-drive gear row +
+Appendix C #9. The 11.4 tooth length runs past the drive gear's 7.2113
+face; the south face stays against its restored MHA-DT-005 boss-side datum.
+The teeth run at full OD for the shoulder length and are turned down north of
+it, so the grown end passes under the inclined T120 (crank_pinion_spec).
+
+Layout: gear axis = Z through the origin, teeth z = 0..FACE_WIDTH (turned to
+TURNED_DIA from SHOULDER_LENGTH), boss z = FACE_WIDTH..OVERALL_LENGTH, pin at
+FACE_WIDTH + BOSS_LENGTH / 2 (W15).
+
+Run (SolidWorks already open)::
+
+    uv run python cad\scripts\build_dt_crank_pinion.py
+"""
+
+from __future__ import annotations
+
+import math
+import sys
+
+import _telemetry
+from _common import (
+    IN,
+    SketchDims,
+    _feature_by_name,
+    _early_bound,
+    add_line_chain,
+    anchor_point_to_origin,
+    apply_material,
+    bbox_extent_check,
+    name_bore_axis,
+    check,
+    define_circle,
+    dimension_between,
+    drive_dimension,
+    ensure_fully_defined,
+    force_rebuild,
+    name_dimensions,
+    name_last_feature,
+    report_mass_properties,
+    run_build,
+    set_global,
+    set_sketch_direct_db,
+)
+from _drawing_marks import (
+    add_diametric_linear_dimension,
+    apply_drawing_precision,
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
+    set_dimension_symmetric_tolerance,
+)
+from _drawing_simplified import save_simplified_part
+from _fit_limits import deviations
+from _gear import build_fixed_gear, volume_check
+from _holes import cross_hole_volume_mm3, wizard_hole_on_cylinder
+from _gtol_spec import CylinderFace
+from _part_pmi import _resolve_faces, author_part_pmi
+from _visibility import blank_reference_geometry
+from dt_crank_pinion_spec import (
+    BORE_DIA,
+    BORE_DIA_BAND,
+    BOSS_DIA,
+    BOSS_LENGTH,
+    DIAMETRAL_PITCH,
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    DRAWING_PRECISION,
+    FACE_WIDTH,
+    FACE_WIDTH_LIMITS,
+    GEAR_DATA,
+    OUTSIDE_DIA,
+    OUTSIDE_DIA_TOLERANCE_MM,
+    OVERALL_LENGTH,
+    PIN_DIA,
+    PIN_HOLE_SPEC,
+    PIN_STATION,
+    PRESSURE_ANGLE_DEG,
+    SHOULDER_LENGTH,
+    SHOULDER_LENGTH_LIMITS,
+    SURFACE_FINISHES,
+    TURNED_DIA,
+    TURNED_DIA_TOLERANCE_MM,
+)
+from involute_gear import gear_facts
+
+PART_NAME = "dt-crank-pinion"
+MATERIAL = "Plain Carbon Steel"  # steel like its mate (p.19/20)
+
+TEETH = 16  # DIMENSIONS.md ch12 / Appendix C #9 estimate (low)
+DP = DIAMETRAL_PITCH  # the 64T's normal-plane cutter, cut square (dt_crank_pinion_spec)
+PA_DEG = PRESSURE_ANGLE_DEG
+# FACE_WIDTH (the whole tooth length), SHOULDER_LENGTH, TURNED_DIA and
+# BOSS_LENGTH are in dt_crank_pinion_spec. build_dt_drive_train_assembly checks the
+# installed south face, the T120 clearances and the 64T row overlap.
+BORE_DIAMETER = BORE_DIA  # the crankshaft's Ø9.0 pinion seat (dt_crank_pinion_spec)
+
+# The hub boss as the runtime gate reads it (#906 diag v3, d6ca08eb7): a boss
+# revolve coincident with the gap floors' root arcs vanished on a
+# regeneration with the rebuild reporting success and What's Wrong empty, so
+# the gate reads the solid itself.  The station sits in the outboard stub,
+# clear of the teeth, so only the boss can reach it; the relieved gap floors
+# share its radius over the toothed length alone.  Tolerances are 1 um: the
+# gate must see a dropped boss, not re-prove the dimensions.
+BOSS_GATE_TOL_MM = 1e-3
+BOSS_GATE_FACE = CylinderFace(
+    BOSS_DIA,
+    contains_z_mm=(FACE_WIDTH + OVERALL_LENGTH) / 2.0,
+    tolerance_mm=BOSS_GATE_TOL_MM,
+)
+
+
+def turned_band_volume_mm3() -> float:
+    """Tooth material the TurnedBand cut removes: every tooth's cross-section
+    between the turned radius and the tip, over the turned length. The tooth
+    half-angle at radius r is Delta - inv(acos(Rb / r)) (the involute the gap
+    cut leaves; gear_facts, inches)."""
+    facts = gear_facts(TEETH, DP, PA_DEG)
+    rb, ra, delta = facts["Rb"], facts["Ra"], facts["Delta"]
+    rt = TURNED_DIA / 2.0 / IN
+    if not rb < rt < ra:
+        raise AssertionError("the turned diameter must cut the involute flanks")
+    samples = 2000
+    area_in2 = 0.0
+    for i in range(samples):
+        r = rt + (ra - rt) * (i + 0.5) / samples
+        phi = math.acos(rb / r)
+        area_in2 += 2.0 * (delta - (math.tan(phi) - phi)) * r * (ra - rt) / samples
+    return TEETH * area_in2 * IN**2 * (FACE_WIDTH - SHOULDER_LENGTH)
+
+
+async def assert_boss_present(adapter, label: str) -> None:
+    """Fail loud unless the solid still reaches OVERALL_LENGTH along the axis
+    and carries exactly one boss-radius cylinder outboard of the teeth."""
+    with _telemetry.span("pinion.boss_gate", label=label):
+        await bbox_extent_check(
+            adapter, f"{label} overall length", "z", OVERALL_LENGTH,
+            tol=BOSS_GATE_TOL_MM,
+        )
+        _resolve_faces(adapter.currentModel, {f"{label} hub boss": BOSS_GATE_FACE})
+        _telemetry.success(f"{label}: hub boss present")
+
+
+async def build(adapter) -> dict[str, str]:
+    from solidworks_mcp.adapters.base import (
+        CreatePlaneParameters,
+        ExtrusionParameters,
+        RevolveParameters,
+    )
+
+    check("create_part", await adapter.create_part())
+
+    # Editable knobs (Tools > Equations): every length carries the load-bearing
+    # mm suffix (INCH document; the equation manager reads bare numbers in
+    # document units, so an unsuffixed length blows the part up 25.4x).
+    # FaceWidth drives the gear blank's extrude depth, OutsideDia its tip
+    # circle: both are printed dimensions, so both are knobs. TEETH/DP stay
+    # module constants -- the tooth gap and pattern are built by
+    # build_fixed_gear with literal numerics, off this self-naming path.
+    await set_global(adapter, "FaceWidth", f"{FACE_WIDTH}mm")
+    await set_global(adapter, "OutsideDia", f"{OUTSIDE_DIA}mm")
+    await set_global(adapter, "BoreDia", f"{BORE_DIAMETER}mm")
+    await set_global(adapter, "BossDia", f"{BOSS_DIA}mm")
+    await set_global(adapter, "BossLength", f"{BOSS_LENGTH}mm")
+    await set_global(adapter, "ShoulderLength", f"{SHOULDER_LENGTH}mm")
+    await set_global(adapter, "TurnedDia", f"{TURNED_DIA}mm")
+
+    drive_jobs: list[tuple[str, str]] = []
+
+    # Root-relieved floor (real dedendum): the mating 64T's tips reach
+    # 0.71 mm BELOW this 16T's base circle at working depth -- the stock
+    # base-chord gap floor (fine for the big-count train pairs) starves a
+    # 16-tooth pinion, and was half of why the old mesh could not close
+    # (2026-07-14 rederive; see build_dt_crank_drive_gear.py's docstring).
+    # The pinion stays a plain straight spur otherwise -- the book's
+    # removable "gear on the crankshaft can be changed" stock member; the
+    # crossing accommodation (helix + backlash) lives on the 64T.
+    disc = await build_fixed_gear(
+        adapter, TEETH, FACE_WIDTH, dp=DP, pa_deg=PA_DEG, root_relief=True,
+    )
+    volume = disc.volume
+
+    # build_fixed_gear is shared by five recipes, so it leaves the blank under
+    # the adapter's default names. Name the blank extrude and its absorbed
+    # profile sketch here: the two sizes the turner sets before a cutter
+    # touches the part -- face width and outside diameter -- print as NATIVE
+    # model dimensions (drawing-simplicity-policy.md rule 1), which means they
+    # must be named, driven, toleranced and marked like any other. Driving both
+    # is also the guard on these default names: a rename that resolved the
+    # wrong feature would move the blank and the equation-neutral volume gate
+    # below would fail loud instead of printing a dimension of something else.
+    _feature_by_name(adapter, "Boss-Extrude1").Name = "GearBlank"
+    _telemetry.success("feature 'Boss-Extrude1' -> 'GearBlank'")
+    drive_jobs += [
+        (name_dimensions(adapter, "GearBlank", ["FaceWidth"])[0], '"FaceWidth"')
+    ]
+    _feature_by_name(adapter, "Sketch1").Name = "GearBlankProfile"
+    _telemetry.success("feature 'Sketch1' -> 'GearBlankProfile'")
+    drive_jobs += [
+        (
+            name_dimensions(adapter, "GearBlankProfile", ["OutsideDia"])[0],
+            '"OutsideDia"',
+        )
+    ]
+
+    # Hub boss (ch12 p.19): the root-circle cylinder BOSS_LENGTH past the
+    # teeth. Its outboard end is dimensioned from the SAME faced end as the
+    # teeth, so the overall length stays one conspicuous native dimension from
+    # one faced end (policy rule 7). The half-profile starts AT the tooth face,
+    # not at the faced end: a profile run through the toothed length sits
+    # exactly on every relieved gap floor's root arc, and SolidWorks drops
+    # that revolve without a feature error on the next regeneration after the
+    # first (#906 diag v3, d6ca08eb7: the stub vanished on a plain
+    # ForceRebuild3, and PinHole lost its face). Starting at the tooth face
+    # adds the same stub, which the volume gate proves. It is a REVOLVE of a
+    # half-profile on the Right plane (local x -> model -Z, local y -> model Y)
+    # rather than an extruded circle: a turned part prints its diameter beside
+    # its length on the side view (rule 7), and only a dimension whose sketch
+    # plane is parallel to that view imports there natively -- the boss
+    # diameter as a doubled centerline-to-outline dim, the overall length
+    # along the outline.
+    boss = SketchDims()
+    check("create_sketch boss", await adapter.create_sketch("Right"))
+    set_sketch_direct_db(adapter, True)
+    boss_axis = check(
+        "boss axis centerline",
+        await adapter.add_centerline(-FACE_WIDTH, 0.0, -OVERALL_LENGTH, 0.0),
+    )
+    boss_pts = [
+        (-FACE_WIDTH, 0.0),
+        (-FACE_WIDTH, BOSS_DIA / 2.0),
+        (-OVERALL_LENGTH, BOSS_DIA / 2.0),
+        (-OVERALL_LENGTH, 0.0),
+    ]
+    boss_lines = await add_line_chain(adapter, boss_pts)
+    # Construction-only side-view witnesses for the other two turned
+    # diameters.  The gear helper's blank circle and the bore circle must stay
+    # on Front to create their features, but rule 2 permits a construction
+    # reference sketch whose own driving dimension carries the printed value.
+    # Keeping the witnesses in this Right-plane profile lets every turned
+    # diameter import natively beside its axial extent without changing the
+    # solid or showing hidden bore lines.
+    outside_ref = check(
+        "outside-diameter reference line",
+        await adapter.add_line(0.0, OUTSIDE_DIA / 2.0, -FACE_WIDTH, OUTSIDE_DIA / 2.0),
+    )
+    bore_ref = check(
+        "bore-diameter reference line",
+        await adapter.add_line(0.0, BORE_DIAMETER / 2.0, -OVERALL_LENGTH, BORE_DIAMETER / 2.0),
+    )
+    set_sketch_direct_db(adapter, False)
+    for line in (outside_ref, bore_ref):
+        segment = _early_bound(adapter._sketch_entities[line], "ISketchSegment")
+        segment.ConstructionGeometry = True
+        if not bool(segment.ConstructionGeometry):
+            raise RuntimeError(f"{line}: failed to become construction geometry")
+    for i, line in enumerate(boss_lines):
+        (_, y1), (_, y2) = boss_pts[i], boss_pts[(i + 1) % len(boss_lines)]
+        direction = "horizontal" if y1 == y2 else "vertical"
+        check(
+            f"boss {direction} {line}",
+            await adapter.add_sketch_constraint(line, None, direction),
+        )
+    for label, line in (
+        ("outside-diameter reference", outside_ref),
+        ("bore-diameter reference", bore_ref),
+    ):
+        check(
+            f"{label} horizontal",
+            await adapter.add_sketch_constraint(line, None, "horizontal"),
+        )
+        check(
+            f"{label} starts at faced end",
+            await adapter.add_sketch_constraint(
+                f"{line}.start", "origin", "vertical_points"
+            ),
+        )
+    check(
+        "bore-diameter reference ends at boss end",
+        await adapter.add_sketch_constraint(
+            f"{bore_ref}.end", f"{boss_lines[2]}.end", "vertical_points"
+        ),
+    )
+    boss_outline = boss_lines[1]
+    await dimension_between(
+        adapter,
+        f"{boss_outline}.end",
+        "origin",
+        "horizontal_distance",
+        OVERALL_LENGTH,
+        "boss OverallLength",
+    )
+    boss.record("OverallLength", '"FaceWidth" + "BossLength"')
+    await add_diametric_linear_dimension(
+        adapter,
+        boss_axis,
+        boss_outline,
+        (-OVERALL_LENGTH / 2.0, BOSS_DIA / 2.0 + 5.0),
+        "BossDia",
+    )
+    boss.record("BossDia", '"BossDia"')
+    # The outside-diameter witness stops at the tooth face, so its axial
+    # attachment says which cylinder the diameter belongs to.  Its span is
+    # definition-only and therefore deliberately stays auto-named/unmarked.
+    await dimension_between(
+        adapter,
+        f"{outside_ref}.start",
+        f"{outside_ref}.end",
+        "horizontal_distance",
+        FACE_WIDTH,
+        "outside-diameter reference span",
+    )
+    boss.record(None, None)
+    await add_diametric_linear_dimension(
+        adapter,
+        boss_axis,
+        f"{outside_ref}.start",
+        (-FACE_WIDTH / 2.0, OUTSIDE_DIA / 2.0 + 5.0),
+        "OutsideDia",
+    )
+    boss.record("OutsideDia", '"OutsideDia"')
+    await add_diametric_linear_dimension(
+        adapter,
+        boss_axis,
+        f"{bore_ref}.start",
+        (-OVERALL_LENGTH / 2.0, BORE_DIAMETER / 2.0 + 3.0),
+        "BoreDia",
+    )
+    boss.record("BoreDia", '"BoreDia"')
+    # The profile's start sits on the axis at the tooth face: one alignment
+    # relation plus one distance, driven by FaceWidth.
+    await anchor_point_to_origin(
+        adapter, f"{boss_lines[0]}.start", -FACE_WIDTH, 0.0, "boss anchor"
+    )
+    boss.record("BossStart", '"FaceWidth"')
+    await ensure_fully_defined(adapter, "boss sketch")
+    check("exit_sketch boss", await adapter.exit_sketch())
+    name_last_feature(adapter, "BossProfile")
+    drive_jobs += boss.apply(adapter, "BossProfile")
+    check(
+        "revolve boss", await adapter.create_revolve(RevolveParameters(angle=360.0))
+    )
+    name_last_feature(adapter, "Boss")
+    v_boss = math.pi * (BOSS_DIA / 2.0) ** 2 * BOSS_LENGTH
+    volume = await volume_check(adapter, "hub boss", volume + v_boss, 0.01 * v_boss)
+
+    # Turned band (user ruling c'' variant B, 2026-09-30): north of the
+    # full-OD shoulder the teeth are turned down to TURNED_DIA so the grown
+    # end passes under the inclined T120 rim. A revolve cut of a rectangle on
+    # the Right plane (local x -> model -Z), like the boss: the shoulder
+    # length prints from the same faced end as the face and overall length,
+    # the turned diameter beside it on the side view (rule 7). The rectangle
+    # runs on to the part's far end and out past the tip -- above the boss,
+    # so it cuts tooth material alone -- and both of those extents are driven
+    # definition-only dimensions that follow the knobs.
+    band = SketchDims()
+    check("create_sketch turned band", await adapter.create_sketch("Right"))
+    set_sketch_direct_db(adapter, True)
+    band_top = OUTSIDE_DIA - TURNED_DIA / 2.0
+    band_pts = [
+        (-SHOULDER_LENGTH, TURNED_DIA / 2.0),
+        (-OVERALL_LENGTH, TURNED_DIA / 2.0),
+        (-OVERALL_LENGTH, band_top),
+        (-SHOULDER_LENGTH, band_top),
+    ]
+    band_lines = await add_line_chain(adapter, band_pts)
+    band_axis = check(
+        "turned band axis centerline",
+        await adapter.add_centerline(0.0, 0.0, -SHOULDER_LENGTH, 0.0),
+    )
+    set_sketch_direct_db(adapter, False)
+    for i, line in enumerate(band_lines):
+        direction = "horizontal" if i % 2 == 0 else "vertical"
+        check(
+            f"turned band {direction} {line}",
+            await adapter.add_sketch_constraint(line, None, direction),
+        )
+    check(
+        "turned band axis at the origin",
+        await adapter.add_sketch_constraint(f"{band_axis}.start", "origin", "coincident"),
+    )
+    check(
+        "turned band axis level",
+        await adapter.add_sketch_constraint(band_axis, None, "horizontal"),
+    )
+    check(
+        "turned band axis ends under the shoulder",
+        await adapter.add_sketch_constraint(
+            f"{band_axis}.end", f"{band_lines[0]}.start", "vertical_points"
+        ),
+    )
+    await dimension_between(
+        adapter,
+        f"{band_lines[0]}.start",
+        "origin",
+        "horizontal_distance",
+        SHOULDER_LENGTH,
+        "turned band ShoulderLength",
+    )
+    band.record("ShoulderLength", '"ShoulderLength"')
+    await add_diametric_linear_dimension(
+        adapter,
+        band_axis,
+        band_lines[0],
+        (-(SHOULDER_LENGTH + FACE_WIDTH) / 2.0, -(TURNED_DIA / 2.0 + 5.0)),
+        "TurnedDia",
+    )
+    band.record("TurnedDia", '"TurnedDia"')
+    await dimension_between(
+        adapter,
+        f"{band_lines[0]}.end",
+        "origin",
+        "horizontal_distance",
+        OVERALL_LENGTH,
+        "turned band far end",
+    )
+    band.record(None, '"FaceWidth" + "BossLength"')
+    await dimension_between(
+        adapter,
+        f"{band_lines[1]}.start",
+        f"{band_lines[1]}.end",
+        "vertical_distance",
+        band_top - TURNED_DIA / 2.0,
+        "turned band rise past the tip",
+    )
+    band.record(None, '"OutsideDia" - "TurnedDia"')
+    await ensure_fully_defined(adapter, "turned band sketch")
+    check("exit_sketch turned band", await adapter.exit_sketch())
+    name_last_feature(adapter, "TurnedBandProfile")
+    drive_jobs += band.apply(adapter, "TurnedBandProfile")
+    check(
+        "revolve-cut turned band",
+        await adapter.create_revolve(RevolveParameters(angle=360.0, is_cut=True)),
+    )
+    name_last_feature(adapter, "TurnedBand")
+    v_band = turned_band_volume_mm3()
+    volume = await volume_check(adapter, "turned band", volume - v_band, 0.01 * v_band)
+
+    # On-axis bore (centre 0,0) through teeth and boss: define_circle emits
+    # only the diameter dim, so only the "Dia" slot is recorded -- the X/Z
+    # names are ignored.
+    bore = SketchDims()
+    check("create_sketch bore", await adapter.create_sketch("Front"))
+    await define_circle(
+        adapter, 0.0, 0.0, BORE_DIAMETER / 2.0, "bore", dims=bore,
+        names=("BoreCx", "BoreCz", "BoreDia"),
+        drives=(None, None, '"BoreDia"'),
+    )
+    await ensure_fully_defined(adapter, "bore sketch")
+    check("exit_sketch bore", await adapter.exit_sketch())
+    name_last_feature(adapter, "BoreProfile")
+    drive_jobs += bore.apply(adapter, "BoreProfile")
+    check(
+        "cut bore",
+        await adapter.create_cut_extrude(
+            ExtrusionParameters(depth=OVERALL_LENGTH + 2.0)
+        ),
+    )
+    name_last_feature(adapter, "Bore")
+    v_bore = math.pi * (BORE_DIAMETER / 2.0) ** 2 * OVERALL_LENGTH
+    volume = await volume_check(adapter, "bore", volume - v_bore, 0.01 * v_bore)
+
+    # Named bore/central axis for view-independent assembly mate
+    # selection (M6 mated-DOF drive train). Stays Axis2: the cross-hole comes
+    # after it and creates no axis of its own.
+    await name_bore_axis(adapter, "Top Plane", 0.0, "Right Plane", 0.0, "bore axis")
+
+    # Retention-pin cross-hole (dt_crank_pinion_spec): a native 1/8 in drill
+    # radially through the boss wall on local -X at the boss's mid-length,
+    # through-all so it exits the far wall too (the pin is flush both sides).
+    # The station rides an offset plane whose distance is the printed
+    # PinStation dimension; the Top plane pins the azimuth. Match-drilled at
+    # assembly with the crankshaft, whose own hole carries the mesh clocking.
+    check(
+        "create_plane PinStationPlane",
+        await adapter.create_plane(
+            CreatePlaneParameters(
+                mode="offset", base_plane="Front Plane", offset=PIN_STATION
+            )
+        ),
+    )
+    name_last_feature(adapter, "PinStationPlane")
+    drive_jobs += [
+        (
+            name_dimensions(adapter, "PinStationPlane", ["PinStation"])[0],
+            '"FaceWidth" + "BossLength" / 2',
+        )
+    ]
+    wizard_hole_on_cylinder(
+        adapter,
+        PIN_HOLE_SPEC,
+        [-BOSS_DIA / 2.0, 0.0, PIN_STATION],
+        "retention-pin cross-hole",
+        name="PinHole",
+        point_planes=("PinStationPlane", "Top Plane"),
+    )
+    # Two boss walls = the full-cylinder cross-drill minus the bore's share.
+    v_pin_hole = cross_hole_volume_mm3(PIN_DIA, BOSS_DIA) - cross_hole_volume_mm3(
+        PIN_DIA, BORE_DIAMETER
+    )
+    volume = await volume_check(
+        adapter, "retention-pin cross-hole", volume - v_pin_hole, 0.02 * v_pin_hole
+    )
+    blank_reference_geometry(adapter, (("PinStationPlane", "PLANE"),))
+
+    # Deferred drive equations, then re-check neutrality (each evaluates to the
+    # as-built value, so the geometry must not move).
+    await force_rebuild(adapter)
+    for dim_name, expr in drive_jobs:
+        await drive_dimension(adapter, dim_name, expr)
+    await force_rebuild(adapter)
+    # A second regeneration is where the old boss profile vanished; take one
+    # and prove the solid kept its boss (the rebuild's own verdict did not).
+    await force_rebuild(adapter)
+    await assert_boss_present(adapter, "driven crank pinion")
+    set_dimension_bilateral_tolerance(
+        adapter, "BossProfile", "BoreDia", *deviations(BORE_DIA_BAND)
+    )
+    # The tip diameter's own band, on the witness the sheet imports: the
+    # crank-mesh stack's tip-to-root air takes it (dt_crank_pinion_spec).  None on
+    # the boss -- nothing runs on it.
+    set_dimension_symmetric_tolerance(
+        adapter, "BossProfile", "OutsideDia", OUTSIDE_DIA_TOLERANCE_MM
+    )
+    # The face's own +0/-0.30: the drive train proves the 64T row engagement
+    # at its short limit and the turned band's T120 clearance at its long one
+    # (Codex P1 on #1128; user ruling 2026-09-30).
+    set_dimension_bilateral_tolerance(
+        adapter, "GearBlank", "FaceWidth", *FACE_WIDTH_LIMITS
+    )
+    # The shoulder's +0/-0.30 and the turned diameter's +/-0.10: the drive
+    # train proves the T120 air and radial clearance at their long/large limits.
+    set_dimension_bilateral_tolerance(
+        adapter, "TurnedBandProfile", "ShoulderLength", *SHOULDER_LENGTH_LIMITS
+    )
+    set_dimension_symmetric_tolerance(
+        adapter, "TurnedBandProfile", "TurnedDia", TURNED_DIA_TOLERANCE_MM
+    )
+    await volume_check(
+        adapter, "driven crank pinion (equations neutral)", volume, 0.01 * v_bore
+    )
+
+    await apply_material(adapter, MATERIAL)
+    await report_mass_properties(adapter)
+
+    # Mark this part's manufacturing dimensions, author the decimal
+    # places they print with (policy rule 2: the model owns both the band and
+    # its spelling -- the drawing only reads them back), and stamp the
+    # title-block + gear-data properties the curated drawing reads.
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {"Gear Data": GEAR_DATA, "Manufacturing Notes": DRAWING_NOTES},
+    )
+    await assert_boss_present(adapter, "crank pinion before save")
+    return await save_simplified_part(adapter, PART_NAME, disc.tooth_features)
+
+
+if __name__ == "__main__":
+    sys.exit(run_build(build))

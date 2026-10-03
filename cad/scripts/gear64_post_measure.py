@@ -1,6 +1,6 @@
-r"""SolidWorks cross-check of crank_boss_rim: the 64T's real distance to MHA-016.
+r"""SolidWorks cross-check of crank_boss_rim: the 64T's real distance to MHA-DT-005.
 
-``crank_boss_rim`` sizes the 64T's face against MHA-016 from an analytic
+``crank_boss_rim`` sizes the 64T's face against MHA-DT-005 from an analytic
 envelope of the gear (a solid disc at its tip diameter).  This measures the
 built drive train: ``IModelDoc2::ClosestDistance`` between the placed
 crank-drive gear and cone pivot post, and reads which post feature the
@@ -21,12 +21,12 @@ import math
 from typing import Any
 
 import _telemetry
-import cone_pivot_post_spec as post
+import dt_cone_pivot_post_spec as post
 import crank_boss_rim
 from _common import _early_bound
 
-GEAR_COMPONENT = "crank-drive-gear-1"
-POST_COMPONENT = "cone-pivot-post-1"
+GEAR_COMPONENT = "dt-crank-drive-gear-1"
+POST_COMPONENT = "dt-cone-pivot-post-1"
 # The measured distance may undercut the envelope's by this much at most:
 # ClosestDistance's own resolution, well under crank_boss_rim's 0.25 floor.
 UNDERCUT_LIMIT_MM = 0.05
@@ -38,7 +38,7 @@ ON_SURFACE_MM = 0.02
 
 
 def post_features_at(point: tuple[float, float, float]) -> tuple[str, ...]:
-    """Every MHA-016 surface a point (crank_boss_rim's frame, mm) lies on.
+    """Every MHA-DT-005 surface a point (crank_boss_rim's frame, mm) lies on.
 
     A corner lies on several and a flush pair (the cone boss's end faces are
     tangent to the Ø42 body) can tie, so this names all of them, never a pick.
@@ -108,16 +108,16 @@ def measure(adapter: Any, *, post_origin: tuple[float, float, float], gear_offse
             sp.set_attribute(f"gear64_post.print_worst.{slug}", round(worst[name], 4))
         governing = min(worst, key=worst.__getitem__)
         sp.set_attribute("gear64_post.print_worst_governing", governing)
-        _telemetry.info(f"64T to MHA-016, SolidWorks vs crank_boss_rim nominal: {record}")
+        _telemetry.info(f"64T to MHA-DT-005, SolidWorks vs crank_boss_rim nominal: {record}")
         _telemetry.info(
-            "64T to MHA-016 by feature (nominal / print-worst, floor "
+            "64T to MHA-DT-005 by feature (nominal / print-worst, floor "
             f"{crank_boss_rim.FLOOR_CLEARANCE_MM}): "
             + "; ".join(f"{name} {nominal[name]:.3f} / {worst[name]:.3f}" for name in POST_FEATURES)
             + f"; governing {governing}"
         )
         if set(measured_features) != set(predicted_features):
             _telemetry.info(
-                f"64T to MHA-016: the envelope's nearest is {record['predicted_feature']}, "
+                f"64T to MHA-DT-005: the envelope's nearest is {record['predicted_feature']}, "
                 f"SolidWorks' is {record['measured_feature']}. The prediction is the "
                 "untoothed 64T (a solid disc to its tip diameter); the cut gear reaches "
                 "a tip-approached feature only where a tooth stands, so it may read "
@@ -125,7 +125,7 @@ def measure(adapter: Any, *, post_origin: tuple[float, float, float], gear_offse
             )
         if measured < predicted - UNDERCUT_LIMIT_MM:
             raise RuntimeError(
-                f"the placed 64T comes {measured:.3f} from MHA-016's "
+                f"the placed 64T comes {measured:.3f} from MHA-DT-005's "
                 f"{record['measured_feature']}, nearer than crank_boss_rim's nominal "
                 f"{predicted:.3f} ({record['predicted_feature']}): the envelope misses "
                 "real material"

@@ -55,33 +55,33 @@ async def main():
     _telemetry.info("Connecting ...")
     await adapter.connect()
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
-    asm_path = str((OUT_SLDASM / "harmonic-analyzer.SLDASM").resolve())
+    asm_path = str((OUT_SLDASM / "ha-harmonic-analyzer.SLDASM").resolve())
     await adapter.open_model(asm_path)
     top = adapter.currentModel
     top_title = str(_read_member(top, "GetTitle"))
     log(f"opened {asm_path} (title={top_title!r})")
 
     # flex channel-1
-    await adapter.float_component(ComponentRefParameters(name="channel-1"))
+    await adapter.float_component(ComponentRefParameters(name="ch-channel-1"))
     for plane in ("Front Plane", "Top Plane", "Right Plane"):
         await coincident_mate(
-            adapter, named_ref(f"{plane}@channel-1", "PLANE"),
+            adapter, named_ref(f"{plane}@ch-channel-1", "PLANE"),
             named_ref(plane, "PLANE"), label=f"ground channel-1 {plane}")
     adapter._attempt(lambda: top.ForceRebuild3(False), default=None)
     log("  set channel-1 FLEXIBLE (blocking solve) ...")
     await adapter.set_component_solving(
-        SetComponentSolvingParameters(name="channel-1", solving="flexible"))
+        SetComponentSolvingParameters(name="ch-channel-1", solving="flexible"))
     adapter._attempt(lambda: top.ForceRebuild3(False), default=None)
 
-    _, ch_doc = _sub_model(adapter, "channel-1")
+    _, ch_doc = _sub_model(adapter, "ch-channel-1")
     ch_title = str(_read_member(ch_doc, "GetTitle"))
     log(f"  channel sub doc title={ch_title!r}")
 
     # (a) top-level path
-    await _try_fix(adapter, top, "channel-1/amplitude-bar-1", "a:top-level")
+    await _try_fix(adapter, top, "ch-channel-1/ch-amplitude-bar-1", "a:top-level")
 
     # (b) in-sub, no activate
-    await _try_fix(adapter, ch_doc, "amplitude-bar-1", "b:in-sub-noact")
+    await _try_fix(adapter, ch_doc, "ch-amplitude-bar-1", "b:in-sub-noact")
 
     # (c) activate sub doc, then fix by name
     act = adapter._attempt(
@@ -90,7 +90,7 @@ async def main():
     active_title = str(_read_member(active, "GetTitle")) if active else None
     log(f"  ActivateDoc3({ch_title!r}) -> ret={act!r} active_title={active_title!r}")
     adapter.currentModel = active or ch_doc
-    await _try_fix(adapter, adapter.currentModel, "amplitude-bar-1", "c:activate-sub")
+    await _try_fix(adapter, adapter.currentModel, "ch-amplitude-bar-1", "c:activate-sub")
 
     # (d)/(e): the CADBooster recipe -- get the component from the TOP-LEVEL
     # assembly (NOT the sub's ModelDoc2; those objects "behave unpredictably"),
@@ -98,7 +98,7 @@ async def main():
     # objects were the bug. Try fixing on the top doc (d) and (e) via the proper
     # SelectByID2 string from GetSelectByIDString.
     adapter.currentModel = top
-    bar_top_c, bar_top_n = _find_one(adapter, "amplitude-bar-1", model=top)
+    bar_top_c, bar_top_n = _find_one(adapter, "ch-amplitude-bar-1", model=top)
     log(f"  top-level bar component: {bar_top_n!r}")
     sel_str = adapter._attempt(lambda: bar_top_c.GetSelectByIDString(), default=None) if bar_top_c else None
     log(f"  GetSelectByIDString -> {sel_str!r}")

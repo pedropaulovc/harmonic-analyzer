@@ -13,11 +13,11 @@ import math
 from dataclasses import dataclass
 
 import _config
-import cone_pivot_post_spec as post
-import crank_drive_gear_notes
-import crank_drive_gear_spec as gear64
-import crank_pinion_spec as pinion
-import crankshaft_spec as shaft
+import dt_cone_pivot_post_spec as post
+import dt_crank_drive_gear_notes
+import dt_crank_drive_gear_spec as gear64
+import dt_crank_pinion_spec as pinion
+import dt_crankshaft_spec as shaft
 from cone_line import COS_I, SIN_I
 from cone_stack_end_play import CONE_FLOAT_NORTH
 from gear_seat_fit import GEAR_SEAT_CLEARANCE
@@ -127,7 +127,7 @@ def stack_terms(*, spacing_printed: float, plan_limit_deg: float, crank_angle_de
         Term("gear bore runout", -KC * (pinion.BORE_DIAMETRAL_CLEARANCE[1] + GEAR_SEAT_CLEARANCE[1]) / 2.0),
         Term("tooth-to-bore cutting runout", -KC * TOOTH_RUNOUT_TIR_MM),
         Term("tip diameter band", TIP_BAND_CLOSE),
-        Term("64T tooth thickness", -K64 * crank_drive_gear_notes.TOOTH_THICKNESS_DEVIATIONS[0]),
+        Term("64T tooth thickness", -K64 * dt_crank_drive_gear_notes.TOOTH_THICKNESS_DEVIATIONS[0]),
         Term("16T tooth thickness", -K16 * pinion.TOOTH_THICKNESS_UPPER_DEVIATION),
         Term("crank axis yaw", _pose_loss(_YAW, crank_angle_deg)),
         Term("crank axis tilt", _pose_loss(_TILT, crank_angle_deg)),
@@ -163,7 +163,7 @@ def open_terms(*, spacing_printed: float, plan_limit_deg: float, crank_bearing_l
         # linearly on the frame reference's DC_PER_DX, as the plan-angle term
         # is: 0.02405, 0.0013 under the 0.02538 exact at the assembly's
         # physical centres (leg 5.881, not 5.647). Chosen, not missed:
-        # build_drive_train_assembly asserts the printed contact ratio holds
+        # build_dt_drive_train_assembly asserts the printed contact ratio holds
         # with the exact opening in its place.
         "cone stack north float": CONE_FLOAT_NORTH * SIN_I * COS_I * DC_PER_DX,
         "crank float at rest": _float_at_rest(_RUNNING[1], crank_bearing_length, CRANK_OVERHANG) * DC_PER_DY,

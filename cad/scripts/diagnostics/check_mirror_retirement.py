@@ -57,67 +57,67 @@ from _transforms import (
 )
 
 # ---- summing --------------------------------------------------------------
-import build_summing_assembly as s
+import build_sm_summing_assembly as s
 
 expect(
-    "summing",
-    "knife-mount-1",
+    "sm-summing",
+    "sm-knife-mount-1",
     [s.KNIFE[0], s.KNIFE_CONTACT_Y, s.SUMMING_Z + s.HEX_Z_MID],
     IDENTITY,
     "knife-mount front",
 )
 expect(
-    "summing",
-    "knife-mount-2",
+    "sm-summing",
+    "sm-knife-mount-2",
     [s.KNIFE[0], s.KNIFE_CONTACT_Y, s.SUMMING_Z - s.HEX_Z_MID],
     IDENTITY,
     "knife-mount back",
 )
 expect(
-    "summing",
-    "knife-hanger-stud-1",
+    "sm-summing",
+    "vn-knife-hanger-stud-1",
     [s.KNIFE[0], s.HANGER_STUD_Y, s.SUMMING_Z + s.HEX_Z_MID],
     IDENTITY,
     "knife-hanger-stud front",
 )
 expect(
-    "summing",
-    "knife-hanger-stud-2",
+    "sm-summing",
+    "vn-knife-hanger-stud-2",
     [s.KNIFE[0], s.HANGER_STUD_Y, s.SUMMING_Z - s.HEX_Z_MID],
     IDENTITY,
     "knife-hanger-stud back",
 )
 expect(
-    "summing",
-    "summing-lever-1",
+    "sm-summing",
+    "sm-summing-lever-1",
     [s.KNIFE[0], s.KNIFE[1], s.SUMMING_Z],
     IDENTITY,
-    "summing-lever",
+    "sm-summing-lever",
 )
-expect("summing", "boss-hook-1", list(s.BOSS_HOOK_POS), IDENTITY, "boss-hook")
+expect("sm-summing", "vn-boss-hook-1", list(s.BOSS_HOOK_POS), IDENTITY, "vn-boss-hook")
 # The counter and gooseneck now seat on unchanged native supplier surfaces.
 # Their analytical insertion seeds are not their final placements and cannot
 # be compared against this historical static mirror-retirement pose dump.
-# build_summing_assembly certifies the native contacts and final pose ledger.
+# build_sm_summing_assembly certifies the native contacts and final pose ledger.
 _telemetry.debug("SKIP static golden poses: counter-spring/gooseneck use native contact seats")
 
 # ---- pen ------------------------------------------------------------------
-import build_pen_assembly as p
+import build_pn_pen_assembly as p
 
-expect("pen", "pen-hanger-1", list(p.HANGER_POS), IDENTITY, "pen-hanger")
-expect("pen", "pen-v-block-1", list(p.VBLOCK_POS), ROT_Y_180, "pen-v-block")
-expect("pen", "pen-rod-1", list(p.PEN_ROD_POS), IDENTITY, "pen-rod")
+expect("pn-pen", "pn-pen-hanger-1", list(p.HANGER_POS), IDENTITY, "pn-pen-hanger")
+expect("pn-pen", "pn-pen-v-block-1", list(p.VBLOCK_POS), ROT_Y_180, "pn-pen-v-block")
+expect("pn-pen", "pn-pen-rod-1", list(p.PEN_ROD_POS), IDENTITY, "pn-pen-rod")
 expect(
-    "pen",
-    "pen-marker-1",
+    "pn-pen",
+    "pn-pen-marker-1",
     [p.MARKER_X, p.MARKER_TIP_Y, p.PEN_Z_MID],
     IDENTITY,
-    "pen-marker",
+    "pn-pen-marker",
 )
-expect("pen", "pen-wire-1", list(p.PEN_WIRE_BOTTOM), IDENTITY, "pen-wire")
-expect("pen", "pen-frame-1", list(p.FRAME_POS), p.FRAME_ROWS, "pen-frame")
-expect("pen", "pen-set-screw-1", list(p.SET_SCREW_POS), ROT_Y_180, "pen-set-screw")
-expect("pen", "hanger-screw-1", list(p.HANGER_SCREW_POS), IDENTITY, "hanger-screw")
+expect("pn-pen", "pn-pen-wire-1", list(p.PEN_WIRE_BOTTOM), IDENTITY, "pn-pen-wire")
+expect("pn-pen", "pn-pen-frame-1", list(p.FRAME_POS), p.FRAME_ROWS, "pn-pen-frame")
+expect("pn-pen", "vn-pen-set-screw-1", list(p.SET_SCREW_POS), ROT_Y_180, "vn-pen-set-screw")
+expect("pn-pen", "vn-hanger-screw-1", list(p.HANGER_SCREW_POS), IDENTITY, "vn-hanger-screw")
 
 # pen-frame euler must agree with rows
 from _transforms import rows_from_euler
@@ -132,107 +132,107 @@ if d >= 1e-9:
     fails.append(("pen-frame euler", fr, p.FRAME_ROWS))
 
 # ---- magnifier ------------------------------------------------------------
-import build_magnifier_assembly as m
+import build_mg_magnifier_assembly as m
 
 expect(
-    "magnifier",
-    "wheel-bar-1",
+    "mg-magnifier",
+    "mg-wheel-bar-1",
     [m.WHEEL_BAR_X0, m.WHEEL_BAR_Y, m.BAR_Z],
     IDENTITY,
-    "wheel-bar",
+    "mg-wheel-bar",
 )
 expect(
-    "magnifier",
-    "column-clamp-front-1",
+    "mg-magnifier",
+    "sh-column-clamp-front-1",
     [m.COLUMN_X, m.WHEEL_BAR_Y, m.COLUMN_Z],
     ROT_Y_POS90,
-    "column-clamp-front",
+    "sh-column-clamp-front",
 )
 expect(
-    "magnifier",
-    "column-clamp-back-1",
+    "mg-magnifier",
+    "sh-column-clamp-back-1",
     [m.COLUMN_X, m.WHEEL_BAR_Y, m.COLUMN_Z],
     ROT_Y_POS90,
-    "column-clamp-back",
+    "sh-column-clamp-back",
 )
 expect(
-    "magnifier",
-    "clamp-screw-1",
+    "mg-magnifier",
+    "vn-clamp-screw-1",
     [m.CLAMP_SCREW_X[0], m.WHEEL_BAR_Y, m.BAR_FRONT_Z],
     IDENTITY,
-    "clamp-screw-1",
+    "vn-clamp-screw-1",
 )
 expect(
-    "magnifier",
-    "clamp-screw-2",
+    "mg-magnifier",
+    "vn-clamp-screw-2",
     [m.CLAMP_SCREW_X[1], m.WHEEL_BAR_Y, m.BAR_FRONT_Z],
     IDENTITY,
-    "clamp-screw-2",
+    "vn-clamp-screw-2",
 )
 expect(
-    "magnifier",
-    "magnifying-lever-1",
+    "mg-magnifier",
+    "mg-magnifying-lever-1",
     [m.LEVER_X0, m.LEVER_ROD_Y, m.LEVER_ROD_Z],
     ROT_Y_180,
-    "magnifying-lever",
+    "mg-magnifying-lever",
 )
 expect(
-    "magnifier",
-    "magnifying-bracket-1",
+    "mg-magnifier",
+    "mg-magnifying-bracket-1",
     [40.0, m.LEVER_ROD_Y, m.LEVER_ROD_Z],
     IDENTITY,
-    "magnifying-bracket",
+    "mg-magnifying-bracket",
 )
 expect(
-    "magnifier",
-    "magnifying-clamp-1",
+    "mg-magnifier",
+    "mg-magnifying-clamp-1",
     list(m.CLAMP_POS),
     ROT_Y_POS90,
-    "magnifying-clamp",
+    "mg-magnifying-clamp",
 )
 _rz = compose_rows(rot_z_rows(-90.0), ROT_Y_180)
 expect(
-    "magnifier",
-    "thumb-screw-1",
+    "mg-magnifier",
+    "vn-thumb-screw-1",
     [m.CLAMP_X, m.LEVER_ROD_Y + 19.0, m.LEVER_ROD_Z],
     _rz,
-    "thumb-screw",
+    "vn-thumb-screw",
 )
 expect(
-    "magnifier",
-    "magnifying-vertical-rod-1",
+    "mg-magnifier",
+    "mg-magnifying-vertical-rod-1",
     [m.CLAMP_X, m.VROD_TOP_Y, m.VROD_Z],
     _rz,
     "vertical-rod",
 )
 expect(
-    "magnifier",
-    "output-fixture-1",
+    "mg-magnifier",
+    "mg-output-fixture-1",
     [m.CLAMP_X, m.FIXTURE_Y0, m.VROD_Z],
     IDENTITY,
-    "output-fixture",
+    "mg-output-fixture",
 )
 expect(
-    "magnifier",
-    "wheel-axle-1",
+    "mg-magnifier",
+    "mg-wheel-axle-1",
     [m.WHEEL_X, m.WHEEL_BAR_Y, m.BAR_FRONT_Z],
     ROT_X_NEG90,
-    "wheel-axle",
+    "mg-wheel-axle",
 )
 expect(
-    "magnifier",
-    "magnifying-wheel-1",
+    "mg-magnifier",
+    "mg-magnifying-wheel-1",
     [m.WHEEL_X, m.WHEEL_BAR_Y, m.WHEEL_MID_Z],
     IDENTITY,
-    "magnifying-wheel",
+    "mg-magnifying-wheel",
 )
 # lever-wire: ACCEPTED delta vs golden -- the old mirror realized this pose
 # through the part's bbox-z-centre plane (2c artifact, 0.015 mm / 4e-5 rows);
 # the new values are the exact authored intent. Documented; will show once in
 # the post-rebuild pose diff.
 expect(
-    "magnifier",
-    "lever-wire-1",
+    "mg-magnifier",
+    "mg-lever-wire-1",
     list(m.HUB_WIRE_END),
     m._HW_ROWS,
     "lever-wire (accepted 2c delta)",
@@ -265,8 +265,8 @@ if d >= 1e-9:
     fails.append(("ROT_Y_180 euler", None, None))
 
 # ---- drive-train ------------------------------------------------------------
-import build_drive_train_assembly as d
-import build_harmonic_base as base
+import build_dt_drive_train_assembly as d
+import build_fr_harmonic_base as base
 
 
 def eul(euler, rows, label):
@@ -285,28 +285,28 @@ eul([90.0, I, 0.0], d.ROT_SHAFT_NORTH, "ROT_SHAFT_NORTH")
 eul([-90.0, I, 0.0], d.ROT_SHAFT_SOUTH, "ROT_SHAFT_SOUTH")
 eul(d.PINCH_WEST_EULER, d.ROT_PINCH_WEST, "PINCH_WEST")
 eul(d.FPIN_EULER, d.FPIN_ROWS, "FPIN")
-eul([180.0, 0.0, -90.0], compose_rows(d.rot_z_rows(-90.0), ROT_Y_180), "crank-arm")
+eul([180.0, 0.0, -90.0], compose_rows(d.rot_z_rows(-90.0), ROT_Y_180), "dt-crank-arm")
 eul([90.0, 0.0, 0.0], d.ROT_X_POS90, "ROT_X_POS90")
 eul([0.0, 90.0, 0.0], d.ROT_Y_POS90, "ROT_Y_POS90")
 
-DT = "drive-train"
+DT = "dt-drive-train"
 expect(
     DT,
-    "cylinder-gear-shaft-1",
+    "dt-cylinder-gear-shaft-1",
     [d.X_DRUM, d.Y_DRIVE, d.ARBOR_SOUTH_Z],
     d.ROT_X_POS90,
     "arbor (seed)",
 )
 expect(
     DT,
-    "arbor-pedestal-1",
+    "dt-arbor-pedestal-1",
     [d.X_DRUM, d.Y_BASE_TOP, -d.ARBOR_PEDESTAL_Z],
     IDENTITY,
     "arbor-pedestal south",
 )
 expect(
     DT,
-    "arbor-pedestal-2",
+    "dt-arbor-pedestal-2",
     [d.X_DRUM, d.Y_BASE_TOP, d.ARBOR_PEDESTAL_NORTH_Z],
     ROT_Y_180,
     "arbor-pedestal north",
@@ -331,190 +331,190 @@ _pcl = platform_station(d.COLLAR_STATION)
 _pad = platform_station(d.ADJ_HEAD_STATION)
 expect(
     DT,
-    "cone-swing-platform-1",
+    "dt-cone-swing-platform-1",
     [_ppv[0], d.Y_BASE_TOP, _ppv[2]],
     d.ROT_Y_INCLINE,
-    "cone-swing-platform",
+    "dt-cone-swing-platform",
 )
 expect(
     DT,
-    "cone-pivot-post-1",
+    "dt-cone-pivot-post-1",
     [_pps[0], d.Y_BASE_TOP + d.PLAT_T, _pps[2]],
     ROT_Y_180,
-    "cone-pivot-post",
+    "dt-cone-pivot-post",
 )
 expect(
     DT,
-    "cone-tip-block-1",
+    "dt-cone-tip-block-1",
     [_ptp[0], d.Y_BASE_TOP + d.PLAT_T, _ptp[2]],
     d.ROT_Y_INCLINE,
-    "cone-tip-block",
+    "dt-cone-tip-block",
 )
 expect(
     DT,
-    "cone-tip-collar-1",
+    "vn-cone-tip-collar-1",
     [_pcl[0], d.Y_DRIVE, _pcl[2]],
     d.ROT_SHAFT_NORTH,
-    "cone-tip-collar",
+    "vn-cone-tip-collar",
 )
 expect(
     DT,
-    "cone-tip-adjuster-1",
+    "vn-cone-tip-adjuster-1",
     [_pad[0], d.Y_DRIVE, _pad[2]],
     d.ROT_SHAFT_SOUTH,
-    "cone-tip-adjuster",
+    "vn-cone-tip-adjuster",
 )
 expect(
     DT,
-    "cone-tip-block-screw-1",
+    "vn-cone-tip-block-screw-1",
     [
         _ptp[0] + d.PLAT_HOLDDOWN_LOCAL_X * d.COS_I,
         d.Y_BASE_TOP + d.PLAT_HOLDDOWN_CBORE_DEPTH,
         _ptp[2] - d.PLAT_HOLDDOWN_LOCAL_X * d.SIN_I,
     ],
     d.ROT_X_180,
-    "cone-tip-block-screw",
+    "vn-cone-tip-block-screw",
 )
 expect(
     DT,
-    "cone-tip-pinch-screw-1",
+    "vn-cone-tip-pinch-screw-1",
     [
         _ptp[0] + (d.TIP_BLOCK_X / 2.0) * d.COS_I,
         d.Y_BASE_TOP + d.PLAT_T + d.TIP_PINCH_Y,
         _ptp[2] - (d.TIP_BLOCK_X / 2.0) * d.SIN_I,
     ],
     d.ROT_PINCH_WEST,
-    "cone-tip-pinch-screw",
+    "vn-cone-tip-pinch-screw",
 )
 expect(
     DT,
-    "cone-lock-knob-1",
+    "vn-cone-lock-knob-1",
     [d.KNOB_X, d.Y_BASE_TOP + d.PLAT_T, d.KNOB_Z],
     IDENTITY,
-    "cone-lock-knob",
+    "vn-cone-lock-knob",
 )
 expect(
     DT,
-    "cone-pivot-screw-1",
+    "vn-cone-pivot-screw-1",
     [
         base.PIVOT_SCREW_XZ[0],
         d.Y_BASE_TOP + d.PSCREW_SHOULDER_LEN,
         base.PIVOT_SCREW_XZ[1],
     ],
     IDENTITY,
-    "cone-pivot-screw",
+    "vn-cone-pivot-screw",
 )
 expect(
     DT,
-    "swing-stop-screw-1",
+    "vn-swing-stop-screw-1",
     [base.STOP_SCREW_XZ[0], d.Y_BASE_TOP, base.STOP_SCREW_XZ[1]],
     IDENTITY,
-    "swing-stop-screw",
+    "vn-swing-stop-screw",
 )
 expect(
     DT,
-    "alignment-pinion-1",
+    "dt-alignment-pinion-1",
     [d.APINION_X, d.APINION_Y, d.APINION_Z_FRONT],
     IDENTITY,
-    "alignment-pinion",
+    "dt-alignment-pinion",
 )
 _strap = compose_rows(ROT_Y_180, d.rot_z_rows(d.STRAP_LEAN_DEG))
 expect(
     DT,
-    "pinion-bracket-1",
+    "dt-pinion-bracket-1",
     [d.PIVOT_X, d.PIVOT_Y, d.RIG.STRAP_Z_INNER[0]],
     _strap,
     "pinion-bracket front",
 )
 expect(
     DT,
-    "pinion-bracket-2",
+    "dt-pinion-bracket-2",
     [d.PIVOT_X, d.PIVOT_Y, d.RIG.STRAP_Z_OUTER[1]],
     _strap,
     "pinion-bracket back",
 )
 expect(
     DT,
-    "pinion-pivot-block-1",
+    "dt-pinion-pivot-block-1",
     [d.BLOCK_X, d.PIVOT_Y, d.BLOCK_FRONT_Z0 + d.BLOCK_DEPTH],
     ROT_Y_180,
     "pinion-pivot-block front",
 )
 expect(
     DT,
-    "pinion-pivot-block-2",
+    "dt-pinion-pivot-block-2",
     [d.BLOCK_X, d.PIVOT_Y, d.BLOCK_BACK_Z0 + d.BLOCK_DEPTH],
     ROT_Y_180,
     "pinion-pivot-block back",
 )
 expect(
     DT,
-    "pinion-pivot-shaft-1",
+    "dt-pinion-pivot-shaft-1",
     [d.PIVOT_X, d.PIVOT_Y, d.PIVOT_SHAFT_Z0],
     # E-a (1c4bea6ac): the torque shaft turns with the strap lean so its
     # cross holes line up with the strap pins.
     d.TORQUE_SHAFT_ROWS,
-    "pinion-pivot-shaft",
+    "dt-pinion-pivot-shaft",
 )
 expect(
     DT,
-    "pinion-lift-rod-1",
+    "dt-pinion-lift-rod-1",
     [d.LIFT_X, d.LIFT_Y, d.LIFT_ROD_Z0],
     d.LIFT_ROD_ROWS,
-    "pinion-lift-rod",
+    "dt-pinion-lift-rod",
 )
 expect(
     DT,
-    "pinion-spring-1",
+    "dt-pinion-spring-1",
     [d.SPRING_X, d.Y_BASE_TOP, d.SPRING_Z],
     ROT_Y_180,
-    "pinion-spring",
+    "dt-pinion-spring",
 )
 expect(
     DT,
-    "pinion-cam-pin-1",
+    "dt-pinion-cam-pin-1",
     [d._FPIN_ORG[0], d._FPIN_ORG[1], d._STRAP_MID_Z[0]],
     d.FPIN_ROWS,
     "pinion-cam-pin front",
 )
 expect(
     DT,
-    "pinion-cam-pin-2",
+    "dt-pinion-cam-pin-2",
     [d._FPIN_ORG[0], d._FPIN_ORG[1], d._STRAP_MID_Z[1]],
     d.FPIN_ROWS,
     "pinion-cam-pin back",
 )
 expect(
-    DT, "pinion-cam-1", [d.LIFT_X, d.LIFT_Y, d.CAM_Z0[0]], d.PINION_CAM_ROWS, "pinion-cam front"
+    DT, "dt-pinion-cam-1", [d.LIFT_X, d.LIFT_Y, d.CAM_Z0[0]], d.PINION_CAM_ROWS, "pinion-cam front"
 )
 expect(
-    DT, "pinion-cam-2", [d.LIFT_X, d.LIFT_Y, d.CAM_Z0[1]], d.PINION_CAM_ROWS, "pinion-cam back"
+    DT, "dt-pinion-cam-2", [d.LIFT_X, d.LIFT_Y, d.CAM_Z0[1]], d.PINION_CAM_ROWS, "pinion-cam back"
 )
 expect(
     DT,
-    "pinion-lever-1",
+    "dt-pinion-lever-1",
     [d.LIFT_X, d.LIFT_Y, d.LEVER_Z],
     d.LEVER_ROWS,
-    "pinion-lever",
+    "dt-pinion-lever",
 )
 expect(
     DT,
-    "pinion-handle-1",
+    "dt-pinion-handle-1",
     [d.APINION_X, d.APINION_Y, d.HANDLE_Z],
     d.HANDLE_ROWS,
-    "pinion-handle",
+    "dt-pinion-handle",
 )
 expect(
     DT,
-    "pinion-arbor-1",
+    "dt-pinion-arbor-1",
     [d.APINION_X, d.APINION_Y, d.ARBOR_Z0],
     d.ARBOR_ROWS,
-    "pinion-arbor",
+    "dt-pinion-arbor",
 )
 for k, (sx, sz) in enumerate(d._BLOCK_SCREW_XZ):
     expect(
         DT,
-        f"slotted-screw-{k + 1}",
+        f"vn-slotted-screw-{k + 1}",
         [sx, d.BLOCK_TOP_Y, sz],
         IDENTITY,
         f"slotted-screw {k}",
@@ -522,7 +522,7 @@ for k, (sx, sz) in enumerate(d._BLOCK_SCREW_XZ):
 for k, (sx, sz) in enumerate(d._FOOT_SCREW_XZ):
     expect(
         DT,
-        f"foot-screw-{k + 1}",
+        f"vn-foot-screw-{k + 1}",
         [sx, d.Y_BASE_TOP + d.SPRING_T, sz],
         IDENTITY,
         f"foot-screw {k}",
@@ -530,17 +530,17 @@ for k, (sx, sz) in enumerate(d._FOOT_SCREW_XZ):
 for k, (sx, sz) in enumerate(d._PEDESTAL_SCREW_XZ):
     expect(
         DT,
-        f"pedestal-hold-down-screw-{k + 1}",
+        f"vn-pedestal-hold-down-screw-{k + 1}",
         [sx, d.Y_BASE_TOP + d.ARBOR_PED_FLANGE_T, sz],
         IDENTITY,
         f"pedestal-hold-down-screw {k}",
     )
 expect(
     DT,
-    "cone-gear-shaft-1",
+    "dt-cone-gear-shaft-1",
     platform_station(d.SHAFT_FRONT_STATION),
     d.ROT_Y_INCLINE,
-    "cone-gear-shaft",
+    "dt-cone-gear-shaft",
 )
 
 
@@ -551,7 +551,7 @@ def on_shaft(station, face):
 
 expect(
     DT,
-    "crank-drive-gear-1",
+    "dt-crank-drive-gear-1",
     on_shaft(d.GEAR64_CENTRE_STATION, d.GEAR64_FACE),
     d.ROT_Y_INCLINE,
     "crank-drive-gear 64T",
@@ -559,7 +559,7 @@ expect(
 for j in range(20):
     expect(
         DT,
-        f"cone-gear-{j + 1}",
+        f"dt-cone-gear-{j + 1}",
         # BDT: seed at the shifted T120 station, grown from the south face.
         on_shaft(
             d.SHAFT_T120_STATION
@@ -575,7 +575,7 @@ cylinder_rows = compose_rows(ROT_Y_180, d.rot_z_rows(-1.5))
 for j in range(20):
     expect(
         DT,
-        f"cylinder-gear-{j + 1}",
+        f"dt-cylinder-gear-{j + 1}",
         [d.X_DRUM, d.Y_DRIVE, d.Z_DRUM0 + d.Z_PITCH * j + d.DRUM_FACE / 2.0],
         cylinder_rows,
         f"cylinder-gear j={j}",
@@ -587,31 +587,31 @@ for j in range(20):
 _SOLVED = dict(pos_tol=0.005, row_tol=1e-6)
 expect(
     DT,
-    "crankshaft-1",
+    "dt-crankshaft-1",
     [d.X_CRANK, d.Y_CRANK, d.CRANKSHAFT_Z0],
     d.ROT_X_POS90,
-    "crankshaft",
+    "dt-crankshaft",
     **_SOLVED,
 )
 expect(
     DT,
-    "crank-hub-1",
+    "dt-crank-hub-1",
     [d.X_CRANK, d.Y_CRANK, d.CRANK_HUB_Z0],
     d.ROT_X_POS90,
-    "crank-hub",
+    "dt-crank-hub",
     **_SOLVED,
 )
 expect(
     DT,
-    "crank-hub-pin-1",
+    "vn-crank-hub-pin-1",
     d.CRANK_HUB_PIN_ORIGIN,
     d.CRANK_HUB_PIN_ROWS,
-    "crank-hub-pin",
+    "vn-crank-hub-pin",
     **_SOLVED,
 )
 expect(
     DT,
-    "crank-pinion-1",
+    "dt-crank-pinion-1",
     [d.X_CRANK, d.Y_CRANK, d.PINION_TOOTH_Z - d.PINION_FACE / 2.0],
     d.rot_z_rows(-d.PINION_SEED_DEG),
     "crank-pinion 16T",
@@ -619,24 +619,24 @@ expect(
 )
 expect(
     DT,
-    "crank-arm-1",
+    "dt-crank-arm-1",
     [d.X_CRANK, d.Y_CRANK, d.CRANK_ARM_ORIGIN_Z],
     compose_rows(d.rot_z_rows(-90.0), ROT_Y_180),
-    "crank-arm",
+    "dt-crank-arm",
     **_SOLVED,
 )
 expect(
     DT,
-    "crank-handle-1",
+    "dt-crank-handle-1",
     [d.X_CRANK, d.Y_CRANK - d.ARM_C2C, d.CRANK_ARM_Z0],
     d.ROT_Y_POS90,
-    "crank-handle",
+    "dt-crank-handle",
     **_SOLVED,
 )
 
 # ---- channel ---------------------------------------------------------------
 import math
-import build_channel_assembly as c
+import build_ch_channel_assembly as c
 import channel_kinematics
 
 _rz = getattr(c, "rot_z_rows", None) or (
@@ -646,7 +646,7 @@ _rz = getattr(c, "rot_z_rows", None) or (
         [0.0, 0.0, 1.0],
     ]
 )
-CH = "channel"
+CH = "ch-channel"
 amplitudes = __import__("_config").amplitudes()
 st0 = channel_kinematics.solve_state(0.0)
 arm_rows = compose_rows(_rz(st0["arm_tilt"]), ROT_Y_180)
@@ -656,49 +656,49 @@ arm_dx = c.ARM_PIVOT_LOCAL_Y * math.sin(_t)
 arm_dy = c.ARM_PIVOT_LOCAL_Y * math.cos(_t)
 expect(
     CH,
-    "pivot-shaft-1",
+    "ch-pivot-shaft-1",
     [c.PIVOT[0], c.PIVOT[1], c.PIVOT_SHAFT_Z],
     IDENTITY,
-    "pivot-shaft",
+    "ch-pivot-shaft",
 )
 expect(
     CH,
-    "fulcrum-shaft-1",
+    "ch-fulcrum-shaft-1",
     [c.FULCRUM[0], c.FULCRUM[1], c.FULCRUM_SHAFT_Z],
     IDENTITY,
-    "fulcrum-shaft",
+    "ch-fulcrum-shaft",
 )
 expect(
     CH,
-    "pivot-bracket-1",
+    "ch-pivot-bracket-1",
     [c.PIVOT[0], c.SUPPORT_APEX_Y, c.PIVOT_BRACKET_Z[0]],
     IDENTITY,
     "pivot-bracket rocker south",
 )
 expect(
     CH,
-    "pivot-bracket-2",
+    "ch-pivot-bracket-2",
     [c.PIVOT[0], c.SUPPORT_APEX_Y, c.PIVOT_BRACKET_Z[1]],
     IDENTITY,
     "pivot-bracket rocker north",
 )
 expect(
     CH,
-    "fulcrum-keeper-1",
+    "ch-fulcrum-keeper-1",
     [c.FULCRUM[0], c.RAIL_TOP_Y, c.FULCRUM_SHAFT_Z + c.KEEPER_Z_OFF],
     [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [-1.0, 0.0, 0.0]],
     "fulcrum keeper +z (rear)",
 )
 expect(
     CH,
-    "fulcrum-keeper-2",
+    "ch-fulcrum-keeper-2",
     [c.FULCRUM[0], c.RAIL_TOP_Y, c.FULCRUM_SHAFT_Z - c.KEEPER_Z_OFF],
     [[0.0, 0.0, -1.0], [0.0, 1.0, 0.0], [1.0, 0.0, 0.0]],
     "fulcrum keeper -z (front)",
 )
 expect(
     CH,
-    "frame-side-screw-1",
+    "vn-frame-side-screw-1",
     [
         c.FULCRUM[0],
         c.RAIL_TOP_Y + c.KEEPER_SCREW_SEAT_H,
@@ -709,7 +709,7 @@ expect(
 )
 expect(
     CH,
-    "frame-side-screw-2",
+    "vn-frame-side-screw-2",
     [
         c.FULCRUM[0],
         c.RAIL_TOP_Y + c.KEEPER_SCREW_SEAT_H,
@@ -738,7 +738,7 @@ for j in range(1, 20):
         **_SOLV,
     )
 # Channel springs also use native-seated poses, not their analytical seeds.
-# build_channel_assembly certifies their contacts and actual mount clearances.
+# build_ch_channel_assembly certifies their contacts and actual mount clearances.
 _telemetry.debug("SKIP static golden poses: channel-spring-installed uses native contact seats")
 for j in range(20):
     zj = c.z_station(j)
@@ -746,7 +746,7 @@ for j in range(20):
     st = channel_kinematics.solve_state(amplitudes[j])
     expect(
         CH,
-        f"rocker-arm-{j + 1}",
+        f"ch-rocker-arm-{j + 1}",
         [c.PIVOT[0] - arm_dx, c.PIVOT[1] - arm_dy, z_mid],
         arm_rows,
         f"rocker-arm ch{j:02d}",
@@ -754,7 +754,7 @@ for j in range(20):
     )
     expect(
         CH,
-        f"connecting-rod-{j + 1}",
+        f"ch-connecting-rod-{j + 1}",
         [c.RING_CENTER[0], c.RING_CENTER[1], zj + c.CAM_DZ],
         rod_rows,
         f"connecting-rod ch{j:02d}",
@@ -762,7 +762,7 @@ for j in range(20):
     )
     expect(
         CH,
-        f"amplitude-bar-{j + 1}",
+        f"ch-amplitude-bar-{j + 1}",
         [st["bar_origin_x"], st["bar_origin_y"], z_mid - c.BAR_WIDTH / 2.0],
         rows_from_euler([st["bar_tilt"], -90.0, 0.0]),
         f"amplitude-bar ch{j:02d}",
@@ -770,7 +770,7 @@ for j in range(20):
     )
     expect(
         CH,
-        f"channel-lever-{j + 1}",
+        f"ch-channel-lever-{j + 1}",
         [c.FULCRUM[0], c.FULCRUM[1], z_mid],
         compose_rows(_rz(st["lever_tilt"]), ROT_Y_180),
         f"channel-lever ch{j:02d}",
@@ -778,14 +778,14 @@ for j in range(20):
     )
     expect(
         CH,
-        f"spring-hook-{j + 1}",
+        f"vn-spring-hook-{j + 1}",
         [*spring_mount_geom.CHANNEL_ANCHOR_XY, z_mid],
         IDENTITY,
         f"spring-hook ch{j:02d}",
     )
 
 # ---- paper-drive -------------------------------------------------------------
-import build_paper_drive_assembly as p
+import build_pd_paper_drive_assembly as p
 
 # The module's own SolidWorks-free layout asserts (rack phase, gear mesh,
 # knob clearance, chain anchors) double as the offline smoke test.
@@ -795,19 +795,19 @@ p._assert_knob_shaft_clearance()
 p._assert_chain_layout()
 _telemetry.debug("OK  paper-drive module layout asserts")
 
-PD = "paper-drive"
-expect(PD, "support-bar-1", [0.0, p.BAR_CY, p.BAR_Z], IDENTITY, "support-bar")
+PD = "pd-paper-drive"
+expect(PD, "pd-support-bar-1", [0.0, p.BAR_CY, p.BAR_Z], IDENTITY, "pd-support-bar")
 for i, sx in enumerate((1.0, -1.0)):
     expect(
         PD,
-        f"column-clamp-front-{i + 1}",
+        f"sh-column-clamp-front-{i + 1}",
         [sx * p.COLUMN_X, p.BAR_CY, p.COLUMN_Z],
         p.ROT_Y_POS90,
         f"column-clamp-front x{sx * p.COLUMN_X:+.0f}",
     )
     expect(
         PD,
-        f"column-clamp-back-{i + 1}",
+        f"sh-column-clamp-back-{i + 1}",
         [sx * p.COLUMN_X, p.BAR_CY, p.COLUMN_Z],
         p.ROT_Y_POS90,
         f"column-clamp-back x{sx * p.COLUMN_X:+.0f}",
@@ -815,31 +815,31 @@ for i, sx in enumerate((1.0, -1.0)):
 for i, x in enumerate(p.CLAMP_HOLE_X):
     expect(
         PD,
-        f"clamp-screw-{i + 1}",
+        f"vn-clamp-screw-{i + 1}",
         [-x, p.BAR_CY, p.BAR_FRONT_Z],
         IDENTITY,
         f"clamp-screw x{-x:+.1f}",
     )
 expect(
     PD,
-    "platen-1",
+    "pd-platen-1",
     [p.PLATE_X0, p.PLATE_Y0, p.PLATE_FRONT_Z],
     IDENTITY,
-    "platen",
+    "pd-platen",
     **_SOLV,
 )
 expect(
     PD,
-    "platen-rack-1",
+    "pd-platen-rack-1",
     [p.RACK_X0, p.RACK_Y0, p.RACK_BACK_Z],
     p.ROT_X_180,
-    "platen-rack",
+    "pd-platen-rack",
     **_SOLV,
 )
 for i, gy in enumerate(p.GUIDE_Y):
     expect(
         PD,
-        f"platen-guide-{i + 1}",
+        f"pd-platen-guide-{i + 1}",
         [p.PLATE_X0 + p.GUIDE_LENGTH, gy, p.BAR_FRONT_Z],
         p.ROT_Y_180,
         f"platen-guide y{gy:.0f}",
@@ -849,7 +849,7 @@ for i, x_c in enumerate(p.LOCK_STATION_X):
     station = p.PLATE_X0 + p.PLATE_WIDTH - x_c
     expect(
         PD,
-        f"guide-lock-{2 * i + 1}",
+        f"pd-guide-lock-{2 * i + 1}",
         [station + p.LOCK_WIDTH / 2.0, p.GUIDE_Y[1] + p.GUIDE_HEIGHT, p.LOCK_Z0],
         _rz(180.0),
         f"guide-lock top x{x_c:.0f}",
@@ -857,7 +857,7 @@ for i, x_c in enumerate(p.LOCK_STATION_X):
     )
     expect(
         PD,
-        f"guide-lock-{2 * i + 2}",
+        f"pd-guide-lock-{2 * i + 2}",
         [station - p.LOCK_WIDTH / 2.0, p.GUIDE_Y[0], p.LOCK_Z0],
         IDENTITY,
         f"guide-lock bottom x{x_c:.0f}",
@@ -866,7 +866,7 @@ for i, x_c in enumerate(p.LOCK_STATION_X):
 for i, (_sx, clip_x, clip_y, rz) in enumerate(p.CLIP_PLACEMENTS):
     expect(
         PD,
-        f"platen-clip-{i + 1}",
+        f"pd-platen-clip-{i + 1}",
         [clip_x, clip_y, p.PLATE_FRONT_Z - p.CLIP_THICKNESS],
         _rz(rz),
         f"platen-clip x{clip_x:+.0f} Rz{rz:+.0f}",
@@ -876,10 +876,10 @@ _paper_side = (p.PLATE_WIDTH - p.PAPER_WIDTH) / 2.0
 _paper_y = p.PLATE_Y0 + p.PLATE_HEIGHT - p.PAPER_HEIGHT - 3.0
 expect(
     PD,
-    "platen-paper-1",
+    "pd-platen-paper-1",
     [p.PLATE_X0 + _paper_side, _paper_y, p.PLATE_FRONT_Z - 0.5],
     IDENTITY,
-    "platen-paper",
+    "pd-platen-paper",
     **_SOLV,
 )
 _fs = 0
@@ -887,7 +887,7 @@ for x, y in p.CLIP_SCREW_XY:
     _fs += 1
     expect(
         PD,
-        f"fillister-screw-{_fs}",
+        f"vn-fillister-screw-{_fs}",
         [x, y, p.PLATE_FRONT_Z - p.CLIP_THICKNESS - p.SCREW_SEAT_BOSS_H],
         IDENTITY,
         f"clip screw {_fs}",
@@ -897,17 +897,17 @@ for x, y in p.GUIDE_SCREW_XY:
     _fs += 1
     expect(
         PD,
-        f"fillister-screw-{_fs}",
+        f"vn-fillister-screw-{_fs}",
         [x, y, p.PLATE_FRONT_Z + p.PLATEN_CBORE_DEPTH],
         IDENTITY,
         f"guide screw {_fs}",
         **_SOLV,
     )
-# R9-31: the guide-lock screws are their own button-head stem (MHA-176).
+# R9-31: the guide-lock screws are their own button-head stem (MHA-VN-046).
 for i, (x, y) in enumerate(p.LOCK_SCREW_XY):
     expect(
         PD,
-        f"guide-lock-screw-{i + 1}",
+        f"vn-guide-lock-screw-{i + 1}",
         [x, y, p.LOCK_Z0 + p.LOCK_THICK],
         p.ROT_Y_180,
         f"lock screw {i + 1}",
@@ -916,31 +916,31 @@ for i, (x, y) in enumerate(p.LOCK_SCREW_XY):
 # Hanger: the arm swings on the pivot P at theta; the plate carries the knob K.
 _P = [p.PIVOT_XY[0], p.PIVOT_XY[1]]
 _arm_rows = p.rot_z_rows(p.ARM_ANGLE_DEG)
-expect(PD, "transgear-pivot-spacer-1", [*_P, p.SPACER_Z0], IDENTITY, "pivot spacer")
-expect(PD, "transgear-arm-1", [*_P, p.ARM_Z0], _arm_rows, "transgear-arm")
+expect(PD, "pd-transgear-pivot-spacer-1", [*_P, p.SPACER_Z0], IDENTITY, "pivot spacer")
+expect(PD, "pd-transgear-arm-1", [*_P, p.ARM_Z0], _arm_rows, "pd-transgear-arm")
 expect(
     PD,
-    "transgear-pivot-screw-1",
+    "vn-transgear-pivot-screw-1",
     [*_P, p.PIVOT_SCREW_Z0],
     p.ROT_X_POS90,
     "pivot screw",
 )
 expect(
-    PD, "transgear-pivot-spring-1", [*_P, p.PIVOT_SPRING_Z0], IDENTITY, "pivot spring"
+    PD, "vn-transgear-pivot-spring-1", [*_P, p.PIVOT_SPRING_Z0], IDENTITY, "pivot spring"
 )
 _K = [p.KNOB_SHAFT_XY[0], p.KNOB_SHAFT_XY[1]]
-expect(PD, "transgear-arm-plate-1", [*_K, p.PLATE_Z0], _arm_rows, "arm plate")
+expect(PD, "pd-transgear-arm-plate-1", [*_K, p.PLATE_Z0], _arm_rows, "arm plate")
 for i, (x, y) in enumerate(p.PLATE_SCREW_XY):
     expect(
         PD,
-        f"transgear-arm-plate-screw-{i + 1}",
+        f"vn-transgear-arm-plate-screw-{i + 1}",
         [x, y, p.PLATE_SCREW_Z0],
         p.ROT_X_POS90,
         f"arm plate screw {i + 1}",
     )
 expect(
     PD,
-    "transgear-latch-pin-1",
+    "vn-transgear-latch-pin-1",
     list(p.LATCH_PIN_POS),
     p.rot_z_rows(p.ARM_ANGLE_DEG - 90.0),
     "latch pin",
@@ -948,7 +948,7 @@ expect(
 # Latch hook on its bracket.
 expect(
     PD,
-    "latch-hook-bracket-1",
+    "pd-latch-hook-bracket-1",
     list(p.HOOK_BRACKET.MACHINE_ORIGIN),
     IDENTITY,
     "latch-hook bracket",
@@ -956,45 +956,45 @@ expect(
 for i, pos in enumerate(p.HOOK_BRACKET_SCREW_POS):
     expect(
         PD,
-        f"latch-hook-bracket-screw-{i + 1}",
+        f"vn-latch-hook-bracket-screw-{i + 1}",
         list(pos),
         p.ROT_X_POS90,
         f"latch-hook bracket screw {i + 1}",
     )
-expect(PD, "latch-hook-1", list(p.LATCH_HOOK_POS), p.LATCH_HOOK_ROWS, "latch hook")
+expect(PD, "pd-latch-hook-1", list(p.LATCH_HOOK_POS), p.LATCH_HOOK_ROWS, "latch hook")
 for i, pos in enumerate(p.HOOK_RIVET_POS):
     expect(
         PD,
-        f"latch-hook-rivet-{i + 1}",
+        f"vn-latch-hook-rivet-{i + 1}",
         list(pos),
         p.rot_z_rows(90.0),
         f"latch-hook rivet {i + 1}",
     )
-# Disc cluster on the MHA-179 pin at S: pin and both bushings Ry(180), the
-# MHA-182 ring in the pin's groove.
+# Disc cluster on the MHA-PD-023 pin at S: pin and both bushings Ry(180), the
+# MHA-VN-047 ring in the pin's groove.
 _S = [p.STUD_XY[0], p.STUD_XY[1]]
-expect(PD, "transgear-pin-1", [*_S, p.PIN_Z0], p.ROT_Y_180, "transgear-pin")
+expect(PD, "pd-transgear-pin-1", [*_S, p.PIN_Z0], p.ROT_Y_180, "pd-transgear-pin")
 expect(
     PD,
-    "transgear-rear-bushing-1",
+    "pd-transgear-rear-bushing-1",
     [*_S, p.REAR_BUSHING_Z0],
     p.ROT_Y_180,
     "rear bushing",
 )
 expect(
     PD,
-    "transgear-feed-pinion-1",
+    "pd-transgear-feed-pinion-1",
     [*_S, p.FEED_Z0],
     p.ROT_Y_180,
     "feed pinion",
     **_SOLV,
 )
-expect(PD, "rack-pinion-1", [*_S, p.DISC_Z0], IDENTITY, "rack-pinion disc", **_SOLV)
-expect(PD, "transgear-disc-hub-1", [*_S, p.DISC_Z0], IDENTITY, "disc hub", **_SOLV)
+expect(PD, "pd-rack-pinion-1", [*_S, p.DISC_Z0], IDENTITY, "rack-pinion disc", **_SOLV)
+expect(PD, "pd-transgear-disc-hub-1", [*_S, p.DISC_Z0], IDENTITY, "disc hub", **_SOLV)
 for i, (x, y) in enumerate(p.DISC_SCREW_XY):
     expect(
         PD,
-        f"transgear-disc-screw-{i + 1}",
+        f"vn-transgear-disc-screw-{i + 1}",
         [x, y, p.DISC_SCREW_Z0],
         p.ROT_X_NEG90,
         f"disc screw {i + 1}",
@@ -1002,14 +1002,14 @@ for i, (x, y) in enumerate(p.DISC_SCREW_XY):
     )
 expect(
     PD,
-    "transgear-front-bushing-1",
+    "pd-transgear-front-bushing-1",
     [*_S, p.FRONT_BUSHING_Z0],
     p.ROT_Y_180,
     "front bushing",
 )
 expect(
     PD,
-    "transgear-retaining-ring-1",
+    "vn-transgear-retaining-ring-1",
     [*_S, p.CLUSTER.RING_REAR_Z],
     p.ROT_Y_180,
     "retaining ring",
@@ -1018,7 +1018,7 @@ expect(
 # T18 spare.
 expect(
     PD,
-    "transgear-removable-1",
+    "pd-transgear-removable-1",
     [*_K, p.REMOVABLE_Z0],
     IDENTITY,
     "removable T24",
@@ -1026,7 +1026,7 @@ expect(
 )
 expect(
     PD,
-    "transgear-drive-collar-1",
+    "pd-transgear-drive-collar-1",
     [*_K, p.KNOB_COLLAR_Z0],
     IDENTITY,
     "drive collar",
@@ -1035,7 +1035,7 @@ expect(
 for i, (x, y) in enumerate(p.KNOB_DRIVE_PIN_XY):
     expect(
         PD,
-        f"transgear-knob-drive-pin-{i + 1}",
+        f"vn-transgear-knob-drive-pin-{i + 1}",
         [x, y, p.KNOB_DRIVE_PIN_Z0],
         p.ROT_X_NEG90,
         f"knob drive pin {i + 1}",
@@ -1043,7 +1043,7 @@ for i, (x, y) in enumerate(p.KNOB_DRIVE_PIN_XY):
     )
 expect(
     PD,
-    "transgear-collar-cross-pin-1",
+    "vn-transgear-collar-cross-pin-1",
     [*_K, p.CROSS_PIN_Z0],
     IDENTITY,
     "collar cross pin",
@@ -1051,7 +1051,7 @@ expect(
 )
 expect(
     PD,
-    "transgear-knob-shaft-1",
+    "pd-transgear-knob-shaft-1",
     [*_K, p.KNOB_SHAFT_Z0],
     p.rot_z_rows(p.THIRD_PHASE_DEG),
     "knob shaft",
@@ -1059,7 +1059,7 @@ expect(
 )
 expect(
     PD,
-    "transgear-thumbnut-1",
+    "pd-transgear-thumbnut-1",
     [*_K, p.THUMBNUT_Z0],
     p.ROT_X_NEG90,
     "thumbnut",
@@ -1067,7 +1067,7 @@ expect(
 )
 expect(
     PD,
-    "transgear-knob-thrust-ring-1",
+    "pd-transgear-knob-thrust-ring-1",
     [*_K, p.KNOB_RING_Z0],
     p.ROT_X_POS90,
     "knob thrust ring",
@@ -1075,7 +1075,7 @@ expect(
 )
 expect(
     PD,
-    "transgear-knob-cup-1",
+    "pd-transgear-knob-cup-1",
     [*_K, p.KNOB_CUP_Z0],
     p.ROT_X_POS90,
     "knob cup",
@@ -1083,7 +1083,7 @@ expect(
 )
 expect(
     PD,
-    "transgear-knob-cup-pin-1",
+    "vn-transgear-knob-cup-pin-1",
     [*_K, p.KNOB_CUP_PIN_Z0],
     IDENTITY,
     "knob cup pin",
@@ -1091,7 +1091,7 @@ expect(
 )
 expect(
     PD,
-    "transgear-removable-2",
+    "pd-transgear-removable-2",
     [-p.CHAIN_CRANK_CENTRE[0], p.CHAIN_CRANK_CENTRE[1], p.REMOVABLE_Z0],
     IDENTITY,
     "removable T12 (crank)",
@@ -1099,7 +1099,7 @@ expect(
 )
 expect(
     PD,
-    "transgear-removable-3",
+    "pd-transgear-removable-3",
     list(p.SPARE_GEAR_POS),
     p.ROT_X_NEG90,
     "removable T18 spare",
@@ -1135,17 +1135,17 @@ def _link_expect(name, station, label):
 
 _link_ok = True
 try:
-    _link_expect("chain-inner-link-1", 0, "chain seed inner @0")
-    _link_expect("chain-outer-link-1", 1, "chain seed outer @1")
+    _link_expect("vn-chain-inner-link-1", 0, "chain seed inner @0")
+    _link_expect("vn-chain-outer-link-1", 1, "chain seed outer @1")
 except Exception as e:
     _telemetry.error(f"chain seed check errored: {e}")
     fails.append(("chain seed lookup", repr(e)))
     _link_ok = False
 if _link_ok and not fails:
     for k in range(1, p.LINK_COUNT // 2):
-        _link_expect(f"chain-inner-link-{k + 1}", 2 * k, f"chain inner @{2 * k}")
+        _link_expect(f"vn-chain-inner-link-{k + 1}", 2 * k, f"chain inner @{2 * k}")
         _link_expect(
-            f"chain-outer-link-{k + 1}", 2 * k + 1, f"chain outer @{2 * k + 1}"
+            f"vn-chain-outer-link-{k + 1}", 2 * k + 1, f"chain outer @{2 * k + 1}"
         )
 
 if fails:

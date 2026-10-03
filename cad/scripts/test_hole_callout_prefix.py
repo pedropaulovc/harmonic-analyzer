@@ -21,7 +21,7 @@ def test_a_closing_line_break_puts_the_native_size_on_its_own_row() -> None:
     rows = dc.compose_hole_callout_prefix(PROBE_PREFIX, PROBE_NATIVE).splitlines()
     assert rows == [
         "MATCH-DRILL/REAM WITH",
-        "MHA-091 AT ASSEMBLY;",
+        "MHA-DT-020 AT ASSEMBLY;",
         "REAM (.1255 IN) FROM FOOT",
         PROBE_NATIVE,
     ]
