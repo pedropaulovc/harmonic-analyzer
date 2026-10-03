@@ -1,5 +1,6 @@
 """Consumer-visible source identity and presentation refusal boundaries."""
 import copy
+from contextlib import contextmanager
 import importlib.util
 import hashlib
 import json
@@ -26,6 +27,39 @@ rocker = load_script('compact-operation-rocker.py', 'source_generation_rocker')
 camera_tracks = load_script(os.environ.get('SOURCE_GENERATOR_PATH',
                                           'generate-analysis-synthesis-source-tracks.py'),
                             'source_generation_camera_tracks')
+
+
+HISTORICAL_SCENE_SHA256 = '7b28468cc3f36a2e4d3699e252c54df837770868481c83a486b572a32f6b3b8b'
+
+
+def historical_scene_bytes():
+    # Exact git blob cad3a39e17fe912b8143e6ed4ed9946cfe6869a1 from
+    # 1af315999:web/src/scene.ts; portable even in archives/shallow checkouts.
+    data = (HERE / 'fixtures/camrod-scene-7b28468c.ts.txt').read_bytes()
+    if hashlib.sha256(data).hexdigest() != HISTORICAL_SCENE_SHA256:
+        raise ValueError('Historical scene replay fixture changed')
+    return data
+
+
+@contextmanager
+def replay_scene_bytes(data):
+    """Test-only source filesystem fixture, never a digest/receipt override."""
+    scene_path = camera_tracks.WEB / 'src/scene.ts'
+    read_bytes = Path.read_bytes
+
+    def read_source(path):
+        return data if path == scene_path else read_bytes(path)
+
+    with patch.object(Path, 'read_bytes', read_source):
+        yield
+
+
+def historical_synthesis_generator():
+    # These behavioral tests replay retained source/input calibration. They do
+    # not observe today's renderer, approve its model, or refresh GPU evidence.
+    # Run the real constructor/guards against the original sealed source bytes.
+    with replay_scene_bytes(historical_scene_bytes()):
+        return camera_tracks.Generator('8KmVDxkia_w')
 
 
 def exact_exposure():
@@ -322,7 +356,7 @@ class PresenterOriginalViewTests(unittest.TestCase):
 
     def construct(self, data):
         with patch.object(camera_tracks.common, 'load_observations', return_value=data):
-            return camera_tracks.Generator('8KmVDxkia_w')
+            return historical_synthesis_generator()
 
     def test_existing_retained_source_accepts_permission(self):
         generator = self.construct(self.source(legacy_views=False))
@@ -895,7 +929,7 @@ class SynthesisAutomaticSourceDriveTests(unittest.TestCase):
     def setUpClass(cls):
         # Use the actual consumer constructor, including inline retained native
         # calibration, rather than assuming every calibration record is a file.
-        cls.generator = camera_tracks.Generator('8KmVDxkia_w')
+        cls.generator = historical_synthesis_generator()
         cls.track = cls.generator.build()
         cls.baseline = common.compact_input(cls.generator.base)
         cls.native_frames = {
@@ -990,7 +1024,7 @@ class SynthesisAutomaticSourceDriveTests(unittest.TestCase):
 
 class SynthesisAutomaticSourceDriveCurrentOnlyTests(unittest.TestCase):
     def fixture(self, load_motion=True):
-        generator = camera_tracks.Generator('8KmVDxkia_w')
+        generator = historical_synthesis_generator()
         if not load_motion:
             generator.synthesis_automatic_motion = None
         return generator
@@ -1136,6 +1170,51 @@ class SynthesisAutomaticSourceDriveCurrentOnlyTests(unittest.TestCase):
                     native_math.write_bytes(native_math.read_bytes() + b'\n')
                 with patch.object(camera_tracks, 'ROOT', root), self.assertRaises(ValueError):
                     generator.synthesis_automatic_motion_packet()
+
+
+class CamrodRendererLineageTests(unittest.TestCase):
+    def test_historical_replay_does_not_approve_current_scene(self):
+        generator = historical_synthesis_generator()
+        current_scene = (camera_tracks.WEB / 'src/scene.ts').read_bytes()
+        self.assertNotEqual(hashlib.sha256(current_scene).hexdigest(), HISTORICAL_SCENE_SHA256)
+        # No filesystem fixture here: the real live source seal must refuse
+        # the historical GPU packet even when unrelated replay tests pass.
+        with self.assertRaisesRegex(ValueError, 'source/native/code/intrinsics lineage differs'):
+            generator.synthesis_coarse_framing_packet()
+
+    def test_even_cosmetic_source_change_requires_new_gpu_evidence(self):
+        generator = historical_synthesis_generator()
+        with replay_scene_bytes(historical_scene_bytes() + b'\n'), \
+                self.assertRaisesRegex(ValueError, 'source/native/code/intrinsics lineage differs'):
+            generator.synthesis_coarse_framing_packet()
+
+    def test_current_receipt_requires_actual_representation_and_native_association(self):
+        # Only exercise the identity predicate here: no synthetic receipt is
+        # promoted through the independently pinned GPU/source lineage guards.
+        generator = object.__new__(camera_tracks.Generator)
+        descriptor = json.loads((camera_tracks.WEB / 'content/model-representation.json').read_text())
+        source, artifact = descriptor['source'], descriptor['representation']
+        generator.data = {'model': {'sha256': source['sha256'], 'sourceCommit': source['sourceCommit']}}
+        provenance = {
+            'identity': 'matched', 'sourceCommit': source['sourceCommit'],
+            'sourceSha256': source['sha256'], 'representationKind': descriptor['kind'],
+            'expectedSha256': artifact['sha256'], 'observedSha256': artifact['sha256'],
+            'expectedByteLength': artifact['byteLength'], 'observedByteLength': artifact['byteLength'],
+        }
+        matches = lambda value: generator.camrod_model_receipt_matches(value, 'new-receipt', source['sha256'])
+        self.assertTrue(matches(provenance))
+        for field, value in (
+                ('identity', 'mismatched'), ('sourceCommit', '0' * 40),
+                ('sourceSha256', '0' * 64), ('representationKind', 'unknown'),
+                ('expectedSha256', source['sha256']), ('observedSha256', source['sha256']),
+                ('expectedByteLength', artifact['byteLength'] + 1),
+                ('observedByteLength', artifact['byteLength'] + 1)):
+            with self.subTest(field=field):
+                self.assertFalse(matches({**provenance, field: value}))
+        # An unbound raw receipt cannot enter through the historical exception.
+        raw = {'identity': 'matched', 'sourceCommit': source['sourceCommit'],
+               'expectedSha256': source['sha256'], 'observedSha256': source['sha256']}
+        self.assertFalse(matches(raw))
 
 
 if __name__ == '__main__':

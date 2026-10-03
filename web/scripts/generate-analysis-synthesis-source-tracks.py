@@ -21,6 +21,11 @@ Synthesis cone-overview retains a two-FIT chosen perspective-camera similarity.
 Cam-rod uses a root-selected upright three-original-FIT fixed-intrinsics SQPNP
 physical pose; former similarities are historical/unaccepted evidence only.
 Independent qualification remains missing; CHECKs never enter camera objectives.
+The cam-rod receipt's exact scene-source seal is intentional: stale calibration
+still refuses current regeneration after a renderer change. Historical replay
+tests supply the original sealed scene bytes, never fresh renderer acceptance.
+New GPU receipts distinguish the observed optimized artifact from its approved
+raw native source association; the original raw receipt remains immutable.
 Synthesis wheel-macro uses only its original wheel-centre FIT and actual GPU
 centre for a chosen principal-point translation; its hanger CHECK stays held out.
 Analysis's stationary full-front shot holds its original frame428 CPU FIT camera
@@ -1025,6 +1030,32 @@ class Generator:
             "limitations":"Cone-overview similarity cannot correct parallax. Cam-rod's three-point pose has ambiguous physical branches and depends on chosen intrinsics/qualitative upright prior; sparse zero FIT residual is not qualification. Only three FIT depths are proven; complete visible geometry and source-shot continuity require root GPU/visual inspection.",
             "shots":keys}
 
+    def camrod_model_receipt_matches(self, provenance, receipt_hash, native_model_sha256):
+        """Separate immutable raw history from current optimized GPU identity."""
+        if (provenance.get("identity") != "matched"
+                or native_model_sha256 != self.data["model"]["sha256"]
+                or provenance.get("sourceCommit") != self.data["model"]["sourceCommit"]):
+            return False
+        # Only these exact already-pinned historical receipt bytes may use the
+        # old raw-transport contract. This is not a fallback for new captures.
+        if receipt_hash == "222d69eb315c39366e93cdcaacadd19a9074b153fa6f0db42d3ff5f9d2af8dbc":
+            return (provenance.get("expectedSha256") == native_model_sha256
+                    and provenance.get("observedSha256") == native_model_sha256
+                    and "representationKind" not in provenance)
+        approved = json.loads((WEB / "content/model-representation.json").read_text())
+        source = approved["source"]
+        artifact = approved["representation"]
+        return (approved["schemaVersion"] == 1
+                and approved["kind"] == "lossless-web-model-representation"
+                and source["sha256"] == native_model_sha256
+                and source["sourceCommit"] == self.data["model"]["sourceCommit"]
+                and provenance.get("sourceSha256") == source["sha256"]
+                and provenance.get("representationKind") == approved["kind"]
+                and provenance.get("expectedSha256") == artifact["sha256"]
+                and provenance.get("observedSha256") == artifact["sha256"]
+                and provenance.get("expectedByteLength") == artifact["byteLength"]
+                and provenance.get("observedByteLength") == artifact["byteLength"])
+
     def synthesis_camrod_physical_pose(self, previous, observations):
         """Publish root's FIT-only upright choice from a pinned sparse probe."""
         path = "web/content/8KmVDxkia_w.camrod-sqpnp-probe-2026-10-01.json"
@@ -1064,8 +1095,8 @@ class Generator:
         if (identity["sourceImage"] != previous["sourceImage"] or identity["shotId"] != "cam-rod"
                 or identity["viewId"] != "main" or identity["timeSeconds"] != 100
                 or identity["decodedTimeSeconds"] != previous["decodedTimeSeconds"]
-                or snapshot["modelProvenance"]["identity"] != "matched"
-                or snapshot["modelProvenance"]["observedSha256"] != lineage["nativeModelSha256"]
+                or not self.camrod_model_receipt_matches(
+                    snapshot["modelProvenance"], receipt_hash, lineage["nativeModelSha256"])
                 or rendered["input"] != lineage["completeInput"] or rendered["timeSeconds"] != 100
                 or rendered["sourceDrawRevision"] != lineage["sourceDrawRevision"]
                 or capture["status"] != "captured" or capture["timeSeconds"] != 100 or capture["viewId"] != "main"):

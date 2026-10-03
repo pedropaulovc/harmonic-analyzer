@@ -404,6 +404,25 @@ The per-named-drawable semantic digest is
 These are import/representation measurements, not a browser-runtime count,
 frame-rate result or geometry/source fidelity acceptance.
 
+A real headed Chromium smoke verified the 38,975,844-byte download against the
+optimized SHA-256 above and the compiled raw association. It observed 435 runtime
+drawables with zero missing bindings. At the same 106.5/118.5 camera, all twenty
+rocker GPU raster records (pixel counts, extents and contours) matched the raw
+baseline bit-for-bit. All twenty spring lengths changed independently; eighteen
+visible spring rasters changed, while two springs were occluded.
+
+Three continuous original-MP4 Analysis/Synthesis clips completed with 209, 205
+and 444 frames and no stall, pause or error events. The maximum
+video/completed-draw delta was 54.341 ms after explicitly excluding the initial
+0.1-second startup period. This scoped playback/render smoke is not an FPS
+improvement measurement or source-fidelity acceptance.
+
+The 50 source regressions pass using a historical source fixture, not a new
+renderer calibration. Production camrod's current-code guard still refuses the
+old `7b28` scene receipt; no old receipt was rehashed or accepted as fresh
+calibration. The optimized-loader smoke does not replace the required current
+camrod GPU recapture.
+
 The website loads one optimized model and reuses geometry buffers during motion.
 Exact sharing reduces buffers and cache duplication, while Meshopt changes
 download encoding, not the instance-expanded triangle count. Frame-rate

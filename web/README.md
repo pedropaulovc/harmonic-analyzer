@@ -296,3 +296,14 @@ This is an 82.5145% reduction in delivered model bytes. All 429 source nodes and
 433 drawable instances are preserved; triangle count is unchanged. Native
 mechanical metadata is unchanged. These measurements establish lossless asset
 delivery, not geometry/source fidelity acceptance or a frame-rate improvement.
+
+A headed Chromium smoke matched the optimized download hash and byte count to
+the compiled raw association, with 435 runtime drawables and no missing bindings.
+All twenty rocker GPU raster records matched the raw baseline bit-for-bit;
+all twenty spring lengths changed independently. Three continuous original-MP4
+Analysis/Synthesis clips had no stall, pause or error events; the maximum
+video/completed-draw delta was 54.341 ms after an explicit initial 0.1-second
+startup exclusion. This is not an FPS measurement or a new source calibration.
+The 50 source regressions pass using a historical source fixture; production
+camrod's current-code guard still refuses the old scene receipt. No historical
+receipt was rehashed or accepted as fresh calibration.
