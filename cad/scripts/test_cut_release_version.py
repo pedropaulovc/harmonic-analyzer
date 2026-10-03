@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import sys
 import time
+import tomllib
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -307,6 +310,129 @@ def test_release_notes_report_the_native_pack_and_go_count() -> None:
 
     assert "native Pack-and-Go (137 referenced documents" in notes
     assert "99 referenced documents" not in notes
+
+
+@pytest.fixture
+def feature_release(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> Path:
+    """Real baseline/feature copies and ZIP; isolate unrelated release producers."""
+    import export_features
+    import export_models
+    from test_features_bound import bound_output, byte_record
+
+    out = bound_output(tmp_path)
+    scene = out / "boxes" / "harmonic-analyzer.json"
+    scene.parent.mkdir()
+    scene.write_bytes(b'{"unit":"mm"}')
+    certificate_path = out / "reports" / "release-neutral.json"
+    certificate = json.loads(certificate_path.read_bytes())
+    certificate["files"]["boxes/harmonic-analyzer.json"] = byte_record(scene)
+    certificate_path.write_text(json.dumps(certificate), encoding="utf-8")
+    inventory = {
+        destination: tmp_path / record["source"]
+        for destination, record in certificate["files"].items()
+    }
+    prepared = out / "release" / "native"
+    native = prepared / "solidworks"
+    drawings = prepared / "slddrw"
+    native.mkdir(parents=True)
+    drawings.mkdir()
+    (native / "fixture.SLDPRT").write_bytes(b"prepared native fixture")
+    package = {
+        "out_dir": prepared.relative_to(tmp_path).as_posix(),
+        "native_dir": native.relative_to(tmp_path).as_posix(),
+        "drawing_dir": drawings.relative_to(tmp_path).as_posix(),
+        "native_files": len(list(native.iterdir())),
+        "drawing_files": len(list(drawings.iterdir())),
+        "documents": len(list(native.iterdir())),
+        "drawings": {},
+        "solidworks_revision": "offline fixture",
+    }
+    monkeypatch.setattr(export_models, "REPO", tmp_path)
+    monkeypatch.setattr(export_models, "NEUTRAL_MANIFEST", certificate_path)
+    monkeypatch.setattr(export_models, "_exporter_digest", lambda: certificate["exporter"])
+    monkeypatch.setattr(export_models, "part_stems", lambda: list(export_features.SUPPORTED_PARTS))
+    monkeypatch.setattr(export_models, "ASSEMBLY_ORDER", ())
+    monkeypatch.setattr(export_models, "all_scene_part_meshes", lambda _assemblies: {})
+    monkeypatch.setattr(export_models, "_release_sources", lambda *_args: {})
+    monkeypatch.setattr(export_models, "_release_inventory", lambda *_args: inventory)
+    monkeypatch.setattr(cut_release, "CAD_ROOT", out.parent)
+    monkeypatch.setattr(cut_release, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(cut_release, "RELEASE_DIR", out / "release")
+    monkeypatch.setattr(cut_release, "SCENE_JSON", scene)
+    monkeypatch.setattr(cut_release, "DRAWING_OUTPUTS", {})
+    monkeypatch.setattr(cut_release, "load_native_package", lambda: package)
+    monkeypatch.setattr(cut_release, "stage_comparisons", lambda _stage: {})
+    monkeypatch.setattr(cut_release, "stage_readout_procedure", lambda *_args: [])
+    monkeypatch.setattr(cut_release, "_git", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(
+        cut_release, "_git_provenance",
+        lambda _version: {"commit_short": "offline", "tree_clean": True},
+    )
+    return out
+
+
+def test_release_zip_keeps_exact_adjacent_feature_bundles(feature_release: Path) -> None:
+    out = feature_release
+    before_certificate = (out / "reports" / "release-neutral.json").read_bytes()
+    expected = {
+        path.relative_to(out).as_posix(): path.read_bytes()
+        for path in (out / "features").rglob("*") if path.is_file()
+    }
+
+    zip_path, facts = cut_release.bundle("v38")
+
+    with zipfile.ZipFile(zip_path) as archive:
+        bundled = {
+            info.filename: archive.read(info)
+            for info in archive.infolist()
+            if info.filename.startswith("features/") and not info.is_dir()
+        }
+        assert bundled == expected
+        sums = {
+            name: digest
+            for digest, name in (
+                line.split("  ", 1)
+                for line in archive.read("SHA256SUMS.txt").decode().splitlines()
+            )
+        }
+        for relative, content in expected.items():
+            assert sums[relative] == hashlib.sha256(content).hexdigest()
+            if relative.endswith("/features.toml"):
+                manifest = tomllib.loads(content.decode("utf-8"))
+                adjacent = str(Path(relative).parent / manifest["step"]).replace("\\", "/")
+                assert archive.read(adjacent) == archive.read(f"step/{manifest['step']}")
+                assert hashlib.sha256(archive.read(adjacent)).hexdigest() == manifest["step_sha256"]
+        rocker = tomllib.loads(archive.read("features/rocker_arm/features.toml").decode())
+        bracket = tomllib.loads(archive.read("features/pivot_bracket/features.toml").decode())
+        assert rocker["features"]["profile_outer"]["land_angle_deg"] == "unknown"
+        assert bracket["drawing"]["revision"] == "unknown"
+        assert bracket["datums"] == "unknown"
+    assert set(facts["features"]) == set(expected)
+    assert (out / "reports" / "release-neutral.json").read_bytes() == before_certificate
+
+
+def test_release_stages_baseline_but_never_seals_divergent_feature_producers(
+    feature_release: Path,
+) -> None:
+    from test_features_bound import byte_record
+
+    out = feature_release
+    full_step = out / "step" / "rocker-arm.STEP"
+    full_step.write_bytes(full_step.read_bytes().replace(b"ADVANCED_FACE", b"ADVANCED_FACX", 1))
+    certificate_path = out / "reports" / "release-neutral.json"
+    certificate = json.loads(certificate_path.read_bytes())
+    certificate["files"]["step/rocker-arm.STEP"] = byte_record(full_step)
+    certificate_path.write_text(json.dumps(certificate), encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="producers diverged"):
+        cut_release.bundle("v38")
+
+    stage = out / "release" / "harmonic-analyzer-v38"
+    assert (stage / "step" / full_step.name).read_bytes() == full_step.read_bytes()
+    assert not (stage / "features").exists()
+    assert not stage.with_suffix(".zip").exists()
 
 
 @pytest.fixture
