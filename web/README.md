@@ -25,6 +25,13 @@ It also accepts the existing `cad/out/gltf/` export when no path is supplied.
 The raw cache stays outside public assets under `web/.vite/model-source/`.
 Missing models and failed YouTube playback produce visible errors.
 
+The current imported release is **v39**, CAD revision
+`81539e53f5146c06a77541415bd79da673806d96`, raw SHA-256
+`60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c`.
+Its native metadata, representation descriptor and public asset were published
+transactionally. All six source tracks still carry the old native association
+and remain unqualified until regenerated; successful import is not source proof.
+
 To adopt a future approved CAD release, provide both its full commit and raw
 SHA-256 (not the optimized file's hash):
 
@@ -35,9 +42,9 @@ npm --prefix web run fetch-model -- /path/to/new.glb --source-commit <full40hexa
 The release command reads that exact CAD revision, checks native rest geometry
 and compatibility with the website's fixed kinematics, magnifier and spring
 deformer mathematics, and stages new native metadata and the optimized asset.
-Compatible geometry, rest, spring and setup changes are supported; unsupported
-ratio, feed, pen-datum or spring-profile changes are refused with a named
-parameter, preserving the last working assets. Missing revisions are also refused.
+Compatible geometry, rest, spring, setup and released pen-datum changes are
+supported; unsupported ratio, feed or spring-profile changes are refused with a
+named parameter, preserving the last working assets. Missing revisions are also refused.
 A current source commit does not approve arbitrary bytes.
 Existing source tracks are stale for a new raw model and reject source-following;
 manual exploration is not recalibration. See [`DESIGN.md`](DESIGN.md) for the
@@ -354,6 +361,39 @@ source-following animation can be demonstrated. Preserve their real bug fixes
 when using those measurement paths. See [`DESIGN.md`](DESIGN.md) for the current
 track, coverage and verification contract.
 
+The October 3 raster controls are historical old-f16/ad5 evidence, not validation
+of the newly approved v39 release. The v5 replay covered all eight unchanged cases:
+all 23 RGBA readbacks matched the original v3 bytes exactly, with zero raster-bound
+violations. The original model response was independently captured by request-bound
+CDP (**38,975,844 bytes**, SHA-256 `ad5c259265be354fb25d208281301356d7587c6a2e508fce1a6cd29014a74719`);
+tar transport and extracted bytes were verified. Mask warp error/bound remain
+**51.700120813456685 / 69.54795584625838 px**, above the original **38.4 px**
+diagnostic budget; the 96 px source-stage target is not a waiver. Thin error/bound
+are **16.40021067721657 / 20.707409278898922 px**.
+
+One original HOLD view passed native contour mask, census and extent readback
+assertions for all **435 Mesh rows**. Finite-native-line evidence remains
+unavailable without a real production API. Six separate synthetic Mesh/Points
+contour diagnostics passed, but their six clone owners and seven new drawable
+geometries are neither genuine 435-part CAD evidence nor source proof.
+The corrected v6 General diagnostic passed **9 views / 63 rows**, retaining all
+42 original rendered positives: **53 rendered / 10 unresolved**, zero bound
+violations, maximum error/bound **2.5764784400118654 / 8.792759708469386 px**.
+Dense passed **21 cases**, zero violations, maximum error/bound
+**0.6929656016926606 / 0.7071067811865476 px**. Their 16/2 RGBA members and
+same-request original model-response bytes were verified. The earlier General
+failure (fixture y=280 instead of baseline 300) remains historical; v2 restores
+the true BEFORE-v1 controls rather than re-pinning assertions.
+Publication's earlier seed differed from `originalBefore`, and v6–v8 transport
+attempts remain failed history. The historical old-f16 v9 private publication
+diagnostic passed all three cases: accepted 32, refused live 16,385 > 16,384 while
+preserving sample/bank/input/epoch, then recovered 48. It retained 435 genuine rows;
+six RGBA members and the original response bytes were extracted and SHA-verified.
+This forced **1920×1080 private fixture** is not the normal application surface
+or source proof. Finite-native-line evidence remains unavailable. All six videos
+remain unmeasured, with **0/3 full collection attempts**.
+See [`DESIGN.md`](DESIGN.md#current-raster-diagnostic-controls) for evidence and scope.
+
 Reports and local screenshots go to `web/.vite/verification-output/` and are
 ignored. `HARMONIC_CHROME` selects the Chromium executable; `HARMONIC_HEADLESS=1`
 is available for automation. External-media restrictions are failures, not skips.
@@ -363,13 +403,27 @@ is available for automation. External-media restrictions are failures, not skips
 `npm --prefix web run build` produces static files under `web/dist/`. The default
 base path is `/harmonic-analyzer/`; set `SIMULATOR_BASE` consistently for both the
 build and verifier when deploying elsewhere. Deployment publishes the optimized
-representation, not the 222,903,724-byte raw export or its private cache.
+representation, not the raw export or its private cache.
 Exact geometry sharing reduces duplicate buffers; Meshopt reduces transfer
 bytes, not the instance-expanded triangle count. No frame-rate improvement is
 established. Fidelity verification still uses all twenty channels and the full
 geometry; it must not substitute reduced geometry.
 
-The current source-v37 import produced the same result in two runs:
+The current **v39** import passed native rest validation (now **131 checks**), with exact semantic
+equivalence for **460 drawables**. Its raw export is approximately **218.8 MiB**;
+Meshopt delivery is **41,071,140 bytes** (about **39.2 MiB**), SHA-256
+`81750ae4c422b973dfd647df4e22f3088933003e39ff41c54563d780eb33fa65`.
+Semantic SHA-256 is
+`5f648e8e3df1dac4c80a6185a9153ac1373d48acf17175e04929c2dea886d37d`.
+A bounded current build passed (**37 modules / 5.82 seconds**), and the model
+suite passed **34 tests / zero failures or skips**. A separate private RTX 3090
+native-viewer smoke verified the current download identity, **479 names /
+462 runtime Mesh rows** against 460 raw drawables, zero missing bindings/errors,
+completed epochs **2→3**, and crank/manual-orbit interaction. This is not the
+normal application surface or source calibration; all-21-spring GPU numerical
+equivalence and ownership remain unverified.
+
+The historical source-v37 import produced the same result in two runs:
 
 | Representation | Bytes |
 |---|---:|
@@ -382,7 +436,7 @@ This is an 82.5145% reduction in delivered model bytes. All 429 source nodes and
 mechanical metadata is unchanged. These measurements establish lossless asset
 delivery, not geometry/source fidelity acceptance or a frame-rate improvement.
 
-A headed Chromium smoke matched the optimized download hash and byte count to
+A historical old-release headed Chromium smoke matched the optimized download hash and byte count to
 the compiled raw association, with 435 runtime drawables and no missing bindings.
 All twenty rocker GPU raster records matched the raw baseline bit-for-bit;
 all twenty spring lengths changed independently. Three continuous original-MP4
@@ -394,5 +448,5 @@ camrod's current-code guard still refuses the old scene receipt. No historical
 receipt was rehashed or accepted as fresh calibration.
 The 33 model tests pass, including real-exporter acceptance of compatible future
 geometry and rejection of unsupported ratio, pitch, feed-sign and spring-profile
-changes before publication. A current raw reimport reproduced the same optimized
-hash and size.
+changes before publication. The historical raw reimport reproduced the same
+optimized hash and size; none of these old-release checks validates v39.

@@ -60,6 +60,41 @@ SHA remain tied to the raw export. Runtime `observedSha256` identifies the actua
 optimized bytes; explicit `sourceSha256` identifies the native association.
 These hashes must not be aliased or substituted for one another.
 
+The current imported release is **v39** at CAD revision
+`81539e53f5146c06a77541415bd79da673806d96`, raw SHA-256
+`60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c`.
+Its approximately **218.8 MiB** raw export produces a **41,071,140-byte**
+Meshopt asset, SHA-256
+`81750ae4c422b973dfd647df4e22f3088933003e39ff41c54563d780eb33fa65`,
+with **460 drawables** and exact semantic digest
+`5f648e8e3df1dac4c80a6185a9153ac1373d48acf17175e04929c2dea886d37d`.
+Native metadata, descriptor and asset were generated transactionally after
+native rest validation (now **131 checks**). A bounded current build passed
+(**37 modules / 5.82 seconds**, `index-Nfm87sg7.js`); the model suite passed
+**34 tests / zero failures / zero skips**. This does not establish full
+synchronization or source acceptance. All six source tracks retain the old native
+association and remain unqualified pending regeneration.
+
+The first rack-negative test mutated native CAD into an early cutter-assertion
+failure, not a runtime-gate refusal; that failed attempt is retained. A bounded
+DP **30→30.003** mutation passed positive native preflight (**131 checks**,
+maximum residual **0.000800083 mm**) and was then refused by the strict actual
+runtime `PITCH` gate without writing any of the four live files.
+
+A corrected private RTX 3090 native-viewer smoke verified actual delivery
+SHA `81750ae4…` / **41,071,140 bytes** and raw association `60a62a2e…` at
+`81539e53…`. It observed **479 names / 462 runtime Mesh rows**, distinct from
+the **460 raw drawables**, with no missing bindings or errors. Completed epochs
+advanced **2→3** and visibility **234→236**; **319 real Mesh matrices** changed
+when `crankTurns` increased by **0.3/(2π)**, and manual orbit worked. The actual
+model was visible in the parent-inspected screenshot. Private evidence is
+`web/.vite/native-v39-smoke-corrected-20261003.json` and
+`web/.vite/native-v39-smoke20261003.png`.
+The first driver used the wrong `.crank` property; its actual failure is preserved
+in `web/.vite/native-v39-smoke-first.json`, not classified as an application bug.
+This smoke is **not the normal application surface**. Normal-route acceptance,
+all-21-spring GPU numerical equivalence and ownership remain unverified.
+
 For the current release, the single command
 `npm --prefix web run fetch-model -- /path/to/raw.glb` validates the existing raw
 pin, optimizes and stages publication without changing native mathematical
@@ -84,13 +119,22 @@ assets. No invented release sidecar supplies approval or automatic fidelity.
 Before publication, new-source adoption checks the archived CAD against the
 actual immutable exports/functions in `kinematics.ts`: channel count/order,
 physical tooth ratios, cone reduction, paper-chain/reducer/feed pitch and senses,
-and total signed feed. It also checks magnifier minimum/built/maximum ratios and
-the fixed `PEN_X`/`PEN_Y`/`PEN_Z` world datum from `magnifier.ts` with a 0.002 mm
-tolerance. Unsupported mathematical changes are refused with a named parameter
-before live assets are replaced. Geometry, rest, spring and setup data may change;
-proportional magnifier geometry is allowed when its ratios remain compatible.
+and total signed feed. It also checks magnifier minimum/built/maximum ratios.
+The released `PEN_X`/`PEN_Y`/`PEN_Z` world datum is derived from native metadata,
+with an independent archived `build_pen_assembly.MARKER_POS`/raw-geometry check
+at the unchanged **0.002 mm** tolerance and a staged magnifier numeric oracle.
+Unsupported mathematical changes are refused with a
+named parameter before live assets are replaced. Geometry, rest, spring, setup
+and released pen-datum data may change; proportional magnifier geometry is
+allowed when its ratios remain compatible.
 The same-current-release path skips native metadata regeneration and these
 new-source gates, leaving the four mechanics/math file hashes unchanged.
+The old exporter refusals for `COLLAR_DIA` and chain closure remain historical
+failures. The first actual v39 import refused `PEN_X`: the old **−0.01035 m**
+datum disagreed with raw **−0.01049999985 m**; no live outputs were published.
+Metadata-derived runtime pen coordinates and independent staged checks corrected
+that incompatibility, after which the real import passed. This does not accept
+any old source-camera/first-surface receipt for the new model.
 
 Spring compatibility is checked against the actual immutable `scene.ts` deformer
 and classifier expressions, extracted from its AST rather than a copied browser
@@ -470,6 +514,70 @@ inventory and coherent attached-part motion still matter. Offline source evidenc
 is separate from compact runtime tracks; full decoded-frame observation corpora
 are not a prerequisite for displaying an honestly labelled approximation.
 
+#### Current raster diagnostic controls
+
+These are historical old-f16/ad5 controls. The imported v39 release changes the
+raw/delivery identity and native inventory; these receipts do not transfer.
+
+The October 3 v5 all-eight replay preserves the unchanged original v3 cases and
+matches **all 23 RGBA members byte-for-byte**, with **zero raster-bound violations**.
+An independent CDP observer captured the original loader response by request ID,
+not a later refetch: **38,975,844 bytes**, SHA-256
+`ad5c259265be354fb25d208281301356d7587c6a2e508fce1a6cd29014a74719`.
+Tar transport and extracted readback/loader-response bytes were all verified.
+This proves scoped current GPU/readback reproducibility and delivery identity,
+not source first-surface validity, geometry correspondence or stage acceptance.
+
+Mask warp error **51.700120813456685 px** and bound **69.54795584625838 px**
+remain above the original **38.4 px diagnostic budget**. The staged **96 px**
+source target does not waive that diagnostic budget. Thin error and bound are
+**16.40021067721657 px** and **20.707409278898922 px**, respectively.
+
+Native contours cover **one original HOLD view / all 435 Mesh rows**; actual
+mask, census and extent readback assertions passed. Finite-native-line evidence
+is unavailable because the current production API has no native finite-line
+GPU producer; a CPU result or synthetic facade is not a substitute.
+Six separate synthetic-contour Mesh/Points diagnostics also passed. Their
+**six clone owners / seven new drawable geometries** remain diagnostic additions,
+not genuine 435-part CAD geometry or source evidence.
+
+Private evidence under
+`web/.vite/verification-output/current-raster-controls-20261003/actual-results/`:
+
+- `eight-2026-10-03T11-46-58-347Z/`
+- `contours-2026-10-03T11-49-56-857Z/`
+- `synthetic-contours-2026-10-03T11-50-09-410Z/`
+- `general-2026-10-03T12-11-35-482Z/`
+- `dense-2026-10-03T12-11-44-436Z/`
+- `publication-2026-10-03T13-39-35-455Z/`
+
+The earlier General failure remains a retained stale-fixture result: y=280
+rather than baseline y=300. Corrected v2 construction restores the true BEFORE-v1
+controls without re-pinning assertions. The observed v6 General diagnostic passed
+**9 views / 63 rows**, retaining all **42 original rendered positives**:
+**53 rendered / 10 unresolved**, **zero bound violations**, maximum error
+**2.5764784400118654 px** and bound **8.792759708469386 px**.
+Dense passed **21 cases**, with **zero bound violations**, maximum error
+**0.6929656016926606 px** and bound **0.7071067811865476 px**. All **16 General /
+2 dense RGBA members** and their same-request original model-response bytes were
+verified. These runs use v6 seal
+`8ff1b46ca247f240e8ff2a2604f54700b6bf5f13f1e85bf5ce9971cdf9e7dfc1`.
+
+Publication's earlier seed differed from `originalBefore`; the interrupted
+v6–v8 transport attempts remain failed history. The historical old-f16 v9 private
+publication diagnostic passed all **three cases**: accepted **32**, refused the
+live **16,385 > 16,384** maximum while preserving **sample/bank/input/epoch**, then
+recovered **48**. It retained **435 genuine rows** and completed **28 phases**,
+with no page/Node errors or closure events; cleanup left the model absent.
+Independent extraction SHA-verified all **six RGBA members** and the original
+**38,975,844-byte ad5 response body** from the exact returned tar/CDP evidence.
+This is an explicitly forced **1920×1080 private fixture**
+(`NORMAL_APP_SURFACE=false`), not the normal application route or source proof.
+Finite-native-line evidence remains unavailable.
+These diagnostics leave **all six videos unmeasured / 0 of 3 full collection
+attempts** unchanged and do not establish production first-surface or source
+acceptance.
+
 #### Bounded Analysis motion authority
 
 The source-specific producers
@@ -665,7 +773,7 @@ For malformed nonfinite entries, `rawRayRequestText`, its parsed-byte SHA and
 `requestIndex` preserve lexical identity, with `request: null` / `raw-packet-entry`;
 ordinary request objects remain unchanged.
 The actual sealed CPU435 CLI packet evaluated **17 rays**, with **7 eligible**,
-zero refused and zero error rows, preserving the original complete51 input.
+zero refused and zero error rows, preserving the original 51-field chosen input.
 The original 17-ray packet was rerun after the camera-boundary fix with the same
 7 eligible / zero refused/error result and exit0. Private evidence is
 `web/.vite/verification-output/intro-spin-20261003/sealed-native-apex17-camera-boundary-after-20261003.json`.
@@ -674,8 +782,8 @@ A separate actual full435 CPU API-boundary control retained the real sealed-mark
 positive and rejected the front-right C-frame occluder. Three removed detached
 API calls raised `TypeError`, with native geometry unchanged. Private evidence is
 `web/.vite/verification-output/intro-spin-20261003/sealed-ray-detachment-after-20261003.json`.
-This proves the sealed Float64 complete51 state/API boundary, without extending
-GPU or source qualification.
+This proves the sealed Float64 51-field chosen-input/API boundary, without
+extending GPU or source qualification; 51 counts input fields, not replay states.
 
 The exact historical `f20571861` static-producer blob (`8626bdf7…`) was run
 against those same three raw-native cases: the coincident-apex and FIT/CHECK
@@ -684,7 +792,7 @@ two-CHECK rank-three positive passed. `INTRO_STATIC_PRODUCER_PATH` selects this
 historical producer without hand-reverting a predicate.
 
 A supplemental current CPU first-surface export uses the original HOLD809
-complete51 chosen input, not the older pen variant differing in 28 scalar fields.
+51-field chosen input, not the older pen variant differing in 28 scalar fields.
 It contains all **435 drawables**, with **21 springs evaluated from their actual
 GLSL AST/uniforms/attributes**, **6,741,474 vertices** and **16,888,236 indices**.
 Actual nearest-apex facets **124/97/108/113** have residuals
@@ -745,14 +853,14 @@ new independence; FIT diagnostics do not establish CHECK or moving coverage.
 
 ## Assets and rights
 
-The current raw native GLB is 222,903,724 bytes with approximately 5.627 million
+The historical source-v37 raw native GLB is 222,903,724 bytes with approximately 5.627 million
 instance-expanded triangles. Its twenty exact-duplicate channel springs each
 contain 147,248 triangles and contribute 52.3% of that triangle count. Measured
 duplicate raw payload accounts for 102,076,512 bytes; two identical PNGs account
 for a further 10,415,064 duplicate bytes. These source measurements are not
 measured optimized savings.
 
-Two current source-v37 imports produced identical optimized bytes:
+Two historical source-v37 imports produced identical optimized bytes:
 
 | Representation | Bytes |
 |---|---:|
@@ -775,7 +883,7 @@ The per-named-drawable semantic digest is
 These are import/representation measurements, not a browser-runtime count,
 frame-rate result or geometry/source fidelity acceptance.
 
-A real headed Chromium smoke verified the 38,975,844-byte download against the
+A historical old-release headed Chromium smoke verified the 38,975,844-byte download against the
 optimized SHA-256 above and the compiled raw association. It observed 435 runtime
 drawables with zero missing bindings. At the same 106.5/118.5 camera, all twenty
 rocker GPU raster records (pixel counts, extents and contours) matched the raw
@@ -800,8 +908,9 @@ unsupported tooth-ratio, feed-pitch, feed-sign and six spring-profile changes
 with named parameters before writing any live files. The archived source-v37
 export checked 211 source files and 130 native rest conditions and passed the
 enriched mathematical and spring-profile gates against the unchanged runtime.
-A current raw reimport reproduced the optimized SHA-256 and 38,975,844-byte
-size above; the production build also passed.
+A historical raw reimport reproduced the optimized SHA-256 and 38,975,844-byte
+size above; that release's production build also passed. These old-release
+receipts do not transfer to v39.
 
 The website loads one optimized model and reuses geometry buffers during motion.
 Exact sharing reduces buffers and cache duplication, while Meshopt changes

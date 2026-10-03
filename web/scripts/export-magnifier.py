@@ -21,7 +21,7 @@ import tarfile
 import tempfile
 from pathlib import Path
 
-COMMIT = "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+COMMIT = "81539e53f5146c06a77541415bd79da673806d96"
 ROOT = Path(__file__).resolve().parents[2]
 
 
