@@ -1,0 +1,31 @@
+# Copied from https://github.com/pedropaulovc/prechips/blob/0dd7614/examples/shop-policy.toml
+# Inventory verification flags and author-choice process proposals are unchanged.
+# Shop-owned policy; a process plan cannot waive required findings.
+# PLAN.md rev 6 §3.4 ships these first seven rules on every subject.
+revision = 6
+
+[required]
+tool_resolves = "*"
+sizing = "*"
+op_chain = "*"
+blind_depth = "*"
+inspection = "*"
+coordinates = "*"
+zero_check = "*"
+
+[numbers]
+refixture_budget_mm = "unknown"
+thin_wall_floor_mm = "unknown"
+stickout_ld_max = "unknown"
+
+# No logbook measurements or authoritative threshold citations were supplied.
+# Separate metadata tables avoid pretending the layout-sketch values are measured.
+[numbers_cite]
+refixture_budget_mm = "unknown"
+thin_wall_floor_mm = "unknown"
+stickout_ld_max = "unknown"
+
+[numbers_verify]
+refixture_budget_mm = true
+thin_wall_floor_mm = true
+stickout_ld_max = true

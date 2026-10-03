@@ -57,6 +57,8 @@ dependencies = [
     # Farm executor (cad/scripts/_farm.py): dispatches cache-missing part/assembly/
     # drawing leaves as Temporal workflows to the SolidWorks build farm.
     "temporalio>=1.32",
+    # Drawing-bound manufacturing travelers (SolidWorks-free check:traveler_*).
+    "prechips",
 ]
 
 [dependency-groups]
@@ -106,3 +108,4 @@ package = false
 # editable so local edits to the COM adapter are picked up live. Run
 # `git submodule update --init` after cloning so this path exists.
 solidworks-mcp-python = { path = "SolidworksMCP-python", editable = true }
+prechips = { git = "https://github.com/pedropaulovc/prechips", rev = "0dd7614" }
