@@ -5,6 +5,9 @@ metadata:
   type: project
 ---
 
+> Identity migration: dated findings, release paths and recorded identifiers below retain their snapshot values. For current IDs and paths, see the [subsystem identity guide](../cad/docs/subsystem-identities.md).
+
+
 2026-07-04, PR7: `part:cone_pivot_post` failed its crank-bore volume check
 (+1314 mm³ — the revolve ran as a BOSS, not a cut). Root cause: the
 `SolidworksMCP-python` submodule working tree sat on a local `personal`

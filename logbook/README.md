@@ -16,6 +16,11 @@ Current Learning and Manufacture workstream status and sequencing live in the
 [Harmonic Analyzer project](https://github.com/users/pedropaulovc/projects/1).
 Module maturity and bench results remain in this directory.
 
+Current part and assembly identities are listed in the
+[subsystem identity guide](../cad/docs/subsystem-identities.md), including the
+old-to-current lookup. Dated entries retain their original identifiers, links
+and measurements; use the guide when comparing them with current CAD.
+
 ## Layout
 
 | path | what |

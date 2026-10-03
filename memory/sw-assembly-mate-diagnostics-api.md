@@ -5,6 +5,9 @@ metadata:
   type: reference
 ---
 
+> Identity migration: dated findings, release paths and recorded identifiers below retain their snapshot values. For current IDs and paths, see the [subsystem identity guide](../cad/docs/subsystem-identities.md).
+
+
 When a SolidWorks assembly build hits an over-define / unsolved mate (e.g. an
 `AddMate5` that returns an error, or a red-X in the tree), use these COM APIs to
 get the same data the **What's Wrong** dialog and **View Mate Errors** flyout
@@ -114,7 +117,7 @@ code path.
 
 **Not every wrong-mate state reaches the error-prose path.** Trying to
 manufacture a `swFeatureError_e 47` by inverting a mate's dimension flip
-(`build_channel_assembly` J1a) does NOT work: the mate still SOLVES, just on the
+(`build_ch_channel_assembly` J1a) does NOT work: the mate still SOLVES, just on the
 wrong side, so the deterministic flip-seed guard raises first
 (`flip-seed MISS … off by 7.06 mm, error=0`) and `_cwm.mate_error_prose` never
 runs. An unsolved-mate repro needs a geometrically IMPOSSIBLE mate, not a

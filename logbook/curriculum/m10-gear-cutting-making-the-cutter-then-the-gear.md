@@ -24,7 +24,7 @@ hours_actual: 0
 
 - `references/gears-and-gear-cutting/gears-and-gear-cutting.pdf` **ch. 12 (Eureka method)**
 - `cad/docs/machining-dfm.md` (gear routing; cutters confirmed non-existent)
-- `cad/scripts/build_cone_gear.py`, `cad/scripts/build_cylinder_gear.py`
+- `cad/scripts/build_dt_cone_gear.py`, `cad/scripts/build_dt_cylinder_gear.py`
 
 ## Practice
 
@@ -38,7 +38,7 @@ hours_actual: 0
 
 ## Now make — the real part this unlocks
 
-**`cone-gear` T120** first (largest, most forgiving), then the `cylinder-gear` ×20, then down the cone set toward T006.
+**`dt-cone-gear` T120** first (largest, most forgiving), then the `dt-cylinder-gear` ×20, then down the cone set toward T006.
 
 ## Competency check
 

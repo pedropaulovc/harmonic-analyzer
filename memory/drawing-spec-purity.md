@@ -5,6 +5,9 @@ metadata:
   type: project
 ---
 
+> Identity migration: dated findings, release paths and recorded identifiers below retain their snapshot values. For current IDs and paths, see the [subsystem identity guide](../cad/docs/subsystem-identities.md).
+
+
 Settled 2026-07-28 from a 10-sheet audit (45 verified findings; report in the
 scratchpad, `cad/docs/tolerance-gdt-assessment.md` is the natural home).
 
@@ -32,8 +35,8 @@ re-renders; `SetText` does not. That is the whole argument.
 **The mechanism already existed and was used by 2 of ~100 build scripts.**
 `_drawing_marks.set_dimension_{symmetric,bilateral}_tolerance` — read-back
 verified, `SetValues` in METERS internally — shipped in
-`build_cone_pivot_screw.py` (whose drawing consequently ships
-`DIMENSION_CALLOUTS = {}`) and `build_fillister_screw.py`. Everything else
+`build_vn_cone_pivot_screw.py` (whose drawing consequently ships
+`DIMENSION_CALLOUTS = {}`) and `build_vn_fillister_screw.py`. Everything else
 leaked its bands into callout text. Propagating it, not building it, is the fix.
 
 **Transposition trap — use `_fit_limits.deviations(band)`.** `_fit_limits`

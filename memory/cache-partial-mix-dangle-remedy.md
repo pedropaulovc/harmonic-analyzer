@@ -5,6 +5,9 @@ metadata:
   type: project
 ---
 
+> Identity migration: dated findings, release paths and recorded identifiers below retain their snapshot values. For current IDs and paths, see the [subsystem identity guide](../cad/docs/subsystem-identities.md).
+
+
 **Symptom** (fresh seat bootstrap, 2026-07-03): full `doit` fails at
 `assembly:harmonic_analyzer`'s deep-health gate with mate errors `[48]`
 (dangling) INSIDE cache-restored subassembly instances, e.g.

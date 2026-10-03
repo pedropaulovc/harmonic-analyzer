@@ -5,8 +5,11 @@ metadata:
   type: project
 ---
 
+> Identity migration: dated findings, release paths and recorded identifiers below retain their snapshot values. For current IDs and paths, see the [subsystem identity guide](../cad/docs/subsystem-identities.md).
+
+
 `cad/scripts/build_kinematic_probe.py` (PR #189) drives the crank +30° on the built
-`paper-drive.SLDASM` and reads the whole feed train back; `verify:kinematics` runs
+`pd-paper-drive.SLDASM` and reads the whole feed train back; `verify:kinematics` runs
 its `_drive_and_measure` as the `paper-drive:crank-feed` gate. Findings that will
 trip up anyone reasoning about this model:
 

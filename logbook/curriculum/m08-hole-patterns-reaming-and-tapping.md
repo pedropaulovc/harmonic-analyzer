@@ -21,8 +21,8 @@ hours_actual: 0
 ## References
 
 - `references/machinerys-handbook/` (tap drill sizes, thread data)
-- `cad/docs/machining-dfm.md` (`rocker-arm-support`, `summing-lever`)
-- `cad/scripts/build_rocker_arm_support.py` (foot thickness, four-hole pattern and 1/2-13 UNC-2B thread)
+- `cad/docs/machining-dfm.md` (`fr-rocker-arm-support`, `sm-summing-lever`)
+- `cad/scripts/build_fr_rocker_arm_support.py` (foot thickness, four-hole pattern and 1/2-13 UNC-2B thread)
 - `cad/scripts/_holes.py` (`TAP_DRILL_MM["1/2-13"]`)
 
 ## Practice
@@ -35,11 +35,11 @@ hours_actual: 0
 
 ## Now make — the real part this unlocks
 
-**`rocker-arm-support`** foot holes: 4× 1/2-13 UNC-2B through the 6.35 mm foot, tap drill Ø10.716 mm (Ø10.72 displayed; 27/64 in), from `cad/scripts/build_rocker_arm_support.py` and `cad/scripts/_holes.py`. Then the 20× Ø2.0 spring holes in the summing lever at 7.0565 mm pitch.
+**`fr-rocker-arm-support`** foot holes: 4× 1/2-13 UNC-2B through the 6.35 mm foot, tap drill Ø10.716 mm (Ø10.72 displayed; 27/64 in), from `cad/scripts/build_fr_rocker_arm_support.py` and `cad/scripts/_holes.py`. Then the 20× Ø2.0 spring holes in the summing lever at 7.0565 mm pitch.
 
 ## Competency check
 
-A four-hole pattern within 0.1 mm true position, and a 1/2-13 UNC-2B thread cut clean without a broken tap (the support thread specified in `cad/scripts/build_rocker_arm_support.py`).
+A four-hole pattern within 0.1 mm true position, and a 1/2-13 UNC-2B thread cut clean without a broken tap (the support thread specified in `cad/scripts/build_fr_rocker_arm_support.py`).
 
 ## Notes
 

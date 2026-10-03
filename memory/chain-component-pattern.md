@@ -5,6 +5,9 @@ metadata:
   type: reference
 ---
 
+> Identity migration: dated findings, release paths and recorded identifiers below retain their snapshot values. For current IDs and paths, see the [subsystem identity guide](../cad/docs/subsystem-identities.md).
+
+
 ## SHIPPED 2026-07-05 — `_insert_roller_chain` now uses the native chain pattern
 
 The paper-drive roller chain is now built by a native **connected-linkage chain

@@ -1,5 +1,7 @@
 # VM1 assembly and datum closeout
 
+> Historical evidence: identifiers, paths, URLs and checksums below are retained as recorded. See [current subsystem identities](../../../subsystem-identities.md) for the canonical migration map.
+
 The combined runtime at `2d8618ca17fdcae69c32a67b9aa0f2f23e1ecee2` passed the
 full pipeline, cold drawing lifecycles, visual inspection, closed snapshot and
 zero-COM repeat. The adapter is `2269009ed56712867826516f4406afc98a0c2814`.

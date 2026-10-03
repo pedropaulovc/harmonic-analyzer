@@ -54,7 +54,7 @@ uv run cad/comparisons/tools/render_offline.py [--only id,..] [--stale-only]
 uv run cad/comparisons/tools/composite.py [--only id1,id2]
 
 # 4. selective model rebuild after fixing a part script (dependent assemblies refresh)
-C:\src\SolidworksMCP-python\.venv\Scripts\python.exe -m doit part:cone_gear
+C:\src\SolidworksMCP-python\.venv\Scripts\python.exe -m doit part:dt_cone_gear
 ```
 
 ## Interactive posing — Blender pose studio
@@ -110,7 +110,7 @@ metre-unit glTF `export_models.py` writes). Produce one either way:
 
 ```powershell
 # from the SolidWorks seat: open a .SLDASM and SaveAs3 it to .glb
-uv run python cad/scripts/export_glb.py <dir-with-the-assembly>/harmonic-analyzer.SLDASM
+uv run python cad/scripts/export_glb.py <dir-with-the-assembly>/ha-harmonic-analyzer.SLDASM
 # or add --fetch-glb below to pull gltf/<model>.glb from the latest release bundle
 ```
 

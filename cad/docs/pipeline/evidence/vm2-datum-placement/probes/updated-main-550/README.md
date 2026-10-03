@@ -1,5 +1,7 @@
 # Closed updated-main baseline: 55056d49
 
+> Historical evidence: identifiers, paths, URLs and checksums below are retained as recorded. See [current subsystem identities](../../../../../subsystem-identities.md) for the canonical migration map.
+
 These are existing snapshot originals, copied byte-for-byte for #702. No new
 build, COM session, snapshot or execution-token restamping produced this bundle.
 This is the updated-main baseline, not the older initial-main `c6ab57db` baseline

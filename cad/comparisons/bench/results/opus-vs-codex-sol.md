@@ -1,5 +1,7 @@
 # Opus-high vs codex-sol — T1 pose read (PARTIAL)
 
+> Historical evidence: identifiers, paths, URLs and checksums below are retained as recorded. See [current subsystem identities](../../../docs/subsystem-identities.md) for the canonical migration map.
+
 > [!WARNING]
 > **INCOMPLETE RESULTS.** The Opus run was stopped by quota exhaustion partway
 > through the T1 screening pass. Only **912 / 1782** T1 cells completed (~51%),

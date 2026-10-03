@@ -1,5 +1,7 @@
 # Codex full-diff and native-evidence review of PR #702
 
+> Historical evidence: identifiers, paths, URLs and checksums below are retained as recorded. See [current subsystem identities](../../../subsystem-identities.md) for the canonical migration map.
+
 - Base: `55056d4990d38ebb461f343d3002fc90731b9e73`
 - Latest reviewed head: `748cf37c18bc8e1ffe65651769e42f0696f644f9`
 - Runtime head: `f9c8bddff7c5f56d094f46723d5bd8151d541e9a`

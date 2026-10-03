@@ -33,7 +33,7 @@ hours_actual: 0
 
 ## Now make — the real part this unlocks
 
-**`knife-mount`** ×2 — a rectangular block 34 × 43.77 × 14, the simplest prismatic part in the machine, and there are two of them.
+**`sm-knife-mount`** ×2 — a rectangular block 34 × 43.77 × 14, the simplest prismatic part in the machine, and there are two of them.
 
 ## Competency check
 

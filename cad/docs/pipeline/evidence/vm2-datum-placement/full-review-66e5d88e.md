@@ -1,5 +1,7 @@
 # Full committed-diff review: 66e5d88e
 
+> Historical evidence: identifiers, paths, URLs and checksums below are retained as recorded. See [current subsystem identities](../../../subsystem-identities.md) for the canonical migration map.
+
 Verdict: **findings outstanding; not clean and not native acceptance**.
 
 Reviewed base `55056d4990d38ebb461f343d3002fc90731b9e73` against head

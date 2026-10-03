@@ -1,5 +1,7 @@
 # Pose-presentation benchmark - results
 
+> Historical evidence: identifiers, paths, URLs and checksums below are retained as recorded. See [current subsystem identities](../../../docs/subsystem-identities.md) for the canonical migration map.
+
 ## Subject model: `opus`
 
 ### T1 - single-shot pose read

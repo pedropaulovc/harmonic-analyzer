@@ -7,6 +7,9 @@ metadata:
   originSessionId: ba03bcc4-d81e-4e71-bbc7-7926c9a87d29
 ---
 
+> Identity migration: dated findings, release paths and recorded identifiers below retain their snapshot values. For current IDs and paths, see the [subsystem identity guide](../cad/docs/subsystem-identities.md).
+
+
 The harmonic analyzer's output amplification runs through TWO inextensible
 steel WIRES at the magnifying wheel — both crucial for the Motion study, both
 kinematic couplings (NOT springs). User flagged this explicitly 2026-06-13.

@@ -49,19 +49,21 @@ jq -r '[.name, ((.end_time[0:19]+"Z"|fromdateiso8601)
               - (.start_time[0:19]+"Z"|fromdateiso8601))] | @tsv' \
   cad/out/reports/telemetry/traces.jsonl | sort -k2 -gr | head -20
 
+# Current registered inventory: 146 part families and 8 assembly identities.
+# See ../../cad/docs/subsystem-identities.md; registry counts are not task counts.
 # how many parts, assemblies, drawings.
 # NOTE: do NOT count `build_*.py` — that file set also contains the 8 assembly
 # scripts and the probe/motion-study scripts, which is how "115 parts" (wrong)
 # got into an earlier draft of the README and the repo description (corrected
 # across 8 files in PR #464, "repo: scaffold the five publishing deliverables").
-# The build graph is authoritative, and listing it needs no SolidWorks seat.
+# The build graph is authoritative for task counts, and listing needs no SolidWorks seat.
 # Capture ONE listing and count that: a pipeline hides doit's exit status, so a
 # run that dies after partial output still prints a plausible number.
 set -euo pipefail
 tasks="$(uv run python -m doit list --all)"
-printf '%s\n' "$tasks" | rg -c '^part:'       # 102
-printf '%s\n' "$tasks" | rg -c '^assembly:'   # 8
-printf '%s\n' "$tasks" | rg -c '^drawing:'    # 95
+printf '%s\n' "$tasks" | rg -c '^part:'
+printf '%s\n' "$tasks" | rg -c '^assembly:'
+printf '%s\n' "$tasks" | rg -c '^drawing:'
 ```
 
 ## Not evidence

@@ -161,10 +161,10 @@ tolerance.**
    independent gear systems at different pitches**, each internally consistent — they do not mesh
    across domains, so they must *not* be collapsed to one DP:
    - **cone↔cylinder train — DP 49.82 / 14.5° PA** (`machine/gear_train.yaml diametral_pitch:
-     49.82`; `build_cylinder_gear.py` imports the train `DP` from `build_cone_gear`, so the whole
+     49.82`; `build_dt_cylinder_gear.py` imports the train `DP` from `build_dt_cone_gear`, so the whole
      20-pair train shares it by construction);
    - **crank-drive pair — DP 26.57** (`gear_train.yaml crank_drive_diametral_pitch`);
-   - **paper-drive rack↔pinion — DP 30** (`build_rack_pinion.py`, which carries a hard note that it
+   - **paper-drive rack↔pinion — DP 30** (`build_pd_rack_pinion.py`, which carries a hard note that it
      must *not* couple to the train DP or the rack silently interferes).
 
    The gear book's "**never mix pressure angle / pitch**" rule applies **within a meshing pair**, not
@@ -181,7 +181,7 @@ tolerance.**
 
 5. **Rocker radius vs. bar length disagree in the model.** The book states the rocker's concave
    radius *equals* the amplitude-bar length (ch. 14), but the CAD implements **R = 800 mm**
-   (`build_rocker_arm.py`) against a **812.8 mm** bar (`build_amplitude_bar.py`, 32″) — a **12.8 mm**
+   (`build_ch_rocker_arm.py`) against a **812.8 mm** bar (`build_ch_amplitude_bar.py`, 32″) — a **12.8 mm**
    gap, and the rocker docstring already flags the book relationship. → spec the rocker radius as the
    **current 800 mm nominal explicitly** (not "= bar length"), and reconcile the 12.8 mm before it
    becomes a toleranced callout — otherwise a "R = bar length ±0.5" rule puts the existing model
@@ -217,22 +217,22 @@ means, so it is called out per row.
 | Control | Where it applies | Target | Hold / inspect |
 |---|---|---|---|
 | **Flatness** | knife-mount seat face; pedestal + base mating faces; top-frame integral-crossbar underside (stud seat; the former top-crossbar is merged into the top-frame casting) | ≤0.02–0.05 mm | surface-grind or single-setup face; dial-indicator sweep on 3 jacks, or CMM |
-| **Straightness** (axis, Ø zone) | `pivot-shaft`, `fulcrum-shaft`, `cone-gear-shaft` tip, `crank-pin` axes | ≤0.02–0.05 mm over length | between-centres turn + steady; indicate on Vee-blocks. Rule #1 (below) already bounds it at MMC |
+| **Straightness** (axis, Ø zone) | `ch-pivot-shaft`, `ch-fulcrum-shaft`, `dt-cone-gear-shaft` tip, `dt-crank-pin` axes | ≤0.02–0.05 mm over length | between-centres turn + steady; indicate on Vee-blocks. Rule #1 (below) already bounds it at MMC |
 | **Circularity / Cylindricity** | gear + cam blanks, running journals, bearing bores | folds into runout, below | 4-jaw indicate true; rotate-and-probe, polar plot |
 
 **Orientation** (feature to datum)
 
 | Control | Where it applies | Target | Hold / inspect |
 |---|---|---|---|
-| **Perpendicularity** | pivot-bore axis ⟂ mount face (`rocker-arm`, `summing-lever`, `knife-mount`, pedestals); **knife edge ⟂ motion plane** | ≤0.02–0.05 mm | bore the hole **in the setup that faces the mount**; indicate off a square |
-| **Parallelism** | the two `knife-mount` seats coplanar / equal-height; amplitude-bar slide face to base | parallel, ≤0.05 mm | shim to a common height at assembly; indicate |
+| **Perpendicularity** | pivot-bore axis ⟂ mount face (`ch-rocker-arm`, `sm-summing-lever`, `sm-knife-mount`, pedestals); **knife edge ⟂ motion plane** | ≤0.02–0.05 mm | bore the hole **in the setup that faces the mount**; indicate off a square |
+| **Parallelism** | the two `sm-knife-mount` seats coplanar / equal-height; amplitude-bar slide face to base | parallel, ≤0.05 mm | shim to a common height at assembly; indicate |
 | **Angularity** | *available* for the oblique cone↔cylinder mesh seat, but that mesh is adjustable / loose (§2) — **not required** | — | sine bar, if ever toleranced |
 
 **Location** (feature-of-size position from a datum reference frame)
 
 | Control | Where it applies | Target | Hold / inspect |
 |---|---|---|---|
-| **Position (true position)** — cylindrical zone about a **basic-dimension** location; **M** where a clearance hole benefits from bonus | `rocker-arm-support` 4× foot holes; `summing-lever` 20 spring holes at 7.0565 pitch; channel pivot / lever bores; `knife-mount` fastener holes (once modeled); crank + frame bolt patterns | Ø0.1–0.2 mm at MMC, loosening with bonus | drill from a common fixture / jig; CMM the hole centres against the basic grid |
+| **Position (true position)** — cylindrical zone about a **basic-dimension** location; **M** where a clearance hole benefits from bonus | `fr-rocker-arm-support` 4× foot holes; `sm-summing-lever` 20 spring holes at 7.0565 pitch; channel pivot / lever bores; `sm-knife-mount` fastener holes (once modeled); crank + frame bolt patterns | Ø0.1–0.2 mm at MMC, loosening with bonus | drill from a common fixture / jig; CMM the hole centres against the basic grid |
 
 Position replaces a `±`-boxed hole location with a **round** zone evenly distributed about the true
 position (a square `±` zone is both too tight on the diagonal and too loose on the axes), and it
@@ -243,7 +243,7 @@ must be ⟂ to.
 
 | Control | Where it applies | Target | Hold / inspect |
 |---|---|---|---|
-| **Profile of a surface** | `rocker-arm` **R800 concave** form (the book's one stated geometric req — profile is its natural control); `cylinder-gear` cam eccentric profile; involute **gear-tooth flanks** | 0.05–0.1 mm zone following the true profile | form-cut / CNC profile; CMM scan against the nominal curve. Profile-without-datum on a nominally flat face ≡ flatness |
+| **Profile of a surface** | `ch-rocker-arm` **R800 concave** form (the book's one stated geometric req — profile is its natural control); `dt-cylinder-gear` cam eccentric profile; involute **gear-tooth flanks** | 0.05–0.1 mm zone following the true profile | form-cut / CNC profile; CMM scan against the nominal curve. Profile-without-datum on a nominally flat face ≡ flatness |
 
 **Runout** (rotating features about a datum axis)
 
@@ -331,19 +331,19 @@ Tier: **T1** = spend the budget here · **T2** = moderate · **T3** = leave loos
 
 | Subsystem · part(s) | Tier | Add |
 |---|---|---|
-| **Summing lever** `summing-lever`, `knife-mount` | **T1** | knife-edge **straightness + ⟂ to motion plane**; **parallelism/equal height** of the two mounts; `precision` on the seat; `bearing` finish on edge + seat. **Material:** the lever is gray cast iron and the mount brass — neither hardens to a durable edge, so the hardness callout needs a **hardened tool-steel knife-edge insert** (e.g. O1/W1, pinned/screwed into the lever) riding a **hardened-steel seat** set into the mount; spec the insert + seat as separate hardened parts (add to `materials.yaml`), *not* "harden the casting." *Least forgiving interface in the machine.* |
-| **Cylinder gears + cams** `cylinder-gear`, `connecting-rod` | **T1** | cam **eccentricity = amplitude** (hold it), **runout of cam OD to gear bore** ≤0.05 mm; **angular phasing to the ~3 mm alignment notch** (per-channel phase datum — set at assembly); `precision` on bore; cam OD `bearing` finish; **rod cam-bore (the `cam_follower_contact` surface) `bearing`; rod *body* `none`** (book: rough — the exemption is the visible body, not the bearing bore). *The 20 cams are the function generators.* |
-| **Cone gears** `cone-gear`, `cone-gear-shaft` | **T1** | **bore-to-pitch runout** ≤0.05 mm; **DP 49.82 / 14.5° PA shared across the whole cone↔cylinder train** (its own domain — Finding 3); flag **T006 0.646 mm nominal / 0.621 mm minimum web** + harder tip metal (Finding 4); `precision` on bore. Mesh itself stays **loose** (oblique, adjustable centre distance). |
-| **Pivots & bushings** `pivot-shaft`, `fulcrum-shaft`, `pivot-bushing`, `lever-bushing` | **T1** | reconcile the **0.15 vs 0.025–0.075 mm** fit (Finding 2); `precision` on bore + journal; `bearing` finish; **all 19 spacers one length, one setup** (channel pitch 7.0565 mm); shaft straightness. |
-| **Rocker arms** `rocker-arm`, `rocker-arm-support` | **T1** | **concave radius R800 nominal** (form, ±0.5 mm; book ch.14 says "= bar length" = 812.8 mm — **reconcile, Finding 5**; stamp the model's R800, never the bar length). Pivot bore **square** to face; slide surface `bearing` finish. |
-| **Amplitude bars** `amplitude-bar` | **T2** | preserve **length** (~80 cm — it linearizes the transfer; don't shorten); notch fit snug-sliding (`sliding_amplitude_bar_on_rocker`); straightness mild; **notch foot (the sliding-contact surface) `bearing`; bar *body* `none`**. Precision here is **position repeatability**, not part geometry. |
-| **Drive train** `crankshaft`, `crank-pin`, `crank-drive-gear`, `crank-pinion`, `crank-arm`, `crank-handle` | **T2** | **taper-pin** crank-to-shaft index (repeatable, zero-backlash angular registration) — ream matching taper; gear bores `precision` + runout; handle/arm loose. |
-| **Paper drive** `rack-pinion`, `platen-rack`, `pinion-bar`, transgear set, chain | **T2/T3** | rack/pinion **DP 30 / 14.5°** (Finding 3); backlash 0.30 mm is fine; chain clearances **loose** (link-to-link contact tolerated). Paper transport is the *time axis*, not the summed signal — moderate. |
-| **Magnifier & pen** `magnifying-wheel`, `magnifying-lever`, `magnifying-bracket/clamp`, `magnifying-vertical-rod`, pen parts | **T2** | wheel/lever bores `precision` + runout on the wheel; linkage pivots squareness. Amplifies output, so play here is visible — but downstream of the sum. |
-| **Frame** `harmonic-base`, `top-frame` (one casting: ring + integral crossbar + gooseneck hub — absorbed the former `top-crossbar` and `gooseneck-clamp`, 2026-08-02), pedestals, clamps, columns, `gooseneck` | **T3** | mating-face flatness "as-machined" + bolt-pattern location; column slip fits (Ø25.4 in 25.5–25.6) already fine. Cast-iron castings stay forgiving. |
-| **Springs** `channel-spring-installed`, `counter-spring` | **T2** | **match rate + free length across the 20 channels** (consistency, not absolute rate); counter spring is the **coarse tare** — leave loose. |
-| **Measuring stick** `measuring-stick` | **T3** | leave loose — original was hand-stamped & uneven; what matters is **one stick sets all 20 bars**. |
-| **Fasteners / misc** `hex-bolt`, `lag-screw`, `hanger-screw`, `fillister-screw`, `thumb-screw`, `nameplate`, knobs | **T3** | `fastener_clearance` close/normal as-is; no additions. |
+| **Summing lever** `sm-summing-lever`, `sm-knife-mount` | **T1** | knife-edge **straightness + ⟂ to motion plane**; **parallelism/equal height** of the two mounts; `precision` on the seat; `bearing` finish on edge + seat. **Material:** the lever is gray cast iron and the mount brass — neither hardens to a durable edge, so the hardness callout needs a **hardened tool-steel knife-edge insert** (e.g. O1/W1, pinned/screwed into the lever) riding a **hardened-steel seat** set into the mount; spec the insert + seat as separate hardened parts (add to `materials.yaml`), *not* "harden the casting." *Least forgiving interface in the machine.* |
+| **Cylinder gears + cams** `dt-cylinder-gear`, `ch-connecting-rod` | **T1** | cam **eccentricity = amplitude** (hold it), **runout of cam OD to gear bore** ≤0.05 mm; **angular phasing to the ~3 mm alignment notch** (per-channel phase datum — set at assembly); `precision` on bore; cam OD `bearing` finish; **rod cam-bore (the `cam_follower_contact` surface) `bearing`; rod *body* `none`** (book: rough — the exemption is the visible body, not the bearing bore). *The 20 cams are the function generators.* |
+| **Cone gears** `dt-cone-gear`, `dt-cone-gear-shaft` | **T1** | **bore-to-pitch runout** ≤0.05 mm; **DP 49.82 / 14.5° PA shared across the whole cone↔cylinder train** (its own domain — Finding 3); flag **T006 0.646 mm nominal / 0.621 mm minimum web** + harder tip metal (Finding 4); `precision` on bore. Mesh itself stays **loose** (oblique, adjustable centre distance). |
+| **Pivots & bushings** `ch-pivot-shaft`, `ch-fulcrum-shaft`, `pivot-bushing`, `lever-bushing` | **T1** | reconcile the **0.15 vs 0.025–0.075 mm** fit (Finding 2); `precision` on bore + journal; `bearing` finish; **all 19 spacers one length, one setup** (channel pitch 7.0565 mm); shaft straightness. |
+| **Rocker arms** `ch-rocker-arm`, `fr-rocker-arm-support` | **T1** | **concave radius R800 nominal** (form, ±0.5 mm; book ch.14 says "= bar length" = 812.8 mm — **reconcile, Finding 5**; stamp the model's R800, never the bar length). Pivot bore **square** to face; slide surface `bearing` finish. |
+| **Amplitude bars** `ch-amplitude-bar` | **T2** | preserve **length** (~80 cm — it linearizes the transfer; don't shorten); notch fit snug-sliding (`sliding_amplitude_bar_on_rocker`); straightness mild; **notch foot (the sliding-contact surface) `bearing`; bar *body* `none`**. Precision here is **position repeatability**, not part geometry. |
+| **Drive train** `crankshaft`, `dt-crank-pin`, `dt-crank-drive-gear`, `dt-crank-pinion`, `dt-crank-arm`, `dt-crank-handle` | **T2** | **taper-pin** crank-to-shaft index (repeatable, zero-backlash angular registration) — ream matching taper; gear bores `precision` + runout; handle/arm loose. |
+| **Paper drive** `pd-rack-pinion`, `pd-platen-rack`, `pinion-bar`, transgear set, chain | **T2/T3** | rack/pinion **DP 30 / 14.5°** (Finding 3); backlash 0.30 mm is fine; chain clearances **loose** (link-to-link contact tolerated). Paper transport is the *time axis*, not the summed signal — moderate. |
+| **Magnifier & pen** `mg-magnifying-wheel`, `mg-magnifying-lever`, `mg-magnifying-bracket/clamp`, `mg-magnifying-vertical-rod`, pen parts | **T2** | wheel/lever bores `precision` + runout on the wheel; linkage pivots squareness. Amplifies output, so play here is visible — but downstream of the sum. |
+| **Frame** `fr-harmonic-base`, `fr-top-frame` (one casting: ring + integral crossbar + gooseneck hub — absorbed the former `top-crossbar` and `gooseneck-clamp`, 2026-08-02), pedestals, clamps, columns, `gooseneck` | **T3** | mating-face flatness "as-machined" + bolt-pattern location; column slip fits (Ø25.4 in 25.5–25.6) already fine. Cast-iron castings stay forgiving. |
+| **Springs** `vn-channel-spring-installed`, `vn-counter-spring` | **T2** | **match rate + free length across the 20 channels** (consistency, not absolute rate); counter spring is the **coarse tare** — leave loose. |
+| **Measuring stick** `ha-measuring-stick` | **T3** | leave loose — original was hand-stamped & uneven; what matters is **one stick sets all 20 bars**. |
+| **Fasteners / misc** `vn-hex-bolt`, `vn-lag-screw`, `vn-hanger-screw`, `vn-fillister-screw`, `vn-thumb-screw`, `nameplate`, knobs | **T3** | `fastener_clearance` close/normal as-is; no additions. |
 
 ---
 
@@ -519,7 +519,7 @@ lockstep with the config.
 - **Tier 1 (do first, ~10 parts):** knife-edge trio · cylinder-gear cams + connecting-rod ·
   cone/cylinder gear bores · pivot/fulcrum shafts + bushings · rocker-arm radius. Plus the three
   **Findings fixes** (precision grade, reconcile pivot clearance, publish the single DP/PA table).
-- **Tier 2:** rack-pinion + transgear, magnifier/pen linkage, crank taper-pin index, spring matching.
+- **Tier 2:** rack-pinion + transgear, mg-magnifier/pen linkage, crank taper-pin index, spring matching.
 - **Tier 3 (leave loose / document as forgiving):** frame castings, measuring stick, counter-spring
   post, chain, fasteners, nameplate, handle.
 
@@ -603,7 +603,7 @@ so supplying them is the single highest-value contribution this supplement makes
     part, never off hidden lines, don't dimension 90° corners, reference-only dims in **( )**.
     Hole callouts carry Ø + depth (⌴ counterbore / ⌵ countersink symbols where used). Thread callouts
     match each thread's **own** standard, not a blanket one: **Unified inch** as *size–TPI–series–
-    class* — the `rocker-arm-support` **9⁄16-12 UNC-2B** tapped feet (the machine's one real threaded
+    class* — the `fr-rocker-arm-support` **9⁄16-12 UNC-2B** tapped feet (the machine's one real threaded
     feature) are inch, so they take the Unified form, **not** metric — and **ISO metric** as
     **M d×pitch** (class 6H/6g) for any metric fastener. Don't force the M form onto an inch thread.
   - **General tolerance block** governs every unspecified dimension. On an ASME print this is the
@@ -627,7 +627,7 @@ depth) a 2D profile cannot. DXF is a **narrow special case**, handled in its own
   input is a free byproduct of the existing neutral export. **But** the neutral exporters write only
   **one `<stem>.STEP` per SLDPRT** (the active config) while emitting the per-config geometry as
   **STL only** (`export_part_stls` iterates configs for STL; STEP is one-per-stem). So the 20-config
-  **`cone-gear`** (and any other multi-config part) currently exports just **one** cone-gear config as
+  **`dt-cone-gear`** (and any other multi-config part) currently exports just **one** cone-gear config as
   STEP — Fusion would see a single gear, not all 20. **A per-config STEP export path must be added**
   (iterate configs like the STL path does) before CAM can be fed from STEP for the whole cone train;
   until then the per-config STLs are the only complete neutral geometry, and STL is a poor CAM input
@@ -641,7 +641,7 @@ depth) a 2D profile cannot. DXF is a **narrow special case**, handled in its own
   **AP242-with-PMI** *can* carry the tolerances into a PMI-aware CAM tool, but that publish path is
   **MBD-add-in-gated** on this seat — see below — so the 2D drawing stays the guaranteed carrier.)
 - **Scope boundary — CNC does the repeats, manual does the rest.** CAM is *not* a whole-machine
-  deliverable: one-off frame/pedestal/linkage parts stay on the manual mill + lathe (fidelity, and
+  deliverable: one-off fr-frame/pedestal/linkage parts stay on the manual mill + lathe (fidelity, and
   not worth CNC fixturing). CAM targets only the high-count families where CNC repeatability buys the
   consistency the error model rewards.
 - **CAM tool = Fusion 360** (Autodesk **Makers / personal SKU**, which bundles CAM). CAM therefore

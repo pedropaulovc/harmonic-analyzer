@@ -46,7 +46,7 @@ geometry acceptance and measured source fidelity; neither is established by
 successful optimization.
 
 Raw exports are cached as `.vite/model-source/<rawSHA>.glb`, outside `public/`.
-Only `public/models/harmonic-analyzer.glb`, the optimized representation, is
+Only `public/models/ha-harmonic-analyzer.glb`, the optimized representation, is
 published. Both model files remain untracked. A fresh checkout without an asset
 must retain the supported missing-model UI.
 
@@ -64,7 +64,7 @@ For the current release, the single command
 `npm --prefix web run fetch-model -- /path/to/raw.glb` validates the existing raw
 pin, optimizes and stages publication without changing native mathematical
 metadata or historical evidence. With no path, it uses the existing
-`cad/out/gltf/` export.
+`cad/out/gltf/ha-harmonic-analyzer.glb` export.
 
 A future actual CAD release requires both approved identifiers:
 
@@ -123,6 +123,12 @@ old raw model are stale after adoption and must reject source-following.
 Compatible manual exploration is not recalibration; replacement needs new
 model-bound evidence before any source-fidelity acceptance claim.
 
+The magnifier exporter also requires an approved canonical CAD revision:
+
+```sh
+python web/scripts/export-magnifier.py --source-commit <approved-canonical-commit>
+```
+
 ## Physical model
 
 All twenty stations contribute to the torque balance, in their CAD row order
@@ -173,7 +179,7 @@ Separately, the user permits only the two small rimmed/recessed lower-rocker
 side-face features either side of the fulcrum to remain absent and uncertified.
 The closed declaration names `lower-rocker-nearest-left-face-bore` and
 `lower-rocker-nearest-right-face-bore`, and permits only qualified
-`harmonic-analyzer/channel/rocker-arm-1..20` paths. All twenty native rockers lack
+`ha-harmonic-analyzer/ch-channel/ch-rocker-arm-1..20` paths. All twenty native rockers lack
 these features. This approval is not a promise of a future CAD match.
 
 `nativeGeometryAssumptions` permits at most one of each exact declaration and
@@ -402,6 +408,10 @@ particular diagnostic path, that path's known correctness defects still matter.
 
 
 ## Assets and rights
+
+The source-v37 measurements, checksums and verification results below retain
+their original snapshot identities. Current CAD identities are listed in the
+[subsystem identity guide](../cad/docs/subsystem-identities.md).
 
 The current raw native GLB is 222,903,724 bytes with approximately 5.627 million
 instance-expanded triangles. Its twenty exact-duplicate channel springs each

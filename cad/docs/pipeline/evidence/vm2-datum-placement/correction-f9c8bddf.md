@@ -1,5 +1,7 @@
 # #702 placement correction: f9c8bddf
 
+> Historical evidence: identifiers, paths, URLs and checksums below are retained as recorded. See [current subsystem identities](../../../subsystem-identities.md) for the canonical migration map.
+
 The two datum corrections and rack finish placement pass the scoped native and
 visual checks below at `f9c8bddff7c5f56d094f46723d5bd8151d541e9a`.
 This is a correction handoff to VM1, not full-stack acceptance or merge approval.

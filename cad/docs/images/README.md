@@ -35,8 +35,8 @@ The part-sheet examples (`rocker-arm-support-drawing.png` and
 `pinion-arbor-drawing.png`) are copied from the matching full-sheet PNGs in the
 package's `png/` directory. The assembly examples are rendered from selected
 pages of its multi-sheet PDFs: zero-based PDF page 3 is drive-train assembly
-sheet 4, **Cone Set + Crank Exploded (MHA-A03)**; page 2 is frame assembly
-sheet 3, **Match-Fit and Assembly Sequence (MHA-A04)** (recipe `FITTING + ASSEMBLY`).
+sheet 4, **Cone Set + Crank Exploded (MHA-DT-000)**; page 2 is frame assembly
+sheet 3, **Match-Fit and Assembly Sequence (MHA-FR-000)** (recipe `FITTING + ASSEMBLY`).
 These are selected PDF pages, not the all-pages drawing contact previews. Keep
 the mappings in `trim_renders.py` so the README cannot silently retain a sheet
 from an older release.
@@ -82,12 +82,12 @@ exported glTF, so it needs no SolidWorks seat, only the export and a GPU. It
 does need Blender >= 5.2.
 
 Use the same pinned release package as the rest of the README image refresh:
-`cad/out/release/harmonic-analyzer-vNN/gltf/harmonic-analyzer.glb`. These
+`cad/out/release/harmonic-analyzer-vNN/gltf/ha-harmonic-analyzer.glb`. These
 meshprobe steps document the pose and settings retained by `trim_renders.py`:
 
 ```powershell
 $releaseRoot = 'cad/out/release/harmonic-analyzer-vNN'
-uv run meshprobe -s ha open "$releaseRoot/gltf/harmonic-analyzer.glb"
+uv run meshprobe -s ha open "$releaseRoot/gltf/ha-harmonic-analyzer.glb"
 ```
 
 The glTF hierarchy is flattened and component names can repeat across

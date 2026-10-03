@@ -5,6 +5,9 @@ metadata:
   type: reference
 ---
 
+> Identity migration: dated findings, release paths and recorded identifiers below retain their snapshot values. For current IDs and paths, see the [subsystem identity guide](../cad/docs/subsystem-identities.md).
+
+
 Making SolidWorks drawing dimensions render **bent leader + horizontal text**
 (2026-07-16, PR #334). Four facts, none documented; all cost a probe to learn.
 

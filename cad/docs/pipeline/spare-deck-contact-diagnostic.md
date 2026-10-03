@@ -1,5 +1,7 @@
 # Saved spare/deck contact readback
 
+> Historical evidence: identifiers, paths, URLs and checksums below are retained as recorded. See [current subsystem identities](../subsystem-identities.md) for the canonical migration map.
+
 `cad/scripts/diagnostics/probe_spare_deck_contact.py` reads the saved complete
 top assembly in its own checkout. It requires an empty document inventory,
 an explicit running SW PID and the exact SHA-256 of the top assembly. The parent

@@ -5,6 +5,9 @@ metadata:
   type: project
 ---
 
+> Identity migration: dated findings, release paths and recorded identifiers below retain their snapshot values. For current IDs and paths, see the [subsystem identity guide](../cad/docs/subsystem-identities.md).
+
+
 The `knife-stay` part (Ø3 anchor rod + 8×2 strap, formerly placed in
 `summing.SLDASM` at machine (0, 1086, 0) as a FIXED, non-mated structural
 component) was REMOVED completely on 2026-06-25 — the user confirmed it never

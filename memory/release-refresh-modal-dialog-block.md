@@ -5,6 +5,9 @@ metadata:
   type: project
 ---
 
+> Identity migration: dated findings, release paths and recorded identifiers below retain their snapshot values. For current IDs and paths, see the [subsystem identity guide](../cad/docs/subsystem-identities.md).
+
+
 `doit release` (and any incremental `refresh_assembly`) failed at the FIRST COM
 step with `open <asm> failed: Failed to open model: …\frame.SLDASM`, while a
 full `doit` build of the same model was green minutes earlier. Root cause was

@@ -1,5 +1,7 @@
 # Complete production drawing checks
 
+> Historical evidence: identifiers, paths, URLs and checksums below are retained as recorded. See [current subsystem identities](../../../subsystem-identities.md) for the canonical migration map.
+
 The normal two-drawing run at `2ef52374e7589f5e6aa9481c2d03df3881408520`
 passed in 73.894 s. [Receipt and exact native/PDF/PNG outputs](probes/production-2ef52374/receipt.json)
 are published together. Recipe, graph and part-isolation gates passed with

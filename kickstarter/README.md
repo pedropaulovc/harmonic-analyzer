@@ -27,9 +27,10 @@ promise. (Widely repeated as campaign advice. Find a citable source before this
 line goes anywhere public.) What this project has going for it is that a large,
 verifiable chunk of the work is already done and already public:
 
-- 102 parts modelled in SolidWorks, generated from Python scripts, with a build
+- 146 registered CAD part families, generated from Python scripts, with a build
   pipeline that gates every assembly on DOF, interference and mass properties.
-  See the root [README](../README.md).
+  See the [subsystem identity guide](../cad/docs/subsystem-identities.md) for the
+  inventory and the root [README](../README.md) for the CAD model.
 - A photo-vs-CAD comparison gallery scoring the model against Hammack, Kranz and
   Carpenter's photographs of the surviving University of Illinois machine.
 - A per-part manufacturability pass

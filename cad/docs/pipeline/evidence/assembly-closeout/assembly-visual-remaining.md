@@ -1,5 +1,7 @@
 # Remaining assembly visual inspection
 
+> Historical evidence: identifiers, paths, URLs and checksums below are retained as recorded. See [current subsystem identities](../../../subsystem-identities.md) for the canonical migration map.
+
 Root Codex inspected the actual PNGs below from frozen head `64c3dab4875354a7d44d709539e001db920a0377`. This is a developing receipt; it does not certify full-build completion.
 
 ## Channel

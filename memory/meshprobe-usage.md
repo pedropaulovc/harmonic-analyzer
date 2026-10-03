@@ -5,6 +5,9 @@ metadata:
   type: reference
 ---
 
+> Identity migration: dated findings, release paths and recorded identifiers below retain their snapshot values. For current IDs and paths, see the [subsystem identity guide](../cad/docs/subsystem-identities.md).
+
+
 meshprobe (`uv run meshprobe`, pedropaulovc/meshprobe, pinned `>=1.4.0`) inspects/renders release
 GLBs in durable sessions. Hard-won usage notes (2026-07-17, filed as issues #93–#102):
 

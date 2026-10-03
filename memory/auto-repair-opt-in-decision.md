@@ -5,6 +5,9 @@ metadata:
   type: project
 ---
 
+> Identity migration: dated findings, release paths and recorded identifiers below retain their snapshot values. For current IDs and paths, see the [subsystem identity guide](../cad/docs/subsystem-identities.md).
+
+
 When a remote-cache **partial-mix dangle** fails `verify:soundness`
 (`[48]` dangling mates on a foreign cached `.SLDASM`), the remedy today is the
 slow `HARMONIC_REMOTE_CACHE_MODE=off` FULL rebuild (~500 s/assembly) — see
@@ -27,5 +30,5 @@ republished under the foreign remote-cache key. Default soundness still fails
 loud and includes the exact opt-in retry command.
 
 **How to apply:** retry one affected assembly with, for example,
-`uv run python cad/scripts/verify.py channel --suite soundness --auto-repair`.
+`uv run python cad/scripts/verify.py ch_channel --suite soundness --auto-repair`.
 Never turn this into an unconditional verify/cache heal.

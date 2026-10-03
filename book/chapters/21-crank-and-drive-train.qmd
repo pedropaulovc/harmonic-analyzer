@@ -15,16 +15,16 @@ One input, and the 4:1 reduction that feeds the cone gear set.
 
 | part | qty | material | stock |
 |---|---|---|---|
-| `crank-arm` | TODO | TODO | TODO |
-| `crank-handle` | TODO | TODO | TODO |
-| `crank-pin` | TODO | TODO | TODO |
-| `crankshaft` | TODO | TODO | TODO |
-| `crank-drive-gear` | TODO | TODO | TODO |
-| `crank-pinion` | TODO | TODO | TODO |
-| `cone-swing-platform` | TODO | TODO | TODO |
-| `cone-pivot-post` | TODO | TODO | TODO |
-| `cone-pivot-screw` | TODO | TODO | TODO |
-| `cone-lock-knob` | TODO | TODO | TODO |
+| `dt-crank-arm` | TODO | TODO | TODO |
+| `dt-crank-handle` | TODO | TODO | TODO |
+| `dt-crank-pin` | TODO | TODO | TODO |
+| `dt-crankshaft` | TODO | TODO | TODO |
+| `dt-crank-drive-gear` | TODO | TODO | TODO |
+| `dt-crank-pinion` | TODO | TODO | TODO |
+| `dt-cone-swing-platform` | TODO | TODO | TODO |
+| `dt-cone-pivot-post` | TODO | TODO | TODO |
+| `vn-cone-pivot-screw` | TODO | TODO | TODO |
+| `vn-cone-lock-knob` | TODO | TODO | TODO |
 
 : {tbl-colwidths="[40,10,25,25]"}
 

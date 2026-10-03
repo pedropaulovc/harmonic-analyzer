@@ -15,8 +15,8 @@ Twenty matched channel springs and one large counter spring. Not off-the-shelf.
 
 | part | qty | material | stock |
 |---|---|---|---|
-| `channel-spring-installed` ×20 | TODO | TODO | TODO |
-| `counter-spring` | TODO | TODO | TODO |
+| `vn-channel-spring-installed` ×20 | TODO | TODO | TODO |
+| `vn-counter-spring` | TODO | TODO | TODO |
 
 : {tbl-colwidths="[40,10,25,25]"}
 

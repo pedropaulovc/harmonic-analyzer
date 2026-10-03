@@ -7,6 +7,9 @@ metadata:
   originSessionId: 1f309627-0ce3-4562-b4bc-935d4f44247a
 ---
 
+> Identity migration: dated findings, release paths and recorded identifiers below retain their snapshot values. For current IDs and paths, see the [subsystem identity guide](../cad/docs/subsystem-identities.md).
+
+
 The M6.4 summing-lever model (knife-edge TUBE + Ø14 bore on an external diamond
 knife-bar) is WRONG per the user (authoritative on the physical machine). The real
 summing lever:

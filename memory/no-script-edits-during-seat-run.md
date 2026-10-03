@@ -5,6 +5,9 @@ metadata:
   type: feedback
 ---
 
+> Identity migration: dated findings, release paths and recorded identifiers below retain their snapshot values. For current IDs and paths, see the [subsystem identity guide](../cad/docs/subsystem-identities.md).
+
+
 Seen 2026-09-02 (PR #650): while `doit -n 4 build_bare`/`build` was running on the seat,
 editing `crank_arm_spec.py` (66 -> 75) and later `build_harmonic_base.py` produced two
 distinct failure shapes:

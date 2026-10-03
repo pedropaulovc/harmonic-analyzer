@@ -1,5 +1,7 @@
 # Independent native evidence and publication review
 
+> Historical evidence: identifiers, paths, URLs and checksums below are retained as recorded. See [current subsystem identities](../../../../../subsystem-identities.md) for the canonical migration map.
+
 Runtime head: `f9c8bddff7c5f56d094f46723d5bd8151d541e9a`.
 Publication head: `9ecef40d999ce6a2839f2f330418f40f2011fda0`.
 Adapter: `2269009ed56712867826516f4406afc98a0c2814`.

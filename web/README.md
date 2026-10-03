@@ -13,7 +13,7 @@ Implementation and fidelity limits are described in [`DESIGN.md`](DESIGN.md).
 
 ```sh
 npm --prefix web ci
-npm --prefix web run fetch-model -- /path/to/harmonic-analyzer.glb
+npm --prefix web run fetch-model -- /path/to/ha-harmonic-analyzer.glb
 npm --prefix web run dev
 ```
 
@@ -21,7 +21,7 @@ The model is a generated artifact, absent from a fresh checkout. Use the exact
 raw CAD export identified by `src/mechanics-data.ts`; incompatible bytes are
 rejected. `fetch-model` validates the current raw pin, performs lossless exact
 deduplication and Meshopt compression, then publishes only the optimized GLB.
-It also accepts the existing `cad/out/gltf/` export when no path is supplied.
+It also accepts `cad/out/gltf/ha-harmonic-analyzer.glb` when no path is supplied.
 The raw cache stays outside public assets under `web/.vite/model-source/`.
 Missing models and failed YouTube playback produce visible errors.
 
@@ -166,7 +166,7 @@ The user separately allows a narrow exception for only the two small
 rimmed/recessed lower-rocker side-face features either side of the fulcrum.
 They are absent from all twenty native rockers and remain explicitly
 **uncertified**, not pending a promised CAD correction. The closed declaration
-names both exact source features and only `harmonic-analyzer/channel/rocker-arm-1..20`
+names both exact source features and only `ha-harmonic-analyzer/ch-channel/ch-rocker-arm-1..20`
 paths. The HUD identifies this exception separately from the rod-head mapping;
 reports retain both exact records when declared.
 
@@ -286,6 +286,10 @@ Exact geometry sharing reduces duplicate buffers; Meshopt reduces transfer
 bytes, not the instance-expanded triangle count. No frame-rate improvement is
 established. Fidelity verification still uses all twenty channels and the full
 geometry; it must not substitute reduced geometry.
+
+The source-v37 measurements and verification results below are preserved from
+that snapshot. Use the [subsystem identity guide](../cad/docs/subsystem-identities.md)
+for current CAD identities.
 
 The current source-v37 import produced the same result in two runs:
 

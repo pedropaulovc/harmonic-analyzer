@@ -7,6 +7,9 @@ metadata:
   originSessionId: 3dfc247c-5caa-477e-bc6b-0e5deca6f310
 ---
 
+> Identity migration: dated findings, release paths and recorded identifiers below retain their snapshot values. For current IDs and paths, see the [subsystem identity guide](../cad/docs/subsystem-identities.md).
+
+
 2026-06-18: user re-anchored the cylinder/cone gear OD from 103.3 to **62.2 mm**
 (LOW confidence — eyeballed by scaling gear brackets in the p.25 bottom-left photo
 vs the back-view), directive: "i am positive stick to 62.2 and fix everything downstream."

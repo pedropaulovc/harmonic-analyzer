@@ -26,7 +26,7 @@ hours_actual: 0
 
 - `references/machining-for-hobbyists-getting-started/`
 - `cad/docs/machining-dfm.md` (D-flat gear seats, no keys or adhesive)
-- `cad/scripts/gear_seat_fit.py`, `cad/scripts/cone_gear_stack.py` and
+- `cad/scripts/gear_seat_fit.py`, `cad/scripts/dt_cone_gear_stack.py` and
   `cad/scripts/cone_stack_end_play.py` (the fit, stack and end-play numbers)
 - `cad/config/parts/*.yaml` (appearance per part)
 
@@ -41,11 +41,11 @@ hours_actual: 0
 
 ## Now make — the real part this unlocks
 
-The **cone gear stack on its D-flat shaft**: the 64T and twenty cone gears slid on flat to flat, touching, with the stack collar locked off a feeler. Silver-solder the `crank-pin-ring` ends. Then finish the `crank-handle` and a `connecting-rod`.
+The **cone gear stack on its D-flat shaft**: the 64T and twenty cone gears slid on flat to flat, touching, with the stack collar locked off a feeler. Silver-solder the `dt-crank-pin-ring` ends. Then finish the `dt-crank-handle` and a `ch-connecting-rod`.
 
 ## Competency check
 
-A twenty-gear stack that measures 137.774 ±0.20 mm (`cad/scripts/cone_gear_stack.py`) and turns free with no tight spot; a silver-soldered test joint pulled to destruction that fails in the parent metal, not the joint; and a polished brass surface with no visible scratch pattern.
+A twenty-gear stack that measures 137.774 ±0.20 mm (`cad/scripts/dt_cone_gear_stack.py`) and turns free with no tight spot; a silver-soldered test joint pulled to destruction that fails in the parent metal, not the joint; and a polished brass surface with no visible scratch pattern.
 
 ## Notes
 

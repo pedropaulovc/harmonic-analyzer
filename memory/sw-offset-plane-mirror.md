@@ -1,3 +1,6 @@
+
+> Identity migration: dated findings, release paths and recorded identifiers below retain their snapshot values. For current IDs and paths, see the [subsystem identity guide](../cad/docs/subsystem-identities.md).
+
 # Negative-offset reference planes MIRROR sketch X (+ related COM seat facts)
 
 Live-proven on the top-frame rederive (PR #459), R2026x seat.
@@ -20,7 +23,7 @@ positive offset). Positive-offset planes inherit the base axes unmirrored
 - SILENT case: symmetric sketches (e.g. panel rectangles whose spans mirror
   onto each other) pass volume checks with WRONG geometry. Any asymmetric
   sketch on a negative-offset plane must author mirrored coordinates
-  (see `_panel_cut` in build_top_frame.py).
+  (see `_panel_cut` in build_fr_top_frame.py).
 
 ## Blind wizard holes read Ø0.0
 
