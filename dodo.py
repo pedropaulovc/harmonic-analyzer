@@ -2001,18 +2001,19 @@ def _preflight_file_deps() -> list[str]:
 
 
 def _export_file_deps() -> list[str]:
-    """Neutral-export inputs: the exporter plus every model's exact identity."""
-    return [str(EXPORT_PY), *_cad_identity_deps()]
+    """Exporter source/config closure plus every model's exact identity."""
+    return [*_export_requirement_deps(), *_cad_identity_deps()]
 
 
 def _export_requirement_deps() -> list[str]:
-    """All source/config requirements read while naming and certifying faces."""
-    from export_features import source_paths
+    """Source/config closure for the exporter and its named-face requirements."""
+    from export_features import SUPPORTED_PARTS, source_paths
 
     return sorted({
         str(EXPORT_PY),
         *module_deps_of(EXPORT_PY),
-        *_config_deps(EXPORT_PY),
+        *(path for stem in SUPPORTED_PARTS
+          for path in _config_deps(SCRIPTS_DIR / "export_features.py", stem, "part")),
         *(str(path.resolve()) for path in source_paths()),
     })
 
@@ -2033,7 +2034,7 @@ def _feature_export_outputs() -> list[Path]:
     return [
         (CAD_OUT / "features" / stem / name).resolve()
         for stem in SUPPORTED_PARTS
-        for name in (f"{stem.replace('_', '-')}.STEP", "features.toml", "neutral.json")
+        for name in (f"{stem.replace('_', '-')}.STEP", "features.toml")
     ]
 
 
@@ -2301,17 +2302,7 @@ def _assembly_file_deps(stem: str) -> list[str]:
 
 
 def _cache_key(file_deps: list[str], label: str | None = None) -> str:
-    # Feature manifests cite YAML file:line locations as well as values. A
-    # comment-only YAML edit moves that provenance even when the native model's
-    # parsed-data recipe is unchanged; re-key exports, never native parts.
-    if label == "package:features":
-        def digest(path: str) -> str:
-            if Path(path).suffix.lower() in {".yaml", ".yml"}:
-                return _canonical_file_md5(path)
-            return ContentChecker._digest(path)
-    else:
-        digest = ContentChecker._digest
-    return _cache.cache_key(file_deps, digest, label)
+    return _cache.cache_key(file_deps, ContentChecker._digest, label)
 
 
 def _farm_build(label: str, key: str, outputs: list[Path]) -> None:
@@ -3556,9 +3547,8 @@ def task_check():
                 str((SCRIPTS_DIR / "features_bound.py").resolve()),
                 *(_export_requirement_deps()),
                 *(str(path) for path in _feature_export_outputs()),
-                str((REPORTS / "release-neutral.json").resolve()),
-                *(str((CAD_OUT / "step" / f"{stem.replace('_', '-')}.STEP").resolve())
-                  for stem in ("rocker_arm", "pivot_shaft", "pivot_bracket", "cone_pivot_post")),
+                *(str((CAD_OUT / "step" / path.name).resolve())
+                  for path in _feature_export_outputs() if path.suffix == ".STEP"),
             ],
             "task_dep": ["package:features", "export"],
             "cmd": [sys.executable, str(SCRIPTS_DIR / "features_bound.py"),
@@ -3745,7 +3735,7 @@ def task_preflight():
 def task_package():
     """COM packages with distinct, cache-keyed leaf payloads.
 
-    ``package:features`` exports isolated STEP/requirements bundles for four
+    ``package:features`` exports isolated STEP/requirements bundles for three
     native parts. It never writes the full export's paths or ledgers.
 
     ``package:release`` is the COM half of a release: SolidWorks Pack-and-Go of

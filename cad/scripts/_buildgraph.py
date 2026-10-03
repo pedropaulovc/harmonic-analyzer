@@ -2297,6 +2297,7 @@ TITLE_BLOCK_GEOMETRY_MODULES = frozenset(
         "crank_pinion_spec",
         "crankshaft_spec",
         "error_budget",
+        "export_features",
         "harmonic_base_fasteners",
         "guide_lock_screw_spec",
         "post_mount_screw_spec",
