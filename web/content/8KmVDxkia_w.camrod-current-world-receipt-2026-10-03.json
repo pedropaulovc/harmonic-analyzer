@@ -1,0 +1,1225 @@
+{
+  "kind": "fresh-current-camrod-world-receipt",
+  "snapshot": {
+    "videoId": "8KmVDxkia_w",
+    "playerVideoId": "8KmVDxkia_w",
+    "mode": "reference-review",
+    "playerState": "paused",
+    "videoTime": 100.016583,
+    "modelTime": 100,
+    "referenceState": "approximate",
+    "modelState": "ready",
+    "missingBindings": [],
+    "modelProvenance": {
+      "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945",
+      "sourceSha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+      "representationKind": "lossless-web-model-representation",
+      "expectedSha256": "ad5c259265be354fb25d208281301356d7587c6a2e508fce1a6cd29014a74719",
+      "expectedByteLength": 38975844,
+      "observedSha256": "ad5c259265be354fb25d208281301356d7587c6a2e508fce1a6cd29014a74719",
+      "observedByteLength": 38975844,
+      "generator": "SOLIDWORKSGLTF",
+      "identity": "matched",
+      "url": "/harmonic-analyzer/models/harmonic-analyzer.glb"
+    },
+    "camera": {
+      "positionMetres": [
+        -0.119936139775151,
+        0.1739581164103444,
+        0.5790659466866046
+      ],
+      "quaternion": [
+        -0.005039273586140319,
+        -0.11877097134333392,
+        0.021688863426512866,
+        0.9926719776900884
+      ],
+      "verticalFovDegrees": 30
+    },
+    "input": {
+      "crankTurns": 0,
+      "amplitudes": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        -0.08
+      ],
+      "phases": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        3.141592653589793
+      ],
+      "gearing": "small-large",
+      "magnification": 4.85205222755,
+      "setup": {
+        "counterHeightM": null,
+        "meanLineAngleRad": 0,
+        "platenOffsetM": 0,
+        "wireFixtureOffsetM": 0.015,
+        "coneSwingRad": 0,
+        "pinionCamRad": 0,
+        "heldChannelTurns": 0,
+        "driveCrankOffsetTurns": 0
+      }
+    },
+    "sourceDrawRevision": 1,
+    "sourceDrawTimeSeconds": 100,
+    "diagnosticCapture": "paused-reference-review",
+    "sourceFollowing": {
+      "kind": "compact-source-track",
+      "stageLadder": [
+        50,
+        20,
+        10,
+        5
+      ],
+      "finalTolerancePx": 96,
+      "stages": {
+        "5": {
+          "status": "unmeasured"
+        },
+        "10": {
+          "status": "unmeasured"
+        },
+        "20": {
+          "status": "unmeasured"
+        },
+        "50": {
+          "status": "unmeasured"
+        }
+      },
+      "stageEvidence": "unmeasured: no independently bound rendered report loaded",
+      "sourceMeasurements": {
+        "status": "partial",
+        "blockers": [
+          "Stage50/20/10/5 source-width errors remain unmeasured by this generator; source camera/input assumptions are not rendered source-fidelity passes.",
+          "Component-envelope closeup/turntable framing is chosen where a source-fit camera is unavailable; exact source camera/temporal history remains unmeasured.",
+          "Blurred montage camera/input donors and finite page-flip/linear-fade baselines remain transfers/assumptions, not independently matched current-source measurements.",
+          "Synthesis conditional relative pen/wheel trajectory and source-displacement cosine witnesses do not metrically qualify full source-visible motion or unknown station/phase associations.",
+          "Bank crank rotation itself is out of frame: + and − physical drive alternatives are retained; source lower-crank sign/cadence cannot transfer across editorial cuts.",
+          "All20amplitude-bar foot settings are unobserved in the rocker-bank crop. Preserve complete old feasible all-zero baseline as chosen hidden input, not source coefficient recovery. Rocker motion itself is independent of foot amplitudes.",
+          "Only station20 cadence and station1 physical relative motion have numeric controls. Stations2..19 phase alignment is a source-informed chosen prior, not20independently recovered historical phases.",
+          "No source pixel qualifies native camera/geometry/rendering. No historical source-sealed pose/world/code witness is rewritten.",
+          "Wheel-macro single original FIT chooses principal-point translation only; independent wheel-hanger CHECK stays held out and moving-spoke/input controls remain unresolved. OneFIT/oneCHECK is not qualified6FIT/2CHECK camera evidence; fresh GPU qualification is deferred.",
+          "Cone-overview's two-FIT similarity remains chosen/unqualified. Cam-rod now uses three original FIT pixels and same-input actual native world markers for a root-selected upright fixedFOV30/centredPP SQPNP physical pose; previous camera similarities are historical/unaccepted. Its declared15deg upright branch prior is not a measured historical camera. Only3FIT depths are established, not whole geometry or GPU/stage acceptance;3FIT/1CHECK still lacks qualified6FIT/2CHECK. Pinion CHECK was never used for objective/ranking/selection and remains held out for root measurement.",
+          "Synthesis presenter-to-spin has one original main machine view with chosen coarse principal-point/FOV reframing. No independently measured transition FIT/CHECK landmarks or per-exposure camera fits are introduced; presenter/black graphic/formula are not native geometry."
+        ]
+      }
+    },
+    "imagePlaneWarp": null,
+    "resolvedImagePlaneWarp": null,
+    "sourceLayout": [
+      {
+        "viewId": "main",
+        "rectSourcePixels": [
+          0,
+          0,
+          1920,
+          1080
+        ],
+        "presentation": "native",
+        "composite": {
+          "mode": "opaque"
+        },
+        "resolvedImagePlaneWarp": null
+      }
+    ],
+    "mechanicalProvenance": "chosen",
+    "unobservedInputFields": [
+      "crankTurns",
+      "gearing",
+      "magnification",
+      "amplitudes[0]",
+      "amplitudes[1]",
+      "amplitudes[2]",
+      "amplitudes[3]",
+      "amplitudes[4]",
+      "amplitudes[5]",
+      "amplitudes[6]",
+      "amplitudes[7]",
+      "amplitudes[8]",
+      "amplitudes[9]",
+      "amplitudes[10]",
+      "amplitudes[11]",
+      "amplitudes[12]",
+      "amplitudes[13]",
+      "amplitudes[14]",
+      "amplitudes[15]",
+      "amplitudes[16]",
+      "amplitudes[17]",
+      "amplitudes[18]",
+      "amplitudes[19]",
+      "phases[0]",
+      "phases[1]",
+      "phases[2]",
+      "phases[3]",
+      "phases[4]",
+      "phases[5]",
+      "phases[6]",
+      "phases[7]",
+      "phases[8]",
+      "phases[9]",
+      "phases[10]",
+      "phases[11]",
+      "phases[12]",
+      "phases[13]",
+      "phases[14]",
+      "phases[15]",
+      "phases[16]",
+      "phases[17]",
+      "phases[18]",
+      "phases[19]",
+      "setup.counterHeightM",
+      "setup.meanLineAngleRad",
+      "setup.platenOffsetM",
+      "setup.wireFixtureOffsetM",
+      "setup.coneSwingRad",
+      "setup.pinionCamRad",
+      "setup.heldChannelTurns",
+      "setup.driveCrankOffsetTurns"
+    ],
+    "explorationOrigin": "interactive-default",
+    "inputMeaning": "chosen-feasible-approximation",
+    "nativeGeometryAssumptions": [
+      {
+        "id": "rod-head-functional-equivalence",
+        "status": "user-approved-pending-cad-match",
+        "scope": "rod-head-topology-only",
+        "nativePartPaths": [
+          "harmonic-analyzer/channel/connecting-rod-1",
+          "harmonic-analyzer/channel/connecting-rod-2",
+          "harmonic-analyzer/channel/connecting-rod-3",
+          "harmonic-analyzer/channel/connecting-rod-4",
+          "harmonic-analyzer/channel/connecting-rod-5",
+          "harmonic-analyzer/channel/connecting-rod-6",
+          "harmonic-analyzer/channel/connecting-rod-7",
+          "harmonic-analyzer/channel/connecting-rod-8",
+          "harmonic-analyzer/channel/connecting-rod-9",
+          "harmonic-analyzer/channel/connecting-rod-10",
+          "harmonic-analyzer/channel/connecting-rod-11",
+          "harmonic-analyzer/channel/connecting-rod-12",
+          "harmonic-analyzer/channel/connecting-rod-13",
+          "harmonic-analyzer/channel/connecting-rod-14",
+          "harmonic-analyzer/channel/connecting-rod-15",
+          "harmonic-analyzer/channel/connecting-rod-16",
+          "harmonic-analyzer/channel/connecting-rod-17",
+          "harmonic-analyzer/channel/connecting-rod-18",
+          "harmonic-analyzer/channel/connecting-rod-19",
+          "harmonic-analyzer/channel/connecting-rod-20"
+        ],
+        "authority": "the one plate-like head vs u crosspiece is a discrepancy but both serve the same purpose; the 3d model will be fixed later to match device; animate assuming they will match later",
+        "sourceCounterpart": "Filmed U-shaped connecting-rod junction/crosspiece",
+        "interpretation": "Functional linkage mapping for animation only; not a current geometric-fidelity pass."
+      }
+    ],
+    "physics": {
+      "renderedViewId": "main",
+      "mechanicalProvenance": "chosen",
+      "springForcesN": [
+        4.485148385879571,
+        4.485148385879571,
+        4.485148385879571,
+        4.485148385879571,
+        4.485148385879571,
+        4.485148385879571,
+        4.485148385879571,
+        4.485148385879571,
+        4.485148385879571,
+        4.485148385879571,
+        4.485148385879571,
+        4.485148385879571,
+        4.485148385879571,
+        4.485148385879571,
+        4.485148385879571,
+        4.485148385879571,
+        4.485148385879571,
+        4.485148385879571,
+        4.485148385879571,
+        4.331021634211968
+      ],
+      "springLengthsM": [
+        0.06493005729418395,
+        0.06493005729418395,
+        0.06493005729418395,
+        0.06493005729418395,
+        0.06493005729418395,
+        0.06493005729418395,
+        0.06493005729418395,
+        0.06493005729418395,
+        0.06493005729418395,
+        0.06493005729418395,
+        0.06493005729418395,
+        0.06493005729418395,
+        0.06493005729418395,
+        0.06493005729418395,
+        0.06493005729418395,
+        0.06493005729418395,
+        0.06493005729418395,
+        0.06493005729418395,
+        0.06493005729418395,
+        0.064049970861681
+      ],
+      "equilibriumResidualNm": 9.549694368615747e-15,
+      "platenTravelM": 0,
+      "summingAngleRad": 1.3855583347321954e-15
+    },
+    "playerAudio": {
+      "state": "audible",
+      "volume": 100
+    },
+    "views": [
+      {
+        "id": "main",
+        "rectSourcePixels": [
+          0,
+          0,
+          1920,
+          1080
+        ],
+        "presentation": "native",
+        "composite": {
+          "mode": "opaque"
+        },
+        "imagePlaneWarp": null,
+        "resolvedImagePlaneWarp": null,
+        "sourceLayout": [
+          {
+            "viewId": "main",
+            "rectSourcePixels": [
+              0,
+              0,
+              1920,
+              1080
+            ],
+            "presentation": "native",
+            "composite": {
+              "mode": "opaque"
+            },
+            "resolvedImagePlaneWarp": null
+          }
+        ],
+        "camera": {
+          "positionMetres": [
+            -0.119936139775151,
+            0.1739581164103444,
+            0.5790659466866046
+          ],
+          "quaternion": [
+            -0.005039273586140318,
+            -0.11877097134333389,
+            0.021688863426512862,
+            0.9926719776900882
+          ],
+          "verticalFovDegrees": 30,
+          "principalPointViewportPixels": [
+            960,
+            540
+          ]
+        },
+        "input": {
+          "crankTurns": 0,
+          "amplitudes": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            -0.08
+          ],
+          "phases": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            3.141592653589793
+          ],
+          "gearing": "small-large",
+          "magnification": 4.85205222755,
+          "setup": {
+            "counterHeightM": null,
+            "meanLineAngleRad": 0,
+            "platenOffsetM": 0,
+            "wireFixtureOffsetM": 0.015,
+            "coneSwingRad": 0,
+            "pinionCamRad": 0,
+            "heldChannelTurns": 0,
+            "driveCrankOffsetTurns": 0
+          }
+        },
+        "mechanicalProvenance": "chosen",
+        "unobservedInputFields": [
+          "crankTurns",
+          "gearing",
+          "magnification",
+          "amplitudes[0]",
+          "amplitudes[1]",
+          "amplitudes[2]",
+          "amplitudes[3]",
+          "amplitudes[4]",
+          "amplitudes[5]",
+          "amplitudes[6]",
+          "amplitudes[7]",
+          "amplitudes[8]",
+          "amplitudes[9]",
+          "amplitudes[10]",
+          "amplitudes[11]",
+          "amplitudes[12]",
+          "amplitudes[13]",
+          "amplitudes[14]",
+          "amplitudes[15]",
+          "amplitudes[16]",
+          "amplitudes[17]",
+          "amplitudes[18]",
+          "amplitudes[19]",
+          "phases[0]",
+          "phases[1]",
+          "phases[2]",
+          "phases[3]",
+          "phases[4]",
+          "phases[5]",
+          "phases[6]",
+          "phases[7]",
+          "phases[8]",
+          "phases[9]",
+          "phases[10]",
+          "phases[11]",
+          "phases[12]",
+          "phases[13]",
+          "phases[14]",
+          "phases[15]",
+          "phases[16]",
+          "phases[17]",
+          "phases[18]",
+          "phases[19]",
+          "setup.counterHeightM",
+          "setup.meanLineAngleRad",
+          "setup.platenOffsetM",
+          "setup.wireFixtureOffsetM",
+          "setup.coneSwingRad",
+          "setup.pinionCamRad",
+          "setup.heldChannelTurns",
+          "setup.driveCrankOffsetTurns"
+        ],
+        "sourceSampling": {
+          "fromTimeSeconds": 100,
+          "toTimeSeconds": 101,
+          "mix": 0,
+          "selection": "continuous",
+          "cameraSelection": "decoded-exposure"
+        },
+        "nativeGeometryAssumptions": [
+          {
+            "id": "rod-head-functional-equivalence",
+            "status": "user-approved-pending-cad-match",
+            "scope": "rod-head-topology-only",
+            "nativePartPaths": [
+              "harmonic-analyzer/channel/connecting-rod-1",
+              "harmonic-analyzer/channel/connecting-rod-2",
+              "harmonic-analyzer/channel/connecting-rod-3",
+              "harmonic-analyzer/channel/connecting-rod-4",
+              "harmonic-analyzer/channel/connecting-rod-5",
+              "harmonic-analyzer/channel/connecting-rod-6",
+              "harmonic-analyzer/channel/connecting-rod-7",
+              "harmonic-analyzer/channel/connecting-rod-8",
+              "harmonic-analyzer/channel/connecting-rod-9",
+              "harmonic-analyzer/channel/connecting-rod-10",
+              "harmonic-analyzer/channel/connecting-rod-11",
+              "harmonic-analyzer/channel/connecting-rod-12",
+              "harmonic-analyzer/channel/connecting-rod-13",
+              "harmonic-analyzer/channel/connecting-rod-14",
+              "harmonic-analyzer/channel/connecting-rod-15",
+              "harmonic-analyzer/channel/connecting-rod-16",
+              "harmonic-analyzer/channel/connecting-rod-17",
+              "harmonic-analyzer/channel/connecting-rod-18",
+              "harmonic-analyzer/channel/connecting-rod-19",
+              "harmonic-analyzer/channel/connecting-rod-20"
+            ],
+            "authority": "the one plate-like head vs u crosspiece is a discrepancy but both serve the same purpose; the 3d model will be fixed later to match device; animate assuming they will match later",
+            "sourceCounterpart": "Filmed U-shaped connecting-rod junction/crosspiece",
+            "interpretation": "Functional linkage mapping for animation only; not a current geometric-fidelity pass."
+          }
+        ],
+        "renderedMechanism": {
+          "status": "rendered",
+          "viewId": "main",
+          "timeSeconds": 100,
+          "sourceDrawRevision": 1,
+          "method": "actual-native-mechanism-solve",
+          "input": {
+            "crankTurns": 0,
+            "amplitudes": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              -0.08
+            ],
+            "phases": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              3.141592653589793
+            ],
+            "gearing": "small-large",
+            "magnification": 4.85205222755,
+            "setup": {
+              "counterHeightM": null,
+              "meanLineAngleRad": 0,
+              "platenOffsetM": 0,
+              "wireFixtureOffsetM": 0.015,
+              "coneSwingRad": 0,
+              "pinionCamRad": 0,
+              "heldChannelTurns": 0,
+              "driveCrankOffsetTurns": 0
+            }
+          },
+          "mechanicalProvenance": "chosen",
+          "unobservedInputFields": [
+            "crankTurns",
+            "gearing",
+            "magnification",
+            "amplitudes[0]",
+            "amplitudes[1]",
+            "amplitudes[2]",
+            "amplitudes[3]",
+            "amplitudes[4]",
+            "amplitudes[5]",
+            "amplitudes[6]",
+            "amplitudes[7]",
+            "amplitudes[8]",
+            "amplitudes[9]",
+            "amplitudes[10]",
+            "amplitudes[11]",
+            "amplitudes[12]",
+            "amplitudes[13]",
+            "amplitudes[14]",
+            "amplitudes[15]",
+            "amplitudes[16]",
+            "amplitudes[17]",
+            "amplitudes[18]",
+            "amplitudes[19]",
+            "phases[0]",
+            "phases[1]",
+            "phases[2]",
+            "phases[3]",
+            "phases[4]",
+            "phases[5]",
+            "phases[6]",
+            "phases[7]",
+            "phases[8]",
+            "phases[9]",
+            "phases[10]",
+            "phases[11]",
+            "phases[12]",
+            "phases[13]",
+            "phases[14]",
+            "phases[15]",
+            "phases[16]",
+            "phases[17]",
+            "phases[18]",
+            "phases[19]",
+            "setup.counterHeightM",
+            "setup.meanLineAngleRad",
+            "setup.platenOffsetM",
+            "setup.wireFixtureOffsetM",
+            "setup.coneSwingRad",
+            "setup.pinionCamRad",
+            "setup.heldChannelTurns",
+            "setup.driveCrankOffsetTurns"
+          ],
+          "nativeGeometryAssumptions": [
+            {
+              "id": "rod-head-functional-equivalence",
+              "status": "user-approved-pending-cad-match",
+              "scope": "rod-head-topology-only",
+              "nativePartPaths": [
+                "harmonic-analyzer/channel/connecting-rod-1",
+                "harmonic-analyzer/channel/connecting-rod-2",
+                "harmonic-analyzer/channel/connecting-rod-3",
+                "harmonic-analyzer/channel/connecting-rod-4",
+                "harmonic-analyzer/channel/connecting-rod-5",
+                "harmonic-analyzer/channel/connecting-rod-6",
+                "harmonic-analyzer/channel/connecting-rod-7",
+                "harmonic-analyzer/channel/connecting-rod-8",
+                "harmonic-analyzer/channel/connecting-rod-9",
+                "harmonic-analyzer/channel/connecting-rod-10",
+                "harmonic-analyzer/channel/connecting-rod-11",
+                "harmonic-analyzer/channel/connecting-rod-12",
+                "harmonic-analyzer/channel/connecting-rod-13",
+                "harmonic-analyzer/channel/connecting-rod-14",
+                "harmonic-analyzer/channel/connecting-rod-15",
+                "harmonic-analyzer/channel/connecting-rod-16",
+                "harmonic-analyzer/channel/connecting-rod-17",
+                "harmonic-analyzer/channel/connecting-rod-18",
+                "harmonic-analyzer/channel/connecting-rod-19",
+                "harmonic-analyzer/channel/connecting-rod-20"
+              ],
+              "authority": "the one plate-like head vs u crosspiece is a discrepancy but both serve the same purpose; the 3d model will be fixed later to match device; animate assuming they will match later",
+              "sourceCounterpart": "Filmed U-shaped connecting-rod junction/crosspiece",
+              "interpretation": "Functional linkage mapping for animation only; not a current geometric-fidelity pass."
+            }
+          ],
+          "imagePlaneWarp": null,
+          "resolvedImagePlaneWarp": null,
+          "sourceLayout": [
+            {
+              "viewId": "main",
+              "rectSourcePixels": [
+                0,
+                0,
+                1920,
+                1080
+              ],
+              "presentation": "native",
+              "composite": {
+                "mode": "opaque"
+              },
+              "resolvedImagePlaneWarp": null
+            }
+          ],
+          "channelAnglesRad": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            3.141592653589793
+          ],
+          "platenTravelM": 0,
+          "penTravelM": -0.10795302231276226,
+          "effectiveBankDriveTurns": 0
+        }
+      }
+    ]
+  },
+  "renderedLandmarks": {
+    "method": "gpu-readback",
+    "visibilityMode": "depth-off-landmark-projection",
+    "status": "captured",
+    "sourceOpacity": 1,
+    "resolvedImagePlaneWarp": null,
+    "nativeViewportBackingPixels": null,
+    "destinationCellSourcePixels": [
+      1.2,
+      1.2
+    ],
+    "sourceLayout": [
+      {
+        "viewId": "main",
+        "rectSourcePixels": [
+          0,
+          0,
+          1920,
+          1080
+        ],
+        "presentation": "native",
+        "composite": {
+          "mode": "opaque"
+        },
+        "resolvedImagePlaneWarp": null
+      }
+    ],
+    "viewId": "main",
+    "presentation": "native",
+    "timeSeconds": 100,
+    "landmarks": [
+      {
+        "id": "wheel-centre",
+        "state": "not-visible",
+        "worldMetres": [
+          0.05299999999999999,
+          0.575699985,
+          -0.15589999634102014
+        ],
+        "worldReason": null,
+        "canvasPixels": null,
+        "sourcePixels": null,
+        "uncertaintyCanvasPixels": null,
+        "uncertaintySourcePixels": null,
+        "reason": "no marker pixels: clipped by camera frustum, near/far planes or view scissor"
+      },
+      {
+        "id": "wheel-clamp-left",
+        "state": "not-visible",
+        "worldMetres": [
+          0.1795,
+          0.575699985,
+          -0.1428486742079258
+        ],
+        "worldReason": null,
+        "canvasPixels": null,
+        "sourcePixels": null,
+        "uncertaintyCanvasPixels": null,
+        "uncertaintySourcePixels": null,
+        "reason": "no marker pixels: clipped by camera frustum, near/far planes or view scissor"
+      },
+      {
+        "id": "top-screw-left",
+        "state": "not-visible",
+        "worldMetres": [
+          0.19699999690055844,
+          1.0179500579833984,
+          -0.1421561638426987
+        ],
+        "worldReason": null,
+        "canvasPixels": null,
+        "sourcePixels": null,
+        "uncertaintyCanvasPixels": null,
+        "uncertaintySourcePixels": null,
+        "reason": "no marker pixels: clipped by camera frustum, near/far planes or view scissor"
+      },
+      {
+        "id": "top-screw-right",
+        "state": "not-visible",
+        "worldMetres": [
+          -0.19699999690055844,
+          1.0179500579833984,
+          -0.1421561638426987
+        ],
+        "worldReason": null,
+        "canvasPixels": null,
+        "sourcePixels": null,
+        "uncertaintyCanvasPixels": null,
+        "uncertaintySourcePixels": null,
+        "reason": "no marker pixels: clipped by camera frustum, near/far planes or view scissor"
+      },
+      {
+        "id": "base-screw-left",
+        "state": "rendered",
+        "worldMetres": [
+          0.19699999690055844,
+          0.03810000047087668,
+          -0.13755616048099673
+        ],
+        "worldReason": null,
+        "canvasPixels": [
+          1089.5,
+          784.5
+        ],
+        "sourcePixels": [
+          1307.4,
+          900.6
+        ],
+        "uncertaintyCanvasPixels": 0.5,
+        "uncertaintySourcePixels": 0.848528137423857,
+        "reason": null
+      },
+      {
+        "id": "base-screw-right",
+        "state": "rendered",
+        "worldMetres": [
+          -0.19699999690055844,
+          0.03810000047087668,
+          -0.13755616048099673
+        ],
+        "worldReason": null,
+        "canvasPixels": [
+          182.5,
+          784.5
+        ],
+        "sourcePixels": [
+          219,
+          900.6
+        ],
+        "uncertaintyCanvasPixels": 0.5,
+        "uncertaintySourcePixels": 0.848528137423857,
+        "reason": null
+      },
+      {
+        "id": "wheel-clamp-outer",
+        "state": "not-visible",
+        "worldMetres": [
+          0.21450000000000014,
+          0.575699985,
+          -0.1428486742079258
+        ],
+        "worldReason": null,
+        "canvasPixels": null,
+        "sourcePixels": null,
+        "uncertaintyCanvasPixels": null,
+        "uncertaintySourcePixels": null,
+        "reason": "no marker pixels: clipped by camera frustum, near/far planes or view scissor"
+      },
+      {
+        "id": "rocker-shaft-front",
+        "state": "rendered",
+        "worldMetres": [
+          0.07289999999999996,
+          0.2538000047,
+          -0.07628066092729568
+        ],
+        "worldReason": null,
+        "canvasPixels": [
+          889.5,
+          282.5
+        ],
+        "sourcePixels": [
+          1067.4,
+          298.2
+        ],
+        "uncertaintyCanvasPixels": 0.5,
+        "uncertaintySourcePixels": 0.848528137423857,
+        "reason": null
+      },
+      {
+        "id": "rocker-shaft-back",
+        "state": "rendered",
+        "worldMetres": [
+          0.07289999999999996,
+          0.2538000047,
+          0.08338933880440891
+        ],
+        "worldReason": null,
+        "canvasPixels": [
+          1035.5,
+          231.5
+        ],
+        "sourcePixels": [
+          1242.6,
+          237
+        ],
+        "uncertaintyCanvasPixels": 0.5,
+        "uncertaintySourcePixels": 0.848528137423857,
+        "reason": null
+      },
+      {
+        "id": "cylinder-axis-back",
+        "state": "rendered",
+        "worldMetres": [
+          -0.06039360165999999,
+          0.09051799773999988,
+          0.084535747725667
+        ],
+        "worldReason": null,
+        "canvasPixels": [
+          588.5,
+          749.5
+        ],
+        "sourcePixels": [
+          706.2,
+          858.6
+        ],
+        "uncertaintyCanvasPixels": 0.5,
+        "uncertaintySourcePixels": 0.848528137423857,
+        "reason": null
+      },
+      {
+        "id": "crank-axis-back",
+        "state": "rendered",
+        "worldMetres": [
+          -0.12873348593999426,
+          0.12980464099999933,
+          -0.04619997391876968
+        ],
+        "worldReason": null,
+        "canvasPixels": [
+          362.5,
+          579.5
+        ],
+        "sourcePixels": [
+          435,
+          654.6
+        ],
+        "uncertaintyCanvasPixels": 0.5,
+        "uncertaintySourcePixels": 0.848528137423857,
+        "reason": null
+      },
+      {
+        "id": "pinion-pivot-back",
+        "state": "rendered",
+        "worldMetres": [
+          -0.014420043680000001,
+          0.06279999763,
+          0.09401188790798187
+        ],
+        "worldReason": null,
+        "canvasPixels": [
+          743.5,
+          849.5
+        ],
+        "sourcePixels": [
+          892.2,
+          978.6
+        ],
+        "uncertaintyCanvasPixels": 0.5,
+        "uncertaintySourcePixels": 0.848528137423857,
+        "reason": null
+      },
+      {
+        "id": "paper-clamp-left-inner",
+        "state": "rendered",
+        "worldMetres": [
+          0.17949999868869781,
+          0.30673399567604065,
+          -0.13868627324700356
+        ],
+        "worldReason": null,
+        "canvasPixels": [
+          1078.5,
+          197.5
+        ],
+        "sourcePixels": [
+          1294.2,
+          196.2
+        ],
+        "uncertaintyCanvasPixels": 0.5,
+        "uncertaintySourcePixels": 0.848528137423857,
+        "reason": null
+      },
+      {
+        "id": "paper-clamp-left-outer",
+        "state": "rendered",
+        "worldMetres": [
+          0.21449999511241913,
+          0.30673399567604065,
+          -0.13868627324700356
+        ],
+        "worldReason": null,
+        "canvasPixels": [
+          1149.5,
+          203.5
+        ],
+        "sourcePixels": [
+          1379.4,
+          203.4
+        ],
+        "uncertaintyCanvasPixels": 0.5,
+        "uncertaintySourcePixels": 0.848528137423857,
+        "reason": null
+      },
+      {
+        "id": "paper-clamp-right-inner",
+        "state": "rendered",
+        "worldMetres": [
+          -0.17949999868869781,
+          0.30673399567604065,
+          -0.13868627324700356
+        ],
+        "worldReason": null,
+        "canvasPixels": [
+          256.5,
+          124.5
+        ],
+        "sourcePixels": [
+          307.8,
+          108.6
+        ],
+        "uncertaintyCanvasPixels": 0.5,
+        "uncertaintySourcePixels": 0.848528137423857,
+        "reason": null
+      },
+      {
+        "id": "paper-clamp-right-outer",
+        "state": "rendered",
+        "worldMetres": [
+          -0.21449999511241913,
+          0.30673399567604065,
+          -0.13868627324700356
+        ],
+        "worldReason": null,
+        "canvasPixels": [
+          165.5,
+          116.5
+        ],
+        "sourcePixels": [
+          198.6,
+          99
+        ],
+        "uncertaintyCanvasPixels": 0.5,
+        "uncertaintySourcePixels": 0.848528137423857,
+        "reason": null
+      },
+      {
+        "id": "crank-axis-front",
+        "state": "rendered",
+        "worldMetres": [
+          -0.12873348594000014,
+          0.12980464099999997,
+          -0.18499999869478284
+        ],
+        "worldReason": null,
+        "canvasPixels": [
+          368.5,
+          556.5
+        ],
+        "sourcePixels": [
+          442.2,
+          627
+        ],
+        "uncertaintyCanvasPixels": 0.5,
+        "uncertaintySourcePixels": 0.848528137423857,
+        "reason": null
+      },
+      {
+        "id": "cylinder-axis-front",
+        "state": "rendered",
+        "worldMetres": [
+          -0.06039360165999999,
+          0.09051799774,
+          -0.08299274366593458
+        ],
+        "worldReason": null,
+        "canvasPixels": [
+          539.5,
+          677.5
+        ],
+        "sourcePixels": [
+          647.4,
+          772.2
+        ],
+        "uncertaintyCanvasPixels": 0.5,
+        "uncertaintySourcePixels": 0.848528137423857,
+        "reason": null
+      },
+      {
+        "id": "paper-chain-axis",
+        "state": "rendered",
+        "worldMetres": [
+          -0.042574994266033166,
+          0.2523671984672547,
+          -0.16700000071016527
+        ],
+        "worldReason": null,
+        "canvasPixels": [
+          580.5,
+          288.5
+        ],
+        "sourcePixels": [
+          696.6,
+          305.4
+        ],
+        "uncertaintyCanvasPixels": 0.5,
+        "uncertaintySourcePixels": 0.848528137423857,
+        "reason": null
+      },
+      {
+        "id": "wheel-hanger-screw",
+        "state": "not-visible",
+        "worldMetres": [
+          -0.003000000026077032,
+          0.5756999850273132,
+          -0.14259999338537455
+        ],
+        "worldReason": null,
+        "canvasPixels": null,
+        "sourcePixels": null,
+        "uncertaintyCanvasPixels": null,
+        "uncertaintySourcePixels": null,
+        "reason": "no marker pixels: clipped by camera frustum, near/far planes or view scissor"
+      }
+    ],
+    "imagePlaneWarp": null
+  },
+  "compiledApplication": {
+    "url": "http://127.0.0.1:5975/harmonic-analyzer/assets/index-Bkerpl_j.js",
+    "sha256": "535f0a33c08eebb56aa7842f08528e902d4689ad355f27c1a23eb2d511f1ac43",
+    "byteLength": 1042257
+  },
+  "actualMedia": {
+    "timeSeconds": 100.016583,
+    "width": 1920,
+    "height": 1080,
+    "paused": true,
+    "readyState": 4,
+    "originalFileSha256": "a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725"
+  },
+  "qualification": "Current normal-route native world markers at original cam-rod source exposure and complete historical input. No source camera, geometry or stage acceptance.",
+  "frameIdentity": {
+    "sourceImage": {
+      "frameIndex": 2398,
+      "sha256Bgr8": "12932c5a2a5ae8649357d7865da6fde3064d01757bba1bd231b4f4ce845f7686",
+      "pixelFormat": "bgr8",
+      "width": 1920,
+      "height": 1080,
+      "sourceSha256": "a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725"
+    },
+    "shotId": "cam-rod",
+    "viewId": "main",
+    "timeSeconds": 100,
+    "decodedTimeSeconds": 100.01658333333333
+  },
+  "historicalWorldReceipt": {
+    "path": "web/content/8KmVDxkia_w.camrod-world-receipt-2026-10-01.json",
+    "sha256": "222d69eb315c39366e93cdcaacadd19a9074b153fa6f0db42d3ff5f9d2af8dbc"
+  },
+  "historicalProbe": {
+    "path": "web/content/8KmVDxkia_w.camrod-sqpnp-probe-2026-10-01.json",
+    "sha256": "5a9f17e64671f84478fbdbc6de8cc620ae88932cfae78c3551dd029bc5cc1321"
+  },
+  "currentRuntimeFiles": {
+    "web/src/scene.ts": {
+      "sha256": "ff57f0a6f758e4006c91e491c09ffc679dce523ad4145d0fe5b832228a0303e9"
+    },
+    "web/src/bindings.ts": {
+      "sha256": "c9e03db0df4dd3640a954fa572478241315206c0d179f28dd2a1395701805288"
+    },
+    "web/src/main.ts": {
+      "sha256": "b5434463371d72dc714eccf6fbabd80e4628543a28a7f6d49623943bec223883"
+    },
+    "web/src/mechanics.ts": {
+      "sha256": "731ae554aee8b77b7643073d4107f59a04ea530ad41612ec8de00316aaec183c"
+    },
+    "web/src/mechanics-data.ts": {
+      "sha256": "e8fe87dfd899b6ea08ea7f7ce133e633fbf871ca7c24aed3885f6f507ef78285"
+    },
+    "web/src/kinematics.ts": {
+      "sha256": "8bb5ffa3046609f9b3afa69dc72e37297e86c6a1d15fd1bdaf21b70b47ea561f"
+    },
+    "web/src/magnifier.ts": {
+      "sha256": "935abfe377c6acf3dbab380270e97567b7000b4947fcd82cd2e4684d7aa46015"
+    },
+    "web/src/source-track.ts": {
+      "sha256": "0c32d3f09732fba1e3f3843353c28a24eae14352874e8b28f82a5e8ee417e9e0"
+    },
+    "web/src/timeline.ts": {
+      "sha256": "fb3b6339b30241c4d780aa87a60b63256c05a11a5701e5ac30e634ab9f345b05"
+    },
+    "web/content/model-representation.json": {
+      "sha256": "4e906719f870ffafce9b961b5f1aed632fb9b99d1b9e7b9f6e7d2802e9fe0f7a"
+    }
+  },
+  "representation": {
+    "schemaVersion": 1,
+    "kind": "lossless-web-model-representation",
+    "source": {
+      "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+      "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+    },
+    "representation": {
+      "path": "models/harmonic-analyzer.glb",
+      "sha256": "ad5c259265be354fb25d208281301356d7587c6a2e508fce1a6cd29014a74719",
+      "byteLength": 38975844,
+      "codec": "EXT_meshopt_compression"
+    },
+    "pipeline": {
+      "version": 1,
+      "steps": [
+        "exact-dedup",
+        "meshopt"
+      ],
+      "codecVersion": "meshoptimizer@0.22.0"
+    },
+    "equivalence": {
+      "method": "decoded-per-drawable-exact-v1",
+      "semanticSha256": "b60baed017b499c6d48e8b5aeab3c2c19f2ad256c26c0bd8e17cb094b3b4a093",
+      "drawableCount": 433
+    }
+  },
+  "measurementNotes": {
+    "worldComparison": "All nine coordinates of the three original FIT native world markers are exactly equal to immutable historical measured worlds; no tolerance/realignment applied.",
+    "sameCompleteInput": true,
+    "historicalRendererSource": {
+      "path": "web/scripts/fixtures/camrod-scene-7b28468c.ts.txt",
+      "sha256": "7b28468cc3f36a2e4d3699e252c54df837770868481c83a486b572a32f6b3b8b"
+    },
+    "sourceFrameIdentity": "Unchanged original declared BGR8 source-frame record; actual original MP4 independently hashed and playback paused at that decoded source time.",
+    "acceptance": "Current native-world compatibility only. Original sparse camera FIT remains chosen/unqualified; no full-frame geometry, GPU source-fidelity or stage acceptance."
+  }
+}

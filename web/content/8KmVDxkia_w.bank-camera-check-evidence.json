@@ -1,0 +1,1560 @@
+{
+  "schemaVersion": 1,
+  "videoId": "8KmVDxkia_w",
+  "source": {
+    "videoId": "8KmVDxkia_w",
+    "sha256": "a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725",
+    "width": 1920,
+    "height": 1080,
+    "fps": {
+      "numerator": 24000,
+      "denominator": 1001
+    },
+    "timeBase": "1/24000",
+    "decodedFrameCount": 8196,
+    "nativePtsRule": "frameIndex*1001; all8196 actual ffprobe best_effort_timestamp verified",
+    "rights": "Numeric independently observed pixels, source identity and derived cameras only. No source video, book/plot artwork or source images are redistributed."
+  },
+  "model": {
+    "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+    "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945",
+    "units": "metres",
+    "axes": "X-width/Y-height/Z-depth"
+  },
+  "feature": {
+    "id": "rocker-terminal-bevel-upper-edge-midpoint",
+    "partLocalMetres": [
+      0.14524006843566895,
+      0.029294639825820923,
+      0.0
+    ],
+    "nativeGeometryEvidence": "Released raw GLB rocker-arm POSITION accessor88: upper edge of terminal bevel at x0.14524006843566895/y0.029294639825820923, z endpoints +/\u22120.00125m. Midpoint is a chosen visible-feature association, subject to actual native surface inspection; not the missing lower-rocker face bores or connecting-rod head.",
+    "sourceAssociation": "Count physical terminal strips far H20 to nearest H1 in native station order. FIT rectangles exclude annotation-covered strips. No explanatory curve/label pixels, interpolated source pixels or old H20 boundary/H1 joint CHECK pixels enter this objective.",
+    "uncertaintyMeaning": "Blur/threshold/edge midpoint and visible-face localization; geometry association uncertainty is separate and remains unqualified."
+  },
+  "rows": [
+    {
+      "role": "check",
+      "physicalStationIndex": 1,
+      "harmonicNumber": 19,
+      "partPath": "harmonic-analyzer/channel/rocker-arm-2",
+      "sourceImage": {
+        "frameIndex": 2580,
+        "nativePts": 2582580,
+        "sourceSha256": "a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725",
+        "width": 1920,
+        "height": 1080,
+        "pixelFormat": "bgr8",
+        "sha256Bgr8": "326d1e8d7878c50323879251b50a83230e0cabd63a87b3c93751922065ae5684"
+      },
+      "timeSeconds": 107.6075,
+      "pixel": [
+        782.7727272727273,
+        353.0
+      ],
+      "uncertaintyPx": 6,
+      "rectSourcePixels": [
+        775,
+        347,
+        19,
+        39
+      ],
+      "method": "physical-gray-bevel-upper-edge",
+      "measurementEvidence": {
+        "componentBoundsPixels": [
+          779,
+          353,
+          11,
+          27
+        ],
+        "componentAreaPixels": 195,
+        "grayThreshold": 185,
+        "maximumSaturation": 69,
+        "upperEdgeLocalizationRows": 3
+      }
+    },
+    {
+      "role": "check",
+      "physicalStationIndex": 2,
+      "harmonicNumber": 18,
+      "partPath": "harmonic-analyzer/channel/rocker-arm-3",
+      "sourceImage": {
+        "frameIndex": 2580,
+        "nativePts": 2582580,
+        "sourceSha256": "a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725",
+        "width": 1920,
+        "height": 1080,
+        "pixelFormat": "bgr8",
+        "sha256Bgr8": "326d1e8d7878c50323879251b50a83230e0cabd63a87b3c93751922065ae5684"
+      },
+      "timeSeconds": 107.6075,
+      "pixel": [
+        806.3214285714286,
+        377.0
+      ],
+      "uncertaintyPx": 6,
+      "rectSourcePixels": [
+        797,
+        371,
+        20,
+        43
+      ],
+      "method": "physical-gray-bevel-upper-edge",
+      "measurementEvidence": {
+        "componentBoundsPixels": [
+          801,
+          377,
+          12,
+          31
+        ],
+        "componentAreaPixels": 249,
+        "grayThreshold": 185,
+        "maximumSaturation": 69,
+        "upperEdgeLocalizationRows": 3
+      }
+    },
+    {
+      "role": "check",
+      "physicalStationIndex": 3,
+      "harmonicNumber": 17,
+      "partPath": "harmonic-analyzer/channel/rocker-arm-4",
+      "sourceImage": {
+        "frameIndex": 2580,
+        "nativePts": 2582580,
+        "sourceSha256": "a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725",
+        "width": 1920,
+        "height": 1080,
+        "pixelFormat": "bgr8",
+        "sha256Bgr8": "326d1e8d7878c50323879251b50a83230e0cabd63a87b3c93751922065ae5684"
+      },
+      "timeSeconds": 107.6075,
+      "pixel": [
+        831.7894736842105,
+        398.0
+      ],
+      "uncertaintyPx": 6,
+      "rectSourcePixels": [
+        824,
+        392,
+        21,
+        43
+      ],
+      "method": "physical-gray-bevel-upper-edge",
+      "measurementEvidence": {
+        "componentBoundsPixels": [
+          828,
+          398,
+          13,
+          31
+        ],
+        "componentAreaPixels": 265,
+        "grayThreshold": 185,
+        "maximumSaturation": 69,
+        "upperEdgeLocalizationRows": 3
+      }
+    },
+    {
+      "role": "check",
+      "physicalStationIndex": 4,
+      "harmonicNumber": 16,
+      "partPath": "harmonic-analyzer/channel/rocker-arm-5",
+      "sourceImage": {
+        "frameIndex": 2580,
+        "nativePts": 2582580,
+        "sourceSha256": "a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725",
+        "width": 1920,
+        "height": 1080,
+        "pixelFormat": "bgr8",
+        "sha256Bgr8": "326d1e8d7878c50323879251b50a83230e0cabd63a87b3c93751922065ae5684"
+      },
+      "timeSeconds": 107.6075,
+      "pixel": [
+        860.1764705882352,
+        419.0
+      ],
+      "uncertaintyPx": 6,
+      "rectSourcePixels": [
+        852,
+        413,
+        20,
+        44
+      ],
+      "method": "physical-gray-bevel-upper-edge",
+      "measurementEvidence": {
+        "componentBoundsPixels": [
+          856,
+          419,
+          12,
+          32
+        ],
+        "componentAreaPixels": 227,
+        "grayThreshold": 185,
+        "maximumSaturation": 69,
+        "upperEdgeLocalizationRows": 3
+      }
+    },
+    {
+      "role": "check",
+      "physicalStationIndex": 5,
+      "harmonicNumber": 15,
+      "partPath": "harmonic-analyzer/channel/rocker-arm-6",
+      "sourceImage": {
+        "frameIndex": 2580,
+        "nativePts": 2582580,
+        "sourceSha256": "a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725",
+        "width": 1920,
+        "height": 1080,
+        "pixelFormat": "bgr8",
+        "sha256Bgr8": "326d1e8d7878c50323879251b50a83230e0cabd63a87b3c93751922065ae5684"
+      },
+      "timeSeconds": 107.6075,
+      "pixel": [
+        879.1739130434783,
+        433.0
+      ],
+      "uncertaintyPx": 6,
+      "rectSourcePixels": [
+        871,
+        427,
+        20,
+        42
+      ],
+      "method": "physical-gray-bevel-upper-edge",
+      "measurementEvidence": {
+        "componentBoundsPixels": [
+          875,
+          433,
+          12,
+          30
+        ],
+        "componentAreaPixels": 222,
+        "grayThreshold": 185,
+        "maximumSaturation": 69,
+        "upperEdgeLocalizationRows": 3
+      }
+    },
+    {
+      "role": "check",
+      "physicalStationIndex": 6,
+      "harmonicNumber": 14,
+      "partPath": "harmonic-analyzer/channel/rocker-arm-7",
+      "sourceImage": {
+        "frameIndex": 2580,
+        "nativePts": 2582580,
+        "sourceSha256": "a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725",
+        "width": 1920,
+        "height": 1080,
+        "pixelFormat": "bgr8",
+        "sha256Bgr8": "326d1e8d7878c50323879251b50a83230e0cabd63a87b3c93751922065ae5684"
+      },
+      "timeSeconds": 107.6075,
+      "pixel": [
+        910.8965517241379,
+        454.0
+      ],
+      "uncertaintyPx": 6,
+      "rectSourcePixels": [
+        901,
+        448,
+        21,
+        46
+      ],
+      "method": "physical-gray-bevel-upper-edge",
+      "measurementEvidence": {
+        "componentBoundsPixels": [
+          905,
+          454,
+          13,
+          34
+        ],
+        "componentAreaPixels": 278,
+        "grayThreshold": 185,
+        "maximumSaturation": 69,
+        "upperEdgeLocalizationRows": 3
+      }
+    },
+    {
+      "role": "check",
+      "physicalStationIndex": 7,
+      "harmonicNumber": 13,
+      "partPath": "harmonic-analyzer/channel/rocker-arm-8",
+      "sourceImage": {
+        "frameIndex": 2580,
+        "nativePts": 2582580,
+        "sourceSha256": "a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725",
+        "width": 1920,
+        "height": 1080,
+        "pixelFormat": "bgr8",
+        "sha256Bgr8": "326d1e8d7878c50323879251b50a83230e0cabd63a87b3c93751922065ae5684"
+      },
+      "timeSeconds": 107.6075,
+      "pixel": [
+        936.2727272727273,
+        464.0
+      ],
+      "uncertaintyPx": 6,
+      "rectSourcePixels": [
+        929,
+        458,
+        19,
+        37
+      ],
+      "method": "physical-gray-bevel-upper-edge",
+      "measurementEvidence": {
+        "componentBoundsPixels": [
+          933,
+          464,
+          11,
+          25
+        ],
+        "componentAreaPixels": 148,
+        "grayThreshold": 185,
+        "maximumSaturation": 69,
+        "upperEdgeLocalizationRows": 3
+      }
+    },
+    {
+      "role": "check",
+      "physicalStationIndex": 8,
+      "harmonicNumber": 12,
+      "partPath": "harmonic-analyzer/channel/rocker-arm-9",
+      "sourceImage": {
+        "frameIndex": 2580,
+        "nativePts": 2582580,
+        "sourceSha256": "a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725",
+        "width": 1920,
+        "height": 1080,
+        "pixelFormat": "bgr8",
+        "sha256Bgr8": "326d1e8d7878c50323879251b50a83230e0cabd63a87b3c93751922065ae5684"
+      },
+      "timeSeconds": 107.6075,
+      "pixel": [
+        962.0,
+        473.0
+      ],
+      "uncertaintyPx": 6,
+      "rectSourcePixels": [
+        954,
+        467,
+        18,
+        42
+      ],
+      "method": "physical-gray-bevel-upper-edge",
+      "measurementEvidence": {
+        "componentBoundsPixels": [
+          958,
+          473,
+          10,
+          30
+        ],
+        "componentAreaPixels": 220,
+        "grayThreshold": 185,
+        "maximumSaturation": 69,
+        "upperEdgeLocalizationRows": 3
+      }
+    },
+    {
+      "role": "check",
+      "physicalStationIndex": 9,
+      "harmonicNumber": 11,
+      "partPath": "harmonic-analyzer/channel/rocker-arm-10",
+      "sourceImage": {
+        "frameIndex": 2580,
+        "nativePts": 2582580,
+        "sourceSha256": "a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725",
+        "width": 1920,
+        "height": 1080,
+        "pixelFormat": "bgr8",
+        "sha256Bgr8": "326d1e8d7878c50323879251b50a83230e0cabd63a87b3c93751922065ae5684"
+      },
+      "timeSeconds": 107.6075,
+      "pixel": [
+        991.2222222222222,
+        488.0
+      ],
+      "uncertaintyPx": 6,
+      "rectSourcePixels": [
+        983,
+        482,
+        20,
+        44
+      ],
+      "method": "physical-gray-bevel-upper-edge",
+      "measurementEvidence": {
+        "componentBoundsPixels": [
+          987,
+          488,
+          12,
+          32
+        ],
+        "componentAreaPixels": 264,
+        "grayThreshold": 185,
+        "maximumSaturation": 69,
+        "upperEdgeLocalizationRows": 3
+      }
+    },
+    {
+      "role": "check",
+      "physicalStationIndex": 11,
+      "harmonicNumber": 9,
+      "partPath": "harmonic-analyzer/channel/rocker-arm-12",
+      "sourceImage": {
+        "frameIndex": 2580,
+        "nativePts": 2582580,
+        "sourceSha256": "a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725",
+        "width": 1920,
+        "height": 1080,
+        "pixelFormat": "bgr8",
+        "sha256Bgr8": "326d1e8d7878c50323879251b50a83230e0cabd63a87b3c93751922065ae5684"
+      },
+      "timeSeconds": 107.6075,
+      "pixel": [
+        1047.2727272727273,
+        506.0
+      ],
+      "uncertaintyPx": 6,
+      "rectSourcePixels": [
+        1038,
+        500,
+        20,
+        39
+      ],
+      "method": "physical-gray-bevel-upper-edge",
+      "measurementEvidence": {
+        "componentBoundsPixels": [
+          1042,
+          506,
+          12,
+          27
+        ],
+        "componentAreaPixels": 208,
+        "grayThreshold": 185,
+        "maximumSaturation": 69,
+        "upperEdgeLocalizationRows": 3
+      }
+    },
+    {
+      "role": "check",
+      "physicalStationIndex": 12,
+      "harmonicNumber": 8,
+      "partPath": "harmonic-analyzer/channel/rocker-arm-13",
+      "sourceImage": {
+        "frameIndex": 2580,
+        "nativePts": 2582580,
+        "sourceSha256": "a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725",
+        "width": 1920,
+        "height": 1080,
+        "pixelFormat": "bgr8",
+        "sha256Bgr8": "326d1e8d7878c50323879251b50a83230e0cabd63a87b3c93751922065ae5684"
+      },
+      "timeSeconds": 107.6075,
+      "pixel": [
+        1075.7894736842106,
+        510.0
+      ],
+      "uncertaintyPx": 6,
+      "rectSourcePixels": [
+        1068,
+        504,
+        19,
+        42
+      ],
+      "method": "physical-gray-bevel-upper-edge",
+      "measurementEvidence": {
+        "componentBoundsPixels": [
+          1072,
+          510,
+          11,
+          30
+        ],
+        "componentAreaPixels": 208,
+        "grayThreshold": 185,
+        "maximumSaturation": 69,
+        "upperEdgeLocalizationRows": 3
+      }
+    },
+    {
+      "role": "check",
+      "physicalStationIndex": 13,
+      "harmonicNumber": 7,
+      "partPath": "harmonic-analyzer/channel/rocker-arm-14",
+      "sourceImage": {
+        "frameIndex": 2580,
+        "nativePts": 2582580,
+        "sourceSha256": "a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725",
+        "width": 1920,
+        "height": 1080,
+        "pixelFormat": "bgr8",
+        "sha256Bgr8": "326d1e8d7878c50323879251b50a83230e0cabd63a87b3c93751922065ae5684"
+      },
+      "timeSeconds": 107.6075,
+      "pixel": [
+        1103.9444444444443,
+        510.0
+      ],
+      "uncertaintyPx": 6,
+      "rectSourcePixels": [
+        1095,
+        504,
+        22,
+        46
+      ],
+      "method": "physical-gray-bevel-upper-edge",
+      "measurementEvidence": {
+        "componentBoundsPixels": [
+          1099,
+          510,
+          14,
+          34
+        ],
+        "componentAreaPixels": 280,
+        "grayThreshold": 185,
+        "maximumSaturation": 69,
+        "upperEdgeLocalizationRows": 3
+      }
+    },
+    {
+      "role": "check",
+      "physicalStationIndex": 14,
+      "harmonicNumber": 6,
+      "partPath": "harmonic-analyzer/channel/rocker-arm-15",
+      "sourceImage": {
+        "frameIndex": 2580,
+        "nativePts": 2582580,
+        "sourceSha256": "a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725",
+        "width": 1920,
+        "height": 1080,
+        "pixelFormat": "bgr8",
+        "sha256Bgr8": "326d1e8d7878c50323879251b50a83230e0cabd63a87b3c93751922065ae5684"
+      },
+      "timeSeconds": 107.6075,
+      "pixel": [
+        1135.25,
+        520.0
+      ],
+      "uncertaintyPx": 6,
+      "rectSourcePixels": [
+        1127,
+        514,
+        21,
+        45
+      ],
+      "method": "physical-gray-bevel-upper-edge",
+      "measurementEvidence": {
+        "componentBoundsPixels": [
+          1131,
+          520,
+          13,
+          33
+        ],
+        "componentAreaPixels": 243,
+        "grayThreshold": 185,
+        "maximumSaturation": 69,
+        "upperEdgeLocalizationRows": 3
+      }
+    },
+    {
+      "role": "check",
+      "physicalStationIndex": 15,
+      "harmonicNumber": 5,
+      "partPath": "harmonic-analyzer/channel/rocker-arm-16",
+      "sourceImage": {
+        "frameIndex": 2580,
+        "nativePts": 2582580,
+        "sourceSha256": "a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725",
+        "width": 1920,
+        "height": 1080,
+        "pixelFormat": "bgr8",
+        "sha256Bgr8": "326d1e8d7878c50323879251b50a83230e0cabd63a87b3c93751922065ae5684"
+      },
+      "timeSeconds": 107.6075,
+      "pixel": [
+        1169.4666666666667,
+        530.0
+      ],
+      "uncertaintyPx": 6,
+      "rectSourcePixels": [
+        1160,
+        524,
+        22,
+        45
+      ],
+      "method": "physical-gray-bevel-upper-edge",
+      "measurementEvidence": {
+        "componentBoundsPixels": [
+          1164,
+          530,
+          14,
+          33
+        ],
+        "componentAreaPixels": 239,
+        "grayThreshold": 185,
+        "maximumSaturation": 69,
+        "upperEdgeLocalizationRows": 3
+      }
+    },
+    {
+      "role": "check",
+      "physicalStationIndex": 16,
+      "harmonicNumber": 4,
+      "partPath": "harmonic-analyzer/channel/rocker-arm-17",
+      "sourceImage": {
+        "frameIndex": 2580,
+        "nativePts": 2582580,
+        "sourceSha256": "a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725",
+        "width": 1920,
+        "height": 1080,
+        "pixelFormat": "bgr8",
+        "sha256Bgr8": "326d1e8d7878c50323879251b50a83230e0cabd63a87b3c93751922065ae5684"
+      },
+      "timeSeconds": 107.6075,
+      "pixel": [
+        1196.1538461538462,
+        549.0
+      ],
+      "uncertaintyPx": 6,
+      "rectSourcePixels": [
+        1187,
+        543,
+        21,
+        45
+      ],
+      "method": "physical-gray-bevel-upper-edge",
+      "measurementEvidence": {
+        "componentBoundsPixels": [
+          1191,
+          549,
+          13,
+          33
+        ],
+        "componentAreaPixels": 244,
+        "grayThreshold": 185,
+        "maximumSaturation": 69,
+        "upperEdgeLocalizationRows": 3
+      }
+    },
+    {
+      "role": "check",
+      "physicalStationIndex": 1,
+      "harmonicNumber": 19,
+      "partPath": "harmonic-analyzer/channel/rocker-arm-2",
+      "sourceImage": {
+        "frameIndex": 2640,
+        "nativePts": 2642640,
+        "sourceSha256": "a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725",
+        "width": 1920,
+        "height": 1080,
+        "pixelFormat": "bgr8",
+        "sha256Bgr8": "d5caefa6da7d8768fc829c12a9038f63dbf41ad5ffa90d20b76cfe39967b724f"
+      },
+      "timeSeconds": 110.11,
+      "pixel": [
+        782.5909090909091,
+        356.0
+      ],
+      "uncertaintyPx": 6,
+      "rectSourcePixels": [
+        775,
+        350,
+        19,
+        39
+      ],
+      "method": "physical-gray-bevel-upper-edge",
+      "measurementEvidence": {
+        "componentBoundsPixels": [
+          779,
+          356,
+          11,
+          27
+        ],
+        "componentAreaPixels": 196,
+        "grayThreshold": 185,
+        "maximumSaturation": 69,
+        "upperEdgeLocalizationRows": 3
+      }
+    },
+    {
+      "role": "check",
+      "physicalStationIndex": 2,
+      "harmonicNumber": 18,
+      "partPath": "harmonic-analyzer/channel/rocker-arm-3",
+      "sourceImage": {
+        "frameIndex": 2640,
+        "nativePts": 2642640,
+        "sourceSha256": "a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725",
+        "width": 1920,
+        "height": 1080,
+        "pixelFormat": "bgr8",
+        "sha256Bgr8": "d5caefa6da7d8768fc829c12a9038f63dbf41ad5ffa90d20b76cfe39967b724f"
+      },
+      "timeSeconds": 110.11,
+      "pixel": [
+        807.4375,
+        355.0
+      ],
+      "uncertaintyPx": 6,
+      "rectSourcePixels": [
+        800,
+        349,
+        20,
+        44
+      ],
+      "method": "physical-gray-bevel-upper-edge",
+      "measurementEvidence": {
+        "componentBoundsPixels": [
+          804,
+          355,
+          12,
+          32
+        ],
+        "componentAreaPixels": 262,
+        "grayThreshold": 185,
+        "maximumSaturation": 69,
+        "upperEdgeLocalizationRows": 3
+      }
+    },
+    {
+      "role": "check",
+      "physicalStationIndex": 4,
+      "harmonicNumber": 16,
+      "partPath": "harmonic-analyzer/channel/rocker-arm-5",
+      "sourceImage": {
+        "frameIndex": 2640,
+        "nativePts": 2642640,
+        "sourceSha256": "a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725",
+        "width": 1920,
+        "height": 1080,
+        "pixelFormat": "bgr8",
+        "sha256Bgr8": "d5caefa6da7d8768fc829c12a9038f63dbf41ad5ffa90d20b76cfe39967b724f"
+      },
+      "timeSeconds": 110.11,
+      "pixel": [
+        870.35,
+        335.0
+      ],
+      "uncertaintyPx": 6,
+      "rectSourcePixels": [
+        861,
+        329,
+        20,
+        44
+      ],
+      "method": "physical-gray-bevel-upper-edge",
+      "measurementEvidence": {
+        "componentBoundsPixels": [
+          865,
+          335,
+          12,
+          32
+        ],
+        "componentAreaPixels": 259,
+        "grayThreshold": 185,
+        "maximumSaturation": 69,
+        "upperEdgeLocalizationRows": 3
+      }
+    },
+    {
+      "role": "check",
+      "physicalStationIndex": 5,
+      "harmonicNumber": 15,
+      "partPath": "harmonic-analyzer/channel/rocker-arm-6",
+      "sourceImage": {
+        "frameIndex": 2640,
+        "nativePts": 2642640,
+        "sourceSha256": "a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725",
+        "width": 1920,
+        "height": 1080,
+        "pixelFormat": "bgr8",
+        "sha256Bgr8": "d5caefa6da7d8768fc829c12a9038f63dbf41ad5ffa90d20b76cfe39967b724f"
+      },
+      "timeSeconds": 110.11,
+      "pixel": [
+        896.8823529411765,
+        308.0
+      ],
+      "uncertaintyPx": 6,
+      "rectSourcePixels": [
+        888,
+        302,
+        21,
+        44
+      ],
+      "method": "physical-gray-bevel-upper-edge",
+      "measurementEvidence": {
+        "componentBoundsPixels": [
+          892,
+          308,
+          13,
+          32
+        ],
+        "componentAreaPixels": 251,
+        "grayThreshold": 185,
+        "maximumSaturation": 69,
+        "upperEdgeLocalizationRows": 3
+      }
+    },
+    {
+      "role": "check",
+      "physicalStationIndex": 6,
+      "harmonicNumber": 14,
+      "partPath": "harmonic-analyzer/channel/rocker-arm-7",
+      "sourceImage": {
+        "frameIndex": 2640,
+        "nativePts": 2642640,
+        "sourceSha256": "a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725",
+        "width": 1920,
+        "height": 1080,
+        "pixelFormat": "bgr8",
+        "sha256Bgr8": "d5caefa6da7d8768fc829c12a9038f63dbf41ad5ffa90d20b76cfe39967b724f"
+      },
+      "timeSeconds": 110.11,
+      "pixel": [
+        934.1304347826087,
+        304.0
+      ],
+      "uncertaintyPx": 6,
+      "rectSourcePixels": [
+        923,
+        298,
+        23,
+        47
+      ],
+      "method": "physical-gray-bevel-upper-edge",
+      "measurementEvidence": {
+        "componentBoundsPixels": [
+          927,
+          304,
+          15,
+          35
+        ],
+        "componentAreaPixels": 325,
+        "grayThreshold": 185,
+        "maximumSaturation": 69,
+        "upperEdgeLocalizationRows": 3
+      }
+    },
+    {
+      "role": "check",
+      "physicalStationIndex": 7,
+      "harmonicNumber": 13,
+      "partPath": "harmonic-analyzer/channel/rocker-arm-8",
+      "sourceImage": {
+        "frameIndex": 2640,
+        "nativePts": 2642640,
+        "sourceSha256": "a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725",
+        "width": 1920,
+        "height": 1080,
+        "pixelFormat": "bgr8",
+        "sha256Bgr8": "d5caefa6da7d8768fc829c12a9038f63dbf41ad5ffa90d20b76cfe39967b724f"
+      },
+      "timeSeconds": 110.11,
+      "pixel": [
+        964.4705882352941,
+        304.0
+      ],
+      "uncertaintyPx": 6,
+      "rectSourcePixels": [
+        957,
+        298,
+        19,
+        53
+      ],
+      "method": "physical-gray-bevel-upper-edge",
+      "measurementEvidence": {
+        "componentBoundsPixels": [
+          961,
+          304,
+          11,
+          41
+        ],
+        "componentAreaPixels": 312,
+        "grayThreshold": 185,
+        "maximumSaturation": 69,
+        "upperEdgeLocalizationRows": 3
+      }
+    },
+    {
+      "role": "check",
+      "physicalStationIndex": 8,
+      "harmonicNumber": 12,
+      "partPath": "harmonic-analyzer/channel/rocker-arm-9",
+      "sourceImage": {
+        "frameIndex": 2640,
+        "nativePts": 2642640,
+        "sourceSha256": "a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725",
+        "width": 1920,
+        "height": 1080,
+        "pixelFormat": "bgr8",
+        "sha256Bgr8": "d5caefa6da7d8768fc829c12a9038f63dbf41ad5ffa90d20b76cfe39967b724f"
+      },
+      "timeSeconds": 110.11,
+      "pixel": [
+        988.1875,
+        330.0
+      ],
+      "uncertaintyPx": 6,
+      "rectSourcePixels": [
+        977,
+        324,
+        21,
+        44
+      ],
+      "method": "physical-gray-bevel-upper-edge",
+      "measurementEvidence": {
+        "componentBoundsPixels": [
+          981,
+          330,
+          13,
+          32
+        ],
+        "componentAreaPixels": 271,
+        "grayThreshold": 185,
+        "maximumSaturation": 69,
+        "upperEdgeLocalizationRows": 3
+      }
+    },
+    {
+      "role": "check",
+      "physicalStationIndex": 9,
+      "harmonicNumber": 11,
+      "partPath": "harmonic-analyzer/channel/rocker-arm-10",
+      "sourceImage": {
+        "frameIndex": 2640,
+        "nativePts": 2642640,
+        "sourceSha256": "a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725",
+        "width": 1920,
+        "height": 1080,
+        "pixelFormat": "bgr8",
+        "sha256Bgr8": "d5caefa6da7d8768fc829c12a9038f63dbf41ad5ffa90d20b76cfe39967b724f"
+      },
+      "timeSeconds": 110.11,
+      "pixel": [
+        1009.7,
+        378.0
+      ],
+      "uncertaintyPx": 6,
+      "rectSourcePixels": [
+        1000,
+        372,
+        22,
+        46
+      ],
+      "method": "physical-gray-bevel-upper-edge",
+      "measurementEvidence": {
+        "componentBoundsPixels": [
+          1004,
+          378,
+          14,
+          34
+        ],
+        "componentAreaPixels": 295,
+        "grayThreshold": 185,
+        "maximumSaturation": 69,
+        "upperEdgeLocalizationRows": 3
+      }
+    },
+    {
+      "role": "check",
+      "physicalStationIndex": 11,
+      "harmonicNumber": 9,
+      "partPath": "harmonic-analyzer/channel/rocker-arm-12",
+      "sourceImage": {
+        "frameIndex": 2640,
+        "nativePts": 2642640,
+        "sourceSha256": "a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725",
+        "width": 1920,
+        "height": 1080,
+        "pixelFormat": "bgr8",
+        "sha256Bgr8": "d5caefa6da7d8768fc829c12a9038f63dbf41ad5ffa90d20b76cfe39967b724f"
+      },
+      "timeSeconds": 110.11,
+      "pixel": [
+        1047.2857142857142,
+        507.0
+      ],
+      "uncertaintyPx": 6,
+      "rectSourcePixels": [
+        1038,
+        501,
+        21,
+        40
+      ],
+      "method": "physical-gray-bevel-upper-edge",
+      "measurementEvidence": {
+        "componentBoundsPixels": [
+          1042,
+          507,
+          13,
+          28
+        ],
+        "componentAreaPixels": 175,
+        "grayThreshold": 185,
+        "maximumSaturation": 69,
+        "upperEdgeLocalizationRows": 3
+      }
+    },
+    {
+      "role": "check",
+      "physicalStationIndex": 12,
+      "harmonicNumber": 8,
+      "partPath": "harmonic-analyzer/channel/rocker-arm-13",
+      "sourceImage": {
+        "frameIndex": 2640,
+        "nativePts": 2642640,
+        "sourceSha256": "a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725",
+        "width": 1920,
+        "height": 1080,
+        "pixelFormat": "bgr8",
+        "sha256Bgr8": "d5caefa6da7d8768fc829c12a9038f63dbf41ad5ffa90d20b76cfe39967b724f"
+      },
+      "timeSeconds": 110.11,
+      "pixel": [
+        1068.375,
+        570.0
+      ],
+      "uncertaintyPx": 6,
+      "rectSourcePixels": [
+        1060,
+        564,
+        18,
+        36
+      ],
+      "method": "physical-gray-bevel-upper-edge",
+      "measurementEvidence": {
+        "componentBoundsPixels": [
+          1064,
+          570,
+          10,
+          24
+        ],
+        "componentAreaPixels": 130,
+        "grayThreshold": 185,
+        "maximumSaturation": 69,
+        "upperEdgeLocalizationRows": 3
+      }
+    },
+    {
+      "role": "check",
+      "physicalStationIndex": 1,
+      "harmonicNumber": 19,
+      "partPath": "harmonic-analyzer/channel/rocker-arm-2",
+      "sourceImage": {
+        "frameIndex": 2820,
+        "nativePts": 2822820,
+        "sourceSha256": "a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725",
+        "width": 1920,
+        "height": 1080,
+        "pixelFormat": "bgr8",
+        "sha256Bgr8": "d3339ad4a12b5f13bf32b12aa7b23f3b528f6bd286cfd84a67cfdfd6ed74a6cc"
+      },
+      "timeSeconds": 117.6175,
+      "pixel": [
+        800.0,
+        231.0
+      ],
+      "uncertaintyPx": 6,
+      "rectSourcePixels": [
+        789,
+        225,
+        21,
+        42
+      ],
+      "method": "physical-gray-bevel-upper-edge",
+      "measurementEvidence": {
+        "componentBoundsPixels": [
+          793,
+          231,
+          13,
+          30
+        ],
+        "componentAreaPixels": 261,
+        "grayThreshold": 185,
+        "maximumSaturation": 69,
+        "upperEdgeLocalizationRows": 3
+      }
+    },
+    {
+      "role": "check",
+      "physicalStationIndex": 2,
+      "harmonicNumber": 18,
+      "partPath": "harmonic-analyzer/channel/rocker-arm-3",
+      "sourceImage": {
+        "frameIndex": 2820,
+        "nativePts": 2822820,
+        "sourceSha256": "a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725",
+        "width": 1920,
+        "height": 1080,
+        "pixelFormat": "bgr8",
+        "sha256Bgr8": "d3339ad4a12b5f13bf32b12aa7b23f3b528f6bd286cfd84a67cfdfd6ed74a6cc"
+      },
+      "timeSeconds": 117.6175,
+      "pixel": [
+        833.6875,
+        205.0
+      ],
+      "uncertaintyPx": 6,
+      "rectSourcePixels": [
+        823,
+        199,
+        22,
+        45
+      ],
+      "method": "physical-gray-bevel-upper-edge",
+      "measurementEvidence": {
+        "componentBoundsPixels": [
+          827,
+          205,
+          14,
+          33
+        ],
+        "componentAreaPixels": 302,
+        "grayThreshold": 185,
+        "maximumSaturation": 69,
+        "upperEdgeLocalizationRows": 3
+      }
+    },
+    {
+      "role": "check",
+      "physicalStationIndex": 3,
+      "harmonicNumber": 17,
+      "partPath": "harmonic-analyzer/channel/rocker-arm-4",
+      "sourceImage": {
+        "frameIndex": 2820,
+        "nativePts": 2822820,
+        "sourceSha256": "a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725",
+        "width": 1920,
+        "height": 1080,
+        "pixelFormat": "bgr8",
+        "sha256Bgr8": "d3339ad4a12b5f13bf32b12aa7b23f3b528f6bd286cfd84a67cfdfd6ed74a6cc"
+      },
+      "timeSeconds": 117.6175,
+      "pixel": [
+        843.0,
+        316.0
+      ],
+      "uncertaintyPx": 6,
+      "rectSourcePixels": [
+        834,
+        310,
+        21,
+        44
+      ],
+      "method": "physical-gray-bevel-upper-edge",
+      "measurementEvidence": {
+        "componentBoundsPixels": [
+          838,
+          316,
+          13,
+          32
+        ],
+        "componentAreaPixels": 291,
+        "grayThreshold": 185,
+        "maximumSaturation": 69,
+        "upperEdgeLocalizationRows": 3
+      }
+    },
+    {
+      "role": "check",
+      "physicalStationIndex": 4,
+      "harmonicNumber": 16,
+      "partPath": "harmonic-analyzer/channel/rocker-arm-5",
+      "sourceImage": {
+        "frameIndex": 2820,
+        "nativePts": 2822820,
+        "sourceSha256": "a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725",
+        "width": 1920,
+        "height": 1080,
+        "pixelFormat": "bgr8",
+        "sha256Bgr8": "d3339ad4a12b5f13bf32b12aa7b23f3b528f6bd286cfd84a67cfdfd6ed74a6cc"
+      },
+      "timeSeconds": 117.6175,
+      "pixel": [
+        860.3157894736842,
+        419.0
+      ],
+      "uncertaintyPx": 6,
+      "rectSourcePixels": [
+        852,
+        413,
+        19,
+        45
+      ],
+      "method": "physical-gray-bevel-upper-edge",
+      "measurementEvidence": {
+        "componentBoundsPixels": [
+          856,
+          419,
+          11,
+          33
+        ],
+        "componentAreaPixels": 222,
+        "grayThreshold": 185,
+        "maximumSaturation": 69,
+        "upperEdgeLocalizationRows": 3
+      }
+    },
+    {
+      "role": "check",
+      "physicalStationIndex": 5,
+      "harmonicNumber": 15,
+      "partPath": "harmonic-analyzer/channel/rocker-arm-6",
+      "sourceImage": {
+        "frameIndex": 2820,
+        "nativePts": 2822820,
+        "sourceSha256": "a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725",
+        "width": 1920,
+        "height": 1080,
+        "pixelFormat": "bgr8",
+        "sha256Bgr8": "d3339ad4a12b5f13bf32b12aa7b23f3b528f6bd286cfd84a67cfdfd6ed74a6cc"
+      },
+      "timeSeconds": 117.6175,
+      "pixel": [
+        885.1904761904761,
+        381.0
+      ],
+      "uncertaintyPx": 6,
+      "rectSourcePixels": [
+        877,
+        375,
+        20,
+        44
+      ],
+      "method": "physical-gray-bevel-upper-edge",
+      "measurementEvidence": {
+        "componentBoundsPixels": [
+          881,
+          381,
+          12,
+          32
+        ],
+        "componentAreaPixels": 238,
+        "grayThreshold": 185,
+        "maximumSaturation": 69,
+        "upperEdgeLocalizationRows": 3
+      }
+    },
+    {
+      "role": "check",
+      "physicalStationIndex": 6,
+      "harmonicNumber": 14,
+      "partPath": "harmonic-analyzer/channel/rocker-arm-7",
+      "sourceImage": {
+        "frameIndex": 2820,
+        "nativePts": 2822820,
+        "sourceSha256": "a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725",
+        "width": 1920,
+        "height": 1080,
+        "pixelFormat": "bgr8",
+        "sha256Bgr8": "d3339ad4a12b5f13bf32b12aa7b23f3b528f6bd286cfd84a67cfdfd6ed74a6cc"
+      },
+      "timeSeconds": 117.6175,
+      "pixel": [
+        935.4347826086956,
+        301.0
+      ],
+      "uncertaintyPx": 6,
+      "rectSourcePixels": [
+        924,
+        295,
+        23,
+        46
+      ],
+      "method": "physical-gray-bevel-upper-edge",
+      "measurementEvidence": {
+        "componentBoundsPixels": [
+          928,
+          301,
+          15,
+          34
+        ],
+        "componentAreaPixels": 336,
+        "grayThreshold": 185,
+        "maximumSaturation": 69,
+        "upperEdgeLocalizationRows": 3
+      }
+    },
+    {
+      "role": "check",
+      "physicalStationIndex": 7,
+      "harmonicNumber": 13,
+      "partPath": "harmonic-analyzer/channel/rocker-arm-8",
+      "sourceImage": {
+        "frameIndex": 2820,
+        "nativePts": 2822820,
+        "sourceSha256": "a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725",
+        "width": 1920,
+        "height": 1080,
+        "pixelFormat": "bgr8",
+        "sha256Bgr8": "d3339ad4a12b5f13bf32b12aa7b23f3b528f6bd286cfd84a67cfdfd6ed74a6cc"
+      },
+      "timeSeconds": 117.6175,
+      "pixel": [
+        957.4666666666667,
+        332.0
+      ],
+      "uncertaintyPx": 6,
+      "rectSourcePixels": [
+        951,
+        326,
+        19,
+        52
+      ],
+      "method": "physical-gray-bevel-upper-edge",
+      "measurementEvidence": {
+        "componentBoundsPixels": [
+          955,
+          332,
+          11,
+          40
+        ],
+        "componentAreaPixels": 298,
+        "grayThreshold": 185,
+        "maximumSaturation": 69,
+        "upperEdgeLocalizationRows": 3
+      }
+    },
+    {
+      "role": "check",
+      "physicalStationIndex": 8,
+      "harmonicNumber": 12,
+      "partPath": "harmonic-analyzer/channel/rocker-arm-9",
+      "sourceImage": {
+        "frameIndex": 2820,
+        "nativePts": 2822820,
+        "sourceSha256": "a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725",
+        "width": 1920,
+        "height": 1080,
+        "pixelFormat": "bgr8",
+        "sha256Bgr8": "d3339ad4a12b5f13bf32b12aa7b23f3b528f6bd286cfd84a67cfdfd6ed74a6cc"
+      },
+      "timeSeconds": 117.6175,
+      "pixel": [
+        963.7,
+        472.0
+      ],
+      "uncertaintyPx": 6,
+      "rectSourcePixels": [
+        955,
+        466,
+        19,
+        42
+      ],
+      "method": "physical-gray-bevel-upper-edge",
+      "measurementEvidence": {
+        "componentBoundsPixels": [
+          959,
+          472,
+          11,
+          30
+        ],
+        "componentAreaPixels": 209,
+        "grayThreshold": 185,
+        "maximumSaturation": 69,
+        "upperEdgeLocalizationRows": 3
+      }
+    },
+    {
+      "role": "check",
+      "physicalStationIndex": 9,
+      "harmonicNumber": 11,
+      "partPath": "harmonic-analyzer/channel/rocker-arm-10",
+      "sourceImage": {
+        "frameIndex": 2820,
+        "nativePts": 2822820,
+        "sourceSha256": "a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725",
+        "width": 1920,
+        "height": 1080,
+        "pixelFormat": "bgr8",
+        "sha256Bgr8": "d3339ad4a12b5f13bf32b12aa7b23f3b528f6bd286cfd84a67cfdfd6ed74a6cc"
+      },
+      "timeSeconds": 117.6175,
+      "pixel": [
+        987.0,
+        523.0
+      ],
+      "uncertaintyPx": 6,
+      "rectSourcePixels": [
+        979,
+        517,
+        21,
+        45
+      ],
+      "method": "physical-gray-bevel-upper-edge",
+      "measurementEvidence": {
+        "componentBoundsPixels": [
+          983,
+          523,
+          13,
+          33
+        ],
+        "componentAreaPixels": 244,
+        "grayThreshold": 185,
+        "maximumSaturation": 69,
+        "upperEdgeLocalizationRows": 3
+      }
+    },
+    {
+      "role": "check",
+      "physicalStationIndex": 11,
+      "harmonicNumber": 9,
+      "partPath": "harmonic-analyzer/channel/rocker-arm-12",
+      "sourceImage": {
+        "frameIndex": 2820,
+        "nativePts": 2822820,
+        "sourceSha256": "a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725",
+        "width": 1920,
+        "height": 1080,
+        "pixelFormat": "bgr8",
+        "sha256Bgr8": "d3339ad4a12b5f13bf32b12aa7b23f3b528f6bd286cfd84a67cfdfd6ed74a6cc"
+      },
+      "timeSeconds": 117.6175,
+      "pixel": [
+        1068.4117647058824,
+        393.0
+      ],
+      "uncertaintyPx": 6,
+      "rectSourcePixels": [
+        1057,
+        387,
+        23,
+        43
+      ],
+      "method": "physical-gray-bevel-upper-edge",
+      "measurementEvidence": {
+        "componentBoundsPixels": [
+          1061,
+          393,
+          15,
+          31
+        ],
+        "componentAreaPixels": 252,
+        "grayThreshold": 185,
+        "maximumSaturation": 69,
+        "upperEdgeLocalizationRows": 3
+      }
+    },
+    {
+      "role": "check",
+      "physicalStationIndex": 12,
+      "harmonicNumber": 8,
+      "partPath": "harmonic-analyzer/channel/rocker-arm-13",
+      "sourceImage": {
+        "frameIndex": 2820,
+        "nativePts": 2822820,
+        "sourceSha256": "a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725",
+        "width": 1920,
+        "height": 1080,
+        "pixelFormat": "bgr8",
+        "sha256Bgr8": "d3339ad4a12b5f13bf32b12aa7b23f3b528f6bd286cfd84a67cfdfd6ed74a6cc"
+      },
+      "timeSeconds": 117.6175,
+      "pixel": [
+        1078.7692307692307,
+        497.0
+      ],
+      "uncertaintyPx": 6,
+      "rectSourcePixels": [
+        1070,
+        491,
+        20,
+        42
+      ],
+      "method": "physical-gray-bevel-upper-edge",
+      "measurementEvidence": {
+        "componentBoundsPixels": [
+          1074,
+          497,
+          12,
+          30
+        ],
+        "componentAreaPixels": 204,
+        "grayThreshold": 185,
+        "maximumSaturation": 69,
+        "upperEdgeLocalizationRows": 3
+      }
+    },
+    {
+      "role": "check",
+      "physicalStationIndex": 15,
+      "harmonicNumber": 5,
+      "partPath": "harmonic-analyzer/channel/rocker-arm-16",
+      "sourceImage": {
+        "frameIndex": 2820,
+        "nativePts": 2822820,
+        "sourceSha256": "a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725",
+        "width": 1920,
+        "height": 1080,
+        "pixelFormat": "bgr8",
+        "sha256Bgr8": "d3339ad4a12b5f13bf32b12aa7b23f3b528f6bd286cfd84a67cfdfd6ed74a6cc"
+      },
+      "timeSeconds": 117.6175,
+      "pixel": [
+        1173.1666666666667,
+        508.0
+      ],
+      "uncertaintyPx": 6,
+      "rectSourcePixels": [
+        1163,
+        502,
+        22,
+        46
+      ],
+      "method": "physical-gray-bevel-upper-edge",
+      "measurementEvidence": {
+        "componentBoundsPixels": [
+          1167,
+          508,
+          14,
+          34
+        ],
+        "componentAreaPixels": 259,
+        "grayThreshold": 185,
+        "maximumSaturation": 69,
+        "upperEdgeLocalizationRows": 3
+      }
+    },
+    {
+      "role": "check",
+      "physicalStationIndex": 16,
+      "harmonicNumber": 4,
+      "partPath": "harmonic-analyzer/channel/rocker-arm-17",
+      "sourceImage": {
+        "frameIndex": 2820,
+        "nativePts": 2822820,
+        "sourceSha256": "a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725",
+        "width": 1920,
+        "height": 1080,
+        "pixelFormat": "bgr8",
+        "sha256Bgr8": "d3339ad4a12b5f13bf32b12aa7b23f3b528f6bd286cfd84a67cfdfd6ed74a6cc"
+      },
+      "timeSeconds": 117.6175,
+      "pixel": [
+        1201.0,
+        524.0
+      ],
+      "uncertaintyPx": 6,
+      "rectSourcePixels": [
+        1191,
+        518,
+        22,
+        44
+      ],
+      "method": "physical-gray-bevel-upper-edge",
+      "measurementEvidence": {
+        "componentBoundsPixels": [
+          1195,
+          524,
+          14,
+          32
+        ],
+        "componentAreaPixels": 252,
+        "grayThreshold": 185,
+        "maximumSaturation": 69,
+        "upperEdgeLocalizationRows": 3
+      }
+    }
+  ],
+  "acceptance": {
+    "cameraGeometryOrGpuAccepted": false
+  }
+}

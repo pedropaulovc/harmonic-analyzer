@@ -1,0 +1,600 @@
+{
+  "schemaVersion": 1,
+  "videoId": "8KmVDxkia_w",
+  "frozenCameraSha256": "32f8f81c9355687839b48b3fc47ec19f3faa9c6fecd05d9a5be3260c24a27a66",
+  "checkEvidenceSha256": "435691e429316b8dd234f6af3dbbfb9a672ee2b3e8d0af2d0914b0626e87bf88",
+  "nativeReceiptSha256": "013cc103da685b5dcc3c9f0a97d16fe0c3ead96f8a5dfa5a5d797600ddec760f",
+  "holdout": "38 new physical bevel-feature controls at 3 original H20-metal-CHECK exposures, disjoint from both this camera FIT and original annotation/cadence FIT; original H20 and H1 pixels/features/roles are unchanged",
+  "projectionPositiveControlMaxPx": 0.8134110597222732,
+  "checkMetrics": {
+    "before": {
+      "count": 38,
+      "rmsPx": 587.129944139963,
+      "medianPx": 583.4063260396231,
+      "maxPx": 778.9835124418552
+    },
+    "after": {
+      "count": 38,
+      "rmsPx": 17.47625918428512,
+      "medianPx": 15.582756324876843,
+      "maxPx": 35.81413694102538
+    },
+    "beforeMethod": "actual-native-GPU-depth-off-landmark-projection",
+    "afterMethod": "shared-source-solver-CPU-pinhole-projection"
+  },
+  "rows": [
+    {
+      "frameIndex": 2580,
+      "physicalStationIndex": 1,
+      "observedPixel": [
+        782.7727272727273,
+        353.0
+      ],
+      "predictedPixel": [
+        785.5309618357104,
+        353.35822459102087
+      ],
+      "errorPx": 2.78139942511803,
+      "uncertaintyPx": 6,
+      "positiveDepth": true
+    },
+    {
+      "frameIndex": 2580,
+      "physicalStationIndex": 2,
+      "observedPixel": [
+        806.3214285714286,
+        377.0
+      ],
+      "predictedPixel": [
+        809.3805061396916,
+        374.2967168952439
+      ],
+      "errorPx": 4.082363912380947,
+      "uncertaintyPx": 6,
+      "positiveDepth": true
+    },
+    {
+      "frameIndex": 2580,
+      "physicalStationIndex": 3,
+      "observedPixel": [
+        831.7894736842105,
+        398.0
+      ],
+      "predictedPixel": [
+        833.7212712267605,
+        393.1614391224241
+      ],
+      "errorPx": 5.209943676414364,
+      "uncertaintyPx": 6,
+      "positiveDepth": true
+    },
+    {
+      "frameIndex": 2580,
+      "physicalStationIndex": 4,
+      "observedPixel": [
+        860.1764705882352,
+        419.0
+      ],
+      "predictedPixel": [
+        858.5753272439775,
+        409.98207664808047
+      ],
+      "errorPx": 9.158962910174733,
+      "uncertaintyPx": 6,
+      "positiveDepth": true
+    },
+    {
+      "frameIndex": 2580,
+      "physicalStationIndex": 5,
+      "observedPixel": [
+        879.1739130434783,
+        433.0
+      ],
+      "predictedPixel": [
+        883.9698690636328,
+        424.8448104618441
+      ],
+      "errorPx": 9.46088318025884,
+      "uncertaintyPx": 6,
+      "positiveDepth": true
+    },
+    {
+      "frameIndex": 2580,
+      "physicalStationIndex": 6,
+      "observedPixel": [
+        910.8965517241379,
+        454.0
+      ],
+      "predictedPixel": [
+        909.934083833275,
+        437.8933363108024
+      ],
+      "errorPx": 16.135394622935582,
+      "uncertaintyPx": 6,
+      "positiveDepth": true
+    },
+    {
+      "frameIndex": 2580,
+      "physicalStationIndex": 7,
+      "observedPixel": [
+        936.2727272727273,
+        464.0
+      ],
+      "predictedPixel": [
+        936.4951593274299,
+        449.32894152247326
+      ],
+      "errorPx": 14.67274455819253,
+      "uncertaintyPx": 6,
+      "positiveDepth": true
+    },
+    {
+      "frameIndex": 2580,
+      "physicalStationIndex": 8,
+      "observedPixel": [
+        962.0,
+        473.0
+      ],
+      "predictedPixel": [
+        963.6733929699524,
+        459.40889714512986
+      ],
+      "errorPx": 13.693732903907007,
+      "uncertaintyPx": 6,
+      "positiveDepth": true
+    },
+    {
+      "frameIndex": 2580,
+      "physicalStationIndex": 9,
+      "observedPixel": [
+        991.2222222222222,
+        488.0
+      ],
+      "predictedPixel": [
+        991.4771568719415,
+        468.4430924017948
+      ],
+      "errorPx": 19.5585691317224,
+      "uncertaintyPx": 6,
+      "positiveDepth": true
+    },
+    {
+      "frameIndex": 2580,
+      "physicalStationIndex": 11,
+      "observedPixel": [
+        1047.2727272727273,
+        506.0
+      ],
+      "predictedPixel": [
+        1048.9079390343013,
+        484.84232043580005
+      ],
+      "errorPx": 21.22077571736138,
+      "uncertaintyPx": 6,
+      "positiveDepth": true
+    },
+    {
+      "frameIndex": 2580,
+      "physicalStationIndex": 12,
+      "observedPixel": [
+        1075.7894736842106,
+        510.0
+      ],
+      "predictedPixel": [
+        1078.4552621223045,
+        493.03119713153967
+      ],
+      "errorPx": 17.17692343772139,
+      "uncertaintyPx": 6,
+      "positiveDepth": true
+    },
+    {
+      "frameIndex": 2580,
+      "physicalStationIndex": 13,
+      "observedPixel": [
+        1103.9444444444443,
+        510.0
+      ],
+      "predictedPixel": [
+        1108.4664105252264,
+        501.8011713574076
+      ],
+      "errorPx": 9.363170848934482,
+      "uncertaintyPx": 6,
+      "positiveDepth": true
+    },
+    {
+      "frameIndex": 2580,
+      "physicalStationIndex": 14,
+      "observedPixel": [
+        1135.25,
+        520.0
+      ],
+      "predictedPixel": [
+        1138.847195533124,
+        511.6042517923181
+      ],
+      "errorPx": 9.13391502425554,
+      "uncertaintyPx": 6,
+      "positiveDepth": true
+    },
+    {
+      "frameIndex": 2580,
+      "physicalStationIndex": 15,
+      "observedPixel": [
+        1169.4666666666667,
+        530.0
+      ],
+      "predictedPixel": [
+        1169.487586459667,
+        522.884586182274
+      ],
+      "errorPx": 7.115444570455536,
+      "uncertaintyPx": 6,
+      "positiveDepth": true
+    },
+    {
+      "frameIndex": 2580,
+      "physicalStationIndex": 16,
+      "observedPixel": [
+        1196.1538461538462,
+        549.0
+      ],
+      "predictedPixel": [
+        1200.2684966484244,
+        536.0638262189924
+      ],
+      "errorPx": 13.574790635032313,
+      "uncertaintyPx": 6,
+      "positiveDepth": true
+    },
+    {
+      "frameIndex": 2640,
+      "physicalStationIndex": 1,
+      "observedPixel": [
+        782.5909090909091,
+        356.0
+      ],
+      "predictedPixel": [
+        786.703074361096,
+        340.9837612642797
+      ],
+      "errorPx": 15.569114585533715,
+      "uncertaintyPx": 6,
+      "positiveDepth": true
+    },
+    {
+      "frameIndex": 2640,
+      "physicalStationIndex": 2,
+      "observedPixel": [
+        807.4375,
+        355.0
+      ],
+      "predictedPixel": [
+        813.5692083538489,
+        334.71409379627914
+      ],
+      "errorPx": 21.192353287042497,
+      "uncertaintyPx": 6,
+      "positiveDepth": true
+    },
+    {
+      "frameIndex": 2640,
+      "physicalStationIndex": 4,
+      "observedPixel": [
+        870.35,
+        335.0
+      ],
+      "predictedPixel": [
+        873.9147464225831,
+        299.36371248610203
+      ],
+      "errorPx": 35.81413694102538,
+      "uncertaintyPx": 6,
+      "positiveDepth": true
+    },
+    {
+      "frameIndex": 2640,
+      "physicalStationIndex": 5,
+      "observedPixel": [
+        896.8823529411765,
+        308.0
+      ],
+      "predictedPixel": [
+        905.2873404628908,
+        286.7399046419117
+      ],
+      "errorPx": 22.861221968109685,
+      "uncertaintyPx": 6,
+      "positiveDepth": true
+    },
+    {
+      "frameIndex": 2640,
+      "physicalStationIndex": 6,
+      "observedPixel": [
+        934.1304347826087,
+        304.0
+      ],
+      "predictedPixel": [
+        934.6907428377681,
+        288.41366985269053
+      ],
+      "errorPx": 15.59639806421997,
+      "uncertaintyPx": 6,
+      "positiveDepth": true
+    },
+    {
+      "frameIndex": 2640,
+      "physicalStationIndex": 7,
+      "observedPixel": [
+        964.4705882352941,
+        304.0
+      ],
+      "predictedPixel": [
+        960.3689840844519,
+        309.43991658934584
+      ],
+      "errorPx": 6.812917811719629,
+      "uncertaintyPx": 6,
+      "positiveDepth": true
+    },
+    {
+      "frameIndex": 2640,
+      "physicalStationIndex": 8,
+      "observedPixel": [
+        988.1875,
+        330.0
+      ],
+      "predictedPixel": [
+        982.1354556258835,
+        350.36813155583513
+      ],
+      "errorPx": 21.248247555553416,
+      "uncertaintyPx": 6,
+      "positiveDepth": true
+    },
+    {
+      "frameIndex": 2640,
+      "physicalStationIndex": 9,
+      "observedPixel": [
+        1009.7,
+        378.0
+      ],
+      "predictedPixel": [
+        1001.5102119037655,
+        406.9225529117666
+      ],
+      "errorPx": 30.059718827613224,
+      "uncertaintyPx": 6,
+      "positiveDepth": true
+    },
+    {
+      "frameIndex": 2640,
+      "physicalStationIndex": 11,
+      "observedPixel": [
+        1047.2857142857142,
+        507.0
+      ],
+      "predictedPixel": [
+        1041.6330843105125,
+        534.2946101723664
+      ],
+      "errorPx": 27.87378643273998,
+      "uncertaintyPx": 6,
+      "positiveDepth": true
+    },
+    {
+      "frameIndex": 2640,
+      "physicalStationIndex": 12,
+      "observedPixel": [
+        1068.375,
+        570.0
+      ],
+      "predictedPixel": [
+        1064.8876009399892,
+        587.8790764011471
+      ],
+      "errorPx": 18.21601836741006,
+      "uncertaintyPx": 6,
+      "positiveDepth": true
+    },
+    {
+      "frameIndex": 2820,
+      "physicalStationIndex": 1,
+      "observedPixel": [
+        800.0,
+        231.0
+      ],
+      "predictedPixel": [
+        806.0322464171,
+        209.8893788009471
+      ],
+      "errorPx": 21.95555338055769,
+      "uncertaintyPx": 6,
+      "positiveDepth": true
+    },
+    {
+      "frameIndex": 2820,
+      "physicalStationIndex": 2,
+      "observedPixel": [
+        833.6875,
+        205.0
+      ],
+      "predictedPixel": [
+        833.3627571191951,
+        214.22402603499359
+      ],
+      "errorPx": 9.229740745702069,
+      "uncertaintyPx": 6,
+      "positiveDepth": true
+    },
+    {
+      "frameIndex": 2820,
+      "physicalStationIndex": 3,
+      "observedPixel": [
+        843.0,
+        316.0
+      ],
+      "predictedPixel": [
+        839.7366483943774,
+        340.152445526353
+      ],
+      "errorPx": 24.371911878335865,
+      "uncertaintyPx": 6,
+      "positiveDepth": true
+    },
+    {
+      "frameIndex": 2820,
+      "physicalStationIndex": 4,
+      "observedPixel": [
+        860.3157894736842,
+        419.0
+      ],
+      "predictedPixel": [
+        857.8475599901892,
+        417.5698643548699
+      ],
+      "errorPx": 2.852620680473572,
+      "uncertaintyPx": 6,
+      "positiveDepth": true
+    },
+    {
+      "frameIndex": 2820,
+      "physicalStationIndex": 5,
+      "observedPixel": [
+        885.1904761904761,
+        381.0
+      ],
+      "predictedPixel": [
+        892.1120188018673,
+        361.07878145275856
+      ],
+      "errorPx": 21.089397822798535,
+      "uncertaintyPx": 6,
+      "positiveDepth": true
+    },
+    {
+      "frameIndex": 2820,
+      "physicalStationIndex": 6,
+      "observedPixel": [
+        935.4347826086956,
+        301.0
+      ],
+      "predictedPixel": [
+        934.534364764426,
+        289.12866796146295
+      ],
+      "errorPx": 11.905430553469095,
+      "uncertaintyPx": 6,
+      "positiveDepth": true
+    },
+    {
+      "frameIndex": 2820,
+      "physicalStationIndex": 7,
+      "observedPixel": [
+        957.4666666666667,
+        332.0
+      ],
+      "predictedPixel": [
+        950.6968032788423,
+        356.991336633536
+      ],
+      "errorPx": 25.892044280444974,
+      "uncertaintyPx": 6,
+      "positiveDepth": true
+    },
+    {
+      "frameIndex": 2820,
+      "physicalStationIndex": 8,
+      "observedPixel": [
+        963.7,
+        472.0
+      ],
+      "predictedPixel": [
+        960.1170496270969,
+        488.9416435898546
+      ],
+      "errorPx": 17.31637435782527,
+      "uncertaintyPx": 6,
+      "positiveDepth": true
+    },
+    {
+      "frameIndex": 2820,
+      "physicalStationIndex": 9,
+      "observedPixel": [
+        987.0,
+        523.0
+      ],
+      "predictedPixel": [
+        985.9308538062435,
+        512.4381178992786
+      ],
+      "errorPx": 10.615857341409734,
+      "uncertaintyPx": 6,
+      "positiveDepth": true
+    },
+    {
+      "frameIndex": 2820,
+      "physicalStationIndex": 11,
+      "observedPixel": [
+        1068.4117647058824,
+        393.0
+      ],
+      "predictedPixel": [
+        1065.3092768712133,
+        400.1161871199208
+      ],
+      "errorPx": 7.7630889399772265,
+      "uncertaintyPx": 6,
+      "positiveDepth": true
+    },
+    {
+      "frameIndex": 2820,
+      "physicalStationIndex": 12,
+      "observedPixel": [
+        1078.7692307692307,
+        497.0
+      ],
+      "predictedPixel": [
+        1073.9944762568073,
+        519.8209166675841
+      ],
+      "errorPx": 23.31507062401328,
+      "uncertaintyPx": 6,
+      "positiveDepth": true
+    },
+    {
+      "frameIndex": 2820,
+      "physicalStationIndex": 15,
+      "observedPixel": [
+        1173.1666666666667,
+        508.0
+      ],
+      "predictedPixel": [
+        1173.3383649837544,
+        504.82518194773957
+      ],
+      "errorPx": 3.1794574972862097,
+      "uncertaintyPx": 6,
+      "positiveDepth": true
+    },
+    {
+      "frameIndex": 2820,
+      "physicalStationIndex": 16,
+      "observedPixel": [
+        1201.0,
+        524.0
+      ],
+      "predictedPixel": [
+        1198.2114978459188,
+        545.7501988462652
+      ],
+      "errorPx": 21.928221407934405,
+      "uncertaintyPx": 6,
+      "positiveDepth": true
+    }
+  ],
+  "acceptance": {
+    "cameraGeometryOrGpuAccepted": false
+  }
+}
