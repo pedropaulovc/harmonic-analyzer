@@ -198,6 +198,8 @@ videos, then present an actual browser demo before refining to 20%, 10%
 and 5%. Complete one coarse pass across the collection rather than perfecting
 one video while the others remain unavailable. Each stage reports its measured
 coverage, maximum errors and unresolved intervals; unmeasured is not passed.
+All-six collection acceptance remains unmeasured and unaccepted at every stage;
+the regional and CPU diagnostics below do not change that status.
 
 ### Runtime tracks
 
@@ -304,24 +306,38 @@ opaque, no-warp exposures **2540..2983**. The actual cut at native 2984
 depth/focal choice are source-informed choices, not recovered camera history.
 Thirty FIT observations at 2541/2589 use physical gray terminal-bevel upper-edge
 midpoints; the camera was frozen before viewing/measuring the 38 CHECK observations
-at 2580/2640/2820. Original actual GPU BEFORE under the old far-portrait camera
+at 2580/2640/2820. These are pre-epoch measurements. Original actual GPU BEFORE under the old far-portrait camera
 has CHECK RMS **587.12994 px**, maximum **778.9835 px**. Actual GPU marker AFTER
 has RMS **17.5404813344 px**, maximum **35.8075760140 px**; adding 6 px source
 and 0.848528 px native localization uncertainty gives an inclusive
 **42.6561041514 px** bound. Keep the old H20 exposure-held and H1 feature-held
 controls separate; these new checks do not extend their authority to H2–H19.
-Depth-off marker projection is not a visibility certificate. Fresh part-ID
-surfaces exist for every native part, but closest sparse own-contour sampling
-does not establish direct surface correspondence. That witness remains pending;
-foreground gears/chain still mismatch in eye review. Neither whole-frame framing,
-source camera, geometry nor any stage is accepted.
+Depth-off marker projection is not a visibility certificate. A pre-epoch 25-frame
+direct native-surface witness observes the existing `gl.readPixels` result after
+the original native call, identifying its buffer by an exact full-435 per-ID
+pixel-histogram match to the normal native probe. All 38 Synthesis CHECK centres
+have the depth-tested correct rocker part ID (zero nearest-own-surface distance).
+For Analysis's 386 CHECK features, 283 centres have their own part ID and all
+386 have a correct own-part native-surface pixel within 1.2 source pixels,
+inside the actual marker-plus-surface uncertainty. No source code, rendering
+or pose is changed; hooks and anchors are restored afterward. This witnesses
+actual native projection-surface neighborhoods, not exact source-feature
+association, self-occlusion depth or whole-frame correspondence. Sparse contour
+distances up to 38 px came from undersampled polylines, not surface absence or
+camera error; nearest sparse own-contour sampling is never visibility authority.
+Foreground gears/chain still mismatch in eye review. Neither whole-frame framing,
+source camera, geometry nor any stage is accepted; CHECK does not retune FIT,
+and the 414 unresolved/null source records remain.
 
-The [current cam-rod world receipt](content/8KmVDxkia_w.camrod-current-world-receipt-2026-10-03.json)
-(`4d61…`) is fresh actual normal-route evidence, not a rehash of the immutable
-[historical probe](content/8KmVDxkia_w.camrod-sqpnp-probe-2026-10-01.json)
-(`5a9f…`) or [raw historical receipt](content/8KmVDxkia_w.camrod-world-receipt-2026-10-01.json)
-(`222d…`). The archived actual renderer `7b28468c…` remains historical authority.
-Current renderer `ff57f0a6…` may reuse the older FIT-only camera only when the
+The active [cam-rod draw-epoch world receipt](content/8KmVDxkia_w.camrod-draw-epoch-world-receipt-2026-10-03.json)
+has SHA-256 `af7f5ddb5add9c7bdf04ad7cdc1444faa3b3f94eff780978cd68759305d42f7d`.
+The [pre-epoch receipt](content/8KmVDxkia_w.camrod-current-world-receipt-2026-10-03.json)
+(`4d61…`), immutable [historical probe](content/8KmVDxkia_w.camrod-sqpnp-probe-2026-10-01.json)
+(`5a9f…`) and [raw historical receipt](content/8KmVDxkia_w.camrod-world-receipt-2026-10-01.json)
+(`222d…`) remain unchanged. Archived renderer `7b28468c…` remains historical authority.
+Current native scene SHA-256 is
+`f16d8a0c03d37a67ccb9c4449b52f9fa0379ec02442aaa00ab09d25aff2e2eb4`.
+It may reuse the older FIT-only camera only when the
 new receipt matches source exposure 2398, original MP4 `a7ac177e…`, the same
 complete physical input and draw, all nine actual native-local coordinates of
 three FIT features with exactly zero delta, and all ten current runtime/descriptor
@@ -332,11 +348,84 @@ establish model byte identity. No historical receipt is rewritten or bypassed,
 and no CHECK pixels select the pose. This bridge proves only three-FIT world
 compatibility, not geometry, camera or stage acceptance.
 
-The actual RTX 3090 normal-route AFTER capture covers 29 frames, retaining all
-435 native drawables, zero missing bindings and zero page errors with that same
-delivery/source association. It is not a full source-camera/geometry/stage pass.
-Fresh continuous playback, seek/manual/orbit/resume, compact-player and audio
-smoke results are not yet reported here; approximation labels remain.
+The current capture uses original source frame **2398**, decimal PTS
+**100.016583**, the same complete historical chosen input, and actual global,
+physical and marker epoch **8**. All nine original FIT world coordinates are
+exactly equal. The actual model GET is `ad5c2592…` / **38,975,844 bytes**;
+compiled JavaScript is `d90d08c903d198ab021a1082d7b84b1faf5329e5bbcdfbfb2ad31e2df469f0e5`
+/ **1,042,881 bytes**. Analysis/Synthesis canonical generation succeeds with
+this new receipt, without promoting a source stage.
+
+`NativeEpochViewer` exposes its existing `drawEpoch` as captured `drawRevision`.
+`renderViews` returns the actual completed epoch and supplies the reserved epoch
+as its callback's third argument. Main records the completed native epoch in
+global and physical `sourceDrawRevision`; incomplete or camera-invalidated batches
+refuse captured evidence. The contract does not change geometry or mechanism math.
+An actual RTX 3090 normal-route control completed two full **435-drawable** draws
+at the same **100-second** time, epochs **10→11**. Pixel, world, visibility,
+physical and global receipts agree; the retained older native ordinal is distinct,
+with zero page errors. The `ff57` baseline completed epochs **3→4**, but its capture
+API carried no epoch. This does not claim that the baseline public reader returned
+stale pixels.
+
+A separate actual RTX 3090 current-module failure control completed epochs
+**4→5**, then drew a real first view in reserved epoch **6** before a caller throw.
+During the second callback and after the catch, world/pixel reads were null and
+visibility was stale with null `drawRevision`; recovery completed epoch **7**.
+An actual `beforeView` camera application invalidated reserved epoch **8→9**
+and threw `Viewer draw was invalidated by beforeView`, with unchanged model pose
+and complete input. Reads again refused/staled, and recovery completed epoch **10**.
+The partial batch advanced native frames **40→44** through **246 draw calls**,
+with GL error zero. Actual delivery bytes matched and all 435 native drawables
+remained present, with zero page errors; the viewer was disposed afterward.
+
+This private control uses runtime-only HOLD51/camera at 100 seconds, not original
+source footage809 or a source-fidelity measurement. Four unchanged native
+frame-cross-screw local anchors provide its readback controls. The complete
+222-anchor historical HOLD resolution has **74 affected landmarks across six
+old mesh-child paths**. Exact raw/decoded-delivery primitive comparisons identify
+Three GLTFLoader fallback names as the cause: raw meshes 139/141/142/264 map to
+delivery meshes 16/18/19/100 after deduplication. All ten affected primitives have
+ordered position/index byte equality; all 429 named nodes, transforms and material
+tables are unchanged. Canonical observations have zero affected top-level anchor
+references; 849 Intro/Rocker references are embedded historical censuses/exclusions.
+Current HOLD producers need stable instance-root plus primitive-index identity,
+without fallback-name parsing or guessed aliases. This correspondence does not
+qualify source features or imply missing CAD geometry. Private runtime evidence is
+`web/.vite/verification-output/native-draw-epoch-controls-20261003/actual-RTX3090-result.json`.
+
+The retained `ff57f0a6…` RTX 3090 normal-route AFTER capture covers 29 frames,
+retaining all 435 native drawables, zero missing bindings and zero page errors
+with that same delivery/source association. Regional Synthesis/Analysis GPU
+checks and the following continuous windows are pre-epoch actual captures,
+not reruns under `f16d8a0c…`. They do not establish source-camera/geometry/stage acceptance.
+The historical normal-route original-MP4 smoke records Synthesis
+**105.96..124.45 seconds**, **443 source frames / 443 completed draws**,
+maximum media-PTS-to-completed-draw **50.565 ms** and player-clock-to-draw
+**17.037 ms**. Its cumulative `T` advances purely forward from 0 to 28.6878.
+Analysis **119.1..124.44 seconds** records **160 source frames / 160 draws**,
+maximum media-PTS-to-draw **44.955 ms** and player-clock-to-draw **17.416 ms**,
+with 71 distinct forward steps and 66 return steps: `T` peaks at 5.8111 and
+returns to 0.4758 by the last captured frame. Both keep all twenty shaft-phase
+law errors exactly zero radians and source phases/amplitudes/setup fixed.
+Only a playing event occurred in each measured continuous window; there were
+no waiting, stalled, pause, error or seeking events within those windows.
+
+Separate actual UI checks seek to Synthesis 113.5 and Analysis 121.5 seconds,
+pause into exploration, open Mechanism Controls and apply keyboard ArrowRight:
+physical crank turns change **11.2020579→11.203** and **4.741108→4.742**,
+respectively. Mouse orbit changes the camera quaternion; Restore video pose
+returns the exact original chosen crank, and Play resumes `following-video`.
+Both compact original video elements measure **222×200 pixels**; their clocks
+advance over 0.6 seconds while model draws follow. Audio state is audible at
+volume 100, with decoded audio bytes **37,059→338,611** for Synthesis and
+**57,227→130,128** for Analysis. Page errors are zero. Private capture evidence
+is `web/.vite/source-fidelity-playback-AFTER-20261003.json`.
+An earlier helper attempt lacked focus on initially collapsed controls; fixing
+that verification precondition required no production-code change, and its
+partial Synthesis playback already completed 443 draws. These local-media
+checks do not prove the official player, all six routes, camera/geometry or a
+fidelity stage; approximation labels and full source-feature/whole-frame limits remain.
 
 Production playback does not require semantic source certificates for every one
 of the 435 native drawables at every exposure. Native model identity, complete
@@ -385,7 +474,7 @@ coordinates. The combined old/new authority has 365 native physical-input knots.
 Typed holdouts separate **141 new FIT exposures**, **19 exposure-held CHECK
 exposures**, and **3710 feature-held CHECK**. Exposure 3710's centroid informed an
 early prototype, but its final corner pixels never enter FIT; it is feature-held,
-not exposure-held. Actual GPU AFTER exposure CHECK (369 measurements) has RMS
+not exposure-held. Pre-epoch actual GPU AFTER exposure CHECK (369 measurements) has RMS
 **19.9944791878 px**, maximum **31.4816573134 px**; 3 px source plus 1.697056 px
 native uncertainty gives inclusive **36.1787135883 px**. Feature CHECK (17
 measurements) has RMS **15.4018384491 px**, maximum **21.1638031103 px**, inclusive
@@ -455,6 +544,96 @@ On a failed stage, refine the worst source-visible discrepancy, rerun the affect
 shot, then rerun the collection. Escalate actual missing geometry outside approved
 exceptions rather than hiding it with a camera warp or an occlusion claim.
 
+### Operation and Rocker source authority
+
+Operation's [chosen seeds](content/jfH-NbsmvD4.source-seeds.json),
+[observations](content/jfH-NbsmvD4.observations.json) and
+[canonical track](content/jfH-NbsmvD4.source-track.json) retain Operation019's
+actual original-MP4 source flow over **94.2942..99.76633333333334 seconds**.
+The correction covers **164 exact exposures**, adding 15 to the original 149
+distinct exposures (154 records). Original FIT/CHECK roles, provenance, pixels
+and losses remain intact; non-019 frames are unchanged. Two actual original-image
+correlation controls have zero difference; a displaced negative gives **-0.193**.
+No historically CHECK-informed v3 camera/input candidate is imported. Source
+flow does not qualify native rendering, source-camera history or mechanism inputs.
+The canonical packet has **1,033 samples / 1,460 views / 144 shots**, retaining
+90 source-loss declarations. Source time 135 seconds, frame 19451, remains
+unmeasured. Chain, removable gears, disassembly, mirror, simultaneous panels and
+pen remain required.
+
+Rocker's [seed `cameraChoice`](content/4mBuyixt22U.source-seeds.json) is the clean
+producer authority; `historicalCameraChoices` retains the body candidate as
+provenance only, without fallback. The sealed `f87b4121…` direct cap/rim FIT-only
+camera was evaluated on actual current **435-drawable / 1,078-input** CPU worlds,
+with 20 rigid rockers and 30 cap anchors. The complete51 input is unchanged.
+`postEpochCPUNativeForward` pins receipt `0d1d400b…`, executed graph `f15cf27e…`
+and actual scene `f16d8a0c…`; the independent cap-transform delta is
+**5.55e-17 m**. No new optimizer run or CHECK-driven winner selection occurred.
+
+| Original FIT diagnostic | Count | CPU RMS before / after (px) | CPU maximum before / after (px) |
+|---|---:|---:|---:|
+| Cap pixels | 25,878 | 21.1155 / 11.7843 | 49.6469 / 26.8082 |
+| Upper rim pixels | 60 | 22.2842 / 2.47564 | 36.6445 / 5.91268 |
+
+The direct camera objective consumes FIT only, but the unchanged bank inherits
+all twenty station extrema, including CHECK stations 1/5/9/13/17. This is
+conditional camera authoring, not a new investigation-wide camera/mechanism
+holdout. The historical balanced camera consumed all nine Rod20 CHECK observations
+at frame0. All 85 frame0 observations remain CHECK, and all 14,004 original contour
+roles remain explicit. The [canonical Rocker track](content/4mBuyixt22U.source-track.json)
+has **1,085 samples / 1,043 views / 27 shots** and retains **8,448 unavailable**
+source declarations. No post-choice actual GPU proof establishes full exterior,
+materials, shank, left edge, linkage identity or whole-435 visibility.
+
+### Intro physical support and first surface
+
+The [eligibility profile](content/NAsM30MAHLg.calibration-eligibility.json) and
+[native request](content/NAsM30MAHLg.native-eligibility-request.json) distinguish
+stored vertex indices from physical camera support. Indices
+**124/126/130/133/136/139** coincide at one apex and cannot supply six independent
+FIT supports. FIT/CHECK physical coincidence refuses the fit before optimization;
+true rank-three support reaches the actual camera optimizer. The dedicated
+[`test_intro_feature_eligibility.py`](scripts/test_intro_feature_eligibility.py)
+executed **3 cases, 3 passes, 0 skips** in **0.331 seconds** on its first post-fix
+run. Missing `INTRO_RAW_NATIVE_MODEL_PATH` raises `RuntimeError`, without a skip.
+`npm --prefix web run test:source:geometry` uses isolated uv with pinned
+numpy **2.5.3**, scipy **1.18.1** and opencv-python-headless **5.0.0.93**.
+The enrolled npm gate also executed **3 tests, 3 passes, 0 skips** in **0.391 seconds**
+with those pins and the actual raw-native prerequisite.
+Set `INTRO_RAW_NATIVE_MODEL_PATH` to the original raw `2280bfa6…` GLB,
+as shown in the README. Missing or mismatched raw bytes fail the prerequisite;
+the optimized public `ad5c2592…` model cannot substitute.
+
+The exact historical `f20571861` static-producer blob (`8626bdf7…`) was run
+against those same three raw-native cases: the coincident-apex and FIT/CHECK
+coincidence cases failed at the actual optimizer sentinel; the true six-FIT /
+two-CHECK rank-three positive passed. `INTRO_STATIC_PRODUCER_PATH` selects this
+historical producer without hand-reverting a predicate.
+
+A supplemental current CPU first-surface export uses the original HOLD809
+complete51 chosen input, not the older pen variant differing in 28 scalar fields.
+It contains all **435 drawables**, with **21 springs evaluated from their actual
+GLSL AST/uniforms/attributes**, **6,741,474 vertices** and **16,888,236 indices**.
+Actual nearest-apex facets **124/97/108/113** have residuals
+**1.39e-16..1.38e-17 m**; additional positive facet125 is consistent with the
+same physical apex. The 32 coincident stored indices **96..127** and their
+incident triangles count as one point. Fifteen independent ray controls reject
+adjacent/body/C-frame/v-block/screw/platen negatives at **4.65..110 mm**.
+This is native CPU geometry conditional on original HOLD and the first-surface
+guard. GPU pixels, source-camera/contact correspondence, historical inputs and
+stage acceptance remain unqualified.
+
+An actual RTX 3090 numerical comparison executed all **21 spring programs /
+3,293,594 vertices**, with current code/program/attribute hashes checked. It
+**fails** the unchanged **1e-7 m** CPU/GPU equivalence bound: GPU world Float32
+maximum error is **3.273407359328867e-7 m**, with **407,744 vertices** outside;
+GPU local Float32 followed by the exact current CPU Float64 world matrix gives
+**3.0548974587765615e-7 m**, with **141,075 vertices** outside. Both failures span
+all 21 springs. The CPU first-surface controls therefore remain CPU-scoped,
+without a current full-geometry GPU equivalence proof, bound relaxation or exemption.
+Private evidence is
+`web/.vite/verification-output/current-native-exports-20261003/actual-RTX3090-current21-spring-numerical-comparison-20261003.json`.
+
 ### Browser verification
 
 Exercise the original visible audible player and use its actual media time,
@@ -474,6 +653,21 @@ contour, masking and per-part certificate machinery is diagnostic legacy work:
 its historical results are preserved, but completing its entire pending queue is
 not a prerequisite for this iterative delivery plan. If a measurement uses a
 particular diagnostic path, that path's known correctness defects still matter.
+
+Contour sidecars join on original source SHA-256, same-format decoded
+`sha256Bgr8` or `sha256Gray8`, native `frameIndex`, exact decimal PTS, shot and
+ordered mapped view layout. BGR8 and gray8 hashes cannot alias each other.
+The current decoder supplies no rational-clock fields; ambiguous decimal joins
+remain unavailable. Missing, ambiguous, alias-conflicting or off-track rows remain
+required unavailable measurements. A mandatory census cannot manufacture ready
+interpolated source frames or synthetic dense compact curves.
+
+For actual depth-tested part-ID partial-edge measurements, the bound is the
+source-to-sampled-native maximum plus source and native localization uncertainties.
+Masks, scissors, resolved warp, current completed epoch, selected camera and
+complete input must agree. A `readPartBinding` wrapper or sparse projected contour
+does not supply this authority. Original CHECK roles stay original CHECK, without
+new independence; FIT diagnostics do not establish CHECK or moving coverage.
 
 
 ## Assets and rights
@@ -524,8 +718,8 @@ improvement measurement or source-fidelity acceptance.
 The 49 source regressions pass using a historical source fixture, not a new
 renderer calibration. Production camrod's current-code guard still refuses the
 old `7b28` scene receipt; no old receipt was rehashed or accepted as fresh
-calibration. The optimized-loader smoke does not replace the required current
-camrod GPU recapture.
+calibration. The optimized-loader smoke is delivery evidence; the separate
+current cam-rod draw-epoch recapture above supplies the bounded world receipt.
 
 All 33 model tests passed: 24 top-level tests and nine real-exporter negative
 subtests. The actual exporter accepted compatible future geometry and refused

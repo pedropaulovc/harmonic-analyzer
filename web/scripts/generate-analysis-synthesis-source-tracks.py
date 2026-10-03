@@ -91,8 +91,8 @@ CAMROD_PROBE = "web/content/8KmVDxkia_w.camrod-sqpnp-probe-2026-10-01.json"
 CAMROD_PROBE_SHA256 = "5a9f17e64671f84478fbdbc6de8cc620ae88932cfae78c3551dd029bc5cc1321"
 CAMROD_HISTORICAL_RECEIPT = "web/content/8KmVDxkia_w.camrod-world-receipt-2026-10-01.json"
 CAMROD_HISTORICAL_RECEIPT_SHA256 = "222d69eb315c39366e93cdcaacadd19a9074b153fa6f0db42d3ff5f9d2af8dbc"
-CAMROD_CURRENT_RECEIPT = "web/content/8KmVDxkia_w.camrod-current-world-receipt-2026-10-03.json"
-CAMROD_CURRENT_RECEIPT_SHA256 = "4d61ddd66a71e78e9f9c70cb48f92ecc2088d35d13c05535cfc151c7ad55150a"
+CAMROD_CURRENT_RECEIPT = "web/content/8KmVDxkia_w.camrod-draw-epoch-world-receipt-2026-10-03.json"
+CAMROD_CURRENT_RECEIPT_SHA256 = "af7f5ddb5add9c7bdf04ad7cdc1444faa3b3f94eff780978cd68759305d42f7d"
 MODEL_REPRESENTATION = "web/content/model-representation.json"
 CAMROD_RUNTIME_FILES = ("web/src/scene.ts", "web/src/bindings.ts", "web/src/main.ts",
     *AUTOMATIC_NATIVE_MATH, "web/src/source-track.ts", "web/src/timeline.ts",
@@ -1574,6 +1574,7 @@ class Generator:
                 or rendered["viewId"] != "main" or rendered["sourceDrawRevision"] != revision
                 or not opaque_unwarped(rendered) or not opaque_unwarped(snapshot)
                 or capture["status"] != "captured" or capture["method"] != "gpu-readback"
+                or capture["drawRevision"] != revision
                 or capture["timeSeconds"] != 100 or capture["viewId"] != "main"
                 or capture["presentation"] != "native" or not opaque_unwarped(capture)):
             raise ValueError("Fresh current cam-rod same-draw complete input/time/view/revision differs.")

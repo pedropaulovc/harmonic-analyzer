@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "videoId": "NAsM30MAHLg",
+  "sourceSha256": "595b0ec7b1e1a0b3523d72d33f6e0950bd97dda5ab7032bf91c3e5b9fb7d225d",
+  "modelSha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+  "calibrationSupport": {
+    "minimumDistinctFitPoints": 6,
+    "minimumIndependentCheckPoints": 2,
+    "minimumFitAffineRank": 2,
+    "supportSeparationMetres": 1e-7,
+    "rankToleranceMetres": 1e-6,
+    "qualification": "Named declarations and seam-duplicated vertex indices are not independent physical support. FIT/CHECK must have distinct actual native 3D points; CHECK points must not coincide with FIT support. Rank-two camera families remain coplanar/non-unique. Source roles, pixels and unavailable observations are never rewritten."
+  },
+  "finiteNib": {
+    "partPath": "harmonic-analyzer/pen/pen-marker-1",
+    "primitiveIndex": 0,
+    "nativeVertexIndex": 124,
+    "storedPartLocalMetres": [0, 0, 0],
+    "eligibilityEpsilonMetres": 1e-7,
+    "equivalence": "Exact stored POSITION equality in this same original primitive only. No epsilon neighbourhood, adjacent body, other primitive or part-name-only admission.",
+    "requiredNativeDrawableCount": 435,
+    "requiredSpringDrawableCount": 21,
+    "sourceAssociationStatus": "unavailable",
+    "sourceAssociationReason": "A positive native apex ray does not identify the independently observed source nib. Source feature/contact/collision and full geometry witnesses remain separate obligations."
+  },
+  "sourceExposure": {
+    "frameIndex": 2132,
+    "decodedTimestampTicks": 2134132,
+    "timeBase": "1/30000",
+    "decodedTimeSeconds": 71.13773333333333,
+    "sha256Bgr8": "1681529d18988527df737b1e83a062ea91f2871947a2d69b55d0df4c7c136f84",
+    "pixelFormat": "bgr8",
+    "width": 1920,
+    "height": 1080,
+    "sourceSha256": "595b0ec7b1e1a0b3523d72d33f6e0950bd97dda5ab7032bf91c3e5b9fb7d225d",
+    "evidence": "Retained original new-pen-macro/source-features.json; source pixels and independent heldouts stay private and unchanged. Presentation clip edges are not native support."
+  },
+  "qualification": "Producer eligibility contract, not recovered historical input, new camera calibration, current native receipt, GPU evidence or a 50/20/10/5-percent stage pass. Final source-frame limit is 96px at 1920 and clock limit is 0.5s."
+}

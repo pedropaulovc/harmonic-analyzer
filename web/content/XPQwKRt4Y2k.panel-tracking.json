@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "videoId": "XPQwKRt4Y2k",
+  "sourceSha256": "52caae2e9d617934ae9eb80d6a3d2b1679b31eb9c71e9da741152e84e2d68505",
+  "sourceSeed": {
+    "frameIndex": 3452,
+    "sha256Bgr8": "39b3f841ad036fb82c3aa353e7e31db834df7f7adefbe9ae5788356c5000566f",
+    "shotId": "endcard",
+    "authority": "Original independently measured endcardViewCatalog source pixels/roles/uncertainties. No camera/native projection supplies source observations."
+  },
+  "panels": ["intro", "synthesis", "analysis", "operation-paper-0", "operation-paper-1", "operation-paper-2", "book"],
+  "blockedCatalogViews": {"analysis": ["analysis-pen-inset"]},
+  "tracking": {
+    "flowWindowPixels": 25,
+    "flowMaxLevel": 0,
+    "sourceSupportRadiusPixels": 15,
+    "maximumForwardBackwardErrorPixels": 1.0,
+    "minimumSeedPatchCorrelation": 0.80,
+    "minimumAdjacentPatchCorrelation": 0.90,
+    "evidence": "Fixed photographed montage panels in one declared source shot. Crop each panel before flow; level-zero flow and full 15px neighbourhood support avoid the previous whole-frame pyramid pulling features/patches across unrelated panel borders. Reject a support touching any later inset mask. No seed resurrection or cut crossing."
+  },
+  "unsupportedViews": ["endcard-analysis-pen-inset", "endcard-guide"],
+  "qualification": "Conditional source-only descendant candidates, not semantic/native material proof or a measured camera. Existing canonical source rows, historical montageSourceControls, FIT/CHECK partitions and all source-required fade/tail/panel obligations remain unchanged. Unsupported frames/patches remain explicitly unavailable."
+}

@@ -11,6 +11,7 @@
     "build": "tsc --noEmit && vite build",
     "verify:sync": "node scripts/verify-sync.mjs",
     "test:source": "uv run --isolated --no-project python -m unittest discover -s scripts -p test_source_generation.py",
+    "test:source:geometry": "uv run --isolated --no-project --with numpy==2.5.3 --with scipy==1.18.1 --with opencv-python-headless==5.0.0.93 python scripts/test_intro_feature_eligibility.py",
     "test:playback": "node --test scripts/source-track.test.mjs",
     "test:model": "node --test scripts/optimize-model.test.mjs scripts/model-representation.test.mjs scripts/fetch-model.test.mjs scripts/model-loader.test.mjs",
     "preview:reference": "node scripts/serve-verification.mjs",

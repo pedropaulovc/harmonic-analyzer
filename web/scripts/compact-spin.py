@@ -4,16 +4,20 @@
 No source video/frames are redistributed, no historical hidden state is recovered,
 and no CPU camera diagnostic is promoted to a current native GPU measurement.
 
-Regenerate from the repository root with: python3 web/scripts/compact-spin.py
+Regenerate with: uv run --no-project --active python web/scripts/compact-spin.py
+The active calibration environment supplies cv2/numpy for candidate-support
+validation. Use --output to write an unpublished CPU candidate.
 Declared seed presentation overrides affect chosen native rendering only; original
 source pixels, source-view layouts and exact-exposure seed identities are retained.
 The immutable numeric phase/source-image map is committed in web/content; private
 capture paths retained in declarations are provenance only, never runtime inputs.
 """
+import argparse
 import copy
 import hashlib
 import importlib.util
 import json
+from fractions import Fraction
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -99,10 +103,101 @@ def validate_seed_presentations(seeds):
             )
 
 
+def panel_source_candidate(seeds, data):
+    """Validate new source-only controls; do not replace historical CHECK rows."""
+    path = common.WEB / "content" / "XPQwKRt4Y2k.panel-source-controls.json"
+    raw = path.read_bytes()
+    packet = json.loads(raw)
+    profile_path = common.WEB / "content" / "XPQwKRt4Y2k.panel-tracking.json"
+    profile = json.loads(profile_path.read_text())
+    producer_path = HERE / "generate-spin-source-controls.py"
+    if (packet["videoId"] != data["source"]["videoId"]
+            or packet["sourceSha256"] != data["source"]["sha256"]
+            or profile["sourceSha256"] != packet["sourceSha256"]
+            or packet["producerSha256"] != hashlib.sha256(producer_path.read_bytes()).hexdigest()
+            or packet["profileSha256"] != hashlib.sha256(profile_path.read_bytes()).hexdigest()):
+        raise ValueError("Spin panel candidate differs from its actual source/producer/profile authority")
+    panel_spec = importlib.util.spec_from_file_location("spin_panel_controls", producer_path)
+    panel = importlib.util.module_from_spec(panel_spec)
+    panel_spec.loader.exec_module(panel)
+    old = seeds["montageSourceControls"]
+    old_frames = {row["sourceImage"]["frameIndex"]: row for row in old["frames"]}
+    frames = {row["sourceImage"]["frameIndex"]: row for row in packet["frames"]}
+    seed_index = profile["sourceSeed"]["frameIndex"]
+    if (len(frames) != len(packet["frames"]) or set(frames) != set(old_frames)
+            or frames[seed_index]["landmarks"] != old_frames[seed_index]["landmarks"]
+            or frames[seed_index]["sourceImage"]["sha256Bgr8"] != profile["sourceSeed"]["sha256Bgr8"]):
+        raise ValueError("Spin panel candidate must retain exact exposures and the unchanged manual role/pixel/uncertainty seed")
+    anchors = {row["id"]: row for row in packet["anchors"]}
+    old_anchors = {row["id"]: row for row in old["anchors"]}
+    if len(anchors) != len(packet["anchors"]) or set(anchors) != set(old_anchors):
+        raise ValueError("Spin panel candidate must retain every original native/source obligation")
+    for key, anchor in anchors.items():
+        for field in ("partPath", "worldMetres", "partLocalMetres"):
+            if anchor.get(field) != old_anchors[key].get(field):
+                raise ValueError("Spin panel candidate must not substitute native geometry/support")
+    manual = {row["anchorId"]: row for row in frames[seed_index]["landmarks"]}
+    catalog = data["sourceMeasurements"]["endcardViewCatalog"]
+    shot = next(row for row in data["shots"] if row["id"] == profile["sourceSeed"]["shotId"])
+    rate = Fraction(data["source"]["fps"]["numerator"], data["source"]["fps"]["denominator"])
+    policy = profile["tracking"]
+    for index, frame in frames.items():
+        if frame["sourceImage"] != old_frames[index]["sourceImage"]:
+            raise ValueError("Spin panel source exposure bytes differ from original raw BGR authority")
+        pts = Fraction(frame["decodedTimestampTicks"]) * Fraction(frame["timeBase"])
+        if pts != Fraction(index) / rate or frame["decodedTimeSeconds"] != float(pts):
+            raise ValueError("Spin panel candidate must use the actual rational source clock")
+        present = {row["anchorId"] for row in frame["landmarks"]}
+        unavailable = {row["anchorId"] for row in frame["unavailable"]}
+        if (len(present) != len(frame["landmarks"]) or len(unavailable) != len(frame["unavailable"])
+                or present & unavailable or present | unavailable != set(anchors)):
+            raise ValueError("Spin panel candidate needs all independent observed or null obligations at every exposure")
+        if not shot["startSeconds"] <= float(pts) < shot["endSeconds"] and present:
+            raise ValueError("Spin panel candidate must not track across the actual source cut")
+        for row in frame["landmarks"]:
+            seed = manual[row["anchorId"]]
+            if row["role"] != seed["role"] or row["viewId"] != seed["viewId"]:
+                raise ValueError("Spin panel candidate must preserve independent roles and owning views")
+            if index == seed_index:
+                continue
+            key = row["viewId"].removeprefix("endcard-")
+            if anchors[row["anchorId"]]["kind"] != "physical-feature" or row["method"] != "optical-flow":
+                raise ValueError("Virtual section centres/manual controls cannot become tracked physical features")
+            rect = catalog[key]["rectSourcePixels"]
+            blockers = [catalog[mask]["rectSourcePixels"] for mask in profile["blockedCatalogViews"].get(key, [])]
+            evidence = row["trackingEvidence"]
+            if (not panel.supported_patch(row["pixel"], rect, blockers, policy["sourceSupportRadiusPixels"])
+                    or evidence["sourcePanelRectPixels"] != rect
+                    or evidence["blockedSourceRectangles"] != blockers
+                    or evidence["sourceSupportRadiusPixels"] != policy["sourceSupportRadiusPixels"]
+                    or evidence["flowMaxLevel"] != policy["flowMaxLevel"]
+                    or evidence["forwardBackwardErrorPx"] > policy["maximumForwardBackwardErrorPixels"]
+                    or evidence["seedPatchCorrelation"] < policy["minimumSeedPatchCorrelation"]
+                    or evidence["adjacentPatchCorrelation"] < policy["minimumAdjacentPatchCorrelation"]):
+                raise ValueError("Spin candidate source patch/flow must be wholly supported by its own panel outside nested insets")
+    summary = {"anchors": len(anchors), "sourceFrames": len(frames),
+               "sourceSeedPoints": len(manual),
+               "trackedObservations": sum(len(row["landmarks"]) for row in frames.values()),
+               "independentCheckObservations": sum(point["role"] == "check" for row in frames.values() for point in row["landmarks"]),
+               "unavailableObservations": sum(len(row["unavailable"]) for row in frames.values())}
+    if summary != packet["summary"]:
+        raise ValueError("Spin candidate summary differs from all retained source obligations")
+    return {"evidencePath": "web/content/" + path.name, "sha256": hashlib.sha256(raw).hexdigest(),
+            "producerSha256": packet["producerSha256"], "profileSha256": packet["profileSha256"],
+            "sourceSeed": packet["sourceSeed"], "summary": summary,
+            "unsupportedViews": packet["unsupportedViews"], "trackingFailures": packet["trackingFailures"],
+            "qualification": packet["qualification"], "sourceAcceptance": False, "GPUAcceptance": False,
+            "cameraOrInputApplication": "none; candidate kept separate from historical montageSourceControls/CHECK rows"}
+
+
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--output", help="Unpublished candidate path; omitted publishes the canonical family track")
+    args = parser.parse_args()
     seeds = json.loads((common.WEB / "content" / "XPQwKRt4Y2k.source-seeds.json").read_text())
     validate_seed_presentations(seeds)
     data = common.load_observations("XPQwKRt4Y2k")
+    panel_candidate = panel_source_candidate(seeds, data)
     controls = seeds["montageSourceControls"]
     data["anchors"].extend(copy.deepcopy(controls["anchors"]))
     source_controls = {(entry["sourceImage"]["frameIndex"], entry["sourceImage"]["sha256Bgr8"]): entry for entry in controls["frames"]}
@@ -234,6 +329,7 @@ def main():
     track["sourceMeasurementTracking"] = {"method": controls["method"], "qualification": controls["qualification"],
                                          "summary": controls["summary"], "trackingFailures": controls["trackingFailures"]}
     track["sourceMeasurementTracking"]["phasePatchReacquisition"] = phase_tracking
+    track["sourceMeasurementTracking"]["panelAwareCandidate"] = panel_candidate
     track["sourceMeasurements"]["status"] = "partial"
     track["sourceMeasurements"]["blockers"].append(
         "Whole-view phase/patch reacquisitions retain actual ROI NCC, actual feature NCC and independent image-edge reference measurements. "
@@ -248,8 +344,15 @@ def main():
          "scope": "endcard-guide exact camera and native source associations",
          "reason": seeds["sourceMeasurementLimits"]["guide"]},
     ]
-    path = common.write_track(track)
-    print(json.dumps({"path": str(path.relative_to(common.WEB.parent)), "shots": len(track["shots"]),
+    if args.output:
+        _, contents = common.prepare_track(track)
+        path = Path(args.output).resolve()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(contents)
+    else:
+        path = common.write_track(track)
+    display_path = path.relative_to(common.WEB.parent) if path.is_relative_to(common.WEB.parent) else path
+    print(json.dumps({"path": str(display_path), "shots": len(track["shots"]),
                       "frames": len(track["frames"]), "views": sum(len(frame["views"]) for frame in track["frames"]),
                       "coverage": track["coverage"]["status"], "bytes": path.stat().st_size,
                       "stages": track["stages"]}))

@@ -179,9 +179,17 @@ def rocker_exposure():
     }
     seeds = {
         'states': [state],
-        'bodyCandidate': {'camera': {'positionMetres': [0, 0, 1],
-                                    'quaternion': [0, 0, 0, 1],
-                                    'verticalFovDegrees': 45}},
+        'cameraChoice': {
+            'camera': {'positionMetres': [0, 0, 1],
+                       'quaternion': [0, 0, 0, 1],
+                       'verticalFovDegrees': 45},
+            'cameraContinuityFamily': 'machine:main:chosen',
+            'cameraProvenance': {
+                'kind': 'chosen',
+                'evidence': 'Unmeasured camera for exact-exposure behavior.',
+            },
+            'qualification': 'Chosen camera; source fidelity remains unmeasured.',
+        },
     }
     return data, seeds
 
@@ -258,6 +266,18 @@ class RockerSourceImageTests(unittest.TestCase):
                 alias = next(frame for frame in track['frames'] if frame['timeSeconds'] == 1)
                 self.assertEqual(alias['sourceImage'], image)
                 self.assertEqual(alias['views'][0]['input'], seeds['states'][0]['completeInput'])
+
+    def test_complete_camera_and_input_do_not_resolve_source_losses(self):
+        data, seeds = rocker_exposure()
+        loss = {'anchorId': 'recess', 'viewId': 'main',
+                'reason': 'Source exterior correspondence is unresolved.'}
+        data['frames'][0]['unavailable'] = [loss]
+        track = self.generate(data, seeds)
+        for time in (1, 1.01):
+            frame = next(row for row in track['frames'] if row['timeSeconds'] == time)
+            self.assertEqual(frame['views'][0]['input'], seeds['states'][0]['completeInput'])
+            self.assertEqual(frame['unavailable'], [loss])
+        self.assertEqual(track['sourceMeasurements']['status'], 'partial')
 
     def test_1016_nearest_state_is_not_required_exposure_identity(self):
         for required in (True, False):
@@ -1420,7 +1440,7 @@ class CamrodRendererLineageTests(unittest.TestCase):
 
     def test_fresh_receipt_rejects_source_transport_complete_input_same_draw_and_world_drift(self):
         for mismatch in ('source-image','source-video','transport-hash','transport-length','raw-source','descriptor',
-                         'complete-input','boolean-input','revision','view','world','missing-world','nonfinite-world','duplicate-world',
+                         'complete-input','boolean-input','revision','capture-revision','view','world','missing-world','nonfinite-world','duplicate-world',
                          'media-time','compiled-hash','historical-link'):
             with self.subTest(mismatch=mismatch):
                 receipt = copy.deepcopy(self.receipt)
@@ -1443,6 +1463,8 @@ class CamrodRendererLineageTests(unittest.TestCase):
                     snapshot['views'][0]['renderedMechanism']['input']['setup']['coneSwingRad'] = False
                 elif mismatch == 'revision':
                     snapshot['views'][0]['renderedMechanism']['sourceDrawRevision'] += 1
+                elif mismatch == 'capture-revision':
+                    capture['drawRevision'] -= 1
                 elif mismatch == 'view':
                     capture['viewId'] = 'inset'
                 elif mismatch in ('world','missing-world','nonfinite-world','duplicate-world'):

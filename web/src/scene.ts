@@ -98,6 +98,8 @@ export interface RenderedLandmarks extends RenderedSourceSupport {
   method: 'gpu-readback'
   visibilityMode: 'depth-off-landmark-projection'
   status: 'captured'
+  /** Genuine viewer epoch of the completed draw that produced this capture. */
+  drawRevision: number
   sourceOpacity: number
   viewId: string
   presentation: Presentation
@@ -116,6 +118,7 @@ export interface RenderedPartVisibility extends RenderedSourceSupport {
   method: 'gpu-readback'
   visibilityMode: 'depth-tested-native-surfaces'
   status: 'captured' | 'stale' | 'unavailable' | 'disposed'
+  drawRevision: number | null
   viewId: string
   presentation: Presentation | null
   timeSeconds: number | null
@@ -205,7 +208,8 @@ export interface Viewer {
   render(): void
   /** Pure hardware/target-size check; never allocates targets or changes draw/camera state. */
   preflightViews(views: readonly SourceView[]): void
-  renderViews(views: readonly SourceView[], beforeView: ((view: SourceView, index: number) => void) | undefined, timeSeconds: number): void
+  /** Returns the reserved epoch only after every view and capture has completed. */
+  renderViews(views: readonly SourceView[], beforeView: ((view: SourceView, index: number, drawRevision: number) => void) | undefined, timeSeconds: number): number
   applyCamera(record: CameraRecord): void
   setInteraction(mode: InteractionMode): void
   fitView(object?: THREE.Object3D): void
@@ -642,6 +646,7 @@ void main() {
   const accumulators = new Float64Array(SLOTS_PER_PASS * ACCUMULATOR_STRIDE)
   const captures = new Map<string, ViewCapture>()
   let drawEpoch = 0
+  let completedDrawEpoch = -1
   let disposed = false
   let renderedProbeRevision = -1
   let visibilityProbe: PartVisibilityProbe | null = null
@@ -1078,21 +1083,31 @@ void main() {
   function render() {
     if (disposed) throw new Error('Viewer is disposed.')
     if (mode === 'exploring') controls.update()
-    drawEpoch++
-    renderedViews = null
-    activeView = null
-    activeViewIndex = -1
-    capturedViewOrder.length = 0
-    beginFrame()
-    camera.aspect = SOURCE_WIDTH / SOURCE_HEIGHT
-    camera.updateProjectionMatrix()
-    drawView(FULL_FRAME, 'native', null, mirrorTarget, false)
-    diagnosticDraw = true
-    captureView(EXPLORING_VIEW_ID, FULL_FRAME, 'native', null, 1)
-    capturePartVisibility(EXPLORING_VIEW_ID, FULL_FRAME, 'native', null, 1)
-    diagnosticDraw = false
-    finishCaptures()
-    renderer.setScissorTest(false)
+    const epoch = ++drawEpoch
+    completedDrawEpoch = -1
+    try {
+      renderedViews = null
+      activeView = null
+      activeViewIndex = -1
+      capturedViewOrder.length = 0
+      beginFrame()
+      camera.aspect = SOURCE_WIDTH / SOURCE_HEIGHT
+      camera.updateProjectionMatrix()
+      drawView(FULL_FRAME, 'native', null, mirrorTarget, false)
+      diagnosticDraw = true
+      captureView(EXPLORING_VIEW_ID, FULL_FRAME, 'native', null, 1)
+      capturePartVisibility(EXPLORING_VIEW_ID, FULL_FRAME, 'native', null, 1)
+      diagnosticDraw = false
+      finishCaptures()
+      renderer.setRenderTarget(null)
+      renderer.setScissorTest(false)
+      if (drawEpoch !== epoch) throw new Error('Viewer draw was invalidated before completion.')
+      completedDrawEpoch = epoch
+    } catch (error) {
+      completedDrawEpoch = -1
+      diagnosticDraw = false
+      throw error
+    }
   }
 
   function assertTargetCapacity(width: number, height: number, label: string, viewId?: string) {
@@ -1126,85 +1141,96 @@ void main() {
     }
   }
 
-  function renderViews(views: readonly SourceView[], beforeView: ((view: SourceView, index: number) => void) | undefined, timeSeconds: number) {
+  function renderViews(views: readonly SourceView[], beforeView: ((view: SourceView, index: number, drawRevision: number) => void) | undefined, timeSeconds: number): number {
     preflightViews(views)
     assertSourceCompositeWeights(views)
-    drawEpoch++
-    renderedViews = views
-    capturedViewOrder.length = probe || visibilityProbe ? views.length : 0
-    beginFrame()
-    for (let i = 0; i < views.length;) {
-      const first = views[i]!
-      const group = first.composite?.mode === 'crossfade' ? first.composite.groupId : null
-      if (group !== null) {
-        ensureCompositeTargets()
-        renderer.getClearColor(savedClearColor)
-        const alpha = renderer.getClearAlpha()
-        renderer.setRenderTarget(compositeSumTarget)
-        renderer.setScissorTest(false)
-        renderer.setClearColor(0x000000, 0)
-        renderer.clear(true, false, false)
-        renderer.setClearColor(savedClearColor, alpha)
-      }
-      do {
-        activeView = views[i]!
-        activeViewIndex = i
-        const view = views[i]!
-        const member = view.composite
-        if (group !== null && (member?.mode !== 'crossfade' || member.groupId !== group)) break
-        const opacity = member?.mode === 'crossfade' ? member.opacity : 1
-        const rect = view.rectSourcePixels
-        const presentation = view.presentation ?? 'native'
-        beforeView?.(view, i)
-        const grid = view.imagePlaneWarp?.unwarpedViewportPixels
-        writeCamera(camera, view.camera, grid?.[0] ?? rect[2], grid?.[1] ?? rect[3])
-        snapshotView(view)
-        if (probe || visibilityProbe) capturedViewOrder[i] = view
-        const previous = i > 0 ? views[i - 1]!.composite : undefined
-        if (group !== null && member?.mode === 'crossfade' && (previous?.mode !== 'crossfade' || previous.groupId !== group || previous.imageLayerId !== member.imageLayerId)) {
+    const epoch = ++drawEpoch
+    completedDrawEpoch = -1
+    try {
+      renderedViews = views
+      capturedViewOrder.length = probe || visibilityProbe ? views.length : 0
+      beginFrame()
+      for (let i = 0; i < views.length;) {
+        const first = views[i]!
+        const group = first.composite?.mode === 'crossfade' ? first.composite.groupId : null
+        if (group !== null) {
+          ensureCompositeTargets()
           renderer.getClearColor(savedClearColor)
           const alpha = renderer.getClearAlpha()
-          renderer.setRenderTarget(compositeImageTarget)
+          renderer.setRenderTarget(compositeSumTarget)
           renderer.setScissorTest(false)
           renderer.setClearColor(0x000000, 0)
-          renderer.clear(true, true, false)
+          renderer.clear(true, false, false)
           renderer.setClearColor(savedClearColor, alpha)
         }
-        if (opacity > 0) {
-          drawView(rect, presentation, group === null ? null : compositeImageTarget, mirrorTarget, true)
-          const next = views[i + 1]?.composite
-          if (group !== null && member?.mode === 'crossfade' && (next?.mode !== 'crossfade' || next.groupId !== group || next.imageLayerId !== member.imageLayerId)) {
-            compositeMaterial.uniforms.stage!.value = 0
-            compositeMaterial.uniforms.weight!.value = opacity
-            compositeMaterial.blending = THREE.CustomBlending
-            compositeMaterial.blendEquation = THREE.AddEquation
-            compositeMaterial.blendSrc = THREE.OneFactor
-            compositeMaterial.blendDst = THREE.OneFactor
-            compositeMaterial.blendEquationAlpha = THREE.AddEquation
-            compositeMaterial.blendSrcAlpha = THREE.OneFactor
-            compositeMaterial.blendDstAlpha = THREE.OneFactor
-            compositeBlit(FULL_FRAME, compositeSumTarget, compositeImageTarget!)
+        do {
+          activeView = views[i]!
+          activeViewIndex = i
+          const view = views[i]!
+          const member = view.composite
+          if (group !== null && (member?.mode !== 'crossfade' || member.groupId !== group)) break
+          const opacity = member?.mode === 'crossfade' ? member.opacity : 1
+          const rect = view.rectSourcePixels
+          const presentation = view.presentation ?? 'native'
+          beforeView?.(view, i, epoch)
+          if (drawEpoch !== epoch) throw new Error('Viewer draw was invalidated by beforeView.')
+          const grid = view.imagePlaneWarp?.unwarpedViewportPixels
+          writeCamera(camera, view.camera, grid?.[0] ?? rect[2], grid?.[1] ?? rect[3])
+          snapshotView(view)
+          if (probe || visibilityProbe) capturedViewOrder[i] = view
+          const previous = i > 0 ? views[i - 1]!.composite : undefined
+          if (group !== null && member?.mode === 'crossfade' && (previous?.mode !== 'crossfade' || previous.groupId !== group || previous.imageLayerId !== member.imageLayerId)) {
+            renderer.getClearColor(savedClearColor)
+            const alpha = renderer.getClearAlpha()
+            renderer.setRenderTarget(compositeImageTarget)
+            renderer.setScissorTest(false)
+            renderer.setClearColor(0x000000, 0)
+            renderer.clear(true, true, false)
+            renderer.setClearColor(savedClearColor, alpha)
           }
+          if (opacity > 0) {
+            drawView(rect, presentation, group === null ? null : compositeImageTarget, mirrorTarget, true)
+            const next = views[i + 1]?.composite
+            if (group !== null && member?.mode === 'crossfade' && (next?.mode !== 'crossfade' || next.groupId !== group || next.imageLayerId !== member.imageLayerId)) {
+              compositeMaterial.uniforms.stage!.value = 0
+              compositeMaterial.uniforms.weight!.value = opacity
+              compositeMaterial.blending = THREE.CustomBlending
+              compositeMaterial.blendEquation = THREE.AddEquation
+              compositeMaterial.blendSrc = THREE.OneFactor
+              compositeMaterial.blendDst = THREE.OneFactor
+              compositeMaterial.blendEquationAlpha = THREE.AddEquation
+              compositeMaterial.blendSrcAlpha = THREE.OneFactor
+              compositeMaterial.blendDstAlpha = THREE.OneFactor
+              compositeBlit(FULL_FRAME, compositeSumTarget, compositeImageTarget!)
+            }
+          }
+          // Higher subviews of this same image mask every diagnostic raster too.
+          diagnosticDraw = true
+          captureView(view.id, rect, presentation, timeSeconds, opacity)
+          capturePartVisibility(view.id, rect, presentation, timeSeconds, opacity)
+          diagnosticDraw = false
+          i++
+          if (group === null) break
+        } while (i < views.length)
+        if (group !== null) {
+          compositeMaterial.uniforms.stage!.value = 1
+          compositeBackground.copy(scene.background instanceof THREE.Color ? scene.background : savedClearColor).convertLinearToSRGB()
+          compositeMaterial.blending = THREE.NoBlending
+          compositeBlit(FULL_FRAME, null, compositeSumTarget!)
+          renderer.clear(false, true, false)
         }
-        // Higher subviews of this same image mask every diagnostic raster too.
-        diagnosticDraw = true
-        captureView(view.id, rect, presentation, timeSeconds, opacity)
-        capturePartVisibility(view.id, rect, presentation, timeSeconds, opacity)
-        diagnosticDraw = false
-        i++
-        if (group === null) break
-      } while (i < views.length)
-      if (group !== null) {
-        compositeMaterial.uniforms.stage!.value = 1
-        compositeBackground.copy(scene.background instanceof THREE.Color ? scene.background : savedClearColor).convertLinearToSRGB()
-        compositeMaterial.blending = THREE.NoBlending
-        compositeBlit(FULL_FRAME, null, compositeSumTarget!)
-        renderer.clear(false, true, false)
       }
+      finishCaptures()
+      renderer.setRenderTarget(null)
+      renderer.setScissorTest(false)
+      if (drawEpoch !== epoch) throw new Error('Viewer draw was invalidated before completion.')
+      completedDrawEpoch = epoch
+      return epoch
+    } catch (error) {
+      completedDrawEpoch = -1
+      diagnosticDraw = false
+      throw error
     }
-    finishCaptures()
-    renderer.setRenderTarget(null)
-    renderer.setScissorTest(false)
   }
 
   const probeTargetOptions = { depthBuffer: false, stencilBuffer: false, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, generateMipmaps: false, type: THREE.UnsignedByteType }
@@ -1494,11 +1520,11 @@ void main() {
   function readRenderedLandmarks(viewId: string): RenderedLandmarks | null {
     const internals = probe?.status === 'active' ? probeInternals.get(probe) : undefined
     const capture = captures.get(viewId)
-    if (!internals || !capture || capture.epoch !== drawEpoch || internals.revision.value !== renderedProbeRevision || disposed || !capturesFresh()) return null
+    if (!internals || !capture || completedDrawEpoch !== drawEpoch || capture.epoch !== drawEpoch || internals.revision.value !== renderedProbeRevision || disposed || !capturesFresh()) return null
     return {
       method: 'gpu-readback', visibilityMode: 'depth-off-landmark-projection', status: 'captured', sourceOpacity: capture.sourceOpacity,
       ...capturedSupport(viewId),
-      viewId, presentation: capture.presentation, timeSeconds: capture.timeSeconds,
+      viewId, drawRevision: capture.epoch, presentation: capture.presentation, timeSeconds: capture.timeSeconds,
       landmarks: internals.markers.map((marker, i) => {
         const rendered = capture.states[i] === 0
         const v = i * 5
@@ -1692,8 +1718,8 @@ void main() {
     const internals = visibilityProbe?.status === 'active' ? partVisibilityInternals.get(visibilityProbe) : undefined
     const capture = visibilityCaptures.get(viewId)
     const status: RenderedPartVisibility['status'] = disposed || visibilityProbe?.status === 'disposed' ? 'disposed' : !internals ? 'unavailable'
-      : !capture || capture.epoch !== drawEpoch || capture.inventoryRevision !== internals.inventoryRevision.value || renderedVisibilityRevision !== internals.revision.value || !capturesFresh() ? 'stale' : 'captured'
-    if (status !== 'captured' || !internals || !capture) return { method: 'gpu-readback', visibilityMode: 'depth-tested-native-surfaces', status, viewId, presentation: null, timeSeconds: null, rectSourcePixels: null, camera: null, sourceOpacity: null, resolvedImagePlaneWarp: null, sourceLayout: [], nativeViewportBackingPixels: null, destinationCellSourcePixels: [0, 0], parts: [] }
+      : !capture || completedDrawEpoch !== drawEpoch || capture.epoch !== drawEpoch || capture.inventoryRevision !== internals.inventoryRevision.value || renderedVisibilityRevision !== internals.revision.value || !capturesFresh() ? 'stale' : 'captured'
+    if (status !== 'captured' || !internals || !capture) return { method: 'gpu-readback', visibilityMode: 'depth-tested-native-surfaces', status, viewId, drawRevision: null, presentation: null, timeSeconds: null, rectSourcePixels: null, camera: null, sourceOpacity: null, resolvedImagePlaneWarp: null, sourceLayout: [], nativeViewportBackingPixels: null, destinationCellSourcePixels: [0, 0], parts: [] }
     const cssX = canvas.clientWidth / gl.drawingBufferWidth
     const cssY = canvas.clientHeight / gl.drawingBufferHeight
     const rect = capture.rect
@@ -1702,7 +1728,7 @@ void main() {
     return {
       method: 'gpu-readback', visibilityMode: 'depth-tested-native-surfaces', status,
       ...capturedSupport(viewId),
-      viewId, presentation: capture.presentation, timeSeconds: capture.timeSeconds,
+      viewId, drawRevision: capture.epoch, presentation: capture.presentation, timeSeconds: capture.timeSeconds,
       rectSourcePixels: [...rect], sourceOpacity: capture.sourceOpacity,
       camera: {
         positionMetres: [capture.cameraValues[0]!, capture.cameraValues[1]!, capture.cameraValues[2]!],

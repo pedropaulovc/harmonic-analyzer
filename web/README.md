@@ -125,7 +125,7 @@ the old late-shot freeze with one cumulative forward-and-return drive over
 162 genuine source exposures (3569..3730), preserving the original boundary,
 twenty phases/amplitudes, setup and camera. Only the final
 124.4576667..124.4910333-second sliver holds through the actual cut.
-Actual GPU AFTER corner checks give exposure-held RMS/max **19.9945/31.4817 px**
+Historical pre-epoch actual GPU AFTER corner checks give exposure-held RMS/max **19.9945/31.4817 px**
 (369 measurements), and feature-held **15.4018/21.1638 px** (17 measurements).
 Their inclusive uncertainty bounds are **36.1787/25.8609 px**, respectively.
 The independent-corner BEFORE maxima **223.1234/123.0095 px** are CPU projections
@@ -163,19 +163,49 @@ After freezing the camera from 30 FIT features, 38 independent CHECK features
 at 2580/2640/2820 give actual GPU marker RMS/max **17.5405/35.8076 px**, versus
 the original far-portrait actual GPU BEFORE **587.1299/778.9835 px**; the inclusive
 uncertainty bound is **42.6561 px**. These measure physical terminal-bevel
-upper-edge midpoints, not whole-frame framing or visible-surface correspondence.
-Foreground gears/chain still mismatch, and direct native-surface proof remains
-pending. Camera, full-scene geometry and stage acceptance are not established.
+upper-edge midpoints, not whole-frame framing. A pre-epoch 25-frame depth-tested
+part-ID witness places all 38 Synthesis CHECK centres on the correct rocker
+surface; Analysis places 283 of 386 centres on their own part and all 386 within
+1.2 source pixels of its actual surface. This proves native projection-neighborhood
+ownership, not exact source-feature association or self-occlusion depth.
+Foreground gears/chain still mismatch; camera, full-scene geometry and stage
+acceptance are not established.
 
-The [fresh current cam-rod world receipt](content/8KmVDxkia_w.camrod-current-world-receipt-2026-10-03.json)
-permits reuse of an immutable older FIT-only camera only after exact native-local
-FIT coordinate, source-frame, complete-input and current-runtime checks.
-It proves three-FIT world compatibility, not source fidelity or model byte identity:
-the downloaded lossless delivery SHA `ad5c2592…` is distinct from its raw-source
-association `2280bfa6…`. The actual normal-route AFTER capture retains all
-435 native drawables, with no missing bindings or page errors. Ambiguous source
-associations and approximation labels remain; full source-camera/geometry/stage
-acceptance and a fresh continuous playback/control/audio report remain unclaimed.
+The active [cam-rod draw-epoch world receipt](content/8KmVDxkia_w.camrod-draw-epoch-world-receipt-2026-10-03.json)
+binds the current native renderer (`f16d8a0c…`) to a completed draw. Native pixel,
+world, visibility and physical receipts share its actual `drawEpoch`; repeated
+draws at the same media time receive different epochs. Incomplete or
+camera-invalidated batches cannot supply captured evidence. The new receipt
+(`af7f5ddb…`) retains all nine original FIT world coordinates exactly and all
+435 drawables. It permits conditional reuse of the immutable FIT-only camera;
+it does not qualify source geometry or camera history. The downloaded lossless
+delivery SHA `ad5c2592…` remains distinct from raw-source SHA `2280bfa6…`.
+The earlier receipt and the regional GPU measurements above remain pre-epoch
+evidence; they are not a fresh GPU replay under `f16d8a0c…`.
+
+The historical `ff57f0a6…` normal-route playback probe of the original MP4 completed **443 source frames /
+443 draws** for Synthesis (105.96..124.45 seconds) and **160 / 160** for Analysis
+(119.1..124.44 seconds), with maximum media-PTS-to-draw skew **50.565/44.955 ms**.
+All twenty shaft phases obeyed the physical law exactly, with fixed source
+phases/amplitudes/setup; Analysis exercised both forward and return motion.
+Both routes passed actual seek, paused keyboard mechanism control, mouse orbit,
+exact chosen-pose restoration and resumed source following. Their compact original
+players remained **222×200 pixels**, with advancing clocks, following model draws
+and audible audio state with increasing decoded audio bytes. No page errors or
+waiting/stalled/pause/error/seeking events occurred during the measured continuous
+windows. This proves those local original-media scenarios, not the official
+YouTube player, all-six-route runtime coverage or whole-scene fidelity.
+
+Operation019 now retains exact original-source optical-flow measurements across
+164 exposures, including 15 previously absent exposures. Original FIT/CHECK roles,
+losses and the current chosen camera/input remain unchanged; the historical
+CHECK-informed inverse-fit candidate is not imported.
+Rocker arms uses a sealed direct FIT-only cap/rim camera evaluated on current
+native CPU geometry. Cap FIT RMS improves **21.1155→11.7843 px** and rim FIT RMS
+**22.2842→2.47564 px**. Its inherited bank inputs include historical CHECK extrema,
+so this is conditional camera authoring, not a new camera/mechanism holdout.
+Source exterior, whole-part visibility and GPU qualification remain unavailable.
+See [`DESIGN.md`](DESIGN.md#operation-and-rocker-source-authority) for scope and maxima.
 
 `npm --prefix web run test:playback` exercises eight synthetic runtime decisions
 through Vite SSR, without a browser or GLB. `SOURCE_TRACK_MODULE` may point to
@@ -255,6 +285,10 @@ Diagnostic landmark receipts also retain the actual native marker's world
 coordinates from the same completed view draw. Stale, unresolved or
 GPU-deformed coordinates remain unavailable; world coordinates are not
 source-pixel measurements or camera qualification.
+Contour sidecars must join the exact original source SHA, same-format decoded
+BGR8/gray8 hash, frame index, decimal PTS, shot and ordered mapped view layout.
+Original CHECK roles do not become new holdouts; partial native depth-ID edge
+bounds do not qualify whole geometry. Missing or ambiguous rows remain unavailable.
 
 Paused interaction verification exercises a bounded crank turn and an actual
 camera orbit, preserving before/after native pixels, camera poses and media
@@ -290,6 +324,21 @@ not recalibrate observations or establish geometry/source fidelity acceptance.
 `npm --prefix web run test:source` runs the source-generation boundary tests
 through uv in an isolated Python environment. The suite covers exact-exposure
 identity, conflicting landmarks and invalid presentation declarations.
+
+Intro's physical-support gate counts coincident seam vertices as one apex and
+refuses overlapping FIT/CHECK support before optimization. The raw-native behavior
+test requires the original `2280bfa6…` GLB; optimized delivery cannot substitute:
+
+```sh
+INTRO_RAW_NATIVE_MODEL_PATH=/private/raw/harmonic-analyzer.glb \
+  npm --prefix web run test:source:geometry
+```
+
+The first post-fix run executed three cases with zero skips. A supplemental
+current full-435 CPU first-surface packet checks the original HOLD809 chosen input
+and native apex facets; it does not measure GPU pixels, source camera, contact or
+stage acceptance. [`DESIGN.md`](DESIGN.md#intro-physical-support-and-first-surface)
+records the input and qualification limits.
 
 Legacy full-part visibility, finite-line, contour and raster-bound diagnostics
 remain historical evidence, not an exhaustive queue that must finish before

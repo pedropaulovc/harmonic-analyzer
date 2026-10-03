@@ -6,7 +6,9 @@ This reads authored numeric seeds/source metadata only: no model, solver,
 optimizer, browser, private evidence directory, or acceptance run. Historical
 report paths/digests remain provenance; source camera failures remain diagnostics.
 Only exact decoded exposures supply source images; nearest states supply chosen
-inputs, not source pixels. None of these choices claim a measured error stage.
+inputs, not source pixels. Superseded source tracks remain provenance-only;
+their genuine numeric replacements preserve roles and unresolved obligations.
+None of these choices claim a measured error stage.
 """
 from __future__ import annotations
 
@@ -65,6 +67,19 @@ def view_record(original, camera, state, evidence):
     return result
 
 
+def capture_request(frame, ident, requests):
+    """Bind new capture authorities to the exact exposure, not a frame alias."""
+    number = frame.get("sourceFrameIndex", frame.get("sourceImage", {}).get("frameIndex"))
+    alias = "presenter-whole" if ident == "main" else ident
+    matching = [(rel, request) for rel, request in requests
+                if request["sourceImage"]["frameIndex"] == number
+                and (request.get("viewId") or request.get("recordId", "").split(":")[-1]) in (ident, alias)
+                and ("decodedTimeSeconds" not in request
+                     or (request["decodedTimeSeconds"] == frame.get("decodedTimeSeconds")
+                         and request["sourceImage"] == frame.get("sourceImage")))]
+    return matching[-1] if matching else None
+
+
 def operation():
     data = common.load_observations("jfH-NbsmvD4")
     seeds, seed_input = load_seeds("jfH-NbsmvD4")
@@ -106,6 +121,8 @@ def operation():
     controls = defaultdict(list)
     for exposure in seeds["sourceControls"]:
         for control in exposure["declarations"]:
+            if control.get("usage") == "provenance-only":
+                continue
             original = control["declaration"]
             controls[exposure["sourceFrameIndex"]].append(
                 ({**control, "sourceImage": exposure["sourceImage"]}, original))
@@ -210,13 +227,15 @@ def operation():
             camera_provenance = original.get("cameraProvenance")
             evidence = "Saved complete chosen51 physical candidate; hidden controls remain unobserved."
             alias = "presenter-whole" if ident == "main" else ident
-            matching = [(rel, r) for rel, r in requests if r["sourceImage"]["frameIndex"] == number and
-                        (r.get("viewId") or r.get("recordId", "").split(":")[-1]) in (ident, alias)]
-            if matching:
-                rel, request = matching[-1]
+            selected_capture = capture_request(frame, ident, requests)
+            if selected_capture:
+                rel, request = selected_capture
                 camera, state = request["camera"], copy.deepcopy(request.get("input", state))
-                family = f"{frame['shotId']}:{rel}:{ident}"
-                camera_provenance = {"kind": "source-transfer", "family": family, "evidence": f"{rel} chosen capture camera used for exact source frame{number}/{ident}; retained source-fit donor, not a new per-exposure camera fit"}
+                family = request.get("cameraContinuityFamily", f"{frame['shotId']}:{rel}:{ident}")
+                camera_provenance = copy.deepcopy(request.get("cameraProvenance")) or {
+                    "kind": "source-transfer", "family": family,
+                    "evidence": f"{rel} chosen capture camera used for exact source frame{number}/{ident}; retained source-fit donor, not a new per-exposure camera fit"}
+                evidence = request.get("inputEvidence", evidence)
             if number == 8002 and ident in corrected:
                 camera, state = corrected[ident]["view"]["camera"], copy.deepcopy(corrected[ident]["chosenInput"])
                 family = f"{frame['shotId']}:corrected-native8002:{ident}"
@@ -285,9 +304,23 @@ def operation():
     source_blockers.append("operation-024111..114s: source establishes one visible turn; absolute crank phase and intermediate speed are chosen. Other hand-driven phase/yaw/disassembly inputs remain partially measured, never static-exempt.")
     track["sourceMeasurements"]["status"] = "partial"
     track["sourceMeasurements"]["blockers"].extend(source_blockers)
+    refinement = seeds.get("operation019SourceRefinement")
+    if refinement:
+        track["evidence"]["operation019SourceRefinement"] = copy.deepcopy(refinement)
+        track["sourceMeasurements"]["blockers"].append(refinement["qualification"])
+    source_unavailable = {
+        (frame["decodedTimeSeconds"], frame["sourceImage"]["frameIndex"]): frame["unavailable"]
+        for frame in data["frames"]
+        if frame.get("sourceObservationAuthority") == "operation019-source-flow-v3-only"
+    }
     for frame in track["frames"]:
         if frame["views"] and all(v["camera"] and v["input"] for v in frame["views"]):
             frame.pop("unavailable", None)
+        source_key = (frame.get("decodedTimeSeconds"), frame.get("sourceImage", {}).get("frameIndex"))
+        if frame["shotId"] == "operation-019" and source_key in source_unavailable:
+            # Ready chosen playback does not qualify lost or virtual source
+            # features. Preserve the current exact-exposure unavailable ledger.
+            frame["unavailable"] = copy.deepcopy(source_unavailable[source_key])
     retain_generator_inputs(track, seeds, seed_input)
     return track
 
@@ -298,7 +331,7 @@ def rocker():
     states = seeds["states"]
     fps = data["source"]["fps"]["numerator"] / data["source"]["fps"]["denominator"]
     by_frame = {row["nativeFrame"]: row for row in states}
-    body_candidate = seeds["bodyCandidate"]
+    camera_choice = seeds["cameraChoice"]
     # The1078 states supply the complete source-informed bank. Shared selection
     # condenses continuous exposures to seconds, cuts, fades and useful motion
     # keys; the original exposure census is diagnostic, not mandatory new cuts.
@@ -322,25 +355,24 @@ def rocker():
         result = []
         for original in common.source_views(frame, data):
             notes = ("Saved CPU-feasible continuous independently actuated held-bank branch; actual source phases/station order, not ideal cosine or historical recovery.")
-            view = view_record(original, body_candidate["camera"], row["completeInput"], notes)
-            view["cameraContinuityFamily"] = "rocker-centered-body-profile"
-            view["cameraProvenance"] = {"kind": "source-transfer", "family": "rocker-centered-body-profile",
-                                        "evidence": "Single recovered-runnable/full-profile-fit.json results2 centered body-aware source camera held across all Rocker exposures/overlays; no per-exposure fit. Original cap/rim CPU strict2% failures retained, current stages unmeasured."}
+            view = view_record(original, camera_choice["camera"], row["completeInput"], notes)
+            view["cameraContinuityFamily"] = camera_choice["cameraContinuityFamily"]
+            view["cameraProvenance"] = copy.deepcopy(camera_choice["cameraProvenance"])
             result.append(view)
         return result
 
     track = common.build_track(data, views, [
         "All1078 original physical samples inform the tested complete51 bank; shared compact selection retains every second, source cut/layout/fade change and useful measured motion keys. Source PTS, measured landmarks and source image hashes are copied.",
-        "Centered body-aware retained camera results2 replaces the cap-compatible extreme-principal branch; capCHECK43.445px/rimCHECK38.809px remain historical CPU diagnostics, not current stage results.",
-        "Continuous chosen held-bank branch was numerically feasible in the retained index; no new CPU/model/GPU execution or historical recovery claim.",
+        "Frozen direct FIT-only cap/rim camera re-evaluated on current actual native435 rigid geometry/full1078 bank. Fixed inputs retain CHECK-informed source-extrema ancestry; original typedCHECK controls are not newly investigation-wide independent.",
+        "Current CPU geometry/forward-projection is not GPU raster, material, first-surface or whole-body camera qualification. Historical camera/report identities remain separate and unchanged.",
         "Regeneration: python3 web/scripts/compact-operation-rocker.py; stages50/20/10/5 are image-width errors and remain unmeasured."])
     track["sourceMeasurements"]["status"] = "partial"
     track["sourceMeasurements"]["blockers"].extend([
         "0..1015.681333s: complete native exterior/shank/side-recess correspondence and independently actuated held-bank cone visibility remain unqualified; no whole-body exemption.",
-        "Centered body-aware camera preserves actual source cap/rim constraints but has not passed current native whole-body source measurement."])
-    for frame in track["frames"]:
-        if frame["views"]:
-            frame.pop("unavailable", None)
+        camera_choice["qualification"]])
+    track["evidence"]["rockerCameraChoice"] = copy.deepcopy(camera_choice)
+    # Complete chosen playback inputs do not resolve the source's missing
+    # exterior/material associations. Keep every selected source loss/null row.
     retain_generator_inputs(track, seeds, seed_input)
     return track
 
