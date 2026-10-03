@@ -1,16 +1,20 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
+import { execFileSync } from 'node:child_process'
 import { copyFile, mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { Matrix4 } from 'three'
 import { authorizeSourceImport, importModel, parseImportOptions, publishPreparedModel } from './fetch-model.mjs'
 import { validateDecodedEquivalence } from './optimize-model.mjs'
+import { assertRuntimeMathCompatibility } from './native-math-compatibility.mjs'
 
 const digest = bytes => createHash('sha256').update(bytes).digest('hex')
 const commit = 'a'.repeat(40)
 
-function rawFixture() {
+function rawFixture(native = null) {
   const geometry = Buffer.alloc(36)
   ;[0, 0, 0, 1, 0, 0, 0, 1, 0].forEach((value, index) => geometry.writeFloatLE(value, index * 4))
   const document = {
@@ -21,6 +25,29 @@ function rawFixture() {
     buffers: [{ byteLength: geometry.length }],
     bufferViews: [{ buffer: 0, byteOffset: 0, byteLength: geometry.length, target: 34962 }],
     accessors: [{ bufferView: 0, byteOffset: 0, componentType: 5126, count: 3, type: 'VEC3', min: [0, 0, 0], max: [1, 1, 0] }],
+  }
+  if (native) {
+    const matrices = native.renderFrames.worldMatrices
+    const nodes = [], indexes = new Map(), identity = new Matrix4().toArray()
+    function add(path) {
+      if (indexes.has(path)) return indexes.get(path)
+      const separator = path.lastIndexOf('/')
+      const parentPath = separator < 0 ? null : path.slice(0, separator)
+      const parent = parentPath ? add(parentPath) : null
+      const world = new Matrix4().fromArray(matrices[path] ?? identity)
+      const parentWorld = new Matrix4().fromArray(matrices[parentPath] ?? identity)
+      const index = nodes.length
+      nodes.push({ name: path.slice(separator + 1), matrix: parentWorld.invert().multiply(world).toArray(), children: [] })
+      indexes.set(path, index)
+      if (parent !== null) nodes[parent].children.push(index)
+      return index
+    }
+    for (const path of Object.keys(matrices)) add(path)
+    // A real geometry replacement with unchanged mechanism datums. It uses
+    // the released native node frames, not a canned exporter response.
+    nodes[add('harmonic-analyzer/frame/replacement-panel-1')].mesh = 0
+    document.nodes = nodes
+    document.scenes[0].nodes = [indexes.get('harmonic-analyzer')]
   }
   const json = Buffer.from(JSON.stringify(document))
   const padded = Buffer.alloc((json.length + 3) & ~3, 0x20)
@@ -47,6 +74,44 @@ async function fixture(t) {
   const nativeBytes = `// Synthetic native identity fixture; no mechanics calibration.\nexport const MECHANISM_DATA = ${JSON.stringify({ provenance: { sourceCommit: commit, modelSha256 } })} as const\n`
   await writeFile(nativePath, nativeBytes)
   return { directory, webRoot, sourcePath, bytes, modelSha256, nativePath, nativeBytes }
+}
+const repository = fileURLToPath(new URL('../../', import.meta.url))
+const web = fileURLToPath(new URL('../', import.meta.url))
+const mechanismData = text => JSON.parse(text.split('export const MECHANISM_DATA = ')[1].split(' as const')[0])
+
+async function releaseFixture(t, editSource = null) {
+  const f = await fixture(t)
+  f.nativeBytes = await readFile(join(web, 'src/mechanics-data.ts'), 'utf8')
+  f.native = mechanismData(f.nativeBytes)
+  await writeFile(f.nativePath, f.nativeBytes)
+  const archive = execFileSync('git', ['archive', f.native.provenance.sourceCommit, 'cad/scripts', 'cad/config'], { cwd: repository, maxBuffer: 64 * 1024 * 1024 })
+  execFileSync('tar', ['-x', '-C', f.directory], { input: archive })
+  await mkdir(join(f.webRoot, 'scripts'))
+  for (const name of ['export-mechanics.py', 'requirements-model-export.txt']) await copyFile(join(web, 'scripts', name), join(f.webRoot, 'scripts', name))
+  for (const name of ['kinematics.ts', 'magnifier.ts']) await copyFile(join(web, 'src', name), join(f.webRoot, 'src', name))
+  if (editSource) {
+    const path = join(f.directory, editSource.path)
+    const before = await readFile(path, 'utf8')
+    const after = before.replace(editSource.from, editSource.to)
+    assert.notEqual(after, before, 'release mutation must change the native source parameter')
+    await writeFile(path, after)
+  } else {
+    const path = join(f.directory, 'cad/config/machine/gear_train.yaml')
+    await writeFile(path, `${await readFile(path, 'utf8')}\n# Geometry-only panel replacement release.\n`)
+  }
+  execFileSync('git', ['init', '--quiet'], { cwd: f.directory })
+  execFileSync('git', ['add', 'cad'], { cwd: f.directory })
+  execFileSync('git', ['-c', 'user.name=Importer fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '--quiet', '-m', 'Approved CAD release fixture'], { cwd: f.directory })
+  f.sourceCommit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: f.directory, encoding: 'utf8' }).trim()
+  f.bytes = rawFixture(f.native)
+  f.modelSha256 = digest(f.bytes)
+  f.sourceSha256 = f.modelSha256
+  await writeFile(f.sourcePath, f.bytes)
+  f.asset = join(f.webRoot, 'public/models/harmonic-analyzer.glb')
+  f.descriptor = join(f.webRoot, 'content/model-representation.json')
+  await writeFile(f.asset, 'previous optimized artifact')
+  await writeFile(f.descriptor, 'previous approved descriptor')
+  return f
 }
 
 test('same-source import publishes exact decoded bytes and descriptor, caches raw, and never regenerates native seals', async t => {
@@ -152,4 +217,72 @@ test('a corrupt immutable raw cache is rejected rather than silently repaired or
   assert.equal(await readFile(cachePath, 'utf8'), 'corrupted raw cache')
   assert.equal(await readFile(destination, 'utf8'), 'previous optimized artifact')
   assert.equal(await readFile(f.nativePath, 'utf8'), f.nativeBytes)
+})
+
+test('compatible future geometry publishes with source/config provenance changes and unchanged runtime mathematics', async t => {
+  const f = await releaseFixture(t)
+  const imported = await importModel(f)
+  const optimized = await readFile(f.asset)
+  const descriptor = JSON.parse(await readFile(f.descriptor, 'utf8'))
+  const native = mechanismData(await readFile(f.nativePath, 'utf8'))
+  assert.equal(imported.nativeMetadataRegenerated, true)
+  assert.equal(native.provenance.sourceCommit, f.sourceCommit)
+  assert.equal(native.provenance.modelSha256, f.sourceSha256)
+  assert.equal(descriptor.representation.sha256, digest(optimized))
+  assert.equal(descriptor.source.sha256, native.provenance.modelSha256)
+  assert.equal((await validateDecodedEquivalence(f.bytes, optimized)).passed, true)
+  const previousSource = f.native.provenance.sourceFiles.find(file => file.path === 'cad/config/machine/gear_train.yaml')
+  const newSource = native.provenance.sourceFiles.find(file => file.path === previousSource.path)
+  assert.notEqual(newSource.sha256, previousSource.sha256)
+  // Exercise the uncertain fixed-math boundaries on actual exported metadata,
+  // while allowing wheel dimensions/rest-frame geometry that the solver reads.
+  const compatible = structuredClone(native)
+  compatible.magnifier.hubPitchRadiusMm += 0.1
+  compatible.magnifier.wheelCentreMm[0] += 1
+  compatible.channel.stationZ0Mm += 1
+  compatible.magnifier.clampRadiusBandMm = compatible.magnifier.clampRadiusBandMm.map(radius => radius * 1.1)
+  compatible.summing.anchorArmMm *= 1.1
+  compatible.spring.rateNPerMm *= 1.1
+  await assertRuntimeMathCompatibility(compatible, f.native, f.webRoot)
+  for (const [parameter, change] of [
+    ['driveTrain.crankRatio', data => { data.driveTrain.crankRatio[0] += 1 }],
+    ['driveTrain.crankTeeth', data => { data.driveTrain.crankTeeth[1] += 1 }],
+    ['harmonicNumbers', data => { [data.harmonicNumbers[0], data.harmonicNumbers[1]] = [data.harmonicNumbers[1], data.harmonicNumbers[0]] }],
+    ['coneTeeth/cylinderTeeth', data => { data.driveTrain.channelMeshes[0].coneTeeth -= 6 }],
+    ['channelMeshes', data => { data.driveTrain.channelMeshes[1].ratio[0] += 6 }],
+    ['clampRadiusBandMm', data => { data.magnifier.clampRadiusBandMm[2] += 1 }],
+    ['clampRadiusBandMm', data => { data.summing.anchorArmMm += 1 }],
+    ['penRestMm', data => { data.magnifier.penRestMm[0] += 1 }],
+    ['reducerRatio', data => { data.paperDrive.reducerRatio *= 2; data.paperDrive.feedPitchDiameterMm /= 2 }],
+    ['fineTravelMmPerCrankRev', data => { data.paperDrive.fineTravelMmPerCrankRev *= 1.01 }],
+    ['netTravelSense', data => { data.paperDrive.netTravelSense *= -1 }],
+  ]) {
+    const unsupported = structuredClone(native)
+    change(unsupported)
+    await assert.rejects(assertRuntimeMathCompatibility(unsupported, f.native, f.webRoot), error => {
+      assert.match(error.message, /Unsupported native runtime parameter/)
+      assert.ok(error.message.includes(parameter), error.message)
+      return true
+    })
+  }
+})
+
+test('staged source reducer and rack pitch changes are refused before any live model, descriptor or native publication', async t => {
+  for (const [name, path, from, to, parameter] of [
+    ['reducer teeth', 'cad/scripts/transgear_pinion_spec.py', 'TEETH = 12', 'TEETH = 13', 'paperDrive.reducerRatio'],
+    ['rack pitch', 'cad/scripts/transgear_feed_pinion_spec.py', 'DIAMETRAL_PITCH = 30.0', 'DIAMETRAL_PITCH = 32.0', 'paperDrive.feedPitchDiameterMm'],
+    ['signed feed', 'cad/scripts/build_kinematic_probe.py', 'FEED_SIGN = +1.0', 'FEED_SIGN = -1.0', 'paperDrive.rackFeedSense'],
+  ]) await t.test(name, async child => {
+    const f = await releaseFixture(child, { path, from, to })
+    await assert.rejects(importModel(f), error => {
+      assert.match(error.message, /Unsupported native runtime parameter/)
+      assert.ok(error.message.includes(parameter), error.message)
+      assert.match(error.message, /No live outputs replaced/)
+      return true
+    })
+    assert.equal(await readFile(f.asset, 'utf8'), 'previous optimized artifact')
+    assert.equal(await readFile(f.descriptor, 'utf8'), 'previous approved descriptor')
+    assert.equal(await readFile(f.nativePath, 'utf8'), f.nativeBytes)
+    assert.deepEqual(await readFile(f.sourcePath), f.bytes)
+  })
 })

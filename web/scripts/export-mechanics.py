@@ -116,6 +116,19 @@ def glb_nodes(path: Path) -> tuple[dict[str, list[float]], str]:
     return result, digest.hexdigest()
 
 
+def recipe_literal_constants(path: Path, names: tuple[str, ...]) -> dict:
+    """Read pinned numeric recipe constants without importing COM recipes."""
+    values = {}
+    for node in ast.parse(path.read_text(), filename=str(path)).body:
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id in names:
+                    values[target.id] = ast.literal_eval(node.value)
+    if set(values) != set(names):
+        raise ValueError(f"Missing native mathematical contract {names} in {path}")
+    return values
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -289,6 +302,13 @@ def main() -> None:
     paper = modules["paper_drive_geom"]
     chain = modules["_chain"]
     installation = modules["cone_pivot_post_installation"]
+    feed_senses = recipe_literal_constants(
+        cad / "scripts/build_kinematic_probe.py", ("GEAR_SENSE", "FEED_SIGN")
+    )
+    crank_teeth = [
+        recipe_literal_constants(cad / "scripts/build_crank_pinion.py", ("TEETH",))["TEETH"],
+        recipe_literal_constants(cad / "scripts/crank_drive_gear_spec.py", ("TEETH",))["TEETH"],
+    ]
     count = config.machine("channels", "count")
     if count != 20:
         raise ValueError("The web solver requires the complete twenty-channel machine")
@@ -595,6 +615,8 @@ def main() -> None:
             "build_paper_drive_assembly.py",
             "build_magnifier_assembly.py",
             "build_kinematic_probe.py",
+            "build_crank_pinion.py",
+            "crank_drive_gear_spec.py",
         )
     )
     sources = []
@@ -612,6 +634,19 @@ def main() -> None:
         )
     data = {
         "harmonicNumbers": [row["harmonic_n"] for row in config.channels()],
+        "driveTrain": {
+            "crankRatio": config.machine("gear_train", "crank_drive_ratio"),
+            "crankTeeth": crank_teeth,
+            "cylinderTeeth": cyl.TEETH,
+            "channelMeshes": [
+                {
+                    "coneTeeth": row["cone_teeth"],
+                    "cylinderTeeth": row["cylinder_teeth"],
+                    "ratio": row["ratio"],
+                }
+                for row in config.channels()
+            ],
+        },
         "provenance": {
             "sourceCommit": args.source_commit,
             "modelSha256": model_hash,
@@ -736,6 +771,13 @@ def main() -> None:
             "hubTangentMm": lw.WIRE_END,
             "wheelCentreMm": [lw.WHEEL_X, lw.WHEEL_BAR_Y, lw.WHEEL_MID_Z],
             "penWireBottomMm": pw.WIRE_BOTTOM,
+            # magnifier.ts still fixes the nib datum. Expose the actual raw
+            # marker origin so the importer can reject a moved datum before
+            # publishing, without freezing other output geometry.
+            "penRestMm": [
+                value * 1000
+                for value in nodes["harmonic-analyzer/pen/pen-marker-1"][12:15]
+            ],
             "cadCoupling": "Rest-linearized yoke; operational wire swing/spin and wrap require the separate physical output-chain solver.",
         },
         "setup": {
@@ -763,9 +805,9 @@ def main() -> None:
             "discAxis": [0.0, 0.0, 1.0],
             "feedAxis": [0.0, 0.0, 1.0],
             "chainSense": 1.0,
-            "externalMeshSense": -1.0,
-            "rackFeedSense": 1.0,
-            "netTravelSense": -1.0,
+            "externalMeshSense": feed_senses["GEAR_SENSE"],
+            "rackFeedSense": feed_senses["FEED_SIGN"],
+            "netTravelSense": feed_senses["GEAR_SENSE"] * feed_senses["FEED_SIGN"],
             "chain": {
                 "linkCount": chain.LINK_COUNT,
                 "pitchMm": chain.LINK_PITCH,

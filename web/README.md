@@ -32,10 +32,13 @@ SHA-256 (not the optimized file's hash):
 npm --prefix web run fetch-model -- /path/to/new.glb --source-commit <full40hexapprovedCADcommit> --source-sha256 <approvedraw64hexreleasehash>
 ```
 
-The release command reads that exact CAD revision, checks the raw model against
-its native mechanics, and stages the new native metadata and optimized asset
-before publication. Missing revisions or incompatible mechanics leave the last
-working assets intact. A current source commit does not approve arbitrary bytes.
+The release command reads that exact CAD revision, checks native rest geometry
+and compatibility with the website's fixed kinematics and magnifier mathematics,
+and stages new native metadata and the optimized asset before publication.
+Compatible geometry, rest, spring and setup changes are supported; unsupported
+ratio, feed or pen-datum changes are refused with a named parameter, preserving
+the last working assets. Missing revisions are also refused. A current source
+commit does not approve arbitrary bytes.
 Existing source tracks are stale for a new raw model and reject source-following;
 manual exploration is not recalibration. See [`DESIGN.md`](DESIGN.md) for the
 representation and provenance contract.
@@ -304,6 +307,9 @@ all twenty spring lengths changed independently. Three continuous original-MP4
 Analysis/Synthesis clips had no stall, pause or error events; the maximum
 video/completed-draw delta was 54.341 ms after an explicit initial 0.1-second
 startup exclusion. This is not an FPS measurement or a new source calibration.
-The 50 source regressions pass using a historical source fixture; production
+The 49 source regressions pass using a historical source fixture; production
 camrod's current-code guard still refuses the old scene receipt. No historical
 receipt was rehashed or accepted as fresh calibration.
+The 25 model tests pass, including real-exporter acceptance of compatible future
+geometry and rejection of unsupported ratio, pitch and feed-sign changes before
+publication. A current raw reimport reproduced the same optimized hash and size.

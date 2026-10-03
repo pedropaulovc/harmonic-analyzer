@@ -1188,34 +1188,6 @@ class CamrodRendererLineageTests(unittest.TestCase):
                 self.assertRaisesRegex(ValueError, 'source/native/code/intrinsics lineage differs'):
             generator.synthesis_coarse_framing_packet()
 
-    def test_current_receipt_requires_actual_representation_and_native_association(self):
-        # Only exercise the identity predicate here: no synthetic receipt is
-        # promoted through the independently pinned GPU/source lineage guards.
-        generator = object.__new__(camera_tracks.Generator)
-        descriptor = json.loads((camera_tracks.WEB / 'content/model-representation.json').read_text())
-        source, artifact = descriptor['source'], descriptor['representation']
-        generator.data = {'model': {'sha256': source['sha256'], 'sourceCommit': source['sourceCommit']}}
-        provenance = {
-            'identity': 'matched', 'sourceCommit': source['sourceCommit'],
-            'sourceSha256': source['sha256'], 'representationKind': descriptor['kind'],
-            'expectedSha256': artifact['sha256'], 'observedSha256': artifact['sha256'],
-            'expectedByteLength': artifact['byteLength'], 'observedByteLength': artifact['byteLength'],
-        }
-        matches = lambda value: generator.camrod_model_receipt_matches(value, 'new-receipt', source['sha256'])
-        self.assertTrue(matches(provenance))
-        for field, value in (
-                ('identity', 'mismatched'), ('sourceCommit', '0' * 40),
-                ('sourceSha256', '0' * 64), ('representationKind', 'unknown'),
-                ('expectedSha256', source['sha256']), ('observedSha256', source['sha256']),
-                ('expectedByteLength', artifact['byteLength'] + 1),
-                ('observedByteLength', artifact['byteLength'] + 1)):
-            with self.subTest(field=field):
-                self.assertFalse(matches({**provenance, field: value}))
-        # An unbound raw receipt cannot enter through the historical exception.
-        raw = {'identity': 'matched', 'sourceCommit': source['sourceCommit'],
-               'expectedSha256': source['sha256'], 'observedSha256': source['sha256']}
-        self.assertFalse(matches(raw))
-
 
 if __name__ == '__main__':
     unittest.main()

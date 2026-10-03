@@ -51,12 +51,17 @@ export function parseImportOptions(args) {
   return options
 }
 
-export function nativeProvenanceFromModule(text) {
+function nativeMetadataFromModule(text) {
   const match = /export const MECHANISM_DATA = ([\s\S]+?) as const\s*$/.exec(text)
   if (!match) throw new Error('Cannot read generated MECHANISM_DATA; run the native metadata exporter with an explicit release identity')
-  const native = JSON.parse(match[1]).provenance
+  const data = JSON.parse(match[1])
+  const native = data.provenance
   if (!native || !COMMIT.test(native.sourceCommit) || !SHA256.test(native.modelSha256)) throw new Error('Native metadata has no valid pinned source identity')
-  return native
+  return data
+}
+
+export function nativeProvenanceFromModule(text) {
+  return nativeMetadataFromModule(text).provenance
 }
 
 export function authorizeSourceImport(native, actualSha256, { sourceCommit = null, sourceSha256 = null } = {}) {
@@ -157,7 +162,8 @@ export async function importModel({ webRoot = WEB, sourcePath = null, sourceComm
   const sourceBytes = await readFile(source)
   const sourceDigest = digest(sourceBytes)
   const nativePath = resolve(webRoot, 'src/mechanics-data.ts')
-  const native = nativeProvenanceFromModule(await readFile(nativePath, 'utf8'))
+  const currentNative = nativeMetadataFromModule(await readFile(nativePath, 'utf8'))
+  const native = currentNative.provenance
   const identity = authorizeSourceImport(native, sourceDigest, { sourceCommit, sourceSha256 })
   const rawCachePath = await cacheRawSource(webRoot, sourceBytes, sourceDigest)
   await mkdir(resolve(webRoot, '.vite'), { recursive: true })
@@ -200,8 +206,10 @@ export async function importModel({ webRoot = WEB, sourcePath = null, sourceComm
       } catch (error) {
         throw new Error(`Native metadata export for ${identity.sourceCommit} failed; the exact CAD release must be available locally and pass twenty-channel/rest checks. No live outputs replaced.\n${error.stderr?.toString() ?? error.message}`, { cause: error })
       }
-      const generatedNative = nativeProvenanceFromModule(await readFile(stagedNative, 'utf8'))
-      assertNativeSourceAssociation(representation, generatedNative)
+      const generatedNative = nativeMetadataFromModule(await readFile(stagedNative, 'utf8'))
+      assertNativeSourceAssociation(representation, generatedNative.provenance)
+      const { assertRuntimeMathCompatibility } = await import('./native-math-compatibility.mjs')
+      await assertRuntimeMathCompatibility(generatedNative, currentNative, webRoot)
       files.push({ staged: stagedNative, destination: nativePath })
     } else assertNativeSourceAssociation(representation, native)
     try { await publishPreparedModel(files, stagingDirectory) }

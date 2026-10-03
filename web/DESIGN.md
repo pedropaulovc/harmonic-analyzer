@@ -77,6 +77,17 @@ compatibility, then stages native metadata and optimized publication. A missing
 commit, incompatible mathematics or a refused release preserves the last working
 assets. No invented release sidecar supplies approval or automatic fidelity.
 
+Before publication, new-source adoption checks the archived CAD against the
+actual immutable exports/functions in `kinematics.ts`: channel count/order,
+physical tooth ratios, cone reduction, paper-chain/reducer/feed pitch and senses,
+and total signed feed. It also checks magnifier minimum/built/maximum ratios and
+the fixed `PEN_X`/`PEN_Y`/`PEN_Z` world datum from `magnifier.ts` with a 0.002 mm
+tolerance. Unsupported mathematical changes are refused with a named parameter
+before live assets are replaced. Geometry, rest, spring and setup data may change;
+proportional magnifier geometry is allowed when its ratios remain compatible.
+The same-current-release path skips native metadata regeneration and these
+new-source gates, leaving the four mechanics/math file hashes unchanged.
+
 The direct mechanics-export invocation uses the same authority inputs and an
 isolated uv environment, but is not a substitute for the staged release command:
 
@@ -417,11 +428,19 @@ video/completed-draw delta was 54.341 ms after explicitly excluding the initial
 0.1-second startup period. This scoped playback/render smoke is not an FPS
 improvement measurement or source-fidelity acceptance.
 
-The 50 source regressions pass using a historical source fixture, not a new
+The 49 source regressions pass using a historical source fixture, not a new
 renderer calibration. Production camrod's current-code guard still refuses the
 old `7b28` scene receipt; no old receipt was rehashed or accepted as fresh
 calibration. The optimized-loader smoke does not replace the required current
 camrod GPU recapture.
+
+All 25 model tests passed: 22 top-level tests and three real-exporter negative
+subtests. The actual exporter accepted compatible future geometry and refused
+the unsupported tooth-ratio, feed-pitch and feed-sign changes before writing
+outputs. The archived source-v37 export checked 210 source files and 130 native
+rest conditions and passed the enriched native mathematical gate against the
+unchanged runtime. A current raw reimport reproduced the optimized SHA-256 and
+38,975,844-byte size above; the production build also passed.
 
 The website loads one optimized model and reuses geometry buffers during motion.
 Exact sharing reduces buffers and cache duplication, while Meshopt changes
