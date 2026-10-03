@@ -1,0 +1,611 @@
+{
+  "schemaVersion": 1,
+  "videoId": "NAsM30MAHLg",
+  "sourceSha256": "595b0ec7b1e1a0b3523d72d33f6e0950bd97dda5ab7032bf91c3e5b9fb7d225d",
+  "modelSha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+  "nativeGeometryScope": "actual original raw native rest node transforms, not current chosen51/all435 posed geometry",
+  "historicalInput": null,
+  "currentCompleteNativeInput": null,
+  "sourceFrame": {
+    "sourceImage": {
+      "frameIndex": 809,
+      "sha256Bgr8": "39644b10abe18220e44e2b708c0e3e0ba882c90fb0f5988f80e8a7fcc9997a75",
+      "pixelFormat": "bgr8",
+      "width": 1920,
+      "height": 1080,
+      "sourceSha256": "595b0ec7b1e1a0b3523d72d33f6e0950bd97dda5ab7032bf91c3e5b9fb7d225d"
+    },
+    "timeSeconds": 27,
+    "decodedTimeSeconds": 26.99363333333333,
+    "decodedTimestampTicks": 809809,
+    "timeBase": "1/30000",
+    "shotId": "presenter-first",
+    "landmarks": [
+      {
+        "anchorId": "frame-cross-screw-6",
+        "role": "fit",
+        "pixel": [
+          783.0021362304688,
+          110.01241302490234
+        ],
+        "status": "observed",
+        "method": "template-match",
+        "uncertaintyPx": 4,
+        "trackingEvidence": {
+          "seedDecodedFrameIndex": 809,
+          "seedTimeSeconds": 27,
+          "seedPatchCorrelation": 0.9999989867210388,
+          "targetPatchLumaStd": 47.669404860436984,
+          "searchRadiusPx": 12,
+          "sourceSha256Bgr8": "39644b10abe18220e44e2b708c0e3e0ba882c90fb0f5988f80e8a7fcc9997a75"
+        }
+      },
+      {
+        "anchorId": "frame-cross-screw-5",
+        "role": "fit",
+        "pixel": [
+          1138.9964599609375,
+          112.00497436523438
+        ],
+        "status": "observed",
+        "method": "template-match",
+        "uncertaintyPx": 4,
+        "trackingEvidence": {
+          "seedDecodedFrameIndex": 809,
+          "seedTimeSeconds": 27,
+          "seedPatchCorrelation": 0.9999990463256836,
+          "targetPatchLumaStd": 48.76332450557056,
+          "searchRadiusPx": 12,
+          "sourceSha256Bgr8": "39644b10abe18220e44e2b708c0e3e0ba882c90fb0f5988f80e8a7fcc9997a75"
+        }
+      },
+      {
+        "anchorId": "frame-cross-screw-2",
+        "role": "fit",
+        "pixel": [
+          792.0613403320312,
+          985.03076171875
+        ],
+        "status": "observed",
+        "method": "template-match",
+        "uncertaintyPx": 4,
+        "trackingEvidence": {
+          "seedDecodedFrameIndex": 809,
+          "seedTimeSeconds": 27,
+          "seedPatchCorrelation": 1,
+          "targetPatchLumaStd": 20.828097048154284,
+          "searchRadiusPx": 12,
+          "sourceSha256Bgr8": "39644b10abe18220e44e2b708c0e3e0ba882c90fb0f5988f80e8a7fcc9997a75"
+        }
+      },
+      {
+        "anchorId": "frame-cross-screw-1",
+        "role": "fit",
+        "pixel": [
+          1138.9500732421875,
+          979.997802734375
+        ],
+        "status": "observed",
+        "method": "template-match",
+        "uncertaintyPx": 4,
+        "trackingEvidence": {
+          "seedDecodedFrameIndex": 809,
+          "seedTimeSeconds": 27,
+          "seedPatchCorrelation": 0.9999986886978149,
+          "targetPatchLumaStd": 14.803505756513937,
+          "searchRadiusPx": 12,
+          "sourceSha256Bgr8": "39644b10abe18220e44e2b708c0e3e0ba882c90fb0f5988f80e8a7fcc9997a75"
+        }
+      },
+      {
+        "anchorId": "wheel.center",
+        "role": "check",
+        "pixel": [
+          921.5,
+          535.5
+        ],
+        "status": "observed",
+        "method": "template-match",
+        "uncertaintyPx": 4,
+        "trackingEvidence": {
+          "seedDecodedFrameIndex": 809,
+          "seedTimeSeconds": 27,
+          "seedPatchCorrelation": 1,
+          "targetPatchLumaStd": 43.66281414135606,
+          "searchRadiusPx": 12,
+          "sourceSha256Bgr8": "39644b10abe18220e44e2b708c0e3e0ba882c90fb0f5988f80e8a7fcc9997a75"
+        }
+      },
+      {
+        "anchorId": "crank.axis",
+        "role": "check",
+        "pixel": [
+          1073.5,
+          889.5
+        ],
+        "status": "observed",
+        "method": "template-match",
+        "uncertaintyPx": 4,
+        "trackingEvidence": {
+          "seedDecodedFrameIndex": 809,
+          "seedTimeSeconds": 27,
+          "seedPatchCorrelation": 0.9999986290931702,
+          "targetPatchLumaStd": 28.93222791002553,
+          "searchRadiusPx": 12,
+          "sourceSha256Bgr8": "39644b10abe18220e44e2b708c0e3e0ba882c90fb0f5988f80e8a7fcc9997a75"
+        }
+      },
+      {
+        "anchorId": "pivot.front",
+        "role": "fit",
+        "pixel": [
+          901,
+          788.5
+        ],
+        "status": "observed",
+        "method": "template-match",
+        "uncertaintyPx": 3,
+        "trackingEvidence": {
+          "seedDecodedFrameIndex": 809,
+          "seedTimeSeconds": 27,
+          "seedPatchCorrelation": 0.9999997019767761,
+          "targetPatchLumaStd": 41.91334332625726,
+          "searchRadiusPx": 12,
+          "sourceSha256Bgr8": "39644b10abe18220e44e2b708c0e3e0ba882c90fb0f5988f80e8a7fcc9997a75"
+        }
+      },
+      {
+        "anchorId": "transgear.stub.front",
+        "role": "fit",
+        "pixel": [
+          967.5,
+          777.5
+        ],
+        "status": "observed",
+        "method": "template-match",
+        "uncertaintyPx": 3,
+        "trackingEvidence": {
+          "seedDecodedFrameIndex": 809,
+          "seedTimeSeconds": 27,
+          "seedPatchCorrelation": 0.9999995827674866,
+          "targetPatchLumaStd": 38.02806003186834,
+          "searchRadiusPx": 12,
+          "sourceSha256Bgr8": "39644b10abe18220e44e2b708c0e3e0ba882c90fb0f5988f80e8a7fcc9997a75"
+        }
+      },
+      {
+        "anchorId": "transgear.knob.axis",
+        "role": "check",
+        "pixel": [
+          1006,
+          789
+        ],
+        "status": "observed",
+        "method": "template-match",
+        "uncertaintyPx": 4,
+        "trackingEvidence": {
+          "seedDecodedFrameIndex": 809,
+          "seedTimeSeconds": 27,
+          "seedPatchCorrelation": 0.9999986290931702,
+          "targetPatchLumaStd": 40.86741939475247,
+          "searchRadiusPx": 12,
+          "sourceSha256Bgr8": "39644b10abe18220e44e2b708c0e3e0ba882c90fb0f5988f80e8a7fcc9997a75"
+        }
+      },
+      {
+        "anchorId": "cylinder.shaft.front",
+        "role": "check",
+        "pixel": [
+          1011.5,
+          918.5
+        ],
+        "status": "observed",
+        "method": "template-match",
+        "uncertaintyPx": 3,
+        "trackingEvidence": {
+          "seedDecodedFrameIndex": 809,
+          "seedTimeSeconds": 27,
+          "seedPatchCorrelation": 1,
+          "targetPatchLumaStd": 37.52446068508035,
+          "searchRadiusPx": 12,
+          "sourceSha256Bgr8": "39644b10abe18220e44e2b708c0e3e0ba882c90fb0f5988f80e8a7fcc9997a75"
+        }
+      },
+      {
+        "anchorId": "fulcrum.front",
+        "role": "fit",
+        "pixel": [
+          783.5,
+          83.5
+        ],
+        "status": "observed",
+        "method": "template-match",
+        "uncertaintyPx": 5,
+        "trackingEvidence": {
+          "seedDecodedFrameIndex": 809,
+          "seedTimeSeconds": 27,
+          "seedPatchCorrelation": 1,
+          "targetPatchLumaStd": 50.606005028268115,
+          "searchRadiusPx": 12,
+          "sourceSha256Bgr8": "39644b10abe18220e44e2b708c0e3e0ba882c90fb0f5988f80e8a7fcc9997a75"
+        }
+      },
+      {
+        "anchorId": "tube2.top",
+        "role": "check",
+        "pixel": [
+          782.5,
+          129.76829268292684
+        ],
+        "status": "observed",
+        "method": "image-edge",
+        "uncertaintyPx": 6,
+        "measurementEvidence": {
+          "sourceSearchRect": [
+            765,
+            122,
+            45,
+            17
+          ],
+          "chromaZeroCrossingY": 129.76829268292684,
+          "chromeSilhouetteEdgesX": [
+            770,
+            795
+          ],
+          "foregroundThresholdLuma": 50
+        }
+      },
+      {
+        "anchorId": "tube2.base",
+        "role": "check",
+        "pixel": [
+          796.5,
+          963.9090909090909
+        ],
+        "status": "observed",
+        "method": "image-edge",
+        "uncertaintyPx": 6,
+        "measurementEvidence": {
+          "sourceSearchRect": [
+            773,
+            955,
+            46,
+            18
+          ],
+          "chromaZeroCrossingY": 963.9090909090909,
+          "chromeSilhouetteEdgesX": [
+            776,
+            817
+          ],
+          "foregroundThresholdLuma": 50
+        }
+      },
+      {
+        "anchorId": "tube4.top",
+        "role": "check",
+        "pixel": [
+          1134,
+          129.1951219512195
+        ],
+        "status": "observed",
+        "method": "image-edge",
+        "uncertaintyPx": 6,
+        "measurementEvidence": {
+          "sourceSearchRect": [
+            1107,
+            122,
+            57,
+            17
+          ],
+          "chromaZeroCrossingY": 129.1951219512195,
+          "chromeSilhouetteEdgesX": [
+            1117,
+            1151
+          ],
+          "foregroundThresholdLuma": 50
+        }
+      }
+    ]
+  },
+  "nativeSupport": [
+    {
+      "anchorId": "frame-cross-screw-6",
+      "partPath": "harmonic-analyzer/frame/frame-cross-screw-6",
+      "kind": "physical-feature",
+      "worldMetres": [
+        0.19699999690055847,
+        1.0179500579833984,
+        -0.13760000467300415
+      ]
+    },
+    {
+      "anchorId": "frame-cross-screw-5",
+      "partPath": "harmonic-analyzer/frame/frame-cross-screw-5",
+      "kind": "physical-feature",
+      "worldMetres": [
+        -0.19699999690055847,
+        1.0179500579833984,
+        -0.13760000467300415
+      ]
+    },
+    {
+      "anchorId": "frame-cross-screw-2",
+      "partPath": "harmonic-analyzer/frame/frame-cross-screw-2",
+      "kind": "physical-feature",
+      "worldMetres": [
+        0.19699999690055847,
+        0.038100000470876694,
+        -0.13300000131130219
+      ]
+    },
+    {
+      "anchorId": "frame-cross-screw-1",
+      "partPath": "harmonic-analyzer/frame/frame-cross-screw-1",
+      "kind": "physical-feature",
+      "worldMetres": [
+        -0.19699999690055847,
+        0.038100000470876694,
+        -0.13300000131130219
+      ]
+    },
+    {
+      "anchorId": "wheel.center",
+      "partPath": "harmonic-analyzer/magnifier/magnifying-wheel-1",
+      "kind": "physical-feature",
+      "worldMetres": [
+        0.05299999937415123,
+        0.5756999850273132,
+        -0.1468999981880188
+      ]
+    },
+    {
+      "anchorId": "crank.axis",
+      "partPath": "harmonic-analyzer/drive-train/crankshaft-1",
+      "kind": "physical-feature",
+      "worldMetres": [
+        -0.12873348593711853,
+        0.12980464100837708,
+        -0.18299999833106995
+      ]
+    },
+    {
+      "anchorId": "pivot.front",
+      "partPath": "harmonic-analyzer/channel/pivot-shaft-1",
+      "kind": "physical-feature",
+      "worldMetres": [
+        0.07289999723434448,
+        0.25380000472068787,
+        -0.07628066092729568
+      ]
+    },
+    {
+      "anchorId": "transgear.stub.front",
+      "partPath": "harmonic-analyzer/paper-drive/transgear-stub-1",
+      "kind": "physical-feature",
+      "worldMetres": [
+        0.0,
+        0.2662006616592407,
+        -0.15430000466797786
+      ]
+    },
+    {
+      "anchorId": "transgear.knob.axis",
+      "partPath": "harmonic-analyzer/paper-drive/transgear-knob-shaft-1",
+      "kind": "physical-feature",
+      "worldMetres": [
+        -0.04257499426603317,
+        0.25236719846725464,
+        -0.16700000041790516
+      ]
+    },
+    {
+      "anchorId": "cylinder.shaft.front",
+      "partPath": "harmonic-analyzer/drive-train/cylinder-gear-shaft-1",
+      "kind": "physical-feature",
+      "worldMetres": [
+        -0.06039360165596008,
+        0.09051799774169922,
+        -0.08299274372859006
+      ]
+    },
+    {
+      "anchorId": "fulcrum.front",
+      "partPath": "harmonic-analyzer/channel/fulcrum-shaft-1",
+      "kind": "physical-feature",
+      "worldMetres": [
+        0.19990000128746033,
+        1.061400055885315,
+        -0.08791241026483476
+      ]
+    },
+    {
+      "anchorId": "tube2.top",
+      "partPath": "harmonic-analyzer/frame/tube-frame-2",
+      "kind": "section-center",
+      "worldMetres": [
+        0.19699999690055847,
+        0.9917000588029623,
+        -0.1120000034570694
+      ]
+    },
+    {
+      "anchorId": "tube2.base",
+      "partPath": "harmonic-analyzer/frame/tube-frame-2",
+      "kind": "section-center",
+      "worldMetres": [
+        0.19699999690055847,
+        0.053300000727176666,
+        -0.1120000034570694
+      ]
+    },
+    {
+      "anchorId": "tube4.top",
+      "partPath": "harmonic-analyzer/frame/tube-frame-4",
+      "kind": "section-center",
+      "worldMetres": [
+        -0.19699999690055847,
+        0.9917000588029623,
+        -0.1120000034570694
+      ]
+    }
+  ],
+  "cameraCandidate": {
+    "positionMetres": [
+      0.12641789096387207,
+      0.4975769075327301,
+      -2.9962747530310425
+    ],
+    "quaternion": [
+      -0.0033051460659736186,
+      0.9997464779389353,
+      -0.006634994566798068,
+      0.021261060774917802
+    ],
+    "verticalFovDegrees": 23.95693195063206,
+    "fitRmsPx": 2.7590683680302996,
+    "fitMaxPx": 3.6923176283653047,
+    "heldOutMaxPx": 31.873426352286764,
+    "thresholdPx": 96.0,
+    "calibrationEligibility": {
+      "eligible": true,
+      "declaredFitPoints": 7,
+      "declaredCheckPoints": 7,
+      "fitAffineRank": 3,
+      "coincidentNativeSupport": [],
+      "reason": null,
+      "qualification": "CPU geometric eligibility only; source association, positive depth, physical complete input and native raster proof remain required."
+    },
+    "stages": [
+      {
+        "maximumSourceFrameWidthPercent": 50,
+        "thresholdPx": 960.0,
+        "cpuPointResidualWithinLimit": true
+      },
+      {
+        "maximumSourceFrameWidthPercent": 20,
+        "thresholdPx": 384.0,
+        "cpuPointResidualWithinLimit": true
+      },
+      {
+        "maximumSourceFrameWidthPercent": 10,
+        "thresholdPx": 192.0,
+        "cpuPointResidualWithinLimit": true
+      },
+      {
+        "maximumSourceFrameWidthPercent": 5,
+        "thresholdPx": 96.0,
+        "cpuPointResidualWithinLimit": true
+      }
+    ],
+    "status": "passed",
+    "projection": "pinhole; independent source landmarks; square pixels; image-centre principal point",
+    "coordinateConvention": "camera-to-CAD-world; quaternion xyzw; looks along local -Z with local +Y up",
+    "viewportSourcePixels": [
+      0,
+      0,
+      1920,
+      1080
+    ],
+    "presentation": "native",
+    "checkErrors": [
+      {
+        "anchorId": "wheel.center",
+        "observedPixel": [
+          921.5,
+          535.5
+        ],
+        "projectedPixel": [
+          916.9705281823473,
+          503.9500524170366
+        ],
+        "errorPx": 31.873426352286764
+      },
+      {
+        "anchorId": "crank.axis",
+        "observedPixel": [
+          1073.5,
+          889.5
+        ],
+        "projectedPixel": [
+          1084.6855721282645,
+          904.9347867383854
+        ],
+        "errorPx": 19.06173301397449
+      },
+      {
+        "anchorId": "transgear.knob.axis",
+        "observedPixel": [
+          1006,
+          789
+        ],
+        "projectedPixel": [
+          1005.2974957044537,
+          793.6230435258828
+        ],
+        "errorPx": 4.67611416963576
+      },
+      {
+        "anchorId": "cylinder.shaft.front",
+        "observedPixel": [
+          1011.5,
+          918.5
+        ],
+        "projectedPixel": [
+          1017.4254438840729,
+          928.719270914065
+        ],
+        "errorPx": 11.812890553897107
+      },
+      {
+        "anchorId": "tube2.top",
+        "observedPixel": [
+          782.5,
+          129.76829268292684
+        ],
+        "projectedPixel": [
+          786.7173921042419,
+          138.6175604953957
+        ],
+        "errorPx": 9.802853511999409
+      },
+      {
+        "anchorId": "tube2.base",
+        "observedPixel": [
+          796.5,
+          963.9090909090909
+        ],
+        "projectedPixel": [
+          791.703710698165,
+          968.2600365113065
+        ],
+        "errorPx": 6.475733062776462
+      },
+      {
+        "anchorId": "tube4.top",
+        "observedPixel": [
+          1134,
+          129.1951219512195
+        ],
+        "projectedPixel": [
+          1132.9972112019764,
+          138.75045589511018
+        ],
+        "errorPx": 9.607808915289217
+      }
+    ],
+    "identifiability": "Noncoplanar fixed native support. CPU point-residual candidate only; source/native association and complete physical input remain conditional. No GPU, full-geometry or source-stage acceptance."
+  },
+  "calibrationEligibility": {
+    "eligible": true,
+    "declaredFitPoints": 7,
+    "declaredCheckPoints": 7,
+    "fitAffineRank": 3,
+    "coincidentNativeSupport": [],
+    "reason": null,
+    "qualification": "CPU geometric eligibility only; source association, positive depth, physical complete input and native raster proof remain required."
+  },
+  "cameraApplication": "diagnostics-only; never substitute this RAW-rest camera onto a current complete-input or normal chosen-minus18mm graph",
+  "sourceAcceptance": false,
+  "GPUAcceptance": false,
+  "qualification": "Actual source FIT selects this conditional CPU camera; unchanged independent source CHECKs scored after selection. Distinct native support/rank is necessary, not complete body/material correspondence, reachable whole51 state, all435 shape/visibility, raster proof or 50/20/10/5-percent stage acceptance."
+}

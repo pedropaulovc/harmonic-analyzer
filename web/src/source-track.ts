@@ -199,6 +199,10 @@ export class CompactVideoReference {
     }
     const anchorIds = new Set(data.anchors.map((anchor) => anchor.id))
     if (anchorIds.size !== data.anchors.length) throw new Error('Compact anchor IDs must be unique.')
+    for (const anchor of data.anchors) {
+      if (anchor.nativeAssociation?.status === 'unavailable'
+        && (anchor.partPath !== undefined || anchor.partLocalMetres !== undefined || anchor.worldMetres !== undefined)) throw new Error('Unavailable source features cannot carry guessed native paths or coordinates.')
+    }
     let previous = -Infinity
     this.frames = data.frames.map((frame) => {
       const t = finite(frame.timeSeconds, 'Compact sample time')

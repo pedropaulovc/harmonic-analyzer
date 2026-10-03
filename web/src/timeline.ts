@@ -40,7 +40,9 @@ export interface ReferenceAnchor {
   partLocalMetres?: [number, number, number]
   worldMetres?: [number, number, number]
   description: string
-  correspondenceEvidence: string
+  correspondenceEvidence?: string
+  /** Narrow raw-native association, never source/GPU/camera qualification. */
+  nativeAssociation?: { status: 'mapped' | 'unavailable'; reason: string | null; proof: Record<string, unknown> }
 }
 export interface Landmark {
   anchorId: string
@@ -84,10 +86,10 @@ export interface SourceSample {
   nativeGeometryAssumptions: readonly NativeGeometryAssumption[]
 }
 
-const compactFiles = import.meta.glob('../content/*.source-track.json', { import: 'default' })
+const compactFiles = import.meta.glob('../content/v39/*.source-track.json', { import: 'default' })
 
 export async function loadReference(video: Video): Promise<CompactVideoReference> {
-  const load = compactFiles[`../content/${video.id}.source-track.json`]
+  const load = compactFiles[`../content/v39/${video.id}.source-track.json`]
   if (!load) throw new Error(`Compact source-following tracks are not available for ${video.title}.`)
   return new CompactVideoReference(await load() as CompactSourceTrack, video)
 }

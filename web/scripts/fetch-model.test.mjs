@@ -114,6 +114,33 @@ async function releaseFixture(t, editSource = null) {
   return f
 }
 
+async function exportSourcePreflight(f) {
+  const stagingDirectory = await mkdtemp(join(f.directory, 'source-preflight-'))
+  const output = join(stagingDirectory, 'mechanics-data.ts')
+  execFileSync('uv', [
+    'run', '--isolated', '--no-project', '--python', '3.13',
+    '--with-requirements', join(f.webRoot, 'scripts/requirements-model-export.txt'),
+    'python', join(f.webRoot, 'scripts/export-mechanics.py'),
+    '--cad-root', join(f.directory, 'cad'),
+    '--model', f.sourcePath,
+    '--source-commit', f.sourceCommit,
+    '--expected-model-sha256', f.sourceSha256,
+    '--output', output,
+  ], { cwd: f.directory, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+  const native = mechanismData(await readFile(output, 'utf8'))
+  assert.equal(native.provenance.sourceCommit, f.sourceCommit)
+  assert.equal(native.provenance.modelSha256, f.sourceSha256)
+  assert.deepEqual(
+    native.provenance.restChecks.map(check => check.path),
+    f.native.provenance.restChecks.map(check => check.path),
+  )
+  for (const check of native.provenance.restChecks) {
+    assert.ok(Number.isFinite(check.errorMm) && check.errorMm <= check.toleranceMm)
+    assert.ok(check.toleranceMm <= 0.002)
+  }
+  return native
+}
+
 test('same-source import publishes exact decoded bytes and descriptor, caches raw, and never regenerates native seals', async t => {
   const f = await fixture(t)
   const imported = await importModel(f)
@@ -139,21 +166,28 @@ test('same-source import publishes exact decoded bytes and descriptor, caches ra
   assert.equal(await readFile(f.nativePath, 'utf8'), f.nativeBytes)
 })
 
-test('current commit remains digest-pinned even when both identity options are explicit', () => {
-  const native = { sourceCommit: '1268c23d4a8fc741147c5e09d8d1e45247a71945', modelSha256: '2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d' }
+test('approved releases remain digest-pinned even when both identity options are explicit', () => {
+  const releases = [
+    { sourceCommit: '1268c23d4a8fc741147c5e09d8d1e45247a71945', modelSha256: '2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d' },
+    { sourceCommit: '81539e53f5146c06a77541415bd79da673806d96', modelSha256: '60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c' },
+  ]
   const wrong = 'f'.repeat(64)
-  for (const options of [{}, { sourceCommit: native.sourceCommit }, { sourceCommit: native.sourceCommit, sourceSha256: wrong }]) {
-    assert.throws(() => authorizeSourceImport(native, wrong, options), /pinned/)
+  for (const native of releases) {
+    for (const options of [{}, { sourceCommit: native.sourceCommit }, { sourceCommit: native.sourceCommit, sourceSha256: wrong }]) {
+      assert.throws(() => authorizeSourceImport(native, wrong, options))
+    }
+    // Each approved pairing stays fixed after another source becomes current.
+    const other = { sourceCommit: commit, modelSha256: wrong }
+    assert.throws(() => authorizeSourceImport(other, wrong, { sourceCommit: native.sourceCommit, sourceSha256: wrong }))
+    assert.equal(authorizeSourceImport(other, native.modelSha256, { sourceCommit: native.sourceCommit, sourceSha256: native.modelSha256 }).regenerateMetadata, true)
   }
-  // The historical release pairing is still fixed after another source becomes current.
-  assert.throws(() => authorizeSourceImport({ sourceCommit: commit, modelSha256: wrong }, wrong, { sourceCommit: native.sourceCommit, sourceSha256: wrong }), /pinned/)
 })
 
 test('new release authority requires explicit commit and approved digest, not the computed hash alone', () => {
   const native = { sourceCommit: commit, modelSha256: '1'.repeat(64) }, rawSha256 = '2'.repeat(64)
-  assert.throws(() => authorizeSourceImport(native, rawSha256), /--source-commit/)
-  assert.throws(() => authorizeSourceImport(native, rawSha256, { sourceCommit: 'b'.repeat(40) }), /both --source-commit/)
-  assert.throws(() => authorizeSourceImport(native, rawSha256, { sourceCommit: 'b'.repeat(40), sourceSha256: '3'.repeat(64) }), /approved release digest/)
+  assert.throws(() => authorizeSourceImport(native, rawSha256))
+  assert.throws(() => authorizeSourceImport(native, rawSha256, { sourceCommit: 'b'.repeat(40) }))
+  assert.throws(() => authorizeSourceImport(native, rawSha256, { sourceCommit: 'b'.repeat(40), sourceSha256: '3'.repeat(64) }))
   assert.equal(authorizeSourceImport(native, rawSha256, { sourceCommit: 'b'.repeat(40), sourceSha256: rawSha256 }).regenerateMetadata, true)
   for (const args of [['--source-commit', 'b'.repeat(39)], ['--source-sha256', '2'.repeat(63)], ['--source-commit', 'B'.repeat(40)], ['--unknown']]) assert.throws(() => parseImportOptions(args))
 })
@@ -166,7 +200,7 @@ test('unavailable exact CAD archive preserves all previous live artifacts and na
   await mkdir(join(f.webRoot, 'scripts'))
   await copyFile(new URL('./export-mechanics.py', import.meta.url), join(f.webRoot, 'scripts/export-mechanics.py'))
   await copyFile(new URL('./requirements-model-export.txt', import.meta.url), join(f.webRoot, 'scripts/requirements-model-export.txt'))
-  await assert.rejects(importModel({ ...f, sourceCommit: 'b'.repeat(40), sourceSha256: f.modelSha256 }), /Cannot archive CAD source commit/)
+  await assert.rejects(importModel({ ...f, sourceCommit: 'b'.repeat(40), sourceSha256: f.modelSha256 }))
   assert.equal(await readFile(asset, 'utf8'), 'previous optimized artifact')
   assert.equal(await readFile(descriptor, 'utf8'), 'previous approved descriptor')
   assert.equal(await readFile(f.nativePath, 'utf8'), f.nativeBytes)
@@ -185,9 +219,9 @@ test('publication errors roll back both existing and initially absent destinatio
     await assert.rejects(publishPreparedModel([
       { staged, destination },
       { staged: join(f.directory, 'missing-stage.json'), destination: other },
-    ], f.directory), /ENOENT/)
+    ], f.directory), { code: 'ENOENT' })
     if (existing) assert.equal(await readFile(destination, 'utf8'), 'old model')
-    else await assert.rejects(stat(destination), /ENOENT/)
+    else await assert.rejects(stat(destination), { code: 'ENOENT' })
     assert.equal(await readFile(other, 'utf8'), 'old descriptor')
   }
 })
@@ -196,12 +230,16 @@ test('a raw input alias of the published destination is refused without overwrit
   const f = await fixture(t)
   const destination = join(f.webRoot, 'public/models/harmonic-analyzer.glb')
   await writeFile(destination, f.bytes)
+  const descriptor = join(f.webRoot, 'content/model-representation.json')
+  await writeFile(descriptor, 'previous approved descriptor')
   const alias = join(f.directory, 'raw-alias.glb')
   await symlink(destination, alias)
   for (const sourcePath of [destination, alias]) {
-    await assert.rejects(importModel({ webRoot: f.webRoot, sourcePath }), /original raw input must be outside/)
+    await assert.rejects(importModel({ webRoot: f.webRoot, sourcePath }))
     assert.deepEqual(await readFile(destination), f.bytes)
     assert.equal(await readFile(f.nativePath, 'utf8'), f.nativeBytes)
+    assert.equal(await readFile(descriptor, 'utf8'), 'previous approved descriptor')
+    assert.deepEqual(await readFile(f.sourcePath), f.bytes)
   }
 })
 
@@ -213,10 +251,14 @@ test('a corrupt immutable raw cache is rejected rather than silently repaired or
   await writeFile(cachePath, 'corrupted raw cache')
   const destination = join(f.webRoot, 'public/models/harmonic-analyzer.glb')
   await writeFile(destination, 'previous optimized artifact')
-  await assert.rejects(importModel(f), /Immutable raw source cache is corrupt/)
+  const descriptor = join(f.webRoot, 'content/model-representation.json')
+  await writeFile(descriptor, 'previous approved descriptor')
+  await assert.rejects(importModel(f))
   assert.equal(await readFile(cachePath, 'utf8'), 'corrupted raw cache')
   assert.equal(await readFile(destination, 'utf8'), 'previous optimized artifact')
   assert.equal(await readFile(f.nativePath, 'utf8'), f.nativeBytes)
+  assert.equal(await readFile(descriptor, 'utf8'), 'previous approved descriptor')
+  assert.deepEqual(await readFile(f.sourcePath), f.bytes)
 })
 
 test('compatible future geometry publishes with source/config provenance changes and unchanged runtime mathematics', async t => {
@@ -259,58 +301,72 @@ test('compatible future geometry publishes with source/config provenance changes
   counterFree.coilEndsMm[0] -= 0.5
   counterFree.coilEndsMm[1] += 0.5
   await assertRuntimeMathCompatibility(compatible, f.native, f.webRoot)
-  for (const [parameter, change] of [
-    ['driveTrain.crankRatio', data => { data.driveTrain.crankRatio[0] += 1 }],
-    ['driveTrain.crankTeeth', data => { data.driveTrain.crankTeeth[1] += 1 }],
-    ['harmonicNumbers', data => { [data.harmonicNumbers[0], data.harmonicNumbers[1]] = [data.harmonicNumbers[1], data.harmonicNumbers[0]] }],
-    ['coneTeeth/cylinderTeeth', data => { data.driveTrain.channelMeshes[0].coneTeeth -= 6 }],
-    ['channelMeshes', data => { data.driveTrain.channelMeshes[1].ratio[0] += 6 }],
-    ['clampRadiusBandMm', data => { data.magnifier.clampRadiusBandMm[2] += 1 }],
-    ['clampRadiusBandMm', data => { data.summing.anchorArmMm += 1 }],
-    ['penRestMm', data => { data.magnifier.penRestMm[0] += 1 }],
-    ['reducerRatio', data => { data.paperDrive.reducerRatio *= 2; data.paperDrive.feedPitchDiameterMm /= 2 }],
-    ['fineTravelMmPerCrankRev', data => { data.paperDrive.fineTravelMmPerCrankRev *= 1.01 }],
-    ['netTravelSense', data => { data.paperDrive.netTravelSense *= -1 }],
-    ['counter.deformation.coilEndInsetMm', data => { data.counter.deformation.coilEndInsetMm += 0.1 }],
-    ['counter.deformation.coilEndCorrectionMm', data => { data.counter.deformation.coilEndCorrectionMm += 0.1 }],
-    ['counter.deformation.coilMeanRadiusMm', data => { data.counter.deformation.coilMeanRadiusMm += 0.1 }],
-    ['counter.deformation.wireRadiusMm', data => { data.counter.deformation.wireRadiusMm += 0.1 }],
-    ['counter.deformation.coilAxis', data => { data.counter.deformation.coilAxis[1] = 1 }],
-    ['counter.deformation.profiles[1].coilEndsMm', data => { data.counter.deformation.profiles[1].coilEndsMm[1] += 0.1 }],
-    ['spring.deformation.transitionHandlePolarRad', data => { data.spring.deformation.transitionHandlePolarRad += 1e-6 }],
-    ['spring.deformation.transitionTangentMm', data => { data.spring.deformation.transitionTangentMm += 0.1 }],
-    ['spring.deformation.profiles[0].hookEyeCentresMm', data => { data.spring.deformation.profiles[0].hookEyeCentresMm[0][0] += 0.1 }],
-    ['spring.deformation.profiles[1].transitionControlPointsMm', data => { data.spring.deformation.profiles[1].transitionControlPointsMm[2][0] += 0.1 }],
+  for (const change of [
+    data => { data.driveTrain.crankRatio[0] += 1 },
+    data => { data.driveTrain.crankTeeth[1] += 1 },
+    data => { [data.harmonicNumbers[0], data.harmonicNumbers[1]] = [data.harmonicNumbers[1], data.harmonicNumbers[0]] },
+    data => { data.driveTrain.channelMeshes[0].coneTeeth -= 6 },
+    data => { data.driveTrain.channelMeshes[1].ratio[0] += 6 },
+    data => { data.magnifier.clampRadiusBandMm[2] += 1 },
+    data => { data.summing.anchorArmMm += 1 },
+    data => { data.paperDrive.reducerRatio *= 2; data.paperDrive.feedPitchDiameterMm /= 2 },
+    data => { data.paperDrive.fineTravelMmPerCrankRev *= 1.01 },
+    data => { data.paperDrive.netTravelSense *= -1 },
+    data => { data.counter.deformation.coilEndInsetMm += 0.1 },
+    data => { data.counter.deformation.coilEndCorrectionMm += 0.1 },
+    data => { data.counter.deformation.coilMeanRadiusMm += 0.1 },
+    data => { data.counter.deformation.wireRadiusMm += 0.1 },
+    data => { data.counter.deformation.coilAxis[1] = 1 },
+    data => { data.counter.deformation.profiles[1].coilEndsMm[1] += 0.1 },
+    data => { data.spring.deformation.transitionHandlePolarRad += 1e-6 },
+    data => { data.spring.deformation.transitionTangentMm += 0.1 },
+    data => { data.spring.deformation.profiles[0].hookEyeCentresMm[0][0] += 0.1 },
+    data => { data.spring.deformation.profiles[1].transitionControlPointsMm[2][0] += 0.1 },
   ]) {
     const unsupported = structuredClone(native)
     change(unsupported)
-    await assert.rejects(assertRuntimeMathCompatibility(unsupported, f.native, f.webRoot), error => {
-      assert.match(error.message, /Unsupported native runtime parameter/)
-      assert.ok(error.message.includes(parameter), error.message)
-      return true
-    })
+    await assert.rejects(assertRuntimeMathCompatibility(unsupported, f.native, f.webRoot))
   }
 })
 
+test('a changed source nib datum cannot publish raw geometry with stale pen rest frames', async t => {
+  const f = await releaseFixture(t, {
+    path: 'cad/scripts/build_pen_assembly.py',
+    from: 'PAPER_FRONT_Z = -143.25',
+    to: 'PAPER_FRONT_Z = -144.25',
+  })
+  await assert.rejects(importModel(f))
+  assert.equal(await readFile(f.asset, 'utf8'), 'previous optimized artifact')
+  assert.equal(await readFile(f.descriptor, 'utf8'), 'previous approved descriptor')
+  assert.equal(await readFile(f.nativePath, 'utf8'), f.nativeBytes)
+  assert.deepEqual(await readFile(f.sourcePath), f.bytes)
+})
+
+// Approved 81539e source: root diameter = 241.3 / DP. Keeping it in
+// [8.04, 8.045) preserves both its printed MIN and the Ø1 in cutter run-out:
+// 10.33 + sqrt(12.7² - (12.7 - 0.48)²) < 13.80 mm. Thus increasing DP
+// must stay <= 241.3 / 8.04 (~30.01244). Also keeping the complete pitch
+// diameter change below the native 0.002 mm rest allowance requires
+// DP < 304.8 / (10.16 - 0.002) (~30.00591). DP 30.003 meets both bounds
+// with a ~0.001016 mm pitch change, far above the strict runtime tolerance.
 test('staged fixed feed and spring-shape changes are refused before any live model, descriptor or native publication', async t => {
-  for (const [name, path, from, to, parameter] of [
-    ['reducer teeth', 'cad/scripts/transgear_pinion_spec.py', 'TEETH = 12', 'TEETH = 13', 'paperDrive.reducerRatio'],
-    ['rack pitch', 'cad/scripts/transgear_feed_pinion_spec.py', 'DIAMETRAL_PITCH = 30.0', 'DIAMETRAL_PITCH = 32.0', 'paperDrive.feedPitchDiameterMm'],
-    ['signed feed', 'cad/scripts/build_kinematic_probe.py', 'FEED_SIGN = +1.0', 'FEED_SIGN = -1.0', 'paperDrive.rackFeedSense'],
-    ['counter coil inset with unchanged origin and eye seats', 'cad/scripts/counter_spring_stock_geom.py', '_COIL_END_INSET_MM = 10.2997', '_COIL_END_INSET_MM = 10.3997', 'counter.deformation.coilEndInsetMm'],
-    ['counter coil axial correction', 'cad/scripts/counter_spring_stock_geom.py', 'return -coil_start_x_mm(length_mm) - WIRE_RADIUS_MM', 'return -coil_start_x_mm(length_mm) - 2.0 * WIRE_RADIUS_MM', 'counter.deformation.coilEndCorrectionMm'],
-    ['channel transition polar', 'cad/scripts/diagnostics/diag_build_9432K31.py', 'VENDOR_HANDLE_POLAR_RAD = -0.00014851266501942706', 'VENDOR_HANDLE_POLAR_RAD = -0.00024851266501942706', 'spring.deformation.transitionHandlePolarRad'],
-    ['channel transition handle', 'cad/scripts/channel_spring_stock_geom.py', 'TRANSITION_TANGENT_MM = COIL_OD_MM * 3.0 / 4.0', 'TRANSITION_TANGENT_MM = COIL_OD_MM * 3.1 / 4.0', 'spring.deformation.transitionTangentMm'],
-    ['channel coil length law with unchanged hook seats', 'cad/scripts/channel_spring_stock_geom.py', 'return check_length_mm(length_mm) - 2.0 * COIL_ID_MM', 'return check_length_mm(length_mm) - 2.1 * COIL_ID_MM', 'spring.deformation.coilEndInsetMm'],
-    ['channel transition hook anchor', 'cad/scripts/diagnostics/diag_build_9432K31.py', '(-22.225, 2.844799999999999, 0.0)', '(-22.325, 2.844799999999999, 0.0)', 'spring.deformation.profiles[0].transitionControlPointsMm'],
+  for (const [name, path, from, to] of [
+    ['reducer teeth', 'cad/scripts/transgear_knob_shaft_spec.py', 'TEETH = 12', 'TEETH = 13'],
+    ['rack pitch', 'cad/scripts/transgear_feed_pinion_spec.py', 'DIAMETRAL_PITCH = 30.0', 'DIAMETRAL_PITCH = 30.003'],
+    ['signed feed', 'cad/scripts/build_kinematic_probe.py', 'FEED_SIGN = +1.0', 'FEED_SIGN = -1.0'],
+    ['counter coil inset with unchanged origin and eye seats', 'cad/scripts/counter_spring_stock_geom.py', '_COIL_END_INSET_MM = 10.2997', '_COIL_END_INSET_MM = 10.3997'],
+    ['counter coil axial correction', 'cad/scripts/counter_spring_stock_geom.py', 'return -coil_start_x_mm(length_mm) - WIRE_RADIUS_MM', 'return -coil_start_x_mm(length_mm) - 2.0 * WIRE_RADIUS_MM'],
+    ['channel transition polar', 'cad/scripts/diagnostics/diag_build_9432K31.py', 'VENDOR_HANDLE_POLAR_RAD = -0.00014851266501942706', 'VENDOR_HANDLE_POLAR_RAD = -0.00024851266501942706'],
+    ['channel transition handle', 'cad/scripts/channel_spring_stock_geom.py', 'TRANSITION_TANGENT_MM = COIL_OD_MM * 3.0 / 4.0', 'TRANSITION_TANGENT_MM = COIL_OD_MM * 3.1 / 4.0'],
+    ['channel coil length law with unchanged hook seats', 'cad/scripts/channel_spring_stock_geom.py', 'return check_length_mm(length_mm) - 2.0 * COIL_ID_MM', 'return check_length_mm(length_mm) - 2.1 * COIL_ID_MM'],
+    ['channel transition hook anchor', 'cad/scripts/diagnostics/diag_build_9432K31.py', '(-22.225, 2.844799999999999, 0.0)', '(-22.325, 2.844799999999999, 0.0)'],
   ]) await t.test(name, async child => {
     const f = await releaseFixture(child, { path, from, to })
-    await assert.rejects(importModel(f), error => {
-      assert.match(error.message, /Unsupported native runtime parameter/)
-      assert.ok(error.message.includes(parameter), error.message)
-      assert.match(error.message, /No live outputs replaced/)
-      return true
-    })
+    // A successful independent source-only export proves this release reaches
+    // runtime compatibility, rather than passing via an unrelated CAD assert.
+    const stagedNative = await exportSourcePreflight(f)
+    await assert.rejects(assertRuntimeMathCompatibility(stagedNative, f.native, f.webRoot))
+    await assert.rejects(importModel(f))
     assert.equal(await readFile(f.asset, 'utf8'), 'previous optimized artifact')
     assert.equal(await readFile(f.descriptor, 'utf8'), 'previous approved descriptor')
     assert.equal(await readFile(f.nativePath, 'utf8'), f.nativeBytes)

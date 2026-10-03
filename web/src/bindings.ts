@@ -2,14 +2,15 @@
  * Qualified native component names are the articulation authority. GLTFLoader
  * makes duplicate short names unique; scene.ts uses the original userData.name
  * at each hierarchy level, never a glTF node index or a mesh-array position.
- * Source: SOLIDWORKSGLTF release 37 / 1268c23d4a8fc741147c5e09d8d1e45247a71945.
+ * Source: SOLIDWORKSGLTF release 39 / 81539e53f5146c06a77541415bd79da673806d96.
  */
 export type Motion =
   | 'crank' | 'cone-spin' | 'cone-swing' | 'cylinder' | 'rod' | 'rocker'
   | 'bar' | 'lever' | 'channel-spring' | 'summing' | 'counter-spring'
   | 'gooseneck' | 'magnifier-fixed' | 'magnifier-clamp' | 'magnifier-rod' | 'magnifier-fixture'
   | 'wheel' | 'lever-wire' | 'pen-wire' | 'pen' | 'platen'
-  | 'pinion-swing' | 'pinion-cam' | 'pinion-lever' | 'paper-gear' | 'chain-link'
+  | 'pinion-swing' | 'pinion-cam' | 'pinion-lever'
+  | 'paper-knob' | 'paper-feed' | 'paper-sprocket' | 'paper-fixed' | 'chain-link'
 
 export interface Binding {
   id: string
@@ -37,13 +38,15 @@ function group(id: string, path: string, names: string, motion: Motion, expected
 }
 
 export const BINDINGS: readonly Binding[] = [
-  // Pinned release build_drive_train_assembly:4225-4241 locks the anchor screw to the arm.
-  group('crank', drive, '(?:crankshaft|crank-arm|crank-hub|crank-hub-pin|crank-pin|crank-pin-eye|crank-handle-pivot-screw|crank-pin-ring|crank-handle|crank-pinion|crank-pinion-pin|fillister-screw)-1', 'crank', 12),
+  // build_drive_train_assembly:5464-5501,5695-5745,5785-5795:
+  // keeper loop, seat hardware and bonded grip parts ride the keyed crank rig.
+  group('crank', drive, '(?:crankshaft|crank-arm|crank-hub|crank-hub-pin|crank-pin|crank-pin-eye|crank-handle-pivot-screw|crank-pin-ring|crank-handle|crank-handle-butt-cup|crank-handle-ferrule|crank-pinion|crank-pinion-pin|crank-seat-washer|keeper-chain|keeper-chain-link|fillister-screw)-1|crank-seat-drive-pin-[12]', 'crank', 19),
   family('coneGears', drive, 'cone-gear', 'cone-spin'),
-  group('coneShaft', drive, '(?:cone-gear-shaft|crank-drive-gear)-1', 'cone-spin', 2),
-  // Source build_drive_train_assembly:4505-4555 carries post/fasteners;
-  // :3772-3799 makes the lock knob and pivot screw base-bolted statics.
-  group('conePlatform', drive, '(?:cone-swing-platform|cone-tip-block|cone-tip-bushing|cone-tip-pinch-screw|cone-tip-adjuster|cone-tip-shim|cone-pivot-post)-1|post-mount-screw-[12]', 'cone-swing', 9),
+  // :5994-6023 keys the tip collar to the spinning shaft, not the tip block.
+  group('coneShaft', drive, '(?:cone-gear-shaft|crank-drive-gear|cone-tip-collar)-1', 'cone-spin', 3),
+  // :5875-5910,5939-5978,6024-6076 carries post/block/fasteners on the plate;
+  // :4968-5009 keeps the lock knob and pivot screw base-bolted.
+  group('conePlatform', drive, '(?:cone-swing-platform|cone-tip-block|cone-tip-block-screw|cone-tip-pinch-screw|cone-tip-adjuster|cone-pivot-post)-1|post-mount-screw-[12]', 'cone-swing', 8),
   family('cylinderGears', drive, 'cylinder-gear', 'cylinder'),
   family('connectingRods', channel, 'connecting-rod', 'rod'),
   family('rockerArms', channel, 'rocker-arm', 'rocker'),
@@ -61,16 +64,26 @@ export const BINDINGS: readonly Binding[] = [
   group('leverWire', magnifier, 'lever-wire-1', 'lever-wire', 1),
   group('penWire', pen, 'pen-wire-1', 'pen-wire', 1),
   group('pen', pen, '(?:pen-rod|pen-v-block|pen-frame|pen-marker|pen-set-screw)-1', 'pen', 5),
-  // Pinned release build_paper_drive_assembly:1170-1458 locks all 33 native
-  // carriage bodies to the platen, including guides, locks and screws 1..22.
-  // Flat native siblings: screws 1/2 attach to clip 1, screws 3/4 to clip 2.
-  group('platen', paper, '(?:platen|platen-rack|platen-paper)-1|(?:platen-clip|platen-guide)-[12]|guide-lock-[1-4]|fillister-screw-(?:[1-9]|1[0-9]|2[0-2])', 'platen', 33),
+  // build_paper_drive_assembly:2185-2476 locks all 33 native carriage bodies
+  // to the platen: four clip and ten guide fillisters, eight low lock screws.
+  group('platen', paper, '(?:platen|platen-rack|platen-paper)-1|(?:platen-clip|platen-guide)-[12]|guide-lock-[1-4]|fillister-screw-(?:[1-9]|1[0-4])|guide-lock-screw-[1-8]', 'platen', 33),
   group('alignmentPinionSwing', drive, 'pinion-bracket-[12]|alignment-pinion-1|pinion-arbor-1|pinion-strap-pin-[123]|pinion-handle-1|pinion-arbor-collar-1', 'pinion-swing', 9),
   group('alignmentPinionCam', drive, 'pinion-cam-[12]|pinion-lift-rod-1|pinion-cam-pin-[12]', 'pinion-cam', 5),
   group('alignmentPinionLever', drive, 'pinion-lever-1|pinion-lever-pin-1', 'pinion-lever', 2),
-  group('paperGears', paper, '(?:transgear-pinion|transgear-feed-pinion|rack-pinion|transgear-knob-shaft|transgear-thumbnut)-1', 'paper-gear', 5),
-  group('paperChain', paper, 'chain-(?:outer|inner)-link-(?:[1-9]|[12][0-9]|3[0-3])', 'chain-link', 66),
-  group('paperSprockets', paper, 'transgear-removable-[123]', 'paper-gear', 3),
+  // :2699-2844 rigidly joins the collar/shaft/cup hardware about knob axis K.
+  group('paperKnob', paper, '(?:transgear-knob-shaft|transgear-thumbnut|transgear-drive-collar|transgear-collar-cross-pin|transgear-knob-cup|transgear-knob-cup-pin|transgear-knob-thrust-ring)-1|transgear-knob-drive-pin-[12]', 'paper-knob', 9),
+  // :2598-2662 locks the sleeve, hub and off-axis screws to the disc at stud S.
+  group('paperFeed', paper, '(?:rack-pinion|transgear-feed-pinion|transgear-disc-hub)-1|transgear-disc-screw-[123]', 'paper-feed', 6),
+  // :56-58,2478-2571,2663-2679 fixes the structure at its authored latched pose.
+  // Physical hanger release/swing is not a published MechanismInput DOF.
+  group('paperHanger', paper, '(?:transgear-arm|transgear-arm-plate|transgear-latch-pin|transgear-pin|transgear-front-bushing|transgear-rear-bushing|transgear-retaining-ring)-1|transgear-arm-plate-screw-[12]', 'paper-fixed', 9),
+  group('paperLatchSupport', paper, '(?:latch-hook|latch-hook-bracket)-1|(?:latch-hook-bracket-screw|latch-hook-rivet)-[12]', 'paper-fixed', 6),
+  // transgear_pivot_spring_spec:18-24,46-52: installed disc-spring geometry,
+  // not a channel/counter swept-wire spring and not a runtime deformation law.
+  group('paperPivotSupport', paper, '(?:transgear-pivot-screw|transgear-pivot-spacer|transgear-pivot-spring)-1', 'paper-fixed', 3),
+  // _chain:154-185 / build_paper_drive_assembly:1936-2004: 34 inner + 34 outer.
+  group('paperChain', paper, 'chain-(?:outer|inner)-link-(?:[1-9]|[12][0-9]|3[0-4])', 'chain-link', 68),
+  group('paperSprockets', paper, 'transgear-removable-[123]', 'paper-sprocket', 3),
   group('magnifierFixture', magnifier, 'output-fixture-1', 'magnifier-fixture', 1),
 ]
 

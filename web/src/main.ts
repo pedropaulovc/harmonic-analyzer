@@ -231,12 +231,12 @@ function retryFollowing(): void {
   } catch (error) { notice(physicsError, error instanceof Error ? error.message : String(error)) }
 }
 
-function applyView(view: PlaybackView): void {
+function applyView(view: PlaybackView, drawRevision: number): void {
   if (!machine || machine.availability !== 'available') return
   updateMachine(view.input)
   let draw = mechanismDraws.get(view.id)
   if (!draw) {
-    draw = { status: 'solved-for-draw', viewId: view.id, timeSeconds: sourceDrawTimeSeconds, sourceDrawRevision,
+    draw = { status: 'solved-for-draw', viewId: view.id, timeSeconds: sourceDrawTimeSeconds, sourceDrawRevision: drawRevision,
       input: createMechanismInput(), mechanicalProvenance: view.mechanicalProvenance, unobservedInputFields: view.unobservedInputFields, nativeGeometryAssumptions: view.nativeGeometryAssumptions,
       imagePlaneWarp: view.authoredImagePlaneWarp, resolvedImagePlaneWarp: view.imagePlaneWarp ?? null, sourceLayout: view.sourceLayout,
       channelAnglesRad: new Float64Array(20), platenTravelM: 0, penTravelM: 0, effectiveBankDriveTurns: 0 }
@@ -244,7 +244,7 @@ function applyView(view: PlaybackView): void {
   }
   draw.status = 'solved-for-draw'
   draw.timeSeconds = sourceDrawTimeSeconds
-  draw.sourceDrawRevision = sourceDrawRevision
+  draw.sourceDrawRevision = drawRevision
   copyInput(machine.input, draw.input)
   draw.mechanicalProvenance = view.mechanicalProvenance
   draw.unobservedInputFields = view.unobservedInputFields
@@ -260,8 +260,13 @@ function applyView(view: PlaybackView): void {
 
 function drawSourceViews(views: readonly PlaybackView[], timeSeconds: number): void {
   sourceDrawTimeSeconds = timeSeconds
-  sourceDrawRevision++
-  viewer.renderViews(views, beforeView, timeSeconds)
+  try {
+    sourceDrawRevision = viewer.renderViews(views, beforeView, timeSeconds)
+  } catch (error) {
+    // No physical receipt remains rendered when the source batch did not complete.
+    for (const draw of mechanismDraws.values()) draw.status = 'solved-for-draw'
+    throw error
+  }
   for (const view of views) {
     const draw = mechanismDraws.get(view.id)
     if (draw?.sourceDrawRevision === sourceDrawRevision) draw.status = 'rendered'
@@ -272,7 +277,7 @@ function renderedMechanism(viewId: string) {
   const draw = mechanismDraws.get(viewId)
   if (!draw) return { status: 'unavailable' as const, viewId, imagePlaneWarp: null, resolvedImagePlaneWarp: null, sourceLayout: [] }
   return {
-    status: mode === 'exploring' || referenceState === 'unavailable' || draw.timeSeconds !== modelTime ? 'stale' as const : draw.status,
+    status: mode === 'exploring' || referenceState === 'unavailable' || draw.timeSeconds !== modelTime || draw.sourceDrawRevision !== sourceDrawRevision ? 'stale' as const : draw.status,
     viewId, timeSeconds: draw.timeSeconds, sourceDrawRevision: draw.sourceDrawRevision,
     method: 'actual-native-mechanism-solve' as const, input: serializeInput(draw.input),
     mechanicalProvenance: draw.mechanicalProvenance, unobservedInputFields: draw.unobservedInputFields,
@@ -285,12 +290,14 @@ function renderedMechanism(viewId: string) {
 function sourceCapture<T extends {
   status: string
   viewId: string
+  drawRevision: number | null
   timeSeconds: number | null
   resolvedImagePlaneWarp: NonNullable<PlaybackView['imagePlaneWarp']> | null
   sourceLayout: PlaybackView['sourceLayout']
 }>(capture: T) {
   const draw = mechanismDraws.get(capture.viewId)
   const bound = draw?.status === 'rendered' && draw.timeSeconds === capture.timeSeconds
+    && capture.drawRevision === draw.sourceDrawRevision && draw.sourceDrawRevision === sourceDrawRevision
     && equalRecord(draw.resolvedImagePlaneWarp, capture.resolvedImagePlaneWarp)
     && equalRecord(draw.sourceLayout, capture.sourceLayout)
   return {
@@ -335,9 +342,9 @@ function renderSource(timeSeconds: number): void {
   notice(sourceError, reference.approximationMessage)
 }
 
-function beforeView(_view: SourceView, index: number): void {
+function beforeView(_view: SourceView, index: number, drawRevision: number): void {
   const sample = activeViews[index]
-  if (sample) applyView(sample)
+  if (sample) applyView(sample, drawRevision)
 }
 
 function updateHud(): void {

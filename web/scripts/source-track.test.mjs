@@ -209,3 +209,18 @@ test('source-following rejects a different raw native source or release commit r
   otherCommit.model.sourceCommit = 'b'.repeat(40)
   assert.throws(() => new CompactVideoReference(otherCommit, video), /different native CAD export/)
 })
+
+test('unavailable native features retain source pixels without accepting ghost path or point', () => {
+  const track = fixture()
+  const unavailable = { id: 'lost-native-feature', kind: 'physical-feature', description: 'Original photographed feature still required',
+    nativeAssociation: { status: 'unavailable', reason: 'No unchanged native counterpart', proof: {} } }
+  track.anchors.push(unavailable)
+  track.frames[0].landmarks.push({ anchorId: unavailable.id, viewId: 'main', pixel: [120, 340], role: 'check', status: 'observed', method: 'manual', uncertaintyPx: 2 })
+  const reference = new CompactVideoReference(track, video)
+  assert.equal(reference.getState(0), 'approximate')
+  for (const ghost of [{ partPath: 'harmonic-analyzer/removed-part' }, { partLocalMetres: [1, 2, 3] }, { worldMetres: [1, 2, 3] }]) {
+    const mutated = structuredClone(track)
+    Object.assign(mutated.anchors[0], ghost)
+    assert.throws(() => new CompactVideoReference(mutated, video), /Unavailable source features/)
+  }
+})

@@ -5,8 +5,8 @@ Run from the repository root (use the approved release commit and raw digest):
   uv run --isolated --no-project --python 3.13 \\
     --with-requirements web/scripts/requirements-model-export.txt \\
     python web/scripts/export-mechanics.py --model /path/to/raw-native.glb \\
-    --source-commit 1268c23d4a8fc741147c5e09d8d1e45247a71945 \\
-    --expected-model-sha256 2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d
+    --source-commit 81539e53f5146c06a77541415bd79da673806d96 \\
+    --expected-model-sha256 60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c
 Only web output is written. CAD sources and the raw model are read-only. The GLB
 is not redistributed. CAD is archived from the exact supplied commit, never from
 the working tree. Analytic force seats and calibrated native render seats are
@@ -32,8 +32,14 @@ import types
 from dataclasses import asdict
 from pathlib import Path
 
-RELEASE_COMMIT = "1268c23d4a8fc741147c5e09d8d1e45247a71945"
-RELEASE_SHA256 = "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d"
+# Approved release associations are immutable, including the historical source.
+# Integrity records do not imply compatibility with historical geometry/CAD APIs.
+RELEASE_SOURCES = {
+    "1268c23d4a8fc741147c5e09d8d1e45247a71945":
+        "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+    "81539e53f5146c06a77541415bd79da673806d96":
+        "60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c",
+}
 
 
 def glb_nodes(path: Path) -> tuple[dict[str, list[float]], str]:
@@ -182,6 +188,44 @@ def spring_deformation_contract(cad: Path, stock, counter) -> tuple[dict, dict]:
     return tuple(contracts)
 
 
+def pen_rest_datum(cad: Path, block, marker) -> list[float]:
+    """Evaluate the released nib-placement data and pure transform only."""
+    path = cad / "scripts/build_pen_assembly.py"
+    constants = recipe_literal_constants(
+        path,
+        ("PAPER_FRONT_Z", "CLEARANCE", "PEN_ROD_X", "PEN_Z_MID",
+         "BLOCK_BOTTOM_Y", "BLOCK_YAW_DEG"),
+    )
+    namespace = {
+        **constants,
+        "math": math,
+        "BLOCK_DEPTH": block.BLOCK_DEPTH,
+        "BORE_X": block.BORE_X,
+        "GROOVE_DEPTH": block.GROOVE_DEPTH,
+        "BARREL_DIA": marker.BARREL_DIA,
+    }
+    names = {
+        "_C", "_S", "BLOCK_ROWS", "ROD_BORE_LOCAL", "VBLOCK_POS",
+        "MARKER_AXIS_LOCAL_Y", "MARKER_TIP_LOCAL_X", "MARKER_POS",
+    }
+    statements = []
+    found = set()
+    for node in ast.parse(path.read_text(), filename=str(path)).body:
+        if isinstance(node, ast.FunctionDef) and node.name == "_block_to_machine":
+            statements.append(node)
+            found.add(node.name)
+        elif isinstance(node, ast.Assign):
+            targets = {target.id for target in node.targets if isinstance(target, ast.Name)}
+            if targets & names:
+                statements.append(node)
+                found.update(targets)
+    if found != names | {"_block_to_machine"}:
+        raise ValueError(f"Missing released pen-placement contract in {path}")
+    exec(compile(ast.Module(body=statements, type_ignores=[]),
+                 str(path), "exec"), namespace)  # noqa: S102
+    return namespace["MARKER_POS"]
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -208,10 +252,11 @@ def main() -> None:
         parser.error("--source-commit must be exactly 40 lowercase hexadecimal characters")
     if not re.fullmatch(r"[0-9a-f]{64}", args.expected_model_sha256):
         parser.error("--expected-model-sha256 must be exactly 64 lowercase hexadecimal characters")
-    if args.source_commit == RELEASE_COMMIT and args.expected_model_sha256 != RELEASE_SHA256:
+    release_sha256 = RELEASE_SOURCES.get(args.source_commit)
+    if release_sha256 is not None and args.expected_model_sha256 != release_sha256:
         parser.error(
-            f"--source-commit {RELEASE_COMMIT} requires the existing raw model SHA256 "
-            f"{RELEASE_SHA256}; its native release pin cannot be replaced"
+            f"--source-commit {args.source_commit} requires the approved raw model SHA256 "
+            f"{release_sha256}; its native release pin cannot be replaced"
         )
     try:
         nodes, model_hash = glb_nodes(args.model)
@@ -321,7 +366,10 @@ def main() -> None:
             "magnifying_clamp_geom",
             "lever_wire_geom",
             "pen_wire_geom",
+            "pen_v_block_spec",
+            "pen_marker_spec",
             "paper_drive_geom",
+            "transgear_removable_spec",
             "spring_force_model",
             "pinion_rig_park_geometry",
             "pinion_cam_geometry",
@@ -354,6 +402,7 @@ def main() -> None:
     lw = modules["lever_wire_geom"]
     pw = modules["pen_wire_geom"]
     paper = modules["paper_drive_geom"]
+    removable = modules["transgear_removable_spec"]
     chain = modules["_chain"]
     installation = modules["cone_pivot_post_installation"]
     feed_senses = recipe_literal_constants(
@@ -484,6 +533,11 @@ def main() -> None:
         [0.0, 0.0, 0.0],
         [lw.WHEEL_X, lw.WHEEL_BAR_Y, lw.WHEEL_MID_Z],
     )
+    check(
+        "harmonic-analyzer/pen/pen-marker-1",
+        [0.0, 0.0, 0.0],
+        pen_rest_datum(cad, modules["pen_v_block_spec"], modules["pen_marker_spec"]),
+    )
     park = modules["pinion_rig_park_geometry"]
     cam = modules["pinion_cam_geometry"]
     cone_line = modules["cone_line"]
@@ -492,8 +546,8 @@ def main() -> None:
     cone_pivot[1] = cone_line.Y_BASE_TOP
     hardware = platform.swing_hardware_geometry(
         (cone_pivot[0], cone_pivot[2]),
-        lock_collar_dia=modules["cone_lock_knob_spec"].COLLAR_DIA,
-        stop_shank_dia=modules["swing_stop_screw_spec"].SHANK_DIA,
+        lock_head_dia=modules["cone_lock_knob_spec"].HEAD_DIA,
+        stop_contact_dia=modules["swing_stop_screw_spec"].CONTACT_DIA,
     )
     pinion_z = nodes["harmonic-analyzer/drive-train/pinion-pivot-shaft-1"][14] * 1000
     lift_z = nodes["harmonic-analyzer/drive-train/pinion-lift-rod-1"][14] * 1000
@@ -553,15 +607,18 @@ def main() -> None:
     engage_cam = (lo + hi) / 2
 
     # Preserve the released chain equation for each actual removable-gear pair.
-    # Only its explicit wrap-radius input assignments differ; the 66 existing
-    # native links and 6.35 mm pitch stay fixed, with sag absorbing the change.
+    # Derive each source pitch circle while retaining the actual native chain.
+    # Swapping mounted wheels cannot select a different number of existing links;
+    # the unchanged released closure bracket/assertions must solve their fixed length.
     chain_tree = ast.parse(Path(chain.__file__).read_text(), filename=chain.__file__)
     chain_paths = {}
-    for gearing, knob_radius, crank_radius in (
-        ("small-large", 24.0, 12.0),
-        ("medium-medium", 18.0, 18.0),
-        ("large-small", 12.0, 24.0),
+    for gearing, knob_config, crank_config in (
+        ("small-large", "T24", "T12"),
+        ("medium-medium", "T18", "T18"),
+        ("large-small", "T12", "T24"),
     ):
+        knob_radius = removable.pitch_dia(removable.TEETH[knob_config]) / 2.0
+        crank_radius = removable.pitch_dia(removable.TEETH[crank_config]) / 2.0
         tree = ast.parse(ast.unparse(chain_tree), filename=chain.__file__)
         for node in tree.body:
             if (
@@ -573,13 +630,11 @@ def main() -> None:
                     node.value = ast.Constant(knob_radius)
                 elif node.targets[0].id == "WRAP_R_B":
                     node.value = ast.Constant(crank_radius)
+                elif node.targets[0].id == "LINK_COUNT":
+                    node.value = ast.Constant(chain.LINK_COUNT)
         values = {"__name__": f"exported_chain_{gearing}"}
-        # Whole pinned-commit chain module with only WRAP_R_A/B constants replaced.
+        # Whole pinned source with mounted radii and the existing native link count.
         exec(compile(ast.fix_missing_locations(tree), chain.__file__, "exec"), values)  # noqa: S102
-        if values["LINK_COUNT"] != chain.LINK_COUNT:
-            raise ValueError(
-                f"{gearing} does not close on the existing native link count"
-            )
         chain_paths[gearing] = {
             "arcsMm": [
                 [0.0, 0.0, knob_radius, values["_ANG_N"], values["SPAN_A"]],
@@ -668,6 +723,7 @@ def main() -> None:
             "build_drive_train_assembly.py",
             "build_paper_drive_assembly.py",
             "build_magnifier_assembly.py",
+            "build_pen_assembly.py",
             "build_kinematic_probe.py",
             "build_crank_pinion.py",
             "crank_drive_gear_spec.py",
@@ -828,9 +884,8 @@ def main() -> None:
             "hubTangentMm": lw.WIRE_END,
             "wheelCentreMm": [lw.WHEEL_X, lw.WHEEL_BAR_Y, lw.WHEEL_MID_Z],
             "penWireBottomMm": pw.WIRE_BOTTOM,
-            # magnifier.ts still fixes the nib datum. Expose the actual raw
-            # marker origin so the importer can reject a moved datum before
-            # publishing, without freezing other output geometry.
+            # The nib is the marker's native local origin. Its raw world datum
+            # passed the independent archived MARKER_POS rest check above.
             "penRestMm": [
                 value * 1000
                 for value in nodes["harmonic-analyzer/pen/pen-marker-1"][12:15]

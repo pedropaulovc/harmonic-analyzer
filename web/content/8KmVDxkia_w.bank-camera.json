@@ -1,0 +1,489 @@
+{
+  "schemaVersion": 1,
+  "videoId": "8KmVDxkia_w",
+  "source": {
+    "videoId": "8KmVDxkia_w",
+    "sha256": "a7ac177e0c6eecdfe9b5817716eeb570c43b4590888f007c2cb6de8229ce1725",
+    "width": 1920,
+    "height": 1080,
+    "fps": {
+      "numerator": 24000,
+      "denominator": 1001
+    },
+    "timeBase": "1/24000",
+    "decodedFrameCount": 8196,
+    "nativePtsRule": "frameIndex*1001; all8196 actual ffprobe best_effort_timestamp verified",
+    "rights": "Numeric independently observed pixels, source identity and derived cameras only. No source video, book/plot artwork or source images are redistributed."
+  },
+  "model": {
+    "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+    "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945",
+    "units": "metres",
+    "axes": "X-width/Y-height/Z-depth"
+  },
+  "camera": {
+    "positionMetres": [
+      -0.45802381574335915,
+      0.5920754674413522,
+      0.8940247435146422
+    ],
+    "quaternion": [
+      -0.17046553306492915,
+      -0.1909163597455164,
+      0.0057142837645500115,
+      0.9666746053245986
+    ],
+    "verticalFovDegrees": 6.021955013878889,
+    "principalPointViewportPixels": [
+      960.0,
+      540.0
+    ]
+  },
+  "cameraInterpolation": "held",
+  "application": {
+    "shotId": "rocker-bank",
+    "viewId": "main",
+    "presentation": "native",
+    "rectSourcePixels": [
+      0,
+      0,
+      1920,
+      1080
+    ],
+    "startSeconds": 105.939166667,
+    "endSeconds": 124.457666667
+  },
+  "fitIntervalSeconds": [
+    105.980875,
+    107.982875
+  ],
+  "sourceEvidence": {
+    "path": "web/content/8KmVDxkia_w.bank-camera-fit-evidence.json",
+    "sha256": "4195ba69e2e3f7dec7c85bf91a0602857442e61a7e219d79caac50af967070e3"
+  },
+  "nativeFitReceipt": {
+    "sha256": "8619d0641b0043405f7c5d73eae37b966bcf2b4322ff86ad7fa383cc8b4069cc",
+    "baseCommit": "81539e53f5146c06a77541415bd79da673806d96",
+    "captureAuthority": "Native geometry transforms and diagnostic GPU marker readback, not source correspondences or camera/fidelity acceptance.",
+    "projectionPositiveControlMaxPx": 0.7734360246872949
+  },
+  "fitMetrics": {
+    "before": {
+      "count": 30,
+      "rmsPx": 598.6359363843512,
+      "medianPx": 572.1062778819169,
+      "maxPx": 793.512295115835
+    },
+    "after": {
+      "count": 30,
+      "rmsPx": 9.126882121019845,
+      "medianPx": 8.75017721029716,
+      "maxPx": 18.005602189165938
+    },
+    "beforeMethod": "actual-native-GPU-depth-off-landmark-projection",
+    "afterMethod": "shared-source-solver-CPU-pinhole-projection"
+  },
+  "fitRows": [
+    {
+      "frameIndex": 2541,
+      "physicalStationIndex": 1,
+      "observedPixel": [
+        808.25,
+        191.0
+      ],
+      "predictedPixel": [
+        812.0385618463577,
+        180.76802305802977
+      ],
+      "errorPx": 10.91084565946597
+    },
+    {
+      "frameIndex": 2541,
+      "physicalStationIndex": 2,
+      "observedPixel": [
+        832.4347826086956,
+        213.0
+      ],
+      "predictedPixel": [
+        836.1288370274916,
+        201.2382181381202
+      ],
+      "errorPx": 12.328241992087547
+    },
+    {
+      "frameIndex": 2541,
+      "physicalStationIndex": 3,
+      "observedPixel": [
+        859.4285714285714,
+        227.0
+      ],
+      "predictedPixel": [
+        860.4977493466173,
+        221.9451791550191
+      ],
+      "errorPx": 5.166658029644524
+    },
+    {
+      "frameIndex": 2541,
+      "physicalStationIndex": 4,
+      "observedPixel": [
+        887.7222222222222,
+        249.0
+      ],
+      "predictedPixel": [
+        885.1501480654606,
+        242.8930266649595
+      ],
+      "errorPx": 6.6265140747437
+    },
+    {
+      "frameIndex": 2541,
+      "physicalStationIndex": 5,
+      "observedPixel": [
+        908.0555555555555,
+        265.0
+      ],
+      "predictedPixel": [
+        910.0910419806954,
+        264.0860167855753
+      ],
+      "errorPx": 2.2312710062157097
+    },
+    {
+      "frameIndex": 2541,
+      "physicalStationIndex": 6,
+      "observedPixel": [
+        937.2857142857143,
+        288.0
+      ],
+      "predictedPixel": [
+        935.325491579238,
+        285.52844955717836
+      ],
+      "errorPx": 3.1545260579676886
+    },
+    {
+      "frameIndex": 2541,
+      "physicalStationIndex": 7,
+      "observedPixel": [
+        963.9285714285714,
+        306.0
+      ],
+      "predictedPixel": [
+        960.858727241131,
+        307.2247693831214
+      ],
+      "errorPx": 3.3051480113594973
+    },
+    {
+      "frameIndex": 2541,
+      "physicalStationIndex": 8,
+      "observedPixel": [
+        988.4705882352941,
+        327.0
+      ],
+      "predictedPixel": [
+        986.6960854758586,
+        329.1795108479781
+      ],
+      "errorPx": 2.8105386636192606
+    },
+    {
+      "frameIndex": 2541,
+      "physicalStationIndex": 9,
+      "observedPixel": [
+        1015.3,
+        349.0
+      ],
+      "predictedPixel": [
+        1012.8430300962088,
+        351.3973167095753
+      ],
+      "errorPx": 3.432758149672687
+    },
+    {
+      "frameIndex": 2541,
+      "physicalStationIndex": 11,
+      "observedPixel": [
+        1068.1176470588234,
+        394.0
+      ],
+      "predictedPixel": [
+        1066.0882052035258,
+        396.64126321185233
+      ],
+      "errorPx": 3.3309016194295253
+    },
+    {
+      "frameIndex": 2541,
+      "physicalStationIndex": 12,
+      "observedPixel": [
+        1094.1176470588234,
+        416.0
+      ],
+      "predictedPixel": [
+        1093.1980470015474,
+        419.6772703152698
+      ],
+      "errorPx": 3.790512001947329
+    },
+    {
+      "frameIndex": 2541,
+      "physicalStationIndex": 13,
+      "observedPixel": [
+        1119.7894736842106,
+        434.0
+      ],
+      "predictedPixel": [
+        1120.6406910851433,
+        442.99606902889445
+      ],
+      "errorPx": 9.036250828539709
+    },
+    {
+      "frameIndex": 2541,
+      "physicalStationIndex": 14,
+      "observedPixel": [
+        1149.8,
+        458.0
+      ],
+      "predictedPixel": [
+        1148.422310936317,
+        466.60290513676114
+      ],
+      "errorPx": 8.712519953968703
+    },
+    {
+      "frameIndex": 2541,
+      "physicalStationIndex": 15,
+      "observedPixel": [
+        1180.235294117647,
+        485.0
+      ],
+      "predictedPixel": [
+        1176.5492336776488,
+        490.5031549756917
+      ],
+      "errorPx": 6.623575790598367
+    },
+    {
+      "frameIndex": 2541,
+      "physicalStationIndex": 16,
+      "observedPixel": [
+        1206.3125,
+        511.0
+      ],
+      "predictedPixel": [
+        1205.0279297532336,
+        514.7023166668941
+      ],
+      "errorPx": 3.9188352122588292
+    },
+    {
+      "frameIndex": 2541,
+      "physicalStationIndex": 17,
+      "observedPixel": [
+        1232.8,
+        530.0
+      ],
+      "predictedPixel": [
+        1233.8650399443848,
+        539.2060330719776
+      ],
+      "errorPx": 9.267435190249781
+    },
+    {
+      "frameIndex": 2541,
+      "physicalStationIndex": 18,
+      "observedPixel": [
+        1259.85,
+        554.0
+      ],
+      "predictedPixel": [
+        1263.0673732439159,
+        564.0200899866685
+      ],
+      "errorPx": 10.523958092447947
+    },
+    {
+      "frameIndex": 2589,
+      "physicalStationIndex": 1,
+      "observedPixel": [
+        789.4285714285714,
+        300.0
+      ],
+      "predictedPixel": [
+        789.3867689979883,
+        316.22793680381335
+      ],
+      "errorPx": 16.22799064430845
+    },
+    {
+      "frameIndex": 2589,
+      "physicalStationIndex": 2,
+      "observedPixel": [
+        809.25,
+        341.0
+      ],
+      "predictedPixel": [
+        811.6654369879848,
+        351.3820680437534
+      ],
+      "errorPx": 10.659346729891595
+    },
+    {
+      "frameIndex": 2589,
+      "physicalStationIndex": 3,
+      "observedPixel": [
+        834.6666666666666,
+        371.0
+      ],
+      "predictedPixel": [
+        834.6150436008619,
+        383.9951533322605
+      ],
+      "errorPx": 12.995255867811295
+    },
+    {
+      "frameIndex": 2589,
+      "physicalStationIndex": 4,
+      "observedPixel": [
+        862.0,
+        405.0
+      ],
+      "predictedPixel": [
+        858.2254288484337,
+        413.5757802192124
+      ],
+      "errorPx": 9.369706171832236
+    },
+    {
+      "frameIndex": 2589,
+      "physicalStationIndex": 5,
+      "observedPixel": [
+        880.1428571428571,
+        433.0
+      ],
+      "predictedPixel": [
+        882.4875162345254,
+        439.76393780042747
+      ],
+      "errorPx": 7.158790458184566
+    },
+    {
+      "frameIndex": 2589,
+      "physicalStationIndex": 6,
+      "observedPixel": [
+        910.8260869565217,
+        463.0
+      ],
+      "predictedPixel": [
+        907.4042519100645,
+        462.33932853347915
+      ],
+      "errorPx": 3.4850311149023607
+    },
+    {
+      "frameIndex": 2589,
+      "physicalStationIndex": 8,
+      "observedPixel": [
+        960.6315789473684,
+        501.0
+      ],
+      "predictedPixel": [
+        959.3044192279658,
+        496.5168672013253
+      ],
+      "errorPx": 4.675449990253116
+    },
+    {
+      "frameIndex": 2589,
+      "physicalStationIndex": 9,
+      "observedPixel": [
+        987.0,
+        519.0
+      ],
+      "predictedPixel": [
+        986.3780461229459,
+        508.4449915109623
+      ],
+      "errorPx": 10.573316926529728
+    },
+    {
+      "frameIndex": 2589,
+      "physicalStationIndex": 11,
+      "observedPixel": [
+        1042.4285714285713,
+        542.0
+      ],
+      "predictedPixel": [
+        1043.0071912369353,
+        524.0036973432912
+      ],
+      "errorPx": 18.005602189165938
+    },
+    {
+      "frameIndex": 2589,
+      "physicalStationIndex": 12,
+      "observedPixel": [
+        1070.4117647058824,
+        544.0
+      ],
+      "predictedPixel": [
+        1072.5940010799925,
+        528.9054199448419
+      ],
+      "errorPx": 15.251508208504005
+    },
+    {
+      "frameIndex": 2589,
+      "physicalStationIndex": 13,
+      "observedPixel": [
+        1098.75,
+        541.0
+      ],
+      "predictedPixel": [
+        1102.9757700188386,
+        532.9544663425196
+      ],
+      "errorPx": 9.087779931631555
+    },
+    {
+      "frameIndex": 2589,
+      "physicalStationIndex": 14,
+      "observedPixel": [
+        1131.5555555555557,
+        548.0
+      ],
+      "predictedPixel": [
+        1134.039150813016,
+        537.0704727397219
+      ],
+      "errorPx": 11.20815825798516
+    },
+    {
+      "frameIndex": 2589,
+      "physicalStationIndex": 15,
+      "observedPixel": [
+        1165.1904761904761,
+        551.0
+      ],
+      "predictedPixel": [
+        1165.6088211042222,
+        542.2221288374711
+      ],
+      "errorPx": 8.787834466625615
+    }
+  ],
+  "identifiability": {
+    "worldPointRank": 3,
+    "focalAtSearchBoundary": false,
+    "cameraAuthority": "chosen-source-FIT-pinhole; square pixels; centered principal point; no warp/lens fit",
+    "hiddenPhysicalState": "Existing coherent bank +1 branch/static phases remain chosen, unchanged; folded cosine does not recover sign or historical setup."
+  },
+  "interpretation": "Bounded physically associated terminal-bevel camera FIT. Held across the same original close-up; unmeasured margins hold the nearest camera, never transfer across a cut. Actual native GPU surfaces, independent source CHECK and continuous normal-route playback remain separately required. No source geometry/camera/stage pass from CPU projection.",
+  "acceptance": {
+    "independentCheckEvaluated": false,
+    "cameraGeometryOrGpuAccepted": false
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "videoId": "NAsM30MAHLg",
+  "purpose": "Fresh complete native eligibility control after the exact-coincident-apex correction; no source-camera, body-shape, historical-input or stage acceptance.",
+  "producer": "web/scripts/NAsM30MAHLg-native-feature-eligibility.py",
+  "profile": "web/content/NAsM30MAHLg.calibration-eligibility.json",
+  "nativeIdentity": {
+    "originalRawSourceSha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+    "actualOptimizedTransportSha256": "ad5c259265be354fb25d208281301356d7587c6a2e508fce1a6cd29014a74719",
+    "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945",
+    "requiredCurrentCode": "Complete actually executed current import/resource closure, not rewritten historical codeHashes.",
+    "requiredDrawableCount": 435,
+    "requiredSpringDrawableCount": 21
+  },
+  "originalStaticAuthority": {
+    "privateEvidencePath": "web/.vite/verification-output/intro-witness-recovery/new-static-census/above-camera-branch/joint-input/native-capture-proposal.HOLD.json",
+    "sha256": "ad1b280f39d7f9f69315bea3f52f5381be01570c2c35311c377a0bdfbfbca091",
+    "chosenInputPointer": "/captures/0/chosenInput",
+    "captureId": "intro809-new-above-machine-joint51-full435-source348",
+    "sourceFrameIndex": 809,
+    "sourceSha256": "595b0ec7b1e1a0b3523d72d33f6e0950bd97dda5ab7032bf91c3e5b9fb7d225d",
+    "sha256Bgr8": "39644b10abe18220e44e2b708c0e3e0ba882c90fb0f5988f80e8a7fcc9997a75",
+    "decodedTimestampTicks": 809809,
+    "timeBase": "1/30000",
+    "decodedTimeSeconds": 26.99363333333333,
+    "requestTimeSeconds": 27,
+    "qualification": "Original 222-anchor diagnostic is source frame809, not frame222. Original request remains ROOT-HOLD until separately released. It is not the minus18mm variant and not the macro chosen state."
+  },
+  "macroAuthority": {
+    "privateEvidencePath": "web/.vite/verification-output/intro-witness-recovery/new-pen-macro/exact-firstsurface-fixed51-native-export.json",
+    "historicalExportSha256": "e2a8acf0b79b1c340e2d802442ac707cb43df33b2863df612cbc8d1e0e55b9ed",
+    "chosenInputPointer": "/input",
+    "completeInputDifferenceFromOriginalStaticScalarCount": 28,
+    "sourceExposureProfilePointer": "/sourceExposure",
+    "qualification": "Different chosen/unobserved complete51. A fresh static809 export can prove native apex eligibility but cannot replace this macro2132 source/camera/physical state. All old six-branch failures remain conditional and unchanged."
+  },
+  "requiredFull435Export": {
+    "codeHashes": "Current actually executed native closure, checked before and after export.",
+    "actuallyExecutedImmutableNativeSourceSnapshots": "Complete current closure entries {relativePath,snapshotPath,sha256}; original current-root files and actually executed immutable copies must both match. Top codeHashes must be a consistent subset.",
+    "input": "Exact complete51 numeric chosen input, only automatic setup.counterHeightM may be null.",
+    "unobservedInputFields": "All51 field paths; no recovered historical setting implied.",
+    "partOverrides": [],
+    "inputMechanismAndAll435ArraysFrozenAsOneState": true,
+    "geometry": "Hash-sealed posed positions f64 and actual indices u32 with census byte offsets/counts/matrixWorld/visibleByNativeGraph.",
+    "springs": "All21 actual current shader deformations. A shader program/uniform/attribute payload plus414 rigid arrays is an honest intermediate, NOT a complete first-surface authority until spring vertices are measured/evaluated from that current shader."
+  },
+  "rayControlContract": {
+    "geometryAuthority": "The exact complete51 chosen input and full435 arrays in one validated sealed export. Camera rays never alter individual native parts or the chosen input.",
+    "allowedRayFields": ["id", "origin", "rotation", "expectedNativeEligibility", "cameraOriginInsideNativeAabbPaths"],
+    "diagnosticAnnotations": "Optional expectedNativeEligibility and cameraOriginInsideNativeAabbPaths are retained request annotations only; neither determines geometry, exposure, eligibility or acceptance.",
+    "detachedPoseRefusal": "Any other ray field, including matrices or partOverrides even when null or empty, is refused before loading native geometry. Input changes require a new complete native solve and fresh sealed complete51/all435 export; no part-path allowlist or transform alias is supported.",
+    "cameraShapeRefusal": "Origin must be a finite numeric vector of length3 and rotation a finite numeric3x3 matrix. Invalid dimensions, types or nonfinite values are refused before loading native geometry; the geometry APIs enforce the same finite-array boundaries.",
+    "errorIdentity": "Refusal/error rows retain ordinary id/request objects with null guardValue/hit and an explicit reason. Requests containing nonfinite parsed numbers instead retain request:null, requestRepresentation:raw-packet-entry and requestIndex; rawRayRequestText preserves the exact original UTF-8-decoded packet including CRLF, and rayRequestSha256 hashes those exact parsed bytes. A nonfinite id remains null with identity retained in the raw packet entry. No validated nativeChosenInput or completeNativeDenominator is claimed when no genuine sealed export was loaded.",
+    "qualification": "Accepted frozen rays are mathematical CPU first-surface controls only. Stale or detached physical-body variants remain refused diagnostics, not first-surface, GPU-equivalence, source or stage acceptance."
+  },
+  "requiredNativeControls": [
+    "A positive actual nearest apex ray on the freshly posed full435 graph, exact same-primitive incident facet among97..127 and residual<=1e-7m. A facet other than96 proves the corrected equivalence gate is load-bearing; old vertex124 only supplied facet96.",
+    "Adjacent marker body and foreground C-frame/other-body negatives stay in the all435 nearest-positive-surface search and remain rejected.",
+    "Six differently named declarations or seam indices at one actual apex cannot satisfy six distinct physical FIT support points. CHECK support must be distinct from FIT and from other CHECK support.",
+    "True distinct native support and physically reachable positive-depth camera positive control; source FIT alone selects any new camera branch."
+  ],
+  "independentSourceChecks": {
+    "sourceFeatureAssociation": null,
+    "currentGpuResiduals": null,
+    "sourceFrame2132PrivateFitPacket": "web/.vite/verification-output/intro-witness-recovery/new-pen-macro/source-features.json",
+    "sourceFrame2132PrivateCheckPacket": "web/.vite/verification-output/intro-witness-recovery/new-pen-macro/heldout-source-sections.json",
+    "preserve": "Original upper/lower/vblock/seam/notch/paper-contact source points and rod-left/rod-right/marker-lower-silhouette heldouts/uncertainties. Contact section is not a unique tracked texture. No rendered/projected source pixels or CHECK-driven candidate selection.",
+    "unavailableUntilMeasured": "Fresh source/native finite-feature association, source-first-hit, actual contact/Coulomb/static/collision closure, full435 shape/visibility, independent raster/geometry bounds and continuous cut-safe camera/mechanism history."
+  },
+  "acceptanceObligations": {
+    "sourceFrameWidthStagesPercent": [50, 20, 10, 5],
+    "finalLimitSourcePixelsAt1920": 96,
+    "clockLimitSeconds": 0.5,
+    "allCutsAndSimultaneousPanelsRemainRequired": true,
+    "mirrorAndImagePlaneWarpRemainSourceScoped": true,
+    "sourceAcceptance": false,
+    "gpuAcceptance": false
+  }
+}

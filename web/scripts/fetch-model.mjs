@@ -18,10 +18,12 @@ import { assertNativeSourceAssociation, validateModelRepresentation, REPRESENTAT
 const WEB = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const SHA256 = /^[0-9a-f]{64}$/
 const COMMIT = /^[0-9a-f]{40}$/
-const PINNED_RELEASE = {
-  sourceCommit: '1268c23d4a8fc741147c5e09d8d1e45247a71945',
-  modelSha256: '2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d',
-}
+// Approved native release associations remain immutable across current cutovers.
+// These are integrity records, not support for historical geometry or CAD APIs.
+const PINNED_RELEASES = new Map([
+  ['1268c23d4a8fc741147c5e09d8d1e45247a71945', '2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d'],
+  ['81539e53f5146c06a77541415bd79da673806d96', '60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c'],
+])
 const digest = bytes => createHash('sha256').update(bytes).digest('hex')
 const HELP = `Usage: npm run fetch-model -- [raw.glb] [--source-commit <40hex> --source-sha256 <approved64hex>]
 No path: select the harmonic-analyzer GLB from cad/out/gltf.
@@ -68,8 +70,9 @@ export function authorizeSourceImport(native, actualSha256, { sourceCommit = nul
   if (sourceCommit !== null && !COMMIT.test(sourceCommit)) throw new Error('Invalid --source-commit; expected 40 lowercase hexadecimal characters')
   if (sourceSha256 !== null && !SHA256.test(sourceSha256)) throw new Error('Invalid --source-sha256; expected 64 lowercase hexadecimal characters')
   const commit = sourceCommit ?? native.sourceCommit
-  if (commit === PINNED_RELEASE.sourceCommit && (actualSha256 !== PINNED_RELEASE.modelSha256 || sourceSha256 !== null && sourceSha256 !== PINNED_RELEASE.modelSha256)) {
-    throw new Error(`Released native commit ${commit} remains pinned to raw SHA256 ${PINNED_RELEASE.modelSha256}; --source-commit cannot authorize different bytes for that release`)
+  const pinnedSha256 = PINNED_RELEASES.get(commit)
+  if (pinnedSha256 !== undefined && (actualSha256 !== pinnedSha256 || sourceSha256 !== null && sourceSha256 !== pinnedSha256)) {
+    throw new Error(`Released native commit ${commit} remains pinned to raw SHA256 ${pinnedSha256}; --source-commit cannot authorize different bytes for that release`)
   }
   if (commit === native.sourceCommit) {
     if (actualSha256 !== native.modelSha256 || sourceSha256 !== null && sourceSha256 !== native.modelSha256) {

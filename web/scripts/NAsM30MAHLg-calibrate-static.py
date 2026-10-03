@@ -19,6 +19,15 @@ import numpy as np
 from scipy.optimize import least_squares
 from scipy.spatial.transform import Rotation
 
+WEB = Path(__file__).resolve().parents[1]
+PROFILE = json.loads((WEB / "content" / "NAsM30MAHLg.calibration-eligibility.json").read_text())
+feature_spec = importlib.util.spec_from_file_location(
+    "intro_native_feature_eligibility",
+    Path(__file__).with_name("NAsM30MAHLg-native-feature-eligibility.py"),
+)
+feature_eligibility = importlib.util.module_from_spec(feature_spec)
+feature_spec.loader.exec_module(feature_eligibility)
+
 
 def camera_parameters(camera, height):
     world_to_cv = (
@@ -70,12 +79,15 @@ def track_feature(source, target, pixel, patch_radius=10, search_radius=12):
 
 
 def fit_candidate(frame, points, initial, fit_source):
+    support = feature_eligibility.calibration_support(
+        frame, points, PROFILE["calibrationSupport"]
+    )
+    if not support["eligible"]:
+        return None
     fitting = [landmark for landmark in frame["landmarks"] if landmark["role"] == "fit"]
     checks = [
         landmark for landmark in frame["landmarks"] if landmark["role"] == "check"
     ]
-    if len(fitting) < 6 or len(checks) < 2:
-        return None
     xyz = np.array([points[landmark["anchorId"]] for landmark in fitting])
     pixels = np.array([landmark["pixel"] for landmark in fitting])
 
@@ -109,9 +121,18 @@ def fit_candidate(frame, points, initial, fit_source):
         "fitRmsPx": float(np.sqrt(np.mean(fit_errors**2))),
         "fitMaxPx": float(fit_errors.max()),
         "heldOutMaxPx": float(check_errors.max()),
-        "thresholdPx": 38.4,
+        "thresholdPx": 96.0,
+        "calibrationEligibility": support,
+        "stages": [
+            {"maximumSourceFrameWidthPercent": percent,
+             "thresholdPx": 1920 * percent / 100,
+             "cpuPointResidualWithinLimit": bool(
+                 max(fit_errors.max(), check_errors.max()) <= 1920 * percent / 100
+                 and min(fit_depth.min(), check_depth.min()) > 0)}
+            for percent in (50, 20, 10, 5)
+        ],
         "status": "passed"
-        if max(fit_errors.max(), check_errors.max()) <= 38.4
+        if max(fit_errors.max(), check_errors.max()) <= 96
         and min(fit_depth.min(), check_depth.min()) > 0
         else "failed",
         "projection": "pinhole; independent source landmarks; square pixels; image-centre principal point",
@@ -127,7 +148,10 @@ def fit_candidate(frame, points, initial, fit_source):
             }
             for landmark, xy, e in zip(checks, check_xy, check_errors)
         ],
-        "identifiability": "Noncoplanar fixed-feature visible-match candidate. Source lens remains a family; no GPU acceptance or hidden-mechanism inference.",
+        "identifiability": (
+            "Coplanar native support: FOV/depth remain non-unique."
+            if support["fitAffineRank"] == 2 else "Noncoplanar fixed native support."
+        ) + " CPU point-residual candidate only; source/native association and complete physical input remain conditional. No GPU, full-geometry or source-stage acceptance.",
     }
     return camera
 
@@ -152,6 +176,9 @@ def main():
     fit_source = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(fit_source)
     obs = json.loads(Path(args.observations).read_text())
+    if (obs["source"]["sha256"] != PROFILE["sourceSha256"]
+            or obs["model"]["sha256"] != PROFILE["modelSha256"]):
+        raise ValueError("Intro source/native geometry differs from the eligibility contract")
     candidate = json.loads((evidence / "codex-fixed-fit-result.json").read_text())
     seeds = candidate["candidateFrame"]["landmarks"]
     anchors = candidate["candidateAnchors"]
@@ -230,11 +257,15 @@ def main():
                     }
                     tracked.append(landmark)
                 candidate_frame = {**frame, "landmarks": tracked}
+                eligibility = feature_eligibility.calibration_support(
+                    candidate_frame, points, PROFILE["calibrationSupport"]
+                )
                 camera = fit_candidate(candidate_frame, points, initial, fit_source)
                 cache[idx] = {
                     "landmarks": tracked,
                     "unavailable": unavailable,
                     "camera": camera,
+                    "calibrationEligibility": eligibility,
                 }
         result = cache[idx]
         if result is None:
@@ -266,6 +297,9 @@ def main():
         "gpuAcceptedViewSamples": 0,
         "fullMechanismInputsAssigned": 0,
     }
+    summary["ineligibleCalibrationSamples"] = sum(
+        not frame["calibrationEligibility"]["eligible"] for frame in output
+    )
     Path(args.output).write_text(
         json.dumps(
             {

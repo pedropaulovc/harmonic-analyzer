@@ -1,0 +1,3389 @@
+{
+  "schemaVersion": 1,
+  "videoId": "NAsM30MAHLg",
+  "sourceSha256": "595b0ec7b1e1a0b3523d72d33f6e0950bd97dda5ab7032bf91c3e5b9fb7d225d",
+  "modelSha256": "60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c",
+  "sourceFrame": {
+    "sourceImage": {
+      "frameIndex": 809,
+      "sha256Bgr8": "39644b10abe18220e44e2b708c0e3e0ba882c90fb0f5988f80e8a7fcc9997a75",
+      "pixelFormat": "bgr8",
+      "width": 1920,
+      "height": 1080,
+      "sourceSha256": "595b0ec7b1e1a0b3523d72d33f6e0950bd97dda5ab7032bf91c3e5b9fb7d225d"
+    },
+    "timeSeconds": 27,
+    "decodedTimeSeconds": 26.99363333333333,
+    "decodedTimestampTicks": 809809,
+    "timeBase": "1/30000",
+    "shotId": "presenter-first",
+    "landmarks": [
+      {
+        "anchorId": "frame-cross-screw-6",
+        "role": "fit",
+        "pixel": [
+          783.0021362304688,
+          110.01241302490234
+        ],
+        "status": "observed",
+        "method": "template-match",
+        "uncertaintyPx": 4,
+        "trackingEvidence": {
+          "seedDecodedFrameIndex": 809,
+          "seedTimeSeconds": 27,
+          "seedPatchCorrelation": 0.9999989867210388,
+          "targetPatchLumaStd": 47.669404860436984,
+          "searchRadiusPx": 12,
+          "sourceSha256Bgr8": "39644b10abe18220e44e2b708c0e3e0ba882c90fb0f5988f80e8a7fcc9997a75"
+        }
+      },
+      {
+        "anchorId": "frame-cross-screw-5",
+        "role": "fit",
+        "pixel": [
+          1138.9964599609375,
+          112.00497436523438
+        ],
+        "status": "observed",
+        "method": "template-match",
+        "uncertaintyPx": 4,
+        "trackingEvidence": {
+          "seedDecodedFrameIndex": 809,
+          "seedTimeSeconds": 27,
+          "seedPatchCorrelation": 0.9999990463256836,
+          "targetPatchLumaStd": 48.76332450557056,
+          "searchRadiusPx": 12,
+          "sourceSha256Bgr8": "39644b10abe18220e44e2b708c0e3e0ba882c90fb0f5988f80e8a7fcc9997a75"
+        }
+      },
+      {
+        "anchorId": "frame-cross-screw-2",
+        "role": "fit",
+        "pixel": [
+          792.0613403320312,
+          985.03076171875
+        ],
+        "status": "observed",
+        "method": "template-match",
+        "uncertaintyPx": 4,
+        "trackingEvidence": {
+          "seedDecodedFrameIndex": 809,
+          "seedTimeSeconds": 27,
+          "seedPatchCorrelation": 1,
+          "targetPatchLumaStd": 20.828097048154284,
+          "searchRadiusPx": 12,
+          "sourceSha256Bgr8": "39644b10abe18220e44e2b708c0e3e0ba882c90fb0f5988f80e8a7fcc9997a75"
+        }
+      },
+      {
+        "anchorId": "frame-cross-screw-1",
+        "role": "fit",
+        "pixel": [
+          1138.9500732421875,
+          979.997802734375
+        ],
+        "status": "observed",
+        "method": "template-match",
+        "uncertaintyPx": 4,
+        "trackingEvidence": {
+          "seedDecodedFrameIndex": 809,
+          "seedTimeSeconds": 27,
+          "seedPatchCorrelation": 0.9999986886978149,
+          "targetPatchLumaStd": 14.803505756513937,
+          "searchRadiusPx": 12,
+          "sourceSha256Bgr8": "39644b10abe18220e44e2b708c0e3e0ba882c90fb0f5988f80e8a7fcc9997a75"
+        }
+      },
+      {
+        "anchorId": "wheel.center",
+        "role": "check",
+        "pixel": [
+          921.5,
+          535.5
+        ],
+        "status": "observed",
+        "method": "template-match",
+        "uncertaintyPx": 4,
+        "trackingEvidence": {
+          "seedDecodedFrameIndex": 809,
+          "seedTimeSeconds": 27,
+          "seedPatchCorrelation": 1,
+          "targetPatchLumaStd": 43.66281414135606,
+          "searchRadiusPx": 12,
+          "sourceSha256Bgr8": "39644b10abe18220e44e2b708c0e3e0ba882c90fb0f5988f80e8a7fcc9997a75"
+        }
+      },
+      {
+        "anchorId": "crank.axis",
+        "role": "check",
+        "pixel": [
+          1073.5,
+          889.5
+        ],
+        "status": "observed",
+        "method": "template-match",
+        "uncertaintyPx": 4,
+        "trackingEvidence": {
+          "seedDecodedFrameIndex": 809,
+          "seedTimeSeconds": 27,
+          "seedPatchCorrelation": 0.9999986290931702,
+          "targetPatchLumaStd": 28.93222791002553,
+          "searchRadiusPx": 12,
+          "sourceSha256Bgr8": "39644b10abe18220e44e2b708c0e3e0ba882c90fb0f5988f80e8a7fcc9997a75"
+        }
+      },
+      {
+        "anchorId": "pivot.front",
+        "role": "fit",
+        "pixel": [
+          901,
+          788.5
+        ],
+        "status": "observed",
+        "method": "template-match",
+        "uncertaintyPx": 3,
+        "trackingEvidence": {
+          "seedDecodedFrameIndex": 809,
+          "seedTimeSeconds": 27,
+          "seedPatchCorrelation": 0.9999997019767761,
+          "targetPatchLumaStd": 41.91334332625726,
+          "searchRadiusPx": 12,
+          "sourceSha256Bgr8": "39644b10abe18220e44e2b708c0e3e0ba882c90fb0f5988f80e8a7fcc9997a75"
+        }
+      },
+      {
+        "anchorId": "transgear.stub.front",
+        "role": "fit",
+        "pixel": [
+          967.5,
+          777.5
+        ],
+        "status": "observed",
+        "method": "template-match",
+        "uncertaintyPx": 3,
+        "trackingEvidence": {
+          "seedDecodedFrameIndex": 809,
+          "seedTimeSeconds": 27,
+          "seedPatchCorrelation": 0.9999995827674866,
+          "targetPatchLumaStd": 38.02806003186834,
+          "searchRadiusPx": 12,
+          "sourceSha256Bgr8": "39644b10abe18220e44e2b708c0e3e0ba882c90fb0f5988f80e8a7fcc9997a75"
+        }
+      },
+      {
+        "anchorId": "transgear.knob.axis",
+        "role": "check",
+        "pixel": [
+          1006,
+          789
+        ],
+        "status": "observed",
+        "method": "template-match",
+        "uncertaintyPx": 4,
+        "trackingEvidence": {
+          "seedDecodedFrameIndex": 809,
+          "seedTimeSeconds": 27,
+          "seedPatchCorrelation": 0.9999986290931702,
+          "targetPatchLumaStd": 40.86741939475247,
+          "searchRadiusPx": 12,
+          "sourceSha256Bgr8": "39644b10abe18220e44e2b708c0e3e0ba882c90fb0f5988f80e8a7fcc9997a75"
+        }
+      },
+      {
+        "anchorId": "cylinder.shaft.front",
+        "role": "check",
+        "pixel": [
+          1011.5,
+          918.5
+        ],
+        "status": "observed",
+        "method": "template-match",
+        "uncertaintyPx": 3,
+        "trackingEvidence": {
+          "seedDecodedFrameIndex": 809,
+          "seedTimeSeconds": 27,
+          "seedPatchCorrelation": 1,
+          "targetPatchLumaStd": 37.52446068508035,
+          "searchRadiusPx": 12,
+          "sourceSha256Bgr8": "39644b10abe18220e44e2b708c0e3e0ba882c90fb0f5988f80e8a7fcc9997a75"
+        }
+      },
+      {
+        "anchorId": "fulcrum.front",
+        "role": "fit",
+        "pixel": [
+          783.5,
+          83.5
+        ],
+        "status": "observed",
+        "method": "template-match",
+        "uncertaintyPx": 5,
+        "trackingEvidence": {
+          "seedDecodedFrameIndex": 809,
+          "seedTimeSeconds": 27,
+          "seedPatchCorrelation": 1,
+          "targetPatchLumaStd": 50.606005028268115,
+          "searchRadiusPx": 12,
+          "sourceSha256Bgr8": "39644b10abe18220e44e2b708c0e3e0ba882c90fb0f5988f80e8a7fcc9997a75"
+        }
+      },
+      {
+        "anchorId": "tube2.top",
+        "role": "check",
+        "pixel": [
+          782.5,
+          129.76829268292684
+        ],
+        "status": "observed",
+        "method": "image-edge",
+        "uncertaintyPx": 6,
+        "measurementEvidence": {
+          "sourceSearchRect": [
+            765,
+            122,
+            45,
+            17
+          ],
+          "chromaZeroCrossingY": 129.76829268292684,
+          "chromeSilhouetteEdgesX": [
+            770,
+            795
+          ],
+          "foregroundThresholdLuma": 50
+        }
+      },
+      {
+        "anchorId": "tube2.base",
+        "role": "check",
+        "pixel": [
+          796.5,
+          963.9090909090909
+        ],
+        "status": "observed",
+        "method": "image-edge",
+        "uncertaintyPx": 6,
+        "measurementEvidence": {
+          "sourceSearchRect": [
+            773,
+            955,
+            46,
+            18
+          ],
+          "chromaZeroCrossingY": 963.9090909090909,
+          "chromeSilhouetteEdgesX": [
+            776,
+            817
+          ],
+          "foregroundThresholdLuma": 50
+        }
+      },
+      {
+        "anchorId": "tube4.top",
+        "role": "check",
+        "pixel": [
+          1134,
+          129.1951219512195
+        ],
+        "status": "observed",
+        "method": "image-edge",
+        "uncertaintyPx": 6,
+        "measurementEvidence": {
+          "sourceSearchRect": [
+            1107,
+            122,
+            57,
+            17
+          ],
+          "chromaZeroCrossingY": 129.1951219512195,
+          "chromeSilhouetteEdgesX": [
+            1117,
+            1151
+          ],
+          "foregroundThresholdLuma": 50
+        }
+      }
+    ]
+  },
+  "nativeSupport": [
+    {
+      "anchorId": "frame-cross-screw-6",
+      "status": "unavailable",
+      "anchor": {
+        "id": "frame-cross-screw-6",
+        "kind": "physical-feature",
+        "description": "Centre of visible slotted head on front (-Z) casting; top/bottom and +X/-X identify screw",
+        "nativeAssociation": {
+          "status": "unavailable",
+          "reason": "Original typed primitive attributes, indices or material role changed; feature requires fresh primary mapping",
+          "proof": {
+            "method": "exact-original-native-local-feature-v1",
+            "historicalSource": {
+              "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+              "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+            },
+            "currentSource": {
+              "sha256": "60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c",
+              "sourceCommit": "81539e53f5146c06a77541415bd79da673806d96"
+            },
+            "historicalAnchorSha256": "263949bca400ac18203abfd3aeb85f59532f15473b54ece8c00b414d0489ae84",
+            "qualifiedPartPath": "harmonic-analyzer/frame/frame-cross-screw-6",
+            "historicalCorrespondenceEvidence": "Actual intro t27 original 1920x1080: front is paper/wheel side (-Z); +X is image-left. Named CAD screw origins map to front slotted heads at the two casting levels. Source pixel manually measured, not model projected.",
+            "qualification": "Native local feature association only; source-first-surface, fitted camera, GPU and stages unmeasured.",
+            "historicalNodeIndex": 152,
+            "currentNodeIndex": 300,
+            "historicalWorldMatrix": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              -1.3435885648505064e-07,
+              -1.0000001343588565,
+              0.0,
+              0.0,
+              1.0000001343588565,
+              -1.3435885648505064e-07,
+              0.0,
+              0.19699999690055847,
+              1.0179500579833984,
+              -0.13760000467300415,
+              1.0
+            ],
+            "currentWorldMatrix": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              -1.3435885648505064e-07,
+              -1.0000001343588565,
+              0.0,
+              0.0,
+              1.0000001343588565,
+              -1.3435885648505064e-07,
+              0.0,
+              0.19699999690055847,
+              1.0179500579833984,
+              -0.13760000467300415,
+              1.0
+            ],
+            "worldFrameUnchanged": true,
+            "historicalPrimitiveSha256": "e671d3bfc28ca1184cd93fcafeb8c58ecbd1bed84c5323b5d7e82be7244686dd",
+            "currentPrimitiveSha256": "98d8df3e0030aad2683e5d246b3f5a2fadc07a007a041f176bef13a1388b6548",
+            "primitives": [
+              {
+                "mode": 4,
+                "attributes": {
+                  "NORMAL": {
+                    "componentType": 5126,
+                    "type": "VEC3",
+                    "count": 69366,
+                    "normalized": false,
+                    "typedBytesSha256": "6edc8e1ef3a50ded88129f35baf9bcb68ff54d9d167464d1936bdf537cb08a0f"
+                  },
+                  "POSITION": {
+                    "componentType": 5126,
+                    "type": "VEC3",
+                    "count": 69366,
+                    "normalized": false,
+                    "typedBytesSha256": "c3683207f680bf98cda070f06d05ed310b78a98a02701206b74836c5022266d8"
+                  }
+                },
+                "indices": {
+                  "componentType": 5125,
+                  "type": "SCALAR",
+                  "count": 141138,
+                  "normalized": false,
+                  "typedBytesSha256": "3f58b26812b46396edb00261663a0c7b6e5133c5704843e4381cc7ba12b9bf28"
+                },
+                "material": {
+                  "name": "carbon steel",
+                  "pbrMetallicRoughness": {
+                    "baseColorFactor": [
+                      0.6117647290229797,
+                      0.5921568870544434,
+                      0.5764706134796143,
+                      1.0
+                    ],
+                    "metallicFactor": 1.0,
+                    "roughnessFactor": 0.10000000149011612
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "proof": {
+        "method": "exact-original-native-local-feature-v1",
+        "historicalSource": {
+          "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+          "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+        },
+        "currentSource": {
+          "sha256": "60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c",
+          "sourceCommit": "81539e53f5146c06a77541415bd79da673806d96"
+        },
+        "historicalAnchorSha256": "263949bca400ac18203abfd3aeb85f59532f15473b54ece8c00b414d0489ae84",
+        "qualifiedPartPath": "harmonic-analyzer/frame/frame-cross-screw-6",
+        "historicalCorrespondenceEvidence": "Actual intro t27 original 1920x1080: front is paper/wheel side (-Z); +X is image-left. Named CAD screw origins map to front slotted heads at the two casting levels. Source pixel manually measured, not model projected.",
+        "qualification": "Native local feature association only; source-first-surface, fitted camera, GPU and stages unmeasured.",
+        "historicalNodeIndex": 152,
+        "currentNodeIndex": 300,
+        "historicalWorldMatrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          -1.3435885648505064e-07,
+          -1.0000001343588565,
+          0.0,
+          0.0,
+          1.0000001343588565,
+          -1.3435885648505064e-07,
+          0.0,
+          0.19699999690055847,
+          1.0179500579833984,
+          -0.13760000467300415,
+          1.0
+        ],
+        "currentWorldMatrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          -1.3435885648505064e-07,
+          -1.0000001343588565,
+          0.0,
+          0.0,
+          1.0000001343588565,
+          -1.3435885648505064e-07,
+          0.0,
+          0.19699999690055847,
+          1.0179500579833984,
+          -0.13760000467300415,
+          1.0
+        ],
+        "worldFrameUnchanged": true,
+        "historicalPrimitiveSha256": "e671d3bfc28ca1184cd93fcafeb8c58ecbd1bed84c5323b5d7e82be7244686dd",
+        "currentPrimitiveSha256": "98d8df3e0030aad2683e5d246b3f5a2fadc07a007a041f176bef13a1388b6548",
+        "primitives": [
+          {
+            "mode": 4,
+            "attributes": {
+              "NORMAL": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 69366,
+                "normalized": false,
+                "typedBytesSha256": "6edc8e1ef3a50ded88129f35baf9bcb68ff54d9d167464d1936bdf537cb08a0f"
+              },
+              "POSITION": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 69366,
+                "normalized": false,
+                "typedBytesSha256": "c3683207f680bf98cda070f06d05ed310b78a98a02701206b74836c5022266d8"
+              }
+            },
+            "indices": {
+              "componentType": 5125,
+              "type": "SCALAR",
+              "count": 141138,
+              "normalized": false,
+              "typedBytesSha256": "3f58b26812b46396edb00261663a0c7b6e5133c5704843e4381cc7ba12b9bf28"
+            },
+            "material": {
+              "name": "carbon steel",
+              "pbrMetallicRoughness": {
+                "baseColorFactor": [
+                  0.6117647290229797,
+                  0.5921568870544434,
+                  0.5764706134796143,
+                  1.0
+                ],
+                "metallicFactor": 1.0,
+                "roughnessFactor": 0.10000000149011612
+              }
+            }
+          }
+        ]
+      },
+      "reason": "Original typed primitive attributes, indices or material role changed; feature requires fresh primary mapping"
+    },
+    {
+      "anchorId": "frame-cross-screw-5",
+      "status": "unavailable",
+      "anchor": {
+        "id": "frame-cross-screw-5",
+        "kind": "physical-feature",
+        "description": "Centre of visible slotted head on front (-Z) casting; top/bottom and +X/-X identify screw",
+        "nativeAssociation": {
+          "status": "unavailable",
+          "reason": "Original typed primitive attributes, indices or material role changed; feature requires fresh primary mapping",
+          "proof": {
+            "method": "exact-original-native-local-feature-v1",
+            "historicalSource": {
+              "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+              "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+            },
+            "currentSource": {
+              "sha256": "60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c",
+              "sourceCommit": "81539e53f5146c06a77541415bd79da673806d96"
+            },
+            "historicalAnchorSha256": "16b9161341a45e9eba22407c1a3b6091398eb7eaf591a66fc4f6a1c16c64c96a",
+            "qualifiedPartPath": "harmonic-analyzer/frame/frame-cross-screw-5",
+            "historicalCorrespondenceEvidence": "Actual intro t27 original 1920x1080: front is paper/wheel side (-Z); +X is image-left. Named CAD screw origins map to front slotted heads at the two casting levels. Source pixel manually measured, not model projected.",
+            "qualification": "Native local feature association only; source-first-surface, fitted camera, GPU and stages unmeasured.",
+            "historicalNodeIndex": 156,
+            "currentNodeIndex": 299,
+            "historicalWorldMatrix": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              -1.3435885648505064e-07,
+              -1.0000001343588565,
+              0.0,
+              0.0,
+              1.0000001343588565,
+              -1.3435885648505064e-07,
+              0.0,
+              -0.19699999690055847,
+              1.0179500579833984,
+              -0.13760000467300415,
+              1.0
+            ],
+            "currentWorldMatrix": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              -1.3435885648505064e-07,
+              -1.0000001343588565,
+              0.0,
+              0.0,
+              1.0000001343588565,
+              -1.3435885648505064e-07,
+              0.0,
+              -0.19699999690055847,
+              1.0179500579833984,
+              -0.13760000467300415,
+              1.0
+            ],
+            "worldFrameUnchanged": true,
+            "historicalPrimitiveSha256": "e671d3bfc28ca1184cd93fcafeb8c58ecbd1bed84c5323b5d7e82be7244686dd",
+            "currentPrimitiveSha256": "98d8df3e0030aad2683e5d246b3f5a2fadc07a007a041f176bef13a1388b6548",
+            "primitives": [
+              {
+                "mode": 4,
+                "attributes": {
+                  "NORMAL": {
+                    "componentType": 5126,
+                    "type": "VEC3",
+                    "count": 69366,
+                    "normalized": false,
+                    "typedBytesSha256": "6edc8e1ef3a50ded88129f35baf9bcb68ff54d9d167464d1936bdf537cb08a0f"
+                  },
+                  "POSITION": {
+                    "componentType": 5126,
+                    "type": "VEC3",
+                    "count": 69366,
+                    "normalized": false,
+                    "typedBytesSha256": "c3683207f680bf98cda070f06d05ed310b78a98a02701206b74836c5022266d8"
+                  }
+                },
+                "indices": {
+                  "componentType": 5125,
+                  "type": "SCALAR",
+                  "count": 141138,
+                  "normalized": false,
+                  "typedBytesSha256": "3f58b26812b46396edb00261663a0c7b6e5133c5704843e4381cc7ba12b9bf28"
+                },
+                "material": {
+                  "name": "carbon steel",
+                  "pbrMetallicRoughness": {
+                    "baseColorFactor": [
+                      0.6117647290229797,
+                      0.5921568870544434,
+                      0.5764706134796143,
+                      1.0
+                    ],
+                    "metallicFactor": 1.0,
+                    "roughnessFactor": 0.10000000149011612
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "proof": {
+        "method": "exact-original-native-local-feature-v1",
+        "historicalSource": {
+          "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+          "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+        },
+        "currentSource": {
+          "sha256": "60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c",
+          "sourceCommit": "81539e53f5146c06a77541415bd79da673806d96"
+        },
+        "historicalAnchorSha256": "16b9161341a45e9eba22407c1a3b6091398eb7eaf591a66fc4f6a1c16c64c96a",
+        "qualifiedPartPath": "harmonic-analyzer/frame/frame-cross-screw-5",
+        "historicalCorrespondenceEvidence": "Actual intro t27 original 1920x1080: front is paper/wheel side (-Z); +X is image-left. Named CAD screw origins map to front slotted heads at the two casting levels. Source pixel manually measured, not model projected.",
+        "qualification": "Native local feature association only; source-first-surface, fitted camera, GPU and stages unmeasured.",
+        "historicalNodeIndex": 156,
+        "currentNodeIndex": 299,
+        "historicalWorldMatrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          -1.3435885648505064e-07,
+          -1.0000001343588565,
+          0.0,
+          0.0,
+          1.0000001343588565,
+          -1.3435885648505064e-07,
+          0.0,
+          -0.19699999690055847,
+          1.0179500579833984,
+          -0.13760000467300415,
+          1.0
+        ],
+        "currentWorldMatrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          -1.3435885648505064e-07,
+          -1.0000001343588565,
+          0.0,
+          0.0,
+          1.0000001343588565,
+          -1.3435885648505064e-07,
+          0.0,
+          -0.19699999690055847,
+          1.0179500579833984,
+          -0.13760000467300415,
+          1.0
+        ],
+        "worldFrameUnchanged": true,
+        "historicalPrimitiveSha256": "e671d3bfc28ca1184cd93fcafeb8c58ecbd1bed84c5323b5d7e82be7244686dd",
+        "currentPrimitiveSha256": "98d8df3e0030aad2683e5d246b3f5a2fadc07a007a041f176bef13a1388b6548",
+        "primitives": [
+          {
+            "mode": 4,
+            "attributes": {
+              "NORMAL": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 69366,
+                "normalized": false,
+                "typedBytesSha256": "6edc8e1ef3a50ded88129f35baf9bcb68ff54d9d167464d1936bdf537cb08a0f"
+              },
+              "POSITION": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 69366,
+                "normalized": false,
+                "typedBytesSha256": "c3683207f680bf98cda070f06d05ed310b78a98a02701206b74836c5022266d8"
+              }
+            },
+            "indices": {
+              "componentType": 5125,
+              "type": "SCALAR",
+              "count": 141138,
+              "normalized": false,
+              "typedBytesSha256": "3f58b26812b46396edb00261663a0c7b6e5133c5704843e4381cc7ba12b9bf28"
+            },
+            "material": {
+              "name": "carbon steel",
+              "pbrMetallicRoughness": {
+                "baseColorFactor": [
+                  0.6117647290229797,
+                  0.5921568870544434,
+                  0.5764706134796143,
+                  1.0
+                ],
+                "metallicFactor": 1.0,
+                "roughnessFactor": 0.10000000149011612
+              }
+            }
+          }
+        ]
+      },
+      "reason": "Original typed primitive attributes, indices or material role changed; feature requires fresh primary mapping"
+    },
+    {
+      "anchorId": "frame-cross-screw-2",
+      "status": "unavailable",
+      "anchor": {
+        "id": "frame-cross-screw-2",
+        "kind": "physical-feature",
+        "description": "Centre of visible slotted head on front (-Z) casting; top/bottom and +X/-X identify screw",
+        "nativeAssociation": {
+          "status": "unavailable",
+          "reason": "Original typed primitive attributes, indices or material role changed; feature requires fresh primary mapping",
+          "proof": {
+            "method": "exact-original-native-local-feature-v1",
+            "historicalSource": {
+              "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+              "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+            },
+            "currentSource": {
+              "sha256": "60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c",
+              "sourceCommit": "81539e53f5146c06a77541415bd79da673806d96"
+            },
+            "historicalAnchorSha256": "6a11ca2ee6651fe77ff5b3b1e82348177d6d33c270087e330791587468b95481",
+            "qualifiedPartPath": "harmonic-analyzer/frame/frame-cross-screw-2",
+            "historicalCorrespondenceEvidence": "Actual intro t27 original 1920x1080: front is paper/wheel side (-Z); +X is image-left. Named CAD screw origins map to front slotted heads at the two casting levels. Source pixel manually measured, not model projected.",
+            "qualification": "Native local feature association only; source-first-surface, fitted camera, GPU and stages unmeasured.",
+            "historicalNodeIndex": 158,
+            "currentNodeIndex": 297,
+            "historicalWorldMatrix": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              -1.3435885648505064e-07,
+              -1.0000001343588565,
+              0.0,
+              0.0,
+              1.0000001343588565,
+              -1.3435885648505064e-07,
+              0.0,
+              0.19699999690055847,
+              0.038100000470876694,
+              -0.13300000131130219,
+              1.0
+            ],
+            "currentWorldMatrix": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              -1.3435885648505064e-07,
+              -1.0000001343588565,
+              0.0,
+              0.0,
+              1.0000001343588565,
+              -1.3435885648505064e-07,
+              0.0,
+              0.19699999690055847,
+              0.038100000470876694,
+              -0.13300000131130219,
+              1.0
+            ],
+            "worldFrameUnchanged": true,
+            "historicalPrimitiveSha256": "e671d3bfc28ca1184cd93fcafeb8c58ecbd1bed84c5323b5d7e82be7244686dd",
+            "currentPrimitiveSha256": "98d8df3e0030aad2683e5d246b3f5a2fadc07a007a041f176bef13a1388b6548",
+            "primitives": [
+              {
+                "mode": 4,
+                "attributes": {
+                  "NORMAL": {
+                    "componentType": 5126,
+                    "type": "VEC3",
+                    "count": 69366,
+                    "normalized": false,
+                    "typedBytesSha256": "6edc8e1ef3a50ded88129f35baf9bcb68ff54d9d167464d1936bdf537cb08a0f"
+                  },
+                  "POSITION": {
+                    "componentType": 5126,
+                    "type": "VEC3",
+                    "count": 69366,
+                    "normalized": false,
+                    "typedBytesSha256": "c3683207f680bf98cda070f06d05ed310b78a98a02701206b74836c5022266d8"
+                  }
+                },
+                "indices": {
+                  "componentType": 5125,
+                  "type": "SCALAR",
+                  "count": 141138,
+                  "normalized": false,
+                  "typedBytesSha256": "3f58b26812b46396edb00261663a0c7b6e5133c5704843e4381cc7ba12b9bf28"
+                },
+                "material": {
+                  "name": "carbon steel",
+                  "pbrMetallicRoughness": {
+                    "baseColorFactor": [
+                      0.6117647290229797,
+                      0.5921568870544434,
+                      0.5764706134796143,
+                      1.0
+                    ],
+                    "metallicFactor": 1.0,
+                    "roughnessFactor": 0.10000000149011612
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "proof": {
+        "method": "exact-original-native-local-feature-v1",
+        "historicalSource": {
+          "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+          "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+        },
+        "currentSource": {
+          "sha256": "60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c",
+          "sourceCommit": "81539e53f5146c06a77541415bd79da673806d96"
+        },
+        "historicalAnchorSha256": "6a11ca2ee6651fe77ff5b3b1e82348177d6d33c270087e330791587468b95481",
+        "qualifiedPartPath": "harmonic-analyzer/frame/frame-cross-screw-2",
+        "historicalCorrespondenceEvidence": "Actual intro t27 original 1920x1080: front is paper/wheel side (-Z); +X is image-left. Named CAD screw origins map to front slotted heads at the two casting levels. Source pixel manually measured, not model projected.",
+        "qualification": "Native local feature association only; source-first-surface, fitted camera, GPU and stages unmeasured.",
+        "historicalNodeIndex": 158,
+        "currentNodeIndex": 297,
+        "historicalWorldMatrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          -1.3435885648505064e-07,
+          -1.0000001343588565,
+          0.0,
+          0.0,
+          1.0000001343588565,
+          -1.3435885648505064e-07,
+          0.0,
+          0.19699999690055847,
+          0.038100000470876694,
+          -0.13300000131130219,
+          1.0
+        ],
+        "currentWorldMatrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          -1.3435885648505064e-07,
+          -1.0000001343588565,
+          0.0,
+          0.0,
+          1.0000001343588565,
+          -1.3435885648505064e-07,
+          0.0,
+          0.19699999690055847,
+          0.038100000470876694,
+          -0.13300000131130219,
+          1.0
+        ],
+        "worldFrameUnchanged": true,
+        "historicalPrimitiveSha256": "e671d3bfc28ca1184cd93fcafeb8c58ecbd1bed84c5323b5d7e82be7244686dd",
+        "currentPrimitiveSha256": "98d8df3e0030aad2683e5d246b3f5a2fadc07a007a041f176bef13a1388b6548",
+        "primitives": [
+          {
+            "mode": 4,
+            "attributes": {
+              "NORMAL": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 69366,
+                "normalized": false,
+                "typedBytesSha256": "6edc8e1ef3a50ded88129f35baf9bcb68ff54d9d167464d1936bdf537cb08a0f"
+              },
+              "POSITION": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 69366,
+                "normalized": false,
+                "typedBytesSha256": "c3683207f680bf98cda070f06d05ed310b78a98a02701206b74836c5022266d8"
+              }
+            },
+            "indices": {
+              "componentType": 5125,
+              "type": "SCALAR",
+              "count": 141138,
+              "normalized": false,
+              "typedBytesSha256": "3f58b26812b46396edb00261663a0c7b6e5133c5704843e4381cc7ba12b9bf28"
+            },
+            "material": {
+              "name": "carbon steel",
+              "pbrMetallicRoughness": {
+                "baseColorFactor": [
+                  0.6117647290229797,
+                  0.5921568870544434,
+                  0.5764706134796143,
+                  1.0
+                ],
+                "metallicFactor": 1.0,
+                "roughnessFactor": 0.10000000149011612
+              }
+            }
+          }
+        ]
+      },
+      "reason": "Original typed primitive attributes, indices or material role changed; feature requires fresh primary mapping"
+    },
+    {
+      "anchorId": "frame-cross-screw-1",
+      "status": "unavailable",
+      "anchor": {
+        "id": "frame-cross-screw-1",
+        "kind": "physical-feature",
+        "description": "Centre of visible slotted head on front (-Z) casting; top/bottom and +X/-X identify screw",
+        "nativeAssociation": {
+          "status": "unavailable",
+          "reason": "Original typed primitive attributes, indices or material role changed; feature requires fresh primary mapping",
+          "proof": {
+            "method": "exact-original-native-local-feature-v1",
+            "historicalSource": {
+              "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+              "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+            },
+            "currentSource": {
+              "sha256": "60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c",
+              "sourceCommit": "81539e53f5146c06a77541415bd79da673806d96"
+            },
+            "historicalAnchorSha256": "a43832aa7985a31f8505360ed975b87a2082193dc28e82331e68852fbfe34fe7",
+            "qualifiedPartPath": "harmonic-analyzer/frame/frame-cross-screw-1",
+            "historicalCorrespondenceEvidence": "Actual intro t27 original 1920x1080: front is paper/wheel side (-Z); +X is image-left. Named CAD screw origins map to front slotted heads at the two casting levels. Source pixel manually measured, not model projected.",
+            "qualification": "Native local feature association only; source-first-surface, fitted camera, GPU and stages unmeasured.",
+            "historicalNodeIndex": 153,
+            "currentNodeIndex": 284,
+            "historicalWorldMatrix": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              -1.3435885648505064e-07,
+              -1.0000001343588565,
+              0.0,
+              0.0,
+              1.0000001343588565,
+              -1.3435885648505064e-07,
+              0.0,
+              -0.19699999690055847,
+              0.038100000470876694,
+              -0.13300000131130219,
+              1.0
+            ],
+            "currentWorldMatrix": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              -1.3435885648505064e-07,
+              -1.0000001343588565,
+              0.0,
+              0.0,
+              1.0000001343588565,
+              -1.3435885648505064e-07,
+              0.0,
+              -0.19699999690055847,
+              0.038100000470876694,
+              -0.13300000131130219,
+              1.0
+            ],
+            "worldFrameUnchanged": true,
+            "historicalPrimitiveSha256": "e671d3bfc28ca1184cd93fcafeb8c58ecbd1bed84c5323b5d7e82be7244686dd",
+            "currentPrimitiveSha256": "98d8df3e0030aad2683e5d246b3f5a2fadc07a007a041f176bef13a1388b6548",
+            "primitives": [
+              {
+                "mode": 4,
+                "attributes": {
+                  "NORMAL": {
+                    "componentType": 5126,
+                    "type": "VEC3",
+                    "count": 69366,
+                    "normalized": false,
+                    "typedBytesSha256": "6edc8e1ef3a50ded88129f35baf9bcb68ff54d9d167464d1936bdf537cb08a0f"
+                  },
+                  "POSITION": {
+                    "componentType": 5126,
+                    "type": "VEC3",
+                    "count": 69366,
+                    "normalized": false,
+                    "typedBytesSha256": "c3683207f680bf98cda070f06d05ed310b78a98a02701206b74836c5022266d8"
+                  }
+                },
+                "indices": {
+                  "componentType": 5125,
+                  "type": "SCALAR",
+                  "count": 141138,
+                  "normalized": false,
+                  "typedBytesSha256": "3f58b26812b46396edb00261663a0c7b6e5133c5704843e4381cc7ba12b9bf28"
+                },
+                "material": {
+                  "name": "carbon steel",
+                  "pbrMetallicRoughness": {
+                    "baseColorFactor": [
+                      0.6117647290229797,
+                      0.5921568870544434,
+                      0.5764706134796143,
+                      1.0
+                    ],
+                    "metallicFactor": 1.0,
+                    "roughnessFactor": 0.10000000149011612
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "proof": {
+        "method": "exact-original-native-local-feature-v1",
+        "historicalSource": {
+          "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+          "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+        },
+        "currentSource": {
+          "sha256": "60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c",
+          "sourceCommit": "81539e53f5146c06a77541415bd79da673806d96"
+        },
+        "historicalAnchorSha256": "a43832aa7985a31f8505360ed975b87a2082193dc28e82331e68852fbfe34fe7",
+        "qualifiedPartPath": "harmonic-analyzer/frame/frame-cross-screw-1",
+        "historicalCorrespondenceEvidence": "Actual intro t27 original 1920x1080: front is paper/wheel side (-Z); +X is image-left. Named CAD screw origins map to front slotted heads at the two casting levels. Source pixel manually measured, not model projected.",
+        "qualification": "Native local feature association only; source-first-surface, fitted camera, GPU and stages unmeasured.",
+        "historicalNodeIndex": 153,
+        "currentNodeIndex": 284,
+        "historicalWorldMatrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          -1.3435885648505064e-07,
+          -1.0000001343588565,
+          0.0,
+          0.0,
+          1.0000001343588565,
+          -1.3435885648505064e-07,
+          0.0,
+          -0.19699999690055847,
+          0.038100000470876694,
+          -0.13300000131130219,
+          1.0
+        ],
+        "currentWorldMatrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          -1.3435885648505064e-07,
+          -1.0000001343588565,
+          0.0,
+          0.0,
+          1.0000001343588565,
+          -1.3435885648505064e-07,
+          0.0,
+          -0.19699999690055847,
+          0.038100000470876694,
+          -0.13300000131130219,
+          1.0
+        ],
+        "worldFrameUnchanged": true,
+        "historicalPrimitiveSha256": "e671d3bfc28ca1184cd93fcafeb8c58ecbd1bed84c5323b5d7e82be7244686dd",
+        "currentPrimitiveSha256": "98d8df3e0030aad2683e5d246b3f5a2fadc07a007a041f176bef13a1388b6548",
+        "primitives": [
+          {
+            "mode": 4,
+            "attributes": {
+              "NORMAL": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 69366,
+                "normalized": false,
+                "typedBytesSha256": "6edc8e1ef3a50ded88129f35baf9bcb68ff54d9d167464d1936bdf537cb08a0f"
+              },
+              "POSITION": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 69366,
+                "normalized": false,
+                "typedBytesSha256": "c3683207f680bf98cda070f06d05ed310b78a98a02701206b74836c5022266d8"
+              }
+            },
+            "indices": {
+              "componentType": 5125,
+              "type": "SCALAR",
+              "count": 141138,
+              "normalized": false,
+              "typedBytesSha256": "3f58b26812b46396edb00261663a0c7b6e5133c5704843e4381cc7ba12b9bf28"
+            },
+            "material": {
+              "name": "carbon steel",
+              "pbrMetallicRoughness": {
+                "baseColorFactor": [
+                  0.6117647290229797,
+                  0.5921568870544434,
+                  0.5764706134796143,
+                  1.0
+                ],
+                "metallicFactor": 1.0,
+                "roughnessFactor": 0.10000000149011612
+              }
+            }
+          }
+        ]
+      },
+      "reason": "Original typed primitive attributes, indices or material role changed; feature requires fresh primary mapping"
+    },
+    {
+      "anchorId": "wheel.center",
+      "status": "mapped",
+      "anchor": {
+        "id": "wheel.center",
+        "kind": "physical-feature",
+        "description": "Centre of front silver spoked wheel hub",
+        "partPath": "harmonic-analyzer/magnifier/magnifying-wheel-1",
+        "partLocalMetres": [
+          0,
+          0,
+          0
+        ],
+        "correspondenceEvidence": "Original source feature identity retained by the historical anchor digest and correspondence evidence in nativeAssociation.proof. Exact original typed primitives and current authored frame independently associated; source-first-surface, fitted-camera and GPU qualification remain unmeasured.",
+        "nativeAssociation": {
+          "status": "mapped",
+          "reason": null,
+          "proof": {
+            "method": "exact-original-native-local-feature-v1",
+            "historicalSource": {
+              "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+              "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+            },
+            "currentSource": {
+              "sha256": "60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c",
+              "sourceCommit": "81539e53f5146c06a77541415bd79da673806d96"
+            },
+            "historicalAnchorSha256": "4e9d861904243ad711d0f11ed8282c8cbc13b9fa9682781105b208e1bd2731ac",
+            "qualifiedPartPath": "harmonic-analyzer/magnifier/magnifying-wheel-1",
+            "historicalCorrespondenceEvidence": "Measured actual intro t27 source. Identify front wheel above paper and front drive crank at lower -X support. CAD named part origin is shaft/hub axis, source measured physical hub centre; no CAD-projected source truth.",
+            "qualification": "Native local feature association only; source-first-surface, fitted camera, GPU and stages unmeasured.",
+            "historicalNodeIndex": 281,
+            "currentNodeIndex": 9,
+            "historicalWorldMatrix": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.05299999937415123,
+              0.5756999850273132,
+              -0.1468999981880188,
+              1.0
+            ],
+            "currentWorldMatrix": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.05299999937415123,
+              0.5756999850273132,
+              -0.1468999981880188,
+              1.0
+            ],
+            "worldFrameUnchanged": true,
+            "historicalPrimitiveSha256": "93e8687aaaa5e2733738fe5a975905bf2b920a169ae31b0acb59accb25ccea8c",
+            "currentPrimitiveSha256": "93e8687aaaa5e2733738fe5a975905bf2b920a169ae31b0acb59accb25ccea8c",
+            "primitives": [
+              {
+                "mode": 4,
+                "attributes": {
+                  "NORMAL": {
+                    "componentType": 5126,
+                    "type": "VEC3",
+                    "count": 362,
+                    "normalized": false,
+                    "typedBytesSha256": "3deb845a43c573fbb00ed162e066111c7131ac06f5e5733662fef5a024cfbf4d"
+                  },
+                  "POSITION": {
+                    "componentType": 5126,
+                    "type": "VEC3",
+                    "count": 362,
+                    "normalized": false,
+                    "typedBytesSha256": "89f6cc5e478f08eca1c60e27cef6791e057de9ded01eb7d72304560648cf4840"
+                  }
+                },
+                "indices": {
+                  "componentType": 5125,
+                  "type": "SCALAR",
+                  "count": 780,
+                  "normalized": false,
+                  "typedBytesSha256": "29b68ddee81a6b41fb6904b60b8f1eba9887570535d70979037b1ed4758368c2"
+                },
+                "material": {
+                  "name": "color",
+                  "pbrMetallicRoughness": {
+                    "baseColorFactor": [
+                      0.0784313753247261,
+                      0.0784313753247261,
+                      0.08627451211214066,
+                      1.0
+                    ],
+                    "metallicFactor": 0.0,
+                    "roughnessFactor": 0.20000000298023224
+                  }
+                }
+              },
+              {
+                "mode": 4,
+                "attributes": {
+                  "NORMAL": {
+                    "componentType": 5126,
+                    "type": "VEC3",
+                    "count": 232,
+                    "normalized": false,
+                    "typedBytesSha256": "36c5945d47cf8ed2a5b9a805c23d81416e6ee1594029f01602e96a39f65e25d0"
+                  },
+                  "POSITION": {
+                    "componentType": 5126,
+                    "type": "VEC3",
+                    "count": 232,
+                    "normalized": false,
+                    "typedBytesSha256": "14af5c0026f3cf5c0413434bbda0b931aa6a070dc76c7651d62c3ffc624c8fa9"
+                  }
+                },
+                "indices": {
+                  "componentType": 5125,
+                  "type": "SCALAR",
+                  "count": 576,
+                  "normalized": false,
+                  "typedBytesSha256": "b0fbb97055d6eef2ed19038772134f0b6c681f28b7e6a2896ae4d6c3ef798291"
+                },
+                "material": {
+                  "name": "color",
+                  "pbrMetallicRoughness": {
+                    "baseColorFactor": [
+                      0.7176470756530762,
+                      0.5568627715110779,
+                      0.2392157018184662,
+                      1.0
+                    ],
+                    "metallicFactor": 0.0,
+                    "roughnessFactor": 0.20000000298023224
+                  }
+                }
+              },
+              {
+                "mode": 4,
+                "attributes": {
+                  "NORMAL": {
+                    "componentType": 5126,
+                    "type": "VEC3",
+                    "count": 338,
+                    "normalized": false,
+                    "typedBytesSha256": "55be70490b54a0405e5870b4b5fc52116a1616b36a38ebed9dc9605d951052e3"
+                  },
+                  "POSITION": {
+                    "componentType": 5126,
+                    "type": "VEC3",
+                    "count": 338,
+                    "normalized": false,
+                    "typedBytesSha256": "3b4e98dd289e67afe7e32ea731106f280b69cb844de3bae1d660ab8ef409d565"
+                  }
+                },
+                "indices": {
+                  "componentType": 5125,
+                  "type": "SCALAR",
+                  "count": 948,
+                  "normalized": false,
+                  "typedBytesSha256": "323a6ba1d32825616aa7840f52b96c49802be9d84d8da5bd19dd606b6b56aa46"
+                },
+                "material": {
+                  "name": "color",
+                  "pbrMetallicRoughness": {
+                    "baseColorFactor": [
+                      0.6470588445663452,
+                      0.6392157077789307,
+                      0.6274510025978088,
+                      1.0
+                    ],
+                    "metallicFactor": 0.0,
+                    "roughnessFactor": 0.20000000298023224
+                  }
+                }
+              }
+            ],
+            "coordinateBasis": "unchanged identified old native local feature",
+            "partLocalMetres": [
+              0,
+              0,
+              0
+            ],
+            "currentRestWorldMetres": [
+              0.05299999937415123,
+              0.5756999850273132,
+              -0.1468999981880188
+            ]
+          }
+        }
+      },
+      "proof": {
+        "method": "exact-original-native-local-feature-v1",
+        "historicalSource": {
+          "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+          "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+        },
+        "currentSource": {
+          "sha256": "60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c",
+          "sourceCommit": "81539e53f5146c06a77541415bd79da673806d96"
+        },
+        "historicalAnchorSha256": "4e9d861904243ad711d0f11ed8282c8cbc13b9fa9682781105b208e1bd2731ac",
+        "qualifiedPartPath": "harmonic-analyzer/magnifier/magnifying-wheel-1",
+        "historicalCorrespondenceEvidence": "Measured actual intro t27 source. Identify front wheel above paper and front drive crank at lower -X support. CAD named part origin is shaft/hub axis, source measured physical hub centre; no CAD-projected source truth.",
+        "qualification": "Native local feature association only; source-first-surface, fitted camera, GPU and stages unmeasured.",
+        "historicalNodeIndex": 281,
+        "currentNodeIndex": 9,
+        "historicalWorldMatrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.05299999937415123,
+          0.5756999850273132,
+          -0.1468999981880188,
+          1.0
+        ],
+        "currentWorldMatrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.05299999937415123,
+          0.5756999850273132,
+          -0.1468999981880188,
+          1.0
+        ],
+        "worldFrameUnchanged": true,
+        "historicalPrimitiveSha256": "93e8687aaaa5e2733738fe5a975905bf2b920a169ae31b0acb59accb25ccea8c",
+        "currentPrimitiveSha256": "93e8687aaaa5e2733738fe5a975905bf2b920a169ae31b0acb59accb25ccea8c",
+        "primitives": [
+          {
+            "mode": 4,
+            "attributes": {
+              "NORMAL": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 362,
+                "normalized": false,
+                "typedBytesSha256": "3deb845a43c573fbb00ed162e066111c7131ac06f5e5733662fef5a024cfbf4d"
+              },
+              "POSITION": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 362,
+                "normalized": false,
+                "typedBytesSha256": "89f6cc5e478f08eca1c60e27cef6791e057de9ded01eb7d72304560648cf4840"
+              }
+            },
+            "indices": {
+              "componentType": 5125,
+              "type": "SCALAR",
+              "count": 780,
+              "normalized": false,
+              "typedBytesSha256": "29b68ddee81a6b41fb6904b60b8f1eba9887570535d70979037b1ed4758368c2"
+            },
+            "material": {
+              "name": "color",
+              "pbrMetallicRoughness": {
+                "baseColorFactor": [
+                  0.0784313753247261,
+                  0.0784313753247261,
+                  0.08627451211214066,
+                  1.0
+                ],
+                "metallicFactor": 0.0,
+                "roughnessFactor": 0.20000000298023224
+              }
+            }
+          },
+          {
+            "mode": 4,
+            "attributes": {
+              "NORMAL": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 232,
+                "normalized": false,
+                "typedBytesSha256": "36c5945d47cf8ed2a5b9a805c23d81416e6ee1594029f01602e96a39f65e25d0"
+              },
+              "POSITION": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 232,
+                "normalized": false,
+                "typedBytesSha256": "14af5c0026f3cf5c0413434bbda0b931aa6a070dc76c7651d62c3ffc624c8fa9"
+              }
+            },
+            "indices": {
+              "componentType": 5125,
+              "type": "SCALAR",
+              "count": 576,
+              "normalized": false,
+              "typedBytesSha256": "b0fbb97055d6eef2ed19038772134f0b6c681f28b7e6a2896ae4d6c3ef798291"
+            },
+            "material": {
+              "name": "color",
+              "pbrMetallicRoughness": {
+                "baseColorFactor": [
+                  0.7176470756530762,
+                  0.5568627715110779,
+                  0.2392157018184662,
+                  1.0
+                ],
+                "metallicFactor": 0.0,
+                "roughnessFactor": 0.20000000298023224
+              }
+            }
+          },
+          {
+            "mode": 4,
+            "attributes": {
+              "NORMAL": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 338,
+                "normalized": false,
+                "typedBytesSha256": "55be70490b54a0405e5870b4b5fc52116a1616b36a38ebed9dc9605d951052e3"
+              },
+              "POSITION": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 338,
+                "normalized": false,
+                "typedBytesSha256": "3b4e98dd289e67afe7e32ea731106f280b69cb844de3bae1d660ab8ef409d565"
+              }
+            },
+            "indices": {
+              "componentType": 5125,
+              "type": "SCALAR",
+              "count": 948,
+              "normalized": false,
+              "typedBytesSha256": "323a6ba1d32825616aa7840f52b96c49802be9d84d8da5bd19dd606b6b56aa46"
+            },
+            "material": {
+              "name": "color",
+              "pbrMetallicRoughness": {
+                "baseColorFactor": [
+                  0.6470588445663452,
+                  0.6392157077789307,
+                  0.6274510025978088,
+                  1.0
+                ],
+                "metallicFactor": 0.0,
+                "roughnessFactor": 0.20000000298023224
+              }
+            }
+          }
+        ],
+        "coordinateBasis": "unchanged identified old native local feature",
+        "partLocalMetres": [
+          0,
+          0,
+          0
+        ],
+        "currentRestWorldMetres": [
+          0.05299999937415123,
+          0.5756999850273132,
+          -0.1468999981880188
+        ]
+      },
+      "reason": null
+    },
+    {
+      "anchorId": "crank.axis",
+      "status": "unavailable",
+      "anchor": {
+        "id": "crank.axis",
+        "kind": "physical-feature",
+        "description": "Pivot of front crank arm at crankshaft axis",
+        "nativeAssociation": {
+          "status": "unavailable",
+          "reason": "Original typed primitive attributes, indices or material role changed; feature requires fresh primary mapping",
+          "proof": {
+            "method": "exact-original-native-local-feature-v1",
+            "historicalSource": {
+              "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+              "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+            },
+            "currentSource": {
+              "sha256": "60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c",
+              "sourceCommit": "81539e53f5146c06a77541415bd79da673806d96"
+            },
+            "historicalAnchorSha256": "6874658648d38cc352e7ec414a196cf891f1d161e6f636ec44c079324bad791f",
+            "qualifiedPartPath": "harmonic-analyzer/drive-train/crankshaft-1",
+            "historicalCorrespondenceEvidence": "Measured actual intro t27 source. Identify front wheel above paper and front drive crank at lower -X support. CAD named part origin is shaft/hub axis, source measured physical hub centre; no CAD-projected source truth.",
+            "qualification": "Native local feature association only; source-first-surface, fitted camera, GPU and stages unmeasured.",
+            "historicalNodeIndex": 221,
+            "currentNodeIndex": 171,
+            "historicalWorldMatrix": [
+              0.9999999999999251,
+              0.0,
+              -3.871714616943654e-07,
+              0.0,
+              3.871714616943654e-07,
+              -1.3435889401058887e-07,
+              1.000000134358819,
+              0.0,
+              0.0,
+              -1.000000134358894,
+              -1.3435889401058887e-07,
+              0.0,
+              -0.12873348593711853,
+              0.12980464100837708,
+              -0.18299999833106995,
+              1.0
+            ],
+            "currentWorldMatrix": [
+              0.9999999999999251,
+              0.0,
+              -3.871714616943654e-07,
+              0.0,
+              3.871714616943654e-07,
+              -1.3435889401058887e-07,
+              1.000000134358819,
+              0.0,
+              0.0,
+              -1.000000134358894,
+              -1.3435889401058887e-07,
+              0.0,
+              -0.129336416721344,
+              0.12985000014305115,
+              -0.18299999833106995,
+              1.0
+            ],
+            "worldFrameUnchanged": false,
+            "historicalPrimitiveSha256": "a898727448872061e27e04540cc2397299d22db20b32cb71a5f69a76839b2511",
+            "currentPrimitiveSha256": "e9daa5d0be5ed6e8579d0fe96bba7fd3527093cb79ab2ef4b457e5bbb7c993d4",
+            "primitives": [
+              {
+                "mode": 4,
+                "attributes": {
+                  "NORMAL": {
+                    "componentType": 5126,
+                    "type": "VEC3",
+                    "count": 2796,
+                    "normalized": false,
+                    "typedBytesSha256": "baab66dc86532a170fcc4b85869605ff952035f5cac1df57cc48ef1e13bfa432"
+                  },
+                  "POSITION": {
+                    "componentType": 5126,
+                    "type": "VEC3",
+                    "count": 2796,
+                    "normalized": false,
+                    "typedBytesSha256": "60977773c956b7b79fa99431934e952f5a6e4d7b88dc85b0cd734f1cb8ced966"
+                  }
+                },
+                "indices": {
+                  "componentType": 5125,
+                  "type": "SCALAR",
+                  "count": 6462,
+                  "normalized": false,
+                  "typedBytesSha256": "8cf112cc532af09afee64a98908ea4decd390c4f7740216fa24e6d2b82cbb6f6"
+                },
+                "material": {
+                  "name": "carbon steel",
+                  "pbrMetallicRoughness": {
+                    "baseColorFactor": [
+                      0.6117647290229797,
+                      0.5921568870544434,
+                      0.5764706134796143,
+                      1.0
+                    ],
+                    "metallicFactor": 1.0,
+                    "roughnessFactor": 0.10000000149011612
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "proof": {
+        "method": "exact-original-native-local-feature-v1",
+        "historicalSource": {
+          "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+          "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+        },
+        "currentSource": {
+          "sha256": "60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c",
+          "sourceCommit": "81539e53f5146c06a77541415bd79da673806d96"
+        },
+        "historicalAnchorSha256": "6874658648d38cc352e7ec414a196cf891f1d161e6f636ec44c079324bad791f",
+        "qualifiedPartPath": "harmonic-analyzer/drive-train/crankshaft-1",
+        "historicalCorrespondenceEvidence": "Measured actual intro t27 source. Identify front wheel above paper and front drive crank at lower -X support. CAD named part origin is shaft/hub axis, source measured physical hub centre; no CAD-projected source truth.",
+        "qualification": "Native local feature association only; source-first-surface, fitted camera, GPU and stages unmeasured.",
+        "historicalNodeIndex": 221,
+        "currentNodeIndex": 171,
+        "historicalWorldMatrix": [
+          0.9999999999999251,
+          0.0,
+          -3.871714616943654e-07,
+          0.0,
+          3.871714616943654e-07,
+          -1.3435889401058887e-07,
+          1.000000134358819,
+          0.0,
+          0.0,
+          -1.000000134358894,
+          -1.3435889401058887e-07,
+          0.0,
+          -0.12873348593711853,
+          0.12980464100837708,
+          -0.18299999833106995,
+          1.0
+        ],
+        "currentWorldMatrix": [
+          0.9999999999999251,
+          0.0,
+          -3.871714616943654e-07,
+          0.0,
+          3.871714616943654e-07,
+          -1.3435889401058887e-07,
+          1.000000134358819,
+          0.0,
+          0.0,
+          -1.000000134358894,
+          -1.3435889401058887e-07,
+          0.0,
+          -0.129336416721344,
+          0.12985000014305115,
+          -0.18299999833106995,
+          1.0
+        ],
+        "worldFrameUnchanged": false,
+        "historicalPrimitiveSha256": "a898727448872061e27e04540cc2397299d22db20b32cb71a5f69a76839b2511",
+        "currentPrimitiveSha256": "e9daa5d0be5ed6e8579d0fe96bba7fd3527093cb79ab2ef4b457e5bbb7c993d4",
+        "primitives": [
+          {
+            "mode": 4,
+            "attributes": {
+              "NORMAL": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 2796,
+                "normalized": false,
+                "typedBytesSha256": "baab66dc86532a170fcc4b85869605ff952035f5cac1df57cc48ef1e13bfa432"
+              },
+              "POSITION": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 2796,
+                "normalized": false,
+                "typedBytesSha256": "60977773c956b7b79fa99431934e952f5a6e4d7b88dc85b0cd734f1cb8ced966"
+              }
+            },
+            "indices": {
+              "componentType": 5125,
+              "type": "SCALAR",
+              "count": 6462,
+              "normalized": false,
+              "typedBytesSha256": "8cf112cc532af09afee64a98908ea4decd390c4f7740216fa24e6d2b82cbb6f6"
+            },
+            "material": {
+              "name": "carbon steel",
+              "pbrMetallicRoughness": {
+                "baseColorFactor": [
+                  0.6117647290229797,
+                  0.5921568870544434,
+                  0.5764706134796143,
+                  1.0
+                ],
+                "metallicFactor": 1.0,
+                "roughnessFactor": 0.10000000149011612
+              }
+            }
+          }
+        ]
+      },
+      "reason": "Original typed primitive attributes, indices or material role changed; feature requires fresh primary mapping"
+    },
+    {
+      "anchorId": "pivot.front",
+      "status": "mapped",
+      "anchor": {
+        "id": "pivot.front",
+        "kind": "physical-feature",
+        "description": "Centre of front circular pivot shaft end above green arbor",
+        "partPath": "harmonic-analyzer/channel/pivot-shaft-1",
+        "partLocalMetres": [
+          0.0,
+          0.0,
+          -0.15816999971866608
+        ],
+        "correspondenceEvidence": "Original source feature identity retained by the historical anchor digest and correspondence evidence in nativeAssociation.proof. Exact original typed primitives and current authored frame independently associated; source-first-surface, fitted-camera and GPU qualification remain unmeasured.",
+        "nativeAssociation": {
+          "status": "mapped",
+          "reason": null,
+          "proof": {
+            "method": "exact-original-native-local-feature-v1",
+            "historicalSource": {
+              "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+              "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+            },
+            "currentSource": {
+              "sha256": "60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c",
+              "sourceCommit": "81539e53f5146c06a77541415bd79da673806d96"
+            },
+            "historicalAnchorSha256": "d1b93e4843f7aab26f4f9b47beb7de53a53cc0b79a4bb86a77358ce6a23019c5",
+            "qualifiedPartPath": "harmonic-analyzer/channel/pivot-shaft-1",
+            "historicalCorrespondenceEvidence": "Manual centre measurement on original lossless decoded frame and 3x nearest-neighbour crop with coordinate grid, independently of native projection. Uncertainty retains feature blur; rear tube occlusions excluded.",
+            "qualification": "Native local feature association only; source-first-surface, fitted camera, GPU and stages unmeasured.",
+            "historicalNodeIndex": 20,
+            "currentNodeIndex": 64,
+            "historicalWorldMatrix": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.07289999723434448,
+              0.25380000472068787,
+              0.08188933879137039,
+              1.0
+            ],
+            "currentWorldMatrix": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.07289999723434448,
+              0.25380000472068787,
+              0.08188933879137039,
+              1.0
+            ],
+            "worldFrameUnchanged": true,
+            "historicalPrimitiveSha256": "4a5cafd912c7eaf03c6900ae4a82012cec200be73f664cbf0b6f50b6fa52cc55",
+            "currentPrimitiveSha256": "4a5cafd912c7eaf03c6900ae4a82012cec200be73f664cbf0b6f50b6fa52cc55",
+            "primitives": [
+              {
+                "mode": 4,
+                "attributes": {
+                  "NORMAL": {
+                    "componentType": 5126,
+                    "type": "VEC3",
+                    "count": 1748,
+                    "normalized": false,
+                    "typedBytesSha256": "7aae1d2ff40936020105bf1826baad7f215174a3db7edec86d78c6b556e18068"
+                  },
+                  "POSITION": {
+                    "componentType": 5126,
+                    "type": "VEC3",
+                    "count": 1748,
+                    "normalized": false,
+                    "typedBytesSha256": "8be3c154ed6a85580afa102dfd4f5a6654e84c3fa279c32e0b99eed6da7a5997"
+                  }
+                },
+                "indices": {
+                  "componentType": 5125,
+                  "type": "SCALAR",
+                  "count": 4074,
+                  "normalized": false,
+                  "typedBytesSha256": "2bc0d9fb2a866fe71272ff387d2103378d5a9d167871f4ff56c9ef69bddd616d"
+                },
+                "material": {
+                  "name": "color",
+                  "pbrMetallicRoughness": {
+                    "baseColorFactor": [
+                      0.6470588445663452,
+                      0.6392157077789307,
+                      0.6274510025978088,
+                      1.0
+                    ],
+                    "metallicFactor": 0.0,
+                    "roughnessFactor": 0.20000000298023224
+                  }
+                }
+              }
+            ],
+            "historicalWorldMetres": [
+              0.07289999723434448,
+              0.25380000472068787,
+              -0.07628066092729568
+            ],
+            "coordinateBasis": "old-world localized by actual old frame, transported by actual new frame",
+            "partLocalMetres": [
+              0.0,
+              0.0,
+              -0.15816999971866608
+            ],
+            "currentRestWorldMetres": [
+              0.07289999723434448,
+              0.25380000472068787,
+              -0.07628066092729568
+            ]
+          }
+        }
+      },
+      "proof": {
+        "method": "exact-original-native-local-feature-v1",
+        "historicalSource": {
+          "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+          "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+        },
+        "currentSource": {
+          "sha256": "60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c",
+          "sourceCommit": "81539e53f5146c06a77541415bd79da673806d96"
+        },
+        "historicalAnchorSha256": "d1b93e4843f7aab26f4f9b47beb7de53a53cc0b79a4bb86a77358ce6a23019c5",
+        "qualifiedPartPath": "harmonic-analyzer/channel/pivot-shaft-1",
+        "historicalCorrespondenceEvidence": "Manual centre measurement on original lossless decoded frame and 3x nearest-neighbour crop with coordinate grid, independently of native projection. Uncertainty retains feature blur; rear tube occlusions excluded.",
+        "qualification": "Native local feature association only; source-first-surface, fitted camera, GPU and stages unmeasured.",
+        "historicalNodeIndex": 20,
+        "currentNodeIndex": 64,
+        "historicalWorldMatrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.07289999723434448,
+          0.25380000472068787,
+          0.08188933879137039,
+          1.0
+        ],
+        "currentWorldMatrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.07289999723434448,
+          0.25380000472068787,
+          0.08188933879137039,
+          1.0
+        ],
+        "worldFrameUnchanged": true,
+        "historicalPrimitiveSha256": "4a5cafd912c7eaf03c6900ae4a82012cec200be73f664cbf0b6f50b6fa52cc55",
+        "currentPrimitiveSha256": "4a5cafd912c7eaf03c6900ae4a82012cec200be73f664cbf0b6f50b6fa52cc55",
+        "primitives": [
+          {
+            "mode": 4,
+            "attributes": {
+              "NORMAL": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 1748,
+                "normalized": false,
+                "typedBytesSha256": "7aae1d2ff40936020105bf1826baad7f215174a3db7edec86d78c6b556e18068"
+              },
+              "POSITION": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 1748,
+                "normalized": false,
+                "typedBytesSha256": "8be3c154ed6a85580afa102dfd4f5a6654e84c3fa279c32e0b99eed6da7a5997"
+              }
+            },
+            "indices": {
+              "componentType": 5125,
+              "type": "SCALAR",
+              "count": 4074,
+              "normalized": false,
+              "typedBytesSha256": "2bc0d9fb2a866fe71272ff387d2103378d5a9d167871f4ff56c9ef69bddd616d"
+            },
+            "material": {
+              "name": "color",
+              "pbrMetallicRoughness": {
+                "baseColorFactor": [
+                  0.6470588445663452,
+                  0.6392157077789307,
+                  0.6274510025978088,
+                  1.0
+                ],
+                "metallicFactor": 0.0,
+                "roughnessFactor": 0.20000000298023224
+              }
+            }
+          }
+        ],
+        "historicalWorldMetres": [
+          0.07289999723434448,
+          0.25380000472068787,
+          -0.07628066092729568
+        ],
+        "coordinateBasis": "old-world localized by actual old frame, transported by actual new frame",
+        "partLocalMetres": [
+          0.0,
+          0.0,
+          -0.15816999971866608
+        ],
+        "currentRestWorldMetres": [
+          0.07289999723434448,
+          0.25380000472068787,
+          -0.07628066092729568
+        ]
+      },
+      "reason": null
+    },
+    {
+      "anchorId": "transgear.stub.front",
+      "status": "unavailable",
+      "anchor": {
+        "id": "transgear.stub.front",
+        "kind": "physical-feature",
+        "description": "Front shaft end centre at brass output gear hub",
+        "nativeAssociation": {
+          "status": "unavailable",
+          "reason": "Exact original qualified native body is absent; no alias or replacement feature is inferred",
+          "proof": {
+            "method": "exact-original-native-local-feature-v1",
+            "historicalSource": {
+              "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+              "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+            },
+            "currentSource": {
+              "sha256": "60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c",
+              "sourceCommit": "81539e53f5146c06a77541415bd79da673806d96"
+            },
+            "historicalAnchorSha256": "01c90848c6207472ba8d9c4700bfc18de93f0b48a61243efc9dc3ecfcbf5b6b1",
+            "qualifiedPartPath": "harmonic-analyzer/paper-drive/transgear-stub-1",
+            "historicalCorrespondenceEvidence": "Manual centre measurement on original lossless decoded frame and 3x nearest-neighbour crop with coordinate grid, independently of native projection. Uncertainty retains feature blur; rear tube occlusions excluded.",
+            "qualification": "Native local feature association only; source-first-surface, fitted camera, GPU and stages unmeasured."
+          }
+        }
+      },
+      "proof": {
+        "method": "exact-original-native-local-feature-v1",
+        "historicalSource": {
+          "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+          "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+        },
+        "currentSource": {
+          "sha256": "60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c",
+          "sourceCommit": "81539e53f5146c06a77541415bd79da673806d96"
+        },
+        "historicalAnchorSha256": "01c90848c6207472ba8d9c4700bfc18de93f0b48a61243efc9dc3ecfcbf5b6b1",
+        "qualifiedPartPath": "harmonic-analyzer/paper-drive/transgear-stub-1",
+        "historicalCorrespondenceEvidence": "Manual centre measurement on original lossless decoded frame and 3x nearest-neighbour crop with coordinate grid, independently of native projection. Uncertainty retains feature blur; rear tube occlusions excluded.",
+        "qualification": "Native local feature association only; source-first-surface, fitted camera, GPU and stages unmeasured."
+      },
+      "reason": "Exact original qualified native body is absent; no alias or replacement feature is inferred"
+    },
+    {
+      "anchorId": "transgear.knob.axis",
+      "status": "unavailable",
+      "anchor": {
+        "id": "transgear.knob.axis",
+        "kind": "physical-feature",
+        "description": "Front brass shaft centre within silver upper sprocket hub",
+        "nativeAssociation": {
+          "status": "unavailable",
+          "reason": "Original typed primitive attributes, indices or material role changed; feature requires fresh primary mapping",
+          "proof": {
+            "method": "exact-original-native-local-feature-v1",
+            "historicalSource": {
+              "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+              "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+            },
+            "currentSource": {
+              "sha256": "60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c",
+              "sourceCommit": "81539e53f5146c06a77541415bd79da673806d96"
+            },
+            "historicalAnchorSha256": "ab2b2635590e789ffeba60d6035ee41923192336dec8814fcddeb732c1d08f8f",
+            "qualifiedPartPath": "harmonic-analyzer/paper-drive/transgear-knob-shaft-1",
+            "historicalCorrespondenceEvidence": "Manual centre measurement on original lossless decoded frame and 3x nearest-neighbour crop with coordinate grid, independently of native projection. Uncertainty retains feature blur; rear tube occlusions excluded.",
+            "qualification": "Native local feature association only; source-first-surface, fitted camera, GPU and stages unmeasured.",
+            "historicalNodeIndex": 392,
+            "currentNodeIndex": 393,
+            "historicalWorldMatrix": [
+              1.0,
+              -1.3484269266192089e-12,
+              3.833233799222864e-17,
+              0.0,
+              -3.833233799222864e-17,
+              -1.3435885648505064e-07,
+              1.0000001343588565,
+              0.0,
+              -1.3484269266192089e-12,
+              -1.0000001343588565,
+              -1.3435885648505064e-07,
+              0.0,
+              -0.04257499426603317,
+              0.25236719846725464,
+              -0.1574999988079071,
+              1.0
+            ],
+            "currentWorldMatrix": [
+              0.9986295349713389,
+              -0.05233595251871104,
+              0.0,
+              0.0,
+              0.05233595251871104,
+              0.9986295349713389,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              -0.04378775507211685,
+              0.2568932771682739,
+              -0.14810000360012054,
+              1.0
+            ],
+            "worldFrameUnchanged": false,
+            "historicalPrimitiveSha256": "1dc3e084ec4e6ed0566c7389604a3e0343a9c20d7ea11439703477e44eb77f2e",
+            "currentPrimitiveSha256": "23082e86e40d112384258c1c5911c704c2da2cdb47691479c2ab7459141c027a",
+            "primitives": [
+              {
+                "mode": 4,
+                "attributes": {
+                  "NORMAL": {
+                    "componentType": 5126,
+                    "type": "VEC3",
+                    "count": 2470,
+                    "normalized": false,
+                    "typedBytesSha256": "9bcee344609fb8837a1a60fee70044e6b30831a64939a378a029507dff5094ac"
+                  },
+                  "POSITION": {
+                    "componentType": 5126,
+                    "type": "VEC3",
+                    "count": 2470,
+                    "normalized": false,
+                    "typedBytesSha256": "edfc65cf49fdbc3ba73c50b709bbd22e9d5e663c9dae2dda0e1e1dd47078de8e"
+                  }
+                },
+                "indices": {
+                  "componentType": 5125,
+                  "type": "SCALAR",
+                  "count": 4764,
+                  "normalized": false,
+                  "typedBytesSha256": "441945ceeb33cb44036a693eb6f63e5295236fb9039091339bbf9fc0d3cb6718"
+                },
+                "material": {
+                  "name": "carbon steel",
+                  "pbrMetallicRoughness": {
+                    "baseColorFactor": [
+                      0.6117647290229797,
+                      0.5921568870544434,
+                      0.5764706134796143,
+                      1.0
+                    ],
+                    "metallicFactor": 1.0,
+                    "roughnessFactor": 0.10000000149011612
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "proof": {
+        "method": "exact-original-native-local-feature-v1",
+        "historicalSource": {
+          "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+          "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+        },
+        "currentSource": {
+          "sha256": "60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c",
+          "sourceCommit": "81539e53f5146c06a77541415bd79da673806d96"
+        },
+        "historicalAnchorSha256": "ab2b2635590e789ffeba60d6035ee41923192336dec8814fcddeb732c1d08f8f",
+        "qualifiedPartPath": "harmonic-analyzer/paper-drive/transgear-knob-shaft-1",
+        "historicalCorrespondenceEvidence": "Manual centre measurement on original lossless decoded frame and 3x nearest-neighbour crop with coordinate grid, independently of native projection. Uncertainty retains feature blur; rear tube occlusions excluded.",
+        "qualification": "Native local feature association only; source-first-surface, fitted camera, GPU and stages unmeasured.",
+        "historicalNodeIndex": 392,
+        "currentNodeIndex": 393,
+        "historicalWorldMatrix": [
+          1.0,
+          -1.3484269266192089e-12,
+          3.833233799222864e-17,
+          0.0,
+          -3.833233799222864e-17,
+          -1.3435885648505064e-07,
+          1.0000001343588565,
+          0.0,
+          -1.3484269266192089e-12,
+          -1.0000001343588565,
+          -1.3435885648505064e-07,
+          0.0,
+          -0.04257499426603317,
+          0.25236719846725464,
+          -0.1574999988079071,
+          1.0
+        ],
+        "currentWorldMatrix": [
+          0.9986295349713389,
+          -0.05233595251871104,
+          0.0,
+          0.0,
+          0.05233595251871104,
+          0.9986295349713389,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          -0.04378775507211685,
+          0.2568932771682739,
+          -0.14810000360012054,
+          1.0
+        ],
+        "worldFrameUnchanged": false,
+        "historicalPrimitiveSha256": "1dc3e084ec4e6ed0566c7389604a3e0343a9c20d7ea11439703477e44eb77f2e",
+        "currentPrimitiveSha256": "23082e86e40d112384258c1c5911c704c2da2cdb47691479c2ab7459141c027a",
+        "primitives": [
+          {
+            "mode": 4,
+            "attributes": {
+              "NORMAL": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 2470,
+                "normalized": false,
+                "typedBytesSha256": "9bcee344609fb8837a1a60fee70044e6b30831a64939a378a029507dff5094ac"
+              },
+              "POSITION": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 2470,
+                "normalized": false,
+                "typedBytesSha256": "edfc65cf49fdbc3ba73c50b709bbd22e9d5e663c9dae2dda0e1e1dd47078de8e"
+              }
+            },
+            "indices": {
+              "componentType": 5125,
+              "type": "SCALAR",
+              "count": 4764,
+              "normalized": false,
+              "typedBytesSha256": "441945ceeb33cb44036a693eb6f63e5295236fb9039091339bbf9fc0d3cb6718"
+            },
+            "material": {
+              "name": "carbon steel",
+              "pbrMetallicRoughness": {
+                "baseColorFactor": [
+                  0.6117647290229797,
+                  0.5921568870544434,
+                  0.5764706134796143,
+                  1.0
+                ],
+                "metallicFactor": 1.0,
+                "roughnessFactor": 0.10000000149011612
+              }
+            }
+          }
+        ]
+      },
+      "reason": "Original typed primitive attributes, indices or material role changed; feature requires fresh primary mapping"
+    },
+    {
+      "anchorId": "cylinder.shaft.front",
+      "status": "unavailable",
+      "anchor": {
+        "id": "cylinder.shaft.front",
+        "kind": "physical-feature",
+        "description": "Front shaft circular end centre in black arbor pedestal",
+        "nativeAssociation": {
+          "status": "unavailable",
+          "reason": "Original typed primitive attributes, indices or material role changed; feature requires fresh primary mapping",
+          "proof": {
+            "method": "exact-original-native-local-feature-v1",
+            "historicalSource": {
+              "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+              "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+            },
+            "currentSource": {
+              "sha256": "60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c",
+              "sourceCommit": "81539e53f5146c06a77541415bd79da673806d96"
+            },
+            "historicalAnchorSha256": "9f19f14bb475837f4a317b2250d0454db19300d70401162579cfc14c24d048c6",
+            "qualifiedPartPath": "harmonic-analyzer/drive-train/cylinder-gear-shaft-1",
+            "historicalCorrespondenceEvidence": "Manual centre measurement on original lossless decoded frame and 3x nearest-neighbour crop with coordinate grid, independently of native projection. Uncertainty retains feature blur; rear tube occlusions excluded.",
+            "qualification": "Native local feature association only; source-first-surface, fitted camera, GPU and stages unmeasured.",
+            "historicalNodeIndex": 171,
+            "currentNodeIndex": 235,
+            "historicalWorldMatrix": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              -1.3435885648505064e-07,
+              1.0000001343588565,
+              0.0,
+              0.0,
+              -1.0000001343588565,
+              -1.3435885648505064e-07,
+              0.0,
+              -0.06039360165596008,
+              0.09051799774169922,
+              -0.08151891082525253,
+              1.0
+            ],
+            "currentWorldMatrix": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              -1.3435885648505064e-07,
+              1.0000001343588565,
+              0.0,
+              0.0,
+              -1.0000001343588565,
+              -1.3435885648505064e-07,
+              0.0,
+              -0.06039360165596008,
+              0.09051799774169922,
+              -0.08151891082525253,
+              1.0
+            ],
+            "worldFrameUnchanged": true,
+            "historicalPrimitiveSha256": "09ca727d5b69d48917fcae398c2ade0d7b0feaa6c439da9e65f7b6b4d3873f6d",
+            "currentPrimitiveSha256": "b22a17c35962f30f52b05b6a4d2407f3b2db8ed624481b6f0ac1cee3938b3c3e",
+            "primitives": [
+              {
+                "mode": 4,
+                "attributes": {
+                  "NORMAL": {
+                    "componentType": 5126,
+                    "type": "VEC3",
+                    "count": 786,
+                    "normalized": false,
+                    "typedBytesSha256": "8badc35d5da6e76846a9bb622f0fe0675eb6be85f30fdaf0f987756c95034dfd"
+                  },
+                  "POSITION": {
+                    "componentType": 5126,
+                    "type": "VEC3",
+                    "count": 786,
+                    "normalized": false,
+                    "typedBytesSha256": "a87b1d0dbba20887eadaf61e4e33d41ad78d5ebbd6512911dd74303aa1767b44"
+                  }
+                },
+                "indices": {
+                  "componentType": 5125,
+                  "type": "SCALAR",
+                  "count": 1884,
+                  "normalized": false,
+                  "typedBytesSha256": "283cf45daddc8ef1ac86239a1f80f3144bd6bdb95b3d0067512817222c511c15"
+                },
+                "material": {
+                  "name": "carbon steel",
+                  "pbrMetallicRoughness": {
+                    "baseColorFactor": [
+                      0.6117647290229797,
+                      0.5921568870544434,
+                      0.5764706134796143,
+                      1.0
+                    ],
+                    "metallicFactor": 1.0,
+                    "roughnessFactor": 0.10000000149011612
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "proof": {
+        "method": "exact-original-native-local-feature-v1",
+        "historicalSource": {
+          "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+          "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+        },
+        "currentSource": {
+          "sha256": "60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c",
+          "sourceCommit": "81539e53f5146c06a77541415bd79da673806d96"
+        },
+        "historicalAnchorSha256": "9f19f14bb475837f4a317b2250d0454db19300d70401162579cfc14c24d048c6",
+        "qualifiedPartPath": "harmonic-analyzer/drive-train/cylinder-gear-shaft-1",
+        "historicalCorrespondenceEvidence": "Manual centre measurement on original lossless decoded frame and 3x nearest-neighbour crop with coordinate grid, independently of native projection. Uncertainty retains feature blur; rear tube occlusions excluded.",
+        "qualification": "Native local feature association only; source-first-surface, fitted camera, GPU and stages unmeasured.",
+        "historicalNodeIndex": 171,
+        "currentNodeIndex": 235,
+        "historicalWorldMatrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          -1.3435885648505064e-07,
+          1.0000001343588565,
+          0.0,
+          0.0,
+          -1.0000001343588565,
+          -1.3435885648505064e-07,
+          0.0,
+          -0.06039360165596008,
+          0.09051799774169922,
+          -0.08151891082525253,
+          1.0
+        ],
+        "currentWorldMatrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          -1.3435885648505064e-07,
+          1.0000001343588565,
+          0.0,
+          0.0,
+          -1.0000001343588565,
+          -1.3435885648505064e-07,
+          0.0,
+          -0.06039360165596008,
+          0.09051799774169922,
+          -0.08151891082525253,
+          1.0
+        ],
+        "worldFrameUnchanged": true,
+        "historicalPrimitiveSha256": "09ca727d5b69d48917fcae398c2ade0d7b0feaa6c439da9e65f7b6b4d3873f6d",
+        "currentPrimitiveSha256": "b22a17c35962f30f52b05b6a4d2407f3b2db8ed624481b6f0ac1cee3938b3c3e",
+        "primitives": [
+          {
+            "mode": 4,
+            "attributes": {
+              "NORMAL": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 786,
+                "normalized": false,
+                "typedBytesSha256": "8badc35d5da6e76846a9bb622f0fe0675eb6be85f30fdaf0f987756c95034dfd"
+              },
+              "POSITION": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 786,
+                "normalized": false,
+                "typedBytesSha256": "a87b1d0dbba20887eadaf61e4e33d41ad78d5ebbd6512911dd74303aa1767b44"
+              }
+            },
+            "indices": {
+              "componentType": 5125,
+              "type": "SCALAR",
+              "count": 1884,
+              "normalized": false,
+              "typedBytesSha256": "283cf45daddc8ef1ac86239a1f80f3144bd6bdb95b3d0067512817222c511c15"
+            },
+            "material": {
+              "name": "carbon steel",
+              "pbrMetallicRoughness": {
+                "baseColorFactor": [
+                  0.6117647290229797,
+                  0.5921568870544434,
+                  0.5764706134796143,
+                  1.0
+                ],
+                "metallicFactor": 1.0,
+                "roughnessFactor": 0.10000000149011612
+              }
+            }
+          }
+        ]
+      },
+      "reason": "Original typed primitive attributes, indices or material role changed; feature requires fresh primary mapping"
+    },
+    {
+      "anchorId": "fulcrum.front",
+      "status": "mapped",
+      "anchor": {
+        "id": "fulcrum.front",
+        "kind": "physical-feature",
+        "description": "Centre of visible front fulcrum shaft end enclosed by upper keeper profile",
+        "partPath": "harmonic-analyzer/channel/fulcrum-shaft-1",
+        "partLocalMetres": [
+          0.0,
+          0.0,
+          -0.09099999815225601
+        ],
+        "correspondenceEvidence": "Original source feature identity retained by the historical anchor digest and correspondence evidence in nativeAssociation.proof. Exact original typed primitives and current authored frame independently associated; source-first-surface, fitted-camera and GPU qualification remain unmeasured.",
+        "nativeAssociation": {
+          "status": "mapped",
+          "reason": null,
+          "proof": {
+            "method": "exact-original-native-local-feature-v1",
+            "historicalSource": {
+              "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+              "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+            },
+            "currentSource": {
+              "sha256": "60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c",
+              "sourceCommit": "81539e53f5146c06a77541415bd79da673806d96"
+            },
+            "historicalAnchorSha256": "5277f0f60b81cdb068483cb262bda143967fa69f015f9fd7a77109f3259f6724",
+            "qualifiedPartPath": "harmonic-analyzer/channel/fulcrum-shaft-1",
+            "historicalCorrespondenceEvidence": "Manually measured t27 native source frame809 on lossless 3x pixel grid. Native inventory shaft front endpoint worldZ=-0.0879124103m, axisX=.1999000013m,Y=1.0614000559m; candidate EGL rendering confirms keeper/shaft ordering. Fixed support, not an articulated source-rest pose.",
+            "qualification": "Native local feature association only; source-first-surface, fitted camera, GPU and stages unmeasured.",
+            "historicalNodeIndex": 17,
+            "currentNodeIndex": 66,
+            "historicalWorldMatrix": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.19990000128746033,
+              1.061400055885315,
+              0.0030875878874212503,
+              1.0
+            ],
+            "currentWorldMatrix": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.19990000128746033,
+              1.061400055885315,
+              0.0030875878874212503,
+              1.0
+            ],
+            "worldFrameUnchanged": true,
+            "historicalPrimitiveSha256": "1a79cc79d8769c451e8fd2dee7be03acb8b1a8b6dfda66d02c35d2f33323fc03",
+            "currentPrimitiveSha256": "1a79cc79d8769c451e8fd2dee7be03acb8b1a8b6dfda66d02c35d2f33323fc03",
+            "primitives": [
+              {
+                "mode": 4,
+                "attributes": {
+                  "NORMAL": {
+                    "componentType": 5126,
+                    "type": "VEC3",
+                    "count": 158,
+                    "normalized": false,
+                    "typedBytesSha256": "2be25acf69f66bbda42535ca209f45820179e3c0dab700d1687f6091affa3c13"
+                  },
+                  "POSITION": {
+                    "componentType": 5126,
+                    "type": "VEC3",
+                    "count": 158,
+                    "normalized": false,
+                    "typedBytesSha256": "7b9b8430d37572364e1a21abbf232dbe28f3ee0ae6929f3dbf727344a852a698"
+                  }
+                },
+                "indices": {
+                  "componentType": 5125,
+                  "type": "SCALAR",
+                  "count": 336,
+                  "normalized": false,
+                  "typedBytesSha256": "7f1d59f4599b0094b23f8be2dd3553b9b6e0af0527d0f943fcfebc58aff364eb"
+                },
+                "material": {
+                  "name": "carbon steel",
+                  "pbrMetallicRoughness": {
+                    "baseColorFactor": [
+                      0.6117647290229797,
+                      0.5921568870544434,
+                      0.5764706134796143,
+                      1.0
+                    ],
+                    "metallicFactor": 1.0,
+                    "roughnessFactor": 0.10000000149011612
+                  }
+                }
+              }
+            ],
+            "historicalWorldMetres": [
+              0.19990000128746033,
+              1.061400055885315,
+              -0.08791241026483476
+            ],
+            "coordinateBasis": "old-world localized by actual old frame, transported by actual new frame",
+            "partLocalMetres": [
+              0.0,
+              0.0,
+              -0.09099999815225601
+            ],
+            "currentRestWorldMetres": [
+              0.19990000128746033,
+              1.061400055885315,
+              -0.08791241026483476
+            ]
+          }
+        }
+      },
+      "proof": {
+        "method": "exact-original-native-local-feature-v1",
+        "historicalSource": {
+          "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+          "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+        },
+        "currentSource": {
+          "sha256": "60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c",
+          "sourceCommit": "81539e53f5146c06a77541415bd79da673806d96"
+        },
+        "historicalAnchorSha256": "5277f0f60b81cdb068483cb262bda143967fa69f015f9fd7a77109f3259f6724",
+        "qualifiedPartPath": "harmonic-analyzer/channel/fulcrum-shaft-1",
+        "historicalCorrespondenceEvidence": "Manually measured t27 native source frame809 on lossless 3x pixel grid. Native inventory shaft front endpoint worldZ=-0.0879124103m, axisX=.1999000013m,Y=1.0614000559m; candidate EGL rendering confirms keeper/shaft ordering. Fixed support, not an articulated source-rest pose.",
+        "qualification": "Native local feature association only; source-first-surface, fitted camera, GPU and stages unmeasured.",
+        "historicalNodeIndex": 17,
+        "currentNodeIndex": 66,
+        "historicalWorldMatrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.19990000128746033,
+          1.061400055885315,
+          0.0030875878874212503,
+          1.0
+        ],
+        "currentWorldMatrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.19990000128746033,
+          1.061400055885315,
+          0.0030875878874212503,
+          1.0
+        ],
+        "worldFrameUnchanged": true,
+        "historicalPrimitiveSha256": "1a79cc79d8769c451e8fd2dee7be03acb8b1a8b6dfda66d02c35d2f33323fc03",
+        "currentPrimitiveSha256": "1a79cc79d8769c451e8fd2dee7be03acb8b1a8b6dfda66d02c35d2f33323fc03",
+        "primitives": [
+          {
+            "mode": 4,
+            "attributes": {
+              "NORMAL": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 158,
+                "normalized": false,
+                "typedBytesSha256": "2be25acf69f66bbda42535ca209f45820179e3c0dab700d1687f6091affa3c13"
+              },
+              "POSITION": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 158,
+                "normalized": false,
+                "typedBytesSha256": "7b9b8430d37572364e1a21abbf232dbe28f3ee0ae6929f3dbf727344a852a698"
+              }
+            },
+            "indices": {
+              "componentType": 5125,
+              "type": "SCALAR",
+              "count": 336,
+              "normalized": false,
+              "typedBytesSha256": "7f1d59f4599b0094b23f8be2dd3553b9b6e0af0527d0f943fcfebc58aff364eb"
+            },
+            "material": {
+              "name": "carbon steel",
+              "pbrMetallicRoughness": {
+                "baseColorFactor": [
+                  0.6117647290229797,
+                  0.5921568870544434,
+                  0.5764706134796143,
+                  1.0
+                ],
+                "metallicFactor": 1.0,
+                "roughnessFactor": 0.10000000149011612
+              }
+            }
+          }
+        ],
+        "historicalWorldMetres": [
+          0.19990000128746033,
+          1.061400055885315,
+          -0.08791241026483476
+        ],
+        "coordinateBasis": "old-world localized by actual old frame, transported by actual new frame",
+        "partLocalMetres": [
+          0.0,
+          0.0,
+          -0.09099999815225601
+        ],
+        "currentRestWorldMetres": [
+          0.19990000128746033,
+          1.061400055885315,
+          -0.08791241026483476
+        ]
+      },
+      "reason": null
+    },
+    {
+      "anchorId": "tube2.top",
+      "status": "unavailable",
+      "anchor": {
+        "id": "tube2.top",
+        "kind": "section-center",
+        "description": "Front tube axis at top casting seam",
+        "nativeAssociation": {
+          "status": "unavailable",
+          "reason": "Original typed primitive attributes, indices or material role changed; feature requires fresh primary mapping",
+          "proof": {
+            "method": "exact-original-native-local-feature-v1",
+            "historicalSource": {
+              "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+              "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+            },
+            "currentSource": {
+              "sha256": "60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c",
+              "sourceCommit": "81539e53f5146c06a77541415bd79da673806d96"
+            },
+            "historicalAnchorSha256": "add15f33bc29784c18b083cb16d17e43d30e243d94c83727053bac81bf34af8e",
+            "qualifiedPartPath": "harmonic-analyzer/frame/tube-frame-2",
+            "historicalCorrespondenceEvidence": "Held-out centre is independently measured between actual chrome tube silhouette edges at casting seam in intro source. Tube2 is image-left/+X; tube4 is image-right/-X. Uses authoritative CAD seam level, not an optical-flow corner or projected pixel.",
+            "qualification": "Native local feature association only; source-first-surface, fitted camera, GPU and stages unmeasured.",
+            "historicalNodeIndex": 164,
+            "currentNodeIndex": 273,
+            "historicalWorldMatrix": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.19699999690055847,
+              0.02539999969303608,
+              -0.1120000034570694,
+              1.0
+            ],
+            "currentWorldMatrix": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.19699999690055847,
+              0.02539999969303608,
+              -0.1120000034570694,
+              1.0
+            ],
+            "worldFrameUnchanged": true,
+            "historicalPrimitiveSha256": "9cb2a6ad805c91a8078ecb9bb426eeb8d2deea0aff11eb76c0bd2cc553f771dd",
+            "currentPrimitiveSha256": "8669101648670347276a191055b34f570b1ed0bf4df8fa7cc1af3e59c2f3626d",
+            "primitives": [
+              {
+                "mode": 4,
+                "attributes": {
+                  "NORMAL": {
+                    "componentType": 5126,
+                    "type": "VEC3",
+                    "count": 1248,
+                    "normalized": false,
+                    "typedBytesSha256": "c3fe718332828f9b450cd282bc8a7a6b304b75bb2a27bae5b43e15930d8f3344"
+                  },
+                  "POSITION": {
+                    "componentType": 5126,
+                    "type": "VEC3",
+                    "count": 1248,
+                    "normalized": false,
+                    "typedBytesSha256": "171d44f2ffff411bd765024b59e241a7efab59460fb0c82df8d1c733d45a45b8"
+                  }
+                },
+                "indices": {
+                  "componentType": 5125,
+                  "type": "SCALAR",
+                  "count": 2772,
+                  "normalized": false,
+                  "typedBytesSha256": "27e7e6568dbddeabf30327925a6852f0bd24216db6070e0ee975b2c4e100d628"
+                },
+                "material": {
+                  "name": "color",
+                  "pbrMetallicRoughness": {
+                    "baseColorFactor": [
+                      0.6470588445663452,
+                      0.6392157077789307,
+                      0.6274510025978088,
+                      1.0
+                    ],
+                    "metallicFactor": 0.0,
+                    "roughnessFactor": 0.20000000298023224
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "proof": {
+        "method": "exact-original-native-local-feature-v1",
+        "historicalSource": {
+          "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+          "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+        },
+        "currentSource": {
+          "sha256": "60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c",
+          "sourceCommit": "81539e53f5146c06a77541415bd79da673806d96"
+        },
+        "historicalAnchorSha256": "add15f33bc29784c18b083cb16d17e43d30e243d94c83727053bac81bf34af8e",
+        "qualifiedPartPath": "harmonic-analyzer/frame/tube-frame-2",
+        "historicalCorrespondenceEvidence": "Held-out centre is independently measured between actual chrome tube silhouette edges at casting seam in intro source. Tube2 is image-left/+X; tube4 is image-right/-X. Uses authoritative CAD seam level, not an optical-flow corner or projected pixel.",
+        "qualification": "Native local feature association only; source-first-surface, fitted camera, GPU and stages unmeasured.",
+        "historicalNodeIndex": 164,
+        "currentNodeIndex": 273,
+        "historicalWorldMatrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.19699999690055847,
+          0.02539999969303608,
+          -0.1120000034570694,
+          1.0
+        ],
+        "currentWorldMatrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.19699999690055847,
+          0.02539999969303608,
+          -0.1120000034570694,
+          1.0
+        ],
+        "worldFrameUnchanged": true,
+        "historicalPrimitiveSha256": "9cb2a6ad805c91a8078ecb9bb426eeb8d2deea0aff11eb76c0bd2cc553f771dd",
+        "currentPrimitiveSha256": "8669101648670347276a191055b34f570b1ed0bf4df8fa7cc1af3e59c2f3626d",
+        "primitives": [
+          {
+            "mode": 4,
+            "attributes": {
+              "NORMAL": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 1248,
+                "normalized": false,
+                "typedBytesSha256": "c3fe718332828f9b450cd282bc8a7a6b304b75bb2a27bae5b43e15930d8f3344"
+              },
+              "POSITION": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 1248,
+                "normalized": false,
+                "typedBytesSha256": "171d44f2ffff411bd765024b59e241a7efab59460fb0c82df8d1c733d45a45b8"
+              }
+            },
+            "indices": {
+              "componentType": 5125,
+              "type": "SCALAR",
+              "count": 2772,
+              "normalized": false,
+              "typedBytesSha256": "27e7e6568dbddeabf30327925a6852f0bd24216db6070e0ee975b2c4e100d628"
+            },
+            "material": {
+              "name": "color",
+              "pbrMetallicRoughness": {
+                "baseColorFactor": [
+                  0.6470588445663452,
+                  0.6392157077789307,
+                  0.6274510025978088,
+                  1.0
+                ],
+                "metallicFactor": 0.0,
+                "roughnessFactor": 0.20000000298023224
+              }
+            }
+          }
+        ]
+      },
+      "reason": "Original typed primitive attributes, indices or material role changed; feature requires fresh primary mapping"
+    },
+    {
+      "anchorId": "tube2.base",
+      "status": "unavailable",
+      "anchor": {
+        "id": "tube2.base",
+        "kind": "section-center",
+        "description": "Front tube axis at base casting seam",
+        "nativeAssociation": {
+          "status": "unavailable",
+          "reason": "Original typed primitive attributes, indices or material role changed; feature requires fresh primary mapping",
+          "proof": {
+            "method": "exact-original-native-local-feature-v1",
+            "historicalSource": {
+              "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+              "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+            },
+            "currentSource": {
+              "sha256": "60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c",
+              "sourceCommit": "81539e53f5146c06a77541415bd79da673806d96"
+            },
+            "historicalAnchorSha256": "cabe05c5bd7c0e82ce0a128bda282182f95a7c037ac646ea0f86f8d7a527a20c",
+            "qualifiedPartPath": "harmonic-analyzer/frame/tube-frame-2",
+            "historicalCorrespondenceEvidence": "Held-out centre is independently measured between actual chrome tube silhouette edges at casting seam in intro source. Tube2 is image-left/+X; tube4 is image-right/-X. Uses authoritative CAD seam level, not an optical-flow corner or projected pixel.",
+            "qualification": "Native local feature association only; source-first-surface, fitted camera, GPU and stages unmeasured.",
+            "historicalNodeIndex": 164,
+            "currentNodeIndex": 273,
+            "historicalWorldMatrix": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.19699999690055847,
+              0.02539999969303608,
+              -0.1120000034570694,
+              1.0
+            ],
+            "currentWorldMatrix": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.19699999690055847,
+              0.02539999969303608,
+              -0.1120000034570694,
+              1.0
+            ],
+            "worldFrameUnchanged": true,
+            "historicalPrimitiveSha256": "9cb2a6ad805c91a8078ecb9bb426eeb8d2deea0aff11eb76c0bd2cc553f771dd",
+            "currentPrimitiveSha256": "8669101648670347276a191055b34f570b1ed0bf4df8fa7cc1af3e59c2f3626d",
+            "primitives": [
+              {
+                "mode": 4,
+                "attributes": {
+                  "NORMAL": {
+                    "componentType": 5126,
+                    "type": "VEC3",
+                    "count": 1248,
+                    "normalized": false,
+                    "typedBytesSha256": "c3fe718332828f9b450cd282bc8a7a6b304b75bb2a27bae5b43e15930d8f3344"
+                  },
+                  "POSITION": {
+                    "componentType": 5126,
+                    "type": "VEC3",
+                    "count": 1248,
+                    "normalized": false,
+                    "typedBytesSha256": "171d44f2ffff411bd765024b59e241a7efab59460fb0c82df8d1c733d45a45b8"
+                  }
+                },
+                "indices": {
+                  "componentType": 5125,
+                  "type": "SCALAR",
+                  "count": 2772,
+                  "normalized": false,
+                  "typedBytesSha256": "27e7e6568dbddeabf30327925a6852f0bd24216db6070e0ee975b2c4e100d628"
+                },
+                "material": {
+                  "name": "color",
+                  "pbrMetallicRoughness": {
+                    "baseColorFactor": [
+                      0.6470588445663452,
+                      0.6392157077789307,
+                      0.6274510025978088,
+                      1.0
+                    ],
+                    "metallicFactor": 0.0,
+                    "roughnessFactor": 0.20000000298023224
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "proof": {
+        "method": "exact-original-native-local-feature-v1",
+        "historicalSource": {
+          "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+          "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+        },
+        "currentSource": {
+          "sha256": "60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c",
+          "sourceCommit": "81539e53f5146c06a77541415bd79da673806d96"
+        },
+        "historicalAnchorSha256": "cabe05c5bd7c0e82ce0a128bda282182f95a7c037ac646ea0f86f8d7a527a20c",
+        "qualifiedPartPath": "harmonic-analyzer/frame/tube-frame-2",
+        "historicalCorrespondenceEvidence": "Held-out centre is independently measured between actual chrome tube silhouette edges at casting seam in intro source. Tube2 is image-left/+X; tube4 is image-right/-X. Uses authoritative CAD seam level, not an optical-flow corner or projected pixel.",
+        "qualification": "Native local feature association only; source-first-surface, fitted camera, GPU and stages unmeasured.",
+        "historicalNodeIndex": 164,
+        "currentNodeIndex": 273,
+        "historicalWorldMatrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.19699999690055847,
+          0.02539999969303608,
+          -0.1120000034570694,
+          1.0
+        ],
+        "currentWorldMatrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.19699999690055847,
+          0.02539999969303608,
+          -0.1120000034570694,
+          1.0
+        ],
+        "worldFrameUnchanged": true,
+        "historicalPrimitiveSha256": "9cb2a6ad805c91a8078ecb9bb426eeb8d2deea0aff11eb76c0bd2cc553f771dd",
+        "currentPrimitiveSha256": "8669101648670347276a191055b34f570b1ed0bf4df8fa7cc1af3e59c2f3626d",
+        "primitives": [
+          {
+            "mode": 4,
+            "attributes": {
+              "NORMAL": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 1248,
+                "normalized": false,
+                "typedBytesSha256": "c3fe718332828f9b450cd282bc8a7a6b304b75bb2a27bae5b43e15930d8f3344"
+              },
+              "POSITION": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 1248,
+                "normalized": false,
+                "typedBytesSha256": "171d44f2ffff411bd765024b59e241a7efab59460fb0c82df8d1c733d45a45b8"
+              }
+            },
+            "indices": {
+              "componentType": 5125,
+              "type": "SCALAR",
+              "count": 2772,
+              "normalized": false,
+              "typedBytesSha256": "27e7e6568dbddeabf30327925a6852f0bd24216db6070e0ee975b2c4e100d628"
+            },
+            "material": {
+              "name": "color",
+              "pbrMetallicRoughness": {
+                "baseColorFactor": [
+                  0.6470588445663452,
+                  0.6392157077789307,
+                  0.6274510025978088,
+                  1.0
+                ],
+                "metallicFactor": 0.0,
+                "roughnessFactor": 0.20000000298023224
+              }
+            }
+          }
+        ]
+      },
+      "reason": "Original typed primitive attributes, indices or material role changed; feature requires fresh primary mapping"
+    },
+    {
+      "anchorId": "tube4.top",
+      "status": "unavailable",
+      "anchor": {
+        "id": "tube4.top",
+        "kind": "section-center",
+        "description": "Front tube axis at top casting seam",
+        "nativeAssociation": {
+          "status": "unavailable",
+          "reason": "Original typed primitive attributes, indices or material role changed; feature requires fresh primary mapping",
+          "proof": {
+            "method": "exact-original-native-local-feature-v1",
+            "historicalSource": {
+              "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+              "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+            },
+            "currentSource": {
+              "sha256": "60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c",
+              "sourceCommit": "81539e53f5146c06a77541415bd79da673806d96"
+            },
+            "historicalAnchorSha256": "8183369765ea49f826e41c7c5fd4fadcad8a06160d0346a5303058a9b87d6253",
+            "qualifiedPartPath": "harmonic-analyzer/frame/tube-frame-4",
+            "historicalCorrespondenceEvidence": "Held-out centre is independently measured between actual chrome tube silhouette edges at casting seam in intro source. Tube2 is image-left/+X; tube4 is image-right/-X. Uses authoritative CAD seam level, not an optical-flow corner or projected pixel.",
+            "qualification": "Native local feature association only; source-first-surface, fitted camera, GPU and stages unmeasured.",
+            "historicalNodeIndex": 161,
+            "currentNodeIndex": 274,
+            "historicalWorldMatrix": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              -0.19699999690055847,
+              0.02539999969303608,
+              -0.1120000034570694,
+              1.0
+            ],
+            "currentWorldMatrix": [
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              -0.19699999690055847,
+              0.02539999969303608,
+              -0.1120000034570694,
+              1.0
+            ],
+            "worldFrameUnchanged": true,
+            "historicalPrimitiveSha256": "9cb2a6ad805c91a8078ecb9bb426eeb8d2deea0aff11eb76c0bd2cc553f771dd",
+            "currentPrimitiveSha256": "8669101648670347276a191055b34f570b1ed0bf4df8fa7cc1af3e59c2f3626d",
+            "primitives": [
+              {
+                "mode": 4,
+                "attributes": {
+                  "NORMAL": {
+                    "componentType": 5126,
+                    "type": "VEC3",
+                    "count": 1248,
+                    "normalized": false,
+                    "typedBytesSha256": "c3fe718332828f9b450cd282bc8a7a6b304b75bb2a27bae5b43e15930d8f3344"
+                  },
+                  "POSITION": {
+                    "componentType": 5126,
+                    "type": "VEC3",
+                    "count": 1248,
+                    "normalized": false,
+                    "typedBytesSha256": "171d44f2ffff411bd765024b59e241a7efab59460fb0c82df8d1c733d45a45b8"
+                  }
+                },
+                "indices": {
+                  "componentType": 5125,
+                  "type": "SCALAR",
+                  "count": 2772,
+                  "normalized": false,
+                  "typedBytesSha256": "27e7e6568dbddeabf30327925a6852f0bd24216db6070e0ee975b2c4e100d628"
+                },
+                "material": {
+                  "name": "color",
+                  "pbrMetallicRoughness": {
+                    "baseColorFactor": [
+                      0.6470588445663452,
+                      0.6392157077789307,
+                      0.6274510025978088,
+                      1.0
+                    ],
+                    "metallicFactor": 0.0,
+                    "roughnessFactor": 0.20000000298023224
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "proof": {
+        "method": "exact-original-native-local-feature-v1",
+        "historicalSource": {
+          "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+          "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+        },
+        "currentSource": {
+          "sha256": "60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c",
+          "sourceCommit": "81539e53f5146c06a77541415bd79da673806d96"
+        },
+        "historicalAnchorSha256": "8183369765ea49f826e41c7c5fd4fadcad8a06160d0346a5303058a9b87d6253",
+        "qualifiedPartPath": "harmonic-analyzer/frame/tube-frame-4",
+        "historicalCorrespondenceEvidence": "Held-out centre is independently measured between actual chrome tube silhouette edges at casting seam in intro source. Tube2 is image-left/+X; tube4 is image-right/-X. Uses authoritative CAD seam level, not an optical-flow corner or projected pixel.",
+        "qualification": "Native local feature association only; source-first-surface, fitted camera, GPU and stages unmeasured.",
+        "historicalNodeIndex": 161,
+        "currentNodeIndex": 274,
+        "historicalWorldMatrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          -0.19699999690055847,
+          0.02539999969303608,
+          -0.1120000034570694,
+          1.0
+        ],
+        "currentWorldMatrix": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          -0.19699999690055847,
+          0.02539999969303608,
+          -0.1120000034570694,
+          1.0
+        ],
+        "worldFrameUnchanged": true,
+        "historicalPrimitiveSha256": "9cb2a6ad805c91a8078ecb9bb426eeb8d2deea0aff11eb76c0bd2cc553f771dd",
+        "currentPrimitiveSha256": "8669101648670347276a191055b34f570b1ed0bf4df8fa7cc1af3e59c2f3626d",
+        "primitives": [
+          {
+            "mode": 4,
+            "attributes": {
+              "NORMAL": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 1248,
+                "normalized": false,
+                "typedBytesSha256": "c3fe718332828f9b450cd282bc8a7a6b304b75bb2a27bae5b43e15930d8f3344"
+              },
+              "POSITION": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 1248,
+                "normalized": false,
+                "typedBytesSha256": "171d44f2ffff411bd765024b59e241a7efab59460fb0c82df8d1c733d45a45b8"
+              }
+            },
+            "indices": {
+              "componentType": 5125,
+              "type": "SCALAR",
+              "count": 2772,
+              "normalized": false,
+              "typedBytesSha256": "27e7e6568dbddeabf30327925a6852f0bd24216db6070e0ee975b2c4e100d628"
+            },
+            "material": {
+              "name": "color",
+              "pbrMetallicRoughness": {
+                "baseColorFactor": [
+                  0.6470588445663452,
+                  0.6392157077789307,
+                  0.6274510025978088,
+                  1.0
+                ],
+                "metallicFactor": 0.0,
+                "roughnessFactor": 0.20000000298023224
+              }
+            }
+          }
+        ]
+      },
+      "reason": "Original typed primitive attributes, indices or material role changed; feature requires fresh primary mapping"
+    }
+  ],
+  "calibrationEligibility": {
+    "eligible": null,
+    "status": "unmeasured",
+    "declaredFitPoints": 7,
+    "declaredCheckPoints": 7,
+    "mappedNativeSupportCount": 3,
+    "unavailableNativeSupport": [
+      {
+        "anchorId": "frame-cross-screw-6",
+        "reason": "Original typed primitive attributes, indices or material role changed; feature requires fresh primary mapping"
+      },
+      {
+        "anchorId": "frame-cross-screw-5",
+        "reason": "Original typed primitive attributes, indices or material role changed; feature requires fresh primary mapping"
+      },
+      {
+        "anchorId": "frame-cross-screw-2",
+        "reason": "Original typed primitive attributes, indices or material role changed; feature requires fresh primary mapping"
+      },
+      {
+        "anchorId": "frame-cross-screw-1",
+        "reason": "Original typed primitive attributes, indices or material role changed; feature requires fresh primary mapping"
+      },
+      {
+        "anchorId": "crank.axis",
+        "reason": "Original typed primitive attributes, indices or material role changed; feature requires fresh primary mapping"
+      },
+      {
+        "anchorId": "transgear.stub.front",
+        "reason": "Exact original qualified native body is absent; no alias or replacement feature is inferred"
+      },
+      {
+        "anchorId": "transgear.knob.axis",
+        "reason": "Original typed primitive attributes, indices or material role changed; feature requires fresh primary mapping"
+      },
+      {
+        "anchorId": "cylinder.shaft.front",
+        "reason": "Original typed primitive attributes, indices or material role changed; feature requires fresh primary mapping"
+      },
+      {
+        "anchorId": "tube2.top",
+        "reason": "Original typed primitive attributes, indices or material role changed; feature requires fresh primary mapping"
+      },
+      {
+        "anchorId": "tube2.base",
+        "reason": "Original typed primitive attributes, indices or material role changed; feature requires fresh primary mapping"
+      },
+      {
+        "anchorId": "tube4.top",
+        "reason": "Original typed primitive attributes, indices or material role changed; feature requires fresh primary mapping"
+      }
+    ],
+    "reason": "Fresh complete current input/world arrays, native distinct support, positive depth/first surface and source camera eligibility remain required. Old RAW-rest eligibility is not transferred.",
+    "qualification": "Original source facts plus separately proven narrow native associations and chosen/unobserved current inputs/framing. Native station/setup ownership is checked, not current posed mechanism feasibility, fitted-camera transfer, source-first-surface, all21-stock numeric/GPU, geometry/raster or 50/20/10/5-percent stage acceptance."
+  },
+  "nativeGeometryScope": "Exact same-path unchanged local-feature association in current authored rest frames only; no chosen-input pose or current source eligibility.",
+  "historicalLineage": [
+    {
+      "path": "web/content/NAsM30MAHLg.static-camera-seeds.json",
+      "sha256": "0151b3effea0bcc2e0620605b313708019d3ac6168d6d2fc1c5b83fc8325e62a",
+      "scope": "immutable historical input; not current native qualification"
+    }
+  ],
+  "historicalInput": null,
+  "currentCompleteNativeInput": null,
+  "cameraApplication": "none; old RAW-rest static CPU camera is historical diagnostics only, never current fitted/framing authority",
+  "sourceAcceptance": false,
+  "GPUAcceptance": false,
+  "qualification": "Original source facts plus separately proven narrow native associations and chosen/unobserved current inputs/framing. Native station/setup ownership is checked, not current posed mechanism feasibility, fitted-camera transfer, source-first-surface, all21-stock numeric/GPU, geometry/raster or 50/20/10/5-percent stage acceptance."
+}
