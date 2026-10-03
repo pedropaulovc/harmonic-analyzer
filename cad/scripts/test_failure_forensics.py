@@ -969,7 +969,7 @@ def test_empty_properties_on_a_loaded_source_name_the_document_api_and_seat(
     monkeypatch.setattr(_common, "_early_bound", lambda obj, _iface: obj)
     monkeypatch.setattr(_seat_forensics, "_process_started_at", lambda pid: time.time() - 21.8)
     _seat_forensics.record_seat_provenance(_Adapter(sw=_StartingSeat([True], pid=15124)))
-    part = _SourcePart({"Number": "MHA-104"}, loading_reads=0)
+    part = _SourcePart({"Number": "MHA-DT-023"}, loading_reads=0)
 
     with pytest.raises(
         RuntimeError,
@@ -992,7 +992,7 @@ def test_empty_properties_on_a_loaded_source_name_the_document_api_and_seat(
     assert capture["file_properties"]["names"] == ["Number"]
     assert capture["file_properties"]["get6"]["Finish"]["result"] == "NotPresent"
     assert capture["file_properties"]["get6"]["Number"] == {
-        "result": "CachedValue", "value": "MHA-104", "resolved": "MHA-104",
+        "result": "CachedValue", "value": "MHA-DT-023", "resolved": "MHA-DT-023",
     }
 
 
@@ -1081,8 +1081,8 @@ def test_px_per_mm_is_measured_and_yields_a_snap_floor(tmp_path, monkeypatch):
         _seat_forensics, "_frame_geometry",
         lambda adapter: {
             "frame_hwnd": 0x1234,
-            "frame_left": 0,
-            "frame_top": 0,
+            "fr-frame_left": 0,
+            "fr-frame_top": 0,
             "frame_width_px": 2000,
             "frame_height_px": 1200,
             "frame_area_px": 2_400_000,
@@ -1137,7 +1137,7 @@ def test_the_main_window_rect_is_recorded_as_comparable_integers(tmp_path):
     assert geometry["frame_width_px"] == 1024
     assert geometry["frame_height_px"] == 640
     assert geometry["frame_area_px"] == 1024 * 640
-    assert (geometry["frame_left"], geometry["frame_top"]) == (12, 34)
+    assert (geometry["fr-frame_left"], geometry["fr-frame_top"]) == (12, 34)
     assert geometry["frame_client_width_px"] == 1008
     assert geometry["frame_state"] == "normal"
     # The comparison the investigation had to do by hand, now arithmetic:
@@ -1843,15 +1843,15 @@ def test_a_failure_that_captured_nothing_says_so(dodo_failures, capture_telemetr
     leaves ``failures/`` empty. Emitting no line at all made that
     indistinguishable from a capture path that never ran, and the submitter's
     message still advertised a ``failures/*`` download -- which fetched zero
-    blobs on ``part:pen_set_screw`` in the 2026-09-18 gate build. The absence
+    blobs on ``part:vn_pen_set_screw`` in the 2026-09-18 gate build. The absence
     has to be STATED, because it is the thing the download instruction is
     conditional on.
     """
     dodo = dodo_failures
     _spans, logs = capture_telemetry
 
-    with pytest.raises(RuntimeError, match=r"^part:pen_set_screw failed \(exit 1\)$"):
-        dodo._fail_task("part:pen_set_screw", 1, started=0.0)
+    with pytest.raises(RuntimeError, match=r"^part:vn_pen_set_screw failed \(exit 1\)$"):
+        dodo._fail_task("part:vn_pen_set_screw", 1, started=0.0)
 
     (record,) = [
         r.log_record
@@ -2193,7 +2193,7 @@ class _RebuildAdapter(_Adapter):
 def test_a_refused_rebuild_names_its_features_captures_and_raises(
     tmp_path, monkeypatch, capture_telemetry
 ):
-    """part:crank_pinion failed five times with only "Failed to rebuild model".
+    """part:dt_crank_pinion failed five times with only "Failed to rebuild model".
     The refusal now carries What's Wrong on the rebuild span, and the full
     capture (session messages included) lands before the unchanged raise."""
     import asyncio
@@ -2363,7 +2363,7 @@ def test_a_service_session_is_not_labelled_as_a_disconnected_interactive_desktop
 def test_a_missed_coordinate_pick_names_its_window_and_keeps_its_message(
     capture_telemetry, monkeypatch
 ):
-    """drawing:pinion_arbor key 870279bc missed a point dead on the Ø8 flank
+    """drawing:dt_pinion_arbor key 870279bc missed a point dead on the Ø8 flank
     on swmaker00000a@10 and hit it on swmaker000004@4; neither leaf said what
     window the hit test ran in."""
     spans, logs = capture_telemetry
@@ -2458,7 +2458,7 @@ def test_a_retried_pivot_bore_pick_can_succeed_without_an_error_log(
 ):
     import math
     import _drawing_common
-    import draw_rocker_arm
+    import draw_ch_rocker_arm
 
     bore = object()
 
@@ -2499,13 +2499,13 @@ def test_a_retried_pivot_bore_pick_can_succeed_without_an_error_log(
     monkeypatch.setattr(_drawing_common, "view_name", lambda adapter, view: "Drawing View2")
     monkeypatch.setattr(_seat_forensics, "_frame_geometry", lambda adapter: {})
     with _telemetry.span("drawing.pivot_datum"):
-        xy = draw_rocker_arm._pick_pivot_bore(
+        xy = draw_ch_rocker_arm._pick_pivot_bore(
             _Adapter(sw=_PickSeat(), model=drawing), _SheetView(), bore, centre
         )
     picked_xy = [args[2:4] for args in drawing.picks]
     assert [
-        math.dist(point, centre) / draw_rocker_arm.PIVOT_BORE_SHEET_R for point in picked_xy
-    ] == pytest.approx(draw_rocker_arm.PIVOT_PICK_FRACTIONS)
+        math.dist(point, centre) / draw_ch_rocker_arm.PIVOT_BORE_SHEET_R for point in picked_xy
+    ] == pytest.approx(draw_ch_rocker_arm.PIVOT_PICK_FRACTIONS)
     assert xy == picked_xy[-1]
     events = [e for s in spans.get_finished_spans() for e in s.events]
     (miss,) = [e for e in events if e.name == "drawing.pick_miss"]

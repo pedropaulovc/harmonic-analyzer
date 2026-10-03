@@ -162,7 +162,7 @@ def harness(monkeypatch, tmp_path):
         ),
         swApp=SimpleNamespace(IsSame=same),
     )
-    state.source_path = tmp_path / "rack-pinion.SLDPRT"
+    state.source_path = tmp_path / "pd-rack-pinion.SLDPRT"
     state.source_path.write_bytes(b"offline source identity fixture")
     state.reference = SimpleNamespace(
         Extension=SimpleNamespace(GetCorrespondingEntity2=lambda _edge: canonical_edge),

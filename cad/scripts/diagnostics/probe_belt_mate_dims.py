@@ -11,7 +11,7 @@ spike DUMPS the candidates on the built model, read-only, never saving:
     and each sketch's display dimensions -- the path's pulley circles may carry
     the diameters as writable dims.
 
-Run (SolidWorks already open, paper-drive.SLDASM built)::
+Run (SolidWorks already open, pd-paper-drive.SLDASM built)::
 
     uv run python cad/scripts/diagnostics/probe_belt_mate_dims.py
 """
@@ -87,7 +87,7 @@ def _dump(adapter: Any) -> None:
 
 
 async def build(adapter: Any) -> dict[str, str]:
-    asm = OUT_SLDASM / "paper-drive.SLDASM"
+    asm = OUT_SLDASM / "pd-paper-drive.SLDASM"
     check("open paper-drive", await adapter.open_model(str(asm)))
     try:
         adapter._handle_com_operation("belt_mate_dump", lambda: _dump(adapter))

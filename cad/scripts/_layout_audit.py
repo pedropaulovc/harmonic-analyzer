@@ -2,8 +2,8 @@
 
 Every manufacturing drawing runs this from ``_drawing_common.finalize_drawing``
 on every sheet. It replaces three partial audits that each missed real
-collisions (2026-09-25: MHA-092's "20.8"/"8.42" and "Ø3.26 ⊽ 6.9"/"6.0" text
-runs, ADJUSTER ENTRY crossed by a view edge; MHA-035's datum-origin axis
+collisions (2026-09-25: MHA-DT-021's "20.8"/"8.42" and "Ø3.26 ⊽ 6.9"/"6.0" text
+runs, ADJUSTER ENTRY crossed by a view edge; MHA-FR-001's datum-origin axis
 through a callout and a leader through "TOP VIEW SCALE 1:4"):
 
 * ``_drawing_layout_check`` boxed every dimension as a +/-4 mm square with no
@@ -107,7 +107,7 @@ class FindingSeverity(Enum):
 
 # Near-contact clearance between the text of two DISTINCT annotations, as a
 # fraction of the smaller text height. Rule 8 requires visible air: two runs
-# closer than a word space read as ONE string. Measured on MHA-092's own PDF
+# closer than a word space read as ONE string. Measured on MHA-DT-021's own PDF
 # (tight pdfium glyph boxes, 3.5 mm text): the word space in "SLOT DEPTH" is
 # 1.77 mm (0.51 h), while "20.8" and "8.42" -- which print as "20.88.42" --
 # are 0.64 mm apart. A penetration test (the old 0.3 mm) passes that pair.
@@ -1388,7 +1388,7 @@ def display_box(display: Mapping[str, Any], *, advance: float = DEFAULT_ADVANCE_
     run from its lower-left along its baseline, its cap height tall and as
     wide as SolidWorks reports (``w``). A run with no reported width is
     ESTIMATED at ``advance`` per glyph (``estimated_text_runs`` counts them):
-    MHA-062's "BOTH CROWNS" reported 34.1 mm, where the estimate made 23.1.
+    MHA-DT-019's "BOTH CROWNS" reported 34.1 mm, where the estimate made 23.1.
     ``None`` when the display data draws nothing.
     """
     boxes = [
@@ -2658,7 +2658,7 @@ def find_lines_through_own_text(
     """A dimension's own extension or dimension line struck through its own text.
 
     ``text-on-line`` skips an annotation's own ink, so text parked across its
-    own witness line went unreported: MHA-014's "10.781", pushed outside its
+    own witness line went unreported: MHA-DT-004's "10.781", pushed outside its
     extension lines, printed with the collar-face witness through "0" and "7"
     (conegear, #916 388d1e3fb). Its own dimension line through its text had
     no finder either (Main's gate-gap sweep). The rows are shrunk by
@@ -2759,13 +2759,13 @@ def find_leader_across_lines(sheet: SheetGeometry) -> list[Finding]:
     dimension/witness line.
 
     Rule 8: no leader crosses a dimension line. A callout's shoulder is its
-    leader's last run under the text: MHA-092's 5.56 heel-height line crossed
+    leader's last run under the text: MHA-DT-021's 5.56 heel-height line crossed
     the ADJUSTER callout's shoulder (swing's gap diff, class d). Touches (a
     leader landing ON a line) are not crossings -- see
     ``_drawing_layout_check._proper_crossing``.
 
     Targets are dimension, extension and frame lines (Main's ruling a) and
-    section cutting lines (``leader-crosses-section-line``, gating: the MHA-025
+    section cutting lines (``leader-crosses-section-line``, gating: the MHA-DT-010
     finish leader was moved off its A-A line for this). A detail circle is no
     target: a leader to a feature inside it must cross it. A crossing on the
     stretch a leader runs past its arrow tip is inside the feature it points
@@ -3426,7 +3426,7 @@ def _near_foreign_text(
 def find_arrows_near_text(sheet: SheetGeometry, *, clearance: float = ARROW_TEXT_CLEARANCE_M) -> list[Finding]:
     """An arrowhead, or an outside arrow's tail, nearer than ``clearance`` to
     another annotation's text: gating, the fleet's arrow-to-text rule. That
-    close the arrow reads as part of the text (MHA-092 round 2: the 15.2's
+    close the arrow reads as part of the text (MHA-DT-021 round 2: the 15.2's
     tail 0.2 mm over ADJUSTER ENTRY, the 10.7's arrow inside the 3.97's
     tolerance stack)."""
     sources = [
@@ -3523,7 +3523,7 @@ def find_text_on_view(
 ) -> list[Finding]:
     """Text printed over a view its annotation does not belong to.
 
-    MHA-092's adjuster callout, owned by the front view, printed across the
+    MHA-DT-021's adjuster callout, owned by the front view, printed across the
     right view's face (swing's gap diff). Text-on-line only sees text that
     touches an edge; text sitting INSIDE a foreign view, between its edges, is
     just as wrong (policy rule 8). The outline is ``GetOutline``'s padded box,
@@ -3637,6 +3637,97 @@ def find_read_errors(dump: Mapping[str, Any]) -> list[Finding]:
             extra={"read_errors": dict(errors)},
         )
     ]
+
+
+# Air between a title-block value's printed glyphs and every rule of its cell
+# (``DrawingTemplateSpec.title_cells_m``): a rule's half width plus visible
+# paper. On the v39 release the tightest value sat 1.67 mm off a rule
+# (cone-gear's PART descender over the DWG. NO. rule); the widest DWG. NO.,
+# MHA-013-T006, ended 21.6 mm short of the REV rule.
+TITLE_FIELD_CLEARANCE_M = 0.00025
+
+
+@dataclass(frozen=True)
+class TitleFieldFit:
+    """One title-block identity value as the sheet printed it.
+
+    ``printed`` is the glyph box of the one PDF text object that prints the
+    WHOLE value -- None when no single object does (blank, cut, or wrapped
+    onto a second line, which SolidWorks writes as a second text object).
+    ``clearance`` is that box's least distance inside the cell's rules,
+    negative where it crosses one, ``-inf`` when nothing printed it.
+    """
+
+    source: str
+    text: str
+    cell: Box
+    printed: Box | None
+    clearance: float
+
+
+def title_field_fits(dump: Mapping[str, Any]) -> list[TitleFieldFit]:
+    """Every ``title_fields`` value the collector recorded, measured on the
+    page's ink. A dump from before the collector recorded them has none."""
+    spans = ink_spans(dump)
+    fits = []
+    for field in dump.get("title_fields") or ():
+        text = str(field["text"])
+        cell = Box(*_floats(field["cell"])[:4])
+        key = ink_key(text)
+        printed, clearance = None, -math.inf
+        for span in spans:
+            if not key or span.key != key:
+                continue
+            box = span.box
+            inside = min(box.xmin - cell.xmin, cell.xmax - box.xmax, box.ymin - cell.ymin, cell.ymax - box.ymax)
+            # The same string elsewhere on the sheet (a BOM row) is farther
+            # outside the cell than the title block's own value.
+            if inside > clearance:
+                printed, clearance = box, inside
+        fits.append(TitleFieldFit(str(field["source"]), text, cell, printed, clearance))
+    return fits
+
+
+def find_title_field_misfits(
+    dump: Mapping[str, Any], *, clearance: float = TITLE_FIELD_CLEARANCE_M
+) -> list[Finding]:
+    """A title-block identity value (DWG. NO. ``Number``, PART ``Title``) not
+    printed whole on one line inside its ruled cell. The template note wraps
+    at its authored width and a wrapped line lands on the next cell's
+    caption; nothing may shorten or shrink the identity to fit, so the fix is
+    the template's cell, never the string."""
+    sheet = str(dump.get("sheet", ""))
+    spans = ink_spans(dump)
+    findings = []
+    for fit in title_field_fits(dump):
+        if fit.printed is not None and fit.clearance >= clearance:
+            continue
+        if fit.printed is None:
+            pieces = [span.key for span in spans if span.box.overlaps(fit.cell, tol=0.0) is not None]
+            detail = (
+                f"{fit.source} {fit.text!r} is not printed whole on one line in its cell "
+                f"{fit.cell.format_mm()}; the cell prints {pieces!r}"
+            )
+            where = fit.cell
+        else:
+            detail = (
+                f"{fit.source} {fit.text!r} prints {fit.printed.format_mm()}, "
+                f"{fit.clearance * MM:.2f} mm inside its cell {fit.cell.format_mm()} "
+                f"(needs {clearance * MM:.2f} mm)"
+            )
+            where = fit.printed
+        findings.append(
+            Finding(
+                kind="title-field-misfit",
+                sheet=sheet,
+                a=f"title {fit.source}",
+                b="",
+                detail=detail,
+                at_mm=tuple(value * MM for value in where.center()),
+                extra={} if fit.printed is None else {"clearance_mm": round(fit.clearance * MM, 3)},
+            )
+        )
+    return findings
 
 
 def find_duplicate_annotations(
@@ -3759,6 +3850,7 @@ GATING_KINDS = frozenset(
         "merged-blocks",
         "tall-block",
         "text-on-view",
+        "title-field-misfit",
     }
 )
 
@@ -3792,20 +3884,25 @@ ENFORCED_KINDS: frozenset[str] = frozenset(
         "line-through-own-text",
         "merged-blocks",
         "shoulder-crosses-line",
+        # No fleet count: enforced from its first build. finalize_drawing
+        # already refused any sheet whose identity notes' INote extents miss
+        # their cells (_drawing_title_fields), so on a sheet that reaches the
+        # audit this fires only where the print disagrees with those extents.
+        "title-field-misfit",
     }
 )
 # Kinds one drawing enforces under REPORT before the fleet does, because its
 # recipe rests a check on them. frame-assembly's short-leader balloons prove
 # their leader start only on the read right after SetPosition: after the
 # rebuild COM reports the start the fit render left, not the one the PDF
-# draws (draw_frame_assembly._short_frame_balloon). The printed leader is
+# draws (draw_fr_frame_assembly._short_frame_balloon). The printed leader is
 # measured here, so a leader printed from inside its own ring fails the leaf,
 # and so does one whose printed start the page leaves ambiguous.
 # frame-assembly reads zero of both on replay of runs 20260928T124727673Z
 # (swmaker000007), 20260928T141421973Z (swmaker000008) and
 # 20260928T152556482Z (swmaker000004).
 STEM_ENFORCED_KINDS: Mapping[str, frozenset[str]] = MappingProxyType(
-    {"frame-assembly": frozenset({"leader-through-own-text", "leader-ink-ambiguous"})}
+    {"fr-frame-assembly": frozenset({"leader-through-own-text", "leader-ink-ambiguous"})}
 )
 
 
@@ -3873,6 +3970,7 @@ def audit_dump(dump: Mapping[str, Any]) -> list[Finding]:
         *find_unclaimed_text(model),
         *find_edgeless_views(model),
         *find_read_errors(dump),
+        *find_title_field_misfits(dump),
         *find_duplicate_annotations(dump),
         *find_duplicate_thread_callouts(dump, sheet),
         *(f for f in find_text_separation(sheet) if frozenset((f.a, f.b)) not in reported),

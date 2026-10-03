@@ -2,7 +2,7 @@ r"""Generate the base's stamped serial-number artwork (ch26 p.70, page001_img02/
 
 The museum machine carries a hand-stamped "2" on the bright machined top of the
 base rim beside the nameplate. The build imports this DXF onto a plane at the
-rim top (build_harmonic_base.SERIAL_*) and cuts it SERIAL_DEPTH deep, the same
+rim top (build_fr_harmonic_base.SERIAL_*) and cuts it SERIAL_DEPTH deep, the same
 closed-region import the nameplate engraving and the measuring-stick numerals
 use. Coordinates are ABSOLUTE part mm converted into the rim-top Top-sketch
 frame (sketch x = part X, sketch y = -part Z; the Makers seat ignores
@@ -18,7 +18,7 @@ from __future__ import annotations
 import sys
 
 import _dxf_text as dxf
-from build_harmonic_base import (
+from build_fr_harmonic_base import (
     SERIAL_DXF,
     SERIAL_HEIGHT_MM,
     SERIAL_MIRROR_Y,

@@ -53,7 +53,7 @@ from _assembly import (  # noqa: E402
     component_transform,
     place_component,
 )
-from build_channel_assembly import (  # noqa: E402
+from build_ch_channel_assembly import (  # noqa: E402
     ARM_MID_DZ,
     IDENTITY,
     PITCH,
@@ -186,7 +186,7 @@ def _bushing_zs(adapter) -> list[float]:
 async def build(adapter) -> dict[str, str]:
     check("create_assembly", await adapter.create_assembly())
     await place_component(
-        adapter, "pivot-shaft", [PIVOT[0], PIVOT[1], PIVOT_SHAFT_Z],
+        adapter, "ch-pivot-shaft", [PIVOT[0], PIVOT[1], PIVOT_SHAFT_Z],
         [0.0, 0.0, 0.0], IDENTITY, ground=True, label="pivot-shaft (grounded)",
     )
 

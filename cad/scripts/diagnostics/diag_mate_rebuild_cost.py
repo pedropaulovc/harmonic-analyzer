@@ -49,8 +49,8 @@ from _assembly import (  # noqa: E402
 
 # Distance drivers seed their side from channel's flip seeds
 # (cad/config/assemblies/channel.yaml), the assembly this probe mirrors.
-activate_assembly_contract("channel")
-from build_channel_assembly import (  # noqa: E402
+activate_assembly_contract("ch-channel")
+from build_ch_channel_assembly import (  # noqa: E402
     IDENTITY,
     PIVOT,
     PIVOT_BUSHING_OD,
@@ -81,7 +81,7 @@ def _probe_params(comp: str, z_mm: float) -> AddMateParameters:
     probe models (`_seat_bushing_on_shaft`'s axial distance, same
     bushing-Front-Plane <-> assembly-Front-Plane references) goes through
     `distance_driver`, whose signature "pivot bushing axial z" was in the
-    channel flip seeds (now cad/config/assemblies/channel.yaml) -- so a negative station seeds flip=False (codex #219
+    channel flip seeds (now cad/config/assemblies/ch-channel.yaml) -- so a negative station seeds flip=False (codex #219
     round 2). Reusing `_seed_flip` over the same label keeps the probe in
     lockstep with the polarity table instead of shadowing it.
     """
@@ -188,7 +188,7 @@ async def _grow_seated(adapter, count: int) -> None:
 async def build(adapter) -> dict[str, str]:
     check("create_assembly", await adapter.create_assembly())
     await place_component(
-        adapter, "pivot-shaft", [PIVOT[0], PIVOT[1], PIVOT_SHAFT_Z],
+        adapter, "ch-pivot-shaft", [PIVOT[0], PIVOT[1], PIVOT_SHAFT_Z],
         [0.0, 0.0, 0.0], IDENTITY, ground=True, label="pivot-shaft (grounded)",
     )
 

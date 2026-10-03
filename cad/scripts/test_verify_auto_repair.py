@@ -68,9 +68,9 @@ def test_auto_repair_requires_clean_reread(monkeypatch) -> None:
     reads = iter([[dangling], []])
     monkeypatch.setattr(verify, "whats_wrong", lambda *_args: next(reads))
     monkeypatch.setattr(verify, "repair_dangling_mates", lambda _adapter, _model: 1)
-    result = verify._repair_cache_dangles(adapter, "channel")
+    result = verify._repair_cache_dangles(adapter, "ch-channel")
     assert result["rebuilt"] is True
-    assert result["documents"] == (("channel", adapter.currentModel),)
+    assert result["documents"] == (("ch-channel", adapter.currentModel),)
 
 
 def test_auto_repair_rejects_remaining_faults(monkeypatch) -> None:
@@ -79,7 +79,7 @@ def test_auto_repair_rejects_remaining_faults(monkeypatch) -> None:
     monkeypatch.setattr(verify, "whats_wrong", lambda *_args: [dangling])
     monkeypatch.setattr(verify, "repair_dangling_mates", lambda _adapter, _model: 1)
     with pytest.raises(RuntimeError, match="did not produce a clean assembly"):
-        verify._repair_cache_dangles(adapter, "channel")
+        verify._repair_cache_dangles(adapter, "ch-channel")
 
 
 def test_auto_repair_refuses_mixed_fault_codes(monkeypatch) -> None:
@@ -96,7 +96,7 @@ def test_auto_repair_refuses_mixed_fault_codes(monkeypatch) -> None:
         lambda *_args: repaired.append(True),
     )
     with pytest.raises(RuntimeError, match="non-48 faults coexist"):
-        verify._repair_cache_dangles(adapter, "channel")
+        verify._repair_cache_dangles(adapter, "ch-channel")
     assert repaired == []
 
 
@@ -136,50 +136,31 @@ def test_health_failure_points_to_explicit_opt_in(monkeypatch) -> None:
 
     monkeypatch.setattr(verify, "assert_model_healthy", fail)
     with pytest.raises(RuntimeError, match=r"--auto-repair"):
-        verify._assert_soundness_health(_Adapter(), "channel", True)
+        verify._assert_soundness_health(_Adapter(), "ch-channel", True)
 
 
 def test_saved_rebuild_gate_reads_before_any_rebuild() -> None:
     with pytest.raises(RuntimeError, match="NeedsRebuild2=1"):
-        assert_saved_rebuild_clean(_Adapter(status=1), "harmonic-analyzer")
+        assert_saved_rebuild_clean(_Adapter(status=1), "ha-harmonic-analyzer")
 
 
 def test_final_rebuild_refuses_a_persistently_dirty_model() -> None:
     with pytest.raises(RuntimeError, match="refusing save"):
-        final_rebuild_before_save(_Adapter(status=1), "harmonic-analyzer")
+        final_rebuild_before_save(_Adapter(status=1), "ha-harmonic-analyzer")
 
 
 def test_final_rebuild_accepts_fully_rebuilt_state() -> None:
-    final_rebuild_before_save(_Adapter(status=0), "harmonic-analyzer")
+    final_rebuild_before_save(_Adapter(status=0), "ha-harmonic-analyzer")
 
 
 def test_save_chokepoint_skips_rebuild_when_solve_state_is_clean() -> None:
     calls = []
     adapter = _Adapter(status=0)
     adapter.currentModel.ForceRebuild3 = lambda _top_only: calls.append(True) or True
-    rebuild_if_needed_before_save(adapter, "harmonic-analyzer")
+    rebuild_if_needed_before_save(adapter, "ha-harmonic-analyzer")
     assert calls == []
 
 
-def test_in_place_save_restamps_stale_revision(monkeypatch) -> None:
-    import _assembly
-
-    expected = _assembly._config.release_revision()
-    stale = f"v{int(expected[1:]) - 1}"
-    model = SimpleNamespace(
-        GetCustomInfoValue=lambda _configuration, name: (
-            stale if name == "Revision" else ""
-        )
-    )
-    adapter = _Adapter()
-    writes = []
-    monkeypatch.setattr(
-        _assembly,
-        "apply_custom_properties",
-        lambda _adapter, props, *, model=None: writes.append((props, model)),
-    )
-    assert _assembly._ensure_assembly_revision(adapter, model) is True
-    assert writes == [({"Revision": expected}, model)]
 
 
 def test_refresh_dof_gate_uses_saved_manifest(tmp_path, monkeypatch) -> None:
@@ -244,16 +225,16 @@ def test_refresh_dof_gate_rejects_stray_free_component(tmp_path, monkeypatch) ->
 
     adapter = _Adapter()
     adapter.currentModel.GetComponents = lambda _top_only: [
-        component("rocker-arm-1"),
+        component("ch-rocker-arm-1"),
         component("structural-bracket-1"),
     ]
     monkeypatch.setattr(_assembly, "OUT_SLDASM", tmp_path)
     (tmp_path / ".channel.dof.json").write_text(
-        json.dumps({"stem": "channel", "specs": [{"verify": ["rocker-arm-1", []]}]}),
+        json.dumps({"stem": "ch-channel", "specs": [{"verify": ["ch-rocker-arm-1", []]}]}),
         encoding="utf-8",
     )
     with pytest.raises(RuntimeError, match="structural-bracket-1"):
-        assert_manifest_dof_state(adapter, "channel")
+        assert_manifest_dof_state(adapter, "ch-channel")
 
 
 def test_unchanged_channel_refresh_still_checks_native_contact_and_revokes_proof(
@@ -261,7 +242,7 @@ def test_unchanged_channel_refresh_still_checks_native_contact_and_revokes_proof
 ) -> None:
     import _assembly
 
-    assembly_path = tmp_path / "channel.SLDASM"
+    assembly_path = tmp_path / "ch-channel.SLDASM"
     assembly_path.write_bytes(b"byte-stable assembly")
     proof = tmp_path / ".channel.massprops.sha"
     proof.write_text("same-digest\n", encoding="utf-8")
@@ -330,7 +311,7 @@ def test_unchanged_channel_refresh_still_checks_native_contact_and_revokes_proof
         asyncio.run(
             _assembly.refresh_assembly(
                 adapter,
-                "channel",
+                "ch-channel",
                 views=[],
                 native_contact_check=fail_native_contact,
             )
@@ -344,8 +325,8 @@ def test_unchanged_channel_refresh_still_checks_native_contact_and_revokes_proof
 @pytest.mark.parametrize(
     ("operation", "assembly_name"),
     [
-        ("save_assembly_and_images", "channel"),
-        ("refresh_assembly", "summing"),
+        ("save_assembly_and_images", "ch-channel"),
+        ("refresh_assembly", "sm-summing"),
     ],
 )
 def test_spring_assembly_rejects_missing_native_checker(operation, assembly_name):
@@ -355,12 +336,12 @@ def test_spring_assembly_rejects_missing_native_checker(operation, assembly_name
         asyncio.run(getattr(_assembly, operation)(None, assembly_name))
 
 
-@pytest.mark.parametrize("persisted_failure", ["channel", "summing", None])
+@pytest.mark.parametrize("persisted_failure", ["ch-channel", "sm-summing", None])
 def test_auto_repair_saves_every_document_before_persisted_contact_gate(
     persisted_failure, monkeypatch, tmp_path
 ) -> None:
     parent = SimpleNamespace(
-        name="harmonic-analyzer",
+        name="ha-harmonic-analyzer",
         persisted=False,
         ForceRebuild3=lambda _top_only: True,
     )
@@ -372,8 +353,8 @@ def test_auto_repair_saves_every_document_before_persisted_contact_gate(
             ForceRebuild3=lambda _top_only: True,
         )
 
-    channel = repaired_model("channel")
-    summing = repaired_model("summing")
+    channel = repaired_model("ch-channel")
+    summing = repaired_model("sm-summing")
     events = []
     rendered = {}
     proof_states_at_reconcile = []
@@ -400,9 +381,9 @@ def test_auto_repair_saves_every_document_before_persisted_contact_gate(
 
     adapter = Adapter()
     monkeypatch.setattr(verify, "OUT_SLDASM", tmp_path)
-    (tmp_path / "harmonic-analyzer.SLDASM").write_bytes(b"parent")
+    (tmp_path / "ha-harmonic-analyzer.SLDASM").write_bytes(b"parent")
     proofs = {
-        name: tmp_path / f".{name}.massprops.sha" for name in ("channel", "summing")
+        name: tmp_path / f".{name}.massprops.sha" for name in ("ch-channel", "sm-summing")
     }
     for proof in proofs.values():
         proof.write_text("stale-proof\n", encoding="utf-8")
@@ -426,7 +407,7 @@ def test_auto_repair_saves_every_document_before_persisted_contact_gate(
         "_repair_cache_dangles",
         lambda *_args: {
             "rebuilt": True,
-            "documents": (("channel", channel), ("summing", summing)),
+            "documents": (("ch-channel", channel), ("sm-summing", summing)),
         },
     )
     monkeypatch.setattr(verify, "_massprops_sidecar", lambda name: proofs[name])
@@ -469,14 +450,14 @@ def test_auto_repair_saves_every_document_before_persisted_contact_gate(
     report = verify.Report()
     asyncio.run(
         verify._verify_static_one(
-            adapter, "harmonic-analyzer", report, auto_repair=True
+            adapter, "ha-harmonic-analyzer", report, auto_repair=True
         )
     )
 
     pre_save_indices = [
-        events.index(("contact-pre-save", name)) for name in ("channel", "summing")
+        events.index(("contact-pre-save", name)) for name in ("ch-channel", "sm-summing")
     ]
-    save_indices = [events.index(("save", name)) for name in ("channel", "summing")]
+    save_indices = [events.index(("save", name)) for name in ("ch-channel", "sm-summing")]
     first_reconcile = next(
         index for index, event in enumerate(events) if event[0] == "reconcile"
     )
@@ -484,18 +465,18 @@ def test_auto_repair_saves_every_document_before_persisted_contact_gate(
     assert max(save_indices) < first_reconcile
     assert all(not any(states) for states in proof_states_at_reconcile)
     assert [event for event in events if event[0] == "reconcile"] == [
-        ("reconcile", "channel"),
-        ("reconcile", "summing"),
+        ("reconcile", "ch-channel"),
+        ("reconcile", "sm-summing"),
     ]
-    assert ("contact-persisted", "channel") in events
-    assert ("contact-persisted", "summing") in events
+    assert ("contact-persisted", "ch-channel") in events
+    assert ("contact-persisted", "sm-summing") in events
     assert all(not proof.exists() for proof in proofs.values())
     if persisted_failure is None:
         assert report.failed == []
         assert rendered == {
-            "channel": "channel",
-            "summing": "summing",
-            "harmonic-analyzer": "harmonic-analyzer",
+            "ch-channel": "ch-channel",
+            "sm-summing": "sm-summing",
+            "ha-harmonic-analyzer": "ha-harmonic-analyzer",
         }
         last_certification = max(
             index

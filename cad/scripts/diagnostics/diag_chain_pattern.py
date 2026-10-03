@@ -1,7 +1,7 @@
 r"""Diagnostic: build ONLY the roller chain in a fresh assembly and render it.
 
 Fast iteration harness for the roller chain -- reuses
-build_paper_drive_assembly._insert_roller_chain (explicit placement of the 64
+build_pd_paper_drive_assembly._insert_roller_chain (explicit placement of the 64
 alternating inner/outer links along the _chain.py loop + gates) without the
 rest of the paper-drive assembly. Renders a few views to cad/out/png/diag-chain/.
 
@@ -18,7 +18,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # cad/scripts
 
 from _common import OUT_PNG, check, run_build  # noqa: E402
-from build_paper_drive_assembly import _insert_roller_chain  # noqa: E402
+from build_pd_paper_drive_assembly import _insert_roller_chain  # noqa: E402
 
 
 async def build(adapter) -> dict[str, str]:

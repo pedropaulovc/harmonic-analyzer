@@ -147,8 +147,8 @@ def _hidden_seat(visible: int = 1, children: int = 0, orientation: str = "*Top")
             "Column": ("Extrusion", 2),
         }
     )
-    drawing = HiddenSketchDrawing(part, "Drawing View2", "summing-lever-2")
-    view = ReferencingView("Drawing View2", "summing-lever-2", part, orientation)
+    drawing = HiddenSketchDrawing(part, "Drawing View2", "sm-summing-lever-2")
+    view = ReferencingView("Drawing View2", "sm-summing-lever-2", part, orientation)
     return FakeAdapter(drawing), drawing, view
 
 
@@ -171,7 +171,7 @@ def test_a_part_hidden_sketch_is_shown_in_the_view_and_left_shown() -> None:
         "ArcCentreX",
         "Length",
     ]
-    sketch = ("ArcReference@summing-lever-2@Drawing View2",)
+    sketch = ("ArcReference@sm-summing-lever-2@Drawing View2",)
     assert drawing.log == [("unblank", sketch), ("import", True)]
     assert drawing.view_shows_sketch
     # The part is only read: its saved hidden state stands.
@@ -349,7 +349,7 @@ class RebuildingHiddenSketchDrawing(HiddenSketchDrawing):
     """The drawing the block rebuilds, logging onto the part's event log."""
 
     def __init__(self, part: TogglePart) -> None:
-        super().__init__(part, "Drawing View2", "summing-lever-2")
+        super().__init__(part, "Drawing View2", "sm-summing-lever-2")
         self.events = part.log
 
     def UnblankSketch(self) -> None:
@@ -368,7 +368,7 @@ class RebuildingHiddenSketchDrawing(HiddenSketchDrawing):
 def _base_view_block(tmp_path, orientation: str):
     part = TogglePart(tmp_path / "lever.SLDPRT", "ArcReference")
     drawing = RebuildingHiddenSketchDrawing(part)
-    base = ReferencingView("Drawing View2", "summing-lever-2", part, orientation)
+    base = ReferencingView("Drawing View2", "sm-summing-lever-2", part, orientation)
     block = hidden_sketches.part_sketches_shown(
         FakeAdapter(drawing), part, ["ArcReference"], label="Detail A", base_view=base
     )
@@ -391,7 +391,7 @@ def test_the_base_view_shows_the_sketches_first_and_keeps_them(tmp_path) -> None
         "part blank",
         "rebuild",
     ]
-    sketch = ("ArcReference@summing-lever-2@Drawing View2",)
+    sketch = ("ArcReference@sm-summing-lever-2@Drawing View2",)
     assert drawing.log == [("unblank", sketch)]
     assert drawing.view_shows_sketch
 
@@ -635,18 +635,18 @@ def test_the_routing_guard_sees_the_known_hidden_sketch_drawings() -> None:
     """The guard below is only as good as its detection: pin what it finds."""
     found = _drawings_reading_blanked_sketches()
     assert {
-        "arbor_pedestal",
-        "cone_gear",
-        "cone_pivot_post",
-        "cone_tip_block",
-        "cylinder_gear_shaft",
-        "harmonic_base",
-        "pinion_bracket",
-        "pinion_spring",
+        "dt_arbor_pedestal",
+        "dt_cone_gear",
+        "dt_cone_pivot_post",
+        "dt_cone_tip_block",
+        "dt_cylinder_gear_shaft",
+        "fr_harmonic_base",
+        "dt_pinion_bracket",
+        "dt_pinion_spring",
     } <= set(found)
-    assert found["cylinder_gear_shaft"] == {"DomeReference"}
+    assert found["dt_cylinder_gear_shaft"] == {"DomeReference"}
     # Blanked with _common.blank_reference_sketches, not blank_sketch.
-    assert found["cone_pivot_post"] == {
+    assert found["dt_cone_pivot_post"] == {
         "BoreSpacingReference",
         "JournalPlanReference",
         "CrankBossStationReference",

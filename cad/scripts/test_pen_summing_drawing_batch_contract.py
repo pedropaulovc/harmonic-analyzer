@@ -3,23 +3,23 @@
 from __future__ import annotations
 
 import _config
-import boss_hook_spec
-import gooseneck_spec
-import measuring_stick_spec
-import output_fixture_spec
-import pen_frame_spec
-import pen_hanger_spec
-import pen_wire_spec
+import vn_boss_hook_spec
+import sm_gooseneck_spec
+import ha_measuring_stick_spec
+import mg_output_fixture_spec
+import pn_pen_frame_spec
+import pn_pen_hanger_spec
+import pn_pen_wire_spec
 
 
 SHEETS = (
-    ("boss-hook", boss_hook_spec),
-    ("gooseneck", gooseneck_spec),
-    ("measuring-stick", measuring_stick_spec),
-    ("output-fixture", output_fixture_spec),
-    ("pen-frame", pen_frame_spec),
-    ("pen-hanger", pen_hanger_spec),
-    ("pen-wire", pen_wire_spec),
+    ("vn-boss-hook", vn_boss_hook_spec),
+    ("sm-gooseneck", sm_gooseneck_spec),
+    ("ha-measuring-stick", ha_measuring_stick_spec),
+    ("mg-output-fixture", mg_output_fixture_spec),
+    ("pn-pen-frame", pn_pen_frame_spec),
+    ("pn-pen-hanger", pn_pen_hanger_spec),
+    ("pn-pen-wire", pn_pen_wire_spec),
 )
 
 TITLE_BLOCK_OWNED_NOTE_TEXT = (

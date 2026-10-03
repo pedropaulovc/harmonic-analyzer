@@ -17,7 +17,7 @@ Two probes in one session on the built paper-drive (never saved):
      members it cannot derive a diameter -- the typed values may finally drive.
      Then measure the true coupling ratio by driving the crank.
 
-Run (SolidWorks already open, paper-drive.SLDASM built)::
+Run (SolidWorks already open, pd-paper-drive.SLDASM built)::
 
     uv run python cad/scripts/diagnostics/probe_belt_axis_members.py
 """
@@ -155,7 +155,7 @@ def _recreate_belt_axis_members(adapter: Any, t12: str, t24: str) -> str | None:
 
 
 async def build(adapter: Any) -> dict[str, str]:
-    asm = OUT_SLDASM / "paper-drive.SLDASM"
+    asm = OUT_SLDASM / "pd-paper-drive.SLDASM"
     check("open paper-drive", await adapter.open_model(str(asm)))
     try:
         roles = _removables_by_role(adapter)

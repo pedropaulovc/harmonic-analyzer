@@ -1,0 +1,11 @@
+pd-latch-hook-bracket:
+  title: Latch Hook Bracket
+  number: MHA-PD-021
+  category: pd
+  # latch_hook_bracket_spec.MATERIAL_TITLE: the title block's MATERIAL cell.
+  material: "1.5 (16 GA) CR sheet, A1008 CS"
+  material_specification: "1.5 low-carbon cold-rolled steel sheet (16 GA), ASTM A1008 CS"
+  finish: stock (as rolled), oiled
+  quantity: 1
+  tolerance_class: machined_block
+  process: "sheared and filed from sheet, bent 90 degrees, holes drilled after bending"

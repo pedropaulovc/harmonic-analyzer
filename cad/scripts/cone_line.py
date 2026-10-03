@@ -18,8 +18,8 @@ from __future__ import annotations
 import math
 
 import _config
-from cone_pivot_post_installation import DRUM_X, GEAR_AXIS_SHIFT
-from cone_tip_block_spec import BLOCK_Z as TIP_BLOCK_Z
+from dt_cone_pivot_post_installation import DRUM_X, GEAR_AXIS_SHIFT
+from dt_cone_tip_block_spec import BLOCK_Z as TIP_BLOCK_Z
 
 Y_BASE_TOP = 50.8  # harmonic-base top face
 Y_DRIVE = Y_BASE_TOP + 6.35 + 33.368  # 90.518: v2 casting's journal axis
@@ -58,7 +58,7 @@ SEAT_PITCH = Z_PITCH * COS_I  # 6.8888: seat pitch along the shaft
 
 # Every station stays on the historical 6.5 cone reference face: the gears
 # grew SOUTH to the full seat pitch with their north faces fixed, so they
-# touch (cone_gear_stack; build_drive_train_assembly).
+# touch (dt_cone_gear_stack; build_dt_drive_train_assembly).
 CONE_FACE_STATION_REFERENCE = 6.5
 DRUM_FACE = 3.0  # cylinder gear face (gear z = 0..3, cam 3..6.5)
 
@@ -80,7 +80,7 @@ def cone_seat(j: int) -> tuple[float, float]:
 
 
 # Cone shaft: pivot end at seat station -28.25 from the T120 centre
-# (25 journal + half of the first 6.5 face -- build_cone_gear_shaft.py).
+# (25 journal + half of the first 6.5 face -- build_dt_cone_gear_shaft.py).
 # CONE_ORIGIN stays the PIVOT END (station 0, the station datum).
 SHAFT_T120_STATION = 25.0 + CONE_FACE_STATION_REFERENCE / 2.0  # 28.25
 _GEAR_CONE_ORIGIN = [
@@ -115,7 +115,7 @@ X_CRANK = cone_station(POST_STATION)[0]  # -129.336: Ry180 v2 installation
 Y_CRANK = Y_BASE_TOP + 6.35 + 72.7  # 129.850: v2 cast-in crank-axis height
 
 # T006 is the reference gear for the tip-end stack: its north face is the
-# fixed layout reference the MHA-096 stack collar is feeler-set off.
+# fixed layout reference the MHA-VN-016 stack collar is feeler-set off.
 T006_CENTER_STATION = SHAFT_T120_STATION + GEAR_AXIS_SHIFT + 19 * SEAT_PITCH
 T006_NORTH_FACE = T006_CENTER_STATION + CONE_FACE_STATION_REFERENCE / 2.0
 # The swing platform pivots about a vertical axis here, just north of the
@@ -127,7 +127,7 @@ PIVOT_STATION = T006_NORTH_FACE + 23.0
 # prism held by one screw in a fixed platform hole under its centre.  Its
 # north face stands TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET south of the pivot,
 # 0.8125 off the pivot screw's head at nominal -- the gap
-# build_drive_train_assembly proves at print-worst -- and the block grows
+# build_dt_drive_train_assembly proves at print-worst -- and the block grows
 # SOUTH from there (its depth closes the adjuster's embed window), so the
 # centre, and the platform hole under it, follow the depth.
 TIP_BLOCK_NORTH_FACE_PIVOT_OFFSET = 5.575

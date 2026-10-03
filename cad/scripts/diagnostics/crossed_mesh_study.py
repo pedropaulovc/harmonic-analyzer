@@ -45,14 +45,14 @@ from matplotlib.path import Path
 import _common  # noqa: F401  -- resolves to diagnostics/_common.py, the import
 # shim that inserts the parent cad/scripts onto sys.path and re-exports the
 # real _common (every diag_*/probe_* script here relies on it)
-import build_drive_train_assembly as dta
+import build_dt_drive_train_assembly as dta
 from _gear import gap_area_in_disc_ext  # noqa: F401  (re-exported for callers)
 from involute_gear import PA_DEG, gear_facts
-from build_crank_drive_gear import BACKLASH_MM, HELIX_DEG
-from crank_drive_gear_spec import LONG_ADDENDUM_MM as LONG_ADDENDUM64_MM
-from crank_drive_gear_spec import PRESSURE_ANGLE_DEG as PA64_T  # transverse
-from crank_pinion_spec import SHOULDER_LENGTH as PINION_SHOULDER
-from crank_pinion_spec import TURNED_DIA as PINION_TURNED_DIA
+from build_dt_crank_drive_gear import BACKLASH_MM, HELIX_DEG
+from dt_crank_drive_gear_spec import LONG_ADDENDUM_MM as LONG_ADDENDUM64_MM
+from dt_crank_drive_gear_spec import PRESSURE_ANGLE_DEG as PA64_T  # transverse
+from dt_crank_pinion_spec import SHOULDER_LENGTH as PINION_SHOULDER
+from dt_crank_pinion_spec import TURNED_DIA as PINION_TURNED_DIA
 
 IN = 25.4
 DP_CRANK = dta.DP_CRANK
@@ -73,7 +73,7 @@ INCLINE_DEG = dta.INCLINE_DEG
 R64, R16, ADD16 = dta.R64, dta.R16, dta.ADD16
 SLACK = math.hypot((GEAR64_SEAT[0] - dta.X_CRANK) * COS_I, dta.Y_CRANK - Y_DRIVE) - R64 - R16
 PINION_TOOTH_Z = dta.PINION_TOOTH_Z
-# The turned band build_crank_pinion revolve-cuts: north of the full-OD
+# The turned band build_dt_crank_pinion revolve-cuts: north of the full-OD
 # shoulder (pinion z > PINION_SHOULDER from the toothed south face) the teeth
 # stop at PINION_TURNED_DIA.
 PINION_TURNED_R = PINION_TURNED_DIA / 2.0

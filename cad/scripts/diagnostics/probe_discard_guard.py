@@ -24,7 +24,7 @@ import comtypes.client
 import _telemetry
 from package_native import SW_TYPELIB, SW_TYPELIB_VER, _discard_open_documents
 
-ASSEMBLY = r"C:\src\harmonic-analyzer\cad\out\sldasm\harmonic-analyzer.SLDASM"
+ASSEMBLY = r"C:\src\ha-harmonic-analyzer\cad\out\sldasm\ha-harmonic-analyzer.SLDASM"
 SW_DOC_ASSEMBLY = 2
 SW_OPEN_SILENT = 1
 

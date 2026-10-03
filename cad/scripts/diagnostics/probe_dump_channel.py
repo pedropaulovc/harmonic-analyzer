@@ -1,4 +1,4 @@
-r"""Fast diagnostic: dump channel.SLDASM's per-part DISTANCE/ANGLE mate values.
+r"""Fast diagnostic: dump ch-channel.SLDASM's per-part DISTANCE/ANGLE mate values.
 
 Opens the channel sub assembly DIRECTLY (flat, not flexible -> the mate walk is
 fast, no per-mate flexible-sub resolution) and logs every single-real-part
@@ -32,12 +32,12 @@ async def main():
     _telemetry.info("Connecting ...")
     await adapter.connect()
     adapter._attempt(lambda: adapter.swApp.CloseAllDocuments(True), default=None)
-    path = str((OUT_SLDASM / "channel.SLDASM").resolve())
+    path = str((OUT_SLDASM / "ch-channel.SLDASM").resolve())
     await adapter.open_model(path)
     model = adapter.currentModel
     log(f"opened {path}")
 
-    root = "channel"  # the doc-root pseudo-part name in its own mate group
+    root = "ch-channel"  # the doc-root pseudo-part name in its own mate group
     # Group single-real-part DISTANCE/ANGLE mates by (family, rounded value) so we
     # see exactly which values recur (pose/spin -> suppress) vs are unique (axial).
     from collections import defaultdict
@@ -51,7 +51,7 @@ async def main():
         if len(reals) != 1:
             continue
         fam = _family(reals[0])
-        if fam not in ("amplitude-bar", "rocker-arm", "channel-lever", "connecting-rod"):
+        if fam not in ("ch-amplitude-bar", "ch-rocker-arm", "ch-channel-lever", "ch-connecting-rod"):
             continue
         val = _mate_value(adapter, mate, mtype)
         if val is None:

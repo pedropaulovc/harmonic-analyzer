@@ -1,4 +1,4 @@
-r"""Probe: why does harmonic-analyzer.SLDASM open dirty + pending rebuild?
+r"""Probe: why does ha-harmonic-analyzer.SLDASM open dirty + pending rebuild?
 
 Attaches READ-ONLY to the already-running SolidWorks and inspects the ACTIVE
 document in place (does NOT CloseAllDocuments -- we want the exact state the user
@@ -88,7 +88,7 @@ def main() -> int:
 
     doc = sw.ActiveDoc
     if doc is None:
-        _telemetry.warn("no active document -- open harmonic-analyzer.SLDASM first")
+        _telemetry.warn("no active document -- open ha-harmonic-analyzer.SLDASM first")
         return 2
     doc = sw_type_info.flagged(doc, "IModelDoc2")
     title = doc.GetTitle()

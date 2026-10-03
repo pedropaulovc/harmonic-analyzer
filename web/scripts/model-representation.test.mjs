@@ -6,7 +6,7 @@ function approved() {
   return {
     schemaVersion: 1, kind: 'lossless-web-model-representation',
     source: { sha256: '1'.repeat(64), sourceCommit: 'a'.repeat(40) },
-    representation: { path: 'models/harmonic-analyzer.glb', sha256: '2'.repeat(64), byteLength: 1024, codec: 'EXT_meshopt_compression' },
+    representation: { path: 'models/ha-harmonic-analyzer.glb', sha256: '2'.repeat(64), byteLength: 1024, codec: 'EXT_meshopt_compression' },
     pipeline: { version: 1, steps: ['exact-dedup', 'meshopt'], codecVersion: 'meshoptimizer@0.22.0' },
     equivalence: { method: 'decoded-per-drawable-exact-v1', semanticSha256: '3'.repeat(64), drawableCount: 2 },
   }

@@ -57,8 +57,8 @@ async def _flex_output(adapter):
 
 async def _try_link(adapter, tag, alignment="closest"):
     try:
-        res = await gear_mate(adapter, _entity_ref("summing-lever-1", "Axis1", "AXIS"),
-                              _entity_ref("magnifying-lever-1", "Axis1", "AXIS"),
+        res = await gear_mate(adapter, _entity_ref("sm-summing-lever-1", "Axis1", "AXIS"),
+                              _entity_ref("mg-magnifying-lever-1", "Axis1", "AXIS"),
                               RATIO, alignment=alignment, label=f"LINK {tag}")
         log(f"  [{tag}] LINK OK: {res.get('name')}")
         return res.get("name")
@@ -95,7 +95,7 @@ async def main():
 
     await _flex_output(adapter)
     await _suppress_named(adapter, "output-1",
-                          ("summing-lever", "magnifying-lever", "magnifying-wheel"),
+                          ("sm-summing-lever", "mg-magnifying-lever", "mg-magnifying-wheel"),
                           (ANGLE,), "summing+mag+wheel rock")
 
     _, out_doc = _sub_model(adapter, "output-1")
@@ -111,8 +111,8 @@ async def main():
 
         # B) confirm free DOF: rotate mag-lever (about world X) and summing (Z)
         log("  --- DOF check (rotate parts in sub doc) ---")
-        await _rotate_in_sub(adapter, out_doc, "magnifying-lever-1", [1.0, 0.0, 0.0], 15.0)
-        await _rotate_in_sub(adapter, out_doc, "summing-lever-1", [0.0, 0.0, 1.0], 10.0)
+        await _rotate_in_sub(adapter, out_doc, "mg-magnifying-lever-1", [1.0, 0.0, 0.0], 15.0)
+        await _rotate_in_sub(adapter, out_doc, "sm-summing-lever-1", [0.0, 0.0, 1.0], 10.0)
 
         # C) perturbed pose
         await _try_link(adapter, "perturbed-closest")

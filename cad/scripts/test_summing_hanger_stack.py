@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from build_knife_hanger_stud import UNDERHEAD_LEN
-from build_summing_assembly import _assert_hanger_axis_positive_y
+from build_vn_knife_hanger_stud import UNDERHEAD_LEN
+from build_sm_summing_assembly import _assert_hanger_axis_positive_y
 from diagnostics.diag_build_91247A720 import GB_LEN, GB_WASHER_T
 
 
@@ -26,7 +26,7 @@ def test_hanger_bolt_seating_length_excludes_integral_washer_face() -> None:
 
 def test_hanger_axis_validation_accepts_authored_positive_y_axis() -> None:
     _assert_hanger_axis_positive_y(
-        "knife-hanger-washer-1",
+        "vn-knife-hanger-washer-1",
         _transform([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]),
     )
 
@@ -43,6 +43,6 @@ def test_hanger_axis_validation_rejects_transverse_or_reversed_axis(
 ) -> None:
     with pytest.raises(RuntimeError, match=r"local \+Y fastener axis.*assembly \+Y"):
         _assert_hanger_axis_positive_y(
-            "knife-hanger-washer-1",
+            "vn-knife-hanger-washer-1",
             _transform(rotation_rows),
         )

@@ -1,7 +1,7 @@
 r"""McMaster 9414T1 -- black-oxide 1215 steel set screw shaft collar, 1/16" bore.
 
 Catalogue: the McMaster product page https://www.mcmaster.com/9414T1/ (read
-in a headless browser on 2026-09-29 for MHA-096): one-piece set screw shaft
+in a headless browser on 2026-09-29 for MHA-VN-016): one-piece set screw shaft
 collar for 1/16 in shaft, 1/4 in OD, 3/16 in wide, black-oxide 1215 carbon
 steel, one black-oxide steel hex-socket set screw included.  The vendor STEP
 model was read locally (never committed) for what the page does not give:
@@ -47,7 +47,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import _telemetry  # noqa: E402
 from _common import check, name_last_feature, volume_check  # noqa: E402
-from cone_tip_collar_spec import (  # noqa: E402
+from vn_cone_tip_collar_spec import (  # noqa: E402
     BORE_DIA,
     EDGE_BREAK,
     OUTER_DIA,

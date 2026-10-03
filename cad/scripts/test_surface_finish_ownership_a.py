@@ -4,62 +4,62 @@ from __future__ import annotations
 
 import inspect
 
-import alignment_pinion_spec
-import arbor_pedestal_spec
-import build_alignment_pinion
-import build_arbor_pedestal
-import build_cone_gear
-import build_cone_gear_shaft
-import build_cone_swing_platform
-import build_connecting_rod
-import build_crank_drive_gear
-import build_crank_pinion
-import build_crankshaft
-import build_cylinder_gear_shaft
-import cone_gear_shaft_spec
-import cone_gear_spec
-import cone_swing_platform_spec
-import connecting_rod_spec
-import crank_drive_gear_spec
-import crank_pinion_spec
-import crankshaft_spec
-import cylinder_gear_shaft_spec
-import draw_alignment_pinion
-import draw_arbor_pedestal
-import draw_cone_gear
-import draw_cone_gear_shaft
-import draw_cone_swing_platform
-import draw_connecting_rod
-import draw_crank_drive_gear
-import draw_crank_pinion
-import draw_crankshaft
-import draw_cylinder_gear_shaft
+import dt_alignment_pinion_spec
+import dt_arbor_pedestal_spec
+import build_dt_alignment_pinion
+import build_dt_arbor_pedestal
+import build_dt_cone_gear
+import build_dt_cone_gear_shaft
+import build_dt_cone_swing_platform
+import build_ch_connecting_rod
+import build_dt_crank_drive_gear
+import build_dt_crank_pinion
+import build_dt_crankshaft
+import build_dt_cylinder_gear_shaft
+import dt_cone_gear_shaft_spec
+import dt_cone_gear_spec
+import dt_cone_swing_platform_spec
+import ch_connecting_rod_spec
+import dt_crank_drive_gear_spec
+import dt_crank_pinion_spec
+import dt_crankshaft_spec
+import dt_cylinder_gear_shaft_spec
+import draw_dt_alignment_pinion
+import draw_dt_arbor_pedestal
+import draw_dt_cone_gear
+import draw_dt_cone_gear_shaft
+import draw_dt_cone_swing_platform
+import draw_ch_connecting_rod
+import draw_dt_crank_drive_gear
+import draw_dt_crank_pinion
+import draw_dt_crankshaft
+import draw_dt_cylinder_gear_shaft
 from _gtol_spec import CylinderFace, PlanarFace
 from _surface_finish import MACHINED_UM, SEAT_UM, SurfaceFinishControl
 
 
 CASES = (
     (
-        alignment_pinion_spec,
-        build_alignment_pinion,
-        draw_alignment_pinion,
+        dt_alignment_pinion_spec,
+        build_dt_alignment_pinion,
+        draw_dt_alignment_pinion,
         (
             SurfaceFinishControl(
-                "drum_bore", MACHINED_UM, CylinderFace(alignment_pinion_spec.BORE_DIA)
+                "drum_bore", MACHINED_UM, CylinderFace(dt_alignment_pinion_spec.BORE_DIA)
             ),
         ),
     ),
     (
-        arbor_pedestal_spec,
-        build_arbor_pedestal,
-        draw_arbor_pedestal,
+        dt_arbor_pedestal_spec,
+        build_dt_arbor_pedestal,
+        draw_dt_arbor_pedestal,
         (
             SurfaceFinishControl(
                 "arbor_bore",
                 MACHINED_UM,
                 CylinderFace(
-                    arbor_pedestal_spec.BORE_DIA,
-                    contains_y_mm=arbor_pedestal_spec.BORE_HEIGHT,
+                    dt_arbor_pedestal_spec.BORE_DIA,
+                    contains_y_mm=dt_arbor_pedestal_spec.BORE_HEIGHT,
                 ),
             ),
             SurfaceFinishControl(
@@ -70,57 +70,57 @@ CASES = (
         ),
     ),
     (
-        cone_gear_spec,
-        build_cone_gear,
-        draw_cone_gear,
+        dt_cone_gear_spec,
+        build_dt_cone_gear,
+        draw_dt_cone_gear,
         (
             SurfaceFinishControl(
                 "cone_gear_bore",
                 MACHINED_UM,
-                CylinderFace(cone_gear_spec.BORE_DIA),
+                CylinderFace(dt_cone_gear_spec.BORE_DIA),
                 native_attachment="model",
             ),
         ),
     ),
     (
-        cone_gear_shaft_spec,
-        build_cone_gear_shaft,
-        draw_cone_gear_shaft,
+        dt_cone_gear_shaft_spec,
+        build_dt_cone_gear_shaft,
+        draw_dt_cone_gear_shaft,
         (
             SurfaceFinishControl(
                 "pivot_journal",
                 MACHINED_UM,
-                CylinderFace(cone_gear_shaft_spec.JOURNAL_DIA),
+                CylinderFace(dt_cone_gear_shaft_spec.JOURNAL_DIA),
             ),
             SurfaceFinishControl(
                 "tip_land",
                 MACHINED_UM,
-                CylinderFace(cone_gear_shaft_spec.SECTION_DIAS[-1], tolerance_mm=0.01),
+                CylinderFace(dt_cone_gear_shaft_spec.SECTION_DIAS[-1], tolerance_mm=0.01),
             ),
         ),
     ),
     (
-        cone_swing_platform_spec,
-        build_cone_swing_platform,
-        draw_cone_swing_platform,
+        dt_cone_swing_platform_spec,
+        build_dt_cone_swing_platform,
+        draw_dt_cone_swing_platform,
         (
             SurfaceFinishControl(
                 "post_seat",
                 SEAT_UM,
-                PlanarFace((0, 1, 0), cone_swing_platform_spec.PLATE_THICKNESS),
+                PlanarFace((0, 1, 0), dt_cone_swing_platform_spec.PLATE_THICKNESS),
             ),
             SurfaceFinishControl("base_slide", MACHINED_UM, PlanarFace((0, -1, 0), 0.0)),
         ),
     ),
     (
-        connecting_rod_spec,
-        build_connecting_rod,
-        draw_connecting_rod,
+        ch_connecting_rod_spec,
+        build_ch_connecting_rod,
+        draw_ch_connecting_rod,
         (
             SurfaceFinishControl(
                 "strap_bore",
                 MACHINED_UM,
-                CylinderFace(connecting_rod_spec.RING_BORE_DIA),
+                CylinderFace(ch_connecting_rod_spec.RING_BORE_DIA),
             ),
         ),
     ),
@@ -128,41 +128,41 @@ CASES = (
     # runs on the bore (drawing-simplicity-policy.md rule 5); its empty tuple is
     # pinned by test_crank_arm_drawing.
     (
-        crank_drive_gear_spec,
-        build_crank_drive_gear,
-        draw_crank_drive_gear,
+        dt_crank_drive_gear_spec,
+        build_dt_crank_drive_gear,
+        draw_dt_crank_drive_gear,
         (
             SurfaceFinishControl(
                 "crank_drive_gear_bore",
                 MACHINED_UM,
-                CylinderFace(crank_drive_gear_spec.BORE_DIA),
+                CylinderFace(dt_crank_drive_gear_spec.BORE_DIA),
             ),
         ),
     ),
     (
-        crank_pinion_spec,
-        build_crank_pinion,
-        draw_crank_pinion,
+        dt_crank_pinion_spec,
+        build_dt_crank_pinion,
+        draw_dt_crank_pinion,
         (
             SurfaceFinishControl(
                 "crank_pinion_bore",
                 MACHINED_UM,
-                CylinderFace(crank_pinion_spec.BORE_DIA),
+                CylinderFace(dt_crank_pinion_spec.BORE_DIA),
             ),
         ),
     ),
     (
-        crankshaft_spec,
-        build_crankshaft,
-        draw_crankshaft,
+        dt_crankshaft_spec,
+        build_dt_crankshaft,
+        draw_dt_crankshaft,
         (
             SurfaceFinishControl(
                 "outboard_journal",
                 MACHINED_UM,
                 CylinderFace(
-                    crankshaft_spec.JOURNAL_DIA,
+                    dt_crankshaft_spec.JOURNAL_DIA,
                     contains_y_mm=(
-                        crankshaft_spec.JOURNAL_START + crankshaft_spec.RELIEF_START
+                        dt_crankshaft_spec.JOURNAL_START + dt_crankshaft_spec.RELIEF_START
                     )
                     / 2.0,
                 ),
@@ -171,29 +171,29 @@ CASES = (
                 "inboard_journal",
                 MACHINED_UM,
                 CylinderFace(
-                    crankshaft_spec.JOURNAL_DIA,
-                    contains_y_mm=(crankshaft_spec.RELIEF_END + crankshaft_spec.JOURNAL_END)
+                    dt_crankshaft_spec.JOURNAL_DIA,
+                    contains_y_mm=(dt_crankshaft_spec.RELIEF_END + dt_crankshaft_spec.JOURNAL_END)
                     / 2.0,
                 ),
             ),
             SurfaceFinishControl(
                 "collar_rear_face",
                 MACHINED_UM,
-                PlanarFace((0, 1, 0), crankshaft_spec.COLLAR_REAR),
+                PlanarFace((0, 1, 0), dt_crankshaft_spec.COLLAR_REAR),
             ),
         ),
     ),
     (
-        cylinder_gear_shaft_spec,
-        build_cylinder_gear_shaft,
-        draw_cylinder_gear_shaft,
+        dt_cylinder_gear_shaft_spec,
+        build_dt_cylinder_gear_shaft,
+        draw_dt_cylinder_gear_shaft,
         (
             SurfaceFinishControl(
                 "arbor_bearing",
                 MACHINED_UM,
                 CylinderFace(
-                    cylinder_gear_shaft_spec.SHAFT_DIA,
-                    contains_y_mm=cylinder_gear_shaft_spec.ARBOR_BEARING_PROBE_Y_MM,
+                    dt_cylinder_gear_shaft_spec.SHAFT_DIA,
+                    contains_y_mm=dt_cylinder_gear_shaft_spec.ARBOR_BEARING_PROBE_Y_MM,
                 ),
             ),
         ),

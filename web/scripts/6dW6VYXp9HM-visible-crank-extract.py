@@ -153,7 +153,7 @@ def main():
         'bun', '--eval',
         'import {MECHANISM_DATA as d} from "./src/mechanics-data.ts";'
         'const r=d.renderFrames;'
-        'const m=r.worldMatrices["harmonic-analyzer/drive-train/crank-handle-1"];'
+        'const m=r.worldMatrices["ha-harmonic-analyzer/dt-drive-train/dt-crank-handle-1"];'
         'console.log(JSON.stringify({nativePivotMm:r.crankPivotMm,nativeAxis:r.crankAxis,'
         'nativeHandleRestCentreMm:m.slice(12,15).map(v=>v*1000)}));'
     ], cwd=WEB))
@@ -212,7 +212,7 @@ def main():
                      'excluded': 'Shot boundary/dissolve margins outside this bounded interval; no extrapolation beyond last sample.'},
         'shaftIdentity': {
             'source': 'Hand turns long steel arm on shaft immediately left of cone large-end drive, with chain sprocket and green bearing. Upper/downward arm exposures are the same main crank, not a second lower paper/feed crank.',
-            'nativePaths': ['harmonic-analyzer/drive-train/crankshaft-1','harmonic-analyzer/drive-train/crank-arm-1','harmonic-analyzer/drive-train/crank-handle-1'],
+            'nativePaths': ['ha-harmonic-analyzer/dt-drive-train/dt-crankshaft-1','ha-harmonic-analyzer/dt-drive-train/dt-crank-arm-1','ha-harmonic-analyzer/dt-drive-train/dt-crank-handle-1'],
             **native,
             'correspondenceAuthority': 'Assembly identity and adjacent cone/chain topology; not a calibrated source/native projection.',
             'sourceStationOrder': 'left-to-right harmonic20..1; native station j=0..19 harmonic20-j, increasing Z pitch; pre93s unmirrored shot'},

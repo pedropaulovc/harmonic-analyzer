@@ -2,7 +2,7 @@ r"""McMaster 98381A433 -- alloy steel dowel pin, 3/32" diameter, 3/16" long.
 
 One of the 98381A* sizes built by the shared recipe in
 ``diag_mcmaster_dowel.py`` (see its docstring for the catalogue facts).
-Used as transgear-knob-drive-pin (MHA-155).
+Used as transgear-knob-drive-pin (MHA-VN-038).
 
 Run standalone (SolidWorks open)::
 

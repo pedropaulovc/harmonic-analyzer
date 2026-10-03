@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
-import { copyFile, mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises'
+import { copyFile, cp, mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -20,7 +20,7 @@ function rawFixture(native = null) {
   const document = {
     asset: { version: '2.0', generator: 'Synthetic importer behavior fixture, not native CAD evidence' },
     scene: 0, scenes: [{ nodes: [0] }],
-    nodes: [{ name: 'harmonic-analyzer', children: [1, 2] }, { name: 'part-1', mesh: 0 }, { name: 'part-2', mesh: 0, translation: [2, 0, 0] }],
+    nodes: [{ name: 'ha-harmonic-analyzer', children: [1, 2] }, { name: 'part-1', mesh: 0 }, { name: 'part-2', mesh: 0, translation: [2, 0, 0] }],
     meshes: [{ primitives: [{ attributes: { POSITION: 0 }, mode: 4 }] }],
     buffers: [{ byteLength: geometry.length }],
     bufferViews: [{ buffer: 0, byteOffset: 0, byteLength: geometry.length, target: 34962 }],
@@ -45,9 +45,9 @@ function rawFixture(native = null) {
     for (const path of Object.keys(matrices)) add(path)
     // A real geometry replacement with unchanged mechanism datums. It uses
     // the released native node frames, not a canned exporter response.
-    nodes[add('harmonic-analyzer/frame/replacement-panel-1')].mesh = 0
+    nodes[add('ha-harmonic-analyzer/fr-frame/replacement-panel-1')].mesh = 0
     document.nodes = nodes
-    document.scenes[0].nodes = [indexes.get('harmonic-analyzer')]
+    document.scenes[0].nodes = [indexes.get('ha-harmonic-analyzer')]
   }
   const json = Buffer.from(JSON.stringify(document))
   const padded = Buffer.alloc((json.length + 3) & ~3, 0x20)
@@ -84,8 +84,9 @@ async function releaseFixture(t, editSource = null) {
   f.nativeBytes = await readFile(join(web, 'src/mechanics-data.ts'), 'utf8')
   f.native = mechanismData(f.nativeBytes)
   await writeFile(f.nativePath, f.nativeBytes)
-  const archive = execFileSync('git', ['archive', f.native.provenance.sourceCommit, 'cad/scripts', 'cad/config'], { cwd: repository, maxBuffer: 64 * 1024 * 1024 })
-  execFileSync('tar', ['-x', '-C', f.directory], { input: archive })
+  // The candidate release uses the canonical source tree, not the historical
+  // geometry-provenance commit whose module identities predate this cutover.
+  for (const directory of ['scripts', 'config']) await cp(join(repository, 'cad', directory), join(f.directory, 'cad', directory), { recursive: true, filter: path => !path.split(/[\\/]/).includes('__pycache__') })
   await mkdir(join(f.webRoot, 'scripts'))
   for (const name of ['export-mechanics.py', 'requirements-model-export.txt']) await copyFile(join(web, 'scripts', name), join(f.webRoot, 'scripts', name))
   for (const name of ['kinematics.ts', 'magnifier.ts', 'scene.ts']) await copyFile(join(web, 'src', name), join(f.webRoot, 'src', name))
@@ -107,7 +108,7 @@ async function releaseFixture(t, editSource = null) {
   f.modelSha256 = digest(f.bytes)
   f.sourceSha256 = f.modelSha256
   await writeFile(f.sourcePath, f.bytes)
-  f.asset = join(f.webRoot, 'public/models/harmonic-analyzer.glb')
+  f.asset = join(f.webRoot, 'public/models/ha-harmonic-analyzer.glb')
   f.descriptor = join(f.webRoot, 'content/model-representation.json')
   await writeFile(f.asset, 'previous optimized artifact')
   await writeFile(f.descriptor, 'previous approved descriptor')
@@ -117,7 +118,7 @@ async function releaseFixture(t, editSource = null) {
 test('same-source import publishes exact decoded bytes and descriptor, caches raw, and never regenerates native seals', async t => {
   const f = await fixture(t)
   const imported = await importModel(f)
-  const optimized = await readFile(join(f.webRoot, 'public/models/harmonic-analyzer.glb'))
+  const optimized = await readFile(join(f.webRoot, 'public/models/ha-harmonic-analyzer.glb'))
   const descriptor = JSON.parse(await readFile(join(f.webRoot, 'content/model-representation.json'), 'utf8'))
   assert.equal(imported.nativeMetadataRegenerated, false)
   assert.equal(await readFile(f.nativePath, 'utf8'), f.nativeBytes)
@@ -160,7 +161,7 @@ test('new release authority requires explicit commit and approved digest, not th
 
 test('unavailable exact CAD archive preserves all previous live artifacts and native metadata', async t => {
   const f = await fixture(t)
-  const asset = join(f.webRoot, 'public/models/harmonic-analyzer.glb'), descriptor = join(f.webRoot, 'content/model-representation.json')
+  const asset = join(f.webRoot, 'public/models/ha-harmonic-analyzer.glb'), descriptor = join(f.webRoot, 'content/model-representation.json')
   await writeFile(asset, 'previous optimized artifact')
   await writeFile(descriptor, 'previous approved descriptor')
   await mkdir(join(f.webRoot, 'scripts'))
@@ -194,7 +195,7 @@ test('publication errors roll back both existing and initially absent destinatio
 
 test('a raw input alias of the published destination is refused without overwriting original bytes', async t => {
   const f = await fixture(t)
-  const destination = join(f.webRoot, 'public/models/harmonic-analyzer.glb')
+  const destination = join(f.webRoot, 'public/models/ha-harmonic-analyzer.glb')
   await writeFile(destination, f.bytes)
   const alias = join(f.directory, 'raw-alias.glb')
   await symlink(destination, alias)
@@ -211,7 +212,7 @@ test('a corrupt immutable raw cache is rejected rather than silently repaired or
   await mkdir(cacheDirectory, { recursive: true })
   const cachePath = join(cacheDirectory, `${f.modelSha256}.glb`)
   await writeFile(cachePath, 'corrupted raw cache')
-  const destination = join(f.webRoot, 'public/models/harmonic-analyzer.glb')
+  const destination = join(f.webRoot, 'public/models/ha-harmonic-analyzer.glb')
   await writeFile(destination, 'previous optimized artifact')
   await assert.rejects(importModel(f), /Immutable raw source cache is corrupt/)
   assert.equal(await readFile(cachePath, 'utf8'), 'corrupted raw cache')
@@ -295,13 +296,13 @@ test('compatible future geometry publishes with source/config provenance changes
 test('staged fixed feed and spring-shape changes are refused before any live model, descriptor or native publication', async t => {
   for (const [name, path, from, to, parameter] of [
     ['reducer teeth', 'cad/scripts/transgear_pinion_spec.py', 'TEETH = 12', 'TEETH = 13', 'paperDrive.reducerRatio'],
-    ['rack pitch', 'cad/scripts/transgear_feed_pinion_spec.py', 'DIAMETRAL_PITCH = 30.0', 'DIAMETRAL_PITCH = 32.0', 'paperDrive.feedPitchDiameterMm'],
+    ['rack pitch', 'cad/scripts/pd_transgear_feed_pinion_spec.py', 'DIAMETRAL_PITCH = 30.0', 'DIAMETRAL_PITCH = 32.0', 'paperDrive.feedPitchDiameterMm'],
     ['signed feed', 'cad/scripts/build_kinematic_probe.py', 'FEED_SIGN = +1.0', 'FEED_SIGN = -1.0', 'paperDrive.rackFeedSense'],
-    ['counter coil inset with unchanged origin and eye seats', 'cad/scripts/counter_spring_stock_geom.py', '_COIL_END_INSET_MM = 10.2997', '_COIL_END_INSET_MM = 10.3997', 'counter.deformation.coilEndInsetMm'],
-    ['counter coil axial correction', 'cad/scripts/counter_spring_stock_geom.py', 'return -coil_start_x_mm(length_mm) - WIRE_RADIUS_MM', 'return -coil_start_x_mm(length_mm) - 2.0 * WIRE_RADIUS_MM', 'counter.deformation.coilEndCorrectionMm'],
+    ['counter coil inset with unchanged origin and eye seats', 'cad/scripts/vn_counter_spring_stock_geom.py', '_COIL_END_INSET_MM = 10.2997', '_COIL_END_INSET_MM = 10.3997', 'counter.deformation.coilEndInsetMm'],
+    ['counter coil axial correction', 'cad/scripts/vn_counter_spring_stock_geom.py', 'return -coil_start_x_mm(length_mm) - WIRE_RADIUS_MM', 'return -coil_start_x_mm(length_mm) - 2.0 * WIRE_RADIUS_MM', 'counter.deformation.coilEndCorrectionMm'],
     ['channel transition polar', 'cad/scripts/diagnostics/diag_build_9432K31.py', 'VENDOR_HANDLE_POLAR_RAD = -0.00014851266501942706', 'VENDOR_HANDLE_POLAR_RAD = -0.00024851266501942706', 'spring.deformation.transitionHandlePolarRad'],
-    ['channel transition handle', 'cad/scripts/channel_spring_stock_geom.py', 'TRANSITION_TANGENT_MM = COIL_OD_MM * 3.0 / 4.0', 'TRANSITION_TANGENT_MM = COIL_OD_MM * 3.1 / 4.0', 'spring.deformation.transitionTangentMm'],
-    ['channel coil length law with unchanged hook seats', 'cad/scripts/channel_spring_stock_geom.py', 'return check_length_mm(length_mm) - 2.0 * COIL_ID_MM', 'return check_length_mm(length_mm) - 2.1 * COIL_ID_MM', 'spring.deformation.coilEndInsetMm'],
+    ['channel transition handle', 'cad/scripts/vn_channel_spring_stock_geom.py', 'TRANSITION_TANGENT_MM = COIL_OD_MM * 3.0 / 4.0', 'TRANSITION_TANGENT_MM = COIL_OD_MM * 3.1 / 4.0', 'spring.deformation.transitionTangentMm'],
+    ['channel coil length law with unchanged hook seats', 'cad/scripts/vn_channel_spring_stock_geom.py', 'return check_length_mm(length_mm) - 2.0 * COIL_ID_MM', 'return check_length_mm(length_mm) - 2.1 * COIL_ID_MM', 'spring.deformation.coilEndInsetMm'],
     ['channel transition hook anchor', 'cad/scripts/diagnostics/diag_build_9432K31.py', '(-22.225, 2.844799999999999, 0.0)', '(-22.325, 2.844799999999999, 0.0)', 'spring.deformation.profiles[0].transitionControlPointsMm'],
   ]) await t.test(name, async child => {
     const f = await releaseFixture(child, { path, from, to })

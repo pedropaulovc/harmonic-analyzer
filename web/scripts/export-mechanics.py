@@ -287,7 +287,7 @@ def main() -> None:
     )
     fillister_module = types.ModuleType("diagnostics.diag_mcmaster_fillister")
     fillister_module.__file__ = str(fillister_path)
-    cross_spec = importlib.import_module("frame_cross_screw_spec")
+    cross_spec = importlib.import_module("vn_frame_cross_screw_spec")
     for name in ("SHANK_DIA", "SHANK_LEN", "HEAD_H", "HEAD_DIA", "PITCH"):
         fillister_module.__dict__[name] = getattr(cross_spec, name)
     # Pinned-commit assignment AST; references the injected cross-screw constants.
@@ -304,64 +304,64 @@ def main() -> None:
             "_config",
             "channel_kinematics",
             "channel_frame_geom",
-            "amplitude_bar_spec",
-            "rocker_arm_spec",
-            "channel_lever_spec",
-            "connecting_rod_spec",
-            "cylinder_gear_spec",
-            "channel_spring_stock_geom",
-            "counter_spring_stock_geom",
+            "ch_amplitude_bar_spec",
+            "ch_rocker_arm_spec",
+            "ch_channel_lever_spec",
+            "ch_connecting_rod_spec",
+            "dt_cylinder_gear_spec",
+            "vn_channel_spring_stock_geom",
+            "vn_counter_spring_stock_geom",
             "spring_mount_geom",
             "settled_spring_seats",
-            "gooseneck_geom",
-            "summing_lever_spec",
+            "sm_gooseneck_geom",
+            "sm_summing_lever_spec",
             "rocker_bank_layout",
-            "cone_pivot_post_installation",
-            "magnifying_lever_geom",
-            "magnifying_clamp_geom",
-            "lever_wire_geom",
-            "pen_wire_geom",
+            "dt_cone_pivot_post_installation",
+            "mg_magnifying_lever_geom",
+            "mg_magnifying_clamp_geom",
+            "mg_lever_wire_geom",
+            "pn_pen_wire_geom",
             "paper_drive_geom",
             "spring_force_model",
             "pinion_rig_park_geometry",
-            "pinion_cam_geometry",
-            "pinion_cam_pin_geometry",
-            "pinion_bracket_geometry",
+            "dt_pinion_cam_geometry",
+            "dt_pinion_cam_pin_geometry",
+            "dt_pinion_bracket_geometry",
             "cone_line",
-            "cone_swing_platform_geometry",
-            "cone_lock_knob_spec",
-            "swing_stop_screw_spec",
-            "magnifying_vertical_rod_spec",
-            "output_fixture_spec",
+            "dt_cone_swing_platform_geometry",
+            "vn_cone_lock_knob_spec",
+            "vn_swing_stop_screw_spec",
+            "mg_magnifying_vertical_rod_spec",
+            "mg_output_fixture_spec",
             "_chain",
         )
     }
     config = modules["_config"]
     ck = modules["channel_kinematics"]
     frame = modules["channel_frame_geom"]
-    bar = modules["amplitude_bar_spec"]
-    arm = modules["rocker_arm_spec"]
-    lever = modules["channel_lever_spec"]
-    cyl = modules["cylinder_gear_spec"]
-    rod = modules["connecting_rod_spec"]
-    stock = modules["channel_spring_stock_geom"]
-    counter = modules["counter_spring_stock_geom"]
+    bar = modules["ch_amplitude_bar_spec"]
+    arm = modules["ch_rocker_arm_spec"]
+    lever = modules["ch_channel_lever_spec"]
+    cyl = modules["dt_cylinder_gear_spec"]
+    rod = modules["ch_connecting_rod_spec"]
+    stock = modules["vn_channel_spring_stock_geom"]
+    counter = modules["vn_counter_spring_stock_geom"]
     spring_deformation, counter_deformation = spring_deformation_contract(cad, stock, counter)
     mount = modules["spring_mount_geom"]
     settled = modules["settled_spring_seats"]
-    goose = modules["gooseneck_geom"]
-    mag = modules["magnifying_lever_geom"]
-    lw = modules["lever_wire_geom"]
-    pw = modules["pen_wire_geom"]
+    goose = modules["sm_gooseneck_geom"]
+    mag = modules["mg_magnifying_lever_geom"]
+    lw = modules["mg_lever_wire_geom"]
+    pw = modules["pn_pen_wire_geom"]
     paper = modules["paper_drive_geom"]
     chain = modules["_chain"]
-    installation = modules["cone_pivot_post_installation"]
+    installation = modules["dt_cone_pivot_post_installation"]
     feed_senses = recipe_literal_constants(
         cad / "scripts/build_kinematic_probe.py", ("GEAR_SENSE", "FEED_SIGN")
     )
     crank_teeth = [
-        recipe_literal_constants(cad / "scripts/build_crank_pinion.py", ("TEETH",))["TEETH"],
-        recipe_literal_constants(cad / "scripts/crank_drive_gear_spec.py", ("TEETH",))["TEETH"],
+        recipe_literal_constants(cad / "scripts/build_dt_crank_pinion.py", ("TEETH",))["TEETH"],
+        recipe_literal_constants(cad / "scripts/dt_crank_drive_gear_spec.py", ("TEETH",))["TEETH"],
     ]
     count = config.machine("channels", "count")
     if count != 20:
@@ -408,36 +408,36 @@ def main() -> None:
         mid = station + mid_dz
         state = ck.solve_state(amplitudes[index])
         spring = settled.channel_seat(amplitudes[index]).pose
-        prefix = "harmonic-analyzer/channel/"
+        prefix = "ha-harmonic-analyzer/ch-channel/"
         check(
-            prefix + f"rocker-arm-{n}",
+            prefix + f"ch-rocker-arm-{n}",
             [0.0, arm.PIVOT_MID_Y, 0.0],
             [*frame.ROCKER_PIVOT_XY, mid],
         )
         check(
-            prefix + f"channel-lever-{n}",
+            prefix + f"ch-channel-lever-{n}",
             [0.0, 0.0, 0.0],
             [*frame.LEVER_FULCRUM_XY, mid],
         )
         check(
-            prefix + f"amplitude-bar-{n}",
+            prefix + f"ch-amplitude-bar-{n}",
             [0.0, 0.0, 0.0],
             [state["bar_origin_x"], state["bar_origin_y"], mid - bar.BAR_WIDTH / 2.0],
         )
         check(
-            prefix + f"connecting-rod-{n}",
+            prefix + f"ch-connecting-rod-{n}",
             [0.0, 0.0, 0.0],
             [*ck._RING_CENTER, station - (cyl.FACE_WIDTH + cyl.CAM_THICKNESS) / 2.0],
         )
         spring_name = next(
             path
             for path in nodes
-            if path.startswith(prefix + "channel-spring-installed-")
+            if path.startswith(prefix + "vn-channel-spring-installed-")
             and path.endswith(f"-{n}")
         )
         check(spring_name, [0.0, 0.0, 0.0], [*spring.centre_xy, mid])
         check(
-            f"harmonic-analyzer/drive-train/cylinder-gear-{n}",
+            f"ha-harmonic-analyzer/dt-drive-train/dt-cylinder-gear-{n}",
             [0.0, 0.0, 0.0],
             [*frame.CAM_SHAFT_XY, station + cyl.FACE_WIDTH / 2.0],
         )
@@ -445,88 +445,88 @@ def main() -> None:
             {
                 "stationM": station / 1000.0,
                 "midplaneM": mid / 1000.0,
-                "rockerWorldMatrix": nodes[prefix + f"rocker-arm-{n}"],
-                "rodWorldMatrix": nodes[prefix + f"connecting-rod-{n}"],
-                "barWorldMatrix": nodes[prefix + f"amplitude-bar-{n}"],
-                "leverWorldMatrix": nodes[prefix + f"channel-lever-{n}"],
+                "rockerWorldMatrix": nodes[prefix + f"ch-rocker-arm-{n}"],
+                "rodWorldMatrix": nodes[prefix + f"ch-connecting-rod-{n}"],
+                "barWorldMatrix": nodes[prefix + f"ch-amplitude-bar-{n}"],
+                "leverWorldMatrix": nodes[prefix + f"ch-channel-lever-{n}"],
                 "springWorldMatrix": nodes[spring_name],
                 "nativeSpring": asdict(spring),
             }
         )
     sum_z = installation.SUMMING_Z
     check(
-        "harmonic-analyzer/summing/summing-lever-1",
+        "ha-harmonic-analyzer/sm-summing/sm-summing-lever-1",
         [0.0, 0.0, 0.0],
         [*mount.KNIFE, sum_z],
     )
     check(
-        "harmonic-analyzer/summing/knife-mount-1",
+        "ha-harmonic-analyzer/sm-summing/sm-knife-mount-1",
         [0.0, 0.0, 0.0],
         [mount.KNIFE[0], mount.KNIFE_CONTACT_Y, sum_z + 87.0585],
     )
     check(
-        "harmonic-analyzer/summing/counter-spring-1",
+        "ha-harmonic-analyzer/sm-summing/vn-counter-spring-1",
         [0.0, 0.0, 0.0],
         [*native_counter.pose.centre_xy, sum_z],
     )
     check(
-        "harmonic-analyzer/summing/gooseneck-1",
+        "ha-harmonic-analyzer/sm-summing/sm-gooseneck-1",
         [0.0, 0.0, 0.0],
         [mount.COLUMN_X, native_goose_y, sum_z],
     )
     check(
-        "harmonic-analyzer/magnifier/magnifying-lever-1",
+        "ha-harmonic-analyzer/mg-magnifier/mg-magnifying-lever-1",
         [mag.KNIFE_LOCAL_X, mag.KNIFE_LOCAL_Y, 0.0],
         [*mount.KNIFE[:1], mount.KNIFE_CONTACT_Y, -128.3],
     )
     check(
-        "harmonic-analyzer/magnifier/magnifying-wheel-1",
+        "ha-harmonic-analyzer/mg-magnifier/mg-magnifying-wheel-1",
         [0.0, 0.0, 0.0],
         [lw.WHEEL_X, lw.WHEEL_BAR_Y, lw.WHEEL_MID_Z],
     )
     park = modules["pinion_rig_park_geometry"]
-    cam = modules["pinion_cam_geometry"]
+    cam = modules["dt_pinion_cam_geometry"]
     cone_line = modules["cone_line"]
-    platform = modules["cone_swing_platform_geometry"]
+    platform = modules["dt_cone_swing_platform_geometry"]
     cone_pivot = cone_line.cone_station(platform.PIVOT_STATION)
     cone_pivot[1] = cone_line.Y_BASE_TOP
     hardware = platform.swing_hardware_geometry(
         (cone_pivot[0], cone_pivot[2]),
-        lock_collar_dia=modules["cone_lock_knob_spec"].COLLAR_DIA,
-        stop_shank_dia=modules["swing_stop_screw_spec"].SHANK_DIA,
+        lock_collar_dia=modules["vn_cone_lock_knob_spec"].COLLAR_DIA,
+        stop_shank_dia=modules["vn_swing_stop_screw_spec"].SHANK_DIA,
     )
-    pinion_z = nodes["harmonic-analyzer/drive-train/pinion-pivot-shaft-1"][14] * 1000
-    lift_z = nodes["harmonic-analyzer/drive-train/pinion-lift-rod-1"][14] * 1000
-    drum_z = nodes["harmonic-analyzer/drive-train/alignment-pinion-1"][14] * 1000
+    pinion_z = nodes["ha-harmonic-analyzer/dt-drive-train/dt-pinion-pivot-shaft-1"][14] * 1000
+    lift_z = nodes["ha-harmonic-analyzer/dt-drive-train/dt-pinion-lift-rod-1"][14] * 1000
+    drum_z = nodes["ha-harmonic-analyzer/dt-drive-train/dt-alignment-pinion-1"][14] * 1000
     check(
-        "harmonic-analyzer/drive-train/cone-swing-platform-1",
+        "ha-harmonic-analyzer/dt-drive-train/dt-cone-swing-platform-1",
         [0.0, 0.0, 0.0],
         cone_pivot,
     )
     check(
-        "harmonic-analyzer/drive-train/pinion-pivot-shaft-1",
+        "ha-harmonic-analyzer/dt-drive-train/dt-pinion-pivot-shaft-1",
         [0.0, 0.0, 0.0],
         [park.PIVOT_X, park.PIVOT_Y, pinion_z],
     )
     check(
-        "harmonic-analyzer/drive-train/pinion-lift-rod-1",
+        "ha-harmonic-analyzer/dt-drive-train/dt-pinion-lift-rod-1",
         [0.0, 0.0, 0.0],
         [park.LIFT_X, park.LIFT_Y, lift_z],
     )
     check(
-        "harmonic-analyzer/drive-train/alignment-pinion-1",
+        "ha-harmonic-analyzer/dt-drive-train/dt-alignment-pinion-1",
         [0.0, 0.0, 0.0],
         [park.APINION_X, park.APINION_Y, drum_z],
     )
     # The engagement triangle and eccentric/follower contact are the actual
-    # source equations (build_drive_train_assembly.py:2532-2607), not a sweep RPM.
+    # source equations (build_dt_drive_train_assembly.py:2532-2607), not a sweep RPM.
     pd = math.hypot(
         frame.CAM_SHAFT_XY[0] - park.PIVOT_X, frame.CAM_SHAFT_XY[1] - park.PIVOT_Y
     )
     parked_azimuth = math.atan2(
         park.APINION_Y - park.PIVOT_Y, park.APINION_X - park.PIVOT_X
     )
-    strap = modules["pinion_bracket_geometry"].C2C
+    strap = modules["dt_pinion_bracket_geometry"].C2C
     c2c = config.machine("alignment_pinion", "engaged_center_distance_mm")
     engaged_azimuth = math.atan2(
         frame.CAM_SHAFT_XY[1] - park.PIVOT_Y, frame.CAM_SHAFT_XY[0] - park.PIVOT_X
@@ -539,7 +539,7 @@ def main() -> None:
         park.SPR_N[0] * c - park.SPR_N[1] * s,
         park.SPR_N[0] * s + park.SPR_N[1] * c,
     )
-    radii = (cam.CAM_OD + modules["pinion_cam_pin_geometry"].PIN_DIA) / 2
+    radii = (cam.CAM_OD + modules["dt_pinion_cam_pin_geometry"].PIN_DIA) / 2
     lo, hi = -math.pi, 0.0
     for _ in range(60):
         mid = (lo + hi) / 2
@@ -612,8 +612,8 @@ def main() -> None:
     for path, matrix in nodes.items():
         if path.startswith(
             (
-                "harmonic-analyzer/paper-drive/chain-inner-link-",
-                "harmonic-analyzer/paper-drive/chain-outer-link-",
+                "ha-harmonic-analyzer/pd-paper-drive/vn-chain-inner-link-",
+                "ha-harmonic-analyzer/pd-paper-drive/vn-chain-outer-link-",
             )
         ):
             station = chain.loop_parameter(
@@ -665,12 +665,12 @@ def main() -> None:
     source_paths.extend(
         cad / "scripts" / name
         for name in (
-            "build_drive_train_assembly.py",
-            "build_paper_drive_assembly.py",
-            "build_magnifier_assembly.py",
+            "build_dt_drive_train_assembly.py",
+            "build_pd_paper_drive_assembly.py",
+            "build_mg_magnifier_assembly.py",
             "build_kinematic_probe.py",
-            "build_crank_pinion.py",
-            "crank_drive_gear_spec.py",
+            "build_dt_crank_pinion.py",
+            "dt_crank_drive_gear_spec.py",
             "diagnostics/diag_build_9432K31.py",
         )
     )
@@ -755,7 +755,7 @@ def main() -> None:
             "rateNPerMm": mount.CHANNEL_RATE_N_PER_MM,
             "initialTensionN": mount.CHANNEL_INITIAL_TENSION_N,
             "maximumForceN": float(
-                config.parts("channel-spring-installed")["maximum_load_n"]
+                config.parts("vn-channel-spring-installed")["maximum_load_n"]
             ),
         },
         "counter": {
@@ -786,36 +786,36 @@ def main() -> None:
         },
         "summing": {
             "knifeMm": [mount.KNIFE[0], mount.KNIFE_CONTACT_Y, sum_z],
-            "anchorArmMm": modules["summing_lever_spec"].HOLE_X,
+            "anchorArmMm": modules["sm_summing_lever_spec"].HOLE_X,
         },
         "magnifier": {
             "clampRadiusBandMm": mag.clamp_radius_band(
-                modules["magnifying_clamp_geom"].BLOCK_DEPTH
+                modules["mg_magnifying_clamp_geom"].BLOCK_DEPTH
             ),
             "clampRestMm": [lw.CLAMP_X, mount.KNIFE[1], -128.3],
             "fixtureRestMm": [
                 lw.CLAMP_X,
                 lw.HOOK_Y + lw.WIRE_DIA / 2 + lw.CLEARANCE,
                 lw.HOOK_Z
-                + modules["magnifying_vertical_rod_spec"].ROD_DIA / 2
+                + modules["mg_magnifying_vertical_rod_spec"].ROD_DIA / 2
                 + lw.WIRE_DIA / 2
                 + lw.CLEARANCE,
             ],
-            # build_magnifier_assembly:209 sets rod top at lever Y+5.
+            # build_mg_magnifier_assembly:209 sets rod top at lever Y+5.
             # Full collar must remain on the straight rod, below the clamp.
             "fixtureOffsetRangeM": [
                 (
                     mount.KNIFE[1]
                     + 5.0
-                    - modules["magnifying_vertical_rod_spec"].ROD_LENGTH
-                    + modules["magnifying_vertical_rod_spec"].ROD_DIA / 2
+                    - modules["mg_magnifying_vertical_rod_spec"].ROD_LENGTH
+                    + modules["mg_magnifying_vertical_rod_spec"].ROD_DIA / 2
                     - (lw.HOOK_Y + lw.WIRE_DIA / 2 + lw.CLEARANCE)
                 )
                 / 1000,
                 (
                     mount.KNIFE[1]
-                    - modules["magnifying_clamp_geom"].LEVER_BORE_Y
-                    - modules["output_fixture_spec"].COLLAR_HEIGHT
+                    - modules["mg_magnifying_clamp_geom"].LEVER_BORE_Y
+                    - modules["mg_output_fixture_spec"].COLLAR_HEIGHT
                     - (lw.HOOK_Y + lw.WIRE_DIA / 2 + lw.CLEARANCE)
                 )
                 / 1000,
@@ -833,7 +833,7 @@ def main() -> None:
             # publishing, without freezing other output geometry.
             "penRestMm": [
                 value * 1000
-                for value in nodes["harmonic-analyzer/pen/pen-marker-1"][12:15]
+                for value in nodes["ha-harmonic-analyzer/pn-pen/pn-pen-marker-1"][12:15]
             ],
             "cadCoupling": "Rest-linearized yoke; operational wire swing/spin and wrap require the separate physical output-chain solver.",
         },
@@ -882,37 +882,37 @@ def main() -> None:
         "renderFrames": {
             "crankPivotMm": [
                 value * 1000
-                for value in nodes["harmonic-analyzer/drive-train/crankshaft-1"][12:15]
+                for value in nodes["ha-harmonic-analyzer/dt-drive-train/dt-crankshaft-1"][12:15]
             ],
             "crankAxis": [0.0, 0.0, 1.0],
             "coneShaftPivotMm": [
                 value * 1000
-                for value in nodes["harmonic-analyzer/drive-train/cone-gear-shaft-1"][
+                for value in nodes["ha-harmonic-analyzer/dt-drive-train/dt-cone-gear-shaft-1"][
                     12:15
                 ]
             ],
-            "coneShaftAxis": nodes["harmonic-analyzer/drive-train/cone-gear-shaft-1"][
+            "coneShaftAxis": nodes["ha-harmonic-analyzer/dt-drive-train/dt-cone-gear-shaft-1"][
                 8:11
             ],
             "paperKnobPivotMm": [
                 value * 1000
                 for value in nodes[
-                    "harmonic-analyzer/paper-drive/transgear-knob-shaft-1"
+                    "ha-harmonic-analyzer/pd-paper-drive/pd-transgear-knob-shaft-1"
                 ][12:15]
             ],
             "paperFeedPivotMm": [
                 value * 1000
-                for value in nodes["harmonic-analyzer/paper-drive/rack-pinion-1"][12:15]
+                for value in nodes["ha-harmonic-analyzer/pd-paper-drive/pd-rack-pinion-1"][12:15]
             ],
             "paperFeedAxis": [0.0, 0.0, 1.0],
             "platenRestMm": [
                 value * 1000
-                for value in nodes["harmonic-analyzer/paper-drive/platen-1"][12:15]
+                for value in nodes["ha-harmonic-analyzer/pd-paper-drive/pd-platen-1"][12:15]
             ],
             "worldMatrices": {
                 path: matrix
                 for path, matrix in nodes.items()
-                if path.startswith("harmonic-analyzer/")
+                if path.startswith("ha-harmonic-analyzer/")
             },
         },
         "restChannels": rest_channels,

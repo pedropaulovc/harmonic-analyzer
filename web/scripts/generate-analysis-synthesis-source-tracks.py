@@ -205,13 +205,13 @@ class Generator:
                 self.features.setdefault(point["featureId"], []).append((f["decodedTimeSeconds"], point["pixel"][1]))
         # These semantic groups refer to actual unchanged native part bounds.
         self.groups = {
-            "whole": ("/frame/", "/base/"), "spring": ("/channel/channel-lever-", "/channel/spring-"),
-            "bar": ("/channel/rocker-arm-", "/channel/amplitude-bar-"),
-            "cone": ("/drive-train/cone", "/drive-train/cylinder", "/drive-train/crank"),
-            "pen": ("/pen/pen-frame-", "/paper-drive/platen-"),
-            "wheel": ("/magnifier/magnifying-wheel-", "/magnifier/wheel-axle-"),
-            "top": ("/magnifier/magnifying-lever-", "/summing/"),
-            "knife": ("/summing/",), "clamp": ("/magnifier/clamp-",),
+            "whole": ("/fr-frame/", "/fr-harmonic-base-"), "spring": ("/ch-channel/ch-channel-lever-", "/ch-channel/vn-spring-"),
+            "bar": ("/ch-channel/ch-rocker-arm-", "/ch-channel/ch-amplitude-bar-"),
+            "cone": ("/dt-drive-train/dt-cone", "/dt-drive-train/vn-cone", "/dt-drive-train/dt-cylinder", "/dt-drive-train/dt-crank", "/dt-drive-train/vn-crank"),
+            "pen": ("/pn-pen/pn-pen-frame-", "/pd-paper-drive/pd-platen-"),
+            "wheel": ("/mg-magnifier/mg-magnifying-wheel-", "/mg-magnifier/mg-wheel-axle-", "/mg-magnifier/vn-wheel-axle-"),
+            "top": ("/mg-magnifier/mg-magnifying-lever-", "/sm-summing/"),
+            "knife": ("/sm-summing/",), "clamp": ("/mg-magnifier/vn-clamp-",),
         }
         self.parts = self.native["mechanical"][0]["all435"]
         self.presenter_reframing = None
@@ -401,7 +401,7 @@ class Generator:
         rest = controls["nativeRest"]["rest"]
         if (controls["nativeRest"]["channel"]["count"] != 20 or len(rest) != 20
                 or {row["partPath"] for row in rest} != {
-                    f"harmonic-analyzer/channel/rocker-arm-{station}" for station in range(1,21)}
+                    f"ha-harmonic-analyzer/ch-channel/ch-rocker-arm-{station}" for station in range(1,21)}
                 or any(len(row["restWorldMatrix"]) != 16
                        or any(type(value) not in (int,float) or not math.isfinite(value)
                               for value in row["restWorldMatrix"]) for row in rest)):
@@ -416,7 +416,7 @@ class Generator:
             raise ValueError("Analysis automatic motion needs one finite complete fixed native input.")
         correspondence = [
             {"sourceStation":station,"harmonic":station,"nativeStationIndex":20-station,
-             "nativePartPath":f"harmonic-analyzer/channel/rocker-arm-{21-station}"}
+             "nativePartPath":f"ha-harmonic-analyzer/ch-channel/ch-rocker-arm-{21-station}"}
             for station in range(1,21)]
         if packet["stationCorrespondence"] != correspondence:
             raise ValueError("Analysis automatic motion source/native station association changed.")

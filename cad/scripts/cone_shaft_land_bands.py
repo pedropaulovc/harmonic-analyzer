@@ -1,4 +1,4 @@
-"""Diameter and across-flat bands of the cone gear shaft's lands (MHA-014) and
+"""Diameter and across-flat bands of the cone gear shaft's lands (MHA-DT-004) and
 the gears on them.
 
 The shaft spec applies these bands to its model dimensions; the cone gears
@@ -13,13 +13,13 @@ from __future__ import annotations
 from _fit_limits import SHAFT_H
 
 # Diameter bands, one NAMED class per land, applied to the model dimension
-# by build_cone_gear_shaft -- never "+0.00/-0.02" typed as sheet callout text.
+# by build_dt_cone_gear_shaft -- never "+0.00/-0.02" typed as sheet callout text.
 #
 # The Ø12.231 pivot journal RUNS, so it keeps the shared ground-shaft h band:
 # it turns in the pivot post's Ø12.2808 bore (0.05 nominal clearance).  The
 # Ø1.588 tip land keeps the same h band: it carries the T012 and T006 seats
-# and, flatted through to the tip, the MHA-096 set-screw collar, whose stock
-# 1/16 in bore (cone_tip_collar_spec.BORE_DIA) slips over it.
+# and, flatted through to the tip, the MHA-VN-016 set-screw collar, whose stock
+# 1/16 in bore (vn_cone_tip_collar_spec.BORE_DIA) slips over it.
 RUNNING_DIA_BAND = SHAFT_H
 # GEAR_SEAT_BAND (U27, 2026-09-23): the three intermediate lands only carry
 # gears, slid on against the stack (gear_seat_fit).  The upper limit stays at
@@ -35,7 +35,7 @@ SECTION_DIA_BANDS: tuple[tuple[float, float], ...] = (
     GEAR_SEAT_BAND,  # Sec1: T030-T120 seats
     GEAR_SEAT_BAND,  # Sec2: T024 seat
     GEAR_SEAT_BAND,  # Sec3: T018 seat
-    RUNNING_DIA_BAND,  # Sec4: T012 + T006 seats + MHA-096 stack collar
+    RUNNING_DIA_BAND,  # Sec4: T012 + T006 seats + MHA-VN-016 stack collar
 )
 # The cone gears each section carries (U40 S1), index-aligned with
 # SECTION_DIA_BANDS.  The 64T crank-drive gear also rides Sec1.

@@ -19,8 +19,8 @@ from __future__ import annotations
 import pytest
 
 import _drawing_common as drawing_common
-import harmonic_base_spec
-import tube_frame_spec
+import fr_harmonic_base_spec
+import fr_tube_frame_spec
 
 
 class RefusingAdapter:
@@ -32,7 +32,7 @@ class RefusingAdapter:
 
 def test_only_the_features_owning_the_kept_names_are_imported() -> None:
     features = drawing_common._features_owning(
-        tube_frame_spec.DRAWING_DIMENSIONS,
+        fr_tube_frame_spec.DRAWING_DIMENSIONS,
         {"Length", "TopChamfer"},
         view_label="length",
     )
@@ -42,14 +42,14 @@ def test_only_the_features_owning_the_kept_names_are_imported() -> None:
 def test_one_feature_is_selected_once_for_all_of_its_kept_names() -> None:
     """Three kept names on one sketch must not become three selections."""
     assert drawing_common._features_owning(
-        tube_frame_spec.DRAWING_DIMENSIONS,
+        fr_tube_frame_spec.DRAWING_DIMENSIONS,
         {"LowerHoleY", "UpperHoleY", "CrossHoleDia"},
         view_label="length",
     ) == ("CrossHoleProfile",)
 
 
 def test_every_marked_dimension_of_a_real_spec_resolves_to_its_feature() -> None:
-    for spec in (tube_frame_spec, harmonic_base_spec):
+    for spec in (fr_tube_frame_spec, fr_harmonic_base_spec):
         owner = drawing_common._feature_by_dimension_name(spec.DRAWING_DIMENSIONS)
         for feature, names in spec.DRAWING_DIMENSIONS.items():
             for name in names:
@@ -59,7 +59,7 @@ def test_every_marked_dimension_of_a_real_spec_resolves_to_its_feature() -> None
 def test_a_kept_name_no_feature_declares_fails_before_com() -> None:
     with pytest.raises(RuntimeError) as error:
         drawing_common._features_owning(
-            tube_frame_spec.DRAWING_DIMENSIONS, {"Length", "Bogus"}, view_label="end"
+            fr_tube_frame_spec.DRAWING_DIMENSIONS, {"Length", "Bogus"}, view_label="end"
         )
     assert "end view keeps dimensions no feature declares: ['Bogus']" in str(
         error.value
@@ -81,7 +81,7 @@ def test_a_view_that_keeps_nothing_imports_nothing() -> None:
             object(),
             keep={},
             view_label="end",
-            dimensions_by_feature=tube_frame_spec.DRAWING_DIMENSIONS,
+            dimensions_by_feature=fr_tube_frame_spec.DRAWING_DIMENSIONS,
         )
         == []
     )
@@ -198,7 +198,7 @@ class FakeAdapter:
         return member() if callable(member) else member
 
 
-def _seat(view="Drawing View1", component="tube-frame-1"):
+def _seat(view="Drawing View1", component="fr-tube-frame-1"):
     kinds = {
         view: "DRAWINGVIEW",
         f"AnnulusProfile@{component}@{view}": "SKETCH",
@@ -238,8 +238,8 @@ def test_a_body_feature_owner_is_retried_after_the_sketch_type() -> None:
     ]
     assert attempted == [
         ("Drawing View1", "DRAWINGVIEW"),
-        ("Column@tube-frame-1@Drawing View1", "SKETCH"),
-        ("Column@tube-frame-1@Drawing View1", "BODYFEATURE"),
+        ("Column@fr-tube-frame-1@Drawing View1", "SKETCH"),
+        ("Column@fr-tube-frame-1@Drawing View1", "BODYFEATURE"),
     ]
 
 
@@ -253,13 +253,13 @@ def test_a_derived_view_is_qualified_by_its_base_view() -> None:
     """A section answers to none of its own model-item paths; its base does.
 
     Measured on the built top-frame drawing:
-    ``"CapRecessProfile@top-frame-7@Section View A-A"`` refuses as a SKETCH and
+    ``"CapRecessProfile@fr-top-frame-7@Section View A-A"`` refuses as a SKETCH and
     as a BODYFEATURE (and for every instance suffix 1..20), the same feature
     resolves through the section's base view, and the import still lands in the
     section because ``InsertModelAnnotations3`` follows the SELECTED view.
     """
-    adapter, drawing, base = _seat(view="Drawing View7", component="top-frame-7")
-    section = FakeView("Section View A-A", "top-frame-7", base=base)
+    adapter, drawing, base = _seat(view="Drawing View7", component="fr-top-frame-7")
+    section = FakeView("Section View A-A", "fr-top-frame-7", base=base)
     drawing.kinds["Section View A-A"] = "DRAWINGVIEW"
     named = drawing_common.insert_feature_dimensions(
         adapter, section, ("AnnulusProfile",)
@@ -272,21 +272,21 @@ def test_a_derived_view_is_qualified_by_its_base_view() -> None:
         )
     ] == [
         ("Section View A-A", "DRAWINGVIEW"),
-        ("AnnulusProfile@top-frame-7@Section View A-A", "SKETCH"),
-        ("AnnulusProfile@top-frame-7@Section View A-A", "BODYFEATURE"),
-        ("AnnulusProfile@top-frame-7@Drawing View7", "SKETCH"),
+        ("AnnulusProfile@fr-top-frame-7@Section View A-A", "SKETCH"),
+        ("AnnulusProfile@fr-top-frame-7@Section View A-A", "BODYFEATURE"),
+        ("AnnulusProfile@fr-top-frame-7@Drawing View7", "SKETCH"),
     ]
     assert ("activate", "Section View A-A") in drawing.calls
 
 
 def test_the_component_qualifier_is_read_back_per_view() -> None:
     """The middle qualifier is the view's own root component, never the part stem."""
-    adapter, drawing, view = _seat(view="Drawing View2", component="tube-frame-2")
+    adapter, drawing, view = _seat(view="Drawing View2", component="fr-tube-frame-2")
     drawing_common.insert_feature_dimensions(adapter, view, ("AnnulusProfile",))
     assert view.child_context == [False]
     assert (
         "select",
-        "AnnulusProfile@tube-frame-2@Drawing View2",
+        "AnnulusProfile@fr-tube-frame-2@Drawing View2",
         "SKETCH",
         True,
     ) in drawing.calls
@@ -346,7 +346,7 @@ def test_kept_dimensions_are_placed_again_only_after_a_delete_or_a_drift(
         object(),
         keep={"Length": (0.1, 0.1)},
         view_label="length",
-        dimensions_by_feature=tube_frame_spec.DRAWING_DIMENSIONS,
+        dimensions_by_feature=fr_tube_frame_spec.DRAWING_DIMENSIONS,
     )
     assert [a.position for a in curated] == [pytest.approx((0.1, 0.1), abs=1e-5)]
     assert calls == passes

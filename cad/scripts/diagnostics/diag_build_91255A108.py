@@ -13,7 +13,7 @@ see its docstring for the [INFERENCE] head, socket and thread laws) with the
 length 3/8 in (9.525) under the head.  No vendor SLDPRT is downloaded or
 committed, so the standalone run is catalog-only.
 
-Ruling R9-48: the MHA-176 guide-lock screws grew from 1/4 in so the worst-case
+Ruling R9-48: the MHA-VN-046 guide-lock screws grew from 1/4 in so the worst-case
 engagement in the platen guide's through tap holds 1.5D.
 
 Run standalone (SolidWorks open)::

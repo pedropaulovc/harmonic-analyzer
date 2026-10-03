@@ -72,7 +72,7 @@ from _cwm import (  # noqa: E402
     resolve_entity,
 )
 
-PREFIXES = {"cylinder-gear", "cone-gear", "cylinder-gear-shaft"}
+PREFIXES = {"dt-cylinder-gear", "dt-cone-gear", "dt-cylinder-gear-shaft"}
 TOL_MM = 0.05
 TOL_DEG = 1e-4
 
@@ -186,7 +186,7 @@ def _copy_one(adapter: Any, seed: str, n: int, dist_slot: int,
 
 async def build(adapter: Any) -> dict[str, str]:
     check("open drive-train",
-          await adapter.open_model(str(OUT_SLDASM / "drive-train.SLDASM")))
+          await adapter.open_model(str(OUT_SLDASM / "dt-drive-train.SLDASM")))
     try:
         return await _probe(adapter)
     finally:
@@ -198,7 +198,7 @@ async def build(adapter: Any) -> dict[str, str]:
 async def _probe(adapter: Any) -> dict[str, str]:
     results: dict[str, str] = {}
     comps = component_names(adapter)
-    cyls = sorted((c for c in comps if _stem(c) == "cylinder-gear"),
+    cyls = sorted((c for c in comps if _stem(c) == "dt-cylinder-gear"),
                   key=lambda c: component_transform(adapter, c)[11])
     if len(cyls) < 4:
         raise RuntimeError(f"need >= 4 cylinder gears, found {len(cyls)}")
@@ -231,13 +231,13 @@ async def _probe(adapter: Any) -> dict[str, str]:
     # cyl instance -> (its cone, its authored mesh-mate name), for every
     # station: the copies' targets AND the stored-form ground truth.
     mesh_of = {
-        next(i for i in r["instances"] if _stem(i) == "cylinder-gear"):
-            (next(i for i in r["instances"] if _stem(i) == "cone-gear"),
+        next(i for i in r["instances"] if _stem(i) == "dt-cylinder-gear"):
+            (next(i for i in r["instances"] if _stem(i) == "dt-cone-gear"),
              r["name"])
         for r in rows
         if "Gear" in r["type"]
-        and any(_stem(i) == "cylinder-gear" for i in r["instances"])
-        and any(_stem(i) == "cone-gear" for i in r["instances"])
+        and any(_stem(i) == "dt-cylinder-gear" for i in r["instances"])
+        and any(_stem(i) == "dt-cone-gear" for i in r["instances"])
     }
     cone_a, cone_b, cone_c = (mesh_of[cyls[-2]][0], mesh_of[cyls[-3]][0],
                               mesh_of[cyls[-4]][0])

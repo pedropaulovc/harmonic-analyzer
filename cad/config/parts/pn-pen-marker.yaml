@@ -1,0 +1,9 @@
+pn-pen-marker:
+  number: MHA-PN-003
+  category: pn
+  material: Brass
+  material_specification: UNS C36000 free-machining brass rod
+  finish: smooth turned, bright; polished tip
+  quantity: 1
+  tolerance_class: machined_block
+  process: "machined (brass)"

@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import math
 
-import build_frame_assembly as frame
-import frame_cross_screw_spec as cross_screw
-from tube_frame_cap_spec import INSIDE_HEIGHT, TOTAL_HEIGHT
+import build_fr_frame_assembly as frame
+import vn_frame_cross_screw_spec as cross_screw
+from vn_tube_frame_cap_spec import INSIDE_HEIGHT, TOTAL_HEIGHT
 
 
 def test_cross_screws_clear_tubes_and_engage_both_casting_sides() -> None:

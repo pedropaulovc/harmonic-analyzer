@@ -24,8 +24,8 @@ import comtypes.client  # noqa: E402
 
 SW_TYPELIB = "{83A33D31-27C5-11CE-BFD4-00400513BB57}"  # SldWorks type library
 SW_TYPELIB_VER = (34, 0)  # matches the pywin32 gen_py module ...x0x34x0
-ASSEMBLY = r"C:\src\harmonic-analyzer\cad\out\sldasm\harmonic-analyzer.SLDASM"
-TEST_ZIP = r"C:\src\harmonic-analyzer\cad\out\release\_probe_packandgo.zip"
+ASSEMBLY = r"C:\src\ha-harmonic-analyzer\cad\out\sldasm\ha-harmonic-analyzer.SLDASM"
+TEST_ZIP = r"C:\src\ha-harmonic-analyzer\cad\out\release\_probe_packandgo.zip"
 
 SW_DOC_ASSEMBLY = 2
 SW_OPEN_SILENT = 1

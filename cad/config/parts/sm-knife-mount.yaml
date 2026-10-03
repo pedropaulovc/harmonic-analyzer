@@ -1,0 +1,9 @@
+sm-knife-mount:
+  number: MHA-SM-002
+  category: sm
+  material: Plain Carbon Steel
+  material_specification: AISI O1 tool steel, hardened and tempered to 58-60 HRC after machining
+  finish: heat treated, unpainted
+  quantity: 2
+  tolerance_class: machined_block
+  process: "machined (steel)"

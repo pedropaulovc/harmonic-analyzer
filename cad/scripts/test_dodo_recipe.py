@@ -122,10 +122,10 @@ def test_recipe_tracker_detects_any_recipe_member(tmp_path):
 
 def test_drawing_depends_on_actual_part_execution():
     dodo = _load_dodo()
-    token = dodo._part_execution_token("platen_guide")
-    part = next(task for task in dodo.task_part() if task["name"] == "platen_guide")
+    token = dodo._part_execution_token("pd_platen_guide")
+    part = next(task for task in dodo.task_part() if task["name"] == "pd_platen_guide")
     drawing = next(
-        task for task in dodo.task_drawing() if task["name"] == "platen_guide"
+        task for task in dodo.task_drawing() if task["name"] == "pd_platen_guide"
     )
     assert token in part["targets"]
     assert token in drawing["file_dep"]
@@ -133,10 +133,10 @@ def test_drawing_depends_on_actual_part_execution():
 
 def test_assembly_drawing_depends_on_actual_assembly_execution():
     dodo = _load_dodo()
-    token = dodo._assembly_execution_token("pen")
-    assembly = next(task for task in dodo.task_assembly() if task["name"] == "pen")
+    token = dodo._assembly_execution_token("pn_pen")
+    assembly = next(task for task in dodo.task_assembly() if task["name"] == "pn_pen")
     drawing = next(
-        task for task in dodo.task_drawing() if task["name"] == "pen_assembly"
+        task for task in dodo.task_drawing() if task["name"] == "pn_pen_assembly"
     )
     assert token in assembly["targets"]
     assert token in drawing["file_dep"]
@@ -146,10 +146,10 @@ def test_release_revision_source_invalidates_native_and_drawing_tasks():
     dodo = _load_dodo()
     revision_source = str(dodo.RELEASE_VERSION_FILE)
 
-    part = next(task for task in dodo.task_part() if task["name"] == "platen_guide")
-    assembly = next(task for task in dodo.task_assembly() if task["name"] == "pen")
+    part = next(task for task in dodo.task_part() if task["name"] == "pd_platen_guide")
+    assembly = next(task for task in dodo.task_assembly() if task["name"] == "pn_pen")
     drawing = next(
-        task for task in dodo.task_drawing() if task["name"] == "platen_guide"
+        task for task in dodo.task_drawing() if task["name"] == "pd_platen_guide"
     )
 
     assert revision_source in part["file_dep"]
@@ -183,8 +183,8 @@ def test_drawing_tasks_depend_on_all_selected_layout_templates():
         # grouped spec. (R1 hard-codes the crank numbers crank_pinion_spec
         # prints, test_crank_pinion_drawing pins them to the registry, so the
         # pin sheet no longer reads a foreign row.)
-        ("cone_gear_shaft", ("cone-gear",)),
-        ("drive_train_assembly", ("cone-gear",)),
+        ("dt_cone_gear_shaft", ("dt-cone-gear",)),
+        ("dt_drive_train_assembly", ("dt-cone-gear",)),
     ],
 )
 def test_drawing_depends_on_the_config_rows_its_closure_reads(stem, rows):
@@ -209,18 +209,18 @@ def test_every_drawing_carries_its_config_read_set():
 
 def test_drawing_reading_a_foreign_part_row_carries_that_row(tmp_path):
     """The Codex example itself: a draw script that prints pivot-bracket's
-    number from the registry depends on parts/pivot-bracket.yaml."""
+    number from the registry depends on parts/ch-pivot-bracket.yaml."""
     dodo = _load_dodo()
     script = tmp_path / "draw_foreign_row_probe.py"
     script.write_text(
-        'import _config\nPIVOT_NUMBER = _config.parts("pivot-bracket")["number"]\n',
+        'import _config\nPIVOT_NUMBER = _config.parts("ch-pivot-bracket")["number"]\n',
         encoding="utf-8",
     )
-    deps = dodo._config_deps(script, "rocker_arm_support", "drawing")
+    deps = dodo._config_deps(script, "fr_rocker_arm_support", "drawing")
     parts = dodo.CONFIG_DIR / "parts"
-    assert str((parts / "pivot-bracket.yaml").resolve()) in deps
+    assert str((parts / "ch-pivot-bracket.yaml").resolve()) in deps
     # A literal read names its row; it does not also pull the sheet's own row.
-    assert str((parts / "rocker-arm-support.yaml").resolve()) not in deps
+    assert str((parts / "fr-rocker-arm-support.yaml").resolve()) not in deps
 
 
 # Every source that reads the registry through a NON-literal part name
@@ -316,7 +316,7 @@ def isolated_drawing_keys(tmp_path, monkeypatch):
     import _buildgraph as bg
 
     dodo = _load_dodo()
-    stems = ("platen_guide", "frame_side_screw", "pen_assembly")
+    stems = ("pd_platen_guide", "vn_frame_side_screw", "pn_pen_assembly")
     release_relative = dodo.RELEASE_VERSION_FILE.relative_to(REPO_ROOT)
     config_relative = dodo.CONFIG_DIR.relative_to(REPO_ROOT)
     # The drawing recipe folds the config rows its closure reads (Codex #936
@@ -427,7 +427,7 @@ def test_drawing_registry_projection_accepts_only_declarative_layout_members():
     registry = dodo.SCRIPTS_DIR / "_drawing_registry.py"
     source = registry.read_text(encoding="utf-8")
     marker = "layout=DrawingLayout.LANDSCAPE,"
-    spec = dodo.DRAWINGS_BY_NAME["platen_guide"]
+    spec = dodo.DRAWINGS_BY_NAME["pd_platen_guide"]
 
     for member in ("LANDSCAPE", "PORTRAIT"):
         candidate = source.replace(
@@ -465,9 +465,10 @@ def test_unrelated_drawing_rows_preserve_freshness_and_cache_keys(
     }
     registry = root / "cad" / "scripts" / "_drawing_registry.py"
     text = registry.read_text(encoding="utf-8")
+    original = text
     if change == "edit":
         text = text.replace(
-            'artifact_stem="crank-arm"', 'artifact_stem="crank-arm-new"'
+            'artifact_stem="dt-crank-arm"', 'artifact_stem="dt-crank-arm-new"'
         )
     else:
         text = text.replace(
@@ -476,6 +477,7 @@ def test_unrelated_drawing_rows_preserve_freshness_and_cache_keys(
             '    DrawingSpec("unrelated", "unrelated", "unrelated", '
             '"draw_unrelated.py", DrawingLayout.LANDSCAPE),',
         )
+    assert text != original, "the unrelated registry mutation must actually change its fixture"
     registry.write_text(text, encoding="utf-8")
     assert snapshot() == before
     assert generated, "drawing projection must have a persisted freshness input"
@@ -492,13 +494,13 @@ def test_selected_drawing_row_changes_only_its_freshness_and_cache_key(
     registry = root / "cad" / "scripts" / "_drawing_registry.py"
     registry.write_text(
         registry.read_text(encoding="utf-8").replace(
-            'artifact_stem="platen-guide"', 'artifact_stem="platen-guide-revised"'
+            'artifact_stem="pd-platen-guide"', 'artifact_stem="pd-platen-guide-revised"'
         ),
         encoding="utf-8",
     )
     after = snapshot()
-    assert all(a != b for a, b in zip(before["platen_guide"], after["platen_guide"]))
-    for stem in ("frame_side_screw", "pen_assembly"):
+    assert all(a != b for a, b in zip(before["pd_platen_guide"], after["pd_platen_guide"]))
+    for stem in ("vn_frame_side_screw", "pn_pen_assembly"):
         assert after[stem] == before[stem]
 
 
@@ -508,14 +510,14 @@ def test_config_row_change_moves_only_its_readers_freshness_and_cache_key(
     dodo, _root, snapshot = isolated_drawing_keys()
     before = snapshot()
     # A renumbering: no geometry input moves, only the printed registry value.
-    row = dodo.CONFIG_DIR / "parts" / "platen-guide.yaml"
+    row = dodo.CONFIG_DIR / "parts" / "pd-platen-guide.yaml"
     text = row.read_text(encoding="utf-8")
-    renumbered = re.sub(r"(?m)^(\s+number:\s*)\S+$", r"\g<1>MHA-999", text, count=1)
+    renumbered = re.sub(r"(?m)^(\s+number:\s*)\S+$", r"\g<1>MHA-PD-999", text, count=1)
     assert renumbered != text
     row.write_text(renumbered, encoding="utf-8")
     after = snapshot()
-    assert all(a != b for a, b in zip(before["platen_guide"], after["platen_guide"]))
-    for stem in ("frame_side_screw", "pen_assembly"):
+    assert all(a != b for a, b in zip(before["pd_platen_guide"], after["pd_platen_guide"]))
+    for stem in ("vn_frame_side_screw", "pn_pen_assembly"):
         assert after[stem] == before[stem], stem
 
 
@@ -542,7 +544,7 @@ def test_shared_drawing_inputs_invalidate_freshness_and_cache_keys(
     else:
         path = {
             "transitive_helper": scripts / "_drawing_common.py",
-            "template": next(iter(dodo.DRAWINGS_BY_NAME["platen_guide"].assets)),
+            "template": next(iter(dodo.DRAWINGS_BY_NAME["pd_platen_guide"].assets)),
         }[member]
         path.write_bytes(path.read_bytes() + b"\n# changed shared input\n")
     after = snapshot()
@@ -577,24 +579,24 @@ def test_registry_imported_helper_remains_in_complete_drawing_closure(
     "consumer",
     [
         "from _drawing_registry import DRAWINGS\nALL_DRAWINGS = tuple(DRAWINGS)\n",
-        "from _drawing_registry import DRAWINGS_BY_NAME\nOTHER = DRAWINGS_BY_NAME['crank_arm']\n",
+        "from _drawing_registry import DRAWINGS_BY_NAME\nOTHER = DRAWINGS_BY_NAME['dt_crank_arm']\n",
         "from _drawing_registry import DRAWINGS_BY_NAME\n"
         "def select(name):\n    return DRAWINGS_BY_NAME[name]\n",
         "import _drawing_registry as registry\ndef expose():\n    return registry\n",
         "from _drawing_registry import DRAWINGS_BY_NAME as rows\n"
-        "def lookup():\n    return rows.get('platen_guide')\n",
+        "def lookup():\n    return rows.get('pd_platen_guide')\n",
         "import importlib\n"
         "registry = importlib.import_module('_drawing_registry')\n"
-        "OTHER = registry.DRAWINGS_BY_NAME['crank_arm']\n",
+        "OTHER = registry.DRAWINGS_BY_NAME['dt_crank_arm']\n",
         "import sys\n"
         "registry = sys.modules['_drawing_registry']\n"
-        "OTHER = registry.DRAWINGS_BY_NAME['crank_arm']\n",
+        "OTHER = registry.DRAWINGS_BY_NAME['dt_crank_arm']\n",
         "from importlib import import_module as load\n"
         "registry = load('_drawing_' + 'registry')\n"
-        "OTHER = registry.DRAWINGS_BY_NAME['crank_arm']\n",
+        "OTHER = registry.DRAWINGS_BY_NAME['dt_crank_arm']\n",
         "REGISTRY_NAME = '_drawing_registry'\n"
         "def other_row(loader):\n"
-        "    return loader(REGISTRY_NAME).DRAWINGS_BY_NAME['crank_arm']\n",
+        "    return loader(REGISTRY_NAME).DRAWINGS_BY_NAME['dt_crank_arm']\n",
     ],
     ids=[
         "whole",
@@ -621,7 +623,7 @@ def test_unclassified_transitive_registry_consumers_keep_full_dependency(
     registry = scripts / "_drawing_registry.py"
     registry.write_text(
         registry.read_text(encoding="utf-8").replace(
-            'artifact_stem="crank-arm"', 'artifact_stem="crank-arm-revised"'
+            'artifact_stem="dt-crank-arm"', 'artifact_stem="dt-crank-arm-revised"'
         ),
         encoding="utf-8",
     )
@@ -637,7 +639,7 @@ def test_drawing_registry_keys_are_checkout_and_eol_independent(isolated_drawing
     assert snapshot() == before
 
 
-@pytest.mark.parametrize("stem", ["platen_guide", "pen_assembly"])
+@pytest.mark.parametrize("stem", ["pd_platen_guide", "pn_pen_assembly"])
 def test_drawing_projection_preserves_exact_native_execution_identity(
     isolated_drawing_keys, stem
 ):
@@ -793,8 +795,8 @@ def isolated_assembly_helper_keys(tmp_path, monkeypatch):
 @pytest.mark.parametrize(
     ("helper", "consumers"),
     [
-        ("_assembly_patterns", {"drive_train", "frame", "magnifier", "paper_drive"}),
-        ("_assembly_couplings", {"drive_train", "paper_drive"}),
+        ("_assembly_patterns", {"dt_drive_train", "fr_frame", "mg_magnifier", "pd_paper_drive"}),
+        ("_assembly_couplings", {"dt_drive_train", "pd_paper_drive"}),
         ("_assembly", None),
     ],
 )
@@ -819,7 +821,7 @@ def test_assembly_helper_edits_change_only_real_recipe_and_cache_consumers(
     assert changed("recipes") == expected
     # Parent keys legitimately include child recipe digests before their exact
     # execution tokens change. This is not a direct top-level FULL rebuild.
-    assert changed("assemblies") == expected | {"harmonic_analyzer"}
+    assert changed("assemblies") == expected | {"ha_harmonic_analyzer"}
     assert changed("part_recipes") == set()
     assert changed("parts") == set()
 
@@ -841,9 +843,9 @@ def test_assembly_depends_on_exact_child_execution_identities():
 def test_assembly_file_deps_drop_only_non_inserted_source_targets():
     dodo = _load_dodo()
     removed = {
-        "frame": ("gooseneck", "rocker_arm"),
-        "drive_train": ("harmonic_base", "channel"),
-        "channel": ("cylinder_gear", "frame"),
+        "fr_frame": ("sm_gooseneck", "ch_rocker_arm"),
+        "dt_drive_train": ("fr_harmonic_base", "ch_channel"),
+        "ch_channel": ("dt_cylinder_gear", "fr_frame"),
     }
     for assembly, sources in removed.items():
         dependencies = set(dodo._assembly_file_deps(assembly))
@@ -905,12 +907,12 @@ def test_source_graph_cache_keys_preserve_real_transitive_identity_edges(
 
     baseline = keys()
     cases = {
-        "rocker_arm": {"channel"},
-        "gooseneck": {"summing"},
-        "harmonic_base": {"frame"},
-        "cylinder_gear": {"drive_train"},
-        "frame_side_screw": {"channel"},
-        "frame_cross_screw": {"frame"},
+        "ch_rocker_arm": {"ch_channel"},
+        "sm_gooseneck": {"sm_summing"},
+        "fr_harmonic_base": {"fr_frame"},
+        "dt_cylinder_gear": {"dt_drive_train"},
+        "vn_frame_side_screw": {"ch_channel"},
+        "vn_frame_cross_screw": {"fr_frame"},
     }
     for source, expected in cases.items():
         part_tokens[source].write_text("b" * 64 + "\n")
@@ -919,16 +921,16 @@ def test_source_graph_cache_keys_preserve_real_transitive_identity_edges(
 
     # A real channel-child identity refresh restamps channel, then invalidates
     # top-level CAD. It must never traverse the removed channel->drive edge.
-    part_tokens["rocker_arm"].write_text("b" * 64 + "\n")
+    part_tokens["ch_rocker_arm"].write_text("b" * 64 + "\n")
     channel_dirty = keys()
-    assembly_tokens["channel"].write_text("c" * 64 + "\n")
-    assert changed(channel_dirty, keys()) == {"harmonic_analyzer"}
-    assembly_tokens["channel"].write_text("a" * 64 + "\n")
-    part_tokens["rocker_arm"].write_text("a" * 64 + "\n")
+    assembly_tokens["ch_channel"].write_text("c" * 64 + "\n")
+    assert changed(channel_dirty, keys()) == {"ha_harmonic_analyzer"}
+    assembly_tokens["ch_channel"].write_text("a" * 64 + "\n")
+    part_tokens["ch_rocker_arm"].write_text("a" * 64 + "\n")
 
     # Recipe changes propagate recursively even before execution tokens change.
-    Path(recipes["part", "rocker_arm"]).write_text("changed rocker geometry recipe\n")
-    assert changed(baseline, keys()) == {"channel", "harmonic_analyzer"}
+    Path(recipes["part", "ch_rocker_arm"]).write_text("changed rocker geometry recipe\n")
+    assert changed(baseline, keys()) == {"ch_channel", "ha_harmonic_analyzer"}
 
 
 def test_verify_gates_depend_on_exact_assembly_identities():
@@ -941,7 +943,7 @@ def test_verify_gates_depend_on_exact_assembly_identities():
     kinematics = next(
         task for task in dodo.task_verify() if task["name"] == "kinematics"
     )
-    for stem in ("pen", "magnifier", "paper_drive"):
+    for stem in ("pn_pen", "mg_magnifier", "pd_paper_drive"):
         assert dodo._assembly_execution_token(stem) in kinematics["file_dep"]
 
 
@@ -968,7 +970,7 @@ def test_assembly_cache_key_changes_with_child_identity(tmp_path, monkeypatch):
 
 def test_cached_drawing_hit_never_builds(tmp_path, monkeypatch):
     dodo = _load_dodo()
-    output = tmp_path / "platen-guide.SLDDRW"
+    output = tmp_path / "pd-platen-guide.SLDDRW"
     restores = []
     stores = []
 
@@ -995,7 +997,7 @@ def test_cached_drawing_hit_never_builds(tmp_path, monkeypatch):
         ),
     )
 
-    dodo._cached_drawing_action("platen_guide")
+    dodo._cached_drawing_action("pd_platen_guide")
 
     assert len(restores) == 1
     assert not stores
@@ -1003,7 +1005,7 @@ def test_cached_drawing_hit_never_builds(tmp_path, monkeypatch):
 
 def test_cached_drawing_miss_builds_once_then_stores(tmp_path, monkeypatch):
     dodo = _load_dodo()
-    output = tmp_path / "platen-guide.SLDDRW"
+    output = tmp_path / "pd-platen-guide.SLDDRW"
     outcomes = iter((False, False))
     restores = []
     builds = []
@@ -1035,7 +1037,7 @@ def test_cached_drawing_miss_builds_once_then_stores(tmp_path, monkeypatch):
         lambda key, outputs, label: stores.append((key, outputs, label)) or "stored",
     )
 
-    dodo._cached_drawing_action("platen_guide")
+    dodo._cached_drawing_action("pd_platen_guide")
 
     assert len(restores) == 2
     assert builds == [True]
@@ -1045,7 +1047,7 @@ def test_cached_drawing_miss_builds_once_then_stores(tmp_path, monkeypatch):
 
 def _locked(dodo, key, label):
     return dodo._cache.RestoreLocked(
-        label, key, PermissionError(13, "Permission denied", "platen-guide.SLDDRW")
+        label, key, PermissionError(13, "Permission denied", "pd-platen-guide.SLDDRW")
     )
 
 
@@ -1056,7 +1058,7 @@ def test_cached_drawing_locked_restore_releases_seat_then_restores(
     forks the artefact identity off the fleet's): release the seat's resident
     documents under the seat, then the re-probe restores the cached build."""
     dodo = _load_dodo()
-    output = tmp_path / "platen-guide.SLDDRW"
+    output = tmp_path / "pd-platen-guide.SLDDRW"
     events = []
 
     monkeypatch.setattr(
@@ -1087,7 +1089,7 @@ def test_cached_drawing_locked_restore_releases_seat_then_restores(
         lambda *_args: events.append(("store", None)) or "stored",
     )
 
-    dodo._cached_drawing_action("platen_guide")
+    dodo._cached_drawing_action("pd_platen_guide")
 
     assert events == [
         ("restore", "locked"),
@@ -1103,7 +1105,7 @@ def test_cached_drawing_lock_first_seen_under_seat_still_recovers(
     probe is the first to hit the lock -- it still gets the release + one
     re-probe instead of failing (CodeRabbit, #754)."""
     dodo = _load_dodo()
-    output = tmp_path / "platen-guide.SLDDRW"
+    output = tmp_path / "pd-platen-guide.SLDDRW"
     events = []
 
     monkeypatch.setattr(
@@ -1130,7 +1132,7 @@ def test_cached_drawing_lock_first_seen_under_seat_still_recovers(
     )
     monkeypatch.setattr(dodo._cache, "store", lambda *_args: "stored")
 
-    dodo._cached_drawing_action("platen_guide")
+    dodo._cached_drawing_action("pd_platen_guide")
 
     assert events == [
         ("restore", False),
@@ -1142,7 +1144,7 @@ def test_cached_drawing_lock_first_seen_under_seat_still_recovers(
 
 def test_cached_drawing_still_locked_after_release_fails_loud(tmp_path, monkeypatch):
     dodo = _load_dodo()
-    output = tmp_path / "platen-guide.SLDDRW"
+    output = tmp_path / "pd-platen-guide.SLDDRW"
     builds = []
 
     monkeypatch.setattr(
@@ -1162,7 +1164,7 @@ def test_cached_drawing_still_locked_after_release_fails_loud(tmp_path, monkeypa
     )
 
     with pytest.raises(RuntimeError, match="still share-locked"):
-        dodo._cached_drawing_action("platen_guide")
+        dodo._cached_drawing_action("pd_platen_guide")
 
     # The release ran; the drawing itself was never built over the locked file.
     assert builds == ["release_seat_documents.py"]
@@ -1172,7 +1174,7 @@ def test_cached_drawing_locked_restore_under_farm_fails_loud(tmp_path, monkeypat
     """The farm submitter holds no seat to release: a locked restore is fatal
     before any leaf is dispatched."""
     dodo = _load_dodo()
-    output = tmp_path / "platen-guide.SLDDRW"
+    output = tmp_path / "pd-platen-guide.SLDDRW"
 
     monkeypatch.setattr(
         dodo, "_drawing_file_deps", lambda _stem: [str(tmp_path / "dep")]
@@ -1192,7 +1194,7 @@ def test_cached_drawing_locked_restore_under_farm_fails_loud(tmp_path, monkeypat
     )
 
     with pytest.raises(dodo._cache.RestoreLocked, match="share-locked"):
-        dodo._cached_drawing_action("platen_guide")
+        dodo._cached_drawing_action("pd_platen_guide")
 
 
 def test_cache_status_covers_drawings():
@@ -1576,13 +1578,13 @@ def test_cached_part_miss_emits_four_sibling_phase_spans(tmp_path, monkeypatch):
     held), and the publish. Each phase is then timed for what it is -- crucially the
     ``task`` span cannot absorb the queueing or the network transfers."""
     dodo = _load_dodo()
-    script = tmp_path / "build_pen_rod.py"
+    script = tmp_path / "build_pn_pen_rod.py"
     script.write_text("", encoding="utf-8")
     outcomes = iter((False, False))  # probe MISS, re-probe under the seat MISS
 
     monkeypatch.setattr(dodo, "_part_file_deps", lambda _script, _stem: [str(script)])
     monkeypatch.setattr(
-        dodo, "_part_cache_outputs", lambda _stem: [tmp_path / "pen-rod.SLDPRT"]
+        dodo, "_part_cache_outputs", lambda _stem: [tmp_path / "pn-pen-rod.SLDPRT"]
     )
     monkeypatch.setattr(dodo, "_cache_key", lambda _deps, _label: "k" * 64)
     monkeypatch.setattr(dodo._cache, "restore", lambda *_a: next(outcomes))
@@ -1613,14 +1615,14 @@ def test_cached_part_miss_emits_four_sibling_phase_spans(tmp_path, monkeypatch):
 
     monkeypatch.setattr(dodo._telemetry, "span", record_span)
 
-    dodo._cached_part_action("pen_rod", script)
+    dodo._cached_part_action("pn_pen_rod", script)
 
     # The seat wait span is _com_seat's, so it is not in this list.
     assert opened == [
-        "cache.probe part:pen_rod",
-        "cache.reprobe part:pen_rod",
-        "task part:pen_rod",
-        "cache.store part:pen_rod",
+        "cache.probe part:pn_pen_rod",
+        "cache.reprobe part:pn_pen_rod",
+        "task part:pn_pen_rod",
+        "cache.store part:pn_pen_rod",
     ]
 
 
@@ -1633,13 +1635,13 @@ def test_autostart_ensures_sw_as_a_top_level_sibling_before_the_task(
     timing (regression guard: an earlier cut called ensure_ready inside _exec_com,
     nesting it under the task span)."""
     dodo = _load_dodo()
-    script = tmp_path / "build_pen_rod.py"
+    script = tmp_path / "build_pn_pen_rod.py"
     script.write_text("", encoding="utf-8")
     outcomes = iter((False, False))  # probe MISS, re-probe MISS -> builds
 
     monkeypatch.setattr(dodo, "_part_file_deps", lambda _script, _stem: [str(script)])
     monkeypatch.setattr(
-        dodo, "_part_cache_outputs", lambda _stem: [tmp_path / "pen-rod.SLDPRT"]
+        dodo, "_part_cache_outputs", lambda _stem: [tmp_path / "pn-pen-rod.SLDPRT"]
     )
     monkeypatch.setattr(dodo, "_cache_key", lambda _deps, _label: "k" * 64)
     monkeypatch.setattr(dodo._cache, "restore", lambda *_a: next(outcomes))
@@ -1680,14 +1682,14 @@ def test_autostart_ensures_sw_as_a_top_level_sibling_before_the_task(
 
     monkeypatch.setattr(dodo._sw_lifecycle, "ensure_ready", fake_ensure)
 
-    dodo._cached_part_action("pen_rod", script)
+    dodo._cached_part_action("pn_pen_rod", script)
 
     assert opened == [
-        "cache.probe part:pen_rod",
-        "cache.reprobe part:pen_rod",
+        "cache.probe part:pn_pen_rod",
+        "cache.reprobe part:pn_pen_rod",
         "sw.ensure_ready",
-        "task part:pen_rod",
-        "cache.store part:pen_rod",
+        "task part:pn_pen_rod",
+        "cache.store part:pn_pen_rod",
     ]
 
 
@@ -1719,11 +1721,11 @@ def test_task_span_carries_its_pipeline_stage_resource():
     own children share a resource instead of the task reading the umbrella name.
     Queueing/transfer keep the separate build-infra resource."""
     dodo = _load_dodo()
-    assert dodo._stage_name("part:pen_rod") == "part-build"
-    assert dodo._stage_name("assembly:pen") == "assembly-build"
-    assert dodo._stage_name("drawing:pen_rod") == "drawing-export"
+    assert dodo._stage_name("part:pn_pen_rod") == "part-build"
+    assert dodo._stage_name("assembly:pn_pen") == "assembly-build"
+    assert dodo._stage_name("drawing:pn_pen_rod") == "drawing-export"
     assert dodo._stage_name("verify soundness") == "verify-soundness"
-    assert dodo._stage_name("nothing recognisable") == "harmonic-analyzer"
+    assert dodo._stage_name("nothing recognisable") == "ha-harmonic-analyzer"
 
     source = inspect.getsource(dodo)
     task_spans = list(
@@ -1935,7 +1937,7 @@ def test_assembly_artefact_digest_folds_in_refs():
     every ancestor (correct invalidation) while pure save-churn of an unchanged part
     does not (idempotency)."""
     dodo = _load_dodo()
-    asm = "frame"
+    asm = "fr_frame"
     got = dodo.ContentChecker._digest(dodo._sldasm(asm))
 
     import hashlib
@@ -1957,7 +1959,7 @@ def test_unknown_artefact_falls_back_to_byte_md5(tmp_path):
     from doit.dependency import get_file_md5
 
     dodo = _load_dodo()
-    orphan = tmp_path / "channel-spring-installed-stretch07.SLDPRT"
+    orphan = tmp_path / "vn-channel-spring-installed-stretch07.SLDPRT"
     orphan.write_bytes(b"\x00solidworks-bytes\x01")
     assert dodo._stable_artefact_digest(str(orphan)) is None
     assert dodo.ContentChecker._digest(str(orphan)) == get_file_md5(str(orphan))
@@ -2023,16 +2025,16 @@ def test_config_deps_are_fine_grained():
     # registry row, title-block properties and the global release.  Its bore
     # and tooth-thickness bands are cone-specific constants in
     # ``cone_gear_spec`` (U38/U42), so ``tolerances.yaml`` is not an input.
-    cone = dodo._config_deps(scripts / "build_cone_gear.py", "cone_gear", "part")
+    cone = dodo._config_deps(scripts / "build_dt_cone_gear.py", "dt_cone_gear", "part")
     assert _rel(cone, cfg) == {
         "machine/gear_train.yaml",
-        "parts/cone-gear.yaml",
+        "parts/dt-cone-gear.yaml",
         "parts/_defaults.yaml",
         "title_block.yaml",
         "release.yaml",
     }, _rel(cone, cfg)
     cylinder = dodo._config_deps(
-        scripts / "build_cylinder_gear.py", "cylinder_gear", "part"
+        scripts / "build_dt_cylinder_gear.py", "dt_cylinder_gear", "part"
     )
     assert "machine/gear_train.yaml" in _rel(cylinder, cfg)
     assert set(cone) <= whole
@@ -2041,10 +2043,10 @@ def test_config_deps_are_fine_grained():
     # on its own row + shared defaults + title_block.yaml + release.yaml, nothing
     # else.
     screw = dodo._config_deps(
-        scripts / "build_fillister_screw.py", "fillister_screw", "part"
+        scripts / "build_vn_fillister_screw.py", "vn_fillister_screw", "part"
     )
     assert _rel(screw, cfg) == {
-        "parts/fillister-screw.yaml",
+        "parts/vn-fillister-screw.yaml",
         "parts/_defaults.yaml",
         "title_block.yaml",
         "release.yaml",
@@ -2062,7 +2064,7 @@ def test_config_deps_are_fine_grained():
     # rebuilt .SLDPRT -> REFRESH); a stamping one (channel) tracks the rows it
     # stamps. _recipe_files is the single source for the FULL/REFRESH digest AND the
     # file_dep, so narrowing it keeps that parity intact.
-    frame_recipe = _rel(dodo._recipe_files("frame"), cfg)
+    frame_recipe = _rel(dodo._recipe_files("fr_frame"), cfg)
     assert not any(t.startswith("parts/") for t in frame_recipe), frame_recipe
     assert "dimensions.yaml" not in frame_recipe
     # Assembly title stamping is a separate contract: every released assembly
@@ -2072,8 +2074,8 @@ def test_config_deps_are_fine_grained():
     assert "tolerances.yaml" not in frame_recipe, frame_recipe
     assert "title_block.yaml" in frame_recipe, frame_recipe
     assert "release.yaml" in frame_recipe, frame_recipe
-    channel_recipe = _rel(dodo._recipe_files("channel"), cfg)
-    assert "parts/channel-spring-installed.yaml" in channel_recipe, channel_recipe
+    channel_recipe = _rel(dodo._recipe_files("ch_channel"), cfg)
+    assert "parts/vn-channel-spring-installed.yaml" in channel_recipe, channel_recipe
     assert "release.yaml" in channel_recipe, channel_recipe
     assert "title_block.yaml" in channel_recipe, channel_recipe
     # The part TEMPLATE narrows identically: channel GENERATES its stretch
@@ -2082,8 +2084,8 @@ def test_config_deps_are_fine_grained():
     # generated variants and shift channel's cache key. A non-generating
     # assembly (frame) gets the template only transitively (re-stamped parts ->
     # shifted artefact digests -> REFRESH), never as a direct member.
-    channel_names = {Path(p).name.lower() for p in dodo._recipe_files("channel")}
-    frame_names = {Path(p).name.lower() for p in dodo._recipe_files("frame")}
+    channel_names = {Path(p).name.lower() for p in dodo._recipe_files("ch_channel")}
+    frame_names = {Path(p).name.lower() for p in dodo._recipe_files("fr_frame")}
     assert "harmonic-analyzer.prtdot" in channel_names, channel_names
     assert "harmonic-analyzer.prtdot" not in frame_names, frame_names
     for stem in dodo.ASSEMBLY_ORDER:
@@ -2094,7 +2096,7 @@ def test_config_deps_are_fine_grained():
         dynamic_part_rows = dodo._expand_parts_token(stem, "assembly", script)
         assert "title_block.yaml" in rel_recipe, stem
         assert dodo._expand_title_block_token("assembly", script), stem
-        if stem == "channel":
+        if stem == "ch_channel":
             assert dynamic_part_rows, stem
             assert "harmonic-analyzer.prtdot" in names, stem
             continue
@@ -2117,8 +2119,8 @@ def test_config_deps_recipe_digest_skips_unread_yaml():
     reads it (station geometry), frame does not."""
     dodo = _load_dodo()
     cfg = (REPO_ROOT / "cad" / "config").resolve()
-    drive = _rel(dodo._recipe_files("drive_train"), cfg)
-    frame = _rel(dodo._recipe_files("frame"), cfg)
+    drive = _rel(dodo._recipe_files("dt_drive_train"), cfg)
+    frame = _rel(dodo._recipe_files("fr_frame"), cfg)
     assert "machine/channels.yaml" in drive, drive
     assert "machine/channels.yaml" not in frame, (
         "frame must not FULL on an active_count edit"
@@ -2407,7 +2409,7 @@ def test_kinematics_verify_depends_on_pen_driver_and_truth_model():
     (machine/output.yaml + channels.yaml): post-#221 they ride no pen .SLDASM
     recipe either, so they must be direct file_deps too (codex #224). (_config.py
     itself needs no direct dep -- it stays on pen's build closure, so it rides
-    the pen.SLDASM recipe digest.)"""
+    the pn-pen.SLDASM recipe digest.)"""
     dodo = _load_dodo()
     kinematics = next(t for t in dodo.task_verify() if t["name"] == "kinematics")
     deps = {Path(d).name for d in kinematics["file_dep"]}
@@ -2461,7 +2463,7 @@ def test_recipe_gate_tracks_sources_imported_by_its_tests():
     deps = {Path(path).name for path in recipe["file_dep"]}
     assert {
         "_holes.py",
-        "build_platen_guide.py",
+        "build_pd_platen_guide.py",
         "test_pen_summing_drawing_batch_contract.py",
     } <= deps
     assert {
@@ -2796,8 +2798,8 @@ def test_title_block_geometry_readers_keep_the_title_block_without_stamping(
     import _buildgraph
 
     dodo = _load_dodo()
-    drive_train = dodo.script_for("drive_train")
-    channel = dodo.script_for("channel")
+    drive_train = dodo.script_for("dt_drive_train")
+    channel = dodo.script_for("ch_channel")
     assert _buildgraph.reads_title_block_geometry(drive_train)
     monkeypatch.setattr(dodo, "stamps_title_block_properties", lambda _script: False)
     assert dodo._expand_title_block_token("assembly", drive_train)
@@ -2816,8 +2818,8 @@ def test_check_gates_depend_on_everything_they_execute():
     import closure (``module_deps_of``, which follows lazy function-local
     imports too) and the config files that closure reads (``_config_deps``,
     conservative whole-config on any unclassified use) must all be declared
-    ``file_dep``s. ``check:math`` missed ``build_summing_assembly.py`` and
-    ``gooseneck_geom.py``: a gooseneck edit left the stamp green (2026-09-23),
+    ``file_dep``s. ``check:math`` missed ``build_sm_summing_assembly.py`` and
+    ``sm_gooseneck_geom.py``: a gooseneck edit left the stamp green (2026-09-23),
     and only an unrelated config change later re-ran it -- red.
 
     Not covered by this derivation, so still hand-listed where a gate needs
@@ -2860,26 +2862,17 @@ def test_fastener_catalog_dep_is_narrowed_to_the_rows_each_task_reads():
     dodo = _load_dodo()
     catalog = str(dodo._FASTENER_CATALOG)
     part = dodo._part_file_deps(
-        dodo.SCRIPTS_DIR / "build_frame_side_screw.py", "frame_side_screw"
+        dodo.SCRIPTS_DIR / "build_vn_frame_side_screw.py", "vn_frame_side_screw"
     )
-    drawing = dodo._drawing_file_deps("frame_side_screw")
-    assembly = dodo._recipe_files("pen")
-    for label, deps in (
-        ("part-frame_side_screw", part),
-        ("drawing-frame_side_screw", drawing),
-        ("assembly-pen", assembly),
-    ):
-        assert catalog not in deps, label
-        assert any(
-            Path(dep).name == f"{label}.digest"
-            and Path(dep).parent.name == ".fastener-catalog"
-            for dep in deps
-        ), label
-    assert dodo._fastener_rows_env("part:frame_side_screw") == "frame-side-screw"
-    assert dodo._fastener_rows_env("drawing:frame_side_screw") == "frame-side-screw"
+    drawing = dodo._drawing_file_deps("vn_frame_side_screw")
+    assembly = dodo._recipe_files("pn_pen")
+    for deps in (part, drawing, assembly):
+        assert catalog not in deps
+    assert dodo._fastener_rows_env("part:vn_frame_side_screw") == "vn-frame-side-screw"
+    assert dodo._fastener_rows_env("drawing:vn_frame_side_screw") == "vn-frame-side-screw"
     # pen's closure imports build_pen_set_screw for its constants; that module's
     # fastener("pen-set-screw") runs on import.
-    assert dodo._fastener_rows_env("assembly:pen") == "pen-set-screw"
+    assert dodo._fastener_rows_env("assembly:pn_pen") == "vn-pen-set-screw"
     assert dodo._fastener_rows_env("check:math") is None
 
 
@@ -2893,8 +2886,8 @@ def test_run_subprocess_hands_the_fastener_rows_to_the_build(monkeypatch):
 
     monkeypatch.setenv("HARMONIC_FASTENER_ROWS", "inherited-must-not-leak")
     monkeypatch.setattr(dodo.subprocess, "run", fake_run)
-    assert dodo._run_subprocess(["x"], "part:frame_side_screw") == 0
-    assert seen["HARMONIC_FASTENER_ROWS"] == "frame-side-screw"
+    assert dodo._run_subprocess(["x"], "part:vn_frame_side_screw") == 0
+    assert seen["HARMONIC_FASTENER_ROWS"] == "vn-frame-side-screw"
     seen.clear()
     assert dodo._run_subprocess(["x"], "check:math") == 0
     assert "HARMONIC_FASTENER_ROWS" not in seen
@@ -2955,15 +2948,15 @@ def test_every_assembly_subprocess_is_guarded_by_its_rows(monkeypatch, tmp_path,
     keying the guard on the label dropped it for every assembly build. The guard
     is keyed on the doit task instead, whatever the display label says."""
     dodo = _load_dodo()
-    launched = _assembly_subprocess_envs(dodo, monkeypatch, tmp_path, "pen", mode=mode)
+    launched = _assembly_subprocess_envs(dodo, monkeypatch, tmp_path, "pn_pen", mode=mode)
 
     scripts = [name for name, _env in launched]
     if mode == "full":
-        assert scripts == ["build_pen_assembly.py", "hook_probe.py"]
+        assert scripts == ["build_pn_pen_assembly.py", "hook_probe.py"]
     else:
         assert scripts == ["refresh_assembly.py"]
     for name, env in launched:
-        assert env.get("HARMONIC_FASTENER_ROWS") == "pen-set-screw", name
+        assert env.get("HARMONIC_FASTENER_ROWS") == "vn-pen-set-screw", name
 
 
 @pytest.mark.parametrize(
@@ -2973,7 +2966,7 @@ def test_every_assembly_subprocess_is_guarded_by_its_rows(monkeypatch, tmp_path,
         "REFRESH channel",
         "hook hook_probe.py",
         "check math",
-        "release documents part:frame_side_screw",
+        "release documents part:vn_frame_side_screw",
         "part:no_such_part",
         "assembly:no_such_assembly",
         "drawing:no_such_drawing",

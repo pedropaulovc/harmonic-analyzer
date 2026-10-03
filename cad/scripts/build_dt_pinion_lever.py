@@ -1,0 +1,564 @@
+r"""Reproduction script: pinion engage lever (book ch. 25).
+
+The grip rod that turns the lift rod (build_dt_pinion_lift_rod.py) to
+swing the pinion into mesh: a cylindrical HUB at the root seats over
+the lift rod's front end (p.69 ``page002_img07``: a short fat cylinder
+with a slightly domed south cap -- NOT a ball, PR7 review item), and a
+STRAIGHT Ø6 rod reaches up-and-out.  img07 annotates the rod "6 mm"
+beside the hub, and equal-scale crops of its root and tip read the same
+width, so there is no taper (user ruling 2026-09-24; the earlier Ø4-root
+taper put the thinnest section where the grip load bends it hardest).
+The 86 length is re-derived from img07 against that 6 mm.  Standing up =
+disengaged, folded flat = engaged; the model carries the DISENGAGED
+rest pose.
+
+Layout: hub axis Z centred at the origin (z -5..+5), BLIND bore Ø6.35
+from the +Z face down to z -3 (2 wall behind), domed cap (sagitta 1.5)
+proud of the -Z face -- the lift rod's front end hides inside. Rod: a
+radius-3 cylinder revolved about +Y from y RodY0 (buried in the hub) to
+86. Revolve LAST (nothing later crosses its axis -- the on-axis-revolve
+pitfall's safe case).
+
+Volume gate (mm^3): annulus + wall disc + cap (spherical-cap formula)
++ rod cylinder - rod/hub-OD overlap (Simpson over circular segments).
+
+U36 (MHA-DT-030): a 1/16 in pin hole crosses the hub along local X -- 3 o'clock
+to the grip -- at mid-engagement (4.0 in from the mouth face B).  It is
+match-drilled at assembly through the hub and the lift rod; the part carries
+it so the print can call it out and the assembly can seat the pin.
+
+Dimensions: cad/config/dimensions.yaml "Chapter 25".
+
+Run (SolidWorks already open)::
+
+    uv run python cad\scripts\build_dt_pinion_lever.py
+"""
+
+from __future__ import annotations
+
+import math
+import sys
+from typing import Any
+
+from _common import (
+    POLISHED_STEEL,
+    SketchDims,
+    _early_bound,
+    add_line_chain,
+    anchor_point_to_origin,
+    apply_color,
+    apply_material,
+    blank_reference_sketches,
+    check,
+    define_circle,
+    dimension_between,
+    drive_dimension,
+    ensure_fully_defined,
+    extrude_at_offset,
+    force_rebuild,
+    name_bore_axis,
+    name_dimensions,
+    name_last_feature,
+    report_mass_properties,
+    run_build,
+    save_part_and_images,
+    set_global,
+    set_sketch_direct_db,
+    volume_check,
+)
+from _drawing_marks import (
+    add_diametric_linear_dimension,
+    apply_drawing_precision,
+    apply_drawing_properties,
+    clear_dimensions_for_drawing,
+    mark_dimensions_for_drawing,
+    set_dimension_bilateral_tolerance,
+    set_dimension_prefix,
+    set_dimension_symmetric_tolerance,
+)
+from _fit_limits import deviations
+from _part_pmi import author_part_pmi
+from _saved_part_guard import require_saved_drawing_properties
+from dt_pinion_lever_spec import (
+    BORE,
+    BORE_BAND,
+    CAP_SAG,
+    DRAWING_DIMENSIONS,
+    DRAWING_NOTES,
+    DRAWING_PRECISION,
+    END_WALL_TOLERANCE_MM,
+    HUB_LEN,
+    HUB_OD,
+    ISOMETRIC_VIEW_NOTE,
+    PIN_HOLE_DIA,
+    PIN_HOLE_Z,
+    REFERENCE_SKETCHES,
+    ROD_DIA,
+    ROD_LEN,
+    ROD_Y0,
+    SURFACE_FINISHES,
+    WALL_T,
+)
+
+PART_NAME = "dt-pinion-lever"
+MATERIAL = "Plain Carbon Steel"  # bright steel (p.68)
+_SAVED_DRAWING_PROPERTIES = (
+    "Number",
+    "Material Specification",
+    "Finish",
+    "Quantity",
+    "Manufacturing Notes",
+    "Isometric View Note",
+)
+
+ROD_R = ROD_DIA / 2.0
+HUB_R = HUB_OD / 2.0
+BORE_R = BORE / 2.0
+CAP_R = (HUB_R**2 + CAP_SAG**2) / (2.0 * CAP_SAG)  # 14.83 crown sphere radius
+
+V_ANNULUS = math.pi * (HUB_R**2 - BORE_R**2) * (HUB_LEN - WALL_T)
+V_WALL = math.pi * HUB_R**2 * WALL_T
+V_CAP = math.pi * CAP_SAG**2 * (3.0 * CAP_R - CAP_SAG) / 3.0  # 101.3
+V_ROD = math.pi * ROD_R**2 * (ROD_LEN - ROD_Y0)
+
+
+def _hub_overlap() -> float:
+    """Rod volume already inside the hub OD cylinder: Simpson over
+    y in [ROD_Y0, HUB_R] of the disc-segment area |x| <= sqrt(HUB_R^2-y^2)
+    on the rod's section disc (the rod's z-extent stays inside the hub)."""
+    n = 2000
+    y0, y1 = ROD_Y0, HUB_R
+    h = (y1 - y0) / n
+
+    def area(y: float) -> float:
+        r = ROD_R
+        c = math.sqrt(max(HUB_R**2 - y * y, 0.0))
+        if c >= r:
+            return math.pi * r * r
+        return 2.0 * (c * math.sqrt(r * r - c * c) + r * r * math.asin(c / r))
+
+    total = area(y0) + area(y1)
+    for i in range(1, n):
+        total += (4.0 if i % 2 else 2.0) * area(y0 + i * h)
+    return total * h / 3.0
+
+
+V_TOTAL = V_ANNULUS + V_WALL + V_CAP + V_ROD - _hub_overlap()
+
+
+def _pin_hole_removed() -> float:
+    """Volume the X-axis pin hole takes out of the hub's two walls.
+
+    Each wall is the slab between the bore (r BORE_R) and the OD (r HUB_R),
+    cut by a cylinder of radius PIN_HOLE_DIA/2 along X through the axis:
+    integrate the hole's chord area over x in (BORE_R, HUB_R] with the
+    circular walls' exact x-extents at each height (Simpson).
+    """
+    r = PIN_HOLE_DIA / 2.0
+    n = 2000
+    h = 2.0 * r / n
+
+    def slab(y: float) -> float:
+        width = 2.0 * math.sqrt(max(r * r - y * y, 0.0))  # chord along z
+        outer = math.sqrt(max(HUB_R**2 - y * y, 0.0))
+        inner = math.sqrt(max(BORE_R**2 - y * y, 0.0))
+        return width * (outer - inner)
+
+    total = slab(-r) + slab(r)
+    for i in range(1, n):
+        total += (4.0 if i % 2 else 2.0) * slab(-r + i * h)
+    return 2.0 * total * h / 3.0
+
+
+def _as_construction(adapter: Any, entity_id: str) -> None:
+    """Flag a registered sketch line as construction geometry (the
+    build_harmonic_base reference-sketch idiom)."""
+    segment = _early_bound(adapter._sketch_entities[entity_id], "ISketchSegment")
+    segment.ConstructionGeometry = True
+    if not bool(segment.ConstructionGeometry):
+        raise RuntimeError(f"{entity_id} did not take the construction flag")
+
+
+async def _station_reference(
+    adapter: Any,
+    *,
+    feature: str,
+    name: str,
+    u_start: float,
+    u_end: float,
+    v: float,
+    drive: str,
+) -> list[tuple[str, str]]:
+    """One construction line on the Right Plane whose ONE driving dimension
+    is a station measured from face B (policy rule 2: a printed value no
+    feature carries is modelled, never typed on the sheet).  Right-plane
+    sketch u is model -z, v is model y."""
+    check(f"create_sketch {feature}", await adapter.create_sketch("Right"))
+    set_sketch_direct_db(adapter, True)
+    line = check(f"{feature} line", await adapter.add_line(u_start, v, u_end, v))
+    set_sketch_direct_db(adapter, False)
+    _as_construction(adapter, line)
+    check(
+        f"{feature} horizontal",
+        await adapter.add_sketch_constraint(line, None, "horizontal"),
+    )
+    await dimension_between(
+        adapter,
+        f"{line}.start",
+        f"{line}.end",
+        "horizontal_distance",
+        abs(u_end - u_start),
+        feature,
+    )
+    await anchor_point_to_origin(adapter, f"{line}.start", u_start, v, feature)
+    await ensure_fully_defined(adapter, f"{feature} sketch")
+    check(f"exit_sketch {feature}", await adapter.exit_sketch())
+    name_last_feature(adapter, feature)
+    named = name_dimensions(adapter, feature, [name])
+    return [(named[0], drive)]
+
+
+async def build(adapter) -> dict[str, str]:
+    from solidworks_mcp.adapters.base import ExtrusionParameters, RevolveParameters
+
+    check("create_part", await adapter.create_part())
+
+    # Editable knobs (Tools > Equations). The mm suffix is load-bearing (INCH
+    # document). HubLen/WallT feed extrude DEPTHS (feature parameters).
+    await set_global(adapter, "RodDia", f"{ROD_DIA}mm")
+    await set_global(adapter, "RodLen", f"{ROD_LEN}mm")
+    await set_global(adapter, "RodY0", f"{ROD_Y0}mm")
+    await set_global(adapter, "HubOd", f"{HUB_OD}mm")
+    await set_global(adapter, "HubLen", f"{HUB_LEN}mm")
+    await set_global(adapter, "Bore", f"{BORE}mm")
+    await set_global(adapter, "WallT", f"{WALL_T}mm")
+    await set_global(adapter, "CapSag", f"{CAP_SAG}mm")
+    await set_global(adapter, "PinHoleDia", f"{PIN_HOLE_DIA}mm")
+
+    drive_jobs: list[tuple[str, str]] = []
+
+    # Bored hub barrel: annulus (OD + bore, both origin-centred) from the
+    # blind wall's north face up the +Z length.
+    barrel = SketchDims()
+    check("create_sketch barrel", await adapter.create_sketch("Front"))
+    await define_circle(
+        adapter,
+        0.0,
+        0.0,
+        HUB_R,
+        "hub OD",
+        dims=barrel,
+        names=("HubOdCx", "HubOdCz", "HubOd"),
+        drives=(None, None, '"HubOd"'),
+    )
+    await define_circle(
+        adapter,
+        0.0,
+        0.0,
+        BORE_R,
+        "hub bore",
+        dims=barrel,
+        names=("HubBoreCx", "HubBoreCz", "HubBore"),
+        drives=(None, None, '"Bore"'),
+    )
+    await ensure_fully_defined(adapter, "barrel sketch")
+    check("exit_sketch barrel", await adapter.exit_sketch())
+    name_last_feature(adapter, "BarrelProfile")
+    drive_jobs += barrel.apply(adapter, "BarrelProfile")
+    extrude_at_offset(adapter, HUB_LEN - WALL_T, -HUB_LEN / 2.0 + WALL_T)
+    name_last_feature(adapter, "Barrel")
+    drive_jobs += [
+        (
+            name_dimensions(adapter, "Barrel", ["BoreDepth"])[0],
+            '"HubLen" - "WallT"',
+        )
+    ]
+    expected = V_ANNULUS
+    await volume_check(adapter, "barrel", expected, 0.005 * V_ANNULUS)
+
+    # Blind wall disc at the south end (z -5..-3).
+    wall = SketchDims()
+    check("create_sketch wall", await adapter.create_sketch("Front"))
+    await define_circle(
+        adapter,
+        0.0,
+        0.0,
+        HUB_R,
+        "wall",
+        dims=wall,
+        names=("WallCx", "WallCz", "WallDia"),
+        drives=(None, None, '"HubOd"'),
+    )
+    await ensure_fully_defined(adapter, "wall sketch")
+    check("exit_sketch wall", await adapter.exit_sketch())
+    name_last_feature(adapter, "WallProfile")
+    drive_jobs += wall.apply(adapter, "WallProfile")
+    extrude_at_offset(adapter, WALL_T, -HUB_LEN / 2.0)
+    name_last_feature(adapter, "Wall")
+    drive_jobs += [(name_dimensions(adapter, "Wall", ["EndWall"])[0], '"WallT"')]
+    expected += V_WALL
+    await volume_check(adapter, "wall", expected, 0.005 * V_WALL)
+
+    # Domed south cap (sagitta CAP_SAG proud of z -5): Top-plane rim->apex
+    # arc revolved about Z -- the pivot-shaft front-cap idiom (apex at the
+    # more-positive sketch v, rim -> apex is the minor CCW lobe).
+    v_base = HUB_LEN / 2.0  # sketch v = -z: the -Z face
+    v_apex = HUB_LEN / 2.0 + CAP_SAG
+    v_centre = HUB_LEN / 2.0 + CAP_SAG - CAP_R
+    cap = SketchDims()
+    check("create_sketch cap", await adapter.create_sketch("Top"))
+    set_sketch_direct_db(adapter, True)
+    check("cap centerline", await adapter.add_centerline(0.0, v_base, 0.0, v_apex))
+    base = check("cap base", await adapter.add_line(0.0, v_base, HUB_R, v_base))
+    arc = check(
+        "cap arc",
+        await adapter.add_arc(0.0, v_centre, HUB_R, v_base, 0.0, v_apex),
+    )
+    close = check("cap close", await adapter.add_line(0.0, v_apex, 0.0, v_base))
+    set_sketch_direct_db(adapter, False)
+    check(
+        "cap base horizontal",
+        await adapter.add_sketch_constraint(base, None, "horizontal"),
+    )
+    check(
+        "cap close vertical",
+        await adapter.add_sketch_constraint(close, None, "vertical"),
+    )
+    check(
+        "cap rim reach",
+        await adapter.add_sketch_dimension(
+            f"{base}.end", "origin", "horizontal_distance", HUB_R
+        ),
+    )
+    cap.record("CapRim", '"HubOd" / 2')
+    check(
+        "cap sagitta",
+        await adapter.add_sketch_dimension(
+            f"{close}.start", f"{close}.end", "vertical_distance", CAP_SAG
+        ),
+    )
+    cap.record("CapSagDim", '"CapSag"')
+    check(
+        "cap on axis",
+        await adapter.add_sketch_constraint(
+            f"{base}.start", "origin", "vertical_points"
+        ),
+    )
+    check(
+        "cap station",
+        await adapter.add_sketch_dimension(
+            f"{base}.start", "origin", "vertical_distance", v_base
+        ),
+    )
+    cap.record("CapZ", '"HubLen" / 2')
+    check(
+        "cap radius",
+        await adapter.add_sketch_dimension(arc, None, "radial", CAP_R),
+    )
+    cap.record(
+        "CapR",
+        '("HubOd" / 2 * "HubOd" / 2 + "CapSag" * "CapSag") / (2 * "CapSag")',
+    )
+    await ensure_fully_defined(adapter, "cap sketch")
+    check("exit_sketch cap", await adapter.exit_sketch())
+    name_last_feature(adapter, "CapProfile")
+    drive_jobs += cap.apply(adapter, "CapProfile")
+    check("revolve cap", await adapter.create_revolve(RevolveParameters(angle=360.0)))
+    name_last_feature(adapter, "Cap")
+    expected += V_CAP
+    await volume_check(adapter, "cap", expected, 0.03 * V_CAP)
+
+    # Straight grip rod LAST: rectangle profile on the Front plane revolved
+    # about +Y (centerline on the axis; nothing later crosses it).  The
+    # centerline merges into the on-axis corners at creation (the usual
+    # turned-part revolve idiom), and the diameter is a doubled centerline dim.
+    rod = SketchDims()
+    check("create_sketch rod", await adapter.create_sketch("Front"))
+    set_sketch_direct_db(adapter, True)
+    centerline = check(
+        "rod centerline",
+        await adapter.add_centerline(0.0, ROD_Y0, 0.0, ROD_LEN),
+    )
+    pts = [
+        (0.0, ROD_Y0),
+        (ROD_R, ROD_Y0),
+        (ROD_R, ROD_LEN),
+        (0.0, ROD_LEN),
+        (0.0, ROD_Y0),
+    ]
+    lines = await add_line_chain(adapter, pts, close=False)
+    set_sketch_direct_db(adapter, False)
+    r_base, flank, r_top, axis_edge = lines
+    check(
+        "rod base horizontal",
+        await adapter.add_sketch_constraint(r_base, None, "horizontal"),
+    )
+    check(
+        "rod top horizontal",
+        await adapter.add_sketch_constraint(r_top, None, "horizontal"),
+    )
+    check(
+        "rod axis vertical",
+        await adapter.add_sketch_constraint(axis_edge, None, "vertical"),
+    )
+    check(
+        "rod flank vertical",
+        await adapter.add_sketch_constraint(flank, None, "vertical"),
+    )
+    check(
+        "rod base on axis",
+        await adapter.add_sketch_constraint(
+            f"{r_base}.start", "origin", "vertical_points"
+        ),
+    )
+    check(
+        "rod base height",
+        await adapter.add_sketch_dimension(
+            f"{r_base}.start", "origin", "vertical_distance", ROD_Y0
+        ),
+    )
+    rod.record("RodBaseY", '"RodY0"')
+    await add_diametric_linear_dimension(
+        adapter,
+        centerline,
+        flank,
+        (8.0, (ROD_Y0 + ROD_LEN) / 2.0),
+        "rod diameter",
+    )
+    rod.record("RodDia", '"RodDia"')
+    check(
+        "rod length",
+        await adapter.add_sketch_dimension(
+            f"{r_top}.end", "origin", "vertical_distance", ROD_LEN
+        ),
+    )
+    rod.record("RodTipY", '"RodLen"')
+    await ensure_fully_defined(adapter, "rod sketch")
+    check("exit_sketch rod", await adapter.exit_sketch())
+    name_last_feature(adapter, "RodProfile")
+    drive_jobs += rod.apply(adapter, "RodProfile")
+    check("revolve rod", await adapter.create_revolve(RevolveParameters(angle=360.0)))
+    name_last_feature(adapter, "Rod")
+    await volume_check(adapter, "lever", V_TOTAL, 0.01 * V_ROD)
+
+    # U36 pin hole: a through cross-hole along X at the mid-engagement
+    # station, sketched on the Right Plane (normal X; sketch u = -z) and cut
+    # mid-plane twice the hub OD deep, so it crosses both hub walls and the
+    # empty bore.  (ThroughAll + both_directions cut ONE side on the farm:
+    # the adapter falls back to single-sided ThroughAll when the install has
+    # no swEndCondThroughAllBoth -- r7, the lift rod lost half its hole.)  It stays clear of the +Y grip, whose root starts at
+    # y ROD_Y0 -- well above the hole's radius.
+    v_hole = _pin_hole_removed()
+    mass = (await adapter.get_mass_properties()).data
+    before, com_before_z = mass.volume, float(mass.center_of_mass[2])
+    pin_hole = SketchDims()
+    check("create_sketch pin hole", await adapter.create_sketch("Right"))
+    await define_circle(
+        adapter,
+        -PIN_HOLE_Z,
+        0.0,
+        PIN_HOLE_DIA / 2.0,
+        "pin hole",
+        dims=pin_hole,
+        names=("PinHoleZ", "PinHoleY", "PinHoleDia"),
+        # PinHoleZ is the station from the hub centre: half the bore
+        # depth in from the mouth leaves half the end wall past the centre.
+        drives=('"WallT" / 2', None, '"PinHoleDia"'),
+    )
+    await ensure_fully_defined(adapter, "pin hole sketch")
+    check("exit_sketch pin hole", await adapter.exit_sketch())
+    name_last_feature(adapter, "PinHoleProfile")
+    drive_jobs += pin_hole.apply(adapter, "PinHoleProfile")
+    cut = await adapter.create_cut_extrude(
+        ExtrusionParameters(depth=2.0 * HUB_OD, both_directions=True)
+    )
+    if not cut.is_success:
+        raise RuntimeError(f"pin hole cut failed: {cut.error}")
+    name_last_feature(adapter, "PinHole")
+    await volume_check(adapter, "pin hole", before - v_hole, 0.05 * v_hole)
+    # The volume cannot tell the mouth-side station (z +1) from its mirror
+    # about the hub centre (z -1): the barrel exists at both.  Material taken
+    # out at z +1 pulls the centre of mass toward -z.
+    com_after_z = float((await adapter.get_mass_properties()).data.center_of_mass[2])
+    if com_after_z >= com_before_z:
+        raise RuntimeError(
+            f"pin hole landed on the floor side (COM z {com_before_z} -> {com_after_z})"
+        )
+
+    # Stations printed from face B (the flat mouth face, z +HUB_LEN/2): the
+    # grip axis (z 0) along the hub's top silhouette, the pin hole along its
+    # bottom one.
+    drive_jobs += await _station_reference(
+        adapter,
+        feature="GripStationReference",
+        name="GripFromB",
+        u_start=-HUB_LEN / 2.0,
+        u_end=0.0,
+        v=HUB_OD / 2.0,
+        drive='"HubLen" / 2',
+    )
+    drive_jobs += await _station_reference(
+        adapter,
+        feature="PinHoleStationReference",
+        name="PinHoleFromB",
+        u_start=-HUB_LEN / 2.0,
+        u_end=-PIN_HOLE_Z,
+        v=-HUB_OD / 2.0,
+        drive='("HubLen" - "WallT") / 2',
+    )
+
+    # Named hub-bore axis (Axis1): the assembly clamps the lever coaxial on
+    # the lift rod (PR8 -- it spins with the rod to drive the cams).
+    await name_bore_axis(adapter, "Right Plane", 0.0, "Top Plane", 0.0, "hub bore")
+    # Named pin-hole axis (along X at the pin station): the MHA-DT-030 pin's
+    # reference in the assembly.
+    await name_bore_axis(
+        adapter, "Top Plane", 0.0, "Front Plane", PIN_HOLE_Z, "lever pin"
+    )
+
+    # Deferred drive equations, then re-check neutrality (each evaluates to the
+    # as-built value, so the geometry must not move).
+    await force_rebuild(adapter)
+    for dim_name, expr in drive_jobs:
+        await drive_dimension(adapter, dim_name, expr)
+    await force_rebuild(adapter)
+    await volume_check(
+        adapter,
+        "driven lever (equations neutral)",
+        V_TOTAL - v_hole,
+        0.01 * V_ROD,
+    )
+
+    # Manufacturing drawing support: the slip bore and the end wall carry the
+    # only bands (both named in the spec); everything else rides the title
+    # block at the part-authored decimal places.
+    set_dimension_bilateral_tolerance(
+        adapter, "BarrelProfile", "HubBore", *deviations(BORE_BAND)
+    )
+    set_dimension_symmetric_tolerance(adapter, "Wall", "EndWall", END_WALL_TOLERANCE_MM)
+    set_dimension_prefix(adapter, "CapProfile", "CapR", "SR")
+    clear_dimensions_for_drawing(adapter)
+    for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
+        mark_dimensions_for_drawing(adapter, feature_name, dimension_names)
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
+    author_part_pmi(adapter, surface_finishes=SURFACE_FINISHES)
+
+    await apply_material(adapter, MATERIAL)
+    await apply_color(adapter, POLISHED_STEEL)
+    await report_mass_properties(adapter)
+    apply_drawing_properties(
+        adapter,
+        PART_NAME,
+        {
+            "Manufacturing Notes": DRAWING_NOTES,
+            "Isometric View Note": ISOMETRIC_VIEW_NOTE,
+        },
+    )
+    blank_reference_sketches(adapter, REFERENCE_SKETCHES)
+    artefacts = await save_part_and_images(adapter, PART_NAME)
+    require_saved_drawing_properties(adapter, _SAVED_DRAWING_PROPERTIES)
+    return artefacts
+
+
+if __name__ == "__main__":
+    sys.exit(run_build(build))

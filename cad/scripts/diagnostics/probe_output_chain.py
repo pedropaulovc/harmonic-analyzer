@@ -48,7 +48,7 @@ SUM_RPM = 1.0  # gentle: 6 deg/s -> 36 deg over 6 s, no acos wrap
 TIMES = [DURATION_S * s / 12.0 for s in range(13)]
 
 
-VALUE_CHAIN_SUBS = ("summing-1", "magnifier-1", "pen-1")
+VALUE_CHAIN_SUBS = ("sm-summing-1", "mg-magnifier-1", "pn-pen-1")
 
 
 async def _flex_value_chain(adapter):
@@ -88,9 +88,9 @@ async def main():
     await _flex_value_chain(adapter)
     # free summing rock + wheel rock + pen travel (the chain's 3 driven DOF),
     # each now in its own sub.
-    await _suppress_named(adapter, "summing-1", ("summing-lever",),
+    await _suppress_named(adapter, "sm-summing-1", ("sm-summing-lever",),
                           (ANGLE,), "summing rock")
-    await _suppress_named(adapter, "magnifier-1", ("magnifying-wheel",),
+    await _suppress_named(adapter, "mg-magnifier-1", ("mg-magnifying-wheel",),
                           (ANGLE,), "wheel rock")
     await _suppress_pen_travel(adapter)
     rim_pt = await _rim_point(adapter)
@@ -106,13 +106,13 @@ async def main():
     w1 = await _add_wire1_gear(adapter)
     log(f"  WIRE1 = {w1.get('name')}")
     w2 = await coincident_mate(
-        adapter, _entity_ref("magnifying-wheel-1", rim_pt, "POINT"),
-        _entity_ref("pen-rod-1", "Top Plane", "PLANE"), label="WIRE2 yoke")
+        adapter, _entity_ref("mg-magnifying-wheel-1", rim_pt, "POINT"),
+        _entity_ref("pn-pen-rod-1", "Top Plane", "PLANE"), label="WIRE2 yoke")
     log(f"  WIRE2 = {w2.get('name')}")
     adapter._attempt(lambda: top.ForceRebuild3(False), default=None)
 
     check("motor summing", await adapter.add_motor(MotionMotorParameters(
-        motor_type="rotary", entity=_entity_ref("summing-lever-1", "Axis1", "AXIS"),
+        motor_type="rotary", entity=_entity_ref("sm-summing-lever-1", "Axis1", "AXIS"),
         speed=SUM_RPM, study_name="")))
 
     await adapter.set_motion_time(MotionTimeParameters(time=0.0, study_name=""))
@@ -120,9 +120,9 @@ async def main():
     adapter._attempt(lambda: top.EditRebuild3(), default=None)
     check("calc", await adapter.calculate_motion(MotionStudyRefParameters(name="")))
 
-    sl, _ = _find_one(adapter, "summing-lever-1")
-    wh, _ = _find_one(adapter, "magnifying-wheel-1")
-    marker, _ = _find_one(adapter, "pen-marker")
+    sl, _ = _find_one(adapter, "sm-summing-lever-1")
+    wh, _ = _find_one(adapter, "mg-magnifying-wheel-1")
+    marker, _ = _find_one(adapter, "pn-pen-marker")
     base = {}
     for t in TIMES:
         await adapter.set_motion_time(MotionTimeParameters(time=t, study_name=""))

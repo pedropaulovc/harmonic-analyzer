@@ -6,7 +6,7 @@
     "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
   },
   "representation": {
-    "path": "models/harmonic-analyzer.glb",
+    "path": "models/ha-harmonic-analyzer.glb",
     "sha256": "ad5c259265be354fb25d208281301356d7587c6a2e508fce1a6cd29014a74719",
     "byteLength": 38975844,
     "codec": "EXT_meshopt_compression"

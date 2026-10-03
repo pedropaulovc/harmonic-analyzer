@@ -12,8 +12,8 @@ from dataclasses import dataclass
 from functools import lru_cache
 
 import channel_kinematics
-import channel_spring_stock_geom as channel_stock
-import counter_spring_stock_geom as counter_stock
+import vn_channel_spring_stock_geom as channel_stock
+import vn_counter_spring_stock_geom as counter_stock
 import spring_mount_geom as mounts
 
 

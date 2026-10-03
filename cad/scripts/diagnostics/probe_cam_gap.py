@@ -25,7 +25,7 @@ from _assembly import (
     world_point,
 )
 
-# Local bore coords (mm) mirrored from build_channel_assembly.
+# Local bore coords (mm) mirrored from build_ch_channel_assembly.
 ROCKER_ROD_BORE_LOCAL = [25.4, 8.39937, 0.0]
 ROD_RING_LOCAL = [0.0, 0.0, 0.0]
 ROD_PIN_LOCAL = [0.0, 127.0, 0.0]
@@ -49,7 +49,7 @@ async def build(adapter):
     path = sys.argv[1]
     res0 = await adapter.open_model(path)
     log(f"opened {path}: {res0.is_success}")
-    res = _origins(adapter, ["connecting-rod-1", "cylinder-gear-1", "rocker-arm-1"])
+    res = _origins(adapter, ["ch-connecting-rod-1", "dt-cylinder-gear-1", "ch-rocker-arm-1"])
     for k, (nm, org) in sorted(res.items()):
         log(f"  {k}: {nm}  origin={org}")
 
@@ -57,11 +57,11 @@ async def build(adapter):
         p = world_point(adapter, name, local)
         return [round(p[0], 4), round(p[1], 4), round(p[2], 4)]
 
-    if "rocker-arm-1" in res:
-        log(f"  rocker rod-bore (Axis2): {wp('rocker-arm-1', ROCKER_ROD_BORE_LOCAL)}")
-    if "connecting-rod-1" in res:
-        log(f"  rod pin  (Axis2): {wp('connecting-rod-1', ROD_PIN_LOCAL)}")
-        log(f"  rod ring (Axis1): {wp('connecting-rod-1', ROD_RING_LOCAL)}")
+    if "ch-rocker-arm-1" in res:
+        log(f"  rocker rod-bore (Axis2): {wp('ch-rocker-arm-1', ROCKER_ROD_BORE_LOCAL)}")
+    if "ch-connecting-rod-1" in res:
+        log(f"  rod pin  (Axis2): {wp('ch-connecting-rod-1', ROD_PIN_LOCAL)}")
+        log(f"  rod ring (Axis1): {wp('ch-connecting-rod-1', ROD_RING_LOCAL)}")
     return {}
 
 

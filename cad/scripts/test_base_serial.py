@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import _dxf_text as dxf
-import build_harmonic_base as base
+import build_fr_harmonic_base as base
 import gen_base_serial_dxf as gen
-from harmonic_base_spec import LIP_H, LIP_W, STACK_HEIGHT, TOP_LENGTH
+from fr_harmonic_base_spec import LIP_H, LIP_W, STACK_HEIGHT, TOP_LENGTH
 
 
 def test_tracked_dxf_matches_the_generator():
@@ -14,12 +14,12 @@ def test_tracked_dxf_matches_the_generator():
 
 
 def test_glyph_sits_on_the_lip_top_beside_the_nameplate():
-    import nameplate_spec
+    import fr_nameplate_spec
 
     s = gen.summary()
     lip_x0, lip_x1 = TOP_LENGTH / 2.0 - LIP_W, TOP_LENGTH / 2.0
     assert lip_x0 + 0.5 <= s["x0"] and s["x1"] <= lip_x1 - 0.5, s
-    plate_z_end = max(z for _x, _y, z in (nameplate_spec.mount_point(p) for p in ((0, 0, 0), (100, 0, 0))))
+    plate_z_end = max(z for _x, _y, z in (fr_nameplate_spec.mount_point(p) for p in ((0, 0, 0), (100, 0, 0))))
     physical_z0, physical_z1 = -s["y1"], -s["y0"]
     assert physical_z0 > plate_z_end + 5.0, (s, plate_z_end)
     assert 0.9 * base.SERIAL_HEIGHT_MM <= (physical_z1 - physical_z0) <= 1.1 * base.SERIAL_HEIGHT_MM

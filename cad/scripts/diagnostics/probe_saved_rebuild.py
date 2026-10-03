@@ -30,7 +30,7 @@ def _needs_rebuild(model) -> int:
 
 
 async def main() -> None:
-    arg = sys.argv[1] if len(sys.argv) > 1 else "frame"
+    arg = sys.argv[1] if len(sys.argv) > 1 else "fr-frame"
     # Accept either a stem (resolved under this repo's OUT) or an absolute path,
     # so the same probe can point at another worktree's artifact.
     path = Path(arg) if arg.lower().endswith(".sldasm") else OUT / f"{arg}.SLDASM"

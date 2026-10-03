@@ -1,5 +1,5 @@
 r"""Diagnostic: assembly-level render materials (component appearance
-overrides) in frame.SLDASM / output.SLDASM / harmonic-analyzer.SLDASM.
+overrides) in fr-frame.SLDASM / output.SLDASM / ha-harmonic-analyzer.SLDASM.
 
 Run: C:\src\SolidworksMCP-python\.venv\Scripts\python.exe cad\scripts\diag_asm_render_materials.py
 """
@@ -18,7 +18,7 @@ import _telemetry  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 
-ASMS = ("frame", "output", "harmonic-analyzer")
+ASMS = ("fr-frame", "output", "ha-harmonic-analyzer")
 
 
 async def build(adapter) -> dict[str, str]:

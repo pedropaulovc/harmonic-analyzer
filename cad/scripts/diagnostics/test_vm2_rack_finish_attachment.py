@@ -118,7 +118,7 @@ def test_help_documents_current_experiment_modes(probe, monkeypatch, capsys):
 @pytest.mark.parametrize("spelling", ["separate", "equals"])
 @pytest.mark.parametrize("relative", [
     "other-checkout/candidate.SLDDRW",
-    "cad/out/slddrw/rack-pinion.SLDDRW",
+    "cad/out/slddrw/pd-rack-pinion.SLDDRW",
     "cad/out/reports/candidate.SLDDRW",
     "cad/out/reports/datum-placement-other/candidate.SLDDRW",
     "cad/out/reports/datum-placement/candidate.json",

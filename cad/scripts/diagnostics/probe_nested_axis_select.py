@@ -5,7 +5,7 @@ ATTACHES to the already-open harmonic-analyzer session (does NOT CloseAllDocumen
 or reopen -- the 22 min reload is the whole thing we are avoiding). The failed
 build_motion_study run left the assembly open with the 3 subs flexible; the cam
 couplings + crank motor all failed with "Failed to select mate entity
-(AXIS at 'Axis1@connecting-rod-1@channel-1@harmonic-analyzer')". This probe:
+(AXIS at 'Axis1@ch-connecting-rod-1@ch-channel-1@harmonic-analyzer')". This probe:
 
   1. confirms the rod/crankshaft parts actually carry Axis1/Axis2 (enumerate the
      part doc's reference-axis features by name);
@@ -84,12 +84,12 @@ async def main():
     log("--- calibration selections ---")
     for nm, et in (
         ("Front Plane", "PLANE"),
-        (f"Front Plane@channel-1@{asm}", "PLANE"),
-        (f"Front Plane@connecting-rod-1@channel-1@{asm}", "PLANE"),
+        (f"Front Plane@ch-channel-1@{asm}", "PLANE"),
+        (f"Front Plane@ch-connecting-rod-1@ch-channel-1@{asm}", "PLANE"),
     ):
         log(f"    SelectByID2 {nm!r} ({et}) -> {_try_select(adapter, doc, nm, et)}")
 
-    for path in ("channel-1/connecting-rod-1", "drive-train-1/crankshaft-1"):
+    for path in ("ch-channel-1/ch-connecting-rod-1", "dt-drive-train-1/dt-crankshaft-1"):
         comp = _find_comp(adapter, doc, path)
         if comp is None:
             log(f"  component NOT FOUND: {path}")

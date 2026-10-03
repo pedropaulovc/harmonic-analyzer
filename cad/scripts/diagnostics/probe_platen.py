@@ -31,11 +31,11 @@ from _assembly import (
     place_component,
     world_point,
 )
-from build_paper_drive_assembly import PLATE_FRONT_Z, PLATE_X0, PLATE_Y0
+from build_pd_paper_drive_assembly import PLATE_FRONT_Z, PLATE_X0, PLATE_Y0
 
 # Distance drivers seed their side from paper-drive's flip seeds
 # (cad/config/assemblies/paper-drive.yaml), the assembly this probe mirrors.
-activate_assembly_contract("paper-drive")
+activate_assembly_contract("pd-paper-drive")
 
 IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
 
@@ -63,9 +63,9 @@ async def build(adapter):
     check("create_assembly", await adapter.create_assembly())
     # Fixed seed so the platen is NOT the first component (SW auto-fixes the
     # first inserted part); in the real assembly many fixed parts precede it.
-    await place_component(adapter, "support-bar", [0.0, 440.0, -133.9],
+    await place_component(adapter, "pd-support-bar", [0.0, 440.0, -133.9],
                           [0.0, 0.0, 0.0], IDENTITY, ground=True)
-    pl = await place_component(adapter, "platen",
+    pl = await place_component(adapter, "pd-platen",
                               [PLATE_X0, PLATE_Y0, PLATE_FRONT_Z], [0.0, 0.0, 0.0],
                               IDENTITY, ground=False)
     pl_o = _org(adapter, pl)
@@ -109,7 +109,7 @@ async def build(adapter):
     from _assembly import lock_mate
     rot_z180 = [[-1.0, 0.0, 0.0], [0.0, -1.0, 0.0], [0.0, 0.0, 1.0]]
     RACK_X0, RACK_Y0, RACK_Z = 41.23, 296.5, -138.9
-    rk = await place_component(adapter, "platen-rack", [RACK_X0, RACK_Y0, RACK_Z],
+    rk = await place_component(adapter, "pd-platen-rack", [RACK_X0, RACK_Y0, RACK_Z],
                               [0.0, 0.0, 180.0], rot_z180, ground=False)
     await lock_mate(adapter, named_ref(f"Front Plane@{rk}", "PLANE"),
                     named_ref(f"Front Plane@{pl}", "PLANE"), label="rack locked to platen")

@@ -30,7 +30,7 @@ and saves it under cad/out/reference for inspection.
 
 ``build_button_head`` and ``catalog_run`` take the ``ButtonHeadScrew``
 dimensions, so another length of the series reuses this recipe unchanged
-(``diag_build_91255A108.py``, the 3/8 in screw MHA-176 takes since R9-48).
+(``diag_build_91255A108.py``, the 3/8 in screw MHA-VN-046 takes since R9-48).
 
 Frame: axis +Y, head up, bearing face (head underside) at y = 0.
 

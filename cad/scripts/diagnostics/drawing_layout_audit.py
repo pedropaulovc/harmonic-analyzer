@@ -72,7 +72,7 @@ Attach-only against the running seat; it never launches SolidWorks, never
 saves, and closes only the document it opened, by path::
 
     uv run cad/scripts/diagnostics/drawing_layout_audit.py \
-        C:/src/harmonic-analyzer/cad/out/slddrw/tube-frame.SLDDRW \
+        C:/src/harmonic-analyzer/cad/out/slddrw/fr-tube-frame.SLDDRW \
         [--json out.json] [--sheet 1]
 
 It takes the machine-global COM seat lock itself (``dodo._com_seat``, the same
@@ -80,7 +80,7 @@ lock every ``doit`` COM task holds) for the whole open-audit-close, so it QUEUES
 behind a running build instead of landing inside it. That is not hygiene: an
 attach-only ``OpenDoc6`` changes the seat's active document, and a sibling part
 build mid-sketch then fails in a plain selection call (``hole wizard hanger stud
-holes: face Select failed`` -- three ``part:top_frame`` builds lost this way on
+holes: face Select failed`` -- three ``part:fr_top_frame`` builds lost this way on
 2026-09-16 to an unlocked probe opening a drawing every minute or two).
 
 Exit status is 1 when any finding is reported, 0 when the layout is clean.
@@ -401,7 +401,7 @@ def _classify_segments(
     fed to the crossing audit.
 
     A hole callout is not classified here: the attach run from the rim to
-    the shelf need not touch the text (MHA-091 RD1's did not, so a leader
+    the shelf need not touch the text (MHA-DT-020 RD1's did not, so a leader
     crossing it went unreported; swing, #902 case 2), and the shared audit
     already owns that rule (``_layout_audit.classify_segments``: every line
     is leader).  This audit has no shoulder role, so the shelf stays leader.

@@ -1,0 +1,9 @@
+mg-output-fixture:
+  number: MHA-MG-006
+  category: mg
+  material: C36000 free-cutting brass
+  material_specification: C36000 free-cutting brass
+  finish: as-machined
+  quantity: 1
+  tolerance_class: machined_block
+  process: "machined (brass)"

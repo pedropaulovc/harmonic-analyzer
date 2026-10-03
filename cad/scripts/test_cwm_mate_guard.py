@@ -229,7 +229,7 @@ def _wire_adapter(existing, creates=()):
 
 def _copy(adapter, **kw):
     return _cwm.copy_with_mates(
-        adapter, ["cylinder-gear-1"], 2, [0.0, 0.0070565],
+        adapter, ["dt-cylinder-gear-1"], 2, [0.0, 0.0070565],
         flips=[False, True], repeat=[True, False],
         new_entities=[None, FakeComponent()], **kw)
 

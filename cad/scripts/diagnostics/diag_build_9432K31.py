@@ -63,7 +63,7 @@ from _common import (  # noqa: E402
     name_last_feature,
     volume_check,
 )
-from channel_spring_stock_geom import (  # noqa: E402
+from vn_channel_spring_stock_geom import (  # noqa: E402
     COIL_MEAN_RADIUS_MM,
     COIL_TURNS,
     FREE_LENGTH_MM,

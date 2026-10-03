@@ -1,5 +1,5 @@
 r"""Throwaway (PR7): where do the base-engaging screws sit in the saved
-drive-train.SLDASM, world frame? The top-level gate reports all 8 fully
+dt-drive-train.SLDASM, world frame? The top-level gate reports all 8 fully
 buried in the base -- compare each screw's world (x, z) against the base's
 authored hole stations to see the misalignment's shape (x-flip? z-flip?).
 """
@@ -13,22 +13,22 @@ from _assembly import component_transform
 
 
 SCREWS = (
-    "cone-pivot-screw-1",
-    "swing-stop-screw-1",
-    "slotted-screw-1",
-    "slotted-screw-2",
-    "slotted-screw-3",
-    "slotted-screw-4",
-    "foot-screw-1",
-    "pedestal-hold-down-screw-1",
-    "pedestal-hold-down-screw-2",
+    "vn-cone-pivot-screw-1",
+    "vn-swing-stop-screw-1",
+    "vn-slotted-screw-1",
+    "vn-slotted-screw-2",
+    "vn-slotted-screw-3",
+    "vn-slotted-screw-4",
+    "vn-foot-screw-1",
+    "vn-pedestal-hold-down-screw-1",
+    "vn-pedestal-hold-down-screw-2",
 )
 
 
 async def main():
     from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
 
-    dt = (OUT_SLDASM / "drive-train.SLDASM").resolve()
+    dt = (OUT_SLDASM / "dt-drive-train.SLDASM").resolve()
     adapter = PyWin32Adapter({})
     await adapter.connect()
     await adapter.open_model(str(dt))

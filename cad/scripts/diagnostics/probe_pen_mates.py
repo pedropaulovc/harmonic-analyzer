@@ -54,7 +54,7 @@ async def main():
     log("  --- pen-rod DISTANCE/ANGLE mates in output ---")
     for _f, mate, name, mtype, parts, val in _iter_mates(adapter, model, read_values=False):
         lone = _lone_real(parts, "output")
-        if lone is None or _family(lone) != "pen-rod":
+        if lone is None or _family(lone) != "pn-pen-rod":
             continue
         if mtype not in (DISTANCE, ANGLE):
             continue

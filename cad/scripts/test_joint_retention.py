@@ -2,7 +2,7 @@
 
 The fixture is the case that exposed the gap: a #10-32 stud screwed into an
 arm until its shim seats, carrying an oiled rotating gear cluster that a front
-cap retains axially (the paper drive's MHA-082 stud in MHA-164, retired by
+cap retains axially (the paper drive's MHA-082 stud in MHA-PD-018, retired by
 R9-68 for a pressed pin). SolidWorks-free.
 """
 
@@ -19,11 +19,11 @@ PARTS = frozenset({"stud", "arm", "shim", "disc", "cap", "jam_nut", "base", "scr
 THREADED = frozenset({"stud", "arm", "cap", "jam_nut", "base", "screw"})
 UNTHREADED = PARTS - THREADED
 STEPS = ("stud-fitted", "cluster-fitted", "stud-locked", "base-screwed")
-INVENTORY = Inventory({"paper_drive": PARTS}, steps={"paper_drive": STEPS})
+INVENTORY = Inventory({"pd_paper_drive": PARTS}, steps={"pd_paper_drive": STEPS})
 
 STUD = Joint(
-    id="paper-drive/stud-in-arm",
-    assembly="paper_drive",
+    id="pd-paper-drive/stud-in-arm",
+    assembly="pd_paper_drive",
     member="stud",
     receiver="arm",
     thread="#10-32 UNF",
@@ -38,8 +38,8 @@ STUD = Joint(
     evidence="fixture",
 )
 CAP = Joint(
-    id="paper-drive/cap-on-stud",
-    assembly="paper_drive",
+    id="pd-paper-drive/cap-on-stud",
+    assembly="pd_paper_drive",
     member="cap",
     receiver="stud",
     thread="#6-32 UNC",
@@ -52,8 +52,8 @@ CAP = Joint(
     evidence="fixture",
 )
 SCREW = Joint(
-    id="paper-drive/screw-in-base",
-    assembly="paper_drive",
+    id="pd-paper-drive/screw-in-base",
+    assembly="pd_paper_drive",
     member="screw",
     receiver="base",
     thread="#8-32 UNC",
@@ -65,8 +65,8 @@ SCREW = Joint(
     evidence="fixture",
 )
 NUT = Joint(
-    id="paper-drive/jam-nut-on-stud",
-    assembly="paper_drive",
+    id="pd-paper-drive/jam-nut-on-stud",
+    assembly="pd_paper_drive",
     member="jam_nut",
     receiver="stud",
     thread="#10-32 UNF",
@@ -115,17 +115,17 @@ def test_a_missing_joint_row_is_omitted() -> None:
 def test_a_missing_row_is_omitted_when_another_row_names_its_parts() -> None:
     # A second screw of the same stock into the same base: stem coverage is
     # satisfied by the first screw's row, so only the registry sees the gap.
-    second = dataclasses.replace(SCREW, id="paper-drive/second-screw-in-base")
-    required = {**REQUIRED, second.id: Occurrence("paper_drive", "fixture", "")}
+    second = dataclasses.replace(SCREW, id="pd-paper-drive/second-screw-in-base")
+    required = {**REQUIRED, second.id: Occurrence("pd_paper_drive", "fixture", "")}
     assert _audit((*VALID, second), required=required) == []
     assert _kinds(_audit(VALID, required=required)) == {(second.id, Kind.OMITTED)}
 
 
 def test_a_row_the_registry_does_not_list_is_unregistered() -> None:
-    extra = dataclasses.replace(SCREW, id="paper-drive/second-screw-in-base")
+    extra = dataclasses.replace(SCREW, id="pd-paper-drive/second-screw-in-base")
     assert _kinds(_audit((*VALID, extra))) == {(extra.id, Kind.UNREGISTERED)}
     # Registered under another assembly is not a match either.
-    required = {**REQUIRED, SCREW.id: Occurrence("frame", "fixture", "")}
+    required = {**REQUIRED, SCREW.id: Occurrence("fr_frame", "fixture", "")}
     assert _kinds(_audit(VALID, required=required)) == {(SCREW.id, Kind.UNREGISTERED)}
 
 
@@ -204,17 +204,17 @@ def test_a_ruling_waives_only_the_joint_it_names() -> None:
 
 
 def test_the_thumbnut_rocked_by_the_free_t24_is_waived_only_by_its_ruling() -> None:
-    """Machinist review of 6c385465d: the free T24 rocks against the MHA-126
+    """Machinist review of 6c385465d: the free T24 rocks against the MHA-PD-013
     flange through its pin backlash, so the nut is an exposed joint; the
-    user's U-MHA-126-no-lock ruling (2026-10-03) waives it, with the backlash
+    user's U-MHA-PD-013-no-lock ruling (2026-10-03) waives it, with the backlash
     the specs give."""
     import math
 
-    import transgear_knob_drive_pin_spec as pin
-    import transgear_removable_spec as wheel
+    import vn_transgear_knob_drive_pin_spec as pin
+    import pd_transgear_removable_spec as wheel
     from _printed_tolerance import drilled_oversize_mm
 
-    joint_id = "paper-drive/thumbnut-on-knob-shaft"
+    joint_id = "pd-paper-drive/thumbnut-on-knob-shaft"
     (row,) = [j for j in jr.JOINTS if j.id == joint_id]
     assert row.exposure is Exposure.OSCILLATING
     assert row.lock is Lock.NONE
@@ -286,7 +286,7 @@ def test_the_locking_operation_must_be_a_step_of_the_assembly() -> None:
     }
     # Without a keyed step list the printed step text is accepted, but a lock
     # that no step installs is still reported.
-    unkeyed = Inventory({"paper_drive": PARTS})
+    unkeyed = Inventory({"pd_paper_drive": PARTS})
     assert _audit(_with_stud(lock_step="SHEET 4 STEP 9"), unkeyed) == []
     assert _kinds(_audit(_with_stud(lock_step=""), unkeyed)) == {
         (STUD.id, Kind.LOCK_STEP_ABSENT)
@@ -298,8 +298,8 @@ def test_hardware_the_drawings_call_for_but_no_assembly_places_is_reported() -> 
     # reported as missing hardware (not as an unknown part) and, exposed with
     # no lock, as unlocked.
     set_screw = Joint(
-        id="paper-drive/arm-set-screw",
-        assembly="paper_drive",
+        id="pd-paper-drive/arm-set-screw",
+        assembly="pd_paper_drive",
         member=jr.UNMODELLED,
         receiver="arm",
         thread="unresolved",
@@ -310,7 +310,7 @@ def test_hardware_the_drawings_call_for_but_no_assembly_places_is_reported() -> 
         lock=Lock.NONE,
         evidence="fixture",
     )
-    required = {**REQUIRED, set_screw.id: Occurrence("paper_drive", "fixture", "")}
+    required = {**REQUIRED, set_screw.id: Occurrence("pd_paper_drive", "fixture", "")}
     findings = _audit((set_screw, CAP, SCREW, NUT, STUD), required=required)
     assert _kinds(findings) == {
         (set_screw.id, Kind.HARDWARE_UNMODELLED),
@@ -330,10 +330,10 @@ def test_a_cross_assembly_joint_covers_the_parts_of_both_subassemblies() -> None
     inventory = Inventory(
         {
             "top": frozenset(),
-            "channel": frozenset({"hook"}),
-            "summing": frozenset({"plate"}),
+            "ch_channel": frozenset({"hook"}),
+            "sm_summing": frozenset({"plate"}),
         },
-        subassemblies={"top": frozenset({"channel", "summing"})},
+        subassemblies={"top": frozenset({"ch_channel", "sm_summing"})},
     )
     hook = Joint(
         id="top/hook-in-plate",
@@ -355,7 +355,7 @@ def test_a_cross_assembly_joint_covers_the_parts_of_both_subassemblies() -> None
     )
     assert _kinds(findings) == {(hook.id, Kind.UNLOCKED)}
     # The same row filed under one sub-assembly cannot name the other's part.
-    misfiled = dataclasses.replace(hook, assembly="channel")
+    misfiled = dataclasses.replace(hook, assembly="ch_channel")
     findings = jr.audit(
         [misfiled],
         inventory,
@@ -405,7 +405,7 @@ def test_deleting_a_row_whose_parts_other_rows_name_is_omitted(
     # The guide screws' stems stay named without their row: fillister_screw
     # as the clip screws' member, platen_guide as the lock screws' receiver.
     # Only the registry notices the guide-screw joint is gone.
-    gone = "paper-drive/guide-screw-in-guide"
+    gone = "pd-paper-drive/guide-screw-in-guide"
     table = tuple(j for j in jr.JOINTS if j.id != gone)
     findings = jr.audit(
         table,
@@ -425,8 +425,8 @@ def test_deleting_a_row_whose_parts_other_rows_name_is_omitted(
 # reusing the stem of a placed instance of the same part would hide them.
 UNPLACED = frozenset(
     {
-        "magnifier/fixture-thumb-screw",  # build_magnifier_assembly omits it
-        "pen/v-block-set-screw-on-rod",  # no set-screw part exists
+        "mg-magnifier/fixture-thumb-screw",  # build_magnifier_assembly omits it
+        "pn-pen/v-block-set-screw-on-rod",  # no set-screw part exists
     }
 )
 
@@ -442,15 +442,15 @@ def test_per_channel_joints_follow_the_built_channel_count(monkeypatch) -> None:
     # A reduced build (machine/channels.yaml active_count) places fewer
     # channel anchors; the report must count what the build places.
     built = jr._config.active_count()
-    before = jr.report([])["per_assembly"]["harmonic_analyzer"]["instances"]
+    before = jr.report([])["per_assembly"]["ha_harmonic_analyzer"]["instances"]
     monkeypatch.setattr(jr._config, "active_count", lambda: 5)
     data = jr.report([])
-    assert data["per_assembly"]["harmonic_analyzer"]["instances"] == before - (
+    assert data["per_assembly"]["ha_harmonic_analyzer"]["instances"] == before - (
         built - 5
     )
     anchors = next(
         j
         for j in data["joints"]
-        if j["id"] == "harmonic-analyzer/channel-anchor-in-summing-plate"
+        if j["id"] == "ha-harmonic-analyzer/channel-anchor-in-summing-plate"
     )
     assert anchors["instances"] == 5

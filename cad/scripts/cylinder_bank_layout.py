@@ -6,17 +6,17 @@ GEOMETRY ONLY: no drawing notes, no annotation contract, no drawing-spec
 imports, and no title-block reads (the ``pinion_rig_layout`` precedent), so a
 print-wording edit can never re-key the drive train.
 
-The bank is a SOLID STACK. Each MHA-027 gear's overall thickness, cam face to
+The bank is a SOLID STACK. Each MHA-DT-012 gear's overall thickness, cam face to
 back face, is the station pitch, so neighbouring gears bear cam face on back
-face, as the rocker hubs do (``rocker_arm_spec.HUB_LENGTH``). A turned thrust
-washer (MHA-121) sits at each end between the end gear and its arbor-pedestal
+face, as the rocker hubs do (``ch_rocker_arm_spec.HUB_LENGTH``). A turned thrust
+washer (MHA-DT-026) sits at each end between the end gear and its arbor-pedestal
 strap.
 
 * The BACK (north) strap is the bank's axial datum. Its inner face is
   DRO-located at fit-up, and the bank is pushed back against it: g19's back
   face bears on the back washer, which bears on the back strap.
 * The arbor fills both strap bores and domes proud of each strap; a set
-  screw in each pedestal's crown apex bears on it (MHA-147): the back one
+  screw in each pedestal's crown apex bears on it (MHA-VN-034): the back one
   fixes the arbor, the front one is tightened once the end-play leaf is set.
 * The FRONT (south) strap is feeler-set: one BANK_END_FEELER leaf between the
   front washer and the strap. That gap is the bank's assembled end play, E_b.
@@ -45,15 +45,15 @@ from __future__ import annotations
 import math
 
 import _config
-import arbor_pedestal_spec as _pedestal
-import arbor_set_screw_spec as _screw
-import connecting_rod_spec as _rod
-import cylinder_gear_shaft_spec as _shaft
-from cylinder_end_disc_spec import (
+import dt_arbor_pedestal_spec as _pedestal
+import vn_arbor_set_screw_spec as _screw
+import ch_connecting_rod_spec as _rod
+import dt_cylinder_gear_shaft_spec as _shaft
+from dt_cylinder_end_disc_spec import (
     WASHER_THICK,
     WASHER_THICK_TOLERANCE_MM,
 )
-from cylinder_gear_spec import (
+from dt_cylinder_gear_spec import (
     CAM_THICKNESS,
     FACE_WIDTH,
     FACE_WIDTH_TOLERANCE_MM,
@@ -65,7 +65,7 @@ COUNT = 20  # the bank is the full set of 20 cylinder gears (every build)
 
 # --- station pitch --------------------------------------------------------
 # The drive-train ladders the gears at the cone-incline z-pitch (the same
-# formula as build_drive_train_assembly.Z_PITCH). The gear's printed overall
+# formula as build_dt_drive_train_assembly.Z_PITCH). The gear's printed overall
 # thickness is the channel station pitch; the two agree to well under a
 # micrometre per station, and the gear is never the longer of the two, so the
 # modelled stack closes without interference.
@@ -162,13 +162,13 @@ STRAP_INNER_SPAN = BACK_STRAP_INNER_Z - FRONT_STRAP_INNER_Z
 CAM_MID_DZ = -(FACE_WIDTH + CAM_THICKNESS) / 2.0
 
 # --- pedestals, arbor and set screws (nominal, bank pushed back) ------------
-# Each MHA-004 stands on its strap INNER face (U34 row 5): the front one as
+# Each MHA-DT-002 stands on its strap INNER face (U34 row 5): the front one as
 # built (local +z = machine +z), the back one turned 180 about y (local +z =
 # machine -z). Their origins follow from those faces.
 FRONT_PEDESTAL_ORIGIN_Z = FRONT_STRAP_INNER_Z - _pedestal.STRAP_INNER_Z
 BACK_PEDESTAL_ORIGIN_Z = BACK_STRAP_INNER_Z + _pedestal.STRAP_INNER_Z
 STRAP_OUTER_SPAN = STRAP_INNER_SPAN + 2.0 * _pedestal.STRAP_T
-# The arbor fills both strap bores end to end, so the MHA-147 apex set screws
+# The arbor fills both strap bores end to end, so the MHA-VN-034 apex set screws
 # (each at its strap's mid-depth) bear on it, and each end is domed
 # ARBOR_DOME_HEIGHT proud of its strap's outer face. Its cylinder IS the span
 # over both straps, the length the fitter measures and cuts to (#743,

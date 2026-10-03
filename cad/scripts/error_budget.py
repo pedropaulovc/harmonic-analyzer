@@ -44,23 +44,23 @@ import numpy as np
 import yaml
 
 import _config
-import amplitude_bar_spec
-import channel_lever_spec
-import channel_spring_installed_spec
-import connecting_rod_spec
-import counter_spring_spec
-import cylinder_gear_spec
-import cone_gear_spec
+import ch_amplitude_bar_spec
+import ch_channel_lever_spec
+import vn_channel_spring_installed_spec
+import ch_connecting_rod_spec
+import vn_counter_spring_spec
+import dt_cylinder_gear_spec
+import dt_cone_gear_spec
 import cone_shaft_land_bands
 import gear_seat_fit
-import lever_wire_geom
-import magnifying_clamp_geom
-import magnifying_lever_geom
-import measuring_stick_geom
+import mg_lever_wire_geom
+import mg_magnifying_clamp_geom
+import mg_magnifying_lever_geom
+import ha_measuring_stick_geom
 import paper_drive_geom
-import pen_wire_geom
-import rocker_arm_spec
-import summing_lever_spec
+import pn_pen_wire_geom
+import ch_rocker_arm_spec
+import sm_summing_lever_spec
 import spring_mount_geom
 import spring_force_model
 from channel_frame_geom import (
@@ -122,45 +122,45 @@ class Nominal:
 
 def nominal() -> Nominal:
     """The as-designed inputs, read from the spec modules the CAD builds from."""
-    lever_band = magnifying_lever_geom.clamp_radius_band(
-        magnifying_clamp_geom.BLOCK_DEPTH
+    lever_band = mg_magnifying_lever_geom.clamp_radius_band(
+        mg_magnifying_clamp_geom.BLOCK_DEPTH
     )
     return Nominal(
-        ecc=cylinder_gear_spec.ECCENTRICITY,
-        rod=connecting_rod_spec.CENTER_DISTANCE,
-        pin_x=rocker_arm_spec.ROD_HOLE_X,
-        pin_y=rocker_arm_spec.ROD_HOLE_Y - rocker_arm_spec.PIVOT_MID_Y,
+        ecc=dt_cylinder_gear_spec.ECCENTRICITY,
+        rod=ch_connecting_rod_spec.CENTER_DISTANCE,
+        pin_x=ch_rocker_arm_spec.ROD_HOLE_X,
+        pin_y=ch_rocker_arm_spec.ROD_HOLE_Y - ch_rocker_arm_spec.PIVOT_MID_Y,
         axis_dx=CAM_SHAFT_XY[0] - ROCKER_PIVOT_XY[0],
         axis_dy=CAM_SHAFT_XY[1] - ROCKER_PIVOT_XY[1],
         cam_home_deg=CYLINDER_LOCK_PHASE_DEG,
-        arc_r=rocker_arm_spec.CURVE_RADIUS,
-        arc_cy=rocker_arm_spec.CENTER_Y - rocker_arm_spec.PIVOT_MID_Y,
+        arc_r=ch_rocker_arm_spec.CURVE_RADIUS,
+        arc_cy=ch_rocker_arm_spec.CENTER_Y - ch_rocker_arm_spec.PIVOT_MID_Y,
         fulcrum_dx=LEVER_FULCRUM_XY[0] - ROCKER_PIVOT_XY[0],
         fulcrum_dy=LEVER_FULCRUM_XY[1] - ROCKER_PIVOT_XY[1],
-        bar_pin_arm=channel_lever_spec.BAR_PIN_X,
-        hook_arm=channel_lever_spec.LEVER_SPRING_X,
-        bar_len=amplitude_bar_spec.TOP_PIN_Y,
-        contact_dx=amplitude_bar_spec.BAR_WIDTH / 2.0,
-        contact_dy=amplitude_bar_spec.BOTTOM_NOTCH_HEIGHT
+        bar_pin_arm=ch_channel_lever_spec.BAR_PIN_X,
+        hook_arm=ch_channel_lever_spec.LEVER_SPRING_X,
+        bar_len=ch_amplitude_bar_spec.TOP_PIN_Y,
+        contact_dx=ch_amplitude_bar_spec.BAR_WIDTH / 2.0,
+        contact_dy=ch_amplitude_bar_spec.BOTTOM_NOTCH_HEIGHT
         - float(_config.fit("cam_follower_contact", "contact_gap_mm")),
-        spring_rate=channel_spring_installed_spec.SPRING_RATE_N_PER_MM,
-        counter_rate=counter_spring_spec.SPRING_RATE_N_PER_MM,
-        spring_initial_tension=channel_spring_installed_spec.INITIAL_TENSION_N,
-        counter_initial_tension=counter_spring_spec.INITIAL_TENSION_N,
-        sum_hole_x=summing_lever_spec.HOLE_X,
+        spring_rate=vn_channel_spring_installed_spec.SPRING_RATE_N_PER_MM,
+        counter_rate=vn_counter_spring_spec.SPRING_RATE_N_PER_MM,
+        spring_initial_tension=vn_channel_spring_installed_spec.INITIAL_TENSION_N,
+        counter_initial_tension=vn_counter_spring_spec.INITIAL_TENSION_N,
+        sum_hole_x=sm_summing_lever_spec.HOLE_X,
         d_max=float(_config.machine("amplitude", "max_travel_mm")),
         lever_r_min=lever_band[0],
         lever_r_built=lever_band[1],
         lever_r_max=lever_band[2],
         wheel_ratio=(
-            pen_wire_geom.RIM_DIA / 2.0
-            + pen_wire_geom.WIRE_DIA / 2.0
-            + pen_wire_geom.CLEARANCE
+            pn_pen_wire_geom.RIM_DIA / 2.0
+            + pn_pen_wire_geom.WIRE_DIA / 2.0
+            + pn_pen_wire_geom.CLEARANCE
         )
         / (
-            lever_wire_geom.HUB_DIA / 2.0
-            + lever_wire_geom.WIRE_DIA / 2.0
-            + lever_wire_geom.CLEARANCE
+            mg_lever_wire_geom.HUB_DIA / 2.0
+            + mg_lever_wire_geom.WIRE_DIA / 2.0
+            + mg_lever_wire_geom.CLEARANCE
         ),
         pen_half=float(_config.machine("output", "pen_trace_half_mm")),
     )
@@ -221,7 +221,7 @@ def rocker_angle(theta: np.ndarray, nom: Nominal) -> np.ndarray:
     lobe's excursion is the cam's own about that axis (x = -ecc sin about the
     lobe angle, build_cylinder_gear's +Y-lobe cosine home), starting
     ``cam_home_deg`` off vertical at crank home -- the drive-train's
-    tooth-in-gap lock (build_channel_assembly.RING_CENTER) -- and the pin
+    tooth-in-gap lock (build_ch_channel_assembly.RING_CENTER) -- and the pin
     rides its arc about the pivot. As designed the rod hangs plumb from the
     pin onto the phased home centre, so the nominal rocker is level at home.
     """
@@ -883,7 +883,7 @@ def phase_profiles() -> dict[str, tuple[np.ndarray, np.ndarray]]:
     The D-flat's AF clearance turns each gear by c / lever, where the lever is
     how far along the flat the gear's bore can bear before contact runs out.
     Every term is bounded at the print's worst, not averaged: the lever is
-    the shortest shaft flat MHA-014 accepts (land at its smallest diameter
+    the shortest shaft flat MHA-DT-004 accepts (land at its smallest diameter
     and largest AF) less the title block's edge break on its torque corner
     (``flat_edge_break_mm``), or the shortest bore flat if that is shorter.
     The bore flat's corner is an inside corner, which the title block does
@@ -915,7 +915,7 @@ def phase_profiles() -> dict[str, tuple[np.ndarray, np.ndarray]]:
         # The configured gear's bore is the nominal diameter of its shaft
         # section; the section's bands set the land's and bores' limits.
         for count in carried:
-            diameter = cone_gear_spec.bore_dia_mm(count)
+            diameter = dt_cone_gear_spec.bore_dia_mm(count)
             shaft_short, shaft_long = _flat_chord_range(
                 diameter, af, dia_band, land_af_band
             )
@@ -1034,7 +1034,7 @@ def _channel_model(
             per_unit, residual = phases[key]
             phi += v * per_unit + residual
         elif key == "station_setting":
-            # A bar can be set neither below the pivot (build_channel_assembly
+            # A bar can be set neither below the pivot (build_ch_channel_assembly
             # rejects amplitude_mm < 0) nor past amplitude.max_travel_mm (the
             # config gate): the setting error at a zero ordinate is one-sided
             # [0, +tol] and at a full-scale ordinate one-sided [-tol, 0]. Draws
@@ -1217,20 +1217,20 @@ def _minimum_pose_wire_estimate(nom: Nominal) -> dict[str, float]:
     tangent, versus the magnifying wheel's rim. Reported so the waiver in
     error_budget.yaml is an informed one; the proof is a seat build of the
     magnifier at that pose (#748)."""
-    import magnifying_wheel_geom
+    import mg_magnifying_wheel_geom
 
-    lever_x0 = lever_wire_geom.CLAMP_X + magnifying_lever_geom.CLAMP_LOCAL_X  # 200
-    hook_x = lever_x0 - (magnifying_lever_geom.KNIFE_LOCAL_X - nom.lever_r_min)
-    hook = np.array([hook_x, lever_wire_geom.HOOK_Y, lever_wire_geom.HOOK_Z])
-    cx, cy = lever_wire_geom.WHEEL_X, lever_wire_geom.WHEEL_BAR_Y
+    lever_x0 = mg_lever_wire_geom.CLAMP_X + mg_magnifying_lever_geom.CLAMP_LOCAL_X  # 200
+    hook_x = lever_x0 - (mg_magnifying_lever_geom.KNIFE_LOCAL_X - nom.lever_r_min)
+    hook = np.array([hook_x, mg_lever_wire_geom.HOOK_Y, mg_lever_wire_geom.HOOK_Z])
+    cx, cy = mg_lever_wire_geom.WHEEL_X, mg_lever_wire_geom.WHEEL_BAR_Y
     vx, vy = hook[0] - cx, hook[1] - cy
-    r_eff = lever_wire_geom._R_EFF
+    r_eff = mg_lever_wire_geom._R_EFF
     theta = math.atan2(vy, vx) - math.acos(r_eff / math.hypot(vx, vy))
     end = np.array(
         [
             cx + r_eff * math.cos(theta),
             cy + r_eff * math.sin(theta),
-            lever_wire_geom.HUB_END_Z,
+            mg_lever_wire_geom.HUB_END_Z,
         ]
     )
     # closest approach of the run to the wheel: the wire runs in FRONT of the
@@ -1239,20 +1239,20 @@ def _minimum_pose_wire_estimate(nom: Nominal) -> dict[str, float]:
     ts = np.linspace(0.0, 1.0, 2001)
     pts = hook[None, :] + ts[:, None] * (end - hook)[None, :]
     radial = np.hypot(pts[:, 0] - cx, pts[:, 1] - cy)
-    rim_r = magnifying_wheel_geom.RIM_OUTER_DIA / 2.0
-    rim_in = magnifying_wheel_geom.RIM_INNER_DIA / 2.0
-    margin = lever_wire_geom.WIRE_DIA / 2.0 + lever_wire_geom.CLEARANCE
+    rim_r = mg_magnifying_wheel_geom.RIM_OUTER_DIA / 2.0
+    rim_in = mg_magnifying_wheel_geom.RIM_INNER_DIA / 2.0
+    margin = mg_lever_wire_geom.WIRE_DIA / 2.0 + mg_lever_wire_geom.CLEARANCE
     over_ring = (radial >= rim_in - margin) & (radial <= rim_r + margin)
-    over_spokes = (radial > lever_wire_geom.HUB_DIA / 2.0 + margin) & (
+    over_spokes = (radial > mg_lever_wire_geom.HUB_DIA / 2.0 + margin) & (
         radial < rim_in - margin
     )
-    ring_face = lever_wire_geom.WHEEL_MID_Z + magnifying_wheel_geom.RIM_AXIAL / 2.0
-    spoke_face = lever_wire_geom.WHEEL_MID_Z + magnifying_wheel_geom.SPOKE_AXIAL / 2.0
+    ring_face = mg_lever_wire_geom.WHEEL_MID_Z + mg_magnifying_wheel_geom.RIM_AXIAL / 2.0
+    spoke_face = mg_lever_wire_geom.WHEEL_MID_Z + mg_magnifying_wheel_geom.SPOKE_AXIAL / 2.0
 
     def gap(mask: np.ndarray, face: float) -> float:
         if not np.any(mask):
             return float("inf")
-        return float(np.min(pts[mask, 2] - face)) - lever_wire_geom.WIRE_DIA / 2.0
+        return float(np.min(pts[mask, 2] - face)) - mg_lever_wire_geom.WIRE_DIA / 2.0
 
     return {
         "hook_x_mm": float(hook[0]),
@@ -1426,7 +1426,7 @@ def closed_form_terms(
     }
     # Lost motion on load reversal: the strap's diametral clearance shifts the
     # rod by c when the ordinate changes sign -- DC for a fixed-sign station.
-    strap_c = connecting_rod_spec.RING_BORE_DIA - cylinder_gear_spec.CAM_DIA
+    strap_c = ch_connecting_rod_spec.RING_BORE_DIA - dt_cylinder_gear_spec.CAM_DIA
     lost_motion = {
         "strap_clearance_mm": strap_c,
         "dc_step_pct_of_channel_amplitude": 100.0 * strap_c / nom.ecc,
@@ -1582,7 +1582,7 @@ def closed_form_terms(
         "inputs_at_minimum_pose": [
             n for n in scored if setups[n].lever_r == nom.lever_r_min
         ],
-        "minimum_pose_cad_gated": False,  # build_magnifier_assembly builds the
+        "minimum_pose_cad_gated": False,  # build_mg_magnifier_assembly builds the
         # as-built pose only; the clamp/rod/wire at the collar is #748's proof
         "minimum_pose_wire_estimate": _minimum_pose_wire_estimate(nom),
         "note": "capacity = full-scale bars whose k=0 peak fills the half-stroke at the minimum magnification; inputs beyond it are set at ordinate_scale < 1; the minimum pose is NOT CAD-gated (reserved.readout.waive_minimum_pose)",
@@ -2056,7 +2056,7 @@ def budget_closes(r: dict[str, Any]) -> list[str]:
     return bad
 
 
-STICK_DIVISION_MM = measuring_stick_geom.DIVISION_SPACING  # the engraved scale
+STICK_DIVISION_MM = ha_measuring_stick_geom.DIVISION_SPACING  # the engraved scale
 
 
 def calibration_table(

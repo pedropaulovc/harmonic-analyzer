@@ -1,4 +1,4 @@
-r"""McMaster 91375A106 -- alloy steel cup-tip set screw, #4-40 x 1/4 (MHA-147).
+r"""McMaster 91375A106 -- alloy steel cup-tip set screw, #4-40 x 1/4 (MHA-VN-034).
 
 Catalog: #4-40 UNC-3A, 1/4 in (6.35) long, black-oxide alloy steel, Rockwell
 C45, 0.050 in hex drive, cup point.  Class 3A is not modelled (nominal UN

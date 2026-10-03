@@ -1,7 +1,7 @@
 r"""Throwaway diagnostic: WHAT is erroring on drive-train (the red X)?
 
 drive-train<1> shows a rebuild error (red circle-X) when inserted + flexible in
-a parent. Is the error LATENT on disk (drive-train.SLDASM itself) or only
+a parent. Is the error LATENT on disk (dt-drive-train.SLDASM itself) or only
 triggered by FLEXIBLE solving in a parent? GetWhatsWrong names the culprit
 feature(s) + error code either way -- this is also the fail-fast gate to add to
 the build scripts.
@@ -72,8 +72,8 @@ async def main():
     )
     from solidworks_mcp.adapters.pywin32_adapter import PyWin32Adapter
 
-    dt = (OUT_SLDASM / "drive-train.SLDASM").resolve()
-    log(f"drive-train.SLDASM = {dt} ({dt.stat().st_size} bytes)")
+    dt = (OUT_SLDASM / "dt-drive-train.SLDASM").resolve()
+    log(f"dt-drive-train.SLDASM = {dt} ({dt.stat().st_size} bytes)")
 
     adapter = PyWin32Adapter({})
     _telemetry.info("Connecting ...")
@@ -85,7 +85,7 @@ async def main():
     sub = adapter.currentModel
     _flag(sub, "IModelDoc2")
     adapter._attempt(lambda: sub.ForceRebuild3(False))
-    _report(adapter, sub, "drive-train.SLDASM standalone (after ForceRebuild3)")
+    _report(adapter, sub, "dt-drive-train.SLDASM standalone (after ForceRebuild3)")
 
     # 2) FLEXIBLE-IN-PARENT: fresh parent, insert, flex, rebuild, check both
     #    the parent and the sub doc.

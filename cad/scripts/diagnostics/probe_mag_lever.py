@@ -27,7 +27,7 @@ from _assembly import (
 
 # Distance drivers seed their side from magnifier's flip seeds
 # (cad/config/assemblies/magnifier.yaml), the assembly this probe mirrors.
-activate_assembly_contract("magnifier")
+activate_assembly_contract("mg-magnifier")
 
 LEVER_ROD_Y = 985.0
 LEVER_ROD_Z = -85.0
@@ -55,9 +55,9 @@ def _status(adapter, comp):
 
 async def build(adapter):
     check("create_assembly", await adapter.create_assembly())
-    mb = await place_component(adapter, "magnifying-bracket",
+    mb = await place_component(adapter, "mg-magnifying-bracket",
                                [-40.0, LEVER_ROD_Y, LEVER_ROD_Z], [0.0, 0.0, 0.0], IDENTITY)
-    ml = await place_component(adapter, "magnifying-lever",
+    ml = await place_component(adapter, "mg-magnifying-lever",
                                [-200.0, LEVER_ROD_Y, LEVER_ROD_Z], [0.0, 0.0, 0.0],
                                IDENTITY, ground=False)
     ml_o = _org(adapter, ml)

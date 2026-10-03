@@ -1,14 +1,14 @@
-r"""The 64T against MHA-016's north side, at print-worst.
+r"""The 64T against MHA-DT-005's north side, at print-worst.
 
-SolidWorks-free.  The 64T (MHA-021) turns on the inclined cone shaft just
-north of MHA-016, and its south face and tip sweep past everything on the
+SolidWorks-free.  The 64T (MHA-DT-007) turns on the inclined cone shaft just
+north of MHA-DT-005, and its south face and tip sweep past everything on the
 post's north side: the crank boss's north face and rim, the Ø42.75 head,
 the turned Ø42 body and the cone boss's north end face.  The post is
 the v36 casting (user ruling 2026-09-28): the crank boss's north face is the
 head's tangent plane, uncut, and the crank bore carries no bushing. The 64T
-stands on the unchanged MHA-014 collar; its south face is fixed there, while
+stands on the unchanged MHA-DT-004 collar; its south face is fixed there, while
 the solid gear stack grows its north face to touch T120. The collar and boss
-bands, not the gear face-width band, govern clearance to MHA-016.
+bands, not the gear face-width band, govern clearance to MHA-DT-005.
 
 Frame: machine axes (north = +z, up = +y), origin where the cone axis crosses
 the post axis.  The cone axis leans ``post.INCLINE_DEG`` in plan, the crank
@@ -34,9 +34,9 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 import _config
-import cone_gear_shaft_spec as shaft
-import cone_pivot_post_spec as post
-import crank_drive_gear_spec as gear64
+import dt_cone_gear_shaft_spec as shaft
+import dt_cone_pivot_post_spec as post
+import dt_crank_drive_gear_spec as gear64
 
 Point = tuple[float, float, float]
 
@@ -79,21 +79,21 @@ BODY_GROWTH = _row(post.DRAWING_PRECISION_BY_NAME["MainBodyDia"]) / 2.0
 CONE_BOSS_END_GROWTH = _row(post.DRAWING_PRECISION_BY_NAME["ConeBossLen"]) / 2.0
 CONE_BOSS_GROWTH = _row(post.DRAWING_PRECISION_BY_NAME["ConeBossDia"]) / 2.0
 #   the 64T's station: the ONE input for how far it may stand toward the
-#   post.  MHA-A03 step 1 sets it against MHA-014's thrust collar (#916),
+#   post.  MHA-DT-000 step 1 sets it against MHA-DT-004's thrust collar (#916),
 #   and the collar bears on the cone boss's north end, so the gear's south
 #   face stands the boss end plus CollarWidth off the post axis.  Both
-#   joints are butts, nominally closed (build_drive_train_assembly asserts
+#   joints are butts, nominally closed (build_dt_drive_train_assembly asserts
 #   each; collar_contacts below reads their sum) and only ever opening, so
 #   they add nothing toward the post. The stack is the boss end SHORT by
 #   its row and the collar thin by its own (Main's ruling (b), 2026-09-27).
 COLLAR_WIDTH_SHORT = _row(shaft.DRAWING_PRECISION_BY_NAME["CollarWidth"])
 GEAR64_STATION_TOWARD_POST = CONE_BOSS_END_GROWTH + COLLAR_WIDTH_SHORT
 #   FaceWidth's ±0.025 extends NORTH of the seated south face and does not
-#   consume any margin to the post; only the collar and MHA-016 bands do.
+#   consume any margin to the post; only the collar and MHA-DT-005 bands do.
 #   64T tip, OutsideDia +/-OUTSIDE_DIA_TOLERANCE_MM (user, #906)
 GEAR_TIP_GROWTH = gear64.OUTSIDE_DIA_TOLERANCE_MM / 2.0
 
-# Every MHA-016 north feature holds this much air to the 64T at print-worst.
+# Every MHA-DT-005 north feature holds this much air to the 64T at print-worst.
 FLOOR_CLEARANCE_MM = 0.25
 
 
@@ -170,7 +170,7 @@ def clearances(
     *, gear_offset: float, worst: bool = True,
     collar_thickness: float = shaft.COLLAR_THICKNESS,
 ) -> dict[str, float]:
-    """Least clearance from the 64T to each feature on MHA-016's north side.
+    """Least clearance from the 64T to each feature on MHA-DT-005's north side.
 
     ``gear_offset`` must seat the south face on ``collar_thickness``. ``worst``
     moves each published boss/collar/gear-tip band toward its opposing surface;
@@ -250,7 +250,7 @@ GOVERNING_FEATURE = min(WORST_CLEARANCES, key=WORST_CLEARANCES.__getitem__)
 if WORST_CLEARANCES[GOVERNING_FEATURE] < FLOOR_CLEARANCE_MM:
     raise AssertionError(
         f"the seated 64T comes {WORST_CLEARANCES[GOVERNING_FEATURE]:.3f} "
-        f"from MHA-016's {GOVERNING_FEATURE} at print-worst, under the "
+        f"from MHA-DT-005's {GOVERNING_FEATURE} at print-worst, under the "
         f"{FLOOR_CLEARANCE_MM} floor ({RULING})"
     )
 COLLAR_MARGIN_MM = WORST_CLEARANCES[GOVERNING_FEATURE] - FLOOR_CLEARANCE_MM

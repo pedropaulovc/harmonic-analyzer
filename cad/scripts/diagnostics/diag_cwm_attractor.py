@@ -75,7 +75,7 @@ from _assembly import (  # noqa: E402
 
 # Distance drivers seed their side from channel's flip seeds
 # (cad/config/assemblies/channel.yaml), the assembly this probe mirrors.
-activate_assembly_contract("channel")
+activate_assembly_contract("ch-channel")
 from _assembly_postbuild import discard_open_documents  # noqa: E402
 from _common import _flag_only, check, log, run_build  # noqa: E402
 from _cwm import (  # noqa: E402
@@ -89,8 +89,8 @@ from _cwm import (  # noqa: E402
 from solidworks_mcp.adapters.solidworks.assembly import (  # noqa: E402
     _create_math_transform,
 )
-from build_rocker_arm import ROD_HOLE_X, ROD_HOLE_Y, _mid_y  # noqa: E402
-from build_connecting_rod import CENTER_DISTANCE as ROD_C2C  # noqa: E402
+from build_ch_rocker_arm import ROD_HOLE_X, ROD_HOLE_Y, _mid_y  # noqa: E402
+from build_ch_connecting_rod import CENTER_DISTANCE as ROD_C2C  # noqa: E402
 
 IDENTITY = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
 SHAFT_R = 6.35 / 2.0
@@ -101,7 +101,7 @@ PIVOT_Y = _mid_y(0.0)  # 8.0 -- rocker pivot bore at local (0, 8)
 Z0 = 10.0  # seed station depth (shaft spans +/-101.6, stations stay inside)
 PITCH = 7.0565
 ROD_DZ = 2.5  # rod Front plane offset off the rocker's (production J2 axial)
-PREFIXES = {"rocker-arm", "connecting-rod", "pivot-shaft"}
+PREFIXES = {"ch-rocker-arm", "ch-connecting-rod", "ch-pivot-shaft"}
 TOL_MM = 0.1
 
 
@@ -164,10 +164,10 @@ async def _seed_slice(adapter, mode: str) -> dict[str, str]:
     (the production J3 loop-closer idiom). Every part lands on-solution."""
     check("create_assembly", await adapter.create_assembly())
     await place_component(
-        adapter, "pivot-shaft", [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], IDENTITY,
+        adapter, "ch-pivot-shaft", [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], IDENTITY,
         ground=False, label="pivot-shaft (seed, auto-fixed)")
     rocker = await place_component(
-        adapter, "rocker-arm", [0.0, -PIVOT_Y, -Z0], [0.0, 0.0, 0.0], IDENTITY,
+        adapter, "ch-rocker-arm", [0.0, -PIVOT_Y, -Z0], [0.0, 0.0, 0.0], IDENTITY,
         ground=False, label="rocker-arm seed")
     tgt = [0.0, -PIVOT_Y, -Z0]
     await concentric_mate(
@@ -178,13 +178,13 @@ async def _seed_slice(adapter, mode: str) -> dict[str, str]:
         adapter, named_ref(f"Front Plane@{rocker}", "PLANE"),
         named_ref("Front Plane", "PLANE"), Z0,
         label=f"J1 rocker axial d={Z0:.2f}", verify=(rocker, tgt))
-    comps = {"rocker-arm": rocker}
+    comps = {"ch-rocker-arm": rocker}
     if mode in ("chain", "loop"):
         # Rod hanging plumb below the rocker's rod pin (local (127.37, 15.30)
         # -> world (127.37, 7.30)); ring centre = rod origin, pin at local +Y.
         pin = [ROD_HOLE_X, ROD_HOLE_Y - PIVOT_Y]
         rod = await place_component(
-            adapter, "connecting-rod",
+            adapter, "ch-connecting-rod",
             [pin[0], pin[1] - ROD_C2C, -Z0 - ROD_DZ],
             [0.0, 0.0, 0.0], IDENTITY,
             ground=False, label="connecting-rod seed")
@@ -197,7 +197,7 @@ async def _seed_slice(adapter, mode: str) -> dict[str, str]:
             adapter, named_ref(f"Front Plane@{rod}", "PLANE"),
             named_ref(f"Front Plane@{rocker}", "PLANE"), ROD_DZ,
             label=f"J2 rod axial d={ROD_DZ:.2f}", verify=(rod, rod_tgt))
-        comps["connecting-rod"] = rod
+        comps["ch-connecting-rod"] = rod
         if mode == "loop":
             # Loop closer: the ring bore held at its as-solved X off the root
             # Right Plane (production J3 idiom) -- closes ground-rocker-rod-
@@ -265,20 +265,20 @@ async def _land_put(adapter, comps, targets) -> None:
 async def _land_drivers(adapter, comps, targets) -> None:
     """The shipped fix: puts + transient drive mates + delete (see
     build_channel_assembly's copy dispatch)."""
-    from build_channel_assembly import _delete_feature
+    from build_ch_channel_assembly import _delete_feature
     await _land_put(adapter, comps, targets)
-    rocker = comps["rocker-arm"]
+    rocker = comps["ch-rocker-arm"]
     drives = []
     mate = await spin_driver(
         adapter, named_ref(f"Axis2@{rocker}", "AXIS"), (0.0, 0.0),
         (ROD_HOLE_X, ROD_HOLE_Y - PIVOT_Y),
         label=f"repro rocker spin -> {ROD_HOLE_X:.1f},{ROD_HOLE_Y - PIVOT_Y:.1f}",
-        verify=(rocker, [v * 1000.0 for v in targets["rocker-arm"][9:12]]))
+        verify=(rocker, [v * 1000.0 for v in targets["ch-rocker-arm"][9:12]]))
     drives.append(mate["name"])
-    if "connecting-rod" in comps:
+    if "ch-connecting-rod" in comps:
         await _land_put(adapter, comps, targets)
-        rod = comps["connecting-rod"]
-        t = targets["connecting-rod"]
+        rod = comps["ch-connecting-rod"]
+        t = targets["ch-connecting-rod"]
         pin = (ROD_HOLE_X, ROD_HOLE_Y - PIVOT_Y)
         ring = (t[9] * 1000.0, t[10] * 1000.0)
         mate = await spin_driver(

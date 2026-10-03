@@ -41,7 +41,7 @@ Frame: axis +Y, head UP, the top of the bevel at y = 0 (Top Plane); the
 crown rises to y = crown_h, the tip is at y = -length.
 
 Cut to fit (optional, ``cut_length`` with ``cut_end_break``): a screw cut
-at assembly, as MHA-166's are, is drawn as installed.  The revolve profile
+at assembly, as MHA-VN-040's are, is drawn as installed.  The revolve profile
 ends the shank at y = -cut_length with a 45 deg break of radial leg
 ``cut_end_break`` in place of the factory 0.7P tip chamfer; everything else
 (head, slot, split, helix to P past the end, thread, runout) is the stock
@@ -71,7 +71,7 @@ from diagnostics.diag_mcmaster_lib import (  # noqa: E402
     insert_helix,
     thread_sweep_cut,
 )
-from transgear_arm_plate_screw_spec import (  # noqa: E402
+from vn_transgear_arm_plate_screw_spec import (  # noqa: E402
     CROWN_H,
     HEAD_ANGLE_DEG,
     HEAD_DIA,
@@ -83,7 +83,7 @@ from transgear_arm_plate_screw_spec import (  # noqa: E402
 OVAL_SIZES = {
     # part: (major dia, length from the top of the bevel, head dia at the top
     #        of the bevel, crown height, head angle deg, pitch)
-    # 8-32 x 5/8, fully threaded (MHA-166, the transgear arm-plate screws,
+    # 8-32 x 5/8, fully threaded (MHA-VN-040, the transgear arm-plate screws,
     # supplied; the part cuts them to fit).
     "91790A196": (
         THREAD_MAJOR,

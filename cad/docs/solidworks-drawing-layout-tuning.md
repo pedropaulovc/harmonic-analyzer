@@ -61,6 +61,15 @@ Exit 1 means findings. The dump lists, per sheet: size, inner border from
 `ISheet::GetZoneMargin`, the title-block keep-out, every view's outline / scale /
 display mode, and every annotation's text box, `GetPosition`, and line segments.
 
+### Title fields
+
+DWG. NO. and PART must each print the linked model's complete `Number` and
+`Title` on one line inside their ruled `DrawingTemplateSpec.title_cells_m`
+cells, with 0.25 mm clearance. `finalize_drawing` runs the native presave
+`_drawing_title_fields` check using `PropertyLinkedText`, `GetText` and
+`GetExtent`. `title-field-misfit` fails from the first build, including report
+mode. Fix the cell geometry; never abbreviate the identity or title to fit.
+
 ## What is readable from the API (stop guessing)
 
 | Question | API | Evidence |
@@ -127,6 +136,8 @@ Every one of these produced a plausible-looking wrong answer instead of an error
   arrive as `OwnerType` = 2 (`swAnnotationOwner_DrawingTemplate`) on the sheet's
   view — on tube-frame, 41 of the sheet view's 42 annotations. Filter to
   `OwnerType` = 1 for sheet-owned ink, or you audit the template against itself.
+  The separate title-field check deliberately inspects template-owned notes;
+  the sheet-owned-ink filter does not apply to DWG. NO. and PART validation.
 - **`GetDisplayData` is the window's rendering, not the sheet's.** A balloon's
   circle and leader start read at fit to the sheet sit where the seat's window
   drew them, a pixel being 0.68 mm on an 820-high window and 0.94 mm on a

@@ -1,6 +1,6 @@
 r"""Visualize whether the channel spring bottom eye actually engages the spring-hook arm.
 
-Inserts channel.SLDASM + summing.SLDASM at identity (so the plate, springs and
+Inserts ch-channel.SLDASM + sm-summing.SLDASM at identity (so the plate, springs and
 hooks share the world frame), hides everything except the summing-lever plate,
 the channel springs and the spring-hooks, and renders tight views. The RIGHT
 view (looking along world X) shows each spring bottom eye as a ring and the hook
@@ -18,7 +18,7 @@ from _common import OUT_PNG, OUT_SLDASM, check, log, run_build
 from _assembly import _flag, _read_member
 
 
-KEEP = ("summing-lever", "spring-hook", "channel-spring-installed")
+KEEP = ("sm-summing-lever", "vn-spring-hook", "vn-channel-spring-installed")
 
 
 async def build(adapter) -> dict[str, str]:
@@ -28,7 +28,7 @@ async def build(adapter) -> dict[str, str]:
     )
 
     check("create_assembly", await adapter.create_assembly())
-    for name in ("channel", "summing"):
+    for name in ("ch-channel", "sm-summing"):
         path = str((OUT_SLDASM / f"{name}.SLDASM").resolve())
         data = check(
             f"insert {name}",

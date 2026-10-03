@@ -34,7 +34,7 @@ from _assembly import (
 
 # Distance drivers seed their side from pen's flip seeds
 # (cad/config/assemblies/pen.yaml), the assembly this probe mirrors.
-activate_assembly_contract("pen")
+activate_assembly_contract("pn-pen")
 
 VBLOCK_POS = (-24.0, 390.0, -159.5)
 PEN_ROD_POS = (-3.0, 398.0, -154.0)
@@ -64,9 +64,9 @@ def _status(adapter, comp):
 async def build(adapter):
     check("create_assembly", await adapter.create_assembly())
     # Fixed seed (v-block) so the rod is not the auto-fixed first component.
-    await place_component(adapter, "pen-v-block", list(VBLOCK_POS),
+    await place_component(adapter, "pn-pen-v-block", list(VBLOCK_POS),
                           [0.0, 0.0, 0.0], IDENTITY, ground=True)
-    rod = await place_component(adapter, "pen-rod", list(PEN_ROD_POS),
+    rod = await place_component(adapter, "pn-pen-rod", list(PEN_ROD_POS),
                                [0.0, 0.0, 0.0], IDENTITY, ground=False)
     rod_o = _org(adapter, rod)
     log(f"rod org = {rod_o}")
@@ -97,7 +97,7 @@ async def build(adapter):
     log(f"rod top AFTER = {top1}  (flip if jumped from {top0})")
 
     # Marker rides the rod (pen carriage) via a Lock mate.
-    mk = await place_component(adapter, "pen-marker", list(MARKER_POS),
+    mk = await place_component(adapter, "pn-pen-marker", list(MARKER_POS),
                               [0.0, 0.0, 0.0], IDENTITY, ground=False)
     await lock_mate(adapter, named_ref(f"Front Plane@{mk}", "PLANE"),
                     named_ref(f"Front Plane@{rod}", "PLANE"),

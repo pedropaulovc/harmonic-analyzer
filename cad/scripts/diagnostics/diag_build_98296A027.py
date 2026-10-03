@@ -2,7 +2,7 @@ r"""McMaster 98296A027 -- 1050-1095 spring steel slotted spring pin, 1/16 x 1/2.
 
 One of the 98296A* sizes built by the shared recipe in
 ``diag_mcmaster_spring_pin.py`` (see its docstring for the catalogue facts).
-Used as pinion-strap-pin (MHA-145).
+Used as pinion-strap-pin (MHA-VN-033).
 
 Run standalone (SolidWorks open)::
 

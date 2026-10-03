@@ -431,11 +431,11 @@ async def probe(adapter, stems, directory, blocks):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("assemblies", nargs="*", choices=("channel", "summing", "harmonic-analyzer"))
+    parser.add_argument("assemblies", nargs="*", choices=("ch-channel", "sm-summing", "ha-harmonic-analyzer"))
     parser.add_argument("--blocks", type=int, default=2)
     parser.add_argument("--worker", action="store_true")
     args = parser.parse_args()
-    stems = args.assemblies or ["channel", "summing", "harmonic-analyzer"]
+    stems = args.assemblies or ["ch-channel", "sm-summing", "ha-harmonic-analyzer"]
     require_owned_diagnostic_environment()
     if os.environ.get("HARMONIC_REMOTE_CACHE_MODE") != "off" or not os.environ.get("HARMONIC_DIAGNOSTIC_SW_PID"):
         raise RuntimeError("probe requires cache mode off and an explicitly inventoried SolidWorks PID")

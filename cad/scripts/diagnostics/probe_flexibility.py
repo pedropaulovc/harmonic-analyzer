@@ -78,7 +78,7 @@ async def build(adapter):
     from solidworks_mcp.adapters.base import InsertComponentParameters, ComponentRefParameters
 
     check("create_assembly", await adapter.create_assembly())
-    for name in ("frame", "drive-train", "channel"):
+    for name in ("fr-frame", "dt-drive-train", "ch-channel"):
         data = check(
             f"insert {name}",
             await adapter.insert_component(
@@ -88,14 +88,14 @@ async def build(adapter):
         )
         # Fix only the frame (the structural anchor); leave drive-train +
         # channel free so they can be made flexible (a fixed sub can't be).
-        if name == "frame" and not data.get("fixed"):
+        if name == "fr-frame" and not data.get("fixed"):
             await adapter.fix_component(ComponentRefParameters(name=data["name"]))
 
     asm = adapter.currentModel
     adapter._attempt(lambda: asm.ForceRebuild3(False), default=None)
 
     # --- Stage 1: set subs flexible, read back ---
-    for needle in ("drive-train", "channel"):
+    for needle in ("dt-drive-train", "ch-channel"):
         comp, nm = _find_comp(adapter, needle)
         if comp is None:
             log(f"STAGE1 {needle}: component not found")

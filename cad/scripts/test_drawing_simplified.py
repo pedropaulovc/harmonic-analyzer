@@ -378,7 +378,7 @@ def _reconcile(file: FakeAssemblyFile) -> SimpleNamespace:
         open_model=open_model,
         _attempt=lambda fn, default=None: fn(),
     )
-    asyncio.run(_assembly.reconcile_saved_rebuild_state(adapter, "paper-drive", "x.SLDASM"))
+    asyncio.run(_assembly.reconcile_saved_rebuild_state(adapter, "pd-paper-drive", "x.SLDASM"))
     return adapter
 
 
@@ -502,7 +502,7 @@ def _stub_drive_train_sheets(monkeypatch, fitted_for):
     ``FakeView``; the cluster ring fits at ``fitted_for(preferred)``. Returns
     the recipe module, its adapter, and the (event, configuration, explode)
     log of the view on the active sheet."""
-    import draw_drive_train_assembly as drawing
+    import draw_dt_drive_train_assembly as drawing
 
     fake = FakeDrawing([])
     adapter = SimpleNamespace(currentModel=fake)
@@ -837,7 +837,7 @@ def _cone_gear() -> FakePart:
 def test_only_the_named_parents_are_simplified_and_keep_their_teeth() -> None:
     part = _cone_gear()
     children = _drawing_simplified.add_simplified_configurations(
-        _part_adapter(part), "cone-gear", TEETH, ["T006", "T120"]
+        _part_adapter(part), "dt-cone-gear", TEETH, ["T006", "T120"]
     )
     assert children == ["T006 Simplified", "T120 Simplified"]
     assert "Default Simplified" not in part.GetConfigurationNames()
@@ -849,7 +849,7 @@ def test_only_the_named_parents_are_simplified_and_keep_their_teeth() -> None:
 def test_a_parent_that_already_lacks_the_features_is_refused_before_deriving() -> None:
     part = _cone_gear()
     with pytest.raises(RuntimeError, match=r"already suppressed: \['ToothGapCut in Default'"):
-        _drawing_simplified.add_simplified_configurations(_part_adapter(part), "cone-gear", TEETH)
+        _drawing_simplified.add_simplified_configurations(_part_adapter(part), "dt-cone-gear", TEETH)
     assert part.GetConfigurationNames() == ["Default", "T006", "T120"]
 
 
@@ -864,9 +864,9 @@ def test_a_child_suppression_that_reaches_its_parent_fails_the_readback() -> Non
 def test_a_simplified_child_of_an_unnamed_configuration_is_an_orphan() -> None:
     part = _cone_gear()
     adapter = _part_adapter(part)
-    _drawing_simplified.add_simplified_configurations(adapter, "cone-gear", TEETH, ["T006", "T120"])
+    _drawing_simplified.add_simplified_configurations(adapter, "dt-cone-gear", TEETH, ["T006", "T120"])
     part.ConfigurationManager.AddConfiguration2("Default Simplified", "", "", 0, "Default", "", False)
     with pytest.raises(RuntimeError, match=r"orphan simplified configurations \['Default Simplified'\]"):
         _drawing_simplified.assert_simplified_configurations(
-            adapter, "cone-gear", TEETH, ["T006", "T120"]
+            adapter, "dt-cone-gear", TEETH, ["T006", "T120"]
         )
