@@ -13,7 +13,7 @@ import crank_hub_geometry as geometry
 import crankshaft_notes as notes
 import crankshaft_spec as spec
 import draw_crankshaft as drawing
-from _drawing_contract import PRECISION_MIGRATED_DRAWINGS
+from _drawing_contract import PRECISION_MIGRATED_DRAWINGS, model_toleranced_dimensions
 from _drawing_registry import DRAWINGS_BY_NAME
 from _hole_spec import blind_cut_dia_mm
 from _surface_finish import MACHINED_UM
@@ -181,39 +181,19 @@ def test_spigot_rim_is_the_named_exception_the_sheet_states() -> None:
     assert float(recorded.group(1)) == _floor_2(nominal) == spec.DRIVE_PIN_SPIGOT_RIM
 
 
-def test_drive_pin_depth_prints_its_band_after_the_native_depth() -> None:
+def test_drive_pin_depth_band_is_the_models_own() -> None:
     # Machinist review of f7c9771b3: the bare 3.95 read under the title
     # block's .XX and left 5.75 - 4.46 = 1.29 of spigot under the holes.  The
-    # callout carries the cut's own band, the one the proud stack reads.
-    assert notes.DRIVE_PIN_DEPTH_BAND == f"<MOD-PM>{spec.DRIVE_PIN_DEPTH_TOL:.2f}"
+    # callout copies the band from the depth dimension it prints, so that
+    # dimension must be the one the part bands, with the band the proud stack
+    # reads; typed after the depth it stayed mm in inch (Codex P2 on #1151).
+    feature, name = drawing.DRIVE_PIN_DEPTH_DIMENSION
+    assert model_toleranced_dimensions(part)[(feature, name)] == "DRIVE_PIN_DEPTH_TOL"
+    assert name in spec.HOLE_CALLOUT_PRECISION[feature]
     floor = (spec.SPIGOT_LENGTH - spec.SPIGOT_LENGTH_TOL) - (
         spec.DRIVE_PIN_DEPTH + spec.DRIVE_PIN_DEPTH_TOL
     )
     assert floor >= 1.5
-    band = notes.DRIVE_PIN_DEPTH_BAND
-    # The farm's native split: the process and diameter modifier in the
-    # prefix, the depth in a later compartment.
-    depth = "<HOLE-DEPTH> <hw-depth>"
-
-    def parts(prefix: str = "REAM <MOD-DIAM>", suffix: str = depth) -> dict:
-        return {5: prefix, 6: suffix, 7: "", 8: ""}
-
-    assert drawing._depth_banded_definition(parts(), band) == (6, f"{depth} {band}")
-    whole = "REAM <MOD-DIAM><hw-diam> <HOLE-DEPTH> <hw-depth>"
-    assert drawing._depth_banded_definition(parts(prefix=whole, suffix=""), band) == (
-        5,
-        f"{whole} {band}",
-    )
-    for broken in (
-        parts(suffix="THRU ALL"),
-        parts(suffix=f"{depth} {band}"),
-        parts(suffix=f"{depth} PRESS FIT"),
-        parts(suffix=f"<HOLE-DEPTH> 1.0 {depth}"),
-        parts(prefix=f"REAM {depth}"),
-        {5: "REAM <MOD-DIAM>", 6: depth},
-    ):
-        with pytest.raises(RuntimeError):
-            drawing._depth_banded_definition(broken, band)
 
 
 def test_integral_dome_is_the_only_outboard_shaft_projection() -> None:
