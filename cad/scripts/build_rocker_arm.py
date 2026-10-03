@@ -91,7 +91,7 @@ from _fit_limits import deviations
 from _part_pmi import author_part_pmi
 from _saved_part_guard import require_saved_drawing_properties
 from rocker_arm_notes import DRAWING_NOTES, ISOMETRIC_VIEW_NOTE
-from rocker_arm_notes import DRAWING_DIMENSIONS
+from rocker_arm_notes import DRAWING_DIMENSIONS, DRAWING_PRECISION
 from rocker_arm_spec import (
     ARM_THICKNESS as SPEC_ARM_THICKNESS,
     HUB_DIA,
@@ -580,10 +580,7 @@ async def build(adapter) -> dict[str, str]:
     set_dimension_bilateral_tolerance(
         adapter, "PivotHoleProfile", "PivotDia", *deviations(PIVOT_HOLE_BAND)
     )
-    apply_drawing_precision(
-        adapter,
-        {"Hub": {"HubLength": 3}, "TopEdgeReference": {"TopAbovePivot": 2}},
-    )
+    apply_drawing_precision(adapter, DRAWING_PRECISION)
     clear_dimensions_for_drawing(adapter)
     for feature_name, dimension_names in DRAWING_DIMENSIONS.items():
         mark_dimensions_for_drawing(adapter, feature_name, dimension_names)

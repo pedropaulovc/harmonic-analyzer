@@ -26,7 +26,7 @@ class _AdvisoryFindings(logging.Filter):
 
 def main(argv: list[str] | None = None) -> int:
     tracing = telemetry.configure("traveler")
-    _telemetry.capture_external_spans(tracing.trace_provider)
+    _telemetry.capture_external_telemetry(tracing.trace_provider, tracing.log_provider)
     advisory = _AdvisoryFindings()
     tracing.logger.addFilter(advisory)
     try:

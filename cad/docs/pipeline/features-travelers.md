@@ -1,81 +1,109 @@
 # Drawing requirements, STEP face sets and process travelers
 
-`export_features` is the scoped COM leaf for `rocker_arm`, `pivot_shaft`,
-`pivot_bracket` and `cone_pivot_post`. It depends on those four native part
-identities only, not on the assembly/kinematics closure. The all-model `export`
-leaf orders after it because both own the same neutral STEP bytes and
-`cad/out/reports/release-neutral.json` certificate. Run COM leaves through the
+## Independent producers
+
+`package:features` is a scoped COM leaf for `rocker_arm`, `pivot_shaft`,
+`pivot_bracket` and `cone_pivot_post`. Its native dependency closure is those
+parts, not assemblies or drawings. It writes only self-contained bundles:
+
+```text
+cad/out/features/<underscore-stem>/
+  <dashed-stem>.STEP
+  features.toml
+  neutral.json
+```
+
+The receipt certifies the raw STEP and manifest bytes, exporter identity,
+requirement/citation source digest, native source digest and drawing revision.
+The manifest's `step` is the adjacent STEP basename; its SHA-256 is checked
+against the receipt and actual bytes. `export_features.py` is SolidWorks-free.
+It rejects missing, corrupt or stale receipts before replacing a manifest.
+
+The ordinary full `export` remains independent: it owns `cad/out/step/`, the
+other existing neutral outputs and `release-neutral.json`. The scoped leaf does
+not touch those paths, STL/PNG outputs, colors or source-digest ledgers. There is
+no ordering or preservation relationship between the producers.
+
+Run COM leaves through the
 [supervised farm launcher](../../../DEVELOPING.md#supervised-farm-launches),
-never by starting a local SolidWorks session or finite build timer.
+never through a local SolidWorks session or finite build timer.
 
-The SolidWorks-free `cad/scripts/export_features.py` reads the spec and drawing
-notes/configuration and writes `cad/out/features/<underscore-stem>.features.toml`.
-Dimensions carry per-value file:line citations. The printed drawing's nominal
-and tolerance bands are acceptance limits; exact model nominal coordinates are
-separate. BASIC and REF dimensions do not acquire general-tolerance bands.
-Unresolved requirements, precision, datums or geometry are explicitly `unknown`.
-Pivot bracket currently has no registered drawing, so its model geometry is not
-silently promoted into known drawing tolerances.
+## Drawing authority
 
-`construction` is `one_piece` unless the part's notes module declares an explicit
-built-up permission note that is included in its drawing notes. A manufacturing
-plan cannot grant itself permission to use an assembled substitute.
+Every sourced value carries file:line citations. Printed general-tolerance and
+note-only bands are acceptance limits, not the underlying inch grade. Exact
+model nominal coordinates are separate; BASIC and REF dimensions do not acquire
+invented general-tolerance bands. Explicit native tolerance bands retain the
+exact authored nominal where native display rounding has not been proved.
+Precision alone does not justify a private rounding convention.
 
-## Face identity and native-file hygiene
+Required geometry, tolerance, precision, datum or setup information without a
+source remains `unknown`. Pivot bracket has no registered drawing, so known
+model geometry does not silently become a known drawing requirement.
+`construction` defaults to `one_piece`; `built_up_permitted` requires an explicit
+permission note included in the part's drawing notes. A process plan cannot
+approve its own assembled substitute.
 
-AP214 export enables `swStepExportFaceEdgeProps`. Before `SaveAs3`, the exporter
-resolves every supported spec feature to all matching native patches using the
-existing `_part_pmi` geometry matcher and gives them deterministic entity names.
-Zero matches, a face claimed by different features, failed naming/read-back,
-and missing or duplicate exported labels fail loudly. Split cylindrical patches
-belong to one feature set: the rocker pivot bore is not assumed to be one face.
-No ordinal STEP face number is treated as persistent identity.
+## Face identity and native hygiene
 
-Names exist only in the open export document. It is closed without saving the
-native part. A before/after hash guard rejects any change to the `.SLDPRT` bytes.
-The manifest reads the STEP's actual `ADVANCED_FACE` labels and is bound to the
-certificate's SHA-256, checked against the referenced STEP bytes. A later export
-must regenerate that binding; an old face set cannot certify a new STEP digest.
-The exporter source/dependency digest and export cache inventory include the
-manifest generator, face matcher and supported requirement sources.
+Both export paths use the same AP214 preference/default-configuration/naming
+path. `swStepExportFaceEdgeProps` exposes deterministic transient native entity
+names. Existing `_part_pmi` geometry matchers resolve each feature to every
+matching native patch. Zero matches, cross-feature claims, failed name/read-back
+or missing/unknown exported labels fail loudly. A periodic native face can yield
+multiple `ADVANCED_FACE` patches with the same label; all belong to its feature
+set. References include STEP entity id, file-order ordinal and raw label, valid
+only with that exact STEP digest. The STEP is never rewritten.
+
+Names are never saved into the native part. A before/after native SHA guard runs
+after closing the export document. Offline parser tests cover split patches and
+ambiguous/lost labels; a real farm run of both independent producers provides
+the separate-session name-survival and rocker-bore patch proof.
+
+## Release binding gate
+
+`check:features_bound` is SolidWorks-free and required by `release`, not `build`.
+It waits for both producers and compares each scoped STEP digest with the actual
+full STEP and its `release-neutral.json` record. It also validates the receipt,
+source freshness and manifest binding. Divergent producers fail loudly; no
+retry, preservation or silent substitution hides that regression.
+
+Release staging copies the verified self-contained bundles under `features/`
+separately from the existing full neutral inventory. Every staged byte comes
+from the bound producer outputs.
 
 ## Local traveler gate
 
-The committed `cad/process/rocker_arm/plan.toml` and three `cad/process/shop/`
-inputs are copied from prechips `0dd7614`, with provenance headers. Only bundle
-paths are changed. Author-choice process proposals and inventory `verify` flags
-are retained; the copy does not assert purchased tools, measured geometry or
-approved cutting data. The generated manifest refers to `../step/rocker-arm.STEP`.
+The committed `cad/process/rocker_arm/plan.toml` and three shop inputs are copied
+from prechips `0dd7614` with provenance headers. Only bundle paths changed;
+author-choice proposals and inventory verification flags are preserved. They do
+not assert purchased tools, measured geometry or approved cutting data.
 
 ```text
 uv run python -m doit check:traveler_rocker_arm
 ```
 
-This SolidWorks-free, opt-in gate has a file dependency on the exported manifest
-and actual STEP, plus its plan, shop inputs and locked consumer dependency. Its
-stamp is `cad/out/reports/check-traveler_rocker_arm.ok`; outputs are
-`cad/out/reports/traveler_rocker_arm/{report.json,traveler.html}`.
+This build/release gate depends on `package:features`, its rocker bundle, plan,
+shop inputs and locked consumer. It needs no full export/assembly closure. Its
+stamp is `cad/out/reports/check-traveler_rocker_arm.ok`; it retains the consumer's
+`report.json` and printable `traveler.html` under `reports/traveler_rocker_arm/`.
 
 | prechips exit | CAD gate | interpretation |
 |---|---|---|
 | 3 | fail, no stamp | bad input or broken producer/consumer contract |
-| 2 | pass | machining blockers; every `✗` finding is logged at warn severity |
+| 2 | pass | machining blockers; every `✗` finding logs at warn severity |
 | 4 | pass | required unknowns remain unresolved |
 | 0 | pass | no blocking/required-unknown findings |
 
-Reports and the printable traveler keep prechips' original verdicts. Passing
-this CAD gate is **not machining approval**. In particular a missing reamer is
-not a CAD regression. Unexpected consumer exits remain fatal.
+The report retains original verdicts. Passing is **not machining approval**;
+a missing reamer is not a CAD regression. Unexpected consumer exits are fatal.
+The existing `_run_stamped` → `_exec` path injects `TRACEPARENT` and service
+`check-traveler`; `prechips.traveler` continues the task span and appends to the
+pipeline's atomic telemetry capture using separately owned provider handles.
 
-The existing `_run_stamped` → `_exec` path injects `TRACEPARENT` and stage
-`OTEL_SERVICE_NAME=check-traveler`. The real consumer `prechips.traveler` span
-continues `task check:traveler_rocker_arm`; its library-owned provider also
-appends to the pipeline's atomic `cad/out/reports/telemetry/traces.jsonl` capture.
-
-## Consumer schema boundary
-
-The dependency is pinned to prechips `0dd7614`. Rocker-arm is the only committed
-traveler gate. Cone-pivot-post emits its drawing's sourced `angularity_dia` and
-`angularity_datums` requirements, which that pin does not yet accept. Bump the pin
-to the prechips M2 merge before validating cone bundles; do not disguise the FCF
-as a position tolerance or drop it. This does not affect the rocker-arm gate.
+The consumer is pinned to full-M2 commit `ba449ce1`, including telemetry
+compatibility without downgrading existing OTel/pydantic-ai/logfire dependencies.
+It accepts cone `angularity_dia`/`angularity_datums` without recasting the FCF as
+position. The cone journal rim-break note and cited maximum remain preserved;
+there is no typed per-feature edge-break field, so its inspection identity stays
+explicitly `unknown` rather than implying an approved general edge break.

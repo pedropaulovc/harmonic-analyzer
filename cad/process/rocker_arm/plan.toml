@@ -8,7 +8,7 @@
 # RPM/feed still require sourced cutting data. The absent R8 chuck, 6.5 H7
 # reamer and supported profile fixture remain explicit machining blockers.
 part = "rocker-arm"
-features = "../../out/features/rocker_arm.features.toml"
+features = "../../out/features/rocker_arm/features.toml"
 quantity = 20
 quantity_cite = "harmonic-analyzer/cad/config/parts/rocker-arm.yaml:5"
 

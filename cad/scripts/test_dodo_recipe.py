@@ -3058,3 +3058,23 @@ def test_every_python_action_passes_doits_argument_rules():
             except Exception as problem:  # doit raises InvalidTask
                 refused.append(f"{task.name}: {problem}")
     assert not refused, "\n".join(refused)
+
+
+def test_feature_citation_drift_rekeys_scoped_bundle_not_native_or_full(tmp_path):
+    dodo = _load_dodo()
+    source = tmp_path / "drawing.yaml"
+    source.write_text("diameter: 6.5\n", encoding="utf-8")
+    labels = ("part:rocker_arm", "export", "package:features")
+    before = {
+        label: dodo._cache_key([str(source)], label)
+        for label in labels
+    }
+    # Geometry stays identical, but the cited row moves from line 1 to line 2.
+    source.write_text("# Same authored value; citation line moved.\ndiameter: 6.5\n", encoding="utf-8")
+    after = {
+        label: dodo._cache_key([str(source)], label)
+        for label in labels
+    }
+    assert after["part:rocker_arm"] == before["part:rocker_arm"]
+    assert after["export"] == before["export"]
+    assert after["package:features"] != before["package:features"]
