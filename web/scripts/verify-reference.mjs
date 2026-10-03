@@ -4,10 +4,14 @@ import { readFile, writeFile, mkdtemp, rm } from 'node:fs/promises'
 import { spawn } from 'node:child_process'
 import { resolve, join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { validateModelRepresentation } from '../model-representation.mjs'
 
 export const VIDEO_IDS = Object.freeze(['NAsM30MAHLg', '8KmVDxkia_w', '6dW6VYXp9HM', 'jfH-NbsmvD4', 'XPQwKRt4Y2k', '4mBuyixt22U'])
-export const MODEL_SHA256 = '2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d'
-export const MODEL_COMMIT = '1268c23d4a8fc741147c5e09d8d1e45247a71945'
+export const CURRENT_CONTENT = 'content/v39'
+export const MODEL_REPRESENTATION = validateModelRepresentation(JSON.parse(
+  await readFile(new URL('../content/model-representation.json', import.meta.url), 'utf8')))
+export const MODEL_SHA256 = MODEL_REPRESENTATION.source.sha256
+export const MODEL_COMMIT = MODEL_REPRESENTATION.source.sourceCommit
 export const PIXEL_LIMIT = 1920 * 0.02
 export const CLOCK_LIMIT = 0.5
 const EPSILON = 1e-6
@@ -16,6 +20,96 @@ const vector = (value, size) => Array.isArray(value) && value.length === size &&
 const text = value => typeof value === 'string' && value.trim().length > 0
 const hash = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value)
 
+
+/** An unavailable association cannot grow a guessed native point or pass measurement. */
+export function nativeAnchorError(anchor, requireAssociation = false) {
+  const association = anchor?.nativeAssociation
+  if (association?.status === 'unavailable') {
+    return anchor.partPath !== undefined || anchor.partLocalMetres !== undefined || anchor.worldMetres !== undefined
+      ? 'Unavailable source feature contains a forbidden native path/coordinate'
+      : association.reason || 'Original source feature has no current native association'
+  }
+  if (requireAssociation && association?.status !== 'mapped') return 'Current feature lacks independently generated native association'
+  if (!text(anchor?.partPath) || !text(anchor?.correspondenceEvidence)
+    || vector(anchor.partLocalMetres, 3) === vector(anchor.worldMetres, 3)) return 'Source landmark lacks native physical-feature correspondence'
+  if (association) {
+    const proof = association.proof
+    if (association.status !== 'mapped' || proof?.method !== 'exact-original-native-local-feature-v1'
+      || proof.currentSource?.sha256 !== MODEL_SHA256 || proof.currentSource?.sourceCommit !== MODEL_COMMIT
+      || proof.qualifiedPartPath !== anchor.partPath || !hash(proof.historicalPrimitiveSha256)
+      || proof.historicalPrimitiveSha256 !== proof.currentPrimitiveSha256
+      || !vector(proof.historicalWorldMatrix, 16) || !vector(proof.currentWorldMatrix, 16)
+      || !vector(proof.partLocalMetres, 3) || canonicalJson(proof.partLocalMetres) !== canonicalJson(anchor.partLocalMetres)
+      || !vector(proof.currentRestWorldMetres, 3)) return 'Current native association proof is missing, changed or inconsistent'
+  }
+  return null
+}
+
+/** Decode/hash each authoritative body proof once, not once per source edge row. */
+export function nativeBodyAssociationIndex(associations) {
+  const index = new Map()
+  if (!associations || typeof associations !== 'object' || Array.isArray(associations)) return index
+  for (const [path, body] of Object.entries(associations)) {
+    const unavailable = reason => index.set(path, { status: 'unavailable', reason, invalid: true })
+    if (!text(path) || !path.startsWith('harmonic-analyzer/') || /[@?*]/.test(path)
+      || !exactKeys(body, ['status', 'reason', 'proof', 'serializedProof']) || !text(body.serializedProof)) {
+      unavailable('Missing closed authoritative native-body proof')
+      continue
+    }
+    let serialized
+    try { serialized = JSON.parse(body.serializedProof) } catch {
+      unavailable('Authoritative native-body serialized proof is not JSON')
+      continue
+    }
+    if (canonicalJson(serialized) !== canonicalJson({ status: body.status, reason: body.reason, proof: body.proof })) {
+      unavailable('Authoritative native-body object differs from its exact serialized proof')
+      continue
+    }
+    const proof = body.proof
+    if (!['mapped', 'unavailable'].includes(body.status) || (body.status === 'mapped' ? body.reason !== null : !text(body.reason))
+      || proof?.method !== 'exact-original-native-primitive-role-v1' || proof.qualifiedPartPath !== path
+      || proof.historicalSource?.sha256 !== '2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d'
+      || proof.historicalSource?.sourceCommit !== '1268c23d4a8fc741147c5e09d8d1e45247a71945'
+      || proof.currentSource?.sha256 !== MODEL_SHA256 || proof.currentSource?.sourceCommit !== MODEL_COMMIT
+      || body.status === 'mapped' && (!hash(proof.historicalPrimitiveSha256)
+        || proof.historicalPrimitiveSha256 !== proof.currentPrimitiveSha256 || !Array.isArray(proof.primitives) || !proof.primitives.length
+        || !vector(proof.historicalWorldMatrix, 16) || !vector(proof.currentWorldMatrix, 16))) {
+      unavailable('Native-body proof has a changed path, model identity, status or primitive/frame authority')
+      continue
+    }
+    index.set(path, { status: body.status, reason: body.reason, proofRef: path,
+      proofSha256: createHash('sha256').update(body.serializedProof, 'utf8').digest('hex') })
+  }
+  return index
+}
+
+/** A current body record is a closed reference, never an inline historical proof. */
+export function resolveNativeBodyAssociation(record, index) {
+  const association = record?.nativeAssociation
+  const unavailable = reason => ({ status: 'unavailable', reason })
+  if (!exactKeys(association, ['status', 'reason', 'proofRef', 'proofSha256'])
+    || !text(association.proofRef) || !hash(association.proofSha256)) return unavailable('Current native-body association lacks its exact proof reference and digest')
+  const body = index?.get(association.proofRef)
+  if (!body) return unavailable('Current native-body proof reference is missing from nativeBodyAssociations')
+  if (body.invalid) return unavailable(body.reason)
+  if (body.proofSha256 !== association.proofSha256 || body.status !== association.status || body.reason !== association.reason
+    || record.originalPartPath !== association.proofRef
+    || (body.status === 'mapped' ? record.partPath !== association.proofRef : record.partPath !== undefined)) {
+    return unavailable('Current native-body reference digest, status or exact qualified path differs from its authoritative proof')
+  }
+  return body
+}
+
+/** Includes frame-level rod/contour facts as well as every original source view. */
+export function* nativeBodyRecords(frame) {
+  for (const context of [frame, ...(frame.views ?? [])]) {
+    for (const field of ['nativeLineChecks', 'sourceContourChecks', 'sourceRodBodyMeasurements', 'unresolvedSourceRodBodies']) {
+      for (const record of context[field] ?? []) if (record.partPath || record.originalPartPath || record.nativeAssociation) {
+        yield { record, viewId: Object.hasOwn(record, 'viewId') ? record.viewId : context === frame ? 'main' : context.id ?? null }
+      }
+    }
+  }
+}
 const ROD_HEAD_AUTHORITY = 'the one plate-like head vs u crosspiece is a discrepancy but both serve the same purpose; the 3d model will be fixed later to match device; animate assuming they will match later'
 const LOWER_ROCKER_SIDE_FACE_POLICY = {
   id: 'lower-rocker-side-face-functional-exception',
@@ -663,10 +757,9 @@ export function inspectReference(data, expectedId, native = null) {
   summary.sourcePixelFormats = [...new Set([...images.keys()].map(key => key.split('/')[1]))].sort()
   const anchors = new Map()
   for (const anchor of data.anchors ?? []) {
-    if (!text(anchor.id) || anchors.has(anchor.id) || !['physical-feature', 'section-center'].includes(anchor.kind) || !text(anchor.partPath) || !text(anchor.correspondenceEvidence) || !text(anchor.description)) fail('anchor-correspondence', `Invalid/duplicate anchor ${anchor.id}`)
-    if (vector(anchor.partLocalMetres, 3) === vector(anchor.worldMetres, 3)) fail('anchor-point', `${anchor.id} needs exactly one finite local or world point`)
-    // Fixed CAD-world points cannot serve as articulated moving-part observations.
-    if (anchor.worldMetres && !anchor.partPath?.startsWith('harmonic-analyzer/frame/')) fail('unarticulated-anchor', `${anchor.id}: moving part points must use partLocalMetres`)
+    if (!text(anchor.id) || anchors.has(anchor.id) || !['physical-feature', 'section-center'].includes(anchor.kind) || !text(anchor.description)) fail('anchor-correspondence', `Invalid/duplicate anchor ${anchor.id}`)
+    const issue = nativeAnchorError(anchor, true)
+    if (issue) fail(anchor.nativeAssociation?.status === 'unavailable' ? 'native-association-unavailable' : 'anchor-correspondence', `${anchor.id}: ${issue}`)
     anchors.set(anchor.id, anchor)
   }
   const shots = new Map(), duration = source.durationSeconds
@@ -682,6 +775,7 @@ export function inspectReference(data, expectedId, native = null) {
   if (!Array.isArray(data.frames) || !data.frames.length) { fail('missing-frames', 'No actual decoded reference frames'); return summary }
   summary.frameCount = data.frames.length
   const times = [], nativeIndices = new Set()
+  const bodyAssociations = nativeBodyAssociationIndex(data.nativeBodyAssociations)
   const allNative = coverage?.requiredEveryNativeFrame === true
   // A full native-frame census subsumes every change. Otherwise the explicit change
   // census is mandatory; chapter-only timestamps are not a motion/edit census.
@@ -693,6 +787,10 @@ export function inspectReference(data, expectedId, native = null) {
   }
   for (const frame of data.frames) {
     const t = frame.timeSeconds
+    for (const { record, viewId } of nativeBodyRecords(frame)) {
+      const association = resolveNativeBodyAssociation(record, bodyAssociations)
+      if (association.status !== 'mapped') fail('native-body-association-unavailable', `${record.id ?? record.originalPartPath}: ${association.reason}`, t, viewId)
+    }
     if (!finite(t) || t <= previous || t < 0 || t > duration) fail('chronology', 'Frame times must be finite and strictly increasing within source duration', t)
     previous = t; times.push(t)
     const shot = shots.get(frame.shotId)
@@ -832,7 +930,7 @@ export async function loadReferences(webRoot, referenceRoot, { signal } = {}) {
   const records = [], failures = []
   for (const id of VIDEO_IDS) {
     try {
-      const data = JSON.parse(await readFile(resolve(webRoot, `content/${id}.observations.json`), 'utf8'))
+      const data = JSON.parse(await readFile(resolve(webRoot, `${CURRENT_CONTENT}/${id}.observations.json`), 'utf8'))
       const entry = metadata.find(item => item.id === id)
       if (!entry || entry.sha256 !== data.source?.sha256) throw new Error('Measured source identity differs from independent acquisition metadata')
       // Keep paths relocatable without requiring original /tmp directories.

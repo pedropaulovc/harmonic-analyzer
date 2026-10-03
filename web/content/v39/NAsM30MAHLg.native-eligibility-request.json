@@ -1,0 +1,158 @@
+{
+  "schemaVersion": 1,
+  "videoId": "NAsM30MAHLg",
+  "purpose": "Fresh current complete native support/first-surface eligibility; no source/GPU/stage acceptance before actual parent proof.",
+  "producer": "web/scripts/NAsM30MAHLg-native-feature-eligibility.py",
+  "producerStatus": "Current export/runtime modernization and actual parent execution required; historical root default/full435 contract is not current eligibility.",
+  "profile": "web/content/v39/NAsM30MAHLg.calibration-eligibility.json",
+  "nativeIdentity": {
+    "originalRawSourceSha256": "60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c",
+    "sourceCommit": "81539e53f5146c06a77541415bd79da673806d96",
+    "actualOptimizedTransportSha256": "81750ae4c422b973dfd647df4e22f3088933003e39ff41c54563d780eb33fa65",
+    "requiredRawPrimitiveCount": 460,
+    "requiredDrawableCount": 462,
+    "requiredSpringDrawableCount": 21,
+    "observedRuntimeLayers": {
+      "rawNativePrimitiveInstances": 460,
+      "rawNamedPaths": 459,
+      "requiredRuntimeDrawableCount": 462,
+      "observedRuntimeNamedPaths": 479,
+      "runtimeObservation": {
+        "path": "web/.vite/native-v39-smoke-corrected-20261003.json",
+        "sha256": "a5c569465fa155d77d849621cf32c0ada54fb5872de7f4f4ccc0017af8cdcd55",
+        "scope": "Actual production createViewer/loadMachine modules, native render, named bindings, crank update and manual orbit; not source footage or spring numeric qualification",
+        "gpu": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3090 (0x00002204) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+        "sourceAcceptance": false,
+        "normalApplicationRoute": false
+      },
+      "qualification": "Raw primitive count and actual viewer/helper-instance census are separate layers. Basic viewer smoke is not complete numeric world/spring/source eligibility."
+    }
+  },
+  "historicalLineage": [
+    {
+      "path": "web/content/NAsM30MAHLg.native-eligibility-request.json",
+      "sha256": "b9ac25215dd4a496fd1e149f95f760b7e560e173e47ba5ef0d80e13c733a1c5e",
+      "scope": "immutable historical input; not current native qualification"
+    }
+  ],
+  "historicalAuthorities": {
+    "originalStaticAuthority": {
+      "privateEvidencePath": "web/.vite/verification-output/intro-witness-recovery/new-static-census/above-camera-branch/joint-input/native-capture-proposal.HOLD.json",
+      "sha256": "ad1b280f39d7f9f69315bea3f52f5381be01570c2c35311c377a0bdfbfbca091",
+      "chosenInputPointer": "/captures/0/chosenInput",
+      "captureId": "intro809-new-above-machine-joint51-full435-source348",
+      "sourceFrameIndex": 809,
+      "sourceSha256": "595b0ec7b1e1a0b3523d72d33f6e0950bd97dda5ab7032bf91c3e5b9fb7d225d",
+      "sha256Bgr8": "39644b10abe18220e44e2b708c0e3e0ba882c90fb0f5988f80e8a7fcc9997a75",
+      "decodedTimestampTicks": 809809,
+      "timeBase": "1/30000",
+      "decodedTimeSeconds": 26.99363333333333,
+      "requestTimeSeconds": 27,
+      "qualification": "Original 222-anchor diagnostic is source frame809, not frame222. Original request remains ROOT-HOLD until separately released. It is not the minus18mm variant and not the macro chosen state."
+    },
+    "macroAuthority": {
+      "privateEvidencePath": "web/.vite/verification-output/intro-witness-recovery/new-pen-macro/exact-firstsurface-fixed51-native-export.json",
+      "historicalExportSha256": "e2a8acf0b79b1c340e2d802442ac707cb43df33b2863df612cbc8d1e0e55b9ed",
+      "chosenInputPointer": "/input",
+      "completeInputDifferenceFromOriginalStaticScalarCount": 28,
+      "sourceExposureProfilePointer": "/sourceExposure",
+      "qualification": "Different chosen/unobserved complete51. A fresh static809 export can prove native apex eligibility but cannot replace this macro2132 source/camera/physical state. All old six-branch failures remain conditional and unchanged."
+    },
+    "qualification": "Immutable old-model authority only; no original 433/435 export or CPU receipt is retagged."
+  },
+  "chosenCurrentInputs": {
+    "static": {
+      "packet": "web/content/v39/NAsM30MAHLg.source-choices.json",
+      "pointer": "/candidates/static/input",
+      "status": "chosen-unobserved",
+      "fieldCount": 51
+    },
+    "macro": {
+      "packet": "web/content/v39/NAsM30MAHLg.source-choices.json",
+      "pointer": "/candidates/macro/input",
+      "status": "chosen-unobserved",
+      "fieldCount": 51
+    }
+  },
+  "requiredCompleteNativeExport": {
+    "status": "unavailable-until-actual-current-parent-export",
+    "requiredRuntimeDrawableCount": 462,
+    "requiredRawPrimitiveInstances": 460,
+    "allCurrentSweptStock": [
+      "harmonic-analyzer/channel/channel-spring-installed-stretch00-1",
+      "harmonic-analyzer/channel/channel-spring-installed-stretch00-2",
+      "harmonic-analyzer/channel/channel-spring-installed-stretch00-3",
+      "harmonic-analyzer/channel/channel-spring-installed-stretch00-4",
+      "harmonic-analyzer/channel/channel-spring-installed-stretch00-5",
+      "harmonic-analyzer/channel/channel-spring-installed-stretch00-6",
+      "harmonic-analyzer/channel/channel-spring-installed-stretch00-7",
+      "harmonic-analyzer/channel/channel-spring-installed-stretch00-8",
+      "harmonic-analyzer/channel/channel-spring-installed-stretch00-9",
+      "harmonic-analyzer/channel/channel-spring-installed-stretch00-10",
+      "harmonic-analyzer/channel/channel-spring-installed-stretch00-11",
+      "harmonic-analyzer/channel/channel-spring-installed-stretch00-12",
+      "harmonic-analyzer/channel/channel-spring-installed-stretch00-13",
+      "harmonic-analyzer/channel/channel-spring-installed-stretch00-14",
+      "harmonic-analyzer/channel/channel-spring-installed-stretch00-15",
+      "harmonic-analyzer/channel/channel-spring-installed-stretch00-16",
+      "harmonic-analyzer/channel/channel-spring-installed-stretch00-17",
+      "harmonic-analyzer/channel/channel-spring-installed-stretch00-18",
+      "harmonic-analyzer/channel/channel-spring-installed-stretch00-19",
+      "harmonic-analyzer/channel/channel-spring-installed-stretch00-20",
+      "harmonic-analyzer/summing/counter-spring-1"
+    ],
+    "partOverrides": [],
+    "geometry": "One complete 51-field chosen input, current mechanism solve and all462 runtime arrays with explicit raw460/helper-instance correspondence; hash-sealed actual f64 posed positions/u32 indices, byte offsets/counts/world matrices/native graph visibility.",
+    "springProof": "Fresh all-vertex current shader/numeric proof for all20 channel stocks plus counter. Counter POSITION/NORMAL differ from old raw and require fresh classification/GPU proof; old receipts cannot qualify them.",
+    "codeClosure": "Current actually executed immutable source snapshots and consistent codeHashes before/after export; no rewritten historical closure.",
+    "freezeContract": "Input, mechanism, stock uniforms and every runtime drawable array must be one actual current state, not a historical all435 field relabel."
+  },
+  "rayControlContract": {
+    "geometryAuthority": "Fresh sealed complete current runtime462 export only; camera rays never change native bodies or chosen input.",
+    "allowedRayFields": [
+      "id",
+      "origin",
+      "rotation",
+      "expectedNativeEligibility",
+      "cameraOriginInsideNativeAabbPaths"
+    ],
+    "detachedPoseRefusal": "Any additional ray field, including matrices or partOverrides even null/empty, is refused before loading native geometry. Input changes require a fresh complete current solve and sealed runtime462 export; no transform alias/allowlist.",
+    "cameraShapeRefusal": "Origin must be a finite numeric vector of length3 and rotation a finite numeric3x3 matrix. Invalid dimensions, types or nonfinite values are refused before loading native geometry; the geometry APIs enforce the same finite-array boundaries.",
+    "qualification": "Mathematical ray controls remain separate from source-feature/contact/GPU/stage acceptance."
+  },
+  "requiredNativeControls": [
+    "Positive actual nearest current native apex ray in the complete runtime462 graph using the exact current same-primitive incident facets. Seam-equivalent indices identify one physical feature, not independent support.",
+    "Adjacent marker body and foreground C-frame/other-body negatives remain in the complete nearest-positive-surface search and stay rejected.",
+    "Six genuinely distinct FIT native/source features with disjoint independent CHECK support and reachable positive-depth camera; FIT alone selects camera branches.",
+    "No changed/removed anchor becomes a guessed replacement, native alias, @crank proxy or waived source obligation."
+  ],
+  "independentSourceChecks": {
+    "sourceFeatureAssociation": null,
+    "currentGpuResiduals": null,
+    "sourceFrame2132PrivateFitPacket": "web/.vite/verification-output/intro-witness-recovery/new-pen-macro/source-features.json",
+    "sourceFrame2132PrivateCheckPacket": "web/.vite/verification-output/intro-witness-recovery/new-pen-macro/heldout-source-sections.json",
+    "preserve": "Original upper/lower/vblock/seam/notch/paper-contact source points and rod-left/rod-right/marker-lower-silhouette heldouts/uncertainties. Contact section is not a unique tracked texture. No rendered/projected source pixels or CHECK-driven candidate selection.",
+    "unavailableUntilMeasured": "Fresh current finite-feature mapping, source first-hit/contact/collision, all462 posed geometry/visibility and all21-stock proof, original independent source pixels, raster bounds and continuous cut-safe camera/mechanism history."
+  },
+  "acceptanceObligations": {
+    "sourceFrameWidthStagesPercent": [
+      50,
+      20,
+      10,
+      5
+    ],
+    "finalLimitSourcePixelsAt1920": 96,
+    "clockLimitSeconds": 0.5,
+    "allCutsAndSimultaneousPanelsRemainRequired": true,
+    "mirrorAndImagePlaneWarpRemainSourceScoped": true,
+    "sourceAcceptance": false,
+    "gpuAcceptance": false
+  },
+  "coincidentApexBlocker": {
+    "status": "pending-current-qualification",
+    "distinctPhysicalApexSupportPoints": 1,
+    "seamEquivalentVertexCount": 32,
+    "reason": "Coincident declarations/seam copies cannot provide six distinct FIT features or disjoint CHECK support. v39 does not resolve that defect by provenance change; fresh actual distinct-feature mapping/positive control remains required, not declared source impossibility."
+  },
+  "qualification": "Original source facts plus separately proven narrow native associations and chosen/unobserved current inputs/framing. Native station/setup ownership is checked, not current posed mechanism feasibility, fitted-camera transfer, source-first-surface, all21-stock numeric/GPU, geometry/raster or 50/20/10/5-percent stage acceptance."
+}

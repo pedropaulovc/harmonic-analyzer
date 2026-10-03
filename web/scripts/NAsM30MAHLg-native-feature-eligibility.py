@@ -6,6 +6,12 @@ additional calibration points. A full435 first-surface result remains conditiona
 on the sealed chosen input/export epoch and does not identify the source nib.
 Operation requires a fresh native export and refuses any native code differing
 from --code-root. Historical snapshots are not a current eligibility authority.
+Every primitive, including hidden ones, must cover exact sealed little-endian
+float64 XYZ / uint32 triangle bytes with finite positions and local index bounds.
+Camera rotations must satisfy R.T @ R = I and determinant +1 within 1e-6 absolute
+rounding tolerance; no normalization or clipping-axis repair is performed.
+These admissibility checks do not relax the 1e-7 m nib epsilon, 5 mm / 100 m
+near/far clipping, or independent 96 px / 0.5 s source obligations.
 """
 import argparse
 import hashlib
@@ -48,6 +54,19 @@ def finite_ray_array(value, shape, label):
         if any(isinstance(number, (bool, np.bool_)) for number in numbers):
             raise ValueError(f"{label} must contain numbers, not booleans")
     return array
+
+
+def proper_camera_rotation(value):
+    """Admit float32-rounded camera rotations without changing clipping gates."""
+    rotation = finite_ray_array(value, (3, 3), "Ray rotation").astype(np.float64, copy=False)
+    tolerance = 1e-6
+    # Bound the entries before products so malformed finite values cannot
+    # overflow, then require SO(3), not a scale/shear/reflection camera.
+    if (np.max(np.abs(rotation)) > 1 + tolerance
+            or np.max(np.abs(rotation.T @ rotation - np.eye(3))) > tolerance
+            or abs(np.linalg.det(rotation) - 1) > tolerance):
+        raise ValueError("Ray rotation must be a proper orthonormal camera rotation")
+    return rotation
 
 
 def request_has_nonfinite(value):
@@ -222,22 +241,45 @@ class FrozenNativeFirstSurface:
         self.incident_nib_triangles = np.flatnonzero(np.isin(triangles, self.equivalent_vertices).any(axis=1))
         self.parts = {}
         arrays = {}
-        for name, dtype in (("positions", "<f8"), ("indices", "<u4")):
+        for name, dtype, declared_dtype in (
+                ("positions", "<f8", "little-endian IEEE754 float64"),
+                ("indices", "<u4", "little-endian uint32")):
             entry = geometry[name]
             path = self.export_path.parent / entry["path"]
+            size = path.stat().st_size
+            if (entry.get("dtype") != declared_dtype
+                    or type(entry.get("bytes")) is not int or entry["bytes"] != size
+                    or size <= 0 or size % np.dtype(dtype).itemsize):
+                raise ValueError("Posed native arrays require exact dtype and complete aligned byte lengths")
             if digest(path) != entry["sha256"]:
                 raise ValueError("Posed native array differs from its sealed export")
             arrays[name] = np.memmap(path, dtype=dtype, mode="r")
+        position_end, index_end = 0, 0
         for row in census:
             path = row["path"]
             if path in self.parts:
                 raise ValueError("Duplicate actual native primitive path")
+            if (row["positionByteOffset"] != position_end or row["indexByteOffset"] != index_end
+                    or row["vertexCount"] > arrays["positions"].size // 3
+                    or row["indexCount"] > arrays["indices"].size):
+                raise ValueError("Native primitive slices must be bounded and contiguous over the complete arrays")
+            position_bytes, index_bytes = row["vertexCount"] * 24, row["indexCount"] * 4
+            position_end += position_bytes
+            index_end += index_bytes
+            if (position_end > arrays["positions"].nbytes or index_end > arrays["indices"].nbytes
+                    or row.get("positionBytes", position_bytes) != position_bytes
+                    or row.get("indexBytes", index_bytes) != index_bytes):
+                raise ValueError("Native primitive counts must exactly cover their declared position/index slices")
             p_offset, f_offset = row["positionByteOffset"] // 8, row["indexByteOffset"] // 4
-            positions = arrays["positions"][p_offset:p_offset + row["vertexCount"] * 3].reshape(-1, 3)
-            faces = arrays["indices"][f_offset:f_offset + row["indexCount"]].reshape(-1, 3)
+            positions = arrays["positions"][p_offset:p_offset + row["vertexCount"] * 3].reshape(row["vertexCount"], 3)
+            faces = arrays["indices"][f_offset:f_offset + row["indexCount"]].reshape(row["indexCount"] // 3, 3)
+            if not np.all(np.isfinite(positions)) or faces.max() >= row["vertexCount"]:
+                raise ValueError("Every native primitive requires finite coordinates and primitive-local triangle indices")
             self.parts[path] = {"P": positions, "F": faces, "M": np.asarray(row["matrixWorld"]).reshape(4, 4, order="F"),
                                 "visible": row["visibleByNativeGraph"]}
             self.parts[path]["bounds"] = (positions.min(axis=0), positions.max(axis=0))
+        if position_end != arrays["positions"].nbytes or index_end != arrays["indices"].nbytes:
+            raise ValueError("Native census slices must cover every byte of the sealed posed arrays")
         if len(self.parts) != self.nib["requiredNativeDrawableCount"]:
             raise ValueError("Incomplete actual native census")
         marker = self.parts[self.nib["partPath"]]
@@ -300,7 +342,7 @@ class FrozenNativeFirstSurface:
 
     def nib_guard(self, origin, rotation):
         origin = finite_ray_array(origin, (3,), "Ray origin")
-        rotation = finite_ray_array(rotation, (3, 3), "Ray rotation")
+        rotation = proper_camera_rotation(rotation)
         self.assert_code()
         marker = self.parts[self.nib["partPath"]]
         vertex = self.nib["nativeVertexIndex"]
@@ -358,7 +400,7 @@ def main():
         else:
             try:
                 origin = finite_ray_array(ray.get("origin"), (3,), "Ray origin")
-                rotation = finite_ray_array(ray.get("rotation"), (3, 3), "Ray rotation")
+                rotation = proper_camera_rotation(ray.get("rotation"))
             except ValueError as error:
                 reason = str(error)
         row = {"id": ray.get("id") if isinstance(ray, dict) else None,

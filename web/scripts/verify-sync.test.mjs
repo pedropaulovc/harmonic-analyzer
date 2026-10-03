@@ -1,9 +1,32 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-const { parseOptions, sourceCensus, sourceContourSidecar, finishVideo, seekSettlement, sourcePtsInShot, requireSourceViews, measureView, measureFrame, measureContours, playbackInterval, sourceSeedIndex, diagnosticReplayOutcome, requirePausedReview, compareCameraPose, requireModel } = await import(process.env.HARMONIC_VERIFY_SYNC_MODULE ?? './verify-sync.mjs')
-import { jsonDigest, sourceLayoutForViews, MODEL_SHA256, MODEL_COMMIT } from './verify-reference.mjs'
+import { createHash } from 'node:crypto'
+const { parseOptions, verificationGoal, finishReport, sourceCensus, sourceContourSidecar: joinSourceContours, finishVideo, seekSettlement, sourcePtsInShot, requireSourceViews, measureView, measureFrame, measureContours, playbackInterval, sourceSeedIndex, diagnosticReplayOutcome, requirePausedReview, compareCameraPose, requireModel } = await import(process.env.HARMONIC_VERIFY_SYNC_MODULE ?? './verify-sync.mjs')
+import { jsonDigest, sourceLayoutForViews, MODEL_SHA256, MODEL_COMMIT, nativeBodyAssociationIndex } from './verify-reference.mjs'
 
 // These are decision-gate unit controls, NOT browser/source-fidelity evidence.
+const BODY_PATH = 'harmonic-analyzer/channel/connecting-rod-20'
+function bodyProofTable() {
+  const matrix = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
+  const body = { status: 'mapped', reason: null, proof: { method: 'exact-original-native-primitive-role-v1',
+    historicalSource: { sha256: '2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d', sourceCommit: '1268c23d4a8fc741147c5e09d8d1e45247a71945' },
+    currentSource: { sha256: MODEL_SHA256, sourceCommit: MODEL_COMMIT }, qualifiedPartPath: BODY_PATH,
+    historicalWorldMatrix: matrix, currentWorldMatrix: matrix, historicalPrimitiveSha256: 'b'.repeat(64), currentPrimitiveSha256: 'b'.repeat(64),
+    primitives: [{ mode: 4, attributes: { POSITION: { componentType: 5126, type: 'VEC3', count: 3, normalized: false, typedBytesSha256: 'c'.repeat(64) },
+      NORMAL: { componentType: 5126, type: 'VEC3', count: 3, normalized: false, typedBytesSha256: 'd'.repeat(64) } }, indices: null, material: null }] } }
+  // Actual Python-produced proofs spell integral floats as 1.0. Measurement must
+  // hash this exact string, not JavaScript's numeric reserialization.
+  const serializedProof = JSON.stringify(body).replaceAll('WorldMatrix":[1,', 'WorldMatrix":[1.0,')
+  return { [BODY_PATH]: { ...body, serializedProof } }
+}
+const nativeBodyAssociations = bodyProofTable()
+const sourceContourSidecar = (frame, originals, table = nativeBodyAssociations) =>
+  joinSourceContours(frame, originals, nativeBodyAssociationIndex(table))
+function bodyProofRef(table = nativeBodyAssociations) {
+  const body = table[BODY_PATH]
+  return { status: body.status, reason: body.reason, proofRef: BODY_PATH,
+    proofSha256: createHash('sha256').update(body.serializedProof, 'utf8').digest('hex') }
+}
 const native = { durationSeconds: 2.1, fps: 30, pts: [0, 1, 2] }
 const frame = (time, classification = 'machine') => ({ timeSeconds: time, decodedTimeSeconds: time, shotId: 'shot', classification, views: [{ id: 'main' }] })
 const observations = { shots: [{ id: 'shot', startSeconds: 0, endSeconds: 2.1, classification: 'machine', hasCorrespondingMachine: true }], frames: [frame(0), frame(1), frame(2)], coverage: { changeTimesSeconds: [0.1, 0.2] } }
@@ -53,14 +76,11 @@ test('stage percentages never reduce retained video or every-second coverage', (
     const census = sourceCensus(observations, { frames: observations.frames, coverage: { changeTimesSeconds: [] } }, native, options)
     assert.deepEqual(census.rows.filter(row => row.reasons.includes('every-second')).map(row => row.timeSeconds), [0, 1, 2])
   }
-  assert.equal(parseOptions([]).stage, 5)
-  assert.equal(parseOptions([]).player, 'both')
 })
 
 test('incremental runs select one video without requiring the other five', () => {
   const options = parseOptions(['--stage', '50', '--video', 'analysis', '--times', '1'])
   assert.deepEqual(options.videos, ['6dW6VYXp9HM'])
-  assert.equal(options.player, 'local')
   const census = sourceCensus(observations, { frames: observations.frames, coverage: { changeTimesSeconds: [] } }, native, options)
   assert.deepEqual(census.selected.map(row => row.timeSeconds), [1])
   assert.deepEqual(census.rows.filter(row => row.reasons.includes('mid-interval')).map(row => row.timeSeconds), [])
@@ -120,7 +140,7 @@ test('measured failures remain failed even alongside unavailable landmarks', () 
 
 test('final5% stage cannot pass on a local-only original media check', () => {
   const video = videoFixture()
-  finishVideo(video, censusFixture, parseOptions(['--player', 'local']))
+  finishVideo(video, censusFixture, parseOptions(['--stage', '5', '--player', 'local']))
   assert.notEqual(video.status, 'passed')
   assert.ok(video.failures.some(failure => failure.code === 'official-player-unmeasured'))
   assert.equal(video.stageMeasurement.tolerancePx, 96)
@@ -341,6 +361,30 @@ function finishMeasuredFixture(fixture, result) {
   finishVideo(video, { rows, selected: rows }, parseOptions(['--stage', '50']))
   return video
 }
+
+test('unavailable native counterparts remain required losses even if a ghost point has matching GPU pixels', () => {
+  for (const retainGhost of [false, true]) {
+    const fixture = measuredViewFixture()
+    const observed = fixture.observations[2], anchor = fixture.anchors.get(observed.anchorId)
+    anchor.nativeAssociation = { status: 'unavailable', reason: 'Original native primitive changed; fresh source feature mapping required', proof: {} }
+    if (!retainGhost) {
+      delete anchor.partPath
+      delete anchor.partLocalMetres
+      delete anchor.correspondenceEvidence
+    }
+    fixture.frame.landmarks = fixture.observations
+    const result = measureFrame(fixture.frame, fixture.response, 96, fixture.anchors)
+    assert.ok(!result.measurements.some(item => item.anchorId === observed.anchorId))
+    const loss = result.unavailable.find(item => item.anchorId === observed.anchorId)
+    assert.equal(loss.required, true)
+    assert.deepEqual(loss.sourcePixels, observed.pixel)
+    assert.equal(loss.originalRole, 'check')
+    assert.equal(result.status, 'unavailable')
+    const finished = finishMeasuredFixture(fixture, result)
+    assert.equal(finished.coverage.passedRequiredSamples, 0)
+    assert.equal(finished.stageMeasurement.status, 'unmeasured')
+  }
+})
 
 test('source-loss obligation blocks passing surviving landmarks for CHECK, FIT and unknown roles', () => {
   for (const role of ['check', 'fit', null]) {
@@ -985,7 +1029,7 @@ function contourFixture(drawRevision = 1) {
   frame.shotId = 'shot'
   frame.classification = 'machine'
   frame.sourceImage = sourceImage(30, 'a'.repeat(64))
-  const check = { id: 'right-exterior', role: 'check', partPath: 'harmonic-analyzer/channel/connecting-rod-20',
+  const check = { id: 'right-exterior', role: 'check', partPath: BODY_PATH, originalPartPath: BODY_PATH, nativeAssociation: bodyProofRef(),
     sourceContourPixels: [[100.5, 100.5], [120.5, 100.5], [140.5, 100.5]], uncertaintyPx: 3,
     measurementEvidence: { sourceImage: frame.sourceImage, evidence: 'Original measured partial exterior edge; original CHECK role, not a newly independent camera/input fit.' } }
   const original = { ...frame, views: [{ ...view, sourceContourChecks: [check] }] }
@@ -1017,6 +1061,75 @@ test('exact source contour packets preserve partial CHECK residuals with additiv
   assert.equal(measureContourFixture(fixture, 9.999).measured[0].status, 'failed')
   fixture.part.contourSourcePixels = fixture.part.contourSourcePixels.slice(1)
   assert.equal(measureContourFixture(fixture, 25).measured[0].rawErrorPx, 20)
+})
+
+test('literal shared body proofs reach actual contour measurement despite Python float spelling', () => {
+  const fixture = contourFixture()
+  assert.equal(measureContourFixture(fixture).measured[0].errorPx, 10)
+  assert.equal(measureContourFixture(fixture).measured[0].status, 'passed')
+  const cloned = structuredClone(fixture.frame)
+  const forged = measureContours(fixture.view, fixture.response, cloned, 10)
+  assert.deepEqual(forged.measured, [])
+  assert.match(forged.unavailable[0].reason, /native-body proof reference/)
+})
+
+test('missing, forged, old-model and unavailable body references remain required census losses', () => {
+  const cases = [
+    (table, check) => { delete table[BODY_PATH] },
+    (table, check) => { check.nativeAssociation.proofSha256 = 'e'.repeat(64) },
+    (table, check) => { check.nativeAssociation.proofRef = 'harmonic-analyzer/channel/connecting-rod-19' },
+    (table, check) => { check.originalPartPath = 'harmonic-analyzer/channel/connecting-rod-19' },
+    (table, check) => { check.nativeAssociation.status = 'unavailable' },
+    (table, check) => { table[BODY_PATH].proof.currentSource.sha256 = 'f'.repeat(64) },
+    (table, check) => { table[BODY_PATH].serializedProof = '{' },
+    (table, check) => { check.nativeAssociation = { status: 'mapped', reason: null, proof: table[BODY_PATH].proof } },
+    (table, check) => {
+      const body = table[BODY_PATH]
+      body.proof.currentSource = { ...body.proof.historicalSource }
+      body.serializedProof = JSON.stringify({ status: body.status, reason: body.reason, proof: body.proof })
+      check.nativeAssociation = bodyProofRef(table)
+    },
+    (table, check) => {
+      const body = table[BODY_PATH]
+      body.status = 'unavailable'; body.reason = 'Original geometry changed; fresh primary mapping required'
+      body.serializedProof = JSON.stringify({ status: body.status, reason: body.reason, proof: body.proof })
+      check.nativeAssociation = bodyProofRef(table)
+      delete check.partPath
+    },
+  ]
+  for (const mutate of cases) {
+    const fixture = contourFixture(), table = bodyProofTable(), original = structuredClone(fixture.original)
+    const check = original.views[0].sourceContourChecks[0]
+    mutate(table, check)
+    const source = { shots: observations.shots, frames: [original], nativeBodyAssociations: table }
+    const row = sourceCensus(source, { frames: [fixture.frame] }, native, parseOptions(['--times', '1'])).selected[0]
+    assert.deepEqual(row.frame.contourChecks, [])
+    const loss = row.frame.unavailable.find(item => item.contourId === check.id)
+    assert.equal(loss.required, true)
+    assert.equal(loss.originalRole, 'check')
+    assert.deepEqual(loss.sourcePixels, check.sourceContourPixels)
+    assert.deepEqual(loss.sourceImage, original.sourceImage)
+    assert.equal(loss.decodedTimeSeconds, original.decodedTimeSeconds)
+    const measured = measureContours(fixture.view, fixture.response, row.frame, 10)
+    assert.deepEqual(measured.measured, [])
+    assert.equal(measured.unavailable[0].contourId, check.id)
+  }
+})
+
+test('unavailable frame-level body facts retain unknown views and required source losses', () => {
+  const fixture = contourFixture(), original = structuredClone(fixture.original)
+  delete original.views[0].sourceContourChecks
+  original.sourceRodBodyMeasurements = [{ id: 'unresolved-rod-body', partPath: BODY_PATH, originalPartPath: BODY_PATH,
+    viewId: null, nativeAssociation: { ...bodyProofRef(), proofSha256: 'e'.repeat(64) },
+    sourceLinePixels: [[123, 456], [321, 654]], measurementEvidence: { sourceImage: original.sourceImage } }]
+  const row = sourceCensus({ shots: observations.shots, frames: [original], nativeBodyAssociations },
+    { frames: [fixture.frame] }, native, parseOptions(['--times', '1'])).selected[0]
+  const loss = row.frame.unavailable.find(item => item.contourId === 'unresolved-rod-body')
+  assert.equal(loss.required, true)
+  assert.equal(loss.originalViewId, null)
+  assert.equal(loss.originalRole, null)
+  assert.deepEqual(loss.sourcePixels, [[123, 456], [321, 654]])
+  assert.deepEqual(loss.sourceImage, original.sourceImage)
 })
 
 test('partial original endpoints at the last source rows remain measured rather than extrapolated or dropped', () => {
@@ -1154,7 +1267,7 @@ test('mandatory off-track CHECK rows cannot manufacture ready views from a camer
   original.sourceImage = sourceImage(15, 'b'.repeat(64))
   original.views[0].sourceContourChecks[0].measurementEvidence.sourceImage = original.sourceImage
   original.landmarks = []
-  const source = { shots: observations.shots, frames: [original] }
+  const source = { shots: observations.shots, frames: [original], nativeBodyAssociations }
   const compact = { shots: observations.shots, frames: observations.frames.map(frame => ({ ...frame, views: [fixture.view] })) }
   const row = sourceCensus(source, compact, native, parseOptions(['--times', '0.5'])).selected[0]
   assert.equal(row.required, true)
@@ -1174,7 +1287,7 @@ test('census retains off-track CHECK exposure requirements and rejects ambiguous
     original.landmarks = []
     return original
   })
-  const source = { shots: observations.shots, frames: originals }
+  const source = { shots: observations.shots, frames: originals, nativeBodyAssociations }
   const compact = { shots: observations.shots, frames: [{ ...frame(1), views: [fixture.view] }] }
   const census = sourceCensus(source, compact, native, parseOptions(['--stage', '50']))
   const obligations = census.rows.filter(row => row.reasons.includes('source-contour-check'))
@@ -1202,7 +1315,7 @@ test('census retains off-track CHECK exposure requirements and rejects ambiguous
 test('CHECK contours override compact exemptions without rescuing invalid source PTS or different decoded formats', () => {
   const fixture = contourFixture()
   const exemptShots = observations.shots.map(shot => ({ ...shot, classification: 'non-machine', hasCorrespondingMachine: false }))
-  const source = { shots: exemptShots, frames: [{ ...fixture.original, classification: 'non-machine' }] }
+  const source = { shots: exemptShots, frames: [{ ...fixture.original, classification: 'non-machine' }], nativeBodyAssociations }
   const compact = { shots: exemptShots, frames: [{ ...fixture.frame, classification: 'non-machine' }] }
   const row = sourceCensus(source, compact, native, parseOptions(['--times', '1'])).selected[0]
   assert.equal(row.required, true)
@@ -1216,7 +1329,7 @@ test('CHECK contours override compact exemptions without rescuing invalid source
   const invalid = structuredClone(fixture.original)
   invalid.timeSeconds = 0.9; invalid.decodedTimeSeconds = 1
   const shots = [{ ...observations.shots[0], endSeconds: 1 }]
-  const outside = sourceCensus({ shots, frames: [invalid] }, { shots, frames: [{ ...invalid, views: [fixture.view] }] }, native, parseOptions(['--times', '0.9'])).selected[0]
+  const outside = sourceCensus({ shots, frames: [invalid], nativeBodyAssociations }, { shots, frames: [{ ...invalid, views: [fixture.view] }] }, native, parseOptions(['--times', '0.9'])).selected[0]
   assert.equal(outside.required, true)
   assert.equal(outside.frame, null)
   assert.equal(outside.contourJoinUnavailable[0].role, 'check')
@@ -1306,4 +1419,234 @@ test('contour CHECK counterexamples fail stages without supplying independent fi
   assert.equal(missing.contourChecks.unavailable, 1)
   assert.equal(missing.coverage.complete, false)
   assert.notEqual(missing.stageMeasurement.status, 'passed')
+})
+
+// Actual admission/measurement consumers produce these synthetic decision-gate
+// receipts. They are not browser, source-fidelity or renderer qualification.
+function eligiblePixelVideo(kind, errorPx) {
+  const fixture = contourFixture()
+  fixture.frame.landmarks = fixture.observations
+  if (kind === 'contour') {
+    fixture.check.sourceContourPixels = [[0, 100], [0, 120], [0, 140]]
+    fixture.check.uncertaintyPx = 0
+    fixture.part.contourSourcePixels = [[errorPx, 100], [errorPx, 120], [errorPx, 140]]
+    fixture.part.uncertaintySourcePixels = 0
+  } else {
+    const observed = fixture.observations[kind === 'fit-point' ? 0 : 2]
+    observed.pixel = [0, observed.pixel[1]]
+    observed.uncertaintyPx = 0
+    const marker = fixture.capture.landmarks.find(item => item.id === observed.anchorId)
+    marker.sourcePixels = [errorPx, observed.pixel[1]]
+    marker.canvasPixels = [...marker.sourcePixels]
+    marker.uncertaintySourcePixels = 0
+  }
+  // The incoming 5%-qualified statuses intentionally say passed. finishVideo
+  // must independently enforce the stricter goal on the admitted numeric error.
+  const result = measureFrame(fixture.frame, fixture.response, 96, fixture.anchors, fixture.seeds)
+  assert.deepEqual(result.unavailable, [])
+  assert.equal(result.status, 'passed')
+  const subject = kind === 'contour' ? result.contourChecks[0]
+    : result.measurements.find(item => item.anchorId === (kind === 'fit-point' ? 'anchor-0' : 'anchor-2'))
+  assert.equal(subject.errorPx, errorPx)
+  assert.equal(subject.status, 'passed')
+  const video = videoFixture()
+  video.playback.youtube = { status: 'passed' }
+  video.shots = [{ id: 'shot', internalMechanismMotion: 'moving' }]
+  Object.assign(video.samples[0], result, { timeSeconds: fixture.frame.timeSeconds,
+    sampleTimeSeconds: fixture.frame.timeSeconds, sourceShotId: 'shot' })
+  const rows = [{ timeSeconds: fixture.frame.timeSeconds, required: true,
+    reasons: ['every-second'], frame: fixture.frame }]
+  return { video, census: { rows, selected: rows }, fixture, subject }
+}
+
+test('the strict full goal is distinct from every explicit qualification stage', () => {
+  const full = verificationGoal(parseOptions([]))
+  assert.equal(full.kind, 'full-acceptance')
+  assert.equal(full.stage, null)
+  assert.equal(full.frameWidthPercent, 2)
+  assert.equal(full.tolerancePx, 38.4)
+  assert.equal(full.requiresOfficialPlayer, true)
+  assert.equal(full.requiresLocalPlayer, true)
+  for (const [stage, tolerancePx] of [[50, 960], [20, 384], [10, 192], [5, 96]]) {
+    const goal = verificationGoal(parseOptions(['--stage', String(stage)]))
+    assert.equal(goal.kind, 'stage-qualification')
+    assert.equal(goal.stage, stage)
+    assert.equal(goal.tolerancePx, tolerancePx)
+    assert.equal(goal.requiresOfficialPlayer, stage === 5)
+    assert.equal(goal.requiresLocalPlayer, false)
+  }
+  assert.throws(() => parseOptions(['--stage', '2']))
+})
+
+test('the same admitted95px point and CHECK contour fail strict full acceptance but pass explicit5 qualification', () => {
+  for (const kind of ['point', 'contour']) {
+    const full = eligiblePixelVideo(kind, 95)
+    finishVideo(full.video, full.census, parseOptions([]))
+    assert.equal(full.subject.status, 'failed')
+    assert.equal(full.video.status, 'failed')
+    assert.equal(full.video.acceptanceMeasurement.status, 'failed')
+    assert.equal(full.video.acceptanceMeasurement.tolerancePx, 38.4)
+    assert.equal(Object.hasOwn(full.video, 'stageMeasurement'), false)
+    const stage = eligiblePixelVideo(kind, 95)
+    finishVideo(stage.video, stage.census, parseOptions(['--stage', '5']))
+    assert.equal(stage.subject.status, 'passed')
+    assert.equal(stage.video.status, 'passed')
+    assert.equal(stage.video.stageMeasurement.status, 'passed')
+    assert.equal(stage.video.stageMeasurement.tolerancePx, 96)
+    assert.equal(Object.hasOwn(stage.video, 'acceptanceMeasurement'), false)
+  }
+})
+
+test('strict point and CHECK contour limits include38.4px equality but refuse the first larger measured bound', () => {
+  for (const kind of ['point', 'contour']) {
+    for (const errorPx of [20, 38.4]) {
+      const positive = eligiblePixelVideo(kind, errorPx)
+      finishVideo(positive.video, positive.census, parseOptions([]))
+      assert.equal(positive.video.status, 'passed')
+      assert.equal(positive.video.acceptanceMeasurement.status, 'passed')
+      assert.equal(positive.subject.status, 'passed')
+    }
+    const outside = eligiblePixelVideo(kind, 38.400001)
+    finishVideo(outside.video, outside.census, parseOptions([]))
+    assert.equal(outside.subject.status, 'failed')
+    assert.equal(outside.video.acceptanceMeasurement.status, 'failed')
+  }
+})
+
+test('an admitted FIT point with a preassigned pass cannot hide a finite strict image-error counterexample', () => {
+  const fixture = eligiblePixelVideo('fit-point', 95)
+  assert.equal(fixture.subject.role, 'fit')
+  finishVideo(fixture.video, fixture.census, parseOptions([]))
+  assert.equal(fixture.subject.status, 'failed')
+  assert.equal(fixture.video.acceptanceMeasurement.status, 'failed')
+  assert.equal(fixture.video.landmarks.fixedChecks, 1)
+  assert.equal(fixture.video.landmarks.movingChecks, 1)
+})
+
+test('strict acceptance requires both original players and a passed manual interaction receipt', () => {
+  for (const [receipt, code] of [['youtube', 'official-player-unmeasured'],
+    ['local', 'local-player-unmeasured'], ['interaction', 'interaction-unmeasured']]) {
+    for (const state of [undefined, 'unavailable', 'failed']) {
+      const fixture = eligiblePixelVideo('point', 20)
+      const target = receipt === 'interaction' ? fixture.video : fixture.video.playback
+      if (state === undefined) delete target[receipt]
+      else target[receipt] = { status: state }
+      finishVideo(fixture.video, fixture.census, parseOptions([]))
+      assert.notEqual(fixture.video.status, 'passed')
+      assert.notEqual(fixture.video.acceptanceMeasurement.status, 'passed')
+      assert.ok(fixture.video.failures.some(item => item.code === code))
+    }
+  }
+})
+
+test('a failed manual interaction object cannot satisfy explicit stage qualification either', () => {
+  const fixture = eligiblePixelVideo('point', 20)
+  fixture.video.interaction = { status: 'failed' }
+  finishVideo(fixture.video, fixture.census, parseOptions(['--stage', '5']))
+  assert.equal(fixture.video.stageMeasurement.status, 'failed')
+  assert.ok(fixture.video.failures.some(item => item.code === 'interaction-unmeasured'))
+})
+
+test('finite admitted diagnostic point and CHECK contour errors override their passed status without supplying mandatory coverage', () => {
+  for (const kind of ['point', 'contour']) {
+    for (const strict of [true, false]) {
+      const diagnostic = eligiblePixelVideo(kind, 95), video = videoFixture()
+      video.playback.youtube = { status: 'passed' }
+      const sample = { ...diagnostic.video.samples[0], diagnosticOnly: true, reasons: ['mid-interval'] }
+      const row = { ...diagnostic.census.rows[0], diagnosticOnly: true, reasons: ['mid-interval'] }
+      video.samples.push(sample)
+      const rows = [...censusFixture.rows, row]
+      finishVideo(video, { rows, selected: rows }, parseOptions(strict ? [] : ['--stage', '5']))
+      assert.equal(video.coverage.complete, true)
+      assert.equal(video.landmarks.movingChecks, 1)
+      if (strict) {
+        assert.equal(diagnostic.subject.status, 'failed')
+        assert.equal(video.acceptanceMeasurement.status, 'failed')
+        assert.ok(video.failures.some(item => item.code === (kind === 'contour'
+          ? 'diagnostic-contour-counterexample' : 'diagnostic-pixel-counterexample')))
+      } else {
+        assert.equal(diagnostic.subject.status, 'passed')
+        assert.equal(video.stageMeasurement.status, 'passed')
+      }
+    }
+  }
+})
+
+test('unknown required source losses block both full acceptance and stage qualification without guessing their view or pixels', () => {
+  for (const strict of [true, false]) {
+    const fixture = eligiblePixelVideo('point', 20)
+    fixture.fixture.frame.unavailable = [{ featureId: 'unidentified-exterior', viewId: null,
+      role: null, sourcePixels: null, required: true, reason: 'Original unidentified source feature remains unresolved.' }]
+    finishVideo(fixture.video, fixture.census, parseOptions(strict ? [] : ['--stage', '5']))
+    assert.equal(fixture.video.coverage.complete, false)
+    assert.notEqual((strict ? fixture.video.acceptanceMeasurement : fixture.video.stageMeasurement).status, 'passed')
+    const loss = fixture.video.unavailableReasons.find(item => item.featureId === 'unidentified-exterior')
+    assert.equal(loss.required, true)
+    assert.equal(loss.originalViewId, null)
+    assert.equal(loss.role, null)
+    assert.equal(loss.sourcePixels, null)
+  }
+})
+
+function finishedRouteReceipts(options, kind = 'point', errorPx = 20) {
+  return options.videos.map(videoId => {
+    const fixture = eligiblePixelVideo(kind, errorPx)
+    fixture.video.videoId = videoId
+    finishVideo(fixture.video, fixture.census, options)
+    return fixture.video
+  })
+}
+
+test('selected-video and time-scoped full runs cannot become all-six acceptance even with successful eligible measurements', () => {
+  for (const args of [['--video', 'analysis'], ['--times', '1']]) {
+    const options = parseOptions(args)
+    const report = { goal: verificationGoal(options), failures: [], videos: finishedRouteReceipts(options) }
+    finishReport(report, options)
+    assert.equal(report.status, 'partial')
+    assert.equal(report.acceptanceMeasurement.status, 'unmeasured')
+    assert.equal(report.acceptanceMeasurement.scope, 'all-six-videos')
+    if (options.scoped) {
+      assert.ok(report.videos.every(video => video.acceptanceMeasurement.status === 'unmeasured'))
+      assert.ok(report.videos.every(video => video.acceptanceMeasurement.scopedSamples.status === 'passed'))
+    } else {
+      assert.ok(report.videos.every(video => video.acceptanceMeasurement.status === 'passed'))
+    }
+  }
+})
+
+test('all six unique routes with genuinely strict finished receipts can certify full acceptance', () => {
+  const options = parseOptions([])
+  const report = { goal: verificationGoal(options), failures: [], videos: finishedRouteReceipts(options) }
+  finishReport(report, options)
+  assert.equal(report.status, 'passed')
+  assert.equal(report.acceptanceMeasurement.status, 'passed')
+  assert.equal(report.acceptanceMeasurement.tolerancePx, 38.4)
+  assert.ok(report.videos.every(video => video.acceptanceMeasurement.kind === 'full-acceptance'
+    && video.acceptanceMeasurement.scope === 'video' && !Object.hasOwn(video, 'stageMeasurement')))
+})
+
+test('missing duplicate foreign failed or stage-only route receipts cannot certify all-six strict acceptance', () => {
+  const options = parseOptions([])
+  for (const mismatch of ['missing', 'duplicate', 'foreign', 'measured-failure', 'stage-only', 'global-failure']) {
+    const report = { goal: verificationGoal(options), failures: [], videos: finishedRouteReceipts(options) }
+    if (mismatch === 'missing') report.videos.pop()
+    else if (mismatch === 'duplicate') report.videos.at(-1).videoId = report.videos[0].videoId
+    else if (mismatch === 'foreign') report.videos.at(-1).videoId = 'not-an-original-route'
+    else if (mismatch === 'measured-failure') {
+      const failed = eligiblePixelVideo('point', 95)
+      failed.video.videoId = report.videos.at(-1).videoId
+      finishVideo(failed.video, failed.census, options)
+      report.videos[report.videos.length - 1] = failed.video
+    } else if (mismatch === 'stage-only') {
+      report.videos = finishedRouteReceipts(parseOptions(['--stage', '5']), 'point', 95)
+      assert.ok(report.videos.every(video => video.stageMeasurement.status === 'passed'))
+    } else report.failures.push({ code: 'missing-source-prerequisite' })
+    finishReport(report, options)
+    assert.notEqual(report.status, 'passed')
+    assert.notEqual(report.acceptanceMeasurement.status, 'passed')
+    if (mismatch === 'measured-failure') {
+      assert.equal(report.status, 'failed')
+      assert.equal(report.acceptanceMeasurement.status, 'failed')
+    }
+  }
 })

@@ -72,8 +72,33 @@ Native metadata, descriptor and asset were generated transactionally after
 native rest validation (now **131 checks**). A bounded current build passed
 (**37 modules / 5.82 seconds**, `index-Nfm87sg7.js`); the model suite passed
 **34 tests / zero failures / zero skips**. This does not establish full
-synchronization or source acceptance. All six source tracks retain the old native
-association and remain unqualified pending regeneration.
+synchronization or source acceptance. All six observations and source tracks
+have since been adopted/generated under **`content/v39/`**; root `content/`
+receipts remain immutable old-release history. Current native associations
+preserve required losses: **Intro 16, Synthesis 16, Analysis 21, Operation 169,
+Spin 42, Rocker 0**. Source-only facts remain; unavailable native associations
+do not become fabricated paths or coordinates. Literal-serialized native body
+proofs and digests live once at the current root; closed references are verified
+before measurement, without inline fallback or rewriting immutable lineage.
+
+The repaired all-six observation adoption, family producers and source-track
+transaction passed in **74.17 seconds**, preserving all source observations and
+required losses. Source, playback and sync-consumer suites passed **51 / 10 /
+88 tests**. A **95 px** point-plus-CHECK-contour control failed against the exact
+unpublished prior revision, then passed the corrected full suite, including
+the **38.4 px** boundary and an explicit stage-5 positive.
+The repaired build passed in **8.05 seconds**, reducing JavaScript chunks from
+about **195 MB to 105 MB**, largest Intro **27.842 MB**; Rocker observations are
+**65,340,336 bytes**, below GitHub's 100 MB file limit. This does not claim a
+successful push, deploy readiness or normal-route acceptance.
+All six remain unmeasured at intermediate **50/20/10/5%** and strict **2%**
+acceptance; actual source-stage verification has not run.
+
+Original MP4 SHA, **1920×1080**, FPS and actual PTS passed for all six, with
+frame counts **6,544 Intro / 8,196 Synthesis / 7,328 Analysis / 21,190 Operation /
+4,165 Spin / 25,134 Rocker**. Evidence is
+`web/.vite/verification-output/current-original-media-20261003.json`.
+This is raw-file/clock identity, not decoded-image replay, footage fit or GPU proof.
 
 The first rack-negative test mutated native CAD into an early cutter-assertion
 failure, not a runtime-gate refusal; that failed attempt is retained. A bounded
@@ -92,8 +117,36 @@ model was visible in the parent-inspected screenshot. Private evidence is
 `web/.vite/native-v39-smoke20261003.png`.
 The first driver used the wrong `.crank` property; its actual failure is preserved
 in `web/.vite/native-v39-smoke-first.json`, not classified as an application bug.
-This smoke is **not the normal application surface**. Normal-route acceptance,
-all-21-spring GPU numerical equivalence and ownership remain unverified.
+This smoke is **not the normal application surface**. Normal-route acceptance
+and all-21-spring GPU numerical equivalence remain unverified.
+
+The separate corrected native owned-motion fixture passed **12 actual states /
+10,328 assertions**, with **zero failures / page errors**, full genuine native
+GPU censuses in every state and real world-matrix ownership/invariant checks.
+It retains **460 raw / 462 runtime Mesh rows**, **479 actual named poses**
+(all `machine.partPaths`, including the genuinely exported camera sibling,
+which is not a CAD drawable), and **21 real spring roles / 3,293,594 vertices**.
+The camera adds neither CAD geometry nor a proxy. Checked groups comprise **19 crank, 3 cone-rig,
+20 cone-gear, 8 platform, 33 platen, 9 knob, 6 feed, 9 hanger, 6 latch, 3 pivot,
+68 chain and 3 sprocket objects**. Actual downloaded evidence is
+`.playwright-cli/native-v39-owned-motion-source-anchor-corrected-20261003.json`.
+
+The preceding narrower pass checked **478 named paths / 10,315 assertions**,
+excluding the camera, and remains valid within that scope. Its actual first-run
+artifact is preserved; the downloaded corrected receipt now holds the follow-up
+**479-pose / 10,328-assertion** run, which adds complete named membership/camera
+checks only, not new shader, first-surface or source evidence.
+
+The first full fixture failed **227 chain-orientation checks** because its private
+oracle used the Float32 native crank origin rather than the pure CAD anchor
+(a **0.110786 µm** discrepancy). The independent archived CAD-equation correction
+changed only the private oracle; all 227 residuals then stayed within
+**2.31e−16 m / 1.43e−14 matrix units**, with the strict **2e−6 m / 1e−6**
+tolerances unchanged. The failed receipt remains history, not a production defect
+or a relaxed bound. This is bounded ownership/invariant evidence, **not**
+all-vertex spring GPU arithmetic, original-footage normal-route, first-surface
+or source acceptance. All six videos remain unmeasured and full collection
+attempts remain **0/3**.
 
 For the current release, the single command
 `npm --prefix web run fetch-model -- /path/to/raw.glb` validates the existing raw
@@ -227,15 +280,18 @@ reports and visibility bindings retain the exact records. Neither declaration
 establishes whole-part correspondence or makes unavailable source data matched.
 Original hole contours remain diagnostics, not fabricated source pixels, native
 holes or textures. Native inventory integrity, all other features, pose and
-motion remain required. The staged image tolerances below replace the former
-38.4-source-pixel limit; timing remains bounded by 0.5 seconds.
+motion remain required. The staged image tolerances below are intermediate
+qualification only; strict final acceptance remains 38.4 px at 1920 pixels wide,
+with timing bounded by 0.5 seconds.
 
 ## Iterative synchronization plan
 
-The approved sequence is **50% → 20% → 10% → 5% of source frame width**.
-These are maximum landmark-position errors, not percentages of videos covered.
-At 1920 pixels wide the limits are 960, 384, 192 and 96 pixels respectively.
-The final target is 5%; video/model timing stays within 0.5 seconds at every stage.
+Intermediate qualification proceeds **50% → 20% → 10% → 5% of source frame width**.
+These are maximum landmark-position errors, not percentages of videos covered:
+960, 384, 192 and 96 pixels at 1920 pixels wide. Canonical `npm run verify:sync`
+defaults to strict full **2% (38.4 px at 1920) / 0.5-second** acceptance across
+all six videos, exercising both official YouTube and local original media, audio,
+compact mode and manual controls. Intermediate passes are not retagged as final.
 
 Start with working approximate camera and mechanism tracking across **all six**
 videos, then present an actual browser demo before refining to 20%, 10%
@@ -266,7 +322,7 @@ cut, layout, gearing and counter-height-mode guards remain authoritative.
 Analysis03's bounded **4.4044..7.307300000000001-second** interval and
 Synthesis's presenter-to-spin **25.984291667..26.609916667-second** interval
 opt in to this chosen continuous framing through the same optional
-`content/<videoId>.chosen-camera-continuity.json` permission convention.
+`content/v39/<videoId>.chosen-camera-continuity.json` permission convention.
 Position, quaternion rotation, FOV and principal point interpolate; Synthesis
 holds its existing front-camera position/quaternion and blends its chosen
 principal-point/FOV reframing keys. Its 16 retained source rows cover native
@@ -282,7 +338,7 @@ Mechanical provenance remains chosen and stages remain unmeasured. Neither this
 interpolation nor the scoped headless Analysis **5.9..7.1-second** and Synthesis
 **25.98..26.54-second** demonstrations establish recovered camera/mechanical pose,
 historical camera motion or a fidelity pass. All six videos retain the final
-**5% / 0.5-second** acceptance limits; other videos' framing policies are unchanged.
+**2% / 0.5-second** acceptance limits; other videos' framing policies are unchanged.
 
 Eight focused `node:test` cases load the real modules through Vite SSR
 (`npm --prefix web run test:playback`). An optional `SOURCE_TRACK_MODULE`
@@ -529,8 +585,8 @@ This proves scoped current GPU/readback reproducibility and delivery identity,
 not source first-surface validity, geometry correspondence or stage acceptance.
 
 Mask warp error **51.700120813456685 px** and bound **69.54795584625838 px**
-remain above the original **38.4 px diagnostic budget**. The staged **96 px**
-source target does not waive that diagnostic budget. Thin error and bound are
+remain above the original **38.4 px diagnostic budget**. The intermediate **96 px**
+stage does not waive that diagnostic budget. Thin error and bound are
 **16.40021067721657 px** and **20.707409278898922 px**, respectively.
 
 Native contours cover **one original HOLD view / all 435 Mesh rows**; actual
@@ -755,10 +811,18 @@ executed **3 cases, 3 passes, 0 skips** in **0.331 seconds** on its first post-f
 run. Missing `INTRO_RAW_NATIVE_MODEL_PATH` raises `RuntimeError`, without a skip.
 `npm --prefix web run test:source:geometry` uses isolated uv with pinned
 numpy **2.5.3**, scipy **1.18.1** and opencv-python-headless **5.0.0.93**.
-The current expanded gate executed **10 passes, zero skips** in **3.478 seconds**,
+The earlier expanded gate executed **10 passes, zero skips** in **3.478 seconds**,
 covering raw support, public CLI refusal/error-state, malformed metadata and camera
 boundary cases without a private full435 test dependency. Malformed code-hash
 metadata retains error rows rather than escaping as an exception.
+
+The later guard repro confirmed bogus eligibility from NaN occluders and scaled
+cameras, plus an index-error path. Corrected focused controls passed **54/54**
+and the enrolled geometry suite passed **18 tests**. Against the exact earlier
+revision, the eight new controls produced **26 negative failures / positive
+pass**, establishing the boundary change without rewriting historical evidence.
+These CPU/synthetic guards do not establish current full-native GPU geometry
+or source first-surface acceptance.
 Set `INTRO_RAW_NATIVE_MODEL_PATH` to the original raw `2280bfa6…` GLB,
 as shown in the README. Missing or mismatched raw bytes fail the prerequisite;
 the optimized public `ad5c2592…` model cannot substitute.
@@ -804,7 +868,7 @@ This is native CPU geometry conditional on original HOLD and the first-surface
 guard. GPU pixels, source-camera/contact correspondence, historical inputs and
 stage acceptance remain unqualified.
 
-An actual RTX 3090 numerical comparison executed all **21 spring programs /
+A historical old-release RTX 3090 numerical comparison executed all **21 spring programs /
 3,293,594 vertices**, with current code/program/attribute hashes checked. It
 **fails** the unchanged **1e-7 m** CPU/GPU equivalence bound: GPU world Float32
 maximum error is **3.273407359328867e-7 m**, with **407,744 vertices** outside;
@@ -814,6 +878,23 @@ all 21 springs. The CPU first-surface controls therefore remain CPU-scoped,
 without a current full-geometry GPU equivalence proof, bound relaxation or exemption.
 Private evidence is
 `web/.vite/verification-output/current-native-exports-20261003/actual-RTX3090-current21-spring-numerical-comparison-20261003.json`.
+
+The current v39 private spring baseline exercised **17 candidates**, with
+**16 feasible / 16 evaluated**; the wire-fixture-offset minimum correctly refused
+hanging-run exhaustion. Across all **21 spring roles / 3,293,594 vertices** per
+feasible state, the **52,697,504-vertex-check** comparison failed the unchanged
+**1e−7 m** equivalence bound: local maximum **3.05495e−7 m**, world diagnostic maximum
+**3.33007e−7 m**, with **2,257,200 local / 3,918,398 world** out-of-bound checks
+across the 16 states. Page errors were zero and original input was restored.
+The archived **1.230 GB / 77-member** baseline passed integrity verification,
+covering **462 native drawables / 6,953,932 vertices / 17,370,204 indices**
+and six exact native-script closures.
+
+This is diagnostic instrumented replication of the actual submitted shader,
+not pixels, source, shadow or final-material qualification. The original world
+uniform was inactive, with zero CPU activations. No production shader fix or
+all-vertex GPU equivalence is established; historical 435-part CPU and declared
+three-part synthetic controls do not prove the current 462-row model.
 
 ### Browser verification
 

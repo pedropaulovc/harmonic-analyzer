@@ -29,8 +29,12 @@ The current imported release is **v39**, CAD revision
 `81539e53f5146c06a77541415bd79da673806d96`, raw SHA-256
 `60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c`.
 Its native metadata, representation descriptor and public asset were published
-transactionally. All six source tracks still carry the old native association
-and remain unqualified until regenerated; successful import is not source proof.
+transactionally. All six observations and source tracks have now been adopted
+and generated under `content/v39/`; root `content/` receipts remain immutable
+old-release history. Current native associations preserve required losses:
+**Intro 16, Synthesis 16, Analysis 21, Operation 169, Spin 42, Rocker 0**.
+All six remain unmeasured at the intermediate **50/20/10/5%** stages and strict
+**2%** acceptance; successful adoption and generation are not source proof.
 
 To adopt a future approved CAD release, provide both its full commit and raw
 SHA-256 (not the optimized file's hash):
@@ -97,9 +101,9 @@ Synthesis's existing front-camera position/rotation stay fixed while its chosen
 principal-point/FOV keys reframe the single machine image. Cuts, layout and
 discrete mechanical changes still hold the decoded exposure. This is unmeasured
 source-informed framing, not recovered camera history or a fidelity pass.
-The final **5% / 0.5-second** limits and other videos' policies remain unchanged.
+The strict **2% / 0.5-second** acceptance limits and other videos' policies remain unchanged.
 
-The optional `content/<videoId>.chosen-camera-continuity.json` permission packet
+The optional `content/v39/<videoId>.chosen-camera-continuity.json` permission packet
 pins source SHA, shot bounds, native coverage and unmeasured main/whole framing
 evidence. No packet preserves the old policy. Analysis03 retains all 90 source
 observation rows covering the contiguous native exposures 132..218. Synthesis's
@@ -248,10 +252,11 @@ a complete feasible reconstruction, with the user's approval. They are listed
 as source-non-identifiable, not geometric-fidelity passed. Moving parts and all
 identifiable-feature and timing checks retain their requirements.
 
-The iterative plan is **50% → 20% → 10% → 5% of source frame width**, across
-all six videos at each stage. These are maximum landmark errors, not fractions
-of coverage. At 1920 pixels wide the limits are 960, 384, 192 and 96 pixels.
-The final tolerance is 5%; timing remains within 0.5 seconds throughout.
+Intermediate qualification is **50% → 20% → 10% → 5% of source frame width**,
+across all six videos at each stage. These are maximum landmark errors, not
+fractions of coverage: 960, 384, 192 and 96 pixels at 1920 pixels wide.
+Canonical final acceptance remains **2% (38.4 px at 1920) / 0.5 seconds**;
+passing an intermediate stage does not retag it as final acceptance.
 
 First demonstrate working coarse camera/mechanism tracking across the collection
 in the browser, then refine the largest visible discrepancies. Verify every
@@ -276,7 +281,7 @@ HARMONIC_HEADLESS=1 npm --prefix web run verify:sync -- --stage 50 --video analy
 # Headless bounded Analysis03 demonstration; not a fidelity acceptance pass:
 HARMONIC_HEADLESS=1 npm --prefix web run verify:sync -- --stage 50 --video analysis --from 5.9 --to 7.1 --player local --headless
 
-# Final all-video acceptance, including the official player:
+# Strict full all-video acceptance: official YouTube and local original media:
 HARMONIC_HEADLESS=1 npm --prefix web run build && HARMONIC_HEADLESS=1 npm --prefix web run verify:sync
 
 # Local demonstration of the unchanged private original footage:
@@ -289,9 +294,9 @@ It must contain the six original MP4s under `videos/`. `preview:reference` serve
 them locally with range support without copying footage into publication assets.
 Default public playback remains the official YouTube embed.
 The verifier serves `dist/`, exercises the original media, and reports per-video
-coverage, rendered landmark errors and timing. Incremental runs are repeatable;
-there is no acceptance-attempt quota. The default final target is 5% of each
-source frame's width, with clock skew no greater than 0.5 seconds.
+coverage, rendered landmark errors and timing. The default `verify:sync` run is
+strict full **2% / 0.5-second** acceptance across all six videos, exercising both
+official YouTube and local original media, audio, compact mode and manual controls.
 `?verify=1` enables native WebGL landmark readback. Mathematical camera fitting
 alone does not count as rendered-pixel evidence.
 Diagnostic landmark receipts also retain the actual native marker's world
@@ -368,7 +373,7 @@ violations. The original model response was independently captured by request-bo
 CDP (**38,975,844 bytes**, SHA-256 `ad5c259265be354fb25d208281301356d7587c6a2e508fce1a6cd29014a74719`);
 tar transport and extracted bytes were verified. Mask warp error/bound remain
 **51.700120813456685 / 69.54795584625838 px**, above the original **38.4 px**
-diagnostic budget; the 96 px source-stage target is not a waiver. Thin error/bound
+diagnostic budget; the intermediate 96 px stage is not a waiver. Thin error/bound
 are **16.40021067721657 / 20.707409278898922 px**.
 
 One original HOLD view passed native contour mask, census and extent readback
@@ -420,8 +425,23 @@ suite passed **34 tests / zero failures or skips**. A separate private RTX 3090
 native-viewer smoke verified the current download identity, **479 names /
 462 runtime Mesh rows** against 460 raw drawables, zero missing bindings/errors,
 completed epochs **2→3**, and crank/manual-orbit interaction. This is not the
-normal application surface or source calibration; all-21-spring GPU numerical
-equivalence and ownership remain unverified.
+normal application surface or source calibration. A separate corrected native
+ownership fixture passed **12 actual states / 10,328 checks**, zero failures/page
+errors, with full 462-row GPU censuses and real-world-matrix invariants. Its
+**479 actual named poses** include the genuinely exported camera sibling, which
+is not a CAD drawable; this adds no CAD geometry or proxy. It retains **21 spring
+roles / 3,293,594 vertices**. This bounded ownership
+proof is not all-vertex spring GPU numerical equivalence, original-footage
+normal-route acceptance or first-surface/source proof.
+
+The repaired all-six observation adoption, family producers and source-track
+transaction passed (**74.17 seconds**), preserving all source facts and required
+losses. Source, playback and sync-consumer suites passed **51 / 10 / 88 tests**;
+the repaired build passed in **8.05 seconds**. JavaScript chunks fell from about
+**195 MB to 105 MB** (largest Intro **27.842 MB**). This is not deploy-ready or
+normal-route/source acceptance; actual source-stage verification has not run.
+Original MP4 SHA, 1920×1080 dimensions, FPS and actual PTS passed for all six;
+raw-file/clock identity is not decoded-image replay or footage-fit proof.
 
 The historical source-v37 import produced the same result in two runs:
 

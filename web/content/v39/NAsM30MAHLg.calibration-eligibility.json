@@ -1,0 +1,2233 @@
+{
+  "schemaVersion": 1,
+  "videoId": "NAsM30MAHLg",
+  "sourceSha256": "595b0ec7b1e1a0b3523d72d33f6e0950bd97dda5ab7032bf91c3e5b9fb7d225d",
+  "modelSha256": "60a62a2edcd15012114d0234438ba54e24be5179f23751ac337cd6df205c562c",
+  "sourceCommit": "81539e53f5146c06a77541415bd79da673806d96",
+  "calibrationSupport": {
+    "minimumDistinctFitPoints": 6,
+    "minimumIndependentCheckPoints": 2,
+    "minimumFitAffineRank": 2,
+    "supportSeparationMetres": 1e-07,
+    "rankToleranceMetres": 1e-06,
+    "qualification": "Named declarations and seam-duplicated vertex indices are not independent physical support. FIT/CHECK must have distinct actual native 3D points; CHECK points must not coincide with FIT support. Rank-two camera families remain coplanar/non-unique. Source roles, pixels and unavailable observations are never rewritten."
+  },
+  "finiteNib": {
+    "partPath": "harmonic-analyzer/pen/pen-marker-1",
+    "primitiveIndex": 0,
+    "nativeVertexIndex": 124,
+    "storedPartLocalMetres": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "eligibilityEpsilonMetres": 1e-07,
+    "equivalence": "Exact stored POSITION equality in this same original primitive only. No epsilon neighbourhood, adjacent body, other primitive or part-name-only admission.",
+    "currentPrimitive": {
+      "mode": 4,
+      "attributes": {
+        "NORMAL": {
+          "componentType": 5126,
+          "type": "VEC3",
+          "count": 218,
+          "normalized": false,
+          "typedBytesSha256": "acb6845e5fe6ca7eccb9f9df896116ac2d5e74bd262e2b8da1b62efaf0008a5a"
+        },
+        "POSITION": {
+          "componentType": 5126,
+          "type": "VEC3",
+          "count": 218,
+          "normalized": false,
+          "typedBytesSha256": "3a1dcbc1705c9d28c1db667abd46f89f4da6a9a978df3de00bf4b1487b25191a"
+        }
+      },
+      "indices": {
+        "componentType": 5125,
+        "type": "SCALAR",
+        "count": 384,
+        "normalized": false,
+        "typedBytesSha256": "15cfec0348d06637c7a98642065c56afe0401b3f942e0ca0e565f7ea50f8dbf1"
+      },
+      "material": {
+        "name": "color",
+        "pbrMetallicRoughness": {
+          "baseColorFactor": [
+            0.6470588445663452,
+            0.6392157077789307,
+            0.6274510025978088,
+            1.0
+          ],
+          "metallicFactor": 0.0,
+          "roughnessFactor": 0.20000000298023224
+        }
+      }
+    },
+    "exactStoredEquivalentVertexIndices": [
+      124,
+      126,
+      130,
+      133,
+      136,
+      139,
+      142,
+      145,
+      148,
+      151,
+      154,
+      157,
+      160,
+      163,
+      166,
+      169,
+      172,
+      175,
+      178,
+      181,
+      184,
+      187,
+      190,
+      193,
+      196,
+      199,
+      202,
+      205,
+      208,
+      211,
+      214,
+      217
+    ],
+    "currentIncidentTriangleIndices": [
+      96,
+      97,
+      98,
+      99,
+      100,
+      101,
+      102,
+      103,
+      104,
+      105,
+      106,
+      107,
+      108,
+      109,
+      110,
+      111,
+      112,
+      113,
+      114,
+      115,
+      116,
+      117,
+      118,
+      119,
+      120,
+      121,
+      122,
+      123,
+      124,
+      125,
+      126,
+      127
+    ],
+    "sourceAssociationStatus": "unavailable",
+    "sourceAssociationReason": "A positive native apex ray does not identify the independently observed source nib. Source feature/contact/collision and full geometry witnesses remain separate obligations.",
+    "qualification": "Exact current stored native apex/incident facets only. Seam indices are one support point; no posed nearest-hit, independent source feature/contact or GPU eligibility is measured.",
+    "requiredNativeDrawableCount": 462,
+    "requiredRawPrimitiveCount": 460,
+    "requiredSpringDrawableCount": 21
+  },
+  "sourceExposure": {
+    "frameIndex": 2132,
+    "decodedTimestampTicks": 2134132,
+    "timeBase": "1/30000",
+    "decodedTimeSeconds": 71.13773333333333,
+    "sha256Bgr8": "1681529d18988527df737b1e83a062ea91f2871947a2d69b55d0df4c7c136f84",
+    "pixelFormat": "bgr8",
+    "width": 1920,
+    "height": 1080,
+    "sourceSha256": "595b0ec7b1e1a0b3523d72d33f6e0950bd97dda5ab7032bf91c3e5b9fb7d225d",
+    "evidence": "Retained original new-pen-macro/source-features.json; source pixels and independent heldouts stay private and unchanged. Presentation clip edges are not native support."
+  },
+  "nativeLayers": {
+    "rawNativePrimitiveInstances": 460,
+    "rawNamedPaths": 459,
+    "requiredRuntimeDrawableCount": 462,
+    "observedRuntimeNamedPaths": 479,
+    "runtimeObservation": {
+      "path": "web/.vite/native-v39-smoke-corrected-20261003.json",
+      "sha256": "a5c569465fa155d77d849621cf32c0ada54fb5872de7f4f4ccc0017af8cdcd55",
+      "scope": "Actual production createViewer/loadMachine modules, native render, named bindings, crank update and manual orbit; not source footage or spring numeric qualification",
+      "gpu": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3090 (0x00002204) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "sourceAcceptance": false,
+      "normalApplicationRoute": false
+    },
+    "qualification": "Raw primitive count and actual viewer/helper-instance census are separate layers. Basic viewer smoke is not complete numeric world/spring/source eligibility."
+  },
+  "requiredCurrentSweptStock": [
+    {
+      "partPath": "harmonic-analyzer/channel/channel-spring-installed-stretch00-1",
+      "currentPrimitives": [
+        {
+          "mode": 4,
+          "attributes": {
+            "NORMAL": {
+              "componentType": 5126,
+              "type": "VEC3",
+              "count": 150228,
+              "normalized": false,
+              "typedBytesSha256": "b8de27ca8244d11b8488b14f5b3087522ff8318000dff40d52edf8d282ee1e2c"
+            },
+            "POSITION": {
+              "componentType": 5126,
+              "type": "VEC3",
+              "count": 150228,
+              "normalized": false,
+              "typedBytesSha256": "ea58bcb9fb673c7a9823adc9fbafa1d35091e17e9ec9375f6987d4cccd3d009d"
+            }
+          },
+          "indices": {
+            "componentType": 5125,
+            "type": "SCALAR",
+            "count": 441744,
+            "normalized": false,
+            "typedBytesSha256": "2f04c1348b3ae35b821f56e55b5ddf53edf803da4c2899743a6b850e0b0c5455"
+          },
+          "material": {
+            "name": "color",
+            "pbrMetallicRoughness": {
+              "baseColorFactor": [
+                0.6470588445663452,
+                0.6392157077789307,
+                0.6274510025978088,
+                1.0
+              ],
+              "metallicFactor": 0.0,
+              "roughnessFactor": 0.20000000298023224
+            }
+          }
+        }
+      ],
+      "historicalPrimitiveComparison": {
+        "historicalSource": {
+          "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+          "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+        },
+        "historicalPrimitives": [
+          {
+            "mode": 4,
+            "attributes": {
+              "NORMAL": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 150228,
+                "normalized": false,
+                "typedBytesSha256": "b8de27ca8244d11b8488b14f5b3087522ff8318000dff40d52edf8d282ee1e2c"
+              },
+              "POSITION": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 150228,
+                "normalized": false,
+                "typedBytesSha256": "ea58bcb9fb673c7a9823adc9fbafa1d35091e17e9ec9375f6987d4cccd3d009d"
+              }
+            },
+            "indices": {
+              "componentType": 5125,
+              "type": "SCALAR",
+              "count": 441744,
+              "normalized": false,
+              "typedBytesSha256": "2f04c1348b3ae35b821f56e55b5ddf53edf803da4c2899743a6b850e0b0c5455"
+            },
+            "material": {
+              "name": "color",
+              "pbrMetallicRoughness": {
+                "baseColorFactor": [
+                  0.6470588445663452,
+                  0.6392157077789307,
+                  0.6274510025978088,
+                  1.0
+                ],
+                "metallicFactor": 0.0,
+                "roughnessFactor": 0.20000000298023224
+              }
+            }
+          }
+        ],
+        "exactPrimitiveEquality": true
+      },
+      "worldProof": "unmeasured",
+      "gpuProof": "unmeasured",
+      "qualification": "Original typed raw storage inspection only; equality never substitutes fresh current posed/all-vertex shader proof."
+    },
+    {
+      "partPath": "harmonic-analyzer/channel/channel-spring-installed-stretch00-2",
+      "currentPrimitives": [
+        {
+          "mode": 4,
+          "attributes": {
+            "NORMAL": {
+              "componentType": 5126,
+              "type": "VEC3",
+              "count": 150228,
+              "normalized": false,
+              "typedBytesSha256": "b8de27ca8244d11b8488b14f5b3087522ff8318000dff40d52edf8d282ee1e2c"
+            },
+            "POSITION": {
+              "componentType": 5126,
+              "type": "VEC3",
+              "count": 150228,
+              "normalized": false,
+              "typedBytesSha256": "ea58bcb9fb673c7a9823adc9fbafa1d35091e17e9ec9375f6987d4cccd3d009d"
+            }
+          },
+          "indices": {
+            "componentType": 5125,
+            "type": "SCALAR",
+            "count": 441744,
+            "normalized": false,
+            "typedBytesSha256": "2f04c1348b3ae35b821f56e55b5ddf53edf803da4c2899743a6b850e0b0c5455"
+          },
+          "material": {
+            "name": "color",
+            "pbrMetallicRoughness": {
+              "baseColorFactor": [
+                0.6470588445663452,
+                0.6392157077789307,
+                0.6274510025978088,
+                1.0
+              ],
+              "metallicFactor": 0.0,
+              "roughnessFactor": 0.20000000298023224
+            }
+          }
+        }
+      ],
+      "historicalPrimitiveComparison": {
+        "historicalSource": {
+          "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+          "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+        },
+        "historicalPrimitives": [
+          {
+            "mode": 4,
+            "attributes": {
+              "NORMAL": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 150228,
+                "normalized": false,
+                "typedBytesSha256": "b8de27ca8244d11b8488b14f5b3087522ff8318000dff40d52edf8d282ee1e2c"
+              },
+              "POSITION": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 150228,
+                "normalized": false,
+                "typedBytesSha256": "ea58bcb9fb673c7a9823adc9fbafa1d35091e17e9ec9375f6987d4cccd3d009d"
+              }
+            },
+            "indices": {
+              "componentType": 5125,
+              "type": "SCALAR",
+              "count": 441744,
+              "normalized": false,
+              "typedBytesSha256": "2f04c1348b3ae35b821f56e55b5ddf53edf803da4c2899743a6b850e0b0c5455"
+            },
+            "material": {
+              "name": "color",
+              "pbrMetallicRoughness": {
+                "baseColorFactor": [
+                  0.6470588445663452,
+                  0.6392157077789307,
+                  0.6274510025978088,
+                  1.0
+                ],
+                "metallicFactor": 0.0,
+                "roughnessFactor": 0.20000000298023224
+              }
+            }
+          }
+        ],
+        "exactPrimitiveEquality": true
+      },
+      "worldProof": "unmeasured",
+      "gpuProof": "unmeasured",
+      "qualification": "Original typed raw storage inspection only; equality never substitutes fresh current posed/all-vertex shader proof."
+    },
+    {
+      "partPath": "harmonic-analyzer/channel/channel-spring-installed-stretch00-3",
+      "currentPrimitives": [
+        {
+          "mode": 4,
+          "attributes": {
+            "NORMAL": {
+              "componentType": 5126,
+              "type": "VEC3",
+              "count": 150228,
+              "normalized": false,
+              "typedBytesSha256": "b8de27ca8244d11b8488b14f5b3087522ff8318000dff40d52edf8d282ee1e2c"
+            },
+            "POSITION": {
+              "componentType": 5126,
+              "type": "VEC3",
+              "count": 150228,
+              "normalized": false,
+              "typedBytesSha256": "ea58bcb9fb673c7a9823adc9fbafa1d35091e17e9ec9375f6987d4cccd3d009d"
+            }
+          },
+          "indices": {
+            "componentType": 5125,
+            "type": "SCALAR",
+            "count": 441744,
+            "normalized": false,
+            "typedBytesSha256": "2f04c1348b3ae35b821f56e55b5ddf53edf803da4c2899743a6b850e0b0c5455"
+          },
+          "material": {
+            "name": "color",
+            "pbrMetallicRoughness": {
+              "baseColorFactor": [
+                0.6470588445663452,
+                0.6392157077789307,
+                0.6274510025978088,
+                1.0
+              ],
+              "metallicFactor": 0.0,
+              "roughnessFactor": 0.20000000298023224
+            }
+          }
+        }
+      ],
+      "historicalPrimitiveComparison": {
+        "historicalSource": {
+          "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+          "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+        },
+        "historicalPrimitives": [
+          {
+            "mode": 4,
+            "attributes": {
+              "NORMAL": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 150228,
+                "normalized": false,
+                "typedBytesSha256": "b8de27ca8244d11b8488b14f5b3087522ff8318000dff40d52edf8d282ee1e2c"
+              },
+              "POSITION": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 150228,
+                "normalized": false,
+                "typedBytesSha256": "ea58bcb9fb673c7a9823adc9fbafa1d35091e17e9ec9375f6987d4cccd3d009d"
+              }
+            },
+            "indices": {
+              "componentType": 5125,
+              "type": "SCALAR",
+              "count": 441744,
+              "normalized": false,
+              "typedBytesSha256": "2f04c1348b3ae35b821f56e55b5ddf53edf803da4c2899743a6b850e0b0c5455"
+            },
+            "material": {
+              "name": "color",
+              "pbrMetallicRoughness": {
+                "baseColorFactor": [
+                  0.6470588445663452,
+                  0.6392157077789307,
+                  0.6274510025978088,
+                  1.0
+                ],
+                "metallicFactor": 0.0,
+                "roughnessFactor": 0.20000000298023224
+              }
+            }
+          }
+        ],
+        "exactPrimitiveEquality": true
+      },
+      "worldProof": "unmeasured",
+      "gpuProof": "unmeasured",
+      "qualification": "Original typed raw storage inspection only; equality never substitutes fresh current posed/all-vertex shader proof."
+    },
+    {
+      "partPath": "harmonic-analyzer/channel/channel-spring-installed-stretch00-4",
+      "currentPrimitives": [
+        {
+          "mode": 4,
+          "attributes": {
+            "NORMAL": {
+              "componentType": 5126,
+              "type": "VEC3",
+              "count": 150228,
+              "normalized": false,
+              "typedBytesSha256": "b8de27ca8244d11b8488b14f5b3087522ff8318000dff40d52edf8d282ee1e2c"
+            },
+            "POSITION": {
+              "componentType": 5126,
+              "type": "VEC3",
+              "count": 150228,
+              "normalized": false,
+              "typedBytesSha256": "ea58bcb9fb673c7a9823adc9fbafa1d35091e17e9ec9375f6987d4cccd3d009d"
+            }
+          },
+          "indices": {
+            "componentType": 5125,
+            "type": "SCALAR",
+            "count": 441744,
+            "normalized": false,
+            "typedBytesSha256": "2f04c1348b3ae35b821f56e55b5ddf53edf803da4c2899743a6b850e0b0c5455"
+          },
+          "material": {
+            "name": "color",
+            "pbrMetallicRoughness": {
+              "baseColorFactor": [
+                0.6470588445663452,
+                0.6392157077789307,
+                0.6274510025978088,
+                1.0
+              ],
+              "metallicFactor": 0.0,
+              "roughnessFactor": 0.20000000298023224
+            }
+          }
+        }
+      ],
+      "historicalPrimitiveComparison": {
+        "historicalSource": {
+          "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+          "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+        },
+        "historicalPrimitives": [
+          {
+            "mode": 4,
+            "attributes": {
+              "NORMAL": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 150228,
+                "normalized": false,
+                "typedBytesSha256": "b8de27ca8244d11b8488b14f5b3087522ff8318000dff40d52edf8d282ee1e2c"
+              },
+              "POSITION": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 150228,
+                "normalized": false,
+                "typedBytesSha256": "ea58bcb9fb673c7a9823adc9fbafa1d35091e17e9ec9375f6987d4cccd3d009d"
+              }
+            },
+            "indices": {
+              "componentType": 5125,
+              "type": "SCALAR",
+              "count": 441744,
+              "normalized": false,
+              "typedBytesSha256": "2f04c1348b3ae35b821f56e55b5ddf53edf803da4c2899743a6b850e0b0c5455"
+            },
+            "material": {
+              "name": "color",
+              "pbrMetallicRoughness": {
+                "baseColorFactor": [
+                  0.6470588445663452,
+                  0.6392157077789307,
+                  0.6274510025978088,
+                  1.0
+                ],
+                "metallicFactor": 0.0,
+                "roughnessFactor": 0.20000000298023224
+              }
+            }
+          }
+        ],
+        "exactPrimitiveEquality": true
+      },
+      "worldProof": "unmeasured",
+      "gpuProof": "unmeasured",
+      "qualification": "Original typed raw storage inspection only; equality never substitutes fresh current posed/all-vertex shader proof."
+    },
+    {
+      "partPath": "harmonic-analyzer/channel/channel-spring-installed-stretch00-5",
+      "currentPrimitives": [
+        {
+          "mode": 4,
+          "attributes": {
+            "NORMAL": {
+              "componentType": 5126,
+              "type": "VEC3",
+              "count": 150228,
+              "normalized": false,
+              "typedBytesSha256": "b8de27ca8244d11b8488b14f5b3087522ff8318000dff40d52edf8d282ee1e2c"
+            },
+            "POSITION": {
+              "componentType": 5126,
+              "type": "VEC3",
+              "count": 150228,
+              "normalized": false,
+              "typedBytesSha256": "ea58bcb9fb673c7a9823adc9fbafa1d35091e17e9ec9375f6987d4cccd3d009d"
+            }
+          },
+          "indices": {
+            "componentType": 5125,
+            "type": "SCALAR",
+            "count": 441744,
+            "normalized": false,
+            "typedBytesSha256": "2f04c1348b3ae35b821f56e55b5ddf53edf803da4c2899743a6b850e0b0c5455"
+          },
+          "material": {
+            "name": "color",
+            "pbrMetallicRoughness": {
+              "baseColorFactor": [
+                0.6470588445663452,
+                0.6392157077789307,
+                0.6274510025978088,
+                1.0
+              ],
+              "metallicFactor": 0.0,
+              "roughnessFactor": 0.20000000298023224
+            }
+          }
+        }
+      ],
+      "historicalPrimitiveComparison": {
+        "historicalSource": {
+          "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+          "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+        },
+        "historicalPrimitives": [
+          {
+            "mode": 4,
+            "attributes": {
+              "NORMAL": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 150228,
+                "normalized": false,
+                "typedBytesSha256": "b8de27ca8244d11b8488b14f5b3087522ff8318000dff40d52edf8d282ee1e2c"
+              },
+              "POSITION": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 150228,
+                "normalized": false,
+                "typedBytesSha256": "ea58bcb9fb673c7a9823adc9fbafa1d35091e17e9ec9375f6987d4cccd3d009d"
+              }
+            },
+            "indices": {
+              "componentType": 5125,
+              "type": "SCALAR",
+              "count": 441744,
+              "normalized": false,
+              "typedBytesSha256": "2f04c1348b3ae35b821f56e55b5ddf53edf803da4c2899743a6b850e0b0c5455"
+            },
+            "material": {
+              "name": "color",
+              "pbrMetallicRoughness": {
+                "baseColorFactor": [
+                  0.6470588445663452,
+                  0.6392157077789307,
+                  0.6274510025978088,
+                  1.0
+                ],
+                "metallicFactor": 0.0,
+                "roughnessFactor": 0.20000000298023224
+              }
+            }
+          }
+        ],
+        "exactPrimitiveEquality": true
+      },
+      "worldProof": "unmeasured",
+      "gpuProof": "unmeasured",
+      "qualification": "Original typed raw storage inspection only; equality never substitutes fresh current posed/all-vertex shader proof."
+    },
+    {
+      "partPath": "harmonic-analyzer/channel/channel-spring-installed-stretch00-6",
+      "currentPrimitives": [
+        {
+          "mode": 4,
+          "attributes": {
+            "NORMAL": {
+              "componentType": 5126,
+              "type": "VEC3",
+              "count": 150228,
+              "normalized": false,
+              "typedBytesSha256": "b8de27ca8244d11b8488b14f5b3087522ff8318000dff40d52edf8d282ee1e2c"
+            },
+            "POSITION": {
+              "componentType": 5126,
+              "type": "VEC3",
+              "count": 150228,
+              "normalized": false,
+              "typedBytesSha256": "ea58bcb9fb673c7a9823adc9fbafa1d35091e17e9ec9375f6987d4cccd3d009d"
+            }
+          },
+          "indices": {
+            "componentType": 5125,
+            "type": "SCALAR",
+            "count": 441744,
+            "normalized": false,
+            "typedBytesSha256": "2f04c1348b3ae35b821f56e55b5ddf53edf803da4c2899743a6b850e0b0c5455"
+          },
+          "material": {
+            "name": "color",
+            "pbrMetallicRoughness": {
+              "baseColorFactor": [
+                0.6470588445663452,
+                0.6392157077789307,
+                0.6274510025978088,
+                1.0
+              ],
+              "metallicFactor": 0.0,
+              "roughnessFactor": 0.20000000298023224
+            }
+          }
+        }
+      ],
+      "historicalPrimitiveComparison": {
+        "historicalSource": {
+          "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+          "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+        },
+        "historicalPrimitives": [
+          {
+            "mode": 4,
+            "attributes": {
+              "NORMAL": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 150228,
+                "normalized": false,
+                "typedBytesSha256": "b8de27ca8244d11b8488b14f5b3087522ff8318000dff40d52edf8d282ee1e2c"
+              },
+              "POSITION": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 150228,
+                "normalized": false,
+                "typedBytesSha256": "ea58bcb9fb673c7a9823adc9fbafa1d35091e17e9ec9375f6987d4cccd3d009d"
+              }
+            },
+            "indices": {
+              "componentType": 5125,
+              "type": "SCALAR",
+              "count": 441744,
+              "normalized": false,
+              "typedBytesSha256": "2f04c1348b3ae35b821f56e55b5ddf53edf803da4c2899743a6b850e0b0c5455"
+            },
+            "material": {
+              "name": "color",
+              "pbrMetallicRoughness": {
+                "baseColorFactor": [
+                  0.6470588445663452,
+                  0.6392157077789307,
+                  0.6274510025978088,
+                  1.0
+                ],
+                "metallicFactor": 0.0,
+                "roughnessFactor": 0.20000000298023224
+              }
+            }
+          }
+        ],
+        "exactPrimitiveEquality": true
+      },
+      "worldProof": "unmeasured",
+      "gpuProof": "unmeasured",
+      "qualification": "Original typed raw storage inspection only; equality never substitutes fresh current posed/all-vertex shader proof."
+    },
+    {
+      "partPath": "harmonic-analyzer/channel/channel-spring-installed-stretch00-7",
+      "currentPrimitives": [
+        {
+          "mode": 4,
+          "attributes": {
+            "NORMAL": {
+              "componentType": 5126,
+              "type": "VEC3",
+              "count": 150228,
+              "normalized": false,
+              "typedBytesSha256": "b8de27ca8244d11b8488b14f5b3087522ff8318000dff40d52edf8d282ee1e2c"
+            },
+            "POSITION": {
+              "componentType": 5126,
+              "type": "VEC3",
+              "count": 150228,
+              "normalized": false,
+              "typedBytesSha256": "ea58bcb9fb673c7a9823adc9fbafa1d35091e17e9ec9375f6987d4cccd3d009d"
+            }
+          },
+          "indices": {
+            "componentType": 5125,
+            "type": "SCALAR",
+            "count": 441744,
+            "normalized": false,
+            "typedBytesSha256": "2f04c1348b3ae35b821f56e55b5ddf53edf803da4c2899743a6b850e0b0c5455"
+          },
+          "material": {
+            "name": "color",
+            "pbrMetallicRoughness": {
+              "baseColorFactor": [
+                0.6470588445663452,
+                0.6392157077789307,
+                0.6274510025978088,
+                1.0
+              ],
+              "metallicFactor": 0.0,
+              "roughnessFactor": 0.20000000298023224
+            }
+          }
+        }
+      ],
+      "historicalPrimitiveComparison": {
+        "historicalSource": {
+          "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+          "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+        },
+        "historicalPrimitives": [
+          {
+            "mode": 4,
+            "attributes": {
+              "NORMAL": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 150228,
+                "normalized": false,
+                "typedBytesSha256": "b8de27ca8244d11b8488b14f5b3087522ff8318000dff40d52edf8d282ee1e2c"
+              },
+              "POSITION": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 150228,
+                "normalized": false,
+                "typedBytesSha256": "ea58bcb9fb673c7a9823adc9fbafa1d35091e17e9ec9375f6987d4cccd3d009d"
+              }
+            },
+            "indices": {
+              "componentType": 5125,
+              "type": "SCALAR",
+              "count": 441744,
+              "normalized": false,
+              "typedBytesSha256": "2f04c1348b3ae35b821f56e55b5ddf53edf803da4c2899743a6b850e0b0c5455"
+            },
+            "material": {
+              "name": "color",
+              "pbrMetallicRoughness": {
+                "baseColorFactor": [
+                  0.6470588445663452,
+                  0.6392157077789307,
+                  0.6274510025978088,
+                  1.0
+                ],
+                "metallicFactor": 0.0,
+                "roughnessFactor": 0.20000000298023224
+              }
+            }
+          }
+        ],
+        "exactPrimitiveEquality": true
+      },
+      "worldProof": "unmeasured",
+      "gpuProof": "unmeasured",
+      "qualification": "Original typed raw storage inspection only; equality never substitutes fresh current posed/all-vertex shader proof."
+    },
+    {
+      "partPath": "harmonic-analyzer/channel/channel-spring-installed-stretch00-8",
+      "currentPrimitives": [
+        {
+          "mode": 4,
+          "attributes": {
+            "NORMAL": {
+              "componentType": 5126,
+              "type": "VEC3",
+              "count": 150228,
+              "normalized": false,
+              "typedBytesSha256": "b8de27ca8244d11b8488b14f5b3087522ff8318000dff40d52edf8d282ee1e2c"
+            },
+            "POSITION": {
+              "componentType": 5126,
+              "type": "VEC3",
+              "count": 150228,
+              "normalized": false,
+              "typedBytesSha256": "ea58bcb9fb673c7a9823adc9fbafa1d35091e17e9ec9375f6987d4cccd3d009d"
+            }
+          },
+          "indices": {
+            "componentType": 5125,
+            "type": "SCALAR",
+            "count": 441744,
+            "normalized": false,
+            "typedBytesSha256": "2f04c1348b3ae35b821f56e55b5ddf53edf803da4c2899743a6b850e0b0c5455"
+          },
+          "material": {
+            "name": "color",
+            "pbrMetallicRoughness": {
+              "baseColorFactor": [
+                0.6470588445663452,
+                0.6392157077789307,
+                0.6274510025978088,
+                1.0
+              ],
+              "metallicFactor": 0.0,
+              "roughnessFactor": 0.20000000298023224
+            }
+          }
+        }
+      ],
+      "historicalPrimitiveComparison": {
+        "historicalSource": {
+          "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+          "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+        },
+        "historicalPrimitives": [
+          {
+            "mode": 4,
+            "attributes": {
+              "NORMAL": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 150228,
+                "normalized": false,
+                "typedBytesSha256": "b8de27ca8244d11b8488b14f5b3087522ff8318000dff40d52edf8d282ee1e2c"
+              },
+              "POSITION": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 150228,
+                "normalized": false,
+                "typedBytesSha256": "ea58bcb9fb673c7a9823adc9fbafa1d35091e17e9ec9375f6987d4cccd3d009d"
+              }
+            },
+            "indices": {
+              "componentType": 5125,
+              "type": "SCALAR",
+              "count": 441744,
+              "normalized": false,
+              "typedBytesSha256": "2f04c1348b3ae35b821f56e55b5ddf53edf803da4c2899743a6b850e0b0c5455"
+            },
+            "material": {
+              "name": "color",
+              "pbrMetallicRoughness": {
+                "baseColorFactor": [
+                  0.6470588445663452,
+                  0.6392157077789307,
+                  0.6274510025978088,
+                  1.0
+                ],
+                "metallicFactor": 0.0,
+                "roughnessFactor": 0.20000000298023224
+              }
+            }
+          }
+        ],
+        "exactPrimitiveEquality": true
+      },
+      "worldProof": "unmeasured",
+      "gpuProof": "unmeasured",
+      "qualification": "Original typed raw storage inspection only; equality never substitutes fresh current posed/all-vertex shader proof."
+    },
+    {
+      "partPath": "harmonic-analyzer/channel/channel-spring-installed-stretch00-9",
+      "currentPrimitives": [
+        {
+          "mode": 4,
+          "attributes": {
+            "NORMAL": {
+              "componentType": 5126,
+              "type": "VEC3",
+              "count": 150228,
+              "normalized": false,
+              "typedBytesSha256": "b8de27ca8244d11b8488b14f5b3087522ff8318000dff40d52edf8d282ee1e2c"
+            },
+            "POSITION": {
+              "componentType": 5126,
+              "type": "VEC3",
+              "count": 150228,
+              "normalized": false,
+              "typedBytesSha256": "ea58bcb9fb673c7a9823adc9fbafa1d35091e17e9ec9375f6987d4cccd3d009d"
+            }
+          },
+          "indices": {
+            "componentType": 5125,
+            "type": "SCALAR",
+            "count": 441744,
+            "normalized": false,
+            "typedBytesSha256": "2f04c1348b3ae35b821f56e55b5ddf53edf803da4c2899743a6b850e0b0c5455"
+          },
+          "material": {
+            "name": "color",
+            "pbrMetallicRoughness": {
+              "baseColorFactor": [
+                0.6470588445663452,
+                0.6392157077789307,
+                0.6274510025978088,
+                1.0
+              ],
+              "metallicFactor": 0.0,
+              "roughnessFactor": 0.20000000298023224
+            }
+          }
+        }
+      ],
+      "historicalPrimitiveComparison": {
+        "historicalSource": {
+          "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+          "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+        },
+        "historicalPrimitives": [
+          {
+            "mode": 4,
+            "attributes": {
+              "NORMAL": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 150228,
+                "normalized": false,
+                "typedBytesSha256": "b8de27ca8244d11b8488b14f5b3087522ff8318000dff40d52edf8d282ee1e2c"
+              },
+              "POSITION": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 150228,
+                "normalized": false,
+                "typedBytesSha256": "ea58bcb9fb673c7a9823adc9fbafa1d35091e17e9ec9375f6987d4cccd3d009d"
+              }
+            },
+            "indices": {
+              "componentType": 5125,
+              "type": "SCALAR",
+              "count": 441744,
+              "normalized": false,
+              "typedBytesSha256": "2f04c1348b3ae35b821f56e55b5ddf53edf803da4c2899743a6b850e0b0c5455"
+            },
+            "material": {
+              "name": "color",
+              "pbrMetallicRoughness": {
+                "baseColorFactor": [
+                  0.6470588445663452,
+                  0.6392157077789307,
+                  0.6274510025978088,
+                  1.0
+                ],
+                "metallicFactor": 0.0,
+                "roughnessFactor": 0.20000000298023224
+              }
+            }
+          }
+        ],
+        "exactPrimitiveEquality": true
+      },
+      "worldProof": "unmeasured",
+      "gpuProof": "unmeasured",
+      "qualification": "Original typed raw storage inspection only; equality never substitutes fresh current posed/all-vertex shader proof."
+    },
+    {
+      "partPath": "harmonic-analyzer/channel/channel-spring-installed-stretch00-10",
+      "currentPrimitives": [
+        {
+          "mode": 4,
+          "attributes": {
+            "NORMAL": {
+              "componentType": 5126,
+              "type": "VEC3",
+              "count": 150228,
+              "normalized": false,
+              "typedBytesSha256": "b8de27ca8244d11b8488b14f5b3087522ff8318000dff40d52edf8d282ee1e2c"
+            },
+            "POSITION": {
+              "componentType": 5126,
+              "type": "VEC3",
+              "count": 150228,
+              "normalized": false,
+              "typedBytesSha256": "ea58bcb9fb673c7a9823adc9fbafa1d35091e17e9ec9375f6987d4cccd3d009d"
+            }
+          },
+          "indices": {
+            "componentType": 5125,
+            "type": "SCALAR",
+            "count": 441744,
+            "normalized": false,
+            "typedBytesSha256": "2f04c1348b3ae35b821f56e55b5ddf53edf803da4c2899743a6b850e0b0c5455"
+          },
+          "material": {
+            "name": "color",
+            "pbrMetallicRoughness": {
+              "baseColorFactor": [
+                0.6470588445663452,
+                0.6392157077789307,
+                0.6274510025978088,
+                1.0
+              ],
+              "metallicFactor": 0.0,
+              "roughnessFactor": 0.20000000298023224
+            }
+          }
+        }
+      ],
+      "historicalPrimitiveComparison": {
+        "historicalSource": {
+          "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+          "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+        },
+        "historicalPrimitives": [
+          {
+            "mode": 4,
+            "attributes": {
+              "NORMAL": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 150228,
+                "normalized": false,
+                "typedBytesSha256": "b8de27ca8244d11b8488b14f5b3087522ff8318000dff40d52edf8d282ee1e2c"
+              },
+              "POSITION": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 150228,
+                "normalized": false,
+                "typedBytesSha256": "ea58bcb9fb673c7a9823adc9fbafa1d35091e17e9ec9375f6987d4cccd3d009d"
+              }
+            },
+            "indices": {
+              "componentType": 5125,
+              "type": "SCALAR",
+              "count": 441744,
+              "normalized": false,
+              "typedBytesSha256": "2f04c1348b3ae35b821f56e55b5ddf53edf803da4c2899743a6b850e0b0c5455"
+            },
+            "material": {
+              "name": "color",
+              "pbrMetallicRoughness": {
+                "baseColorFactor": [
+                  0.6470588445663452,
+                  0.6392157077789307,
+                  0.6274510025978088,
+                  1.0
+                ],
+                "metallicFactor": 0.0,
+                "roughnessFactor": 0.20000000298023224
+              }
+            }
+          }
+        ],
+        "exactPrimitiveEquality": true
+      },
+      "worldProof": "unmeasured",
+      "gpuProof": "unmeasured",
+      "qualification": "Original typed raw storage inspection only; equality never substitutes fresh current posed/all-vertex shader proof."
+    },
+    {
+      "partPath": "harmonic-analyzer/channel/channel-spring-installed-stretch00-11",
+      "currentPrimitives": [
+        {
+          "mode": 4,
+          "attributes": {
+            "NORMAL": {
+              "componentType": 5126,
+              "type": "VEC3",
+              "count": 150228,
+              "normalized": false,
+              "typedBytesSha256": "b8de27ca8244d11b8488b14f5b3087522ff8318000dff40d52edf8d282ee1e2c"
+            },
+            "POSITION": {
+              "componentType": 5126,
+              "type": "VEC3",
+              "count": 150228,
+              "normalized": false,
+              "typedBytesSha256": "ea58bcb9fb673c7a9823adc9fbafa1d35091e17e9ec9375f6987d4cccd3d009d"
+            }
+          },
+          "indices": {
+            "componentType": 5125,
+            "type": "SCALAR",
+            "count": 441744,
+            "normalized": false,
+            "typedBytesSha256": "2f04c1348b3ae35b821f56e55b5ddf53edf803da4c2899743a6b850e0b0c5455"
+          },
+          "material": {
+            "name": "color",
+            "pbrMetallicRoughness": {
+              "baseColorFactor": [
+                0.6470588445663452,
+                0.6392157077789307,
+                0.6274510025978088,
+                1.0
+              ],
+              "metallicFactor": 0.0,
+              "roughnessFactor": 0.20000000298023224
+            }
+          }
+        }
+      ],
+      "historicalPrimitiveComparison": {
+        "historicalSource": {
+          "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+          "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+        },
+        "historicalPrimitives": [
+          {
+            "mode": 4,
+            "attributes": {
+              "NORMAL": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 150228,
+                "normalized": false,
+                "typedBytesSha256": "b8de27ca8244d11b8488b14f5b3087522ff8318000dff40d52edf8d282ee1e2c"
+              },
+              "POSITION": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 150228,
+                "normalized": false,
+                "typedBytesSha256": "ea58bcb9fb673c7a9823adc9fbafa1d35091e17e9ec9375f6987d4cccd3d009d"
+              }
+            },
+            "indices": {
+              "componentType": 5125,
+              "type": "SCALAR",
+              "count": 441744,
+              "normalized": false,
+              "typedBytesSha256": "2f04c1348b3ae35b821f56e55b5ddf53edf803da4c2899743a6b850e0b0c5455"
+            },
+            "material": {
+              "name": "color",
+              "pbrMetallicRoughness": {
+                "baseColorFactor": [
+                  0.6470588445663452,
+                  0.6392157077789307,
+                  0.6274510025978088,
+                  1.0
+                ],
+                "metallicFactor": 0.0,
+                "roughnessFactor": 0.20000000298023224
+              }
+            }
+          }
+        ],
+        "exactPrimitiveEquality": true
+      },
+      "worldProof": "unmeasured",
+      "gpuProof": "unmeasured",
+      "qualification": "Original typed raw storage inspection only; equality never substitutes fresh current posed/all-vertex shader proof."
+    },
+    {
+      "partPath": "harmonic-analyzer/channel/channel-spring-installed-stretch00-12",
+      "currentPrimitives": [
+        {
+          "mode": 4,
+          "attributes": {
+            "NORMAL": {
+              "componentType": 5126,
+              "type": "VEC3",
+              "count": 150228,
+              "normalized": false,
+              "typedBytesSha256": "b8de27ca8244d11b8488b14f5b3087522ff8318000dff40d52edf8d282ee1e2c"
+            },
+            "POSITION": {
+              "componentType": 5126,
+              "type": "VEC3",
+              "count": 150228,
+              "normalized": false,
+              "typedBytesSha256": "ea58bcb9fb673c7a9823adc9fbafa1d35091e17e9ec9375f6987d4cccd3d009d"
+            }
+          },
+          "indices": {
+            "componentType": 5125,
+            "type": "SCALAR",
+            "count": 441744,
+            "normalized": false,
+            "typedBytesSha256": "2f04c1348b3ae35b821f56e55b5ddf53edf803da4c2899743a6b850e0b0c5455"
+          },
+          "material": {
+            "name": "color",
+            "pbrMetallicRoughness": {
+              "baseColorFactor": [
+                0.6470588445663452,
+                0.6392157077789307,
+                0.6274510025978088,
+                1.0
+              ],
+              "metallicFactor": 0.0,
+              "roughnessFactor": 0.20000000298023224
+            }
+          }
+        }
+      ],
+      "historicalPrimitiveComparison": {
+        "historicalSource": {
+          "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+          "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+        },
+        "historicalPrimitives": [
+          {
+            "mode": 4,
+            "attributes": {
+              "NORMAL": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 150228,
+                "normalized": false,
+                "typedBytesSha256": "b8de27ca8244d11b8488b14f5b3087522ff8318000dff40d52edf8d282ee1e2c"
+              },
+              "POSITION": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 150228,
+                "normalized": false,
+                "typedBytesSha256": "ea58bcb9fb673c7a9823adc9fbafa1d35091e17e9ec9375f6987d4cccd3d009d"
+              }
+            },
+            "indices": {
+              "componentType": 5125,
+              "type": "SCALAR",
+              "count": 441744,
+              "normalized": false,
+              "typedBytesSha256": "2f04c1348b3ae35b821f56e55b5ddf53edf803da4c2899743a6b850e0b0c5455"
+            },
+            "material": {
+              "name": "color",
+              "pbrMetallicRoughness": {
+                "baseColorFactor": [
+                  0.6470588445663452,
+                  0.6392157077789307,
+                  0.6274510025978088,
+                  1.0
+                ],
+                "metallicFactor": 0.0,
+                "roughnessFactor": 0.20000000298023224
+              }
+            }
+          }
+        ],
+        "exactPrimitiveEquality": true
+      },
+      "worldProof": "unmeasured",
+      "gpuProof": "unmeasured",
+      "qualification": "Original typed raw storage inspection only; equality never substitutes fresh current posed/all-vertex shader proof."
+    },
+    {
+      "partPath": "harmonic-analyzer/channel/channel-spring-installed-stretch00-13",
+      "currentPrimitives": [
+        {
+          "mode": 4,
+          "attributes": {
+            "NORMAL": {
+              "componentType": 5126,
+              "type": "VEC3",
+              "count": 150228,
+              "normalized": false,
+              "typedBytesSha256": "b8de27ca8244d11b8488b14f5b3087522ff8318000dff40d52edf8d282ee1e2c"
+            },
+            "POSITION": {
+              "componentType": 5126,
+              "type": "VEC3",
+              "count": 150228,
+              "normalized": false,
+              "typedBytesSha256": "ea58bcb9fb673c7a9823adc9fbafa1d35091e17e9ec9375f6987d4cccd3d009d"
+            }
+          },
+          "indices": {
+            "componentType": 5125,
+            "type": "SCALAR",
+            "count": 441744,
+            "normalized": false,
+            "typedBytesSha256": "2f04c1348b3ae35b821f56e55b5ddf53edf803da4c2899743a6b850e0b0c5455"
+          },
+          "material": {
+            "name": "color",
+            "pbrMetallicRoughness": {
+              "baseColorFactor": [
+                0.6470588445663452,
+                0.6392157077789307,
+                0.6274510025978088,
+                1.0
+              ],
+              "metallicFactor": 0.0,
+              "roughnessFactor": 0.20000000298023224
+            }
+          }
+        }
+      ],
+      "historicalPrimitiveComparison": {
+        "historicalSource": {
+          "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+          "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+        },
+        "historicalPrimitives": [
+          {
+            "mode": 4,
+            "attributes": {
+              "NORMAL": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 150228,
+                "normalized": false,
+                "typedBytesSha256": "b8de27ca8244d11b8488b14f5b3087522ff8318000dff40d52edf8d282ee1e2c"
+              },
+              "POSITION": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 150228,
+                "normalized": false,
+                "typedBytesSha256": "ea58bcb9fb673c7a9823adc9fbafa1d35091e17e9ec9375f6987d4cccd3d009d"
+              }
+            },
+            "indices": {
+              "componentType": 5125,
+              "type": "SCALAR",
+              "count": 441744,
+              "normalized": false,
+              "typedBytesSha256": "2f04c1348b3ae35b821f56e55b5ddf53edf803da4c2899743a6b850e0b0c5455"
+            },
+            "material": {
+              "name": "color",
+              "pbrMetallicRoughness": {
+                "baseColorFactor": [
+                  0.6470588445663452,
+                  0.6392157077789307,
+                  0.6274510025978088,
+                  1.0
+                ],
+                "metallicFactor": 0.0,
+                "roughnessFactor": 0.20000000298023224
+              }
+            }
+          }
+        ],
+        "exactPrimitiveEquality": true
+      },
+      "worldProof": "unmeasured",
+      "gpuProof": "unmeasured",
+      "qualification": "Original typed raw storage inspection only; equality never substitutes fresh current posed/all-vertex shader proof."
+    },
+    {
+      "partPath": "harmonic-analyzer/channel/channel-spring-installed-stretch00-14",
+      "currentPrimitives": [
+        {
+          "mode": 4,
+          "attributes": {
+            "NORMAL": {
+              "componentType": 5126,
+              "type": "VEC3",
+              "count": 150228,
+              "normalized": false,
+              "typedBytesSha256": "b8de27ca8244d11b8488b14f5b3087522ff8318000dff40d52edf8d282ee1e2c"
+            },
+            "POSITION": {
+              "componentType": 5126,
+              "type": "VEC3",
+              "count": 150228,
+              "normalized": false,
+              "typedBytesSha256": "ea58bcb9fb673c7a9823adc9fbafa1d35091e17e9ec9375f6987d4cccd3d009d"
+            }
+          },
+          "indices": {
+            "componentType": 5125,
+            "type": "SCALAR",
+            "count": 441744,
+            "normalized": false,
+            "typedBytesSha256": "2f04c1348b3ae35b821f56e55b5ddf53edf803da4c2899743a6b850e0b0c5455"
+          },
+          "material": {
+            "name": "color",
+            "pbrMetallicRoughness": {
+              "baseColorFactor": [
+                0.6470588445663452,
+                0.6392157077789307,
+                0.6274510025978088,
+                1.0
+              ],
+              "metallicFactor": 0.0,
+              "roughnessFactor": 0.20000000298023224
+            }
+          }
+        }
+      ],
+      "historicalPrimitiveComparison": {
+        "historicalSource": {
+          "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+          "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+        },
+        "historicalPrimitives": [
+          {
+            "mode": 4,
+            "attributes": {
+              "NORMAL": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 150228,
+                "normalized": false,
+                "typedBytesSha256": "b8de27ca8244d11b8488b14f5b3087522ff8318000dff40d52edf8d282ee1e2c"
+              },
+              "POSITION": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 150228,
+                "normalized": false,
+                "typedBytesSha256": "ea58bcb9fb673c7a9823adc9fbafa1d35091e17e9ec9375f6987d4cccd3d009d"
+              }
+            },
+            "indices": {
+              "componentType": 5125,
+              "type": "SCALAR",
+              "count": 441744,
+              "normalized": false,
+              "typedBytesSha256": "2f04c1348b3ae35b821f56e55b5ddf53edf803da4c2899743a6b850e0b0c5455"
+            },
+            "material": {
+              "name": "color",
+              "pbrMetallicRoughness": {
+                "baseColorFactor": [
+                  0.6470588445663452,
+                  0.6392157077789307,
+                  0.6274510025978088,
+                  1.0
+                ],
+                "metallicFactor": 0.0,
+                "roughnessFactor": 0.20000000298023224
+              }
+            }
+          }
+        ],
+        "exactPrimitiveEquality": true
+      },
+      "worldProof": "unmeasured",
+      "gpuProof": "unmeasured",
+      "qualification": "Original typed raw storage inspection only; equality never substitutes fresh current posed/all-vertex shader proof."
+    },
+    {
+      "partPath": "harmonic-analyzer/channel/channel-spring-installed-stretch00-15",
+      "currentPrimitives": [
+        {
+          "mode": 4,
+          "attributes": {
+            "NORMAL": {
+              "componentType": 5126,
+              "type": "VEC3",
+              "count": 150228,
+              "normalized": false,
+              "typedBytesSha256": "b8de27ca8244d11b8488b14f5b3087522ff8318000dff40d52edf8d282ee1e2c"
+            },
+            "POSITION": {
+              "componentType": 5126,
+              "type": "VEC3",
+              "count": 150228,
+              "normalized": false,
+              "typedBytesSha256": "ea58bcb9fb673c7a9823adc9fbafa1d35091e17e9ec9375f6987d4cccd3d009d"
+            }
+          },
+          "indices": {
+            "componentType": 5125,
+            "type": "SCALAR",
+            "count": 441744,
+            "normalized": false,
+            "typedBytesSha256": "2f04c1348b3ae35b821f56e55b5ddf53edf803da4c2899743a6b850e0b0c5455"
+          },
+          "material": {
+            "name": "color",
+            "pbrMetallicRoughness": {
+              "baseColorFactor": [
+                0.6470588445663452,
+                0.6392157077789307,
+                0.6274510025978088,
+                1.0
+              ],
+              "metallicFactor": 0.0,
+              "roughnessFactor": 0.20000000298023224
+            }
+          }
+        }
+      ],
+      "historicalPrimitiveComparison": {
+        "historicalSource": {
+          "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+          "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+        },
+        "historicalPrimitives": [
+          {
+            "mode": 4,
+            "attributes": {
+              "NORMAL": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 150228,
+                "normalized": false,
+                "typedBytesSha256": "b8de27ca8244d11b8488b14f5b3087522ff8318000dff40d52edf8d282ee1e2c"
+              },
+              "POSITION": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 150228,
+                "normalized": false,
+                "typedBytesSha256": "ea58bcb9fb673c7a9823adc9fbafa1d35091e17e9ec9375f6987d4cccd3d009d"
+              }
+            },
+            "indices": {
+              "componentType": 5125,
+              "type": "SCALAR",
+              "count": 441744,
+              "normalized": false,
+              "typedBytesSha256": "2f04c1348b3ae35b821f56e55b5ddf53edf803da4c2899743a6b850e0b0c5455"
+            },
+            "material": {
+              "name": "color",
+              "pbrMetallicRoughness": {
+                "baseColorFactor": [
+                  0.6470588445663452,
+                  0.6392157077789307,
+                  0.6274510025978088,
+                  1.0
+                ],
+                "metallicFactor": 0.0,
+                "roughnessFactor": 0.20000000298023224
+              }
+            }
+          }
+        ],
+        "exactPrimitiveEquality": true
+      },
+      "worldProof": "unmeasured",
+      "gpuProof": "unmeasured",
+      "qualification": "Original typed raw storage inspection only; equality never substitutes fresh current posed/all-vertex shader proof."
+    },
+    {
+      "partPath": "harmonic-analyzer/channel/channel-spring-installed-stretch00-16",
+      "currentPrimitives": [
+        {
+          "mode": 4,
+          "attributes": {
+            "NORMAL": {
+              "componentType": 5126,
+              "type": "VEC3",
+              "count": 150228,
+              "normalized": false,
+              "typedBytesSha256": "b8de27ca8244d11b8488b14f5b3087522ff8318000dff40d52edf8d282ee1e2c"
+            },
+            "POSITION": {
+              "componentType": 5126,
+              "type": "VEC3",
+              "count": 150228,
+              "normalized": false,
+              "typedBytesSha256": "ea58bcb9fb673c7a9823adc9fbafa1d35091e17e9ec9375f6987d4cccd3d009d"
+            }
+          },
+          "indices": {
+            "componentType": 5125,
+            "type": "SCALAR",
+            "count": 441744,
+            "normalized": false,
+            "typedBytesSha256": "2f04c1348b3ae35b821f56e55b5ddf53edf803da4c2899743a6b850e0b0c5455"
+          },
+          "material": {
+            "name": "color",
+            "pbrMetallicRoughness": {
+              "baseColorFactor": [
+                0.6470588445663452,
+                0.6392157077789307,
+                0.6274510025978088,
+                1.0
+              ],
+              "metallicFactor": 0.0,
+              "roughnessFactor": 0.20000000298023224
+            }
+          }
+        }
+      ],
+      "historicalPrimitiveComparison": {
+        "historicalSource": {
+          "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+          "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+        },
+        "historicalPrimitives": [
+          {
+            "mode": 4,
+            "attributes": {
+              "NORMAL": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 150228,
+                "normalized": false,
+                "typedBytesSha256": "b8de27ca8244d11b8488b14f5b3087522ff8318000dff40d52edf8d282ee1e2c"
+              },
+              "POSITION": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 150228,
+                "normalized": false,
+                "typedBytesSha256": "ea58bcb9fb673c7a9823adc9fbafa1d35091e17e9ec9375f6987d4cccd3d009d"
+              }
+            },
+            "indices": {
+              "componentType": 5125,
+              "type": "SCALAR",
+              "count": 441744,
+              "normalized": false,
+              "typedBytesSha256": "2f04c1348b3ae35b821f56e55b5ddf53edf803da4c2899743a6b850e0b0c5455"
+            },
+            "material": {
+              "name": "color",
+              "pbrMetallicRoughness": {
+                "baseColorFactor": [
+                  0.6470588445663452,
+                  0.6392157077789307,
+                  0.6274510025978088,
+                  1.0
+                ],
+                "metallicFactor": 0.0,
+                "roughnessFactor": 0.20000000298023224
+              }
+            }
+          }
+        ],
+        "exactPrimitiveEquality": true
+      },
+      "worldProof": "unmeasured",
+      "gpuProof": "unmeasured",
+      "qualification": "Original typed raw storage inspection only; equality never substitutes fresh current posed/all-vertex shader proof."
+    },
+    {
+      "partPath": "harmonic-analyzer/channel/channel-spring-installed-stretch00-17",
+      "currentPrimitives": [
+        {
+          "mode": 4,
+          "attributes": {
+            "NORMAL": {
+              "componentType": 5126,
+              "type": "VEC3",
+              "count": 150228,
+              "normalized": false,
+              "typedBytesSha256": "b8de27ca8244d11b8488b14f5b3087522ff8318000dff40d52edf8d282ee1e2c"
+            },
+            "POSITION": {
+              "componentType": 5126,
+              "type": "VEC3",
+              "count": 150228,
+              "normalized": false,
+              "typedBytesSha256": "ea58bcb9fb673c7a9823adc9fbafa1d35091e17e9ec9375f6987d4cccd3d009d"
+            }
+          },
+          "indices": {
+            "componentType": 5125,
+            "type": "SCALAR",
+            "count": 441744,
+            "normalized": false,
+            "typedBytesSha256": "2f04c1348b3ae35b821f56e55b5ddf53edf803da4c2899743a6b850e0b0c5455"
+          },
+          "material": {
+            "name": "color",
+            "pbrMetallicRoughness": {
+              "baseColorFactor": [
+                0.6470588445663452,
+                0.6392157077789307,
+                0.6274510025978088,
+                1.0
+              ],
+              "metallicFactor": 0.0,
+              "roughnessFactor": 0.20000000298023224
+            }
+          }
+        }
+      ],
+      "historicalPrimitiveComparison": {
+        "historicalSource": {
+          "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+          "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+        },
+        "historicalPrimitives": [
+          {
+            "mode": 4,
+            "attributes": {
+              "NORMAL": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 150228,
+                "normalized": false,
+                "typedBytesSha256": "b8de27ca8244d11b8488b14f5b3087522ff8318000dff40d52edf8d282ee1e2c"
+              },
+              "POSITION": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 150228,
+                "normalized": false,
+                "typedBytesSha256": "ea58bcb9fb673c7a9823adc9fbafa1d35091e17e9ec9375f6987d4cccd3d009d"
+              }
+            },
+            "indices": {
+              "componentType": 5125,
+              "type": "SCALAR",
+              "count": 441744,
+              "normalized": false,
+              "typedBytesSha256": "2f04c1348b3ae35b821f56e55b5ddf53edf803da4c2899743a6b850e0b0c5455"
+            },
+            "material": {
+              "name": "color",
+              "pbrMetallicRoughness": {
+                "baseColorFactor": [
+                  0.6470588445663452,
+                  0.6392157077789307,
+                  0.6274510025978088,
+                  1.0
+                ],
+                "metallicFactor": 0.0,
+                "roughnessFactor": 0.20000000298023224
+              }
+            }
+          }
+        ],
+        "exactPrimitiveEquality": true
+      },
+      "worldProof": "unmeasured",
+      "gpuProof": "unmeasured",
+      "qualification": "Original typed raw storage inspection only; equality never substitutes fresh current posed/all-vertex shader proof."
+    },
+    {
+      "partPath": "harmonic-analyzer/channel/channel-spring-installed-stretch00-18",
+      "currentPrimitives": [
+        {
+          "mode": 4,
+          "attributes": {
+            "NORMAL": {
+              "componentType": 5126,
+              "type": "VEC3",
+              "count": 150228,
+              "normalized": false,
+              "typedBytesSha256": "b8de27ca8244d11b8488b14f5b3087522ff8318000dff40d52edf8d282ee1e2c"
+            },
+            "POSITION": {
+              "componentType": 5126,
+              "type": "VEC3",
+              "count": 150228,
+              "normalized": false,
+              "typedBytesSha256": "ea58bcb9fb673c7a9823adc9fbafa1d35091e17e9ec9375f6987d4cccd3d009d"
+            }
+          },
+          "indices": {
+            "componentType": 5125,
+            "type": "SCALAR",
+            "count": 441744,
+            "normalized": false,
+            "typedBytesSha256": "2f04c1348b3ae35b821f56e55b5ddf53edf803da4c2899743a6b850e0b0c5455"
+          },
+          "material": {
+            "name": "color",
+            "pbrMetallicRoughness": {
+              "baseColorFactor": [
+                0.6470588445663452,
+                0.6392157077789307,
+                0.6274510025978088,
+                1.0
+              ],
+              "metallicFactor": 0.0,
+              "roughnessFactor": 0.20000000298023224
+            }
+          }
+        }
+      ],
+      "historicalPrimitiveComparison": {
+        "historicalSource": {
+          "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+          "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+        },
+        "historicalPrimitives": [
+          {
+            "mode": 4,
+            "attributes": {
+              "NORMAL": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 150228,
+                "normalized": false,
+                "typedBytesSha256": "b8de27ca8244d11b8488b14f5b3087522ff8318000dff40d52edf8d282ee1e2c"
+              },
+              "POSITION": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 150228,
+                "normalized": false,
+                "typedBytesSha256": "ea58bcb9fb673c7a9823adc9fbafa1d35091e17e9ec9375f6987d4cccd3d009d"
+              }
+            },
+            "indices": {
+              "componentType": 5125,
+              "type": "SCALAR",
+              "count": 441744,
+              "normalized": false,
+              "typedBytesSha256": "2f04c1348b3ae35b821f56e55b5ddf53edf803da4c2899743a6b850e0b0c5455"
+            },
+            "material": {
+              "name": "color",
+              "pbrMetallicRoughness": {
+                "baseColorFactor": [
+                  0.6470588445663452,
+                  0.6392157077789307,
+                  0.6274510025978088,
+                  1.0
+                ],
+                "metallicFactor": 0.0,
+                "roughnessFactor": 0.20000000298023224
+              }
+            }
+          }
+        ],
+        "exactPrimitiveEquality": true
+      },
+      "worldProof": "unmeasured",
+      "gpuProof": "unmeasured",
+      "qualification": "Original typed raw storage inspection only; equality never substitutes fresh current posed/all-vertex shader proof."
+    },
+    {
+      "partPath": "harmonic-analyzer/channel/channel-spring-installed-stretch00-19",
+      "currentPrimitives": [
+        {
+          "mode": 4,
+          "attributes": {
+            "NORMAL": {
+              "componentType": 5126,
+              "type": "VEC3",
+              "count": 150228,
+              "normalized": false,
+              "typedBytesSha256": "b8de27ca8244d11b8488b14f5b3087522ff8318000dff40d52edf8d282ee1e2c"
+            },
+            "POSITION": {
+              "componentType": 5126,
+              "type": "VEC3",
+              "count": 150228,
+              "normalized": false,
+              "typedBytesSha256": "ea58bcb9fb673c7a9823adc9fbafa1d35091e17e9ec9375f6987d4cccd3d009d"
+            }
+          },
+          "indices": {
+            "componentType": 5125,
+            "type": "SCALAR",
+            "count": 441744,
+            "normalized": false,
+            "typedBytesSha256": "2f04c1348b3ae35b821f56e55b5ddf53edf803da4c2899743a6b850e0b0c5455"
+          },
+          "material": {
+            "name": "color",
+            "pbrMetallicRoughness": {
+              "baseColorFactor": [
+                0.6470588445663452,
+                0.6392157077789307,
+                0.6274510025978088,
+                1.0
+              ],
+              "metallicFactor": 0.0,
+              "roughnessFactor": 0.20000000298023224
+            }
+          }
+        }
+      ],
+      "historicalPrimitiveComparison": {
+        "historicalSource": {
+          "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+          "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+        },
+        "historicalPrimitives": [
+          {
+            "mode": 4,
+            "attributes": {
+              "NORMAL": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 150228,
+                "normalized": false,
+                "typedBytesSha256": "b8de27ca8244d11b8488b14f5b3087522ff8318000dff40d52edf8d282ee1e2c"
+              },
+              "POSITION": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 150228,
+                "normalized": false,
+                "typedBytesSha256": "ea58bcb9fb673c7a9823adc9fbafa1d35091e17e9ec9375f6987d4cccd3d009d"
+              }
+            },
+            "indices": {
+              "componentType": 5125,
+              "type": "SCALAR",
+              "count": 441744,
+              "normalized": false,
+              "typedBytesSha256": "2f04c1348b3ae35b821f56e55b5ddf53edf803da4c2899743a6b850e0b0c5455"
+            },
+            "material": {
+              "name": "color",
+              "pbrMetallicRoughness": {
+                "baseColorFactor": [
+                  0.6470588445663452,
+                  0.6392157077789307,
+                  0.6274510025978088,
+                  1.0
+                ],
+                "metallicFactor": 0.0,
+                "roughnessFactor": 0.20000000298023224
+              }
+            }
+          }
+        ],
+        "exactPrimitiveEquality": true
+      },
+      "worldProof": "unmeasured",
+      "gpuProof": "unmeasured",
+      "qualification": "Original typed raw storage inspection only; equality never substitutes fresh current posed/all-vertex shader proof."
+    },
+    {
+      "partPath": "harmonic-analyzer/channel/channel-spring-installed-stretch00-20",
+      "currentPrimitives": [
+        {
+          "mode": 4,
+          "attributes": {
+            "NORMAL": {
+              "componentType": 5126,
+              "type": "VEC3",
+              "count": 150228,
+              "normalized": false,
+              "typedBytesSha256": "b8de27ca8244d11b8488b14f5b3087522ff8318000dff40d52edf8d282ee1e2c"
+            },
+            "POSITION": {
+              "componentType": 5126,
+              "type": "VEC3",
+              "count": 150228,
+              "normalized": false,
+              "typedBytesSha256": "ea58bcb9fb673c7a9823adc9fbafa1d35091e17e9ec9375f6987d4cccd3d009d"
+            }
+          },
+          "indices": {
+            "componentType": 5125,
+            "type": "SCALAR",
+            "count": 441744,
+            "normalized": false,
+            "typedBytesSha256": "2f04c1348b3ae35b821f56e55b5ddf53edf803da4c2899743a6b850e0b0c5455"
+          },
+          "material": {
+            "name": "color",
+            "pbrMetallicRoughness": {
+              "baseColorFactor": [
+                0.6470588445663452,
+                0.6392157077789307,
+                0.6274510025978088,
+                1.0
+              ],
+              "metallicFactor": 0.0,
+              "roughnessFactor": 0.20000000298023224
+            }
+          }
+        }
+      ],
+      "historicalPrimitiveComparison": {
+        "historicalSource": {
+          "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+          "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+        },
+        "historicalPrimitives": [
+          {
+            "mode": 4,
+            "attributes": {
+              "NORMAL": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 150228,
+                "normalized": false,
+                "typedBytesSha256": "b8de27ca8244d11b8488b14f5b3087522ff8318000dff40d52edf8d282ee1e2c"
+              },
+              "POSITION": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 150228,
+                "normalized": false,
+                "typedBytesSha256": "ea58bcb9fb673c7a9823adc9fbafa1d35091e17e9ec9375f6987d4cccd3d009d"
+              }
+            },
+            "indices": {
+              "componentType": 5125,
+              "type": "SCALAR",
+              "count": 441744,
+              "normalized": false,
+              "typedBytesSha256": "2f04c1348b3ae35b821f56e55b5ddf53edf803da4c2899743a6b850e0b0c5455"
+            },
+            "material": {
+              "name": "color",
+              "pbrMetallicRoughness": {
+                "baseColorFactor": [
+                  0.6470588445663452,
+                  0.6392157077789307,
+                  0.6274510025978088,
+                  1.0
+                ],
+                "metallicFactor": 0.0,
+                "roughnessFactor": 0.20000000298023224
+              }
+            }
+          }
+        ],
+        "exactPrimitiveEquality": true
+      },
+      "worldProof": "unmeasured",
+      "gpuProof": "unmeasured",
+      "qualification": "Original typed raw storage inspection only; equality never substitutes fresh current posed/all-vertex shader proof."
+    },
+    {
+      "partPath": "harmonic-analyzer/summing/counter-spring-1",
+      "currentPrimitives": [
+        {
+          "mode": 4,
+          "attributes": {
+            "NORMAL": {
+              "componentType": 5126,
+              "type": "VEC3",
+              "count": 289034,
+              "normalized": false,
+              "typedBytesSha256": "225a9f2ee2918f385face4bdc8f81dcfa705b994758138fbf32c6564ccc97df4"
+            },
+            "POSITION": {
+              "componentType": 5126,
+              "type": "VEC3",
+              "count": 289034,
+              "normalized": false,
+              "typedBytesSha256": "10041f0db23c25aec8fc3b8e460e527aa4b3cf52eb7af2d798ca9178e2fc63b3"
+            }
+          },
+          "indices": {
+            "componentType": 5125,
+            "type": "SCALAR",
+            "count": 853590,
+            "normalized": false,
+            "typedBytesSha256": "dbbf3005e9defebb91fef146bfe816509ba08bdb173b3b6caf32787597ea7062"
+          },
+          "material": {
+            "name": "color",
+            "pbrMetallicRoughness": {
+              "baseColorFactor": [
+                0.11764706671237946,
+                0.11764706671237946,
+                0.12941177189350128,
+                1.0
+              ],
+              "metallicFactor": 0.0,
+              "roughnessFactor": 0.20000000298023224
+            }
+          }
+        }
+      ],
+      "historicalPrimitiveComparison": {
+        "historicalSource": {
+          "sha256": "2280bfa641e33aea841b01b97daf0d2021f091da272ea55c06631a231e876b1d",
+          "sourceCommit": "1268c23d4a8fc741147c5e09d8d1e45247a71945"
+        },
+        "historicalPrimitives": [
+          {
+            "mode": 4,
+            "attributes": {
+              "NORMAL": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 289034,
+                "normalized": false,
+                "typedBytesSha256": "cab766162232511cd66da2cc6c30508f5420a4ddbd39e53a74e52e0d2da11bd5"
+              },
+              "POSITION": {
+                "componentType": 5126,
+                "type": "VEC3",
+                "count": 289034,
+                "normalized": false,
+                "typedBytesSha256": "f813fe341e0213990c4f054f860dc24eefe83f83135d2c15af4e232a9447f15d"
+              }
+            },
+            "indices": {
+              "componentType": 5125,
+              "type": "SCALAR",
+              "count": 853590,
+              "normalized": false,
+              "typedBytesSha256": "dbbf3005e9defebb91fef146bfe816509ba08bdb173b3b6caf32787597ea7062"
+            },
+            "material": {
+              "name": "color",
+              "pbrMetallicRoughness": {
+                "baseColorFactor": [
+                  0.11764706671237946,
+                  0.11764706671237946,
+                  0.12941177189350128,
+                  1.0
+                ],
+                "metallicFactor": 0.0,
+                "roughnessFactor": 0.20000000298023224
+              }
+            }
+          }
+        ],
+        "exactPrimitiveEquality": false
+      },
+      "worldProof": "unmeasured",
+      "gpuProof": "unmeasured",
+      "qualification": "Original typed raw storage inspection only; equality never substitutes fresh current posed/all-vertex shader proof."
+    }
+  ],
+  "rigidDiscSpring": {
+    "partPath": "harmonic-analyzer/paper-drive/transgear-pivot-spring-1",
+    "currentPrimitives": [
+      {
+        "mode": 4,
+        "attributes": {
+          "NORMAL": {
+            "componentType": 5126,
+            "type": "VEC3",
+            "count": 716,
+            "normalized": false,
+            "typedBytesSha256": "029cba92bb62beb2b6a4debb60f34d6ab394c95792c5c86d5a95d78ec33ac91a"
+          },
+          "POSITION": {
+            "componentType": 5126,
+            "type": "VEC3",
+            "count": 716,
+            "normalized": false,
+            "typedBytesSha256": "37a1abd99c7ab416712a1899a556048209850e488c691730cee02c3c93d661b5"
+          }
+        },
+        "indices": {
+          "componentType": 5125,
+          "type": "SCALAR",
+          "count": 1704,
+          "normalized": false,
+          "typedBytesSha256": "e7a9fd0501c3f2253f80deb179005ebdf56ae813f4347bcc039beba6c1e2454f"
+        },
+        "material": {
+          "name": "carbon steel",
+          "pbrMetallicRoughness": {
+            "baseColorFactor": [
+              0.6117647290229797,
+              0.5921568870544434,
+              0.5764706134796143,
+              1.0
+            ],
+            "metallicFactor": 1.0,
+            "roughnessFactor": 0.10000000149011612
+          }
+        }
+      }
+    ],
+    "role": "authored rigid disc; not a22nd swept stock"
+  },
+  "coincidentApexBlocker": {
+    "status": "pending-current-qualification",
+    "distinctPhysicalApexSupportPoints": 1,
+    "seamEquivalentVertexCount": 32,
+    "reason": "Coincident declarations/seam copies cannot provide six distinct FIT features or disjoint CHECK support. v39 does not resolve that defect by provenance change; fresh actual distinct-feature mapping/positive control remains required, not declared source impossibility."
+  },
+  "eligibility": {
+    "status": "unmeasured",
+    "source": false,
+    "gpu": false
+  },
+  "historicalLineage": [
+    {
+      "path": "web/content/NAsM30MAHLg.calibration-eligibility.json",
+      "sha256": "77a32c34a6944b8faf914ed0f4cbf0b166d24796e6ce1a77b2e471d506ea4594",
+      "scope": "immutable historical input; not current native qualification"
+    },
+    {
+      "path": "web/content/NAsM30MAHLg.native-eligibility-request.json",
+      "sha256": "b9ac25215dd4a496fd1e149f95f760b7e560e173e47ba5ef0d80e13c733a1c5e",
+      "scope": "immutable historical input; not current native qualification"
+    }
+  ],
+  "qualification": "Original source facts plus separately proven narrow native associations and chosen/unobserved current inputs/framing. Native station/setup ownership is checked, not current posed mechanism feasibility, fitted-camera transfer, source-first-surface, all21-stock numeric/GPU, geometry/raster or 50/20/10/5-percent stage acceptance."
+}

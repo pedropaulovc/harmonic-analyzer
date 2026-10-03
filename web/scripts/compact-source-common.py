@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Compact retained source observations without inventing source or GPU measurements.
 
-Video-specific authors provide physically feasible inputs and candidate cameras. This
-module only selects existing decoded-source observations and copies numeric evidence.
+Video-specific authors provide explicitly chosen unobserved inputs and cameras. This
+module selects existing decoded-source observations and preserves original evidence.
 Coverage means playback data coverage; stage matching remains unmeasured until the
 real renderer is compared with the retained source landmarks.
 Exact-image aliases may contribute original observed landmarks to a selected row,
@@ -12,6 +12,7 @@ conflicting corresponding source points fail closed rather than choosing a donor
 from __future__ import annotations
 
 import copy
+import importlib.util
 import json
 import math
 import re
@@ -19,6 +20,19 @@ from functools import lru_cache
 from pathlib import Path
 
 WEB = Path(__file__).resolve().parents[1]
+CURRENT_CONTENT = WEB / "content" / "v39"
+HISTORICAL_CONTENT = WEB / "content"
+VIDEO_IDS = ("NAsM30MAHLg", "8KmVDxkia_w", "6dW6VYXp9HM", "jfH-NbsmvD4", "XPQwKRt4Y2k", "4mBuyixt22U")
+_association_spec = importlib.util.spec_from_file_location(
+    "native_source_association", Path(__file__).with_name("native-source-association.py"))
+_association = importlib.util.module_from_spec(_association_spec)
+_association_spec.loader.exec_module(_association)
+native_source_association = _association
+associate_native_anchor = _association.associate_native_anchor
+associate_native_part = _association.associate_native_part
+current_model_identity = _association.current_model_identity
+current_native_paths = _association.current_native_paths
+current_native_parts = _association.current_native_parts
 SETUP_FIELDS = (
     "counterHeightM", "meanLineAngleRad", "platenOffsetM", "wireFixtureOffsetM",
     "coneSwingRad", "pinionCamRad", "heldChannelTurns", "driveCrankOffsetTurns",
@@ -29,8 +43,13 @@ INPUT_FIELDS = ["crankTurns", "gearing", "magnification"] + [
 
 
 def load_observations(video_id, prefer_track=False):
-    suffix = "track" if prefer_track and (WEB / "content" / f"{video_id}.track.json").exists() else "observations"
-    return json.loads((WEB / "content" / f"{video_id}.{suffix}.json").read_text())
+    """One current corpus only; the retained argument cannot enable old track fallback."""
+    if video_id not in VIDEO_IDS:
+        raise ValueError(f"Unknown retained original video: {video_id}")
+    data = json.loads((CURRENT_CONTENT / f"{video_id}.observations.json").read_text())
+    if data.get("model") != current_model_identity():
+        raise ValueError("Current observations target a different native source")
+    return data
 
 
 def needs_machine(frame, data):
@@ -270,21 +289,10 @@ def selected_frames(data):
         shot = next(s for s in data["shots"] if s["startSeconds"] <= time < s["endSeconds"])
         pool = by_shot[shot["id"]]
         if not pool:
-            # Explicitly unsupported source sampling, not a fabricated exposure.
-            output[time] = {"timeSeconds": time, "decodedTimeSeconds": None,
-                            "sourceSampleUnavailable": True, "shotId": shot["id"],
-                            "classification": shot["classification"], "landmarks": [],
-                            "views": [], "unavailable": [
-                                {"reason": "No retained decoded source observation in this shot."}]}
-            continue
+            raise ValueError(f'{shot["id"]}@{time}: no actual retained same-shot decoded source exposure; no null PTS is fabricated.')
         source = min(pool, key=lambda f: abs(f["decodedTimeSeconds"] - time))
         if abs(source["decodedTimeSeconds"] - time) > 0.5:
-            output[time] = {"timeSeconds": time, "decodedTimeSeconds": None,
-                            "sourceSampleUnavailable": True, "shotId": shot["id"],
-                            "classification": shot["classification"], "landmarks": [],
-                            "views": [], "unavailable": [
-                                {"reason": "No retained same-shot decoded source observation within 0.5s."}]}
-            continue
+            raise ValueError(f'{shot["id"]}@{time}: no actual source exposure within 0.5s; source coverage cannot erase this interval.')
         if source["timeSeconds"] == time:
             output[time] = source
         else:
@@ -346,12 +354,15 @@ def compact_camera(camera):
 def compact_input(value):
     if value is None:
         return None
+    fields = {"crankTurns", "amplitudes", "phases", "gearing", "magnification", "setup"}
+    if not isinstance(value, dict) or set(value) != fields or not isinstance(value["setup"], dict) or set(value["setup"]) != set(SETUP_FIELDS):
+        raise ValueError("A chosen input must contain exactly the complete 51-coordinate contract.")
     result = {key: copy.deepcopy(value[key]) for key in ("crankTurns", "amplitudes", "phases", "gearing", "magnification")}
     result["setup"] = {key: value["setup"][key] for key in SETUP_FIELDS}
-    if len(result["amplitudes"]) != 20 or len(result["phases"]) != 20:
+    if not isinstance(result["amplitudes"], list) or not isinstance(result["phases"], list) or len(result["amplitudes"]) != 20 or len(result["phases"]) != 20:
         raise ValueError("A chosen source input must name all twenty channel amplitudes and phases.")
     numbers = [result["crankTurns"], result["magnification"]] + result["amplitudes"] + result["phases"] + [x for x in result["setup"].values() if x is not None]
-    if not all(isinstance(x, (int, float)) and math.isfinite(x) for x in numbers):
+    if not all(type(x) in (int, float) and math.isfinite(x) for x in numbers):
         raise ValueError("A chosen source input must be complete and finite.")
     if any(abs(x) > 1 for x in result["amplitudes"]) or result["magnification"] <= 0:
         raise ValueError("Invalid source amplitude or magnification.")
@@ -415,7 +426,7 @@ FIXED_ANCHOR_PARTS = {
         ("magnifier", "wheel-bar", (1,)), ("magnifier", "wheel-axle-nut", (1,)),
         ("magnifier", "clamp-screw", (1, 2)), ("magnifier", "column-clamp-front", (1,)),
         ("paper-drive", "support-bar", (1,)), ("paper-drive", "clamp-screw", range(1, 5)),
-        ("paper-drive", "transgear-stub", (1,)), ("pen", "hanger-screw", (1,)),
+        ("pen", "hanger-screw", (1,)),
     )
     for index in indices
 }
@@ -453,6 +464,8 @@ def native_motion_bindings():
 
 
 def anchor_motion(anchor):
+    if anchor.get("nativeAssociation", {}).get("status") == "unavailable":
+        return None
     if anchor.get("motion") in ("fixed", "moving"):
         return anchor["motion"]
     path = anchor.get("partPath")
@@ -464,9 +477,12 @@ def anchor_motion(anchor):
     # A spin/swing binding alone does not prove that this point is off its axis.
     # Crank/cone also have compound platform motion: their unidentified centres
     # remain unknown, rather than being certified fixed or moving by prose.
-    if motion in (None, "crank", "cone-spin", "cylinder", "wheel", "paper-gear",
+    if motion in (None, "crank", "cone-spin", "cylinder", "wheel",
+                  "paper-knob", "paper-feed", "paper-sprocket",
                   "pinion-swing", "pinion-cam", "pinion-lever"):
         return None
+    if motion == "paper-fixed":
+        return "fixed"
     return "moving"
 
 
@@ -475,10 +491,12 @@ def build_track(data, frame_views_callback, evidence_notes=None):
     shots = [{key: copy.deepcopy(shot[key]) for key in ("id", "startSeconds", "endSeconds", "classification", "hasCorrespondingMachine", "reason", "internalMechanismMotion", "internalMotionEvidence", "internalMotionSourceEvidence") if key in shot} for shot in data["shots"]]
     anchors = []
     for anchor in data["anchors"]:
-        item = {key: copy.deepcopy(anchor[key]) for key in ("id", "kind", "partPath", "partLocalMetres", "worldMetres", "description", "correspondenceEvidence") if key in anchor}
+        item = {key: copy.deepcopy(anchor[key]) for key in ("id", "kind", "partPath", "partLocalMetres", "worldMetres", "description", "correspondenceEvidence", "nativeAssociation") if key in anchor}
         item["motion"] = anchor_motion(anchor)
         anchors.append(item)
     frames, blockers = [], []
+    unavailable_anchors = {anchor["id"]: anchor["nativeAssociation"] for anchor in anchors
+                           if anchor.get("nativeAssociation", {}).get("status") == "unavailable"}
     for frame in selected_frames(data):
         views = [] if frame.get("sourceSampleUnavailable") else frame_views_callback(frame)
         for view in views:
@@ -493,9 +511,33 @@ def build_track(data, frame_views_callback, evidence_notes=None):
             if landmark.get("status") != "observed" or landmark.get("pixel") is None:
                 continue
             row["landmarks"].append({key: copy.deepcopy(landmark[key]) for key in ("anchorId", "viewId", "role", "pixel", "status", "method", "uncertaintyPx", "trackingEvidence", "measurementEvidence") if key in landmark})
-        if frame.get("unavailable"):
-            row["unavailable"] = [{key: copy.deepcopy(item[key]) for key in ("anchorId", "viewId", "reason") if key in item} if isinstance(item, dict) else item for item in frame["unavailable"]]
+        row["unavailable"] = copy.deepcopy(frame.get("unavailable", []))
+        for landmark in frame.get("landmarks", []):
+            association = unavailable_anchors.get(landmark["anchorId"])
+            if association:
+                row["unavailable"].append({
+                    "anchorId": landmark["anchorId"], "viewId": landmark.get("viewId", "main"),
+                    "role": landmark.get("role"), "sourcePixels": copy.deepcopy(landmark.get("pixel")),
+                    "status": "unmeasured-native", "required": True, "reason": association["reason"]})
+            if landmark.get("status") != "observed" or landmark.get("pixel") is None:
+                row["unavailable"].append({
+                    "anchorId": landmark["anchorId"], "viewId": landmark.get("viewId", "main"),
+                    "role": landmark.get("role"), "sourcePixels": copy.deepcopy(landmark.get("pixel")),
+                    "status": "source-unavailable", "required": True,
+                    "reason": "Original required source feature is unresolved/unobserved; no pixel measurement inferred."})
         row["views"] = views
+        if needs_machine(frame, data):
+            for source_view in source_views(frame, data):
+                source_id = source_view.get("id")
+                represented = source_id is not None and any(
+                    view.get("id") == source_id
+                    or (source_id in view.get("sourceViewIds", []) and view.get("sourceViewMappingEvidence"))
+                    for view in views)
+                if not represented:
+                    reason = f'Original required source view {source_id!r} has no explicit current rendered-view association.'
+                    row["unavailable"].append({"viewId": source_id, "originalViewId": source_id,
+                                               "required": True, "status": "source-unavailable", "reason": reason})
+                    blockers.append(f'{frame["shotId"]} at {frame["timeSeconds"]:.6f}s: {reason}')
         if row["decodedTimeSeconds"] is None or abs(row["decodedTimeSeconds"] - row["timeSeconds"]) > 0.5:
             blockers.append(f'{frame["shotId"]} at {frame["timeSeconds"]:.6f}s: no retained observation within 0.5s.')
         if needs_machine(frame, data) and (not views or any(view.get("camera") is None or view.get("input") is None for view in views)):
@@ -510,7 +552,7 @@ def build_track(data, frame_views_callback, evidence_notes=None):
                            "legacyChangeSampleCount": len(data.get("coverage", {}).get("changeTimesSeconds", [])),
                            "samplingPolicy": "Every integer second, every shot edge, quarter-fade checks, and retained camera/layout/observed-motion keys. Legacy per-exposure certification expansion is diagnostic only."},
               "stages": {str(stage): {"status": "unmeasured"} for stage in (50, 20, 10, 5)},
-              "evidence": {"interpretation": "Chosen source-informed physically feasible playback candidates. Historical hidden inputs are not recovered. Retained camera FIT/CHECK residuals are CPU diagnostics, not current GPU measurements or stage passes.",
+              "evidence": {"interpretation": "Explicitly chosen unobserved current playback candidates, not recovered history. Exact raw-native feature associations are narrow correspondence only. Historical feasibility/camera FIT/CHECK/GPU receipts remain old-model lineage, not current support. Source-first-surface, current camera calibration and rendered 50/20/10/5 stages remain unmeasured.",
                            "notes": list(evidence_notes or [])}}
     required_views = [(frame, view) for frame in frames if needs_machine(frame, data) for view in frame["views"]]
     checked_views = sum(any(point.get("role") == "check" and point.get("viewId", "main") == view["id"] for point in frame["landmarks"]) for frame, view in required_views)
@@ -523,6 +565,7 @@ def build_track(data, frame_views_callback, evidence_notes=None):
             f"Independent source CHECK pixels are missing in {len(required_views) - checked_views} required view samples.",
             f"{assumed_cameras} view samples use an explicitly source-informed framing assumption, not a source-fitted camera.",
             "Rendered stage matching remains unmeasured; runtime coverage is not source measurement or fidelity completion.",
+            *[f'{anchor_id}: {association["reason"]}' for anchor_id, association in unavailable_anchors.items()],
         ],
     }
     result["samplingDiagnostics"] = copy.deepcopy(data.get("samplingDiagnostics", {}))
@@ -533,11 +576,14 @@ def build_track(data, frame_views_callback, evidence_notes=None):
 
 def prepare_track(track):
     """Serialize without publishing, so paired outputs can be prepared together."""
-    path = WEB / "content" / f'{track["source"]["videoId"]}.source-track.json'
+    if track.get("model") != current_model_identity() or track["source"]["videoId"] not in VIDEO_IDS:
+        raise ValueError("Only the approved current six-video corpus may be published")
+    path = CURRENT_CONTENT / f'{track["source"]["videoId"]}.source-track.json'
     return path, json.dumps(track, separators=(",", ":"), allow_nan=False) + "\n"
 
 
 def write_track(track):
     path, contents = prepare_track(track)
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(contents)
     return path

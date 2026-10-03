@@ -6,10 +6,13 @@ Requires numpy, scipy, opencv-python-headless and the original raw2280 GLB:
 
 History controls select exact materialized git revisions, never edited predicates.
 INTRO_STATIC_PRODUCER_PATH selects the static camera producer (f20571861).
-INTRO_NATIVE_FEATURE_PRODUCER_PATH selects native ray eligibility (7d89e1bf7).
-Missing or mismatched raw bytes fail, never a green skip. The CLI error/refusal
-controls do not depend on an unreconstructible private full435 checkpoint; actual
-positive first-surface proof requires a separately sealed native export.
+INTRO_NATIVE_FEATURE_PRODUCER_PATH selects native eligibility, including exact
+460b1a4 history controls for posed-array / proper-camera rejection assertions.
+Missing or mismatched raw bytes fail, never a green skip. Admissibility fixtures
+declare their own three-primitive test inventory, never a fabricated full435.
+They retain the original raw marker and camera controls, but do not establish a
+complete native solve, current462 geometry, source association or GPU acceptance.
+Actual complete first-surface proof still requires a separately sealed export.
 """
 import copy
 import hashlib
@@ -352,6 +355,231 @@ class SealedNativeRayRequestTests(unittest.TestCase):
                     self.assertIsInstance(row["reason"], str)
                     self.assertIsNone(row["guardValue"])
                     self.assertIsNone(row["hit"])
+
+
+class PosedNativeAdmissibilityTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        SealedNativeRayRequestTests.setUpClass.__func__(cls)
+        cls.profile = copy.deepcopy(cls.profile)
+        cls.profile['finiteNib'].update(requiredNativeDrawableCount=3, requiredSpringDrawableCount=0)
+        cls.profile['fixtureQualification'] = 'THREE_PRIMITIVE_ADMISSIBILITY_ONLY_NOT_NATIVE_SOLVE'
+        cls.local, cls.faces = cls.feature.stored_primitive(
+            cls.raw_path, cls.marker_path, cls.profile['finiteNib']['primitiveIndex'], cls.profile['modelSha256'])
+        # Original actual marker matrix and camera control, kept independently
+        # of the production validator. Other primitives are bounded triangles.
+        cls.matrix = np.array([
+            -1.2683255031580161e-7, -1.0000001000062668, 2.0317130798349802e-8, 0.,
+            .70710678243166, -1.1111807210867963e-7, -.7071068370779496, 0.,
+            .7071067991398629, -5.8255212252507367e-8, .7071067203634824, 0.,
+            -.010350000113248825, .36079823093539387, -.14364999532699585, 1.,
+        ]).reshape(4, 4, order='F')
+        cls.marker_positions = (cls.matrix @ np.c_[cls.local, np.ones(len(cls.local))].T).T[:, :3]
+        cls.point = cls.marker_positions[cls.profile['finiteNib']['nativeVertexIndex']]
+        track = json.loads((WEB / 'content' / 'NAsM30MAHLg.source-track.json').read_text())
+        cls.chosen_input = next(view['input'] for frame in track['frames']
+                                for view in frame['views'] if isinstance(view.get('input'), dict))
+
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        self.profile_path = self.root / 'test-profile.json'
+        self.profile_path.write_text(json.dumps(self.profile))
+        rotation = np.asarray(self.ray['rotation'])
+        centre = (self.point + np.asarray(self.ray['origin'])) / 2
+        u, v = .02 * rotation[:, 0], .02 * rotation[:, 1]
+        self.occluding_positions = np.array([centre - u - v, centre + u - v, centre + 2 * v])
+        self.remote_positions = np.array([[2., 2., 2.], [2.001, 2., 2.], [2., 2.001, 2.]])
+        test_path = HERE / 'test_intro_feature_eligibility.py'
+        test_sha = self.feature.digest(test_path)
+        snapshot = self.root / 'executed-test-fixture.py'
+        snapshot.write_bytes(test_path.read_bytes())
+        self.header = {
+            'fixtureQualification': 'SEALED_TEST_ARRAYS_NOT_ACTUAL_NATIVE_EXECUTION',
+            'modelSha256': self.profile['modelSha256'],
+            'nativeDrawableDenominator': 3, 'springDrawableCount': 0,
+            'input': self.chosen_input, 'unobservedInputFields': self.feature.common.INPUT_FIELDS,
+            'inputMechanismAndAll435ArraysFrozenAsOneState': True, 'partOverrides': [],
+            'codeHashes': {'web/scripts/test_intro_feature_eligibility.py': test_sha},
+            'actuallyExecutedImmutableNativeSourceSnapshots': [{
+                'relativePath': 'web/scripts/test_intro_feature_eligibility.py',
+                'snapshotPath': str(snapshot), 'sha256': test_sha,
+            }],
+            'geometry': {}, 'census': [],
+        }
+        p_offset = f_offset = 0
+        for path, positions, faces, matrix in [
+                (self.marker_path, self.marker_positions, self.faces, self.matrix),
+                ('fixture/occluder', self.occluding_positions, [[0, 1, 2]], np.eye(4)),
+                ('fixture/separated', self.remote_positions, [[0, 1, 2]], np.eye(4))]:
+            faces = np.asarray(faces, dtype='<u4')
+            self.header['census'].append({
+                'path': path, 'vertexCount': len(positions), 'indexCount': faces.size,
+                'positionByteOffset': p_offset, 'indexByteOffset': f_offset,
+                'matrixWorld': matrix.flatten(order='F').tolist(), 'visibleByNativeGraph': True,
+            })
+            p_offset += np.asarray(positions, dtype='<f8').nbytes
+            f_offset += faces.nbytes
+        self.positions = np.concatenate([self.marker_positions, self.occluding_positions, self.remote_positions]).astype('<f8')
+        self.indices = np.concatenate([self.faces.reshape(-1), [0, 1, 2], [0, 1, 2]]).astype('<u4')
+
+    def seal(self, positions=None, indices=None, header=None):
+        export = copy.deepcopy(self.header if header is None else header)
+        for name, value, dtype in [
+                ('positions', self.positions if positions is None else positions, 'little-endian IEEE754 float64'),
+                ('indices', self.indices if indices is None else indices, 'little-endian uint32')]:
+            payload = value if isinstance(value, bytes) else value.tobytes()
+            path = self.root / (name + '.bin')
+            path.write_bytes(payload)
+            export['geometry'][name] = {'path': str(path), 'sha256': self.feature.digest(path),
+                                        'bytes': len(payload), 'dtype': dtype}
+        path = self.root / 'export.json'
+        path.write_text(json.dumps(export, allow_nan=False))
+        return path
+
+    def native(self, export):
+        return self.feature.FrozenNativeFirstSurface(export, self.raw_path, self.profile, WEB.parent)
+
+    def cli(self, export, rays):
+        packet, output = self.root / 'rays.json', self.root / 'result.json'
+        packet.write_text(json.dumps({'rays': rays}, allow_nan=False))
+        if output.exists():
+            output.unlink()
+        completed = subprocess.run([
+            sys.executable, str(self.producer_path), '--model', str(self.raw_path),
+            '--profile', str(self.profile_path), '--native-export', str(export),
+            '--code-root', str(WEB.parent), '--rays', str(packet), '--output', str(output),
+        ], capture_output=True, text=True)
+        self.assertTrue(output.is_file(), completed.stderr)
+        return completed.returncode, json.loads(output.read_text())
+
+    def assert_rejected_payload(self, export):
+        with self.assertRaises(ValueError):
+            self.native(export)
+        before = dict(copy.deepcopy(self.ray), id='detached-before', matrices={})
+        after = dict(copy.deepcopy(self.ray), id='detached-after', partOverrides=[])
+        second = dict(copy.deepcopy(self.ray), id='valid-camera-after-native-error')
+        rays = [before, self.ray, second, after]
+        returncode, result = self.cli(export, rays)
+        self.assertNotEqual(returncode, 0)
+        self.assertEqual([row['status'] for row in result['rays']], ['refused', 'error', 'error', 'refused'])
+        self.assertEqual([row['request'] for row in result['rays']], rays)
+        self.assertEqual([row['id'] for row in result['rays']], [ray['id'] for ray in rays])
+        self.assertIsNone(result['completeNativeDenominator'])
+        self.assertIsNone(result['nativeChosenInput'])
+        self.assertIsNone(result['nativeExportSha256'])
+        self.assertFalse(result['GPUAcceptance'])
+        self.assertFalse(result['sourceAcceptance'])
+        for row in result['rays']:
+            self.assertIsNone(row['hit'])
+            self.assertIsNone(row['guardValue'])
+
+    def test_sealed_valid_arrays_retain_positive_and_occluder_controls(self):
+        for occluded in (False, True):
+            with self.subTest(occluded=occluded):
+                positions = self.positions.copy()
+                if not occluded:
+                    positions[len(self.local):len(self.local) + 3] = self.remote_positions
+                export = self.seal(positions=positions)
+                native = self.native(export)
+                value, hit = native.nib_guard(self.ray['origin'], self.ray['rotation'])
+                self.assertEqual(hit['actualFiniteNibIsExactNearestPositiveSurface'], not occluded)
+                self.assertEqual(hit['partPath'], 'fixture/occluder' if occluded else self.marker_path)
+                if occluded:
+                    self.assertLess(value, 0)
+                else:
+                    self.assertGreater(value, 0)
+                returncode, result = self.cli(export, [self.ray])
+                self.assertEqual(returncode, 0)
+                self.assertEqual(result['rays'][0]['status'], 'measured')
+                self.assertEqual(result['rays'][0]['hit']['actualFiniteNibIsExactNearestPositiveSurface'], not occluded)
+
+    def test_nonfinite_coordinates_reject_visible_and_hidden_whole_payload(self):
+        for value in (np.nan, np.inf, -np.inf):
+            for visible in (True, False):
+                with self.subTest(value=value, visible=visible):
+                    positions = self.positions.copy()
+                    positions[len(self.local):len(self.local) + 3] = value
+                    header = copy.deepcopy(self.header)
+                    header['census'][1]['visibleByNativeGraph'] = visible
+                    self.assert_rejected_payload(self.seal(positions=positions, header=header))
+
+    def test_payload_byte_coverage_is_exact_not_hash_only(self):
+        p, f = self.positions.tobytes(), self.indices.tobytes()
+        for positions, indices in [(p[:-24], f), (p, f[:-12]), (p[:-1], f), (p, f[:-1]),
+                                   (p + bytes(24), f), (p, f + bytes(12))]:
+            with self.subTest(positionBytes=len(positions), indexBytes=len(indices)):
+                self.assert_rejected_payload(self.seal(positions, indices))
+
+    def test_declared_payload_dtype_and_size_match_actual_bytes(self):
+        for name, field, value in [('positions', 'dtype', 'little-endian IEEE754 float32'),
+                                   ('indices', 'dtype', 'little-endian uint16'),
+                                   ('positions', 'bytes', self.positions.nbytes - 8),
+                                   ('indices', 'bytes', self.indices.nbytes - 4)]:
+            with self.subTest(name=name, field=field):
+                export = self.seal()
+                header = json.loads(export.read_text())
+                header['geometry'][name][field] = value
+                export.write_text(json.dumps(header))
+                self.assert_rejected_payload(export)
+
+    def test_indices_cannot_leave_their_own_primitive(self):
+        for index in (3, np.iinfo(np.uint32).max):
+            with self.subTest(index=index):
+                indices = self.indices.copy()
+                indices[self.faces.size] = index
+                self.assert_rejected_payload(self.seal(indices=indices))
+
+    def test_census_counts_offsets_and_triangle_coverage_are_bounded(self):
+        for field, value in [('vertexCount', -1), ('vertexCount', 2**80), ('indexCount', 2),
+                             ('positionByteOffset', 2**80), ('indexByteOffset', 2**80),
+                             ('positionByteOffset', 0), ('indexByteOffset', 0),
+                             ('positionByteOffset', self.header['census'][1]['positionByteOffset'] + 8)]:
+            with self.subTest(field=field, value=value):
+                header = copy.deepcopy(self.header)
+                header['census'][1][field] = value
+                self.assert_rejected_payload(self.seal(header=header))
+
+    def test_nonrotation_cameras_are_refused_at_api_and_cli_preload_boundaries(self):
+        export = self.seal()
+        native = self.native(export)
+        rotation = np.asarray(self.ray['rotation'])
+        depth = float(-((self.point - np.asarray(self.ray['origin'])) @ rotation)[2])
+        scaled = rotation.copy()
+        scaled[:, 2] *= (.005 / .9) / depth
+        reflection = rotation.copy()
+        reflection[:, 0] *= -1
+        for invalid in (scaled, np.zeros((3, 3)), reflection, np.diag([1., 1., 0.]), np.full((3, 3), 1e300)):
+            with self.subTest(rotation=invalid.tolist()):
+                with self.assertRaises(ValueError):
+                    native.nib_guard(self.ray['origin'], invalid)
+                ray = dict(copy.deepcopy(self.ray), id='invalid-camera', rotation=invalid.tolist())
+                detached = dict(copy.deepcopy(self.ray), id='detached', matrices={})
+                returncode, result = self.cli(self.root / 'missing.json', [detached, ray])
+                self.assertNotEqual(returncode, 0)
+                self.assertEqual([row['status'] for row in result['rays']], ['refused', 'refused'])
+                self.assertEqual([row['request'] for row in result['rays']], [detached, ray])
+                self.assertIsNone(result['nativeExportSha256'])
+                self.assertIsNone(result['completeNativeDenominator'])
+                rays = [detached, ray, self.ray]
+                returncode, result = self.cli(export, rays)
+                self.assertNotEqual(returncode, 0)
+                self.assertEqual([row['status'] for row in result['rays']], ['refused', 'refused', 'measured'])
+                self.assertEqual([row['request'] for row in result['rays']], rays)
+                self.assertFalse(result['rays'][2]['hit']['actualFiniteNibIsExactNearestPositiveSurface'])
+
+    def test_float32_camera_rotation_preserves_realizable_positive_control(self):
+        positions = self.positions.copy()
+        positions[len(self.local):len(self.local) + 3] = self.remote_positions
+        export = self.seal(positions=positions)
+        rotation = np.asarray(self.ray['rotation'], dtype=np.float32)
+        _, hit = self.native(export).nib_guard(self.ray['origin'], rotation)
+        self.assertTrue(hit['actualFiniteNibIsExactNearestPositiveSurface'])
+        ray = dict(copy.deepcopy(self.ray), rotation=rotation.tolist())
+        returncode, result = self.cli(export, [ray])
+        self.assertEqual(returncode, 0)
+        self.assertTrue(result['rays'][0]['hit']['actualFiniteNibIsExactNearestPositiveSurface'])
 
 
 if __name__ == "__main__":
