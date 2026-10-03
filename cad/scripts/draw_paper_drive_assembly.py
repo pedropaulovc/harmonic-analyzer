@@ -1047,13 +1047,16 @@ def _step_text() -> dict[str, str]:
             "EDGE); CLAMP THE ARM TO THE BAR. RUN THE FULL TRAVEL: NO TIGHT SPOT, "
             "SHAKE AT EVERY TOOTH."
         ),
+        # Machinist review of 0316d0951: the set is measured on the hook's
+        # rivet holes from the MHA-170 datums, the flap's lower edge and the
+        # bar's back face under its base (latch_hook_bracket_spec.HOOK_SET_YZ).
         "hook-set-and-riveted": (
             f"HOLDING THAT MESH, SET THE {_N['latch-hook']} HOOK ON THE BRACKET "
-            f"FLAP, ITS HOLE'S LOWER EDGE ON THE {_N['transgear-latch-pin']} PIN "
-            f"(HOOK OVER {steps.HOOK_SET_TEXT} OFF ITS DRAWN PLACE: STOP AND "
-            "REPORT); CLAMP. DRILL THE FLAP THROUGH ITS "
-            f"{TRANSGEAR_QUANTITIES['latch-hook-rivet']} RIVET HOLES (SEE "
-            f"{_N['latch-hook-bracket']}); SET "
+            f"FLAP, ITS HOLE'S LOWER EDGE ON THE {_N['transgear-latch-pin']} PIN, "
+            f"ITS RIVET HOLES {steps.HOOK_SET_Y_TEXT} ABOVE THE FLAP'S LOWER EDGE, "
+            f"THE FRONT ONE {steps.HOOK_SET_Z_TEXT} REAR OF THE BAR, "
+            f"{steps.HOOK_SET_TEXT}, ELSE REPORT; CLAMP. DRILL THE FLAP THROUGH "
+            f"THEM PER {_N['latch-hook-bracket']}; SET "
             f"{TRANSGEAR_QUANTITIES['latch-hook-rivet']} "
             f"{_N['latch-hook-rivet']} RIVETS. UNCLAMP, LATCH, RE-RUN THE TRAVEL."
         ),

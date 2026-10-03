@@ -1150,7 +1150,23 @@ def test_the_hook_is_set_on_a_meshed_and_run_hanger() -> None:
     pin = drawing._N["transgear-latch-pin"]
     assert f"ITS HOLE'S LOWER EDGE ON THE {pin} PIN" in hook
     assert "CLEAR" not in hook
-    assert f"OVER {steps.HOOK_SET_TEXT} OFF ITS DRAWN PLACE: STOP AND REPORT" in hook
+    # Machinist review of 0316d0951: "its drawn place" had no dimension a
+    # fitter could measure. The step locates the hook's rivet holes from the
+    # MHA-170 datums: the flap's lower edge and the bar's back face, on which
+    # the bracket's base sits.
+    assert "DRAWN PLACE" not in hook
+    flap_edge_y = assembly.HOOK_BRACKET.MACHINE_ORIGIN[1]
+    (_, front_y, front_z), _upper = sorted(
+        assembly.HOOK_RIVET_POS, key=lambda pos: pos[2]
+    )
+    above = f"{front_y - flap_edge_y:.2f}"
+    rear = f"{front_z - assembly.BAR_BACK_Z:.2f}"
+    assert (above, rear) == ("3.80", "11.30")
+    assert (
+        f"ITS RIVET HOLES {above} ABOVE THE FLAP'S LOWER EDGE, THE FRONT ONE "
+        f"{rear} REAR OF THE BAR, {steps.HOOK_SET_TEXT}, ELSE REPORT; CLAMP."
+    ) in hook
+    assert steps.HOOK_SET_TEXT == "\u00b10.51"
     assert hook.endswith("UNCLAMP, LATCH, RE-RUN THE TRAVEL.")
 
 

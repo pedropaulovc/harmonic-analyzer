@@ -341,6 +341,7 @@ import transgear_retaining_ring_spec as E_RING  # noqa: E402
 import latch_hook_bracket_screw_spec as HOOK_BRACKET_SCREW  # noqa: E402
 import latch_hook_bracket_spec as HOOK_BRACKET_SPEC  # noqa: E402
 import latch_hook_rivet_spec as HOOK_RIVET  # noqa: E402
+import latch_hook_spec as HOOK_SPEC  # noqa: E402
 
 FEED_PD = FEED_TEETH / FEED_DP * IN  # 10.16 -- meshes the DP30 rack
 # Centre extension of the feed-pinion/rack mesh (R9-62): 0.55, contact ratio
@@ -1395,7 +1396,22 @@ def _assert_lock_station_sweep() -> None:
     # stands proud of it by the deepest notch on the thinnest arm stock.
     arm_forward = -_SPACER_LENGTH_DEV[0]
     plate_forward = arm_forward + ARM.THICKNESS_BAND + _NOTCH_DEPTH_DEV[1]
-    hook_set = HOOK_BRACKET_SPEC.HOOK_SET_RANGE
+    # The hook is set at fit-up on its front rivet hole, measured from the
+    # MHA-170 datums (HOOK_SET_YZ as printed, ±HOOK_SET_RANGE), before the
+    # flap is match-drilled through it. The upper hole is a printed pitch
+    # further; the outline is off the holes by the hook's printed rivet run
+    # (y) and, across the strip (z), the pair's centring, half the stock's
+    # width band and half the pitch band.
+    hook_set_y = max(map(abs, HOOK_BRACKET_SPEC.HOOK_SET_Y_DEV))
+    hook_set_forward = -HOOK_BRACKET_SPEC.HOOK_SET_Z_DEV[0]
+    hook_set_rear = HOOK_BRACKET_SPEC.HOOK_SET_Z_DEV[1]
+    hook_pitch = max(
+        map(abs, printed_deviations(HOOK.RIVET_PITCH, HOOK_SPEC.RIVET_PLACES))
+    )
+    hook_run = max(map(abs, printed_deviations(HOOK.RIVET_RUN, HOOK_SPEC.RIVET_PLACES)))
+    hook_across = (
+        HOOK_SPEC.CENTRING_BAND + HOOK_SPEC.STOCK_WIDTH_TOL / 2.0 + hook_pitch / 2.0
+    )
     fixed: list[tuple[str, tuple[float, float, float, float]]] = [
         (
             "arm",
@@ -1504,9 +1520,8 @@ def _assert_lock_station_sweep() -> None:
                 bracket_screw_z + HOOK_BRACKET_SCREW.HEAD_H,
             ),
         ),
-        # The hook is set at fit-up up to HOOK_SET_RANGE either way in y and z
-        # before its rivet holes are match-drilled.  Either end of the rivet:
-        # the dome, the tail past the flap, or the widest shop head.
+        # Either end of the rivet: the dome, the tail past the flap, or the
+        # widest shop head.
         *(
             (
                 "latch-hook rivet",
@@ -1517,15 +1532,23 @@ def _assert_lock_station_sweep() -> None:
                         z - HOOK_RIVET.ENVELOPE_DIA / 2.0,
                         z + HOOK_RIVET.ENVELOPE_DIA / 2.0,
                     ),
-                    hook_set,
-                    hook_set,
-                    hook_set,
+                    hook_set_y,
+                    hook_set_forward + hook_pitch,
+                    hook_set_rear + hook_pitch,
                 ),
             )
             for _, y, z in HOOK_RIVET_POS
         ),
         *(
-            ("latch hook", _grown(section, hook_set, hook_set, hook_set))
+            (
+                "latch hook",
+                _grown(
+                    section,
+                    hook_set_y + hook_run,
+                    hook_set_forward + hook_across,
+                    hook_set_rear + hook_across,
+                ),
+            )
             for section in _latch_hook_sections()
         ),
     ]

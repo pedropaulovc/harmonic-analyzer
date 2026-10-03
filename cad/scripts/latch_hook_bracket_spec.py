@@ -24,8 +24,8 @@ How the sheet locates things (holes drilled after bending, R9-10):
 
 Walls (policy rule 12) are judged at the worst case of those bands, with the
 sheet rounding each printed value to its places.  The rivet holes' walls are
-judged over the hook's set range (HOOK_SET_RANGE either way in the flap
-plane) and the hook's own printed pitch band.
+judged over the hook's set (HOOK_SET_YZ as printed, ±HOOK_SET_RANGE, in the
+flap plane) and the hook's own printed pitch band.
 """
 
 from __future__ import annotations
@@ -65,6 +65,18 @@ HEAD_CLEARANCE_FLOOR = 0.2  # R9-10: screw head to the bend fillet
 # .XX pin-hole run band, which the set takes up (R9-24, R9-26).
 HOOK_SET_RANGE = 0.51
 HOOK_PITCH_PLACES = 3  # the hook prints its rivet pitch at .XXX
+# Sheet 4's hook-set-and-riveted step measures the set hook on its rivet
+# holes from this sheet's own datums: both centres HOOK_SET_YZ[0] above the
+# flap's lower edge (y = 0), the front one's HOOK_SET_YZ[1] rear of the bar's
+# back face (the base's underside, z = 0), each printed at .XX and held to
+# ±HOOK_SET_RANGE.  Machinist review of 0316d0951: "its drawn place" gave the
+# fitter nothing to measure from.
+HOOK_SET_PLACES = 2
+HOOK_SET_YZ = RIVET_YZ[0]
+HOOK_SET_Y_DEV, HOOK_SET_Z_DEV = (
+    printed_deviations(value, HOOK_SET_PLACES, (-HOOK_SET_RANGE, HOOK_SET_RANGE))
+    for value in HOOK_SET_YZ
+)
 
 
 def _position(value: float) -> tuple[float, float]:
@@ -128,7 +140,8 @@ def _rivet_y_edges() -> tuple[float, float]:
     high = WIDTH - _RIVET_Y - _RIVET_R
     return (
         min(low, high),
-        min(low - HOOK_SET_RANGE, high + _WIDTH_LOW - HOOK_SET_RANGE) - _RIVET_GROW,
+        min(low + HOOK_SET_Y_DEV[0], high + _WIDTH_LOW - HOOK_SET_Y_DEV[1])
+        - _RIVET_GROW,
     )
 
 
@@ -138,7 +151,7 @@ def _rivet_top_edge() -> tuple[float, float]:
     worst = (
         nominal
         + _row(FLAP_HEIGHT, FLAP_HEIGHT_PLACES)[0]
-        - HOOK_SET_RANGE
+        - HOOK_SET_Z_DEV[1]
         - _PITCH_HIGH
         - _RIVET_GROW
     )
@@ -150,7 +163,7 @@ def _rivet_bend() -> tuple[float, float]:
     inner face (the hook's face): thickest sheet, largest printed radius."""
     nominal = _RIVET_Z_LOW - _RIVET_R - (SHEET_T + INSIDE_BEND_R)
     fillet_top = SHEET_T + SHEET_T_PLUS + INSIDE_BEND_R_MAX
-    worst = _RIVET_Z_LOW - HOOK_SET_RANGE - _PITCH_HIGH - _RIVET_R_MAX - fillet_top
+    worst = _RIVET_Z_LOW + HOOK_SET_Z_DEV[0] - _PITCH_HIGH - _RIVET_R_MAX - fillet_top
     return nominal, worst
 
 

@@ -317,6 +317,11 @@ T24_HELD_BACK_TEXT = "T24 HELD BACK ON ITS SEAT"
 COLLAR_DISC_AIR_TEXT = f"{COLLAR_DISC_AIR_MIN:.2f} MIN"
 RACK_CREST_TEXT = f"{RACK_CREST_DROP:.2f} \u00b1{RACK_CREST_TOL:.2f}"
 MESH_BACKLASH_TEXT = f"{MESH_BACKLASH_RANGE[0]:.2f} TO {MESH_BACKLASH_RANGE[1]:.2f}"
+# The set hook's rivet holes from the MHA-170 datums (latch_hook_bracket_spec
+# HOOK_SET_YZ): above the flap's lower edge, and the front one rear of the bar.
+HOOK_SET_Y_TEXT, HOOK_SET_Z_TEXT = (
+    f"{value:.{hook_bracket.HOOK_SET_PLACES}f}" for value in hook_bracket.HOOK_SET_YZ
+)
 HOOK_SET_TEXT = f"\u00b1{hook_bracket.HOOK_SET_RANGE:.2f}"
 # The collar's seat limit (transgear_drive_collar_spec.SEAT_MAX_FROM_F).
 T24_SEAT_MAX_TEXT = f"{collar.SEAT_MAX_FROM_F:.2f} MAX"
