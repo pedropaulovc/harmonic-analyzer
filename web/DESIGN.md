@@ -35,6 +35,10 @@ is released with the viewer.
 `fetch-model.mjs` invokes `optimize-model.mjs`: exact buffer/accessor/mesh/image
 deduplication comes first, followed by Meshopt 0.22.0 compression. Quantization,
 simplification, node pruning, index reordering and instancing are excluded.
+Image dependencies must be sealed in the GLB: embedded buffer-view and data-URI
+image bytes are preserved. External image URIs are rejected, including companion
+files, network URLs, `blob:` and `file:` references; optimization must not depend
+on ambient files or fetched image content.
 The optimizer fully decodes source and output and compares semantics bit-exactly
 per named drawable; compression and sharing must not change geometry, material,
 transform or component identity. This representation check is separate from
@@ -87,6 +91,20 @@ before live assets are replaced. Geometry, rest, spring and setup data may chang
 proportional magnifier geometry is allowed when its ratios remain compatible.
 The same-current-release path skips native metadata regeneration and these
 new-source gates, leaving the four mechanics/math file hashes unchanged.
+
+Spring compatibility is checked against the actual immutable `scene.ts` deformer
+and classifier expressions, extracted from its AST rather than a copied browser
+formula. Source-derived channel and counter profiles include coil-end inset and
+correction, coil/wire radii and free/maximum-length coil ends; the counter also
+supplies its coil axis. Channel profiles additionally describe the native
+transition polar handle/tangent, hook-eye centres and transition control points.
+The channel transition recipe comes from the exact archived
+`diag_build_9432K31.py` expressions/constants, with provenance recorded.
+The gate permits dynamic stock dimensions, turns, catalogue lengths, force and
+setup when the source shape agrees with the actual consumer; counter rigid
+loop/transition geometry is not frozen. Only the existing tiny native solver
+residue in free-length transition interior points uses a 1e-6 mm positional
+tolerance; polar/handle and other comparisons retain their tight checks.
 
 The direct mechanics-export invocation uses the same authority inputs and an
 isolated uv environment, but is not a substitute for the staged release command:
@@ -434,13 +452,14 @@ old `7b28` scene receipt; no old receipt was rehashed or accepted as fresh
 calibration. The optimized-loader smoke does not replace the required current
 camrod GPU recapture.
 
-All 25 model tests passed: 22 top-level tests and three real-exporter negative
+All 33 model tests passed: 24 top-level tests and nine real-exporter negative
 subtests. The actual exporter accepted compatible future geometry and refused
-the unsupported tooth-ratio, feed-pitch and feed-sign changes before writing
-outputs. The archived source-v37 export checked 210 source files and 130 native
-rest conditions and passed the enriched native mathematical gate against the
-unchanged runtime. A current raw reimport reproduced the optimized SHA-256 and
-38,975,844-byte size above; the production build also passed.
+unsupported tooth-ratio, feed-pitch, feed-sign and six spring-profile changes
+with named parameters before writing any live files. The archived source-v37
+export checked 211 source files and 130 native rest conditions and passed the
+enriched mathematical and spring-profile gates against the unchanged runtime.
+A current raw reimport reproduced the optimized SHA-256 and 38,975,844-byte
+size above; the production build also passed.
 
 The website loads one optimized model and reuses geometry buffers during motion.
 Exact sharing reduces buffers and cache duplication, while Meshopt changes

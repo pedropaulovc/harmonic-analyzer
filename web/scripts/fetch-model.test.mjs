@@ -88,7 +88,7 @@ async function releaseFixture(t, editSource = null) {
   execFileSync('tar', ['-x', '-C', f.directory], { input: archive })
   await mkdir(join(f.webRoot, 'scripts'))
   for (const name of ['export-mechanics.py', 'requirements-model-export.txt']) await copyFile(join(web, 'scripts', name), join(f.webRoot, 'scripts', name))
-  for (const name of ['kinematics.ts', 'magnifier.ts']) await copyFile(join(web, 'src', name), join(f.webRoot, 'src', name))
+  for (const name of ['kinematics.ts', 'magnifier.ts', 'scene.ts']) await copyFile(join(web, 'src', name), join(f.webRoot, 'src', name))
   if (editSource) {
     const path = join(f.directory, editSource.path)
     const before = await readFile(path, 'utf8')
@@ -243,6 +243,21 @@ test('compatible future geometry publishes with source/config provenance changes
   compatible.magnifier.clampRadiusBandMm = compatible.magnifier.clampRadiusBandMm.map(radius => radius * 1.1)
   compatible.summing.anchorArmMm *= 1.1
   compatible.spring.rateNPerMm *= 1.1
+  // These remain staged-data inputs, not fixed runtime stock/catalog values.
+  compatible.counter.coilTurns += 1
+  compatible.counter.coilOutsideDiameterMm += 0.2
+  compatible.counter.loopMeanRadiusMm += 0.1
+  compatible.counter.deformation.coilMeanRadiusMm += 0.1
+  compatible.counter.maximumLengthMm += 1
+  const counterMaximum = compatible.counter.deformation.profiles[1]
+  counterMaximum.lengthMm += 1
+  counterMaximum.coilEndsMm[0] -= 0.5
+  counterMaximum.coilEndsMm[1] += 0.5
+  compatible.counter.freeLengthMm += 1
+  const counterFree = compatible.counter.deformation.profiles[0]
+  counterFree.lengthMm += 1
+  counterFree.coilEndsMm[0] -= 0.5
+  counterFree.coilEndsMm[1] += 0.5
   await assertRuntimeMathCompatibility(compatible, f.native, f.webRoot)
   for (const [parameter, change] of [
     ['driveTrain.crankRatio', data => { data.driveTrain.crankRatio[0] += 1 }],
@@ -256,6 +271,16 @@ test('compatible future geometry publishes with source/config provenance changes
     ['reducerRatio', data => { data.paperDrive.reducerRatio *= 2; data.paperDrive.feedPitchDiameterMm /= 2 }],
     ['fineTravelMmPerCrankRev', data => { data.paperDrive.fineTravelMmPerCrankRev *= 1.01 }],
     ['netTravelSense', data => { data.paperDrive.netTravelSense *= -1 }],
+    ['counter.deformation.coilEndInsetMm', data => { data.counter.deformation.coilEndInsetMm += 0.1 }],
+    ['counter.deformation.coilEndCorrectionMm', data => { data.counter.deformation.coilEndCorrectionMm += 0.1 }],
+    ['counter.deformation.coilMeanRadiusMm', data => { data.counter.deformation.coilMeanRadiusMm += 0.1 }],
+    ['counter.deformation.wireRadiusMm', data => { data.counter.deformation.wireRadiusMm += 0.1 }],
+    ['counter.deformation.coilAxis', data => { data.counter.deformation.coilAxis[1] = 1 }],
+    ['counter.deformation.profiles[1].coilEndsMm', data => { data.counter.deformation.profiles[1].coilEndsMm[1] += 0.1 }],
+    ['spring.deformation.transitionHandlePolarRad', data => { data.spring.deformation.transitionHandlePolarRad += 1e-6 }],
+    ['spring.deformation.transitionTangentMm', data => { data.spring.deformation.transitionTangentMm += 0.1 }],
+    ['spring.deformation.profiles[0].hookEyeCentresMm', data => { data.spring.deformation.profiles[0].hookEyeCentresMm[0][0] += 0.1 }],
+    ['spring.deformation.profiles[1].transitionControlPointsMm', data => { data.spring.deformation.profiles[1].transitionControlPointsMm[2][0] += 0.1 }],
   ]) {
     const unsupported = structuredClone(native)
     change(unsupported)
@@ -267,11 +292,17 @@ test('compatible future geometry publishes with source/config provenance changes
   }
 })
 
-test('staged source reducer and rack pitch changes are refused before any live model, descriptor or native publication', async t => {
+test('staged fixed feed and spring-shape changes are refused before any live model, descriptor or native publication', async t => {
   for (const [name, path, from, to, parameter] of [
     ['reducer teeth', 'cad/scripts/transgear_pinion_spec.py', 'TEETH = 12', 'TEETH = 13', 'paperDrive.reducerRatio'],
     ['rack pitch', 'cad/scripts/transgear_feed_pinion_spec.py', 'DIAMETRAL_PITCH = 30.0', 'DIAMETRAL_PITCH = 32.0', 'paperDrive.feedPitchDiameterMm'],
     ['signed feed', 'cad/scripts/build_kinematic_probe.py', 'FEED_SIGN = +1.0', 'FEED_SIGN = -1.0', 'paperDrive.rackFeedSense'],
+    ['counter coil inset with unchanged origin and eye seats', 'cad/scripts/counter_spring_stock_geom.py', '_COIL_END_INSET_MM = 10.2997', '_COIL_END_INSET_MM = 10.3997', 'counter.deformation.coilEndInsetMm'],
+    ['counter coil axial correction', 'cad/scripts/counter_spring_stock_geom.py', 'return -coil_start_x_mm(length_mm) - WIRE_RADIUS_MM', 'return -coil_start_x_mm(length_mm) - 2.0 * WIRE_RADIUS_MM', 'counter.deformation.coilEndCorrectionMm'],
+    ['channel transition polar', 'cad/scripts/diagnostics/diag_build_9432K31.py', 'VENDOR_HANDLE_POLAR_RAD = -0.00014851266501942706', 'VENDOR_HANDLE_POLAR_RAD = -0.00024851266501942706', 'spring.deformation.transitionHandlePolarRad'],
+    ['channel transition handle', 'cad/scripts/channel_spring_stock_geom.py', 'TRANSITION_TANGENT_MM = COIL_OD_MM * 3.0 / 4.0', 'TRANSITION_TANGENT_MM = COIL_OD_MM * 3.1 / 4.0', 'spring.deformation.transitionTangentMm'],
+    ['channel coil length law with unchanged hook seats', 'cad/scripts/channel_spring_stock_geom.py', 'return check_length_mm(length_mm) - 2.0 * COIL_ID_MM', 'return check_length_mm(length_mm) - 2.1 * COIL_ID_MM', 'spring.deformation.coilEndInsetMm'],
+    ['channel transition hook anchor', 'cad/scripts/diagnostics/diag_build_9432K31.py', '(-22.225, 2.844799999999999, 0.0)', '(-22.325, 2.844799999999999, 0.0)', 'spring.deformation.profiles[0].transitionControlPointsMm'],
   ]) await t.test(name, async child => {
     const f = await releaseFixture(child, { path, from, to })
     await assert.rejects(importModel(f), error => {

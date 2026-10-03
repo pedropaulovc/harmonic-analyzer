@@ -129,6 +129,59 @@ def recipe_literal_constants(path: Path, names: tuple[str, ...]) -> dict:
     return values
 
 
+def spring_deformation_contract(cad: Path, stock, counter) -> tuple[dict, dict]:
+    """Read only the archived pure transition AST, never its COM imports.
+
+    Export the actual coil length law and hook/transition geometry consumed by
+    scene.ts. Catalogue limits, forces and other rigid end-assembly geometry
+    are deliberately not fixed by this contract.
+    """
+    transition_path = cad / "scripts/diagnostics/diag_build_9432K31.py"
+    transition_values = recipe_literal_constants(
+        transition_path,
+        ("VENDOR_TRANSITION_CP_MM", "VENDOR_HANDLE_POLAR_RAD", "_FREE_EPS_MM"),
+    )
+    transition_tree = ast.parse(transition_path.read_text(), filename=str(transition_path))
+    transition_function = next(
+        node for node in transition_tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "transition_bezier_mm"
+    )
+    namespace = {**vars(stock), **transition_values, "math": math}
+    exec(compile(ast.Module(body=[transition_function], type_ignores=[]),
+                 str(transition_path), "exec"), namespace)  # noqa: S102
+
+    contracts = []
+    for module in (stock, counter):
+        is_counter = module is counter
+        lengths = (module.FREE_LENGTH_MM, module.MAX_LENGTH_MM)
+        profiles = []
+        for length in lengths:
+            ends = (
+                (module.coil_start_x_mm(length), module.coil_end_x_mm(length))
+                if is_counter else module.coil_ends_mm(length)
+            )
+            profile = {"lengthMm": length, "coilEndsMm": ends}
+            if not is_counter:
+                profile["hookEyeCentresMm"] = module.end_centers_mm(length)
+                profile["transitionControlPointsMm"] = namespace["transition_bezier_mm"](length)
+            profiles.append(profile)
+        start, end = profiles[0]["coilEndsMm"]
+        contract = {
+            "coilEndInsetMm": lengths[0] / 2.0 + start,
+            "coilEndCorrectionMm": -start - end,
+            "coilMeanRadiusMm": module.COIL_MEAN_RADIUS_MM,
+            "wireRadiusMm": module.WIRE_RADIUS_MM if is_counter else module.WIRE_DIA_MM / 2.0,
+            "profiles": profiles,
+        }
+        if is_counter:
+            contract["coilAxis"] = module.COIL_AXIS
+        else:
+            contract["transitionHandlePolarRad"] = transition_values["VENDOR_HANDLE_POLAR_RAD"]
+            contract["transitionTangentMm"] = module.TRANSITION_TANGENT_MM
+        contracts.append(contract)
+    return tuple(contracts)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -293,6 +346,7 @@ def main() -> None:
     rod = modules["connecting_rod_spec"]
     stock = modules["channel_spring_stock_geom"]
     counter = modules["counter_spring_stock_geom"]
+    spring_deformation, counter_deformation = spring_deformation_contract(cad, stock, counter)
     mount = modules["spring_mount_geom"]
     settled = modules["settled_spring_seats"]
     goose = modules["gooseneck_geom"]
@@ -617,6 +671,7 @@ def main() -> None:
             "build_kinematic_probe.py",
             "build_crank_pinion.py",
             "crank_drive_gear_spec.py",
+            "diagnostics/diag_build_9432K31.py",
         )
     )
     sources = []
@@ -687,6 +742,7 @@ def main() -> None:
             "stickDivisionMm": config.machine("amplitude", "stick_division_spacing_mm"),
         },
         "spring": {
+            "deformation": spring_deformation,
             "anchorMm": mount.CHANNEL_ANCHOR_XY,
             "lowerSeatOffsetMm": mount._CHANNEL_LOWER_OFFSET,
             "upperSeatDropMm": mount._CHANNEL_UPPER_DROP,
@@ -703,6 +759,7 @@ def main() -> None:
             ),
         },
         "counter": {
+            "deformation": counter_deformation,
             "anchorMm": mount.COUNTER_ANCHOR_XY,
             "upperEyeXMm": mount.COUNTER_UPPER_EYE_X,
             "lowerSeatOffsetMm": mount._COUNTER_LOWER_OFFSET,

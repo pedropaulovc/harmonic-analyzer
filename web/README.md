@@ -33,12 +33,12 @@ npm --prefix web run fetch-model -- /path/to/new.glb --source-commit <full40hexa
 ```
 
 The release command reads that exact CAD revision, checks native rest geometry
-and compatibility with the website's fixed kinematics and magnifier mathematics,
-and stages new native metadata and the optimized asset before publication.
+and compatibility with the website's fixed kinematics, magnifier and spring
+deformer mathematics, and stages new native metadata and the optimized asset.
 Compatible geometry, rest, spring and setup changes are supported; unsupported
-ratio, feed or pen-datum changes are refused with a named parameter, preserving
-the last working assets. Missing revisions are also refused. A current source
-commit does not approve arbitrary bytes.
+ratio, feed, pen-datum or spring-profile changes are refused with a named
+parameter, preserving the last working assets. Missing revisions are also refused.
+A current source commit does not approve arbitrary bytes.
 Existing source tracks are stale for a new raw model and reject source-following;
 manual exploration is not recalibration. See [`DESIGN.md`](DESIGN.md) for the
 representation and provenance contract.
@@ -310,6 +310,7 @@ startup exclusion. This is not an FPS measurement or a new source calibration.
 The 49 source regressions pass using a historical source fixture; production
 camrod's current-code guard still refuses the old scene receipt. No historical
 receipt was rehashed or accepted as fresh calibration.
-The 25 model tests pass, including real-exporter acceptance of compatible future
-geometry and rejection of unsupported ratio, pitch and feed-sign changes before
-publication. A current raw reimport reproduced the same optimized hash and size.
+The 33 model tests pass, including real-exporter acceptance of compatible future
+geometry and rejection of unsupported ratio, pitch, feed-sign and spring-profile
+changes before publication. A current raw reimport reproduced the same optimized
+hash and size.
