@@ -279,6 +279,64 @@ test('replacement source content yields new source/artifact pins and semantic id
   await assert.rejects(validateDecodedEquivalence(originalBytes, replaced.optimizedBytes), /decoded equivalence failed/)
 })
 
+test('embedded data URI images preserve their complete payload, opaque metadata and exact decoded identity', async () => {
+  const png = pngPixel()
+  const uris = [
+    `data:image/png;base64,${png.toString('base64')}`,
+    `data:image/png,${Array.from(png, byte => `%${byte.toString(16).padStart(2, '0')}`).join('')}`,
+  ]
+  for (const uri of uris) {
+    const model = fixture({ copies: 2 })
+    const image = { uri, extras: { uri: 'https://mutable.example.test/opaque-metadata.png', bufferView: 999, extensions: { CUSTOM_annotation: { uri: 'companion.png' } } } }
+    model.json.images.push(structuredClone(image), structuredClone(image))
+    model.json.textures.push({ source: 2, sampler: 0 }, { source: 3, sampler: 0 })
+    model.json.extras.uri = 'file:///opaque-metadata.png'
+    const source = packGlb(model.json, model.binary), originalBytes = Buffer.from(source)
+    const { optimizedBytes, report } = await optimizeModel(source), optimized = unpackGlb(optimizedBytes)
+    assert.deepEqual(source, originalBytes)
+    assert.equal(optimized.json.images.length, 2)
+    const preserved = optimized.json.images[optimized.json.textures[2].source]
+    assert.deepEqual(preserved, image)
+    assert.equal(optimized.json.textures[2].source, optimized.json.textures[3].source)
+    assert.deepEqual(optimized.json.extras, model.json.extras)
+    // Node's actual data-URL decoder reads only the sealed inline bytes, without
+    // requiring a browser image API or contacting any external asset host.
+    assert.deepEqual(Buffer.from(await (await fetch(preserved.uri)).arrayBuffer()), model.png)
+    const embedded = optimized.json.images[optimized.json.textures[0].source]
+    assert.equal(optimized.json.textures[0].source, optimized.json.textures[1].source)
+    assert.deepEqual(await decodedView(optimized, embedded.bufferView), model.png)
+    assert.equal(report.sourceSha256, sha256(originalBytes))
+    assert.equal(report.optimizedSha256, sha256(optimizedBytes))
+    assert.equal(report.equivalence.passed, true)
+    assert.deepEqual(await validateDecodedEquivalence(source, optimizedBytes), report.equivalence)
+    const changed = unpackGlb(optimizedBytes)
+    changed.json.images[changed.json.textures[2].source].uri = `data:image/png;base64,${Buffer.from([0]).toString('base64')}`
+    await assert.rejects(validateDecodedEquivalence(source, packGlb(changed.json, changed.binary)), /decoded equivalence failed for (images|textures)/)
+  }
+})
+
+test('unsealed external image dependencies are refused by optimization and both equivalence inputs', async () => {
+  const embedded = fixture({ copies: 1 }), embeddedBytes = packGlb(embedded.json, embedded.binary)
+  const uris = [
+    'texture.png', './textures/texture.png', '../texture.png', '/texture.png',
+    'http://mutable.example.test/texture.png', 'https://mutable.example.test/texture.png',
+    'file:///tmp/texture.png', 'blob:https://mutable.example.test/texture',
+    '//mutable.example.test/texture.png', '', 'data:image/png;base64',
+  ]
+  for (const uri of uris) {
+    const model = fixture({ copies: 1 })
+    delete model.json.images[0].bufferView
+    model.json.images[0].uri = uri
+    const externalBytes = packGlb(model.json, model.binary)
+    const refusal = /external image URIs are unsupported; images\[0\]\.uri must be an embedded data URI/
+    await assert.rejects(optimizeModel(externalBytes), refusal, uri)
+    await assert.rejects(validateDecodedEquivalence(externalBytes, embeddedBytes), refusal, uri)
+    await assert.rejects(validateDecodedEquivalence(embeddedBytes, externalBytes), refusal, uri)
+    // A byte-identical pair must not certify mutable or unpublished dependencies.
+    await assert.rejects(validateDecodedEquivalence(externalBytes, externalBytes), refusal, uri)
+  }
+})
+
 test('malformed GLB and references, external buffers and ambiguous extensions are refused without fallback geometry', async () => {
   await assert.rejects(optimizeModel(Buffer.from('not a GLB')), /invalid GLB header/)
   const badHeader = fixture({ copies: 1 }), badHeaderBytes = packGlb(badHeader.json, badHeader.binary)

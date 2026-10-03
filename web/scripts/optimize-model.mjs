@@ -293,7 +293,11 @@ function validateReferences(json, views) {
     if (image.bufferView !== undefined) {
       ref(json, 'bufferViews', image.bufferView, `images[${i}].bufferView`)
       if (typeof image.mimeType !== 'string') fail(`images[${i}] requires mimeType`)
-    } else if (typeof image.uri !== 'string') fail(`images[${i}].uri must be a string`)
+    } else {
+      if (typeof image.uri !== 'string') fail(`images[${i}].uri must be a string`)
+      // Only embedded payloads are sealed by the GLB hash and published with it.
+      if (!/^data:[^,]*,/i.test(image.uri)) fail(`external image URIs are unsupported; images[${i}].uri must be an embedded data URI`)
+    }
   }
   for (const [i, texture] of (json.textures ?? []).entries()) {
     if (texture.source !== undefined) ref(json, 'images', texture.source, `textures[${i}].source`)
